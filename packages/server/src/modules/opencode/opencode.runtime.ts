@@ -38,7 +38,13 @@ function spawnServe(path: string, env: NodeJS.ProcessEnv) {
 }
 
 type Exit = { code: number | undefined; signal: string | undefined };
-type Process = { child: ReturnType<typeof spawnServe>; expectedExit: boolean; exited: Promise<Exit> };
+type Process = {
+  child: ReturnType<typeof spawnServe>;
+  expectedExit: boolean;
+  exited: Promise<Exit>;
+  /** Ends the global event subscription of this process. */
+  events: AbortController;
+};
 
 const LISTENING = /listening on (http:\/\/127\.0\.0\.1:\d+)/;
 
@@ -53,6 +59,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
   let sdk: Sdk | undefined;
   let autoRestartArmed = true;
   const lostListeners = new Set<() => void>();
+  const eventListeners = new Set<(raw: unknown) => void>();
 
   function setState(next: RuntimeDTO): void {
     state = next;
@@ -88,6 +95,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       child,
       expectedExit: false,
       exited: child.then((result) => ({ code: result.exitCode, signal: result.signal })),
+      events: new AbortController(),
     };
     const address = new Promise<string>((resolve, reject) => {
       let seen = '';
@@ -116,7 +124,20 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     return { launched, address };
   }
 
+  /** Forwards opencode's global event stream (D34) until the process goes away. */
+  async function pumpEvents(client: Sdk, owner: Process): Promise<void> {
+    const { signal } = owner.events;
+    try {
+      const { stream } = await client.global.event({ signal });
+      for await (const raw of stream) for (const listener of eventListeners) listener(raw);
+    } catch (err) {
+      // Aborting is how the subscription ends when the process stops; anything else loses events and is logged.
+      if (!signal.aborted) log.error({ err }, 'opencode event stream failed');
+    }
+  }
+
   function onExit(exited: Process, { code, signal }: Exit): void {
+    exited.events.abort();
     if (exited !== proc || exited.expectedExit) return;
     proc = undefined;
     sdk = undefined;
@@ -155,6 +176,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       await client.config.get();
       transition(runtimeMachine, RuntimeStatus.Starting, RuntimeEvent.Listening);
       sdk = client;
+      void pumpEvents(client, launched);
       setState({
         status: RuntimeStatus.Ready,
         path,
@@ -179,6 +201,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     current.expectedExit = true;
     proc = undefined;
     sdk = undefined;
+    current.events.abort();
     current.child.kill();
     await current.exited;
   }
@@ -215,6 +238,11 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     },
     isReady: () => sdk !== undefined,
     processId: (): number | undefined => proc?.child.pid,
+    /** Raw events of opencode's global stream; parsed by the client. */
+    onEvent(listener: (raw: unknown) => void): () => void {
+      eventListeners.add(listener);
+      return () => eventListeners.delete(listener);
+    },
     /** Called when a ready runtime goes away (crash or restart): its sessions no longer exist. */
     onLost(listener: () => void): () => void {
       lostListeners.add(listener);

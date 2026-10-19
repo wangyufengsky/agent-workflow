@@ -1,0 +1,1595 @@
+[
+  {
+    "payload": {
+      "id": "evt_1538b5c75001LyEOrAuIbExka5",
+      "type": "server.connected",
+      "properties": {}
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b5d08001JNOrCLFEvrbydD",
+      "type": "session.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "id": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "slug": "glowing-river",
+          "projectID": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+          "directory": "/tmp/aw-repo",
+          "path": "",
+          "title": "probe",
+          "agent": "aw-executor",
+          "model": {
+            "id": "beam-free",
+            "providerID": "opencode",
+            "variant": "default"
+          },
+          "version": "1.19.0",
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          },
+          "permission": [
+            {
+              "permission": "bash",
+              "pattern": "*",
+              "action": "ask"
+            }
+          ],
+          "time": {
+            "created": 1792403004536,
+            "updated": 1792403004679
+          }
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b5d0d001Gy97a4P6oP6V27",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "id": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "role": "user",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "time": {
+            "created": 1792403004679
+          },
+          "agent": "aw-executor",
+          "model": {
+            "providerID": "opencode",
+            "modelID": "beam-free"
+          },
+          "system": "extra system"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b5d0e001LrMJM9wDV5quqB",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "type": "text",
+          "text": "Create a file hello.txt containing \"hi\". Then run the shell command `ls`. Then reply with one short sentence.",
+          "messageID": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "id": "prt_1538b5d0c001Z1IZyHn8gV6nMi"
+        },
+        "time": 1792403004686
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b5d170017YZSsn1uB7ZayE",
+      "type": "session.status",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "status": {
+          "type": "busy"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b5d1a0014ksAaB1EnL2s7l",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "id": "msg_1538b5d19001aSulM6ndvCetJc",
+          "parentID": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "role": "assistant",
+          "mode": "aw-executor",
+          "agent": "aw-executor",
+          "path": {
+            "cwd": "/tmp/aw-repo",
+            "root": "/tmp/aw-repo"
+          },
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          },
+          "modelID": "beam-free",
+          "providerID": "opencode",
+          "time": {
+            "created": 1792403004697
+          },
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b5e37001wsaHChlZQV9XWN",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "role": "user",
+          "time": {
+            "created": 1792403004679
+          },
+          "agent": "aw-executor",
+          "model": {
+            "providerID": "opencode",
+            "modelID": "beam-free"
+          },
+          "system": "extra system",
+          "id": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "summary": {
+            "diffs": []
+          }
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b6ab4001QAwd7pSuWFp7j3",
+      "type": "session.status",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "status": {
+          "type": "busy"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b6f0e001QtxXH4AkvLQo9M",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b6f0e001SbCWGreobRwWv0",
+          "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "snapshot": "1766483793937eed1e3b0926a5a74633da742b85",
+          "type": "step-start"
+        },
+        "time": 1792403009294
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b6f14001w7xVB0f6552VOE",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b6f14001nAUFZvmGoZyHBU",
+          "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "reasoning",
+          "text": "",
+          "time": {
+            "start": 1792403009300
+          }
+        },
+        "time": 1792403009300
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b6f16001Jto00wCM7shdhE",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+        "partID": "prt_1538b6f14001nAUFZvmGoZyHBU",
+        "field": "text",
+        "delta": "The"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b6f5300142CJmzNCM4B7Nc",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+        "partID": "prt_1538b6f14001nAUFZvmGoZyHBU",
+        "field": "text",
+        "delta": " user wants me to:\n1. Create a file hello.txt containing \"hi\"\n"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b6f53002qWad4qa2xf4FvL",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+        "partID": "prt_1538b6f14001nAUFZvmGoZyHBU",
+        "field": "text",
+        "delta": "2. Run the shell command `ls`\n3. Reply with one short sentence"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b6f53003ZUELTzh3hqJcFw",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+        "partID": "prt_1538b6f14001nAUFZvmGoZyHBU",
+        "field": "text",
+        "delta": "\n\nLet me do the first two in parallel since they"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b6f70001L7M7N5ua586V15",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+        "partID": "prt_1538b6f14001nAUFZvmGoZyHBU",
+        "field": "text",
+        "delta": "'re independent? Actually, the file"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b6fa5001rjgiPNfUovBOTM",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+        "partID": "prt_1538b6f14001nAUFZvmGoZyHBU",
+        "field": "text",
+        "delta": " creation should happen first, then ls. But actually the write"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b6fc10019qb8eAQu6Rjg25",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+        "partID": "prt_1538b6f14001nAUFZvmGoZyHBU",
+        "field": "text",
+        "delta": " and ls are somewhat dependent - ls should show the file. Let me do"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b6fc3001m3GBJiBnLgbghv",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+        "partID": "prt_1538b6f14001nAUFZvmGoZyHBU",
+        "field": "text",
+        "delta": " write first, then ls"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b6ff6001AI9GFVNU7edEdx",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+        "partID": "prt_1538b6f14001nAUFZvmGoZyHBU",
+        "field": "text",
+        "delta": ". Actually I can do them in sequence to"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b70410012DEi1ExH968yn1",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+        "partID": "prt_1538b6f14001nAUFZvmGoZyHBU",
+        "field": "text",
+        "delta": " ensure ls shows the file.\n\nWait, the instructions say \"Be brief"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b704a001mULwLA4xocnV6W",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+        "partID": "prt_1538b6f14001nAUFZvmGoZyHBU",
+        "field": "text",
+        "delta": ".\" Let me just do it.\n\nI can do write and then ls"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b7062001QTC5E8asbrLFc2",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+        "partID": "prt_1538b6f14001nAUFZvmGoZyHBU",
+        "field": "text",
+        "delta": ". Let me do write first."
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b7063001kyEZ9InzOrfJ3I",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b6f14001nAUFZvmGoZyHBU",
+          "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "reasoning",
+          "text": "The user wants me to:\n1. Create a file hello.txt containing \"hi\"\n2. Run the shell command `ls`\n3. Reply with one short sentence\n\nLet me do the first two in parallel since they're independent? Actually, the file creation should happen first, then ls. But actually the write and ls are somewhat dependent - ls should show the file. Let me do write first, then ls. Actually I can do them in sequence to ensure ls shows the file.\n\nWait, the instructions say \"Be brief.\" Let me just do it.\n\nI can do write and then ls. Let me do write first.",
+          "time": {
+            "start": 1792403009300,
+            "end": 1792403009635
+          }
+        },
+        "time": 1792403009635
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b70660015icu6eLqISd3QN",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b7065001dFnTyjyo6cosp7",
+          "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "tool",
+          "tool": "write",
+          "callID": "call-085658c0-2d90-4838-a9b8-49fac3653796",
+          "state": {
+            "status": "pending",
+            "input": {},
+            "raw": ""
+          }
+        },
+        "time": 1792403009638
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b71a7001hTcgybznzWMywv",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call-085658c0-2d90-4838-a9b8-49fac3653796",
+          "state": {
+            "status": "running",
+            "input": {
+              "content": "hi",
+              "filePath": "/tmp/aw-repo/hello.txt"
+            },
+            "time": {
+              "start": 1792403009959
+            }
+          },
+          "id": "prt_1538b7065001dFnTyjyo6cosp7",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "messageID": "msg_1538b5d19001aSulM6ndvCetJc"
+        },
+        "time": 1792403009959
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b71b6001lKxjZfCGU18407",
+      "type": "file.edited",
+      "properties": {
+        "file": "/tmp/aw-repo/hello.txt"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b71ba001ER7jOmxH72MBgD",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "type": "tool",
+          "tool": "write",
+          "callID": "call-085658c0-2d90-4838-a9b8-49fac3653796",
+          "state": {
+            "status": "completed",
+            "input": {
+              "content": "hi",
+              "filePath": "/tmp/aw-repo/hello.txt"
+            },
+            "output": "Wrote file successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "filepath": "/tmp/aw-repo/hello.txt",
+              "exists": false,
+              "truncated": false
+            },
+            "title": "hello.txt",
+            "time": {
+              "start": 1792403009959,
+              "end": 1792403009977
+            }
+          },
+          "id": "prt_1538b7065001dFnTyjyo6cosp7",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "messageID": "msg_1538b5d19001aSulM6ndvCetJc"
+        },
+        "time": 1792403009977
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b723d001LE47zchCqBtoKt",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b723d001f2I80CqDGxK1Ua",
+          "reason": "tool-calls",
+          "snapshot": "bebff1440eadfe1f17b712ac6e5f6051c0802be3",
+          "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "step-finish",
+          "tokens": {
+            "total": 9931,
+            "input": 9736,
+            "output": 63,
+            "reasoning": 132,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "cost": 0
+        },
+        "time": 1792403010109
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b7240001kSxZn2AIk2RQKp",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "id": "msg_1538b5d19001aSulM6ndvCetJc",
+          "parentID": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "role": "assistant",
+          "mode": "aw-executor",
+          "agent": "aw-executor",
+          "path": {
+            "cwd": "/tmp/aw-repo",
+            "root": "/tmp/aw-repo"
+          },
+          "cost": 0,
+          "tokens": {
+            "total": 9931,
+            "input": 9736,
+            "output": 63,
+            "reasoning": 132,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "modelID": "beam-free",
+          "providerID": "opencode",
+          "time": {
+            "created": 1792403004697
+          },
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "finish": "tool-calls"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b72b1001Yf6rd10GO5mTbV",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b72b1001Lvj0j0HaDAlkTO",
+          "messageID": "msg_1538b5d19001aSulM6ndvCetJc",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "patch",
+          "hash": "1766483793937eed1e3b0926a5a74633da742b85",
+          "files": ["/tmp/aw-repo/hello.txt"]
+        },
+        "time": 1792403010225
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b72b5001xsx7PHyDSMSUhD",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "id": "msg_1538b5d19001aSulM6ndvCetJc",
+          "parentID": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "role": "assistant",
+          "mode": "aw-executor",
+          "agent": "aw-executor",
+          "path": {
+            "cwd": "/tmp/aw-repo",
+            "root": "/tmp/aw-repo"
+          },
+          "cost": 0,
+          "tokens": {
+            "total": 9931,
+            "input": 9736,
+            "output": 63,
+            "reasoning": 132,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "modelID": "beam-free",
+          "providerID": "opencode",
+          "time": {
+            "created": 1792403004697,
+            "completed": 1792403010229
+          },
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "finish": "tool-calls"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b72b6001LuFzXYc3EMd2FU",
+      "type": "session.status",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "status": {
+          "type": "busy"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b72b8001v7cZtrp5GKrhRD",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "id": "msg_1538b72b8001PShaIBPviQmH3V",
+          "parentID": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "role": "assistant",
+          "mode": "aw-executor",
+          "agent": "aw-executor",
+          "path": {
+            "cwd": "/tmp/aw-repo",
+            "root": "/tmp/aw-repo"
+          },
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          },
+          "modelID": "beam-free",
+          "providerID": "opencode",
+          "time": {
+            "created": 1792403010232
+          },
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b7315001o7uwtneBoYP6oG",
+      "type": "session.status",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "status": {
+          "type": "busy"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b73730014ROtb5fEl6Thfk",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "role": "user",
+          "time": {
+            "created": 1792403004679
+          },
+          "agent": "aw-executor",
+          "model": {
+            "providerID": "opencode",
+            "modelID": "beam-free"
+          },
+          "system": "extra system",
+          "summary": {
+            "diffs": [
+              {
+                "file": "hello.txt",
+                "patch": "Index: hello.txt\n===================================================================\n--- hello.txt\t\n+++ hello.txt\t\n@@ -0,0 +1,1 @@\n+hi\n\\ No newline at end of file\n",
+                "additions": 1,
+                "deletions": 0,
+                "status": "added"
+              }
+            ]
+          },
+          "id": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b75d9001rygO2aYiSq41dn",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b75d9001kQLGw6UT1GV3Ge",
+          "messageID": "msg_1538b72b8001PShaIBPviQmH3V",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "snapshot": "bebff1440eadfe1f17b712ac6e5f6051c0802be3",
+          "type": "step-start"
+        },
+        "time": 1792403011033
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b75db001gH4IAT3N5KyS8g",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b75db001CbcS6NP9IYxBgk",
+          "messageID": "msg_1538b72b8001PShaIBPviQmH3V",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "reasoning",
+          "text": "",
+          "time": {
+            "start": 1792403011035
+          }
+        },
+        "time": 1792403011035
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b75de001W1KnAxhN2FLNUZ",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b72b8001PShaIBPviQmH3V",
+        "partID": "prt_1538b75db001CbcS6NP9IYxBgk",
+        "field": "text",
+        "delta": "Now run ls"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b75eb00184PJa0lrr7oegk",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b72b8001PShaIBPviQmH3V",
+        "partID": "prt_1538b75db001CbcS6NP9IYxBgk",
+        "field": "text",
+        "delta": "."
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b75eb0022Pn4l4ma3SHCvu",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b75db001CbcS6NP9IYxBgk",
+          "messageID": "msg_1538b72b8001PShaIBPviQmH3V",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "reasoning",
+          "text": "Now run ls.",
+          "time": {
+            "start": 1792403011035,
+            "end": 1792403011051
+          }
+        },
+        "time": 1792403011051
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b75ed001dV9frQWQHS1WqS",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b75ed001Uf2SNk81F0AjYV",
+          "messageID": "msg_1538b72b8001PShaIBPviQmH3V",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-68dfc13f-ea64-49f3-a807-8a90e44a691e",
+          "state": {
+            "status": "pending",
+            "input": {},
+            "raw": ""
+          }
+        },
+        "time": 1792403011053
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b75f50016PU0oVdeaaD711",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-68dfc13f-ea64-49f3-a807-8a90e44a691e",
+          "state": {
+            "status": "running",
+            "input": {
+              "command": "ls"
+            },
+            "time": {
+              "start": 1792403011061
+            }
+          },
+          "id": "prt_1538b75ed001Uf2SNk81F0AjYV",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "messageID": "msg_1538b72b8001PShaIBPviQmH3V"
+        },
+        "time": 1792403011061
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b763f0029XAXXsX6GmESX2",
+      "type": "permission.asked",
+      "properties": {
+        "id": "per_1538b763f00126bX5oaRtvGt4W",
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "permission": "bash",
+        "patterns": ["ls"],
+        "metadata": {
+          "command": "ls"
+        },
+        "always": ["ls *"],
+        "tool": {
+          "messageID": "msg_1538b72b8001PShaIBPviQmH3V",
+          "callID": "call-68dfc13f-ea64-49f3-a807-8a90e44a691e"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b7644001pLu1P22Su2L1eY",
+      "type": "permission.replied",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "requestID": "per_1538b763f00126bX5oaRtvGt4W",
+        "reply": "once"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b7646001cVHQ7RztdNlf8h",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-68dfc13f-ea64-49f3-a807-8a90e44a691e",
+          "state": {
+            "metadata": {
+              "output": ""
+            },
+            "status": "running",
+            "input": {
+              "command": "ls"
+            },
+            "time": {
+              "start": 1792403011061
+            }
+          },
+          "id": "prt_1538b75ed001Uf2SNk81F0AjYV",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "messageID": "msg_1538b72b8001PShaIBPviQmH3V"
+        },
+        "time": 1792403011142
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b7663001aJGPfHLdiZNcvd",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-68dfc13f-ea64-49f3-a807-8a90e44a691e",
+          "state": {
+            "metadata": {
+              "output": "README.md\nhello.txt\n"
+            },
+            "status": "running",
+            "input": {
+              "command": "ls"
+            },
+            "time": {
+              "start": 1792403011061
+            }
+          },
+          "id": "prt_1538b75ed001Uf2SNk81F0AjYV",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "messageID": "msg_1538b72b8001PShaIBPviQmH3V"
+        },
+        "time": 1792403011170
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b7669001WMUTUkDRo6qQyC",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "call-68dfc13f-ea64-49f3-a807-8a90e44a691e",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "ls"
+            },
+            "output": "README.md\nhello.txt\n",
+            "metadata": {
+              "output": "README.md\nhello.txt\n",
+              "exit": 0,
+              "truncated": false
+            },
+            "title": "ls",
+            "time": {
+              "start": 1792403011061,
+              "end": 1792403011177
+            }
+          },
+          "id": "prt_1538b75ed001Uf2SNk81F0AjYV",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "messageID": "msg_1538b72b8001PShaIBPviQmH3V"
+        },
+        "time": 1792403011177
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b76b4001JFm7Gh6wfoYyGa",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b76b4001gOr6eCgiRboLGb",
+          "reason": "tool-calls",
+          "snapshot": "bebff1440eadfe1f17b712ac6e5f6051c0802be3",
+          "messageID": "msg_1538b72b8001PShaIBPviQmH3V",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "step-finish",
+          "tokens": {
+            "total": 9972,
+            "input": 219,
+            "output": 12,
+            "reasoning": 13,
+            "cache": {
+              "write": 0,
+              "read": 9728
+            }
+          },
+          "cost": 0
+        },
+        "time": 1792403011252
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b76b6001yUvbZphRf4QeYd",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "id": "msg_1538b72b8001PShaIBPviQmH3V",
+          "parentID": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "role": "assistant",
+          "mode": "aw-executor",
+          "agent": "aw-executor",
+          "path": {
+            "cwd": "/tmp/aw-repo",
+            "root": "/tmp/aw-repo"
+          },
+          "cost": 0,
+          "tokens": {
+            "total": 9972,
+            "input": 219,
+            "output": 12,
+            "reasoning": 13,
+            "cache": {
+              "write": 0,
+              "read": 9728
+            }
+          },
+          "modelID": "beam-free",
+          "providerID": "opencode",
+          "time": {
+            "created": 1792403010232
+          },
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "finish": "tool-calls"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b771f001dN75Tze21l1Mpa",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "id": "msg_1538b72b8001PShaIBPviQmH3V",
+          "parentID": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "role": "assistant",
+          "mode": "aw-executor",
+          "agent": "aw-executor",
+          "path": {
+            "cwd": "/tmp/aw-repo",
+            "root": "/tmp/aw-repo"
+          },
+          "cost": 0,
+          "tokens": {
+            "total": 9972,
+            "input": 219,
+            "output": 12,
+            "reasoning": 13,
+            "cache": {
+              "write": 0,
+              "read": 9728
+            }
+          },
+          "modelID": "beam-free",
+          "providerID": "opencode",
+          "time": {
+            "created": 1792403010232,
+            "completed": 1792403011359
+          },
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "finish": "tool-calls"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b7721001GOD03TBC5z8GGX",
+      "type": "session.status",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "status": {
+          "type": "busy"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b7722001lcFpnx9rFgZOwu",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "id": "msg_1538b7722001eShREG1zsNNTxV",
+          "parentID": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "role": "assistant",
+          "mode": "aw-executor",
+          "agent": "aw-executor",
+          "path": {
+            "cwd": "/tmp/aw-repo",
+            "root": "/tmp/aw-repo"
+          },
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          },
+          "modelID": "beam-free",
+          "providerID": "opencode",
+          "time": {
+            "created": 1792403011362
+          },
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b7785001pt7QwBTcVJUBhC",
+      "type": "session.status",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "status": {
+          "type": "busy"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b77d0001uu5g6BO302SKIk",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "role": "user",
+          "time": {
+            "created": 1792403004679
+          },
+          "agent": "aw-executor",
+          "model": {
+            "providerID": "opencode",
+            "modelID": "beam-free"
+          },
+          "system": "extra system",
+          "summary": {
+            "diffs": [
+              {
+                "file": "hello.txt",
+                "patch": "Index: hello.txt\n===================================================================\n--- hello.txt\t\n+++ hello.txt\t\n@@ -0,0 +1,1 @@\n+hi\n\\ No newline at end of file\n",
+                "additions": 1,
+                "deletions": 0,
+                "status": "added"
+              }
+            ]
+          },
+          "id": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b8178001WFUjokfawbQKX1",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b8177001CKm2474NN3q2I2",
+          "messageID": "msg_1538b7722001eShREG1zsNNTxV",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "snapshot": "bebff1440eadfe1f17b712ac6e5f6051c0802be3",
+          "type": "step-start"
+        },
+        "time": 1792403014008
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b8182001aD5ieH7WFdsetP",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b8182001AecqAZc79eiLv6",
+          "messageID": "msg_1538b7722001eShREG1zsNNTxV",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "reasoning",
+          "text": "",
+          "time": {
+            "start": 1792403014018
+          }
+        },
+        "time": 1792403014018
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b8184001h1PWzMY0hhpqCP",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b7722001eShREG1zsNNTxV",
+        "partID": "prt_1538b8182001AecqAZc79eiLv6",
+        "field": "text",
+        "delta": "Done. Reply"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b81920014lI1fI6FbrcJZD",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b7722001eShREG1zsNNTxV",
+        "partID": "prt_1538b8182001AecqAZc79eiLv6",
+        "field": "text",
+        "delta": " with one short sentence."
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b8193001H1ptARPC592roN",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b8182001AecqAZc79eiLv6",
+          "messageID": "msg_1538b7722001eShREG1zsNNTxV",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "reasoning",
+          "text": "Done. Reply with one short sentence.",
+          "time": {
+            "start": 1792403014018,
+            "end": 1792403014034
+          }
+        },
+        "time": 1792403014035
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b8196001vVslqD1UKZZuCF",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b8196001QzJsPmTcVDvPsK",
+          "messageID": "msg_1538b7722001eShREG1zsNNTxV",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "text",
+          "text": "",
+          "time": {
+            "start": 1792403014038
+          }
+        },
+        "time": 1792403014038
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b819a001IVhYHozdzM0tbP",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b7722001eShREG1zsNNTxV",
+        "partID": "prt_1538b8196001QzJsPmTcVDvPsK",
+        "field": "text",
+        "delta": "Created hello.txt with \"hi\" and listed the"
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b81a4001Zg0J97RITMkkWZ",
+      "type": "message.part.delta",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "messageID": "msg_1538b7722001eShREG1zsNNTxV",
+        "partID": "prt_1538b8196001QzJsPmTcVDvPsK",
+        "field": "text",
+        "delta": " directory contents."
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b81a5001qs523KB81meTap",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b8196001QzJsPmTcVDvPsK",
+          "messageID": "msg_1538b7722001eShREG1zsNNTxV",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "text",
+          "text": "Created hello.txt with \"hi\" and listed the directory contents.",
+          "time": {
+            "start": 1792403014038,
+            "end": 1792403014053
+          }
+        },
+        "time": 1792403014053
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b81db001RAyXqrKB1kKZoK",
+      "type": "message.part.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "part": {
+          "id": "prt_1538b81db001iO3yYI8bp2NswM",
+          "reason": "stop",
+          "snapshot": "bebff1440eadfe1f17b712ac6e5f6051c0802be3",
+          "messageID": "msg_1538b7722001eShREG1zsNNTxV",
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "type": "step-finish",
+          "tokens": {
+            "total": 10020,
+            "input": 69,
+            "output": 18,
+            "reasoning": 13,
+            "cache": {
+              "write": 0,
+              "read": 9920
+            }
+          },
+          "cost": 0
+        },
+        "time": 1792403014107
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b81dc001fK2U7syWy2weX0",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "id": "msg_1538b7722001eShREG1zsNNTxV",
+          "parentID": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "role": "assistant",
+          "mode": "aw-executor",
+          "agent": "aw-executor",
+          "path": {
+            "cwd": "/tmp/aw-repo",
+            "root": "/tmp/aw-repo"
+          },
+          "cost": 0,
+          "tokens": {
+            "total": 10020,
+            "input": 69,
+            "output": 18,
+            "reasoning": 13,
+            "cache": {
+              "write": 0,
+              "read": 9920
+            }
+          },
+          "modelID": "beam-free",
+          "providerID": "opencode",
+          "time": {
+            "created": 1792403011362
+          },
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "finish": "stop"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b820d001M3SP4aKUeYWEjQ",
+      "type": "message.updated",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "info": {
+          "id": "msg_1538b7722001eShREG1zsNNTxV",
+          "parentID": "msg_1538b5d06001LWnfpApJAGs0Cz",
+          "role": "assistant",
+          "mode": "aw-executor",
+          "agent": "aw-executor",
+          "path": {
+            "cwd": "/tmp/aw-repo",
+            "root": "/tmp/aw-repo"
+          },
+          "cost": 0,
+          "tokens": {
+            "total": 10020,
+            "input": 69,
+            "output": 18,
+            "reasoning": 13,
+            "cache": {
+              "write": 0,
+              "read": 9920
+            }
+          },
+          "modelID": "beam-free",
+          "providerID": "opencode",
+          "time": {
+            "created": 1792403011362,
+            "completed": 1792403014157
+          },
+          "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+          "finish": "stop"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b820e001ColU0KMHPu6SAu",
+      "type": "session.status",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "status": {
+          "type": "busy"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b8211001Qilu8nZya57A3E",
+      "type": "session.status",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ",
+        "status": {
+          "type": "idle"
+        }
+      }
+    }
+  },
+  {
+    "directory": "/tmp/aw-repo",
+    "project": "ecf0f907260318e33bcc1c788e7605a64246c50f",
+    "payload": {
+      "id": "evt_1538b8211002WBUxZBRfx4NR9F",
+      "type": "session.idle",
+      "properties": {
+        "sessionID": "ses_eac74a387ffeMgXo9hDGXzyQPQ"
+      }
+    }
+  }
+]

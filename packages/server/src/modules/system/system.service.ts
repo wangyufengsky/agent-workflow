@@ -1,9 +1,14 @@
 import { AppError, type EnvironmentDTO, ErrorCode, type Health, RuntimeStatus } from '@aw/shared';
 import type { AppConfig } from '../../core/config.ts';
 import { readGitVersion } from '../git/index.ts';
-import type { OpencodeRuntime } from '../opencode/index.ts';
+import type { OpencodeClient, OpencodeRuntime } from '../opencode/index.ts';
 
-export type SystemServiceDeps = { config: AppConfig; env: NodeJS.ProcessEnv; runtime: OpencodeRuntime };
+export type SystemServiceDeps = {
+  config: AppConfig;
+  env: NodeJS.ProcessEnv;
+  runtime: OpencodeRuntime;
+  opencode: OpencodeClient;
+};
 
 const NOT_HOSTABLE: readonly RuntimeStatus[] = [RuntimeStatus.NotInstalled, RuntimeStatus.VersionMismatch];
 
@@ -17,16 +22,18 @@ async function detectGit(env: NodeJS.ProcessEnv): Promise<EnvironmentDTO['git']>
   }
 }
 
-export function createSystemService({ config, env, runtime }: SystemServiceDeps) {
+export function createSystemService({ config, env, runtime, opencode }: SystemServiceDeps) {
   async function environment(): Promise<EnvironmentDTO> {
-    const opencode = await runtime.snapshot();
+    const runtimeState = await runtime.snapshot();
     const git = await detectGit(env);
+    // Models are only known while opencode runs; the renderer refetches on runtime.updated.
+    const models = opencode.isConnected() ? await opencode.listModels() : { available: [] };
     return {
       git,
-      opencode,
-      // TODO(M2-04): provider list from the hosted runtime; until then onboarding does not require a model.
-      models: { available: [] },
-      ready: git.installed && !NOT_HOSTABLE.includes(opencode.status),
+      opencode: runtimeState,
+      models,
+      // TODO(M2-10): also require a model once browser E2E runs against FakeOpencode.
+      ready: git.installed && !NOT_HOSTABLE.includes(runtimeState.status),
     };
   }
 

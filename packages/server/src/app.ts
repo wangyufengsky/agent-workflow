@@ -20,7 +20,13 @@ import {
   createCredentialsModule,
   unavailableCipher,
 } from './modules/credentials/index.ts';
-import { buildOpencodeConfig, createOpencodeRuntime, type OpencodeRuntime } from './modules/opencode/index.ts';
+import {
+  buildOpencodeConfig,
+  createOpencodeRuntime,
+  createRuntimeClient,
+  type OpencodeClient,
+  type OpencodeRuntime,
+} from './modules/opencode/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
@@ -40,7 +46,7 @@ export type App = {
   server: FastifyInstance;
   events: EventBus;
   log: Logger;
-  services: { credentials: CredentialsService; runtime: OpencodeRuntime };
+  services: { credentials: CredentialsService; runtime: OpencodeRuntime; opencode: OpencodeClient };
   /** Starts the hosted opencode once the API listens (its MCP endpoint needs the port); no-op if not hostable. */
   startRuntime(apiPort: number): Promise<void>;
   close(): Promise<void>;
@@ -84,7 +90,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     logDir: join(config.dataDir, 'logs'),
   });
   server.addHook('onClose', () => runtime.stop());
-  const system = createSystemModule({ config, env, runtime });
+  const opencode = createRuntimeClient(runtime, log);
+  const system = createSystemModule({ config, env, runtime, opencode });
   const projects = createProjectsModule({ db: database.db, clock });
   mountOperations(server, [...settings.operations, ...system.operations, ...projects.operations]);
 
@@ -93,7 +100,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     server,
     events,
     log,
-    services: { credentials: credentials.service, runtime },
+    services: { credentials: credentials.service, runtime, opencode },
     async startRuntime(port) {
       apiPort = port;
       await runtime.startIfStopped();
