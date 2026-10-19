@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": ["**", "!opencode-workflow-design-showcase", "!**/out", "!**/dist", "!docs", "!spikes"]
+  },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 120 },
+  "javascript": { "formatter": { "quoteStyle": "single", "trailingCommas": "all", "semicolons": "always" } },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "correctness": {
+        "useImportExtensions": "error",
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "error",
+        "noDefaultExport": "error",
+        "useImportType": "error",
+        "noEnum": "error"
+      },
+      "suspicious": { "noExplicitAny": "error" },
+      "nursery": { "noFloatingPromises": "error" }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.config.ts", "**/electron.vite.config.ts", "playwright.config.ts"],
+      "linter": { "rules": { "style": { "noDefaultExport": "off" } } }
+    }
+  ],
+  "assist": { "actions": { "source": { "organizeImports": "on" } } }
+}

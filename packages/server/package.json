@@ -1,0 +1,19 @@
+{
+  "name": "@aw/server",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "dev": "node --watch src/main.ts"
+  },
+  "dependencies": {
+    "@aw/shared": "workspace:*",
+    "@fastify/static": "10.1.6",
+    "fastify": "5.12.7",
+    "pino": "10.4.0",
+    "zod": "4.6.7"
+  }
+}

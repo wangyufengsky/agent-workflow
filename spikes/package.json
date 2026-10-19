@@ -1,0 +1,16 @@
+{
+  "name": "@aw/spikes",
+  "private": true,
+  "type": "module",
+  "description": "M0 technical spikes S1–S7. Deleted once conclusions are recorded in docs/02-decisions.md.",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@opencode-ai/plugin": "1.19.0",
+    "@opencode-ai/sdk": "1.19.0",
+    "drizzle-kit": "0.31.11",
+    "drizzle-orm": "0.45.4",
+    "execa": "10.2.0",
+    "fastify": "5.12.7",
+    "zod": "4.6.7"
+  }
+}

@@ -2,7 +2,7 @@
 
 ## 1. 约定
 
-- 基址：`http://127.0.0.1:<port>/api/v1`，端口与令牌由 preload 提供（`window.aw.apiBase` / `window.aw.apiToken`）。
+- 基址：相对路径 `/api/v1`。前端页面由后端同源托管（开发时 Vite 代理到 `DEV_API_PORT`，D31）；令牌由 preload 提供（`window.aw.apiToken`），浏览器开发/E2E 模式用 `VITE_AW_API_TOKEN`。
 - 认证：`Authorization: Bearer <apiToken>`；缺失或错误 → 401 `UNAUTHORIZED`。
 - 请求与响应均为 JSON，字段 `camelCase`；枚举值为 `snake_case` 字符串；时间为毫秒时间戳。
 - 除 SSE、会话流、diff 文件内容等少数流式接口外，端点都由**操作清单**挂载（[03 §5](03-architecture.md#5-操作清单operation-registry)）：每个端点对应一个操作 id，schema 位于 `shared/operations/<domain>.ts`，路由、前端客户端、命令面板、v1.1 助手共用，**本文与清单不一致以清单为准并修正本文**。
@@ -218,7 +218,6 @@ type TaskDetailDTO = {
 
 ```ts
 interface AwBridge {
-  apiBase: string;
   apiToken: string;
   selectDirectory(): Promise<string | null>;
   openExternal(url: string): Promise<void>;       // 仅 http(s)

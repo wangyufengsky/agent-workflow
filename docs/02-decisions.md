@@ -9,7 +9,7 @@
 | D03 | 流程画布用 React Flow（`@xyflow/react`）+ elkjs 自动布局 | 成熟、可定制节点、分组嵌套 | 2026-10-19 |
 | D04 | 四套主题（deepseek / warm / spdb / github-white）做成强类型主题配置，运行时生成 CSS 变量；另加「跟随系统」 | 新增主题只加一个文件 | 2026-10-19 |
 | D05 | 后端 Node 24 + TS，运行在 Electron utilityProcess；HTTP 用 Fastify 5；renderer 通过 127.0.0.1 HTTP + SSE 访问 | 后端可脱离 Electron 独立运行，便于测试；同一 HTTP 服务也承载 MCP | 2026-10-19 |
-| D06 | 本地存储 SQLite（首选 `node:sqlite`，备选 better-sqlite3）+ Drizzle ORM；只追加日志用 JSONL | 结构化状态与大体量流式日志分离 | 2026-10-19 |
+| D06 | 本地存储 SQLite + Drizzle ORM；只追加日志用 JSONL（驱动已由 D30 确定） | 结构化状态与大体量流式日志分离 | 2026-10-19 |
 | D07 | 项目数据库用 mysql2，v1 只读 | 用户要求；写操作风险高，后置 | 2026-10-19 |
 | D08 | Git 用本机 CLI（execa 封装）；GitHub 用 Octokit，GitLab 用 Gitbeaker，统一 `GitHostingProvider` 接口；每任务一个分支 + worktree | 用户要求；并发隔离 | 2026-10-19 |
 | D09 | 每次启动应用托管一个 `opencode serve`（精确 1.19.0），通过 `OPENCODE_CONFIG_CONTENT` 注入本项目 MCP（remote / Streamable HTTP）与基础 agent；一个 opencode 服务通过 `directory` 参数服务所有 worktree | 一个进程即可并发多 worktree，管理简单 | 2026-10-19 |
@@ -32,3 +32,13 @@
 | D26 | 助手生成的文档默认放在应用的助手目录 `<数据目录>/assistant/files/` | 用户确认；不触碰项目仓库 | 2026-10-19 |
 | D27 | 助手调用 write 级操作需确认卡片，用户可在卡片或设置中对单个操作选「总是允许」；critical 级（合并、取消、删除）每次都确认且不可设为总是允许 | 用户确认；与 D16 一致 | 2026-10-19 |
 | D28 | 凭据（密码、令牌）不经过助手对话：凭据字段不进入助手工具 schema，助手只能打开预填非敏感字段的表单 | 避免凭据发给模型提供方 | 2026-10-19 |
+| D29 | TypeScript 锁定 6.0.3（不用 7.x：原生重写版缺少工具链依赖的 JS API）；源码之间用显式 `.ts` 扩展名导入，开启 `erasableSyntaxOnly`（禁用 enum、参数属性、namespace）；Node 24 直接运行 TS 源码（后端开发、脚本、配置文件、utilityProcess），不引入 tsx | M0：配置文件由 Node 直接加载，无扩展名导入失败；原生类型剥离让工具链更少 | 2026-10-19 |
+| D30 | SQLite 驱动用 `node:sqlite`（S2 通过：Electron 44.9 内置 Node 24.22，utilityProcess 内可用，WAL、一万行写入、回滚、并发读均正常）；Drizzle 通过约 50 行适配器复用其 better-sqlite3 同步会话，**不用 sqlite-proxy**（异步驱动会让事务内的 await 与其他请求交错） | 免原生编译；真同步事务 | 2026-10-19 |
+| D31 | 后端同时托管构建后的前端页面（同源），renderer 一律用相对路径 `/api/v1` 调用；开发时 Vite 代理到固定端口（`DEV_API_PORT=47821`，前端 `DEV_WEB_PORT=47822`），生产用随机端口。preload 只暴露令牌与系统能力，不再提供 `apiBase` | 免 CORS 与 `file://` 源问题，CSP 可设为 `'self'` | 2026-10-19 |
+| D32 | 后端及其依赖由 electron-vite 整体打包为 `out/main/server.js`；`@aw/*` 为 desktop 的 devDependencies，安装包内没有 node_modules（S7 通过：未签名 dmg 128 MB，打包版与 dmg 挂载版均启动正常） | 打包简单、与 pnpm 布局无关 | 2026-10-19 |
+| D33 | MCP 调用归属采用插件方案（S1 通过）：`tool.execute.before` 中**原地修改** `output.args.__aw_session = input.sessionID`（重新赋值对象无效）；放弃 `attempt_token` 备选 | 两个并发会话的 4 次调用全部带上正确 sessionID | 2026-10-19 |
+| D34 | 确认 D09：单个 `opencode serve` 并发服务多个 worktree（S4 通过：两目录并发、无串写，会话的 agent / model / system 参数生效）。事件订阅全局流 `GET /global/event`（事件带 `directory`）；权限请求事件为 `permission.asked`，回复用 `permission.reply({ requestID, reply })` | S5 实测 | 2026-10-19 |
+| D35 | 每个会话在 `session.create` 时传入 `permission` 规则集（opencode 1.19 支持会话级规则），bash 策略随设置即时生效，**修改 `ai.bashPolicy` 不再需要重启 opencode** | 1.19 SDK 实测能力 | 2026-10-19 |
+| D36 | 禁用 opencode 原生 `question` 工具（aw agent 权限 `question: deny`），提问统一走 MCP `ask_user` | 我们的提问存库、可跨应用重启、支持「做出假设并写明」；原生提问的挂起状态在重启后不可恢复（未验证，倾向保守） | 2026-10-19 |
+| D37 | 所有 git 调用设置 `LC_ALL=C`；改动 refs 或 worktree 列表的操作经每仓库互斥锁（S6：不加锁时 4 轮中 1 轮出现 3 次 worktree 元数据错误，加锁后 400 次操作零错误；worktree 内部的并发提交无冲突） | 本机 git 输出为中文，解析需固定语言 | 2026-10-19 |
+| D38 | 工具返回错误码后模型能按 hint 自我修正（S3 实测：免费模型 glm-5.3-flash-free 收到 `SPIKE_FAIL` 后按 hint 重试成功），验证了「工具失败返回错误码」的设计 | 01 §5 验收标准第 7 条的前置验证 | 2026-10-19 |

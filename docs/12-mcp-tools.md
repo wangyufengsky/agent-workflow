@@ -26,26 +26,30 @@
   },
   "plugin": ["file://<appResources>/opencode-plugin/agent-workflow-bridge.js"],
   "agent": {
-    "aw-planner":  { "mode": "primary", "description": "agent-workflow planner",  "prompt": "<protocol-plan.md>",    "permission": { "edit": "deny",  "bash": "<只读白名单>", "webfetch": "deny", "external_directory": "deny" } },
-    "aw-executor": { "mode": "primary", "description": "agent-workflow executor", "prompt": "<protocol-execute.md>", "permission": { "edit": "allow", "bash": "<按 ai.bashPolicy>", "webfetch": "ask",  "external_directory": "deny" } },
-    "aw-reviewer": { "mode": "primary", "description": "agent-workflow reviewer", "prompt": "<protocol-review.md>",  "permission": { "edit": "deny",  "bash": "<只读白名单 + 测试命令>", "webfetch": "deny", "external_directory": "deny" } }
+    "aw-planner":  { "mode": "primary", "description": "agent-workflow planner",  "prompt": "<protocol-plan.md>",    "permission": { "edit": "deny",  "question": "deny", "webfetch": "deny", "external_directory": "deny" } },
+    "aw-executor": { "mode": "primary", "description": "agent-workflow executor", "prompt": "<protocol-execute.md>", "permission": { "edit": "allow", "question": "deny", "webfetch": "ask",  "external_directory": "deny" } },
+    "aw-reviewer": { "mode": "primary", "description": "agent-workflow reviewer", "prompt": "<protocol-review.md>",  "permission": { "edit": "deny",  "question": "deny", "webfetch": "deny", "external_directory": "deny" } }
   }
 }
 ```
 
-- **bash 权限**（常量 `BASH_PERMISSION_PRESETS`，在 `shared/constants/opencode.ts`）：
+- agent 只放不随设置变化的权限；**bash 规则在 `session.create` 时以会话级 `permission` 规则集传入**（D35），格式 `[{ permission: 'bash', pattern, action }]`。
+- 原生 `question` 工具禁用，提问只走 MCP `ask_user`（D36）。
+- **bash 规则集**（常量 `BASH_PERMISSION_PRESETS`，在 `shared/constants/opencode.ts`；reviewer 与 planner 用只读白名单，executor 按 `ai.bashPolicy`）：
   - 只读白名单：`ls* cat* head* tail* rg* grep* find* wc* git status* git log* git diff* git show*` 为 allow，其余 ask。
   - `ai.bashPolicy = auto`（默认）：`*` allow；`git commit* git push* git checkout* git switch* git reset* git rebase* git merge* git branch -D* git worktree*` deny。
   - `ai.bashPolicy = ask`：只读白名单 allow，其余 ask。
 - 角色差异不靠多个 agent：会话使用角色的 `base_agent` 对应的 agent，角色提示词通过每次 prompt 的 `system` 字段追加，模型通过 prompt 的 `model` 字段指定。因此修改角色无需重启 opencode。
-- 修改 `ai.bashPolicy` 需要重启 opencode（运行环境页提示「空闲时自动重启」）。
+- 修改 `ai.bashPolicy` 对之后新建的会话立即生效，无需重启 opencode。
 
 ## 3. 调用归属（哪个尝试在调用工具）
 
 MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 
-- **首选（待 S1 验证）**：插件 `agent-workflow-bridge` 在 `tool.execute.before` 钩子中，对名称以 `agent-workflow_` 开头的工具，把 `sessionID` 写入参数 `__aw_session`。MCP 服务端在 zod 校验前取出该字段，按 `attempts.opencode_session_id` 找到 `starting/running` 状态的尝试。
-- **备选**：每个工具 schema 增加必填参数 `attempt_token`，尝试开始时在提示词中给出（随机 16 字符，存 attempts 表）。
+- 插件 `agent-workflow-bridge`（S1 已验证，D33）在 `tool.execute.before` 钩子中，对名称以 `agent-workflow_` 开头的工具**原地修改** `output.args.__aw_session = input.sessionID`（给 `output.args` 重新赋值不会生效）。MCP 服务端在 zod 校验前取出该字段，按 `attempts.opencode_session_id` 找到 `starting/running` 状态的尝试。
+- 模型在后续调用中可能自己照抄 `__aw_session`，钩子总会用真实 sessionID 覆盖，因此不影响归属。
+- 插件按 opencode 的目录实例各加载一次（每个 worktree 一次），实现须无状态。
+- 插件以构建后的 JS 随安装包放在 `Resources/opencode-plugin/`（M2-03）。
 - 解析失败 → `MCP_ATTEMPT_UNRESOLVED`；工具不允许用于该尝试类型 → `MCP_TOOL_NOT_ALLOWED`。
 
 ## 4. 会话协议
@@ -270,3 +274,16 @@ export const submitPlanTool = defineMcpTool({
 ```
 
 工具 handler 只做参数到 service 的转发；业务规则在 service 中，与 REST 共用。
+
+## 8. opencode 1.19.0 实测记录（M0）
+
+| 项 | 结论 |
+| --- | --- |
+| SDK | 使用 `@opencode-ai/sdk/v2` 的 `createOpencodeClient({ baseUrl })`；方法参数为扁平对象（如 `session.promptAsync({ sessionID, directory, agent, model: { providerID, modelID }, system, parts })`） |
+| 启动 | `opencode serve --hostname 127.0.0.1 --port 0 --print-logs --log-level WARN`，从 stdout/stderr 解析 `http://127.0.0.1:<port>` |
+| 配置合并 | `OPENCODE_CONFIG_CONTENT` 与用户全局配置合并；`config.get({ directory })` 可见注入的 mcp / agent / plugin；`mcp.status` 为 `connected` |
+| 会话 | `session.create({ directory, title, agent, permission })`；同一服务两个目录并发互不干扰 |
+| 事件 | `global.event()` 为全局流，每条带 `directory`；`event.subscribe({ directory })` 只含该目录事件。实测事件类型：`session.created/updated/status/idle/diff`、`message.updated`、`message.part.updated/delta`、`permission.asked/replied`、`file.edited`、`server.heartbeat` 等 |
+| 权限 | `permission.asked` → `permission.reply({ requestID, directory, reply })` 后会话继续 |
+| 数据目录 | opencode 会话存于用户自己的 opencode 数据目录（与用户 TUI 共享，登录凭据也在那里），本应用不隔离；会话标题带任务编号便于辨认 |
+| 免费模型 | 开发与 `@opencode` 集成测试默认 `opencode/glm-5.3-flash-free`，不产生费用 |
