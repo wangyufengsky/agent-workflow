@@ -10,6 +10,7 @@ import { registerTokenAuth } from './core/http/auth.ts';
 import { registerErrorHandling } from './core/http/errors.ts';
 import { createLogger, type Logger } from './core/logger.ts';
 import { mountOperations } from './core/operations/operations.ts';
+import { registerSseHub } from './core/sse/sse-hub.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
 import { registerSystemRoutes } from './modules/system/system.routes.ts';
 
@@ -42,6 +43,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('onClose', async () => database.close());
   registerTokenAuth(server, config.apiToken);
   registerErrorHandling(server, { serveSpa: config.webDir !== undefined });
+  registerSseHub(server, events);
   registerSystemRoutes(server, config);
 
   const settings = createSettingsModule({ db: database.db, events, clock });
