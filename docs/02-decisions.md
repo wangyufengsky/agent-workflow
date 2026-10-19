@@ -43,3 +43,6 @@
 | D37 | 所有 git 调用设置 `LC_ALL=C`；改动 refs 或 worktree 列表的操作经每仓库互斥锁（S6：不加锁时 4 轮中 1 轮出现 3 次 worktree 元数据错误，加锁后 400 次操作零错误；worktree 内部的并发提交无冲突） | 本机 git 输出为中文，解析需固定语言 | 2026-10-19 |
 | D38 | 工具返回错误码后模型能按 hint 自我修正（S3 实测：免费模型 glm-5.3-flash-free 收到 `SPIKE_FAIL` 后按 hint 重试成功），验证了「工具失败返回错误码」的设计 | 01 §5 验收标准第 7 条的前置验证 | 2026-10-19 |
 | D39 | 不引入 `fastify-type-provider-zod`：操作清单的挂载层（`core/operations`）把 path/query/body 合并后用操作的 zod `input` schema 解析，失败统一抛 `VALIDATION_FAILED`（`details.issues`）；响应体用 `output` schema 解析后返回（剥离 DTO 之外的字段） | 该库 7.0.0 把 `@fastify/swagger` 设为必需 peer 依赖；我们的输入来自三处合并，自己解析十几行即可，错误结构也由我们控制 | 2026-10-19 |
+| D40 | M2 的执行 MCP 工具先接**调试尝试**：开发构建的调试入口对一个 Git 目录发起不属于任务的 `execute` 尝试（`attempts.task_id` 为空），由 `debug` 模块提供任务上下文并接收结果（内存中，不建表）；M3 起尝试归属节点 / 任务 | 不必等 tasks / nodes 表即可端到端验证 opencode 托管、MCP、会话流 | 2026-10-19 |
+| D41 | `report_progress` 的「当前进展」记在活动尝试上（内存，随 `attempt.updated` 推送，尝试结束清除），节点与规划阶段显示其活动尝试的这一行 | 规划阶段与节点共用一个机制；进展只是瞬时状态，不写库 | 2026-10-19 |
+| D42 | `@opencode` 集成测试与开发默认免费模型改为可用的 `opencode/beam-free`（2026-10-19 起 `glm-5.3-flash-free` 免费额度用尽，会话卡在 `session.status: retry`）；测试中经 `AW_OC_TEST_MODEL` 可覆盖 | 免费模型的额度会变，测试不能依赖单一模型 | 2026-10-19 |

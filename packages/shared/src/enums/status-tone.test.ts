@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { STATUS_TONE } from './status-tone.ts';
+import { RuntimeStatus } from './system.ts';
 import {
   ATTEMPT_STATUSES,
   NODE_STATUSES,
@@ -16,6 +17,7 @@ describe('STATUS_TONE', () => {
     ['task', TASK_STATUSES, STATUS_TONE.task],
     ['node', NODE_STATUSES, STATUS_TONE.node],
     ['attempt', ATTEMPT_STATUSES, STATUS_TONE.attempt],
+    ['runtime', Object.values(RuntimeStatus), STATUS_TONE.runtime],
     ['taskDisplay', TASK_DISPLAY_GROUPS, STATUS_TONE.taskDisplay],
   ] as const)('%s 的每个状态都映射到一个合法语气', (_name, statuses, map) => {
     const tones: Record<string, string> = map;

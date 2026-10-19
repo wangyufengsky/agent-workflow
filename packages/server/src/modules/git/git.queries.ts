@@ -34,3 +34,12 @@ export async function readOriginUrl(repo: string): Promise<string | undefined> {
   const { stdout, exitCode } = await runGit(['remote', 'get-url', 'origin'], { cwd: repo, okExitCodes: [0, 2] });
   return exitCode === 0 ? stdout.trim() : undefined;
 }
+
+/** Checked-out branch (undefined when HEAD is detached) and the commit HEAD points at. */
+export async function readHead(repo: string): Promise<{ branch: string | undefined; commit: string }> {
+  const [branch, commit] = await Promise.all([
+    runGit(['symbolic-ref', '--quiet', '--short', 'HEAD'], { cwd: repo, okExitCodes: [0, 1] }),
+    runGit(['rev-parse', 'HEAD'], { cwd: repo }),
+  ]);
+  return { branch: branch.exitCode === 0 ? branch.stdout.trim() : undefined, commit: commit.stdout.trim() };
+}

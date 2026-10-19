@@ -1,10 +1,11 @@
 // Fails when development-only code paths end up in the production Electron bundle (M1-06):
-// the plaintext credential adapter must be compiled out of apps/desktop/out/main.
+// the plaintext credential adapter and FakeOpencode must be compiled out of apps/desktop/out/main.
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const OUT = 'apps/desktop/out/main';
-const FORBIDDEN = ['aw-dev-plaintext:'];
+// Markers are string literals inside the code itself (comments and emptied function names survive folding).
+const FORBIDDEN = ['aw-dev-plaintext:', 'fake_ses'];
 
 const files = (await readdir(OUT, { recursive: true })).filter((f) => f.endsWith('.js')).map((f) => join(OUT, f));
 let violations = 0;

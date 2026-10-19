@@ -22,4 +22,5 @@ export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];
 export const ROUTE_IDS = {
   projects: '/_shell/projects',
   project: '/_shell/projects/$projectId',
+  runtime: '/_shell/runtime',
 } as const;

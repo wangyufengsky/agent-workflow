@@ -20,19 +20,22 @@
 | --- | --- | --- |
 | GET | `/system/environment` | 环境检测结果 `EnvironmentDTO` |
 | POST | `/system/environment/recheck` | 重新检测（安装 opencode 后用） |
-| GET | `/system/runtime` | `RuntimeDTO`：opencode 状态、版本、地址、启动时间、活动会话数 |
-| POST | `/system/runtime/restart` | 重启 opencode（先中止活动尝试） |
+| GET | `/system/runtime` | `RuntimeDTO`：opencode 状态、路径、版本；`ready` 时含地址与启动时间 |
+| POST | `/system/runtime/restart` | `ready` 时重启，`stopped` / `crashed` 时启动（活动尝试 → `interrupted`）；返回启动结束后的 `RuntimeDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
 | GET | `/system/runtime/logs?tail=500` 🅿 | opencode 日志末尾若干行 |
 | GET | `/system/storage` | 数据目录占用 |
 | GET | `/settings` | 全部设置 `Record<SettingKey, value>` |
 | PATCH | `/settings` | 部分更新；按 key 的 schema 校验 |
 
 ```ts
+type RuntimeDTO =
+  | { status: 'not_installed'; path?: string; requiredVersion: '1.19.0' }      // path：找到但无法执行时
+  | { status: 'version_mismatch' | 'stopped' | 'starting' | 'crashed'; path: string; version: string; requiredVersion: '1.19.0' }
+  | { status: 'ready'; path: string; version: string; requiredVersion: '1.19.0'; url: string; startedAt: number };
+
 type EnvironmentDTO = {
   git: { installed: true; version: string } | { installed: false };
-  opencode:
-    | { status: 'not_installed'; path?: string; requiredVersion: '1.19.0' }      // path：找到但无法执行时
-    | { status: Exclude<RuntimeStatus, 'not_installed'>; path: string; version: string; requiredVersion: '1.19.0' };
+  opencode: RuntimeDTO;
   models: { available: Array<{ providerId: string; modelId: string; name: string }>; defaultModel?: string };
   ready: boolean;              // 三项都满足（M1 起模型列表为占位，M2-04 接入后才计入）
 };
@@ -150,9 +153,24 @@ type TaskDetailDTO = {
 | POST | `/tasks/:id/nodes/:nodeId/reject` | `{ feedback }`；→ `ready` |
 | POST | `/tasks/:id/nodes/:nodeId/retry` | `failed → ready`，`{ feedback? }` |
 | POST | `/tasks/:id/nodes/:nodeId/skip` 🅿 | |
-| GET | `/attempts/:id` | `AttemptDTO` |
-| GET | `/attempts/:id/transcript?afterSeq` | `{ entries: TranscriptEntry[], lastSeq, done: boolean }` |
-| POST | `/attempts/:id/abort` 🅿 | 中止进行中的尝试（节点按 `attempt_failed` 处理） |
+| GET | `/attempts/:id` | `AttemptDTO`；不存在 404 `ATTEMPT_NOT_FOUND` |
+| GET | `/attempts/:id/transcript?afterSeq` | `{ entries: TranscriptEntry[], lastSeq, done: boolean }`（非清单路由，10 §3）：`lastSeq` 为本页最大 seq（空页为请求的 `afterSeq`），`done` 表示尝试已结束且已读到末尾 |
+| POST | `/attempts/:id/abort` 🅿 | 中止进行中的尝试（节点按 `attempt_failed` 处理）；非 `running` 409 `STATE_TRANSITION_INVALID` |
+| POST | `/debug/attempts` | 仅开发构建（M2-09）：`{ directory, requirement, model? }` → 201 `AttemptDTO`；对 Git 目录发起一次不属于任务的 `execute` 尝试。目录不在 Git 仓库中 400 `PROJECT_PATH_NOT_GIT_REPO`；opencode 未就绪 503 `OPENCODE_NOT_READY` |
+
+```ts
+type AttemptSummaryDTO = {
+  id: string; taskId: string | null; nodeId: string | null;   // 调试尝试两者皆空
+  kind: AttemptKind; seq: number; status: AttemptStatus;
+  model: string | null; nudges: number; error: ErrorInfo | null;
+  progress: string | null;          // 最近一次 report_progress，仅活动期间，内存中
+  startedAt: number; endedAt: number | null;
+};
+type AttemptDTO = AttemptSummaryDTO & {
+  directory: string; opencodeSessionId: string | null;
+  tokensInput: number | null; tokensOutput: number | null; cost: number | null;
+};
+```
 
 ## 7. 需要你处理
 
@@ -211,7 +229,7 @@ type TaskDetailDTO = {
 | `task.updated` | `TaskSummaryDTO` | 更新列表与详情缓存 |
 | `node.updated` | `{ taskId, node: NodeSummaryDTO }` | 更新详情中的节点 |
 | `plan.updated` | `{ taskId, plan: PlanDTO }` | |
-| `attempt.updated` | `{ taskId, nodeId?, attempt: AttemptSummaryDTO }` | |
+| `attempt.updated` | `{ taskId, nodeId, attempt: AttemptSummaryDTO }`（调试尝试 `taskId`、`nodeId` 为 null） | 状态、提醒次数、当前进展变化时 |
 | `attempt.transcript` | `{ attemptId, entries: TranscriptEntry[] }` | 追加到正在查看的会话流 |
 | `inbox.updated` | `{ item: InboxItemDTO, openCount }` | 徽标与列表 |
 | `delivery.updated` | `{ taskId, delivery: DeliveryDTO }` | |

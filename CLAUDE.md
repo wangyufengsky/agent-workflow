@@ -1,6 +1,6 @@
 # agent-workflow · AI 编码助手须知
 
-当前阶段：**M1（基础层）已完成，下一步 M2**。开始任何开发任务前，先读：
+当前阶段：**M2（opencode 托管与 MCP）已完成，下一步 M3**。开始任何开发任务前，先读：
 
 1. `docs/06-coding-standards.md`：找根因不兜底、不过度防御、状态只经状态机、一处定义。
 2. `docs/07-testing-standards.md`：测行为不测实现、少而有效、真实 SQLite/Git、缺陷先写失败测试、禁止 sleep。

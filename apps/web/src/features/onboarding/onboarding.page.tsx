@@ -70,6 +70,32 @@ function OpencodeCheck({ opencode, onRecheck }: { opencode: EnvironmentDTO['open
   );
 }
 
+/** Models are listed by the running opencode; before it runs they are unknown, not missing. */
+function ModelsCheck({ environment }: { environment: EnvironmentDTO }) {
+  const count = environment.models.available.length;
+  if (count > 0) {
+    return (
+      <CheckRow title={C.models.title} tone={StatusTone.Ok} badge={C.ready}>
+        <span className="hint">{C.models.available(count)}</span>
+      </CheckRow>
+    );
+  }
+  if (environment.opencode.status === RuntimeStatus.Ready) {
+    return (
+      <CheckRow title={C.models.title} tone={StatusTone.Danger} badge={C.notReady}>
+        <span className="hint">{C.models.none}</span>
+        <CopyCommand command={C.models.fix} />
+      </CheckRow>
+    );
+  }
+  return (
+    <CheckRow title={C.models.title} tone={StatusTone.Wait} badge={C.models.pendingBadge}>
+      <span className="hint">{C.models.pending}</span>
+      <CopyCommand command={C.models.fix} />
+    </CheckRow>
+  );
+}
+
 /** First-run checks, then the first project (14 §3.1). */
 export function OnboardingPage() {
   const environment = useQuery(environmentQuery);
@@ -95,10 +121,7 @@ export function OnboardingPage() {
             <div className="card list list-sep">
               <GitCheck git={environment.data.git} />
               <OpencodeCheck opencode={environment.data.opencode} onRecheck={() => recheck.mutate()} />
-              <CheckRow title={C.models.title} tone={StatusTone.Wait} badge={C.models.pendingBadge}>
-                <span className="hint">{C.models.pending}</span>
-                <CopyCommand command={C.models.fix} />
-              </CheckRow>
+              <ModelsCheck environment={environment.data} />
             </div>
             <section className="section">
               <div className="section-head">

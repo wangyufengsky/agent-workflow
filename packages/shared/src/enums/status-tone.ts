@@ -1,3 +1,4 @@
+import { RuntimeStatus } from './system.ts';
 import { AttemptStatus, NodeStatus, TaskDisplayGroup, TaskStatus } from './task.ts';
 import { StatusTone } from './ui.ts';
 
@@ -36,6 +37,14 @@ export const STATUS_TONE = {
     [AttemptStatus.Aborted]: StatusTone.Warn,
     [AttemptStatus.Interrupted]: StatusTone.Warn,
   },
+  runtime: {
+    [RuntimeStatus.NotInstalled]: StatusTone.Danger,
+    [RuntimeStatus.VersionMismatch]: StatusTone.Danger,
+    [RuntimeStatus.Stopped]: StatusTone.Wait,
+    [RuntimeStatus.Starting]: StatusTone.Run,
+    [RuntimeStatus.Ready]: StatusTone.Ok,
+    [RuntimeStatus.Crashed]: StatusTone.Danger,
+  },
   taskDisplay: {
     [TaskDisplayGroup.Preparing]: StatusTone.Run,
     [TaskDisplayGroup.PlanReview]: StatusTone.Wait,
@@ -52,5 +61,6 @@ export const STATUS_TONE = {
   task: Record<TaskStatus, StatusTone>;
   node: Record<NodeStatus, StatusTone>;
   attempt: Record<AttemptStatus, StatusTone>;
+  runtime: Record<RuntimeStatus, StatusTone>;
   taskDisplay: Record<TaskDisplayGroup, StatusTone>;
 };

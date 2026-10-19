@@ -38,6 +38,21 @@ export const TranscriptEntryKind = {
 export type TranscriptEntryKind = (typeof TranscriptEntryKind)[keyof typeof TranscriptEntryKind];
 export const transcriptEntryKindSchema = z.enum(TranscriptEntryKind);
 
+/** What a `system` transcript entry records; the renderer words it (web/src/copy). */
+export const TranscriptSystemEvent = {
+  AttemptStarted: 'attempt_started',
+  /** Idle without a result: the nudge prompt was sent (12 §4.2). */
+  Nudged: 'nudged',
+  /** opencode waits before retrying a failed model request; `detail` is its message. */
+  Retrying: 'retrying',
+  ResultSubmitted: 'result_submitted',
+  TimedOut: 'timed_out',
+  Aborted: 'aborted',
+  RuntimeLost: 'runtime_lost',
+} as const;
+export type TranscriptSystemEvent = (typeof TranscriptSystemEvent)[keyof typeof TranscriptSystemEvent];
+export const transcriptSystemEventSchema = z.enum(TranscriptSystemEvent);
+
 export const BashPolicy = {
   Auto: 'auto',
   Ask: 'ask',

@@ -206,21 +206,24 @@ type Acceptance = {
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
 | id | TEXT PK | |
-| task_id | TEXT → tasks，CASCADE | |
-| node_id | TEXT NULL → nodes，CASCADE | `plan` 类为空 |
+| task_id | TEXT NULL → tasks，CASCADE | 空 = 调试尝试（仅开发构建，M2-09，不属于任何任务） |
+| node_id | TEXT NULL → nodes，CASCADE | `plan` 类与调试尝试为空 |
 | kind | TEXT | `AttemptKind` |
-| seq | INTEGER | 同一节点（或同一任务的 plan 类）内序号 |
+| seq | INTEGER | 同一节点（或同一任务的 plan 类、或全部调试尝试）内序号 |
 | status | TEXT | `AttemptStatus` |
-| role_id | TEXT → roles | |
-| model | TEXT NULL | 实际使用的模型 |
-| opencode_session_id | TEXT NULL UNIQUE | MCP 调用归属的依据 |
+| role_id | TEXT NULL → roles | 调试尝试为空 |
+| model | TEXT NULL | 发送提示词时指定的 `provider/model`；空 = opencode 默认 |
+| directory | TEXT | 会话工作目录（任务 worktree） |
+| opencode_session_id | TEXT NULL | MCP 调用归属的依据；不唯一：重新规划沿用原规划会话（12 §4.3），归属取该会话最新的尝试 |
 | nudges | INTEGER | |
 | error | TEXT(JSON) NULL | `{ code, message, details? }` |
 | tokens_input / tokens_output | INTEGER NULL | |
 | cost | REAL NULL | |
 | started_at / ended_at | INTEGER | |
 
-索引：`(node_id)`、`(task_id, kind)`、`(status)`。
+索引：`(node_id)`、`(task_id, kind)`、`(status)`、`(opencode_session_id)`。
+
+> M2 建表时 tasks / nodes / roles 表尚不存在：`task_id`、`node_id`、`role_id` 的外键随 M3 的迁移加上。
 
 ### inbox_items
 
@@ -279,27 +282,27 @@ payload / response：
 
 ## 3. JSONL 会话流
 
-路径：`<数据目录>/runs/<taskId>/<attemptId>.jsonl`。每次尝试一个文件，只追加，由 opencode 事件桥写入，同时经 SSE 推送 `attempt.transcript` 事件。
+路径：`<数据目录>/runs/<taskId>/<attemptId>.jsonl`（调试尝试为 `runs/debug/<attemptId>.jsonl`）。每次尝试一个文件，只追加（同步追加，保持事件顺序），由尝试模块把 opencode 事件转换后写入，同时经 SSE 推送 `attempt.transcript` 事件。schema 为 `shared/contracts/api/attempts.ts` 的 `transcriptEntrySchema`。
 
 每行：
 
 ```json
-{ "seq": 12, "ts": 1760851200000, "kind": "tool_call", "partId": "prt_...", "data": { "tool": "edit", "input": { "filePath": "src/a.ts" } } }
+{ "seq": 12, "ts": 1760851200000, "kind": "tool_call", "data": { "tool": "edit", "callId": "call_...", "input": { "filePath": "src/a.ts" } } }
 ```
 
 | kind | data |
 | --- | --- |
 | `user_message` | `{ text }`（我们发给会话的提示词 / 答案 / 提醒） |
-| `text` | `{ text }`（模型正文；流式时同一 `partId` 多行，读取时按 partId 取最后一行） |
-| `reasoning` | `{ text }` |
-| `tool_call` | `{ tool, callId, input }` |
-| `tool_result` | `{ tool, callId, status: 'completed' | 'error', output, error? }` |
-| `file_edit` | `{ path, additions, deletions }` |
-| `permission` | `{ permissionId, type, title, decision? }` |
-| `system` | `{ message }`（如「尝试开始」「已提醒提交结果」） |
-| `error` | `{ code, message }` |
+| `text` | `{ text }`，带 `partId`（模型正文；流式时同一 `partId` 多行，每行是到当时为止的全文：每增长 `TRANSCRIPT_TEXT_FLUSH_CHARS` 写一次，片段结束再写一次；读取时按 `partId` 取最后一行） |
+| `reasoning` | 同 `text` |
+| `tool_call` | `{ tool, callId, input }`（工具开始运行时一次） |
+| `tool_result` | `{ tool, callId, status: 'completed' \| 'error', output?, error? }` |
+| `file_edit` | `{ path, additions, deletions }`（预留，M2 未产生；编辑以 `tool_call` / `tool_result` 出现） |
+| `permission` | `{ permissionId, permission, patterns }` |
+| `system` | `{ event: TranscriptSystemEvent, detail? }`（尝试开始、已提醒、重试中、已提交、超时、已中止、运行时消失；文案在前端） |
+| `error` | `ErrorInfo`（`{ code, message, details? }`；尝试结束后的会话错误不记录，如提交后我们发出的中止） |
 
-读取：`GET /attempts/:id/transcript?afterSeq=` 顺序读取文件并按 `afterSeq` 过滤，每页 `TRANSCRIPT_PAGE_SIZE`。单文件预计 < 10 MB，M6 做性能验证，必要时加 seq → 偏移量索引。
+读取：`GET /attempts/:id/transcript?afterSeq=` 顺序读取文件并按 `afterSeq` 过滤，每页 `TRANSCRIPT_PAGE_SIZE` 行；页内同一 `partId` 只保留最后一行、放在它首次出现的位置。单文件预计 < 10 MB，M6 做性能验证，必要时加 seq → 偏移量索引。
 
 ## 4. v1.1 预留：助手
 

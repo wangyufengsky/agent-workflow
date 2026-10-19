@@ -15,7 +15,16 @@ export default defineConfig({
         },
       },
       { test: { name: 'int', include: [`${SOURCES}/*.int.test.ts`], exclude: IGNORE } },
-      { test: { name: 'oc', include: [`${SOURCES}/*.oc.test.ts`], exclude: IGNORE, testTimeout: 120_000 } },
+      {
+        test: {
+          name: 'oc',
+          include: [`${SOURCES}/*.oc.test.ts`],
+          exclude: IGNORE,
+          testTimeout: 120_000,
+          // Hooks start opencode, which the runtime allows OPENCODE_START_TIMEOUT_MS (30 s) to come up.
+          hookTimeout: 60_000,
+        },
+      },
       { test: { name: 'live', include: ['live/**/*.live.test.ts'], testTimeout: 1_800_000 } },
     ],
   },

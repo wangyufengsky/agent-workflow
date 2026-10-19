@@ -12,6 +12,7 @@ import { ProOnly } from '../features/pro/pro-only.tsx';
 import { ProjectDetailPage } from '../features/projects/project-detail.page.tsx';
 import { ProjectsPage } from '../features/projects/projects.page.tsx';
 import { projectsQuery } from '../features/projects/projects.queries.ts';
+import { RuntimePage } from '../features/runtime/runtime.page.tsx';
 import { SettingsPage } from '../features/settings/settings.page.tsx';
 import { settingsQuery, useSettings } from '../features/settings/settings.queries.ts';
 import { useAppliedTheme } from '../theme/use-applied-theme.ts';
@@ -75,6 +76,17 @@ const projectsRoute = createRoute({
   validateSearch: z.object({ add: z.boolean().optional() }),
   component: ProjectsPage,
 });
+const runtimeRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.runtime,
+  // `?attempt=<id>` shows a debug attempt started from this page (development builds, M2-09).
+  validateSearch: z.object({ attempt: z.string().optional() }),
+  component: () => (
+    <ProOnly>
+      <RuntimePage />
+    </ProOnly>
+  ),
+});
 const projectRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.project,
@@ -95,7 +107,7 @@ const routeTree = rootRoute.addChildren([
     proPage(ROUTES.roles, 'users'),
     proPage(ROUTES.databases, 'db'),
     proPage(ROUTES.tools, 'tool'),
-    proPage(ROUTES.runtime, 'server'),
+    runtimeRoute,
   ]),
   ...(import.meta.env.DEV
     ? [createRoute({ getParentRoute: () => rootRoute, path: ROUTES.devComponents, component: ComponentGalleryPage })]

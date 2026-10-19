@@ -30,6 +30,8 @@ export default defineConfig({
         AW_PORT: String(DEV_API_PORT),
         AW_LOG_LEVEL: 'warn',
         NODE_ENV: 'development',
+        // AI sessions are played by FakeOpencode (07 §2), which also reports a model so the environment is ready.
+        AW_FAKE_OPENCODE: '1',
         // Deterministic environment checks: a fake `opencode --version` first on PATH, no ~/.opencode.
         PATH: `${resolve('e2e/fixtures/bin')}:${process.env.PATH ?? ''}`,
         HOME: backendHome,

@@ -180,7 +180,7 @@ stateDiagram-v2
 - `no_result`：见 [03-architecture §2.4](03-architecture.md#24-会话空闲但未提交结果)。
 - `timeout`：从 `running` 起超过 `attempt.timeoutMinutes`。
 - `abort`：用户中止或任务取消；后端调用 opencode `session/{id}/abort`。
-- `runtime_lost`：opencode 进程退出或应用重启时仍在进行。
+- `runtime_lost`：opencode 进程退出、用户重启 opencode，或后端启动时发现上次仍在进行（会话已不存在）。
 - 终态：`succeeded` `failed` `aborted` `interrupted`。尝试不会被「恢复」，重试总是新建尝试（`plan` 类尝试可复用原会话继续，见 12-mcp-tools §4.3）。
 
 ## 5. 计划 Plan
@@ -282,6 +282,8 @@ stateDiagram-v2
 
 - 初始状态由环境检测（启动时与「重新检测」`recheck`）决定：`stopped` / `not_installed` / `version_mismatch`。
 - `listening`：从 stdout 解析到地址并且 `/config` 请求成功。
-- `ready` 的 `exited`：活动尝试全部 → `interrupted`；自动 `start` 一次。
-- `crashed` 的 `start`：自动一次，之后需用户在运行环境页点重启。
-- `restart`：用户手动；先中止活动尝试。
+- `starting` 的 `exited`：进程退出，或 `OPENCODE_START_TIMEOUT_MS` 内未报告地址 / `/config` 失败（此时后端结束进程）。
+- `ready` 的 `exited`：活动尝试全部 → `interrupted`（`runtime_lost`）。
+- 进入 `crashed` 后自动 `start` 一次；自动机会用完后需用户在运行环境页点重启（`crashed` 的 `start`），用户的手动启动 / 重启会重新给一次自动机会。
+- `restart`：用户手动；活动尝试先 → `interrupted`（会话随旧进程一起消失，可重试），再结束旧进程启动新进程。
+- 后端退出时结束 opencode 进程，不做状态转换。
