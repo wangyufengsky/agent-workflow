@@ -11,6 +11,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@aw/builtin": "workspace:*",
     "@aw/shared": "workspace:*",
     "@fastify/static": "10.1.6",
     "@modelcontextprotocol/sdk": "1.32.1",

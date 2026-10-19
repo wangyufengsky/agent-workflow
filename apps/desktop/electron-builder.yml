@@ -12,6 +12,8 @@ extraResources:
     to: opencode-plugin
   - from: ../../packages/server/migrations
     to: migrations
+  - from: ../../packages/builtin/prompts
+    to: prompts
 npmRebuild: false
 asar: true
 mac:

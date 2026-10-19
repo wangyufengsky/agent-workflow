@@ -1,4 +1,7 @@
+import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
+import { loadPrompts } from '@aw/builtin';
+import { MCP_EXEC_PATH } from '@aw/shared';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
 import type { DestinationStream } from 'pino';
@@ -17,7 +20,7 @@ import {
   createCredentialsModule,
   unavailableCipher,
 } from './modules/credentials/index.ts';
-import { createOpencodeRuntime, type OpencodeRuntime } from './modules/opencode/index.ts';
+import { buildOpencodeConfig, createOpencodeRuntime, type OpencodeRuntime } from './modules/opencode/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
@@ -63,11 +66,18 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const settings = createSettingsModule({ db: database.db, events, clock });
   const credentials = createCredentialsModule({ db: database.db, clock, cipher: deps.cipher ?? unavailableCipher });
   const env = deps.env ?? process.env;
+  const prompts = loadPrompts(config.promptsDir);
+  // Per-launch secret of the execution MCP, separate from the renderer token (D25).
+  const mcpToken = randomBytes(32).toString('hex');
+  let apiPort: number | undefined;
   const runtime = createOpencodeRuntime({
     env,
     binaryPath: () => settings.service.get('opencode.binaryPath'),
-    // TODO(M2-02): MCP, agents and the bridge plugin.
-    configContent: () => '{}',
+    configContent: () => {
+      if (apiPort === undefined) throw new Error('opencode started before the API listens');
+      const mcpUrl = `http://127.0.0.1:${apiPort}${MCP_EXEC_PATH}`;
+      return JSON.stringify(buildOpencodeConfig({ mcpUrl, mcpToken, pluginFile: config.opencodePluginFile, prompts }));
+    },
     log,
     events,
     clock,
@@ -84,7 +94,10 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     events,
     log,
     services: { credentials: credentials.service, runtime },
-    startRuntime: async () => runtime.startIfStopped(),
+    async startRuntime(port) {
+      apiPort = port;
+      await runtime.startIfStopped();
+    },
     close: () => server.close(),
   };
 }

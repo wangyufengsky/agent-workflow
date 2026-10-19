@@ -1,0 +1,452 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash 规则 1`] = `
+{
+  "executor": [
+    {
+      "action": "ask",
+      "pattern": "*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "ls*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show*",
+      "permission": "bash",
+    },
+  ],
+  "planner": [
+    {
+      "action": "ask",
+      "pattern": "*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "ls*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show*",
+      "permission": "bash",
+    },
+  ],
+  "reviewer": [
+    {
+      "action": "ask",
+      "pattern": "*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "ls*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show*",
+      "permission": "bash",
+    },
+  ],
+}
+`;
+
+exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bash 规则 1`] = `
+{
+  "executor": [
+    {
+      "action": "allow",
+      "pattern": "*",
+      "permission": "bash",
+    },
+    {
+      "action": "deny",
+      "pattern": "git commit*",
+      "permission": "bash",
+    },
+    {
+      "action": "deny",
+      "pattern": "git push*",
+      "permission": "bash",
+    },
+    {
+      "action": "deny",
+      "pattern": "git checkout*",
+      "permission": "bash",
+    },
+    {
+      "action": "deny",
+      "pattern": "git switch*",
+      "permission": "bash",
+    },
+    {
+      "action": "deny",
+      "pattern": "git reset*",
+      "permission": "bash",
+    },
+    {
+      "action": "deny",
+      "pattern": "git rebase*",
+      "permission": "bash",
+    },
+    {
+      "action": "deny",
+      "pattern": "git merge*",
+      "permission": "bash",
+    },
+    {
+      "action": "deny",
+      "pattern": "git branch -D*",
+      "permission": "bash",
+    },
+    {
+      "action": "deny",
+      "pattern": "git worktree*",
+      "permission": "bash",
+    },
+  ],
+  "planner": [
+    {
+      "action": "ask",
+      "pattern": "*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "ls*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show*",
+      "permission": "bash",
+    },
+  ],
+  "reviewer": [
+    {
+      "action": "ask",
+      "pattern": "*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "ls*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show*",
+      "permission": "bash",
+    },
+  ],
+}
+`;
+
+exports[`opencode 配置生成 > 注入 MCP、三个基础 agent 与 bridge 插件 1`] = `
+{
+  "agent": {
+    "aw-executor": {
+      "description": "agent-workflow executor",
+      "mode": "primary",
+      "permission": {
+        "edit": "allow",
+        "external_directory": "deny",
+        "question": "deny",
+        "webfetch": "ask",
+      },
+      "prompt": "<protocol-execute.md>",
+    },
+    "aw-planner": {
+      "description": "agent-workflow planner",
+      "mode": "primary",
+      "permission": {
+        "edit": "deny",
+        "external_directory": "deny",
+        "question": "deny",
+        "webfetch": "deny",
+      },
+      "prompt": "<protocol-plan.md>",
+    },
+    "aw-reviewer": {
+      "description": "agent-workflow reviewer",
+      "mode": "primary",
+      "permission": {
+        "edit": "deny",
+        "external_directory": "deny",
+        "question": "deny",
+        "webfetch": "deny",
+      },
+      "prompt": "<protocol-review.md>",
+    },
+  },
+  "mcp": {
+    "agent-workflow": {
+      "enabled": true,
+      "headers": {
+        "Authorization": "Bearer mcp-token",
+      },
+      "oauth": false,
+      "type": "remote",
+      "url": "http://127.0.0.1:4000/mcp/exec",
+    },
+  },
+  "plugin": [
+    "file:///Applications/Agent%20Workflow.app/Contents/Resources/opencode-plugin/agent-workflow-bridge.js",
+  ],
+}
+`;
