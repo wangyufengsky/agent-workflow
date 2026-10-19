@@ -47,20 +47,20 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 各状态含义与转换见 [09-state-machines.md](09-state-machines.md)。
 
-**任务显示状态（简单模式）**由 `TaskStatus` + 是否有打开的「需要你处理」条目推导，常量 `TASK_DISPLAY_GROUP`：
+**任务显示状态（简单模式）**`TaskDisplayGroup` 由 `TaskStatus` + 是否有打开的「需要你处理」条目推导：常量 `TASK_DISPLAY_GROUP`（状态 → 显示）与函数 `resolveTaskDisplayGroup(status, hasOpenAttentionItem)`，覆盖规则的条目类型为常量 `ATTENTION_INBOX_KINDS`：
 
-| 显示 | 来源 |
-| --- | --- |
-| 准备中 | `draft` `preparing` `planning` |
-| 待确认计划 | `plan_review` |
-| 执行中 | `running` |
-| 已暂停 | `paused` |
-| 需要你处理 | 任意非终态 + 存在 `open` 的 `question` / `permission` / `acceptance` 条目（覆盖上面几种显示） |
-| 待合并 | `review` |
-| 合并中 | `merging` |
-| 已完成 | `completed` |
-| 失败 | `failed` |
-| 已取消 | `cancelled` |
+| `TaskDisplayGroup` | 显示 | 来源 |
+| --- | --- | --- |
+| `preparing` | 准备中 | `draft` `preparing` `planning` |
+| `plan_review` | 待确认计划 | `plan_review` |
+| `running` | 执行中 | `running` |
+| `paused` | 已暂停 | `paused` |
+| `needs_attention` | 需要你处理 | 任意非终态 + 存在 `open` 的 `question` / `permission` / `acceptance` 条目（覆盖上面几种显示） |
+| `review` | 待合并 | `review` |
+| `merging` | 合并中 | `merging` |
+| `completed` | 已完成 | `completed` |
+| `failed` | 失败 | `failed` |
+| `cancelled` | 已取消 | `cancelled` |
 
 ### 2.3 流程与角色
 
@@ -71,6 +71,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `WorkflowDeliverable` | `code_changes` · `report` | 代码审查等只读流程产出报告，不合并 |
 | `RoleBaseAgent` | `planner` · `executor` · `reviewer` | 对应注入 opencode 的 agent `aw-planner` / `aw-executor` / `aw-reviewer`，决定权限基线 |
 | `RoleKind` | `builtin` · `custom` | |
+| `NodeKind` | `normal` · `revise` | `revise` 为「再改改」/「解决冲突」追加的节点 |
+| `RequiredStepPosition` | `first` · `last` | 流程必经步骤在 AI 计划中的位置约束（5.3 `REQUIRED_STEP_ORDER`） |
 
 ### 2.4 Git 与交付
 
@@ -103,15 +105,17 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 
-| tone | TaskStatus | NodeStatus | AttemptStatus |
-| --- | --- | --- | --- |
-| `idle` | `draft` | `pending` · `skipped` · `cancelled` | — |
-| `run` | `preparing` · `planning` · `running` · `merging` | `ready` · `running` · `verifying` | `starting` · `running` |
-| `wait` | `plan_review` · `paused` | `waiting_input` · `awaiting_acceptance` | — |
-| `ok` | `review` | `done` | `succeeded` |
-| `done` | `completed` | — | — |
-| `danger` | `failed` | `failed` | `failed` |
-| `warn` | `cancelled` | — | `aborted` · `interrupted` |
+`STATUS_TONE.task` / `.node` / `.attempt` / `.taskDisplay`（类型保证每个值都有映射，单测再校验一次）：
+
+| tone | TaskStatus | NodeStatus | AttemptStatus | TaskDisplayGroup |
+| --- | --- | --- | --- | --- |
+| `idle` | `draft` | `pending` · `skipped` · `cancelled` | — | — |
+| `run` | `preparing` · `planning` · `running` · `merging` | `ready` · `running` · `verifying` | `starting` · `running` | `preparing` · `running` · `merging` |
+| `wait` | `plan_review` · `paused` | `waiting_input` · `awaiting_acceptance` | — | `plan_review` · `paused` · `needs_attention` |
+| `ok` | `review` | `done` | `succeeded` | `review` |
+| `done` | `completed` | — | — | `completed` |
+| `danger` | `failed` | `failed` | `failed` | `failed` |
+| `warn` | `cancelled` | — | `aborted` · `interrupted` | `cancelled` |
 
 ## 4. 常量
 
@@ -126,7 +130,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `MCP_ASSISTANT_SERVER_NAME` | `agent-workflow-app` | 助手 MCP（v1.1） |
 | `TASK_KEY_PREFIX` | `T-` | 任务编号 `T-<自增>` |
 | `BRANCH_PREFIX` | `aw/` | 分支名 `aw/<taskKey>-<slug>` |
-| `BRANCH_SLUG_MAX` | `40` | slug 由标题转写，只保留 `[a-z0-9-]` |
+| `BRANCH_SLUG_MAX` | `40` | slug 由标题转写，只保留 `[a-z0-9-]`（`toSlug`，`shared/naming.ts`） |
+| `PROJECT_SLUG_MAX` | `40` | 项目 slug（worktree 目录名）由名称转写；无 ASCII 字符时为 `project`，重名追加 `-2`、`-3` |
 | `API_PREFIX` | `/api/v1` | |
 | `DEV_API_PORT` / `DEV_WEB_PORT` | `47821` / `47822` | 仅开发；生产后端随机端口（D31） |
 | `MCP_EXEC_PATH` | `/mcp/exec` | |
@@ -160,13 +165,13 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `scheduler.maxConcurrentNodesPerTask` | `2` | 专业 |
 | `node.maxAttempts` | `3` | 专业 |
 | `attempt.timeoutMinutes` | `60` | 专业 |
-| `worktree.rootDir` | `<数据目录>/worktrees` | 专业 |
-| `delivery.defaultStrategy` | `squash` | 专业 |
+| `worktree.rootDir` | `null`（使用 `<数据目录>/worktrees`） | 专业 |
+| `delivery.defaultStrategy` | `squash`（可选 `squash` / `merge` / `rebase`；PR 有单独按钮） | 专业 |
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |
 | `opencode.binaryPath` | `null`（从 PATH 与 `~/.opencode/bin` 查找） | 专业 |
 | `assistant.alwaysAllow` | `[]`（操作 id 列表，仅 write 级可加入；v1.1） | 简单 |
 
-「模式」列表示该设置在哪种界面模式下出现在设置页。
+「模式」列表示该设置在哪种界面模式下出现在设置页（常量 `SETTING_MODE`）。值的 schema 为 `settingsSchema`（strict：未知键拒绝），默认值为 `SETTING_DEFAULTS`。
 
 ## 5. 错误码
 
@@ -257,6 +262,8 @@ class AppError extends Error {
 | `CREDENTIAL_UNAVAILABLE` | 500 | safeStorage 不可用或解密失败 |
 
 ### 5.3 计划校验子码（`PLAN_INVALID.details.problems[].code`）
+
+枚举 `PlanProblemCode`，hint 为常量 `PLAN_PROBLEM_HINT`（英文，给模型看）；校验函数 `validatePlanGraph(graph, { allowedRoles, requiredSteps })` 位于 `shared/workflow`，一次返回全部问题。存在环时不检查必经步骤顺序。
 
 | 子码 | 含义 | 给模型的 hint |
 | --- | --- | --- |

@@ -1,0 +1,15 @@
+export const SETTINGS_COPY = {
+  title: '设置',
+  appearance: '外观',
+  theme: '主题',
+  themeHint: '跟随系统时，深色用 DeepSeek 深色，浅色用 GitHub 白。',
+  mode: '界面模式',
+  proMode: '专业模式',
+  proModeHint: '开启后显示流程编排、计划编辑、Git 管理台、角色、数据库等功能。',
+  ai: 'AI',
+  uncertainty: 'AI 遇到不确定的地方时',
+  assume: '做出合理假设并写明',
+  ask: '停下来问我',
+  concurrency: '同时运行的 AI 会话数',
+  concurrencyHint: '多个任务同时进行时，最多并行的 AI 会话数量。',
+} as const;

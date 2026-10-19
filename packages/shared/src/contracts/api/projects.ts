@@ -1,0 +1,47 @@
+import { z } from 'zod';
+import { hostingProviderSchema } from '../../enums/git.ts';
+
+export const hostingRefSchema = z.object({
+  provider: hostingProviderSchema,
+  /** Self-hosted GitLab address; null for github.com / gitlab.com. */
+  baseUrl: z.string().nullable(),
+  /** `owner/name` (GitHub) or the project path (GitLab). */
+  repo: z.string(),
+});
+export type HostingRef = z.infer<typeof hostingRefSchema>;
+
+export const projectSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  repoPath: z.string(),
+  defaultBranch: z.string(),
+  /** `$PROJECT_CHECK` in acceptance checks (13 §1); null when the project has none. */
+  checkCommand: z.string().nullable(),
+  /** Bound remote (M4-05); only whether a token is stored is exposed. */
+  hosting: hostingRefSchema.extend({ hasToken: z.boolean() }).nullable(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+export type ProjectDTO = z.infer<typeof projectSchema>;
+
+export const projectDetailSchema = projectSchema.extend({
+  /** Parsed from `git remote get-url origin`, used to prefill the hosting form; null when not recognisable. */
+  inferredHosting: hostingRefSchema.nullable(),
+});
+export type ProjectDetailDTO = z.infer<typeof projectDetailSchema>;
+
+export const createProjectRequestSchema = z.object({
+  /** Absolute path of the repository root. */
+  repoPath: z.string().min(1),
+  name: z.string().trim().min(1).optional(),
+});
+export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
+
+export const updateProjectRequestSchema = z.object({
+  id: z.string(),
+  name: z.string().trim().min(1).optional(),
+  defaultBranch: z.string().min(1).optional(),
+  checkCommand: z.string().trim().min(1).nullable().optional(),
+});
+export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;

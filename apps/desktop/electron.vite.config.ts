@@ -5,8 +5,11 @@ import { defineConfig } from 'electron-vite';
 
 const webRoot = resolve(import.meta.dirname, '../web');
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   main: {
+    // Replaced at build time so development-only branches (the plaintext credential adapter) are removed from
+    // production bundles; scripts/check-prod-bundle.mjs verifies it.
+    define: { 'process.env.NODE_ENV': JSON.stringify(mode === 'development' ? 'development' : 'production') },
     build: {
       // Bundle the backend and all its dependencies into out/main so the packaged app needs no node_modules.
       externalizeDeps: false,
@@ -31,4 +34,4 @@ export default defineConfig({
     server: { port: DEV_WEB_PORT, strictPort: true, proxy: { [API_PREFIX]: `http://127.0.0.1:${DEV_API_PORT}` } },
     build: { rollupOptions: { input: resolve(webRoot, 'index.html') } },
   },
-});
+}));

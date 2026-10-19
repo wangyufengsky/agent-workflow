@@ -1,9 +1,23 @@
+import { RoleBaseAgent } from '../enums/workflow.ts';
+
 export const APP_ID = 'agent-workflow';
+/** Exact opencode version this app hosts; any other version is `version_mismatch`. */
 export const OPENCODE_VERSION = '1.19.0';
+export const OPENCODE_AGENT_NAME = {
+  [RoleBaseAgent.Planner]: 'aw-planner',
+  [RoleBaseAgent.Executor]: 'aw-executor',
+  [RoleBaseAgent.Reviewer]: 'aw-reviewer',
+} as const satisfies Record<RoleBaseAgent, string>;
+export const MCP_SERVER_NAME = 'agent-workflow';
+export const MCP_ASSISTANT_SERVER_NAME = 'agent-workflow-app';
+export const TASK_KEY_PREFIX = 'T-';
+export const BRANCH_PREFIX = 'aw/';
+export const BRANCH_SLUG_MAX = 40;
+/** Project slug: the project's directory name under the worktree root. */
+export const PROJECT_SLUG_MAX = 40;
 export const API_PREFIX = '/api/v1';
 export const MCP_EXEC_PATH = '/mcp/exec';
 export const MCP_ASSISTANT_PATH = '/mcp/assistant';
-export const MCP_SERVER_NAME = 'agent-workflow';
 /** Fixed backend port in development so the Vite dev server can proxy to it; production uses a random port. */
 export const DEV_API_PORT = 47821;
 export const DEV_WEB_PORT = 47822;

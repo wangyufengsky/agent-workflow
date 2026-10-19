@@ -1,6 +1,7 @@
+import './styles/base.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { App } from './App.tsx';
+import { App } from './app/app.tsx';
 
 const root = document.getElementById('root');
 if (root === null) throw new Error('#root element missing');

@@ -29,29 +29,33 @@
 
 ```ts
 type EnvironmentDTO = {
-  git: { installed: boolean; version?: string };
-  opencode: { status: RuntimeStatus; path?: string; version?: string; requiredVersion: '1.19.0' };
+  git: { installed: true; version: string } | { installed: false };
+  opencode:
+    | { status: 'not_installed'; path?: string; requiredVersion: '1.19.0' }      // path：找到但无法执行时
+    | { status: Exclude<RuntimeStatus, 'not_installed'>; path: string; version: string; requiredVersion: '1.19.0' };
   models: { available: Array<{ providerId: string; modelId: string; name: string }>; defaultModel?: string };
-  ready: boolean;              // 三项都满足
+  ready: boolean;              // 三项都满足（M1 起模型列表为占位，M2-04 接入后才计入）
 };
 ```
 
 `models` 来自 opencode `/config/providers`，用于引导页判断「是否已登录至少一个模型提供方」。
 
+opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则依次查找 `PATH` 中的 `opencode` 与 `~/.opencode/bin/opencode`；能执行 `--version` 且输出等于 `OPENCODE_VERSION` → `stopped`（M2 起由运行时启动），版本不同 → `version_mismatch`，找不到或无法执行 → `not_installed`。`recheck` 只在 `not_installed` / `version_mismatch` 时重新检测 opencode（运行时状态机 `recheck`），git 每次都重新检测。
+
 ## 3. 项目
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/projects` | 列表 |
-| POST | `/projects` | `{ repoPath, name? }`；校验是 Git 仓库根目录，读取默认分支 |
-| GET | `/projects/:id` | `ProjectDTO`（含远端绑定摘要、关联数据库、活动任务数） |
-| PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand? }` |
+| GET | `/projects` | `{ items: ProjectDTO[] }`（按添加时间） |
+| POST | `/projects` | `{ repoPath, name? }` → 201 `ProjectDetailDTO`；`repoPath` 须为仓库根目录的绝对路径（子目录、非仓库、不存在 → 400 `PROJECT_PATH_NOT_GIT_REPO`），读取默认分支（`origin/HEAD`，否则当前分支；HEAD 游离且无 `origin/HEAD` → 400 `GIT_BASE_BRANCH_NOT_FOUND`），推断检查命令（13 §1） |
+| GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting`；关联数据库（M5）、活动任务数（M3）随对应模块加入 |
+| PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand?: string \| null }`；分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND` |
 | DELETE | `/projects/:id` | 有非终态任务时 409 `PROJECT_HAS_ACTIVE_TASKS` |
 | PUT | `/projects/:id/hosting` | `{ provider, baseUrl?, repo, token }`；保存前调用平台 API 验证令牌 |
 | DELETE | `/projects/:id/hosting` | 解除绑定并删除凭据 |
 | PUT | `/projects/:id/db-connections` 🅿 | `{ connectionIds: string[] }` 覆盖关联 |
 
-远端 `repo` 默认从 `git remote get-url origin` 推断，前端预填。
+远端 `repo` 默认从 `git remote get-url origin` 推断（`inferredHosting`：`github.com` → GitHub，其他主机 → GitLab，非 `gitlab.com` 时 `baseUrl = https://<host>`），前端预填。
 
 ## 4. 流程与角色
 
@@ -191,14 +195,15 @@ type TaskDetailDTO = {
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/mcp/tools` 🅿 | 执行 MCP 的工具名、说明、输入 schema（JSON Schema）、允许的尝试类型 |
-| GET | `/operations?expose=palette` | 命令面板可用的操作：id、标题 key、风险、最低模式、输入 schema |
+| GET | `/operations?expose=palette` | `{ items: OperationInfo[] }`：命令面板可用的操作（`expose.palette` 且非 critical）：id、标题 key、说明、风险、最低模式、method、path、输入 JSON Schema；不带 `expose` 返回全部 |
 
 ## 11. SSE 事件
 
 `GET /api/v1/events`（`Authorization` 通过查询参数 `?token=` 传递，因 EventSource 不支持头；仅本机）。
 
-- 每条：`id: <单调递增>`、`event: <ServerEventType>`、`data: <JSON>`。
-- 断线重连带 `Last-Event-ID`；服务端内存保留最近 `SSE_REPLAY_BUFFER` 条，能补则补；补不上发送 `event: resync`，前端使所有查询失效重新拉取。
+- 每条：`id: <bootId>-<seq>`（`bootId` 每次后端启动随机生成，`seq` 单调递增）、`event: <ServerEventType>`、`data: <JSON>`。
+- 断线重连带 `Last-Event-ID`；服务端内存保留最近 `SSE_REPLAY_BUFFER` 条，能补则补；补不上（超出缓冲、或 `bootId` 不是本次启动）发送 `event: resync`（其 id 为当前位置），前端使所有查询失效重新拉取。
+- 事件 schema 为 `shared/contracts/events` 的 `serverEventSchema`；各里程碑随实体加入对应事件。
 - 事件只做「失效通知 + 必要增量」，前端以 TanStack Query 缓存为准：收到 `task.updated` 就 `setQueryData` 或 `invalidate` 对应 key。
 
 | ServerEventType | data | 前端处理 |

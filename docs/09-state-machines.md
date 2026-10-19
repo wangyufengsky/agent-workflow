@@ -6,9 +6,15 @@
 
 ```ts
 export const taskMachine = defineMachine<TaskStatus, TaskEvent>({
-  draft:      { start: ['preparing'], cancel: ['cancelled'] },
-  preparing:  { workspace_ready: ['planning', 'plan_review', 'running'], fail: ['failed'], cancel: ['cancelled'] },
-  // ...
+  entity: 'task',
+  states: TASK_STATUSES,
+  events: Object.values(TaskEvent),
+  initial: [TaskStatus.Draft],
+  table: {
+    [TaskStatus.Draft]: { [TaskEvent.Start]: [TaskStatus.Preparing], [TaskEvent.Cancel]: [TaskStatus.Cancelled] },
+    // ...
+    [TaskStatus.Completed]: {},          // 没有事件的状态即终态（isTerminalState）
+  },
 });
 ```
 
@@ -16,46 +22,59 @@ export const taskMachine = defineMachine<TaskStatus, TaskEvent>({
 - 状态字段只能在 repo 的 `updateStatus(id, from, to)` 中写，SQL 带 `WHERE status = :from`，影响 0 行即抛 `STATE_TRANSITION_INVALID`（防止并发下的脏写，不需要其他版本号机制）。
 - 每次转换在同一事务内写一条 `task_events`（任务域）并在提交后经 event-bus 推送 SSE。
 - 事件名为 `snake_case` 动词/过去分词，枚举 `TaskEvent`、`NodeEvent` 等与表同文件导出。
-- 状态图由脚本 `pnpm gen:fsm-docs` 从转换表生成 Mermaid，校验本文是否同步（CI 检查）。
+- 本文的状态图由 `pnpm gen:fsm-docs` 从转换表生成（`<!-- fsm:<name> -->` 标记之间的内容，勿手改）；`pnpm check` 执行 `gen:fsm-docs --check`，不同步即失败。图中只标事件名，多目标事件的目标选择写在各节表格中。
 
 ## 2. 任务 Task
 
+<!-- fsm:task 由 pnpm gen:fsm-docs 生成，勿手改 -->
 ```mermaid
 stateDiagram-v2
   [*] --> draft
   draft --> preparing: start
-  preparing --> planning: workspace_ready（流程=ai）
-  preparing --> plan_review: workspace_ready（fixed 且 confirm_plan）
-  preparing --> running: workspace_ready（fixed 且无检查点）
-  planning --> plan_review: plan_submitted（confirm_plan）
-  planning --> running: plan_submitted（无检查点）
+  draft --> cancelled: cancel
+  preparing --> planning: workspace_ready
+  preparing --> plan_review: workspace_ready
+  preparing --> running: workspace_ready
+  preparing --> failed: fail
+  preparing --> cancelled: cancel
+  planning --> plan_review: plan_submitted
+  planning --> running: plan_submitted
+  planning --> failed: fail
+  planning --> cancelled: cancel
   plan_review --> running: plan_confirmed
   plan_review --> planning: replan_requested
-  running --> paused: pause
-  paused --> running: resume
-  running --> review: all_nodes_finished
-  review --> running: changes_requested
-  review --> merging: deliver（squash/merge/rebase/pull_request）
-  review --> completed: deliver（report_only）
-  merging --> completed: delivery_succeeded
-  merging --> review: delivery_conflict / delivery_failed
-  preparing --> failed: fail
-  planning --> failed: fail
-  running --> failed: fail
-  failed --> preparing: retry（failedPhase=preparing）
-  failed --> planning: retry（failedPhase=planning）
-  failed --> running: retry（failedPhase=running）
-  draft --> cancelled: cancel
-  preparing --> cancelled: cancel
-  planning --> cancelled: cancel
   plan_review --> cancelled: cancel
+  running --> paused: pause
+  running --> review: all_nodes_finished
+  running --> failed: fail
   running --> cancelled: cancel
+  paused --> running: resume
   paused --> cancelled: cancel
+  review --> running: changes_requested
+  review --> merging: deliver
+  review --> completed: deliver
   review --> cancelled: cancel
+  merging --> completed: delivery_succeeded
+  merging --> review: delivery_conflict
+  merging --> review: delivery_failed
+  failed --> preparing: retry
+  failed --> planning: retry
+  failed --> running: retry
   failed --> cancelled: cancel
   completed --> [*]
   cancelled --> [*]
 ```
+<!-- /fsm:task -->
+
+多目标事件的目标选择（service 判断，状态机只校验是否允许）：
+
+| 事件 | 目标 |
+| --- | --- |
+| `workspace_ready` | 流程 `planning=ai` → `planning`；fixed 且开启 `confirm_plan` → `plan_review`；fixed 且无检查点 → `running` |
+| `plan_submitted` | 开启 `confirm_plan` → `plan_review`；否则 → `running` |
+| `deliver` | `squash` / `merge` / `rebase` / `pull_request` → `merging`；`report_only` → `completed` |
+| `delivery_conflict` / `delivery_failed` | → `review` |
+| `retry` | 按 `failedPhase` 回到 `preparing` / `planning` / `running` |
 
 | 状态 | 含义 | 进入时后端做什么 |
 | --- | --- | --- |
@@ -79,36 +98,46 @@ stateDiagram-v2
 
 ## 3. 节点 Node
 
+<!-- fsm:node 由 pnpm gen:fsm-docs 生成，勿手改 -->
 ```mermaid
 stateDiagram-v2
   [*] --> pending
+  [*] --> ready
   pending --> ready: deps_met
+  pending --> skipped: skip
+  pending --> cancelled: cancel
   ready --> running: dispatch
+  ready --> skipped: skip
+  ready --> cancelled: cancel
   running --> waiting_input: input_requested
+  running --> verifying: result_submitted
+  running --> awaiting_acceptance: result_submitted
+  running --> done: result_submitted
+  running --> ready: attempt_failed
+  running --> failed: attempt_failed
+  running --> ready: interrupted
+  running --> cancelled: cancel
   waiting_input --> running: input_answered
-  running --> verifying: result_submitted（有自动检查）
-  running --> awaiting_acceptance: result_submitted（无自动检查，需人工验收）
-  running --> done: result_submitted（无检查）
-  verifying --> awaiting_acceptance: checks_passed（需人工验收）
+  waiting_input --> cancelled: cancel
+  verifying --> awaiting_acceptance: checks_passed
   verifying --> done: checks_passed
-  verifying --> ready: checks_failed（有预算）
-  verifying --> failed: checks_failed（无预算）
-  running --> ready: attempt_failed（有预算）/ interrupted
-  running --> failed: attempt_failed（无预算）
+  verifying --> ready: checks_failed
+  verifying --> failed: checks_failed
+  verifying --> ready: interrupted
+  verifying --> cancelled: cancel
   awaiting_acceptance --> done: accept
   awaiting_acceptance --> ready: reject
-  failed --> ready: retry
-  pending --> skipped: skip
-  ready --> skipped: skip
-  failed --> skipped: skip
-  pending --> cancelled: cancel
-  ready --> cancelled: cancel
-  running --> cancelled: cancel
-  waiting_input --> cancelled: cancel
-  verifying --> cancelled: cancel
   awaiting_acceptance --> cancelled: cancel
+  failed --> ready: retry
+  failed --> skipped: skip
   failed --> cancelled: cancel
+  done --> [*]
+  skipped --> [*]
+  cancelled --> [*]
 ```
+<!-- /fsm:node -->
+
+节点创建时：无依赖 → `ready`，否则 `pending`。
 
 | 规则 | 说明 |
 | --- | --- |
@@ -119,7 +148,7 @@ stateDiagram-v2
 | 跳过 | 仅专业模式；被跳过节点视为完成，下游可继续 |
 | 重启恢复 | `running`/`verifying` 的节点：其尝试标 `interrupted`，节点回 `ready`（不消耗预算）；`waiting_input` 保持不变（opencode 会话持久化，回答后继续） |
 
-**`result_submitted` 的目标选择**：有 `acceptance.checks` → `verifying`；否则需要人工验收 → `awaiting_acceptance`；否则 → `done`。
+**`result_submitted` 的目标选择**：有 `acceptance.checks` → `verifying`；否则需要人工验收 → `awaiting_acceptance`；否则 → `done`。`checks_passed` 同理（需人工验收 → `awaiting_acceptance`，否则 `done`）；`checks_failed` / `attempt_failed` 有预算 → `ready`，无预算 → `failed`；`interrupted`（重启恢复）→ `ready`。
 
 **`verifying`** 依次执行检查：`command` 在 worktree 中运行（超时 `ACCEPTANCE_COMMAND_TIMEOUT_MS`）；`ai_review` 创建 `review` 类尝试，`submit_review` 返回 `pass/fail`。任一失败即 `checks_failed`。
 
@@ -127,17 +156,25 @@ stateDiagram-v2
 
 ## 4. 尝试 Attempt
 
+<!-- fsm:attempt 由 pnpm gen:fsm-docs 生成，勿手改 -->
 ```mermaid
 stateDiagram-v2
   [*] --> starting
   starting --> running: session_started
   starting --> failed: start_failed
-  running --> succeeded: submitted
-  running --> failed: session_error / no_result / timeout
-  running --> aborted: abort
   starting --> interrupted: runtime_lost
+  running --> succeeded: submitted
+  running --> failed: session_error
+  running --> failed: no_result
+  running --> failed: timeout
+  running --> aborted: abort
   running --> interrupted: runtime_lost
+  succeeded --> [*]
+  failed --> [*]
+  aborted --> [*]
+  interrupted --> [*]
 ```
+<!-- /fsm:attempt -->
 
 - `submitted`：`plan` 类为 `submit_plan` 校验通过；`execute` 类为 `submit_result`；`review` 类为 `submit_review`。尝试成功只表示「模型交付了结果」，验收结论在节点层。
 - `no_result`：见 [03-architecture §2.4](03-architecture.md#24-会话空闲但未提交结果)。
@@ -148,53 +185,103 @@ stateDiagram-v2
 
 ## 5. 计划 Plan
 
-| from | 事件 | to | 说明 |
-| --- | --- | --- | --- |
-| `draft` | `confirm` | `confirmed` | 同任务原 `confirmed` 版本同时 → `superseded` |
-| `draft` | `supersede` | `superseded` | 产生了更新的草稿（重新规划 / 再次编辑） |
-| `confirmed` | `supersede` | `superseded` | 暂停调整或「再改改」产生的新版本被确认 |
+<!-- fsm:plan 由 pnpm gen:fsm-docs 生成，勿手改 -->
+```mermaid
+stateDiagram-v2
+  [*] --> draft
+  draft --> confirmed: confirm
+  draft --> superseded: supersede
+  confirmed --> superseded: supersede
+  superseded --> [*]
+```
+<!-- /fsm:plan -->
+
+- `confirm`：同任务原 `confirmed` 版本同时 `supersede` → `superseded`。
+- `draft` 的 `supersede`：产生了更新的草稿（重新规划 / 再次编辑）。
+- `confirmed` 的 `supersede`：暂停调整或「再改改」产生的新版本被确认。
 
 每个任务同一时刻至多一个 `draft`、一个 `confirmed`。版本号 `version` 在任务内自增。
 
 ## 6. Worktree
 
-| from | 事件 | to |
-| --- | --- | --- |
-| `creating` | `created` | `ready` |
-| `creating` | `create_failed` | `error` |
-| `ready` | `remove` | `removing` |
-| `removing` | `removed` | `removed` |
-| `removing` | `remove_failed` | `error` |
-| `error` | `remove` | `removing` |
+<!-- fsm:worktree 由 pnpm gen:fsm-docs 生成，勿手改 -->
+```mermaid
+stateDiagram-v2
+  [*] --> creating
+  creating --> ready: created
+  creating --> error: create_failed
+  ready --> removing: remove
+  removing --> removed: removed
+  removing --> error: remove_failed
+  error --> removing: remove
+  removed --> [*]
+```
+<!-- /fsm:worktree -->
 
 ## 7. 交付 Delivery
 
 每次「合并 / 建 PR」创建一条 delivery 记录，初始 `running`。
 
-| from | 事件 | to | 任务事件 |
-| --- | --- | --- | --- |
-| `running` | `succeeded` | `succeeded` | `delivery_succeeded` |
-| `running` | `conflicted` | `conflict` | `delivery_conflict`（`details.files`） |
-| `running` | `failed` | `failed` | `delivery_failed` |
+<!-- fsm:delivery 由 pnpm gen:fsm-docs 生成，勿手改 -->
+```mermaid
+stateDiagram-v2
+  [*] --> running
+  running --> succeeded: succeeded
+  running --> conflict: conflicted
+  running --> failed: failed
+  succeeded --> [*]
+  conflict --> [*]
+  failed --> [*]
+```
+<!-- /fsm:delivery -->
+
+同一事务内对应的任务事件：`succeeded` → `delivery_succeeded`；`conflicted` → `delivery_conflict`（`details.files`）；`failed` → `delivery_failed`。
 
 本地合并流程（`squash` 为例）：在**主仓库**（不是 worktree）检查目标分支是否检出且干净 → 若用户主工作区当前分支即目标分支且有未提交改动，则失败并提示（不碰用户改动）→ `git merge --squash` → 提交 → 删除 worktree / 分支。冲突时 `git merge --abort` 恢复原状再报告冲突文件。
 
 ## 8. 需要你处理 Inbox
 
-| from | 事件 | to |
-| --- | --- | --- |
-| `open` | `resolve` | `resolved`（用户作答 / 决定） |
-| `open` | `dismiss` | `dismissed`（用户忽略，或关联任务/节点进入终态时自动） |
+<!-- fsm:inbox 由 pnpm gen:fsm-docs 生成，勿手改 -->
+```mermaid
+stateDiagram-v2
+  [*] --> open
+  [*] --> resolved
+  open --> resolved: resolve
+  open --> dismissed: dismiss
+  resolved --> [*]
+  dismissed --> [*]
+```
+<!-- /fsm:inbox -->
+
+- `resolve`：用户作答 / 决定。
+- `dismiss`：用户忽略，或关联任务/节点进入终态时自动。
+- 模型按自己的假设继续的提问（未问用户）直接以 `resolved` 创建，作为记录。
 
 ## 9. opencode 运行时 Runtime
 
-| from | 事件 | to | 说明 |
-| --- | --- | --- | --- |
-| （检测） | `detected` | `stopped` / `not_installed` / `version_mismatch` | 启动与「重新检测」时执行 |
-| `stopped` | `start` | `starting` | |
-| `starting` | `listening` | `ready` | 从 stdout 解析到地址并且 `/config` 请求成功 |
-| `starting` | `exited` | `crashed` | |
-| `ready` | `exited` | `crashed` | 活动尝试全部 → `interrupted`；自动 `start` 一次 |
-| `crashed` | `start` | `starting` | 自动一次，之后需用户在运行环境页点重启 |
-| `ready` | `restart` | `starting` | 用户手动；先中止活动尝试 |
-| `not_installed` / `version_mismatch` | `recheck` | （重新检测） | |
+<!-- fsm:runtime 由 pnpm gen:fsm-docs 生成，勿手改 -->
+```mermaid
+stateDiagram-v2
+  [*] --> stopped
+  [*] --> not_installed
+  [*] --> version_mismatch
+  not_installed --> stopped: recheck
+  not_installed --> not_installed: recheck
+  not_installed --> version_mismatch: recheck
+  version_mismatch --> stopped: recheck
+  version_mismatch --> not_installed: recheck
+  version_mismatch --> version_mismatch: recheck
+  stopped --> starting: start
+  starting --> ready: listening
+  starting --> crashed: exited
+  ready --> crashed: exited
+  ready --> starting: restart
+  crashed --> starting: start
+```
+<!-- /fsm:runtime -->
+
+- 初始状态由环境检测（启动时与「重新检测」`recheck`）决定：`stopped` / `not_installed` / `version_mismatch`。
+- `listening`：从 stdout 解析到地址并且 `/config` 请求成功。
+- `ready` 的 `exited`：活动尝试全部 → `interrupted`；自动 `start` 一次。
+- `crashed` 的 `start`：自动一次，之后需用户在运行环境页点重启。
+- `restart`：用户手动；先中止活动尝试。

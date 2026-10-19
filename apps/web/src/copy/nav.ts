@@ -1,0 +1,18 @@
+export const NAV_COPY = {
+  brand: 'Agent Workflow',
+  brandSub: '本地 AI 开发流程',
+  startTask: '开始任务',
+  proGroup: '专业',
+  home: '主页',
+  tasks: '任务',
+  inbox: '需要你处理',
+  projects: '项目',
+  git: 'Git',
+  workflows: '流程',
+  roles: '角色',
+  databases: '数据库',
+  tools: 'MCP 工具',
+  runtime: '运行环境',
+  settings: '设置',
+  onboarding: '首次启动',
+} as const;

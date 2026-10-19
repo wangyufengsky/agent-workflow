@@ -27,7 +27,8 @@
 
 - **main 不含业务逻辑**。凡需要系统能力（选目录、加解密）的，renderer 通过 preload 调 main；后端需要加解密时经 utilityProcess 的 `MessagePort` 请求 main。
 - **后端是唯一的状态权威**。renderer 不直接碰 Git、SQLite、opencode、MySQL。
-- **后端可独立运行**：`pnpm --filter server dev` 用系统 Node 24 启动，renderer 用浏览器打开即可开发与跑 E2E（此时 safeStorage 由开发用的明文适配器替代，仅限开发环境）。
+- **凭据加解密**：后端经 utilityProcess 的 `process.parentPort` 发 `credential.request`（`encrypt` / `decrypt`，协议 schema 在 `shared/contracts/credential-port.ts`），main 用 safeStorage 处理后回 `credential.response`；safeStorage 不可用时后端抛 `CREDENTIAL_UNAVAILABLE`。
+- **后端可独立运行**：`pnpm --filter server dev` 用系统 Node 24 启动，renderer 用浏览器打开即可开发与跑 E2E（此时 safeStorage 由开发用的明文适配器替代，仅限 `NODE_ENV=development`；该分支在生产构建中被常量折叠删除，`pnpm build` 末尾的 `scripts/check-prod-bundle.mjs` 校验产物中不存在它）。
 - 令牌：每次启动随机生成 renderer 令牌与各 MCP 令牌，只存在内存；端口均为随机端口，仅绑定 127.0.0.1。开发时后端固定 `DEV_API_PORT`，Vite 把 `/api/v1` 代理过去（D31）。
 - **两套 MCP 权限隔离**：执行 MCP 只给执行任务的 AI 会话用，工具绑定到所属尝试；助手 MCP（v1.1，见 [15-assistant.md](15-assistant.md)）给应用助手用，能力来自操作清单，写操作需用户确认。
 
@@ -81,11 +82,12 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | 服务端状态 | @tanstack/react-query | 5.104.4 |
 | 界面状态 | zustand | 5.0.15 |
 | 画布 | @xyflow/react + elkjs | 12.12.0 / 0.12.0 |
-| 无样式组件 | @radix-ui/react-*（Dialog、Popover、Tabs、Tooltip、DropdownMenu、Select） | M0 锁定 |
-| 表单 | react-hook-form + @hookform/resolvers | M0 锁定 |
-| diff / 代码高亮 | @git-diff-view/react + shiki | M0 锁定 |
+| 无样式组件 | @radix-ui/react-dialog、@radix-ui/react-tabs（Dialog、Drawer、命令面板、Tabs）；Popover、Tooltip、DropdownMenu、Select 引入时锁定 | 1.3.1 / 1.2.1 |
+| Markdown 渲染 | react-markdown + remark-gfm（不渲染原始 HTML，模型产出的摘要与报告） | 10.1.0 / 4.0.1 |
+| 表单 | react-hook-form + @hookform/resolvers | 引入时锁定（M1 表单字段少，用受控组件） |
+| diff / 代码高亮 | @git-diff-view/react + shiki | 引入时锁定（M4-07） |
 | 契约 | zod | 4.6.7 |
-| HTTP | fastify + fastify-type-provider-zod | 5.12.7 / 7.0.0 |
+| HTTP | fastify（请求校验由操作清单挂载层直接用 zod 解析，见 D39） | 5.12.7 |
 | MCP | @modelcontextprotocol/sdk | 1.32.1 |
 | opencode 客户端 | @opencode-ai/sdk | **1.19.0（与 CLI 一致）** |
 | SQLite | `node:sqlite`（内置，D30） | — |
@@ -133,7 +135,7 @@ agent-workflow/
 │  │     ├─ contracts/events/  SSE 事件 schema
 │  │     ├─ operations/        操作清单契约（defineOperationContract）
 │  │     ├─ workflow/          流程定义 schema、计划图 schema 与校验
-│  │     └─ theme/             主题 token schema
+│  │     └─ naming.ts          slug 转写（分支名、项目目录名）
 │  ├─ server/                  后端
 │  │  └─ src/
 │  │     ├─ core/              config、db、logger、event-bus、jsonl、errors、http、operations
@@ -215,14 +217,19 @@ export const startTaskOp = defineOperationContract({
   mode: UiMode.Simple,                   // 最低可见界面模式
 });
 
-// server/modules/tasks/tasks.operations.ts
-export const taskOperations = [
-  implement(startTaskOp, (input, ctx) => ctx.services.tasks.create(input)),
-  // ...
-];
+// server/modules/tasks/tasks.operations.ts —— 闭包持有本模块 service，由模块 index.ts 的工厂组装
+export function taskOperations(tasks: TasksService) {
+  return [
+    implement(startTaskOp, (input) => tasks.create(input)),
+    // ...
+  ];
+}
 ```
 
 - `core/operations` 负责：把清单挂载为 Fastify 路由（统一校验、错误映射）、提供 `GET /operations` 给命令面板、v1.1 生成助手 MCP 工具。
+  - 输入：路径参数、query、body 合并为一个对象后用 `input` 解析（路径参数优先，body 必须是 JSON 对象），失败 400 `VALIDATION_FAILED`。
+  - 输出：handler 返回值用 `output` 解析后返回，DTO 之外的字段被剥离；不匹配视为缺陷（500）。`http.status` 缺省 200，`output` 为 `z.void()` 时 204。
+  - `GET /operations?expose=palette|assistant`：`palette` 只含 `expose.palette` 且非 `critical` 的操作；每项含 `id`、`title`、`description`、`risk`、`mode`、`method`、`path`、`inputSchema`（JSON Schema）。
 - SSE、会话流 transcript、diff 文件内容等流式或二进制接口不走清单，单独定义路由（清单只管「一次调用、一个结果」的操作）。
 - 执行 MCP 工具（12）**不**来自清单：它们绑定在尝试上，语义不同，单独用 `defineMcpTool` 定义；两者共享 service。
 - 新增功能 = 写 service + 注册操作；不手写 route。

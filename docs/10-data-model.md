@@ -79,7 +79,7 @@
 
 ### workflows
 
-流程按版本存储，**行不可变**；编辑产生新版本行。任务引用具体版本行。
+流程按版本存储，**行不可变**；编辑产生新版本行。任务引用具体版本行。`definition` 的 zod schema 为 `shared/workflow` 的 `workflowDefinitionSchema`（`planGraphSchema`、`acceptanceSchema` 同处）。
 
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
