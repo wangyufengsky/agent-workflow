@@ -8,6 +8,8 @@ export type SystemServiceDeps = {
   env: NodeJS.ProcessEnv;
   runtime: OpencodeRuntime;
   opencode: OpencodeClient;
+  /** Starts the hosted runtime if it is stopped (and hosting has begun, see app.ts). */
+  startRuntime: () => Promise<void>;
 };
 
 const NOT_HOSTABLE: readonly RuntimeStatus[] = [RuntimeStatus.NotInstalled, RuntimeStatus.VersionMismatch];
@@ -22,7 +24,7 @@ async function detectGit(env: NodeJS.ProcessEnv): Promise<EnvironmentDTO['git']>
   }
 }
 
-export function createSystemService({ config, env, runtime, opencode }: SystemServiceDeps) {
+export function createSystemService({ config, env, runtime, opencode, startRuntime }: SystemServiceDeps) {
   async function environment(): Promise<EnvironmentDTO> {
     const runtimeState = await runtime.snapshot();
     const git = await detectGit(env);
@@ -39,8 +41,10 @@ export function createSystemService({ config, env, runtime, opencode }: SystemSe
   return {
     health: (): Health => ({ status: 'ok', appVersion: config.appVersion, node: process.versions.node }),
     environment,
+    /** After installing opencode (or choosing its path) the runtime becomes `stopped`: start it right away. */
     async recheck(): Promise<EnvironmentDTO> {
       await runtime.recheck();
+      await startRuntime();
       return environment();
     },
     runtime: () => runtime.snapshot(),

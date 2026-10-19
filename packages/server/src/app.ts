@@ -106,7 +106,13 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   server.addHook('onClose', () => runtime.stop());
   const opencode = deps.opencode ?? createRuntimeClient(runtime, log);
-  const system = createSystemModule({ config, env, runtime, opencode });
+  // The hosted runtime can start only once the API listens (its MCP endpoint needs the port) and when no fake
+  // replaces it; startRuntime() decides that, after which a recheck may start a newly hostable runtime too.
+  let hosting = false;
+  const startHostedRuntime = async () => {
+    if (hosting) await runtime.startIfStopped();
+  };
+  const system = createSystemModule({ config, env, runtime, opencode, startRuntime: startHostedRuntime });
   const projects = createProjectsModule({ db: database.db, clock });
   const attempts = createAttemptsModule({
     db: database.db,
@@ -141,7 +147,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     mcpToken,
     async startRuntime(port) {
       apiPort = port;
-      if (deps.opencode === undefined) await runtime.startIfStopped();
+      hosting = deps.opencode === undefined;
+      await startHostedRuntime();
     },
     close: () => server.close(),
   };

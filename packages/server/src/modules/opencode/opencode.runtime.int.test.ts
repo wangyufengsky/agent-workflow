@@ -7,6 +7,7 @@ import {
   OPENCODE_VERSION,
   type RuntimeDTO,
   RuntimeStatus,
+  recheckEnvironmentOp,
   restartRuntimeOp,
   ServerEventType,
 } from '@aw/shared';
@@ -64,6 +65,22 @@ describe('opencode 运行时', () => {
     expect((await t.call(restartRuntimeOp, {})).status).toBe(200);
     await secondRound;
     expect(await launchCount()).toBe(4);
+  });
+
+  it('安装 opencode 后重新检测即启动运行时', async () => {
+    const empty = await mkdtemp(join(tmpdir(), 'aw-empty-'));
+    await t.close();
+    t = await createTestApp({ env: { PATH: empty, HOME: empty }, realOpencode: true });
+    await t.app.startRuntime(t.port);
+    expect((await t.call(getRuntimeOp, {})).body.status).toBe(RuntimeStatus.NotInstalled);
+
+    bin = empty;
+    launches = join(empty, 'launches.log');
+    await crashingOpencode();
+    const settled = waitForEvent(t.app.events, ServerEventType.RuntimeUpdated, nthCrash(2));
+    await t.call(recheckEnvironmentOp, {});
+    await settled;
+    expect(await launchCount()).toBe(2);
   });
 
   it('opencode 未安装时不能重启', async () => {

@@ -68,6 +68,26 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "pattern": "git show*",
       "permission": "bash",
     },
+    {
+      "action": "allow",
+      "pattern": "git blame*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse*",
+      "permission": "bash",
+    },
   ],
   "planner": [
     {
@@ -135,6 +155,26 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "pattern": "git show*",
       "permission": "bash",
     },
+    {
+      "action": "allow",
+      "pattern": "git blame*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse*",
+      "permission": "bash",
+    },
   ],
   "reviewer": [
     {
@@ -200,6 +240,26 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "git show*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git blame*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse*",
       "permission": "bash",
     },
   ],
@@ -216,47 +276,47 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "deny",
-      "pattern": "git commit*",
+      "pattern": "git *",
       "permission": "bash",
     },
     {
-      "action": "deny",
-      "pattern": "git push*",
+      "action": "allow",
+      "pattern": "git status*",
       "permission": "bash",
     },
     {
-      "action": "deny",
-      "pattern": "git checkout*",
+      "action": "allow",
+      "pattern": "git log*",
       "permission": "bash",
     },
     {
-      "action": "deny",
-      "pattern": "git switch*",
+      "action": "allow",
+      "pattern": "git diff*",
       "permission": "bash",
     },
     {
-      "action": "deny",
-      "pattern": "git reset*",
+      "action": "allow",
+      "pattern": "git show*",
       "permission": "bash",
     },
     {
-      "action": "deny",
-      "pattern": "git rebase*",
+      "action": "allow",
+      "pattern": "git blame*",
       "permission": "bash",
     },
     {
-      "action": "deny",
-      "pattern": "git merge*",
+      "action": "allow",
+      "pattern": "git grep*",
       "permission": "bash",
     },
     {
-      "action": "deny",
-      "pattern": "git branch -D*",
+      "action": "allow",
+      "pattern": "git ls-files*",
       "permission": "bash",
     },
     {
-      "action": "deny",
-      "pattern": "git worktree*",
+      "action": "allow",
+      "pattern": "git rev-parse*",
       "permission": "bash",
     },
   ],
@@ -326,6 +386,26 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "pattern": "git show*",
       "permission": "bash",
     },
+    {
+      "action": "allow",
+      "pattern": "git blame*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse*",
+      "permission": "bash",
+    },
   ],
   "reviewer": [
     {
@@ -391,6 +471,26 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "allow",
       "pattern": "git show*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git blame*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse*",
       "permission": "bash",
     },
   ],

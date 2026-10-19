@@ -37,8 +37,9 @@
 - agent 只放不随设置变化的权限；**bash 规则在 `session.create` 时以会话级 `permission` 规则集传入**（D35，`sessionPermissionRules`），格式 `[{ permission: 'bash', pattern, action }]`。opencode 取**最后一条**匹配的规则，所以兜底的 `*` 放在最前。
 - 原生 `question` 工具禁用，提问只走 MCP `ask_user`（D36）。
 - **bash 规则集**（常量 `BASH_PERMISSION_PRESETS`，在 `shared/constants/opencode.ts`；reviewer 与 planner 用只读白名单，executor 按 `ai.bashPolicy`）：
-  - 只读白名单：`ls* cat* head* tail* rg* grep* find* wc* git status* git log* git diff* git show*` 为 allow，其余 ask。
-  - `ai.bashPolicy = auto`（默认）：`*` allow；`git commit* git push* git checkout* git switch* git reset* git rebase* git merge* git branch -D* git worktree*` deny。
+  - Git 只读子命令：`git status* git log* git diff* git show* git blame* git grep* git ls-files* git rev-parse*`。
+  - 只读白名单：`ls* cat* head* tail* rg* grep* find* wc*` 与 Git 只读子命令为 allow，其余 ask。
+  - `ai.bashPolicy = auto`（默认）：`*` allow；`git *` deny（其他所有 Git 命令都可能改动 refs 或工作区，不逐个列举）；Git 只读子命令再 allow。
   - `ai.bashPolicy = ask`：只读白名单 allow，其余 ask。
 - 角色差异不靠多个 agent：会话使用角色的 `base_agent` 对应的 agent，角色提示词通过每次 prompt 的 `system` 字段追加，模型通过 prompt 的 `model` 字段指定。因此修改角色无需重启 opencode。
 - 修改 `ai.bashPolicy` 对之后新建的会话立即生效，无需重启 opencode。

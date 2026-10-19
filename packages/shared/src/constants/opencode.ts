@@ -21,33 +21,19 @@ export const OPENCODE_START_TIMEOUT_MS = 30_000;
 export type PermissionAction = 'allow' | 'ask' | 'deny';
 export type PermissionRule = { permission: string; pattern: string; action: PermissionAction };
 
-/** Commands that only read the workspace; allowed without asking under every policy. */
-const BASH_READONLY = [
-  'ls*',
-  'cat*',
-  'head*',
-  'tail*',
-  'rg*',
-  'grep*',
-  'find*',
-  'wc*',
+/** Git subcommands that only read; every other git command writes refs or the worktree, which is the backend's job. */
+const GIT_READONLY = [
   'git status*',
   'git log*',
   'git diff*',
   'git show*',
+  'git blame*',
+  'git grep*',
+  'git ls-files*',
+  'git rev-parse*',
 ];
-/** Git writes are the backend's job (12 §1); the model never runs them. */
-const BASH_GIT_WRITES = [
-  'git commit*',
-  'git push*',
-  'git checkout*',
-  'git switch*',
-  'git reset*',
-  'git rebase*',
-  'git merge*',
-  'git branch -D*',
-  'git worktree*',
-];
+/** Commands that only read the workspace; allowed without asking under every policy. */
+const BASH_READONLY = ['ls*', 'cat*', 'head*', 'tail*', 'rg*', 'grep*', 'find*', 'wc*', ...GIT_READONLY];
 
 const bash = (pattern: string, action: PermissionAction): PermissionRule => ({ permission: 'bash', pattern, action });
 
@@ -57,6 +43,7 @@ const bash = (pattern: string, action: PermissionAction): PermissionRule => ({ p
  */
 export const BASH_PERMISSION_PRESETS = {
   readonly: [bash('*', 'ask'), ...BASH_READONLY.map((p) => bash(p, 'allow'))],
-  [BashPolicy.Auto]: [bash('*', 'allow'), ...BASH_GIT_WRITES.map((p) => bash(p, 'deny'))],
+  // Git is denied as a whole and only its read-only subcommands are allowed again (12 §1: the model never writes Git).
+  [BashPolicy.Auto]: [bash('*', 'allow'), bash('git *', 'deny'), ...GIT_READONLY.map((p) => bash(p, 'allow'))],
   [BashPolicy.Ask]: [bash('*', 'ask'), ...BASH_READONLY.map((p) => bash(p, 'allow'))],
 } as const satisfies Record<'readonly' | BashPolicy, readonly PermissionRule[]>;

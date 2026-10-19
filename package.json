@@ -12,7 +12,7 @@
     "dev:server": "pnpm build:plugin && pnpm --filter @aw/server dev",
     "dev:web": "pnpm --filter @aw/web dev",
     "build": "pnpm build:plugin && pnpm --filter @aw/desktop build && node scripts/check-prod-bundle.mjs",
-    "dist": "pnpm --filter @aw/desktop dist",
+    "dist": "pnpm build:plugin && pnpm --filter @aw/desktop dist",
     "typecheck": "pnpm -r --parallel typecheck",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

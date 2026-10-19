@@ -31,6 +31,8 @@ export function watchSessions(state: AttemptState, deps: { opencode: OpencodeCli
         code: ErrorCode.AttemptNoResult,
         message: 'Session went idle without submitting a result',
       });
+      // The session is already idle, so no later idle event would release it.
+      live.delete(session.sessionId);
       return;
     }
     repo.incrementNudges(attempt.id);
