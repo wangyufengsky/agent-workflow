@@ -1,7 +1,7 @@
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { API_PREFIX, type OperationContract } from '@aw/shared';
+import { API_PREFIX, type OperationContract, toOperationRequest } from '@aw/shared';
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
 import type { z } from 'zod';
 import { type App, type AppDeps, buildApp } from '../../src/app.ts';
@@ -28,22 +28,6 @@ export type TestApp = {
   close(): Promise<void>;
 };
 
-/** Splits an input object into path params (`:name`) and the rest, sent as query (GET/DELETE) or body. */
-function toRequest(op: OperationContract, input: Record<string, unknown>): InjectOptions {
-  const rest = { ...input };
-  const path = op.http.path.replace(/:([A-Za-z]+)/g, (_m, name: string) => {
-    const value = rest[name];
-    delete rest[name];
-    return encodeURIComponent(String(value));
-  });
-  const url = `${API_PREFIX}${path}`;
-  if (op.http.method === 'GET' || op.http.method === 'DELETE') {
-    const query = new URLSearchParams(Object.entries(rest).map(([k, v]): [string, string] => [k, String(v)]));
-    return { method: op.http.method, url: query.size > 0 ? `${url}?${query}` : url };
-  }
-  return { method: op.http.method, url, payload: rest };
-}
-
 /** Backend on a fresh temporary data directory with captured logs (07 §4). */
 export async function createTestApp(deps: Omit<AppDeps, 'logDestination'> = {}): Promise<TestApp> {
   const dataDir = await mkdtemp(join(tmpdir(), 'aw-int-'));
@@ -59,7 +43,13 @@ export async function createTestApp(deps: Omit<AppDeps, 'logDestination'> = {}):
     request: ({ url, headers, ...rest }) =>
       app.server.inject({ ...rest, url: `${API_PREFIX}${url}`, headers: { authorization, ...headers } }),
     async call(op, input) {
-      const raw = await app.server.inject({ ...toRequest(op, input), headers: { authorization } });
+      const { method, url, body } = toOperationRequest(op, input);
+      const raw = await app.server.inject({
+        method,
+        url,
+        headers: { authorization },
+        ...(body === undefined ? {} : { payload: body }),
+      });
       // 204 responses have an empty body.
       return { status: raw.statusCode, body: JSON.parse(raw.body === '' ? 'null' : raw.body), raw };
     },

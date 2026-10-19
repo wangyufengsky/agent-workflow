@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { API_PREFIX } from '../constants/app.ts';
 import { type OperationRisk, operationRiskSchema } from '../enums/system.ts';
 import { type UiMode, uiModeSchema } from '../enums/ui.ts';
 
@@ -56,3 +57,25 @@ export type OperationExposure = (typeof OperationExposure)[keyof typeof Operatio
 export const listOperationsQuerySchema = z.object({ expose: z.enum(OperationExposure).optional() });
 export const listOperationsResponseSchema = z.object({ items: z.array(operationInfoSchema) });
 export type ListOperationsResponse = z.infer<typeof listOperationsResponseSchema>;
+
+/** An operation call as an HTTP request: `:name` path params filled from the input, the rest as query or JSON body. */
+export type OperationRequest = { method: HttpMethod; url: string; body?: Record<string, unknown> };
+
+export function toOperationRequest(contract: OperationContract, input: Record<string, unknown>): OperationRequest {
+  const rest: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) if (value !== undefined) rest[key] = value;
+  const path = contract.http.path.replace(/:([A-Za-z]+)/g, (_match, name: string) => {
+    const value = rest[name];
+    delete rest[name];
+    return encodeURIComponent(String(value));
+  });
+  const url = `${API_PREFIX}${path}`;
+  const { method } = contract.http;
+  if (method === 'GET' || method === 'DELETE') {
+    const query = Object.entries(rest)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join('&');
+    return { method, url: query === '' ? url : `${url}?${query}` };
+  }
+  return { method, url, body: rest };
+}
