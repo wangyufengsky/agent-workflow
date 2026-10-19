@@ -5,6 +5,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.system.health': '后台状态',
   'op.system.environment': '查看运行环境',
   'op.system.recheckEnvironment': '重新检测环境',
+  'op.system.runtime': '查看 opencode 运行状态',
+  'op.system.restartRuntime': '重启 opencode',
   'op.projects.list': '项目列表',
   'op.projects.create': '添加项目',
   'op.projects.get': '查看项目',

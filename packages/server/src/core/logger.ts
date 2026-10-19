@@ -6,7 +6,8 @@ import type { AppConfig } from './config.ts';
 
 export type { Logger };
 
-function dateStamp(ms: number): string {
+/** `YYYYMMDD` (UTC) used in daily log file names. */
+export function dateStamp(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10).replaceAll('-', '');
 }
 

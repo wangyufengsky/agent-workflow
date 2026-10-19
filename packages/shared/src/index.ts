@@ -1,5 +1,6 @@
 export * from './constants/app.ts';
 export * from './constants/limits.ts';
+export * from './constants/opencode.ts';
 export * from './constants/settings.ts';
 export * from './contracts/api/projects.ts';
 export * from './contracts/api/system.ts';

@@ -17,6 +17,7 @@ import {
   createCredentialsModule,
   unavailableCipher,
 } from './modules/credentials/index.ts';
+import { createOpencodeRuntime, type OpencodeRuntime } from './modules/opencode/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
@@ -36,7 +37,9 @@ export type App = {
   server: FastifyInstance;
   events: EventBus;
   log: Logger;
-  services: { credentials: CredentialsService };
+  services: { credentials: CredentialsService; runtime: OpencodeRuntime };
+  /** Starts the hosted opencode once the API listens (its MCP endpoint needs the port); no-op if not hostable. */
+  startRuntime(apiPort: number): Promise<void>;
   close(): Promise<void>;
 };
 
@@ -59,10 +62,29 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
 
   const settings = createSettingsModule({ db: database.db, events, clock });
   const credentials = createCredentialsModule({ db: database.db, clock, cipher: deps.cipher ?? unavailableCipher });
-  const system = createSystemModule({ config, env: deps.env ?? process.env, settings: settings.service });
+  const env = deps.env ?? process.env;
+  const runtime = createOpencodeRuntime({
+    env,
+    binaryPath: () => settings.service.get('opencode.binaryPath'),
+    // TODO(M2-02): MCP, agents and the bridge plugin.
+    configContent: () => '{}',
+    log,
+    events,
+    clock,
+    logDir: join(config.dataDir, 'logs'),
+  });
+  server.addHook('onClose', () => runtime.stop());
+  const system = createSystemModule({ config, env, runtime });
   const projects = createProjectsModule({ db: database.db, clock });
   mountOperations(server, [...settings.operations, ...system.operations, ...projects.operations]);
 
   if (config.webDir !== undefined) await server.register(fastifyStatic, { root: config.webDir });
-  return { server, events, log, services: { credentials: credentials.service }, close: () => server.close() };
+  return {
+    server,
+    events,
+    log,
+    services: { credentials: credentials.service, runtime },
+    startRuntime: async () => runtime.startIfStopped(),
+    close: () => server.close(),
+  };
 }

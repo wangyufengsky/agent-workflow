@@ -20,19 +20,22 @@
 | --- | --- | --- |
 | GET | `/system/environment` | 环境检测结果 `EnvironmentDTO` |
 | POST | `/system/environment/recheck` | 重新检测（安装 opencode 后用） |
-| GET | `/system/runtime` | `RuntimeDTO`：opencode 状态、版本、地址、启动时间、活动会话数 |
-| POST | `/system/runtime/restart` | 重启 opencode（先中止活动尝试） |
+| GET | `/system/runtime` | `RuntimeDTO`：opencode 状态、路径、版本；`ready` 时含地址与启动时间 |
+| POST | `/system/runtime/restart` | `ready` 时重启，`stopped` / `crashed` 时启动（活动尝试 → `interrupted`）；返回启动结束后的 `RuntimeDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
 | GET | `/system/runtime/logs?tail=500` 🅿 | opencode 日志末尾若干行 |
 | GET | `/system/storage` | 数据目录占用 |
 | GET | `/settings` | 全部设置 `Record<SettingKey, value>` |
 | PATCH | `/settings` | 部分更新；按 key 的 schema 校验 |
 
 ```ts
+type RuntimeDTO =
+  | { status: 'not_installed'; path?: string; requiredVersion: '1.19.0' }      // path：找到但无法执行时
+  | { status: 'version_mismatch' | 'stopped' | 'starting' | 'crashed'; path: string; version: string; requiredVersion: '1.19.0' }
+  | { status: 'ready'; path: string; version: string; requiredVersion: '1.19.0'; url: string; startedAt: number };
+
 type EnvironmentDTO = {
   git: { installed: true; version: string } | { installed: false };
-  opencode:
-    | { status: 'not_installed'; path?: string; requiredVersion: '1.19.0' }      // path：找到但无法执行时
-    | { status: Exclude<RuntimeStatus, 'not_installed'>; path: string; version: string; requiredVersion: '1.19.0' };
+  opencode: RuntimeDTO;
   models: { available: Array<{ providerId: string; modelId: string; name: string }>; defaultModel?: string };
   ready: boolean;              // 三项都满足（M1 起模型列表为占位，M2-04 接入后才计入）
 };

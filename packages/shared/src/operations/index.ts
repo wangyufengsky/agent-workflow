@@ -1,7 +1,7 @@
 import type { OperationContract } from './define.ts';
 import { createProjectOp, deleteProjectOp, getProjectOp, listProjectsOp, updateProjectOp } from './projects.ts';
 import { getSettingsOp, updateSettingsOp } from './settings.ts';
-import { getEnvironmentOp, getHealthOp, recheckEnvironmentOp } from './system.ts';
+import { getEnvironmentOp, getHealthOp, getRuntimeOp, recheckEnvironmentOp, restartRuntimeOp } from './system.ts';
 
 export * from './define.ts';
 export * from './projects.ts';
@@ -15,6 +15,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getHealthOp,
   getEnvironmentOp,
   recheckEnvironmentOp,
+  getRuntimeOp,
+  restartRuntimeOp,
   listProjectsOp,
   createProjectOp,
   getProjectOp,
