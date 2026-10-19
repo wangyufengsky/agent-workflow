@@ -134,7 +134,7 @@ agent-workflow/
 │  │     ├─ contracts/events/  SSE 事件 schema
 │  │     ├─ operations/        操作清单契约（defineOperationContract）
 │  │     ├─ workflow/          流程定义 schema、计划图 schema 与校验
-│  │     └─ theme/             主题 token schema
+│  │     └─ naming.ts          slug 转写（分支名、项目目录名）
 │  ├─ server/                  后端
 │  │  └─ src/
 │  │     ├─ core/              config、db、logger、event-bus、jsonl、errors、http、operations

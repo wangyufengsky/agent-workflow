@@ -167,27 +167,28 @@ export const NAV_ITEMS: NavItem[] = [
 
 ```
 web/src/theme/
-├─ tokens.ts           ThemeTokens 类型（键与设计稿 skins.css 变量一一对应）
+├─ tokens.ts             THEME_TOKEN_NAMES 与 ThemeTokens 类型（键与设计稿 skins.css 变量一一对应）
+├─ theme-definition.ts   ThemeDefinition 类型
 ├─ themes/
 │  ├─ deepseek.ts
 │  ├─ warm.ts
 │  ├─ spdb.ts
 │  └─ github-white.ts
-├─ registry.ts         THEMES: Record<ThemeId, ThemeDefinition>
-└─ apply-theme.ts      把 tokens 写成 :root CSS 变量，设置 color-scheme 与 data-theme
+├─ registry.ts           THEMES: Record<ThemeId, ThemeDefinition>
+├─ apply-theme.ts        resolveTheme(preference, prefersDark)；applyTheme 把 tokens 写成 :root CSS 变量，设置 color-scheme 与 data-theme
+└─ use-applied-theme.ts  按设置应用主题，system 时跟随 prefers-color-scheme
 ```
 
 ```ts
 export type ThemeDefinition = {
-  id: ThemeId;
-  label: string;                 // 文案 key
+  id: ThemeId;                   // 显示名在 copy 中按 ThemeId 查
   colorScheme: 'light' | 'dark';
-  tokens: ThemeTokens;           // surface / text / accent / status(idle..danger, 各含 base/fill/line) / canvas / code / effect
+  tokens: ThemeTokens;           // Record<ThemeTokenName, string>，键即 CSS 变量名（去掉 --）
   codeTheme: string;             // shiki 主题名
 };
 ```
 
-- `tokens.ts` 的键由设计稿 `originals/main/assets/skins.css` 迁移，CSS 变量名保持不变（`--bg`、`--ink`、`--run-fill`…），设计稿的 `ds.css` 迁入 `styles/base.css` 后可直接使用。
+- `tokens.ts` 的键由设计稿 `originals/main/assets/skins.css` 迁移，CSS 变量名保持不变（`--bg`、`--ink`、`--run-fill`…；`unknown*` 随「回执未知」状态删除，D11；`shadow-card` 来自 ds.css），设计稿的 `ds.css` 迁入 `styles/base.css`（只保留与主题无关的令牌和通用类，原型切换器与 canvas.js 节点样式不迁移）后可直接使用。
 - 组件样式（CSS Modules）只能使用 `var(--token)`，禁止写颜色字面量；`pnpm lint:css` 检查 `#hex`、`rgb(`、`hsl(` 出现在主题文件以外即报错。
 - 切换：设置 `ui.theme` 变更 → `applyTheme()` 即时生效，无需刷新；`system` 时监听 `prefers-color-scheme`。
 - React Flow 的连线、节点、小地图颜色，diff 增删色，代码高亮主题都从当前主题取值。
