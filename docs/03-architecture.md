@@ -85,7 +85,7 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | 表单 | react-hook-form + @hookform/resolvers | M0 锁定 |
 | diff / 代码高亮 | @git-diff-view/react + shiki | M0 锁定 |
 | 契约 | zod | 4.6.7 |
-| HTTP | fastify + fastify-type-provider-zod | 5.12.7 / 7.0.0 |
+| HTTP | fastify（请求校验由操作清单挂载层直接用 zod 解析，见 D39） | 5.12.7 |
 | MCP | @modelcontextprotocol/sdk | 1.32.1 |
 | opencode 客户端 | @opencode-ai/sdk | **1.19.0（与 CLI 一致）** |
 | SQLite | `node:sqlite`（内置，D30） | — |

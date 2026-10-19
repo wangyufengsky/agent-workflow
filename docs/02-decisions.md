@@ -42,3 +42,4 @@
 | D36 | 禁用 opencode 原生 `question` 工具（aw agent 权限 `question: deny`），提问统一走 MCP `ask_user` | 我们的提问存库、可跨应用重启、支持「做出假设并写明」；原生提问的挂起状态在重启后不可恢复（未验证，倾向保守） | 2026-10-19 |
 | D37 | 所有 git 调用设置 `LC_ALL=C`；改动 refs 或 worktree 列表的操作经每仓库互斥锁（S6：不加锁时 4 轮中 1 轮出现 3 次 worktree 元数据错误，加锁后 400 次操作零错误；worktree 内部的并发提交无冲突） | 本机 git 输出为中文，解析需固定语言 | 2026-10-19 |
 | D38 | 工具返回错误码后模型能按 hint 自我修正（S3 实测：免费模型 glm-5.3-flash-free 收到 `SPIKE_FAIL` 后按 hint 重试成功），验证了「工具失败返回错误码」的设计 | 01 §5 验收标准第 7 条的前置验证 | 2026-10-19 |
+| D39 | 不引入 `fastify-type-provider-zod`：操作清单的挂载层（`core/operations`）把 path/query/body 合并后用操作的 zod `input` schema 解析，失败统一抛 `VALIDATION_FAILED`（`details.issues`）；响应体用 `output` schema 解析后返回（剥离 DTO 之外的字段） | 该库 7.0.0 把 `@fastify/swagger` 设为必需 peer 依赖；我们的输入来自三处合并，自己解析十几行即可，错误结构也由我们控制 | 2026-10-19 |

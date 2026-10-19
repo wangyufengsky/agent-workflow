@@ -1,23 +1,47 @@
-import { API_PREFIX } from '@aw/shared';
+import { join } from 'node:path';
 import fastifyStatic from '@fastify/static';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
+import type { DestinationStream } from 'pino';
+import { type Clock, systemClock } from './core/clock.ts';
 import type { AppConfig } from './core/config.ts';
+import { openDatabase } from './core/db/database.ts';
+import { createEventBus, type EventBus } from './core/event-bus.ts';
+import { registerTokenAuth } from './core/http/auth.ts';
+import { registerErrorHandling } from './core/http/errors.ts';
+import { createLogger, type Logger } from './core/logger.ts';
 import { registerSystemRoutes } from './modules/system/system.routes.ts';
 
-export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
-  const app = Fastify({ logger: { level: config.logLevel } });
+/** Collaborators that tests replace; production uses the defaults. */
+export type AppDeps = {
+  clock?: Clock;
+  /** Captures log output instead of writing stdout and the log file. */
+  logDestination?: DestinationStream;
+};
 
-  app.addHook('onRequest', async (req, reply) => {
-    if (!req.url.startsWith(API_PREFIX)) return;
-    if (req.headers.authorization !== `Bearer ${config.apiToken}`) {
-      await reply.code(401).send({ error: { code: 'UNAUTHORIZED', message: 'Missing or invalid token' } });
-    }
+export type App = {
+  server: FastifyInstance;
+  events: EventBus;
+  log: Logger;
+  close(): Promise<void>;
+};
+
+export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<App> {
+  const clock = deps.clock ?? systemClock;
+  const log = createLogger(config, clock, deps.logDestination);
+  const database = openDatabase(join(config.dataDir, 'app.db'), config.migrationsDir);
+  const events = createEventBus();
+
+  const fastifyLog: FastifyBaseLogger = log;
+  // Per-request lines would drown the state-transition log (06 §10); errors are logged by the error handler.
+  const server = Fastify({
+    loggerInstance: fastifyLog,
+    logController: new LogController({ disableRequestLogging: true }),
   });
+  server.addHook('onClose', async () => database.close());
+  registerTokenAuth(server, config.apiToken);
+  registerErrorHandling(server, { serveSpa: config.webDir !== undefined });
+  registerSystemRoutes(server, config);
 
-  registerSystemRoutes(app, config);
-
-  if (config.webDir !== undefined) {
-    await app.register(fastifyStatic, { root: config.webDir });
-  }
-  return app;
+  if (config.webDir !== undefined) await server.register(fastifyStatic, { root: config.webDir });
+  return { server, events, log, close: () => server.close() };
 }
