@@ -215,14 +215,19 @@ export const startTaskOp = defineOperationContract({
   mode: UiMode.Simple,                   // 最低可见界面模式
 });
 
-// server/modules/tasks/tasks.operations.ts
-export const taskOperations = [
-  implement(startTaskOp, (input, ctx) => ctx.services.tasks.create(input)),
-  // ...
-];
+// server/modules/tasks/tasks.operations.ts —— 闭包持有本模块 service，由模块 index.ts 的工厂组装
+export function taskOperations(tasks: TasksService) {
+  return [
+    implement(startTaskOp, (input) => tasks.create(input)),
+    // ...
+  ];
+}
 ```
 
 - `core/operations` 负责：把清单挂载为 Fastify 路由（统一校验、错误映射）、提供 `GET /operations` 给命令面板、v1.1 生成助手 MCP 工具。
+  - 输入：路径参数、query、body 合并为一个对象后用 `input` 解析（路径参数优先，body 必须是 JSON 对象），失败 400 `VALIDATION_FAILED`。
+  - 输出：handler 返回值用 `output` 解析后返回，DTO 之外的字段被剥离；不匹配视为缺陷（500）。`http.status` 缺省 200，`output` 为 `z.void()` 时 204。
+  - `GET /operations?expose=palette|assistant`：`palette` 只含 `expose.palette` 且非 `critical` 的操作；每项含 `id`、`title`、`description`、`risk`、`mode`、`method`、`path`、`inputSchema`（JSON Schema）。
 - SSE、会话流 transcript、diff 文件内容等流式或二进制接口不走清单，单独定义路由（清单只管「一次调用、一个结果」的操作）。
 - 执行 MCP 工具（12）**不**来自清单：它们绑定在尝试上，语义不同，单独用 `defineMcpTool` 定义；两者共享 service。
 - 新增功能 = 写 service + 注册操作；不手写 route。

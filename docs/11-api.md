@@ -191,7 +191,7 @@ type TaskDetailDTO = {
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/mcp/tools` 🅿 | 执行 MCP 的工具名、说明、输入 schema（JSON Schema）、允许的尝试类型 |
-| GET | `/operations?expose=palette` | 命令面板可用的操作：id、标题 key、风险、最低模式、输入 schema |
+| GET | `/operations?expose=palette` | `{ items: OperationInfo[] }`：命令面板可用的操作（`expose.palette` 且非 critical）：id、标题 key、说明、风险、最低模式、method、path、输入 JSON Schema；不带 `expose` 返回全部 |
 
 ## 11. SSE 事件
 

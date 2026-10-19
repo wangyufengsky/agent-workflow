@@ -9,6 +9,8 @@ import { createEventBus, type EventBus } from './core/event-bus.ts';
 import { registerTokenAuth } from './core/http/auth.ts';
 import { registerErrorHandling } from './core/http/errors.ts';
 import { createLogger, type Logger } from './core/logger.ts';
+import { mountOperations } from './core/operations/operations.ts';
+import { createSettingsModule } from './modules/settings/index.ts';
 import { registerSystemRoutes } from './modules/system/system.routes.ts';
 
 /** Collaborators that tests replace; production uses the defaults. */
@@ -41,6 +43,9 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   registerTokenAuth(server, config.apiToken);
   registerErrorHandling(server, { serveSpa: config.webDir !== undefined });
   registerSystemRoutes(server, config);
+
+  const settings = createSettingsModule({ db: database.db, events, clock });
+  mountOperations(server, [...settings.operations]);
 
   if (config.webDir !== undefined) await server.register(fastifyStatic, { root: config.webDir });
   return { server, events, log, close: () => server.close() };
