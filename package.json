@@ -8,10 +8,10 @@
   },
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
-    "dev": "pnpm --filter @aw/desktop dev",
-    "dev:server": "pnpm --filter @aw/server dev",
+    "dev": "pnpm build:plugin && pnpm --filter @aw/desktop dev",
+    "dev:server": "pnpm build:plugin && pnpm --filter @aw/server dev",
     "dev:web": "pnpm --filter @aw/web dev",
-    "build": "pnpm --filter @aw/desktop build && node scripts/check-prod-bundle.mjs",
+    "build": "pnpm build:plugin && pnpm --filter @aw/desktop build && node scripts/check-prod-bundle.mjs",
     "dist": "pnpm --filter @aw/desktop dist",
     "typecheck": "pnpm -r --parallel typecheck",
     "lint": "biome check .",
@@ -22,12 +22,13 @@
     "check": "pnpm typecheck && pnpm lint && pnpm lint:deps && pnpm lint:css && pnpm gen:fsm-docs --check",
     "test": "vitest run --project unit",
     "test:int": "vitest run --project int",
-    "test:oc": "vitest run --project oc",
+    "test:oc": "pnpm build:plugin && vitest run --project oc",
     "test:live": "vitest run --project live",
     "e2e": "playwright test --project browser",
     "e2e:electron": "playwright test --project electron",
     "verify": "pnpm check && pnpm test && pnpm test:int && pnpm build",
-    "verify:full": "pnpm verify && pnpm test:oc && pnpm e2e"
+    "verify:full": "pnpm verify && pnpm test:oc && pnpm e2e",
+    "build:plugin": "node --disable-warning=ExperimentalWarning scripts/build-opencode-plugin.ts"
   },
   "devDependencies": {
     "@aw/shared": "workspace:*",

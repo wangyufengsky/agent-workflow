@@ -90,6 +90,7 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | HTTP | fastify（请求校验由操作清单挂载层直接用 zod 解析，见 D39） | 5.12.7 |
 | MCP | @modelcontextprotocol/sdk | 1.32.1 |
 | opencode 客户端 | @opencode-ai/sdk | **1.19.0（与 CLI 一致）** |
+| opencode 插件类型 | @opencode-ai/plugin（仅类型，开发依赖） | 1.19.0 |
 | SQLite | `node:sqlite`（内置，D30） | — |
 | ORM / 迁移 | drizzle-orm（经 `core/db/node-sqlite-client.ts` 适配器复用 better-sqlite3 同步会话）+ drizzle-kit | 0.45.4 / 0.31.11 |
 | MySQL | mysql2 | 3.24.6 |
@@ -149,7 +150,7 @@ agent-workflow/
 │  │        ├─ inbox/  delivery/
 │  │        └─ databases/          drivers/mysql
 │  ├─ builtin/                 内置流程与角色（数据 + prompts/*.md）
-│  └─ opencode-plugin/         agent-workflow-bridge（注入 sessionID 到本项目 MCP 工具参数）
+│  └─ opencode-plugin/         agent-workflow-bridge（注入 sessionID 到本项目 MCP 工具参数）；`pnpm build:plugin` 去掉类型生成 dist/agent-workflow-bridge.js
 ├─ e2e/                        Playwright
 ├─ docs/
 └─ opencode-workflow-design-showcase/  设计参考（只读）

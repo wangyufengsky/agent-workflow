@@ -24,6 +24,9 @@ export function startBackend(isDev: boolean): Promise<Backend> {
       AW_PROMPTS_DIR: app.isPackaged
         ? join(process.resourcesPath, 'prompts')
         : join(app.getAppPath(), '../../packages/builtin/prompts'),
+      AW_OPENCODE_PLUGIN_FILE: app.isPackaged
+        ? join(process.resourcesPath, 'opencode-plugin', 'agent-workflow-bridge.js')
+        : join(app.getAppPath(), '../../packages/opencode-plugin/dist/agent-workflow-bridge.js'),
       ...(isDev ? {} : { AW_WEB_DIR: join(import.meta.dirname, '../renderer') }),
     },
   });

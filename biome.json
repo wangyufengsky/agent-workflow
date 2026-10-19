@@ -27,7 +27,12 @@
   },
   "overrides": [
     {
-      "includes": ["**/*.config.ts", "**/electron.vite.config.ts", "playwright.config.ts"],
+      "includes": [
+        "**/*.config.ts",
+        "**/electron.vite.config.ts",
+        "playwright.config.ts",
+        "packages/opencode-plugin/src/agent-workflow-bridge.ts"
+      ],
       "linter": { "rules": { "style": { "noDefaultExport": "off" } } }
     }
   ],

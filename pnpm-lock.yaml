@@ -114,6 +114,9 @@ importers:
 
   packages/opencode-plugin:
     devDependencies:
+      '@aw/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@opencode-ai/plugin':
         specifier: 1.19.0
         version: 1.19.0

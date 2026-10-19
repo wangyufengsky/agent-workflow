@@ -8,7 +8,8 @@ files:
   - out/**
   - package.json
 extraResources:
-  - from: ../../packages/opencode-plugin/src
+  # Built by `pnpm build:plugin` (M2-03).
+  - from: ../../packages/opencode-plugin/dist
     to: opencode-plugin
   - from: ../../packages/server/migrations
     to: migrations

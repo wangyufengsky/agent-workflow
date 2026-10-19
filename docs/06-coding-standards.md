@@ -85,7 +85,7 @@ await repoLock.run(project.repoPath, () => git.worktreeAdd(...));
 - 禁止 `any`；外部未知数据用 `unknown` + zod 解析。
 - 禁止非空断言 `!`，除非紧邻一行注释说明为何类型系统无法表达且确实不可能为空。
 - 禁止 `as` 类型断言绕过检查（`as const` 除外；测试数据构造允许）。
-- 只用具名导出；不用 `default export`（路由懒加载入口与工具配置文件除外）。
+- 只用具名导出；不用 `default export`（路由懒加载入口、工具配置文件与 opencode 插件入口除外）。
 - 相对导入写显式扩展名 `./x.ts`（Biome `useImportExtensions`）；`erasableSyntaxOnly` 开启：不用 enum、参数属性（`constructor(readonly x)`）、namespace（D29）。
 - 异步一律 `async/await`；不混用 `.then` 链；不留悬空 Promise（Biome `noFloatingPromises`）。
 
