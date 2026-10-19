@@ -71,6 +71,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `WorkflowDeliverable` | `code_changes` · `report` | 代码审查等只读流程产出报告，不合并 |
 | `RoleBaseAgent` | `planner` · `executor` · `reviewer` | 对应注入 opencode 的 agent `aw-planner` / `aw-executor` / `aw-reviewer`，决定权限基线 |
 | `RoleKind` | `builtin` · `custom` | |
+| `NodeKind` | `normal` · `revise` | `revise` 为「再改改」/「解决冲突」追加的节点 |
+| `RequiredStepPosition` | `first` · `last` | 流程必经步骤在 AI 计划中的位置约束（5.3 `REQUIRED_STEP_ORDER`） |
 
 ### 2.4 Git 与交付
 
@@ -259,6 +261,8 @@ class AppError extends Error {
 | `CREDENTIAL_UNAVAILABLE` | 500 | safeStorage 不可用或解密失败 |
 
 ### 5.3 计划校验子码（`PLAN_INVALID.details.problems[].code`）
+
+枚举 `PlanProblemCode`，hint 为常量 `PLAN_PROBLEM_HINT`（英文，给模型看）；校验函数 `validatePlanGraph(graph, { allowedRoles, requiredSteps })` 位于 `shared/workflow`，一次返回全部问题。存在环时不检查必经步骤顺序。
 
 | 子码 | 含义 | 给模型的 hint |
 | --- | --- | --- |
