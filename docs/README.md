@@ -1,0 +1,29 @@
+# agent-workflow 文档索引
+
+> 状态：开发前设计定稿（2026-10-19）。尚未开始编码。
+
+agent-workflow 是一个本地桌面应用：选项目、选流程、写一句需求，AI（托管的 opencode 1.19.0）在独立 Git worktree 中完成开发，用户查看结果并决定是否合并。默认简单，专业能力可选开启。
+
+| 文档 | 内容 | 读者 |
+| --- | --- | --- |
+| [01-product.md](01-product.md) | 产品定义、简单/专业模式、v1.0 交付范围与验收 | 全员 |
+| [02-decisions.md](02-decisions.md) | 已确认决策记录（含讨论结论） | 全员 |
+| [03-architecture.md](03-architecture.md) | 技术选型、进程拓扑、模块划分、目录结构、依赖清单 | 开发 |
+| [04-project-plan.md](04-project-plan.md) | 里程碑、工期、风险 | 全员 |
+| [05-dev-plan.md](05-dev-plan.md) | 技术验证项与逐里程碑任务分解、完成标准 | 开发 |
+| [06-coding-standards.md](06-coding-standards.md) | 代码开发规范 | 开发 / AI 助手 |
+| [07-testing-standards.md](07-testing-standards.md) | 测试规范 | 开发 / AI 助手 |
+| [08-enums-and-errors.md](08-enums-and-errors.md) | 枚举、常量、错误码 | 开发 |
+| [09-state-machines.md](09-state-machines.md) | 任务 / 节点 / 尝试等状态机 | 开发 |
+| [10-data-model.md](10-data-model.md) | SQLite 表结构与 JSONL 日志布局 | 开发 |
+| [11-api.md](11-api.md) | 后端 REST API 与 SSE 事件 | 开发 |
+| [12-mcp-tools.md](12-mcp-tools.md) | 内部 MCP 工具定义与 opencode 集成 | 开发 |
+| [13-builtin-workflows.md](13-builtin-workflows.md) | 内置流程与内置角色 | 开发 / 产品 |
+| [14-ui-spec.md](14-ui-spec.md) | 页面与路由、简单/专业模式界面、主题配置、设计稿改进 | 开发 / 设计 |
+| [15-assistant.md](15-assistant.md) | 应用助手（v1.1）设计与 v1.0 预留 | 全员 |
+
+## 维护规则
+
+- 改枚举、状态机、API、MCP 工具、表结构时，**同一个提交**更新对应文档。
+- 文档只写结论和约束，不写过程记录；过程讨论结论进 `02-decisions.md`。
+- 设计稿 `opencode-workflow-design-showcase/` 只作为视觉与交互参考，以本目录文档为准；二者冲突时按 [14-ui-spec.md](14-ui-spec.md) 的改进清单执行。

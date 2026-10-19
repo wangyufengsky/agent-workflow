@@ -1,0 +1,27 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# dependencies & build
+node_modules/
+dist/
+out/
+.build/
+coverage/
+*.tsbuildinfo
+
+# test artifacts
+test-results/
+playwright-report/
+live/reports/
+
+# local env
+.env
+.env.*
+!.env.example
+
+# design showcase: keep prototype & sources, drop screenshots and backups
+opencode-workflow-design-showcase/evidence/
+opencode-workflow-design-showcase/backup-*/
