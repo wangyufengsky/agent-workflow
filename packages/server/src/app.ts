@@ -17,6 +17,7 @@ import {
   createCredentialsModule,
   unavailableCipher,
 } from './modules/credentials/index.ts';
+import { createProjectsModule } from './modules/projects/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
 
@@ -59,7 +60,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const settings = createSettingsModule({ db: database.db, events, clock });
   const credentials = createCredentialsModule({ db: database.db, clock, cipher: deps.cipher ?? unavailableCipher });
   const system = createSystemModule({ config, env: deps.env ?? process.env, settings: settings.service });
-  mountOperations(server, [...settings.operations, ...system.operations]);
+  const projects = createProjectsModule({ db: database.db, clock });
+  mountOperations(server, [...settings.operations, ...system.operations, ...projects.operations]);
 
   if (config.webDir !== undefined) await server.register(fastifyStatic, { root: config.webDir });
   return { server, events, log, services: { credentials: credentials.service }, close: () => server.close() };

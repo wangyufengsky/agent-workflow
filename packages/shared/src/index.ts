@@ -1,6 +1,7 @@
 export * from './constants/app.ts';
 export * from './constants/limits.ts';
 export * from './constants/settings.ts';
+export * from './contracts/api/projects.ts';
 export * from './contracts/api/system.ts';
 export * from './contracts/bridge.ts';
 export * from './contracts/credential-port.ts';
@@ -17,5 +18,6 @@ export * from './errors/app-error.ts';
 export * from './errors/codes.ts';
 export * from './errors/plan-problems.ts';
 export * from './fsm/index.ts';
+export * from './naming.ts';
 export * from './operations/index.ts';
 export * from './workflow/index.ts';

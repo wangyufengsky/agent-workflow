@@ -13,6 +13,8 @@ export const MCP_ASSISTANT_SERVER_NAME = 'agent-workflow-app';
 export const TASK_KEY_PREFIX = 'T-';
 export const BRANCH_PREFIX = 'aw/';
 export const BRANCH_SLUG_MAX = 40;
+/** Project slug: the project's directory name under the worktree root. */
+export const PROJECT_SLUG_MAX = 40;
 export const API_PREFIX = '/api/v1';
 export const MCP_EXEC_PATH = '/mcp/exec';
 export const MCP_ASSISTANT_PATH = '/mcp/assistant';

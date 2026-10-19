@@ -15,6 +15,13 @@
       "when": 1792393385075,
       "tag": "0001_regular_warbound",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792393780090,
+      "tag": "0002_greedy_young_avengers",
+      "breakpoints": true
     }
   ]
 }

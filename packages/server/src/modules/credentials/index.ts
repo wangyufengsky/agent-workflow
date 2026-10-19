@@ -8,6 +8,8 @@ export {
   unavailableCipher,
 } from './cipher.ts';
 export type { CredentialsService } from './credentials.service.ts';
+/** Exported for foreign keys only; reads and writes go through the service. */
+export { credentialsTable } from './credentials.table.ts';
 
 export function createCredentialsModule(deps: CredentialsServiceDeps) {
   return { service: createCredentialsService(deps) };

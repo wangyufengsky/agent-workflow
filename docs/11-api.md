@@ -44,16 +44,16 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/projects` | 列表 |
-| POST | `/projects` | `{ repoPath, name? }`；校验是 Git 仓库根目录，读取默认分支 |
-| GET | `/projects/:id` | `ProjectDTO`（含远端绑定摘要、关联数据库、活动任务数） |
-| PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand? }` |
+| GET | `/projects` | `{ items: ProjectDTO[] }`（按添加时间） |
+| POST | `/projects` | `{ repoPath, name? }` → 201 `ProjectDetailDTO`；`repoPath` 须为仓库根目录的绝对路径（子目录、非仓库、不存在 → 400 `PROJECT_PATH_NOT_GIT_REPO`），读取默认分支（`origin/HEAD`，否则当前分支；HEAD 游离且无 `origin/HEAD` → 400 `GIT_BASE_BRANCH_NOT_FOUND`），推断检查命令（13 §1） |
+| GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting`；关联数据库（M5）、活动任务数（M3）随对应模块加入 |
+| PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand?: string \| null }`；分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND` |
 | DELETE | `/projects/:id` | 有非终态任务时 409 `PROJECT_HAS_ACTIVE_TASKS` |
 | PUT | `/projects/:id/hosting` | `{ provider, baseUrl?, repo, token }`；保存前调用平台 API 验证令牌 |
 | DELETE | `/projects/:id/hosting` | 解除绑定并删除凭据 |
 | PUT | `/projects/:id/db-connections` 🅿 | `{ connectionIds: string[] }` 覆盖关联 |
 
-远端 `repo` 默认从 `git remote get-url origin` 推断，前端预填。
+远端 `repo` 默认从 `git remote get-url origin` 推断（`inferredHosting`：`github.com` → GitHub，其他主机 → GitLab，非 `gitlab.com` 时 `baseUrl = https://<host>`），前端预填。
 
 ## 4. 流程与角色
 
