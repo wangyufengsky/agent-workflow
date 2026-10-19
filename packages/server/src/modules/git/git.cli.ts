@@ -25,6 +25,7 @@ export async function runGit(args: readonly string[], options: GitOptions): Prom
   if (result.code === 'ENOENT' && result.exitCode === undefined) {
     throw new AppError(ErrorCode.GitNotInstalled, 'git executable not found');
   }
+  // No exit code means git was killed by a signal; report it as a failure like any unexpected exit.
   const exitCode = result.exitCode ?? -1;
   if (!(options.okExitCodes ?? [0]).includes(exitCode)) {
     throw new AppError(ErrorCode.GitCommandFailed, `git ${args[0]} failed`, {

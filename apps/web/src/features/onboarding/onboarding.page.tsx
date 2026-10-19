@@ -17,7 +17,7 @@ function GitCheck({ git }: { git: EnvironmentDTO['git'] }) {
   if (git.installed) {
     return (
       <CheckRow title={C.git.title} tone={StatusTone.Ok} badge={C.ready}>
-        <span className="hint">{C.git.installed(git.version ?? '')}</span>
+        <span className="hint">{C.git.installed(git.version)}</span>
       </CheckRow>
     );
   }
@@ -35,16 +35,14 @@ function OpencodeCheck({ opencode, onRecheck }: { opencode: EnvironmentDTO['open
   if (opencode.status !== RuntimeStatus.NotInstalled && opencode.status !== RuntimeStatus.VersionMismatch) {
     return (
       <CheckRow title={C.opencode.title} tone={StatusTone.Ok} badge={C.ready}>
-        <span className="hint">{C.opencode.ok(opencode.version ?? '', opencode.path ?? '')}</span>
+        <span className="hint">{C.opencode.ok(opencode.version, opencode.path)}</span>
       </CheckRow>
     );
   }
   return (
     <CheckRow title={C.opencode.title} tone={StatusTone.Danger} badge={C.notReady}>
       <span className="hint">
-        {opencode.status === RuntimeStatus.VersionMismatch
-          ? C.opencode.mismatch(opencode.version ?? '')
-          : C.opencode.missing}
+        {opencode.status === RuntimeStatus.VersionMismatch ? C.opencode.mismatch(opencode.version) : C.opencode.missing}
       </span>
       <CopyCommand command={C.opencode.fix} />
       <form

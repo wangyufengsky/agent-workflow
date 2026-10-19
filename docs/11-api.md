@@ -29,8 +29,10 @@
 
 ```ts
 type EnvironmentDTO = {
-  git: { installed: boolean; version?: string };
-  opencode: { status: RuntimeStatus; path?: string; version?: string; requiredVersion: '1.19.0' };
+  git: { installed: true; version: string } | { installed: false };
+  opencode:
+    | { status: 'not_installed'; path?: string; requiredVersion: '1.19.0' }      // path：找到但无法执行时
+    | { status: Exclude<RuntimeStatus, 'not_installed'>; path: string; version: string; requiredVersion: '1.19.0' };
   models: { available: Array<{ providerId: string; modelId: string; name: string }>; defaultModel?: string };
   ready: boolean;              // 三项都满足（M1 起模型列表为占位，M2-04 接入后才计入）
 };
