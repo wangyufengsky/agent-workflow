@@ -107,7 +107,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 
-`STATUS_TONE.task` / `.node` / `.attempt` / `.taskDisplay`（类型保证每个值都有映射，单测再校验一次）：
+`STATUS_TONE.task` / `.node` / `.attempt` / `.runtime` / `.taskDisplay`（类型保证每个值都有映射，单测再校验一次）。`runtime`：`ready` → `ok`，`starting` → `run`，`stopped` → `wait`，`not_installed` / `version_mismatch` / `crashed` → `danger`。
 
 | tone | TaskStatus | NodeStatus | AttemptStatus | TaskDisplayGroup |
 | --- | --- | --- | --- | --- |

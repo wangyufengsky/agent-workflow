@@ -239,6 +239,8 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         const finished = event.status === ToolCallStatus.Completed || event.status === ToolCallStatus.Error;
         if (session.stopAfterSubmit && isSubmit && finished) {
           session.stopAfterSubmit = false;
+          // Recorded here rather than when the result is accepted, so it follows the submit call in the transcript.
+          record(attempt, [systemEntry(TranscriptSystemEvent.ResultSubmitted)]);
           inBackground(attempt.id, () => stopSession(session));
         }
         return;
@@ -337,9 +339,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
 
     /** `submit_*` succeeded: the attempt is done; further generation is stopped once the call returns. */
     markSubmitted(id: string): AttemptDTO {
-      const attempt = mustFind(id);
-      record(attempt, [systemEntry(TranscriptSystemEvent.ResultSubmitted)]);
-      const updated = move(attempt, AttemptEvent.Submitted);
+      const updated = move(mustFind(id), AttemptEvent.Submitted);
       for (const session of live.values()) if (session.attemptId === id) session.stopAfterSubmit = true;
       return toDto(updated);
     },

@@ -49,7 +49,7 @@ describe('会话流', () => {
     unsubscribe();
 
     const { entries, done } = await page(attempt.id, 0);
-    expect(kinds(entries)).toEqual(['system', 'user_message', 'text', 'tool_call', 'system', 'tool_result']);
+    expect(kinds(entries)).toEqual(['system', 'user_message', 'text', 'tool_call', 'tool_result', 'system']);
     expect(entries[2]).toMatchObject({ kind: 'text', data: { text: answer } });
     expect(done).toBe(true);
 
@@ -72,7 +72,7 @@ describe('会话流', () => {
 
     const second = await page(attempt.id, first.lastSeq);
     expect(second.entries[0]?.seq).toBe(TRANSCRIPT_PAGE_SIZE + 1);
-    expect(kinds(second.entries)).toEqual(['text', 'text', 'tool_call', 'system', 'tool_result']);
+    expect(kinds(second.entries)).toEqual(['text', 'text', 'tool_call', 'tool_result', 'system']);
     expect(second.done).toBe(true);
 
     expect(await page(attempt.id, second.lastSeq)).toEqual({ entries: [], lastSeq: second.lastSeq, done: true });
