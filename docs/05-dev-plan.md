@@ -4,6 +4,8 @@
 
 ## M0 · 工程骨架与技术验证（1 周）
 
+> 状态：**已完成**（2026-10-19）。S1–S7 全部通过，结论见 [02-decisions.md](02-decisions.md) D29–D38 与 [12 §8](12-mcp-tools.md#8-opencode-1190-实测记录m0)。命令 `pnpm ci` 与 pnpm 内置命令重名，改为 `pnpm verify`。S7 未能在另一台 Mac 上验证，改为从 dmg 挂载的副本启动验证；未签名应用从网络下载后需在「系统设置 → 隐私与安全性」中放行。
+
 ### 工程骨架
 
 | # | 任务 | 完成标准 |
@@ -12,7 +14,7 @@
 | M0-02 | Biome 配置；dependency-cruiser 规则（03 §4.1）；`pnpm check` = tsc + biome + depcruise + `lint:css` | 故意违反一条依赖规则时 `pnpm check` 失败 |
 | M0-03 | Vitest（单元 + 集成两套配置）；Playwright（浏览器模式 + Electron 模式）；`pnpm test` / `test:int` / `test:oc` / `e2e` / `test:live` | 各有一个示例测试通过 |
 | M0-04 | electron-vite：main / preload / renderer；后端以 utilityProcess 启动并通过 MessagePort 握手；`pnpm dev` 一条命令启动 | 窗口显示后端返回的 `/system/health` |
-| M0-05 | 本地 CI 脚本 `pnpm ci`（check + test + test:int + build）；git hooks（pre-commit：biome 格式化暂存文件） | 一条命令跑完 |
+| M0-05 | 本地 CI 脚本 `pnpm verify`（check + test + test:int + build）；git hooks（pre-commit：biome 格式化暂存文件） | 一条命令跑完 |
 
 ### 技术验证（结论写入 02-decisions，验证代码放 `spikes/`，结束后删除）
 

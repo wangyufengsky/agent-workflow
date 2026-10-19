@@ -128,6 +128,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `BRANCH_PREFIX` | `aw/` | 分支名 `aw/<taskKey>-<slug>` |
 | `BRANCH_SLUG_MAX` | `40` | slug 由标题转写，只保留 `[a-z0-9-]` |
 | `API_PREFIX` | `/api/v1` | |
+| `DEV_API_PORT` / `DEV_WEB_PORT` | `47821` / `47822` | 仅开发；生产后端随机端口（D31） |
 | `MCP_EXEC_PATH` | `/mcp/exec` | |
 | `MCP_ASSISTANT_PATH` | `/mcp/assistant` | v1.1 |
 
@@ -172,8 +173,15 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 ### 5.1 结构
 
 ```ts
+// erasableSyntaxOnly（D29）：不用参数属性，字段显式声明
 class AppError extends Error {
-  constructor(readonly code: ErrorCode, message?: string, readonly details?: Record<string, unknown>) {}
+  readonly code: ErrorCode;
+  readonly details: Record<string, unknown> | undefined;
+  constructor(code: ErrorCode, message?: string, details?: Record<string, unknown>) {
+    super(message ?? code);
+    this.code = code;
+    this.details = details;
+  }
 }
 ```
 

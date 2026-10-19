@@ -25,3 +25,4 @@ live/reports/
 # design showcase: keep prototype & sources, drop screenshots and backups
 opencode-workflow-design-showcase/evidence/
 opencode-workflow-design-showcase/backup-*/
+apps/desktop/release/

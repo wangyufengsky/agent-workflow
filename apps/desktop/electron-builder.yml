@@ -1,0 +1,21 @@
+# Everything the app needs is bundled into out/ by electron-vite, so no node_modules are packaged.
+appId: com.wangyufengsky.agent-workflow
+productName: Agent Workflow
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+extraResources:
+  - from: ../../packages/opencode-plugin/src
+    to: opencode-plugin
+npmRebuild: false
+asar: true
+mac:
+  target:
+    - target: dmg
+      arch: arm64
+  category: public.app-category.developer-tools
+  # Unsigned until a Developer ID certificate is available (M6-04).
+  identity: null

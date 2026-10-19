@@ -95,5 +95,5 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 
 - 不设全局覆盖率百分比。
 - 以下模块要求分支覆盖率 ≥ 90%：`shared/fsm`、`shared/workflow`（计划校验）、`scheduler`、`mcp.registry`。
-- CI（本地 `pnpm ci`）：check + test + test:int + e2e（浏览器）必须全绿；`test:oc` 在装有 opencode 的机器上随 `pnpm ci:full` 执行。
+- CI（本地 `pnpm verify`）：check + test + test:int + e2e（浏览器）必须全绿；`test:oc` 在装有 opencode 的机器上随 `pnpm verify:full` 执行。
 - 测试失败时禁止 `.skip` 合并；确需暂时跳过须附任务编号与原因，并在一周内处理。

@@ -1,6 +1,6 @@
 # agent-workflow · AI 编码助手须知
 
-当前阶段：**开发前设计已定稿，尚未开始编码**。开始任何开发任务前，先读：
+当前阶段：**M0（工程骨架与技术验证）已完成，下一步 M1**。开始任何开发任务前，先读：
 
 1. `docs/06-coding-standards.md`：找根因不兜底、不过度防御、状态只经状态机、一处定义。
 2. `docs/07-testing-standards.md`：测行为不测实现、少而有效、真实 SQLite/Git、缺陷先写失败测试、禁止 sleep。
@@ -11,3 +11,5 @@
 `opencode-workflow-design-showcase/` 只是视觉参考，与 `docs/14-ui-spec.md` 冲突时以后者为准。
 
 文档、注释与界面文案用中文；代码标识符、日志消息、提交信息用英文。
+
+常用命令：`pnpm dev`（桌面开发）、`pnpm verify`（提交前全量检查：类型、lint、依赖边界、单元与集成测试、构建）、`pnpm e2e`、`pnpm e2e:electron`（需先 `pnpm build`）。

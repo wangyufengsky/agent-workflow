@@ -1,0 +1,5 @@
+#!/bin/sh
+# Format and lint staged files; re-stage what Biome fixed.
+set -e
+npx --no-install biome check --write --staged --no-errors-on-unmatched
+git update-index --again

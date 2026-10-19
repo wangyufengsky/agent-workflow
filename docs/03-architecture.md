@@ -5,14 +5,15 @@
 ```
 ┌──────────────────────────── Electron 应用 ────────────────────────────┐
 │ main（薄）：窗口、菜单、文件夹选择、safeStorage 加解密、子进程生命周期   │
-│   │ preload：暴露 window.aw = { apiBase, apiToken, selectDirectory,   │
+│   │ preload：暴露 window.aw = { apiToken, appVersion, selectDirectory,│
 │   │          openExternal, revealInFinder }（不含加解密）             │
 │   ▼                                                                   │
-│ renderer（React）── HTTP /api/v1 + SSE /api/v1/events ──┐              │
+│ renderer（React，由后端同源托管）── 相对路径 /api/v1 + SSE ──┐        │
 │                                                         ▼              │
 │ utilityProcess：后端服务（Node 24 + Fastify，127.0.0.1:随机端口）       │
 │   ├─ /api/v1/*      REST（renderer 令牌）                               │
 │   ├─ /api/v1/events SSE                                                │
+│   ├─ /              构建后的前端静态文件（同源，D31）                   │
 │   ├─ /mcp/exec      执行 MCP，Streamable HTTP（执行 MCP 令牌）          │
 │   ├─ /mcp/assistant 助手 MCP（v1.1，独立令牌）                          │
 │   ├─ SQLite（app.db）+ JSONL 日志                                       │
@@ -27,7 +28,7 @@
 - **main 不含业务逻辑**。凡需要系统能力（选目录、加解密）的，renderer 通过 preload 调 main；后端需要加解密时经 utilityProcess 的 `MessagePort` 请求 main。
 - **后端是唯一的状态权威**。renderer 不直接碰 Git、SQLite、opencode、MySQL。
 - **后端可独立运行**：`pnpm --filter server dev` 用系统 Node 24 启动，renderer 用浏览器打开即可开发与跑 E2E（此时 safeStorage 由开发用的明文适配器替代，仅限开发环境）。
-- 令牌：每次启动随机生成 renderer 令牌与各 MCP 令牌，只存在内存；端口均为随机端口，仅绑定 127.0.0.1。
+- 令牌：每次启动随机生成 renderer 令牌与各 MCP 令牌，只存在内存；端口均为随机端口，仅绑定 127.0.0.1。开发时后端固定 `DEV_API_PORT`，Vite 把 `/api/v1` 代理过去（D31）。
 - **两套 MCP 权限隔离**：执行 MCP 只给执行任务的 AI 会话用，工具绑定到所属尝试；助手 MCP（v1.1，见 [15-assistant.md](15-assistant.md)）给应用助手用，能力来自操作清单，写操作需用户确认。
 
 ## 2. 关键运行流程
@@ -38,7 +39,7 @@
 2. 后端：打开 SQLite → 执行迁移 → 启动 HTTP → 环境检测（git 版本、opencode 路径与版本）。
 3. 版本精确等于 `OPENCODE_VERSION`（1.19.0）时启动 `opencode serve --hostname 127.0.0.1 --port 0`，环境变量 `OPENCODE_CONFIG_CONTENT` 注入配置；从 stdout 解析监听地址；订阅其事件流。
 4. 恢复：把上次退出时仍为 `running/starting` 的尝试标为 `interrupted`，对应节点按重试预算回到 `ready`；调度器开始工作。
-5. main 创建窗口，preload 注入 `apiBase` 与 `apiToken`。
+5. 后端经 `process.parentPort` 通知 main 监听端口；main 创建窗口加载 `http://127.0.0.1:<port>/`，令牌经 `additionalArguments` 传给 preload。
 
 ### 2.2 一个任务的生命周期（简单模式）
 
@@ -64,11 +65,11 @@
 
 ### 2.5 权限请求
 
-opencode 事件 `permission.updated` → 创建「需要你处理」条目（类型 permission）→ 用户选择「允许一次 / 总是允许 / 拒绝」→ 调用 opencode `POST /session/{id}/permissions/{permissionID}`。
+opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`、`patterns`、`directory`）→ 创建「需要你处理」条目（类型 permission）→ 用户选择「允许一次 / 总是允许 / 拒绝」→ `permission.reply({ requestID, directory, reply: 'once' | 'always' | 'reject' })`（D34）。
 
 ## 3. 技术选型与依赖清单
 
-版本为 2026-10-19 npm 最新稳定版；M0 时在根 `package.json` 精确锁定（不使用 `^`）。标「M0 锁定」的在 M0 选定具体版本。
+版本为 2026-10-19 npm 最新稳定版，精确锁定（`.npmrc` 中 `save-exact=true`）。标「引入时锁定」的在首次使用的里程碑选定具体版本。
 
 | 用途 | 依赖 | 版本 |
 | --- | --- | --- |
@@ -79,22 +80,23 @@ opencode 事件 `permission.updated` → 创建「需要你处理」条目（类
 | 路由 | @tanstack/react-router | 1.170.45 |
 | 服务端状态 | @tanstack/react-query | 5.104.4 |
 | 界面状态 | zustand | 5.0.15 |
-| 画布 | @xyflow/react + elkjs | 12.12.0 / M0 锁定 |
+| 画布 | @xyflow/react + elkjs | 12.12.0 / 0.12.0 |
 | 无样式组件 | @radix-ui/react-*（Dialog、Popover、Tabs、Tooltip、DropdownMenu、Select） | M0 锁定 |
 | 表单 | react-hook-form + @hookform/resolvers | M0 锁定 |
 | diff / 代码高亮 | @git-diff-view/react + shiki | M0 锁定 |
 | 契约 | zod | 4.6.7 |
-| HTTP | fastify + fastify-type-provider-zod | 5.12.7 / M0 锁定 |
+| HTTP | fastify + fastify-type-provider-zod | 5.12.7 / 7.0.0 |
 | MCP | @modelcontextprotocol/sdk | 1.32.1 |
 | opencode 客户端 | @opencode-ai/sdk | **1.19.0（与 CLI 一致）** |
-| SQLite | `node:sqlite`（内置）；备选 better-sqlite3 | — |
-| ORM / 迁移 | drizzle-orm（sqlite-proxy 驱动）+ drizzle-kit | 0.45.4 / M0 锁定 |
+| SQLite | `node:sqlite`（内置，D30） | — |
+| ORM / 迁移 | drizzle-orm（经 `core/db/node-sqlite-client.ts` 适配器复用 better-sqlite3 同步会话）+ drizzle-kit | 0.45.4 / 0.31.11 |
 | MySQL | mysql2 | 3.24.6 |
 | 子进程 | execa | 10.2.0 |
 | GitHub / GitLab | @octokit/rest / @gitbeaker/rest | 22.0.1 / 43.8.0 |
 | 日志 | pino | 10.4.0 |
 | 测试 | vitest / @playwright/test | 5.0.5 / 1.64.1 |
-| 代码质量 | @biomejs/biome、dependency-cruiser、typescript | M0 锁定 |
+| 代码质量 | @biomejs/biome / dependency-cruiser / typescript | 2.5.15 / 18.6.0 / **6.0.3**（D29） |
+| 静态文件 | @fastify/static | 10.1.6 |
 
 **明确不引入**：Temporal / BullMQ（单机够用）、XState（见 D21）、tRPC（要可文档化 REST）、Tailwind（已有令牌与样式体系）、Monaco（v1 不在应用内编辑代码）、任何 ORM 之外的数据访问层封装。
 
@@ -260,9 +262,10 @@ export const taskOperations = [
 
 ## 9. 安全边界
 
-- renderer：`contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`、CSP 限制只连 `apiBase`。
+- renderer：`contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`、CSP `default-src 'self'`；主窗口禁止导航到应用以外的地址、禁止 `window.open`。
 - 凭据（Git 令牌、数据库密码）：经 main 的 safeStorage 加密后存 SQLite，只在使用时解密；不写日志、不进 DTO、不进 MCP 返回值。
 - opencode 会话：`directory` 为任务 worktree；`external_directory: deny`；edit 允许；bash 按角色基线（见 13-builtin-workflows）。
 - 执行 MCP：独立令牌；每次调用根据 sessionID 解析到唯一的活动尝试，工具按尝试类型授权。
+- Git：所有调用设置 `LC_ALL=C`（D37），参数数组传参。
 - 助手 MCP（v1.1）：独立令牌；写操作经用户确认；凭据字段不进入工具 schema，凭据只能在表单中由用户输入。
 - 数据库工具：只读事务 + 语句类型白名单 + 行数与超时限制。
