@@ -42,17 +42,6 @@ export function createAttemptsRepo(db: DbExecutor) {
     listByStatus(statuses: readonly AttemptStatus[]): Attempt[] {
       return db.select().from(attemptsTable).where(inArray(attemptsTable.status, statuses)).all().map(toAttempt);
     },
-    /** Debug attempts (no task), newest first. */
-    listDebug(limit: number): Attempt[] {
-      return db
-        .select()
-        .from(attemptsTable)
-        .where(isNull(attemptsTable.taskId))
-        .orderBy(desc(attemptsTable.startedAt))
-        .limit(limit)
-        .all()
-        .map(toAttempt);
-    },
     /** Next number within the attempt's scope: its node, its task's plan attempts, or the debug attempts. */
     nextSeq(scope: { taskId: string | null; nodeId: string | null; kind: AttemptKind }): number {
       const where =

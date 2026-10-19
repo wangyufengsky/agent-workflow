@@ -51,6 +51,8 @@
 
 ## M2 · opencode 托管与 MCP（1.5 周）
 
+> 状态：**已完成**（2026-10-19）。与计划的差异：执行 MCP 工具先接**调试尝试**（开发构建的调试入口，不属于任务，D40），任务 / 节点归属随 M3 加入；`attempts` 的 `task_id` / `node_id` / `role_id` 外键随 M3 的迁移加上；结束条件中「空闲且有未回答的阻塞问题」随 `ask_user`（M3-08）实现；`report_progress` 的进展记在活动尝试上（D41）；`RuntimeDTO` 不含活动会话数；`/system/runtime/logs` 随 M5-08；会话流暂不产生 `file_edit` 条目（编辑以工具调用出现）。`glm-5.3-flash-free` 免费额度用尽，`@opencode` 测试改用 `opencode/beam-free`（D42），bridge 插件测试是唯一调用模型的 `@opencode` 测试。
+
 | # | 任务 | 完成标准 |
 | --- | --- | --- |
 | M2-01 | opencode runtime：查找二进制、版本检查、启动/停止/重启、stdout 解析地址、日志落盘、崩溃自动重启一次、运行时状态机 | 集成测试（真实 opencode，标记 `@opencode`）：启动到 ready；kill 进程后自动恢复 |

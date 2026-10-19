@@ -180,7 +180,7 @@ stateDiagram-v2
 - `no_result`：见 [03-architecture §2.4](03-architecture.md#24-会话空闲但未提交结果)。
 - `timeout`：从 `running` 起超过 `attempt.timeoutMinutes`。
 - `abort`：用户中止或任务取消；后端调用 opencode `session/{id}/abort`。
-- `runtime_lost`：opencode 进程退出或应用重启时仍在进行。
+- `runtime_lost`：opencode 进程退出、用户重启 opencode，或后端启动时发现上次仍在进行（会话已不存在）。
 - 终态：`succeeded` `failed` `aborted` `interrupted`。尝试不会被「恢复」，重试总是新建尝试（`plan` 类尝试可复用原会话继续，见 12-mcp-tools §4.3）。
 
 ## 5. 计划 Plan
