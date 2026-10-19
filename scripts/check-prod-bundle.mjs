@@ -4,7 +4,8 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const OUT = 'apps/desktop/out/main';
-const FORBIDDEN = ['aw-dev-plaintext:', 'FakeOpencode'];
+// Markers are string literals inside the code itself (comments and emptied function names survive folding).
+const FORBIDDEN = ['aw-dev-plaintext:', 'fake_ses'];
 
 const files = (await readdir(OUT, { recursive: true })).filter((f) => f.endsWith('.js')).map((f) => join(OUT, f));
 let violations = 0;
