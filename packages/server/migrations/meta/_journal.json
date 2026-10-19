@@ -8,6 +8,13 @@
       "when": 1792392852028,
       "tag": "0000_military_forge",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792393385075,
+      "tag": "0001_regular_warbound",
+      "breakpoints": true
     }
   ]
 }

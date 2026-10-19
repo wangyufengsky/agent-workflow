@@ -27,7 +27,8 @@
 
 - **main 不含业务逻辑**。凡需要系统能力（选目录、加解密）的，renderer 通过 preload 调 main；后端需要加解密时经 utilityProcess 的 `MessagePort` 请求 main。
 - **后端是唯一的状态权威**。renderer 不直接碰 Git、SQLite、opencode、MySQL。
-- **后端可独立运行**：`pnpm --filter server dev` 用系统 Node 24 启动，renderer 用浏览器打开即可开发与跑 E2E（此时 safeStorage 由开发用的明文适配器替代，仅限开发环境）。
+- **凭据加解密**：后端经 utilityProcess 的 `process.parentPort` 发 `credential.request`（`encrypt` / `decrypt`，协议 schema 在 `shared/contracts/credential-port.ts`），main 用 safeStorage 处理后回 `credential.response`；safeStorage 不可用时后端抛 `CREDENTIAL_UNAVAILABLE`。
+- **后端可独立运行**：`pnpm --filter server dev` 用系统 Node 24 启动，renderer 用浏览器打开即可开发与跑 E2E（此时 safeStorage 由开发用的明文适配器替代，仅限 `NODE_ENV=development`；该分支在生产构建中被常量折叠删除，`pnpm build` 末尾的 `scripts/check-prod-bundle.mjs` 校验产物中不存在它）。
 - 令牌：每次启动随机生成 renderer 令牌与各 MCP 令牌，只存在内存；端口均为随机端口，仅绑定 127.0.0.1。开发时后端固定 `DEV_API_PORT`，Vite 把 `/api/v1` 代理过去（D31）。
 - **两套 MCP 权限隔离**：执行 MCP 只给执行任务的 AI 会话用，工具绑定到所属尝试；助手 MCP（v1.1，见 [15-assistant.md](15-assistant.md)）给应用助手用，能力来自操作清单，写操作需用户确认。
 

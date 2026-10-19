@@ -10,6 +10,8 @@ files:
 extraResources:
   - from: ../../packages/opencode-plugin/src
     to: opencode-plugin
+  - from: ../../packages/server/migrations
+    to: migrations
 npmRebuild: false
 asar: true
 mac:

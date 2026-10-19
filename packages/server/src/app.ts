@@ -11,6 +11,12 @@ import { registerErrorHandling } from './core/http/errors.ts';
 import { createLogger, type Logger } from './core/logger.ts';
 import { mountOperations } from './core/operations/operations.ts';
 import { registerSseHub } from './core/sse/sse-hub.ts';
+import {
+  type CredentialCipher,
+  type CredentialsService,
+  createCredentialsModule,
+  unavailableCipher,
+} from './modules/credentials/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
 import { registerSystemRoutes } from './modules/system/system.routes.ts';
 
@@ -19,12 +25,15 @@ export type AppDeps = {
   clock?: Clock;
   /** Captures log output instead of writing stdout and the log file. */
   logDestination?: DestinationStream;
+  /** Encryption for stored secrets; without one, credential use fails with CREDENTIAL_UNAVAILABLE. */
+  cipher?: CredentialCipher;
 };
 
 export type App = {
   server: FastifyInstance;
   events: EventBus;
   log: Logger;
+  services: { credentials: CredentialsService };
   close(): Promise<void>;
 };
 
@@ -47,8 +56,9 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   registerSystemRoutes(server, config);
 
   const settings = createSettingsModule({ db: database.db, events, clock });
+  const credentials = createCredentialsModule({ db: database.db, clock, cipher: deps.cipher ?? unavailableCipher });
   mountOperations(server, [...settings.operations]);
 
   if (config.webDir !== undefined) await server.register(fastifyStatic, { root: config.webDir });
-  return { server, events, log, close: () => server.close() };
+  return { server, events, log, services: { credentials: credentials.service }, close: () => server.close() };
 }

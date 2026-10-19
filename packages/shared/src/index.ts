@@ -3,6 +3,7 @@ export * from './constants/limits.ts';
 export * from './constants/settings.ts';
 export * from './contracts/api/system.ts';
 export * from './contracts/bridge.ts';
+export * from './contracts/credential-port.ts';
 export * from './contracts/events/server-events.ts';
 export * from './enums/git.ts';
 export * from './enums/inbox.ts';
