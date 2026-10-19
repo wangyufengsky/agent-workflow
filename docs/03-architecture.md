@@ -82,9 +82,10 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | 服务端状态 | @tanstack/react-query | 5.104.4 |
 | 界面状态 | zustand | 5.0.15 |
 | 画布 | @xyflow/react + elkjs | 12.12.0 / 0.12.0 |
-| 无样式组件 | @radix-ui/react-*（Dialog、Popover、Tabs、Tooltip、DropdownMenu、Select） | M0 锁定 |
-| 表单 | react-hook-form + @hookform/resolvers | M0 锁定 |
-| diff / 代码高亮 | @git-diff-view/react + shiki | M0 锁定 |
+| 无样式组件 | @radix-ui/react-dialog、@radix-ui/react-tabs（Dialog、Drawer、命令面板、Tabs）；Popover、Tooltip、DropdownMenu、Select 引入时锁定 | 1.3.1 / 1.2.1 |
+| Markdown 渲染 | react-markdown + remark-gfm（不渲染原始 HTML，模型产出的摘要与报告） | 10.1.0 / 4.0.1 |
+| 表单 | react-hook-form + @hookform/resolvers | 引入时锁定（M1 表单字段少，用受控组件） |
+| diff / 代码高亮 | @git-diff-view/react + shiki | 引入时锁定（M4-07） |
 | 契约 | zod | 4.6.7 |
 | HTTP | fastify（请求校验由操作清单挂载层直接用 zod 解析，见 D39） | 5.12.7 |
 | MCP | @modelcontextprotocol/sdk | 1.32.1 |

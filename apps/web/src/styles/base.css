@@ -1389,3 +1389,59 @@ details.adv .chev {
 details.adv[open] > summary .chev {
   transform: rotate(90deg);
 }
+
+/* ---------- 14. 产品补充 ---------- */
+/* StatusTone 的 warn 语气（设计稿只有 .st-fail，同为 warn 颜色）。 */
+.st-warn {
+  color: var(--warn);
+  background: var(--warn-fill);
+}
+/* 只取语气文字色（指示点等）。 */
+.tone-idle {
+  color: var(--idle);
+}
+.tone-run {
+  color: var(--run);
+}
+.tone-wait {
+  color: var(--wait);
+}
+.tone-warn {
+  color: var(--warn);
+}
+.tone-ok {
+  color: var(--ok);
+}
+.tone-done {
+  color: var(--done);
+}
+.tone-danger {
+  color: var(--danger);
+}
+/* 按内容宽度的控件（如顶栏主题选择）。 */
+.select.fit {
+  width: auto;
+}
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+.crumbs + .page-head {
+  margin-top: var(--s-4);
+}
+/* 纵向分组的卡片之间的间距（设置页等）。 */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+}
+.input.narrow {
+  width: 96px;
+}
+.tab-panel {
+  padding-top: var(--s-4);
+}
+fieldset.seg {
+  margin: 0;
+  min-inline-size: 0;
+}

@@ -4,7 +4,7 @@
 
 ## 1. 路由与页面
 
-路由常量在 `web/src/app/routes.ts`；导航配置在 `web/src/app/navigation.ts`。
+路由常量在 `web/src/app/routes.ts`（侧栏内页面挂在无路径布局路由 `_shell` 下，`getRouteApi` 用 `ROUTE_IDS`）；导航配置在 `web/src/app/navigation.ts`。没有任何项目时，侧栏内的页面都重定向到 `/onboarding`。开发构建另有 `/dev/components` 组件走查页（E2E 在四套主题下截图，生产构建不含）。
 
 | 路由 | 页面 | 模式 | 设计参考 |
 | --- | --- | --- | --- |

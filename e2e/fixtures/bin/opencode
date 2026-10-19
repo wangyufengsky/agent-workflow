@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stand-in for opencode in browser E2E: environment detection only runs `opencode --version`.
+echo 1.19.0
