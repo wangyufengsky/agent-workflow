@@ -1,0 +1,132 @@
+import { z } from 'zod';
+
+export const ErrorCode = {
+  // 通用
+  ValidationFailed: 'VALIDATION_FAILED',
+  NotFound: 'NOT_FOUND',
+  StateTransitionInvalid: 'STATE_TRANSITION_INVALID',
+  Unauthorized: 'UNAUTHORIZED',
+  InternalError: 'INTERNAL_ERROR',
+  // 项目
+  ProjectNotFound: 'PROJECT_NOT_FOUND',
+  ProjectPathNotGitRepo: 'PROJECT_PATH_NOT_GIT_REPO',
+  ProjectAlreadyExists: 'PROJECT_ALREADY_EXISTS',
+  ProjectHasActiveTasks: 'PROJECT_HAS_ACTIVE_TASKS',
+  // Git / worktree
+  GitNotInstalled: 'GIT_NOT_INSTALLED',
+  GitCommandFailed: 'GIT_COMMAND_FAILED',
+  GitBaseBranchNotFound: 'GIT_BASE_BRANCH_NOT_FOUND',
+  WorktreeCreateFailed: 'WORKTREE_CREATE_FAILED',
+  WorktreeDirty: 'WORKTREE_DIRTY',
+  // 托管平台
+  HostingNotConfigured: 'HOSTING_NOT_CONFIGURED',
+  HostingAuthFailed: 'HOSTING_AUTH_FAILED',
+  HostingApiError: 'HOSTING_API_ERROR',
+  // 流程 / 角色
+  WorkflowNotFound: 'WORKFLOW_NOT_FOUND',
+  WorkflowReadonly: 'WORKFLOW_READONLY',
+  WorkflowDefinitionInvalid: 'WORKFLOW_DEFINITION_INVALID',
+  RoleNotFound: 'ROLE_NOT_FOUND',
+  RoleReadonly: 'ROLE_READONLY',
+  RoleInUse: 'ROLE_IN_USE',
+  // 任务 / 计划 / 节点
+  TaskNotFound: 'TASK_NOT_FOUND',
+  PlanNotFound: 'PLAN_NOT_FOUND',
+  PlanVersionConflict: 'PLAN_VERSION_CONFLICT',
+  PlanInvalid: 'PLAN_INVALID',
+  NodeNotFound: 'NODE_NOT_FOUND',
+  NodeNotEditable: 'NODE_NOT_EDITABLE',
+  // 尝试 / opencode
+  AttemptNotFound: 'ATTEMPT_NOT_FOUND',
+  AttemptNoResult: 'ATTEMPT_NO_RESULT',
+  AttemptTimeout: 'ATTEMPT_TIMEOUT',
+  AttemptSessionError: 'ATTEMPT_SESSION_ERROR',
+  OpencodeNotReady: 'OPENCODE_NOT_READY',
+  OpencodeRequestFailed: 'OPENCODE_REQUEST_FAILED',
+  // MCP 专用
+  McpAttemptUnresolved: 'MCP_ATTEMPT_UNRESOLVED',
+  McpToolNotAllowed: 'MCP_TOOL_NOT_ALLOWED',
+  McpResultAlreadySubmitted: 'MCP_RESULT_ALREADY_SUBMITTED',
+  McpNodeNotFound: 'MCP_NODE_NOT_FOUND',
+  // Inbox
+  InboxItemNotFound: 'INBOX_ITEM_NOT_FOUND',
+  InboxItemClosed: 'INBOX_ITEM_CLOSED',
+  // 交付
+  DeliveryConflict: 'DELIVERY_CONFLICT',
+  DeliveryTargetNotFound: 'DELIVERY_TARGET_NOT_FOUND',
+  // 数据库
+  DbConnectionNotFound: 'DB_CONNECTION_NOT_FOUND',
+  DbConnectionFailed: 'DB_CONNECTION_FAILED',
+  DbQueryRejected: 'DB_QUERY_REJECTED',
+  DbQueryTimeout: 'DB_QUERY_TIMEOUT',
+  DbQueryFailed: 'DB_QUERY_FAILED',
+  // 凭据
+  CredentialUnavailable: 'CREDENTIAL_UNAVAILABLE',
+} as const;
+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
+export const ERROR_CODES = Object.values(ErrorCode);
+export const errorCodeSchema = z.enum(ErrorCode);
+
+/** HTTP status of each code (08 §5.2); null for codes recorded on attempts or returned only over MCP. */
+export const ERROR_HTTP_STATUS = {
+  [ErrorCode.ValidationFailed]: 400,
+  [ErrorCode.NotFound]: 404,
+  [ErrorCode.StateTransitionInvalid]: 409,
+  [ErrorCode.Unauthorized]: 401,
+  [ErrorCode.InternalError]: 500,
+  [ErrorCode.ProjectNotFound]: 404,
+  [ErrorCode.ProjectPathNotGitRepo]: 400,
+  [ErrorCode.ProjectAlreadyExists]: 409,
+  [ErrorCode.ProjectHasActiveTasks]: 409,
+  [ErrorCode.GitNotInstalled]: 500,
+  [ErrorCode.GitCommandFailed]: 500,
+  [ErrorCode.GitBaseBranchNotFound]: 400,
+  [ErrorCode.WorktreeCreateFailed]: 500,
+  [ErrorCode.WorktreeDirty]: 409,
+  [ErrorCode.HostingNotConfigured]: 400,
+  [ErrorCode.HostingAuthFailed]: 401,
+  [ErrorCode.HostingApiError]: 502,
+  [ErrorCode.WorkflowNotFound]: 404,
+  [ErrorCode.WorkflowReadonly]: 409,
+  [ErrorCode.WorkflowDefinitionInvalid]: 400,
+  [ErrorCode.RoleNotFound]: 404,
+  [ErrorCode.RoleReadonly]: 409,
+  [ErrorCode.RoleInUse]: 409,
+  [ErrorCode.TaskNotFound]: 404,
+  [ErrorCode.PlanNotFound]: 404,
+  [ErrorCode.PlanVersionConflict]: 409,
+  [ErrorCode.PlanInvalid]: 400,
+  [ErrorCode.NodeNotFound]: 404,
+  [ErrorCode.NodeNotEditable]: 409,
+  [ErrorCode.AttemptNotFound]: 404,
+  [ErrorCode.AttemptNoResult]: null,
+  [ErrorCode.AttemptTimeout]: null,
+  [ErrorCode.AttemptSessionError]: null,
+  [ErrorCode.OpencodeNotReady]: 503,
+  [ErrorCode.OpencodeRequestFailed]: 502,
+  [ErrorCode.McpAttemptUnresolved]: null,
+  [ErrorCode.McpToolNotAllowed]: null,
+  [ErrorCode.McpResultAlreadySubmitted]: null,
+  [ErrorCode.McpNodeNotFound]: null,
+  [ErrorCode.InboxItemNotFound]: 404,
+  [ErrorCode.InboxItemClosed]: 409,
+  [ErrorCode.DeliveryConflict]: 409,
+  [ErrorCode.DeliveryTargetNotFound]: 400,
+  [ErrorCode.DbConnectionNotFound]: 404,
+  [ErrorCode.DbConnectionFailed]: 502,
+  [ErrorCode.DbQueryRejected]: 400,
+  [ErrorCode.DbQueryTimeout]: 504,
+  [ErrorCode.DbQueryFailed]: 400,
+  [ErrorCode.CredentialUnavailable]: 500,
+} as const satisfies Record<ErrorCode, number | null>;
+
+/** `{ code, message, details? }` as stored on tasks / attempts and returned in HTTP error bodies. */
+export const errorInfoSchema = z.object({
+  code: errorCodeSchema,
+  message: z.string(),
+  details: z.record(z.string(), z.unknown()).optional(),
+});
+export type ErrorInfo = z.infer<typeof errorInfoSchema>;
+
+export const errorResponseSchema = z.object({ error: errorInfoSchema });
+export type ErrorResponse = z.infer<typeof errorResponseSchema>;

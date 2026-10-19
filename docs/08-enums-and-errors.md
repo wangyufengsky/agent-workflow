@@ -47,20 +47,20 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 各状态含义与转换见 [09-state-machines.md](09-state-machines.md)。
 
-**任务显示状态（简单模式）**由 `TaskStatus` + 是否有打开的「需要你处理」条目推导，常量 `TASK_DISPLAY_GROUP`：
+**任务显示状态（简单模式）**`TaskDisplayGroup` 由 `TaskStatus` + 是否有打开的「需要你处理」条目推导：常量 `TASK_DISPLAY_GROUP`（状态 → 显示）与函数 `resolveTaskDisplayGroup(status, hasOpenAttentionItem)`，覆盖规则的条目类型为常量 `ATTENTION_INBOX_KINDS`：
 
-| 显示 | 来源 |
-| --- | --- |
-| 准备中 | `draft` `preparing` `planning` |
-| 待确认计划 | `plan_review` |
-| 执行中 | `running` |
-| 已暂停 | `paused` |
-| 需要你处理 | 任意非终态 + 存在 `open` 的 `question` / `permission` / `acceptance` 条目（覆盖上面几种显示） |
-| 待合并 | `review` |
-| 合并中 | `merging` |
-| 已完成 | `completed` |
-| 失败 | `failed` |
-| 已取消 | `cancelled` |
+| `TaskDisplayGroup` | 显示 | 来源 |
+| --- | --- | --- |
+| `preparing` | 准备中 | `draft` `preparing` `planning` |
+| `plan_review` | 待确认计划 | `plan_review` |
+| `running` | 执行中 | `running` |
+| `paused` | 已暂停 | `paused` |
+| `needs_attention` | 需要你处理 | 任意非终态 + 存在 `open` 的 `question` / `permission` / `acceptance` 条目（覆盖上面几种显示） |
+| `review` | 待合并 | `review` |
+| `merging` | 合并中 | `merging` |
+| `completed` | 已完成 | `completed` |
+| `failed` | 失败 | `failed` |
+| `cancelled` | 已取消 | `cancelled` |
 
 ### 2.3 流程与角色
 
@@ -103,15 +103,17 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 
-| tone | TaskStatus | NodeStatus | AttemptStatus |
-| --- | --- | --- | --- |
-| `idle` | `draft` | `pending` · `skipped` · `cancelled` | — |
-| `run` | `preparing` · `planning` · `running` · `merging` | `ready` · `running` · `verifying` | `starting` · `running` |
-| `wait` | `plan_review` · `paused` | `waiting_input` · `awaiting_acceptance` | — |
-| `ok` | `review` | `done` | `succeeded` |
-| `done` | `completed` | — | — |
-| `danger` | `failed` | `failed` | `failed` |
-| `warn` | `cancelled` | — | `aborted` · `interrupted` |
+`STATUS_TONE.task` / `.node` / `.attempt` / `.taskDisplay`（类型保证每个值都有映射，单测再校验一次）：
+
+| tone | TaskStatus | NodeStatus | AttemptStatus | TaskDisplayGroup |
+| --- | --- | --- | --- | --- |
+| `idle` | `draft` | `pending` · `skipped` · `cancelled` | — | — |
+| `run` | `preparing` · `planning` · `running` · `merging` | `ready` · `running` · `verifying` | `starting` · `running` | `preparing` · `running` · `merging` |
+| `wait` | `plan_review` · `paused` | `waiting_input` · `awaiting_acceptance` | — | `plan_review` · `paused` · `needs_attention` |
+| `ok` | `review` | `done` | `succeeded` | `review` |
+| `done` | `completed` | — | — | `completed` |
+| `danger` | `failed` | `failed` | `failed` | `failed` |
+| `warn` | `cancelled` | — | `aborted` · `interrupted` | `cancelled` |
 
 ## 4. 常量
 
@@ -160,13 +162,13 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `scheduler.maxConcurrentNodesPerTask` | `2` | 专业 |
 | `node.maxAttempts` | `3` | 专业 |
 | `attempt.timeoutMinutes` | `60` | 专业 |
-| `worktree.rootDir` | `<数据目录>/worktrees` | 专业 |
-| `delivery.defaultStrategy` | `squash` | 专业 |
+| `worktree.rootDir` | `null`（使用 `<数据目录>/worktrees`） | 专业 |
+| `delivery.defaultStrategy` | `squash`（可选 `squash` / `merge` / `rebase`；PR 有单独按钮） | 专业 |
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |
 | `opencode.binaryPath` | `null`（从 PATH 与 `~/.opencode/bin` 查找） | 专业 |
 | `assistant.alwaysAllow` | `[]`（操作 id 列表，仅 write 级可加入；v1.1） | 简单 |
 
-「模式」列表示该设置在哪种界面模式下出现在设置页。
+「模式」列表示该设置在哪种界面模式下出现在设置页（常量 `SETTING_MODE`）。值的 schema 为 `settingsSchema`（strict：未知键拒绝），默认值为 `SETTING_DEFAULTS`。
 
 ## 5. 错误码
 
