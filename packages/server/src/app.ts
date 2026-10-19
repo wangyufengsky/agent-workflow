@@ -18,7 +18,7 @@ import {
   unavailableCipher,
 } from './modules/credentials/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
-import { registerSystemRoutes } from './modules/system/system.routes.ts';
+import { createSystemModule } from './modules/system/index.ts';
 
 /** Collaborators that tests replace; production uses the defaults. */
 export type AppDeps = {
@@ -27,6 +27,8 @@ export type AppDeps = {
   logDestination?: DestinationStream;
   /** Encryption for stored secrets; without one, credential use fails with CREDENTIAL_UNAVAILABLE. */
   cipher?: CredentialCipher;
+  /** Environment used to locate git and opencode (PATH, HOME). */
+  env?: NodeJS.ProcessEnv;
 };
 
 export type App = {
@@ -53,11 +55,11 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   registerTokenAuth(server, config.apiToken);
   registerErrorHandling(server, { serveSpa: config.webDir !== undefined });
   registerSseHub(server, events);
-  registerSystemRoutes(server, config);
 
   const settings = createSettingsModule({ db: database.db, events, clock });
   const credentials = createCredentialsModule({ db: database.db, clock, cipher: deps.cipher ?? unavailableCipher });
-  mountOperations(server, [...settings.operations]);
+  const system = createSystemModule({ config, env: deps.env ?? process.env, settings: settings.service });
+  mountOperations(server, [...settings.operations, ...system.operations]);
 
   if (config.webDir !== undefined) await server.register(fastifyStatic, { root: config.webDir });
   return { server, events, log, services: { credentials: credentials.service }, close: () => server.close() };
