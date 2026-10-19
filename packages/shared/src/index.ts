@@ -14,3 +14,4 @@ export * from './enums/workflow.ts';
 export * from './errors/app-error.ts';
 export * from './errors/codes.ts';
 export * from './errors/plan-problems.ts';
+export * from './fsm/index.ts';
