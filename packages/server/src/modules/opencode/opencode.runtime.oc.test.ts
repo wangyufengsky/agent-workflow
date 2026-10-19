@@ -8,13 +8,13 @@ const START_TIMEOUT_MS = 60_000;
 
 let t: TestApp;
 beforeEach(async () => {
-  t = await createTestApp();
+  t = await createTestApp({ realOpencode: true });
 });
 afterEach(() => t.close());
 
 describe('@opencode 运行时托管', () => {
   it('启动到 ready；进程被杀后自动恢复', async () => {
-    await t.app.startRuntime(0);
+    await t.app.startRuntime(t.port);
     const ready = await t.app.services.runtime.snapshot();
     expect(ready).toMatchObject({
       status: RuntimeStatus.Ready,

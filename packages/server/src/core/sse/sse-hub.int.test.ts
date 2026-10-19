@@ -7,8 +7,7 @@ let t: TestApp;
 let url: string;
 beforeEach(async () => {
   t = await createTestApp();
-  const address = await t.app.server.listen({ host: '127.0.0.1', port: 0 });
-  url = `${address}${API_PREFIX}/events?token=${TEST_TOKEN}`;
+  url = `http://127.0.0.1:${t.port}${API_PREFIX}/events?token=${TEST_TOKEN}`;
 });
 afterEach(() => t.close());
 

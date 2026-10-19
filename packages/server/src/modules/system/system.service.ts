@@ -32,8 +32,7 @@ export function createSystemService({ config, env, runtime, opencode }: SystemSe
       git,
       opencode: runtimeState,
       models,
-      // TODO(M2-10): also require a model once browser E2E runs against FakeOpencode.
-      ready: git.installed && !NOT_HOSTABLE.includes(runtimeState.status),
+      ready: git.installed && !NOT_HOSTABLE.includes(runtimeState.status) && models.available.length > 0,
     };
   }
 

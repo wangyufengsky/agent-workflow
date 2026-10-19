@@ -99,6 +99,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DbType` | `mysql` |
 | `CredentialKind` | `git_token` · `db_password` |
 | `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` |
+| `TranscriptSystemEvent` | `attempt_started` · `nudged` · `retrying` · `result_submitted` · `timed_out` · `aborted` · `runtime_lost`（`system` 会话流条目记录的事件，文案在前端） |
+| `McpToolName` | 执行 MCP 工具名（12 §6）；`ATTEMPT_SUBMIT_TOOL` 为每种尝试的提交工具 |
 | `BashPolicy` | `auto`（默认放行，禁止 Git 写操作）· `ask`（只读命令放行，其余询问） |
 | `OperationRisk` | `read` · `write` · `critical`（操作清单风险等级，决定助手确认行为，见 15 §4） |
 | `ServerEventType` | 见 [11-api.md §11](11-api.md#11-sse-事件) |
@@ -144,6 +146,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `OPENCODE_START_TIMEOUT_MS` | `30000` | `opencode serve` 报告地址并响应 `/config` 的时限 |
 | `MCP_TOOL_PREFIX` | `agent-workflow_` | opencode 中本项目 MCP 工具名的前缀 |
 | `MCP_SESSION_ARG` | `__aw_session` | bridge 插件注入的会话 id 参数名（12 §3） |
+| `ATTEMPT_BASE_AGENT` | `{ plan: planner, execute: executor, review: reviewer }` | 尝试类型对应的基础 agent |
 | `BASH_PERMISSION_PRESETS` | `readonly` / `auto` / `ask` 三套规则 | 会话级 bash 规则（12 §2） |
 
 ### 4.2 限制值（`constants/limits.ts`）
@@ -158,6 +161,9 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DB_QUERY_MAX_ROWS` | 200 |
 | `DB_QUERY_TIMEOUT_MS` | 15000 |
 | `TRANSCRIPT_PAGE_SIZE` | 200 |
+| `TRANSCRIPT_TEXT_FLUSH_CHARS` | 200（流式文本每增长这么多字符写一次会话流） |
+| `REPORT_PROGRESS_MAX_CHARS` | 200 |
+| `RESULT_SUMMARY_MAX_CHARS` | 4000 |
 | `SSE_REPLAY_BUFFER` | 1000（条） |
 | `DIFF_FILE_MAX_BYTES` | 1048576（超过显示「文件过大」） |
 

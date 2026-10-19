@@ -6,6 +6,12 @@ export const ACCEPTANCE_COMMAND_TIMEOUT_MS = 600_000;
 export const DB_QUERY_MAX_ROWS = 200;
 export const DB_QUERY_TIMEOUT_MS = 15_000;
 export const TRANSCRIPT_PAGE_SIZE = 200;
+/** A streaming text part is written to the transcript again once it grew by this many characters (10 §3). */
+export const TRANSCRIPT_TEXT_FLUSH_CHARS = 200;
 /** SSE events kept in memory for `Last-Event-ID` replay. */
 export const SSE_REPLAY_BUFFER = 1000;
 export const DIFF_FILE_MAX_BYTES = 1_048_576;
+/** `report_progress` message (12 §6.8). */
+export const REPORT_PROGRESS_MAX_CHARS = 200;
+/** `submit_result` summary (12 §6.5). */
+export const RESULT_SUMMARY_MAX_CHARS = 4000;

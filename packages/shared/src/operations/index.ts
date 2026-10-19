@@ -1,8 +1,12 @@
+import { abortAttemptOp, getAttemptOp } from './attempts.ts';
+import { startDebugAttemptOp } from './debug.ts';
 import type { OperationContract } from './define.ts';
 import { createProjectOp, deleteProjectOp, getProjectOp, listProjectsOp, updateProjectOp } from './projects.ts';
 import { getSettingsOp, updateSettingsOp } from './settings.ts';
 import { getEnvironmentOp, getHealthOp, getRuntimeOp, recheckEnvironmentOp, restartRuntimeOp } from './system.ts';
 
+export * from './attempts.ts';
+export * from './debug.ts';
 export * from './define.ts';
 export * from './projects.ts';
 export * from './settings.ts';
@@ -22,4 +26,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getProjectOp,
   updateProjectOp,
   deleteProjectOp,
+  getAttemptOp,
+  abortAttemptOp,
+  startDebugAttemptOp,
 ];

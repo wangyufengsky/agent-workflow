@@ -12,4 +12,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.projects.get': '查看项目',
   'op.projects.update': '修改项目',
   'op.projects.delete': '删除项目',
+  'op.attempts.get': '查看 AI 会话',
+  'op.attempts.abort': '中止 AI 会话',
+  'op.debug.startAttempt': '调试：发起一次执行尝试',
 };

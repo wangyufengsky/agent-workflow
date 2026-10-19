@@ -7,8 +7,8 @@ import { sessionPermissionRules } from './opencode.config.ts';
 /** Real opencode 1.19.0; no model is called (07 §2). */
 let t: TestApp;
 beforeEach(async () => {
-  t = await createTestApp();
-  await t.app.startRuntime(0);
+  t = await createTestApp({ realOpencode: true });
+  await t.app.startRuntime(t.port);
 });
 afterEach(() => t.close());
 

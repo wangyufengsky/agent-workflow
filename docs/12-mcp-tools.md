@@ -47,7 +47,7 @@
 
 MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 
-- 插件 `agent-workflow-bridge`（S1 已验证，D33）在 `tool.execute.before` 钩子中，对名称以 `agent-workflow_` 开头的工具**原地修改** `output.args.__aw_session = input.sessionID`（给 `output.args` 重新赋值不会生效）。MCP 服务端在 zod 校验前取出该字段，按 `attempts.opencode_session_id` 找到 `starting/running` 状态的尝试。
+- 插件 `agent-workflow-bridge`（S1 已验证，D33）在 `tool.execute.before` 钩子中，对名称以 `agent-workflow_` 开头的工具**原地修改** `output.args.__aw_session = input.sessionID`（给 `output.args` 重新赋值不会生效）。MCP 服务端在 zod 校验前取出该字段，按 `attempts.opencode_session_id` 找到该会话**最新**的尝试：不存在或不在 `starting/running` → `MCP_ATTEMPT_UNRESOLVED`；已 `succeeded` 且调用的是提交类工具（`submit_plan/result/review`）→ `MCP_RESULT_ALREADY_SUBMITTED`。
 - 模型在后续调用中可能自己照抄 `__aw_session`，钩子总会用真实 sessionID 覆盖，因此不影响归属。
 - 插件按 opencode 的目录实例各加载一次（每个 worktree 一次），实现须无状态。
 - 插件以构建后的 JS 随安装包放在 `Resources/opencode-plugin/`（M2-03）。
@@ -71,9 +71,14 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | --- | --- |
 | 调用 `submit_plan` / `submit_result` / `submit_review` 成功 | 尝试 `succeeded`；后端随后中止会话的后续生成（若仍在生成） |
 | `session.idle` 且有未回答的阻塞问题 | 节点 `waiting_input`；回答后 `prompt_async` 发送答案（`start-answer.md` 模板） |
-| `session.idle` 且未提交、无问题 | 发送提醒（`nudge.md`），`nudges+1`；超过 `ATTEMPT_MAX_NUDGES` → `failed / ATTEMPT_NO_RESULT` |
-| `session.error` | `failed / ATTEMPT_SESSION_ERROR` |
-| 超时 | 中止会话，`failed / ATTEMPT_TIMEOUT` |
+| `session.idle` 且未提交、无问题 | 发送提醒（`nudge.md`，按尝试类型填入对应的提交工具名），`nudges+1`；已提醒 `ATTEMPT_MAX_NUDGES` 次仍空闲 → `failed / ATTEMPT_NO_RESULT` |
+| `session.error` | `failed / ATTEMPT_SESSION_ERROR`（`details.error` 为 opencode 的错误对象） |
+| 超时 | 从 `running` 起 `attempt.timeoutMinutes`：中止会话，`failed / ATTEMPT_TIMEOUT` |
+| 用户中止 | `aborted`，中止会话 |
+| opencode 进程退出 / 重启、后端重启 | 活动尝试 → `interrupted` |
+
+- 「中止会话的后续生成」在提交工具调用返回（工具片段 `completed`）后执行，因此工具结果仍完整记入会话流。
+- 会话创建后、发送首条消息前尝试即进入 `running`，保证首条消息引起的任何事件都能找到活动尝试；首条消息发送失败按 `session_error` 处理，会话创建失败按 `start_failed`。
 
 ### 4.3 规划会话的复用
 
@@ -89,6 +94,8 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 ```
 
 成功返回：`{ content: [{ type: "text", text: JSON.stringify(output) }], structuredContent: output }`。
+
+通用 hint（`mcp.registry.ts`，各工具可按错误码覆盖）：`VALIDATION_FAILED` 让模型按 `details.issues` 修正参数；`MCP_ATTEMPT_UNRESOLVED` 让模型结束本轮；`MCP_TOOL_NOT_ALLOWED` 让模型只用指令中提到的工具；`MCP_RESULT_ALREADY_SUBMITTED` 让模型结束本轮。未知工具返回 `NOT_FOUND`；未预期异常返回 `INTERNAL_ERROR` 并记录日志。
 
 ## 6. 工具清单
 
@@ -106,7 +113,9 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `db_describe` | plan · execute · review | 查看表结构 |
 | `db_query` | plan · execute · review | 只读查询 |
 
-工具名在 opencode 中显示为 `agent-workflow_<name>`。输入/输出 schema 位于 `shared/contracts/mcp/<tool>.ts`；下文用 TS 类型描述。
+工具名在 opencode 中显示为 `agent-workflow_<name>`（名称常量 `McpToolName`）。输入/输出 schema 位于 `shared/contracts/mcp/<tool>.ts`；下文用 TS 类型描述。
+
+M2 实现了 `get_task_context`、`report_progress`、`submit_result`，归属对象是**调试尝试**（开发构建的调试入口，不属于任务）：`get_task_context` 返回任务编号 `DEBUG`、需求、所在目录的分支与 HEAD；`submit_result` 直接使尝试 `succeeded`（返回 `next: 'done'`）。其余工具与任务归属随 M3 加入。
 
 ---
 
@@ -228,8 +237,8 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 
 ### 6.8 `report_progress`
 
-输入：`{ message: string }`（1..200）
-行为：更新节点（或任务规划阶段）的「当前进展」一行，推送 SSE；不写库历史。
+输入：`{ message: string }`（1..`REPORT_PROGRESS_MAX_CHARS`）
+行为：记为当前尝试的 `progress`（只在内存中，尝试结束时清除），推送 `attempt.updated`；节点（或任务规划阶段）的「当前进展」显示其活动尝试的这一行。不写库历史。
 输出：`{ ok: true }`
 
 ### 6.9 `db_list_connections`
@@ -255,8 +264,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 ```
 modules/mcp/
 ├─ mcp.server.ts        McpServer + StreamableHTTPServerTransport，挂载到 Fastify /mcp/exec；校验执行 MCP 令牌
-├─ mcp.registry.ts      工具注册表：definition → 自动生成 tools/list，统一做归属解析、类型授权、zod 校验、错误映射
-├─ mcp.context.ts       解析 __aw_session → AttemptContext
+├─ mcp.registry.ts      工具注册表：definition → 自动生成 tools/list，统一做归属解析（取出 __aw_session）、类型授权、zod 校验、错误映射
 └─ tools/
    ├─ get-task-context.tool.ts
    ├─ submit-plan.tool.ts
@@ -290,4 +298,4 @@ export const submitPlanTool = defineMcpTool({
 | 重试（M2） | 模型请求失败时 `session.status` 为 `{ type: 'retry', message, next }`，会话一直等待到 `next`（如免费额度用尽），不发 `session.error` |
 | 内部事件（M2） | `modules/opencode/opencode.events.ts` 只解析用到的事件（消息角色、文本与增量、工具、用量、重试、空闲、错误、权限），加上运行时消失的 `runtime_lost`；其他模块只经 `OpencodeClient.subscribe` 获取 |
 | 数据目录 | opencode 会话存于用户自己的 opencode 数据目录（与用户 TUI 共享，登录凭据也在那里），本应用不隔离；会话标题带任务编号便于辨认 |
-| 免费模型 | 开发与 `@opencode` 集成测试默认 `opencode/glm-5.3-flash-free`，不产生费用 |
+| 免费模型 | 开发与 `@opencode` 集成测试默认免费模型，不产生费用：M0 用 `opencode/glm-5.3-flash-free`；2026-10-19 其免费额度用尽后改为 `opencode/beam-free`（D42，`AW_OC_TEST_MODEL` 可覆盖） |

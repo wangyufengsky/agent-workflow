@@ -6,10 +6,13 @@ import { parseInput } from './errors.ts';
 
 let t: TestApp;
 beforeEach(async () => {
-  t = await createTestApp();
-  t.app.server.post(`${API_PREFIX}/__test/echo`, async (req) => parseInput(z.object({ n: z.number() }), req.body));
-  t.app.server.get(`${API_PREFIX}/__test/boom`, async () => {
-    throw new Error('kaboom');
+  t = await createTestApp({
+    routes: (server) => {
+      server.post(`${API_PREFIX}/__test/echo`, async (req) => parseInput(z.object({ n: z.number() }), req.body));
+      server.get(`${API_PREFIX}/__test/boom`, async () => {
+        throw new Error('kaboom');
+      });
+    },
   });
 });
 afterEach(() => t.close());

@@ -40,7 +40,7 @@ beforeEach(async () => {
   bin = await mkdtemp(join(tmpdir(), 'aw-bin-'));
   launches = join(bin, 'launches.log');
   await crashingOpencode();
-  t = await createTestApp({ env: { PATH: bin, HOME: bin } });
+  t = await createTestApp({ env: { PATH: bin, HOME: bin }, realOpencode: true });
 });
 afterEach(() => t.close());
 
@@ -48,7 +48,7 @@ describe('opencode 运行时', () => {
   it('启动后进程退出时自动重启一次，之后停在 crashed', async () => {
     // The second crash: the automatic restart has been used up.
     const settled = waitForEvent(t.app.events, ServerEventType.RuntimeUpdated, nthCrash(2));
-    await t.app.startRuntime(0);
+    await t.app.startRuntime(t.port);
     await settled;
 
     expect(await launchCount()).toBe(2);
@@ -57,7 +57,7 @@ describe('opencode 运行时', () => {
 
   it('手动重启重新允许一次自动重启', async () => {
     const firstRound = waitForEvent(t.app.events, ServerEventType.RuntimeUpdated, nthCrash(2));
-    await t.app.startRuntime(0);
+    await t.app.startRuntime(t.port);
     await firstRound;
 
     const secondRound = waitForEvent(t.app.events, ServerEventType.RuntimeUpdated, nthCrash(2));
@@ -69,7 +69,7 @@ describe('opencode 运行时', () => {
   it('opencode 未安装时不能重启', async () => {
     const empty = await mkdtemp(join(tmpdir(), 'aw-empty-'));
     await t.close();
-    t = await createTestApp({ env: { PATH: empty, HOME: empty } });
+    t = await createTestApp({ env: { PATH: empty, HOME: empty }, realOpencode: true });
     const res = await t.call(restartRuntimeOp, {});
     expect(res.status).toBe(409);
     expect(res.body).toMatchObject({ error: { code: ErrorCode.StateTransitionInvalid } });

@@ -153,9 +153,24 @@ type TaskDetailDTO = {
 | POST | `/tasks/:id/nodes/:nodeId/reject` | `{ feedback }`；→ `ready` |
 | POST | `/tasks/:id/nodes/:nodeId/retry` | `failed → ready`，`{ feedback? }` |
 | POST | `/tasks/:id/nodes/:nodeId/skip` 🅿 | |
-| GET | `/attempts/:id` | `AttemptDTO` |
-| GET | `/attempts/:id/transcript?afterSeq` | `{ entries: TranscriptEntry[], lastSeq, done: boolean }` |
-| POST | `/attempts/:id/abort` 🅿 | 中止进行中的尝试（节点按 `attempt_failed` 处理） |
+| GET | `/attempts/:id` | `AttemptDTO`；不存在 404 `ATTEMPT_NOT_FOUND` |
+| GET | `/attempts/:id/transcript?afterSeq` | `{ entries: TranscriptEntry[], lastSeq, done: boolean }`（非清单路由，10 §3）：`lastSeq` 为本页最大 seq（空页为请求的 `afterSeq`），`done` 表示尝试已结束且已读到末尾 |
+| POST | `/attempts/:id/abort` 🅿 | 中止进行中的尝试（节点按 `attempt_failed` 处理）；非 `running` 409 `STATE_TRANSITION_INVALID` |
+| POST | `/debug/attempts` | 仅开发构建（M2-09）：`{ directory, requirement, model? }` → 201 `AttemptDTO`；对 Git 目录发起一次不属于任务的 `execute` 尝试。目录不在 Git 仓库中 400 `PROJECT_PATH_NOT_GIT_REPO`；opencode 未就绪 503 `OPENCODE_NOT_READY` |
+
+```ts
+type AttemptSummaryDTO = {
+  id: string; taskId: string | null; nodeId: string | null;   // 调试尝试两者皆空
+  kind: AttemptKind; seq: number; status: AttemptStatus;
+  model: string | null; nudges: number; error: ErrorInfo | null;
+  progress: string | null;          // 最近一次 report_progress，仅活动期间，内存中
+  startedAt: number; endedAt: number | null;
+};
+type AttemptDTO = AttemptSummaryDTO & {
+  directory: string; opencodeSessionId: string | null;
+  tokensInput: number | null; tokensOutput: number | null; cost: number | null;
+};
+```
 
 ## 7. 需要你处理
 
@@ -214,7 +229,7 @@ type TaskDetailDTO = {
 | `task.updated` | `TaskSummaryDTO` | 更新列表与详情缓存 |
 | `node.updated` | `{ taskId, node: NodeSummaryDTO }` | 更新详情中的节点 |
 | `plan.updated` | `{ taskId, plan: PlanDTO }` | |
-| `attempt.updated` | `{ taskId, nodeId?, attempt: AttemptSummaryDTO }` | |
+| `attempt.updated` | `{ taskId, nodeId, attempt: AttemptSummaryDTO }`（调试尝试 `taskId`、`nodeId` 为 null） | 状态、提醒次数、当前进展变化时 |
 | `attempt.transcript` | `{ attemptId, entries: TranscriptEntry[] }` | 追加到正在查看的会话流 |
 | `inbox.updated` | `{ item: InboxItemDTO, openCount }` | 徽标与列表 |
 | `delivery.updated` | `{ taskId, delivery: DeliveryDTO }` | |

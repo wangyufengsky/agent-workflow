@@ -49,10 +49,10 @@
 
 | 名称 | 位置 | 说明 |
 | --- | --- | --- |
-| `FakeOpencode` | `packages/server/test/fakes/fake-opencode.ts` | 实现 `OpencodeClient` 接口；用脚本描述会话行为：`edit(file, content)`、`callTool(name, args)`、`idle()`、`ask(...)`、`requestPermission(...)`、`error(...)`；真实写 worktree 文件、真实通过 MCP 调用后端 |
+| `FakeOpencode` | `packages/server/test/fakes/fake-opencode.ts` | 实现 `OpencodeClient` 接口；`fake.enqueue(script()…)` 为下一条发给会话的消息排一个回合：`edit(file, content)`、`text(…)`、`callTool(name, args)`、`ask(...)`、`requestPermission(...)`、`error(...)`，回合结束即空闲（没有排脚本的消息直接空闲）；真实写 worktree 文件、真实通过 MCP 调用后端（注入 `__aw_session`）。可断言 `sessions`、`prompts`、`toolCalls`、`aborts`、`permissionReplies`；`crash()` 模拟运行时消失；`settled()` 等待已开始的回合放完。浏览器 E2E 中后端以 `AW_FAKE_OPENCODE=1`（仅开发模式）使用它 |
 | `FakeHosting` | `test/fakes/fake-hosting.ts` | 本地 HTTP 服务模拟 GitHub/GitLab 用到的少数端点 |
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
-| `createTestApp()` | `test/helpers/app.ts` | 启动后端（临时数据目录、随机端口），返回类型化 API 客户端、MCP 客户端、FakeOpencode |
+| `createTestApp()` | `test/helpers/app.ts` | 启动后端（临时数据目录、随机端口），返回类型化 API 调用 `call(op, input)`、`mcpUrl`、FakeOpencode；`realOpencode: true` 用于 `@opencode` 测试；MCP SDK 客户端见 `test/helpers/mcp.ts` |
 | `build.*()` | `test/builders/` | 最小测试数据构造器，只填测试关心的字段，其余用合法默认值 |
 | `waitForEvent(type, predicate)` | `test/helpers/events.ts` | 订阅 event-bus 等待事件，带超时（默认 5s）；**替代一切 sleep** |
 | `FakeClock` | `test/helpers/clock.ts` | 注入时钟，测试超时与 nudge 逻辑，不真实等待 |
