@@ -18,12 +18,12 @@
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
+| GET | `/system/health` | `{ status: 'ok', appVersion, node }`：后台存活、应用版本（`AW_APP_VERSION`，桌面包的版本号）与 Node.js 版本；「设置 → 关于」显示 |
 | GET | `/system/environment` | 环境检测结果 `EnvironmentDTO` |
 | POST | `/system/environment/recheck` | 重新检测（安装 opencode 后用） |
 | GET | `/system/runtime` | `RuntimeDTO`：opencode 状态、路径、版本；`ready` 时含地址与启动时间 |
 | POST | `/system/runtime/restart` | `ready` 时重启，`stopped` / `crashed` 时启动（活动尝试 → `interrupted`）；返回启动结束后的 `RuntimeDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
 | GET | `/system/runtime/logs?tail=500` 🅿 | 最新一天 opencode 日志（`<数据目录>/logs/opencode-YYYYMMDD.log`）的末尾 `tail` 行（默认 `RUNTIME_LOG_TAIL_DEFAULT`，至多 `RUNTIME_LOG_TAIL_MAX`）：`{ file, lines }`；还没有日志时 `{ file: null, lines: [] }` |
-| GET | `/system/storage` | 数据目录占用 |
 | GET | `/settings` | 全部设置 `Record<SettingKey, value>` |
 | PATCH | `/settings` | 部分更新；按 key 的 schema 校验 |
 
