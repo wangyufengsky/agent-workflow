@@ -5,12 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { createTestRepo } from '../../../test/helpers/git.ts';
+import { TEST_MODEL } from '../../../test/helpers/model.ts';
 
-/**
- * The one `@opencode` test that calls a model (07 §2): only a model can make opencode run a tool. A free model keeps
- * it at no cost (D42); override with AW_OC_TEST_MODEL.
- */
-const MODEL = process.env.AW_OC_TEST_MODEL ?? 'opencode/beam-free';
+/** The one `@opencode` test that calls a model (07 §2): only a model can make opencode run a tool. */
 const SESSION_TIMEOUT_MS = 110_000;
 
 let t: TestApp;
@@ -34,9 +31,15 @@ describe('@opencode bridge 插件', () => {
       requirement:
         'This is a connectivity check. Do not read or change any files. Call agent-workflow_get_task_context, ' +
         'then call agent-workflow_submit_result with the summary "bridge ok".',
-      model: MODEL,
+      model: TEST_MODEL,
     });
     const result = (await ended).attempt;
+    // A model or session failure (unavailable model, quota, provider error) shows its code and message here.
+    const error =
+      result.error === null
+        ? null
+        : `${result.error.code}: ${result.error.message} ${JSON.stringify(result.error.details?.error ?? '')}`;
+    expect({ status: result.status, error }).toEqual({ status: AttemptStatus.Succeeded, error: null });
 
     const transcript = (await readFile(join(t.dataDir, 'runs', 'debug', `${attempt.id}.jsonl`), 'utf8'))
       .trim()

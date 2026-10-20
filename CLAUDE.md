@@ -12,4 +12,4 @@
 
 文档、注释与界面文案用中文；代码标识符、日志消息、提交信息用英文。
 
-常用命令：`pnpm dev`（桌面开发）、`pnpm verify`（提交前全量检查：类型、lint、依赖边界、单元与集成测试、构建）、`pnpm e2e`、`pnpm e2e:electron`（需先 `pnpm build`）、`pnpm test:oc` 与 `pnpm test:live`（真实 opencode；模型用 `AW_OC_TEST_MODEL` / `AW_LIVE_MODEL` 指定）。
+常用命令：`pnpm dev`（桌面开发）、`pnpm verify`（提交前全量检查：类型、lint、依赖边界、单元与集成测试、构建）、`pnpm e2e`、`pnpm e2e:electron`（需先 `pnpm build`）、`pnpm test:oc` 与 `pnpm test:live`（真实 opencode；默认免费模型 `opencode-go/beam-free`，`AW_OC_TEST_MODEL` 可覆盖）。

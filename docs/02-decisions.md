@@ -45,7 +45,7 @@
 | D39 | 不引入 `fastify-type-provider-zod`：操作清单的挂载层（`core/operations`）把 path/query/body 合并后用操作的 zod `input` schema 解析，失败统一抛 `VALIDATION_FAILED`（`details.issues`）；响应体用 `output` schema 解析后返回（剥离 DTO 之外的字段） | 该库 7.0.0 把 `@fastify/swagger` 设为必需 peer 依赖；我们的输入来自三处合并，自己解析十几行即可，错误结构也由我们控制 | 2026-10-19 |
 | D40 | M2 的执行 MCP 工具先接**调试尝试**：开发构建的调试入口对一个 Git 目录发起不属于任务的 `execute` 尝试（`attempts.task_id` 为空），由 `debug` 模块提供任务上下文并接收结果（内存中，不建表）；M3 起尝试归属节点 / 任务 | 不必等 tasks / nodes 表即可端到端验证 opencode 托管、MCP、会话流 | 2026-10-19 |
 | D41 | `report_progress` 的「当前进展」记在活动尝试上（内存，随 `attempt.updated` 推送，尝试结束清除），节点与规划阶段显示其活动尝试的这一行 | 规划阶段与节点共用一个机制；进展只是瞬时状态，不写库 | 2026-10-19 |
-| D42 | `@opencode` 集成测试与开发默认免费模型改为可用的 `opencode/beam-free`（2026-10-19 起 `glm-5.3-flash-free` 免费额度用尽，会话卡在 `session.status: retry`）；测试中经 `AW_OC_TEST_MODEL` 可覆盖 | 免费模型的额度会变，测试不能依赖单一模型 | 2026-10-19 |
+| D42 | （默认模型已被 D50 取代）`@opencode` 集成测试与开发默认免费模型改为可用的 `opencode/beam-free`（2026-10-19 起 `glm-5.3-flash-free` 免费额度用尽，会话卡在 `session.status: retry`）；测试中经 `AW_OC_TEST_MODEL` 可覆盖 | 免费模型的额度会变，测试不能依赖单一模型 | 2026-10-19 |
 | D43 | 表定义文件之间可以直接相互引用（`*.table.ts` → 其他模块的 `*.table.ts`，dependency-cruiser 规则 `tables-import-tables`），其余代码跨模块仍只经 `index.ts` | 外键从下层模块指向上层模块的表（nodes → tasks、attempts → nodes），经 `index.ts` 引用会形成服务层循环；表与表之间是一张图，服务之间仍分层 | 2026-10-20 |
 | D44 | 跨服务的事务用环境事务 `core/db/unit-of-work.ts`：`transact(fn)` 嵌套调用加入外层事务，`publish` / `afterCommit` 在提交后才执行 | SQLite 单连接同步事务，服务各自调用 `transact` 即可组合成一个事务；回滚的变更不会推送事件 | 2026-10-20 |
 | D45 | 服务分层：inbox / plans / timeline / worktrees → attempts → acceptance → nodes → tasks → scheduler；需要整个任务上下文的入口（`inbox.resolve`、`projects.delete`、节点的通过/驳回/重试）由 tasks 模块实现。尝试通过信号（`attempts.onSignal`：结束、开始等待、等待结束）通知其所有者，不反向依赖 | 状态机之间的联动集中在一个方向，没有循环；新增一种所有者只需订阅信号 | 2026-10-20 |
@@ -53,4 +53,4 @@
 | D47 | 全局并发上限（`scheduler.maxConcurrentAttempts`）计入 `running`/`verifying` 的节点与规划中的任务；等待输入的节点只占每任务上限。调度器只在事件（任务、节点、尝试、设置、运行时变化）后运行，`start(port)` 之后才开始 | 等待用户的会话不消耗算力；API 监听前会话无法回调 MCP | 2026-10-20 |
 | D48 | 节点完成时后端以 `agent-workflow <agent-workflow@localhost>` 身份、`--no-verify`、关闭签名提交；并行节点共享任务工作区，先完成的节点的提交会包含此刻工作区中的全部改动 | AI 的提交与用户的提交区分开；用户的钩子与签名可能交互或很慢，验收检查已经是关卡；一个任务一个工作区（D20） | 2026-10-20 |
 | D49 | AI 评审会话未能给出结论（未提交、出错、超时、被中止）按检查失败处理（消耗预算，反馈写明评审未完成）；运行时消失则节点回 `ready` 不消耗预算 | 与命令检查一致，节点只有一种失败路径 | 2026-10-20 |
-| D50 | live 示例仓库 `ts-stats` 用 Node 内置测试（`node --test`，TypeScript 由 Node 直接运行），不依赖 Vitest；2026-10-20 起 `opencode/*-free` 模型对开发机的网络返回 `FreeTierError`（403），`@opencode` 与 live 测试改用 `opencode-go/beam-free`（`AW_OC_TEST_MODEL` / `AW_LIVE_MODEL`），默认值不变 | 示例仓库复制到临时目录后无需安装依赖即可检查；免费模型的可用性随网络与额度变化，测试只经环境变量切换 | 2026-10-20 |
+| D50 | live 示例仓库 `ts-stats` 用 Node 内置测试（`node --test`，TypeScript 由 Node 直接运行），不依赖 Vitest。调用模型的测试（`@opencode` bridge 测试与 live）共用一个默认模型常量 `TEST_MODEL`（`test/helpers/model.ts`），默认 `opencode-go/beam-free`，`AW_OC_TEST_MODEL` 可覆盖；模型或会话出错时测试先断言尝试的错误码与信息（取代 D42 的默认值） | 2026-10-20 起 `opencode/*-free` 模型对开发机网络返回 `FreeTierError`（403）；默认配置下测试要能通过，失败时要直接看到根因 | 2026-10-20 |

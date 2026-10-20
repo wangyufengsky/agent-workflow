@@ -7,7 +7,7 @@
 ## 开发环境
 
 - macOS（arm64）、Node.js 24.19+、pnpm 10.28（`corepack enable`）、Git
-- opencode 1.19.0（已登录至少一个模型提供方；开发可用免费模型 `opencode/glm-5.3-flash-free`）
+- opencode 1.19.0（已登录至少一个模型提供方；开发与测试用免费模型 `opencode-go/beam-free`）
 
 ```bash
 pnpm install

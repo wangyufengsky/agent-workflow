@@ -22,12 +22,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { runGit } from '../packages/server/src/modules/git/index.ts';
 import { createTestApp, type TestApp } from '../packages/server/test/helpers/app.ts';
 import { waitForEvent } from '../packages/server/test/helpers/events.ts';
+import { TEST_MODEL as MODEL } from '../packages/server/test/helpers/model.ts';
 
 /**
  * M3-12 live smoke (07 §6): the built-in bugfix and feature workflows on a small fixture repository with the real
- * opencode and a free model. Run by hand: `pnpm test:live` (AW_LIVE_MODEL overrides the model).
+ * opencode and the free test model. Run by hand: `pnpm test:live` (AW_OC_TEST_MODEL overrides the model).
  */
-const MODEL = process.env.AW_LIVE_MODEL ?? 'opencode/glm-5.3-flash-free';
 const TASK_TIMEOUT_MS = 25 * 60_000;
 const FIXTURE = new URL('fixtures/ts-stats', import.meta.url).pathname;
 const ENDED: readonly TaskStatus[] = [TaskStatus.Review, TaskStatus.Failed, TaskStatus.Cancelled];
@@ -159,6 +159,15 @@ async function runTask(workflowKey: string, requirement: string): Promise<TaskDe
   return task;
 }
 
+/** Status and, when the task failed, the code and message of the failure (with its details). */
+const outcome = (task: TaskDetailDTO) => ({
+  status: task.status,
+  failure:
+    task.failure === null
+      ? null
+      : `${task.failure.code}: ${task.failure.message} ${JSON.stringify(task.failure.details ?? {})}`,
+});
+
 describe('@live 内置流程冒烟', () => {
   it(
     'bugfix：修复 median 的排序缺陷',
@@ -167,7 +176,8 @@ describe('@live 内置流程冒烟', () => {
         'bugfix',
         'median 返回了错误的结果：median([10, 9, 1]) 应该是 9，实际是 10。请找到原因并修复。',
       );
-      expect(task.status).toBe(TaskStatus.Review);
+      // A failed phase (model unavailable, session error …) shows its code and message here.
+      expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
       expect(task.result?.checks.every((c) => c.passed)).toBe(true);
       const worktree = task.git.worktreePath ?? '';
       const { stdout } = await runGit(['log', '--format=%an', `${task.git.baseCommit}..HEAD`], { cwd: worktree });
@@ -185,7 +195,8 @@ describe('@live 内置流程冒烟', () => {
         'feature',
         '新增函数 percentile(values: number[], p: number): number，返回第 p 百分位数（p 取 0 到 100，线性插值），放在 src/stats.ts，并补充测试。',
       );
-      expect(task.status).toBe(TaskStatus.Review);
+      // A failed phase (model unavailable, session error …) shows its code and message here.
+      expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
       expect(task.result?.filesChanged).toBeGreaterThan(0);
       expect(task.result?.checks.every((c) => c.passed)).toBe(true);
     },
