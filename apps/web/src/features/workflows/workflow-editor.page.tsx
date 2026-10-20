@@ -23,7 +23,7 @@ import { EmptyState } from '../../components/empty-state.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { toast } from '../../components/toast.tsx';
-import { COMMON_COPY } from '../../copy/common.ts';
+import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
 import { PLAN_PROBLEM_LABEL, WORKFLOW_PROBLEM_LABEL } from '../../copy/plan-editor.ts';
 import {
   WORKFLOW_EDITOR_COPY as C,
@@ -62,7 +62,7 @@ function Versions({ workflowKey }: { workflowKey: string }) {
           <li key={v.id} className="row">
             <span className="grow">{WORKFLOWS_COPY.version(v.version)}</span>
             {index === 0 && <span className="chip">{C.latest}</span>}
-            <span className="hint">{new Date(v.createdAt).toLocaleString()}</span>
+            <span className="hint">{formatDateTime(v.createdAt)}</span>
           </li>
         ))}
       </ul>

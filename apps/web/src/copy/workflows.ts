@@ -73,7 +73,7 @@ export const WORKFLOW_EDITOR_COPY = {
   positionNone: '不限',
   positionFirst: '最先',
   positionLast: '最后',
-  problems: '需要修正',
+  problems: '校验结果',
   noProblems: '定义可以保存。',
   save: '保存为新版本',
   saved: (v: number) => `已保存为第 ${v} 版`,

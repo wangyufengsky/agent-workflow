@@ -1,4 +1,4 @@
-import { RuntimeStatus } from '@aw/shared';
+import { McpToolName, RuntimeStatus } from '@aw/shared';
 
 export const RUNTIME_STATUS_LABEL: Record<RuntimeStatus, string> = {
   [RuntimeStatus.NotInstalled]: '未安装 opencode',
@@ -41,4 +41,19 @@ export const TOOLS_COPY = {
   lede: 'AI 会话通过这些工具与本应用交互：读取上下文、提交计划与结果、提问、只读查询数据库。每种会话只能用允许的工具。',
   allowedKinds: '可用于',
   inputSchema: '输入参数（JSON Schema）',
+  modelDescription: '给模型的说明',
+  /** What each tool lets the AI do (12 §6), in the user's words. */
+  description: {
+    [McpToolName.GetTaskContext]: '读取任务的需求、当前步骤、检查方式、前面步骤的结果，以及用户的回答与反馈。',
+    [McpToolName.GetNodeOutput]: '读取本任务中某个已完成步骤的完整产出：摘要、改动文件、注意事项与检查结果。',
+    [McpToolName.GetTaskDiff]: '查看任务工作区相对基线的改动：文件列表，或某个文件的 diff。',
+    [McpToolName.SubmitPlan]: '提交计划：步骤、角色、指令与依赖。计划不合规时返回问题，AI 修改后再提交。',
+    [McpToolName.SubmitResult]: '步骤完成后提交结果；每次尝试只能提交一次，之后进入检查。',
+    [McpToolName.SubmitReview]: '提交评审结论：通过，或列出问题及位置。',
+    [McpToolName.AskUser]: '向你提问。阻塞的问题会让步骤停下来等你回答；不阻塞时 AI 按默认假设继续。',
+    [McpToolName.ReportProgress]: '上报一句当前进展，显示在任务页上。',
+    [McpToolName.DbListConnections]: '列出项目关联的数据库连接。',
+    [McpToolName.DbDescribe]: '查看数据库的表结构。',
+    [McpToolName.DbQuery]: '只读查询数据库：只允许单条 SELECT / SHOW / DESCRIBE / EXPLAIN，限制行数与时间。',
+  } satisfies Record<McpToolName, string>,
 } as const;

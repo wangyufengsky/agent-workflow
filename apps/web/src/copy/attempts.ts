@@ -1,4 +1,5 @@
 import { AttemptKind, AttemptStatus, TranscriptSystemEvent } from '@aw/shared';
+import { formatDateTimeSeconds, formatTimeSeconds } from './common.ts';
 
 export const ATTEMPT_STATUS_LABEL: Record<AttemptStatus, string> = {
   [AttemptStatus.Starting]: '启动中',
@@ -38,7 +39,7 @@ export const ATTEMPT_COPY = {
   costValue: (usd: number) => `$${usd.toFixed(4)}`,
   time: '时间',
   timeRange: (start: number, end: number | null) =>
-    `${new Date(start).toLocaleString()} → ${end === null ? '进行中' : new Date(end).toLocaleTimeString()}`,
+    `${formatDateTimeSeconds(start)} → ${end === null ? '进行中' : formatTimeSeconds(end)}`,
   error: '错误',
   abort: '中止',
   transcript: '会话流',

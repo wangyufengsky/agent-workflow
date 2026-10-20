@@ -31,7 +31,7 @@ export const PLAN_EDITOR_COPY = {
   manual: '人工验收',
   removeStep: '删除步骤',
   lockedNote: '这个步骤已经开始，只能查看。',
-  problems: '需要修正',
+  problems: '校验结果',
   noProblems: '计划可以保存。',
   incomplete: (key: string) => `步骤 ${key} 的标题、指令与检查命令不能为空`,
   lockedChanged: (keys: string[]) => `已开始的步骤不能修改或删除：${keys.join('、')}`,

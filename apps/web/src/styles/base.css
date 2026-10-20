@@ -138,6 +138,9 @@ svg.i.lg {
 .muted {
   color: var(--muted);
 }
+.nowrap {
+  white-space: nowrap;
+}
 .sub {
   color: var(--sub);
 }
@@ -540,6 +543,11 @@ svg.i.lg {
 }
 .field + .field {
   margin-top: 20px;
+}
+/* A label with its control beside it (switches). */
+.field.row {
+  flex-direction: row;
+  align-items: center;
 }
 .label {
   font-size: 13px;

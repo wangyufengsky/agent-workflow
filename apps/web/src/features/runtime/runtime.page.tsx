@@ -7,7 +7,7 @@ import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { StatusBadge } from '../../components/status-badge.tsx';
-import { COMMON_COPY } from '../../copy/common.ts';
+import { COMMON_COPY, formatDateTimeSeconds } from '../../copy/common.ts';
 import { RUNTIME_COPY as C, RUNTIME_STATUS_LABEL } from '../../copy/runtime.ts';
 import { AttemptView } from '../attempts/attempt-view.tsx';
 import { CopyCommand } from '../onboarding/copy-command.tsx';
@@ -27,7 +27,7 @@ function LogsPanel() {
       title={C.logs}
       actions={
         <span className="row">
-          <label className="hint" htmlFor="log-tail">
+          <label className="hint nowrap" htmlFor="log-tail">
             {C.logsTail}
           </label>
           <select id="log-tail" className="select" value={tail} onChange={(e) => setTail(Number(e.target.value))}>
@@ -58,8 +58,6 @@ function LogsPanel() {
 }
 
 const route = getRouteApi(ROUTE_IDS.runtime);
-
-const formatTime = (ms: number) => new Date(ms).toLocaleString();
 
 function RuntimePanel() {
   const runtime = useQuery(runtimeQuery);
@@ -110,7 +108,7 @@ function RuntimePanel() {
             <dt>{C.url}</dt>
             <dd className="mono">{r.url}</dd>
             <dt>{C.startedAt}</dt>
-            <dd>{formatTime(r.startedAt)}</dd>
+            <dd>{formatDateTimeSeconds(r.startedAt)}</dd>
           </>
         )}
       </dl>

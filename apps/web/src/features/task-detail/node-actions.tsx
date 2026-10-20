@@ -9,14 +9,21 @@ import { useRetryNode, useSkipNode } from '../tasks/tasks.queries.ts';
 /** Steps that may be skipped (09 §3 `skip`). */
 const SKIPPABLE: readonly NodeStatus[] = [NodeStatus.Pending, NodeStatus.Ready, NodeStatus.Failed];
 
+const runningAttempt = (task: TaskDetailDTO, node: NodeSummaryDTO) =>
+  task.activeAttempts.find(
+    (a) => a.nodeId === node.id && a.kind === AttemptKind.Execute && a.status === AttemptStatus.Running,
+  );
+
+/** Whether the step has any action right now; a finished step has none. */
+export const hasNodeActions = (task: TaskDetailDTO, node: NodeSummaryDTO) =>
+  node.status === NodeStatus.Failed || SKIPPABLE.includes(node.status) || runningAttempt(task, node) !== undefined;
+
 /** Pro step actions (M5-03): run a failed step again, skip it, or stop its running session. */
 export function NodeActions({ task, node }: { task: TaskDetailDTO; node: NodeSummaryDTO }) {
   const skip = useSkipNode();
   const retry = useRetryNode();
   const abort = useAbortAttempt();
-  const running = task.activeAttempts.find(
-    (a) => a.nodeId === node.id && a.kind === AttemptKind.Execute && a.status === AttemptStatus.Running,
-  );
+  const running = runningAttempt(task, node);
   const ids = { id: task.id, nodeId: node.id };
   const failure = skip.error ?? retry.error ?? abort.error;
   return (
