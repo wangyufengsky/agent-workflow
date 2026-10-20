@@ -42,7 +42,7 @@ export const githubWhiteTheme: ThemeDefinition = {
     run: '#17743a',
     'run-fill': 'rgba(23,116,58,0.1)',
     'run-line': 'rgba(23,116,58,0.38)',
-    stall: '#cf222e',
+    stall: '#ad1f2b',
     'stall-fill': 'rgba(207,34,46,0.1)',
     'stall-line': 'rgba(207,34,46,0.38)',
     danger: '#cf222e',

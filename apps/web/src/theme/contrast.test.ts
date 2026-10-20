@@ -78,10 +78,20 @@ describe.each(THEME_IDS)('主题 %s 对比度', (id) => {
     }
   });
 
-  it('状态文字在自身填充色上 ≥ 4.5:1', () => {
+  it('状态文字在自身填充色上 ≥ 4.5:1（填充色叠在 bg / panel 上）', () => {
     for (const tone of [...STATUS_TONES, 'stall'] as const) {
-      const fill = over(color(`${tone}-fill`), color('bg'));
-      expect(contrast(color(tone), fill), `${tone} on ${tone}-fill`).toBeGreaterThanOrEqual(MIN);
+      for (const surface of SURFACES.filter((s) => s !== 'sidebar')) {
+        const fill = over(color(`${tone}-fill`), color(surface));
+        expect(contrast(color(tone), fill), `${tone} on ${tone}-fill over ${surface}`).toBeGreaterThanOrEqual(MIN);
+      }
+    }
+  });
+
+  it('侧栏「任务」旁的数量徽标（stall）在侧栏、悬停与选中项上 ≥ 4.5:1', () => {
+    for (const tint of [undefined, 'fill-3', 'fill-4'] as const) {
+      const item = tint === undefined ? color('sidebar') : over(color(tint), color('sidebar'));
+      const badge = over(color('stall-fill'), item);
+      expect(contrast(color('stall'), badge), `stall on ${tint ?? 'sidebar'}`).toBeGreaterThanOrEqual(MIN);
     }
   });
 

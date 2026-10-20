@@ -14,7 +14,7 @@
 | `/tasks/:taskId` | 任务页（`?node` 选中步骤、`open` 打开抽屉、`details` 简单模式下临时显示专业视图，D60） | 全部（两种视图） | `delivery/task.html` |
 | `/tasks/:taskId/nodes/:nodeId` | 完整步骤页（`?attempt=` 选尝试） | 全部（专业视图的入口） | `node/index.html` |
 | `/inbox` | 需要你处理 | 全部 | `inbox.html` |
-| `/projects`、`/projects/:id` | 项目 | 全部 | `projects.html` |
+| `/projects`、`/projects/:projectId` | 项目 | 全部 | `projects.html` |
 | `/settings` | 设置 | 全部（专业项按模式显示） | `settings.html` |
 | `/git`、`/git/:projectId` | Git 管理台（`?tab=branches\|commits\|files\|worktrees`，`ref`、`sha`、`path`、`file` 记录所看的内容） | 专业 | `git/index.html`、`delivery/git.html` |
 | `/workflows`、`/workflows/:key` | 流程列表与编排器（`:key` 为流程 key，编辑其最新版本） | 专业 | `workflows.html`、`workflow-editor.html` |
@@ -178,7 +178,7 @@ export const NAV_ITEMS: NavItem[] = [
 - 项目：卡片列表（名称、路径、默认分支、活动任务数）；详情页编辑名称、默认分支、检查命令、远端绑定（平台、自建 GitLab 地址、仓库、令牌；由 origin 预填，保存前验证令牌；已绑定时可更换令牌或解除绑定）；专业模式显示关联数据库。
 - Git 管理台（专业）：项目列表 → 单个仓库页：顶部主工作区状态（分支、上游领先落后、是否干净）与「拉取远端」；页签「分支」（本地与远端分支、所属任务、上游、最近提交，点击查看提交；任意两个 ref 的比较）、「提交」（ref 的提交列表，分页加载；提交详情含 diff 浏览器）、「文件」（按 ref 浏览目录与文本文件）、「Worktree」（全部 worktree：路径、分支、任务、本应用创建 / 主工作区 / 其他、锁定、目录已不存在、是否有未提交改动、相对默认分支的领先落后；「清理遗留 worktree」需确认）。
 - 任务列表：筛选（项目、显示状态）+ 表格（标题、项目、流程、显示状态、更新时间）。
-- 设置（简单）：外观（主题 + 跟随系统）、界面模式（专业模式开关）、AI（不确定时：做出合理假设并写明 / 停下来问我）、并发任务数。专业项见 08 §4.3。
+- 设置（简单）：外观（主题 + 跟随系统）、界面模式（专业模式开关）、AI（不确定时：做出合理假设并写明 / 停下来问我）、并发任务数。专业项见 08 §4.3。最下方「关于」（M6-04）：版本号（`/system/health` 的 `appVersion`，即桌面包版本）、托管的 opencode 版本、后台 Node.js 版本、许可证与源代码链接；macOS 应用菜单「关于 Agent Workflow」显示同样的版本号。
 
 ## 4. 主题配置
 
@@ -212,7 +212,7 @@ export type ThemeDefinition = {
 - 切换：设置 `ui.theme` 变更 → `applyTheme()` 即时生效，无需刷新；`system` 时监听 `prefers-color-scheme`。
 - React Flow 的连线、节点、小地图颜色，diff 增删色，代码高亮主题都从当前主题取值。
 - 新增主题 = 新增一个 `themes/*.ts` + 在 `ThemeId` 枚举与 registry 中登记；类型系统保证令牌齐全。
-- 每套主题在单测中校验：正文/次要文字在 `bg`/`panel`/`sidebar` 及其上叠加的悬停、选中底色（`fill-1`–`fill-3`、`accent-fill`）和外框装饰渐变最浓处上对比度 ≥ 4.5:1，状态文字在其 fill 上 ≥ 4.5:1，主按钮与品牌按钮（含悬停）文字 ≥ 4.5:1（沿用设计稿已校验的约束）。渲染后的页面另由 E2E 走查（J9）用 axe 的 `color-contrast` 规则在四套主题下逐页检查（M6-01）。
+- 每套主题在单测中校验：正文/次要文字在 `bg`/`panel`/`sidebar` 及其上叠加的悬停、选中底色（`fill-1`–`fill-3`、`accent-fill`）和外框装饰渐变最浓处上对比度 ≥ 4.5:1，状态文字在其 fill（叠在 `bg` / `panel` 上）上 ≥ 4.5:1，侧栏数量徽标（`stall`）在侧栏及其悬停、选中底色上 ≥ 4.5:1，主按钮与品牌按钮（含悬停）文字 ≥ 4.5:1（沿用设计稿已校验的约束）。渲染后的页面另由 E2E 走查（J9）用 axe 的 `color-contrast` 规则在四套主题下逐页检查（M6-01）。
 
 ## 5. 流程画布（React Flow）
 
