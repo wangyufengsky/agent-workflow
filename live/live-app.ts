@@ -70,6 +70,8 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
   if (runtime.status !== 'ready') throw new Error(`opencode is not ready: ${runtime.status}`);
   await t.call(updateSettingsOp, { 'ai.defaultModel': MODEL });
   const reports: Report[] = [];
+  /** The workflow of each task started, to tell which case a permission request came from. */
+  const workflowOfTask = new Map<string, string>();
   const userActions = playTheUser(t);
 
   /** A fresh Git repository with the fixture project, added as a user would: the check command is inferred. */
@@ -129,6 +131,7 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
         checkpoints: { confirm_plan: options.confirmPlan },
       });
       taskId = created.id;
+      workflowOfTask.set(taskId, `${workflowKey} · ${fixture}`);
       await ended;
       // The status changes inside the submit call; its result reaches the transcript when the call returns, and
       // the attempt ends after that. Read transcripts only once every attempt of the task has ended.
@@ -173,9 +176,10 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
     async close() {
       await mkdir(new URL('reports', import.meta.url), { recursive: true });
       const file = new URL(`reports/${name}-${new Date().toISOString().replaceAll(':', '-')}.json`, import.meta.url);
-      // Which kind of session asked for each permission (the planner and reviewer only read).
+      // Which case and kind of session asked for each permission (the planner and reviewer only read).
       const asked = await Promise.all(
-        userActions.asked.map(async ({ attemptId, ask }) => ({
+        userActions.asked.map(async ({ taskId, attemptId, ask }) => ({
+          workflow: taskId === null ? null : (workflowOfTask.get(taskId) ?? null),
           kind: attemptId === null ? null : (await t.call(getAttemptOp, { id: attemptId })).body.kind,
           ask,
         })),
@@ -194,13 +198,18 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
  * stock reply, as a cooperative user would (counted in the report).
  */
 function playTheUser(t: TestApp) {
-  const userActions = { permissions: 0, answers: 0, asked: [] as Array<{ attemptId: string | null; ask: string }> };
+  const userActions = {
+    permissions: 0,
+    answers: 0,
+    asked: [] as Array<{ taskId: string | null; attemptId: string | null; ask: string }>,
+  };
   t.app.events.subscribe((event) => {
     if (event.type !== ServerEventType.InboxUpdated || event.data.item.status !== InboxStatus.Open) return;
     const { item } = event.data;
     if (item.kind === InboxKind.Permission) {
       userActions.permissions++;
       userActions.asked.push({
+        taskId: item.taskId,
         attemptId: item.attemptId,
         ask: `${item.payload.permission}: ${item.payload.patterns.join(' | ')}`,
       });
