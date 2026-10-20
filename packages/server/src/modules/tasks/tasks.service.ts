@@ -1,5 +1,6 @@
 import {
   type AttemptDTO,
+  type ChangeRequestReason,
   type CreateTaskRequest,
   type DeliverRequest,
   type NodeDetailDTO,
@@ -14,6 +15,7 @@ import {
 import type { EventBus } from '../../core/event-bus.ts';
 import { listTaskEvents } from '../timeline/index.ts';
 import { createTaskActions } from './tasks.actions.ts';
+import { createTaskChanges } from './tasks.changes.ts';
 import { createTaskContext } from './tasks.context.ts';
 import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
@@ -31,6 +33,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   const actions = createTaskActions(deps, state, lifecycle);
   const diffs = createTaskDiffs(deps, state);
   const delivery = createTaskDelivery(deps, state);
+  const changes = createTaskChanges(deps, state);
 
   // A task's summary shows its open attention items, working steps and progress line; keep it current.
   deps.events.subscribe((event) => {
@@ -123,6 +126,14 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     },
     async deliver(id: string, request: Omit<DeliverRequest, 'id'>): Promise<TaskDetailDTO> {
       await delivery.deliver(id, request);
+      return detail(id);
+    },
+    async requestChanges(
+      id: string,
+      reason: ChangeRequestReason,
+      feedback: string | undefined,
+    ): Promise<TaskDetailDTO> {
+      await changes.requestChanges(id, reason, feedback);
       return detail(id);
     },
     confirmPlan(id: string, version: number): TaskDetailDTO {

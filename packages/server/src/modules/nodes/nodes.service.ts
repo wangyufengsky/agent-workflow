@@ -10,6 +10,7 @@ import {
   NodeStatus,
   type NodeSummaryDTO,
   nodeMachine,
+  type PlanNodeSpec,
   ServerEventType,
   TaskEventEntity,
   transition,
@@ -80,6 +81,37 @@ export function createNodesService(deps: NodesServiceDeps) {
 
   const runner = createNodeRunner(deps, { repo, get, move });
 
+  function insert(input: Omit<MaterializeInput, 'graph'>, spec: PlanNodeSpec, position: number): Node {
+    const id = randomUUID();
+    const now = clock.now();
+    repo.insert({
+      id,
+      taskId: input.taskId,
+      planId: input.planId,
+      key: spec.key,
+      title: spec.title,
+      roleId: roles.getByKey(spec.roleKey).id,
+      instructions: spec.instructions,
+      dependsOn: spec.dependsOn,
+      acceptance: resolveAcceptance(
+        spec.acceptance ?? input.defaultAcceptance,
+        input.checkCommand,
+        input.acceptEachNode,
+      ),
+      kind: spec.kind ?? NodeKind.Normal,
+      status: spec.dependsOn.length === 0 ? NodeStatus.Ready : NodeStatus.Pending,
+      attemptCount: 0,
+      retryFeedback: null,
+      commitSha: null,
+      position,
+      createdAt: now,
+      updatedAt: now,
+      startedAt: null,
+      finishedAt: null,
+    });
+    return get(id);
+  }
+
   return {
     get,
     ...runner,
@@ -125,39 +157,18 @@ export function createNodesService(deps: NodesServiceDeps) {
 
     /** Creates the nodes of a confirmed plan: those without dependencies are ready (09 §3). */
     materialize(input: MaterializeInput): void {
-      const now = clock.now();
-      const created = unit.transact(() =>
-        input.graph.nodes.map((spec, position) => {
-          const id = randomUUID();
-          repo.insert({
-            id,
-            taskId: input.taskId,
-            planId: input.planId,
-            key: spec.key,
-            title: spec.title,
-            roleId: roles.getByKey(spec.roleKey).id,
-            instructions: spec.instructions,
-            dependsOn: spec.dependsOn,
-            acceptance: resolveAcceptance(
-              spec.acceptance ?? input.defaultAcceptance,
-              input.checkCommand,
-              input.acceptEachNode,
-            ),
-            kind: spec.kind ?? NodeKind.Normal,
-            status: spec.dependsOn.length === 0 ? NodeStatus.Ready : NodeStatus.Pending,
-            attemptCount: 0,
-            retryFeedback: null,
-            commitSha: null,
-            position,
-            createdAt: now,
-            updatedAt: now,
-            startedAt: null,
-            finishedAt: null,
-          });
-          return get(id);
-        }),
-      );
+      const created = unit.transact(() => input.graph.nodes.map((spec, position) => insert(input, spec, position)));
       for (const node of created) publish(node);
+    },
+
+    /**
+     * Adds one node of a newer confirmed plan version to the task's existing nodes, after them (09 §2
+     * `changes_requested`: the revise or conflict-resolution step).
+     */
+    append(input: Omit<MaterializeInput, 'graph'>, spec: PlanNodeSpec): Node {
+      const node = insert(input, spec, repo.listByTask(input.taskId).length);
+      publish(node);
+      return node;
     },
 
     /** `deps_met`: every dependency is done or skipped. */

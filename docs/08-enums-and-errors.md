@@ -83,6 +83,9 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DeliveryStrategy` | `squash` · `merge` · `rebase` · `pull_request` · `report_only` |
 | `DeliveryStatus` | `running` · `succeeded` · `conflict` · `failed` |
 | `HostingProvider` | `github` · `gitlab` |
+| `ChangeRequestReason` | `user`（让 AI 再改改）· `conflict`（交给 AI 解决冲突）；`request-changes` 的 `reason` |
+
+`LOCAL_MERGE_STRATEGIES`（`squash` / `merge` / `rebase`，即 `delivery.defaultStrategy` 的取值）与 `isLocalMerge` 在同一文件。
 
 ### 2.5 需要你处理（Inbox）
 
