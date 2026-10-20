@@ -152,7 +152,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `OPENCODE_START_TIMEOUT_MS` | `30000` | `opencode serve` 报告地址并响应 `/config` 的时限 |
 | `MCP_TOOL_PREFIX` | `agent-workflow_` | opencode 中本项目 MCP 工具名的前缀 |
 | `MCP_SESSION_ARG` | `__aw_session` | bridge 插件注入的会话 id 参数名（12 §3） |
-| `BASH_PERMISSION_PRESETS` | `readonly` / `auto` / `ask` 三套规则 | 会话级 bash 规则（12 §2） |
+| `BASH_PERMISSION_PRESETS` | `auto` / `ask` 两套规则 | 执行者的会话级 bash 规则（12 §2） |
+| `readonlyBashRules(checkCommands)` | 函数 | 规划与评审会话的会话级 bash 规则，`ask` 策略即不带检查命令的这一套（12 §2，D64） |
 
 ### 4.2 限制值（`constants/limits.ts`）
 

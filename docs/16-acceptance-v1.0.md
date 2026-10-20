@@ -53,7 +53,7 @@
 
 **结果。** FakeOpencode 下通过；真实模型下任务都能到达结果卡，但**仍可能出现少量权限请求**（`e2e.log`、`live-final.log`、`live/reports/smoke-*.json`）。
 
-**备注。** live 中最初每个任务有 4–8 次权限请求，不满足「无需中途操作」。按根因修了两处：只读命令白名单缺 `echo`、版本查询等（D61），代码审查流程中只读角色执行的步骤没有放行项目检查命令（D51 扩展）；live 也改用推断出的检查命令。修复后 deepseek 一轮的冒烟（修 Bug、新功能）共 2 次请求，都是评审会话用 `node -e` 写内联脚本自行验证——这是模型自己的写法，不在任何只读白名单里，见「已知差距」第 1 条。
+**备注。** live 中最初每个任务有 4–8 次权限请求，不满足「无需中途操作」。按根因修了两处：只读命令白名单缺 `echo`、版本查询等（D61），代码审查流程中只读角色执行的步骤没有放行项目检查命令（D51 扩展）；live 也改用推断出的检查命令。修复后 deepseek 一轮的冒烟（修 Bug、新功能）共 2 次请求，都是评审会话用 `node -e` 写内联脚本自行验证——这是模型自己的写法，不在任何只读白名单里。D64 之后的对比见「已知差距」第 1 条。
 
 ## 3. 同一项目 3 个任务并发
 
@@ -159,7 +159,26 @@ deepseek-v4.1-flash 在多数用例中用的 tokens 更少（代码审查除外�
 
 ## 已知差距与发现但未处理
 
-1. **真实模型下的权限请求**：修复后每个任务仍有 0–2 次权限请求，来源是只读会话（规划、评审、代码审查步骤）里模型自己写的命令不在白名单：`node -e '…'` 内联脚本、`mvn test`（与推断的检查命令 `mvn -q test` 不同）、`npx tsc --version`。白名单不可能覆盖模型的所有写法，放得更宽又会削弱「只读」；是否调整由用户决定。（早先报告里「执行会话」请求 `mvn` 权限的情况已查明：那是代码审查流程中由只读评审者角色执行的步骤，已修复。）
+1. **真实模型下的权限请求**（D64 后减少，未到 0）。M6 修复后每个任务仍有 0–2 次请求，都来自只读会话（规划、评审、代码审查步骤）里模型自己写的命令。D64 放行了检查命令所用工具的测试写法（`mvn test`、`mvn -q -o test`、`node --test` 等）与单条版本查询（`java -version`、`npx tsc --version`），两者后接结尾的 `2>&1` 也放行；协议提示词要求用项目测试命令或读文件验证，不写临时脚本；`node -e`、`python -c` 等仍询问。默认模型 `opencode-go/deepseek-v4.1-flash` 下 `pnpm test:live` 的对比（main f847e67 两轮，D64 分支两轮；`permissions` 套件故意触发的请求不计；改动前第 1 轮的报告还不记录用例，按会话类型与命令推断）：
+
+   | 用例 | 改动前 第 1 轮 | 改动前 第 2 轮 | 改动后 第 1 轮 | 改动后 第 2 轮 |
+   | --- | --- | --- | --- | --- |
+   | 冒烟 修 Bug（ts-stats） | 0 | 0 | 0 | 0 |
+   | 冒烟 新功能（ts-stats） | 1 | 3 | 2 | 0 |
+   | 流程 修 Bug（java-inventory） | 合计 4（无法细分） | 1 | 0 | 0 |
+   | 流程 重构（java-inventory） | ↑ | 2 | 1 | 0 |
+   | 流程 补单元测试（ts-stats） | 0 | 0 | 0 | 0 |
+   | 流程 代码审查（java-inventory） | 1 | 2 | 0 | 1 |
+   | MCP 纠错（ts-stats 规划） | 0 | 0 | 1 | 1 |
+   | **合计** | **6** | **8** | **4** | **2** |
+
+   改动前的 14 次请求的来源：同一工具的测试写法 5 次（评审 `mvn test 2>&1 | …` ×3、代码审查 `mvn -q -o test 2>&1 | …`、规划 `node --version && node --test`），版本查询 1 次（规划 `mvn -v 2>&1`），临时脚本或临时文件 4 次（评审 `node --input-type=module -e …`、评审写 `/tmp/*.ts` 再 `sed -i` 改路径（2 次）、代码审查 `javac` 编译临时探针类），`sort` 2 次（规划 `find src -type f | sort`），只读命令带重定向 2 次（评审 `cat target/surefire-reports/*.txt 2>&1`、代码审查 `ls -R src 2>/dev/null`）。
+
+   改动后剩下的 6 次请求只有两种来源，都不在 D64 的范围内：
+   - `sort` 不在只读白名单（3 次：新功能规划、重构规划、代码审查都用 `find … | sort` 列文件）。`sort -o <文件>` 会写文件，放行时要连同 `-o` 作为逃逸写法一起处理。
+   - 只读命令带 `2>/dev/null`（3 次：新功能评审 `ls -R src test 2>/dev/null`、MCP 纠错的规划 `ls src 2>/dev/null` ×2）。这是 D63 已记录的代价：只读白名单上的命令带任何重定向都询问，D64 只对测试写法与版本查询放行结尾的 `2>&1`。
+
+   两轮都没有出现测试写法、版本查询或临时脚本触发的请求。`permissions.live.test.ts` 在真实 opencode 上确认 `java -version`、`mvn test` 不询问，`mvn test > test-output.txt` 与 `java -version && rm nothing-here.txt`（被询问的是 `rm`）询问，原有 D63 的三种逃逸写法仍询问。改动后第 2 轮中 `mcp-errors` 失败一次：任务已到「待确认计划」（第二次 `submit_plan` 成功），但测试读会话记录时只有第一次被拒的调用；单独重跑 3 次都通过，与 bash 规则无关，像是会话记录写入与尝试结束之间的竞态，未处理。
 2. 主题单测与 axe 都不检查画布节点内的文字（axe 判定为被 React Flow 图层覆盖、无法确定背景）；节点文字使用状态语气色，已在「状态文字在自身填充色上 ≥ 4.5:1」中覆盖令牌。
 3. 前端主包 5.2 MB（shiki 语法按需加载但 cpp 等大语法单独成块），本地加载不受网络影响，未优化。
-4. **已修复**（D63）：只读白名单按前缀匹配，`find … -exec` / `-delete`、重定向（`cat a > b`）、`rg --pre`、`git log --output`、`git grep -O` 等会被当作只读放行，规划者与评审者能借此写文件或执行程序。现在这些写法在白名单之后改回询问；单测 `shared/constants/opencode.test.ts` 先证明了漏洞（16 种写法 × 两套预设全部被放行）再验证修复，live `permissions.live.test.ts` 在真实 opencode 上确认三种逃逸写法询问、对应的只读写法不询问（`live-permissions.log`）。代价：只读会话中 `2>/dev/null` 这类重定向也会询问。
+4. **已修复**（D63）：只读白名单按前缀匹配，`find … -exec` / `-delete`、重定向（`cat a > b`）、`rg --pre`、`git log --output`、`git grep -O` 等会被当作只读放行，规划者与评审者能借此写文件或执行程序。现在这些写法在白名单之后改回询问；单测 `shared/constants/opencode.test.ts`（D64 起并入 `server/modules/opencode/opencode.permissions.test.ts`）先证明了漏洞（16 种写法 × 两套预设全部被放行）再验证修复，live `permissions.live.test.ts` 在真实 opencode 上确认三种逃逸写法询问、对应的只读写法不询问（`live-permissions.log`）。代价：只读会话中 `2>/dev/null` 这类重定向也会询问。
