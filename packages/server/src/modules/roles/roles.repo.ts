@@ -4,7 +4,9 @@ import type { DbExecutor } from '../../core/db/database.ts';
 import { rolesTable } from './roles.table.ts';
 
 /** Undefined fields are left unchanged. */
-export type RoleChanges = { [K in 'name' | 'description' | 'prompt' | 'model']?: RoleDTO[K] | undefined } & {
+export type RoleChanges = {
+  [K in 'name' | 'description' | 'prompt' | 'model' | 'baseAgent']?: RoleDTO[K] | undefined;
+} & {
   updatedAt: number;
 };
 

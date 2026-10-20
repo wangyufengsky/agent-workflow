@@ -36,6 +36,8 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
   }
 
   async function acceptNode(taskId: string, nodeId: string) {
+    // The node must belong to the task whose worktree is committed (NODE_NOT_FOUND otherwise, before any change).
+    nodes.detail(taskId, nodeId);
     return nodes.accept(nodeId, state.runContext(state.get(taskId)));
   }
 

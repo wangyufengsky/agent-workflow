@@ -34,14 +34,18 @@ export function createRolesService({ db, clock, log }: RolesServiceDeps) {
       db.transaction((tx) => {
         const txRepo = createRolesRepo(tx);
         for (const seed of seeds) {
-          const content = { name: seed.name, description: seed.description, prompt: seed.prompt };
+          const content = {
+            name: seed.name,
+            description: seed.description,
+            prompt: seed.prompt,
+            baseAgent: seed.baseAgent,
+          };
           const existing = txRepo.findByKey(seed.key);
           if (existing === undefined) {
             txRepo.insert({
               id: randomUUID(),
               key: seed.key,
               kind: RoleKind.Builtin,
-              baseAgent: seed.baseAgent,
               model: null,
               ...content,
               createdAt: now,
@@ -51,7 +55,8 @@ export function createRolesService({ db, clock, log }: RolesServiceDeps) {
           } else if (
             existing.name !== content.name ||
             existing.description !== content.description ||
-            existing.prompt !== content.prompt
+            existing.prompt !== content.prompt ||
+            existing.baseAgent !== content.baseAgent
           ) {
             txRepo.update(existing.id, { ...content, updatedAt: now });
             log.info({ role: seed.key }, 'builtin role updated');

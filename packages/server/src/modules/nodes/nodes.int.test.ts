@@ -155,6 +155,34 @@ describe('节点状态机（09 §3）', () => {
     await fixRunning;
   });
 
+  it('通过节点时任务与节点不匹配：NODE_NOT_FOUND，且不改动该节点', async () => {
+    const { project } = await addProject(t, { checkCommand: null });
+    t.fake.enqueue(script().edit('a.txt', 'a\n').callTool('submit_result', { summary: 'A' }), locate);
+    t.fake.enqueue(submit('B'), locate);
+    let waiting = 0;
+    const bothAwait = new Promise<void>((resolve) => {
+      t.app.events.subscribe((e) => {
+        if (e.type === 'node.updated' && e.data.node.status === 'awaiting_acceptance' && ++waiting === 2) resolve();
+      });
+    });
+    const a = await createTask(t, {
+      projectId: project.id,
+      workflow: 'bugfix',
+      checkpoints: { accept_each_node: true },
+    });
+    const b = await createTask(t, {
+      projectId: project.id,
+      workflow: 'bugfix',
+      checkpoints: { accept_each_node: true },
+    });
+    await bothAwait;
+    const nodeOfA = await nodeOf(a.id, 'locate');
+
+    const res = await t.call(acceptNodeOp, { id: b.id, nodeId: nodeOfA.id });
+    expect(res.body).toMatchObject({ error: { code: ErrorCode.NodeNotFound } });
+    expect(await nodeOf(a.id, 'locate')).toMatchObject({ status: 'awaiting_acceptance', commitSha: null });
+  });
+
   it('running → ready（运行时消失，不消耗预算）；waiting_input → ready（用户中止，按 attempt_failed）', async () => {
     const { project } = await addProject(t);
     t.fake.enqueue(script().hang(), locate);

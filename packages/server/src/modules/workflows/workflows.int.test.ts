@@ -48,10 +48,12 @@ describe('内置流程与角色', () => {
     expect(workflows.list()).toHaveLength(5);
   });
 
-  it('内置角色的提示词变化时就地更新', async () => {
+  it('内置角色的提示词或基础 agent 变化时就地更新', async () => {
     const { roles } = t.app.services;
-    roles.syncBuiltin(loadBuiltinRoles(promptsDir).map((r) => (r.key === 'tester' ? { ...r, prompt: 'p2' } : r)));
-    expect(roles.getByKey('tester').prompt).toBe('p2');
+    roles.syncBuiltin(
+      loadBuiltinRoles(promptsDir).map((r) => (r.key === 'tester' ? { ...r, prompt: 'p2', baseAgent: 'reviewer' } : r)),
+    );
+    expect(roles.getByKey('tester')).toMatchObject({ prompt: 'p2', baseAgent: 'reviewer' });
   });
 
   it('内置流程与角色只读', async () => {
