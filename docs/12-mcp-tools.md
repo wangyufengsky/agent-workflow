@@ -38,7 +38,7 @@
 - 原生 `question` 工具禁用，提问只走 MCP `ask_user`（D36）。
 - **bash 规则集**（常量 `BASH_PERMISSION_PRESETS`，在 `shared/constants/opencode.ts`；reviewer 与 planner 用只读白名单，executor 按 `ai.bashPolicy`）：
   - Git 只读子命令：`git status* git log* git diff* git show* git blame* git grep* git ls-files* git rev-parse*`。
-  - 只读白名单：`ls* cat* head* tail* rg* grep* find* wc* echo* pwd which*`、`node` / `npm` / `pnpm --version` 与 Git 只读子命令为 allow，其余 ask（D61）。规划与评审会话另外放行项目检查命令（`<checkCommand>*`，评审会话还包括被评审节点验收中的命令检查，即 `$PROJECT_CHECK` 展开后的命令），追加在最后：运行检查是只读角色了解代码状态的常规手段，询问会频繁打扰用户（D51）。
+  - 只读白名单：`ls* cat* head* tail* rg* grep* find* wc* echo* pwd which*`、`node` / `npm` / `pnpm --version` 与 Git 只读子命令为 allow，其余 ask（D61）。规划与评审会话、以及只读角色执行的步骤（如代码审查流程中评审者的步骤）另外放行项目检查命令（`<checkCommand>*`，评审会话还包括被评审节点验收中的命令检查，即 `$PROJECT_CHECK` 展开后的命令），追加在最后：运行检查是只读角色了解代码状态的常规手段，询问会频繁打扰用户（D51）。
   - `ai.bashPolicy = auto`（默认）：`*` allow；`git *` deny（其他所有 Git 命令都可能改动 refs 或工作区，不逐个列举）；Git 只读子命令再 allow。
   - `ai.bashPolicy = ask`：只读白名单 allow，其余 ask。
 - 角色差异不靠多个 agent：会话使用角色的 `base_agent` 对应的 agent（与尝试类型无关：只读的「代码审查」步骤以 reviewer 身份执行 `execute` 尝试，用 `submit_result` 提交报告），角色提示词通过每次 prompt 的 `system` 字段追加，模型通过 prompt 的 `model` 字段指定。因此修改角色无需重启 opencode。评审检查（`review` 尝试）固定使用内置 `reviewer` 角色。
@@ -309,4 +309,4 @@ export const submitPlanTool = defineMcpTool({
 | 重试（M2） | 模型请求失败时 `session.status` 为 `{ type: 'retry', message, next }`，会话一直等待到 `next`（如免费额度用尽），不发 `session.error` |
 | 内部事件（M2） | `modules/opencode/opencode.events.ts` 只解析用到的事件（消息角色、文本与增量、工具、用量、重试、空闲、错误、权限），加上运行时消失的 `runtime_lost`；其他模块只经 `OpencodeClient.subscribe` 获取 |
 | 数据目录 | opencode 会话存于用户自己的 opencode 数据目录（与用户 TUI 共享，登录凭据也在那里），本应用不隔离；会话标题带任务编号便于辨认 |
-| 免费模型 | 调用模型的测试（`@opencode` bridge 测试与 `pnpm test:live`）用免费模型，不产生费用，默认值只在 `packages/server/test/helpers/model.ts` 的 `TEST_MODEL` 定义：`opencode-go/beam-free`，`AW_OC_TEST_MODEL` 可覆盖（D50）。历史：M0 用 `opencode/glm-5.3-flash-free`，2026-10-19 额度用尽后改为 `opencode/beam-free`（D42）；2026-10-20 起 `opencode/*-free` 对开发机网络返回 FreeTierError 403 |
+| 免费模型 | 调用模型的测试（`@opencode` bridge 测试与 `pnpm test:live`）用免费模型，不产生费用，默认值只在 `packages/server/test/helpers/model.ts` 的 `TEST_MODEL` 定义：`opencode-go/deepseek-v4.1-flash`（opencode go 订阅内免费，比 `beam-free` 强），`AW_OC_TEST_MODEL` 可覆盖（D62）。历史：M0 用 `opencode/glm-5.3-flash-free`，2026-10-19 额度用尽后改为 `opencode/beam-free`（D42）；2026-10-20 起 `opencode/*-free` 对开发机网络返回 FreeTierError 403，改用 `opencode-go/beam-free`（D50）；2026-10-21 改为 `opencode-go/deepseek-v4.1-flash`（D62），M6 验收中两者的 live 结果见 16 |

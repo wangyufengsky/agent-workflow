@@ -199,6 +199,8 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         model: role.model ?? settings.get('ai.defaultModel'),
         system: role.prompt,
         prompt,
+        // A step of a read-only role (the code review's reviewer) may run the project check like a review (D51).
+        checkCommands: ctx.checkCommand === null ? [] : [ctx.checkCommand],
       });
       inBackground(nodeId, async () => {
         try {
