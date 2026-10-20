@@ -21,6 +21,9 @@ type Seed = {
   failed: Task;
   review: Task;
   completed: Task;
+  /** Keys of the copied workflows (unique per seed, so the spec can run again against the same backend). */
+  fixedKey: string;
+  aiKey: string;
 };
 
 async function api<T>(request: APIRequestContext, method: 'GET' | 'POST', path: string, data?: object): Promise<T> {
@@ -113,16 +116,19 @@ async function seed(request: APIRequestContext): Promise<Seed> {
   const failed = await startWorkflow(request, failedProject, 'bugfix', '支付回调偶发超时');
 
   // Custom definitions open in the editors; a connection fills the databases page.
+  const run = reviewProject.slug.replace(/[^a-z0-9]/g, '_').slice(-6);
+  const fixedKey = `walk_bugfix_${run}`;
+  const aiKey = `walk_feature_${run}`;
   const workflows = await api<{ items: { id: string; key: string }[] }>(request, 'GET', '/workflows');
   for (const [from, key, name] of [
-    ['bugfix', 'walk_bugfix', '我的修 Bug'],
-    ['feature', 'walk_feature', '我的新功能开发'],
+    ['bugfix', fixedKey, '我的修 Bug'],
+    ['feature', aiKey, '我的新功能开发'],
   ] as const) {
     const copyFrom = workflows.items.find((w) => w.key === from)?.id;
     await api(request, 'POST', '/workflows', { key, name, copyFrom });
   }
   await api(request, 'POST', '/db-connections', {
-    name: 'shop',
+    name: `shop_${run}`,
     type: 'mysql',
     host: '127.0.0.1',
     port: 3306,
@@ -142,6 +148,8 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     failed: await waitForStatus(request, failed, 'failed'),
     review: await waitForStatus(request, review, 'review'),
     completed: await waitForStatus(request, completed, 'completed'),
+    fixedKey,
+    aiKey,
   };
 }
 
@@ -299,11 +307,16 @@ const SHOTS: Shot[] = [
     ready: (page) => page.getByRole('article').first(),
   },
   { name: 'pro-workflow-builtin', mode: UiMode.Pro, url: () => '/workflows/bugfix', ready: testId('progress-canvas') },
-  { name: 'pro-workflow-fixed', mode: UiMode.Pro, url: () => '/workflows/walk_bugfix', ready: testId('plan-editor') },
+  {
+    name: 'pro-workflow-fixed',
+    mode: UiMode.Pro,
+    url: (s) => `/workflows/${s.fixedKey}`,
+    ready: testId('plan-editor'),
+  },
   {
     name: 'pro-workflow-ai',
     mode: UiMode.Pro,
-    url: () => '/workflows/walk_feature',
+    url: (s) => `/workflows/${s.aiKey}`,
     ready: heading('我的新功能开发'),
   },
   { name: 'pro-roles', mode: UiMode.Pro, url: () => '/roles', ready: (page) => page.getByRole('article').first() },

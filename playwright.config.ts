@@ -15,7 +15,12 @@ export default defineConfig({
   workers: 1,
   reporter: 'list',
   projects: [
-    { name: 'browser', testMatch: /.*\.browser\.spec\.ts/, use: { baseURL: `http://localhost:${DEV_WEB_PORT}` } },
+    {
+      name: 'browser',
+      testMatch: /.*\.browser\.spec\.ts/,
+      // A failure keeps its trace (network, console, DOM snapshots): an intermittent one must be diagnosable (07 §1).
+      use: { baseURL: `http://localhost:${DEV_WEB_PORT}`, trace: 'retain-on-failure' },
+    },
     // Requires `pnpm build` first; launches the built Electron app.
     { name: 'electron', testMatch: /.*\.electron\.spec\.ts/ },
   ],
