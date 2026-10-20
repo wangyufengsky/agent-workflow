@@ -12,6 +12,10 @@ export const queryKeys = {
   workflow: (id: string) => ['workflows', id],
   workflowVersions: (key: string) => ['workflows', 'versions', key],
   roles: ['roles'],
+  dbConnections: ['db-connections'],
+  dbSchema: (id: string) => ['db-connections', id, 'schema'],
+  mcpTools: ['mcp', 'tools'],
+  runtimeLogs: (tail: number) => ['system', 'runtime', 'logs', tail],
   /** Every task list (all filters) shares this prefix. */
   taskLists: ['tasks', 'list'],
   tasks: (filter: Record<string, string | undefined>) => ['tasks', 'list', filter],

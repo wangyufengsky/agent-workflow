@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { useServerEvents } from '../api/server-events.ts';
 import { ErrorState } from '../components/error-state.tsx';
 import { ToastHost } from '../components/toast.tsx';
+import { DatabasesPage } from '../features/databases/databases.page.tsx';
 import { ComponentGalleryPage } from '../features/dev/component-gallery.page.tsx';
 import { GitConsolePage } from '../features/git/git-console.page.tsx';
 import { GIT_TABS, GitProjectPage } from '../features/git/git-project.page.tsx';
@@ -12,7 +13,6 @@ import { HomePage } from '../features/home/home.page.tsx';
 import { InboxPage } from '../features/inbox/inbox.page.tsx';
 import { NodePage } from '../features/node-detail/node.page.tsx';
 import { OnboardingPage } from '../features/onboarding/onboarding.page.tsx';
-import { ComingSoonPage } from '../features/pro/coming-soon.page.tsx';
 import { ProOnly } from '../features/pro/pro-only.tsx';
 import { ProjectDetailPage } from '../features/projects/project-detail.page.tsx';
 import { ProjectsPage } from '../features/projects/projects.page.tsx';
@@ -23,6 +23,7 @@ import { SettingsPage } from '../features/settings/settings.page.tsx';
 import { settingsQuery, useSettings } from '../features/settings/settings.queries.ts';
 import { TaskPage } from '../features/task-detail/task.page.tsx';
 import { TasksPage } from '../features/tasks/tasks.page.tsx';
+import { ToolsPage } from '../features/tools/tools.page.tsx';
 import { WorkflowEditorPage } from '../features/workflows/workflow-editor.page.tsx';
 import { WorkflowsPage } from '../features/workflows/workflows.page.tsx';
 import { useAppliedTheme } from '../theme/use-applied-theme.ts';
@@ -79,13 +80,6 @@ const proOnlyPage = <P extends string>(path: P, Component: () => React.ReactNode
       <Component />
     </ProOnly>
   ));
-const proPage = <P extends string>(path: P, icon: Parameters<typeof ComingSoonPage>[0]['icon']) =>
-  page(path, () => (
-    <ProOnly>
-      <ComingSoonPage icon={icon} />
-    </ProOnly>
-  ));
-
 const projectsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.projects,
@@ -189,8 +183,8 @@ const routeTree = rootRoute.addChildren([
     proOnlyPage(ROUTES.workflows, WorkflowsPage),
     proOnlyPage(ROUTES.workflow, WorkflowEditorPage),
     proOnlyPage(ROUTES.roles, RolesPage),
-    proPage(ROUTES.databases, 'db'),
-    proPage(ROUTES.tools, 'tool'),
+    proOnlyPage(ROUTES.databases, DatabasesPage),
+    proOnlyPage(ROUTES.tools, ToolsPage),
     runtimeRoute,
   ]),
   ...(import.meta.env.DEV

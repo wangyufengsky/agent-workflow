@@ -40,10 +40,10 @@ export const getEnvironmentOp = defineOperationContract({
 export const recheckEnvironmentOp = defineOperationContract({
   id: 'system.recheckEnvironment',
   title: 'op.system.recheckEnvironment',
-  description: 'Detect git and opencode again, e.g. after installing opencode',
+  description: 'Detect git and opencode again, e.g. after installing opencode; a newly usable opencode is started',
   input: z.object({}),
   output: environmentSchema,
-  risk: OperationRisk.Read,
+  risk: OperationRisk.Write,
   http: { method: 'POST', path: '/system/environment/recheck' },
   expose: { palette: true, assistant: true },
   credentialFields: [],

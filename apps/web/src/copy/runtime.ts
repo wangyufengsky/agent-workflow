@@ -29,4 +29,16 @@ export const RUNTIME_COPY = {
   defaultModel: (model: string) => `默认模型：${model}`,
   noModels: '还没有可用的模型。在终端登录一个模型提供方：',
   modelsPending: 'opencode 启动后显示。',
+  logs: 'opencode 日志',
+  logsTail: '显示行数',
+  logsRefresh: '刷新',
+  logsEmpty: 'opencode 还没有运行过，暂无日志。',
+  logsFile: (file: string) => `最新的日志文件：${file}`,
+} as const;
+
+export const TOOLS_COPY = {
+  title: 'MCP 工具',
+  lede: 'AI 会话通过这些工具与本应用交互：读取上下文、提交计划与结果、提问、只读查询数据库。每种会话只能用允许的工具。',
+  allowedKinds: '可用于',
+  inputSchema: '输入参数（JSON Schema）',
 } as const;

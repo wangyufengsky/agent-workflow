@@ -1,4 +1,4 @@
-import { getRuntimeOp, restartRuntimeOp } from '@aw/shared';
+import { getRuntimeLogsOp, getRuntimeOp, listMcpToolsOp, restartRuntimeOp } from '@aw/shared';
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
@@ -16,3 +16,13 @@ export function useRestartRuntime() {
     onSuccess: (runtime) => queryClient.setQueryData(queryKeys.runtime, runtime),
   });
 }
+
+/** The end of the opencode log (M5-08); refreshed on demand. */
+export const runtimeLogsQuery = (tail: number) =>
+  queryOptions({ queryKey: queryKeys.runtimeLogs(tail), queryFn: () => callOperation(getRuntimeLogsOp, { tail }) });
+
+export const mcpToolsQuery = queryOptions({
+  queryKey: queryKeys.mcpTools,
+  queryFn: async () => (await callOperation(listMcpToolsOp, {})).items,
+  staleTime: Number.POSITIVE_INFINITY,
+});

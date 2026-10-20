@@ -36,7 +36,8 @@ export const resolveInboxOp = defineOperationContract({
     'Answer an open item with the response its kind expects (answer, permission decision, acceptance, plan decision, retry or cancel)',
   input: z.object({ id: z.string(), response: inboxResolveResponseSchema }),
   output: inboxItemSchema,
-  risk: OperationRisk.Write,
+  // A failure item's `cancel` cancels the task, and a permission's `always` widens what the AI may do (D27).
+  risk: OperationRisk.Critical,
   http: { method: 'POST', path: '/inbox/:id/resolve' },
 });
 

@@ -40,6 +40,8 @@ export const createTaskOp = defineOperationContract({
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks', status: 201 },
+  // The palette opens the home page's start form with it (14 §2.1).
+  expose: { palette: true, assistant: true },
 });
 
 export const getTaskOp = defineOperationContract({
