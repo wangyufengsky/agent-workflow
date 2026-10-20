@@ -68,7 +68,7 @@ const READS = [
 /** A program's version as one command (D64). */
 const VERSION_QUERIES = [
   'node --version',
-  'npx tsc --version',
+  'npx --version',
   'java -version',
   'java -version 2>&1',
   'mvn -v',
@@ -82,6 +82,8 @@ const NOT_VERSION_QUERIES = [
   'rm x && node --version',
   'rm -rf src --version',
   'npx rimraf src --version',
+  // Without a TTY npx installs and runs any package from the registry, so only `npx --version` itself is a query.
+  'npx tsc --version',
   'PATH=. node --version',
   './deploy.sh --version',
   'java -version > version.txt',

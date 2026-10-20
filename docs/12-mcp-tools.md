@@ -40,7 +40,7 @@
   - Git 只读子命令：`git status* git log* git diff* git show* git blame* git grep* git ls-files* git rev-parse*`。
   - 只读规则，按顺序（最后一条匹配的规则生效）：
     1. `*` ask。
-    2. 版本查询 allow（D64）：单条命令 `<程序> --version` / `-version` / `-V`、`npx <工具> --version`、`go version`；`-v` 只对 `node npm npx pnpm yarn bun mvn gradle docker`（别的程序里 `-v` 常是 verbose，如 `rake -v` 会运行默认任务）。程序名前还有别的词（`rm -rf src --version`、`PATH=. node --version`）或程序是路径（`./deploy.sh --version`）时 ask。
+    2. 版本查询 allow（D64）：单条命令 `<程序> --version` / `-version` / `-V`、`go version`；`-v` 只对 `node npm npx pnpm yarn bun mvn gradle docker`（别的程序里 `-v` 常是 verbose，如 `rake -v` 会运行默认任务）。程序名前还有别的词（`rm -rf src --version`、`PATH=. node --version`）或程序是路径（`./deploy.sh --version`）时 ask；`npx <包> --version` 也 ask（没有 TTY 时 npx 默认 `--yes`，会下载并运行任意包），只有 `npx --version` 本身放行。
     3. 只读白名单 allow：`ls* cat* head* tail* rg* grep* find* wc* echo* pwd which*` 与 Git 只读子命令（D61）。
     4. 同一工具的测试命令 allow（只在有检查命令的只读会话，D64）：检查命令的第一个词是 npm / pnpm / yarn / bun / npx / node 时放行 `npm test`、`npm run test`、`npm t`、`pnpm test`、`pnpm run test`、`yarn test`、`yarn run test`、`bun run test`、`node --test`、`npx vitest run`、`pnpm vitest run`、`pnpm exec vitest run`、`npx jest`；mvn / ./mvnw 时 `mvn` / `./mvnw` + 可选的 `-q`、`-o`（任意顺序）+ `test`；./gradlew / gradle 时 `test` 与 `-q test`；go 时 `go test`；pytest / python / python3 时 `pytest`、`python -m pytest`、`python3 -m pytest`。每条都可带任意参数（`<命令> *`）；该工具的其他子命令（`mvn deploy`、`npm publish`、`npm install`）不放行。
     5. 逃逸写法 ask（D63）：任何重定向（`*>*`，也包括 `2>&1`、`2>/dev/null`）、`find` 的 `-exec` / `-execdir` / `-ok` / `-okdir` / `-delete` / `-fprint*` / `-fls`、`rg --pre`、`git … --output`、`git grep -O` / `--open-files-in-pager`。

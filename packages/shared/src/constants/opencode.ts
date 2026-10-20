@@ -111,16 +111,15 @@ const STDERR_TO_STDOUT = ' 2>&1';
 const bash = (pattern: string, action: PermissionAction): PermissionRule => ({ permission: 'bash', pattern, action });
 
 /**
- * A version query is one command: a program name and the flag (`java -version`, `npx tsc --version`). The asks take
- * back longer commands that only end in the flag (`rm -rf src --version`) and paths, which run whatever the file is
- * (`./deploy.sh --version`). `suffix` is `''` or `STDERR_TO_STDOUT`.
+ * A version query is one command: a program name and the flag (`java -version`). The asks take back longer commands
+ * that only end in the flag: `rm -rf src --version`, and `npx <package> --version`, which without a TTY installs and
+ * runs any package from the registry; and paths, which run whatever the file is (`./deploy.sh --version`). `suffix`
+ * is `''` or `STDERR_TO_STDOUT`.
  */
 const versionQueryRules = (suffix: string): PermissionRule[] => [
   ...VERSION_FLAGS.flatMap((flag) => [
     bash(`* ${flag}${suffix}`, 'allow'),
     bash(`* * ${flag}${suffix}`, 'ask'),
-    bash(`npx * ${flag}${suffix}`, 'allow'),
-    bash(`npx * * ${flag}${suffix}`, 'ask'),
     bash(`*/* ${flag}${suffix}`, 'ask'),
   ]),
   ...VERSION_V_PROGRAMS.map((program) => bash(`${program} -v${suffix}`, 'allow')),

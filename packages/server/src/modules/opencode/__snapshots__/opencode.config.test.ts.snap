@@ -19,16 +19,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * --version",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * --version",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* --version",
       "permission": "bash",
@@ -44,16 +34,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * -version",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -version",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* -version",
       "permission": "bash",
@@ -66,16 +46,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "* * -V",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npx * -V",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -V",
       "permission": "bash",
     },
     {
@@ -289,16 +259,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * --version 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * --version 2>&1",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* --version 2>&1",
       "permission": "bash",
@@ -314,16 +274,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * -version 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -version 2>&1",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* -version 2>&1",
       "permission": "bash",
@@ -336,16 +286,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "* * -V 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npx * -V 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -V 2>&1",
       "permission": "bash",
     },
     {
@@ -426,16 +366,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * --version",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * --version",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* --version",
       "permission": "bash",
@@ -451,16 +381,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * -version",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -version",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* -version",
       "permission": "bash",
@@ -473,16 +393,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "* * -V",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npx * -V",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -V",
       "permission": "bash",
     },
     {
@@ -696,16 +606,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * --version 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * --version 2>&1",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* --version 2>&1",
       "permission": "bash",
@@ -721,16 +621,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * -version 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -version 2>&1",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* -version 2>&1",
       "permission": "bash",
@@ -743,16 +633,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "* * -V 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npx * -V 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -V 2>&1",
       "permission": "bash",
     },
     {
@@ -833,16 +713,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * --version",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * --version",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* --version",
       "permission": "bash",
@@ -858,16 +728,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * -version",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -version",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* -version",
       "permission": "bash",
@@ -880,16 +740,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "* * -V",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npx * -V",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -V",
       "permission": "bash",
     },
     {
@@ -1103,16 +953,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * --version 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * --version 2>&1",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* --version 2>&1",
       "permission": "bash",
@@ -1128,16 +968,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * -version 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -version 2>&1",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* -version 2>&1",
       "permission": "bash",
@@ -1150,16 +980,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "* * -V 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npx * -V 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -V 2>&1",
       "permission": "bash",
     },
     {
@@ -1297,16 +1117,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * --version",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * --version",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* --version",
       "permission": "bash",
@@ -1322,16 +1132,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * -version",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -version",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* -version",
       "permission": "bash",
@@ -1344,16 +1144,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "ask",
       "pattern": "* * -V",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npx * -V",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -V",
       "permission": "bash",
     },
     {
@@ -1567,16 +1357,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * --version 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * --version 2>&1",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* --version 2>&1",
       "permission": "bash",
@@ -1592,16 +1372,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * -version 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -version 2>&1",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* -version 2>&1",
       "permission": "bash",
@@ -1614,16 +1384,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "ask",
       "pattern": "* * -V 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npx * -V 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -V 2>&1",
       "permission": "bash",
     },
     {
@@ -1704,16 +1464,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * --version",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * --version",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* --version",
       "permission": "bash",
@@ -1729,16 +1479,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * -version",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -version",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* -version",
       "permission": "bash",
@@ -1751,16 +1491,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "ask",
       "pattern": "* * -V",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npx * -V",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -V",
       "permission": "bash",
     },
     {
@@ -1974,16 +1704,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * --version 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * --version 2>&1",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* --version 2>&1",
       "permission": "bash",
@@ -1999,16 +1719,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "permission": "bash",
     },
     {
-      "action": "allow",
-      "pattern": "npx * -version 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -version 2>&1",
-      "permission": "bash",
-    },
-    {
       "action": "ask",
       "pattern": "*/* -version 2>&1",
       "permission": "bash",
@@ -2021,16 +1731,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "ask",
       "pattern": "* * -V 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npx * -V 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "npx * * -V 2>&1",
       "permission": "bash",
     },
     {
