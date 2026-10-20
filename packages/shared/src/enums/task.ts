@@ -109,3 +109,14 @@ export const TaskDisplayGroup = {
 export type TaskDisplayGroup = (typeof TaskDisplayGroup)[keyof typeof TaskDisplayGroup];
 export const TASK_DISPLAY_GROUPS = Object.values(TaskDisplayGroup);
 export const taskDisplayGroupSchema = z.enum(TaskDisplayGroup);
+
+/** What a `task_events` row is about (10 §task_events). */
+export const TaskEventEntity = {
+  Task: 'task',
+  Node: 'node',
+  Attempt: 'attempt',
+  Plan: 'plan',
+  Delivery: 'delivery',
+} as const;
+export type TaskEventEntity = (typeof TaskEventEntity)[keyof typeof TaskEventEntity];
+export const taskEventEntitySchema = z.enum(TaskEventEntity);

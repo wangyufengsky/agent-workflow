@@ -31,10 +31,22 @@ module.exports = {
       name: 'modules-via-index-only',
       comment: 'Cross-module imports go through the other module index.ts',
       severity: 'error',
-      from: { path: '^packages/server/src/modules/([^/]+)/' },
+      from: { path: '^packages/server/src/modules/([^/]+)/', pathNot: '\\.table\\.ts$' },
       to: {
         path: '^packages/server/src/modules/[^/]+/',
         pathNot: ['^packages/server/src/modules/$1/', '/index\\.ts$'],
+      },
+    },
+    {
+      name: 'tables-import-tables',
+      comment:
+        'Foreign keys point from lower modules to the tables of higher ones (e.g. nodes → tasks); a table file may ' +
+        "import another module's table file, which keeps the schema a graph without creating service-level cycles",
+      severity: 'error',
+      from: { path: '^packages/server/src/modules/([^/]+)/[^/]+\\.table\\.ts$' },
+      to: {
+        path: '^packages/server/src/modules/[^/]+/',
+        pathNot: ['^packages/server/src/modules/$1/', '\\.table\\.ts$', '/index\\.ts$'],
       },
     },
   ],

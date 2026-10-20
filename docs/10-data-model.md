@@ -138,8 +138,8 @@ type Acceptance = {
 | base_branch | TEXT | |
 | base_commit | TEXT NULL | worktree 创建时的基线 |
 | branch | TEXT NULL | |
-| current_plan_id | TEXT NULL → plans | 当前生效（confirmed）版本 |
-| result | TEXT(JSON) NULL | 结果卡数据：`{ summary, filesChanged, insertions, deletions, checks[], nodeSummaries[] }` |
+| current_plan_id | TEXT NULL | 当前生效（confirmed）版本（无外键：plans 引用 tasks，两张表不能互相引用，D43） |
+| result | TEXT(JSON) NULL | 结果卡数据 `TaskResultDTO`：`{ summary, filesChanged, insertions, deletions, files[], checks[], nodeSummaries[], assumptions[] }`（进入 `review` 时生成） |
 | created_at / updated_at / started_at / finished_at | INTEGER | |
 
 索引：`(project_id, status)`、`(status, updated_at)`。
@@ -194,7 +194,7 @@ type Acceptance = {
 | attempt_count | INTEGER | 消耗的预算 |
 | retry_feedback | TEXT NULL | 下次尝试附带 |
 | result | TEXT(JSON) NULL | 最近一次 `submit_result` 内容 |
-| check_results | TEXT(JSON) NULL | `[{ kind, passed, output, attemptId? }]` |
+| check_results | TEXT(JSON) NULL | `CheckResult[]`：命令检查 `{ kind: command, command, passed, output, exitCode, timedOut }`（输出保留末尾 `ACCEPTANCE_OUTPUT_MAX_CHARS`）；AI 评审 `{ kind: ai_review, focus, passed, output, attemptId, issues[] }` |
 | commit_sha | TEXT NULL | |
 | position | INTEGER | 画布与列表排序 |
 | created_at / updated_at / started_at / finished_at | INTEGER | |
@@ -207,7 +207,7 @@ type Acceptance = {
 | --- | --- | --- |
 | id | TEXT PK | |
 | task_id | TEXT NULL → tasks，CASCADE | 空 = 调试尝试（仅开发构建，M2-09，不属于任何任务） |
-| node_id | TEXT NULL → nodes，CASCADE | `plan` 类与调试尝试为空 |
+| node_id | TEXT NULL → nodes，CASCADE | `execute` 类为所执行的节点，`review` 类为被评审的节点；`plan` 类与调试尝试为空 |
 | kind | TEXT | `AttemptKind` |
 | seq | INTEGER | 同一节点（或同一任务的 plan 类、或全部调试尝试）内序号 |
 | status | TEXT | `AttemptStatus` |
@@ -223,7 +223,6 @@ type Acceptance = {
 
 索引：`(node_id)`、`(task_id, kind)`、`(status)`、`(opencode_session_id)`。
 
-> M2 建表时 tasks / nodes / roles 表尚不存在：`task_id`、`node_id`、`role_id` 的外键随 M3 的迁移加上。
 
 ### inbox_items
 
@@ -245,11 +244,13 @@ payload / response：
 | kind | payload | response |
 | --- | --- | --- |
 | `question` | `{ question, options?: string[], blocking: boolean, defaultAssumption?: string }` | `{ answer: string }` 或 `{ assumed: true, value }`（未问用户、按假设继续时直接以 resolved 写入，作为记录） |
-| `permission` | `{ opencodePermissionId, sessionId, type, title, pattern?, metadata }` | `{ decision: PermissionDecision }` |
+| `permission` | `{ opencodePermissionId, sessionId, directory, permission, patterns[] }` | `{ decision: PermissionDecision }` |
 | `acceptance` | `{}` | `{ accepted: boolean, feedback?: string }` |
 | `plan` | `{ planId, version }` | `{ confirmed: true }` 或 `{ replanFeedback }` |
 | `failure` | `{ phase, error }` | `{ action: 'retry' | 'cancel' }` |
 | `delivery` | `{}` | `{ deliveryId }` |
+
+`title` 是简短的纯文本（问题原文、权限的命令、步骤或任务标题），卡片按 kind 组织其余文案。问题与权限条目的 `attempt_id` 是发起的尝试，尝试结束时其仍打开的条目自动 dismiss；验收、计划、失败、投递条目不关联尝试。
 
 ### worktrees
 

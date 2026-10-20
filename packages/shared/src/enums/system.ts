@@ -46,6 +46,8 @@ export const TranscriptSystemEvent = {
   /** opencode waits before retrying a failed model request; `detail` is its message. */
   Retrying: 'retrying',
   ResultSubmitted: 'result_submitted',
+  /** Waiting for the user: an open blocking question or a permission request (12 §4.2). */
+  AwaitingInput: 'awaiting_input',
   TimedOut: 'timed_out',
   Aborted: 'aborted',
   RuntimeLost: 'runtime_lost',

@@ -22,7 +22,13 @@ export const attemptMachine = defineMachine<AttemptStatus, AttemptEvent>({
   events: Object.values(AttemptEvent),
   initial: [S.Starting],
   table: {
-    [S.Starting]: { [E.SessionStarted]: [S.Running], [E.StartFailed]: [S.Failed], [E.RuntimeLost]: [S.Interrupted] },
+    // A task may be cancelled while the session is still being created.
+    [S.Starting]: {
+      [E.SessionStarted]: [S.Running],
+      [E.StartFailed]: [S.Failed],
+      [E.Abort]: [S.Aborted],
+      [E.RuntimeLost]: [S.Interrupted],
+    },
     [S.Running]: {
       [E.Submitted]: [S.Succeeded],
       [E.SessionError]: [S.Failed],

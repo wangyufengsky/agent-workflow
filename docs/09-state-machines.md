@@ -118,6 +118,9 @@ stateDiagram-v2
   running --> ready: interrupted
   running --> cancelled: cancel
   waiting_input --> running: input_answered
+  waiting_input --> ready: attempt_failed
+  waiting_input --> failed: attempt_failed
+  waiting_input --> ready: interrupted
   waiting_input --> cancelled: cancel
   verifying --> awaiting_acceptance: checks_passed
   verifying --> done: checks_passed
@@ -143,16 +146,18 @@ stateDiagram-v2
 | --- | --- |
 | 预算 | 每个节点最多 `node.maxAttempts` 次 `execute` 尝试；`checks_failed` 与 `attempt_failed` 都消耗预算；`reject`（人工驳回）与 `retry`（用户手动重试）不受预算限制，`retry` 会重置计数 |
 | 重试携带反馈 | 回到 `ready` 时记录 `retryFeedback`（检查失败输出 / 评审问题 / 驳回意见 / 失败原因），下次尝试的提示词附带 |
-| `waiting_input` | 两种来源：会话空闲且有未回答的阻塞问题；opencode 权限请求待处理 |
+| `waiting_input` | 两种来源：会话空闲且有未回答的阻塞问题；opencode 权限请求待处理。等待期间尝试仍是 `running`（不计超时），因此仍可能失败（用户中止 → `attempt_failed`）或中断（运行时消失时待处理的权限请求随之失效 → `interrupted`） |
 | 人工验收 | 节点 `acceptance.manual=true` 或任务开启 `accept_each_node` 时进入 `awaiting_acceptance`，并创建 `acceptance` 类 inbox 条目 |
 | 跳过 | 仅专业模式；被跳过节点视为完成，下游可继续 |
-| 重启恢复 | `running`/`verifying` 的节点：其尝试标 `interrupted`，节点回 `ready`（不消耗预算）；`waiting_input` 保持不变（opencode 会话持久化，回答后继续） |
+| 重启恢复 | `running`/`verifying` 的节点：其尝试标 `interrupted`，节点回 `ready`（不消耗预算）；等待阻塞问题答案的 `waiting_input` 保持不变（opencode 会话持久化，回答后在同一会话继续）；等待权限的 `waiting_input` 回 `ready`（权限请求随 opencode 进程失效，条目 dismiss） |
 
 **`result_submitted` 的目标选择**：有 `acceptance.checks` → `verifying`；否则需要人工验收 → `awaiting_acceptance`；否则 → `done`。`checks_passed` 同理（需人工验收 → `awaiting_acceptance`，否则 `done`）；`checks_failed` / `attempt_failed` 有预算 → `ready`，无预算 → `failed`；`interrupted`（重启恢复）→ `ready`。
 
 **`verifying`** 依次执行检查：`command` 在 worktree 中运行（超时 `ACCEPTANCE_COMMAND_TIMEOUT_MS`）；`ai_review` 创建 `review` 类尝试，`submit_review` 返回 `pass/fail`。任一失败即 `checks_failed`。
 
-**提交代码**：节点到达 `done` 时，后端在 worktree 执行 `git add -A && git commit -m "<taskKey> <nodeTitle>"`（无改动则跳过），提交 sha 记录在节点上。模型不需要自己提交。
+**提交代码**：节点到达 `done` 之前，后端在 worktree 执行 `git add -A && git commit -m "<taskKey> <nodeTitle>"`（无改动则跳过，`commit_sha` 为空），提交 sha 记录在节点上；先提交再转换，下游节点不会在提交之前开始。提交者为 `GIT_COMMIT_IDENTITY`，带 `--no-verify` 且关闭签名（D48）。并行节点共享任务工作区，先完成的节点的提交会包含此刻工作区中的全部改动。模型不需要自己提交。
+
+**AI 评审未完成**：评审会话没有提交结论就结束（未提交、出错、超时、被中止）按 `checks_failed` 处理；运行时消失则 `interrupted`（D49）。
 
 ## 4. 尝试 Attempt
 
@@ -162,6 +167,7 @@ stateDiagram-v2
   [*] --> starting
   starting --> running: session_started
   starting --> failed: start_failed
+  starting --> aborted: abort
   starting --> interrupted: runtime_lost
   running --> succeeded: submitted
   running --> failed: session_error
@@ -179,7 +185,7 @@ stateDiagram-v2
 - `submitted`：`plan` 类为 `submit_plan` 校验通过；`execute` 类为 `submit_result`；`review` 类为 `submit_review`。尝试成功只表示「模型交付了结果」，验收结论在节点层。
 - `no_result`：见 [03-architecture §2.4](03-architecture.md#24-会话空闲但未提交结果)。
 - `timeout`：从 `running` 起超过 `attempt.timeoutMinutes`。
-- `abort`：用户中止或任务取消；后端调用 opencode `session/{id}/abort`。
+- `abort`：用户中止或任务取消；后端调用 opencode `session/{id}/abort`。会话仍在创建中（`starting`）时也可中止（任务取消），之后不再发送首条消息。
 - `runtime_lost`：opencode 进程退出、用户重启 opencode，或后端启动时发现上次仍在进行（会话已不存在）。
 - 终态：`succeeded` `failed` `aborted` `interrupted`。尝试不会被「恢复」，重试总是新建尝试（`plan` 类尝试可复用原会话继续，见 12-mcp-tools §4.3）。
 

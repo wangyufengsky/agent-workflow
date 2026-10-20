@@ -1,20 +1,21 @@
 import type { AttemptKind, AttemptStatus } from '@aw/shared';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { nodesTable } from '../nodes/nodes.table.ts';
+import { rolesTable } from '../roles/roles.table.ts';
+import { tasksTable } from '../tasks/tasks.table.ts';
 
-/**
- * 10 §attempts. `task_id` / `node_id` / `role_id` get their foreign keys with the tasks, nodes and roles tables (M3);
- * a debug attempt (development builds, M2-09) has none of them.
- */
+/** 10 §attempts. A debug attempt (development builds, M2-09) has no task, node or role. */
 export const attemptsTable = sqliteTable(
   'attempts',
   {
     id: text('id').primaryKey(),
-    taskId: text('task_id'),
-    nodeId: text('node_id'),
+    taskId: text('task_id').references(() => tasksTable.id, { onDelete: 'cascade' }),
+    /** The node an execute attempt works on, or the node a review attempt reviews; null for plan attempts. */
+    nodeId: text('node_id').references(() => nodesTable.id, { onDelete: 'cascade' }),
     kind: text('kind').$type<AttemptKind>().notNull(),
     seq: integer('seq').notNull(),
     status: text('status').$type<AttemptStatus>().notNull(),
-    roleId: text('role_id'),
+    roleId: text('role_id').references(() => rolesTable.id),
     model: text('model'),
     /** Working directory of the session (the task worktree). */
     directory: text('directory').notNull(),
