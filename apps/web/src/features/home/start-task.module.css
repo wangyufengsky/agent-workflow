@@ -1,0 +1,53 @@
+.workflows {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.workflow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--fill-1);
+  text-align: left;
+  color: var(--ink-2);
+  transition:
+    border-color var(--t-fast),
+    background var(--t-fast);
+}
+
+.workflow:hover {
+  border-color: var(--line-3);
+}
+
+.workflow[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-fill);
+  color: var(--ink);
+}
+
+.name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.description {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

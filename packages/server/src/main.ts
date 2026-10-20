@@ -17,7 +17,11 @@ async function selectCipher(): Promise<CredentialCipher | undefined> {
 /** Browser E2E plays AI sessions with FakeOpencode (07 §2); folded away in production bundles like the cipher above. */
 async function selectFakeOpencode() {
   if (process.env.NODE_ENV === 'development' && process.env.AW_FAKE_OPENCODE === '1') {
-    return (await import('../test/fakes/fake-opencode.ts')).createFakeOpencode();
+    const [{ createFakeOpencode }, { registerFakeOpencodeRoutes }] = await Promise.all([
+      import('../test/fakes/fake-opencode.ts'),
+      import('../test/fakes/fake-opencode.routes.ts'),
+    ]);
+    return { fake: createFakeOpencode(), registerFakeOpencodeRoutes };
   }
   return undefined;
 }
@@ -27,14 +31,15 @@ const cipher = await selectCipher();
 const fake = await selectFakeOpencode();
 const app = await buildApp(config, {
   ...(cipher === undefined ? {} : { cipher }),
-  ...(fake === undefined ? {} : { opencode: fake }),
+  ...(fake === undefined ? {} : { opencode: fake.fake }),
 });
 const { server } = app;
+fake?.registerFakeOpencodeRoutes(server, fake.fake);
 await server.listen({ host: '127.0.0.1', port: config.port });
 
 const address = server.server.address();
 if (address === null || typeof address === 'string') throw new Error('Server is not listening on a TCP port');
 // Running inside Electron utilityProcess: tell the main process where we listen.
 process.parentPort?.postMessage({ type: 'ready', port: address.port });
-fake?.connectMcp({ url: `http://127.0.0.1:${address.port}${MCP_EXEC_PATH}`, token: app.mcpToken });
+fake?.fake.connectMcp({ url: `http://127.0.0.1:${address.port}${MCP_EXEC_PATH}`, token: app.mcpToken });
 await app.start(address.port);

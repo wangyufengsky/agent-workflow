@@ -3,6 +3,8 @@ import type { QueryClient } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { appendTranscript, updateAttempt } from '../features/attempts/attempt.queries.ts';
+import { updateInbox } from '../features/inbox/inbox.queries.ts';
+import { updateNode, updateTask } from '../features/tasks/tasks.queries.ts';
 import { apiToken } from './client.ts';
 import { queryKeys } from './query-keys.ts';
 
@@ -16,9 +18,24 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       // Whether models are available depends on the runtime.
       return qc.invalidateQueries({ queryKey: queryKeys.environment });
     case ServerEventType.AttemptUpdated:
-      return updateAttempt(qc, event.data.attempt);
+      updateAttempt(qc, event.data.attempt);
+      // A task's active attempts (and their progress line) are part of its detail.
+      if (event.data.taskId !== null)
+        await qc.invalidateQueries({ queryKey: queryKeys.task(event.data.taskId), exact: true });
+      if (event.data.nodeId !== null && event.data.taskId !== null) {
+        await qc.invalidateQueries({ queryKey: queryKeys.node(event.data.taskId, event.data.nodeId) });
+      }
+      return;
     case ServerEventType.AttemptTranscript:
       return appendTranscript(qc, event.data.attemptId, event.data.entries);
+    case ServerEventType.TaskUpdated:
+      return updateTask(qc, event.data);
+    case ServerEventType.NodeUpdated:
+      return updateNode(qc, event.data.taskId, event.data.node);
+    case ServerEventType.PlanUpdated:
+      return qc.invalidateQueries({ queryKey: queryKeys.task(event.data.taskId), exact: true });
+    case ServerEventType.InboxUpdated:
+      return updateInbox(qc, event.data.openCount);
   }
 }
 

@@ -71,7 +71,7 @@ const DELTA_CHARS = 8;
  */
 export function createFakeOpencode() {
   const listeners = new Set<(event: OpencodeEvent) => void>();
-  const queue: Array<{ script: FakeScript; match: ScriptMatch | undefined }> = [];
+  const queue: Array<{ script: Pick<FakeScript, 'steps'>; match: ScriptMatch | undefined }> = [];
   /** Resolvers of `hang` steps, per session, released by abort(). */
   const hanging = new Map<string, Array<() => void>>();
   const pendingPermissions = new Map<string, (reply: PermissionDecision) => void>();
@@ -220,7 +220,7 @@ export function createFakeOpencode() {
      * Queues a script for a later prompt: the first queued script whose `match` fits the prompted session plays
      * (no match = any session).
      */
-    enqueue(s: FakeScript, match?: ScriptMatch): void;
+    enqueue(s: Pick<FakeScript, 'steps'>, match?: ScriptMatch): void;
     /** Resolves once every turn started so far has played out (a turn waiting for a permission never does). */
     settled(): Promise<void>;
     /** The runtime disappears: `runtime_lost`, and requests fail until `reconnect()`. */

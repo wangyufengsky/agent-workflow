@@ -7,6 +7,7 @@ import { useSettings } from '../../features/settings/settings.queries.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { NAV_ITEMS, navItemsFor } from '../navigation.ts';
 import { ROUTES } from '../routes.ts';
+import { InboxButton } from './inbox-button.tsx';
 import { NavLink } from './nav-link.tsx';
 import { RuntimeChip } from './runtime-chip.tsx';
 import { ThemeSwitch } from './theme-switch.tsx';
@@ -91,6 +92,7 @@ export function AppShell() {
         <header className="header">
           <h1>{title}</h1>
           <span className="spacer" />
+          <InboxButton />
           <ThemeSwitch />
         </header>
         <main className="content">

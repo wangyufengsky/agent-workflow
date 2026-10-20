@@ -49,7 +49,7 @@
 
 | 名称 | 位置 | 说明 |
 | --- | --- | --- |
-| `FakeOpencode` | `packages/server/test/fakes/fake-opencode.ts` | 实现 `OpencodeClient` 接口；`fake.enqueue(script()…)` 为下一条发给会话的消息排一个回合：`edit(file, content)`、`text(…)`、`callTool(name, args)`、`ask(...)`、`requestPermission(...)`、`error(...)`，回合结束即空闲（没有排脚本的消息直接空闲）；真实写 worktree 文件、真实通过 MCP 调用后端（注入 `__aw_session`）。可断言 `sessions`、`prompts`、`toolCalls`、`aborts`、`permissionReplies`；`crash()` 模拟运行时消失；`settled()` 等待已开始的回合放完。浏览器 E2E 中后端以 `AW_FAKE_OPENCODE=1`（仅开发模式）使用它 |
+| `FakeOpencode` | `packages/server/test/fakes/fake-opencode.ts` | 实现 `OpencodeClient` 接口；`fake.enqueue(script()…, match?)` 为之后发给会话的消息排一个回合（`match` 按会话标题、agent、目录的子串选会话，第一个匹配的脚本生效）：`edit(file, content)`、`text(…)`、`callTool(name, args)`、`ask(...)`、`requestPermission(...)`、`hang()`（一直工作直到被中止）、`error(...)`，回合结束即空闲（没有排脚本的消息直接空闲）；真实写 worktree 文件、真实通过 MCP 调用后端（注入 `__aw_session`）。可断言 `sessions`、`prompts`、`toolCalls`、`aborts`、`permissionReplies`；`crash()` 模拟运行时消失；`settled()` 等待已开始的回合放完。浏览器 E2E 中后端以 `AW_FAKE_OPENCODE=1`（仅开发模式）使用它，spec 经开发接口 `POST /api/v1/dev/fake-opencode/scripts` 排回合（按项目的 worktree 目录匹配，互不干扰）；`createTestApp({ dataDir, fake })` 复用同一个 FakeOpencode 模拟后端重启 |
 | `FakeHosting` | `test/fakes/fake-hosting.ts` | 本地 HTTP 服务模拟 GitHub/GitLab 用到的少数端点 |
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
 | `createTestApp()` | `test/helpers/app.ts` | 启动后端（临时数据目录、随机端口），返回类型化 API 调用 `call(op, input)`、`mcpUrl`、FakeOpencode；`realOpencode: true` 用于 `@opencode` 测试；MCP SDK 客户端见 `test/helpers/mcp.ts` |

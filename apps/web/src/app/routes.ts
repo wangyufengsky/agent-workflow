@@ -3,6 +3,7 @@ export const ROUTES = {
   onboarding: '/onboarding',
   home: '/',
   tasks: '/tasks',
+  task: '/tasks/$taskId',
   inbox: '/inbox',
   projects: '/projects',
   project: '/projects/$projectId',
@@ -20,6 +21,9 @@ export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];
 
 /** Route ids for `getRouteApi`: pages inside the sidebar layout live under the pathless `_shell` route. */
 export const ROUTE_IDS = {
+  home: '/_shell/',
+  tasks: '/_shell/tasks',
+  task: '/_shell/tasks/$taskId',
   projects: '/_shell/projects',
   project: '/_shell/projects/$projectId',
   runtime: '/_shell/runtime',
