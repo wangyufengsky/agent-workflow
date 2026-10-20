@@ -18,4 +18,25 @@ export const queryKeys = {
   inbox: ['inbox'],
   inboxList: (filter: Record<string, string | undefined>) => ['inbox', 'list', filter],
   inboxCount: ['inbox', 'count'],
+  taskDiff: (id: string) => ['tasks', 'detail', id, 'diff'],
+  taskDiffFile: (id: string, path: string) => ['tasks', 'detail', id, 'diff', path],
+  nodeDiff: (taskId: string, nodeId: string) => ['tasks', 'detail', taskId, 'nodes', nodeId, 'diff'],
+  nodeDiffFile: (taskId: string, nodeId: string, path: string) => [
+    'tasks',
+    'detail',
+    taskId,
+    'nodes',
+    nodeId,
+    'diff',
+    path,
+  ],
+  /** Highlighted tokens of a diff: derived in the renderer, cached like server data. */
+  syntax: (path: string, digest: string) => ['syntax', path, digest],
+  git: (projectId: string) => ['git', projectId],
+  gitResource: (projectId: string, resource: string, params: Record<string, string | number | undefined>) => [
+    'git',
+    projectId,
+    resource,
+    params,
+  ],
 } as const;

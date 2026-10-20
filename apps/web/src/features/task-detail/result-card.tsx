@@ -1,27 +1,75 @@
-import { type TaskDetailDTO, TaskStatus, WorkflowDeliverable } from '@aw/shared';
+import {
+  DeliveryStatus,
+  DeliveryStrategy,
+  type TaskDetailDTO,
+  TaskStatus,
+  WorkflowDeliverable,
+  WorktreeStatus,
+} from '@aw/shared';
 import { useState } from 'react';
 import { Button } from '../../components/button.tsx';
-import { Dialog } from '../../components/dialog.tsx';
-import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { Panel } from '../../components/panel.tsx';
-import { toast } from '../../components/toast.tsx';
+import { DELIVERY_COPY as D } from '../../copy/delivery.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
-import { useCancelTask } from '../tasks/tasks.queries.ts';
+import { ChangesDrawer } from './changes-drawer.tsx';
+import { DeliveryActions } from './delivery-actions.tsx';
 import styles from './task-page.module.css';
 
-/** Result card (14 §3.5). Merging and pull requests arrive with delivery (M4); their buttons are placeholders. */
+/** How the task was delivered, once it is merging or done. */
+function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
+  const delivery = task.lastDelivery;
+  if (task.status === TaskStatus.Merging) {
+    return (
+      <p className="row hint">
+        <span className="spin" aria-hidden="true" />
+        {D.merging}
+      </p>
+    );
+  }
+  if (task.status !== TaskStatus.Completed || delivery?.status !== DeliveryStatus.Succeeded) return null;
+  if (delivery.strategy === DeliveryStrategy.PullRequest && delivery.prUrl !== null) {
+    const url = delivery.prUrl;
+    return (
+      <p className="row" data-testid="delivery-outcome">
+        <Icon name="git" />
+        {D.prOpened}
+        <a
+          href={url}
+          onClick={(e) => {
+            // In the app, links open in the system browser (03 §9: the window never navigates away).
+            if (window.aw === undefined) return;
+            e.preventDefault();
+            void window.aw.openExternal(url);
+          }}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {D.openPr}
+        </a>
+      </p>
+    );
+  }
+  return (
+    <p className="row" data-testid="delivery-outcome">
+      <Icon name="check" />
+      {delivery.commitSha === null ? D.reportDone : D.merged(delivery.targetBranch, delivery.commitSha)}
+    </p>
+  );
+}
+
+/** Result card (14 §3.5): what was done, the changes, and the delivery decisions while in review. */
 export function ResultCard({ task }: { task: TaskDetailDTO }) {
-  const [discarding, setDiscarding] = useState(false);
-  const cancel = useCancelTask();
+  const [viewing, setViewing] = useState(false);
   const { result } = task;
   if (result === null) return <p className="hint">{C.resultPending}</p>;
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
   const failedChecks = result.checks.filter((c) => !c.passed).length;
   const checks =
     result.checks.length === 0 ? C.noChecks : failedChecks === 0 ? C.checksPassed : C.checksFailed(failedChecks);
-  const actionable = task.status === TaskStatus.Review;
+  // The diff is read from the worktree, which goes away once the task is delivered or cancelled.
+  const browsable = task.git.worktreeStatus === WorktreeStatus.Ready;
   return (
     <Panel solid>
       <div className="col" data-testid="result-card">
@@ -30,6 +78,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
           {C.resultHeadline(result.nodeSummaries.length, result.filesChanged, result.insertions, result.deletions)} ·{' '}
           {checks}
         </p>
+        <DeliveryOutcome task={task} />
         <h3 className="sec-t">{report ? C.report : C.summary}</h3>
         <Markdown source={result.summary} />
         {result.assumptions.length > 0 && (
@@ -44,11 +93,28 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
         )}
         {result.files.length > 0 && (
           <>
-            <h3 className="sec-t">{C.changedFiles}</h3>
+            <h3 className="sec-t row">
+              <span className="grow">{C.changedFiles}</span>
+              {browsable && (
+                <Button size="sm" variant="ghost" onClick={() => setViewing(true)}>
+                  {D.viewChanges}
+                </Button>
+              )}
+            </h3>
             <ul className={styles.files}>
               {result.files.map((f) => (
                 <li key={f.path} className={styles.file}>
-                  <span className="mono grow ellipsis">{f.path}</span>
+                  {browsable ? (
+                    <button
+                      type="button"
+                      className={`mono grow ellipsis ${styles.fileLink}`}
+                      onClick={() => setViewing(true)}
+                    >
+                      {f.path}
+                    </button>
+                  ) : (
+                    <span className="mono grow ellipsis">{f.path}</span>
+                  )}
                   <span className={styles.add}>+{f.additions ?? 0}</span>
                   <span className={styles.del}>−{f.deletions ?? 0}</span>
                 </li>
@@ -56,50 +122,9 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
             </ul>
           </>
         )}
-        {actionable && (
-          <>
-            <div className={styles.actions}>
-              {report ? (
-                <>
-                  <Button variant="primary" disabled>
-                    {C.complete}
-                  </Button>
-                  <Button disabled>{C.fixFromReport}</Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="primary" icon="git" disabled>
-                    {C.merge(task.git.baseBranch)}
-                  </Button>
-                  <Button disabled>{C.createPr}</Button>
-                  <Button disabled>{C.revise}</Button>
-                </>
-              )}
-              <Button variant="ghost" onClick={() => setDiscarding(true)}>
-                {C.discard}
-              </Button>
-            </div>
-            <span className="hint">{C.deliveryLater}</span>
-          </>
-        )}
+        {task.status === TaskStatus.Review && <DeliveryActions task={task} />}
       </div>
-      <Dialog
-        open={discarding}
-        onOpenChange={setDiscarding}
-        title={C.cancelTitle}
-        footer={
-          <Button
-            variant="danger"
-            pending={cancel.isPending}
-            onClick={() => cancel.mutate(task.id, { onSuccess: () => toast(C.cancelled) })}
-          >
-            {C.discard}
-          </Button>
-        }
-      >
-        <p>{C.cancelBody}</p>
-        {cancel.isError && <ErrorState error={cancel.error} />}
-      </Dialog>
+      {browsable && <ChangesDrawer task={task} open={viewing} onOpenChange={setViewing} />}
     </Panel>
   );
 }

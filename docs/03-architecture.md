@@ -86,7 +86,7 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | 无样式组件 | @radix-ui/react-dialog、@radix-ui/react-tabs（Dialog、Drawer、命令面板、Tabs）；Popover、Tooltip、DropdownMenu、Select 引入时锁定 | 1.3.1 / 1.2.1 |
 | Markdown 渲染 | react-markdown + remark-gfm（不渲染原始 HTML，模型产出的摘要与报告） | 10.1.0 / 4.0.1 |
 | 表单 | react-hook-form + @hookform/resolvers | 引入时锁定（M1 表单字段少，用受控组件） |
-| diff / 代码高亮 | @git-diff-view/react + shiki | 引入时锁定（M4-07） |
+| diff / 代码高亮 | shiki（JavaScript 正则引擎、CSS 变量主题，按扩展名懒加载语法）；unified / split 视图与文件树为自写组件 `components/diff/`（D54） | 4.5.0 |
 | 契约 | zod | 4.6.7 |
 | HTTP | fastify（请求校验由操作清单挂载层直接用 zod 解析，见 D39） | 5.12.7 |
 | MCP | @modelcontextprotocol/sdk | 1.32.1 |

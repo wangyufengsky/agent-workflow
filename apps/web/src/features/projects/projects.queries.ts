@@ -1,9 +1,13 @@
 import {
   type CreateProjectRequest,
+  clearProjectHostingOp,
   createProjectOp,
   deleteProjectOp,
   getProjectOp,
   listProjectsOp,
+  type ProjectDetailDTO,
+  type SetHostingRequest,
+  setProjectHostingOp,
   type UpdateProjectRequest,
   updateProjectOp,
 } from '@aw/shared';
@@ -52,3 +56,18 @@ export function useDeleteProject() {
     },
   });
 }
+
+function useProjectMutation<I>(run: (input: I) => Promise<ProjectDetailDTO>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    onSuccess: async (project) => {
+      queryClient.setQueryData(queryKeys.project(project.id), project);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.projects, exact: true });
+    },
+  });
+}
+
+export const useSetHosting = () =>
+  useProjectMutation((input: SetHostingRequest) => callOperation(setProjectHostingOp, input));
+export const useClearHosting = () => useProjectMutation((id: string) => callOperation(clearProjectHostingOp, { id }));

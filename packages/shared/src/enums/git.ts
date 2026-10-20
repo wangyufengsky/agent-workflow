@@ -43,6 +43,7 @@ export const LOCAL_MERGE_STRATEGIES = [
   DeliveryStrategy.Rebase,
 ] as const;
 export type LocalMergeStrategy = (typeof LOCAL_MERGE_STRATEGIES)[number];
+export const localMergeStrategySchema = z.enum(LOCAL_MERGE_STRATEGIES);
 export const isLocalMerge = (strategy: DeliveryStrategy): strategy is LocalMergeStrategy =>
   LOCAL_MERGE_STRATEGIES.some((s) => s === strategy);
 

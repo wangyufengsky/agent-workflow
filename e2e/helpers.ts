@@ -2,8 +2,18 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { APIRequestContext } from '@playwright/test';
+import { type APIRequestContext, expect, type Page } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
+
+/** Runs git in a repository (`LC_ALL=C`, like the backend) and returns its trimmed output. */
+export function git(cwd: string, ...args: string[]): string {
+  return execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', ...args], {
+    cwd,
+    env: { ...process.env, LC_ALL: 'C' },
+  })
+    .toString()
+    .trim();
+}
 
 /** A real Git repository with one commit on main. */
 export function createRepo(): string {
@@ -67,4 +77,15 @@ export async function queueTurn(
     data: { match: { ...match, directory: `/${project.slug}/` }, steps },
   });
   if (!res.ok()) throw new Error(`queueing a fake turn failed: ${res.status()} ${await res.text()}`);
+}
+
+/** Home page of the project (the select writes the same `?projectId=`), then workflow, requirement and start. */
+export async function startTask(page: Page, project: E2EProject, workflow: RegExp, requirement: string): Promise<void> {
+  await page.goto(`/?projectId=${project.id}`);
+  const projectSelect = page.getByLabel('项目', { exact: true });
+  if ((await projectSelect.count()) > 0) await expect(projectSelect).toHaveValue(project.id);
+  await page.getByRole('group', { name: '流程' }).getByRole('button', { name: workflow }).click();
+  await page.getByLabel('需求').fill(requirement);
+  await page.getByRole('button', { name: /^开始/ }).click();
+  await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/);
 }

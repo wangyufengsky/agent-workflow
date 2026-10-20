@@ -1,20 +1,9 @@
-import { expect, type Page, test } from '@playwright/test';
-import { createProject, type E2EProject, passReview, patchSettings, queueTurn, submitResult } from './helpers.ts';
+import { expect, test } from '@playwright/test';
+import { createProject, passReview, patchSettings, queueTurn, startTask, submitResult } from './helpers.ts';
 
 // Journeys J1–J4 (07 §5): the AI sessions are played by FakeOpencode, scripted per step.
 
 test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
-
-/** Home page of the project (the select writes the same `?projectId=`), then workflow, requirement and start. */
-async function startTask(page: Page, project: E2EProject, workflow: RegExp, requirement: string) {
-  await page.goto(`/?projectId=${project.id}`);
-  const projectSelect = page.getByLabel('项目', { exact: true });
-  if ((await projectSelect.count()) > 0) await expect(projectSelect).toHaveValue(project.id);
-  await page.getByRole('group', { name: '流程' }).getByRole('button', { name: workflow }).click();
-  await page.getByLabel('需求').fill(requirement);
-  await page.getByRole('button', { name: /^开始/ }).click();
-  await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/);
-}
 
 test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开始 → 结果卡显示改动与检查通过', async ({ page, request }) => {
   const project = await createProject(request, 'true');

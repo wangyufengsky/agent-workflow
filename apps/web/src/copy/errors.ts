@@ -30,6 +30,14 @@ export const ERROR_COPY: Partial<Record<ErrorCode, string>> = {
   [ErrorCode.OpencodeRequestFailed]: '与 opencode 通信失败。',
   [ErrorCode.InboxItemNotFound]: '这一项不存在。',
   [ErrorCode.InboxItemClosed]: '这一项已经处理过了。',
+  [ErrorCode.WorktreeDirty]: '任务的工作区里有未提交的改动，先处理它们再合并。',
+  [ErrorCode.DeliveryConflict]: '合并时有冲突。',
+  [ErrorCode.DeliveryTargetNotFound]: '目标分支不存在。',
+  [ErrorCode.DeliveryTargetDirty]: '目标分支所在的工作区有未提交的改动。为了不碰你的改动，先提交或暂存它们再合并。',
+  [ErrorCode.DeliveryInterrupted]: '合并过程中应用退出了，可以再试一次。',
+  [ErrorCode.HostingNotConfigured]: '项目还没有绑定远端仓库，先在项目设置里绑定。',
+  [ErrorCode.HostingAuthFailed]: '令牌无效，或没有这个仓库的权限。',
+  [ErrorCode.HostingApiError]: '远端平台返回了错误，请稍后再试。',
 };
 
 export const GENERIC_ERROR = '操作没有成功。';

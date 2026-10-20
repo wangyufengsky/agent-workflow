@@ -1,25 +1,34 @@
 import {
   acceptNodeOp,
+  type ChangeRequestReason,
   type CreateTaskRequest,
   cancelTaskOp,
   confirmPlanOp,
   createTaskOp,
+  type DeliverRequest,
+  deliverTaskOp,
   getNodeOp,
   getTaskOp,
   listRolesOp,
   listTasksOp,
   listWorkflowsOp,
   type NodeSummaryDTO,
+  nodeDiffFileOp,
+  nodeDiffOp,
   rejectNodeOp,
   replanOp,
+  requestChangesOp,
   retryTaskOp,
   type TaskDetailDTO,
   type TaskDisplayGroup,
   type TaskSummaryDTO,
+  taskDiffFileOp,
+  taskDiffOp,
 } from '@aw/shared';
 import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
+import type { FileDiffQuery } from '../../components/diff/diff-browser.tsx';
 
 export const workflowsQuery = queryOptions({
   queryKey: queryKeys.workflows,
@@ -46,6 +55,29 @@ export const nodeQuery = (taskId: string, nodeId: string) =>
   queryOptions({
     queryKey: queryKeys.node(taskId, nodeId),
     queryFn: () => callOperation(getNodeOp, { id: taskId, nodeId }),
+  });
+
+export const taskDiffQuery = (id: string) =>
+  queryOptions({ queryKey: queryKeys.taskDiff(id), queryFn: () => callOperation(taskDiffOp, { id }) });
+
+export const taskDiffFileQuery =
+  (id: string): FileDiffQuery =>
+  (path) => ({
+    queryKey: queryKeys.taskDiffFile(id, path),
+    queryFn: () => callOperation(taskDiffFileOp, { id, path }),
+  });
+
+export const nodeDiffQuery = (taskId: string, nodeId: string) =>
+  queryOptions({
+    queryKey: queryKeys.nodeDiff(taskId, nodeId),
+    queryFn: () => callOperation(nodeDiffOp, { id: taskId, nodeId }),
+  });
+
+export const nodeDiffFileQuery =
+  (taskId: string, nodeId: string): FileDiffQuery =>
+  (path) => ({
+    queryKey: queryKeys.nodeDiffFile(taskId, nodeId, path),
+    queryFn: () => callOperation(nodeDiffFileOp, { id: taskId, nodeId, path }),
   });
 
 /** SSE `task.updated`: lists refetch (order and filters may change); a loaded detail takes the summary fields. */
@@ -84,6 +116,11 @@ export const useCancelTask = () => useTaskMutation((id: string) => callOperation
 export const useRetryTask = () => useTaskMutation((id: string) => callOperation(retryTaskOp, { id }));
 export const useConfirmPlan = () =>
   useTaskMutation((input: { id: string; version: number }) => callOperation(confirmPlanOp, input));
+export const useDeliver = () => useTaskMutation((input: DeliverRequest) => callOperation(deliverTaskOp, input));
+export const useRequestChanges = () =>
+  useTaskMutation((input: { id: string; reason: ChangeRequestReason; feedback?: string }) =>
+    callOperation(requestChangesOp, input),
+  );
 export const useReplan = () =>
   useTaskMutation((input: { id: string; feedback: string }) => callOperation(replanOp, input));
 

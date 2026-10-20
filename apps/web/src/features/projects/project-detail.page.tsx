@@ -10,6 +10,7 @@ import { Panel } from '../../components/panel.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { PROJECTS_COPY as C } from '../../copy/projects.ts';
+import { HostingPanel } from './hosting-form.tsx';
 import { projectQuery, useDeleteProject, useUpdateProject } from './projects.queries.ts';
 
 const route = getRouteApi(ROUTE_IDS.project);
@@ -109,12 +110,7 @@ export function ProjectDetailPage() {
       </Panel>
       <section className="section">
         <Panel title={C.remote}>
-          <p>
-            {p.inferredHosting === null
-              ? C.remoteNone
-              : C.remoteInferred(p.inferredHosting.provider, p.inferredHosting.repo)}
-          </p>
-          <p className="hint">{C.remoteBindingLater}</p>
+          <HostingPanel key={`${p.id}:${p.updatedAt}`} project={p} />
         </Panel>
       </section>
       <section className="section">

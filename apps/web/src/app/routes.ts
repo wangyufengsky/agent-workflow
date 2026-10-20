@@ -9,6 +9,7 @@ export const ROUTES = {
   project: '/projects/$projectId',
   settings: '/settings',
   git: '/git',
+  gitProject: '/git/$projectId',
   workflows: '/workflows',
   roles: '/roles',
   databases: '/databases',
@@ -27,4 +28,5 @@ export const ROUTE_IDS = {
   projects: '/_shell/projects',
   project: '/_shell/projects/$projectId',
   runtime: '/_shell/runtime',
+  gitProject: '/_shell/git/$projectId',
 } as const;
