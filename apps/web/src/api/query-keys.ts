@@ -8,6 +8,7 @@ export const queryKeys = {
   runtime: ['system', 'runtime'],
   attempt: (id: string) => ['attempts', id],
   transcript: (id: string) => ['attempts', id, 'transcript'],
+  transcriptLive: (id: string) => ['attempts', id, 'transcript-live'],
   workflows: ['workflows'],
   workflow: (id: string) => ['workflows', id],
   workflowVersions: (key: string) => ['workflows', 'versions', key],

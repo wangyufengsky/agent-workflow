@@ -77,6 +77,8 @@ export const transcriptPageSchema = z.object({
   entries: z.array(transcriptEntrySchema),
   /** Highest seq in this page (the request's `afterSeq` when empty); pass it as the next `afterSeq`. */
   lastSeq: z.number(),
+  /** Lines after this page were already written: read on with `afterSeq = lastSeq`. */
+  hasMore: z.boolean(),
   /** The attempt has ended and this page reaches the end of its transcript. */
   done: z.boolean(),
 });

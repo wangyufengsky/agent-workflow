@@ -1,16 +1,17 @@
 import type { TranscriptEntry } from '@aw/shared';
 import { TranscriptEntryKind } from '@aw/shared';
-import { useQuery } from '@tanstack/react-query';
+import { memo } from 'react';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { ATTEMPT_COPY as C, TRANSCRIPT_SYSTEM_LABEL } from '../../copy/attempts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
-import { transcriptQuery } from './attempt.queries.ts';
+import { useTranscript } from './attempt.queries.ts';
 import styles from './transcript.module.css';
 
 const pretty = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value, null, 2));
 
-function Entry({ entry }: { entry: TranscriptEntry }) {
+/** Memoised: a live stream re-renders on every line, and Markdown is the costly part (M6-02). */
+const Entry = memo(function Entry({ entry }: { entry: TranscriptEntry }) {
   switch (entry.kind) {
     case TranscriptEntryKind.UserMessage:
       return (
@@ -62,19 +63,27 @@ function Entry({ entry }: { entry: TranscriptEntry }) {
         </p>
       );
   }
-}
+});
 
-/** Live session stream of one attempt (10 §3): loaded page by page, then extended by `attempt.transcript`. */
+/** Live session stream of one attempt (10 §3): shown from its first page on, then extended by `attempt.transcript`. */
 export function TranscriptView({ attemptId }: { attemptId: string }) {
-  const transcript = useQuery(transcriptQuery(attemptId));
-  if (transcript.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
-  if (transcript.isError) return <ErrorState error={transcript.error} onRetry={() => void transcript.refetch()} />;
-  if (transcript.data.entries.length === 0) return <p className="hint">{C.transcriptEmpty}</p>;
+  const { pages, entries } = useTranscript(attemptId);
+  if (pages.data === undefined) {
+    if (pages.isError) return <ErrorState error={pages.error} onRetry={() => void pages.refetch()} />;
+    return <p className="hint">{COMMON_COPY.loading}</p>;
+  }
+  if (entries.length === 0) return <p className="hint">{C.transcriptEmpty}</p>;
   return (
     <div className={styles.list} data-testid="transcript">
-      {transcript.data.entries.map((entry) => (
-        <Entry key={entry.seq} entry={entry} />
+      {entries.map((entry) => (
+        // A streaming part keeps its first position and key while its text grows.
+        <Entry key={'partId' in entry ? entry.partId : entry.seq} entry={entry} />
       ))}
+      {pages.isFetchNextPageError ? (
+        <ErrorState error={pages.error} onRetry={() => void pages.fetchNextPage()} />
+      ) : (
+        pages.hasNextPage && <p className="hint">{COMMON_COPY.loading}</p>
+      )}
     </div>
   );
 }

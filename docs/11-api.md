@@ -159,7 +159,7 @@ type TaskDetailDTO = {
 | POST | `/tasks/:id/nodes/:nodeId/retry` | `failed → ready`，`{ feedback? }` |
 | POST | `/tasks/:id/nodes/:nodeId/skip` 🅿 | `pending` / `ready` / `failed` → `skipped`，返回 `NodeDetailDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
 | GET | `/attempts/:id` | `AttemptDTO`；不存在 404 `ATTEMPT_NOT_FOUND` |
-| GET | `/attempts/:id/transcript?afterSeq` | `{ entries: TranscriptEntry[], lastSeq, done: boolean }`（非清单路由，10 §3）：`lastSeq` 为本页最大 seq（空页为请求的 `afterSeq`），`done` 表示尝试已结束且已读到末尾 |
+| GET | `/attempts/:id/transcript?afterSeq` | `{ entries: TranscriptEntry[], lastSeq, hasMore: boolean, done: boolean }`（非清单路由，10 §3）：`lastSeq` 为本页最大 seq（空页为请求的 `afterSeq`），`hasMore` 表示本页之后已有写入的行（以 `afterSeq = lastSeq` 继续读），`done` 表示尝试已结束且已读到末尾 |
 | POST | `/attempts/:id/abort` 🅿 | 中止进行中的尝试（节点按 `attempt_failed` 处理）；非 `running` 409 `STATE_TRANSITION_INVALID` |
 | POST | `/debug/attempts` | 仅开发构建（M2-09）：`{ directory, requirement, model? }` → 201 `AttemptDTO`；对 Git 目录发起一次不属于任务的 `execute` 尝试。目录不在 Git 仓库中 400 `PROJECT_PATH_NOT_GIT_REPO`；opencode 未就绪 503 `OPENCODE_NOT_READY` |
 
