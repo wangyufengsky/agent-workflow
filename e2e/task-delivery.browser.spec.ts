@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
+import { API_BASE, AUTH } from './env.ts';
 import {
   createProject,
   type E2EProject,
@@ -93,4 +94,73 @@ test('J6 两个任务改同一文件 → 第二个合并冲突 → 交给 AI 解
   await result.getByRole('button', { name: '合并到 main' }).click();
   await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main');
   expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe(resolved.trimEnd());
+});
+
+test('三个任务同时运行改同一文件：各自分支与工作区互不阻塞；依次合并，第二、三个冲突交给 AI 解决（01 §5 第 3 条）', async ({
+  page,
+  request,
+}) => {
+  const project = await createProject(request, null);
+  writeFileSync(join(project.repoPath, 'greet.ts'), 'export const greet = () => "hi";\n');
+  git(project.repoPath, 'add', '-A');
+  git(project.repoPath, 'commit', '-q', '-m', 'add greet');
+  const workflows = await (await request.get(`${API_BASE}/workflows`, { headers: AUTH })).json();
+  const bugfix = workflows.items.find((w: { key: string }) => w.key === 'bugfix');
+
+  // Drafts first, so each task's turns can be queued for its own worktree (named after the task key).
+  const words = ['你好', '您好', '早上好'];
+  const tasks: Array<{ id: string; key: string }> = [];
+  for (const word of words) {
+    const res = await request.post(`${API_BASE}/tasks`, {
+      headers: AUTH,
+      data: { projectId: project.id, workflowId: bugfix.id, requirement: `问候语改成${word}`, start: false },
+    });
+    const task = await res.json();
+    tasks.push(task);
+    await queueTurn(request, project, { title: '定位根因', taskKey: task.key }, [submitResult('找到了问候语')]);
+    // Each fix waits for a permission, so all three are in flight at once until the user answers.
+    await queueTurn(request, project, { title: '修复', taskKey: task.key }, [
+      { type: 'permission', permission: 'bash', patterns: [`echo ${word}`] },
+      { type: 'edit', file: 'greet.ts', content: `export const greet = () => "${word}";\n` },
+      submitResult(`改成了${word}`),
+    ]);
+    await queueTurn(request, project, { agent: 'aw-reviewer', taskKey: task.key }, [passReview]);
+  }
+  for (const task of tasks) await request.post(`${API_BASE}/tasks/${task.id}/start`, { headers: AUTH });
+
+  await page.goto('/inbox');
+  const permissions = page.getByTestId('inbox-permission');
+  await expect(permissions).toHaveCount(3);
+  for (const word of words) {
+    await permissions
+      .filter({ hasText: `echo ${word}` })
+      .getByRole('button', { name: '允许一次' })
+      .click();
+  }
+  const worktrees = git(project.repoPath, 'worktree', 'list', '--porcelain');
+  for (const task of tasks) expect(worktrees).toMatch(new RegExp(`^branch refs/heads/aw/${task.key}$`, 'm'));
+
+  let expected = 'hi';
+  for (const [i, task] of tasks.entries()) {
+    await page.goto(`/tasks/${task.id}`);
+    const result = page.getByTestId('result-card');
+    await result.getByRole('button', { name: '合并到 main' }).click();
+    if (i > 0) {
+      await expect(result.getByTestId('delivery-conflict')).toContainText('greet.ts');
+      const resolved = `${expected}，${words[i]}`;
+      await queueTurn(request, project, { title: '解决合并冲突', taskKey: task.key }, [
+        { type: 'edit', file: 'greet.ts', content: `export const greet = () => "${resolved}";\n` },
+        submitResult('保留了两边的改动'),
+      ]);
+      await result.getByRole('button', { name: '交给 AI 解决冲突' }).click();
+      await expect(result).not.toContainText('时有冲突');
+      await result.getByRole('button', { name: '合并到 main' }).click();
+      expected = resolved;
+    } else {
+      expected = words[0] ?? '';
+    }
+    await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main');
+    expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe(`export const greet = () => "${expected}";`);
+  }
+  expect(git(project.repoPath, 'worktree', 'list', '--porcelain').match(/^worktree /gm)).toHaveLength(1);
 });
