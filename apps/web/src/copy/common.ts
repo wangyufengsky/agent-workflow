@@ -1,6 +1,7 @@
 export const COMMON_COPY = {
   loading: '正在加载…',
   retry: '重试',
+  loadMore: '加载更多',
   cancel: '取消',
   close: '关闭',
   save: '保存',
@@ -11,7 +12,5 @@ export const COMMON_COPY = {
   proOnlyTitle: '此页面属于专业模式',
   proOnlyBody: '开启专业模式后可以使用流程编排、Git 管理台、角色与数据库等功能。',
   enablePro: '开启专业模式',
-  comingSoonTitle: '即将推出',
-  comingSoonBody: '这个页面会在后续版本中提供。',
   themeSwitch: '切换主题',
 } as const;

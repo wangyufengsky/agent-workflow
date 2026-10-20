@@ -1,0 +1,33 @@
+.hostRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 12px;
+}
+
+.hostRow > :global(.field) + :global(.field) {
+  margin-top: 0;
+}
+
+.ok {
+  font-size: 13px;
+  color: var(--ok);
+}
+
+.table {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+}
+
+.columns {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.columns td {
+  padding: 4px 8px 4px 0;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}

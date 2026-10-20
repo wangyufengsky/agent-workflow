@@ -1,4 +1,4 @@
-import type { ProjectDetailDTO } from '@aw/shared';
+import { type ProjectDetailDTO, UiMode } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, useState } from 'react';
@@ -9,7 +9,10 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
+import { DATABASES_COPY } from '../../copy/databases.ts';
 import { PROJECTS_COPY as C } from '../../copy/projects.ts';
+import { ProjectDatabases } from '../databases/project-databases.tsx';
+import { useSettings } from '../settings/settings.queries.ts';
 import { HostingPanel } from './hosting-form.tsx';
 import { projectQuery, useDeleteProject, useUpdateProject } from './projects.queries.ts';
 
@@ -81,6 +84,7 @@ export function ProjectDetailPage() {
   const remove = useDeleteProject();
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState(false);
+  const pro = useSettings()['ui.mode'] === UiMode.Pro;
 
   if (project.isPending) return <p className="page hint">{COMMON_COPY.loading}</p>;
   if (project.isError) {
@@ -113,6 +117,13 @@ export function ProjectDetailPage() {
           <HostingPanel key={`${p.id}:${p.updatedAt}`} project={p} />
         </Panel>
       </section>
+      {pro && (
+        <section className="section">
+          <Panel title={DATABASES_COPY.projectSection}>
+            <ProjectDatabases key={`${p.id}:${p.dbConnectionIds.join(',')}`} project={p} />
+          </Panel>
+        </section>
+      )}
       <section className="section">
         <Button variant="danger" icon="trash" onClick={() => setConfirming(true)}>
           {C.delete}

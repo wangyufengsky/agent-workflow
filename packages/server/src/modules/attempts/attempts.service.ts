@@ -121,6 +121,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       return attempt === undefined ? undefined : toDto(attempt);
     },
     roleIdOf: (attemptId: string): string | null => mustFind(attemptId).roleId,
+    usesRole: (roleId: string): boolean => repo.hasRole(roleId),
 
     /**
      * Creates the session and sends the first message (12 §4.1); the attempt is then `running`. The attempt row is

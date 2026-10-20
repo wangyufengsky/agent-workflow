@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   AppError,
+  EDITABLE_NODE_STATUSES,
   ErrorCode,
   isTerminalState,
   type NodeDetailDTO,
@@ -81,14 +82,10 @@ export function createNodesService(deps: NodesServiceDeps) {
 
   const runner = createNodeRunner(deps, { repo, get, move });
 
-  function insert(input: Omit<MaterializeInput, 'graph'>, spec: PlanNodeSpec, position: number): Node {
-    const id = randomUUID();
-    const now = clock.now();
-    repo.insert({
-      id,
-      taskId: input.taskId,
+  /** The node a plan step defines, as stored (acceptance resolved for the project and the task's checkpoints). */
+  function definitionOf(input: Omit<MaterializeInput, 'graph'>, spec: PlanNodeSpec, position: number) {
+    return {
       planId: input.planId,
-      key: spec.key,
       title: spec.title,
       roleId: roles.getByKey(spec.roleKey).id,
       instructions: spec.instructions,
@@ -99,11 +96,22 @@ export function createNodesService(deps: NodesServiceDeps) {
         input.acceptEachNode,
       ),
       kind: spec.kind ?? NodeKind.Normal,
+      position,
+    };
+  }
+
+  function insert(input: Omit<MaterializeInput, 'graph'>, spec: PlanNodeSpec, position: number): Node {
+    const id = randomUUID();
+    const now = clock.now();
+    repo.insert({
+      id,
+      taskId: input.taskId,
+      key: spec.key,
+      ...definitionOf(input, spec, position),
       status: spec.dependsOn.length === 0 ? NodeStatus.Ready : NodeStatus.Pending,
       attemptCount: 0,
       retryFeedback: null,
       commitSha: null,
-      position,
       createdAt: now,
       updatedAt: now,
       startedAt: null,
@@ -120,6 +128,7 @@ export function createNodesService(deps: NodesServiceDeps) {
     /** All nodes of the tasks, for the scheduler. */
     listByTasks: (taskIds: readonly string[]): Node[] => repo.listByTasks(taskIds),
     listByTask: (taskId: string): Node[] => repo.listByTask(taskId),
+    usesRole: (roleId: string): boolean => repo.hasRole(roleId),
 
     detail(taskId: string, nodeId: string): NodeDetailDTO {
       const node = get(nodeId);
@@ -170,6 +179,46 @@ export function createNodesService(deps: NodesServiceDeps) {
       publish(node);
       return node;
     },
+
+    /**
+     * Applies a newer confirmed plan version of a paused task (09 §2): steps that have not started take their new
+     * definition, new steps are created and removed ones deleted; started steps only move to their new position. The
+     * caller has checked that started steps are unchanged (`lockedChanges`).
+     */
+    rematerialize(input: MaterializeInput): void {
+      const existing = new Map(repo.listByTask(input.taskId).map((n) => [n.key, n]));
+      const keys = new Set(input.graph.nodes.map((n) => n.key));
+      const touched = unit.transact(() => {
+        for (const node of existing.values()) {
+          if (keys.has(node.key)) continue;
+          if (!EDITABLE_NODE_STATUSES.includes(node.status)) throw new Error(`Started node ${node.key} was removed`);
+          repo.delete(node.id);
+        }
+        const now = clock.now();
+        const nodes = input.graph.nodes.map((spec, position) => {
+          const node = existing.get(spec.key);
+          if (node === undefined) return insert(input, spec, position);
+          if (EDITABLE_NODE_STATUSES.includes(node.status)) {
+            repo.redefine(node.id, { ...definitionOf(input, spec, position), updatedAt: now });
+          } else repo.setPosition(node.id, position);
+          return get(node.id);
+        });
+        const finished = new Set(
+          nodes.filter((n) => n.status === NodeStatus.Done || n.status === NodeStatus.Skipped).map((n) => n.key),
+        );
+        // A ready step that now depends on unfinished work waits again; the scheduler releases it (`deps_met`).
+        // `move` publishes the steps it changes; the others are returned to be published here.
+        return nodes.filter((n) => {
+          const waits = n.status === NodeStatus.Ready && !n.dependsOn.every((key) => finished.has(key));
+          if (waits) move(n, NodeEvent.DepsUnmet);
+          return !waits;
+        });
+      });
+      for (const node of touched) publish(node);
+    },
+
+    /** Pro mode (09 §3): a skipped step counts as finished for the steps depending on it. */
+    skip: (nodeId: string): Node => move(get(nodeId), NodeEvent.Skip, undefined, { finishedAt: clock.now() }),
 
     /** `deps_met`: every dependency is done or skipped. */
     markReady: (nodeId: string): Node => move(get(nodeId), NodeEvent.DepsMet),

@@ -1,20 +1,22 @@
 import { type InboxItemDTO, InboxStatus } from '@aw/shared';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ROUTES } from '../../app/routes.ts';
+import { Button } from '../../components/button.tsx';
 import { EmptyState } from '../../components/empty-state.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { INBOX_COPY as C } from '../../copy/tasks.ts';
 import { tasksQuery } from '../tasks/tasks.queries.ts';
-import { inboxQuery } from './inbox.queries.ts';
+import { inboxPagesQuery } from './inbox.queries.ts';
 import { InboxCard } from './inbox-card.tsx';
 
 /** Open items grouped by task (14 §3.6). */
 export function InboxPage() {
-  const items = useQuery(inboxQuery({ status: InboxStatus.Open }));
+  const pages = useInfiniteQuery(inboxPagesQuery({ status: InboxStatus.Open }));
+  const items = pages.data?.pages.flatMap((page) => page.items);
   const tasks = useQuery(tasksQuery());
-  const groups = Map.groupBy(items.data ?? [], (item: InboxItemDTO) => item.taskId ?? '');
+  const groups = Map.groupBy(items ?? [], (item: InboxItemDTO) => item.taskId ?? '');
   return (
     <div className="page">
       <div className="page-head">
@@ -23,9 +25,9 @@ export function InboxPage() {
           <p className="lede">{C.lede}</p>
         </div>
       </div>
-      {items.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
-      {items.isError && <ErrorState error={items.error} onRetry={() => void items.refetch()} />}
-      {items.data?.length === 0 && <EmptyState icon="inbox" title={C.empty} body={C.emptyBody} />}
+      {pages.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
+      {pages.isError && <ErrorState error={pages.error} onRetry={() => void pages.refetch()} />}
+      {items?.length === 0 && <EmptyState icon="inbox" title={C.empty} body={C.emptyBody} />}
       {[...groups].map(([taskId, group]) => {
         const task = tasks.data?.find((t) => t.id === taskId);
         return (
@@ -45,6 +47,13 @@ export function InboxPage() {
           </section>
         );
       })}
+      {pages.hasNextPage && (
+        <div className="row">
+          <Button pending={pages.isFetchingNextPage} onClick={() => void pages.fetchNextPage()}>
+            {COMMON_COPY.loadMore}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

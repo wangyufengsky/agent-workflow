@@ -9,7 +9,7 @@
 - 成功：`200` 返回资源或 `{ items, nextCursor }`；创建返回 `201`；无内容返回 `204`。
 - 失败：`{ "error": { "code", "message", "details"? } }`，状态码见 [08 §5](08-enums-and-errors.md#5-错误码)。
 - 命令型操作（start / cancel / deliver…）用 `POST /资源/:id/<动词>`，返回操作后的完整资源 DTO，前端直接用它更新缓存。
-- 分页：`?limit=<1..100，默认 50>&cursor=<不透明字符串>`。
+- 分页：`?limit=<1..LIST_PAGE_MAX，默认 LIST_PAGE_DEFAULT>&cursor=<不透明字符串>`，响应 `{ items, nextCursor }`（`nextCursor` 为空即最后一页）；任务与「需要你处理」列表用上一页最后一项的排序键做游标（keyset），列表在两页之间变化时不重复也不跳过未变的项。
 - 不做幂等键与回执：本地同步事务，重复点击由状态机拒绝（`STATE_TRANSITION_INVALID`），前端按钮在请求期间禁用。
 
 标记：🅿 = 仅专业模式界面使用（API 本身不区分模式）。
@@ -22,7 +22,7 @@
 | POST | `/system/environment/recheck` | 重新检测（安装 opencode 后用） |
 | GET | `/system/runtime` | `RuntimeDTO`：opencode 状态、路径、版本；`ready` 时含地址与启动时间 |
 | POST | `/system/runtime/restart` | `ready` 时重启，`stopped` / `crashed` 时启动（活动尝试 → `interrupted`）；返回启动结束后的 `RuntimeDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
-| GET | `/system/runtime/logs?tail=500` 🅿 | opencode 日志末尾若干行 |
+| GET | `/system/runtime/logs?tail=500` 🅿 | 最新一天 opencode 日志（`<数据目录>/logs/opencode-YYYYMMDD.log`）的末尾 `tail` 行（默认 `RUNTIME_LOG_TAIL_DEFAULT`，至多 `RUNTIME_LOG_TAIL_MAX`）：`{ file, lines }`；还没有日志时 `{ file: null, lines: [] }` |
 | GET | `/system/storage` | 数据目录占用 |
 | GET | `/settings` | 全部设置 `Record<SettingKey, value>` |
 | PATCH | `/settings` | 部分更新；按 key 的 schema 校验 |
@@ -51,12 +51,12 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | --- | --- | --- |
 | GET | `/projects` | `{ items: ProjectDTO[] }`（按添加时间） |
 | POST | `/projects` | `{ repoPath, name? }` → 201 `ProjectDetailDTO`；`repoPath` 须为仓库根目录的绝对路径（子目录、非仓库、不存在 → 400 `PROJECT_PATH_NOT_GIT_REPO`），读取默认分支（`origin/HEAD`，否则当前分支；HEAD 游离且无 `origin/HEAD` → 400 `GIT_BASE_BRANCH_NOT_FOUND`），推断检查命令（13 §1） |
-| GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting`；关联数据库（M5）、活动任务数（M3）随对应模块加入 |
+| GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting` + 关联的数据库连接 `dbConnectionIds`（M5-07） |
 | PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand?: string \| null }`；分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND` |
 | DELETE | `/projects/:id` | 有非终态任务时 409 `PROJECT_HAS_ACTIVE_TASKS` |
 | PUT | `/projects/:id/hosting` | `{ provider, baseUrl?, repo, token }`（`token` 为凭据字段）→ `ProjectDetailDTO`；保存前调用平台 API 读取该仓库验证令牌（令牌无效或看不到仓库 401 `HOSTING_AUTH_FAILED`，其他失败 502 `HOSTING_API_ERROR`），通过后加密保存（再次绑定替换原令牌）。GitHub 忽略 `baseUrl`；GitLab 不填即 gitlab.com |
 | DELETE | `/projects/:id/hosting` | 解除绑定并删除凭据 → `ProjectDetailDTO`；删除项目时同样删除其凭据 |
-| PUT | `/projects/:id/db-connections` 🅿 | `{ connectionIds: string[] }` 覆盖关联 |
+| PUT | `/projects/:id/db-connections` 🅿 | `{ connectionIds: string[] }` 覆盖关联 → `ProjectDetailDTO`；不存在的连接 404 `DB_CONNECTION_NOT_FOUND`。项目的 AI 会话只能用关联的连接（12 §6.9） |
 
 远端 `repo` 默认从 `git remote get-url origin` 推断（`inferredHosting`：`github.com` → GitHub，其他主机 → GitLab，非 `gitlab.com` 时 `baseUrl = https://<host>`），前端预填。
 
@@ -66,27 +66,29 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | --- | --- | --- |
 | GET | `/workflows` | 最新版本列表（按流程首次加入的顺序；内置流程在前） |
 | GET | `/workflows/:id` | 某版本详情（含 `definition`） |
-| GET | `/workflows/by-key/:key/versions` 🅿 | 版本历史 |
-| POST | `/workflows` 🅿 | 新建自定义流程 `{ key, name, description, planning, deliverable, definition }`；或 `{ copyFrom: workflowId, key, name }` |
-| PUT | `/workflows/:id` 🅿 | `{ name?, description?, definition? }`；产生新版本，返回新版本；内置流程 409 `WORKFLOW_READONLY` |
-| DELETE | `/workflows/by-key/:key` 🅿 | 仅自定义；已被任务引用的版本保留（标记删除，不在列表出现） |
-| POST | `/workflows/validate` 🅿 | 校验定义，返回 `{ problems[] }`（编辑器实时校验用） |
+| GET | `/workflows/by-key/:key/versions` 🅿 | 版本历史（新的在前，含已删除流程被任务保留的版本）；没有该 key 404 `WORKFLOW_NOT_FOUND` |
+| POST | `/workflows` 🅿 | 新建自定义流程 `{ key, name, description?, planning, deliverable, definition }`；或 `{ copyFrom: workflowId, key, name, description? }`（可复制内置流程）→ 201 `WorkflowDTO`（`kind=custom`）。`key` 为 `DEFINITION_KEY_PATTERN`（`[a-z][a-z0-9_]{0,39}`），已被列出的流程使用 409 `WORKFLOW_ALREADY_EXISTS`；定义按 08 §5.4 校验，失败 400 `WORKFLOW_DEFINITION_INVALID`。版本号接在该 key 已有版本之后 |
+| PUT | `/workflows/:id` 🅿 | `{ name?, description?, definition? }`；校验后产生新版本，返回新版本；运行中的任务继续用旧版本；内置流程 409 `WORKFLOW_READONLY` |
+| DELETE | `/workflows/by-key/:key` 🅿 | 仅自定义（内置 409 `WORKFLOW_READONLY`）→ 204；已被任务引用的版本保留但不再列出（`is_latest` 全部置否），其余版本删除 |
+| POST | `/workflows/validate` 🅿 | `{ planning, definition }` → `{ problems[] }`（08 §5.4；编辑器保存前校验） |
 | GET | `/roles` | 列表 |
-| POST | `/roles` 🅿 | 新建或 `{ copyFrom }` |
+| POST | `/roles` 🅿 | 新建 `{ key, name, description?, baseAgent, prompt, model? }` 或复制 `{ copyFrom: roleId, key, name, ... }`（可复制内置角色）→ 201 `RoleDTO`；key 已存在 409 `ROLE_ALREADY_EXISTS` |
 | PUT | `/roles/:id` 🅿 | `{ name?, description?, prompt?, model? }`；内置 409 `ROLE_READONLY` |
-| DELETE | `/roles/:id` 🅿 | 被最新版流程引用时 409 `ROLE_IN_USE` |
+| DELETE | `/roles/:id` 🅿 | 内置 409 `ROLE_READONLY`；被列出的流程（最新版本的允许角色、规划者、必经步骤、模板）引用，或被任务的步骤与会话使用过 → 409 `ROLE_IN_USE`；成功 204 |
+
+删除流程与角色需要知道任务的使用情况，由 tasks 模块实现（同删除项目）。
 
 ## 5. 任务
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/tasks?projectId&status&displayGroup&limit` | `{ items: TaskSummaryDTO[] }`，按 `updatedAt` 倒序，最多 `limit`（默认 50，≤ 100）条；v1 不分页 |
+| GET | `/tasks?projectId&status&displayGroup&limit&cursor` | `{ items: TaskSummaryDTO[], nextCursor }`，按 `updatedAt`（同时按编号）倒序分页（§1，`LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX`）；`displayGroup` 在查询中过滤（由 `resolveTaskDisplayGroup` 推出每个状态与是否有打开的提问 / 权限 / 验收条目的组合），每页都是满的；游标为上一页最后一个任务的 `<updatedAt>.<seq>`，格式不对 400 `VALIDATION_FAILED` |
 | POST | `/tasks` | 创建，见下 |
 | GET | `/tasks/:id` | `TaskDetailDTO` |
 | GET | `/tasks/:id/timeline?afterId` | `{ items: TaskEventDTO[] }`：`id > afterId` 的 `task_events`，按 id 升序 |
 | POST | `/tasks/:id/start` | `draft → preparing` |
-| POST | `/tasks/:id/pause` 🅿 | `running → paused` |
-| POST | `/tasks/:id/resume` 🅿 | `paused → running` |
+| POST | `/tasks/:id/pause` 🅿 | `running → paused`：不再派发新步骤，进行中的步骤继续 |
+| POST | `/tasks/:id/resume` 🅿 | `paused → running`；未确认的调整草稿被取代 |
 | POST | `/tasks/:id/retry` | `failed → <failedPhase>` |
 | POST | `/tasks/:id/cancel` | `{ keepBranch?: boolean }` |
 | POST | `/tasks/:id/request-changes` | `{ reason: 'user' \| 'conflict', feedback? }`；`review → running`，追加「按反馈修改」或「解决合并冲突」节点（13 §4）。`user` 必须带 `feedback`；`conflict` 要求最近一次交付为 `conflict`；否则 400 `VALIDATION_FAILED` |
@@ -146,16 +148,16 @@ type TaskDetailDTO = {
 | --- | --- | --- |
 | GET | `/tasks/:id/plans` | 版本列表（`PlanDTO` 不含 graph） |
 | GET | `/tasks/:id/plans/:version` | 某版本完整内容 |
-| POST | `/tasks/:id/plan/confirm` | `{ version }`；`plan_review → running`，或暂停调整中确认草稿 |
+| POST | `/tasks/:id/plan/confirm` | `{ version }`；`plan_review → running`，或暂停调整中确认草稿（重新物化，见 09 §2；任务保持 `paused`，已开始的节点期间被改动 409 `NODE_NOT_EDITABLE`）。`version` 不是当前草稿 → 409 `PLAN_VERSION_CONFLICT` |
 | POST | `/tasks/:id/plan/replan` | `{ feedback }`；`plan_review → planning`（AI 在原规划会话中按反馈修改） |
-| PUT | `/tasks/:id/plan/draft` 🅿 | `{ baseVersion, graph }`；用户编辑产生新草稿版本（`source=user`）。`plan_review` 时任意编辑；`paused` 时只能改动未开始的节点，否则 409 `NODE_NOT_EDITABLE`；`baseVersion` 不是最新版本 → 409 `PLAN_VERSION_CONFLICT`。返回新 `PlanDTO` 或 400 `PLAN_INVALID` |
+| PUT | `/tasks/:id/plan/draft` 🅿 | `{ baseVersion, graph }`；用户编辑产生新草稿版本（`source=user`，沿用基础版本的说明与假设，取代原草稿）。`plan_review` 时任意编辑（「需要你处理」中的确认确认的是当前草稿）；`paused` 时只能改动、删除未开始的节点（`details.nodes` 列出被改动的已开始节点），否则 409 `NODE_NOT_EDITABLE`；`baseVersion` 不是最新版本 → 409 `PLAN_VERSION_CONFLICT`；其他状态 409 `STATE_TRANSITION_INVALID`。校验与计划画布相同：`validatePlanGraph(graph, planEditRules(definition, base))`（允许角色另含计划中已有的角色，如系统节点的 developer），失败 400 `PLAN_INVALID`。返回新 `PlanDTO` |
 | GET | `/tasks/:id/nodes/:nodeId` | `NodeDetailDTO`：定义、状态、结果、检查结果、尝试列表、提交 sha、本节点 diff 统计 |
 | GET | `/tasks/:id/nodes/:nodeId/diff` | 本节点提交的 diff 文件列表 `DiffDTO`（`commit_sha^..commit_sha`，在项目仓库中读取，worktree 删除后仍可用）；没有提交的节点 `{ base: null, files: [] }` |
 | GET | `/tasks/:id/nodes/:nodeId/diff/file?path=` | 本节点提交中单文件的 unified diff `FileDiffDTO`；没有提交 → 404 `NOT_FOUND` |
 | POST | `/tasks/:id/nodes/:nodeId/accept` | `awaiting_acceptance → done` |
 | POST | `/tasks/:id/nodes/:nodeId/reject` | `{ feedback }`；→ `ready` |
 | POST | `/tasks/:id/nodes/:nodeId/retry` | `failed → ready`，`{ feedback? }` |
-| POST | `/tasks/:id/nodes/:nodeId/skip` 🅿 | |
+| POST | `/tasks/:id/nodes/:nodeId/skip` 🅿 | `pending` / `ready` / `failed` → `skipped`，返回 `NodeDetailDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
 | GET | `/attempts/:id` | `AttemptDTO`；不存在 404 `ATTEMPT_NOT_FOUND` |
 | GET | `/attempts/:id/transcript?afterSeq` | `{ entries: TranscriptEntry[], lastSeq, done: boolean }`（非清单路由，10 §3）：`lastSeq` 为本页最大 seq（空页为请求的 `afterSeq`），`done` 表示尝试已结束且已读到末尾 |
 | POST | `/attempts/:id/abort` 🅿 | 中止进行中的尝试（节点按 `attempt_failed` 处理）；非 `running` 409 `STATE_TRANSITION_INVALID` |
@@ -179,7 +181,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/inbox?status&taskId` | `{ items: InboxItemDTO[] }`，按创建时间倒序；`/inbox/count` 返回 `{ open }` 用于徽标 |
+| GET | `/inbox?status&taskId&limit&cursor` | `{ items: InboxItemDTO[], nextCursor }`，按创建时间（同时按 id）倒序分页（§1）；`/inbox/count` 返回 `{ open }` 用于徽标 |
 | POST | `/inbox/:id/resolve` | `{ response }`，`response` 为对应 kind 的回应（见 10 §inbox_items；`question` 只接受 `{ answer }`）；不符合该 kind 400 `VALIDATION_FAILED`；已关闭 409 `INBOX_ITEM_CLOSED`；回答问题时 opencode 未就绪 503 `OPENCODE_NOT_READY`（条目保持打开） |
 | POST | `/inbox/:id/dismiss` | 仅 `failure` / `delivery` 可忽略 |
 
@@ -207,18 +209,20 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/db-connections` | 列表（不含密码） |
-| POST | `/db-connections` | `{ name, type, host, port, database, username, password, tls }` |
-| PATCH | `/db-connections/:id` | 可改密码（传 `password` 时） |
-| DELETE | `/db-connections/:id` | |
-| POST | `/db-connections/:id/test` | `{ ok, serverVersion?, error? }` |
-| GET | `/db-connections/:id/schema` | 表与列（只读浏览） |
+| GET | `/db-connections` | `{ items: DbConnectionDTO[] }`（`{ id, name, type, host, port, database, username, tls, createdAt, updatedAt }`，不含密码） |
+| POST | `/db-connections` | `{ name, type, host, port, database, username, password, tls }`（`password` 为凭据字段，可为空串）→ 201；密码经 credentials 模块加密保存；名称已被使用 409 `DB_CONNECTION_ALREADY_EXISTS`（AI 的工具按名称找连接） |
+| PATCH | `/db-connections/:id` | 部分字段；传 `password` 时替换密码 |
+| DELETE | `/db-connections/:id` | 204；删除密码，项目关联随之删除 |
+| POST | `/db-connections/:id/test` | `{ ok, serverVersion, error }`：连接并读取 `VERSION()`；连不上时 `ok: false`、`error` 为驱动信息（不作为 HTTP 错误） |
+| GET | `/db-connections/:id/schema` | `{ tables: Array<{ name, comment?, rows?, columns: Array<{ name, type, nullable, key?, default?, comment? }> }> }`（只读浏览） |
+
+每次访问数据库都单独建立连接、用完关闭（连接超时 `DB_CONNECT_TIMEOUT_MS`）；连不上 502 `DB_CONNECTION_FAILED`（`details.driverMessage`）。
 
 ## 10. MCP 工具清单与操作清单
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/mcp/tools` 🅿 | 执行 MCP 的工具名、说明、输入 schema（JSON Schema）、允许的尝试类型 |
+| GET | `/mcp/tools` 🅿 | `{ items: Array<{ name, description, inputSchema, allowedKinds }> }`：执行 MCP 的工具名、说明、输入 JSON Schema（不含注入的会话参数）、允许的尝试类型；与 `tools/list` 同序 |
 | GET | `/operations?expose=palette` | `{ items: OperationInfo[] }`：命令面板可用的操作（`expose.palette` 且非 critical）：id、标题 key、说明、风险、最低模式、method、path、输入 JSON Schema；不带 `expose` 返回全部 |
 
 ## 11. SSE 事件

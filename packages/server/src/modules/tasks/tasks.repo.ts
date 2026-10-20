@@ -9,7 +9,7 @@ import {
   type TaskStatus,
   taskResultSchema,
 } from '@aw/shared';
-import { and, desc, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, notInArray, or, type SQL, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { projectsTable } from '../projects/index.ts';
 import { workflowsTable } from '../workflows/index.ts';
@@ -61,6 +61,9 @@ function serialize(changes: TaskChanges) {
   };
 }
 
+/** A task status, and whether the task must (`with`) or must not (`without`) have open attention items. */
+export type StatusMatch = { status: TaskStatus; attention: 'with' | 'without' | 'any' };
+
 export function createTasksRepo(db: DbExecutor) {
   const t = tasksTable;
   const select = (where: SQL | undefined) =>
@@ -101,6 +104,51 @@ export function createTasksRepo(db: DbExecutor) {
         ),
       )
         .orderBy(desc(t.updatedAt), desc(t.seq))
+        .all()
+        .map(toTask);
+    },
+    /** The workflow versions among `ids` that some task uses. */
+    workflowsInUse(ids: readonly string[]): Set<string> {
+      if (ids.length === 0) return new Set();
+      return new Set(
+        db
+          .select({ id: t.workflowId })
+          .from(t)
+          .where(inArray(t.workflowId, ids))
+          .all()
+          .map((r) => r.id),
+      );
+    },
+    /**
+     * One page of the list, most recently updated first (11 §1): `after` is where the previous page ended. `oneOf`
+     * keeps tasks that match any entry: a status, and whether the task is in `attention` (or either).
+     */
+    page(filter: {
+      projectId: string | undefined;
+      oneOf: readonly StatusMatch[] | undefined;
+      attention: ReadonlySet<string>;
+      after: { updatedAt: number; seq: number } | undefined;
+      limit: number;
+    }): Task[] {
+      const ids = [...filter.attention];
+      const statusMatch = filter.oneOf?.flatMap(({ status, attention }) => {
+        if (attention === 'any') return [eq(t.status, status)];
+        if (attention === 'with') return ids.length === 0 ? [] : [and(eq(t.status, status), inArray(t.id, ids))];
+        return [ids.length === 0 ? eq(t.status, status) : and(eq(t.status, status), notInArray(t.id, ids))];
+      });
+      const { after } = filter;
+      return select(
+        and(
+          ...(filter.projectId === undefined ? [] : [eq(t.projectId, filter.projectId)]),
+          // No status can match: an empty page, not every task.
+          ...(statusMatch === undefined ? [] : [statusMatch.length === 0 ? sql`0` : or(...statusMatch)]),
+          ...(after === undefined
+            ? []
+            : [or(lt(t.updatedAt, after.updatedAt), and(eq(t.updatedAt, after.updatedAt), lt(t.seq, after.seq)))]),
+        ),
+      )
+        .orderBy(desc(t.updatedAt), desc(t.seq))
+        .limit(filter.limit)
         .all()
         .map(toTask);
     },

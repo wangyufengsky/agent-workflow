@@ -18,6 +18,7 @@ import {
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
 import type { CredentialsService } from '../credentials/index.ts';
+import type { DatabasesService } from '../databases/index.ts';
 import { branchExists, readDefaultBranch, readOriginUrl, readRepoRoot } from '../git/index.ts';
 import { createHostingProvider, type GitHostingProvider, type HostingEndpoints } from '../hosting/index.ts';
 import { inferRepoCheckCommand, parseRemoteUrl } from './projects.inference.ts';
@@ -27,6 +28,7 @@ export type ProjectsServiceDeps = {
   db: Db;
   clock: Clock;
   credentials: CredentialsService;
+  databases: DatabasesService;
   /** Platform API addresses (FakeHosting in tests). */
   hosting: HostingEndpoints;
 };
@@ -57,7 +59,7 @@ async function resolveRepoRoot(repoPath: string): Promise<string> {
   return root;
 }
 
-export function createProjectsService({ db, clock, credentials, hosting }: ProjectsServiceDeps) {
+export function createProjectsService({ db, clock, credentials, databases, hosting }: ProjectsServiceDeps) {
   const repo = createProjectsRepo(db);
 
   function require(id: string): ProjectDTO {
@@ -68,7 +70,11 @@ export function createProjectsService({ db, clock, credentials, hosting }: Proje
 
   async function detail(project: ProjectDTO): Promise<ProjectDetailDTO> {
     const origin = await readOriginUrl(project.repoPath);
-    return { ...project, inferredHosting: origin === undefined ? null : parseRemoteUrl(origin) };
+    return {
+      ...project,
+      inferredHosting: origin === undefined ? null : parseRemoteUrl(origin),
+      dbConnectionIds: databases.linkedIds(project.id),
+    };
   }
 
   return {
@@ -141,6 +147,13 @@ export function createProjectsService({ db, clock, credentials, hosting }: Proje
       if (existing !== null) await credentials.replace(existing, token);
       repo.setHosting(id, { ...ref, credentialId }, clock.now());
       return detail(require(id));
+    },
+
+    /** Replaces the connections the project's AI sessions may query (11 §3). */
+    setDbConnections(id: string, connectionIds: readonly string[]): Promise<ProjectDetailDTO> {
+      const project = require(id);
+      databases.setProjectLinks(id, connectionIds);
+      return detail(project);
     },
 
     async clearHosting(id: string): Promise<ProjectDetailDTO> {

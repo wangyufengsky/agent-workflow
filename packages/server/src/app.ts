@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { loadBuiltinRoles, loadBuiltinWorkflows, loadPrompts } from '@aw/builtin';
-import { MCP_EXEC_PATH } from '@aw/shared';
+import { DB_QUERY_TIMEOUT_MS, MCP_EXEC_PATH } from '@aw/shared';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
 import type { DestinationStream } from 'pino';
@@ -23,6 +23,7 @@ import {
   createCredentialsModule,
   unavailableCipher,
 } from './modules/credentials/index.ts';
+import { createDatabasesModule, mysqlDriver } from './modules/databases/index.ts';
 import { createDebugModule } from './modules/debug/index.ts';
 import { createDeliveryModule } from './modules/delivery/index.ts';
 import { createRepoLocks } from './modules/git/index.ts';
@@ -61,6 +62,8 @@ export type AppDeps = {
   opencode?: OpencodeClient;
   /** GitHub / GitLab API addresses (FakeHosting in tests); the public platforms by default. */
   hosting?: HostingEndpoints;
+  /** Time limit of the AI's database queries; tests shorten `DB_QUERY_TIMEOUT_MS`. */
+  dbQueryTimeoutMs?: number;
 };
 
 export type App = {
@@ -137,16 +140,25 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     if (hosting) await runtime.startIfStopped();
   };
   const system = createSystemModule({ config, env, runtime, opencode, startRuntime: startHostedRuntime });
+  const databases = createDatabasesModule({
+    db: database.db,
+    clock,
+    log,
+    credentials: credentials.service,
+    driver: mysqlDriver,
+    queryTimeoutMs: deps.dbQueryTimeoutMs ?? DB_QUERY_TIMEOUT_MS,
+  });
   const projects = createProjectsModule({
     db: database.db,
     clock,
     credentials: credentials.service,
+    databases: databases.service,
     hosting: deps.hosting ?? PUBLIC_HOSTING,
   });
   // Built-in roles and workflows of this app version are written on every start (13).
   const roles = createRolesModule({ db: database.db, clock, log });
   roles.service.syncBuiltin(loadBuiltinRoles(config.promptsDir));
-  const workflows = createWorkflowsModule({ db: database.db, clock, log });
+  const workflows = createWorkflowsModule({ db: database.db, clock, log, roles: roles.service });
   workflows.service.syncBuiltin(loadBuiltinWorkflows(config.promptsDir));
   const inbox = createInboxModule({ db: database.db, unit, clock, log });
   const attempts = createAttemptsModule({
@@ -209,6 +221,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     attempts: attempts.service,
     inbox: inbox.service,
     deliveries: deliveries.service,
+    databases: databases.service,
     locks,
     dataDir: config.dataDir,
   });
@@ -242,6 +255,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...settings.operations,
     ...system.operations,
     ...projects.operations,
+    ...databases.operations,
     ...roles.operations,
     ...workflows.operations,
     ...tasks.operations,
@@ -249,6 +263,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...inbox.operations,
     ...attempts.operations,
     ...repository.operations,
+    ...mcp.operations,
     // The debug entry exists in development builds only (M2-09).
     ...(config.nodeEnv === 'production' ? [] : debug.operations),
   ]);

@@ -5,6 +5,9 @@ import {
   AskUserStatus,
   type AttemptDTO,
   AttemptKind,
+  type DbDescribeOutput,
+  type DbQueryInput,
+  type DbQueryOutput,
   ErrorCode,
   InboxKind,
   InboxStatus,
@@ -28,11 +31,19 @@ const QUEUED_INSTRUCTION = {
 
 /** What the execution MCP tools read about the attempt's task (12 §6.1–6.3, 6.7). */
 export function createTaskContext(deps: TasksServiceDeps, state: TaskState) {
-  const { inbox, nodes, plans, worktrees, workflows, roles, projects } = deps;
+  const { inbox, nodes, plans, worktrees, workflows, roles, projects, databases } = deps;
 
   function taskOf(attempt: AttemptDTO): Task {
     if (attempt.taskId === null) throw new Error(`Attempt ${attempt.id} belongs to no task`);
     return state.get(attempt.taskId);
+  }
+
+  /** The project whose database connections an attempt may use; a debug attempt has none. */
+  function projectOf(attempt: AttemptDTO): string {
+    if (attempt.taskId === null) {
+      throw new AppError(ErrorCode.DbConnectionNotFound, 'This session belongs to no project with databases');
+    }
+    return taskOf(attempt).projectId;
   }
 
   function readyWorktree(task: Task) {
@@ -161,8 +172,24 @@ export function createTaskContext(deps: TasksServiceDeps, state: TaskState) {
               },
             }
           : {}),
-        databases: [],
+        databases: databases.forProject(task.projectId).map((c) => ({ name: c.name, type: c.type })),
       };
+    },
+
+    /** `db_list_connections` (12 §6.9); a debug attempt belongs to no project and sees none. */
+    dbConnections(attempt: AttemptDTO) {
+      const connections = attempt.taskId === null ? [] : databases.forProject(taskOf(attempt).projectId);
+      return { connections: connections.map((c) => ({ name: c.name, type: c.type, database: c.database })) };
+    },
+
+    /** `db_describe` (12 §6.10). */
+    dbDescribe(attempt: AttemptDTO, connection: string, table: string | undefined): Promise<DbDescribeOutput> {
+      return databases.describe(projectOf(attempt), connection, table);
+    },
+
+    /** `db_query` (12 §6.11). */
+    dbQuery(attempt: AttemptDTO, { connection, sql, limit }: DbQueryInput): Promise<DbQueryOutput> {
+      return databases.query(projectOf(attempt), connection, sql, limit);
     },
 
     /** `get_node_output` (12 §6.2). */

@@ -3,6 +3,7 @@ import {
   createProjectOp,
   getProjectOp,
   listProjectsOp,
+  setProjectDbConnectionsOp,
   setProjectHostingOp,
   updateProjectOp,
 } from '@aw/shared';
@@ -16,6 +17,7 @@ export function projectsOperations(projects: ProjectsService) {
     implement(createProjectOp, (input) => projects.create(input)),
     implement(getProjectOp, ({ id }) => projects.get(id)),
     implement(updateProjectOp, (input) => projects.update(input)),
+    implement(setProjectDbConnectionsOp, ({ id, connectionIds }) => projects.setDbConnections(id, connectionIds)),
     implement(setProjectHostingOp, (input) => projects.setHosting(input)),
     implement(clearProjectHostingOp, ({ id }) => projects.clearHosting(id)),
   ];

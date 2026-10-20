@@ -49,7 +49,9 @@ export async function createProject(request: APIRequestContext, checkCommand: st
 export type FakeStep =
   | { type: 'edit'; file: string; content: string }
   | { type: 'callTool'; name: string; args: Record<string, unknown> }
-  | { type: 'permission'; permission: string; patterns: string[] };
+  | { type: 'permission'; permission: string; patterns: string[] }
+  /** Keeps working until the session is aborted. */
+  | { type: 'hang' };
 
 export const submitResult = (summary: string): FakeStep => ({
   type: 'callTool',

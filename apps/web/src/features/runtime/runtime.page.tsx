@@ -1,6 +1,7 @@
-import { RuntimeStatus, STATUS_TONE } from '@aw/shared';
+import { RUNTIME_LOG_TAIL_DEFAULT, RuntimeStatus, STATUS_TONE } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
+import { useState } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -12,7 +13,49 @@ import { AttemptView } from '../attempts/attempt-view.tsx';
 import { CopyCommand } from '../onboarding/copy-command.tsx';
 import { environmentQuery } from '../onboarding/environment.queries.ts';
 import { DebugAttemptForm } from './debug-attempt-form.tsx';
-import { runtimeQuery, useRestartRuntime } from './runtime.queries.ts';
+import styles from './runtime.module.css';
+import { runtimeLogsQuery, runtimeQuery, useRestartRuntime } from './runtime.queries.ts';
+
+/** Line counts offered for the log tail. */
+const LOG_TAILS = [200, 500, 2000] as const;
+
+function LogsPanel() {
+  const [tail, setTail] = useState<number>(RUNTIME_LOG_TAIL_DEFAULT);
+  const logs = useQuery(runtimeLogsQuery(tail));
+  return (
+    <Panel
+      title={C.logs}
+      actions={
+        <span className="row">
+          <label className="hint" htmlFor="log-tail">
+            {C.logsTail}
+          </label>
+          <select id="log-tail" className="select" value={tail} onChange={(e) => setTail(Number(e.target.value))}>
+            {LOG_TAILS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+          <Button size="sm" icon="refresh" pending={logs.isFetching} onClick={() => void logs.refetch()}>
+            {C.logsRefresh}
+          </Button>
+        </span>
+      }
+    >
+      {logs.isError && <ErrorState error={logs.error} onRetry={() => void logs.refetch()} />}
+      {logs.data?.file === null && <p className="hint">{C.logsEmpty}</p>}
+      {logs.data !== undefined && logs.data.file !== null && (
+        <div className="col">
+          <span className="hint mono">{C.logsFile(logs.data.file)}</span>
+          <pre className={styles.logs} data-testid="runtime-logs">
+            {logs.data.lines.join('\n')}
+          </pre>
+        </div>
+      )}
+    </Panel>
+  );
+}
 
 const route = getRouteApi(ROUTE_IDS.runtime);
 
@@ -114,6 +157,7 @@ export function RuntimePage() {
       <div className="stack">
         <RuntimePanel />
         <ModelsPanel />
+        <LogsPanel />
         {import.meta.env.DEV && (
           <>
             <DebugAttemptForm onStarted={(id) => void navigate({ search: { attempt: id } })} />

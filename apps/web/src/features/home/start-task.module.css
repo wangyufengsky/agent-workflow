@@ -51,3 +51,13 @@
   align-items: center;
   gap: 12px;
 }
+
+.more {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.more[open] {
+  padding-bottom: 4px;
+}

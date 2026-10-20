@@ -42,6 +42,14 @@ export const HOME_TASK_COPY = {
   inProgress: '进行中',
   recent: '最近完成',
   noneInProgress: '没有进行中的任务。',
+  moreOptions: '更多选项',
+  title: '标题',
+  titlePlaceholder: '默认取需求的第一行',
+  baseBranch: '基于分支',
+  defaultBranch: '项目默认分支',
+  acceptEachNode: '每个步骤由我验收',
+  askOnUncertainty: '不确定时停下来问我',
+  saveDraft: '保存草稿',
 } as const;
 
 export const TASKS_COPY = {
@@ -59,6 +67,24 @@ export const TASK_COPY = {
   meta: (key: string, project: string, workflow: string) => `${key} · ${project} · ${workflow}`,
   doing: (step: string) => `正在：${step}`,
   showDetails: '显示详细信息',
+  startDraft: '开始',
+  draft: '草稿：还没有开始，开始后会建立独立工作区。',
+  hideDetails: '隐藏详细信息',
+  pause: '暂停',
+  paused: '任务已暂停：进行中的步骤会做完，不会开始新的步骤',
+  resume: '继续执行',
+  resumed: '已继续执行',
+  // 编辑计划（专业）
+  editPlan: '编辑计划',
+  saveEdits: '保存修改',
+  cancelEdits: '放弃修改',
+  planSaved: (v: number) => `已保存为第 ${v} 版`,
+  adjustPlan: '调整计划',
+  adjustHint: '只能修改还没开始的步骤；保存后确认调整才会生效，任务继续保持暂停。',
+  draftPending: (v: number) => `有未确认的调整（第 ${v} 版）`,
+  confirmAdjust: '确认调整',
+  adjusted: '计划已调整',
+  resumeDiscards: '继续执行会放弃未确认的调整。',
   cancel: '取消任务',
   cancelTitle: '取消这个任务？',
   cancelBody: 'AI 会话会被中止，独立工作区和分支会被删除，已经完成的改动不会保留。',
@@ -101,7 +127,14 @@ export const TASK_COPY = {
   sideNode: '步骤',
   sideNodeEmpty: '点击画布中的步骤查看摘要。',
   viewNode: '查看详情',
+  viewNodePage: '完整详情',
   attempts: (n: number) => `尝试 ${n} 次`,
+  skip: '跳过',
+  skipped: '已跳过这个步骤',
+  retryNode: '重跑',
+  retriedNode: '已重新开始这个步骤',
+  abort: '中止',
+  aborted: '已中止这次尝试',
 } as const;
 
 export const NODE_COPY = {
@@ -124,6 +157,14 @@ export const NODE_COPY = {
   noAttempt: '这一步还没有开始。',
   follow: '跟随最新',
   attemptOf: (n: number) => `第 ${n} 次尝试`,
+} as const;
+
+export const NODE_PAGE_COPY = {
+  back: (key: string, title: string) => `← ${key} · ${title}`,
+  attempts: '尝试',
+  attempt: (kind: string, seq: number) => `${kind} #${seq}`,
+  actions: '操作',
+  instructions: '指令',
 } as const;
 
 export const INBOX_COPY = {

@@ -1,4 +1,11 @@
-import { getEnvironmentOp, getHealthOp, getRuntimeOp, recheckEnvironmentOp, restartRuntimeOp } from '@aw/shared';
+import {
+  getEnvironmentOp,
+  getHealthOp,
+  getRuntimeLogsOp,
+  getRuntimeOp,
+  recheckEnvironmentOp,
+  restartRuntimeOp,
+} from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
 import type { SystemService } from './system.service.ts';
 
@@ -9,5 +16,6 @@ export function systemOperations(system: SystemService) {
     implement(recheckEnvironmentOp, () => system.recheck()),
     implement(getRuntimeOp, () => system.runtime()),
     implement(restartRuntimeOp, () => system.restartRuntime()),
+    implement(getRuntimeLogsOp, ({ tail }) => system.runtimeLogs(tail)),
   ];
 }

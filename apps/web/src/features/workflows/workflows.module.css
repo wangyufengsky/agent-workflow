@@ -1,0 +1,44 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+.roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.problems {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.versions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.readonlyCanvas {
+  height: 420px;
+}
+
+/* Fields side by side: the stacked-field spacing of base.css does not apply across columns. */
+.fieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.fieldGrid > :global(.field) + :global(.field) {
+  margin-top: 0;
+}

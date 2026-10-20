@@ -1,55 +1,13 @@
 import { type Settings, themePreferenceSchema, UiMode } from '@aw/shared';
-import { useState } from 'react';
+import { ErrorState } from '../../components/error-state.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { SETTINGS_COPY as C } from '../../copy/settings.ts';
 import { THEME_LABEL } from '../../copy/themes.ts';
+import { ProSettings } from './pro-settings.tsx';
+import { NumberSetting, Segmented } from './setting-inputs.tsx';
 import { useSettings, useUpdateSettings } from './settings.queries.ts';
 
-function Segmented<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: ReadonlyArray<{ value: T; label: string }>;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <fieldset className="seg">
-      <legend className="sr">{label}</legend>
-      {options.map((o) => (
-        <button key={o.value} type="button" aria-pressed={o.value === value} onClick={() => onChange(o.value)}>
-          {o.label}
-        </button>
-      ))}
-    </fieldset>
-  );
-}
-
-function ConcurrencyInput({ value, onCommit }: { value: number; onCommit: (n: number) => void }) {
-  const [text, setText] = useState(String(value));
-  const commit = () => {
-    const n = Number(text);
-    if (Number.isInteger(n) && n >= 1) onCommit(n);
-    else setText(String(value));
-  };
-  return (
-    <input
-      id="concurrency"
-      className="input narrow"
-      type="number"
-      min={1}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => e.key === 'Enter' && commit()}
-    />
-  );
-}
-
-/** Simple-mode settings (14 §3.7); pro-only keys (SETTING_MODE) come with M5-08. */
+/** Settings (14 §3.7): the simple ones, and in pro mode the pro keys of `SETTING_MODE` (M5-08). */
 export function SettingsPage() {
   const settings = useSettings();
   const update = useUpdateSettings();
@@ -109,14 +67,17 @@ export function SettingsPage() {
             <label className="label" htmlFor="concurrency">
               {C.concurrency}
             </label>
-            <ConcurrencyInput
+            <NumberSetting
               key={settings['scheduler.maxConcurrentAttempts']}
+              id="concurrency"
               value={settings['scheduler.maxConcurrentAttempts']}
               onCommit={(n) => set({ 'scheduler.maxConcurrentAttempts': n })}
             />
             <p className="hint">{C.concurrencyHint}</p>
           </div>
         </Panel>
+        {isPro && <ProSettings settings={settings} set={set} />}
+        {update.isError && <ErrorState error={update.error} />}
       </div>
     </div>
   );

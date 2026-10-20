@@ -10,6 +10,9 @@ export const McpToolName = {
   SubmitReview: 'submit_review',
   AskUser: 'ask_user',
   ReportProgress: 'report_progress',
+  DbListConnections: 'db_list_connections',
+  DbDescribe: 'db_describe',
+  DbQuery: 'db_query',
 } as const;
 export type McpToolName = (typeof McpToolName)[keyof typeof McpToolName];
 

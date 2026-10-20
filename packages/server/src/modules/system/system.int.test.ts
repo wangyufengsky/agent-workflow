@@ -1,8 +1,14 @@
 import { execFileSync } from 'node:child_process';
-import { chmod, mkdtemp, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getEnvironmentOp, OPENCODE_VERSION, recheckEnvironmentOp, updateSettingsOp } from '@aw/shared';
+import {
+  getEnvironmentOp,
+  getRuntimeLogsOp,
+  OPENCODE_VERSION,
+  recheckEnvironmentOp,
+  updateSettingsOp,
+} from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 
@@ -73,5 +79,21 @@ describe('环境检测', () => {
     const { body } = await t.call(getEnvironmentOp, {});
     expect(body.git).toEqual({ installed: false });
     expect(body.ready).toBe(false);
+  });
+});
+
+describe('运行环境日志（M5-08）', () => {
+  it('返回最新一天 opencode 日志的末尾若干行；还没有日志时为空', async () => {
+    await appWithPath({ git: true });
+    expect((await t.call(getRuntimeLogsOp, {})).body).toEqual({ file: null, lines: [] });
+    const logs = join(t.dataDir, 'logs');
+    await mkdir(logs, { recursive: true });
+    await writeFile(join(logs, 'opencode-20261019.log'), 'old\n');
+    await writeFile(join(logs, 'opencode-20261020.log'), 'one\ntwo\nthree\n');
+    await writeFile(join(logs, 'app-20261021.log'), 'not opencode\n');
+    expect((await t.call(getRuntimeLogsOp, { tail: 2 })).body).toEqual({
+      file: 'opencode-20261020.log',
+      lines: ['two', 'three'],
+    });
   });
 });

@@ -85,7 +85,10 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
         }
         case InboxKind.Plan: {
           const decision = parseInput(planResponseSchema, response);
-          if ('confirmed' in decision) lifecycle.confirmPlan(taskOf(item), item.payload.version);
+          // The draft under review may be the user's edit of the item's version (M5-01).
+          const draft = deps.plans.draft(taskOf(item));
+          if (draft === undefined) throw new Error(`Plan item ${item.id} has no draft to confirm`);
+          if ('confirmed' in decision) lifecycle.confirmPlan(taskOf(item), draft.version);
           else lifecycle.replan(taskOf(item), decision.replanFeedback);
           break;
         }
@@ -104,6 +107,20 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
           });
       }
       return inbox.get(id);
+    },
+
+    /** A custom workflow goes; the versions tasks use stay for them, unlisted (11 §4). */
+    deleteWorkflow(key: string): void {
+      deps.workflows.remove(key, (ids) => state.repo.workflowsInUse(ids));
+    },
+
+    /** A custom role goes unless a listed workflow names it or a task step or session used it (ROLE_IN_USE). */
+    deleteRole(id: string): void {
+      roles.delete(id, (role) => {
+        const workflows = deps.workflows.usingRole(role.key);
+        const usedByTasks = nodes.usesRole(role.id) || attempts.usesRole(role.id);
+        return workflows.length > 0 || usedByTasks ? { workflows, usedByTasks } : null;
+      });
     },
 
     /** Deleting a project deletes its finished tasks and their records (10 §5). */

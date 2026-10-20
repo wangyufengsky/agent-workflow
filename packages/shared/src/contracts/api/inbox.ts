@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LIST_PAGE_DEFAULT, LIST_PAGE_MAX } from '../../constants/limits.ts';
 import { InboxKind, inboxStatusSchema, permissionDecisionSchema } from '../../enums/inbox.ts';
 import { taskFailedPhaseSchema } from '../../enums/task.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
@@ -90,7 +91,13 @@ export const inboxResolveResponseSchema = z.union([
   failureResponseSchema,
 ]);
 
+/** Opaque to clients: where the previous page ended (`<createdAt>.<id>` of its last item). */
+export const inboxCursorSchema = z.string().regex(/^\d+\.[0-9a-f-]+$/);
+
 export const listInboxQuerySchema = z.object({
   status: inboxStatusSchema.optional(),
   taskId: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(LIST_PAGE_MAX).default(LIST_PAGE_DEFAULT),
+  cursor: inboxCursorSchema.optional(),
 });
+export type ListInboxQuery = z.infer<typeof listInboxQuerySchema>;

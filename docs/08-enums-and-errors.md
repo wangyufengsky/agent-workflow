@@ -167,12 +167,15 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ACCEPTANCE_OUTPUT_MAX_CHARS` | 20000（验收命令输出保留末尾这么多字符） |
 | `DB_QUERY_MAX_ROWS` | 200 |
 | `DB_QUERY_TIMEOUT_MS` | 15000 |
+| `DB_CONNECT_TIMEOUT_MS` | 10000（建立到项目数据库的连接） |
 | `TRANSCRIPT_PAGE_SIZE` | 200 |
 | `TRANSCRIPT_TEXT_FLUSH_CHARS` | 200（流式文本每增长这么多字符写一次会话流） |
 | `REPORT_PROGRESS_MAX_CHARS` | 200 |
 | `RESULT_SUMMARY_MAX_CHARS` | 4000 |
 | `SSE_REPLAY_BUFFER` | 1000（条） |
 | `DIFF_FILE_MAX_BYTES` | 1048576（超过显示「文件过大」） |
+| `RUNTIME_LOG_TAIL_DEFAULT` / `RUNTIME_LOG_TAIL_MAX` | 500 / 5000（运行环境日志页的行数） |
+| `LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX` | 50 / 100（任务与「需要你处理」列表每页条数，11 §1） |
 
 ### 4.3 用户设置（`constants/settings.ts`，键 → 默认值）
 
@@ -245,10 +248,12 @@ class AppError extends Error {
 | **流程 / 角色** | | |
 | `WORKFLOW_NOT_FOUND` | 404 | |
 | `WORKFLOW_READONLY` | 409 | 修改内置流程 |
-| `WORKFLOW_DEFINITION_INVALID` | 400 | `details.problems[]` |
+| `WORKFLOW_DEFINITION_INVALID` | 400 | `details.problems[]`，子码见 5.4 |
+| `WORKFLOW_ALREADY_EXISTS` | 409 | 新建 / 复制流程时 key 已被列出的流程使用 |
 | `ROLE_NOT_FOUND` | 404 | |
 | `ROLE_READONLY` | 409 | |
-| `ROLE_IN_USE` | 409 | 删除被流程引用的角色 |
+| `ROLE_IN_USE` | 409 | 删除被流程引用或被任务步骤 / 会话使用过的角色；`details: { workflows[], usedByTasks }` |
+| `ROLE_ALREADY_EXISTS` | 409 | 新建 / 复制角色时 key 已存在 |
 | **任务 / 计划 / 节点** | | |
 | `TASK_NOT_FOUND` | 404 | |
 | `PLAN_NOT_FOUND` | 404 | |
@@ -278,7 +283,8 @@ class AppError extends Error {
 | `DELIVERY_TARGET_DIRTY` | 409 | 目标分支检出在某个工作区（通常是用户的主工作区）且有未提交改动，拒绝合并；`details: { path, branch, files[] }` |
 | `DELIVERY_INTERRUPTED` | — | 应用在交付过程中退出（记录在 delivery 上，重启后任务回到 `review`） |
 | **数据库** | | |
-| `DB_CONNECTION_NOT_FOUND` | 404 | |
+| `DB_CONNECTION_NOT_FOUND` | 404 | 不存在，或（MCP 工具）不是任务项目关联的连接 |
+| `DB_CONNECTION_ALREADY_EXISTS` | 409 | 连接名称已被使用（MCP 工具按名称找连接） |
 | `DB_CONNECTION_FAILED` | 502 | `details.driverMessage` |
 | `DB_QUERY_REJECTED` | 400 | 非只读语句 |
 | `DB_QUERY_TIMEOUT` | 504 | |
@@ -301,3 +307,15 @@ class AppError extends Error {
 | `MISSING_REQUIRED_STEP` | 缺少流程要求的必经步骤；`details.requiredStep` | 补上该步骤 |
 | `REQUIRED_STEP_ORDER` | 必经步骤位置不符（`first` 须被所有节点传递依赖，`last` 须传递依赖所有节点） | 调整 depends_on |
 | `INSTRUCTIONS_TOO_LONG` | 指令超长 | 精简 |
+
+### 5.4 流程定义校验子码（`WORKFLOW_DEFINITION_INVALID.details.problems[].code`）
+
+枚举 `WorkflowProblemCode`（`shared/errors/workflow-problems.ts`）；校验函数 `validateWorkflowDefinition({ planning, definition }, roles)` 位于 `shared/workflow`，流程编排器与后端（`POST /workflows/validate`、新建、修改）共用。每项带 `field`（`allowedRoles` / `plannerRole` / `template` / `requiredSteps`）。固定流程的模板按 5.3 的计划校验（允许角色为流程的 `allowedRoles`，无必经步骤），必经步骤检查重复 key（`DUPLICATE_KEY`）、角色是否允许（`UNKNOWN_ROLE`）、指令长度（`INSTRUCTIONS_TOO_LONG`），这些沿用 5.3 的子码。
+
+| 子码 | 含义 |
+| --- | --- |
+| `NO_ALLOWED_ROLES` | 允许的角色为空 |
+| `ROLE_NOT_FOUND` | 允许列表或规划者中的角色不存在；`details.role` |
+| `MISSING_PLANNER` | AI 规划流程没有规划者角色 |
+| `PLANNER_ROLE_INVALID` | 规划者角色的 `base_agent` 不是 `planner` |
+| `MISSING_TEMPLATE` | 固定流程没有模板 |

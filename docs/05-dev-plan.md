@@ -102,6 +102,8 @@
 
 ## M5 · 专业模式（2 周）
 
+> 状态：**已完成**（2026-10-20）。与计划的差异与补充：暂停调整只能改动 / 删除 `pending`、`ready` 的节点，确认后按 key 重新物化（就地改写，保留尝试历史；新事件 `deps_unmet` 让多了未完成依赖的 `ready` 节点回到 `pending`），任务保持暂停，`resume` 时未确认的草稿被取代（D55）；计划画布与后端共用 `planEditRules` + `validatePlanGraph` + `lockedChanges`，依赖也可在步骤面板勾选（D56）；`plan_review` 中用户编辑的草稿取代 AI 草稿，「需要你处理」中的确认确认当前草稿。流程与角色的复制、新建、删除随 M5-05 / M5-06：删除由 tasks 模块实现，被任务用过的流程版本保留但不再列出，用过的角色不能删除（D57）；流程定义校验 `validateWorkflowDefinition`（08 §5.4）编辑器与后端共用；新增错误码 `WORKFLOW_ALREADY_EXISTS`、`ROLE_ALREADY_EXISTS`、`DB_CONNECTION_ALREADY_EXISTS`。数据库只读查询另外拒绝可执行注释、`INTO` 与加锁子句，每次访问单独连接（D58）；集成测试用 Docker 中的 MySQL 8.4（`test/helpers/mysql.ts`，`pnpm verify` 需要本机 Docker，镜像先 `docker pull mysql:8.4`）；项目详情加 `dbConnectionIds`，`PUT /projects/:id/db-connections` 由 projects 模块实现。M5-08 新增 `GET /system/runtime/logs` 与 `GET /mcp/tools` 两个操作。M5-10 复核操作标注：`inbox.resolve` 改为 critical、`system.recheckEnvironment` 改为 write（D59），`tasks.create` 进入命令面板（打开主页表单）。任务页的专业视图也可在简单模式下用「显示详细信息」临时打开，完整步骤页两种模式都能访问（D60）。M3 推迟的任务与 inbox 列表分页随本里程碑完成（游标分页，任务页与「需要你处理」页「加载更多」）。E2E 新增 J7、J8、步骤操作冒烟、⌘K 冒烟与「简单模式打开专业页面」。
+
 | # | 任务 | 完成标准 |
 | --- | --- | --- |
 | M5-01 | 计划编辑画布：增删节点、连线、字段面板、前端实时校验（shared 校验函数）、保存草稿、确认 | E2E：J7 |

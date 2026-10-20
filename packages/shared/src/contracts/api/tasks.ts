@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { REQUIREMENT_MAX_CHARS, TASK_TITLE_MAX_CHARS } from '../../constants/limits.ts';
+import {
+  LIST_PAGE_DEFAULT,
+  LIST_PAGE_MAX,
+  REQUIREMENT_MAX_CHARS,
+  TASK_TITLE_MAX_CHARS,
+} from '../../constants/limits.ts';
 import { worktreeStatusSchema } from '../../enums/git.ts';
 import {
   AcceptanceCheckKind,
@@ -121,6 +126,14 @@ export type PlanSummaryDTO = z.infer<typeof planSummarySchema>;
 export const planSchema = planSummarySchema.extend({ graph: planGraphSchema });
 export type PlanDTO = z.infer<typeof planSchema>;
 
+/** `PUT /tasks/:id/plan/draft` (11 §6): a user-edited plan, based on the task's latest plan version. */
+export const saveDraftPlanRequestSchema = z.object({
+  id: z.string(),
+  baseVersion: z.number().int().min(1),
+  graph: planGraphSchema,
+});
+export type SaveDraftPlanRequest = z.infer<typeof saveDraftPlanRequestSchema>;
+
 /** Result card data, written when the task reaches review (M3-10). */
 export const taskResultSchema = z.object({
   /** Composed from the node summaries; for report workflows, the report itself. */
@@ -180,6 +193,8 @@ export const taskDetailSchema = taskSummarySchema.extend({
   }),
   /** The confirmed plan; while `plan_review`, the draft waiting for confirmation. */
   plan: planSchema.nullable(),
+  /** While `paused`: the adjusted plan waiting for confirmation (M5-02). */
+  draftPlan: planSchema.nullable(),
   nodes: z.array(nodeSummarySchema),
   activeAttempts: z.array(attemptSummarySchema),
   openInbox: z.array(inboxItemSchema),
@@ -189,12 +204,17 @@ export const taskDetailSchema = taskSummarySchema.extend({
 });
 export type TaskDetailDTO = z.infer<typeof taskDetailSchema>;
 
+/** Opaque to clients: where the previous page ended (`<updatedAt>.<seq>` of its last task). */
+export const taskCursorSchema = z.string().regex(/^\d+\.\d+$/);
+
 export const listTasksQuerySchema = z.object({
   projectId: z.string().optional(),
   status: taskStatusSchema.optional(),
   displayGroup: taskDisplayGroupSchema.optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  limit: z.coerce.number().int().min(1).max(LIST_PAGE_MAX).default(LIST_PAGE_DEFAULT),
+  cursor: taskCursorSchema.optional(),
 });
+export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
 
 /** One `task_events` row (10 §task_events). */
 export const taskEventSchema = z.object({

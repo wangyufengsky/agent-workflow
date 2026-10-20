@@ -38,3 +38,7 @@ export const BASH_PERMISSION_PRESETS = {
   [BashPolicy.Auto]: [bash('*', 'allow'), bash('git *', 'deny'), ...GIT_READONLY.map((p) => bash(p, 'allow'))],
   [BashPolicy.Ask]: [bash('*', 'ask'), ...BASH_READONLY.map((p) => bash(p, 'allow'))],
 } as const satisfies Record<'readonly' | BashPolicy, readonly PermissionRule[]>;
+
+/** Daily opencode log files in `<data dir>/logs` (03 §7): `opencode-YYYYMMDD.log`. */
+export const opencodeLogFile = (date: string) => `opencode-${date}.log`;
+export const OPENCODE_LOG_FILE_PATTERN = /^opencode-\d{8}\.log$/;

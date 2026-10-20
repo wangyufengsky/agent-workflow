@@ -119,7 +119,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 
 工具名在 opencode 中显示为 `agent-workflow_<name>`（名称常量 `McpToolName`）。输入/输出 schema 位于 `shared/contracts/mcp/<tool>.ts`；下文用 TS 类型描述。
 
-M3 实现了除数据库工具（M5-07）以外的全部工具。调试尝试（开发构建，不属于任务）仍可用 `get_task_context`（返回任务编号 `DEBUG`）、`report_progress`、`submit_result`（直接使尝试 `succeeded`，返回 `next: 'done'`）。
+M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07。调试尝试（开发构建，不属于任务）仍可用 `get_task_context`（返回任务编号 `DEBUG`）、`report_progress`、`submit_result`（直接使尝试 `succeeded`，返回 `next: 'done'`）；调试尝试不属于任何项目，`db_list_connections` 返回空列表，其他数据库工具返回 `DB_CONNECTION_NOT_FOUND`。
 
 ---
 
@@ -252,16 +252,23 @@ M3 实现了除数据库工具（M5-07）以外的全部工具。调试尝试（
 
 ### 6.10 `db_describe`
 
-输入：`{ connection: string; table?: string }`
-输出：无 table 时 `{ tables: Array<{ name; comment?; rows?: number }> }`；有 table 时 `{ columns: Array<{ name; type; nullable; key?; default?; comment? }>, indexes: Array<{ name; columns: string[]; unique: boolean }> }`
+输入：`{ connection: string; table?: string }`（`connection` 为连接名称，须是任务项目关联的连接）
+输出：无 table 时 `{ tables: Array<{ name; comment?; rows?: number }> }`（`rows` 为服务器的估计值）；有 table 时 `{ columns: Array<{ name; type; nullable; key?; default?; comment? }>, indexes: Array<{ name; columns: string[]; unique: boolean }> }`（`type` 为完整列类型如 `varchar(64)`，索引按名称排序）
 错误：`DB_CONNECTION_NOT_FOUND`、`DB_CONNECTION_FAILED`、`VALIDATION_FAILED`（表不存在）。
 
 ### 6.11 `db_query`
 
-输入：`{ connection: string; sql: string; limit?: number }`（limit ≤ `DB_QUERY_MAX_ROWS`）
-行为：只允许单条 `SELECT` / `SHOW` / `DESCRIBE` / `EXPLAIN`（解析首关键字并拒绝多语句）；在 `START TRANSACTION READ ONLY` 中执行；超时 `DB_QUERY_TIMEOUT_MS`；结果截断到 limit。
+输入：`{ connection: string; sql: string; limit?: number }`（limit ≤ `DB_QUERY_MAX_ROWS`，默认即上限）
+行为（只读的四道关，`modules/databases`）：
+
+1. **单条语句**：`databases.sql.ts` 的 `assertReadOnlySql` 去掉字符串、引号标识符与注释后检查：只允许末尾一个分号；`/*! … */` 可执行注释直接拒绝。驱动连接关闭 `multipleStatements`。
+2. **首关键字白名单**：`SELECT` / `SHOW` / `DESCRIBE`（`DESC`）/ `EXPLAIN`（允许前导括号）；另拒绝仍会写入或加锁的子句：`INTO`（`INTO OUTFILE` 写服务器文件、`INTO @var`）、`FOR UPDATE` / `FOR SHARE`、`LOCK IN SHARE MODE`。不符合 → `DB_QUERY_REJECTED`。
+3. **只读事务**：每次查询独立连接，`START TRANSACTION READ ONLY` 中执行（例如调用会写入的函数被服务器以 1792 拒绝，映射为 `DB_QUERY_REJECTED`），结束后关闭连接。
+4. **行数与时间**：流式读取，读满 limit 即停止并关闭连接（`truncated: true`）；`SET SESSION MAX_EXECUTION_TIME = DB_QUERY_TIMEOUT_MS`（服务器中断 SELECT，3024）并以稍长的客户端超时兜住其他语句 → `DB_QUERY_TIMEOUT`。
+
+值按 JSON 返回：日期为字符串，`BIGINT` / `DECIMAL` 为字符串（可能超出 JSON 数字精度），二进制为 `0x` 开头的十六进制（最多 64 字节）。
 输出：`{ columns: string[], rows: unknown[][], truncated: boolean, elapsedMs: number }`
-错误：`DB_QUERY_REJECTED`、`DB_QUERY_TIMEOUT`、`DB_QUERY_FAILED`、`DB_CONNECTION_FAILED`。
+错误：`DB_QUERY_REJECTED`、`DB_QUERY_TIMEOUT`、`DB_QUERY_FAILED`（`details.driverMessage`）、`DB_CONNECTION_FAILED`、`DB_CONNECTION_NOT_FOUND`。
 
 ## 7. 实现结构
 

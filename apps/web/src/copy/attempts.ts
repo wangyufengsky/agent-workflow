@@ -34,6 +34,11 @@ export const ATTEMPT_COPY = {
   nudges: '提醒次数',
   tokens: '用量',
   tokenUsage: (input: number, output: number) => `输入 ${input} · 输出 ${output} tokens`,
+  cost: '成本',
+  costValue: (usd: number) => `$${usd.toFixed(4)}`,
+  time: '时间',
+  timeRange: (start: number, end: number | null) =>
+    `${new Date(start).toLocaleString()} → ${end === null ? '进行中' : new Date(end).toLocaleTimeString()}`,
   error: '错误',
   abort: '中止',
   transcript: '会话流',

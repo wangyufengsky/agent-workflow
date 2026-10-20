@@ -1,6 +1,8 @@
 import { AcceptanceCheckKind, AttemptKind, type CheckResult, type NodeDetailDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
+import { ROUTES } from '../../app/routes.ts';
 import { DiffBrowser } from '../../components/diff/diff-browser.tsx';
 import { Drawer } from '../../components/drawer.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -8,7 +10,7 @@ import { Markdown } from '../../components/markdown.tsx';
 import { StatusBadge } from '../../components/status-badge.tsx';
 import { Tabs } from '../../components/tabs.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
-import { NODE_COPY as C } from '../../copy/tasks.ts';
+import { NODE_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
 import { TranscriptView } from '../attempts/transcript-view.tsx';
 import { NodeBadge } from '../tasks/task-badge.tsx';
 import { nodeDiffFileQuery, nodeDiffQuery, nodeQuery } from '../tasks/tasks.queries.ts';
@@ -43,7 +45,8 @@ function Check({ check }: { check: CheckResult }) {
   );
 }
 
-function Output({ node }: { node: NodeDetailDTO }) {
+/** A step's result, assumptions, notes and checks (14 §3.4「产出」). */
+export function Output({ node }: { node: NodeDetailDTO }) {
   const { result } = node;
   return (
     <div className="col">
@@ -85,7 +88,8 @@ function Output({ node }: { node: NodeDetailDTO }) {
   );
 }
 
-function Changes({ node }: { node: NodeDetailDTO }) {
+/** A step's listed changes and its commit's diff (14 §3.4「改动」). */
+export function Changes({ node }: { node: NodeDetailDTO }) {
   const changes = node.result?.changes ?? [];
   const diff = useQuery(nodeDiffQuery(node.taskId, node.id));
   return (
@@ -140,14 +144,16 @@ function Process({ node }: { node: NodeDetailDTO }) {
   );
 }
 
-/** Step details in a drawer (14 §3.4): output, changes, process. */
+/** Step details in a drawer (14 §3.4): output, changes, process; the pro view links to the full page (M5-04). */
 export function NodeDrawer({
   taskId,
   nodeId,
+  pro,
   onClose,
 }: {
   taskId: string;
   nodeId: string | undefined;
+  pro: boolean;
   onClose: () => void;
 }) {
   const node = useQuery({ ...nodeQuery(taskId, nodeId ?? ''), enabled: nodeId !== undefined });
@@ -164,7 +170,12 @@ export function NodeDrawer({
         <div className="col">
           <span className="row">
             <NodeBadge status={node.data.status} />
-            <span className="hint">{node.data.roleName}</span>
+            <span className="hint grow">{node.data.roleName}</span>
+            {pro && (
+              <Link to={ROUTES.node} params={{ taskId, nodeId: node.data.id }} search={{}} className="btn secondary sm">
+                {TASK_COPY.viewNodePage}
+              </Link>
+            )}
           </span>
           <Tabs
             items={[

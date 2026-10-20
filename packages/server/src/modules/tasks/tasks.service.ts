@@ -3,12 +3,16 @@ import {
   type ChangeRequestReason,
   type CreateTaskRequest,
   type DeliverRequest,
+  type ListTasksQuery,
   type NodeDetailDTO,
+  type PlanDTO,
+  type PlanGraph,
   type ResultNext,
+  resolveTaskDisplayGroup,
   ServerEventType,
   type SubmitResultInput,
+  TASK_STATUSES,
   type TaskDetailDTO,
-  type TaskDisplayGroup,
   TaskStatus,
   type TaskSummaryDTO,
 } from '@aw/shared';
@@ -20,6 +24,7 @@ import { createTaskContext } from './tasks.context.ts';
 import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
+import type { StatusMatch } from './tasks.repo.ts';
 import { createTaskResults } from './tasks.result.ts';
 import { createTaskState, type TasksServiceDeps } from './tasks.state.ts';
 
@@ -75,6 +80,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
         worktreeStatus: worktree?.status ?? null,
       },
       plan: plan ?? null,
+      draftPlan: task.status === TaskStatus.Paused ? (plans.draft(id) ?? null) : null,
       nodes: nodes.summaries(id),
       activeAttempts: attempts.listActive(id),
       openInbox: inbox.listOpen({ taskId: id }),
@@ -85,20 +91,37 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
 
   return {
     detail,
-    list(filter: {
-      projectId?: string | undefined;
-      status?: TaskStatus | undefined;
-      displayGroup?: TaskDisplayGroup | undefined;
-      limit: number;
-    }): TaskSummaryDTO[] {
-      const tasks = state.repo.list({
-        ...(filter.projectId === undefined ? {} : { projectId: filter.projectId }),
-        ...(filter.status === undefined ? {} : { statuses: [filter.status] }),
+    /** A page of task summaries (11 §5); the display group is decided in SQL so that pages stay full. */
+    list({ projectId, status, displayGroup, limit, cursor }: ListTasksQuery): {
+      items: TaskSummaryDTO[];
+      nextCursor: string | null;
+    } {
+      const attention = state.attentionTaskIds();
+      const statuses = status === undefined ? TASK_STATUSES : [status];
+      const oneOf =
+        status === undefined && displayGroup === undefined
+          ? undefined
+          : statuses.flatMap((s): StatusMatch[] => {
+              const without = displayGroup === undefined || resolveTaskDisplayGroup(s, false) === displayGroup;
+              const withAttention = displayGroup === undefined || resolveTaskDisplayGroup(s, true) === displayGroup;
+              if (without && withAttention) return [{ status: s, attention: 'any' }];
+              if (without) return [{ status: s, attention: 'without' }];
+              return withAttention ? [{ status: s, attention: 'with' }] : [];
+            });
+      const [updatedAt, seq] = cursor === undefined ? [] : cursor.split('.').map(Number);
+      const rows = state.repo.page({
+        projectId,
+        oneOf,
+        attention,
+        after: updatedAt === undefined || seq === undefined ? undefined : { updatedAt, seq },
+        limit: limit + 1,
       });
-      return state
-        .summaries(tasks)
-        .filter((t) => filter.displayGroup === undefined || t.displayGroup === filter.displayGroup)
-        .slice(0, filter.limit);
+      const page = rows.slice(0, limit);
+      const last = page.at(-1);
+      return {
+        items: state.summaries(page),
+        nextCursor: rows.length > limit && last !== undefined ? `${last.updatedAt}.${last.seq}` : null,
+      };
     },
     /** Tasks in the given states, for the scheduler. */
     listByStatus: (statuses: readonly TaskStatus[]) => state.repo.list({ statuses }),
@@ -144,6 +167,16 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       lifecycle.replan(id, feedback);
       return detail(id);
     },
+    saveDraftPlan: (id: string, baseVersion: number, graph: PlanGraph): PlanDTO =>
+      lifecycle.saveDraft(id, baseVersion, graph),
+    pause(id: string): TaskDetailDTO {
+      lifecycle.pause(id);
+      return detail(id);
+    },
+    resume(id: string): TaskDetailDTO {
+      lifecycle.resume(id);
+      return detail(id);
+    },
 
     node: (taskId: string, nodeId: string): NodeDetailDTO => nodes.detail(taskId, nodeId),
     async acceptNode(taskId: string, nodeId: string): Promise<NodeDetailDTO> {
@@ -153,6 +186,11 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     rejectNode(taskId: string, nodeId: string, feedback: string): NodeDetailDTO {
       nodes.detail(taskId, nodeId);
       nodes.reject(nodeId, feedback);
+      return nodes.detail(taskId, nodeId);
+    },
+    skipNode(taskId: string, nodeId: string): NodeDetailDTO {
+      nodes.detail(taskId, nodeId);
+      nodes.skip(nodeId);
       return nodes.detail(taskId, nodeId);
     },
     retryNode(taskId: string, nodeId: string, feedback: string | undefined): NodeDetailDTO {
@@ -170,6 +208,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     ...diffs,
     resolveInbox: actions.resolveInbox,
     deleteProject: actions.deleteProject,
+    deleteWorkflow: actions.deleteWorkflow,
+    deleteRole: actions.deleteRole,
     ...context,
     submitPlan: lifecycle.submitPlan,
     startPlanning: lifecycle.startPlanning,

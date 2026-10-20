@@ -7,6 +7,7 @@ import {
   nodeDetailSchema,
   planSchema,
   planSummarySchema,
+  saveDraftPlanRequestSchema,
   taskDetailSchema,
   taskEventSchema,
   taskSummarySchema,
@@ -23,9 +24,10 @@ export const listTasksOp = defineOperationContract({
   ...common,
   id: 'tasks.list',
   title: 'op.tasks.list',
-  description: 'Tasks, most recently updated first, optionally filtered by project, status or display group',
+  description:
+    'Tasks, most recently updated first, optionally filtered by project, status or display group, a page at a time',
   input: listTasksQuerySchema,
-  output: z.object({ items: z.array(taskSummarySchema) }),
+  output: z.object({ items: z.array(taskSummarySchema), nextCursor: z.string().nullable() }),
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/tasks' },
 });
@@ -39,6 +41,8 @@ export const createTaskOp = defineOperationContract({
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks', status: 201 },
+  // The palette opens the home page's start form with it (14 §2.1).
+  expose: { palette: true, assistant: true },
 });
 
 export const getTaskOp = defineOperationContract({
@@ -96,6 +100,30 @@ export const cancelTaskOp = defineOperationContract({
   http: { method: 'POST', path: '/tasks/:id/cancel' },
 });
 
+export const pauseTaskOp = defineOperationContract({
+  ...common,
+  id: 'tasks.pause',
+  title: 'op.tasks.pause',
+  description: 'Pause a running task: no new steps start, steps already working finish; its plan can then be adjusted',
+  input: byId,
+  output: taskDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/pause' },
+  mode: UiMode.Pro,
+});
+
+export const resumeTaskOp = defineOperationContract({
+  ...common,
+  id: 'tasks.resume',
+  title: 'op.tasks.resume',
+  description: 'Resume a paused task; an adjusted plan that was not confirmed is discarded',
+  input: byId,
+  output: taskDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/resume' },
+  mode: UiMode.Pro,
+});
+
 export const listPlansOp = defineOperationContract({
   ...common,
   id: 'plans.list',
@@ -122,11 +150,25 @@ export const confirmPlanOp = defineOperationContract({
   ...common,
   id: 'tasks.confirmPlan',
   title: 'op.tasks.confirmPlan',
-  description: 'Confirm the plan waiting for review and start running its steps',
+  description:
+    'Confirm the plan waiting for review and start running its steps, or (paused task) apply the adjusted plan',
   input: z.object({ id: z.string(), version: z.number().int().min(1) }),
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/plan/confirm' },
+});
+
+export const saveDraftPlanOp = defineOperationContract({
+  ...common,
+  id: 'plans.saveDraft',
+  title: 'op.plans.saveDraft',
+  description:
+    'Save a user-edited plan as a new draft version: any change while the plan waits for review; only steps that have not started while the task is paused',
+  input: saveDraftPlanRequestSchema,
+  output: planSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'PUT', path: '/tasks/:id/plan/draft' },
+  mode: UiMode.Pro,
 });
 
 export const replanOp = defineOperationContract({
@@ -182,6 +224,18 @@ export const retryNodeOp = defineOperationContract({
   output: nodeDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/nodes/:nodeId/retry' },
+  mode: UiMode.Pro,
+});
+
+export const skipNodeOp = defineOperationContract({
+  ...common,
+  id: 'nodes.skip',
+  title: 'op.nodes.skip',
+  description: 'Skip a step that has not started or has failed; steps depending on it go on as if it were done',
+  input: byNode,
+  output: nodeDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/nodes/:nodeId/skip' },
   mode: UiMode.Pro,
 });
 

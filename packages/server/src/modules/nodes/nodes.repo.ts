@@ -32,6 +32,12 @@ export type NewNode = Omit<NodeRow, 'dependsOn' | 'acceptance' | 'result' | 'che
   acceptance: Acceptance;
 };
 
+/** What a plan version defines about a node; a plan adjustment rewrites it for nodes that have not started. */
+export type NodeDefinition = Pick<NodeRow, 'planId' | 'title' | 'roleId' | 'instructions' | 'kind' | 'position'> & {
+  dependsOn: string[];
+  acceptance: Acceptance;
+};
+
 /** Columns a transition may change together with the status. */
 export type NodeChanges = Partial<
   Pick<NodeRow, 'attemptCount' | 'retryFeedback' | 'commitSha' | 'startedAt' | 'finishedAt'> & {
@@ -89,6 +95,10 @@ export function createNodesRepo(db: DbExecutor) {
         .get();
       return row === undefined ? undefined : toNode(row);
     },
+    /** Whether any node is assigned the role (a role in use cannot be deleted). */
+    hasRole(roleId: string): boolean {
+      return db.select({ id: t.id }).from(t).where(eq(t.roleId, roleId)).get() !== undefined;
+    },
     /** By position. */
     listByTask(taskId: string): Node[] {
       return select().where(eq(t.taskId, taskId)).orderBy(asc(t.position)).all().map(toNode);
@@ -100,6 +110,22 @@ export function createNodesRepo(db: DbExecutor) {
     listByTasks(taskIds: readonly string[]): Node[] {
       if (taskIds.length === 0) return [];
       return select().where(inArray(t.taskId, taskIds)).orderBy(asc(t.position)).all().map(toNode);
+    },
+    redefine(id: string, definition: NodeDefinition & { updatedAt: number }): void {
+      db.update(t)
+        .set({
+          ...definition,
+          dependsOn: JSON.stringify(definition.dependsOn),
+          acceptance: JSON.stringify(definition.acceptance),
+        })
+        .where(eq(t.id, id))
+        .run();
+    },
+    setPosition(id: string, position: number): void {
+      db.update(t).set({ position }).where(eq(t.id, id)).run();
+    },
+    delete(id: string): void {
+      db.delete(t).where(eq(t.id, id)).run();
     },
     update(id: string, changes: NodeChanges & { updatedAt: number }): void {
       db.update(t).set(serialize(changes)).where(eq(t.id, id)).run();

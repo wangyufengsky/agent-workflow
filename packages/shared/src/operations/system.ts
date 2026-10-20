@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { environmentSchema, healthSchema, runtimeSchema } from '../contracts/api/system.ts';
+import { RUNTIME_LOG_TAIL_DEFAULT, RUNTIME_LOG_TAIL_MAX } from '../constants/limits.ts';
+import {
+  environmentSchema,
+  healthSchema,
+  mcpToolInfoSchema,
+  runtimeLogsSchema,
+  runtimeSchema,
+} from '../contracts/api/system.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -33,10 +40,10 @@ export const getEnvironmentOp = defineOperationContract({
 export const recheckEnvironmentOp = defineOperationContract({
   id: 'system.recheckEnvironment',
   title: 'op.system.recheckEnvironment',
-  description: 'Detect git and opencode again, e.g. after installing opencode',
+  description: 'Detect git and opencode again, e.g. after installing opencode; a newly usable opencode is started',
   input: z.object({}),
   output: environmentSchema,
-  risk: OperationRisk.Read,
+  risk: OperationRisk.Write,
   http: { method: 'POST', path: '/system/environment/recheck' },
   expose: { palette: true, assistant: true },
   credentialFields: [],
@@ -65,6 +72,32 @@ export const restartRuntimeOp = defineOperationContract({
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/system/runtime/restart' },
   expose: { palette: true, assistant: true },
+  credentialFields: [],
+  mode: UiMode.Pro,
+});
+
+export const getRuntimeLogsOp = defineOperationContract({
+  id: 'system.runtimeLogs',
+  title: 'op.system.runtimeLogs',
+  description: 'The last lines of the hosted opencode log',
+  input: z.object({ tail: z.coerce.number().int().min(1).max(RUNTIME_LOG_TAIL_MAX).default(RUNTIME_LOG_TAIL_DEFAULT) }),
+  output: runtimeLogsSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/system/runtime/logs' },
+  expose: { palette: false, assistant: true },
+  credentialFields: [],
+  mode: UiMode.Pro,
+});
+
+export const listMcpToolsOp = defineOperationContract({
+  id: 'system.mcpTools',
+  title: 'op.system.mcpTools',
+  description: 'Tools of the execution MCP that AI sessions use: name, description, input schema and attempt kinds',
+  input: z.object({}),
+  output: z.object({ items: z.array(mcpToolInfoSchema) }),
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/mcp/tools' },
+  expose: { palette: false, assistant: true },
   credentialFields: [],
   mode: UiMode.Pro,
 });

@@ -1,31 +1,57 @@
 import {
   acceptNodeOp,
   type ChangeRequestReason,
+  type CreateRoleRequest,
   type CreateTaskRequest,
+  type CreateWorkflowRequest,
   cancelTaskOp,
   confirmPlanOp,
+  createRoleOp,
   createTaskOp,
+  createWorkflowOp,
   type DeliverRequest,
+  deleteRoleOp,
+  deleteWorkflowOp,
   deliverTaskOp,
   getNodeOp,
   getTaskOp,
+  getWorkflowOp,
   listRolesOp,
   listTasksOp,
   listWorkflowsOp,
+  listWorkflowVersionsOp,
+  type NodeDetailDTO,
   type NodeSummaryDTO,
   nodeDiffFileOp,
   nodeDiffOp,
+  type PlanGraph,
+  pauseTaskOp,
   rejectNodeOp,
   replanOp,
   requestChangesOp,
+  resumeTaskOp,
+  retryNodeOp,
   retryTaskOp,
+  saveDraftPlanOp,
+  skipNodeOp,
+  startTaskOp,
   type TaskDetailDTO,
   type TaskDisplayGroup,
   type TaskSummaryDTO,
   taskDiffFileOp,
   taskDiffOp,
+  type UpdateRoleRequest,
+  type UpdateWorkflowRequest,
+  updateRoleOp,
+  updateWorkflowOp,
 } from '@aw/shared';
-import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  type QueryClient,
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import type { FileDiffQuery } from '../../components/diff/diff-browser.tsx';
@@ -34,6 +60,40 @@ export const workflowsQuery = queryOptions({
   queryKey: queryKeys.workflows,
   queryFn: async () => (await callOperation(listWorkflowsOp, {})).items,
 });
+
+export const workflowQuery = (id: string) =>
+  queryOptions({ queryKey: queryKeys.workflow(id), queryFn: () => callOperation(getWorkflowOp, { id }) });
+
+export const workflowVersionsQuery = (key: string) =>
+  queryOptions({
+    queryKey: queryKeys.workflowVersions(key),
+    queryFn: async () => (await callOperation(listWorkflowVersionsOp, { key })).items,
+  });
+
+/**
+ * Workflow and role definitions changed (M5-05 / M5-06): every list and version view refetches. Not awaited: a saved
+ * workflow version is a new row, so the refetch remounts its editor, and the caller's `onSuccess` must run first.
+ */
+function useDefinitionMutation<I, O>(run: (input: I) => Promise<O>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workflows });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.roles });
+    },
+  });
+}
+export const useCreateWorkflow = () =>
+  useDefinitionMutation((input: CreateWorkflowRequest) => callOperation(createWorkflowOp, input));
+export const useUpdateWorkflow = () =>
+  useDefinitionMutation((input: UpdateWorkflowRequest) => callOperation(updateWorkflowOp, input));
+export const useDeleteWorkflow = () => useDefinitionMutation((key: string) => callOperation(deleteWorkflowOp, { key }));
+export const useCreateRole = () =>
+  useDefinitionMutation((input: CreateRoleRequest) => callOperation(createRoleOp, input));
+export const useUpdateRole = () =>
+  useDefinitionMutation((input: UpdateRoleRequest) => callOperation(updateRoleOp, input));
+export const useDeleteRole = () => useDefinitionMutation((id: string) => callOperation(deleteRoleOp, { id }));
 
 export const rolesQuery = queryOptions({
   queryKey: queryKeys.roles,
@@ -46,6 +106,19 @@ export const tasksQuery = (filter: TaskFilter = {}) =>
   queryOptions({
     queryKey: queryKeys.tasks(filter),
     queryFn: async () => (await callOperation(listTasksOp, { ...filter })).items,
+  });
+
+/** The first page is asked for without a cursor. */
+const FIRST_PAGE = '';
+
+/** Every loaded page of a filtered list (11 §1 pagination), for the tasks page's「加载更多」. */
+export const taskPagesQuery = (filter: TaskFilter = {}) =>
+  infiniteQueryOptions({
+    queryKey: queryKeys.taskPages(filter),
+    queryFn: ({ pageParam }) =>
+      callOperation(listTasksOp, { ...filter, ...(pageParam === FIRST_PAGE ? {} : { cursor: pageParam }) }),
+    initialPageParam: FIRST_PAGE,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
 
 export const taskQuery = (id: string) =>
@@ -123,6 +196,31 @@ export const useRequestChanges = () =>
   );
 export const useReplan = () =>
   useTaskMutation((input: { id: string; feedback: string }) => callOperation(replanOp, input));
+export const useStartTask = () => useTaskMutation((id: string) => callOperation(startTaskOp, { id }));
+export const usePauseTask = () => useTaskMutation((id: string) => callOperation(pauseTaskOp, { id }));
+export const useResumeTask = () => useTaskMutation((id: string) => callOperation(resumeTaskOp, { id }));
+
+/** A user-edited plan saved as a new draft version (M5-01 / M5-02); the task detail then shows it. */
+export function useSaveDraftPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; baseVersion: number; graph: PlanGraph }) => callOperation(saveDraftPlanOp, input),
+    onSuccess: (_plan, input) => queryClient.invalidateQueries({ queryKey: queryKeys.task(input.id), exact: true }),
+  });
+}
+
+/** Step actions of the pro view (M5-03): the node detail comes back; the task refetches through SSE. */
+function useNodeMutation<I extends { id: string; nodeId: string }>(run: (input: I) => Promise<NodeDetailDTO>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    onSuccess: (node) => queryClient.setQueryData(queryKeys.node(node.taskId, node.id), node),
+  });
+}
+export const useSkipNode = () =>
+  useNodeMutation((input: { id: string; nodeId: string }) => callOperation(skipNodeOp, input));
+export const useRetryNode = () =>
+  useNodeMutation((input: { id: string; nodeId: string; feedback?: string }) => callOperation(retryNodeOp, input));
 
 export function useAcceptNode() {
   const queryClient = useQueryClient();

@@ -3,6 +3,7 @@ import { defineMachine } from './define.ts';
 
 export const NodeEvent = {
   DepsMet: 'deps_met',
+  DepsUnmet: 'deps_unmet',
   Dispatch: 'dispatch',
   InputRequested: 'input_requested',
   InputAnswered: 'input_answered',
@@ -29,7 +30,13 @@ export const nodeMachine = defineMachine<NodeStatus, NodeEvent>({
   initial: [S.Pending, S.Ready],
   table: {
     [S.Pending]: { [E.DepsMet]: [S.Ready], [E.Skip]: [S.Skipped], [E.Cancel]: [S.Cancelled] },
-    [S.Ready]: { [E.Dispatch]: [S.Running], [E.Skip]: [S.Skipped], [E.Cancel]: [S.Cancelled] },
+    // A plan adjustment (paused task) may give a ready node a dependency that has not finished yet.
+    [S.Ready]: {
+      [E.Dispatch]: [S.Running],
+      [E.DepsUnmet]: [S.Pending],
+      [E.Skip]: [S.Skipped],
+      [E.Cancel]: [S.Cancelled],
+    },
     [S.Running]: {
       [E.InputRequested]: [S.WaitingInput],
       [E.ResultSubmitted]: [S.Verifying, S.AwaitingAcceptance, S.Done],

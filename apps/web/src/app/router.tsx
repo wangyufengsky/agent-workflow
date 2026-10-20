@@ -5,22 +5,27 @@ import { z } from 'zod';
 import { useServerEvents } from '../api/server-events.ts';
 import { ErrorState } from '../components/error-state.tsx';
 import { ToastHost } from '../components/toast.tsx';
+import { DatabasesPage } from '../features/databases/databases.page.tsx';
 import { ComponentGalleryPage } from '../features/dev/component-gallery.page.tsx';
 import { GitConsolePage } from '../features/git/git-console.page.tsx';
 import { GIT_TABS, GitProjectPage } from '../features/git/git-project.page.tsx';
 import { HomePage } from '../features/home/home.page.tsx';
 import { InboxPage } from '../features/inbox/inbox.page.tsx';
+import { NodePage } from '../features/node-detail/node.page.tsx';
 import { OnboardingPage } from '../features/onboarding/onboarding.page.tsx';
-import { ComingSoonPage } from '../features/pro/coming-soon.page.tsx';
 import { ProOnly } from '../features/pro/pro-only.tsx';
 import { ProjectDetailPage } from '../features/projects/project-detail.page.tsx';
 import { ProjectsPage } from '../features/projects/projects.page.tsx';
 import { projectsQuery } from '../features/projects/projects.queries.ts';
+import { RolesPage } from '../features/roles/roles.page.tsx';
 import { RuntimePage } from '../features/runtime/runtime.page.tsx';
 import { SettingsPage } from '../features/settings/settings.page.tsx';
 import { settingsQuery, useSettings } from '../features/settings/settings.queries.ts';
 import { TaskPage } from '../features/task-detail/task.page.tsx';
 import { TasksPage } from '../features/tasks/tasks.page.tsx';
+import { ToolsPage } from '../features/tools/tools.page.tsx';
+import { WorkflowEditorPage } from '../features/workflows/workflow-editor.page.tsx';
+import { WorkflowsPage } from '../features/workflows/workflows.page.tsx';
 import { useAppliedTheme } from '../theme/use-applied-theme.ts';
 import { ROUTES } from './routes.ts';
 import { AppShell } from './shell/app-shell.tsx';
@@ -68,13 +73,13 @@ const shellRoute = createRoute({
 
 const page = <P extends string>(path: P, component: () => React.ReactNode) =>
   createRoute({ getParentRoute: () => shellRoute, path, component });
-const proPage = <P extends string>(path: P, icon: Parameters<typeof ComingSoonPage>[0]['icon']) =>
+/** A pro page (14 §1): in simple mode it explains itself and offers to switch. */
+const proOnlyPage = <P extends string>(path: P, Component: () => React.ReactNode) =>
   page(path, () => (
     <ProOnly>
-      <ComingSoonPage icon={icon} />
+      <Component />
     </ProOnly>
   ));
-
 const projectsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.projects,
@@ -114,9 +119,21 @@ const tasksRoute = createRoute({
 const taskRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.task,
-  // `?node=<id>` selects a step on the canvas; `open` shows its details drawer (14 §3.4).
-  validateSearch: z.object({ node: z.string().optional(), open: z.boolean().optional() }),
+  // `?node=<id>` selects a step on the canvas; `open` shows its details drawer (14 §3.4); `details` shows the pro view
+  // of this task in simple mode (D19).
+  validateSearch: z.object({
+    node: z.string().optional(),
+    open: z.boolean().optional(),
+    details: z.boolean().optional(),
+  }),
   component: TaskPage,
+});
+const nodeRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.node,
+  // `?attempt=<id>` shows one attempt; the latest by default (M5-04).
+  validateSearch: z.object({ attempt: z.string().optional() }),
+  component: NodePage,
 });
 const gitRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -156,16 +173,18 @@ const routeTree = rootRoute.addChildren([
     homeRoute,
     tasksRoute,
     taskRoute,
+    nodeRoute,
     page(ROUTES.inbox, InboxPage),
     projectsRoute,
     projectRoute,
     page(ROUTES.settings, SettingsPage),
     gitRoute,
     gitProjectRoute,
-    proPage(ROUTES.workflows, 'flow'),
-    proPage(ROUTES.roles, 'users'),
-    proPage(ROUTES.databases, 'db'),
-    proPage(ROUTES.tools, 'tool'),
+    proOnlyPage(ROUTES.workflows, WorkflowsPage),
+    proOnlyPage(ROUTES.workflow, WorkflowEditorPage),
+    proOnlyPage(ROUTES.roles, RolesPage),
+    proOnlyPage(ROUTES.databases, DatabasesPage),
+    proOnlyPage(ROUTES.tools, ToolsPage),
     runtimeRoute,
   ]),
   ...(import.meta.env.DEV

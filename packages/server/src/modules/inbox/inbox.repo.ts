@@ -1,5 +1,5 @@
 import { AppError, ErrorCode, type InboxItemDTO, type InboxKind, InboxStatus, inboxItemSchema } from '@aw/shared';
-import { and, count, desc, eq, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, lt, or, type SQL } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { inboxItemsTable } from './inbox.table.ts';
 
@@ -51,6 +51,30 @@ export function createInboxRepo(db: DbExecutor) {
         .from(inboxItemsTable)
         .where(whereOf(scope, status))
         .orderBy(desc(inboxItemsTable.createdAt))
+        .all()
+        .map(toItem);
+    },
+    /** One page, newest first (11 §1): `after` is where the previous page ended. */
+    page(
+      scope: InboxScope,
+      status: InboxStatus | undefined,
+      after: { createdAt: number; id: string } | undefined,
+      limit: number,
+    ): InboxItemDTO[] {
+      const t = inboxItemsTable;
+      return db
+        .select()
+        .from(t)
+        .where(
+          and(
+            whereOf(scope, status),
+            ...(after === undefined
+              ? []
+              : [or(lt(t.createdAt, after.createdAt), and(eq(t.createdAt, after.createdAt), lt(t.id, after.id)))]),
+          ),
+        )
+        .orderBy(desc(t.createdAt), desc(t.id))
+        .limit(limit)
         .all()
         .map(toItem);
     },

@@ -22,6 +22,7 @@ import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import type { DatabasesService } from '../databases/index.ts';
 import type { DeliveriesService } from '../delivery/index.ts';
 import type { RepoLocks } from '../git/index.ts';
 import type { InboxService } from '../inbox/index.ts';
@@ -51,6 +52,7 @@ export type TasksServiceDeps = {
   attempts: AttemptsService;
   inbox: InboxService;
   deliveries: DeliveriesService;
+  databases: DatabasesService;
   locks: RepoLocks;
   dataDir: string;
 };
@@ -69,15 +71,19 @@ export function createTaskState(deps: TasksServiceDeps) {
     return task;
   }
 
-  /** Summaries of several tasks with a fixed number of queries (06 §9: no N+1). */
-  function summaries(tasks: readonly Task[]): TaskSummaryDTO[] {
-    const ids = tasks.map((t) => t.id);
-    const attention = new Set(
+  /** Tasks with an open question, permission or acceptance item (08 §2.2 `needs_attention`). */
+  const attentionTaskIds = (): Set<string> =>
+    new Set(
       inbox
         .listOpen({})
         .filter((item) => ATTENTION_INBOX_KINDS.includes(item.kind))
-        .map((item) => item.taskId),
+        .flatMap((item) => (item.taskId === null ? [] : [item.taskId])),
     );
+
+  /** Summaries of several tasks with a fixed number of queries (06 §9: no N+1). */
+  function summaries(tasks: readonly Task[]): TaskSummaryDTO[] {
+    const ids = tasks.map((t) => t.id);
+    const attention = attentionTaskIds();
     const working = new Map<string, string[]>();
     for (const node of nodes.listByTasks(ids).filter((n) => WORKING_NODE.includes(n.status))) {
       working.set(node.taskId, [...(working.get(node.taskId) ?? []), node.title]);
@@ -173,6 +179,6 @@ export function createTaskState(deps: TasksServiceDeps) {
     };
   }
 
-  return { repo, get, summaries, summary, publish, move, fail, runContext };
+  return { repo, get, attentionTaskIds, summaries, summary, publish, move, fail, runContext };
 }
 export type TaskState = ReturnType<typeof createTaskState>;

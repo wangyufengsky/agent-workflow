@@ -1,12 +1,16 @@
 import { createWriteStream, mkdirSync } from 'node:fs';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   AppError,
   ErrorCode,
+  OPENCODE_LOG_FILE_PATTERN,
   OPENCODE_START_TIMEOUT_MS,
   OPENCODE_VERSION,
+  opencodeLogFile,
   type RuntimeDTO,
   RuntimeEvent,
+  type RuntimeLogsDTO,
   RuntimeStatus,
   runtimeMachine,
   ServerEventType,
@@ -84,7 +88,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
 
   function openLog() {
     mkdirSync(deps.logDir, { recursive: true });
-    return createWriteStream(join(deps.logDir, `opencode-${dateStamp(clock.now())}.log`), { flags: 'a' });
+    return createWriteStream(join(deps.logDir, opencodeLogFile(dateStamp(clock.now()))), { flags: 'a' });
   }
 
   /** Spawns `opencode serve` and resolves with its address; rejects if it exits or stays silent too long. */
@@ -228,6 +232,24 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       autoRestartArmed = true;
       const { status } = await snapshot();
       return boot(status === RuntimeStatus.Ready ? RuntimeEvent.Restart : RuntimeEvent.Start);
+    },
+    /** The last lines of the newest opencode log (11 §2 `/system/runtime/logs`). */
+    async logTail(lines: number): Promise<RuntimeLogsDTO> {
+      let names: string[];
+      try {
+        names = await readdir(deps.logDir);
+      } catch (err) {
+        // Recovery with a defined meaning: opencode never ran with this data directory, so there is no log yet.
+        if (err instanceof Error && 'code' in err && err.code === 'ENOENT') return { file: null, lines: [] };
+        throw err;
+      }
+      const file = names
+        .filter((n) => OPENCODE_LOG_FILE_PATTERN.test(n))
+        .sort()
+        .at(-1);
+      if (file === undefined) return { file: null, lines: [] };
+      const text = await readFile(join(deps.logDir, file), 'utf8');
+      return { file, lines: text.replace(/\n$/, '').split('\n').slice(-lines) };
     },
     /** Stops the process for good (backend shutdown); no state transition. */
     stop: stopProcess,

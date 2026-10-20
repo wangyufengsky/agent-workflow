@@ -83,7 +83,7 @@ stateDiagram-v2
 | `planning` | AI 规划中 | 创建 `plan` 类尝试；`submit_plan` 成功即发 `plan_submitted` |
 | `plan_review` | 等用户确认计划 | 创建 `plan` 类 inbox 条目（点开跳到任务页的计划画布确认） |
 | `running` | 执行节点 | 计划确认 → 生成节点（无依赖节点为 `ready`）→ 触发调度 |
-| `paused` | 暂停：不再派发新节点，进行中的尝试继续跑完 | 专业模式可编辑未开始的节点 |
+| `paused` | 暂停：不再派发新节点，进行中的尝试继续跑完（依赖满足的节点仍会 `pending → ready`） | 专业模式可调整计划：只能改动、删除未开始（`pending` / `ready`，`EDITABLE_NODE_STATUSES`）的节点，可新增节点；保存为草稿版本，确认后重新物化（见下），任务保持暂停；`resume` 时未确认的草稿被取代 |
 | `review` | 全部节点结束，等用户决定 | 生成结果摘要；创建 `delivery` 类 inbox 条目 |
 | `merging` | 合并 / 推送 / 建 PR 中 | 见 delivery 状态机 |
 | `completed` | 终态 | 清理 worktree；按设置删除本地分支（PR 交付保留分支） |
@@ -96,6 +96,8 @@ stateDiagram-v2
 - `fail`（running 阶段）：存在 `failed` 节点 且 没有 `running/verifying/waiting_input` 的节点。一旦存在 `failed` 节点，调度器不再派发新节点。
 - `changes_requested`：用户「让 AI 再改改」或「交给 AI 解决冲突」→ 新建计划版本，追加一个 `revise` 节点（依赖所有叶子节点），确认后回到 `running`。
 
+**暂停调整的重新物化**（`nodes.rematerialize`，M5-02）：确认暂停中的草稿时，先再次检查已开始的节点没有被改动或删除（期间可能有节点结束，`NODE_NOT_EDITABLE`）；未开始的节点按新定义改写（`plan_id`、标题、角色、指令、依赖、验收、顺序），新节点按 key 创建（初始 `pending` / `ready` 同物化），被删除的未开始节点删除；已开始的节点只更新顺序。改写后依赖未全部完成的 `ready` 节点经 `deps_unmet` 回到 `pending`，由调度器重新放行。
+
 ## 3. 节点 Node
 
 <!-- fsm:node 由 pnpm gen:fsm-docs 生成，勿手改 -->
@@ -106,6 +108,7 @@ stateDiagram-v2
   pending --> ready: deps_met
   pending --> skipped: skip
   pending --> cancelled: cancel
+  ready --> pending: deps_unmet
   ready --> running: dispatch
   ready --> skipped: skip
   ready --> cancelled: cancel
@@ -148,7 +151,8 @@ stateDiagram-v2
 | 重试携带反馈 | 回到 `ready` 时记录 `retryFeedback`（检查失败输出 / 评审问题 / 驳回意见 / 失败原因），下次尝试的提示词附带 |
 | `waiting_input` | 两种来源：会话空闲且有未回答的阻塞问题；opencode 权限请求待处理。等待期间尝试仍是 `running`（不计超时），因此仍可能失败（用户中止 → `attempt_failed`）或中断（运行时消失时待处理的权限请求随之失效 → `interrupted`） |
 | 人工验收 | 节点 `acceptance.manual=true` 或任务开启 `accept_each_node` 时进入 `awaiting_acceptance`，并创建 `acceptance` 类 inbox 条目 |
-| 跳过 | 仅专业模式；被跳过节点视为完成，下游可继续 |
+| 跳过 | 仅专业模式（`pending` / `ready` / `failed` → `skipped`）；被跳过节点视为完成，下游可继续。任务因该节点失败时，跳过后「重试任务」即继续 |
+| 依赖变化 | `deps_unmet`：暂停调整使 `ready` 节点多了未完成的依赖 → `pending` |
 | 重启恢复 | `running`/`verifying` 的节点：其尝试标 `interrupted`，节点回 `ready`（不消耗预算）；等待阻塞问题答案的 `waiting_input` 保持不变（opencode 会话持久化，回答后在同一会话继续）；等待权限的 `waiting_input` 回 `ready`（权限请求随 opencode 进程失效，条目 dismiss） |
 
 **`result_submitted` 的目标选择**：有 `acceptance.checks` → `verifying`；否则需要人工验收 → `awaiting_acceptance`；否则 → `done`。`checks_passed` 同理（需人工验收 → `awaiting_acceptance`，否则 `done`）；`checks_failed` / `attempt_failed` 有预算 → `ready`，无预算 → `failed`；`interrupted`（重启恢复）→ `ready`。
