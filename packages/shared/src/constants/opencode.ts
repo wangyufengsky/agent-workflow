@@ -23,8 +23,27 @@ const GIT_READONLY = [
   'git ls-files*',
   'git rev-parse*',
 ];
-/** Commands that only read the workspace; allowed without asking under every policy. */
-const BASH_READONLY = ['ls*', 'cat*', 'head*', 'tail*', 'rg*', 'grep*', 'find*', 'wc*', ...GIT_READONLY];
+/**
+ * Commands that only read the workspace or print; allowed without asking under every policy. Models exploring a
+ * repository chain them with `echo` separators and version checks (M6-05 live runs, D61).
+ */
+const BASH_READONLY = [
+  'ls*',
+  'cat*',
+  'head*',
+  'tail*',
+  'rg*',
+  'grep*',
+  'find*',
+  'wc*',
+  'echo*',
+  'pwd',
+  'which*',
+  'node --version',
+  'npm --version',
+  'pnpm --version',
+  ...GIT_READONLY,
+];
 
 const bash = (pattern: string, action: PermissionAction): PermissionRule => ({ permission: 'bash', pattern, action });
 

@@ -50,6 +50,36 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "echo*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "git status*",
       "permission": "bash",
     },
@@ -137,6 +167,36 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "echo*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "git status*",
       "permission": "bash",
     },
@@ -220,6 +280,36 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "wc*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "echo*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm --version",
       "permission": "bash",
     },
     {
@@ -368,6 +458,36 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "allow",
+      "pattern": "echo*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "git status*",
       "permission": "bash",
     },
@@ -451,6 +571,36 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "allow",
       "pattern": "wc*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "echo*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm --version",
       "permission": "bash",
     },
     {

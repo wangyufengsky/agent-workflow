@@ -15,7 +15,6 @@ import {
   type TaskDetailDTO,
   TaskStatus,
   type TranscriptEntry,
-  updateProjectOp,
   updateSettingsOp,
 } from '@aw/shared';
 import { runGit } from '../packages/server/src/modules/git/index.ts';
@@ -29,8 +28,6 @@ const ENDED: readonly TaskStatus[] = [TaskStatus.Review, TaskStatus.Failed, Task
 const IDENTITY = ['-c', 'user.name=aw-live', '-c', 'user.email=aw-live@example.com'];
 
 export type Fixture = 'ts-stats' | 'java-inventory';
-/** Each fixture's check command (live/fixtures/README.md). */
-const CHECK_COMMAND: Record<Fixture, string> = { 'ts-stats': 'node --test', 'java-inventory': 'mvn -q test' };
 
 type Report = {
   workflow: string;
@@ -71,7 +68,7 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
   const reports: Report[] = [];
   const userActions = playTheUser(t);
 
-  /** A fresh Git repository with the fixture project and its check command. */
+  /** A fresh Git repository with the fixture project, added as a user would: the check command is inferred. */
   async function addFixtureProject(fixture: Fixture): Promise<string> {
     const repo = await realpath(await mkdtemp(join(tmpdir(), 'aw-live-')));
     await cp(new URL(`fixtures/${fixture}`, import.meta.url).pathname, repo, { recursive: true });
@@ -84,7 +81,6 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
       await runGit([...IDENTITY, ...args], { cwd: repo });
     }
     const { body: project } = await t.call(createProjectOp, { repoPath: repo });
-    await t.call(updateProjectOp, { id: project.id, checkCommand: CHECK_COMMAND[fixture] });
     return project.id;
   }
 
@@ -155,7 +151,17 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
     async close() {
       await mkdir(new URL('reports', import.meta.url), { recursive: true });
       const file = new URL(`reports/${name}-${new Date().toISOString().replaceAll(':', '-')}.json`, import.meta.url);
-      await writeFile(file, `${JSON.stringify({ model: MODEL, userActions, reports }, null, 2)}\n`);
+      // Which kind of session asked for each permission (the planner and reviewer only read).
+      const asked = await Promise.all(
+        userActions.asked.map(async ({ attemptId, ask }) => ({
+          kind: attemptId === null ? null : (await t.call(getAttemptOp, { id: attemptId })).body.kind,
+          ask,
+        })),
+      );
+      await writeFile(
+        file,
+        `${JSON.stringify({ model: MODEL, userActions: { ...userActions, asked }, reports }, null, 2)}\n`,
+      );
       await t.close();
     },
   };
@@ -166,12 +172,16 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
  * stock reply, as a cooperative user would (counted in the report).
  */
 function playTheUser(t: TestApp) {
-  const userActions = { permissions: 0, answers: 0 };
+  const userActions = { permissions: 0, answers: 0, asked: [] as Array<{ attemptId: string | null; ask: string }> };
   t.app.events.subscribe((event) => {
     if (event.type !== ServerEventType.InboxUpdated || event.data.item.status !== InboxStatus.Open) return;
     const { item } = event.data;
     if (item.kind === InboxKind.Permission) {
       userActions.permissions++;
+      userActions.asked.push({
+        attemptId: item.attemptId,
+        ask: `${item.payload.permission}: ${item.payload.patterns.join(' | ')}`,
+      });
       void t.call(resolveInboxOp, { id: item.id, response: { decision: 'once' } });
     } else if (item.kind === InboxKind.Question && item.payload.blocking) {
       userActions.answers++;

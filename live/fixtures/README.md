@@ -4,5 +4,5 @@
 
 | 项目 | 内容 | 已知缺陷 | 功能需求 |
 | --- | --- | --- | --- |
-| `ts-stats` | TypeScript 统计函数，检查命令 `node --test`（Node 内置测试，无需安装依赖） | `median` 用默认的字符串排序，`median([10, 9, 1])` 返回 10 而不是 9 | 新增 `percentile(values, p)` |
-| `java-inventory` | Java 17 库存类（Maven + JUnit 5），检查命令 `mvn -q test`（首次运行需从 Maven 中央仓库下载 JUnit 与 surefire） | `lowStock(threshold)` 用 `<`，库存正好等于阈值的商品没有列出 | 提取 `add` / `remove` 中重复的数量校验（重构）；审查 `Inventory`（代码审查） |
+| `ts-stats` | TypeScript 统计函数，检查命令推断为 `npm test`（即 `node --test`，Node 内置测试，无需安装依赖） | `median` 用默认的字符串排序，`median([10, 9, 1])` 返回 10 而不是 9 | 新增 `percentile(values, p)` |
+| `java-inventory` | Java 17 库存类（Maven + JUnit 5），检查命令推断为 `mvn -q test`（首次运行需从 Maven 中央仓库下载 JUnit 与 surefire） | `lowStock(threshold)` 用 `<`，库存正好等于阈值的商品没有列出 | 提取 `add` / `remove` 中重复的数量校验（重构）；审查 `Inventory`（代码审查） |

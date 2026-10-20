@@ -29,7 +29,7 @@ describe('只读会话的检查命令', () => {
     const checks = ['node --test', 'node --test'];
     const reviewer = sessionPermissionRules(RoleBaseAgent.Reviewer, BashPolicy.Ask, checks);
     expect(reviewer.at(0)).toEqual({ permission: 'bash', pattern: '*', action: 'ask' });
-    expect(reviewer.filter((r) => r.pattern.startsWith('node'))).toEqual([
+    expect(reviewer.filter((r) => r.pattern.startsWith('node --test'))).toEqual([
       { permission: 'bash', pattern: 'node --test*', action: 'allow' },
     ]);
     expect(reviewer.at(-1)?.pattern).toBe('node --test*');
