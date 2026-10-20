@@ -54,8 +54,8 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting`；关联数据库（M5）、活动任务数（M3）随对应模块加入 |
 | PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand?: string \| null }`；分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND` |
 | DELETE | `/projects/:id` | 有非终态任务时 409 `PROJECT_HAS_ACTIVE_TASKS` |
-| PUT | `/projects/:id/hosting` | `{ provider, baseUrl?, repo, token }`；保存前调用平台 API 验证令牌 |
-| DELETE | `/projects/:id/hosting` | 解除绑定并删除凭据 |
+| PUT | `/projects/:id/hosting` | `{ provider, baseUrl?, repo, token }`（`token` 为凭据字段）→ `ProjectDetailDTO`；保存前调用平台 API 读取该仓库验证令牌（令牌无效或看不到仓库 401 `HOSTING_AUTH_FAILED`，其他失败 502 `HOSTING_API_ERROR`），通过后加密保存（再次绑定替换原令牌）。GitHub 忽略 `baseUrl`；GitLab 不填即 gitlab.com |
+| DELETE | `/projects/:id/hosting` | 解除绑定并删除凭据 → `ProjectDetailDTO`；删除项目时同样删除其凭据 |
 | PUT | `/projects/:id/db-connections` 🅿 | `{ connectionIds: string[] }` 覆盖关联 |
 
 远端 `repo` 默认从 `git remote get-url origin` 推断（`inferredHosting`：`github.com` → GitHub，其他主机 → GitLab，非 `gitlab.com` 时 `baseUrl = https://<host>`），前端预填。
@@ -136,7 +136,7 @@ type TaskDetailDTO = {
 ### 5.3 交付
 
 - `strategy ∈ { squash, merge, rebase }`：本地合并到 `targetBranch`（默认 `baseBranch`），见 09 §7。合并前的检查失败直接返回错误、不改状态：`DELIVERY_TARGET_NOT_FOUND`、`WORKTREE_DIRTY`、`DELIVERY_TARGET_DIRTY`（目标分支检出在有未提交改动的工作区）。成功 → 任务 `completed`。冲突 → 任务回 `review`，`lastDelivery.status = conflict`，`conflictFiles` 列出文件；前端提供「交给 AI 解决」（= `request-changes` with `reason: 'conflict'`）。其他 git 失败 → 任务回 `review`，`lastDelivery.status = failed`，`error` 为原因。以上都返回操作后的 `TaskDetailDTO`。
-- `pull_request`：推送分支到远端 → 创建 PR/MR（`targetBranch` 为目标）→ 任务 `completed`，`prUrl` 记录在 delivery。
+- `pull_request`：项目未绑定远端 → 400 `HOSTING_NOT_CONFIGURED`（不改状态）。在仓库锁内把任务分支推送到 `origin`（HTTPS 远端经环境变量 `http.extraHeader` 带上令牌，不出现在命令参数中；SSH 远端用用户自己的密钥）→ 创建 PR/MR（`targetBranch` 为目标，标题与说明默认为任务标题与结果摘要，可用 `pr` 指定）→ 任务 `completed`，`prUrl` 记录在 delivery；worktree 删除，分支保留。推送或平台失败 → `lastDelivery.status = failed`，任务回 `review`。
 - `report_only`：仅 `deliverable = report` 的任务可用，直接 `completed`。
 - `deliverable = report` 的任务使用其他策略 → 400 `VALIDATION_FAILED`。
 

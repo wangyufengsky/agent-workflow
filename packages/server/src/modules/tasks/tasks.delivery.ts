@@ -14,7 +14,8 @@ import {
   WorkflowDeliverable,
   WorktreeStatus,
 } from '@aw/shared';
-import { checkDeliverable, type MergeOutcome, mergeLocally } from '../delivery/index.ts';
+import { checkDeliverable, type MergeOutcome, mergeLocally, pushBranch } from '../delivery/index.ts';
+import type { GitHostingProvider } from '../hosting/index.ts';
 import type { Worktree } from '../worktrees/index.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
@@ -101,6 +102,33 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
     });
   }
 
+  /** Pushes the branch and opens the pull request on the project's platform (11 §5.3). */
+  async function openPullRequest(
+    task: Task,
+    delivery: DeliveryDTO,
+    worktree: Worktree,
+    hosting: GitHostingProvider,
+    pr: { title: string; body: string },
+  ): Promise<void> {
+    let url: string;
+    try {
+      const { repoPath } = projects.getRecord(task.projectId);
+      await pushBranch(locks, { repoPath, branch: worktree.branch, authorization: hosting.gitAuthorization() });
+      ({ url } = await hosting.createPullRequest({
+        head: worktree.branch,
+        base: delivery.targetBranch,
+        title: pr.title,
+        body: pr.body,
+      }));
+    } catch (err) {
+      recordFailure(task.id, delivery, err);
+      if (err instanceof AppError) return;
+      throw err;
+    }
+    recordSuccess(task.id, delivery, { prUrl: url });
+    await cleanUp(task, worktree, delivery.strategy);
+  }
+
   return {
     async deliver(taskId: string, request: Omit<DeliverRequest, 'id'>): Promise<void> {
       const task = get(taskId);
@@ -135,12 +163,18 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
         targetBranch,
         checkTargetWorktree: isLocalMerge(request.strategy),
       });
+      const hosting =
+        request.strategy === DeliveryStrategy.PullRequest ? await projects.hostingOf(task.projectId) : undefined;
       const delivery = unit.transact(() => {
         const started = deliveries.start({ taskId, strategy: request.strategy, targetBranch });
         move(task, TaskEvent.Deliver, TaskStatus.Merging);
         return started;
       });
-      await mergeTask(task, delivery, worktree, repoPath);
+      if (hosting === undefined) await mergeTask(task, delivery, worktree, repoPath);
+      else {
+        const pr = request.pr ?? { title: task.title, body: task.result?.summary ?? '' };
+        await openPullRequest(task, delivery, worktree, hosting, pr);
+      }
     },
 
     lastDelivery: (taskId: string): DeliveryDTO | null => deliveries.latest(taskId) ?? null,

@@ -45,3 +45,20 @@ export const updateProjectRequestSchema = z.object({
   checkCommand: z.string().trim().min(1).nullable().optional(),
 });
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
+
+/** `PUT /projects/:id/hosting`: the token is verified with the platform before it is stored (11 §3). */
+export const setHostingRequestSchema = z.object({
+  id: z.string(),
+  provider: hostingProviderSchema,
+  /** Self-hosted GitLab address; omit for github.com and gitlab.com. */
+  baseUrl: z
+    .url({ protocol: /^https?$/ })
+    .nullable()
+    .optional(),
+  repo: z
+    .string()
+    .trim()
+    .regex(/^[^/\s]+(\/[^/\s]+)+$/),
+  token: z.string().trim().min(1),
+});
+export type SetHostingRequest = z.infer<typeof setHostingRequestSchema>;

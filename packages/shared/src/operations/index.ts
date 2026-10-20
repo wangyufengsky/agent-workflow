@@ -15,7 +15,15 @@ import {
   pruneWorktreesOp,
 } from './git.ts';
 import { countInboxOp, dismissInboxOp, listInboxOp, resolveInboxOp } from './inbox.ts';
-import { createProjectOp, deleteProjectOp, getProjectOp, listProjectsOp, updateProjectOp } from './projects.ts';
+import {
+  clearProjectHostingOp,
+  createProjectOp,
+  deleteProjectOp,
+  getProjectOp,
+  listProjectsOp,
+  setProjectHostingOp,
+  updateProjectOp,
+} from './projects.ts';
 import { getSettingsOp, updateSettingsOp } from './settings.ts';
 import { getEnvironmentOp, getHealthOp, getRuntimeOp, recheckEnvironmentOp, restartRuntimeOp } from './system.ts';
 import {
@@ -68,6 +76,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getProjectOp,
   updateProjectOp,
   deleteProjectOp,
+  setProjectHostingOp,
+  clearProjectHostingOp,
   getAttemptOp,
   abortAttemptOp,
   startDebugAttemptOp,

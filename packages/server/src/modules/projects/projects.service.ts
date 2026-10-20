@@ -4,20 +4,32 @@ import { basename, isAbsolute } from 'node:path';
 import {
   AppError,
   type CreateProjectRequest,
+  CredentialKind,
   ErrorCode,
+  HostingProvider,
+  type HostingRef,
   PROJECT_SLUG_MAX,
   type ProjectDetailDTO,
   type ProjectDTO,
+  type SetHostingRequest,
   toSlug,
   type UpdateProjectRequest,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
+import type { CredentialsService } from '../credentials/index.ts';
 import { branchExists, readDefaultBranch, readOriginUrl, readRepoRoot } from '../git/index.ts';
+import { createHostingProvider, type GitHostingProvider, type HostingEndpoints } from '../hosting/index.ts';
 import { inferRepoCheckCommand, parseRemoteUrl } from './projects.inference.ts';
 import { createProjectsRepo } from './projects.repo.ts';
 
-export type ProjectsServiceDeps = { db: Db; clock: Clock };
+export type ProjectsServiceDeps = {
+  db: Db;
+  clock: Clock;
+  credentials: CredentialsService;
+  /** Platform API addresses (FakeHosting in tests). */
+  hosting: HostingEndpoints;
+};
 
 /** Fallback slug for names with no ASCII letters or digits (e.g. Chinese names). */
 const DEFAULT_SLUG = 'project';
@@ -45,7 +57,7 @@ async function resolveRepoRoot(repoPath: string): Promise<string> {
   return root;
 }
 
-export function createProjectsService({ db, clock }: ProjectsServiceDeps) {
+export function createProjectsService({ db, clock, credentials, hosting }: ProjectsServiceDeps) {
   const repo = createProjectsRepo(db);
 
   function require(id: string): ProjectDTO {
@@ -109,8 +121,45 @@ export function createProjectsService({ db, clock }: ProjectsServiceDeps) {
     /** The tasks module removes the project's tasks first (PROJECT_HAS_ACTIVE_TASKS while any is unfinished). */
     delete(id: string): void {
       require(id);
-      // TODO(M4-05): delete the hosting credential.
+      const credentialId = repo.hostingCredentialId(id);
       repo.delete(id);
+      if (credentialId !== null) credentials.remove(credentialId);
+    },
+
+    /** Binds the remote (11 §3) once the platform accepts the token; the token is stored encrypted. */
+    async setHosting({ id, provider, baseUrl, repo: path, token }: SetHostingRequest): Promise<ProjectDetailDTO> {
+      require(id);
+      const ref: HostingRef = {
+        provider,
+        // github.com has no self-hosted address here; GitLab's is kept without a trailing slash.
+        baseUrl: provider === HostingProvider.Github ? null : (baseUrl?.replace(/\/+$/, '') ?? null),
+        repo: path,
+      };
+      await createHostingProvider(ref, token, hosting).verify();
+      const existing = repo.hostingCredentialId(id);
+      const credentialId = existing ?? (await credentials.create(CredentialKind.GitToken, token));
+      if (existing !== null) await credentials.replace(existing, token);
+      repo.setHosting(id, { ...ref, credentialId }, clock.now());
+      return detail(require(id));
+    },
+
+    async clearHosting(id: string): Promise<ProjectDetailDTO> {
+      require(id);
+      const credentialId = repo.hostingCredentialId(id);
+      repo.setHosting(id, null, clock.now());
+      if (credentialId !== null) credentials.remove(credentialId);
+      return detail(require(id));
+    },
+
+    /** The project's platform, signed in with its token; HOSTING_NOT_CONFIGURED when there is none. */
+    async hostingOf(id: string): Promise<GitHostingProvider> {
+      const project = require(id);
+      const credentialId = repo.hostingCredentialId(id);
+      if (project.hosting === null || credentialId === null) {
+        throw new AppError(ErrorCode.HostingNotConfigured, 'The project is not bound to a hosting repository', { id });
+      }
+      const { provider, baseUrl, repo: path } = project.hosting;
+      return createHostingProvider({ provider, baseUrl, repo: path }, await credentials.reveal(credentialId), hosting);
     },
   };
 }

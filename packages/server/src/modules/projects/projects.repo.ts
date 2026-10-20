@@ -1,4 +1,4 @@
-import type { ProjectDTO } from '@aw/shared';
+import type { HostingRef, ProjectDTO } from '@aw/shared';
 import { asc, eq } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { projectsTable } from './projects.table.ts';
@@ -9,6 +9,9 @@ export type NewProject = Omit<ProjectRow, 'hostingProvider' | 'hostingBaseUrl' |
 export type ProjectChanges = { [K in 'name' | 'defaultBranch' | 'checkCommand']?: ProjectRow[K] | undefined } & {
   updatedAt: number;
 };
+
+/** A bound remote, or null to unbind. */
+export type ProjectHosting = (HostingRef & { credentialId: string }) | null;
 
 function toProject(row: ProjectRow): ProjectDTO {
   return {
@@ -56,6 +59,26 @@ export function createProjectsRepo(db: DbExecutor) {
     },
     insert(project: NewProject): void {
       db.insert(projectsTable).values(project).run();
+    },
+    hostingCredentialId(id: string): string | null {
+      const row = db
+        .select({ id: projectsTable.hostingCredentialId })
+        .from(projectsTable)
+        .where(eq(projectsTable.id, id))
+        .get();
+      return row?.id ?? null;
+    },
+    setHosting(id: string, hosting: ProjectHosting, updatedAt: number): void {
+      db.update(projectsTable)
+        .set({
+          hostingProvider: hosting?.provider ?? null,
+          hostingBaseUrl: hosting?.baseUrl ?? null,
+          hostingRepo: hosting?.repo ?? null,
+          hostingCredentialId: hosting?.credentialId ?? null,
+          updatedAt,
+        })
+        .where(eq(projectsTable.id, id))
+        .run();
     },
     update(id: string, changes: ProjectChanges): void {
       db.update(projectsTable).set(changes).where(eq(projectsTable.id, id)).run();

@@ -50,7 +50,7 @@
 | 名称 | 位置 | 说明 |
 | --- | --- | --- |
 | `FakeOpencode` | `packages/server/test/fakes/fake-opencode.ts` | 实现 `OpencodeClient` 接口；`fake.enqueue(script()…, match?)` 为之后发给会话的消息排一个回合（`match` 按会话标题、agent、目录的子串选会话，第一个匹配的脚本生效）：`edit(file, content)`、`text(…)`、`callTool(name, args)`、`ask(...)`、`requestPermission(...)`、`hang()`（一直工作直到被中止）、`error(...)`，回合结束即空闲（没有排脚本的消息直接空闲）；真实写 worktree 文件、真实通过 MCP 调用后端（注入 `__aw_session`）。可断言 `sessions`、`prompts`、`toolCalls`、`aborts`、`permissionReplies`；`crash()` 模拟运行时消失；`settled()` 等待已开始的回合放完。浏览器 E2E 中后端以 `AW_FAKE_OPENCODE=1`（仅开发模式）使用它，spec 经开发接口 `POST /api/v1/dev/fake-opencode/scripts` 排回合（按项目的 worktree 目录匹配，互不干扰）；`createTestApp({ dataDir, fake })` 复用同一个 FakeOpencode 模拟后端重启 |
-| `FakeHosting` | `test/fakes/fake-hosting.ts` | 本地 HTTP 服务模拟 GitHub/GitLab 用到的少数端点 |
+| `FakeHosting` | `test/fakes/fake-hosting.ts` | 本地 HTTP 服务模拟 GitHub/GitLab 用到的少数端点（读仓库、建 PR/MR），只认一个令牌；`createTestApp({ hosting: fake.endpoints })` 指向它；断言 `pullRequests`；`failNextPullRequest(status)` 模拟平台报错 |
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
 | `createTestApp()` | `test/helpers/app.ts` | 启动后端（临时数据目录、随机端口），返回类型化 API 调用 `call(op, input)`、`mcpUrl`、FakeOpencode；`realOpencode: true` 用于 `@opencode` 测试；MCP SDK 客户端见 `test/helpers/mcp.ts` |
 | `build.*()` | `test/builders/` | 最小测试数据构造器，只填测试关心的字段，其余用合法默认值 |
@@ -78,6 +78,7 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 
 ## 6. live 测试
 
+- 托管平台 `live/hosting.live.test.ts`（M4-05）：无效令牌在 github.com 与 gitlab.com 上为 `HOSTING_AUTH_FAILED`；设置 `AW_LIVE_HOSTING_PROVIDER` / `AW_LIVE_HOSTING_REPO` / `AW_LIVE_HOSTING_TOKEN`（自建 GitLab 另加 `AW_LIVE_HOSTING_BASE_URL`）时验证真实令牌，再设 `AW_LIVE_HOSTING_PR_HEAD` / `AW_LIVE_HOSTING_PR_BASE` 时创建一个 PR。
 - 示例仓库：`live/fixtures/` 下的小项目，各带一个已知缺陷和一个功能需求：`ts-stats`（TypeScript + `node --test`，M3-12）；Java + Maven 随 M6-05。说明见 `live/fixtures/README.md`。
 - M3-12 冒烟 `live/smoke.live.test.ts`：`bugfix` 与 `feature` 各跑一次，报告写到 `live/reports/smoke-<时间>.json`（尝试、提醒次数、用量、`submit_*` 调用成败）。
 - 用例：五个内置流程各一次；统计 `submit_*` 调用成功率、尝试次数、耗时、成本，输出报告到 `live/reports/`。
