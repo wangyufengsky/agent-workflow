@@ -25,7 +25,10 @@ export default defineConfig({
           hookTimeout: 60_000,
         },
       },
-      { test: { name: 'live', include: ['live/**/*.live.test.ts'], testTimeout: 1_800_000 } },
+      {
+        // Suites one after another: each hosts its own opencode, and the free model is shared.
+        test: { name: 'live', include: ['live/**/*.live.test.ts'], testTimeout: 1_800_000, fileParallelism: false },
+      },
     ],
   },
 });

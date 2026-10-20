@@ -74,16 +74,16 @@
 | J7 | 专业模式：开启确认计划 → 编辑计划（加节点、连线）→ 确认 → 按新计划执行 | 浏览器 |
 | J8 | 专业模式：复制内置流程 → 修改 → 用它跑通一个任务 | 浏览器 |
 | J9 | 四主题与两种模式切换，全部页面可打开无报错、无对比度（axe `color-contrast`）与横向溢出问题（1280 宽）；截图写到 `screenshots/walkthrough/<主题>/`（不提交，`AW_WALKTHROUGH_DIR` 可改）供人工走查（`walkthrough.browser.spec.ts`，M6-01） | 浏览器 |
-| J10 | 打包应用：引导页 → 添加项目 → J1 精简版；运行中退出重开 → 任务继续完成 | Electron |
+| J10 | 打包应用：引导页 → 添加项目 → J1 精简版（修 Bug，示例仓库 `ts-stats`）；运行中退出重开 → 任务继续完成，被打断的尝试为 `interrupted` 且步骤重跑。真实 opencode 与免费模型 `TEST_MODEL`（生产包里没有 FakeOpencode），每次用全新的用户数据目录；`AW_E2E_EXECUTABLE` 指向打包后的可执行文件（如 dmg 挂载副本） | Electron |
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 
 ## 6. live 测试
 
 - 托管平台 `live/hosting.live.test.ts`（M4-05）：无效令牌在 github.com 与 gitlab.com 上为 `HOSTING_AUTH_FAILED`；设置 `AW_LIVE_HOSTING_PROVIDER` / `AW_LIVE_HOSTING_REPO` / `AW_LIVE_HOSTING_TOKEN`（自建 GitLab 另加 `AW_LIVE_HOSTING_BASE_URL`）时验证真实令牌，再设 `AW_LIVE_HOSTING_PR_HEAD` / `AW_LIVE_HOSTING_PR_BASE` 时创建一个 PR。
-- 示例仓库：`live/fixtures/` 下的小项目，各带一个已知缺陷和一个功能需求：`ts-stats`（TypeScript + `node --test`，M3-12）；Java + Maven 随 M6-05。说明见 `live/fixtures/README.md`。
+- 示例仓库：`live/fixtures/` 下的小项目，各带一个已知缺陷和一个功能需求：`ts-stats`（TypeScript + `node --test`，M3-12）；`java-inventory`（Java 17 + Maven + JUnit 5，M6-05）。说明见 `live/fixtures/README.md`。
 - M3-12 冒烟 `live/smoke.live.test.ts`：`bugfix` 与 `feature` 各跑一次，报告写到 `live/reports/smoke-<时间>.json`（尝试、提醒次数、用量、`submit_*` 调用成败）。
-- 用例：五个内置流程各一次；统计 `submit_*` 调用成功率、尝试次数、耗时、成本，输出报告到 `live/reports/`。
+- 用例（M6-05 `live/workflows.live.test.ts`，与冒烟合起来）：五个内置流程各一次（Java 项目上的修 Bug、代码审查、重构，TypeScript 项目上的新功能、补单测、修 Bug）；统计 `submit_*` 调用成功率、尝试次数、耗时、成本，输出报告到 `live/reports/`。辅助代码在 `live/live-app.ts`；各套件依次运行（`fileParallelism: false`）。
 - 不作为通过/失败的硬门槛（模型有随机性），但内置提示词改动的 PR 必须附 live 报告对比。
 
 ## 7. 编写规则
