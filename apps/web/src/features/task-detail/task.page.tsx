@@ -85,7 +85,7 @@ export function TaskPage() {
   const task = useQuery(taskQuery(taskId));
   const selection: Selection = {
     selected: node,
-    select: (id) => void navigate({ search: { node: id, open: false }, replace: true }),
+    select: (id) => void navigate({ search: (prev) => ({ ...prev, node: id }), replace: true }),
     open: (id) => void navigate({ search: { node: id, open: true } }),
   };
   const { open } = route.useSearch();

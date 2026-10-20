@@ -82,7 +82,7 @@ export const TASK_COPY = {
   // 失败
   failedTitle: '任务没有完成',
   failedPhase: { preparing: '准备工作区时', planning: '规划时', running: '执行步骤时', merging: '合并时' },
-  failedStep: (title: string) => `「${title}」多次尝试仍未通过检查。`,
+  failedStep: (title: string) => `「${title}」多次尝试仍没有完成。`,
   retry: '重试',
   retried: '已重新开始',
   // 结果卡

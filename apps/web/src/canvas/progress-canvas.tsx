@@ -90,6 +90,8 @@ function Flow({ steps, selectedId, onSelect, onOpen }: Props) {
       elementsSelectable={false}
       onNodeClick={(_e, node) => onSelect?.(node.id)}
       onNodeDoubleClick={(_e, node) => onOpen?.(node.id)}
+      // Double-click opens a step (14 §5), it does not zoom.
+      zoomOnDoubleClick={false}
       proOptions={{ hideAttribution: true }}
       minZoom={0.3}
       maxZoom={1.5}
