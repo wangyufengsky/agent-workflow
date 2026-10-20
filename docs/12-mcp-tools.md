@@ -42,10 +42,16 @@
     1. `*` ask。
     2. 版本查询 allow（D64）：单条命令 `<程序> --version` / `-version` / `-V`、`go version`；`-v` 只对 `node npm npx pnpm yarn bun mvn gradle docker`（别的程序里 `-v` 常是 verbose，如 `rake -v` 会运行默认任务）。程序名前还有别的词（`rm -rf src --version`、`PATH=. node --version`）或程序是路径（`./deploy.sh --version`）时 ask；`npx <包> --version` 也 ask（没有 TTY 时 npx 默认 `--yes`，会下载并运行任意包），只有 `npx --version` 本身放行。
     3. 只读白名单 allow：`ls* cat* head* tail* rg* grep* find* wc* echo* pwd which*` 与 Git 只读子命令（D61）。
-    4. 同一工具的测试命令 allow（只在有检查命令的只读会话，D64）：检查命令的第一个词是 npm / pnpm / yarn / bun / npx / node 时放行 `npm test`、`npm run test`、`npm t`、`pnpm test`、`pnpm run test`、`yarn test`、`yarn run test`、`bun run test`、`node --test`、`npx vitest run`、`pnpm vitest run`、`pnpm exec vitest run`、`npx jest`；mvn / ./mvnw 时 `mvn` / `./mvnw` + 可选的 `-q`、`-o`（任意顺序）+ `test`；./gradlew / gradle 时 `test` 与 `-q test`；go 时 `go test`；pytest / python / python3 时 `pytest`、`python -m pytest`、`python3 -m pytest`。每条都可带任意参数（`<命令> *`）；该工具的其他子命令（`mvn deploy`、`npm publish`、`npm install`）不放行。
+    4. 同一工具的测试命令 allow（只在有检查命令的只读会话，D64）：检查命令以下列工具开头时放行对应的测试写法，该工具的其他子命令（`mvn deploy`、`npm publish`、`npm install`）不放行：
+       - npm / pnpm / yarn / bun / node：`npm test`、`npm run test`、`npm t`、`pnpm test`、`pnpm run test`、`yarn test`、`yarn run test`、`bun run test`、`node --test`、`pnpm vitest run`、`pnpm exec vitest run`，可带任意参数。
+       - `npx vitest` / `npx jest`：只有检查命令本身用 npx 运行该工具时才放行 `npx vitest run` / `npx jest`（可带任意参数）；npx 在项目没装该包时会下载并运行它。
+       - mvn / ./mvnw：`mvn` / `./mvnw` + 可选的 `-q`、`-o`（任意顺序）+ `test`；./gradlew / gradle：`test` 与 `-q test`。之后**只能跟一个以 `-` 开头的参数**（`mvn test -Dtest=Foo#bar`），Gradle 还可以是 `--tests <过滤>`：再多一个词可能是另一个阶段或任务（`mvn test deploy`、`mvn -q test install`、`./gradlew test publish`），通配符分不清它和第二个参数，所以第二个参数也询问（`mvn test -Dtest=X -o`）。用这两个工具的检查命令本身也按这个形状放行，不再是 `<checkCommand>*`（因此 `mvn -q test > f` 也询问）。
+       - go：`go test`，可带任意参数，但 `-exec` / `-toolexec`（用别的程序代替测试二进制或编译器）在第 7 步之后仍 ask。
+       - pytest / python / python3：`pytest`、`python -m pytest`、`python3 -m pytest`，可带任意参数。
     5. 逃逸写法 ask（D63）：任何重定向（`*>*`，也包括 `2>&1`、`2>/dev/null`）、`find` 的 `-exec` / `-execdir` / `-ok` / `-okdir` / `-delete` / `-fprint*` / `-fls`、`rg --pre`、`git … --output`、`git grep -O` / `--open-files-in-pager`。
     6. 第 2、4 步的命令后接结尾单独的 ` 2>&1` 再 allow（`java -version` 把版本打到 stderr，模型常写 `mvn test 2>&1 | tail`），随后 `*>*>*` ask：再有第二个重定向（`mvn test > f 2>&1`）仍询问。
-    7. 项目检查命令本身 allow（`<checkCommand>*`，带参数或重定向也放行；评审会话还包括被评审节点验收中的命令检查，即 `$PROJECT_CHECK` 展开后的命令）：运行检查是只读角色了解代码状态的常规手段，询问会频繁打扰用户（D51）。规划与评审会话、以及只读角色执行的步骤（如代码审查流程中评审者的步骤）都带检查命令。
+    7. 项目检查命令本身 allow（`<checkCommand>*`，带参数或重定向也放行；Maven / Gradle 的检查命令除外，见第 4 步；评审会话还包括被评审节点验收中的命令检查，即 `$PROJECT_CHECK` 展开后的命令）：运行检查是只读角色了解代码状态的常规手段，询问会频繁打扰用户（D51）。规划与评审会话、以及只读角色执行的步骤（如代码审查流程中评审者的步骤）都带检查命令。
+    8. 测试工具自己的逃逸参数 ask（D64）：`go test *-exec*`、`go test *-toolexec*`，排在检查命令之后，所以检查命令 `go test ./...` 也带不进 `-exec`。
   - `node -e`、`python -c`、`bash -c`、`sh -c` 等内联脚本始终 ask；规划者与评审者的协议提示词要求用项目测试命令或读文件来验证，不写临时脚本、不建临时文件（D64）。
   - opencode 1.19 对每条子命令（tree-sitter 的 `command` 节点，文本含其重定向）单独匹配，`X *` 形式的规则也匹配 `X` 本身，任一子命令不是 allow 就询问；单测 `server/modules/opencode/opencode.permissions.test.ts` 按此语义校验，live `permissions.live.test.ts` 在真实 opencode 上验证（含 `java -version && rm …` 中的 `rm` 仍询问）。
   - `ai.bashPolicy = auto`（默认）：`*` allow；`git *` deny（其他所有 Git 命令都可能改动 refs 或工作区，不逐个列举）；Git 只读子命令再 allow。
