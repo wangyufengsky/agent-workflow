@@ -85,8 +85,8 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | GET | `/tasks/:id` | `TaskDetailDTO` |
 | GET | `/tasks/:id/timeline?afterId` | `{ items: TaskEventDTO[] }`：`id > afterId` 的 `task_events`，按 id 升序 |
 | POST | `/tasks/:id/start` | `draft → preparing` |
-| POST | `/tasks/:id/pause` 🅿 | `running → paused` |
-| POST | `/tasks/:id/resume` 🅿 | `paused → running` |
+| POST | `/tasks/:id/pause` 🅿 | `running → paused`：不再派发新步骤，进行中的步骤继续 |
+| POST | `/tasks/:id/resume` 🅿 | `paused → running`；未确认的调整草稿被取代 |
 | POST | `/tasks/:id/retry` | `failed → <failedPhase>` |
 | POST | `/tasks/:id/cancel` | `{ keepBranch?: boolean }` |
 | POST | `/tasks/:id/request-changes` | `{ reason: 'user' \| 'conflict', feedback? }`；`review → running`，追加「按反馈修改」或「解决合并冲突」节点（13 §4）。`user` 必须带 `feedback`；`conflict` 要求最近一次交付为 `conflict`；否则 400 `VALIDATION_FAILED` |
@@ -146,16 +146,16 @@ type TaskDetailDTO = {
 | --- | --- | --- |
 | GET | `/tasks/:id/plans` | 版本列表（`PlanDTO` 不含 graph） |
 | GET | `/tasks/:id/plans/:version` | 某版本完整内容 |
-| POST | `/tasks/:id/plan/confirm` | `{ version }`；`plan_review → running`，或暂停调整中确认草稿 |
+| POST | `/tasks/:id/plan/confirm` | `{ version }`；`plan_review → running`，或暂停调整中确认草稿（重新物化，见 09 §2；任务保持 `paused`，已开始的节点期间被改动 409 `NODE_NOT_EDITABLE`）。`version` 不是当前草稿 → 409 `PLAN_VERSION_CONFLICT` |
 | POST | `/tasks/:id/plan/replan` | `{ feedback }`；`plan_review → planning`（AI 在原规划会话中按反馈修改） |
-| PUT | `/tasks/:id/plan/draft` 🅿 | `{ baseVersion, graph }`；用户编辑产生新草稿版本（`source=user`）。`plan_review` 时任意编辑；`paused` 时只能改动未开始的节点，否则 409 `NODE_NOT_EDITABLE`；`baseVersion` 不是最新版本 → 409 `PLAN_VERSION_CONFLICT`。返回新 `PlanDTO` 或 400 `PLAN_INVALID` |
+| PUT | `/tasks/:id/plan/draft` 🅿 | `{ baseVersion, graph }`；用户编辑产生新草稿版本（`source=user`，沿用基础版本的说明与假设，取代原草稿）。`plan_review` 时任意编辑（「需要你处理」中的确认确认的是当前草稿）；`paused` 时只能改动、删除未开始的节点（`details.nodes` 列出被改动的已开始节点），否则 409 `NODE_NOT_EDITABLE`；`baseVersion` 不是最新版本 → 409 `PLAN_VERSION_CONFLICT`；其他状态 409 `STATE_TRANSITION_INVALID`。校验与计划画布相同：`validatePlanGraph(graph, planEditRules(definition, base))`（允许角色另含计划中已有的角色，如系统节点的 developer），失败 400 `PLAN_INVALID`。返回新 `PlanDTO` |
 | GET | `/tasks/:id/nodes/:nodeId` | `NodeDetailDTO`：定义、状态、结果、检查结果、尝试列表、提交 sha、本节点 diff 统计 |
 | GET | `/tasks/:id/nodes/:nodeId/diff` | 本节点提交的 diff 文件列表 `DiffDTO`（`commit_sha^..commit_sha`，在项目仓库中读取，worktree 删除后仍可用）；没有提交的节点 `{ base: null, files: [] }` |
 | GET | `/tasks/:id/nodes/:nodeId/diff/file?path=` | 本节点提交中单文件的 unified diff `FileDiffDTO`；没有提交 → 404 `NOT_FOUND` |
 | POST | `/tasks/:id/nodes/:nodeId/accept` | `awaiting_acceptance → done` |
 | POST | `/tasks/:id/nodes/:nodeId/reject` | `{ feedback }`；→ `ready` |
 | POST | `/tasks/:id/nodes/:nodeId/retry` | `failed → ready`，`{ feedback? }` |
-| POST | `/tasks/:id/nodes/:nodeId/skip` 🅿 | |
+| POST | `/tasks/:id/nodes/:nodeId/skip` 🅿 | `pending` / `ready` / `failed` → `skipped`，返回 `NodeDetailDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
 | GET | `/attempts/:id` | `AttemptDTO`；不存在 404 `ATTEMPT_NOT_FOUND` |
 | GET | `/attempts/:id/transcript?afterSeq` | `{ entries: TranscriptEntry[], lastSeq, done: boolean }`（非清单路由，10 §3）：`lastSeq` 为本页最大 seq（空页为请求的 `afterSeq`），`done` 表示尝试已结束且已读到末尾 |
 | POST | `/attempts/:id/abort` 🅿 | 中止进行中的尝试（节点按 `attempt_failed` 处理）；非 `running` 409 `STATE_TRANSITION_INVALID` |

@@ -85,7 +85,10 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
         }
         case InboxKind.Plan: {
           const decision = parseInput(planResponseSchema, response);
-          if ('confirmed' in decision) lifecycle.confirmPlan(taskOf(item), item.payload.version);
+          // The draft under review may be the user's edit of the item's version (M5-01).
+          const draft = deps.plans.draft(taskOf(item));
+          if (draft === undefined) throw new Error(`Plan item ${item.id} has no draft to confirm`);
+          if ('confirmed' in decision) lifecycle.confirmPlan(taskOf(item), draft.version);
           else lifecycle.replan(taskOf(item), decision.replanFeedback);
           break;
         }

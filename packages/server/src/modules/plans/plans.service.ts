@@ -113,6 +113,15 @@ export function createPlansService({ db, unit, clock, log }: PlansServiceDeps) {
       });
     },
 
+    /** The newest version of the task's plan, whatever its status. */
+    latest: (taskId: string): PlanDTO | undefined => {
+      const [newest] = repo.listByTask(taskId);
+      return newest === undefined ? undefined : toDto(newest);
+    },
+    /** A draft nobody will confirm (a paused task resumed without applying its adjustment). */
+    discard(planId: string): void {
+      move(mustFind(planId), PlanEvent.Supersede);
+    },
     /** Confirms a draft; the previously confirmed version is superseded (09 §5). */
     confirm(planId: string): PlanDTO {
       return unit.transact(() => {

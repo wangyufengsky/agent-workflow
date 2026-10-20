@@ -4,6 +4,8 @@ import {
   type CreateTaskRequest,
   type DeliverRequest,
   type NodeDetailDTO,
+  type PlanDTO,
+  type PlanGraph,
   type ResultNext,
   ServerEventType,
   type SubmitResultInput,
@@ -75,6 +77,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
         worktreeStatus: worktree?.status ?? null,
       },
       plan: plan ?? null,
+      draftPlan: task.status === TaskStatus.Paused ? (plans.draft(id) ?? null) : null,
       nodes: nodes.summaries(id),
       activeAttempts: attempts.listActive(id),
       openInbox: inbox.listOpen({ taskId: id }),
@@ -144,6 +147,16 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       lifecycle.replan(id, feedback);
       return detail(id);
     },
+    saveDraftPlan: (id: string, baseVersion: number, graph: PlanGraph): PlanDTO =>
+      lifecycle.saveDraft(id, baseVersion, graph),
+    pause(id: string): TaskDetailDTO {
+      lifecycle.pause(id);
+      return detail(id);
+    },
+    resume(id: string): TaskDetailDTO {
+      lifecycle.resume(id);
+      return detail(id);
+    },
 
     node: (taskId: string, nodeId: string): NodeDetailDTO => nodes.detail(taskId, nodeId),
     async acceptNode(taskId: string, nodeId: string): Promise<NodeDetailDTO> {
@@ -153,6 +166,11 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     rejectNode(taskId: string, nodeId: string, feedback: string): NodeDetailDTO {
       nodes.detail(taskId, nodeId);
       nodes.reject(nodeId, feedback);
+      return nodes.detail(taskId, nodeId);
+    },
+    skipNode(taskId: string, nodeId: string): NodeDetailDTO {
+      nodes.detail(taskId, nodeId);
+      nodes.skip(nodeId);
       return nodes.detail(taskId, nodeId);
     },
     retryNode(taskId: string, nodeId: string, feedback: string | undefined): NodeDetailDTO {

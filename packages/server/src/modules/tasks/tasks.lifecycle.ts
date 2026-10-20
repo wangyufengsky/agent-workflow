@@ -6,21 +6,26 @@ import {
   AttemptKind,
   AttemptStatus,
   type CreateTaskRequest,
+  EDITABLE_NODE_STATUSES,
   ErrorCode,
   type ErrorInfo,
   FailureAction,
   InboxKind,
   InboxStatus,
+  lockedChanges,
   NodeStatus,
   PLAN_PROBLEM_HINT,
   type PlanDTO,
+  type PlanGraph,
   PlanSource,
+  planEditRules,
   type SubmitPlanInput,
   TASK_KEY_PREFIX,
   TASK_TITLE_MAX_CHARS,
   TaskEvent,
   TaskFailedPhase,
   TaskStatus,
+  validatePlanGraph,
   type WorkflowDTO,
   WorkflowPlanning,
   WorktreeStatus,
@@ -58,18 +63,36 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
     work().catch((err: unknown) => log.error({ err, taskId }, 'task background work failed'));
   };
 
+  const materializeInput = (task: Task, plan: PlanDTO, workflow: WorkflowDTO) => ({
+    taskId: task.id,
+    planId: plan.id,
+    graph: plan.graph,
+    checkCommand: projects.getRecord(task.projectId).checkCommand,
+    defaultAcceptance: workflow.definition.defaultAcceptance,
+    acceptEachNode: task.checkpoints.accept_each_node,
+  });
+
   /** Confirms a plan version and creates its nodes; the scheduler dispatches them once this commits. */
   function confirmAndMaterialize(task: Task, plan: PlanDTO, workflow: WorkflowDTO): void {
     plans.confirm(plan.id);
     repo.update(task.id, { currentPlanId: plan.id, updatedAt: clock.now() });
-    nodes.materialize({
-      taskId: task.id,
-      planId: plan.id,
-      graph: plan.graph,
-      checkCommand: projects.getRecord(task.projectId).checkCommand,
-      defaultAcceptance: workflow.definition.defaultAcceptance,
-      acceptEachNode: task.checkpoints.accept_each_node,
-    });
+    nodes.materialize(materializeInput(task, plan, workflow));
+  }
+
+  /** A paused task's plan may change only steps that have not started (09 §2); NODE_NOT_EDITABLE otherwise. */
+  function assertStartedStepsKept(task: Task, graph: PlanGraph): void {
+    const confirmed = plans.confirmed(task.id);
+    if (confirmed === undefined) throw new Error(`Paused task ${task.key} has no confirmed plan`);
+    const locked = new Set(
+      nodes
+        .listByTask(task.id)
+        .filter((n) => !EDITABLE_NODE_STATUSES.includes(n.status))
+        .map((n) => n.key),
+    );
+    const changed = lockedChanges(confirmed.graph, graph, locked);
+    if (changed.length > 0) {
+      throw new AppError(ErrorCode.NodeNotEditable, 'Steps that have started cannot be changed', { nodes: changed });
+    }
   }
 
   function requestPlanReview(task: Task, plan: PlanDTO): void {
@@ -163,14 +186,17 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
     inBackground(taskId, () => prepare(taskId));
   }
 
-  /** The planner's feedback for the next draft: the re-planning request on the latest draft, if any. */
+  /** The planner's feedback for the next draft: a re-planning request made since the newest plan version, if any. */
   function pendingReplanFeedback(taskId: string): string | null {
     const [latest] = inbox.list({ taskId, kind: InboxKind.Plan }, InboxStatus.Resolved);
     if (latest?.kind !== InboxKind.Plan || latest.response === null || !('replanFeedback' in latest.response)) {
       return null;
     }
-    const [newest] = plans.list(taskId);
-    return newest?.version === latest.payload.version ? latest.response.replanFeedback : null;
+    const newest = plans.latest(taskId);
+    // The draft under review may be the user's edit of the item's version (M5-01), so compare times, not versions.
+    return newest !== undefined && latest.resolvedAt !== null && latest.resolvedAt >= newest.createdAt
+      ? latest.response.replanFeedback
+      : null;
   }
 
   // A planning attempt that ends without a plan fails the planning phase; an interrupted one is restarted by the
@@ -299,7 +325,10 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       });
     },
 
-    /** The user confirms the plan waiting for review (11 §6). */
+    /**
+     * The user confirms the plan waiting for review, or applies the adjusted plan of a paused task, which stays
+     * paused until resumed (11 §6).
+     */
     confirmPlan(taskId: string, version: number): void {
       const task = get(taskId);
       const draft = plans.draft(taskId);
@@ -310,10 +339,71 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
         });
       }
       const workflow = workflows.get(task.workflowId);
+      if (task.status === TaskStatus.Paused) {
+        // Steps may have started finishing since the draft was saved; check again against what runs now.
+        assertStartedStepsKept(task, draft.graph);
+        unit.transact(() => {
+          plans.confirm(draft.id);
+          repo.update(task.id, { currentPlanId: draft.id, updatedAt: clock.now() });
+          nodes.rematerialize(materializeInput(task, draft, workflow));
+        });
+        state.publish(taskId);
+        return;
+      }
       unit.transact(() => {
         const running = move(task, TaskEvent.PlanConfirmed);
         confirmAndMaterialize(running, draft, workflow);
         inbox.resolveOpen({ taskId, kind: InboxKind.Plan }, { confirmed: true });
+      });
+    },
+
+    /**
+     * A user-edited plan (11 §6 `PUT plan/draft`) becomes a new draft version: any change while it waits for review,
+     * only steps that have not started while the task is paused.
+     */
+    saveDraft(taskId: string, baseVersion: number, graph: PlanGraph): PlanDTO {
+      const task = get(taskId);
+      if (task.status !== TaskStatus.PlanReview && task.status !== TaskStatus.Paused) {
+        throw new AppError(ErrorCode.StateTransitionInvalid, `The plan of task ${task.key} cannot be edited now`, {
+          entity: 'task',
+          from: task.status,
+          event: 'edit_plan',
+        });
+      }
+      const latest = plans.latest(taskId);
+      if (latest === undefined || latest.version !== baseVersion) {
+        throw new AppError(ErrorCode.PlanVersionConflict, `Version ${baseVersion} is not the latest plan`, {
+          baseVersion,
+          latest: latest?.version ?? null,
+        });
+      }
+      if (task.status === TaskStatus.Paused) assertStartedStepsKept(task, graph);
+      const workflow = workflows.get(task.workflowId);
+      const problems = validatePlanGraph(graph, planEditRules(workflow.definition, latest.graph));
+      if (problems.length > 0) throw new AppError(ErrorCode.PlanInvalid, 'Plan graph is invalid', { problems });
+      return plans.createDraft({
+        taskId,
+        source: PlanSource.User,
+        graph,
+        summary: latest.summary,
+        assumptions: latest.assumptions,
+        feedback: null,
+        createdByAttemptId: null,
+      });
+    },
+
+    /** Stops dispatching new steps; steps at work finish (09 §2 `paused`). */
+    pause(taskId: string): void {
+      move(get(taskId), TaskEvent.Pause);
+    },
+
+    /** Dispatching continues; an adjustment that was saved but not applied is dropped. */
+    resume(taskId: string): void {
+      const task = get(taskId);
+      unit.transact(() => {
+        move(task, TaskEvent.Resume);
+        const draft = plans.draft(taskId);
+        if (draft !== undefined) plans.discard(draft.id);
       });
     },
 

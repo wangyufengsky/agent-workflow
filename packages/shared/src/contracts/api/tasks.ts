@@ -121,6 +121,14 @@ export type PlanSummaryDTO = z.infer<typeof planSummarySchema>;
 export const planSchema = planSummarySchema.extend({ graph: planGraphSchema });
 export type PlanDTO = z.infer<typeof planSchema>;
 
+/** `PUT /tasks/:id/plan/draft` (11 §6): a user-edited plan, based on the task's latest plan version. */
+export const saveDraftPlanRequestSchema = z.object({
+  id: z.string(),
+  baseVersion: z.number().int().min(1),
+  graph: planGraphSchema,
+});
+export type SaveDraftPlanRequest = z.infer<typeof saveDraftPlanRequestSchema>;
+
 /** Result card data, written when the task reaches review (M3-10). */
 export const taskResultSchema = z.object({
   /** Composed from the node summaries; for report workflows, the report itself. */
@@ -180,6 +188,8 @@ export const taskDetailSchema = taskSummarySchema.extend({
   }),
   /** The confirmed plan; while `plan_review`, the draft waiting for confirmation. */
   plan: planSchema.nullable(),
+  /** While `paused`: the adjusted plan waiting for confirmation (M5-02). */
+  draftPlan: planSchema.nullable(),
   nodes: z.array(nodeSummarySchema),
   activeAttempts: z.array(attemptSummarySchema),
   openInbox: z.array(inboxItemSchema),
