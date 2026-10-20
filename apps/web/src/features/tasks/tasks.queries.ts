@@ -9,16 +9,24 @@ import {
   deliverTaskOp,
   getNodeOp,
   getTaskOp,
+  getWorkflowOp,
   listRolesOp,
   listTasksOp,
   listWorkflowsOp,
+  type NodeDetailDTO,
   type NodeSummaryDTO,
   nodeDiffFileOp,
   nodeDiffOp,
+  type PlanGraph,
+  pauseTaskOp,
   rejectNodeOp,
   replanOp,
   requestChangesOp,
+  resumeTaskOp,
+  retryNodeOp,
   retryTaskOp,
+  saveDraftPlanOp,
+  skipNodeOp,
   type TaskDetailDTO,
   type TaskDisplayGroup,
   type TaskSummaryDTO,
@@ -34,6 +42,9 @@ export const workflowsQuery = queryOptions({
   queryKey: queryKeys.workflows,
   queryFn: async () => (await callOperation(listWorkflowsOp, {})).items,
 });
+
+export const workflowQuery = (id: string) =>
+  queryOptions({ queryKey: queryKeys.workflow(id), queryFn: () => callOperation(getWorkflowOp, { id }) });
 
 export const rolesQuery = queryOptions({
   queryKey: queryKeys.roles,
@@ -123,6 +134,30 @@ export const useRequestChanges = () =>
   );
 export const useReplan = () =>
   useTaskMutation((input: { id: string; feedback: string }) => callOperation(replanOp, input));
+export const usePauseTask = () => useTaskMutation((id: string) => callOperation(pauseTaskOp, { id }));
+export const useResumeTask = () => useTaskMutation((id: string) => callOperation(resumeTaskOp, { id }));
+
+/** A user-edited plan saved as a new draft version (M5-01 / M5-02); the task detail then shows it. */
+export function useSaveDraftPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; baseVersion: number; graph: PlanGraph }) => callOperation(saveDraftPlanOp, input),
+    onSuccess: (_plan, input) => queryClient.invalidateQueries({ queryKey: queryKeys.task(input.id), exact: true }),
+  });
+}
+
+/** Step actions of the pro view (M5-03): the node detail comes back; the task refetches through SSE. */
+function useNodeMutation<I extends { id: string; nodeId: string }>(run: (input: I) => Promise<NodeDetailDTO>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    onSuccess: (node) => queryClient.setQueryData(queryKeys.node(node.taskId, node.id), node),
+  });
+}
+export const useSkipNode = () =>
+  useNodeMutation((input: { id: string; nodeId: string }) => callOperation(skipNodeOp, input));
+export const useRetryNode = () =>
+  useNodeMutation((input: { id: string; nodeId: string; feedback?: string }) => callOperation(retryNodeOp, input));
 
 export function useAcceptNode() {
   const queryClient = useQueryClient();

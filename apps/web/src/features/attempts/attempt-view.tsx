@@ -47,6 +47,14 @@ export function AttemptView({ attemptId }: { attemptId: string }) {
             <dd>{C.tokenUsage(a.tokensInput, a.tokensOutput)}</dd>
           </>
         )}
+        {a.cost !== null && (
+          <>
+            <dt>{C.cost}</dt>
+            <dd>{C.costValue(a.cost)}</dd>
+          </>
+        )}
+        <dt>{C.time}</dt>
+        <dd>{C.timeRange(a.startedAt, a.endedAt)}</dd>
         {a.error !== null && (
           <>
             <dt>{C.error}</dt>

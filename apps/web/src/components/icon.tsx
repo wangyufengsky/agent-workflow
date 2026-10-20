@@ -28,6 +28,12 @@ const ICON_PATHS = {
   sparkle: 'M12 3l1.8 5.6L19.5 10l-5.7 1.6L12 17l-1.8-5.4L4.5 10l5.7-1.4z',
   logo: 'M20 12a8 8 0 1 1-3-6.2M20 4v4h-4M12 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
   layers: 'M12 3 2 8l10 5 10-5zM2 13l10 5 10-5',
+  lock: 'M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3',
+  pause: 'M8 5v14M16 5v14',
+  play: 'M7 4l13 8-13 8z',
+  skip: 'M5 5l10 7-10 7zM19 5v14',
+  edit: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
+  stop: 'M6 6h12v12H6z',
 } as const;
 export type IconName = keyof typeof ICON_PATHS;
 

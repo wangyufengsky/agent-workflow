@@ -1,0 +1,56 @@
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+.process {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.attempts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attempt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink-2);
+  font-size: 13px;
+  text-align: left;
+}
+
+.attempt[aria-current="true"] {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.attemptBody {
+  min-width: 0;
+}
+
+.instructions {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 13px;
+  color: var(--ink-2);
+}

@@ -1,10 +1,10 @@
 import '@xyflow/react/dist/base.css';
 import { NodeStatus } from '@aw/shared';
 import { type Edge, MiniMap, type Node, ReactFlow, ReactFlowProvider, useReactFlow, useStore } from '@xyflow/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import styles from './canvas.module.css';
-import { layoutGraph } from './layout.ts';
 import { type CanvasStep, TaskNode, type TaskNodeData } from './task-node.tsx';
+import { useGraphLayout } from './use-graph-layout.ts';
 
 const NODE_TYPES = { task: TaskNode };
 /** The minimap helps only for larger graphs (14 §5). */
@@ -22,7 +22,6 @@ type Props = {
 
 function Flow({ steps, selectedId, onSelect, onOpen }: Props) {
   const { fitView } = useReactFlow();
-  const [positions, setPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const fitted = useRef(false);
   const idOf = useMemo(() => new Map(steps.map((s) => [s.key, s.id])), [steps]);
   const edges = useMemo<Edge[]>(
@@ -46,17 +45,7 @@ function Flow({ steps, selectedId, onSelect, onOpen }: Props) {
       ),
     [steps, idOf],
   );
-  // Only the shape of the graph (not node states) decides the layout; a result for an outdated shape is dropped.
-  const latestShape = useRef('');
-  useEffect(() => {
-    const graph = { nodes: steps.map((s) => ({ id: s.id })), edges };
-    const shape = JSON.stringify(graph);
-    if (shape === latestShape.current) return;
-    latestShape.current = shape;
-    void layoutGraph(graph).then((layout) => {
-      if (latestShape.current === shape) setPositions(layout);
-    });
-  }, [steps, edges]);
+  const positions = useGraphLayout({ nodes: steps, edges });
 
   // Fit the first layout once React Flow has measured a visible canvas (it may start folded away); afterwards keep
   // the user's view.

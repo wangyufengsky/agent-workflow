@@ -12,15 +12,21 @@ import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { rolesQuery, useConfirmPlan, useReplan } from '../tasks/tasks.queries.ts';
 import { stepsOfPlan } from './steps.ts';
 import styles from './task-page.module.css';
+import { TaskPlanEditor } from './task-plan-editor.tsx';
 
-/** Plan waiting for confirmation (14 §3.3): read-only canvas, summary, assumptions; confirm or send feedback. */
-export function PlanReview({ task }: { task: TaskDetailDTO }) {
+/**
+ * Plan waiting for confirmation (14 §3.3): read-only canvas, summary, assumptions; confirm or send feedback. The pro
+ * view can edit the plan first (M5-01), which saves a new draft version.
+ */
+export function PlanReview({ task, pro }: { task: TaskDetailDTO; pro: boolean }) {
   const roles = useQuery(rolesQuery);
   const confirm = useConfirmPlan();
   const replan = useReplan();
   const [feedback, setFeedback] = useState('');
+  const [editing, setEditing] = useState(false);
   const { plan } = task;
   if (plan === null) return null;
+  if (editing) return <TaskPlanEditor task={task} base={plan} onDone={() => setEditing(false)} />;
   const sendFeedback = (e: FormEvent) => {
     e.preventDefault();
     replan.mutate({ id: task.id, feedback: feedback.trim() }, { onSuccess: () => setFeedback('') });
@@ -52,6 +58,11 @@ export function PlanReview({ task }: { task: TaskDetailDTO }) {
             >
               {C.confirmPlan}
             </Button>
+            {pro && (
+              <Button icon="edit" onClick={() => setEditing(true)}>
+                {C.editPlan}
+              </Button>
+            )}
             {confirm.isError && <ErrorState error={confirm.error} />}
           </div>
         </Panel>

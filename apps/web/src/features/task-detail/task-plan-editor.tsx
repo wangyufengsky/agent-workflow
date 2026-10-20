@@ -1,0 +1,74 @@
+import { type NodeStatus, type PlanGraph, planEditRules, type TaskDetailDTO } from '@aw/shared';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { checkPlan, type PlanLock } from '../../canvas/plan-check.ts';
+import { PlanEditor } from '../../canvas/plan-editor.tsx';
+import { Button } from '../../components/button.tsx';
+import { ErrorState } from '../../components/error-state.tsx';
+import { toast } from '../../components/toast.tsx';
+import { COMMON_COPY } from '../../copy/common.ts';
+import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { rolesQuery, useSaveDraftPlan, workflowQuery } from '../tasks/tasks.queries.ts';
+
+type Props = {
+  task: TaskDetailDTO;
+  /** The plan version the edit starts from: the task's latest (11 §6 `baseVersion`). */
+  base: { version: number; graph: PlanGraph };
+  lock?: PlanLock | undefined;
+  statuses?: ReadonlyMap<string, NodeStatus> | undefined;
+  /** Saved or abandoned: back to the read-only view. */
+  onDone: () => void;
+};
+
+/** Editing a task's plan (M5-01 / M5-02): the plan editor with the workflow's rules, saved as a new draft version. */
+export function TaskPlanEditor({ task, base, lock, statuses, onDone }: Props) {
+  const roles = useQuery(rolesQuery);
+  const workflow = useQuery(workflowQuery(task.workflow.id));
+  const save = useSaveDraftPlan();
+  const [graph, setGraph] = useState(base.graph);
+  if (workflow.isError) return <ErrorState error={workflow.error} onRetry={() => void workflow.refetch()} />;
+  if (roles.isError) return <ErrorState error={roles.error} onRetry={() => void roles.refetch()} />;
+  if (workflow.data === undefined || roles.data === undefined) return <p className="hint">{COMMON_COPY.loading}</p>;
+  const rules = planEditRules(workflow.data.definition, base.graph);
+  const problems = checkPlan(graph, rules, lock);
+  return (
+    <PlanEditor
+      graph={graph}
+      onChange={setGraph}
+      rules={rules}
+      roles={roles.data}
+      lock={lock}
+      statuses={statuses}
+      problems={problems}
+      actions={
+        <>
+          {save.isError && <ErrorState error={save.error} />}
+          <div className="row">
+            <Button
+              variant="primary"
+              icon="check"
+              pending={save.isPending}
+              disabled={problems.length > 0}
+              onClick={() =>
+                save.mutate(
+                  { id: task.id, baseVersion: base.version, graph },
+                  {
+                    onSuccess: (plan) => {
+                      toast(C.planSaved(plan.version));
+                      onDone();
+                    },
+                  },
+                )
+              }
+            >
+              {C.saveEdits}
+            </Button>
+            <Button variant="ghost" onClick={onDone}>
+              {C.cancelEdits}
+            </Button>
+          </div>
+        </>
+      }
+    />
+  );
+}

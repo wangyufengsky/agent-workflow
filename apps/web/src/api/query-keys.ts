@@ -9,6 +9,8 @@ export const queryKeys = {
   attempt: (id: string) => ['attempts', id],
   transcript: (id: string) => ['attempts', id, 'transcript'],
   workflows: ['workflows'],
+  workflow: (id: string) => ['workflows', id],
+  workflowVersions: (key: string) => ['workflows', 'versions', key],
   roles: ['roles'],
   /** Every task list (all filters) shares this prefix. */
   taskLists: ['tasks', 'list'],

@@ -10,6 +10,7 @@ import { GitConsolePage } from '../features/git/git-console.page.tsx';
 import { GIT_TABS, GitProjectPage } from '../features/git/git-project.page.tsx';
 import { HomePage } from '../features/home/home.page.tsx';
 import { InboxPage } from '../features/inbox/inbox.page.tsx';
+import { NodePage } from '../features/node-detail/node.page.tsx';
 import { OnboardingPage } from '../features/onboarding/onboarding.page.tsx';
 import { ComingSoonPage } from '../features/pro/coming-soon.page.tsx';
 import { ProOnly } from '../features/pro/pro-only.tsx';
@@ -114,9 +115,21 @@ const tasksRoute = createRoute({
 const taskRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.task,
-  // `?node=<id>` selects a step on the canvas; `open` shows its details drawer (14 §3.4).
-  validateSearch: z.object({ node: z.string().optional(), open: z.boolean().optional() }),
+  // `?node=<id>` selects a step on the canvas; `open` shows its details drawer (14 §3.4); `details` shows the pro view
+  // of this task in simple mode (D19).
+  validateSearch: z.object({
+    node: z.string().optional(),
+    open: z.boolean().optional(),
+    details: z.boolean().optional(),
+  }),
   component: TaskPage,
+});
+const nodeRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.node,
+  // `?attempt=<id>` shows one attempt; the latest by default (M5-04).
+  validateSearch: z.object({ attempt: z.string().optional() }),
+  component: NodePage,
 });
 const gitRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -156,6 +169,7 @@ const routeTree = rootRoute.addChildren([
     homeRoute,
     tasksRoute,
     taskRoute,
+    nodeRoute,
     page(ROUTES.inbox, InboxPage),
     projectsRoute,
     projectRoute,

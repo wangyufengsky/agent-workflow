@@ -1,0 +1,60 @@
+import { PlanProblemCode, WorkflowProblemCode } from '@aw/shared';
+
+export const CANVAS_COPY = {
+  locked: '已开始，不能修改',
+} as const;
+
+export const PLAN_EDITOR_COPY = {
+  canvasLabel: '计划画布',
+  addStep: '添加步骤',
+  newStepTitle: '新步骤',
+  step: '步骤',
+  noSelection: '在画布上点选一个步骤，或添加步骤。从一个步骤右侧的圆点拖到另一个步骤左侧即可连线（后者依赖前者）。',
+  key: '标识',
+  keyHint: '小写字母、数字与下划线，计划内唯一',
+  keyPattern: '只能用小写字母、数字与下划线（最长 40）',
+  keyTaken: '已有步骤使用这个标识',
+  title: '标题',
+  role: '角色',
+  instructions: '指令',
+  dependsOn: '依赖的步骤',
+  noOtherSteps: '没有其他步骤',
+  acceptance: '检查',
+  useDefaultAcceptance: '使用流程的默认检查',
+  commands: '检查命令',
+  commandPlaceholder: '$PROJECT_CHECK',
+  commandHint: '$PROJECT_CHECK 代表项目的检查命令',
+  addCommand: '添加命令',
+  removeCommand: '删除命令',
+  aiReview: 'AI 评审',
+  reviewFocus: '评审重点（可选）',
+  manual: '人工验收',
+  removeStep: '删除步骤',
+  lockedNote: '这个步骤已经开始，只能查看。',
+  problems: '需要修正',
+  noProblems: '计划可以保存。',
+  incomplete: (key: string) => `步骤 ${key} 的标题、指令与检查命令不能为空`,
+  lockedChanged: (keys: string[]) => `已开始的步骤不能修改或删除：${keys.join('、')}`,
+} as const;
+
+/** Plan problem sub-codes (08 §5.3) in the editor's words. */
+export const PLAN_PROBLEM_LABEL: Record<PlanProblemCode, string> = {
+  [PlanProblemCode.Empty]: '计划至少需要一个步骤',
+  [PlanProblemCode.TooManyNodes]: '步骤太多，请合并相近的步骤',
+  [PlanProblemCode.DuplicateKey]: '有重复的步骤标识',
+  [PlanProblemCode.UnknownDependency]: '依赖了不存在的步骤',
+  [PlanProblemCode.Cycle]: '依赖形成了环',
+  [PlanProblemCode.UnknownRole]: '流程不允许这个角色',
+  [PlanProblemCode.MissingRequiredStep]: '缺少流程要求的步骤',
+  [PlanProblemCode.RequiredStepOrder]: '流程要求的步骤位置不对（必须最先或最后）',
+  [PlanProblemCode.InstructionsTooLong]: '指令太长',
+};
+
+/** Workflow definition problem sub-codes (08 §5.4). */
+export const WORKFLOW_PROBLEM_LABEL: Record<WorkflowProblemCode, string> = {
+  [WorkflowProblemCode.NoAllowedRoles]: '至少允许一个角色',
+  [WorkflowProblemCode.RoleNotFound]: '角色不存在',
+  [WorkflowProblemCode.MissingPlanner]: '需要选择规划者角色',
+  [WorkflowProblemCode.PlannerRoleInvalid]: '规划者角色的基础类型必须是「规划」',
+  [WorkflowProblemCode.MissingTemplate]: '固定流程需要步骤模板',
+};
