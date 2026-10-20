@@ -2,6 +2,7 @@ import { PromptName, renderTemplate, SYSTEM_NODES } from '@aw/builtin';
 import {
   AppError,
   ChangeRequestReason,
+  type DeliveryDTO,
   DeliveryStatus,
   ErrorCode,
   InboxKind,
@@ -24,8 +25,12 @@ const leafKeys = (nodes: ReadonlyArray<{ key: string; dependsOn: readonly string
  * Sending a task in review back to the AI (09 §2 `changes_requested`, 13 §4): a new plan version with one more step —
  * the user's requested changes, or the resolution of a conflicting merge — confirmed at once; back to `running`.
  */
-export function createTaskChanges(deps: TasksServiceDeps, state: TaskState) {
-  const { unit, prompts, projects, workflows, plans, nodes, inbox, deliveries, locks } = deps;
+export function createTaskChanges(
+  deps: TasksServiceDeps,
+  state: TaskState,
+  currentDelivery: (taskId: string) => DeliveryDTO | null,
+) {
+  const { unit, prompts, projects, workflows, plans, nodes, inbox, locks } = deps;
   const { get, move } = state;
 
   /**
@@ -67,7 +72,7 @@ export function createTaskChanges(deps: TasksServiceDeps, state: TaskState) {
           resultSummary: task.result?.summary ?? '',
         });
       } else {
-        const delivery = deliveries.latest(taskId);
+        const delivery = currentDelivery(taskId);
         if (delivery?.status !== DeliveryStatus.Conflict) {
           throw new AppError(ErrorCode.ValidationFailed, 'The last delivery did not conflict', {
             issues: [{ path: ['reason'], message: 'conflict needs a conflicting delivery' }],

@@ -68,6 +68,8 @@ describe('交给 AI 解决冲突（13 §4）', () => {
       files: [{ path: 'greet.ts', additions: 1, deletions: 1 }],
     });
     expect(inReview.result?.filesChanged).toBe(1);
+    // Back in review, the earlier conflict no longer describes the task (it would keep offering conflict actions).
+    expect(inReview.lastDelivery).toBeNull();
 
     const { body: done } = await t.call(deliverTaskOp, { id: second.id, strategy: 'squash' });
     expect(done).toMatchObject({ status: 'completed', lastDelivery: { status: 'succeeded' } });

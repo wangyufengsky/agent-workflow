@@ -33,7 +33,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   const actions = createTaskActions(deps, state, lifecycle);
   const diffs = createTaskDiffs(deps, state);
   const delivery = createTaskDelivery(deps, state);
-  const changes = createTaskChanges(deps, state);
+  const changes = createTaskChanges(deps, state, delivery.current);
 
   // A task's summary shows its open attention items, working steps and progress line; keep it current.
   deps.events.subscribe((event) => {

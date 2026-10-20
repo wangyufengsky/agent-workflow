@@ -160,6 +160,9 @@ describe('交付：本地合并（09 §7）', () => {
     db.prepare(
       `INSERT INTO deliveries (id, task_id, strategy, target_branch, status, created_at) VALUES ('d1', ?, 'squash', 'main', 'running', 0)`,
     ).run(task.id);
+    db.prepare(
+      `INSERT INTO task_events (task_id, entity, entity_id, type, to_status, created_at) VALUES (?, 'delivery', 'd1', 'note', 'running', 0)`,
+    ).run(task.id);
     db.close();
 
     t = await createTestApp({ dataDir: t.dataDir });

@@ -8,6 +8,7 @@ import {
   InboxKind,
   isLocalMerge,
   TaskEvent,
+  TaskEventEntity,
   TaskStatus,
   taskMachine,
   transition,
@@ -16,6 +17,7 @@ import {
 } from '@aw/shared';
 import { checkDeliverable, type MergeOutcome, mergeLocally, pushBranch } from '../delivery/index.ts';
 import type { GitHostingProvider } from '../hosting/index.ts';
+import { latestTaskEventId } from '../timeline/index.ts';
 import type { Worktree } from '../worktrees/index.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
@@ -28,8 +30,24 @@ const errorInfoOf = (err: unknown): ErrorInfo =>
  * delivery record, the merge or pull request, and the outcome; a completed task's worktree is removed.
  */
 export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
-  const { unit, clock, log, settings, projects, workflows, worktrees, inbox, deliveries, locks } = deps;
+  const { db, unit, clock, log, settings, projects, workflows, worktrees, inbox, deliveries, locks } = deps;
   const { get, move } = state;
+
+  /**
+   * The latest delivery of the current review round (11 §5.2): made after the task last reached review. Once the AI
+   * was sent back (再改改 / 解决冲突), an earlier conflict or failure no longer describes the task.
+   */
+  function current(taskId: string): DeliveryDTO | null {
+    const delivery = deliveries.latest(taskId);
+    if (delivery === undefined) return null;
+    const reviewed = latestTaskEventId(db, taskId, { entity: TaskEventEntity.Task, type: TaskEvent.AllNodesFinished });
+    const started = latestTaskEventId(db, taskId, {
+      entity: TaskEventEntity.Delivery,
+      type: 'note',
+      entityId: delivery.id,
+    });
+    return started > reviewed ? delivery : null;
+  }
 
   function readyWorktree(task: Task): Worktree {
     const worktree = worktrees.findByTask(task.id);
@@ -130,6 +148,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
   }
 
   return {
+    current,
     async deliver(taskId: string, request: Omit<DeliverRequest, 'id'>): Promise<void> {
       const task = get(taskId);
       transition(taskMachine, task.status, TaskEvent.Deliver, TaskStatus.Merging);
@@ -177,7 +196,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
       }
     },
 
-    lastDelivery: (taskId: string): DeliveryDTO | null => deliveries.latest(taskId) ?? null,
+    lastDelivery: current,
 
     /** Startup: a delivery cut short by the previous run failed; its task waits in review for another try. */
     recover(): void {

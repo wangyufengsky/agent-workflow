@@ -128,7 +128,7 @@ type TaskDetailDTO = {
   activeAttempts: AttemptSummaryDTO[];
   openInbox: InboxItemDTO[];
   result?: TaskResultDTO;         // review 及之后
-  lastDelivery?: DeliveryDTO;     // 最近一次交付：{ id, strategy, targetBranch, status, commitSha?, prUrl?, conflictFiles?, error?, createdAt, finishedAt? }
+  lastDelivery?: DeliveryDTO;     // 本轮（最近一次进入 review 以来）最近的交付；「再改改」/「解决冲突」后回到 review 即为空：{ id, strategy, targetBranch, status, commitSha?, prUrl?, conflictFiles?, error?, createdAt, finishedAt? }
   createdAt: number; updatedAt: number; startedAt?: number; finishedAt?: number;
 };
 ```
