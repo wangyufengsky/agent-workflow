@@ -43,3 +43,12 @@ export async function readHead(repo: string): Promise<{ branch: string | undefin
   ]);
   return { branch: branch.exitCode === 0 ? branch.stdout.trim() : undefined, commit: commit.stdout.trim() };
 }
+
+/** Whether a local branch exists. */
+export async function branchExists(repo: string, branch: string): Promise<boolean> {
+  const { exitCode } = await runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], {
+    cwd: repo,
+    okExitCodes: [0, 1],
+  });
+  return exitCode === 0;
+}

@@ -97,13 +97,12 @@ describe('尝试的结束条件（12 §4.2）', () => {
 
   it('超过 attempt.timeoutMinutes 时中止会话并失败 ATTEMPT_TIMEOUT', async () => {
     await t.call(updateSettingsOp, { 'attempt.timeoutMinutes': 5 });
-    // A pending permission keeps the turn open without going idle.
-    t.fake.enqueue(script().requestPermission('bash', ['make deploy']));
-    const asked = waitForEvent(t.app.events, ServerEventType.AttemptTranscript, (d) =>
-      d.entries.some((e) => e.kind === 'permission'),
+    t.fake.enqueue(script().text('Working on it').hang());
+    const working = waitForEvent(t.app.events, ServerEventType.AttemptTranscript, (d) =>
+      d.entries.some((e) => e.kind === 'text'),
     );
     const started = await startAttempt();
-    await asked;
+    await working;
 
     clock.advance(5 * 60_000 - 1);
     expect((await t.call(getAttemptOp, { id: started.id })).body.status).toBe('running');

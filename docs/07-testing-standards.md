@@ -14,7 +14,7 @@
 | --- | --- | --- | --- | --- | --- |
 | 单元 | Vitest | 纯逻辑：状态机表、计划校验、调度决策函数、git 输出解析器、配置生成、检查点解析、错误映射、主题对比度 | 无 IO | 被测文件旁 `*.test.ts` | `pnpm test` |
 | 集成 | Vitest | 模块 service 与 HTTP/MCP 接口：从 API 或 MCP 调用到数据库与 Git 结果 | 真实 SQLite（临时文件）、真实 git（临时仓库）、FakeOpencode、假 Hosting 服务 | `*.int.test.ts` | `pnpm test:int` |
-| opencode 集成 | Vitest，标记 `@opencode` | runtime 托管、配置注入、插件、事件解析 | 本机真实 opencode 1.19.0，**不调用模型**（只启动、读配置、建会话、发 `noReply` 消息）；唯一例外是 bridge 插件测试（只有模型能让 opencode 调用工具），用免费模型（D42） | `*.oc.test.ts` | `pnpm test:oc`（先构建插件） |
+| opencode 集成 | Vitest，标记 `@opencode` | runtime 托管、配置注入、插件、事件解析 | 本机真实 opencode 1.19.0，**不调用模型**（只启动、读配置、建会话、发 `noReply` 消息）；唯一例外是 bridge 插件测试（只有模型能让 opencode 调用工具），用免费模型 `TEST_MODEL`（D50） | `*.oc.test.ts` | `pnpm test:oc`（先构建插件） |
 | E2E | Playwright | 关键用户旅程（§5） | 浏览器模式：后端 + FakeOpencode；Electron 模式：打包产物 | `e2e/` | `pnpm e2e` / `pnpm e2e:electron` |
 | live | Vitest，标记 `@live` | 真实模型跑内置流程 | 真实 opencode + 模型 + 示例仓库 | `live/` | `pnpm test:live`（手动，不进 CI） |
 
@@ -49,7 +49,7 @@
 
 | 名称 | 位置 | 说明 |
 | --- | --- | --- |
-| `FakeOpencode` | `packages/server/test/fakes/fake-opencode.ts` | 实现 `OpencodeClient` 接口；`fake.enqueue(script()…)` 为下一条发给会话的消息排一个回合：`edit(file, content)`、`text(…)`、`callTool(name, args)`、`ask(...)`、`requestPermission(...)`、`error(...)`，回合结束即空闲（没有排脚本的消息直接空闲）；真实写 worktree 文件、真实通过 MCP 调用后端（注入 `__aw_session`）。可断言 `sessions`、`prompts`、`toolCalls`、`aborts`、`permissionReplies`；`crash()` 模拟运行时消失；`settled()` 等待已开始的回合放完。浏览器 E2E 中后端以 `AW_FAKE_OPENCODE=1`（仅开发模式）使用它 |
+| `FakeOpencode` | `packages/server/test/fakes/fake-opencode.ts` | 实现 `OpencodeClient` 接口；`fake.enqueue(script()…, match?)` 为之后发给会话的消息排一个回合（`match` 按会话标题、agent、目录的子串选会话，第一个匹配的脚本生效）：`edit(file, content)`、`text(…)`、`callTool(name, args)`、`ask(...)`、`requestPermission(...)`、`hang()`（一直工作直到被中止）、`error(...)`，回合结束即空闲（没有排脚本的消息直接空闲）；真实写 worktree 文件、真实通过 MCP 调用后端（注入 `__aw_session`）。可断言 `sessions`、`prompts`、`toolCalls`、`aborts`、`permissionReplies`；`crash()` 模拟运行时消失；`settled()` 等待已开始的回合放完。浏览器 E2E 中后端以 `AW_FAKE_OPENCODE=1`（仅开发模式）使用它，spec 经开发接口 `POST /api/v1/dev/fake-opencode/scripts` 排回合（按项目的 worktree 目录匹配，互不干扰）；`createTestApp({ dataDir, fake })` 复用同一个 FakeOpencode 模拟后端重启 |
 | `FakeHosting` | `test/fakes/fake-hosting.ts` | 本地 HTTP 服务模拟 GitHub/GitLab 用到的少数端点 |
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
 | `createTestApp()` | `test/helpers/app.ts` | 启动后端（临时数据目录、随机端口），返回类型化 API 调用 `call(op, input)`、`mcpUrl`、FakeOpencode；`realOpencode: true` 用于 `@opencode` 测试；MCP SDK 客户端见 `test/helpers/mcp.ts` |
@@ -78,7 +78,8 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 
 ## 6. live 测试
 
-- 示例仓库：`live/fixtures/` 下两个小项目（TS + Vitest、Java + Maven），各带一个已知缺陷和一个功能需求。
+- 示例仓库：`live/fixtures/` 下的小项目，各带一个已知缺陷和一个功能需求：`ts-stats`（TypeScript + `node --test`，M3-12）；Java + Maven 随 M6-05。说明见 `live/fixtures/README.md`。
+- M3-12 冒烟 `live/smoke.live.test.ts`：`bugfix` 与 `feature` 各跑一次，报告写到 `live/reports/smoke-<时间>.json`（尝试、提醒次数、用量、`submit_*` 调用成败）。
 - 用例：五个内置流程各一次；统计 `submit_*` 调用成功率、尝试次数、耗时、成本，输出报告到 `live/reports/`。
 - 不作为通过/失败的硬门槛（模型有随机性），但内置提示词改动的 PR 必须附 live 报告对比。
 

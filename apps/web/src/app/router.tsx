@@ -1,3 +1,4 @@
+import { taskDisplayGroupSchema } from '@aw/shared';
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect } from '@tanstack/react-router';
 import { z } from 'zod';
@@ -6,6 +7,7 @@ import { ErrorState } from '../components/error-state.tsx';
 import { ToastHost } from '../components/toast.tsx';
 import { ComponentGalleryPage } from '../features/dev/component-gallery.page.tsx';
 import { HomePage } from '../features/home/home.page.tsx';
+import { InboxPage } from '../features/inbox/inbox.page.tsx';
 import { OnboardingPage } from '../features/onboarding/onboarding.page.tsx';
 import { ComingSoonPage } from '../features/pro/coming-soon.page.tsx';
 import { ProOnly } from '../features/pro/pro-only.tsx';
@@ -15,6 +17,8 @@ import { projectsQuery } from '../features/projects/projects.queries.ts';
 import { RuntimePage } from '../features/runtime/runtime.page.tsx';
 import { SettingsPage } from '../features/settings/settings.page.tsx';
 import { settingsQuery, useSettings } from '../features/settings/settings.queries.ts';
+import { TaskPage } from '../features/task-detail/task.page.tsx';
+import { TasksPage } from '../features/tasks/tasks.page.tsx';
 import { useAppliedTheme } from '../theme/use-applied-theme.ts';
 import { ROUTES } from './routes.ts';
 import { AppShell } from './shell/app-shell.tsx';
@@ -87,6 +91,26 @@ const runtimeRoute = createRoute({
     </ProOnly>
   ),
 });
+const homeRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.home,
+  // The project to start a task in; kept in the URL so a reload or link keeps it.
+  validateSearch: z.object({ projectId: z.string().optional() }),
+  component: HomePage,
+});
+const tasksRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.tasks,
+  validateSearch: z.object({ projectId: z.string().optional(), displayGroup: taskDisplayGroupSchema.optional() }),
+  component: TasksPage,
+});
+const taskRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.task,
+  // `?node=<id>` selects a step on the canvas; `open` shows its details drawer (14 §3.4).
+  validateSearch: z.object({ node: z.string().optional(), open: z.boolean().optional() }),
+  component: TaskPage,
+});
 const projectRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.project,
@@ -96,9 +120,10 @@ const projectRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   onboardingRoute,
   shellRoute.addChildren([
-    page(ROUTES.home, HomePage),
-    page(ROUTES.tasks, () => <ComingSoonPage icon="list" />),
-    page(ROUTES.inbox, () => <ComingSoonPage icon="inbox" />),
+    homeRoute,
+    tasksRoute,
+    taskRoute,
+    page(ROUTES.inbox, InboxPage),
     projectsRoute,
     projectRoute,
     page(ROUTES.settings, SettingsPage),

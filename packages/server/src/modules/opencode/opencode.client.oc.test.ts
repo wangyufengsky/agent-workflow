@@ -8,7 +8,7 @@ import { sessionPermissionRules } from './opencode.config.ts';
 let t: TestApp;
 beforeEach(async () => {
   t = await createTestApp({ realOpencode: true });
-  await t.app.startRuntime(t.port);
+  await t.app.start(t.port);
 });
 afterEach(() => t.close());
 

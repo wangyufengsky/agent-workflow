@@ -49,7 +49,7 @@ describe('opencode 运行时', () => {
   it('启动后进程退出时自动重启一次，之后停在 crashed', async () => {
     // The second crash: the automatic restart has been used up.
     const settled = waitForEvent(t.app.events, ServerEventType.RuntimeUpdated, nthCrash(2));
-    await t.app.startRuntime(t.port);
+    await t.app.start(t.port);
     await settled;
 
     expect(await launchCount()).toBe(2);
@@ -58,7 +58,7 @@ describe('opencode 运行时', () => {
 
   it('手动重启重新允许一次自动重启', async () => {
     const firstRound = waitForEvent(t.app.events, ServerEventType.RuntimeUpdated, nthCrash(2));
-    await t.app.startRuntime(t.port);
+    await t.app.start(t.port);
     await firstRound;
 
     const secondRound = waitForEvent(t.app.events, ServerEventType.RuntimeUpdated, nthCrash(2));
@@ -71,7 +71,7 @@ describe('opencode 运行时', () => {
     const empty = await mkdtemp(join(tmpdir(), 'aw-empty-'));
     await t.close();
     t = await createTestApp({ env: { PATH: empty, HOME: empty }, realOpencode: true });
-    await t.app.startRuntime(t.port);
+    await t.app.start(t.port);
     expect((await t.call(getRuntimeOp, {})).body.status).toBe(RuntimeStatus.NotInstalled);
 
     bin = empty;

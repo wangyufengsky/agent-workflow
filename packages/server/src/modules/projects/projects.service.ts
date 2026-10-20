@@ -13,7 +13,7 @@ import {
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
-import { readDefaultBranch, readOriginUrl, readRepoRoot, runGit } from '../git/index.ts';
+import { branchExists, readDefaultBranch, readOriginUrl, readRepoRoot } from '../git/index.ts';
 import { inferRepoCheckCommand, parseRemoteUrl } from './projects.inference.ts';
 import { createProjectsRepo } from './projects.repo.ts';
 
@@ -61,6 +61,8 @@ export function createProjectsService({ db, clock }: ProjectsServiceDeps) {
 
   return {
     list: (): ProjectDTO[] => repo.list(),
+    /** The stored project, without the remote inference of `get`. */
+    getRecord: require,
 
     get: (id: string): Promise<ProjectDetailDTO> => detail(require(id)),
 
@@ -94,11 +96,7 @@ export function createProjectsService({ db, clock }: ProjectsServiceDeps) {
     async update({ id, ...changes }: UpdateProjectRequest): Promise<ProjectDetailDTO> {
       const project = require(id);
       if (changes.defaultBranch !== undefined) {
-        const { exitCode } = await runGit(['rev-parse', '--verify', '--quiet', `refs/heads/${changes.defaultBranch}`], {
-          cwd: project.repoPath,
-          okExitCodes: [0, 1],
-        });
-        if (exitCode !== 0) {
+        if (!(await branchExists(project.repoPath, changes.defaultBranch))) {
           throw new AppError(ErrorCode.GitBaseBranchNotFound, 'Branch does not exist', {
             branch: changes.defaultBranch,
           });
@@ -108,9 +106,10 @@ export function createProjectsService({ db, clock }: ProjectsServiceDeps) {
       return detail(require(id));
     },
 
+    /** The tasks module removes the project's tasks first (PROJECT_HAS_ACTIVE_TASKS while any is unfinished). */
     delete(id: string): void {
       require(id);
-      // TODO(M3-03): refuse with PROJECT_HAS_ACTIVE_TASKS once tasks exist; TODO(M4-05): delete the hosting credential.
+      // TODO(M4-05): delete the hosting credential.
       repo.delete(id);
     },
   };

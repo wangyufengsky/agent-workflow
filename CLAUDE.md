@@ -1,6 +1,6 @@
 # agent-workflow · AI 编码助手须知
 
-当前阶段：**M2（opencode 托管与 MCP）已完成，下一步 M3**。开始任何开发任务前，先读：
+当前阶段：**M3（任务主链路·简单模式）已完成，下一步 M4**。开始任何开发任务前，先读：
 
 1. `docs/06-coding-standards.md`：找根因不兜底、不过度防御、状态只经状态机、一处定义。
 2. `docs/07-testing-standards.md`：测行为不测实现、少而有效、真实 SQLite/Git、缺陷先写失败测试、禁止 sleep。
@@ -12,4 +12,4 @@
 
 文档、注释与界面文案用中文；代码标识符、日志消息、提交信息用英文。
 
-常用命令：`pnpm dev`（桌面开发）、`pnpm verify`（提交前全量检查：类型、lint、依赖边界、单元与集成测试、构建）、`pnpm e2e`、`pnpm e2e:electron`（需先 `pnpm build`）。
+常用命令：`pnpm dev`（桌面开发）、`pnpm verify`（提交前全量检查：类型、lint、依赖边界、单元与集成测试、构建）、`pnpm e2e`、`pnpm e2e:electron`（需先 `pnpm build`）、`pnpm test:oc` 与 `pnpm test:live`（真实 opencode；默认免费模型 `opencode-go/beam-free`，`AW_OC_TEST_MODEL` 可覆盖）。

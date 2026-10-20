@@ -37,7 +37,14 @@ export const nodeMachine = defineMachine<NodeStatus, NodeEvent>({
       [E.Interrupted]: [S.Ready],
       [E.Cancel]: [S.Cancelled],
     },
-    [S.WaitingInput]: { [E.InputAnswered]: [S.Running], [E.Cancel]: [S.Cancelled] },
+    // The attempt keeps running while it waits; it can still fail (user abort) or be interrupted (runtime lost while a
+    // permission request was pending: the request dies with the runtime).
+    [S.WaitingInput]: {
+      [E.InputAnswered]: [S.Running],
+      [E.AttemptFailed]: [S.Ready, S.Failed],
+      [E.Interrupted]: [S.Ready],
+      [E.Cancel]: [S.Cancelled],
+    },
     [S.Verifying]: {
       [E.ChecksPassed]: [S.AwaitingAcceptance, S.Done],
       [E.ChecksFailed]: [S.Ready, S.Failed],

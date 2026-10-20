@@ -44,6 +44,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `PlanSource` | `ai` · `template` · `user` |
 | `CheckpointKey` | `confirm_plan`（运行前确认计划）· `accept_each_node`（每个节点人工验收）· `ask_on_uncertainty`（不确定时停下来问） |
 | `AcceptanceCheckKind` | `command`（在 worktree 运行命令，退出码 0 为通过）· `ai_review`（评审角色会话） |
+| `TaskEventEntity` | `task` · `node` · `attempt` · `plan` · `delivery`（`task_events.entity`） |
 
 各状态含义与转换见 [09-state-machines.md](09-state-machines.md)。
 
@@ -99,7 +100,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DbType` | `mysql` |
 | `CredentialKind` | `git_token` · `db_password` |
 | `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` |
-| `TranscriptSystemEvent` | `attempt_started` · `nudged` · `retrying` · `result_submitted` · `timed_out` · `aborted` · `runtime_lost`（`system` 会话流条目记录的事件，文案在前端） |
+| `TranscriptSystemEvent` | `attempt_started` · `nudged` · `retrying` · `result_submitted` · `awaiting_input`（等待用户回答或授权）· `timed_out` · `aborted` · `runtime_lost`（`system` 会话流条目记录的事件，文案在前端） |
 | `McpToolName` | 执行 MCP 工具名（12 §6）；`ATTEMPT_SUBMIT_TOOL` 为每种尝试的提交工具 |
 | `BashPolicy` | `auto`（默认放行，禁止 Git 写操作）· `ask`（只读命令放行，其余询问） |
 | `OperationRisk` | `read` · `write` · `critical`（操作清单风险等级，决定助手确认行为，见 15 §4） |
@@ -138,6 +139,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DEV_API_PORT` / `DEV_WEB_PORT` | `47821` / `47822` | 仅开发；生产后端随机端口（D31） |
 | `MCP_EXEC_PATH` | `/mcp/exec` | |
 | `MCP_ASSISTANT_PATH` | `/mcp/assistant` | v1.1 |
+| `PROJECT_CHECK_PLACEHOLDER` | `$PROJECT_CHECK` | 验收命令中代表项目检查命令，物化节点时替换（13 §1） |
+| `GIT_COMMIT_IDENTITY` | `agent-workflow <agent-workflow@localhost>` | 节点完成时后端提交的作者与提交者（09 §3） |
 
 `constants/opencode.ts`：
 
@@ -146,7 +149,6 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `OPENCODE_START_TIMEOUT_MS` | `30000` | `opencode serve` 报告地址并响应 `/config` 的时限 |
 | `MCP_TOOL_PREFIX` | `agent-workflow_` | opencode 中本项目 MCP 工具名的前缀 |
 | `MCP_SESSION_ARG` | `__aw_session` | bridge 插件注入的会话 id 参数名（12 §3） |
-| `ATTEMPT_BASE_AGENT` | `{ plan: planner, execute: executor, review: reviewer }` | 尝试类型对应的基础 agent |
 | `BASH_PERMISSION_PRESETS` | `readonly` / `auto` / `ask` 三套规则 | 会话级 bash 规则（12 §2） |
 
 ### 4.2 限制值（`constants/limits.ts`）
@@ -156,8 +158,10 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `PLAN_MAX_NODES` | 20 |
 | `NODE_INSTRUCTIONS_MAX_CHARS` | 8000 |
 | `REQUIREMENT_MAX_CHARS` | 20000 |
+| `TASK_TITLE_MAX_CHARS` | 80（未填标题时由需求首行截取） |
 | `ATTEMPT_MAX_NUDGES` | 1 |
 | `ACCEPTANCE_COMMAND_TIMEOUT_MS` | 600000 |
+| `ACCEPTANCE_OUTPUT_MAX_CHARS` | 20000（验收命令输出保留末尾这么多字符） |
 | `DB_QUERY_MAX_ROWS` | 200 |
 | `DB_QUERY_TIMEOUT_MS` | 15000 |
 | `TRANSCRIPT_PAGE_SIZE` | 200 |
@@ -249,6 +253,7 @@ class AppError extends Error {
 | `PLAN_INVALID` | 400 | 计划图校验失败；`details.problems[]`，每项 `{ code, nodeKey?, message }`，子码见 5.3 |
 | `NODE_NOT_FOUND` | 404 | |
 | `NODE_NOT_EDITABLE` | 409 | 调整计划时修改了已开始的节点 |
+| `NODE_ATTEMPTS_EXHAUSTED` | — | 节点用完重试预算仍未通过（记录在任务的 `failure` 上，不作为 HTTP 错误）；`details: { nodeKey, nodeTitle, feedback }` |
 | **尝试 / opencode** | | |
 | `ATTEMPT_NOT_FOUND` | 404 | |
 | `ATTEMPT_NO_RESULT` | — | 会话结束但未提交结果（记录在尝试上，不作为 HTTP 错误） |

@@ -1,8 +1,9 @@
 import { AttemptKind, McpToolName, submitResultInputSchema, submitResultOutputSchema } from '@aw/shared';
 import type { DebugService } from '../../debug/index.ts';
+import type { TasksService } from '../../tasks/index.ts';
 import { defineMcpTool } from '../mcp.registry.ts';
 
-export const submitResultTool = (debug: DebugService) =>
+export const submitResultTool = (tasks: TasksService, debug: DebugService) =>
   defineMcpTool({
     name: McpToolName.SubmitResult,
     description:
@@ -10,6 +11,8 @@ export const submitResultTool = (debug: DebugService) =>
     allowedKinds: [AttemptKind.Execute],
     input: submitResultInputSchema,
     output: submitResultOutputSchema,
-    // TODO(M3-06): node attempts write the node result and move the node to acceptance.
-    handler: (input, { attempt }) => debug.submitResult(attempt, input),
+    handler: async (input, { attempt }) =>
+      attempt.taskId === null
+        ? debug.submitResult(attempt, input)
+        : { accepted: true as const, next: await tasks.submitResult(attempt, input) },
   });

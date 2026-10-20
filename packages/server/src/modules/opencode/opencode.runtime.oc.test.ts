@@ -14,7 +14,7 @@ afterEach(() => t.close());
 
 describe('@opencode 运行时托管', () => {
   it('启动到 ready；进程被杀后自动恢复', async () => {
-    await t.app.startRuntime(t.port);
+    await t.app.start(t.port);
     const ready = await t.app.services.runtime.snapshot();
     expect(ready).toMatchObject({
       status: RuntimeStatus.Ready,

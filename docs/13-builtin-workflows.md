@@ -6,16 +6,19 @@
 
 ```
 packages/builtin/
-├─ roles.ts                    角色定义（引用 prompts/roles/*.md）
-├─ workflows.ts                流程定义（引用 prompts/workflows/*.md）
+├─ src/roles.ts                角色定义（提示词为 prompts/roles/<key>.md）
+├─ src/workflows.ts            流程定义（AI 规划流程的指引为 prompts/workflows/<key>.md）
+├─ src/builtins.ts             读入提示词后的种子数据（loadBuiltinRoles / loadBuiltinWorkflows）
 └─ prompts/
    ├─ protocol-plan.md         aw-planner agent 基础提示词：工作方式、工具使用规则
    ├─ protocol-execute.md      aw-executor
-   ├─ protocol-review.md       aw-reviewer
-   ├─ start-plan.md            首条消息模板（Mustache 风格 {{var}}，无逻辑）
+   ├─ protocol-review.md       aw-reviewer（评审检查用 submit_review；本身就是审查步骤的节点用 submit_result）
+   ├─ start-plan.md            首条消息模板（Mustache 风格 {{var}}，无逻辑；空段落填 None.）
    ├─ start-execute.md
    ├─ start-review.md
    ├─ start-answer.md          把用户答案发回会话
+   ├─ replan.md                「按意见重新规划」时发回规划会话的反馈消息
+   ├─ rule-ask.md / rule-assume.md  ask_on_uncertainty 开 / 关时首条消息中的提问规则
    ├─ nudge.md                 提醒提交结果
    ├─ revise.md                「让 AI 再改改」节点指令模板
    ├─ revise-conflict.md       「交给 AI 解决冲突」节点指令模板
@@ -23,7 +26,9 @@ packages/builtin/
    └─ workflows/*.md           各 AI 规划流程的规划指引
 ```
 
-首次启动及每次升级时，后端把内置定义同步进数据库（`kind=builtin`；内容变化则产生新版本），用户不能修改，只能复制。
+每次启动时，后端把内置定义同步进数据库（`kind=builtin`）：流程内容变化（名称、说明、规划方式、产出、定义任一项）则新增一个版本并设为最新，旧版本保留给引用它的任务；角色没有版本，内容变化时就地更新。用户不能修改内置定义（`WORKFLOW_READONLY` / `ROLE_READONLY`），只能复制（M5）。
+
+提示词写给模型，用英文；节点标题、角色名、流程名是给用户看的数据，用中文。要求模型「摘要、说明、问题用需求的语言书写」，因为它们会显示给用户。
 
 ## 1. 项目检查命令
 

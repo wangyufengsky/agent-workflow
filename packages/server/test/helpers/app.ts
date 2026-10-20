@@ -36,10 +36,12 @@ export type TestApp = {
 };
 
 export type TestAppOptions = Omit<AppDeps, 'logDestination' | 'opencode'> & {
-  /** `@opencode` tests: use the hosted runtime (start it with `app.startRuntime(port)`) instead of FakeOpencode. */
+  /** `@opencode` tests: use the hosted runtime (start it with `app.start(port)`) instead of FakeOpencode. */
   realOpencode?: boolean;
   /** Reuse a data directory, e.g. to start the backend again after a simulated exit. */
   dataDir?: string;
+  /** Reuse a FakeOpencode, whose sessions outlive a simulated backend restart like opencode's do. */
+  fake?: FakeOpencode;
   /** Extra routes for tests of the HTTP layer itself; Fastify only accepts routes before it listens. */
   routes?: (server: FastifyInstance) => void;
 };
@@ -52,13 +54,14 @@ export async function createTestApp({
   realOpencode = false,
   routes,
   dataDir: reusedDataDir,
+  fake: reusedFake,
   ...deps
 }: TestAppOptions = {}): Promise<TestApp> {
   const dataDir = reusedDataDir ?? (await mkdtemp(join(tmpdir(), 'aw-int-')));
   const logs: LogLine[] = [];
   const logDestination = { write: (line: string) => void logs.push(JSON.parse(line)) };
   const config = loadConfig({ AW_API_TOKEN: TEST_TOKEN, AW_DATA_DIR: dataDir, AW_LOG_LEVEL: 'info', NODE_ENV: 'test' });
-  const fake = createFakeOpencode();
+  const fake = reusedFake ?? createFakeOpencode();
   const app = await buildApp(config, { ...deps, logDestination, ...(realOpencode ? {} : { opencode: fake }) });
   routes?.(app.server);
   await app.server.listen({ host: '127.0.0.1', port: 0 });
@@ -66,6 +69,8 @@ export async function createTestApp({
   if (address === null || typeof address === 'string') throw new Error('Test app is not listening on a TCP port');
   const mcpUrl = `http://127.0.0.1:${address.port}${MCP_EXEC_PATH}`;
   fake.connectMcp({ url: mcpUrl, token: app.mcpToken });
+  // With the real runtime the test decides when it starts.
+  if (!realOpencode) await app.start(address.port);
   const authorization = `Bearer ${TEST_TOKEN}`;
   return {
     app,

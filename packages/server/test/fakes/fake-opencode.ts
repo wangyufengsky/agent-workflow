@@ -19,6 +19,7 @@ export type FakeStep =
   | { type: 'text'; text: string }
   | { type: 'callTool'; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
+  | { type: 'hang' }
   | { type: 'error'; name: string; message: string };
 
 /** Script builder (07 §4): `script().edit('a.ts', '…').callTool('submit_result', {…})`. The turn ends idle. */
@@ -41,6 +42,8 @@ export function script() {
       add({ type: 'callTool', name: 'ask_user', args }),
     /** Asks for a permission and waits until the backend replies. */
     requestPermission: (permission: string, patterns: string[]) => add({ type: 'permission', permission, patterns }),
+    /** Keeps working (never idle) until the session is aborted. */
+    hang: () => add({ type: 'hang' }),
     /** Fails the turn with a session error. */
     error: (name: string, message: string) => add({ type: 'error', name, message }),
   };
@@ -49,6 +52,15 @@ export function script() {
 export type FakeScript = ReturnType<typeof script>;
 
 export type FakeSession = CreateSessionInput & { id: string };
+
+/** Which session a queued script is for: every given field must be contained in the session's (substring match). */
+export type ScriptMatch = { title?: string; agent?: string; directory?: string };
+
+const matches = (session: FakeSession, match: ScriptMatch | undefined) =>
+  match === undefined ||
+  ((match.title === undefined || session.title.includes(match.title)) &&
+    (match.agent === undefined || session.agent.includes(match.agent)) &&
+    (match.directory === undefined || session.directory.includes(match.directory)));
 export type ToolCallRecord = { sessionId: string; name: string; isError: boolean; result: unknown };
 
 const DELTA_CHARS = 8;
@@ -59,7 +71,9 @@ const DELTA_CHARS = 8;
  */
 export function createFakeOpencode() {
   const listeners = new Set<(event: OpencodeEvent) => void>();
-  const queue: FakeScript[] = [];
+  const queue: Array<{ script: Pick<FakeScript, 'steps'>; match: ScriptMatch | undefined }> = [];
+  /** Resolvers of `hang` steps, per session, released by abort(). */
+  const hanging = new Map<string, Array<() => void>>();
   const pendingPermissions = new Map<string, (reply: PermissionDecision) => void>();
   /** Bumped by abort(): a turn stops when its session's generation changed (later prompts play normally). */
   const generation = new Map<string, number>();
@@ -173,6 +187,9 @@ export function createFakeOpencode() {
           await replied;
           break;
         }
+        case 'hang':
+          await new Promise<void>((resolve) => hanging.set(sessionId, [...(hanging.get(sessionId) ?? []), resolve]));
+          break;
         case 'error':
           emit({ type: E.Error, sessionId, error: { name: step.name, data: { message: step.message } } });
           emit({ type: E.Idle, sessionId });
@@ -199,8 +216,11 @@ export function createFakeOpencode() {
     models: ModelInfo[];
     /** Where `callTool` reaches the backend's execution MCP. */
     connectMcp(endpoint: { url: string; token: string }): void;
-    /** Queues the script for the next prompt. */
-    enqueue(s: FakeScript): void;
+    /**
+     * Queues a script for a later prompt: the first queued script whose `match` fits the prompted session plays
+     * (no match = any session).
+     */
+    enqueue(s: Pick<FakeScript, 'steps'>, match?: ScriptMatch): void;
     /** Resolves once every turn started so far has played out (a turn waiting for a permission never does). */
     settled(): Promise<void>;
     /** The runtime disappears: `runtime_lost`, and requests fail until `reconnect()`. */
@@ -216,9 +236,12 @@ export function createFakeOpencode() {
     models,
     connectMcp(endpoint) {
       mcp = endpoint;
+      // A restarted backend listens elsewhere: reconnect on the next call.
+      mcpClient = undefined;
+      closed = false;
     },
-    enqueue(s) {
-      queue.push(s);
+    enqueue(s, match) {
+      queue.push({ script: s, match });
     },
     async settled() {
       await Promise.all(turns);
@@ -233,8 +256,11 @@ export function createFakeOpencode() {
     /** Stops emitting events and lets MCP calls in flight finish before the backend goes away. */
     async close() {
       closed = true;
+      // A backend started later (simulated restart) subscribes anew.
+      listeners.clear();
       await Promise.allSettled(toolRequests);
       if (mcpClient !== undefined) await (await mcpClient).close();
+      mcpClient = undefined;
     },
     isConnected: () => connected,
     async createSession(input) {
@@ -247,7 +273,8 @@ export function createFakeOpencode() {
       if (!connected) throw new Error('FakeOpencode is not connected');
       const session = sessionOf(input.sessionId);
       prompts.push(input);
-      const steps = queue.shift()?.steps ?? [];
+      const index = queue.findIndex((q) => matches(session, q.match));
+      const steps = index === -1 ? [] : (queue.splice(index, 1)[0]?.script.steps ?? []);
       // Like prompt_async: return at once, the turn plays out as events.
       const turn = new Promise<void>((resolve) => setImmediate(resolve)).then(() => play(session, steps));
       turns.add(turn);
@@ -256,6 +283,8 @@ export function createFakeOpencode() {
     async abort({ sessionId }) {
       aborts.push(sessionId);
       generation.set(sessionId, (generation.get(sessionId) ?? 0) + 1);
+      for (const release of hanging.get(sessionId) ?? []) release();
+      hanging.delete(sessionId);
       emit({ type: E.Error, sessionId, error: { name: 'MessageAbortedError', data: { message: 'Aborted' } } });
       emit({ type: E.Idle, sessionId });
     },

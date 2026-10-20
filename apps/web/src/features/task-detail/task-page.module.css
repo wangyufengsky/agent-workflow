@@ -1,0 +1,123 @@
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.doing {
+  font-size: 13px;
+  color: var(--sub);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  min-height: 520px;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.stages {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.stage[data-state="active"] {
+  color: var(--ink);
+}
+
+.stage[data-state="done"] {
+  color: var(--ok);
+}
+
+.activity {
+  font-size: 13px;
+  color: var(--sub);
+  border-left: 2px solid var(--run-line);
+  padding-left: 10px;
+}
+
+.headline {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.add {
+  color: var(--ok);
+  font-variant-numeric: tabular-nums;
+}
+
+.del {
+  color: var(--danger);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.output {
+  max-height: 260px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--fill-2);
+}
+
+.canvasFold {
+  margin-top: 16px;
+}
+
+.canvasFold > div {
+  height: 420px;
+}

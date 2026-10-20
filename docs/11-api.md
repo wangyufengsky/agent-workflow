@@ -64,26 +64,26 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/workflows` | 最新版本列表 |
+| GET | `/workflows` | 最新版本列表（按流程首次加入的顺序；内置流程在前） |
 | GET | `/workflows/:id` | 某版本详情（含 `definition`） |
 | GET | `/workflows/by-key/:key/versions` 🅿 | 版本历史 |
 | POST | `/workflows` 🅿 | 新建自定义流程 `{ key, name, description, planning, deliverable, definition }`；或 `{ copyFrom: workflowId, key, name }` |
-| PUT | `/workflows/:id` 🅿 | 产生新版本，返回新版本；内置流程 409 `WORKFLOW_READONLY` |
+| PUT | `/workflows/:id` 🅿 | `{ name?, description?, definition? }`；产生新版本，返回新版本；内置流程 409 `WORKFLOW_READONLY` |
 | DELETE | `/workflows/by-key/:key` 🅿 | 仅自定义；已被任务引用的版本保留（标记删除，不在列表出现） |
 | POST | `/workflows/validate` 🅿 | 校验定义，返回 `{ problems[] }`（编辑器实时校验用） |
 | GET | `/roles` | 列表 |
 | POST | `/roles` 🅿 | 新建或 `{ copyFrom }` |
-| PUT | `/roles/:id` 🅿 | 内置 409 `ROLE_READONLY` |
+| PUT | `/roles/:id` 🅿 | `{ name?, description?, prompt?, model? }`；内置 409 `ROLE_READONLY` |
 | DELETE | `/roles/:id` 🅿 | 被最新版流程引用时 409 `ROLE_IN_USE` |
 
 ## 5. 任务
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/tasks?projectId&status&displayGroup&limit&cursor` | `TaskSummaryDTO[]`，按 `updatedAt` 倒序 |
+| GET | `/tasks?projectId&status&displayGroup&limit` | `{ items: TaskSummaryDTO[] }`，按 `updatedAt` 倒序，最多 `limit`（默认 50，≤ 100）条；v1 不分页 |
 | POST | `/tasks` | 创建，见下 |
 | GET | `/tasks/:id` | `TaskDetailDTO` |
-| GET | `/tasks/:id/timeline?afterId` | `task_events` 分页 |
+| GET | `/tasks/:id/timeline?afterId` | `{ items: TaskEventDTO[] }`：`id > afterId` 的 `task_events`，按 id 升序 |
 | POST | `/tasks/:id/start` | `draft → preparing` |
 | POST | `/tasks/:id/pause` 🅿 | `running → paused` |
 | POST | `/tasks/:id/resume` 🅿 | `paused → running` |
@@ -112,6 +112,8 @@ type CreateTaskRequest = {
 
 ### 5.2 TaskDetailDTO
 
+TaskSummaryDTO：`{ id, key, title, status, displayGroup, project: { id, name }, workflow: { id, key, name }, currentStep, progress, createdAt, updatedAt, startedAt, finishedAt }`（`currentStep` 为工作中的步骤标题，`progress` 为活动尝试最近一次 `report_progress`）。DTO 中可空字段用 `null` 表示（下式中的 `?`）。
+
 ```ts
 type TaskDetailDTO = {
   id: string; key: string; title: string; requirement: string;
@@ -121,12 +123,12 @@ type TaskDetailDTO = {
   checkpoints: Checkpoints;
   git: { baseBranch: string; baseCommit?: string; branch?: string; worktreePath?: string; worktreeStatus?: WorktreeStatus };
   plan?: PlanDTO;                 // 当前生效版本；plan_review 时为待确认草稿
-  draftPlan?: PlanDTO;            // 暂停调整中的草稿（专业模式）
+  draftPlan?: PlanDTO;            // 暂停调整中的草稿（专业模式，M5-02）
   nodes: NodeSummaryDTO[];        // 含 status、roleName、attemptCount、resultSummary、position
   activeAttempts: AttemptSummaryDTO[];
   openInbox: InboxItemDTO[];
   result?: TaskResultDTO;         // review 及之后
-  lastDelivery?: DeliveryDTO;
+  lastDelivery?: DeliveryDTO;     // M4
   createdAt: number; updatedAt: number; startedAt?: number; finishedAt?: number;
 };
 ```
@@ -176,8 +178,8 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/inbox?status=open&taskId&limit&cursor` | 列表；`/inbox/count` 返回 `{ open }` 用于徽标 |
-| POST | `/inbox/:id/resolve` | body 为对应 kind 的 `response`（见 10 §inbox_items）；已关闭 409 `INBOX_ITEM_CLOSED` |
+| GET | `/inbox?status&taskId` | `{ items: InboxItemDTO[] }`，按创建时间倒序；`/inbox/count` 返回 `{ open }` 用于徽标 |
+| POST | `/inbox/:id/resolve` | `{ response }`，`response` 为对应 kind 的回应（见 10 §inbox_items；`question` 只接受 `{ answer }`）；不符合该 kind 400 `VALIDATION_FAILED`；已关闭 409 `INBOX_ITEM_CLOSED`；回答问题时 opencode 未就绪 503 `OPENCODE_NOT_READY`（条目保持打开） |
 | POST | `/inbox/:id/dismiss` | 仅 `failure` / `delivery` 可忽略 |
 
 `resolve` 是各业务动作的统一入口：`question` → 答案发回会话；`permission` → 回复 opencode；`acceptance` → 节点 accept/reject；`plan` → 等同 plan confirm/replan；`failure` → 任务 retry/cancel；`delivery` 不通过 resolve，而是 `deliver` 成功后自动 resolved。
