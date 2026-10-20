@@ -138,6 +138,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DEV_API_PORT` / `DEV_WEB_PORT` | `47821` / `47822` | 仅开发；生产后端随机端口（D31） |
 | `MCP_EXEC_PATH` | `/mcp/exec` | |
 | `MCP_ASSISTANT_PATH` | `/mcp/assistant` | v1.1 |
+| `PROJECT_CHECK_PLACEHOLDER` | `$PROJECT_CHECK` | 验收命令中代表项目检查命令，物化节点时替换（13 §1） |
+| `GIT_COMMIT_IDENTITY` | `agent-workflow <agent-workflow@localhost>` | 节点完成时后端提交的作者与提交者（09 §3） |
 
 `constants/opencode.ts`：
 

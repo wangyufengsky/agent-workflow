@@ -15,3 +15,7 @@ export const DIFF_FILE_MAX_BYTES = 1_048_576;
 export const REPORT_PROGRESS_MAX_CHARS = 200;
 /** `submit_result` summary (12 §6.5). */
 export const RESULT_SUMMARY_MAX_CHARS = 4000;
+/** A task title taken from the requirement's first line is cut to this length. */
+export const TASK_TITLE_MAX_CHARS = 80;
+/** Output of an acceptance command kept on the node (its end, where failures are reported). */
+export const ACCEPTANCE_OUTPUT_MAX_CHARS = 20_000;

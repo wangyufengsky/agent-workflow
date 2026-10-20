@@ -15,4 +15,9 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.attempts.get': '查看 AI 会话',
   'op.attempts.abort': '中止 AI 会话',
   'op.debug.startAttempt': '调试：发起一次执行尝试',
+  'op.workflows.list': '流程列表',
+  'op.workflows.get': '查看流程',
+  'op.workflows.update': '修改流程',
+  'op.roles.list': '角色列表',
+  'op.roles.update': '修改角色',
 };

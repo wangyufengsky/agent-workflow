@@ -64,16 +64,16 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/workflows` | 最新版本列表 |
+| GET | `/workflows` | 最新版本列表（按流程首次加入的顺序；内置流程在前） |
 | GET | `/workflows/:id` | 某版本详情（含 `definition`） |
 | GET | `/workflows/by-key/:key/versions` 🅿 | 版本历史 |
 | POST | `/workflows` 🅿 | 新建自定义流程 `{ key, name, description, planning, deliverable, definition }`；或 `{ copyFrom: workflowId, key, name }` |
-| PUT | `/workflows/:id` 🅿 | 产生新版本，返回新版本；内置流程 409 `WORKFLOW_READONLY` |
+| PUT | `/workflows/:id` 🅿 | `{ name?, description?, definition? }`；产生新版本，返回新版本；内置流程 409 `WORKFLOW_READONLY` |
 | DELETE | `/workflows/by-key/:key` 🅿 | 仅自定义；已被任务引用的版本保留（标记删除，不在列表出现） |
 | POST | `/workflows/validate` 🅿 | 校验定义，返回 `{ problems[] }`（编辑器实时校验用） |
 | GET | `/roles` | 列表 |
 | POST | `/roles` 🅿 | 新建或 `{ copyFrom }` |
-| PUT | `/roles/:id` 🅿 | 内置 409 `ROLE_READONLY` |
+| PUT | `/roles/:id` 🅿 | `{ name?, description?, prompt?, model? }`；内置 409 `ROLE_READONLY` |
 | DELETE | `/roles/:id` 🅿 | 被最新版流程引用时 409 `ROLE_IN_USE` |
 
 ## 5. 任务

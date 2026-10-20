@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { loadPrompts } from '@aw/builtin';
+import { loadBuiltinRoles, loadBuiltinWorkflows, loadPrompts } from '@aw/builtin';
 import { MCP_EXEC_PATH } from '@aw/shared';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
@@ -31,8 +31,10 @@ import {
   type OpencodeRuntime,
 } from './modules/opencode/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
+import { createRolesModule, type RolesService } from './modules/roles/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
+import { createWorkflowsModule, type WorkflowsService } from './modules/workflows/index.ts';
 
 /** Collaborators that tests replace; production uses the defaults. */
 export type AppDeps = {
@@ -56,6 +58,8 @@ export type App = {
     runtime: OpencodeRuntime;
     opencode: OpencodeClient;
     attempts: AttemptsService;
+    roles: RolesService;
+    workflows: WorkflowsService;
   };
   /** Bearer token of the execution MCP at `/mcp/exec`. */
   mcpToken: string;
@@ -114,6 +118,11 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   };
   const system = createSystemModule({ config, env, runtime, opencode, startRuntime: startHostedRuntime });
   const projects = createProjectsModule({ db: database.db, clock });
+  // Built-in roles and workflows of this app version are written on every start (13).
+  const roles = createRolesModule({ db: database.db, clock, log });
+  roles.service.syncBuiltin(loadBuiltinRoles(config.promptsDir));
+  const workflows = createWorkflowsModule({ db: database.db, clock, log });
+  workflows.service.syncBuiltin(loadBuiltinWorkflows(config.promptsDir));
   const attempts = createAttemptsModule({
     db: database.db,
     events,
@@ -133,6 +142,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...settings.operations,
     ...system.operations,
     ...projects.operations,
+    ...roles.operations,
+    ...workflows.operations,
     ...attempts.operations,
     // The debug entry exists in development builds only (M2-09).
     ...(config.nodeEnv === 'production' ? [] : debug.operations),
@@ -143,7 +154,14 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     server,
     events,
     log,
-    services: { credentials: credentials.service, runtime, opencode, attempts: attempts.service },
+    services: {
+      credentials: credentials.service,
+      runtime,
+      opencode,
+      attempts: attempts.service,
+      roles: roles.service,
+      workflows: workflows.service,
+    },
     mcpToken,
     async startRuntime(port) {
       apiPort = port;

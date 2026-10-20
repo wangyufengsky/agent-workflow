@@ -21,3 +21,7 @@ export const MCP_ASSISTANT_PATH = '/mcp/assistant';
 /** Fixed backend port in development so the Vite dev server can proxy to it; production uses a random port. */
 export const DEV_API_PORT = 47821;
 export const DEV_WEB_PORT = 47822;
+/** Written in acceptance commands for the project's check command; replaced when nodes are created (13 §1). */
+export const PROJECT_CHECK_PLACEHOLDER = '$PROJECT_CHECK';
+/** Author and committer of the commits the backend makes for finished nodes (09 §3). */
+export const GIT_COMMIT_IDENTITY = { name: 'agent-workflow', email: 'agent-workflow@localhost' } as const;

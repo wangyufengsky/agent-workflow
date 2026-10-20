@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { basename, isAbsolute } from 'node:path';
-import { PromptName, type Prompts, renderTemplate } from '@aw/builtin';
+import { EMPTY_SECTION, PromptName, type Prompts, renderTemplate } from '@aw/builtin';
 import {
   AppError,
   type AttemptDTO,
@@ -71,7 +71,8 @@ export function createDebugService({ attempts, settings, prompts }: DebugService
         requirement: run.requirement,
         nodeTitle: run.title,
         instructions: run.requirement,
-        retryFeedback: '',
+        retryFeedback: EMPTY_SECTION,
+        uncertaintyRule: prompts[settings.get('ai.askOnUncertainty') ? PromptName.RuleAsk : PromptName.RuleAssume],
       });
       const attempt = await attempts.start({
         kind: AttemptKind.Execute,
