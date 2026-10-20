@@ -1,4 +1,4 @@
-import { getNodeOp, getTaskOp, getTaskTimelineOp, listInboxOp } from '@aw/shared';
+import { getNodeOp, getTaskOp, getTaskTimelineOp, listInboxOp, readonlyBashRules } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 describe('只读角色执行的步骤', () => {
-  it('代码审查步骤（评审者角色）的会话也可不经询问运行项目检查命令（D51、D61）', async () => {
+  it('代码审查步骤（评审者角色）的会话也可不经询问运行项目检查命令（D51、D61、D64）', async () => {
     const { project } = await addProject(t, { checkCommand: 'mvn -q test' });
     t.fake.enqueue(script().callTool('submit_result', { summary: 'No issues' }), { title: '· 代码审查' });
     const review = taskReaches(t, 'review');
@@ -23,7 +23,8 @@ describe('只读角色执行的步骤', () => {
     await review;
     const session = t.fake.sessions.find((s) => s.title.includes('· 代码审查'));
     expect(session?.agent).toBe('aw-reviewer');
-    expect(session?.permission).toContainEqual({ permission: 'bash', pattern: 'mvn -q test*', action: 'allow' });
+    // What these rules allow and ask is covered by opencode.permissions.test.ts.
+    expect(session?.permission).toEqual(readonlyBashRules(['mvn -q test']));
   });
 });
 

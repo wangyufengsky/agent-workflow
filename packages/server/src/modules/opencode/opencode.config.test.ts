@@ -23,19 +23,3 @@ describe('opencode 配置生成', () => {
     expect(rules).toMatchSnapshot();
   });
 });
-
-describe('只读会话的检查命令', () => {
-  it('规划者与评审者可不经询问运行项目检查命令（最后一条规则生效），执行者的规则不变', () => {
-    const checks = ['node --test', 'node --test'];
-    const reviewer = sessionPermissionRules(RoleBaseAgent.Reviewer, BashPolicy.Ask, checks);
-    expect(reviewer.at(0)).toEqual({ permission: 'bash', pattern: '*', action: 'ask' });
-    expect(reviewer.filter((r) => r.pattern.startsWith('node --test'))).toEqual([
-      { permission: 'bash', pattern: 'node --test*', action: 'allow' },
-    ]);
-    expect(reviewer.at(-1)?.pattern).toBe('node --test*');
-    expect(sessionPermissionRules(RoleBaseAgent.Planner, BashPolicy.Auto, checks).at(-1)?.pattern).toBe('node --test*');
-    expect(sessionPermissionRules(RoleBaseAgent.Executor, BashPolicy.Ask, checks)).toEqual(
-      sessionPermissionRules(RoleBaseAgent.Executor, BashPolicy.Ask),
-    );
-  });
-});
