@@ -38,7 +38,7 @@
 - 原生 `question` 工具禁用，提问只走 MCP `ask_user`（D36）。
 - **bash 规则集**（常量 `BASH_PERMISSION_PRESETS`，在 `shared/constants/opencode.ts`；reviewer 与 planner 用只读白名单，executor 按 `ai.bashPolicy`）：
   - Git 只读子命令：`git status* git log* git diff* git show* git blame* git grep* git ls-files* git rev-parse*`。
-  - 只读白名单：`ls* cat* head* tail* rg* grep* find* wc* echo* pwd which*`、`node` / `npm` / `pnpm --version` 与 Git 只读子命令为 allow，其余 ask（D61）。规划与评审会话、以及只读角色执行的步骤（如代码审查流程中评审者的步骤）另外放行项目检查命令（`<checkCommand>*`，评审会话还包括被评审节点验收中的命令检查，即 `$PROJECT_CHECK` 展开后的命令），追加在最后：运行检查是只读角色了解代码状态的常规手段，询问会频繁打扰用户（D51）。
+  - 只读白名单：`ls* cat* head* tail* rg* grep* find* wc* echo* pwd which*`、`node` / `npm` / `pnpm --version` 与 Git 只读子命令为 allow，其余 ask（D61）；其后再把会写文件或执行其他程序的写法改回 ask（D63）：任何重定向（`*>*`，也包括 `2>&1`、`2>/dev/null`）、`find` 的 `-exec` / `-execdir` / `-ok` / `-okdir` / `-delete` / `-fprint*` / `-fls`、`rg --pre`、`git … --output`、`git grep -O` / `--open-files-in-pager`。opencode 对管道中的每条子命令按完整文本（含重定向）匹配、最后一条匹配的规则生效，单测 `shared/constants/opencode.test.ts` 按此语义校验，live `permissions.live.test.ts` 在真实 opencode 上验证。规划与评审会话、以及只读角色执行的步骤（如代码审查流程中评审者的步骤）另外放行项目检查命令（`<checkCommand>*`，评审会话还包括被评审节点验收中的命令检查，即 `$PROJECT_CHECK` 展开后的命令），追加在最后：运行检查是只读角色了解代码状态的常规手段，询问会频繁打扰用户（D51）。
   - `ai.bashPolicy = auto`（默认）：`*` allow；`git *` deny（其他所有 Git 命令都可能改动 refs 或工作区，不逐个列举）；Git 只读子命令再 allow。
   - `ai.bashPolicy = ask`：只读白名单 allow，其余 ask。
 - 角色差异不靠多个 agent：会话使用角色的 `base_agent` 对应的 agent（与尝试类型无关：只读的「代码审查」步骤以 reviewer 身份执行 `execute` 尝试，用 `submit_result` 提交报告），角色提示词通过每次 prompt 的 `system` 字段追加，模型通过 prompt 的 `model` 字段指定。因此修改角色无需重启 opencode。评审检查（`review` 尝试）固定使用内置 `reviewer` 角色。

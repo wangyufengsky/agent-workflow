@@ -83,7 +83,7 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 托管平台 `live/hosting.live.test.ts`（M4-05）：无效令牌在 github.com 与 gitlab.com 上为 `HOSTING_AUTH_FAILED`；设置 `AW_LIVE_HOSTING_PROVIDER` / `AW_LIVE_HOSTING_REPO` / `AW_LIVE_HOSTING_TOKEN`（自建 GitLab 另加 `AW_LIVE_HOSTING_BASE_URL`）时验证真实令牌，再设 `AW_LIVE_HOSTING_PR_HEAD` / `AW_LIVE_HOSTING_PR_BASE` 时创建一个 PR。
 - 示例仓库：`live/fixtures/` 下的小项目，各带一个已知缺陷和一个功能需求：`ts-stats`（TypeScript + `node --test`，M3-12）；`java-inventory`（Java 17 + Maven + JUnit 5，M6-05）。说明见 `live/fixtures/README.md`。
 - M3-12 冒烟 `live/smoke.live.test.ts`：`bugfix` 与 `feature` 各跑一次，报告写到 `live/reports/smoke-<时间>.json`（尝试、提醒次数、用量、`submit_*` 调用成败）。
-- 用例（M6-05 `live/workflows.live.test.ts`，与冒烟合起来）：五个内置流程各一次（Java 项目上的修 Bug、代码审查、重构，TypeScript 项目上的新功能、补单测、修 Bug）；统计 `submit_*` 调用成功率、尝试次数、耗时、成本，输出报告到 `live/reports/`。辅助代码在 `live/live-app.ts`；各套件依次运行（`fileParallelism: false`）。
+- 用例（M6-05 `live/workflows.live.test.ts`，与冒烟合起来）：五个内置流程各一次（Java 项目上的修 Bug、代码审查、重构，TypeScript 项目上的新功能、补单测、修 Bug）；统计 `submit_*` 调用成功率、尝试次数、耗时、成本，输出报告到 `live/reports/`。另有 `mcp-errors.live.test.ts`（工具错误码让模型改正计划，01 §5 第 7 条）与 `permissions.live.test.ts`（只读会话的 bash 规则在真实 opencode 上的效果，D63）。辅助代码在 `live/live-app.ts`；各套件依次运行（`fileParallelism: false`）。
 - 不作为通过/失败的硬门槛（模型有随机性），但内置提示词改动的 PR 必须附 live 报告对比。
 
 ## 7. 编写规则

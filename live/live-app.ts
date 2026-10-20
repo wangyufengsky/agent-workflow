@@ -57,6 +57,8 @@ export type LiveApp = {
     requirement: string,
     options?: { confirmPlan: boolean },
   ): Promise<TaskDetailDTO>;
+  /** The commands of every permission request the simulated user allowed so far (`<permission>: <patterns>`). */
+  asked(): string[];
   /** Writes `live/reports/<name>-<time>.json` and closes the app. */
   close(): Promise<void>;
 };
@@ -106,6 +108,7 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
 
   return {
     t,
+    asked: () => userActions.asked.map((a) => a.ask),
     async runTask(workflowKey, fixture, requirement, options = { confirmPlan: false }) {
       const until = options.confirmPlan ? [...ENDED, TaskStatus.PlanReview] : ENDED;
       const projectId = await addFixtureProject(fixture);
