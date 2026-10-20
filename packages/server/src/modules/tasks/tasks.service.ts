@@ -14,6 +14,7 @@ import type { EventBus } from '../../core/event-bus.ts';
 import { listTaskEvents } from '../timeline/index.ts';
 import { createTaskActions } from './tasks.actions.ts';
 import { createTaskContext } from './tasks.context.ts';
+import { createTaskDiffs } from './tasks.diff.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
 import { createTaskResults } from './tasks.result.ts';
 import { createTaskState, type TasksServiceDeps } from './tasks.state.ts';
@@ -26,6 +27,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   const results = createTaskResults(deps, state);
   const context = createTaskContext(deps, state);
   const actions = createTaskActions(deps, state, lifecycle);
+  const diffs = createTaskDiffs(deps, state);
 
   // A task's summary shows its open attention items, working steps and progress line; keep it current.
   deps.events.subscribe((event) => {
@@ -146,6 +148,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       return nodes.submitResult(attempt, input, state.runContext(state.get(attempt.taskId)));
     },
 
+    ...diffs,
     resolveInbox: actions.resolveInbox,
     deleteProject: actions.deleteProject,
     ...context,

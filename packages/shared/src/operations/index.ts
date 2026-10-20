@@ -29,11 +29,15 @@ import {
   getTaskTimelineOp,
   listPlansOp,
   listTasksOp,
+  nodeDiffFileOp,
+  nodeDiffOp,
   rejectNodeOp,
   replanOp,
   retryNodeOp,
   retryTaskOp,
   startTaskOp,
+  taskDiffFileOp,
+  taskDiffOp,
 } from './tasks.ts';
 import { getWorkflowOp, listRolesOp, listWorkflowsOp, updateRoleOp, updateWorkflowOp } from './workflows.ts';
 
@@ -85,6 +89,10 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   acceptNodeOp,
   rejectNodeOp,
   retryNodeOp,
+  taskDiffOp,
+  taskDiffFileOp,
+  nodeDiffOp,
+  nodeDiffFileOp,
   listInboxOp,
   countInboxOp,
   resolveInboxOp,

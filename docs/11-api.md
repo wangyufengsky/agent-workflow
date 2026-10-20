@@ -91,8 +91,8 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/tasks/:id/cancel` | `{ keepBranch?: boolean }` |
 | POST | `/tasks/:id/request-changes` | `{ feedback, reason: 'user' | 'conflict' }`；`review → running` |
 | POST | `/tasks/:id/deliver` | `{ strategy, targetBranch?, pr?: { title, body } }`；见 §5.3 |
-| GET | `/tasks/:id/diff` | 相对基线（或目标分支 merge-base）的文件列表与增删统计 |
-| GET | `/tasks/:id/diff/file?path=` | 单文件 unified diff（超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true }`） |
+| GET | `/tasks/:id/diff` | `DiffDTO { base, files }`：worktree（含未提交改动）相对任务分支与目标分支的 merge-base（起初即基线提交；解决冲突合入目标分支后为目标分支的提交）的文件列表与增删统计；worktree 已删除 → 404 `NOT_FOUND` |
+| GET | `/tasks/:id/diff/file?path=` | 单文件 unified diff `FileDiffDTO`（超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }`） |
 
 ### 5.1 创建
 
@@ -150,7 +150,8 @@ type TaskDetailDTO = {
 | POST | `/tasks/:id/plan/replan` | `{ feedback }`；`plan_review → planning`（AI 在原规划会话中按反馈修改） |
 | PUT | `/tasks/:id/plan/draft` 🅿 | `{ baseVersion, graph }`；用户编辑产生新草稿版本（`source=user`）。`plan_review` 时任意编辑；`paused` 时只能改动未开始的节点，否则 409 `NODE_NOT_EDITABLE`；`baseVersion` 不是最新版本 → 409 `PLAN_VERSION_CONFLICT`。返回新 `PlanDTO` 或 400 `PLAN_INVALID` |
 | GET | `/tasks/:id/nodes/:nodeId` | `NodeDetailDTO`：定义、状态、结果、检查结果、尝试列表、提交 sha、本节点 diff 统计 |
-| GET | `/tasks/:id/nodes/:nodeId/diff` | 本节点提交的 diff 文件列表（`commit_sha^..commit_sha`） |
+| GET | `/tasks/:id/nodes/:nodeId/diff` | 本节点提交的 diff 文件列表 `DiffDTO`（`commit_sha^..commit_sha`，在项目仓库中读取，worktree 删除后仍可用）；没有提交的节点 `{ base: null, files: [] }` |
+| GET | `/tasks/:id/nodes/:nodeId/diff/file?path=` | 本节点提交中单文件的 unified diff `FileDiffDTO`；没有提交 → 404 `NOT_FOUND` |
 | POST | `/tasks/:id/nodes/:nodeId/accept` | `awaiting_acceptance → done` |
 | POST | `/tasks/:id/nodes/:nodeId/reject` | `{ feedback }`；→ `ready` |
 | POST | `/tasks/:id/nodes/:nodeId/retry` | `failed → ready`，`{ feedback? }` |

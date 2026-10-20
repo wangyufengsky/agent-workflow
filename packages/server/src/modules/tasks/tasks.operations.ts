@@ -8,12 +8,16 @@ import {
   getTaskOp,
   getTaskTimelineOp,
   listTasksOp,
+  nodeDiffFileOp,
+  nodeDiffOp,
   rejectNodeOp,
   replanOp,
   resolveInboxOp,
   retryNodeOp,
   retryTaskOp,
   startTaskOp,
+  taskDiffFileOp,
+  taskDiffOp,
 } from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
 import type { TasksService } from './tasks.service.ts';
@@ -33,6 +37,10 @@ export function tasksOperations(tasks: TasksService) {
     implement(acceptNodeOp, ({ id, nodeId }) => tasks.acceptNode(id, nodeId)),
     implement(rejectNodeOp, ({ id, nodeId, feedback }) => tasks.rejectNode(id, nodeId, feedback)),
     implement(retryNodeOp, ({ id, nodeId, feedback }) => tasks.retryNode(id, nodeId, feedback)),
+    implement(taskDiffOp, ({ id }) => tasks.diff(id)),
+    implement(taskDiffFileOp, ({ id, path }) => tasks.diffFile(id, path)),
+    implement(nodeDiffOp, ({ id, nodeId }) => tasks.nodeDiff(id, nodeId)),
+    implement(nodeDiffFileOp, ({ id, nodeId, path }) => tasks.nodeDiffFile(id, nodeId, path)),
     implement(resolveInboxOp, ({ id, response }) => tasks.resolveInbox(id, response)),
     implement(deleteProjectOp, ({ id }) => tasks.deleteProject(id)),
   ];

@@ -12,6 +12,7 @@ import {
 } from '@aw/shared';
 import { diffCommits, runGit } from '../git/index.ts';
 import type { Node } from '../nodes/index.ts';
+import { taskDiffBase } from './tasks.diff.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
 /** Leaf nodes: no other node depends on them; their summaries describe the outcome of a report workflow. */
@@ -32,7 +33,7 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
     const worktree = worktrees.findByTask(taskId);
     if (worktree === undefined) throw new AppError(ErrorCode.NotFound, `Task ${task.key} has no worktree`);
     const head = (await runGit(['rev-parse', 'HEAD'], { cwd: worktree.path })).stdout.trim();
-    const files = await diffCommits(worktree.path, worktree.baseCommit, head);
+    const files = await diffCommits(worktree.path, await taskDiffBase(worktree.path, task.baseBranch), head);
     const done = nodes
       .listByTask(taskId)
       .flatMap((node) =>

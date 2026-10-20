@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { diffSchema, fileDiffSchema } from '../contracts/api/git.ts';
 import {
   createTaskRequestSchema,
   listTasksQuerySchema,
@@ -181,4 +182,48 @@ export const retryNodeOp = defineOperationContract({
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/nodes/:nodeId/retry' },
   mode: UiMode.Pro,
+});
+
+export const taskDiffOp = defineOperationContract({
+  ...common,
+  id: 'tasks.diff',
+  title: 'op.tasks.diff',
+  description: 'Files the task changed (committed or not) against the merge base of its branch and the target branch',
+  input: byId,
+  output: diffSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/diff' },
+});
+
+export const taskDiffFileOp = defineOperationContract({
+  ...common,
+  id: 'tasks.diffFile',
+  title: 'op.tasks.diffFile',
+  description: 'Unified diff of one file the task changed',
+  input: z.object({ id: z.string(), path: z.string().min(1) }),
+  output: fileDiffSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/diff/file' },
+});
+
+export const nodeDiffOp = defineOperationContract({
+  ...common,
+  id: 'nodes.diff',
+  title: 'op.nodes.diff',
+  description: "Files changed by a step's commit",
+  input: byNode,
+  output: diffSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/nodes/:nodeId/diff' },
+});
+
+export const nodeDiffFileOp = defineOperationContract({
+  ...common,
+  id: 'nodes.diffFile',
+  title: 'op.nodes.diffFile',
+  description: "Unified diff of one file in a step's commit",
+  input: z.object({ id: z.string(), nodeId: z.string(), path: z.string().min(1) }),
+  output: fileDiffSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/nodes/:nodeId/diff/file' },
 });
