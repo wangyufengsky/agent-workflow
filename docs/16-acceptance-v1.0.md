@@ -23,9 +23,9 @@
 | 6 | 专业模式：编辑计划后执行、暂停调整、自定义流程跑通任务 | 通过 |
 | 7 | MCP 工具返回错误码后模型据此修正并再次调用成功 | 通过 |
 | 8 | 四套主题下全部页面无对比度问题、无横向溢出（1280 宽） | 自动检查通过；截图的人工走查**需要用户完成** |
+| 9 | 测试规范要求的单元 / 集成 / E2E 测试全部通过 | 通过 |
 
 另有一个**未解决的已知问题**：走查测试在一次完整 `pnpm e2e` 中偶发失败一次，根因未查明（见「未解决的已知问题」）。
-| 9 | 测试规范要求的单元 / 集成 / E2E 测试全部通过 | 通过 |
 
 ## 1. 首次启动引导（干净 Mac）
 
@@ -107,7 +107,7 @@
 | `pnpm e2e`（浏览器 J1–J9、三任务并发与冒烟） | 通过：19 个（偶发失败一次见「未解决的已知问题」） | `e2e.log`、`e2e-repeat*.log` |
 | `pnpm e2e:electron`（J10，未打包应用与 dmg 副本各一次） | 通过 | `e2e-electron.log`、`e2e-electron-dmg.log` |
 | `pnpm test:oc`（默认配置，真实 opencode） | 通过（beam-free 与 deepseek-v4.1-flash 各一次） | `test-oc-beam-free.log`、`test-oc.log` |
-| `pnpm test:live`（五个内置流程、Java/Maven 示例、MCP 纠错） | 通过（beam-free 一轮全过；deepseek 一轮中 MCP 纠错用例因测试竞态失败一次，修复后重跑通过）；托管平台的真实令牌用例跳过（见下） | `live-beam-free.log`、`live-final.log`、`live-mcp-errors-rerun.log`、`live/reports/` |
+| `pnpm test:live`（五个内置流程、Java/Maven 示例、MCP 纠错、只读规则） | 通过（beam-free 一轮全过；deepseek 一轮中 MCP 纠错用例因测试竞态失败一次，修复后重跑通过）；托管平台的真实令牌用例跳过（见下） | `live-beam-free.log`、`live-final.log`、`live-mcp-errors-rerun.log`、`live/reports/` |
 
 ## 需要用户完成的项
 
@@ -162,4 +162,4 @@ deepseek-v4.1-flash 在多数用例中用的 tokens 更少（代码审查除外�
 1. **真实模型下的权限请求**：修复后每个任务仍有 0–2 次权限请求，来源是只读会话（规划、评审、代码审查步骤）里模型自己写的命令不在白名单：`node -e '…'` 内联脚本、`mvn test`（与推断的检查命令 `mvn -q test` 不同）、`npx tsc --version`。白名单不可能覆盖模型的所有写法，放得更宽又会削弱「只读」；是否调整由用户决定。（早先报告里「执行会话」请求 `mvn` 权限的情况已查明：那是代码审查流程中由只读评审者角色执行的步骤，已修复。）
 2. 主题单测与 axe 都不检查画布节点内的文字（axe 判定为被 React Flow 图层覆盖、无法确定背景）；节点文字使用状态语气色，已在「状态文字在自身填充色上 ≥ 4.5:1」中覆盖令牌。
 3. 前端主包 5.2 MB（shiki 语法按需加载但 cpp 等大语法单独成块），本地加载不受网络影响，未优化。
-4. `find*` 在只读白名单中，`find … -exec` / `-delete` 因此也被放行，只读角色理论上能借此写文件；M2 起的设计，未改。
+4. **已修复**（D63）：只读白名单按前缀匹配，`find … -exec` / `-delete`、重定向（`cat a > b`）、`rg --pre`、`git log --output`、`git grep -O` 等会被当作只读放行，规划者与评审者能借此写文件或执行程序。现在这些写法在白名单之后改回询问；单测 `shared/constants/opencode.test.ts` 先证明了漏洞（16 种写法 × 两套预设全部被放行）再验证修复，live `permissions.live.test.ts` 在真实 opencode 上确认三种逃逸写法询问、对应的只读写法不询问（`live-permissions.log`）。代价：只读会话中 `2>/dev/null` 这类重定向也会询问。
