@@ -16,7 +16,10 @@ import type { Logger } from '../../core/logger.ts';
 export type McpToolContext = { attempt: AttemptDTO };
 
 /** One execution MCP tool (03 §4.2 extension point): schema, allowed attempt kinds and a handler that only forwards. */
-export type McpToolDefinition<I extends z.ZodObject = z.ZodObject, O extends z.ZodObject = z.ZodObject> = {
+export type McpToolDefinition<
+  I extends z.ZodObject = z.ZodObject,
+  O extends z.ZodType<Record<string, unknown>> = z.ZodType<Record<string, unknown>>,
+> = {
   name: McpToolName;
   /** English, for the model. */
   description: string;
@@ -28,7 +31,7 @@ export type McpToolDefinition<I extends z.ZodObject = z.ZodObject, O extends z.Z
   handler(input: z.output<I>, ctx: McpToolContext): z.input<O> | Promise<z.input<O>>;
 };
 
-export function defineMcpTool<I extends z.ZodObject, O extends z.ZodObject>(
+export function defineMcpTool<I extends z.ZodObject, O extends z.ZodType<Record<string, unknown>>>(
   tool: McpToolDefinition<I, O>,
 ): McpToolDefinition<I, O> {
   return tool;

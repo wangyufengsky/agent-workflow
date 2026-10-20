@@ -1,4 +1,4 @@
-import { AttemptKind, ErrorCode, MCP_SESSION_ARG, McpToolName } from '@aw/shared';
+import { AttemptKind, ErrorCode, MCP_SESSION_ARG, McpToolName, RoleBaseAgent } from '@aw/shared';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
@@ -18,12 +18,13 @@ afterEach(async () => {
   await t.close();
 });
 
-/** An attempt of `kind` whose session is waiting (its turn never ends: a permission stays pending). */
+/** An attempt of `kind` whose session keeps working (its turn never ends). */
 async function activeSession(kind: AttemptKind): Promise<string> {
-  t.fake.enqueue(script().requestPermission('bash', ['sleep 100']));
+  t.fake.enqueue(script().hang());
   const repo = await createTestRepo();
   const attempt = await t.app.services.attempts.start({
     kind,
+    agent: RoleBaseAgent.Executor,
     taskId: null,
     nodeId: null,
     roleId: null,
@@ -48,8 +49,13 @@ describe('执行 MCP（/mcp/exec）', () => {
     const { tools } = await mcp.listTools();
     expect(tools.map((tool) => tool.name)).toEqual([
       McpToolName.GetTaskContext,
-      McpToolName.ReportProgress,
+      McpToolName.GetNodeOutput,
+      McpToolName.GetTaskDiff,
+      McpToolName.SubmitPlan,
       McpToolName.SubmitResult,
+      McpToolName.SubmitReview,
+      McpToolName.AskUser,
+      McpToolName.ReportProgress,
     ]);
     const submit = tools.find((tool) => tool.name === McpToolName.SubmitResult);
     expect(submit?.inputSchema).toMatchObject({ type: 'object', required: ['summary'] });

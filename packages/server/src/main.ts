@@ -37,4 +37,4 @@ if (address === null || typeof address === 'string') throw new Error('Server is 
 // Running inside Electron utilityProcess: tell the main process where we listen.
 process.parentPort?.postMessage({ type: 'ready', port: address.port });
 fake?.connectMcp({ url: `http://127.0.0.1:${address.port}${MCP_EXEC_PATH}`, token: app.mcpToken });
-await app.startRuntime(address.port);
+await app.start(address.port);

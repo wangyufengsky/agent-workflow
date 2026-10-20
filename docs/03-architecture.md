@@ -39,7 +39,8 @@
 1. main 启动 utilityProcess（后端），传入数据目录、令牌。
 2. 后端：打开 SQLite → 执行迁移 → 启动 HTTP → 环境检测（git 版本、opencode 路径与版本）。
 3. 版本精确等于 `OPENCODE_VERSION`（1.19.0）时启动 `opencode serve --hostname 127.0.0.1 --port 0`，环境变量 `OPENCODE_CONFIG_CONTENT` 注入配置；从 stdout 解析监听地址；订阅其事件流。
-4. 恢复：把上次退出时仍为 `running/starting` 的尝试标为 `interrupted`，对应节点按重试预算回到 `ready`；调度器开始工作。
+4. 恢复：把上次退出时仍为 `running/starting` 的尝试标为 `interrupted`（等待阻塞问题答案的除外，D46），对应节点回到 `ready`（不消耗预算）；仍在 `running`/`verifying` 而没有工作中尝试的节点回到 `ready`；仍在 `preparing` 的任务重新准备工作区。
+4a. API 开始监听后（`app.start(port)`）调度器开始工作：重新派发 `ready` 节点、为规划中的任务启动规划会话。
 5. 后端经 `process.parentPort` 通知 main 监听端口；main 创建窗口加载 `http://127.0.0.1:<port>/`，令牌经 `additionalArguments` 传给 preload。
 
 ### 2.2 一个任务的生命周期（简单模式）
@@ -139,12 +140,12 @@ agent-workflow/
 │  │     └─ naming.ts          slug 转写（分支名、项目目录名）
 │  ├─ server/                  后端
 │  │  └─ src/
-│  │     ├─ core/              config、db、logger、event-bus、jsonl、errors、http、operations
+│  │     ├─ core/              config、db（含 unit-of-work 环境事务）、logger、event-bus、errors、http、operations、sse
 │  │     └─ modules/
 │  │        ├─ system/  settings/  credentials/
 │  │        ├─ projects/  git/  hosting/  worktrees/
 │  │        ├─ workflows/  roles/
-│  │        ├─ tasks/  plans/  nodes/  attempts/  scheduler/  acceptance/
+│  │        ├─ tasks/  plans/  nodes/  attempts/  scheduler/  acceptance/  timeline/（task_events）
 │  │        ├─ opencode/           runtime（进程托管）、client、event-bridge、prompts
 │  │        ├─ mcp/                server + tools/*
 │  │        ├─ inbox/  delivery/
@@ -174,7 +175,9 @@ modules/tasks/
 
 依赖方向（dependency-cruiser 强制）：
 
-- `operations / routes → service → repo`；跨模块只能 import 对方的 `index.ts`。
+- `operations / routes → service → repo`；跨模块只能 import 对方的 `index.ts`。例外：表定义文件可以直接引用其他模块的表定义文件以声明外键（D43）。
+- 任务域的服务分层（D45）：`inbox`、`plans`、`timeline`、`worktrees` → `attempts` → `acceptance` → `nodes` → `tasks` → `scheduler`；`mcp` 在最上层。尝试经 `attempts.onSignal` 通知其所有者（节点、规划、评审），不反向依赖；需要完整任务上下文的入口（`inbox.resolve`、`projects.delete`、节点通过/驳回/重试）由 `tasks` 实现。
+- 跨服务的写入用 `core/db/unit-of-work` 的 `transact`（嵌套加入外层事务，事件在提交后发出，D44）。
 - `core` 不依赖 `modules`；`shared` 不依赖任何 app/package；`web` 只依赖 `shared`。
 - 模块间不循环。需要反向通知时用 `core/event-bus` 发领域事件。
 
@@ -266,7 +269,7 @@ export function taskOperations(tasks: TasksService) {
 - SQLite 单连接、单写者；多行状态变更放进同一事务。
 - 状态变更只通过 `fsm.transition()`，转换表在 `shared/fsm`；非法转换抛 `STATE_TRANSITION_INVALID`。
 - Git：同一仓库会改动 refs 或 worktree 列表的操作（worktree add/remove、branch 删除、merge、push）经**每仓库互斥锁**串行；worktree 内部的读写彼此独立。
-- 调度器：全局并发上限 `maxConcurrentAttempts`、每任务上限 `maxConcurrentNodesPerTask`；事件驱动（节点完成、任务启动、设置变更）触发一次调度，不轮询。
+- 调度器：全局并发上限 `maxConcurrentAttempts`（计入 `running`/`verifying` 的节点与规划中的任务）、每任务上限 `maxConcurrentNodesPerTask`（另计入等待输入的节点）；事件驱动（任务、节点、尝试、设置、运行时变化）触发一次调度，同一时刻只有一次调度在运行，不轮询（D47）。纯决策函数为 `scheduler.decide.ts`。
 
 ## 9. 安全边界
 

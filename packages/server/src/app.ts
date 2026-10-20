@@ -8,12 +8,14 @@ import type { DestinationStream } from 'pino';
 import { type Clock, systemClock } from './core/clock.ts';
 import type { AppConfig } from './core/config.ts';
 import { openDatabase } from './core/db/database.ts';
+import { createUnitOfWork } from './core/db/unit-of-work.ts';
 import { createEventBus, type EventBus } from './core/event-bus.ts';
 import { registerTokenAuth } from './core/http/auth.ts';
 import { registerErrorHandling } from './core/http/errors.ts';
 import { createLogger, type Logger } from './core/logger.ts';
 import { mountOperations } from './core/operations/operations.ts';
 import { registerSseHub } from './core/sse/sse-hub.ts';
+import { createAcceptanceModule } from './modules/acceptance/index.ts';
 import { type AttemptsService, createAttemptsModule } from './modules/attempts/index.ts';
 import {
   type CredentialCipher,
@@ -22,7 +24,10 @@ import {
   unavailableCipher,
 } from './modules/credentials/index.ts';
 import { createDebugModule } from './modules/debug/index.ts';
+import { createRepoLocks } from './modules/git/index.ts';
+import { createInboxModule, type InboxService } from './modules/inbox/index.ts';
 import { createMcpModule } from './modules/mcp/index.ts';
+import { createNodesModule, type NodesService } from './modules/nodes/index.ts';
 import {
   buildOpencodeConfig,
   createOpencodeRuntime,
@@ -30,11 +35,15 @@ import {
   type OpencodeClient,
   type OpencodeRuntime,
 } from './modules/opencode/index.ts';
+import { createPlansModule } from './modules/plans/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
 import { createRolesModule, type RolesService } from './modules/roles/index.ts';
+import { createScheduler } from './modules/scheduler/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
+import { createTasksModule, type TasksService } from './modules/tasks/index.ts';
 import { createWorkflowsModule, type WorkflowsService } from './modules/workflows/index.ts';
+import { createWorktreesModule, type WorktreesService } from './modules/worktrees/index.ts';
 
 /** Collaborators that tests replace; production uses the defaults. */
 export type AppDeps = {
@@ -60,14 +69,18 @@ export type App = {
     attempts: AttemptsService;
     roles: RolesService;
     workflows: WorkflowsService;
+    tasks: TasksService;
+    nodes: NodesService;
+    inbox: InboxService;
+    worktrees: WorktreesService;
   };
   /** Bearer token of the execution MCP at `/mcp/exec`. */
   mcpToken: string;
   /**
-   * Called once the API listens: opencode's MCP endpoint needs the port. Starts the hosted opencode unless it is
-   * replaced or not hostable.
+   * Called once the API listens: opencode's MCP endpoint needs the port. Starts task scheduling and the hosted
+   * opencode unless it is replaced or not hostable.
    */
-  startRuntime(apiPort: number): Promise<void>;
+  start(apiPort: number): Promise<void>;
   close(): Promise<void>;
 };
 
@@ -76,6 +89,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const log = createLogger(config, clock, deps.logDestination);
   const database = openDatabase(join(config.dataDir, 'app.db'), config.migrationsDir);
   const events = createEventBus();
+  const unit = createUnitOfWork(database.db, events);
+  const locks = createRepoLocks();
 
   const fastifyLog: FastifyBaseLogger = log;
   // Per-request lines would drown the state-transition log (06 §10); errors are logged by the error handler.
@@ -111,7 +126,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('onClose', () => runtime.stop());
   const opencode = deps.opencode ?? createRuntimeClient(runtime, log);
   // The hosted runtime can start only once the API listens (its MCP endpoint needs the port) and when no fake
-  // replaces it; startRuntime() decides that, after which a recheck may start a newly hostable runtime too.
+  // replaces it; start() decides that, after which a recheck may start a newly hostable runtime too.
   let hosting = false;
   const startHostedRuntime = async () => {
     if (hosting) await runtime.startIfStopped();
@@ -123,19 +138,84 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   roles.service.syncBuiltin(loadBuiltinRoles(config.promptsDir));
   const workflows = createWorkflowsModule({ db: database.db, clock, log });
   workflows.service.syncBuiltin(loadBuiltinWorkflows(config.promptsDir));
+  const inbox = createInboxModule({ db: database.db, unit, clock, log });
   const attempts = createAttemptsModule({
     db: database.db,
+    unit,
     events,
     clock,
     log,
     opencode,
+    inbox: inbox.service,
     settings: settings.service,
     prompts,
     dataDir: config.dataDir,
   });
-  attempts.service.recover();
+  const worktrees = createWorktreesModule({
+    db: database.db,
+    clock,
+    log,
+    locks,
+    settings: settings.service,
+    dataDir: config.dataDir,
+  });
+  const plans = createPlansModule({ db: database.db, unit, clock, log });
+  const acceptance = createAcceptanceModule({
+    attempts: attempts.service,
+    roles: roles.service,
+    settings: settings.service,
+    prompts,
+    log,
+    env,
+  });
+  const nodes = createNodesModule({
+    db: database.db,
+    unit,
+    clock,
+    log,
+    attempts: attempts.service,
+    acceptance: acceptance.service,
+    inbox: inbox.service,
+    roles: roles.service,
+    settings: settings.service,
+    prompts,
+    locks,
+  });
+  const tasks = createTasksModule({
+    db: database.db,
+    unit,
+    events,
+    clock,
+    log,
+    settings: settings.service,
+    prompts,
+    projects: projects.service,
+    workflows: workflows.service,
+    roles: roles.service,
+    worktrees: worktrees.service,
+    plans: plans.service,
+    nodes: nodes.service,
+    attempts: attempts.service,
+    inbox: inbox.service,
+    dataDir: config.dataDir,
+  });
+  const scheduler = createScheduler({
+    tasks: tasks.service,
+    nodes: nodes.service,
+    attempts: attempts.service,
+    settings: settings.service,
+    events,
+    log,
+  });
   const debug = createDebugModule({ attempts: attempts.service, settings: settings.service, prompts });
-  const mcp = createMcpModule({ token: mcpToken, attempts: attempts.service, debug: debug.service, log });
+  const mcp = createMcpModule({
+    token: mcpToken,
+    attempts: attempts.service,
+    tasks: tasks.service,
+    acceptance: acceptance.service,
+    debug: debug.service,
+    log,
+  });
   mcp.register(server);
   attempts.registerRoutes(server);
   mountOperations(server, [
@@ -144,10 +224,19 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...projects.operations,
     ...roles.operations,
     ...workflows.operations,
+    ...tasks.operations,
+    ...plans.operations,
+    ...inbox.operations,
     ...attempts.operations,
     // The debug entry exists in development builds only (M2-09).
     ...(config.nodeEnv === 'production' ? [] : debug.operations),
   ]);
+
+  // Recovery from the previous run (03 §2.1): attempts first (their nodes and tasks react to the interruption), then
+  // what is left of nodes and tasks. Scheduling starts once the API listens (start()).
+  attempts.service.recover();
+  nodes.service.recover();
+  tasks.service.recover();
 
   if (config.webDir !== undefined) await server.register(fastifyStatic, { root: config.webDir });
   return {
@@ -161,11 +250,17 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       attempts: attempts.service,
       roles: roles.service,
       workflows: workflows.service,
+      tasks: tasks.service,
+      nodes: nodes.service,
+      inbox: inbox.service,
+      worktrees: worktrees.service,
     },
     mcpToken,
-    async startRuntime(port) {
+    async start(port) {
       apiPort = port;
       hosting = deps.opencode === undefined;
+      // Sessions can only call back once the API listens; the scheduler waits for the runtime by itself.
+      scheduler.start();
       await startHostedRuntime();
     },
     close: () => server.close(),
