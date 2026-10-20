@@ -53,3 +53,4 @@
 | D47 | 全局并发上限（`scheduler.maxConcurrentAttempts`）计入 `running`/`verifying` 的节点与规划中的任务；等待输入的节点只占每任务上限。调度器只在事件（任务、节点、尝试、设置、运行时变化）后运行，`start(port)` 之后才开始 | 等待用户的会话不消耗算力；API 监听前会话无法回调 MCP | 2026-10-20 |
 | D48 | 节点完成时后端以 `agent-workflow <agent-workflow@localhost>` 身份、`--no-verify`、关闭签名提交；并行节点共享任务工作区，先完成的节点的提交会包含此刻工作区中的全部改动 | AI 的提交与用户的提交区分开；用户的钩子与签名可能交互或很慢，验收检查已经是关卡；一个任务一个工作区（D20） | 2026-10-20 |
 | D49 | AI 评审会话未能给出结论（未提交、出错、超时、被中止）按检查失败处理（消耗预算，反馈写明评审未完成）；运行时消失则节点回 `ready` 不消耗预算 | 与命令检查一致，节点只有一种失败路径 | 2026-10-20 |
+| D50 | live 示例仓库 `ts-stats` 用 Node 内置测试（`node --test`，TypeScript 由 Node 直接运行），不依赖 Vitest；2026-10-20 起 `opencode/*-free` 模型对开发机的网络返回 `FreeTierError`（403），`@opencode` 与 live 测试改用 `opencode-go/beam-free`（`AW_OC_TEST_MODEL` / `AW_LIVE_MODEL`），默认值不变 | 示例仓库复制到临时目录后无需安装依赖即可检查；免费模型的可用性随网络与额度变化，测试只经环境变量切换 | 2026-10-20 |

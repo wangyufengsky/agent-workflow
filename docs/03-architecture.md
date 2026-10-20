@@ -187,7 +187,7 @@ modules/tasks/
 | --- | --- | --- |
 | 托管平台 | `GitHostingProvider` | github、gitlab |
 | 数据库 | `DbDriver` | mysql |
-| 验收方式 | `AcceptanceCheck` | command、ai_review |
+| 验收方式 | `acceptance` 模块的检查函数（`runCommand` / `review`，结果为 `CheckResult`） | command、ai_review |
 | 主题 | `ThemeDefinition`（数据） | 4 套 |
 | 流程与角色 | `WorkflowDefinition` / `RoleDefinition`（数据） | 5 个流程、4 个角色 |
 | 执行 MCP 工具 | `McpToolDefinition`（schema + handler + 允许的尝试类型） | 见 12-mcp-tools |

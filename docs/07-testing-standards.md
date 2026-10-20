@@ -78,7 +78,8 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 
 ## 6. live 测试
 
-- 示例仓库：`live/fixtures/` 下两个小项目（TS + Vitest、Java + Maven），各带一个已知缺陷和一个功能需求。
+- 示例仓库：`live/fixtures/` 下的小项目，各带一个已知缺陷和一个功能需求：`ts-stats`（TypeScript + `node --test`，M3-12）；Java + Maven 随 M6-05。说明见 `live/fixtures/README.md`。
+- M3-12 冒烟 `live/smoke.live.test.ts`：`bugfix` 与 `feature` 各跑一次，报告写到 `live/reports/smoke-<时间>.json`（尝试、提醒次数、用量、`submit_*` 调用成败）。
 - 用例：五个内置流程各一次；统计 `submit_*` 调用成功率、尝试次数、耗时、成本，输出报告到 `live/reports/`。
 - 不作为通过/失败的硬门槛（模型有随机性），但内置提示词改动的 PR 必须附 live 报告对比。
 

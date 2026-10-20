@@ -302,4 +302,4 @@ export const submitPlanTool = defineMcpTool({
 | 重试（M2） | 模型请求失败时 `session.status` 为 `{ type: 'retry', message, next }`，会话一直等待到 `next`（如免费额度用尽），不发 `session.error` |
 | 内部事件（M2） | `modules/opencode/opencode.events.ts` 只解析用到的事件（消息角色、文本与增量、工具、用量、重试、空闲、错误、权限），加上运行时消失的 `runtime_lost`；其他模块只经 `OpencodeClient.subscribe` 获取 |
 | 数据目录 | opencode 会话存于用户自己的 opencode 数据目录（与用户 TUI 共享，登录凭据也在那里），本应用不隔离；会话标题带任务编号便于辨认 |
-| 免费模型 | 开发与 `@opencode` 集成测试默认免费模型，不产生费用：M0 用 `opencode/glm-5.3-flash-free`；2026-10-19 其免费额度用尽后改为 `opencode/beam-free`（D42，`AW_OC_TEST_MODEL` 可覆盖） |
+| 免费模型 | 开发与 `@opencode` 集成测试默认免费模型，不产生费用：M0 用 `opencode/glm-5.3-flash-free`；2026-10-19 其免费额度用尽后改为 `opencode/beam-free`（D42，`AW_OC_TEST_MODEL` 可覆盖）；2026-10-20 `opencode/*-free` 对开发机网络不可用，用 `opencode-go/beam-free`（D50） |
