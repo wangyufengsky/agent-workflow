@@ -7,6 +7,7 @@ import {
   AttemptKind,
   ErrorCode,
   ResultNext,
+  RoleBaseAgent,
   type SubmitResultInput,
   type TaskContext,
   WorkflowDeliverable,
@@ -76,6 +77,7 @@ export function createDebugService({ attempts, settings, prompts }: DebugService
       });
       const attempt = await attempts.start({
         kind: AttemptKind.Execute,
+        agent: RoleBaseAgent.Executor,
         taskId: null,
         nodeId: null,
         roleId: null,

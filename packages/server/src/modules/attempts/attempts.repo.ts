@@ -1,19 +1,16 @@
-import { AppError, type AttemptKind, type AttemptStatus, ErrorCode, type ErrorInfo, errorInfoSchema } from '@aw/shared';
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { AppError, AttemptKind, type AttemptStatus, ErrorCode, type ErrorInfo, errorInfoSchema } from '@aw/shared';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { attemptsTable } from './attempts.table.ts';
 
 type AttemptRow = typeof attemptsTable.$inferSelect;
 
 /** An attempt as stored; the service adds in-memory state (progress) for DTOs. */
-export type Attempt = Omit<AttemptRow, 'error' | 'roleId'> & { error: ErrorInfo | null };
+export type Attempt = Omit<AttemptRow, 'error'> & { error: ErrorInfo | null };
 
-export type NewAttempt = Omit<
-  AttemptRow,
-  'error' | 'opencodeSessionId' | 'tokensInput' | 'tokensOutput' | 'cost' | 'endedAt'
->;
+export type NewAttempt = Omit<AttemptRow, 'error' | 'tokensInput' | 'tokensOutput' | 'cost' | 'endedAt'>;
 
-function toAttempt({ error, roleId: _roleId, ...row }: AttemptRow): Attempt {
+function toAttempt({ error, ...row }: AttemptRow): Attempt {
   // JSON column: parsed at the boundary (06 §9).
   return { ...row, error: error === null ? null : errorInfoSchema.parse(JSON.parse(error)) };
 }
@@ -35,12 +32,43 @@ export function createAttemptsRepo(db: DbExecutor) {
         .select()
         .from(attemptsTable)
         .where(eq(attemptsTable.opencodeSessionId, sessionId))
-        .orderBy(desc(attemptsTable.startedAt))
+        // Insertion order breaks ties: a re-planning attempt may start in the same millisecond.
+        .orderBy(desc(attemptsTable.startedAt), desc(sql`rowid`))
         .get();
       return row === undefined ? undefined : toAttempt(row);
     },
     listByStatus(statuses: readonly AttemptStatus[]): Attempt[] {
       return db.select().from(attemptsTable).where(inArray(attemptsTable.status, statuses)).all().map(toAttempt);
+    },
+    /** Oldest first. */
+    listByNode(nodeId: string): Attempt[] {
+      return db
+        .select()
+        .from(attemptsTable)
+        .where(eq(attemptsTable.nodeId, nodeId))
+        .orderBy(asc(attemptsTable.startedAt), asc(sql`rowid`))
+        .all()
+        .map(toAttempt);
+    },
+    /** Attempts of a task in the given states (all kinds), oldest first. */
+    listByTask(taskId: string, statuses: readonly AttemptStatus[]): Attempt[] {
+      return db
+        .select()
+        .from(attemptsTable)
+        .where(and(eq(attemptsTable.taskId, taskId), inArray(attemptsTable.status, statuses)))
+        .orderBy(asc(attemptsTable.startedAt), asc(sql`rowid`))
+        .all()
+        .map(toAttempt);
+    },
+    /** The task's most recent plan attempt. */
+    findLatestPlan(taskId: string): Attempt | undefined {
+      const row = db
+        .select()
+        .from(attemptsTable)
+        .where(and(eq(attemptsTable.taskId, taskId), eq(attemptsTable.kind, AttemptKind.Plan)))
+        .orderBy(desc(attemptsTable.startedAt), desc(sql`rowid`))
+        .get();
+      return row === undefined ? undefined : toAttempt(row);
     },
     /** Next number within the attempt's scope: its node, its task's plan attempts, or the debug attempts. */
     nextSeq(scope: { taskId: string | null; nodeId: string | null; kind: AttemptKind }): number {

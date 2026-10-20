@@ -2,23 +2,34 @@ import { randomUUID } from 'node:crypto';
 import type { Prompts } from '@aw/builtin';
 import {
   AppError,
-  ATTEMPT_BASE_AGENT,
   type AttemptDTO,
   AttemptEvent,
   type AttemptKind,
   AttemptStatus,
+  type AttemptSummaryDTO,
   attemptMachine,
   ErrorCode,
   isTerminalState,
   OPENCODE_AGENT_NAME,
+  type PermissionDecision,
+  type PermissionPayload,
+  type RoleBaseAgent,
   type TranscriptPage,
   TranscriptSystemEvent,
 } from '@aw/shared';
 import { parseModelRef, sessionPermissionRules } from '../opencode/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { watchSessions } from './attempts.reactions.ts';
+import type { Attempt } from './attempts.repo.ts';
 import { createSessionView } from './attempts.session-view.ts';
-import { type AttemptStateDeps, createAttemptState, errorOf, type LiveSession, systemEntry } from './attempts.state.ts';
+import {
+  type AttemptSignal,
+  type AttemptStateDeps,
+  createAttemptState,
+  errorOf,
+  type LiveSession,
+  systemEntry,
+} from './attempts.state.ts';
 
 export type AttemptsServiceDeps = AttemptStateDeps & { settings: SettingsService; prompts: Prompts };
 
@@ -27,6 +38,8 @@ export type StartAttemptInput = {
   taskId: string | null;
   nodeId: string | null;
   roleId: string | null;
+  /** The role's base agent: decides the opencode agent and its bash rules (12 §2). */
+  agent: RoleBaseAgent;
   /** Session working directory: the task worktree. */
   directory: string;
   /** Session title, `<taskKey> · <node title>` (12 §4.1). */
@@ -39,6 +52,11 @@ export type StartAttemptInput = {
   prompt: string;
 };
 
+/** What re-attaching to a persisted session needs after a restart: the session state lived in memory. */
+export type ResumeInput = { agent: RoleBaseAgent; system: string | undefined };
+
+const ACTIVE: readonly AttemptStatus[] = [AttemptStatus.Starting, AttemptStatus.Running];
+
 /** Attempt lifecycle (09 §4) and the session protocol (12 §4); opencode-driven end conditions are in the reactions. */
 export function createAttemptsService(deps: AttemptsServiceDeps) {
   const { clock, opencode, settings, transcripts } = deps;
@@ -46,12 +64,68 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
   const { repo, mustFind, move, record, toDto } = state;
   const reactions = watchSessions(state, deps);
 
+  function requireReady(): void {
+    if (!opencode.isConnected()) throw new AppError(ErrorCode.OpencodeNotReady, 'opencode is not ready');
+  }
+
+  /** Registers the session as ours, with the attempt timeout running. */
+  function track(
+    attempt: Attempt,
+    session: Pick<LiveSession, 'attemptId' | 'taskId' | 'sessionId' | 'directory' | 'agent' | 'model' | 'system'>,
+    parked: boolean,
+  ): LiveSession {
+    const timeoutMs = settings.get('attempt.timeoutMinutes') * 60_000;
+    const { promise: released, resolve: release } = Promise.withResolvers<void>();
+    const tracked: LiveSession = {
+      ...session,
+      view: createSessionView(),
+      timeoutMs,
+      cancelTimeout: parked ? () => undefined : clock.schedule(timeoutMs, () => reactions.timeOut(attempt.id)),
+      stopAfterSubmit: false,
+      parked,
+      // A session re-attached after a restart waits idle for its answer.
+      idle: parked,
+      pendingAnswers: [],
+      released,
+      release,
+    };
+    state.live.set(session.sessionId, tracked);
+    return tracked;
+  }
+
+  /** Sends a message; a failure to deliver it fails the attempt like a session error. */
+  async function sendOrFail(session: LiveSession, text: string): Promise<void> {
+    try {
+      await state.send(session, text);
+    } catch (err) {
+      const current = mustFind(session.attemptId);
+      if (current.status === AttemptStatus.Running) move(current, AttemptEvent.SessionError, errorOf(err));
+    }
+  }
+
   return {
     get: (id: string): AttemptDTO => toDto(mustFind(id)),
+    isReady: (): boolean => opencode.isConnected(),
+    onSignal: state.onSignal,
 
-    /** Creates the session and sends the first message (12 §4.1); the attempt is then `running`. */
+    /** Execute and review attempts of a node, oldest first. */
+    listByNode: (nodeId: string): AttemptSummaryDTO[] => repo.listByNode(nodeId).map(state.toSummary),
+    /** Every active attempt, for task summaries. */
+    listActiveAll: (): AttemptSummaryDTO[] => repo.listByStatus(ACTIVE).map(state.toSummary),
+    /** Active (starting / running) attempts of a task. */
+    listActive: (taskId: string): AttemptSummaryDTO[] => repo.listByTask(taskId, ACTIVE).map(state.toSummary),
+    latestPlanAttempt: (taskId: string): AttemptDTO | undefined => {
+      const attempt = repo.findLatestPlan(taskId);
+      return attempt === undefined ? undefined : toDto(attempt);
+    },
+    roleIdOf: (attemptId: string): string | null => mustFind(attemptId).roleId,
+
+    /**
+     * Creates the session and sends the first message (12 §4.1); the attempt is then `running`. The attempt row is
+     * written before the first await, so a caller that does not wait still sees it as active.
+     */
     async start(input: StartAttemptInput): Promise<AttemptDTO> {
-      if (!opencode.isConnected()) throw new AppError(ErrorCode.OpencodeNotReady, 'opencode is not ready');
+      requireReady();
       const model = input.model === null ? undefined : parseModelRef(input.model);
       const id = randomUUID();
       repo.insert({
@@ -64,51 +138,97 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         status: AttemptStatus.Starting,
         model: input.model,
         directory: input.directory,
+        opencodeSessionId: null,
         nudges: 0,
         startedAt: clock.now(),
       });
       state.publish(mustFind(id));
       record(mustFind(id), [systemEntry(TranscriptSystemEvent.AttemptStarted)]);
 
-      const base = ATTEMPT_BASE_AGENT[input.kind];
-      const agent = OPENCODE_AGENT_NAME[base];
+      const agent = OPENCODE_AGENT_NAME[input.agent];
       let sessionId: string;
       try {
         sessionId = await opencode.createSession({
           directory: input.directory,
           title: input.title,
           agent,
-          permission: sessionPermissionRules(base, settings.get('ai.bashPolicy')),
+          permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy')),
         });
       } catch (err) {
         return toDto(move(mustFind(id), AttemptEvent.StartFailed, errorOf(err)));
       }
       repo.setSession(id, sessionId);
       const attempt = mustFind(id);
-      // The runtime may have gone away while the session was being created.
+      // The runtime may have gone away (or the task been cancelled) while the session was being created.
       if (attempt.status !== AttemptStatus.Starting) return toDto(attempt);
 
-      const session: LiveSession = {
-        attemptId: id,
-        taskId: input.taskId,
-        sessionId,
-        directory: input.directory,
-        agent,
-        model,
-        system: input.system,
-        view: createSessionView(),
-        cancelTimeout: clock.schedule(settings.get('attempt.timeoutMinutes') * 60_000, () => reactions.timeOut(id)),
-        stopAfterSubmit: false,
-      };
-      state.live.set(sessionId, session);
+      const session = track(
+        attempt,
+        {
+          attemptId: id,
+          taskId: input.taskId,
+          sessionId,
+          directory: input.directory,
+          agent,
+          model,
+          system: input.system,
+        },
+        false,
+      );
       // Running before the first prompt, so every event of the session finds the attempt active.
       move(attempt, AttemptEvent.SessionStarted);
-      try {
-        await state.send(session, input.prompt);
-      } catch (err) {
-        const current = mustFind(id);
-        if (current.status === AttemptStatus.Running) move(current, AttemptEvent.SessionError, errorOf(err));
+      await sendOrFail(session, input.prompt);
+      return toDto(mustFind(id));
+    },
+
+    /**
+     * A new plan attempt on the session of an earlier one (re-planning, 12 §4.3): the model keeps what it read and
+     * receives `prompt` as the next message. Synchronous up to sending, like `start`.
+     */
+    async continueSession(previousId: string, input: { prompt: string } & ResumeInput): Promise<AttemptDTO> {
+      requireReady();
+      const previous = mustFind(previousId);
+      if (previous.opencodeSessionId === null) {
+        throw new AppError(ErrorCode.AttemptNotFound, `Attempt ${previousId} has no session`, { id: previousId });
       }
+      const id = randomUUID();
+      repo.insert({
+        id,
+        taskId: previous.taskId,
+        nodeId: previous.nodeId,
+        roleId: previous.roleId,
+        kind: previous.kind,
+        seq: repo.nextSeq(previous),
+        status: AttemptStatus.Starting,
+        model: previous.model,
+        directory: previous.directory,
+        opencodeSessionId: previous.opencodeSessionId,
+        nudges: 0,
+        startedAt: clock.now(),
+      });
+      record(mustFind(id), [systemEntry(TranscriptSystemEvent.AttemptStarted)]);
+      // The previous turn on this session may still be winding down (the abort after its submit); its last events
+      // must not reach the new attempt.
+      const winding = state.live.get(previous.opencodeSessionId);
+      if (winding !== undefined) await winding.released;
+      const attempt = mustFind(id);
+      // Cancelled while waiting.
+      if (attempt.status !== AttemptStatus.Starting) return toDto(attempt);
+      const session = track(
+        attempt,
+        {
+          attemptId: id,
+          taskId: previous.taskId,
+          sessionId: previous.opencodeSessionId,
+          directory: previous.directory,
+          agent: OPENCODE_AGENT_NAME[input.agent],
+          model: previous.model === null ? undefined : parseModelRef(previous.model),
+          system: input.system,
+        },
+        false,
+      );
+      move(attempt, AttemptEvent.SessionStarted);
+      await sendOrFail(session, input.prompt);
       return toDto(mustFind(id));
     },
 
@@ -126,7 +246,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       return toDto(updated);
     },
 
-    /** User abort (11 §6). */
+    /** User abort (11 §6) or task cancellation. */
     async abort(id: string): Promise<AttemptDTO> {
       const updated = move(mustFind(id), AttemptEvent.Abort);
       record(updated, [systemEntry(TranscriptSystemEvent.Aborted)]);
@@ -141,13 +261,59 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       state.publish(mustFind(id));
     },
 
+    /**
+     * An answer to the attempt's question (12 §4.2): sent as the next message once the session waits for nothing
+     * else; while it is still working the answer waits for its next idle. After a restart the persisted session is
+     * re-attached. An attempt that already ended keeps the answer only in the task context.
+     */
+    async deliverAnswer(attemptId: string, text: string, resume: ResumeInput): Promise<void> {
+      const attempt = mustFind(attemptId);
+      if (attempt.status !== AttemptStatus.Running || attempt.opencodeSessionId === null) return;
+      const session =
+        state.sessionOf(attemptId) ??
+        track(
+          attempt,
+          {
+            attemptId,
+            taskId: attempt.taskId,
+            sessionId: attempt.opencodeSessionId,
+            directory: attempt.directory,
+            agent: OPENCODE_AGENT_NAME[resume.agent],
+            model: attempt.model === null ? undefined : parseModelRef(attempt.model),
+            system: resume.system,
+          },
+          true,
+        );
+      session.pendingAnswers.push(text);
+      reactions.resume(session);
+    },
+
+    /** The user's decision on a permission request goes back to opencode, and the turn continues (D34). */
+    async replyPermission(payload: PermissionPayload, reply: PermissionDecision): Promise<void> {
+      await opencode.replyPermission({
+        permissionId: payload.opencodePermissionId,
+        directory: payload.directory,
+        reply,
+      });
+    },
+
+    /** Once nothing is left to wait for (the permission item was resolved), the session resumes. */
+    resumeIfAnswered(attemptId: string): void {
+      const session = state.sessionOf(attemptId);
+      if (session !== undefined) reactions.resume(session);
+    },
+
     transcript(id: string, afterSeq: number): TranscriptPage {
       const attempt = mustFind(id);
       return transcripts.read(attempt, afterSeq, isTerminalState(attemptMachine, attempt.status));
     },
 
-    /** Startup: sessions of a previous run are gone, so attempts still active then are interrupted (03 §2.1). */
+    /**
+     * Startup: sessions of a previous run are gone, so attempts still active then are interrupted (03 §2.1), except
+     * those waiting for the answer to a blocking question: their persisted session continues when it arrives.
+     */
     recover: reactions.interruptActive,
   };
 }
 export type AttemptsService = ReturnType<typeof createAttemptsService>;
+export type { AttemptSignal };

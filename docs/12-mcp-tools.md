@@ -41,7 +41,7 @@
   - 只读白名单：`ls* cat* head* tail* rg* grep* find* wc*` 与 Git 只读子命令为 allow，其余 ask。
   - `ai.bashPolicy = auto`（默认）：`*` allow；`git *` deny（其他所有 Git 命令都可能改动 refs 或工作区，不逐个列举）；Git 只读子命令再 allow。
   - `ai.bashPolicy = ask`：只读白名单 allow，其余 ask。
-- 角色差异不靠多个 agent：会话使用角色的 `base_agent` 对应的 agent，角色提示词通过每次 prompt 的 `system` 字段追加，模型通过 prompt 的 `model` 字段指定。因此修改角色无需重启 opencode。
+- 角色差异不靠多个 agent：会话使用角色的 `base_agent` 对应的 agent（与尝试类型无关：只读的「代码审查」步骤以 reviewer 身份执行 `execute` 尝试，用 `submit_result` 提交报告），角色提示词通过每次 prompt 的 `system` 字段追加，模型通过 prompt 的 `model` 字段指定。因此修改角色无需重启 opencode。评审检查（`review` 尝试）固定使用内置 `reviewer` 角色。
 - 修改 `ai.bashPolicy` 对之后新建的会话立即生效，无需重启 opencode。
 
 ## 3. 调用归属（哪个尝试在调用工具）
@@ -71,7 +71,8 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | 情况 | 处理 |
 | --- | --- |
 | 调用 `submit_plan` / `submit_result` / `submit_review` 成功 | 尝试 `succeeded`；后端随后中止会话的后续生成（若仍在生成） |
-| `session.idle` 且有未回答的阻塞问题 | 节点 `waiting_input`；回答后 `prompt_async` 发送答案（`start-answer.md` 模板） |
+| `session.idle` 且有未回答的阻塞问题（或待处理的权限请求） | 尝试保持 `running` 但停止计时，节点 `waiting_input`；全部回答后 `prompt_async` 发送答案（`start-answer.md`，多个答案合成一条），节点回到 `running`，重新计时（D46） |
+| `session.idle` 且有已回答但未送达的答案 | 发送答案（会话忙时回答的问题，在下一次空闲时送达） |
 | `session.idle` 且未提交、无问题 | 发送提醒（`nudge.md`，按尝试类型填入对应的提交工具名），`nudges+1`；已提醒 `ATTEMPT_MAX_NUDGES` 次仍空闲 → `failed / ATTEMPT_NO_RESULT` |
 | `session.error` | `failed / ATTEMPT_SESSION_ERROR`（`details.error` 为 opencode 的错误对象） |
 | 超时 | 从 `running` 起 `attempt.timeoutMinutes`：中止会话，`failed / ATTEMPT_TIMEOUT` |
@@ -83,7 +84,9 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 
 ### 4.3 规划会话的复用
 
-`plan` 类尝试：用户在 `plan_review` 选择「按反馈重新规划」时，在**同一会话**发送反馈消息并新建一条 `plan` 类尝试记录指向同一 `opencode_session_id`（上一条已 `succeeded`，归属解析只匹配活动尝试，不冲突）。
+`plan` 类尝试：用户在 `plan_review` 选择「按反馈重新规划」时，在**同一会话**发送反馈消息（`replan.md`）并新建一条 `plan` 类尝试记录指向同一 `opencode_session_id`（上一条已 `succeeded`，归属解析只匹配活动尝试，不冲突）。新尝试立即记录；上一轮在提交后的收尾（中止产生的错误与空闲事件）结束之后才发送反馈，避免这些事件落到新尝试上。固定流程（模板计划）不能重新规划（400 `VALIDATION_FAILED`）。
+
+规划失败（规划尝试未提交、出错、超时或被中止）→ 任务 `failed`（`failedPhase = planning`）；规划尝试因运行时消失中断 → 任务保持 `planning`，调度器在运行时恢复后新开一个规划会话。
 
 ## 5. 错误返回格式
 
@@ -116,7 +119,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 
 工具名在 opencode 中显示为 `agent-workflow_<name>`（名称常量 `McpToolName`）。输入/输出 schema 位于 `shared/contracts/mcp/<tool>.ts`；下文用 TS 类型描述。
 
-M2 实现了 `get_task_context`、`report_progress`、`submit_result`，归属对象是**调试尝试**（开发构建的调试入口，不属于任务）：`get_task_context` 返回任务编号 `DEBUG`、需求、所在目录的分支与 HEAD；`submit_result` 直接使尝试 `succeeded`（返回 `next: 'done'`）。其余工具与任务归属随 M3 加入。
+M3 实现了除数据库工具（M5-07）以外的全部工具。调试尝试（开发构建，不属于任务）仍可用 `get_task_context`（返回任务编号 `DEBUG`）、`report_progress`、`submit_result`（直接使尝试 `succeeded`，返回 `next: 'done'`）。
 
 ---
 
@@ -176,7 +179,7 @@ M2 实现了 `get_task_context`、`report_progress`、`submit_result`，归属�
 }
 ```
 
-行为：校验（08 §5.3 子码）→ 通过则创建 `draft` 计划版本（`source=ai`），尝试 `succeeded`，任务发 `plan_submitted`。`requiredSteps` 中的节点若未出现由校验报 `MISSING_REQUIRED_STEP`（模型须原样包含，可改 instructions 不可改 key/role）。
+行为：校验（08 §5.3 子码，`details.problems[]` 每项带该子码的 `hint`）→ 通过则创建 `draft` 计划版本（`source=ai`），尝试 `succeeded`，任务发 `plan_submitted`。`requiredSteps` 中的节点若未出现由校验报 `MISSING_REQUIRED_STEP`（模型须原样包含，可改 instructions 与 depends_on）；存入计划时必经步骤的 title、角色与验收以流程定义为准。`acceptance` 省略时物化节点用流程的 `defaultAcceptance`。
 输出：`{ version: number, accepted: true }`
 错误：`PLAN_INVALID`（details.problems）、`MCP_RESULT_ALREADY_SUBMITTED`、`MCP_TOOL_NOT_ALLOWED`。
 
