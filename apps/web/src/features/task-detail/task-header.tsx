@@ -8,7 +8,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { toast } from '../../components/toast.tsx';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
-import { useCancelTask, usePauseTask, useResumeTask } from '../tasks/tasks.queries.ts';
+import { useCancelTask, usePauseTask, useResumeTask, useStartTask } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
 
 type Props = {
@@ -25,6 +25,7 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
   const cancel = useCancelTask();
   const pause = usePauseTask();
   const resume = useResumeTask();
+  const start = useStartTask();
   const doing = task.progress ?? task.currentStep;
   return (
     <header className={styles.header}>
@@ -37,6 +38,11 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
         {details !== undefined && (
           <Button variant="ghost" size="sm" icon="layers" onClick={() => onDetailsChange(!details)}>
             {details ? C.hideDetails : C.showDetails}
+          </Button>
+        )}
+        {task.status === TaskStatus.Draft && (
+          <Button variant="primary" icon="play" pending={start.isPending} onClick={() => start.mutate(task.id)}>
+            {C.startDraft}
           </Button>
         )}
         {pro && task.status === TaskStatus.Running && (
@@ -62,6 +68,8 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
       </div>
       <span className="hint">{C.meta(task.key, task.project.name, task.workflow.name)}</span>
       {doing !== null && <span className={styles.doing}>{C.doing(doing)}</span>}
+      {task.status === TaskStatus.Draft && <span className="hint">{C.draft}</span>}
+      {start.isError && <ErrorState error={start.error} />}
       {pause.isError && <ErrorState error={pause.error} />}
       {resume.isError && <ErrorState error={resume.error} />}
       <Dialog

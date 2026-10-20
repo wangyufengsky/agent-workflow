@@ -17,11 +17,14 @@ import { ProOnly } from '../features/pro/pro-only.tsx';
 import { ProjectDetailPage } from '../features/projects/project-detail.page.tsx';
 import { ProjectsPage } from '../features/projects/projects.page.tsx';
 import { projectsQuery } from '../features/projects/projects.queries.ts';
+import { RolesPage } from '../features/roles/roles.page.tsx';
 import { RuntimePage } from '../features/runtime/runtime.page.tsx';
 import { SettingsPage } from '../features/settings/settings.page.tsx';
 import { settingsQuery, useSettings } from '../features/settings/settings.queries.ts';
 import { TaskPage } from '../features/task-detail/task.page.tsx';
 import { TasksPage } from '../features/tasks/tasks.page.tsx';
+import { WorkflowEditorPage } from '../features/workflows/workflow-editor.page.tsx';
+import { WorkflowsPage } from '../features/workflows/workflows.page.tsx';
 import { useAppliedTheme } from '../theme/use-applied-theme.ts';
 import { ROUTES } from './routes.ts';
 import { AppShell } from './shell/app-shell.tsx';
@@ -69,6 +72,13 @@ const shellRoute = createRoute({
 
 const page = <P extends string>(path: P, component: () => React.ReactNode) =>
   createRoute({ getParentRoute: () => shellRoute, path, component });
+/** A pro page (14 §1): in simple mode it explains itself and offers to switch. */
+const proOnlyPage = <P extends string>(path: P, Component: () => React.ReactNode) =>
+  page(path, () => (
+    <ProOnly>
+      <Component />
+    </ProOnly>
+  ));
 const proPage = <P extends string>(path: P, icon: Parameters<typeof ComingSoonPage>[0]['icon']) =>
   page(path, () => (
     <ProOnly>
@@ -176,8 +186,9 @@ const routeTree = rootRoute.addChildren([
     page(ROUTES.settings, SettingsPage),
     gitRoute,
     gitProjectRoute,
-    proPage(ROUTES.workflows, 'flow'),
-    proPage(ROUTES.roles, 'users'),
+    proOnlyPage(ROUTES.workflows, WorkflowsPage),
+    proOnlyPage(ROUTES.workflow, WorkflowEditorPage),
+    proOnlyPage(ROUTES.roles, RolesPage),
     proPage(ROUTES.databases, 'db'),
     proPage(ROUTES.tools, 'tool'),
     runtimeRoute,

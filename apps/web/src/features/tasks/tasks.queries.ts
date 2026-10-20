@@ -1,11 +1,17 @@
 import {
   acceptNodeOp,
   type ChangeRequestReason,
+  type CreateRoleRequest,
   type CreateTaskRequest,
+  type CreateWorkflowRequest,
   cancelTaskOp,
   confirmPlanOp,
+  createRoleOp,
   createTaskOp,
+  createWorkflowOp,
   type DeliverRequest,
+  deleteRoleOp,
+  deleteWorkflowOp,
   deliverTaskOp,
   getNodeOp,
   getTaskOp,
@@ -13,6 +19,7 @@ import {
   listRolesOp,
   listTasksOp,
   listWorkflowsOp,
+  listWorkflowVersionsOp,
   type NodeDetailDTO,
   type NodeSummaryDTO,
   nodeDiffFileOp,
@@ -27,11 +34,16 @@ import {
   retryTaskOp,
   saveDraftPlanOp,
   skipNodeOp,
+  startTaskOp,
   type TaskDetailDTO,
   type TaskDisplayGroup,
   type TaskSummaryDTO,
   taskDiffFileOp,
   taskDiffOp,
+  type UpdateRoleRequest,
+  type UpdateWorkflowRequest,
+  updateRoleOp,
+  updateWorkflowOp,
 } from '@aw/shared';
 import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import { callOperation } from '../../api/client.ts';
@@ -45,6 +57,37 @@ export const workflowsQuery = queryOptions({
 
 export const workflowQuery = (id: string) =>
   queryOptions({ queryKey: queryKeys.workflow(id), queryFn: () => callOperation(getWorkflowOp, { id }) });
+
+export const workflowVersionsQuery = (key: string) =>
+  queryOptions({
+    queryKey: queryKeys.workflowVersions(key),
+    queryFn: async () => (await callOperation(listWorkflowVersionsOp, { key })).items,
+  });
+
+/**
+ * Workflow and role definitions changed (M5-05 / M5-06): every list and version view refetches. Not awaited: a saved
+ * workflow version is a new row, so the refetch remounts its editor, and the caller's `onSuccess` must run first.
+ */
+function useDefinitionMutation<I, O>(run: (input: I) => Promise<O>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.workflows });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.roles });
+    },
+  });
+}
+export const useCreateWorkflow = () =>
+  useDefinitionMutation((input: CreateWorkflowRequest) => callOperation(createWorkflowOp, input));
+export const useUpdateWorkflow = () =>
+  useDefinitionMutation((input: UpdateWorkflowRequest) => callOperation(updateWorkflowOp, input));
+export const useDeleteWorkflow = () => useDefinitionMutation((key: string) => callOperation(deleteWorkflowOp, { key }));
+export const useCreateRole = () =>
+  useDefinitionMutation((input: CreateRoleRequest) => callOperation(createRoleOp, input));
+export const useUpdateRole = () =>
+  useDefinitionMutation((input: UpdateRoleRequest) => callOperation(updateRoleOp, input));
+export const useDeleteRole = () => useDefinitionMutation((id: string) => callOperation(deleteRoleOp, { id }));
 
 export const rolesQuery = queryOptions({
   queryKey: queryKeys.roles,
@@ -134,6 +177,7 @@ export const useRequestChanges = () =>
   );
 export const useReplan = () =>
   useTaskMutation((input: { id: string; feedback: string }) => callOperation(replanOp, input));
+export const useStartTask = () => useTaskMutation((id: string) => callOperation(startTaskOp, { id }));
 export const usePauseTask = () => useTaskMutation((id: string) => callOperation(pauseTaskOp, { id }));
 export const useResumeTask = () => useTaskMutation((id: string) => callOperation(resumeTaskOp, { id }));
 

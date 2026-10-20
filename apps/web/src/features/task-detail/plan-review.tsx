@@ -33,7 +33,7 @@ export function PlanReview({ task, pro }: { task: TaskDetailDTO; pro: boolean })
   };
   return (
     <div className={styles.layout}>
-      <ProgressCanvas steps={stepsOfPlan(plan, roles.data ?? [])} />
+      <ProgressCanvas steps={stepsOfPlan(plan.graph, roles.data ?? [])} />
       <aside className={styles.side}>
         <Panel title={`${C.planTitle} · ${C.planVersion(plan.version)}`}>
           <div className="col">

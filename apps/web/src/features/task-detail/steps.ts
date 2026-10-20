@@ -1,4 +1,4 @@
-import type { PlanDTO, RoleDTO, TaskDetailDTO } from '@aw/shared';
+import type { PlanGraph, RoleDTO, TaskDetailDTO } from '@aw/shared';
 import type { CanvasStep } from '../../canvas/task-node.tsx';
 
 /** Canvas steps of a task's nodes, with the progress line of the attempt working on each. */
@@ -15,9 +15,9 @@ export function stepsOfNodes(task: TaskDetailDTO): CanvasStep[] {
   }));
 }
 
-/** Canvas steps of a plan that has no nodes yet (waiting for confirmation). */
-export function stepsOfPlan(plan: PlanDTO, roles: readonly RoleDTO[]): CanvasStep[] {
-  return plan.graph.nodes.map((node) => ({
+/** Canvas steps of a plan that has no nodes yet (waiting for confirmation, or a workflow's template). */
+export function stepsOfPlan(graph: PlanGraph, roles: readonly RoleDTO[]): CanvasStep[] {
+  return graph.nodes.map((node) => ({
     id: node.key,
     key: node.key,
     title: node.title,

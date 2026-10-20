@@ -1,4 +1,4 @@
-import type { ProjectDTO } from '@aw/shared';
+import { type ProjectDTO, TASK_TITLE_MAX_CHARS, UiMode, WorkflowKind } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type KeyboardEvent, useState } from 'react';
@@ -7,11 +7,95 @@ import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
+import { gitBranchesQuery } from '../git/git.queries.ts';
+import { useSettings } from '../settings/settings.queries.ts';
 import { useCreateTask, workflowsQuery } from '../tasks/tasks.queries.ts';
 import styles from './start-task.module.css';
 import { workflowIcon } from './workflow-icon.ts';
 
-/** One step to start a task (14 §3.2): project, workflow card, requirement, optional plan confirmation. */
+/** Pro mode's「更多选项」(M5-09): title, base branch, every checkpoint; null fields use the defaults. */
+type MoreOptions = {
+  title: string;
+  baseBranch: string | null;
+  acceptEachNode: boolean | null;
+  askOnUncertainty: boolean | null;
+};
+const NO_OPTIONS: MoreOptions = { title: '', baseBranch: null, acceptEachNode: null, askOnUncertainty: null };
+
+function MoreOptionsFields({
+  projectId,
+  value,
+  onChange,
+}: {
+  projectId: string;
+  value: MoreOptions;
+  onChange: (value: MoreOptions) => void;
+}) {
+  const branches = useQuery({ ...gitBranchesQuery(projectId), enabled: projectId !== '' });
+  const askDefault = useSettings()['ai.askOnUncertainty'];
+  const local = branches.data?.filter((b) => !b.remote) ?? [];
+  return (
+    <details className={styles.more}>
+      <summary className="hint">{C.moreOptions}</summary>
+      <div className="grid-2">
+        <div>
+          <div className="field">
+            <label className="label" htmlFor="start-title">
+              {C.title}
+            </label>
+            <input
+              id="start-title"
+              className="input"
+              maxLength={TASK_TITLE_MAX_CHARS}
+              placeholder={C.titlePlaceholder}
+              value={value.title}
+              onChange={(e) => onChange({ ...value, title: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="start-branch">
+            {C.baseBranch}
+          </label>
+          <select
+            id="start-branch"
+            className="select"
+            value={value.baseBranch ?? ''}
+            onChange={(e) => onChange({ ...value, baseBranch: e.target.value === '' ? null : e.target.value })}
+          >
+            <option value="">{C.defaultBranch}</option>
+            {local.map((b) => (
+              <option key={b.name} value={b.name}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={value.acceptEachNode ?? false}
+          onChange={(e) => onChange({ ...value, acceptEachNode: e.target.checked })}
+        />
+        <span>{C.acceptEachNode}</span>
+      </label>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={value.askOnUncertainty ?? askDefault}
+          onChange={(e) => onChange({ ...value, askOnUncertainty: e.target.checked })}
+        />
+        <span>{C.askOnUncertainty}</span>
+      </label>
+    </details>
+  );
+}
+
+/**
+ * One step to start a task (14 §3.2): project, workflow card, requirement, optional plan confirmation. Pro mode also
+ * lists custom workflows and offers more options and saving a draft (M5-09).
+ */
 export function StartTaskForm({
   projects,
   projectId,
@@ -25,23 +109,35 @@ export function StartTaskForm({
   initialWorkflowKey?: string | undefined;
   initialRequirement?: string | undefined;
 }) {
+  const pro = useSettings()['ui.mode'] === UiMode.Pro;
   const workflows = useQuery(workflowsQuery);
+  const shown = workflows.data?.filter((w) => pro || w.kind === WorkflowKind.Builtin);
   const [workflowId, setWorkflowId] = useState<string | undefined>(undefined);
   const [requirement, setRequirement] = useState(initialRequirement ?? '');
   const [confirmPlan, setConfirmPlan] = useState(false);
+  const [options, setOptions] = useState<MoreOptions>(NO_OPTIONS);
   const create = useCreateTask();
   const navigate = useNavigate();
-  const selected = workflowId ?? (workflows.data?.find((w) => w.key === initialWorkflowKey) ?? workflows.data?.[0])?.id;
+  const selected = workflowId ?? (shown?.find((w) => w.key === initialWorkflowKey) ?? shown?.[0])?.id;
   const canStart = selected !== undefined && projectId !== '' && requirement.trim() !== '';
 
-  const start = () => {
+  const start = (asDraft = false) => {
     if (!canStart) return;
+    const more = pro ? options : NO_OPTIONS;
+    const checkpoints = {
+      ...(confirmPlan ? { confirm_plan: true } : {}),
+      ...(more.acceptEachNode === null ? {} : { accept_each_node: more.acceptEachNode }),
+      ...(more.askOnUncertainty === null ? {} : { ask_on_uncertainty: more.askOnUncertainty }),
+    };
     create.mutate(
       {
         projectId,
         workflowId: selected,
         requirement: requirement.trim(),
-        ...(confirmPlan ? { checkpoints: { confirm_plan: true } } : {}),
+        ...(Object.keys(checkpoints).length === 0 ? {} : { checkpoints }),
+        ...(more.title.trim() === '' ? {} : { title: more.title.trim() }),
+        ...(more.baseBranch === null ? {} : { baseBranch: more.baseBranch }),
+        ...(asDraft ? { start: false } : {}),
       },
       { onSuccess: (task) => void navigate({ to: ROUTES.task, params: { taskId: task.id } }) },
     );
@@ -50,6 +146,7 @@ export function StartTaskForm({
     e.preventDefault();
     start();
   };
+
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -84,7 +181,7 @@ export function StartTaskForm({
         </span>
         {workflows.isError && <ErrorState error={workflows.error} onRetry={() => void workflows.refetch()} />}
         <fieldset className={styles.workflows} aria-labelledby="start-workflow">
-          {workflows.data?.map((w) => (
+          {shown?.map((w) => (
             <button
               key={w.id}
               type="button"
@@ -113,12 +210,18 @@ export function StartTaskForm({
           onKeyDown={onKeyDown}
         />
       </div>
+      {pro && <MoreOptionsFields projectId={projectId} value={options} onChange={setOptions} />}
       {create.isError && <ErrorState error={create.error} />}
       <div className={styles.footer}>
         <label className="check grow">
           <input type="checkbox" checked={confirmPlan} onChange={(e) => setConfirmPlan(e.target.checked)} />
           <span>{C.confirmPlan}</span>
         </label>
+        {pro && (
+          <Button pending={create.isPending} disabled={!canStart} onClick={() => start(true)}>
+            {C.saveDraft}
+          </Button>
+        )}
         <Button type="submit" variant="primary" icon="sparkle" pending={create.isPending} disabled={!canStart}>
           {C.start}
           <span className="kbd">{C.startShortcut}</span>

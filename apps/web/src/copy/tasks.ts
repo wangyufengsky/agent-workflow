@@ -42,6 +42,14 @@ export const HOME_TASK_COPY = {
   inProgress: '进行中',
   recent: '最近完成',
   noneInProgress: '没有进行中的任务。',
+  moreOptions: '更多选项',
+  title: '标题',
+  titlePlaceholder: '默认取需求的第一行',
+  baseBranch: '基于分支',
+  defaultBranch: '项目默认分支',
+  acceptEachNode: '每个步骤由我验收',
+  askOnUncertainty: '不确定时停下来问我',
+  saveDraft: '保存草稿',
 } as const;
 
 export const TASKS_COPY = {
@@ -59,6 +67,8 @@ export const TASK_COPY = {
   meta: (key: string, project: string, workflow: string) => `${key} · ${project} · ${workflow}`,
   doing: (step: string) => `正在：${step}`,
   showDetails: '显示详细信息',
+  startDraft: '开始',
+  draft: '草稿：还没有开始，开始后会建立独立工作区。',
   hideDetails: '隐藏详细信息',
   pause: '暂停',
   paused: '任务已暂停：进行中的步骤会做完，不会开始新的步骤',

@@ -52,7 +52,12 @@ export function TaskSide({
                 {C.viewNode}
               </Button>
               {pro && (
-                <Link to={ROUTES.node} params={{ taskId: task.id, nodeId: node.id }} search={{}} className="btn sm">
+                <Link
+                  to={ROUTES.node}
+                  params={{ taskId: task.id, nodeId: node.id }}
+                  search={{}}
+                  className="btn secondary sm"
+                >
                   {C.viewNodePage}
                 </Link>
               )}

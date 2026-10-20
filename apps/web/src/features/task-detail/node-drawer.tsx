@@ -172,7 +172,7 @@ export function NodeDrawer({
             <NodeBadge status={node.data.status} />
             <span className="hint grow">{node.data.roleName}</span>
             {pro && (
-              <Link to={ROUTES.node} params={{ taskId, nodeId: node.data.id }} search={{}} className="btn sm">
+              <Link to={ROUTES.node} params={{ taskId, nodeId: node.data.id }} search={{}} className="btn secondary sm">
                 {TASK_COPY.viewNodePage}
               </Link>
             )}

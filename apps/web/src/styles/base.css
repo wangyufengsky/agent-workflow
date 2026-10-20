@@ -1449,3 +1449,15 @@ fieldset.seg {
   margin: 0;
   min-inline-size: 0;
 }
+
+/* Groups of related fields (plan editor, workflow editor): structure for assistive technology, no browser frame. */
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+legend {
+  padding: 0;
+}
