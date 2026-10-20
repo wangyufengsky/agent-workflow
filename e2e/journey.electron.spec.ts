@@ -11,6 +11,8 @@ import { git } from './helpers.ts';
 const executablePath = process.env.AW_E2E_EXECUTABLE;
 const userDataDir = mkdtempSync(join(tmpdir(), 'aw-e2e-userdata-'));
 const TASK_TIMEOUT_MS = 20 * 60_000;
+/** Screenshots of the first launch and the result for the acceptance report (not committed). */
+const SHOTS = 'screenshots/electron';
 
 function launch(): Promise<ElectronApplication> {
   const args = [`--user-data-dir=${userDataDir}`];
@@ -69,6 +71,7 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
   for (const check of ['Git', 'opencode 1.19.0', '可用的模型']) {
     await expect(page.getByTestId(`check-${check}`)).toContainText('已就绪', { timeout: 60_000 });
   }
+  await page.screenshot({ path: join(SHOTS, 'onboarding.png') });
   await page.getByLabel('仓库目录').fill(fixtureRepo());
   await page.getByRole('button', { name: '添加项目' }).click();
   await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
@@ -107,6 +110,7 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
   const result = page.getByTestId('result-card');
   await expect(result).toContainText('检查全部通过', { timeout: TASK_TIMEOUT_MS });
   await expect(result).toContainText('src/stats.ts');
+  await page.screenshot({ path: join(SHOTS, 'result-card.png') });
 
   // The session cut off by quitting ended as interrupted and its step ran again.
   const task = await (await request.get(`${api.base}/tasks/${taskId}`, { headers: api.headers })).json();
