@@ -1,4 +1,4 @@
-import { type DiffFile, DiffFileStatus } from '@aw/shared';
+import { DIFF_FILE_MAX_BYTES, type DiffFile, DiffFileStatus, type FileDiffDTO } from '@aw/shared';
 import { runGit } from './git.cli.ts';
 
 const NAME_STATUS: Readonly<Record<string, DiffFile['status']>> = {
@@ -60,8 +60,8 @@ function merge(
 /** Files changed between two commits. */
 export async function diffCommits(cwd: string, from: string, to: string): Promise<DiffFile[]> {
   const [names, counts] = await Promise.all([
-    runGit(['diff', '--name-status', '-z', '-M', from, to], { cwd }),
-    runGit(['diff', '--numstat', '-z', '-M', from, to], { cwd }),
+    runGit(['diff', '--name-status', '-z', '-M', '--end-of-options', from, to, '--'], { cwd }),
+    runGit(['diff', '--numstat', '-z', '-M', '--end-of-options', from, to, '--'], { cwd }),
   ]);
   return merge(parseNameStatus(names.stdout), parseNumstat(counts.stdout));
 }
@@ -98,8 +98,23 @@ export async function diffWorktree(cwd: string, from: string): Promise<DiffFile[
 export async function diffWorktreeFile(cwd: string, from: string, path: string): Promise<string> {
   const untracked = await runGit(['ls-files', '--others', '--exclude-standard', '--', path], { cwd });
   if (untracked.stdout.trim() !== '') {
-    const { stdout } = await runGit(['diff', '--no-index', '--', '/dev/null', path], { cwd, okExitCodes: [1] });
+    const { stdout } = await runGit(['diff', '--no-index', '--', '/dev/null', path], {
+      cwd,
+      okExitCodes: [1],
+      verbatim: true,
+    });
     return stdout;
   }
-  return (await runGit(['diff', '-M', from, '--', path], { cwd })).stdout;
+  return (await runGit(['diff', '-M', from, '--', path], { cwd, verbatim: true })).stdout;
+}
+
+/** Unified diff of one file between two commits. */
+export async function diffCommitsFile(cwd: string, from: string, to: string, path: string): Promise<string> {
+  return (await runGit(['diff', '-M', '--end-of-options', from, to, '--', path], { cwd, verbatim: true })).stdout;
+}
+
+/** A file's diff for the UI: over DIFF_FILE_MAX_BYTES only its size (11 §5). */
+export function limitDiff(path: string, diff: string): FileDiffDTO {
+  const size = Buffer.byteLength(diff);
+  return size > DIFF_FILE_MAX_BYTES ? { path, tooLarge: true, size } : { path, diff };
 }

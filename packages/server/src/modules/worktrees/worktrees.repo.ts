@@ -13,6 +13,9 @@ export function createWorktreesRepo(db: DbExecutor) {
     find(id: string): Worktree | undefined {
       return db.select().from(worktreesTable).where(eq(worktreesTable.id, id)).get();
     },
+    listByProject(projectId: string): Worktree[] {
+      return db.select().from(worktreesTable).where(eq(worktreesTable.projectId, projectId)).all();
+    },
     findByTask(taskId: string): Worktree | undefined {
       return db.select().from(worktreesTable).where(eq(worktreesTable.taskId, taskId)).get();
     },

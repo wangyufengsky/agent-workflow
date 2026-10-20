@@ -93,6 +93,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     },
     /** Tasks in the given states, for the scheduler. */
     listByStatus: (statuses: readonly TaskStatus[]) => state.repo.list({ statuses }),
+    /** Every task of a project, for the Git console. */
+    listByProject: (projectId: string) => state.repo.list({ projectId }),
     timeline: (id: string, afterId: number) => {
       state.get(id);
       return listTaskEvents(db, id, afterId);

@@ -87,6 +87,7 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
 
   return {
     findByTask: (taskId: string): Worktree | undefined => repo.findByTask(taskId),
+    listByProject: (projectId: string): Worktree[] => repo.listByProject(projectId),
 
     /** `<root>/<projectSlug>/<taskKey>` on a new branch from the base branch's current commit. */
     async create(input: CreateWorktreeInput): Promise<Worktree> {

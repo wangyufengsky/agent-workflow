@@ -37,6 +37,7 @@ import {
 } from './modules/opencode/index.ts';
 import { createPlansModule } from './modules/plans/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
+import { createRepositoryModule } from './modules/repository/index.ts';
 import { createRolesModule, type RolesService } from './modules/roles/index.ts';
 import { createScheduler } from './modules/scheduler/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
@@ -207,6 +208,13 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     events,
     log,
   });
+  const repository = createRepositoryModule({
+    projects: projects.service,
+    tasks: tasks.service,
+    worktrees: worktrees.service,
+    locks,
+    log,
+  });
   const debug = createDebugModule({ attempts: attempts.service, settings: settings.service, prompts });
   const mcp = createMcpModule({
     token: mcpToken,
@@ -228,6 +236,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...plans.operations,
     ...inbox.operations,
     ...attempts.operations,
+    ...repository.operations,
     // The debug entry exists in development builds only (M2-09).
     ...(config.nodeEnv === 'production' ? [] : debug.operations),
   ]);

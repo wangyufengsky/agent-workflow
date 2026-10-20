@@ -7,6 +7,8 @@ export type GitOptions = {
   okExitCodes?: readonly number[];
   /** Environment for locating git; defaults to the process environment. */
   env?: NodeJS.ProcessEnv;
+  /** Keep stdout exactly as written (file contents and diffs end with their own newline). */
+  verbatim?: boolean;
 };
 
 export type GitResult = { stdout: string; exitCode: number };
@@ -21,6 +23,7 @@ export async function runGit(args: readonly string[], options: GitOptions): Prom
     env: { ...(options.env ?? process.env), LC_ALL: 'C' },
     extendEnv: false,
     reject: false,
+    stripFinalNewline: options.verbatim !== true,
   });
   if (result.code === 'ENOENT' && result.exitCode === undefined) {
     throw new AppError(ErrorCode.GitNotInstalled, 'git executable not found');

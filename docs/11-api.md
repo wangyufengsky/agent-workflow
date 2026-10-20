@@ -188,16 +188,19 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/projects/:id/git/status` | 当前分支、是否干净、ahead/behind |
-| GET | `/projects/:id/git/branches` | 本地与远端分支，标注任务分支 |
-| GET | `/projects/:id/git/log?ref&limit&cursor` | 提交列表 |
-| GET | `/projects/:id/git/commits/:sha` | 提交详情 + 文件列表 |
-| GET | `/projects/:id/git/diff?from&to&path?` | 任意两个 ref 的 diff |
-| GET | `/projects/:id/git/tree?ref&path` | 目录浏览 |
-| GET | `/projects/:id/git/file?ref&path` | 文件内容 |
-| POST | `/projects/:id/git/fetch` | `git fetch --prune` |
-| GET | `/projects/:id/worktrees` | 所有 worktree（含非本应用创建的，标注 `managed`），关联任务、分支、脏状态、ahead/behind |
-| POST | `/projects/:id/worktrees/prune` | 清理终态任务遗留的 worktree 与 `git worktree prune` |
+| GET | `/projects/:id/git/status` | 主工作区：当前分支、提交、上游与 ahead/behind、是否干净、改动文件（porcelain 两字母代码） |
+| GET | `/projects/:id/git/branches` | 本地与远端分支（不含 `origin/HEAD` 这类符号引用），标注当前分支与所属任务（`task: { id, key, status }`） |
+| GET | `/projects/:id/git/log?ref&limit&cursor` | 提交列表 `{ items, nextCursor }`，`cursor` 为已显示的提交数 |
+| GET | `/projects/:id/git/commits/:sha` | 提交详情 + 相对第一个父提交的文件列表（根提交与空树比较） |
+| GET | `/projects/:id/git/diff?from&to` | 任意两个 ref 的文件列表 `DiffDTO` |
+| GET | `/projects/:id/git/diff/file?from&to&path` | 单文件 unified diff（`FileDiffDTO`，超过 `DIFF_FILE_MAX_BYTES` 只返回大小） |
+| GET | `/projects/:id/git/tree?ref&path` | 目录浏览（目录在前；`path` 为空即仓库根） |
+| GET | `/projects/:id/git/file?ref&path` | 文件内容；二进制返回 `{ binary: true }`，超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }` |
+| POST | `/projects/:id/git/fetch` | `git fetch --all --prune`（仓库锁内） |
+| GET | `/projects/:id/worktrees` | 所有 worktree（含非本应用创建的，标注 `managed`），关联任务、分支、脏状态、相对项目默认分支的 ahead/behind；目录已不存在的标 `prunable` |
+| POST | `/projects/:id/worktrees/prune` | 删除终态任务遗留的 worktree（保留分支）并 `git worktree prune`，返回新的列表 |
+
+不存在的 ref 或路径返回 404 `NOT_FOUND`（`details.object`）。
 
 ## 9. 数据库连接（专业模式）
 
