@@ -99,6 +99,7 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | GitHub / GitLab | @octokit/rest / @gitbeaker/rest | 22.0.1 / 43.8.0 |
 | 日志 | pino | 10.4.0 |
 | 测试 | vitest / @playwright/test | 5.0.5 / 1.64.1 |
+| 界面走查的对比度检查 | @axe-core/playwright（E2E 中只跑 `color-contrast` 规则，M6-01） | 4.13.0 |
 | 代码质量 | @biomejs/biome / dependency-cruiser / typescript | 2.5.15 / 18.6.0 / **6.0.3**（D29） |
 | 静态文件 | @fastify/static | 10.1.6 |
 
