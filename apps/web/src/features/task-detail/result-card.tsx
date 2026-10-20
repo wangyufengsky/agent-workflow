@@ -8,6 +8,7 @@ import {
 } from '@aw/shared';
 import { useState } from 'react';
 import { Button } from '../../components/button.tsx';
+import { ExternalLink } from '../../components/external-link.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { Panel } from '../../components/panel.tsx';
@@ -35,19 +36,7 @@ function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
       <p className="row" data-testid="delivery-outcome">
         <Icon name="git" />
         {D.prOpened}
-        <a
-          href={url}
-          onClick={(e) => {
-            // In the app, links open in the system browser (03 §9: the window never navigates away).
-            if (window.aw === undefined) return;
-            e.preventDefault();
-            void window.aw.openExternal(url);
-          }}
-          target="_blank"
-          rel="noreferrer"
-        >
-          {D.openPr}
-        </a>
+        <ExternalLink href={url}>{D.openPr}</ExternalLink>
       </p>
     );
   }

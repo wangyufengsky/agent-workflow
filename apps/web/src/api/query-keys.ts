@@ -6,6 +6,7 @@ export const queryKeys = {
   project: (id: string) => ['projects', id],
   paletteOperations: ['operations', 'palette'],
   runtime: ['system', 'runtime'],
+  health: ['system', 'health'],
   attempt: (id: string) => ['attempts', id],
   transcript: (id: string) => ['attempts', id, 'transcript'],
   transcriptLive: (id: string) => ['attempts', id, 'transcript-live'],

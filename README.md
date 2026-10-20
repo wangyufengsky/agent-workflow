@@ -4,6 +4,19 @@
 
 设计与规范见 [docs/](docs/README.md)。
 
+## 安装
+
+需要 macOS（Apple 芯片）、Git，以及 [opencode](https://opencode.ai) **1.19.0**（版本必须一致），并已在终端运行 `opencode auth login` 登录至少一个模型提供方。
+
+1. 下载 `Agent Workflow-<版本>-arm64.dmg`，打开后把 Agent Workflow 拖进「应用程序」。
+2. 安装包**没有签名与公证**。从网络下载的副本第一次打开时，macOS 会提示「无法验证开发者」或「已损坏」：
+   - 在「应用程序」中右键（或按住 Control 点按）Agent Workflow →「打开」→ 在弹窗中再点「打开」；或
+   - 先尝试打开一次，然后到「系统设置 → 隐私与安全性」，在「安全性」一栏找到「已阻止使用 Agent Workflow」，点「仍要打开」，输入密码确认。
+   - 只需放行一次。若提示「已损坏，无法打开」，在终端执行 `xattr -dr com.apple.quarantine "/Applications/Agent Workflow.app"` 去掉下载隔离标记后再打开。
+3. 首次启动是引导页：检测 Git、opencode 1.19.0 与可用模型，未通过的项给出修复命令；全部通过后添加第一个 Git 仓库即可开始。
+
+应用数据（数据库、会话记录、日志、独立工作区）在 `~/Library/Application Support/Agent Workflow/`；版本号见「设置 → 关于」。
+
 ## 开发环境
 
 - macOS（arm64）、Node.js 24.19+、pnpm 10.28（`corepack enable`）、Git

@@ -1,5 +1,11 @@
 export const SETTINGS_COPY = {
   title: '设置',
+  about: '关于',
+  version: '版本',
+  opencodeVersion: '托管的 opencode',
+  nodeVersion: '后台 Node.js',
+  license: '许可证',
+  source: '源代码',
   appearance: '外观',
   theme: '主题',
   themeHint: '跟随系统时，深色用 DeepSeek 深色，浅色用 GitHub 白。',

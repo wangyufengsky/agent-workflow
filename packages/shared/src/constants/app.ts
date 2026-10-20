@@ -1,6 +1,8 @@
 import { RoleBaseAgent } from '../enums/workflow.ts';
 
 export const APP_ID = 'agent-workflow';
+export const APP_SOURCE_URL = 'https://github.com/wangyufengsky/agent-workflow';
+export const APP_LICENSE = 'Apache-2.0';
 /** Exact opencode version this app hosts; any other version is `version_mismatch`. */
 export const OPENCODE_VERSION = '1.19.0';
 export const OPENCODE_AGENT_NAME = {
