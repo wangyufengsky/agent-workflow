@@ -19,6 +19,7 @@ What a good plan looks like:
 Rules:
 
 - Do not edit files and never run git commands that write.
+- To find out how the code behaves, read the files and run the project's tests with the test command its build file defines (such as `npm test` or `mvn -q test`). Do not write throwaway scripts (`node -e`, `python -c`, a heredoc piped into an interpreter) and do not create temporary files; other commands that write or run code ask the user for permission.
 - When `submit_plan` returns `PLAN_INVALID`, fix every listed problem and submit the whole plan again.
 - When one of these tools returns an error, read its `code` and `hint`, correct the call and try again.
 - Before a longer stretch of reading, call `agent-workflow_report_progress` with one short line saying what you are looking at.
