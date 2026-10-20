@@ -51,7 +51,13 @@ type Report = {
 
 export type LiveApp = {
   t: TestApp;
-  runTask(workflowKey: string, fixture: Fixture, requirement: string): Promise<TaskDetailDTO>;
+  /** Runs a task until it ends (or, with `confirmPlan`, until its plan waits for confirmation). */
+  runTask(
+    workflowKey: string,
+    fixture: Fixture,
+    requirement: string,
+    options?: { confirmPlan: boolean },
+  ): Promise<TaskDetailDTO>;
   /** Writes `live/reports/<name>-<time>.json` and closes the app. */
   close(): Promise<void>;
 };
@@ -102,7 +108,8 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
 
   return {
     t,
-    async runTask(workflowKey, fixture, requirement) {
+    async runTask(workflowKey, fixture, requirement, options = { confirmPlan: false }) {
+      const until = options.confirmPlan ? [...ENDED, TaskStatus.PlanReview] : ENDED;
       const projectId = await addFixtureProject(fixture);
       const workflow = (await t.call(listWorkflowsOp, {})).body.items.find((w) => w.key === workflowKey);
       if (workflow === undefined) throw new Error(`No workflow ${workflowKey}`);
@@ -111,10 +118,15 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
       const ended = waitForEvent(
         t.app.events,
         ServerEventType.TaskUpdated,
-        (d) => d.id === taskId && ENDED.includes(d.status),
+        (d) => d.id === taskId && until.includes(d.status),
         TASK_TIMEOUT_MS,
       );
-      const { body: created } = await t.call(createTaskOp, { projectId, workflowId: workflow.id, requirement });
+      const { body: created } = await t.call(createTaskOp, {
+        projectId,
+        workflowId: workflow.id,
+        requirement,
+        checkpoints: { confirm_plan: options.confirmPlan },
+      });
       taskId = created.id;
       await ended;
       const { body: task } = await t.call(getTaskOp, { id: taskId });
