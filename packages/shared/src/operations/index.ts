@@ -53,7 +53,19 @@ import {
   taskDiffFileOp,
   taskDiffOp,
 } from './tasks.ts';
-import { getWorkflowOp, listRolesOp, listWorkflowsOp, updateRoleOp, updateWorkflowOp } from './workflows.ts';
+import {
+  createRoleOp,
+  createWorkflowOp,
+  deleteRoleOp,
+  deleteWorkflowOp,
+  getWorkflowOp,
+  listRolesOp,
+  listWorkflowsOp,
+  listWorkflowVersionsOp,
+  updateRoleOp,
+  updateWorkflowOp,
+  validateWorkflowOp,
+} from './workflows.ts';
 
 export * from './attempts.ts';
 export * from './debug.ts';
@@ -87,9 +99,15 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   startDebugAttemptOp,
   listWorkflowsOp,
   getWorkflowOp,
+  listWorkflowVersionsOp,
+  createWorkflowOp,
+  validateWorkflowOp,
   updateWorkflowOp,
+  deleteWorkflowOp,
   listRolesOp,
+  createRoleOp,
   updateRoleOp,
+  deleteRoleOp,
   listTasksOp,
   createTaskOp,
   getTaskOp,

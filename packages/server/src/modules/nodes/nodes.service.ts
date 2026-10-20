@@ -128,6 +128,7 @@ export function createNodesService(deps: NodesServiceDeps) {
     /** All nodes of the tasks, for the scheduler. */
     listByTasks: (taskIds: readonly string[]): Node[] => repo.listByTasks(taskIds),
     listByTask: (taskId: string): Node[] => repo.listByTask(taskId),
+    usesRole: (roleId: string): boolean => repo.hasRole(roleId),
 
     detail(taskId: string, nodeId: string): NodeDetailDTO {
       const node = get(nodeId);

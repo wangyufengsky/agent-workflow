@@ -66,15 +66,17 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | --- | --- | --- |
 | GET | `/workflows` | 最新版本列表（按流程首次加入的顺序；内置流程在前） |
 | GET | `/workflows/:id` | 某版本详情（含 `definition`） |
-| GET | `/workflows/by-key/:key/versions` 🅿 | 版本历史 |
-| POST | `/workflows` 🅿 | 新建自定义流程 `{ key, name, description, planning, deliverable, definition }`；或 `{ copyFrom: workflowId, key, name }` |
-| PUT | `/workflows/:id` 🅿 | `{ name?, description?, definition? }`；产生新版本，返回新版本；内置流程 409 `WORKFLOW_READONLY` |
-| DELETE | `/workflows/by-key/:key` 🅿 | 仅自定义；已被任务引用的版本保留（标记删除，不在列表出现） |
-| POST | `/workflows/validate` 🅿 | 校验定义，返回 `{ problems[] }`（编辑器实时校验用） |
+| GET | `/workflows/by-key/:key/versions` 🅿 | 版本历史（新的在前，含已删除流程被任务保留的版本）；没有该 key 404 `WORKFLOW_NOT_FOUND` |
+| POST | `/workflows` 🅿 | 新建自定义流程 `{ key, name, description?, planning, deliverable, definition }`；或 `{ copyFrom: workflowId, key, name, description? }`（可复制内置流程）→ 201 `WorkflowDTO`（`kind=custom`）。`key` 为 `DEFINITION_KEY_PATTERN`（`[a-z][a-z0-9_]{0,39}`），已被列出的流程使用 409 `WORKFLOW_ALREADY_EXISTS`；定义按 08 §5.4 校验，失败 400 `WORKFLOW_DEFINITION_INVALID`。版本号接在该 key 已有版本之后 |
+| PUT | `/workflows/:id` 🅿 | `{ name?, description?, definition? }`；校验后产生新版本，返回新版本；运行中的任务继续用旧版本；内置流程 409 `WORKFLOW_READONLY` |
+| DELETE | `/workflows/by-key/:key` 🅿 | 仅自定义（内置 409 `WORKFLOW_READONLY`）→ 204；已被任务引用的版本保留但不再列出（`is_latest` 全部置否），其余版本删除 |
+| POST | `/workflows/validate` 🅿 | `{ planning, definition }` → `{ problems[] }`（08 §5.4；编辑器保存前校验） |
 | GET | `/roles` | 列表 |
-| POST | `/roles` 🅿 | 新建或 `{ copyFrom }` |
+| POST | `/roles` 🅿 | 新建 `{ key, name, description?, baseAgent, prompt, model? }` 或复制 `{ copyFrom: roleId, key, name, ... }`（可复制内置角色）→ 201 `RoleDTO`；key 已存在 409 `ROLE_ALREADY_EXISTS` |
 | PUT | `/roles/:id` 🅿 | `{ name?, description?, prompt?, model? }`；内置 409 `ROLE_READONLY` |
-| DELETE | `/roles/:id` 🅿 | 被最新版流程引用时 409 `ROLE_IN_USE` |
+| DELETE | `/roles/:id` 🅿 | 内置 409 `ROLE_READONLY`；被列出的流程（最新版本的允许角色、规划者、必经步骤、模板）引用，或被任务的步骤与会话使用过 → 409 `ROLE_IN_USE`；成功 204 |
+
+删除流程与角色需要知道任务的使用情况，由 tasks 模块实现（同删除项目）。
 
 ## 5. 任务
 

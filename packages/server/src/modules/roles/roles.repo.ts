@@ -24,6 +24,9 @@ export function createRolesRepo(db: DbExecutor) {
     insert(role: RoleDTO): void {
       db.insert(rolesTable).values(role).run();
     },
+    delete(id: string): void {
+      db.delete(rolesTable).where(eq(rolesTable.id, id)).run();
+    },
     update(id: string, changes: RoleChanges): void {
       db.update(rolesTable).set(changes).where(eq(rolesTable.id, id)).run();
     },

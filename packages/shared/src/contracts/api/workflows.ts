@@ -6,7 +6,24 @@ import {
   workflowKindSchema,
   workflowPlanningSchema,
 } from '../../enums/workflow.ts';
+import { workflowProblemSchema } from '../../errors/workflow-problems.ts';
 import { workflowDefinitionSchema } from '../../workflow/plan-graph.ts';
+
+/** Keys of custom workflows and roles: stable identifiers that plans and definitions refer to. */
+export const DEFINITION_KEY_PATTERN = /^[a-z][a-z0-9_]{0,39}$/;
+const definitionKeySchema = z.string().regex(DEFINITION_KEY_PATTERN);
+
+/** Requires either `copyFrom` or every field of a new definition (a REST body cannot be a union of objects here). */
+const requireNewOrCopy =
+  <K extends string>(fields: readonly K[]) =>
+  (value: Partial<Record<K | 'copyFrom', unknown>>, ctx: z.RefinementCtx) => {
+    if (value.copyFrom !== undefined) return;
+    for (const field of fields) {
+      if (value[field] === undefined) {
+        ctx.addIssue({ code: 'custom', path: [field], message: 'required unless copyFrom is given' });
+      }
+    }
+  };
 
 /** `roles` row (10 §roles): who an attempt works as. */
 export const roleSchema = z.object({
@@ -34,6 +51,20 @@ export const updateRoleRequestSchema = z.object({
 });
 export type UpdateRoleRequest = z.infer<typeof updateRoleRequestSchema>;
 
+/** `POST /roles` (11 §4): a new custom role, or a copy of `copyFrom` under a new key and name. */
+export const createRoleRequestSchema = z
+  .object({
+    key: definitionKeySchema,
+    name: z.string().trim().min(1),
+    copyFrom: z.string().optional(),
+    description: z.string().optional(),
+    baseAgent: roleBaseAgentSchema.optional(),
+    prompt: z.string().min(1).optional(),
+    model: z.string().min(1).nullable().optional(),
+  })
+  .superRefine(requireNewOrCopy(['baseAgent', 'prompt']));
+export type CreateRoleRequest = z.infer<typeof createRoleRequestSchema>;
+
 /** One version of a workflow (rows are immutable; editing adds a version). */
 export const workflowSummarySchema = z.object({
   id: z.string(),
@@ -58,3 +89,25 @@ export const updateWorkflowRequestSchema = z.object({
   definition: workflowDefinitionSchema.optional(),
 });
 export type UpdateWorkflowRequest = z.infer<typeof updateWorkflowRequestSchema>;
+
+/** `POST /workflows` (11 §4): a new custom workflow, or a copy of the version `copyFrom` under a new key and name. */
+export const createWorkflowRequestSchema = z
+  .object({
+    key: definitionKeySchema,
+    name: z.string().trim().min(1),
+    copyFrom: z.string().optional(),
+    description: z.string().optional(),
+    planning: workflowPlanningSchema.optional(),
+    deliverable: workflowDeliverableSchema.optional(),
+    definition: workflowDefinitionSchema.optional(),
+  })
+  .superRefine(requireNewOrCopy(['planning', 'deliverable', 'definition']));
+export type CreateWorkflowRequest = z.infer<typeof createWorkflowRequestSchema>;
+
+/** `POST /workflows/validate`: the editor's check before saving. */
+export const validateWorkflowRequestSchema = z.object({
+  planning: workflowPlanningSchema,
+  definition: workflowDefinitionSchema,
+});
+export const validateWorkflowResponseSchema = z.object({ problems: z.array(workflowProblemSchema) });
+export type ValidateWorkflowResponse = z.infer<typeof validateWorkflowResponseSchema>;

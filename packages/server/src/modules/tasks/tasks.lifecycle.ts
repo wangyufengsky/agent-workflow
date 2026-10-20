@@ -28,6 +28,7 @@ import {
   validatePlanGraph,
   type WorkflowDTO,
   WorkflowPlanning,
+  WorkflowProblemCode,
   WorktreeStatus,
 } from '@aw/shared';
 import { branchExists } from '../git/index.ts';
@@ -118,7 +119,13 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
     const { template } = workflow.definition;
     if (template === undefined) {
       throw new AppError(ErrorCode.WorkflowDefinitionInvalid, `Fixed workflow ${workflow.key} has no template`, {
-        problems: [{ code: 'MISSING_TEMPLATE', message: 'A fixed workflow needs a template' }],
+        problems: [
+          {
+            code: WorkflowProblemCode.MissingTemplate,
+            field: 'template',
+            message: 'A fixed workflow needs a template',
+          },
+        ],
       });
     }
     const confirmFirst = task.checkpoints.confirm_plan;
@@ -261,7 +268,13 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       const { plannerRole } = workflow.definition;
       if (plannerRole === undefined) {
         throw new AppError(ErrorCode.WorkflowDefinitionInvalid, `Workflow ${workflow.key} has no planner role`, {
-          problems: [{ code: 'MISSING_PLANNER', message: 'An AI-planned workflow needs a planner role' }],
+          problems: [
+            {
+              code: WorkflowProblemCode.MissingPlanner,
+              field: 'plannerRole',
+              message: 'An AI-planned workflow needs a planner role',
+            },
+          ],
         });
       }
       const planner = roles.getByKey(plannerRole);

@@ -104,6 +104,18 @@ export function createTasksRepo(db: DbExecutor) {
         .all()
         .map(toTask);
     },
+    /** The workflow versions among `ids` that some task uses. */
+    workflowsInUse(ids: readonly string[]): Set<string> {
+      if (ids.length === 0) return new Set();
+      return new Set(
+        db
+          .select({ id: t.workflowId })
+          .from(t)
+          .where(inArray(t.workflowId, ids))
+          .all()
+          .map((r) => r.id),
+      );
+    },
     update(id: string, changes: TaskChanges & { updatedAt: number }): void {
       db.update(t).set(serialize(changes)).where(eq(t.id, id)).run();
     },

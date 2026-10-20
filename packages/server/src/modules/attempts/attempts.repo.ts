@@ -41,6 +41,13 @@ export function createAttemptsRepo(db: DbExecutor) {
       return db.select().from(attemptsTable).where(inArray(attemptsTable.status, statuses)).all().map(toAttempt);
     },
     /** Oldest first. */
+    /** Whether any attempt worked as the role (a role in use cannot be deleted). */
+    hasRole(roleId: string): boolean {
+      return (
+        db.select({ id: attemptsTable.id }).from(attemptsTable).where(eq(attemptsTable.roleId, roleId)).get() !==
+        undefined
+      );
+    },
     listByNode(nodeId: string): Attempt[] {
       return db
         .select()

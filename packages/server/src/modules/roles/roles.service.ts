@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { RoleSeed } from '@aw/builtin';
-import { AppError, ErrorCode, type RoleDTO, RoleKind, type UpdateRoleRequest } from '@aw/shared';
+import {
+  AppError,
+  type CreateRoleRequest,
+  ErrorCode,
+  type RoleDTO,
+  RoleKind,
+  type UpdateRoleRequest,
+} from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
 import type { Logger } from '../../core/logger.ts';
@@ -63,6 +70,51 @@ export function createRolesService({ db, clock, log }: RolesServiceDeps) {
           }
         }
       });
+    },
+
+    /** A new custom role, or a copy of a role (built-in ones included) under a new key. */
+    create({ key, name, copyFrom, ...fields }: CreateRoleRequest): RoleDTO {
+      if (repo.findByKey(key) !== undefined) {
+        throw new AppError(ErrorCode.RoleAlreadyExists, `Role ${key} already exists`, { key });
+      }
+      const source = copyFrom === undefined ? undefined : get(copyFrom);
+      const baseAgent = fields.baseAgent ?? source?.baseAgent;
+      const prompt = fields.prompt ?? source?.prompt;
+      // The request schema requires these without copyFrom.
+      if (baseAgent === undefined || prompt === undefined) {
+        throw new Error('A new role without copyFrom passed validation incomplete');
+      }
+      const now = clock.now();
+      const id = randomUUID();
+      repo.insert({
+        id,
+        key,
+        name,
+        kind: RoleKind.Custom,
+        baseAgent,
+        description: fields.description ?? source?.description ?? '',
+        prompt,
+        model: fields.model === undefined ? (source?.model ?? null) : fields.model,
+        createdAt: now,
+        updatedAt: now,
+      });
+      log.info({ role: key }, 'role created');
+      return get(id);
+    },
+
+    /**
+     * Deletes a custom role once `inUse` (the tasks module's check of workflows and task steps) finds no use; throws
+     * ROLE_IN_USE with what it found otherwise.
+     */
+    delete(id: string, inUse: (role: RoleDTO) => Record<string, unknown> | null): void {
+      const role = get(id);
+      if (role.kind === RoleKind.Builtin) {
+        throw new AppError(ErrorCode.RoleReadonly, 'Built-in roles cannot be deleted', { id });
+      }
+      const uses = inUse(role);
+      if (uses !== null) throw new AppError(ErrorCode.RoleInUse, `Role ${role.key} is in use`, uses);
+      repo.delete(id);
+      log.info({ role: role.key }, 'role deleted');
     },
 
     update({ id, ...changes }: UpdateRoleRequest): RoleDTO {

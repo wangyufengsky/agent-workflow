@@ -188,6 +188,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     ...diffs,
     resolveInbox: actions.resolveInbox,
     deleteProject: actions.deleteProject,
+    deleteWorkflow: actions.deleteWorkflow,
+    deleteRole: actions.deleteRole,
     ...context,
     submitPlan: lifecycle.submitPlan,
     startPlanning: lifecycle.startPlanning,

@@ -95,6 +95,10 @@ export function createNodesRepo(db: DbExecutor) {
         .get();
       return row === undefined ? undefined : toNode(row);
     },
+    /** Whether any node is assigned the role (a role in use cannot be deleted). */
+    hasRole(roleId: string): boolean {
+      return db.select({ id: t.id }).from(t).where(eq(t.roleId, roleId)).get() !== undefined;
+    },
     /** By position. */
     listByTask(taskId: string): Node[] {
       return select().where(eq(t.taskId, taskId)).orderBy(asc(t.position)).all().map(toNode);

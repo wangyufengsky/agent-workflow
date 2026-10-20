@@ -146,7 +146,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   // Built-in roles and workflows of this app version are written on every start (13).
   const roles = createRolesModule({ db: database.db, clock, log });
   roles.service.syncBuiltin(loadBuiltinRoles(config.promptsDir));
-  const workflows = createWorkflowsModule({ db: database.db, clock, log });
+  const workflows = createWorkflowsModule({ db: database.db, clock, log, roles: roles.service });
   workflows.service.syncBuiltin(loadBuiltinWorkflows(config.promptsDir));
   const inbox = createInboxModule({ db: database.db, unit, clock, log });
   const attempts = createAttemptsModule({

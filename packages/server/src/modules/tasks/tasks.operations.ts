@@ -4,6 +4,8 @@ import {
   confirmPlanOp,
   createTaskOp,
   deleteProjectOp,
+  deleteRoleOp,
+  deleteWorkflowOp,
   deliverTaskOp,
   getNodeOp,
   getTaskOp,
@@ -55,5 +57,7 @@ export function tasksOperations(tasks: TasksService) {
     implement(nodeDiffFileOp, ({ id, nodeId, path }) => tasks.nodeDiffFile(id, nodeId, path)),
     implement(resolveInboxOp, ({ id, response }) => tasks.resolveInbox(id, response)),
     implement(deleteProjectOp, ({ id }) => tasks.deleteProject(id)),
+    implement(deleteWorkflowOp, ({ key }) => tasks.deleteWorkflow(key)),
+    implement(deleteRoleOp, ({ id }) => tasks.deleteRole(id)),
   ];
 }

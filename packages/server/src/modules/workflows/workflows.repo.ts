@@ -1,5 +1,5 @@
 import { type WorkflowDTO, workflowDefinitionSchema } from '@aw/shared';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { workflowsTable } from './workflows.table.ts';
 
@@ -34,6 +34,23 @@ export function createWorkflowsRepo(db: DbExecutor) {
         .where(and(eq(workflowsTable.key, key), eq(workflowsTable.isLatest, true)))
         .get();
       return row === undefined ? undefined : toWorkflow(row);
+    },
+    /** Every version of the key, newest first (also those of a deleted workflow kept for its tasks). */
+    listVersions(key: string): WorkflowDTO[] {
+      return db
+        .select()
+        .from(workflowsTable)
+        .where(eq(workflowsTable.key, key))
+        .orderBy(desc(workflowsTable.version))
+        .all()
+        .map(toWorkflow);
+    },
+    /** A deleted workflow keeps the versions its tasks use, none of them listed (11 §4). */
+    unlist(key: string): void {
+      db.update(workflowsTable).set({ isLatest: false }).where(eq(workflowsTable.key, key)).run();
+    },
+    delete(ids: readonly string[]): void {
+      if (ids.length > 0) db.delete(workflowsTable).where(inArray(workflowsTable.id, ids)).run();
     },
     /** Adds a version and makes it the latest one. */
     insertLatest(workflow: WorkflowDTO): void {

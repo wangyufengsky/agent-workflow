@@ -33,6 +33,7 @@ export * from './enums/workflow.ts';
 export * from './errors/app-error.ts';
 export * from './errors/codes.ts';
 export * from './errors/plan-problems.ts';
+export * from './errors/workflow-problems.ts';
 export * from './fsm/index.ts';
 export * from './naming.ts';
 export * from './operations/index.ts';
