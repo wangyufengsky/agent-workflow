@@ -9,7 +9,7 @@
 - 成功：`200` 返回资源或 `{ items, nextCursor }`；创建返回 `201`；无内容返回 `204`。
 - 失败：`{ "error": { "code", "message", "details"? } }`，状态码见 [08 §5](08-enums-and-errors.md#5-错误码)。
 - 命令型操作（start / cancel / deliver…）用 `POST /资源/:id/<动词>`，返回操作后的完整资源 DTO，前端直接用它更新缓存。
-- 分页：`?limit=<1..100，默认 50>&cursor=<不透明字符串>`。
+- 分页：`?limit=<1..LIST_PAGE_MAX，默认 LIST_PAGE_DEFAULT>&cursor=<不透明字符串>`，响应 `{ items, nextCursor }`（`nextCursor` 为空即最后一页）；任务与「需要你处理」列表用上一页最后一项的排序键做游标（keyset），列表在两页之间变化时不重复也不跳过未变的项。
 - 不做幂等键与回执：本地同步事务，重复点击由状态机拒绝（`STATE_TRANSITION_INVALID`），前端按钮在请求期间禁用。
 
 标记：🅿 = 仅专业模式界面使用（API 本身不区分模式）。
@@ -82,7 +82,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/tasks?projectId&status&displayGroup&limit` | `{ items: TaskSummaryDTO[] }`，按 `updatedAt` 倒序，最多 `limit`（默认 50，≤ 100）条；v1 不分页 |
+| GET | `/tasks?projectId&status&displayGroup&limit&cursor` | `{ items: TaskSummaryDTO[], nextCursor }`，按 `updatedAt`（同时按编号）倒序分页（§1，`LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX`）；`displayGroup` 在查询中过滤（由 `resolveTaskDisplayGroup` 推出每个状态与是否有打开的提问 / 权限 / 验收条目的组合），每页都是满的；游标为上一页最后一个任务的 `<updatedAt>.<seq>`，格式不对 400 `VALIDATION_FAILED` |
 | POST | `/tasks` | 创建，见下 |
 | GET | `/tasks/:id` | `TaskDetailDTO` |
 | GET | `/tasks/:id/timeline?afterId` | `{ items: TaskEventDTO[] }`：`id > afterId` 的 `task_events`，按 id 升序 |
@@ -181,7 +181,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/inbox?status&taskId` | `{ items: InboxItemDTO[] }`，按创建时间倒序；`/inbox/count` 返回 `{ open }` 用于徽标 |
+| GET | `/inbox?status&taskId&limit&cursor` | `{ items: InboxItemDTO[], nextCursor }`，按创建时间（同时按 id）倒序分页（§1）；`/inbox/count` 返回 `{ open }` 用于徽标 |
 | POST | `/inbox/:id/resolve` | `{ response }`，`response` 为对应 kind 的回应（见 10 §inbox_items；`question` 只接受 `{ answer }`）；不符合该 kind 400 `VALIDATION_FAILED`；已关闭 409 `INBOX_ITEM_CLOSED`；回答问题时 opencode 未就绪 503 `OPENCODE_NOT_READY`（条目保持打开） |
 | POST | `/inbox/:id/dismiss` | 仅 `failure` / `delivery` 可忽略 |
 

@@ -6,7 +6,13 @@ import {
   listInboxOp,
   resolveInboxOp,
 } from '@aw/shared';
-import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  type QueryClient,
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import type { z } from 'zod';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
@@ -17,6 +23,19 @@ export const inboxQuery = (filter: InboxFilter) =>
   queryOptions({
     queryKey: queryKeys.inboxList(filter),
     queryFn: async () => (await callOperation(listInboxOp, { ...filter })).items,
+  });
+
+/** The first page is asked for without a cursor. */
+const FIRST_PAGE = '';
+
+/** Every loaded page (11 §1 pagination), for the inbox page's「加载更多」. */
+export const inboxPagesQuery = (filter: InboxFilter) =>
+  infiniteQueryOptions({
+    queryKey: queryKeys.inboxPages(filter),
+    queryFn: ({ pageParam }) =>
+      callOperation(listInboxOp, { ...filter, ...(pageParam === FIRST_PAGE ? {} : { cursor: pageParam }) }),
+    initialPageParam: FIRST_PAGE,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
 
 export const inboxCountQuery = queryOptions({

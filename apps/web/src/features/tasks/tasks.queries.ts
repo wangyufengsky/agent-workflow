@@ -45,7 +45,13 @@ import {
   updateRoleOp,
   updateWorkflowOp,
 } from '@aw/shared';
-import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  type QueryClient,
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import type { FileDiffQuery } from '../../components/diff/diff-browser.tsx';
@@ -100,6 +106,19 @@ export const tasksQuery = (filter: TaskFilter = {}) =>
   queryOptions({
     queryKey: queryKeys.tasks(filter),
     queryFn: async () => (await callOperation(listTasksOp, { ...filter })).items,
+  });
+
+/** The first page is asked for without a cursor. */
+const FIRST_PAGE = '';
+
+/** Every loaded page of a filtered list (11 §1 pagination), for the tasks page's「加载更多」. */
+export const taskPagesQuery = (filter: TaskFilter = {}) =>
+  infiniteQueryOptions({
+    queryKey: queryKeys.taskPages(filter),
+    queryFn: ({ pageParam }) =>
+      callOperation(listTasksOp, { ...filter, ...(pageParam === FIRST_PAGE ? {} : { cursor: pageParam }) }),
+    initialPageParam: FIRST_PAGE,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
   });
 
 export const taskQuery = (id: string) =>

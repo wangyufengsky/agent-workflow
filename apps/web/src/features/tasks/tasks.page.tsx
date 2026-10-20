@@ -1,7 +1,8 @@
 import { TASK_DISPLAY_GROUPS, type TaskDisplayGroup, taskDisplayGroupSchema } from '@aw/shared';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
+import { Button } from '../../components/button.tsx';
 import { EmptyState } from '../../components/empty-state.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
@@ -9,7 +10,7 @@ import { TASKS_COPY as C, TASK_DISPLAY_LABEL } from '../../copy/tasks.ts';
 import { projectsQuery } from '../projects/projects.queries.ts';
 import { TaskBadge } from './task-badge.tsx';
 import styles from './tasks.module.css';
-import { tasksQuery } from './tasks.queries.ts';
+import { taskPagesQuery } from './tasks.queries.ts';
 
 const route = getRouteApi(ROUTE_IDS.tasks);
 const time = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
@@ -19,12 +20,13 @@ export function TasksPage() {
   const { projectId, displayGroup } = route.useSearch();
   const navigate = route.useNavigate();
   const projects = useQuery(projectsQuery);
-  const tasks = useQuery(
-    tasksQuery({
+  const pages = useInfiniteQuery(
+    taskPagesQuery({
       ...(projectId === undefined ? {} : { projectId }),
       ...(displayGroup === undefined ? {} : { displayGroup }),
     }),
   );
+  const rows = pages.data?.pages.flatMap((page) => page.items);
   const setFilter = (next: { projectId?: string | undefined; displayGroup?: TaskDisplayGroup | undefined }) =>
     void navigate({ search: (prev) => ({ ...prev, ...next }) });
 
@@ -68,10 +70,10 @@ export function TasksPage() {
           </select>
         </div>
       </div>
-      {tasks.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
-      {tasks.isError && <ErrorState error={tasks.error} onRetry={() => void tasks.refetch()} />}
-      {tasks.data?.length === 0 && <EmptyState icon="list" title={C.empty} body={C.emptyBody} />}
-      {tasks.data !== undefined && tasks.data.length > 0 && (
+      {pages.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
+      {pages.isError && <ErrorState error={pages.error} onRetry={() => void pages.refetch()} />}
+      {rows?.length === 0 && <EmptyState icon="list" title={C.empty} body={C.emptyBody} />}
+      {rows !== undefined && rows.length > 0 && (
         <table className={styles.table}>
           <thead>
             <tr>
@@ -83,7 +85,7 @@ export function TasksPage() {
             </tr>
           </thead>
           <tbody>
-            {tasks.data.map((t) => (
+            {rows.map((t) => (
               <tr key={t.id}>
                 <td>
                   <Link to={ROUTES.task} params={{ taskId: t.id }} search={{}}>
@@ -100,6 +102,13 @@ export function TasksPage() {
             ))}
           </tbody>
         </table>
+      )}
+      {pages.hasNextPage && (
+        <div className="row">
+          <Button pending={pages.isFetchingNextPage} onClick={() => void pages.fetchNextPage()}>
+            {COMMON_COPY.loadMore}
+          </Button>
+        </div>
       )}
     </div>
   );

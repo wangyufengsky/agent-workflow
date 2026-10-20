@@ -24,9 +24,10 @@ export const listTasksOp = defineOperationContract({
   ...common,
   id: 'tasks.list',
   title: 'op.tasks.list',
-  description: 'Tasks, most recently updated first, optionally filtered by project, status or display group',
+  description:
+    'Tasks, most recently updated first, optionally filtered by project, status or display group, a page at a time',
   input: listTasksQuerySchema,
-  output: z.object({ items: z.array(taskSummarySchema) }),
+  output: z.object({ items: z.array(taskSummarySchema), nextCursor: z.string().nullable() }),
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/tasks' },
 });

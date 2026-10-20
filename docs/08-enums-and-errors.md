@@ -175,6 +175,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `SSE_REPLAY_BUFFER` | 1000（条） |
 | `DIFF_FILE_MAX_BYTES` | 1048576（超过显示「文件过大」） |
 | `RUNTIME_LOG_TAIL_DEFAULT` / `RUNTIME_LOG_TAIL_MAX` | 500 / 5000（运行环境日志页的行数） |
+| `LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX` | 50 / 100（任务与「需要你处理」列表每页条数，11 §1） |
 
 ### 4.3 用户设置（`constants/settings.ts`，键 → 默认值）
 

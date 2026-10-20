@@ -24,3 +24,6 @@ export const ACCEPTANCE_OUTPUT_MAX_CHARS = 20_000;
 /** `GET /system/runtime/logs`: lines returned by default and at most. */
 export const RUNTIME_LOG_TAIL_DEFAULT = 500;
 export const RUNTIME_LOG_TAIL_MAX = 5000;
+/** Page size of the task and inbox lists (11 §1 pagination): the default and the largest `limit`. */
+export const LIST_PAGE_DEFAULT = 50;
+export const LIST_PAGE_MAX = 100;

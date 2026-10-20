@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { REQUIREMENT_MAX_CHARS, TASK_TITLE_MAX_CHARS } from '../../constants/limits.ts';
+import {
+  LIST_PAGE_DEFAULT,
+  LIST_PAGE_MAX,
+  REQUIREMENT_MAX_CHARS,
+  TASK_TITLE_MAX_CHARS,
+} from '../../constants/limits.ts';
 import { worktreeStatusSchema } from '../../enums/git.ts';
 import {
   AcceptanceCheckKind,
@@ -199,12 +204,17 @@ export const taskDetailSchema = taskSummarySchema.extend({
 });
 export type TaskDetailDTO = z.infer<typeof taskDetailSchema>;
 
+/** Opaque to clients: where the previous page ended (`<updatedAt>.<seq>` of its last task). */
+export const taskCursorSchema = z.string().regex(/^\d+\.\d+$/);
+
 export const listTasksQuerySchema = z.object({
   projectId: z.string().optional(),
   status: taskStatusSchema.optional(),
   displayGroup: taskDisplayGroupSchema.optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  limit: z.coerce.number().int().min(1).max(LIST_PAGE_MAX).default(LIST_PAGE_DEFAULT),
+  cursor: taskCursorSchema.optional(),
 });
+export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
 
 /** One `task_events` row (10 §task_events). */
 export const taskEventSchema = z.object({

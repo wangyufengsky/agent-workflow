@@ -19,10 +19,13 @@ export const queryKeys = {
   /** Every task list (all filters) shares this prefix. */
   taskLists: ['tasks', 'list'],
   tasks: (filter: Record<string, string | undefined>) => ['tasks', 'list', filter],
+  /** All pages of a filtered list (the tasks page); under the same prefix, so task events refresh it. */
+  taskPages: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'pages', filter],
   task: (id: string) => ['tasks', 'detail', id],
   node: (taskId: string, nodeId: string) => ['tasks', 'detail', taskId, 'nodes', nodeId],
   inbox: ['inbox'],
   inboxList: (filter: Record<string, string | undefined>) => ['inbox', 'list', filter],
+  inboxPages: (filter: Record<string, string | undefined>) => ['inbox', 'list', 'pages', filter],
   inboxCount: ['inbox', 'count'],
   taskDiff: (id: string) => ['tasks', 'detail', id, 'diff'],
   taskDiffFile: (id: string, path: string) => ['tasks', 'detail', id, 'diff', path],

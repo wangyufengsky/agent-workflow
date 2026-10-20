@@ -8,6 +8,7 @@ import {
   InboxKind,
   InboxStatus,
   inboxMachine,
+  type ListInboxQuery,
   ServerEventType,
   transition,
 } from '@aw/shared';
@@ -74,6 +75,19 @@ export function createInboxService({ db, unit, clock, log }: InboxServiceDeps) {
     get,
     list: (scope: InboxScope, status?: InboxStatus): InboxItemDTO[] => repo.list(scope, status),
     listOpen: (scope: InboxScope): InboxItemDTO[] => repo.list(scope, InboxStatus.Open),
+    /** A page of the「需要你处理」list (11 §7), newest first. */
+    page({ status, taskId, limit, cursor }: ListInboxQuery): { items: InboxItemDTO[]; nextCursor: string | null } {
+      const at = cursor === undefined ? -1 : cursor.indexOf('.');
+      const after =
+        cursor === undefined ? undefined : { createdAt: Number(cursor.slice(0, at)), id: cursor.slice(at + 1) };
+      const rows = repo.page(taskId === undefined ? {} : { taskId }, status, after, limit + 1);
+      const items = rows.slice(0, limit);
+      const last = items.at(-1);
+      return {
+        items,
+        nextCursor: rows.length > limit && last !== undefined ? `${last.createdAt}.${last.id}` : null,
+      };
+    },
     countOpen: (): number => repo.countOpen(),
 
     create: (input: NewInboxItem): InboxItemDTO => insert(input, InboxStatus.Open, null),

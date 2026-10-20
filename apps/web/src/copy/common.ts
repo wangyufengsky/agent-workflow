@@ -1,6 +1,7 @@
 export const COMMON_COPY = {
   loading: '正在加载…',
   retry: '重试',
+  loadMore: '加载更多',
   cancel: '取消',
   close: '关闭',
   save: '保存',

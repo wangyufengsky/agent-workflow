@@ -3,14 +3,16 @@ import {
   type ChangeRequestReason,
   type CreateTaskRequest,
   type DeliverRequest,
+  type ListTasksQuery,
   type NodeDetailDTO,
   type PlanDTO,
   type PlanGraph,
   type ResultNext,
+  resolveTaskDisplayGroup,
   ServerEventType,
   type SubmitResultInput,
+  TASK_STATUSES,
   type TaskDetailDTO,
-  type TaskDisplayGroup,
   TaskStatus,
   type TaskSummaryDTO,
 } from '@aw/shared';
@@ -22,6 +24,7 @@ import { createTaskContext } from './tasks.context.ts';
 import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
+import type { StatusMatch } from './tasks.repo.ts';
 import { createTaskResults } from './tasks.result.ts';
 import { createTaskState, type TasksServiceDeps } from './tasks.state.ts';
 
@@ -88,20 +91,37 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
 
   return {
     detail,
-    list(filter: {
-      projectId?: string | undefined;
-      status?: TaskStatus | undefined;
-      displayGroup?: TaskDisplayGroup | undefined;
-      limit: number;
-    }): TaskSummaryDTO[] {
-      const tasks = state.repo.list({
-        ...(filter.projectId === undefined ? {} : { projectId: filter.projectId }),
-        ...(filter.status === undefined ? {} : { statuses: [filter.status] }),
+    /** A page of task summaries (11 §5); the display group is decided in SQL so that pages stay full. */
+    list({ projectId, status, displayGroup, limit, cursor }: ListTasksQuery): {
+      items: TaskSummaryDTO[];
+      nextCursor: string | null;
+    } {
+      const attention = state.attentionTaskIds();
+      const statuses = status === undefined ? TASK_STATUSES : [status];
+      const oneOf =
+        status === undefined && displayGroup === undefined
+          ? undefined
+          : statuses.flatMap((s): StatusMatch[] => {
+              const without = displayGroup === undefined || resolveTaskDisplayGroup(s, false) === displayGroup;
+              const withAttention = displayGroup === undefined || resolveTaskDisplayGroup(s, true) === displayGroup;
+              if (without && withAttention) return [{ status: s, attention: 'any' }];
+              if (without) return [{ status: s, attention: 'without' }];
+              return withAttention ? [{ status: s, attention: 'with' }] : [];
+            });
+      const [updatedAt, seq] = cursor === undefined ? [] : cursor.split('.').map(Number);
+      const rows = state.repo.page({
+        projectId,
+        oneOf,
+        attention,
+        after: updatedAt === undefined || seq === undefined ? undefined : { updatedAt, seq },
+        limit: limit + 1,
       });
-      return state
-        .summaries(tasks)
-        .filter((t) => filter.displayGroup === undefined || t.displayGroup === filter.displayGroup)
-        .slice(0, filter.limit);
+      const page = rows.slice(0, limit);
+      const last = page.at(-1);
+      return {
+        items: state.summaries(page),
+        nextCursor: rows.length > limit && last !== undefined ? `${last.updatedAt}.${last.seq}` : null,
+      };
     },
     /** Tasks in the given states, for the scheduler. */
     listByStatus: (statuses: readonly TaskStatus[]) => state.repo.list({ statuses }),

@@ -10,9 +10,10 @@ export const listInboxOp = defineOperationContract({
   ...common,
   id: 'inbox.list',
   title: 'op.inbox.list',
-  description: 'Items that need the user: questions, permission requests, acceptances, plans, failures, deliveries',
+  description:
+    'Items that need the user (questions, permission requests, acceptances, plans, failures, deliveries), newest first, a page at a time',
   input: listInboxQuerySchema,
-  output: z.object({ items: z.array(inboxItemSchema) }),
+  output: z.object({ items: z.array(inboxItemSchema), nextCursor: z.string().nullable() }),
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/inbox' },
 });
