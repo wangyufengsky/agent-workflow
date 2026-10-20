@@ -10,6 +10,131 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "* --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "ls*",
       "permission": "bash",
     },
@@ -61,21 +186,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "which*",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "node --version",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npm --version",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "pnpm --version",
       "permission": "bash",
     },
     {
@@ -166,6 +276,136 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*>*>*",
       "permission": "bash",
     },
   ],
@@ -177,6 +417,131 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "* --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "ls*",
       "permission": "bash",
     },
@@ -228,21 +593,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "which*",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "node --version",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npm --version",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "pnpm --version",
       "permission": "bash",
     },
     {
@@ -333,6 +683,136 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*>*>*",
       "permission": "bash",
     },
   ],
@@ -344,6 +824,131 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "* --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "ls*",
       "permission": "bash",
     },
@@ -395,21 +1000,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "which*",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "node --version",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npm --version",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "pnpm --version",
       "permission": "bash",
     },
     {
@@ -500,6 +1090,136 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*>*>*",
       "permission": "bash",
     },
   ],
@@ -568,6 +1288,131 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "allow",
+      "pattern": "* --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "ls*",
       "permission": "bash",
     },
@@ -619,21 +1464,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "allow",
       "pattern": "which*",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "node --version",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npm --version",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "pnpm --version",
       "permission": "bash",
     },
     {
@@ -724,6 +1554,136 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*>*>*",
       "permission": "bash",
     },
   ],
@@ -735,6 +1695,131 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "allow",
+      "pattern": "* --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * --version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -version",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -V",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "ls*",
       "permission": "bash",
     },
@@ -786,21 +1871,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "allow",
       "pattern": "which*",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "node --version",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "npm --version",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "pnpm --version",
       "permission": "bash",
     },
     {
@@ -891,6 +1961,136 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "npx * * -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*>*>*",
       "permission": "bash",
     },
   ],
