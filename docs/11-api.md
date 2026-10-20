@@ -22,7 +22,7 @@
 | POST | `/system/environment/recheck` | 重新检测（安装 opencode 后用） |
 | GET | `/system/runtime` | `RuntimeDTO`：opencode 状态、路径、版本；`ready` 时含地址与启动时间 |
 | POST | `/system/runtime/restart` | `ready` 时重启，`stopped` / `crashed` 时启动（活动尝试 → `interrupted`）；返回启动结束后的 `RuntimeDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
-| GET | `/system/runtime/logs?tail=500` 🅿 | opencode 日志末尾若干行 |
+| GET | `/system/runtime/logs?tail=500` 🅿 | 最新一天 opencode 日志（`<数据目录>/logs/opencode-YYYYMMDD.log`）的末尾 `tail` 行（默认 `RUNTIME_LOG_TAIL_DEFAULT`，至多 `RUNTIME_LOG_TAIL_MAX`）：`{ file, lines }`；还没有日志时 `{ file: null, lines: [] }` |
 | GET | `/system/storage` | 数据目录占用 |
 | GET | `/settings` | 全部设置 `Record<SettingKey, value>` |
 | PATCH | `/settings` | 部分更新；按 key 的 schema 校验 |
@@ -51,12 +51,12 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | --- | --- | --- |
 | GET | `/projects` | `{ items: ProjectDTO[] }`（按添加时间） |
 | POST | `/projects` | `{ repoPath, name? }` → 201 `ProjectDetailDTO`；`repoPath` 须为仓库根目录的绝对路径（子目录、非仓库、不存在 → 400 `PROJECT_PATH_NOT_GIT_REPO`），读取默认分支（`origin/HEAD`，否则当前分支；HEAD 游离且无 `origin/HEAD` → 400 `GIT_BASE_BRANCH_NOT_FOUND`），推断检查命令（13 §1） |
-| GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting`；关联数据库（M5）、活动任务数（M3）随对应模块加入 |
+| GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting` + 关联的数据库连接 `dbConnectionIds`（M5-07） |
 | PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand?: string \| null }`；分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND` |
 | DELETE | `/projects/:id` | 有非终态任务时 409 `PROJECT_HAS_ACTIVE_TASKS` |
 | PUT | `/projects/:id/hosting` | `{ provider, baseUrl?, repo, token }`（`token` 为凭据字段）→ `ProjectDetailDTO`；保存前调用平台 API 读取该仓库验证令牌（令牌无效或看不到仓库 401 `HOSTING_AUTH_FAILED`，其他失败 502 `HOSTING_API_ERROR`），通过后加密保存（再次绑定替换原令牌）。GitHub 忽略 `baseUrl`；GitLab 不填即 gitlab.com |
 | DELETE | `/projects/:id/hosting` | 解除绑定并删除凭据 → `ProjectDetailDTO`；删除项目时同样删除其凭据 |
-| PUT | `/projects/:id/db-connections` 🅿 | `{ connectionIds: string[] }` 覆盖关联 |
+| PUT | `/projects/:id/db-connections` 🅿 | `{ connectionIds: string[] }` 覆盖关联 → `ProjectDetailDTO`；不存在的连接 404 `DB_CONNECTION_NOT_FOUND`。项目的 AI 会话只能用关联的连接（12 §6.9） |
 
 远端 `repo` 默认从 `git remote get-url origin` 推断（`inferredHosting`：`github.com` → GitHub，其他主机 → GitLab，非 `gitlab.com` 时 `baseUrl = https://<host>`），前端预填。
 
@@ -209,18 +209,20 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/db-connections` | 列表（不含密码） |
-| POST | `/db-connections` | `{ name, type, host, port, database, username, password, tls }` |
-| PATCH | `/db-connections/:id` | 可改密码（传 `password` 时） |
-| DELETE | `/db-connections/:id` | |
-| POST | `/db-connections/:id/test` | `{ ok, serverVersion?, error? }` |
-| GET | `/db-connections/:id/schema` | 表与列（只读浏览） |
+| GET | `/db-connections` | `{ items: DbConnectionDTO[] }`（`{ id, name, type, host, port, database, username, tls, createdAt, updatedAt }`，不含密码） |
+| POST | `/db-connections` | `{ name, type, host, port, database, username, password, tls }`（`password` 为凭据字段，可为空串）→ 201；密码经 credentials 模块加密保存；名称已被使用 409 `DB_CONNECTION_ALREADY_EXISTS`（AI 的工具按名称找连接） |
+| PATCH | `/db-connections/:id` | 部分字段；传 `password` 时替换密码 |
+| DELETE | `/db-connections/:id` | 204；删除密码，项目关联随之删除 |
+| POST | `/db-connections/:id/test` | `{ ok, serverVersion, error }`：连接并读取 `VERSION()`；连不上时 `ok: false`、`error` 为驱动信息（不作为 HTTP 错误） |
+| GET | `/db-connections/:id/schema` | `{ tables: Array<{ name, comment?, rows?, columns: Array<{ name, type, nullable, key?, default?, comment? }> }> }`（只读浏览） |
+
+每次访问数据库都单独建立连接、用完关闭（连接超时 `DB_CONNECT_TIMEOUT_MS`）；连不上 502 `DB_CONNECTION_FAILED`（`details.driverMessage`）。
 
 ## 10. MCP 工具清单与操作清单
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/mcp/tools` 🅿 | 执行 MCP 的工具名、说明、输入 schema（JSON Schema）、允许的尝试类型 |
+| GET | `/mcp/tools` 🅿 | `{ items: Array<{ name, description, inputSchema, allowedKinds }> }`：执行 MCP 的工具名、说明、输入 JSON Schema（不含注入的会话参数）、允许的尝试类型；与 `tools/list` 同序 |
 | GET | `/operations?expose=palette` | `{ items: OperationInfo[] }`：命令面板可用的操作（`expose.palette` 且非 critical）：id、标题 key、说明、风险、最低模式、method、path、输入 JSON Schema；不带 `expose` 返回全部 |
 
 ## 11. SSE 事件

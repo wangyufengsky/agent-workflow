@@ -48,10 +48,10 @@
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
 | id | TEXT PK | |
-| name | TEXT | |
+| name | TEXT UNIQUE | AI 的数据库工具按名称找连接 |
 | type | TEXT | `DbType` |
 | host / port / database / username | TEXT / INTEGER / TEXT / TEXT | |
-| credential_id | TEXT → credentials | |
+| credential_id | TEXT → credentials | 密码；删除连接后删除凭据 |
 | tls | INTEGER(bool) | |
 | created_at / updated_at | INTEGER | |
 

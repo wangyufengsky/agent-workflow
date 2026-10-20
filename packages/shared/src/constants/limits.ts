@@ -5,6 +5,8 @@ export const ATTEMPT_MAX_NUDGES = 1;
 export const ACCEPTANCE_COMMAND_TIMEOUT_MS = 600_000;
 export const DB_QUERY_MAX_ROWS = 200;
 export const DB_QUERY_TIMEOUT_MS = 15_000;
+/** Opening a connection to a project database (test, schema, the AI's database tools). */
+export const DB_CONNECT_TIMEOUT_MS = 10_000;
 export const TRANSCRIPT_PAGE_SIZE = 200;
 /** A streaming text part is written to the transcript again once it grew by this many characters (10 §3). */
 export const TRANSCRIPT_TEXT_FLUSH_CHARS = 200;
@@ -19,3 +21,6 @@ export const RESULT_SUMMARY_MAX_CHARS = 4000;
 export const TASK_TITLE_MAX_CHARS = 80;
 /** Output of an acceptance command kept on the node (its end, where failures are reported). */
 export const ACCEPTANCE_OUTPUT_MAX_CHARS = 20_000;
+/** `GET /system/runtime/logs`: lines returned by default and at most. */
+export const RUNTIME_LOG_TAIL_DEFAULT = 500;
+export const RUNTIME_LOG_TAIL_MAX = 5000;

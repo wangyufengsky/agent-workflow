@@ -49,6 +49,7 @@ export function createSystemService({ config, env, runtime, opencode, startRunti
     },
     runtime: () => runtime.snapshot(),
     restartRuntime: () => runtime.restart(),
+    runtimeLogs: (tail: number) => runtime.logTail(tail),
   };
 }
 export type SystemService = ReturnType<typeof createSystemService>;

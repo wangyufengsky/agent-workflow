@@ -7,6 +7,7 @@ import {
   ErrorCode,
   type ErrorInfo,
   MCP_SESSION_ARG,
+  type McpToolInfo,
   type McpToolName,
 } from '@aw/shared';
 import { type CallToolResult, type Tool, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -48,6 +49,8 @@ const COMMON_HINTS: Partial<Record<ErrorCode, string>> = {
 
 export type ToolRegistry = {
   list(): Tool[];
+  /** What the MCP tools page shows (11 §10). */
+  info(): McpToolInfo[];
   call(name: string, args: Record<string, unknown>): Promise<CallToolResult>;
 };
 
@@ -103,6 +106,14 @@ export function createToolRegistry(
           inputSchema: z.toJSONSchema(t.input, { io: 'input' }),
         }),
       ),
+
+    info: () =>
+      tools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: z.toJSONSchema(t.input, { io: 'input' }),
+        allowedKinds: [...t.allowedKinds],
+      })),
 
     async call(name, args) {
       const tool = tools.find((t) => t.name === name);

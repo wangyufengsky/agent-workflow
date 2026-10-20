@@ -167,12 +167,14 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ACCEPTANCE_OUTPUT_MAX_CHARS` | 20000（验收命令输出保留末尾这么多字符） |
 | `DB_QUERY_MAX_ROWS` | 200 |
 | `DB_QUERY_TIMEOUT_MS` | 15000 |
+| `DB_CONNECT_TIMEOUT_MS` | 10000（建立到项目数据库的连接） |
 | `TRANSCRIPT_PAGE_SIZE` | 200 |
 | `TRANSCRIPT_TEXT_FLUSH_CHARS` | 200（流式文本每增长这么多字符写一次会话流） |
 | `REPORT_PROGRESS_MAX_CHARS` | 200 |
 | `RESULT_SUMMARY_MAX_CHARS` | 4000 |
 | `SSE_REPLAY_BUFFER` | 1000（条） |
 | `DIFF_FILE_MAX_BYTES` | 1048576（超过显示「文件过大」） |
+| `RUNTIME_LOG_TAIL_DEFAULT` / `RUNTIME_LOG_TAIL_MAX` | 500 / 5000（运行环境日志页的行数） |
 
 ### 4.3 用户设置（`constants/settings.ts`，键 → 默认值）
 

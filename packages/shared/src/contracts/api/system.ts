@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { OPENCODE_VERSION } from '../../constants/app.ts';
 import { RuntimeStatus } from '../../enums/system.ts';
+import { attemptKindSchema } from '../../enums/task.ts';
 
 export const healthSchema = z.object({
   status: z.literal('ok'),
@@ -46,3 +47,21 @@ export const environmentSchema = z.object({
   ready: z.boolean(),
 });
 export type EnvironmentDTO = z.infer<typeof environmentSchema>;
+
+/** `GET /system/runtime/logs` (11 §2): the end of the newest opencode log. */
+export const runtimeLogsSchema = z.object({
+  /** File name in `<data dir>/logs`; null before opencode first ran. */
+  file: z.string().nullable(),
+  lines: z.array(z.string()),
+});
+export type RuntimeLogsDTO = z.infer<typeof runtimeLogsSchema>;
+
+/** `GET /mcp/tools` (11 §10): one tool of the execution MCP as the tools page shows it. */
+export const mcpToolInfoSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  /** JSON Schema of the input. */
+  inputSchema: z.record(z.string(), z.unknown()),
+  allowedKinds: z.array(attemptKindSchema),
+});
+export type McpToolInfo = z.infer<typeof mcpToolInfoSchema>;

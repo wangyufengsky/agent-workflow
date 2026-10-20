@@ -28,6 +28,8 @@ export type ProjectDTO = z.infer<typeof projectSchema>;
 export const projectDetailSchema = projectSchema.extend({
   /** Parsed from `git remote get-url origin`, used to prefill the hosting form; null when not recognisable. */
   inferredHosting: hostingRefSchema.nullable(),
+  /** Database connections the project's AI sessions may query (M5-07). */
+  dbConnectionIds: z.array(z.string()),
 });
 export type ProjectDetailDTO = z.infer<typeof projectDetailSchema>;
 

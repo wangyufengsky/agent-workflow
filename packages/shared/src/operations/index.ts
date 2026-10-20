@@ -1,4 +1,12 @@
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
+import {
+  createDbConnectionOp,
+  dbSchemaOp,
+  deleteDbConnectionOp,
+  listDbConnectionsOp,
+  testDbConnectionOp,
+  updateDbConnectionOp,
+} from './databases.ts';
 import { startDebugAttemptOp } from './debug.ts';
 import type { OperationContract } from './define.ts';
 import {
@@ -21,11 +29,20 @@ import {
   deleteProjectOp,
   getProjectOp,
   listProjectsOp,
+  setProjectDbConnectionsOp,
   setProjectHostingOp,
   updateProjectOp,
 } from './projects.ts';
 import { getSettingsOp, updateSettingsOp } from './settings.ts';
-import { getEnvironmentOp, getHealthOp, getRuntimeOp, recheckEnvironmentOp, restartRuntimeOp } from './system.ts';
+import {
+  getEnvironmentOp,
+  getHealthOp,
+  getRuntimeLogsOp,
+  getRuntimeOp,
+  listMcpToolsOp,
+  recheckEnvironmentOp,
+  restartRuntimeOp,
+} from './system.ts';
 import {
   acceptNodeOp,
   cancelTaskOp,
@@ -68,6 +85,7 @@ import {
 } from './workflows.ts';
 
 export * from './attempts.ts';
+export * from './databases.ts';
 export * from './debug.ts';
 export * from './define.ts';
 export * from './git.ts';
@@ -87,6 +105,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   recheckEnvironmentOp,
   getRuntimeOp,
   restartRuntimeOp,
+  getRuntimeLogsOp,
+  listMcpToolsOp,
   listProjectsOp,
   createProjectOp,
   getProjectOp,
@@ -94,6 +114,13 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   deleteProjectOp,
   setProjectHostingOp,
   clearProjectHostingOp,
+  setProjectDbConnectionsOp,
+  listDbConnectionsOp,
+  createDbConnectionOp,
+  updateDbConnectionOp,
+  deleteDbConnectionOp,
+  testDbConnectionOp,
+  dbSchemaOp,
   getAttemptOp,
   abortAttemptOp,
   startDebugAttemptOp,

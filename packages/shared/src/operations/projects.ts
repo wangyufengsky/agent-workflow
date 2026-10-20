@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { setProjectDbConnectionsRequestSchema } from '../contracts/api/databases.ts';
 import {
   createProjectRequestSchema,
   projectDetailSchema,
@@ -101,4 +102,17 @@ export const clearProjectHostingOp = defineOperationContract({
   expose: { palette: false, assistant: true },
   credentialFields: [],
   mode: UiMode.Simple,
+});
+
+export const setProjectDbConnectionsOp = defineOperationContract({
+  id: 'projects.setDbConnections',
+  title: 'op.projects.setDbConnections',
+  description: "Choose the database connections the project's AI sessions may query read-only",
+  input: setProjectDbConnectionsRequestSchema,
+  output: projectDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'PUT', path: '/projects/:id/db-connections' },
+  expose: { palette: false, assistant: true },
+  credentialFields: [],
+  mode: UiMode.Pro,
 });

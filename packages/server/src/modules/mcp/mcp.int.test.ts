@@ -1,4 +1,4 @@
-import { AttemptKind, ErrorCode, MCP_SESSION_ARG, McpToolName, RoleBaseAgent } from '@aw/shared';
+import { AttemptKind, ErrorCode, listMcpToolsOp, MCP_SESSION_ARG, McpToolName, RoleBaseAgent } from '@aw/shared';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
@@ -56,10 +56,22 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.SubmitReview,
       McpToolName.AskUser,
       McpToolName.ReportProgress,
+      McpToolName.DbListConnections,
+      McpToolName.DbDescribe,
+      McpToolName.DbQuery,
     ]);
     const submit = tools.find((tool) => tool.name === McpToolName.SubmitResult);
     expect(submit?.inputSchema).toMatchObject({ type: 'object', required: ['summary'] });
     expect(JSON.stringify(tools)).not.toContain(MCP_SESSION_ARG);
+  });
+
+  it('工具页的清单（GET /mcp/tools）带允许的尝试类型与输入 schema', async () => {
+    const { body } = await t.call(listMcpToolsOp, {});
+    expect(body.items.map((tool) => tool.name)).toEqual((await mcp.listTools()).tools.map((tool) => tool.name));
+    expect(body.items.find((tool) => tool.name === McpToolName.SubmitPlan)).toMatchObject({
+      allowedKinds: ['plan'],
+      inputSchema: { type: 'object', required: expect.arrayContaining(['summary', 'nodes']) },
+    });
   });
 
   it('没有会话参数或会话不属于任何尝试时返回 MCP_ATTEMPT_UNRESOLVED', async () => {
