@@ -66,14 +66,25 @@ const VERSION_FLAGS = ['--version', '-version', '-V'];
 const VERSION_V_PROGRAMS = ['node', 'npm', 'npx', 'pnpm', 'yarn', 'bun', 'mvn', 'gradle', 'docker'];
 
 /**
- * Test commands of the tools a project check command runs (D64): when the check runs one of `tools`, read-only
- * sessions may also run `commands` with any arguments (`mvn -q test` also allows `mvn test -Dtest=X`). Only the
- * test commands, never another subcommand of the tool (`mvn deploy`, `npm publish`, `npm install`).
+ * Test commands of the tools a project check command runs (D64): when the check starts with one of `tools`, read-only
+ * sessions may also run `commands`. Only the test commands, never another subcommand of the tool (`mvn deploy`,
+ * `npm publish`, `npm install`). `args`: `any` allows any arguments after the command; `flag` allows one argument
+ * starting with `-` or one `valueFlags` option with its value, because any other word is another phase or task that
+ * runs too (`mvn test deploy`, `./gradlew test publish`), and the check command itself is held to the same shape.
+ * `escapes` are arguments that run another program; they ask even after the check command.
  */
-const TEST_RUNNERS: ReadonlyArray<{ tools: readonly string[]; commands: readonly string[] }> = [
+type TestRunner = {
+  tools: readonly string[];
+  commands: readonly string[];
+  args: 'any' | 'flag';
+  valueFlags?: readonly string[];
+  escapes?: readonly string[];
+};
+const TEST_RUNNERS: readonly TestRunner[] = [
   {
-    // Package scripts and the runners a test script usually calls.
-    tools: ['npm', 'pnpm', 'yarn', 'bun', 'npx', 'node'],
+    // Package scripts and the runners a test script usually calls; `npx` only below, since it installs and runs a
+    // package the project does not have.
+    tools: ['npm', 'pnpm', 'yarn', 'bun', 'node'],
     commands: [
       'npm test',
       'npm run test',
@@ -84,25 +95,33 @@ const TEST_RUNNERS: ReadonlyArray<{ tools: readonly string[]; commands: readonly
       'yarn run test',
       'bun run test',
       'node --test',
-      'npx vitest run',
       'pnpm vitest run',
       'pnpm exec vitest run',
-      'npx jest',
     ],
+    args: 'any',
   },
+  { tools: ['npx vitest'], commands: ['npx vitest run'], args: 'any' },
+  { tools: ['npx jest'], commands: ['npx jest'], args: 'any' },
   {
-    // Quiet and offline in either order before the phase; more phases after it run them too (`mvn test deploy`).
+    // Quiet and offline in either order before the phase.
     tools: ['mvn', './mvnw'],
     commands: ['mvn', './mvnw'].flatMap((mvn) =>
       ['', '-q ', '-o ', '-q -o ', '-o -q '].map((flags) => `${mvn} ${flags}test`),
     ),
+    args: 'flag',
   },
   {
     tools: ['./gradlew', 'gradle'],
     commands: ['./gradlew test', './gradlew -q test', 'gradle test', 'gradle -q test'],
+    args: 'flag',
+    valueFlags: ['--tests'],
   },
-  { tools: ['go'], commands: ['go test'] },
-  { tools: ['pytest', 'python', 'python3'], commands: ['pytest', 'python -m pytest', 'python3 -m pytest'] },
+  { tools: ['go'], commands: ['go test'], args: 'any', escapes: ['go test *-exec*', 'go test *-toolexec*'] },
+  {
+    tools: ['pytest', 'python', 'python3'],
+    commands: ['pytest', 'python -m pytest', 'python3 -m pytest'],
+    args: 'any',
+  },
 ];
 
 /** The only redirection allowed back after the escapes, for test commands and version queries (`java -version` prints to stderr). */
@@ -126,30 +145,56 @@ const versionQueryRules = (suffix: string): PermissionRule[] => [
   bash(`go version${suffix}`, 'allow'),
 ];
 
-/** The test commands of the tools the check commands run (`TEST_RUNNERS`). */
-const sameToolTestCommands = (checkCommands: readonly string[]): string[] => {
-  const tools = new Set(checkCommands.map((command) => command.trim().split(/\s+/)[0]));
-  return [...new Set(TEST_RUNNERS.filter((r) => r.tools.some((t) => tools.has(t))).flatMap((r) => r.commands))];
-};
+const startsWithWords = (command: string, words: string) => command === words || command.startsWith(`${words} `);
+
+/**
+ * Rules allowing `command` with the arguments its runner permits, followed by `suffix` (`''` or `STDERR_TO_STDOUT`).
+ * The asks use ` ?*` rather than ` *`: opencode also matches a pattern ending in ` *` without that part.
+ */
+function testCommandRules(command: string, runner: TestRunner, suffix: string): PermissionRule[] {
+  if (runner.args === 'any')
+    return suffix === ''
+      ? [bash(`${command} *`, 'allow')]
+      : [bash(`${command}${suffix}`, 'allow'), bash(`${command} *${suffix}`, 'allow')];
+  return [
+    bash(`${command}${suffix}`, 'allow'),
+    bash(`${command} -*${suffix}`, 'allow'),
+    bash(`${command} -* ?*${suffix}`, 'ask'),
+    ...(runner.valueFlags ?? []).flatMap((flag) => [
+      bash(`${command} ${flag} *${suffix}`, 'allow'),
+      bash(`${command} ${flag} * ?*${suffix}`, 'ask'),
+    ]),
+  ];
+}
 
 /**
  * Bash rules of read-only sessions (12 §2). opencode applies the last matching rule, so the catch-all comes first:
  * version queries and the read-only list, the test commands of the check's tool, then the escapes (D63); after them
- * the same version queries and test commands followed by `2>&1` alone, a second redirection asks again, and the
- * check commands themselves (`<checkCommand>*`, D51) go last.
+ * the same version queries and test commands followed by `2>&1` alone, a second redirection asks again, the other
+ * check commands (`<checkCommand>*`, D51), and last the test runners' own escapes.
  */
 export function readonlyBashRules(checkCommands: readonly string[] = []): PermissionRule[] {
-  const tests = sameToolTestCommands(checkCommands);
+  const checks = [...new Set(checkCommands.map((c) => c.trim()))];
+  const runners = TEST_RUNNERS.filter((r) => checks.some((c) => r.tools.some((t) => startsWithWords(c, t))));
+  // A check command run by a `flag` runner gets that runner's shape instead of `<checkCommand>*`.
+  const shaped = (c: string) => runners.find((r) => r.args === 'flag' && r.tools.some((t) => startsWithWords(c, t)));
+  const tests = runners.flatMap((runner) =>
+    [...new Set([...runner.commands, ...checks.filter((c) => shaped(c) === runner)])].map((command) => ({
+      command,
+      runner,
+    })),
+  );
   return [
     bash('*', 'ask'),
     ...versionQueryRules(''),
     ...BASH_READONLY.map((p) => bash(p, 'allow')),
-    ...tests.map((c) => bash(`${c} *`, 'allow')),
+    ...tests.flatMap(({ command, runner }) => testCommandRules(command, runner, '')),
     ...BASH_READONLY_ESCAPES.map((p) => bash(p, 'ask')),
     ...versionQueryRules(STDERR_TO_STDOUT),
-    ...tests.flatMap((c) => [bash(`${c}${STDERR_TO_STDOUT}`, 'allow'), bash(`${c} *${STDERR_TO_STDOUT}`, 'allow')]),
+    ...tests.flatMap(({ command, runner }) => testCommandRules(command, runner, STDERR_TO_STDOUT)),
     bash('*>*>*', 'ask'),
-    ...[...new Set(checkCommands)].map((c) => bash(`${c}*`, 'allow')),
+    ...checks.filter((c) => shaped(c) === undefined).map((c) => bash(`${c}*`, 'allow')),
+    ...runners.flatMap((r) => r.escapes ?? []).map((p) => bash(p, 'ask')),
   ];
 }
 
