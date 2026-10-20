@@ -54,6 +54,6 @@ async function emptyTree(repo: string): Promise<string> {
 export async function readCommit(repo: string, sha: string): Promise<GitCommitDetailDTO> {
   const [commit] = await readLog(repo, sha, 1, 0);
   if (commit === undefined) throw new Error(`git log returned no commit for ${sha}`);
-  const parent = commit.parents[0] ?? (await emptyTree(repo));
-  return { ...commit, files: await diffCommits(repo, parent, commit.sha) };
+  const base = commit.parents[0] ?? (await emptyTree(repo));
+  return { ...commit, base, files: await diffCommits(repo, base, commit.sha) };
 }

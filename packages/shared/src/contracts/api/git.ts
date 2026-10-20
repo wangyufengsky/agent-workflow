@@ -48,8 +48,8 @@ export const gitCommitSchema = z.object({
 });
 export type GitCommitDTO = z.infer<typeof gitCommitSchema>;
 
-/** A commit with the files it changed against its first parent (the empty tree for a root commit). */
-export const gitCommitDetailSchema = gitCommitSchema.extend({ files: z.array(diffFileSchema) });
+/** A commit with the files it changed against `base`: its first parent, or the empty tree for a root commit. */
+export const gitCommitDetailSchema = gitCommitSchema.extend({ base: z.string(), files: z.array(diffFileSchema) });
 export type GitCommitDetailDTO = z.infer<typeof gitCommitDetailSchema>;
 
 export const GitTreeEntryType = {

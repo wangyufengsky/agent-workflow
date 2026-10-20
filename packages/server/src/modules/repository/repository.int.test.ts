@@ -1,10 +1,12 @@
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   cancelTaskOp,
   createProjectOp,
   ErrorCode,
+  getTaskOp,
   gitBranchesOp,
   gitCommitOp,
   gitDiffFileOp,
@@ -14,6 +16,8 @@ import {
   gitLogOp,
   gitStatusOp,
   gitTreeOp,
+  listWorktreesOp,
+  pruneWorktreesOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
@@ -94,6 +98,14 @@ describe('Git 管理台（读取仓库）', () => {
       ['README.md', 'added'],
       ['src/a.ts', 'added'],
     ]);
+    // A root commit's files diff against the empty tree it reports as its base.
+    const rootFile = await t.call(gitDiffFileOp, {
+      id: project.id,
+      from: root.body.base,
+      to: root.body.sha,
+      path: 'README.md',
+    });
+    expect('diff' in rootFile.body && rootFile.body.diff).toContain('+# test');
     const missing = await t.call(gitCommitOp, { id: project.id, sha: 'no-such-ref' });
     expect([missing.status, missing.raw.json().error.code]).toEqual([404, ErrorCode.NotFound]);
   });
@@ -127,5 +139,56 @@ describe('Git 管理台（读取仓库）', () => {
       binary: true,
     });
     expect((await t.call(gitFileOp, { id: project.id, ref: 'main', path: 'nope.txt' })).status).toBe(404);
+  });
+});
+
+describe('worktree 总览与清理（M4-08）', () => {
+  it('列出主工作区、任务 worktree（标注任务）与其他 worktree；清理终态任务遗留的 worktree（保留分支）并 prune', async () => {
+    const { repo, project } = await setUp();
+    const running = taskReaches(t, 'running');
+    const created = await createTask(t, { projectId: project.id, workflow: 'bugfix', requirement: 'Fix it' });
+    await running;
+    const { body: task } = await t.call(getTaskOp, { id: created.id });
+    const managed = task.git.worktreePath ?? '';
+    await writeFile(join(managed, 'wip.txt'), 'wip\n');
+    const side = join(await mkdtemp(join(tmpdir(), 'aw-side-')), 'wt');
+    await repo.git('worktree', 'add', '-q', '-b', 'side', side);
+    const gone = join(await mkdtemp(join(tmpdir(), 'aw-gone-')), 'wt');
+    await repo.git('worktree', 'add', '-q', '--detach', gone);
+    await rm(gone, { recursive: true });
+
+    const { body } = await t.call(listWorktreesOp, { id: project.id });
+    const row = (w: (typeof body.items)[number]) => [
+      w.branch,
+      w.main,
+      w.managed,
+      w.task?.key ?? null,
+      w.dirty,
+      w.prunable,
+    ];
+    expect(body.items[0]?.main).toBe(true);
+    expect(body.items.map(row).sort()).toEqual(
+      [
+        ['main', true, false, null, false, false],
+        [task.git.branch, false, true, 'T-1', true, false],
+        ['side', false, false, null, false, false],
+        [null, false, false, null, null, true],
+      ].sort(),
+    );
+    expect(body.items.find((w) => w.branch === 'side')).toMatchObject({ ahead: 0, behind: 0 });
+
+    // Removing the worktree fails while it is locked: the task is cancelled, its worktree is left behind.
+    await repo.git('worktree', 'lock', managed);
+    await t.call(cancelTaskOp, { id: task.id });
+    expect(t.app.services.worktrees.findByTask(task.id)?.status).toBe('error');
+    await repo.git('worktree', 'unlock', managed);
+
+    const pruned = await t.call(pruneWorktreesOp, { id: project.id });
+    expect(pruned.body.items.map((w) => w.branch).sort()).toEqual(['main', 'side']);
+    expect(existsSync(managed)).toBe(false);
+    expect(t.app.services.worktrees.findByTask(task.id)?.status).toBe('removed');
+    expect(await repo.git('branch', '--list', task.git.branch ?? '', '--format=%(refname:short)')).toBe(
+      task.git.branch,
+    );
   });
 });

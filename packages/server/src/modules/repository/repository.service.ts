@@ -123,15 +123,16 @@ export function createRepositoryService({ projects, tasks, worktrees, locks, log
       return readCommit(repo, sha);
     },
 
+    // `from` may also be a tree: the empty tree a root commit is compared with.
     async diff(projectId: string, from: string, to: string): Promise<DiffDTO> {
       const repo = repoOf(projectId);
-      await Promise.all([requireObject(repo, `${from}^{commit}`), requireObject(repo, `${to}^{commit}`)]);
+      await Promise.all([requireObject(repo, `${from}^{tree}`), requireObject(repo, `${to}^{tree}`)]);
       return { base: from, files: await diffCommits(repo, from, to) };
     },
 
     async diffFile(projectId: string, from: string, to: string, path: string): Promise<FileDiffDTO> {
       const repo = repoOf(projectId);
-      await Promise.all([requireObject(repo, `${from}^{commit}`), requireObject(repo, `${to}^{commit}`)]);
+      await Promise.all([requireObject(repo, `${from}^{tree}`), requireObject(repo, `${to}^{tree}`)]);
       return limitDiff(path, await diffCommitsFile(repo, from, to, path));
     },
 
