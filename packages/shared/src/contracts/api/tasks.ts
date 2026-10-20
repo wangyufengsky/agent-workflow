@@ -19,6 +19,7 @@ import { diffFileSchema } from '../mcp/get-task-diff.ts';
 import { submitResultInputSchema } from '../mcp/submit-result.ts';
 import { reviewIssueSchema } from '../mcp/submit-review.ts';
 import { attemptSummarySchema } from './attempts.ts';
+import { deliverySchema } from './delivery.ts';
 import { inboxItemSchema } from './inbox.ts';
 
 /** Resolved once when the task is created (11 §5.1) and never changed afterwards. */
@@ -183,6 +184,8 @@ export const taskDetailSchema = taskSummarySchema.extend({
   activeAttempts: z.array(attemptSummarySchema),
   openInbox: z.array(inboxItemSchema),
   result: taskResultSchema.nullable(),
+  /** The latest merge or pull request (M4). */
+  lastDelivery: deliverySchema.nullable(),
 });
 export type TaskDetailDTO = z.infer<typeof taskDetailSchema>;
 

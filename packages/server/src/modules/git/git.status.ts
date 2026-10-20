@@ -60,3 +60,9 @@ export async function unmergedFiles(cwd: string): Promise<string[]> {
   const { stdout } = await runGit(['diff', '--name-only', '--diff-filter=U', '-z'], { cwd });
   return stdout.split('\0').filter((p) => p !== '');
 }
+
+/** A merge is in progress (`MERGE_HEAD` exists), e.g. the one a conflict resolution step completes. */
+export async function hasMergeHead(cwd: string): Promise<boolean> {
+  const { exitCode } = await runGit(['rev-parse', '--quiet', '--verify', 'MERGE_HEAD'], { cwd, okExitCodes: [0, 1] });
+  return exitCode === 0;
+}

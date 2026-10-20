@@ -1,4 +1,4 @@
-import { AppError, ErrorCode } from '@aw/shared';
+import { AppError, ErrorCode, GIT_COMMIT_IDENTITY } from '@aw/shared';
 import { execa } from 'execa';
 
 export type GitOptions = {
@@ -11,7 +11,7 @@ export type GitOptions = {
   verbatim?: boolean;
 };
 
-export type GitResult = { stdout: string; exitCode: number };
+export type GitResult = { stdout: string; stderr: string; exitCode: number };
 
 /**
  * The only way to run git (06 §2.3): argument array, `LC_ALL=C` so output is parseable (D37),
@@ -37,5 +37,27 @@ export async function runGit(args: readonly string[], options: GitOptions): Prom
       stderr: result.stderr,
     });
   }
-  return { stdout: result.stdout, exitCode };
+  return { stdout: result.stdout, stderr: result.stderr, exitCode };
 }
+
+/** The failure of a command whose exit code was accepted but turned out not to be an answer. */
+export function gitFailure(args: readonly string[], result: GitResult): AppError {
+  return new AppError(ErrorCode.GitCommandFailed, `git ${args[0]} failed`, {
+    args: [...args],
+    exitCode: result.exitCode,
+    stderr: result.stderr,
+  });
+}
+
+/**
+ * Commits made by the backend (node commits, merges, rebases) use agent-workflow's identity, without the user's
+ * signing setup (D48); prepend to the git arguments.
+ */
+export const BACKEND_COMMITTER = [
+  '-c',
+  `user.name=${GIT_COMMIT_IDENTITY.name}`,
+  '-c',
+  `user.email=${GIT_COMMIT_IDENTITY.email}`,
+  '-c',
+  'commit.gpgsign=false',
+] as const;

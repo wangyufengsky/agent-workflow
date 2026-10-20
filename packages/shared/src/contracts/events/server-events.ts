@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { settingsSchema } from '../../constants/settings.ts';
 import { ServerEventType } from '../../enums/system.ts';
 import { attemptSummarySchema, transcriptEntrySchema } from '../api/attempts.ts';
+import { deliverySchema } from '../api/delivery.ts';
 import { inboxItemSchema } from '../api/inbox.ts';
 import { runtimeSchema } from '../api/system.ts';
 import { nodeSummarySchema, planSummarySchema, taskSummarySchema } from '../api/tasks.ts';
@@ -29,6 +30,10 @@ export const serverEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal(ServerEventType.AttemptUpdated),
     data: z.object({ taskId: z.string().nullable(), nodeId: z.string().nullable(), attempt: attemptSummarySchema }),
+  }),
+  z.object({
+    type: z.literal(ServerEventType.DeliveryUpdated),
+    data: z.object({ taskId: z.string(), delivery: deliverySchema }),
   }),
   z.object({
     type: z.literal(ServerEventType.AttemptTranscript),

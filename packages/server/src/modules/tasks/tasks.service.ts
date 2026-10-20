@@ -1,6 +1,7 @@
 import {
   type AttemptDTO,
   type CreateTaskRequest,
+  type DeliverRequest,
   type NodeDetailDTO,
   type ResultNext,
   ServerEventType,
@@ -14,6 +15,7 @@ import type { EventBus } from '../../core/event-bus.ts';
 import { listTaskEvents } from '../timeline/index.ts';
 import { createTaskActions } from './tasks.actions.ts';
 import { createTaskContext } from './tasks.context.ts';
+import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
 import { createTaskResults } from './tasks.result.ts';
@@ -28,6 +30,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   const context = createTaskContext(deps, state);
   const actions = createTaskActions(deps, state, lifecycle);
   const diffs = createTaskDiffs(deps, state);
+  const delivery = createTaskDelivery(deps, state);
 
   // A task's summary shows its open attention items, working steps and progress line; keep it current.
   deps.events.subscribe((event) => {
@@ -73,6 +76,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       activeAttempts: attempts.listActive(id),
       openInbox: inbox.listOpen({ taskId: id }),
       result: task.result,
+      lastDelivery: delivery.lastDelivery(id),
     };
   }
 
@@ -117,6 +121,10 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       await lifecycle.cancel(id, keepBranch);
       return detail(id);
     },
+    async deliver(id: string, request: Omit<DeliverRequest, 'id'>): Promise<TaskDetailDTO> {
+      await delivery.deliver(id, request);
+      return detail(id);
+    },
     confirmPlan(id: string, version: number): TaskDetailDTO {
       lifecycle.confirmPlan(id, version);
       return detail(id);
@@ -157,7 +165,11 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     finishRunning: results.finishRunning,
     failRunning: results.failRunning,
     runContext: (taskId: string) => state.runContext(state.get(taskId)),
-    recover: lifecycle.recover,
+    /** Startup: deliveries cut short go back to review, preparations continue (03 §2.1). */
+    recover(): void {
+      delivery.recover();
+      lifecycle.recover();
+    },
   };
 }
 export type TasksService = ReturnType<typeof createTasksService>;

@@ -55,6 +55,8 @@ export const ErrorCode = {
   // 交付
   DeliveryConflict: 'DELIVERY_CONFLICT',
   DeliveryTargetNotFound: 'DELIVERY_TARGET_NOT_FOUND',
+  DeliveryTargetDirty: 'DELIVERY_TARGET_DIRTY',
+  DeliveryInterrupted: 'DELIVERY_INTERRUPTED',
   // 数据库
   DbConnectionNotFound: 'DB_CONNECTION_NOT_FOUND',
   DbConnectionFailed: 'DB_CONNECTION_FAILED',
@@ -114,6 +116,8 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.InboxItemClosed]: 409,
   [ErrorCode.DeliveryConflict]: 409,
   [ErrorCode.DeliveryTargetNotFound]: 400,
+  [ErrorCode.DeliveryTargetDirty]: 409,
+  [ErrorCode.DeliveryInterrupted]: null,
   [ErrorCode.DbConnectionNotFound]: 404,
   [ErrorCode.DbConnectionFailed]: 502,
   [ErrorCode.DbQueryRejected]: 400,

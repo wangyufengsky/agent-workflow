@@ -39,6 +39,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.tasks.diffFile': '查看任务的文件改动',
   'op.nodes.diff': '步骤改动',
   'op.nodes.diffFile': '查看步骤的文件改动',
+  'op.tasks.deliver': '合并或创建 PR',
+  'op.tasks.requestChanges': '让 AI 再改改',
   'op.inbox.list': '需要你处理',
   'op.inbox.count': '待处理数量',
   'op.inbox.resolve': '处理条目',

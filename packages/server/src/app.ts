@@ -24,6 +24,7 @@ import {
   unavailableCipher,
 } from './modules/credentials/index.ts';
 import { createDebugModule } from './modules/debug/index.ts';
+import { createDeliveryModule } from './modules/delivery/index.ts';
 import { createRepoLocks } from './modules/git/index.ts';
 import { createInboxModule, type InboxService } from './modules/inbox/index.ts';
 import { createMcpModule } from './modules/mcp/index.ts';
@@ -161,6 +162,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     dataDir: config.dataDir,
   });
   const plans = createPlansModule({ db: database.db, unit, clock, log });
+  const deliveries = createDeliveryModule({ db: database.db, unit, clock, log });
   const acceptance = createAcceptanceModule({
     attempts: attempts.service,
     roles: roles.service,
@@ -198,6 +200,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     nodes: nodes.service,
     attempts: attempts.service,
     inbox: inbox.service,
+    deliveries: deliveries.service,
+    locks,
     dataDir: config.dataDir,
   });
   const scheduler = createScheduler({

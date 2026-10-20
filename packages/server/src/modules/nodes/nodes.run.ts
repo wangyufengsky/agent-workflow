@@ -7,7 +7,6 @@ import {
   AttemptStatus,
   type CheckResult,
   ErrorCode,
-  GIT_COMMIT_IDENTITY,
   InboxKind,
   NodeEvent,
   NodeStatus,
@@ -17,7 +16,7 @@ import {
   transition,
 } from '@aw/shared';
 import type { Attempt } from '../attempts/index.ts';
-import { runGit } from '../git/index.ts';
+import { BACKEND_COMMITTER, hasMergeHead, runGit } from '../git/index.ts';
 import type { createNodesRepo, Node, NodeChanges } from './nodes.repo.ts';
 import { feedbackFromAttempt, feedbackFromChecks, feedbackFromRejection, nextAfterFailure } from './nodes.rules.ts';
 import type { NodeRunContext, NodesServiceDeps } from './nodes.types.ts';
@@ -52,30 +51,20 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     return move(node, NodeEvent.Interrupted, NodeStatus.Ready, { attemptCount: Math.max(0, node.attemptCount - 1) });
   }
 
-  /** The backend commits a finished node's changes (09 §3); none → no commit. */
+  /**
+   * The backend commits a finished node's changes (09 §3); none → no commit. A merge in progress (the target branch
+   * merged in for a conflict resolution, 13 §4) is concluded by this commit even when it brings no changes.
+   */
   async function commit(node: Node, ctx: NodeRunContext): Promise<string | null> {
     return locks.run(ctx.repoPath, async () => {
       const cwd = ctx.directory;
       const { stdout } = await runGit(['status', '--porcelain'], { cwd });
-      if (stdout.trim() === '') return null;
+      if (stdout.trim() === '' && !(await hasMergeHead(cwd))) return null;
       await runGit(['add', '-A'], { cwd });
-      await runGit(
-        [
-          '-c',
-          `user.name=${GIT_COMMIT_IDENTITY.name}`,
-          '-c',
-          `user.email=${GIT_COMMIT_IDENTITY.email}`,
-          '-c',
-          'commit.gpgsign=false',
-          'commit',
-          '--quiet',
-          // The node's acceptance checks are the gate; the user's hooks may be slow or interactive.
-          '--no-verify',
-          '-m',
-          `${ctx.taskKey} ${node.title}`,
-        ],
-        { cwd },
-      );
+      // The node's acceptance checks are the gate; the user's hooks may be slow or interactive.
+      await runGit([...BACKEND_COMMITTER, 'commit', '--quiet', '--no-verify', '-m', `${ctx.taskKey} ${node.title}`], {
+        cwd,
+      });
       return (await runGit(['rev-parse', 'HEAD'], { cwd })).stdout.trim();
     });
   }

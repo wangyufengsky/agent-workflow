@@ -22,6 +22,8 @@ import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import type { DeliveriesService } from '../delivery/index.ts';
+import type { RepoLocks } from '../git/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { NodeRunContext, NodesService } from '../nodes/index.ts';
 import type { PlansService } from '../plans/index.ts';
@@ -48,6 +50,8 @@ export type TasksServiceDeps = {
   nodes: NodesService;
   attempts: AttemptsService;
   inbox: InboxService;
+  deliveries: DeliveriesService;
+  locks: RepoLocks;
   dataDir: string;
 };
 

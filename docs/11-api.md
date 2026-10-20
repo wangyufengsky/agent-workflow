@@ -128,14 +128,14 @@ type TaskDetailDTO = {
   activeAttempts: AttemptSummaryDTO[];
   openInbox: InboxItemDTO[];
   result?: TaskResultDTO;         // review 及之后
-  lastDelivery?: DeliveryDTO;     // M4
+  lastDelivery?: DeliveryDTO;     // 最近一次交付：{ id, strategy, targetBranch, status, commitSha?, prUrl?, conflictFiles?, error?, createdAt, finishedAt? }
   createdAt: number; updatedAt: number; startedAt?: number; finishedAt?: number;
 };
 ```
 
 ### 5.3 交付
 
-- `strategy ∈ { squash, merge, rebase }`：本地合并到 `targetBranch`（默认 `baseBranch`），见 09 §7。成功 → 任务 `completed`。冲突 → 任务回 `review`，`lastDelivery.status = conflict`，`conflictFiles` 列出文件；前端提供「交给 AI 解决」（= `request-changes` with `reason: 'conflict'`）。
+- `strategy ∈ { squash, merge, rebase }`：本地合并到 `targetBranch`（默认 `baseBranch`），见 09 §7。合并前的检查失败直接返回错误、不改状态：`DELIVERY_TARGET_NOT_FOUND`、`WORKTREE_DIRTY`、`DELIVERY_TARGET_DIRTY`（目标分支检出在有未提交改动的工作区）。成功 → 任务 `completed`。冲突 → 任务回 `review`，`lastDelivery.status = conflict`，`conflictFiles` 列出文件；前端提供「交给 AI 解决」（= `request-changes` with `reason: 'conflict'`）。其他 git 失败 → 任务回 `review`，`lastDelivery.status = failed`，`error` 为原因。以上都返回操作后的 `TaskDetailDTO`。
 - `pull_request`：推送分支到远端 → 创建 PR/MR（`targetBranch` 为目标）→ 任务 `completed`，`prUrl` 记录在 delivery。
 - `report_only`：仅 `deliverable = report` 的任务可用，直接 `completed`。
 - `deliverable = report` 的任务使用其他策略 → 400 `VALIDATION_FAILED`。
