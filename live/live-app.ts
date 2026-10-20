@@ -2,6 +2,7 @@ import { cp, mkdir, mkdtemp, readdir, readFile, realpath, writeFile } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  attemptMachine,
   createProjectOp,
   createTaskOp,
   getAttemptOp,
@@ -9,6 +10,7 @@ import {
   getTaskOp,
   InboxKind,
   InboxStatus,
+  isTerminalState,
   listWorkflowsOp,
   resolveInboxOp,
   ServerEventType,
@@ -125,6 +127,23 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
       });
       taskId = created.id;
       await ended;
+      // The status changes inside the submit call; its result reaches the transcript when the call returns, and
+      // the attempt ends after that. Read transcripts only once every attempt of the task has ended.
+      const endedAttempts = new Set<string>();
+      let waitingFor: readonly string[] | undefined;
+      let allEnded = () => {};
+      const settled = new Promise<void>((resolve) => {
+        allEnded = resolve;
+      });
+      const unsubscribe = t.app.events.subscribe((e) => {
+        if (e.type !== ServerEventType.AttemptUpdated || e.data.taskId !== taskId) return;
+        if (isTerminalState(attemptMachine, e.data.attempt.status)) endedAttempts.add(e.data.attempt.id);
+        if (waitingFor?.every((id) => endedAttempts.has(id))) allEnded();
+      });
+      waitingFor = (await t.call(getTaskOp, { id: taskId })).body.activeAttempts.map((a) => a.id);
+      if (waitingFor.every((id) => endedAttempts.has(id))) allEnded();
+      await settled;
+      unsubscribe();
       const { body: task } = await t.call(getTaskOp, { id: taskId });
       const attemptIds = [
         ...new Set((await readdir(join(t.dataDir, 'runs', taskId))).map((f) => f.replace('.jsonl', ''))),
