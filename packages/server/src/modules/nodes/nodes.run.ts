@@ -116,6 +116,10 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
               resultSummary: node.result.summary,
               focus: check.focus,
               directory: ctx.directory,
+              checkCommands: [
+                ...(ctx.checkCommand === null ? [] : [ctx.checkCommand]),
+                ...node.acceptance.checks.flatMap((c) => (c.kind === AcceptanceCheckKind.Command ? [c.command] : [])),
+              ],
             },
             controller.signal,
           );

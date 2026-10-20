@@ -156,13 +156,15 @@ export function createTaskState(deps: TasksServiceDeps) {
         taskId: task.id,
       });
     }
+    const project = projects.getRecord(task.projectId);
     return {
       taskId: task.id,
       taskKey: task.key,
       taskTitle: task.title,
       requirement: task.requirement,
       directory: worktree.path,
-      repoPath: projects.getRecord(task.projectId).repoPath,
+      repoPath: project.repoPath,
+      checkCommand: project.checkCommand,
       askOnUncertainty: task.checkpoints.ask_on_uncertainty,
     };
   }

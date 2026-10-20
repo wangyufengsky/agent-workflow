@@ -44,6 +44,8 @@ export type ReviewRequest = {
   resultSummary: string;
   focus: string | undefined;
   directory: string;
+  /** The project check and the node's command checks, which the reviewer may run without asking. */
+  checkCommands: readonly string[];
 };
 
 /** A review either completes with a verdict or is interrupted with the runtime (then the node starts over). */
@@ -140,6 +142,7 @@ export function createAcceptanceService({ attempts, roles, settings, prompts, lo
           title: `${request.taskKey} · ${request.nodeTitle} · review`,
           model: reviewer.model ?? settings.get('ai.defaultModel'),
           system: reviewer.prompt,
+          checkCommands: request.checkCommands,
           prompt: renderTemplate(prompts[PromptName.StartReview], {
             taskKey: request.taskKey,
             taskTitle: request.taskTitle,

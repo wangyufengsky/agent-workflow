@@ -50,6 +50,8 @@ export type StartAttemptInput = {
   system?: string;
   /** First message. */
   prompt: string;
+  /** Check commands a read-only session may run without asking (12 §2). */
+  checkCommands?: readonly string[];
 };
 
 /** What re-attaching to a persisted session needs after a restart: the session state lived in memory. */
@@ -152,7 +154,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
           directory: input.directory,
           title: input.title,
           agent,
-          permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy')),
+          permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), input.checkCommands),
         });
       } catch (err) {
         return toDto(move(mustFind(id), AttemptEvent.StartFailed, errorOf(err)));
