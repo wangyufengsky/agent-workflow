@@ -103,7 +103,7 @@
 
 | 命令 | 结果 | 证据 |
 | --- | --- | --- |
-| `pnpm verify`（类型、Biome、依赖边界、CSS 令牌、状态机文档、单元、集成含 Docker MySQL、构建与生产包检查） | 通过：单元 163、集成 153 | `verify.log` |
+| `pnpm verify`（类型、Biome、依赖边界、CSS 令牌、状态机文档、单元、集成含 Docker MySQL、构建与生产包检查） | 通过：单元 215、集成 153 | `verify.log` |
 | `pnpm e2e`（浏览器 J1–J9、三任务并发与冒烟） | 通过：19 个（偶发失败一次见「未解决的已知问题」） | `e2e.log`、`e2e-repeat*.log` |
 | `pnpm e2e:electron`（J10，未打包应用与 dmg 副本各一次） | 通过 | `e2e-electron.log`、`e2e-electron-dmg.log` |
 | `pnpm test:oc`（默认配置，真实 opencode） | 通过（beam-free 与 deepseek-v4.1-flash 各一次） | `test-oc-beam-free.log`、`test-oc.log` |
