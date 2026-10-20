@@ -10,7 +10,7 @@ import { ATTEMPT_KIND_LABEL, ATTEMPT_STATUS_LABEL } from '../../copy/attempts.ts
 import { COMMON_COPY } from '../../copy/common.ts';
 import { NODE_PAGE_COPY as C, NODE_COPY, TASK_COPY } from '../../copy/tasks.ts';
 import { AttemptView } from '../attempts/attempt-view.tsx';
-import { NodeActions } from '../task-detail/node-actions.tsx';
+import { hasNodeActions, NodeActions } from '../task-detail/node-actions.tsx';
 import { Changes, Output } from '../task-detail/node-drawer.tsx';
 import { NodeBadge } from '../tasks/task-badge.tsx';
 import { nodeQuery, taskQuery } from '../tasks/tasks.queries.ts';
@@ -81,7 +81,7 @@ export function NodePage() {
           ]}
         />
         <aside className="col">
-          {summary !== undefined && (
+          {summary !== undefined && hasNodeActions(task.data, summary) && (
             <Panel title={C.actions}>
               <NodeActions task={task.data} node={summary} />
             </Panel>

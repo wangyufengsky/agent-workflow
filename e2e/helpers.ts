@@ -66,17 +66,20 @@ export const passReview: FakeStep = {
 
 /**
  * Queues a turn for the next matching session of this project's tasks (sessions run in the project's worktrees, so
- * the directory keeps specs apart); `title` or `agent` narrow it to a step or the planner/reviewer.
+ * the directory keeps specs apart); `title` or `agent` narrow it to a step or the planner/reviewer, `taskKey` to one
+ * task (its worktree is `<project slug>/<task key>`).
  */
 export async function queueTurn(
   request: APIRequestContext,
   project: E2EProject,
-  match: { title?: string; agent?: string },
+  match: { title?: string; agent?: string; taskKey?: string },
   steps: FakeStep[],
 ): Promise<void> {
+  const { taskKey, ...rest } = match;
+  const directory = taskKey === undefined ? `/${project.slug}/` : `/${project.slug}/${taskKey}`;
   const res = await request.post(`${API_BASE}/dev/fake-opencode/scripts`, {
     headers: AUTH,
-    data: { match: { ...match, directory: `/${project.slug}/` }, steps },
+    data: { match: { ...rest, directory }, steps },
   });
   if (!res.ok()) throw new Error(`queueing a fake turn failed: ${res.status()} ${await res.text()}`);
 }

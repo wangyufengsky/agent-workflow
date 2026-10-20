@@ -6,62 +6,94 @@ import {
   getAttemptOp,
   startDebugAttemptOp,
   type TranscriptEntry,
+  type TranscriptPage,
   transcriptPageSchema,
 } from '@aw/shared';
-import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  infiniteQueryOptions,
+  type QueryClient,
+  queryOptions,
+  skipToken,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { useEffect, useMemo } from 'react';
 import { callOperation, getJson } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 
 export const attemptQuery = (id: string) =>
   queryOptions({ queryKey: queryKeys.attempt(id), queryFn: () => callOperation(getAttemptOp, { id }) });
 
-/** Entries in display order; `lastSeq` is the newest line already merged. */
-export type Transcript = { entries: TranscriptEntry[]; lastSeq: number };
-
-/** A streaming part replaces its earlier line in place (10 §3); other entries append. Lines already seen are skipped. */
-export function mergeTranscript(current: Transcript, incoming: readonly TranscriptEntry[]): Transcript {
-  const entries = [...current.entries];
-  let { lastSeq } = current;
-  for (const entry of incoming) {
-    if (entry.seq <= lastSeq) continue;
-    lastSeq = entry.seq;
-    const partId = 'partId' in entry ? entry.partId : undefined;
-    const at = partId === undefined ? -1 : entries.findIndex((e) => 'partId' in e && e.partId === partId);
-    if (at === -1) entries.push(entry);
-    else entries[at] = entry;
-  }
-  return { entries, lastSeq };
-}
-
-/** Reads every page written so far; `attempt.transcript` events extend it afterwards. */
+/** The stream page by page (10 §3); the view reads on in the background while `hasMore`. */
 export const transcriptQuery = (id: string) =>
-  queryOptions({
+  infiniteQueryOptions({
     queryKey: queryKeys.transcript(id),
-    queryFn: async (): Promise<Transcript> => {
-      let transcript: Transcript = { entries: [], lastSeq: 0 };
-      for (;;) {
-        const page = await getJson(
-          `${API_PREFIX}/attempts/${encodeURIComponent(id)}/transcript?afterSeq=${transcript.lastSeq}`,
-          transcriptPageSchema,
-        );
-        const before = transcript.lastSeq;
-        transcript = { ...mergeTranscript(transcript, page.entries), lastSeq: page.lastSeq };
-        if (page.done || page.lastSeq === before) return transcript;
-      }
-    },
+    queryFn: ({ pageParam }) =>
+      getJson(
+        `${API_PREFIX}/attempts/${encodeURIComponent(id)}/transcript?afterSeq=${pageParam}`,
+        transcriptPageSchema,
+      ),
+    initialPageParam: 0,
+    getNextPageParam: (last) => (last.hasMore ? last.lastSeq : undefined),
   });
 
-/** SSE: new lines extend a loaded transcript; while it is still loading, reload so nothing falls between. */
-export function appendTranscript(
-  qc: QueryClient,
-  attemptId: string,
-  entries: readonly TranscriptEntry[],
-): Promise<void> {
-  const key = queryKeys.transcript(attemptId);
-  const current = qc.getQueryData<Transcript>(key);
-  if (current === undefined) return qc.invalidateQueries({ queryKey: key });
-  qc.setQueryData<Transcript>(key, mergeTranscript(current, entries));
-  return Promise.resolve();
+/**
+ * Entries pushed over SSE (`attempt.transcript`) since the stream was opened, kept apart from the pages: a page read
+ * just before a line was appended misses it, and the line's event may arrive before that page does. Pages and live
+ * lines together hold every line exactly once or twice, never zero times.
+ */
+export const liveTranscriptQuery = (id: string) =>
+  queryOptions<TranscriptEntry[]>({ queryKey: queryKeys.transcriptLive(id), queryFn: skipToken });
+
+/**
+ * Display order of pages followed by live lines: each line once (by seq); a streaming part keeps the position where
+ * it first appeared and shows its latest text (10 §3). Pages cover lines 1…n without gaps, so a live line not in
+ * them comes after all of them.
+ */
+export function transcriptEntries(
+  pages: readonly TranscriptPage[],
+  live: readonly TranscriptEntry[],
+): TranscriptEntry[] {
+  const entries: TranscriptEntry[] = [];
+  const indexOfPart = new Map<string, number>();
+  const seen = new Set<number>();
+  for (const entry of [...pages.flatMap((p) => p.entries), ...live]) {
+    if (seen.has(entry.seq)) continue;
+    seen.add(entry.seq);
+    const partId = 'partId' in entry ? entry.partId : undefined;
+    const at = partId === undefined ? undefined : indexOfPart.get(partId);
+    if (at !== undefined) {
+      entries[at] = entry;
+      continue;
+    }
+    if (partId !== undefined) indexOfPart.set(partId, entries.length);
+    entries.push(entry);
+  }
+  return entries;
+}
+
+/** SSE: lines of a stream someone has open are kept until its pages are read again. */
+export function appendTranscript(qc: QueryClient, attemptId: string, entries: readonly TranscriptEntry[]): void {
+  if (qc.getQueryCache().find({ queryKey: queryKeys.transcript(attemptId), exact: true }) === undefined) return;
+  qc.setQueryData<TranscriptEntry[]>(queryKeys.transcriptLive(attemptId), (old = []) => [...old, ...entries]);
+}
+
+/** One attempt's stream: the first page as soon as it arrives, the rest read on in the background, live lines after. */
+export function useTranscript(attemptId: string) {
+  const pages = useInfiniteQuery(transcriptQuery(attemptId));
+  const live = useQuery(liveTranscriptQuery(attemptId));
+  const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = pages;
+  // After a failed page the view offers a retry instead of reading on by itself.
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && !isFetchNextPageError) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
+  const entries = useMemo(
+    () => (pages.data === undefined ? [] : transcriptEntries(pages.data.pages, live.data ?? [])),
+    [pages.data, live.data],
+  );
+  return { pages, entries };
 }
 
 /** SSE: a summary update refreshes the loaded attempt without a request. */

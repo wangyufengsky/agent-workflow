@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { APP_LICENSE, APP_SOURCE_URL } from '@aw/shared';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { type Backend, startBackend } from './backend.ts';
 
@@ -37,6 +38,13 @@ ipcMain.handle('aw:open-external', async (_e, url: string) => {
   await shell.openExternal(url);
 });
 ipcMain.handle('aw:reveal-in-finder', (_e, path: string) => shell.showItemInFolder(path));
+
+app.setAboutPanelOptions({
+  applicationName: 'Agent Workflow',
+  applicationVersion: app.getVersion(),
+  version: '',
+  copyright: `${APP_LICENSE} · ${APP_SOURCE_URL}`,
+});
 
 app.whenReady().then(async () => {
   backend = await startBackend(isDev);

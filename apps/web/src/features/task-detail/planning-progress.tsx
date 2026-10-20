@@ -1,16 +1,15 @@
 import { AttemptKind, type TaskDetailDTO, TaskStatus, TranscriptEntryKind } from '@aw/shared';
-import { useQuery } from '@tanstack/react-query';
 import { Icon } from '../../components/icon.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { ATTEMPT_COPY } from '../../copy/attempts.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
-import { transcriptQuery } from '../attempts/attempt.queries.ts';
+import { useTranscript } from '../attempts/attempt.queries.ts';
 import styles from './task-page.module.css';
 
 /** The planning session's latest tool call, as one line. */
 function LastAction({ attemptId }: { attemptId: string }) {
-  const transcript = useQuery(transcriptQuery(attemptId));
-  const call = transcript.data?.entries.findLast((e) => e.kind === TranscriptEntryKind.ToolCall);
+  const { entries } = useTranscript(attemptId);
+  const call = entries.findLast((e) => e.kind === TranscriptEntryKind.ToolCall);
   if (call?.kind !== TranscriptEntryKind.ToolCall) return null;
   return (
     <p className={styles.activity}>

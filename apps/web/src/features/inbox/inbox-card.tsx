@@ -4,7 +4,7 @@ import { type FormEvent, useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
-import { ERROR_COPY, GENERIC_ERROR } from '../../copy/errors.ts';
+import { ERROR_COPY } from '../../copy/errors.ts';
 import { INBOX_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
 import { type InboxResponse, useDismissInbox, useResolveInbox } from './inbox.queries.ts';
 import styles from './inbox-card.module.css';
@@ -132,7 +132,7 @@ function FailureCard({ item, resolve, pending }: CardProps<typeof InboxKind.Fail
   return (
     <>
       <p className={styles.title}>
-        {TASK_COPY.failedPhase[item.payload.phase]}：{ERROR_COPY[error.code] ?? `${GENERIC_ERROR}（${error.code}）`}
+        {TASK_COPY.failedPhase[item.payload.phase]}：{ERROR_COPY[error.code]}
       </p>
       <div className={styles.actions}>
         <Button variant="primary" size="sm" disabled={pending} onClick={() => resolve({ action: FailureAction.Retry })}>

@@ -1,7 +1,7 @@
 import { errorInfoSchema } from '@aw/shared';
 import { ApiError } from '../api/client.ts';
 import { COMMON_COPY } from '../copy/common.ts';
-import { ERROR_COPY, GENERIC_ERROR } from '../copy/errors.ts';
+import { ERROR_COPY } from '../copy/errors.ts';
 import { Button } from './button.tsx';
 import { Icon } from './icon.tsx';
 
@@ -11,8 +11,7 @@ import { Icon } from './icon.tsx';
  */
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const info = error instanceof ApiError ? error : errorInfoSchema.safeParse(error).data;
-  const message =
-    info === undefined ? COMMON_COPY.backendUnreachable : (ERROR_COPY[info.code] ?? `${GENERIC_ERROR}（${info.code}）`);
+  const message = info === undefined ? COMMON_COPY.backendUnreachable : ERROR_COPY[info.code];
   const detail = error instanceof Error ? error.message : (info?.message ?? String(error));
   return (
     <div className="banner danger" role="alert">

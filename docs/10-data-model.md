@@ -303,7 +303,7 @@ payload / response：
 | `system` | `{ event: TranscriptSystemEvent, detail? }`（尝试开始、已提醒、重试中、已提交、超时、已中止、运行时消失；文案在前端） |
 | `error` | `ErrorInfo`（`{ code, message, details? }`；尝试结束后的会话错误不记录，如提交后我们发出的中止） |
 
-读取：`GET /attempts/:id/transcript?afterSeq=` 顺序读取文件并按 `afterSeq` 过滤，每页 `TRANSCRIPT_PAGE_SIZE` 行；页内同一 `partId` 只保留最后一行、放在它首次出现的位置。单文件预计 < 10 MB，M6 做性能验证，必要时加 seq → 偏移量索引。
+读取：`GET /attempts/:id/transcript?afterSeq=` 每页 `TRANSCRIPT_PAGE_SIZE` 行；seq 从 1 起逐行连续编号（第 i 行即 seq i+1），所以一页就是按行切出的一段，只解析这一段（M6-02：5 MB、约六千行的文件，每页约 20 ms）；页内同一 `partId` 只保留最后一行、放在它首次出现的位置。界面先显示第一页，其余页在后台接着读；读页期间经 SSE 到达的行另存一处，显示时与各页按 seq 去重合并（`transcriptEntries`），因此读页与追加交错时不丢行。
 
 ## 4. v1.1 预留：助手
 

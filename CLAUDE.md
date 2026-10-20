@@ -1,6 +1,6 @@
 # agent-workflow · AI 编码助手须知
 
-当前阶段：**M5（专业模式）已完成，下一步 M6**。开始任何开发任务前，先读：
+当前阶段：**v1.0 完成（M0–M6）**，验收报告见 `docs/16-acceptance-v1.0.md`；下一步 v1.1 应用助手（`docs/15-assistant.md`）。开始任何开发任务前，先读：
 
 1. `docs/06-coding-standards.md`：找根因不兜底、不过度防御、状态只经状态机、一处定义。
 2. `docs/07-testing-standards.md`：测行为不测实现、少而有效、真实 SQLite/Git、缺陷先写失败测试、禁止 sleep。
@@ -12,4 +12,4 @@
 
 文档、注释与界面文案用中文；代码标识符、日志消息、提交信息用英文。
 
-常用命令：`pnpm dev`（桌面开发）、`pnpm verify`（提交前全量检查：类型、lint、依赖边界、单元与集成测试、构建；数据库集成测试需要本机 Docker 与 `mysql:8.4` 镜像）、`pnpm e2e`、`pnpm e2e:electron`（需先 `pnpm build`）、`pnpm test:oc` 与 `pnpm test:live`（真实 opencode；默认免费模型 `opencode-go/beam-free`，`AW_OC_TEST_MODEL` 可覆盖）。
+常用命令：`pnpm dev`（桌面开发）、`pnpm verify`（提交前全量检查：类型、lint、依赖边界、单元与集成测试、构建；数据库集成测试需要本机 Docker 与 `mysql:8.4` 镜像）、`pnpm e2e`（含四主题走查，截图在 `screenshots/walkthrough/`）、`pnpm e2e:electron`（需先 `pnpm build`；真实 opencode 与模型）、`pnpm test:oc` 与 `pnpm test:live`（真实 opencode；默认免费模型 `opencode-go/deepseek-v4.1-flash`（D62），`AW_OC_TEST_MODEL` 可覆盖）、`pnpm perf`（性能实测）、`pnpm dist`（未签名 dmg）。

@@ -50,6 +50,36 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "echo*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "git status*",
       "permission": "bash",
     },
@@ -86,6 +116,56 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "git rev-parse*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*>*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-exec*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-ok*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-delete*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fprint*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fls*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "rg *--pre*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git *--output*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *-O*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *--open-files-in-pager*",
       "permission": "bash",
     },
   ],
@@ -137,6 +217,36 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "echo*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "git status*",
       "permission": "bash",
     },
@@ -173,6 +283,56 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "git rev-parse*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*>*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-exec*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-ok*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-delete*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fprint*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fls*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "rg *--pre*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git *--output*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *-O*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *--open-files-in-pager*",
       "permission": "bash",
     },
   ],
@@ -224,6 +384,36 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "echo*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "git status*",
       "permission": "bash",
     },
@@ -260,6 +450,56 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "git rev-parse*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*>*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-exec*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-ok*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-delete*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fprint*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fls*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "rg *--pre*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git *--output*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *-O*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *--open-files-in-pager*",
       "permission": "bash",
     },
   ],
@@ -368,6 +608,36 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "allow",
+      "pattern": "echo*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "git status*",
       "permission": "bash",
     },
@@ -404,6 +674,56 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "allow",
       "pattern": "git rev-parse*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*>*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-exec*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-ok*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-delete*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fprint*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fls*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "rg *--pre*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git *--output*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *-O*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *--open-files-in-pager*",
       "permission": "bash",
     },
   ],
@@ -455,6 +775,36 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "allow",
+      "pattern": "echo*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm --version",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "git status*",
       "permission": "bash",
     },
@@ -491,6 +841,56 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "allow",
       "pattern": "git rev-parse*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*>*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-exec*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-ok*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-delete*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fprint*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fls*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "rg *--pre*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git *--output*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *-O*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *--open-files-in-pager*",
       "permission": "bash",
     },
   ],

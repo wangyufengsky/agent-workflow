@@ -1,6 +1,6 @@
 # agent-workflow 文档索引
 
-> 状态：设计定稿（2026-10-19）；M0、M1 已完成，进度见 [05-dev-plan.md](05-dev-plan.md)。
+> 状态：v1.0 开发完成（M0–M6，2026-10-20），验收见 [16-acceptance-v1.0.md](16-acceptance-v1.0.md)；进度与各里程碑的差异见 [05-dev-plan.md](05-dev-plan.md)。
 
 agent-workflow 是一个本地桌面应用：选项目、选流程、写一句需求，AI（托管的 opencode 1.19.0）在独立 Git worktree 中完成开发，用户查看结果并决定是否合并。默认简单，专业能力可选开启。
 
@@ -21,6 +21,7 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [13-builtin-workflows.md](13-builtin-workflows.md) | 内置流程与内置角色 | 开发 / 产品 |
 | [14-ui-spec.md](14-ui-spec.md) | 页面与路由、简单/专业模式界面、主题配置、设计稿改进 | 开发 / 设计 |
 | [15-assistant.md](15-assistant.md) | 应用助手（v1.1）设计与 v1.0 预留 | 全员 |
+| [16-acceptance-v1.0.md](16-acceptance-v1.0.md) | v1.0 验收报告：01 §5 逐条的验证方法、结果与证据，需要用户完成的项 | 全员 |
 
 ## 维护规则
 

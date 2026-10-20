@@ -35,9 +35,12 @@ function useShortcuts() {
   }, [navigate, setPaletteOpen]);
 }
 
+/** Shell pages reached from the top bar rather than the sidebar. */
+const PAGES_OUTSIDE_NAV = [{ route: ROUTES.inbox, label: NAV_COPY.inbox }];
+
 function useCurrentTitle(): string {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const item = [...NAV_ITEMS]
+  const item = [...NAV_ITEMS, ...PAGES_OUTSIDE_NAV]
     .sort((a, b) => b.route.length - a.route.length)
     .find((i) => (i.route === ROUTES.home ? pathname === '/' : pathname.startsWith(i.route)));
   return item?.label ?? NAV_COPY.brand;

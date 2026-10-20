@@ -5,7 +5,7 @@ import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { EmptyState } from '../../components/empty-state.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
-import { COMMON_COPY } from '../../copy/common.ts';
+import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
 import { TASKS_COPY as C, TASK_DISPLAY_LABEL } from '../../copy/tasks.ts';
 import { projectsQuery } from '../projects/projects.queries.ts';
 import { TaskBadge } from './task-badge.tsx';
@@ -13,7 +13,6 @@ import styles from './tasks.module.css';
 import { taskPagesQuery } from './tasks.queries.ts';
 
 const route = getRouteApi(ROUTE_IDS.tasks);
-const time = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
 
 /** Task list (14 §3.7): filter by project and display state. */
 export function TasksPage() {
@@ -97,7 +96,7 @@ export function TasksPage() {
                 <td>
                   <TaskBadge group={t.displayGroup} />
                 </td>
-                <td className="hint">{time.format(t.updatedAt)}</td>
+                <td className="hint">{formatDateTime(t.updatedAt)}</td>
               </tr>
             ))}
           </tbody>

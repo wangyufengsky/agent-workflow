@@ -5,7 +5,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
-import { ERROR_COPY, GENERIC_ERROR } from '../../copy/errors.ts';
+import { ERROR_COPY } from '../../copy/errors.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { useRetryTask } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
@@ -24,9 +24,7 @@ export function FailurePanel({ task }: { task: TaskDetailDTO }) {
       <div className="col" data-testid="failure-panel">
         <p>
           {C.failedPhase[failedPhase]}：
-          {exhausted === undefined
-            ? (ERROR_COPY[failure.code] ?? `${GENERIC_ERROR}（${failure.code}）`)
-            : C.failedStep(exhausted.nodeTitle)}
+          {exhausted === undefined ? ERROR_COPY[failure.code] : C.failedStep(exhausted.nodeTitle)}
         </p>
         <details>
           <summary className="hint">{COMMON_COPY.errorDetails}</summary>

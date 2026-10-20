@@ -76,7 +76,7 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | 用途 | 依赖 | 版本 |
 | --- | --- | --- |
 | 桌面 | electron | 44.9.0 |
-| 构建 | electron-vite / vite | 6.0.0 / 8.3.4 |
+| 构建 | electron-vite / vite / @vitejs/plugin-react | 6.0.0 / 8.3.4 / 6.1.2 |
 | 打包 | electron-builder | 26.15.3 |
 | UI | react / react-dom | 19.3.1 |
 | 路由 | @tanstack/react-router | 1.170.45 |
@@ -99,6 +99,8 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | GitHub / GitLab | @octokit/rest / @gitbeaker/rest | 22.0.1 / 43.8.0 |
 | 日志 | pino | 10.4.0 |
 | 测试 | vitest / @playwright/test | 5.0.5 / 1.64.1 |
+| 界面走查的对比度检查 | @axe-core/playwright（E2E 中只跑 `color-contrast` 规则，M6-01） | 4.13.0 |
+| 类型 | @types/node / @types/react / @types/react-dom | 24.19.2 / 19.3.0 / 19.3.0 |
 | 代码质量 | @biomejs/biome / dependency-cruiser / typescript | 2.5.15 / 18.6.0 / **6.0.3**（D29） |
 | 静态文件 | @fastify/static | 10.1.6 |
 
@@ -152,7 +154,9 @@ agent-workflow/
 │  │        └─ databases/          drivers/mysql
 │  ├─ builtin/                 内置流程与角色（数据 + prompts/*.md）
 │  └─ opencode-plugin/         agent-workflow-bridge（注入 sessionID 到本项目 MCP 工具参数）；`pnpm build:plugin` 去掉类型生成 dist/agent-workflow-bridge.js
-├─ e2e/                        Playwright
+├─ e2e/                        Playwright：浏览器旅程、四主题走查（walkthrough）、Electron 旅程 J10、性能实测（*.perf.spec.ts）
+├─ live/                       真实模型的 live 测试与示例仓库（fixtures/）
+├─ scripts/                    构建插件、生产包检查、CSS 令牌检查、状态机文档生成
 ├─ docs/
 └─ opencode-workflow-design-showcase/  设计参考（只读）
 ```

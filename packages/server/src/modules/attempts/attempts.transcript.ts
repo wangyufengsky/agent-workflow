@@ -30,19 +30,21 @@ export function createTranscriptStore({ runsDir, events, clock }: { runsDir: str
   const fileOf = (attempt: { id: string; taskId: string | null }) =>
     join(runsDir, attempt.taskId ?? DEBUG_RUN_DIR, `${attempt.id}.jsonl`);
 
-  function readAll(file: string): TranscriptEntry[] {
+  /**
+   * The file's lines, unparsed. `append` numbers entries 1, 2, 3… one per line, so line `i` holds seq `i + 1`: a page
+   * is a slice of lines and only its own lines are parsed (a long session's file runs to megabytes).
+   */
+  function lines(file: string): string[] {
     if (!existsSync(file)) return [];
-    return readFileSync(file, 'utf8')
-      .split('\n')
-      .filter((line) => line !== '')
-      .map((line) => transcriptEntrySchema.parse(JSON.parse(line)));
+    const text = readFileSync(file, 'utf8');
+    return text === '' ? [] : text.slice(0, -1).split('\n');
   }
 
   return {
     append(attempt: { id: string; taskId: string | null }, entries: readonly NewTranscriptEntry[]): void {
       if (entries.length === 0) return;
       const file = fileOf(attempt);
-      let seq = lastSeq.get(attempt.id) ?? readAll(file).at(-1)?.seq ?? 0;
+      let seq = lastSeq.get(attempt.id) ?? lines(file).length;
       const ts = clock.now();
       const numbered = entries.map((e) => transcriptEntrySchema.parse({ ...e, seq: ++seq, ts }));
       mkdirSync(dirname(file), { recursive: true });
@@ -56,8 +58,11 @@ export function createTranscriptStore({ runsDir, events, clock }: { runsDir: str
      * the position where it started; later pages (and SSE) may repeat the part, which readers replace by `partId`.
      */
     read(attempt: { id: string; taskId: string | null }, afterSeq: number, isEnded: boolean): TranscriptPage {
-      const rest = readAll(fileOf(attempt)).filter((e) => e.seq > afterSeq);
-      const page = rest.slice(0, TRANSCRIPT_PAGE_SIZE);
+      const all = lines(fileOf(attempt));
+      const page = all
+        .slice(afterSeq, afterSeq + TRANSCRIPT_PAGE_SIZE)
+        .map((line) => transcriptEntrySchema.parse(JSON.parse(line)));
+      const hasMore = all.length > afterSeq + page.length;
       const merged: TranscriptEntry[] = [];
       const indexOfPart = new Map<string, number>();
       for (const entry of page) {
@@ -70,11 +75,7 @@ export function createTranscriptStore({ runsDir, events, clock }: { runsDir: str
         if (partId !== undefined) indexOfPart.set(partId, merged.length);
         merged.push(entry);
       }
-      return {
-        entries: merged,
-        lastSeq: page.at(-1)?.seq ?? afterSeq,
-        done: isEnded && rest.length === page.length,
-      };
+      return { entries: merged, lastSeq: page.at(-1)?.seq ?? afterSeq, hasMore, done: isEnded && !hasMore };
     },
   };
 }

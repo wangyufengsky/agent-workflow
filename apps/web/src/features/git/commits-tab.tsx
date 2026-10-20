@@ -2,12 +2,10 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Button } from '../../components/button.tsx';
 import { DiffBrowser } from '../../components/diff/diff-browser.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
-import { COMMON_COPY } from '../../copy/common.ts';
+import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
 import { GIT_COPY as C } from '../../copy/git.ts';
 import styles from './git.module.css';
 import { gitCommitQuery, gitDiffFileQuery, gitLogQuery } from './git.queries.ts';
-
-const date = (ms: number) => new Date(ms).toLocaleString();
 
 function CommitDetail({ projectId, sha, onBack }: { projectId: string; sha: string; onBack: () => void }) {
   const commit = useQuery(gitCommitQuery(projectId, sha));
@@ -21,7 +19,7 @@ function CommitDetail({ projectId, sha, onBack }: { projectId: string; sha: stri
       </Button>
       <h3 className={styles.subject}>{c.subject}</h3>
       <span className="hint">
-        <span className="mono">{c.sha.slice(0, 12)}</span> · {C.commitBy(c.authorName, date(c.authoredAt))}
+        <span className="mono">{c.sha.slice(0, 12)}</span> · {C.commitBy(c.authorName, formatDateTime(c.authoredAt))}
       </span>
       {c.body !== '' && <pre className={styles.code}>{c.body}</pre>}
       <DiffBrowser files={c.files} fileQuery={gitDiffFileQuery(projectId, c.base, c.sha)} />
@@ -77,7 +75,7 @@ export function CommitsTab({
                 </button>
               </td>
               <td className="mono hint">{c.sha.slice(0, 8)}</td>
-              <td className="hint">{C.commitBy(c.authorName, date(c.authoredAt))}</td>
+              <td className="hint">{C.commitBy(c.authorName, formatDateTime(c.authoredAt))}</td>
             </tr>
           ))}
         </tbody>

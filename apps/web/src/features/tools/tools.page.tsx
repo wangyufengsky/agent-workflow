@@ -27,7 +27,7 @@ export function ToolsPage() {
               <span className="section-title mono grow">{tool.name}</span>
               <span className="hint mono">{`${MCP_TOOL_PREFIX}${tool.name}`}</span>
             </span>
-            <p className="sub">{tool.description}</p>
+            <p className="sub">{C.description[tool.name]}</p>
             <span className="row wrap">
               <span className="hint">{C.allowedKinds}</span>
               {tool.allowedKinds.map((kind) => (
@@ -36,6 +36,10 @@ export function ToolsPage() {
                 </span>
               ))}
             </span>
+            <details>
+              <summary className="hint">{C.modelDescription}</summary>
+              <p className="hint">{tool.description}</p>
+            </details>
             <details>
               <summary className="hint">{C.inputSchema}</summary>
               <pre className={styles.schema}>{JSON.stringify(tool.inputSchema, null, 2)}</pre>

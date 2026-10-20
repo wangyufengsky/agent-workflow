@@ -217,7 +217,7 @@ class AppError extends Error {
 
 - HTTP 响应：`{ "error": { "code": "TASK_NOT_FOUND", "message": "...", "details": {...} } }`，HTTP 状态取自错误码表。
 - MCP 响应：`{ isError: true, content: [{ type: "text", text: JSON.stringify({ code, message, hint, details }) }] }`。`hint` 写给模型看：怎么改才能成功。
-- `message` 面向开发者（英文）；用户可见文案由前端按 `code` 查 `copy/errors.ts`，查不到时显示通用文案 + code。
+- `message` 面向开发者（英文）；用户可见文案由前端按 `code` 查 `copy/errors.ts`（`Record<ErrorCode, string>`，每个码都有文案，单测校验两表的键一致）。
 - 只有下表中的码；新增必须加表。未预期异常统一为 `INTERNAL_ERROR`，日志记录完整堆栈。
 
 ### 5.2 错误码表（`errors/codes.ts`）

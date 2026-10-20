@@ -26,12 +26,14 @@
     "test:live": "vitest run --project live",
     "e2e": "playwright test --project browser",
     "e2e:electron": "playwright test --project electron",
+    "perf": "playwright test -c playwright.perf.config.ts",
     "verify": "pnpm check && pnpm test && pnpm test:int && pnpm build",
     "verify:full": "pnpm verify && pnpm test:oc && pnpm e2e",
     "build:plugin": "node --disable-warning=ExperimentalWarning scripts/build-opencode-plugin.ts"
   },
   "devDependencies": {
     "@aw/shared": "workspace:*",
+    "@axe-core/playwright": "4.13.0",
     "@biomejs/biome": "2.5.15",
     "@playwright/test": "1.64.1",
     "@types/node": "24.19.2",

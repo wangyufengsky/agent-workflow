@@ -3,6 +3,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { SETTINGS_COPY as C } from '../../copy/settings.ts';
 import { THEME_LABEL } from '../../copy/themes.ts';
+import { AboutPanel } from './about-panel.tsx';
 import { ProSettings } from './pro-settings.tsx';
 import { NumberSetting, Segmented } from './setting-inputs.tsx';
 import { useSettings, useUpdateSettings } from './settings.queries.ts';
@@ -78,6 +79,7 @@ export function SettingsPage() {
         </Panel>
         {isPro && <ProSettings settings={settings} set={set} />}
         {update.isError && <ErrorState error={update.error} />}
+        <AboutPanel />
       </div>
     </div>
   );

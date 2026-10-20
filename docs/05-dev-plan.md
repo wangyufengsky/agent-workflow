@@ -119,6 +119,8 @@
 
 ## M6 · 打磨与发布（1 周）
 
+> 状态：**已完成**（2026-10-21），验收报告见 [16-acceptance-v1.0.md](16-acceptance-v1.0.md)。M6-01：走查即 E2E J9（`walkthrough.browser.spec.ts`），四套主题 × 两种模式 39 个页面状态，自动检查 axe `color-contrast` 与横向溢出，截图写到不提交的 `screenshots/walkthrough/`；找出并修复品牌按钮与 `muted` 文字在悬停 / 选中底色上的对比度（主题单测随之扩大），以及若干界面问题；新增依赖 `@axe-core/playwright`。M6-02：`pnpm perf` 实测（生产构建前端 + FakeOpencode），画布 60 fps；5 MB 会话流首屏 1215 → 52 ms（只解析本页的行、先显示第一页、实时行另存合并，`TranscriptPage.hasMore`）；10 并发任务时实时会话流的任务页 48.6 → 54.2 fps。M6-03：`ERROR_COPY` 为 `Record<ErrorCode, string>` 并有单测，前端不再有「通用文案 + 码」的回退。M6-04：图标、设置页「关于」与 macOS 关于面板、版本 1.0.0、`GET /system/health` 进入 11；未签名 dmg，「干净 Mac」以 dmg 挂载副本 + 全新用户数据目录替代（16 §1）。M6-05：J10 用真实 opencode 与免费模型（生产包中没有 FakeOpencode），取代原先的启动冒烟；live 新增 Java + Maven 示例 `java-inventory` 与 `workflows.live.test.ts`，五个内置流程各跑一次；live 用推断的检查命令；只读白名单加入 `echo` 等（D61），只读角色执行的步骤（代码审查）也放行项目检查命令；只读规则收回 `find -exec` / `-delete`、重定向、`rg --pre`、`git --output` 等写入或执行的写法（D63）；调用模型的测试默认模型改为 `opencode-go/deepseek-v4.1-flash`（D62），beam-free 的结果一并保留在 16。M6-06 另新增「三任务并发合并」E2E 与 MCP 纠错 live 测试。托管平台真实令牌、真正的干净 Mac、截图逐张走查、签名与发布需要用户完成；走查测试的一次偶发失败根因未查明，列为未解决的已知问题（16）。
+
 | # | 任务 | 完成标准 |
 | --- | --- | --- |
 | M6-01 | 四主题 × 全部页面走查（Playwright 截图集，人工检查） | 无对比度与溢出问题 |

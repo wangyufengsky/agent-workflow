@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { OPENCODE_VERSION } from '../../constants/app.ts';
 import { RuntimeStatus } from '../../enums/system.ts';
 import { attemptKindSchema } from '../../enums/task.ts';
+import { McpToolName } from '../mcp/names.ts';
 
 export const healthSchema = z.object({
   status: z.literal('ok'),
@@ -58,7 +59,8 @@ export type RuntimeLogsDTO = z.infer<typeof runtimeLogsSchema>;
 
 /** `GET /mcp/tools` (11 §10): one tool of the execution MCP as the tools page shows it. */
 export const mcpToolInfoSchema = z.object({
-  name: z.string(),
+  name: z.enum(McpToolName),
+  /** Written for the model (English); the page shows its own description per tool name. */
   description: z.string(),
   /** JSON Schema of the input. */
   inputSchema: z.record(z.string(), z.unknown()),

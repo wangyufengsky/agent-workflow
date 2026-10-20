@@ -68,14 +68,19 @@ describe('会话流', () => {
 
     const first = await page(attempt.id, 0);
     expect(first.entries).toHaveLength(TRANSCRIPT_PAGE_SIZE);
-    expect(first).toMatchObject({ lastSeq: TRANSCRIPT_PAGE_SIZE, done: false });
+    expect(first).toMatchObject({ lastSeq: TRANSCRIPT_PAGE_SIZE, hasMore: true, done: false });
 
     const second = await page(attempt.id, first.lastSeq);
     expect(second.entries[0]?.seq).toBe(TRANSCRIPT_PAGE_SIZE + 1);
     expect(kinds(second.entries)).toEqual(['text', 'text', 'tool_call', 'tool_result', 'system']);
-    expect(second.done).toBe(true);
+    expect(second).toMatchObject({ hasMore: false, done: true });
 
-    expect(await page(attempt.id, second.lastSeq)).toEqual({ entries: [], lastSeq: second.lastSeq, done: true });
+    expect(await page(attempt.id, second.lastSeq)).toEqual({
+      entries: [],
+      lastSeq: second.lastSeq,
+      hasMore: false,
+      done: true,
+    });
   });
 
   it('不存在的尝试返回 404 ATTEMPT_NOT_FOUND', async () => {

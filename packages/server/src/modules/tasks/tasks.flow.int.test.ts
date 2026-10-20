@@ -14,6 +14,19 @@ afterEach(async () => {
   await t.close();
 });
 
+describe('只读角色执行的步骤', () => {
+  it('代码审查步骤（评审者角色）的会话也可不经询问运行项目检查命令（D51、D61）', async () => {
+    const { project } = await addProject(t, { checkCommand: 'mvn -q test' });
+    t.fake.enqueue(script().callTool('submit_result', { summary: 'No issues' }), { title: '· 代码审查' });
+    const review = taskReaches(t, 'review');
+    await createTask(t, { projectId: project.id, workflow: 'code_review' });
+    await review;
+    const session = t.fake.sessions.find((s) => s.title.includes('· 代码审查'));
+    expect(session?.agent).toBe('aw-reviewer');
+    expect(session?.permission).toContainEqual({ permission: 'bash', pattern: 'mvn -q test*', action: 'allow' });
+  });
+});
+
 describe('任务主链路（新功能开发，简单模式）', () => {
   it('规划 → 并行执行两个步骤 → 整体验证（命令 + AI 评审）→ 待合并，结果卡含改动、检查与摘要', async () => {
     const { project } = await addProject(t, { checkCommand: 'test -f greet.ts' });
