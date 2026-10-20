@@ -24,7 +24,7 @@ export const spdbTheme: ThemeDefinition = {
     ink: '#1c2745',
     'ink-2': '#2b3858',
     sub: '#4e5d78',
-    muted: '#5b6983',
+    muted: '#576580',
     faint: '#9aa5b8',
     accent: '#004790',
     'accent-ink': '#00356b',

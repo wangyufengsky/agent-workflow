@@ -24,7 +24,7 @@ export const warmTheme: ThemeDefinition = {
     ink: '#2b2925',
     'ink-2': '#3a3731',
     sub: '#655f55',
-    muted: '#6f685d',
+    muted: '#686157',
     faint: '#a39b8e',
     accent: '#89583f',
     'accent-ink': '#6b432f',

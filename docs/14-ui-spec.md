@@ -212,7 +212,7 @@ export type ThemeDefinition = {
 - 切换：设置 `ui.theme` 变更 → `applyTheme()` 即时生效，无需刷新；`system` 时监听 `prefers-color-scheme`。
 - React Flow 的连线、节点、小地图颜色，diff 增删色，代码高亮主题都从当前主题取值。
 - 新增主题 = 新增一个 `themes/*.ts` + 在 `ThemeId` 枚举与 registry 中登记；类型系统保证令牌齐全。
-- 每套主题在单测中校验：正文/次要文字在 `bg`/`panel` 上对比度 ≥ 4.5:1，状态文字在其 fill 上 ≥ 4.5:1（沿用设计稿已校验的约束）。
+- 每套主题在单测中校验：正文/次要文字在 `bg`/`panel`/`sidebar` 及其上叠加的悬停、选中底色（`fill-1`–`fill-3`、`accent-fill`）和外框装饰渐变最浓处上对比度 ≥ 4.5:1，状态文字在其 fill 上 ≥ 4.5:1，主按钮与品牌按钮（含悬停）文字 ≥ 4.5:1（沿用设计稿已校验的约束）。渲染后的页面另由 E2E 走查（J9）用 axe 的 `color-contrast` 规则在四套主题下逐页检查（M6-01）。
 
 ## 5. 流程画布（React Flow）
 

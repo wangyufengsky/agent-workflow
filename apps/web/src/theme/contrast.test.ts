@@ -39,17 +39,41 @@ function contrast(a: Rgba, b: Rgba): number {
 }
 
 const TEXT: ThemeTokenName[] = ['ink', 'ink-2', 'sub', 'muted'];
-const SURFACES: ThemeTokenName[] = ['bg', 'panel'];
+const SURFACES: ThemeTokenName[] = ['bg', 'panel', 'sidebar'];
+/** Tints laid over a surface under text: hover and pressed rows, selected cards and chips. */
+const TINTS: ThemeTokenName[] = ['fill-1', 'fill-2', 'fill-3', 'accent-fill'];
 const MIN = 4.5;
 
 describe.each(THEME_IDS)('主题 %s 对比度', (id) => {
   const tokens = THEMES[id].tokens;
   const color = (name: ThemeTokenName) => parseColor(tokens[name]);
 
-  it('正文与次要文字在 bg / panel 上 ≥ 4.5:1', () => {
+  it('正文与次要文字在 bg / panel / sidebar 及其上的悬停、选中底色上 ≥ 4.5:1', () => {
     for (const surface of SURFACES) {
+      const backgrounds = [
+        [surface, color(surface)] as const,
+        ...TINTS.map((tint) => [`${tint} over ${surface}`, over(color(tint), color(surface))] as const),
+      ];
+      for (const [name, background] of backgrounds) {
+        for (const text of TEXT) {
+          expect(contrast(color(text), background), `${text} on ${name}`).toBeGreaterThanOrEqual(MIN);
+        }
+      }
+    }
+  });
+
+  // The shell layers a decorative gradient over its solid colour (base.css: main = glow over bg, sidebar = glass over
+  // sidebar); text has to stay readable where the gradient is strongest. The E2E walkthrough leaves them to this test.
+  it('正文与次要文字在外框渐变最浓处 ≥ 4.5:1', () => {
+    for (const [gradient, base] of [
+      ['glow', 'bg'],
+      ['glass', 'sidebar'],
+    ] as const) {
+      const stops = (tokens[gradient].match(/rgba\([^)]+\)/g) ?? []).map(parseColor);
+      const strongest = stops.reduce((a, b) => (b[3] > a[3] ? b : a));
+      const surface = over(strongest, color(base));
       for (const text of TEXT) {
-        expect(contrast(color(text), color(surface)), `${text} on ${surface}`).toBeGreaterThanOrEqual(MIN);
+        expect(contrast(color(text), surface), `${text} on ${gradient} over ${base}`).toBeGreaterThanOrEqual(MIN);
       }
     }
   });
@@ -61,7 +85,10 @@ describe.each(THEME_IDS)('主题 %s 对比度', (id) => {
     }
   });
 
-  it('主按钮文字 ≥ 4.5:1', () => {
+  it('主按钮与品牌按钮文字（含悬停）≥ 4.5:1', () => {
     expect(contrast(color('primary-ink'), color('primary-bg'))).toBeGreaterThanOrEqual(MIN);
+    for (const fill of ['brand', 'brand-hover'] as const) {
+      expect(contrast(color('on-brand'), color(fill)), `on-brand on ${fill}`).toBeGreaterThanOrEqual(MIN);
+    }
   });
 });

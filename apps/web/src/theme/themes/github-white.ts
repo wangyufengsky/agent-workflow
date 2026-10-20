@@ -24,7 +24,7 @@ export const githubWhiteTheme: ThemeDefinition = {
     ink: '#1f2328',
     'ink-2': '#31363c',
     sub: '#59636e',
-    muted: '#636c76',
+    muted: '#606974',
     faint: '#9ea7b1',
     accent: '#0969da',
     'accent-ink': '#0550ae',
