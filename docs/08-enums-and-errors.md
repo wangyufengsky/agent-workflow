@@ -83,6 +83,9 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DeliveryStrategy` | `squash` · `merge` · `rebase` · `pull_request` · `report_only` |
 | `DeliveryStatus` | `running` · `succeeded` · `conflict` · `failed` |
 | `HostingProvider` | `github` · `gitlab` |
+| `ChangeRequestReason` | `user`（让 AI 再改改）· `conflict`（交给 AI 解决冲突）；`request-changes` 的 `reason` |
+
+`LOCAL_MERGE_STRATEGIES`（`squash` / `merge` / `rebase`，即 `delivery.defaultStrategy` 的取值）与 `isLocalMerge` 在同一文件。
 
 ### 2.5 需要你处理（Inbox）
 
@@ -270,8 +273,10 @@ class AppError extends Error {
 | `INBOX_ITEM_NOT_FOUND` | 404 | |
 | `INBOX_ITEM_CLOSED` | 409 | 条目已处理 |
 | **交付** | | |
-| `DELIVERY_CONFLICT` | 409 | 合并冲突；`details.files[]` |
+| `DELIVERY_CONFLICT` | 409 | 合并冲突；`details.files[]`（记录在冲突的 delivery 的 `error` 上，`deliver` 本身返回任务 DTO） |
 | `DELIVERY_TARGET_NOT_FOUND` | 400 | 目标分支不存在 |
+| `DELIVERY_TARGET_DIRTY` | 409 | 目标分支检出在某个工作区（通常是用户的主工作区）且有未提交改动，拒绝合并；`details: { path, branch, files[] }` |
+| `DELIVERY_INTERRUPTED` | — | 应用在交付过程中退出（记录在 delivery 上，重启后任务回到 `review`） |
 | **数据库** | | |
 | `DB_CONNECTION_NOT_FOUND` | 404 | |
 | `DB_CONNECTION_FAILED` | 502 | `details.driverMessage` |

@@ -98,6 +98,11 @@ describe('任务主链路（新功能开发，简单模式）', () => {
     // The requirement and the required last step reached the sessions as specified.
     const planner = t.fake.sessions.find((s) => s.agent === 'aw-planner');
     expect(planner).toMatchObject({ title: 'T-1 · Add a greeting module', directory: worktree });
+    // Read-only sessions run the project check without asking the user.
+    const reviewer = t.fake.sessions.find((s) => s.agent === 'aw-reviewer');
+    for (const session of [planner, reviewer]) {
+      expect(session?.permission).toContainEqual({ permission: 'bash', pattern: 'test -f greet.ts*', action: 'allow' });
+    }
     const verify = t.fake.prompts.find((p) => p.text.includes('Your step: 整体验证'));
     expect(verify?.system).toContain('Role: tester');
     const timeline = (await t.call(getTaskTimelineOp, { id: task.id })).body.items;

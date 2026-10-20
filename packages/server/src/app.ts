@@ -24,7 +24,9 @@ import {
   unavailableCipher,
 } from './modules/credentials/index.ts';
 import { createDebugModule } from './modules/debug/index.ts';
+import { createDeliveryModule } from './modules/delivery/index.ts';
 import { createRepoLocks } from './modules/git/index.ts';
+import { type HostingEndpoints, PUBLIC_HOSTING } from './modules/hosting/index.ts';
 import { createInboxModule, type InboxService } from './modules/inbox/index.ts';
 import { createMcpModule } from './modules/mcp/index.ts';
 import { createNodesModule, type NodesService } from './modules/nodes/index.ts';
@@ -37,6 +39,7 @@ import {
 } from './modules/opencode/index.ts';
 import { createPlansModule } from './modules/plans/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
+import { createRepositoryModule } from './modules/repository/index.ts';
 import { createRolesModule, type RolesService } from './modules/roles/index.ts';
 import { createScheduler } from './modules/scheduler/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
@@ -56,6 +59,8 @@ export type AppDeps = {
   env?: NodeJS.ProcessEnv;
   /** Replaces the hosted opencode (FakeOpencode in tests and browser E2E); the runtime is then never started. */
   opencode?: OpencodeClient;
+  /** GitHub / GitLab API addresses (FakeHosting in tests); the public platforms by default. */
+  hosting?: HostingEndpoints;
 };
 
 export type App = {
@@ -132,7 +137,12 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     if (hosting) await runtime.startIfStopped();
   };
   const system = createSystemModule({ config, env, runtime, opencode, startRuntime: startHostedRuntime });
-  const projects = createProjectsModule({ db: database.db, clock });
+  const projects = createProjectsModule({
+    db: database.db,
+    clock,
+    credentials: credentials.service,
+    hosting: deps.hosting ?? PUBLIC_HOSTING,
+  });
   // Built-in roles and workflows of this app version are written on every start (13).
   const roles = createRolesModule({ db: database.db, clock, log });
   roles.service.syncBuiltin(loadBuiltinRoles(config.promptsDir));
@@ -160,6 +170,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     dataDir: config.dataDir,
   });
   const plans = createPlansModule({ db: database.db, unit, clock, log });
+  const deliveries = createDeliveryModule({ db: database.db, unit, clock, log });
   const acceptance = createAcceptanceModule({
     attempts: attempts.service,
     roles: roles.service,
@@ -197,6 +208,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     nodes: nodes.service,
     attempts: attempts.service,
     inbox: inbox.service,
+    deliveries: deliveries.service,
+    locks,
     dataDir: config.dataDir,
   });
   const scheduler = createScheduler({
@@ -205,6 +218,13 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     attempts: attempts.service,
     settings: settings.service,
     events,
+    log,
+  });
+  const repository = createRepositoryModule({
+    projects: projects.service,
+    tasks: tasks.service,
+    worktrees: worktrees.service,
+    locks,
     log,
   });
   const debug = createDebugModule({ attempts: attempts.service, settings: settings.service, prompts });
@@ -228,6 +248,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...plans.operations,
     ...inbox.operations,
     ...attempts.operations,
+    ...repository.operations,
     // The debug entry exists in development builds only (M2-09).
     ...(config.nodeEnv === 'production' ? [] : debug.operations),
   ]);

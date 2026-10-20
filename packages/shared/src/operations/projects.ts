@@ -3,6 +3,7 @@ import {
   createProjectRequestSchema,
   projectDetailSchema,
   projectSchema,
+  setHostingRequestSchema,
   updateProjectRequestSchema,
 } from '../contracts/api/projects.ts';
 import { OperationRisk } from '../enums/system.ts';
@@ -71,6 +72,32 @@ export const deleteProjectOp = defineOperationContract({
   output: z.void(),
   risk: OperationRisk.Critical,
   http: { method: 'DELETE', path: '/projects/:id' },
+  expose: { palette: false, assistant: true },
+  credentialFields: [],
+  mode: UiMode.Simple,
+});
+
+export const setProjectHostingOp = defineOperationContract({
+  id: 'projects.setHosting',
+  title: 'op.projects.setHosting',
+  description: 'Bind the project to its GitHub or GitLab repository with an access token (verified first)',
+  input: setHostingRequestSchema,
+  output: projectDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'PUT', path: '/projects/:id/hosting' },
+  expose: { palette: false, assistant: true },
+  credentialFields: ['token'],
+  mode: UiMode.Simple,
+});
+
+export const clearProjectHostingOp = defineOperationContract({
+  id: 'projects.clearHosting',
+  title: 'op.projects.clearHosting',
+  description: 'Unbind the project from its hosting repository and delete the stored token',
+  input: byId,
+  output: projectDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'DELETE', path: '/projects/:id/hosting' },
   expose: { palette: false, assistant: true },
   credentialFields: [],
   mode: UiMode.Simple,

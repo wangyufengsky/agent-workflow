@@ -43,6 +43,13 @@
       "when": 1792497419318,
       "tag": "0005_task_pipeline",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792503430060,
+      "tag": "0006_deliveries",
+      "breakpoints": true
     }
   ]
 }

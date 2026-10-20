@@ -86,6 +86,16 @@
   font-size: 13px;
 }
 
+.fileLink {
+  text-align: left;
+  color: var(--ink-2);
+}
+
+.fileLink:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 .add {
   color: var(--ok);
   font-variant-numeric: tabular-nums;

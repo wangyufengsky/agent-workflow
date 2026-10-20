@@ -53,6 +53,8 @@ export function HomePage() {
         <StartTaskForm
           projects={projects}
           projectId={projectId ?? ''}
+          initialWorkflowKey={search.workflow}
+          initialRequirement={search.requirement}
           onProjectChange={(id) => void navigate({ search: { projectId: id }, replace: true })}
         />
       )}

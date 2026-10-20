@@ -243,7 +243,16 @@ stateDiagram-v2
 
 同一事务内对应的任务事件：`succeeded` → `delivery_succeeded`；`conflicted` → `delivery_conflict`（`details.files`）；`failed` → `delivery_failed`。
 
-本地合并流程（`squash` 为例）：在**主仓库**（不是 worktree）检查目标分支是否检出且干净 → 若用户主工作区当前分支即目标分支且有未提交改动，则失败并提示（不碰用户改动）→ `git merge --squash` → 提交 → 删除 worktree / 分支。冲突时 `git merge --abort` 恢复原状再报告冲突文件。
+本地合并流程（`delivery.merge.ts`，D52）：
+
+1. 检查（任一不满足即返回错误，不建 delivery、不改状态）：目标分支存在（`DELIVERY_TARGET_NOT_FOUND`）；任务 worktree 没有未提交改动（`WORKTREE_DIRTY`）；目标分支检出所在的工作区（通常是用户的主工作区）干净，否则 `DELIVERY_TARGET_DIRTY`（不碰用户改动）。
+2. 建 delivery（`running`），任务 `deliver → merging`。
+3. 在仓库锁内、在**主仓库**中合并：目标分支检出在哪个工作区就在哪里合并（用户主工作区在目标分支上时其文件随之更新）；没有检出时在临时 worktree 中合并后删除。提交者为 `GIT_COMMIT_IDENTITY`、`--no-verify`、关闭签名（同 D48）。
+   - `squash`：`git merge --squash` → 提交「<任务标题> (<任务编号>)」；目标分支已含全部改动时不提交。冲突时 `git reset --merge`（squash 没有 MERGE_HEAD，`merge --abort` 不可用）。
+   - `merge`：`git merge --no-ff -m …`；冲突时 `git merge --abort`。
+   - `rebase`：在任务 worktree 中 `git rebase <target>`（任务分支已包含目标分支时跳过，例如解决冲突时已合入），再在目标处 `git merge --ff-only`；冲突时 `git rebase --abort`。
+4. 成功 → `succeeded`（`commit_sha` 为目标分支新提交）+ 任务 `completed`，交付条目 resolved；之后删除 worktree，按 `delivery.deleteBranchAfterMerge` 删除分支（删除失败只记在 worktree 上）。冲突 → 恢复原状，`conflicted`（`conflict_files`）+ 任务回 `review`。其他 git 失败 → `failed` + 任务回 `review`。
+5. 重启时仍为 `running` 的 delivery 记为 `failed`（`DELIVERY_INTERRUPTED`），任务回 `review`。
 
 ## 8. 需要你处理 Inbox
 

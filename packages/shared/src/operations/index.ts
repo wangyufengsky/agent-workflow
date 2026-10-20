@@ -1,8 +1,29 @@
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
 import { startDebugAttemptOp } from './debug.ts';
 import type { OperationContract } from './define.ts';
+import {
+  gitBranchesOp,
+  gitCommitOp,
+  gitDiffFileOp,
+  gitDiffOp,
+  gitFetchOp,
+  gitFileOp,
+  gitLogOp,
+  gitStatusOp,
+  gitTreeOp,
+  listWorktreesOp,
+  pruneWorktreesOp,
+} from './git.ts';
 import { countInboxOp, dismissInboxOp, listInboxOp, resolveInboxOp } from './inbox.ts';
-import { createProjectOp, deleteProjectOp, getProjectOp, listProjectsOp, updateProjectOp } from './projects.ts';
+import {
+  clearProjectHostingOp,
+  createProjectOp,
+  deleteProjectOp,
+  getProjectOp,
+  listProjectsOp,
+  setProjectHostingOp,
+  updateProjectOp,
+} from './projects.ts';
 import { getSettingsOp, updateSettingsOp } from './settings.ts';
 import { getEnvironmentOp, getHealthOp, getRuntimeOp, recheckEnvironmentOp, restartRuntimeOp } from './system.ts';
 import {
@@ -10,23 +31,30 @@ import {
   cancelTaskOp,
   confirmPlanOp,
   createTaskOp,
+  deliverTaskOp,
   getNodeOp,
   getPlanOp,
   getTaskOp,
   getTaskTimelineOp,
   listPlansOp,
   listTasksOp,
+  nodeDiffFileOp,
+  nodeDiffOp,
   rejectNodeOp,
   replanOp,
+  requestChangesOp,
   retryNodeOp,
   retryTaskOp,
   startTaskOp,
+  taskDiffFileOp,
+  taskDiffOp,
 } from './tasks.ts';
 import { getWorkflowOp, listRolesOp, listWorkflowsOp, updateRoleOp, updateWorkflowOp } from './workflows.ts';
 
 export * from './attempts.ts';
 export * from './debug.ts';
 export * from './define.ts';
+export * from './git.ts';
 export * from './inbox.ts';
 export * from './projects.ts';
 export * from './settings.ts';
@@ -48,6 +76,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getProjectOp,
   updateProjectOp,
   deleteProjectOp,
+  setProjectHostingOp,
+  clearProjectHostingOp,
   getAttemptOp,
   abortAttemptOp,
   startDebugAttemptOp,
@@ -71,8 +101,25 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   acceptNodeOp,
   rejectNodeOp,
   retryNodeOp,
+  taskDiffOp,
+  taskDiffFileOp,
+  nodeDiffOp,
+  nodeDiffFileOp,
+  deliverTaskOp,
+  requestChangesOp,
   listInboxOp,
   countInboxOp,
   resolveInboxOp,
   dismissInboxOp,
+  gitStatusOp,
+  gitBranchesOp,
+  gitLogOp,
+  gitCommitOp,
+  gitDiffOp,
+  gitDiffFileOp,
+  gitTreeOp,
+  gitFileOp,
+  gitFetchOp,
+  listWorktreesOp,
+  pruneWorktreesOp,
 ];

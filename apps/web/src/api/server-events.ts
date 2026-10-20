@@ -33,6 +33,7 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
     case ServerEventType.NodeUpdated:
       return updateNode(qc, event.data.taskId, event.data.node);
     case ServerEventType.PlanUpdated:
+    case ServerEventType.DeliveryUpdated:
       return qc.invalidateQueries({ queryKey: queryKeys.task(event.data.taskId), exact: true });
     case ServerEventType.InboxUpdated:
       return updateInbox(qc, event.data.openCount);

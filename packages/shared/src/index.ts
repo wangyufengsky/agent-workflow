@@ -3,6 +3,8 @@ export * from './constants/limits.ts';
 export * from './constants/opencode.ts';
 export * from './constants/settings.ts';
 export * from './contracts/api/attempts.ts';
+export * from './contracts/api/delivery.ts';
+export * from './contracts/api/git.ts';
 export * from './contracts/api/inbox.ts';
 export * from './contracts/api/projects.ts';
 export * from './contracts/api/system.ts';

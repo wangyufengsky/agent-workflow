@@ -67,7 +67,20 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
   };
 }
 
-/** Bash rules passed to `session.create` (D35): read-only for planner and reviewer, `ai.bashPolicy` for executors. */
-export function sessionPermissionRules(base: RoleBaseAgent, bashPolicy: BashPolicy): PermissionRule[] {
-  return [...BASH_PERMISSION_PRESETS[base === RoleBaseAgent.Executor ? bashPolicy : 'readonly']];
+/**
+ * Bash rules passed to `session.create` (D35): read-only for planner and reviewer, `ai.bashPolicy` for executors.
+ * Read-only sessions may also run `checkCommands` (the project check and the node's command checks) without asking:
+ * running the checks is how a planner or reviewer learns the state of the code, and asking would interrupt the user
+ * on every review. The rules go last because opencode applies the last matching rule.
+ */
+export function sessionPermissionRules(
+  base: RoleBaseAgent,
+  bashPolicy: BashPolicy,
+  checkCommands: readonly string[] = [],
+): PermissionRule[] {
+  if (base === RoleBaseAgent.Executor) return [...BASH_PERMISSION_PRESETS[bashPolicy]];
+  const checks = [...new Set(checkCommands)].map(
+    (command): PermissionRule => ({ permission: 'bash', pattern: `${command}*`, action: 'allow' }),
+  );
+  return [...BASH_PERMISSION_PRESETS.readonly, ...checks];
 }

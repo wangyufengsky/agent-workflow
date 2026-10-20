@@ -1,6 +1,7 @@
 import { AcceptanceCheckKind, AttemptKind, type CheckResult, type NodeDetailDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
+import { DiffBrowser } from '../../components/diff/diff-browser.tsx';
 import { Drawer } from '../../components/drawer.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
@@ -10,7 +11,7 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { NODE_COPY as C } from '../../copy/tasks.ts';
 import { TranscriptView } from '../attempts/transcript-view.tsx';
 import { NodeBadge } from '../tasks/task-badge.tsx';
-import { nodeQuery } from '../tasks/tasks.queries.ts';
+import { nodeDiffFileQuery, nodeDiffQuery, nodeQuery } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
 
 function Check({ check }: { check: CheckResult }) {
@@ -86,11 +87,10 @@ function Output({ node }: { node: NodeDetailDTO }) {
 
 function Changes({ node }: { node: NodeDetailDTO }) {
   const changes = node.result?.changes ?? [];
+  const diff = useQuery(nodeDiffQuery(node.taskId, node.id));
   return (
     <div className="col">
-      {changes.length === 0 ? (
-        <p className="hint">{C.changesEmpty}</p>
-      ) : (
+      {changes.length > 0 && (
         <ul className={styles.files}>
           {changes.map((c) => (
             <li key={c.path} className={styles.file}>
@@ -100,8 +100,18 @@ function Changes({ node }: { node: NodeDetailDTO }) {
           ))}
         </ul>
       )}
-      {node.commitSha !== null && <span className="chip mono">{C.commit(node.commitSha)}</span>}
-      <span className="hint">{C.diffLater}</span>
+      {node.commitSha === null ? (
+        <p className="hint">{C.changesEmpty}</p>
+      ) : (
+        <>
+          <span className="chip mono">{C.commit(node.commitSha)}</span>
+          {diff.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
+          {diff.isError && <ErrorState error={diff.error} onRetry={() => void diff.refetch()} />}
+          {diff.data !== undefined && (
+            <DiffBrowser files={diff.data.files} fileQuery={nodeDiffFileQuery(node.taskId, node.id)} />
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -146,7 +156,7 @@ export function NodeDrawer({
       open={nodeId !== undefined}
       onOpenChange={(open) => !open && onClose()}
       title={node.data?.title ?? ''}
-      size="lg"
+      size="wide"
     >
       {node.isPending && nodeId !== undefined && <p className="hint">{COMMON_COPY.loading}</p>}
       {node.isError && <ErrorState error={node.error} onRetry={() => void node.refetch()} />}

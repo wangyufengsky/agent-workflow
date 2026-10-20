@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DeliveryStrategy } from '../enums/git.ts';
+import { DeliveryStrategy, localMergeStrategySchema } from '../enums/git.ts';
 import { BashPolicy, bashPolicySchema } from '../enums/system.ts';
 import { ThemePreference, themePreferenceSchema, UiMode, uiModeSchema } from '../enums/ui.ts';
 
@@ -18,7 +18,7 @@ export const settingsSchema = z.strictObject({
   /** Absolute directory; null means `<data dir>/worktrees`. */
   'worktree.rootDir': z.string().min(1).nullable(),
   /** Strategy of the result card's primary「合并」button; pull requests have their own button. */
-  'delivery.defaultStrategy': z.enum([DeliveryStrategy.Squash, DeliveryStrategy.Merge, DeliveryStrategy.Rebase]),
+  'delivery.defaultStrategy': localMergeStrategySchema,
   'delivery.deleteBranchAfterMerge': z.boolean(),
   /** null looks the binary up on PATH and in `~/.opencode/bin`. */
   'opencode.binaryPath': z.string().min(1).nullable(),

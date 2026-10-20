@@ -35,6 +35,8 @@ export type NodeRunContext = {
   directory: string;
   /** The project repository, whose lock guards ref changes (D37). */
   repoPath: string;
+  /** The project check command, which a reviewer may run without asking (12 §2). */
+  checkCommand: string | null;
   askOnUncertainty: boolean;
 };
 

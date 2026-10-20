@@ -1,14 +1,17 @@
 import {
   createProjectOp,
   createTaskOp,
+  getTaskOp,
   type InboxItemDTO,
   listWorkflowsOp,
   type NodeStatus,
   ServerEventType,
+  startTaskOp,
   type TaskDetailDTO,
   type TaskStatus,
   updateProjectOp,
 } from '@aw/shared';
+import { script } from '../fakes/fake-opencode.ts';
 import type { TestApp } from './app.ts';
 import { waitForEvent } from './events.ts';
 import { createTestRepo, type TestRepo } from './git.ts';
@@ -95,3 +98,37 @@ export const finalVerify = (dependsOn: string[]): PlanNodeArgs => ({
   role: 'tester',
   depends_on: dependsOn,
 });
+
+/**
+ * A bug-fix task (fixed workflow: locate → fix with AI review) whose fix step writes `edits`, run until it waits for
+ * delivery. Scripts are matched by the task's worktree directory, so several tasks may use this one after another.
+ */
+export async function taskInReview(
+  t: TestApp,
+  projectId: string,
+  edits: Record<string, string>,
+  requirement = 'Fix the greeting',
+): Promise<TaskDetailDTO> {
+  const fix = script();
+  for (const [file, content] of Object.entries(edits)) fix.edit(file, content);
+  const task = await createTask(t, { projectId, workflow: 'bugfix', requirement, start: false });
+  const review = waitForEvent(
+    t.app.events,
+    ServerEventType.TaskUpdated,
+    (d) => d.id === task.id && d.status === 'review',
+  );
+  const directory = `/${task.key}`;
+  t.fake.enqueue(script().callTool('submit_result', { summary: 'Located the cause' }), {
+    title: '· 定位根因',
+    directory,
+  });
+  t.fake.enqueue(fix.callTool('submit_result', { summary: `Fixed: ${requirement}` }), { title: '· 修复', directory });
+  t.fake.enqueue(script().callTool('submit_review', { verdict: 'pass', summary: 'Looks right' }), {
+    agent: 'aw-reviewer',
+    directory,
+  });
+  await t.call(startTaskOp, { id: task.id });
+  await review;
+  await t.fake.settled();
+  return (await t.call(getTaskOp, { id: task.id })).body;
+}

@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { deliverRequestSchema, requestChangesSchema } from '../contracts/api/delivery.ts';
+import { diffSchema, fileDiffSchema } from '../contracts/api/git.ts';
 import {
   createTaskRequestSchema,
   listTasksQuerySchema,
@@ -181,4 +183,72 @@ export const retryNodeOp = defineOperationContract({
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/nodes/:nodeId/retry' },
   mode: UiMode.Pro,
+});
+
+export const taskDiffOp = defineOperationContract({
+  ...common,
+  id: 'tasks.diff',
+  title: 'op.tasks.diff',
+  description: 'Files the task changed (committed or not) against the merge base of its branch and the target branch',
+  input: byId,
+  output: diffSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/diff' },
+});
+
+export const taskDiffFileOp = defineOperationContract({
+  ...common,
+  id: 'tasks.diffFile',
+  title: 'op.tasks.diffFile',
+  description: 'Unified diff of one file the task changed',
+  input: z.object({ id: z.string(), path: z.string().min(1) }),
+  output: fileDiffSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/diff/file' },
+});
+
+export const nodeDiffOp = defineOperationContract({
+  ...common,
+  id: 'nodes.diff',
+  title: 'op.nodes.diff',
+  description: "Files changed by a step's commit",
+  input: byNode,
+  output: diffSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/nodes/:nodeId/diff' },
+});
+
+export const nodeDiffFileOp = defineOperationContract({
+  ...common,
+  id: 'nodes.diffFile',
+  title: 'op.nodes.diffFile',
+  description: "Unified diff of one file in a step's commit",
+  input: z.object({ id: z.string(), nodeId: z.string(), path: z.string().min(1) }),
+  output: fileDiffSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/nodes/:nodeId/diff/file' },
+});
+
+export const deliverTaskOp = defineOperationContract({
+  ...common,
+  id: 'tasks.deliver',
+  title: 'op.tasks.deliver',
+  description:
+    'Deliver a task waiting for review: merge its branch locally (squash / merge / rebase), push it and open a pull request, or (report workflows) finish it',
+  input: deliverRequestSchema,
+  output: taskDetailSchema,
+  risk: OperationRisk.Critical,
+  http: { method: 'POST', path: '/tasks/:id/deliver' },
+});
+
+export const requestChangesOp = defineOperationContract({
+  ...common,
+  id: 'tasks.requestChanges',
+  title: 'op.tasks.requestChanges',
+  description:
+    'Send a task waiting for review back to the AI: a new step makes the requested changes (reason user) or resolves the merge conflict (reason conflict)',
+  input: requestChangesSchema,
+  output: taskDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/request-changes' },
 });

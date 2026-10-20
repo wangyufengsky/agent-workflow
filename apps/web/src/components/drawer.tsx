@@ -7,7 +7,7 @@ type DrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
-  size?: 'md' | 'lg' | 'xl';
+  size?: 'md' | 'lg' | 'xl' | 'wide';
   children: ReactNode;
   footer?: ReactNode;
 };

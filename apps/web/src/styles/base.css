@@ -40,6 +40,7 @@
   --drawer-md: 480px;
   --drawer-lg: 520px;
   --drawer-xl: 600px;
+  --drawer-wide: min(1120px, 92vw);
   --read-max: 800px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --t-fast: 0.15s;
@@ -1106,6 +1107,9 @@ button.card:hover,
 }
 .drawer.xl {
   width: var(--drawer-xl);
+}
+.drawer.wide {
+  width: var(--drawer-wide);
 }
 .drawer-head {
   flex: none;

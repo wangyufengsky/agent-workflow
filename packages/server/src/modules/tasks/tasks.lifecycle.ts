@@ -31,6 +31,9 @@ import type { Worktree } from '../worktrees/index.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
+/** The project check a read-only session may run without asking, if the project has one. */
+const checkCommandsOf = (checkCommand: string | null): string[] => (checkCommand === null ? [] : [checkCommand]);
+
 const firstLine = (text: string) => text.trim().split('\n')[0]?.trim() ?? '';
 
 /** Where a retry continues for each failed phase (09 §2). */
@@ -247,6 +250,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
         title: `${task.key} · ${task.title}`,
         model: planner.model ?? settings.get('ai.defaultModel'),
         system: planner.prompt,
+        checkCommands: checkCommandsOf(projects.getRecord(task.projectId).checkCommand),
         prompt: renderTemplate(prompts[PromptName.StartPlan], {
           taskKey: task.key,
           taskTitle: task.title,

@@ -87,6 +87,8 @@
 
 ## M4 · 交付与 Git（1.5 周）
 
+> 状态：**已完成**（2026-10-20）。与计划的差异：Git 管理台的任意 ref 比较拆为 `/git/diff`（文件列表）与 `/git/diff/file`（单文件），步骤 diff 另有单文件接口；任务 diff 与结果卡相对任务分支与目标分支的 merge-base（解决冲突合入目标分支后不计入目标分支的改动）；本地合并在目标分支检出的工作区或临时 worktree 中进行，`deliver` 在冲突与失败时也返回任务 DTO（D52）；PR 推送到 `origin`，令牌经环境变量传给 git（D53）；diff 视图自写 + shiki，未引入 `@git-diff-view/react`（D54）；`lastDelivery` 只描述本轮待合并；worktree 路径按 git 的方式存为解析符号链接后的路径。新增错误码 `DELIVERY_TARGET_DIRTY`、`DELIVERY_INTERRUPTED`，枚举 `ChangeRequestReason`。顺带：规划与评审会话可不经询问运行项目检查命令（D51）。托管平台的 live 测试在提供令牌与仓库的环境变量时才验证真实令牌与创建 PR（07 §6）。
+
 | # | 任务 | 完成标准 |
 | --- | --- | --- |
 | M4-01 | git 模块：status、branches、log、show、diff、tree、file、fetch 的解析器 | 单测：解析器用真实 git 输出样本；集成测试用临时仓库 |

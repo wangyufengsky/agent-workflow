@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { mkdir, realpath } from 'node:fs/promises';
+import { join } from 'node:path';
 import {
   AppError,
   BRANCH_PREFIX,
@@ -87,14 +87,18 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
 
   return {
     findByTask: (taskId: string): Worktree | undefined => repo.findByTask(taskId),
+    listByProject: (projectId: string): Worktree[] => repo.listByProject(projectId),
 
     /** `<root>/<projectSlug>/<taskKey>` on a new branch from the base branch's current commit. */
     async create(input: CreateWorktreeInput): Promise<Worktree> {
       const root = settings.get('worktree.rootDir') ?? join(dataDir, 'worktrees');
-      const path = join(root, input.projectSlug, input.taskKey);
+      const parent = join(root, input.projectSlug);
       const branch = branchName(input.taskKey, input.title);
       return locks.run(input.repoPath, async () => {
         const cwd = input.repoPath;
+        // Stored with symlinks resolved, as git reports it (`git worktree list`), so the two can be matched.
+        await mkdir(parent, { recursive: true });
+        const path = join(await realpath(parent), input.taskKey);
         const { stdout } = await runGit(['rev-parse', '--verify', `refs/heads/${input.baseBranch}^{commit}`], { cwd });
         const id = randomUUID();
         repo.insert({
@@ -110,7 +114,6 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
           removedAt: null,
         });
         try {
-          await mkdir(dirname(path), { recursive: true });
           await runGit(['worktree', 'add', '-b', branch, path, stdout.trim()], { cwd });
         } catch (err) {
           if (!(err instanceof AppError)) throw err;

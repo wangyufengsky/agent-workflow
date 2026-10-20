@@ -16,6 +16,7 @@ import {
   WorktreeStatus,
 } from '@aw/shared';
 import { diffWorktree, diffWorktreeFile } from '../git/index.ts';
+import { taskDiffBase } from './tasks.diff.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
@@ -169,8 +170,10 @@ export function createTaskContext(deps: TasksServiceDeps, state: TaskState) {
 
     /** `get_task_diff` (12 §6.3): the worktree, committed or not, against the base commit. */
     async taskDiff(attempt: AttemptDTO, path: string | undefined): Promise<TaskDiffOutput> {
-      const worktree = readyWorktree(taskOf(attempt));
-      const files = await diffWorktree(worktree.path, worktree.baseCommit);
+      const task = taskOf(attempt);
+      const worktree = readyWorktree(task);
+      const base = await taskDiffBase(worktree.path, task.baseBranch);
+      const files = await diffWorktree(worktree.path, base);
       if (path === undefined) return { files };
       const file = files.find((f) => f.path === path);
       if (file === undefined) {
@@ -178,7 +181,7 @@ export function createTaskContext(deps: TasksServiceDeps, state: TaskState) {
           issues: [{ path: ['path'], message: 'not a changed file; call without path to list them' }],
         });
       }
-      return { path, diff: await diffWorktreeFile(worktree.path, worktree.baseCommit, path) };
+      return { path, diff: await diffWorktreeFile(worktree.path, base, path) };
     },
 
     /** `ask_user` (12 §6.7): ask, or record the model's assumption when the user prefers not to be asked. */

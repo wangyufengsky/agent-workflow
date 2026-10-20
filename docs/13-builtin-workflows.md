@@ -105,12 +105,12 @@ packages/builtin/
 
 ## 4. 系统生成的节点
 
-| 来源 | key | 角色 | 指令模板 | 依赖 |
-| --- | --- | --- | --- | --- |
-| 让 AI 再改改 | `revise_<n>` | developer | `revise.md`：用户反馈 + 当前结果摘要 | 当前所有叶子节点 |
-| 交给 AI 解决冲突 | `resolve_conflict_<n>` | developer | `revise-conflict.md`：冲突文件列表；后端在派发前已于 worktree 执行 `git merge <target>` 并保留冲突标记；节点完成时后端提交合并 | 当前所有叶子节点 |
+| 来源 | key | 标题 | 角色 | 指令模板 | 依赖 |
+| --- | --- | --- | --- | --- | --- |
+| 让 AI 再改改 | `revise_<n>` | 按反馈修改 | developer | `revise.md`：用户反馈 + 当前结果摘要 | 当前所有叶子节点 |
+| 交给 AI 解决冲突 | `resolve_conflict_<n>` | 解决合并冲突 | developer | `revise-conflict.md`：冲突文件列表；后端在创建节点前已于 worktree 执行 `git merge --no-ff --no-commit <target>`（`target` 为冲突的那次交付的目标分支）并保留冲突标记；节点完成时后端的提交即结束这次合并（合并提交） | 当前所有叶子节点 |
 
-两者 acceptance 均为 `{ checks: [command $PROJECT_CHECK], manual: false }`。
+定义在 `packages/builtin/src/system-nodes.ts`（`SYSTEM_NODES`）。两者 acceptance 均为 `{ checks: [command $PROJECT_CHECK], manual: false }`（任务开启 `accept_each_node` 时另加人工验收），`kind = revise`，`n` 从 1 起按任务内同类节点计数。计划新版本 `source = user`、`feedback` 为用户反馈（模型经 `get_task_context.userFeedback` 读到），创建后立即确认，只物化新增的节点；任务的交付条目随之 dismiss，再次进入 `review` 时重新创建。
 
 ## 5. 自定义流程（专业模式）
 

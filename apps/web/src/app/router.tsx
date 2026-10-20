@@ -6,6 +6,8 @@ import { useServerEvents } from '../api/server-events.ts';
 import { ErrorState } from '../components/error-state.tsx';
 import { ToastHost } from '../components/toast.tsx';
 import { ComponentGalleryPage } from '../features/dev/component-gallery.page.tsx';
+import { GitConsolePage } from '../features/git/git-console.page.tsx';
+import { GIT_TABS, GitProjectPage } from '../features/git/git-project.page.tsx';
 import { HomePage } from '../features/home/home.page.tsx';
 import { InboxPage } from '../features/inbox/inbox.page.tsx';
 import { OnboardingPage } from '../features/onboarding/onboarding.page.tsx';
@@ -94,8 +96,13 @@ const runtimeRoute = createRoute({
 const homeRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.home,
-  // The project to start a task in; kept in the URL so a reload or link keeps it.
-  validateSearch: z.object({ projectId: z.string().optional() }),
+  // The project to start a task in; kept in the URL so a reload or link keeps it. A workflow key and requirement
+  // prefill the form (the report card's「据此修复」).
+  validateSearch: z.object({
+    projectId: z.string().optional(),
+    workflow: z.string().optional(),
+    requirement: z.string().optional(),
+  }),
   component: HomePage,
 });
 const tasksRoute = createRoute({
@@ -110,6 +117,32 @@ const taskRoute = createRoute({
   // `?node=<id>` selects a step on the canvas; `open` shows its details drawer (14 §3.4).
   validateSearch: z.object({ node: z.string().optional(), open: z.boolean().optional() }),
   component: TaskPage,
+});
+const gitRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.git,
+  component: () => (
+    <ProOnly>
+      <GitConsolePage />
+    </ProOnly>
+  ),
+});
+const gitProjectRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.gitProject,
+  // The open tab and what it shows: a ref's log or one commit, a directory or file of the tree.
+  validateSearch: z.object({
+    tab: z.enum(GIT_TABS).optional(),
+    ref: z.string().optional(),
+    sha: z.string().optional(),
+    path: z.string().optional(),
+    file: z.boolean().optional(),
+  }),
+  component: () => (
+    <ProOnly>
+      <GitProjectPage />
+    </ProOnly>
+  ),
 });
 const projectRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -127,7 +160,8 @@ const routeTree = rootRoute.addChildren([
     projectsRoute,
     projectRoute,
     page(ROUTES.settings, SettingsPage),
-    proPage(ROUTES.git, 'git'),
+    gitRoute,
+    gitProjectRoute,
     proPage(ROUTES.workflows, 'flow'),
     proPage(ROUTES.roles, 'users'),
     proPage(ROUTES.databases, 'db'),

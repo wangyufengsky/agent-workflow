@@ -1,0 +1,186 @@
+/* Diff browser (M4-07): file tree, unified and side-by-side views; syntax colours map shiki's CSS variables to theme tokens. */
+
+.browser {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: var(--s-3);
+  min-height: 360px;
+}
+
+.treeRoot {
+  overflow: auto;
+  max-height: 70vh;
+  padding: var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+}
+
+.tree {
+  margin: 0;
+  padding: 0 0 0 var(--s-3);
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+
+.treeRoot > .tree {
+  padding-left: 0;
+}
+
+.dir {
+  display: block;
+  padding: 2px var(--s-1);
+  color: var(--sub);
+  font-family: var(--font-mono);
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: 3px var(--s-1);
+  border-radius: var(--r-xs);
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.file:hover {
+  background: var(--fill-2);
+}
+
+.file[aria-pressed="true"] {
+  background: var(--accent-fill);
+  color: var(--ink-strong);
+}
+
+.status {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--sub);
+}
+
+.status[data-status="added"] {
+  color: var(--ok);
+}
+
+.status[data-status="deleted"] {
+  color: var(--danger);
+}
+
+.status[data-status="renamed"] {
+  color: var(--warn);
+}
+
+.stat {
+  display: inline-flex;
+  gap: var(--s-1);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.add {
+  color: var(--ok);
+}
+
+.del {
+  color: var(--danger);
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  font-size: var(--fs-sm);
+}
+
+.scroll {
+  overflow: auto;
+  max-height: 70vh;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+
+  --syntax-foreground: var(--ink-2);
+  --syntax-background: transparent;
+  --syntax-token-keyword: var(--accent);
+  --syntax-token-string: var(--ok);
+  --syntax-token-string-expression: var(--ok);
+  --syntax-token-comment: var(--muted);
+  --syntax-token-constant: var(--warn);
+  --syntax-token-function: var(--run);
+  --syntax-token-parameter: var(--ink);
+  --syntax-token-punctuation: var(--sub);
+  --syntax-token-link: var(--accent);
+  --syntax-token-inserted: var(--ok);
+  --syntax-token-deleted: var(--danger);
+  --syntax-token-changed: var(--warn);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--syntax-foreground);
+}
+
+.table {
+  table-layout: fixed;
+}
+
+.noCol {
+  width: 48px;
+}
+
+.signCol {
+  width: 18px;
+}
+
+.hunk td {
+  padding: 2px var(--s-3);
+  background: var(--fill-2);
+  color: var(--sub);
+}
+
+.no {
+  padding: 0 var(--s-2);
+  text-align: right;
+  color: var(--faint);
+  user-select: none;
+  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+
+.sign {
+  color: var(--sub);
+  user-select: none;
+}
+
+.code {
+  padding: 0 var(--s-2);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.line[data-kind="add"] td,
+.code[data-kind="add"] {
+  background: var(--ok-fill);
+}
+
+.line[data-kind="del"] td,
+.code[data-kind="del"] {
+  background: var(--danger-fill);
+}
+
+.code[data-kind="none"] {
+  background: var(--fill-1);
+}

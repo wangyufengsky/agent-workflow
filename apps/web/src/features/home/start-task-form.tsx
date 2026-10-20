@@ -16,18 +16,22 @@ export function StartTaskForm({
   projects,
   projectId,
   onProjectChange,
+  initialWorkflowKey,
+  initialRequirement,
 }: {
   projects: readonly ProjectDTO[];
   projectId: string;
   onProjectChange: (id: string) => void;
+  initialWorkflowKey?: string | undefined;
+  initialRequirement?: string | undefined;
 }) {
   const workflows = useQuery(workflowsQuery);
   const [workflowId, setWorkflowId] = useState<string | undefined>(undefined);
-  const [requirement, setRequirement] = useState('');
+  const [requirement, setRequirement] = useState(initialRequirement ?? '');
   const [confirmPlan, setConfirmPlan] = useState(false);
   const create = useCreateTask();
   const navigate = useNavigate();
-  const selected = workflowId ?? workflows.data?.[0]?.id;
+  const selected = workflowId ?? (workflows.data?.find((w) => w.key === initialWorkflowKey) ?? workflows.data?.[0])?.id;
   const canStart = selected !== undefined && projectId !== '' && requirement.trim() !== '';
 
   const start = () => {
