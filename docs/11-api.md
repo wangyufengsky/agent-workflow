@@ -252,6 +252,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `assistant.navigate` | `{ conversationId, target: AssistantPageRef }` | 助手调用 `open_page`：面板旁跳转，面板保持打开 |
 | `assistant.open_form` | `{ conversationId, form: AssistantForm, values }` | 助手调用 `open_form`：打开表单并预填（不含凭据字段） |
 | `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
+| `knowledge.updated` | `{ conversationId }` | 知识问答：新一轮、答案提交、一轮结束、权限请求等待或已处理、删除时；对话与列表重新拉取（研究过程沿用 `attempt.transcript`） |
 | `resync` | `{}` | 全部失效 |
 
 ## 12. 应用助手（v1.1）
@@ -272,6 +273,20 @@ type AttemptDTO = AttemptSummaryDTO & {
 | GET | `/assistant/conversations/:id/confirmations` | `{ items: AssistantConfirmationDTO[] }`，按创建时间；`AssistantConfirmationDTO = { id, conversationId, operationId, title, risk, input, status, result: { ok: true, output } \| { ok: false, error } \| null, createdAt, resolvedAt }` |
 | POST | `/assistant/confirmations/:id/confirm` | `{ alwaysAllow? }`：执行操作并把结果作为下一条消息发回会话；`alwaysAllow` 只允许 write 级（critical 400 `VALIDATION_FAILED`），同时把操作加入 `assistant.alwaysAllow`；已处理 409 `STATE_TRANSITION_INVALID`；不存在 404 `ASSISTANT_CONFIRMATION_NOT_FOUND` |
 | POST | `/assistant/confirmations/:id/cancel` | 会话收到「用户取消了该操作」 |
+
+## 13a. 知识问答（v1.1）
+
+见 [18-knowledge.md §4](18-knowledge.md#4-api操作清单)。全部 `mode = simple`、`expose.assistant = true`、不进命令面板（D67）。
+
+| 方法 | 路径 | 操作 | 风险 | 说明 |
+| --- | --- | --- | --- | --- |
+| GET | `/knowledge/conversations?projectId&query&limit&cursor` | `knowledge.list` | read | `{ items: KnowledgeConversationSummaryDTO[], nextCursor }`，按 `updated_at` 倒序；`query` 匹配问题与回答 |
+| GET | `/knowledge/conversations/:id` | `knowledge.get` | read | `KnowledgeConversationDTO`（全部轮次、状态、回答、引用、`awaitingInput`） |
+| POST | `/knowledge/conversations` | `knowledge.ask` | write | `{ projectId, question, sources }` → 201 详情；opencode 未就绪 503；项目无关联数据库却勾选数据库 400 |
+| POST | `/knowledge/conversations/:id/turns` | `knowledge.followUp` | write | `{ question }`；上一轮研究中 409 `KNOWLEDGE_CONVERSATION_BUSY` |
+| POST | `/knowledge/conversations/:id/stop` | `knowledge.stop` | write | 中止研究中的一轮；已结束 409 `STATE_TRANSITION_INVALID` |
+| DELETE | `/knowledge/conversations/:id` | `knowledge.delete` | critical | 204；研究中 409 |
+| GET | `/knowledge/turns/:turnId/citations/:index` | `knowledge.citation` | read | `CitationSourceDTO`（18 §6.3）；404 `KNOWLEDGE_CITATION_NOT_FOUND` / `KNOWLEDGE_SOURCE_UNAVAILABLE` |
 
 ## 13. preload 能力（非 HTTP）
 

@@ -159,7 +159,7 @@ type KnowledgeConversationSummaryDTO = {
 注入到 opencode 配置（12 §2）：
 
 ```jsonc
-"aw-researcher": { "mode": "primary", "description": "agent-workflow knowledge researcher", "prompt": "<protocol-research.md>",
+"aw-researcher": { "mode": "primary", "description": "agent-workflow researcher", "prompt": "<protocol-research.md>",
   "permission": { "edit": "deny", "question": "deny", "webfetch": "deny", "websearch": "deny", "task": "deny",
                   "external_directory": "deny", "agent-workflow-app_*": "deny" } }
 ```

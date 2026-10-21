@@ -6,6 +6,7 @@ import { implement } from '../../core/operations/operations.ts';
 import type { AcceptanceService } from '../acceptance/index.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { DebugService } from '../debug/index.ts';
+import type { KnowledgeService } from '../knowledge/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import { createToolRegistry, type McpToolDefinition } from './mcp.registry.ts';
 import { askUserTool } from './tools/ask-user.tool.ts';
@@ -14,6 +15,7 @@ import { getNodeOutputTool } from './tools/get-node-output.tool.ts';
 import { getTaskContextTool } from './tools/get-task-context.tool.ts';
 import { getTaskDiffTool } from './tools/get-task-diff.tool.ts';
 import { reportProgressTool } from './tools/report-progress.tool.ts';
+import { submitAnswerTool } from './tools/submit-answer.tool.ts';
 import { submitPlanTool } from './tools/submit-plan.tool.ts';
 import { submitResultTool } from './tools/submit-result.tool.ts';
 import { submitReviewTool } from './tools/submit-review.tool.ts';
@@ -26,10 +28,11 @@ export type McpModuleDeps = {
   tasks: TasksService;
   acceptance: AcceptanceService;
   debug: DebugService;
+  knowledge: KnowledgeService;
   log: Logger;
 };
 
-export function createMcpModule({ token, attempts, tasks, acceptance, debug, log }: McpModuleDeps) {
+export function createMcpModule({ token, attempts, tasks, acceptance, debug, knowledge, log }: McpModuleDeps) {
   const tools: McpToolDefinition[] = [
     getTaskContextTool(tasks, debug),
     getNodeOutputTool(tasks),
@@ -39,9 +42,10 @@ export function createMcpModule({ token, attempts, tasks, acceptance, debug, log
     submitReviewTool(acceptance),
     askUserTool(tasks),
     reportProgressTool(attempts),
-    dbListConnectionsTool(tasks),
-    dbDescribeTool(tasks),
-    dbQueryTool(tasks),
+    dbListConnectionsTool(tasks, knowledge),
+    dbDescribeTool(tasks, knowledge),
+    dbQueryTool(tasks, knowledge),
+    submitAnswerTool(knowledge),
   ];
   const registry = createToolRegistry(tools, attempts, log);
   return {

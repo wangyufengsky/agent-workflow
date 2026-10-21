@@ -206,10 +206,10 @@ type Acceptance = {
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
 | id | TEXT PK | |
-| task_id | TEXT NULL → tasks，CASCADE | 空 = 调试尝试（仅开发构建，M2-09，不属于任何任务） |
+| task_id | TEXT NULL → tasks，CASCADE | 空 = 调试尝试（仅开发构建，M2-09）或知识问答的 `research` 尝试（v1.1，由 `knowledge_turns` 指向），不属于任何任务 |
 | node_id | TEXT NULL → nodes，CASCADE | `execute` 类为所执行的节点，`review` 类为被评审的节点；`plan` 类与调试尝试为空 |
 | kind | TEXT | `AttemptKind` |
-| seq | INTEGER | 同一节点（或同一任务的 plan 类、或全部调试尝试）内序号 |
+| seq | INTEGER | 同一节点（或同一任务的 plan 类、或不属于任务的同类尝试）内序号 |
 | status | TEXT | `AttemptStatus` |
 | role_id | TEXT NULL → roles | 调试尝试为空 |
 | model | TEXT NULL | 发送提示词时指定的 `provider/model`；空 = opencode 默认 |
@@ -283,7 +283,7 @@ payload / response：
 
 ## 3. JSONL 会话流
 
-路径：`<数据目录>/runs/<taskId>/<attemptId>.jsonl`（调试尝试为 `runs/debug/<attemptId>.jsonl`）。每次尝试一个文件，只追加（同步追加，保持事件顺序），由尝试模块把 opencode 事件转换后写入，同时经 SSE 推送 `attempt.transcript` 事件。schema 为 `shared/contracts/api/attempts.ts` 的 `transcriptEntrySchema`。
+路径：`<数据目录>/runs/<taskId>/<attemptId>.jsonl`（调试尝试为 `runs/debug/<attemptId>.jsonl`，知识问答的 `research` 尝试为 `runs/knowledge/<attemptId>.jsonl`）。每次尝试一个文件，只追加（同步追加，保持事件顺序），由尝试模块把 opencode 事件转换后写入，同时经 SSE 推送 `attempt.transcript` 事件。schema 为 `shared/contracts/api/attempts.ts` 的 `transcriptEntrySchema`。
 
 每行：
 
@@ -339,9 +339,41 @@ payload / response：
 
 消息流：`<数据目录>/assistant/conversations/<id>.jsonl`，格式同 §3（多 `confirmation`、`attachment`、`entity_ref` 三种条目）；记录用户的消息、模型的正文与工具调用、权限请求、错误；后端代发的确认结果消息与每轮注入的 `system` 不记录（卡片显示结果）。
 
+## 4a. 知识问答（v1.1）
+
+见 [18-knowledge.md §3](18-knowledge.md#3-数据模型)，迁移 `0009_knowledge`。
+
+### knowledge_conversations
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| project_id | TEXT → projects，CASCADE | |
+| title | TEXT | 第一次提问的首行（`KNOWLEDGE_TITLE_MAX_CHARS`） |
+| sources | TEXT(JSON) | `{ code, docs, database, web }`，对话开始后固定（D66） |
+| created_at / updated_at | INTEGER | `updated_at` 随每一轮的创建与结束更新 |
+
+索引：`(project_id)`、`(updated_at)`。
+
+### knowledge_turns
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| conversation_id | TEXT → knowledge_conversations，CASCADE | |
+| seq | INTEGER | 对话内序号，从 1 起 |
+| question | TEXT | |
+| attempt_id | TEXT → attempts | 这一轮的 `research` 尝试；状态由它推导，不另存 |
+| answer | TEXT NULL | `submit_answer` 通过校验后写入 |
+| citations | TEXT(JSON) NULL | `CitationDTO[]` |
+| created_at / answered_at | INTEGER | |
+
+索引：`(conversation_id, seq)` 唯一、`(attempt_id)`。
+
 ## 5. 删除与清理
 
-- 删除项目：要求无非终态任务；级联删除其任务及全部关联数据和 `runs/<taskId>` 目录。
+- 删除项目：要求无非终态任务、没有研究中的知识对话；级联删除其任务及全部关联数据和 `runs/<taskId>` 目录，以及知识对话、其 `research` 尝试与会话流。
+- 删除知识对话：要求没有研究中的一轮；删除轮次、其尝试（权限条目随之级联）与 `runs/knowledge/<attemptId>.jsonl`。
 - 删除助手对话：级联删除其确认，并删除 `assistant/conversations/<id>.jsonl` 与 `assistant/files/<id>/`。
 - 任务终态后 worktree 删除，但任务、计划、节点、尝试、会话流保留（供回看）。
 - 不做自动过期清理（v1）。设置页显示数据目录占用。
