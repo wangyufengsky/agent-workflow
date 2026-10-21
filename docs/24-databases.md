@@ -66,7 +66,7 @@
 | 另拒绝 | `INTO`、`FOR UPDATE` / `FOR SHARE`、`LOCK IN SHARE MODE`、`/*! */` 可执行注释 | `INTO`（`SELECT INTO` 建表）、`FOR [NO KEY] UPDATE`、`FOR [KEY] SHARE` | 会写入、执行代码、改变会话或事务、加锁的关键字（§4.3） |
 | ③ 事务 | `START TRANSACTION READ ONLY`（写入被 1792 拒绝） | `START TRANSACTION READ ONLY`（写入被 SQLSTATE 25006 拒绝，例如调用会写入的函数、`nextval`） | `BEGIN TRANSACTION`，**从不提交**；连接关闭时服务器回滚 |
 | ④ 时间 | `MAX_EXECUTION_TIME`（只管 SELECT）+ 稍长的客户端超时 | `SET LOCAL statement_timeout`（服务器中断任何语句，57014） | tedious 的 `requestTimeout`：到时发送 attention，服务器取消该批 |
-| 行数 | 流式读取，读满即关闭连接 | 游标 `read(limit + 1)`：服务器只发出所需的行 | 流式读取，读满即关闭连接（随之回滚）；只读第一个结果集 |
+| 行数 | 流式读取，读满即关闭连接 | 游标 `read(limit + 1)`：服务器只发出所需的行 | 流式读取，读满即取消请求（TDS attention，服务器停止发送），取消完成后关闭连接（随之回滚）；只读第一个结果集。不能在请求仍在传输时直接关闭连接：tedious 会在回调之外抛错 |
 
 三种方言都不允许 `WITH` 开头：MySQL 与 PostgreSQL 允许 `WITH … UPDATE / DELETE`，统一拒绝，模型改写为子查询即可。
 
