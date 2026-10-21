@@ -1,6 +1,6 @@
 # 19 · 质量与用量（v1.1）
 
-> 状态：**v1.1 已实现**，待合并（任务 I-01…I-08，见 [05](05-dev-plan.md#v11--质量与用量)）。D79（只统计 tokens，不统计成本）与 D82（自写柱状图）用户已确认（2026-10-21）。
+> 状态：**v1.1 已实现**，待合并（任务 I-01…I-08，见 [05](05-dev-plan.md#v11--质量与用量)）。D79（只统计 tokens，不统计成本）与 D80（自写柱状图）用户已确认（2026-10-21）。
 
 ## 1. 定位
 
@@ -193,7 +193,7 @@ type InsightsTaskDTO = {
   - `insights.aggregate.ts`：由查出的行计算 §2 的全部数字（纯函数）；
   - `insights.repo.ts`：§5 的查询，只读，读取其他模块经其 `index.ts` 导出的表；
   - `insights.service.ts`、`insights.operations.ts`、`index.ts`。
-- `web/src/features/insights/`：页面（简单 / 专业两种视图）、`bar-chart.tsx`（自写的 HTML/CSS 柱状图，D82）、`drill.ts`（钻取过滤）、查询；文案 `web/src/copy/insights.ts`。SSE `task.updated`、`attempt.updated`（含知识问答的尝试）与 `inbox.updated` 让这些查询重新读取。
+- `web/src/features/insights/`：页面（简单 / 专业两种视图）、`bar-chart.tsx`（自写的 HTML/CSS 柱状图，D80）、`drill.ts`（钻取过滤）、查询；文案 `web/src/copy/insights.ts`。SSE `task.updated`、`attempt.updated`（含知识问答的尝试）与 `inbox.updated` 让这些查询重新读取。
 
 ## 8. 测试
 

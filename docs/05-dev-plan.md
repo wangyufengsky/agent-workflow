@@ -189,11 +189,11 @@
 | X-11 | 文档收尾：03 §7 数据目录、11 环境接口、07 CI 与 Electron 冒烟、14 引导页、README 各平台安装、本节状态 | 文档与代码一致 |
 ## v1.1 · 质量与用量
 
-> 状态：**已完成**（2026-10-21），待合并。设计见 [19-insights.md](19-insights.md)；决策 D79（只统计 tokens，不统计成本）与 D82（自写柱状图）用户已确认。验收：本机 macOS `pnpm verify`、`pnpm e2e`（含 J16 与走查 J9）、`pnpm test:oc` 通过；性能实测见 19 §5。与计划的差异：用户确认后去掉了成本（原设计按 opencode 报告的美元成本统计，并把未报价格的用量标为「未计价」）；趋势图为 HTML/CSS 柱状图；两种模式默认都看本周。顺带修复的根因缺陷：FakeOpencode 的 `abort()` 同步生效，提交结果那一步的用量永远报不上来（opencode 在工具结果之后紧接着发 step-finish，早于我们的中止请求）；跳过午夜的夏令时时区（哈瓦那）一天的起点算到了前一天（PR #17 评审）。恢复工作台、快照评审、历史归档不做见 D77。
+> 状态：**已完成**（2026-10-21），待合并。设计见 [19-insights.md](19-insights.md)；决策 D79（只统计 tokens，不统计成本）与 D80（自写柱状图）用户已确认。验收：本机 macOS `pnpm verify`、`pnpm e2e`（含 J16 与走查 J9）、`pnpm test:oc` 通过；性能实测见 19 §5。与计划的差异：用户确认后去掉了成本（原设计按 opencode 报告的美元成本统计，并把未报价格的用量标为「未计价」）；趋势图为 HTML/CSS 柱状图；两种模式默认都看本周。顺带修复的根因缺陷：FakeOpencode 的 `abort()` 同步生效，提交结果那一步的用量永远报不上来（opencode 在工具结果之后紧接着发 step-finish，早于我们的中止请求）；跳过午夜的夏令时时区（哈瓦那）一天的起点算到了前一天（PR #17 评审）。恢复工作台、快照评审、历史归档不做见 D77。
 
 | # | 任务 | 完成标准 |
 | --- | --- | --- |
-| I-01 | 设计文档 19、任务拆分、决策 D79、D82（D80、D81 留给 PR #15）；14 路由表、11 API、10 索引、08 枚举与常量、07 E2E 旅程同步 | 文档评审通过 |
+| I-01 | 设计文档 19、任务拆分、决策 D79–D80；14 路由表、11 API、10 索引、08 枚举与常量、07 E2E 旅程同步 | 文档评审通过 |
 | I-02 | shared：`InsightsPeriod` / `InsightsDimension` / `InsightsFailureKind` / `InsightsDrill`、`INSIGHTS_MAX_DAYS`、`AssistantPage.Insights`；契约 `insightsQuerySchema`、`InsightsSummaryDTO`、`InsightsTaskDTO`；操作 `insights.summary`、`insights.tasks`（read、`mode = simple`、`expose.assistant = true`） | `pnpm check` 通过；操作标题文案完整（已有单测） |
 | I-03 | 后端纯函数：`insights.period.ts`（时间段 → 日期与区间、时刻 → 日期，时区参数化）、`insights.aggregate.ts`（19 §2 全部口径） | 单测：五种时间段与校验、跨时区归日、夏令时；空数据、没有用量的尝试、中断不计、失败原因、按假设的提问、中位数、拆分空键 |
 | I-04 | 后端：迁移 `0010_insights`（`attempts(started_at)`、`inbox_items(created_at)`）；`insights.repo.ts`（按区间与按任务 id 批量查询）、service、operations、装配；FakeOpencode 新增 `usage` 步骤（本回合报告的 tokens） | 集成测试：真实流程（首次通过、检查失败后重试且有一次提问、取消、知识问答）后两个操作的数字；`custom` 缺日期 400；性能实测数字记入 19 §5 |

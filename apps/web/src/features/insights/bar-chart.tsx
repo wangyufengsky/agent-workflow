@@ -28,7 +28,7 @@ export function niceTicks(max: number): number[] {
 }
 
 /**
- * Per-day bars with the series stacked (D82: no chart library). The hovered or focused day is read out above the
+ * Per-day bars with the series stacked (D80: no chart library). The hovered or focused day is read out above the
  * bars; a visually hidden table carries the same numbers for screen readers.
  */
 export function BarChart({
