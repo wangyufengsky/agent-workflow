@@ -54,7 +54,8 @@ Electron `app.getPath('userData')`，目录名为产品名：
 | Windows | `opencode.exe`，其次 `opencode.cmd`（npm 全局安装生成的启动脚本） | `%USERPROFILE%\.opencode\bin\opencode.exe` | `USERPROFILE` |
 
 - Windows 的环境变量名不区分大小写（系统里常见 `Path`），而后端把环境复制成普通对象传给子进程，`env.PATH` 可能读不到。`platform.ts` 的 `envValue(env, name)` 在 Windows 上按不区分大小写读取，这是读 PATH / 主目录的唯一入口。
-- Node 不允许不经 shell 直接启动 `.cmd`（CVE-2024-27980 之后会报 `EINVAL`）。`platform.ts` 的 `commandFor(file, args)` 对 `.cmd` 改为 `cmd.exe /d /s /c "<文件> <参数>"`（参数都是本应用写死的字面量，不含 cmd 元字符）；opencode 的检测（`--version`）与托管（`serve`）都经它启动。
+- Node 不允许不经 shell 直接启动 `.cmd`（CVE-2024-27980 之后会报 `EINVAL`）。execa 10 在 Windows 上自己按 `PATHEXT` 解析命令，`.cmd` 经 `cmd.exe` 运行并转义参数，所以 opencode 的检测（`--version`）与托管（`serve`）直接用找到的路径。
+- 反过来，execa 解析不到的命令也会交给 `cmd.exe`，结果是退出码 1 与「不是内部或外部命令」而不是 `ENOENT`。所以 `runGit` 先用 `platform.findExecutable('git', PATH)` 定位 git，找不到即 `GIT_NOT_INSTALLED`，不靠启动失败判断。
 - Windows 上「可执行」只看文件存在（`X_OK` 等同 `F_OK`），扩展名决定能否运行，所以只认 `.exe` 与 `.cmd`。
 
 ### 3.3 opencode 在 Windows 上用的 shell 与 bash 权限规则
@@ -88,13 +89,12 @@ Electron `app.getPath('userData')`，目录名为产品名：
 | 检查命令（`acceptance.runCommand`） | `/bin/sh -c`，自成进程组；超时 / 中止时向进程组发 `SIGTERM` | Git Bash `-c`（与 opencode 同一个 shell，D68）；超时 / 中止时 `taskkill /T /F` |
 | git | 正常退出，不需要终止 | 同左 |
 
-两者都经 `platform.treeSpawnOptions` 启动、`platform.killProcessTree` 停止。只结束 shell 本身时，它启动的命令（`a && b` 中的 `b`、后台的测试进程）继续运行并占着输出管道，execa 的结果要等它们结束才返回。
+两者都用 execa 的 `killDescendants` 启动（POSIX 上自成进程组，Windows 上停止时运行 `taskkill /T`），`child.kill()` 即结束整棵进程树。只结束 shell 本身时，它启动的命令（`a && b` 中的 `b`、后台的测试进程）继续运行并占着输出管道，execa 的结果要等它们结束才返回。
 
 **应用退出。** 结束 utilityProcess（Windows 上即 `TerminateProcess`）不会运行后端的清理，opencode 会留下。main 在 `will-quit` 时向后端发 `backend.shutdown`（`shared/contracts/backend-port.ts`），后端关闭 HTTP 服务（随之停止 opencode 进程树）后退出，main 等它退出再退出；`pnpm dev:server` 下 Ctrl+C（`SIGINT`）走同一路径。
 
 - 检查命令在所有平台都由 POSIX shell 执行，`mvn -q test && …`、`./gradlew test` 的写法与推断出的检查命令（`projects.inference.ts`）在三个平台一致，不按平台推断不同命令。
-- 检查命令的超时与中止不再交给 execa 的 `timeout` / `cancelSignal`（它们只结束 shell 本身），改为注入时钟计时并调用 `killProcessTree`。
-- `taskkill.exe` 从 `%SystemRoot%\System32` 定位，不依赖 PATH；它对已经退出的进程返回 128，视为已停止。
+- 检查命令的超时改为注入时钟计时（原来是 execa 的 `timeout`），超时与中止都调用 `child.kill()`。
 
 ### 3.6 凭据（safeStorage）
 

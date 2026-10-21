@@ -142,13 +142,13 @@
 | # | 任务 | 完成标准 |
 | --- | --- | --- |
 | X-01 | 设计文档 17、任务拆分、决策 D66–D71；仓库 `.gitattributes`（`* text=auto eol=lf`） | 文档评审通过；Windows 检出后 `pnpm check` 不因换行失败 |
-| X-02 | 后端平台模块 `core/platform.ts`：`envValue`（Windows 不区分大小写）、`homeDir`、`executableCandidates`、`commandFor`（`.cmd` 经 `cmd.exe`）、`fromGitPath`、`GIT_PLATFORM_ARGS`、`killProcessTree`、`findGitBash`；业务代码不出现 `process.platform` | 单测覆盖纯函数（以 `path.win32` / `path.posix` 参数化，不依赖运行平台）；`grep process.platform packages/server/src` 只有该文件 |
-| X-03 | opencode 查找与托管：Windows 上 `opencode.exe` / `opencode.cmd`、`%USERPROFILE%\.opencode\bin`；`.cmd` 经 `cmd.exe` 启动；停止与重启时结束进程树 | 系统集成测试（伪造 PATH 与主目录）在三平台通过：未安装、版本不符、PATH 中找到、主目录中找到、设置路径优先 |
+| X-02 | 后端平台模块 `core/platform.ts`：`envValue`（Windows 不区分大小写）、`pathDirs`、`homeDir`、`findExecutable`（`.exe` / `.cmd`）、`fromGitPath`、`gitPlatformArgs`、`gitBashOf`；`.cmd` 的启动与结束进程树用 execa 10 自带的能力（Windows 命令解析、`killDescendants`）；业务代码不出现 `process.platform` | 单测覆盖纯函数（以 `path.win32` / `path.posix` 参数化，不依赖运行平台）；`grep process.platform packages/server/src` 只有该文件 |
+| X-03 | opencode 查找与托管：Windows 上 `opencode.exe` / `opencode.cmd`、`%USERPROFILE%\.opencode\bin`；停止与重启时结束进程树；应用退出时 main 请后端先停止 opencode（`backend.shutdown`） | 系统集成测试（伪造 PATH 与主目录）在三平台通过：未安装、版本不符、PATH 中找到、主目录中找到、设置路径优先 |
 | X-04 | Windows 上 opencode 的 shell 固定为 Git Bash（注入配置 `shell`）；找不到 Git Bash 时 Git 检测未就绪、opencode 不启动 | 配置快照含 / 不含 `shell` 两种；17 §3.3 写明依据（opencode 1.19.0 源码） |
 | X-05 | 检查命令：POSIX shell（Windows 上 Git Bash）、注入时钟计时、超时与中止结束进程树 | 集成测试：超时（FakeClock）与中止都结束命令且结果为未通过；三平台 CI 通过 |
 | X-06 | git：读取路径的入口规范化（`readRepoRoot`、`listWorktrees`）；Windows 上 `core.longpaths` | 项目、worktree、交付、Git 管理台的集成测试在 Windows CI 上通过（不改断言） |
 | X-07 | 凭据：Linux 上 `basic_text` / `unknown` 后端视为不可用；credential port 新增 `status`；`EnvironmentDTO.credentials`；引导页「凭据存储」警告项 | 单测：后端名称 → 可用性；集成测试：环境检测报告凭据可用性；E2E 引导页不受影响 |
-| X-08 | 引导页与文案按平台：`EnvironmentDTO.platform`、安装命令、opencode 路径示例、设置说明；快捷键显示 ⌘ / Ctrl | 单测：每个平台都有文案（`Record<Platform, …>`）；浏览器 E2E 在三平台通过 |
+| X-08 | 引导页与文案按平台：`EnvironmentDTO.platform`、安装命令、opencode 路径示例、设置说明；快捷键显示 ⌘ / Ctrl | 每个平台都有文案（`satisfies Record<Platform, …>`，由类型检查保证）；浏览器 E2E 在三平台通过 |
 | X-09 | 打包：electron-builder 增加 win nsis x64、linux AppImage + deb x64、`icon.png`、维护者与可执行文件名；`pnpm dist` 构建当前平台 | CI 在 windows 与 ubuntu 上打出安装包并上传 artifact |
 | X-10 | CI：GitHub Actions 三平台矩阵（verify 各步骤、浏览器 E2E、Electron 启动冒烟，Linux 用 xvfb）；数据库集成测试只在 ubuntu 运行并写明原因 | 三平台全绿 |
 | X-11 | 文档收尾：03 §7 数据目录、11 环境接口、07 CI 与 Electron 冒烟、14 引导页、README 各平台安装、本节状态 | 文档与代码一致 |
