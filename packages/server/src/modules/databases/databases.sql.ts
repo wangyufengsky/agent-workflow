@@ -1,52 +1,194 @@
-import { AppError, ErrorCode } from '@aw/shared';
+import { AppError, DbType, ErrorCode } from '@aw/shared';
 
-/** First keywords of the statements `db_query` runs (12 §6.11). */
-const READ_ONLY_FIRST_KEYWORDS: ReadonlySet<string> = new Set(['SELECT', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN']);
+/** How a database family writes SQL: quoting, comments, and which statements are read-only (24 §4). */
+const SqlDialect = { Mysql: 'mysql', Postgres: 'postgres', Tsql: 'tsql' } as const;
+type SqlDialect = (typeof SqlDialect)[keyof typeof SqlDialect];
+
+const SQL_DIALECT = {
+  [DbType.Mysql]: SqlDialect.Mysql,
+  [DbType.Goldendb]: SqlDialect.Mysql,
+  [DbType.Postgresql]: SqlDialect.Postgres,
+  [DbType.Opengauss]: SqlDialect.Postgres,
+  [DbType.Sqlserver]: SqlDialect.Tsql,
+} as const satisfies Record<DbType, SqlDialect>;
 
 /**
- * Clauses of a read-only statement that still write or lock: `SELECT … INTO OUTFILE` writes a server file and `INTO`
- * sets variables; locking reads hold row locks. Matched on the statement with strings and comments removed.
+ * T-SQL words that write, run code, change the session or the transaction, or lock (24 §4.3). T-SQL needs no
+ * semicolon between statements, so a second statement can only be found by its keyword; most of these are reserved
+ * words, which an identifier can use only quoted (and quoted text is blanked before matching).
  */
-const FORBIDDEN_CLAUSES: readonly RegExp[] = [
-  /\bINTO\b/i,
-  /\bFOR\s+(UPDATE|SHARE)\b/i,
-  /\bLOCK\s+IN\s+SHARE\s+MODE\b/i,
-];
+const TSQL_FORBIDDEN_WORDS = [
+  'INTO',
+  'INSERT',
+  'UPDATE',
+  'DELETE',
+  'MERGE',
+  'TRUNCATE',
+  'DROP',
+  'CREATE',
+  'ALTER',
+  'ADD',
+  'EXEC',
+  'EXECUTE',
+  'BEGIN',
+  'COMMIT',
+  'ROLLBACK',
+  'SAVE',
+  'TRAN',
+  'TRANSACTION',
+  'GRANT',
+  'REVOKE',
+  'DENY',
+  'USE',
+  'SET',
+  'DECLARE',
+  'KILL',
+  'SHUTDOWN',
+  'BACKUP',
+  'RESTORE',
+  'DBCC',
+  'BULK',
+  'RECONFIGURE',
+  'CHECKPOINT',
+  'SETUSER',
+  'REVERT',
+  'OPENROWSET',
+  'OPENQUERY',
+  'OPENDATASOURCE',
+  'WRITETEXT',
+  'UPDATETEXT',
+  'RECEIVE',
+  'SEND',
+  'CONVERSATION',
+  'ENABLE',
+  'DISABLE',
+  'UPDLOCK',
+  'XLOCK',
+  'HOLDLOCK',
+  'TABLOCK',
+  'TABLOCKX',
+] as const;
+
+type DialectRules = {
+  /** First keywords of the statements `db_query` runs (12 §6.11). */
+  firstKeywords: ReadonlySet<string>;
+  /** Clauses that still write or lock, matched on the statement with quoted text and comments removed. */
+  forbidden: readonly RegExp[];
+  /** Opening character of quoted text (strings and identifiers) → its closing character. */
+  quotes: Readonly<Record<string, string>>;
+  /** Quotes inside which a backslash escapes the next character. */
+  backslashQuotes: string;
+  /** Whether `/* … *\/` comments nest. */
+  nestedComments: boolean;
+  isLineComment(sql: string, i: number): boolean;
+};
+
+const RULES: Record<SqlDialect, DialectRules> = {
+  [SqlDialect.Mysql]: {
+    firstKeywords: new Set(['SELECT', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN']),
+    // `SELECT … INTO OUTFILE` writes a server file and `INTO` sets variables; locking reads hold row locks.
+    forbidden: [/\bINTO\b/i, /\bFOR\s+(UPDATE|SHARE)\b/i, /\bLOCK\s+IN\s+SHARE\s+MODE\b/i],
+    quotes: { "'": "'", '"': '"', '`': '`' },
+    backslashQuotes: `'"`,
+    nestedComments: false,
+    // `--` starts a comment only when followed by whitespace.
+    isLineComment: (sql, i) => sql[i] === '#' || (sql.startsWith('--', i) && /\s/.test(sql[i + 2] ?? ' ')),
+  },
+  [SqlDialect.Postgres]: {
+    firstKeywords: new Set(['SELECT', 'SHOW', 'EXPLAIN']),
+    // `SELECT … INTO` creates a table.
+    forbidden: [/\bINTO\b/i, /\bFOR\s+(NO\s+KEY\s+UPDATE|KEY\s+SHARE|UPDATE|SHARE)\b/i],
+    quotes: { "'": "'", '"': '"' },
+    // Only E'…' strings know backslash escapes; they are found by the `E` before the quote (`codeOf`).
+    backslashQuotes: '',
+    nestedComments: true,
+    isLineComment: (sql, i) => sql.startsWith('--', i),
+  },
+  [SqlDialect.Tsql]: {
+    firstKeywords: new Set(['SELECT']),
+    forbidden: [new RegExp(`\\b(${TSQL_FORBIDDEN_WORDS.join('|')})\\b`, 'i')],
+    quotes: { "'": "'", '"': '"', '[': ']' },
+    backslashQuotes: '',
+    nestedComments: true,
+    isLineComment: (sql, i) => sql.startsWith('--', i),
+  },
+};
 
 const reject = (reason: string, details: Record<string, unknown> = {}) =>
   new AppError(ErrorCode.DbQueryRejected, reason, details);
 
+/** Index after quoted text opened at `i`; a doubled closing character stands for itself. */
+function quotedEnd(sql: string, i: number, close: string, backslash: boolean): number {
+  let j = i + 1;
+  while (j < sql.length) {
+    if (backslash && sql[j] === '\\') j += 2;
+    else if (sql[j] === close && sql[j + 1] === close) j += 2;
+    else if (sql[j] === close) return j + 1;
+    else j += 1;
+  }
+  throw reject('Unterminated quoted text');
+}
+
+/** Index after the `/* … *\/` comment opened at `i`. */
+function blockCommentEnd(sql: string, i: number, nested: boolean): number {
+  if (!nested) {
+    const end = sql.indexOf('*/', i + 2);
+    if (end === -1) throw reject('Unterminated comment');
+    return end + 2;
+  }
+  let depth = 0;
+  let j = i;
+  while (j < sql.length) {
+    if (sql.startsWith('/*', j)) {
+      depth += 1;
+      j += 2;
+    } else if (sql.startsWith('*/', j)) {
+      depth -= 1;
+      j += 2;
+      if (depth === 0) return j;
+    } else j += 1;
+  }
+  throw reject('Unterminated comment');
+}
+
+/** PostgreSQL's `$tag$ … $tag$` string opened at `i`, or undefined (`$1` is a parameter, `a$b` an identifier). */
+function dollarQuoteEnd(sql: string, i: number): number | undefined {
+  if (/[\w$]/.test(sql[i - 1] ?? ' ')) return undefined;
+  const tag = /^\$([A-Za-z_]\w*)?\$/.exec(sql.slice(i))?.[0];
+  if (tag === undefined) return undefined;
+  const end = sql.indexOf(tag, i + tag.length);
+  if (end === -1) throw reject('Unterminated quoted text');
+  return end + tag.length;
+}
+
 /**
- * The statement's code with string literals, quoted identifiers and comments blanked out, so keywords and semicolons
- * inside them do not count. MySQL executes the content of `/*! … *\/` comments, so those are rejected.
+ * The statement's code with quoted text and comments blanked out, so keywords and semicolons inside them do not count.
+ * Line comments end at `\r` as well as `\n`: seeing more code than the server does only rejects more. MySQL executes
+ * the content of `/*! … *\/` comments, so those are rejected.
  */
-function codeOf(sql: string): string {
+function codeOf(sql: string, dialect: SqlDialect): string {
+  const rules = RULES[dialect];
   let code = '';
   let i = 0;
   while (i < sql.length) {
     const c = sql[i] ?? '';
-    const next = sql[i + 1] ?? '';
-    if (c === "'" || c === '"' || c === '`') {
-      let j = i + 1;
-      while (j < sql.length) {
-        if (sql[j] === '\\' && c !== '`') j += 2;
-        else if (sql[j] === c && sql[j + 1] === c) j += 2;
-        else if (sql[j] === c) break;
-        else j += 1;
-      }
-      if (j >= sql.length) throw reject('Unterminated quoted text');
+    const close = rules.quotes[c];
+    const dollarEnd = dialect === SqlDialect.Postgres && c === '$' ? dollarQuoteEnd(sql, i) : undefined;
+    if (close !== undefined) {
+      const escapeString = dialect === SqlDialect.Postgres && /(^|[^\w$])[Ee]$/.test(sql.slice(0, i));
+      i = quotedEnd(sql, i, close, rules.backslashQuotes.includes(c) || (c === "'" && escapeString));
       code += ' ? ';
-      i = j + 1;
-    } else if (c === '/' && next === '*') {
-      if (sql[i + 2] === '!') throw reject('Executable comments are not allowed');
-      const end = sql.indexOf('*/', i + 2);
-      if (end === -1) throw reject('Unterminated comment');
+    } else if (dollarEnd !== undefined) {
+      i = dollarEnd;
+      code += ' ? ';
+    } else if (sql.startsWith('/*', i)) {
+      if (dialect === SqlDialect.Mysql && sql[i + 2] === '!') throw reject('Executable comments are not allowed');
+      i = blockCommentEnd(sql, i, rules.nestedComments);
       code += ' ';
-      i = end + 2;
-    } else if (c === '#' || (c === '-' && next === '-' && /\s/.test(sql[i + 2] ?? ' '))) {
-      const end = sql.indexOf('\n', i);
+    } else if (rules.isLineComment(sql, i)) {
+      const end = sql.slice(i).search(/[\r\n]/);
+      i = end === -1 ? sql.length : i + end + 1;
       code += ' ';
-      i = end === -1 ? sql.length : end + 1;
     } else {
       code += c;
       i += 1;
@@ -56,17 +198,21 @@ function codeOf(sql: string): string {
 }
 
 /**
- * The statement-level half of the read-only guarantee (12 §6.11): exactly one statement (a trailing semicolon is
- * allowed), starting with SELECT / SHOW / DESCRIBE / EXPLAIN, without clauses that write or lock. The driver adds the
- * other half: no multi-statement support and a READ ONLY transaction with row and time limits.
+ * The statement-level half of the read-only guarantee (12 §6.11, 24 §4): exactly one statement (a trailing semicolon
+ * is allowed), starting with one of the dialect's read-only keywords, without clauses that write or lock. The driver
+ * adds the other half: one statement per request, a read-only (or rolled back) transaction, row and time limits.
  */
-export function assertReadOnlySql(sql: string): void {
-  const code = codeOf(sql).trim().replace(/;\s*$/, '');
+export function assertReadOnlySql(sql: string, type: DbType): void {
+  const dialect = SQL_DIALECT[type];
+  const rules = RULES[dialect];
+  const code = codeOf(sql, dialect).trim().replace(/;\s*$/, '');
   if (code.includes(';')) throw reject('Only one statement is allowed');
   const first = /^[\s(]*([A-Za-z]+)/.exec(code)?.[1]?.toUpperCase();
-  if (first === undefined || !READ_ONLY_FIRST_KEYWORDS.has(first)) {
-    throw reject('Only SELECT, SHOW, DESCRIBE and EXPLAIN statements are allowed', { keyword: first ?? null });
+  if (first === undefined || !rules.firstKeywords.has(first)) {
+    throw reject(`Only ${[...rules.firstKeywords].join(', ')} statements are allowed`, { keyword: first ?? null });
   }
-  const clause = FORBIDDEN_CLAUSES.find((pattern) => pattern.test(code));
-  if (clause !== undefined) throw reject('The statement writes or locks', { clause: clause.source });
+  for (const pattern of rules.forbidden) {
+    const clause = pattern.exec(code)?.[0];
+    if (clause !== undefined) throw reject('The statement writes or locks', { clause });
+  }
 }

@@ -19,7 +19,8 @@ const UNKNOWN_CONNECTION_HINT = 'Call db_list_connections and use one of the nam
 export const dbListConnectionsTool = (tasks: TasksService, knowledge: KnowledgeService) =>
   defineMcpTool({
     name: McpToolName.DbListConnections,
-    description: 'List the databases of the project that you may query read-only.',
+    description:
+      'List the databases of the project that you may query read-only, with their type (mysql, goldendb, postgresql, opengauss, sqlserver): write SQL in that dialect.',
     allowedKinds: ALL_KINDS,
     input: dbListConnectionsInputSchema,
     output: dbListConnectionsOutputSchema,
@@ -49,14 +50,14 @@ export const dbQueryTool = (tasks: TasksService, knowledge: KnowledgeService) =>
   defineMcpTool({
     name: McpToolName.DbQuery,
     description:
-      'Run one read-only SQL statement (SELECT, SHOW, DESCRIBE or EXPLAIN) and get at most `limit` rows back.',
+      "Run one read-only SQL statement in the connection's dialect and get at most `limit` rows back: SELECT, SHOW, DESCRIBE or EXPLAIN on mysql and goldendb; SELECT, SHOW or EXPLAIN on postgresql and opengauss; a single SELECT on sqlserver.",
     allowedKinds: ALL_KINDS,
     input: dbQueryInputSchema,
     output: dbQueryOutputSchema,
     hints: {
       [ErrorCode.DbConnectionNotFound]: UNKNOWN_CONNECTION_HINT,
       [ErrorCode.DbQueryRejected]:
-        'Only one read-only statement is allowed: SELECT, SHOW, DESCRIBE or EXPLAIN, without INTO or locking clauses.',
+        'Only one read-only statement is allowed (the message lists what this database accepts), without INTO, locking clauses or anything that writes.',
       [ErrorCode.DbQueryTimeout]: 'Narrow the query (WHERE, LIMIT, indexed columns) and try again.',
       [ErrorCode.DbQueryFailed]: 'Fix the SQL using details.driverMessage; db_describe shows the table structure.',
       [ErrorCode.DbConnectionFailed]: 'The database cannot be reached; continue without it and say so in your result.',

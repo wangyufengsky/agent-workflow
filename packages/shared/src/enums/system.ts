@@ -20,8 +20,13 @@ export const Platform = {
 export type Platform = (typeof Platform)[keyof typeof Platform];
 export const platformSchema = z.enum(Platform);
 
+/** Project database engines (24 §1): GoldenDB speaks the MySQL protocol, openGauss covers GaussDB. */
 export const DbType = {
   Mysql: 'mysql',
+  Postgresql: 'postgresql',
+  Opengauss: 'opengauss',
+  Sqlserver: 'sqlserver',
+  Goldendb: 'goldendb',
 } as const;
 export type DbType = (typeof DbType)[keyof typeof DbType];
 export const dbTypeSchema = z.enum(DbType);

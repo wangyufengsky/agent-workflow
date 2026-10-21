@@ -218,3 +218,18 @@
 | B-08 | 界面：批量视图（进度汇总、逐个状态与进展、冲突 / 失败标注、合并全部待合并的 + 确认对话框、结果提示）、批量任务列表 `/batches`、主页「批量任务」区、任务列表入口；四套主题 | E2E 见 B-09；走查截图含新建页与批量视图 |
 | B-09 | E2E（FakeOpencode）：J17 主页「补单元测试」的「批量」→ 选 3 个目录 → 创建 → 三个任务到达待合并 → 合并全部 → 主分支 3 个提交、全部已完成；J9 走查加入批量页面 | `pnpm e2e` 通过 |
 | B-10 | 文档收尾：03（模块分层）、07（J17）、14（路由与主页）、本节状态段 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
+
+## v1.2 · 更多数据库
+
+> 状态：**开发完成，待合并**。设计见 [24-databases.md](24-databases.md)；决策 D97（驱动：pg、gaussdb-node、tedious，GoldenDB 复用 mysql2）、D98（SQL Server 的只读方式）、D99（表结构范围与值的表示）**待用户确认**。openGauss 默认 sha256 认证下 pg 无法登录，已用容器实测（24 §6）。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| DB-01 | 设计文档 24、决策 D97–D99；容器实测 openGauss 的 sha256 认证（pg 与 gaussdb-node） | 文档评审通过；实测结果写入 24 §6 |
+| DB-02 | shared：`DbType` 五个值、`DB_DEFAULT_PORT`；`get_task_context` 的 `databases[].type` 为 `DbType`；操作与 MCP 工具说明按方言 | 类型检查通过 |
+| DB-03 | 语句检查按方言（`assertReadOnlySql(sql, type)`）：MySQL、PostgreSQL、T-SQL 的引号与注释词法；T-SQL 关键字拒绝表；知识问答的引用校验按连接类型检查 | 单测：三种方言各自的放行与拒绝 |
+| DB-04 | 驱动：`drivers/postgres.ts`（PostgreSQL 与 openGauss 两个实例：只读事务、`statement_timeout`、游标取行、pg_catalog 读表结构）、`drivers/sqlserver.ts`（不提交的事务、`requestTimeout`、流式取行、INFORMATION_SCHEMA 与 sys 视图读表结构）；`DB_DRIVERS` 按类型组装，service 按连接类型取驱动 | 集成测试（真实容器）：PostgreSQL 17.6、openGauss 7（sha256）、SQL Server 2022 的测试连接、表结构、`db_describe`、值的表示、截断、拒绝写入、超时、SQL 错误；GoldenDB 类型在 MySQL 容器上通过 |
+| DB-05 | 测试辅助 `test/helpers/db-containers.ts`（取代 `mysql.ts`）：四种容器、镜像缺失时跳过并提示 `docker pull` | 没有可选镜像时对应用例跳过、有提示 |
+| DB-06 | 界面：连接对话框的类型选择与说明、端口随类型切换；连接卡片显示类型；测试结果显示服务器版本 | E2E 见 DB-07；J9 走查数据库页无报错 |
+| DB-07 | E2E J21（FakeOpencode + PostgreSQL 容器） | `pnpm e2e` 通过 |
+| DB-08 | 文档同步：01、03（依赖与扩展点）、07（J21、容器辅助）、08、10、11、12、14、17、README、CI 拉取镜像与排除 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |

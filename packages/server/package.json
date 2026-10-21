@@ -21,12 +21,19 @@
     "drizzle-orm": "0.45.4",
     "execa": "10.2.0",
     "fastify": "5.12.7",
+    "gaussdb-cursor": "0.2.2",
+    "gaussdb-node": "0.2.2",
     "mysql2": "3.24.6",
+    "pg": "8.23.1",
+    "pg-cursor": "2.22.1",
     "pino": "10.4.0",
+    "tedious": "20.3.8",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "@types/pg-cursor": "2.7.2",
     "drizzle-kit": "0.31.11"
   }
 }

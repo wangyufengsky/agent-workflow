@@ -2,6 +2,7 @@ import { AppError, DB_CONNECT_TIMEOUT_MS, ErrorCode } from '@aw/shared';
 import mysql from 'mysql2';
 import { z } from 'zod';
 import type { DbDriver, DbTarget } from '../databases.driver.ts';
+import { toJsonValue } from './values.ts';
 
 type Connection = ReturnType<typeof mysql.createConnection>;
 
@@ -16,8 +17,6 @@ const CLIENT_TIMEOUT_CODE = 'PROTOCOL_SEQUENCE_TIMEOUT';
  * the other statements.
  */
 const CLIENT_TIMEOUT_GRACE_MS = 1000;
-/** Binary values are shown as hex, cut to this many bytes. */
-const BINARY_PREVIEW_BYTES = 64;
 
 const driverErrorSchema = z.object({
   message: z.string(),
@@ -91,14 +90,6 @@ function run(connection: Connection, sql: string, values: unknown[] = []): Promi
   });
 }
 
-function toJsonValue(value: unknown): unknown {
-  if (Buffer.isBuffer(value)) {
-    const hex = value.subarray(0, BINARY_PREVIEW_BYTES).toString('hex');
-    return `0x${hex}${value.length > BINARY_PREVIEW_BYTES ? '…' : ''}`;
-  }
-  return value;
-}
-
 const fieldsSchema = z.array(z.object({ name: z.string() }));
 const rowSchema = z.array(z.unknown());
 
@@ -152,7 +143,7 @@ const columnRowSchema = z.object({
 });
 const indexRowSchema = z.object({ name: z.string(), columnName: z.string().nullable(), nonUnique: z.coerce.number() });
 
-/** MySQL through mysql2 (D07). */
+/** MySQL and GoldenDB (MySQL protocol) through mysql2 (D07, D97). */
 export const mysqlDriver: DbDriver = {
   serverVersion: (target) =>
     withConnection(target, async (connection) => {

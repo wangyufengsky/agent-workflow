@@ -10,6 +10,7 @@ import {
   CitationType,
   citationMarkers,
   classifySource,
+  type DbType,
   ErrorCode,
   KNOWLEDGE_CITATION_MAX_LINES,
   KNOWLEDGE_EXCERPT_MAX_CHARS,
@@ -76,7 +77,8 @@ const excerptOf = (lines: readonly string[], start: number, end: number) =>
     .join('\n')
     .slice(0, KNOWLEDGE_EXCERPT_MAX_CHARS);
 
-export type CitationScope = { repoPath: string; sources: KnowledgeSources; connections: readonly string[] };
+/** `connections`: the project's database connections by name, with their type (its SQL dialect, 24 §4). */
+export type CitationScope = { repoPath: string; sources: KnowledgeSources; connections: ReadonlyMap<string, DbType> };
 
 async function checkCitation(
   citation: SubmittedCitation,
@@ -130,14 +132,15 @@ async function checkCitation(
         notSelected(KnowledgeSourceKind.Database);
         return undefined;
       }
-      if (!scope.connections.includes(citation.connection)) {
+      const type = scope.connections.get(citation.connection);
+      if (type === undefined) {
         report(CitationProblemCode.UnknownConnection, `No connection ${citation.connection}`, {
-          connections: scope.connections,
+          connections: [...scope.connections.keys()],
         });
         return undefined;
       }
       try {
-        assertReadOnlySql(citation.sql);
+        assertReadOnlySql(citation.sql, type);
       } catch (err) {
         if (!(err instanceof AppError) || err.code !== ErrorCode.DbQueryRejected) throw err;
         report(CitationProblemCode.QueryNotReadonly, err.message);

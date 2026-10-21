@@ -1,3 +1,4 @@
+import { DbType } from '../enums/system.ts';
 import { SessionAgent } from '../enums/workflow.ts';
 
 export const APP_ID = 'agent-workflow';
@@ -73,3 +74,11 @@ function parsePort(env: Readonly<Record<string, string | undefined>>, name: stri
 export const PROJECT_CHECK_PLACEHOLDER = '$PROJECT_CHECK';
 /** Author and committer of the commits the backend makes for finished nodes (09 §3). */
 export const GIT_COMMIT_IDENTITY = { name: 'agent-workflow', email: 'agent-workflow@localhost' } as const;
+/** The connection form's port for each database type (24 §2). */
+export const DB_DEFAULT_PORT = {
+  [DbType.Mysql]: 3306,
+  [DbType.Postgresql]: 5432,
+  [DbType.Opengauss]: 5432,
+  [DbType.Sqlserver]: 1433,
+  [DbType.Goldendb]: 3306,
+} as const satisfies Record<DbType, number>;

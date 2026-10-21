@@ -193,7 +193,7 @@ macOS 仍是一个 job，按上面的顺序串行跑完：它约 3 分钟，比�
 
 **Playwright 只装 Chromium 的 headless shell**（`--only-shell`，浏览器 E2E 以 headless 运行，原来也只用它），系统依赖只在 Linux 上装（`--with-deps`）：Windows 上的 `--with-deps` 会花约 3.5 分钟启用 Media Foundation 功能，没有 spec 播放媒体（§4.3）。
 
-**数据库集成测试只在 ubuntu 上运行。** `databases.int.test.ts` 需要 Docker 中的 Linux 容器 `mysql:8.4`：GitHub 的 Windows runner 的 Docker 只能运行 Windows 容器，macOS runner 没有 Docker。工作流在这两个平台对 `test:int` 显式加 `--exclude '**/databases.int.test.ts'` 并在步骤名与注释中写明原因；代码中不按平台跳过（缺 Docker 时测试照常失败）。该测试与平台无关（只经 TCP 访问 MySQL），在 ubuntu 上运行即覆盖。
+**数据库集成测试只在 ubuntu 上运行。** `databases.int.test.ts` 与 `databases.engines.int.test.ts`（v1.2，24 §7）需要 Docker 中的 Linux 容器（`mysql:8.4`、`postgres:17.6`、openGauss、SQL Server）：GitHub 的 Windows runner 的 Docker 只能运行 Windows 容器，macOS runner 没有 Docker。工作流在这两个平台对 `test:int` 显式排除这两个文件并在步骤名与注释中写明原因；代码中不按平台跳过（缺 Docker 时测试照常失败）。该测试与平台无关（只经 TCP 访问 MySQL），在 ubuntu 上运行即覆盖。
 
 **不进 CI**：`test:oc`、`test:live`、J10（`journey.electron.spec.ts`）需要真实 opencode、登录的模型与网络，仍在本机运行。
 

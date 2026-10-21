@@ -42,7 +42,7 @@
 
 - macOS（arm64）、Node.js 24.19+、pnpm 10.28（`corepack enable`）、Git
 - opencode 1.19.0（已登录至少一个模型提供方；调用模型的测试默认用免费模型 `opencode-go/deepseek-v4.1-flash`，`AW_OC_TEST_MODEL` 可改）
-- Docker 与 `mysql:8.4` 镜像（`docker pull mysql:8.4`）：数据库集成测试用；live 测试的 Java 示例仓库需要 JDK 17+ 与 Maven
+- Docker 与 `mysql:8.4` 镜像（`docker pull mysql:8.4`）：数据库集成测试用；`postgres:17.6`、`opengauss/opengauss-server:7.0.0-RC3.B025`、`mcr.microsoft.com/mssql/server:2022-latest` 可选，没有拉取时对应的测试跳过（24 §7）；live 测试的 Java 示例仓库需要 JDK 17+ 与 Maven
 
 ```bash
 pnpm install
@@ -86,7 +86,7 @@ Electron main（apps/desktop/src/main）
 | 后端组装与启动 | `packages/server/src/app.ts`、`main.ts`；模块在 `src/modules/<名称>/`，对外只经 `index.ts` |
 | 一个任务怎么跑 | `modules/tasks` → `scheduler` → `nodes` → `attempts` → `opencode`；AI 调用的工具在 `modules/mcp` |
 | 页面与路由 | `apps/web/src/app/routes.ts`、`router.tsx`；页面在 `src/features/`；文案只在 `src/copy/` |
-| 测试辅助 | `packages/server/test/`（`createTestApp`、`FakeOpencode`、`FakeHosting`、`startMysql`） |
+| 测试辅助 | `packages/server/test/`（`createTestApp`、`FakeOpencode`、`FakeHosting`、`startMysql` 等数据库容器，`test/helpers/db-containers.ts`） |
 
 完整设计见 [docs/](docs/README.md)：产品与验收 [01](docs/01-product.md)、决策 [02](docs/02-decisions.md)、架构 [03](docs/03-architecture.md)、规范 [06](docs/06-coding-standards.md) / [07](docs/07-testing-standards.md)，v1.0 验收报告 [16](docs/16-acceptance-v1.0.md)。
 
