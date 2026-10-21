@@ -9,7 +9,7 @@ import { E2E_TOKEN } from './env.ts';
 /**
  * Starts the one backend every browser spec runs against (so specs run one at a time against its state). It listens
  * on a port the system picks, unless `AW_DEV_API_PORT` sets one, and reports it once listening: no other process can
- * take the port between choosing and listening, and checkouts run E2E side by side (D77). Workers start after this
+ * take the port between choosing and listening, and checkouts run E2E side by side (D78). Workers start after this
  * and inherit the runner's environment, so the port reaches baseURL and `API_BASE` through `AW_DEV_API_PORT`.
  */
 export default async function globalSetup(): Promise<() => Promise<void>> {

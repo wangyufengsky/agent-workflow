@@ -39,7 +39,7 @@ export const KNOWLEDGE_DOC_EXTENSIONS = ['.md', '.mdx', '.markdown', '.txt', '.r
 /** Fixed backend port in development so the Vite dev server can proxy to it; production uses a random port. */
 export const DEV_API_PORT = 47821;
 export const DEV_WEB_PORT = 47822;
-/** Override the development ports, so several checkouts can run side by side (D77). */
+/** Override the development ports, so several checkouts can run side by side (D78). */
 export const DEV_PORT_ENV = { api: 'AW_DEV_API_PORT', web: 'AW_DEV_WEB_PORT' } as const;
 
 /**

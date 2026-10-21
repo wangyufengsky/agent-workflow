@@ -58,7 +58,7 @@ pnpm dev
 | `pnpm dev` | 启动桌面应用（开发模式，后端端口 47821，前端 47822；`AW_DEV_API_PORT` / `AW_DEV_WEB_PORT` 可覆盖，多个 checkout 同时开发时用） |
 | `pnpm dev:server` / `pnpm dev:web` | 单独启动后端（Node 直接运行 TS，监听开发端口；需设 `AW_API_TOKEN` 与 `AW_DATA_DIR`）/ 浏览器前端（代理到同一端口；`VITE_AW_API_TOKEN` 设为同一令牌） |
 | `pnpm verify` | 提交前全量检查：类型、Biome、依赖边界、CSS 令牌、状态机文档、单元与集成测试、构建 |
-| `pnpm e2e` | 浏览器模式 E2E（FakeOpencode 扮演 AI；含四主题走查，截图写到 `screenshots/walkthrough/`）。后端用系统分配的端口，多个 checkout 可同时运行（D77） |
+| `pnpm e2e` | 浏览器模式 E2E（FakeOpencode 扮演 AI；含四主题走查，截图写到 `screenshots/walkthrough/`）。后端用系统分配的端口，多个 checkout 可同时运行（D78） |
 | `pnpm e2e:electron` | Electron 模式 E2E（需先 `pnpm build`；真实 opencode 与免费模型；`AW_E2E_EXECUTABLE` 可指向打包后的应用） |
 | `pnpm e2e:smoke` | Electron 启动冒烟（需先 `pnpm build`；不需要 opencode，CI 在三个平台运行） |
 | `pnpm test:oc` | 真实 opencode 的集成测试（只有 bridge 插件测试调用模型） |

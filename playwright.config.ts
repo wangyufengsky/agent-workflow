@@ -7,7 +7,7 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   reporter: 'list',
-  // Starts the backend the browser specs share, on a port it reports (D77); workers load this file again after it.
+  // Starts the backend the browser specs share, on a port it reports (D78); workers load this file again after it.
   globalSetup: './e2e/global-setup.ts',
   projects: [
     {
