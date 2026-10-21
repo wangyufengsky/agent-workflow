@@ -17,6 +17,7 @@ import {
 import { appendTranscript, attemptTranscript, updateAttempt } from '../features/attempts/attempt.queries.ts';
 import { updateInbox } from '../features/inbox/inbox.queries.ts';
 import { refreshKnowledge } from '../features/knowledge/knowledge.queries.ts';
+import { refreshSchedules } from '../features/schedules/schedules.queries.ts';
 import { updateNode, updateTask } from '../features/tasks/tasks.queries.ts';
 import { useUiStore } from '../state/ui.store.ts';
 import { apiToken } from './client.ts';
@@ -73,6 +74,9 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
     }
     case ServerEventType.KnowledgeUpdated:
       return refreshKnowledge(qc);
+    case ServerEventType.ScheduleUpdated:
+      await refreshSchedules(qc, event.data.scheduleId);
+      return;
     case ServerEventType.AssistantConfirmation:
       return updateConfirmation(qc, event.data);
     // Requests of the assistant to the renderer, carried out by the shell (15 §6).

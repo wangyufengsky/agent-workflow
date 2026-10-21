@@ -1,6 +1,7 @@
 import { insightsQuerySchema } from '@aw/shared';
 import { describe, expect, it } from 'vitest';
-import { localDateIn, resolvePeriod, startOfDay } from './insights.period.ts';
+import { localDateIn } from '../../core/time-zone.ts';
+import { resolvePeriod, startOfDay } from './insights.period.ts';
 
 const SHANGHAI = 'Asia/Shanghai';
 const LA = 'America/Los_Angeles';

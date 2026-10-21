@@ -13,7 +13,8 @@ import {
   type UsageGroupDTO,
   type UsageTotals,
 } from '@aw/shared';
-import { localDateIn, type ResolvedPeriod } from './insights.period.ts';
+import { localDateIn } from '../../core/time-zone.ts';
+import type { ResolvedPeriod } from './insights.period.ts';
 
 /** An attempt that started in the period: a task's (plan, execute, review) or a knowledge question's (research). */
 export type UsageAttempt = {

@@ -185,9 +185,9 @@ type AttemptDTO = AttemptSummaryDTO & {
 | --- | --- | --- |
 | GET | `/inbox?status&taskId&limit&cursor` | `{ items: InboxItemDTO[], nextCursor }`，按创建时间（同时按 id）倒序分页（§1）；`/inbox/count` 返回 `{ open }` 用于徽标 |
 | POST | `/inbox/:id/resolve` | `{ response }`，`response` 为对应 kind 的回应（见 10 §inbox_items；`question` 只接受 `{ answer }`）；不符合该 kind 400 `VALIDATION_FAILED`；已关闭 409 `INBOX_ITEM_CLOSED`；回答问题时 opencode 未就绪 503 `OPENCODE_NOT_READY`（条目保持打开） |
-| POST | `/inbox/:id/dismiss` | 仅 `failure` / `delivery` 可忽略 |
+| POST | `/inbox/:id/dismiss` | 仅 `failure` / `delivery` / `schedule_failure` 可忽略 |
 
-`resolve` 是各业务动作的统一入口：`question` → 答案发回会话；`permission` → 回复 opencode；`acceptance` → 节点 accept/reject；`plan` → 等同 plan confirm/replan；`failure` → 任务 retry/cancel；`delivery` 不通过 resolve，而是 `deliver` 成功后自动 resolved。
+`resolve` 是各业务动作的统一入口：`question` → 答案发回会话；`permission` → 回复 opencode；`acceptance` → 节点 accept/reject；`plan` → 等同 plan confirm/replan；`failure` → 任务 retry/cancel；`delivery` 不通过 resolve，而是 `deliver` 成功后自动 resolved；`schedule_failure` 同样不通过 resolve，恢复定时任务时自动 resolved（22 §5）。
 
 ## 8. Git（专业模式）
 
@@ -255,6 +255,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `assistant.open_form` | `{ conversationId, form: AssistantForm, values }` | 助手调用 `open_form`：打开表单并预填（不含凭据字段） |
 | `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
 | `knowledge.updated` | `{ conversationId }` | 知识问答：新一轮、答案提交、一轮结束、权限请求等待或已处理、删除时；对话与列表重新拉取（研究过程与流式回答的草稿沿用 `attempt.transcript`：研究尝试的正文每 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 个字符推送一次，草稿 = 最后一个非提交工具调用之后的正文，18 §5.5） |
+| `schedule.updated` | `{ scheduleId }` | 定时任务（v1.2）：创建、修改、暂停 / 恢复、每次运行、删除后；定时任务列表与详情重新拉取（查询挂在任务列表前缀下，开出的任务状态变化也会刷新，22 §9） |
 | `resync` | `{}` | 全部失效 |
 
 ## 12. 应用助手（v1.1）
@@ -311,6 +312,21 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/batches/:id/deliver` | `batches.deliver` | critical | `{ strategy? }`（`squash` / `merge` / `rebase`，默认 `delivery.defaultStrategy`；报告流程一律 `report_only`）→ `{ batch, outcomes: [{ taskId, taskKey, target, outcome, error }] }`：按目标顺序逐个交付「待合并」的子任务（§5.3），冲突与失败的停在 `review`，其余继续 |
 
 批次不新增 SSE 事件：进度随子任务的 `task.updated` 变化，前端批次查询挂在任务列表的缓存前缀下一并刷新。
+
+## 13d. 定时任务（v1.2）
+
+见 [22-scheduled-tasks.md §9](22-scheduled-tasks.md#9-api-与操作清单)。全部 `mode = simple`、`expose.assistant = true`；`schedules.create` 进命令面板。
+
+| 方法 | 路径 | 操作 | 风险 | 说明 |
+| --- | --- | --- | --- | --- |
+| GET | `/schedules?projectId` | `schedules.list` | read | `{ items: ScheduleDTO[] }`，按创建时间倒序，不分页 |
+| POST | `/schedules` | `schedules.create` | write | `{ projectId, workflowKey, requirement, frequency, baseBranch? }` → 201 `ScheduleDetailDTO`；只用 `fixed` 流程（否则 400 `VALIDATION_FAILED`，`path: ['workflowKey']`）；基础分支须存在（`GIT_BASE_BRANCH_NOT_FOUND`）；`produces: schedule` |
+| GET | `/schedules/:id` | `schedules.get` | read | `ScheduleDetailDTO`（最近 `SCHEDULE_RUNS_SHOWN` 次运行）；404 `SCHEDULE_NOT_FOUND` |
+| PATCH | `/schedules/:id` | `schedules.update` | write | `{ workflowKey?, requirement?, frequency?, baseBranch? }`（`baseBranch: null` 恢复默认分支，项目不能改）；改频率且启用中时重算 `nextRunAt` |
+| POST | `/schedules/:id/pause` | `schedules.pause` | write | `active → paused`；非法转换 409 `STATE_TRANSITION_INVALID` |
+| POST | `/schedules/:id/resume` | `schedules.resume` | write | `paused → active`，从现在起算下一次；关闭该定时任务的 `schedule_failure` 条目 |
+| POST | `/schedules/:id/run` | `schedules.run` | write | 立即运行一次（`trigger = manual`，不改计划时刻）→ `ScheduleDetailDTO`；上一次的任务未结束 409 `SCHEDULE_BUSY`；开不了任务时直接返回错误（不自动暂停） |
+| DELETE | `/schedules/:id` | `schedules.delete` | critical | 204；运行记录随之删除，开出的任务保留 |
 
 ## 13. preload 能力（非 HTTP）
 

@@ -113,6 +113,15 @@ const CASES: Array<{ name: string; machine: Machine<string, string>; illegal: Ar
       ['cancelled', 'confirm'],
     ],
   },
+  {
+    name: 'schedule',
+    machine: MACHINES.schedule,
+    illegal: [
+      ['active', 'resume'],
+      ['paused', 'pause'],
+      ['paused', 'start_failed'],
+    ],
+  },
 ];
 
 it('每个状态机都有用例', () => {

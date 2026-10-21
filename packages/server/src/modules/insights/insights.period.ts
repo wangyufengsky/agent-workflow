@@ -1,60 +1,10 @@
 import { InsightsPeriod, type InsightsQuery } from '@aw/shared';
-
-const DAY_MS = 86_400_000;
-/** Sampling this far before and after local midnight sees the offsets on both sides of a change near it. */
-const SIX_HOURS = 21_600_000;
-
-/** Calendar arithmetic on `YYYY-MM-DD`, independent of any time zone. */
-export function addDays(date: string, days: number): string {
-  return new Date(Date.parse(date) + days * DAY_MS).toISOString().slice(0, 10);
-}
-
-/** The date of each instant in `timeZone`; one formatter per zone, as it runs for every counted row. */
-export function localDateIn(timeZone: string): (ms: number) => string {
-  // en-CA writes dates as YYYY-MM-DD.
-  const format = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
-  return (ms) => format.format(ms);
-}
-
-/** How far the zone's wall clock is ahead of UTC at `ms`. */
-function offsetAt(ms: number, timeZone: string): number {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', {
-      timeZone,
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      second: 'numeric',
-      hourCycle: 'h23',
-    })
-      .formatToParts(ms)
-      .map((p) => [p.type, Number(p.value)]),
-  );
-  const wall = Date.UTC(
-    Number(parts.year),
-    Number(parts.month) - 1,
-    Number(parts.day),
-    Number(parts.hour),
-    Number(parts.minute),
-    Number(parts.second),
-  );
-  return wall - (ms - (ms % 1000));
-}
+import { addDays, localDateIn, weekdayOf, zonedInstant } from '../../core/time-zone.ts';
 
 /** The instant the date begins in `timeZone`: its 0:00, or the first instant of the date when the clocks skip it. */
 export function startOfDay(date: string, timeZone: string): number {
-  const midnightUtc = Date.parse(date);
-  const dateOf = localDateIn(timeZone);
-  const guess = midnightUtc - offsetAt(midnightUtc, timeZone);
-  // Local midnight in the offset before and in the offset after a change near it. When the change skips midnight
-  // (America/Havana springs from 23:59 to 1:00), only the earlier offset lands on the date, at the jump.
-  const starts = [guess - SIX_HOURS, guess + SIX_HOURS]
-    .map((t) => midnightUtc - offsetAt(t, timeZone))
-    .filter((t) => dateOf(t) === date);
-  if (starts.length === 0) throw new Error(`No start of ${date} in ${timeZone}`);
-  return Math.min(...starts);
+  // When a change skips midnight (America/Havana springs from 23:59 to 1:00), the date begins at the jump.
+  return zonedInstant(date, 0, timeZone);
 }
 
 export type ResolvedPeriod = {
@@ -77,8 +27,8 @@ export function resolvePeriod(query: InsightsQuery, now: number, timeZone: strin
       case InsightsPeriod.Today:
         return [today, today];
       case InsightsPeriod.Week: {
-        // getUTCDay of a bare date is its weekday; Monday starts the week.
-        const sinceMonday = (new Date(Date.parse(today)).getUTCDay() + 6) % 7;
+        // Monday starts the week.
+        const sinceMonday = (weekdayOf(today) + 6) % 7;
         return [addDays(today, -sinceMonday), today];
       }
       case InsightsPeriod.Last7Days:

@@ -97,6 +97,8 @@ export function createWorkflowsService({ db, clock, log, roles }: WorkflowsServi
   return {
     list: (): WorkflowSummaryDTO[] => repo.listLatest().map(toSummary),
     get,
+    /** The listed version of a key (scheduled tasks run it, 22 §1); WORKFLOW_NOT_FOUND once deleted. */
+    latest: latestByKey,
     versions(key: string): WorkflowSummaryDTO[] {
       const versions = repo.listVersions(key);
       if (versions.length === 0) throw new AppError(ErrorCode.WorkflowNotFound, `Workflow ${key} not found`, { key });

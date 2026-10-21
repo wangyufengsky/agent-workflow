@@ -14,6 +14,7 @@
 | `/tasks/:taskId` | 任务页（`?node` 选中步骤、`open` 打开抽屉、`details` 简单模式下临时显示专业视图，D60） | 全部（两种视图） | `delivery/task.html` |
 | `/tasks/:taskId/nodes/:nodeId` | 完整步骤页（`?attempt=` 选尝试） | 全部（专业视图的入口） | `node/index.html` |
 | `/batches`、`/batches/new`、`/batches/:batchId` | 批量任务（v1.1）：列表、新建（`?projectId=&workflow=<key>` 预选项目与流程）、批量视图，见 [20-batch-tasks.md](20-batch-tasks.md) | 全部 | 新增（风格同任务列表与主页表单） |
+| `/schedules`、`/schedules/new`、`/schedules/:scheduleId`、`/schedules/:scheduleId/edit` | 定时任务（v1.2）：列表、新建（`?projectId=&workflow=<key>` 预选项目与流程）、定时任务页（频率、下次运行、立即运行 / 暂停 / 恢复 / 修改 / 删除、运行记录）、修改，见 [22-scheduled-tasks.md §7](22-scheduled-tasks.md#7-页面) | 全部 | 新增（风格同批量任务） |
 | `/inbox` | 需要你处理 | 全部 | `inbox.html` |
 | `/projects`、`/projects/:projectId` | 项目 | 全部 | `projects.html` |
 | `/knowledge`、`/knowledge/:conversationId`、`/knowledge/history` | 知识问答（v1.1）：首屏（`?projectId=`）、对话（`?turn=&cite=` 打开某一轮的某处引用原文，`?details=true` 简单模式下的专业视图）、对话记录（`?q=&projectId=`） | 全部 | `knowledge.html`、`knowledge-history.html`，见 [18-knowledge.md §2](18-knowledge.md#2-页面与交互) |
@@ -108,7 +109,7 @@ export const NAV_ITEMS: NavItem[] = [
 └───────────────────────────────────────────────────────┘
 ```
 
-- 流程卡片：图标 + 名称 + 一句话说明；固定流程的卡片右上角有「批量」，进入新建批量任务页（20 §2）；专业模式下额外列出自定义流程，并显示「更多选项」（标题、基于分支、每个步骤由我验收、不确定时停下来问我）与「保存草稿」（`start: false`；任务页的草稿显示「开始」按钮）。
+- 流程卡片：图标 + 名称 + 一句话说明；固定流程的卡片右上角有「批量」，进入新建批量任务页（20 §2），右下角有「定时」，进入新建定时任务页（22 §7）；专业模式下额外列出自定义流程，并显示「更多选项」（标题、基于分支、每个步骤由我验收、不确定时停下来问我）与「保存草稿」（`start: false`；任务页的草稿显示「开始」按钮）。
 - 所选项目记在地址里（`/?projectId=`），刷新或从别处链接过来都保留；只有一个项目时不显示项目选择。
 - 无项目时，输入区替换为「添加项目」引导。
 - 点开始 → 立即跳到任务页（任务处于「准备中」）。「开始」不可用时旁边说明原因（如「先描述需求」）。
@@ -188,6 +189,9 @@ export const NAV_ITEMS: NavItem[] = [
 | plan | 计划版本与说明（不重复任务标题） | 去确认（跳任务页） |
 | failure | 失败说明（与任务页同一句，写明哪一步） | 重试 / 取消任务 |
 | delivery | 结果已就绪、等你合并或创建 PR（不重复任务标题；改动统计在结果卡） | 去查看（跳任务页结果卡） |
+| schedule_failure（v1.2） | 「定时任务没能开始：<原因>」与「已自动暂停」 | 查看定时任务 / 忽略 |
+
+定时任务开出的任务，其条目的来源一行先写「定时任务「<标题>」」（22 §6）。
 
 ### 3.7 项目、任务列表、设置
 

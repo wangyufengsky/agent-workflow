@@ -7,6 +7,7 @@ import { EmptyState } from '../../components/empty-state.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { BATCHES_COPY } from '../../copy/batches.ts';
 import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
+import { SCHEDULES_COPY } from '../../copy/schedules.ts';
 import { TASKS_COPY as C, TASK_DISPLAY_LABEL } from '../../copy/tasks.ts';
 import { projectsQuery } from '../projects/projects.queries.ts';
 import { TaskBadge } from './task-badge.tsx';
@@ -40,6 +41,9 @@ export function TasksPage() {
         <div className={styles.filters}>
           <Link to={ROUTES.batches} className="btn ghost">
             {BATCHES_COPY.title}
+          </Link>
+          <Link to={ROUTES.schedules} className="btn ghost">
+            {SCHEDULES_COPY.title}
           </Link>
           <select
             className="select"
