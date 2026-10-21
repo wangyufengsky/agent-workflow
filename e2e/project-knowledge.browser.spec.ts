@@ -159,4 +159,9 @@ test('J13 对助手提问 → 正在查资料 → 带引用的回答 → 点引�
   await card.getByRole('button', { name: '打开' }).click();
   await expect(page).toHaveURL(new RegExp(`/knowledge/${id}$`));
   await expect(page.getByTestId('knowledge-turn')).toContainText('退款在 refund() 中四舍五入到分');
+  // Later specs open the panel on the most recent conversation: leave none behind.
+  const conversations = await (await request.get(`${API_BASE}/assistant/conversations`, { headers: AUTH })).json();
+  for (const c of conversations.items) {
+    await request.delete(`${API_BASE}/assistant/conversations/${c.id}`, { headers: AUTH });
+  }
 });
