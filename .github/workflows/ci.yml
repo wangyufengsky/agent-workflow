@@ -30,6 +30,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
 
+      # Measured on the runner (17 §4.1): with real-time scanning every new file in temp directories and the workspace
+      # (SQLite databases, test repositories, worktrees) is scanned, which made the integration tests about 4x slower
+      # than on Ubuntu. Users get the same advice for the data directory in README.
+      - name: Exclude test directories from Defender scanning
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-MpComputerStatus | Select-Object RealTimeProtectionEnabled, AntivirusEnabled | Format-List
+          Add-MpPreference -ExclusionPath $env:TEMP, $env:RUNNER_TEMP, $env:GITHUB_WORKSPACE
+
       - name: Allow Chromium's sandbox for Electron (Ubuntu 24.04 restricts unprivileged user namespaces)
         if: runner.os == 'Linux'
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
