@@ -329,7 +329,8 @@ test.use({ viewport: { width: WIDTH, height: HEIGHT } });
 test.afterAll(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
 
 test('J9 走查：四套主题 × 两种模式下全部页面无报错、无对比度与横向溢出问题', async ({ page, request }) => {
-  test.setTimeout(900_000);
+  // About 3 minutes on a Mac; several times that on a CI runner, Windows the slowest (17 §4.1).
+  test.setTimeout(2_400_000);
   const s = await seed(request);
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(e.message));

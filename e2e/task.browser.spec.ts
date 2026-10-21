@@ -85,10 +85,12 @@ test('J4 检查失败 → 自动重试成功；另一步骤预算耗尽 → 任�
         type: 'callTool',
         name: 'submit_plan',
         args: {
-          summary: '两个独立的步骤，最后整体验证。',
+          summary: '先生成标记文件，再更新说明，最后整体验证。',
           nodes: [
             { key: 'a', title: '生成标记文件', role: 'developer', instructions: 'Create ok.txt' },
-            { key: 'b', title: '更新说明', role: 'developer', instructions: 'Update docs' },
+            // After a: otherwise b may use up its budget (failing the task, which stops dispatching) before a's retry
+            // starts, depending on how long a's check takes.
+            { key: 'b', title: '更新说明', role: 'developer', instructions: 'Update docs', depends_on: ['a'] },
             { key: 'final_verify', title: '整体验证', role: 'tester', instructions: 'Verify', depends_on: ['a', 'b'] },
           ],
         },

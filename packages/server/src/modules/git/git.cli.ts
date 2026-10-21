@@ -20,16 +20,18 @@ export type GitResult = { stdout: string; stderr: string; exitCode: number };
  * missing binary → GIT_NOT_INSTALLED, unexpected exit → GIT_COMMAND_FAILED with args, exit code and stderr.
  */
 export async function runGit(args: readonly string[], options: GitOptions): Promise<GitResult> {
-  const result = await execa('git', [...host.gitPlatformArgs, ...args], {
+  const env = options.env ?? process.env;
+  // Located here rather than by spawning: on Windows execa runs an unresolvable command through cmd.exe, which
+  // exits 1 instead of reporting ENOENT.
+  const git = host.findExecutable('git', host.pathDirs(env));
+  if (git === undefined) throw new AppError(ErrorCode.GitNotInstalled, 'git executable not found');
+  const result = await execa(git, [...host.gitPlatformArgs, ...args], {
     cwd: options.cwd,
-    env: { ...(options.env ?? process.env), LC_ALL: 'C' },
+    env: { ...env, LC_ALL: 'C' },
     extendEnv: false,
     reject: false,
     stripFinalNewline: options.verbatim !== true,
   });
-  if (result.code === 'ENOENT' && result.exitCode === undefined) {
-    throw new AppError(ErrorCode.GitNotInstalled, 'git executable not found');
-  }
   // No exit code means git was killed by a signal; report it as a failure like any unexpected exit.
   const exitCode = result.exitCode ?? -1;
   if (!(options.okExitCodes ?? [0]).includes(exitCode)) {

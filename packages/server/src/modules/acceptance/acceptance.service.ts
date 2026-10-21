@@ -16,7 +16,6 @@ import {
 import { execa } from 'execa';
 import type { Clock } from '../../core/clock.ts';
 import type { Logger } from '../../core/logger.ts';
-import { host } from '../../core/platform.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import { locateShell } from '../git/index.ts';
 import type { RolesService } from '../roles/index.ts';
@@ -116,12 +115,11 @@ export function createAcceptanceService({
         all: true,
         reject: false,
         stdin: 'ignore',
-        ...host.treeSpawnOptions,
+        // A shell ended alone leaves its commands running, holding the output and worktree files (D68).
+        killDescendants: true,
       });
       let timedOut = false;
-      const stop = () => {
-        host.killProcessTree(child).catch((err: unknown) => log.error({ err, command }, 'check command not stopped'));
-      };
+      const stop = () => child.kill();
       const cancelTimeout = clock.schedule(ACCEPTANCE_COMMAND_TIMEOUT_MS, () => {
         timedOut = true;
         stop();

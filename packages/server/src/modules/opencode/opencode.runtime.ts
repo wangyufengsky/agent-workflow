@@ -21,7 +21,6 @@ import { execa } from 'execa';
 import type { Clock } from '../../core/clock.ts';
 import type { EventBus } from '../../core/event-bus.ts';
 import { dateStamp, type Logger } from '../../core/logger.ts';
-import { host } from '../../core/platform.ts';
 import { detectOpencode } from './opencode.binary.ts';
 
 export type OpencodeRuntimeDeps = {
@@ -42,15 +41,15 @@ export type OpencodeRuntimeDeps = {
 const SERVE_ARGS = ['serve', '--hostname', '127.0.0.1', '--port', '0', '--print-logs', '--log-level', 'WARN'];
 
 function spawnServe(path: string, env: NodeJS.ProcessEnv) {
-  const command = host.commandFor(path, SERVE_ARGS, env);
-  return execa(command.file, command.args, {
+  return execa(path, SERVE_ARGS, {
     env,
     extendEnv: false,
     stdin: 'ignore',
     buffer: false,
     reject: false,
-    windowsVerbatimArguments: command.windowsVerbatimArguments,
-    ...host.treeSpawnOptions,
+    // Stopping ends its bash commands and language servers too: on Windows they would outlive it, holding worktree
+    // files (D68).
+    killDescendants: true,
   });
 }
 
@@ -216,7 +215,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     } catch (err) {
       // Recovery with a defined meaning: a launch that does not come up is killed and recorded as crashed by onExit.
       log.warn({ err }, 'opencode failed to start');
-      await host.killProcessTree(launched.child);
+      launched.child.kill();
       await launched.exited;
     }
     return snapshot();
@@ -229,8 +228,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     proc = undefined;
     sdk = undefined;
     current.events.abort();
-    // On Windows its bash commands and language servers would outlive it, holding worktree files (D68).
-    await host.killProcessTree(current.child);
+    current.child.kill();
     await current.exited;
   }
 

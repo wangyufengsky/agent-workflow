@@ -14,25 +14,6 @@ describe('平台规则', () => {
     expect(linux.homeDir(env)).toBe('/home/me');
   });
 
-  it('Windows 上可执行文件为 .exe 或 npm 的 .cmd 启动脚本', () => {
-    expect(windows.executableNames('opencode')).toEqual(['opencode.exe', 'opencode.cmd']);
-    expect(linux.executableNames('opencode')).toEqual(['opencode']);
-  });
-
-  it('.cmd 经 cmd.exe 启动，路径中的空格与括号在引号内', () => {
-    const env = { ComSpec: 'C:\\Windows\\System32\\cmd.exe' };
-    expect(windows.commandFor('C:\\Program Files (x86)\\npm\\opencode.cmd', ['--version'], env)).toEqual({
-      file: 'C:\\Windows\\System32\\cmd.exe',
-      args: ['/d', '/s', '/c', '""C:\\Program Files (x86)\\npm\\opencode.cmd" --version"'],
-      windowsVerbatimArguments: true,
-    });
-    expect(windows.commandFor('C:\\oc\\opencode.exe', ['serve'], env)).toEqual({
-      file: 'C:\\oc\\opencode.exe',
-      args: ['serve'],
-      windowsVerbatimArguments: false,
-    });
-  });
-
   it('git 输出的正斜杠路径在 Windows 上转为本机形式', () => {
     expect(windows.fromGitPath('C:/Users/me/repo')).toBe('C:\\Users\\me\\repo');
     expect(linux.fromGitPath('/home/me/repo')).toBe('/home/me/repo');
