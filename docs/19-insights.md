@@ -47,7 +47,7 @@
 | 指标 | 计算 |
 | --- | --- |
 | 尝试数 | 范围内尝试的条数（含没有报告用量的） |
-| 输入 / 输出 tokens | `tokens_input`、`tokens_output` 之和；为空（会话没有完成过一步）记 0 |
+| 输入 / 输出 tokens | `tokens_input`、`tokens_output` 之和；为空（会话没有完成过一步）记 0。取 opencode 每一步报告的 `input` / `output`：不含缓存读写与推理 tokens（已有数据只记了这两项），成本则是 opencode 按全部用量算的 |
 | 成本 | `cost` 之和，单位为 opencode 报告的美元；界面保留 4 位小数 |
 | 未计价 tokens | `cost` 为 0 或为空、而 tokens 大于 0 的尝试的输入 + 输出 tokens。opencode 对免费模型和没有配置价格的模型都报告 0，两者无法区分，统一显示为「未计价」，不估算（D78 ②） |
 
@@ -175,7 +175,7 @@ type InsightsTaskDTO = {
   - `attempts(started_at)`：用量按时间区间扫描尝试，尝试是这些表里最大的一张（每个节点每次重试、每次评审、每次提问各一行）；
   - `inbox_items(created_at)`：`attention` 按创建时间扫描，已有的 `(status, created_at)` 以状态开头，用不上。
 - 不需要新索引的查询：结束的任务用已有的 `tasks(status, updated_at)`（`updated_at ≥ finished_at`，先按 `updated_at ≥ from` 缩小再判断结束时间）；按任务 id 的批量查询用已有的 `nodes(task_id, status)`、`attempts(task_id, kind)`、`task_events(task_id, id)`、`inbox_items(task_id)`；知识对话、项目、流程、角色按主键。
-- 实测（I-04，本机 M 系列 Mac）：5 000 个任务、6 万次尝试、30 万条任务事件的数据库上，`last_30_days`（约 400 个任务、5 000 次尝试）的 `insights.summary` 约 X ms（数字见 05 I-04 完成记录）。
+- 实测（I-04，本机 Apple Silicon Mac，2026-10-21）：5 000 个任务（分布在一年内）、2 万个节点、6 万次尝试、30 万条任务事件的数据库上，读取加汇总：`last_30_days`（409 个结束的任务、4 908 次尝试）首次 70 ms、之后 35–45 ms；`last_7_days` 约 8 ms。`EXPLAIN QUERY PLAN` 确认用量走 `attempts_started_idx`、结束的任务走 `tasks_status_updated_idx`、打扰走 `inbox_created_idx` 与 `inbox_task_idx`。
 - 前端：两次请求（汇总与任务明细）；钻取、拆分标签切换都在客户端完成，不再请求。
 
 ## 6. 枚举、常量（08）
