@@ -106,37 +106,31 @@ function run(connection: Connection, sql: string, params: Record<string, string>
 }
 
 /**
- * Streams the first result set and stops once `maxRows` rows are in; the caller then closes the connection, which
- * rolls the transaction back. T-SQL runs a batch of statements; later result sets are not read.
+ * Streams the first result set; once `maxRows` rows are in, cancels the request (the server stops sending) and
+ * resolves when tedious reports the cancellation. Closing the connection while a request still streams makes tedious
+ * throw outside any callback, so the connection is closed only afterwards (by the caller, rolling the transaction
+ * back). T-SQL runs a batch of statements; later result sets are not read.
  */
 function streamRows(connection: Connection, sql: string, maxRows: number) {
   return new Promise<{ columns: string[]; rows: unknown[][]; truncated: boolean }>((resolve, reject) => {
     let columns: string[] = [];
     let resultSets = 0;
     const rows: unknown[][] = [];
-    let settled = false;
-    const finish = (truncated: boolean) => {
-      if (settled) return;
-      settled = true;
-      resolve({ columns, rows, truncated });
-    };
+    let truncated = false;
     const request = new Request(sql, (err) => {
-      // After truncation the connection is closed on purpose; what the request reports then is not a result.
-      if (settled) return;
-      if (err === undefined || err === null) finish(false);
-      else {
-        settled = true;
-        reject(requestError(err));
-      }
+      // The cancellation asked for after truncation ends the request with ECANCEL; that is the expected end.
+      if (err === undefined || err === null || truncated) resolve({ columns, rows, truncated });
+      else reject(requestError(err));
     });
     request.on('columnMetadata', (metadata) => {
       resultSets += 1;
       if (resultSets === 1) columns = Object.values(metadata).map((m) => m.colName);
     });
     request.on('row', (values: unknown) => {
-      if (settled || resultSets > 1) return;
+      if (truncated || resultSets > 1) return;
       if (rows.length === maxRows) {
-        finish(true);
+        truncated = true;
+        connection.cancel();
         return;
       }
       rows.push(rowSchema.parse(values).map(toJson));
