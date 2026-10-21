@@ -102,12 +102,21 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `RuntimeStatus` | `not_installed` · `version_mismatch` · `stopped` · `starting` · `ready` · `crashed` |
 | `DbType` | `mysql` |
 | `CredentialKind` | `git_token` · `db_password` |
-| `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` |
+| `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` · `confirmation` · `attachment`（后两种仅助手对话，10 §3） |
 | `TranscriptSystemEvent` | `attempt_started` · `nudged` · `retrying` · `result_submitted` · `awaiting_input`（等待用户回答或授权）· `timed_out` · `aborted` · `runtime_lost`（`system` 会话流条目记录的事件，文案在前端） |
 | `McpToolName` | 执行 MCP 工具名（12 §6）；`ATTEMPT_SUBMIT_TOOL` 为每种尝试的提交工具 |
 | `BashPolicy` | `auto`（默认放行，禁止 Git 写操作）· `ask`（只读命令放行，其余询问） |
 | `OperationRisk` | `read` · `write` · `critical`（操作清单风险等级，决定助手确认行为，见 15 §4） |
 | `ServerEventType` | 见 [11-api.md §11](11-api.md#11-sse-事件) |
+
+### 2.7 应用助手（v1.1，`enums/assistant.ts`）
+
+| 枚举 | 值 | 说明 |
+| --- | --- | --- |
+| `AssistantConfirmationStatus` | `pending` · `confirmed` · `cancelled` | 确认卡片（09 §10） |
+| `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` | 助手专用工具（15 §3）；其余工具由操作清单生成 |
+| `AssistantPage` | `home` · `tasks` · `task` · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey`） |
+| `AssistantForm` | `tasks.create` · `projects.create` · `projects.setHosting` · `databases.create` · `databases.update` | `open_form` 能打开的表单，以其提交的操作命名（`ASSISTANT_FORM_OPERATION`）；预填值的 schema 为该操作的助手输入（不含凭据字段）的 partial |
 
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 
@@ -133,7 +142,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `OPENCODE_VERSION` | `1.19.0` | 精确匹配，不匹配则 `version_mismatch` |
 | `OPENCODE_AGENT_NAME` | `{ planner: 'aw-planner', executor: 'aw-executor', reviewer: 'aw-reviewer' }` | |
 | `MCP_SERVER_NAME` | `agent-workflow` | 执行 MCP；opencode 中工具名为 `agent-workflow_<tool>` |
-| `MCP_ASSISTANT_SERVER_NAME` | `agent-workflow-app` | 助手 MCP（v1.1） |
+| `MCP_ASSISTANT_SERVER_NAME` | `agent-workflow-app` | 助手 MCP（v1.1）；opencode 中工具名为 `agent-workflow-app_<tool>` |
+| `OPENCODE_ASSISTANT_AGENT` | `aw-assistant` | 助手的 agent（v1.1） |
 | `TASK_KEY_PREFIX` | `T-` | 任务编号 `T-<自增>` |
 | `BRANCH_PREFIX` | `aw/` | 分支名 `aw/<taskKey>-<slug>` |
 | `BRANCH_SLUG_MAX` | `40` | slug 由标题转写，只保留 `[a-z0-9-]`（`toSlug`，`shared/naming.ts`） |
@@ -142,6 +152,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DEV_API_PORT` / `DEV_WEB_PORT` | `47821` / `47822` | 仅开发；生产后端随机端口（D31） |
 | `MCP_EXEC_PATH` | `/mcp/exec` | |
 | `MCP_ASSISTANT_PATH` | `/mcp/assistant` | v1.1 |
+| `ASSISTANT_DIR` / `ASSISTANT_FILES_DIR` / `ASSISTANT_CONVERSATIONS_DIR` | `assistant` / `files` / `conversations` | 助手工作目录 `<数据目录>/assistant/`，对话文件 `files/<id>/`，消息流 `conversations/<id>.jsonl` |
 | `PROJECT_CHECK_PLACEHOLDER` | `$PROJECT_CHECK` | 验收命令中代表项目检查命令，物化节点时替换（13 §1） |
 | `GIT_COMMIT_IDENTITY` | `agent-workflow <agent-workflow@localhost>` | 节点完成时后端提交的作者与提交者（09 §3） |
 
@@ -151,6 +162,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | --- | --- | --- |
 | `OPENCODE_START_TIMEOUT_MS` | `30000` | `opencode serve` 报告地址并响应 `/config` 的时限 |
 | `MCP_TOOL_PREFIX` | `agent-workflow_` | opencode 中本项目 MCP 工具名的前缀 |
+| `MCP_ASSISTANT_TOOL_PREFIX` | `agent-workflow-app_` | 助手 MCP 工具名的前缀；bridge 插件对两种前缀都注入会话 id |
 | `MCP_SESSION_ARG` | `__aw_session` | bridge 插件注入的会话 id 参数名（12 §3） |
 | `BASH_PERMISSION_PRESETS` | `auto` / `ask` 两套规则 | 执行者的会话级 bash 规则（12 §2） |
 | `readonlyBashRules(checkCommands)` | 函数 | 规划与评审会话的会话级 bash 规则，`ask` 策略即不带检查命令的这一套（12 §2，D64） |
@@ -177,6 +189,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DIFF_FILE_MAX_BYTES` | 1048576（超过显示「文件过大」） |
 | `RUNTIME_LOG_TAIL_DEFAULT` / `RUNTIME_LOG_TAIL_MAX` | 500 / 5000（运行环境日志页的行数） |
 | `LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX` | 50 / 100（任务与「需要你处理」列表每页条数，11 §1） |
+| `ASSISTANT_TITLE_MAX_CHARS` | 40（助手对话标题取第一条消息的首行） |
+| `ASSISTANT_MESSAGE_MAX_CHARS` | 20000（一条发给助手的消息） |
 
 ### 4.3 用户设置（`constants/settings.ts`，键 → 默认值）
 
@@ -195,7 +209,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `delivery.defaultStrategy` | `squash`（可选 `squash` / `merge` / `rebase`；PR 有单独按钮） | 专业 |
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |
 | `opencode.binaryPath` | `null`（从 PATH 与 `~/.opencode/bin` 查找） | 专业 |
-| `assistant.alwaysAllow` | `[]`（操作 id 列表，仅 write 级可加入；v1.1） | 简单 |
+| `assistant.alwaysAllow` | `[]`（操作 id 列表；只有 write 级生效，critical 即使在列表中也每次确认；助手自己不能修改，D65；v1.1） | 简单 |
 
 「模式」列表示该设置在哪种界面模式下出现在设置页（常量 `SETTING_MODE`）。值的 schema 为 `settingsSchema`（strict：未知键拒绝），默认值为 `SETTING_DEFAULTS`。
 
@@ -275,6 +289,11 @@ class AppError extends Error {
 | `MCP_TOOL_NOT_ALLOWED` | — | 当前尝试类型不允许此工具 |
 | `MCP_RESULT_ALREADY_SUBMITTED` | — | 同一尝试重复提交结果/计划/评审 |
 | `MCP_NODE_NOT_FOUND` | — | `get_node_output` 的 node_key 不存在或未完成 |
+| `MCP_CONVERSATION_UNRESOLVED` | — | 助手 MCP：调用的会话不属于任何助手对话（如执行任务的会话） |
+| **助手（v1.1）** | | |
+| `ASSISTANT_CONVERSATION_NOT_FOUND` | 404 | |
+| `ASSISTANT_CONFIRMATION_NOT_FOUND` | 404 | |
+| `ASSISTANT_BUSY` | 409 | 助手正在回复时又发来消息（先等它结束或停止它） |
 | **Inbox** | | |
 | `INBOX_ITEM_NOT_FOUND` | 404 | |
 | `INBOX_ITEM_CLOSED` | 409 | 条目已处理 |

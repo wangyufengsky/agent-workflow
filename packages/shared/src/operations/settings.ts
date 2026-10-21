@@ -27,5 +27,7 @@ export const updateSettingsOp = defineOperationContract({
   http: { method: 'PATCH', path: '/settings' },
   expose: { palette: false, assistant: true },
   credentialFields: [],
+  // Approving its own calls, or choosing the program the app starts, stays with the user (D65).
+  assistantOmit: ['assistant.alwaysAllow', 'opencode.binaryPath'],
   mode: UiMode.Simple,
 });

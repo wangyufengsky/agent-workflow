@@ -302,15 +302,45 @@ payload / response：
 | `permission` | `{ permissionId, permission, patterns }` |
 | `system` | `{ event: TranscriptSystemEvent, detail? }`（尝试开始、已提醒、重试中、已提交、超时、已中止、运行时消失；文案在前端） |
 | `error` | `ErrorInfo`（`{ code, message, details? }`；尝试结束后的会话错误不记录，如提交后我们发出的中止） |
+| `confirmation` | `{ confirmationId }`（仅助手对话：一次等待用户确认的调用，卡片内容来自 `assistant_confirmations`） |
+| `attachment` | `{ path }`（仅助手对话：助手写入对话文件目录 `files/<id>/` 的文件，`path` 相对该目录） |
 
 读取：`GET /attempts/:id/transcript?afterSeq=` 每页 `TRANSCRIPT_PAGE_SIZE` 行；seq 从 1 起逐行连续编号（第 i 行即 seq i+1），所以一页就是按行切出的一段，只解析这一段（M6-02：5 MB、约六千行的文件，每页约 20 ms）；页内同一 `partId` 只保留最后一行、放在它首次出现的位置。界面先显示第一页，其余页在后台接着读；读页期间经 SSE 到达的行另存一处，显示时与各页按 seq 去重合并（`transcriptEntries`），因此读页与追加交错时不丢行。
 
-## 4. v1.1 预留：助手
+## 4. 助手（v1.1）
 
-`assistant_conversations`（id、title、opencode_session_id、created_at、updated_at）与 `assistant_confirmations`（id、conversation_id、operation_id、input JSON、status `pending/confirmed/cancelled`、result JSON、created_at、resolved_at）在 v1.1 以新迁移加入，v1.0 不建表。见 [15-assistant.md](15-assistant.md)。
+见 [15-assistant.md](15-assistant.md)，迁移 `0008`。
+
+### assistant_conversations
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| title | TEXT | 默认取第一条消息的首行（`ASSISTANT_TITLE_MAX_CHARS`） |
+| opencode_session_id | TEXT NULL | 第一条消息时创建；MCP 调用归属的依据 |
+| created_at / updated_at | INTEGER | `updated_at` 随每条消息更新，列表按它倒序 |
+
+索引：`(opencode_session_id)`、`(updated_at)`。
+
+### assistant_confirmations
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| conversation_id | TEXT → assistant_conversations，CASCADE | |
+| operation_id | TEXT | 操作清单 id |
+| input | TEXT(JSON) | 助手给出的参数（已按助手 schema 校验，不含凭据字段） |
+| status | TEXT | `AssistantConfirmationStatus`（09 §10） |
+| result | TEXT(JSON) NULL | 确认后：`{ ok: true, output }` 或 `{ ok: false, error }`；取消为空 |
+| created_at / resolved_at | INTEGER | |
+
+索引：`(conversation_id, created_at)`。
+
+消息流：`<数据目录>/assistant/conversations/<id>.jsonl`，格式同 §3（多 `confirmation`、`attachment` 两种条目）；记录用户的消息、模型的正文与工具调用、权限请求、错误；后端代发的确认结果消息与每轮注入的 `system` 不记录（卡片显示结果）。
 
 ## 5. 删除与清理
 
 - 删除项目：要求无非终态任务；级联删除其任务及全部关联数据和 `runs/<taskId>` 目录。
+- 删除助手对话：级联删除其确认，并删除 `assistant/conversations/<id>.jsonl` 与 `assistant/files/<id>/`。
 - 任务终态后 worktree 删除，但任务、计划、节点、尝试、会话流保留（供回看）。
 - 不做自动过期清理（v1）。设置页显示数据目录占用。

@@ -1,9 +1,23 @@
+import {
+  abortAssistantOp,
+  cancelAssistantCallOp,
+  confirmAssistantCallOp,
+  createConversationOp,
+  deleteConversationOp,
+  getConversationOp,
+  listAssistantFilesOp,
+  listConfirmationsOp,
+  listConversationsOp,
+  replyAssistantPermissionOp,
+  sendAssistantMessageOp,
+} from './assistant.ts';
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
 import {
   createDbConnectionOp,
   dbSchemaOp,
   deleteDbConnectionOp,
   listDbConnectionsOp,
+  queryDbOp,
   testDbConnectionOp,
   updateDbConnectionOp,
 } from './databases.ts';
@@ -84,6 +98,7 @@ import {
   validateWorkflowOp,
 } from './workflows.ts';
 
+export * from './assistant.ts';
 export * from './attempts.ts';
 export * from './databases.ts';
 export * from './debug.ts';
@@ -121,6 +136,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   deleteDbConnectionOp,
   testDbConnectionOp,
   dbSchemaOp,
+  queryDbOp,
   getAttemptOp,
   abortAttemptOp,
   startDebugAttemptOp,
@@ -175,4 +191,15 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   gitFetchOp,
   listWorktreesOp,
   pruneWorktreesOp,
+  listConversationsOp,
+  createConversationOp,
+  getConversationOp,
+  deleteConversationOp,
+  sendAssistantMessageOp,
+  abortAssistantOp,
+  replyAssistantPermissionOp,
+  listAssistantFilesOp,
+  listConfirmationsOp,
+  confirmAssistantCallOp,
+  cancelAssistantCallOp,
 ];

@@ -35,7 +35,10 @@ export type AttemptDTO = z.infer<typeof attemptSchema>;
 const entry = { seq: z.number(), ts: z.number() };
 const part = { ...entry, partId: z.string() };
 
-/** One line of `runs/<taskId>/<attemptId>.jsonl` (10 §3). Streaming text repeats its `partId`; the last line wins. */
+/**
+ * One line of `runs/<taskId>/<attemptId>.jsonl` and of the assistant's `conversations/<id>.jsonl` (10 §3). Streaming
+ * text repeats its `partId`; the last line wins.
+ */
 export const transcriptEntrySchema = z.discriminatedUnion('kind', [
   z.object({ ...entry, kind: z.literal(TranscriptEntryKind.UserMessage), data: z.object({ text: z.string() }) }),
   z.object({ ...part, kind: z.literal(TranscriptEntryKind.Text), data: z.object({ text: z.string() }) }),
@@ -67,6 +70,13 @@ export const transcriptEntrySchema = z.discriminatedUnion('kind', [
     data: z.object({ event: transcriptSystemEventSchema, detail: z.string().optional() }),
   }),
   z.object({ ...entry, kind: z.literal(TranscriptEntryKind.Error), data: errorInfoSchema }),
+  z.object({
+    ...entry,
+    kind: z.literal(TranscriptEntryKind.Confirmation),
+    data: z.object({ confirmationId: z.string() }),
+  }),
+  /** `path` is relative to the conversation's files directory. */
+  z.object({ ...entry, kind: z.literal(TranscriptEntryKind.Attachment), data: z.object({ path: z.string() }) }),
 ]);
 export type TranscriptEntry = z.infer<typeof transcriptEntrySchema>;
 

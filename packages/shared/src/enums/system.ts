@@ -34,6 +34,10 @@ export const TranscriptEntryKind = {
   Permission: 'permission',
   System: 'system',
   Error: 'error',
+  /** Assistant conversations only: a call waiting for the user's confirmation (15 §4). */
+  Confirmation: 'confirmation',
+  /** Assistant conversations only: a file the assistant wrote in the conversation's files directory (15 §6). */
+  Attachment: 'attachment',
 } as const;
 export type TranscriptEntryKind = (typeof TranscriptEntryKind)[keyof typeof TranscriptEntryKind];
 export const transcriptEntryKindSchema = z.enum(TranscriptEntryKind);
@@ -82,6 +86,13 @@ export const ServerEventType = {
   DeliveryUpdated: 'delivery.updated',
   RuntimeUpdated: 'runtime.updated',
   SettingsUpdated: 'settings.updated',
+  AssistantUpdated: 'assistant.updated',
+  AssistantTranscript: 'assistant.transcript',
+  AssistantConfirmation: 'assistant.confirmation',
+  /** The assistant asks the renderer to open a page, a prefilled form, or reveal a file (15 §3). */
+  AssistantNavigate: 'assistant.navigate',
+  AssistantOpenForm: 'assistant.open_form',
+  AssistantRevealFile: 'assistant.reveal_file',
   Resync: 'resync',
 } as const;
 export type ServerEventType = (typeof ServerEventType)[keyof typeof ServerEventType];

@@ -51,6 +51,11 @@ export const ErrorCode = {
   McpToolNotAllowed: 'MCP_TOOL_NOT_ALLOWED',
   McpResultAlreadySubmitted: 'MCP_RESULT_ALREADY_SUBMITTED',
   McpNodeNotFound: 'MCP_NODE_NOT_FOUND',
+  McpConversationUnresolved: 'MCP_CONVERSATION_UNRESOLVED',
+  // 助手
+  AssistantConversationNotFound: 'ASSISTANT_CONVERSATION_NOT_FOUND',
+  AssistantConfirmationNotFound: 'ASSISTANT_CONFIRMATION_NOT_FOUND',
+  AssistantBusy: 'ASSISTANT_BUSY',
   // Inbox
   InboxItemNotFound: 'INBOX_ITEM_NOT_FOUND',
   InboxItemClosed: 'INBOX_ITEM_CLOSED',
@@ -117,6 +122,10 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.McpToolNotAllowed]: null,
   [ErrorCode.McpResultAlreadySubmitted]: null,
   [ErrorCode.McpNodeNotFound]: null,
+  [ErrorCode.McpConversationUnresolved]: null,
+  [ErrorCode.AssistantConversationNotFound]: 404,
+  [ErrorCode.AssistantConfirmationNotFound]: 404,
+  [ErrorCode.AssistantBusy]: 409,
   [ErrorCode.InboxItemNotFound]: 404,
   [ErrorCode.InboxItemClosed]: 409,
   [ErrorCode.DeliveryConflict]: 409,

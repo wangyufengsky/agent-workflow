@@ -222,6 +222,7 @@ export const startTaskOp = defineOperationContract({
   http: { method: 'POST', path: '/tasks' },
   expose: { palette: false, assistant: true },
   credentialFields: [],                  // 此类字段不会出现在助手工具 schema 中
+  // assistantOmit: [...],               // 可选：其他助手不能设置的字段（D65，如 settings.update 的 assistant.alwaysAllow）
   mode: UiMode.Simple,                   // 最低可见界面模式
 });
 

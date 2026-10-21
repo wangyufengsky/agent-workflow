@@ -1,3 +1,4 @@
+import { assistantConfirmationMachine } from './assistant-confirmation.machine.ts';
 import { attemptMachine } from './attempt.machine.ts';
 import { deliveryMachine } from './delivery.machine.ts';
 import { inboxMachine } from './inbox.machine.ts';
@@ -7,6 +8,7 @@ import { runtimeMachine } from './runtime.machine.ts';
 import { taskMachine } from './task.machine.ts';
 import { worktreeMachine } from './worktree.machine.ts';
 
+export * from './assistant-confirmation.machine.ts';
 export * from './attempt.machine.ts';
 export * from './define.ts';
 export * from './delivery.machine.ts';
@@ -28,4 +30,5 @@ export const MACHINES = {
   delivery: deliveryMachine,
   inbox: inboxMachine,
   runtime: runtimeMachine,
+  assistantConfirmation: assistantConfirmationMachine,
 } as const;
