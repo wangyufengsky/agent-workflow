@@ -13,10 +13,13 @@ export const taskMachine = defineMachine<TaskStatus, TaskEvent>({
   table: {
     [TaskStatus.Draft]: { [TaskEvent.Start]: [TaskStatus.Preparing], [TaskEvent.Cancel]: [TaskStatus.Cancelled] },
     // ...
-    [TaskStatus.Completed]: {},          // 没有事件的状态即终态（isTerminalState）
+    [TaskStatus.Completed]: { [TaskEvent.ReviewFeedback]: [TaskStatus.Running] },
   },
+  reopenedBy: [TaskEvent.ReviewFeedback],
 });
 ```
+
+- 除 `reopenedBy` 声明的事件外没有事件的状态即终态（`isTerminalState`）：`reopenedBy` 是「工作已结束、只有这个明确的例外能重新开始」的事件，状态仍算终态（如以 PR 交付的已完成任务按审查意见修改，21 §7；已删除的 worktree 随之重建）。活动任务、批次「已结束」、是否显示「取消」等判断都按终态，不受它影响。
 
 - `transition(machine, from, event, to?)`：查表；同一事件有多个可能目标时调用方必须给出 `to`，且必须在列表内；否则抛 `STATE_TRANSITION_INVALID`。**选哪个目标是 service 的业务判断，状态机只负责「是否允许」。**
 - 状态字段只能在 repo 的 `updateStatus(id, from, to)` 中写，SQL 带 `WHERE status = :from`，影响 0 行即抛 `STATE_TRANSITION_INVALID`（防止并发下的脏写，不需要其他版本号机制）。
@@ -57,6 +60,7 @@ stateDiagram-v2
   merging --> completed: delivery_succeeded
   merging --> review: delivery_conflict
   merging --> review: delivery_failed
+  completed --> running: review_feedback
   failed --> preparing: retry
   failed --> planning: retry
   failed --> running: retry
@@ -75,6 +79,7 @@ stateDiagram-v2
 | `deliver` | `squash` / `merge` / `rebase` / `pull_request` → `merging`；`report_only` → `completed` |
 | `delivery_conflict` / `delivery_failed` | → `review` |
 | `retry` | 按 `failedPhase` 回到 `preparing` / `planning` / `running` |
+| `review_feedback` | → `running`；只限最近一次成功的交付为 `pull_request` 且该 PR 仍打开（21 §3） |
 
 | 状态 | 含义 | 进入时后端做什么 |
 | --- | --- | --- |
@@ -86,7 +91,7 @@ stateDiagram-v2
 | `paused` | 暂停：不再派发新节点，进行中的尝试继续跑完（依赖满足的节点仍会 `pending → ready`） | 专业模式可调整计划：只能改动、删除未开始（`pending` / `ready`，`EDITABLE_NODE_STATUSES`）的节点，可新增节点；保存为草稿版本，确认后重新物化（见下），任务保持暂停；`resume` 时未确认的草稿被取代 |
 | `review` | 全部节点结束，等用户决定 | 生成结果摘要；创建 `delivery` 类 inbox 条目 |
 | `merging` | 合并 / 推送 / 建 PR 中 | 见 delivery 状态机 |
-| `completed` | 终态 | 清理 worktree；按设置删除本地分支（PR 交付保留分支） |
+| `completed` | 终态（唯一例外：以 PR 交付、PR 仍打开的任务可经 `review_feedback` 按审查意见回到 `running`，21 §7） | 清理 worktree；按设置删除本地分支（PR 交付保留分支） |
 | `failed` | 某阶段失败且重试预算耗尽；`failedPhase` 记录阶段 | 创建 `failure` 类 inbox 条目 |
 | `cancelled` | 终态 | 中止活动尝试；节点 → `cancelled`；关闭相关 inbox 条目（`dismissed`）；删除 worktree；分支默认删除（专业模式可选保留） |
 
@@ -95,6 +100,7 @@ stateDiagram-v2
 - `all_nodes_finished`：所有节点 ∈ {`done`, `skipped`}。
 - `fail`（running 阶段）：存在 `failed` 节点 且 没有 `running/verifying/waiting_input` 的节点。一旦存在 `failed` 节点，调度器不再派发新节点。
 - `changes_requested`：用户「让 AI 再改改」或「交给 AI 解决冲突」→ 新建计划版本，追加一个 `revise` 节点（依赖所有叶子节点），确认后回到 `running`。
+- `review_feedback`（21）：已完成的 PR 任务「让 AI 按意见再改改」→ 抓取并快进任务分支、重建 worktree（worktree `restore`）→ 同上追加 `review_fix_<n>` 节点，`completed → running`，`finishedAt` 清空。
 
 **暂停调整的重新物化**（`nodes.rematerialize`，M5-02）：确认暂停中的草稿时，先再次检查已开始的节点没有被改动或删除（期间可能有节点结束，`NODE_NOT_EDITABLE`）；未开始的节点按新定义改写（`plan_id`、标题、角色、指令、依赖、验收、顺序），新节点按 key 创建（初始 `pending` / `ready` 同物化），被删除的未开始节点删除；已开始的节点只更新顺序。改写后依赖未全部完成的 `ready` 节点经 `deps_unmet` 回到 `pending`，由调度器重新放行。
 
@@ -223,10 +229,13 @@ stateDiagram-v2
   ready --> removing: remove
   removing --> removed: removed
   removing --> error: remove_failed
+  removed --> creating: restore
   error --> removing: remove
   removed --> [*]
 ```
 <!-- /fsm:worktree -->
+
+`restore`（21 §4.2）：以 PR 交付、worktree 已删除的任务按审查意见修改时，同一条记录回到 `creating`（`removed_at` 清空），在原路径上 `git worktree add <path> <branch>`（已有分支），成功 `created → ready`，失败 `create_failed → error`。
 
 ## 7. 交付 Delivery
 
@@ -257,6 +266,8 @@ stateDiagram-v2
    - `rebase`：在任务 worktree 中 `git rebase <target>`（任务分支已包含目标分支时跳过，例如解决冲突时已合入），再在目标处 `git merge --ff-only`；冲突时 `git rebase --abort`。
 4. 成功 → `succeeded`（`commit_sha` 为目标分支新提交）+ 任务 `completed`，交付条目 resolved；之后删除 worktree，按 `delivery.deleteBranchAfterMerge` 删除分支（删除失败只记在 worktree 上）。冲突 → 恢复原状，`conflicted`（`conflict_files`）+ 任务回 `review`。其他 git 失败 → `failed` + 任务回 `review`。
 5. 重启时仍为 `running` 的 delivery 记为 `failed`（`DELIVERY_INTERRUPTED`），任务回 `review`。
+
+PR 交付（`pull_request`）：推送任务分支（普通推送，不 force）后按分支查找打开的 PR/MR，找到就沿用它（按审查意见修改后推送回同一个 PR，21 §5），没有才新建；成功同上 `succeeded`（`pr_url`）+ 任务 `completed`，worktree 删除、分支保留。
 
 ## 8. 需要你处理 Inbox
 

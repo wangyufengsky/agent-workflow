@@ -62,6 +62,9 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.DeliveryTargetNotFound]: '目标分支不存在。',
   [ErrorCode.DeliveryTargetDirty]: '目标分支所在的工作区有未提交的改动。为了不碰你的改动，先提交或暂存它们再合并。',
   [ErrorCode.DeliveryInterrupted]: '合并过程中应用退出了，可以再试一次。',
+  [ErrorCode.PullRequestNotOpen]: 'PR 已经合并或关闭了，不能再按意见修改。',
+  [ErrorCode.BranchDiverged]:
+    'PR 的分支在平台上和本地各有对方没有的提交。为了不覆盖任何改动，先在 Git 管理台里把两边合到一起再试。',
   [ErrorCode.DbConnectionNotFound]: '这个数据库连接不存在。',
   [ErrorCode.DbConnectionAlreadyExists]: '已有同名的数据库连接，换一个名称再试。',
   [ErrorCode.DbConnectionFailed]: '连不上数据库，检查地址、端口、用户名和密码。',

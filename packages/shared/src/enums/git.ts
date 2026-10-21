@@ -53,6 +53,19 @@ export const ChangeRequestReason = {
   User: 'user',
   /** 「交给 AI 解决冲突」after a conflicting merge. */
   Conflict: 'conflict',
+  /** 「让 AI 按意见再改改」with review comments of the task's pull request (21 §3); not through `request-changes`. */
+  Review: 'review',
 } as const;
 export type ChangeRequestReason = (typeof ChangeRequestReason)[keyof typeof ChangeRequestReason];
-export const changeRequestReasonSchema = z.enum(ChangeRequestReason);
+/** The reasons `request-changes` accepts: review comments go through their own operation, which fetches them. */
+export const changeRequestReasonSchema = z.enum([ChangeRequestReason.User, ChangeRequestReason.Conflict]);
+
+/** A review comment of a pull request (21 §2.2). */
+export const ReviewCommentKind = {
+  /** An unresolved review thread, usually on a line of a file. */
+  Thread: 'thread',
+  /** A comment in the conversation, or the text of a submitted review. */
+  General: 'general',
+} as const;
+export type ReviewCommentKind = (typeof ReviewCommentKind)[keyof typeof ReviewCommentKind];
+export const reviewCommentKindSchema = z.enum(ReviewCommentKind);

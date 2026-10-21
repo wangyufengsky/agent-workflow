@@ -51,7 +51,7 @@
 | 名称 | 位置 | 说明 |
 | --- | --- | --- |
 | `FakeOpencode` | `packages/server/test/fakes/fake-opencode.ts` | 实现 `OpencodeClient` 接口；`fake.enqueue(script()…, match?)` 为之后发给会话的消息排一个回合（`match` 按会话标题、agent、目录的子串选会话，第一个匹配的脚本生效）：`edit(file, content)`、`text(…)`、`callTool(name, args)`、`callAppTool(name, args)`（助手 MCP）、`ask(...)`、`requestPermission(...)`、`hang()`（一直工作直到被中止）、`usage(input, output)`（本回合结束时报告的 tokens，默认 100 / 20）、`error(name, message, { idle? })`（`idle: false` 时报错后不再发空闲事件），回合结束即空闲（没有排脚本的消息直接空闲）；真实写 worktree 文件、真实通过 MCP 调用后端（注入 `__aw_session`）。可断言 `sessions`、`prompts`、`toolCalls`、`aborts`、`permissionReplies`；`crash()` 模拟运行时消失；`failNextPrompt()` 让下一次发消息失败（`OPENCODE_REQUEST_FAILED`）；`settled()` 等待已开始的回合放完。浏览器 E2E 中后端以 `AW_FAKE_OPENCODE=1`（仅开发模式）使用它，spec 经开发接口 `POST /api/v1/dev/fake-opencode/scripts` 排回合（按项目的 worktree 目录匹配，互不干扰）；`createTestApp({ dataDir, fake })` 复用同一个 FakeOpencode 模拟后端重启 |
-| `FakeHosting` | `test/fakes/fake-hosting.ts` | 本地 HTTP 服务模拟 GitHub/GitLab 用到的少数端点（读仓库、建 PR/MR），只认一个令牌；`createTestApp({ hosting: fake.endpoints })` 指向它；断言 `pullRequests`；`failNextPullRequest(status)` 模拟平台报错 |
+| `FakeHosting` | `test/fakes/fake-hosting.ts` | 本地 HTTP 服务模拟 GitHub/GitLab 用到的少数端点（读仓库、建 PR/MR、按分支查找打开的 PR/MR、GitHub GraphQL 审查讨论、GitLab 讨论），只认一个令牌；`createTestApp({ hosting: fake.endpoints })` 指向它；断言 `pullRequests`；`failNextPullRequest(status)` 模拟平台报错；`addReviewThread(head, …)` / `addComment(head, …)` 扮演审查者、`closePullRequest(head)` 模拟 PR 已合并或关闭（21）。浏览器 E2E 中后端以 `AW_FAKE_HOSTING_TOKEN` / `AW_FAKE_HOSTING_REPO`（仅开发模式）使用它，spec 经开发接口 `POST /api/v1/dev/fake-hosting/review-threads`、`/comments` 添加意见 |
 | `startMysql()` | `test/helpers/mysql.ts` | 用 Docker 启动一个 MySQL 8.4（随机本地端口、空库 `shop`），等日志出现「ready for connections … port: 3306」后返回连接参数、`exec(sql)` 与 `stop()`；数据库集成测试在 `beforeAll` 中启动一次（镜像需先 `docker pull mysql:8.4`） |
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
 | `createTestApp()` | `test/helpers/app.ts` | 启动后端（临时数据目录、随机端口），返回类型化 API 调用 `call(op, input)`、`mcpUrl`、FakeOpencode；`realOpencode: true` 用于 `@opencode` 测试；MCP SDK 客户端见 `test/helpers/mcp.ts` |
@@ -83,6 +83,7 @@
 | J15 | Electron 启动冒烟（`launch.electron.spec.ts`，`pnpm e2e:smoke`）：构建后的应用启动后端、显示引导页（各项检测有结果）、正常退出（main 等后端停止 opencode 后退出）。不需要 opencode 与模型，三平台 CI 运行（17 §4.1） | Electron |
 | J16 | 质量与用量：FakeOpencode 造任务后，简单视图本周三个数、专业视图用量与质量的数字正确；钻取失败原因 → 任务列表 → 任务页；四主题切换无报错（v1.1，`task-insights.browser.spec.ts`） | 浏览器 |
 | J17 | 批量任务：主页「补单元测试」的「批量」→ 在目录树中选 3 个目录（按行输入页显示同样的目标）→ 创建 → 三个任务各自跑完到待合并 → 「合并全部待合并的」确认 → 主分支 3 个提交、批次「已全部结束」（v1.1，`task-batch.browser.spec.ts`，20） | 浏览器 |
+| J18 | PR 审查意见回流：修 Bug 任务创建 PR → 审查者在 PR 上留下讨论与评论 → 结果卡「取回审查意见」（默认全选）→ 取消一条、填补充说明 →「让 AI 按意见再改改」→ 回到待合并、主按钮为「推送到 PR」→ 推送 → 远端同一分支有 AI 的修改、主分支不变（v1.2，`task-review.browser.spec.ts`，21） | 浏览器 |
 | J19 | 定时任务：主页「补单元测试」的「定时」→ 每周一、五 03:30 → 创建 → 「立即运行一次」→ 任务到待合并，「需要你处理」的条目注明来自该定时任务 → 合并 → 暂停后显示「已暂停」（v1.2，`task-schedule.browser.spec.ts`，22；到点运行、补跑、跳过与失败暂停由集成测试用 FakeClock 驱动） | 浏览器 |
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。

@@ -267,6 +267,8 @@ payload / response：
 | error | TEXT NULL | |
 | created_at / removed_at | INTEGER | |
 
+一个任务只有一条记录：以 PR 交付的任务按审查意见修改时，已删除的 worktree 在原路径与分支上重建（状态 `removed → creating → ready`，`removed_at` 清空，`base_commit` 不变；21 §4.2）。
+
 ### deliveries
 
 | 列 | 类型 | 说明 |

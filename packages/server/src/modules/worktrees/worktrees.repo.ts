@@ -24,7 +24,7 @@ export function createWorktreesRepo(db: DbExecutor) {
       id: string,
       from: WorktreeStatus,
       to: WorktreeStatus,
-      changes: { error?: string; removedAt?: number } = {},
+      changes: { error?: string; removedAt?: number | null } = {},
     ): void {
       const result = db
         .update(worktreesTable)

@@ -25,6 +25,7 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [18-knowledge.md](18-knowledge.md) | 知识问答（v1.1）：页面、数据、API、研究员与引用校验 | 全员 |
 | [19-insights.md](19-insights.md) | 质量与用量（v1.1）：指标口径、页面与钻取、API、性能 | 全员 |
 | [20-batch-tasks.md](20-batch-tasks.md) | 固定模板批量任务（v1.1）：创建、目标、并发、批量视图与批量交付 | 全员 |
+| [21-review-feedback.md](21-review-feedback.md) | PR 审查意见回流（v1.2）：取回意见、按意见修改、推送回同一个 PR | 全员 |
 | [22-scheduled-tasks.md](22-scheduled-tasks.md) | 定时任务（v1.2）：频率与时区、到点运行、补跑与跳过、失败暂停、页面、数据与 API | 全员 |
 
 ## 维护规则

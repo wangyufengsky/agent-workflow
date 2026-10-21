@@ -31,6 +31,8 @@ export const queryKeys = {
   schedules: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'schedules', filter],
   schedule: (id: string) => ['tasks', 'list', 'schedule', id],
   task: (id: string) => ['tasks', 'detail', id],
+  /** Outside the task detail's prefix: read from the platform only when the user asks, never refreshed by events. */
+  reviewComments: (id: string) => ['review-comments', id],
   node: (taskId: string, nodeId: string) => ['tasks', 'detail', taskId, 'nodes', nodeId],
   inbox: ['inbox'],
   inboxList: (filter: Record<string, string | undefined>) => ['inbox', 'list', filter],
