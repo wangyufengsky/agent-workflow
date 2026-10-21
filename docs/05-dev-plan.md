@@ -146,5 +146,22 @@
 | A-07 | 主页顶部助手输入框（回车打开面板并开始新对话，与结构化「开始任务」并存）；设置页「助手」分组：查看与撤销「总是允许」 | E2E：主页输入 → 面板中出现新对话；卡片上「总是允许」后设置页列出该操作，撤销后消失 |
 | A-08 | E2E（FakeOpencode）：对助手说开始任务 → 确认卡片 → 任务运行；四主题走查加入助手面板 | `pnpm e2e` 通过，走查截图含助手面板 |
 | A-09 | live 冒烟（真实 opencode + 默认模型 `TEST_MODEL`）：让助手查明天的日期、列出项目 | `live/assistant.live.test.ts` 通过：回复包含明天的日期与示例项目名，会话中调用了 `get_current_time` 与 `projects_list` |
-| A-11 | 导航卡片（D66）：契约可选字段 `produces` 与枚举 `EntityKind`；助手执行的操作成功后在消息流写 `entity_ref`（直接执行与确认后执行两条路径）；前端 `app/entity-routes.ts` 一处映射对象 → 页面，卡片显示图标、标题、状态（任务随 `task.updated`）、「打开」；对象删除后显示「已删除」 | 集成测试：确认后执行 `tasks_create` 与「总是允许」直接执行 `projects_create` 都写出 `entity_ref`，失败的调用不写；E2E：J11 中任务卡片状态更新、「打开」跳到任务页且面板保持打开；直接执行出现项目卡片、删除后显示「已删除」；J9 走查含卡片 |
+| A-11 | 导航卡片（D73）：契约可选字段 `produces` 与枚举 `EntityKind`；助手执行的操作成功后在消息流写 `entity_ref`（直接执行与确认后执行两条路径）；前端 `app/entity-routes.ts` 一处映射对象 → 页面，卡片显示图标、标题、状态（任务随 `task.updated`）、「打开」；对象删除后显示「已删除」 | 集成测试：确认后执行 `tasks_create` 与「总是允许」直接执行 `projects_create` 都写出 `entity_ref`，失败的调用不写；E2E：J11 中任务卡片状态更新、「打开」跳到任务页且面板保持打开；直接执行出现项目卡片、删除后显示「已删除」；J9 走查含卡片 |
 | A-10 | 文档收尾：15 与实现对齐、03 / 12 / 14 中的助手部分、本节状态段 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
+
+## v1.1 · 知识问答
+
+> 状态：**进行中**。设计见 [18-knowledge.md](18-knowledge.md)；需要用户拍板的取舍为 D73–D75（待用户确认），实现按保守方案。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| K-01 | 契约：枚举（`KnowledgeTurnStatus`、`CitationType`、`KnowledgeSourceKind`、`CitationProblemCode`、`AttemptKind.research`、`SessionAgent`、`McpToolName.SubmitAnswer`、`knowledge.updated` 事件）、常量与限制值、错误码、`citationMarkers` / `classifySource`、DTO、`submit_answer` schema、知识操作契约；08 / 10 / 11 / 12 同步 | 单测：`citationMarkers`（链接、代码块、行内代码不算）、`classifySource`、`knowledgeTurnStatusOf`；`STATUS_TONE` 覆盖新状态；`ERROR_COPY` 覆盖新错误码；知识操作的风险与暴露标注 |
+| K-02 | 存储：迁移 `0009_knowledge`（两张表）；repo；尝试模块支持预先给定 id、`research` 会话流目录 `runs/knowledge/`、按 id 删除尝试及其会话流 | 集成测试：新建对话 → 列表 → 详情；删除对话同时删除轮次、尝试与会话流文件 |
+| K-03 | `aw-researcher` agent（配置注入：edit / question / webfetch / websearch / task deny，助手工具 deny）；会话级规则：`readonlyBashRules()` + 网络开关；尝试的 `agent` 扩为 `SessionAgent`；提示词 `protocol-research.md`、`start-research.md`、`research-followup.md` | 单测：配置快照；会话规则（开关关：无 web allow；开：两条 allow 在最后）；`@opencode`：注入后 `aw-researcher` 可见 |
+| K-04 | knowledge 服务：提问（`ask`）、续问（同一会话 `continueSession`）、停止、删除、列表（搜索、项目、游标分页）、详情（`awaitingInput`）；尝试结束的反应与 `knowledge.updated`；删除项目时检查研究中的对话并级联 | 集成测试（FakeOpencode）：会话目录为项目仓库、agent 与规则正确；续问发到同一 opencode 会话；研究中续问 / 删除返回 `KNOWLEDGE_CONVERSATION_BUSY`；停止 → `stopped`；未提交 → 提醒 → `failed`；删除项目时研究中拒绝 |
+| K-05 | `submit_answer` 工具与引用校验（路径越界含 `..` / 符号链接 / `.git`、文件不存在、行号越界、区间过长、来源不在范围、未知连接、非只读 SQL、未知标注、未用引用），一次返回全部问题 + hint；数据库工具支持 `research` 尝试 | 集成测试（MCP SDK 客户端）：每个子码一次且带 hint；修正后重提成功、轮次 `answered`、`excerpt` 正确；`research` 调用 `submit_result` / `ask_user` 为 `MCP_TOOL_NOT_ALLOWED`；范围不含数据库时 `db_list_connections` 为空 |
+| K-06 | 原文读取 `knowledge.citation`：文件窗口与 `changed`、读取时再检查路径、数据库只读重新执行、网页 | 集成测试：窗口与高亮区间正确；改动后 `changed`；删除文件后 `KNOWLEDGE_SOURCE_UNAVAILABLE`；编号越界 `KNOWLEDGE_CITATION_NOT_FOUND`；数据库引用返回行（Docker MySQL） |
+| K-07 | 界面：`/knowledge` 首屏（项目、输入框、资料来源弹层与网络开关、示例问题）、对话（研究过程卡与阶段推导、回答与引用上标、引用卡、停止 / 重新提问、等待你允许）、原文面板（推入、高亮、上一处 / 下一处、`Esc`）、专业视图（会话流、模型与用量）；侧栏菜单；四套主题 | 单测：`researchSteps`；E2E 冒烟见 K-09 |
+| K-08 | 界面：`/knowledge/history` 对话记录（搜索、项目筛选、今天 / 昨天 / 更早分组、摘要与状态、加载更多、删除确认、空与错误态） | E2E 见 K-09 |
+| K-09 | E2E（FakeOpencode）：J12「提问 → 研究过程 → 带引用的回答 → 点击引用看原文 → 续问 → 对话记录」；J9 走查加入知识问答 | `pnpm e2e` 通过，走查截图含知识问答首屏、回答 + 原文面板、对话记录 |
+| K-10 | live（真实 opencode + `TEST_MODEL`）：对 `ts-stats` 提有确定答案的问题；文档收尾（03、07、14、本节状态段） | `live/knowledge.live.test.ts` 通过：回答带有效引用且指向正确的文件；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |

@@ -22,6 +22,7 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [14-ui-spec.md](14-ui-spec.md) | 页面与路由、简单/专业模式界面、主题配置、设计稿改进 | 开发 / 设计 |
 | [15-assistant.md](15-assistant.md) | 应用助手（v1.1）设计与 v1.0 预留 | 全员 |
 | [16-acceptance-v1.0.md](16-acceptance-v1.0.md) | v1.0 验收报告：01 §5 逐条的验证方法、结果与证据，需要用户完成的项 | 全员 |
+| [18-knowledge.md](18-knowledge.md) | 知识问答（v1.1）：页面、数据、API、研究员与引用校验 | 全员 |
 
 ## 维护规则
 
