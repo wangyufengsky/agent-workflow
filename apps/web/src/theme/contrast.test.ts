@@ -87,6 +87,19 @@ describe.each(THEME_IDS)('主题 %s 对比度', (id) => {
     }
   });
 
+  // Canvas nodes are opaque cards: the E2E walkthrough usually cannot decide their text (overlapped by the canvas
+  // layers), so the tokens are checked here.
+  it('画布节点上的文字与状态标签 ≥ 4.5:1（node-bg）', () => {
+    const node = color('node-bg');
+    for (const text of TEXT) {
+      expect(contrast(color(text), node), `${text} on node-bg`).toBeGreaterThanOrEqual(MIN);
+    }
+    for (const tone of STATUS_TONES) {
+      const fill = over(color(`${tone}-fill`), node);
+      expect(contrast(color(tone), fill), `${tone} on ${tone}-fill over node-bg`).toBeGreaterThanOrEqual(MIN);
+    }
+  });
+
   it('侧栏「任务」旁的数量徽标（stall）在侧栏、悬停与选中项上 ≥ 4.5:1', () => {
     for (const tint of [undefined, 'fill-3', 'fill-4'] as const) {
       const item = tint === undefined ? color('sidebar') : over(color(tint), color('sidebar'));
