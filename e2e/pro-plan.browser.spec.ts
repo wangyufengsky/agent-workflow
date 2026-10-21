@@ -24,7 +24,8 @@ async function startBugfix(page: Page, project: E2EProject, requirement: string,
   await page.getByLabel('需求').fill(requirement);
   if (confirmPlan) await page.getByLabel('运行前让我确认计划').check();
   await page.getByRole('button', { name: /^开始/ }).click();
-  await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/);
+  // Starting creates the task's worktree first (up to 9 s on the Windows runner).
+  await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/, { timeout: TASK_RUN_TIMEOUT_MS });
 }
 
 test('J7 专业模式：开启确认计划 → 编辑计划（加节点、连线）→ 确认 → 按新计划执行', async ({ page, request }) => {

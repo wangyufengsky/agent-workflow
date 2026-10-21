@@ -8,8 +8,8 @@ import { API_BASE, AUTH } from './env.ts';
 /**
  * Waits that span a whole task run (worktree, steps with checks and commits, review) until its result card. Measured
  * in CI (17 §4.1): J4 from start to failure takes 0.2 s on macOS, 0.8 s on Ubuntu and 3.6 s on the Windows runner,
- * where every git and shell process start costs ~100 ms or more; J7 / J5 runs crossed 5 s there. Only Windows waits
- * longer.
+ * where every git and shell process start costs ~100 ms or more; J7 / J5 runs crossed 5 s there, and creating one
+ * worktree took up to 9.3 s. Only Windows waits longer.
  */
 export const TASK_RUN_TIMEOUT_MS = process.platform === 'win32' ? 20_000 : 5_000;
 
@@ -133,5 +133,6 @@ export async function startTask(page: Page, project: E2EProject, workflow: RegEx
   await page.getByRole('group', { name: '流程' }).getByRole('button', { name: workflow }).click();
   await page.getByLabel('需求').fill(requirement);
   await page.getByRole('button', { name: /^开始/ }).click();
-  await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/);
+  // Starting creates the task's worktree first (up to 9 s on the Windows runner).
+  await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/, { timeout: TASK_RUN_TIMEOUT_MS });
 }
