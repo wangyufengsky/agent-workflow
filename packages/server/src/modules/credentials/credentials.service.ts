@@ -28,6 +28,7 @@ export function createCredentialsService({ db, clock, cipher }: CredentialsServi
       if (row === undefined) throw new AppError(ErrorCode.NotFound, `Credential ${id} not found`);
       return cipher.decrypt(row.ciphertext);
     },
+    isAvailable: (): Promise<boolean> => cipher.isAvailable(),
     remove(id: string): void {
       db.delete(credentialsTable).where(eq(credentialsTable.id, id)).run();
     },

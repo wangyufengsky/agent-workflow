@@ -142,7 +142,14 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const startHostedRuntime = async () => {
     if (hosting) await runtime.startIfStopped();
   };
-  const system = createSystemModule({ config, env, runtime, opencode, startRuntime: startHostedRuntime });
+  const system = createSystemModule({
+    config,
+    env,
+    runtime,
+    opencode,
+    credentials: credentials.service,
+    startRuntime: startHostedRuntime,
+  });
   const databases = createDatabasesModule({
     db: database.db,
     clock,

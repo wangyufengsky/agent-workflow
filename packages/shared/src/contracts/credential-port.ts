@@ -7,8 +7,9 @@ import { z } from 'zod';
 export const credentialPortRequestSchema = z.object({
   type: z.literal('credential.request'),
   id: z.number().int(),
-  op: z.enum(['encrypt', 'decrypt']),
-  /** encrypt: plaintext; decrypt: base64 ciphertext. */
+  /** `status`: whether encryption is usable (answered `ok: false` with the reason when it is not, D69). */
+  op: z.enum(['encrypt', 'decrypt', 'status']),
+  /** encrypt: plaintext; decrypt: base64 ciphertext; status: empty. */
   data: z.string(),
 });
 export type CredentialPortRequest = z.infer<typeof credentialPortRequestSchema>;
@@ -18,7 +19,7 @@ export const credentialPortResponseSchema = z.discriminatedUnion('ok', [
     type: z.literal('credential.response'),
     id: z.number().int(),
     ok: z.literal(true),
-    /** encrypt: base64 ciphertext; decrypt: plaintext. */
+    /** encrypt: base64 ciphertext; decrypt: plaintext; status: empty. */
     data: z.string(),
   }),
   z.object({ type: z.literal('credential.response'), id: z.number().int(), ok: z.literal(false), error: z.string() }),

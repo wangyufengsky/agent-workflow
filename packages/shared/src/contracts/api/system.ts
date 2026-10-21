@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { OPENCODE_VERSION } from '../../constants/app.ts';
-import { RuntimeStatus } from '../../enums/system.ts';
+import { platformSchema, RuntimeStatus } from '../../enums/system.ts';
 import { attemptKindSchema } from '../../enums/task.ts';
 import { McpToolName } from '../mcp/names.ts';
 
@@ -36,6 +36,8 @@ export type ModelInfo = z.infer<typeof modelInfoSchema>;
 
 /** `GET /system/environment` (11 §2): what onboarding checks. */
 export const environmentSchema = z.object({
+  /** Decides the install commands onboarding shows (17 §3.7). */
+  platform: platformSchema,
   git: z.discriminatedUnion('installed', [
     z.object({ installed: z.literal(true), version: z.string() }),
     z.object({ installed: z.literal(false) }),
@@ -45,6 +47,8 @@ export const environmentSchema = z.object({
     available: z.array(modelInfoSchema),
     defaultModel: z.string().optional(),
   }),
+  /** Secrets (hosting tokens, database passwords) can be stored; not part of `ready` (D69). */
+  credentials: z.object({ available: z.boolean() }),
   ready: z.boolean(),
 });
 export type EnvironmentDTO = z.infer<typeof environmentSchema>;

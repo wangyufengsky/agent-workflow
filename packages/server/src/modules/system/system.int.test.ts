@@ -10,6 +10,7 @@ import {
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
+import { testCipher } from '../../../test/helpers/cipher.ts';
 import { isolatedEnv, writeFakeVersion } from '../../../test/helpers/executables.ts';
 
 let bin: string;
@@ -71,6 +72,20 @@ describe('环境检测', () => {
     const { body } = await t.call(getEnvironmentOp, {});
     expect(body.git).toEqual({ installed: false });
     expect(body.ready).toBe(false);
+  });
+});
+
+describe('凭据存储（D69）', () => {
+  it('报告能否保存令牌与密码；不可用不影响环境就绪', async () => {
+    await fakeOpencode(bin, OPENCODE_VERSION);
+    const env = await isolatedEnv(bin, home, { git: true });
+    t = await createTestApp({ env, cipher: testCipher });
+    expect((await t.call(getEnvironmentOp, {})).body.credentials).toEqual({ available: true });
+
+    // No encryption backend (Linux without a secret service): the store is unavailable, the rest still ready.
+    await t.close();
+    t = await createTestApp({ env });
+    expect((await t.call(getEnvironmentOp, {})).body).toMatchObject({ credentials: { available: false }, ready: true });
   });
 });
 
