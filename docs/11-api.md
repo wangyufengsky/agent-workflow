@@ -45,7 +45,7 @@ type EnvironmentDTO = {
 
 `models` 来自 opencode `/config/providers`，用于引导页判断「是否已登录至少一个模型提供方」。
 
-opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则依次查找 `PATH` 中的 `opencode` 与主目录下的 `.opencode/bin/opencode`（Windows：`opencode.exe` 或 npm 的 `opencode.cmd`，主目录为 `%USERPROFILE%`，17 §3.2）；能执行 `--version` 且输出等于 `OPENCODE_VERSION` → `stopped`（M2 起由运行时启动），版本不同 → `version_mismatch`，找不到或无法执行 → `not_installed`。`recheck` 只在 `not_installed` / `version_mismatch` 时重新检测 opencode（运行时状态机 `recheck`），git 每次都重新检测。
+opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则依次查找 `PATH` 中的 `opencode` 与主目录下的 `.opencode/bin/opencode`（Windows：`opencode.exe` 或 npm 的 `opencode.cmd`，主目录为 `%USERPROFILE%`，17 §3.2）；能执行 `--version` 且输出等于 `OPENCODE_VERSION` → `stopped`（M2 起由运行时启动），版本不同 → `version_mismatch`，找不到或无法执行 → `not_installed`。`recheck` 只在 `not_installed` / `version_mismatch` 时重新检测 opencode（运行时状态机 `recheck`），git 每次都重新检测；之后启动 `stopped` 或 `crashed` 的运行时（`crashed` 可能是环境问题已修好，如 Windows 上补装了 Git Bash，D72），并重新允许一次自动重启。
 
 ## 3. 项目
 

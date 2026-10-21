@@ -245,9 +245,15 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       setState(detected);
       return detected;
     },
-    /** Starts a stopped runtime (backend startup); a no-op when opencode is not hostable. */
-    async startIfStopped(): Promise<void> {
-      if ((await snapshot()).status === RuntimeStatus.Stopped) await boot(RuntimeEvent.Start);
+    /**
+     * Starts a runtime that is down: `stopped` at backend startup, or `crashed` when the user rechecks the environment
+     * after fixing what made it fail (Git Bash installed on Windows, D72), with the automatic restart armed again as
+     * for a manual start. A no-op when opencode is not hostable or already running.
+     */
+    async startIfDown(): Promise<void> {
+      const { status } = await snapshot();
+      if (status === RuntimeStatus.Crashed) autoRestartArmed = true;
+      if (status === RuntimeStatus.Stopped || status === RuntimeStatus.Crashed) await boot(RuntimeEvent.Start);
     },
     /** User action on the runtime page: restart a ready runtime or start a crashed / stopped one. */
     async restart(): Promise<RuntimeDTO> {

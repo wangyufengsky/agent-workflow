@@ -164,7 +164,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   // replaces it; start() decides that, after which a recheck may start a newly hostable runtime too.
   let hosting = false;
   const startHostedRuntime = async () => {
-    if (hosting) await runtime.startIfStopped();
+    if (hosting) await runtime.startIfDown();
   };
   const system = createSystemModule({
     config,

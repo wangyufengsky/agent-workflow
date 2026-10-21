@@ -78,6 +78,17 @@ describe('opencode 运行时', () => {
     expect(await launchCount()).toBe(4);
   });
 
+  it('停在 crashed 时重新检测环境会再次启动（如 Windows 上补装 Git Bash 之后），并重新允许一次自动重启', async () => {
+    const crashed = waitForEvent(t.app.events, ServerEventType.RuntimeUpdated, nthCrash(2));
+    await t.app.start(t.port);
+    await crashed;
+
+    const again = waitForEvent(t.app.events, ServerEventType.RuntimeUpdated, nthCrash(2));
+    expect((await t.call(recheckEnvironmentOp, {})).status).toBe(200);
+    await again;
+    expect(await launchCount()).toBe(4);
+  });
+
   it('安装 opencode 后重新检测即启动运行时', async () => {
     const empty = await mkdtemp(join(tmpdir(), 'aw-empty-'));
     await t.close();

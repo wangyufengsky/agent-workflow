@@ -11,7 +11,7 @@ export type SystemServiceDeps = {
   runtime: OpencodeRuntime;
   opencode: OpencodeClient;
   credentials: CredentialsService;
-  /** Starts the hosted runtime if it is stopped (and hosting has begun, see app.ts). */
+  /** Starts the hosted runtime if it is stopped or crashed (and hosting has begun, see app.ts). */
   startRuntime: () => Promise<void>;
 };
 
@@ -49,7 +49,10 @@ export function createSystemService({ config, env, runtime, opencode, credential
   return {
     health: (): Health => ({ status: 'ok', appVersion: config.appVersion, node: process.versions.node }),
     environment,
-    /** After installing opencode (or choosing its path) the runtime becomes `stopped`: start it right away. */
+    /**
+     * After installing opencode (or choosing its path) the runtime becomes `stopped`: start it right away. A crashed
+     * runtime is started again too: what made it fail may be fixed now (Git Bash installed on Windows, D72).
+     */
     async recheck(): Promise<EnvironmentDTO> {
       await runtime.recheck();
       await startRuntime();

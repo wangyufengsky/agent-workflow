@@ -65,7 +65,7 @@ Electron `app.getPath('userData')`，目录名为产品名：
 **对策（D72）。** Windows 上要求 Git for Windows（自带 Git Bash），并在注入的 opencode 配置中设置 `shell` 为 Git Bash 的绝对路径。opencode 对 bash 用 bash 语法解析、以 `bash -l -c` 运行，规则与 macOS / Linux 的语义一致，规则本身不分平台。
 
 - Git Bash 的位置由 `git --exec-path`（如 `C:/Program Files/Git/mingw64/libexec/git-core`）上溯三级得到 Git 安装根目录，取 `<根目录>\bin\bash.exe`。用 `--exec-path` 而不是 PATH 中 `git.exe` 的位置，是因为 scoop 等安装方式在 PATH 里放的是转发程序。
-- 找不到 Git Bash（例如只有 MinGit）时：引导页 Git 一项显示「未就绪」并说明需要 Git for Windows；托管 opencode 不启动（启动时生成配置失败 → 运行时 `crashed`，日志写明原因）。不退回到 PowerShell。
+- 找不到 Git Bash（例如只有 MinGit）时：引导页 Git 一项显示「未就绪」并说明需要 Git for Windows；托管 opencode 不启动（启动时生成配置失败 → 运行时 `crashed`，日志写明原因）。不退回到 PowerShell。装好后在引导页点「重新检测」即可：重新检测会再次启动 `crashed` 的运行时，不必重启应用。
 - 只注入 `shell`，不改 opencode 的其他行为；用户自己的 opencode 配置里的 `shell` 在 Windows 上被覆盖（注入配置优先，S3）。
 - macOS / Linux 不注入，opencode 用用户的 `$SHELL`（login shell 带来用户的 PATH，如 nvm）。用户若把 opencode 的 `shell` 配成 PowerShell 等非 POSIX shell，规则同样不成立——这是 v1.0 起就有的前提，记在「发现但未处理」中（§7）。
 
