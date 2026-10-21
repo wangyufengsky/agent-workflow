@@ -10,6 +10,8 @@ type Entry = { seq: number; event: ServerEvent };
  * Forwards event-bus events to every `GET /api/v1/events` client (11 §11).
  * Ids are `<bootId>-<seq>`; a reconnect with `Last-Event-ID` replays from the in-memory buffer, and when the
  * gap cannot be filled (buffer overrun, or the backend restarted) the client gets `resync` and refetches everything.
+ * A first connection gets `resync` too: the client read its data before the stream was open, and events in between
+ * would otherwise be lost (a page showing two of three permission requests until the next event).
  */
 export function registerSseHub(server: FastifyInstance, events: EventBus, bufferSize = SSE_REPLAY_BUFFER): void {
   const bootId = randomUUID().slice(0, 8);
@@ -43,13 +45,9 @@ export function registerSseHub(server: FastifyInstance, events: EventBus, buffer
     const res = reply.raw;
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
     const lastEventId = req.headers['last-event-id'];
-    if (typeof lastEventId === 'string') {
-      const missed = replayAfter(lastEventId);
-      if (missed === undefined) write(res, seq, ServerEventType.Resync, {});
-      else for (const e of missed) write(res, e.seq, e.event.type, e.event.data);
-    } else {
-      res.write(': connected\n\n');
-    }
+    const missed = typeof lastEventId === 'string' ? replayAfter(lastEventId) : undefined;
+    if (missed === undefined) write(res, seq, ServerEventType.Resync, {});
+    else for (const e of missed) write(res, e.seq, e.event.type, e.event.data);
     clients.add(res);
     req.raw.on('close', () => clients.delete(res));
   });

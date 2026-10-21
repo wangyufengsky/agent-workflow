@@ -23,10 +23,26 @@ describe('SSE 事件流', () => {
     expect(res.status).toBe(401);
   });
 
+  it('首次连接（不带 Last-Event-ID）先收到 resync：连上之前读到的数据可能已错过事件', async () => {
+    publish(2);
+    const first = await openEventStream(url);
+    const [resync] = await first.waitForCount(1);
+    expect(resync).toMatchObject({ event: 'resync', data: {} });
+    await first.close();
+
+    // Its id is the current position: a reconnect with it replays only what came after.
+    publish(1);
+    const second = await openEventStream(url, { 'last-event-id': resync?.id ?? '' });
+    const [missed] = await second.waitForCount(1);
+    expect(missed?.event).toBe('settings.updated');
+    expect(Number(missed?.id?.split('-')[1])).toBe(Number(resync?.id?.split('-')[1]) + 1);
+    await second.close();
+  });
+
   it('推送事件，id 单调递增', async () => {
     const stream = await openEventStream(url);
     publish(2);
-    const [a, b] = await stream.waitForCount(2);
+    const [, a, b] = await stream.waitForCount(3);
     expect(a).toMatchObject({ event: 'settings.updated', data: { keys: ['ui.theme'] } });
     expect(Number(b?.id?.split('-')[1])).toBe(Number(a?.id?.split('-')[1]) + 1);
     await stream.close();
@@ -35,7 +51,7 @@ describe('SSE 事件流', () => {
   it('断线后带 Last-Event-ID 重连能补齐错过的事件', async () => {
     const first = await openEventStream(url);
     publish(1);
-    const [seen] = await first.waitForCount(1);
+    const [, seen] = await first.waitForCount(2);
     await first.close();
 
     publish(3);
@@ -49,7 +65,7 @@ describe('SSE 事件流', () => {
   it('错过的事件超出回放缓冲时收到 resync', async () => {
     const first = await openEventStream(url);
     publish(1);
-    const [seen] = await first.waitForCount(1);
+    const [, seen] = await first.waitForCount(2);
     await first.close();
 
     publish(SSE_REPLAY_BUFFER + 1);
