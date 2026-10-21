@@ -59,8 +59,16 @@ jobs:
         run: pnpm build
 
       - name: pnpm e2e
+        id: e2e
         if: ${{ !cancelled() }}
         run: pnpm e2e
+      # Before the Electron smoke: Playwright empties test-results/ at the start of every run.
+      - name: Upload E2E traces
+        if: ${{ !cancelled() && steps.e2e.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-${{ runner.os }}
+          path: test-results/
       - name: Electron launch smoke
         if: ${{ !cancelled() && runner.os != 'Linux' }}
         run: pnpm e2e:smoke
@@ -81,11 +89,3 @@ jobs:
             apps/desktop/release/*.AppImage
             apps/desktop/release/*.deb
           if-no-files-found: error
-
-      - name: Upload Playwright traces
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-${{ runner.os }}
-          path: test-results/
-          if-no-files-found: ignore

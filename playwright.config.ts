@@ -31,6 +31,9 @@ export default defineConfig({
       command: 'node packages/server/src/main.ts',
       port: DEV_API_PORT,
       reuseExistingServer: false,
+      // In CI the backend's warnings and errors go to the job log, next to a failing spec.
+      stdout: process.env.CI === undefined ? 'ignore' : 'pipe',
+      stderr: 'pipe',
       env: {
         AW_API_TOKEN: E2E_TOKEN,
         AW_DATA_DIR: join(backendHome, 'data'),
@@ -50,6 +53,8 @@ export default defineConfig({
       command: 'pnpm --filter @aw/web dev',
       url: `http://localhost:${DEV_WEB_PORT}`,
       reuseExistingServer: false,
+      // Vite reports dependency re-optimization and full page reloads here.
+      stdout: process.env.CI === undefined ? 'ignore' : 'pipe',
       env: { VITE_AW_API_TOKEN: E2E_TOKEN },
     },
   ],
