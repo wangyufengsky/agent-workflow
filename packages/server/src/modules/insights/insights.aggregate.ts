@@ -1,6 +1,7 @@
 import {
   type AttemptKind,
   AttemptStatus,
+  type ErrorCode,
   type FailureReasonDTO,
   InsightsDimension,
   InsightsFailureKind,
@@ -49,7 +50,7 @@ export type InsightsData = {
   /** Nodes of the ended tasks. */
   nodes: { id: string; taskId: string; status: NodeStatus }[];
   /** Execute attempts of the ended tasks. */
-  executeAttempts: { taskId: string; nodeId: string; status: AttemptStatus; errorCode: string | null }[];
+  executeAttempts: { taskId: string; nodeId: string; status: AttemptStatus; errorCode: ErrorCode | null }[];
   /** `checks_failed` and `reject` node events of the ended tasks. */
   nodeEvents: { taskId: string; type: string }[];
   /** Questions and permission requests: those of the ended tasks and those created in the period. */
