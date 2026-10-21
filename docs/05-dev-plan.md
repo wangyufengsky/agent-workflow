@@ -218,3 +218,16 @@
 | B-08 | 界面：批量视图（进度汇总、逐个状态与进展、冲突 / 失败标注、合并全部待合并的 + 确认对话框、结果提示）、批量任务列表 `/batches`、主页「批量任务」区、任务列表入口；四套主题 | E2E 见 B-09；走查截图含新建页与批量视图 |
 | B-09 | E2E（FakeOpencode）：J17 主页「补单元测试」的「批量」→ 选 3 个目录 → 创建 → 三个任务到达待合并 → 合并全部 → 主分支 3 个提交、全部已完成；J9 走查加入批量页面 | `pnpm e2e` 通过 |
 | B-10 | 文档收尾：03（模块分层）、07（J17）、14（路由与主页）、本节状态段 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
+
+## v1.2 · PR 审查意见回流
+
+> 状态：R-01…R-06 **已完成**（2026-10-22，待合并）。设计见 [21-review-feedback.md](21-review-feedback.md)，决策 D87（取回与勾选）、D88（修改后由用户推送）、D89（不回写平台），均按保守方案实现，**待用户确认**。没有新表与迁移。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| R-01 | 设计文档 21、决策 D87–D89 | 文档评审通过 |
+| R-02 | 契约：`ChangeRequestReason.Review`（`request-changes` 仍只接受 user / conflict）、`ReviewCommentKind`、错误码 `PULL_REQUEST_NOT_OPEN` / `BRANCH_DIVERGED`、任务事件 `review_feedback`（`completed → running`）、worktree 事件 `restore`（`removed → creating`）、`TaskDetailDTO.pullRequest`、`ReviewCommentsDTO`、操作 `tasks.reviewComments`（read）与 `tasks.reviseFromReview`（write）；08 / 09 / 11 同步 | `ERROR_COPY` 与操作文案覆盖新增项；状态机文档由 `gen:fsm-docs` 生成 |
+| R-03 | 托管平台：按分支查找打开的 PR/MR；读取审查意见（GitHub GraphQL `reviewThreads` / 对话评论 / 审查总结，GitLab `discussions`）；FakeHosting 支持这些端点并能扮演审查者 | 集成测试见 R-04 |
+| R-04 | 服务：取回意见（默认勾选）、发起修改（重新取回按 id 挑选、抓取并快进分支、分叉即停、重建 worktree、复用「再改改」追加 `review_fix_<n>` 节点）；`pull_request` 交付沿用已打开的 PR | 集成测试（FakeOpencode + FakeHosting + 真实 Git）：GitHub 全流程（审查者在平台提交的建议被快进进来、提示词含勾选的意见与补充说明、推送后仍只有一个 PR 且远端分支有 AI 的修改）；GitLab 意见映射；意见已不在 400、分支分叉 409 且不做改动、PR 关闭 409、本地合并的任务 409 |
+| R-05 | 界面：结果卡「审查意见」区（取回、勾选、补充说明、发起修改）、PR 任务待合并时的「推送到 PR」；助手经操作清单可调用两个操作 | E2E 见 R-06 |
+| R-06 | E2E J18（`task-review.browser.spec.ts`，开发后端以 `AW_FAKE_HOSTING_*` 启用 FakeHosting）；文档 03 / 07 / 10 / 12 / 13 / 14 | `pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |

@@ -132,9 +132,11 @@ describe.each(CASES)('$name 状态机', ({ machine, illegal }) => {
     }
   });
 
-  it('终态不接受任何事件', () => {
+  it('终态只接受声明的重新打开事件', () => {
     for (const state of machine.states.filter((s) => isTerminalState(machine, s))) {
-      for (const event of machine.events) expect(() => transition(machine, state, event)).toThrow();
+      for (const event of machine.events.filter((e) => !(machine.reopenedBy ?? []).includes(e))) {
+        expect(() => transition(machine, state, event)).toThrow();
+      }
     }
   });
 

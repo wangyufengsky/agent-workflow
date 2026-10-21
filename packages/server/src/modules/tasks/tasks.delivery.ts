@@ -120,7 +120,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
     });
   }
 
-  /** Pushes the branch and opens the pull request on the project's platform (11 §5.3). */
+  /** Pushes the branch and opens the pull request on the project's platform, unless one is open (11 §5.3). */
   async function openPullRequest(
     task: Task,
     delivery: DeliveryDTO,
@@ -132,12 +132,16 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
     try {
       const { repoPath } = projects.getRecord(task.projectId);
       await pushBranch(locks, { repoPath, branch: worktree.branch, authorization: hosting.gitAuthorization() });
-      ({ url } = await hosting.createPullRequest({
-        head: worktree.branch,
-        base: delivery.targetBranch,
-        title: pr.title,
-        body: pr.body,
-      }));
+      // After a revision from review comments the push updates the pull request already open (21 §5).
+      const open = await hosting.findOpenPullRequest(worktree.branch);
+      ({ url } =
+        open ??
+        (await hosting.createPullRequest({
+          head: worktree.branch,
+          base: delivery.targetBranch,
+          title: pr.title,
+          body: pr.body,
+        })));
     } catch (err) {
       recordFailure(task.id, delivery, err);
       if (err instanceof AppError) return;

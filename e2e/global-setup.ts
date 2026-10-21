@@ -4,7 +4,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { DEV_PORT_ENV, devPorts } from '@aw/shared';
-import { E2E_TOKEN } from './env.ts';
+import { E2E_HOSTING, E2E_TOKEN } from './env.ts';
 
 /**
  * Starts the one backend every browser spec runs against (so specs run one at a time against its state). It listens
@@ -31,6 +31,9 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     NODE_ENV: 'development',
     // AI sessions are played by FakeOpencode (07 §2), which also reports a model so the environment is ready.
     AW_FAKE_OPENCODE: '1',
+    // Pull requests and their reviewers are played by FakeHosting (07 §4, J18).
+    AW_FAKE_HOSTING_TOKEN: E2E_HOSTING.token,
+    AW_FAKE_HOSTING_REPO: E2E_HOSTING.repo,
     // Deterministic environment checks: a fake `opencode --version` first on PATH (`opencode.cmd` on Windows),
     // no ~/.opencode.
     [pathKey]: `${resolve('e2e/fixtures/bin')}${delimiter}${process.env[pathKey] ?? ''}`,
