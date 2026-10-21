@@ -7,6 +7,7 @@ import {
   setHostingRequestSchema,
   updateProjectRequestSchema,
 } from '../contracts/api/projects.ts';
+import { EntityKind } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -37,6 +38,7 @@ export const createProjectOp = defineOperationContract({
   expose: { palette: true, assistant: true },
   credentialFields: [],
   mode: UiMode.Simple,
+  produces: { kind: EntityKind.Project, ref: (project) => ({ id: project.id, title: project.name }) },
 });
 
 export const getProjectOp = defineOperationContract({

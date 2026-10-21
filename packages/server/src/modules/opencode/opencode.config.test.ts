@@ -12,6 +12,8 @@ function config(shell: string | undefined) {
   return buildOpencodeConfig({
     mcpUrl: 'http://127.0.0.1:4000/mcp/exec',
     mcpToken: 'mcp-token',
+    assistantMcpUrl: 'http://127.0.0.1:4000/mcp/assistant',
+    assistantMcpToken: 'assistant-token',
     pluginFile: PLUGIN_FILE,
     prompts: prompts as Record<PromptName, string>,
     shell,
@@ -19,14 +21,14 @@ function config(shell: string | undefined) {
 }
 
 describe('opencode 配置生成', () => {
-  it('注入 MCP、三个基础 agent 与 bridge 插件', () => {
+  it('注入两套 MCP、三个基础 agent、助手 agent 与 bridge 插件', () => {
     // The plugin URL depends on the platform's absolute paths (a drive letter on Windows).
     const { plugin, ...rest } = config(undefined);
     expect(plugin).toEqual([pathToFileURL(PLUGIN_FILE).href]);
     expect(rest).toMatchSnapshot();
   });
 
-  it('固定 shell 时注入 shell（Windows 上的 Git Bash，D67），否则不设置', () => {
+  it('固定 shell 时注入 shell（Windows 上的 Git Bash，D68），否则不设置', () => {
     expect(config('C:\\Program Files\\Git\\bin\\bash.exe').shell).toBe('C:\\Program Files\\Git\\bin\\bash.exe');
     expect('shell' in config(undefined)).toBe(false);
   });

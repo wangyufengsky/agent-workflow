@@ -12,6 +12,7 @@ import {
   taskEventSchema,
   taskSummarySchema,
 } from '../contracts/api/tasks.ts';
+import { EntityKind } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -43,6 +44,7 @@ export const createTaskOp = defineOperationContract({
   http: { method: 'POST', path: '/tasks', status: 201 },
   // The palette opens the home page's start form with it (14 §2.1).
   expose: { palette: true, assistant: true },
+  produces: { kind: EntityKind.Task, ref: (task) => ({ id: task.id, title: `${task.key} · ${task.title}` }) },
 });
 
 export const getTaskOp = defineOperationContract({

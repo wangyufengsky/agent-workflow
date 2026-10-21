@@ -15,12 +15,14 @@
 │   ├─ /api/v1/events SSE                                                │
 │   ├─ /              构建后的前端静态文件（同源，D31）                   │
 │   ├─ /mcp/exec      执行 MCP，Streamable HTTP（执行 MCP 令牌）          │
-│   ├─ /mcp/assistant 助手 MCP（v1.1，独立令牌）                          │
+│   ├─ /mcp/assistant 助手 MCP（v1.1，独立令牌，server agent-workflow-app） │
 │   ├─ SQLite（app.db）+ JSONL 日志                                       │
 │   ├─ git CLI / GitHub / GitLab / mysql2                                │
 │   └─ 子进程：opencode serve 1.19.0（127.0.0.1:随机端口）                 │
 │         └─ 配置注入：mcp.agent-workflow → .../mcp/exec                 │
+│                     mcp.agent-workflow-app → .../mcp/assistant（v1.1） │
 │                     agent: aw-planner / aw-executor / aw-reviewer      │
+│                            aw-assistant（v1.1）                         │
 │                     plugin: agent-workflow-bridge（注入 sessionID）     │
 └───────────────────────────────────────────────────────────────────────┘
 ```
@@ -180,7 +182,7 @@ modules/tasks/
 依赖方向（dependency-cruiser 强制）：
 
 - `operations / routes → service → repo`；跨模块只能 import 对方的 `index.ts`。例外：表定义文件可以直接引用其他模块的表定义文件以声明外键（D43）。
-- 任务域的服务分层（D45）：`inbox`、`plans`、`timeline`、`worktrees` → `attempts` → `acceptance` → `nodes` → `tasks` → `scheduler`；`mcp` 在最上层。尝试经 `attempts.onSignal` 通知其所有者（节点、规划、评审），不反向依赖；需要完整任务上下文的入口（`inbox.resolve`、`projects.delete`、节点通过/驳回/重试、删除流程与角色）由 `tasks` 实现。`databases` 在 `projects` 之下（项目详情列出关联的连接），任务上下文与数据库 MCP 工具经 `tasks` 使用它；`workflows` 依赖 `roles`（校验流程定义）。
+- 任务域的服务分层（D45）：`inbox`、`plans`、`timeline`、`worktrees` → `attempts` → `acceptance` → `nodes` → `tasks` → `scheduler`；`mcp` 在最上层。`assistant`（v1.1）与 `mcp` 同在最上层：它从 `app.ts` 拿到其余所有模块的操作实现来生成工具，并用 `attempts` 的会话流存储与会话视图、`tasks` / `projects` / `workflows` 查页面上的名称。尝试经 `attempts.onSignal` 通知其所有者（节点、规划、评审），不反向依赖；需要完整任务上下文的入口（`inbox.resolve`、`projects.delete`、节点通过/驳回/重试、删除流程与角色）由 `tasks` 实现。`databases` 在 `projects` 之下（项目详情列出关联的连接），任务上下文与数据库 MCP 工具经 `tasks` 使用它；`workflows` 依赖 `roles`（校验流程定义）。
 - 跨服务的写入用 `core/db/unit-of-work` 的 `transact`（嵌套加入外层事务，事件在提交后发出，D44）。
 - `core` 不依赖 `modules`；`shared` 不依赖任何 app/package；`web` 只依赖 `shared`。
 - 模块间不循环。需要反向通知时用 `core/event-bus` 发领域事件。
@@ -207,7 +209,7 @@ modules/tasks/
 | --- | --- | --- |
 | REST API | ✅ 路由由清单挂载 | |
 | ⌘K 命令面板 | ✅ `expose.palette` 的操作 | |
-| 助手 MCP | 预留字段 | ✅ `expose.assistant` 的操作 |
+| 助手 MCP | 预留字段 | ✅ `expose.assistant` 的操作（剔除凭据与 `assistantOmit` 字段，按界面模式过滤，D65） |
 | 对外 MCP（供 Claude Desktop 等外部客户端） | — | 候选 |
 
 ```ts
@@ -222,6 +224,8 @@ export const startTaskOp = defineOperationContract({
   http: { method: 'POST', path: '/tasks' },
   expose: { palette: false, assistant: true },
   credentialFields: [],                  // 此类字段不会出现在助手工具 schema 中
+  // assistantOmit: [...],               // 可选：其他助手不能设置的字段（D65，如 settings.update 的 assistant.alwaysAllow）
+  // produces: { kind: EntityKind.Task, ref: (t) => ({ id: t.id, title: t.title }) },  // 可选：产出的对象（D66，助手的导航卡片）
   mode: UiMode.Simple,                   // 最低可见界面模式
 });
 
@@ -267,7 +271,7 @@ export function taskOperations(tasks: TasksService) {
 │     └─ <attemptId>.jsonl     会话流（消息/片段/工具调用镜像）；任务时间线在 SQLite task_events
 ├─ worktrees/
 │  └─ <projectSlug>/<taskKey>/ 任务 worktree（默认位置，可在设置中改）
-└─ assistant/                  助手工作目录（v1.1）：files/、conversations/
+└─ assistant/                  助手工作目录（v1.1）：会话 directory；files/<对话 id>/ 生成的文件，conversations/<对话 id>.jsonl 消息流
 ```
 
 ## 8. 并发与一致性
@@ -284,5 +288,6 @@ export function taskOperations(tasks: TasksService) {
 - opencode 会话：`directory` 为任务 worktree；`external_directory: deny`；edit 允许；bash 按角色基线（见 13-builtin-workflows）。
 - 执行 MCP：独立令牌；每次调用根据 sessionID 解析到唯一的活动尝试，工具按尝试类型授权。
 - Git：所有调用设置 `LC_ALL=C`（D37），参数数组传参。
-- 助手 MCP（v1.1）：独立令牌；写操作经用户确认；凭据字段不进入工具 schema，凭据只能在表单中由用户输入。
+- 助手 MCP（v1.1）：独立令牌；调用按会话归属到助手对话（执行任务的会话调用不了）；写操作经用户确认；凭据字段不进入工具 schema，凭据只能在表单中由用户输入；助手不能修改「总是允许」、opencode 路径、bash 策略与 worktree 目录（D65）。
+- 助手会话：`directory` 为 `<数据目录>/assistant/`，`external_directory: deny`，bash 为只读规则、其余询问。
 - 数据库工具：只读事务 + 语句类型白名单 + 行数与超时限制。

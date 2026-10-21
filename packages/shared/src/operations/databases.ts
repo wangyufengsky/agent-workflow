@@ -6,6 +6,8 @@ import {
   dbTestResultSchema,
   updateDbConnectionRequestSchema,
 } from '../contracts/api/databases.ts';
+import { dbQueryInputSchema, dbQueryOutputSchema } from '../contracts/mcp/db-tools.ts';
+import { EntityKind } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -35,6 +37,7 @@ export const createDbConnectionOp = defineOperationContract({
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/db-connections', status: 201 },
   credentialFields: ['password'],
+  produces: { kind: EntityKind.DbConnection, ref: (connection) => ({ id: connection.id, title: connection.name }) },
 });
 
 export const updateDbConnectionOp = defineOperationContract({
@@ -82,5 +85,18 @@ export const dbSchemaOp = defineOperationContract({
   output: dbSchemaSchema,
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/db-connections/:id/schema' },
+  credentialFields: [],
+});
+
+export const queryDbOp = defineOperationContract({
+  ...common,
+  id: 'databases.query',
+  title: 'op.databases.query',
+  description:
+    'Run one read-only statement (SELECT, SHOW, DESCRIBE or EXPLAIN) on a connection; rows and time are limited',
+  input: z.object({ id: z.string(), sql: dbQueryInputSchema.shape.sql, limit: dbQueryInputSchema.shape.limit }),
+  output: dbQueryOutputSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'POST', path: '/db-connections/:id/query' },
   credentialFields: [],
 });

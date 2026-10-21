@@ -6,8 +6,15 @@ import { PROJECTS_COPY } from '../../copy/projects.ts';
 import { useCreateProject } from './projects.queries.ts';
 
 /** Repository root by path; in Electron a folder picker fills it in. */
-export function AddProjectForm({ onAdded }: { onAdded: (project: ProjectDetailDTO) => void }) {
-  const [repoPath, setRepoPath] = useState('');
+export function AddProjectForm({
+  initialRepoPath = '',
+  onAdded,
+}: {
+  /** Prefilled by the assistant's `open_form` (15 §5). */
+  initialRepoPath?: string;
+  onAdded: (project: ProjectDetailDTO) => void;
+}) {
+  const [repoPath, setRepoPath] = useState(initialRepoPath);
   const create = useCreateProject();
   const bridge = window.aw;
 

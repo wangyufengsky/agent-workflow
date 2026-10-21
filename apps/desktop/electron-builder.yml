@@ -26,7 +26,7 @@ mac:
   category: public.app-category.developer-tools
   # Unsigned until a Developer ID certificate is available (M6-04).
   identity: null
-# Windows and Linux (v1.1, 17 §3.8, D71): x64 only, unsigned. Artifact names without spaces.
+# Windows and Linux (v1.1, 17 §3.8, D72): x64 only, unsigned. Artifact names without spaces.
 win:
   # electron-builder converts the 1024 px PNG (extracted from icon.icns) to .ico.
   icon: build/icon.png

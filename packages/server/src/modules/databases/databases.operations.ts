@@ -3,6 +3,7 @@ import {
   dbSchemaOp,
   deleteDbConnectionOp,
   listDbConnectionsOp,
+  queryDbOp,
   testDbConnectionOp,
   updateDbConnectionOp,
 } from '@aw/shared';
@@ -17,5 +18,6 @@ export function databasesOperations(databases: DatabasesService) {
     implement(deleteDbConnectionOp, ({ id }) => databases.delete(id)),
     implement(testDbConnectionOp, ({ id }) => databases.test(id)),
     implement(dbSchemaOp, ({ id }) => databases.schema(id)),
+    implement(queryDbOp, ({ id, sql, limit }) => databases.queryById(id, sql, limit)),
   ];
 }

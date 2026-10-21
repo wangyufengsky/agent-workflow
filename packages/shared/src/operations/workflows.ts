@@ -10,6 +10,7 @@ import {
   workflowSchema,
   workflowSummarySchema,
 } from '../contracts/api/workflows.ts';
+import { EntityKind } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -67,6 +68,7 @@ export const createWorkflowOp = defineOperationContract({
   expose: { palette: false, assistant: true },
   credentialFields: [],
   mode: UiMode.Pro,
+  produces: { kind: EntityKind.Workflow, ref: (workflow) => ({ id: workflow.key, title: workflow.name }) },
 });
 
 export const validateWorkflowOp = defineOperationContract({
@@ -132,6 +134,7 @@ export const createRoleOp = defineOperationContract({
   expose: { palette: false, assistant: true },
   credentialFields: [],
   mode: UiMode.Pro,
+  produces: { kind: EntityKind.Role, ref: (role) => ({ id: role.id, title: role.name }) },
 });
 
 export const deleteRoleOp = defineOperationContract({

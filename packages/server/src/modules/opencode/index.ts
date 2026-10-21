@@ -7,7 +7,12 @@ export {
   type PromptInput,
   parseModelRef,
 } from './opencode.client.ts';
-export { buildOpencodeConfig, type OpencodeConfigInput, sessionPermissionRules } from './opencode.config.ts';
+export {
+  assistantPermissionRules,
+  buildOpencodeConfig,
+  type OpencodeConfigInput,
+  sessionPermissionRules,
+} from './opencode.config.ts';
 export {
   type OpencodeError,
   type OpencodeEvent,

@@ -1,14 +1,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import {
-  ServerEventType,
-  TRANSCRIPT_PAGE_SIZE,
-  type TranscriptEntry,
-  type TranscriptPage,
-  transcriptEntrySchema,
-} from '@aw/shared';
+import { dirname } from 'node:path';
+import { TRANSCRIPT_PAGE_SIZE, type TranscriptEntry, type TranscriptPage, transcriptEntrySchema } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
-import type { EventBus } from '../../core/event-bus.ts';
 
 /** An entry before the store numbers and timestamps it. */
 export type NewTranscriptEntry = TranscriptEntry extends infer E
@@ -17,18 +10,21 @@ export type NewTranscriptEntry = TranscriptEntry extends infer E
     : never
   : never;
 
-/** Debug attempts belong to no task; their transcripts live under `runs/debug/`. */
-const DEBUG_RUN_DIR = 'debug';
-
 /**
- * Append-only JSONL per attempt at `<data dir>/runs/<taskId>/<attemptId>.jsonl` (10 §3); every appended entry is also
- * pushed as `attempt.transcript`. Appends are synchronous so entries keep the order of the events that produced them.
+ * Append-only JSONL, one file per subject (10 §3): attempts at `runs/<taskId>/<attemptId>.jsonl`, assistant
+ * conversations at `assistant/conversations/<id>.jsonl`. Every appended entry is also handed to `onAppend`, which
+ * pushes it over SSE. Appends are synchronous so entries keep the order of the events that produced them.
  */
-export function createTranscriptStore({ runsDir, events, clock }: { runsDir: string; events: EventBus; clock: Clock }) {
+export function createTranscriptStore<S extends { id: string }>({
+  fileOf,
+  onAppend,
+  clock,
+}: {
+  fileOf(subject: S): string;
+  onAppend(subject: S, entries: TranscriptEntry[]): void;
+  clock: Clock;
+}) {
   const lastSeq = new Map<string, number>();
-
-  const fileOf = (attempt: { id: string; taskId: string | null }) =>
-    join(runsDir, attempt.taskId ?? DEBUG_RUN_DIR, `${attempt.id}.jsonl`);
 
   /**
    * The file's lines, unparsed. `append` numbers entries 1, 2, 3… one per line, so line `i` holds seq `i + 1`: a page
@@ -41,24 +37,24 @@ export function createTranscriptStore({ runsDir, events, clock }: { runsDir: str
   }
 
   return {
-    append(attempt: { id: string; taskId: string | null }, entries: readonly NewTranscriptEntry[]): void {
+    append(subject: S, entries: readonly NewTranscriptEntry[]): void {
       if (entries.length === 0) return;
-      const file = fileOf(attempt);
-      let seq = lastSeq.get(attempt.id) ?? lines(file).length;
+      const file = fileOf(subject);
+      let seq = lastSeq.get(subject.id) ?? lines(file).length;
       const ts = clock.now();
       const numbered = entries.map((e) => transcriptEntrySchema.parse({ ...e, seq: ++seq, ts }));
       mkdirSync(dirname(file), { recursive: true });
       appendFileSync(file, numbered.map((e) => `${JSON.stringify(e)}\n`).join(''));
-      lastSeq.set(attempt.id, seq);
-      events.publish({ type: ServerEventType.AttemptTranscript, data: { attemptId: attempt.id, entries: numbered } });
+      lastSeq.set(subject.id, seq);
+      onAppend(subject, numbered);
     },
 
     /**
      * Entries after `afterSeq`, one page at a time. Within a page a streaming part shows once, with its last text, at
      * the position where it started; later pages (and SSE) may repeat the part, which readers replace by `partId`.
      */
-    read(attempt: { id: string; taskId: string | null }, afterSeq: number, isEnded: boolean): TranscriptPage {
-      const all = lines(fileOf(attempt));
+    read(subject: S, afterSeq: number, isEnded: boolean): TranscriptPage {
+      const all = lines(fileOf(subject));
       const page = all
         .slice(afterSeq, afterSeq + TRANSCRIPT_PAGE_SIZE)
         .map((line) => transcriptEntrySchema.parse(JSON.parse(line)));
@@ -77,6 +73,11 @@ export function createTranscriptStore({ runsDir, events, clock }: { runsDir: str
       }
       return { entries: merged, lastSeq: page.at(-1)?.seq ?? afterSeq, hasMore, done: isEnded && !hasMore };
     },
+
+    /** The subject is gone (a deleted conversation); its file is removed by the caller. */
+    forget(subject: S): void {
+      lastSeq.delete(subject.id);
+    },
   };
 }
-export type TranscriptStore = ReturnType<typeof createTranscriptStore>;
+export type TranscriptStore<S extends { id: string }> = ReturnType<typeof createTranscriptStore<S>>;

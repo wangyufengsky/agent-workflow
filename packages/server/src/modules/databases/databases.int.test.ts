@@ -5,6 +5,7 @@ import {
   ErrorCode,
   getProjectOp,
   listDbConnectionsOp,
+  queryDbOp,
   setProjectDbConnectionsOp,
   testDbConnectionOp,
   updateDbConnectionOp,
@@ -111,6 +112,18 @@ describe('数据库连接（11 §9）', () => {
     expect((await t.call(deleteDbConnectionOp, { id })).status).toBe(204);
     expect((await t.call(listDbConnectionsOp, {})).body.items).toEqual([]);
     expect((await t.call(getProjectOp, { id: project.id })).body.dbConnectionIds).toEqual([]);
+  });
+
+  it('只读查询（databases.query，供助手使用）：返回行，拒绝写语句', async () => {
+    const { id } = (await t.call(createDbConnectionOp, connectionInput('shop-db'))).body;
+    expect((await t.call(queryDbOp, { id, sql: 'SELECT name FROM items ORDER BY id', limit: 2 })).body).toMatchObject({
+      columns: ['name'],
+      rows: [['a'], ['b']],
+      truncated: true,
+    });
+    expect((await t.call(queryDbOp, { id, sql: "DELETE FROM items WHERE name = 'a'" })).body).toMatchObject({
+      error: { code: ErrorCode.DbQueryRejected },
+    });
   });
 });
 

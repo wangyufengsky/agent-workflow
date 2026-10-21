@@ -34,11 +34,11 @@ type RuntimeDTO =
   | { status: 'ready'; path: string; version: string; requiredVersion: '1.19.0'; url: string; startedAt: number };
 
 type EnvironmentDTO = {
-  platform: 'darwin' | 'win32' | 'linux';   // 后端的操作系统，引导页据此显示安装命令（D70）
-  git: { installed: true; version: string } | { installed: false };   // Windows 上还要求 Git for Windows 的 Git Bash（D67）
+  platform: 'darwin' | 'win32' | 'linux';   // 后端的操作系统，引导页据此显示安装命令（D71）
+  git: { installed: true; version: string } | { installed: false };   // Windows 上还要求 Git for Windows 的 Git Bash（D68）
   opencode: RuntimeDTO;
   models: { available: Array<{ providerId: string; modelId: string; name: string }>; defaultModel?: string };
-  credentials: { available: boolean };   // 能否保存令牌与密码（safeStorage；Linux 无密钥服务时为 false，D69），不计入 ready
+  credentials: { available: boolean };   // 能否保存令牌与密码（safeStorage；Linux 无密钥服务时为 false，D70），不计入 ready
   ready: boolean;              // git、opencode、模型三项都满足
 };
 ```
@@ -217,6 +217,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | DELETE | `/db-connections/:id` | 204；删除密码，项目关联随之删除 |
 | POST | `/db-connections/:id/test` | `{ ok, serverVersion, error }`：连接并读取 `VERSION()`；连不上时 `ok: false`、`error` 为驱动信息（不作为 HTTP 错误） |
 | GET | `/db-connections/:id/schema` | `{ tables: Array<{ name, comment?, rows?, columns: Array<{ name, type, nullable, key?, default?, comment? }> }> }`（只读浏览） |
+| POST | `/db-connections/:id/query` | `{ sql, limit? }` → `{ columns, rows, truncated, elapsedMs }`：与 AI 的 `db_query` 同样的只读四道关（12 §6.11），但可用于任意连接；供应用助手使用（v1.1，15 §3） |
 
 每次访问数据库都单独建立连接、用完关闭（连接超时 `DB_CONNECT_TIMEOUT_MS`）；连不上 502 `DB_CONNECTION_FAILED`（`details.driverMessage`）。
 
@@ -247,9 +248,34 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `delivery.updated` | `{ taskId, delivery: DeliveryDTO }` | |
 | `runtime.updated` | `RuntimeDTO` | 运行环境指示 |
 | `settings.updated` | `{ keys: SettingKey[] }` | 重新拉设置（主题、模式即时生效） |
+| `assistant.updated` | `AssistantConversationDTO` | 对话列表与面板（忙碌、待回复的权限请求） |
+| `assistant.transcript` | `{ conversationId, entries: TranscriptEntry[] }` | 追加到面板的消息流；含 `confirmation`（确认卡片）、`attachment`（文件）、`entity_ref`（`{ kind, id, title }`，产出对象的导航卡片，D66）条目（10 §3） |
+| `assistant.confirmation` | `AssistantConfirmationDTO` | 确认卡片的状态与结果 |
+| `assistant.navigate` | `{ conversationId, target: AssistantPageRef }` | 助手调用 `open_page`：面板旁跳转，面板保持打开 |
+| `assistant.open_form` | `{ conversationId, form: AssistantForm, values }` | 助手调用 `open_form`：打开表单并预填（不含凭据字段） |
+| `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
 | `resync` | `{}` | 全部失效 |
 
-## 12. preload 能力（非 HTTP）
+## 12. 应用助手（v1.1）
+
+见 [15-assistant.md](15-assistant.md)。这些操作 `expose.assistant = false`（助手不能确认自己的调用），也不进命令面板。
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/assistant/conversations` | `{ items: AssistantConversationDTO[] }`，最近更新在前；`AssistantConversationDTO = { id, title, busy, pendingPermissions: Array<{ permissionId, permission, patterns }>, createdAt, updatedAt }`（`busy` 与权限请求只在内存中，重启后为空） |
+| POST | `/assistant/conversations` | `{ title? }` → 201；opencode 会话在第一条消息时创建 |
+| GET | `/assistant/conversations/:id` | 不存在 404 `ASSISTANT_CONVERSATION_NOT_FOUND` |
+| DELETE | `/assistant/conversations/:id` | 204；连同确认、消息流 JSONL 与 `files/<id>/` |
+| POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在回复时 409 `ASSISTANT_BUSY` |
+| POST | `/assistant/conversations/:id/abort` | 停止本轮回复 |
+| POST | `/assistant/conversations/:id/permissions/:permissionId` | `{ reply: PermissionDecision }`：回复助手会话的权限请求（bash / webfetch 询问），不存在 404 `NOT_FOUND` |
+| GET | `/assistant/conversations/:id/transcript?afterSeq=` | 消息流分页（非清单路由，格式同 `/attempts/:id/transcript`；`done` 恒为 false：对话不会结束） |
+| GET | `/assistant/conversations/:id/files` | `{ items: Array<{ path, absolutePath, size, modifiedAt }> }`：`files/<id>/` 下助手写的文件 |
+| GET | `/assistant/conversations/:id/confirmations` | `{ items: AssistantConfirmationDTO[] }`，按创建时间；`AssistantConfirmationDTO = { id, conversationId, operationId, title, risk, input, status, result: { ok: true, output } \| { ok: false, error } \| null, createdAt, resolvedAt }` |
+| POST | `/assistant/confirmations/:id/confirm` | `{ alwaysAllow? }`：执行操作并把结果作为下一条消息发回会话；`alwaysAllow` 只允许 write 级（critical 400 `VALIDATION_FAILED`），同时把操作加入 `assistant.alwaysAllow`；已处理 409 `STATE_TRANSITION_INVALID`；不存在 404 `ASSISTANT_CONFIRMATION_NOT_FOUND` |
+| POST | `/assistant/confirmations/:id/cancel` | 会话收到「用户取消了该操作」 |
+
+## 13. preload 能力（非 HTTP）
 
 ```ts
 interface AwBridge {

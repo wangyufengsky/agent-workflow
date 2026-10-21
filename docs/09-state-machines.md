@@ -306,3 +306,21 @@ stateDiagram-v2
 - 进入 `crashed` 后自动 `start` 一次；自动机会用完后需用户在运行环境页点重启（`crashed` 的 `start`），用户的手动启动 / 重启会重新给一次自动机会。
 - `restart`：用户手动；活动尝试先 → `interrupted`（会话随旧进程一起消失，可重试），再结束旧进程启动新进程。
 - 后端退出时结束 opencode 进程，不做状态转换。
+
+## 10. 助手确认 AssistantConfirmation（v1.1）
+
+<!-- fsm:assistantConfirmation 由 pnpm gen:fsm-docs 生成，勿手改 -->
+```mermaid
+stateDiagram-v2
+  [*] --> pending
+  pending --> confirmed: confirm
+  pending --> cancelled: cancel
+  confirmed --> [*]
+  cancelled --> [*]
+```
+<!-- /fsm:assistantConfirmation -->
+
+- 助手调用 write（不在「总是允许」中）或 critical 级操作时以 `pending` 创建（15 §4），工具返回 `needs_confirmation`。
+- `confirm`：用户在确认卡片上确认；后端随后执行操作，结果（输出或错误码）写入 `result`，并作为下一条消息发回同一会话。操作本身失败也是 `confirmed`（用户确认过，结果是错误）。
+- `cancel`：用户取消；会话收到「用户取消了该操作」。
+- 没有超时，重启后仍为 `pending` 的确认照常可确认或取消。

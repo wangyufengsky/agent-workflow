@@ -3,7 +3,7 @@ import path from 'node:path';
 import { Platform, platformSchema } from '@aw/shared';
 
 /**
- * Everything that differs between the operating systems the backend runs on (17 §2, D66). Built per platform so
+ * Everything that differs between the operating systems the backend runs on (17 §2, D67). Built per platform so
  * the Windows rules can be unit-tested anywhere; the rest of the backend uses `host`. Starting `.cmd` launchers and
  * ending a process with its descendants are left to execa (Windows command resolution, `killDescendants`).
  */
@@ -49,7 +49,7 @@ export function platformRules(os: Platform) {
     gitPlatformArgs: isWindows ? (['-c', 'core.longpaths=true'] as const) : ([] as const),
 
     /**
-     * Whether commands run in Git for Windows' bash, which is then also opencode's shell (D67, D68); elsewhere
+     * Whether commands run in Git for Windows' bash, which is then also opencode's shell (D68, D69); elsewhere
      * check commands use /bin/sh and opencode the user's own shell.
      */
     shellFromGit: isWindows,

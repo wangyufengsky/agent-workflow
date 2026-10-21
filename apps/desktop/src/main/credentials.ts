@@ -3,7 +3,7 @@ import { safeStorage, type UtilityProcess } from 'electron';
 
 /**
  * Why safeStorage cannot protect secrets, if it cannot. On Linux without a secret service Chromium selects
- * `basic_text`, a key hard-coded in its source, and still reports encryption as available (D69).
+ * `basic_text`, a key hard-coded in its source, and still reports encryption as available (D70).
  */
 function unavailableReason(): string | undefined {
   if (!safeStorage.isEncryptionAvailable()) return 'safeStorage encryption is not available';

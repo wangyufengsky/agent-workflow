@@ -1,4 +1,4 @@
-import { backendShutdownMessageSchema, MCP_EXEC_PATH } from '@aw/shared';
+import { backendShutdownMessageSchema, MCP_ASSISTANT_PATH, MCP_EXEC_PATH } from '@aw/shared';
 import { buildApp } from './app.ts';
 import { loadConfig } from './core/config.ts';
 import { type CredentialCipher, createPortCipher, parentPortTransport } from './modules/credentials/index.ts';
@@ -41,9 +41,12 @@ const address = server.server.address();
 if (address === null || typeof address === 'string') throw new Error('Server is not listening on a TCP port');
 // Running inside Electron utilityProcess: tell the main process where we listen.
 process.parentPort?.postMessage({ type: 'ready', port: address.port });
-fake?.fake.connectMcp({ url: `http://127.0.0.1:${address.port}${MCP_EXEC_PATH}`, token: app.mcpToken });
+fake?.fake.connectMcp({
+  exec: { url: `http://127.0.0.1:${address.port}${MCP_EXEC_PATH}`, token: app.mcpToken },
+  assistant: { url: `http://127.0.0.1:${address.port}${MCP_ASSISTANT_PATH}`, token: app.assistantMcpToken },
+});
 
-/** Closing the server stops opencode with its process tree (D68); only then may the process exit. */
+/** Closing the server stops opencode with its process tree (D69); only then may the process exit. */
 async function shutdown(): Promise<void> {
   await server.close();
   process.exit(0);

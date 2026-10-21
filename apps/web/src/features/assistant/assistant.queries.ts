@@ -1,0 +1,111 @@
+import {
+  API_PREFIX,
+  type AssistantConfirmationDTO,
+  type AssistantConversationDTO,
+  type AssistantPageRef,
+  abortAssistantOp,
+  cancelAssistantCallOp,
+  confirmAssistantCallOp,
+  createConversationOp,
+  deleteConversationOp,
+  listAssistantFilesOp,
+  listConfirmationsOp,
+  listConversationsOp,
+  type PermissionDecision,
+  replyAssistantPermissionOp,
+  sendAssistantMessageOp,
+} from '@aw/shared';
+import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import { callOperation } from '../../api/client.ts';
+import { queryKeys } from '../../api/query-keys.ts';
+import type { TranscriptSource } from '../attempts/attempt.queries.ts';
+
+export const conversationsQuery = queryOptions({
+  queryKey: queryKeys.assistantConversations,
+  queryFn: async () => (await callOperation(listConversationsOp, {})).items,
+});
+
+export const confirmationsQuery = (id: string) =>
+  queryOptions({
+    queryKey: queryKeys.assistantConfirmations(id),
+    queryFn: async () => (await callOperation(listConfirmationsOp, { id })).items,
+  });
+
+export const assistantFilesQuery = (id: string) =>
+  queryOptions({
+    queryKey: queryKeys.assistantFiles(id),
+    queryFn: async () => (await callOperation(listAssistantFilesOp, { id })).items,
+  });
+
+export const conversationTranscript = (id: string): TranscriptSource => ({
+  key: queryKeys.assistantTranscript(id),
+  liveKey: queryKeys.assistantTranscriptLive(id),
+  url: `${API_PREFIX}/assistant/conversations/${encodeURIComponent(id)}/transcript`,
+});
+
+/** SSE and mutations: a conversation's new state replaces it in the list, newest first. */
+export function updateConversation(qc: QueryClient, conversation: AssistantConversationDTO): void {
+  qc.setQueryData<AssistantConversationDTO[]>(queryKeys.assistantConversations, (old) =>
+    old === undefined
+      ? old
+      : [conversation, ...old.filter((c) => c.id !== conversation.id)].sort((a, b) => b.updatedAt - a.updatedAt),
+  );
+}
+
+/** SSE: a confirmation card changed (created, confirmed, ran, cancelled). */
+export function updateConfirmation(qc: QueryClient, confirmation: AssistantConfirmationDTO): void {
+  qc.setQueryData<AssistantConfirmationDTO[]>(queryKeys.assistantConfirmations(confirmation.conversationId), (old) =>
+    old === undefined
+      ? old
+      : [...old.filter((c) => c.id !== confirmation.id), confirmation].sort((a, b) => a.createdAt - b.createdAt),
+  );
+}
+
+export function useCreateConversation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (title: string | undefined) =>
+      callOperation(createConversationOp, title === undefined ? {} : { title }),
+    onSuccess: (c) => updateConversation(queryClient, c),
+  });
+}
+
+// The conversation's busy state and permission requests arrive in order over SSE (`assistant.updated`). These
+// responses are not written to the cache: one can arrive after the event saying the turn already ended.
+export const useSendMessage = () =>
+  useMutation({
+    mutationFn: (input: { id: string; text: string; context: AssistantPageRef }) =>
+      callOperation(sendAssistantMessageOp, input),
+  });
+export const useAbortAssistant = () =>
+  useMutation({ mutationFn: (id: string) => callOperation(abortAssistantOp, { id }) });
+export const useReplyAssistantPermission = () =>
+  useMutation({
+    mutationFn: (input: { id: string; permissionId: string; reply: PermissionDecision }) =>
+      callOperation(replyAssistantPermissionOp, input),
+  });
+
+export function useDeleteConversation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => callOperation(deleteConversationOp, { id }),
+    onSuccess: (_void, id) => {
+      queryClient.setQueryData<AssistantConversationDTO[]>(queryKeys.assistantConversations, (old) =>
+        old?.filter((c) => c.id !== id),
+      );
+      queryClient.removeQueries({ queryKey: ['assistant', id] });
+    },
+  });
+}
+
+function useConfirmationMutation<I>(fn: (input: I) => Promise<AssistantConfirmationDTO>) {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: fn, onSuccess: (c) => updateConfirmation(queryClient, c) });
+}
+
+export const useConfirmCall = () =>
+  useConfirmationMutation((input: { id: string; alwaysAllow: boolean }) =>
+    callOperation(confirmAssistantCallOp, input.alwaysAllow ? input : { id: input.id }),
+  );
+export const useCancelCall = () =>
+  useConfirmationMutation((id: string) => callOperation(cancelAssistantCallOp, { id }));

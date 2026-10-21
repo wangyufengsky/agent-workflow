@@ -3,8 +3,12 @@ import { PromptName, type Prompts } from '@aw/builtin';
 import {
   BASH_PERMISSION_PRESETS,
   type BashPolicy,
+  MCP_ASSISTANT_SERVER_NAME,
+  MCP_ASSISTANT_TOOL_PREFIX,
   MCP_SERVER_NAME,
+  MCP_TOOL_PREFIX,
   OPENCODE_AGENT_NAME,
+  OPENCODE_ASSISTANT_AGENT,
   type PermissionAction,
   type PermissionRule,
   RoleBaseAgent,
@@ -15,9 +19,12 @@ export type OpencodeConfigInput = {
   /** `http://127.0.0.1:<apiPort>/mcp/exec` */
   mcpUrl: string;
   mcpToken: string;
+  /** `http://127.0.0.1:<apiPort>/mcp/assistant`, with its own token (D25). */
+  assistantMcpUrl: string;
+  assistantMcpToken: string;
   pluginFile: string;
   prompts: Prompts;
-  /** Pinned shell (Git Bash on Windows, D67); otherwise opencode uses the user's own. */
+  /** Pinned shell (Git Bash on Windows, D68); otherwise opencode uses the user's own. */
   shell: string | undefined;
 };
 
@@ -28,15 +35,50 @@ type AgentPermission = {
   external_directory: 'deny';
 };
 
+/** opencode removes the tools a rule denies outright, so each agent only sees its own MCP server's tools. */
+const EXEC_TOOLS = `${MCP_TOOL_PREFIX}*`;
+const ASSISTANT_TOOLS = `${MCP_ASSISTANT_TOOL_PREFIX}*`;
+
 /**
  * Agent permissions that never change with settings (12 §2). The native question tool is denied: questions go
- * through MCP `ask_user` (D36). Bash rules are per session, see `sessionPermissionRules`.
+ * through MCP `ask_user` (D36). Bash rules are per session, see `sessionPermissionRules`. Sessions working on a task
+ * never get the assistant's tools (D25).
  */
-const AGENT_PERMISSION: Record<RoleBaseAgent, AgentPermission> = {
-  [RoleBaseAgent.Planner]: { edit: 'deny', question: 'deny', webfetch: 'deny', external_directory: 'deny' },
-  [RoleBaseAgent.Executor]: { edit: 'allow', question: 'deny', webfetch: 'ask', external_directory: 'deny' },
-  [RoleBaseAgent.Reviewer]: { edit: 'deny', question: 'deny', webfetch: 'deny', external_directory: 'deny' },
+const AGENT_PERMISSION: Record<RoleBaseAgent, AgentPermission & { [ASSISTANT_TOOLS]: 'deny' }> = {
+  [RoleBaseAgent.Planner]: {
+    edit: 'deny',
+    question: 'deny',
+    webfetch: 'deny',
+    external_directory: 'deny',
+    [ASSISTANT_TOOLS]: 'deny',
+  },
+  [RoleBaseAgent.Executor]: {
+    edit: 'allow',
+    question: 'deny',
+    webfetch: 'ask',
+    external_directory: 'deny',
+    [ASSISTANT_TOOLS]: 'deny',
+  },
+  [RoleBaseAgent.Reviewer]: {
+    edit: 'deny',
+    question: 'deny',
+    webfetch: 'deny',
+    external_directory: 'deny',
+    [ASSISTANT_TOOLS]: 'deny',
+  },
 };
+
+/**
+ * The assistant (15 §2) writes only inside its own directory (the session directory, `external_directory` denied),
+ * asks before fetching the web and never sees the execution MCP's tools. Its bash rules are per session.
+ */
+const ASSISTANT_PERMISSION = {
+  edit: 'allow',
+  question: 'deny',
+  webfetch: 'ask',
+  external_directory: 'deny',
+  [EXEC_TOOLS]: 'deny',
+} as const satisfies AgentPermission & { [EXEC_TOOLS]: 'deny' };
 
 const AGENT_PROMPT: Record<RoleBaseAgent, PromptName> = {
   [RoleBaseAgent.Planner]: PromptName.ProtocolPlan,
@@ -55,21 +97,34 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
       permission: AGENT_PERMISSION[base],
     },
   ]);
+  const remote = (url: string, token: string) => ({
+    type: 'remote',
+    url,
+    headers: { Authorization: `Bearer ${token}` },
+    oauth: false,
+    enabled: true,
+  });
   return {
     mcp: {
-      [MCP_SERVER_NAME]: {
-        type: 'remote',
-        url: input.mcpUrl,
-        headers: { Authorization: `Bearer ${input.mcpToken}` },
-        oauth: false,
-        enabled: true,
-      },
+      [MCP_SERVER_NAME]: remote(input.mcpUrl, input.mcpToken),
+      [MCP_ASSISTANT_SERVER_NAME]: remote(input.assistantMcpUrl, input.assistantMcpToken),
     },
     plugin: [pathToFileURL(input.pluginFile).href],
-    agent: Object.fromEntries(agents),
+    agent: {
+      ...Object.fromEntries(agents),
+      [OPENCODE_ASSISTANT_AGENT]: {
+        mode: 'primary',
+        description: 'agent-workflow assistant',
+        prompt: input.prompts[PromptName.ProtocolAssistant],
+        permission: ASSISTANT_PERMISSION,
+      },
+    },
     ...(input.shell === undefined ? {} : { shell: input.shell }),
   };
 }
+
+/** The assistant's session bash rules (15 §2): the read-only rules without check commands; anything else asks. */
+export const assistantPermissionRules = (): PermissionRule[] => readonlyBashRules();
 
 /**
  * Bash rules passed to `session.create` (D35): read-only for planner and reviewer, `ai.bashPolicy` for executors.

@@ -1,4 +1,4 @@
-import { type DbConnectionDTO, DbType } from '@aw/shared';
+import { AssistantForm, createDbConnectionRequestSchema, type DbConnectionDTO, DbType } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { Button } from '../../components/button.tsx';
@@ -10,6 +10,7 @@ import { Icon } from '../../components/icon.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DATABASES_COPY as C } from '../../copy/databases.ts';
+import { clearPendingForm, usePendingForm } from '../../state/ui.store.ts';
 import styles from './databases.module.css';
 import {
   dbConnectionsQuery,
@@ -23,15 +24,30 @@ import {
 /** MySQL's default port. */
 const DEFAULT_PORT = 3306;
 
-/** Add or change a connection; the password goes to the credentials store and never comes back (06 §11). */
-function ConnectionDialog({ connection, onClose }: { connection: DbConnectionDTO | undefined; onClose: () => void }) {
-  const [name, setName] = useState(connection?.name ?? '');
-  const [host, setHost] = useState(connection?.host ?? '127.0.0.1');
-  const [port, setPort] = useState(String(connection?.port ?? DEFAULT_PORT));
-  const [database, setDatabase] = useState(connection?.database ?? '');
-  const [username, setUsername] = useState(connection?.username ?? '');
+/** Fields the assistant's `open_form` may prefill (15 §5): everything but the password. */
+const prefillSchema = createDbConnectionRequestSchema.omit({ password: true }).partial();
+type Prefill = ReturnType<typeof prefillSchema.parse>;
+
+/**
+ * Add or change a connection; the password goes to the credentials store and never comes back (06 §11). The
+ * assistant may prefill the other fields; the user types the password.
+ */
+function ConnectionDialog({
+  connection,
+  prefill = {},
+  onClose,
+}: {
+  connection: DbConnectionDTO | undefined;
+  prefill?: Prefill;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(prefill.name ?? connection?.name ?? '');
+  const [host, setHost] = useState(prefill.host ?? connection?.host ?? '127.0.0.1');
+  const [port, setPort] = useState(String(prefill.port ?? connection?.port ?? DEFAULT_PORT));
+  const [database, setDatabase] = useState(prefill.database ?? connection?.database ?? '');
+  const [username, setUsername] = useState(prefill.username ?? connection?.username ?? '');
   const [password, setPassword] = useState('');
-  const [tls, setTls] = useState(connection?.tls ?? false);
+  const [tls, setTls] = useState(prefill.tls ?? connection?.tls ?? false);
   const create = useCreateDbConnection();
   const update = useUpdateDbConnection();
   const mutation = connection === undefined ? create : update;
@@ -239,6 +255,10 @@ export function DatabasesPage() {
   const remove = useDeleteDbConnection();
   const [open, setOpen] = useState<Open>({ what: 'none' });
   const close = () => setOpen({ what: 'none' });
+  // A form the assistant opened (15 §5): its values were checked by the backend against the same schema.
+  const adding = usePendingForm(AssistantForm.AddDbConnection);
+  const editing = usePendingForm(AssistantForm.EditDbConnection);
+  const edited = connections.data?.find((c) => c.id === editing?.values.id);
   return (
     <div className="page">
       <div className="page-head">
@@ -265,6 +285,22 @@ export function DatabasesPage() {
         ))}
       </div>
       {open.what === 'add' && <ConnectionDialog connection={undefined} onClose={close} />}
+      {adding !== undefined && (
+        <ConnectionDialog
+          key={adding.seq}
+          connection={undefined}
+          prefill={prefillSchema.parse(adding.values)}
+          onClose={clearPendingForm}
+        />
+      )}
+      {editing !== undefined && edited !== undefined && (
+        <ConnectionDialog
+          key={editing.seq}
+          connection={edited}
+          prefill={prefillSchema.parse(editing.values)}
+          onClose={clearPendingForm}
+        />
+      )}
       {open.what === 'edit' && <ConnectionDialog connection={open.connection} onClose={close} />}
       {open.what === 'schema' && <SchemaDrawer connection={open.connection} onClose={close} />}
       {open.what === 'delete' && (

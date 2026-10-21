@@ -9,7 +9,7 @@ const isWindows = host.os === Platform.Win32;
 
 /**
  * A stand-in command `name` in `dir` that runs the JavaScript module `source` with its arguments: an executable sh
- * script, or on Windows a `.cmd` launcher (the form npm installs, D70). Returns the file to expect as its path.
+ * script, or on Windows a `.cmd` launcher (the form npm installs, D71). Returns the file to expect as its path.
  */
 export async function writeFakeExecutable(dir: string, name: string, source: string): Promise<string> {
   const script = join(dir, `${name}.mjs`);

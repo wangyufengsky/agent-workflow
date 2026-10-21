@@ -22,19 +22,24 @@
       "headers": { "Authorization": "Bearer <mcpToken>" },
       "oauth": false,
       "enabled": true
-    }
+    },
+    // v1.1：助手 MCP，令牌另生成（D25）
+    "agent-workflow-app": { "type": "remote", "url": "http://127.0.0.1:<apiPort>/mcp/assistant", "headers": { "Authorization": "Bearer <assistantMcpToken>" }, "oauth": false, "enabled": true }
   },
   "plugin": ["file://<appResources>/opencode-plugin/agent-workflow-bridge.js"],
   "agent": {
-    "aw-planner":  { "mode": "primary", "description": "agent-workflow planner",  "prompt": "<protocol-plan.md>",    "permission": { "edit": "deny",  "question": "deny", "webfetch": "deny", "external_directory": "deny" } },
-    "aw-executor": { "mode": "primary", "description": "agent-workflow executor", "prompt": "<protocol-execute.md>", "permission": { "edit": "allow", "question": "deny", "webfetch": "ask",  "external_directory": "deny" } },
-    "aw-reviewer": { "mode": "primary", "description": "agent-workflow reviewer", "prompt": "<protocol-review.md>",  "permission": { "edit": "deny",  "question": "deny", "webfetch": "deny", "external_directory": "deny" } }
+    "aw-planner":  { "mode": "primary", "description": "agent-workflow planner",  "prompt": "<protocol-plan.md>",    "permission": { "edit": "deny",  "question": "deny", "webfetch": "deny", "external_directory": "deny", "agent-workflow-app_*": "deny" } },
+    "aw-executor": { "mode": "primary", "description": "agent-workflow executor", "prompt": "<protocol-execute.md>", "permission": { "edit": "allow", "question": "deny", "webfetch": "ask",  "external_directory": "deny", "agent-workflow-app_*": "deny" } },
+    "aw-reviewer": { "mode": "primary", "description": "agent-workflow reviewer", "prompt": "<protocol-review.md>",  "permission": { "edit": "deny",  "question": "deny", "webfetch": "deny", "external_directory": "deny", "agent-workflow-app_*": "deny" } },
+    // v1.1 应用助手（15 §2）：只看到助手 MCP 的工具
+    "aw-assistant": { "mode": "primary", "description": "agent-workflow assistant", "prompt": "<protocol-assistant.md>", "permission": { "edit": "allow", "question": "deny", "webfetch": "ask", "external_directory": "deny", "agent-workflow_*": "deny" } }
   },
-  "shell": "C:\\Program Files\\Git\\bin\\bash.exe"   // 仅 Windows：Git Bash，bash 规则按 bash 语法匹配（D67）
+  "shell": "C:\\Program Files\\Git\\bin\\bash.exe"   // 仅 Windows：Git Bash，bash 规则按 bash 语法匹配（D68）
 }
 ```
 
 - 生成函数 `buildOpencodeConfig`（`modules/opencode/opencode.config.ts`）；agent 的 `prompt` 为 `packages/builtin/prompts/protocol-*.md`，插件路径为构建出的 `agent-workflow-bridge.js`（打包后在 `Resources/opencode-plugin/`，源码运行时在 `packages/opencode-plugin/dist/`）。
+- 每个 agent 的权限 deny 另一套 MCP 的工具（`agent-workflow-app_*` / `agent-workflow_*`）：opencode 去掉被整体 deny 的工具，执行任务的会话看不到几十个助手工具，助手也看不到执行工具；即使调用了，归属也会失败（12 §3、15 §2）。
 - agent 只放不随设置变化的权限；**bash 规则在 `session.create` 时以会话级 `permission` 规则集传入**（D35，`sessionPermissionRules`），格式 `[{ permission: 'bash', pattern, action }]`。opencode 取**最后一条**匹配的规则，所以兜底的 `*` 放在最前。
 - 原生 `question` 工具禁用，提问只走 MCP `ask_user`（D36）。
 - **bash 规则集**（`shared/constants/opencode.ts`：planner 与 reviewer 用 `readonlyBashRules(checkCommands)`，executor 按 `ai.bashPolicy` 用 `BASH_PERMISSION_PRESETS`）：
@@ -64,7 +69,7 @@
 
 MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 
-- 插件 `agent-workflow-bridge`（S1 已验证，D33）在 `tool.execute.before` 钩子中，对名称以 `agent-workflow_` 开头的工具**原地修改** `output.args.__aw_session = input.sessionID`（给 `output.args` 重新赋值不会生效）。MCP 服务端在 zod 校验前取出该字段，按 `attempts.opencode_session_id` 找到该会话**最新**的尝试：不存在或不在 `starting/running` → `MCP_ATTEMPT_UNRESOLVED`；已 `succeeded` 且调用的是提交类工具（`submit_plan/result/review`）→ `MCP_RESULT_ALREADY_SUBMITTED`。
+- 插件 `agent-workflow-bridge`（S1 已验证，D33）在 `tool.execute.before` 钩子中，对名称以 `agent-workflow_`（执行 MCP）或 `agent-workflow-app_`（助手 MCP，v1.1）开头的工具**原地修改** `output.args.__aw_session = input.sessionID`（给 `output.args` 重新赋值不会生效）。助手 MCP 按该会话找到助手对话（15 §2）。MCP 服务端在 zod 校验前取出该字段，按 `attempts.opencode_session_id` 找到该会话**最新**的尝试：不存在或不在 `starting/running` → `MCP_ATTEMPT_UNRESOLVED`；已 `succeeded` 且调用的是提交类工具（`submit_plan/result/review`）→ `MCP_RESULT_ALREADY_SUBMITTED`。
 - 模型在后续调用中可能自己照抄 `__aw_session`，钩子总会用真实 sessionID 覆盖，因此不影响归属。
 - 插件按 opencode 的目录实例各加载一次（每个 worktree 一次），实现须无状态。
 - 插件以构建后的 JS 随安装包放在 `Resources/opencode-plugin/`（M2-03）。
@@ -289,8 +294,9 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 ## 7. 实现结构
 
 ```
+core/http/mcp-endpoint.ts   McpServer + StreamableHTTPServerTransport，挂载到 Fastify（/mcp/exec 与 /mcp/assistant 共用）；校验各自的令牌
 modules/mcp/
-├─ mcp.server.ts        McpServer + StreamableHTTPServerTransport，挂载到 Fastify /mcp/exec；校验执行 MCP 令牌
+├─ index.ts             组装工具，挂载 /mcp/exec
 ├─ mcp.registry.ts      工具注册表：definition → 自动生成 tools/list，统一做归属解析（取出 __aw_session）、类型授权、zod 校验、错误映射
 └─ tools/
    ├─ get-task-context.tool.ts

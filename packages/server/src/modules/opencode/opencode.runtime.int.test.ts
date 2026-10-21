@@ -36,7 +36,7 @@ if (process.argv[2] === '--version') {
   );
 }
 
-/** Git stays reachable: on Windows the opencode configuration needs Git Bash (D67). */
+/** Git stays reachable: on Windows the opencode configuration needs Git Bash (D68). */
 const appIn = async (dir: string) =>
   createTestApp({ env: await isolatedEnv(dir, dir, { git: true }), realOpencode: true });
 

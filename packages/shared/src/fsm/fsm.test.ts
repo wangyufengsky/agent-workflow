@@ -105,6 +105,14 @@ const CASES: Array<{ name: string; machine: Machine<string, string>; illegal: Ar
       ['stopped', 'listening'],
     ],
   },
+  {
+    name: 'assistantConfirmation',
+    machine: MACHINES.assistantConfirmation,
+    illegal: [
+      ['confirmed', 'cancel'],
+      ['cancelled', 'confirm'],
+    ],
+  },
 ];
 
 it('每个状态机都有用例', () => {

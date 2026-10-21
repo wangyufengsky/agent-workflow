@@ -47,7 +47,7 @@ export const environmentSchema = z.object({
     available: z.array(modelInfoSchema),
     defaultModel: z.string().optional(),
   }),
-  /** Secrets (hosting tokens, database passwords) can be stored; not part of `ready` (D69). */
+  /** Secrets (hosting tokens, database passwords) can be stored; not part of `ready` (D70). */
   credentials: z.object({ available: z.boolean() }),
   ready: z.boolean(),
 });

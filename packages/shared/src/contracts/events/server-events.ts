@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { settingsSchema } from '../../constants/settings.ts';
+import { assistantFormSchema } from '../../enums/assistant.ts';
 import { ServerEventType } from '../../enums/system.ts';
+import { assistantConfirmationSchema, assistantConversationSchema, assistantPageRefSchema } from '../api/assistant.ts';
 import { attemptSummarySchema, transcriptEntrySchema } from '../api/attempts.ts';
 import { deliverySchema } from '../api/delivery.ts';
 import { inboxItemSchema } from '../api/inbox.ts';
@@ -38,6 +40,28 @@ export const serverEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal(ServerEventType.AttemptTranscript),
     data: z.object({ attemptId: z.string(), entries: z.array(transcriptEntrySchema) }),
+  }),
+  z.object({ type: z.literal(ServerEventType.AssistantUpdated), data: assistantConversationSchema }),
+  z.object({
+    type: z.literal(ServerEventType.AssistantTranscript),
+    data: z.object({ conversationId: z.string(), entries: z.array(transcriptEntrySchema) }),
+  }),
+  z.object({ type: z.literal(ServerEventType.AssistantConfirmation), data: assistantConfirmationSchema }),
+  z.object({
+    type: z.literal(ServerEventType.AssistantNavigate),
+    data: z.object({ conversationId: z.string(), target: assistantPageRefSchema }),
+  }),
+  z.object({
+    type: z.literal(ServerEventType.AssistantOpenForm),
+    data: z.object({
+      conversationId: z.string(),
+      form: assistantFormSchema,
+      values: z.record(z.string(), z.unknown()),
+    }),
+  }),
+  z.object({
+    type: z.literal(ServerEventType.AssistantRevealFile),
+    data: z.object({ conversationId: z.string(), absolutePath: z.string() }),
   }),
 ]);
 export type ServerEvent = z.infer<typeof serverEventSchema>;

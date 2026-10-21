@@ -21,6 +21,9 @@ describe('操作清单的标注（M5-10）', () => {
     const critical = OPERATION_CONTRACTS.filter((op) => op.risk === OperationRisk.Critical).map((op) => op.id);
     expect(critical.sort()).toEqual(
       [
+        'assistant.confirm',
+        'assistant.delete',
+        'assistant.replyPermission',
         'databases.delete',
         'inbox.resolve',
         'projects.delete',
@@ -31,6 +34,12 @@ describe('操作清单的标注（M5-10）', () => {
         'worktrees.prune',
       ].sort(),
     );
+  });
+
+  it('助手面板自己的操作不是助手工具：助手不能确认自己的调用（A-01）', () => {
+    const own = OPERATION_CONTRACTS.filter((op) => op.id.startsWith('assistant.'));
+    expect(own.length).toBeGreaterThan(0);
+    expect(own.filter((op) => op.expose.assistant || op.expose.palette)).toEqual([]);
   });
 
   it('操作 id 与 HTTP 路由各不相同', () => {

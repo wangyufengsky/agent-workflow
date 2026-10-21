@@ -1,10 +1,16 @@
-import { API_PREFIX, type ServerEvent, ServerEventType, serverEventSchema } from '@aw/shared';
+import { API_PREFIX, type ServerEvent, ServerEventType, serverEventSchema, TranscriptEntryKind } from '@aw/shared';
 import type { QueryClient } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { appendTranscript, updateAttempt } from '../features/attempts/attempt.queries.ts';
+import {
+  conversationTranscript,
+  updateConfirmation,
+  updateConversation,
+} from '../features/assistant/assistant.queries.ts';
+import { appendTranscript, attemptTranscript, updateAttempt } from '../features/attempts/attempt.queries.ts';
 import { updateInbox } from '../features/inbox/inbox.queries.ts';
 import { updateNode, updateTask } from '../features/tasks/tasks.queries.ts';
+import { useUiStore } from '../state/ui.store.ts';
 import { apiToken } from './client.ts';
 import { queryKeys } from './query-keys.ts';
 
@@ -27,7 +33,7 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       }
       return;
     case ServerEventType.AttemptTranscript:
-      return appendTranscript(qc, event.data.attemptId, event.data.entries);
+      return appendTranscript(qc, attemptTranscript(event.data.attemptId), event.data.entries);
     case ServerEventType.TaskUpdated:
       return updateTask(qc, event.data);
     case ServerEventType.NodeUpdated:
@@ -37,6 +43,27 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       return qc.invalidateQueries({ queryKey: queryKeys.task(event.data.taskId), exact: true });
     case ServerEventType.InboxUpdated:
       return updateInbox(qc, event.data.openCount);
+    case ServerEventType.AssistantUpdated:
+      return updateConversation(qc, event.data);
+    case ServerEventType.AssistantTranscript: {
+      appendTranscript(qc, conversationTranscript(event.data.conversationId), event.data.entries);
+      // A file the assistant wrote shows as an attachment with its path on disk.
+      if (event.data.entries.some((e) => e.kind === TranscriptEntryKind.Attachment)) {
+        await qc.invalidateQueries({ queryKey: queryKeys.assistantFiles(event.data.conversationId) });
+      }
+      return;
+    }
+    case ServerEventType.AssistantConfirmation:
+      return updateConfirmation(qc, event.data);
+    // Requests of the assistant to the renderer, carried out by the shell (15 §6).
+    case ServerEventType.AssistantNavigate:
+      return useUiStore.getState().requestFromAssistant({ kind: 'navigate', target: event.data.target });
+    case ServerEventType.AssistantOpenForm:
+      return useUiStore
+        .getState()
+        .requestFromAssistant({ kind: 'form', form: event.data.form, values: event.data.values });
+    case ServerEventType.AssistantRevealFile:
+      return useUiStore.getState().requestFromAssistant({ kind: 'reveal', absolutePath: event.data.absolutePath });
   }
 }
 

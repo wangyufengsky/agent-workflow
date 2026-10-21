@@ -16,7 +16,7 @@ export type GitResult = { stdout: string; stderr: string; exitCode: number };
 
 /**
  * The only way to run git (06 §2.3): argument array, `LC_ALL=C` so output is parseable (D37), the platform's
- * options (D66),
+ * options (D67),
  * missing binary → GIT_NOT_INSTALLED, unexpected exit → GIT_COMMAND_FAILED with args, exit code and stderr.
  */
 export async function runGit(args: readonly string[], options: GitOptions): Promise<GitResult> {

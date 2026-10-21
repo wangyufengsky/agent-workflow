@@ -7,10 +7,16 @@ import type { FakeOpencode, FakeStep } from './fake-opencode.ts';
 const stepSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('edit'), file: z.string(), content: z.string() }),
   z.object({ type: z.literal('text'), text: z.string() }),
-  z.object({ type: z.literal('callTool'), name: z.string(), args: z.record(z.string(), z.unknown()) }),
+  z.object({
+    type: z.literal('callTool'),
+    // Specs written for the execution MCP leave it out.
+    server: z.enum(['exec', 'assistant']).default('exec'),
+    name: z.string(),
+    args: z.record(z.string(), z.unknown()),
+  }),
   z.object({ type: z.literal('permission'), permission: z.string(), patterns: z.array(z.string()) }),
   z.object({ type: z.literal('hang') }),
-  z.object({ type: z.literal('error'), name: z.string(), message: z.string() }),
+  z.object({ type: z.literal('error'), name: z.string(), message: z.string(), idle: z.boolean().default(true) }),
 ]) satisfies z.ZodType<FakeStep>;
 
 const bodySchema = z.object({
