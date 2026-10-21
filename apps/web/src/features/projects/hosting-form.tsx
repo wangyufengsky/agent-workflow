@@ -1,17 +1,35 @@
-import { HostingProvider, hostingProviderSchema, type ProjectDetailDTO } from '@aw/shared';
+import { AssistantForm, HostingProvider, hostingProviderSchema, type ProjectDetailDTO } from '@aw/shared';
 import { type FormEvent, useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { toast } from '../../components/toast.tsx';
 import { PROJECTS_COPY as C } from '../../copy/projects.ts';
+import { clearPendingForm, usePendingForm } from '../../state/ui.store.ts';
 import { useClearHosting, useSetHosting } from './projects.queries.ts';
 
-/** Binding the project to its GitHub / GitLab repository with a token (14 §3.7); prefilled from origin. */
-function BindForm({ project, onDone }: { project: ProjectDetailDTO; onDone: () => void }) {
+type Prefill = { provider?: HostingProvider; baseUrl?: string; repo?: string };
+
+/** What the assistant's `open_form` prefills (15 §5); never the token. */
+function prefillOf(values: Record<string, unknown>): Prefill {
+  const provider = hostingProviderSchema.safeParse(values.provider);
+  return {
+    ...(provider.success ? { provider: provider.data } : {}),
+    ...(typeof values.baseUrl === 'string' ? { baseUrl: values.baseUrl } : {}),
+    ...(typeof values.repo === 'string' ? { repo: values.repo } : {}),
+  };
+}
+
+/**
+ * Binding the project to its GitHub / GitLab repository with a token (14 §3.7); prefilled from origin, or from the
+ * assistant's `open_form`. The user types the token.
+ */
+function BindForm({ project, prefill, onDone }: { project: ProjectDetailDTO; prefill: Prefill; onDone: () => void }) {
   const known = project.hosting ?? project.inferredHosting;
-  const [provider, setProvider] = useState<HostingProvider>(known?.provider ?? HostingProvider.Github);
-  const [baseUrl, setBaseUrl] = useState(known?.baseUrl ?? '');
-  const [repo, setRepo] = useState(known?.repo ?? '');
+  const [provider, setProvider] = useState<HostingProvider>(
+    prefill.provider ?? known?.provider ?? HostingProvider.Github,
+  );
+  const [baseUrl, setBaseUrl] = useState(prefill.baseUrl ?? known?.baseUrl ?? '');
+  const [repo, setRepo] = useState(prefill.repo ?? known?.repo ?? '');
   const [token, setToken] = useState('');
   const bind = useSetHosting();
   const submit = (e: FormEvent) => {
@@ -108,8 +126,14 @@ function BindForm({ project, onDone }: { project: ProjectDetailDTO; onDone: () =
 export function HostingPanel({ project }: { project: ProjectDetailDTO }) {
   const [editing, setEditing] = useState(false);
   const clear = useClearHosting();
+  const pending = usePendingForm(AssistantForm.ProjectHosting);
+  const prefill = pending?.values.id === project.id ? pending : undefined;
   const { hosting } = project;
-  if (hosting === null || editing) {
+  const done = () => {
+    clearPendingForm();
+    setEditing(false);
+  };
+  if (hosting === null || editing || prefill !== undefined) {
     return (
       <div className="col">
         <p className="hint">
@@ -117,7 +141,12 @@ export function HostingPanel({ project }: { project: ProjectDetailDTO }) {
             ? C.remoteNone
             : C.remoteInferred(C.providers[project.inferredHosting.provider], project.inferredHosting.repo)}
         </p>
-        <BindForm project={project} onDone={() => setEditing(false)} />
+        <BindForm
+          key={prefill?.seq}
+          project={project}
+          prefill={prefill === undefined ? {} : prefillOf(prefill.values)}
+          onDone={done}
+        />
       </div>
     );
   }

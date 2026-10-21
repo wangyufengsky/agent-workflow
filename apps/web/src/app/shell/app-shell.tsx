@@ -2,7 +2,11 @@ import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-route
 import { useEffect } from 'react';
 import { CommandPalette } from '../../components/command-palette.tsx';
 import { Icon } from '../../components/icon.tsx';
+import { IconButton } from '../../components/icon-button.tsx';
+import { ASSISTANT_COPY } from '../../copy/assistant.ts';
 import { NAV_COPY } from '../../copy/nav.ts';
+import { AssistantPanel } from '../../features/assistant/assistant-panel.tsx';
+import { useAssistantRequests } from '../../features/assistant/assistant-requests.ts';
 import { useSettings } from '../../features/settings/settings.queries.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { NAV_ITEMS, navItemsFor } from '../navigation.ts';
@@ -13,7 +17,7 @@ import { RuntimeChip } from './runtime-chip.tsx';
 import { ThemeSwitch } from './theme-switch.tsx';
 import { usePaletteItems } from './use-palette-items.ts';
 
-/** Global shortcuts (14 §2): ⌘K palette, ⌘N start a task, ⌘, settings. ⌘J stays reserved for the v1.1 assistant. */
+/** Global shortcuts (14 §2): ⌘K palette, ⌘J assistant panel, ⌘N start a task, ⌘, settings. */
 function useShortcuts() {
   const navigate = useNavigate();
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
@@ -22,6 +26,7 @@ function useShortcuts() {
       if (!(e.metaKey || e.ctrlKey)) return;
       const actions: Record<string, () => void> = {
         k: () => setPaletteOpen(true),
+        j: () => useUiStore.setState((s) => ({ assistantOpen: !s.assistantOpen })),
         n: () => void navigate({ to: ROUTES.home }),
         ',': () => void navigate({ to: ROUTES.settings }),
       };
@@ -53,10 +58,13 @@ export function AppShell() {
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const paletteItems = usePaletteItems();
   const title = useCurrentTitle();
+  const assistantOpen = useUiStore((s) => s.assistantOpen);
+  const setAssistantOpen = useUiStore((s) => s.setAssistantOpen);
   useShortcuts();
+  useAssistantRequests();
 
   return (
-    <div className="app">
+    <div className={assistantOpen ? 'app with-assistant' : 'app'}>
       <nav className="nav" aria-label={NAV_COPY.brand}>
         <div className="brand">
           <span className="brand-mark">
@@ -96,12 +104,19 @@ export function AppShell() {
           <h1>{title}</h1>
           <span className="spacer" />
           <InboxButton />
+          <IconButton
+            icon="sparkle"
+            label={assistantOpen ? ASSISTANT_COPY.close : ASSISTANT_COPY.open}
+            aria-pressed={assistantOpen}
+            onClick={() => setAssistantOpen(!assistantOpen)}
+          />
           <ThemeSwitch />
         </header>
         <main className="content">
           <Outlet />
         </main>
       </div>
+      {assistantOpen && <AssistantPanel />}
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} items={paletteItems} />
     </div>
   );

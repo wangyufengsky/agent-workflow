@@ -1,3 +1,4 @@
+import { AssistantForm } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
@@ -9,6 +10,7 @@ import { Icon } from '../../components/icon.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { PROJECTS_COPY as C } from '../../copy/projects.ts';
+import { clearPendingForm, usePendingForm } from '../../state/ui.store.ts';
 import { AddProjectForm } from './add-project-form.tsx';
 import { projectsQuery } from './projects.queries.ts';
 
@@ -18,7 +20,12 @@ export function ProjectsPage() {
   const projects = useQuery(projectsQuery);
   const adding = route.useSearch().add === true;
   const navigate = route.useNavigate();
-  const setAdding = (open: boolean) => void navigate({ search: open ? { add: true } : {} });
+  const prefill = usePendingForm(AssistantForm.AddProject);
+  const setAdding = (open: boolean) => {
+    if (!open) clearPendingForm();
+    void navigate({ search: open ? { add: true } : {} });
+  };
+  const prefilledPath = prefill?.values.repoPath;
 
   return (
     <div className="page">
@@ -56,7 +63,10 @@ export function ProjectsPage() {
       </div>
       <Dialog open={adding} onOpenChange={setAdding} title={C.addTitle}>
         <AddProjectForm
+          key={prefill?.seq}
+          {...(typeof prefilledPath === 'string' ? { initialRepoPath: prefilledPath } : {})}
           onAdded={(project) => {
+            clearPendingForm();
             toast(C.added);
             void navigate({ to: ROUTES.project, params: { projectId: project.id }, search: {} });
           }}

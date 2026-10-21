@@ -5,7 +5,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { ATTEMPT_COPY as C, TRANSCRIPT_SYSTEM_LABEL } from '../../copy/attempts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
-import { useTranscript } from './attempt.queries.ts';
+import { attemptTranscript, useTranscript } from './attempt.queries.ts';
 import styles from './transcript.module.css';
 
 const pretty = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value, null, 2));
@@ -62,12 +62,16 @@ const Entry = memo(function Entry({ entry }: { entry: TranscriptEntry }) {
           {entry.data.code} · {entry.data.message}
         </p>
       );
+    case TranscriptEntryKind.Confirmation:
+    case TranscriptEntryKind.Attachment:
+      // Assistant conversations only (10 §3).
+      return null;
   }
 });
 
 /** Live session stream of one attempt (10 §3): shown from its first page on, then extended by `attempt.transcript`. */
 export function TranscriptView({ attemptId }: { attemptId: string }) {
-  const { pages, entries } = useTranscript(attemptId);
+  const { pages, entries } = useTranscript(attemptTranscript(attemptId));
   if (pages.data === undefined) {
     if (pages.isError) return <ErrorState error={pages.error} onRetry={() => void pages.refetch()} />;
     return <p className="hint">{COMMON_COPY.loading}</p>;

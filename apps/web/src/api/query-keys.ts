@@ -43,6 +43,11 @@ export const queryKeys = {
   ],
   /** Highlighted tokens of a diff: derived in the renderer, cached like server data. */
   syntax: (path: string, digest: string) => ['syntax', path, digest],
+  assistantConversations: ['assistant', 'conversations'],
+  assistantTranscript: (id: string) => ['assistant', id, 'transcript'],
+  assistantTranscriptLive: (id: string) => ['assistant', id, 'transcript-live'],
+  assistantConfirmations: (id: string) => ['assistant', id, 'confirmations'],
+  assistantFiles: (id: string) => ['assistant', id, 'files'],
   git: (projectId: string) => ['git', projectId],
   gitResource: (projectId: string, resource: string, params: Record<string, string | number | undefined>) => [
     'git',

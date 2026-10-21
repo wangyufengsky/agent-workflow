@@ -90,3 +90,10 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.assistant.confirm': '确认助手的操作',
   'op.assistant.cancelConfirmation': '取消助手的操作',
 };
+
+/** The title of an operation by its contract's `title` key; the unit test keeps every key covered. */
+export function operationTitle(titleKey: string): string {
+  const title = OPERATION_TITLE[titleKey];
+  if (title === undefined) throw new Error(`No title for ${titleKey}`);
+  return title;
+}

@@ -12,6 +12,7 @@ import {
 import {
   infiniteQueryOptions,
   type QueryClient,
+  type QueryKey,
   queryOptions,
   skipToken,
   useInfiniteQuery,
@@ -26,26 +27,31 @@ import { queryKeys } from '../../api/query-keys.ts';
 export const attemptQuery = (id: string) =>
   queryOptions({ queryKey: queryKeys.attempt(id), queryFn: () => callOperation(getAttemptOp, { id }) });
 
-/** The stream page by page (10 §3); the view reads on in the background while `hasMore`. */
-export const transcriptQuery = (id: string) =>
+/** A message stream read page by page (10 §3): an attempt's or an assistant conversation's. */
+export type TranscriptSource = { key: QueryKey; liveKey: QueryKey; url: string };
+
+export const attemptTranscript = (id: string): TranscriptSource => ({
+  key: queryKeys.transcript(id),
+  liveKey: queryKeys.transcriptLive(id),
+  url: `${API_PREFIX}/attempts/${encodeURIComponent(id)}/transcript`,
+});
+
+/** The stream page by page; the view reads on in the background while `hasMore`. */
+const transcriptQuery = (source: TranscriptSource) =>
   infiniteQueryOptions({
-    queryKey: queryKeys.transcript(id),
-    queryFn: ({ pageParam }) =>
-      getJson(
-        `${API_PREFIX}/attempts/${encodeURIComponent(id)}/transcript?afterSeq=${pageParam}`,
-        transcriptPageSchema,
-      ),
+    queryKey: source.key,
+    queryFn: ({ pageParam }) => getJson(`${source.url}?afterSeq=${pageParam}`, transcriptPageSchema),
     initialPageParam: 0,
-    getNextPageParam: (last) => (last.hasMore ? last.lastSeq : undefined),
+    getNextPageParam: (last: TranscriptPage) => (last.hasMore ? last.lastSeq : undefined),
   });
 
 /**
- * Entries pushed over SSE (`attempt.transcript`) since the stream was opened, kept apart from the pages: a page read
- * just before a line was appended misses it, and the line's event may arrive before that page does. Pages and live
- * lines together hold every line exactly once or twice, never zero times.
+ * Entries pushed over SSE (`attempt.transcript`, `assistant.transcript`) since the stream was opened, kept apart from
+ * the pages: a page read just before a line was appended misses it, and the line's event may arrive before that page
+ * does. Pages and live lines together hold every line exactly once or twice, never zero times.
  */
-export const liveTranscriptQuery = (id: string) =>
-  queryOptions<TranscriptEntry[]>({ queryKey: queryKeys.transcriptLive(id), queryFn: skipToken });
+const liveTranscriptQuery = (source: TranscriptSource) =>
+  queryOptions<TranscriptEntry[]>({ queryKey: source.liveKey, queryFn: skipToken });
 
 /**
  * Display order of pages followed by live lines: each line once (by seq); a streaming part keeps the position where
@@ -75,15 +81,15 @@ export function transcriptEntries(
 }
 
 /** SSE: lines of a stream someone has open are kept until its pages are read again. */
-export function appendTranscript(qc: QueryClient, attemptId: string, entries: readonly TranscriptEntry[]): void {
-  if (qc.getQueryCache().find({ queryKey: queryKeys.transcript(attemptId), exact: true }) === undefined) return;
-  qc.setQueryData<TranscriptEntry[]>(queryKeys.transcriptLive(attemptId), (old = []) => [...old, ...entries]);
+export function appendTranscript(qc: QueryClient, source: TranscriptSource, entries: readonly TranscriptEntry[]): void {
+  if (qc.getQueryCache().find({ queryKey: source.key, exact: true }) === undefined) return;
+  qc.setQueryData<TranscriptEntry[]>(source.liveKey, (old = []) => [...old, ...entries]);
 }
 
-/** One attempt's stream: the first page as soon as it arrives, the rest read on in the background, live lines after. */
-export function useTranscript(attemptId: string) {
-  const pages = useInfiniteQuery(transcriptQuery(attemptId));
-  const live = useQuery(liveTranscriptQuery(attemptId));
+/** One stream: the first page as soon as it arrives, the rest read on in the background, live lines after. */
+export function useTranscript(source: TranscriptSource) {
+  const pages = useInfiniteQuery(transcriptQuery(source));
+  const live = useQuery(liveTranscriptQuery(source));
   const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = pages;
   // After a failed page the view offers a retry instead of reading on by itself.
   useEffect(() => {
