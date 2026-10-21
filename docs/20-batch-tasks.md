@@ -75,7 +75,7 @@
 └──────────────────────────────────────────────────────────┘
 ```
 
-- **进度汇总**：按显示状态计数（`batchCounts`），进度条为终态任务占比；全部终态时显示「已全部结束」。
+- **进度汇总**：按显示状态计数（`batchCounts`），进度条为终态任务（`ended`）占比；全部终态时显示「已全部结束」。
 - **逐个查看**：每行一个目标：目标原文、任务编号与标题（链接到任务页）、状态徽标（同任务列表的 `TaskBadge`）、当前步骤或进展（`currentStep` / `progress`）。本轮交付有冲突或失败时在状态后注明「有冲突」/「合并失败」，处理方式在任务页（交给 AI 解决冲突、再合并）。
 - **统一操作**只有一个：「合并全部待合并的（n）」（§5）。其余操作（作答、允许、重试、取消、再改改）都在各子任务里做，与单个任务相同，不在批量视图重复一套。
 - 实时更新：批次查询的 key 在任务列表前缀下，`task.updated` 刷新任务列表时一并刷新（不新增 SSE 事件）。
@@ -136,8 +136,8 @@ type BatchSummaryDTO = {
   project: { id: string; name: string };
   workflow: { id: string; key: string; name: string; deliverable: WorkflowDeliverable };
   total: number;
-  counts: Record<TaskDisplayGroup, number>; // batchCounts
-  finished: boolean;                        // 全部子任务终态
+  counts: Array<{ group: TaskDisplayGroup; count: number }>; // batchCounts：有任务的显示状态，按显示顺序
+  ended: number;                            // 终态的子任务数，等于 total 即全部结束
   createdAt: number;
 };
 type BatchDetailDTO = BatchSummaryDTO & {

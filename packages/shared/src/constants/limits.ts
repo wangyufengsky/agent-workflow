@@ -27,6 +27,9 @@ export const RUNTIME_LOG_TAIL_MAX = 5000;
 /** Page size of the task and inbox lists (11 §1 pagination): the default and the largest `limit`. */
 export const LIST_PAGE_DEFAULT = 50;
 export const LIST_PAGE_MAX = 100;
+/** Targets of one batch (20 §2, D78). */
+export const BATCH_TARGETS_MAX = 20;
+export const BATCH_TARGET_MAX_CHARS = 500;
 /** A conversation's title taken from its first message is cut to this length. */
 export const ASSISTANT_TITLE_MAX_CHARS = 40;
 /** One message to the assistant. */

@@ -24,6 +24,7 @@ describe('操作清单的标注（M5-10）', () => {
         'assistant.confirm',
         'assistant.delete',
         'assistant.replyPermission',
+        'batches.deliver',
         'databases.delete',
         'inbox.resolve',
         'knowledge.delete',

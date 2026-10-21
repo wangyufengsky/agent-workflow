@@ -25,6 +25,7 @@ import { registerSseHub } from './core/sse/sse-hub.ts';
 import { createAcceptanceModule } from './modules/acceptance/index.ts';
 import { type AssistantService, createAssistantModule } from './modules/assistant/index.ts';
 import { type AttemptsService, createAttemptsModule } from './modules/attempts/index.ts';
+import { createBatchesModule } from './modules/batches/index.ts';
 import {
   type CredentialCipher,
   type CredentialsService,
@@ -273,6 +274,15 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     locks,
     dataDir: config.dataDir,
   });
+  const batches = createBatchesModule({
+    db: database.db,
+    unit,
+    clock,
+    log,
+    settings: settings.service,
+    workflows: workflows.service,
+    tasks: tasks.service,
+  });
   const scheduler = createScheduler({
     tasks: tasks.service,
     nodes: nodes.service,
@@ -308,6 +318,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...roles.operations,
     ...workflows.operations,
     ...tasks.operations,
+    ...batches.operations,
     ...knowledge.operations,
     ...plans.operations,
     ...inbox.operations,

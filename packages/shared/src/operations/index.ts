@@ -12,6 +12,7 @@ import {
   sendAssistantMessageOp,
 } from './assistant.ts';
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
+import { createBatchOp, deliverBatchOp, getBatchOp, listBatchesOp } from './batches.ts';
 import {
   createDbConnectionOp,
   dbSchemaOp,
@@ -109,6 +110,7 @@ import {
 
 export * from './assistant.ts';
 export * from './attempts.ts';
+export * from './batches.ts';
 export * from './databases.ts';
 export * from './debug.ts';
 export * from './define.ts';
@@ -186,6 +188,10 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   nodeDiffFileOp,
   deliverTaskOp,
   requestChangesOp,
+  listBatchesOp,
+  createBatchOp,
+  getBatchOp,
+  deliverBatchOp,
   listInboxOp,
   countInboxOp,
   resolveInboxOp,

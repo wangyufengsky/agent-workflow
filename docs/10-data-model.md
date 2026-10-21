@@ -370,9 +370,35 @@ payload / response：
 
 索引：`(conversation_id, seq)` 唯一、`(attempt_id)`。
 
+## 4b. 批量任务（v1.1）
+
+见 [20-batch-tasks.md §6](20-batch-tasks.md#6-数据模型迁移-0010_batches)，迁移 `0010_batches`。批次没有状态列，进度由子任务推导（D78）。
+
+### batches
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| seq | INTEGER UNIQUE | 编号 `B-<seq>` |
+| project_id | TEXT → projects，CASCADE | |
+| workflow_id | TEXT → workflows | 流程版本（必须是 `fixed`） |
+| title | TEXT | 需求模板首行 |
+| requirement_template | TEXT | 含 `{{target}}` |
+| base_branch | TEXT | 全部子任务的基础分支 |
+| created_at | INTEGER | |
+
+### batch_tasks
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| batch_id | TEXT → batches，CASCADE | 与 `position` 组成主键 |
+| task_id | TEXT → tasks，CASCADE，UNIQUE | |
+| position | INTEGER | 目标顺序，从 0 起 |
+| target | TEXT | 目标原文 |
+
 ## 5. 删除与清理
 
-- 删除项目：要求无非终态任务、没有研究中的知识对话；级联删除其任务及全部关联数据和 `runs/<taskId>` 目录，以及知识对话、其 `research` 尝试与会话流。
+- 删除项目：要求无非终态任务、没有研究中的知识对话；级联删除其任务及全部关联数据和 `runs/<taskId>` 目录，以及知识对话、其 `research` 尝试与会话流，以及批次（外键级联，20 §6）。
 - 删除知识对话：要求没有研究中的一轮；删除轮次、其尝试（权限条目随之级联）与 `runs/knowledge/<attemptId>.jsonl`。
 - 删除助手对话：级联删除其确认，并删除 `assistant/conversations/<id>.jsonl` 与 `assistant/files/<id>/`。
 - 任务终态后 worktree 删除，但任务、计划、节点、尝试、会话流保留（供回看）。

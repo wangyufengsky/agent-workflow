@@ -161,6 +161,28 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     ]);
   });
 
+  it('确认后执行「批量任务」：批次与子任务已创建，消息流出现指向该批次的 entity_ref（20 §8）', async () => {
+    const { project } = await addProject(t, { checkCommand: null });
+    const { body } = await call('batches_create', {
+      projectId: project.id,
+      workflowId: await workflowId(t, 'code_review'),
+      requirementTemplate: '审查 {{target}}',
+      targets: ['src/'],
+    });
+    expect(body).toMatchObject({ status: 'needs_confirmation' });
+    // The batch's task runs once confirmed; it is let finish so that nothing works on while the app closes.
+    t.fake.enqueue(script().callTool('submit_result', { summary: 'Fine' }), { title: '· 代码审查' });
+    const review = waitForEvent(t.app.events, ServerEventType.TaskUpdated, (task) => task.status === 'review');
+    const res = await decide(String(body.confirmation_id), 'confirm');
+    const output = res.body.result?.ok === true ? res.body.result.output : undefined;
+    expect(output).toMatchObject({ key: 'B-1', title: '审查 {{target}}', items: [{ target: 'src/' }] });
+    expect(await entityRefs()).toEqual([
+      { kind: 'batch', id: (output as { id: string }).id, title: 'B-1 · 审查 {{target}}' },
+    ]);
+    await review;
+    await t.fake.settled();
+  });
+
   it('直接执行（总是允许）的路径同样记下产出的对象；失败的调用不记', async () => {
     await t.call(updateSettingsOp, { 'assistant.alwaysAllow': ['projects.create'] });
     const repo = await createTestRepo();

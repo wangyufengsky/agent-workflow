@@ -56,6 +56,8 @@ export const ErrorCode = {
   AssistantConversationNotFound: 'ASSISTANT_CONVERSATION_NOT_FOUND',
   AssistantConfirmationNotFound: 'ASSISTANT_CONFIRMATION_NOT_FOUND',
   AssistantBusy: 'ASSISTANT_BUSY',
+  // 批量任务
+  BatchNotFound: 'BATCH_NOT_FOUND',
   // 知识问答
   KnowledgeConversationNotFound: 'KNOWLEDGE_CONVERSATION_NOT_FOUND',
   KnowledgeConversationBusy: 'KNOWLEDGE_CONVERSATION_BUSY',
@@ -132,6 +134,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.AssistantConversationNotFound]: 404,
   [ErrorCode.AssistantConfirmationNotFound]: 404,
   [ErrorCode.AssistantBusy]: 409,
+  [ErrorCode.BatchNotFound]: 404,
   [ErrorCode.KnowledgeConversationNotFound]: 404,
   [ErrorCode.KnowledgeConversationBusy]: 409,
   [ErrorCode.KnowledgeCitationInvalid]: null,

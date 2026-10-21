@@ -96,10 +96,11 @@ export function createTasksRepo(db: DbExecutor) {
       return row === undefined ? undefined : toTask(row);
     },
     /** Most recently updated first. */
-    list(filter: { projectId?: string; statuses?: readonly TaskStatus[] }): Task[] {
+    list(filter: { projectId?: string; statuses?: readonly TaskStatus[]; ids?: readonly string[] }): Task[] {
       return select(
         and(
           ...(filter.projectId === undefined ? [] : [eq(t.projectId, filter.projectId)]),
+          ...(filter.ids === undefined ? [] : [inArray(t.id, filter.ids)]),
           ...(filter.statuses === undefined ? [] : [inArray(t.status, filter.statuses)]),
         ),
       )
