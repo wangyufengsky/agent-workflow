@@ -92,7 +92,7 @@
 - **D16（合并需要用户点击）**：每一次合并都算用户点击——这一下点击明确说了「合并这 n 个」，确认对话框列出 n 个任务与目标分支后才发起。批量交付的风险等级为 `critical`（与 `tasks.deliver` 相同），助手调用时每次都要确认，不能设为「总是允许」。
 - 没有待合并的任务时返回空的 `outcomes`（按钮此时不可用）。
 
-## 6. 数据模型（迁移 `0010_batches`）
+## 6. 数据模型（迁移 `0011_batches`）
 
 `batches`：
 
@@ -163,4 +163,4 @@ type BatchDetailDTO = BatchSummaryDTO & {
 - 测试（07）：
   - 单元：`renderBatchRequirement`、`batchCounts`、`isBatchDeliverable`；创建请求 schema（无占位符、重复目标、超长需求）。
   - 集成（FakeOpencode + 真实 Git）：创建批次后各子任务独立运行（各自分支与 worktree，各自到达待合并）；AI 规划流程 400；批量交付中一个冲突、其余照常合并（主分支有对应提交、冲突任务留在待合并且 `lastDelivery.status = conflict`、再次批量交付不再包含它）；报告流程批量「完成」。
-  - E2E（FakeOpencode）：主页「补单元测试」卡片的「批量」→ 选 3 个目录 → 创建 → 批量视图三个任务到达待合并 → 合并全部 → 主分支有 3 个提交、全部已完成（J16）。
+  - E2E（FakeOpencode）：主页「补单元测试」卡片的「批量」→ 选 3 个目录 → 创建 → 批量视图三个任务到达待合并 → 合并全部 → 主分支有 3 个提交、全部已完成（J17）。

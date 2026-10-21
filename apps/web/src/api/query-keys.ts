@@ -56,6 +56,9 @@ export const queryKeys = {
   knowledgeConversation: (id: string) => ['knowledge', 'conversation', id],
   knowledgePages: (filter: Record<string, string | undefined>) => ['knowledge', 'list', filter],
   knowledgeCitation: (turnId: string, index: number) => ['knowledge', 'citation', turnId, index],
+  /** Every quality and usage query shares this prefix; task updates refresh them. */
+  insightsAll: ['insights'],
+  insights: (view: 'summary' | 'tasks', query: Record<string, string | undefined>) => ['insights', view, query],
   git: (projectId: string) => ['git', projectId],
   gitResource: (projectId: string, resource: string, params: Record<string, string | number | undefined>) => [
     'git',

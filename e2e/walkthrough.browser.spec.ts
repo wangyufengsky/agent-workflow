@@ -392,6 +392,7 @@ const SHOTS: Shot[] = [
     url: () => '/knowledge/history',
     ready: testId('knowledge-history-row'),
   },
+  { name: 'insights', mode: UiMode.Simple, url: () => '/insights', ready: testId('insights-simple') },
   {
     name: 'batch-new',
     mode: UiMode.Simple,
@@ -481,6 +482,12 @@ const SHOTS: Shot[] = [
     mode: UiMode.Pro,
     url: (s) => `/workflows/${s.aiKey}`,
     ready: heading('我的新功能开发'),
+  },
+  {
+    name: 'pro-insights',
+    mode: UiMode.Pro,
+    url: () => '/insights?period=last_30_days',
+    ready: testId('insights-tasks'),
   },
   { name: 'pro-roles', mode: UiMode.Pro, url: () => '/roles', ready: (page) => page.getByRole('article').first() },
   { name: 'pro-databases', mode: UiMode.Pro, url: () => '/databases', ready: heading('数据库') },

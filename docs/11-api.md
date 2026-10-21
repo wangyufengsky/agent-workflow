@@ -290,7 +290,16 @@ type AttemptDTO = AttemptSummaryDTO & {
 | DELETE | `/knowledge/conversations/:id` | `knowledge.delete` | critical | 204；研究中 409 |
 | GET | `/knowledge/turns/:turnId/citations/:index` | `knowledge.citation` | read | `CitationSourceDTO`（18 §6.3）；404 `KNOWLEDGE_CITATION_NOT_FOUND` / `KNOWLEDGE_SOURCE_UNAVAILABLE` |
 
-## 13b. 批量任务（v1.1）
+## 13b. 质量与用量（v1.1）
+
+见 [19-insights.md §4](19-insights.md#4-api操作清单)。全部 `risk = read`、`mode = simple`、`expose.assistant = true`、不进命令面板（D79 ④）。
+
+| 方法 | 路径 | 操作 | 说明 |
+| --- | --- | --- | --- |
+| GET | `/insights?period&from&to` | `insights.summary` | `InsightsSummaryDTO`：时间段（含时区）、tokens 用量合计（不含成本，D79）与按项目 / 流程 / 角色 / 模型 / 用途的拆分、按天趋势、质量、`attention`；`period = custom` 缺日期、其余时间段带日期、`from > to` 或超过 `INSIGHTS_MAX_DAYS` 天为 400 |
+| GET | `/insights/tasks?period&from&to` | `insights.tasks` | `{ items: InsightsTaskDTO[] }`：时间段内结束或有用量的任务及其数字（钻取用） |
+
+## 13c. 批量任务（v1.1）
 
 见 [20-batch-tasks.md §7](20-batch-tasks.md#7-api-与操作清单)。全部 `mode = simple`、`expose.assistant = true`；`batches.create` 进命令面板。
 

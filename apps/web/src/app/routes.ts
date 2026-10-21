@@ -15,6 +15,7 @@ export const ROUTES = {
   knowledge: '/knowledge',
   knowledgeConversation: '/knowledge/$conversationId',
   knowledgeHistory: '/knowledge/history',
+  insights: '/insights',
   settings: '/settings',
   git: '/git',
   gitProject: '/git/$projectId',
@@ -45,4 +46,5 @@ export const ROUTE_IDS = {
   knowledge: '/_shell/knowledge',
   knowledgeConversation: '/_shell/knowledge/$conversationId',
   knowledgeHistory: '/_shell/knowledge/history',
+  insights: '/_shell/insights',
 } as const;

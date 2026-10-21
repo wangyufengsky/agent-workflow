@@ -14,6 +14,7 @@ import { GitConsolePage } from '../features/git/git-console.page.tsx';
 import { GIT_TABS, GitProjectPage } from '../features/git/git-project.page.tsx';
 import { HomePage } from '../features/home/home.page.tsx';
 import { InboxPage } from '../features/inbox/inbox.page.tsx';
+import { InsightsPage, insightsSearchSchema } from '../features/insights/insights.page.tsx';
 import { KnowledgeConversationPage, KnowledgeWelcomePage } from '../features/knowledge/knowledge.page.tsx';
 import { KnowledgeHistoryPage } from '../features/knowledge/knowledge-history.page.tsx';
 import { NodePage } from '../features/node-detail/node.page.tsx';
@@ -197,6 +198,13 @@ const knowledgeHistoryRoute = createRoute({
   validateSearch: z.object({ q: z.string().optional(), projectId: z.string().optional() }),
   component: KnowledgeHistoryPage,
 });
+// Quality and usage (19 §3): the period and the metric drilled into stay in the address.
+const insightsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.insights,
+  validateSearch: insightsSearchSchema,
+  component: InsightsPage,
+});
 const projectRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.project,
@@ -219,6 +227,7 @@ const routeTree = rootRoute.addChildren([
     knowledgeRoute,
     knowledgeHistoryRoute,
     knowledgeConversationRoute,
+    insightsRoute,
     page(ROUTES.settings, SettingsPage),
     gitRoute,
     gitProjectRoute,

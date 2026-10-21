@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "97f5e2f0-46af-4fee-9e8f-e0f754533181",
+  "id": "50768a80-19ca-4bd3-aafb-0f5be2fa9f2f",
   "prevId": "4cd1fb7f-8779-4079-90e6-573c5c7d1785",
   "tables": {
     "assistant_confirmations": {
@@ -285,6 +285,11 @@
           "name": "attempts_session_idx",
           "columns": ["opencode_session_id"],
           "isUnique": false
+        },
+        "attempts_started_idx": {
+          "name": "attempts_started_idx",
+          "columns": ["started_at"],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -311,165 +316,6 @@
           "tableFrom": "attempts",
           "tableTo": "roles",
           "columnsFrom": ["role_id"],
-          "columnsTo": ["id"],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "batch_tasks": {
-      "name": "batch_tasks",
-      "columns": {
-        "batch_id": {
-          "name": "batch_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "task_id": {
-          "name": "task_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "position": {
-          "name": "position",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "target": {
-          "name": "target",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "batch_tasks_task_id_unique": {
-          "name": "batch_tasks_task_id_unique",
-          "columns": ["task_id"],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "batch_tasks_batch_id_batches_id_fk": {
-          "name": "batch_tasks_batch_id_batches_id_fk",
-          "tableFrom": "batch_tasks",
-          "tableTo": "batches",
-          "columnsFrom": ["batch_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "batch_tasks_task_id_tasks_id_fk": {
-          "name": "batch_tasks_task_id_tasks_id_fk",
-          "tableFrom": "batch_tasks",
-          "tableTo": "tasks",
-          "columnsFrom": ["task_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "batch_tasks_batch_id_position_pk": {
-          "columns": ["batch_id", "position"],
-          "name": "batch_tasks_batch_id_position_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "batches": {
-      "name": "batches",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "seq": {
-          "name": "seq",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "workflow_id": {
-          "name": "workflow_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "requirement_template": {
-          "name": "requirement_template",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "base_branch": {
-          "name": "base_branch",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "batches_seq_unique": {
-          "name": "batches_seq_unique",
-          "columns": ["seq"],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "batches_project_id_projects_id_fk": {
-          "name": "batches_project_id_projects_id_fk",
-          "tableFrom": "batches",
-          "tableTo": "projects",
-          "columnsFrom": ["project_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "batches_workflow_id_workflows_id_fk": {
-          "name": "batches_workflow_id_workflows_id_fk",
-          "tableFrom": "batches",
-          "tableTo": "workflows",
-          "columnsFrom": ["workflow_id"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -861,6 +707,11 @@
         "inbox_task_idx": {
           "name": "inbox_task_idx",
           "columns": ["task_id"],
+          "isUnique": false
+        },
+        "inbox_created_idx": {
+          "name": "inbox_created_idx",
+          "columns": ["created_at"],
           "isUnique": false
         }
       },

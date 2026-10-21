@@ -38,6 +38,7 @@ import {
   pruneWorktreesOp,
 } from './git.ts';
 import { countInboxOp, dismissInboxOp, listInboxOp, resolveInboxOp } from './inbox.ts';
+import { insightsSummaryOp, insightsTasksOp } from './insights.ts';
 import {
   askKnowledgeOp,
   deleteKnowledgeOp,
@@ -116,6 +117,7 @@ export * from './debug.ts';
 export * from './define.ts';
 export * from './git.ts';
 export * from './inbox.ts';
+export * from './insights.ts';
 export * from './knowledge.ts';
 export * from './projects.ts';
 export * from './settings.ts';
@@ -225,4 +227,6 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   stopKnowledgeOp,
   deleteKnowledgeOp,
   knowledgeCitationOp,
+  insightsSummaryOp,
+  insightsTasksOp,
 ];

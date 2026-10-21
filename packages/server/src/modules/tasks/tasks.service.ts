@@ -125,7 +125,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
         nextCursor: rows.length > limit && last !== undefined ? `${last.updatedAt}.${last.seq}` : null,
       };
     },
-    /** Summaries of the given tasks, in the given order (batches). */
+    /** Summaries of the given tasks, in the given order (batches 20 §4, quality and usage 19 §4). */
     summariesOf(ids: readonly string[]): TaskSummaryDTO[] {
       const byId = new Map(state.repo.list({ ids }).map((task) => [task.id, task]));
       return state.summaries(

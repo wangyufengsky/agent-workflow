@@ -221,7 +221,7 @@ type Acceptance = {
 | cost | REAL NULL | |
 | started_at / ended_at | INTEGER | |
 
-索引：`(node_id)`、`(task_id, kind)`、`(status)`、`(opencode_session_id)`。
+索引：`(node_id)`、`(task_id, kind)`、`(status)`、`(opencode_session_id)`、`(started_at)`（质量与用量按时间区间统计，19 §5）。
 
 
 ### inbox_items
@@ -237,7 +237,7 @@ type Acceptance = {
 | response | TEXT(JSON) NULL | 用户回应 |
 | created_at / resolved_at | INTEGER | |
 
-索引：`(status, created_at)`、`(task_id)`。
+索引：`(status, created_at)`、`(task_id)`、`(created_at)`（质量与用量统计打扰次数，19 §5）。
 
 payload / response：
 
@@ -372,7 +372,7 @@ payload / response：
 
 ## 4b. 批量任务（v1.1）
 
-见 [20-batch-tasks.md §6](20-batch-tasks.md#6-数据模型迁移-0010_batches)，迁移 `0010_batches`。批次没有状态列，进度由子任务推导（D85）。
+见 [20-batch-tasks.md §6](20-batch-tasks.md#6-数据模型迁移-0011_batches)，迁移 `0011_batches`。批次没有状态列，进度由子任务推导（D85）。
 
 ### batches
 

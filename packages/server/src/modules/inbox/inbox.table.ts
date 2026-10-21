@@ -22,5 +22,10 @@ export const inboxItemsTable = sqliteTable(
     createdAt: integer('created_at').notNull(),
     resolvedAt: integer('resolved_at'),
   },
-  (t) => [index('inbox_status_created_idx').on(t.status, t.createdAt), index('inbox_task_idx').on(t.taskId)],
+  (t) => [
+    index('inbox_status_created_idx').on(t.status, t.createdAt),
+    index('inbox_task_idx').on(t.taskId),
+    // Quality and usage count questions and permission requests by when they were asked (19 §5).
+    index('inbox_created_idx').on(t.createdAt),
+  ],
 );

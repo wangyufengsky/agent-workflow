@@ -187,6 +187,20 @@
 | X-09 | 打包：electron-builder 增加 win nsis x64、linux AppImage + deb x64、`icon.png`、维护者与可执行文件名；`pnpm dist` 构建当前平台 | CI 在 windows 与 ubuntu 上打出安装包并上传 artifact |
 | X-10 | CI：GitHub Actions 三平台矩阵（verify 各步骤、浏览器 E2E、Electron 启动冒烟，Linux 用 xvfb）；数据库集成测试只在 ubuntu 运行并写明原因 | 三平台全绿 |
 | X-11 | 文档收尾：03 §7 数据目录、11 环境接口、07 CI 与 Electron 冒烟、14 引导页、README 各平台安装、本节状态 | 文档与代码一致 |
+## v1.1 · 质量与用量
+
+> 状态：**已完成**（2026-10-21），待合并。设计见 [19-insights.md](19-insights.md)；决策 D79（只统计 tokens，不统计成本）与 D80（自写柱状图）用户已确认。验收：本机 macOS `pnpm verify`、`pnpm e2e`（含 J16 与走查 J9）、`pnpm test:oc` 通过；性能实测见 19 §5。与计划的差异：用户确认后去掉了成本（原设计按 opencode 报告的美元成本统计，并把未报价格的用量标为「未计价」）；趋势图为 HTML/CSS 柱状图；两种模式默认都看本周。顺带修复的根因缺陷：FakeOpencode 的 `abort()` 同步生效，提交结果那一步的用量永远报不上来（opencode 在工具结果之后紧接着发 step-finish，早于我们的中止请求）；跳过午夜的夏令时时区（哈瓦那）一天的起点算到了前一天（PR #17 评审）。恢复工作台、快照评审、历史归档不做见 D77。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| I-01 | 设计文档 19、任务拆分、决策 D79–D80；14 路由表、11 API、10 索引、08 枚举与常量、07 E2E 旅程同步 | 文档评审通过 |
+| I-02 | shared：`InsightsPeriod` / `InsightsDimension` / `InsightsFailureKind` / `InsightsDrill`、`INSIGHTS_MAX_DAYS`、`AssistantPage.Insights`；契约 `insightsQuerySchema`、`InsightsSummaryDTO`、`InsightsTaskDTO`；操作 `insights.summary`、`insights.tasks`（read、`mode = simple`、`expose.assistant = true`） | `pnpm check` 通过；操作标题文案完整（已有单测） |
+| I-03 | 后端纯函数：`insights.period.ts`（时间段 → 日期与区间、时刻 → 日期，时区参数化）、`insights.aggregate.ts`（19 §2 全部口径） | 单测：五种时间段与校验、跨时区归日、夏令时；空数据、没有用量的尝试、中断不计、失败原因、按假设的提问、中位数、拆分空键 |
+| I-04 | 后端：迁移 `0010_insights`（`attempts(started_at)`、`inbox_items(created_at)`）；`insights.repo.ts`（按区间与按任务 id 批量查询）、service、operations、装配；FakeOpencode 新增 `usage` 步骤（本回合报告的 tokens） | 集成测试：真实流程（首次通过、检查失败后重试且有一次提问、取消、知识问答）后两个操作的数字；`custom` 缺日期 400；性能实测数字记入 19 §5 |
+| I-05 | 助手：`open_page` 的 `insights` 页面；助手可调用 `insights_summary` | 集成测试：助手会话调用 `insights_summary { period: 'week' }` 直接返回用量 |
+| I-06 | 界面：路由 `/insights`、导航（两种模式）、图标 `chart`；简单视图三张卡；专业视图工具条、用量卡、自写 HTML/CSS 的 tokens 柱状趋势图（令牌着色）、拆分标签页、质量卡、失败原因、任务明细与钻取（`?period&from&to&drill&key`） | 单测：钻取过滤；四主题 `lint:css` 通过 |
+| I-07 | E2E J16 `task-insights.browser.spec.ts`：造任务后简单与专业视图的数字、钻取到任务页、四主题切换；走查 J9 包含该页 | `pnpm e2e` 通过 |
+| I-08 | 收尾：本节状态、`pnpm verify`、`pnpm e2e`、`pnpm test:oc` | 三条命令通过 |
 
 ## v1.1 · 固定模板批量任务
 
@@ -196,11 +210,11 @@
 | --- | --- | --- |
 | B-01 | 设计文档 20、任务拆分、决策 D85 / D86 | 文档评审通过 |
 | B-02 | 契约：`EntityKind.Batch`、`BatchDeliveryOutcome`、常量（`BATCH_TARGET_PLACEHOLDER`、`BATCH_KEY_PREFIX`、`BATCH_TARGETS_MAX`、`BATCH_TARGET_MAX_CHARS`）、错误码 `BATCH_NOT_FOUND`、`renderBatchRequirement` / `batchCounts` / `isBatchDeliverable`、批次 schema 与 DTO、四个操作契约（`batches.create` 为 write 并声明 `produces`，`batches.deliver` 为 critical）；08 / 10 / 11 同步 | 单测：三个函数；创建请求 schema 拒绝无占位符、重复目标、换行目标、替换后超长的需求；`ERROR_COPY` 覆盖新错误码；操作风险与 `produces` 标注 |
-| B-03 | 存储：迁移 `0010_batches`（`batches`、`batch_tasks`）；batches 模块的 repo（插入、按 id 读、分页列表、子任务关联） | 集成测试见 B-04；删除项目后批次随之消失 |
+| B-03 | 存储：迁移 `0011_batches`（`batches`、`batch_tasks`）；batches 模块的 repo（插入、按 id 读、分页列表、子任务关联） | 集成测试见 B-04；删除项目后批次随之消失 |
 | B-04 | 批次服务：创建（只用固定流程、分支检查一次、一个事务写入批次与全部子任务草稿、提交后依次开始；任务创建拆为「检查」与「写入草稿」两步）、详情（子任务摘要与本轮交付）、列表（汇总计数、游标分页） | 集成测试（FakeOpencode + 真实 Git）：创建 3 个目标的批次后各子任务各自有分支与 worktree、各自跑完到待合并、需求为模板替换结果、计划不需确认；AI 规划流程 400 `VALIDATION_FAILED`；不存在的批次 404 `BATCH_NOT_FOUND`；删除项目级联删除批次 |
 | B-05 | 批量交付：按目标顺序逐个 `tasks.deliver`（代码流程用本地合并策略，默认 `delivery.defaultStrategy`；报告流程 `report_only`），冲突 / 失败 / 合并前检查不通过的任务停下并记录原因，其余继续；返回每个任务的结果 | 集成测试：三个任务中一个与主分支冲突，另外两个合并成功（主分支有两次提交）、冲突的留在 `review` 且 `lastDelivery.status = conflict`，再次批量交付不包含它；报告流程（`code_review`）批量「完成」 |
 | B-06 | 助手：`batches.create` 经确认后创建并出现批次导航卡片；`entity-routes.ts` 加入批次 | 集成测试（MCP SDK 客户端）：`batches_create` → `needs_confirmation` → 确认后批次存在、对话消息流有 `entity_ref`（kind `batch`） |
 | B-07 | 界面：新建批量任务页（项目、固定流程、需求模板与默认模板、目录树勾选 / 按行输入、预览、⌘↵ 创建）；主页流程卡片「批量」；流程页「批量运行」 | 单测：目标文本解析（空行、首尾空白）；E2E 见 B-09 |
 | B-08 | 界面：批量视图（进度汇总、逐个状态与进展、冲突 / 失败标注、合并全部待合并的 + 确认对话框、结果提示）、批量任务列表 `/batches`、主页「批量任务」区、任务列表入口；四套主题 | E2E 见 B-09；走查截图含新建页与批量视图 |
-| B-09 | E2E（FakeOpencode）：J16 主页「补单元测试」的「批量」→ 选 3 个目录 → 创建 → 三个任务到达待合并 → 合并全部 → 主分支 3 个提交、全部已完成；J9 走查加入批量页面 | `pnpm e2e` 通过 |
-| B-10 | 文档收尾：03（模块分层）、07（J16）、14（路由与主页）、本节状态段 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
+| B-09 | E2E（FakeOpencode）：J17 主页「补单元测试」的「批量」→ 选 3 个目录 → 创建 → 三个任务到达待合并 → 合并全部 → 主分支 3 个提交、全部已完成；J9 走查加入批量页面 | `pnpm e2e` 通过 |
+| B-10 | 文档收尾：03（模块分层）、07（J17）、14（路由与主页）、本节状态段 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
