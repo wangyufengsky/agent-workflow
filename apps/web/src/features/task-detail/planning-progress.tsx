@@ -1,19 +1,23 @@
 import { AttemptKind, type TaskDetailDTO, TaskStatus, TranscriptEntryKind } from '@aw/shared';
+import { useQuery } from '@tanstack/react-query';
 import { Icon } from '../../components/icon.tsx';
 import { Panel } from '../../components/panel.tsx';
-import { ATTEMPT_COPY } from '../../copy/attempts.ts';
+import { toolActionLabel } from '../../copy/attempts.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
-import { attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
+import { attemptQuery, attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
+import { relativeTo, toolAction } from '../attempts/process-lines.ts';
 import styles from './task-page.module.css';
 
 /** The planning session's latest tool call, as one line. */
 function LastAction({ attemptId }: { attemptId: string }) {
+  const attempt = useQuery(attemptQuery(attemptId));
   const { entries } = useTranscript(attemptTranscript(attemptId));
   const call = entries.findLast((e) => e.kind === TranscriptEntryKind.ToolCall);
-  if (call?.kind !== TranscriptEntryKind.ToolCall) return null;
+  if (call?.kind !== TranscriptEntryKind.ToolCall || attempt.data === undefined) return null;
+  const action = toolAction(call.data.tool, call.data.input, relativeTo(attempt.data.directory));
   return (
     <p className={styles.activity}>
-      {C.lastAction}：<span className="mono">{ATTEMPT_COPY.toolCall(call.data.tool)}</span>
+      {C.lastAction}：<span className="mono">{toolActionLabel(action)}</span>
     </p>
   );
 }
