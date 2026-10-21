@@ -188,10 +188,10 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 | 节点验收（verifying → 下一状态，检查命令 + 提交），中位 / 最大 | 60 / 102 ms | 174 / 512 ms | 892 / 3795 ms |
 | 一次 Git Bash 检查命令（`acceptance.command.int.test.ts` 3 个用例合计） | 149 ms | 89 ms | 548 ms |
 | J4 从开始到任务失败 | 0.2 s | 0.8 s | 3.6 s |
-| 一次 squash 合并（review → completed），其他两个任务仍在提交时 | — | — | 2.9 s（无竞争时 0.3–0.7 s） |
+| 一次 squash 合并（review → completed），其他两个任务仍在提交时 | — | — | 2.9 s（无竞争时 0.3–0.7 s，另一轮的长尾 16 s） |
 | J6 / 三任务并发合并 整个用例 | 2.8 / 3.0 s | 7.9 / 10.2 s | 17.6 / 20.2 s |
 
-慢集中在启动进程上（每次 git 与 Git Bash 约 100 ms 以上，一个节点的提交要十几次 git 调用）。排查过的 Windows 特有原因：Defender 实时扫描在 runner 上本来就是关闭的（`RealTimeProtectionEnabled : False`，曾临时加的排除步骤已去掉）；`core.fsmonitor` / `core.preloadindex` 影响 `status` 的文件扫描，对这些只有几个文件的测试仓库没有可省的；进程启动开销是平台本身的成本。处理：集成测试的 `testTimeout` 与 `waitForEvent` 默认等待按最慢的 Windows 留余量；E2E 只对等待整个任务运行、建工作区或合并的断言（开始后进入任务页、结果卡出现、合并结果：J1–J8、J4 的失败面板）在 Windows 上放宽到 20 s（`e2e/helpers.ts` 的 `TASK_RUN_TIMEOUT_MS`），其余断言保持 5 s。
+慢集中在启动进程上（每次 git 与 Git Bash 约 100 ms 以上，一个节点的提交要十几次 git 调用）。排查过的 Windows 特有原因：Defender 实时扫描在 runner 上本来就是关闭的（`RealTimeProtectionEnabled : False`，曾临时加的排除步骤已去掉）；`core.fsmonitor` / `core.preloadindex` 影响 `status` 的文件扫描，对这些只有几个文件的测试仓库没有可省的；进程启动开销是平台本身的成本。处理：集成测试的 `testTimeout` 与 `waitForEvent` 默认等待按最慢的 Windows 留余量；E2E 只对等待整个任务运行、建工作区或合并的断言（开始后进入任务页、结果卡出现、合并结果：J1–J8、J4 的失败面板）在 Windows 上放宽到 20 s（`e2e/helpers.ts` 的 `TASK_RUN_TIMEOUT_MS`），其余断言保持 5 s；一个用例里串起多个任务与合并的交付用例在 Windows 上标 `test.slow`（`GIT_HEAVY_SPECS_SLOW`）。
 
 ### 4.2 测试代码中的平台差异
 

@@ -5,6 +5,7 @@ import { API_BASE, AUTH } from './env.ts';
 import {
   createProject,
   type E2EProject,
+  GIT_HEAVY_SPECS_SLOW,
   git,
   passReview,
   patchSettings,
@@ -15,6 +16,8 @@ import {
 } from './helpers.ts';
 
 // Journeys J5 and J6 (07 §5): delivery from the result card, with FakeOpencode playing the AI sessions.
+
+test.slow(GIT_HEAVY_SPECS_SLOW, 'several task runs and merges per test (17 §4.1)');
 
 test.beforeEach(({ request }) =>
   patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple', 'delivery.defaultStrategy': 'squash' }),
@@ -60,8 +63,11 @@ test('J5 合并到 main（squash）→ 主分支有提交、worktree 已清理�
 
   expect(git(project.repoPath, 'log', '-1', '--format=%s', 'main')).toMatch(/^问候语写错了 \(T-\d+\)$/);
   expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe('export const greet = () => "你好";');
-  expect(git(project.repoPath, 'worktree', 'list', '--porcelain').match(/^worktree /gm)).toHaveLength(1);
-  expect(git(project.repoPath, 'branch', '--list', 'aw/*')).toBe('');
+  // The worktree and branch are cleaned up after the merge is reported.
+  await expect
+    .poll(() => git(project.repoPath, 'worktree', 'list', '--porcelain').match(/^worktree /gm))
+    .toHaveLength(1);
+  await expect.poll(() => git(project.repoPath, 'branch', '--list', 'aw/*')).toBe('');
 });
 
 test('J6 两个任务改同一文件 → 第二个合并冲突 → 交给 AI 解决 → 合并成功', async ({ page, request }) => {
@@ -167,5 +173,8 @@ test('三个任务同时运行改同一文件：各自分支与工作区互不�
     });
     expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe(`export const greet = () => "${expected}";`);
   }
-  expect(git(project.repoPath, 'worktree', 'list', '--porcelain').match(/^worktree /gm)).toHaveLength(1);
+  // The last merge's worktree is removed after the merge is reported.
+  await expect
+    .poll(() => git(project.repoPath, 'worktree', 'list', '--porcelain').match(/^worktree /gm))
+    .toHaveLength(1);
 });

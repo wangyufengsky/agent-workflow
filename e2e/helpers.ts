@@ -15,6 +15,12 @@ import { API_BASE, AUTH } from './env.ts';
  */
 export const TASK_RUN_TIMEOUT_MS = process.platform === 'win32' ? 20_000 : 5_000;
 
+/**
+ * Specs that chain several task runs and merges in one test exceed the 30 s test budget on the Windows runner, where
+ * a single squash merge once took 16 s (17 §4.1); they are marked `test.slow` there only.
+ */
+export const GIT_HEAVY_SPECS_SLOW = process.platform === 'win32';
+
 /** Runs git in a repository (`LC_ALL=C`, like the backend) and returns its trimmed output. */
 export function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', ...args], {
