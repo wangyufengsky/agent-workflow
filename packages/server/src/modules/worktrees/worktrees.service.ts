@@ -60,7 +60,7 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
     return worktree;
   }
 
-  function move(worktree: Worktree, event: WorktreeEvent, changes: { error?: string; removedAt?: number } = {}) {
+  function move(worktree: Worktree, event: WorktreeEvent, changes: { error?: string; removedAt?: number | null } = {}) {
     const to = transition(worktreeMachine, worktree.status, event);
     repo.updateStatus(worktree.id, worktree.status, to, changes);
     log.info({ taskId: worktree.taskId, from: worktree.status, to, event }, 'worktree transition');
@@ -129,6 +129,28 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
     },
 
     remove,
+
+    /**
+     * Brings a removed worktree back at its path on its kept branch (21 §4.2): a task delivered as a pull request
+     * is revised again. The record stays the task's one worktree.
+     */
+    async restore(worktree: Worktree, repoPath: string): Promise<Worktree> {
+      return locks.run(repoPath, async () => {
+        const creating = move(worktree, WorktreeEvent.Restore, { removedAt: null });
+        try {
+          await runGit(['worktree', 'add', creating.path, creating.branch], { cwd: repoPath });
+        } catch (err) {
+          if (!(err instanceof AppError)) throw err;
+          move(creating, WorktreeEvent.CreateFailed, { error: messageOf(err) });
+          throw new AppError(ErrorCode.WorktreeCreateFailed, 'git worktree add failed', {
+            path: creating.path,
+            branch: creating.branch,
+            ...err.details,
+          });
+        }
+        return move(creating, WorktreeEvent.Created);
+      });
+    },
 
     /**
      * Clears a worktree that never became ready (creation failed, or the app stopped while creating) so the task can

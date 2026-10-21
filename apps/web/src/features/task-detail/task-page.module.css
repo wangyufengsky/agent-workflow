@@ -212,3 +212,34 @@
 .canvasFold > div {
   height: 420px;
 }
+
+/* Review comments of the task's pull request (21 §9): a checkbox and link per comment, its messages below. */
+.reviewComments {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reviewComment {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.reviewMessages {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0 0 0 26px;
+  list-style: none;
+  min-width: 0;
+}

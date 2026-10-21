@@ -1,7 +1,6 @@
 import {
   AppError,
   type AttemptDTO,
-  type ChangeRequestReason,
   type CreateTaskRequest,
   type DeliverRequest,
   ErrorCode,
@@ -9,6 +8,7 @@ import {
   type NodeDetailDTO,
   type PlanDTO,
   type PlanGraph,
+  type RequestChangesRequest,
   type ResultNext,
   resolveTaskDisplayGroup,
   ServerEventType,
@@ -28,6 +28,7 @@ import { createTaskDiffs } from './tasks.diff.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
 import type { StatusMatch } from './tasks.repo.ts';
 import { createTaskResults } from './tasks.result.ts';
+import { createTaskReview } from './tasks.review.ts';
 import { createTaskState, type TasksServiceDeps } from './tasks.state.ts';
 
 /** Tasks (09 §2): lifecycle, the context their attempts read, decisions on their items, and their views. */
@@ -41,6 +42,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   const diffs = createTaskDiffs(deps, state);
   const delivery = createTaskDelivery(deps, state);
   const changes = createTaskChanges(deps, state, delivery.current);
+  const review = createTaskReview(deps, state, changes);
 
   // A task's summary shows its open attention items, working steps and progress line; keep it current.
   deps.events.subscribe((event) => {
@@ -88,6 +90,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       openInbox: inbox.listOpen({ taskId: id }),
       result: task.result,
       lastDelivery: delivery.lastDelivery(id),
+      pullRequest: review.pullRequestOf(id),
     };
   }
 
@@ -174,10 +177,19 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     },
     async requestChanges(
       id: string,
-      reason: ChangeRequestReason,
+      reason: RequestChangesRequest['reason'],
       feedback: string | undefined,
     ): Promise<TaskDetailDTO> {
       await changes.requestChanges(id, reason, feedback);
+      return detail(id);
+    },
+    reviewComments: review.reviewComments,
+    async reviseFromReview(
+      id: string,
+      commentIds: readonly string[],
+      note: string | undefined,
+    ): Promise<TaskDetailDTO> {
+      await review.reviseFromReview(id, commentIds, note);
       return detail(id);
     },
     confirmPlan(id: string, version: number): TaskDetailDTO {

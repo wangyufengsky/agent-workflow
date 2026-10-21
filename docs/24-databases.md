@@ -145,7 +145,7 @@ openGauss 的口令存储方式由 `password_encryption_type` 决定：0 为 md5
 | 单元 | `databases.sql.test.ts` | 三种方言各自的放行与拒绝（引号、注释、美元引号、方括号、不带分号的第二条语句、拒绝表） |
 | 集成 | `databases.int.test.ts` | MySQL 8.4（原有）；GoldenDB 类型的连接指向同一个 MySQL 容器：测试连接、浏览、只读事务拒绝写入的函数 |
 | 集成 | `databases.engines.int.test.ts` | PostgreSQL 17.6、openGauss 7（只用 sha256 认证）、SQL Server 2022，表驱动的同一组用例：测试连接与版本、浏览表结构（注释、行数、列、主键）、`db_describe` 的列与索引、值的 JSON 表示、`limit` 截断、写语句被拒绝（PostgreSQL 一族另测会写入的函数被只读事务拒绝）、超时、SQL 错误 |
-| E2E | `pro-databases.browser.spec.ts`（J21） | 浏览器：添加 PostgreSQL 连接（切换类型后端口变为 5432）→ 测试连接显示版本 → 浏览表结构 → 关联项目 → FakeOpencode 的会话调用 `db_query` 拿到行 |
+| E2E | `pro-databases.browser.spec.ts`（J21） | 浏览器：添加 PostgreSQL 连接（切换类型后端口变为 5432）→ 测试连接显示版本 → 浏览表结构 → 关联项目 → 知识问答勾选数据库，研究员（FakeOpencode）调用 `db_query` 并引用 → 打开引用看到在 PostgreSQL 上重新执行的行 |
 
 容器镜像需要先拉取：
 

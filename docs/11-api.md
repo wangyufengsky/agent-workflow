@@ -95,6 +95,8 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/tasks/:id/cancel` | `{ keepBranch?: boolean }` |
 | POST | `/tasks/:id/request-changes` | `{ reason: 'user' \| 'conflict', feedback? }`；`review → running`，追加「按反馈修改」或「解决合并冲突」节点（13 §4）。`user` 必须带 `feedback`；`conflict` 要求最近一次交付为 `conflict`；否则 400 `VALIDATION_FAILED` |
 | POST | `/tasks/:id/deliver` | `{ strategy, targetBranch?, pr?: { title, body } }`；见 §5.3 |
+| GET | `/tasks/:id/review-comments` | `ReviewCommentsDTO`：任务的 PR/MR 上的审查意见，实时取自平台；见 §5.4 |
+| POST | `/tasks/:id/review-feedback` | `{ commentIds: string[], note? }`；`completed → running`，按勾选的审查意见追加「按审查意见修改」节点；见 §5.4 |
 | GET | `/tasks/:id/diff` | `DiffDTO { base, files }`：worktree（含未提交改动）相对任务分支与目标分支的 merge-base（起初即基线提交；解决冲突合入目标分支后为目标分支的提交）的文件列表与增删统计；worktree 已删除 → 404 `NOT_FOUND` |
 | GET | `/tasks/:id/diff/file?path=` | 单文件 unified diff `FileDiffDTO`（超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }`） |
 
@@ -133,6 +135,7 @@ type TaskDetailDTO = {
   openInbox: InboxItemDTO[];
   result?: TaskResultDTO;         // review 及之后
   lastDelivery?: DeliveryDTO;     // 本轮（最近一次进入 review 以来）最近的交付；「再改改」/「解决冲突」后回到 review 即为空：{ id, strategy, targetBranch, status, commitSha?, prUrl?, conflictFiles?, error?, createdAt, finishedAt? }
+  pullRequest?: { url: string; pushedAt: number };  // 最近一次成功的 PR 交付（跨轮次；pushedAt 为其完成时间，21 §5）
   createdAt: number; updatedAt: number; startedAt?: number; finishedAt?: number;
 };
 ```
@@ -140,9 +143,30 @@ type TaskDetailDTO = {
 ### 5.3 交付
 
 - `strategy ∈ { squash, merge, rebase }`：本地合并到 `targetBranch`（默认 `baseBranch`），见 09 §7。合并前的检查失败直接返回错误、不改状态：`DELIVERY_TARGET_NOT_FOUND`、`WORKTREE_DIRTY`、`DELIVERY_TARGET_DIRTY`（目标分支检出在有未提交改动的工作区）。成功 → 任务 `completed`。冲突 → 任务回 `review`，`lastDelivery.status = conflict`，`conflictFiles` 列出文件；前端提供「交给 AI 解决」（= `request-changes` with `reason: 'conflict'`）。其他 git 失败 → 任务回 `review`，`lastDelivery.status = failed`，`error` 为原因。以上都返回操作后的 `TaskDetailDTO`。
-- `pull_request`：项目未绑定远端 → 400 `HOSTING_NOT_CONFIGURED`（不改状态）。在仓库锁内把任务分支推送到 `origin`（HTTPS 远端经环境变量 `http.extraHeader` 带上令牌，不出现在命令参数中；SSH 远端用用户自己的密钥）→ 创建 PR/MR（`targetBranch` 为目标，标题与说明默认为任务标题与结果摘要，可用 `pr` 指定）→ 任务 `completed`，`prUrl` 记录在 delivery；worktree 删除，分支保留。推送或平台失败 → `lastDelivery.status = failed`，任务回 `review`。
+- `pull_request`：项目未绑定远端 → 400 `HOSTING_NOT_CONFIGURED`（不改状态）。在仓库锁内把任务分支推送到 `origin`（HTTPS 远端经环境变量 `http.extraHeader` 带上令牌，不出现在命令参数中；SSH 远端用用户自己的密钥）→ 创建 PR/MR（`targetBranch` 为目标，标题与说明默认为任务标题与结果摘要，可用 `pr` 指定）→ 任务 `completed`，`prUrl` 记录在 delivery；worktree 删除，分支保留。推送或平台失败 → `lastDelivery.status = failed`，任务回 `review`。推送后先按分支查找打开的 PR/MR：已有（按审查意见修改后再次交付）就沿用它、不改标题与说明，`prUrl` 为同一个地址（21 §5）。
 - `report_only`：仅 `deliverable = report` 的任务可用，直接 `completed`。
 - `deliverable = report` 的任务使用其他策略 → 400 `VALIDATION_FAILED`。
+
+### 5.4 PR 审查意见（v1.2，21）
+
+- `GET /tasks/:id/review-comments`（`tasks.reviewComments`，read）：任务的最近一次成功交付必须是 PR，且该分支上的 PR/MR 仍打开，否则 409 `PULL_REQUEST_NOT_OPEN`；项目未绑定远端 400 `HOSTING_NOT_CONFIGURED`；平台错误 `HOSTING_AUTH_FAILED` / `HOSTING_API_ERROR`。返回：
+
+```ts
+type ReviewCommentsDTO = {
+  pullRequest: { url: string; number: number };
+  items: Array<{
+    id: string;                      // 平台上的讨论 / 评论 / 审查 id
+    kind: ReviewCommentKind;         // thread | general
+    path?: string; line?: number;    // thread 所在的文件与行
+    url: string;
+    messages: Array<{ author: string; body: string; createdAt: number }>;  // 按时间
+    selectedByDefault: boolean;      // 未解决的讨论；上次推送之后的一般评论（D87）
+  }>;
+};
+```
+
+  已解决的讨论、系统笔记与空正文不列出；每类最多 100 条（`REVIEW_COMMENTS_MAX`）。
+- `POST /tasks/:id/review-feedback`（`tasks.reviseFromReview`，write）：`{ commentIds: string[]（至少一条）, note?: string }`。顺序：状态机检查 `completed --review_feedback--> running`（否则 409 `STATE_TRANSITION_INVALID`）→ 同上检查 PR → 重新取回意见，`commentIds` 有不在其中的 → 400 `VALIDATION_FAILED`（`issues[].path = ['commentIds']`）→ 抓取远端分支并快进本地任务分支（两边分叉 409 `BRANCH_DIVERGED`，不做改动）→ 重建 worktree（失败 `WORKTREE_CREATE_FAILED`）→ 一个事务内建计划新版本、追加 `review_fix_<n>` 节点、任务 `running`。返回 `TaskDetailDTO`。完成后任务回到 `review`，用户以 `deliver`（`pull_request`）推送回同一个 PR。
 
 ## 6. 计划与节点
 

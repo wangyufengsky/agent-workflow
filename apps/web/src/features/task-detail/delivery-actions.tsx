@@ -16,6 +16,7 @@ import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { ExternalLink } from '../../components/external-link.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
@@ -129,6 +130,7 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
   const delivery = task.lastDelivery;
   const conflict = delivery?.status === DeliveryStatus.Conflict ? delivery : null;
   const canPr = project.data?.hosting?.hasToken === true;
+  const { pullRequest } = task;
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
 
   const merge = (strategy: LocalMergeStrategy, targetBranch: string) =>
@@ -205,6 +207,16 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
             </Button>
             <Button onClick={() => setOpen('manual')}>{C.resolveMyself}</Button>
           </>
+        ) : pullRequest !== null ? (
+          // Delivered as a pull request: the platform merges it, revisions go to the same one (21 §5).
+          <Button
+            variant="primary"
+            icon="git"
+            pending={deliver.isPending && open === undefined}
+            onClick={() => deliver.mutate({ id: task.id, strategy: DeliveryStrategy.PullRequest })}
+          >
+            {C.pushToPr}
+          </Button>
         ) : (
           <>
             <Button
@@ -222,17 +234,24 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
             )}
           </>
         )}
-        <span title={canPr ? undefined : C.prNeedsRemote}>
-          <Button disabled={!canPr} onClick={() => setOpen('pr')}>
-            {C.createPr}
-          </Button>
-        </span>
+        {pullRequest === null && (
+          <span title={canPr ? undefined : C.prNeedsRemote}>
+            <Button disabled={!canPr} onClick={() => setOpen('pr')}>
+              {C.createPr}
+            </Button>
+          </span>
+        )}
         <Button onClick={() => setOpen('revise')}>{C.revise}</Button>
         <Button variant="ghost" onClick={() => setOpen('discard')}>
           {C.discard}
         </Button>
       </div>
-      {!canPr && project.data !== undefined && (
+      {pullRequest !== null && conflict === null && (
+        <p className="hint">
+          {C.pushToPrHint} <ExternalLink href={pullRequest.url}>{C.openPr}</ExternalLink>
+        </p>
+      )}
+      {pullRequest === null && !canPr && project.data !== undefined && (
         <p className="hint">
           {C.prNeedsRemote}{' '}
           <Link to={ROUTES.project} params={{ projectId: task.project.id }} className="link">

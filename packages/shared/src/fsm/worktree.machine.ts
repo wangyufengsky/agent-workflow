@@ -7,6 +7,8 @@ export const WorktreeEvent = {
   Remove: 'remove',
   Removed: 'removed',
   RemoveFailed: 'remove_failed',
+  /** The worktree of a task delivered as a pull request comes back on its kept branch (21 §4.2). */
+  Restore: 'restore',
 } as const;
 export type WorktreeEvent = (typeof WorktreeEvent)[keyof typeof WorktreeEvent];
 
@@ -22,7 +24,8 @@ export const worktreeMachine = defineMachine<WorktreeStatus, WorktreeEvent>({
     [S.Creating]: { [E.Created]: [S.Ready], [E.CreateFailed]: [S.Error] },
     [S.Ready]: { [E.Remove]: [S.Removing] },
     [S.Removing]: { [E.Removed]: [S.Removed], [E.RemoveFailed]: [S.Error] },
-    [S.Removed]: {},
+    [S.Removed]: { [E.Restore]: [S.Creating] },
     [S.Error]: { [E.Remove]: [S.Removing] },
   },
+  reopenedBy: [E.Restore],
 });
