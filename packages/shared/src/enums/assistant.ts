@@ -42,6 +42,7 @@ export const AssistantPage = {
   Knowledge: 'knowledge',
   KnowledgeConversation: 'knowledge_conversation',
   KnowledgeHistory: 'knowledge_history',
+  Insights: 'insights',
 } as const;
 export type AssistantPage = (typeof AssistantPage)[keyof typeof AssistantPage];
 export const assistantPageSchema = z.enum(AssistantPage);
@@ -70,6 +71,7 @@ export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.Knowledge]: [],
   [AssistantPage.KnowledgeConversation]: ['knowledgeConversationId'],
   [AssistantPage.KnowledgeHistory]: [],
+  [AssistantPage.Insights]: [],
 } as const satisfies Record<AssistantPage, readonly AssistantPageParam[]>;
 
 /**
