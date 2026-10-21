@@ -13,7 +13,7 @@ import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
 
 const byId = z.object({ id: z.string() });
-// Knowledge Q&A is a simple-mode feature the assistant can use too (D74).
+// Knowledge Q&A is a simple-mode feature the assistant can use too (D68).
 const common = { expose: { palette: false, assistant: true }, credentialFields: [], mode: UiMode.Simple } as const;
 
 export const listKnowledgeOp = defineOperationContract({
@@ -45,7 +45,7 @@ export const askKnowledgeOp = defineOperationContract({
   description: 'Ask a question about a project; a read-only researcher answers with citations',
   input: askKnowledgeRequestSchema,
   output: knowledgeConversationSchema,
-  // Only reads the project; the assistant runs it without a confirmation and gets the answer later (D74, 18 §4a).
+  // Only reads the project; the assistant runs it without a confirmation and gets the answer later (D68, 18 §4a).
   risk: OperationRisk.Read,
   produces: { kind: EntityKind.KnowledgeConversation, ref: (c) => ({ id: c.id, title: c.title }) },
   http: { method: 'POST', path: '/knowledge/conversations', status: 201 },

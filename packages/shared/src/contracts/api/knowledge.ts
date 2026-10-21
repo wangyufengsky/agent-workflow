@@ -5,7 +5,7 @@ import { errorInfoSchema } from '../../errors/codes.ts';
 import { dbQueryOutputSchema } from '../mcp/db-tools.ts';
 import { attemptSummarySchema } from './attempts.ts';
 
-/** What a conversation's questions may draw on (18 §2.1); fixed once the conversation starts (D73). */
+/** What a conversation's questions may draw on (18 §2.1); fixed once the conversation starts (D67). */
 export const knowledgeSourcesSchema = z
   .object({ code: z.boolean(), docs: z.boolean(), database: z.boolean(), web: z.boolean() })
   .refine((s) => s.code || s.docs || s.database, {

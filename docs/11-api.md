@@ -276,7 +276,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 ## 13a. 知识问答（v1.1）
 
-见 [18-knowledge.md §4](18-knowledge.md#4-api操作清单)。全部 `mode = simple`、`expose.assistant = true`、不进命令面板（D74）。
+见 [18-knowledge.md §4](18-knowledge.md#4-api操作清单)。全部 `mode = simple`、`expose.assistant = true`、不进命令面板（D68）。
 
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |

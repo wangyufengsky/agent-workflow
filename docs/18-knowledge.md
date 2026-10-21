@@ -1,6 +1,6 @@
 # 18 · 知识问答（v1.1）
 
-> 状态：**v1.1 已实现**（任务 K-01…K-10，见 [05](05-dev-plan.md#v11--知识问答)）。需要用户拍板的取舍记在 [02](02-decisions.md) D73–D75（待用户确认），实现按其中的保守方案。
+> 状态：**v1.1 已实现**（任务 K-01…K-11，见 [05](05-dev-plan.md#v11--知识问答)）。需要用户拍板的取舍记在 [02](02-decisions.md) D67–D69（待用户确认），实现按其中的保守方案。
 
 ## 1. 定位
 
@@ -40,7 +40,7 @@
   | 读取原文 | `read`、bash 的 `cat` `head` `tail` `git show`、`webfetch`、`db_query`：逐个列出文件 / 网址 / 查询 |
   | 组织回答 | 调用 `submit_answer` 之后；被拒绝时显示「引用有误，正在修正」 |
   `report_progress` 的最新一句（尝试的「当前进展」）显示在卡片标题旁。
-- **回答**：Markdown；引用编号 `[n]` 渲染为可点击的上标。回答在 `submit_answer` 通过校验后一次出现（不流式，D73：引用要先校验）。回答下方列出引用卡（编号、文件路径与行号 / 连接与查询 / 网页标题，点击同样打开原文）。
+- **回答**：Markdown；引用编号 `[n]` 渲染为可点击的上标。回答在 `submit_answer` 通过校验后一次出现（不流式，D67：引用要先校验）。回答下方列出引用卡（编号、文件路径与行号 / 连接与查询 / 网页标题，点击同样打开原文）。
 - **停止**：研究中输入框右侧的按钮变为「停止」，停止后这一轮显示「已停止」，可以「重新提问」（同一问题作为新一轮）。
 - **失败**（未提交、超时、会话出错、应用重启中断）：显示原因（按错误码的文案）与「重新提问」。
 - **等待你允许**：研究员要运行只读白名单以外的命令时，权限请求进入「需要你处理」（与任务相同，03 §2.5）；这一轮显示「等待你允许一条命令」与「去处理」链接。
@@ -80,7 +80,7 @@
 | id | TEXT PK | |
 | project_id | TEXT → projects，CASCADE | 对话开始后不可更换 |
 | title | TEXT | 第一次提问的首行（`KNOWLEDGE_TITLE_MAX_CHARS`） |
-| sources | TEXT(JSON) | `KnowledgeSources`：`{ code, docs, database, web }`，均为布尔；对话开始后固定（D73） |
+| sources | TEXT(JSON) | `KnowledgeSources`：`{ code, docs, database, web }`，均为布尔；对话开始后固定（D67） |
 | created_at / updated_at | INTEGER | `updated_at` 随每一轮的创建与结束更新，列表按它倒序 |
 
 索引：`(project_id)`、`(updated_at)`。
@@ -154,7 +154,7 @@ type KnowledgeConversationSummaryDTO = {
 
 ### 4a. 应用助手调用知识问答
 
-用户要求助手能直接提问（D74）。`knowledge.ask` 与 `knowledge.followUp` 为 read：只读项目，不需要确认卡片；契约声明 `produces: knowledge_conversation`（D66）。研究可能要几分钟，助手的工具调用不阻塞，沿用确认流程「结果作为下一条消息」的模式（15 §4）：
+用户要求助手能直接提问（D68）。`knowledge.ask` 与 `knowledge.followUp` 为 read：只读项目，不需要确认卡片；契约声明 `produces: knowledge_conversation`（D66）。研究可能要几分钟，助手的工具调用不阻塞，沿用确认流程「结果作为下一条消息」的模式（15 §4）：
 
 1. 助手调用 `knowledge_ask`（或 `knowledge_followUp`）。操作照常执行；工具不返回对话 DTO，而是立即返回 `{ status: 'researching', knowledge_conversation_id, instruction }`，`instruction` 让模型告诉用户正在查资料并结束本轮。助手模块记下「这一轮由哪个助手对话等待」（内存中；应用重启会中断研究本身，结果仍可在知识问答页看到）。
 2. 这一轮结束时（知识模块 `onTurnEnded`），后端先在助手对话中记录指向该知识对话的导航卡片（`entity_ref`），再把消息发回原助手会话（会话忙时等本轮结束，`deliver`）：
@@ -184,7 +184,7 @@ type KnowledgeConversationSummaryDTO = {
 
 - `AttemptKind.Research`；提交工具 `ATTEMPT_SUBMIT_TOOL.research = submit_answer`；`nudge.md` 照常提醒；超时用 `attempt.timeoutMinutes`。
 - 首条消息 `start-research.md`：项目名、问题、本对话的资料范围（勾选项、关联数据库名称、网络开关）、引用规则（§6）；续问 `research-followup.md`：新问题，提醒仍需 `submit_answer`。
-- 不计入调度器的并发上限（D74：研究是用户当场发起、等着看的）。
+- 不计入调度器的并发上限（D68：研究是用户当场发起、等着看的）。
 
 ### 5.3 一轮的生命周期
 

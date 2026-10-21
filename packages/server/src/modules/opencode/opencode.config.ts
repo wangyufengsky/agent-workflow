@@ -42,7 +42,7 @@ const ASSISTANT_TOOLS = `${MCP_ASSISTANT_TOOL_PREFIX}*`;
 /**
  * Agent permissions that never change with settings (12 §2). The native question tool is denied: questions go
  * through MCP `ask_user` (D36). Bash rules are per session, see `sessionPermissionRules`. Sessions working on a task
- * never get the assistant's tools (D25). The knowledge researcher only reads (18 §5.1, D75): no web unless its session
+ * never get the assistant's tools (D25). The knowledge researcher only reads (18 §5.1, D69): no web unless its session
  * turns it on, and no subagents, which run with their own permissions.
  */
 const AGENT_PERMISSION: Record<SessionAgent, AgentPermission & { [ASSISTANT_TOOLS]: 'deny' }> = {
@@ -147,7 +147,7 @@ const WEB_RULES: readonly PermissionRule[] = [
  * Read-only sessions may also run `checkCommands` (the project check and the node's command checks) and the usual
  * test commands of the same tool without asking: running the checks is how a planner or reviewer learns the state of
  * the code, and asking would interrupt the user on every review (D51, D64). The researcher runs no checks; `web`
- * turns its web tools on (D75).
+ * turns its web tools on (D69).
  */
 export function sessionPermissionRules(
   base: SessionAgent,

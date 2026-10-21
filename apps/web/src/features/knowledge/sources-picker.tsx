@@ -28,7 +28,7 @@ export function SourcesPicker({
 }: {
   sources: KnowledgeSources;
   databaseCount: number;
-  /** Absent: the conversation's sources, fixed (D73). */
+  /** Absent: the conversation's sources, fixed (D67). */
   onChange?: (sources: KnowledgeSources) => void;
 }) {
   const [open, setOpen] = useState(false);
