@@ -1,0 +1,245 @@
+/* 质量与用量（19 §3） */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-5);
+}
+.toolbar :global(.input) {
+  width: auto;
+  height: var(--ctl-h);
+}
+
+.proHint {
+  margin-top: var(--s-5);
+}
+
+/* 数字卡 */
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: 18px 20px;
+  text-align: left;
+  min-width: 0;
+}
+.statLabel {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.statValue {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+  color: var(--ink-strong);
+  font-variant-numeric: tabular-nums;
+}
+.statSub {
+  font-size: var(--fs-sm);
+  color: var(--sub);
+}
+.qualityGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .qualityGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.endedLinks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.trend,
+.breakdown,
+.failures {
+  margin-top: var(--s-4);
+}
+
+/* 柱状图：系列颜色只用主题令牌 */
+.s0 {
+  background: var(--accent);
+}
+.s1 {
+  background: var(--role-2);
+}
+.chart {
+  margin: 0;
+}
+.readout {
+  min-height: 20px;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: var(--s-3);
+}
+.legend {
+  display: inline-flex;
+  gap: var(--s-4);
+  color: var(--sub);
+}
+.legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.plot {
+  position: relative;
+  height: 180px;
+  margin-left: 56px;
+}
+.tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--line);
+}
+.tick span {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: -8px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+}
+.column {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column-reverse;
+  border-radius: var(--r-xs) var(--r-xs) 0 0;
+}
+.column:hover,
+.column:focus-visible {
+  background: var(--fill-2);
+}
+.segment {
+  display: block;
+  width: 100%;
+  opacity: 0.85;
+}
+.column:hover .segment,
+.column:focus-visible .segment {
+  opacity: 1;
+}
+.segment:last-child {
+  border-radius: var(--r-xs) var(--r-xs) 0 0;
+}
+.dates {
+  display: flex;
+  gap: 3px;
+  margin: 6px 0 0 56px;
+}
+.dates span {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+/* 表格 */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.table th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.table tr:hover td {
+  background: var(--fill-1);
+}
+.table .num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.barCell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  min-width: 140px;
+}
+.barTrack {
+  width: 64px;
+  height: 6px;
+  display: flex;
+  justify-content: flex-end;
+}
+.barTrack i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  opacity: 0.75;
+}
+.link {
+  color: var(--accent-ink);
+  text-align: left;
+}
+.link:hover {
+  text-decoration: underline;
+}
+.link:disabled {
+  color: var(--sub);
+  text-decoration: none;
+  cursor: default;
+}
+
+.reasons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.reasons li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.reasons li:last-child {
+  border-bottom: none;
+}
+
+.drilling {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 10px 20px;
+  background: var(--accent-fill);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}

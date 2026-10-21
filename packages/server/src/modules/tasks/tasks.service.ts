@@ -125,6 +125,9 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     },
     /** Tasks in the given states, for the scheduler. */
     listByStatus: (statuses: readonly TaskStatus[]) => state.repo.list({ statuses }),
+    /** Summaries of the given tasks (quality and usage, 19 §4), most recently updated first. */
+    summariesOf: (ids: readonly string[]): TaskSummaryDTO[] =>
+      ids.length === 0 ? [] : state.summaries(state.repo.list({ ids })),
     /** Every task of a project, for the Git console. */
     listByProject: (projectId: string) => state.repo.list({ projectId }),
     timeline: (id: string, afterId: number) => {

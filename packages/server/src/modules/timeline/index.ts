@@ -3,6 +3,7 @@ import type { DbExecutor } from '../../core/db/database.ts';
 import { createTimelineRepo, type NewTaskEvent } from './timeline.repo.ts';
 
 export type { NewTaskEvent } from './timeline.repo.ts';
+export { taskEventsTable } from './timeline.table.ts';
 
 /**
  * `task_events` (10): every state change of a task, its nodes, plans and attempts, written in the transaction of the

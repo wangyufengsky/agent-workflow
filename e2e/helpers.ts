@@ -71,7 +71,9 @@ export type FakeStep =
   | { type: 'callTool'; server?: 'exec' | 'assistant'; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
   /** Keeps working until the session is aborted. */
-  | { type: 'hang' };
+  | { type: 'hang' }
+  /** The tokens the turn reports when it ends; 100 input and 20 output otherwise. */
+  | { type: 'usage'; input: number; output: number };
 
 export const submitResult = (summary: string): FakeStep => ({
   type: 'callTool',

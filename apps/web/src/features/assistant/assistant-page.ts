@@ -24,6 +24,7 @@ const PAGE_ROUTE = {
   [AssistantPage.Knowledge]: ROUTES.knowledge,
   [AssistantPage.KnowledgeConversation]: ROUTES.knowledgeConversation,
   [AssistantPage.KnowledgeHistory]: ROUTES.knowledgeHistory,
+  [AssistantPage.Insights]: ROUTES.insights,
 } as const satisfies Record<AssistantPage, string>;
 
 const PAGE_OF_ROUTE = new Map<string, AssistantPage>(

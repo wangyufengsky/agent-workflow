@@ -37,6 +37,7 @@ import { createDeliveryModule } from './modules/delivery/index.ts';
 import { createRepoLocks, locateOpencodeShell } from './modules/git/index.ts';
 import { type HostingEndpoints, PUBLIC_HOSTING } from './modules/hosting/index.ts';
 import { createInboxModule, type InboxService } from './modules/inbox/index.ts';
+import { createInsightsModule } from './modules/insights/index.ts';
 import { createKnowledgeModule, type KnowledgeService } from './modules/knowledge/index.ts';
 import { createMcpModule } from './modules/mcp/index.ts';
 import { createNodesModule, type NodesService } from './modules/nodes/index.ts';
@@ -73,7 +74,7 @@ export type AppDeps = {
   hosting?: HostingEndpoints;
   /** Time limit of the AI's database queries; tests shorten `DB_QUERY_TIMEOUT_MS`. */
   dbQueryTimeoutMs?: number;
-  /** IANA time zone the assistant tells the time in; the system's by default. */
+  /** IANA time zone the assistant tells the time in and insights count days in; the system's by default. */
   timeZone?: string;
 };
 
@@ -281,6 +282,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     events,
     log,
   });
+  const timeZone = deps.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const insights = createInsightsModule({ db: database.db, clock, timeZone, tasks: tasks.service });
   const repository = createRepositoryModule({
     projects: projects.service,
     tasks: tasks.service,
@@ -309,6 +312,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...workflows.operations,
     ...tasks.operations,
     ...knowledge.operations,
+    ...insights.operations,
     ...plans.operations,
     ...inbox.operations,
     ...attempts.operations,
@@ -331,7 +335,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     workflows: workflows.service,
     knowledge: knowledge.service,
     dataDir: config.dataDir,
-    timeZone: deps.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timeZone,
     token: assistantMcpToken,
     operations,
     appStatus: async () => ({
