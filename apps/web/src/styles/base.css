@@ -46,6 +46,9 @@
   --t-fast: 0.15s;
   --t-mid: 0.28s;
   --t-slow: 0.45s;
+  /* A slight overshoot: panels that arrive with some life (the assistant drawer, D84). */
+  --ease-spring: cubic-bezier(0.32, 1.28, 0.54, 1);
+  --t-drawer: 0.5s;
 }
 
 /* ---------- 2. 基础 ---------- */
@@ -183,10 +186,6 @@ svg.i.lg {
   grid-template-columns: var(--nav-w) minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
-}
-/* The assistant panel docks as a third column (15 §6): pages stay usable next to it. */
-.app.with-assistant {
-  grid-template-columns: var(--nav-w) minmax(0, 1fr) var(--drawer-sm);
 }
 .nav {
   display: flex;

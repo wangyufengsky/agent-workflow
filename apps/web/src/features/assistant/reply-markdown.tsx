@@ -3,19 +3,27 @@ import type { ReactNode } from 'react';
 import type { Components } from 'react-markdown';
 import { ExternalLink } from '../../components/external-link.tsx';
 import { Markdown } from '../../components/markdown.tsx';
+import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
+import styles from './assistant.module.css';
+
+/** A knowledge answer cites as `[[n]](link)` (18 §4a): the mark reads as a small numbered chip. */
+const CITATION = /^\[(\d+)\]$/;
 
 /** A link to a page of the app (a knowledge answer's citations and conversation, 18 §4a): opens beside the panel. */
 function InAppLink({ href, children }: { href: string; children: ReactNode }) {
   const navigate = useNavigate();
+  const citation = typeof children === 'string' ? CITATION.exec(children)?.[1] : undefined;
   return (
     <a
       href={href}
+      className={citation === undefined ? undefined : styles.cite}
+      aria-label={citation === undefined ? undefined : KNOWLEDGE_COPY.citationMark(Number(citation))}
       onClick={(e) => {
         e.preventDefault();
         void navigate({ href });
       }}
     >
-      {children}
+      {citation ?? children}
     </a>
   );
 }

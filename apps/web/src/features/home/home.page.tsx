@@ -5,7 +5,7 @@ import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { EmptyState } from '../../components/empty-state.tsx';
 import { HOME_COPY } from '../../copy/home.ts';
 import { HOME_TASK_COPY as C, INBOX_COPY } from '../../copy/tasks.ts';
-import { HomeAssistantInput } from '../assistant/home-assistant-input.tsx';
+import { HomeAssistantEntry } from '../assistant/home-assistant-entry.tsx';
 import { inboxQuery } from '../inbox/inbox.queries.ts';
 import { InboxCard } from '../inbox/inbox-card.tsx';
 import { projectsQuery } from '../projects/projects.queries.ts';
@@ -39,7 +39,6 @@ export function HomePage() {
       <div className="page-head">
         <h1 className="title grow">{HOME_COPY.title}</h1>
       </div>
-      <HomeAssistantInput />
       {projects.length === 0 ? (
         <EmptyState
           icon="folder"
@@ -62,6 +61,7 @@ export function HomePage() {
           onProjectChange={(id) => void navigate({ search: { projectId: id }, replace: true })}
         />
       )}
+      <HomeAssistantEntry />
       {attention.length > 0 && (
         <section className="section">
           <div className="section-head">
