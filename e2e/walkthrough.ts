@@ -20,9 +20,15 @@ export type PageReport = {
 export async function inspectPage(page: Page): Promise<PageReport> {
   // axe cannot decide text over a background image, and the shell lays a faint decorative gradient over its solid
   // colours (14 §4), so nearly every text would be undecided. Drop the images while axe runs; the theme contrast unit
-  // test checks text where those gradients are strongest. Colours still easing in after the theme was applied, or a
-  // panel still sliding in over the page (`sideIn`), would be measured mid-way, so transitions and animations end at
-  // once: axe sees the page at rest.
+  // test checks text where those gradients are strongest. Animated content first reaches its end state: messages
+  // fade in (the assistant panel, D84), so axe waits for one-shot animations. Then nothing moves while axe measures:
+  // colours still easing in after the theme was applied, a panel still sliding in (`sideIn`) or a looping indicator
+  // would be measured mid-way, so transitions and animations end at once.
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every((a) => a.playState !== 'running' || a.effect?.getComputedTiming().iterations === Number.POSITIVE_INFINITY),
+  );
   const noImages = await page.addStyleTag({
     content:
       '*, *::before, *::after { background-image: none !important; transition: none !important; animation: none !important; }',

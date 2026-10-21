@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { attemptSchema } from '../contracts/api/attempts.ts';
+import { InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -21,6 +22,7 @@ export const getAttemptOp = defineOperationContract({
 
 export const abortAttemptOp = defineOperationContract({
   id: 'attempts.abort',
+  refs: { id: InputRef.Attempt },
   title: 'op.attempts.abort',
   description: 'Stop a running AI session attempt',
   input: byId,

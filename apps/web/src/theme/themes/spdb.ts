@@ -90,5 +90,12 @@ export const spdbTheme: ThemeDefinition = {
     glow: 'radial-gradient(ellipse 62% 380px at 50% -170px,rgba(0,71,144,0.07),rgba(0,71,144,0) 70%)',
     dots: 'radial-gradient(rgba(28,39,69,0.11) 1px,transparent 1.2px)',
     'shadow-card': '0 1px 0 rgba(255,255,255,.03) inset',
+    frost: 'rgba(255,255,255,.8)',
+    'frost-card': 'rgba(255,255,255,.72)',
+    'frost-edge': 'rgba(255,255,255,.9)',
+    'frost-filter': 'blur(28px) saturate(160%)',
+    'frost-shadow': '0 24px 60px rgba(28,39,69,.16),0 3px 10px rgba(28,39,69,.07)',
+    'frost-sheen': 'linear-gradient(180deg,rgba(243,246,252,.7),rgba(243,246,252,0) 160px)',
+    aura: 'conic-gradient(from 200deg,#004790,#3a7bd5,#6c568e,#1b626c,#004790)',
   },
 };

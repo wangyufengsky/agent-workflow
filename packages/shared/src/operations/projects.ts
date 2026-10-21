@@ -7,7 +7,7 @@ import {
   setHostingRequestSchema,
   updateProjectRequestSchema,
 } from '../contracts/api/projects.ts';
-import { EntityKind } from '../enums/entity.ts';
+import { EntityKind, InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -56,6 +56,7 @@ export const getProjectOp = defineOperationContract({
 
 export const updateProjectOp = defineOperationContract({
   id: 'projects.update',
+  refs: { id: InputRef.Project },
   title: 'op.projects.update',
   description: 'Rename a project or change its default branch or check command',
   input: updateProjectRequestSchema,
@@ -69,6 +70,7 @@ export const updateProjectOp = defineOperationContract({
 
 export const deleteProjectOp = defineOperationContract({
   id: 'projects.delete',
+  refs: { id: InputRef.Project },
   title: 'op.projects.delete',
   description: 'Remove a project from the app (the repository itself is untouched)',
   input: byId,
@@ -95,6 +97,7 @@ export const setProjectHostingOp = defineOperationContract({
 
 export const clearProjectHostingOp = defineOperationContract({
   id: 'projects.clearHosting',
+  refs: { id: InputRef.Project },
   title: 'op.projects.clearHosting',
   description: 'Unbind the project from its hosting repository and delete the stored token',
   input: byId,
@@ -108,6 +111,7 @@ export const clearProjectHostingOp = defineOperationContract({
 
 export const setProjectDbConnectionsOp = defineOperationContract({
   id: 'projects.setDbConnections',
+  refs: { id: InputRef.Project, connectionIds: InputRef.DbConnection },
   title: 'op.projects.setDbConnections',
   description: "Choose the database connections the project's AI sessions may query read-only",
   input: setProjectDbConnectionsRequestSchema,

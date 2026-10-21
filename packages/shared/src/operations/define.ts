@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { API_PREFIX } from '../constants/app.ts';
-import type { EntityKind, EntityRef } from '../enums/entity.ts';
+import type { EntityKind, EntityRef, InputRef } from '../enums/entity.ts';
 import { type OperationRisk, operationRiskSchema } from '../enums/system.ts';
 import { type UiMode, uiModeSchema } from '../enums/ui.ts';
 
@@ -32,6 +32,11 @@ export type OperationContract<I extends z.ZodObject = z.ZodObject, O extends z.Z
    * its tool schema.
    */
   assistantOmit?: ReadonlyArray<keyof z.input<I> & string>;
+  /**
+   * Input fields that name an object, by what they name: the assistant's confirmation card shows the object's name
+   * under its kind instead of the raw id (15 §4).
+   */
+  refs?: Partial<Record<keyof z.input<I> & string, InputRef>>;
   /** Lowest UI mode that shows the operation. */
   mode: UiMode;
   /**

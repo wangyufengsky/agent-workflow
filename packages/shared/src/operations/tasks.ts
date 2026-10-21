@@ -12,7 +12,7 @@ import {
   taskEventSchema,
   taskSummarySchema,
 } from '../contracts/api/tasks.ts';
-import { EntityKind } from '../enums/entity.ts';
+import { EntityKind, InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -36,6 +36,7 @@ export const listTasksOp = defineOperationContract({
 export const createTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.create',
+  refs: { projectId: InputRef.Project, workflowId: InputRef.Workflow },
   title: 'op.tasks.create',
   description: 'Create a development task in a project with a workflow and start it (unless start is false)',
   input: createTaskRequestSchema,
@@ -72,6 +73,7 @@ export const getTaskTimelineOp = defineOperationContract({
 export const startTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.start',
+  refs: { id: InputRef.Task },
   title: 'op.tasks.start',
   description: 'Start a draft task',
   input: byId,
@@ -83,6 +85,7 @@ export const startTaskOp = defineOperationContract({
 export const retryTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.retry',
+  refs: { id: InputRef.Task },
   title: 'op.tasks.retry',
   description: 'Continue a failed task from the phase it failed in',
   input: byId,
@@ -94,6 +97,7 @@ export const retryTaskOp = defineOperationContract({
 export const cancelTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.cancel',
+  refs: { id: InputRef.Task },
   title: 'op.tasks.cancel',
   description: 'Cancel a task: stop its AI sessions and remove its worktree (and branch unless keepBranch)',
   input: z.object({ id: z.string(), keepBranch: z.boolean().optional() }),
@@ -105,6 +109,7 @@ export const cancelTaskOp = defineOperationContract({
 export const pauseTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.pause',
+  refs: { id: InputRef.Task },
   title: 'op.tasks.pause',
   description: 'Pause a running task: no new steps start, steps already working finish; its plan can then be adjusted',
   input: byId,
@@ -117,6 +122,7 @@ export const pauseTaskOp = defineOperationContract({
 export const resumeTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.resume',
+  refs: { id: InputRef.Task },
   title: 'op.tasks.resume',
   description: 'Resume a paused task; an adjusted plan that was not confirmed is discarded',
   input: byId,
@@ -151,6 +157,7 @@ export const getPlanOp = defineOperationContract({
 export const confirmPlanOp = defineOperationContract({
   ...common,
   id: 'tasks.confirmPlan',
+  refs: { id: InputRef.Task },
   title: 'op.tasks.confirmPlan',
   description:
     'Confirm the plan waiting for review and start running its steps, or (paused task) apply the adjusted plan',
@@ -163,6 +170,7 @@ export const confirmPlanOp = defineOperationContract({
 export const saveDraftPlanOp = defineOperationContract({
   ...common,
   id: 'plans.saveDraft',
+  refs: { id: InputRef.Task },
   title: 'op.plans.saveDraft',
   description:
     'Save a user-edited plan as a new draft version: any change while the plan waits for review; only steps that have not started while the task is paused',
@@ -176,6 +184,7 @@ export const saveDraftPlanOp = defineOperationContract({
 export const replanOp = defineOperationContract({
   ...common,
   id: 'tasks.replan',
+  refs: { id: InputRef.Task },
   title: 'op.tasks.replan',
   description: 'Send feedback on the plan waiting for review; the planner revises it in the same session',
   input: z.object({ id: z.string(), feedback: z.string().trim().min(1) }),
@@ -198,6 +207,7 @@ export const getNodeOp = defineOperationContract({
 export const acceptNodeOp = defineOperationContract({
   ...common,
   id: 'nodes.accept',
+  refs: { id: InputRef.Task, nodeId: InputRef.Node },
   title: 'op.nodes.accept',
   description: 'Accept a step that waits for manual acceptance',
   input: byNode,
@@ -209,6 +219,7 @@ export const acceptNodeOp = defineOperationContract({
 export const rejectNodeOp = defineOperationContract({
   ...common,
   id: 'nodes.reject',
+  refs: { id: InputRef.Task, nodeId: InputRef.Node },
   title: 'op.nodes.reject',
   description: 'Reject a step that waits for manual acceptance; the feedback goes to its next attempt',
   input: z.object({ id: z.string(), nodeId: z.string(), feedback: z.string().trim().min(1) }),
@@ -220,6 +231,7 @@ export const rejectNodeOp = defineOperationContract({
 export const retryNodeOp = defineOperationContract({
   ...common,
   id: 'nodes.retry',
+  refs: { id: InputRef.Task, nodeId: InputRef.Node },
   title: 'op.nodes.retry',
   description: 'Give a failed step a fresh attempt budget, optionally with feedback for its next attempt',
   input: z.object({ id: z.string(), nodeId: z.string(), feedback: z.string().trim().min(1).optional() }),
@@ -232,6 +244,7 @@ export const retryNodeOp = defineOperationContract({
 export const skipNodeOp = defineOperationContract({
   ...common,
   id: 'nodes.skip',
+  refs: { id: InputRef.Task, nodeId: InputRef.Node },
   title: 'op.nodes.skip',
   description: 'Skip a step that has not started or has failed; steps depending on it go on as if it were done',
   input: byNode,
@@ -288,6 +301,7 @@ export const nodeDiffFileOp = defineOperationContract({
 export const deliverTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.deliver',
+  refs: { id: InputRef.Task },
   title: 'op.tasks.deliver',
   description:
     'Deliver a task waiting for review: merge its branch locally (squash / merge / rebase), push it and open a pull request, or (report workflows) finish it',
@@ -300,6 +314,7 @@ export const deliverTaskOp = defineOperationContract({
 export const requestChangesOp = defineOperationContract({
   ...common,
   id: 'tasks.requestChanges',
+  refs: { id: InputRef.Task },
   title: 'op.tasks.requestChanges',
   description:
     'Send a task waiting for review back to the AI: a new step makes the requested changes (reason user) or resolves the merge conflict (reason conflict)',

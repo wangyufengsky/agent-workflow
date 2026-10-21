@@ -10,7 +10,7 @@ import {
   workflowSchema,
   workflowSummarySchema,
 } from '../contracts/api/workflows.ts';
-import { EntityKind } from '../enums/entity.ts';
+import { EntityKind, InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -59,6 +59,7 @@ export const listWorkflowVersionsOp = defineOperationContract({
 
 export const createWorkflowOp = defineOperationContract({
   id: 'workflows.create',
+  refs: { copyFrom: InputRef.Workflow },
   title: 'op.workflows.create',
   description: 'Create a custom workflow, or copy an existing one (built-in workflows can only be changed as copies)',
   input: createWorkflowRequestSchema,
@@ -86,6 +87,7 @@ export const validateWorkflowOp = defineOperationContract({
 
 export const deleteWorkflowOp = defineOperationContract({
   id: 'workflows.delete',
+  refs: { key: InputRef.Workflow },
   title: 'op.workflows.delete',
   description: 'Delete a custom workflow; versions used by tasks are kept for them but no longer listed',
   input: byKey,
@@ -99,6 +101,7 @@ export const deleteWorkflowOp = defineOperationContract({
 
 export const updateWorkflowOp = defineOperationContract({
   id: 'workflows.update',
+  refs: { id: InputRef.Workflow },
   title: 'op.workflows.update',
   description: 'Save a custom workflow as a new version; built-in workflows are read-only',
   input: updateWorkflowRequestSchema,
@@ -125,6 +128,7 @@ export const listRolesOp = defineOperationContract({
 
 export const createRoleOp = defineOperationContract({
   id: 'roles.create',
+  refs: { copyFrom: InputRef.Role },
   title: 'op.roles.create',
   description: 'Create a custom role, or copy an existing one (built-in roles can only be changed as copies)',
   input: createRoleRequestSchema,
@@ -139,6 +143,7 @@ export const createRoleOp = defineOperationContract({
 
 export const deleteRoleOp = defineOperationContract({
   id: 'roles.delete',
+  refs: { id: InputRef.Role },
   title: 'op.roles.delete',
   description: 'Delete a custom role that no workflow and no task step uses',
   input: byId,
@@ -152,6 +157,7 @@ export const deleteRoleOp = defineOperationContract({
 
 export const updateRoleOp = defineOperationContract({
   id: 'roles.update',
+  refs: { id: InputRef.Role },
   title: 'op.roles.update',
   description: "Change a custom role's name, prompt or model; built-in roles are read-only",
   input: updateRoleRequestSchema,
