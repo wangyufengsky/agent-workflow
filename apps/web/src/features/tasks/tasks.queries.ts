@@ -153,15 +153,27 @@ export const nodeDiffFileQuery =
     queryFn: () => callOperation(nodeDiffFileOp, { id: taskId, nodeId, path }),
   });
 
+/**
+ * Refetches a detail after an event about it. A first read still in flight may have been answered before the event
+ * (a refetch would join it and keep its older answer), so it is cancelled and read again.
+ */
+async function refetchAfterEvent(qc: QueryClient, queryKey: readonly unknown[]): Promise<void> {
+  await qc.cancelQueries({ queryKey, exact: true });
+  await qc.invalidateQueries({ queryKey, exact: true });
+}
+
 /** SSE `task.updated`: lists refetch (order and filters may change); a loaded detail takes the summary fields. */
 export async function updateTask(qc: QueryClient, summary: TaskSummaryDTO): Promise<void> {
-  qc.setQueryData<TaskDetailDTO>(queryKeys.task(summary.id), (old) =>
+  const detail = queryKeys.task(summary.id);
+  // Cancelled first: cancelling restores the state from before the read, which would undo the update.
+  await qc.cancelQueries({ queryKey: detail, exact: true });
+  qc.setQueryData<TaskDetailDTO>(detail, (old) =>
     old === undefined ? old : { ...old, ...summary, workflow: old.workflow },
   );
   await Promise.all([
     qc.invalidateQueries({ queryKey: queryKeys.taskLists }),
     // The detail's plan, nodes, items and result change with its state; refetch it in the background.
-    qc.invalidateQueries({ queryKey: queryKeys.task(summary.id), exact: true }),
+    qc.invalidateQueries({ queryKey: detail, exact: true }),
   ]);
 }
 
@@ -170,7 +182,7 @@ export async function updateNode(qc: QueryClient, taskId: string, node: NodeSumm
   qc.setQueryData<TaskDetailDTO>(queryKeys.task(taskId), (old) =>
     old === undefined ? old : { ...old, nodes: old.nodes.map((n) => (n.id === node.id ? node : n)) },
   );
-  await qc.invalidateQueries({ queryKey: queryKeys.node(taskId, node.id) });
+  await refetchAfterEvent(qc, queryKeys.node(taskId, node.id));
 }
 
 function useTaskMutation<I>(run: (input: I) => Promise<TaskDetailDTO>) {
