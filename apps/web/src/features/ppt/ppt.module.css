@@ -212,7 +212,7 @@
 
 .stage {
   display: grid;
-  grid-template-columns: 196px minmax(0, 1fr) 320px;
+  grid-template-columns: 160px minmax(0, 1fr) 300px;
   gap: var(--s-4);
   align-items: start;
 }
@@ -352,7 +352,8 @@
   break-after: page;
 }
 
-.printPage > * {
+/* The page fills the printed page: no card corners or shadow (more specific than slide.module.css's frame). */
+.printPage > div {
   border-radius: 0;
   box-shadow: none;
 }

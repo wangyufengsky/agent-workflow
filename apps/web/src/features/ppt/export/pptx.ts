@@ -43,7 +43,7 @@ function runs(text: string, p: SlidePalette, paragraph: PptxGenJS.TextPropsOptio
 
 function bulletList(items: readonly string[], p: SlidePalette, sizePx: number, gapPx: number): Runs {
   return items.flatMap((item) =>
-    runs(item, p, { bullet: { code: '25CF' }, paraSpaceAfter: pt(gapPx), fontSize: pt(sizePx) }),
+    runs(item, p, { bullet: { code: '25CF', indent: pt(sizePx) }, paraSpaceAfter: pt(gapPx), fontSize: pt(sizePx) }),
   );
 }
 
@@ -91,6 +91,15 @@ function box(slide: Slide, at: { x: number; y: number; w: number; h: number }, p
   });
 }
 
+/**
+ * Height of text in a box `width` pixels wide, for boxes that hug their text like the canvas (slide.module.css):
+ * Chinese text is about one em per character, so a line holds `width / size` of them.
+ */
+function textHeight(text: string, width: number, size: number, lineHeight = 1.4): number {
+  const perLine = Math.max(1, Math.floor(width / size));
+  return Math.ceil(text.replaceAll('**', '').length / perLine) * size * lineHeight;
+}
+
 /** `n` equal columns across the body with `gap` pixels between them. */
 const columns = (n: number, gap: number) =>
   Array.from({ length: n }, (_, i) => {
@@ -113,14 +122,16 @@ function cover(slide: Slide, c: SlideContentOf<'cover'> | SlideContentOf<'sectio
       fill: { color: hex(p.fill) },
     });
   }
+  const titleH = textHeight(c.title, 1056, 68, 1.2);
   text(
     slide,
     runs(c.title, p),
-    { x: 112, y: 270, w: 1056, h: 220 },
+    { x: 112, y: 270, w: 1056, h: titleH },
     { fontSize: pt(68), bold: true, color: hex(p.ink) },
   );
   if (c.subtitle !== undefined) {
-    text(slide, runs(c.subtitle, p), { x: 112, y: 500, w: 1056, h: 100 }, { fontSize: pt(30), color: hex(p.sub) });
+    const at = { x: 112, y: 270 + titleH + 28, w: 1056, h: 100 };
+    text(slide, runs(c.subtitle, p), at, { fontSize: pt(30), color: hex(p.sub) });
   }
 }
 
@@ -149,8 +160,9 @@ function body(slide: Slide, c: SlideContent, p: SlidePalette): void {
         [c.right, right],
       ] as const) {
         if (at === undefined) continue;
-        box(slide, { x: at.x, y: BODY_Y, w: at.w, h: BODY_H }, p);
         const inner = { x: at.x + 36, w: at.w - 72 };
+        const bullets = column.bullets.reduce((h, b) => h + textHeight(b, inner.w - 26, 26) + 16, 0);
+        box(slide, { x: at.x, y: BODY_Y, w: at.w, h: Math.min(BODY_H, 100 + bullets + 32) }, p);
         text(
           slide,
           runs(column.heading, p),
@@ -177,8 +189,12 @@ function body(slide: Slide, c: SlideContent, p: SlidePalette): void {
       columns(c.cards.length, 32).forEach((at, i) => {
         const card = c.cards[i];
         if (card === undefined) return;
-        box(slide, { x: at.x, y: BODY_Y, w: at.w, h: BODY_H }, p);
         const inner = { x: at.x + 36, w: at.w - 72 };
+        box(
+          slide,
+          { x: at.x, y: BODY_Y, w: at.w, h: Math.min(BODY_H, 100 + textHeight(card.body, inner.w, 24) + 32) },
+          p,
+        );
         text(
           slide,
           runs(card.heading, p),
@@ -236,10 +252,11 @@ function body(slide: Slide, c: SlideContent, p: SlidePalette): void {
             valign: 'middle',
           },
         );
+        const labelH = textHeight(step.label, at.w, 28);
         text(
           slide,
           runs(step.label, p),
-          { x: at.x, y: top + 90, w: at.w, h: 80 },
+          { x: at.x, y: top + 90, w: at.w, h: labelH },
           {
             fontSize: pt(28),
             bold: true,
@@ -250,7 +267,7 @@ function body(slide: Slide, c: SlideContent, p: SlidePalette): void {
           text(
             slide,
             runs(step.detail, p),
-            { x: at.x, y: top + 176, w: at.w, h: 140 },
+            { x: at.x, y: top + 90 + labelH + 14, w: at.w, h: 140 },
             {
               fontSize: pt(22),
               color: hex(p.sub),
@@ -305,7 +322,7 @@ function body(slide: Slide, c: SlideContent, p: SlidePalette): void {
     }
     case SlideLayout.Code: {
       title(slide, c.title, p);
-      const h = c.caption === undefined ? BODY_H : BODY_H - 56;
+      const h = Math.min(c.caption === undefined ? BODY_H : BODY_H - 56, c.code.split('\n').length * 33 + 56);
       box(slide, { x: FRAME.x, y: BODY_Y, w: FRAME.w, h }, p, p.codeBg);
       text(
         slide,
@@ -341,12 +358,13 @@ function body(slide: Slide, c: SlideContent, p: SlidePalette): void {
       }
       return;
     }
-    case SlideLayout.Quote:
+    case SlideLayout.Quote: {
       text(slide, '“', { x: 136, y: 110, w: 200, h: 140 }, { fontSize: pt(160), bold: true, color: hex(p.accent) });
+      const quoteH = Math.min(380, textHeight(c.quote, 1008, 50, 1.35));
       text(
         slide,
         runs(c.quote, p),
-        { x: 136, y: 250, w: 1008, h: 280 },
+        { x: 136, y: 250, w: 1008, h: quoteH },
         {
           fontSize: pt(50),
           bold: true,
@@ -357,11 +375,12 @@ function body(slide: Slide, c: SlideContent, p: SlidePalette): void {
         text(
           slide,
           runs(c.attribution, p),
-          { x: 136, y: 560, w: 1008, h: 50 },
+          { x: 136, y: 250 + quoteH + 24, w: 1008, h: 50 },
           { fontSize: pt(26), color: hex(p.sub) },
         );
       }
       return;
+    }
   }
 }
 

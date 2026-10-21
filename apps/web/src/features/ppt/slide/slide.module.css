@@ -60,8 +60,9 @@
   line-height: 1.25;
 }
 
+/* Hugs its content and shrinks (then overflows, 23 §5.4) when the content is taller than the space left. */
 .body {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   overflow: hidden;
   margin: 0;
@@ -141,6 +142,7 @@
 .cards {
   display: grid;
   gap: 32px;
+  align-items: start;
 }
 
 .columns {
@@ -191,6 +193,7 @@
 
 /* 流程 */
 .steps {
+  flex: 1;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
@@ -241,6 +244,7 @@
 
 /* 数字 */
 .stats {
+  flex: 1;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;

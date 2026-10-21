@@ -21,7 +21,7 @@ import { SlideView } from './slide/slide-view.tsx';
 import { useWidth } from './slide/use-width.ts';
 import { SlidePanel } from './slide-panel.tsx';
 
-const THUMB_WIDTH = 168;
+const THUMB_WIDTH = 132;
 
 function Thumb({
   deck,

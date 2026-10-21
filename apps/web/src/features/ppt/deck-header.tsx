@@ -103,7 +103,7 @@ export function DeckHeader({ deck, details }: { deck: DeckDTO; details: boolean 
         </ol>
       </div>
       <div className={styles.toolbar}>
-        <label className="row">
+        <label className="row nowrap">
           <span className="hint">{C.theme}</span>
           <select
             className="select"

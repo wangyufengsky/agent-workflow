@@ -13,6 +13,7 @@ import {
   queueAssistantTurn,
   queueResearchTurn,
   queueTurn,
+  queueWriterTurn,
   submitResult,
 } from './helpers.ts';
 import { fullHeight, inspectPage, type PageReport, WALKTHROUGH_DIR } from './walkthrough.ts';
@@ -43,7 +44,73 @@ type Seed = {
   batch: string;
   /** An assistant conversation that keeps working until the walkthrough ends. */
   assistantBusy: string;
+  /** PPTs (23): one whose outline waits for confirmation, one made with a page in every layout. */
+  deckOutline: string;
+  deckMade: string;
 };
+
+/** One page in each of the ten layouts, the texts near their limits (23 §5.1). */
+const DECK_PAGES = [
+  { layout: 'cover', title: '订单服务退款改造', subtitle: '列表分页与导出 · 第 42 周进展汇报' },
+  { layout: 'section', title: '为什么要改', subtitle: '退款单过了十万条以后，列表与导出都撑不住了' },
+  {
+    layout: 'bullets',
+    title: '列表接口在大数据量下超时',
+    bullets: ['十万条以上时列表接口要 **8 秒**', '导出只能放在凌晨跑，白天经常失败', '客服每周收到二十多次投诉'],
+  },
+  {
+    layout: 'two_column',
+    title: '改造前后对比',
+    left: { heading: '改造前', bullets: ['一次查出全部数据', '导出占满数据库连接'] },
+    right: { heading: '改造后', bullets: ['游标分页，每页 50 条', '导出改成后台任务'] },
+  },
+  {
+    layout: 'cards',
+    title: '三处改动',
+    cards: [
+      { heading: '分页查询', body: '按创建时间与编号做游标，翻页不再扫全表。' },
+      { heading: '后台导出', body: '导出任务排队执行，完成后通知下载。' },
+      { heading: '索引', body: '补了 (status, created_at) 复合索引。' },
+    ],
+  },
+  {
+    layout: 'steps',
+    title: '上线分四步',
+    steps: [
+      { label: '灰度 5%', detail: '观察接口耗时' },
+      { label: '灰度 50%', detail: '观察数据库负载' },
+      { label: '全量', detail: '关闭旧接口' },
+      { label: '复盘', detail: '一周后回顾' },
+    ],
+  },
+  {
+    layout: 'stats',
+    title: '改完以后',
+    stats: [
+      { value: '200 ms', label: '列表接口 P95' },
+      { value: '0', label: '本周导出失败' },
+      { value: '-92%', label: '数据库 CPU 峰值' },
+    ],
+  },
+  {
+    layout: 'table',
+    title: '接口耗时',
+    columns: ['数据量', '改造前', '改造后'],
+    rows: [
+      ['1 万条', '0.9 秒', '0.12 秒'],
+      ['10 万条', '8.1 秒', '0.18 秒'],
+      ['50 万条', '超时', '0.21 秒'],
+    ],
+  },
+  {
+    layout: 'code',
+    title: '游标分页的查询',
+    language: 'sql',
+    code: 'SELECT * FROM refunds\nWHERE (created_at, id) < (?, ?)\nORDER BY created_at DESC, id DESC\nLIMIT 50;',
+    caption: '用上一页最后一条的 created_at 与 id 作为游标',
+  },
+  { layout: 'quote', quote: '**可以全量上线**，导出任务下周迁到独立队列。', attribution: '评审结论' },
+];
 
 async function api<T>(request: APIRequestContext, method: 'GET' | 'POST', path: string, data?: object): Promise<T> {
   const res = await request.fetch(`${API_BASE}${path}`, { method, headers: AUTH, ...(data && { data }) });
@@ -299,6 +366,49 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     .toEqual(['running', 'review']);
   const assistantBusy = await seedAssistant(request, reviewProject, { id: knowledge.id, turnId: knowledgeTurn.id });
 
+  const pptProject = await createProject(request, null);
+  type Deck = { id: string; status: string };
+  const outline = (pages: Array<Record<string, unknown>>) => ({
+    type: 'callTool' as const,
+    name: 'submit_outline',
+    args: {
+      title: '订单服务退款改造',
+      understanding: { audience: '团队同事与产品经理', duration: '约 15 分钟', assumptions: ['听众了解订单服务'] },
+      slides: pages.map((p) => ({
+        layout: p.layout,
+        title: typeof p.title === 'string' ? p.title : '结论',
+        points: ['说明这一页要讲的事'],
+      })),
+    },
+  });
+  const deckReaches = (id: string, status: string) =>
+    expect.poll(async () => (await api<Deck>(request, 'GET', `/decks/${id}`)).status).toBe(status);
+  await queueWriterTurn(request, pptProject, [outline(DECK_PAGES)]);
+  const deckOutline = await api<Deck>(request, 'POST', '/decks', {
+    brief: '向团队汇报退款改造',
+    projectId: pptProject.id,
+  });
+  await deckReaches(deckOutline.id, 'outline_ready');
+  await queueWriterTurn(request, pptProject, [outline(DECK_PAGES)]);
+  // Dark pages: in the light app themes the workspace shows a PPT in another theme than its own.
+  const deckMade = await api<Deck>(request, 'POST', '/decks', {
+    brief: '退款改造评审',
+    projectId: pptProject.id,
+    theme: 'deepseek',
+  });
+  await deckReaches(deckMade.id, 'outline_ready');
+  await queueWriterTurn(
+    request,
+    pptProject,
+    DECK_PAGES.map((content, i) => ({
+      type: 'callTool' as const,
+      name: 'submit_slide',
+      args: { page: i + 1, content, notes: '这一页的讲稿' },
+    })),
+  );
+  await api(request, 'POST', `/decks/${deckMade.id}/generate`, {});
+  await deckReaches(deckMade.id, 'ready');
+
   const completedReview = await waitForStatus(request, completed, 'review');
   await api(request, 'POST', `/tasks/${completedReview.id}/deliver`, { strategy: 'squash' });
   return {
@@ -315,6 +425,8 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     knowledgeDraft: draft.id,
     batch: batch.id,
     assistantBusy,
+    deckOutline: deckOutline.id,
+    deckMade: deckMade.id,
   };
 }
 
@@ -326,6 +438,8 @@ type Shot = {
   ready: (page: Page) => Locator;
   /** Opens a dialog, drawer or editor before the screenshot. */
   open?: (page: Page) => Promise<Locator>;
+  /** The document itself scrolls (a page outside the shell): the screenshot takes all of it. */
+  fullPage?: boolean;
 };
 
 const node = (task: Task, key: string) => {
@@ -483,6 +597,23 @@ const SHOTS: Shot[] = [
     ready: testId('knowledge-history-row'),
   },
   { name: 'insights', mode: UiMode.Simple, url: () => '/insights', ready: testId('insights-simple') },
+  { name: 'ppt', mode: UiMode.Simple, url: () => '/ppt', ready: testId('deck-card') },
+  {
+    name: 'ppt-new',
+    mode: UiMode.Simple,
+    url: (s) => `/ppt/new?projectId=${s.project.id}`,
+    ready: heading('做一份 PPT'),
+  },
+  { name: 'ppt-outline', mode: UiMode.Simple, url: (s) => `/ppt/${s.deckOutline}`, ready: testId('outline-page') },
+  { name: 'ppt-preview', mode: UiMode.Simple, url: (s) => `/ppt/${s.deckMade}`, ready: testId('slide-thumb') },
+  // Every layout at full size in the theme: the walkthrough checks the pages' own contrast too.
+  {
+    name: 'ppt-pages',
+    mode: UiMode.Simple,
+    url: (s) => `/ppt/${s.deckMade}/print`,
+    ready: testId('slide-canvas'),
+    fullPage: true,
+  },
   {
     name: 'batch-new',
     mode: UiMode.Simple,
@@ -654,7 +785,11 @@ test.describe('J9 走查：两种模式下全部页面无报错、无对比度�
         reports[shot.name] = await inspectPage(page);
 
         await fullHeight(page, WIDTH, HEIGHT);
-        await page.screenshot({ path: join(dir, `${shot.name}.png`), animations: 'disabled' });
+        await page.screenshot({
+          path: join(dir, `${shot.name}.png`),
+          animations: 'disabled',
+          fullPage: shot.fullPage === true,
+        });
       }
       writeFileSync(join(dir, 'report.json'), `${JSON.stringify(reports, null, 2)}\n`);
       const problems = Object.entries(reports)
