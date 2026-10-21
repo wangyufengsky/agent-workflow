@@ -37,7 +37,7 @@ test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开�
 
   await startTask(page, project, /新功能开发/, '新增问候函数\n返回中文问候语。');
   const result = page.getByTestId('result-card');
-  await expect(result).toContainText('检查全部通过');
+  await expect(result).toContainText('检查全部通过', { timeout: TASK_RUN_TIMEOUT_MS });
   await expect(result).toContainText('改动 1 个文件 +1 −0');
   await expect(result).toContainText('greet.ts');
   await expect(page.getByTestId('task-page').getByText('待合并', { exact: true }).first()).toBeVisible();
@@ -65,7 +65,7 @@ test('J2 AI 阻塞提问 → 在需要你处理中作答 → 节点继续 → �
   await question.getByRole('button', { name: '提交' }).click();
   await page.keyboard.press('Escape');
 
-  await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤');
+  await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
 });
 
 test('J3 权限请求 → 允许一次 → 继续', async ({ page, request }) => {
@@ -81,7 +81,7 @@ test('J3 权限请求 → 允许一次 → 继续', async ({ page, request }) =>
   const permission = page.getByTestId('inbox-permission');
   await expect(permission).toContainText('rm -rf dist');
   await permission.getByRole('button', { name: '允许一次' }).click();
-  await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤');
+  await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
 });
 
 test('J4 检查失败 → 自动重试成功；另一步骤预算耗尽 → 任务失败 → 用户重试 → 完成', async ({ page, request }) => {

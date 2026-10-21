@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createProject, passReview, patchSettings, queueTurn, submitResult } from './helpers.ts';
+import { createProject, passReview, patchSettings, queueTurn, submitResult, TASK_RUN_TIMEOUT_MS } from './helpers.ts';
 
 // J8 (07 §5): a copied built-in workflow, changed and used for a task; AI sessions are played by FakeOpencode.
 
@@ -37,7 +37,7 @@ test('J8 专业模式：复制内置流程 → 修改 → 用它跑通一个任�
   await page.getByLabel('需求').fill('订单金额四舍五入错误');
   await page.getByRole('button', { name: /^开始/ }).click();
   const result = page.getByTestId('result-card');
-  await expect(result).toContainText('已完成 2 个步骤');
+  await expect(result).toContainText('已完成 2 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
   await expect(result).toContainText('fix.txt');
   await expect(page.getByTestId('task-page')).toContainText('我的修 Bug');
 });

@@ -6,9 +6,10 @@ import { type APIRequestContext, expect, type Page } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 
 /**
- * Waits that span a whole task run (planning, several steps with checks and commits). Measured in CI (17 §4.1): J4
- * from start to failure takes 0.2 s on macOS, 0.8 s on Ubuntu and 3.6 s on the Windows runner, where every git and
- * shell process start costs ~100 ms or more; the default 5 s is too tight there only.
+ * Waits that span a whole task run (worktree, steps with checks and commits, review) until its result card. Measured
+ * in CI (17 §4.1): J4 from start to failure takes 0.2 s on macOS, 0.8 s on Ubuntu and 3.6 s on the Windows runner,
+ * where every git and shell process start costs ~100 ms or more; J7 / J5 runs crossed 5 s there. Only Windows waits
+ * longer.
  */
 export const TASK_RUN_TIMEOUT_MS = process.platform === 'win32' ? 20_000 : 5_000;
 

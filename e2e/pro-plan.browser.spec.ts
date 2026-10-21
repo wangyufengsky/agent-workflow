@@ -1,5 +1,13 @@
 import { expect, type Page, test } from '@playwright/test';
-import { createProject, type E2EProject, passReview, patchSettings, queueTurn, submitResult } from './helpers.ts';
+import {
+  createProject,
+  type E2EProject,
+  passReview,
+  patchSettings,
+  queueTurn,
+  submitResult,
+  TASK_RUN_TIMEOUT_MS,
+} from './helpers.ts';
 
 // J7 (07 §5) and the step-operation smoke test of M5-03, in pro mode; AI sessions are played by FakeOpencode.
 
@@ -47,7 +55,7 @@ test('J7 专业模式：开启确认计划 → 编辑计划（加节点、连线
   await expect(page.getByText('AI 的计划 · 第 2 版')).toBeVisible();
   await page.getByRole('button', { name: '确认并开始' }).click();
   const result = page.getByTestId('result-card');
-  await expect(result).toContainText('已完成 3 个步骤');
+  await expect(result).toContainText('已完成 3 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
   await expect(result).toContainText('CHANGELOG.md');
 });
 
@@ -70,5 +78,5 @@ test('步骤操作冒烟：暂停 → 跳过步骤 → 中止会话 → 继续�
 
   await queueTurn(request, project, { title: '定位根因' }, [submitResult('重新定位到了根因')]);
   await page.getByRole('button', { name: '继续执行' }).click();
-  await expect(page.getByTestId('result-card')).toBeVisible();
+  await expect(page.getByTestId('result-card')).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
 });

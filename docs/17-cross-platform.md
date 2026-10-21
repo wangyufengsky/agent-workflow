@@ -190,7 +190,7 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 | J4 从开始到任务失败 | 0.2 s | 0.8 s | 3.6 s |
 | J6 / 三任务并发合并 整个用例 | 2.8 / 3.0 s | 7.9 / 10.2 s | 17.6 / 20.2 s |
 
-慢集中在启动进程上（每次 git 与 Git Bash 约 100 ms 以上，一个节点的提交要十几次 git 调用）。排查过的 Windows 特有原因：Defender 实时扫描在 runner 上本来就是关闭的（`RealTimeProtectionEnabled : False`，曾临时加的排除步骤已去掉）；`core.fsmonitor` / `core.preloadindex` 影响 `status` 的文件扫描，对这些只有几个文件的测试仓库没有可省的；进程启动开销是平台本身的成本。处理：集成测试的 `testTimeout` 与 `waitForEvent` 默认等待按最慢的 Windows 留余量；E2E 只对跨整个任务运行的断言（J4）在 Windows 上放宽到 20 s（`e2e/helpers.ts` 的 `TASK_RUN_TIMEOUT_MS`），其余断言保持 5 s。
+慢集中在启动进程上（每次 git 与 Git Bash 约 100 ms 以上，一个节点的提交要十几次 git 调用）。排查过的 Windows 特有原因：Defender 实时扫描在 runner 上本来就是关闭的（`RealTimeProtectionEnabled : False`，曾临时加的排除步骤已去掉）；`core.fsmonitor` / `core.preloadindex` 影响 `status` 的文件扫描，对这些只有几个文件的测试仓库没有可省的；进程启动开销是平台本身的成本。处理：集成测试的 `testTimeout` 与 `waitForEvent` 默认等待按最慢的 Windows 留余量；E2E 只对等待整个任务运行结束的断言（结果卡出现：J1–J8、J4 的失败面板）在 Windows 上放宽到 20 s（`e2e/helpers.ts` 的 `TASK_RUN_TIMEOUT_MS`），其余断言保持 5 s。
 
 ### 4.2 测试代码中的平台差异
 

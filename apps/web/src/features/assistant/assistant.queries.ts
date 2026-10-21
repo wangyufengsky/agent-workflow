@@ -43,13 +43,20 @@ export const conversationTranscript = (id: string): TranscriptSource => ({
   url: `${API_PREFIX}/assistant/conversations/${encodeURIComponent(id)}/transcript`,
 });
 
-/** SSE and mutations: a conversation's new state replaces it in the list, newest first. */
-export function updateConversation(qc: QueryClient, conversation: AssistantConversationDTO): void {
-  qc.setQueryData<AssistantConversationDTO[]>(queryKeys.assistantConversations, (old) =>
+/**
+ * SSE and mutations: a conversation's new state replaces it in the list, newest first. As with confirmations, a read
+ * in flight is cancelled and repeated: answered before the change, it would bring back a conversation that is still
+ * `busy` and the panel would keep waiting.
+ */
+export async function updateConversation(qc: QueryClient, conversation: AssistantConversationDTO): Promise<void> {
+  const key = queryKeys.assistantConversations;
+  await qc.cancelQueries({ queryKey: key, exact: true });
+  qc.setQueryData<AssistantConversationDTO[]>(key, (old) =>
     old === undefined
       ? old
       : [conversation, ...old.filter((c) => c.id !== conversation.id)].sort((a, b) => b.updatedAt - a.updatedAt),
   );
+  await qc.invalidateQueries({ queryKey: key, exact: true });
 }
 
 /**

@@ -11,6 +11,7 @@ import {
   queueTurn,
   startTask,
   submitResult,
+  TASK_RUN_TIMEOUT_MS,
 } from './helpers.ts';
 
 // Journeys J5 and J6 (07 §5): delivery from the result card, with FakeOpencode playing the AI sessions.
@@ -34,7 +35,9 @@ async function fixInReview(
   ]);
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
   await startTask(page, project, /修 Bug/, requirement);
-  await expect(page.getByTestId('result-card').getByRole('button', { name: '合并到 main' })).toBeVisible();
+  await expect(page.getByTestId('result-card').getByRole('button', { name: '合并到 main' })).toBeVisible({
+    timeout: TASK_RUN_TIMEOUT_MS,
+  });
   return page.url();
 }
 
@@ -89,7 +92,7 @@ test('J6 两个任务改同一文件 → 第二个合并冲突 → 交给 AI 解
     submitResult('保留了两边的改动'),
   ]);
   await result.getByRole('button', { name: '交给 AI 解决冲突' }).click();
-  await expect(result.getByRole('button', { name: '合并到 main' })).toBeVisible();
+  await expect(result.getByRole('button', { name: '合并到 main' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
   await expect(result).not.toContainText('时有冲突');
   await result.getByRole('button', { name: '合并到 main' }).click();
   await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main');
