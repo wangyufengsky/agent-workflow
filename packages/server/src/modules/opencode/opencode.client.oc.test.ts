@@ -29,6 +29,11 @@ describe('@opencode 客户端与配置注入', () => {
       permission: { edit: 'allow', question: 'deny', external_directory: 'deny' },
     });
     expect(data.plugin).toEqual(expect.arrayContaining([expect.stringMatching(/agent-workflow-bridge\.js$/)]));
+    // The knowledge researcher only reads (18 §5.1).
+    expect(data.agent?.[OPENCODE_AGENT_NAME.researcher]).toMatchObject({
+      mode: 'primary',
+      permission: { edit: 'deny', question: 'deny', webfetch: 'deny', websearch: 'deny', task: 'deny' },
+    });
   });
 
   it('助手的 agent 与助手 MCP 也已注入，两套 MCP 都已连接（A-03）', async () => {
