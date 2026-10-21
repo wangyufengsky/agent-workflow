@@ -109,6 +109,17 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     expect(body).toMatchObject({ items: [{ id: project.id, name: project.name }] });
   });
 
+  it('「这周花了多少」：insights_summary 是 read，直接返回本周的用量（19 §4）', async () => {
+    const { isError, body } = await call('insights_summary', { period: 'week' });
+    expect(isError).toBe(false);
+    // The fake clock is Friday 2025-10-10 in Shanghai: the week started on Monday.
+    expect(body).toMatchObject({
+      period: { period: 'week', from: '2025-10-06', to: '2025-10-10', timeZone: 'Asia/Shanghai' },
+      usage: { attempts: 0, cost: 0, unpricedTokens: 0 },
+      attention: { interruptions: 0 },
+    });
+  });
+
   it('write：返回 needs_confirmation；确认后操作生效，结果作为下一条消息发回同一会话', async () => {
     const { project } = await addProject(t);
     const { body } = await call('projects_update', { id: project.id, name: '订单服务' });
