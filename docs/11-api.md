@@ -282,8 +282,8 @@ type AttemptDTO = AttemptSummaryDTO & {
 | --- | --- | --- | --- | --- |
 | GET | `/knowledge/conversations?projectId&query&limit&cursor` | `knowledge.list` | read | `{ items: KnowledgeConversationSummaryDTO[], nextCursor }`，按 `updated_at` 倒序；`query` 匹配问题与回答 |
 | GET | `/knowledge/conversations/:id` | `knowledge.get` | read | `KnowledgeConversationDTO`（全部轮次、状态、回答、引用、`awaitingInput`） |
-| POST | `/knowledge/conversations` | `knowledge.ask` | write | `{ projectId, question, sources }` → 201 详情；opencode 未就绪 503；项目无关联数据库却勾选数据库 400 |
-| POST | `/knowledge/conversations/:id/turns` | `knowledge.followUp` | write | `{ question }`；上一轮研究中 409 `KNOWLEDGE_CONVERSATION_BUSY` |
+| POST | `/knowledge/conversations` | `knowledge.ask` | read | `{ projectId, question, sources }` → 201 详情；opencode 未就绪 503；项目无关联数据库却勾选数据库 400 |
+| POST | `/knowledge/conversations/:id/turns` | `knowledge.followUp` | read | `{ question }`；上一轮研究中 409 `KNOWLEDGE_CONVERSATION_BUSY` |
 | POST | `/knowledge/conversations/:id/stop` | `knowledge.stop` | write | 中止研究中的一轮；已结束 409 `STATE_TRANSITION_INVALID` |
 | DELETE | `/knowledge/conversations/:id` | `knowledge.delete` | critical | 204；研究中 409 |
 | GET | `/knowledge/turns/:turnId/citations/:index` | `knowledge.citation` | read | `CitationSourceDTO`（18 §6.3）；404 `KNOWLEDGE_CITATION_NOT_FOUND` / `KNOWLEDGE_SOURCE_UNAVAILABLE` |

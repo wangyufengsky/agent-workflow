@@ -318,6 +318,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     tasks: tasks.service,
     projects: projects.service,
     workflows: workflows.service,
+    knowledge: knowledge.service,
     dataDir: config.dataDir,
     timeZone: deps.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     token: assistantMcpToken,

@@ -47,6 +47,11 @@ export type OperationToolDeps = {
   settings: SettingsService;
   /** Records the object an operation produced in the conversation (D66). */
   recordProduced(conversationId: string, contract: OperationContract, output: unknown): void;
+  /**
+   * Operations whose outcome arrives later as a message (a knowledge question, 18 §4a): what the tool returns
+   * instead of the output; their navigation card comes with that message.
+   */
+  deferred: ReadonlyMap<string, (conversationId: string, output: unknown) => unknown>;
   /** Records a pending confirmation for a call the user has to approve. */
   requestConfirmation(
     conversationId: string,
@@ -77,6 +82,8 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
           if (allowed) {
             // A failing operation answers with its error code, like any tool (12 §5).
             const output = await impl.run(input);
+            const deferred = deps.deferred.get(contract.id);
+            if (deferred !== undefined) return deferred(conversation.id, output);
             deps.recordProduced(conversation.id, contract, output);
             return output;
           }

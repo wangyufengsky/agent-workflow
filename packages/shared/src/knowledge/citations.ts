@@ -43,3 +43,12 @@ export function classifySource(path: string): typeof KnowledgeSourceKind.Code | 
   const isDocFile = KNOWLEDGE_DOC_EXTENSIONS.some((ext) => name.endsWith(ext));
   return inDocDir || isDocFile ? KnowledgeSourceKind.Docs : KnowledgeSourceKind.Code;
 }
+
+/**
+ * In-app address of a knowledge conversation, or of one citation's source in it (the renderer's route
+ * `/knowledge/$conversationId` with `?turn=&cite=`, 14 §1). The assistant's messages link there (18 §4a).
+ */
+export function knowledgeLink(conversationId: string, citation?: { turnId: string; index: number }): string {
+  const path = `/knowledge/${encodeURIComponent(conversationId)}`;
+  return citation === undefined ? path : `${path}?turn=${encodeURIComponent(citation.turnId)}&cite=${citation.index}`;
+}

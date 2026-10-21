@@ -7,6 +7,7 @@ import {
   knowledgeConversationSummarySchema,
   listKnowledgeQuerySchema,
 } from '../contracts/api/knowledge.ts';
+import { EntityKind } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -41,11 +42,12 @@ export const askKnowledgeOp = defineOperationContract({
   ...common,
   id: 'knowledge.ask',
   title: 'op.knowledge.ask',
-  description:
-    'Ask a question about a project; a read-only researcher answers with citations. Read the answer with knowledge.get',
+  description: 'Ask a question about a project; a read-only researcher answers with citations',
   input: askKnowledgeRequestSchema,
   output: knowledgeConversationSchema,
-  risk: OperationRisk.Write,
+  // Only reads the project; the assistant runs it without a confirmation and gets the answer later (D74, 18 §4a).
+  risk: OperationRisk.Read,
+  produces: { kind: EntityKind.KnowledgeConversation, ref: (c) => ({ id: c.id, title: c.title }) },
   http: { method: 'POST', path: '/knowledge/conversations', status: 201 },
 });
 
@@ -56,7 +58,8 @@ export const followUpKnowledgeOp = defineOperationContract({
   description: 'Ask a follow-up question in a knowledge conversation once its previous question is finished',
   input: followUpKnowledgeRequestSchema,
   output: knowledgeConversationSchema,
-  risk: OperationRisk.Write,
+  risk: OperationRisk.Read,
+  produces: { kind: EntityKind.KnowledgeConversation, ref: (c) => ({ id: c.id, title: c.title }) },
   http: { method: 'POST', path: '/knowledge/conversations/:id/turns' },
 });
 

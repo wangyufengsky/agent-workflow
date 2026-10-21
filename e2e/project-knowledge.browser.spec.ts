@@ -1,7 +1,15 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { createProject, type FakeStep, patchSettings, queueResearchTurn } from './helpers.ts';
+import { API_BASE, AUTH } from './env.ts';
+import {
+  appTool,
+  createProject,
+  type FakeStep,
+  patchSettings,
+  queueAssistantTurn,
+  queueResearchTurn,
+} from './helpers.ts';
 
 // J12 (K-09): a question about a project, its research, an answer with citations, the cited source, a follow-up and
 // the history. The researcher's turns are played by FakeOpencode in the project repository. The file name sorts after
@@ -88,4 +96,67 @@ test('J12 提问 → 研究过程 → 带引用的回答 → 点击引用看原�
   await expect(row).toContainText('1 处引用');
   await row.click();
   await expect(page.getByTestId('knowledge-turn')).toHaveCount(2);
+});
+
+test('J13 对助手提问 → 正在查资料 → 带引用的回答 → 点引用看原文 → 卡片打开知识问答对话', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  mkdirSync(join(project.repoPath, 'src'));
+  writeFileSync(join(project.repoPath, 'src/refund.ts'), REFUND);
+  await queueAssistantTurn(request, [
+    appTool('knowledge_ask', {
+      projectId: project.id,
+      question: '退款在哪里四舍五入？',
+      sources: { code: true, docs: true, database: false, web: false },
+    }),
+    { type: 'text', text: '我去查一下资料，稍等。' },
+  ]);
+  // The researcher waits for a permission until the assistant's next turn is queued: that turn needs the ids.
+  await queueResearchTurn(request, project, [
+    { type: 'tool', tool: 'read', input: { filePath: join(project.repoPath, 'src/refund.ts') } },
+    { type: 'permission', permission: 'bash', patterns: ['ls src'] },
+    answer('退款在 `refund()` 中四舍五入到分 [1]。', [file('src/refund.ts', 3, 3)]),
+  ]);
+
+  await page.goto(`/?projectId=${project.id}`);
+  await page.keyboard.press('ControlOrMeta+j');
+  const panel = page.getByRole('complementary', { name: '应用助手' });
+  await panel.getByLabel('发给助手的消息').fill('退款在哪里四舍五入？');
+  await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
+  await expect(panel).toContainText('我去查一下资料，稍等。');
+
+  const list = await (
+    await request.get(`${API_BASE}/knowledge/conversations?projectId=${project.id}`, { headers: AUTH })
+  ).json();
+  const id: string = list.items[0].id;
+  const detail = await (await request.get(`${API_BASE}/knowledge/conversations/${id}`, { headers: AUTH })).json();
+  const turnId: string = detail.turns[0].id;
+  await queueAssistantTurn(request, [
+    {
+      type: 'text',
+      text: `退款在 \`refund()\` 中四舍五入到分 [[1]](/knowledge/${id}?turn=${turnId}&cite=1)。[在知识问答中查看](/knowledge/${id})`,
+    },
+  ]);
+  const inbox = await (await request.get(`${API_BASE}/inbox?status=open`, { headers: AUTH })).json();
+  const permission = inbox.items.find(
+    (item: { kind: string; payload: { patterns?: string[] } }) =>
+      item.kind === 'permission' && item.payload.patterns?.includes('ls src'),
+  );
+  const resolved = await request.post(`${API_BASE}/inbox/${permission.id}/resolve`, {
+    headers: AUTH,
+    data: { response: { decision: 'once' } },
+  });
+  expect(resolved.ok()).toBe(true);
+
+  const card = panel.getByTestId('entity-card');
+  await expect(card).toContainText('知识问答对话');
+  await expect(card).toContainText('退款在哪里四舍五入？');
+  await expect(panel).toContainText('退款在 refund() 中四舍五入到分');
+  await panel.getByRole('link', { name: '[1]' }).click();
+  const source = page.getByRole('complementary', { name: '引用原文' });
+  await expect(source.getByTestId('citation-lines').locator('[data-cited="true"]')).toContainText('Math.round');
+  await expect(panel).toBeVisible();
+
+  await card.getByRole('button', { name: '打开' }).click();
+  await expect(page).toHaveURL(new RegExp(`/knowledge/${id}$`));
+  await expect(page.getByTestId('knowledge-turn')).toContainText('退款在 refund() 中四舍五入到分');
 });

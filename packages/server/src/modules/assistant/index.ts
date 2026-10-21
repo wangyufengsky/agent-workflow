@@ -3,12 +3,14 @@ import { type GetAppStatusOutput, MCP_ASSISTANT_PATH, MCP_ASSISTANT_SERVER_NAME 
 import type { FastifyInstance } from 'fastify';
 import { registerMcpEndpoint } from '../../core/http/mcp-endpoint.ts';
 import type { OperationImpl } from '../../core/operations/operations.ts';
+import type { KnowledgeService } from '../knowledge/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import type { WorkflowsService } from '../workflows/index.ts';
 import { createConfirmations } from './assistant.confirmations.ts';
 import { createContextRenderer } from './assistant.context.ts';
 import { helperTools } from './assistant.helpers.ts';
+import { createKnowledgeRelay, KNOWLEDGE_QUESTION_OPS } from './assistant.knowledge.ts';
 import { assistantOperations } from './assistant.operations.ts';
 import { registerAssistantRoutes } from './assistant.routes.ts';
 import { type AssistantServiceDeps, createAssistantService } from './assistant.service.ts';
@@ -23,6 +25,7 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context'> & {
   tasks: TasksService;
   projects: ProjectsService;
   workflows: WorkflowsService;
+  knowledge: KnowledgeService;
   /** Every other operation of the app; the assistant's tools are generated from them (15 §3). */
   operations: readonly OperationImpl[];
   appStatus(): Promise<GetAppStatusOutput>;
@@ -37,12 +40,14 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     conversations,
     operations: new Map(deps.operations.map((impl) => [impl.contract.id, impl])),
   });
+  const relay = createKnowledgeRelay({ ...deps, conversations });
   const registry = createAssistantToolRegistry(
     [
       ...operationTools(deps.operations, {
         settings: deps.settings,
         requestConfirmation: confirmations.request,
         recordProduced: conversations.recordProduced,
+        deferred: new Map(KNOWLEDGE_QUESTION_OPS.map((id) => [id, relay.researching])),
       }),
       ...helperTools({ ...deps, conversations }),
     ],

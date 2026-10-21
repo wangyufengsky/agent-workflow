@@ -9,6 +9,7 @@ import {
   type TaskDetailDTO,
   UiMode,
 } from '@aw/shared';
+import type { KnowledgeService } from '../knowledge/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import type { WorkflowsService } from '../workflows/index.ts';
@@ -56,6 +57,8 @@ const STATIC_PAGES: Partial<Record<AssistantPage, string>> = {
   [AssistantPage.Databases]: 'the database connections page',
   [AssistantPage.Tools]: 'the MCP tools page',
   [AssistantPage.Runtime]: 'the runtime page',
+  [AssistantPage.Knowledge]: 'the knowledge Q&A page (ask a question about a project)',
+  [AssistantPage.KnowledgeHistory]: 'the knowledge Q&A history',
 };
 
 function param(ref: AssistantPageRef, name: AssistantPageParam): string {
@@ -70,10 +73,11 @@ export type ContextDeps = {
   tasks: TasksService;
   projects: ProjectsService;
   workflows: WorkflowsService;
+  knowledge: KnowledgeService;
 };
 
 /** What the model is told with every message (15 §2): time, interface mode, and the page the user is on. */
-export function createContextRenderer({ prompts, tasks, projects, workflows }: ContextDeps) {
+export function createContextRenderer({ prompts, tasks, projects, workflows, knowledge }: ContextDeps) {
   /** The ids of the page come from the renderer: a missing entity is a NOT_FOUND like any other input. */
   function describeTask(task: TaskDetailDTO, nodeId: string | undefined, prefix: string): string {
     const base = `${prefix} of task ${task.key} "${task.title}" (task id ${task.id}, status ${task.status}, project "${task.project.name}", project id ${task.project.id})`;
@@ -105,6 +109,10 @@ export function createContextRenderer({ prompts, tasks, projects, workflows }: C
         if (workflow === undefined)
           throw new AppError(ErrorCode.WorkflowNotFound, `Workflow ${key} not found`, { key });
         return `the editor of workflow "${workflow.name}" (key ${workflow.key}, id ${workflow.id})`;
+      }
+      case AssistantPage.KnowledgeConversation: {
+        const conversation = knowledge.get(param(ref, 'knowledgeConversationId'));
+        return `the knowledge Q&A conversation "${conversation.title}" (knowledge conversation id ${conversation.id}, project "${conversation.project.name}", ${conversation.turns.length} questions)`;
       }
       default:
         throw new Error(`Page ${page} has no description`);

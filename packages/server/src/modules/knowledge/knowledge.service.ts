@@ -50,6 +50,8 @@ export type KnowledgeServiceDeps = {
   prompts: Prompts;
 };
 
+export type TurnEnded = { conversationId: string; turnId: string };
+
 /** Prefix of the opencode session titles of knowledge conversations (the titles show only in opencode). */
 const SESSION_TITLE_PREFIX = 'Q&A';
 
@@ -247,16 +249,25 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
     return projectId;
   }
 
+  const turnEndedListeners = new Set<(ended: TurnEnded) => void>();
+
   // Each end of a turn, and a permission request waiting or answered, changes what the conversation shows.
   attempts.onSignal(({ type, attempt }) => {
     if (attempt.kind !== AttemptKind.Research) return;
-    const { conversation } = turnOf(attempt);
-    if (type === 'ended') repo.touchConversation(conversation.id, clock.now());
+    const { turn, conversation } = turnOf(attempt);
     publish(conversation.id);
+    if (type !== 'ended') return;
+    repo.touchConversation(conversation.id, clock.now());
+    for (const listener of turnEndedListeners) listener({ conversationId: conversation.id, turnId: turn.id });
   });
 
   return {
     get: detail,
+
+    /** Each turn that ended, in any way (answered, stopped, failed); the app assistant relays the outcome (18 §4a). */
+    onTurnEnded(listener: (ended: TurnEnded) => void): void {
+      turnEndedListeners.add(listener);
+    },
 
     /** A page of conversations, most recently updated first (18 §4). */
     list({ projectId, query, limit, cursor }: ListKnowledgeQuery): {

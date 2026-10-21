@@ -114,8 +114,8 @@
 | --- | --- | --- | --- |
 | `knowledge.list` | `GET /knowledge/conversations?projectId&query&limit&cursor` | read | 对话列表（`KnowledgeConversationSummaryDTO`），按 `updated_at` 倒序，游标分页；`query` 匹配问题与回答 |
 | `knowledge.get` | `GET /knowledge/conversations/:id` | read | 对话详情：项目、范围、全部轮次（`KnowledgeTurnDTO`） |
-| `knowledge.ask` | `POST /knowledge/conversations` `{ projectId, question, sources }` | write | 新建对话并开始第一轮，返回详情（201） |
-| `knowledge.followUp` | `POST /knowledge/conversations/:id/turns` `{ question }` | write | 续问：同一会话的新一轮；上一轮还在研究 → `KNOWLEDGE_CONVERSATION_BUSY` |
+| `knowledge.ask` | `POST /knowledge/conversations` `{ projectId, question, sources }` | read | 新建对话并开始第一轮，返回详情（201） |
+| `knowledge.followUp` | `POST /knowledge/conversations/:id/turns` `{ question }` | read | 续问：同一会话的新一轮；上一轮还在研究 → `KNOWLEDGE_CONVERSATION_BUSY` |
 | `knowledge.stop` | `POST /knowledge/conversations/:id/stop` | write | 中止研究中的一轮（尝试 `aborted`）；没有研究中的一轮 → `STATE_TRANSITION_INVALID` |
 | `knowledge.delete` | `DELETE /knowledge/conversations/:id` | critical | 删除对话（§3） |
 | `knowledge.citation` | `GET /knowledge/turns/:turnId/citations/:index` | read | 一处引用的原文（§6.3）；`index` 从 1 起 |
@@ -151,6 +151,17 @@ type KnowledgeConversationSummaryDTO = {
 - 发起时 opencode 未就绪 → `OPENCODE_NOT_READY`（503），什么都不写。
 - 项目没有关联数据库却勾选了 `database` → `VALIDATION_FAILED`（`details.issues` 指向 `sources.database`）。
 - SSE：`knowledge.updated { conversationId }`（新一轮、提交答案、尝试结束、删除时发出），界面据此刷新对话与列表；研究过程的实时片段沿用 `attempt.transcript` 与 `attempt.updated`。
+
+### 4a. 应用助手调用知识问答
+
+用户要求助手能直接提问（D74）。`knowledge.ask` 与 `knowledge.followUp` 为 read：只读项目，不需要确认卡片；契约声明 `produces: knowledge_conversation`（D66）。研究可能要几分钟，助手的工具调用不阻塞，沿用确认流程「结果作为下一条消息」的模式（15 §4）：
+
+1. 助手调用 `knowledge_ask`（或 `knowledge_followUp`）。操作照常执行；工具不返回对话 DTO，而是立即返回 `{ status: 'researching', knowledge_conversation_id, instruction }`，`instruction` 让模型告诉用户正在查资料并结束本轮。助手模块记下「这一轮由哪个助手对话等待」（内存中；应用重启会中断研究本身，结果仍可在知识问答页看到）。
+2. 这一轮结束时（知识模块 `onTurnEnded`），后端先在助手对话中记录指向该知识对话的导航卡片（`entity_ref`），再把消息发回原助手会话（会话忙时等本轮结束，`deliver`）：
+   - 回答（`assistant-knowledge-answered.md`）：问题、带 `[n]` 的回答、引用列表（`[n] 路径 第 a–b 行 — link: /knowledge/<id>?turn=<turnId>&cite=<n>`），以及对话页面链接 `/knowledge/<id>`（即 `open_page` 的 `knowledge_conversation` 页面）；要求模型把提到的引用写成 `[[n]](link)` 形式的 Markdown 链接，并在结尾附上对话页面链接。
+   - 失败、停止（`assistant-knowledge-failed.md`）：状态、错误码与原因、对话页面链接。
+3. 助手面板中以 `/` 开头的链接在应用内导航（面板保持打开）：点引用即打开知识问答页并推入该处原文；导航卡片「打开」进入知识对话页。链接地址由 `knowledgeLink()`（`shared/knowledge/citations.ts`）生成，与前端路由一致。
+4. `AssistantPage` 增加 `knowledge`、`knowledge_conversation`（参数 `knowledgeConversationId`）、`knowledge_history`：助手知道用户正在看哪个知识对话，也能用 `open_page` 打开它。
 
 ## 5. 研究员 agent 与 MCP 工具
 
@@ -284,5 +295,6 @@ apps/web/src/features/knowledge/       页面、研究过程卡、回答与引�
 | 单元 | `citationMarkers`（链接、代码块、行内代码不算）、`classifySource`、`knowledgeTurnStatusOf`、`researchSteps`（前端阶段推导）、配置快照（`aw-researcher` 权限）、会话规则（网络开关） |
 | 集成 | `knowledge.int.test.ts`（FakeOpencode）：提问 → 会话的目录 / agent / 规则正确 → `submit_answer` 通过后轮次 `answered`、引用与 excerpt 正确；引用校验每个子码（不存在的文件、越界行号、`..` 与符号链接越界、`.git`、范围外来源、未知标注、未用引用、未知连接）且返回 hint，修正后重提成功；只读：研究会话的规则无 edit、bash 写命令 ask、`task` deny、网络默认 deny；续问沿用同一 opencode 会话且上一轮研究中时 `KNOWLEDGE_CONVERSATION_BUSY`；停止 → `stopped`；未提交 → 提醒 → `failed`；读取原文（窗口、`changed`、文件删除后 404、编号越界 404）；删除对话清理尝试与会话流；删除项目时研究中拒绝、结束后级联；`research` 尝试不能调用 `submit_result` / `ask_user`；数据库引用（Docker MySQL）：原文重新执行只读查询 |
 | `@opencode` | 注入后 `aw-researcher` 在 opencode 配置中可见 |
-| E2E | J12（FakeOpencode）：首屏 → 提问 → 研究过程（检索、读取）→ 带引用的回答 → 点击引用看原文（高亮、下一处）→ 续问 → 对话记录中出现并可回到对话；J9 走查加入知识问答三个状态 |
+| 集成（助手） | `assistant.knowledge.int.test.ts`：`knowledge_ask` 不需确认、立即返回 `researching`；研究完成后助手会话收到带引用与链接的回答消息、对话中有导航卡片；研究失败时收到错误码与原因 |
+| E2E | J13：对助手提问 → 「正在查资料」→ 导航卡片与带引用的回答 → 点引用看到原文 → 卡片「打开」进入知识对话页。J12（FakeOpencode）：首屏 → 提问 → 研究过程（检索、读取）→ 带引用的回答 → 点击引用看原文（高亮、下一处）→ 续问 → 对话记录中出现并可回到对话；J9 走查加入知识问答三个状态 |
 | live | `live/knowledge.live.test.ts`：对 `ts-stats` 提一个有确定答案的问题，断言回答带有效引用且引用指向正确的文件，报告写到 `live/reports/knowledge-*.json` |
