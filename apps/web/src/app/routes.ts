@@ -21,6 +21,12 @@ export const ROUTES = {
   knowledgeConversation: '/knowledge/$conversationId',
   knowledgeHistory: '/knowledge/history',
   insights: '/insights',
+  /** PPT (23 §2.1): the list, a new PPT, one PPT's workspace, its full-screen show and its print view. */
+  ppt: '/ppt',
+  pptNew: '/ppt/new',
+  pptDeck: '/ppt/$deckId',
+  pptPlay: '/ppt/$deckId/play',
+  pptPrint: '/ppt/$deckId/print',
   settings: '/settings',
   git: '/git',
   gitProject: '/git/$projectId',
@@ -55,4 +61,9 @@ export const ROUTE_IDS = {
   knowledgeConversation: '/_shell/knowledge/$conversationId',
   knowledgeHistory: '/_shell/knowledge/history',
   insights: '/_shell/insights',
+  ppt: '/_shell/ppt',
+  pptNew: '/_shell/ppt/new',
+  pptDeck: '/_shell/ppt/$deckId',
+  pptPlay: '/ppt/$deckId/play',
+  pptPrint: '/ppt/$deckId/print',
 } as const;

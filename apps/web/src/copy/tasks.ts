@@ -207,6 +207,7 @@ export const INBOX_COPY = {
   inTask: (key: string, title: string) => `${key} · ${title}`,
   inStep: (title: string) => `步骤「${title}」`,
   fromKnowledge: '知识问答',
+  fromPpt: 'PPT',
   planBody: (version: number) => `AI 写好了计划（第 ${version} 版），确认后开始执行。`,
   deliveryReady: '结果已经就绪，等你合并或创建 PR。',
   viewAll: '查看全部',

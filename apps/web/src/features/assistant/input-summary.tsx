@@ -9,6 +9,7 @@ import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
 import { inboxQuery } from '../inbox/inbox.queries.ts';
 import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
+import { deckQuery } from '../ppt/ppt.queries.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
 import { scheduleQuery } from '../schedules/schedules.queries.ts';
 import { rolesQuery, taskQuery, workflowsQuery } from '../tasks/tasks.queries.ts';
@@ -101,6 +102,11 @@ function KnowledgeRef({ id }: { id: string }) {
   return <Named ids={[id]} names={[query.data?.title]} query={query} />;
 }
 
+function DeckRef({ id }: { id: string }) {
+  const query = useQuery(deckQuery(id));
+  return <Named ids={[id]} names={[query.data?.title]} query={query} />;
+}
+
 function WorkflowRef({ ids }: { ids: string[] }) {
   // Workflows are named by id when used and by key when edited or deleted (EntityKind.Workflow).
   return (
@@ -148,6 +154,8 @@ function RefValue({ kind, value, input }: { kind: InputRef; value: unknown; inpu
       return <KnowledgeRef id={first} />;
     case InputRef.Batch:
       return <BatchRef id={first} />;
+    case InputRef.Deck:
+      return <DeckRef id={first} />;
     case InputRef.Schedule:
       return <ScheduleRef id={first} />;
     case InputRef.Workflow:

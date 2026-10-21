@@ -18,6 +18,8 @@
 | `/inbox` | 需要你处理 | 全部 | `inbox.html` |
 | `/projects`、`/projects/:projectId` | 项目 | 全部 | `projects.html` |
 | `/knowledge`、`/knowledge/:conversationId`、`/knowledge/history` | 知识问答（v1.1）：首屏（`?projectId=`）、对话（`?turn=&cite=` 打开某一轮的某处引用原文，`?details=true` 简单模式下的专业视图）、对话记录（`?q=&projectId=`） | 全部 | `knowledge.html`、`knowledge-history.html`，见 [18-knowledge.md §2](18-knowledge.md#2-页面与交互) |
+| `/ppt`、`/ppt/new`、`/ppt/:deckId` | PPT（v1.2）：列表（搜索、项目筛选）、新建（`?projectId=&taskId=&knowledgeConversationId=` 预选资料，「做成 PPT」入口用它）、工作台（`?slide=` 选中的页，`?details=true` 简单模式下的专业视图） | 全部 | `ppt-works.html`、`ppt.html`、`ppt-studio.html`，见 [23-ppt.md §2](23-ppt.md#2-页面与交互) |
+| `/ppt/:deckId/play`、`/ppt/:deckId/print` | 放映（全屏翻页，`?slide=`）与打印视图（导出 PDF 时由隐藏窗口打印），都在外壳之外 | 全部 | 新增 |
 | `/insights` | 质量与用量（v1.1）：简单模式为本周三个数，专业模式为用量、趋势、拆分、质量与钻取（`?period=&from=&to=&drill=&key=`） | 全部（两种视图） | `insights.html`，见 [19-insights.md §3](19-insights.md#3-页面与交互) |
 | `/settings` | 设置 | 全部（专业项按模式显示） | `settings.html` |
 | `/git`、`/git/:projectId` | Git 管理台（`?tab=branches\|commits\|files\|worktrees`，`ref`、`sha`、`path`、`file` 记录所看的内容） | 专业 | `git/index.html`、`delivery/git.html` |
@@ -34,6 +36,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'tasks',     route: ROUTES.tasks,     label: COPY.nav.tasks,     icon: 'list',     visibleIn: ['simple', 'pro'], badge: 'inboxOpen' },
   { id: 'projects',  route: ROUTES.projects,  label: COPY.nav.projects,  icon: 'folder',   visibleIn: ['simple', 'pro'] },
   { id: 'knowledge', route: ROUTES.knowledge, label: COPY.nav.knowledge, icon: 'book',     visibleIn: ['simple', 'pro'] },   // v1.1
+  { id: 'ppt',       route: ROUTES.ppt,       label: COPY.nav.ppt,       icon: 'slides',   visibleIn: ['simple', 'pro'] },   // v1.2
   { id: 'insights',  route: ROUTES.insights,  label: COPY.nav.insights,  icon: 'chart',    visibleIn: ['simple', 'pro'] },   // v1.1
   { id: 'git',       route: ROUTES.git,       label: COPY.nav.git,       icon: 'gitRepo',  visibleIn: ['pro'], group: 'pro' },
   { id: 'workflows', route: ROUTES.workflows, label: COPY.nav.workflows, icon: 'flow',     visibleIn: ['pro'], group: 'pro' },
@@ -186,7 +189,7 @@ export const NAV_ITEMS: NavItem[] = [
 | kind | 卡片内容 | 操作 |
 | --- | --- | --- |
 | question | 问题、选项按钮、自由回答框 | 提交 |
-| permission | 「AI 想要执行：`rm -rf dist`」、所在任务与步骤（知识问答的请求标「知识问答」） | 允许一次 / 总是允许 / 拒绝 |
+| permission | 「AI 想要执行：`rm -rf dist`」、所在任务与步骤（知识问答的请求标「知识问答」，PPT 的请求标「PPT」） | 允许一次 / 总是允许 / 拒绝 |
 | acceptance | 节点摘要 + 改动入口 | 通过 / 驳回（填意见） |
 | plan | 计划版本与说明（不重复任务标题） | 去确认（跳任务页） |
 | failure | 失败说明（与任务页同一句，写明哪一步） | 重试 / 取消任务 |
@@ -234,6 +237,7 @@ export type ThemeDefinition = {
 - 切换：设置 `ui.theme` 变更 → `applyTheme()` 即时生效，无需刷新；`system` 时监听 `prefers-color-scheme`。
 - React Flow 的连线、节点、小地图颜色，diff 增删色，代码高亮主题都从当前主题取值。
 - 新增主题 = 新增一个 `themes/*.ts` + 在 `ThemeId` 枚举与 registry 中登记；类型系统保证令牌齐全。
+- PPT 的页面有自己的主题（与应用主题无关）：每套主题另有一组不透明的幻灯片调色板 `slides: SlidePalette`（`bg` `surface` `ink` `sub` `accent` `fill` `onFill` `line` `codeBg` `codeInk`），渲染时写成页面容器上的 `--slide-*` 变量，PowerPoint 导出也读它；单测校验其对比度（23 §5.2）。
 - 助手面板的磨砂材质与助手标识也是主题令牌（`frost`、`frost-card`、`frost-edge`、`frost-filter`、`frost-shadow`、`frost-sheen`、`aura`，D84）；与主题无关的动效令牌 `--ease-spring`、`--t-drawer` 在 `base.css`。
 - 每套主题在单测中校验：正文/次要文字在 `bg`/`panel`/`sidebar` 及其上叠加的悬停、选中底色（`fill-1`–`fill-3`、`accent-fill`）、外框装饰渐变最浓处，以及助手磨砂面板（`frost` 叠在 `bg`/`surface`/`raised` 上，及其上的 `frost-card` 与悬停底色）上对比度 ≥ 4.5:1，状态文字在其 fill（叠在 `bg` / `panel` 上）上 ≥ 4.5:1，侧栏数量徽标（`stall`）在侧栏及其悬停、选中底色上 ≥ 4.5:1，主按钮与品牌按钮（含悬停）文字 ≥ 4.5:1（沿用设计稿已校验的约束）。渲染后的页面另由 E2E 走查（J9）用 axe 的 `color-contrast` 规则在四套主题下逐页检查（M6-01）。
 
@@ -271,7 +275,7 @@ export type ThemeDefinition = {
 
 | # | 设计稿现状 | v1.0 处理 |
 | --- | --- | --- |
-| 1 | 17 个菜单 | 简单模式 5 个（v1.1 加入知识问答），专业模式 12 个；PPT、质量与用量、模板任务不做 |
+| 1 | 17 个菜单 | 简单模式 5 个（v1.1 加入知识问答、质量与用量，v1.2 加入 PPT），专业模式 12 个 |
 | 2 | 开始任务 → 需求草稿 → 需求画布五段胶囊 → 准备工作区 → 开始执行，多次确认 | 主页一步开始；计划确认是可选检查点；工作区自动准备，专业视图才显示 |
 | 3 | 规划轮次、候选对照、逐项核对、修订次数、分组细化（PE 系列 50 个状态） | 简化为：计划草稿 → 确认 / 按意见重新规划 / 编辑（专业）；历史版本可查看 |
 | 4 | 回执未知、待核对、部分创建、重启核对等状态 | 删除；仅保留「已中断（将自动重试）」 |

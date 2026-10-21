@@ -34,6 +34,11 @@ describe('@opencode 客户端与配置注入', () => {
       mode: 'primary',
       permission: { edit: 'deny', question: 'deny', webfetch: 'deny', websearch: 'deny', task: 'deny' },
     });
+    // So does the PPT writer (23 §7.1).
+    expect(data.agent?.[OPENCODE_AGENT_NAME.slides_writer]).toMatchObject({
+      mode: 'primary',
+      permission: { edit: 'deny', question: 'deny', webfetch: 'deny', websearch: 'deny', task: 'deny' },
+    });
   });
 
   it('助手的 agent 与助手 MCP 也已注入，两套 MCP 都已连接（A-03）', async () => {

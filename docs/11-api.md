@@ -280,6 +280,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
 | `knowledge.updated` | `{ conversationId }` | 知识问答：新一轮、答案提交、一轮结束、权限请求等待或已处理、删除时；对话与列表重新拉取（研究过程与流式回答的草稿沿用 `attempt.transcript`：研究尝试的正文每 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 个字符推送一次，草稿 = 最后一个非提交工具调用之后的正文，18 §5.5） |
 | `schedule.updated` | `{ scheduleId }` | 定时任务（v1.2）：创建、修改、暂停 / 恢复、每次运行、删除后；定时任务列表与详情重新拉取（查询挂在任务列表前缀下，开出的任务状态变化也会刷新，22 §9） |
+| `deck.updated` | `{ deckId }` | PPT：AI 工作开始与结束、每次提交通过、权限请求等待或已处理、页面修改、删除时；PPT 与列表重新拉取（23 §8） |
 | `resync` | `{}` | 全部失效 |
 
 ## 12. 应用助手（v1.1）
@@ -352,6 +353,30 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/schedules/:id/run` | `schedules.run` | write | 立即运行一次（`trigger = manual`，不改计划时刻）→ `ScheduleDetailDTO`；上一次的任务未结束 409 `SCHEDULE_BUSY`；开不了任务时直接返回错误（不自动暂停） |
 | DELETE | `/schedules/:id` | `schedules.delete` | critical | 204；运行记录随之删除，开出的任务保留 |
 
+## 13e. PPT（v1.2）
+
+见 [23-ppt.md §8](23-ppt.md#8-api操作清单)。全部 `mode = simple`、`expose.assistant = true`、不进命令面板（D96）；改动内容的 write 操作在有 AI 工作进行中时 409 `DECK_BUSY`；发起 AI 工作时 opencode 未就绪 503。`model` 同知识问答（`provider/model`、`null` 或省略）。
+
+| 方法 | 路径 | 操作 | 风险 | 说明 |
+| --- | --- | --- | --- | --- |
+| GET | `/decks?projectId&query&limit&cursor` | `decks.list` | read | `{ items: DeckSummaryDTO[], nextCursor }`，按 `updated_at` 倒序；`query` 匹配标题 |
+| GET | `/decks/:id` | `decks.get` | read | `DeckDTO`（要求、资料、理解、全部页、AI 工作记录、显示状态）；404 `DECK_NOT_FOUND` |
+| POST | `/decks` | `decks.create` | write | `{ brief, projectId?, materials, slideCount?, theme?, model? }` → 201 `DeckDTO` 并开始写大纲；资料来自多个项目、任务没有结果、对话没有回答、资料超过 `DECK_MATERIALS_MAX_CHARS` 为 400；`produces: deck` |
+| PATCH | `/decks/:id` | `decks.update` | write | `{ title?, theme? }`，不调用 AI |
+| POST | `/decks/:id/outline/revise` | `decks.reviseOutline` | write | `{ instruction?, model? }`：按意见重写大纲；不带意见为重新写（大纲失败后重试）；已确认大纲 409 `STATE_TRANSITION_INVALID` |
+| PUT | `/decks/:id/outline` | `decks.updateOutline` | write | `{ slides: [{ id?, layout, title, points }] }`：整体替换；已确认 409 |
+| POST | `/decks/:id/generate` | `decks.generate` | write | `{ model? }`：第一次调用时确认大纲，制作全部未制作的页（也用于继续制作）；没有未制作的页 409 |
+| POST | `/decks/:id/revise` | `decks.reviseSlides` | write | `{ slideIds, instruction, model? }`：页面必须都已制作 |
+| PUT | `/decks/:id/slides/:slideId` | `decks.updateSlide` | write | `{ content, notes }`：手动修改，按 `slideContentSchema` 校验 |
+| POST | `/decks/:id/slides/:slideId/restore` | `decks.restoreSlide` | write | 恢复 AI 最近一次修改之前的内容；没有上一版 409 |
+| POST | `/decks/:id/slides` | `decks.insertSlide` | write | `{ afterSlideId?, layout, title, points, model? }`：加一页并只让 AI 做这一页（制作阶段） |
+| POST | `/decks/:id/slides/:slideId/move` | `decks.moveSlide` | write | `{ toSeq }` |
+| DELETE | `/decks/:id/slides/:slideId` | `decks.deleteSlide` | write | 最后一页不能删（409） |
+| POST | `/decks/:id/stop` | `decks.stop` | write | 中止进行中的 AI 工作；已结束 409 |
+| DELETE | `/decks/:id` | `decks.delete` | critical | 204；AI 工作中 409 `DECK_BUSY` |
+
+导出不是 HTTP 操作：PowerPoint 在渲染进程生成，PDF 由 Electron main 打印 `/ppt/:id/print`（§13）。
+
 ## 13. preload 能力（非 HTTP）
 
 ```ts
@@ -361,7 +386,12 @@ interface AwBridge {
   openExternal(url: string): Promise<void>;       // 仅 http(s)
   revealInFinder(path: string): Promise<void>;
   appVersion: string;
+  exportPdf(deckId: string, fileName: string): Promise<PdfExport>;       // 隐藏窗口打印 /ppt/:id/print，保存到用户选择的位置（23 §6.1）
+  saveFile(fileName: string, bytes: Uint8Array): Promise<string | null>; // 渲染进程生成的文件（.pptx，23 §6.2）；取消为 null
+  printSettled(result: PrintSettled): void;                              // 打印视图告诉隐藏窗口：可以打印，或为什么不能显示
 }
+type PrintSettled = { ok: true } | { ok: false; error: ErrorInfo };
+type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorInfo };   // path 为 null：用户取消了保存
 ```
 
 加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。

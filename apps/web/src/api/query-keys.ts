@@ -62,6 +62,10 @@ export const queryKeys = {
   knowledgeConversation: (id: string) => ['knowledge', 'conversation', id],
   knowledgePages: (filter: Record<string, string | undefined>) => ['knowledge', 'list', filter],
   knowledgeCitation: (turnId: string, index: number) => ['knowledge', 'citation', turnId, index],
+  /** Every PPT query shares this prefix; `deck.updated` refreshes them all. */
+  decks: ['decks'],
+  deck: (id: string) => ['decks', 'detail', id],
+  deckPages: (filter: Record<string, string | undefined>) => ['decks', 'list', filter],
   /** Every quality and usage query shares this prefix; task updates refresh them. */
   insightsAll: ['insights'],
   insights: (view: 'summary' | 'tasks', query: Record<string, string | undefined>) => ['insights', view, query],

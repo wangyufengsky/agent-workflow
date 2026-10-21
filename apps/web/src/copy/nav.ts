@@ -8,6 +8,7 @@ export const NAV_COPY = {
   inbox: '需要你处理',
   projects: '项目',
   knowledge: '知识问答',
+  ppt: 'PPT',
   insights: '质量与用量',
   git: 'Git',
   workflows: '流程',

@@ -62,3 +62,56 @@ export const KNOWLEDGE_ANSWER_EXCERPT_CHARS = 160;
 export const KNOWLEDGE_DRAFT_FLUSH_CHARS = 24;
 /** Days a custom quality and usage period may span (19 §2.2). */
 export const INSIGHTS_MAX_DAYS = 366;
+/** PPT (23 §10). */
+export const DECK_BRIEF_MAX_CHARS = 4000;
+/** A PPT's title, taken from the brief's first line until the outline gives one. */
+export const DECK_TITLE_MAX_CHARS = 60;
+export const DECK_MATERIALS_MAX = 10;
+/** All material of one PPT together: it goes into the first message (23 §7.2). */
+export const DECK_MATERIALS_MAX_CHARS = 60_000;
+export const DECK_INSTRUCTION_MAX_CHARS = 2000;
+export const DECK_MAX_SLIDES = 30;
+/** Pages the AI picks from when the user lets it decide. */
+export const DECK_AUTO_SLIDES_MIN = 5;
+export const DECK_AUTO_SLIDES_MAX = 12;
+/** An outline page's points: what the page is to say. */
+export const SLIDE_POINTS_MAX = 6;
+export const SLIDE_POINT_MAX_CHARS = 120;
+export const SLIDE_NOTES_MAX_CHARS = 1000;
+/**
+ * Characters per text field of a page, sized so the text fits the 1280×720 canvas at the theme's smallest font size
+ * (23 §5.1). Counted in UTF-16 units: one per Chinese character.
+ */
+export const SLIDE_TEXT_LIMITS = {
+  title: 40,
+  subtitle: 80,
+  bullet: 60,
+  bullets: 6,
+  columnHeading: 20,
+  columnBullet: 40,
+  columnBullets: 5,
+  cardHeading: 16,
+  cardBody: 80,
+  cardsMin: 2,
+  cardsMax: 4,
+  stepLabel: 12,
+  stepDetail: 40,
+  stepsMin: 2,
+  stepsMax: 6,
+  statValue: 12,
+  statLabel: 24,
+  statsMax: 4,
+  tableColumnsMin: 2,
+  tableColumnsMax: 5,
+  tableHeader: 16,
+  tableCell: 30,
+  tableRows: 8,
+  codeLines: 16,
+  codeLineChars: 80,
+  codeLanguage: 20,
+  caption: 60,
+  quote: 120,
+  attribution: 40,
+} as const;
+/** Text that does not fit is shrunk down to this scale before the page is flagged (23 §5.4). */
+export const SLIDE_FIT_MIN_SCALE = 0.8;

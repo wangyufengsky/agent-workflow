@@ -5,6 +5,18 @@ export const warmTheme: ThemeDefinition = {
   id: ThemeId.Warm,
   colorScheme: 'light',
   codeTheme: 'github-light',
+  slides: {
+    bg: '#f8f7f3',
+    surface: '#efece4',
+    ink: '#2b2925',
+    sub: '#5e584e',
+    accent: '#89583f',
+    fill: '#89583f',
+    onFill: '#ffffff',
+    line: '#dcd7ce',
+    codeBg: '#2b2925',
+    codeInk: '#f3f1eb',
+  },
   tokens: {
     bg: '#f8f7f3',
     'bg-sunken': '#f1efe9',

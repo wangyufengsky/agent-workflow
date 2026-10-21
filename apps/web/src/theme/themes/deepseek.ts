@@ -5,6 +5,18 @@ export const deepseekTheme: ThemeDefinition = {
   id: ThemeId.Deepseek,
   colorScheme: 'dark',
   codeTheme: 'github-dark-default',
+  slides: {
+    bg: '#0e0f12',
+    surface: '#181a1f',
+    ink: '#f5f6f7',
+    sub: '#a1a6ae',
+    accent: '#a9bcff',
+    fill: '#4865f2',
+    onFill: '#ffffff',
+    line: '#2c2f36',
+    codeBg: '#16181d',
+    codeInk: '#e6e8eb',
+  },
   tokens: {
     bg: '#0a0a0a',
     'bg-sunken': '#070707',

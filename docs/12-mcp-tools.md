@@ -33,6 +33,8 @@
     "aw-reviewer": { "mode": "primary", "description": "agent-workflow reviewer", "prompt": "<protocol-review.md>",  "permission": { "edit": "deny",  "question": "deny", "webfetch": "deny", "external_directory": "deny", "agent-workflow-app_*": "deny" } },
     // v1.1 知识研究员（18 §5.1）：只读；网络工具与子 agent 关闭，会话的网络开关打开时会话级规则再放行 webfetch / websearch
     "aw-researcher": { "mode": "primary", "description": "agent-workflow researcher", "prompt": "<protocol-research.md>", "permission": { "edit": "deny", "question": "deny", "webfetch": "deny", "websearch": "deny", "task": "deny", "external_directory": "deny", "agent-workflow-app_*": "deny" } },
+    // v1.2 PPT 写作者（23 §7.1）：权限同研究员，没有网络
+    "aw-slides": { "mode": "primary", "description": "agent-workflow slides_writer", "prompt": "<protocol-slides.md>", "permission": { "edit": "deny", "question": "deny", "webfetch": "deny", "websearch": "deny", "task": "deny", "external_directory": "deny", "agent-workflow-app_*": "deny" } },
     // v1.1 应用助手（15 §2）：只看到助手 MCP 的工具
     "aw-assistant": { "mode": "primary", "description": "agent-workflow assistant", "prompt": "<protocol-assistant.md>", "permission": { "edit": "allow", "question": "deny", "webfetch": "ask", "external_directory": "deny", "agent-workflow_*": "deny" } }
   },
@@ -65,6 +67,7 @@
   - `ai.bashPolicy = auto`（默认）：`*` allow；`git *` deny（其他所有 Git 命令都可能改动 refs 或工作区，不逐个列举）；Git 只读子命令再 allow。
   - `ai.bashPolicy = ask`：不带检查命令的只读规则（第 1–3、5、6 步）。
 - 知识研究员（v1.1，18 §5.1）的会话级规则：不带检查命令的 `readonlyBashRules()`；对话打开网络检索时末尾再加 `webfetch *` 与 `websearch *` allow（agent 规则在前、会话规则在后，最后匹配生效；被整体 deny 的工具不出现在工具列表中，见 §8）。会话目录为项目主仓库，不建 worktree。
+- PPT 写作者（v1.2，23 §7.1）的会话级规则：不带检查命令的 `readonlyBashRules()`，没有网络；会话目录为项目仓库，没有项目时为 `<数据目录>/ppt/blank/`。
 - 角色差异不靠多个 agent：会话使用角色的 `base_agent` 对应的 agent（与尝试类型无关：只读的「代码审查」步骤以 reviewer 身份执行 `execute` 尝试，用 `submit_result` 提交报告），角色提示词通过每次 prompt 的 `system` 字段追加，模型通过 prompt 的 `model` 字段指定。因此修改角色无需重启 opencode。评审检查（`review` 尝试）固定使用内置 `reviewer` 角色。
 - 修改 `ai.bashPolicy` 对之后新建的会话立即生效，无需重启 opencode。
 
@@ -136,15 +139,17 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `submit_result` | execute | 提交节点结果 |
 | `submit_review` | review | 提交评审结论 |
 | `ask_user` | plan · execute | 向用户提问 |
-| `report_progress` | plan · execute · review · research | 上报一句当前进展 |
+| `report_progress` | plan · execute · review · research · deck_outline · deck_slides | 上报一句当前进展 |
 | `db_list_connections` | plan · execute · review · research | 列出项目关联的数据库 |
 | `db_describe` | plan · execute · review · research | 查看表结构 |
 | `db_query` | plan · execute · review · research | 只读查询 |
 | `submit_answer` | research | 提交带引用的回答（v1.1 知识问答，18 §6） |
+| `submit_outline` | deck_outline | 提交 PPT 大纲与 AI 的理解（v1.2，23 §7.3） |
+| `submit_slide` | deck_slides | 按页码提交 PPT 的一页（v1.2，23 §7.3） |
 
 工具名在 opencode 中显示为 `agent-workflow_<name>`（名称常量 `McpToolName`）。输入/输出 schema 位于 `shared/contracts/mcp/<tool>.ts`；下文用 TS 类型描述。
 
-M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07。调试尝试（开发构建，不属于任务）仍可用 `get_task_context`（返回任务编号 `DEBUG`）、`report_progress`、`submit_result`（直接使尝试 `succeeded`，返回 `next: 'done'`）；调试尝试不属于任何项目，`db_list_connections` 返回空列表，其他数据库工具返回 `DB_CONNECTION_NOT_FOUND`。知识问答的 `research` 尝试（v1.1）用对话的项目；对话的资料范围不含数据库时与调试尝试相同。
+M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07。调试尝试（开发构建，不属于任务）仍可用 `get_task_context`（返回任务编号 `DEBUG`）、`report_progress`、`submit_result`（直接使尝试 `succeeded`，返回 `next: 'done'`）；调试尝试不属于任何项目，`db_list_connections` 返回空列表，其他数据库工具返回 `DB_CONNECTION_NOT_FOUND`。知识问答的 `research` 尝试（v1.1）用对话的项目；对话的资料范围不含数据库时与调试尝试相同。PPT 的尝试（v1.2）不能用数据库工具与任务工具（`MCP_TOOL_NOT_ALLOWED`）。
 
 ---
 
@@ -301,6 +306,20 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 行为：后端校验每处引用与每个标注（18 §6.2）：通过 → 写入这一轮的回答与引用（文件引用另存被引用的行）并使尝试 `succeeded`；不通过 → `KNOWLEDGE_CITATION_INVALID`，`details.problems[]` 每项带子码、编号与 hint，什么都不写。
 输出：`{ accepted: true }`
 错误：`KNOWLEDGE_CITATION_INVALID`、`VALIDATION_FAILED`、`MCP_RESULT_ALREADY_SUBMITTED`。
+
+### 6.13 `submit_outline`（v1.2）
+
+只用于 `deck_outline` 尝试（PPT，23 §7.3）。输入：`{ title; understanding: { audience; duration; assumptions: string[] }; slides: Array<{ layout: SlideLayout; title; points: string[] }> }`。
+行为：用户指定了页数时页数必须相等（否则 `VALIDATION_FAILED`，`issues[].path = ['slides']`，什么都不写）；通过 → 大纲整体替换这份 PPT 的页面（内容为空），写入理解与标题（用户改过名时不改标题），尝试 `succeeded`。
+输出：`{ accepted: true }`
+错误：`VALIDATION_FAILED`、`MCP_RESULT_ALREADY_SUBMITTED`。
+
+### 6.14 `submit_slide`（v1.2）
+
+只用于 `deck_slides` 尝试（PPT，23 §7.3）。输入：`{ page: number; content: SlideContent; notes?: string }`（`page` 为页码，从 1 起；`content` 按版式校验字段、条数与字数，`SLIDE_TEXT_LIMITS`）。
+行为：`page` 必须是这次工作的目标页之一（否则 `VALIDATION_FAILED`，`path = ['page']`，消息列出目标页码）；通过 → 写入这一页的内容与讲稿（这次工作第一次覆盖已有内容时，旧内容存为上一版）；同一页可以重复提交，以最后一次为准；全部目标页都提交过时尝试 `succeeded`。
+输出：`{ accepted: true, remaining: number[] }`（这次工作还没提交的页码）
+错误：`VALIDATION_FAILED`、`MCP_RESULT_ALREADY_SUBMITTED`。
 
 ## 7. 实现结构
 

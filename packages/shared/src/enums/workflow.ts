@@ -29,8 +29,11 @@ export const RoleBaseAgent = {
 export type RoleBaseAgent = (typeof RoleBaseAgent)[keyof typeof RoleBaseAgent];
 export const roleBaseAgentSchema = z.enum(RoleBaseAgent);
 
-/** Who an attempt's session runs as (12 §2): a role's base agent, or the knowledge researcher (18 §5.1). */
-export const SessionAgent = { ...RoleBaseAgent, Researcher: 'researcher' } as const;
+/**
+ * Who an attempt's session runs as (12 §2): a role's base agent, the knowledge researcher (18 §5.1) or the PPT writer
+ * (23 §7.1).
+ */
+export const SessionAgent = { ...RoleBaseAgent, Researcher: 'researcher', SlidesWriter: 'slides_writer' } as const;
 export type SessionAgent = (typeof SessionAgent)[keyof typeof SessionAgent];
 
 export const RoleKind = {

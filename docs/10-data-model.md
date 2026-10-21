@@ -206,7 +206,7 @@ type Acceptance = {
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
 | id | TEXT PK | |
-| task_id | TEXT NULL → tasks，CASCADE | 空 = 调试尝试（仅开发构建，M2-09）或知识问答的 `research` 尝试（v1.1，由 `knowledge_turns` 指向），不属于任何任务 |
+| task_id | TEXT NULL → tasks，CASCADE | 空 = 调试尝试（仅开发构建，M2-09）、知识问答的 `research` 尝试（v1.1，由 `knowledge_turns` 指向）或 PPT 的 `deck_outline` / `deck_slides` 尝试（v1.2，由 `deck_runs` 指向），不属于任何任务 |
 | node_id | TEXT NULL → nodes，CASCADE | `execute` 类为所执行的节点，`review` 类为被评审的节点；`plan` 类与调试尝试为空 |
 | kind | TEXT | `AttemptKind` |
 | seq | INTEGER | 同一节点（或同一任务的 plan 类、或不属于任务的同类尝试）内序号 |
@@ -286,7 +286,7 @@ payload / response：
 
 ## 3. JSONL 会话流
 
-路径：`<数据目录>/runs/<taskId>/<attemptId>.jsonl`（调试尝试为 `runs/debug/<attemptId>.jsonl`，知识问答的 `research` 尝试为 `runs/knowledge/<attemptId>.jsonl`）。每次尝试一个文件，只追加（同步追加，保持事件顺序），由尝试模块把 opencode 事件转换后写入，同时经 SSE 推送 `attempt.transcript` 事件。schema 为 `shared/contracts/api/attempts.ts` 的 `transcriptEntrySchema`。
+路径：`<数据目录>/runs/<taskId>/<attemptId>.jsonl`（调试尝试为 `runs/debug/<attemptId>.jsonl`，知识问答的 `research` 尝试为 `runs/knowledge/<attemptId>.jsonl`，PPT 的尝试为 `runs/ppt/<attemptId>.jsonl`）。每次尝试一个文件，只追加（同步追加，保持事件顺序），由尝试模块把 opencode 事件转换后写入，同时经 SSE 推送 `attempt.transcript` 事件。schema 为 `shared/contracts/api/attempts.ts` 的 `transcriptEntrySchema`。
 
 每行：
 
@@ -432,11 +432,77 @@ payload / response：
 | error | TEXT(JSON) NULL | `failed` 时的 `ErrorInfo` |
 | created_at | INTEGER | 实际处理时刻；最新的运行按插入顺序（rowid）读取 |
 
+## 4d. PPT（v1.2）
+
+见 [23-ppt.md §3](23-ppt.md#3-数据模型)，迁移 `0013_decks`。PPT 没有状态列，显示状态由页面与最近一次 AI 工作的尝试推导（23 §4.3）。
+
+### decks
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| project_id | TEXT NULL → projects，SET NULL | AI 可读其代码的项目；删除项目后 PPT 保留 |
+| title | TEXT | 要求的首行，大纲返回后为 AI 给的标题（`title_edited` 时不再改） |
+| title_edited | INTEGER(bool) | 用户改过名 |
+| brief | TEXT | 要求原文 |
+| slide_count_target | INTEGER NULL | 指定的页数；NULL = AI 决定 |
+| theme | TEXT | `ThemeId` |
+| understanding | TEXT(JSON) NULL | `DeckUnderstanding`，随大纲提交 |
+| outline_confirmed_at | INTEGER NULL | 只写一次：之前为大纲阶段，之后为制作阶段 |
+| created_at / updated_at | INTEGER | 列表按 `updated_at` 倒序 |
+
+索引：`(project_id)`、`(updated_at)`。
+
+### deck_materials
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| deck_id | TEXT → decks，CASCADE | |
+| seq | INTEGER | |
+| kind | TEXT | `DeckMaterialKind` |
+| ref_id | TEXT NULL | 来源任务 / 知识对话（不设外键，快照不随其删除） |
+| title | TEXT | |
+| content | TEXT | 创建时的快照（Markdown） |
+
+### deck_slides
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| deck_id | TEXT → decks，CASCADE | |
+| seq | INTEGER | 页序，从 1 起 |
+| layout | TEXT | `SlideLayout`；做好后为内容的版式 |
+| title | TEXT | 大纲标题 |
+| points | TEXT(JSON) | 大纲要点 `string[]` |
+| content | TEXT(JSON) NULL | `SlideContent`；NULL = 还没制作 |
+| notes | TEXT | 讲稿 |
+| previous | TEXT(JSON) NULL | AI 最近一次修改之前的 `{ content, notes }`（恢复上一版） |
+| updated_at | INTEGER | |
+
+索引：`(deck_id, seq)`。
+
+### deck_runs
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| deck_id | TEXT → decks，CASCADE | |
+| seq | INTEGER | PPT 内序号，从 1 起 |
+| attempt_id | TEXT → attempts | 这次工作的尝试；类型（大纲 / 页面）、状态与模型由它推导 |
+| targets | TEXT(JSON) | 目标页 id；大纲为空 |
+| done | TEXT(JSON) | 已提交的目标页 id |
+| instruction | TEXT NULL | 用户的意见或修改要求 |
+| created_at | INTEGER | |
+
+索引：`(deck_id, seq)`、`(attempt_id)`。
+
 ## 5. 删除与清理
 
 - 删除项目：要求无非终态任务、没有研究中的知识对话；级联删除其任务及全部关联数据和 `runs/<taskId>` 目录，以及知识对话、其 `research` 尝试与会话流，以及批次（外键级联，20 §6）与定时任务及其运行记录（22 §8）。
 - 删除定时任务：删除其运行记录，关闭其未处理的 `schedule_failure` 条目（dismissed）；开出的任务保留。
 - 删除知识对话：要求没有研究中的一轮；删除轮次、其尝试（权限条目随之级联）与 `runs/knowledge/<attemptId>.jsonl`。
+- 删除 PPT：要求没有进行中的 AI 工作（`DECK_BUSY`）；删除其尝试（会话流 `runs/ppt/<attemptId>.jsonl` 随之删除，权限条目级联），再删除 PPT（页面、资料、工作记录级联）。删除项目时 PPT 的 `project_id` 置空。
 - 删除助手对话：级联删除其确认，并删除 `assistant/conversations/<id>.jsonl` 与 `assistant/files/<id>/`。
 - 任务终态后 worktree 删除，但任务、计划、节点、尝试、会话流保留（供回看）。
 - 不做自动过期清理（v1）。设置页显示数据目录占用。

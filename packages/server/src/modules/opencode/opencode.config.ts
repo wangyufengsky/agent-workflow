@@ -41,6 +41,17 @@ type AgentPermission = {
 const EXEC_TOOLS = `${MCP_TOOL_PREFIX}*`;
 const ASSISTANT_TOOLS = `${MCP_ASSISTANT_TOOL_PREFIX}*`;
 
+/** Agents that only read and answer through their submit tool: no web unless the session allows it, no subagents. */
+const READ_ONLY_WRITER = {
+  edit: 'deny',
+  question: 'deny',
+  webfetch: 'deny',
+  websearch: 'deny',
+  task: 'deny',
+  external_directory: 'deny',
+  [ASSISTANT_TOOLS]: 'deny',
+} as const;
+
 /**
  * Agent permissions that never change with settings (12 §2). The native question tool is denied: questions go
  * through MCP `ask_user` (D36). Bash rules are per session, see `sessionPermissionRules`. Sessions working on a task
@@ -69,15 +80,9 @@ const AGENT_PERMISSION: Record<SessionAgent, AgentPermission & { [ASSISTANT_TOOL
     external_directory: 'deny',
     [ASSISTANT_TOOLS]: 'deny',
   },
-  [SessionAgent.Researcher]: {
-    edit: 'deny',
-    question: 'deny',
-    webfetch: 'deny',
-    websearch: 'deny',
-    task: 'deny',
-    external_directory: 'deny',
-    [ASSISTANT_TOOLS]: 'deny',
-  },
+  [SessionAgent.Researcher]: READ_ONLY_WRITER,
+  // The PPT writer reads like the researcher and never uses the web (23 §7.1).
+  [SessionAgent.SlidesWriter]: READ_ONLY_WRITER,
 };
 
 /**
@@ -97,6 +102,7 @@ const AGENT_PROMPT: Record<SessionAgent, PromptName> = {
   [SessionAgent.Executor]: PromptName.ProtocolExecute,
   [SessionAgent.Reviewer]: PromptName.ProtocolReview,
   [SessionAgent.Researcher]: PromptName.ProtocolResearch,
+  [SessionAgent.SlidesWriter]: PromptName.ProtocolSlides,
 };
 
 /** Injected as `OPENCODE_CONFIG_CONTENT` and merged by opencode with the user's own configuration (12 §2, S3). */
@@ -162,5 +168,6 @@ export function sessionPermissionRules(
 ): PermissionRule[] {
   if (base === SessionAgent.Executor) return [...BASH_PERMISSION_PRESETS[bashPolicy]];
   if (base === SessionAgent.Researcher) return [...readonlyBashRules(), ...(web ? WEB_RULES : [])];
+  if (base === SessionAgent.SlidesWriter) return readonlyBashRules();
   return readonlyBashRules(checkCommands);
 }

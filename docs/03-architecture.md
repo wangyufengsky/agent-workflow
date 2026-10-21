@@ -109,6 +109,7 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | 类型 | @types/node / @types/react / @types/react-dom | 24.19.2 / 19.3.0 / 19.3.0 |
 | 代码质量 | @biomejs/biome / dependency-cruiser / typescript | 2.5.15 / 18.6.0 / **6.0.3**（D29） |
 | 静态文件 | @fastify/static | 10.1.6 |
+| PPT 导出为 PowerPoint | pptxgenjs（MIT；依赖 jszip、image-size；渲染进程按需加载，不进首屏包，D94） | 4.0.1 |
 
 **明确不引入**：Temporal / BullMQ（单机够用）、XState（见 D21）、tRPC（要可文档化 REST）、Tailwind（已有令牌与样式体系）、Monaco（v1 不在应用内编辑代码）、任何 ORM 之外的数据访问层封装。
 
@@ -158,6 +159,7 @@ agent-workflow/
 │  │        ├─ mcp/                server + tools/*
 │  │        ├─ inbox/  delivery/
 │  │        ├─ knowledge/          知识问答（v1.1，18）：对话、research 尝试、引用校验与原文
+│  │        ├─ decks/              PPT（v1.2，23）：大纲、页面、资料快照、deck_outline / deck_slides 尝试
 │  │        └─ databases/          drivers/{mysql,postgres,sqlserver}
 │  ├─ builtin/                 内置流程与角色（数据 + prompts/*.md）
 │  └─ opencode-plugin/         agent-workflow-bridge（注入 sessionID 到本项目 MCP 工具参数）；`pnpm build:plugin` 去掉类型生成 dist/agent-workflow-bridge.js
@@ -189,6 +191,7 @@ modules/tasks/
 - `operations / routes → service → repo`；跨模块只能 import 对方的 `index.ts`。例外：表定义文件可以直接引用其他模块的表定义文件以声明外键（D43）。
 - 知识问答（v1.1，18 §8）：`knowledge` 在 `attempts`、`projects`、`databases`、`inbox` 之上，`tasks`（删除项目）与 `mcp` 之下；研究尝试的 `task_id` 为空，由 `knowledge_turns` 指向。
 - PR 审查意见回流（v1.2，21）：编排在 `tasks/tasks.review.ts`（取回意见、发起修改），用 `hosting`（`GitHostingProvider` 新增按分支查找打开的 PR 与读取审查意见）、`delivery`（抓取并快进任务分支）、`worktrees`（`restore` 重建）与「再改改」的节点追加（`tasks.changes.ts` 的 `appendRevision`）；不新增模块与表。
+- PPT（v1.2，23 §12）：`decks` 在 `attempts`、`projects`、`tasks`（任务结果快照）、`knowledge`（对话快照）、`inbox` 之上，`mcp` 与 `assistant` 之下；PPT 尝试的 `task_id` 为空，由 `deck_runs` 指向。删除项目时 PPT 的 `project_id` 由外键置空，`tasks` 不需要知道 PPT。
 - 批量任务（v1.1，20 §9）：`batches` 在 `tasks`、`workflows`、`settings` 之上，`assistant` 之下；`tasks` 不知道批次（批次表引用任务表）。
 - 定时任务（v1.2，22 §11）：`schedules` 在 `tasks`、`workflows`、`inbox` 之上，`assistant` 之下；`tasks` 不知道定时任务（运行表引用任务表）。检查循环（`schedules.timer.ts`）用注入时钟，`app.start` 时与调度器一起启动，收到 `schedule.updated` 时重排；时区换算在 `core/time-zone.ts`，质量与用量共用。
 - 任务域的服务分层（D45）：`inbox`、`plans`、`timeline`、`worktrees` → `attempts` → `acceptance` → `nodes` → `tasks` → `scheduler`；`mcp` 在最上层。`assistant`（v1.1）与 `mcp` 同在最上层：它从 `app.ts` 拿到其余所有模块的操作实现来生成工具，并用 `attempts` 的会话流存储与会话视图、`tasks` / `projects` / `workflows` 查页面上的名称。尝试经 `attempts.onSignal` 通知其所有者（节点、规划、评审），不反向依赖；需要完整任务上下文的入口（`inbox.resolve`、`projects.delete`、节点通过/驳回/重试、删除流程与角色）由 `tasks` 实现。`databases` 在 `projects` 之下（项目详情列出关联的连接），任务上下文与数据库 MCP 工具经 `tasks` 使用它；`workflows` 依赖 `roles`（校验流程定义）。
@@ -279,7 +282,7 @@ export function taskOperations(tasks: TasksService) {
 ├─ runs/
 │  └─ <taskId>/
 │     └─ <attemptId>.jsonl     会话流（消息/片段/工具调用镜像）；任务时间线在 SQLite task_events
-│        （知识问答每一轮的会话流在 runs/knowledge/<attemptId>.jsonl，v1.1）
+│        （知识问答每一轮的会话流在 runs/knowledge/<attemptId>.jsonl，v1.1；PPT 的在 runs/ppt/<attemptId>.jsonl，v1.2）
 ├─ worktrees/
 │  └─ <projectSlug>/<taskKey>/ 任务 worktree（默认位置，可在设置中改）
 └─ assistant/                  助手工作目录（v1.1）：会话 directory；files/<对话 id>/ 生成的文件，conversations/<对话 id>.jsonl 消息流

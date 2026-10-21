@@ -121,6 +121,19 @@ export async function queueResearchTurn(
   if (!res.ok()) throw new Error(`queueing a research turn failed: ${res.status()} ${await res.text()}`);
 }
 
+/** Queues a turn for the PPT writer of this project (its sessions run in the project repository, 23 §7.1). */
+export async function queueWriterTurn(
+  request: APIRequestContext,
+  project: E2EProject,
+  steps: FakeStep[],
+): Promise<void> {
+  const res = await request.post(`${API_BASE}/dev/fake-opencode/scripts`, {
+    headers: AUTH,
+    data: { match: { agent: 'aw-slides', directory: project.repoPath }, steps },
+  });
+  if (!res.ok()) throw new Error(`queueing a writer turn failed: ${res.status()} ${await res.text()}`);
+}
+
 /** Queues a turn for the next message to the app assistant (its sessions run as `aw-assistant`). */
 export async function queueAssistantTurn(request: APIRequestContext, steps: FakeStep[]): Promise<void> {
   const res = await request.post(`${API_BASE}/dev/fake-opencode/scripts`, {

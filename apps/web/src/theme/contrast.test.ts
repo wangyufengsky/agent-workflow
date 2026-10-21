@@ -132,4 +132,17 @@ describe.each(THEME_IDS)('主题 %s 对比度', (id) => {
       expect(contrast(color('on-brand'), color(fill)), `on-brand on ${fill}`).toBeGreaterThanOrEqual(MIN);
     }
   });
+
+  it('PPT 调色板：正文、次要文字与强调色在页面与卡片底上，填充上的文字，代码 ≥ 4.5:1（23 §5.2）', () => {
+    const p = THEMES[id].slides;
+    const c = (value: string) => parseColor(value);
+    for (const background of ['bg', 'surface'] as const) {
+      for (const text of ['ink', 'sub', 'accent'] as const) {
+        expect(contrast(c(p[text]), c(p[background])), `${text} on ${background}`).toBeGreaterThanOrEqual(MIN);
+      }
+    }
+    expect(contrast(c(p.onFill), c(p.fill)), 'onFill on fill').toBeGreaterThanOrEqual(MIN);
+    expect(contrast(c(p.codeInk), c(p.codeBg)), 'codeInk on codeBg').toBeGreaterThanOrEqual(MIN);
+    for (const value of Object.values(p)) expect(value, 'opaque #rrggbb').toMatch(/^#[0-9a-f]{6}$/);
+  });
 });

@@ -5,6 +5,18 @@ export const spdbTheme: ThemeDefinition = {
   id: ThemeId.Spdb,
   colorScheme: 'light',
   codeTheme: 'github-light',
+  slides: {
+    bg: '#ffffff',
+    surface: '#f3f6fc',
+    ink: '#1c2745',
+    sub: '#4e5d78',
+    accent: '#004790',
+    fill: '#004790',
+    onFill: '#ffffff',
+    line: '#dbe2ee',
+    codeBg: '#0f1b33',
+    codeInk: '#e8edf6',
+  },
   tokens: {
     bg: '#ffffff',
     'bg-sunken': '#f6f8fc',

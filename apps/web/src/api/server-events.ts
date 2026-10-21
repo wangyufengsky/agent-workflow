@@ -17,11 +17,14 @@ import {
 import { appendTranscript, attemptTranscript, updateAttempt } from '../features/attempts/attempt.queries.ts';
 import { updateInbox } from '../features/inbox/inbox.queries.ts';
 import { refreshKnowledge } from '../features/knowledge/knowledge.queries.ts';
+import { refreshDecks } from '../features/ppt/ppt.queries.ts';
 import { refreshSchedules } from '../features/schedules/schedules.queries.ts';
 import { updateNode, updateTask } from '../features/tasks/tasks.queries.ts';
 import { useUiStore } from '../state/ui.store.ts';
 import { apiToken } from './client.ts';
 import { queryKeys } from './query-keys.ts';
+
+const DECK_ATTEMPT_KINDS: readonly AttemptKind[] = [AttemptKind.DeckOutline, AttemptKind.DeckSlides];
 
 /** Quality and usage figures are read again whenever what they count changed (19 §3). */
 const refreshInsights = (qc: QueryClient) => qc.invalidateQueries({ queryKey: queryKeys.insightsAll });
@@ -39,6 +42,8 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       updateAttempt(qc, event.data.attempt);
       // A research turn's progress line and status are part of its knowledge conversation (18 §4).
       if (event.data.attempt.kind === AttemptKind.Research) await refreshKnowledge(qc);
+      // A PPT's progress line and status come from its AI work's attempt (23 §4.3).
+      if (DECK_ATTEMPT_KINDS.includes(event.data.attempt.kind)) await refreshDecks(qc);
       // A task's active attempts (and their progress line) are part of its detail.
       if (event.data.taskId !== null)
         await qc.invalidateQueries({ queryKey: queryKeys.task(event.data.taskId), exact: true });
@@ -74,6 +79,8 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
     }
     case ServerEventType.KnowledgeUpdated:
       return refreshKnowledge(qc);
+    case ServerEventType.DeckUpdated:
+      return refreshDecks(qc);
     case ServerEventType.ScheduleUpdated:
       await refreshSchedules(qc, event.data.scheduleId);
       return;

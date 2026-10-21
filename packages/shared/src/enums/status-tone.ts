@@ -1,3 +1,4 @@
+import { DeckStatus } from './deck.ts';
 import { KnowledgeTurnStatus } from './knowledge.ts';
 import { ScheduleStatus } from './schedule.ts';
 import { RuntimeStatus } from './system.ts';
@@ -45,6 +46,14 @@ export const STATUS_TONE = {
     [KnowledgeTurnStatus.Stopped]: StatusTone.Idle,
     [KnowledgeTurnStatus.Failed]: StatusTone.Danger,
   },
+  deck: {
+    [DeckStatus.Outlining]: StatusTone.Run,
+    [DeckStatus.OutlineReady]: StatusTone.Wait,
+    [DeckStatus.Failed]: StatusTone.Danger,
+    [DeckStatus.Generating]: StatusTone.Run,
+    [DeckStatus.Incomplete]: StatusTone.Warn,
+    [DeckStatus.Ready]: StatusTone.Ok,
+  },
   runtime: {
     [RuntimeStatus.NotInstalled]: StatusTone.Danger,
     [RuntimeStatus.VersionMismatch]: StatusTone.Danger,
@@ -74,6 +83,7 @@ export const STATUS_TONE = {
   node: Record<NodeStatus, StatusTone>;
   attempt: Record<AttemptStatus, StatusTone>;
   knowledgeTurn: Record<KnowledgeTurnStatus, StatusTone>;
+  deck: Record<DeckStatus, StatusTone>;
   runtime: Record<RuntimeStatus, StatusTone>;
   taskDisplay: Record<TaskDisplayGroup, StatusTone>;
   schedule: Record<ScheduleStatus, StatusTone>;

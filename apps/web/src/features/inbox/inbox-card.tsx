@@ -1,4 +1,11 @@
-import { FailureAction, type InboxItemDTO, type InboxItemOf, InboxKind, PermissionDecision } from '@aw/shared';
+import {
+  AttemptKind,
+  FailureAction,
+  type InboxItemDTO,
+  type InboxItemOf,
+  InboxKind,
+  PermissionDecision,
+} from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type FormEvent, useState } from 'react';
@@ -8,6 +15,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { SCHEDULES_COPY } from '../../copy/schedules.ts';
 import { INBOX_COPY as C } from '../../copy/tasks.ts';
+import { attemptQuery } from '../attempts/attempt.queries.ts';
 import { schedulesQuery } from '../schedules/schedules.queries.ts';
 import { failureText } from '../tasks/failure-text.ts';
 import { taskQuery, tasksQuery } from '../tasks/tasks.queries.ts';
@@ -163,17 +171,25 @@ const NAMES_NO_STEP = new Set<InboxKind>([InboxKind.Question, InboxKind.Permissi
 
 /**
  * Where an item comes from (14 §3.6): the schedule that started its task (22 §6), its task (unless the list already
- * groups by it) and, for questions and permissions, its step; other items without a task come from knowledge
- * questions. The task comes from the one task list every card shares; only questions and permissions, which belong to
- * running steps, read their task's steps. A schedule has at most one task that has not ended, its `activeTask`.
+ * groups by it) and, for questions and permissions, its step; other items without a task come from a knowledge
+ * question or a PPT, told by its attempt. The task comes from the one task list every card shares; only questions
+ * and permissions, which belong to running steps, read their task's steps. A schedule has at most one task that has
+ * not ended, its `activeTask`.
  */
 function useSource(item: InboxItemDTO, showTask: boolean): string | undefined {
   const needsStep = item.taskId !== null && item.nodeId !== null && NAMES_NO_STEP.has(item.kind);
   const tasks = useQuery({ ...tasksQuery(), enabled: showTask && item.taskId !== null }).data;
   const detail = useQuery({ ...taskQuery(item.taskId ?? ''), enabled: needsStep }).data;
   const schedules = useQuery(schedulesQuery()).data;
+  const attempt = useQuery({
+    ...attemptQuery(item.attemptId ?? ''),
+    enabled: item.taskId === null && item.attemptId !== null,
+  }).data;
   if (item.kind === InboxKind.ScheduleFailure) return SCHEDULES_COPY.fromSchedule(item.title);
-  if (item.taskId === null) return C.fromKnowledge;
+  if (item.taskId === null) {
+    if (attempt === undefined) return undefined;
+    return attempt.kind === AttemptKind.Research ? C.fromKnowledge : C.fromPpt;
+  }
   const parts: string[] = [];
   const schedule = schedules?.find((s) => s.activeTask?.id === item.taskId);
   if (schedule !== undefined) parts.push(SCHEDULES_COPY.fromSchedule(schedule.title));

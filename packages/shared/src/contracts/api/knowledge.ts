@@ -16,14 +16,15 @@ export type KnowledgeSources = z.infer<typeof knowledgeSourcesSchema>;
 
 const question = z.string().trim().min(1).max(KNOWLEDGE_QUESTION_MAX_CHARS);
 /**
- * The turn's model (D67 ④): `provider/model`, null for opencode's default, left out for `ai.defaultModel` (the
- * assistant's calls).
+ * The model of one AI turn the user starts (D67 ④): `provider/model`, null for opencode's default, left out for
+ * `ai.defaultModel` (the assistant's calls). PPT work takes the same choice (23 §2.3).
  */
-const model = z
+export const modelChoiceSchema = z
   .string()
   .regex(/^[^/]+\/.+$/, 'provider/model')
   .nullable()
   .optional();
+const model = modelChoiceSchema;
 
 /** A stored citation (18 §6.1): numbered by its position in the turn, from 1. */
 export const citationSchema = z.discriminatedUnion('type', [

@@ -6,6 +6,7 @@ import { implement } from '../../core/operations/operations.ts';
 import type { AcceptanceService } from '../acceptance/index.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { DebugService } from '../debug/index.ts';
+import type { DecksService } from '../decks/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import { createToolRegistry, type McpToolDefinition } from './mcp.registry.ts';
@@ -16,9 +17,11 @@ import { getTaskContextTool } from './tools/get-task-context.tool.ts';
 import { getTaskDiffTool } from './tools/get-task-diff.tool.ts';
 import { reportProgressTool } from './tools/report-progress.tool.ts';
 import { submitAnswerTool } from './tools/submit-answer.tool.ts';
+import { submitOutlineTool } from './tools/submit-outline.tool.ts';
 import { submitPlanTool } from './tools/submit-plan.tool.ts';
 import { submitResultTool } from './tools/submit-result.tool.ts';
 import { submitReviewTool } from './tools/submit-review.tool.ts';
+import { submitSlideTool } from './tools/submit-slide.tool.ts';
 
 export type { McpToolDefinition } from './mcp.registry.ts';
 
@@ -29,10 +32,11 @@ export type McpModuleDeps = {
   acceptance: AcceptanceService;
   debug: DebugService;
   knowledge: KnowledgeService;
+  decks: DecksService;
   log: Logger;
 };
 
-export function createMcpModule({ token, attempts, tasks, acceptance, debug, knowledge, log }: McpModuleDeps) {
+export function createMcpModule({ token, attempts, tasks, acceptance, debug, knowledge, decks, log }: McpModuleDeps) {
   const tools: McpToolDefinition[] = [
     getTaskContextTool(tasks, debug),
     getNodeOutputTool(tasks),
@@ -46,6 +50,8 @@ export function createMcpModule({ token, attempts, tasks, acceptance, debug, kno
     dbDescribeTool(tasks, knowledge),
     dbQueryTool(tasks, knowledge),
     submitAnswerTool(knowledge),
+    submitOutlineTool(decks),
+    submitSlideTool(decks),
   ];
   const registry = createToolRegistry(tools, attempts, log);
   return {

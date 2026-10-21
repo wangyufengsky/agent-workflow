@@ -1797,7 +1797,7 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
 }
 `;
 
-exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识研究员、助手 agent 与 bridge 插件 1`] = `
+exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识研究员、PPT 写作者、助手 agent 与 bridge 插件 1`] = `
 {
   "agent": {
     "aw-assistant": {
@@ -1861,6 +1861,20 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "webfetch": "deny",
       },
       "prompt": "<protocol-review.md>",
+    },
+    "aw-slides": {
+      "description": "agent-workflow slides_writer",
+      "mode": "primary",
+      "permission": {
+        "agent-workflow-app_*": "deny",
+        "edit": "deny",
+        "external_directory": "deny",
+        "question": "deny",
+        "task": "deny",
+        "webfetch": "deny",
+        "websearch": "deny",
+      },
+      "prompt": "<protocol-slides.md>",
     },
   },
   "mcp": {

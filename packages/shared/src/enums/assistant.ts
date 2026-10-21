@@ -43,12 +43,22 @@ export const AssistantPage = {
   KnowledgeConversation: 'knowledge_conversation',
   KnowledgeHistory: 'knowledge_history',
   Insights: 'insights',
+  /** PPT (23 §2): the list and one PPT's workspace. */
+  Ppt: 'ppt',
+  PptDeck: 'ppt_deck',
 } as const;
 export type AssistantPage = (typeof AssistantPage)[keyof typeof AssistantPage];
 export const assistantPageSchema = z.enum(AssistantPage);
 
 /** Ids a page is about; on the task page `nodeId` is the selected step. */
-export type AssistantPageParam = 'taskId' | 'nodeId' | 'projectId' | 'workflowKey' | 'knowledgeConversationId';
+export type AssistantPageParam =
+  | 'taskId'
+  | 'nodeId'
+  | 'projectId'
+  | 'workflowKey'
+  | 'knowledgeConversationId'
+  | 'deckId'
+  | 'slideId';
 
 /** Params each page needs to be opened. */
 export const ASSISTANT_PAGE_PARAMS = {
@@ -72,6 +82,8 @@ export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.KnowledgeConversation]: ['knowledgeConversationId'],
   [AssistantPage.KnowledgeHistory]: [],
   [AssistantPage.Insights]: [],
+  [AssistantPage.Ppt]: [],
+  [AssistantPage.PptDeck]: ['deckId'],
 } as const satisfies Record<AssistantPage, readonly AssistantPageParam[]>;
 
 /**

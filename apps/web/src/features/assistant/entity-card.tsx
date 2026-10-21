@@ -15,6 +15,8 @@ import { frequencyText } from '../../copy/schedules.ts';
 import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
 import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
+import { deckCounts, deckStatusLabel } from '../ppt/deck-status.ts';
+import { deckQuery } from '../ppt/ppt.queries.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
 import { scheduleQuery } from '../schedules/schedules.queries.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
@@ -125,6 +127,16 @@ function BatchEntityCard({ entity }: { entity: EntityRef }) {
   return <Shell entity={entity} presence={byDetail(query, ErrorCode.BatchNotFound, status)} />;
 }
 
+function DeckEntityCard({ entity }: { entity: EntityRef }) {
+  // `deck.updated` keeps this query current: the card follows the outline and the making (D96).
+  const query = useQuery(deckQuery(entity.id));
+  const status =
+    query.data === undefined ? undefined : (
+      <StatusBadge tone={STATUS_TONE.deck[query.data.status]} label={deckStatusLabel(deckCounts(query.data))} />
+    );
+  return <Shell entity={entity} presence={byDetail(query, ErrorCode.DeckNotFound, status)} />;
+}
+
 function ScheduleEntityCard({ entity }: { entity: EntityRef }) {
   const query = useQuery(scheduleQuery(entity.id));
   const status =
@@ -149,6 +161,8 @@ export function EntityCard({ entity }: { entity: EntityRef }) {
       return <KnowledgeConversationCard entity={entity} />;
     case EntityKind.Batch:
       return <BatchEntityCard entity={entity} />;
+    case EntityKind.Deck:
+      return <DeckEntityCard entity={entity} />;
     case EntityKind.Schedule:
       return <ScheduleEntityCard entity={entity} />;
   }

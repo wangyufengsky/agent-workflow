@@ -1,5 +1,6 @@
 import { UiMode } from '@aw/shared';
 import { DELIVERY_COPY } from './delivery.ts';
+import { PPT_COPY } from './ppt.ts';
 import { SETTINGS_COPY } from './settings.ts';
 import { THEME_LABEL } from './themes.ts';
 
@@ -117,6 +118,21 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.knowledge.citation': '查看引用原文',
   'op.insights.summary': '质量与用量',
   'op.insights.tasks': '质量与用量的任务明细',
+  'op.decks.list': 'PPT 列表',
+  'op.decks.get': '查看 PPT',
+  'op.decks.create': '新建 PPT',
+  'op.decks.update': '修改 PPT 名称或风格',
+  'op.decks.reviseOutline': '按意见重写 PPT 大纲',
+  'op.decks.updateOutline': '修改 PPT 大纲',
+  'op.decks.generate': '确认大纲并制作 PPT',
+  'op.decks.reviseSlides': '让 AI 改 PPT 页面',
+  'op.decks.updateSlide': '修改 PPT 的一页',
+  'op.decks.restoreSlide': '恢复 PPT 一页的上一版',
+  'op.decks.insertSlide': '给 PPT 加一页',
+  'op.decks.moveSlide': '移动 PPT 的一页',
+  'op.decks.deleteSlide': '删除 PPT 的一页',
+  'op.decks.stop': '停止制作 PPT',
+  'op.decks.delete': '删除 PPT',
 };
 
 /**
@@ -172,6 +188,20 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   pr: 'PR',
   reason: '原因',
   response: '回复',
+  brief: PPT_COPY.brief,
+  materials: PPT_COPY.materials,
+  slideCount: PPT_COPY.slideCount,
+  theme: PPT_COPY.theme,
+  instruction: '修改意见',
+  slides: '大纲',
+  slideIds: '页面',
+  slideId: '页面',
+  content: PPT_COPY.content,
+  notes: PPT_COPY.notes,
+  layout: PPT_COPY.layout,
+  points: '要点',
+  afterSlideId: PPT_COPY.insertAfter,
+  toSeq: '移到第几页',
 };
 
 /** Values of enum fields in words, by field name; other values show as given. */
@@ -180,6 +210,8 @@ export const INPUT_VALUE_LABEL: Readonly<Record<string, Readonly<Record<string, 
   'ui.theme': THEME_LABEL,
   'delivery.defaultStrategy': DELIVERY_COPY.strategies,
   strategy: DELIVERY_COPY.strategies,
+  theme: THEME_LABEL,
+  layout: PPT_COPY.layouts,
 };
 
 /** The title of an operation by its contract's `title` key; the unit test keeps every key covered. */

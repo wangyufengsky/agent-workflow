@@ -48,6 +48,10 @@ export const AttemptKind = {
   Review: 'review',
   /** One question of a knowledge conversation (18 §5.2); belongs to no task. */
   Research: 'research',
+  /** A PPT's outline (23 §4): the AI proposes the pages; belongs to no task. */
+  DeckOutline: 'deck_outline',
+  /** Makes or revises some pages of a PPT (23 §4). */
+  DeckSlides: 'deck_slides',
 } as const;
 export type AttemptKind = (typeof AttemptKind)[keyof typeof AttemptKind];
 export const attemptKindSchema = z.enum(AttemptKind);

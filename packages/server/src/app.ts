@@ -34,6 +34,7 @@ import {
 } from './modules/credentials/index.ts';
 import { createDatabasesModule, DB_DRIVERS } from './modules/databases/index.ts';
 import { createDebugModule } from './modules/debug/index.ts';
+import { createDecksModule, type DecksService } from './modules/decks/index.ts';
 import { createDeliveryModule } from './modules/delivery/index.ts';
 import { createRepoLocks, locateOpencodeShell } from './modules/git/index.ts';
 import { type HostingEndpoints, PUBLIC_HOSTING } from './modules/hosting/index.ts';
@@ -97,6 +98,7 @@ export type App = {
     worktrees: WorktreesService;
     assistant: AssistantService;
     knowledge: KnowledgeService;
+    decks: DecksService;
     schedules: SchedulesService & { settled(): Promise<void> };
   };
   /** Bearer token of the execution MCP at `/mcp/exec`. */
@@ -286,6 +288,19 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     workflows: workflows.service,
     tasks: tasks.service,
   });
+  const decks = createDecksModule({
+    db: database.db,
+    unit,
+    clock,
+    attempts: attempts.service,
+    projects: projects.service,
+    tasks: tasks.service,
+    knowledge: knowledge.service,
+    inbox: inbox.service,
+    settings: settings.service,
+    prompts,
+    dataDir: config.dataDir,
+  });
   const scheduler = createScheduler({
     tasks: tasks.service,
     nodes: nodes.service,
@@ -327,6 +342,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     acceptance: acceptance.service,
     debug: debug.service,
     knowledge: knowledge.service,
+    decks: decks.service,
     log,
   });
   mcp.register(server);
@@ -342,6 +358,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...batches.operations,
     ...schedules.operations,
     ...knowledge.operations,
+    ...decks.operations,
     ...insights.operations,
     ...plans.operations,
     ...inbox.operations,
@@ -364,6 +381,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     projects: projects.service,
     workflows: workflows.service,
     knowledge: knowledge.service,
+    decks: decks.service,
     dataDir: config.dataDir,
     timeZone,
     token: assistantMcpToken,
@@ -403,6 +421,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       worktrees: worktrees.service,
       assistant: assistant.service,
       knowledge: knowledge.service,
+      decks: decks.service,
       schedules: { ...schedules.service, settled: schedules.timer.settled },
     },
     mcpToken,
