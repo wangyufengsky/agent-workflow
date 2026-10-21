@@ -214,6 +214,35 @@ test('J14 回答流式出现：引用先待核对、提交通过后可点击；�
   await expect(second).toContainText('opencode/fake-model');
   await expect(second).not.toContainText('fake-model-2');
 
+  // Straight to another conversation on the same route (as an in-app link does): its picker follows its latest turn.
+  await queueResearchTurn(request, project, [answer('先扣手续费 [1]。', [file('src/refund.ts', 2, 2)])]);
+  const other = await (
+    await request.post(`${API_BASE}/knowledge/conversations`, {
+      headers: AUTH,
+      data: {
+        projectId: project.id,
+        question: '手续费在哪里扣？',
+        sources: { code: true, docs: true, database: false, web: false },
+        model: 'opencode/fake-model-2',
+      },
+    })
+  ).json();
+  const here = new URL(page.url()).pathname;
+  const goInApp = (path: string) =>
+    page.evaluate((to) => {
+      window.history.pushState({}, '', to);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }, path);
+  // Both conversations cached first, then back to the other one.
+  await goInApp(`/knowledge/${other.id}`);
+  await expect(page.getByTestId('knowledge-turn').first()).toContainText('手续费在哪里扣？');
+  await goInApp(here);
+  await expect(page.getByLabel('模型')).toHaveValue('opencode/fake-model');
+  await goInApp(`/knowledge/${other.id}`);
+  await expect(page.getByTestId('knowledge-turn').first()).toContainText('手续费在哪里扣？');
+  await expect(page.getByLabel('模型')).toHaveValue('opencode/fake-model-2');
+  await goInApp(here);
+
   await page.getByRole('link', { name: '对话记录' }).click();
   const row = page.getByTestId('knowledge-history-row').filter({ hasText: '退款金额怎样取整？' });
   await expect(row).toContainText('opencode/fake-model');

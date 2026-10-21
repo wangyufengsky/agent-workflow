@@ -290,5 +290,6 @@ export function KnowledgeConversationPage() {
       </div>
     );
   }
-  return <Conversation conversation={conversation.data} />;
+  // Keyed: another conversation starts with its own state (the model picker follows its latest turn).
+  return <Conversation key={conversation.data.id} conversation={conversation.data} />;
 }
