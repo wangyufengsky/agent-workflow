@@ -41,7 +41,7 @@ export function InboxPage() {
             )}
             <div className="col">
               {group.map((item) => (
-                <InboxCard key={item.id} item={item} />
+                <InboxCard key={item.id} item={item} showTask={task === undefined} />
               ))}
             </div>
           </section>

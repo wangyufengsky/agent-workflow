@@ -20,7 +20,7 @@ export const NODE_STATUS_LABEL: Record<NodeStatus, string> = {
   [NodeStatus.WaitingInput]: '等你回答',
   [NodeStatus.Verifying]: '检查中',
   [NodeStatus.AwaitingAcceptance]: '等你验收',
-  [NodeStatus.Done]: '完成',
+  [NodeStatus.Done]: '已完成',
   [NodeStatus.Failed]: '失败',
   [NodeStatus.Skipped]: '已跳过',
   [NodeStatus.Cancelled]: '已取消',
@@ -33,6 +33,8 @@ export const HOME_TASK_COPY = {
   requirementPlaceholder: '描述你的需求……（支持粘贴长文本）',
   confirmPlan: '运行前让我确认计划',
   start: '开始',
+  needsRequirement: '先描述需求',
+  needsWorkflow: '先选择项目和流程',
   /** After the platform's modifier key (`MOD_KEY`). */
   startShortcut: '↵',
   noProjectTitle: '先添加一个项目',
@@ -41,8 +43,9 @@ export const HOME_TASK_COPY = {
   attention: (n: number) => `需要你处理（${n}）`,
   viewAll: '查看全部',
   inProgress: '进行中',
+  toMerge: '待合并',
   recent: '最近完成',
-  noneInProgress: '没有进行中的任务。',
+  noneInProgress: '还没有任务。描述需求后点「开始」，AI 会在独立工作区里完成它。',
   moreOptions: '更多选项',
   title: '标题',
   titlePlaceholder: '默认取需求的第一行',
@@ -101,6 +104,7 @@ export const TASK_COPY = {
   planTitle: 'AI 的计划',
   planVersion: (v: number) => `第 ${v} 版`,
   assumptions: '假设',
+  planSteps: (n: number) => `步骤（${n}）`,
   confirmPlan: '确认并开始',
   replan: '按意见重新规划',
   replanPlaceholder: '告诉 AI 计划要怎么改……',
@@ -109,7 +113,7 @@ export const TASK_COPY = {
   // 失败
   failedTitle: '任务没有完成',
   failedPhase: { preparing: '准备工作区时', planning: '规划时', running: '执行步骤时', merging: '合并时' },
-  failedStep: (title: string) => `「${title}」多次尝试仍没有完成。`,
+  failedStep: (title: string) => `执行步骤「${title}」时多次尝试仍没有完成。`,
   retry: '重试',
   retried: '已重新开始',
   // 结果卡
@@ -200,6 +204,12 @@ export const INBOX_COPY = {
   viewResult: '去查看',
   dismiss: '忽略',
   inTask: (key: string, title: string) => `${key} · ${title}`,
+  inStep: (title: string) => `步骤「${title}」`,
+  fromKnowledge: '知识问答',
+  planBody: (version: number) => `AI 写好了计划（第 ${version} 版），确认后开始执行。`,
+  deliveryBody: (files: number, add: number, del: number) =>
+    `改动 ${files} 个文件 +${add} −${del}，等你合并或创建 PR。`,
+  deliveryReady: '结果已经就绪，等你合并或创建 PR。',
   viewAll: '查看全部',
   done: '已处理',
 } as const;
