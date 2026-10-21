@@ -105,6 +105,10 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
           throw new AppError(ErrorCode.ValidationFailed, 'A delivery item is resolved by merging or opening a PR', {
             kind: item.kind,
           });
+        case InboxKind.ScheduleFailure:
+          throw new AppError(ErrorCode.ValidationFailed, 'A schedule failure is resolved by resuming the schedule', {
+            kind: item.kind,
+          });
       }
       return inbox.get(id);
     },

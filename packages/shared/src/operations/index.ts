@@ -58,6 +58,16 @@ import {
   setProjectHostingOp,
   updateProjectOp,
 } from './projects.ts';
+import {
+  createScheduleOp,
+  deleteScheduleOp,
+  getScheduleOp,
+  listSchedulesOp,
+  pauseScheduleOp,
+  resumeScheduleOp,
+  runScheduleOp,
+  updateScheduleOp,
+} from './schedules.ts';
 import { getSettingsOp, updateSettingsOp } from './settings.ts';
 import {
   getEnvironmentOp,
@@ -122,6 +132,7 @@ export * from './inbox.ts';
 export * from './insights.ts';
 export * from './knowledge.ts';
 export * from './projects.ts';
+export * from './schedules.ts';
 export * from './settings.ts';
 export * from './system.ts';
 export * from './tasks.ts';
@@ -198,6 +209,14 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   createBatchOp,
   getBatchOp,
   deliverBatchOp,
+  listSchedulesOp,
+  createScheduleOp,
+  getScheduleOp,
+  updateScheduleOp,
+  pauseScheduleOp,
+  resumeScheduleOp,
+  runScheduleOp,
+  deleteScheduleOp,
   listInboxOp,
   countInboxOp,
   resolveInboxOp,

@@ -187,6 +187,7 @@ modules/tasks/
 - 知识问答（v1.1，18 §8）：`knowledge` 在 `attempts`、`projects`、`databases`、`inbox` 之上，`tasks`（删除项目）与 `mcp` 之下；研究尝试的 `task_id` 为空，由 `knowledge_turns` 指向。
 - PR 审查意见回流（v1.2，21）：编排在 `tasks/tasks.review.ts`（取回意见、发起修改），用 `hosting`（`GitHostingProvider` 新增按分支查找打开的 PR 与读取审查意见）、`delivery`（抓取并快进任务分支）、`worktrees`（`restore` 重建）与「再改改」的节点追加（`tasks.changes.ts` 的 `appendRevision`）；不新增模块与表。
 - 批量任务（v1.1，20 §9）：`batches` 在 `tasks`、`workflows`、`settings` 之上，`assistant` 之下；`tasks` 不知道批次（批次表引用任务表）。
+- 定时任务（v1.2，22 §11）：`schedules` 在 `tasks`、`workflows`、`inbox` 之上，`assistant` 之下；`tasks` 不知道定时任务（运行表引用任务表）。检查循环（`schedules.timer.ts`）用注入时钟，`app.start` 时与调度器一起启动，收到 `schedule.updated` 时重排；时区换算在 `core/time-zone.ts`，质量与用量共用。
 - 任务域的服务分层（D45）：`inbox`、`plans`、`timeline`、`worktrees` → `attempts` → `acceptance` → `nodes` → `tasks` → `scheduler`；`mcp` 在最上层。`assistant`（v1.1）与 `mcp` 同在最上层：它从 `app.ts` 拿到其余所有模块的操作实现来生成工具，并用 `attempts` 的会话流存储与会话视图、`tasks` / `projects` / `workflows` 查页面上的名称。尝试经 `attempts.onSignal` 通知其所有者（节点、规划、评审），不反向依赖；需要完整任务上下文的入口（`inbox.resolve`、`projects.delete`、节点通过/驳回/重试、删除流程与角色）由 `tasks` 实现。`databases` 在 `projects` 之下（项目详情列出关联的连接），任务上下文与数据库 MCP 工具经 `tasks` 使用它；`workflows` 依赖 `roles`（校验流程定义）。
 - 跨服务的写入用 `core/db/unit-of-work` 的 `transact`（嵌套加入外层事务，事件在提交后发出，D44）。
 - `core` 不依赖 `modules`；`shared` 不依赖任何 app/package；`web` 只依赖 `shared`。

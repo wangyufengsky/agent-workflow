@@ -19,6 +19,12 @@
   right: 6px;
 }
 
+.schedule {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+}
+
 .workflow {
   flex: 1;
   display: flex;
@@ -74,7 +80,7 @@
   padding-bottom: 4px;
 }
 
-/* The「批量」button sits in the card's corner; the card's text keeps clear of it. */
+/* The「批量」and「定时」buttons sit in the card's corners; the card's text keeps clear of them. */
 .card:has(.batch) .workflow {
   padding-right: 56px;
 }

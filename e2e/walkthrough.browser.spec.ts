@@ -41,6 +41,8 @@ type Seed = {
   knowledgeDraft: string;
   /** A code-review batch of two targets: one report waiting to be finished, one still running (20 §4). */
   batch: string;
+  /** A code-review schedule run once by hand (22 §7). */
+  schedule: string;
   /** An assistant conversation that keeps working until the walkthrough ends. */
   assistantBusy: string;
 };
@@ -297,6 +299,15 @@ async function seed(request: APIRequestContext): Promise<Seed> {
   await expect
     .poll(async () => (await api<BatchCounts>(request, 'GET', `/batches/${batch.id}`)).counts.map((c) => c.group))
     .toEqual(['running', 'review']);
+  // The schedule's run takes the next code-review turn; the batch's tasks already took theirs.
+  await queueTurn(request, batchProject, { title: '代码审查' }, [submitResult('审查完成：没有发现问题。')]);
+  const schedule = await api<{ id: string }>(request, 'POST', '/schedules', {
+    projectId: batchProject.id,
+    workflowKey: 'code_review',
+    requirement: '每周审查订单模块的改动',
+    frequency: { kind: 'weekly', weekdays: [1, 3, 5], time: '09:00' },
+  });
+  await api(request, 'POST', `/schedules/${schedule.id}/run`);
   const assistantBusy = await seedAssistant(request, reviewProject, { id: knowledge.id, turnId: knowledgeTurn.id });
 
   const completedReview = await waitForStatus(request, completed, 'review');
@@ -314,6 +325,7 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     knowledge: { id: knowledge.id, turnId: knowledgeTurn.id },
     knowledgeDraft: draft.id,
     batch: batch.id,
+    schedule: schedule.id,
     assistantBusy,
   };
 }
@@ -501,6 +513,30 @@ const SHOTS: Shot[] = [
     },
   },
   { name: 'batches', mode: UiMode.Simple, url: () => '/batches', ready: testId('batch-card') },
+  {
+    name: 'schedule-new',
+    mode: UiMode.Simple,
+    url: (s) => `/schedules/new?projectId=${s.project.id}&workflow=unit_tests`,
+    ready: heading('新建定时任务'),
+  },
+  { name: 'schedule', mode: UiMode.Simple, url: (s) => `/schedules/${s.schedule}`, ready: testId('schedule-run') },
+  {
+    name: 'schedule-delete',
+    mode: UiMode.Simple,
+    url: (s) => `/schedules/${s.schedule}`,
+    ready: testId('schedule-run'),
+    open: async (page) => {
+      await page.getByRole('button', { name: '删除' }).click();
+      return page.getByRole('dialog', { name: '删除这个定时任务？' });
+    },
+  },
+  { name: 'schedules', mode: UiMode.Simple, url: () => '/schedules', ready: testId('schedule-card') },
+  {
+    name: 'schedule-edit-pro',
+    mode: UiMode.Pro,
+    url: (s) => `/schedules/${s.schedule}/edit`,
+    ready: heading('修改定时任务'),
+  },
   { name: 'projects', mode: UiMode.Simple, url: () => '/projects', ready: heading('项目') },
   { name: 'project', mode: UiMode.Simple, url: (s) => `/projects/${s.project.id}`, ready: heading(/.+/) },
   { name: 'settings', mode: UiMode.Simple, url: () => '/settings', ready: heading('设置') },

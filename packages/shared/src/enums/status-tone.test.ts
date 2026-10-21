@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { KnowledgeTurnStatus } from './knowledge.ts';
+import { ScheduleStatus } from './schedule.ts';
 import { STATUS_TONE } from './status-tone.ts';
 import { RuntimeStatus } from './system.ts';
 import {
@@ -21,6 +22,7 @@ describe('STATUS_TONE', () => {
     ['knowledgeTurn', Object.values(KnowledgeTurnStatus), STATUS_TONE.knowledgeTurn],
     ['runtime', Object.values(RuntimeStatus), STATUS_TONE.runtime],
     ['taskDisplay', TASK_DISPLAY_GROUPS, STATUS_TONE.taskDisplay],
+    ['schedule', Object.values(ScheduleStatus), STATUS_TONE.schedule],
   ] as const)('%s 的每个状态都映射到一个合法语气', (_name, statuses, map) => {
     const tones: Record<string, string> = map;
     expect(Object.keys(tones).sort()).toEqual([...statuses].sort());

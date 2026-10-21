@@ -106,6 +106,8 @@ export const ServerEventType = {
   AssistantRevealFile: 'assistant.reveal_file',
   /** A knowledge conversation changed: a new turn, a submitted answer, a turn that ended, a deletion (18 §4). */
   KnowledgeUpdated: 'knowledge.updated',
+  /** A schedule was created, changed, ran or was deleted (22 §9). */
+  ScheduleUpdated: 'schedule.updated',
   Resync: 'resync',
 } as const;
 export type ServerEventType = (typeof ServerEventType)[keyof typeof ServerEventType];

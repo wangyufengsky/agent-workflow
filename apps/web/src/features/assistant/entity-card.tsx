@@ -11,10 +11,12 @@ import { StatusBadge } from '../../components/status-badge.tsx';
 import { ENTITY_COPY as C } from '../../copy/assistant.ts';
 import { BATCHES_COPY } from '../../copy/batches.ts';
 import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
+import { frequencyText } from '../../copy/schedules.ts';
 import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
 import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
+import { scheduleQuery } from '../schedules/schedules.queries.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import { rolesQuery, taskQuery, workflowsQuery } from '../tasks/tasks.queries.ts';
 import styles from './cards.module.css';
@@ -123,6 +125,13 @@ function BatchEntityCard({ entity }: { entity: EntityRef }) {
   return <Shell entity={entity} presence={byDetail(query, ErrorCode.BatchNotFound, status)} />;
 }
 
+function ScheduleEntityCard({ entity }: { entity: EntityRef }) {
+  const query = useQuery(scheduleQuery(entity.id));
+  const status =
+    query.data === undefined ? undefined : <span className="hint">{frequencyText(query.data.frequency)}</span>;
+  return <Shell entity={entity} presence={byDetail(query, ErrorCode.ScheduleNotFound, status)} />;
+}
+
 /** A navigation card for an object an operation of the assistant produced (D66). */
 export function EntityCard({ entity }: { entity: EntityRef }) {
   switch (entity.kind) {
@@ -140,5 +149,7 @@ export function EntityCard({ entity }: { entity: EntityRef }) {
       return <KnowledgeConversationCard entity={entity} />;
     case EntityKind.Batch:
       return <BatchEntityCard entity={entity} />;
+    case EntityKind.Schedule:
+      return <ScheduleEntityCard entity={entity} />;
   }
 }

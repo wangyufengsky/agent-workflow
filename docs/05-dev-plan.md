@@ -231,3 +231,18 @@
 | R-04 | 服务：取回意见（默认勾选）、发起修改（重新取回按 id 挑选、抓取并快进分支、分叉即停、重建 worktree、复用「再改改」追加 `review_fix_<n>` 节点）；`pull_request` 交付沿用已打开的 PR | 集成测试（FakeOpencode + FakeHosting + 真实 Git）：GitHub 全流程（审查者在平台提交的建议被快进进来、提示词含勾选的意见与补充说明、推送后仍只有一个 PR 且远端分支有 AI 的修改）；GitLab 意见映射；意见已不在 400、分支分叉 409 且不做改动、PR 关闭 409、本地合并的任务 409 |
 | R-05 | 界面：结果卡「审查意见」区（取回、勾选、补充说明、发起修改）、PR 任务待合并时的「推送到 PR」；助手经操作清单可调用两个操作 | E2E 见 R-06 |
 | R-06 | E2E J18（`task-review.browser.spec.ts`，开发后端以 `AW_FAKE_HOSTING_*` 启用 FakeHosting）；文档 03 / 07 / 10 / 12 / 13 / 14 | `pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
+
+## v1.2 · 定时任务
+
+> 状态：S-01…S-08 **已完成**（2026-10-21，待合并）。设计见 [22-scheduled-tasks.md](22-scheduled-tasks.md)，决策 D90（预设频率、不开放 cron、系统时区）、D91（只在应用打开时运行、错过的最多补跑一次、上一次没结束就跳过、开不了任务时自动暂停并进「需要你处理」）、D92（只用固定流程、按 key 取最新版本、合并仍需点击、风险等级），三项按保守方案实现，**待用户确认**。与设计的补充：时区换算从质量与用量移到 `core/time-zone.ts` 共用；工作流服务新增 `latest(key)`。未做：助手页面类型 `AssistantPage` 没有加入定时任务页面（同批量任务）。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| S-01 | 设计文档 22、任务拆分、决策 D90–D92 | 文档评审通过 |
+| S-02 | 契约：`ScheduleStatus` / `ScheduleFrequencyKind` / `ScheduleRunTrigger` / `ScheduleRunOutcome`、状态机 `schedule`（09 §11）、`EntityKind.Schedule`、`InboxKind.ScheduleFailure`、`ServerEventType.ScheduleUpdated`、`SCHEDULE_*` 常量、错误码 `SCHEDULE_NOT_FOUND` / `SCHEDULE_BUSY`、频率 schema 与 DTO、八个操作契约（删除为 critical） | 单测：状态机表；频率 schema 拒绝错误时刻、空星期、重复星期、非约数小时；操作风险标注 |
+| S-03 | 存储：迁移 `0012_schedules`（`schedules`、`schedule_runs`）与 repo（状态只经 `updateStatus`） | 集成测试见 S-05 |
+| S-04 | 计划时刻：`nextRunAfter`（三种频率、时区、夏令时）与 `foldDueTimes` | 单测：跨天跨周、夏令时跳过的时刻顺延、重复的时刻只运行一次、折叠错过的时刻 |
+| S-05 | 服务与检查循环：到点开任务（不确认计划）、跳过、补跑、失败自动暂停 + `schedule_failure` 条目、暂停 / 恢复、立即运行、删除；检查循环最长 60 秒、注入时钟 | 集成测试（FakeClock + FakeOpencode + 真实 Git）：到点开任务并在「需要你处理」待合并；上一次没结束跳过；关闭三天后重开只补跑一次（`missed = 3`）；分支被删 → 失败暂停 + 条目，恢复后条目关闭；暂停期间不运行；AI 规划流程 400；立即运行与 409；删除项目级联 |
+| S-06 | 助手：`schedules.create` 确认后出现定时任务导航卡片；确认卡片把频率写成「每周一、三、五 02:00」 | 集成测试（MCP SDK 客户端）：`schedules_create` → `needs_confirmation` → 确认后 `entity_ref`（kind `schedule`） |
+| S-07 | 界面：定时任务列表、新建 / 修改页（频率选择器、专业模式的基础分支）、定时任务页（运行记录、补跑说明）；主页流程卡片「定时」、流程页「定时运行」、任务列表入口；「需要你处理」的来源与 `schedule_failure` 卡片；四套主题 | E2E 见 S-08；走查截图含新页面 |
+| S-08 | E2E J19 与 J9 走查；文档收尾（03、07、08、10、11、14、15） | `pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
