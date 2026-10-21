@@ -133,7 +133,7 @@
 
 ## v1.1 · 应用助手（约 2 周，v1.0 发布后）
 
-> 状态：**已完成**（2026-10-21），待合并。设计与实现见 [15-assistant.md](15-assistant.md)（§9 为实现结构与测试）。与设计的差异与补充：按保守方案收紧了助手能用的操作（D65）：工具按界面模式过滤（用户已确认）、`settings.update` 的 `assistant.alwaysAllow`、`opencode.binaryPath`、`ai.bashPolicy`、`worktree.rootDir` 不进入助手 schema（契约新增可选字段 `assistantOmit`，用户已确认）、凭据必填的操作（`databases.create`、`projects.setHosting`）只能 `open_form`（待用户确认）；第一批操作中缺少的数据库只读查询补为新操作 `databases.query`；助手面板自己的操作 `expose.assistant = false`。确认先转为 `confirmed` 再执行（防止重复执行），会话忙时结果在本轮结束后送达；助手会话的权限询问在面板中以卡片回复（不进「需要你处理」）；助手写入对话文件目录的文件以新会话流条目 `attachment` 出现，确认卡片为 `confirmation` 条目。执行 MCP 的 Streamable HTTP 挂载移到 `core/http/mcp-endpoint.ts`，会话流存储按主体泛化，两者由助手复用。各 agent 的权限 deny 另一套 MCP 的工具。前端：面板为外壳第三列；对话状态只以 SSE 为准（发送响应可能晚于「本轮结束」事件）。live 冒烟（`opencode-go/deepseek-v4.1-flash`）：调用 `get_current_time` 与 `projects_list`，回复「明天是 2026 年 10 月 22 日（星期四）」与项目名。未验证：opencode 是否每次会话重新读取 MCP 工具列表（15 §3）。
+> 状态：**已完成**（2026-10-21；A-11 导航卡片 2026-10-22 加入），待合并。设计与实现见 [15-assistant.md](15-assistant.md)（§9 为实现结构与测试）。与设计的差异与补充：按保守方案收紧了助手能用的操作（D65）：工具按界面模式过滤（用户已确认）、`settings.update` 的 `assistant.alwaysAllow`、`opencode.binaryPath`、`ai.bashPolicy`、`worktree.rootDir` 不进入助手 schema（契约新增可选字段 `assistantOmit`，用户已确认）、凭据必填的操作（`databases.create`、`projects.setHosting`）只能 `open_form`（待用户确认）；第一批操作中缺少的数据库只读查询补为新操作 `databases.query`；助手面板自己的操作 `expose.assistant = false`。确认先转为 `confirmed` 再执行（防止重复执行），会话忙时结果在本轮结束后送达；助手会话的权限询问在面板中以卡片回复（不进「需要你处理」）；助手写入对话文件目录的文件以新会话流条目 `attachment` 出现，确认卡片为 `confirmation` 条目。执行 MCP 的 Streamable HTTP 挂载移到 `core/http/mcp-endpoint.ts`，会话流存储按主体泛化，两者由助手复用。各 agent 的权限 deny 另一套 MCP 的工具。前端：面板为外壳第三列；对话状态只以 SSE 为准（发送响应可能晚于「本轮结束」事件）。live 冒烟（`opencode-go/deepseek-v4.1-flash`）：调用 `get_current_time` 与 `projects_list`，回复「明天是 2026 年 10 月 22 日（星期四）」与项目名。未验证：opencode 是否每次会话重新读取 MCP 工具列表（15 §3）。
 
 | # | 任务 | 完成标准 |
 | --- | --- | --- |
@@ -146,4 +146,5 @@
 | A-07 | 主页顶部助手输入框（回车打开面板并开始新对话，与结构化「开始任务」并存）；设置页「助手」分组：查看与撤销「总是允许」 | E2E：主页输入 → 面板中出现新对话；卡片上「总是允许」后设置页列出该操作，撤销后消失 |
 | A-08 | E2E（FakeOpencode）：对助手说开始任务 → 确认卡片 → 任务运行；四主题走查加入助手面板 | `pnpm e2e` 通过，走查截图含助手面板 |
 | A-09 | live 冒烟（真实 opencode + 默认模型 `TEST_MODEL`）：让助手查明天的日期、列出项目 | `live/assistant.live.test.ts` 通过：回复包含明天的日期与示例项目名，会话中调用了 `get_current_time` 与 `projects_list` |
+| A-11 | 导航卡片（D66）：契约可选字段 `produces` 与枚举 `EntityKind`；助手执行的操作成功后在消息流写 `entity_ref`（直接执行与确认后执行两条路径）；前端 `app/entity-routes.ts` 一处映射对象 → 页面，卡片显示图标、标题、状态（任务随 `task.updated`）、「打开」；对象删除后显示「已删除」 | 集成测试：确认后执行 `tasks_create` 与「总是允许」直接执行 `projects_create` 都写出 `entity_ref`，失败的调用不写；E2E：J11 中任务卡片状态更新、「打开」跳到任务页且面板保持打开；直接执行出现项目卡片、删除后显示「已删除」；J9 走查含卡片 |
 | A-10 | 文档收尾：15 与实现对齐、03 / 12 / 14 中的助手部分、本节状态段 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |

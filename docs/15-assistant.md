@@ -1,6 +1,6 @@
 # 15 · 应用助手（v1.1）
 
-> 状态：**v1.1 已实现**（任务 A-01…A-10，见 [05](05-dev-plan.md#v11--应用助手约-2-周v10-发布后)）。v1.0 交付了它的地基：操作清单（[03 §5](03-architecture.md#5-操作清单operation-registry)）与 ⌘K 命令面板。实现中按保守方案收紧的取舍见 D65（待用户确认）。
+> 状态：**v1.1 已实现**（任务 A-01…A-11，见 [05](05-dev-plan.md#v11--应用助手约-2-周v10-发布后)）。v1.0 交付了它的地基：操作清单（[03 §5](03-architecture.md#5-操作清单operation-registry)）与 ⌘K 命令面板。实现中按保守方案收紧的取舍见 D65（①② 用户已确认，③ 待确认）。
 
 ## 1. 定位
 
@@ -19,7 +19,7 @@
 | 应用工具 | **助手 MCP**（`/mcp/assistant`，server 名 `agent-workflow-app`），与执行 MCP 分开、令牌分开；bridge 插件对 `agent-workflow_` 与 `agent-workflow-app_` 两种前缀都注入会话 id，调用按会话归属到对话（不属于任何对话 → `MCP_CONVERSATION_UNRESOLVED`）；`aw-assistant` 的权限 deny `agent-workflow_*`，规划 / 执行 / 评审 agent deny `agent-workflow-app_*`，各自只看到自己那套工具 |
 | 用户外部 MCP | opencode 合并用户全局配置，用户自己配置的 MCP（如日历）助手可直接使用 |
 | 上下文 | 每轮 `system` 注入（模板 `assistant-context.md`）：用户发消息时的当地时间、星期、时区与 UTC 偏移、界面模式、当前页面与选中对象（任务编号与标题、状态、项目；选中的步骤；项目名称与仓库；流程名称）、对话文件目录。页面由前端随消息发送（`AssistantPageRef`），名称由后端查出；指向不存在的对象时消息不发送（如 `TASK_NOT_FOUND`） |
-| 对话存储 | 表 `assistant_conversations`、`assistant_confirmations`（10 §4，迁移 0008）；消息流 JSONL `<数据目录>/assistant/conversations/<id>.jsonl`（格式同 10 §3，另有 `confirmation`、`attachment` 两种条目）；助手写入 `files/<id>/` 的文件（opencode `write` / `edit` 工具）记为附件条目 |
+| 对话存储 | 表 `assistant_conversations`、`assistant_confirmations`（10 §4，迁移 0008）；消息流 JSONL `<数据目录>/assistant/conversations/<id>.jsonl`（格式同 10 §3，另有 `confirmation`、`attachment`、`entity_ref` 三种条目）；助手写入 `files/<id>/` 的文件（opencode `write` / `edit` 工具）记为附件条目 |
 
 ## 3. 助手 MCP 工具
 
@@ -71,6 +71,7 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 
 - 侧边面板（`features/assistant/`）：`⌘J` 或顶栏的助手按钮开合；作为外壳的第三列（宽 `--drawer-sm`）停靠在右侧，页面在旁边照常可用。对话列表（下拉切换、新建、删除）、消息流（用户消息、Markdown 正文、工具调用与结果折叠为一行、确认卡片、权限卡片、文件附件卡片（Electron 中可「在 Finder 中显示」）、系统事件与错误）、输入框（`⌘↵` 发送；助手回复中显示「停止」）、`Esc` 收起。
 - 对话的忙碌状态与权限请求只以 SSE `assistant.updated` 为准（按顺序到达）；发送、停止、回复权限的响应不写缓存，否则可能晚于「本轮已结束」的事件被应用。
+- 导航卡片（A-11，D66）：助手执行的操作若在契约上声明了 `produces`（开始任务、添加项目、新建流程 / 角色、新建数据库连接），执行成功后消息流出现 `entity_ref` 卡片：图标、对象类型与标题、状态（任务的显示状态随 `task.updated` 实时更新）、「打开」。对象类型 → 页面只在 `web/src/app/entity-routes.ts` 定义（`knowledge_conversation` 预留，暂无页面）；「打开」只跳转页面，面板保持打开；对象已删除时显示「已删除」并禁用按钮。
 - 主页顶部助手输入框：回车后新建对话、打开侧边面板并发送。
 - 助手触发的 `open_page` / `open_form` 在面板旁直接导航，面板保持打开；`reveal_file` 经 preload 在 Finder 中显示（浏览器开发模式没有）。
 
@@ -108,7 +109,7 @@ server/src/modules/assistant/
 | 层 | 覆盖 |
 | --- | --- |
 | 单元 | `localTime` 跨日与各时区偏移；确认状态机；操作清单标注（`assistant.*` 不暴露给助手）；配置快照（两套 MCP、助手 agent、互相 deny） |
-| 集成 | `assistant.int.test.ts`：对话增删查与消息流、会话目录 / agent / bash 规则 / 每轮 system、`ASSISTANT_BUSY` 与停止、面板中的权限请求、附件、删除时清理；`assistant.mcp.int.test.ts`：令牌隔离、工具生成与过滤、read / write / 总是允许 / critical / 取消 / 忙时确认、`MCP_CONVERSATION_UNRESOLVED`、`MCP_TOOL_NOT_ALLOWED`、凭据与 D65 字段被拒、全部助手专用工具；`databases.int.test.ts`：`databases.query` |
+| 集成 | `assistant.mcp.int.test.ts` 另覆盖 `entity_ref`（确认后执行与直接执行，失败不写）；`assistant.int.test.ts`：对话增删查与消息流、会话目录 / agent / bash 规则 / 每轮 system、`ASSISTANT_BUSY` 与停止、面板中的权限请求、附件、删除时清理；`assistant.mcp.int.test.ts`：令牌隔离、工具生成与过滤、read / write / 总是允许 / critical / 取消 / 忙时确认、`MCP_CONVERSATION_UNRESOLVED`、`MCP_TOOL_NOT_ALLOWED`、凭据与 D65 字段被拒、全部助手专用工具；`databases.int.test.ts`：`databases.query` |
 | `@opencode` | 注入后 `aw-assistant` 与 `agent-workflow-app` 出现在 opencode 配置中，两套 MCP 都已连接 |
-| E2E | J11「对助手说开始任务 → 确认卡片 → 任务运行」；主页输入 → 面板、`open_page` 跳转且面板保持打开、「确认并总是允许」→ 设置页撤销；J9 走查含助手面板（简单与专业） |
+| E2E | J11「对助手说开始任务 → 确认卡片 → 任务卡片状态更新 → 打开任务页」；直接执行出现项目卡片、删除后「已删除」；主页输入 → 面板、`open_page` 跳转且面板保持打开、「确认并总是允许」→ 设置页撤销；J9 走查含助手面板（简单与专业） |
 | live | `live/assistant.live.test.ts`：真实模型查明天的日期并列出项目（调用 `get_current_time` 与 `projects_list`，回复含两者），报告写到 `live/reports/assistant-*.json` |

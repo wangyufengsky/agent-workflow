@@ -127,6 +127,7 @@ export function createConfirmations(deps: ConfirmationsDeps) {
       publish(id);
       const result = await runOperation(impl, c.input, log);
       repo.setConfirmationResult(id, result);
+      if (result.ok) conversations.recordProduced(c.conversationId, impl.contract, result.output);
       const dto = publish(id);
       await conversations.deliver(
         c.conversationId,

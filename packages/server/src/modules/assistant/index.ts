@@ -42,6 +42,7 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
       ...operationTools(deps.operations, {
         settings: deps.settings,
         requestConfirmation: confirmations.request,
+        recordProduced: conversations.recordProduced,
       }),
       ...helperTools({ ...deps, conversations }),
     ],

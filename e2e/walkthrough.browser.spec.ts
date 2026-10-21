@@ -6,6 +6,7 @@ import { API_BASE, AUTH } from './env.ts';
 import {
   appTool,
   createProject,
+  createRepo,
   type E2EProject,
   passReview,
   patchSettings,
@@ -147,9 +148,12 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     tls: false,
   });
 
-  // A conversation whose last call waits for confirmation, for the assistant panel (A-08).
+  // A conversation with a produced object (D66) whose last call waits for confirmation, for the assistant panel.
+  await patchSettings(request, { 'assistant.alwaysAllow': ['projects.create'] });
   await queueAssistantTurn(request, [
-    { type: 'text', text: '好的，我来把**检查命令**改成 `npm test`。' },
+    appTool('projects_create', { repoPath: createRepo(), name: '助手加的项目' }),
+
+    { type: 'text', text: '项目加好了。我再把**检查命令**改成 `npm test`。' },
     appTool('projects_update', { id: reviewProject.id, checkCommand: 'npm test' }),
     { type: 'text', text: '请在卡片上确认。' },
   ]);
@@ -165,6 +169,7 @@ async function seed(request: APIRequestContext): Promise<Seed> {
           .items.length,
     )
     .toBe(1);
+  await patchSettings(request, { 'assistant.alwaysAllow': [] });
 
   const completedReview = await waitForStatus(request, completed, 'review');
   await api(request, 'POST', `/tasks/${completedReview.id}/deliver`, { strategy: 'squash' });
@@ -284,6 +289,7 @@ const SHOTS: Shot[] = [
       await page.keyboard.press('ControlOrMeta+j');
       const panel = page.getByRole('complementary', { name: '应用助手' });
       await expect(panel.getByTestId('confirmation-card')).toBeVisible();
+      await expect(panel.getByTestId('entity-card')).toBeVisible();
       return panel;
     },
   },
@@ -372,6 +378,7 @@ const SHOTS: Shot[] = [
       await page.keyboard.press('ControlOrMeta+j');
       const panel = page.getByRole('complementary', { name: '应用助手' });
       await expect(panel.getByTestId('confirmation-card')).toBeVisible();
+      await expect(panel.getByTestId('entity-card')).toBeVisible();
       return panel;
     },
   },

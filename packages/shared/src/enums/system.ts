@@ -38,6 +38,8 @@ export const TranscriptEntryKind = {
   Confirmation: 'confirmation',
   /** Assistant conversations only: a file the assistant wrote in the conversation's files directory (15 §6). */
   Attachment: 'attachment',
+  /** Assistant conversations only: an object an operation produced, shown as a navigation card (D66). */
+  EntityRef: 'entity_ref',
 } as const;
 export type TranscriptEntryKind = (typeof TranscriptEntryKind)[keyof typeof TranscriptEntryKind];
 export const transcriptEntryKindSchema = z.enum(TranscriptEntryKind);

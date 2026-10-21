@@ -27,6 +27,7 @@ export * from './contracts/mcp/submit-plan.ts';
 export * from './contracts/mcp/submit-result.ts';
 export * from './contracts/mcp/submit-review.ts';
 export * from './enums/assistant.ts';
+export * from './enums/entity.ts';
 export * from './enums/git.ts';
 export * from './enums/inbox.ts';
 export * from './enums/status-tone.ts';

@@ -7,6 +7,7 @@ import {
   type ErrorInfo,
   isAssistantCallable,
   MCP_SESSION_ARG,
+  type OperationContract,
   OperationRisk,
   UiMode,
 } from '@aw/shared';
@@ -44,6 +45,8 @@ const RISK_NOTE: Record<OperationRisk, string> = {
 
 export type OperationToolDeps = {
   settings: SettingsService;
+  /** Records the object an operation produced in the conversation (D66). */
+  recordProduced(conversationId: string, contract: OperationContract, output: unknown): void;
   /** Records a pending confirmation for a call the user has to approve. */
   requestConfirmation(
     conversationId: string,
@@ -71,8 +74,12 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
           const allowed =
             contract.risk === OperationRisk.Read ||
             (contract.risk === OperationRisk.Write && deps.settings.get('assistant.alwaysAllow').includes(contract.id));
-          // A failing operation answers with its error code, like any tool (12 §5).
-          if (allowed) return impl.run(input);
+          if (allowed) {
+            // A failing operation answers with its error code, like any tool (12 §5).
+            const output = await impl.run(input);
+            deps.recordProduced(conversation.id, contract, output);
+            return output;
+          }
           const confirmation = deps.requestConfirmation(conversation.id, contract.id, input);
           return {
             status: 'needs_confirmation',

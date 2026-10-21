@@ -7,6 +7,7 @@ import {
   updateDbConnectionRequestSchema,
 } from '../contracts/api/databases.ts';
 import { dbQueryInputSchema, dbQueryOutputSchema } from '../contracts/mcp/db-tools.ts';
+import { EntityKind } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -36,6 +37,7 @@ export const createDbConnectionOp = defineOperationContract({
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/db-connections', status: 201 },
   credentialFields: ['password'],
+  produces: { kind: EntityKind.DbConnection, ref: (connection) => ({ id: connection.id, title: connection.name }) },
 });
 
 export const updateDbConnectionOp = defineOperationContract({

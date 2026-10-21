@@ -64,6 +64,7 @@ const Entry = memo(function Entry({ entry }: { entry: TranscriptEntry }) {
       );
     case TranscriptEntryKind.Confirmation:
     case TranscriptEntryKind.Attachment:
+    case TranscriptEntryKind.EntityRef:
       // Assistant conversations only (10 §3).
       return null;
   }

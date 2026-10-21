@@ -13,7 +13,9 @@ import {
   type AssistantPermissionRequestDTO,
   ErrorCode,
   OPENCODE_ASSISTANT_AGENT,
+  type OperationContract,
   type PermissionDecision,
+  producedEntity,
   type SendAssistantMessageRequest,
   ServerEventType,
   TranscriptEntryKind,
@@ -385,6 +387,12 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     /** Records a confirmation card in the conversation's message stream (15 §4). */
     recordConfirmation(id: string, confirmationId: string): void {
       record(get(id), [{ kind: TranscriptEntryKind.Confirmation, data: { confirmationId } }]);
+    },
+
+    /** An operation the assistant ran produced an object: a navigation card in the conversation (D66). */
+    recordProduced(id: string, contract: OperationContract, output: unknown): void {
+      const entity = producedEntity(contract, output);
+      if (entity !== undefined) record(get(id), [{ kind: TranscriptEntryKind.EntityRef, data: entity }]);
     },
   };
 }

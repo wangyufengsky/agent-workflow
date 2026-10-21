@@ -247,7 +247,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `runtime.updated` | `RuntimeDTO` | 运行环境指示 |
 | `settings.updated` | `{ keys: SettingKey[] }` | 重新拉设置（主题、模式即时生效） |
 | `assistant.updated` | `AssistantConversationDTO` | 对话列表与面板（忙碌、待回复的权限请求） |
-| `assistant.transcript` | `{ conversationId, entries: TranscriptEntry[] }` | 追加到面板的消息流 |
+| `assistant.transcript` | `{ conversationId, entries: TranscriptEntry[] }` | 追加到面板的消息流；含 `confirmation`（确认卡片）、`attachment`（文件）、`entity_ref`（`{ kind, id, title }`，产出对象的导航卡片，D66）条目（10 §3） |
 | `assistant.confirmation` | `AssistantConfirmationDTO` | 确认卡片的状态与结果 |
 | `assistant.navigate` | `{ conversationId, target: AssistantPageRef }` | 助手调用 `open_page`：面板旁跳转，面板保持打开 |
 | `assistant.open_form` | `{ conversationId, form: AssistantForm, values }` | 助手调用 `open_form`：打开表单并预填（不含凭据字段） |

@@ -304,6 +304,7 @@ payload / response：
 | `error` | `ErrorInfo`（`{ code, message, details? }`；尝试结束后的会话错误不记录，如提交后我们发出的中止） |
 | `confirmation` | `{ confirmationId }`（仅助手对话：一次等待用户确认的调用，卡片内容来自 `assistant_confirmations`） |
 | `attachment` | `{ path }`（仅助手对话：助手写入对话文件目录 `files/<id>/` 的文件，`path` 相对该目录） |
+| `entity_ref` | `{ kind: EntityKind, id, title }`（仅助手对话：助手调用的操作执行成功后产出的对象，界面渲染为导航卡片，D66） |
 
 读取：`GET /attempts/:id/transcript?afterSeq=` 每页 `TRANSCRIPT_PAGE_SIZE` 行；seq 从 1 起逐行连续编号（第 i 行即 seq i+1），所以一页就是按行切出的一段，只解析这一段（M6-02：5 MB、约六千行的文件，每页约 20 ms）；页内同一 `partId` 只保留最后一行、放在它首次出现的位置。界面先显示第一页，其余页在后台接着读；读页期间经 SSE 到达的行另存一处，显示时与各页按 seq 去重合并（`transcriptEntries`），因此读页与追加交错时不丢行。
 
@@ -336,7 +337,7 @@ payload / response：
 
 索引：`(conversation_id, created_at)`。
 
-消息流：`<数据目录>/assistant/conversations/<id>.jsonl`，格式同 §3（多 `confirmation`、`attachment` 两种条目）；记录用户的消息、模型的正文与工具调用、权限请求、错误；后端代发的确认结果消息与每轮注入的 `system` 不记录（卡片显示结果）。
+消息流：`<数据目录>/assistant/conversations/<id>.jsonl`，格式同 §3（多 `confirmation`、`attachment`、`entity_ref` 三种条目）；记录用户的消息、模型的正文与工具调用、权限请求、错误；后端代发的确认结果消息与每轮注入的 `system` 不记录（卡片显示结果）。
 
 ## 5. 删除与清理
 

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { API_PREFIX } from '../constants/app.ts';
+import type { EntityKind, EntityRef } from '../enums/entity.ts';
 import { type OperationRisk, operationRiskSchema } from '../enums/system.ts';
 import { type UiMode, uiModeSchema } from '../enums/ui.ts';
 
@@ -33,12 +34,23 @@ export type OperationContract<I extends z.ZodObject = z.ZodObject, O extends z.Z
   assistantOmit?: ReadonlyArray<keyof z.input<I> & string>;
   /** Lowest UI mode that shows the operation. */
   mode: UiMode;
+  /**
+   * The object the operation creates, and how to read its id and title from the output: the assistant shows it as a
+   * navigation card once the operation ran (D66).
+   */
+  produces?: { kind: EntityKind; ref(output: z.output<O>): { id: string; title: string } };
 };
 
 export function defineOperationContract<I extends z.ZodObject, O extends z.ZodType>(
   contract: OperationContract<I, O>,
 ): OperationContract<I, O> {
   return contract;
+}
+
+/** The object an operation produced, read from its (parsed) output; undefined when it produces none. */
+export function producedEntity(contract: OperationContract, output: unknown): EntityRef | undefined {
+  if (contract.produces === undefined) return undefined;
+  return { kind: contract.produces.kind, ...contract.produces.ref(output) };
 }
 
 /** Input fields the assistant never sees or sets (15 §5). */

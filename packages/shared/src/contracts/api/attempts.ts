@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { entityRefSchema } from '../../enums/entity.ts';
 import { TranscriptEntryKind, transcriptSystemEventSchema } from '../../enums/system.ts';
 import { attemptKindSchema, attemptStatusSchema } from '../../enums/task.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
@@ -77,6 +78,7 @@ export const transcriptEntrySchema = z.discriminatedUnion('kind', [
   }),
   /** `path` is relative to the conversation's files directory. */
   z.object({ ...entry, kind: z.literal(TranscriptEntryKind.Attachment), data: z.object({ path: z.string() }) }),
+  z.object({ ...entry, kind: z.literal(TranscriptEntryKind.EntityRef), data: entityRefSchema }),
 ]);
 export type TranscriptEntry = z.infer<typeof transcriptEntrySchema>;
 

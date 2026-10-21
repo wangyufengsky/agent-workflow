@@ -1,4 +1,4 @@
-import { AssistantConfirmationStatus, OperationRisk } from '@aw/shared';
+import { AssistantConfirmationStatus, EntityKind, OperationRisk } from '@aw/shared';
 
 /** The app assistant (15 §6). */
 export const ASSISTANT_COPY = {
@@ -60,4 +60,18 @@ export const ASSISTANT_SETTINGS_COPY = {
   alwaysAllowHint: '助手调用这些操作时不再弹出确认卡片。合并、取消、删除等关键操作每次都需要确认，不会出现在这里。',
   none: '还没有总是允许的操作。在助手的确认卡片上选「确认并总是允许」即可加入。',
   revoke: '撤销',
+} as const;
+
+/** Navigation cards of the objects the assistant's calls produced (D66). */
+export const ENTITY_COPY = {
+  kind: {
+    [EntityKind.Task]: '任务',
+    [EntityKind.Project]: '项目',
+    [EntityKind.Workflow]: '流程',
+    [EntityKind.Role]: '角色',
+    [EntityKind.DbConnection]: '数据库连接',
+    [EntityKind.KnowledgeConversation]: '知识库会话',
+  } satisfies Record<EntityKind, string>,
+  open: '打开',
+  deleted: '已删除',
 } as const;

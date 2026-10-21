@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
-import { appTool, createProject, patchSettings, queueAssistantTurn, queueTurn } from './helpers.ts';
+import { appTool, createProject, createRepo, patchSettings, queueAssistantTurn, queueTurn } from './helpers.ts';
 
 // J11 and the panel smoke (A-06–A-08): the assistant's turns are played by FakeOpencode through the assistant MCP.
 // The file name sorts after onboarding.browser.spec.ts, which needs the shared backend without any project.
@@ -43,9 +43,13 @@ test('J11 对助手说开始任务 → 确认卡片 → 任务运行', async ({ 
   await expect(card).toContainText('已执行');
   await expect(panel).toContainText('任务已经开始了。');
 
-  // The link's name carries the open-item count when earlier specs left some.
-  await page.getByRole('navigation').getByRole('link', { name: /^任务/ }).click();
-  await expect(page.getByRole('row').filter({ hasText: '助手开的任务：退款金额少算了运费' })).toContainText('执行中');
+  // The produced task shows as a navigation card whose status follows the task (D66).
+  const taskCard = panel.getByTestId('entity-card');
+  await expect(taskCard).toContainText('助手开的任务：退款金额少算了运费');
+  await expect(taskCard).toContainText('执行中');
+  await taskCard.getByRole('button', { name: '打开' }).click();
+  await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+$/);
+  await expect(page.getByRole('heading', { name: '助手开的任务：退款金额少算了运费' })).toBeVisible();
   await expect(panel).toBeVisible();
 });
 
@@ -82,4 +86,35 @@ test('主页输入交给助手；open_page 在面板旁跳转；卡片上「总�
 
   await page.keyboard.press('ControlOrMeta+j');
   await expect(panel).toBeHidden();
+});
+
+test('总是允许的调用直接执行并出现对象卡片；对象删除后卡片显示「已删除」', async ({ page, request }) => {
+  await createProject(request, null);
+  await patchSettings(request, { 'assistant.alwaysAllow': ['projects.create'] });
+  const repoPath = createRepo();
+  await queueAssistantTurn(request, [
+    appTool('projects_create', { repoPath, name: '助手加的项目' }),
+    { type: 'text', text: '项目已添加。' },
+  ]);
+
+  await page.goto('/');
+  await page.keyboard.press('ControlOrMeta+j');
+  const panel = page.getByRole('complementary', { name: '应用助手' });
+  await panel.getByLabel('发给助手的消息').fill('把这个仓库加成项目');
+  await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
+  const card = panel.getByTestId('entity-card');
+  await expect(card).toContainText('助手加的项目');
+  await expect(card.getByRole('button', { name: '打开' })).toBeEnabled();
+
+  const projects: { items: { id: string; name: string }[] } = await (
+    await request.get(`${API_BASE}/projects`, { headers: AUTH })
+  ).json();
+  const added = projects.items.find((p) => p.name === '助手加的项目');
+  if (added === undefined) throw new Error('project not added');
+  await request.delete(`${API_BASE}/projects/${added.id}`, { headers: AUTH });
+
+  await page.reload();
+  await page.keyboard.press('ControlOrMeta+j');
+  await expect(card).toContainText('已删除');
+  await expect(card.getByRole('button', { name: '打开' })).toBeDisabled();
 });

@@ -24,6 +24,7 @@ import {
   useReplyAssistantPermission,
 } from './assistant.queries.ts';
 import { ConfirmationCard } from './confirmation-card.tsx';
+import { EntityCard } from './entity-card.tsx';
 
 type ToolResult = Extract<TranscriptEntry, { kind: typeof TranscriptEntryKind.ToolResult }>;
 
@@ -149,6 +150,8 @@ const Message = memo(function Message({ entry, ctx }: { entry: TranscriptEntry; 
     }
     case TranscriptEntryKind.Attachment:
       return <AttachmentCard conversationId={ctx.conversation.id} path={entry.data.path} />;
+    case TranscriptEntryKind.EntityRef:
+      return <EntityCard entity={entry.data} />;
     case TranscriptEntryKind.System:
       return <p className={styles.line}>{TRANSCRIPT_SYSTEM_LABEL[entry.data.event]}</p>;
     case TranscriptEntryKind.Error:

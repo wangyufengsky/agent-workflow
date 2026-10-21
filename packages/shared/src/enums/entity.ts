@@ -1,0 +1,19 @@
+import { z } from 'zod';
+
+/** Objects an operation can produce (`OperationContract.produces`); the renderer maps each to its page (D66). */
+export const EntityKind = {
+  Task: 'task',
+  Project: 'project',
+  /** Identified by its key: the editor's route is `/workflows/:key`. */
+  Workflow: 'workflow',
+  Role: 'role',
+  DbConnection: 'db_connection',
+  /** Reserved for the knowledge base's conversations (v1.1). */
+  KnowledgeConversation: 'knowledge_conversation',
+} as const;
+export type EntityKind = (typeof EntityKind)[keyof typeof EntityKind];
+export const entityKindSchema = z.enum(EntityKind);
+
+/** A produced object as the assistant's message stream records it (10 §3 `entity_ref`). */
+export const entityRefSchema = z.object({ kind: entityKindSchema, id: z.string(), title: z.string() });
+export type EntityRef = z.infer<typeof entityRefSchema>;

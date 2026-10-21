@@ -15,6 +15,7 @@ import {
   RoleBaseAgent,
   ServerEventType,
   sendAssistantMessageOp,
+  type TranscriptPage,
   updateSettingsOp,
 } from '@aw/shared';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -25,7 +26,7 @@ import { createFakeClock } from '../../../test/helpers/clock.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { createTestRepo } from '../../../test/helpers/git.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
-import { addProject } from '../../../test/helpers/tasks.ts';
+import { addProject, workflowId } from '../../../test/helpers/tasks.ts';
 
 let t: TestApp;
 let mcp: Client;
@@ -53,6 +54,12 @@ const becomesIdle = () =>
   waitForEvent(t.app.events, ServerEventType.AssistantUpdated, (c) => c.id === conversationId && !c.busy);
 
 const call = (name: string, args: Record<string, unknown> = {}) => callTool(mcp, name, { ...args, ...session });
+
+async function entityRefs(): Promise<unknown[]> {
+  const res = await t.request({ method: 'GET', url: `/assistant/conversations/${conversationId}/transcript` });
+  const page: TranscriptPage = JSON.parse(res.body);
+  return page.entries.flatMap((e) => (e.kind === 'entity_ref' ? [e.data] : []));
+}
 
 /** Confirms (or cancels) and waits until the result reached the session as the next message. */
 async function decide(confirmationId: string, decision: 'confirm' | 'cancel', alwaysAllow?: boolean) {
@@ -135,6 +142,32 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     const second = await call('projects_update', { id: project.id, name: 'B' });
     expect(second.body).toMatchObject({ name: 'B' });
     expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toHaveLength(1);
+  });
+
+  it('确认后执行「开始任务」：消息流出现指向该任务的 entity_ref（D66）', async () => {
+    const { project } = await addProject(t);
+    const { body } = await call('tasks_create', {
+      projectId: project.id,
+      workflowId: await workflowId(t, 'bugfix'),
+      requirement: '订单时间显示错了',
+      start: false,
+    });
+    expect(await entityRefs()).toEqual([]);
+    const res = await decide(String(body.confirmation_id), 'confirm');
+    const output = res.body.result?.ok === true ? res.body.result.output : undefined;
+    expect(output).toMatchObject({ key: 'T-1', title: '订单时间显示错了' });
+    expect(await entityRefs()).toEqual([
+      { kind: 'task', id: (output as { id: string }).id, title: 'T-1 · 订单时间显示错了' },
+    ]);
+  });
+
+  it('直接执行（总是允许）的路径同样记下产出的对象；失败的调用不记', async () => {
+    await t.call(updateSettingsOp, { 'assistant.alwaysAllow': ['projects.create'] });
+    const repo = await createTestRepo();
+    const { body } = await call('projects_create', { repoPath: repo.path, name: '库存服务' });
+    expect(body).toMatchObject({ name: '库存服务' });
+    expect(await call('projects_create', { repoPath: repo.path })).toMatchObject({ isError: true });
+    expect(await entityRefs()).toEqual([{ kind: 'project', id: body.id, title: '库存服务' }]);
   });
 
   it('critical：不能设为总是允许，即使在总是允许列表中也每次确认', async () => {
