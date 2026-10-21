@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { inboxItemSchema, inboxResolveResponseSchema, listInboxQuerySchema } from '../contracts/api/inbox.ts';
+import { InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -32,6 +33,7 @@ export const countInboxOp = defineOperationContract({
 export const resolveInboxOp = defineOperationContract({
   ...common,
   id: 'inbox.resolve',
+  refs: { id: InputRef.InboxItem },
   title: 'op.inbox.resolve',
   description:
     'Answer an open item with the response its kind expects (answer, permission decision, acceptance, plan decision, retry or cancel)',
@@ -45,6 +47,7 @@ export const resolveInboxOp = defineOperationContract({
 export const dismissInboxOp = defineOperationContract({
   ...common,
   id: 'inbox.dismiss',
+  refs: { id: InputRef.InboxItem },
   title: 'op.inbox.dismiss',
   description: 'Dismiss an open failure or delivery item',
   input: z.object({ id: z.string() }),

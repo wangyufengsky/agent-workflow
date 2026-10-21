@@ -7,6 +7,7 @@ import {
   type ErrorInfo,
   isAssistantCallable,
   MCP_SESSION_ARG,
+  type NeedsConfirmationOutput,
   type OperationContract,
   OperationRisk,
   UiMode,
@@ -92,7 +93,7 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
             status: 'needs_confirmation',
             confirmation_id: confirmation.id,
             instruction: NEEDS_CONFIRMATION_INSTRUCTION,
-          };
+          } satisfies NeedsConfirmationOutput;
         },
       } satisfies AssistantTool;
     });

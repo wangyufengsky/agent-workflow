@@ -7,7 +7,7 @@ import {
   updateDbConnectionRequestSchema,
 } from '../contracts/api/databases.ts';
 import { dbQueryInputSchema, dbQueryOutputSchema } from '../contracts/mcp/db-tools.ts';
-import { EntityKind } from '../enums/entity.ts';
+import { EntityKind, InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -43,6 +43,7 @@ export const createDbConnectionOp = defineOperationContract({
 export const updateDbConnectionOp = defineOperationContract({
   ...common,
   id: 'databases.update',
+  refs: { id: InputRef.DbConnection },
   title: 'op.databases.update',
   description: 'Change a database connection; the password changes only when given',
   input: updateDbConnectionRequestSchema,
@@ -55,6 +56,7 @@ export const updateDbConnectionOp = defineOperationContract({
 export const deleteDbConnectionOp = defineOperationContract({
   ...common,
   id: 'databases.delete',
+  refs: { id: InputRef.DbConnection },
   title: 'op.databases.delete',
   description: 'Delete a database connection and its stored password; projects lose it',
   input: byId,
