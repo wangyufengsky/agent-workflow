@@ -5,6 +5,7 @@ export const PROJECTS_COPY = {
   addTitle: '添加项目',
   repoPath: '仓库目录',
   repoPathHint: '仓库的根目录（包含 .git 的目录）的完整路径。',
+  repoPathMissing: '先填写或选择仓库的根目录。',
   repoPathPlaceholder: '/Users/you/code/my-app',
   chooseFolder: '选择文件夹…',
   added: '项目已添加',

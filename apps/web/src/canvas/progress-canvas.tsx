@@ -3,6 +3,7 @@ import { NodeStatus } from '@aw/shared';
 import { type Edge, MiniMap, type Node, ReactFlow, ReactFlowProvider, useReactFlow, useStore } from '@xyflow/react';
 import { useEffect, useMemo, useRef } from 'react';
 import styles from './canvas.module.css';
+import { CANVAS_FIT, EDGE_DONE, EDGE_PENDING } from './canvas-style.ts';
 import { type CanvasStep, TaskNode, type TaskNodeData } from './task-node.tsx';
 import { useGraphLayout } from './use-graph-layout.ts';
 import { useNodeSizes } from './use-node-sizes.ts';
@@ -11,8 +12,6 @@ const NODE_TYPES = { task: TaskNode };
 /** The minimap helps only for larger graphs (14 §5). */
 const MINIMAP_FROM = 12;
 const FINISHED: readonly NodeStatus[] = [NodeStatus.Done, NodeStatus.Skipped];
-/** Fitting never zooms out further than this: past it node titles are unreadable; the user pans instead. */
-const FIT = { padding: 0.15, minZoom: 0.6, maxZoom: 1 };
 
 type Props = {
   steps: readonly CanvasStep[];
@@ -33,15 +32,8 @@ function Flow({ steps, selectedId, onSelect, onOpen }: Props) {
           if (source === undefined) return [];
           const from = steps.find((s) => s.id === source);
           const done = from?.status !== undefined && FINISHED.includes(from.status);
-          // Finished upstream: solid highlighted line; otherwise dashed (14 §5).
-          return [
-            {
-              id: `${source}->${step.id}`,
-              source,
-              target: step.id,
-              style: done ? { stroke: 'var(--edge-done)' } : { stroke: 'var(--edge)', strokeDasharray: '6 6' },
-            },
-          ];
+          // Finished upstream: solid line in the done tone; otherwise dashed (14 §5).
+          return [{ id: `${source}->${step.id}`, source, target: step.id, style: done ? EDGE_DONE : EDGE_PENDING }];
         }),
       ),
     [steps, idOf],
@@ -54,7 +46,7 @@ function Flow({ steps, selectedId, onSelect, onOpen }: Props) {
   useEffect(() => {
     if (fitted.current || !measured || positions.size === 0) return;
     fitted.current = true;
-    requestAnimationFrame(() => void fitView(FIT));
+    requestAnimationFrame(() => void fitView(CANVAS_FIT));
   }, [measured, positions, fitView]);
 
   const { onNodesChange, measured: sizeOf } = useNodeSizes();

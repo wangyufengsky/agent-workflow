@@ -41,3 +41,32 @@
 .error {
   color: var(--danger);
 }
+.action {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+.mark {
+  flex: none;
+  display: inline-flex;
+  color: var(--muted);
+}
+.action[data-state="ok"] .mark {
+  color: var(--ok);
+}
+.action[data-state="failed"] .mark {
+  color: var(--danger);
+}
+.now {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--run-fill);
+  color: var(--run);
+  font-size: var(--fs-sm);
+}

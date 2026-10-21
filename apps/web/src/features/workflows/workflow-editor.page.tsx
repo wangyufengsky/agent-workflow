@@ -179,7 +179,12 @@ function WorkflowEditor({ workflow, roles }: { workflow: WorkflowDTO; roles: rea
                 />
                 <span>{C.acceptEachNode}</span>
               </label>
-              <h3 className="sec-t">{C.defaultAcceptance}</h3>
+              <span className="hint">{C.checkpointsHint}</span>
+            </div>
+          </Panel>
+          <Panel title={C.defaultAcceptance}>
+            <div className="col">
+              <span className="hint">{C.defaultAcceptanceHint}</span>
               <AcceptanceEditor
                 idPrefix="workflow-default"
                 value={definition.defaultAcceptance}
@@ -218,11 +223,15 @@ function WorkflowEditor({ workflow, roles }: { workflow: WorkflowDTO; roles: rea
                     rows={6}
                     placeholder={C.guidancePlaceholder}
                     value={definition.plannerGuidance ?? ''}
+                    aria-describedby="workflow-guidance-hint"
                     onChange={(e) => {
                       const { plannerGuidance: _old, ...rest } = definition;
                       setDefinition(e.target.value === '' ? rest : { ...rest, plannerGuidance: e.target.value });
                     }}
                   />
+                  <span id="workflow-guidance-hint" className="hint">
+                    {C.guidanceHint}
+                  </span>
                 </div>
                 <h3 className="sec-t">{C.requiredSteps}</h3>
                 <RequiredStepsEditor

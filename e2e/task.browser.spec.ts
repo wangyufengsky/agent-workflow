@@ -113,7 +113,7 @@ test('J4 检查失败 → 自动重试成功；另一步骤预算耗尽 → 任�
 
     await startTask(page, project, /新功能开发/, '生成标记文件并更新说明');
     const failure = page.getByTestId('failure-panel');
-    await expect(failure).toContainText('「更新说明」多次尝试仍没有完成', { timeout: TASK_RUN_TIMEOUT_MS });
+    await expect(failure).toContainText('执行步骤「更新说明」时多次尝试仍没有完成', { timeout: TASK_RUN_TIMEOUT_MS });
     await expect(page.getByTestId('step-a')).toContainText('完成');
 
     await queueTurn(request, project, { title: '更新说明' }, [submitResult('已更新说明')]);

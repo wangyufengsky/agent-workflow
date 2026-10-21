@@ -122,6 +122,8 @@ export function StartTaskForm({
   const navigate = useNavigate();
   const selected = workflowId ?? (shown?.find((w) => w.key === initialWorkflowKey) ?? shown?.[0])?.id;
   const canStart = selected !== undefined && projectId !== '' && requirement.trim() !== '';
+  // Why「开始」is unavailable, said next to it (only the requirement can be missing once projects and workflows load).
+  const blocked = canStart ? undefined : requirement.trim() === '' ? C.needsRequirement : C.needsWorkflow;
 
   const start = (asDraft = false) => {
     if (!canStart) return;
@@ -236,7 +238,19 @@ export function StartTaskForm({
             {C.saveDraft}
           </Button>
         )}
-        <Button type="submit" variant="primary" icon="sparkle" pending={create.isPending} disabled={!canStart}>
+        {blocked !== undefined && (
+          <span id="start-blocked" className="hint">
+            {blocked}
+          </span>
+        )}
+        <Button
+          type="submit"
+          variant="primary"
+          icon="sparkle"
+          pending={create.isPending}
+          disabled={!canStart}
+          aria-describedby={blocked === undefined ? undefined : 'start-blocked'}
+        >
           {C.start}
           <span className="kbd">
             {MOD_KEY}

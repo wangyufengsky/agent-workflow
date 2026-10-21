@@ -61,35 +61,48 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
   const browsable = task.git.worktreeStatus === WorktreeStatus.Ready;
   return (
     <Panel solid>
-      <div className="col" data-testid="result-card">
+      <div className={styles.result} data-testid="result-card">
         <p className={styles.headline}>
           <Icon name="check" />
           {C.resultHeadline(result.nodeSummaries.length, result.filesChanged, result.insertions, result.deletions)} ·{' '}
           {checks}
         </p>
         <DeliveryOutcome task={task} />
-        <h3 className="sec-t">{report ? C.report : C.summary}</h3>
-        <Markdown source={result.summary} />
+        <section className={styles.block}>
+          <h3 className="sec-t">{report ? C.report : C.summary}</h3>
+          {report ? (
+            <Markdown source={result.summary} />
+          ) : (
+            <ol className={styles.stepSummaries}>
+              {result.nodeSummaries.map((n) => (
+                <li key={n.key}>
+                  <span className={styles.stepTitle}>{n.title}</span>
+                  <Markdown source={n.summary} />
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
         {result.assumptions.length > 0 && (
-          <>
+          <section className={styles.block}>
             <h3 className="sec-t">{C.assumptions}</h3>
-            <ul>
+            <ul className={styles.bullets}>
               {result.assumptions.map((a) => (
                 <li key={a}>{a}</li>
               ))}
             </ul>
-          </>
+          </section>
         )}
         {result.files.length > 0 && (
-          <>
-            <h3 className="sec-t row">
-              <span className="grow">{C.changedFiles}</span>
+          <section className={styles.block}>
+            <div className={styles.blockHead}>
+              <h3 className="sec-t grow">{C.changedFiles}</h3>
               {browsable && (
                 <Button size="sm" variant="ghost" onClick={() => setViewing(true)}>
                   {D.viewChanges}
                 </Button>
               )}
-            </h3>
+            </div>
             <ul className={styles.files}>
               {result.files.map((f) => (
                 <li key={f.path} className={styles.file}>
@@ -109,7 +122,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
                 </li>
               ))}
             </ul>
-          </>
+          </section>
         )}
         {task.status === TaskStatus.Review && <DeliveryActions task={task} />}
       </div>
