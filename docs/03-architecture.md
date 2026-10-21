@@ -17,7 +17,7 @@
 │   ├─ /mcp/exec      执行 MCP，Streamable HTTP（执行 MCP 令牌）          │
 │   ├─ /mcp/assistant 助手 MCP（v1.1，独立令牌，server agent-workflow-app） │
 │   ├─ SQLite（app.db）+ JSONL 日志                                       │
-│   ├─ git CLI / GitHub / GitLab / mysql2                                │
+│   ├─ git CLI / GitHub / GitLab / 项目数据库驱动                          │
 │   └─ 子进程：opencode serve 1.19.0（127.0.0.1:随机端口）                 │
 │         └─ 配置注入：mcp.agent-workflow → .../mcp/exec                 │
 │                     mcp.agent-workflow-app → .../mcp/assistant（v1.1） │
@@ -29,7 +29,7 @@
 ```
 
 - **main 不含业务逻辑**。凡需要系统能力（选目录、加解密）的，renderer 通过 preload 调 main；后端需要加解密时经 utilityProcess 的 `MessagePort` 请求 main。
-- **后端是唯一的状态权威**。renderer 不直接碰 Git、SQLite、opencode、MySQL。
+- **后端是唯一的状态权威**。renderer 不直接碰 Git、SQLite、opencode、项目数据库。
 - **凭据加解密**：后端经 utilityProcess 的 `process.parentPort` 发 `credential.request`（`encrypt` / `decrypt`，协议 schema 在 `shared/contracts/credential-port.ts`），main 用 safeStorage 处理后回 `credential.response`；safeStorage 不可用时后端抛 `CREDENTIAL_UNAVAILABLE`。
 - **后端可独立运行**：`pnpm --filter server dev` 用系统 Node 24 启动，renderer 用浏览器打开即可开发与跑 E2E（此时 safeStorage 由开发用的明文适配器替代，仅限 `NODE_ENV=development`；该分支在生产构建中被常量折叠删除，`pnpm build` 末尾的 `scripts/check-prod-bundle.mjs` 校验产物中不存在它）。
 - 令牌：每次启动随机生成 renderer 令牌与各 MCP 令牌，只存在内存；端口均为随机端口，仅绑定 127.0.0.1。开发时后端固定 `DEV_API_PORT`，Vite 把 `/api/v1` 代理过去（D31）。
@@ -97,7 +97,10 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | opencode 插件类型 | @opencode-ai/plugin（仅类型，开发依赖） | 1.19.0 |
 | SQLite | `node:sqlite`（内置，D30） | — |
 | ORM / 迁移 | drizzle-orm（经 `core/db/node-sqlite-client.ts` 适配器复用 better-sqlite3 同步会话）+ drizzle-kit | 0.45.4 / 0.31.11 |
-| MySQL | mysql2 | 3.24.6 |
+| MySQL / GoldenDB | mysql2 | 3.24.6 |
+| PostgreSQL（v1.2，24 §1） | pg + pg-cursor（类型 @types/pg、@types/pg-cursor） | 8.23.1 / 2.22.1 |
+| openGauss / GaussDB（D97） | gaussdb-node + gaussdb-cursor（华为云的 pg 分支，支持 sha256 认证；类型借用 pg 的，`drivers/gaussdb.d.ts`） | 0.2.2 / 0.2.2 |
+| SQL Server（D97） | tedious | 20.3.8 |
 | 子进程 | execa | 10.2.0 |
 | GitHub / GitLab | @octokit/rest / @gitbeaker/rest | 22.0.1 / 43.8.0 |
 | 日志 | pino | 10.4.0 |
@@ -157,7 +160,7 @@ agent-workflow/
 │  │        ├─ inbox/  delivery/
 │  │        ├─ knowledge/          知识问答（v1.1，18）：对话、research 尝试、引用校验与原文
 │  │        ├─ decks/              PPT（v1.2，23）：大纲、页面、资料快照、deck_outline / deck_slides 尝试
-│  │        └─ databases/          drivers/mysql
+│  │        └─ databases/          drivers/{mysql,postgres,sqlserver}
 │  ├─ builtin/                 内置流程与角色（数据 + prompts/*.md）
 │  └─ opencode-plugin/         agent-workflow-bridge（注入 sessionID 到本项目 MCP 工具参数）；`pnpm build:plugin` 去掉类型生成 dist/agent-workflow-bridge.js
 ├─ e2e/                        Playwright：浏览器旅程、四主题走查（walkthrough）、Electron 旅程 J10、性能实测（*.perf.spec.ts）
@@ -201,7 +204,7 @@ modules/tasks/
 | 扩展点 | 接口 | v1 实现 |
 | --- | --- | --- |
 | 托管平台 | `GitHostingProvider` | github、gitlab |
-| 数据库 | `DbDriver` | mysql |
+| 数据库 | `DbDriver` | mysql（含 goldendb）、postgres（PostgreSQL 与 openGauss 两个实例）、sqlserver（v1.2，24） |
 | 验收方式 | `acceptance` 模块的检查函数（`runCommand` / `review`，结果为 `CheckResult`） | command、ai_review |
 | 主题 | `ThemeDefinition`（数据） | 4 套 |
 | 流程与角色 | `WorkflowDefinition` / `RoleDefinition`（数据） | 5 个流程、4 个角色 |
@@ -301,4 +304,4 @@ export function taskOperations(tasks: TasksService) {
 - Git：所有调用设置 `LC_ALL=C`（D37），参数数组传参。
 - 助手 MCP（v1.1）：独立令牌；调用按会话归属到助手对话（执行任务的会话调用不了）；写操作经用户确认；凭据字段不进入工具 schema，凭据只能在表单中由用户输入；助手不能修改「总是允许」、opencode 路径、bash 策略与 worktree 目录（D65）。
 - 助手会话：`directory` 为 `<数据目录>/assistant/`，`external_directory: deny`，bash 为只读规则、其余询问。
-- 数据库工具：只读事务 + 语句类型白名单 + 行数与超时限制。
+- 数据库工具：只读事务（SQL Server 为从不提交的事务）+ 按方言的语句检查 + 行数与超时限制（24 §4）。

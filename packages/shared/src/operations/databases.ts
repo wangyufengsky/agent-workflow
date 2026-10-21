@@ -31,7 +31,8 @@ export const createDbConnectionOp = defineOperationContract({
   ...common,
   id: 'databases.create',
   title: 'op.databases.create',
-  description: 'Add a MySQL connection that AI sessions of linked projects may query read-only',
+  description:
+    'Add a database connection (MySQL, PostgreSQL, openGauss / GaussDB, SQL Server, GoldenDB) that AI sessions of linked projects may query read-only',
   input: createDbConnectionRequestSchema,
   output: dbConnectionSchema,
   risk: OperationRisk.Write,
@@ -95,7 +96,7 @@ export const queryDbOp = defineOperationContract({
   id: 'databases.query',
   title: 'op.databases.query',
   description:
-    'Run one read-only statement (SELECT, SHOW, DESCRIBE or EXPLAIN) on a connection; rows and time are limited',
+    "Run one read-only statement in the connection's dialect (SELECT, and SHOW / DESCRIBE / EXPLAIN where the database has them) on a connection; rows and time are limited",
   input: z.object({ id: z.string(), sql: dbQueryInputSchema.shape.sql, limit: dbQueryInputSchema.shape.limit }),
   output: dbQueryOutputSchema,
   risk: OperationRisk.Read,

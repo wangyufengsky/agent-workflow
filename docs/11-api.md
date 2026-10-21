@@ -239,11 +239,11 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/db-connections` | `{ name, type, host, port, database, username, password, tls }`（`password` 为凭据字段，可为空串）→ 201；密码经 credentials 模块加密保存；名称已被使用 409 `DB_CONNECTION_ALREADY_EXISTS`（AI 的工具按名称找连接） |
 | PATCH | `/db-connections/:id` | 部分字段；传 `password` 时替换密码 |
 | DELETE | `/db-connections/:id` | 204；删除密码，项目关联随之删除 |
-| POST | `/db-connections/:id/test` | `{ ok, serverVersion, error }`：连接并读取 `VERSION()`；连不上时 `ok: false`、`error` 为驱动信息（不作为 HTTP 错误） |
-| GET | `/db-connections/:id/schema` | `{ tables: Array<{ name, comment?, rows?, columns: Array<{ name, type, nullable, key?, default?, comment? }> }> }`（只读浏览） |
+| POST | `/db-connections/:id/test` | `{ ok, serverVersion, error }`：连接并读取服务器版本（MySQL / GoldenDB `VERSION()`，PostgreSQL / openGauss `version()` 去掉构建信息，SQL Server `SERVERPROPERTY('ProductVersion')`）；连不上时 `ok: false`、`error` 为驱动信息（不作为 HTTP 错误） |
+| GET | `/db-connections/:id/schema` | `{ tables: Array<{ name, comment?, rows?, columns: Array<{ name, type, nullable, key?, default?, comment? }> }> }`（只读浏览；范围与各类型的差异见 24 §3） |
 | POST | `/db-connections/:id/query` | `{ sql, limit? }` → `{ columns, rows, truncated, elapsedMs }`：与 AI 的 `db_query` 同样的只读四道关（12 §6.11），但可用于任意连接；供应用助手使用（v1.1，15 §3） |
 
-每次访问数据库都单独建立连接、用完关闭（连接超时 `DB_CONNECT_TIMEOUT_MS`）；连不上 502 `DB_CONNECTION_FAILED`（`details.driverMessage`）。
+`type` 为 `DbType` 的五种之一（v1.2，24）。每次访问数据库都单独建立连接、用完关闭（连接超时 `DB_CONNECT_TIMEOUT_MS`）；连不上 502 `DB_CONNECTION_FAILED`（`details.driverMessage`）。
 
 ## 10. MCP 工具清单与操作清单
 

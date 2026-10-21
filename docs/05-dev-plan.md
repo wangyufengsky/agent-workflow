@@ -262,3 +262,18 @@
 | P-08 | 导出：PowerPoint（pptxgenjs 按需加载，每种版式映射为原生对象与备注页）、PDF（main 隐藏窗口 + `printToPDF` + 保存对话框） | J20 断言 .pptx 的幻灯片与备注；PDF 在桌面应用中人工验证 |
 | P-09 | 助手：导航卡片（状态实时）、确认卡片中的 PPT 名称、页面上下文（选中的页）、`open_page`；「需要你处理」中 PPT 的权限请求标「PPT」 | 单测：确认卡片字段文案；E2E J20 与 J9 走查 |
 | P-10 | E2E J20、J9 走查（列表、新建、大纲、预览、全部版式）、文档收尾 | `pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
+
+## v1.2 · 更多数据库
+
+> 状态：**开发完成，待合并**。设计见 [24-databases.md](24-databases.md)；决策 D97（驱动：pg、gaussdb-node、tedious，GoldenDB 复用 mysql2）、D98（SQL Server 的只读方式）、D99（表结构范围与值的表示）**待用户确认**。openGauss 默认 sha256 认证下 pg 无法登录，已用容器实测（24 §6）。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| DB-01 | 设计文档 24、决策 D97–D99；容器实测 openGauss 的 sha256 认证（pg 与 gaussdb-node） | 文档评审通过；实测结果写入 24 §6 |
+| DB-02 | shared：`DbType` 五个值、`DB_DEFAULT_PORT`；`get_task_context` 的 `databases[].type` 为 `DbType`；操作与 MCP 工具说明按方言 | 类型检查通过 |
+| DB-03 | 语句检查按方言（`assertReadOnlySql(sql, type)`）：MySQL、PostgreSQL、T-SQL 的引号与注释词法；T-SQL 关键字拒绝表；知识问答的引用校验按连接类型检查 | 单测：三种方言各自的放行与拒绝 |
+| DB-04 | 驱动：`drivers/postgres.ts`（PostgreSQL 与 openGauss 两个实例：只读事务、`statement_timeout`、游标取行、pg_catalog 读表结构）、`drivers/sqlserver.ts`（不提交的事务、`requestTimeout`、流式取行、INFORMATION_SCHEMA 与 sys 视图读表结构）；`DB_DRIVERS` 按类型组装，service 按连接类型取驱动 | 集成测试（真实容器）：PostgreSQL 17.6、openGauss 7（sha256）、SQL Server 2022 的测试连接、表结构、`db_describe`、值的表示、截断、拒绝写入、超时、SQL 错误；GoldenDB 类型在 MySQL 容器上通过 |
+| DB-05 | 测试辅助 `test/helpers/db-containers.ts`（取代 `mysql.ts`）：四种容器、镜像缺失时跳过并提示 `docker pull` | 没有可选镜像时对应用例跳过、有提示 |
+| DB-06 | 界面：连接对话框的类型选择与说明、端口随类型切换；连接卡片显示类型；测试结果显示服务器版本 | E2E 见 DB-07；J9 走查数据库页无报错 |
+| DB-07 | E2E J21（FakeOpencode + PostgreSQL 容器） | `pnpm e2e` 通过 |
+| DB-08 | 文档同步：01、03（依赖与扩展点）、07（J21、容器辅助）、08、10、11、12、14、17、README、CI 拉取镜像与排除 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |

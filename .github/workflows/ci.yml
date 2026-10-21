@@ -53,14 +53,17 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           docker pull mysql:8.4
+          docker pull postgres:17.6
+          docker pull opengauss/opengauss-server:7.0.0-RC3.B025
+          docker pull mcr.microsoft.com/mssql/server:2022-latest
           pnpm test:int --shard=${{ matrix.shard }}/2
-      # databases.int.test.ts needs the Linux container mysql:8.4: the Windows runner's Docker runs only Windows
-      # containers and the macOS runner has no Docker. It only talks to MySQL over TCP, so the ubuntu run covers it.
-      - name: test:int (without the MySQL tests, see above)
+      # The database tests need Linux containers (docs/24 §7): the Windows runner's Docker runs only Windows containers
+      # and the macOS runner has no Docker. They only talk to the servers over TCP, so the ubuntu run covers them.
+      - name: test:int (without the database tests, see above)
         if: runner.os != 'Linux'
         shell: bash
         # Explicit file list: vitest's --exclude flag does not reach the files of a configured project.
-        run: pnpm test:int --shard=${{ matrix.shard }}/2 $(git ls-files '*.int.test.ts' | grep -v '/databases.int.test.ts$')
+        run: pnpm test:int --shard=${{ matrix.shard }}/2 $(git ls-files '*.int.test.ts' | grep -v '/databases\..*int.test.ts$')
 
   e2e:
     name: e2e (${{ matrix.os }}, ${{ matrix.shard }}/2)
@@ -166,9 +169,9 @@ jobs:
       - name: pnpm test
         if: ${{ !cancelled() }}
         run: pnpm test
-      - name: test:int (without the MySQL tests, see the int job)
+      - name: test:int (without the database tests, see the int job)
         if: ${{ !cancelled() }}
-        run: pnpm test:int $(git ls-files '*.int.test.ts' | grep -v '/databases.int.test.ts$')
+        run: pnpm test:int $(git ls-files '*.int.test.ts' | grep -v '/databases\..*int.test.ts$')
       - name: pnpm build
         if: ${{ !cancelled() }}
         run: pnpm build

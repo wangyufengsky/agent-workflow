@@ -32,7 +32,7 @@ import {
   createCredentialsModule,
   unavailableCipher,
 } from './modules/credentials/index.ts';
-import { createDatabasesModule, mysqlDriver } from './modules/databases/index.ts';
+import { createDatabasesModule, DB_DRIVERS } from './modules/databases/index.ts';
 import { createDebugModule } from './modules/debug/index.ts';
 import { createDecksModule, type DecksService } from './modules/decks/index.ts';
 import { createDeliveryModule } from './modules/delivery/index.ts';
@@ -186,7 +186,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     clock,
     log,
     credentials: credentials.service,
-    driver: mysqlDriver,
+    drivers: DB_DRIVERS,
     queryTimeoutMs: deps.dbQueryTimeoutMs ?? DB_QUERY_TIMEOUT_MS,
   });
   const projects = createProjectsModule({

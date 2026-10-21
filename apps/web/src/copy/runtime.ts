@@ -1,4 +1,5 @@
-import { McpToolName, RuntimeStatus } from '@aw/shared';
+import { McpToolName, RuntimeStatus, readOnlyStatementGroups } from '@aw/shared';
+import { DATABASES_COPY } from './databases.ts';
 
 export const RUNTIME_STATUS_LABEL: Record<RuntimeStatus, string> = {
   [RuntimeStatus.NotInstalled]: '未安装 opencode',
@@ -56,7 +57,10 @@ export const TOOLS_COPY = {
     [McpToolName.ReportProgress]: '上报一句当前进展，显示在任务页上。',
     [McpToolName.DbListConnections]: '列出项目关联的数据库连接。',
     [McpToolName.DbDescribe]: '查看数据库的表结构。',
-    [McpToolName.DbQuery]: '只读查询数据库：只允许单条 SELECT / SHOW / DESCRIBE / EXPLAIN，限制行数与时间。',
+    // The allowed statements depend on the connection's database (24 §4).
+    [McpToolName.DbQuery]: `只读查询数据库：每次一条只读语句（${readOnlyStatementGroups()
+      .map((g) => `${g.types.map((t) => DATABASES_COPY.typeLabel[t]).join('、')} 允许 ${g.statements.join(' / ')}`)
+      .join('；')}），限制行数与时间。`,
     [McpToolName.SubmitAnswer]:
       '知识问答：提交带引用的回答。引用的文件、行号或数据库连接不存在时返回问题，AI 修正后再提交。',
     [McpToolName.SubmitOutline]: 'PPT：提交大纲（每页的版式、标题与要点）以及 AI 对听众、时长的理解和假设。',

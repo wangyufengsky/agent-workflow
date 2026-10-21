@@ -172,7 +172,7 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
   answeredQuestions: Array<{ question: string; answer: string }>;             // 本任务内已回答/已假设
   userFeedback: string[];                                                     // 重新规划 / 再改改 / 审查意见（21）/ 驳回意见，按时间
   planning?: { guidance?: string; allowedRoles: Array<{ key; name; description }>; requiredSteps: PlanNodeSpec[]; maxNodes: number };  // 仅 plan 类
-  databases: Array<{ name: string; type: 'mysql' }>;
+  databases: Array<{ name: string; type: DbType }>;
 }
 ```
 
@@ -278,7 +278,7 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 ### 6.9 `db_list_connections`
 
 输入：`{}`
-输出：`{ connections: Array<{ name: string; type: 'mysql'; database: string }> }`（仅项目关联的；不含主机、用户、密码）
+输出：`{ connections: Array<{ name: string; type: DbType; database: string }> }`（仅项目关联的；不含主机、用户、密码）。`type` 决定写 SQL 用的方言（v1.2，24 §5），工具说明请模型按它写 SQL
 
 ### 6.10 `db_describe`
 
@@ -289,14 +289,14 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 ### 6.11 `db_query`
 
 输入：`{ connection: string; sql: string; limit?: number }`（limit ≤ `DB_QUERY_MAX_ROWS`，默认即上限）
-行为（只读的四道关，`modules/databases`）：
+行为（只读的四道关，`modules/databases`；下面是 MySQL / GoldenDB 的做法，PostgreSQL / openGauss / SQL Server 的对应做法见 24 §4）：
 
 1. **单条语句**：`databases.sql.ts` 的 `assertReadOnlySql` 去掉字符串、引号标识符与注释后检查：只允许末尾一个分号；`/*! … */` 可执行注释直接拒绝。驱动连接关闭 `multipleStatements`。
 2. **首关键字白名单**：`SELECT` / `SHOW` / `DESCRIBE`（`DESC`）/ `EXPLAIN`（允许前导括号）；另拒绝仍会写入或加锁的子句：`INTO`（`INTO OUTFILE` 写服务器文件、`INTO @var`）、`FOR UPDATE` / `FOR SHARE`、`LOCK IN SHARE MODE`。不符合 → `DB_QUERY_REJECTED`。
 3. **只读事务**：每次查询独立连接，`START TRANSACTION READ ONLY` 中执行（例如调用会写入的函数被服务器以 1792 拒绝，映射为 `DB_QUERY_REJECTED`），结束后关闭连接。
 4. **行数与时间**：流式读取，读满 limit 即停止并关闭连接（`truncated: true`）；`SET SESSION MAX_EXECUTION_TIME = DB_QUERY_TIMEOUT_MS`（服务器中断 SELECT，3024）并以稍长的客户端超时兜住其他语句 → `DB_QUERY_TIMEOUT`。
 
-值按 JSON 返回：日期为字符串，`BIGINT` / `DECIMAL` 为字符串（可能超出 JSON 数字精度），二进制为 `0x` 开头的十六进制（最多 64 字节）。
+值按 JSON 返回：日期为字符串，`BIGINT` / `DECIMAL` 为字符串（可能超出 JSON 数字精度；SQL Server 的 `DECIMAL` 例外为数字，24 §5），二进制为 `0x` 开头的十六进制（最多 64 字节）。
 输出：`{ columns: string[], rows: unknown[][], truncated: boolean, elapsedMs: number }`
 错误：`DB_QUERY_REJECTED`、`DB_QUERY_TIMEOUT`、`DB_QUERY_FAILED`（`details.driverMessage`）、`DB_CONNECTION_FAILED`、`DB_CONNECTION_NOT_FOUND`。
 

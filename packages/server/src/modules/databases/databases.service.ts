@@ -9,6 +9,7 @@ import {
   type DbQueryOutput,
   type DbSchemaDTO,
   type DbTestResultDTO,
+  type DbType,
   ErrorCode,
   type UpdateDbConnectionRequest,
 } from '@aw/shared';
@@ -25,7 +26,8 @@ export type DatabasesServiceDeps = {
   clock: Clock;
   log: Logger;
   credentials: CredentialsService;
-  driver: DbDriver;
+  /** The driver of each database type (24 §1). */
+  drivers: Readonly<Record<DbType, DbDriver>>;
   /** `DB_QUERY_TIMEOUT_MS` in production; tests shorten it. */
   queryTimeoutMs: number;
 };
@@ -36,7 +38,7 @@ const toDto = ({ credentialId: _credential, ...connection }: DbConnection): DbCo
  * Project databases (D07, 11 §9): connections with their password in the credentials module, project links, schema
  * browsing, and the read-only access of the AI's database tools (12 §6.9–6.11).
  */
-export function createDatabasesService({ db, clock, log, credentials, driver, queryTimeoutMs }: DatabasesServiceDeps) {
+export function createDatabasesService({ db, clock, log, credentials, drivers, queryTimeoutMs }: DatabasesServiceDeps) {
   const repo = createDatabasesRepo(db);
 
   function get(id: string): DbConnection {
@@ -54,8 +56,9 @@ export function createDatabasesService({ db, clock, log, credentials, driver, qu
     }
   }
 
-  async function target(connection: DbConnection): Promise<DbTarget> {
-    return {
+  /** The connection's driver and where to connect, with its password. */
+  async function access(connection: DbConnection): Promise<{ driver: DbDriver; target: DbTarget }> {
+    const target = {
       host: connection.host,
       port: connection.port,
       database: connection.database,
@@ -63,6 +66,7 @@ export function createDatabasesService({ db, clock, log, credentials, driver, qu
       password: await credentials.reveal(connection.credentialId),
       tls: connection.tls,
     };
+    return { driver: drivers[connection.type], target };
   }
 
   /** A connection the project's AI sessions may use, by its name. */
@@ -77,10 +81,10 @@ export function createDatabasesService({ db, clock, log, credentials, driver, qu
   }
 
   async function readOnlyQuery(connection: DbConnection, sql: string, limit: number | undefined) {
-    assertReadOnlySql(sql);
-    const connectTo = await target(connection);
+    assertReadOnlySql(sql, connection.type);
+    const { driver, target } = await access(connection);
     const started = clock.now();
-    const result = await driver.readOnlyQuery(connectTo, sql, {
+    const result = await driver.readOnlyQuery(target, sql, {
       maxRows: limit ?? DB_QUERY_MAX_ROWS,
       timeoutMs: queryTimeoutMs,
     });
@@ -119,9 +123,9 @@ export function createDatabasesService({ db, clock, log, credentials, driver, qu
 
     /** A failed connection is the answer here, not an error. */
     async test(id: string): Promise<DbTestResultDTO> {
-      const connectTo = await target(get(id));
+      const { driver, target } = await access(get(id));
       try {
-        return { ok: true, serverVersion: await driver.serverVersion(connectTo), error: null };
+        return { ok: true, serverVersion: await driver.serverVersion(target), error: null };
       } catch (err) {
         if (!(err instanceof AppError && err.code === ErrorCode.DbConnectionFailed)) throw err;
         const message = err.details?.driverMessage;
@@ -130,8 +134,8 @@ export function createDatabasesService({ db, clock, log, credentials, driver, qu
     },
 
     async schema(id: string): Promise<DbSchemaDTO> {
-      const connectTo = await target(get(id));
-      const [tables, columns] = await Promise.all([driver.tables(connectTo), driver.columns(connectTo)]);
+      const { driver, target } = await access(get(id));
+      const [tables, columns] = await Promise.all([driver.tables(target), driver.columns(target)]);
       const byTable = Map.groupBy(columns, (c) => c.table);
       return {
         tables: tables.map((table) => ({
@@ -151,12 +155,9 @@ export function createDatabasesService({ db, clock, log, credentials, driver, qu
 
     /** `db_describe` (12 §6.10): the tables, or one table's columns and indexes. */
     async describe(projectId: string, name: string, table: string | undefined): Promise<DbDescribeOutput> {
-      const connectTo = await target(linked(projectId, name));
-      if (table === undefined) return { tables: await driver.tables(connectTo) };
-      const [columns, indexes] = await Promise.all([
-        driver.columns(connectTo, table),
-        driver.indexes(connectTo, table),
-      ]);
+      const { driver, target } = await access(linked(projectId, name));
+      if (table === undefined) return { tables: await driver.tables(target) };
+      const [columns, indexes] = await Promise.all([driver.columns(target, table), driver.indexes(target, table)]);
       if (columns.length === 0) {
         throw new AppError(ErrorCode.ValidationFailed, `Table ${table} does not exist`, {
           issues: [{ path: ['table'], message: 'no such table; call db_describe without table to list them' }],
