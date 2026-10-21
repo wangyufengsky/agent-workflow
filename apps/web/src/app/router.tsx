@@ -5,6 +5,9 @@ import { z } from 'zod';
 import { useServerEvents } from '../api/server-events.ts';
 import { ErrorState } from '../components/error-state.tsx';
 import { ToastHost } from '../components/toast.tsx';
+import { BatchPage } from '../features/batches/batch.page.tsx';
+import { BatchesPage } from '../features/batches/batches.page.tsx';
+import { NewBatchPage } from '../features/batches/new-batch.page.tsx';
 import { DatabasesPage } from '../features/databases/databases.page.tsx';
 import { ComponentGalleryPage } from '../features/dev/component-gallery.page.tsx';
 import { GitConsolePage } from '../features/git/git-console.page.tsx';
@@ -138,6 +141,13 @@ const nodeRoute = createRoute({
   validateSearch: z.object({ attempt: z.string().optional() }),
   component: NodePage,
 });
+// Batches (20): a new batch keeps the project and workflow it was opened for (the home page's「批量」).
+const batchNewRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.batchNew,
+  validateSearch: z.object({ projectId: z.string().optional(), workflow: z.string().optional() }),
+  component: NewBatchPage,
+});
 const gitRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.git,
@@ -208,6 +218,9 @@ const routeTree = rootRoute.addChildren([
     tasksRoute,
     taskRoute,
     nodeRoute,
+    page(ROUTES.batches, BatchesPage),
+    batchNewRoute,
+    page(ROUTES.batch, BatchPage),
     page(ROUTES.inbox, InboxPage),
     projectsRoute,
     projectRoute,

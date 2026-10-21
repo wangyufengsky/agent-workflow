@@ -20,6 +20,10 @@ export const ENTITY_ROUTES = {
   [EntityKind.Workflow]: { icon: 'flow', open: (navigate, key) => navigate({ to: ROUTES.workflow, params: { key } }) },
   [EntityKind.Role]: { icon: 'users', open: (navigate) => navigate({ to: ROUTES.roles }) },
   [EntityKind.DbConnection]: { icon: 'db', open: (navigate) => navigate({ to: ROUTES.databases }) },
+  [EntityKind.Batch]: {
+    icon: 'layers',
+    open: (navigate, id) => navigate({ to: ROUTES.batch, params: { batchId: id } }),
+  },
   [EntityKind.KnowledgeConversation]: {
     icon: 'book',
     open: (navigate, id) => navigate({ to: ROUTES.knowledgeConversation, params: { conversationId: id } }),

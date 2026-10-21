@@ -17,6 +17,7 @@ import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { toast } from '../../components/toast.tsx';
+import { BATCHES_COPY } from '../../copy/batches.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import {
   WORKFLOWS_COPY as C,
@@ -205,6 +206,11 @@ export function WorkflowsPage() {
               <Button size="sm" icon="copy" onClick={() => setTarget({ mode: 'copy', from: w })}>
                 {C.copy}
               </Button>
+              {w.planning === WorkflowPlanning.Fixed && (
+                <Link to={ROUTES.batchNew} search={{ workflow: w.key }} className="btn ghost sm">
+                  {BATCHES_COPY.runAsBatch}
+                </Link>
+              )}
               {w.kind === WorkflowKind.Custom && (
                 <Button size="sm" variant="ghost" icon="trash" onClick={() => setDeleting(w)}>
                   {C.delete}

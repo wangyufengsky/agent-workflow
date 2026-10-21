@@ -24,6 +24,7 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [16-acceptance-v1.0.md](16-acceptance-v1.0.md) | v1.0 验收报告：01 §5 逐条的验证方法、结果与证据，需要用户完成的项 | 全员 |
 | [18-knowledge.md](18-knowledge.md) | 知识问答（v1.1）：页面、数据、API、研究员与引用校验 | 全员 |
 | [19-insights.md](19-insights.md) | 质量与用量（v1.1）：指标口径、页面与钻取、API、性能 | 全员 |
+| [20-batch-tasks.md](20-batch-tasks.md) | 固定模板批量任务（v1.1）：创建、目标、并发、批量视图与批量交付 | 全员 |
 
 ## 维护规则
 

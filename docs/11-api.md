@@ -299,6 +299,19 @@ type AttemptDTO = AttemptSummaryDTO & {
 | GET | `/insights?period&from&to` | `insights.summary` | `InsightsSummaryDTO`：时间段（含时区）、tokens 用量合计（不含成本，D79）与按项目 / 流程 / 角色 / 模型 / 用途的拆分、按天趋势、质量、`attention`；`period = custom` 缺日期、其余时间段带日期、`from > to` 或超过 `INSIGHTS_MAX_DAYS` 天为 400 |
 | GET | `/insights/tasks?period&from&to` | `insights.tasks` | `{ items: InsightsTaskDTO[] }`：时间段内结束或有用量的任务及其数字（钻取用） |
 
+## 13c. 批量任务（v1.1）
+
+见 [20-batch-tasks.md §7](20-batch-tasks.md#7-api-与操作清单)。全部 `mode = simple`、`expose.assistant = true`；`batches.create` 进命令面板。
+
+| 方法 | 路径 | 操作 | 风险 | 说明 |
+| --- | --- | --- | --- | --- |
+| GET | `/batches?projectId&limit&cursor` | `batches.list` | read | `{ items: BatchSummaryDTO[], nextCursor }`，按编号倒序；游标为上一页最后一个批次的编号 |
+| POST | `/batches` | `batches.create` | write | `{ projectId, workflowId, requirementTemplate, targets, baseBranch? }` → 201 `BatchDetailDTO`；只用 `fixed` 流程（否则 400 `VALIDATION_FAILED`，`path: ['workflowId']`）；模板须含 `{{target}}`，目标 1–20 个、单行、不重复，替换后的需求不超过 `REQUIREMENT_MAX_CHARS`；子任务 `confirm_plan = false`，创建后立即开始；`produces: batch` |
+| GET | `/batches/:id` | `batches.get` | read | `BatchDetailDTO`（每个目标的任务摘要与本轮交付）；404 `BATCH_NOT_FOUND` |
+| POST | `/batches/:id/deliver` | `batches.deliver` | critical | `{ strategy? }`（`squash` / `merge` / `rebase`，默认 `delivery.defaultStrategy`；报告流程一律 `report_only`）→ `{ batch, outcomes: [{ taskId, taskKey, target, outcome, error }] }`：按目标顺序逐个交付「待合并」的子任务（§5.3），冲突与失败的停在 `review`，其余继续 |
+
+批次不新增 SSE 事件：进度随子任务的 `task.updated` 变化，前端批次查询挂在任务列表的缓存前缀下一并刷新。
+
 ## 13. preload 能力（非 HTTP）
 
 ```ts

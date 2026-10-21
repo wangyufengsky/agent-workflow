@@ -223,13 +223,20 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
   return {
     prepare,
 
-    async create(input: CreateTaskRequest): Promise<string> {
+    /** What creating a task needs (11 §5.1): its project, workflow and base branch exist; resolves the branch. */
+    async checkCreate(input: Pick<CreateTaskRequest, 'projectId' | 'workflowId' | 'baseBranch'>): Promise<string> {
       const project = projects.getRecord(input.projectId);
-      const workflow = workflows.get(input.workflowId);
+      workflows.get(input.workflowId);
       const baseBranch = input.baseBranch ?? project.defaultBranch;
       if (!(await branchExists(project.repoPath, baseBranch))) {
         throw new AppError(ErrorCode.GitBaseBranchNotFound, 'Base branch does not exist', { branch: baseBranch });
       }
+      return baseBranch;
+    },
+
+    /** Inserts a draft task whose project, workflow and base branch `checkCreate` accepted; returns its id. */
+    insertDraft(input: Omit<CreateTaskRequest, 'start'> & { baseBranch: string }): string {
+      const workflow = workflows.get(input.workflowId);
       // Request > workflow definition > setting (11 §5.1); fixed for the task's lifetime.
       const checkpoints = {
         confirm_plan: input.checkpoints?.confirm_plan ?? workflow.definition.checkpoints.confirm_plan,
@@ -241,12 +248,12 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       repo.insert(
         {
           id,
-          projectId: project.id,
+          projectId: input.projectId,
           workflowId: workflow.id,
           title: input.title ?? firstLine(input.requirement).slice(0, TASK_TITLE_MAX_CHARS),
           requirement: input.requirement,
           status: TaskStatus.Draft,
-          baseBranch,
+          baseBranch: input.baseBranch,
           checkpoints,
           createdAt: now,
           updatedAt: now,
@@ -255,7 +262,6 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       );
       log.info({ taskId: id, workflow: workflow.key }, 'task created');
       state.publish(id);
-      if (input.start !== false) start(id);
       return id;
     },
 

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { CONFIRMATION_COPY, INPUT_REF_LABEL } from '../../copy/assistant.ts';
 import { INPUT_FIELD_LABEL, INPUT_VALUE_LABEL } from '../../copy/operations.ts';
 import { INBOX_COPY } from '../../copy/tasks.ts';
+import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
 import { inboxQuery } from '../inbox/inbox.queries.ts';
 import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
@@ -81,6 +82,11 @@ function ProjectRef({ id }: { id: string }) {
   return <Named ids={[id]} names={[query.data?.name]} query={query} />;
 }
 
+function BatchRef({ id }: { id: string }) {
+  const query = useQuery(batchQuery(id));
+  return <Named ids={[id]} names={[query.data && `${query.data.key} · ${query.data.title}`]} query={query} />;
+}
+
 function KnowledgeRef({ id }: { id: string }) {
   const query = useQuery(knowledgeConversationQuery(id));
   return <Named ids={[id]} names={[query.data?.title]} query={query} />;
@@ -131,6 +137,8 @@ function RefValue({ kind, value, input }: { kind: InputRef; value: unknown; inpu
       return <ProjectRef id={first} />;
     case InputRef.KnowledgeConversation:
       return <KnowledgeRef id={first} />;
+    case InputRef.Batch:
+      return <BatchRef id={first} />;
     case InputRef.Workflow:
       return <WorkflowRef ids={ids} />;
     case InputRef.Role:

@@ -78,6 +78,13 @@
       "when": 1792584045500,
       "tag": "0010_insights",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1792590360740,
+      "tag": "0011_batches",
+      "breakpoints": true
     }
   ]
 }

@@ -10,6 +10,8 @@ export const EntityKind = {
   DbConnection: 'db_connection',
   /** A knowledge Q&A conversation (18). */
   KnowledgeConversation: 'knowledge_conversation',
+  /** A batch of tasks made from one fixed workflow (20). */
+  Batch: 'batch',
 } as const;
 export type EntityKind = (typeof EntityKind)[keyof typeof EntityKind];
 export const entityKindSchema = z.enum(EntityKind);

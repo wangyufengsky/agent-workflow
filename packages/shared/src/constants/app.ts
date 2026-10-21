@@ -16,6 +16,10 @@ export const OPENCODE_ASSISTANT_AGENT = 'aw-assistant';
 export const MCP_SERVER_NAME = 'agent-workflow';
 export const MCP_ASSISTANT_SERVER_NAME = 'agent-workflow-app';
 export const TASK_KEY_PREFIX = 'T-';
+/** A batch is shown as `B-<seq>` (20 §6). */
+export const BATCH_KEY_PREFIX = 'B-';
+/** The one placeholder of a batch's requirement template, replaced by each target (20 §2). */
+export const BATCH_TARGET_PLACEHOLDER = '{{target}}';
 export const BRANCH_PREFIX = 'aw/';
 export const BRANCH_SLUG_MAX = 40;
 /** Project slug: the project's directory name under the worktree root. */

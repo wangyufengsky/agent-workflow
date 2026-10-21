@@ -1,8 +1,10 @@
 import {
+  AppError,
   type AttemptDTO,
   type ChangeRequestReason,
   type CreateTaskRequest,
   type DeliverRequest,
+  ErrorCode,
   type ListTasksQuery,
   type NodeDetailDTO,
   type PlanDTO,
@@ -123,11 +125,21 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
         nextCursor: rows.length > limit && last !== undefined ? `${last.updatedAt}.${last.seq}` : null,
       };
     },
+    /** Summaries of the given tasks, in the given order (batches 20 §4, quality and usage 19 §4). */
+    summariesOf(ids: readonly string[]): TaskSummaryDTO[] {
+      const byId = new Map(state.repo.list({ ids }).map((task) => [task.id, task]));
+      return state.summaries(
+        ids.map((id) => {
+          const task = byId.get(id);
+          if (task === undefined) throw new AppError(ErrorCode.TaskNotFound, `Task ${id} not found`, { id });
+          return task;
+        }),
+      );
+    },
+    /** The task's current round's latest delivery (`TaskDetailDTO.lastDelivery`). */
+    lastDelivery: (id: string) => delivery.current(id),
     /** Tasks in the given states, for the scheduler. */
     listByStatus: (statuses: readonly TaskStatus[]) => state.repo.list({ statuses }),
-    /** Summaries of the given tasks (quality and usage, 19 §4), most recently updated first. */
-    summariesOf: (ids: readonly string[]): TaskSummaryDTO[] =>
-      ids.length === 0 ? [] : state.summaries(state.repo.list({ ids })),
     /** Every task of a project, for the Git console. */
     listByProject: (projectId: string) => state.repo.list({ projectId }),
     timeline: (id: string, afterId: number) => {
@@ -136,8 +148,14 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     },
 
     async create(input: CreateTaskRequest): Promise<TaskDetailDTO> {
-      return detail(await lifecycle.create(input));
+      const baseBranch = await lifecycle.checkCreate(input);
+      const id = lifecycle.insertDraft({ ...input, baseBranch });
+      if (input.start !== false) lifecycle.start(id);
+      return detail(id);
     },
+    /** Creating several tasks in one transaction (batches, 20 §2): check once, insert drafts, start after commit. */
+    checkCreate: lifecycle.checkCreate,
+    insertDraft: lifecycle.insertDraft,
     start(id: string): TaskDetailDTO {
       lifecycle.start(id);
       return detail(id);

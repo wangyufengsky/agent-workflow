@@ -8,7 +8,19 @@
   gap: 10px;
 }
 
+.card {
+  position: relative;
+  display: flex;
+}
+
+.batch {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
 .workflow {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -60,4 +72,9 @@
 
 .more[open] {
   padding-bottom: 4px;
+}
+
+/* The「批量」button sits in the card's corner; the card's text keeps clear of it. */
+.card:has(.batch) .workflow {
+  padding-right: 56px;
 }

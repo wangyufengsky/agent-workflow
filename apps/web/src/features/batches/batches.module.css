@@ -1,0 +1,112 @@
+/* Like `.chip`, inline in a title: ink on a neutral fill keeps the contrast of the text around it. */
+.placeholder {
+  display: inline-block;
+  padding: 0 6px;
+  margin: 0 2px;
+  border-radius: var(--r-xs);
+  background: var(--fill-3);
+  border: 1px solid var(--line-2);
+  color: var(--ink-2);
+  font-size: 0.9em;
+}
+
+.meter {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--fill-3);
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  background: var(--done);
+  transition: width var(--t-mid) var(--ease);
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tree {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 4px;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+}
+
+.entry:hover {
+  background: var(--fill-2);
+}
+
+.entryName {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  color: var(--ink-2);
+}
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.crumb {
+  color: var(--accent);
+}
+
+.preview {
+  white-space: pre-wrap;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--fill-1);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-2);
+  vertical-align: middle;
+}
+
+.target {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin-left: 6px;
+  font-size: var(--fs-sm);
+  color: var(--danger);
+}

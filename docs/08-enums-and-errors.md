@@ -117,7 +117,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `AssistantConfirmationStatus` | `pending` · `confirmed` · `cancelled` | 确认卡片（09 §10） |
 | `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` | 助手专用工具（15 §3）；其余工具由操作清单生成 |
 | `AssistantPage` | `home` · `tasks` · `task` · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId`） |
-| `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation`（预留） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
+| `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
 | `InputRef` | `EntityKind` 的全部取值 · `inbox_item` · `node`（同一输入中 `id` 所指任务的步骤） · `attempt` | 操作契约 `refs`：输入字段指向的对象（`enums/entity.ts`）；助手确认卡片据此把 id 显示为对象名称，标签为对象类型（D84）；`workflow` 字段可以是流程 id 或 key |
 | `AssistantForm` | `tasks.create` · `projects.create` · `projects.setHosting` · `databases.create` · `databases.update` | `open_form` 能打开的表单，以其提交的操作命名（`ASSISTANT_FORM_OPERATION`）；预填值的 schema 为该操作的助手输入（不含凭据字段）的 partial |
 
@@ -138,6 +138,14 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `InsightsDimension` | `project` · `workflow` · `role` · `model` · `kind` | 用量的拆分维度（19 §2.3） |
 | `InsightsFailureKind` | `checks_failed` · `rejected` · `attempt_error` | 失败原因的类别（19 §2.4）；`attempt_error` 另带错误码 |
 | `InsightsDrill` | `completed` · `cancelled` · `failed` · `first_pass_missed` · `retried` · `interrupted` · `review_duration` · `failure` · 以及 `InsightsDimension` 的五个值 | 页面钻取的指标（19 §3.2），写在地址 `?drill=` |
+
+### 2.10 批量任务（v1.1，`enums/batch.ts`）
+
+| 枚举 | 值 | 说明 |
+| --- | --- | --- |
+| `BatchDeliveryOutcome` | `delivered` · `conflict` · `failed` | 批量交付中一个任务的结果（20 §5）：已合并或已完成 / 合并冲突 / 合并前检查、合并或完成失败；后两种任务停在 `review` |
+
+批次没有状态枚举：进度由子任务的 `TaskDisplayGroup` 汇总（`batchCounts`），「待合并」由 `isBatchDeliverable` 判断（`shared/batch/batch.ts`，D85）。
 
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 
@@ -166,6 +174,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `MCP_ASSISTANT_SERVER_NAME` | `agent-workflow-app` | 助手 MCP（v1.1）；opencode 中工具名为 `agent-workflow-app_<tool>` |
 | `OPENCODE_ASSISTANT_AGENT` | `aw-assistant` | 助手的 agent（v1.1） |
 | `TASK_KEY_PREFIX` | `T-` | 任务编号 `T-<自增>` |
+| `BATCH_KEY_PREFIX` | `B-` | 批次编号 `B-<自增>`（20 §6） |
+| `BATCH_TARGET_PLACEHOLDER` | `{{target}}` | 批次需求模板中唯一的占位符，替换为每个目标（`renderBatchRequirement`，20 §2） |
 | `BRANCH_PREFIX` | `aw/` | 分支名 `aw/<taskKey>-<slug>` |
 | `BRANCH_SLUG_MAX` | `40` | slug 由标题转写，只保留 `[a-z0-9-]`（`toSlug`，`shared/naming.ts`） |
 | `PROJECT_SLUG_MAX` | `40` | 项目 slug（worktree 目录名）由名称转写；无 ASCII 字符时为 `project`，重名追加 `-2`、`-3` |
@@ -212,6 +222,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `INSIGHTS_MAX_DAYS` | 366（质量与用量自定义时间段最多天数） |
 | `RUNTIME_LOG_TAIL_DEFAULT` / `RUNTIME_LOG_TAIL_MAX` | 500 / 5000（运行环境日志页的行数） |
 | `LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX` | 50 / 100（任务与「需要你处理」列表每页条数，11 §1） |
+| `BATCH_TARGETS_MAX` | 20（一个批次的目标数，D85） |
+| `BATCH_TARGET_MAX_CHARS` | 500（一个目标，单行） |
 | `ASSISTANT_TITLE_MAX_CHARS` | 40（助手对话标题取第一条消息的首行） |
 | `ASSISTANT_MESSAGE_MAX_CHARS` | 20000（一条发给助手的消息） |
 | `KNOWLEDGE_QUESTION_MAX_CHARS` | 4000（一次提问） |
@@ -327,6 +339,8 @@ class AppError extends Error {
 | `ASSISTANT_CONVERSATION_NOT_FOUND` | 404 | |
 | `ASSISTANT_CONFIRMATION_NOT_FOUND` | 404 | |
 | `ASSISTANT_BUSY` | 409 | 助手正在回复时又发来消息（先等它结束或停止它） |
+| **批量任务（v1.1）** | | |
+| `BATCH_NOT_FOUND` | 404 | 批次不存在（所属项目已删除时随之删除） |
 | **知识问答（v1.1）** | | |
 | `KNOWLEDGE_CONVERSATION_NOT_FOUND` | 404 | |
 | `KNOWLEDGE_CONVERSATION_BUSY` | 409 | 对话还有一轮在研究时又续问、删除对话，或删除其项目 |
