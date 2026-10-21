@@ -37,6 +37,8 @@ type Seed = {
   aiKey: string;
   /** An answered knowledge question with two citations (K-09). */
   knowledge: { id: string; turnId: string };
+  /** A question whose answer is still a draft: written, waiting for a permission before it is submitted (18 §5.5). */
+  knowledgeDraft: string;
 };
 
 async function api<T>(request: APIRequestContext, method: 'GET' | 'POST', path: string, data?: object): Promise<T> {
@@ -207,6 +209,23 @@ async function seed(request: APIRequestContext): Promise<Seed> {
   const knowledgeTurn = await turnOf();
   if (knowledgeTurn === undefined) throw new Error('knowledge turn not found');
 
+  await queueResearchTurn(request, reviewProject, [
+    { type: 'text', text: '退款在 `refund()` 中先扣手续费 [1]，再四舍五入到分 [2]。' },
+    { type: 'permission', permission: 'bash', patterns: ['ls src'] },
+  ]);
+  const draft = await api<{ id: string }>(request, 'POST', '/knowledge/conversations', {
+    projectId: reviewProject.id,
+    question: '手续费在哪里扣？',
+    sources: { code: true, docs: true, database: false, web: false },
+  });
+  await expect
+    .poll(
+      async () =>
+        (await api<{ turns: { awaitingInput: boolean }[] }>(request, 'GET', `/knowledge/conversations/${draft.id}`))
+          .turns[0]?.awaitingInput,
+    )
+    .toBe(true);
+
   const completedReview = await waitForStatus(request, completed, 'review');
   await api(request, 'POST', `/tasks/${completedReview.id}/deliver`, { strategy: 'squash' });
   return {
@@ -220,6 +239,7 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     fixedKey,
     aiKey,
     knowledge: { id: knowledge.id, turnId: knowledgeTurn.id },
+    knowledgeDraft: draft.id,
   };
 }
 
@@ -341,6 +361,12 @@ const SHOTS: Shot[] = [
     mode: UiMode.Simple,
     url: (s) => `/knowledge/${s.knowledge.id}?turn=${s.knowledge.turnId}&cite=2`,
     ready: testId('citation-lines'),
+  },
+  {
+    name: 'knowledge-draft',
+    mode: UiMode.Simple,
+    url: (s) => `/knowledge/${s.knowledgeDraft}`,
+    ready: testId('answer-draft'),
   },
   {
     name: 'knowledge-history',

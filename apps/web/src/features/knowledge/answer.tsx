@@ -7,14 +7,41 @@ import { KNOWLEDGE_COPY as C } from '../../copy/knowledge.ts';
 import styles from './knowledge.module.css';
 
 const CITE_HREF = '#cite-';
+/** A marker of a draft: not checked yet, so never a link (18 §5.5). */
+const PENDING_HREF = '#pending-';
 
-/** Each marker `[n]` of a known citation becomes a link the renderer turns into a citation button. */
-function linkMarkers(answer: string, count: number): string {
+/** Each marker `[n]` (of a known citation, when `count` is given) becomes a link the renderer turns into a mark. */
+function linkMarkers(answer: string, href: string, count = Number.POSITIVE_INFINITY): string {
   let text = answer;
   for (const { n, start, end } of citationMarkers(answer).reverse()) {
-    if (n >= 1 && n <= count) text = `${text.slice(0, start)}[${n}](${CITE_HREF}${n})${text.slice(end)}`;
+    if (n >= 1 && n <= count) text = `${text.slice(0, start)}[${n}](${href}${n})${text.slice(end)}`;
   }
   return text;
+}
+
+const draftComponents: Components = {
+  a: ({ href, children }) =>
+    href?.startsWith(PENDING_HREF) === true ? (
+      <span className={styles.pendingMark} title={C.pendingCitation}>
+        {href.slice(PENDING_HREF.length)}
+      </span>
+    ) : (
+      children
+    ),
+};
+
+/**
+ * The answer as the researcher writes it (18 §5.5): its markers are grey and not clickable until the submitted
+ * answer passed the citation check.
+ */
+export function DraftAnswer({ draft, stopped }: { draft: string; stopped: boolean }) {
+  const source = useMemo(() => linkMarkers(draft, PENDING_HREF), [draft]);
+  return (
+    <div className={styles.answer} data-testid="answer-draft">
+      <Markdown source={source} components={draftComponents} />
+      <p className="hint">{stopped ? C.draftStopped : C.draftWriting}</p>
+    </div>
+  );
 }
 
 export function citationLabel(citation: CitationDTO): string {
@@ -41,7 +68,7 @@ export function Answer({
   active: number | undefined;
   onCite(index: number, trigger: HTMLElement): void;
 }) {
-  const source = useMemo(() => linkMarkers(answer, citations.length), [answer, citations.length]);
+  const source = useMemo(() => linkMarkers(answer, CITE_HREF, citations.length), [answer, citations.length]);
   const components: Components = {
     a: ({ href, children }) => {
       if (href?.startsWith(CITE_HREF) === true) {

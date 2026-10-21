@@ -59,7 +59,9 @@ function useConversationMutation<I>(mutationFn: (input: I) => Promise<KnowledgeC
 export const useAskKnowledge = () =>
   useConversationMutation((input: AskKnowledgeRequest) => callOperation(askKnowledgeOp, input));
 export const useFollowUp = () =>
-  useConversationMutation((input: { id: string; question: string }) => callOperation(followUpKnowledgeOp, input));
+  useConversationMutation((input: { id: string; question: string; model: string | null }) =>
+    callOperation(followUpKnowledgeOp, input),
+  );
 export const useStopKnowledge = () => useConversationMutation((id: string) => callOperation(stopKnowledgeOp, { id }));
 
 export function useDeleteKnowledge() {
