@@ -26,8 +26,9 @@ export type OperationContract<I extends z.ZodObject = z.ZodObject, O extends z.Z
   /** Input fields holding secrets: never part of the assistant tool schema (D28). */
   credentialFields: ReadonlyArray<keyof z.input<I> & string>;
   /**
-   * Other input fields the assistant may not set: ones that would let it approve its own calls or choose a program
-   * the app runs (D65). Like credentials, they are left out of its tool schema.
+   * Other input fields the assistant may not set: ones that would let it approve its own calls, choose a program the
+   * app runs, widen what AI sessions may do or move where they write (D65). Like credentials, they are left out of
+   * its tool schema.
    */
   assistantOmit?: ReadonlyArray<keyof z.input<I> & string>;
   /** Lowest UI mode that shows the operation. */

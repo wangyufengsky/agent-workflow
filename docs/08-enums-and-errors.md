@@ -200,15 +200,15 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ui.theme` | `system` | 简单 |
 | `ai.askOnUncertainty` | `false` | 简单 |
 | `ai.defaultModel` | `null`（使用 opencode 默认模型） | 专业 |
-| `ai.bashPolicy` | `auto` | 专业 |
+| `ai.bashPolicy` | `auto`（助手不能修改，D65） | 专业 |
 | `scheduler.maxConcurrentAttempts` | `4` | 简单 |
 | `scheduler.maxConcurrentNodesPerTask` | `2` | 专业 |
 | `node.maxAttempts` | `3` | 专业 |
 | `attempt.timeoutMinutes` | `60` | 专业 |
-| `worktree.rootDir` | `null`（使用 `<数据目录>/worktrees`） | 专业 |
+| `worktree.rootDir` | `null`（使用 `<数据目录>/worktrees`；助手不能修改，D65） | 专业 |
 | `delivery.defaultStrategy` | `squash`（可选 `squash` / `merge` / `rebase`；PR 有单独按钮） | 专业 |
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |
-| `opencode.binaryPath` | `null`（从 PATH 与 `~/.opencode/bin` 查找） | 专业 |
+| `opencode.binaryPath` | `null`（从 PATH 与 `~/.opencode/bin` 查找；助手不能修改，D65） | 专业 |
 | `assistant.alwaysAllow` | `[]`（操作 id 列表；只有 write 级生效，critical 即使在列表中也每次确认；助手自己不能修改，D65；v1.1） | 简单 |
 
 「模式」列表示该设置在哪种界面模式下出现在设置页（常量 `SETTING_MODE`）。值的 schema 为 `settingsSchema`（strict：未知键拒绝），默认值为 `SETTING_DEFAULTS`。

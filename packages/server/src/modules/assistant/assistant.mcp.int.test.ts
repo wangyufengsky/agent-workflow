@@ -87,11 +87,11 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     expect(tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(['git_status', 'databases_update']));
     const schemas = JSON.stringify(tools.map((tool) => tool.inputSchema));
     expect(schemas).not.toMatch(/"(password|token)"/);
-    const settings = tools.find((tool) => tool.name === 'settings_update');
-    expect(Object.keys(settings?.inputSchema.properties ?? {})).not.toEqual(
-      expect.arrayContaining(['assistant.alwaysAllow']),
-    );
-    expect(Object.keys(settings?.inputSchema.properties ?? {})).not.toContain('opencode.binaryPath');
+    const settings = Object.keys(tools.find((tool) => tool.name === 'settings_update')?.inputSchema.properties ?? {});
+    expect(settings).toContain('ui.theme');
+    for (const omitted of ['assistant.alwaysAllow', 'opencode.binaryPath', 'ai.bashPolicy', 'worktree.rootDir']) {
+      expect(settings).not.toContain(omitted);
+    }
     expect(JSON.stringify(tools)).not.toContain(MCP_SESSION_ARG);
   });
 
@@ -248,6 +248,8 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
       ['databases_update', { id: 'c1', password: 'secret' }],
       ['settings_update', { 'assistant.alwaysAllow': ['projects.delete'] }],
       ['settings_update', { 'opencode.binaryPath': '/tmp/evil' }],
+      ['settings_update', { 'ai.bashPolicy': 'auto' }],
+      ['settings_update', { 'worktree.rootDir': '/tmp/elsewhere' }],
     ] as const) {
       const { isError, body } = await call(name, args);
       expect(isError).toBe(true);
@@ -256,6 +258,7 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     expect((await t.call(getSettingsOp, {})).body).toMatchObject({
       'assistant.alwaysAllow': [],
       'opencode.binaryPath': null,
+      'worktree.rootDir': null,
     });
   });
 });

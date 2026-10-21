@@ -28,7 +28,7 @@
 - 只生成 `expose.assistant` 的操作；助手面板自己的操作（`assistant.*`）不暴露（助手不能确认自己的调用）。
 - 剔除后仍有必填凭据字段的操作不生成工具（`databases.create`、`projects.setHosting`），只能 `open_form`。
 - 按界面模式过滤：简单模式下只有 `mode = simple` 的操作，调用时再检查（`MCP_TOOL_NOT_ALLOWED`，hint 提示用户可切到专业模式）。
-- `settings.update` 的 `assistant.alwaysAllow`、`opencode.binaryPath` 不进入 schema（D65）。
+- `settings.update` 的 `assistant.alwaysAllow`、`opencode.binaryPath`、`ai.bashPolicy`、`worktree.rootDir` 不进入 schema（D65）。
 
 另有少量助手专用工具（`assistant.helpers.ts`，输入输出 schema 在 `shared/contracts/mcp/assistant-tools.ts`）：
 
