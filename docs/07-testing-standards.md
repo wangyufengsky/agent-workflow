@@ -78,6 +78,7 @@
 | J11 | 对助手说开始任务 → 确认卡片 → 任务运行（v1.1，`shell-assistant.browser.spec.ts`；同文件另有主页输入 → 面板、`open_page` 跳转、「总是允许」→ 设置页撤销的冒烟） | 浏览器 |
 | J12 | 知识问答：提问 → 研究过程（检索、读取）→ 带引用的回答 → 点击引用看原文（高亮、下一处、Esc）→ 续问 → 对话记录中回到对话（v1.1，`project-knowledge.browser.spec.ts`；FakeOpencode 的 `tool` 步骤报告只读的原生工具调用） | 浏览器 |
 | J13 | 对助手提问（知识问答）→「正在查资料」→ 导航卡片与带引用的回答 → 点引用看到原文 → 卡片「打开」进入知识对话页（v1.1，`project-knowledge.browser.spec.ts`） | 浏览器 |
+| J14 | 知识问答流式回答与模型：草稿出现、引用编号「待核对」不可点 → 提交通过后变为可点击的引用；换模型续问，对话与对话记录显示各轮模型（v1.1，`project-knowledge.browser.spec.ts`） | 浏览器 |
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 

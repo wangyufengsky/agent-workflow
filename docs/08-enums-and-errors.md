@@ -211,6 +211,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `KNOWLEDGE_SOURCE_CONTEXT_LINES` | 40（原文面板中引用区间前后各显示的行数） |
 | `KNOWLEDGE_QUERY_ROWS` | 50（打开数据库引用时重新执行查询返回的行数） |
 | `KNOWLEDGE_ANSWER_EXCERPT_CHARS` | 160（对话记录中最后一轮回答的摘要） |
+| `KNOWLEDGE_DRAFT_FLUSH_CHARS` | 24（研究尝试的流式正文写会话流的粒度，回答草稿因此流式显示，18 §5.5） |
 
 ### 4.3 用户设置（`constants/settings.ts`，键 → 默认值）
 

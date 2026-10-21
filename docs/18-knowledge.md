@@ -213,6 +213,7 @@ type KnowledgeConversationSummaryDTO = {
 - **显示规则**：研究中（含校验失败后修正中）显示草稿，编号灰色「待核对」；`answered` 显示提交的正文与可点击的引用；`stopped` / `failed` 有草稿时显示草稿与「已停止，引用未核对」。
 - **tokens**：正文输出两遍（正文 + `submit_answer` 参数），多出的输出 tokens 约等于回答长度（数百到一千多）；研究阶段读文件的输入 tokens 通常是它的几十倍，影响很小。另一种做法是 `submit_answer` 只提交引用、回答取模型最后一段正文，省掉这部分 tokens，但模型的最后一段正文常夹带别的话，回答与校验对象可能不一致，所以不采用。
 - 应用助手的异步调用（§4a）不变：助手收到的仍是通过校验后的最终回答。
+- 模型不先写正文、直接提交时没有草稿，界面在提交通过后直接显示回答（不会出现未经校验的可点击引用）。live 中 `deepseek-v4.1-flash` 起初就这样做，首条消息与协议提示词随后写明「先写正文、再提交」的两步顺序，此后三次 live 都先流式写出正文（草稿与提交的回答一致）。
 
 ## 6. 引用
 
@@ -308,5 +309,6 @@ apps/web/src/features/knowledge/       页面、研究过程卡、回答与引�
 | 集成 | `knowledge.int.test.ts`（FakeOpencode）：提问 → 会话的目录 / agent / 规则正确 → `submit_answer` 通过后轮次 `answered`、引用与 excerpt 正确；引用校验每个子码（不存在的文件、越界行号、`..` 与符号链接越界、`.git`、范围外来源、未知标注、未用引用、未知连接）且返回 hint，修正后重提成功；只读：研究会话的规则无 edit、bash 写命令 ask、`task` deny、网络默认 deny；续问沿用同一 opencode 会话且上一轮研究中时 `KNOWLEDGE_CONVERSATION_BUSY`；停止 → `stopped`；未提交 → 提醒 → `failed`；读取原文（窗口、`changed`、文件删除后 404、编号越界 404）；删除对话清理尝试与会话流；删除项目时研究中拒绝、结束后级联；`research` 尝试不能调用 `submit_result` / `ask_user`；数据库引用（Docker MySQL）：原文重新执行只读查询 |
 | `@opencode` | 注入后 `aw-researcher` 在 opencode 配置中可见 |
 | 集成（助手） | `assistant.knowledge.int.test.ts`：`knowledge_ask` 不需确认、立即返回 `researching`；研究完成后助手会话收到带引用与链接的回答消息、对话中有导航卡片；研究失败时收到错误码与原因 |
-| E2E | J13：对助手提问 → 「正在查资料」→ 导航卡片与带引用的回答 → 点引用看到原文 → 卡片「打开」进入知识对话页。J12（FakeOpencode）：首屏 → 提问 → 研究过程（检索、读取）→ 带引用的回答 → 点击引用看原文（高亮、下一处）→ 续问 → 对话记录中出现并可回到对话；J9 走查加入知识问答三个状态 |
-| live | `live/knowledge.live.test.ts`：对 `ts-stats` 提一个有确定答案的问题，断言回答带有效引用且引用指向正确的文件，报告写到 `live/reports/knowledge-*.json` |
+| 集成（流式与模型） | `knowledge.int.test.ts`：草稿在提交前以 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 的粒度写进会话流、提交后回答为提交的正文；校验失败时仍在研究、没有回答、草稿保留；停止后草稿保留；四轮分别用请求的模型、换模型、`ai.defaultModel`、opencode 默认，记录在轮次上并随首条消息发送 |
+| E2E | J14：草稿与「待核对」编号 → 提交通过后可点击；换模型续问后对话与对话记录显示模型。J13：对助手提问 → 「正在查资料」→ 导航卡片与带引用的回答 → 点引用看到原文 → 卡片「打开」进入知识对话页。J12（FakeOpencode）：首屏 → 提问 → 研究过程（检索、读取）→ 带引用的回答 → 点击引用看原文（高亮、下一处）→ 续问 → 对话记录中出现并可回到对话；J9 走查加入知识问答三个状态 |
+| live | `live/knowledge.live.test.ts`（K-15 起另断言回答先以正文流式写出）：对 `ts-stats` 提一个有确定答案的问题，断言回答带有效引用且引用指向正确的文件，报告写到 `live/reports/knowledge-*.json` |

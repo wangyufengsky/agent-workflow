@@ -294,7 +294,7 @@ payload / response：
 | kind | data |
 | --- | --- |
 | `user_message` | `{ text }`（我们发给会话的提示词 / 答案 / 提醒） |
-| `text` | `{ text }`，带 `partId`（模型正文；流式时同一 `partId` 多行，每行是到当时为止的全文：每增长 `TRANSCRIPT_TEXT_FLUSH_CHARS` 写一次，片段结束再写一次；读取时按 `partId` 取最后一行） |
+| `text` | `{ text }`，带 `partId`（模型正文；流式时同一 `partId` 多行，每行是到当时为止的全文：每增长 `TRANSCRIPT_TEXT_FLUSH_CHARS` 写一次（知识问答的 `research` 尝试为 `KNOWLEDGE_DRAFT_FLUSH_CHARS`，回答草稿因此流式显示，18 §5.5），片段结束再写一次；读取时按 `partId` 取最后一行） |
 | `reasoning` | 同 `text` |
 | `tool_call` | `{ tool, callId, input }`（工具开始运行时一次） |
 | `tool_result` | `{ tool, callId, status: 'completed' \| 'error', output?, error? }` |
@@ -363,7 +363,7 @@ payload / response：
 | conversation_id | TEXT → knowledge_conversations，CASCADE | |
 | seq | INTEGER | 对话内序号，从 1 起 |
 | question | TEXT | |
-| attempt_id | TEXT → attempts | 这一轮的 `research` 尝试；状态由它推导，不另存 |
+| attempt_id | TEXT → attempts | 这一轮的 `research` 尝试；状态与模型（`model` 列，D67 ④）由它推导，不另存 |
 | answer | TEXT NULL | `submit_answer` 通过校验后写入 |
 | citations | TEXT(JSON) NULL | `CitationDTO[]` |
 | created_at / answered_at | INTEGER | |
