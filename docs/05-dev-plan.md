@@ -187,3 +187,17 @@
 | X-09 | 打包：electron-builder 增加 win nsis x64、linux AppImage + deb x64、`icon.png`、维护者与可执行文件名；`pnpm dist` 构建当前平台 | CI 在 windows 与 ubuntu 上打出安装包并上传 artifact |
 | X-10 | CI：GitHub Actions 三平台矩阵（verify 各步骤、浏览器 E2E、Electron 启动冒烟，Linux 用 xvfb）；数据库集成测试只在 ubuntu 运行并写明原因 | 三平台全绿 |
 | X-11 | 文档收尾：03 §7 数据目录、11 环境接口、07 CI 与 Electron 冒烟、14 引导页、README 各平台安装、本节状态 | 文档与代码一致 |
+## v1.1 · 质量与用量
+
+> 状态：进行中。设计见 [19-insights.md](19-insights.md)；需要用户拍板的取舍为 D78（口径与范围）、D79（不引入图表库），**待用户确认**，实现按保守方案。恢复工作台、快照评审、历史归档不做见 D77。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| I-01 | 设计文档 19、任务拆分、决策 D78–D79；14 路由表、11 API、10 索引、08 枚举与常量、07 E2E 旅程同步 | 文档评审通过 |
+| I-02 | shared：`InsightsPeriod` / `InsightsDimension` / `InsightsFailureKind` / `InsightsDrill`、`INSIGHTS_MAX_DAYS`、`AssistantPage.Insights`；契约 `insightsQuerySchema`、`InsightsSummaryDTO`、`InsightsTaskDTO`；操作 `insights.summary`、`insights.tasks`（read、`mode = simple`、`expose.assistant = true`） | `pnpm check` 通过；操作标题文案完整（已有单测） |
+| I-03 | 后端纯函数：`insights.period.ts`（时间段 → 日期与区间、时刻 → 日期，时区参数化）、`insights.aggregate.ts`（19 §2 全部口径） | 单测：五种时间段与校验、跨时区归日、夏令时；空数据、未计价、中断不计、失败原因、按假设的提问、中位数、拆分空键 |
+| I-04 | 后端：迁移 `0010_insights`（`attempts(started_at)`、`inbox_items(created_at)`）；`insights.repo.ts`（按区间与按任务 id 批量查询）、service、operations、装配；FakeOpencode 新增 `usage` 步骤（本回合报告的 tokens 与成本） | 集成测试：真实流程（首次通过、检查失败后重试且有一次提问、取消、知识问答）后两个操作的数字；`custom` 缺日期 400；性能实测数字记入 19 §5 |
+| I-05 | 助手：`open_page` 的 `insights` 页面；助手可调用 `insights_summary` | 集成测试：助手会话调用 `insights_summary { period: 'week' }` 直接返回用量 |
+| I-06 | 界面：路由 `/insights`、导航（两种模式）、图标 `chart`；简单视图三张卡；专业视图工具条、用量卡、自写 SVG 柱状趋势图（令牌着色）、拆分标签页、质量卡、失败原因、任务明细与钻取（`?period&from&to&drill&key`） | 单测：钻取过滤；四主题 `lint:css` 通过 |
+| I-07 | E2E J16 `task-insights.browser.spec.ts`：造任务后简单与专业视图的数字、钻取到任务页、四主题切换；走查 J9 包含该页 | `pnpm e2e` 通过 |
+| I-08 | 收尾：本节状态、`pnpm verify`、`pnpm e2e`、`pnpm test:oc` | 三条命令通过 |
