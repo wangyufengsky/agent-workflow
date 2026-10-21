@@ -100,7 +100,7 @@ describe('PR 审查意见回流（21）', () => {
       [ReviewCommentKind.General, null, null, ['alice'], true],
     ]);
 
-    const revised = 'export const greet = (name: string) => (name === "" ? "hello!" : `hello, ${name}!`);\n';
+    const revised = 'export const greet = (name: string) => (name === "" ? "hello!" : "hello, " + name);\n';
     t.fake.enqueue(script().edit('greet.ts', revised).callTool('submit_result', { summary: 'Handled empty names' }), {
       title: '· 按审查意见修改',
       directory: worktree,

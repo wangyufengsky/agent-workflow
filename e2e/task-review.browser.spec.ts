@@ -75,7 +75,7 @@ test('J18 PR 审查意见 → 取回并勾选 → AI 按意见修改 → 推送�
   await review.getByRole('checkbox', { name: '对话中的评论' }).uncheck();
   await expect(review).toContainText('已选 1 条');
 
-  const revised = 'export const greet = (name = "") => (name === "" ? "你好" : `你好，${name}`);\n';
+  const revised = 'export const greet = (name = "") => (name === "" ? "你好" : "你好，" + name);\n';
   await queueTurn(request, project, { title: '按审查意见修改' }, [
     { type: 'edit', file: 'greet.ts', content: revised },
     submitResult('名字为空时也问候'),
