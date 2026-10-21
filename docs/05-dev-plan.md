@@ -187,3 +187,20 @@
 | X-09 | 打包：electron-builder 增加 win nsis x64、linux AppImage + deb x64、`icon.png`、维护者与可执行文件名；`pnpm dist` 构建当前平台 | CI 在 windows 与 ubuntu 上打出安装包并上传 artifact |
 | X-10 | CI：GitHub Actions 三平台矩阵（verify 各步骤、浏览器 E2E、Electron 启动冒烟，Linux 用 xvfb）；数据库集成测试只在 ubuntu 运行并写明原因 | 三平台全绿 |
 | X-11 | 文档收尾：03 §7 数据目录、11 环境接口、07 CI 与 Electron 冒烟、14 引导页、README 各平台安装、本节状态 | 文档与代码一致 |
+
+## v1.1 · 固定模板批量任务
+
+> 状态：开发中。设计见 [20-batch-tasks.md](20-batch-tasks.md)，决策 D78（批次的边界）、D79（批量交付），其中子任务不确认计划、目标为任意文本且上限 20、批量交付不支持 PR 三项**待用户确认**，先按保守方案实现。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| B-01 | 设计文档 20、任务拆分、决策 D78 / D79 | 文档评审通过 |
+| B-02 | 契约：`EntityKind.Batch`、`BatchDeliveryOutcome`、常量（`BATCH_TARGET_PLACEHOLDER`、`BATCH_KEY_PREFIX`、`BATCH_TARGETS_MAX`、`BATCH_TARGET_MAX_CHARS`）、错误码 `BATCH_NOT_FOUND`、`renderBatchRequirement` / `batchCounts` / `isBatchDeliverable`、批次 schema 与 DTO、四个操作契约（`batches.create` 为 write 并声明 `produces`，`batches.deliver` 为 critical）；08 / 10 / 11 同步 | 单测：三个函数；创建请求 schema 拒绝无占位符、重复目标、换行目标、替换后超长的需求；`ERROR_COPY` 覆盖新错误码；操作风险与 `produces` 标注 |
+| B-03 | 存储：迁移 `0010_batches`（`batches`、`batch_tasks`）；batches 模块的 repo（插入、按 id 读、分页列表、子任务关联） | 集成测试见 B-04；删除项目后批次随之消失 |
+| B-04 | 批次服务：创建（只用固定流程、分支检查一次、一个事务写入批次与全部子任务草稿、提交后依次开始；任务创建拆为「检查」与「写入草稿」两步）、详情（子任务摘要与本轮交付）、列表（汇总计数、游标分页） | 集成测试（FakeOpencode + 真实 Git）：创建 3 个目标的批次后各子任务各自有分支与 worktree、各自跑完到待合并、需求为模板替换结果、计划不需确认；AI 规划流程 400 `VALIDATION_FAILED`；不存在的批次 404 `BATCH_NOT_FOUND`；删除项目级联删除批次 |
+| B-05 | 批量交付：按目标顺序逐个 `tasks.deliver`（代码流程用本地合并策略，默认 `delivery.defaultStrategy`；报告流程 `report_only`），冲突 / 失败 / 合并前检查不通过的任务停下并记录原因，其余继续；返回每个任务的结果 | 集成测试：三个任务中一个与主分支冲突，另外两个合并成功（主分支有两次提交）、冲突的留在 `review` 且 `lastDelivery.status = conflict`，再次批量交付不包含它；报告流程（`code_review`）批量「完成」 |
+| B-06 | 助手：`batches.create` 经确认后创建并出现批次导航卡片；`entity-routes.ts` 加入批次 | 集成测试（MCP SDK 客户端）：`batches_create` → `needs_confirmation` → 确认后批次存在、对话消息流有 `entity_ref`（kind `batch`） |
+| B-07 | 界面：新建批量任务页（项目、固定流程、需求模板与默认模板、目录树勾选 / 按行输入、预览、⌘↵ 创建）；主页流程卡片「批量」；流程页「批量运行」 | 单测：目标文本解析（空行、首尾空白）；E2E 见 B-09 |
+| B-08 | 界面：批量视图（进度汇总、逐个状态与进展、冲突 / 失败标注、合并全部待合并的 + 确认对话框、结果提示）、批量任务列表 `/batches`、主页「批量任务」区、任务列表入口；四套主题 | E2E 见 B-09；走查截图含新建页与批量视图 |
+| B-09 | E2E（FakeOpencode）：J16 主页「补单元测试」的「批量」→ 选 3 个目录 → 创建 → 三个任务到达待合并 → 合并全部 → 主分支 3 个提交、全部已完成；J9 走查加入批量页面 | `pnpm e2e` 通过 |
+| B-10 | 文档收尾：03（模块分层）、07（J16）、14（路由与主页）、本节状态段 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
