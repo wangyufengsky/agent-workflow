@@ -103,19 +103,19 @@ export function createAcceptanceService({
   return {
     /**
      * Runs the command in the worktree; exit code 0 within ACCEPTANCE_COMMAND_TIMEOUT_MS passes. A timeout or the
-     * signal ends the command with everything it started (D69).
+     * signal ends the command with everything it started (D73).
      */
     async runCommand(directory: string, command: string, signal: AbortSignal): Promise<CommandCheckResult> {
       const child = execa(command, {
         cwd: directory,
-        // A check command is a POSIX shell command line on every platform (`pnpm test`, `mvn -q test && …`, D69).
+        // A check command is a POSIX shell command line on every platform (`pnpm test`, `mvn -q test && …`, D73).
         shell: await locateShell(env),
         env,
         extendEnv: false,
         all: true,
         reject: false,
         stdin: 'ignore',
-        // A shell ended alone leaves its commands running, holding the output and worktree files (D69).
+        // A shell ended alone leaves its commands running, holding the output and worktree files (D73).
         killDescendants: true,
       });
       let timedOut = false;

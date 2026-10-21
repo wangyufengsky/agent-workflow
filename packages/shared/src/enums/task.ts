@@ -46,6 +46,8 @@ export const AttemptKind = {
   Plan: 'plan',
   Execute: 'execute',
   Review: 'review',
+  /** One question of a knowledge conversation (18 §5.2); belongs to no task. */
+  Research: 'research',
 } as const;
 export type AttemptKind = (typeof AttemptKind)[keyof typeof AttemptKind];
 export const attemptKindSchema = z.enum(AttemptKind);

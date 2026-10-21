@@ -1,4 +1,4 @@
-import { RoleBaseAgent } from '../enums/workflow.ts';
+import { SessionAgent } from '../enums/workflow.ts';
 
 export const APP_ID = 'agent-workflow';
 export const APP_SOURCE_URL = 'https://github.com/wangyufengsky/agent-workflow';
@@ -6,10 +6,11 @@ export const APP_LICENSE = 'Apache-2.0';
 /** Exact opencode version this app hosts; any other version is `version_mismatch`. */
 export const OPENCODE_VERSION = '1.19.0';
 export const OPENCODE_AGENT_NAME = {
-  [RoleBaseAgent.Planner]: 'aw-planner',
-  [RoleBaseAgent.Executor]: 'aw-executor',
-  [RoleBaseAgent.Reviewer]: 'aw-reviewer',
-} as const satisfies Record<RoleBaseAgent, string>;
+  [SessionAgent.Planner]: 'aw-planner',
+  [SessionAgent.Executor]: 'aw-executor',
+  [SessionAgent.Reviewer]: 'aw-reviewer',
+  [SessionAgent.Researcher]: 'aw-researcher',
+} as const satisfies Record<SessionAgent, string>;
 /** The app assistant's agent (15 §2); not a role base agent. */
 export const OPENCODE_ASSISTANT_AGENT = 'aw-assistant';
 export const MCP_SERVER_NAME = 'agent-workflow';
@@ -29,6 +30,12 @@ export const MCP_ASSISTANT_PATH = '/mcp/assistant';
 export const ASSISTANT_DIR = 'assistant';
 export const ASSISTANT_FILES_DIR = 'files';
 export const ASSISTANT_CONVERSATIONS_DIR = 'conversations';
+/**
+ * Cited files under these directories, or with these extensions, are documentation; every other file is code
+ * (18 §6.1). Matched case-insensitively.
+ */
+export const KNOWLEDGE_DOC_DIRS = ['docs', 'doc'] as const;
+export const KNOWLEDGE_DOC_EXTENSIONS = ['.md', '.mdx', '.markdown', '.txt', '.rst', '.adoc'] as const;
 /** Fixed backend port in development so the Vite dev server can proxy to it; production uses a random port. */
 export const DEV_API_PORT = 47821;
 export const DEV_WEB_PORT = 47822;

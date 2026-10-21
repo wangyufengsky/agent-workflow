@@ -5,9 +5,9 @@ import { host } from '../../core/platform.ts';
 import { runGit } from './git.cli.ts';
 
 /**
- * The POSIX shell that runs check commands (D69): /bin/sh, or on Windows the bash of Git for Windows, found from
+ * The POSIX shell that runs check commands (D73): /bin/sh, or on Windows the bash of Git for Windows, found from
  * git's own installation (`--exec-path`) because PATH may hold a forwarding shim (scoop). GIT_NOT_INSTALLED when
- * that git has no bash beside it (MinGit): commands must not fall back to cmd or PowerShell (D68).
+ * that git has no bash beside it (MinGit): commands must not fall back to cmd or PowerShell (D72).
  */
 export async function locateShell(env: NodeJS.ProcessEnv): Promise<string> {
   if (!host.shellFromGit) return host.posixShell;
@@ -17,7 +17,7 @@ export async function locateShell(env: NodeJS.ProcessEnv): Promise<string> {
   return bash;
 }
 
-/** The shell opencode must use (`shell` in its config): Git Bash on Windows (D68), otherwise the user's own. */
+/** The shell opencode must use (`shell` in its config): Git Bash on Windows (D72), otherwise the user's own. */
 export async function locateOpencodeShell(env: NodeJS.ProcessEnv): Promise<string | undefined> {
   return host.shellFromGit ? locateShell(env) : undefined;
 }

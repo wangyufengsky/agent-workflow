@@ -22,6 +22,13 @@ export const PromptName = {
   AssistantContext: 'assistant-context',
   AssistantConfirmed: 'assistant-confirmed',
   AssistantCancelled: 'assistant-cancelled',
+  /** The outcome of a knowledge question the assistant asked, sent to its session (18 §4a). */
+  AssistantKnowledgeAnswered: 'assistant-knowledge-answered',
+  AssistantKnowledgeFailed: 'assistant-knowledge-failed',
+  /** The knowledge researcher's agent prompt, its first message and a follow-up question (18 §5). */
+  ProtocolResearch: 'protocol-research',
+  StartResearch: 'start-research',
+  ResearchFollowUp: 'research-followup',
 } as const;
 export type PromptName = (typeof PromptName)[keyof typeof PromptName];
 
@@ -53,6 +60,11 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.AssistantContext]: read(PromptName.AssistantContext),
     [PromptName.AssistantConfirmed]: read(PromptName.AssistantConfirmed),
     [PromptName.AssistantCancelled]: read(PromptName.AssistantCancelled),
+    [PromptName.AssistantKnowledgeAnswered]: read(PromptName.AssistantKnowledgeAnswered),
+    [PromptName.AssistantKnowledgeFailed]: read(PromptName.AssistantKnowledgeFailed),
+    [PromptName.ProtocolResearch]: read(PromptName.ProtocolResearch),
+    [PromptName.StartResearch]: read(PromptName.StartResearch),
+    [PromptName.ResearchFollowUp]: read(PromptName.ResearchFollowUp),
   };
 }
 

@@ -41,6 +41,7 @@ export const assistantPageRefSchema = z
         nodeId: z.string().min(1).optional(),
         projectId: z.string().min(1).optional(),
         workflowKey: z.string().min(1).optional(),
+        knowledgeConversationId: z.string().min(1).optional(),
       })
       .default({}),
   })

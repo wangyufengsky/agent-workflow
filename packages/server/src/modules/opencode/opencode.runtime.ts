@@ -29,7 +29,7 @@ export type OpencodeRuntimeDeps = {
   binaryPath: () => string | null;
   /**
    * `OPENCODE_CONFIG_CONTENT` for the next launch (12 §2); built per launch because it holds the MCP endpoint.
-   * Rejects when opencode cannot be hosted safely here (no Git Bash on Windows, D68).
+   * Rejects when opencode cannot be hosted safely here (no Git Bash on Windows, D72).
    */
   configContent: () => Promise<string>;
   log: Logger;
@@ -48,7 +48,7 @@ function spawnServe(path: string, env: NodeJS.ProcessEnv) {
     buffer: false,
     reject: false,
     // Stopping ends its bash commands and language servers too: on Windows they would outlive it, holding worktree
-    // files (D69).
+    // files (D73).
     killDescendants: true,
   });
 }

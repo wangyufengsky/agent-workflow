@@ -8,7 +8,7 @@ export const EntityKind = {
   Workflow: 'workflow',
   Role: 'role',
   DbConnection: 'db_connection',
-  /** Reserved for the knowledge base's conversations (v1.1). */
+  /** A knowledge Q&A conversation (18). */
   KnowledgeConversation: 'knowledge_conversation',
 } as const;
 export type EntityKind = (typeof EntityKind)[keyof typeof EntityKind];

@@ -104,6 +104,8 @@ export const ServerEventType = {
   AssistantNavigate: 'assistant.navigate',
   AssistantOpenForm: 'assistant.open_form',
   AssistantRevealFile: 'assistant.reveal_file',
+  /** A knowledge conversation changed: a new turn, a submitted answer, a turn that ended, a deletion (18 §4). */
+  KnowledgeUpdated: 'knowledge.updated',
   Resync: 'resync',
 } as const;
 export type ServerEventType = (typeof ServerEventType)[keyof typeof ServerEventType];

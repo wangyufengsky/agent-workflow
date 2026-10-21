@@ -59,6 +59,7 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.DbListConnections,
       McpToolName.DbDescribe,
       McpToolName.DbQuery,
+      McpToolName.SubmitAnswer,
     ]);
     const submit = tools.find((tool) => tool.name === McpToolName.SubmitResult);
     expect(submit?.inputSchema).toMatchObject({ type: 'object', required: ['summary'] });

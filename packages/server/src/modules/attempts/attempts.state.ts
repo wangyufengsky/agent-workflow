@@ -2,6 +2,7 @@ import {
   AppError,
   type AttemptDTO,
   type AttemptEvent,
+  type AttemptKind,
   type AttemptSummaryDTO,
   attemptMachine,
   ErrorCode,
@@ -63,7 +64,7 @@ export type AttemptStateDeps = {
   log: Logger;
   opencode: OpencodeClient;
   inbox: InboxService;
-  transcripts: TranscriptStore<{ id: string; taskId: string | null }>;
+  transcripts: TranscriptStore<{ id: string; taskId: string | null; kind: AttemptKind }>;
 };
 
 /** An expected failure (opencode request, not ready …) as the error recorded on the attempt; anything else is a bug. */
@@ -169,7 +170,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
       listeners.add(listener);
     },
 
-    record(attempt: { id: string; taskId: string | null }, entries: NewTranscriptEntry[]): void {
+    record(attempt: Attempt, entries: NewTranscriptEntry[]): void {
       transcripts.append(attempt, entries);
     },
 
@@ -225,9 +226,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
     /** Sends a message to the session and records it as ours. */
     async send(session: LiveSession, text: string): Promise<void> {
       session.idle = false;
-      transcripts.append({ id: session.attemptId, taskId: session.taskId }, [
-        { kind: TranscriptEntryKind.UserMessage, data: { text } },
-      ]);
+      transcripts.append(mustFind(session.attemptId), [{ kind: TranscriptEntryKind.UserMessage, data: { text } }]);
       await opencode.prompt({
         sessionId: session.sessionId,
         directory: session.directory,

@@ -11,7 +11,6 @@ import { memo, useEffect, useMemo, useRef } from 'react';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
-import { Markdown } from '../../components/markdown.tsx';
 import { ASSISTANT_COPY as C } from '../../copy/assistant.ts';
 import { ATTEMPT_COPY, TRANSCRIPT_SYSTEM_LABEL } from '../../copy/attempts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
@@ -25,6 +24,7 @@ import {
 } from './assistant.queries.ts';
 import { ConfirmationCard } from './confirmation-card.tsx';
 import { EntityCard } from './entity-card.tsx';
+import { ReplyMarkdown } from './reply-markdown.tsx';
 
 type ToolResult = Extract<TranscriptEntry, { kind: typeof TranscriptEntryKind.ToolResult }>;
 
@@ -121,7 +121,7 @@ const Message = memo(function Message({ entry, ctx }: { entry: TranscriptEntry; 
     case TranscriptEntryKind.Text:
       return (
         <div className={styles.reply}>
-          <Markdown source={entry.data.text} />
+          <ReplyMarkdown source={entry.data.text} />
         </div>
       );
     case TranscriptEntryKind.Reasoning:

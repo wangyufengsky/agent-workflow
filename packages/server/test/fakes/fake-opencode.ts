@@ -29,6 +29,8 @@ export type McpEndpoint = { url: string; token: string };
 export type FakeStep =
   | { type: 'edit'; file: string; content: string }
   | { type: 'text'; text: string }
+  /** A native tool call that only reads (`read`, `grep`, a bash command …): reported, nothing happens. */
+  | { type: 'tool'; tool: string; input: Record<string, unknown>; output: string }
   | { type: 'callTool'; server: FakeMcpServer; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
   | { type: 'hang' }
@@ -46,6 +48,8 @@ export function script() {
     steps,
     /** Writes the file in the session directory and reports a `write` tool call. */
     edit: (file: string, content: string) => add({ type: 'edit', file, content }),
+    /** Reports a native read-only tool call (the knowledge researcher's `read`, `grep` …), 18 §2.1. */
+    tool: (tool: string, input: Record<string, unknown>, output = '') => add({ type: 'tool', tool, input, output }),
     /** Streams assistant text in small deltas. */
     text: (text: string) => add({ type: 'text', text }),
     /** Calls one of our MCP tools over HTTP, with the session id injected as the bridge plugin would. */
@@ -168,6 +172,12 @@ export function createFakeOpencode() {
             input,
             output: 'Wrote file successfully.',
           });
+          break;
+        }
+        case 'tool': {
+          const { tool, input, output } = step;
+          emit({ type: E.Tool, ...ids, callId: partId, tool, status: ToolCallStatus.Running, input });
+          emit({ type: E.Tool, ...ids, callId: partId, tool, status: ToolCallStatus.Completed, input, output });
           break;
         }
         case 'text': {

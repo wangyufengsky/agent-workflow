@@ -46,7 +46,7 @@ fake?.fake.connectMcp({
   assistant: { url: `http://127.0.0.1:${address.port}${MCP_ASSISTANT_PATH}`, token: app.assistantMcpToken },
 });
 
-/** Closing the server stops opencode with its process tree (D69); only then may the process exit. */
+/** Closing the server stops opencode with its process tree (D73); only then may the process exit. */
 async function shutdown(): Promise<void> {
   await server.close();
   process.exit(0);

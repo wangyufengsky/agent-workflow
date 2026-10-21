@@ -22,6 +22,7 @@
 │         └─ 配置注入：mcp.agent-workflow → .../mcp/exec                 │
 │                     mcp.agent-workflow-app → .../mcp/assistant（v1.1） │
 │                     agent: aw-planner / aw-executor / aw-reviewer      │
+│                            aw-researcher（v1.1 知识问答，18）           │
 │                            aw-assistant（v1.1）                         │
 │                     plugin: agent-workflow-bridge（注入 sessionID）     │
 └───────────────────────────────────────────────────────────────────────┘
@@ -153,6 +154,7 @@ agent-workflow/
 │  │        ├─ opencode/           runtime（进程托管）、client、event-bridge、prompts
 │  │        ├─ mcp/                server + tools/*
 │  │        ├─ inbox/  delivery/
+│  │        ├─ knowledge/          知识问答（v1.1，18）：对话、research 尝试、引用校验与原文
 │  │        └─ databases/          drivers/mysql
 │  ├─ builtin/                 内置流程与角色（数据 + prompts/*.md）
 │  └─ opencode-plugin/         agent-workflow-bridge（注入 sessionID 到本项目 MCP 工具参数）；`pnpm build:plugin` 去掉类型生成 dist/agent-workflow-bridge.js
@@ -182,6 +184,7 @@ modules/tasks/
 依赖方向（dependency-cruiser 强制）：
 
 - `operations / routes → service → repo`；跨模块只能 import 对方的 `index.ts`。例外：表定义文件可以直接引用其他模块的表定义文件以声明外键（D43）。
+- 知识问答（v1.1，18 §8）：`knowledge` 在 `attempts`、`projects`、`databases`、`inbox` 之上，`tasks`（删除项目）与 `mcp` 之下；研究尝试的 `task_id` 为空，由 `knowledge_turns` 指向。
 - 任务域的服务分层（D45）：`inbox`、`plans`、`timeline`、`worktrees` → `attempts` → `acceptance` → `nodes` → `tasks` → `scheduler`；`mcp` 在最上层。`assistant`（v1.1）与 `mcp` 同在最上层：它从 `app.ts` 拿到其余所有模块的操作实现来生成工具，并用 `attempts` 的会话流存储与会话视图、`tasks` / `projects` / `workflows` 查页面上的名称。尝试经 `attempts.onSignal` 通知其所有者（节点、规划、评审），不反向依赖；需要完整任务上下文的入口（`inbox.resolve`、`projects.delete`、节点通过/驳回/重试、删除流程与角色）由 `tasks` 实现。`databases` 在 `projects` 之下（项目详情列出关联的连接），任务上下文与数据库 MCP 工具经 `tasks` 使用它；`workflows` 依赖 `roles`（校验流程定义）。
 - 跨服务的写入用 `core/db/unit-of-work` 的 `transact`（嵌套加入外层事务，事件在提交后发出，D44）。
 - `core` 不依赖 `modules`；`shared` 不依赖任何 app/package；`web` 只依赖 `shared`。
@@ -269,6 +272,7 @@ export function taskOperations(tasks: TasksService) {
 ├─ runs/
 │  └─ <taskId>/
 │     └─ <attemptId>.jsonl     会话流（消息/片段/工具调用镜像）；任务时间线在 SQLite task_events
+│        （知识问答每一轮的会话流在 runs/knowledge/<attemptId>.jsonl，v1.1）
 ├─ worktrees/
 │  └─ <projectSlug>/<taskKey>/ 任务 worktree（默认位置，可在设置中改）
 └─ assistant/                  助手工作目录（v1.1）：会话 directory；files/<对话 id>/ 生成的文件，conversations/<对话 id>.jsonl 消息流

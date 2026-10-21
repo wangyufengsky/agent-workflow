@@ -11,6 +11,7 @@ import {
   passReview,
   patchSettings,
   queueAssistantTurn,
+  queueResearchTurn,
   queueTurn,
   submitResult,
 } from './helpers.ts';
@@ -34,6 +35,8 @@ type Seed = {
   /** Keys of the copied workflows (unique per seed, so the spec can run again against the same backend). */
   fixedKey: string;
   aiKey: string;
+  /** An answered knowledge question with two citations (K-09). */
+  knowledge: { id: string; turnId: string };
 };
 
 async function api<T>(request: APIRequestContext, method: 'GET' | 'POST', path: string, data?: object): Promise<T> {
@@ -171,6 +174,39 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     .toBe(1);
   await patchSettings(request, { 'assistant.alwaysAllow': [] });
 
+  // An answered knowledge question about the review project, with citations to open (K-09).
+  mkdirSync(join(reviewProject.repoPath, 'src'), { recursive: true });
+  writeFileSync(
+    join(reviewProject.repoPath, 'src/refund.ts'),
+    'export function refund(amount: number, fee: number) {\n  const net = amount - fee;\n  return Math.round(net * 100) / 100;\n}\n',
+  );
+  await queueResearchTurn(request, reviewProject, [
+    { type: 'tool', tool: 'grep', input: { pattern: 'Math.round' } },
+    { type: 'tool', tool: 'read', input: { filePath: join(reviewProject.repoPath, 'src/refund.ts') } },
+    {
+      type: 'callTool',
+      name: 'submit_answer',
+      args: {
+        answer: '退款在 `refund()` 中先扣手续费 [1]，再四舍五入到分 [2]。',
+        citations: [
+          { type: 'file', path: 'src/refund.ts', start_line: 2, end_line: 2 },
+          { type: 'file', path: 'src/refund.ts', start_line: 3, end_line: 3 },
+        ],
+      },
+    },
+  ]);
+  const knowledge = await api<{ id: string }>(request, 'POST', '/knowledge/conversations', {
+    projectId: reviewProject.id,
+    question: '退款金额在哪里四舍五入？',
+    sources: { code: true, docs: true, database: false, web: false },
+  });
+  type KnowledgeTurn = { id: string; status: string };
+  const turnOf = async () =>
+    (await api<{ turns: KnowledgeTurn[] }>(request, 'GET', `/knowledge/conversations/${knowledge.id}`)).turns[0];
+  await expect.poll(async () => (await turnOf())?.status).toBe('answered');
+  const knowledgeTurn = await turnOf();
+  if (knowledgeTurn === undefined) throw new Error('knowledge turn not found');
+
   const completedReview = await waitForStatus(request, completed, 'review');
   await api(request, 'POST', `/tasks/${completedReview.id}/deliver`, { strategy: 'squash' });
   return {
@@ -183,6 +219,7 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     completed: await waitForStatus(request, completed, 'completed'),
     fixedKey,
     aiKey,
+    knowledge: { id: knowledge.id, turnId: knowledgeTurn.id },
   };
 }
 
@@ -293,6 +330,24 @@ const SHOTS: Shot[] = [
       return panel;
     },
   },
+  {
+    name: 'knowledge',
+    mode: UiMode.Simple,
+    url: (s) => `/knowledge?projectId=${s.project.id}`,
+    ready: (page) => page.getByRole('heading', { name: '关于这个项目，你想了解什么？' }),
+  },
+  {
+    name: 'knowledge-answer-source',
+    mode: UiMode.Simple,
+    url: (s) => `/knowledge/${s.knowledge.id}?turn=${s.knowledge.turnId}&cite=2`,
+    ready: testId('citation-lines'),
+  },
+  {
+    name: 'knowledge-history',
+    mode: UiMode.Simple,
+    url: () => '/knowledge/history',
+    ready: testId('knowledge-history-row'),
+  },
   { name: 'projects', mode: UiMode.Simple, url: () => '/projects', ready: heading('项目') },
   { name: 'project', mode: UiMode.Simple, url: (s) => `/projects/${s.project.id}`, ready: heading(/.+/) },
   { name: 'settings', mode: UiMode.Simple, url: () => '/settings', ready: heading('设置') },
@@ -369,6 +424,17 @@ const SHOTS: Shot[] = [
   { name: 'pro-databases', mode: UiMode.Pro, url: () => '/databases', ready: heading('数据库') },
   { name: 'pro-tools', mode: UiMode.Pro, url: () => '/tools', ready: heading('MCP 工具') },
   { name: 'pro-runtime', mode: UiMode.Pro, url: () => '/runtime', ready: testId('runtime-details') },
+  {
+    name: 'pro-knowledge',
+    mode: UiMode.Pro,
+    url: (s) => `/knowledge/${s.knowledge.id}`,
+    ready: testId('knowledge-turn'),
+    open: async (page) => {
+      const details = page.getByText('会话流');
+      await details.click();
+      return page.getByTestId('knowledge-turn');
+    },
+  },
   {
     name: 'pro-assistant-panel',
     mode: UiMode.Pro,

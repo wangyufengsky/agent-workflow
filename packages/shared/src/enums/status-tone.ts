@@ -1,3 +1,4 @@
+import { KnowledgeTurnStatus } from './knowledge.ts';
 import { RuntimeStatus } from './system.ts';
 import { AttemptStatus, NodeStatus, TaskDisplayGroup, TaskStatus } from './task.ts';
 import { StatusTone } from './ui.ts';
@@ -37,6 +38,12 @@ export const STATUS_TONE = {
     [AttemptStatus.Aborted]: StatusTone.Warn,
     [AttemptStatus.Interrupted]: StatusTone.Warn,
   },
+  knowledgeTurn: {
+    [KnowledgeTurnStatus.Researching]: StatusTone.Run,
+    [KnowledgeTurnStatus.Answered]: StatusTone.Ok,
+    [KnowledgeTurnStatus.Stopped]: StatusTone.Idle,
+    [KnowledgeTurnStatus.Failed]: StatusTone.Danger,
+  },
   runtime: {
     [RuntimeStatus.NotInstalled]: StatusTone.Danger,
     [RuntimeStatus.VersionMismatch]: StatusTone.Danger,
@@ -61,6 +68,7 @@ export const STATUS_TONE = {
   task: Record<TaskStatus, StatusTone>;
   node: Record<NodeStatus, StatusTone>;
   attempt: Record<AttemptStatus, StatusTone>;
+  knowledgeTurn: Record<KnowledgeTurnStatus, StatusTone>;
   runtime: Record<RuntimeStatus, StatusTone>;
   taskDisplay: Record<TaskDisplayGroup, StatusTone>;
 };

@@ -1,6 +1,6 @@
 # 17 · Windows 与 Linux 支持（v1.1）
 
-v1.0 只验收了 macOS arm64（D13），代码按跨平台抽象编写。本文说明 v1.1 支持 Windows 与 Linux 时各模块的平台差异和处理方式；任务拆分见 [05 §v1.1 跨平台](05-dev-plan.md#v11--windows-与-linux)，决策见 02 的 D67–D72。
+v1.0 只验收了 macOS arm64（D13），代码按跨平台抽象编写。本文说明 v1.1 支持 Windows 与 Linux 时各模块的平台差异和处理方式；任务拆分见 [05 §v1.1 跨平台](05-dev-plan.md#v11--windows-与-linux)，决策见 02 的 D71–D76。
 
 ## 1. 目标平台
 
@@ -62,7 +62,7 @@ Electron `app.getPath('userData')`，目录名为产品名：
 
 **问题。** opencode 1.19.0 的 shell 工具（`packages/core/src/shell.ts`，已从源码确认）在 Windows 上没有配置 `shell` 时按 `pwsh` → `powershell` → Git Bash → `cmd.exe` 的顺序选择，Windows 总有 `powershell.exe`，所以默认是 **PowerShell**。权限匹配时 opencode 用对应语言的 tree-sitter 语法拆出子命令再按我们的通配规则匹配：PowerShell 语法下，`cat` / `ls` 是 `Get-Content` / `Get-ChildItem` 的别名，`$( … )` 子表达式、`;`、管道到 `ForEach-Object` 的脚本块等写法与 bash 不同，D51 / D61 / D63 / D64 的只读白名单和「逃逸写法」规则是按 bash 语义推敲的，在 PowerShell 下不再成立（例如 `echo $(Remove-Item x)` 的整体文本以 `echo` 开头）。
 
-**对策（D68）。** Windows 上要求 Git for Windows（自带 Git Bash），并在注入的 opencode 配置中设置 `shell` 为 Git Bash 的绝对路径。opencode 对 bash 用 bash 语法解析、以 `bash -l -c` 运行，规则与 macOS / Linux 的语义一致，规则本身不分平台。
+**对策（D72）。** Windows 上要求 Git for Windows（自带 Git Bash），并在注入的 opencode 配置中设置 `shell` 为 Git Bash 的绝对路径。opencode 对 bash 用 bash 语法解析、以 `bash -l -c` 运行，规则与 macOS / Linux 的语义一致，规则本身不分平台。
 
 - Git Bash 的位置由 `git --exec-path`（如 `C:/Program Files/Git/mingw64/libexec/git-core`）上溯三级得到 Git 安装根目录，取 `<根目录>\bin\bash.exe`。用 `--exec-path` 而不是 PATH 中 `git.exe` 的位置，是因为 scoop 等安装方式在 PATH 里放的是转发程序。
 - 找不到 Git Bash（例如只有 MinGit）时：引导页 Git 一项显示「未就绪」并说明需要 Git for Windows；托管 opencode 不启动（启动时生成配置失败 → 运行时 `crashed`，日志写明原因）。不退回到 PowerShell。
@@ -86,7 +86,7 @@ Electron `app.getPath('userData')`，目录名为产品名：
 | 子进程 | macOS / Linux | Windows |
 | --- | --- | --- |
 | `opencode serve` | 自成进程组（`detached`），停止时向进程组发 `SIGTERM` | 没有信号，`TerminateProcess` 只结束 opencode 本身，bash 子进程与语言服务会留下。用 `taskkill /pid <pid> /T /F` 结束进程树 |
-| 检查命令（`acceptance.runCommand`） | `/bin/sh -c`，自成进程组；超时 / 中止时向进程组发 `SIGTERM` | Git Bash `-c`（与 opencode 同一个 shell，D69）；超时 / 中止时 `taskkill /T /F` |
+| 检查命令（`acceptance.runCommand`） | `/bin/sh -c`，自成进程组；超时 / 中止时向进程组发 `SIGTERM` | Git Bash `-c`（与 opencode 同一个 shell，D73）；超时 / 中止时 `taskkill /T /F` |
 | git | 正常退出，不需要终止 | 同左 |
 
 两者都用 execa 的 `killDescendants` 启动（POSIX 上自成进程组，Windows 上停止时运行 `taskkill /T`），`child.kill()` 即结束整棵进程树。只结束 shell 本身时，它启动的命令（`a && b` 中的 `b`、后台的测试进程）继续运行并占着输出管道，execa 的结果要等它们结束才返回。
@@ -104,7 +104,7 @@ Electron `app.getPath('userData')`，目录名为产品名：
 | Windows | DPAPI（按 Windows 用户加密） | 总可用 |
 | Linux | Secret Service（`gnome_libsecret`）或 KWallet（`kwallet` / `kwallet5` / `kwallet6`） | 取决于桌面环境 |
 
-Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写死在源码中的密钥「加密」，等同明文，而 `safeStorage.isEncryptionAvailable()` 仍返回 `true`。因此 main 判断可用性时另外要求 `safeStorage.getSelectedStorageBackend()` 不是 `basic_text` / `unknown`（D70）。不可用时：
+Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写死在源码中的密钥「加密」，等同明文，而 `safeStorage.isEncryptionAvailable()` 仍返回 `true`。因此 main 判断可用性时另外要求 `safeStorage.getSelectedStorageBackend()` 不是 `basic_text` / `unknown`（D74）。不可用时：
 
 - 加解密请求返回失败，后端抛 `CREDENTIAL_UNAVAILABLE`（已有行为），绑定令牌、保存数据库密码的表单显示该错误的文案；不退回明文。
 - 引导页增加「凭据存储」一项（`EnvironmentDTO.credentials`，后端经 credential port 新增的 `status` 请求询问 main）：不可用时为警告（不阻止「就绪」，只有托管平台令牌与数据库密码需要它），说明安装 `gnome-keyring`（或使用 KDE 的 KWallet）后重启应用。
@@ -112,7 +112,7 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 
 ### 3.7 引导页与界面文案
 
-- `EnvironmentDTO` 增加 `platform`（`darwin` / `win32` / `linux`，后端的 `process.platform`，D71）。前端只用它选择文案，不自己猜测操作系统。
+- `EnvironmentDTO` 增加 `platform`（`darwin` / `win32` / `linux`，后端的 `process.platform`，D75）。前端只用它选择文案，不自己猜测操作系统。
 - 安装命令按平台：
 
 | | macOS | Windows | Linux（Ubuntu） |
@@ -126,7 +126,7 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 - 快捷键：处理时已同时接受 `metaKey` 与 `ctrlKey`；显示时 macOS 用 `⌘`，其他平台用 `Ctrl`（如 `Ctrl+K`、`Ctrl+↵`）。显示由前端 `platform.ts` 的 `modKey` 决定，它读 `navigator.userAgent`（快捷键属于运行界面的机器；浏览器 E2E 中前后端在同一台机器）。
 - 关于面板：`app.setAboutPanelOptions` 在 macOS 与 Linux 有效；Windows 没有系统关于面板，设置页的「关于」已覆盖。
 
-### 3.8 打包（electron-builder 26，D72）
+### 3.8 打包（electron-builder 26，D76）
 
 | 平台 | 目标 | 说明 |
 | --- | --- | --- |
@@ -144,10 +144,16 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 
 - 工作目录 `<数据目录>/assistant/`（`files/<对话 id>/`、`conversations/`）只经 `node:path` 拼接，`mkdirSync({ recursive: true })` 创建，三平台一致。
 - `list_files` / `reveal_file` 与附件识别判断「是否在本对话目录内」用 `path.relative` + 不以 `..` 开头 + 不是绝对路径：Windows 上 `relative` 不区分大小写，跨盘符时返回绝对路径，同样被拒绝；返回给模型与界面的相对路径用本机分隔符。
-- `aw-assistant` 会话与执行会话共用 opencode 的 `shell` 配置：Windows 上同为 Git Bash，助手的 bash 规则按 bash 语义成立（D68）。
+- `aw-assistant` 会话与执行会话共用 opencode 的 `shell` 配置：Windows 上同为 Git Bash，助手的 bash 规则按 bash 语义成立（D72）。
 - 界面文案：打开助手与发送的快捷键提示随平台写 ⌘ / Ctrl；「在 Finder 中显示」在 Windows 写「资源管理器」、Linux 写「文件管理器」（`copy/assistant.ts` 按 `UI_PLATFORM`）；`shell.showItemInFolder` 三平台可用。
 
-### 3.10 其他检查过、无需改动的点
+### 3.10 知识问答（v1.1，18）
+
+- 引用路径校验（`knowledge.citations.ts`）：模型给出的路径用 `path.resolve` 接到 `realpath` 后的仓库根下，再用 `relative` 判断是否越界（Windows 上跨盘符时 `relative` 返回绝对路径，被拒绝；`/etc/hosts` 在 Windows 上也是绝对路径）；`.git` 目录的判断在 `realpath` 之后再做一次，Windows 上写成 `.GIT` 也会被 `realpath` 还原成磁盘上的大小写而拒绝。存储与显示的引用路径统一为 `/` 分隔（`relative(...).split(sep).join('/')`），文件类型分类按 `/` 进行，三平台一致。
+- **行号与 CRLF**：Windows 上 `core.autocrlf=true` 的检出文件是 CRLF。按行切分原先只认 `\n`，每行会带着 `\r` 进入摘录与原文窗口；改为同时识别 `\r\n`（集成测试覆盖），行号不变。
+- 研究会话的 JSONL 在 `runs/knowledge/<attemptId>.jsonl`，经 `node:path` 拼接；`aw-researcher` 与执行会话共用 opencode 的 `shell` 配置（Windows 上为 Git Bash，D72），只读规则按 bash 语义成立。
+
+### 3.11 其他检查过、无需改动的点
 
 - 端口与地址：都绑定 `127.0.0.1`；Windows 防火墙对环回地址不弹窗。
 - SQLite（`node:sqlite`）、JSONL 日志、迁移文件：只用 `node:path` 拼接，跨平台。

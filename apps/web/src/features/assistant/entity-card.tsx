@@ -1,4 +1,4 @@
-import { EntityKind, type EntityRef, ErrorCode } from '@aw/shared';
+import { EntityKind, type EntityRef, ErrorCode, STATUS_TONE } from '@aw/shared';
 import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
@@ -7,8 +7,11 @@ import { ENTITY_ROUTES } from '../../app/entity-routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
+import { StatusBadge } from '../../components/status-badge.tsx';
 import { ENTITY_COPY as C } from '../../copy/assistant.ts';
+import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
+import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import { rolesQuery, taskQuery, workflowsQuery } from '../tasks/tasks.queries.ts';
@@ -47,18 +50,16 @@ function Shell({ entity, presence }: { entity: EntityRef; presence: Presence }) 
   return (
     <section className={styles.card} aria-label={`${C.kind[entity.kind]}：${entity.title}`} data-testid="entity-card">
       <div className={styles.cardTitle}>
-        <Icon name={route === null ? 'layers' : route.icon} />
+        <Icon name={route.icon} />
         <span className="grow col">
           <span className="hint">{C.kind[entity.kind]}</span>
           <span>{entity.title}</span>
         </span>
         {deleted ? <span className="hint">{C.deleted}</span> : presence.state === 'present' && presence.status}
-        {route !== null && (
-          // The panel stays open: only the page beside it changes (15 §6).
-          <Button size="sm" disabled={deleted} onClick={() => void route.open(navigate, entity.id)}>
-            {C.open}
-          </Button>
-        )}
+        {/* The panel stays open: only the page beside it changes (15 §6). */}
+        <Button size="sm" disabled={deleted} onClick={() => void route.open(navigate, entity.id)}>
+          {C.open}
+        </Button>
       </div>
       {presence.state === 'error' && <ErrorState error={presence.error} />}
     </section>
@@ -88,6 +89,17 @@ function DbConnectionCard({ entity }: { entity: EntityRef }) {
   return <Shell entity={entity} presence={byList(useQuery(dbConnectionsQuery), (c) => c.id === entity.id)} />;
 }
 
+function KnowledgeConversationCard({ entity }: { entity: EntityRef }) {
+  // `knowledge.updated` keeps this query current, so the status follows the latest question.
+  const query = useQuery(knowledgeConversationQuery(entity.id));
+  const latest = query.data?.turns.at(-1);
+  const status =
+    latest === undefined ? undefined : (
+      <StatusBadge tone={STATUS_TONE.knowledgeTurn[latest.status]} label={KNOWLEDGE_COPY.status[latest.status]} />
+    );
+  return <Shell entity={entity} presence={byDetail(query, ErrorCode.KnowledgeConversationNotFound, status)} />;
+}
+
 /** A navigation card for an object an operation of the assistant produced (D66). */
 export function EntityCard({ entity }: { entity: EntityRef }) {
   switch (entity.kind) {
@@ -102,6 +114,6 @@ export function EntityCard({ entity }: { entity: EntityRef }) {
     case EntityKind.DbConnection:
       return <DbConnectionCard entity={entity} />;
     case EntityKind.KnowledgeConversation:
-      return <Shell entity={entity} presence={{ state: 'present' }} />;
+      return <KnowledgeConversationCard entity={entity} />;
   }
 }

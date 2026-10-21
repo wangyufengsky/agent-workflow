@@ -37,6 +37,7 @@ import { createDeliveryModule } from './modules/delivery/index.ts';
 import { createRepoLocks, locateOpencodeShell } from './modules/git/index.ts';
 import { type HostingEndpoints, PUBLIC_HOSTING } from './modules/hosting/index.ts';
 import { createInboxModule, type InboxService } from './modules/inbox/index.ts';
+import { createKnowledgeModule, type KnowledgeService } from './modules/knowledge/index.ts';
 import { createMcpModule } from './modules/mcp/index.ts';
 import { createNodesModule, type NodesService } from './modules/nodes/index.ts';
 import {
@@ -92,6 +93,7 @@ export type App = {
     inbox: InboxService;
     worktrees: WorktreesService;
     assistant: AssistantService;
+    knowledge: KnowledgeService;
   };
   /** Bearer token of the execution MCP at `/mcp/exec`. */
   mcpToken: string;
@@ -237,6 +239,17 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     prompts,
     locks,
   });
+  const knowledge = createKnowledgeModule({
+    db: database.db,
+    unit,
+    clock,
+    attempts: attempts.service,
+    projects: projects.service,
+    databases: databases.service,
+    inbox: inbox.service,
+    settings: settings.service,
+    prompts,
+  });
   const tasks = createTasksModule({
     db: database.db,
     unit,
@@ -255,6 +268,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     inbox: inbox.service,
     deliveries: deliveries.service,
     databases: databases.service,
+    knowledge: knowledge.service,
     locks,
     dataDir: config.dataDir,
   });
@@ -280,6 +294,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     tasks: tasks.service,
     acceptance: acceptance.service,
     debug: debug.service,
+    knowledge: knowledge.service,
     log,
   });
   mcp.register(server);
@@ -292,6 +307,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...roles.operations,
     ...workflows.operations,
     ...tasks.operations,
+    ...knowledge.operations,
     ...plans.operations,
     ...inbox.operations,
     ...attempts.operations,
@@ -312,6 +328,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     tasks: tasks.service,
     projects: projects.service,
     workflows: workflows.service,
+    knowledge: knowledge.service,
     dataDir: config.dataDir,
     timeZone: deps.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     token: assistantMcpToken,
@@ -350,6 +367,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       inbox: inbox.service,
       worktrees: worktrees.service,
       assistant: assistant.service,
+      knowledge: knowledge.service,
     },
     mcpToken,
     assistantMcpToken,

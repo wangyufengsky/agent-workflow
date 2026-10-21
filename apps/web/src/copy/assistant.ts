@@ -78,7 +78,7 @@ export const ENTITY_COPY = {
     [EntityKind.Workflow]: '流程',
     [EntityKind.Role]: '角色',
     [EntityKind.DbConnection]: '数据库连接',
-    [EntityKind.KnowledgeConversation]: '知识库会话',
+    [EntityKind.KnowledgeConversation]: '知识问答对话',
   } satisfies Record<EntityKind, string>,
   open: '打开',
   deleted: '已删除',

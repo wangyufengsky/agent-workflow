@@ -8,6 +8,12 @@ const stepSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('edit'), file: z.string(), content: z.string() }),
   z.object({ type: z.literal('text'), text: z.string() }),
   z.object({
+    type: z.literal('tool'),
+    tool: z.string(),
+    input: z.record(z.string(), z.unknown()),
+    output: z.string().default(''),
+  }),
+  z.object({
     type: z.literal('callTool'),
     // Specs written for the execution MCP leave it out.
     server: z.enum(['exec', 'assistant']).default('exec'),

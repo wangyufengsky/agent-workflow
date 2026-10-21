@@ -7,6 +7,7 @@ export const NAV_COPY = {
   tasks: '任务',
   inbox: '需要你处理',
   projects: '项目',
+  knowledge: '知识问答',
   git: 'Git',
   workflows: '流程',
   roles: '角色',

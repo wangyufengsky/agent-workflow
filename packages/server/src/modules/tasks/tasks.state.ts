@@ -26,6 +26,7 @@ import type { DatabasesService } from '../databases/index.ts';
 import type { DeliveriesService } from '../delivery/index.ts';
 import type { RepoLocks } from '../git/index.ts';
 import type { InboxService } from '../inbox/index.ts';
+import type { KnowledgeService } from '../knowledge/index.ts';
 import type { NodeRunContext, NodesService } from '../nodes/index.ts';
 import type { PlansService } from '../plans/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
@@ -53,6 +54,7 @@ export type TasksServiceDeps = {
   inbox: InboxService;
   deliveries: DeliveriesService;
   databases: DatabasesService;
+  knowledge: KnowledgeService;
   locks: RepoLocks;
   dataDir: string;
 };

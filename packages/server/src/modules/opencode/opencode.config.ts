@@ -11,8 +11,8 @@ import {
   OPENCODE_ASSISTANT_AGENT,
   type PermissionAction,
   type PermissionRule,
-  RoleBaseAgent,
   readonlyBashRules,
+  SessionAgent,
 } from '@aw/shared';
 
 export type OpencodeConfigInput = {
@@ -24,7 +24,7 @@ export type OpencodeConfigInput = {
   assistantMcpToken: string;
   pluginFile: string;
   prompts: Prompts;
-  /** Pinned shell (Git Bash on Windows, D68); otherwise opencode uses the user's own. */
+  /** Pinned shell (Git Bash on Windows, D72); otherwise opencode uses the user's own. */
   shell: string | undefined;
 };
 
@@ -33,6 +33,8 @@ type AgentPermission = {
   question: 'deny';
   webfetch: PermissionAction;
   external_directory: 'deny';
+  websearch?: 'deny';
+  task?: 'deny';
 };
 
 /** opencode removes the tools a rule denies outright, so each agent only sees its own MCP server's tools. */
@@ -42,27 +44,37 @@ const ASSISTANT_TOOLS = `${MCP_ASSISTANT_TOOL_PREFIX}*`;
 /**
  * Agent permissions that never change with settings (12 §2). The native question tool is denied: questions go
  * through MCP `ask_user` (D36). Bash rules are per session, see `sessionPermissionRules`. Sessions working on a task
- * never get the assistant's tools (D25).
+ * never get the assistant's tools (D25). The knowledge researcher only reads (18 §5.1, D69): no web unless its session
+ * turns it on, and no subagents, which run with their own permissions.
  */
-const AGENT_PERMISSION: Record<RoleBaseAgent, AgentPermission & { [ASSISTANT_TOOLS]: 'deny' }> = {
-  [RoleBaseAgent.Planner]: {
+const AGENT_PERMISSION: Record<SessionAgent, AgentPermission & { [ASSISTANT_TOOLS]: 'deny' }> = {
+  [SessionAgent.Planner]: {
     edit: 'deny',
     question: 'deny',
     webfetch: 'deny',
     external_directory: 'deny',
     [ASSISTANT_TOOLS]: 'deny',
   },
-  [RoleBaseAgent.Executor]: {
+  [SessionAgent.Executor]: {
     edit: 'allow',
     question: 'deny',
     webfetch: 'ask',
     external_directory: 'deny',
     [ASSISTANT_TOOLS]: 'deny',
   },
-  [RoleBaseAgent.Reviewer]: {
+  [SessionAgent.Reviewer]: {
     edit: 'deny',
     question: 'deny',
     webfetch: 'deny',
+    external_directory: 'deny',
+    [ASSISTANT_TOOLS]: 'deny',
+  },
+  [SessionAgent.Researcher]: {
+    edit: 'deny',
+    question: 'deny',
+    webfetch: 'deny',
+    websearch: 'deny',
+    task: 'deny',
     external_directory: 'deny',
     [ASSISTANT_TOOLS]: 'deny',
   },
@@ -80,15 +92,16 @@ const ASSISTANT_PERMISSION = {
   [EXEC_TOOLS]: 'deny',
 } as const satisfies AgentPermission & { [EXEC_TOOLS]: 'deny' };
 
-const AGENT_PROMPT: Record<RoleBaseAgent, PromptName> = {
-  [RoleBaseAgent.Planner]: PromptName.ProtocolPlan,
-  [RoleBaseAgent.Executor]: PromptName.ProtocolExecute,
-  [RoleBaseAgent.Reviewer]: PromptName.ProtocolReview,
+const AGENT_PROMPT: Record<SessionAgent, PromptName> = {
+  [SessionAgent.Planner]: PromptName.ProtocolPlan,
+  [SessionAgent.Executor]: PromptName.ProtocolExecute,
+  [SessionAgent.Reviewer]: PromptName.ProtocolReview,
+  [SessionAgent.Researcher]: PromptName.ProtocolResearch,
 };
 
 /** Injected as `OPENCODE_CONFIG_CONTENT` and merged by opencode with the user's own configuration (12 §2, S3). */
 export function buildOpencodeConfig(input: OpencodeConfigInput) {
-  const agents = Object.values(RoleBaseAgent).map((base) => [
+  const agents = Object.values(SessionAgent).map((base) => [
     OPENCODE_AGENT_NAME[base],
     {
       mode: 'primary',
@@ -126,17 +139,28 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
 /** The assistant's session bash rules (15 §2): the read-only rules without check commands; anything else asks. */
 export const assistantPermissionRules = (): PermissionRule[] => readonlyBashRules();
 
+/** A knowledge conversation with web access on (18 §5.1): after the agent's denies, so the last match allows. */
+const WEB_RULES: readonly PermissionRule[] = [
+  { permission: 'webfetch', pattern: '*', action: 'allow' },
+  { permission: 'websearch', pattern: '*', action: 'allow' },
+];
+
 /**
- * Bash rules passed to `session.create` (D35): read-only for planner and reviewer, `ai.bashPolicy` for executors.
+ * Rules passed to `session.create` (D35): read-only bash for planner and reviewer, `ai.bashPolicy` for executors.
  * Read-only sessions may also run `checkCommands` (the project check and the node's command checks) and the usual
  * test commands of the same tool without asking: running the checks is how a planner or reviewer learns the state of
- * the code, and asking would interrupt the user on every review (D51, D64).
+ * the code, and asking would interrupt the user on every review (D51, D64). The researcher runs no checks; `web`
+ * turns its web tools on (D69).
  */
 export function sessionPermissionRules(
-  base: RoleBaseAgent,
+  base: SessionAgent,
   bashPolicy: BashPolicy,
-  checkCommands: readonly string[] = [],
+  {
+    checkCommands = [],
+    web = false,
+  }: { checkCommands?: readonly string[] | undefined; web?: boolean | undefined } = {},
 ): PermissionRule[] {
-  if (base === RoleBaseAgent.Executor) return [...BASH_PERMISSION_PRESETS[bashPolicy]];
+  if (base === SessionAgent.Executor) return [...BASH_PERMISSION_PRESETS[bashPolicy]];
+  if (base === SessionAgent.Researcher) return [...readonlyBashRules(), ...(web ? WEB_RULES : [])];
   return readonlyBashRules(checkCommands);
 }

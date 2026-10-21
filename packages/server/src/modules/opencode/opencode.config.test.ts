@@ -1,6 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import { PromptName } from '@aw/builtin';
-import { BashPolicy, RoleBaseAgent } from '@aw/shared';
+import { BashPolicy, RoleBaseAgent, readonlyBashRules, SessionAgent } from '@aw/shared';
 import { describe, expect, it } from 'vitest';
 import { buildOpencodeConfig, sessionPermissionRules } from './opencode.config.ts';
 
@@ -21,14 +21,14 @@ function config(shell: string | undefined) {
 }
 
 describe('opencode 配置生成', () => {
-  it('注入两套 MCP、三个基础 agent、助手 agent 与 bridge 插件', () => {
+  it('注入两套 MCP、三个基础 agent、知识研究员、助手 agent 与 bridge 插件', () => {
     // The plugin URL depends on the platform's absolute paths (a drive letter on Windows).
     const { plugin, ...rest } = config(undefined);
     expect(plugin).toEqual([pathToFileURL(PLUGIN_FILE).href]);
     expect(rest).toMatchSnapshot();
   });
 
-  it('固定 shell 时注入 shell（Windows 上的 Git Bash，D68），否则不设置', () => {
+  it('固定 shell 时注入 shell（Windows 上的 Git Bash，D72），否则不设置', () => {
     expect(config('C:\\Program Files\\Git\\bin\\bash.exe').shell).toBe('C:\\Program Files\\Git\\bin\\bash.exe');
     expect('shell' in config(undefined)).toBe(false);
   });
@@ -38,5 +38,16 @@ describe('opencode 配置生成', () => {
       Object.values(RoleBaseAgent).map((base) => [base, sessionPermissionRules(base, policy)]),
     );
     expect(rules).toMatchSnapshot();
+  });
+
+  it('知识研究员只有在打开网络检索时才放行 webfetch 与 websearch，且排在最后', () => {
+    const off = sessionPermissionRules(SessionAgent.Researcher, BashPolicy.Auto);
+    const on = sessionPermissionRules(SessionAgent.Researcher, BashPolicy.Auto, { web: true });
+    expect(off).toEqual(readonlyBashRules());
+    expect(on.slice(0, off.length)).toEqual(off);
+    expect(on.slice(off.length)).toEqual([
+      { permission: 'webfetch', pattern: '*', action: 'allow' },
+      { permission: 'websearch', pattern: '*', action: 'allow' },
+    ]);
   });
 });

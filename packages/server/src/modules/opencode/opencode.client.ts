@@ -49,8 +49,20 @@ export function parseModelRef(value: string): ModelRef {
 /** OpencodeClient over the SDK of the hosted runtime. */
 export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): OpencodeClient {
   const listeners = new Set<(event: OpencodeEvent) => void>();
+  /**
+   * Each subscriber handles each event on its own (D70): a defect in handling one event is logged with its stack and
+   * the event, and the other subscribers and the following events go on. Thrown into the stream loop it would end
+   * the subscription and leave every session without events.
+   */
   const emit = (event: OpencodeEvent) => {
-    for (const listener of listeners) listener(event);
+    for (const listener of listeners) {
+      try {
+        listener(event);
+      } catch (err) {
+        const sessionId = 'sessionId' in event ? event.sessionId : undefined;
+        log.error({ err, event: event.type, sessionId }, 'opencode event handler failed');
+      }
+    }
   };
 
   runtime.onEvent((raw) => {

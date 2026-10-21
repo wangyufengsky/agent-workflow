@@ -48,6 +48,11 @@ export const queryKeys = {
   assistantTranscriptLive: (id: string) => ['assistant', id, 'transcript-live'],
   assistantConfirmations: (id: string) => ['assistant', id, 'confirmations'],
   assistantFiles: (id: string) => ['assistant', id, 'files'],
+  /** Every knowledge query shares this prefix; `knowledge.updated` refreshes them all. */
+  knowledge: ['knowledge'],
+  knowledgeConversation: (id: string) => ['knowledge', 'conversation', id],
+  knowledgePages: (filter: Record<string, string | undefined>) => ['knowledge', 'list', filter],
+  knowledgeCitation: (turnId: string, index: number) => ['knowledge', 'citation', turnId, index],
   git: (projectId: string) => ['git', projectId],
   gitResource: (projectId: string, resource: string, params: Record<string, string | number | undefined>) => [
     'git',

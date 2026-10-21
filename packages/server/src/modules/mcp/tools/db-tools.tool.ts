@@ -9,23 +9,25 @@ import {
   ErrorCode,
   McpToolName,
 } from '@aw/shared';
+import type { KnowledgeService } from '../../knowledge/index.ts';
 import type { TasksService } from '../../tasks/index.ts';
 import { defineMcpTool } from '../mcp.registry.ts';
 
-const ALL_KINDS = [AttemptKind.Plan, AttemptKind.Execute, AttemptKind.Review];
+const ALL_KINDS = [AttemptKind.Plan, AttemptKind.Execute, AttemptKind.Review, AttemptKind.Research];
 const UNKNOWN_CONNECTION_HINT = 'Call db_list_connections and use one of the names it returns.';
 
-export const dbListConnectionsTool = (tasks: TasksService) =>
+export const dbListConnectionsTool = (tasks: TasksService, knowledge: KnowledgeService) =>
   defineMcpTool({
     name: McpToolName.DbListConnections,
-    description: "List the databases of this task's project that you may query read-only.",
+    description: 'List the databases of the project that you may query read-only.',
     allowedKinds: ALL_KINDS,
     input: dbListConnectionsInputSchema,
     output: dbListConnectionsOutputSchema,
-    handler: (_input, { attempt }) => tasks.dbConnections(attempt),
+    handler: (_input, { attempt }) =>
+      attempt.kind === AttemptKind.Research ? knowledge.dbConnections(attempt) : tasks.dbConnections(attempt),
   });
 
-export const dbDescribeTool = (tasks: TasksService) =>
+export const dbDescribeTool = (tasks: TasksService, knowledge: KnowledgeService) =>
   defineMcpTool({
     name: McpToolName.DbDescribe,
     description: 'List the tables of a database, or show the columns and indexes of one table.',
@@ -37,10 +39,13 @@ export const dbDescribeTool = (tasks: TasksService) =>
       [ErrorCode.ValidationFailed]: 'Call db_describe without table to list the tables, then pick one.',
       [ErrorCode.DbConnectionFailed]: 'The database cannot be reached; continue without it and say so in your result.',
     },
-    handler: ({ connection, table }, { attempt }) => tasks.dbDescribe(attempt, connection, table),
+    handler: ({ connection, table }, { attempt }) =>
+      attempt.kind === AttemptKind.Research
+        ? knowledge.dbDescribe(attempt, connection, table)
+        : tasks.dbDescribe(attempt, connection, table),
   });
 
-export const dbQueryTool = (tasks: TasksService) =>
+export const dbQueryTool = (tasks: TasksService, knowledge: KnowledgeService) =>
   defineMcpTool({
     name: McpToolName.DbQuery,
     description:
@@ -56,5 +61,6 @@ export const dbQueryTool = (tasks: TasksService) =>
       [ErrorCode.DbQueryFailed]: 'Fix the SQL using details.driverMessage; db_describe shows the table structure.',
       [ErrorCode.DbConnectionFailed]: 'The database cannot be reached; continue without it and say so in your result.',
     },
-    handler: (input, { attempt }) => tasks.dbQuery(attempt, input),
+    handler: (input, { attempt }) =>
+      attempt.kind === AttemptKind.Research ? knowledge.dbQuery(attempt, input) : tasks.dbQuery(attempt, input),
   });

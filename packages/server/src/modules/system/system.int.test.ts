@@ -74,7 +74,7 @@ describe('环境检测', () => {
   });
 });
 
-describe('凭据存储（D70）', () => {
+describe('凭据存储（D74）', () => {
   it('报告能否保存令牌与密码；不可用不影响环境就绪', async () => {
     await fakeOpencode(bin, OPENCODE_VERSION);
     const env = await isolatedEnv(bin, home, { git: true });

@@ -1,4 +1,4 @@
-# Three-platform CI (docs/17 §4.1, D72). Tests that need the real opencode and a model (test:oc, test:live, J10) are
+# Three-platform CI (docs/17 §4.1, D76). Tests that need the real opencode and a model (test:oc, test:live, J10) are
 # not run here: they stay on the developer's machine.
 name: CI
 

@@ -8,7 +8,7 @@ export type NavItem = {
   route: RoutePath;
   label: string;
   icon: IconName;
-  /** Interface modes in which the item appears (D15: simple shows 4 items, pro adds the rest). */
+  /** Interface modes in which the item appears (D15: simple shows 5 items, pro adds the rest). */
   visibleIn: readonly UiMode[];
   group?: 'pro';
   position?: 'bottom';
@@ -23,6 +23,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'home', route: ROUTES.home, label: NAV_COPY.home, icon: 'home', visibleIn: BOTH },
   { id: 'tasks', route: ROUTES.tasks, label: NAV_COPY.tasks, icon: 'list', visibleIn: BOTH, badge: 'inboxOpen' },
   { id: 'projects', route: ROUTES.projects, label: NAV_COPY.projects, icon: 'folder', visibleIn: BOTH },
+  { id: 'knowledge', route: ROUTES.knowledge, label: NAV_COPY.knowledge, icon: 'book', visibleIn: BOTH },
   { id: 'git', route: ROUTES.git, label: NAV_COPY.git, icon: 'git', visibleIn: PRO, group: 'pro' },
   { id: 'workflows', route: ROUTES.workflows, label: NAV_COPY.workflows, icon: 'flow', visibleIn: PRO, group: 'pro' },
   { id: 'roles', route: ROUTES.roles, label: NAV_COPY.roles, icon: 'users', visibleIn: PRO, group: 'pro' },

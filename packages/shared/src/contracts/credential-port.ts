@@ -7,7 +7,7 @@ import { z } from 'zod';
 export const credentialPortRequestSchema = z.object({
   type: z.literal('credential.request'),
   id: z.number().int(),
-  /** `status`: whether encryption is usable (answered `ok: false` with the reason when it is not, D70). */
+  /** `status`: whether encryption is usable (answered `ok: false` with the reason when it is not, D74). */
   op: z.enum(['encrypt', 'decrypt', 'status']),
   /** encrypt: plaintext; decrypt: base64 ciphertext; status: empty. */
   data: z.string(),

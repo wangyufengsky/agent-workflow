@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { TRANSCRIPT_PAGE_SIZE, type TranscriptEntry, type TranscriptPage, transcriptEntrySchema } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
@@ -76,6 +76,12 @@ export function createTranscriptStore<S extends { id: string }>({
 
     /** The subject is gone (a deleted conversation); its file is removed by the caller. */
     forget(subject: S): void {
+      lastSeq.delete(subject.id);
+    },
+
+    /** Deletes the subject's file (a deleted research attempt). */
+    remove(subject: S): void {
+      rmSync(fileOf(subject), { force: true });
       lastSeq.delete(subject.id);
     },
   };

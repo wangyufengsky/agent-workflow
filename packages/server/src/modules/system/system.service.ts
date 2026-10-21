@@ -20,7 +20,7 @@ const NOT_HOSTABLE: readonly RuntimeStatus[] = [RuntimeStatus.NotInstalled, Runt
 async function detectGit(env: NodeJS.ProcessEnv): Promise<EnvironmentDTO['git']> {
   try {
     const version = await readGitVersion(env);
-    // On Windows commands run in the bash that comes with Git for Windows: a git without it is not enough (D68).
+    // On Windows commands run in the bash that comes with Git for Windows: a git without it is not enough (D72).
     await locateShell(env);
     return { installed: true, version };
   } catch (err) {

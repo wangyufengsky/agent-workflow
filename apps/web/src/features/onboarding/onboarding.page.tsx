@@ -104,7 +104,7 @@ function ModelsCheck({ environment }: { environment: EnvironmentDTO }) {
   );
 }
 
-/** Secrets need an OS key store; without one only storing tokens and passwords fails, so this is a warning (D70). */
+/** Secrets need an OS key store; without one only storing tokens and passwords fails, so this is a warning (D74). */
 function CredentialsCheck({ environment }: { environment: EnvironmentDTO }) {
   if (environment.credentials.available) {
     return (

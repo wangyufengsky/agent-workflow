@@ -10,7 +10,7 @@ import {
 export type CredentialCipher = {
   encrypt(plaintext: string): Promise<Uint8Array>;
   decrypt(ciphertext: Uint8Array): Promise<string>;
-  /** Whether secrets can be stored at all; onboarding shows it (D70). */
+  /** Whether secrets can be stored at all; onboarding shows it (D74). */
   isAvailable(): Promise<boolean>;
 };
 

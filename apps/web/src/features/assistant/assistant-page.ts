@@ -21,6 +21,9 @@ const PAGE_ROUTE = {
   [AssistantPage.Databases]: ROUTES.databases,
   [AssistantPage.Tools]: ROUTES.tools,
   [AssistantPage.Runtime]: ROUTES.runtime,
+  [AssistantPage.Knowledge]: ROUTES.knowledge,
+  [AssistantPage.KnowledgeConversation]: ROUTES.knowledgeConversation,
+  [AssistantPage.KnowledgeHistory]: ROUTES.knowledgeHistory,
 } as const satisfies Record<AssistantPage, string>;
 
 const PAGE_OF_ROUTE = new Map<string, AssistantPage>(
@@ -50,6 +53,7 @@ export function useAssistantPage(): AssistantPageRef {
         nodeId: text(params.nodeId) ?? text(search.node),
         projectId: text(params.projectId),
         workflowKey: text(params.key),
+        knowledgeConversationId: text(params.conversationId),
       };
       return {
         page,
@@ -83,6 +87,11 @@ export function useOpenAssistantPage() {
           return navigate({ to: ROUTES.gitProject, params: { projectId: param(ref, 'projectId') } });
         case AssistantPage.Workflow:
           return navigate({ to: ROUTES.workflow, params: { key: param(ref, 'workflowKey') } });
+        case AssistantPage.KnowledgeConversation:
+          return navigate({
+            to: ROUTES.knowledgeConversation,
+            params: { conversationId: param(ref, 'knowledgeConversationId') },
+          });
         default:
           return navigate({ to: PAGE_ROUTE[ref.page] });
       }
