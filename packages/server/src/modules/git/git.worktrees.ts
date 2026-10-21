@@ -1,3 +1,4 @@
+import { host } from '../../core/platform.ts';
 import { runGit } from './git.cli.ts';
 
 export type GitWorktree = {
@@ -25,7 +26,7 @@ export function parseWorktreeList(output: string): GitWorktree[] {
     const key = space < 0 ? field : field.slice(0, space);
     const value = space < 0 ? '' : field.slice(space + 1);
     if (key === 'worktree') {
-      current = { path: value, commit: null, branch: null, locked: false, prunable: false };
+      current = { path: host.fromGitPath(value), commit: null, branch: null, locked: false, prunable: false };
       continue;
     }
     if (current === undefined) throw new Error(`git worktree list attribute ${field} outside a worktree`);

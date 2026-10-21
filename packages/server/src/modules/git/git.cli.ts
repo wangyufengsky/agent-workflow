@@ -1,5 +1,6 @@
 import { AppError, ErrorCode, GIT_COMMIT_IDENTITY } from '@aw/shared';
 import { execa } from 'execa';
+import { host } from '../../core/platform.ts';
 
 export type GitOptions = {
   cwd: string;
@@ -14,11 +15,12 @@ export type GitOptions = {
 export type GitResult = { stdout: string; stderr: string; exitCode: number };
 
 /**
- * The only way to run git (06 §2.3): argument array, `LC_ALL=C` so output is parseable (D37),
+ * The only way to run git (06 §2.3): argument array, `LC_ALL=C` so output is parseable (D37), the platform's
+ * options (D66),
  * missing binary → GIT_NOT_INSTALLED, unexpected exit → GIT_COMMAND_FAILED with args, exit code and stderr.
  */
 export async function runGit(args: readonly string[], options: GitOptions): Promise<GitResult> {
-  const result = await execa('git', args, {
+  const result = await execa('git', [...host.gitPlatformArgs, ...args], {
     cwd: options.cwd,
     env: { ...(options.env ?? process.env), LC_ALL: 'C' },
     extendEnv: false,
