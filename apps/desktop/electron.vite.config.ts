@@ -1,9 +1,10 @@
 import { resolve } from 'node:path';
-import { API_PREFIX, DEV_API_PORT, DEV_WEB_PORT } from '@aw/shared';
+import { API_PREFIX, devPorts } from '@aw/shared';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 
 const webRoot = resolve(import.meta.dirname, '../web');
+const ports = devPorts(process.env);
 
 export default defineConfig(({ mode }) => ({
   main: {
@@ -31,7 +32,7 @@ export default defineConfig(({ mode }) => ({
   renderer: {
     root: webRoot,
     plugins: [react()],
-    server: { port: DEV_WEB_PORT, strictPort: true, proxy: { [API_PREFIX]: `http://127.0.0.1:${DEV_API_PORT}` } },
+    server: { port: ports.web, strictPort: true, proxy: { [API_PREFIX]: `http://127.0.0.1:${ports.api}` } },
     build: { rollupOptions: { input: resolve(webRoot, 'index.html') } },
   },
 }));

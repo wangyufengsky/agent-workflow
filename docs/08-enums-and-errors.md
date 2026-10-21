@@ -160,7 +160,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `BRANCH_SLUG_MAX` | `40` | slug 由标题转写，只保留 `[a-z0-9-]`（`toSlug`，`shared/naming.ts`） |
 | `PROJECT_SLUG_MAX` | `40` | 项目 slug（worktree 目录名）由名称转写；无 ASCII 字符时为 `project`，重名追加 `-2`、`-3` |
 | `API_PREFIX` | `/api/v1` | |
-| `DEV_API_PORT` / `DEV_WEB_PORT` | `47821` / `47822` | 仅开发；生产后端随机端口（D31） |
+| `DEV_API_PORT` / `DEV_WEB_PORT` | `47821` / `47822` | 仅开发；生产后端随机端口（D31）。环境变量 `AW_DEV_API_PORT` / `AW_DEV_WEB_PORT`（`DEV_PORT_ENV`）覆盖，经 `devPorts(env)` 读取；浏览器 E2E 默认由系统分配（D77） |
 | `MCP_EXEC_PATH` | `/mcp/exec` | |
 | `MCP_ASSISTANT_PATH` | `/mcp/assistant` | v1.1 |
 | `ASSISTANT_DIR` / `ASSISTANT_FILES_DIR` / `ASSISTANT_CONVERSATIONS_DIR` | `assistant` / `files` / `conversations` | 助手工作目录 `<数据目录>/assistant/`，对话文件 `files/<id>/`，消息流 `conversations/<id>.jsonl` |

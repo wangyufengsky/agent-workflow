@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { type BackendShutdownMessage, DEV_API_PORT } from '@aw/shared';
+import { type BackendShutdownMessage, devPorts } from '@aw/shared';
 import { app, utilityProcess } from 'electron';
 import { serveCredentialRequests } from './credentials.ts';
 
@@ -17,7 +17,7 @@ export function startBackend(isDev: boolean): Promise<Backend> {
       ...process.env,
       AW_API_TOKEN: apiToken,
       AW_DATA_DIR: app.getPath('userData'),
-      AW_PORT: String(isDev ? DEV_API_PORT : 0),
+      AW_PORT: String(isDev ? devPorts(process.env).api : 0),
       AW_APP_VERSION: app.getVersion(),
       AW_MIGRATIONS_DIR: app.isPackaged
         ? join(process.resourcesPath, 'migrations')
