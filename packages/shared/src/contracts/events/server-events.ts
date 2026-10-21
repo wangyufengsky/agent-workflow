@@ -42,6 +42,7 @@ export const serverEventSchema = z.discriminatedUnion('type', [
     data: z.object({ attemptId: z.string(), entries: z.array(transcriptEntrySchema) }),
   }),
   z.object({ type: z.literal(ServerEventType.AssistantUpdated), data: assistantConversationSchema }),
+  z.object({ type: z.literal(ServerEventType.KnowledgeUpdated), data: z.object({ conversationId: z.string() }) }),
   z.object({
     type: z.literal(ServerEventType.AssistantTranscript),
     data: z.object({ conversationId: z.string(), entries: z.array(transcriptEntrySchema) }),

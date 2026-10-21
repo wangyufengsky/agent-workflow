@@ -38,7 +38,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TaskStatus` | `draft` · `preparing` · `planning` · `plan_review` · `running` · `paused` · `review` · `merging` · `completed` · `failed` · `cancelled` |
 | `TaskFailedPhase` | `preparing` · `planning` · `running` · `merging` |
 | `NodeStatus` | `pending` · `ready` · `running` · `waiting_input` · `verifying` · `awaiting_acceptance` · `done` · `failed` · `skipped` · `cancelled` |
-| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话） |
+| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2） |
 | `AttemptStatus` | `starting` · `running` · `succeeded` · `failed` · `aborted` · `interrupted` |
 | `PlanStatus` | `draft` · `confirmed` · `superseded` |
 | `PlanSource` | `ai` · `template` · `user` |
@@ -119,9 +119,18 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation`（预留） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
 | `AssistantForm` | `tasks.create` · `projects.create` · `projects.setHosting` · `databases.create` · `databases.update` | `open_form` 能打开的表单，以其提交的操作命名（`ASSISTANT_FORM_OPERATION`）；预填值的 schema 为该操作的助手输入（不含凭据字段）的 partial |
 
+### 2.8 知识问答（v1.1，`enums/knowledge.ts`）
+
+| 枚举 | 值 | 说明 |
+| --- | --- | --- |
+| `KnowledgeTurnStatus` | `researching` · `answered` · `stopped` · `failed` | 一轮的状态，由其 `research` 尝试的状态推导（`knowledgeTurnStatusOf`，18 §3），不存储 |
+| `KnowledgeSourceKind` | `code` · `docs` · `database` · `web` | 资料范围与引用的来源类别；文件按 `classifySource(path)` 分为代码或文档（`KNOWLEDGE_DOC_DIRS`、`KNOWLEDGE_DOC_EXTENSIONS`） |
+| `CitationType` | `file` · `database` · `web` | `submit_answer` 的引用类型（18 §6.1） |
+| `SessionAgent` | `planner` · `executor` · `reviewer` · `researcher` | 会话以哪个 agent 运行（`enums/workflow.ts`）；角色的基础类型 `RoleBaseAgent` 只有前三个 |
+
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 
-`STATUS_TONE.task` / `.node` / `.attempt` / `.runtime` / `.taskDisplay`（类型保证每个值都有映射，单测再校验一次）。`runtime`：`ready` → `ok`，`starting` → `run`，`stopped` → `wait`，`not_installed` / `version_mismatch` / `crashed` → `danger`。
+`STATUS_TONE.task` / `.node` / `.attempt` / `.knowledgeTurn` / `.runtime` / `.taskDisplay`（类型保证每个值都有映射，单测再校验一次）。`knowledgeTurn`：`researching` → `run`，`answered` → `ok`，`stopped` → `idle`，`failed` → `danger`。`runtime`：`ready` → `ok`，`starting` → `run`，`stopped` → `wait`，`not_installed` / `version_mismatch` / `crashed` → `danger`。
 
 | tone | TaskStatus | NodeStatus | AttemptStatus | TaskDisplayGroup |
 | --- | --- | --- | --- | --- |
@@ -141,7 +150,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | --- | --- | --- |
 | `APP_ID` | `agent-workflow` | 数据目录名、MCP server 名 |
 | `OPENCODE_VERSION` | `1.19.0` | 精确匹配，不匹配则 `version_mismatch` |
-| `OPENCODE_AGENT_NAME` | `{ planner: 'aw-planner', executor: 'aw-executor', reviewer: 'aw-reviewer' }` | |
+| `OPENCODE_AGENT_NAME` | `{ planner: 'aw-planner', executor: 'aw-executor', reviewer: 'aw-reviewer', researcher: 'aw-researcher' }` | 按 `SessionAgent`；`aw-researcher` 为知识研究员（v1.1，18 §5.1） |
 | `MCP_SERVER_NAME` | `agent-workflow` | 执行 MCP；opencode 中工具名为 `agent-workflow_<tool>` |
 | `MCP_ASSISTANT_SERVER_NAME` | `agent-workflow-app` | 助手 MCP（v1.1）；opencode 中工具名为 `agent-workflow-app_<tool>` |
 | `OPENCODE_ASSISTANT_AGENT` | `aw-assistant` | 助手的 agent（v1.1） |
@@ -154,6 +163,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `MCP_EXEC_PATH` | `/mcp/exec` | |
 | `MCP_ASSISTANT_PATH` | `/mcp/assistant` | v1.1 |
 | `ASSISTANT_DIR` / `ASSISTANT_FILES_DIR` / `ASSISTANT_CONVERSATIONS_DIR` | `assistant` / `files` / `conversations` | 助手工作目录 `<数据目录>/assistant/`，对话文件 `files/<id>/`，消息流 `conversations/<id>.jsonl` |
+| `KNOWLEDGE_DOC_DIRS` / `KNOWLEDGE_DOC_EXTENSIONS` | `docs` `doc` / `.md` `.mdx` `.markdown` `.txt` `.rst` `.adoc` | 被引用的文件位于这些目录下或带这些扩展名时为文档，否则为代码（18 §6.1） |
 | `PROJECT_CHECK_PLACEHOLDER` | `$PROJECT_CHECK` | 验收命令中代表项目检查命令，物化节点时替换（13 §1） |
 | `GIT_COMMIT_IDENTITY` | `agent-workflow <agent-workflow@localhost>` | 节点完成时后端提交的作者与提交者（09 §3） |
 
@@ -192,6 +202,15 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX` | 50 / 100（任务与「需要你处理」列表每页条数，11 §1） |
 | `ASSISTANT_TITLE_MAX_CHARS` | 40（助手对话标题取第一条消息的首行） |
 | `ASSISTANT_MESSAGE_MAX_CHARS` | 20000（一条发给助手的消息） |
+| `KNOWLEDGE_QUESTION_MAX_CHARS` | 4000（一次提问） |
+| `KNOWLEDGE_TITLE_MAX_CHARS` | 80（知识对话标题取第一次提问的首行） |
+| `KNOWLEDGE_ANSWER_MAX_CHARS` | 20000（`submit_answer` 的回答） |
+| `KNOWLEDGE_MAX_CITATIONS` | 20（一次回答的引用数） |
+| `KNOWLEDGE_CITATION_MAX_LINES` | 200（一处文件引用的行数） |
+| `KNOWLEDGE_EXCERPT_MAX_CHARS` | 4000（与文件引用一起保存的被引用行） |
+| `KNOWLEDGE_SOURCE_CONTEXT_LINES` | 40（原文面板中引用区间前后各显示的行数） |
+| `KNOWLEDGE_QUERY_ROWS` | 50（打开数据库引用时重新执行查询返回的行数） |
+| `KNOWLEDGE_ANSWER_EXCERPT_CHARS` | 160（对话记录中最后一轮回答的摘要） |
 
 ### 4.3 用户设置（`constants/settings.ts`，键 → 默认值）
 
@@ -295,6 +314,12 @@ class AppError extends Error {
 | `ASSISTANT_CONVERSATION_NOT_FOUND` | 404 | |
 | `ASSISTANT_CONFIRMATION_NOT_FOUND` | 404 | |
 | `ASSISTANT_BUSY` | 409 | 助手正在回复时又发来消息（先等它结束或停止它） |
+| **知识问答（v1.1）** | | |
+| `KNOWLEDGE_CONVERSATION_NOT_FOUND` | 404 | |
+| `KNOWLEDGE_CONVERSATION_BUSY` | 409 | 对话还有一轮在研究时又续问、删除对话，或删除其项目 |
+| `KNOWLEDGE_CITATION_INVALID` | — | MCP `submit_answer`：引用校验失败；`details.problems[]`，每项 `{ code, citation?, message, hint, details? }`，子码见 5.5 |
+| `KNOWLEDGE_CITATION_NOT_FOUND` | 404 | 轮次不存在，或编号超出这一轮的引用数 |
+| `KNOWLEDGE_SOURCE_UNAVAILABLE` | 404 | 被引用的文件已不存在或已不在项目仓库内 |
 | **Inbox** | | |
 | `INBOX_ITEM_NOT_FOUND` | 404 | |
 | `INBOX_ITEM_CLOSED` | 409 | 条目已处理 |
@@ -340,3 +365,7 @@ class AppError extends Error {
 | `MISSING_PLANNER` | AI 规划流程没有规划者角色 |
 | `PLANNER_ROLE_INVALID` | 规划者角色的 `base_agent` 不是 `planner` |
 | `MISSING_TEMPLATE` | 固定流程没有模板 |
+
+### 5.5 引用校验子码（`KNOWLEDGE_CITATION_INVALID.details.problems[].code`）
+
+枚举 `CitationProblemCode`，hint 为常量 `CITATION_PROBLEM_HINT`（英文，给模型看），均在 `shared/errors/citation-problems.ts`；各子码的含义与 hint 见 [18 §6.2](18-knowledge.md#62-校验knowledge_citation_invaliddetailsproblems)：`OUTSIDE_PROJECT` · `FILE_NOT_FOUND` · `LINE_OUT_OF_RANGE` · `RANGE_TOO_LONG` · `SOURCE_NOT_SELECTED` · `UNKNOWN_CONNECTION` · `QUERY_NOT_READONLY` · `UNKNOWN_MARKER` · `UNUSED_CITATION`。

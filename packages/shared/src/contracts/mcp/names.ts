@@ -13,6 +13,7 @@ export const McpToolName = {
   DbListConnections: 'db_list_connections',
   DbDescribe: 'db_describe',
   DbQuery: 'db_query',
+  SubmitAnswer: 'submit_answer',
 } as const;
 export type McpToolName = (typeof McpToolName)[keyof typeof McpToolName];
 
@@ -21,4 +22,5 @@ export const ATTEMPT_SUBMIT_TOOL = {
   [AttemptKind.Plan]: McpToolName.SubmitPlan,
   [AttemptKind.Execute]: McpToolName.SubmitResult,
   [AttemptKind.Review]: McpToolName.SubmitReview,
+  [AttemptKind.Research]: McpToolName.SubmitAnswer,
 } as const satisfies Record<AttemptKind, McpToolName>;

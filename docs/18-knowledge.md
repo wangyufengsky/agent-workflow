@@ -50,7 +50,7 @@
 
 - 点击引用编号或引用卡，右侧推入原文面板（宽 520，主区域收窄，不遮住回答）；回答中对应编号同步高亮。
 - 文件：路径、行号区间、原文窗口（引用区间前后各 `KNOWLEDGE_SOURCE_CONTEXT_LINES` 行，带行号），被引用的行高亮并滚动到可见；文件在回答之后被改过时显示「这段原文在回答之后有改动，以下为当前内容」。文件已删除或移出项目时显示错误态。
-- 数据库：连接名、SQL；打开时以只读方式重新执行（`DB_QUERY_DEFAULT_LIMIT` 行），显示列与行；连接失败按错误码显示。
+- 数据库：连接名、SQL；打开时以只读方式重新执行（`KNOWLEDGE_QUERY_ROWS` 行），显示列与行；连接失败按错误码显示。
 - 网页：标题与网址，「在浏览器中打开」（`openExternal`）。
 - 「上一处 / 下一处」在这一轮的引用之间切换；`Esc` 或关闭按钮收起，焦点回到原编号。
 
@@ -209,13 +209,13 @@ type KnowledgeConversationSummaryDTO = {
 // 成功返回 { accepted: true }
 ```
 
-存储与 DTO（`CitationDTO`）：`file` 另存 `excerpt`（校验时读出的被引用行，截断到 `KNOWLEDGE_EXCERPT_MAX_CHARS`）与 `source: 'code' | 'docs'`（按路径分类：扩展名为 `.md .mdx .markdown .txt .rst .adoc` 或位于 `docs/` `doc/` 下为文档，其余为代码；`KNOWLEDGE_DOC_EXTENSIONS`、`KNOWLEDGE_DOC_DIRS`）；`database` 原样；`web` 原样。
+存储与 DTO（`CitationDTO`）：`file` 另存 `excerpt`（校验时读出的被引用行，截断到 `KNOWLEDGE_EXCERPT_MAX_CHARS`）与 `source: 'code' | 'docs'`（`classifySource(path)`：扩展名为 `.md .mdx .markdown .txt .rst .adoc`，或任一级目录名为 `docs` / `doc` 时为文档，其余为代码；`KNOWLEDGE_DOC_EXTENSIONS`、`KNOWLEDGE_DOC_DIRS`，不分大小写）；`database` 原样；`web` 原样。
 
 引用标注 `[n]` 的识别（`citationMarkers(answer)`，`shared/knowledge/citations.ts`，后端校验与前端渲染共用）：`[` 数字 `]` 且后面不是 `(`（不是 Markdown 链接），跳过代码块与行内代码。
 
 ### 6.2 校验（`KNOWLEDGE_CITATION_INVALID`，`details.problems[]`）
 
-一次返回全部问题，每项 `{ code, citation?, message }`（`citation` 为从 1 起的编号）；子码 `CitationProblemCode` 与给模型的 hint `CITATION_PROBLEM_HINT` 在 `shared/errors/citation-problems.ts`：
+一次返回全部问题，每项 `{ code, citation?, message, hint, details? }`（`citation` 为从 1 起的编号）；子码 `CitationProblemCode` 与给模型的 hint `CITATION_PROBLEM_HINT` 在 `shared/errors/citation-problems.ts`：
 
 | 子码 | 含义 | 给模型的 hint |
 | --- | --- | --- |
@@ -240,7 +240,7 @@ type KnowledgeConversationSummaryDTO = {
 type CitationSourceDTO =
   | { type: 'file'; path: string; startLine: number; endLine: number;
       firstLine: number; lines: string[]; lineCount: number; changed: boolean }   // 窗口：区间前后各 KNOWLEDGE_SOURCE_CONTEXT_LINES 行
-  | { type: 'database'; connection: string; sql: string; result: DbQueryOutput }   // 只读重新执行，DB_QUERY_DEFAULT_LIMIT 行
+  | { type: 'database'; connection: string; sql: string; result: DbQueryOutput }   // 只读重新执行，KNOWLEDGE_QUERY_ROWS 行
   | { type: 'web'; url: string; title: string | null };
 ```
 
@@ -251,7 +251,7 @@ type CitationSourceDTO =
 ## 7. 枚举、常量、错误码（08）
 
 - 枚举（`shared/enums/knowledge.ts`）：`KnowledgeTurnStatus`（`researching` `answered` `stopped` `failed`，`STATUS_TONE`：accent / ok / idle / fail）、`CitationType`（`file` `database` `web`）、`KnowledgeSourceKind`（`code` `docs` `database` `web`）、`CitationProblemCode`；`AttemptKind` 加 `research`；`SessionAgent`；`McpToolName.SubmitAnswer`；`ServerEventType.KnowledgeUpdated`。
-- 常量：`OPENCODE_AGENT_NAME.researcher = 'aw-researcher'`、`KNOWLEDGE_RUN_DIR = 'knowledge'`；限制值 `KNOWLEDGE_QUESTION_MAX_CHARS`（4000）、`KNOWLEDGE_TITLE_MAX_CHARS`（80）、`KNOWLEDGE_ANSWER_MAX_CHARS`（20000）、`KNOWLEDGE_MAX_CITATIONS`（20）、`KNOWLEDGE_CITATION_MAX_LINES`（200）、`KNOWLEDGE_EXCERPT_MAX_CHARS`（4000）、`KNOWLEDGE_SOURCE_CONTEXT_LINES`（40）、`KNOWLEDGE_LIST_PAGE_SIZE`（30）、`KNOWLEDGE_DOC_EXTENSIONS`、`KNOWLEDGE_DOC_DIRS`。
+- 常量：`OPENCODE_AGENT_NAME.researcher = 'aw-researcher'`、`KNOWLEDGE_DOC_DIRS`、`KNOWLEDGE_DOC_EXTENSIONS`；限制值 `KNOWLEDGE_QUESTION_MAX_CHARS`（4000）、`KNOWLEDGE_TITLE_MAX_CHARS`（80）、`KNOWLEDGE_ANSWER_MAX_CHARS`（20000）、`KNOWLEDGE_MAX_CITATIONS`（20）、`KNOWLEDGE_CITATION_MAX_LINES`（200）、`KNOWLEDGE_EXCERPT_MAX_CHARS`（4000）、`KNOWLEDGE_SOURCE_CONTEXT_LINES`（40）、`KNOWLEDGE_QUERY_ROWS`（50）、`KNOWLEDGE_ANSWER_EXCERPT_CHARS`（160）；列表分页沿用 `LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX`。详见 08。
 - 错误码：`KNOWLEDGE_CONVERSATION_NOT_FOUND`（404）、`KNOWLEDGE_CONVERSATION_BUSY`（409，研究中又发起续问 / 删除对话 / 删除项目）、`KNOWLEDGE_CITATION_INVALID`（MCP，`details.problems[]`）、`KNOWLEDGE_CITATION_NOT_FOUND`（404）、`KNOWLEDGE_SOURCE_UNAVAILABLE`（404）。
 - 没有新设置项。
 
