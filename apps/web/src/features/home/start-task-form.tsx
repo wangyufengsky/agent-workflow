@@ -2,6 +2,7 @@ import { type ProjectDTO, TASK_TITLE_MAX_CHARS, UiMode, WorkflowKind } from '@aw
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type KeyboardEvent, useState } from 'react';
+import { MOD_KEY } from '../../app/platform.ts';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -224,7 +225,10 @@ export function StartTaskForm({
         )}
         <Button type="submit" variant="primary" icon="sparkle" pending={create.isPending} disabled={!canStart}>
           {C.start}
-          <span className="kbd">{C.startShortcut}</span>
+          <span className="kbd">
+            {MOD_KEY}
+            {C.startShortcut}
+          </span>
         </Button>
       </div>
     </form>
