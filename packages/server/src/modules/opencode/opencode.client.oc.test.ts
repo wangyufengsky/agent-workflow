@@ -1,4 +1,11 @@
-import { BashPolicy, MCP_SERVER_NAME, OPENCODE_AGENT_NAME, RoleBaseAgent } from '@aw/shared';
+import {
+  BashPolicy,
+  MCP_ASSISTANT_SERVER_NAME,
+  MCP_SERVER_NAME,
+  OPENCODE_AGENT_NAME,
+  OPENCODE_ASSISTANT_AGENT,
+  RoleBaseAgent,
+} from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { createTestRepo } from '../../../test/helpers/git.ts';
@@ -22,6 +29,23 @@ describe('@opencode 客户端与配置注入', () => {
       permission: { edit: 'allow', question: 'deny', external_directory: 'deny' },
     });
     expect(data.plugin).toEqual(expect.arrayContaining([expect.stringMatching(/agent-workflow-bridge\.js$/)]));
+  });
+
+  it('助手的 agent 与助手 MCP 也已注入，两套 MCP 都已连接（A-03）', async () => {
+    const repo = await createTestRepo();
+    const sdk = t.app.services.runtime.sdk();
+    const { data } = await sdk.config.get({ directory: repo.path }, { throwOnError: true });
+    expect(data.mcp?.[MCP_ASSISTANT_SERVER_NAME]).toMatchObject({ type: 'remote', enabled: true });
+    expect(data.agent?.[OPENCODE_ASSISTANT_AGENT]).toMatchObject({
+      mode: 'primary',
+      permission: { edit: 'allow', question: 'deny', external_directory: 'deny', 'agent-workflow_*': 'deny' },
+    });
+    expect(data.agent?.[OPENCODE_AGENT_NAME.executor]?.permission).toMatchObject({ 'agent-workflow-app_*': 'deny' });
+    const { data: status } = await sdk.mcp.status({ directory: repo.path }, { throwOnError: true });
+    expect(status).toMatchObject({
+      [MCP_SERVER_NAME]: { status: 'connected' },
+      [MCP_ASSISTANT_SERVER_NAME]: { status: 'connected' },
+    });
   });
 
   it('在目录中建会话并带上会话级 bash 规则；可列出模型', async () => {
