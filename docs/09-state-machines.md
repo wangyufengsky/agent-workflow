@@ -186,7 +186,7 @@ stateDiagram-v2
 ```
 <!-- /fsm:attempt -->
 
-- `submitted`：`plan` 类为 `submit_plan` 校验通过；`execute` 类为 `submit_result`；`review` 类为 `submit_review`。尝试成功只表示「模型交付了结果」，验收结论在节点层。
+- `submitted`：`plan` 类为 `submit_plan` 校验通过；`execute` 类为 `submit_result`；`review` 类为 `submit_review`；`research` 类为 `submit_answer`；`deck_outline` 类为 `submit_outline`；`deck_slides` 类为这次工作的最后一个目标页的 `submit_slide`（23 §4.1）。知识问答的轮次与 PPT 没有自己的状态机，它们的状态是尝试状态的投影（18 §3、23 §4.3）。尝试成功只表示「模型交付了结果」，验收结论在节点层。
 - `no_result`：见 [03-architecture §2.4](03-architecture.md#24-会话空闲但未提交结果)。
 - `timeout`：从 `running` 起超过 `attempt.timeoutMinutes`。
 - `abort`：用户中止或任务取消；后端调用 opencode `session/{id}/abort`。会话仍在创建中（`starting`）时也可中止（任务取消），之后不再发送首条消息。

@@ -218,3 +218,20 @@
 | B-08 | 界面：批量视图（进度汇总、逐个状态与进展、冲突 / 失败标注、合并全部待合并的 + 确认对话框、结果提示）、批量任务列表 `/batches`、主页「批量任务」区、任务列表入口；四套主题 | E2E 见 B-09；走查截图含新建页与批量视图 |
 | B-09 | E2E（FakeOpencode）：J17 主页「补单元测试」的「批量」→ 选 3 个目录 → 创建 → 三个任务到达待合并 → 合并全部 → 主分支 3 个提交、全部已完成；J9 走查加入批量页面 | `pnpm e2e` 通过 |
 | B-10 | 文档收尾：03（模块分层）、07（J17）、14（路由与主页）、本节状态段 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
+
+## v1.2 · PPT 制作
+
+> 状态：P-01…P-10 **已完成**（2026-10-22）。设计见 [23-ppt.md](23-ppt.md)，决策 D93（结构化内容 + 内置版式）、D94（PDF + PowerPoint）、D95（流程与输入）、D96（与助手），用户 2026-10-22 按推荐方案确认。与设计的差异见 23 文首的「实现说明」。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| P-01 | 设计文档 23、决策 D93–D96 | 用户确认 |
+| P-02 | 契约：`DeckStatus` / `DeckRunKind` / `DeckMaterialKind` / `SlideLayout`，`AttemptKind.DeckOutline` / `DeckSlides`，`SessionAgent.SlidesWriter`，`EntityKind.Deck`，`ServerEventType.DeckUpdated`，`AssistantPage.Ppt` / `PptDeck`，常量与错误码，`slideContentSchema`（字数上限），`deckStatusOf`，15 个操作契约；08–12 同步 | 单测：`deckStatusOf` 每个状态；操作风险（`decks.delete` 为 critical）与确认卡片字段文案 |
+| P-03 | 存储：迁移 `0012_decks`（`decks`、`deck_materials`、`deck_slides`、`deck_runs`）与 repo | 集成测试见 P-05 |
+| P-04 | 写作者：agent `aw-slides`（权限同研究员）、`continueSession` 可换 kind、提示词（协议、上下文、大纲、重写大纲、制作、修改）、`submit_outline` / `submit_slide` | 配置快照含 `aw-slides`；`@opencode` 测试中 `aw-slides` 可见 |
+| P-05 | decks 服务与操作：创建（资料快照、项目推断、字数上限）、大纲（重写、手改）、制作 / 继续、让 AI 改、手改、恢复上一版、加页 / 移动 / 删除、停止、删除；SSE | `decks.int.test.ts`（FakeOpencode + 真实 Git）：只读会话与资料快照、页数校验、逐页提交（非目标页与超字数被拒）、同一会话、上一版与恢复、停止后继续、制作中 `DECK_BUSY`、空白目录、任务工具不可用、删除与项目删除 |
+| P-06 | 渲染：十种版式组件、四套主题的幻灯片调色板、文字放不下时缩小并提示 | 单测：调色板对比度与不透明色、`emphasisRuns`；走查截图含全部版式 |
+| P-07 | 界面：列表、新建（资料选择、页数、风格、模型）、工作台（大纲编辑、缩略图栏、预览、这一页、让 AI 改、恢复上一版、加页）、放映、打印视图；任务结果卡 / 知识对话 / 项目详情的「做成 PPT」 | E2E 见 P-09 |
+| P-08 | 导出：PowerPoint（pptxgenjs 按需加载，每种版式映射为原生对象与备注页）、PDF（main 隐藏窗口 + `printToPDF` + 保存对话框） | J20 断言 .pptx 的幻灯片与备注；PDF 在桌面应用中人工验证 |
+| P-09 | 助手：导航卡片（状态实时）、确认卡片中的 PPT 名称、页面上下文（选中的页）、`open_page`；「需要你处理」中 PPT 的权限请求标「PPT」 | 单测：确认卡片字段文案；E2E J20 与 J9 走查 |
+| P-10 | E2E J20、J9 走查（列表、新建、大纲、预览、全部版式）、文档收尾 | `pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |

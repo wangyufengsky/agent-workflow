@@ -38,7 +38,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TaskStatus` | `draft` · `preparing` · `planning` · `plan_review` · `running` · `paused` · `review` · `merging` · `completed` · `failed` · `cancelled` |
 | `TaskFailedPhase` | `preparing` · `planning` · `running` · `merging` |
 | `NodeStatus` | `pending` · `ready` · `running` · `waiting_input` · `verifying` · `awaiting_acceptance` · `done` · `failed` · `skipped` · `cancelled` |
-| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2） |
+| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2）· `deck_outline`（PPT 的大纲）· `deck_slides`（PPT 的若干页：制作或修改，23 §4；两者在同一个会话中，`continueSession` 可换 kind） |
 | `AttemptStatus` | `starting` · `running` · `succeeded` · `failed` · `aborted` · `interrupted` |
 | `PlanStatus` | `draft` · `confirmed` · `superseded` |
 | `PlanSource` | `ai` · `template` · `user` |
@@ -116,8 +116,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | --- | --- | --- |
 | `AssistantConfirmationStatus` | `pending` · `confirmed` · `cancelled` | 确认卡片（09 §10） |
 | `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` | 助手专用工具（15 §3）；其余工具由操作清单生成 |
-| `AssistantPage` | `home` · `tasks` · `task` · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId`） |
-| `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
+| `AssistantPage` | `home` · `tasks` · `task` · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` · `ppt` · `ppt_deck`（23 §9） | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId` / `deckId`；PPT 工作台另可带选中的页 `slideId`） |
+| `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8）· `deck`（23 §9） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
 | `InputRef` | `EntityKind` 的全部取值 · `inbox_item` · `node`（同一输入中 `id` 所指任务的步骤） · `attempt` | 操作契约 `refs`：输入字段指向的对象（`enums/entity.ts`）；助手确认卡片据此把 id 显示为对象名称，标签为对象类型（D84）；`workflow` 字段可以是流程 id 或 key |
 | `AssistantForm` | `tasks.create` · `projects.create` · `projects.setHosting` · `databases.create` · `databases.update` | `open_form` 能打开的表单，以其提交的操作命名（`ASSISTANT_FORM_OPERATION`）；预填值的 schema 为该操作的助手输入（不含凭据字段）的 partial |
 
@@ -128,7 +128,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `KnowledgeTurnStatus` | `researching` · `answered` · `stopped` · `failed` | 一轮的状态，由其 `research` 尝试的状态推导（`knowledgeTurnStatusOf`，18 §3），不存储 |
 | `KnowledgeSourceKind` | `code` · `docs` · `database` · `web` | 资料范围与引用的来源类别；文件按 `classifySource(path)` 分为代码或文档（`KNOWLEDGE_DOC_DIRS`、`KNOWLEDGE_DOC_EXTENSIONS`） |
 | `CitationType` | `file` · `database` · `web` | `submit_answer` 的引用类型（18 §6.1） |
-| `SessionAgent` | `planner` · `executor` · `reviewer` · `researcher` | 会话以哪个 agent 运行（`enums/workflow.ts`）；角色的基础类型 `RoleBaseAgent` 只有前三个 |
+| `SessionAgent` | `planner` · `executor` · `reviewer` · `researcher` · `slides_writer` | 会话以哪个 agent 运行（`enums/workflow.ts`）；角色的基础类型 `RoleBaseAgent` 只有前三个；`slides_writer` 为 PPT 写作者（23 §7.1） |
 
 ### 2.9 质量与用量（v1.1，`enums/insights.ts`）
 
@@ -147,9 +147,18 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 批次没有状态枚举：进度由子任务的 `TaskDisplayGroup` 汇总（`batchCounts`），「待合并」由 `isBatchDeliverable` 判断（`shared/batch/batch.ts`，D85）。
 
+### 2.11 PPT（v1.2，`enums/deck.ts`）
+
+| 枚举 | 值 | 说明 |
+| --- | --- | --- |
+| `DeckStatus` | `outlining` · `outline_ready` · `failed` · `generating` · `incomplete` · `ready` | PPT 的显示状态，由页面与最近一次 AI 工作的尝试状态推导（`deckStatusOf`，`shared/deck/status.ts`，23 §4.3），不存储 |
+| `DeckRunKind` | `outline` · `slides` | 一次 AI 工作做什么，由其尝试的 kind 推导（`deckRunKindOf`） |
+| `DeckMaterialKind` | `text` · `file` · `task` · `knowledge` | 创建时快照的资料（23 §2.3） |
+| `SlideLayout` | `cover` · `section` · `bullets` · `two_column` · `cards` · `steps` · `stats` · `table` · `code` · `quote` | 内置版式（23 §5.1，D93）；每种版式的字段与字数上限为 `slideContentSchema`（`shared/contracts/deck/slide.ts`） |
+
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 
-`STATUS_TONE.task` / `.node` / `.attempt` / `.knowledgeTurn` / `.runtime` / `.taskDisplay`（类型保证每个值都有映射，单测再校验一次）。`knowledgeTurn`：`researching` → `run`，`answered` → `ok`，`stopped` → `idle`，`failed` → `danger`。`runtime`：`ready` → `ok`，`starting` → `run`，`stopped` → `wait`，`not_installed` / `version_mismatch` / `crashed` → `danger`。
+`STATUS_TONE.task` / `.node` / `.attempt` / `.knowledgeTurn` / `.deck` / `.runtime` / `.taskDisplay`（类型保证每个值都有映射，单测再校验一次）。`knowledgeTurn`：`researching` → `run`，`answered` → `ok`，`stopped` → `idle`，`failed` → `danger`。`deck`：`outlining` / `generating` → `run`，`outline_ready` → `wait`，`incomplete` → `warn`，`failed` → `danger`，`ready` → `ok`。`runtime`：`ready` → `ok`，`starting` → `run`，`stopped` → `wait`，`not_installed` / `version_mismatch` / `crashed` → `danger`。
 
 | tone | TaskStatus | NodeStatus | AttemptStatus | TaskDisplayGroup |
 | --- | --- | --- | --- | --- |
@@ -169,7 +178,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | --- | --- | --- |
 | `APP_ID` | `agent-workflow` | 数据目录名、MCP server 名 |
 | `OPENCODE_VERSION` | `1.19.0` | 精确匹配，不匹配则 `version_mismatch` |
-| `OPENCODE_AGENT_NAME` | `{ planner: 'aw-planner', executor: 'aw-executor', reviewer: 'aw-reviewer', researcher: 'aw-researcher' }` | 按 `SessionAgent`；`aw-researcher` 为知识研究员（v1.1，18 §5.1） |
+| `OPENCODE_AGENT_NAME` | `{ planner: 'aw-planner', executor: 'aw-executor', reviewer: 'aw-reviewer', researcher: 'aw-researcher', slides_writer: 'aw-slides' }` | 按 `SessionAgent`；`aw-researcher` 为知识研究员（v1.1，18 §5.1），`aw-slides` 为 PPT 写作者（v1.2，23 §7.1） |
 | `MCP_SERVER_NAME` | `agent-workflow` | 执行 MCP；opencode 中工具名为 `agent-workflow_<tool>` |
 | `MCP_ASSISTANT_SERVER_NAME` | `agent-workflow-app` | 助手 MCP（v1.1）；opencode 中工具名为 `agent-workflow-app_<tool>` |
 | `OPENCODE_ASSISTANT_AGENT` | `aw-assistant` | 助手的 agent（v1.1） |
@@ -236,6 +245,17 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `KNOWLEDGE_QUERY_ROWS` | 50（打开数据库引用时重新执行查询返回的行数） |
 | `KNOWLEDGE_ANSWER_EXCERPT_CHARS` | 160（对话记录中最后一轮回答的摘要） |
 | `KNOWLEDGE_DRAFT_FLUSH_CHARS` | 24（研究尝试的流式正文写会话流的粒度，回答草稿因此流式显示，18 §5.5） |
+| `DECK_BRIEF_MAX_CHARS` | 4000（PPT 的要求） |
+| `DECK_TITLE_MAX_CHARS` | 60（PPT 标题；创建时取要求的首行，大纲返回后用 AI 给的标题） |
+| `DECK_MATERIALS_MAX` | 10（一份 PPT 的资料数） |
+| `DECK_MATERIALS_MAX_CHARS` | 60000（全部资料快照的总字数，随首条消息发送，23 §7.2） |
+| `DECK_INSTRUCTION_MAX_CHARS` | 2000（按意见重写大纲、让 AI 改的要求） |
+| `DECK_MAX_SLIDES` | 30（一份 PPT 的页数） |
+| `DECK_AUTO_SLIDES_MIN` / `DECK_AUTO_SLIDES_MAX` | 5 / 12（「让 AI 决定」页数时的范围，写在给 AI 的消息里） |
+| `SLIDE_POINTS_MAX` / `SLIDE_POINT_MAX_CHARS` | 6 / 120（大纲一页的要点） |
+| `SLIDE_NOTES_MAX_CHARS` | 1000（一页的讲稿） |
+| `SLIDE_TEXT_LIMITS` | 各版式字段的字数与条数上限（标题 40、要点每条 60 至多 6 条、卡片 2–4 张、步骤 2–6 步、表格 2–5 列 1–8 行、代码 16 行每行 80 字……），按 1280×720 画布与最小字号定；`submit_slide` 与手动修改共用（`slideContentSchema`） |
+| `SLIDE_FIT_MIN_SCALE` | 0.8（文字放不下时先缩到的最小比例，之后提示「文字可能放不下」，23 §5.4） |
 
 ### 4.3 用户设置（`constants/settings.ts`，键 → 默认值）
 
@@ -347,6 +367,10 @@ class AppError extends Error {
 | `KNOWLEDGE_CITATION_INVALID` | — | MCP `submit_answer`：引用校验失败；`details.problems[]`，每项 `{ code, citation?, message, hint, details? }`，子码见 5.5 |
 | `KNOWLEDGE_CITATION_NOT_FOUND` | 404 | 轮次不存在，或编号超出这一轮的引用数 |
 | `KNOWLEDGE_SOURCE_UNAVAILABLE` | 404 | 被引用的文件已不存在或已不在项目仓库内 |
+| **PPT（v1.2）** | | |
+| `DECK_NOT_FOUND` | 404 | |
+| `DECK_SLIDE_NOT_FOUND` | 404 | 页面不存在或不属于这份 PPT |
+| `DECK_BUSY` | 409 | 有 AI 工作进行中时又修改页面、发起 AI 工作或删除 PPT（先等它完成或停止） |
 | **Inbox** | | |
 | `INBOX_ITEM_NOT_FOUND` | 404 | |
 | `INBOX_ITEM_CLOSED` | 409 | 条目已处理 |

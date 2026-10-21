@@ -1,6 +1,8 @@
 # 23 · PPT 制作（v1.2）
 
-> 状态：**设计已确认**（D93–D96，用户 2026-10-22 按推荐方案确认），按 §12 拆分开发。
+> 状态：**v1.2 已实现**（P-01…P-10，见 [05](05-dev-plan.md#v12--ppt-制作)）。设计已由用户确认（D93–D96，2026-10-22，按推荐方案）。
+>
+> 实现说明（与最初设计的差异，正文已按实现改写）：尝试分为 `deck_outline` 与 `deck_slides` 两类（同一会话中 `continueSession` 换 kind），`deck_runs` 不另存类型；`submit_slide` 按**页码**提交（`page`），不用页 id，校验失败统一为 `VALIDATION_FAILED`（`details.issues` 指出字段与上限），不另设 `DECK_OUTLINE_INVALID` / `DECK_SLIDE_INVALID`；删除项目不检查进行中的 PPT 工作（PPT 的 `project_id` 置空，会话照常在原目录中只读）；「这一页」面板只按字段改文字，换版式交给「让 AI 改」；代码版式为等宽纯文字（不做语法高亮，PPT 主题与应用主题无关，shiki 的配色取应用令牌）；删除在工作台页头而不是列表卡片的菜单；导出为页头的两个按钮；按意见重写大纲的意见可以省略（大纲失败后的「重试」即重新写）；PPT 的用量暂不计入「质量与用量」（19 只统计任务与知识问答，见 §11）。
 
 把手头的材料做成一份能讲的 PPT：AI 先出大纲，你确认或改过之后逐页制作，做好后可以预览、逐页让 AI 改、自己改文字，最后导出 PDF 或 PowerPoint。
 
@@ -27,7 +29,7 @@
 - **AI 写内容，应用负责排版**（D93）：AI 只产出结构化的幻灯片内容（选哪种版式、每个位置写什么字），由应用的内置版式与四套主题渲染。AI 不写 HTML / CSS，所以每一页都整齐、可校验、换主题不用重新生成。
 - **大纲先过目**（D95）：生成大纲后停下来等你确认或修改，确认后才逐页制作——大纲阶段改一句话的成本远低于做完再返工。
 - **全程只读**：AI 可以读项目代码，但不能改文件、不能跑写命令，与知识问答的研究员同一套只读边界（18 §5.1）。
-- **不是第二套执行机制**：每次 AI 工作（出大纲、做页面、改页面）= 一次 `slides` 类尝试，会话、超时、提醒、中断、会话流、权限请求、用量统计都复用尝试模块（09 §4、12）。
+- **不是第二套执行机制**：每次 AI 工作（出大纲、做页面、改页面）= 一次 `deck_outline` 或 `deck_slides` 类尝试，会话、超时、提醒、中断、会话流、权限请求、用量统计都复用尝试模块（09 §4、12）。
 
 ## 2. 页面与交互
 
@@ -47,7 +49,7 @@
 
 - 页头「PPT」+ 主按钮「新建 PPT」。
 - 工具条：搜索（标题）、项目下拉。
-- 卡片网格：缩略图（第一页的真实渲染，§5.3）、标题、状态（§4.3 的显示文案：「正在写大纲」「大纲待确认」「正在制作 3 / 8」「还有 2 页没做完」「8 页」）、项目 · 更新时间。整张卡片可点，进入工作台。行尾菜单：删除（确认对话框；制作中需先停止）。
+- 卡片网格：缩略图（第一页的真实渲染，§5.3）、标题、状态（§4.3 的显示文案：「正在写大纲」「大纲待确认」「正在制作 3 / 8」「还有 2 页没做完」「8 页」）、项目 · 更新时间。整张卡片可点，进入工作台（删除在工作台页头）。
 - 状态：加载中（骨架）、空（「还没有 PPT」+ 一句说明「把任务结果、知识问答或一段文字做成能讲的 PPT」+「新建 PPT」）、搜索无结果、加载失败（`ErrorState`）。游标分页「加载更多」。
 
 ### 2.3 新建 `/ppt/new`
@@ -81,7 +83,7 @@
 
 ### 2.4 工作台 `/ppt/:deckId`
 
-页头：标题（点击可改名）、项目 · 页数、步骤条「大纲 → 制作 → 完成」；右侧「风格 ▾」「放映」「导出 ▾」（PDF / PowerPoint，§6）、「显示详细信息」。
+页头：标题（点击可改名）、项目 · 页数、步骤条「大纲 → 制作 → 完成」；下面一行：「风格」下拉、「显示详细信息」（简单模式）、「放映」「导出 PowerPoint」「导出 PDF」（只在桌面应用中，§6）与「删除」（确认对话框；AI 工作中不可用）。页头下方是这次 AI 工作的模型选择（默认沿用上一次工作的模型）。
 
 **① 大纲阶段**（正在写大纲 / 大纲待确认）
 
@@ -128,7 +130,7 @@
 - **左侧缩略图栏**：每页一个真实渲染的缩略图；制作中的页显示「正在制作」、尚未制作的页显示标题占位；上移 / 下移 / 删除、「加一页」（填标题与要点，AI 只做这一页）。文字放不下的页（§5.4）角上有提示图标。
 - **中间预览**：当前页按 16:9 缩放到可用宽度；`←` `→` 翻页。
 - **右侧「这一页」面板**：
-  - **内容**：按该页版式的字段逐项编辑（标题、要点、两栏、卡片、步骤、数字、表格、代码、引言，§5.1），失焦即保存，预览同步变化；可以换版式（字段按名称尽量保留，放不进新版式的内容丢弃前先确认）。
+  - **内容**：按该页版式的字段逐项编辑（标题、要点、两栏、卡片、步骤、数字、表格、代码、引言，§5.1），焦点离开表单即保存（不合版式字数的修改不保存并提示），预览同步变化；要换版式就「让 AI 改」（如「改成流程图」）。
   - **讲稿**：演讲备注，导出 PPTX 时写入备注页。
   - **让 AI 改**：范围「本页 / 全部页面」+ 一句要求（「精简到三条」「全部改成英文」）。AI 基于当前内容（包括你手改过的）修改；修改中该页显示「正在修改」。文字放不下时面板顶部有提示与一键「让 AI 精简这一页」。
   - **恢复上一版**：撤销这一页最近一次由 AI 做的修改（只保留一步，D95）。
@@ -192,7 +194,7 @@
 | points | TEXT(JSON) | `string[]`：大纲要点，即这一页的写作要求 |
 | content | TEXT(JSON) NULL | `SlideContent`（§5.1，按 `layout` 判别）；NULL = 还没制作 |
 | notes | TEXT | 讲稿，可为空 |
-| previous | TEXT(JSON) NULL | AI 最近一次修改之前的 `{ layout, content, notes }`，「恢复上一版」用；手动修改不写它 |
+| previous | TEXT(JSON) NULL | AI 最近一次修改之前的 `{ content, notes }`（版式在 content 里），「恢复上一版」用；手动修改不写它 |
 | updated_at | INTEGER | |
 
 索引：`(deck_id, seq)`。
@@ -205,16 +207,17 @@
 | --- | --- | --- |
 | id | TEXT PK | |
 | deck_id | TEXT → decks，CASCADE | |
-| kind | TEXT | `DeckRunKind`：`outline`（出大纲 / 按意见重写）、`slides`（制作或修改若干页） |
-| attempt_id | TEXT → attempts | 这次工作的 `slides` 尝试；与本行在同一个同步段内写入（同 18 §5.3） |
-| targets | TEXT(JSON) NULL | `slides` 的目标页 id 列表；`outline` 为 NULL |
+| seq | INTEGER | PPT 内序号，从 1 起 |
+| attempt_id | TEXT → attempts | 这次工作的尝试（`deck_outline` 或 `deck_slides`，由此推导 `DeckRunKind`）；与本行在同一个同步段内写入（同 18 §5.3） |
+| targets | TEXT(JSON) | 目标页 id 列表；大纲为空列表 |
+| done | TEXT(JSON) | 这次工作已提交的目标页 id；全部提交即完成 |
 | instruction | TEXT NULL | 用户的意见或修改要求；整份制作为 NULL |
 | created_at | INTEGER | |
 
-索引：`(deck_id, created_at)`、`(attempt_id)`。
+索引：`(deck_id, seq)`、`(attempt_id)`。
 
 - 会话流就是尝试的会话流：`<数据目录>/runs/ppt/<attemptId>.jsonl`（10 §3）。
-- **删除 PPT** = 删除其 runs 的尝试（尝试模块同时删除会话流；权限请求条目随尝试级联删除），再删除 PPT（其余三张表级联）。制作中不能删除（`DECK_BUSY`）。删除项目时，有制作中的 PPT 关联它 → `DECK_BUSY`；否则 `project_id` 置空。
+- **删除 PPT** = 删除其 runs 的尝试（尝试模块同时删除会话流；权限请求条目随尝试级联删除），再删除 PPT（其余三张表级联）。制作中不能删除（`DECK_BUSY`）。删除项目时 `project_id` 由外键置空（进行中的工作照常在原目录中只读完成）。
 - 应用里**没有导出文件的存储**：导出由用户选择保存位置（§6），应用不保留副本。PPT 的全部内容就是这几张表，所以「SQLite + 文件」中的文件只有会话流。
 
 ## 4. 生成流程
@@ -232,16 +235,16 @@
 
 | 步骤 | 操作 | AI 工作 | 结果 |
 | --- | --- | --- | --- |
-| 出大纲 | `decks.create` | `outline`，首条消息 `start-deck.md`：要求、页数、资料快照（§7.2）、项目名 | 大纲页行（`content` 为空）+ `understanding` + 标题 |
-| 按意见重写大纲 | `decks.reviseOutline` | `outline`，`deck-outline-revise.md`：意见 + 当前大纲（含手改） | 大纲页行整体替换 |
-| 确认并制作 | `decks.generate` | `slides`，目标 = 全部未制作的页，`deck-slides.md`：主题无关的版式说明、每页的标题与要点 | 逐页写入 `content` 与 `notes` |
+| 出大纲 | `decks.create` | `deck_outline`，首条消息 = `deck-context.md`（项目、要求、资料快照，§7.2）+ `deck-outline.md`（页数、版式说明） | 大纲页行（`content` 为空）+ `understanding` + 标题 |
+| 按意见重写大纲 | `decks.reviseOutline` | `deck_outline`，`deck-outline-revise.md`：意见 + 当前大纲（含手改）；不带意见时为 `deck-outline.md`（重新写） | 大纲页行整体替换 |
+| 确认并制作 | `decks.generate` | `deck_slides`，目标 = 全部未制作的页，`deck-slides.md`：版式说明、每页的页码、建议版式、标题与要点 | 逐页写入 `content` 与 `notes` |
 | 继续制作 | `decks.generate`（再次） | 同上，目标 = 仍未制作的页 | 同上 |
-| 让 AI 改 | `decks.reviseSlides` | `slides`，目标 = 本页或全部已制作的页，`deck-slides-revise.md`：要求 + 目标页当前内容 | 覆盖前把旧内容写进 `previous` |
-| 加一页 | `decks.insertSlide` | `slides`，目标 = 新页 | 新页的 `content` |
+| 让 AI 改 | `decks.reviseSlides` | `deck_slides`，目标 = 本页或全部已制作的页，`deck-slides-revise.md`：要求 + 目标页当前内容 | 覆盖前把旧内容写进 `previous` |
+| 加一页 | `decks.insertSlide` | `deck_slides`，目标 = 新页 | 新页的 `content` |
 
 ### 4.3 显示状态（推导，不存）
 
-`deckStatusOf(deck, slides, latestRun)`（`shared/deck/status.ts`，前后端共用）：
+`deckStatusOf({ outlineConfirmed, slideCount, madeCount, latestRun })`（`shared/deck/status.ts`，单测覆盖每个状态）：
 
 | `DeckStatus` | 条件 | 列表与页头文案 |
 | --- | --- | --- |
@@ -281,13 +284,13 @@ AI 提交、应用保存与渲染的都是 `SlideContent`（`shared/contracts/de
 
 - 每套应用主题（`ThemeDefinition`，14 §4）新增一组**幻灯片调色板** `slides: SlidePalette`：`bg` `surface` `ink` `sub` `accent` `onAccent` `line` `codeBg` `codeInk`，全部为不透明的 `#rrggbb`（PPTX 只接受纯色；应用令牌里有半透明色与渐变，不能直接用）。调色板只在主题文件里定义，界面渲染与 PPTX 导出都读它（一处定义，06 §1.4）。
 - 一份 PPT 的主题与应用当前主题无关：渲染时把该 PPT 主题的调色板写成幻灯片容器上的 CSS 变量（`--slide-bg` 等，不写 `:root`），所以应用是深色主题时也能正确预览一份浅色主题的 PPT。
-- 字体：标题与正文用系统中文字体栈（与应用相同），代码用等宽字体栈；PPTX 中写 `SLIDE_FONT_FACE` / `SLIDE_MONO_FONT_FACE`（§6.2）。
+- 字体：标题与正文用系统中文字体栈（与应用相同），代码用等宽字体栈；PPTX 中写 Microsoft YaHei / Consolas（§6.2）。
 - 单测校验每套调色板：`ink` / `sub` 在 `bg` 与 `surface` 上、`onAccent` 在 `accent` 上、`codeInk` 在 `codeBg` 上对比度 ≥ 4.5:1。
 
 ### 5.3 渲染
 
 - `features/ppt/slide/`：每种版式一个纯展示组件，画布固定 1280×720 CSS 像素，缩略图、预览、放映、打印都是同一个组件按比例缩放（`transform: scale`），所以四处看到的完全一致。
-- 代码版式用已有的 shiki（D54）高亮，颜色取幻灯片调色板。
+- 代码版式为等宽纯文字（`codeBg` 底、`codeInk` 字），不做语法高亮：shiki 的配色取应用主题的令牌，而 PPT 的主题与应用主题无关。
 - 不渲染模型产出的 HTML（03 §9 的 CSP 不放宽）：内容都是结构化字段，React 按文本渲染。
 
 ### 5.4 文字放不下
@@ -300,7 +303,7 @@ AI 提交、应用保存与渲染的都是 `SlideContent`（`shared/contracts/de
 
 ### 6.1 PDF
 
-- 桌面版：preload 新增 `exportPdf(deckId, fileName)` → Electron main 用一个隐藏窗口（同一 preload、同源）加载 `/ppt/:deckId/print`；打印视图渲染完全部页面并等字体加载完（`document.fonts.ready`）后经 preload 通知 main，main 调 `webContents.printToPDF({ pageSize: 13.333×7.5 英寸, margins: 0, printBackground: true, preferCSSPageSize: true })`，弹出保存对话框写文件，关闭隐藏窗口；返回保存路径（取消为 `null`），界面提示「已导出」并可「在 Finder 中显示」。
+- 桌面版：preload 新增 `exportPdf(deckId, fileName)` → Electron main 用一个隐藏窗口（同一 preload、同源）加载 `/ppt/:deckId/print`；打印视图渲染完全部页面并等字体加载完（`document.fonts.ready`）后经 preload 通知 main，main 调 `webContents.printToPDF({ pageSize: 13.333×7.5 英寸, margins: 0, printBackground: true, preferCSSPageSize: true })`，弹出保存对话框写文件，关闭隐藏窗口；返回保存路径（取消为 `null`），界面提示「已导出」。
 - 打印视图用 `@page { size: 1280px 720px; margin: 0 }`，每页一张，与预览像素一致；文字是矢量、可选中。
 - 浏览器开发模式（没有 preload）不显示「导出 PDF」，与 `reveal_file` 相同。
 - 不需要新依赖。
@@ -325,7 +328,7 @@ AI 提交、应用保存与渲染的都是 `SlideContent`（`shared/contracts/de
 
 - 会话级 bash 规则为 `readonlyBashRules()`（不带检查命令）；白名单外的命令照常询问，进入「需要你处理」。
 - 会话目录：关联了项目时为项目仓库路径（主工作区，只读，同研究员）；没有项目时为 `<数据目录>/ppt/blank/`（空目录，AI 只有资料快照可用）。
-- `SessionAgent` 增加 `slides`，`OPENCODE_AGENT_NAME.slides = 'aw-slides'`；`AttemptKind` 增加 `slides`（一份 PPT 的大纲与页面在同一个会话里，`continueSession` 沿用 kind；这次工作要哪个提交工具由 `deck_runs.kind` 决定，提醒 `nudge` 照此写明工具名）。
+- `SessionAgent` 增加 `slides_writer`，`OPENCODE_AGENT_NAME.slides_writer = 'aw-slides'`；`AttemptKind` 增加 `deck_outline`（提交工具 `submit_outline`）与 `deck_slides`（`submit_slide`）。一份 PPT 的大纲与页面在同一个会话里，`continueSession` 可以给新尝试换 kind；提醒 `nudge` 按 kind 写明提交工具。PPT 的尝试与研究一样不计入调度器的并发上限。
 
 ### 7.2 资料怎么交给 AI
 
@@ -336,10 +339,10 @@ AI 提交、应用保存与渲染的都是 `SlideContent`（`shared/contracts/de
 
 ### 7.3 执行 MCP 工具
 
-| 工具 | `slides` 尝试中的行为 |
+| 工具 | PPT 尝试中的行为 |
 | --- | --- |
-| `submit_outline` | **新增**：`{ title, understanding: { audience, duration, assumptions[] }, slides: [{ layout, title, points[] }] }`；只在 `outline` 工作中允许。页数：指定了页数时必须相等，否则在自动范围内；不通过 → `DECK_OUTLINE_INVALID` + 每处问题的 hint |
-| `submit_slide` | **新增**：`{ slide_id, layout, content, notes }`；只在 `slides` 工作中允许，`slide_id` 必须是这次的目标页；`content` 按 §5.1 校验（字段、条数、字数），不通过 → `DECK_SLIDE_INVALID` + 每处问题的 hint（如「bullets[2] 超出 18 字，请精简」），AI 修正后重提；同一页可以重复提交，以最后一次为准 |
+| `submit_outline` | **新增**：`{ title, understanding: { audience, duration, assumptions[] }, slides: [{ layout, title, points[] }] }`；只在 `deck_outline` 尝试中允许。指定了页数时必须相等（「让 AI 决定」时范围写在消息里，不强制）；不通过 → `VALIDATION_FAILED`（`issues` 指出 `slides` 与原因），什么都不写 |
+| `submit_slide` | **新增**：`{ page, content, notes }`；只在 `deck_slides` 尝试中允许，`page`（页码，从 1 起，消息里按页码列出）必须是这次的目标页；`content` 按 §5.1 校验（字段、条数、字数），不通过 → `VALIDATION_FAILED`（`issues` 指出字段与上限），AI 修正后重提；同一页可以重复提交，以最后一次为准；返回 `remaining`（还没提交的页码） |
 | `report_progress` | 允许；显示在工作台的进度一行 |
 | 其他（`ask_user`、`submit_result`、`db_*` 等） | 不允许（`MCP_TOOL_NOT_ALLOWED`）。AI 不提问：理解与假设写在大纲的 `understanding` 里（D95） |
 
@@ -398,9 +401,9 @@ type SlideDTO = { id: string; seq: number; layout: SlideLayout; title: string; p
 
 ## 10. 枚举、常量、错误码（08）
 
-- 枚举（`shared/enums/deck.ts`）：`DeckStatus`（`outlining` `outline_ready` `failed` `generating` `incomplete` `ready`，`STATUS_TONE`：accent / warn / fail / accent / warn / ok）、`DeckRunKind`（`outline` `slides`）、`DeckMaterialKind`（`text` `file` `task` `knowledge`）、`SlideLayout`（§5.1 十种）；`AttemptKind` 加 `slides`；`SessionAgent` 加 `slides`；`EntityKind` 加 `deck`；`McpToolName` 加 `SubmitOutline` `SubmitSlide`；`ServerEventType.DeckUpdated`；`AssistantPage` 加 `ppt` `ppt_deck`。
-- 常量：`OPENCODE_AGENT_NAME.slides = 'aw-slides'`；`DECK_BRIEF_MAX_CHARS`（4000）、`DECK_TITLE_MAX_CHARS`（60）、`DECK_MATERIALS_MAX`（10 份）、`DECK_MATERIALS_MAX_CHARS`（60000）、`DECK_MAX_SLIDES`（30）、`DECK_AUTO_SLIDES_MIN` / `MAX`（5 / 12）、`SLIDE_POINTS_MAX`（6）、`SLIDE_NOTES_MAX_CHARS`（1000）、`SLIDE_CODE_MAX_LINES`（16）、各版式字段字数上限（实现时按画布实测定，写入 08）、`SLIDE_FIT_MIN_SCALE`（0.8）、`SLIDE_CANVAS`（1280×720）、`SLIDE_FONT_FACE` / `SLIDE_MONO_FONT_FACE`。括号中为建议值。
-- 错误码：`DECK_NOT_FOUND`（404）、`DECK_SLIDE_NOT_FOUND`（404）、`DECK_BUSY`（409）、`DECK_OUTLINE_INVALID`（MCP，`details.problems[]`）、`DECK_SLIDE_INVALID`（MCP，`details.problems[]`）。
+- 枚举（`shared/enums/deck.ts`）：`DeckStatus`（`outlining` `outline_ready` `failed` `generating` `incomplete` `ready`，`STATUS_TONE`：run / wait / danger / run / warn / ok）、`DeckRunKind`（`outline` `slides`）、`DeckMaterialKind`（`text` `file` `task` `knowledge`）、`SlideLayout`（§5.1 十种）；`AttemptKind` 加 `deck_outline` `deck_slides`；`SessionAgent` 加 `slides_writer`；`EntityKind` 加 `deck`；`McpToolName` 加 `SubmitOutline` `SubmitSlide`；`ServerEventType.DeckUpdated`；`AssistantPage` 加 `ppt` `ppt_deck`（参数 `deckId`，工作台另带选中的页 `slideId`）。
+- 常量（08 §4.2）：`OPENCODE_AGENT_NAME.slides_writer = 'aw-slides'`；`DECK_BRIEF_MAX_CHARS`（4000）、`DECK_TITLE_MAX_CHARS`（60）、`DECK_MATERIALS_MAX`（10 份）、`DECK_MATERIALS_MAX_CHARS`（60000）、`DECK_INSTRUCTION_MAX_CHARS`（2000）、`DECK_MAX_SLIDES`（30）、`DECK_AUTO_SLIDES_MIN` / `MAX`（5 / 12）、`SLIDE_POINTS_MAX` / `SLIDE_POINT_MAX_CHARS`（6 / 120）、`SLIDE_NOTES_MAX_CHARS`（1000）、`SLIDE_TEXT_LIMITS`（各版式字段的字数与条数）、`SLIDE_FIT_MIN_SCALE`（0.8）。画布尺寸 1280×720 只在渲染进程使用（`features/ppt/slide/geometry.ts`）。
+- 错误码：`DECK_NOT_FOUND`（404）、`DECK_SLIDE_NOT_FOUND`（404）、`DECK_BUSY`（409）；提交工具的校验失败用 `VALIDATION_FAILED`。
 - 没有新设置项。
 
 ## 11. 不做
@@ -417,6 +420,7 @@ type SlideDTO = { id: string; seq: number; layout: SlideLayout; title: string; p
 | 版本历史、修订号、方案冲突（设计稿中的修订 r8、自动保存冲突） | 本地单用户，同步写库（D11）；只保留「恢复上一版」一步 |
 | 设计稿的七模块「制作方案」（制作目标、叙事结构、视觉规范、图表素材、演讲辅助、交付设置） | 对简单模式过重；这些信息由要求、大纲与主题选择承担 |
 | 制作后的自动「检查」页（一致性、可读性） | 只做文字溢出检查（§5.4），其余由人看预览 |
+| PPT 的用量计入「质量与用量」 | 19 的口径只有任务与知识问答（D79）；PPT 的尝试照常记录 tokens，要统计需在 19 加一个来源（后续） |
 | 演讲者视图、计时、多屏放映 | 放映只做全屏翻页；需要演讲者视图请导出后用办公软件 |
 | 4:3 等其他比例 | 只做 16:9 |
 | 归档、复制为新 PPT | 删除即可；需要时再加 |
@@ -427,7 +431,7 @@ type SlideDTO = { id: string; seq: number; layout: SlideLayout; title: string; p
 packages/shared/src/
 ├─ enums/deck.ts                       §10 枚举
 ├─ deck/status.ts                      deckStatusOf（前后端共用）
-├─ contracts/deck/slide.ts             SlideContent、字数校验与问题列表（submit_slide 与 updateSlide 共用）
+├─ contracts/deck/slide.ts             SlideContent 与字数校验（submit_slide 与 updateSlide 共用）
 ├─ contracts/api/decks.ts              DTO
 ├─ contracts/mcp/submit-outline.ts、submit-slide.ts
 └─ operations/decks.ts
@@ -435,25 +439,26 @@ packages/server/src/modules/decks/
 ├─ decks.table.ts / .repo.ts           四张表
 ├─ decks.service.ts                    创建、大纲、制作、修改、页操作、停止、删除；尝试结束的反应
 ├─ decks.materials.ts                  任务与知识对话的快照
+├─ decks.prompts.ts                    给写作者的版式说明、大纲与页面
 ├─ decks.operations.ts / index.ts
 packages/server/src/modules/mcp/tools/submit-outline.tool.ts、submit-slide.tool.ts
-packages/builtin/prompts/protocol-slides.md、start-deck.md、deck-outline-revise.md、deck-slides.md、deck-slides-revise.md
+packages/builtin/prompts/protocol-slides.md、deck-context.md、deck-outline.md、deck-outline-revise.md、deck-slides.md、deck-slides-revise.md
 apps/web/src/features/ppt/             列表、新建、工作台（大纲、缩略图栏、预览、这一页面板）、放映、打印视图
 apps/web/src/features/ppt/slide/       十种版式组件、溢出检查
 apps/web/src/features/ppt/export/      pptx 映射（按需加载）、保存
 apps/web/src/theme/themes/*.ts         各主题的 slides 调色板
-apps/desktop/src/main/                 exportPdf（隐藏窗口 + printToPDF）、saveFile
+apps/desktop/src/main/export.ts        exportPdf（隐藏窗口 + printToPDF）、saveFile
 ```
 
-依赖方向：`decks` → `attempts`、`projects`、`tasks`（读任务结果做快照）、`knowledge`（读对话做快照）、`inbox`；`mcp` → `decks`；删除项目（`tasks.deleteProject`）检查制作中的 PPT（`decks` 提供查询，经注入避免循环，同 knowledge 的做法）。
+依赖方向：`decks` → `attempts`、`projects`、`tasks`（读任务结果做快照）、`knowledge`（读对话做快照）、`inbox`；`mcp`、`assistant` → `decks`。删除项目由外键把 `project_id` 置空，`tasks` 不需要知道 PPT。
 
-开发任务（确认后写入 05，约 2 周）：
+开发任务（已写入 05 并完成）：
 
 | # | 任务 |
 | --- | --- |
 | P-01 | 枚举、常量、错误码、`SlideContent` schema 与字数校验、`deckStatusOf`；文档 08–12 同步 |
 | P-02 | 表与迁移、repo；资料快照（任务、知识对话） |
-| P-03 | `aw-slides` agent、`slides` 尝试、提示词；`submit_outline` / `submit_slide` |
+| P-03 | `aw-slides` agent、`deck_outline` / `deck_slides` 尝试、提示词；`submit_outline` / `submit_slide` |
 | P-04 | decks 服务与操作清单：创建、大纲、制作、修改、页操作、停止、删除；SSE |
 | P-05 | 幻灯片版式组件与四套调色板（对比度单测）、溢出检查 |
 | P-06 | 列表与新建页、其他页面的「做成 PPT」入口 |
@@ -467,9 +472,9 @@ apps/desktop/src/main/                 exportPdf（隐藏窗口 + printToPDF）�
 | 层 | 覆盖 |
 | --- | --- |
 | 单元 | `SlideContent` 校验（每种版式的条数与字数边界、问题列表的路径与 hint）、`deckStatusOf`（每个状态）、调色板对比度、`toPptxSlide`：生成的 .pptx 用 jszip 读回，页数、每页文字与讲稿正确（测输出不测调用）、配置快照（`aw-slides` 权限）、溢出检查的缩放逻辑 |
-| 集成 | `decks.int.test.ts`（FakeOpencode）：创建 → 会话目录 / agent / 只读规则正确、首条消息含资料快照 → `submit_outline` 通过后大纲与理解写入、页数不符被拒且有 hint → 改大纲 → 生成 → 逐页 `submit_slide`（非目标页、字数超限被拒，修正后通过）→ `ready`；按意见重写大纲沿用同一会话；修改一页写 `previous`、恢复上一版；停止 → `incomplete` → 继续制作只做剩下的页；制作中改内容 `DECK_BUSY`；未提交 → 提醒 → 失败；删除 PPT 清理尝试与会话流；删除项目时制作中拒绝、否则置空；没有项目时会话目录为空白目录；任务与知识对话快照的内容；`slides` 尝试不能调用 `submit_result` / `ask_user` / `db_*` |
+| 集成 | `decks.int.test.ts`（FakeOpencode）：创建 → 会话目录 / agent / 只读规则正确、首条消息含资料快照 → `submit_outline` 通过后大纲与理解写入、页数不符被拒且有 hint → 改大纲 → 生成 → 逐页 `submit_slide`（非目标页、字数超限被拒，修正后通过）→ `ready`；按意见重写大纲沿用同一会话；修改一页写 `previous`、恢复上一版；停止 → `incomplete` → 继续制作只做剩下的页；制作中改内容 `DECK_BUSY`；未提交 → 提醒 → 失败；删除 PPT 清理尝试与会话流；删除项目后 `project` 置空；没有项目时会话目录为空白目录；任务结果快照的内容；PPT 尝试不能调用 `submit_result` / `ask_user` |
 | 集成（助手） | `decks_create` 需确认，确认后出现 `deck` 导航卡片；`decks_delete` 为 critical |
 | `@opencode` | 注入后 `aw-slides` 在 opencode 配置中可见（`pnpm test:oc`） |
-| E2E | **J20**（FakeOpencode）：任务结果卡「做成 PPT」→ 新建页预选资料 → 生成大纲 → 改一页标题、删一页 → 确认制作 → 逐页出现 → 选中第 2 页手动改要点、预览同步 → 让 AI 改本页 → 恢复上一版 → 换主题 → 导出 PowerPoint（断言下载的文件是有效 .pptx 且页数正确）→ 放映翻页与 `Esc`；打印视图每页一张。J9 走查加入列表、新建、大纲、预览四个状态（四套主题、axe 对比度） |
-| Electron | `pnpm e2e:electron` 加一步：导出 PDF，断言文件页数等于 PPT 页数 |
+| E2E | **J20**（FakeOpencode，`ppt.browser.spec.ts`）：项目页「做成 PPT」→ 新建页预选项目 → 加一段文字、指定 3 页 → 生成大纲 → 改一页、删一页、加一页 → 确认制作 → 逐页出现 → 选中第 2 页手动改要点、预览同步 → 让 AI 改本页 → 恢复上一版 → 换主题（页面底色即时变化）→ 导出 PowerPoint（下载的 .pptx 有 3 张幻灯片与备注页）→ 放映翻页与 `Esc`；打印视图每页一张。J9 走查加入列表、新建、大纲、预览与全部版式的打印视图（四套应用主题、axe 对比度；预览的 PPT 用深色调色板） |
+| Electron | PDF 导出（隐藏窗口 + `printToPDF` + 保存对话框）在桌面应用中人工验证；浏览器 E2E 覆盖它打印的打印视图 |
 | live | `live/ppt.live.test.ts`：对 `ts-stats` 做一份 5 页介绍，断言大纲 5 页、每页都通过校验、内容提到仓库里真实存在的函数名，报告写到 `live/reports/ppt-*.json` |
