@@ -52,13 +52,20 @@ export function updateConversation(qc: QueryClient, conversation: AssistantConve
   );
 }
 
-/** SSE: a confirmation card changed (created, confirmed, ran, cancelled). */
-export function updateConfirmation(qc: QueryClient, confirmation: AssistantConfirmationDTO): void {
-  qc.setQueryData<AssistantConfirmationDTO[]>(queryKeys.assistantConfirmations(confirmation.conversationId), (old) =>
+/**
+ * SSE and mutations: a confirmation card changed (created, confirmed, ran, cancelled). A read still in flight was
+ * answered before the change and would overwrite it (the card of a just-sent message never showed), so it is
+ * cancelled and the list read again, as `updateTask` does.
+ */
+export async function updateConfirmation(qc: QueryClient, confirmation: AssistantConfirmationDTO): Promise<void> {
+  const key = queryKeys.assistantConfirmations(confirmation.conversationId);
+  await qc.cancelQueries({ queryKey: key, exact: true });
+  qc.setQueryData<AssistantConfirmationDTO[]>(key, (old) =>
     old === undefined
       ? old
       : [...old.filter((c) => c.id !== confirmation.id), confirmation].sort((a, b) => a.createdAt - b.createdAt),
   );
+  await qc.invalidateQueries({ queryKey: key, exact: true });
 }
 
 export function useCreateConversation() {
