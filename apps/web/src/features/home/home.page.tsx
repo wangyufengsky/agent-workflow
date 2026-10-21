@@ -3,9 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { EmptyState } from '../../components/empty-state.tsx';
+import { BATCHES_COPY } from '../../copy/batches.ts';
 import { HOME_COPY } from '../../copy/home.ts';
 import { HOME_TASK_COPY as C, INBOX_COPY } from '../../copy/tasks.ts';
 import { HomeAssistantInput } from '../assistant/home-assistant-input.tsx';
+import { BatchCard } from '../batches/batch-card.tsx';
+import { batchesQuery } from '../batches/batches.queries.ts';
 import { inboxQuery } from '../inbox/inbox.queries.ts';
 import { InboxCard } from '../inbox/inbox-card.tsx';
 import { projectsQuery } from '../projects/projects.queries.ts';
@@ -27,6 +30,8 @@ export function HomePage() {
   const projectId = projects.some((p) => p.id === search.projectId) ? search.projectId : projects[0]?.id;
   const tasks = useQuery(tasksQuery()).data ?? [];
   const attention = useQuery(inboxQuery({ status: InboxStatus.Open })).data ?? [];
+  // Batches whose tasks have not all ended (20 §4).
+  const batches = (useQuery(batchesQuery()).data ?? []).filter((b) => b.ended < b.total);
   const inProgress = tasks.filter((t) => !isTerminalState(taskMachine, t.status));
   const recent = tasks.filter((t) => t.status === TaskStatus.Completed).slice(0, RECENT_SHOWN);
   const label = (taskId: string | null) => {
@@ -73,6 +78,21 @@ export function HomePage() {
           <div className="col">
             {attention.slice(0, ATTENTION_SHOWN).map((item) => (
               <InboxCard key={item.id} item={item} taskLabel={label(item.taskId)} />
+            ))}
+          </div>
+        </section>
+      )}
+      {batches.length > 0 && (
+        <section className="section">
+          <div className="section-head">
+            <h2 className="section-title grow">{BATCHES_COPY.inProgress}</h2>
+            <Link to={ROUTES.batches} className="btn ghost sm">
+              {BATCHES_COPY.viewAll}
+            </Link>
+          </div>
+          <div className="grid-2">
+            {batches.map((b) => (
+              <BatchCard key={b.id} batch={b} />
             ))}
           </div>
         </section>

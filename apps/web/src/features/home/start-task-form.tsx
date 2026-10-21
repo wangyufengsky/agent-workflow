@@ -1,12 +1,13 @@
-import { type ProjectDTO, TASK_TITLE_MAX_CHARS, UiMode, WorkflowKind } from '@aw/shared';
+import { type ProjectDTO, TASK_TITLE_MAX_CHARS, UiMode, WorkflowKind, WorkflowPlanning } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type KeyboardEvent, useState } from 'react';
 import { MOD_KEY } from '../../app/platform.ts';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
+import { BATCHES_COPY } from '../../copy/batches.ts';
 import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
 import { gitBranchesQuery } from '../git/git.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
@@ -183,17 +184,29 @@ export function StartTaskForm({
         {workflows.isError && <ErrorState error={workflows.error} onRetry={() => void workflows.refetch()} />}
         <fieldset className={styles.workflows} aria-labelledby="start-workflow">
           {shown?.map((w) => (
-            <button
-              key={w.id}
-              type="button"
-              className={styles.workflow}
-              aria-pressed={w.id === selected}
-              onClick={() => setWorkflowId(w.id)}
-            >
-              <Icon name={workflowIcon(w.key)} />
-              <span className={styles.name}>{w.name}</span>
-              <span className={styles.description}>{w.description}</span>
-            </button>
+            <div key={w.id} className={styles.card}>
+              <button
+                type="button"
+                className={styles.workflow}
+                aria-pressed={w.id === selected}
+                onClick={() => setWorkflowId(w.id)}
+              >
+                <Icon name={workflowIcon(w.key)} />
+                <span className={styles.name}>{w.name}</span>
+                <span className={styles.description}>{w.description}</span>
+              </button>
+              {/* Fixed workflows can run on several targets at once (20 §2). */}
+              {w.planning === WorkflowPlanning.Fixed && (
+                <Link
+                  to={ROUTES.batchNew}
+                  search={{ projectId, workflow: w.key }}
+                  className={`btn ghost sm ${styles.batch}`}
+                  aria-label={BATCHES_COPY.batchOf(w.name)}
+                >
+                  {BATCHES_COPY.batch}
+                </Link>
+              )}
+            </div>
           ))}
         </fieldset>
       </div>

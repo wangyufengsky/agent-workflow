@@ -23,6 +23,9 @@ export const queryKeys = {
   tasks: (filter: Record<string, string | undefined>) => ['tasks', 'list', filter],
   /** All pages of a filtered list (the tasks page); under the same prefix, so task events refresh it. */
   taskPages: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'pages', filter],
+  /** Batches are under the task lists' prefix: their progress is their tasks', so task events refresh them (20 §4). */
+  batches: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'batches', filter],
+  batch: (id: string) => ['tasks', 'list', 'batch', id],
   task: (id: string) => ['tasks', 'detail', id],
   node: (taskId: string, nodeId: string) => ['tasks', 'detail', taskId, 'nodes', nodeId],
   inbox: ['inbox'],

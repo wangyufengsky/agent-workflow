@@ -88,6 +88,7 @@ export function usePaletteItems(): PaletteItem[] {
     'system.restartRuntime': () => restart.mutate(),
     'projects.create': () => void navigate({ to: ROUTES.projects, search: { add: true } }),
     'tasks.create': () => void navigate({ to: ROUTES.home }),
+    'batches.create': () => void navigate({ to: ROUTES.batchNew }),
   };
   const actions: PaletteItem[] = operations
     .filter((op) => mode === UiMode.Pro || op.mode === UiMode.Simple)

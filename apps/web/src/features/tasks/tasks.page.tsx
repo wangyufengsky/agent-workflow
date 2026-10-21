@@ -5,6 +5,7 @@ import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { EmptyState } from '../../components/empty-state.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { BATCHES_COPY } from '../../copy/batches.ts';
 import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
 import { TASKS_COPY as C, TASK_DISPLAY_LABEL } from '../../copy/tasks.ts';
 import { projectsQuery } from '../projects/projects.queries.ts';
@@ -37,6 +38,9 @@ export function TasksPage() {
           <p className="lede">{C.lede}</p>
         </div>
         <div className={styles.filters}>
+          <Link to={ROUTES.batches} className="btn ghost">
+            {BATCHES_COPY.title}
+          </Link>
           <select
             className="select"
             aria-label={C.allProjects}

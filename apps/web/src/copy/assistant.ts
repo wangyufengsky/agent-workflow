@@ -79,6 +79,7 @@ export const ENTITY_COPY = {
     [EntityKind.Role]: '角色',
     [EntityKind.DbConnection]: '数据库连接',
     [EntityKind.KnowledgeConversation]: '知识问答对话',
+    [EntityKind.Batch]: '批量任务',
   } satisfies Record<EntityKind, string>,
   open: '打开',
   deleted: '已删除',

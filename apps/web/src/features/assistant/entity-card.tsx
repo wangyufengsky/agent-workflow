@@ -9,7 +9,9 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { StatusBadge } from '../../components/status-badge.tsx';
 import { ENTITY_COPY as C } from '../../copy/assistant.ts';
+import { BATCHES_COPY } from '../../copy/batches.ts';
 import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
+import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
 import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
@@ -100,6 +102,20 @@ function KnowledgeConversationCard({ entity }: { entity: EntityRef }) {
   return <Shell entity={entity} presence={byDetail(query, ErrorCode.KnowledgeConversationNotFound, status)} />;
 }
 
+function BatchEntityCard({ entity }: { entity: EntityRef }) {
+  // Under the task lists' cache prefix: `task.updated` keeps the progress current (20 §4).
+  const query = useQuery(batchQuery(entity.id));
+  const status =
+    query.data === undefined ? undefined : (
+      <span className="hint">
+        {query.data.ended === query.data.total
+          ? BATCHES_COPY.allFinished
+          : BATCHES_COPY.progress(query.data.ended, query.data.total)}
+      </span>
+    );
+  return <Shell entity={entity} presence={byDetail(query, ErrorCode.BatchNotFound, status)} />;
+}
+
 /** A navigation card for an object an operation of the assistant produced (D66). */
 export function EntityCard({ entity }: { entity: EntityRef }) {
   switch (entity.kind) {
@@ -115,5 +131,7 @@ export function EntityCard({ entity }: { entity: EntityRef }) {
       return <DbConnectionCard entity={entity} />;
     case EntityKind.KnowledgeConversation:
       return <KnowledgeConversationCard entity={entity} />;
+    case EntityKind.Batch:
+      return <BatchEntityCard entity={entity} />;
   }
 }
