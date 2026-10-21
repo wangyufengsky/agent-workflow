@@ -66,7 +66,7 @@ export type FakeStep =
   | { type: 'edit'; file: string; content: string }
   | { type: 'text'; text: string }
   /** A native read-only tool call (`read`, `grep` …), reported only. */
-  | { type: 'tool'; tool: string; input: Record<string, unknown> }
+  | { type: 'tool'; tool: string; input: Record<string, unknown>; output?: string }
   /** `server: 'assistant'` calls the assistant MCP (15 §3); the execution MCP otherwise. */
   | { type: 'callTool'; server?: 'exec' | 'assistant'; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }

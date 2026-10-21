@@ -110,6 +110,8 @@ test('总是允许的调用直接执行并出现对象卡片；对象删除后�
   await patchSettings(request, { 'assistant.alwaysAllow': ['projects.create'] });
   const repoPath = createRepo();
   await queueAssistantTurn(request, [
+    // A native tool may print anything, malformed JSON included: only the app's tools are read as JSON.
+    { type: 'tool', tool: 'bash', input: { command: 'git status' }, output: '{ unfinished' },
     appTool('projects_create', { repoPath, name: '助手加的项目' }),
     { type: 'text', text: '项目已添加。' },
   ]);
@@ -124,6 +126,7 @@ test('总是允许的调用直接执行并出现对象卡片；对象删除后�
   await expect(card).toContainText('助手加的项目');
   await expect(card.getByRole('button', { name: '打开' })).toBeEnabled();
   await expect(panel.getByTestId('assistant-action').filter({ hasText: '添加项目' })).toBeVisible();
+  await expect(panel.getByTestId('assistant-action').filter({ hasText: '运行命令' })).toContainText('git status');
   await expect(panel).not.toContainText('projects_create');
 
   const projects: { items: { id: string; name: string }[] } = await (
