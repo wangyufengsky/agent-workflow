@@ -8,4 +8,4 @@ Project: {{projectName}}
 
 {{sources}}
 
-Research the question in these sources, then call `agent-workflow_submit_answer` once with the answer and its citations.
+Research the question in these sources. Then write the answer as your message text and call `agent-workflow_submit_answer` once with that answer and its citations.

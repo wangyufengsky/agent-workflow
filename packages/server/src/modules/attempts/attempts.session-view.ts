@@ -11,9 +11,9 @@ type TextPart = {
 /**
  * What one session has streamed so far, enough to turn its events into transcript entries (10 §3):
  * the role of each message (our own prompts are recorded when sent, so user parts are skipped), the text of
- * streaming parts, and which tool calls were already recorded.
+ * streaming parts (written every `textFlushChars` characters), and which tool calls were already recorded.
  */
-export function createSessionView() {
+export function createSessionView(textFlushChars: number = TRANSCRIPT_TEXT_FLUSH_CHARS) {
   const roles = new Map<string, 'user' | 'assistant'>();
   const parts = new Map<string, TextPart>();
   const calledTools = new Set<string>();
@@ -42,7 +42,7 @@ export function createSessionView() {
           const part = parts.get(event.partId);
           if (part === undefined) return [];
           part.text += event.delta;
-          return part.text.length - part.written >= TRANSCRIPT_TEXT_FLUSH_CHARS ? [textEntry(event.partId, part)] : [];
+          return part.text.length - part.written >= textFlushChars ? [textEntry(event.partId, part)] : [];
         }
         case E.Tool: {
           const { callId, tool } = event;
