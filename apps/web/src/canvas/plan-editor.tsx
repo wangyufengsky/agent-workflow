@@ -21,6 +21,7 @@ import { addNode, connect, disconnect, removeNode, renameNode, updateNode } from
 import { PlanNodeForm } from './plan-node-form.tsx';
 import { TaskNode, type TaskNodeData } from './task-node.tsx';
 import { useGraphLayout } from './use-graph-layout.ts';
+import { useNodeSizes } from './use-node-sizes.ts';
 
 const NODE_TYPES = { task: TaskNode };
 const MINIMAP_FROM = 12;
@@ -77,6 +78,7 @@ function EditorFlow({ graph, onChange, roles, statuses, isLocked, selected, onSe
     requestAnimationFrame(() => void fitView(FIT));
   }, [measured, positions, fitView]);
 
+  const { onNodesChange, measured: sizeOf } = useNodeSizes();
   const roleName = (key: string) => roles.find((r) => r.key === key)?.name ?? key;
   const nodes: Node<TaskNodeData>[] = graph.nodes.map((n) => {
     const status = statuses?.get(n.key);
@@ -99,6 +101,7 @@ function EditorFlow({ graph, onChange, roles, statuses, isLocked, selected, onSe
       },
       deletable: !isLocked(n.key),
       draggable: false,
+      ...sizeOf(n.key),
     };
   });
 
@@ -110,6 +113,7 @@ function EditorFlow({ graph, onChange, roles, statuses, isLocked, selected, onSe
   return (
     <ReactFlow
       nodes={nodes}
+      onNodesChange={onNodesChange}
       edges={edges}
       nodeTypes={NODE_TYPES}
       nodesDraggable={false}
