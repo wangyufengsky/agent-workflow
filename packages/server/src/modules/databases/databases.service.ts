@@ -76,6 +76,17 @@ export function createDatabasesService({ db, clock, log, credentials, driver, qu
     return connection;
   }
 
+  async function readOnlyQuery(connection: DbConnection, sql: string, limit: number | undefined) {
+    assertReadOnlySql(sql);
+    const connectTo = await target(connection);
+    const started = clock.now();
+    const result = await driver.readOnlyQuery(connectTo, sql, {
+      maxRows: limit ?? DB_QUERY_MAX_ROWS,
+      timeoutMs: queryTimeoutMs,
+    });
+    return { ...result, elapsedMs: clock.now() - started };
+  }
+
   return {
     list: (): DbConnectionDTO[] => repo.list().map(toDto),
     get: (id: string): DbConnectionDTO => toDto(get(id)),
@@ -155,16 +166,12 @@ export function createDatabasesService({ db, clock, log, credentials, driver, qu
     },
 
     /** `db_query` (12 §6.11): one read-only statement, row and time limited. */
-    async query(projectId: string, name: string, sql: string, limit: number | undefined): Promise<DbQueryOutput> {
-      assertReadOnlySql(sql);
-      const connectTo = await target(linked(projectId, name));
-      const started = clock.now();
-      const result = await driver.readOnlyQuery(connectTo, sql, {
-        maxRows: limit ?? DB_QUERY_MAX_ROWS,
-        timeoutMs: queryTimeoutMs,
-      });
-      return { ...result, elapsedMs: clock.now() - started };
-    },
+    query: (projectId: string, name: string, sql: string, limit: number | undefined): Promise<DbQueryOutput> =>
+      readOnlyQuery(linked(projectId, name), sql, limit),
+
+    /** The same read-only query on any connection, for the user's assistant (`databases.query`, 15 §3). */
+    queryById: (id: string, sql: string, limit: number | undefined): Promise<DbQueryOutput> =>
+      readOnlyQuery(get(id), sql, limit),
   };
 }
 export type DatabasesService = ReturnType<typeof createDatabasesService>;

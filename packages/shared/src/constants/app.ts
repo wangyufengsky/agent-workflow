@@ -10,6 +10,8 @@ export const OPENCODE_AGENT_NAME = {
   [RoleBaseAgent.Executor]: 'aw-executor',
   [RoleBaseAgent.Reviewer]: 'aw-reviewer',
 } as const satisfies Record<RoleBaseAgent, string>;
+/** The app assistant's agent (15 §2); not a role base agent. */
+export const OPENCODE_ASSISTANT_AGENT = 'aw-assistant';
 export const MCP_SERVER_NAME = 'agent-workflow';
 export const MCP_ASSISTANT_SERVER_NAME = 'agent-workflow-app';
 export const TASK_KEY_PREFIX = 'T-';
@@ -20,6 +22,13 @@ export const PROJECT_SLUG_MAX = 40;
 export const API_PREFIX = '/api/v1';
 export const MCP_EXEC_PATH = '/mcp/exec';
 export const MCP_ASSISTANT_PATH = '/mcp/assistant';
+/**
+ * Assistant working directory under the data directory (03 §7): its sessions run there; generated files go to
+ * `files/<conversationId>/`, message streams to `conversations/<conversationId>.jsonl`.
+ */
+export const ASSISTANT_DIR = 'assistant';
+export const ASSISTANT_FILES_DIR = 'files';
+export const ASSISTANT_CONVERSATIONS_DIR = 'conversations';
 /** Fixed backend port in development so the Vite dev server can proxy to it; production uses a random port. */
 export const DEV_API_PORT = 47821;
 export const DEV_WEB_PORT = 47822;

@@ -3,12 +3,12 @@ import { Icon } from '../../components/icon.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { ATTEMPT_COPY } from '../../copy/attempts.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
-import { useTranscript } from '../attempts/attempt.queries.ts';
+import { attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
 import styles from './task-page.module.css';
 
 /** The planning session's latest tool call, as one line. */
 function LastAction({ attemptId }: { attemptId: string }) {
-  const { entries } = useTranscript(attemptId);
+  const { entries } = useTranscript(attemptTranscript(attemptId));
   const call = entries.findLast((e) => e.kind === TranscriptEntryKind.ToolCall);
   if (call?.kind !== TranscriptEntryKind.ToolCall) return null;
   return (

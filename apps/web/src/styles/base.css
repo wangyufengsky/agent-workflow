@@ -184,6 +184,10 @@ svg.i.lg {
   height: 100vh;
   overflow: hidden;
 }
+/* The assistant panel docks as a third column (15 §6): pages stay usable next to it. */
+.app.with-assistant {
+  grid-template-columns: var(--nav-w) minmax(0, 1fr) var(--drawer-sm);
+}
 .nav {
   display: flex;
   flex-direction: column;

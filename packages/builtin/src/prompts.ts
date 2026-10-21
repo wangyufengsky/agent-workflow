@@ -17,6 +17,11 @@ export const PromptName = {
   /** How to handle uncertainty when the task's `ask_on_uncertainty` checkpoint is on / off. */
   RuleAsk: 'rule-ask',
   RuleAssume: 'rule-assume',
+  /** The app assistant's agent prompt and its per-turn messages (15). */
+  ProtocolAssistant: 'protocol-assistant',
+  AssistantContext: 'assistant-context',
+  AssistantConfirmed: 'assistant-confirmed',
+  AssistantCancelled: 'assistant-cancelled',
 } as const;
 export type PromptName = (typeof PromptName)[keyof typeof PromptName];
 
@@ -44,6 +49,10 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.ReviseConflict]: read(PromptName.ReviseConflict),
     [PromptName.RuleAsk]: read(PromptName.RuleAsk),
     [PromptName.RuleAssume]: read(PromptName.RuleAssume),
+    [PromptName.ProtocolAssistant]: read(PromptName.ProtocolAssistant),
+    [PromptName.AssistantContext]: read(PromptName.AssistantContext),
+    [PromptName.AssistantConfirmed]: read(PromptName.AssistantConfirmed),
+    [PromptName.AssistantCancelled]: read(PromptName.AssistantCancelled),
   };
 }
 

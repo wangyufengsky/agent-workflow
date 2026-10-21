@@ -3,7 +3,17 @@ import { join } from 'node:path';
 import { THEME_IDS, type ThemeId, UiMode } from '@aw/shared';
 import { type APIRequestContext, expect, type Locator, type Page, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
-import { createProject, type E2EProject, passReview, patchSettings, queueTurn, submitResult } from './helpers.ts';
+import {
+  appTool,
+  createProject,
+  createRepo,
+  type E2EProject,
+  passReview,
+  patchSettings,
+  queueAssistantTurn,
+  queueTurn,
+  submitResult,
+} from './helpers.ts';
 import { fullHeight, inspectPage, type PageReport, WALKTHROUGH_DIR } from './walkthrough.ts';
 
 // J9 (07 §5) and the M6-01 walkthrough: every page in both modes and all four themes opens without errors, has no
@@ -138,6 +148,29 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     tls: false,
   });
 
+  // A conversation with a produced object (D66) whose last call waits for confirmation, for the assistant panel.
+  await patchSettings(request, { 'assistant.alwaysAllow': ['projects.create'] });
+  await queueAssistantTurn(request, [
+    appTool('projects_create', { repoPath: createRepo(), name: '助手加的项目' }),
+
+    { type: 'text', text: '项目加好了。我再把**检查命令**改成 `npm test`。' },
+    appTool('projects_update', { id: reviewProject.id, checkCommand: 'npm test' }),
+    { type: 'text', text: '请在卡片上确认。' },
+  ]);
+  const conversation = await api<{ id: string }>(request, 'POST', '/assistant/conversations', {});
+  await api(request, 'POST', `/assistant/conversations/${conversation.id}/messages`, {
+    text: '把订单服务的检查命令改成 npm test',
+    context: { page: 'home', params: {} },
+  });
+  await expect
+    .poll(
+      async () =>
+        (await api<{ items: unknown[] }>(request, 'GET', `/assistant/conversations/${conversation.id}/confirmations`))
+          .items.length,
+    )
+    .toBe(1);
+  await patchSettings(request, { 'assistant.alwaysAllow': [] });
+
   const completedReview = await waitForStatus(request, completed, 'review');
   await api(request, 'POST', `/tasks/${completedReview.id}/deliver`, { strategy: 'squash' });
   return {
@@ -247,6 +280,19 @@ const SHOTS: Shot[] = [
     ready: testId('node-page'),
   },
   { name: 'inbox', mode: UiMode.Simple, url: () => '/inbox', ready: testId('inbox-question') },
+  {
+    name: 'assistant-panel',
+    mode: UiMode.Simple,
+    url: (s) => `/tasks/${s.running.id}`,
+    ready: testId('progress-canvas'),
+    open: async (page) => {
+      await page.keyboard.press('ControlOrMeta+j');
+      const panel = page.getByRole('complementary', { name: '应用助手' });
+      await expect(panel.getByTestId('confirmation-card')).toBeVisible();
+      await expect(panel.getByTestId('entity-card')).toBeVisible();
+      return panel;
+    },
+  },
   { name: 'projects', mode: UiMode.Simple, url: () => '/projects', ready: heading('项目') },
   { name: 'project', mode: UiMode.Simple, url: (s) => `/projects/${s.project.id}`, ready: heading(/.+/) },
   { name: 'settings', mode: UiMode.Simple, url: () => '/settings', ready: heading('设置') },
@@ -323,6 +369,19 @@ const SHOTS: Shot[] = [
   { name: 'pro-databases', mode: UiMode.Pro, url: () => '/databases', ready: heading('数据库') },
   { name: 'pro-tools', mode: UiMode.Pro, url: () => '/tools', ready: heading('MCP 工具') },
   { name: 'pro-runtime', mode: UiMode.Pro, url: () => '/runtime', ready: testId('runtime-details') },
+  {
+    name: 'pro-assistant-panel',
+    mode: UiMode.Pro,
+    url: (s) => `/git/${s.project.id}?tab=commits`,
+    ready: testId('git-status'),
+    open: async (page) => {
+      await page.keyboard.press('ControlOrMeta+j');
+      const panel = page.getByRole('complementary', { name: '应用助手' });
+      await expect(panel.getByTestId('confirmation-card')).toBeVisible();
+      await expect(panel.getByTestId('entity-card')).toBeVisible();
+      return panel;
+    },
+  },
 ];
 
 test.use({ viewport: { width: WIDTH, height: HEIGHT } });

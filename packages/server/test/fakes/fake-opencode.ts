@@ -1,6 +1,14 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { MCP_SESSION_ARG, MCP_TOOL_PREFIX, type ModelInfo, type PermissionDecision } from '@aw/shared';
+import {
+  AppError,
+  ErrorCode,
+  MCP_ASSISTANT_TOOL_PREFIX,
+  MCP_SESSION_ARG,
+  MCP_TOOL_PREFIX,
+  type ModelInfo,
+  type PermissionDecision,
+} from '@aw/shared';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -13,14 +21,19 @@ import {
   ToolCallStatus,
 } from '../../src/modules/opencode/index.ts';
 
+/** Which of our MCP endpoints a tool call goes to: the execution MCP or the assistant MCP (D25). */
+export type FakeMcpServer = 'exec' | 'assistant';
+export type McpEndpoint = { url: string; token: string };
+
 /** One thing the fake model does during its turn. */
 export type FakeStep =
   | { type: 'edit'; file: string; content: string }
   | { type: 'text'; text: string }
-  | { type: 'callTool'; name: string; args: Record<string, unknown> }
+  | { type: 'callTool'; server: FakeMcpServer; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
   | { type: 'hang' }
-  | { type: 'error'; name: string; message: string };
+  /** `idle: false`: opencode reports the error without a following idle event. */
+  | { type: 'error'; name: string; message: string; idle: boolean };
 
 /** Script builder (07 §4): `script().edit('a.ts', '…').callTool('submit_result', {…})`. The turn ends idle. */
 export function script() {
@@ -36,16 +49,21 @@ export function script() {
     /** Streams assistant text in small deltas. */
     text: (text: string) => add({ type: 'text', text }),
     /** Calls one of our MCP tools over HTTP, with the session id injected as the bridge plugin would. */
-    callTool: (name: string, args: Record<string, unknown> = {}) => add({ type: 'callTool', name, args }),
+    callTool: (name: string, args: Record<string, unknown> = {}) =>
+      add({ type: 'callTool', server: 'exec', name, args }),
+    /** Calls an assistant MCP tool (15 §3), likewise with the session id injected. */
+    callAppTool: (name: string, args: Record<string, unknown> = {}) =>
+      add({ type: 'callTool', server: 'assistant', name, args }),
     /** `ask_user` (M3-08) through MCP. */
     ask: (args: { question: string; blocking: boolean; options?: string[]; default_assumption?: string }) =>
-      add({ type: 'callTool', name: 'ask_user', args }),
+      add({ type: 'callTool', server: 'exec', name: 'ask_user', args }),
     /** Asks for a permission and waits until the backend replies. */
     requestPermission: (permission: string, patterns: string[]) => add({ type: 'permission', permission, patterns }),
     /** Keeps working (never idle) until the session is aborted. */
     hang: () => add({ type: 'hang' }),
     /** Fails the turn with a session error. */
-    error: (name: string, message: string) => add({ type: 'error', name, message }),
+    error: (name: string, message: string, { idle = true }: { idle?: boolean } = {}) =>
+      add({ type: 'error', name, message, idle }),
   };
   return builder;
 }
@@ -78,12 +96,14 @@ export function createFakeOpencode() {
   /** Bumped by abort(): a turn stops when its session's generation changed (later prompts play normally). */
   const generation = new Map<string, number>();
   let connected = true;
+  /** Set by failNextPrompt(): the next prompt request fails like an opencode HTTP error. */
+  let failPrompt = false;
   let closed = false;
   /** Turns being played and MCP calls in flight, so tests can wait for them and close() can let them finish. */
   const turns = new Set<Promise<void>>();
   const toolRequests = new Set<Promise<unknown>>();
-  let mcp: { url: string; token: string } | undefined;
-  let mcpClient: Promise<Client> | undefined;
+  let endpoints: Record<FakeMcpServer, McpEndpoint> | undefined;
+  const mcpClients = new Map<FakeMcpServer, Promise<Client>>();
   let counter = 0;
 
   const sessions: FakeSession[] = [];
@@ -99,19 +119,23 @@ export function createFakeOpencode() {
     for (const listener of listeners) listener(event);
   };
 
-  function client(): Promise<Client> {
-    if (mcp === undefined) throw new Error('FakeOpencode.connectMcp() was not called');
-    const { url, token } = mcp;
-    mcpClient ??= (async () => {
-      const c = new Client({ name: 'fake-opencode', version: '0.0.0' });
-      const transport = new StreamableHTTPClientTransport(new URL(url), {
-        requestInit: { headers: { Authorization: `Bearer ${token}` } },
-      });
-      // The SDK's own transport type does not satisfy its Transport interface under exactOptionalPropertyTypes.
-      await c.connect(transport as Transport);
-      return c;
-    })();
-    return mcpClient;
+  function client(server: FakeMcpServer): Promise<Client> {
+    if (endpoints === undefined) throw new Error('FakeOpencode.connectMcp() was not called');
+    const { url, token } = endpoints[server];
+    let connected = mcpClients.get(server);
+    if (connected === undefined) {
+      connected = (async () => {
+        const c = new Client({ name: 'fake-opencode', version: '0.0.0' });
+        const transport = new StreamableHTTPClientTransport(new URL(url), {
+          requestInit: { headers: { Authorization: `Bearer ${token}` } },
+        });
+        // The SDK's own transport type does not satisfy its Transport interface under exactOptionalPropertyTypes.
+        await c.connect(transport as Transport);
+        return c;
+      })();
+      mcpClients.set(server, connected);
+    }
+    return connected;
   }
 
   async function play(session: FakeSession, steps: readonly FakeStep[]): Promise<void> {
@@ -150,10 +174,11 @@ export function createFakeOpencode() {
           break;
         }
         case 'callTool': {
-          const tool = `${MCP_TOOL_PREFIX}${step.name}`;
+          const { server } = step;
+          const tool = `${server === 'exec' ? MCP_TOOL_PREFIX : MCP_ASSISTANT_TOOL_PREFIX}${step.name}`;
           const input = { ...step.args, [MCP_SESSION_ARG]: sessionId };
           emit({ type: E.Tool, ...ids, callId: partId, tool, status: ToolCallStatus.Running, input });
-          const request = client().then((c) => c.callTool({ name: step.name, arguments: input }));
+          const request = client(server).then((c) => c.callTool({ name: step.name, arguments: input }));
           toolRequests.add(request);
           const result = await request.finally(() => toolRequests.delete(request));
           if (closed) return;
@@ -192,7 +217,7 @@ export function createFakeOpencode() {
           break;
         case 'error':
           emit({ type: E.Error, sessionId, error: { name: step.name, data: { message: step.message } } });
-          emit({ type: E.Idle, sessionId });
+          if (step.idle) emit({ type: E.Idle, sessionId });
           return;
       }
     }
@@ -214,8 +239,8 @@ export function createFakeOpencode() {
     /** Session ids the backend aborted, in order. */
     aborts: string[];
     models: ModelInfo[];
-    /** Where `callTool` reaches the backend's execution MCP. */
-    connectMcp(endpoint: { url: string; token: string }): void;
+    /** Where `callTool` reaches the backend's execution MCP and `callAppTool` its assistant MCP. */
+    connectMcp(endpoints: Record<FakeMcpServer, McpEndpoint>): void;
     /**
      * Queues a script for a later prompt: the first queued script whose `match` fits the prompted session plays
      * (no match = any session).
@@ -225,6 +250,8 @@ export function createFakeOpencode() {
     settled(): Promise<void>;
     /** The runtime disappears: `runtime_lost`, and requests fail until `reconnect()`. */
     crash(): void;
+    /** The next `prompt` request fails with OPENCODE_REQUEST_FAILED while the runtime stays connected. */
+    failNextPrompt(): void;
     reconnect(): void;
     close(): Promise<void>;
   } = {
@@ -234,10 +261,10 @@ export function createFakeOpencode() {
     permissionReplies,
     aborts,
     models,
-    connectMcp(endpoint) {
-      mcp = endpoint;
+    connectMcp(next) {
+      endpoints = next;
       // A restarted backend listens elsewhere: reconnect on the next call.
-      mcpClient = undefined;
+      mcpClients.clear();
       closed = false;
     },
     enqueue(s, match) {
@@ -245,6 +272,9 @@ export function createFakeOpencode() {
     },
     async settled() {
       await Promise.all(turns);
+    },
+    failNextPrompt() {
+      failPrompt = true;
     },
     crash() {
       connected = false;
@@ -259,8 +289,8 @@ export function createFakeOpencode() {
       // A backend started later (simulated restart) subscribes anew.
       listeners.clear();
       await Promise.allSettled(toolRequests);
-      if (mcpClient !== undefined) await (await mcpClient).close();
-      mcpClient = undefined;
+      for (const c of mcpClients.values()) await (await c).close();
+      mcpClients.clear();
     },
     isConnected: () => connected,
     async createSession(input) {
@@ -271,6 +301,10 @@ export function createFakeOpencode() {
     },
     async prompt(input) {
       if (!connected) throw new Error('FakeOpencode is not connected');
+      if (failPrompt) {
+        failPrompt = false;
+        throw new AppError(ErrorCode.OpencodeRequestFailed, 'opencode session.promptAsync failed');
+      }
       const session = sessionOf(input.sessionId);
       prompts.push(input);
       const index = queue.findIndex((q) => matches(session, q.match));

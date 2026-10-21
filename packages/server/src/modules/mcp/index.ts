@@ -1,5 +1,6 @@
-import { listMcpToolsOp } from '@aw/shared';
+import { listMcpToolsOp, MCP_EXEC_PATH, MCP_SERVER_NAME } from '@aw/shared';
 import type { FastifyInstance } from 'fastify';
+import { registerMcpEndpoint } from '../../core/http/mcp-endpoint.ts';
 import type { Logger } from '../../core/logger.ts';
 import { implement } from '../../core/operations/operations.ts';
 import type { AcceptanceService } from '../acceptance/index.ts';
@@ -7,7 +8,6 @@ import type { AttemptsService } from '../attempts/index.ts';
 import type { DebugService } from '../debug/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import { createToolRegistry, type McpToolDefinition } from './mcp.registry.ts';
-import { registerMcpServer } from './mcp.server.ts';
 import { askUserTool } from './tools/ask-user.tool.ts';
 import { dbDescribeTool, dbListConnectionsTool, dbQueryTool } from './tools/db-tools.tool.ts';
 import { getNodeOutputTool } from './tools/get-node-output.tool.ts';
@@ -47,6 +47,7 @@ export function createMcpModule({ token, attempts, tasks, acceptance, debug, log
   return {
     registry,
     operations: [implement(listMcpToolsOp, () => ({ items: registry.info() }))],
-    register: (server: FastifyInstance) => registerMcpServer(server, { token, registry }),
+    register: (server: FastifyInstance) =>
+      registerMcpEndpoint(server, { path: MCP_EXEC_PATH, name: MCP_SERVER_NAME, token, tools: registry }),
   };
 }

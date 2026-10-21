@@ -5,11 +5,13 @@ import { buildOpencodeConfig, sessionPermissionRules } from './opencode.config.t
 
 // The generated configuration is the product here, so snapshots are the assertion (07 §3.3).
 describe('opencode 配置生成', () => {
-  it('注入 MCP、三个基础 agent 与 bridge 插件', () => {
+  it('注入两套 MCP、三个基础 agent、助手 agent 与 bridge 插件', () => {
     const prompts = Object.fromEntries(Object.values(PromptName).map((name) => [name, `<${name}.md>`]));
     const config = buildOpencodeConfig({
       mcpUrl: 'http://127.0.0.1:4000/mcp/exec',
       mcpToken: 'mcp-token',
+      assistantMcpUrl: 'http://127.0.0.1:4000/mcp/assistant',
+      assistantMcpToken: 'assistant-token',
       pluginFile: '/Applications/Agent Workflow.app/Contents/Resources/opencode-plugin/agent-workflow-bridge.js',
       prompts: prompts as Record<PromptName, string>,
     });

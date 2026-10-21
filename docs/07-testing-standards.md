@@ -50,7 +50,7 @@
 
 | 名称 | 位置 | 说明 |
 | --- | --- | --- |
-| `FakeOpencode` | `packages/server/test/fakes/fake-opencode.ts` | 实现 `OpencodeClient` 接口；`fake.enqueue(script()…, match?)` 为之后发给会话的消息排一个回合（`match` 按会话标题、agent、目录的子串选会话，第一个匹配的脚本生效）：`edit(file, content)`、`text(…)`、`callTool(name, args)`、`ask(...)`、`requestPermission(...)`、`hang()`（一直工作直到被中止）、`error(...)`，回合结束即空闲（没有排脚本的消息直接空闲）；真实写 worktree 文件、真实通过 MCP 调用后端（注入 `__aw_session`）。可断言 `sessions`、`prompts`、`toolCalls`、`aborts`、`permissionReplies`；`crash()` 模拟运行时消失；`settled()` 等待已开始的回合放完。浏览器 E2E 中后端以 `AW_FAKE_OPENCODE=1`（仅开发模式）使用它，spec 经开发接口 `POST /api/v1/dev/fake-opencode/scripts` 排回合（按项目的 worktree 目录匹配，互不干扰）；`createTestApp({ dataDir, fake })` 复用同一个 FakeOpencode 模拟后端重启 |
+| `FakeOpencode` | `packages/server/test/fakes/fake-opencode.ts` | 实现 `OpencodeClient` 接口；`fake.enqueue(script()…, match?)` 为之后发给会话的消息排一个回合（`match` 按会话标题、agent、目录的子串选会话，第一个匹配的脚本生效）：`edit(file, content)`、`text(…)`、`callTool(name, args)`、`callAppTool(name, args)`（助手 MCP）、`ask(...)`、`requestPermission(...)`、`hang()`（一直工作直到被中止）、`error(name, message, { idle? })`（`idle: false` 时报错后不再发空闲事件），回合结束即空闲（没有排脚本的消息直接空闲）；真实写 worktree 文件、真实通过 MCP 调用后端（注入 `__aw_session`）。可断言 `sessions`、`prompts`、`toolCalls`、`aborts`、`permissionReplies`；`crash()` 模拟运行时消失；`failNextPrompt()` 让下一次发消息失败（`OPENCODE_REQUEST_FAILED`）；`settled()` 等待已开始的回合放完。浏览器 E2E 中后端以 `AW_FAKE_OPENCODE=1`（仅开发模式）使用它，spec 经开发接口 `POST /api/v1/dev/fake-opencode/scripts` 排回合（按项目的 worktree 目录匹配，互不干扰）；`createTestApp({ dataDir, fake })` 复用同一个 FakeOpencode 模拟后端重启 |
 | `FakeHosting` | `test/fakes/fake-hosting.ts` | 本地 HTTP 服务模拟 GitHub/GitLab 用到的少数端点（读仓库、建 PR/MR），只认一个令牌；`createTestApp({ hosting: fake.endpoints })` 指向它；断言 `pullRequests`；`failNextPullRequest(status)` 模拟平台报错 |
 | `startMysql()` | `test/helpers/mysql.ts` | 用 Docker 启动一个 MySQL 8.4（随机本地端口、空库 `shop`），等日志出现「ready for connections … port: 3306」后返回连接参数、`exec(sql)` 与 `stop()`；数据库集成测试在 `beforeAll` 中启动一次（镜像需先 `docker pull mysql:8.4`） |
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
@@ -75,6 +75,7 @@
 | J8 | 专业模式：复制内置流程 → 修改 → 用它跑通一个任务 | 浏览器 |
 | J9 | 四主题与两种模式切换，全部页面可打开无报错、无对比度（axe `color-contrast`）与横向溢出问题（1280 宽）；截图写到 `screenshots/walkthrough/<主题>/`（不提交，`AW_WALKTHROUGH_DIR` 可改）供人工走查（`walkthrough.browser.spec.ts`，M6-01） | 浏览器 |
 | J10 | 打包应用：引导页 → 添加项目 → J1 精简版（修 Bug，示例仓库 `ts-stats`）；运行中退出重开 → 任务继续完成，被打断的尝试为 `interrupted` 且步骤重跑。真实 opencode 与免费模型 `TEST_MODEL`（生产包里没有 FakeOpencode），每次用全新的用户数据目录；`AW_E2E_EXECUTABLE` 指向打包后的可执行文件（如 dmg 挂载副本） | Electron |
+| J11 | 对助手说开始任务 → 确认卡片 → 任务运行（v1.1，`shell-assistant.browser.spec.ts`；同文件另有主页输入 → 面板、`open_page` 跳转、「总是允许」→ 设置页撤销的冒烟） | 浏览器 |
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 
@@ -84,6 +85,7 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 示例仓库：`live/fixtures/` 下的小项目，各带一个已知缺陷和一个功能需求：`ts-stats`（TypeScript + `node --test`，M3-12）；`java-inventory`（Java 17 + Maven + JUnit 5，M6-05）。说明见 `live/fixtures/README.md`。
 - M3-12 冒烟 `live/smoke.live.test.ts`：`bugfix` 与 `feature` 各跑一次，报告写到 `live/reports/smoke-<时间>.json`（尝试、提醒次数、用量、`submit_*` 调用成败）。
 - 用例（M6-05 `live/workflows.live.test.ts`，与冒烟合起来）：五个内置流程各一次（Java 项目上的修 Bug、代码审查、重构，TypeScript 项目上的新功能、补单测、修 Bug）；统计 `submit_*` 调用成功率、尝试次数、耗时、成本，输出报告到 `live/reports/`。另有 `mcp-errors.live.test.ts`（工具错误码让模型改正计划，01 §5 第 7 条）与 `permissions.live.test.ts`（只读会话的 bash 规则在真实 opencode 上的效果，D63）。辅助代码在 `live/live-app.ts`；各套件依次运行（`fileParallelism: false`）。
+- 应用助手 `live/assistant.live.test.ts`（A-09）：让助手查明天的日期并列出项目，断言调用了 `get_current_time` 与 `projects_list`、回复含明天的日期与项目名，报告写到 `live/reports/assistant-<时间>.json`。
 - 不作为通过/失败的硬门槛（模型有随机性），但内置提示词改动的 PR 必须附 live 报告对比。
 
 ## 7. 编写规则

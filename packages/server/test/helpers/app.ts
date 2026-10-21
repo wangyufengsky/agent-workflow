@@ -1,7 +1,7 @@
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { API_PREFIX, MCP_EXEC_PATH, type OperationContract, toOperationRequest } from '@aw/shared';
+import { API_PREFIX, MCP_ASSISTANT_PATH, MCP_EXEC_PATH, type OperationContract, toOperationRequest } from '@aw/shared';
 import type { FastifyInstance, InjectOptions, LightMyRequestResponse } from 'fastify';
 import type { z } from 'zod';
 import { type App, type AppDeps, buildApp } from '../../src/app.ts';
@@ -23,6 +23,8 @@ export type TestApp = {
   port: number;
   /** `http://127.0.0.1:<port>/mcp/exec` */
   mcpUrl: string;
+  /** `http://127.0.0.1:<port>/mcp/assistant` */
+  assistantMcpUrl: string;
   /** Plays the AI sessions, unless the test runs against the real opencode. */
   fake: FakeOpencode;
   /** Authorised request to `/api/v1<path>`. */
@@ -68,7 +70,11 @@ export async function createTestApp({
   const address = app.server.server.address();
   if (address === null || typeof address === 'string') throw new Error('Test app is not listening on a TCP port');
   const mcpUrl = `http://127.0.0.1:${address.port}${MCP_EXEC_PATH}`;
-  fake.connectMcp({ url: mcpUrl, token: app.mcpToken });
+  const assistantMcpUrl = `http://127.0.0.1:${address.port}${MCP_ASSISTANT_PATH}`;
+  fake.connectMcp({
+    exec: { url: mcpUrl, token: app.mcpToken },
+    assistant: { url: assistantMcpUrl, token: app.assistantMcpToken },
+  });
   // With the real runtime the test decides when it starts.
   if (!realOpencode) await app.start(address.port);
   const authorization = `Bearer ${TEST_TOKEN}`;
@@ -78,6 +84,7 @@ export async function createTestApp({
     logs,
     port: address.port,
     mcpUrl,
+    assistantMcpUrl,
     fake,
     request: ({ url, headers, ...rest }) =>
       app.server.inject({ ...rest, url: `${API_PREFIX}${url}`, headers: { authorization, ...headers } }),
