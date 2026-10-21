@@ -118,6 +118,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
       seq: turn.seq,
       question: turn.question,
       status,
+      model: attempt.model,
       attempt,
       awaitingInput: status === KnowledgeTurnStatus.Researching && inbox.listOpen({ attemptId: attempt.id }).length > 0,
       answer: turn.answer,
@@ -180,7 +181,13 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
    * researcher remembers what it read (18 §5.3). The attempt row is written before the session can call back, and the
    * turn right after it, before anything else runs.
    */
-  async function startTurn(conversation: Conversation, question: string): Promise<void> {
+  /** `model`: the request's (null = opencode's default), or `ai.defaultModel` when it gives none (D67 ④). */
+  async function startTurn(
+    conversation: Conversation,
+    question: string,
+    requested: string | null | undefined,
+  ): Promise<void> {
+    const model = requested === undefined ? settings.get('ai.defaultModel') : requested;
     const project = projects.getRecord(conversation.projectId);
     const turns = repo.listTurns(conversation.id);
     const previous = turns.at(-1);
@@ -191,6 +198,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
         ? attempts.continueSession(previous.attemptId, {
             id: attemptId,
             prompt: renderTemplate(prompts[PromptName.ResearchFollowUp], { question }),
+            model,
             agent: SessionAgent.Researcher,
             system: undefined,
           })
@@ -203,7 +211,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
             roleId: null,
             directory: project.repoPath,
             title: `${SESSION_TITLE_PREFIX} · ${conversation.title}`,
-            model: settings.get('ai.defaultModel'),
+            model,
             prompt: renderTemplate(prompts[PromptName.StartResearch], {
               projectName: project.name,
               question,
@@ -295,6 +303,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
           turnCount: turns.filter((t) => t.conversationId === conversation.id).length,
           latest: {
             status: knowledgeTurnStatusOf(attempt.status),
+            model: attempt.model,
             answerExcerpt: latest.answer === null ? null : plainExcerpt(latest.answer),
             citationCount: latest.citations.length,
             error: attempt.error,
@@ -307,7 +316,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
     },
 
     /** A new conversation and its first question (`knowledge.ask`). */
-    async ask({ projectId, question, sources }: AskKnowledgeRequest): Promise<KnowledgeConversationDTO> {
+    async ask({ projectId, question, sources, model }: AskKnowledgeRequest): Promise<KnowledgeConversationDTO> {
       projects.getRecord(projectId);
       assertDatabaseSelectable(projectId, sources);
       attempts.requireReady();
@@ -321,16 +330,16 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
         updatedAt: now,
       };
       repo.insertConversation(conversation);
-      await startTurn(conversation, question);
+      await startTurn(conversation, question, model);
       return detail(conversation.id);
     },
 
     /** The next question of a conversation whose previous one finished (`knowledge.followUp`). */
-    async followUp(id: string, question: string): Promise<KnowledgeConversationDTO> {
+    async followUp(id: string, question: string, model?: string | null): Promise<KnowledgeConversationDTO> {
       const conversation = mustFind(id);
       assertIdle(conversation);
       attempts.requireReady();
-      await startTurn(conversation, question);
+      await startTurn(conversation, question, model);
       return detail(id);
     },
 

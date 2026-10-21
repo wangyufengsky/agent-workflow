@@ -46,6 +46,7 @@ export * from './errors/plan-problems.ts';
 export * from './errors/workflow-problems.ts';
 export * from './fsm/index.ts';
 export * from './knowledge/citations.ts';
+export * from './knowledge/draft.ts';
 export * from './naming.ts';
 export * from './operations/index.ts';
 export * from './workflow/index.ts';

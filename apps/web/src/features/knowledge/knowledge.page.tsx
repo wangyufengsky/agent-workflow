@@ -1,4 +1,10 @@
-import { type KnowledgeConversationDTO, type KnowledgeTurnDTO, KnowledgeTurnStatus, UiMode } from '@aw/shared';
+import {
+  answerDraft,
+  type KnowledgeConversationDTO,
+  type KnowledgeTurnDTO,
+  KnowledgeTurnStatus,
+  UiMode,
+} from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
@@ -8,14 +14,15 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { KNOWLEDGE_COPY as C } from '../../copy/knowledge.ts';
-import { attemptQuery } from '../attempts/attempt.queries.ts';
+import { attemptQuery, attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
 import { TranscriptView } from '../attempts/transcript-view.tsx';
 import { projectQuery, projectsQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
-import { Answer } from './answer.tsx';
+import { Answer, DraftAnswer } from './answer.tsx';
 import { Composer } from './composer.tsx';
 import styles from './knowledge.module.css';
 import { knowledgeConversationQuery, useAskKnowledge, useFollowUp, useStopKnowledge } from './knowledge.queries.ts';
+import { ModelPicker } from './model-picker.tsx';
 import { ResearchCard } from './research-card.tsx';
 import { SourcePanel } from './source-panel.tsx';
 import { DEFAULT_SOURCES, hasSource, SourcesPicker } from './sources-picker.tsx';
@@ -59,6 +66,7 @@ export function KnowledgeWelcomePage() {
   // A project without linked databases cannot have them as a source, whatever was ticked for another project.
   const sources = { ...chosen, database: chosen.database && databaseCount > 0 };
   const [example, setExample] = useState<string | undefined>(undefined);
+  const [model, setModel] = useState(useSettings()['ai.defaultModel']);
   const ask = useAskKnowledge();
 
   return (
@@ -99,10 +107,11 @@ export function KnowledgeWelcomePage() {
             blockedReason={hasSource(sources) ? undefined : C.needSource}
             researching={false}
             pending={ask.isPending}
+            tools={<ModelPicker value={model} onChange={setModel} />}
             onSend={(question) => {
               if (projectId === undefined) return;
               ask.mutate(
-                { projectId, question, sources },
+                { projectId, question, sources, model },
                 {
                   onSuccess: (c) =>
                     void navigate({ to: ROUTES.knowledgeConversation, params: { conversationId: c.id } }),
@@ -162,6 +171,9 @@ function Turn({
   onAskAgain(): void;
 }) {
   const ended = turn.status === KnowledgeTurnStatus.Stopped || turn.status === KnowledgeTurnStatus.Failed;
+  const { entries } = useTranscript(attemptTranscript(turn.attempt.id));
+  // Until the checked answer replaces it, the text being written is shown as a draft (18 §5.5).
+  const draft = turn.answer === null ? answerDraft(entries) : undefined;
   return (
     <article className={styles.turn} aria-label={turn.question} data-testid="knowledge-turn">
       <p className={styles.question}>{turn.question}</p>
@@ -170,8 +182,10 @@ function Turn({
           <Icon name="book" size="sm" />
         </span>
         <span className="label">{C.researcher}</span>
+        <span className={styles.modelTag}>{C.modelOf(turn.model)}</span>
       </div>
-      <ResearchCard turn={turn} repoPath={repoPath} />
+      <ResearchCard turn={turn} entries={entries} repoPath={repoPath} />
+      {draft !== undefined && <DraftAnswer draft={draft} stopped={ended} />}
       {turn.answer !== null && (
         <Answer answer={turn.answer} citations={turn.citations} active={activeCitation} onCite={onCite} />
       )}
@@ -203,6 +217,8 @@ function Conversation({ conversation }: { conversation: KnowledgeConversationDTO
   const latest = conversation.turns.at(-1);
   const researching = latest?.status === KnowledgeTurnStatus.Researching;
   const cited = conversation.turns.find((t) => t.id === openTurn);
+  // A follow-up keeps the model of the question before it unless the user picks another one (D67 ④).
+  const [model, setModel] = useState(latest?.model ?? null);
 
   const openCitation = (turnId: string, index: number, from?: HTMLElement) => {
     if (from !== undefined) trigger.current = from;
@@ -213,7 +229,7 @@ function Conversation({ conversation }: { conversation: KnowledgeConversationDTO
     trigger.current?.focus();
   };
   const ask = (question: string, clear?: () => void) =>
-    followUp.mutate({ id: conversation.id, question }, { onSuccess: () => clear?.() });
+    followUp.mutate({ id: conversation.id, question, model }, { onSuccess: () => clear?.() });
 
   return (
     <div className={styles.page}>
@@ -244,6 +260,7 @@ function Conversation({ conversation }: { conversation: KnowledgeConversationDTO
           pending={followUp.isPending}
           onSend={ask}
           onStop={() => stop.mutate(conversation.id)}
+          tools={<ModelPicker value={model} onChange={setModel} />}
         >
           <SourcesPicker sources={conversation.sources} databaseCount={conversation.project.databaseCount} />
         </Composer>
@@ -273,5 +290,6 @@ export function KnowledgeConversationPage() {
       </div>
     );
   }
-  return <Conversation conversation={conversation.data} />;
+  // Keyed: another conversation starts with its own state (the model picker follows its latest turn).
+  return <Conversation key={conversation.data.id} conversation={conversation.data} />;
 }

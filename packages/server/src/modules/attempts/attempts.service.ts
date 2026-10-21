@@ -4,16 +4,18 @@ import {
   AppError,
   type AttemptDTO,
   AttemptEvent,
-  type AttemptKind,
+  AttemptKind,
   AttemptStatus,
   type AttemptSummaryDTO,
   attemptMachine,
   ErrorCode,
   isTerminalState,
+  KNOWLEDGE_DRAFT_FLUSH_CHARS,
   OPENCODE_AGENT_NAME,
   type PermissionDecision,
   type PermissionPayload,
   type SessionAgent,
+  TRANSCRIPT_TEXT_FLUSH_CHARS,
   type TranscriptPage,
   TranscriptSystemEvent,
 } from '@aw/shared';
@@ -84,7 +86,10 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     const { promise: released, resolve: release } = Promise.withResolvers<void>();
     const tracked: LiveSession = {
       ...session,
-      view: createSessionView(),
+      // A research answer streams as its draft (18 §5.5): its text is written to the transcript more often.
+      view: createSessionView(
+        attempt.kind === AttemptKind.Research ? KNOWLEDGE_DRAFT_FLUSH_CHARS : TRANSCRIPT_TEXT_FLUSH_CHARS,
+      ),
       timeoutMs,
       cancelTimeout: parked ? () => undefined : clock.schedule(timeoutMs, () => reactions.timeOut(attempt.id)),
       stopAfterSubmit: false,
@@ -196,18 +201,20 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     },
 
     /**
-     * A new plan attempt on the session of an earlier one (re-planning, 12 §4.3): the model keeps what it read and
-     * receives `prompt` as the next message. Synchronous up to sending, like `start`.
+     * A new attempt on the session of an earlier one (re-planning, 12 §4.3; a knowledge follow-up, 18 §5.3): the
+     * model keeps what it read and receives `prompt` as the next message, with the previous attempt's model unless
+     * `model` gives another one. Synchronous up to sending, like `start`.
      */
     async continueSession(
       previousId: string,
-      input: { id?: string; prompt: string } & ResumeInput,
+      input: { id?: string; prompt: string; model?: string | null } & ResumeInput,
     ): Promise<AttemptDTO> {
       requireReady();
       const previous = mustFind(previousId);
       if (previous.opencodeSessionId === null) {
         throw new AppError(ErrorCode.AttemptNotFound, `Attempt ${previousId} has no session`, { id: previousId });
       }
+      const model = input.model === undefined ? previous.model : input.model;
       const id = input.id ?? randomUUID();
       repo.insert({
         id,
@@ -217,7 +224,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         kind: previous.kind,
         seq: repo.nextSeq(previous),
         status: AttemptStatus.Starting,
-        model: previous.model,
+        model,
         directory: previous.directory,
         opencodeSessionId: previous.opencodeSessionId,
         nudges: 0,
@@ -239,7 +246,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
           sessionId: previous.opencodeSessionId,
           directory: previous.directory,
           agent: OPENCODE_AGENT_NAME[input.agent],
-          model: previous.model === null ? undefined : parseModelRef(previous.model),
+          model: model === null ? undefined : parseModelRef(model),
           system: input.system,
         },
         false,

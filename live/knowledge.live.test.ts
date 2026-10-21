@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   AttemptKind,
+  answerDraft,
   askKnowledgeOp,
   CitationType,
   createProjectOp,
@@ -23,7 +24,7 @@ import { createTestApp, type TestApp } from '../packages/server/test/helpers/app
 import { waitForEvent } from '../packages/server/test/helpers/events.ts';
 import { TEST_MODEL } from '../packages/server/test/helpers/model.ts';
 
-/** K-10: one real question to the knowledge researcher (07 §6), the free test model, the `ts-stats` fixture. */
+/** K-10, K-15: one real question (its answer streams as a draft before it is submitted) to the knowledge researcher (07 §6), the free test model, the `ts-stats` fixture. */
 const TURN_TIMEOUT_MS = 10 * 60_000;
 const IDENTITY = ['-c', 'user.name=aw-live', '-c', 'user.email=aw-live@example.com'];
 /** `median` in `live/fixtures/ts-stats/src/stats.ts`: the answer must cite lines of it. */
@@ -81,6 +82,20 @@ describe('@live 知识问答', () => {
       .map((line) => JSON.parse(line));
     const tools = entries.flatMap((e) => (e.kind === 'tool_call' ? [e.data.tool] : []));
     const submits = entries.filter((e) => e.kind === 'tool_result' && e.data.tool.endsWith('submit_answer'));
+    // The answer was written as text before it was submitted: the draft the page streams (18 §5.5).
+    // The JSONL repeats a streaming part at each flush; the page shows its last text where it started (10 §3).
+    const parts = new Map<string, number>();
+    const merged: TranscriptEntry[] = [];
+    for (const entry of entries) {
+      const at = 'partId' in entry ? parts.get(entry.partId) : undefined;
+      if (at !== undefined) merged[at] = entry;
+      else {
+        if ('partId' in entry) parts.set(entry.partId, merged.length);
+        merged.push(entry);
+      }
+    }
+    const submitAt = merged.findIndex((e) => e.kind === 'tool_call' && e.data.tool.endsWith('submit_answer'));
+    const draft = answerDraft(merged.slice(0, submitAt === -1 ? merged.length : submitAt));
     await mkdir(new URL('reports', import.meta.url), { recursive: true });
     const report = new URL(`reports/knowledge-${new Date().toISOString().replaceAll(':', '-')}.json`, import.meta.url);
     await writeFile(
@@ -95,6 +110,7 @@ describe('@live 知识问答', () => {
           submitAnswer: submits.map((e) => (e.kind === 'tool_result' ? e.data.status : '')),
           tools,
           asked,
+          draft,
           answer: turn.answer,
           citations: turn.citations,
         },
@@ -105,6 +121,7 @@ describe('@live 知识问答', () => {
 
     expect(turn.attempt.error).toBeNull();
     expect(turn.status).toBe(KnowledgeTurnStatus.Answered);
+    expect(draft?.length ?? 0).toBeGreaterThan(0);
     const files = turn.citations.flatMap((c) => (c.type === CitationType.File ? [c] : []));
     expect(files.length).toBeGreaterThan(0);
     const median = files.filter(

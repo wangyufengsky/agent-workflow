@@ -115,7 +115,10 @@ export function createFakeOpencode() {
   const toolCalls: ToolCallRecord[] = [];
   const permissionReplies: Array<{ permissionId: string; reply: PermissionDecision }> = [];
   const aborts: string[] = [];
-  const models: ModelInfo[] = [{ providerId: 'opencode', modelId: 'fake-model', name: 'Fake Model' }];
+  const models: ModelInfo[] = [
+    { providerId: 'opencode', modelId: 'fake-model', name: 'Fake Model' },
+    { providerId: 'opencode', modelId: 'fake-model-2', name: 'Fake Model 2' },
+  ];
 
   const nextId = (prefix: string) => `${prefix}_${++counter}`;
   const emit = (event: OpencodeEvent) => {

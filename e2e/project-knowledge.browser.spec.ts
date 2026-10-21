@@ -165,3 +165,86 @@ test('J13 对助手提问 → 正在查资料 → 带引用的回答 → 点引�
     await request.delete(`${API_BASE}/assistant/conversations/${c.id}`, { headers: AUTH });
   }
 });
+
+test('J14 回答流式出现：引用先待核对、提交通过后可点击；换模型续问，对话与记录显示模型', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  mkdirSync(join(project.repoPath, 'src'));
+  writeFileSync(join(project.repoPath, 'src/refund.ts'), REFUND);
+  const text = '退款在 `refund()` 中四舍五入到分 [1]。';
+  // The permission holds the turn after the draft is written, before the answer is submitted.
+  await queueResearchTurn(request, project, [
+    { type: 'tool', tool: 'read', input: { filePath: join(project.repoPath, 'src/refund.ts') } },
+    { type: 'text', text },
+    { type: 'permission', permission: 'bash', patterns: ['ls src/refund'] },
+    answer(text, [file('src/refund.ts', 3, 3)]),
+  ]);
+
+  await page.goto(`/knowledge?projectId=${project.id}`);
+  await page.getByLabel('模型').selectOption({ label: 'Fake Model 2' });
+  await page.getByLabel('向项目提问').fill('退款金额怎样取整？');
+  await page.getByLabel('向项目提问').press('Enter');
+
+  const turn = page.getByTestId('knowledge-turn').first();
+  const draft = turn.getByTestId('answer-draft');
+  await expect(draft).toContainText('退款在 refund() 中四舍五入到分');
+  await expect(draft).toContainText('正在写回答 · 引用待核对');
+  await expect(draft.getByTitle(/待核对/)).toHaveText('1');
+  await expect(turn.getByRole('button', { name: '引用 1' })).toHaveCount(0);
+  await expect(turn).toContainText('opencode/fake-model-2');
+
+  const inbox = await (await request.get(`${API_BASE}/inbox?status=open`, { headers: AUTH })).json();
+  const permission = inbox.items.find(
+    (item: { kind: string; payload: { patterns?: string[] } }) =>
+      item.kind === 'permission' && item.payload.patterns?.includes('ls src/refund'),
+  );
+  await request.post(`${API_BASE}/inbox/${permission.id}/resolve`, {
+    headers: AUTH,
+    data: { response: { decision: 'once' } },
+  });
+  await expect(turn.getByRole('button', { name: '引用 1' })).toBeVisible();
+  await expect(draft).toHaveCount(0);
+
+  await queueResearchTurn(request, project, [answer('手续费先扣 [1]。', [file('src/refund.ts', 2, 2)])]);
+  await expect(page.getByLabel('模型')).toHaveValue('opencode/fake-model-2');
+  await page.getByLabel('模型').selectOption({ label: 'Fake Model' });
+  await page.getByLabel('向项目提问').fill('手续费什么时候扣？');
+  await page.getByLabel('向项目提问').press('Enter');
+  const second = page.getByTestId('knowledge-turn').nth(1);
+  await expect(second.getByRole('button', { name: '引用 1' })).toBeVisible();
+  await expect(second).toContainText('opencode/fake-model');
+  await expect(second).not.toContainText('fake-model-2');
+
+  // Straight to another conversation on the same route (as an in-app link does): its picker follows its latest turn.
+  await queueResearchTurn(request, project, [answer('先扣手续费 [1]。', [file('src/refund.ts', 2, 2)])]);
+  const other = await (
+    await request.post(`${API_BASE}/knowledge/conversations`, {
+      headers: AUTH,
+      data: {
+        projectId: project.id,
+        question: '手续费在哪里扣？',
+        sources: { code: true, docs: true, database: false, web: false },
+        model: 'opencode/fake-model-2',
+      },
+    })
+  ).json();
+  const here = new URL(page.url()).pathname;
+  const goInApp = (path: string) =>
+    page.evaluate((to) => {
+      window.history.pushState({}, '', to);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }, path);
+  // Both conversations cached first, then back to the other one.
+  await goInApp(`/knowledge/${other.id}`);
+  await expect(page.getByTestId('knowledge-turn').first()).toContainText('手续费在哪里扣？');
+  await goInApp(here);
+  await expect(page.getByLabel('模型')).toHaveValue('opencode/fake-model');
+  await goInApp(`/knowledge/${other.id}`);
+  await expect(page.getByTestId('knowledge-turn').first()).toContainText('手续费在哪里扣？');
+  await expect(page.getByLabel('模型')).toHaveValue('opencode/fake-model-2');
+  await goInApp(here);
+
+  await page.getByRole('link', { name: '对话记录' }).click();
+  const row = page.getByTestId('knowledge-history-row').filter({ hasText: '退款金额怎样取整？' });
+  await expect(row).toContainText('opencode/fake-model');
+  await expect(row).not.toContainText('fake-model-2');
+});

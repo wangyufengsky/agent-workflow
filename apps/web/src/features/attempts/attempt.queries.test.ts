@@ -33,4 +33,13 @@ describe('会话流的显示顺序', () => {
       [5, 'tool_call'],
     ]);
   });
+
+  it('页面已有某片段的较新一行时，经实时推送补来的较旧一行不会覆盖它', () => {
+    // The page was read after seq 3 was written: the server keeps p's last line only. SSE also brought seq 2.
+    const pages = [page([text(3, 'p', 'abc')], 3, false)];
+    const live = [text(2, 'p', 'ab'), text(3, 'p', 'abc')];
+    expect(transcriptEntries(pages, live).map((e) => [e.seq, e.kind === 'text' ? e.data.text : e.kind])).toEqual([
+      [3, 'abc'],
+    ]);
+  });
 });
