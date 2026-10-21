@@ -14,6 +14,8 @@ export const PromptName = {
   Nudge: 'nudge',
   Revise: 'revise',
   ReviseConflict: 'revise-conflict',
+  /** Review comments of the task's pull request to address (21 §3.1). */
+  ReviseReview: 'revise-review',
   /** How to handle uncertainty when the task's `ask_on_uncertainty` checkpoint is on / off. */
   RuleAsk: 'rule-ask',
   RuleAssume: 'rule-assume',
@@ -61,6 +63,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.Nudge]: read(PromptName.Nudge),
     [PromptName.Revise]: read(PromptName.Revise),
     [PromptName.ReviseConflict]: read(PromptName.ReviseConflict),
+    [PromptName.ReviseReview]: read(PromptName.ReviseReview),
     [PromptName.RuleAsk]: read(PromptName.RuleAsk),
     [PromptName.RuleAssume]: read(PromptName.RuleAssume),
     [PromptName.ProtocolAssistant]: read(PromptName.ProtocolAssistant),

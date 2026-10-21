@@ -19,6 +19,7 @@ import { PPT_COPY } from '../../copy/ppt.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { ChangesDrawer } from './changes-drawer.tsx';
 import { DeliveryActions } from './delivery-actions.tsx';
+import { ReviewComments } from './review-comments.tsx';
 import styles from './task-page.module.css';
 
 /** How the task was delivered, once it is merging or done. */
@@ -134,6 +135,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
             </ul>
           </section>
         )}
+        {task.status === TaskStatus.Completed && task.pullRequest !== null && <ReviewComments task={task} />}
         {task.status === TaskStatus.Review && <DeliveryActions task={task} />}
       </div>
       {browsable && <ChangesDrawer task={task} open={viewing} onOpenChange={setViewing} />}

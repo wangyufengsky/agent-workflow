@@ -49,6 +49,8 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.AssistantConfirmationNotFound]: '这条确认不存在，可能所在的对话已被删除。',
   [ErrorCode.AssistantBusy]: '助手还在处理上一条消息，请等它回复后再发，或先停止它。',
   [ErrorCode.BatchNotFound]: '这个批量任务不存在，可能所属项目已被删除。',
+  [ErrorCode.ScheduleNotFound]: '这个定时任务不存在，可能已被删除。',
+  [ErrorCode.ScheduleBusy]: '上一次运行的任务还没结束，处理完它再运行。',
   [ErrorCode.KnowledgeConversationNotFound]: '这个对话不存在，可能已被删除。',
   [ErrorCode.KnowledgeConversationBusy]: '研究员还在查资料，等这一轮结束或先停止它。',
   [ErrorCode.KnowledgeCitationInvalid]: '回答的引用不完整，研究员没能给出可核对的原文。',
@@ -63,6 +65,9 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.DeliveryTargetNotFound]: '目标分支不存在。',
   [ErrorCode.DeliveryTargetDirty]: '目标分支所在的工作区有未提交的改动。为了不碰你的改动，先提交或暂存它们再合并。',
   [ErrorCode.DeliveryInterrupted]: '合并过程中应用退出了，可以再试一次。',
+  [ErrorCode.PullRequestNotOpen]: 'PR 已经合并或关闭了，不能再按意见修改。',
+  [ErrorCode.BranchDiverged]:
+    'PR 的分支在平台上和本地各有对方没有的提交。为了不覆盖任何改动，先在 Git 管理台里把两边合到一起再试。',
   [ErrorCode.DbConnectionNotFound]: '这个数据库连接不存在。',
   [ErrorCode.DbConnectionAlreadyExists]: '已有同名的数据库连接，换一个名称再试。',
   [ErrorCode.DbConnectionFailed]: '连不上数据库，检查地址、端口、用户名和密码。',

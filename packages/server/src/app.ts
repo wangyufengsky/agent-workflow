@@ -55,6 +55,7 @@ import { createProjectsModule } from './modules/projects/index.ts';
 import { createRepositoryModule } from './modules/repository/index.ts';
 import { createRolesModule, type RolesService } from './modules/roles/index.ts';
 import { createScheduler } from './modules/scheduler/index.ts';
+import { createSchedulesModule, type SchedulesService } from './modules/schedules/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
 import { createTasksModule, type TasksService } from './modules/tasks/index.ts';
@@ -98,6 +99,7 @@ export type App = {
     assistant: AssistantService;
     knowledge: KnowledgeService;
     decks: DecksService;
+    schedules: SchedulesService & { settled(): Promise<void> };
   };
   /** Bearer token of the execution MCP at `/mcp/exec`. */
   mcpToken: string;
@@ -308,6 +310,22 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     log,
   });
   const timeZone = deps.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const schedules = createSchedulesModule({
+    db: database.db,
+    unit,
+    events,
+    clock,
+    log,
+    timeZone,
+    workflows: workflows.service,
+    tasks: tasks.service,
+    inbox: inbox.service,
+  });
+  // Stopped before the database closes: a check must not run against a closed database.
+  server.addHook('preClose', async () => {
+    schedules.timer.stop();
+    await schedules.timer.settled();
+  });
   const insights = createInsightsModule({ db: database.db, clock, timeZone, tasks: tasks.service });
   const repository = createRepositoryModule({
     projects: projects.service,
@@ -338,6 +356,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...workflows.operations,
     ...tasks.operations,
     ...batches.operations,
+    ...schedules.operations,
     ...knowledge.operations,
     ...decks.operations,
     ...insights.operations,
@@ -403,6 +422,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       assistant: assistant.service,
       knowledge: knowledge.service,
       decks: decks.service,
+      schedules: { ...schedules.service, settled: schedules.timer.settled },
     },
     mcpToken,
     assistantMcpToken,
@@ -411,6 +431,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       hosting = deps.opencode === undefined;
       // Sessions can only call back once the API listens; the scheduler waits for the runtime by itself.
       scheduler.start();
+      // Schedules missed while the app was closed are due now and run once (22 §4).
+      schedules.timer.start();
       await startHostedRuntime();
     },
     close: () => server.close(),

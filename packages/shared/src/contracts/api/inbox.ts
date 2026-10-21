@@ -56,6 +56,11 @@ export const failureResponseSchema = z.object({ action: z.enum(FailureAction) })
 export const deliveryPayloadSchema = z.object({});
 export const deliveryResponseSchema = z.object({ deliveryId: z.string() });
 
+/** The run's error; the item's title is the schedule's (22 §5). */
+export const scheduleFailurePayloadSchema = z.object({ scheduleId: z.string(), error: errorInfoSchema });
+/** Closed by resuming the schedule. */
+export const scheduleFailureResponseSchema = z.object({ resumed: z.literal(true) });
+
 const base = {
   id: z.string(),
   status: inboxStatusSchema,
@@ -78,6 +83,7 @@ export const inboxItemSchema = z.discriminatedUnion('kind', [
   item(InboxKind.Plan, planPayloadSchema, planResponseSchema),
   item(InboxKind.Failure, failurePayloadSchema, failureResponseSchema),
   item(InboxKind.Delivery, deliveryPayloadSchema, deliveryResponseSchema),
+  item(InboxKind.ScheduleFailure, scheduleFailurePayloadSchema, scheduleFailureResponseSchema),
 ]);
 export type InboxItemDTO = z.infer<typeof inboxItemSchema>;
 export type InboxItemOf<K extends InboxKind> = Extract<InboxItemDTO, { kind: K }>;

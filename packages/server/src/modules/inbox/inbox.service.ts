@@ -26,7 +26,7 @@ export type NewInboxItem = {
 }[InboxKind];
 
 /** Only these kinds may be dismissed by the user (11 §7); the others need a decision. */
-const USER_DISMISSABLE: readonly InboxKind[] = [InboxKind.Failure, InboxKind.Delivery];
+const USER_DISMISSABLE: readonly InboxKind[] = [InboxKind.Failure, InboxKind.Delivery, InboxKind.ScheduleFailure];
 
 /**
  * 「需要你处理」records (10 §inbox_items) and their state machine (09 §8). Acting on a decision (sending an answer,
@@ -115,7 +115,7 @@ export function createInboxService({ db, unit, clock, log }: InboxServiceDeps) {
       for (const item of repo.list(scope, InboxStatus.Open)) close(item, InboxEvent.Resolve, response);
     },
 
-    /** The user dismisses a failure or delivery item. */
+    /** The user dismisses a failure, delivery or schedule failure item. */
     dismiss(id: string): InboxItemDTO {
       const item = get(id);
       if (!USER_DISMISSABLE.includes(item.kind)) {

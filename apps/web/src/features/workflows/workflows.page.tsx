@@ -19,6 +19,7 @@ import { Icon } from '../../components/icon.tsx';
 import { toast } from '../../components/toast.tsx';
 import { BATCHES_COPY } from '../../copy/batches.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
+import { SCHEDULES_COPY } from '../../copy/schedules.ts';
 import {
   WORKFLOWS_COPY as C,
   WORKFLOW_DELIVERABLE_LABEL,
@@ -207,9 +208,14 @@ export function WorkflowsPage() {
                 {C.copy}
               </Button>
               {w.planning === WorkflowPlanning.Fixed && (
-                <Link to={ROUTES.batchNew} search={{ workflow: w.key }} className="btn ghost sm">
-                  {BATCHES_COPY.runAsBatch}
-                </Link>
+                <>
+                  <Link to={ROUTES.batchNew} search={{ workflow: w.key }} className="btn ghost sm">
+                    {BATCHES_COPY.runAsBatch}
+                  </Link>
+                  <Link to={ROUTES.scheduleNew} search={{ workflow: w.key }} className="btn ghost sm">
+                    {SCHEDULES_COPY.runOnSchedule}
+                  </Link>
+                </>
               )}
               {w.kind === WorkflowKind.Custom && (
                 <Button size="sm" variant="ghost" icon="trash" onClick={() => setDeleting(w)}>

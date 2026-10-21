@@ -1,6 +1,5 @@
 import {
   acceptNodeOp,
-  type ChangeRequestReason,
   type CreateRoleRequest,
   type CreateTaskRequest,
   type CreateWorkflowRequest,
@@ -26,12 +25,16 @@ import {
   nodeDiffOp,
   type PlanGraph,
   pauseTaskOp,
+  type RequestChangesRequest,
+  type ReviseFromReviewRequest,
   rejectNodeOp,
   replanOp,
   requestChangesOp,
   resumeTaskOp,
   retryNodeOp,
   retryTaskOp,
+  reviewCommentsOp,
+  reviseFromReviewOp,
   saveDraftPlanOp,
   skipNodeOp,
   startTaskOp,
@@ -203,9 +206,17 @@ export const useConfirmPlan = () =>
   useTaskMutation((input: { id: string; version: number }) => callOperation(confirmPlanOp, input));
 export const useDeliver = () => useTaskMutation((input: DeliverRequest) => callOperation(deliverTaskOp, input));
 export const useRequestChanges = () =>
-  useTaskMutation((input: { id: string; reason: ChangeRequestReason; feedback?: string }) =>
-    callOperation(requestChangesOp, input),
-  );
+  useTaskMutation((input: RequestChangesRequest) => callOperation(requestChangesOp, input));
+export const useReviseFromReview = () =>
+  useTaskMutation((input: ReviseFromReviewRequest) => callOperation(reviseFromReviewOp, input));
+
+/** Review comments of the task's open pull request, read live from the platform when the user asks (D87). */
+export const reviewCommentsQuery = (id: string) =>
+  queryOptions({
+    queryKey: queryKeys.reviewComments(id),
+    queryFn: () => callOperation(reviewCommentsOp, { id }),
+    enabled: false,
+  });
 export const useReplan = () =>
   useTaskMutation((input: { id: string; feedback: string }) => callOperation(replanOp, input));
 export const useStartTask = () => useTaskMutation((id: string) => callOperation(startTaskOp, { id }));

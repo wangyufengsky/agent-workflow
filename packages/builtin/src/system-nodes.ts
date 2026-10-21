@@ -2,7 +2,7 @@ import { type Acceptance, AcceptanceCheckKind, ChangeRequestReason, PROJECT_CHEC
 import { PromptName } from './prompts.ts';
 import { BuiltinRoleKey } from './roles.ts';
 
-/** A node the system appends to a task in review when the user sends it back to the AI (13 §4). */
+/** A node the system appends when the user sends a task back to the AI (13 §4): from review, or review comments (21). */
 export type SystemNode = {
   /** Keys are `<keyPrefix><n>`, n counting the task's earlier nodes of the kind from 1. */
   keyPrefix: string;
@@ -30,6 +30,13 @@ export const SYSTEM_NODES: Readonly<Record<ChangeRequestReason, SystemNode>> = {
     title: '解决合并冲突',
     roleKey: BuiltinRoleKey.Developer,
     prompt: PromptName.ReviseConflict,
+    acceptance: checked,
+  },
+  [ChangeRequestReason.Review]: {
+    keyPrefix: 'review_fix_',
+    title: '按审查意见修改',
+    roleKey: BuiltinRoleKey.Developer,
+    prompt: PromptName.ReviseReview,
     acceptance: checked,
   },
 };

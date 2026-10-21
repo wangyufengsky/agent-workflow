@@ -95,6 +95,8 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/tasks/:id/cancel` | `{ keepBranch?: boolean }` |
 | POST | `/tasks/:id/request-changes` | `{ reason: 'user' \| 'conflict', feedback? }`；`review → running`，追加「按反馈修改」或「解决合并冲突」节点（13 §4）。`user` 必须带 `feedback`；`conflict` 要求最近一次交付为 `conflict`；否则 400 `VALIDATION_FAILED` |
 | POST | `/tasks/:id/deliver` | `{ strategy, targetBranch?, pr?: { title, body } }`；见 §5.3 |
+| GET | `/tasks/:id/review-comments` | `ReviewCommentsDTO`：任务的 PR/MR 上的审查意见，实时取自平台；见 §5.4 |
+| POST | `/tasks/:id/review-feedback` | `{ commentIds: string[], note? }`；`completed → running`，按勾选的审查意见追加「按审查意见修改」节点；见 §5.4 |
 | GET | `/tasks/:id/diff` | `DiffDTO { base, files }`：worktree（含未提交改动）相对任务分支与目标分支的 merge-base（起初即基线提交；解决冲突合入目标分支后为目标分支的提交）的文件列表与增删统计；worktree 已删除 → 404 `NOT_FOUND` |
 | GET | `/tasks/:id/diff/file?path=` | 单文件 unified diff `FileDiffDTO`（超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }`） |
 
@@ -133,6 +135,7 @@ type TaskDetailDTO = {
   openInbox: InboxItemDTO[];
   result?: TaskResultDTO;         // review 及之后
   lastDelivery?: DeliveryDTO;     // 本轮（最近一次进入 review 以来）最近的交付；「再改改」/「解决冲突」后回到 review 即为空：{ id, strategy, targetBranch, status, commitSha?, prUrl?, conflictFiles?, error?, createdAt, finishedAt? }
+  pullRequest?: { url: string; pushedAt: number };  // 最近一次成功的 PR 交付（跨轮次；pushedAt 为其完成时间，21 §5）
   createdAt: number; updatedAt: number; startedAt?: number; finishedAt?: number;
 };
 ```
@@ -140,9 +143,30 @@ type TaskDetailDTO = {
 ### 5.3 交付
 
 - `strategy ∈ { squash, merge, rebase }`：本地合并到 `targetBranch`（默认 `baseBranch`），见 09 §7。合并前的检查失败直接返回错误、不改状态：`DELIVERY_TARGET_NOT_FOUND`、`WORKTREE_DIRTY`、`DELIVERY_TARGET_DIRTY`（目标分支检出在有未提交改动的工作区）。成功 → 任务 `completed`。冲突 → 任务回 `review`，`lastDelivery.status = conflict`，`conflictFiles` 列出文件；前端提供「交给 AI 解决」（= `request-changes` with `reason: 'conflict'`）。其他 git 失败 → 任务回 `review`，`lastDelivery.status = failed`，`error` 为原因。以上都返回操作后的 `TaskDetailDTO`。
-- `pull_request`：项目未绑定远端 → 400 `HOSTING_NOT_CONFIGURED`（不改状态）。在仓库锁内把任务分支推送到 `origin`（HTTPS 远端经环境变量 `http.extraHeader` 带上令牌，不出现在命令参数中；SSH 远端用用户自己的密钥）→ 创建 PR/MR（`targetBranch` 为目标，标题与说明默认为任务标题与结果摘要，可用 `pr` 指定）→ 任务 `completed`，`prUrl` 记录在 delivery；worktree 删除，分支保留。推送或平台失败 → `lastDelivery.status = failed`，任务回 `review`。
+- `pull_request`：项目未绑定远端 → 400 `HOSTING_NOT_CONFIGURED`（不改状态）。在仓库锁内把任务分支推送到 `origin`（HTTPS 远端经环境变量 `http.extraHeader` 带上令牌，不出现在命令参数中；SSH 远端用用户自己的密钥）→ 创建 PR/MR（`targetBranch` 为目标，标题与说明默认为任务标题与结果摘要，可用 `pr` 指定）→ 任务 `completed`，`prUrl` 记录在 delivery；worktree 删除，分支保留。推送或平台失败 → `lastDelivery.status = failed`，任务回 `review`。推送后先按分支查找打开的 PR/MR：已有（按审查意见修改后再次交付）就沿用它、不改标题与说明，`prUrl` 为同一个地址（21 §5）。
 - `report_only`：仅 `deliverable = report` 的任务可用，直接 `completed`。
 - `deliverable = report` 的任务使用其他策略 → 400 `VALIDATION_FAILED`。
+
+### 5.4 PR 审查意见（v1.2，21）
+
+- `GET /tasks/:id/review-comments`（`tasks.reviewComments`，read）：任务的最近一次成功交付必须是 PR，且该分支上的 PR/MR 仍打开，否则 409 `PULL_REQUEST_NOT_OPEN`；项目未绑定远端 400 `HOSTING_NOT_CONFIGURED`；平台错误 `HOSTING_AUTH_FAILED` / `HOSTING_API_ERROR`。返回：
+
+```ts
+type ReviewCommentsDTO = {
+  pullRequest: { url: string; number: number };
+  items: Array<{
+    id: string;                      // 平台上的讨论 / 评论 / 审查 id
+    kind: ReviewCommentKind;         // thread | general
+    path?: string; line?: number;    // thread 所在的文件与行
+    url: string;
+    messages: Array<{ author: string; body: string; createdAt: number }>;  // 按时间
+    selectedByDefault: boolean;      // 未解决的讨论；上次推送之后的一般评论（D87）
+  }>;
+};
+```
+
+  已解决的讨论、系统笔记与空正文不列出；每类最多 100 条（`REVIEW_COMMENTS_MAX`）。
+- `POST /tasks/:id/review-feedback`（`tasks.reviseFromReview`，write）：`{ commentIds: string[]（至少一条）, note?: string }`。顺序：状态机检查 `completed --review_feedback--> running`（否则 409 `STATE_TRANSITION_INVALID`）→ 同上检查 PR → 重新取回意见，`commentIds` 有不在其中的 → 400 `VALIDATION_FAILED`（`issues[].path = ['commentIds']`）→ 抓取远端分支并快进本地任务分支（两边分叉 409 `BRANCH_DIVERGED`，不做改动）→ 重建 worktree（失败 `WORKTREE_CREATE_FAILED`）→ 一个事务内建计划新版本、追加 `review_fix_<n>` 节点、任务 `running`。返回 `TaskDetailDTO`。完成后任务回到 `review`，用户以 `deliver`（`pull_request`）推送回同一个 PR。
 
 ## 6. 计划与节点
 
@@ -185,9 +209,9 @@ type AttemptDTO = AttemptSummaryDTO & {
 | --- | --- | --- |
 | GET | `/inbox?status&taskId&limit&cursor` | `{ items: InboxItemDTO[], nextCursor }`，按创建时间（同时按 id）倒序分页（§1）；`/inbox/count` 返回 `{ open }` 用于徽标 |
 | POST | `/inbox/:id/resolve` | `{ response }`，`response` 为对应 kind 的回应（见 10 §inbox_items；`question` 只接受 `{ answer }`）；不符合该 kind 400 `VALIDATION_FAILED`；已关闭 409 `INBOX_ITEM_CLOSED`；回答问题时 opencode 未就绪 503 `OPENCODE_NOT_READY`（条目保持打开） |
-| POST | `/inbox/:id/dismiss` | 仅 `failure` / `delivery` 可忽略 |
+| POST | `/inbox/:id/dismiss` | 仅 `failure` / `delivery` / `schedule_failure` 可忽略 |
 
-`resolve` 是各业务动作的统一入口：`question` → 答案发回会话；`permission` → 回复 opencode；`acceptance` → 节点 accept/reject；`plan` → 等同 plan confirm/replan；`failure` → 任务 retry/cancel；`delivery` 不通过 resolve，而是 `deliver` 成功后自动 resolved。
+`resolve` 是各业务动作的统一入口：`question` → 答案发回会话；`permission` → 回复 opencode；`acceptance` → 节点 accept/reject；`plan` → 等同 plan confirm/replan；`failure` → 任务 retry/cancel；`delivery` 不通过 resolve，而是 `deliver` 成功后自动 resolved；`schedule_failure` 同样不通过 resolve，恢复定时任务时自动 resolved（22 §5）。
 
 ## 8. Git（专业模式）
 
@@ -255,6 +279,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `assistant.open_form` | `{ conversationId, form: AssistantForm, values }` | 助手调用 `open_form`：打开表单并预填（不含凭据字段） |
 | `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
 | `knowledge.updated` | `{ conversationId }` | 知识问答：新一轮、答案提交、一轮结束、权限请求等待或已处理、删除时；对话与列表重新拉取（研究过程与流式回答的草稿沿用 `attempt.transcript`：研究尝试的正文每 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 个字符推送一次，草稿 = 最后一个非提交工具调用之后的正文，18 §5.5） |
+| `schedule.updated` | `{ scheduleId }` | 定时任务（v1.2）：创建、修改、暂停 / 恢复、每次运行、删除后；定时任务列表与详情重新拉取（查询挂在任务列表前缀下，开出的任务状态变化也会刷新，22 §9） |
 | `deck.updated` | `{ deckId }` | PPT：AI 工作开始与结束、每次提交通过、权限请求等待或已处理、页面修改、删除时；PPT 与列表重新拉取（23 §8） |
 | `resync` | `{}` | 全部失效 |
 
@@ -313,7 +338,22 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 批次不新增 SSE 事件：进度随子任务的 `task.updated` 变化，前端批次查询挂在任务列表的缓存前缀下一并刷新。
 
-## 13d. PPT（v1.2）
+## 13d. 定时任务（v1.2）
+
+见 [22-scheduled-tasks.md §9](22-scheduled-tasks.md#9-api-与操作清单)。全部 `mode = simple`、`expose.assistant = true`；`schedules.create` 进命令面板。
+
+| 方法 | 路径 | 操作 | 风险 | 说明 |
+| --- | --- | --- | --- | --- |
+| GET | `/schedules?projectId` | `schedules.list` | read | `{ items: ScheduleDTO[] }`，按创建时间倒序，不分页 |
+| POST | `/schedules` | `schedules.create` | write | `{ projectId, workflowKey, requirement, frequency, baseBranch? }` → 201 `ScheduleDetailDTO`；只用 `fixed` 流程（否则 400 `VALIDATION_FAILED`，`path: ['workflowKey']`）；基础分支须存在（`GIT_BASE_BRANCH_NOT_FOUND`）；`produces: schedule` |
+| GET | `/schedules/:id` | `schedules.get` | read | `ScheduleDetailDTO`（最近 `SCHEDULE_RUNS_SHOWN` 次运行）；404 `SCHEDULE_NOT_FOUND` |
+| PATCH | `/schedules/:id` | `schedules.update` | write | `{ workflowKey?, requirement?, frequency?, baseBranch? }`（`baseBranch: null` 恢复默认分支，项目不能改）；改频率且启用中时重算 `nextRunAt` |
+| POST | `/schedules/:id/pause` | `schedules.pause` | write | `active → paused`；非法转换 409 `STATE_TRANSITION_INVALID` |
+| POST | `/schedules/:id/resume` | `schedules.resume` | write | `paused → active`，从现在起算下一次；关闭该定时任务的 `schedule_failure` 条目 |
+| POST | `/schedules/:id/run` | `schedules.run` | write | 立即运行一次（`trigger = manual`，不改计划时刻）→ `ScheduleDetailDTO`；上一次的任务未结束 409 `SCHEDULE_BUSY`；开不了任务时直接返回错误（不自动暂停） |
+| DELETE | `/schedules/:id` | `schedules.delete` | critical | 204；运行记录随之删除，开出的任务保留 |
+
+## 13e. PPT（v1.2）
 
 见 [23-ppt.md §8](23-ppt.md#8-api操作清单)。全部 `mode = simple`、`expose.assistant = true`、不进命令面板（D96）；改动内容的 write 操作在有 AI 工作进行中时 409 `DECK_BUSY`；发起 AI 工作时 opencode 未就绪 503。`model` 同知识问答（`provider/model`、`null` 或省略）。
 

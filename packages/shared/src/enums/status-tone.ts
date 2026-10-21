@@ -1,5 +1,6 @@
 import { DeckStatus } from './deck.ts';
 import { KnowledgeTurnStatus } from './knowledge.ts';
+import { ScheduleStatus } from './schedule.ts';
 import { RuntimeStatus } from './system.ts';
 import { AttemptStatus, NodeStatus, TaskDisplayGroup, TaskStatus } from './task.ts';
 import { StatusTone } from './ui.ts';
@@ -73,6 +74,10 @@ export const STATUS_TONE = {
     [TaskDisplayGroup.Failed]: StatusTone.Danger,
     [TaskDisplayGroup.Cancelled]: StatusTone.Warn,
   },
+  schedule: {
+    [ScheduleStatus.Active]: StatusTone.Ok,
+    [ScheduleStatus.Paused]: StatusTone.Wait,
+  },
 } as const satisfies {
   task: Record<TaskStatus, StatusTone>;
   node: Record<NodeStatus, StatusTone>;
@@ -81,4 +86,5 @@ export const STATUS_TONE = {
   deck: Record<DeckStatus, StatusTone>;
   runtime: Record<RuntimeStatus, StatusTone>;
   taskDisplay: Record<TaskDisplayGroup, StatusTone>;
+  schedule: Record<ScheduleStatus, StatusTone>;
 };

@@ -219,6 +219,33 @@
 | B-09 | E2E（FakeOpencode）：J17 主页「补单元测试」的「批量」→ 选 3 个目录 → 创建 → 三个任务到达待合并 → 合并全部 → 主分支 3 个提交、全部已完成；J9 走查加入批量页面 | `pnpm e2e` 通过 |
 | B-10 | 文档收尾：03（模块分层）、07（J17）、14（路由与主页）、本节状态段 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
 
+## v1.2 · PR 审查意见回流
+
+> 状态：R-01…R-06 **已完成**（2026-10-22，待合并）。设计见 [21-review-feedback.md](21-review-feedback.md)，决策 D87（取回与勾选）、D88（修改后由用户推送）、D89（不回写平台），均按保守方案实现，**待用户确认**。没有新表与迁移。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| R-01 | 设计文档 21、决策 D87–D89 | 文档评审通过 |
+| R-02 | 契约：`ChangeRequestReason.Review`（`request-changes` 仍只接受 user / conflict）、`ReviewCommentKind`、错误码 `PULL_REQUEST_NOT_OPEN` / `BRANCH_DIVERGED`、任务事件 `review_feedback`（`completed → running`）、worktree 事件 `restore`（`removed → creating`）、`TaskDetailDTO.pullRequest`、`ReviewCommentsDTO`、操作 `tasks.reviewComments`（read）与 `tasks.reviseFromReview`（write）；08 / 09 / 11 同步 | `ERROR_COPY` 与操作文案覆盖新增项；状态机文档由 `gen:fsm-docs` 生成 |
+| R-03 | 托管平台：按分支查找打开的 PR/MR；读取审查意见（GitHub GraphQL `reviewThreads` / 对话评论 / 审查总结，GitLab `discussions`）；FakeHosting 支持这些端点并能扮演审查者 | 集成测试见 R-04 |
+| R-04 | 服务：取回意见（默认勾选）、发起修改（重新取回按 id 挑选、抓取并快进分支、分叉即停、重建 worktree、复用「再改改」追加 `review_fix_<n>` 节点）；`pull_request` 交付沿用已打开的 PR | 集成测试（FakeOpencode + FakeHosting + 真实 Git）：GitHub 全流程（审查者在平台提交的建议被快进进来、提示词含勾选的意见与补充说明、推送后仍只有一个 PR 且远端分支有 AI 的修改）；GitLab 意见映射；意见已不在 400、分支分叉 409 且不做改动、PR 关闭 409、本地合并的任务 409 |
+| R-05 | 界面：结果卡「审查意见」区（取回、勾选、补充说明、发起修改）、PR 任务待合并时的「推送到 PR」；助手经操作清单可调用两个操作 | E2E 见 R-06 |
+| R-06 | E2E J18（`task-review.browser.spec.ts`，开发后端以 `AW_FAKE_HOSTING_*` 启用 FakeHosting）；文档 03 / 07 / 10 / 12 / 13 / 14 | `pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
+
+## v1.2 · 定时任务
+
+> 状态：S-01…S-08 **已完成**（2026-10-21，待合并）。设计见 [22-scheduled-tasks.md](22-scheduled-tasks.md)，决策 D90（预设频率、不开放 cron、系统时区）、D91（只在应用打开时运行、错过的最多补跑一次、上一次没结束就跳过、开不了任务时自动暂停并进「需要你处理」）、D92（只用固定流程、按 key 取最新版本、合并仍需点击、风险等级），三项按保守方案实现，**待用户确认**。与设计的补充：时区换算从质量与用量移到 `core/time-zone.ts` 共用；工作流服务新增 `latest(key)`。未做：助手页面类型 `AssistantPage` 没有加入定时任务页面（同批量任务）。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| S-01 | 设计文档 22、任务拆分、决策 D90–D92 | 文档评审通过 |
+| S-02 | 契约：`ScheduleStatus` / `ScheduleFrequencyKind` / `ScheduleRunTrigger` / `ScheduleRunOutcome`、状态机 `schedule`（09 §11）、`EntityKind.Schedule`、`InboxKind.ScheduleFailure`、`ServerEventType.ScheduleUpdated`、`SCHEDULE_*` 常量、错误码 `SCHEDULE_NOT_FOUND` / `SCHEDULE_BUSY`、频率 schema 与 DTO、八个操作契约（删除为 critical） | 单测：状态机表；频率 schema 拒绝错误时刻、空星期、重复星期、非约数小时；操作风险标注 |
+| S-03 | 存储：迁移 `0012_schedules`（`schedules`、`schedule_runs`）与 repo（状态只经 `updateStatus`） | 集成测试见 S-05 |
+| S-04 | 计划时刻：`nextRunAfter`（三种频率、时区、夏令时）与 `foldDueTimes` | 单测：跨天跨周、夏令时跳过的时刻顺延、重复的时刻只运行一次、折叠错过的时刻 |
+| S-05 | 服务与检查循环：到点开任务（不确认计划）、跳过、补跑、失败自动暂停 + `schedule_failure` 条目、暂停 / 恢复、立即运行、删除；检查循环最长 60 秒、注入时钟 | 集成测试（FakeClock + FakeOpencode + 真实 Git）：到点开任务并在「需要你处理」待合并；上一次没结束跳过；关闭三天后重开只补跑一次（`missed = 3`）；分支被删 → 失败暂停 + 条目，恢复后条目关闭；暂停期间不运行；AI 规划流程 400；立即运行与 409；删除项目级联 |
+| S-06 | 助手：`schedules.create` 确认后出现定时任务导航卡片；确认卡片把频率写成「每周一、三、五 02:00」 | 集成测试（MCP SDK 客户端）：`schedules_create` → `needs_confirmation` → 确认后 `entity_ref`（kind `schedule`） |
+| S-07 | 界面：定时任务列表、新建 / 修改页（频率选择器、专业模式的基础分支）、定时任务页（运行记录、补跑说明）；主页流程卡片「定时」、流程页「定时运行」、任务列表入口；「需要你处理」的来源与 `schedule_failure` 卡片；四套主题 | E2E 见 S-08；走查截图含新页面 |
+| S-08 | E2E J19 与 J9 走查；文档收尾（03、07、08、10、11、14、15） | `pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
 ## v1.2 · PPT 制作
 
 > 状态：P-01…P-10 **已完成**（2026-10-22）。设计见 [23-ppt.md](23-ppt.md)，决策 D93（结构化内容 + 内置版式）、D94（PDF + PowerPoint）、D95（流程与输入）、D96（与助手），用户 2026-10-22 按推荐方案确认。与设计的差异见 23 文首的「实现说明」。
@@ -227,7 +254,7 @@
 | --- | --- | --- |
 | P-01 | 设计文档 23、决策 D93–D96 | 用户确认 |
 | P-02 | 契约：`DeckStatus` / `DeckRunKind` / `DeckMaterialKind` / `SlideLayout`，`AttemptKind.DeckOutline` / `DeckSlides`，`SessionAgent.SlidesWriter`，`EntityKind.Deck`，`ServerEventType.DeckUpdated`，`AssistantPage.Ppt` / `PptDeck`，常量与错误码，`slideContentSchema`（字数上限），`deckStatusOf`，15 个操作契约；08–12 同步 | 单测：`deckStatusOf` 每个状态；操作风险（`decks.delete` 为 critical）与确认卡片字段文案 |
-| P-03 | 存储：迁移 `0012_decks`（`decks`、`deck_materials`、`deck_slides`、`deck_runs`）与 repo | 集成测试见 P-05 |
+| P-03 | 存储：迁移 `0013_decks`（`decks`、`deck_materials`、`deck_slides`、`deck_runs`）与 repo | 集成测试见 P-05 |
 | P-04 | 写作者：agent `aw-slides`（权限同研究员）、`continueSession` 可换 kind、提示词（协议、上下文、大纲、重写大纲、制作、修改）、`submit_outline` / `submit_slide` | 配置快照含 `aw-slides`；`@opencode` 测试中 `aw-slides` 可见 |
 | P-05 | decks 服务与操作：创建（资料快照、项目推断、字数上限）、大纲（重写、手改）、制作 / 继续、让 AI 改、手改、恢复上一版、加页 / 移动 / 删除、停止、删除；SSE | `decks.int.test.ts`（FakeOpencode + 真实 Git）：只读会话与资料快照、页数校验、逐页提交（非目标页与超字数被拒）、同一会话、上一版与恢复、停止后继续、制作中 `DECK_BUSY`、空白目录、任务工具不可用、删除与项目删除 |
 | P-06 | 渲染：十种版式组件、四套主题的幻灯片调色板、文字放不下时缩小并提示 | 单测：调色板对比度与不透明色、`emphasisRuns`；走查截图含全部版式 |

@@ -14,6 +14,8 @@ export const EntityKind = {
   Batch: 'batch',
   /** A PPT (23). */
   Deck: 'deck',
+  /** A workflow run on a schedule (22). */
+  Schedule: 'schedule',
 } as const;
 export type EntityKind = (typeof EntityKind)[keyof typeof EntityKind];
 export const entityKindSchema = z.enum(EntityKind);

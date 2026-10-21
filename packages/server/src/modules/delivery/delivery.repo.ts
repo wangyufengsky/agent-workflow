@@ -1,7 +1,8 @@
 import {
   AppError,
   type DeliveryDTO,
-  type DeliveryStatus,
+  DeliveryStatus,
+  DeliveryStrategy,
   ErrorCode,
   type ErrorInfo,
   errorInfoSchema,
@@ -47,6 +48,22 @@ export function createDeliveriesRepo(db: DbExecutor) {
     },
     latest(taskId: string): Delivery | undefined {
       const row = db.select().from(t).where(eq(t.taskId, taskId)).orderBy(desc(t.createdAt), desc(t.id)).get();
+      return row === undefined ? undefined : toDelivery(row);
+    },
+    /** The task's latest pull request that was opened or pushed to (21 §5). */
+    latestPullRequest(taskId: string): Delivery | undefined {
+      const row = db
+        .select()
+        .from(t)
+        .where(
+          and(
+            eq(t.taskId, taskId),
+            eq(t.strategy, DeliveryStrategy.PullRequest),
+            eq(t.status, DeliveryStatus.Succeeded),
+          ),
+        )
+        .orderBy(desc(t.createdAt), desc(t.id))
+        .get();
       return row === undefined ? undefined : toDelivery(row);
     },
     listByStatus(status: DeliveryStatus): Delivery[] {

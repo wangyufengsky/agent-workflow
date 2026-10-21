@@ -108,6 +108,8 @@ export const ServerEventType = {
   KnowledgeUpdated: 'knowledge.updated',
   /** A PPT changed: AI work started or ended, a page was submitted, edited, moved or deleted (23 §8). */
   DeckUpdated: 'deck.updated',
+  /** A schedule was created, changed, ran or was deleted (22 §9). */
+  ScheduleUpdated: 'schedule.updated',
   Resync: 'resync',
 } as const;
 export type ServerEventType = (typeof ServerEventType)[keyof typeof ServerEventType];

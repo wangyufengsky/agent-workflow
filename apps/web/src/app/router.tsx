@@ -30,6 +30,10 @@ import { ProjectsPage } from '../features/projects/projects.page.tsx';
 import { projectsQuery } from '../features/projects/projects.queries.ts';
 import { RolesPage } from '../features/roles/roles.page.tsx';
 import { RuntimePage } from '../features/runtime/runtime.page.tsx';
+import { EditSchedulePage } from '../features/schedules/edit-schedule.page.tsx';
+import { NewSchedulePage } from '../features/schedules/new-schedule.page.tsx';
+import { SchedulePage } from '../features/schedules/schedule.page.tsx';
+import { SchedulesPage } from '../features/schedules/schedules.page.tsx';
 import { SettingsPage } from '../features/settings/settings.page.tsx';
 import { settingsQuery, useSettings } from '../features/settings/settings.queries.ts';
 import { TaskPage } from '../features/task-detail/task.page.tsx';
@@ -153,6 +157,13 @@ const batchNewRoute = createRoute({
   validateSearch: z.object({ projectId: z.string().optional(), workflow: z.string().optional() }),
   component: NewBatchPage,
 });
+// Scheduled tasks (22): a new schedule keeps the project and workflow it was opened for (the home page's「定时」).
+const scheduleNewRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.scheduleNew,
+  validateSearch: z.object({ projectId: z.string().optional(), workflow: z.string().optional() }),
+  component: NewSchedulePage,
+});
 const gitRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.git,
@@ -253,6 +264,10 @@ const routeTree = rootRoute.addChildren([
     page(ROUTES.batches, BatchesPage),
     batchNewRoute,
     page(ROUTES.batch, BatchPage),
+    page(ROUTES.schedules, SchedulesPage),
+    scheduleNewRoute,
+    page(ROUTES.schedule, SchedulePage),
+    page(ROUTES.scheduleEdit, EditSchedulePage),
     page(ROUTES.inbox, InboxPage),
     projectsRoute,
     projectRoute,

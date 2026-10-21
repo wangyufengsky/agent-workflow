@@ -249,6 +249,7 @@ payload / response：
 | `plan` | `{ planId, version }` | `{ confirmed: true }` 或 `{ replanFeedback }` |
 | `failure` | `{ phase, error }` | `{ action: 'retry' | 'cancel' }` |
 | `delivery` | `{}` | `{ deliveryId }` |
+| `schedule_failure`（v1.2） | `{ scheduleId, error }`（`task_id` 等为空，`title` 为定时任务标题） | `{ resumed: true }`（恢复定时任务时 resolved；删除定时任务或用户忽略时 dismissed，22 §5） |
 
 `title` 是简短的纯文本（问题原文、权限的命令、步骤或任务标题），卡片按 kind 组织其余文案。问题与权限条目的 `attempt_id` 是发起的尝试，尝试结束时其仍打开的条目自动 dismiss；验收、计划、失败、投递条目不关联尝试。
 
@@ -265,6 +266,8 @@ payload / response：
 | status | TEXT | `WorktreeStatus` |
 | error | TEXT NULL | |
 | created_at / removed_at | INTEGER | |
+
+一个任务只有一条记录：以 PR 交付的任务按审查意见修改时，已删除的 worktree 在原路径与分支上重建（状态 `removed → creating → ready`，`removed_at` 清空，`base_commit` 不变；21 §4.2）。
 
 ### deliveries
 
@@ -396,9 +399,42 @@ payload / response：
 | position | INTEGER | 目标顺序，从 0 起 |
 | target | TEXT | 目标原文 |
 
-## 4c. PPT（v1.2）
+## 4c. 定时任务（v1.2）
 
-见 [23-ppt.md §3](23-ppt.md#3-数据模型)，迁移 `0012_decks`（与并行的 v1.2 迁移冲突时由后合并的一方重新生成）。PPT 没有状态列，显示状态由页面与最近一次 AI 工作的尝试推导（23 §4.3）。
+见 [22-scheduled-tasks.md §8](22-scheduled-tasks.md#8-数据模型迁移-0012_schedules)，迁移 `0012_schedules`。
+
+### schedules
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| project_id | TEXT → projects，CASCADE | |
+| workflow_key | TEXT | 流程 key，无外键（每次运行取最新版本，D92） |
+| title | TEXT | 需求首行 |
+| requirement | TEXT | |
+| base_branch | TEXT NULL | 空 = 运行时的项目默认分支 |
+| frequency | TEXT(JSON) | `ScheduleFrequency` |
+| status | TEXT | `ScheduleStatus`（09 §11） |
+| next_run_at | INTEGER NULL | 暂停时为空 |
+| created_at / updated_at | INTEGER | |
+
+### schedule_runs
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| schedule_id | TEXT → schedules，CASCADE | 索引 `(schedule_id)` |
+| trigger | TEXT | `ScheduleRunTrigger` |
+| outcome | TEXT | `ScheduleRunOutcome` |
+| due_at | INTEGER | 本次运行对应的计划时刻（手动为点击时刻） |
+| missed | INTEGER | 折叠掉的更早的计划时刻数 |
+| task_id | TEXT NULL → tasks，SET NULL | `started` 时开出的任务 |
+| error | TEXT(JSON) NULL | `failed` 时的 `ErrorInfo` |
+| created_at | INTEGER | 实际处理时刻；最新的运行按插入顺序（rowid）读取 |
+
+## 4d. PPT（v1.2）
+
+见 [23-ppt.md §3](23-ppt.md#3-数据模型)，迁移 `0013_decks`。PPT 没有状态列，显示状态由页面与最近一次 AI 工作的尝试推导（23 §4.3）。
 
 ### decks
 
@@ -463,7 +499,8 @@ payload / response：
 
 ## 5. 删除与清理
 
-- 删除项目：要求无非终态任务、没有研究中的知识对话；级联删除其任务及全部关联数据和 `runs/<taskId>` 目录，以及知识对话、其 `research` 尝试与会话流，以及批次（外键级联，20 §6）。
+- 删除项目：要求无非终态任务、没有研究中的知识对话；级联删除其任务及全部关联数据和 `runs/<taskId>` 目录，以及知识对话、其 `research` 尝试与会话流，以及批次（外键级联，20 §6）与定时任务及其运行记录（22 §8）。
+- 删除定时任务：删除其运行记录，关闭其未处理的 `schedule_failure` 条目（dismissed）；开出的任务保留。
 - 删除知识对话：要求没有研究中的一轮；删除轮次、其尝试（权限条目随之级联）与 `runs/knowledge/<attemptId>.jsonl`。
 - 删除 PPT：要求没有进行中的 AI 工作（`DECK_BUSY`）；删除其尝试（会话流 `runs/ppt/<attemptId>.jsonl` 随之删除，权限条目级联），再删除 PPT（页面、资料、工作记录级联）。删除项目时 PPT 的 `project_id` 置空。
 - 删除助手对话：级联删除其确认，并删除 `assistant/conversations/<id>.jsonl` 与 `assistant/files/<id>/`。

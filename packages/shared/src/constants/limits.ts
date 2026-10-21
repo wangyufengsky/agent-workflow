@@ -30,6 +30,14 @@ export const LIST_PAGE_MAX = 100;
 /** Targets of one batch (20 §2, D85). */
 export const BATCH_TARGETS_MAX = 20;
 export const BATCH_TARGET_MAX_CHARS = 500;
+/** Scheduled tasks (22): due schedules are looked for at least this often, so a computer waking up finds them soon. */
+export const SCHEDULE_CHECK_INTERVAL_MS = 60_000;
+/** A run handled this long after its time is a catch-up (22 §4). */
+export const SCHEDULE_CATCH_UP_AFTER_MS = 300_000;
+/** Runs listed on a schedule's page, newest first. */
+export const SCHEDULE_RUNS_SHOWN = 20;
+/** `hourly` frequencies: divisors of 24, so a day's run times are the same every day (22 §2, D90). */
+export const SCHEDULE_EVERY_HOURS = [1, 2, 3, 4, 6, 8, 12] as const;
 /** A conversation's title taken from its first message is cut to this length. */
 export const ASSISTANT_TITLE_MAX_CHARS = 40;
 /** One message to the assistant. */

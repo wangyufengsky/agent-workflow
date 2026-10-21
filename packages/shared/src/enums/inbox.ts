@@ -7,6 +7,8 @@ export const InboxKind = {
   Plan: 'plan',
   Failure: 'failure',
   Delivery: 'delivery',
+  /** A scheduled run could not start its task; belongs to no task (22 §5). */
+  ScheduleFailure: 'schedule_failure',
 } as const;
 export type InboxKind = (typeof InboxKind)[keyof typeof InboxKind];
 export const inboxKindSchema = z.enum(InboxKind);

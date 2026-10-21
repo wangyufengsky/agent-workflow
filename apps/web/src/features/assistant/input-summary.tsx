@@ -1,8 +1,9 @@
-import { InboxStatus, InputRef, MCP_SESSION_ARG, type OperationContract } from '@aw/shared';
+import { InboxStatus, InputRef, MCP_SESSION_ARG, type OperationContract, scheduleFrequencySchema } from '@aw/shared';
 import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 import { CONFIRMATION_COPY, INPUT_REF_LABEL } from '../../copy/assistant.ts';
 import { INPUT_FIELD_LABEL, INPUT_VALUE_LABEL } from '../../copy/operations.ts';
+import { frequencyText } from '../../copy/schedules.ts';
 import { INBOX_COPY } from '../../copy/tasks.ts';
 import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
@@ -10,6 +11,7 @@ import { inboxQuery } from '../inbox/inbox.queries.ts';
 import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
 import { deckQuery } from '../ppt/ppt.queries.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
+import { scheduleQuery } from '../schedules/schedules.queries.ts';
 import { rolesQuery, taskQuery, workflowsQuery } from '../tasks/tasks.queries.ts';
 import styles from './cards.module.css';
 
@@ -30,7 +32,9 @@ function valueText(field: string, value: unknown): string | undefined {
   if (typeof value === 'boolean') return value ? CONFIRMATION_COPY.yes : CONFIRMATION_COPY.no;
   if (typeof value === 'number') return String(value);
   if (typeof value === 'string') return INPUT_VALUE_LABEL[field]?.[value] ?? value;
-  return undefined;
+  // A schedule's frequency in words (22 §2); the model's input is checked like any boundary.
+  const frequency = field === 'frequency' ? scheduleFrequencySchema.safeParse(value) : undefined;
+  return frequency?.success === true ? frequencyText(frequency.data) : undefined;
 }
 
 /** The object's name once known; its id while the query runs or when the object is gone. */
@@ -86,6 +90,11 @@ function ProjectRef({ id }: { id: string }) {
 function BatchRef({ id }: { id: string }) {
   const query = useQuery(batchQuery(id));
   return <Named ids={[id]} names={[query.data && `${query.data.key} · ${query.data.title}`]} query={query} />;
+}
+
+function ScheduleRef({ id }: { id: string }) {
+  const query = useQuery(scheduleQuery(id));
+  return <Named ids={[id]} names={[query.data?.title]} query={query} />;
 }
 
 function KnowledgeRef({ id }: { id: string }) {
@@ -147,6 +156,8 @@ function RefValue({ kind, value, input }: { kind: InputRef; value: unknown; inpu
       return <BatchRef id={first} />;
     case InputRef.Deck:
       return <DeckRef id={first} />;
+    case InputRef.Schedule:
+      return <ScheduleRef id={first} />;
     case InputRef.Workflow:
       return <WorkflowRef ids={ids} />;
     case InputRef.Role:

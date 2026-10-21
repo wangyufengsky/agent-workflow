@@ -128,6 +128,7 @@ export const ENTITY_COPY = {
     [EntityKind.KnowledgeConversation]: '知识问答对话',
     [EntityKind.Batch]: '批量任务',
     [EntityKind.Deck]: 'PPT',
+    [EntityKind.Schedule]: '定时任务',
   } satisfies Record<EntityKind, string>,
   open: '打开',
   deleted: '已删除',

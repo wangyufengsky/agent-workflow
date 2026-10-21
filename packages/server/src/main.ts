@@ -26,15 +26,31 @@ async function selectFakeOpencode() {
   return undefined;
 }
 
+/** Browser E2E plays the reviewers of pull requests with FakeHosting (J18); folded away in production bundles. */
+async function selectFakeHosting() {
+  const { AW_FAKE_HOSTING_TOKEN: token, AW_FAKE_HOSTING_REPO: repo } = process.env;
+  if (process.env.NODE_ENV === 'development' && token !== undefined && repo !== undefined) {
+    const [{ createFakeHosting }, { registerFakeHostingRoutes }] = await Promise.all([
+      import('../test/fakes/fake-hosting.ts'),
+      import('../test/fakes/fake-hosting.routes.ts'),
+    ]);
+    return { fake: await createFakeHosting({ token, repos: [repo] }), registerFakeHostingRoutes };
+  }
+  return undefined;
+}
+
 const config = loadConfig(process.env);
 const cipher = await selectCipher();
 const fake = await selectFakeOpencode();
+const fakeHosting = await selectFakeHosting();
 const app = await buildApp(config, {
   ...(cipher === undefined ? {} : { cipher }),
   ...(fake === undefined ? {} : { opencode: fake.fake }),
+  ...(fakeHosting === undefined ? {} : { hosting: fakeHosting.fake.endpoints }),
 });
 const { server } = app;
 fake?.registerFakeOpencodeRoutes(server, fake.fake);
+fakeHosting?.registerFakeHostingRoutes(server, fakeHosting.fake);
 await server.listen({ host: '127.0.0.1', port: config.port });
 
 const address = server.server.address();

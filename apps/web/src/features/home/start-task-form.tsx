@@ -8,6 +8,7 @@ import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { BATCHES_COPY } from '../../copy/batches.ts';
+import { SCHEDULES_COPY } from '../../copy/schedules.ts';
 import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
 import { gitBranchesQuery } from '../git/git.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
@@ -197,16 +198,26 @@ export function StartTaskForm({
                 <span className={styles.name}>{w.name}</span>
                 <span className={styles.description}>{w.description}</span>
               </button>
-              {/* Fixed workflows can run on several targets at once (20 §2). */}
+              {/* Fixed workflows can run on several targets at once (20 §2) and on a schedule (22 §7). */}
               {w.planning === WorkflowPlanning.Fixed && (
-                <Link
-                  to={ROUTES.batchNew}
-                  search={{ projectId, workflow: w.key }}
-                  className={`btn ghost sm ${styles.batch}`}
-                  aria-label={BATCHES_COPY.batchOf(w.name)}
-                >
-                  {BATCHES_COPY.batch}
-                </Link>
+                <>
+                  <Link
+                    to={ROUTES.batchNew}
+                    search={{ projectId, workflow: w.key }}
+                    className={`btn ghost sm ${styles.batch}`}
+                    aria-label={BATCHES_COPY.batchOf(w.name)}
+                  >
+                    {BATCHES_COPY.batch}
+                  </Link>
+                  <Link
+                    to={ROUTES.scheduleNew}
+                    search={{ projectId, workflow: w.key }}
+                    className={`btn ghost sm ${styles.schedule}`}
+                    aria-label={SCHEDULES_COPY.scheduleOf(w.name)}
+                  >
+                    {SCHEDULES_COPY.schedule}
+                  </Link>
+                </>
               )}
             </div>
           ))}

@@ -26,7 +26,13 @@ export const queryKeys = {
   /** Batches are under the task lists' prefix: their progress is their tasks', so task events refresh them (20 §4). */
   batches: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'batches', filter],
   batch: (id: string) => ['tasks', 'list', 'batch', id],
+  /** Schedules too: the state of the task a schedule started is part of it (22 §9). */
+  scheduleLists: ['tasks', 'list', 'schedules'],
+  schedules: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'schedules', filter],
+  schedule: (id: string) => ['tasks', 'list', 'schedule', id],
   task: (id: string) => ['tasks', 'detail', id],
+  /** Outside the task detail's prefix: read from the platform only when the user asks, never refreshed by events. */
+  reviewComments: (id: string) => ['review-comments', id],
   node: (taskId: string, nodeId: string) => ['tasks', 'detail', taskId, 'nodes', nodeId],
   inbox: ['inbox'],
   inboxList: (filter: Record<string, string | undefined>) => ['inbox', 'list', filter],

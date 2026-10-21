@@ -58,6 +58,9 @@ export const ErrorCode = {
   AssistantBusy: 'ASSISTANT_BUSY',
   // 批量任务
   BatchNotFound: 'BATCH_NOT_FOUND',
+  // 定时任务
+  ScheduleNotFound: 'SCHEDULE_NOT_FOUND',
+  ScheduleBusy: 'SCHEDULE_BUSY',
   // 知识问答
   KnowledgeConversationNotFound: 'KNOWLEDGE_CONVERSATION_NOT_FOUND',
   KnowledgeConversationBusy: 'KNOWLEDGE_CONVERSATION_BUSY',
@@ -76,6 +79,9 @@ export const ErrorCode = {
   DeliveryTargetNotFound: 'DELIVERY_TARGET_NOT_FOUND',
   DeliveryTargetDirty: 'DELIVERY_TARGET_DIRTY',
   DeliveryInterrupted: 'DELIVERY_INTERRUPTED',
+  // PR 审查意见回流（21）
+  PullRequestNotOpen: 'PULL_REQUEST_NOT_OPEN',
+  BranchDiverged: 'BRANCH_DIVERGED',
   // 数据库
   DbConnectionNotFound: 'DB_CONNECTION_NOT_FOUND',
   DbConnectionAlreadyExists: 'DB_CONNECTION_ALREADY_EXISTS',
@@ -139,6 +145,8 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.AssistantConfirmationNotFound]: 404,
   [ErrorCode.AssistantBusy]: 409,
   [ErrorCode.BatchNotFound]: 404,
+  [ErrorCode.ScheduleNotFound]: 404,
+  [ErrorCode.ScheduleBusy]: 409,
   [ErrorCode.KnowledgeConversationNotFound]: 404,
   [ErrorCode.KnowledgeConversationBusy]: 409,
   [ErrorCode.KnowledgeCitationInvalid]: null,
@@ -153,6 +161,8 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.DeliveryTargetNotFound]: 400,
   [ErrorCode.DeliveryTargetDirty]: 409,
   [ErrorCode.DeliveryInterrupted]: null,
+  [ErrorCode.PullRequestNotOpen]: 409,
+  [ErrorCode.BranchDiverged]: 409,
   [ErrorCode.DbConnectionNotFound]: 404,
   [ErrorCode.DbConnectionAlreadyExists]: 409,
   [ErrorCode.DbConnectionFailed]: 502,

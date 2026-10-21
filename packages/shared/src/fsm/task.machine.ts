@@ -15,6 +15,7 @@ export const TaskEvent = {
   DeliverySucceeded: 'delivery_succeeded',
   DeliveryConflict: 'delivery_conflict',
   DeliveryFailed: 'delivery_failed',
+  ReviewFeedback: 'review_feedback',
   Fail: 'fail',
   Retry: 'retry',
   Cancel: 'cancel',
@@ -55,8 +56,10 @@ export const taskMachine = defineMachine<TaskStatus, TaskEvent>({
       [E.DeliveryConflict]: [S.Review],
       [E.DeliveryFailed]: [S.Review],
     },
-    [S.Completed]: {},
+    // Only a task delivered as a pull request that is still open (21 §7); the service decides.
+    [S.Completed]: { [E.ReviewFeedback]: [S.Running] },
     [S.Failed]: { [E.Retry]: [S.Preparing, S.Planning, S.Running], [E.Cancel]: [S.Cancelled] },
     [S.Cancelled]: {},
   },
+  reopenedBy: [E.ReviewFeedback],
 });

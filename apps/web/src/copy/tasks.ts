@@ -185,6 +185,7 @@ export const INBOX_COPY = {
     [InboxKind.Plan]: '计划待确认',
     [InboxKind.Failure]: '任务失败',
     [InboxKind.Delivery]: '待合并',
+    [InboxKind.ScheduleFailure]: '定时任务没能开始',
   },
   blocking: 'AI 在等这个答案',
   defaultAssumption: (value: string) => `不回答时 AI 会假设：${value}`,
