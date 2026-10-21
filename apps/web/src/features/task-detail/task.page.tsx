@@ -41,11 +41,17 @@ function StepsView({ task, selection, pro }: MainProps) {
   );
 }
 
-/** Paused (M5-02): the steps with the adjustment banner, or the plan editor with started steps locked. */
-function PausedMain(props: MainProps) {
+/**
+ * Running, paused (M5-02) and failed: the steps under the adjustment banner or failure panel, or the plan editor with
+ * started steps locked. The canvas keeps its place in the tree across these states, so pausing or resuming does not
+ * remount it: a remount lost the user's view, and in CI left the new canvas with nodes it never measured (hidden).
+ */
+function StepsMain(props: MainProps) {
   const { task } = props;
   const [adjusting, setAdjusting] = useState(false);
-  if (adjusting && task.plan !== null) {
+  const paused = task.status === TaskStatus.Paused;
+  const failed = task.status === TaskStatus.Failed;
+  if (paused && adjusting && task.plan !== null) {
     const base = task.draftPlan ?? task.plan;
     const lock = {
       base: task.plan.graph,
@@ -66,8 +72,9 @@ function PausedMain(props: MainProps) {
   }
   return (
     <div className="col">
-      <PausedBanner task={task} pro={props.pro} onAdjust={() => setAdjusting(true)} />
-      <StepsView {...props} />
+      {paused && <PausedBanner task={task} pro={props.pro} onAdjust={() => setAdjusting(true)} />}
+      {failed && <FailurePanel task={task} />}
+      {(!failed || task.nodes.length > 0) && <StepsView {...props} />}
     </div>
   );
 }
@@ -88,16 +95,9 @@ function TaskMain({ task, selection, pro }: MainProps) {
     case TaskStatus.PlanReview:
       return <PlanReview task={task} pro={pro} />;
     case TaskStatus.Running:
-      return <StepsView {...props} />;
     case TaskStatus.Paused:
-      return <PausedMain {...props} />;
     case TaskStatus.Failed:
-      return (
-        <div className="col">
-          <FailurePanel task={task} />
-          {task.nodes.length > 0 && <StepsView {...props} />}
-        </div>
-      );
+      return <StepsMain {...props} />;
     case TaskStatus.Review:
     case TaskStatus.Merging:
     case TaskStatus.Completed:
