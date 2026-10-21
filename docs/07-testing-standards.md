@@ -56,7 +56,8 @@
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
 | `createTestApp()` | `test/helpers/app.ts` | 启动后端（临时数据目录、随机端口），返回类型化 API 调用 `call(op, input)`、`mcpUrl`、FakeOpencode；`realOpencode: true` 用于 `@opencode` 测试；MCP SDK 客户端见 `test/helpers/mcp.ts` |
 | `build.*()` | `test/builders/` | 最小测试数据构造器，只填测试关心的字段，其余用合法默认值 |
-| `waitForEvent(type, predicate)` | `test/helpers/events.ts` | 订阅 event-bus 等待事件，带超时（默认 5s）；**替代一切 sleep** |
+| `waitForEvent(type, predicate)` | `test/helpers/events.ts` | 订阅 event-bus 等待事件，带超时（默认 20s，慢的 CI runner 与 Windows 上一个任务要几秒）；**替代一切 sleep** |
+| git 环境 | `test/setup/git-config.ts`（int 项目的 setupFiles） | 集成测试中的 git 不读开发者的全局与系统配置，且不猜测提交者身份（`user.useConfigOnly`）：结果与全新 CI runner 一致；需要身份的地方必须显式给出（后端用 `BACKEND_COMMITTER`，测试仓库用 `createTestRepo` 的身份） |
 | `FakeClock` | `test/helpers/clock.ts` | 注入时钟，测试超时与 nudge 逻辑，不真实等待 |
 
 后端代码中需要时间的地方（超时、时间戳）通过注入的 `clock` 获取，不直接调 `Date.now()` / `setTimeout`，以便测试控制。
