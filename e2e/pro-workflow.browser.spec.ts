@@ -47,5 +47,6 @@ test('简单模式直接打开专业页面：说明属于专业模式，可一�
   await page.goto('/workflows');
   await expect(page.getByText('此页面属于专业模式')).toBeVisible();
   await page.getByRole('button', { name: '开启专业模式' }).click();
-  await expect(page.getByRole('heading', { name: '流程' })).toBeVisible();
+  // The shell header shows the same title once pro mode is on: the page's own heading is the one asserted.
+  await expect(page.getByRole('main').getByRole('heading', { name: '流程' })).toBeVisible();
 });
