@@ -26,7 +26,7 @@ export function parseWorktreeList(output: string): GitWorktree[] {
     const key = space < 0 ? field : field.slice(0, space);
     const value = space < 0 ? '' : field.slice(space + 1);
     if (key === 'worktree') {
-      current = { path: host.fromGitPath(value), commit: null, branch: null, locked: false, prunable: false };
+      current = { path: value, commit: null, branch: null, locked: false, prunable: false };
       continue;
     }
     if (current === undefined) throw new Error(`git worktree list attribute ${field} outside a worktree`);
@@ -40,5 +40,6 @@ export function parseWorktreeList(output: string): GitWorktree[] {
 
 export async function listWorktrees(repo: string): Promise<GitWorktree[]> {
   const { stdout } = await runGit(['worktree', 'list', '--porcelain', '-z'], { cwd: repo });
-  return parseWorktreeList(stdout);
+  // Native paths, comparable with the stored ones (git prints C:/... on Windows, 17 §3.4).
+  return parseWorktreeList(stdout).map((worktree) => ({ ...worktree, path: host.fromGitPath(worktree.path) }));
 }
