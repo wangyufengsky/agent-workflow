@@ -39,6 +39,11 @@ describe('researchSteps', () => {
     });
   });
 
+  it('Windows 上 opencode 报告的原生路径同样去掉仓库路径，以 / 分隔显示', () => {
+    const entries = [call('read', { filePath: 'C:\\Users\\me\\repo\\src\\refund.ts' })];
+    expect(researchSteps(entries, 'C:\\Users\\me\\repo').reads).toEqual(['src/refund.ts']);
+  });
+
   it('提交回答后进入组织回答；被拒绝时标出正在修正，重提通过后不再标出', () => {
     const rejected = [call('agent-workflow_submit_answer'), result('agent-workflow_submit_answer', 'error')];
     expect(researchSteps(rejected, '/repo')).toMatchObject({ current: 'answer', rejected: true });

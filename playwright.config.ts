@@ -36,7 +36,7 @@ export default defineConfig({
       url: `http://127.0.0.1:${DEV_API_PORT}/api/v1/system/health`,
       timeout: 180_000,
       reuseExistingServer: false,
-      // In CI the backend's warnings and errors go to the job log, next to a failing spec.
+      // In CI the backend's log goes to the job log, next to a failing spec.
       stdout: process.env.CI === undefined ? 'ignore' : 'pipe',
       stderr: 'pipe',
       env: {
@@ -45,7 +45,8 @@ export default defineConfig({
         AW_API_TOKEN: E2E_TOKEN,
         AW_DATA_DIR: join(backendHome, 'data'),
         AW_PORT: String(DEV_API_PORT),
-        AW_LOG_LEVEL: 'warn',
+        // In CI the state transitions with their timestamps show where a slow platform spends its time (17 §4.1).
+        AW_LOG_LEVEL: process.env.CI === undefined ? 'warn' : 'info',
         NODE_ENV: 'development',
         // AI sessions are played by FakeOpencode (07 §2), which also reports a model so the environment is ready.
         AW_FAKE_OPENCODE: '1',
