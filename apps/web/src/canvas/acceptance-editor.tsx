@@ -13,16 +13,19 @@ function compose(commands: CommandCheck[], review: ReviewCheck | undefined, manu
 
 /**
  * A step's checks (10 §workflows `Acceptance`): commands, an AI review and manual acceptance. `undefined` means the
- * workflow's default, offered when `allowDefault` (plan steps; not the workflow default itself).
+ * workflow's default, offered when `allowDefault` (plan steps; not the workflow default itself). Without `legend` the
+ * surrounding panel's title names the group.
  */
 export function AcceptanceEditor({
   idPrefix,
+  legend,
   value,
   onChange,
   disabled = false,
   allowDefault,
 }: {
   idPrefix: string;
+  legend?: string;
   value: Acceptance | undefined;
   onChange: (value: Acceptance | undefined) => void;
   disabled?: boolean;
@@ -38,8 +41,8 @@ export function AcceptanceEditor({
     );
 
   return (
-    <fieldset className="col" disabled={disabled}>
-      <legend className="label">{C.acceptance}</legend>
+    <fieldset className="field" disabled={disabled} aria-label={legend === undefined ? C.acceptance : undefined}>
+      {legend !== undefined && <legend className="label">{legend}</legend>}
       {allowDefault && (
         <label className="check">
           <input
@@ -52,7 +55,7 @@ export function AcceptanceEditor({
       )}
       {!usesDefault && (
         <>
-          <span className="hint">{C.commands}</span>
+          <span className="sub-label">{C.commands}</span>
           {commands.map((check, index) => (
             // Commands have no identity besides their position while being typed.
             // biome-ignore lint/suspicious/noArrayIndexKey: see above

@@ -64,21 +64,22 @@ export function FilesTab({
           {tree.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
           {tree.isError && <ErrorState error={tree.error} onRetry={() => void tree.refetch()} />}
           {tree.data?.length === 0 && <p className="hint">{C.empty}</p>}
-          <ul className="list">
+          <ul className={styles.tree}>
             {tree.data?.map((entry) => (
-              <li key={entry.path} className="list-row">
+              <li key={entry.path}>
                 {entry.type === GitTreeEntryType.Commit ? (
-                  <span className="mono hint">
+                  <span className={`${styles.treeEntry} hint`}>
+                    <Icon name="git" size="sm" />
                     {entry.name} · {C.submodule}
                   </span>
                 ) : (
                   <button
                     type="button"
-                    className={`row mono ${styles.rowButton}`}
+                    className={styles.treeEntry}
                     onClick={() => onOpen(entry.path, entry.type === GitTreeEntryType.Blob)}
                   >
-                    <Icon name={entry.type === GitTreeEntryType.Tree ? 'folder' : 'list'} />
-                    {entry.name}
+                    <Icon name={entry.type === GitTreeEntryType.Tree ? 'folder' : 'file'} size="sm" />
+                    <span className="ellipsis">{entry.name}</span>
                   </button>
                 )}
               </li>

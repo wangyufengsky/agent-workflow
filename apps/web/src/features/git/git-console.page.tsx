@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { ROUTES } from '../../app/routes.ts';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
+import { PathText } from '../../components/path-text.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { GIT_COPY as C } from '../../copy/git.ts';
 import { projectsQuery } from '../projects/projects.queries.ts';
@@ -28,7 +29,7 @@ export function GitConsolePage() {
               <Icon name="git" />
               <strong>{p.name}</strong>
             </span>
-            <span className="mono hint ellipsis">{p.repoPath}</span>
+            <PathText path={p.repoPath} className="hint" />
           </Link>
         ))}
       </div>

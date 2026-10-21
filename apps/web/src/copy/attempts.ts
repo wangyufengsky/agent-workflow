@@ -1,4 +1,5 @@
-import { AttemptKind, AttemptStatus, TranscriptSystemEvent } from '@aw/shared';
+import { AttemptKind, AttemptStatus, McpToolName, TranscriptSystemEvent } from '@aw/shared';
+import type { ActionState, ToolAction } from '../features/attempts/process-lines.ts';
 import { formatDateTimeSeconds, formatTimeSeconds } from './common.ts';
 
 export const ATTEMPT_STATUS_LABEL: Record<AttemptStatus, string> = {
@@ -63,4 +64,53 @@ export const DEBUG_COPY = {
   model: '模型（可选）',
   modelPlaceholder: 'provider/model，留空使用设置或 opencode 默认',
   start: '开始',
+} as const;
+
+/** Our execution MCP tools as the simple process view names them (14 §3.4). */
+const APP_TOOL_LABEL: Record<McpToolName, string> = {
+  [McpToolName.GetTaskContext]: '读取任务背景',
+  [McpToolName.GetNodeOutput]: '读取前面步骤的产出',
+  [McpToolName.GetTaskDiff]: '查看任务的改动',
+  [McpToolName.SubmitPlan]: '提交计划',
+  [McpToolName.SubmitResult]: '提交结果',
+  [McpToolName.SubmitReview]: '提交评审意见',
+  [McpToolName.AskUser]: '向你提问',
+  [McpToolName.ReportProgress]: '进展',
+  [McpToolName.DbListConnections]: '查看可用的数据库',
+  [McpToolName.DbDescribe]: '查看表结构',
+  [McpToolName.DbQuery]: '查询数据库',
+  [McpToolName.SubmitAnswer]: '提交回答',
+};
+
+/** One tool call in the user's words:「编辑 src/a.ts +12 −3」「运行 pnpm test」. */
+export function toolActionLabel(action: ToolAction): string {
+  switch (action.kind) {
+    case 'edit':
+      return `编辑 ${action.path} +${action.added} −${action.removed}`;
+    case 'write':
+      return `写入 ${action.path} +${action.lines}`;
+    case 'read':
+      return `查看 ${action.path}`;
+    case 'run':
+      return `运行 ${action.command}`;
+    case 'search':
+      return `搜索 ${action.query}`;
+    case 'fetch':
+      return `打开网页 ${action.url}`;
+    case 'todo':
+      return '整理待办';
+    case 'app':
+      return action.detail === undefined || action.detail === ''
+        ? APP_TOOL_LABEL[action.name]
+        : `${APP_TOOL_LABEL[action.name]}：${action.detail}`;
+    case 'other':
+      return `使用工具 ${action.tool}`;
+  }
+}
+
+export const PROCESS_COPY = {
+  now: '当前进展',
+  empty: 'AI 还没有开始写内容。',
+  state: { running: '进行中', ok: '成功', failed: '失败' } satisfies Record<ActionState, string>,
+  permission: (permission: string, patterns: string) => `请求权限：${permission} ${patterns}`,
 } as const;

@@ -80,7 +80,9 @@ async function seed(request: APIRequestContext): Promise<Seed> {
       submitResult('找到了根因：时区换算用了服务器本地时区。'),
     ]);
     await queueTurn(request, project, { title: '修复' }, [
+      { type: 'text', text: '时区换算用了服务器本地时区，改为统一按 UTC 换算。' },
       { type: 'edit', file, content: 'export const toLocal = (t: number) => new Date(t).toISOString();\n' },
+      { type: 'tool', tool: 'bash', input: { command: 'pnpm test' } },
       submitResult('统一按 UTC 换算，并补充了 `toLocal` 的说明。'),
     ]);
     await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
@@ -95,7 +97,12 @@ async function seed(request: APIRequestContext): Promise<Seed> {
   const completed = await startWorkflow(request, completedProject, 'bugfix', '退款时间显示错了');
 
   const runningProject = await createProject(request, null);
-  await queueTurn(request, runningProject, { title: '定位根因' }, [{ type: 'hang' }]);
+  await queueTurn(request, runningProject, { title: '定位根因' }, [
+    { type: 'text', text: '先看导出逻辑，确认最后一行是在哪里丢的。' },
+    { type: 'tool', tool: 'read', input: { filePath: 'src/export.ts' } },
+    { type: 'callTool', name: 'report_progress', args: { message: '正在复现缺少最后一行的问题' } },
+    { type: 'hang' },
+  ]);
   const running = await startWorkflow(request, runningProject, 'bugfix', '导出的报表缺少最后一行');
 
   const questionProject = await createProject(request, null);

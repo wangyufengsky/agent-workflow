@@ -1,11 +1,13 @@
 import { FailureAction, type InboxItemDTO, type InboxItemOf, InboxKind, PermissionDecision } from '@aw/shared';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type FormEvent, useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
-import { ERROR_COPY } from '../../copy/errors.ts';
-import { INBOX_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
+import { INBOX_COPY as C } from '../../copy/tasks.ts';
+import { failureText } from '../tasks/failure-text.ts';
+import { taskQuery, tasksQuery } from '../tasks/tasks.queries.ts';
 import { type InboxResponse, useDismissInbox, useResolveInbox } from './inbox.queries.ts';
 import styles from './inbox-card.module.css';
 
@@ -131,9 +133,7 @@ function FailureCard({ item, resolve, pending }: CardProps<typeof InboxKind.Fail
   const { error } = item.payload;
   return (
     <>
-      <p className={styles.title}>
-        {TASK_COPY.failedPhase[item.payload.phase]}：{ERROR_COPY[error.code]}
-      </p>
+      <p className={styles.title}>{failureText(item.payload.phase, error)}</p>
       <div className={styles.actions}>
         <Button variant="primary" size="sm" disabled={pending} onClick={() => resolve({ action: FailureAction.Retry })}>
           {C.retry}
@@ -155,10 +155,32 @@ function TaskLink({ item, label }: { item: InboxItemDTO; label: string }) {
   );
 }
 
-/** One open item, handled where it is shown (14 §3.6). */
-export function InboxCard({ item, taskLabel }: { item: InboxItemDTO; taskLabel?: string | undefined }) {
+/** Kinds whose card text does not name the step it came from. */
+const NAMES_NO_STEP = new Set<InboxKind>([InboxKind.Question, InboxKind.Permission]);
+
+/**
+ * Where an item comes from (14 §3.6): its task (unless the list already groups by it) and, for questions and
+ * permissions, its step; items without a task come from knowledge questions. The task comes from the one task list
+ * every card shares; only questions and permissions, which belong to running steps, read their task's steps.
+ */
+function useSource(item: InboxItemDTO, showTask: boolean): string | undefined {
+  const needsStep = item.taskId !== null && item.nodeId !== null && NAMES_NO_STEP.has(item.kind);
+  const tasks = useQuery({ ...tasksQuery(), enabled: showTask && item.taskId !== null }).data;
+  const detail = useQuery({ ...taskQuery(item.taskId ?? ''), enabled: needsStep }).data;
+  if (item.taskId === null) return C.fromKnowledge;
+  const parts: string[] = [];
+  const task = tasks?.find((t) => t.id === item.taskId);
+  if (showTask && task !== undefined) parts.push(C.inTask(task.key, task.title));
+  const step = detail?.nodes.find((n) => n.id === item.nodeId);
+  if (step !== undefined) parts.push(C.inStep(step.title));
+  return parts.length === 0 ? undefined : parts.join(' · ');
+}
+
+/** One open item, handled where it is shown (14 §3.6); `showTask` is off where the list is already the task's. */
+export function InboxCard({ item, showTask = true }: { item: InboxItemDTO; showTask?: boolean }) {
   const resolve = useResolveInbox();
   const dismiss = useDismissInbox();
+  const label = useSource(item, showTask);
   const props = {
     pending: resolve.isPending,
     resolve: (response: InboxResponse) => resolve.mutate({ id: item.id, response }),
@@ -167,7 +189,7 @@ export function InboxCard({ item, taskLabel }: { item: InboxItemDTO; taskLabel?:
     <article className={styles.card} data-testid={`inbox-${item.kind}`}>
       <header className={styles.head}>
         <span className="chip">{C.kind[item.kind]}</span>
-        {taskLabel !== undefined && <span className="ellipsis">{taskLabel}</span>}
+        {label !== undefined && <span className="ellipsis">{label}</span>}
       </header>
       {item.kind === InboxKind.Question && <QuestionCard item={item} {...props} />}
       {item.kind === InboxKind.Permission && <PermissionCard item={item} {...props} />}
@@ -175,7 +197,7 @@ export function InboxCard({ item, taskLabel }: { item: InboxItemDTO; taskLabel?:
       {item.kind === InboxKind.Failure && <FailureCard item={item} {...props} />}
       {item.kind === InboxKind.Plan && (
         <>
-          <p className={styles.title}>{item.title}</p>
+          <p className={styles.title}>{C.planBody(item.payload.version)}</p>
           <div className={styles.actions}>
             <TaskLink item={item} label={C.confirmPlan} />
           </div>
@@ -183,7 +205,7 @@ export function InboxCard({ item, taskLabel }: { item: InboxItemDTO; taskLabel?:
       )}
       {item.kind === InboxKind.Delivery && (
         <>
-          <p className={styles.title}>{item.title}</p>
+          <p className={styles.title}>{C.deliveryReady}</p>
           <div className={styles.actions}>
             <TaskLink item={item} label={C.viewResult} />
             <Button size="sm" pending={dismiss.isPending} onClick={() => dismiss.mutate(item.id)}>

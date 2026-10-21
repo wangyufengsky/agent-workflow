@@ -5,7 +5,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
 import { GIT_COPY as C } from '../../copy/git.ts';
 import styles from './git.module.css';
-import { gitCommitQuery, gitDiffFileQuery, gitLogQuery } from './git.queries.ts';
+import { gitBranchesQuery, gitCommitQuery, gitDiffFileQuery, gitLogQuery } from './git.queries.ts';
 
 function CommitDetail({ projectId, sha, onBack }: { projectId: string; sha: string; onBack: () => void }) {
   const commit = useQuery(gitCommitQuery(projectId, sha));
@@ -23,6 +23,61 @@ function CommitDetail({ projectId, sha, onBack }: { projectId: string; sha: stri
       </span>
       {c.body !== '' && <pre className={styles.code}>{c.body}</pre>}
       <DiffBrowser files={c.files} fileQuery={gitDiffFileQuery(projectId, c.base, c.sha)} />
+    </div>
+  );
+}
+
+/** Which ref the log shows: a branch from the list, or any commit typed in. */
+function RefPicker({
+  projectId,
+  refName,
+  onRef,
+}: {
+  projectId: string;
+  refName: string;
+  onRef: (ref: string) => void;
+}) {
+  const branches = useQuery(gitBranchesQuery(projectId)).data ?? [];
+  const isBranch = branches.some((b) => b.name === refName);
+  return (
+    <div className={styles.refPicker}>
+      <div className="field">
+        <label className="label" htmlFor="log-branch">
+          {C.branch}
+        </label>
+        <select
+          id="log-branch"
+          className="select mono"
+          value={isBranch ? refName : ''}
+          onChange={(e) => e.target.value !== '' && onRef(e.target.value)}
+        >
+          {!isBranch && <option value="">{C.otherRef(refName)}</option>}
+          {branches.map((b) => (
+            <option key={b.name} value={b.name}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <form
+        className="row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const value = new FormData(e.currentTarget).get('ref');
+          if (typeof value === 'string' && value.trim() !== '') onRef(value.trim());
+        }}
+      >
+        <input
+          name="ref"
+          className="input mono"
+          aria-label={C.ref}
+          placeholder={C.refPlaceholder}
+          defaultValue={isBranch ? '' : refName}
+          // The branches arrive after the first render; until then the ref cannot be told from a commit.
+          key={`${refName}|${isBranch}`}
+        />
+        <Button type="submit">{C.viewCommits}</Button>
+      </form>
     </div>
   );
 }
@@ -46,31 +101,21 @@ export function CommitsTab({
   const commits = log.data?.pages.flatMap((p) => p.items) ?? [];
   return (
     <div className="col">
-      <form
-        className={styles.toolbar}
-        onSubmit={(e) => {
-          e.preventDefault();
-          const value = new FormData(e.currentTarget).get('ref');
-          if (typeof value === 'string' && value.trim() !== '') onRef(value.trim());
-        }}
-      >
-        <div className="field">
-          <label className="label" htmlFor="log-ref">
-            {C.ref}
-          </label>
-          <input id="log-ref" name="ref" className="input mono" defaultValue={refName} key={refName} />
-        </div>
-        <Button type="submit">{C.viewCommits}</Button>
-      </form>
+      <RefPicker projectId={projectId} refName={refName} onRef={onRef} />
       {log.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
       {log.isError && <ErrorState error={log.error} onRetry={() => void log.refetch()} />}
       {log.isSuccess && commits.length === 0 && <p className="hint">{C.noCommits}</p>}
-      <table className={styles.table}>
+      <table className={styles.table} data-layout="fixed">
+        <colgroup>
+          <col />
+          <col className={styles.shaCol} />
+          <col className={styles.byCol} />
+        </colgroup>
         <tbody>
           {commits.map((c) => (
             <tr key={c.sha} data-testid="git-log-entry">
-              <td>
-                <button type="button" className={styles.rowButton} onClick={() => onSha(c.sha)}>
+              <td className={styles.subjectCell}>
+                <button type="button" className={styles.rowButton} title={c.subject} onClick={() => onSha(c.sha)}>
                   {c.subject}
                 </button>
               </td>

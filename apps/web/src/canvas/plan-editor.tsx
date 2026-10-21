@@ -1,5 +1,5 @@
 import '@xyflow/react/dist/base.css';
-import type { NodeStatus, PlanGraph, PlanRules, RoleDTO } from '@aw/shared';
+import { type NodeStatus, type PlanGraph, type PlanRules, type RoleDTO, transitiveDependencies } from '@aw/shared';
 import {
   type Connection,
   type Edge,
@@ -15,6 +15,7 @@ import { Button } from '../components/button.tsx';
 import { Panel } from '../components/panel.tsx';
 import { PLAN_EDITOR_COPY as C } from '../copy/plan-editor.ts';
 import styles from './canvas.module.css';
+import { CANVAS_FIT, EDGE_PLAN } from './canvas-style.ts';
 import type { EditorProblem, PlanLock } from './plan-check.ts';
 import editorStyles from './plan-editor.module.css';
 import { addNode, connect, disconnect, removeNode, renameNode, updateNode } from './plan-graph-edit.ts';
@@ -25,7 +26,6 @@ import { useNodeSizes } from './use-node-sizes.ts';
 
 const NODE_TYPES = { task: TaskNode };
 const MINIMAP_FROM = 12;
-const FIT = { padding: 0.15, minZoom: 0.6, maxZoom: 1 };
 
 type Props = {
   graph: PlanGraph;
@@ -64,7 +64,7 @@ function EditorFlow({ graph, onChange, roles, statuses, isLocked, selected, onSe
             target: node.key,
             // A started step keeps its dependencies.
             deletable: !isLocked(node.key),
-            style: { stroke: 'var(--edge-done)' },
+            style: EDGE_PLAN,
           })),
       ),
     [graph, keys, isLocked],
@@ -75,7 +75,7 @@ function EditorFlow({ graph, onChange, roles, statuses, isLocked, selected, onSe
   useEffect(() => {
     if (fitted.current || !measured || positions.size === 0) return;
     fitted.current = true;
-    requestAnimationFrame(() => void fitView(FIT));
+    requestAnimationFrame(() => void fitView(CANVAS_FIT));
   }, [measured, positions, fitView]);
 
   const { onNodesChange, measured: sizeOf } = useNodeSizes();
@@ -108,7 +108,8 @@ function EditorFlow({ graph, onChange, roles, statuses, isLocked, selected, onSe
   const isValidConnection = (c: Connection | Edge) =>
     c.source !== c.target &&
     !isLocked(c.target) &&
-    !graph.nodes.some((n) => n.key === c.target && n.dependsOn.includes(c.source));
+    !graph.nodes.some((n) => n.key === c.target && n.dependsOn.includes(c.source)) &&
+    !transitiveDependencies(graph.nodes, c.source).has(c.target);
 
   return (
     <ReactFlow

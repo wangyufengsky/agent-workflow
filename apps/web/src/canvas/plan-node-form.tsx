@@ -1,4 +1,4 @@
-import type { PlanGraph, PlanNodeSpec, RoleDTO } from '@aw/shared';
+import { dependencyCandidates, type PlanGraph, type PlanNodeSpec, type RoleDTO } from '@aw/shared';
 import { useState } from 'react';
 import { Button } from '../components/button.tsx';
 import { PLAN_EDITOR_COPY as C } from '../copy/plan-editor.ts';
@@ -49,9 +49,12 @@ function KeyField({ graph, node, locked, onRename }: Pick<Props, 'graph' | 'node
   );
 }
 
-/** Fields of the selected step (14 §5): dependencies as checkboxes too, so the plan can be edited without dragging. */
+/**
+ * Fields of the selected step (14 §5): dependencies as checkboxes too, so the plan can be edited without dragging; only
+ * steps that do not already depend on this one are offered, so a dependency never closes a cycle.
+ */
 export function PlanNodeForm({ graph, node, allowedRoles, roles, locked, onPatch, onRename, onRemove }: Props) {
-  const others = graph.nodes.filter((n) => n.key !== node.key);
+  const upstream = dependencyCandidates(graph.nodes, node.key);
   const roleKeys = allowedRoles.includes(node.roleKey) ? allowedRoles : [...allowedRoles, node.roleKey];
   const roleName = (key: string) => roles.find((r) => r.key === key)?.name ?? key;
   return (
@@ -102,10 +105,10 @@ export function PlanNodeForm({ graph, node, allowedRoles, roles, locked, onPatch
           onChange={(e) => onPatch({ instructions: e.target.value })}
         />
       </div>
-      <fieldset className="col" disabled={locked}>
+      <fieldset className="field" disabled={locked}>
         <legend className="label">{C.dependsOn}</legend>
-        {others.length === 0 && <span className="hint">{C.noOtherSteps}</span>}
-        {others.map((other) => (
+        {upstream.length === 0 && <span className="hint">{C.noOtherSteps}</span>}
+        {upstream.map((other) => (
           <label key={other.key} className="check">
             <input
               type="checkbox"
@@ -124,6 +127,7 @@ export function PlanNodeForm({ graph, node, allowedRoles, roles, locked, onPatch
       </fieldset>
       <AcceptanceEditor
         idPrefix="plan-node"
+        legend={C.acceptance}
         value={node.acceptance}
         onChange={(acceptance) => onPatch({ acceptance })}
         disabled={locked}

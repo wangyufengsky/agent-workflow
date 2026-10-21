@@ -1,5 +1,4 @@
-import type { TaskDetailDTO } from '@aw/shared';
-import { WorkflowPlanning } from '@aw/shared';
+import { type PlanGraph, type RoleDTO, type TaskDetailDTO, transitiveDependencies, WorkflowPlanning } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { ProgressCanvas } from '../../canvas/progress-canvas.tsx';
@@ -13,6 +12,25 @@ import { rolesQuery, useConfirmPlan, useReplan } from '../tasks/tasks.queries.ts
 import { stepsOfPlan } from './steps.ts';
 import styles from './task-page.module.css';
 import { TaskPlanEditor } from './task-plan-editor.tsx';
+
+/** The plan's steps in an order that runs each after its dependencies: fewer transitive dependencies first. */
+function PlanSteps({ graph, roles }: { graph: PlanGraph; roles: readonly RoleDTO[] }) {
+  const depth = new Map(graph.nodes.map((n) => [n.key, transitiveDependencies(graph.nodes, n.key).size]));
+  const ordered = graph.nodes.toSorted((a, b) => (depth.get(a.key) ?? 0) - (depth.get(b.key) ?? 0));
+  return (
+    <ol className={styles.planSteps} data-testid="plan-steps">
+      {ordered.map((n) => (
+        <li key={n.key}>
+          <span className="row">
+            <span className={`${styles.stepTitle} grow`}>{n.title}</span>
+            <span className="chip">{roles.find((r) => r.key === n.roleKey)?.name ?? n.roleKey}</span>
+          </span>
+          <p className={styles.instructions}>{n.instructions}</p>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 /**
  * Plan waiting for confirmation (14 §3.3): read-only canvas, summary, assumptions; confirm or send feedback. The pro
@@ -36,17 +54,21 @@ export function PlanReview({ task, pro }: { task: TaskDetailDTO; pro: boolean })
       <ProgressCanvas steps={stepsOfPlan(plan.graph, roles.data ?? [])} />
       <aside className={styles.side}>
         <Panel title={`${C.planTitle} · ${C.planVersion(plan.version)}`}>
-          <div className="col">
+          <div className={styles.result}>
             {plan.summary !== null && <Markdown source={plan.summary} />}
+            <section className={styles.block}>
+              <h3 className="sec-t">{C.planSteps(plan.graph.nodes.length)}</h3>
+              <PlanSteps graph={plan.graph} roles={roles.data ?? []} />
+            </section>
             {plan.assumptions.length > 0 && (
-              <>
+              <section className={styles.block}>
                 <h3 className="sec-t">{C.assumptions}</h3>
-                <ul>
+                <ul className={styles.bullets}>
                   {plan.assumptions.map((a) => (
                     <li key={a}>{a}</li>
                   ))}
                 </ul>
-              </>
+              </section>
             )}
             <Button
               variant="primary"
