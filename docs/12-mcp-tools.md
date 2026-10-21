@@ -337,7 +337,7 @@ export const submitPlanTool = defineMcpTool({
 | 会话 | `session.create({ directory, title, agent, permission })`；同一服务两个目录并发互不干扰 |
 | 事件 | `global.event()` 为全局流，每条带 `directory`；`event.subscribe({ directory })` 只含该目录事件。实测事件类型：`session.created/updated/status/idle/diff`、`message.updated`、`message.part.updated/delta`、`permission.asked/replied`、`file.edited`、`server.heartbeat` 等 |
 | 权限 | `permission.asked` → `permission.reply({ requestID, directory, reply })` 后会话继续 |
-| 规则合并（v1.1） | 发给模型的工具列表按 `merge(agent.permission, session.permission)` 计算被整体 deny 的工具（二进制中 `de.disabled(Object.keys(tools), de.merge(e.agent.permission, e.permission ?? []))`），所以会话级 allow 能重新打开 agent deny 的工具（知识研究员的网络开关，D68） |
+| 规则合并（v1.1） | 发给模型的工具列表按 `merge(agent.permission, session.permission)` 计算被整体 deny 的工具（二进制中 `de.disabled(Object.keys(tools), de.merge(e.agent.permission, e.permission ?? []))`），所以会话级 allow 能重新打开 agent deny 的工具（知识研究员的网络开关，D75） |
 | 流式正文（M2） | `message.part.updated` 在文本/思考片段开始（`text` 为空）与结束（带 `time.end`）时各一次，其间是 `message.part.delta`（`field: 'text'`）；工具片段依次 `pending` → `running`（可多次，`metadata.output` 增长）→ `completed` / `error`；`step-finish` 片段带 tokens 与 cost；`server.connected`、`server.heartbeat` 不带 `directory`。样本见 `packages/server/test/fixtures/opencode-1.19.0-events.json` |
 | 重试（M2） | 模型请求失败时 `session.status` 为 `{ type: 'retry', message, next }`，会话一直等待到 `next`（如免费额度用尽），不发 `session.error` |
 | 内部事件（M2） | `modules/opencode/opencode.events.ts` 只解析用到的事件（消息角色、文本与增量、工具、用量、重试、空闲、错误、权限），加上运行时消失的 `runtime_lost`；其他模块只经 `OpencodeClient.subscribe` 获取 |

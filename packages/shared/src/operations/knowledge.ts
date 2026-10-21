@@ -12,7 +12,7 @@ import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
 
 const byId = z.object({ id: z.string() });
-// Knowledge Q&A is a simple-mode feature the assistant can use too (D67).
+// Knowledge Q&A is a simple-mode feature the assistant can use too (D74).
 const common = { expose: { palette: false, assistant: true }, credentialFields: [], mode: UiMode.Simple } as const;
 
 export const listKnowledgeOp = defineOperationContract({

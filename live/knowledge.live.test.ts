@@ -31,7 +31,7 @@ const MEDIAN_LINES = { first: 8, last: 13 };
 
 let t: TestApp;
 let projectId: string;
-/** Permission requests of the researcher, allowed once like a user would (its bash is read-only, D68). */
+/** Permission requests of the researcher, allowed once like a user would (its bash is read-only, D75). */
 const asked: string[] = [];
 
 beforeAll(async () => {

@@ -350,7 +350,7 @@ payload / response：
 | id | TEXT PK | |
 | project_id | TEXT → projects，CASCADE | |
 | title | TEXT | 第一次提问的首行（`KNOWLEDGE_TITLE_MAX_CHARS`） |
-| sources | TEXT(JSON) | `{ code, docs, database, web }`，对话开始后固定（D66） |
+| sources | TEXT(JSON) | `{ code, docs, database, web }`，对话开始后固定（D73） |
 | created_at / updated_at | INTEGER | `updated_at` 随每一轮的创建与结束更新 |
 
 索引：`(project_id)`、`(updated_at)`。
