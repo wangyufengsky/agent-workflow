@@ -29,7 +29,8 @@
     "aw-planner":  { "mode": "primary", "description": "agent-workflow planner",  "prompt": "<protocol-plan.md>",    "permission": { "edit": "deny",  "question": "deny", "webfetch": "deny", "external_directory": "deny" } },
     "aw-executor": { "mode": "primary", "description": "agent-workflow executor", "prompt": "<protocol-execute.md>", "permission": { "edit": "allow", "question": "deny", "webfetch": "ask",  "external_directory": "deny" } },
     "aw-reviewer": { "mode": "primary", "description": "agent-workflow reviewer", "prompt": "<protocol-review.md>",  "permission": { "edit": "deny",  "question": "deny", "webfetch": "deny", "external_directory": "deny" } }
-  }
+  },
+  "shell": "C:\\Program Files\\Git\\bin\\bash.exe"   // 仅 Windows：Git Bash，bash 规则按 bash 语法匹配（D67）
 }
 ```
 

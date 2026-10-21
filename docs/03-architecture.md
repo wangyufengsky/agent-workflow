@@ -254,8 +254,10 @@ export function taskOperations(tasks: TasksService) {
 
 ## 7. 数据目录
 
+位置为 Electron 的 `userData`：macOS `~/Library/Application Support/Agent Workflow/`，Windows `%APPDATA%\Agent Workflow\`，Linux `~/.config/Agent Workflow/`（17 §3.1）。
+
 ```
-~/Library/Application Support/agent-workflow/
+<userData>/
 ├─ app.db                      SQLite（WAL）
 ├─ logs/
 │  ├─ app-YYYYMMDD.log         pino

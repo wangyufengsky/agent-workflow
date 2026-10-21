@@ -84,13 +84,17 @@ Electron `app.getPath('userData')`，目录名为产品名：
 
 | 子进程 | macOS / Linux | Windows |
 | --- | --- | --- |
-| `opencode serve` | `SIGTERM`，opencode 自己结束子进程 | 没有信号，`TerminateProcess` 只结束 opencode 本身，bash 子进程与语言服务会留下。用 `taskkill /pid <pid> /T /F` 结束进程树（`platform.killProcessTree`） |
-| 检查命令（`acceptance.runCommand`） | `/bin/sh -c`；超时 / 中止时 `SIGTERM` | Git Bash `-c`（与 opencode 同一个 shell，D68）；超时 / 中止时 `taskkill /T /F` |
+| `opencode serve` | 自成进程组（`detached`），停止时向进程组发 `SIGTERM` | 没有信号，`TerminateProcess` 只结束 opencode 本身，bash 子进程与语言服务会留下。用 `taskkill /pid <pid> /T /F` 结束进程树 |
+| 检查命令（`acceptance.runCommand`） | `/bin/sh -c`，自成进程组；超时 / 中止时向进程组发 `SIGTERM` | Git Bash `-c`（与 opencode 同一个 shell，D68）；超时 / 中止时 `taskkill /T /F` |
 | git | 正常退出，不需要终止 | 同左 |
+
+两者都经 `platform.treeSpawnOptions` 启动、`platform.killProcessTree` 停止。只结束 shell 本身时，它启动的命令（`a && b` 中的 `b`、后台的测试进程）继续运行并占着输出管道，execa 的结果要等它们结束才返回。
+
+**应用退出。** 结束 utilityProcess（Windows 上即 `TerminateProcess`）不会运行后端的清理，opencode 会留下。main 在 `will-quit` 时向后端发 `backend.shutdown`（`shared/contracts/backend-port.ts`），后端关闭 HTTP 服务（随之停止 opencode 进程树）后退出，main 等它退出再退出；`pnpm dev:server` 下 Ctrl+C（`SIGINT`）走同一路径。
 
 - 检查命令在所有平台都由 POSIX shell 执行，`mvn -q test && …`、`./gradlew test` 的写法与推断出的检查命令（`projects.inference.ts`）在三个平台一致，不按平台推断不同命令。
 - 检查命令的超时与中止不再交给 execa 的 `timeout` / `cancelSignal`（它们只结束 shell 本身），改为注入时钟计时并调用 `killProcessTree`。
-- `taskkill` 在 `C:\Windows\System32` 中，从 `SystemRoot` 定位，不依赖 PATH。
+- `taskkill.exe` 从 `%SystemRoot%\System32` 定位，不依赖 PATH；它对已经退出的进程返回 128，视为已停止。
 
 ### 3.6 凭据（safeStorage）
 
@@ -128,7 +132,7 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 | --- | --- | --- |
 | macOS | dmg arm64 | 不变 |
 | Windows | NSIS x64，`oneClick: false`、可改安装目录、按用户安装 | 未签名：SmartScreen 提示「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」 |
-| Linux | AppImage x64、deb x64 | 未签名。deb 的维护者字段取 `linux.maintainer`；可执行文件名 `agent-workflow`；deb 依赖 `libsecret-1-0`（凭据存储，§3.6） |
+| Linux | AppImage x64、deb x64 | 未签名。deb 包名与可执行文件名 `agent-workflow`，维护者字段取 `linux.maintainer`；electron-builder 的默认 deb 依赖已含 `libsecret-1-0`（凭据存储，§3.6） |
 
 - 图标：`build/icon.svg` 渲染出 `build/icon.png`（1024 px），Windows（转 ico）与 Linux 使用；macOS 仍用 `icon.icns`。
 - `pnpm dist` 构建当前平台的安装包（`electron-builder` 不带平台参数，按各平台的 `target` 配置），CI 在各自的 runner 上运行。
@@ -164,7 +168,7 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 
 只在测试辅助函数中处理，测试用例本身不写平台判断：
 
-- `test/helpers/executables.ts`：`writeFakeExecutable(dir, name, script)` 在 Windows 上写 `<name>.cmd`，其他平台写可执行的 sh 脚本；`gitOnlyPath()` 构造只含 git 的 PATH（POSIX 上软链接 git，Windows 上用 git 自己的目录，因为 Git for Windows 的 `git.exe` 依赖安装目录的相对位置）。
+- `test/helpers/executables.ts`：`writeFakeExecutable(dir, name, source)` 写一个用 Node 运行 JS 模块 `source` 的假命令（Windows 上是 npm 形式的 `<name>.cmd`，其他平台是可执行的 sh 脚本）；`isolatedEnv(bin, home, { git })` 构造只找得到 `bin`（和 git）的环境（POSIX 上软链接 git；Windows 上加入 git 自己的目录，因为 Git for Windows 的 `git.exe` 依赖安装目录的相对位置，另保留 `SystemRoot`、`ComSpec` 等 Windows 程序需要的变量）。
 - 浏览器 E2E 的假 opencode：`e2e/fixtures/bin/` 同时有 `opencode`（sh）与 `opencode.cmd`；PATH 用 `path.delimiter` 拼接，主目录同时设 `HOME` 与 `USERPROFILE`。
 
 ## 5. 验收
@@ -187,4 +191,3 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 ## 7. 发现但未处理
 
 - macOS / Linux 上若用户在自己的 opencode 配置中把 `shell` 设为 PowerShell / nushell，只读规则同样不按 bash 语义匹配（v1.0 起的前提）。可选做法是三平台都注入 POSIX shell，但会失去 login shell 带来的 PATH，需要单独决定。
-- POSIX 上检查命令超时只结束 `/bin/sh`（行为与 v1.0 相同）；shell 不是直接 `exec` 命令时（如 `a && b`）子进程会留下。Windows 已按进程树结束。

@@ -34,16 +34,18 @@ type RuntimeDTO =
   | { status: 'ready'; path: string; version: string; requiredVersion: '1.19.0'; url: string; startedAt: number };
 
 type EnvironmentDTO = {
-  git: { installed: true; version: string } | { installed: false };
+  platform: 'darwin' | 'win32' | 'linux';   // 后端的操作系统，引导页据此显示安装命令（D70）
+  git: { installed: true; version: string } | { installed: false };   // Windows 上还要求 Git for Windows 的 Git Bash（D67）
   opencode: RuntimeDTO;
   models: { available: Array<{ providerId: string; modelId: string; name: string }>; defaultModel?: string };
-  ready: boolean;              // 三项都满足（M1 起模型列表为占位，M2-04 接入后才计入）
+  credentials: { available: boolean };   // 能否保存令牌与密码（safeStorage；Linux 无密钥服务时为 false，D69），不计入 ready
+  ready: boolean;              // git、opencode、模型三项都满足
 };
 ```
 
 `models` 来自 opencode `/config/providers`，用于引导页判断「是否已登录至少一个模型提供方」。
 
-opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则依次查找 `PATH` 中的 `opencode` 与 `~/.opencode/bin/opencode`；能执行 `--version` 且输出等于 `OPENCODE_VERSION` → `stopped`（M2 起由运行时启动），版本不同 → `version_mismatch`，找不到或无法执行 → `not_installed`。`recheck` 只在 `not_installed` / `version_mismatch` 时重新检测 opencode（运行时状态机 `recheck`），git 每次都重新检测。
+opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则依次查找 `PATH` 中的 `opencode` 与主目录下的 `.opencode/bin/opencode`（Windows：`opencode.exe` 或 npm 的 `opencode.cmd`，主目录为 `%USERPROFILE%`，17 §3.2）；能执行 `--version` 且输出等于 `OPENCODE_VERSION` → `stopped`（M2 起由运行时启动），版本不同 → `version_mismatch`，找不到或无法执行 → `not_installed`。`recheck` 只在 `not_installed` / `version_mismatch` 时重新检测 opencode（运行时状态机 `recheck`），git 每次都重新检测。
 
 ## 3. 项目
 

@@ -74,6 +74,7 @@
 | J7 | 专业模式：开启确认计划 → 编辑计划（加节点、连线）→ 确认 → 按新计划执行 | 浏览器 |
 | J8 | 专业模式：复制内置流程 → 修改 → 用它跑通一个任务 | 浏览器 |
 | J9 | 四主题与两种模式切换，全部页面可打开无报错、无对比度（axe `color-contrast`）与横向溢出问题（1280 宽）；截图写到 `screenshots/walkthrough/<主题>/`（不提交，`AW_WALKTHROUGH_DIR` 可改）供人工走查（`walkthrough.browser.spec.ts`，M6-01） | 浏览器 |
+| J11 | Electron 启动冒烟（`launch.electron.spec.ts`，`pnpm e2e:smoke`）：构建后的应用启动后端、显示引导页（各项检测有结果）、正常退出（main 等后端停止 opencode 后退出）。不需要 opencode 与模型，三平台 CI 运行（17 §4.1） | Electron |
 | J10 | 打包应用：引导页 → 添加项目 → J1 精简版（修 Bug，示例仓库 `ts-stats`）；运行中退出重开 → 任务继续完成，被打断的尝试为 `interrupted` 且步骤重跑。真实 opencode 与免费模型 `TEST_MODEL`（生产包里没有 FakeOpencode），每次用全新的用户数据目录；`AW_E2E_EXECUTABLE` 指向打包后的可执行文件（如 dmg 挂载副本） | Electron |
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
@@ -99,5 +100,6 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 
 - 不设全局覆盖率百分比。
 - 以下模块要求分支覆盖率 ≥ 90%：`shared/fsm`、`shared/workflow`（计划校验）、`scheduler`、`mcp.registry`。
-- CI（本地 `pnpm verify`）：check + test + test:int + e2e（浏览器）必须全绿；`test:oc` 在装有 opencode 的机器上随 `pnpm verify:full` 执行。
+- 本地 `pnpm verify`：check + test + test:int + build，另加 e2e（浏览器）必须全绿；`test:oc` 在装有 opencode 的机器上随 `pnpm verify:full` 执行。
+- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J11，Linux 用 xvfb），Ubuntu 与 Windows 另打安装包。数据库集成测试只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
 - 测试失败时禁止 `.skip` 合并；确需暂时跳过须附任务编号与原因，并在一周内处理。

@@ -6,16 +6,37 @@
 
 ## 安装
 
-需要 macOS（Apple 芯片）、Git，以及 [opencode](https://opencode.ai) **1.19.0**（版本必须一致），并已在终端运行 `opencode auth login` 登录至少一个模型提供方。
+需要 Git，以及 [opencode](https://opencode.ai) **1.19.0**（版本必须一致，三个平台都可用 `npm install -g opencode-ai@1.19.0` 安装），并已在终端运行 `opencode auth login` 登录至少一个模型提供方。安装包都**没有签名**。平台差异的完整说明见 [docs/17](docs/17-cross-platform.md)。
+
+### macOS（Apple 芯片）
 
 1. 下载 `Agent Workflow-<版本>-arm64.dmg`，打开后把 Agent Workflow 拖进「应用程序」。
 2. 安装包**没有签名与公证**。从网络下载的副本第一次打开时，macOS 会提示「无法验证开发者」或「已损坏」：
    - 在「应用程序」中右键（或按住 Control 点按）Agent Workflow →「打开」→ 在弹窗中再点「打开」；或
    - 先尝试打开一次，然后到「系统设置 → 隐私与安全性」，在「安全性」一栏找到「已阻止使用 Agent Workflow」，点「仍要打开」，输入密码确认。
    - 只需放行一次。若提示「已损坏，无法打开」，在终端执行 `xattr -dr com.apple.quarantine "/Applications/Agent Workflow.app"` 去掉下载隔离标记后再打开。
-3. 首次启动是引导页：检测 Git、opencode 1.19.0 与可用模型，未通过的项给出修复命令；全部通过后添加第一个 Git 仓库即可开始。
 
-应用数据（数据库、会话记录、日志、独立工作区）在 `~/Library/Application Support/Agent Workflow/`；版本号见「设置 → 关于」。
+应用数据在 `~/Library/Application Support/Agent Workflow/`。
+
+### Windows 10 / 11（x64）
+
+1. 需要 **Git for Windows**（`winget install --id Git.Git -e`）：AI 执行的命令与检查命令都在它自带的 Git Bash 中运行，只装 MinGit 不够。
+2. 运行 `agent-workflow-<版本>-setup-x64.exe`。SmartScreen 提示「Windows 已保护你的电脑」时点「更多信息 → 仍要运行」；可以选择安装目录，默认只为当前用户安装。
+3. 仓库路径很深时（如 `node_modules`），建议在系统中开启长路径支持（组策略「启用 Win32 长路径」或注册表 `LongPathsEnabled`），否则部分构建工具会失败；本应用调用 git 时已自动启用 `core.longpaths`。
+
+应用数据在 `%APPDATA%\Agent Workflow\`。
+
+### Linux（Ubuntu 22.04+ x64，其他发行版尽力支持）
+
+- **deb**（推荐 Ubuntu / Debian）：`sudo apt install ./agent-workflow_<版本>_amd64.deb`，之后在应用菜单中打开，或运行 `agent-workflow`。
+- **AppImage**（其他发行版）：`chmod +x agent-workflow-<版本>-x86_64.AppImage` 后运行。需要 FUSE 2（Ubuntu 24.04：`sudo apt install libfuse2t64`）。Ubuntu 24.04 默认限制非特权用户命名空间，AppImage 可能因 Chromium 沙箱无法启动；请改用 deb，或按发行版说明为该 AppImage 配置 AppArmor 规则。
+- 保存托管平台令牌与数据库密码需要系统密钥服务（GNOME Keyring 或 KWallet）；没有时引导页「凭据存储」一项会提示（`sudo apt install gnome-keyring` 后重启应用），其他功能不受影响。
+
+应用数据在 `~/.config/Agent Workflow/`。
+
+### 首次启动
+
+首次启动是引导页：检测 Git、opencode 1.19.0、可用模型与凭据存储，未通过的项给出本平台的修复命令；前三项通过后添加第一个 Git 仓库即可开始。版本号见「设置 → 关于」。
 
 ## 开发环境
 
@@ -39,10 +60,11 @@ pnpm dev
 | `pnpm verify` | 提交前全量检查：类型、Biome、依赖边界、CSS 令牌、状态机文档、单元与集成测试、构建 |
 | `pnpm e2e` | 浏览器模式 E2E（FakeOpencode 扮演 AI；含四主题走查，截图写到 `screenshots/walkthrough/`） |
 | `pnpm e2e:electron` | Electron 模式 E2E（需先 `pnpm build`；真实 opencode 与免费模型；`AW_E2E_EXECUTABLE` 可指向打包后的应用） |
+| `pnpm e2e:smoke` | Electron 启动冒烟（需先 `pnpm build`；不需要 opencode，CI 在三个平台运行） |
 | `pnpm test:oc` | 真实 opencode 的集成测试（只有 bridge 插件测试调用模型） |
 | `pnpm test:live` | 真实模型跑五个内置流程（手动，约一小时；报告写到 `live/reports/`） |
 | `pnpm perf` | 性能实测：20 节点画布帧率、5 MB 会话流首屏、10 个并发任务（结果写到 `perf-results/`） |
-| `pnpm dist` | 打包 macOS arm64 .dmg（未签名，输出到 `apps/desktop/release/`） |
+| `pnpm dist` | 打包当前平台的安装包（macOS dmg arm64、Windows NSIS x64、Linux AppImage 与 deb x64；未签名，输出到 `apps/desktop/release/`） |
 
 ## 架构入口
 
