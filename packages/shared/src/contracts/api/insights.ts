@@ -100,18 +100,22 @@ export type InsightsSummaryDTO = z.infer<typeof insightsSummarySchema>;
 /** A task the period is about: it ended in the period, or used AI in it (19 §4). */
 export const insightsTaskSchema = z.object({
   task: taskSummarySchema,
-  /** When it ended, if that was in the period: then it counts for quality. */
-  endedAt: z.number().nullable(),
   /** In the period. */
   usage: usageTotalsSchema,
   roles: z.array(z.string()),
   models: z.array(z.string().nullable()),
   kinds: z.array(attemptKindSchema),
-  doneNodes: z.number(),
-  firstPassNodes: z.number(),
-  retries: z.number(),
-  interruptions: z.number(),
-  failureReasons: z.array(failureReasonSchema),
-  reviewDurationMs: z.number().nullable(),
+  /** Only for a task that ended in the period: it counts for quality (19 §2.4). */
+  quality: z
+    .object({
+      endedAt: z.number(),
+      doneNodes: z.number(),
+      firstPassNodes: z.number(),
+      retries: z.number(),
+      interruptions: z.number(),
+      failureReasons: z.array(failureReasonSchema),
+      reviewDurationMs: z.number().nullable(),
+    })
+    .nullable(),
 });
 export type InsightsTaskDTO = z.infer<typeof insightsTaskSchema>;

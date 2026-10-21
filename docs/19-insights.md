@@ -152,14 +152,15 @@ type InsightsSummaryDTO = {
 };
 
 type InsightsTaskDTO = {
-  id: string; key: string; title: string; status: TaskStatus;
-  project: { id: string; name: string }; workflow: { key: string; name: string };
-  endedAt: number | null;                     // 在时间段内结束时有值（属于质量集合）
+  task: TaskSummaryDTO;                       // 与任务列表相同
   usage: UsageTotals;                         // 本时间段内的
   roles: string[]; models: (string | null)[]; kinds: AttemptKind[];   // 本时间段内用到的
-  doneNodes: number; firstPassNodes: number; retries: number; interruptions: number;
-  failureReasons: { kind: InsightsFailureKind; code: string | null; count: number }[];
-  reviewDurationMs: number | null;
+  quality: {                                  // 只有在时间段内结束的任务（属于质量集合）才有
+    endedAt: number;
+    doneNodes: number; firstPassNodes: number; retries: number; interruptions: number;
+    failureReasons: { kind: InsightsFailureKind; code: string | null; count: number }[];
+    reviewDurationMs: number | null;
+  } | null;
 };
 ```
 
