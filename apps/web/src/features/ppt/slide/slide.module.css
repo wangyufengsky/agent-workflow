@@ -1,0 +1,353 @@
+/*
+ * The page canvas (23 §5.3): fixed 1280×720 CSS pixels, scaled as a whole, so its sizes are absolute pixels rather
+ * than the app's spacing scale. Colours come only from the PPT's palette variables (paletteStyle in slide-view.tsx);
+ * text sizes are multiplied by --fit when the text has to shrink (23 §5.4).
+ */
+.frameBox {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  border-radius: var(--r-xs);
+  box-shadow: var(--shadow-card);
+}
+
+.canvas {
+  --fit: 1;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1280px;
+  height: 720px;
+  transform-origin: 0 0;
+  overflow: hidden;
+  background: var(--slide-bg);
+  color: var(--slide-ink);
+  font-family: var(--font);
+  line-height: 1.4;
+  text-align: left;
+}
+
+.placeholder {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 80px;
+  color: var(--slide-sub);
+  font-size: 40px;
+  text-align: center;
+  border: 4px dashed var(--slide-line);
+}
+
+.em {
+  color: var(--slide-accent);
+  font-weight: 700;
+}
+
+.frame {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  height: 100%;
+  padding: 64px 88px 56px;
+}
+
+.title {
+  margin: 0;
+  max-height: 136px;
+  overflow: hidden;
+  font-size: calc(46px * var(--fit));
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+.bullets {
+  display: flex;
+  flex-direction: column;
+  gap: calc(22px * var(--fit));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: calc(30px * var(--fit));
+}
+
+.bullets li,
+.columnBullets li {
+  position: relative;
+  padding-left: 1.1em;
+}
+
+.bullets li::before,
+.columnBullets li::before {
+  content: "";
+  position: absolute;
+  top: 0.55em;
+  left: 0;
+  width: 0.36em;
+  height: 0.36em;
+  border-radius: 50%;
+  background: var(--slide-fill);
+}
+
+/* 封面与章节 */
+.cover,
+.section {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+  height: 100%;
+  padding: 88px 112px;
+}
+
+.coverBar {
+  width: 96px;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--slide-fill);
+}
+
+.coverTitle,
+.sectionTitle {
+  margin: 0;
+  max-height: 300px;
+  overflow: hidden;
+  font-size: calc(68px * var(--fit));
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.coverSubtitle,
+.sectionSubtitle {
+  margin: 0;
+  color: var(--slide-sub);
+  font-size: calc(30px * var(--fit));
+}
+
+.section {
+  background: var(--slide-surface);
+  border-left: 24px solid var(--slide-fill);
+}
+
+/* 两栏与卡片 */
+.columns,
+.cards {
+  display: grid;
+  gap: 32px;
+}
+
+.columns {
+  grid-template-columns: 1fr 1fr;
+}
+
+.cards {
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+}
+
+.column,
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+  padding: 32px 36px;
+  overflow: hidden;
+  border: 2px solid var(--slide-line);
+  border-radius: 20px;
+  background: var(--slide-surface);
+}
+
+.columnHeading,
+.cardHeading {
+  margin: 0;
+  color: var(--slide-accent);
+  font-size: calc(30px * var(--fit));
+  font-weight: 700;
+}
+
+.columnBullets {
+  display: flex;
+  flex-direction: column;
+  gap: calc(16px * var(--fit));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: calc(26px * var(--fit));
+}
+
+.cardBody {
+  margin: 0;
+  color: var(--slide-sub);
+  font-size: calc(24px * var(--fit));
+}
+
+/* 流程 */
+.steps {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 28px;
+  align-content: center;
+  list-style: none;
+}
+
+.step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 34px;
+  left: 84px;
+  right: -20px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--slide-line);
+}
+
+.stepNo {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--slide-fill);
+  color: var(--slide-on-fill);
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.stepLabel {
+  font-size: calc(28px * var(--fit));
+  font-weight: 700;
+}
+
+.stepDetail {
+  color: var(--slide-sub);
+  font-size: calc(22px * var(--fit));
+}
+
+/* 数字 */
+.stats {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 40px;
+  align-content: center;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-left: 28px;
+  border-left: 6px solid var(--slide-fill);
+}
+
+.statValue {
+  color: var(--slide-accent);
+  font-size: calc(76px * var(--fit));
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.statLabel {
+  color: var(--slide-sub);
+  font-size: calc(26px * var(--fit));
+}
+
+/* 表格 */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: calc(22px * var(--fit));
+}
+
+.table th {
+  padding: 14px 18px;
+  background: var(--slide-fill);
+  color: var(--slide-on-fill);
+  font-weight: 700;
+  text-align: left;
+}
+
+.table td {
+  padding: 12px 18px;
+  border-bottom: 2px solid var(--slide-line);
+}
+
+/* 代码 */
+.codeBox {
+  position: relative;
+  padding: 28px 32px;
+  border-radius: 16px;
+  background: var(--slide-code-bg);
+}
+
+.codeLanguage {
+  position: absolute;
+  top: 14px;
+  right: 22px;
+  color: var(--slide-code-ink);
+  font-family: var(--font-mono);
+  font-size: 18px;
+}
+
+.code {
+  margin: 0;
+  color: var(--slide-code-ink);
+  font-family: var(--font-mono);
+  font-size: calc(22px * var(--fit));
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.caption {
+  margin: 0;
+  color: var(--slide-sub);
+  font-size: 22px;
+}
+
+/* 结论 */
+.quoteFrame {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  height: 100%;
+  padding: 88px 136px;
+}
+
+.quoteMark {
+  color: var(--slide-accent);
+  font-size: 160px;
+  font-weight: 800;
+  line-height: 0.6;
+}
+
+.quote {
+  margin: 0;
+  max-height: 380px;
+  overflow: hidden;
+  font-size: calc(50px * var(--fit));
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.attribution {
+  margin: 0;
+  color: var(--slide-sub);
+  font-size: 26px;
+}

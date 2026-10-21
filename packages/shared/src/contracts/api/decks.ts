@@ -144,7 +144,12 @@ export const updateDeckRequestSchema = z.object({
   theme: themeIdSchema.optional(),
 });
 
-export const reviseOutlineRequestSchema = z.object({ id: z.string(), instruction, model: modelChoiceSchema });
+/** Without an instruction the outline is written again from the brief (after a failed outline). */
+export const reviseOutlineRequestSchema = z.object({
+  id: z.string(),
+  instruction: instruction.optional(),
+  model: modelChoiceSchema,
+});
 
 /** The outline as the user edited it: pages with an id are kept, the others are new. */
 export const updateOutlineRequestSchema = z.object({

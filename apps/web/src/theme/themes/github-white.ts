@@ -5,6 +5,18 @@ export const githubWhiteTheme: ThemeDefinition = {
   id: ThemeId.GithubWhite,
   colorScheme: 'light',
   codeTheme: 'github-light-default',
+  slides: {
+    bg: '#ffffff',
+    surface: '#f6f8fa',
+    ink: '#1f2328',
+    sub: '#59636e',
+    accent: '#0969da',
+    fill: '#0969da',
+    onFill: '#ffffff',
+    line: '#d1d9e0',
+    codeBg: '#f6f8fa',
+    codeInk: '#1f2328',
+  },
   tokens: {
     bg: '#ffffff',
     'bg-sunken': '#f6f8fa',

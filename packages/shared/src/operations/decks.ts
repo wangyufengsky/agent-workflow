@@ -51,6 +51,7 @@ export const getDeckOp = defineOperationContract({
 export const createDeckOp = defineOperationContract({
   ...common,
   id: 'decks.create',
+  refs: { projectId: InputRef.Project },
   title: 'op.decks.create',
   description:
     'Create a PPT from a brief and material (pasted text, a task result, a knowledge conversation; a project whose ' +
@@ -79,7 +80,8 @@ export const reviseOutlineOp = defineOperationContract({
   id: 'decks.reviseOutline',
   refs: deckRef,
   title: 'op.decks.reviseOutline',
-  description: "Let the AI rewrite a PPT's outline following an instruction, before the outline is confirmed",
+  description:
+    "Let the AI rewrite a PPT's outline following an instruction (or write it again without one), before the outline is confirmed",
   input: reviseOutlineRequestSchema,
   output: deckSchema,
   risk: OperationRisk.Write,

@@ -278,6 +278,13 @@ export function createDecksService(deps: DecksServiceDeps) {
     await started;
   }
 
+  /** Writes the outline from the brief (`decks.create`, a retry after a failed outline). */
+  const outlineStep = (deck: Deck) =>
+    renderTemplate(prompts[PromptName.DeckOutline], {
+      slideCount: describeSlideCount(deck.slideCountTarget),
+      layouts: describeLayouts(),
+    });
+
   /** Makes these pages (`decks.generate`, `decks.insertSlide`): the step lists them as they will be numbered. */
   const makeStep = (pages: readonly Slide[]) =>
     renderTemplate(prompts[PromptName.DeckSlides], { pages: describePagesToMake(pages), layouts: describeLayouts() });
@@ -395,10 +402,7 @@ export function createDecksService(deps: DecksServiceDeps) {
         kind: AttemptKind.DeckOutline,
         targets: [],
         instruction: null,
-        step: renderTemplate(prompts[PromptName.DeckOutline], {
-          slideCount: describeSlideCount(deck.slideCountTarget),
-          layouts: describeLayouts(),
-        }),
+        step: outlineStep(deck),
         model: request.model,
       });
       return detail(deck.id);
@@ -415,8 +419,12 @@ export function createDecksService(deps: DecksServiceDeps) {
       );
     },
 
-    /** The writer rewrites the outline following the user's instruction (before it is confirmed). */
-    async reviseOutline(id: string, instruction: string, model: string | null | undefined): Promise<DeckDTO> {
+    /** The writer rewrites the outline following the user's instruction, or writes it again without one. */
+    async reviseOutline(
+      id: string,
+      instruction: string | undefined,
+      model: string | null | undefined,
+    ): Promise<DeckDTO> {
       const deck = mustFind(id);
       assertIdle(deck);
       assertOutlineStage(deck, false);
@@ -424,12 +432,15 @@ export function createDecksService(deps: DecksServiceDeps) {
       await startRun(deck, {
         kind: AttemptKind.DeckOutline,
         targets: [],
-        instruction,
-        step: renderTemplate(prompts[PromptName.DeckOutlineRevise], {
-          instruction,
-          outline: describeOutline(repo.listSlides(id)),
-          slideCount: describeSlideCount(deck.slideCountTarget),
-        }),
+        instruction: instruction ?? null,
+        step:
+          instruction === undefined
+            ? outlineStep(deck)
+            : renderTemplate(prompts[PromptName.DeckOutlineRevise], {
+                instruction,
+                outline: describeOutline(repo.listSlides(id)),
+                slideCount: describeSlideCount(deck.slideCountTarget),
+              }),
         model,
       });
       return detail(id);

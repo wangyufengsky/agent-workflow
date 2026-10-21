@@ -38,6 +38,10 @@ const ICON_PATHS = {
   chart: 'M3 3v18h18M8 16v-5M13 16V7M18 16v-8',
   book: 'M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z',
   clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+  slides: 'M3 4h18v12H3zM12 16v4M8 20h8M7 8h6M7 11h10',
+  download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
+  arrowDown: 'M12 5v14M6 13l6 6 6-6',
+  undo: 'M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
   chevLeft: 'M15 6l-6 6 6 6',
   arrowUp: 'M12 19V5M5 12l7-7 7 7',
 } as const;

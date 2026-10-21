@@ -1,0 +1,358 @@
+/* PPT pages (23 §2): app chrome only; the pages themselves are styled in slide/slide.module.css. */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-bottom: var(--s-4);
+}
+
+/* 列表 */
+.deckGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--s-4);
+}
+
+.deckCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  min-width: 0;
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color var(--t-fast) var(--ease);
+}
+
+.deckCard:hover,
+.deckCard:focus-visible {
+  border-color: var(--accent-line);
+}
+
+.deckThumb {
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--r-xs);
+  background: var(--fill-2);
+}
+
+.deckTitle {
+  font-weight: 500;
+}
+
+/* 新建 */
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+}
+
+.countInput {
+  width: 88px;
+}
+
+.themes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+}
+
+.themeOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-1);
+  padding: var(--s-2);
+  border: 2px solid transparent;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.themeOn {
+  border-color: var(--accent);
+}
+
+.themeOption:focus-within {
+  outline: 2px solid var(--accent-line);
+}
+
+.materialBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.adder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.materials {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.material {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-sm);
+  background: var(--fill-2);
+}
+
+/* 工作台 */
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.deckName {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.stepper {
+  display: flex;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.stepper li {
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--r-pill);
+  background: var(--fill-2);
+}
+
+.stepper .stepDone {
+  color: var(--ok);
+  background: var(--ok-fill);
+}
+
+.stepper .stepNow {
+  color: var(--accent-ink);
+  background: var(--accent-fill);
+}
+
+.waiting {
+  display: flex;
+  gap: var(--s-2);
+  color: var(--wait);
+}
+
+.assumptions {
+  margin: 0;
+  padding-left: var(--s-5);
+  color: var(--sub);
+}
+
+.outline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.outlineRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+}
+
+.outlineNo {
+  min-width: 24px;
+  padding-top: var(--s-2);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rowActions {
+  display: flex;
+  gap: var(--s-1);
+}
+
+.outlineFoot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  align-items: center;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr) 320px;
+  gap: var(--s-4);
+  align-items: start;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+  padding: var(--s-1);
+}
+
+.thumb {
+  position: relative;
+  display: flex;
+  gap: var(--s-1);
+  padding: var(--s-1);
+  border: 2px solid transparent;
+  border-radius: var(--r-sm);
+  background: none;
+  cursor: pointer;
+}
+
+.thumbOn {
+  border-color: var(--accent);
+}
+
+.thumbNo {
+  min-width: 14px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.thumbState,
+.thumbWarn {
+  position: absolute;
+  right: var(--s-2);
+  bottom: var(--s-2);
+  padding: 0 var(--s-1);
+  border-radius: var(--r-xs);
+  font-size: var(--fs-xs);
+}
+
+.thumbState {
+  color: var(--run);
+  background: var(--run-fill);
+}
+
+.thumbWarn {
+  top: var(--s-2);
+  bottom: auto;
+  color: var(--warn);
+  background: var(--warn-fill);
+}
+
+.railActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+}
+
+.preview {
+  min-width: 0;
+  border-radius: var(--r-sm);
+}
+
+.preview:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.codeInput {
+  white-space: pre;
+}
+
+.record {
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+/* 放映 */
+.play {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  /* Around the page: the PPT's own background (set by the page), so the show looks borderless. */
+  cursor: pointer;
+}
+
+.playHint {
+  position: fixed;
+  right: var(--s-4);
+  bottom: var(--s-3);
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-xs);
+  background: var(--overlay);
+  color: var(--sub);
+  font-size: var(--fs-xs);
+}
+
+/* 打印（导出 PDF） */
+@page {
+  size: 1280px 720px;
+  margin: 0;
+}
+
+.print {
+  margin: 0;
+}
+
+.printPage {
+  width: 1280px;
+  height: 720px;
+  break-after: page;
+}
+
+.printPage > * {
+  border-radius: 0;
+  box-shadow: none;
+}

@@ -24,6 +24,10 @@ export const ENTITY_ROUTES = {
     icon: 'layers',
     open: (navigate, id) => navigate({ to: ROUTES.batch, params: { batchId: id } }),
   },
+  [EntityKind.Deck]: {
+    icon: 'slides',
+    open: (navigate, id) => navigate({ to: ROUTES.pptDeck, params: { deckId: id } }),
+  },
   [EntityKind.KnowledgeConversation]: {
     icon: 'book',
     open: (navigate, id) => navigate({ to: ROUTES.knowledgeConversation, params: { conversationId: id } }),

@@ -19,6 +19,11 @@ import { KnowledgeConversationPage, KnowledgeWelcomePage } from '../features/kno
 import { KnowledgeHistoryPage } from '../features/knowledge/knowledge-history.page.tsx';
 import { NodePage } from '../features/node-detail/node.page.tsx';
 import { OnboardingPage } from '../features/onboarding/onboarding.page.tsx';
+import { PptDeckPage } from '../features/ppt/ppt-deck.page.tsx';
+import { PptListPage } from '../features/ppt/ppt-list.page.tsx';
+import { PptNewPage } from '../features/ppt/ppt-new.page.tsx';
+import { PptPlayPage } from '../features/ppt/ppt-play.page.tsx';
+import { PptPrintPage } from '../features/ppt/ppt-print.page.tsx';
 import { ProOnly } from '../features/pro/pro-only.tsx';
 import { ProjectDetailPage } from '../features/projects/project-detail.page.tsx';
 import { ProjectsPage } from '../features/projects/projects.page.tsx';
@@ -205,6 +210,31 @@ const insightsRoute = createRoute({
   validateSearch: insightsSearchSchema,
   component: InsightsPage,
 });
+// PPT (23 §2): a new PPT keeps the material it was opened with (「做成 PPT」); the workspace keeps the selected page
+// and the pro view of simple mode. The show and the print view are full pages outside the sidebar.
+const pptNewRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.pptNew,
+  validateSearch: z.object({
+    projectId: z.string().optional(),
+    taskId: z.string().optional(),
+    knowledgeConversationId: z.string().optional(),
+  }),
+  component: PptNewPage,
+});
+const pptDeckRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.pptDeck,
+  validateSearch: z.object({ slide: z.string().optional(), details: z.boolean().optional() }),
+  component: PptDeckPage,
+});
+const pptPlayRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: ROUTES.pptPlay,
+  validateSearch: z.object({ slide: z.string().optional() }),
+  component: PptPlayPage,
+});
+const pptPrintRoute = createRoute({ getParentRoute: () => rootRoute, path: ROUTES.pptPrint, component: PptPrintPage });
 const projectRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.project,
@@ -213,6 +243,8 @@ const projectRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   onboardingRoute,
+  pptPlayRoute,
+  pptPrintRoute,
   shellRoute.addChildren([
     homeRoute,
     tasksRoute,
@@ -228,6 +260,9 @@ const routeTree = rootRoute.addChildren([
     knowledgeHistoryRoute,
     knowledgeConversationRoute,
     insightsRoute,
+    page(ROUTES.ppt, PptListPage),
+    pptNewRoute,
+    pptDeckRoute,
     page(ROUTES.settings, SettingsPage),
     gitRoute,
     gitProjectRoute,

@@ -14,6 +14,9 @@ const bridge: AwBridge = {
   selectDirectory: () => ipcRenderer.invoke('aw:select-directory'),
   openExternal: (url) => ipcRenderer.invoke('aw:open-external', url),
   revealInFinder: (path) => ipcRenderer.invoke('aw:reveal-in-finder', path),
+  exportPdf: (deckId, fileName) => ipcRenderer.invoke('aw:export-pdf', deckId, fileName),
+  saveFile: (fileName, bytes) => ipcRenderer.invoke('aw:save-file', fileName, bytes),
+  printReady: () => ipcRenderer.send('aw:print-ready'),
 };
 
 contextBridge.exposeInMainWorld('aw', bridge);

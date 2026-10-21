@@ -25,6 +25,8 @@ const PAGE_ROUTE = {
   [AssistantPage.KnowledgeConversation]: ROUTES.knowledgeConversation,
   [AssistantPage.KnowledgeHistory]: ROUTES.knowledgeHistory,
   [AssistantPage.Insights]: ROUTES.insights,
+  [AssistantPage.Ppt]: ROUTES.ppt,
+  [AssistantPage.PptDeck]: ROUTES.pptDeck,
 } as const satisfies Record<AssistantPage, string>;
 
 const PAGE_OF_ROUTE = new Map<string, AssistantPage>(
@@ -55,6 +57,8 @@ export function useAssistantPage(): AssistantPageRef {
         projectId: text(params.projectId),
         workflowKey: text(params.key),
         knowledgeConversationId: text(params.conversationId),
+        deckId: text(params.deckId),
+        slideId: text(search.slide),
       };
       return {
         page,
@@ -92,6 +96,12 @@ export function useOpenAssistantPage() {
           return navigate({
             to: ROUTES.knowledgeConversation,
             params: { conversationId: param(ref, 'knowledgeConversationId') },
+          });
+        case AssistantPage.PptDeck:
+          return navigate({
+            to: ROUTES.pptDeck,
+            params: { deckId: param(ref, 'deckId') },
+            search: ref.params.slideId === undefined ? {} : { slide: ref.params.slideId },
           });
         default:
           return navigate({ to: PAGE_ROUTE[ref.page] });

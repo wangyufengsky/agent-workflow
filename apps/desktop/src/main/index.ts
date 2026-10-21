@@ -2,25 +2,22 @@ import { join } from 'node:path';
 import { APP_LICENSE, APP_SOURCE_URL } from '@aw/shared';
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { type Backend, startBackend } from './backend.ts';
+import { serveExports } from './export.ts';
 
 const isDev = process.env.ELECTRON_RENDERER_URL !== undefined;
 let backend: Backend | undefined;
 
 function createWindow(b: Backend): void {
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 1024,
-    minHeight: 700,
-    webPreferences: {
-      preload: join(import.meta.dirname, '../preload/index.cjs'),
-      sandbox: true,
-      contextIsolation: true,
-      nodeIntegration: false,
-      additionalArguments: [`--aw-api-token=${b.apiToken}`, `--aw-app-version=${app.getVersion()}`],
-    },
-  });
+  const webPreferences = {
+    preload: join(import.meta.dirname, '../preload/index.cjs'),
+    sandbox: true,
+    contextIsolation: true,
+    nodeIntegration: false,
+    additionalArguments: [`--aw-api-token=${b.apiToken}`, `--aw-app-version=${app.getVersion()}`],
+  };
+  const win = new BrowserWindow({ width: 1280, height: 800, minWidth: 1024, minHeight: 700, webPreferences });
   const url = process.env.ELECTRON_RENDERER_URL ?? `http://127.0.0.1:${b.port}/`;
+  serveExports(url, webPreferences);
   // Never navigate the privileged window away from the app; open external links in the browser.
   win.webContents.on('will-navigate', (event, target) => {
     if (!target.startsWith(url)) event.preventDefault();
