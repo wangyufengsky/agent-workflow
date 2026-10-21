@@ -46,7 +46,9 @@ jobs:
       # containers and the macOS runner has no Docker. It only talks to MySQL over TCP, so the ubuntu run covers it.
       - name: test:int (without the MySQL tests, see above)
         if: runner.os != 'Linux'
-        run: pnpm test:int --exclude '**/databases.int.test.ts'
+        shell: bash
+        # Explicit file list: vitest's --exclude flag does not reach the files of a configured project.
+        run: pnpm test:int $(git ls-files '*.int.test.ts' | grep -v '/databases.int.test.ts$')
       - run: pnpm build
 
       - run: pnpm e2e
