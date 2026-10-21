@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import styles from './canvas.module.css';
 import { type CanvasStep, TaskNode, type TaskNodeData } from './task-node.tsx';
 import { useGraphLayout } from './use-graph-layout.ts';
+import { useNodeSizes } from './use-node-sizes.ts';
 
 const NODE_TYPES = { task: TaskNode };
 /** The minimap helps only for larger graphs (14 §5). */
@@ -56,6 +57,7 @@ function Flow({ steps, selectedId, onSelect, onOpen }: Props) {
     requestAnimationFrame(() => void fitView(FIT));
   }, [measured, positions, fitView]);
 
+  const { onNodesChange, measured: sizeOf } = useNodeSizes();
   const nodes = useMemo<Node<TaskNodeData>[]>(
     () =>
       steps.map((step) => ({
@@ -65,13 +67,15 @@ function Flow({ steps, selectedId, onSelect, onOpen }: Props) {
         data: { step, selected: step.id === selectedId },
         draggable: false,
         connectable: false,
+        ...sizeOf(step.id),
       })),
-    [steps, positions, selectedId],
+    [steps, positions, selectedId, sizeOf],
   );
 
   return (
     <ReactFlow
       nodes={nodes}
+      onNodesChange={onNodesChange}
       edges={edges}
       nodeTypes={NODE_TYPES}
       nodesDraggable={false}

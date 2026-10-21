@@ -15,7 +15,7 @@
 | 单元 | Vitest | 纯逻辑：状态机表、计划校验、调度决策函数、git 输出解析器、配置生成、检查点解析、错误映射、主题对比度 | 无 IO | 被测文件旁 `*.test.ts` | `pnpm test` |
 | 集成 | Vitest | 模块 service 与 HTTP/MCP 接口：从 API 或 MCP 调用到数据库与 Git 结果 | 真实 SQLite（临时文件）、真实 git（临时仓库）、Docker 中的真实 MySQL（项目数据库，需本机 Docker）、FakeOpencode、假 Hosting 服务 | `*.int.test.ts` | `pnpm test:int` |
 | opencode 集成 | Vitest，标记 `@opencode` | runtime 托管、配置注入、插件、事件解析 | 本机真实 opencode 1.19.0，**不调用模型**（只启动、读配置、建会话、发 `noReply` 消息）；唯一例外是 bridge 插件测试（只有模型能让 opencode 调用工具），用免费模型 `TEST_MODEL`（默认 `opencode-go/deepseek-v4.1-flash`，D62） | `*.oc.test.ts` | `pnpm test:oc`（先构建插件） |
-| E2E | Playwright | 关键用户旅程（§5） | 浏览器模式：后端 + FakeOpencode，后端托管构建出的前端（不经 Vite 开发服务器，17 §4.1）；Electron 模式：打包产物 | `e2e/` | `pnpm e2e` / `pnpm e2e:electron` |
+| E2E | Playwright | 关键用户旅程（§5） | 浏览器模式：后端 + FakeOpencode，后端托管构建出的前端（不经 Vite 开发服务器，17 §4.1）；后端由 global setup（`e2e/global-setup.ts`）启动，监听系统分配的端口并回报，多个 worktree 可同时运行（`AW_DEV_API_PORT` 可指定端口，D78）；Electron 模式：打包产物 | `e2e/` | `pnpm e2e` / `pnpm e2e:electron` |
 | live | Vitest，标记 `@live` | 真实模型跑内置流程 | 真实 opencode + 模型 + 示例仓库 | `live/` | `pnpm test:live`（手动，不进 CI） |
 | 性能 | Playwright（`playwright.perf.config.ts`） | M6-02 的三项实测：20 节点计划画布的帧率、5 MB 会话流的首屏时间、10 个并发任务时的帧率与长任务；只输出数字到 `perf-results/`（不提交），不作通过/失败门槛 | 生产构建的前端 + 开发模式后端（FakeOpencode） | `e2e/*.perf.spec.ts` | `pnpm perf`（手动） |
 

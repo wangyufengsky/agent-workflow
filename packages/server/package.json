@@ -7,7 +7,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",
-    "dev": "node --watch src/main.ts",
+    "dev": "node --watch src/dev.ts",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
