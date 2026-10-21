@@ -71,7 +71,9 @@ export type FakeStep =
   | { type: 'callTool'; server?: 'exec' | 'assistant'; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
   /** Keeps working until the session is aborted. */
-  | { type: 'hang' };
+  | { type: 'hang' }
+  /** The model provider fails the turn; `idle: false` leaves the session without an idle event. */
+  | { type: 'error'; name: string; message: string; idle?: boolean };
 
 export const submitResult = (summary: string): FakeStep => ({
   type: 'callTool',

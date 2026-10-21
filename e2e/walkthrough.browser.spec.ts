@@ -39,6 +39,8 @@ type Seed = {
   knowledge: { id: string; turnId: string };
   /** A question whose answer is still a draft: written, waiting for a permission before it is submitted (18 §5.5). */
   knowledgeDraft: string;
+  /** An assistant conversation that keeps working until the walkthrough ends. */
+  assistantBusy: string;
 };
 
 async function api<T>(request: APIRequestContext, method: 'GET' | 'POST', path: string, data?: object): Promise<T> {
@@ -71,6 +73,75 @@ async function waitForStatus(request: APIRequestContext, id: string, status: str
     .poll(async () => (await api<Task>(request, 'GET', `/tasks/${id}`)).status, { timeout: 20_000 })
     .toBe(status);
   return api<Task>(request, 'GET', `/tasks/${id}`);
+}
+
+async function settledConversation(request: APIRequestContext, id: string) {
+  await expect
+    .poll(async () => (await api<{ busy: boolean }>(request, 'GET', `/assistant/conversations/${id}`)).busy)
+    .toBe(false);
+}
+
+/**
+ * The assistant panel's states (15 §6, D84): a conversation with every kind of message — action rows, a navigation
+ * card, an answer citing the knowledge conversation, an error, a write waiting for confirmation last — and one still
+ * working. Returns the working one, aborted when the walkthrough ends.
+ */
+async function seedAssistant(
+  request: APIRequestContext,
+  project: E2EProject,
+  knowledge: { id: string; turnId: string },
+): Promise<string> {
+  const busy = await api<{ id: string }>(request, 'POST', '/assistant/conversations', { title: '失败任务排查' });
+  await queueAssistantTurn(request, [
+    { type: 'tool', tool: 'read', input: { filePath: 'notes.md' } },
+    { type: 'hang' },
+  ]);
+  await api(request, 'POST', `/assistant/conversations/${busy.id}/messages`, {
+    text: '最近有哪些任务失败了？',
+    context: { page: 'home', params: {} },
+  });
+
+  const conversation = await api<{ id: string }>(request, 'POST', '/assistant/conversations', { title: '项目整理' });
+  const say = (text: string) =>
+    api(request, 'POST', `/assistant/conversations/${conversation.id}/messages`, {
+      text,
+      context: { page: 'home', params: {} },
+    });
+  await patchSettings(request, { 'assistant.alwaysAllow': ['projects.create'] });
+  await queueAssistantTurn(request, [
+    appTool('projects_list', {}),
+    appTool('projects_create', { repoPath: createRepo(), name: '助手加的项目' }),
+    { type: 'text', text: '项目加好了，检查命令按仓库推断为 `pnpm test`。' },
+  ]);
+  await say('看看我有哪些项目，再把这个仓库加进来');
+  await settledConversation(request, conversation.id);
+  await patchSettings(request, { 'assistant.alwaysAllow': [] });
+
+  const cite = (index: number) => `/knowledge/${knowledge.id}?turn=${knowledge.turnId}&cite=${index}`;
+  await queueAssistantTurn(request, [
+    { type: 'text', text: `退款在 \`refund()\` 中先扣手续费 [[1]](${cite(1)})，再四舍五入到分 [[2]](${cite(2)})。` },
+  ]);
+  await say('退款金额在哪里四舍五入？');
+  await settledConversation(request, conversation.id);
+
+  await queueAssistantTurn(request, [{ type: 'error', name: 'ProviderAuthError', message: '访问令牌已失效。' }]);
+  await say('写一份本周的周报');
+  await settledConversation(request, conversation.id);
+
+  await queueAssistantTurn(request, [
+    appTool('projects_update', { id: project.id, checkCommand: 'npm test' }),
+    { type: 'text', text: '请在卡片上确认。' },
+  ]);
+  await say('把检查命令改成 npm test');
+  await expect
+    .poll(
+      async () =>
+        (await api<{ items: unknown[] }>(request, 'GET', `/assistant/conversations/${conversation.id}/confirmations`))
+          .items.length,
+    )
+    .toBe(1);
+  await settledConversation(request, conversation.id);
+  return busy.id;
 }
 
 /** One task per state the task page renders differently (14 §3.3), each in its own project so scripts stay apart. */
@@ -153,29 +224,6 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     tls: false,
   });
 
-  // A conversation with a produced object (D66) whose last call waits for confirmation, for the assistant panel.
-  await patchSettings(request, { 'assistant.alwaysAllow': ['projects.create'] });
-  await queueAssistantTurn(request, [
-    appTool('projects_create', { repoPath: createRepo(), name: '助手加的项目' }),
-
-    { type: 'text', text: '项目加好了。我再把**检查命令**改成 `npm test`。' },
-    appTool('projects_update', { id: reviewProject.id, checkCommand: 'npm test' }),
-    { type: 'text', text: '请在卡片上确认。' },
-  ]);
-  const conversation = await api<{ id: string }>(request, 'POST', '/assistant/conversations', {});
-  await api(request, 'POST', `/assistant/conversations/${conversation.id}/messages`, {
-    text: '把订单服务的检查命令改成 npm test',
-    context: { page: 'home', params: {} },
-  });
-  await expect
-    .poll(
-      async () =>
-        (await api<{ items: unknown[] }>(request, 'GET', `/assistant/conversations/${conversation.id}/confirmations`))
-          .items.length,
-    )
-    .toBe(1);
-  await patchSettings(request, { 'assistant.alwaysAllow': [] });
-
   // An answered knowledge question about the review project, with citations to open (K-09).
   mkdirSync(join(reviewProject.repoPath, 'src'), { recursive: true });
   writeFileSync(
@@ -226,6 +274,8 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     )
     .toBe(true);
 
+  const assistantBusy = await seedAssistant(request, reviewProject, { id: knowledge.id, turnId: knowledgeTurn.id });
+
   const completedReview = await waitForStatus(request, completed, 'review');
   await api(request, 'POST', `/tasks/${completedReview.id}/deliver`, { strategy: 'squash' });
   return {
@@ -240,6 +290,7 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     aiKey,
     knowledge: { id: knowledge.id, turnId: knowledgeTurn.id },
     knowledgeDraft: draft.id,
+    assistantBusy,
   };
 }
 
@@ -258,6 +309,17 @@ const node = (task: Task, key: string) => {
   if (found === undefined) throw new Error(`node ${key} not found`);
   return found.id;
 };
+/** Opens the assistant panel, on the conversation titled `title` when given. */
+async function openAssistant(page: Page, title?: string): Promise<Locator> {
+  await page.keyboard.press('ControlOrMeta+j');
+  const panel = page.getByRole('complementary', { name: '应用助手' });
+  await expect(panel).toBeVisible();
+  if (title !== undefined) {
+    await panel.getByRole('button', { name: '切换对话' }).click();
+    await page.getByRole('menuitemradio', { name: title }).click();
+  }
+  return panel;
+}
 const heading = (name: string | RegExp) => (page: Page) => page.getByRole('heading', { name, level: 1 }).first();
 const testId = (id: string) => (page: Page) => page.getByTestId(id).first();
 
@@ -343,10 +405,32 @@ const SHOTS: Shot[] = [
     url: (s) => `/tasks/${s.running.id}`,
     ready: testId('progress-canvas'),
     open: async (page) => {
-      await page.keyboard.press('ControlOrMeta+j');
-      const panel = page.getByRole('complementary', { name: '应用助手' });
-      await expect(panel.getByTestId('confirmation-card')).toBeVisible();
+      const panel = await openAssistant(page, '项目整理');
+      await expect(panel.getByTestId('confirmation-card')).toContainText('检查命令');
       await expect(panel.getByTestId('entity-card')).toBeVisible();
+      return panel;
+    },
+  },
+  {
+    name: 'assistant-busy',
+    mode: UiMode.Simple,
+    url: (s) => `/tasks/${s.running.id}`,
+    ready: testId('progress-canvas'),
+    open: async (page) => {
+      const panel = await openAssistant(page, '失败任务排查');
+      await expect(panel.getByTestId('assistant-thinking')).toBeVisible();
+      return panel;
+    },
+  },
+  {
+    name: 'assistant-welcome',
+    mode: UiMode.Simple,
+    url: () => '/',
+    ready: heading('今天想让 AI 做什么？'),
+    open: async (page) => {
+      const panel = await openAssistant(page);
+      await panel.getByRole('button', { name: '新对话' }).click();
+      await expect(panel.getByRole('heading', { name: '有什么可以帮你？' })).toBeVisible();
       return panel;
     },
   },
@@ -467,10 +551,9 @@ const SHOTS: Shot[] = [
     url: (s) => `/git/${s.project.id}?tab=commits`,
     ready: testId('git-status'),
     open: async (page) => {
-      await page.keyboard.press('ControlOrMeta+j');
-      const panel = page.getByRole('complementary', { name: '应用助手' });
-      await expect(panel.getByTestId('confirmation-card')).toBeVisible();
-      await expect(panel.getByTestId('entity-card')).toBeVisible();
+      const panel = await openAssistant(page, '项目整理');
+      await panel.getByTestId('assistant-action').first().locator('summary').click();
+      await expect(panel.getByText('agent-workflow-app_projects_list')).toBeVisible();
       return panel;
     },
   },
@@ -516,4 +599,5 @@ test('J9 走查：四套主题 × 两种模式下全部页面无报错、无对�
   }
   expect(pageErrors).toEqual([]);
   await api(request, 'POST', `/tasks/${s.running.id}/cancel`);
+  await api(request, 'POST', `/assistant/conversations/${s.assistantBusy}/abort`);
 });
