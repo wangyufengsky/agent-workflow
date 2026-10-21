@@ -230,6 +230,7 @@ export const startTaskOp = defineOperationContract({
   credentialFields: [],                  // 此类字段不会出现在助手工具 schema 中
   // assistantOmit: [...],               // 可选：其他助手不能设置的字段（D65，如 settings.update 的 assistant.alwaysAllow）
   // produces: { kind: EntityKind.Task, ref: (t) => ({ id: t.id, title: t.title }) },  // 可选：产出的对象（D66，助手的导航卡片）
+  // refs: { projectId: InputRef.Project, workflowId: InputRef.Workflow },  // 可选：指向对象的输入字段（D84，确认卡片显示名称而非 id）
   mode: UiMode.Simple,                   // 最低可见界面模式
 });
 

@@ -64,7 +64,7 @@ export function AppShell() {
   useAssistantRequests();
 
   return (
-    <div className={assistantOpen ? 'app with-assistant' : 'app'}>
+    <div className="app">
       <nav className="nav" aria-label={NAV_COPY.brand}>
         <div className="brand">
           <span className="brand-mark">
@@ -116,7 +116,8 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
-      {assistantOpen && <AssistantPanel />}
+      {/* Floats over the page and plays its own open and close (D84), so it stays mounted. */}
+      <AssistantPanel />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} items={paletteItems} />
     </div>
   );

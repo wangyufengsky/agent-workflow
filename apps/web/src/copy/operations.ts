@@ -1,3 +1,8 @@
+import { UiMode } from '@aw/shared';
+import { DELIVERY_COPY } from './delivery.ts';
+import { SETTINGS_COPY } from './settings.ts';
+import { THEME_LABEL } from './themes.ts';
+
 /** Operation titles by the contract's `title` key (shared/operations); a unit test keeps it complete. */
 export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.settings.get': '查看设置',
@@ -102,6 +107,66 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.knowledge.citation': '查看引用原文',
   'op.insights.summary': '质量与用量',
   'op.insights.tasks': '质量与用量的任务明细',
+};
+
+/**
+ * Labels of the operation input fields a confirmation card shows (15 §4), by field name; fields naming an object take
+ * their label from what they name (`INPUT_REF_LABEL`). A unit test keeps every field of a confirmed operation covered.
+ */
+export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
+  'ui.mode': SETTINGS_COPY.mode,
+  'ui.theme': SETTINGS_COPY.theme,
+  'ai.askOnUncertainty': SETTINGS_COPY.uncertainty,
+  'ai.defaultModel': SETTINGS_COPY.defaultModel,
+  'scheduler.maxConcurrentAttempts': SETTINGS_COPY.concurrency,
+  'scheduler.maxConcurrentNodesPerTask': SETTINGS_COPY.nodesPerTask,
+  'node.maxAttempts': SETTINGS_COPY.maxAttempts,
+  'attempt.timeoutMinutes': SETTINGS_COPY.timeoutMinutes,
+  'delivery.defaultStrategy': SETTINGS_COPY.defaultStrategy,
+  'delivery.deleteBranchAfterMerge': SETTINGS_COPY.deleteBranch,
+  repoPath: '仓库目录',
+  name: '名称',
+  defaultBranch: '默认分支',
+  checkCommand: '检查命令',
+  type: '类型',
+  host: '主机',
+  port: '端口',
+  database: '数据库',
+  username: '用户名',
+  tls: 'TLS',
+  key: '标识',
+  description: '说明',
+  planning: '规划方式',
+  deliverable: '产出',
+  definition: '流程定义',
+  baseAgent: '基础 agent',
+  prompt: '提示词',
+  model: '模型',
+  requirement: '需求',
+  requirementTemplate: '需求模板',
+  targets: '目标',
+  title: '标题',
+  baseBranch: '基于分支',
+  checkpoints: '检查点',
+  start: '立即开始',
+  keepBranch: '保留任务分支',
+  baseVersion: '基于计划版本',
+  graph: '计划',
+  version: '计划版本',
+  feedback: '意见',
+  strategy: DELIVERY_COPY.strategy,
+  targetBranch: DELIVERY_COPY.targetBranch,
+  pr: 'PR',
+  reason: '原因',
+  response: '回复',
+};
+
+/** Values of enum fields in words, by field name; other values show as given. */
+export const INPUT_VALUE_LABEL: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  'ui.mode': { [UiMode.Simple]: '简单模式', [UiMode.Pro]: SETTINGS_COPY.proMode },
+  'ui.theme': THEME_LABEL,
+  'delivery.defaultStrategy': DELIVERY_COPY.strategies,
+  strategy: DELIVERY_COPY.strategies,
 };
 
 /** The title of an operation by its contract's `title` key; the unit test keeps every key covered. */

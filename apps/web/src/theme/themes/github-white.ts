@@ -90,5 +90,12 @@ export const githubWhiteTheme: ThemeDefinition = {
     glow: 'radial-gradient(ellipse 62% 380px at 50% -170px,rgba(9,105,218,0.07),rgba(9,105,218,0) 70%)',
     dots: 'radial-gradient(rgba(31,35,40,0.11) 1px,transparent 1.2px)',
     'shadow-card': '0 1px 0 rgba(255,255,255,.03) inset',
+    frost: 'rgba(255,255,255,.8)',
+    'frost-card': 'rgba(255,255,255,.72)',
+    'frost-edge': 'rgba(255,255,255,.9)',
+    'frost-filter': 'blur(28px) saturate(170%)',
+    'frost-shadow': '0 24px 60px rgba(31,35,40,.16),0 3px 10px rgba(31,35,40,.07)',
+    'frost-sheen': 'linear-gradient(180deg,rgba(246,248,250,.7),rgba(246,248,250,0) 160px)',
+    aura: 'conic-gradient(from 200deg,#0969da,#54aeff,#7a46d6,#17707a,#0969da)',
   },
 };

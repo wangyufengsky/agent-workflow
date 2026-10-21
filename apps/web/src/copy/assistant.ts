@@ -1,4 +1,11 @@
-import { AssistantConfirmationStatus, EntityKind, OperationRisk, type Platform } from '@aw/shared';
+import {
+  AssistantConfirmationStatus,
+  AssistantToolName,
+  EntityKind,
+  InputRef,
+  OperationRisk,
+  type Platform,
+} from '@aw/shared';
 import { MOD_KEY, UI_PLATFORM } from '../app/platform.ts';
 
 /** The system file manager differs by platform (17 §3.7). */
@@ -12,20 +19,27 @@ const REVEAL: Record<Platform, string> = {
 export const ASSISTANT_COPY = {
   panel: '应用助手',
   open: `打开助手（${MOD_KEY}J）`,
+  shortcut: `${MOD_KEY}J`,
   close: '收起助手',
   untitled: '新对话',
   newConversation: '新对话',
   conversations: '对话',
+  switchConversation: '切换对话',
   deleteConversation: '删除这个对话',
   deleteConfirm: '删除后消息、确认记录和助手生成的文件都会删除。',
-  empty: '告诉助手你想做什么，比如「明天几号」「列出我的项目」「在订单服务里修一下登录报错」。',
+  greeting: '有什么可以帮你？',
+  empty: '查信息、改设置、开任务、跨页面操作，用一句话告诉我就行。',
+  suggestions: ['列出我的项目', '哪些事需要我处理', '明天几号', '最近有哪些任务失败了'],
   inputLabel: '发给助手的消息',
-  inputPlaceholder: `问助手，或让它帮你做事…（${MOD_KEY}↵ 发送）`,
+  inputPlaceholder: '问助手，或让它帮你做事…',
+  sendHint: `${MOD_KEY}↵ 发送`,
   send: '发送',
   stop: '停止',
-  working: '助手正在处理…',
-  toolLine: (tool: string) => `调用 ${tool}`,
-  toolFailed: (tool: string) => `调用 ${tool} 失败`,
+  thinking: '正在思考',
+  reasoning: '思考过程',
+  toolFailed: '没有成功',
+  toolStopped: '已中断',
+  toolName: '工具',
   attachment: '助手生成的文件',
   reveal: REVEAL[UI_PLATFORM],
   permissionTitle: '助手请求权限',
@@ -33,10 +47,41 @@ export const ASSISTANT_COPY = {
   permissionAlways: '总是允许',
   permissionReject: '拒绝',
   home: {
-    label: '问助手',
-    placeholder: '用一句话告诉助手你想做什么，回车发送',
-    hint: '开发任务更推荐用下面的「开始任务」；零散的事交给助手。',
+    title: '零散的事，交给应用助手',
+    body: '查信息、改设置、跨页面操作都可以直接说；开发任务请用上面的表单。',
+    open: '问助手',
+    suggestionsLabel: '试试问助手',
   },
+} as const;
+
+/** opencode's own tools (12 §2), keyed by the name opencode reports. */
+const NATIVE_TOOL: Readonly<Record<string, string>> = {
+  read: '读取文件',
+  write: '写入文件',
+  edit: '编辑文件',
+  glob: '查找文件',
+  grep: '搜索内容',
+  list: '列出目录',
+  bash: '运行命令',
+  webfetch: '读取网页',
+  websearch: '搜索网页',
+  codesearch: '搜索代码',
+  todowrite: '整理待办',
+};
+
+/** What each tool of the assistant does, as a verb phrase; operations use their titles (copy/operations.ts). */
+export const TOOL_COPY = {
+  app: {
+    [AssistantToolName.GetCurrentTime]: '查看当前时间',
+    [AssistantToolName.GetAppStatus]: '查看应用状态',
+    [AssistantToolName.OpenPage]: '打开页面',
+    [AssistantToolName.OpenForm]: '打开表单',
+    [AssistantToolName.ListFiles]: '列出生成的文件',
+    [AssistantToolName.RevealFile]: REVEAL[UI_PLATFORM],
+  } satisfies Record<AssistantToolName, string>,
+  /** opencode's own tools (12 §2); the user's own MCP servers show as `external`. */
+  native: NATIVE_TOOL,
+  external: '使用外部工具',
 } as const;
 
 export const CONFIRMATION_COPY = {
@@ -46,6 +91,8 @@ export const CONFIRMATION_COPY = {
   cancel: '取消',
   input: '参数',
   running: '正在执行…',
+  yes: '是',
+  no: '否',
   done: '已执行',
   failed: '执行失败',
   status: {
@@ -84,3 +131,11 @@ export const ENTITY_COPY = {
   open: '打开',
   deleted: '已删除',
 } as const;
+
+/** Labels of input fields that name an object, by what they name (`OperationContract.refs`, 15 §4). */
+export const INPUT_REF_LABEL = {
+  ...ENTITY_COPY.kind,
+  [InputRef.InboxItem]: '待处理条目',
+  [InputRef.Node]: '步骤',
+  [InputRef.Attempt]: 'AI 会话',
+} satisfies Record<InputRef, string>;

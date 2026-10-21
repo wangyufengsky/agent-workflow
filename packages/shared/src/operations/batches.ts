@@ -7,7 +7,7 @@ import {
   deliverBatchResponseSchema,
   listBatchesQuerySchema,
 } from '../contracts/api/batches.ts';
-import { EntityKind } from '../enums/entity.ts';
+import { EntityKind, InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -34,6 +34,7 @@ export const createBatchOp = defineOperationContract({
     'Run a fixed workflow (not an AI-planned one) on several targets at once: one task per target, each with its own branch and worktree; {{target}} in the requirement template is replaced by each target',
   input: createBatchRequestSchema,
   output: batchDetailSchema,
+  refs: { projectId: InputRef.Project, workflowId: InputRef.Workflow },
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/batches', status: 201 },
   // The palette opens the new-batch page (20 §7).
@@ -48,6 +49,7 @@ export const getBatchOp = defineOperationContract({
   description: "A batch with each target's task, its status and its latest delivery",
   input: z.object({ id: z.string() }),
   output: batchDetailSchema,
+  refs: { id: InputRef.Batch },
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/batches/:id' },
 });
@@ -60,6 +62,7 @@ export const deliverBatchOp = defineOperationContract({
     'Deliver every task of a batch waiting for review, one after another: merge each locally (or finish reports); a task that conflicts or fails stays in review and the others go on',
   input: deliverBatchRequestSchema,
   output: deliverBatchResponseSchema,
+  refs: { id: InputRef.Batch },
   risk: OperationRisk.Critical,
   http: { method: 'POST', path: '/batches/:id/deliver' },
 });

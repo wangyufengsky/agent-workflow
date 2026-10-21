@@ -66,12 +66,14 @@ export type FakeStep =
   | { type: 'edit'; file: string; content: string }
   | { type: 'text'; text: string }
   /** A native read-only tool call (`read`, `grep` …), reported only. */
-  | { type: 'tool'; tool: string; input: Record<string, unknown> }
+  | { type: 'tool'; tool: string; input: Record<string, unknown>; output?: string }
   /** `server: 'assistant'` calls the assistant MCP (15 §3); the execution MCP otherwise. */
   | { type: 'callTool'; server?: 'exec' | 'assistant'; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
   /** Keeps working until the session is aborted. */
   | { type: 'hang' }
+  /** The model provider fails the turn; `idle: false` leaves the session without an idle event. */
+  | { type: 'error'; name: string; message: string; idle?: boolean }
   /** The tokens the turn reports when it ends; 100 input and 20 output otherwise. */
   | { type: 'usage'; input: number; output: number };
 

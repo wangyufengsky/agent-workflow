@@ -1,4 +1,9 @@
-import { type AssistantConfirmationDTO, AssistantConfirmationStatus, OperationRisk } from '@aw/shared';
+import {
+  type AssistantConfirmationDTO,
+  AssistantConfirmationStatus,
+  OPERATION_CONTRACTS,
+  OperationRisk,
+} from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -7,10 +12,9 @@ import { CONFIRMATION_COPY as C } from '../../copy/assistant.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { operationTitle } from '../../copy/operations.ts';
 import { taskDiffQuery } from '../tasks/tasks.queries.ts';
-import styles from './assistant.module.css';
 import { useCancelCall, useConfirmCall } from './assistant.queries.ts';
-
-const shown = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value, null, 2));
+import styles from './cards.module.css';
+import { InputSummary } from './input-summary.tsx';
 
 /** Merging shows what would be merged (15 §4). */
 function DeliveryImpact({ taskId }: { taskId: string }) {
@@ -18,54 +22,71 @@ function DeliveryImpact({ taskId }: { taskId: string }) {
   if (diff === undefined) return null;
   // Binary files have no line counts.
   const sum = (key: 'additions' | 'deletions') => diff.files.reduce((n, f) => n + (f[key] ?? 0), 0);
-  return <p className="hint">{C.diffStat(diff.files.length, sum('additions'), sum('deletions'))}</p>;
+  return <p className={styles.note}>{C.diffStat(diff.files.length, sum('additions'), sum('deletions'))}</p>;
 }
 
 function Outcome({ confirmation }: { confirmation: AssistantConfirmationDTO }) {
   const { status, result } = confirmation;
-  if (status === AssistantConfirmationStatus.Cancelled) return <p className="hint">{C.status.cancelled}</p>;
-  if (result === null) return <p className="hint">{C.running}</p>;
-  if (result.ok) return <p className="hint">{C.done}</p>;
+  if (status === AssistantConfirmationStatus.Cancelled) return <p className={styles.outcome}>{C.status.cancelled}</p>;
+  if (result === null) return <p className={`${styles.outcome} ${styles.shimmer}`}>{C.running}</p>;
+  if (result.ok) {
+    return (
+      <p className={styles.outcome} data-tone="ok">
+        <Icon name="check" size="sm" />
+        {C.done}
+      </p>
+    );
+  }
   return (
-    <p className={`${styles.failed} hint`}>
+    <p className={styles.outcome} data-tone="danger">
+      <Icon name="alert" size="sm" />
       {C.failed} · {ERROR_COPY[result.error.code]}
     </p>
   );
 }
 
-/** A write or critical call of the assistant waiting for the user (15 §4): what it does, with which input. */
+function contractOf(operationId: string) {
+  const contract = OPERATION_CONTRACTS.find((c) => c.id === operationId);
+  // Confirmations are only created for registered operations.
+  if (contract === undefined) throw new Error(`Unknown operation ${operationId}`);
+  return contract;
+}
+
+/** A write or critical call of the assistant waiting for the user (15 §4): what it does, to what, in words. */
 export function ConfirmationCard({ confirmation }: { confirmation: AssistantConfirmationDTO }) {
   const confirm = useConfirmCall();
   const cancel = useCancelCall();
   const pending = confirmation.status === AssistantConfirmationStatus.Pending;
+  const critical = confirmation.risk === OperationRisk.Critical;
   const title = operationTitle(confirmation.title);
   const busy = confirm.isPending || cancel.isPending;
   const taskId = confirmation.input.id;
   return (
     <section
-      className={`${styles.card} ${pending ? styles.cardWait : ''}`}
+      className={styles.card}
+      data-tone={pending ? (critical ? 'critical' : 'wait') : undefined}
       aria-label={`${C.title}：${title}`}
       data-testid="confirmation-card"
     >
-      <div className={styles.cardTitle}>
-        <Icon name={confirmation.risk === OperationRisk.Critical ? 'alert' : 'info'} />
-        <span className="grow">{title}</span>
-        <span className="hint">{C.status[confirmation.status]}</span>
-      </div>
-      <dl className={styles.params} aria-label={C.input}>
-        {Object.entries(confirmation.input).map(([key, value]) => (
-          <div key={key} className={styles.param}>
-            <dt>{key}</dt>
-            <dd>{shown(value)}</dd>
-          </div>
-        ))}
-      </dl>
+      <header className={styles.cardHead}>
+        <span className={styles.tile} data-tone={critical ? 'danger' : 'accent'} aria-hidden="true">
+          <Icon name={critical ? 'alert' : 'edit'} size="sm" />
+        </span>
+        <span className={styles.cardHeading}>
+          <span className={styles.eyebrow}>{C.title}</span>
+          <span className={styles.cardTitle}>{title}</span>
+        </span>
+        <span className={styles.chip} data-status={confirmation.status}>
+          {C.status[confirmation.status]}
+        </span>
+      </header>
+      <InputSummary operation={contractOf(confirmation.operationId)} input={confirmation.input} />
       {pending && confirmation.operationId === 'tasks.deliver' && typeof taskId === 'string' && (
         <DeliveryImpact taskId={taskId} />
       )}
       {pending ? (
         <>
-          <p className="hint">{C.impact[confirmation.risk]}</p>
+          <p className={styles.note}>{C.impact[confirmation.risk]}</p>
           <div className={styles.actions}>
             <Button
               variant="primary"

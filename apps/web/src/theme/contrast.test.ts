@@ -78,6 +78,24 @@ describe.each(THEME_IDS)('主题 %s 对比度', (id) => {
     }
   });
 
+  // The assistant panel is translucent (D84): what shows through depends on the page under it. Pages are bg with
+  // surface and raised cards, so the frost is checked over each of them, bare and under its cards and hover tints.
+  it('正文与次要文字在助手磨砂面板（叠在 bg / surface / raised 上）及其卡片、悬停底色上 ≥ 4.5:1', () => {
+    for (const page of ['bg', 'surface', 'raised'] as const) {
+      const frost = over(color('frost'), color(page));
+      const backgrounds = [
+        ['frost', frost],
+        ['frost-card', over(color('frost-card'), frost)],
+        ...TINTS.map((tint) => [tint, over(color(tint), frost)] as const),
+      ] as const;
+      for (const [name, background] of backgrounds) {
+        for (const text of TEXT) {
+          expect(contrast(color(text), background), `${text} on ${name} over ${page}`).toBeGreaterThanOrEqual(MIN);
+        }
+      }
+    }
+  });
+
   it('状态文字在自身填充色上 ≥ 4.5:1（填充色叠在 bg / panel 上）', () => {
     for (const tone of [...STATUS_TONES, 'stall'] as const) {
       for (const surface of SURFACES.filter((s) => s !== 'sidebar')) {

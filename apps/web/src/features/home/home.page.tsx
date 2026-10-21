@@ -6,7 +6,7 @@ import { EmptyState } from '../../components/empty-state.tsx';
 import { BATCHES_COPY } from '../../copy/batches.ts';
 import { HOME_COPY } from '../../copy/home.ts';
 import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
-import { HomeAssistantInput } from '../assistant/home-assistant-input.tsx';
+import { HomeAssistantEntry } from '../assistant/home-assistant-entry.tsx';
 import { BatchCard } from '../batches/batch-card.tsx';
 import { batchesQuery } from '../batches/batches.queries.ts';
 import { inboxQuery } from '../inbox/inbox.queries.ts';
@@ -70,7 +70,6 @@ export function HomePage() {
       <div className="page-head">
         <h1 className="title grow">{HOME_COPY.title}</h1>
       </div>
-      <HomeAssistantInput />
       {projects.length === 0 ? (
         <EmptyState
           icon="folder"
@@ -93,6 +92,7 @@ export function HomePage() {
           onProjectChange={(id) => void navigate({ search: { projectId: id }, replace: true })}
         />
       )}
+      <HomeAssistantEntry />
       {attention.length > 0 && (
         <section className="section">
           <div className="section-head">

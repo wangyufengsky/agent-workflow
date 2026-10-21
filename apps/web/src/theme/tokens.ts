@@ -1,6 +1,7 @@
 /**
  * Theme token names = CSS custom properties (`--bg`, `--run-fill` …), migrated one-to-one from the design showcase's
- * skins.css. The `unknown*` tokens were dropped with the「回执未知」state (D11); `shadow-card` came from ds.css.
+ * skins.css. The `unknown*` tokens were dropped with the「回执未知」state (D11); `shadow-card` came from ds.css; the `frost*` and `aura` tokens
+ * were added for the assistant panel (D84).
  */
 export const THEME_TOKEN_NAMES = [
   'bg',
@@ -87,6 +88,15 @@ export const THEME_TOKEN_NAMES = [
   'glow',
   'dots',
   'shadow-card',
+  // The assistant's frosted panel (D84): translucent fill under backdrop-filter, cards on it, its highlight edge,
+  // the filter itself, its elevation and top sheen; `aura` is the gradient of the assistant's mark and busy glow.
+  'frost',
+  'frost-card',
+  'frost-edge',
+  'frost-filter',
+  'frost-shadow',
+  'frost-sheen',
+  'aura',
 ] as const;
 export type ThemeTokenName = (typeof THEME_TOKEN_NAMES)[number];
 export type ThemeTokens = Record<ThemeTokenName, string>;

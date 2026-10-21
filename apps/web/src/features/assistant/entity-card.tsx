@@ -17,7 +17,7 @@ import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import { rolesQuery, taskQuery, workflowsQuery } from '../tasks/tasks.queries.ts';
-import styles from './assistant.module.css';
+import styles from './cards.module.css';
 
 /** What the card knows about the object now: still loading, gone, or there (with a status for tasks). */
 type Presence =
@@ -50,14 +50,21 @@ function Shell({ entity, presence }: { entity: EntityRef; presence: Presence }) 
   const route = ENTITY_ROUTES[entity.kind];
   const deleted = presence.state === 'deleted';
   return (
-    <section className={styles.card} aria-label={`${C.kind[entity.kind]}：${entity.title}`} data-testid="entity-card">
-      <div className={styles.cardTitle}>
-        <Icon name={route.icon} />
-        <span className="grow col">
-          <span className="hint">{C.kind[entity.kind]}</span>
-          <span>{entity.title}</span>
+    <section
+      className={`${styles.card} ${styles.linkCard}`}
+      data-deleted={deleted || undefined}
+      aria-label={`${C.kind[entity.kind]}：${entity.title}`}
+      data-testid="entity-card"
+    >
+      <div className={styles.cardHead}>
+        <span className={styles.tile} data-tone="accent" aria-hidden="true">
+          <Icon name={route.icon} size="sm" />
         </span>
-        {deleted ? <span className="hint">{C.deleted}</span> : presence.state === 'present' && presence.status}
+        <span className={styles.cardHeading}>
+          <span className={styles.eyebrow}>{C.kind[entity.kind]}</span>
+          <span className={`${styles.cardTitle} ellipsis`}>{entity.title}</span>
+        </span>
+        {deleted ? <span className={styles.chip}>{C.deleted}</span> : presence.state === 'present' && presence.status}
         {/* The panel stays open: only the page beside it changes (15 §6). */}
         <Button size="sm" disabled={deleted} onClick={() => void route.open(navigate, entity.id)}>
           {C.open}
