@@ -7,6 +7,7 @@ import {
   insightsPeriodSchema,
 } from '../../enums/insights.ts';
 import { attemptKindSchema } from '../../enums/task.ts';
+import { errorCodeSchema } from '../../errors/codes.ts';
 import { taskSummarySchema } from './tasks.ts';
 
 const DAY_MS = 86_400_000;
@@ -57,7 +58,7 @@ export type UsageGroupDTO = z.infer<typeof usageGroupSchema>;
 export const failureReasonSchema = z.object({
   kind: insightsFailureKindSchema,
   /** The attempt's error code for `attempt_error`. */
-  code: z.string().nullable(),
+  code: errorCodeSchema.nullable(),
   count: z.number(),
 });
 export type FailureReasonDTO = z.infer<typeof failureReasonSchema>;

@@ -45,7 +45,9 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
     case ServerEventType.AttemptTranscript:
       return appendTranscript(qc, attemptTranscript(event.data.attemptId), event.data.entries);
     case ServerEventType.TaskUpdated:
-      return updateTask(qc, event.data);
+      await updateTask(qc, event.data);
+      // Quality and usage figures follow the tasks they count.
+      return qc.invalidateQueries({ queryKey: queryKeys.insightsAll });
     case ServerEventType.NodeUpdated:
       return updateNode(qc, event.data.taskId, event.data.node);
     case ServerEventType.PlanUpdated:
