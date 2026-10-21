@@ -320,9 +320,17 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       if (session !== undefined) reactions.resume(session);
     },
 
-    /** Deletes ended attempts with their transcripts (a deleted knowledge conversation, 18 §3). */
+    /**
+     * Deletes ended attempts with their transcripts (a deleted knowledge conversation, 18 §3). A session that just
+     * ended may still be winding down (the submit call returning, the abort after it); it is no longer followed, so
+     * its last events find no attempt to update.
+     */
     delete(ids: readonly string[]): void {
       const attempts = ids.map(mustFind);
+      for (const attempt of attempts) {
+        const session = state.sessionOf(attempt.id);
+        if (session !== undefined) state.releaseSession(session);
+      }
       repo.deleteMany(ids);
       for (const attempt of attempts) transcripts.remove(attempt);
     },

@@ -319,6 +319,22 @@ describe('知识问答', () => {
     expect(existsSync(transcript(attemptOf(second)))).toBe(false);
   });
 
+  it('刚回答完就删除对话：会话收尾的事件被忽略，之后的会话照常进行', async () => {
+    const { project: p } = await project();
+    t.fake.enqueue(answering(), RESEARCHER);
+    const ended = turnEnds();
+    const { body } = await t.call(askKnowledgeOp, { projectId: p.id, question: 'one', sources: CODE_AND_DOCS });
+    await ended;
+    // The session still winds down (the submit call returns, then the abort after it) when the rows go.
+    expect((await t.call(deleteKnowledgeOp, { id: body.id })).status).toBe(204);
+    await t.fake.settled();
+
+    t.fake.enqueue(answering(), RESEARCHER);
+    const next = await ask(p.id, 'two');
+    expect(next.turns[0]?.status).toBe(KnowledgeTurnStatus.Answered);
+    expect(t.logs.filter((l) => l.level >= 50)).toEqual([]);
+  });
+
   it('项目没有关联数据库时不能把数据库选为资料来源', async () => {
     const { project: p } = await project();
     const res = await t.call(askKnowledgeOp, {
