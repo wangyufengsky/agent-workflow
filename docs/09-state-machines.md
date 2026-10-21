@@ -190,7 +190,7 @@ stateDiagram-v2
 - `no_result`：见 [03-architecture §2.4](03-architecture.md#24-会话空闲但未提交结果)。
 - `timeout`：从 `running` 起超过 `attempt.timeoutMinutes`。
 - `abort`：用户中止或任务取消；后端调用 opencode `session/{id}/abort`。会话仍在创建中（`starting`）时也可中止（任务取消），之后不再发送首条消息。
-- `runtime_lost`：opencode 进程退出、用户重启 opencode，或后端启动时发现上次仍在进行（会话已不存在）。
+- `runtime_lost`：opencode 进程退出、用户重启 opencode、应用退出（后端先中断再结束 opencode，§9），或后端启动时发现上次仍在进行（会话已不存在）。会话还在创建时运行时消失，创建请求随之失败，这次失败属于中断本身，不再记为 `start_failed`。
 - 终态：`succeeded` `failed` `aborted` `interrupted`。尝试不会被「恢复」，重试总是新建尝试（`plan` 类尝试可复用原会话继续，见 12-mcp-tools §4.3）。
 
 ## 5. 计划 Plan
@@ -305,7 +305,7 @@ stateDiagram-v2
 - `ready` 的 `exited`：活动尝试全部 → `interrupted`（`runtime_lost`）。
 - 进入 `crashed` 后自动 `start` 一次；自动机会用完后需用户在运行环境页点重启（`crashed` 的 `start`），用户的手动启动 / 重启会重新给一次自动机会。
 - `restart`：用户手动；活动尝试先 → `interrupted`（会话随旧进程一起消失，可重试），再结束旧进程启动新进程。
-- 后端退出时结束 opencode 进程，不做状态转换。
+- 后端退出（应用退出）时：与 `restart` 一样，活动尝试先 → `interrupted`（`runtime_lost`；等待阻塞问题答案的除外，D46），再结束 opencode 进程树，运行时本身不做状态转换。顺序不能反：结束进程时正在进行的请求（如创建会话）会失败，若尝试仍在进行就会被记成 `failed` 并消耗预算（D73）。「重新检测」除了 `not_installed` / `version_mismatch` 的 `recheck`，还会 `start` 一个 `crashed` 的运行时（Windows 上补装 Git Bash 之后，D72）。
 
 ## 10. 助手确认 AssistantConfirmation（v1.1）
 

@@ -105,6 +105,8 @@ export function createFakeOpencode() {
   /** Bumped by abort(): a turn stops when its session's generation changed (later prompts play normally). */
   const generation = new Map<string, number>();
   let connected = true;
+  let holding = false;
+  const heldSessions = new Set<() => void>();
   /** Set by failNextPrompt(): the next prompt request fails like an opencode HTTP error. */
   let failPrompt = false;
   let closed = false;
@@ -268,6 +270,8 @@ export function createFakeOpencode() {
     settled(): Promise<void>;
     /** The runtime disappears: `runtime_lost`, and requests fail until `reconnect()`. */
     crash(): void;
+    /** `createSession` requests wait until the runtime goes away (`shutdown`), then fail as opencode's would. */
+    holdSessions(): void;
     /** The next `prompt` request fails with OPENCODE_REQUEST_FAILED while the runtime stays connected. */
     failNextPrompt(): void;
     reconnect(): void;
@@ -298,6 +302,22 @@ export function createFakeOpencode() {
       connected = false;
       emit({ type: E.RuntimeLost });
     },
+    holdSessions() {
+      holding = true;
+    },
+    /**
+     * The backend stops opencode on its way out (app quit): `runtime_lost`, then requests still in flight fail. The
+     * backend handles those failures before it closes, as it does with the real process tree being ended.
+     */
+    async shutdown() {
+      connected = false;
+      emit({ type: E.RuntimeLost });
+      holding = false;
+      const held = [...heldSessions];
+      heldSessions.clear();
+      for (const release of held) release();
+      await new Promise((resolve) => setImmediate(resolve));
+    },
     reconnect() {
       connected = true;
     },
@@ -312,6 +332,7 @@ export function createFakeOpencode() {
     },
     isConnected: () => connected,
     async createSession(input) {
+      if (holding) await new Promise<void>((resolve) => heldSessions.add(resolve));
       if (!connected) throw new Error('FakeOpencode is not connected');
       const session = { ...input, id: nextId('fake_ses') };
       sessions.push(session);

@@ -158,8 +158,9 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     clock,
     logDir: join(config.dataDir, 'logs'),
   });
-  server.addHook('onClose', () => runtime.stop());
   const opencode = deps.opencode ?? createRuntimeClient(runtime, log);
+  // Before the API and database close: opencode's last requests and events still reach a working backend.
+  server.addHook('preClose', () => opencode.shutdown());
   // The hosted runtime can start only once the API listens (its MCP endpoint needs the port) and when no fake
   // replaces it; start() decides that, after which a recheck may start a newly hostable runtime too.
   let hosting = false;

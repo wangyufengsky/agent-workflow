@@ -279,8 +279,14 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       const text = await readFile(join(deps.logDir, file), 'utf8');
       return { file, lines: text.replace(/\n$/, '').split('\n').slice(-lines) };
     },
-    /** Stops the process for good (backend shutdown); no state transition. */
-    stop: stopProcess,
+    /**
+     * Backend shutdown (app quit): sessions of a ready runtime are lost first, as when it crashes or restarts, so
+     * requests failing while the process tree ends do not fail their attempts; no state transition.
+     */
+    async shutdown(): Promise<void> {
+      if (proc !== undefined && sdk !== undefined) for (const listener of lostListeners) listener();
+      await stopProcess();
+    },
     /** SDK client of the ready runtime. */
     sdk(): Sdk {
       if (sdk === undefined) throw new AppError(ErrorCode.OpencodeNotReady, 'opencode is not ready');
