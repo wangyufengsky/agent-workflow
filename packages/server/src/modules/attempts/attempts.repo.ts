@@ -26,6 +26,10 @@ export function createAttemptsRepo(db: DbExecutor) {
       const row = db.select().from(attemptsTable).where(byId(id)).get();
       return row === undefined ? undefined : toAttempt(row);
     },
+    findMany(ids: readonly string[]): Attempt[] {
+      if (ids.length === 0) return [];
+      return db.select().from(attemptsTable).where(inArray(attemptsTable.id, ids)).all().map(toAttempt);
+    },
     /** The most recent attempt on an opencode session (several when re-planning continues a session). */
     findLatestBySession(sessionId: string): Attempt | undefined {
       const row = db
@@ -77,14 +81,14 @@ export function createAttemptsRepo(db: DbExecutor) {
         .get();
       return row === undefined ? undefined : toAttempt(row);
     },
-    /** Next number within the attempt's scope: its node, its task's plan attempts, or the debug attempts. */
+    /** Next number within the attempt's scope: its node, its task's plan attempts, or the taskless ones of its kind. */
     nextSeq(scope: { taskId: string | null; nodeId: string | null; kind: AttemptKind }): number {
       const where =
         scope.nodeId !== null
           ? eq(attemptsTable.nodeId, scope.nodeId)
           : scope.taskId !== null
             ? and(eq(attemptsTable.taskId, scope.taskId), eq(attemptsTable.kind, scope.kind))
-            : isNull(attemptsTable.taskId);
+            : and(isNull(attemptsTable.taskId), eq(attemptsTable.kind, scope.kind));
       const row = db
         .select({ max: sql<number | null>`max(${attemptsTable.seq})` })
         .from(attemptsTable)
@@ -115,6 +119,9 @@ export function createAttemptsRepo(db: DbExecutor) {
           to,
         });
       }
+    },
+    deleteMany(ids: readonly string[]): void {
+      db.delete(attemptsTable).where(inArray(attemptsTable.id, ids)).run();
     },
     setSession(id: string, sessionId: string): void {
       db.update(attemptsTable).set({ opencodeSessionId: sessionId }).where(byId(id)).run();

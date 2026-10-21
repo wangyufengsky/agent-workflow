@@ -27,7 +27,7 @@ function decide(rules: readonly PermissionRule[], command: string): PermissionAc
 }
 
 const reviewer = (checkCommands: string[] = []) =>
-  sessionPermissionRules(RoleBaseAgent.Reviewer, BashPolicy.Auto, checkCommands);
+  sessionPermissionRules(RoleBaseAgent.Reviewer, BashPolicy.Auto, { checkCommands });
 /** Planner and reviewer sessions without a project check, and executors under `ai.bashPolicy = ask`. */
 const READONLY_PRESETS = [
   ['只读会话', reviewer()],
@@ -247,12 +247,12 @@ describe('项目检查命令本身（D51）', () => {
   it('规划者与评审者运行检查命令不询问，带参数或重定向也一样；执行者的规则不变', () => {
     const checks = ['make check', 'make check'];
     for (const base of [RoleBaseAgent.Planner, RoleBaseAgent.Reviewer]) {
-      const rules = sessionPermissionRules(base, BashPolicy.Ask, checks);
+      const rules = sessionPermissionRules(base, BashPolicy.Ask, { checkCommands: checks });
       for (const command of ['make check', 'make check V=1', 'make check > check.log 2>&1'])
         expect(decide(rules, command), `${base}: ${command}`).toBe('allow');
       expect(decide(rules, 'make install')).toBe('ask');
     }
-    expect(sessionPermissionRules(RoleBaseAgent.Executor, BashPolicy.Ask, checks)).toEqual(
+    expect(sessionPermissionRules(RoleBaseAgent.Executor, BashPolicy.Ask, { checkCommands: checks })).toEqual(
       sessionPermissionRules(RoleBaseAgent.Executor, BashPolicy.Ask),
     );
   });
