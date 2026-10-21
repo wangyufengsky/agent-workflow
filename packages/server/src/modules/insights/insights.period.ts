@@ -1,6 +1,8 @@
 import { InsightsPeriod, type InsightsQuery } from '@aw/shared';
 
 const DAY_MS = 86_400_000;
+/** Sampling this far before and after local midnight sees the offsets on both sides of a change near it. */
+const SIX_HOURS = 21_600_000;
 
 /** Calendar arithmetic on `YYYY-MM-DD`, independent of any time zone. */
 export function addDays(date: string, days: number): string {
@@ -41,12 +43,18 @@ function offsetAt(ms: number, timeZone: string): number {
   return wall - (ms - (ms % 1000));
 }
 
-/** The instant the date begins in `timeZone` (its 0:00, which a daylight-saving change may move). */
+/** The instant the date begins in `timeZone`: its 0:00, or the first instant of the date when the clocks skip it. */
 export function startOfDay(date: string, timeZone: string): number {
   const midnightUtc = Date.parse(date);
+  const dateOf = localDateIn(timeZone);
   const guess = midnightUtc - offsetAt(midnightUtc, timeZone);
-  // The offset at the guess is the one in force at local midnight, unless a change falls in between.
-  return midnightUtc - offsetAt(guess, timeZone);
+  // Local midnight in the offset before and in the offset after a change near it. When the change skips midnight
+  // (America/Havana springs from 23:59 to 1:00), only the earlier offset lands on the date, at the jump.
+  const starts = [guess - SIX_HOURS, guess + SIX_HOURS]
+    .map((t) => midnightUtc - offsetAt(t, timeZone))
+    .filter((t) => dateOf(t) === date);
+  if (starts.length === 0) throw new Error(`No start of ${date} in ${timeZone}`);
+  return Math.min(...starts);
 }
 
 export type ResolvedPeriod = {

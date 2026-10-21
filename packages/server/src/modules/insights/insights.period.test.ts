@@ -46,6 +46,14 @@ describe('resolvePeriod', () => {
     expect(startOfDay('2026-03-08', LA)).toBe(Date.parse('2026-03-08T08:00:00Z'));
     expect(startOfDay('2026-03-09', LA)).toBe(Date.parse('2026-03-09T07:00:00Z'));
   });
+
+  it('夏令时跳过午夜的时区（哈瓦那）：一天从时钟跳到 1:00 的那一刻开始，不含前一天的最后一小时', () => {
+    const havana = 'America/Havana';
+    const start = startOfDay('2026-03-08', havana);
+    expect(start).toBe(Date.parse('2026-03-08T05:00:00Z'));
+    expect(localDateIn(havana)(start)).toBe('2026-03-08');
+    expect(localDateIn(havana)(start - 1)).toBe('2026-03-07');
+  });
 });
 
 describe('insightsQuerySchema', () => {

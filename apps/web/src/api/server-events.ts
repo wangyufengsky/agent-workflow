@@ -22,6 +22,9 @@ import { useUiStore } from '../state/ui.store.ts';
 import { apiToken } from './client.ts';
 import { queryKeys } from './query-keys.ts';
 
+/** Quality and usage figures are read again whenever what they count changed (19 §3). */
+const refreshInsights = (qc: QueryClient) => qc.invalidateQueries({ queryKey: queryKeys.insightsAll });
+
 /** How each SSE event updates the cache; events are invalidation hints and increments, the queries stay the source of truth. */
 async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
   switch (event.type) {
@@ -41,20 +44,23 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       if (event.data.nodeId !== null && event.data.taskId !== null) {
         await qc.invalidateQueries({ queryKey: queryKeys.node(event.data.taskId, event.data.nodeId) });
       }
-      return;
+      // Usage is counted per attempt, a knowledge question's too.
+      return refreshInsights(qc);
     case ServerEventType.AttemptTranscript:
       return appendTranscript(qc, attemptTranscript(event.data.attemptId), event.data.entries);
     case ServerEventType.TaskUpdated:
       await updateTask(qc, event.data);
-      // Quality and usage figures follow the tasks they count.
-      return qc.invalidateQueries({ queryKey: queryKeys.insightsAll });
+      // Quality is counted over the tasks that ended.
+      return refreshInsights(qc);
     case ServerEventType.NodeUpdated:
       return updateNode(qc, event.data.taskId, event.data.node);
     case ServerEventType.PlanUpdated:
     case ServerEventType.DeliveryUpdated:
       return qc.invalidateQueries({ queryKey: queryKeys.task(event.data.taskId), exact: true });
     case ServerEventType.InboxUpdated:
-      return updateInbox(qc, event.data.openCount);
+      await updateInbox(qc, event.data.openCount);
+      // Questions and permission requests are counted as interruptions, a knowledge researcher's too.
+      return refreshInsights(qc);
     case ServerEventType.AssistantUpdated:
       return updateConversation(qc, event.data);
     case ServerEventType.AssistantTranscript: {

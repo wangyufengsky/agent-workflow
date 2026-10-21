@@ -37,7 +37,7 @@
 | `last_30_days` | 今天及之前 29 天 |
 | `custom` | `from`、`to`（`YYYY-MM-DD`），`from ≤ to`，最多 `INSIGHTS_MAX_DAYS`（366）天；否则 `VALIDATION_FAILED` |
 
-- **时区**：后端进程的系统时区（与界面在同一台机器上），即 `AppDeps.timeZone`，助手报时用的也是它。一天 = 该时区的 0:00 到次日 0:00，按 `Intl` 计算，夏令时那天是 23 或 25 小时。
+- **时区**：后端进程的系统时区（与界面在同一台机器上），即 `AppDeps.timeZone`，助手报时用的也是它。一天 = 该时区的 0:00 到次日 0:00，按 `Intl` 计算，夏令时那天是 23 或 25 小时；时钟跳过 0:00 的时区（如 `America/Havana`），那天从跳到 1:00 的那一刻开始。
 - 时间段换算为毫秒区间 `[from 当天 0:00, to 次日 0:00)`；每条记录按下面各指标规定的时间点归入区间与某一天。
 
 ### 2.3 用量
@@ -195,13 +195,13 @@ type InsightsTaskDTO = {
   - `insights.aggregate.ts`：由查出的行计算 §2 的全部数字（纯函数）；
   - `insights.repo.ts`：§5 的查询，只读，读取其他模块经其 `index.ts` 导出的表；
   - `insights.service.ts`、`insights.operations.ts`、`index.ts`。
-- `web/src/features/insights/`：页面（简单 / 专业两种视图）、`bar-chart.tsx`（自写的 HTML/CSS 柱状图，D79）、`drill.ts`（钻取过滤）、查询；文案 `web/src/copy/insights.ts`。SSE `task.updated` 让这些查询重新读取。
+- `web/src/features/insights/`：页面（简单 / 专业两种视图）、`bar-chart.tsx`（自写的 HTML/CSS 柱状图，D79）、`drill.ts`（钻取过滤）、查询；文案 `web/src/copy/insights.ts`。SSE `task.updated`、`attempt.updated`（含知识问答的尝试）与 `inbox.updated` 让这些查询重新读取。
 
 ## 8. 测试
 
 | 层 | 测什么 |
 | --- | --- |
-| 单元 `insights.period.test.ts` | 五种时间段的日期范围（含跨年、周一）；`custom` 的校验；同一时刻在 `Asia/Shanghai` 与 `America/Los_Angeles` 归入不同的日期；夏令时开始那天的区间为 23 小时 |
+| 单元 `insights.period.test.ts` | 五种时间段的日期范围（含跨年、周一）；`custom` 的校验；同一时刻在 `Asia/Shanghai` 与 `America/Los_Angeles` 归入不同的日期；夏令时开始那天的区间为 23 小时；跳过午夜的时区（哈瓦那）一天从跳变那一刻开始 |
 | 单元 `insights.aggregate.test.ts` | 空数据（全 0、比率为空、每天都有点）；未计价 tokens（成本为 0 或为空且 tokens 大于 0）；首次通过与重试不计中断的尝试；失败原因的三类与排序；按假设记录的提问不算打扰；到待合并耗时的中位数；拆分的分组与空键 |
 | 单元 `drill.test.ts`（web） | 每个钻取键的过滤 |
 | 集成 `insights.int.test.ts` | 经 API：FakeOpencode（`usage` 步骤报告 tokens 与成本）跑完一个首次通过的任务、一个检查失败后重试通过且有一次提问的任务、一个取消的任务、一次知识问答；`insights.summary` 与 `insights.tasks` 的数字；`custom` 缺日期 400 |
