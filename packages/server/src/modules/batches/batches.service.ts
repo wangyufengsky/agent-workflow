@@ -153,7 +153,7 @@ export function createBatchesService({ db, unit, clock, log, settings, workflows
 
     /**
      * Creates the batch and a task per target in one transaction, then starts the tasks in target order (20 §2).
-     * Only fixed workflows: their plan is the template, so the tasks do not wait for plan confirmation (D78).
+     * Only fixed workflows: their plan is the template, so the tasks do not wait for plan confirmation (D85).
      */
     async create(input: CreateBatchRequest): Promise<BatchDetailDTO> {
       const workflow = workflows.get(input.workflowId);
@@ -192,7 +192,7 @@ export function createBatchesService({ db, unit, clock, log, settings, workflows
     },
 
     /**
-     * 「合并全部待合并的」(20 §5, D79): every task waiting for review is delivered in target order, as its own
+     * 「合并全部待合并的」(20 §5, D86): every task waiting for review is delivered in target order, as its own
      * result card would; a conflicting or failing one stays in review and the others go on.
      */
     async deliver(id: string, strategy: LocalMergeStrategy | undefined): Promise<DeliverBatchResponse> {

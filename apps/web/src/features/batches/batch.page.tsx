@@ -39,7 +39,7 @@ function outcomeMessage({ outcomes }: DeliverBatchResponse): {
 
 /**
  *「合并全部待合并的」(20 §5): the dialog says how many tasks go where before one click delivers them one by one;
- * each merge is the user's (D16, D79).
+ * each merge is the user's (D16, D86).
  */
 function DeliverAll({ batch }: { batch: BatchDetailDTO }) {
   const [open, setOpen] = useState(false);

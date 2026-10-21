@@ -135,7 +135,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | --- | --- | --- |
 | `BatchDeliveryOutcome` | `delivered` · `conflict` · `failed` | 批量交付中一个任务的结果（20 §5）：已合并或已完成 / 合并冲突 / 合并前检查、合并或完成失败；后两种任务停在 `review` |
 
-批次没有状态枚举：进度由子任务的 `TaskDisplayGroup` 汇总（`batchCounts`），「待合并」由 `isBatchDeliverable` 判断（`shared/batch/batch.ts`，D78）。
+批次没有状态枚举：进度由子任务的 `TaskDisplayGroup` 汇总（`batchCounts`），「待合并」由 `isBatchDeliverable` 判断（`shared/batch/batch.ts`，D85）。
 
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 
@@ -211,7 +211,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DIFF_FILE_MAX_BYTES` | 1048576（超过显示「文件过大」） |
 | `RUNTIME_LOG_TAIL_DEFAULT` / `RUNTIME_LOG_TAIL_MAX` | 500 / 5000（运行环境日志页的行数） |
 | `LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX` | 50 / 100（任务与「需要你处理」列表每页条数，11 §1） |
-| `BATCH_TARGETS_MAX` | 20（一个批次的目标数，D78） |
+| `BATCH_TARGETS_MAX` | 20（一个批次的目标数，D85） |
 | `BATCH_TARGET_MAX_CHARS` | 500（一个目标，单行） |
 | `ASSISTANT_TITLE_MAX_CHARS` | 40（助手对话标题取第一条消息的首行） |
 | `ASSISTANT_MESSAGE_MAX_CHARS` | 20000（一条发给助手的消息） |

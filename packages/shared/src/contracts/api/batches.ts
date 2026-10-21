@@ -16,7 +16,7 @@ import { errorInfoSchema } from '../../errors/codes.ts';
 import { deliverySchema } from './delivery.ts';
 import { taskSummarySchema } from './tasks.ts';
 
-/** One target: a path, a module or class name — any single line of text (20 §2, D78 ③). */
+/** One target: a path, a module or class name — any single line of text (20 §2, D85 ③). */
 const targetSchema = z
   .string()
   .trim()

@@ -190,11 +190,11 @@
 
 ## v1.1 · 固定模板批量任务
 
-> 状态：B-01…B-10 **已完成**（2026-10-21），待合并。设计见 [20-batch-tasks.md](20-batch-tasks.md)，决策 D78（批次的边界）、D79（批量交付），其中子任务不确认计划、目标为任意文本且上限 20、批量交付不支持 PR 三项**待用户确认**，先按保守方案实现。与设计的补充：批次摘要用 `ended`（终态任务数）而不是布尔的「已结束」，进度条与「已全部结束」都由它得出；任务服务新增 `summariesOf(ids)` 与 `lastDelivery(id)` 供批次读取；助手面板的导航卡片显示批次进度。未做：助手页面类型 `AssistantPage` 没有加入批量页面（用户在批量视图中提问时助手视为未知页面，20 §8）。
+> 状态：B-01…B-10 **已完成**（2026-10-21），待合并。设计见 [20-batch-tasks.md](20-batch-tasks.md)，决策 D85（批次的边界）、D86（批量交付），其中子任务不确认计划、目标为任意文本且上限 20、批量交付不支持 PR 三项**待用户确认**，先按保守方案实现。与设计的补充：批次摘要用 `ended`（终态任务数）而不是布尔的「已结束」，进度条与「已全部结束」都由它得出；任务服务新增 `summariesOf(ids)` 与 `lastDelivery(id)` 供批次读取；助手面板的导航卡片显示批次进度。未做：助手页面类型 `AssistantPage` 没有加入批量页面（用户在批量视图中提问时助手视为未知页面，20 §8）。
 
 | # | 任务 | 完成标准 |
 | --- | --- | --- |
-| B-01 | 设计文档 20、任务拆分、决策 D78 / D79 | 文档评审通过 |
+| B-01 | 设计文档 20、任务拆分、决策 D85 / D86 | 文档评审通过 |
 | B-02 | 契约：`EntityKind.Batch`、`BatchDeliveryOutcome`、常量（`BATCH_TARGET_PLACEHOLDER`、`BATCH_KEY_PREFIX`、`BATCH_TARGETS_MAX`、`BATCH_TARGET_MAX_CHARS`）、错误码 `BATCH_NOT_FOUND`、`renderBatchRequirement` / `batchCounts` / `isBatchDeliverable`、批次 schema 与 DTO、四个操作契约（`batches.create` 为 write 并声明 `produces`，`batches.deliver` 为 critical）；08 / 10 / 11 同步 | 单测：三个函数；创建请求 schema 拒绝无占位符、重复目标、换行目标、替换后超长的需求；`ERROR_COPY` 覆盖新错误码；操作风险与 `produces` 标注 |
 | B-03 | 存储：迁移 `0010_batches`（`batches`、`batch_tasks`）；batches 模块的 repo（插入、按 id 读、分页列表、子任务关联） | 集成测试见 B-04；删除项目后批次随之消失 |
 | B-04 | 批次服务：创建（只用固定流程、分支检查一次、一个事务写入批次与全部子任务草稿、提交后依次开始；任务创建拆为「检查」与「写入草稿」两步）、详情（子任务摘要与本轮交付）、列表（汇总计数、游标分页） | 集成测试（FakeOpencode + 真实 Git）：创建 3 个目标的批次后各子任务各自有分支与 worktree、各自跑完到待合并、需求为模板替换结果、计划不需确认；AI 规划流程 400 `VALIDATION_FAILED`；不存在的批次 404 `BATCH_NOT_FOUND`；删除项目级联删除批次 |

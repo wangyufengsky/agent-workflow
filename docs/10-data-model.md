@@ -372,7 +372,7 @@ payload / response：
 
 ## 4b. 批量任务（v1.1）
 
-见 [20-batch-tasks.md §6](20-batch-tasks.md#6-数据模型迁移-0010_batches)，迁移 `0010_batches`。批次没有状态列，进度由子任务推导（D78）。
+见 [20-batch-tasks.md §6](20-batch-tasks.md#6-数据模型迁移-0010_batches)，迁移 `0010_batches`。批次没有状态列，进度由子任务推导（D85）。
 
 ### batches
 
