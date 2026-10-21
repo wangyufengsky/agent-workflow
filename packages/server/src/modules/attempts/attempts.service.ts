@@ -205,13 +205,13 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     },
 
     /**
-     * A new attempt on the session of an earlier one (re-planning, 12 §4.3; a knowledge follow-up, 18 §5.3): the
-     * model keeps what it read and receives `prompt` as the next message, with the previous attempt's model unless
-     * `model` gives another one. Synchronous up to sending, like `start`.
+     * A new attempt on the session of an earlier one (re-planning, 12 §4.3; a knowledge follow-up, 18 §5.3; PPT work,
+     * 23 §4.1): the model keeps what it read and receives `prompt` as the next message, with the previous attempt's
+     * model and kind unless `model` / `kind` give others. Synchronous up to sending, like `start`.
      */
     async continueSession(
       previousId: string,
-      input: { id?: string; prompt: string; model?: string | null } & ResumeInput,
+      input: { id?: string; prompt: string; model?: string | null; kind?: AttemptKind } & ResumeInput,
     ): Promise<AttemptDTO> {
       requireReady();
       const previous = mustFind(previousId);
@@ -219,14 +219,16 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         throw new AppError(ErrorCode.AttemptNotFound, `Attempt ${previousId} has no session`, { id: previousId });
       }
       const model = input.model === undefined ? previous.model : input.model;
+      // A PPT's outline and pages are different kinds of work on one session (23 §7.1).
+      const kind = input.kind ?? previous.kind;
       const id = input.id ?? randomUUID();
       repo.insert({
         id,
         taskId: previous.taskId,
         nodeId: previous.nodeId,
         roleId: previous.roleId,
-        kind: previous.kind,
-        seq: repo.nextSeq(previous),
+        kind,
+        seq: repo.nextSeq({ ...previous, kind }),
         status: AttemptStatus.Starting,
         model,
         directory: previous.directory,

@@ -64,6 +64,10 @@ export const ErrorCode = {
   KnowledgeCitationInvalid: 'KNOWLEDGE_CITATION_INVALID',
   KnowledgeCitationNotFound: 'KNOWLEDGE_CITATION_NOT_FOUND',
   KnowledgeSourceUnavailable: 'KNOWLEDGE_SOURCE_UNAVAILABLE',
+  // PPT
+  DeckNotFound: 'DECK_NOT_FOUND',
+  DeckSlideNotFound: 'DECK_SLIDE_NOT_FOUND',
+  DeckBusy: 'DECK_BUSY',
   // Inbox
   InboxItemNotFound: 'INBOX_ITEM_NOT_FOUND',
   InboxItemClosed: 'INBOX_ITEM_CLOSED',
@@ -140,6 +144,9 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.KnowledgeCitationInvalid]: null,
   [ErrorCode.KnowledgeCitationNotFound]: 404,
   [ErrorCode.KnowledgeSourceUnavailable]: 404,
+  [ErrorCode.DeckNotFound]: 404,
+  [ErrorCode.DeckSlideNotFound]: 404,
+  [ErrorCode.DeckBusy]: 409,
   [ErrorCode.InboxItemNotFound]: 404,
   [ErrorCode.InboxItemClosed]: 409,
   [ErrorCode.DeliveryConflict]: 409,

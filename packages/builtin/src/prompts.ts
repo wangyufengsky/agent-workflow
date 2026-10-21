@@ -29,6 +29,13 @@ export const PromptName = {
   ProtocolResearch: 'protocol-research',
   StartResearch: 'start-research',
   ResearchFollowUp: 'research-followup',
+  /** The PPT writer's agent prompt, the first message's context and the message of each kind of work (23 §7). */
+  ProtocolSlides: 'protocol-slides',
+  DeckContext: 'deck-context',
+  DeckOutline: 'deck-outline',
+  DeckOutlineRevise: 'deck-outline-revise',
+  DeckSlides: 'deck-slides',
+  DeckSlidesRevise: 'deck-slides-revise',
 } as const;
 export type PromptName = (typeof PromptName)[keyof typeof PromptName];
 
@@ -65,6 +72,12 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.ProtocolResearch]: read(PromptName.ProtocolResearch),
     [PromptName.StartResearch]: read(PromptName.StartResearch),
     [PromptName.ResearchFollowUp]: read(PromptName.ResearchFollowUp),
+    [PromptName.ProtocolSlides]: read(PromptName.ProtocolSlides),
+    [PromptName.DeckContext]: read(PromptName.DeckContext),
+    [PromptName.DeckOutline]: read(PromptName.DeckOutline),
+    [PromptName.DeckOutlineRevise]: read(PromptName.DeckOutlineRevise),
+    [PromptName.DeckSlides]: read(PromptName.DeckSlides),
+    [PromptName.DeckSlidesRevise]: read(PromptName.DeckSlidesRevise),
   };
 }
 

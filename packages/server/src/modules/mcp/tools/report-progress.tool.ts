@@ -6,7 +6,14 @@ export const reportProgressTool = (attempts: AttemptsService) =>
   defineMcpTool({
     name: McpToolName.ReportProgress,
     description: 'Tell the user in one short line what you are doing now.',
-    allowedKinds: [AttemptKind.Plan, AttemptKind.Execute, AttemptKind.Review, AttemptKind.Research],
+    allowedKinds: [
+      AttemptKind.Plan,
+      AttemptKind.Execute,
+      AttemptKind.Review,
+      AttemptKind.Research,
+      AttemptKind.DeckOutline,
+      AttemptKind.DeckSlides,
+    ],
     input: reportProgressInputSchema,
     output: reportProgressOutputSchema,
     handler: ({ message }, { attempt }) => {

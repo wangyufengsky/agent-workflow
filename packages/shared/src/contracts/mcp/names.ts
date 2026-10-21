@@ -14,6 +14,8 @@ export const McpToolName = {
   DbDescribe: 'db_describe',
   DbQuery: 'db_query',
   SubmitAnswer: 'submit_answer',
+  SubmitOutline: 'submit_outline',
+  SubmitSlide: 'submit_slide',
 } as const;
 export type McpToolName = (typeof McpToolName)[keyof typeof McpToolName];
 
@@ -23,4 +25,7 @@ export const ATTEMPT_SUBMIT_TOOL = {
   [AttemptKind.Execute]: McpToolName.SubmitResult,
   [AttemptKind.Review]: McpToolName.SubmitReview,
   [AttemptKind.Research]: McpToolName.SubmitAnswer,
+  [AttemptKind.DeckOutline]: McpToolName.SubmitOutline,
+  // Called once per page; the attempt is submitted with the last of its pages (23 §4.1).
+  [AttemptKind.DeckSlides]: McpToolName.SubmitSlide,
 } as const satisfies Record<AttemptKind, McpToolName>;

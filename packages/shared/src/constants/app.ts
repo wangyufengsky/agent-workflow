@@ -10,6 +10,7 @@ export const OPENCODE_AGENT_NAME = {
   [SessionAgent.Executor]: 'aw-executor',
   [SessionAgent.Reviewer]: 'aw-reviewer',
   [SessionAgent.Researcher]: 'aw-researcher',
+  [SessionAgent.SlidesWriter]: 'aw-slides',
 } as const satisfies Record<SessionAgent, string>;
 /** The app assistant's agent (15 §2); not a role base agent. */
 export const OPENCODE_ASSISTANT_AGENT = 'aw-assistant';

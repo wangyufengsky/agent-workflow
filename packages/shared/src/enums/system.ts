@@ -106,6 +106,8 @@ export const ServerEventType = {
   AssistantRevealFile: 'assistant.reveal_file',
   /** A knowledge conversation changed: a new turn, a submitted answer, a turn that ended, a deletion (18 §4). */
   KnowledgeUpdated: 'knowledge.updated',
+  /** A PPT changed: AI work started or ended, a page was submitted, edited, moved or deleted (23 §8). */
+  DeckUpdated: 'deck.updated',
   Resync: 'resync',
 } as const;
 export type ServerEventType = (typeof ServerEventType)[keyof typeof ServerEventType];

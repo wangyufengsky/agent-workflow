@@ -23,6 +23,23 @@ import {
   updateDbConnectionOp,
 } from './databases.ts';
 import { startDebugAttemptOp } from './debug.ts';
+import {
+  createDeckOp,
+  deleteDeckOp,
+  deleteSlideOp,
+  generateDeckOp,
+  getDeckOp,
+  insertSlideOp,
+  listDecksOp,
+  moveSlideOp,
+  restoreSlideOp,
+  reviseOutlineOp,
+  reviseSlidesOp,
+  stopDeckOp,
+  updateDeckOp,
+  updateOutlineOp,
+  updateSlideOp,
+} from './decks.ts';
 import type { OperationContract } from './define.ts';
 import {
   gitBranchesOp,
@@ -114,6 +131,7 @@ export * from './attempts.ts';
 export * from './batches.ts';
 export * from './databases.ts';
 export * from './debug.ts';
+export * from './decks.ts';
 export * from './define.ts';
 export * from './git.ts';
 export * from './inbox.ts';
@@ -229,4 +247,19 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   knowledgeCitationOp,
   insightsSummaryOp,
   insightsTasksOp,
+  listDecksOp,
+  getDeckOp,
+  createDeckOp,
+  updateDeckOp,
+  reviseOutlineOp,
+  updateOutlineOp,
+  generateDeckOp,
+  reviseSlidesOp,
+  updateSlideOp,
+  restoreSlideOp,
+  insertSlideOp,
+  moveSlideOp,
+  deleteSlideOp,
+  stopDeckOp,
+  deleteDeckOp,
 ];

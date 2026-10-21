@@ -12,6 +12,8 @@ export const EntityKind = {
   KnowledgeConversation: 'knowledge_conversation',
   /** A batch of tasks made from one fixed workflow (20). */
   Batch: 'batch',
+  /** A PPT (23). */
+  Deck: 'deck',
 } as const;
 export type EntityKind = (typeof EntityKind)[keyof typeof EntityKind];
 export const entityKindSchema = z.enum(EntityKind);
