@@ -133,4 +133,17 @@
 
 ## v1.1 · 应用助手（约 2 周，v1.0 发布后）
 
-任务概要见 [15-assistant.md §8](15-assistant.md#8-v11-开发任务概要)，届时按本文格式拆分编号 `A-xx`。
+> 状态：进行中。设计见 [15-assistant.md](15-assistant.md)，由 15 §8 拆分为下列任务。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| A-01 | 契约：枚举（确认状态、助手工具名、页面、表单）、常量（助手目录、工具前缀、标题长度）、错误码、确认状态机、助手操作与 DTO、SSE 事件、会话流新增 `confirmation` / `attachment` 两种条目；08 / 09 / 10 / 11 同步 | 单测：确认状态机合法 / 非法转换；`pnpm gen:fsm-docs --check` 通过；助手自己的操作 `expose.assistant = false` |
+| A-02 | 存储：迁移新增 `assistant_conversations`、`assistant_confirmations`；assistant 模块的对话增删查；消息流 JSONL `assistant/conversations/<id>.jsonl` | 集成测试：新建 → 列表 → 读消息流分页；删除对话同时删除其确认、JSONL 与 `files/<id>/` |
+| A-03 | `aw-assistant` agent：注入配置（agent、助手 MCP server、两套 MCP 工具在对方 agent 中 deny）、bridge 插件同时给 `agent-workflow-app_` 工具注入会话 id；会话 `directory = <数据目录>/assistant/`、`external_directory: deny`、bash 用不带检查命令的只读规则、`question: deny`；每轮 `system` 注入时间与时区、界面模式、当前页面与选中对象；对话忙碌状态、会话事件 → 消息流、对话中的权限请求 | 单测：配置快照；集成测试（FakeOpencode）：发送消息时会话的目录、agent、规则与 `system` 内容正确（含选中任务的编号与标题），忙碌时再发返回 `ASSISTANT_BUSY`，权限请求在对话中回复后会话继续；`@opencode` 测试：注入后 `aw-assistant` 与 `agent-workflow-app` 在 opencode 中可见且 MCP 已连接 |
+| A-04 | 助手 MCP `/mcp/assistant`（独立令牌）：从操作清单生成工具（`expose.assistant`、按界面模式过滤、名称 `.` → `_`、剔除凭据字段、凭据字段必填的操作不生成）；会话归属；风险拦截：read 直接执行，write 需确认（`assistant.alwaysAllow` 中的直接执行），critical 每次确认；确认 / 取消后由后端执行并把结果作为下一条消息发回同一会话（会话忙时等空闲再发）；助手不能修改 `assistant.alwaysAllow` 与 `opencode.binaryPath`（D65） | 集成测试（MCP SDK 客户端 + FakeOpencode）：read 直接返回结果；write → `needs_confirmation` → 确认后操作生效且会话收到结果消息；write 在总是允许中时直接执行；critical 不能设为总是允许（400）且总是允许列表中的 critical 仍需确认；取消后会话收到取消消息；工具 schema 中没有 `password` / `token`；未归属的会话（执行会话）调用返回 `MCP_CONVERSATION_UNRESOLVED` |
+| A-05 | 助手专用工具：`get_current_time`、`get_app_status`、`open_page`、`open_form`（凭据字段不在 schema 中，预填凭据被拒绝）、`list_files`、`reveal_file`（路径限定在对话的 `files/<id>/`）；补齐第一批操作中缺的数据库只读查询 `databases.query` | 集成测试：时间与时区正确（FakeClock）；`open_page` / `open_form` / `reveal_file` 推送对应 SSE 事件；`open_form` 带 `password` 返回 `VALIDATION_FAILED`；`reveal_file` 越界路径返回 `VALIDATION_FAILED`；`databases.query` 拒绝写语句（Docker MySQL） |
+| A-06 | 界面：⌘J 侧边面板（对话列表新建 / 切换 / 删除、消息流、工具调用折叠一行、确认卡片、权限卡片、文件附件卡片、`⌘↵` 发送、`Esc` 收起）；`open_page` / `open_form` 在面板旁导航（面板保持打开），表单预填非敏感字段；`reveal_file` 经 preload 在 Finder 中显示 | E2E 冒烟：⌘J 打开面板、发送消息、显示回复；`open_page` 后页面跳转且面板仍打开 |
+| A-07 | 主页顶部助手输入框（回车打开面板并开始新对话，与结构化「开始任务」并存）；设置页「助手」分组：查看与撤销「总是允许」 | E2E：主页输入 → 面板中出现新对话；卡片上「总是允许」后设置页列出该操作，撤销后消失 |
+| A-08 | E2E（FakeOpencode）：对助手说开始任务 → 确认卡片 → 任务运行；四主题走查加入助手面板 | `pnpm e2e` 通过，走查截图含助手面板 |
+| A-09 | live 冒烟（真实 opencode + 默认模型 `TEST_MODEL`）：让助手查明天的日期、列出项目 | `live/assistant.live.test.ts` 通过：回复包含明天的日期与示例项目名，会话中调用了 `get_current_time` 与 `projects_list` |
+| A-10 | 文档收尾：15 与实现对齐、03 / 12 / 14 中的助手部分、本节状态段 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
