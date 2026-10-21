@@ -219,4 +219,7 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 
 ## 7. 发现但未处理
 
+- `pnpm perf`（`playwright.perf.config.ts`，不进 CI）的启动命令用 `NODE_ENV=production …` 与 `:` 拼接 PATH，在 Windows 上不能运行；需要时改成与 `playwright.config.ts` 相同的写法。
+- Windows runner 上建 worktree 偶有数秒（最大 9.3 s）的长尾，原因未查明（Defender 已排除）；真机上是否同样出现需要观察。
+
 - macOS / Linux 上若用户在自己的 opencode 配置中把 `shell` 设为 PowerShell / nushell，只读规则同样不按 bash 语义匹配（v1.0 起的前提）。可选做法是三平台都注入 POSIX shell，但会失去 login shell 带来的 PATH，需要单独决定。

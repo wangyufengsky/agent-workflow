@@ -168,7 +168,7 @@
 
 ## v1.1 · Windows 与 Linux
 
-> 状态：进行中。设计见 [17-cross-platform.md](17-cross-platform.md)，决策 D71–D76。验收：三平台 CI（`.github/workflows/ci.yml`）全绿 + 本机 macOS `pnpm verify`、`pnpm e2e`、`pnpm test:oc`；Windows 与 Linux 真机安装与首次引导由用户完成（17 §5）。
+> 状态：**已完成**（2026-10-21），待合并。设计见 [17-cross-platform.md](17-cross-platform.md)，决策 D71–D76。验收：三平台 CI（`.github/workflows/ci.yml`）全绿 + 本机 macOS `pnpm verify`、`pnpm e2e`、`pnpm test:oc`、`pnpm e2e:smoke`；Windows 与 Linux 真机安装与首次引导由用户完成（17 §5）。与计划的差异：`.cmd` 启动与结束进程树用 execa 10 自带的能力（不自写）；浏览器 E2E 改由后端托管构建出的前端（Vite 开发服务器的 HMR 断线重载是 M6 遗留偶发失败的根因，17 §4.1）；合并 main 时把应用助手与知识问答纳入排查（17 §3.9、§3.10）。顺带修复的根因缺陷：冲突预合并缺少提交者身份、知识引用对 CRLF 文件带 `\r`、研究过程在 Windows 上显示绝对路径、助手确认卡片与对话状态在首次读取进行中到达时丢失。
 
 | # | 任务 | 完成标准 |
 | --- | --- | --- |
