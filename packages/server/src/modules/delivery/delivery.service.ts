@@ -67,6 +67,10 @@ export function createDeliveriesService({ db, unit, clock, log }: DeliveriesServ
       const delivery = repo.latest(taskId);
       return delivery === undefined ? undefined : toDto(delivery);
     },
+    latestPullRequest(taskId: string): DeliveryDTO | undefined {
+      const delivery = repo.latestPullRequest(taskId);
+      return delivery === undefined ? undefined : toDto(delivery);
+    },
     /** Deliveries cut short by the previous run, for recovery. */
     listRunning: (): Array<DeliveryDTO & { taskId: string }> => repo.listByStatus(Status.Running),
 

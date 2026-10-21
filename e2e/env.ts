@@ -5,3 +5,5 @@ export const E2E_TOKEN = 'e2e'.padEnd(64, '0');
 /** In workers, the port the backend reported to global setup (D78). */
 export const API_BASE = `http://127.0.0.1:${devPorts(process.env).api}/api/v1`;
 export const AUTH = { Authorization: `Bearer ${E2E_TOKEN}` };
+/** The repository FakeHosting serves to the E2E backend and the token it accepts (J18). */
+export const E2E_HOSTING = { repo: 'acme/shop', token: 'e2e-hosting-token' };

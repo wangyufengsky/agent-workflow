@@ -106,7 +106,7 @@ describe('交付：创建 PR（11 §5.3）', () => {
       lastDelivery: { strategy: 'pull_request', status: 'succeeded', prUrl: 'https://github.example/acme/shop/pull/1' },
       git: { worktreeStatus: 'removed' },
     });
-    expect(hosting.pullRequests).toEqual([
+    expect(hosting.pullRequests).toMatchObject([
       {
         provider: 'github',
         repo: 'acme/shop',

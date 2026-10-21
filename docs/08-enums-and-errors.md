@@ -83,7 +83,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DeliveryStrategy` | `squash` · `merge` · `rebase` · `pull_request` · `report_only` |
 | `DeliveryStatus` | `running` · `succeeded` · `conflict` · `failed` |
 | `HostingProvider` | `github` · `gitlab` |
-| `ChangeRequestReason` | `user`（让 AI 再改改）· `conflict`（交给 AI 解决冲突）；`request-changes` 的 `reason` |
+| `ChangeRequestReason` | `user`（让 AI 再改改）· `conflict`（交给 AI 解决冲突）· `review`（按 PR 审查意见修改，21）；`request-changes` 的 `reason` 只接受前两个，`review` 只经 `review-feedback` 发起 |
+| `ReviewCommentKind` | `thread`（未解决的审查讨论，通常在某个文件的某一行）· `general`（对话中的评论或审查总结）（21 §2.2） |
 
 `LOCAL_MERGE_STRATEGIES`（`squash` / `merge` / `rebase`，即 `delivery.defaultStrategy` 的取值）与 `isLocalMerge` 在同一文件。
 
@@ -355,6 +356,9 @@ class AppError extends Error {
 | `DELIVERY_TARGET_NOT_FOUND` | 400 | 目标分支不存在 |
 | `DELIVERY_TARGET_DIRTY` | 409 | 目标分支检出在某个工作区（通常是用户的主工作区）且有未提交改动，拒绝合并；`details: { path, branch, files[] }` |
 | `DELIVERY_INTERRUPTED` | — | 应用在交付过程中退出（记录在 delivery 上，重启后任务回到 `review`） |
+| **PR 审查意见回流（21）** | | |
+| `PULL_REQUEST_NOT_OPEN` | 409 | 任务没有以 PR 交付，或它的 PR/MR 已合并或关闭；`details: { taskId, branch? }` |
+| `BRANCH_DIVERGED` | 409 | 本地任务分支与 PR 的远端分支各有对方没有的提交，不做任何改动；`details: { branch }` |
 | **数据库** | | |
 | `DB_CONNECTION_NOT_FOUND` | 404 | 不存在，或（MCP 工具）不是任务项目关联的连接 |
 | `DB_CONNECTION_ALREADY_EXISTS` | 409 | 连接名称已被使用（MCP 工具按名称找连接） |

@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { deliverRequestSchema, requestChangesSchema } from '../contracts/api/delivery.ts';
+import {
+  deliverRequestSchema,
+  requestChangesSchema,
+  reviewCommentsSchema,
+  reviseFromReviewSchema,
+} from '../contracts/api/delivery.ts';
 import { diffSchema, fileDiffSchema } from '../contracts/api/git.ts';
 import {
   createTaskRequestSchema,
@@ -322,4 +327,30 @@ export const requestChangesOp = defineOperationContract({
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/request-changes' },
+});
+
+export const reviewCommentsOp = defineOperationContract({
+  ...common,
+  id: 'tasks.reviewComments',
+  refs: { id: InputRef.Task },
+  title: 'op.tasks.reviewComments',
+  description:
+    'Fetch the review comments of the open pull request a task was delivered as: unresolved review threads and general comments, live from the hosting platform',
+  input: byId,
+  output: reviewCommentsSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/review-comments' },
+});
+
+export const reviseFromReviewOp = defineOperationContract({
+  ...common,
+  id: 'tasks.reviseFromReview',
+  refs: { id: InputRef.Task },
+  title: 'op.tasks.reviseFromReview',
+  description:
+    'Send a task delivered as a pull request back to the AI to address the chosen review comments (ids from tasks.reviewComments) on its branch; it returns to review, and the user pushes the changes to the same pull request with tasks.deliver',
+  input: reviseFromReviewSchema,
+  output: taskDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/review-feedback' },
 });

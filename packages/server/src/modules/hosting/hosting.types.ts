@@ -1,6 +1,15 @@
-import { AppError, ErrorCode } from '@aw/shared';
+import { AppError, ErrorCode, type ReviewCommentDTO } from '@aw/shared';
 
 export type PullRequestInput = { head: string; base: string; title: string; body: string };
+
+/** An open pull (merge) request: its number on the platform (GitLab's `iid`) and web address. */
+export type OpenPullRequest = { number: number; url: string };
+
+/** A review comment as the platform has it; whether it is selected by default is the service's call (D87). */
+export type PlatformReviewComment = Omit<ReviewCommentDTO, 'selectedByDefault'>;
+
+/** Comments of each kind read from a pull request (21 §2.2); more are not shown. */
+export const REVIEW_COMMENTS_MAX = 100;
 
 /** A hosting platform (03 §4.2 extension point) for one repository, authenticated with the project's token. */
 export type GitHostingProvider = {
@@ -8,6 +17,10 @@ export type GitHostingProvider = {
   verify(): Promise<void>;
   /** Opens a pull (merge) request and returns its web address. */
   createPullRequest(input: PullRequestInput): Promise<{ url: string }>;
+  /** The open pull request from `branch` of the repository itself, if there is one. */
+  findOpenPullRequest(branch: string): Promise<OpenPullRequest | undefined>;
+  /** Unresolved review threads and general comments of a pull request (21 §2.2), oldest first. */
+  listReviewComments(pullRequest: OpenPullRequest): Promise<PlatformReviewComment[]>;
   /** `Authorization` header value with which git pushes over HTTPS using the token. */
   gitAuthorization(): string;
 };

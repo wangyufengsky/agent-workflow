@@ -9,6 +9,7 @@ import {
   NodeKind,
   type PlanNodeSpec,
   PlanSource,
+  type RequestChangesRequest,
   TaskEvent,
   taskMachine,
   transition,
@@ -22,7 +23,7 @@ const leafKeys = (nodes: ReadonlyArray<{ key: string; dependsOn: readonly string
   nodes.filter((n) => !nodes.some((other) => other.dependsOn.includes(n.key))).map((n) => n.key);
 
 /**
- * Sending a task in review back to the AI (09 §2 `changes_requested`, 13 §4): a new plan version with one more step —
+ * Sending a task back to the AI (09 §2 `changes_requested`, 13 §4; `review_feedback`, 21 §3): a new plan version with one more step —
  * the user's requested changes, or the resolution of a conflicting merge — confirmed at once; back to `running`.
  */
 export function createTaskChanges(
@@ -54,13 +55,64 @@ export function createTaskChanges(
     return `${prefix}${taken + 1}`;
   }
 
+  /**
+   * One more step after all current ones, in a new plan version confirmed at once (13 §4); the task goes back to
+   * `running` with `event`. Only the new node is materialized.
+   */
+  function appendRevision(
+    task: Task,
+    revision: { reason: ChangeRequestReason; instructions: string; feedback: string | null },
+    event: typeof TaskEvent.ChangesRequested | typeof TaskEvent.ReviewFeedback,
+  ): void {
+    const confirmed = plans.confirmed(task.id);
+    if (confirmed === undefined) throw new Error(`Task ${task.key} has no confirmed plan`);
+    const system = SYSTEM_NODES[revision.reason];
+    const spec: PlanNodeSpec = {
+      key: nextKey(task.id, system.keyPrefix),
+      title: system.title,
+      roleKey: system.roleKey,
+      instructions: revision.instructions,
+      dependsOn: leafKeys(confirmed.graph.nodes),
+      acceptance: system.acceptance,
+      kind: NodeKind.Revise,
+    };
+    const workflow = workflows.get(task.workflowId);
+    unit.transact(() => {
+      const plan = plans.createDraft({
+        taskId: task.id,
+        source: PlanSource.User,
+        graph: { nodes: [...confirmed.graph.nodes, spec] },
+        summary: confirmed.summary,
+        assumptions: confirmed.assumptions,
+        feedback: revision.feedback,
+        createdByAttemptId: null,
+      });
+      plans.confirm(plan.id);
+      nodes.append(
+        {
+          taskId: task.id,
+          planId: plan.id,
+          checkCommand: projects.getRecord(task.projectId).checkCommand,
+          defaultAcceptance: workflow.definition.defaultAcceptance,
+          acceptEachNode: task.checkpoints.accept_each_node,
+        },
+        spec,
+      );
+      // The task leaves review; reaching it again opens a new delivery item.
+      inbox.dismissOpen({ taskId: task.id, kind: InboxKind.Delivery });
+      // A completed task is not finished any more (21 §7).
+      move(get(task.id), event, undefined, { currentPlanId: plan.id, finishedAt: null });
+    });
+  }
+
   return {
-    async requestChanges(taskId: string, reason: ChangeRequestReason, feedback: string | undefined): Promise<void> {
+    async requestChanges(
+      taskId: string,
+      reason: RequestChangesRequest['reason'],
+      feedback: string | undefined,
+    ): Promise<void> {
       const task = get(taskId);
       transition(taskMachine, task.status, TaskEvent.ChangesRequested);
-      const confirmed = plans.confirmed(taskId);
-      if (confirmed === undefined) throw new Error(`Task ${task.key} in review has no confirmed plan`);
-      const system = SYSTEM_NODES[reason];
       let instructions: string;
       if (reason === ChangeRequestReason.User) {
         if (feedback === undefined) {
@@ -85,41 +137,10 @@ export function createTaskChanges(
           files: files.map((f) => `- \`${f}\``).join('\n'),
         });
       }
-      const spec: PlanNodeSpec = {
-        key: nextKey(taskId, system.keyPrefix),
-        title: system.title,
-        roleKey: system.roleKey,
-        instructions,
-        dependsOn: leafKeys(confirmed.graph.nodes),
-        acceptance: system.acceptance,
-        kind: NodeKind.Revise,
-      };
-      const workflow = workflows.get(task.workflowId);
-      unit.transact(() => {
-        const plan = plans.createDraft({
-          taskId,
-          source: PlanSource.User,
-          graph: { nodes: [...confirmed.graph.nodes, spec] },
-          summary: confirmed.summary,
-          assumptions: confirmed.assumptions,
-          feedback: feedback ?? null,
-          createdByAttemptId: null,
-        });
-        plans.confirm(plan.id);
-        nodes.append(
-          {
-            taskId,
-            planId: plan.id,
-            checkCommand: projects.getRecord(task.projectId).checkCommand,
-            defaultAcceptance: workflow.definition.defaultAcceptance,
-            acceptEachNode: task.checkpoints.accept_each_node,
-          },
-          spec,
-        );
-        // The task leaves review; reaching it again opens a new delivery item.
-        inbox.dismissOpen({ taskId, kind: InboxKind.Delivery });
-        move(get(taskId), TaskEvent.ChangesRequested, undefined, { currentPlanId: plan.id });
-      });
+      appendRevision(task, { reason, instructions, feedback: feedback ?? null }, TaskEvent.ChangesRequested);
     },
+
+    appendRevision,
   };
 }
+export type TaskChangeRequests = ReturnType<typeof createTaskChanges>;

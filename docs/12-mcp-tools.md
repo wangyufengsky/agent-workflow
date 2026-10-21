@@ -165,7 +165,7 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
   node?: { key; title; role; instructions; acceptance: Acceptance; dependsOn: string[] };
   upstream: Array<{ key; title; summary: string; changedFiles: string[] }>;   // 直接依赖节点
   answeredQuestions: Array<{ question: string; answer: string }>;             // 本任务内已回答/已假设
-  userFeedback: string[];                                                     // 重新规划 / 再改改 / 驳回意见，按时间
+  userFeedback: string[];                                                     // 重新规划 / 再改改 / 审查意见（21）/ 驳回意见，按时间
   planning?: { guidance?: string; allowedRoles: Array<{ key; name; description }>; requiredSteps: PlanNodeSpec[]; maxNodes: number };  // 仅 plan 类
   databases: Array<{ name: string; type: 'mysql' }>;
 }
