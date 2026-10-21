@@ -189,6 +189,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `BATCH_KEY_PREFIX` | `B-` | 批次编号 `B-<自增>`（20 §6） |
 | `BATCH_TARGET_PLACEHOLDER` | `{{target}}` | 批次需求模板中唯一的占位符，替换为每个目标（`renderBatchRequirement`，20 §2） |
 | `DB_DEFAULT_PORT` | `mysql` 3306 · `postgresql` 5432 · `opengauss` 5432 · `sqlserver` 1433 · `goldendb` 3306 | 连接表单按类型预填的端口（24 §2） |
+| `DB_READ_ONLY_STATEMENTS` | `mysql` / `goldendb`：SELECT SHOW DESCRIBE DESC EXPLAIN · `postgresql` / `opengauss`：SELECT SHOW EXPLAIN · `sqlserver`：SELECT | `db_query` 按连接类型允许的首关键字（24 §4）；语句检查、MCP 工具说明与界面文案都从它生成（`readOnlyStatementGroups`） |
 | `BRANCH_PREFIX` | `aw/` | 分支名 `aw/<taskKey>-<slug>` |
 | `BRANCH_SLUG_MAX` | `40` | slug 由标题转写，只保留 `[a-z0-9-]`（`toSlug`，`shared/naming.ts`） |
 | `PROJECT_SLUG_MAX` | `40` | 项目 slug（worktree 目录名）由名称转写；无 ASCII 字符时为 `project`，重名追加 `-2`、`-3` |

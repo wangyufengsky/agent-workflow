@@ -8,6 +8,7 @@ import {
   dbQueryOutputSchema,
   ErrorCode,
   McpToolName,
+  readOnlyStatementGroups,
 } from '@aw/shared';
 import type { KnowledgeService } from '../../knowledge/index.ts';
 import type { TasksService } from '../../tasks/index.ts';
@@ -49,8 +50,9 @@ export const dbDescribeTool = (tasks: TasksService, knowledge: KnowledgeService)
 export const dbQueryTool = (tasks: TasksService, knowledge: KnowledgeService) =>
   defineMcpTool({
     name: McpToolName.DbQuery,
-    description:
-      "Run one read-only SQL statement in the connection's dialect and get at most `limit` rows back: SELECT, SHOW, DESCRIBE or EXPLAIN on mysql and goldendb; SELECT, SHOW or EXPLAIN on postgresql and opengauss; a single SELECT on sqlserver.",
+    description: `Run one read-only SQL statement in the connection's dialect and get at most \`limit\` rows back. Allowed statements by type: ${readOnlyStatementGroups()
+      .map((g) => `${g.types.join(', ')}: ${g.statements.join(', ')}`)
+      .join('; ')}.`,
     allowedKinds: ALL_KINDS,
     input: dbQueryInputSchema,
     output: dbQueryOutputSchema,

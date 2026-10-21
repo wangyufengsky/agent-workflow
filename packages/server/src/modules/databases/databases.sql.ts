@@ -1,4 +1,4 @@
-import { AppError, DbType, ErrorCode } from '@aw/shared';
+import { AppError, DB_READ_ONLY_STATEMENTS, DbType, ErrorCode } from '@aw/shared';
 
 /** How a database family writes SQL: quoting, comments, and which statements are read-only (24 §4). */
 const SqlDialect = { Mysql: 'mysql', Postgres: 'postgres', Tsql: 'tsql' } as const;
@@ -69,9 +69,8 @@ const TSQL_FORBIDDEN_WORDS = [
   'TABLOCKX',
 ] as const;
 
+/** The first keyword a statement may have comes from `DB_READ_ONLY_STATEMENTS`, by connection type. */
 type DialectRules = {
-  /** First keywords of the statements `db_query` runs (12 §6.11). */
-  firstKeywords: ReadonlySet<string>;
   /** Clauses that still write or lock, matched on the statement with quoted text and comments removed. */
   forbidden: readonly RegExp[];
   /** Opening character of quoted text (strings and identifiers) → its closing character. */
@@ -85,7 +84,6 @@ type DialectRules = {
 
 const RULES: Record<SqlDialect, DialectRules> = {
   [SqlDialect.Mysql]: {
-    firstKeywords: new Set(['SELECT', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN']),
     // `SELECT … INTO OUTFILE` writes a server file and `INTO` sets variables; locking reads hold row locks.
     forbidden: [/\bINTO\b/i, /\bFOR\s+(UPDATE|SHARE)\b/i, /\bLOCK\s+IN\s+SHARE\s+MODE\b/i],
     quotes: { "'": "'", '"': '"', '`': '`' },
@@ -95,7 +93,6 @@ const RULES: Record<SqlDialect, DialectRules> = {
     isLineComment: (sql, i) => sql[i] === '#' || (sql.startsWith('--', i) && /\s/.test(sql[i + 2] ?? ' ')),
   },
   [SqlDialect.Postgres]: {
-    firstKeywords: new Set(['SELECT', 'SHOW', 'EXPLAIN']),
     // `SELECT … INTO` creates a table.
     forbidden: [/\bINTO\b/i, /\bFOR\s+(NO\s+KEY\s+UPDATE|KEY\s+SHARE|UPDATE|SHARE)\b/i],
     quotes: { "'": "'", '"': '"' },
@@ -105,7 +102,6 @@ const RULES: Record<SqlDialect, DialectRules> = {
     isLineComment: (sql, i) => sql.startsWith('--', i),
   },
   [SqlDialect.Tsql]: {
-    firstKeywords: new Set(['SELECT']),
     forbidden: [new RegExp(`\\b(${TSQL_FORBIDDEN_WORDS.join('|')})\\b`, 'i')],
     quotes: { "'": "'", '"': '"', '[': ']' },
     backslashQuotes: '',
@@ -207,9 +203,10 @@ export function assertReadOnlySql(sql: string, type: DbType): void {
   const rules = RULES[dialect];
   const code = codeOf(sql, dialect).trim().replace(/;\s*$/, '');
   if (code.includes(';')) throw reject('Only one statement is allowed');
+  const allowed: readonly string[] = DB_READ_ONLY_STATEMENTS[type];
   const first = /^[\s(]*([A-Za-z]+)/.exec(code)?.[1]?.toUpperCase();
-  if (first === undefined || !rules.firstKeywords.has(first)) {
-    throw reject(`Only ${[...rules.firstKeywords].join(', ')} statements are allowed`, { keyword: first ?? null });
+  if (first === undefined || !allowed.includes(first)) {
+    throw reject(`Only ${allowed.join(', ')} statements are allowed`, { keyword: first ?? null });
   }
   for (const pattern of rules.forbidden) {
     const clause = pattern.exec(code)?.[0];

@@ -50,8 +50,8 @@
 | 表注释 | `TABLE_COMMENT` | `obj_description` | 扩展属性 `MS_Description` |
 | 行数估计 | `TABLE_ROWS` | `reltuples`（从未 ANALYZE 的表为 -1，不返回；视图不返回） | `sys.partitions` 的行数之和（堆或聚集索引；视图不返回） |
 | 列 | `information_schema.COLUMNS` | `pg_attribute` + `format_type` + `pg_get_expr`（默认值）+ `col_description` | `INFORMATION_SCHEMA.COLUMNS` + `MS_Description`；类型由 `DATA_TYPE` 与长度 / 精度拼成，如 `nvarchar(64)`、`varbinary(max)`、`decimal(10,2)` |
-| `key` | `PRI` / `UNI` / `MUL`（`COLUMN_KEY`） | 只有 `PRI`（主键列） | 只有 `PRI` |
-| 索引 | `information_schema.STATISTICS` | `pg_index` + `pg_get_indexdef(oid, n)` 逐列（表达式索引显示表达式）；用选择列表里的 `generate_series` 展开，不用 `LATERAL`（openGauss 基于 PostgreSQL 9.2） | `sys.indexes` + `sys.index_columns`（不含 `INCLUDE` 列；堆没有名称，不列） |
+| `key` | `PRI` / `UNI` / `MUL`（`COLUMN_KEY`） | 只有 `PRI`（主键的键列：`indkey` 的前 `indnkeyatts` 个，`INCLUDE` 列不算） | 只有 `PRI` |
+| 索引 | `information_schema.STATISTICS` | `pg_index` + `pg_get_indexdef(oid, n)` 逐列，只列前 `indnkeyatts` 个键列、不含 `INCLUDE` 列（表达式索引显示表达式；openGauss 只有 ustore 表的 ubtree 索引支持 `INCLUDE`）；用选择列表里的 `generate_series` 展开，不用 `LATERAL`（openGauss 基于 PostgreSQL 9.2） | `sys.indexes` + `sys.index_columns`（不含 `INCLUDE` 列；堆没有名称，不列） |
 
 主键索引名各不相同：MySQL `PRIMARY`、PostgreSQL `<表>_pkey`、SQL Server 未命名时 `PK__<表>__<哈希>`。
 
@@ -62,7 +62,7 @@
 | 关 | MySQL / GoldenDB | PostgreSQL / openGauss | SQL Server |
 | --- | --- | --- | --- |
 | ① 单条语句 | 语句检查（只允许末尾一个分号）+ mysql2 关闭 `multipleStatements` | 语句检查 + 扩展查询协议（服务器拒绝一次多条命令） | 语句检查；T-SQL 的语句之间不需要分号，第二条语句只能靠关键字发现（§4.3） |
-| ② 允许的语句 | `SELECT` `SHOW` `DESCRIBE` `DESC` `EXPLAIN` | `SELECT` `SHOW` `EXPLAIN` | `SELECT` |
+| ② 允许的语句（`DB_READ_ONLY_STATEMENTS`，08 §4；`db_query` 的工具说明与 MCP 工具页的文案由它生成） | `SELECT` `SHOW` `DESCRIBE` `DESC` `EXPLAIN` | `SELECT` `SHOW` `EXPLAIN` | `SELECT` |
 | 另拒绝 | `INTO`、`FOR UPDATE` / `FOR SHARE`、`LOCK IN SHARE MODE`、`/*! */` 可执行注释 | `INTO`（`SELECT INTO` 建表）、`FOR [NO KEY] UPDATE`、`FOR [KEY] SHARE` | 会写入、执行代码、改变会话或事务、加锁的关键字（§4.3） |
 | ③ 事务 | `START TRANSACTION READ ONLY`（写入被 1792 拒绝） | `START TRANSACTION READ ONLY`（写入被 SQLSTATE 25006 拒绝，例如调用会写入的函数、`nextval`） | `BEGIN TRANSACTION`，**从不提交**；连接关闭时服务器回滚 |
 | ④ 时间 | `MAX_EXECUTION_TIME`（只管 SELECT）+ 稍长的客户端超时 | `SET LOCAL statement_timeout`（服务器中断任何语句，57014） | tedious 的 `requestTimeout`：到时发送 attention，服务器取消该批 |
