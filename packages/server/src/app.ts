@@ -1,7 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { loadBuiltinRoles, loadBuiltinWorkflows, loadPrompts } from '@aw/builtin';
-import { DB_QUERY_TIMEOUT_MS, MCP_EXEC_PATH } from '@aw/shared';
+import {
+  DB_QUERY_TIMEOUT_MS,
+  isTerminalState,
+  MCP_ASSISTANT_PATH,
+  MCP_EXEC_PATH,
+  TASK_STATUSES,
+  taskMachine,
+} from '@aw/shared';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } from 'fastify';
 import type { DestinationStream } from 'pino';
@@ -13,9 +20,10 @@ import { createEventBus, type EventBus } from './core/event-bus.ts';
 import { registerTokenAuth } from './core/http/auth.ts';
 import { registerErrorHandling } from './core/http/errors.ts';
 import { createLogger, type Logger } from './core/logger.ts';
-import { mountOperations } from './core/operations/operations.ts';
+import { mountOperations, type OperationImpl } from './core/operations/operations.ts';
 import { registerSseHub } from './core/sse/sse-hub.ts';
 import { createAcceptanceModule } from './modules/acceptance/index.ts';
+import { type AssistantService, createAssistantModule } from './modules/assistant/index.ts';
 import { type AttemptsService, createAttemptsModule } from './modules/attempts/index.ts';
 import {
   type CredentialCipher,
@@ -64,6 +72,8 @@ export type AppDeps = {
   hosting?: HostingEndpoints;
   /** Time limit of the AI's database queries; tests shorten `DB_QUERY_TIMEOUT_MS`. */
   dbQueryTimeoutMs?: number;
+  /** IANA time zone the assistant tells the time in; the system's by default. */
+  timeZone?: string;
 };
 
 export type App = {
@@ -81,9 +91,12 @@ export type App = {
     nodes: NodesService;
     inbox: InboxService;
     worktrees: WorktreesService;
+    assistant: AssistantService;
   };
   /** Bearer token of the execution MCP at `/mcp/exec`. */
   mcpToken: string;
+  /** Bearer token of the assistant MCP at `/mcp/assistant` (D25). */
+  assistantMcpToken: string;
   /**
    * Called once the API listens: opencode's MCP endpoint needs the port. Starts task scheduling and the hosted
    * opencode unless it is replaced or not hostable.
@@ -115,16 +128,26 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const credentials = createCredentialsModule({ db: database.db, clock, cipher: deps.cipher ?? unavailableCipher });
   const env = deps.env ?? process.env;
   const prompts = loadPrompts(config.promptsDir);
-  // Per-launch secret of the execution MCP, separate from the renderer token (D25).
+  // Per-launch secrets of the two MCP endpoints, separate from the renderer token and from each other (D25).
   const mcpToken = randomBytes(32).toString('hex');
+  const assistantMcpToken = randomBytes(32).toString('hex');
   let apiPort: number | undefined;
   const runtime = createOpencodeRuntime({
     env,
     binaryPath: () => settings.service.get('opencode.binaryPath'),
     configContent: () => {
       if (apiPort === undefined) throw new Error('opencode started before the API listens');
-      const mcpUrl = `http://127.0.0.1:${apiPort}${MCP_EXEC_PATH}`;
-      return JSON.stringify(buildOpencodeConfig({ mcpUrl, mcpToken, pluginFile: config.opencodePluginFile, prompts }));
+      const api = `http://127.0.0.1:${apiPort}`;
+      return JSON.stringify(
+        buildOpencodeConfig({
+          mcpUrl: `${api}${MCP_EXEC_PATH}`,
+          mcpToken,
+          assistantMcpUrl: `${api}${MCP_ASSISTANT_PATH}`,
+          assistantMcpToken,
+          pluginFile: config.opencodePluginFile,
+          prompts,
+        }),
+      );
     },
     log,
     events,
@@ -251,7 +274,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   mcp.register(server);
   attempts.registerRoutes(server);
-  mountOperations(server, [
+  const operations: OperationImpl[] = [
     ...settings.operations,
     ...system.operations,
     ...projects.operations,
@@ -266,7 +289,33 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...mcp.operations,
     // The debug entry exists in development builds only (M2-09).
     ...(config.nodeEnv === 'production' ? [] : debug.operations),
-  ]);
+  ];
+  const activeTaskStatuses = TASK_STATUSES.filter((s) => !isTerminalState(taskMachine, s));
+  const assistant = createAssistantModule({
+    db: database.db,
+    events,
+    clock,
+    log,
+    opencode,
+    settings: settings.service,
+    prompts,
+    tasks: tasks.service,
+    projects: projects.service,
+    workflows: workflows.service,
+    dataDir: config.dataDir,
+    timeZone: deps.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+    token: assistantMcpToken,
+    operations,
+    appStatus: async () => ({
+      runtime: (await runtime.snapshot()).status,
+      uiMode: settings.service.get('ui.mode'),
+      projects: projects.service.list().length,
+      activeTasks: tasks.service.listByStatus(activeTaskStatuses).length,
+      openInbox: inbox.service.countOpen(),
+    }),
+  });
+  assistant.register(server);
+  mountOperations(server, [...operations, ...assistant.operations]);
 
   // Recovery from the previous run (03 §2.1): attempts first (their nodes and tasks react to the interruption), then
   // what is left of nodes and tasks. Scheduling starts once the API listens (start()).
@@ -290,8 +339,10 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       nodes: nodes.service,
       inbox: inbox.service,
       worktrees: worktrees.service,
+      assistant: assistant.service,
     },
     mcpToken,
+    assistantMcpToken,
     async start(port) {
       apiPort = port;
       hosting = deps.opencode === undefined;
