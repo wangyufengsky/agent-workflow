@@ -3,6 +3,7 @@ import { API_BASE, AUTH } from './env.ts';
 import { appTool, createProject, patchSettings, queueAssistantTurn, queueTurn } from './helpers.ts';
 
 // J11 and the panel smoke (A-06–A-08): the assistant's turns are played by FakeOpencode through the assistant MCP.
+// The file name sorts after onboarding.browser.spec.ts, which needs the shared backend without any project.
 
 test.beforeEach(({ request }) =>
   patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple', 'assistant.alwaysAllow': [] }),
@@ -16,7 +17,11 @@ test('J11 对助手说开始任务 → 确认卡片 → 任务运行', async ({ 
   const bugfix = workflows.items.find((w) => w.key === 'bugfix');
   if (bugfix === undefined) throw new Error('no bugfix workflow');
   await queueAssistantTurn(request, [
-    appTool('tasks_create', { projectId: project.id, workflowId: bugfix.id, requirement: '订单时间显示错了' }),
+    appTool('tasks_create', {
+      projectId: project.id,
+      workflowId: bugfix.id,
+      requirement: '助手开的任务：退款金额少算了运费',
+    }),
     { type: 'text', text: '我准备开始一个修 Bug 任务，请在卡片上确认。' },
   ]);
   await queueAssistantTurn(request, [{ type: 'text', text: '任务已经开始了。' }]);
@@ -26,20 +31,21 @@ test('J11 对助手说开始任务 → 确认卡片 → 任务运行', async ({ 
   await page.goto(`/?projectId=${project.id}`);
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
-  await panel.getByLabel('发给助手的消息').fill('帮我修一下：订单时间显示错了');
+  await panel.getByLabel('发给助手的消息').fill('帮我修一下：助手开的任务：退款金额少算了运费');
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
-  await expect(panel.getByTestId('assistant-user-message')).toHaveText('帮我修一下：订单时间显示错了');
+  await expect(panel.getByTestId('assistant-user-message')).toHaveText('帮我修一下：助手开的任务：退款金额少算了运费');
 
   const card = panel.getByTestId('confirmation-card');
   await expect(card).toContainText('开始任务');
-  await expect(card).toContainText('订单时间显示错了');
+  await expect(card).toContainText('助手开的任务：退款金额少算了运费');
   await expect(card).toContainText('等待确认');
   await card.getByRole('button', { name: '确认', exact: true }).click();
   await expect(card).toContainText('已执行');
   await expect(panel).toContainText('任务已经开始了。');
 
-  await page.getByRole('link', { name: '任务', exact: true }).click();
-  await expect(page.getByRole('row').filter({ hasText: '订单时间显示错了' })).toContainText('执行中');
+  // The link's name carries the open-item count when earlier specs left some.
+  await page.getByRole('navigation').getByRole('link', { name: /^任务/ }).click();
+  await expect(page.getByRole('row').filter({ hasText: '助手开的任务：退款金额少算了运费' })).toContainText('执行中');
   await expect(panel).toBeVisible();
 });
 

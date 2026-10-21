@@ -133,7 +133,7 @@
 
 ## v1.1 · 应用助手（约 2 周，v1.0 发布后）
 
-> 状态：进行中。设计见 [15-assistant.md](15-assistant.md)，由 15 §8 拆分为下列任务。
+> 状态：**已完成**（2026-10-21），待合并。设计与实现见 [15-assistant.md](15-assistant.md)（§9 为实现结构与测试）。与设计的差异与补充：按保守方案收紧了助手能用的操作（D65，**待用户确认**）：工具按界面模式过滤、`settings.update` 的 `assistant.alwaysAllow` 与 `opencode.binaryPath` 不进入助手 schema（契约新增可选字段 `assistantOmit`）、凭据必填的操作（`databases.create`、`projects.setHosting`）只能 `open_form`；第一批操作中缺少的数据库只读查询补为新操作 `databases.query`；助手面板自己的操作 `expose.assistant = false`。确认先转为 `confirmed` 再执行（防止重复执行），会话忙时结果在本轮结束后送达；助手会话的权限询问在面板中以卡片回复（不进「需要你处理」）；助手写入对话文件目录的文件以新会话流条目 `attachment` 出现，确认卡片为 `confirmation` 条目。执行 MCP 的 Streamable HTTP 挂载移到 `core/http/mcp-endpoint.ts`，会话流存储按主体泛化，两者由助手复用。各 agent 的权限 deny 另一套 MCP 的工具。前端：面板为外壳第三列；对话状态只以 SSE 为准（发送响应可能晚于「本轮结束」事件）。live 冒烟（`opencode-go/deepseek-v4.1-flash`）：调用 `get_current_time` 与 `projects_list`，回复「明天是 2026 年 10 月 22 日（星期四）」与项目名。未验证：opencode 是否每次会话重新读取 MCP 工具列表（15 §3）。
 
 | # | 任务 | 完成标准 |
 | --- | --- | --- |
