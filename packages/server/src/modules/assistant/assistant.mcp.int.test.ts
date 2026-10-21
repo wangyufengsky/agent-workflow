@@ -186,6 +186,34 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     expect(t.fake.prompts.at(-1)?.text).toContain('The user confirmed `projects_update`');
   });
 
+  it('opencode 不可用时确认的结果随下一条消息送达；那次发送失败时结果仍保留到下一次', async () => {
+    const { project } = await addProject(t);
+    const { body } = await call('projects_update', { id: project.id, name: 'D' });
+    t.fake.crash();
+    await t.call(confirmAssistantCallOp, { id: String(body.confirmation_id) });
+    t.fake.reconnect();
+    const prompts = t.fake.prompts.length;
+
+    t.fake.failNextPrompt();
+    const failed = await t.call(sendAssistantMessageOp, {
+      id: conversationId,
+      text: '改好了吗？',
+      context: { page: 'home', params: {} },
+    });
+    expect(failed.body).toMatchObject({ error: { code: ErrorCode.OpencodeRequestFailed } });
+
+    const idle = becomesIdle();
+    await t.call(sendAssistantMessageOp, {
+      id: conversationId,
+      text: '改好了吗？',
+      context: { page: 'home', params: {} },
+    });
+    await idle;
+    expect(t.fake.prompts).toHaveLength(prompts + 1);
+    expect(t.fake.prompts.at(-1)?.text).toContain('The user confirmed `projects_update`');
+    expect(t.fake.prompts.at(-1)?.text).toContain('改好了吗？');
+  });
+
   it('不属于助手对话的会话（如执行任务的会话）调用返回 MCP_CONVERSATION_UNRESOLVED', async () => {
     t.fake.enqueue(script().hang());
     const repo = await createTestRepo();

@@ -117,6 +117,18 @@ describe('助手对话（A-02、A-03）', () => {
     expect(entries.at(-1)).toMatchObject({ kind: 'system', data: { event: 'aborted' } });
   });
 
+  it('会话报错而没有随后的空闲事件时，本轮也结束：对话不再忙碌，可以再发消息', async () => {
+    const c = await newConversation();
+    t.fake.enqueue(script().error('ProviderAuthError', 'invalid api key', { idle: false }), {
+      agent: OPENCODE_ASSISTANT_AGENT,
+    });
+    await say(c.id, '你好');
+    expect((await transcript(c.id)).entries.at(-1)).toMatchObject({ kind: 'error' });
+
+    const res = await t.call(sendAssistantMessageOp, { id: c.id, text: '再试一次', context: HOME });
+    expect(res.status).toBe(200);
+  });
+
   it('权限请求出现在对话中，回复后会话继续', async () => {
     const c = await newConversation();
     t.fake.enqueue(script().requestPermission('bash', ['rm -rf build']).text('删好了'), {

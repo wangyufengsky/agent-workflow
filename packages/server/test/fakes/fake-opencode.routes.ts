@@ -16,7 +16,7 @@ const stepSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('permission'), permission: z.string(), patterns: z.array(z.string()) }),
   z.object({ type: z.literal('hang') }),
-  z.object({ type: z.literal('error'), name: z.string(), message: z.string() }),
+  z.object({ type: z.literal('error'), name: z.string(), message: z.string(), idle: z.boolean().default(true) }),
 ]) satisfies z.ZodType<FakeStep>;
 
 const bodySchema = z.object({

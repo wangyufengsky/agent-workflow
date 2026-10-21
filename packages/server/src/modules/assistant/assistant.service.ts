@@ -260,7 +260,10 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         });
         publish(id);
         return;
+      // A session error ends the turn like idle does; opencode does not always follow it with an idle event.
+      case OpencodeEventType.Error:
       case OpencodeEventType.Idle:
+        if (!state.busy) return;
         state.busy = false;
         state.aborting = false;
         state.permissions.clear();
@@ -318,7 +321,14 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       const sessionId = await sessionOf(titled);
       record(c, [{ kind: TranscriptEntryKind.UserMessage, data: { text } }]);
       state.page = page;
-      await prompt(get(id), sessionId, systemText, [...state.outbox.splice(0), text].join('\n\n'));
+      const queued = state.outbox.splice(0);
+      try {
+        await prompt(get(id), sessionId, systemText, [...queued, text].join('\n\n'));
+      } catch (err) {
+        // The model has not seen them: they go with the next message.
+        state.outbox.unshift(...queued);
+        throw err;
+      }
       return toDto(get(id));
     },
 

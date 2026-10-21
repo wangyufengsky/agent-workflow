@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import {
+  AppError,
+  ErrorCode,
   MCP_ASSISTANT_TOOL_PREFIX,
   MCP_SESSION_ARG,
   MCP_TOOL_PREFIX,
@@ -30,7 +32,8 @@ export type FakeStep =
   | { type: 'callTool'; server: FakeMcpServer; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
   | { type: 'hang' }
-  | { type: 'error'; name: string; message: string };
+  /** `idle: false`: opencode reports the error without a following idle event. */
+  | { type: 'error'; name: string; message: string; idle: boolean };
 
 /** Script builder (07 §4): `script().edit('a.ts', '…').callTool('submit_result', {…})`. The turn ends idle. */
 export function script() {
@@ -59,7 +62,8 @@ export function script() {
     /** Keeps working (never idle) until the session is aborted. */
     hang: () => add({ type: 'hang' }),
     /** Fails the turn with a session error. */
-    error: (name: string, message: string) => add({ type: 'error', name, message }),
+    error: (name: string, message: string, { idle = true }: { idle?: boolean } = {}) =>
+      add({ type: 'error', name, message, idle }),
   };
   return builder;
 }
@@ -92,6 +96,8 @@ export function createFakeOpencode() {
   /** Bumped by abort(): a turn stops when its session's generation changed (later prompts play normally). */
   const generation = new Map<string, number>();
   let connected = true;
+  /** Set by failNextPrompt(): the next prompt request fails like an opencode HTTP error. */
+  let failPrompt = false;
   let closed = false;
   /** Turns being played and MCP calls in flight, so tests can wait for them and close() can let them finish. */
   const turns = new Set<Promise<void>>();
@@ -211,7 +217,7 @@ export function createFakeOpencode() {
           break;
         case 'error':
           emit({ type: E.Error, sessionId, error: { name: step.name, data: { message: step.message } } });
-          emit({ type: E.Idle, sessionId });
+          if (step.idle) emit({ type: E.Idle, sessionId });
           return;
       }
     }
@@ -244,6 +250,8 @@ export function createFakeOpencode() {
     settled(): Promise<void>;
     /** The runtime disappears: `runtime_lost`, and requests fail until `reconnect()`. */
     crash(): void;
+    /** The next `prompt` request fails with OPENCODE_REQUEST_FAILED while the runtime stays connected. */
+    failNextPrompt(): void;
     reconnect(): void;
     close(): Promise<void>;
   } = {
@@ -264,6 +272,9 @@ export function createFakeOpencode() {
     },
     async settled() {
       await Promise.all(turns);
+    },
+    failNextPrompt() {
+      failPrompt = true;
     },
     crash() {
       connected = false;
@@ -290,6 +301,10 @@ export function createFakeOpencode() {
     },
     async prompt(input) {
       if (!connected) throw new Error('FakeOpencode is not connected');
+      if (failPrompt) {
+        failPrompt = false;
+        throw new AppError(ErrorCode.OpencodeRequestFailed, 'opencode session.promptAsync failed');
+      }
       const session = sessionOf(input.sessionId);
       prompts.push(input);
       const index = queue.findIndex((q) => matches(session, q.match));
