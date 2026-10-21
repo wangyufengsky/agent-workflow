@@ -106,25 +106,28 @@ export function NewBatchPage() {
               ))}
             </select>
           </div>
-          <div className="field">
-            <label className="label" htmlFor="batch-workflow">
-              {C.workflow}
-            </label>
-            <select
-              id="batch-workflow"
-              className="select"
-              value={workflow?.id ?? ''}
-              onChange={(e) => {
-                setWorkflowId(e.target.value);
-                setEdited(undefined);
-              }}
-            >
-              {fixed?.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
+          {/* Its own box: `.field + .field` would push it below the project. */}
+          <div>
+            <div className="field">
+              <label className="label" htmlFor="batch-workflow">
+                {C.workflow}
+              </label>
+              <select
+                id="batch-workflow"
+                className="select"
+                value={workflow?.id ?? ''}
+                onChange={(e) => {
+                  setWorkflowId(e.target.value);
+                  setEdited(undefined);
+                }}
+              >
+                {fixed?.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
         {workflows.isError && <ErrorState error={workflows.error} onRetry={() => void workflows.refetch()} />}

@@ -39,6 +39,8 @@ type Seed = {
   knowledge: { id: string; turnId: string };
   /** A question whose answer is still a draft: written, waiting for a permission before it is submitted (18 §5.5). */
   knowledgeDraft: string;
+  /** A code-review batch of two targets: one report waiting to be finished, one still running (20 §4). */
+  batch: string;
 };
 
 async function api<T>(request: APIRequestContext, method: 'GET' | 'POST', path: string, data?: object): Promise<T> {
@@ -226,6 +228,21 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     )
     .toBe(true);
 
+  const batchProject = await createProject(request, null);
+  await queueTurn(request, batchProject, { title: '代码审查' }, [submitResult('审查完成：发现 2 个问题。')]);
+  await queueTurn(request, batchProject, { title: '代码审查' }, [{ type: 'hang' }]);
+  const workflowList = await api<{ items: { id: string; key: string }[] }>(request, 'GET', '/workflows');
+  const batch = await api<{ id: string }>(request, 'POST', '/batches', {
+    projectId: batchProject.id,
+    workflowId: workflowList.items.find((w) => w.key === 'code_review')?.id,
+    requirementTemplate: '审查 {{target}} 的代码，列出问题、位置与改进建议。',
+    targets: ['src/order/', 'src/payment/'],
+  });
+  type BatchCounts = { counts: { group: string; count: number }[] };
+  await expect
+    .poll(async () => (await api<BatchCounts>(request, 'GET', `/batches/${batch.id}`)).counts.map((c) => c.group))
+    .toEqual(['running', 'review']);
+
   const completedReview = await waitForStatus(request, completed, 'review');
   await api(request, 'POST', `/tasks/${completedReview.id}/deliver`, { strategy: 'squash' });
   return {
@@ -240,6 +257,7 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     aiKey,
     knowledge: { id: knowledge.id, turnId: knowledgeTurn.id },
     knowledgeDraft: draft.id,
+    batch: batch.id,
   };
 }
 
@@ -374,6 +392,24 @@ const SHOTS: Shot[] = [
     url: () => '/knowledge/history',
     ready: testId('knowledge-history-row'),
   },
+  {
+    name: 'batch-new',
+    mode: UiMode.Simple,
+    url: (s) => `/batches/new?projectId=${s.project.id}&workflow=unit_tests`,
+    ready: heading('新建批量任务'),
+  },
+  { name: 'batch', mode: UiMode.Simple, url: (s) => `/batches/${s.batch}`, ready: testId('batch-item') },
+  {
+    name: 'batch-deliver',
+    mode: UiMode.Simple,
+    url: (s) => `/batches/${s.batch}`,
+    ready: testId('batch-item'),
+    open: async (page) => {
+      await page.getByRole('button', { name: '完成全部待完成的报告（1）' }).click();
+      return page.getByRole('dialog', { name: '完成 1 份报告？' });
+    },
+  },
+  { name: 'batches', mode: UiMode.Simple, url: () => '/batches', ready: testId('batch-card') },
   { name: 'projects', mode: UiMode.Simple, url: () => '/projects', ready: heading('项目') },
   { name: 'project', mode: UiMode.Simple, url: (s) => `/projects/${s.project.id}`, ready: heading(/.+/) },
   { name: 'settings', mode: UiMode.Simple, url: () => '/settings', ready: heading('设置') },

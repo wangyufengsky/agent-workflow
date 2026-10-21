@@ -1,10 +1,12 @@
+/* Like `.chip`, inline in a title: ink on a neutral fill keeps the contrast of the text around it. */
 .placeholder {
   display: inline-block;
   padding: 0 6px;
   margin: 0 2px;
   border-radius: var(--r-xs);
-  background: var(--accent-fill);
-  color: var(--accent);
+  background: var(--fill-3);
+  border: 1px solid var(--line-2);
+  color: var(--ink-2);
   font-size: 0.9em;
 }
 
