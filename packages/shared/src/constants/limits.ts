@@ -49,3 +49,5 @@ export const KNOWLEDGE_QUERY_ROWS = 50;
 export const KNOWLEDGE_ANSWER_EXCERPT_CHARS = 160;
 /** A research attempt's streaming text is written to its transcript this often, so the answer draft streams (18 §5.5). */
 export const KNOWLEDGE_DRAFT_FLUSH_CHARS = 24;
+/** Days a custom quality and usage period may span (19 §2.2). */
+export const INSIGHTS_MAX_DAYS = 366;

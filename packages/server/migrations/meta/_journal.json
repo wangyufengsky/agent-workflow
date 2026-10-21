@@ -71,6 +71,13 @@
       "when": 1792549131365,
       "tag": "0009_knowledge",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1792584045500,
+      "tag": "0010_insights",
+      "breakpoints": true
     }
   ]
 }

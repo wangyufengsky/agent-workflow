@@ -35,5 +35,7 @@ export const attemptsTable = sqliteTable(
     index('attempts_task_kind_idx').on(t.taskId, t.kind),
     index('attempts_status_idx').on(t.status),
     index('attempts_session_idx').on(t.opencodeSessionId),
+    // Quality and usage count attempts by when they started (19 §5).
+    index('attempts_started_idx').on(t.startedAt),
   ],
 );

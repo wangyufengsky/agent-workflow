@@ -34,6 +34,8 @@ export type FakeStep =
   | { type: 'callTool'; server: FakeMcpServer; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
   | { type: 'hang' }
+  /** The tokens the turn reports as used when it ends, instead of 100 input and 20 output. */
+  | { type: 'usage'; input: number; output: number }
   /** `idle: false`: opencode reports the error without a following idle event. */
   | { type: 'error'; name: string; message: string; idle: boolean };
 
@@ -63,6 +65,8 @@ export function script() {
       add({ type: 'callTool', server: 'exec', name: 'ask_user', args }),
     /** Asks for a permission and waits until the backend replies. */
     requestPermission: (permission: string, patterns: string[]) => add({ type: 'permission', permission, patterns }),
+    /** The tokens the turn reports when it ends (quality and usage, 19). */
+    usage: (input: number, output: number) => add({ type: 'usage', input, output }),
     /** Keeps working (never idle) until the session is aborted. */
     hang: () => add({ type: 'hang' }),
     /** Fails the turn with a session error. */
@@ -157,6 +161,7 @@ export function createFakeOpencode() {
     const turnGeneration = generation.get(sessionId) ?? 0;
     const messageId = nextId('fake_msg');
     emit({ type: E.Message, sessionId, messageId, role: 'assistant' });
+    let used = { input: 100, output: 20 };
     for (const step of steps) {
       if ((generation.get(sessionId) ?? 0) !== turnGeneration || closed) return;
       const partId = nextId('fake_prt');
@@ -232,6 +237,9 @@ export function createFakeOpencode() {
           await replied;
           break;
         }
+        case 'usage':
+          used = step;
+          break;
         case 'hang':
           await new Promise<void>((resolve) => hanging.set(sessionId, [...(hanging.get(sessionId) ?? []), resolve]));
           break;
@@ -241,7 +249,7 @@ export function createFakeOpencode() {
           return;
       }
     }
-    emit({ type: E.StepFinished, sessionId, tokens: { input: 100, output: 20 }, cost: 0 });
+    emit({ type: E.StepFinished, sessionId, tokens: { input: used.input, output: used.output }, cost: 0 });
     emit({ type: E.Idle, sessionId });
   }
 
@@ -355,6 +363,9 @@ export function createFakeOpencode() {
     },
     async abort({ sessionId }) {
       aborts.push(sessionId);
+      // An HTTP request to opencode: events already on their way arrive first, like the usage of the step that just
+      // called a tool (opencode 1.19.0 sends step-finish right after the tool result, test/fixtures).
+      await Promise.resolve();
       generation.set(sessionId, (generation.get(sessionId) ?? 0) + 1);
       for (const release of hanging.get(sessionId) ?? []) release();
       hanging.delete(sessionId);

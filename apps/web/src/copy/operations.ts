@@ -101,6 +101,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.knowledge.stop': '停止研究',
   'op.knowledge.delete': '删除知识问答对话',
   'op.knowledge.citation': '查看引用原文',
+  'op.insights.summary': '质量与用量',
+  'op.insights.tasks': '质量与用量的任务明细',
 };
 
 /**

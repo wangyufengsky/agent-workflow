@@ -73,7 +73,9 @@ export type FakeStep =
   /** Keeps working until the session is aborted. */
   | { type: 'hang' }
   /** The model provider fails the turn; `idle: false` leaves the session without an idle event. */
-  | { type: 'error'; name: string; message: string; idle?: boolean };
+  | { type: 'error'; name: string; message: string; idle?: boolean }
+  /** The tokens the turn reports when it ends; 100 input and 20 output otherwise. */
+  | { type: 'usage'; input: number; output: number };
 
 export const submitResult = (summary: string): FakeStep => ({
   type: 'callTool',

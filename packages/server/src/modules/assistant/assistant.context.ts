@@ -59,6 +59,7 @@ const STATIC_PAGES: Partial<Record<AssistantPage, string>> = {
   [AssistantPage.Runtime]: 'the runtime page',
   [AssistantPage.Knowledge]: 'the knowledge Q&A page (ask a question about a project)',
   [AssistantPage.KnowledgeHistory]: 'the knowledge Q&A history',
+  [AssistantPage.Insights]: 'the quality and usage page (how much AI did, how well, and what it cost)',
 };
 
 function param(ref: AssistantPageRef, name: AssistantPageParam): string {

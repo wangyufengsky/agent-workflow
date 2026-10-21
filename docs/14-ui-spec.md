@@ -16,6 +16,7 @@
 | `/inbox` | 需要你处理 | 全部 | `inbox.html` |
 | `/projects`、`/projects/:projectId` | 项目 | 全部 | `projects.html` |
 | `/knowledge`、`/knowledge/:conversationId`、`/knowledge/history` | 知识问答（v1.1）：首屏（`?projectId=`）、对话（`?turn=&cite=` 打开某一轮的某处引用原文，`?details=true` 简单模式下的专业视图）、对话记录（`?q=&projectId=`） | 全部 | `knowledge.html`、`knowledge-history.html`，见 [18-knowledge.md §2](18-knowledge.md#2-页面与交互) |
+| `/insights` | 质量与用量（v1.1）：简单模式为本周三个数，专业模式为用量、趋势、拆分、质量与钻取（`?period=&from=&to=&drill=&key=`） | 全部（两种视图） | `insights.html`，见 [19-insights.md §3](19-insights.md#3-页面与交互) |
 | `/settings` | 设置 | 全部（专业项按模式显示） | `settings.html` |
 | `/git`、`/git/:projectId` | Git 管理台（`?tab=branches\|commits\|files\|worktrees`，`ref`、`sha`、`path`、`file` 记录所看的内容） | 专业 | `git/index.html`、`delivery/git.html` |
 | `/workflows`、`/workflows/:key` | 流程列表与编排器（`:key` 为流程 key，编辑其最新版本） | 专业 | `workflows.html`、`workflow-editor.html` |
@@ -31,6 +32,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'tasks',     route: ROUTES.tasks,     label: COPY.nav.tasks,     icon: 'list',     visibleIn: ['simple', 'pro'], badge: 'inboxOpen' },
   { id: 'projects',  route: ROUTES.projects,  label: COPY.nav.projects,  icon: 'folder',   visibleIn: ['simple', 'pro'] },
   { id: 'knowledge', route: ROUTES.knowledge, label: COPY.nav.knowledge, icon: 'book',     visibleIn: ['simple', 'pro'] },   // v1.1
+  { id: 'insights',  route: ROUTES.insights,  label: COPY.nav.insights,  icon: 'chart',    visibleIn: ['simple', 'pro'] },   // v1.1
   { id: 'git',       route: ROUTES.git,       label: COPY.nav.git,       icon: 'gitRepo',  visibleIn: ['pro'], group: 'pro' },
   { id: 'workflows', route: ROUTES.workflows, label: COPY.nav.workflows, icon: 'flow',     visibleIn: ['pro'], group: 'pro' },
   // roles, databases, tools, runtime ...
