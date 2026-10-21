@@ -20,10 +20,12 @@ export type PageReport = {
 export async function inspectPage(page: Page): Promise<PageReport> {
   // axe cannot decide text over a background image, and the shell lays a faint decorative gradient over its solid
   // colours (14 §4), so nearly every text would be undecided. Drop the images while axe runs; the theme contrast unit
-  // test checks text where those gradients are strongest. Colours still easing in after the theme was applied would
-  // be measured mid-way, so transitions end at once.
+  // test checks text where those gradients are strongest. Colours still easing in after the theme was applied, or a
+  // panel still sliding in over the page (`sideIn`), would be measured mid-way, so transitions and animations end at
+  // once: axe sees the page at rest.
   const noImages = await page.addStyleTag({
-    content: '*, *::before, *::after { background-image: none !important; transition: none !important; }',
+    content:
+      '*, *::before, *::after { background-image: none !important; transition: none !important; animation: none !important; }',
   });
   const axe = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
   await noImages.evaluate((el) => el.remove());

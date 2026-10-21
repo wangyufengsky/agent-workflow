@@ -491,17 +491,31 @@ const SHOTS: Shot[] = [
 ];
 
 test.use({ viewport: { width: WIDTH, height: HEIGHT } });
-test.afterAll(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
 
-test('J9 走查：四套主题 × 两种模式下全部页面无报错、无对比度与横向溢出问题', async ({ page, request }) => {
-  // About 3 minutes on a Mac; several times that on a CI runner, Windows the slowest (17 §4.1).
-  test.setTimeout(2_400_000);
-  const s = await seed(request);
-  const pageErrors: string[] = [];
-  page.on('pageerror', (e) => pageErrors.push(e.message));
+// One test per theme, so CI can run the themes on separate machines (`--grep @walkthrough --shard`, 17 §4.1). The
+// `parallel` mode only lets shards split them: with the single worker they run one after another and share the seed.
+test.describe('J9 走查：两种模式下全部页面无报错、无对比度与横向溢出问题', { tag: '@walkthrough' }, () => {
+  // A theme takes about 20 s on a Mac and over a minute on a Windows CI runner (17 §4.1).
+  test.describe.configure({ mode: 'parallel', timeout: 600_000 });
+  let request: APIRequestContext;
+  let s: Seed;
+
+  test.beforeAll(async ({ playwright }) => {
+    test.setTimeout(600_000);
+    request = await playwright.request.newContext();
+    s = await seed(request);
+  });
+  test.afterAll(async () => {
+    // A failed seed is already reported by beforeAll; there is no running task to cancel then.
+    if (s !== undefined) await api(request, 'POST', `/tasks/${s.running.id}/cancel`);
+    await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' });
+    await request.dispose();
+  });
 
   for (const theme of THEME_IDS) {
-    await test.step(theme, async () => {
+    test(theme, async ({ page }) => {
+      const pageErrors: string[] = [];
+      page.on('pageerror', (e) => pageErrors.push(e.message));
       const dir = join(WALKTHROUGH_DIR, theme);
       mkdirSync(dir, { recursive: true });
       const reports: Record<string, PageReport> = {};
@@ -515,7 +529,7 @@ test('J9 走查：四套主题 × 两种模式下全部页面无报错、无对�
         if (shot.open !== undefined) await expect(await shot.open(page)).toBeVisible();
         await page.evaluate(() => document.fonts.ready);
         // Pages render failures through ErrorState, the only role="alert" element.
-        await expect.soft(page.getByRole('alert'), `${theme} ${shot.name}`).toHaveCount(0);
+        await expect.soft(page.getByRole('alert'), shot.name).toHaveCount(0);
         reports[shot.name] = await inspectPage(page);
 
         await fullHeight(page, WIDTH, HEIGHT);
@@ -525,9 +539,8 @@ test('J9 走查：四套主题 × 两种模式下全部页面无报错、无对�
       const problems = Object.entries(reports)
         .filter(([, r]) => r.contrast.length > 0 || r.overflow.length > 0)
         .map(([name, r]) => [name, [...r.contrast, ...r.overflow]]);
-      expect.soft(Object.fromEntries(problems), theme).toEqual({});
+      expect.soft(Object.fromEntries(problems)).toEqual({});
+      expect(pageErrors).toEqual([]);
     });
   }
-  expect(pageErrors).toEqual([]);
-  await api(request, 'POST', `/tasks/${s.running.id}/cancel`);
 });
