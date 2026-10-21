@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { createProject, passReview, patchSettings, queueTurn, startTask, submitResult } from './helpers.ts';
+import {
+  createProject,
+  passReview,
+  patchSettings,
+  queueTurn,
+  startTask,
+  submitResult,
+  TASK_RUN_TIMEOUT_MS,
+} from './helpers.ts';
 
 // Journeys J1–J4 (07 §5): the AI sessions are played by FakeOpencode, scripted per step.
 
@@ -105,14 +113,14 @@ test('J4 检查失败 → 自动重试成功；另一步骤预算耗尽 → 任�
 
     await startTask(page, project, /新功能开发/, '生成标记文件并更新说明');
     const failure = page.getByTestId('failure-panel');
-    await expect(failure).toContainText('「更新说明」多次尝试仍没有完成');
+    await expect(failure).toContainText('「更新说明」多次尝试仍没有完成', { timeout: TASK_RUN_TIMEOUT_MS });
     await expect(page.getByTestId('step-a')).toContainText('完成');
 
     await queueTurn(request, project, { title: '更新说明' }, [submitResult('已更新说明')]);
     await queueTurn(request, project, { title: '整体验证' }, [submitResult('全部通过')]);
     await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
     await failure.getByRole('button', { name: '重试' }).click();
-    await expect(page.getByTestId('result-card')).toContainText('检查全部通过');
+    await expect(page.getByTestId('result-card')).toContainText('检查全部通过', { timeout: TASK_RUN_TIMEOUT_MS });
   } finally {
     await patchSettings(request, { 'node.maxAttempts': 3 });
   }

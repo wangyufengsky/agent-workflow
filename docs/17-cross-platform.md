@@ -179,11 +179,25 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 
 **浏览器 E2E 不经 Vite 开发服务器。** 后端先 `vite build` 出开发模式的前端（保留开发页面），再像打包应用一样同源托管它。CI 的 J9 trace 显示：Vite 客户端的 HMR 连接偶发断开后会 `location.reload()`，正在加载的模块请求全部中止，页面停在未渲染状态（`data-theme` 等不到，M6 遗留的偶发失败即此）；按需转换的几百个模块也让 Windows 上每次打开页面都很慢。改为构建产物后，本机 E2E 从 4.9 分钟降到 1.9 分钟。
 
+**各平台的实测耗时**（CI，同一提交 cbdd21a；E2E 后端在 CI 中以 info 级别记录状态转换，时间取自日志）：
+
+| | macOS | Ubuntu | Windows |
+| --- | --- | --- | --- |
+| 集成测试总耗时（Windows 与 macOS 不含 MySQL） | 14 s | 91 s（含 MySQL 容器） | 242 s |
+| 建 worktree（preparing → 工作区就绪），中位 / 最大 | 42 / 125 ms | 107 / 340 ms | 542 / 6259 ms |
+| 节点验收（verifying → 下一状态，检查命令 + 提交），中位 / 最大 | 60 / 102 ms | 174 / 512 ms | 892 / 3795 ms |
+| 一次 Git Bash 检查命令（`acceptance.command.int.test.ts` 3 个用例合计） | 149 ms | 89 ms | 548 ms |
+| J4 从开始到任务失败 | 0.2 s | 0.8 s | 3.6 s |
+| J6 / 三任务并发合并 整个用例 | 2.8 / 3.0 s | 7.9 / 10.2 s | 17.6 / 20.2 s |
+
+慢集中在启动进程上（每次 git 与 Git Bash 约 100 ms 以上，一个节点的提交要十几次 git 调用）。排查过的 Windows 特有原因：Defender 实时扫描在 runner 上本来就是关闭的（`RealTimeProtectionEnabled : False`，曾临时加的排除步骤已去掉）；`core.fsmonitor` / `core.preloadindex` 影响 `status` 的文件扫描，对这些只有几个文件的测试仓库没有可省的；进程启动开销是平台本身的成本。处理：集成测试的 `testTimeout` 与 `waitForEvent` 默认等待按最慢的 Windows 留余量；E2E 只对跨整个任务运行的断言（J4）在 Windows 上放宽到 20 s（`e2e/helpers.ts` 的 `TASK_RUN_TIMEOUT_MS`），其余断言保持 5 s。
+
 ### 4.2 测试代码中的平台差异
 
 只在测试辅助函数中处理，测试用例本身不写平台判断：
 
 - `test/helpers/executables.ts`：`writeFakeExecutable(dir, name, source)` 写一个用 Node 运行 JS 模块 `source` 的假命令（Windows 上是 npm 形式的 `<name>.cmd`，其他平台是可执行的 sh 脚本）；`isolatedEnv(bin, home, { git })` 构造只找得到 `bin`（和 git）的环境（POSIX 上软链接 git；Windows 上加入 git 自己的目录，因为 Git for Windows 的 `git.exe` 依赖安装目录的相对位置，另保留 `SystemRoot`、`ComSpec` 等 Windows 程序需要的变量）。
+- E2E 中跨整个任务运行的等待：`e2e/helpers.ts` 的 `TASK_RUN_TIMEOUT_MS`（只在 Windows 上放宽，数据见 §4.1）。
 - 浏览器 E2E 的假 opencode：`e2e/fixtures/bin/` 同时有 `opencode`（sh）与 `opencode.cmd`；PATH 用 `path.delimiter` 拼接，主目录同时设 `HOME` 与 `USERPROFILE`。
 
 ## 5. 验收
