@@ -22,5 +22,6 @@
   "productName": "Agent Workflow",
   "version": "1.0.0",
   "description": "Local AI development workflow desktop app",
-  "author": "wangyufeng"
+  "author": "wangyufeng",
+  "homepage": "https://github.com/wangyufengsky/agent-workflow"
 }
