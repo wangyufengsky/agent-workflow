@@ -70,7 +70,7 @@ export function DeckHeader({ deck, details }: { deck: DeckDTO; details: boolean 
   const exporting = useMutation({
     mutationFn: (kind: 'pdf' | 'pptx') => (kind === 'pdf' ? exportPdf(deck) : exportPptx(deck)),
     onSuccess: (saved: Saved) => {
-      if (saved !== null) toast(C.exported);
+      if (saved !== null && !('failed' in saved)) toast(C.exported);
     },
   });
   const busy = deck.runs.some((r) => isAttemptActive(r.attempt.status));
@@ -166,6 +166,9 @@ export function DeckHeader({ deck, details }: { deck: DeckDTO; details: boolean 
         </Button>
       </div>
       {exporting.isError && <ErrorState error={exporting.error} />}
+      {exporting.data !== undefined && exporting.data !== null && 'failed' in exporting.data && (
+        <ErrorState error={exporting.data.failed} />
+      )}
       {update.isError && <ErrorState error={update.error} />}
       <Dialog
         open={confirmDelete}

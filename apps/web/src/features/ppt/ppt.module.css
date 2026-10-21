@@ -349,6 +349,11 @@
 .printPage {
   width: 1280px;
   height: 720px;
+  overflow: hidden;
+}
+
+/* A break after the last page would print an empty one. */
+.printPage:not(:last-child) {
   break-after: page;
 }
 

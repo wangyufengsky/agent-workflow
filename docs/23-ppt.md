@@ -2,7 +2,7 @@
 
 > 状态：**v1.2 已实现**（P-01…P-10，见 [05](05-dev-plan.md#v12--ppt-制作)）。设计已由用户确认（D93–D96，2026-10-22，按推荐方案）。
 >
-> 实现说明（与最初设计的差异，正文已按实现改写）：尝试分为 `deck_outline` 与 `deck_slides` 两类（同一会话中 `continueSession` 换 kind），`deck_runs` 不另存类型；`submit_slide` 按**页码**提交（`page`），不用页 id，校验失败统一为 `VALIDATION_FAILED`（`details.issues` 指出字段与上限），不另设 `DECK_OUTLINE_INVALID` / `DECK_SLIDE_INVALID`；删除项目不检查进行中的 PPT 工作（PPT 的 `project_id` 置空，会话照常在原目录中只读）；「这一页」面板只按字段改文字，换版式交给「让 AI 改」；代码版式为等宽纯文字（不做语法高亮，PPT 主题与应用主题无关，shiki 的配色取应用令牌）；删除在工作台页头而不是列表卡片的菜单；导出为页头的两个按钮；按意见重写大纲的意见可以省略（大纲失败后的「重试」即重新写）；PPT 的用量暂不计入「质量与用量」（19 只统计任务与知识问答，见 §11）。
+> 实现说明（与最初设计的差异，正文已按实现改写）：尝试分为 `deck_outline` 与 `deck_slides` 两类（同一会话中 `continueSession` 换 kind），`deck_runs` 不另存类型；`submit_slide` 按**页码**提交（`page`），不用页 id，校验失败统一为 `VALIDATION_FAILED`（`details.issues` 指出字段与上限），不另设 `DECK_OUTLINE_INVALID` / `DECK_SLIDE_INVALID`；删除项目不检查进行中的 PPT 工作（PPT 的 `project_id` 置空，会话照常在原目录中只读）；「这一页」面板只按字段改文字，换版式交给「让 AI 改」；代码版式为等宽纯文字（不做语法高亮，PPT 主题与应用主题无关，shiki 的配色取应用令牌）；删除在工作台页头而不是列表卡片的菜单；导出为页头的两个按钮；按意见重写大纲的意见可以省略（大纲失败后的「重试」即重新写）；PPT 的用量暂不计入「质量与用量」（19 只统计任务与知识问答，见 §11）；打印视图向 main 报告「可以打印 / 失败原因」而不是只报告完成（评审发现：PPT 读不出来时导出会一直等待）。
 
 把手头的材料做成一份能讲的 PPT：AI 先出大纲，你确认或改过之后逐页制作，做好后可以预览、逐页让 AI 改、自己改文字，最后导出 PDF 或 PowerPoint。
 
@@ -303,7 +303,7 @@ AI 提交、应用保存与渲染的都是 `SlideContent`（`shared/contracts/de
 
 ### 6.1 PDF
 
-- 桌面版：preload 新增 `exportPdf(deckId, fileName)` → Electron main 用一个隐藏窗口（同一 preload、同源）加载 `/ppt/:deckId/print`；打印视图渲染完全部页面并等字体加载完（`document.fonts.ready`）后经 preload 通知 main，main 调 `webContents.printToPDF({ pageSize: 13.333×7.5 英寸, margins: 0, printBackground: true, preferCSSPageSize: true })`，弹出保存对话框写文件，关闭隐藏窗口；返回保存路径（取消为 `null`），界面提示「已导出」。
+- 桌面版：preload 新增 `exportPdf(deckId, fileName)` → Electron main 用一个隐藏窗口（同一 preload、同源）加载 `/ppt/:deckId/print`；打印视图渲染完全部页面并等字体加载完（`document.fonts.ready`）后经 preload 告诉 main「可以打印」（`printSettled({ ok: true })`）；PPT 读不出来（已删除、后端出错）时告诉 main 原因（`{ ok: false, error }`），隐藏窗口的渲染进程退出时 main 也按失败结束，所以导出总会返回：成功为保存路径，失败为 `ErrorInfo`，界面按错误码显示。main 在任何情况下都移除监听并销毁隐藏窗口。main 调 `webContents.printToPDF({ pageSize: 13.333×7.5 英寸, margins: 0, printBackground: true, preferCSSPageSize: true })`，弹出保存对话框写文件，关闭隐藏窗口；返回 `{ ok: true, path }`（取消为 `path: null`），界面提示「已导出」。渲染进程的资源路径是绝对的（`base: '/'`，覆盖 electron-vite 为 file:// 页面设的 `./`），否则直接打开 `/ppt/:id/print` 这样的多级地址时脚本加载失败（应用内刷新任意多级页面同理）。
 - 打印视图用 `@page { size: 1280px 720px; margin: 0 }`，每页一张，与预览像素一致；文字是矢量、可选中。
 - 浏览器开发模式（没有 preload）不显示「导出 PDF」，与 `reveal_file` 相同。
 - 不需要新依赖。
@@ -476,5 +476,5 @@ apps/desktop/src/main/export.ts        exportPdf（隐藏窗口 + printToPDF）�
 | 集成（助手） | `decks_create` 需确认，确认后出现 `deck` 导航卡片；`decks_delete` 为 critical |
 | `@opencode` | 注入后 `aw-slides` 在 opencode 配置中可见（`pnpm test:oc`） |
 | E2E | **J20**（FakeOpencode，`ppt.browser.spec.ts`）：项目页「做成 PPT」→ 新建页预选项目 → 加一段文字、指定 3 页 → 生成大纲 → 改一页、删一页、加一页 → 确认制作 → 逐页出现 → 选中第 2 页手动改要点、预览同步 → 让 AI 改本页 → 恢复上一版 → 换主题（页面底色即时变化）→ 导出 PowerPoint（下载的 .pptx 有 3 张幻灯片与备注页）→ 放映翻页与 `Esc`；打印视图每页一张。J9 走查加入列表、新建、大纲、预览与全部版式的打印视图（四套应用主题、axe 对比度；预览的 PPT 用深色调色板） |
-| Electron | PDF 导出（隐藏窗口 + `printToPDF` + 保存对话框）在桌面应用中人工验证；浏览器 E2E 覆盖它打印的打印视图 |
+| Electron | `ppt-export.electron.spec.ts`（`pnpm e2e:electron`，不需要 opencode 与模型）：第一次启动建库后关闭应用，直接写入一份做好的 PPT，再启动；在 main 中应答保存对话框，导出的文件以 `%PDF` 开头且页数等于 PPT 的页数；不存在的 PPT 返回 `{ ok: false, error: DECK_NOT_FOUND }` 而不是一直等待 |
 | live | `live/ppt.live.test.ts`：对 `ts-stats` 做一份 5 页介绍，断言大纲 5 页、每页都通过校验、内容提到仓库里真实存在的函数名，报告写到 `live/reports/ppt-*.json` |

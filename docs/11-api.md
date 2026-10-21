@@ -386,10 +386,12 @@ interface AwBridge {
   openExternal(url: string): Promise<void>;       // 仅 http(s)
   revealInFinder(path: string): Promise<void>;
   appVersion: string;
-  exportPdf(deckId: string, fileName: string): Promise<string | null>;   // 隐藏窗口打印 /ppt/:id/print，保存到用户选择的位置（23 §6.1）
+  exportPdf(deckId: string, fileName: string): Promise<PdfExport>;       // 隐藏窗口打印 /ppt/:id/print，保存到用户选择的位置（23 §6.1）
   saveFile(fileName: string, bytes: Uint8Array): Promise<string | null>; // 渲染进程生成的文件（.pptx，23 §6.2）；取消为 null
-  printReady(): void;                                                    // 打印视图渲染完成，通知隐藏窗口可以打印
+  printSettled(result: PrintSettled): void;                              // 打印视图告诉隐藏窗口：可以打印，或为什么不能显示
 }
+type PrintSettled = { ok: true } | { ok: false; error: ErrorInfo };
+type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorInfo };   // path 为 null：用户取消了保存
 ```
 
 加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。

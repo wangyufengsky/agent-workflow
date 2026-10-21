@@ -2,9 +2,18 @@ import { resolve } from 'node:path';
 import { API_PREFIX, devPorts } from '@aw/shared';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
+import type { Plugin } from 'vite';
 
 const webRoot = resolve(import.meta.dirname, '../web');
 const ports = devPorts(process.env);
+
+/**
+ * The backend serves the renderer at the origin's root (D31), so asset paths are absolute and a page loaded at a
+ * nested address (a reload on /tasks/:id, the PDF export's print view /ppt/:id/print) finds them. electron-vite's
+ * renderer preset sets `base: './'` for production builds (meant for file:// pages), which resolves them under that
+ * address and serves the SPA's HTML instead; this runs after the preset.
+ */
+const servedFromRoot: Plugin = { name: 'aw:served-from-root', config: () => ({ base: '/' }) };
 
 export default defineConfig(({ mode }) => ({
   main: {
@@ -31,7 +40,7 @@ export default defineConfig(({ mode }) => ({
   },
   renderer: {
     root: webRoot,
-    plugins: [react()],
+    plugins: [react(), servedFromRoot],
     server: { port: ports.web, strictPort: true, proxy: { [API_PREFIX]: `http://127.0.0.1:${ports.api}` } },
     build: { rollupOptions: { input: resolve(webRoot, 'index.html') } },
   },

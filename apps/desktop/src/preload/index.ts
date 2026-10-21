@@ -16,7 +16,7 @@ const bridge: AwBridge = {
   revealInFinder: (path) => ipcRenderer.invoke('aw:reveal-in-finder', path),
   exportPdf: (deckId, fileName) => ipcRenderer.invoke('aw:export-pdf', deckId, fileName),
   saveFile: (fileName, bytes) => ipcRenderer.invoke('aw:save-file', fileName, bytes),
-  printReady: () => ipcRenderer.send('aw:print-ready'),
+  printSettled: (result) => ipcRenderer.send('aw:print-settled', result),
 };
 
 contextBridge.exposeInMainWorld('aw', bridge);
