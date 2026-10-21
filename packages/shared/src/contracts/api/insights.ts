@@ -40,7 +40,7 @@ export const insightsQuerySchema = z
   });
 export type InsightsQuery = z.infer<typeof insightsQuerySchema>;
 
-/** Usage of a set of attempts (19 §2.3): tokens only, cost is not counted (D78). */
+/** Usage of a set of attempts (19 §2.3): tokens only, cost is not counted (D79). */
 export const usageTotalsSchema = z.object({
   attempts: z.number(),
   tokensInput: z.number(),

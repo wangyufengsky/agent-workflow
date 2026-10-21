@@ -233,7 +233,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 `GET /api/v1/events`（`Authorization` 通过查询参数 `?token=` 传递，因 EventSource 不支持头；仅本机）。
 
 - 每条：`id: <bootId>-<seq>`（`bootId` 每次后端启动随机生成，`seq` 单调递增）、`event: <ServerEventType>`、`data: <JSON>`。
-- 断线重连带 `Last-Event-ID`；服务端内存保留最近 `SSE_REPLAY_BUFFER` 条，能补则补；补不上（超出缓冲、或 `bootId` 不是本次启动）发送 `event: resync`（其 id 为当前位置），前端使所有查询失效重新拉取。
+- 断线重连带 `Last-Event-ID`；服务端内存保留最近 `SSE_REPLAY_BUFFER` 条，能补则补；补不上（超出缓冲、或 `bootId` 不是本次启动）发送 `event: resync`（其 id 为当前位置），前端使所有查询失效重新拉取。首次连接（不带 `Last-Event-ID`）同样先收到 `resync`：页面在连上之前就读了数据，其间的事件无从补发，不重新拉取就会停在旧状态（如三条权限请求只显示两条，直到下一个相关事件）。
 - 事件 schema 为 `shared/contracts/events` 的 `serverEventSchema`；各里程碑随实体加入对应事件。
 - 事件只做「失效通知 + 必要增量」，前端以 TanStack Query 缓存为准：收到 `task.updated` 就 `setQueryData` 或 `invalidate` 对应 key。
 
@@ -292,11 +292,11 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 ## 13b. 质量与用量（v1.1）
 
-见 [19-insights.md §4](19-insights.md#4-api操作清单)。全部 `risk = read`、`mode = simple`、`expose.assistant = true`、不进命令面板（D78 ④）。
+见 [19-insights.md §4](19-insights.md#4-api操作清单)。全部 `risk = read`、`mode = simple`、`expose.assistant = true`、不进命令面板（D79 ④）。
 
 | 方法 | 路径 | 操作 | 说明 |
 | --- | --- | --- | --- |
-| GET | `/insights?period&from&to` | `insights.summary` | `InsightsSummaryDTO`：时间段（含时区）、tokens 用量合计（不含成本，D78）与按项目 / 流程 / 角色 / 模型 / 用途的拆分、按天趋势、质量、`attention`；`period = custom` 缺日期、其余时间段带日期、`from > to` 或超过 `INSIGHTS_MAX_DAYS` 天为 400 |
+| GET | `/insights?period&from&to` | `insights.summary` | `InsightsSummaryDTO`：时间段（含时区）、tokens 用量合计（不含成本，D79）与按项目 / 流程 / 角色 / 模型 / 用途的拆分、按天趋势、质量、`attention`；`period = custom` 缺日期、其余时间段带日期、`from > to` 或超过 `INSIGHTS_MAX_DAYS` 天为 400 |
 | GET | `/insights/tasks?period&from&to` | `insights.tasks` | `{ items: InsightsTaskDTO[] }`：时间段内结束或有用量的任务及其数字（钻取用） |
 
 ## 13. preload 能力（非 HTTP）

@@ -69,10 +69,6 @@
   border-color: var(--danger-line);
 }
 
-.tone-idle {
-  opacity: 0.85;
-}
-
 @keyframes breathe {
   50% {
     box-shadow:

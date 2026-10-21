@@ -39,8 +39,9 @@ await server.listen({ host: '127.0.0.1', port: config.port });
 
 const address = server.server.address();
 if (address === null || typeof address === 'string') throw new Error('Server is not listening on a TCP port');
-// Running inside Electron utilityProcess: tell the main process where we listen.
+// Tell the parent where we listen: Electron main (utilityProcess), or browser E2E's global setup (a Node fork).
 process.parentPort?.postMessage({ type: 'ready', port: address.port });
+process.send?.({ type: 'ready', port: address.port });
 fake?.fake.connectMcp({
   exec: { url: `http://127.0.0.1:${address.port}${MCP_EXEC_PATH}`, token: app.mcpToken },
   assistant: { url: `http://127.0.0.1:${address.port}${MCP_ASSISTANT_PATH}`, token: app.assistantMcpToken },
@@ -54,6 +55,8 @@ async function shutdown(): Promise<void> {
 process.parentPort?.on('message', ({ data }) => {
   if (backendShutdownMessageSchema.safeParse(data).success) void shutdown();
 });
+// A Node fork ends with its parent's channel: E2E teardown disconnects, and so does a parent that dies.
+process.once('disconnect', () => void shutdown());
 // Plain Node (`pnpm dev:server`): opencode leads its own process group, so Ctrl+C would not reach it.
 process.once('SIGINT', () => void shutdown());
 process.once('SIGTERM', () => void shutdown());

@@ -39,6 +39,32 @@ export const KNOWLEDGE_DOC_EXTENSIONS = ['.md', '.mdx', '.markdown', '.txt', '.r
 /** Fixed backend port in development so the Vite dev server can proxy to it; production uses a random port. */
 export const DEV_API_PORT = 47821;
 export const DEV_WEB_PORT = 47822;
+/** Override the development ports, so several checkouts can run side by side (D78). */
+export const DEV_PORT_ENV = { api: 'AW_DEV_API_PORT', web: 'AW_DEV_WEB_PORT' } as const;
+
+/**
+ * The development ports, the one place they are read: the Vite configs, Electron main and Playwright all call it.
+ * `defaults` replaces the fixed ports for a caller that lets the system choose (browser E2E passes `api: 0`).
+ */
+export function devPorts(
+  env: Readonly<Record<string, string | undefined>>,
+  defaults: { api?: number; web?: number } = {},
+): { api: number; web: number } {
+  return {
+    api: parsePort(env, DEV_PORT_ENV.api, defaults.api ?? DEV_API_PORT),
+    web: parsePort(env, DEV_PORT_ENV.web, defaults.web ?? DEV_WEB_PORT),
+  };
+}
+
+function parsePort(env: Readonly<Record<string, string | undefined>>, name: string, fallback: number): number {
+  const value = env[name];
+  if (value === undefined) return fallback;
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`${name} must be a port number (1-65535), got "${value}"`);
+  }
+  return port;
+}
 /** Written in acceptance commands for the project's check command; replaced when nodes are created (13 §1). */
 export const PROJECT_CHECK_PLACEHOLDER = '$PROJECT_CHECK';
 /** Author and committer of the commits the backend makes for finished nodes (09 §3). */

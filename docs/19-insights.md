@@ -1,10 +1,10 @@
 # 19 · 质量与用量（v1.1）
 
-> 状态：**v1.1 已实现**，待合并（任务 I-01…I-08，见 [05](05-dev-plan.md#v11--质量与用量)）。D78（只统计 tokens，不统计成本）与 D79（自写柱状图）用户已确认（2026-10-21）。
+> 状态：**v1.1 已实现**，待合并（任务 I-01…I-08，见 [05](05-dev-plan.md#v11--质量与用量)）。D79（只统计 tokens，不统计成本）与 D82（自写柱状图）用户已确认（2026-10-21）。
 
 ## 1. 定位
 
-回答三个问题：**AI 帮我做了多少事、做得好不好、用了多少。**用量只按 tokens 统计，不统计成本（D78：用户本地用的模型都是免费的）。
+回答三个问题：**AI 帮我做了多少事、做得好不好、用了多少。**用量只按 tokens 统计，不统计成本（D79：用户本地用的模型都是免费的）。
 
 - **只读展示**：不改变任何业务状态，不新增采集；所有数字由已有的表现算（§2.1）。
 - **如实显示**：没有数据时显示「—」与原因，不显示 0%。
@@ -17,7 +17,7 @@
 
 | 表 | 用到的列 |
 | --- | --- |
-| `attempts` | `kind`、`status`、`task_id`、`node_id`、`role_id`、`model`、`tokens_input`、`tokens_output`、`error.code`（`cost` 照常存储，不统计、不展示，D78）、`started_at` |
+| `attempts` | `kind`、`status`、`task_id`、`node_id`、`role_id`、`model`、`tokens_input`、`tokens_output`、`error.code`（`cost` 照常存储，不统计、不展示，D79）、`started_at` |
 | `tasks` | `status`、`project_id`、`workflow_id`、`started_at`、`finished_at`、`updated_at` |
 | `nodes` | `task_id`、`status`（首次通过与重试按尝试表计算，不用会被重试清零的 `attempt_count`） |
 | `task_events` | 节点的 `checks_failed`、`reject` 事件；任务第一次进入 `review` 的时间 |
@@ -25,7 +25,7 @@
 | `knowledge_turns` → `knowledge_conversations` | `research` 尝试所属的项目 |
 | `projects`、`workflows`、`roles` | 拆分维度的名称 |
 
-**不在统计内**：应用助手对话的用量——助手会话不产生尝试，opencode 报告的用量没有记录（D78 ①）；开发构建的调试尝试（既不属于任务也不是 `research`）。页面在用量区注明「应用助手对话的用量未记录」。
+**不在统计内**：应用助手对话的用量——助手会话不产生尝试，opencode 报告的用量没有记录（D79 ①）；开发构建的调试尝试（既不属于任务也不是 `research`）。页面在用量区注明「应用助手对话的用量未记录」。
 
 ### 2.2 时间段
 
@@ -63,7 +63,7 @@
 
 ### 2.4 质量
 
-质量统计一个**任务集合**：时间段内**结束**的任务（D78 ③）。结束时间：已完成、已取消取 `finished_at`；失败取 `updated_at`（失败后只有重试或取消会再改它，二者都会改变状态）。失败的任务之后被重试并完成，按完成的那次计入。
+质量统计一个**任务集合**：时间段内**结束**的任务（D79 ③）。结束时间：已完成、已取消取 `finished_at`；失败取 `updated_at`（失败后只有重试或取消会再改它，二者都会改变状态）。失败的任务之后被重试并完成，按完成的那次计入。
 
 | 指标 | 计算 | 分母为 0 时 |
 | --- | --- | --- |
@@ -85,7 +85,7 @@
 
 ## 3. 页面与交互
 
-路由 `/insights`，导航「质量与用量」（图标 `chart`），两种模式都显示。设计参考 `originals/main/pages/insights.html`（REVIEW 第 12 节），按「默认简单」收敛：去掉成本与币种（D78）、「已加载 / 未知记录」类说明（数字由后端一次算全，没有分页加载）、质量徽标与评审逐项（看评审到任务页）。
+路由 `/insights`，导航「质量与用量」（图标 `chart`），两种模式都显示。设计参考 `originals/main/pages/insights.html`（REVIEW 第 12 节），按「默认简单」收敛：去掉成本与币种（D79）、「已加载 / 未知记录」类说明（数字由后端一次算全，没有分页加载）、质量徽标与评审逐项（看评审到任务页）。
 
 ### 3.1 简单模式
 
@@ -121,7 +121,7 @@
 
 ## 4. API（操作清单）
 
-两个操作都是 `risk = read`、`mode = simple`、`expose = { palette: false, assistant: true }`、无凭据字段（D78 ④）。命令面板通过导航项打开页面，不需要单独的操作。
+两个操作都是 `risk = read`、`mode = simple`、`expose = { palette: false, assistant: true }`、无凭据字段（D79 ④）。命令面板通过导航项打开页面，不需要单独的操作。
 
 | 方法 | 路径 | 操作 | 说明 |
 | --- | --- | --- | --- |
@@ -131,7 +131,7 @@
 输入（`insightsQuerySchema`）：`period: InsightsPeriod`；`period = custom` 时必须有 `from`、`to`，其余时间段不能带（`VALIDATION_FAILED`）。
 
 ```ts
-type UsageTotals = { attempts: number; tokensInput: number; tokensOutput: number };   // 不含成本（D78）
+type UsageTotals = { attempts: number; tokensInput: number; tokensOutput: number };   // 不含成本（D79）
 
 type InsightsSummaryDTO = {
   period: { period: InsightsPeriod; from: string; to: string; timeZone: string };   // 日期为 YYYY-MM-DD
@@ -193,7 +193,7 @@ type InsightsTaskDTO = {
   - `insights.aggregate.ts`：由查出的行计算 §2 的全部数字（纯函数）；
   - `insights.repo.ts`：§5 的查询，只读，读取其他模块经其 `index.ts` 导出的表；
   - `insights.service.ts`、`insights.operations.ts`、`index.ts`。
-- `web/src/features/insights/`：页面（简单 / 专业两种视图）、`bar-chart.tsx`（自写的 HTML/CSS 柱状图，D79）、`drill.ts`（钻取过滤）、查询；文案 `web/src/copy/insights.ts`。SSE `task.updated`、`attempt.updated`（含知识问答的尝试）与 `inbox.updated` 让这些查询重新读取。
+- `web/src/features/insights/`：页面（简单 / 专业两种视图）、`bar-chart.tsx`（自写的 HTML/CSS 柱状图，D82）、`drill.ts`（钻取过滤）、查询；文案 `web/src/copy/insights.ts`。SSE `task.updated`、`attempt.updated`（含知识问答的尝试）与 `inbox.updated` 让这些查询重新读取。
 
 ## 8. 测试
 

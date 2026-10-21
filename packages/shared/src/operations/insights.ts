@@ -4,7 +4,7 @@ import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
 
-// Read-only figures for both modes; the assistant answers「这周花了多少」with them (D78 ④).
+// Read-only figures for both modes; the assistant answers「这周用了多少」with them (D79 ④).
 const common = {
   expose: { palette: false, assistant: true },
   credentialFields: [],

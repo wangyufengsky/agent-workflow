@@ -22,7 +22,7 @@ const INPUT: BarSeries = { name: C.tokensInput, tone: 's0' };
 const OUTPUT: BarSeries = { name: C.tokensOutput, tone: 's1' };
 const total = (u: UsageTotals) => u.tokensInput + u.tokensOutput;
 
-/** Usage in tokens (19 §2.3, D78): totals, the daily trend and the five breakdowns. */
+/** Usage in tokens (19 §2.3, D79): totals, the daily trend and the five breakdowns. */
 export function UsageSection({
   summary,
   rows,
