@@ -54,7 +54,8 @@ export const knowledgeConversationSchema = z.object({
   id: z.string(),
   title: z.string(),
   sources: knowledgeSourcesSchema,
-  project: projectRef.extend({ databaseCount: z.number() }),
+  /** `repoPath` is where the researcher works: its file paths are shown relative to it. */
+  project: projectRef.extend({ repoPath: z.string(), databaseCount: z.number() }),
   turns: z.array(knowledgeTurnSchema),
   createdAt: z.number(),
   updatedAt: z.number(),

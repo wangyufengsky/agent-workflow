@@ -15,6 +15,7 @@
 | `/tasks/:taskId/nodes/:nodeId` | 完整步骤页（`?attempt=` 选尝试） | 全部（专业视图的入口） | `node/index.html` |
 | `/inbox` | 需要你处理 | 全部 | `inbox.html` |
 | `/projects`、`/projects/:projectId` | 项目 | 全部 | `projects.html` |
+| `/knowledge`、`/knowledge/:conversationId`、`/knowledge/history` | 知识问答（v1.1）：首屏（`?projectId=`）、对话（`?turn=&cite=` 打开某一轮的某处引用原文，`?details=true` 简单模式下的专业视图）、对话记录（`?q=&projectId=`） | 全部 | `knowledge.html`、`knowledge-history.html`，见 [18-knowledge.md §2](18-knowledge.md#2-页面与交互) |
 | `/settings` | 设置 | 全部（专业项按模式显示） | `settings.html` |
 | `/git`、`/git/:projectId` | Git 管理台（`?tab=branches\|commits\|files\|worktrees`，`ref`、`sha`、`path`、`file` 记录所看的内容） | 专业 | `git/index.html`、`delivery/git.html` |
 | `/workflows`、`/workflows/:key` | 流程列表与编排器（`:key` 为流程 key，编辑其最新版本） | 专业 | `workflows.html`、`workflow-editor.html` |
@@ -29,6 +30,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'home',      route: ROUTES.home,      label: COPY.nav.home,      icon: 'home',     visibleIn: ['simple', 'pro'] },
   { id: 'tasks',     route: ROUTES.tasks,     label: COPY.nav.tasks,     icon: 'list',     visibleIn: ['simple', 'pro'], badge: 'inboxOpen' },
   { id: 'projects',  route: ROUTES.projects,  label: COPY.nav.projects,  icon: 'folder',   visibleIn: ['simple', 'pro'] },
+  { id: 'knowledge', route: ROUTES.knowledge, label: COPY.nav.knowledge, icon: 'book',     visibleIn: ['simple', 'pro'] },   // v1.1
   { id: 'git',       route: ROUTES.git,       label: COPY.nav.git,       icon: 'gitRepo',  visibleIn: ['pro'], group: 'pro' },
   { id: 'workflows', route: ROUTES.workflows, label: COPY.nav.workflows, icon: 'flow',     visibleIn: ['pro'], group: 'pro' },
   // roles, databases, tools, runtime ...
@@ -249,7 +251,7 @@ export type ThemeDefinition = {
 
 | # | 设计稿现状 | v1.0 处理 |
 | --- | --- | --- |
-| 1 | 17 个菜单 | 简单模式 4 个，专业模式 11 个；知识库、PPT、质量与用量、模板任务不做 |
+| 1 | 17 个菜单 | 简单模式 5 个（v1.1 加入知识问答），专业模式 12 个；PPT、质量与用量、模板任务不做 |
 | 2 | 开始任务 → 需求草稿 → 需求画布五段胶囊 → 准备工作区 → 开始执行，多次确认 | 主页一步开始；计划确认是可选检查点；工作区自动准备，专业视图才显示 |
 | 3 | 规划轮次、候选对照、逐项核对、修订次数、分组细化（PE 系列 50 个状态） | 简化为：计划草稿 → 确认 / 按意见重新规划 / 编辑（专业）；历史版本可查看 |
 | 4 | 回执未知、待核对、部分创建、重启核对等状态 | 删除；仅保留「已中断（将自动重试）」 |

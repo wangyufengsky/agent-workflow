@@ -34,6 +34,10 @@ const ICON_PATHS = {
   skip: 'M5 5l10 7-10 7zM19 5v14',
   edit: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
   stop: 'M6 6h12v12H6z',
+  book: 'M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z',
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+  chevLeft: 'M15 6l-6 6 6 6',
+  arrowUp: 'M12 19V5M5 12l7-7 7 7',
 } as const;
 export type IconName = keyof typeof ICON_PATHS;
 

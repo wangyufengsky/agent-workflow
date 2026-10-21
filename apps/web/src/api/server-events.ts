@@ -1,4 +1,11 @@
-import { API_PREFIX, type ServerEvent, ServerEventType, serverEventSchema, TranscriptEntryKind } from '@aw/shared';
+import {
+  API_PREFIX,
+  AttemptKind,
+  type ServerEvent,
+  ServerEventType,
+  serverEventSchema,
+  TranscriptEntryKind,
+} from '@aw/shared';
 import type { QueryClient } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -9,6 +16,7 @@ import {
 } from '../features/assistant/assistant.queries.ts';
 import { appendTranscript, attemptTranscript, updateAttempt } from '../features/attempts/attempt.queries.ts';
 import { updateInbox } from '../features/inbox/inbox.queries.ts';
+import { refreshKnowledge } from '../features/knowledge/knowledge.queries.ts';
 import { updateNode, updateTask } from '../features/tasks/tasks.queries.ts';
 import { useUiStore } from '../state/ui.store.ts';
 import { apiToken } from './client.ts';
@@ -25,6 +33,8 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       return qc.invalidateQueries({ queryKey: queryKeys.environment });
     case ServerEventType.AttemptUpdated:
       updateAttempt(qc, event.data.attempt);
+      // A research turn's progress line and status are part of its knowledge conversation (18 §4).
+      if (event.data.attempt.kind === AttemptKind.Research) await refreshKnowledge(qc);
       // A task's active attempts (and their progress line) are part of its detail.
       if (event.data.taskId !== null)
         await qc.invalidateQueries({ queryKey: queryKeys.task(event.data.taskId), exact: true });
@@ -53,6 +63,8 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       }
       return;
     }
+    case ServerEventType.KnowledgeUpdated:
+      return refreshKnowledge(qc);
     case ServerEventType.AssistantConfirmation:
       return updateConfirmation(qc, event.data);
     // Requests of the assistant to the renderer, carried out by the shell (15 §6).

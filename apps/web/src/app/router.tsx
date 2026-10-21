@@ -11,6 +11,8 @@ import { GitConsolePage } from '../features/git/git-console.page.tsx';
 import { GIT_TABS, GitProjectPage } from '../features/git/git-project.page.tsx';
 import { HomePage } from '../features/home/home.page.tsx';
 import { InboxPage } from '../features/inbox/inbox.page.tsx';
+import { KnowledgeConversationPage, KnowledgeWelcomePage } from '../features/knowledge/knowledge.page.tsx';
+import { KnowledgeHistoryPage } from '../features/knowledge/knowledge-history.page.tsx';
 import { NodePage } from '../features/node-detail/node.page.tsx';
 import { OnboardingPage } from '../features/onboarding/onboarding.page.tsx';
 import { ProOnly } from '../features/pro/pro-only.tsx';
@@ -161,6 +163,30 @@ const gitProjectRoute = createRoute({
     </ProOnly>
   ),
 });
+// Knowledge Q&A (18 §2): the first screen keeps the chosen project in the address; a conversation keeps the open
+// citation (`turn` + `cite`) and the pro view of simple mode (`details`); the history keeps its filters.
+const knowledgeRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.knowledge,
+  validateSearch: z.object({ projectId: z.string().optional() }),
+  component: KnowledgeWelcomePage,
+});
+const knowledgeConversationRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.knowledgeConversation,
+  validateSearch: z.object({
+    turn: z.string().optional(),
+    cite: z.number().int().min(1).optional(),
+    details: z.boolean().optional(),
+  }),
+  component: KnowledgeConversationPage,
+});
+const knowledgeHistoryRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.knowledgeHistory,
+  validateSearch: z.object({ q: z.string().optional(), projectId: z.string().optional() }),
+  component: KnowledgeHistoryPage,
+});
 const projectRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.project,
@@ -177,6 +203,9 @@ const routeTree = rootRoute.addChildren([
     page(ROUTES.inbox, InboxPage),
     projectsRoute,
     projectRoute,
+    knowledgeRoute,
+    knowledgeHistoryRoute,
+    knowledgeConversationRoute,
     page(ROUTES.settings, SettingsPage),
     gitRoute,
     gitProjectRoute,

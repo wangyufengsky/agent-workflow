@@ -135,7 +135,7 @@ type KnowledgeTurnDTO = {
 
 type KnowledgeConversationDTO = {
   id: string; title: string; sources: KnowledgeSources;
-  project: { id: string; name: string; databaseCount: number };
+  project: { id: string; name: string; repoPath: string; databaseCount: number };   // 研究过程中的文件路径相对 repoPath 显示
   turns: KnowledgeTurnDTO[];
   createdAt: number; updatedAt: number;
 };

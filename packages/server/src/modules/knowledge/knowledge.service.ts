@@ -134,7 +134,12 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
       id: conversation.id,
       title: conversation.title,
       sources: conversation.sources,
-      project: { id: project.id, name: project.name, databaseCount: databases.forProject(project.id).length },
+      project: {
+        id: project.id,
+        name: project.name,
+        repoPath: project.repoPath,
+        databaseCount: databases.forProject(project.id).length,
+      },
       turns: turns.map((t) => toTurnDto(t, summaryOf(summaries, t))),
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
