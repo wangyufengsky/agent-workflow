@@ -49,7 +49,6 @@ export function createInsightsRepo(db: DbExecutor) {
       model: a.model,
       tokensInput: a.tokensInput,
       tokensOutput: a.tokensOutput,
-      cost: a.cost,
       startedAt: a.startedAt,
       projectId: projectsTable.id,
       projectName: projectsTable.name,

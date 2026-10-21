@@ -40,14 +40,11 @@ export const insightsQuerySchema = z
   });
 export type InsightsQuery = z.infer<typeof insightsQuerySchema>;
 
-/** Usage of a set of attempts (19 §2.3); cost in USD as opencode reports it. */
+/** Usage of a set of attempts (19 §2.3): tokens only, cost is not counted (D78). */
 export const usageTotalsSchema = z.object({
   attempts: z.number(),
   tokensInput: z.number(),
   tokensOutput: z.number(),
-  cost: z.number(),
-  /** Tokens of attempts that reported no cost: a free model or one without a price, which opencode cannot tell apart. */
-  unpricedTokens: z.number(),
 });
 export type UsageTotals = z.infer<typeof usageTotalsSchema>;
 

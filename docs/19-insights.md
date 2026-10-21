@@ -1,15 +1,15 @@
 # 19 · 质量与用量（v1.1）
 
-> 状态：**v1.1 已实现**，待合并（任务 I-01…I-08，见 [05](05-dev-plan.md#v11--质量与用量)）。口径与范围按保守方案推进，D78、D79 待用户确认。
+> 状态：**v1.1 已实现**，待合并（任务 I-01…I-08，见 [05](05-dev-plan.md#v11--质量与用量)）。D78（只统计 tokens，不统计成本）与 D79（自写柱状图）用户已确认（2026-10-21）。
 
 ## 1. 定位
 
-回答三个问题：**AI 帮我做了多少事、做得好不好、花了多少。**
+回答三个问题：**AI 帮我做了多少事、做得好不好、用了多少。**用量只按 tokens 统计，不统计成本（D78：用户本地用的模型都是免费的）。
 
 - **只读展示**：不改变任何业务状态，不新增采集；所有数字由已有的表现算（§2.1）。
-- **如实显示**：opencode 没有报告价格的用量标为「未计价」，不估算；没有数据时显示「—」与原因，不显示 0%。
-- **默认简单**：简单模式只有一行三个数（本周完成了几个任务、花了多少、打扰了你几次）；专业模式是完整的拆分、趋势、质量与钻取。
-- 应用助手可以调用同一组只读操作回答「这周花了多少」（§4）。
+- **如实显示**：没有数据时显示「—」与原因，不显示 0%。
+- **默认简单**：简单模式只有一行三个数（本周完成了几个任务、用了多少 tokens、打扰了你几次）；专业模式是完整的拆分、趋势、质量与钻取。
+- 应用助手可以调用同一组只读操作回答「这周用了多少」（§4）。
 
 ## 2. 指标口径
 
@@ -17,7 +17,7 @@
 
 | 表 | 用到的列 |
 | --- | --- |
-| `attempts` | `kind`、`status`、`task_id`、`node_id`、`role_id`、`model`、`tokens_input`、`tokens_output`、`cost`、`error.code`、`started_at` |
+| `attempts` | `kind`、`status`、`task_id`、`node_id`、`role_id`、`model`、`tokens_input`、`tokens_output`、`error.code`（`cost` 照常存储，不统计、不展示，D78）、`started_at` |
 | `tasks` | `status`、`project_id`、`workflow_id`、`started_at`、`finished_at`、`updated_at` |
 | `nodes` | `task_id`、`status`（首次通过与重试按尝试表计算，不用会被重试清零的 `attempt_count`） |
 | `task_events` | 节点的 `checks_failed`、`reject` 事件；任务第一次进入 `review` 的时间 |
@@ -47,11 +47,9 @@
 | 指标 | 计算 |
 | --- | --- |
 | 尝试数 | 范围内尝试的条数（含没有报告用量的） |
-| 输入 / 输出 tokens | `tokens_input`、`tokens_output` 之和；为空（会话没有完成过一步）记 0。取 opencode 每一步报告的 `input` / `output`：不含缓存读写与推理 tokens（已有数据只记了这两项），成本则是 opencode 按全部用量算的 |
-| 成本 | `cost` 之和，单位为 opencode 报告的美元；界面保留 4 位小数 |
-| 未计价 tokens | `cost` 为 0 或为空、而 tokens 大于 0 的尝试的输入 + 输出 tokens。opencode 对免费模型和没有配置价格的模型都报告 0，两者无法区分，统一显示为「未计价」，不估算（D78 ②） |
+| 输入 / 输出 tokens | `tokens_input`、`tokens_output` 之和；为空（会话没有完成过一步）记 0。取 opencode 每一步报告的 `input` / `output`：不含缓存读写与推理 tokens（已有数据只记了这两项） |
 
-**拆分**（`InsightsDimension`，每组都有上面四项，按成本、再按 tokens 降序）：
+**拆分**（`InsightsDimension`，每组都有上面三项，按输入 + 输出 tokens 降序）：
 
 | 维度 | 分组键 | 名称 |
 | --- | --- | --- |
@@ -61,7 +59,7 @@
 | `model` | 尝试的 `model` | 空 = 发送时未指定，界面显示「opencode 默认模型」 |
 | `kind` | `AttemptKind` | 界面显示规划 / 执行 / 评审 / 知识问答 |
 
-**趋势**：时间段内每一天一个点：输入 / 输出 tokens、成本、未计价 tokens、当天完成的任务数（§2.4 结束时间为当天且状态为已完成）。没有记录的天也有点（全 0）。
+**趋势**：时间段内每一天一个点：输入 / 输出 tokens、当天完成的任务数（§2.4 结束时间为当天且状态为已完成）。没有记录的天也有点（全 0）。
 
 ### 2.4 质量
 
@@ -82,30 +80,30 @@
 | 数 | 计算 |
 | --- | --- |
 | 完成了几个任务 | 本周（`week`）结束且已完成的任务数 |
-| 花了多少 | 本周用量的成本；有未计价 tokens 时附「另有 N tokens 未计价」 |
+| 用了多少 | 本周的输入 + 输出 tokens |
 | 打扰了你几次 | **本周创建**的 `question` / `permission` 条目数（不含按假设记录的提问），不限于结束的任务，也包括知识研究员的权限请求 |
 
 ## 3. 页面与交互
 
-路由 `/insights`，导航「质量与用量」（图标 `chart`），两种模式都显示。设计参考 `originals/main/pages/insights.html`（REVIEW 第 12 节），按「默认简单」收敛：去掉币种分列（opencode 只报美元）、「已加载 / 未知记录」类说明（数字由后端一次算全，没有分页加载）、质量徽标与评审逐项（看评审到任务页）。
+路由 `/insights`，导航「质量与用量」（图标 `chart`），两种模式都显示。设计参考 `originals/main/pages/insights.html`（REVIEW 第 12 节），按「默认简单」收敛：去掉成本与币种（D78）、「已加载 / 未知记录」类说明（数字由后端一次算全，没有分页加载）、质量徽标与评审逐项（看评审到任务页）。
 
 ### 3.1 简单模式
 
-- 标题「质量与用量」+ 一句说明「本周 AI 帮你做了多少、花了多少。」
-- 三张卡（§2.5）：「完成了 N 个任务」「花了 $X」「打扰了你 N 次」；成本卡在有未计价用量时下方一行「另有 N tokens 未计价」，悬停说明原因。
-- 下方一行提示：「在专业模式下查看按项目、流程、角色、模型的拆分、每天的趋势和任务明细」，附「开启专业模式」按钮（同 `ProOnly`）。
+- 标题「质量与用量」+ 一句说明「本周 AI 帮你做了多少、用了多少。」
+- 三张卡（§2.5）：「完成了 N 个任务」「用了 N tokens」「打扰了你 N 次」。
+- 下方一行提示：「在专业模式下查看按项目、流程、角色、模型的 tokens 拆分、每天的趋势和任务明细」，附「开启专业模式」按钮（同 `ProOnly`）。
 
 ### 3.2 专业模式
 
 自上而下：
 
 1. **工具条**：时间段分段控件「今天 / 本周 / 近 7 天 / 近 30 天 / 自定义」，默认本周；选「自定义」时出现两个日期输入（默认近 7 天）。时间段写在地址 `?period=&from=&to=`。
-2. **用量卡**：输入 tokens、输出 tokens、成本（附未计价说明）、尝试数；卡片下注「应用助手对话的用量未记录」。
-3. **趋势**：按天的柱状图，可切换「成本 / tokens」（这段时间没有计价的用量时默认 tokens）；tokens 为输入、输出两段堆叠。纵轴取整刻度；横轴日期过多时隔几天标一次；悬停或键盘聚焦某一天时，图上方一行读出日期与数值，图下附同样数据的隐藏表格供读屏。颜色取主题令牌（`--accent`、`--role-2`），四套主题由令牌保证。
-4. **拆分**：标签页「项目 / 流程 / 角色 / 模型 / 用途」，表格列：名称、tokens（数值左侧按最大值比例的小横条）、成本（未计价的组显示「未计价」标签）、尝试数。点击一行钻取到用到它的任务（知识问答的组没有任务，不可点击）。
+2. **用量卡**：tokens 合计、输入 tokens、输出 tokens、尝试数；卡片下注「应用助手对话的用量未记录」。
+3. **趋势**：按天的 tokens 柱状图，输入、输出两段堆叠。纵轴取整刻度；横轴日期过多时隔几天标一次；悬停或键盘聚焦某一天时，图上方一行读出日期与数值，图下附同样数据的隐藏表格供读屏。颜色取主题令牌（`--accent`、`--role-2`），四套主题由令牌保证。
+4. **拆分**：标签页「项目 / 流程 / 角色 / 模型 / 用途」，表格列：名称、tokens 合计（数值左侧按最大值比例的小横条）、输入、输出、尝试数。点击一行钻取到用到它的任务（知识问答的组没有任务，不可点击）。
 5. **质量卡**：完成率（下方「完成 N · 取消 N · 失败 N」）、首次通过率、平均重试、平均打扰、到待合并耗时（中位数）。分母为 0 时显示「—」与「这段时间没有结束的任务」。每张卡可点击钻取。
 6. **失败原因**：列表，每行原因文案（错误码按 `copy/errors.ts`）与次数，点击钻取。
-7. **任务明细**：本时间段相关的任务（结束的任务 ∪ 有用量的任务），列：任务（链接到任务页）、项目、状态、tokens（比例横条）、成本、重试、打扰、到待合并耗时。钻取时表格上方出现「正在查看：<指标> · 清除」，表格只显示该指标对应的任务，并滚动到表格；钻取写在地址 `?drill=`（`InsightsDrill`）与 `?key=`。
+7. **任务明细**：本时间段相关的任务（结束的任务 ∪ 有用量的任务），列：任务（链接到任务页）、项目、状态、tokens（比例横条）、重试、打扰、到待合并耗时。钻取时表格上方出现「正在查看：<指标> · 清除」，表格只显示该指标对应的任务，并滚动到表格；钻取写在地址 `?drill=`（`InsightsDrill`）与 `?key=`。
 
 钻取的对应关系（前端纯函数 `drillFilter(drill, key)`，对 §4 `insights.tasks` 返回的行过滤）：
 
@@ -133,7 +131,7 @@
 输入（`insightsQuerySchema`）：`period: InsightsPeriod`；`period = custom` 时必须有 `from`、`to`，其余时间段不能带（`VALIDATION_FAILED`）。
 
 ```ts
-type UsageTotals = { attempts: number; tokensInput: number; tokensOutput: number; cost: number; unpricedTokens: number };
+type UsageTotals = { attempts: number; tokensInput: number; tokensOutput: number };   // 不含成本（D78）
 
 type InsightsSummaryDTO = {
   period: { period: InsightsPeriod; from: string; to: string; timeZone: string };   // 日期为 YYYY-MM-DD
@@ -166,7 +164,7 @@ type InsightsTaskDTO = {
 
 `InsightsFailureKind`：`checks_failed`、`rejected`、`attempt_error`（`code` 为错误码，其余两种为空）。
 
-**应用助手**：两个操作按操作清单自动成为助手工具 `insights_summary`、`insights_tasks`（read，直接执行）。用户问「这周花了多少」时，助手调用 `insights_summary { period: 'week' }`，回答成本与未计价说明。`open_page` 增加页面 `insights`。
+**应用助手**：两个操作按操作清单自动成为助手工具 `insights_summary`、`insights_tasks`（read，直接执行）。用户问「这周用了多少」时，助手调用 `insights_summary { period: 'week' }`，回答 tokens。`open_page` 增加页面 `insights`。
 
 ## 5. 性能
 
@@ -202,8 +200,8 @@ type InsightsTaskDTO = {
 | 层 | 测什么 |
 | --- | --- |
 | 单元 `insights.period.test.ts` | 五种时间段的日期范围（含跨年、周一）；`custom` 的校验；同一时刻在 `Asia/Shanghai` 与 `America/Los_Angeles` 归入不同的日期；夏令时开始那天的区间为 23 小时；跳过午夜的时区（哈瓦那）一天从跳变那一刻开始 |
-| 单元 `insights.aggregate.test.ts` | 空数据（全 0、比率为空、每天都有点）；未计价 tokens（成本为 0 或为空且 tokens 大于 0）；首次通过与重试不计中断的尝试；失败原因的三类与排序；按假设记录的提问不算打扰；到待合并耗时的中位数；拆分的分组与空键 |
+| 单元 `insights.aggregate.test.ts` | 空数据（全 0、比率为空、每天都有点）；没有报告用量的尝试只计次数；首次通过与重试不计中断的尝试；失败原因的三类与排序；按假设记录的提问不算打扰；到待合并耗时的中位数；拆分的分组与空键 |
 | 单元 `drill.test.ts`（web） | 每个钻取键的过滤 |
-| 集成 `insights.int.test.ts` | 经 API：FakeOpencode（`usage` 步骤报告 tokens 与成本）跑完一个首次通过的任务、一个检查失败后重试通过且有一次提问的任务、一个取消的任务、一次知识问答；`insights.summary` 与 `insights.tasks` 的数字；`custom` 缺日期 400 |
-| 集成（助手） | 助手会话调用 `insights_summary`（read）直接返回本周用量 |
+| 集成 `insights.int.test.ts` | 经 API：FakeOpencode（`usage` 步骤报告 tokens）跑完一个首次通过的任务、一个检查失败后重试通过且有一次提问的任务、一个取消的任务、一次知识问答；`insights.summary` 与 `insights.tasks` 的数字；`custom` 缺日期 400 |
+| 集成（助手） | 助手会话调用 `insights_summary`（read）直接返回本周的 tokens |
 | E2E `task-insights.browser.spec.ts`（J16） | 用 FakeOpencode 造两个任务后打开页面：简单模式三张卡的数字；专业模式的用量、完成率、首次通过率；点「失败原因」钻取到任务、点任务进入任务页；四套主题切换无报错（走查 J9 也覆盖该页） |

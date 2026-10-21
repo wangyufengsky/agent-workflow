@@ -14,7 +14,7 @@ async function api<T>(request: APIRequestContext, method: 'GET' | 'POST', path: 
 }
 
 const week = (request: APIRequestContext) => api<InsightsSummaryDTO>(request, 'GET', '/insights?period=week');
-const cost = (usd: number) => `$${usd.toFixed(4)}`;
+const tokens = (u: InsightsSummaryDTO['usage']) => (u.tokensInput + u.tokensOutput).toLocaleString('zh-CN');
 
 /** A bug-fix task through to its merge; the turns were queued before. */
 async function runAndMerge(request: APIRequestContext, project: E2EProject, requirement: string) {
@@ -47,25 +47,22 @@ test('J16 质量与用量：简单视图本周三个数，专业视图用量与�
 
   // First pass, every turn priced.
   await queueTurn(request, project, { title: '定位根因' }, [
-    { type: 'usage', input: 1000, output: 100, cost: 0.5 },
+    { type: 'usage', input: 1000, output: 100 },
     submitResult('找到了'),
   ]);
   await queueTurn(request, project, { title: '修复' }, [
-    { type: 'usage', input: 2000, output: 200, cost: 1 },
+    { type: 'usage', input: 2000, output: 200 },
     { type: 'edit', file: 'a.txt', content: 'a\n' },
     submitResult('改好了'),
   ]);
-  await queueTurn(request, project, { agent: 'aw-reviewer' }, [
-    { type: 'usage', input: 500, output: 50, cost: 0.25 },
-    passReview,
-  ]);
+  await queueTurn(request, project, { agent: 'aw-reviewer' }, [{ type: 'usage', input: 500, output: 50 }, passReview]);
   const clean = await runAndMerge(request, project, '一次通过');
 
-  // The first fix changes nothing and fails the check; its turn and the locate step report no cost.
+  // The first fix changes nothing and fails the check; the turns without a usage step report 100 / 20 tokens.
   await queueTurn(request, project, { title: '定位根因' }, [submitResult('找到了')]);
   await queueTurn(request, project, { title: '修复' }, [submitResult('没改')]);
   await queueTurn(request, project, { title: '修复' }, [
-    { type: 'usage', input: 2000, output: 200, cost: 1 },
+    { type: 'usage', input: 2000, output: 200 },
     { type: 'edit', file: 'b.txt', content: 'b\n' },
     submitResult('这次改了'),
   ]);
@@ -74,17 +71,16 @@ test('J16 质量与用量：简单视图本周三个数，专业视图用量与�
 
   const after = await week(request);
   expect(after.quality.ended.completed - before.quality.ended.completed).toBe(2);
-  expect(after.usage.cost - before.usage.cost).toBeCloseTo(2.75);
-  expect(after.usage.unpricedTokens - before.usage.unpricedTokens).toBe(3 * 120);
+  expect(after.usage.tokensInput - before.usage.tokensInput).toBe(3500 + 2300);
+  expect(after.usage.tokensOutput - before.usage.tokensOutput).toBe(350 + 260);
   expect(after.quality.retries - before.quality.retries).toBe(1);
 
   // Simple mode: this week's three figures, as the API counts them.
   await page.goto('/insights');
   const simple = page.getByTestId('insights-simple');
   await expect(simple).toContainText(`完成了 ${after.quality.ended.completed} 个任务`);
-  await expect(simple).toContainText(`花了 ${cost(after.usage.cost)}`);
+  await expect(simple).toContainText(`用了 ${tokens(after.usage)} tokens`);
   await expect(simple).toContainText(`打扰了你 ${after.attention.interruptions} 次`);
-  await expect(simple).toContainText(`tokens 未计价`);
 
   // Pro mode: usage and quality of the same week, then the tasks behind a failure reason.
   await page.getByRole('button', { name: '开启专业模式' }).click();
@@ -92,7 +88,7 @@ test('J16 质量与用量：简单视图本周三个数，专业视图用量与�
     'aria-pressed',
     'true',
   );
-  await expect(page.getByTestId('insights-usage')).toContainText(cost(after.usage.cost));
+  await expect(page.getByTestId('insights-usage')).toContainText(tokens(after.usage));
   await expect(page.getByTestId('insights-quality')).toContainText(`完成 ${after.quality.ended.completed}`);
   await page.getByRole('button', { name: '检查未通过' }).click();
   await expect(page.getByTestId('insights-drill')).toContainText('失败原因「检查未通过」');

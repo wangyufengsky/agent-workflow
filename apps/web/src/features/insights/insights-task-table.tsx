@@ -17,7 +17,6 @@ import {
   groupName,
 } from '../../copy/insights.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
-import { CostValue } from './cost-value.tsx';
 import { drillFilter, failureKey } from './drill.ts';
 import styles from './insights.module.css';
 
@@ -76,7 +75,6 @@ export function InsightsTaskTable({
                 <th>{C.columns.project}</th>
                 <th>{C.columns.status}</th>
                 <th className={styles.num}>{C.columns.tokens}</th>
-                <th className={styles.num}>{C.columns.cost}</th>
                 <th className={styles.num}>{C.columns.retries}</th>
                 <th className={styles.num}>{C.columns.interruptions}</th>
                 <th className={styles.num}>{C.columns.reviewDuration}</th>
@@ -101,9 +99,6 @@ export function InsightsTaskTable({
                       </span>
                       {formatTokens(tokens(row))}
                     </span>
-                  </td>
-                  <td className={styles.num}>
-                    <CostValue usage={row.usage} />
                   </td>
                   <td className={styles.num}>{row.quality === null ? C.dash : row.quality.retries}</td>
                   <td className={styles.num}>{row.quality === null ? C.dash : row.quality.interruptions}</td>

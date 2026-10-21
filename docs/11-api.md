@@ -296,7 +296,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 操作 | 说明 |
 | --- | --- | --- | --- |
-| GET | `/insights?period&from&to` | `insights.summary` | `InsightsSummaryDTO`：时间段（含时区）、用量合计与按项目 / 流程 / 角色 / 模型 / 用途的拆分、按天趋势、质量、`attention`；`period = custom` 缺日期、其余时间段带日期、`from > to` 或超过 `INSIGHTS_MAX_DAYS` 天为 400 |
+| GET | `/insights?period&from&to` | `insights.summary` | `InsightsSummaryDTO`：时间段（含时区）、tokens 用量合计（不含成本，D78）与按项目 / 流程 / 角色 / 模型 / 用途的拆分、按天趋势、质量、`attention`；`period = custom` 缺日期、其余时间段带日期、`from > to` 或超过 `INSIGHTS_MAX_DAYS` 天为 400 |
 | GET | `/insights/tasks?period&from&to` | `insights.tasks` | `{ items: InsightsTaskDTO[] }`：时间段内结束或有用量的任务及其数字（钻取用） |
 
 ## 13. preload 能力（非 HTTP）

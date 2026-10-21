@@ -40,7 +40,7 @@ const submit = (s: FakeScript, summary = 'Done') => s.callTool('submit_result', 
 const pass = (s: FakeScript) => s.callTool('submit_review', { verdict: 'pass', summary: 'ok' });
 
 describe('质量与用量（19）', () => {
-  it('跑完任务与一次知识问答后：用量、拆分、未计价、完成率、首次通过、重试、失败原因与打扰', async () => {
+  it('跑完任务与一次知识问答后：用量、拆分、完成率、首次通过、重试、失败原因与打扰', async () => {
     // The check passes once the step changed something: a fix that submits nothing fails it.
     const { project } = await addProject(t, {
       files: { 'src/refund.ts': 'export const refund = (n: number) => n;\n' },
@@ -48,9 +48,9 @@ describe('质量与用量（19）', () => {
     });
 
     const first = await bugfix(project.id, {
-      locate: submit(script().usage(1000, 100, 0.5)),
-      fix: [submit(script().usage(2000, 200, 1).edit('a.txt', 'a\n'))],
-      review: pass(script().usage(500, 50, 0.25)),
+      locate: submit(script().usage(1000, 100)),
+      fix: [submit(script().usage(2000, 200).edit('a.txt', 'a\n'))],
+      review: pass(script().usage(500, 50)),
     });
     await first.review;
     await t.fake.settled();
@@ -60,12 +60,12 @@ describe('质量与用量（19）', () => {
       // An assumed question is only a record; the permission request interrupts the user.
       locate: submit(
         script()
-          .usage(1000, 100, 0.5)
+          .usage(1000, 100)
           .ask({ question: 'Which module?', blocking: false, default_assumption: 'refund' })
           .requestPermission('bash', ['make lint']),
       ),
-      fix: [submit(script().usage(100, 10, 0)), submit(script().usage(2000, 200, 1).edit('b.txt', 'b\n'))],
-      review: pass(script().usage(500, 50, 0.25)),
+      fix: [submit(script().usage(100, 10)), submit(script().usage(2000, 200).edit('b.txt', 'b\n'))],
+      review: pass(script().usage(500, 50)),
     });
     const asked = (await permission).item;
     await t.call(resolveInboxOp, { id: asked.id, response: { decision: 'once' } });
@@ -74,7 +74,7 @@ describe('质量与用量（19）', () => {
 
     t.fake.enqueue(
       script()
-        .usage(300, 30, 0)
+        .usage(300, 30)
         .callTool('submit_answer', {
           answer: 'It returns the amount [1].',
           citations: [{ type: 'file', path: 'src/refund.ts', start_line: 1, end_line: 1 }],
@@ -105,21 +105,18 @@ describe('质量与用量（19）', () => {
       attempts: 8,
       tokensInput: 7400,
       tokensOutput: 740,
-      cost: 3.5,
-      // The free first fix (110) and the knowledge question (330).
-      unpricedTokens: 440,
     });
-    expect(summary.usage.groups.kind.map((g) => [g.key, g.attempts, g.cost])).toEqual([
-      ['execute', 5, 3],
-      ['review', 2, 0.5],
-      ['research', 1, 0],
+    expect(summary.usage.groups.kind.map((g) => [g.key, g.attempts, g.tokensInput])).toEqual([
+      ['execute', 5, 6100],
+      ['review', 2, 1000],
+      ['research', 1, 300],
     ]);
     expect(summary.usage.groups.workflow.map((g) => [g.key, g.name, g.attempts])).toEqual([
       ['bugfix', '修 Bug', 7],
       [null, null, 1],
     ]);
     expect(summary.usage.groups.project).toEqual([expect.objectContaining({ key: project.id, attempts: 8 })]);
-    expect(summary.days).toEqual([expect.objectContaining({ cost: 3.5, tasksCompleted: 2 })]);
+    expect(summary.days).toEqual([expect.objectContaining({ tokensInput: 7400, tasksCompleted: 2 })]);
     expect(summary.quality).toMatchObject({
       ended: { completed: 2, cancelled: 1, failed: 0 },
       doneNodes: 4,
@@ -139,7 +136,7 @@ describe('质量与用量（19）', () => {
     expect(tasks.items.map((i) => i.task.id)).toEqual([third.id, second.task.id, first.task.id]);
     expect(tasks.items[1]).toMatchObject({
       task: { status: 'completed', project: { id: project.id } },
-      usage: { attempts: 4, tokensInput: 3600, cost: 1.75, unpricedTokens: 110 },
+      usage: { attempts: 4, tokensInput: 3600, tokensOutput: 360 },
       kinds: ['execute', 'review'],
       quality: {
         doneNodes: 2,

@@ -72,8 +72,8 @@ export type FakeStep =
   | { type: 'permission'; permission: string; patterns: string[] }
   /** Keeps working until the session is aborted. */
   | { type: 'hang' }
-  /** The tokens and cost (USD) the turn reports when it ends; 100 / 20 / 0 otherwise. */
-  | { type: 'usage'; input: number; output: number; cost: number };
+  /** The tokens the turn reports when it ends; 100 input and 20 output otherwise. */
+  | { type: 'usage'; input: number; output: number };
 
 export const submitResult = (summary: string): FakeStep => ({
   type: 'callTool',

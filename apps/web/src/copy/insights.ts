@@ -21,17 +21,15 @@ const HOUR = 60 * MINUTE;
 /** 19: figures are shown as they are; a missing denominator is a dash, never 0 %. */
 export const INSIGHTS_COPY = {
   title: '质量与用量',
-  lede: 'AI 帮你做了多少、做得怎样、花了多少。',
-  simpleLede: '本周 AI 帮你做了多少、花了多少。',
+  lede: 'AI 帮你做了多少、做得怎样、用了多少。',
+  simpleLede: '本周 AI 帮你做了多少、用了多少。',
   completed: (n: number) => `完成了 ${n} 个任务`,
-  spent: (cost: string) => `花了 ${cost}`,
+  used: (tokens: string) => `用了 ${tokens} tokens`,
   interrupted: (n: number) => `打扰了你 ${n} 次`,
   completedHint: '本周完成并合并或交付的任务',
-  spentHint: 'opencode 报告的成本（美元）',
+  usedHint: '本周 AI 读写的 tokens（输入与输出）',
   interruptedHint: 'AI 的提问与权限请求，不含按默认假设继续的提问',
-  unpriced: (tokens: string) => `另有 ${tokens} tokens 未计价`,
-  unpricedWhy: 'opencode 对免费模型和没有配置价格的模型都报告成本为 0，无法区分，这里不做估算。',
-  proHint: '在专业模式下查看按项目、流程、角色、模型的拆分，每天的趋势和任务明细。',
+  proHint: '在专业模式下查看按项目、流程、角色、模型的 tokens 拆分，每天的趋势和任务明细。',
   enablePro: '开启专业模式',
 
   periodLabel: '时间段',
@@ -40,14 +38,10 @@ export const INSIGHTS_COPY = {
   usageTitle: '用量',
   tokensInput: '输入 tokens',
   tokensOutput: '输出 tokens',
-  cost: '成本',
+  tokensTotal: 'tokens 合计',
   attempts: 'AI 会话',
   assistantNotCounted: '应用助手对话的用量没有记录，不在统计内。',
-  trendTitle: '每天',
-  trendCost: '成本',
-  trendTokens: 'tokens',
-  trendInput: '输入',
-  trendOutput: '输出',
+  trendTitle: '每天的 tokens',
   trendTable: '每天的数据',
   date: '日期',
   breakdownTitle: '拆分',
@@ -78,7 +72,6 @@ export const INSIGHTS_COPY = {
     project: '项目',
     status: '状态',
     tokens: 'tokens',
-    cost: '成本',
     retries: '重试',
     interruptions: '打扰',
     reviewDuration: '到待合并',
@@ -88,7 +81,6 @@ export const INSIGHTS_COPY = {
   emptyTitle: '这段时间没有 AI 活动',
   emptyBody: '开始一个任务或提一个问题后，这里会显示用量与质量。',
   dash: '—',
-  unpricedBadge: '未计价',
 } as const;
 
 export const PERIOD_LABEL: Record<InsightsPeriod, string> = {
@@ -171,7 +163,6 @@ export function drillLabel(drill: InsightsDrill, name: string): string {
   }
 }
 
-export const formatCost = (usd: number) => `$${usd.toFixed(4)}`;
 export const formatTokens = (n: number) => TOKENS.format(n);
 export const formatTokensShort = (n: number) => TOKENS_SHORT.format(n);
 export const formatPercent = (ratio: number | null) => (ratio === null ? INSIGHTS_COPY.dash : PERCENT.format(ratio));

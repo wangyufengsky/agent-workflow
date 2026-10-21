@@ -34,8 +34,8 @@ export type FakeStep =
   | { type: 'callTool'; server: FakeMcpServer; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
   | { type: 'hang' }
-  /** What the turn reports as used when it ends, instead of 100 input and 20 output tokens at no cost. */
-  | { type: 'usage'; input: number; output: number; cost: number }
+  /** The tokens the turn reports as used when it ends, instead of 100 input and 20 output. */
+  | { type: 'usage'; input: number; output: number }
   /** `idle: false`: opencode reports the error without a following idle event. */
   | { type: 'error'; name: string; message: string; idle: boolean };
 
@@ -65,8 +65,8 @@ export function script() {
       add({ type: 'callTool', server: 'exec', name: 'ask_user', args }),
     /** Asks for a permission and waits until the backend replies. */
     requestPermission: (permission: string, patterns: string[]) => add({ type: 'permission', permission, patterns }),
-    /** The tokens and cost (USD) the turn reports when it ends (quality and usage, 19). */
-    usage: (input: number, output: number, cost: number) => add({ type: 'usage', input, output, cost }),
+    /** The tokens the turn reports when it ends (quality and usage, 19). */
+    usage: (input: number, output: number) => add({ type: 'usage', input, output }),
     /** Keeps working (never idle) until the session is aborted. */
     hang: () => add({ type: 'hang' }),
     /** Fails the turn with a session error. */
@@ -161,7 +161,7 @@ export function createFakeOpencode() {
     const turnGeneration = generation.get(sessionId) ?? 0;
     const messageId = nextId('fake_msg');
     emit({ type: E.Message, sessionId, messageId, role: 'assistant' });
-    let used = { input: 100, output: 20, cost: 0 };
+    let used = { input: 100, output: 20 };
     for (const step of steps) {
       if ((generation.get(sessionId) ?? 0) !== turnGeneration || closed) return;
       const partId = nextId('fake_prt');
@@ -249,7 +249,7 @@ export function createFakeOpencode() {
           return;
       }
     }
-    emit({ type: E.StepFinished, sessionId, tokens: { input: used.input, output: used.output }, cost: used.cost });
+    emit({ type: E.StepFinished, sessionId, tokens: { input: used.input, output: used.output }, cost: 0 });
     emit({ type: E.Idle, sessionId });
   }
 

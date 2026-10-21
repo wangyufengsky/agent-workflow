@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
-import { INSIGHTS_COPY as C, formatCost, formatTokens } from '../../copy/insights.ts';
+import { INSIGHTS_COPY as C, formatTokens } from '../../copy/insights.ts';
 import { useSettings, useUpdateSettings } from '../settings/settings.queries.ts';
 import styles from './insights.module.css';
 import { insightsSummaryQuery } from './insights.queries.ts';
@@ -44,11 +44,8 @@ function SimpleInsights() {
         <div className="grid-3" data-testid="insights-simple">
           <StatCard label={C.completedHint} value={C.completed(summary.data.quality.ended.completed)} />
           <StatCard
-            label={C.spentHint}
-            value={C.spent(formatCost(summary.data.usage.cost))}
-            {...(summary.data.usage.unpricedTokens > 0 && {
-              sub: <span title={C.unpricedWhy}>{C.unpriced(formatTokens(summary.data.usage.unpricedTokens))}</span>,
-            })}
+            label={C.usedHint}
+            value={C.used(formatTokens(summary.data.usage.tokensInput + summary.data.usage.tokensOutput))}
           />
           <StatCard label={C.interruptedHint} value={C.interrupted(summary.data.attention.interruptions)} />
         </div>

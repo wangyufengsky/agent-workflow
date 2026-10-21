@@ -17,11 +17,10 @@ export const insightsSummaryOp = defineOperationContract({
   id: 'insights.summary',
   title: 'op.insights.summary',
   description:
-    'Quality and usage over a period in the user time zone: tokens and cost (USD as opencode reports it; ' +
-    '"unpricedTokens" had no reported cost, never estimate one) broken down by project, workflow, role, model and ' +
-    'attempt kind, per day, and the quality of tasks that ended in the period (completion and first-pass rates, ' +
-    'retries, failure reasons, interruptions, time to review). Assistant conversations are not counted. "week" ' +
-    'starts on Monday; "custom" needs from and to (YYYY-MM-DD)',
+    'Quality and usage over a period in the user time zone: input and output tokens (cost is not counted) broken ' +
+    'down by project, workflow, role, model and attempt kind, per day, and the quality of tasks that ended in the ' +
+    'period (completion and first-pass rates, retries, failure reasons, interruptions, time to review). Assistant ' +
+    'conversations are not counted. "week" starts on Monday; "custom" needs from and to (YYYY-MM-DD)',
   input: insightsQuerySchema,
   output: insightsSummarySchema,
   http: { method: 'GET', path: '/insights' },

@@ -24,7 +24,6 @@ const attempt = (over: Partial<UsageAttempt> = {}): UsageAttempt => ({
   model: 'p/m',
   tokensInput: 100,
   tokensOutput: 10,
-  cost: 0.5,
   startedAt: at(6),
   projectId: 'p1',
   projectName: '商城',
@@ -44,7 +43,7 @@ const ended = (over: Partial<EndedTask> & { id: string }): EndedTask => ({
 describe('aggregateInsights', () => {
   it('没有数据：合计为 0、比率与中位数为空、每一天都有点', () => {
     const { summary, tasks } = aggregateInsights(period, empty);
-    expect(summary.usage).toMatchObject({ attempts: 0, tokensInput: 0, cost: 0, unpricedTokens: 0 });
+    expect(summary.usage).toMatchObject({ attempts: 0, tokensInput: 0, tokensOutput: 0 });
     expect(summary.usage.groups.project).toEqual([]);
     expect(summary.days.map((d) => [d.date, d.tokensInput, d.tasksCompleted])).toEqual([
       ['2026-01-05', 0, 0],
@@ -62,27 +61,20 @@ describe('aggregateInsights', () => {
     expect(tasks).toEqual([]);
   });
 
-  it('成本为 0 或为空而 tokens 大于 0 的用量计为未计价，成本不估算；没有用量的尝试只计次数', () => {
+  it('没有报告用量的尝试只计次数；拆分按 tokens 降序，模型的空键为 opencode 默认模型', () => {
     const { summary } = aggregateInsights(period, {
       ...empty,
       usage: [
-        attempt({ model: 'p/paid', cost: 0.25 }),
-        attempt({ model: 'p/free', cost: 0 }),
-        attempt({ model: 'p/free', cost: null }),
-        attempt({ model: null, tokensInput: null, tokensOutput: null, cost: null }),
+        attempt({ model: 'p/small' }),
+        attempt({ model: 'p/large', tokensInput: 900, tokensOutput: 90 }),
+        attempt({ model: null, tokensInput: null, tokensOutput: null }),
       ],
     });
-    expect(summary.usage).toMatchObject({
-      attempts: 4,
-      tokensInput: 300,
-      tokensOutput: 30,
-      cost: 0.25,
-      unpricedTokens: 220,
-    });
-    expect(summary.usage.groups.model.map((g) => [g.key, g.cost, g.unpricedTokens, g.attempts])).toEqual([
-      ['p/paid', 0.25, 0, 1],
-      ['p/free', 0, 220, 2],
-      [null, 0, 0, 1],
+    expect(summary.usage).toMatchObject({ attempts: 3, tokensInput: 1000, tokensOutput: 100 });
+    expect(summary.usage.groups.model.map((g) => [g.key, g.tokensInput, g.attempts])).toEqual([
+      ['p/large', 900, 1],
+      ['p/small', 100, 1],
+      [null, 0, 1],
     ]);
   });
 
@@ -90,17 +82,20 @@ describe('aggregateInsights', () => {
     const { summary } = aggregateInsights(period, {
       ...empty,
       // 2026-01-05 23:30 in Shanghai is still the 5th there (15:30 UTC).
-      usage: [attempt({ startedAt: at(5, '23:30'), cost: 1 }), attempt({ startedAt: at(6, '00:10'), cost: 2 })],
+      usage: [
+        attempt({ startedAt: at(5, '23:30'), tokensInput: 1 }),
+        attempt({ startedAt: at(6, '00:10'), tokensInput: 2 }),
+      ],
     });
-    expect(summary.days.map((d) => d.cost)).toEqual([1, 2, 0]);
+    expect(summary.days.map((d) => d.tokensInput)).toEqual([1, 2, 0]);
   });
 
   it('拆分：知识问答的尝试没有流程与角色（空键），同一流程合并', () => {
     const { summary } = aggregateInsights(period, {
       ...empty,
       usage: [
-        attempt({ cost: 1 }),
-        attempt({ kind: 'review', roleKey: 'reviewer', roleName: '评审员', cost: 1 }),
+        attempt(),
+        attempt({ kind: 'review', roleKey: 'reviewer', roleName: '评审员' }),
         attempt({
           taskId: null,
           kind: 'research',
@@ -108,7 +103,7 @@ describe('aggregateInsights', () => {
           roleName: null,
           workflowKey: null,
           workflowName: null,
-          cost: 3,
+          tokensInput: 300,
         }),
       ],
     });

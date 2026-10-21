@@ -24,7 +24,6 @@ export type UsageAttempt = {
   model: string | null;
   tokensInput: number | null;
   tokensOutput: number | null;
-  cost: number | null;
   startedAt: number;
   projectId: string;
   projectName: string;
@@ -60,16 +59,13 @@ export type InsightsData = {
 /** Task-level figures before the task summary is added. */
 export type InsightsTaskFacts = Omit<InsightsTaskDTO, 'task'> & { taskId: string };
 
-const emptyTotals = (): UsageTotals => ({ attempts: 0, tokensInput: 0, tokensOutput: 0, cost: 0, unpricedTokens: 0 });
+const emptyTotals = (): UsageTotals => ({ attempts: 0, tokensInput: 0, tokensOutput: 0 });
 
+/** No usage reported (the session never finished a step) counts as no tokens. */
 function addUsage(totals: UsageTotals, a: UsageAttempt): void {
-  const tokens = (a.tokensInput ?? 0) + (a.tokensOutput ?? 0);
   totals.attempts += 1;
   totals.tokensInput += a.tokensInput ?? 0;
   totals.tokensOutput += a.tokensOutput ?? 0;
-  totals.cost += a.cost ?? 0;
-  // opencode reports 0 for free models and for models it has no price for: say so, never estimate (D78 ②).
-  if ((a.cost ?? 0) === 0) totals.unpricedTokens += tokens;
 }
 
 const GROUP_OF: Record<InsightsDimension, (a: UsageAttempt) => [string | null, string | null]> = {
@@ -92,9 +88,7 @@ function groupsBy(dimension: InsightsDimension, usage: readonly UsageAttempt[]):
     addUsage(group, a);
   }
   const tokens = (g: UsageGroupDTO) => g.tokensInput + g.tokensOutput;
-  return [...groups.values()].sort(
-    (a, b) => b.cost - a.cost || tokens(b) - tokens(a) || String(a.key).localeCompare(String(b.key)),
-  );
+  return [...groups.values()].sort((a, b) => tokens(b) - tokens(a) || String(a.key).localeCompare(String(b.key)));
 }
 
 function median(values: number[]): number | null {
