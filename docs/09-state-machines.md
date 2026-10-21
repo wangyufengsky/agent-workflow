@@ -335,3 +335,21 @@ stateDiagram-v2
 - `confirm`：用户在确认卡片上确认；后端随后执行操作，结果（输出或错误码）写入 `result`，并作为下一条消息发回同一会话。操作本身失败也是 `confirmed`（用户确认过，结果是错误）。
 - `cancel`：用户取消；会话收到「用户取消了该操作」。
 - 没有超时，重启后仍为 `pending` 的确认照常可确认或取消。
+
+## 11. 定时任务 Schedule（v1.2）
+
+<!-- fsm:schedule 由 pnpm gen:fsm-docs 生成，勿手改 -->
+```mermaid
+stateDiagram-v2
+  [*] --> active
+  active --> paused: pause
+  active --> paused: start_failed
+  paused --> active: resume
+```
+<!-- /fsm:schedule -->
+
+- 创建即 `active`（[22 §3](22-scheduled-tasks.md#3-状态机09-11)）；没有终态，删除定时任务即删除记录（运行记录随之删除，开出的任务保留）。
+- `pause`：用户暂停，`next_run_at` 清空。
+- `resume`：用户恢复，从现在起计算 `next_run_at`（暂停期间错过的不补），并把该定时任务未关闭的 `schedule_failure` 条目记为 `resolved`。
+- `start_failed`：到点时开不了任务（`checkCreate` 等抛出 `AppError`）；同一事务内记一条 `failed` 运行、创建 `schedule_failure` 条目（D91）。「立即运行一次」失败不触发它，错误直接返回给用户。
+- 到点运行本身不改变状态：每次到点在 `schedule_runs` 记一条 `started` / `skipped` / `failed`，并推进 `next_run_at`（22 §4）。

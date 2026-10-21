@@ -58,6 +58,9 @@ export const ErrorCode = {
   AssistantBusy: 'ASSISTANT_BUSY',
   // 批量任务
   BatchNotFound: 'BATCH_NOT_FOUND',
+  // 定时任务
+  ScheduleNotFound: 'SCHEDULE_NOT_FOUND',
+  ScheduleBusy: 'SCHEDULE_BUSY',
   // 知识问答
   KnowledgeConversationNotFound: 'KNOWLEDGE_CONVERSATION_NOT_FOUND',
   KnowledgeConversationBusy: 'KNOWLEDGE_CONVERSATION_BUSY',
@@ -138,6 +141,8 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.AssistantConfirmationNotFound]: 404,
   [ErrorCode.AssistantBusy]: 409,
   [ErrorCode.BatchNotFound]: 404,
+  [ErrorCode.ScheduleNotFound]: 404,
+  [ErrorCode.ScheduleBusy]: 409,
   [ErrorCode.KnowledgeConversationNotFound]: 404,
   [ErrorCode.KnowledgeConversationBusy]: 409,
   [ErrorCode.KnowledgeCitationInvalid]: null,

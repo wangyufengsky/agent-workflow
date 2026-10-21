@@ -5,6 +5,7 @@ import { inboxMachine } from './inbox.machine.ts';
 import { nodeMachine } from './node.machine.ts';
 import { planMachine } from './plan.machine.ts';
 import { runtimeMachine } from './runtime.machine.ts';
+import { scheduleMachine } from './schedule.machine.ts';
 import { taskMachine } from './task.machine.ts';
 import { worktreeMachine } from './worktree.machine.ts';
 
@@ -17,6 +18,7 @@ export * from './mermaid.ts';
 export * from './node.machine.ts';
 export * from './plan.machine.ts';
 export * from './runtime.machine.ts';
+export * from './schedule.machine.ts';
 export * from './task.machine.ts';
 export * from './worktree.machine.ts';
 
@@ -31,4 +33,5 @@ export const MACHINES = {
   inbox: inboxMachine,
   runtime: runtimeMachine,
   assistantConfirmation: assistantConfirmationMachine,
+  schedule: scheduleMachine,
 } as const;

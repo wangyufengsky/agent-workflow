@@ -194,6 +194,25 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     await t.fake.settled();
   });
 
+  it('确认后执行「定时任务」：定时任务已创建，消息流出现指向它的 entity_ref（22 §10）', async () => {
+    const { project } = await addProject(t);
+    const { body } = await call('schedules_create', {
+      projectId: project.id,
+      workflowKey: 'code_review',
+      requirement: '每晚审查订单模块',
+      frequency: { kind: 'weekly', weekdays: [1, 2, 3, 4, 5], time: '02:00' },
+    });
+    expect(body).toMatchObject({ status: 'needs_confirmation' });
+
+    const res = await decide(String(body.confirmation_id), 'confirm');
+
+    const output = res.body.result?.ok === true ? res.body.result.output : undefined;
+    expect(output).toMatchObject({ title: '每晚审查订单模块', status: 'active', workflow: { key: 'code_review' } });
+    expect(await entityRefs()).toEqual([
+      { kind: 'schedule', id: (output as { id: string }).id, title: '每晚审查订单模块' },
+    ]);
+  });
+
   it('直接执行（总是允许）的路径同样记下产出的对象；失败的调用不记', async () => {
     await t.call(updateSettingsOp, { 'assistant.alwaysAllow': ['projects.create'] });
     const repo = await createTestRepo();

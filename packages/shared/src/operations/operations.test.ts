@@ -30,6 +30,7 @@ describe('操作清单的标注（M5-10）', () => {
         'knowledge.delete',
         'projects.delete',
         'roles.delete',
+        'schedules.delete',
         'tasks.cancel',
         'tasks.deliver',
         'workflows.delete',
