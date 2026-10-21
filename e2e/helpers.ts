@@ -48,7 +48,9 @@ export async function createProject(request: APIRequestContext, checkCommand: st
 /** One turn of FakeOpencode (packages/server/test/fakes); the backend runs with AW_FAKE_OPENCODE=1. */
 export type FakeStep =
   | { type: 'edit'; file: string; content: string }
-  | { type: 'callTool'; name: string; args: Record<string, unknown> }
+  | { type: 'text'; text: string }
+  /** `server: 'assistant'` calls the assistant MCP (15 §3); the execution MCP otherwise. */
+  | { type: 'callTool'; server?: 'exec' | 'assistant'; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
   /** Keeps working until the session is aborted. */
   | { type: 'hang' };
@@ -83,6 +85,22 @@ export async function queueTurn(
   });
   if (!res.ok()) throw new Error(`queueing a fake turn failed: ${res.status()} ${await res.text()}`);
 }
+
+/** Queues a turn for the next message to the app assistant (its sessions run as `aw-assistant`). */
+export async function queueAssistantTurn(request: APIRequestContext, steps: FakeStep[]): Promise<void> {
+  const res = await request.post(`${API_BASE}/dev/fake-opencode/scripts`, {
+    headers: AUTH,
+    data: { match: { agent: 'aw-assistant' }, steps },
+  });
+  if (!res.ok()) throw new Error(`queueing an assistant turn failed: ${res.status()} ${await res.text()}`);
+}
+
+export const appTool = (name: string, args: Record<string, unknown>): FakeStep => ({
+  type: 'callTool',
+  server: 'assistant',
+  name,
+  args,
+});
 
 /** Home page of the project (the select writes the same `?projectId=`), then workflow, requirement and start. */
 export async function startTask(page: Page, project: E2EProject, workflow: RegExp, requirement: string): Promise<void> {
