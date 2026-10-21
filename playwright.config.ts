@@ -1,12 +1,14 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { DEV_API_PORT, DEV_WEB_PORT } from '@aw/shared';
 import { defineConfig } from '@playwright/test';
 import { E2E_TOKEN } from './e2e/env.ts';
 
 // One backend serves every browser spec, so specs run one at a time against its state.
 const backendHome = mkdtempSync(join(tmpdir(), 'aw-e2e-home-'));
+// Windows spells it `Path`; a second, differently cased key would be ambiguous for the backend.
+const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH';
 
 export default defineConfig({
   testDir: 'e2e',
@@ -37,9 +39,11 @@ export default defineConfig({
         NODE_ENV: 'development',
         // AI sessions are played by FakeOpencode (07 §2), which also reports a model so the environment is ready.
         AW_FAKE_OPENCODE: '1',
-        // Deterministic environment checks: a fake `opencode --version` first on PATH, no ~/.opencode.
-        PATH: `${resolve('e2e/fixtures/bin')}:${process.env.PATH ?? ''}`,
+        // Deterministic environment checks: a fake `opencode --version` first on PATH (`opencode.cmd` on Windows),
+        // no ~/.opencode.
+        [pathKey]: `${resolve('e2e/fixtures/bin')}${delimiter}${process.env[pathKey] ?? ''}`,
         HOME: backendHome,
+        USERPROFILE: backendHome,
       },
     },
     {

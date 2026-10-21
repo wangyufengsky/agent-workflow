@@ -1845,8 +1845,5 @@ exports[`opencode 配置生成 > 注入 MCP、三个基础 agent 与 bridge 插�
       "url": "http://127.0.0.1:4000/mcp/exec",
     },
   },
-  "plugin": [
-    "file:///Applications/Agent%20Workflow.app/Contents/Resources/opencode-plugin/agent-workflow-bridge.js",
-  ],
 }
 `;

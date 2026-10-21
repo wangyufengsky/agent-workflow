@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -14,6 +14,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
+import { isolatedEnv, writeFakeExecutable } from '../../../test/helpers/executables.ts';
 
 let bin: string;
 let launches: string;
@@ -21,13 +22,23 @@ let t: TestApp;
 
 /** An `opencode` of the right version whose `serve` exits at once, recording each launch. */
 async function crashingOpencode(): Promise<void> {
-  const file = join(bin, 'opencode');
-  await writeFile(
-    file,
-    `#!/bin/sh\nif [ "$1" = "--version" ]; then echo ${OPENCODE_VERSION}; exit 0; fi\necho launch >> "${launches}"\nexit 3\n`,
-  );
-  await chmod(file, 0o755);
+  await writeFakeExecutable(
+    bin,
+    'opencode',
+    `import { appendFileSync } from 'node:fs';
+if (process.argv[2] === '--version') {
+  console.log(${JSON.stringify(OPENCODE_VERSION)});
+} else {
+  appendFileSync(${JSON.stringify(launches)}, 'launch\\n');
+  process.exit(3);
 }
+`,
+  );
+}
+
+/** Git stays reachable: on Windows the opencode configuration needs Git Bash (D67). */
+const appIn = async (dir: string) =>
+  createTestApp({ env: await isolatedEnv(dir, dir, { git: true }), realOpencode: true });
 
 /** Predicate matching the `n`-th `crashed` update it sees. */
 function nthCrash(n: number) {
@@ -41,7 +52,7 @@ beforeEach(async () => {
   bin = await mkdtemp(join(tmpdir(), 'aw-bin-'));
   launches = join(bin, 'launches.log');
   await crashingOpencode();
-  t = await createTestApp({ env: { PATH: bin, HOME: bin }, realOpencode: true });
+  t = await appIn(bin);
 });
 afterEach(() => t.close());
 
@@ -70,7 +81,7 @@ describe('opencode 运行时', () => {
   it('安装 opencode 后重新检测即启动运行时', async () => {
     const empty = await mkdtemp(join(tmpdir(), 'aw-empty-'));
     await t.close();
-    t = await createTestApp({ env: { PATH: empty, HOME: empty }, realOpencode: true });
+    t = await appIn(empty);
     await t.app.start(t.port);
     expect((await t.call(getRuntimeOp, {})).body.status).toBe(RuntimeStatus.NotInstalled);
 
@@ -86,7 +97,7 @@ describe('opencode 运行时', () => {
   it('opencode 未安装时不能重启', async () => {
     const empty = await mkdtemp(join(tmpdir(), 'aw-empty-'));
     await t.close();
-    t = await createTestApp({ env: { PATH: empty, HOME: empty }, realOpencode: true });
+    t = await appIn(empty);
     const res = await t.call(restartRuntimeOp, {});
     expect(res.status).toBe(409);
     expect(res.body).toMatchObject({ error: { code: ErrorCode.StateTransitionInvalid } });

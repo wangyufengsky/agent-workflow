@@ -21,14 +21,18 @@ import { execa } from 'execa';
 import type { Clock } from '../../core/clock.ts';
 import type { EventBus } from '../../core/event-bus.ts';
 import { dateStamp, type Logger } from '../../core/logger.ts';
+import { host } from '../../core/platform.ts';
 import { detectOpencode } from './opencode.binary.ts';
 
 export type OpencodeRuntimeDeps = {
   env: NodeJS.ProcessEnv;
   /** Setting `opencode.binaryPath`, read at each detection. */
   binaryPath: () => string | null;
-  /** `OPENCODE_CONFIG_CONTENT` for the next launch (12 §2); built per launch because it holds the MCP endpoint. */
-  configContent: () => string;
+  /**
+   * `OPENCODE_CONFIG_CONTENT` for the next launch (12 §2); built per launch because it holds the MCP endpoint.
+   * Rejects when opencode cannot be hosted safely here (no Git Bash on Windows, D67).
+   */
+  configContent: () => Promise<string>;
   log: Logger;
   events: EventBus;
   clock: Clock;
@@ -38,7 +42,16 @@ export type OpencodeRuntimeDeps = {
 const SERVE_ARGS = ['serve', '--hostname', '127.0.0.1', '--port', '0', '--print-logs', '--log-level', 'WARN'];
 
 function spawnServe(path: string, env: NodeJS.ProcessEnv) {
-  return execa(path, SERVE_ARGS, { env, extendEnv: false, stdin: 'ignore', buffer: false, reject: false });
+  const command = host.commandFor(path, SERVE_ARGS, env);
+  return execa(command.file, command.args, {
+    env,
+    extendEnv: false,
+    stdin: 'ignore',
+    buffer: false,
+    reject: false,
+    windowsVerbatimArguments: command.windowsVerbatimArguments,
+    ...host.treeSpawnOptions,
+  });
 }
 
 type Exit = { code: number | undefined; signal: string | undefined };
@@ -92,8 +105,8 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
   }
 
   /** Spawns `opencode serve` and resolves with its address; rejects if it exits or stays silent too long. */
-  function launch(path: string): { launched: Process; address: Promise<string> } {
-    const child = spawnServe(path, { ...deps.env, OPENCODE_CONFIG_CONTENT: deps.configContent() });
+  function launch(path: string, configContent: string): { launched: Process; address: Promise<string> } {
+    const child = spawnServe(path, { ...deps.env, OPENCODE_CONFIG_CONTENT: configContent });
     const logFile = openLog();
     const launched: Process = {
       child,
@@ -171,7 +184,17 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       await stopProcess();
     }
     setState({ status: RuntimeStatus.Starting, path, version, requiredVersion: OPENCODE_VERSION });
-    const { launched, address } = launch(path);
+    let configContent: string;
+    try {
+      configContent = await deps.configContent();
+    } catch (err) {
+      // Recovery with a defined meaning: opencode cannot be hosted here, so it does not start; the log says why.
+      log.error({ err }, 'opencode configuration failed');
+      transition(runtimeMachine, RuntimeStatus.Starting, RuntimeEvent.Exited);
+      setState({ status: RuntimeStatus.Crashed, path, version, requiredVersion: OPENCODE_VERSION });
+      return snapshot();
+    }
+    const { launched, address } = launch(path, configContent);
     proc = launched;
     void launched.exited.then((exit) => onExit(launched, exit));
     try {
@@ -193,7 +216,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     } catch (err) {
       // Recovery with a defined meaning: a launch that does not come up is killed and recorded as crashed by onExit.
       log.warn({ err }, 'opencode failed to start');
-      launched.child.kill();
+      await host.killProcessTree(launched.child);
       await launched.exited;
     }
     return snapshot();
@@ -206,7 +229,8 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     proc = undefined;
     sdk = undefined;
     current.events.abort();
-    current.child.kill();
+    // On Windows its bash commands and language servers would outlive it, holding worktree files (D68).
+    await host.killProcessTree(current.child);
     await current.exited;
   }
 

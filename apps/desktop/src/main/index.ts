@@ -52,4 +52,11 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => app.quit());
-app.on('will-quit', () => backend?.stop());
+app.on('will-quit', (event) => {
+  const running = backend;
+  if (running === undefined) return;
+  // Quit again once the backend has stopped opencode and exited (17 §3.5).
+  event.preventDefault();
+  backend = undefined;
+  void running.stop().then(() => app.quit());
+});

@@ -3,3 +3,4 @@
 *.icns binary
 *.png binary
 *.ico binary
+*.cmd text eol=crlf

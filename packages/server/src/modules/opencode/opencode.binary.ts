@@ -1,8 +1,9 @@
 import { constants } from 'node:fs';
 import { access, stat } from 'node:fs/promises';
-import { delimiter, join } from 'node:path';
+import { join } from 'node:path';
 import { OPENCODE_VERSION, RuntimeStatus } from '@aw/shared';
 import { execa } from 'execa';
+import { host } from '../../core/platform.ts';
 
 export type OpencodeDetection =
   | { status: typeof RuntimeStatus.NotInstalled; path?: string }
@@ -18,18 +19,17 @@ async function isExecutableFile(file: string): Promise<boolean> {
   }
 }
 
-/** The configured path, else the first `opencode` on PATH, else `~/.opencode/bin/opencode` (the installer's default). */
+/**
+ * The configured path, else the first opencode on PATH, else `~/.opencode/bin` (the installer's default); on
+ * Windows `opencode.exe` or npm's `opencode.cmd` launcher (17 §3.2).
+ */
 async function locate(env: NodeJS.ProcessEnv, configuredPath: string | null): Promise<string | undefined> {
+  const home = host.homeDir(env);
+  const dirs = [...host.pathDirs(env), ...(home === undefined ? [] : [join(home, '.opencode', 'bin')])];
   const candidates =
     configuredPath !== null
       ? [configuredPath]
-      : [
-          ...(env.PATH ?? '')
-            .split(delimiter)
-            .filter((dir) => dir !== '')
-            .map((dir) => join(dir, 'opencode')),
-          ...(env.HOME === undefined ? [] : [join(env.HOME, '.opencode', 'bin', 'opencode')]),
-        ];
+      : dirs.flatMap((dir) => host.executableNames('opencode').map((name) => join(dir, name)));
   for (const candidate of candidates) if (await isExecutableFile(candidate)) return candidate;
   return undefined;
 }
@@ -41,7 +41,13 @@ export async function detectOpencode(
 ): Promise<OpencodeDetection> {
   const path = await locate(env, configuredPath);
   if (path === undefined) return { status: RuntimeStatus.NotInstalled };
-  const result = await execa(path, ['--version'], { env, extendEnv: false, reject: false });
+  const command = host.commandFor(path, ['--version'], env);
+  const result = await execa(command.file, command.args, {
+    env,
+    extendEnv: false,
+    reject: false,
+    windowsVerbatimArguments: command.windowsVerbatimArguments,
+  });
   // A binary that cannot report its version cannot be hosted either.
   if (result.exitCode !== 0) return { status: RuntimeStatus.NotInstalled, path };
   const version = result.stdout.trim();

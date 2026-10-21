@@ -26,7 +26,7 @@ import {
 import { createDatabasesModule, mysqlDriver } from './modules/databases/index.ts';
 import { createDebugModule } from './modules/debug/index.ts';
 import { createDeliveryModule } from './modules/delivery/index.ts';
-import { createRepoLocks } from './modules/git/index.ts';
+import { createRepoLocks, locateOpencodeShell } from './modules/git/index.ts';
 import { type HostingEndpoints, PUBLIC_HOSTING } from './modules/hosting/index.ts';
 import { createInboxModule, type InboxService } from './modules/inbox/index.ts';
 import { createMcpModule } from './modules/mcp/index.ts';
@@ -121,10 +121,13 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const runtime = createOpencodeRuntime({
     env,
     binaryPath: () => settings.service.get('opencode.binaryPath'),
-    configContent: () => {
+    configContent: async () => {
       if (apiPort === undefined) throw new Error('opencode started before the API listens');
       const mcpUrl = `http://127.0.0.1:${apiPort}${MCP_EXEC_PATH}`;
-      return JSON.stringify(buildOpencodeConfig({ mcpUrl, mcpToken, pluginFile: config.opencodePluginFile, prompts }));
+      const shell = await locateOpencodeShell(env);
+      return JSON.stringify(
+        buildOpencodeConfig({ mcpUrl, mcpToken, pluginFile: config.opencodePluginFile, prompts, shell }),
+      );
     },
     log,
     events,
@@ -189,6 +192,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     settings: settings.service,
     prompts,
     log,
+    clock,
     env,
   });
   const nodes = createNodesModule({

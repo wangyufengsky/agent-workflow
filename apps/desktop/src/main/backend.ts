@@ -1,10 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { DEV_API_PORT } from '@aw/shared';
+import { type BackendShutdownMessage, DEV_API_PORT } from '@aw/shared';
 import { app, utilityProcess } from 'electron';
 import { serveCredentialRequests } from './credentials.ts';
 
-export type Backend = { port: number; apiToken: string; stop(): void };
+/** `stop` asks the backend to shut down (it stops opencode first) and resolves once it has exited. */
+export type Backend = { port: number; apiToken: string; stop(): Promise<void> };
 
 /** Starts the backend in a utilityProcess and resolves once it is listening. */
 export function startBackend(isDev: boolean): Promise<Backend> {
@@ -37,7 +38,16 @@ export function startBackend(isDev: boolean): Promise<Backend> {
     child.on('message', (message: { type: string; port: number }) => {
       if (message.type !== 'ready') return;
       child.removeAllListeners('exit');
-      resolve({ port: message.port, apiToken, stop: () => child.kill() });
+      const exited = new Promise<void>((done) => child.once('exit', () => done()));
+      const shutdown: BackendShutdownMessage = { type: 'backend.shutdown' };
+      resolve({
+        port: message.port,
+        apiToken,
+        stop: async () => {
+          child.postMessage(shutdown);
+          await exited;
+        },
+      });
     });
   });
 }
