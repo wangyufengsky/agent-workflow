@@ -49,7 +49,7 @@
 | --- | --- | --- |
 | id | TEXT PK | |
 | name | TEXT UNIQUE | AI 的数据库工具按名称找连接 |
-| type | TEXT | `DbType` |
+| type | TEXT | `DbType`（v1.2 起五种，24 §1） |
 | host / port / database / username | TEXT / INTEGER / TEXT / TEXT | |
 | credential_id | TEXT → credentials | 密码；删除连接后删除凭据 |
 | tls | INTEGER(bool) | |

@@ -1,6 +1,7 @@
 import {
   askKnowledgeOp,
   createDbConnectionOp,
+  DbType,
   dbSchemaOp,
   deleteDbConnectionOp,
   ErrorCode,
@@ -19,15 +20,15 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { testCipher } from '../../../test/helpers/cipher.ts';
+import { startMysql, type TestDatabase } from '../../../test/helpers/db-containers.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
-import { startMysql, type TestMysql } from '../../../test/helpers/mysql.ts';
 import { addProject, createTask, nodeReaches } from '../../../test/helpers/tasks.ts';
 
 /** Short enough for a test, long enough for the small queries that must pass. */
 const QUERY_TIMEOUT_MS = 1500;
 
-let mysql: TestMysql;
+let mysql: TestDatabase;
 let t: TestApp;
 
 beforeAll(async () => {
@@ -58,9 +59,9 @@ beforeEach(async () => {
 });
 afterEach(() => t.close());
 
-const connectionInput = (name: string, password = mysql.password) => ({
+const connectionInput = (name: string, password = mysql.password, type: DbType = DbType.Mysql) => ({
   name,
-  type: 'mysql' as const,
+  type,
   host: mysql.host,
   port: mysql.port,
   database: mysql.database,
@@ -127,6 +128,18 @@ describe('数据库连接（11 §9）', () => {
       truncated: true,
     });
     expect((await t.call(queryDbOp, { id, sql: "DELETE FROM items WHERE name = 'a'" })).body).toMatchObject({
+      error: { code: ErrorCode.DbQueryRejected },
+    });
+  });
+
+  it('GoldenDB 走 MySQL 协议（D97）：同一个 MySQL 服务器上测试连接、浏览与只读查询', async () => {
+    const { body } = await t.call(createDbConnectionOp, connectionInput('golden', mysql.password, DbType.Goldendb));
+    expect(body.type).toBe(DbType.Goldendb);
+    expect((await t.call(testDbConnectionOp, { id: body.id })).body).toMatchObject({ ok: true });
+    expect((await t.call(dbSchemaOp, { id: body.id })).body.tables).toEqual([
+      expect.objectContaining({ name: 'items' }),
+    ]);
+    expect((await t.call(queryDbOp, { id: body.id, sql: 'SELECT bump()' })).body).toMatchObject({
       error: { code: ErrorCode.DbQueryRejected },
     });
   });

@@ -166,7 +166,8 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
   /** What the researcher may use, in its first message (18 §5.2). */
   function describeSources(conversation: Conversation): string {
     const { sources } = conversation;
-    const connections = databases.forProject(conversation.projectId).map((c) => c.name);
+    // The type tells the researcher which SQL dialect to write (24 §4).
+    const connections = databases.forProject(conversation.projectId).map((c) => `${c.name} (${c.type})`);
     const yesNo = (on: boolean) => (on ? 'yes' : 'no');
     return [
       `- Code (source files): ${yesNo(sources.code)}`,
@@ -408,7 +409,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
       const citations = await validateCitations(input, {
         repoPath: project.repoPath,
         sources: conversation.sources,
-        connections: databases.forProject(project.id).map((c) => c.name),
+        connections: new Map(databases.forProject(project.id).map((c) => [c.name, c.type])),
       });
       unit.transact(() => {
         repo.setAnswer(turn.id, { answer: input.answer, citations, answeredAt: clock.now() });

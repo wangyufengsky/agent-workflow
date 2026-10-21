@@ -23,7 +23,7 @@ export type DbDescribeOutput = z.infer<typeof dbDescribeOutputSchema>;
 /** `db_query` (12 §6.11): one read-only statement. */
 export const dbQueryInputSchema = z.object({
   connection: z.string().min(1).describe('Connection name from db_list_connections'),
-  sql: z.string().min(1).describe('One SELECT, SHOW, DESCRIBE or EXPLAIN statement'),
+  sql: z.string().min(1).describe("One read-only statement in the connection's dialect"),
   limit: z
     .number()
     .int()

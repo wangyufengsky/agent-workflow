@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { dbTypeSchema } from '../../enums/system.ts';
 import { attemptKindSchema, nodeStatusSchema } from '../../enums/task.ts';
 import { workflowDeliverableSchema } from '../../enums/workflow.ts';
 import { acceptanceSchema, planNodeSpecSchema } from '../../workflow/plan-graph.ts';
@@ -57,6 +58,6 @@ export const getTaskContextOutputSchema = z.object({
       maxNodes: z.number(),
     })
     .optional(),
-  databases: z.array(z.object({ name: z.string(), type: z.literal('mysql') })),
+  databases: z.array(z.object({ name: z.string(), type: dbTypeSchema })),
 });
 export type TaskContext = z.infer<typeof getTaskContextOutputSchema>;

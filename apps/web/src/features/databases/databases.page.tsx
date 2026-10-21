@@ -1,4 +1,11 @@
-import { AssistantForm, createDbConnectionRequestSchema, type DbConnectionDTO, DbType } from '@aw/shared';
+import {
+  AssistantForm,
+  createDbConnectionRequestSchema,
+  DB_DEFAULT_PORT,
+  type DbConnectionDTO,
+  DbType,
+  dbTypeSchema,
+} from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { Button } from '../../components/button.tsx';
@@ -21,9 +28,6 @@ import {
   useUpdateDbConnection,
 } from './databases.queries.ts';
 
-/** MySQL's default port. */
-const DEFAULT_PORT = 3306;
-
 /** Fields the assistant's `open_form` may prefill (15 §5): everything but the password. */
 const prefillSchema = createDbConnectionRequestSchema.omit({ password: true }).partial();
 type Prefill = ReturnType<typeof prefillSchema.parse>;
@@ -41,9 +45,10 @@ function ConnectionDialog({
   prefill?: Prefill;
   onClose: () => void;
 }) {
+  const [type, setType] = useState<DbType>(prefill.type ?? connection?.type ?? DbType.Mysql);
   const [name, setName] = useState(prefill.name ?? connection?.name ?? '');
   const [host, setHost] = useState(prefill.host ?? connection?.host ?? '127.0.0.1');
-  const [port, setPort] = useState(String(prefill.port ?? connection?.port ?? DEFAULT_PORT));
+  const [port, setPort] = useState(String(prefill.port ?? connection?.port ?? DB_DEFAULT_PORT[type]));
   const [database, setDatabase] = useState(prefill.database ?? connection?.database ?? '');
   const [username, setUsername] = useState(prefill.username ?? connection?.username ?? '');
   const [password, setPassword] = useState('');
@@ -54,11 +59,16 @@ function ConnectionDialog({
   const portNumber = Number(port);
   const valid =
     [name, host, database, username].every((v) => v.trim() !== '') && Number.isInteger(portNumber) && portNumber > 0;
+  /** A port still at the old type's default follows the new type; one the user typed stays. */
+  const changeType = (next: DbType) => {
+    if (port === String(DB_DEFAULT_PORT[type])) setPort(String(DB_DEFAULT_PORT[next]));
+    setType(next);
+  };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const fields = {
       name: name.trim(),
-      type: DbType.Mysql,
+      type,
       host: host.trim(),
       port: portNumber,
       database: database.trim(),
@@ -90,6 +100,23 @@ function ConnectionDialog({
       title={connection === undefined ? C.addTitle : C.editTitle(connection.name)}
     >
       <form className="col" onSubmit={submit}>
+        {field(
+          'db-type',
+          C.type,
+          <select
+            id="db-type"
+            className="select"
+            value={type}
+            onChange={(e) => changeType(dbTypeSchema.parse(e.target.value))}
+          >
+            {dbTypeSchema.options.map((t) => (
+              <option key={t} value={t}>
+                {C.typeLabel[t]}
+              </option>
+            ))}
+          </select>,
+          C.typeHint[type],
+        )}
         {field(
           'db-name',
           C.name,
@@ -218,6 +245,7 @@ function ConnectionCard({
           <Icon name="db" />
         </span>
         <span className="section-title grow ellipsis">{connection.name}</span>
+        <span className="chip">{C.typeLabel[connection.type]}</span>
         {connection.tls && <span className="chip">{C.tlsChip}</span>}
       </span>
       <span className="hint mono ellipsis">

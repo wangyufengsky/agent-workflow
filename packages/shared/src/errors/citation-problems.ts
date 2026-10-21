@@ -25,7 +25,8 @@ export const CITATION_PROBLEM_HINT = {
   [CitationProblemCode.RangeTooLong]: 'Cite only the lines that support the statement.',
   [CitationProblemCode.SourceNotSelected]: 'Cite only sources this question may use (see details.allowed).',
   [CitationProblemCode.UnknownConnection]: 'Use a connection name returned by db_list_connections.',
-  [CitationProblemCode.QueryNotReadonly]: 'Cite one read-only statement: SELECT, SHOW, DESCRIBE or EXPLAIN.',
+  [CitationProblemCode.QueryNotReadonly]:
+    'Cite one read-only statement that db_query accepts for this connection; the message lists the allowed statements.',
   [CitationProblemCode.UnknownMarker]: 'Markers are [1], [2] … matching the position of a citation in citations.',
   [CitationProblemCode.UnusedCitation]: 'Mark the citation in the answer where it supports a statement, or remove it.',
 } as const satisfies Record<CitationProblemCode, string>;

@@ -13,7 +13,7 @@
 | 层 | 工具 | 对象 | 依赖 | 位置 | 命令 |
 | --- | --- | --- | --- | --- | --- |
 | 单元 | Vitest | 纯逻辑：状态机表、计划校验、调度决策函数、git 输出解析器、配置生成、检查点解析、错误映射、主题对比度 | 无 IO | 被测文件旁 `*.test.ts` | `pnpm test` |
-| 集成 | Vitest | 模块 service 与 HTTP/MCP 接口：从 API 或 MCP 调用到数据库与 Git 结果 | 真实 SQLite（临时文件）、真实 git（临时仓库）、Docker 中的真实 MySQL（项目数据库，需本机 Docker）、FakeOpencode、假 Hosting 服务 | `*.int.test.ts` | `pnpm test:int` |
+| 集成 | Vitest | 模块 service 与 HTTP/MCP 接口：从 API 或 MCP 调用到数据库与 Git 结果 | 真实 SQLite（临时文件）、真实 git（临时仓库）、Docker 中的真实 MySQL（项目数据库，需本机 Docker；PostgreSQL、openGauss、SQL Server 可选，24 §7）、FakeOpencode、假 Hosting 服务 | `*.int.test.ts` | `pnpm test:int` |
 | opencode 集成 | Vitest，标记 `@opencode` | runtime 托管、配置注入、插件、事件解析 | 本机真实 opencode 1.19.0，**不调用模型**（只启动、读配置、建会话、发 `noReply` 消息）；唯一例外是 bridge 插件测试（只有模型能让 opencode 调用工具），用免费模型 `TEST_MODEL`（默认 `opencode-go/deepseek-v4.1-flash`，D62） | `*.oc.test.ts` | `pnpm test:oc`（先构建插件） |
 | E2E | Playwright | 关键用户旅程（§5） | 浏览器模式：后端 + FakeOpencode，后端托管构建出的前端（不经 Vite 开发服务器，17 §4.1）；后端由 global setup（`e2e/global-setup.ts`）启动，监听系统分配的端口并回报，多个 worktree 可同时运行（`AW_DEV_API_PORT` 可指定端口，D78）；Electron 模式：打包产物 | `e2e/` | `pnpm e2e` / `pnpm e2e:electron` |
 | live | Vitest，标记 `@live` | 真实模型跑内置流程 | 真实 opencode + 模型 + 示例仓库 | `live/` | `pnpm test:live`（手动，不进 CI） |
@@ -52,7 +52,7 @@
 | --- | --- | --- |
 | `FakeOpencode` | `packages/server/test/fakes/fake-opencode.ts` | 实现 `OpencodeClient` 接口；`fake.enqueue(script()…, match?)` 为之后发给会话的消息排一个回合（`match` 按会话标题、agent、目录的子串选会话，第一个匹配的脚本生效）：`edit(file, content)`、`text(…)`、`callTool(name, args)`、`callAppTool(name, args)`（助手 MCP）、`ask(...)`、`requestPermission(...)`、`hang()`（一直工作直到被中止）、`usage(input, output)`（本回合结束时报告的 tokens，默认 100 / 20）、`error(name, message, { idle? })`（`idle: false` 时报错后不再发空闲事件），回合结束即空闲（没有排脚本的消息直接空闲）；真实写 worktree 文件、真实通过 MCP 调用后端（注入 `__aw_session`）。可断言 `sessions`、`prompts`、`toolCalls`、`aborts`、`permissionReplies`；`crash()` 模拟运行时消失；`failNextPrompt()` 让下一次发消息失败（`OPENCODE_REQUEST_FAILED`）；`settled()` 等待已开始的回合放完。浏览器 E2E 中后端以 `AW_FAKE_OPENCODE=1`（仅开发模式）使用它，spec 经开发接口 `POST /api/v1/dev/fake-opencode/scripts` 排回合（按项目的 worktree 目录匹配，互不干扰）；`createTestApp({ dataDir, fake })` 复用同一个 FakeOpencode 模拟后端重启 |
 | `FakeHosting` | `test/fakes/fake-hosting.ts` | 本地 HTTP 服务模拟 GitHub/GitLab 用到的少数端点（读仓库、建 PR/MR、按分支查找打开的 PR/MR、GitHub GraphQL 审查讨论、GitLab 讨论），只认一个令牌；`createTestApp({ hosting: fake.endpoints })` 指向它；断言 `pullRequests`；`failNextPullRequest(status)` 模拟平台报错；`addReviewThread(head, …)` / `addComment(head, …)` 扮演审查者、`closePullRequest(head)` 模拟 PR 已合并或关闭（21）。浏览器 E2E 中后端以 `AW_FAKE_HOSTING_TOKEN` / `AW_FAKE_HOSTING_REPO`（仅开发模式）使用它，spec 经开发接口 `POST /api/v1/dev/fake-hosting/review-threads`、`/comments` 添加意见 |
-| `startMysql()` | `test/helpers/mysql.ts` | 用 Docker 启动一个 MySQL 8.4（随机本地端口、空库 `shop`），等日志出现「ready for connections … port: 3306」后返回连接参数、`exec(sql)` 与 `stop()`；数据库集成测试在 `beforeAll` 中启动一次（镜像需先 `docker pull mysql:8.4`） |
+| `startMysql()` 等 | `test/helpers/db-containers.ts` | 用 Docker 启动一个数据库（随机本地端口、空库 `shop`），等它可以连接（日志中的就绪行；openGauss 的日志写文件，改为等 Docker 健康检查通过的事件）后返回连接参数、`exec(sql)`（管理员身份）与 `stop()`：`startMysql`（MySQL 8.4）、`startPostgres`（17.6）、`startOpenGauss`（7.0.0-RC3，只用 sha256 认证）、`startSqlServer`（2022）；数据库集成测试在 `beforeAll` 中启动一次。镜像需先 `docker pull`（`DB_IMAGE`）：MySQL 必需，其余没有拉取时 `imageAvailable` 打印 `docker pull` 命令、相应用例跳过 |
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
 | `createTestApp()` | `test/helpers/app.ts` | 启动后端（临时数据目录、随机端口），返回类型化 API 调用 `call(op, input)`、`mcpUrl`、FakeOpencode；`realOpencode: true` 用于 `@opencode` 测试；MCP SDK 客户端见 `test/helpers/mcp.ts` |
 | `build.*()` | `test/builders/` | 最小测试数据构造器，只填测试关心的字段，其余用合法默认值 |
@@ -85,6 +85,7 @@
 | J17 | 批量任务：主页「补单元测试」的「批量」→ 在目录树中选 3 个目录（按行输入页显示同样的目标）→ 创建 → 三个任务各自跑完到待合并 → 「合并全部待合并的」确认 → 主分支 3 个提交、批次「已全部结束」（v1.1，`task-batch.browser.spec.ts`，20） | 浏览器 |
 | J18 | PR 审查意见回流：修 Bug 任务创建 PR → 审查者在 PR 上留下讨论与评论 → 结果卡「取回审查意见」（默认全选）→ 取消一条、填补充说明 →「让 AI 按意见再改改」→ 回到待合并、主按钮为「推送到 PR」→ 推送 → 远端同一分支有 AI 的修改、主分支不变（v1.2，`task-review.browser.spec.ts`，21） | 浏览器 |
 | J19 | 定时任务：主页「补单元测试」的「定时」→ 每周一、五 03:30 → 创建 → 「立即运行一次」→ 任务到待合并，「需要你处理」的条目注明来自该定时任务 → 合并 → 暂停后显示「已暂停」（v1.2，`task-schedule.browser.spec.ts`，22；到点运行、补跑、跳过与失败暂停由集成测试用 FakeClock 驱动） | 浏览器 |
+| J21 | 更多数据库：添加 PostgreSQL 连接（类型切换后端口变为 5432）→ 测试连接显示服务器版本 → 浏览表结构看到表与列注释 → 项目详情关联 → 知识问答勾选数据库，研究员（FakeOpencode）调用 `db_query` 并引用 → 打开引用看到在 PostgreSQL 上重新执行的行（v1.2，`pro-databases.browser.spec.ts`，24 §7；没有 `postgres:17.6` 镜像时跳过） | 浏览器 |
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 
@@ -112,5 +113,5 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 以下模块要求分支覆盖率 ≥ 90%：`shared/fsm`、`shared/workflow`（计划校验）、`scheduler`、`mcp.registry`。
 - 本地 `pnpm verify`：check + test + test:int + build，另加 e2e（浏览器）必须全绿；`test:oc` 在装有 opencode 的机器上随 `pnpm verify:full` 执行。
 - 当前的验收以本机 macOS 的全量验证为准：`pnpm verify`、`pnpm e2e`、`pnpm test:oc`、`pnpm e2e:electron`（D82，用户确认）。跨平台代码照常按 `core/platform.ts` 写，平台相关的单元测试在 macOS 上也会运行；Windows / Linux 的真机与 CI 验证推迟到正式版本之前。
-- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：只在手动触发时运行（`workflow_dispatch`：发布前或需要时，17 §4.1），PR、推送到 main 与 tag 都不触发。一次运行在 macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J15，Linux 用 xvfb），Ubuntu 与 Windows 另打安装包。Ubuntu 与 Windows 上这些步骤拆成并行的 job，集成测试与浏览器 E2E 分片运行，J9 每套主题一片；macOS 一个 job（D81，耗时与计费分钟见 17 §4.3）。失败的 job 用 GitHub 的「Re-run failed jobs」单独重跑。数据库集成测试只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
+- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：只在手动触发时运行（`workflow_dispatch`：发布前或需要时，17 §4.1），PR、推送到 main 与 tag 都不触发。一次运行在 macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J15，Linux 用 xvfb），Ubuntu 与 Windows 另打安装包。Ubuntu 与 Windows 上这些步骤拆成并行的 job，集成测试与浏览器 E2E 分片运行，J9 每套主题一片；macOS 一个 job（D81，耗时与计费分钟见 17 §4.3）。失败的 job 用 GitHub 的「Re-run failed jobs」单独重跑。数据库集成测试（`databases.int.test.ts`、`databases.engines.int.test.ts`）只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
 - 测试失败时禁止 `.skip` 合并；确需暂时跳过须附任务编号与原因，并在一周内处理。

@@ -1,3 +1,4 @@
+import { DbType, dbTypeSchema } from '../enums/system.ts';
 import { SessionAgent } from '../enums/workflow.ts';
 
 export const APP_ID = 'agent-workflow';
@@ -73,3 +74,31 @@ function parsePort(env: Readonly<Record<string, string | undefined>>, name: stri
 export const PROJECT_CHECK_PLACEHOLDER = '$PROJECT_CHECK';
 /** Author and committer of the commits the backend makes for finished nodes (09 §3). */
 export const GIT_COMMIT_IDENTITY = { name: 'agent-workflow', email: 'agent-workflow@localhost' } as const;
+/** The connection form's port for each database type (24 §2). */
+export const DB_DEFAULT_PORT = {
+  [DbType.Mysql]: 3306,
+  [DbType.Postgresql]: 5432,
+  [DbType.Opengauss]: 5432,
+  [DbType.Sqlserver]: 1433,
+  [DbType.Goldendb]: 3306,
+} as const satisfies Record<DbType, number>;
+/** The statements `db_query` runs, by the connection's database (24 §4): its SQL dialect decides. */
+export const DB_READ_ONLY_STATEMENTS = {
+  [DbType.Mysql]: ['SELECT', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN'],
+  [DbType.Goldendb]: ['SELECT', 'SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN'],
+  [DbType.Postgresql]: ['SELECT', 'SHOW', 'EXPLAIN'],
+  [DbType.Opengauss]: ['SELECT', 'SHOW', 'EXPLAIN'],
+  [DbType.Sqlserver]: ['SELECT'],
+} as const satisfies Record<DbType, readonly string[]>;
+
+/** `DB_READ_ONLY_STATEMENTS` with the types that allow the same statements together, for descriptions. */
+export function readOnlyStatementGroups(): Array<{ types: DbType[]; statements: readonly string[] }> {
+  const groups: Array<{ types: DbType[]; statements: readonly string[] }> = [];
+  for (const type of dbTypeSchema.options) {
+    const statements = DB_READ_ONLY_STATEMENTS[type];
+    const same = groups.find((g) => g.statements.join() === statements.join());
+    if (same === undefined) groups.push({ types: [type], statements });
+    else same.types.push(type);
+  }
+  return groups;
+}

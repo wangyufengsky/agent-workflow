@@ -1,11 +1,30 @@
+import type { DbType } from '@aw/shared';
+
 export const DATABASES_COPY = {
   title: '数据库',
-  lede: '项目的 AI 会话可以只读查询关联的 MySQL 数据库：只允许单条 SELECT / SHOW / DESCRIBE / EXPLAIN，在只读事务中执行，限制行数与时间。密码加密保存，不会发给 AI。',
+  lede: '项目的 AI 会话可以只读查询关联的数据库：每次只允许一条只读查询，在只读事务中执行（SQL Server 为不提交的事务），限制行数与时间。密码加密保存，不会发给 AI。',
   add: '添加连接',
   addTitle: '添加数据库连接',
   editTitle: (name: string) => `修改「${name}」`,
   empty: '还没有数据库连接',
   emptyBody: '添加连接后，在项目详情里把它关联给项目。',
+  type: '类型',
+  typeLabel: {
+    mysql: 'MySQL',
+    postgresql: 'PostgreSQL',
+    opengauss: 'openGauss / GaussDB',
+    sqlserver: 'SQL Server',
+    goldendb: 'GoldenDB',
+  } satisfies Record<DbType, string>,
+  /** Below the type select: what differs for that database (24 §2). */
+  typeHint: {
+    mysql: '浏览表结构时显示所填数据库中的表。',
+    postgresql: '浏览表结构时显示当前 schema（通常是 public）中的表；其他 schema 可在查询中写全名。',
+    opengauss: '支持 openGauss 默认的 sha256 密码认证。GaussDB 的端口通常是 8000。浏览表结构时显示当前 schema 中的表。',
+    sqlserver:
+      '只支持 SQL Server 账号登录。SQL Server 没有只读事务：查询在不提交的事务中执行，并拒绝任何会写入的关键字；建议使用只有读取权限的账号（如 db_datareader）。浏览表结构时显示默认 schema（通常是 dbo）中的表。',
+    goldendb: '按 MySQL 协议连接，端口填计算节点（DBProxy）的端口。',
+  } satisfies Record<DbType, string>,
   name: '名称',
   nameHint: 'AI 按这个名称使用连接',
   host: '主机',
@@ -17,7 +36,7 @@ export const DATABASES_COPY = {
   tls: '使用 TLS',
   tlsChip: 'TLS',
   test: '测试连接',
-  testOk: (version: string) => `连接成功 · MySQL ${version}`,
+  testOk: (version: string) => `连接成功 · 服务器版本 ${version}`,
   testFailed: (error: string) => `连接失败：${error}`,
   schema: '浏览表结构',
   schemaTitle: (name: string) => `${name} 的表结构`,

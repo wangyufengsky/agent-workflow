@@ -102,7 +102,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | --- | --- |
 | `RuntimeStatus` | `not_installed` · `version_mismatch` · `stopped` · `starting` · `ready` · `crashed` |
 | `Platform` | `darwin` · `win32` · `linux`（运行应用的操作系统，17 §1） |
-| `DbType` | `mysql` |
+| `DbType` | `mysql` · `postgresql` · `opengauss`（openGauss / GaussDB）· `sqlserver` · `goldendb`（MySQL 协议）（v1.2，24 §1） |
 | `CredentialKind` | `git_token` · `db_password` |
 | `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` · `confirmation` · `attachment` · `entity_ref`（后三种仅助手对话，10 §3） |
 | `TranscriptSystemEvent` | `attempt_started` · `nudged` · `retrying` · `result_submitted` · `awaiting_input`（等待用户回答或授权）· `timed_out` · `aborted` · `runtime_lost`（`system` 会话流条目记录的事件，文案在前端） |
@@ -188,6 +188,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TASK_KEY_PREFIX` | `T-` | 任务编号 `T-<自增>` |
 | `BATCH_KEY_PREFIX` | `B-` | 批次编号 `B-<自增>`（20 §6） |
 | `BATCH_TARGET_PLACEHOLDER` | `{{target}}` | 批次需求模板中唯一的占位符，替换为每个目标（`renderBatchRequirement`，20 §2） |
+| `DB_DEFAULT_PORT` | `mysql` 3306 · `postgresql` 5432 · `opengauss` 5432 · `sqlserver` 1433 · `goldendb` 3306 | 连接表单按类型预填的端口（24 §2） |
+| `DB_READ_ONLY_STATEMENTS` | `mysql` / `goldendb`：SELECT SHOW DESCRIBE DESC EXPLAIN · `postgresql` / `opengauss`：SELECT SHOW EXPLAIN · `sqlserver`：SELECT | `db_query` 按连接类型允许的首关键字（24 §4）；语句检查、MCP 工具说明与界面文案都从它生成（`readOnlyStatementGroups`） |
 | `BRANCH_PREFIX` | `aw/` | 分支名 `aw/<taskKey>-<slug>` |
 | `BRANCH_SLUG_MAX` | `40` | slug 由标题转写，只保留 `[a-z0-9-]`（`toSlug`，`shared/naming.ts`） |
 | `PROJECT_SLUG_MAX` | `40` | 项目 slug（worktree 目录名）由名称转写；无 ASCII 字符时为 `project`，重名追加 `-2`、`-3` |
@@ -381,7 +383,7 @@ class AppError extends Error {
 | `DB_CONNECTION_NOT_FOUND` | 404 | 不存在，或（MCP 工具）不是任务项目关联的连接 |
 | `DB_CONNECTION_ALREADY_EXISTS` | 409 | 连接名称已被使用（MCP 工具按名称找连接） |
 | `DB_CONNECTION_FAILED` | 502 | `details.driverMessage` |
-| `DB_QUERY_REJECTED` | 400 | 非只读语句 |
+| `DB_QUERY_REJECTED` | 400 | 非只读语句（按连接类型的方言检查，24 §4） |
 | `DB_QUERY_TIMEOUT` | 504 | |
 | `DB_QUERY_FAILED` | 400 | SQL 错误；`details.driverMessage` |
 | **凭据** | | |
