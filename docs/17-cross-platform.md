@@ -1,6 +1,6 @@
 # 17 · Windows 与 Linux 支持（v1.1）
 
-v1.0 只验收了 macOS arm64（D13），代码按跨平台抽象编写。本文说明 v1.1 支持 Windows 与 Linux 时各模块的平台差异和处理方式；任务拆分见 [05 §v1.1 跨平台](05-dev-plan.md#v11--windows-与-linux)，决策见 02 的 D71–D76。
+v1.0 只验收了 macOS arm64（D13），代码按跨平台抽象编写。本文说明 v1.1 支持 Windows 与 Linux 时各模块的平台差异和处理方式；任务拆分见 [05 §v1.1 跨平台](05-dev-plan.md#v11--windows-与-linux)，决策见 02 的 D71–D76、D81、D82。
 
 ## 1. 目标平台
 
@@ -165,13 +165,33 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 
 ### 4.1 GitHub Actions（`.github/workflows/ci.yml`）
 
-矩阵 `macos-latest`、`ubuntu-latest`、`windows-latest`，每个平台：
+工作流只在手动触发时运行（见下文「何时运行与当前的验收」）。三个平台运行同一组检查与测试：`pnpm verify` 的各步骤（`check`、`test`、`test:int`、`build`）、浏览器 E2E `pnpm e2e`（FakeOpencode）、Electron 启动冒烟 `pnpm e2e:smoke`（J15：打包前的构建产物启动、后端握手、显示引导页、四项检测有结果；Linux 下用 `xvfb-run`）；ubuntu 与 windows 另外 `pnpm dist`，并把安装包（`release/*.exe`、`*.AppImage`、`*.deb`）作为 artifact 上传。依赖安装（Node 24、pnpm 10.28、按锁文件哈希缓存的 pnpm store）由 `.github/actions/setup` 统一完成。
 
-1. `pnpm install --frozen-lockfile`（Node 24、pnpm 10.28）；Playwright 只装 Chromium。
-2. `pnpm verify` 的各步骤：`check`、`test`、`test:int`、`build`。
-3. `pnpm e2e`（浏览器 E2E，FakeOpencode）。
-4. Electron 启动冒烟 `pnpm e2e:smoke`（`launch.electron.spec.ts`：打包前的构建产物启动、后端握手、显示引导页、四项检测有结果；Linux 下用 `xvfb-run`）。
-5. ubuntu 与 windows 上 `pnpm dist`，安装包（`release/*.exe`、`*.AppImage`、`*.deb`）作为 artifact 上传。
+**ubuntu 与 windows 拆成并行的 job（D81）。** 私有仓库的 Linux 与 Windows runner 只有 2 个 vCPU：vitest 默认的 worker 数是 CPU 数减 1，集成测试逐个文件串行；浏览器 E2E 共用一个后端，本来就是一个 worker。因此在这两个平台上把测试分到同时运行的多台机器上：
+
+| job | 内容 |
+| --- | --- |
+| `check (os)` | `pnpm check`、`pnpm test` |
+| `test:int (os, i/2)` | `pnpm test:int --shard=i/2`（vitest 按文件分片） |
+| `e2e (os, i/2)` | `pnpm build` 后 `pnpm e2e --grep-invert @walkthrough --shard=i/2`（除 J9 外的浏览器 E2E，Playwright 按文件分片） |
+| `e2e J9 (os, i/4)` | `pnpm build` 后 `pnpm e2e --grep @walkthrough --shard=i/4`：J9 每套主题一个用例，一片一套主题 |
+| `package (os)` | `pnpm build`、Electron 启动冒烟、`pnpm dist`、上传安装包 |
+
+macOS 仍是一个 job，按上面的顺序串行跑完：它约 3 分钟，比拆分后的 Windows 还快，而 macOS runner 按 10 倍计费，拆开只增加费用。
+
+**何时运行与当前的验收（D82，用户确认）**：
+
+- **当前的验收以本机 macOS 的全量验证为准**：主会话验收每个 PR 时在本机运行 `pnpm verify`、`pnpm e2e`、`pnpm test:oc`、`pnpm e2e:electron`，通过后合并。
+- **三平台 CI 不自动运行**：工作流只有 `workflow_dispatch` 触发，PR、推送到 main 与 tag 都不触发。发布正式版本前，或某个改动需要在 Windows / Linux 上确认时，手动运行（GitHub 的 Actions → CI → Run workflow，或 `gh workflow run ci.yml --ref <分支>`）。手动运行时三个平台都跑，上面的拆分与分片照样生效。
+- **跨平台代码照常写**：平台差异仍只在 `core/platform.ts` 等三处处理（D71），平台相关的单元测试（如 `platform.test.ts`）不依赖运行平台，在 macOS 上也会运行。Windows / Linux 的真机验证与三平台 CI 推迟到正式版本之前（§5）。
+
+分片的取值是 `i/N`，N 与矩阵列表写在一起；Playwright 与 vitest 的分片都是把全部用例按顺序切成 N 份，各片的并集就是全部用例，新增的 spec 或测试文件自动进入某一片。J9 原来是一个循环四套主题的用例（Windows 上 4.5 分钟，无法分片），现拆成每套主题一个用例（`walkthrough.browser.spec.ts`，标签 `@walkthrough`）：该 describe 设为 `parallel` 只为让分片能把它们分开；本机一个 worker 时四个用例依次运行、共用 `beforeAll` 的一次种子数据，与原来相同。
+
+**结果与重跑。** job 内后面的步骤在前面失败后照常运行，一轮能看到该 job 的全部问题；任何一步失败，该 job 失败，整个 run 也就失败。只重跑失败部分用 GitHub 自带的「Re-run failed jobs」（或 `gh run rerun <run-id> --failed`），不另做机制。失败时 E2E 的 trace（`retain-on-failure`）连同 `test-results/` 作为 artifact 上传（`e2e-results-*`、`walkthrough-results-*`），后端日志在 CI 中输出到 job 日志。
+
+**打包产物何时产生**：只在手动运行工作流时产生，ubuntu 与 windows 每次运行都打包并上传安装包；macOS 不打包（本机用 `pnpm dist`）。打包与测试同时进行：实测 Windows 的 `package` job（3.2–3.3 分钟）与最长的测试 job（3.0–3.5 分钟）相当，不拖长一轮。
+
+**Playwright 只装 Chromium 的 headless shell**（`--only-shell`，浏览器 E2E 以 headless 运行，原来也只用它），系统依赖只在 Linux 上装（`--with-deps`）：Windows 上的 `--with-deps` 会花约 3.5 分钟启用 Media Foundation 功能，没有 spec 播放媒体（§4.3）。
 
 **数据库集成测试只在 ubuntu 上运行。** `databases.int.test.ts` 需要 Docker 中的 Linux 容器 `mysql:8.4`：GitHub 的 Windows runner 的 Docker 只能运行 Windows 容器，macOS runner 没有 Docker。工作流在这两个平台对 `test:int` 显式加 `--exclude '**/databases.int.test.ts'` 并在步骤名与注释中写明原因；代码中不按平台跳过（缺 Docker 时测试照常失败）。该测试与平台无关（只经 TCP 访问 MySQL），在 ubuntu 上运行即覆盖。
 
@@ -201,6 +221,52 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 - E2E 中跨整个任务运行的等待：`e2e/helpers.ts` 的 `TASK_RUN_TIMEOUT_MS`（只在 Windows 上放宽，数据见 §4.1）。
 - 浏览器 E2E 的假 opencode：`e2e/fixtures/bin/` 同时有 `opencode`（sh）与 `opencode.cmd`；PATH 用 `path.delimiter` 拼接，主目录同时设 `HOME` 与 `USERPROFILE`。
 
+### 4.3 CI 耗时（D81）
+
+改动前取 PR #10 的三轮全绿运行（39556036848、39559586194、39568342291），改动后取 PR #15 的运行 39597198853（第一次尝试；最长的 job 与整轮时间另含 39598819067）；单位为秒，范围为多轮或多个分片的最小与最大值。拆分后每个阶段在各自的 job 里运行，「准备」与 Playwright 安装在每个需要它的 job 中各有一次。
+
+| 阶段 | Ubuntu 改动前 | Ubuntu 改动后 | Windows 改动前 | Windows 改动后 |
+| --- | --- | --- | --- | --- |
+| 准备（job 启动、checkout、pnpm、Node、安装依赖） | 14–17 | 11–17（每个 job） | 47–53 | 39–56（每个 job，一次 82） |
+| Playwright 安装 | 29–33 | 19–29 | 222–251（其中 ~205 为 Media Foundation） | 11–15 |
+| `pnpm check` | 34–44 | 33 | 53–79 | 59 |
+| `pnpm test` | 8–9 | 8 | 13–30 | 14 |
+| `test:int`（Ubuntu 含拉取 MySQL 镜像 24 s） | 91–109 | 55 / 76（两片） | 194–258 | 84 / 117（两片） |
+| `pnpm build` | 4–5 | 3–7 | 8–9 | 5–7 |
+| 浏览器 E2E，J9 以外 | 52–71 ¹ | 36 / 40（两片） | 138–177 ¹ | 61 / 84（两片） |
+| 浏览器 E2E，J9 | 150–192（一个用例） | 45–70（每套主题） | 264–282（一个用例） | 74–93（每套主题） |
+| Electron 启动冒烟 | 9–11 | 12 | 17–22 | 19 |
+| `pnpm dist`（Windows 中 NSIS 压缩约 75 s） | 86–104 | 92 | 105–140 | 108 |
+| **最长的 job（该平台的反馈时间）** | **503–613（8.4–10.2 分钟）** | **138–145（2.3–2.4 分钟，`package`）** | **1163–1303（19.4–21.7 分钟）** | **191–209（3.2–3.5 分钟，`package` 或一片 J9）** |
+
+¹ 改动前 E2E 是一个步骤，表中为每轮的步骤耗时减去该轮 J9 与 webServer 启动（构建前端 + 后端启动：Ubuntu 6 s、Windows 27 s，改动后每片各有一次）。
+
+macOS 不变：一个 job 2.9–3.6 分钟（改动后 3.1–3.5 分钟）。整个 run 从创建到结束由 Windows 决定，改动前约 20–22 分钟，改动后 4.0–4.7 分钟；后者中有时约 1.5 分钟是排队：账户的并发 job 数有上限（GitHub Free 为 20），上述两轮有 21 个 job，同时还有其他分支的运行占用名额，部分 job 晚 1–2 分钟才开始。
+
+**计费分钟**。GitHub 把每个 job 的耗时向上取整到分钟再乘平台倍数（Linux ×1、Windows ×2、macOS ×10）。改动前取 PR #10 的三轮，改动后取运行 39597198853 与 39598819067；「实际」为取整后、换算前的分钟数：
+
+| 平台（倍数） | 改动前，每轮 实际 / 计费 | 改动后，每轮 实际 / 计费 |
+| --- | --- | --- |
+| Ubuntu（×1） | 9–11 / 9–11 | 21 / 21 |
+| Windows（×2） | 20–22 / 40–44 | 31–32 / 62–64 |
+| macOS（×10） | 3–4 / 30–40 | 4 / 40 |
+| **合计** | **32–37 / 79–95** | **56–57 / 123–125** |
+
+拆分使 Ubuntu 与 Windows 的实际分钟增加（每个 job 各有约 1 分钟准备，且各自向上取整）。改动前每个 PR 的每次推送与每次合并都自动跑一轮（PR #10 一个 PR 跑了 18 轮），用尽了账户的 Actions 额度；现在只在手动运行时消耗（D82）。
+
+**看过但没有采用的手段**：
+
+- 缓存 Playwright 浏览器、Electron 与 electron-builder 的下载：实测下载本身不慢（headless shell 在 Windows 上约 10 s，electron-builder 的 Electron 与 NSIS 不到 1 s），恢复缓存的开销相当；pnpm store 已由 `setup-node` 按锁文件哈希缓存，安装 4–14 s。
+- Defender 排除：runner 上实时扫描本来就关闭（§4.1）。
+- `core.fscache` 等 git 设置：慢在每次启动进程（§4.1），测试仓库只有几个文件，没有可省的文件扫描；没有数据支持，不加。
+- 在 2 vCPU 上提高 vitest 的 worker 数：没有实测；跨机器分片的收益是确定的，已足够。
+
+**测试集合的变化**：每个平台运行的检查与测试与改动前相同，逐项为：
+
+- J9 由一个用例拆成每套主题一个用例，页面、模式、主题与断言不变（页面错误、`role="alert"`、对比度与横向溢出问题、截图）；种子数据每次运行（或每个分片）一份。
+- Playwright 不再下载完整的 Chrome for Testing（浏览器 E2E 一直用 headless shell）；Windows 不再启用 Media Foundation。
+- `package` job 不安装 Playwright 浏览器（Electron 冒烟用 Electron 自带的 Chromium）。
+
 ## 5. 验收
 
 | 项 | 方式 | 由谁 |
@@ -211,6 +277,8 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 | **Windows 真机**：安装 NSIS 包（SmartScreen 放行）→ 引导页三项检测（Git for Windows、opencode 1.19.0、模型）→ 添加项目 → 跑通一个「修 Bug」任务 → 合并；任务中模型执行 bash 命令时只读规则生效（规划阶段不弹权限请求）；取消运行中的任务后 worktree 能被清理 | 手动 | **需要用户完成** |
 | **Linux 真机（Ubuntu 22.04 / 24.04 桌面）**：安装 deb 与运行 AppImage（24.04 的 AppArmor 限制）→ 引导页三项检测与「凭据存储」→ 绑定托管平台令牌（GNOME Keyring 存在时成功；无密钥服务时显示 `CREDENTIAL_UNAVAILABLE`）→ 跑通一个任务 | 手动 | **需要用户完成** |
 | 真实 opencode 在 Windows / Linux 上的 `test:oc`、`test:live`、J10 | 在对应机器上运行 | **需要用户完成**（可选） |
+
+按 D82，表中的三平台 CI 与 Windows / Linux 真机验证推迟到发布正式版本之前；在此之前以本机 macOS 的全量验证为准。
 
 ## 6. 不做
 

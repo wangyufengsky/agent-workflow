@@ -74,7 +74,7 @@
 | J6 | 两个任务改同一文件 → 第二个合并冲突 → 交给 AI 解决 → 合并成功；另有三任务版（01 §5 第 3 条）：三个任务同时运行（各自等待一个权限请求）、各自分支与工作区，依次合并，第二、三个冲突交给 AI 解决 | 浏览器 |
 | J7 | 专业模式：开启确认计划 → 编辑计划（加节点、连线）→ 确认 → 按新计划执行 | 浏览器 |
 | J8 | 专业模式：复制内置流程 → 修改 → 用它跑通一个任务 | 浏览器 |
-| J9 | 四主题与两种模式切换，全部页面可打开无报错、无对比度（axe `color-contrast`）与横向溢出问题（1280 宽）；截图写到 `screenshots/walkthrough/<主题>/`（不提交，`AW_WALKTHROUGH_DIR` 可改）供人工走查（`walkthrough.browser.spec.ts`，M6-01） | 浏览器 |
+| J9 | 四主题与两种模式切换，全部页面可打开无报错、无对比度（axe `color-contrast`）与横向溢出问题（1280 宽）；每套主题一个用例（标签 `@walkthrough`，CI 按主题分片），截图写到 `screenshots/walkthrough/<主题>/`（不提交，`AW_WALKTHROUGH_DIR` 可改）供人工走查（`walkthrough.browser.spec.ts`，M6-01） | 浏览器 |
 | J10 | 打包应用：引导页 → 添加项目 → J1 精简版（修 Bug，示例仓库 `ts-stats`）；运行中退出重开 → 任务继续完成，被打断的尝试为 `interrupted` 且步骤重跑。真实 opencode 与免费模型 `TEST_MODEL`（生产包里没有 FakeOpencode），每次用全新的用户数据目录；`AW_E2E_EXECUTABLE` 指向打包后的可执行文件（如 dmg 挂载副本） | Electron |
 | J11 | 对助手说开始任务 → 确认卡片 → 任务运行（v1.1，`shell-assistant.browser.spec.ts`；同文件另有主页输入 → 面板、`open_page` 跳转、「总是允许」→ 设置页撤销的冒烟） | 浏览器 |
 | J12 | 知识问答：提问 → 研究过程（检索、读取）→ 带引用的回答 → 点击引用看原文（高亮、下一处、Esc）→ 续问 → 对话记录中回到对话（v1.1，`project-knowledge.browser.spec.ts`；FakeOpencode 的 `tool` 步骤报告只读的原生工具调用） | 浏览器 |
@@ -108,5 +108,6 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 不设全局覆盖率百分比。
 - 以下模块要求分支覆盖率 ≥ 90%：`shared/fsm`、`shared/workflow`（计划校验）、`scheduler`、`mcp.registry`。
 - 本地 `pnpm verify`：check + test + test:int + build，另加 e2e（浏览器）必须全绿；`test:oc` 在装有 opencode 的机器上随 `pnpm verify:full` 执行。
-- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J15，Linux 用 xvfb），Ubuntu 与 Windows 另打安装包。数据库集成测试只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
+- 当前的验收以本机 macOS 的全量验证为准：`pnpm verify`、`pnpm e2e`、`pnpm test:oc`、`pnpm e2e:electron`（D82，用户确认）。跨平台代码照常按 `core/platform.ts` 写，平台相关的单元测试在 macOS 上也会运行；Windows / Linux 的真机与 CI 验证推迟到正式版本之前。
+- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：只在手动触发时运行（`workflow_dispatch`：发布前或需要时，17 §4.1），PR、推送到 main 与 tag 都不触发。一次运行在 macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J15，Linux 用 xvfb），Ubuntu 与 Windows 另打安装包。Ubuntu 与 Windows 上这些步骤拆成并行的 job，集成测试与浏览器 E2E 分片运行，J9 每套主题一片；macOS 一个 job（D81，耗时与计费分钟见 17 §4.3）。失败的 job 用 GitHub 的「Re-run failed jobs」单独重跑。数据库集成测试只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
 - 测试失败时禁止 `.skip` 合并；确需暂时跳过须附任务编号与原因，并在一周内处理。
