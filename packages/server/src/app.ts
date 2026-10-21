@@ -362,6 +362,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     projects: projects.service,
     workflows: workflows.service,
     knowledge: knowledge.service,
+    decks: decks.service,
     dataDir: config.dataDir,
     timeZone,
     token: assistantMcpToken,

@@ -9,6 +9,7 @@ import {
   type TaskDetailDTO,
   UiMode,
 } from '@aw/shared';
+import type { DecksService } from '../decks/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { TasksService } from '../tasks/index.ts';
@@ -60,6 +61,7 @@ const STATIC_PAGES: Partial<Record<AssistantPage, string>> = {
   [AssistantPage.Knowledge]: 'the knowledge Q&A page (ask a question about a project)',
   [AssistantPage.KnowledgeHistory]: 'the knowledge Q&A history',
   [AssistantPage.Insights]: 'the quality and usage page (how much AI did, how well, and what it cost)',
+  [AssistantPage.Ppt]: 'the PPT list (slide decks made from a brief and material)',
 };
 
 function param(ref: AssistantPageRef, name: AssistantPageParam): string {
@@ -75,10 +77,11 @@ export type ContextDeps = {
   projects: ProjectsService;
   workflows: WorkflowsService;
   knowledge: KnowledgeService;
+  decks: DecksService;
 };
 
 /** What the model is told with every message (15 §2): time, interface mode, and the page the user is on. */
-export function createContextRenderer({ prompts, tasks, projects, workflows, knowledge }: ContextDeps) {
+export function createContextRenderer({ prompts, tasks, projects, workflows, knowledge, decks }: ContextDeps) {
   /** The ids of the page come from the renderer: a missing entity is a NOT_FOUND like any other input. */
   function describeTask(task: TaskDetailDTO, nodeId: string | undefined, prefix: string): string {
     const base = `${prefix} of task ${task.key} "${task.title}" (task id ${task.id}, status ${task.status}, project "${task.project.name}", project id ${task.project.id})`;
@@ -114,6 +117,16 @@ export function createContextRenderer({ prompts, tasks, projects, workflows, kno
       case AssistantPage.KnowledgeConversation: {
         const conversation = knowledge.get(param(ref, 'knowledgeConversationId'));
         return `the knowledge Q&A conversation "${conversation.title}" (knowledge conversation id ${conversation.id}, project "${conversation.project.name}", ${conversation.turns.length} questions)`;
+      }
+      case AssistantPage.PptDeck: {
+        const deck = decks.get(param(ref, 'deckId'));
+        const base = `the workspace of PPT "${deck.title}" (deck id ${deck.id}, status ${deck.status}, ${deck.slides.length} pages)`;
+        const { slideId } = ref.params;
+        if (slideId === undefined) return base;
+        const slide = deck.slides.find((s) => s.id === slideId);
+        if (slide === undefined)
+          throw new AppError(ErrorCode.DeckSlideNotFound, `Page ${slideId} not found`, { slideId });
+        return `${base}, page ${slide.seq} "${slide.title}" selected (slide id ${slide.id})`;
       }
       default:
         throw new Error(`Page ${page} has no description`);

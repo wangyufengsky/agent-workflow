@@ -5,6 +5,7 @@ export const PPT_COPY = {
   title: 'PPT',
   lede: '把任务结果、知识问答或一段文字做成一份能讲的 PPT：AI 先写大纲，你确认后逐页制作。',
   newDeck: '新建 PPT',
+  makeDeck: '做成 PPT',
   search: '搜索标题',
   allProjects: '全部项目',
   noProject: '不关联项目',

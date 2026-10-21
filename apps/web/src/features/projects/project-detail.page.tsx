@@ -6,10 +6,12 @@ import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { Icon } from '../../components/icon.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DATABASES_COPY } from '../../copy/databases.ts';
+import { PPT_COPY } from '../../copy/ppt.ts';
 import { PROJECTS_COPY as C } from '../../copy/projects.ts';
 import { ProjectDatabases } from '../databases/project-databases.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
@@ -107,6 +109,10 @@ export function ProjectDetailPage() {
           <h1 className="title">{p.name}</h1>
           <p className="lede mono">{p.repoPath}</p>
         </div>
+        <Link to={ROUTES.pptNew} search={{ projectId: p.id }} className="btn sm">
+          <Icon name="slides" size="sm" />
+          {PPT_COPY.makeDeck}
+        </Link>
       </div>
       <Panel title={C.title}>
         {/* Keyed by the saved values so the form resets when the project changes underneath it. */}

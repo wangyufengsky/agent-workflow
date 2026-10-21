@@ -14,6 +14,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { KNOWLEDGE_COPY as C } from '../../copy/knowledge.ts';
+import { PPT_COPY } from '../../copy/ppt.ts';
 import { attemptQuery, attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
 import { TranscriptView } from '../attempts/transcript-view.tsx';
 import { projectQuery, projectsQuery } from '../projects/projects.queries.ts';
@@ -30,7 +31,7 @@ import { DEFAULT_SOURCES, hasSource, SourcesPicker } from './sources-picker.tsx'
 const welcomeRoute = getRouteApi(ROUTE_IDS.knowledge);
 const conversationRoute = getRouteApi(ROUTE_IDS.knowledgeConversation);
 
-function TopBar({ project, locked }: { project?: string; locked: boolean }) {
+function TopBar({ project, locked, conversationId }: { project?: string; locked: boolean; conversationId?: string }) {
   return (
     <div className={styles.topBar}>
       {project !== undefined && (
@@ -40,6 +41,13 @@ function TopBar({ project, locked }: { project?: string; locked: boolean }) {
         </span>
       )}
       <span className="grow" />
+      {conversationId !== undefined && (
+        // 23 §2.5: what was found, as a PPT.
+        <Link to={ROUTES.pptNew} search={{ knowledgeConversationId: conversationId }} className="btn ghost sm">
+          <Icon name="slides" size="sm" />
+          {PPT_COPY.makeDeck}
+        </Link>
+      )}
       <Link to={ROUTES.knowledgeHistory} className="btn ghost sm">
         <Icon name="clock" size="sm" />
         {C.history}
@@ -234,7 +242,7 @@ function Conversation({ conversation }: { conversation: KnowledgeConversationDTO
   return (
     <div className={styles.page}>
       <div className={styles.main}>
-        <TopBar project={conversation.project.name} locked />
+        <TopBar project={conversation.project.name} locked conversationId={conversation.id} />
         <div className={styles.scroll}>
           <div className={styles.axis}>
             {conversation.turns.map((turn) => (

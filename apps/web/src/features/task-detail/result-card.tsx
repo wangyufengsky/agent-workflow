@@ -6,13 +6,16 @@ import {
   WorkflowDeliverable,
   WorktreeStatus,
 } from '@aw/shared';
+import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
+import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ExternalLink } from '../../components/external-link.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { DELIVERY_COPY as D } from '../../copy/delivery.ts';
+import { PPT_COPY } from '../../copy/ppt.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { ChangesDrawer } from './changes-drawer.tsx';
 import { DeliveryActions } from './delivery-actions.tsx';
@@ -62,11 +65,18 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
   return (
     <Panel solid>
       <div className={styles.result} data-testid="result-card">
-        <p className={styles.headline}>
-          <Icon name="check" />
-          {C.resultHeadline(result.nodeSummaries.length, result.filesChanged, result.insertions, result.deletions)} ·{' '}
-          {checks}
-        </p>
+        <div className="row">
+          <p className={`${styles.headline} grow`}>
+            <Icon name="check" />
+            {C.resultHeadline(result.nodeSummaries.length, result.filesChanged, result.insertions, result.deletions)} ·{' '}
+            {checks}
+          </p>
+          {/* 23 §2.5: the result as a PPT for the team. */}
+          <Link to={ROUTES.pptNew} search={{ taskId: task.id }} className="btn ghost sm">
+            <Icon name="slides" size="sm" />
+            {PPT_COPY.makeDeck}
+          </Link>
+        </div>
         <DeliveryOutcome task={task} />
         <section className={styles.block}>
           <h3 className="sec-t">{report ? C.report : C.summary}</h3>
