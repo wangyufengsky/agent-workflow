@@ -7,7 +7,7 @@ import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { INBOX_COPY as C } from '../../copy/tasks.ts';
 import { failureText } from '../tasks/failure-text.ts';
-import { taskQuery } from '../tasks/tasks.queries.ts';
+import { taskQuery, tasksQuery } from '../tasks/tasks.queries.ts';
 import { type InboxResponse, useDismissInbox, useResolveInbox } from './inbox.queries.ts';
 import styles from './inbox-card.module.css';
 
@@ -160,23 +160,27 @@ const NAMES_NO_STEP = new Set<InboxKind>([InboxKind.Question, InboxKind.Permissi
 
 /**
  * Where an item comes from (14 §3.6): its task (unless the list already groups by it) and, for questions and
- * permissions, its step; items without a task come from knowledge questions.
+ * permissions, its step; items without a task come from knowledge questions. The task comes from the one task list
+ * every card shares; only questions and permissions, which belong to running steps, read their task's steps.
  */
-function useSource(item: InboxItemDTO, showTask: boolean) {
-  const task = useQuery({ ...taskQuery(item.taskId ?? ''), enabled: item.taskId !== null }).data;
-  if (item.taskId === null) return { label: C.fromKnowledge, task };
+function useSource(item: InboxItemDTO, showTask: boolean): string | undefined {
+  const needsStep = item.taskId !== null && item.nodeId !== null && NAMES_NO_STEP.has(item.kind);
+  const tasks = useQuery({ ...tasksQuery(), enabled: showTask && item.taskId !== null }).data;
+  const detail = useQuery({ ...taskQuery(item.taskId ?? ''), enabled: needsStep }).data;
+  if (item.taskId === null) return C.fromKnowledge;
   const parts: string[] = [];
+  const task = tasks?.find((t) => t.id === item.taskId);
   if (showTask && task !== undefined) parts.push(C.inTask(task.key, task.title));
-  const step = task?.nodes.find((n) => n.id === item.nodeId);
-  if (step !== undefined && NAMES_NO_STEP.has(item.kind)) parts.push(C.inStep(step.title));
-  return { label: parts.length === 0 ? undefined : parts.join(' · '), task };
+  const step = detail?.nodes.find((n) => n.id === item.nodeId);
+  if (step !== undefined) parts.push(C.inStep(step.title));
+  return parts.length === 0 ? undefined : parts.join(' · ');
 }
 
 /** One open item, handled where it is shown (14 §3.6); `showTask` is off where the list is already the task's. */
 export function InboxCard({ item, showTask = true }: { item: InboxItemDTO; showTask?: boolean }) {
   const resolve = useResolveInbox();
   const dismiss = useDismissInbox();
-  const { label, task } = useSource(item, showTask);
+  const label = useSource(item, showTask);
   const props = {
     pending: resolve.isPending,
     resolve: (response: InboxResponse) => resolve.mutate({ id: item.id, response }),
@@ -201,11 +205,7 @@ export function InboxCard({ item, showTask = true }: { item: InboxItemDTO; showT
       )}
       {item.kind === InboxKind.Delivery && (
         <>
-          <p className={styles.title}>
-            {task?.result == null
-              ? C.deliveryReady
-              : C.deliveryBody(task.result.filesChanged, task.result.insertions, task.result.deletions)}
-          </p>
+          <p className={styles.title}>{C.deliveryReady}</p>
           <div className={styles.actions}>
             <TaskLink item={item} label={C.viewResult} />
             <Button size="sm" pending={dismiss.isPending} onClick={() => dismiss.mutate(item.id)}>

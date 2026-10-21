@@ -10,10 +10,10 @@ import { ERROR_COPY } from '../../copy/errors.ts';
 import { attemptQuery, attemptTranscript, useTranscript } from './attempt.queries.ts';
 import { type ProcessLine, processLines } from './process-lines.ts';
 
+import styles from './transcript.module.css';
+
 const isProgress = (line: Extract<ProcessLine, { kind: 'action' }>, progress: string) =>
   line.action.kind === 'app' && line.action.name === McpToolName.ReportProgress && line.action.detail === progress;
-
-import styles from './transcript.module.css';
 
 const Line = memo(function Line({ line }: { line: ProcessLine }) {
   switch (line.kind) {
