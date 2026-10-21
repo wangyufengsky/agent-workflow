@@ -134,13 +134,16 @@ function createPostgresDriver({ Client, Cursor }: PostgresLibrary): DbDriver {
 
     columns: (target, table) =>
       withClient(target, async (client) => {
+        // A primary key's columns are the first indnkeyatts of indkey (INCLUDE columns follow). The slice is spaced:
+        // openGauss reads `:name` as a bind placeholder.
         const rows = z.array(columnRowSchema).parse(
           await run(
             client,
             `SELECT c.relname AS "tableName", a.attname AS name, format_type(a.atttypid, a.atttypmod) AS type,
                 NOT a.attnotnull AS nullable,
                 EXISTS (SELECT 1 FROM pg_catalog.pg_index i
-                         WHERE i.indrelid = c.oid AND i.indisprimary AND a.attnum = ANY (i.indkey)) AS "isPrimary",
+                         WHERE i.indrelid = c.oid AND i.indisprimary
+                           AND a.attnum = ANY ((i.indkey::int2[])[0 : i.indnkeyatts - 1])) AS "isPrimary",
                 pg_get_expr(d.adbin, d.adrelid) AS "defaultValue", col_description(c.oid, a.attnum) AS comment
                FROM pg_catalog.pg_attribute a
                JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
@@ -165,13 +168,14 @@ function createPostgresDriver({ Client, Cursor }: PostgresLibrary): DbDriver {
 
     indexes: (target, table) =>
       withClient(target, async (client) => {
-        // generate_series in the select list rather than LATERAL: openGauss follows PostgreSQL 9.2.
+        // generate_series in the select list rather than LATERAL: openGauss follows PostgreSQL 9.2. Only the key
+        // columns (the first indnkeyatts); INCLUDE columns follow them and are not part of the key.
         const rows = z.array(indexRowSchema).parse(
           await run(
             client,
             `SELECT name, "unique", pg_get_indexdef(indexrelid, n, true) AS "columnName"
                FROM (SELECT ic.relname AS name, i.indisunique AS "unique", i.indexrelid,
-                            generate_series(1, i.indnatts) AS n
+                            generate_series(1, i.indnkeyatts) AS n
                        FROM pg_catalog.pg_index i
                        JOIN pg_catalog.pg_class ic ON ic.oid = i.indexrelid
                        JOIN pg_catalog.pg_class c ON c.oid = i.indrelid

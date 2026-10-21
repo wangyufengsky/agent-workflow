@@ -46,6 +46,8 @@ type Engine = {
   unknownColumn: string;
   /** A statement the check lets through that writes; the server's read-only transaction stops it. */
   serverRejected?: { sql: string; message: string };
+  /** A table whose primary key carries a non-key `INCLUDE` column (PostgreSQL 11+, openGauss). */
+  includedColumnTable?: string;
 };
 
 const POSTGRES_FIXTURE = [
@@ -89,6 +91,7 @@ const postgresFamily = {
   sleep: 'SELECT pg_sleep(5)',
   unknownColumn: 'column "nope" does not exist',
   serverRejected: { sql: 'SELECT bump()', message: 'read-only transaction' },
+  includedColumnTable: 'CREATE TABLE tags (id INTEGER, label VARCHAR(16), PRIMARY KEY (id) INCLUDE (label))',
 };
 
 const ENGINES: Engine[] = [
@@ -113,6 +116,8 @@ const ENGINES: Engine[] = [
       [1, 'a', '1.50', '2026-01-02 00:00:00', '0x0102'],
       [2, 'b', '2.00', null, null],
     ],
+    // INCLUDE needs the ubtree index of the in-place-update storage engine.
+    includedColumnTable: `${postgresFamily.includedColumnTable} WITH (STORAGE_TYPE = USTORE)`,
   },
   {
     type: DbType.Sqlserver,
@@ -251,6 +256,22 @@ for (const engine of ENGINES) {
         code: ErrorCode.DbQueryFailed,
         details: { driverMessage: expect.stringContaining(engine.unknownColumn) },
       });
+    });
+
+    // Regression: the key columns of an index are the first indnkeyatts of indkey; INCLUDE columns follow them.
+    it.runIf(engine.includedColumnTable !== undefined)('主键的 INCLUDE 列不标为主键', async () => {
+      await server.exec(engine.includedColumnTable ?? '');
+      try {
+        expect((await call('db_describe', { table: 'tags' })).body).toEqual({
+          columns: [
+            { name: 'id', type: 'integer', nullable: false, key: 'PRI' },
+            { name: 'label', type: 'character varying(16)', nullable: true },
+          ],
+          indexes: [{ name: 'tags_pkey', columns: ['id'], unique: true }],
+        });
+      } finally {
+        await server.exec('DROP TABLE tags');
+      }
     });
   });
 }
