@@ -29,6 +29,8 @@ test('J11 对助手说开始任务 → 确认卡片 → 任务运行', async ({ 
   await queueTurn(request, project, { title: '定位根因' }, [{ type: 'hang' }]);
 
   await page.goto(`/?projectId=${project.id}`);
+  // The shell's shortcuts listen once the page has rendered.
+  await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
   await panel.getByLabel('发给助手的消息').fill('帮我修一下：助手开的任务：退款金额少算了运费');
@@ -98,6 +100,7 @@ test('总是允许的调用直接执行并出现对象卡片；对象删除后�
   ]);
 
   await page.goto('/');
+  await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
   await panel.getByLabel('发给助手的消息').fill('把这个仓库加成项目');
@@ -114,6 +117,7 @@ test('总是允许的调用直接执行并出现对象卡片；对象删除后�
   await request.delete(`${API_BASE}/projects/${added.id}`, { headers: AUTH });
 
   await page.reload();
+  await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+j');
   await expect(card).toContainText('已删除');
   await expect(card.getByRole('button', { name: '打开' })).toBeDisabled();

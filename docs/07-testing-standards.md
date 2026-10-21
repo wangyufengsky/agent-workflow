@@ -15,7 +15,7 @@
 | 单元 | Vitest | 纯逻辑：状态机表、计划校验、调度决策函数、git 输出解析器、配置生成、检查点解析、错误映射、主题对比度 | 无 IO | 被测文件旁 `*.test.ts` | `pnpm test` |
 | 集成 | Vitest | 模块 service 与 HTTP/MCP 接口：从 API 或 MCP 调用到数据库与 Git 结果 | 真实 SQLite（临时文件）、真实 git（临时仓库）、Docker 中的真实 MySQL（项目数据库，需本机 Docker）、FakeOpencode、假 Hosting 服务 | `*.int.test.ts` | `pnpm test:int` |
 | opencode 集成 | Vitest，标记 `@opencode` | runtime 托管、配置注入、插件、事件解析 | 本机真实 opencode 1.19.0，**不调用模型**（只启动、读配置、建会话、发 `noReply` 消息）；唯一例外是 bridge 插件测试（只有模型能让 opencode 调用工具），用免费模型 `TEST_MODEL`（默认 `opencode-go/deepseek-v4.1-flash`，D62） | `*.oc.test.ts` | `pnpm test:oc`（先构建插件） |
-| E2E | Playwright | 关键用户旅程（§5） | 浏览器模式：后端 + FakeOpencode；Electron 模式：打包产物 | `e2e/` | `pnpm e2e` / `pnpm e2e:electron` |
+| E2E | Playwright | 关键用户旅程（§5） | 浏览器模式：后端 + FakeOpencode，后端托管构建出的前端（不经 Vite 开发服务器，17 §4.1）；Electron 模式：打包产物 | `e2e/` | `pnpm e2e` / `pnpm e2e:electron` |
 | live | Vitest，标记 `@live` | 真实模型跑内置流程 | 真实 opencode + 模型 + 示例仓库 | `live/` | `pnpm test:live`（手动，不进 CI） |
 | 性能 | Playwright（`playwright.perf.config.ts`） | M6-02 的三项实测：20 节点计划画布的帧率、5 MB 会话流的首屏时间、10 个并发任务时的帧率与长任务；只输出数字到 `perf-results/`（不提交），不作通过/失败门槛 | 生产构建的前端 + 开发模式后端（FakeOpencode） | `e2e/*.perf.spec.ts` | `pnpm perf`（手动） |
 
@@ -75,9 +75,9 @@
 | J7 | 专业模式：开启确认计划 → 编辑计划（加节点、连线）→ 确认 → 按新计划执行 | 浏览器 |
 | J8 | 专业模式：复制内置流程 → 修改 → 用它跑通一个任务 | 浏览器 |
 | J9 | 四主题与两种模式切换，全部页面可打开无报错、无对比度（axe `color-contrast`）与横向溢出问题（1280 宽）；截图写到 `screenshots/walkthrough/<主题>/`（不提交，`AW_WALKTHROUGH_DIR` 可改）供人工走查（`walkthrough.browser.spec.ts`，M6-01） | 浏览器 |
-| J11 | Electron 启动冒烟（`launch.electron.spec.ts`，`pnpm e2e:smoke`）：构建后的应用启动后端、显示引导页（各项检测有结果）、正常退出（main 等后端停止 opencode 后退出）。不需要 opencode 与模型，三平台 CI 运行（17 §4.1） | Electron |
 | J10 | 打包应用：引导页 → 添加项目 → J1 精简版（修 Bug，示例仓库 `ts-stats`）；运行中退出重开 → 任务继续完成，被打断的尝试为 `interrupted` 且步骤重跑。真实 opencode 与免费模型 `TEST_MODEL`（生产包里没有 FakeOpencode），每次用全新的用户数据目录；`AW_E2E_EXECUTABLE` 指向打包后的可执行文件（如 dmg 挂载副本） | Electron |
 | J11 | 对助手说开始任务 → 确认卡片 → 任务运行（v1.1，`shell-assistant.browser.spec.ts`；同文件另有主页输入 → 面板、`open_page` 跳转、「总是允许」→ 设置页撤销的冒烟） | 浏览器 |
+| J12 | Electron 启动冒烟（`launch.electron.spec.ts`，`pnpm e2e:smoke`）：构建后的应用启动后端、显示引导页（各项检测有结果）、正常退出（main 等后端停止 opencode 后退出）。不需要 opencode 与模型，三平台 CI 运行（17 §4.1） | Electron |
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 
@@ -104,5 +104,5 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 不设全局覆盖率百分比。
 - 以下模块要求分支覆盖率 ≥ 90%：`shared/fsm`、`shared/workflow`（计划校验）、`scheduler`、`mcp.registry`。
 - 本地 `pnpm verify`：check + test + test:int + build，另加 e2e（浏览器）必须全绿；`test:oc` 在装有 opencode 的机器上随 `pnpm verify:full` 执行。
-- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J11，Linux 用 xvfb），Ubuntu 与 Windows 另打安装包。数据库集成测试只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
+- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J12，Linux 用 xvfb），Ubuntu 与 Windows 另打安装包。数据库集成测试只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
 - 测试失败时禁止 `.skip` 合并；确需暂时跳过须附任务编号与原因，并在一周内处理。

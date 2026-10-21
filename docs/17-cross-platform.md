@@ -171,6 +171,8 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 
 **不进 CI**：`test:oc`、`test:live`、J10（`journey.electron.spec.ts`）需要真实 opencode、登录的模型与网络，仍在本机运行。
 
+**浏览器 E2E 不经 Vite 开发服务器。** 后端先 `vite build` 出开发模式的前端（保留开发页面），再像打包应用一样同源托管它。CI 的 J9 trace 显示：Vite 客户端的 HMR 连接偶发断开后会 `location.reload()`，正在加载的模块请求全部中止，页面停在未渲染状态（`data-theme` 等不到，M6 遗留的偶发失败即此）；按需转换的几百个模块也让 Windows 上每次打开页面都很慢。改为构建产物后，本机 E2E 从 4.9 分钟降到 1.9 分钟。
+
 ### 4.2 测试代码中的平台差异
 
 只在测试辅助函数中处理，测试用例本身不写平台判断：
