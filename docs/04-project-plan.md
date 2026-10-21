@@ -56,12 +56,12 @@
 
 ### 5.2 v1.2（原 v1.2 与 v1.3 合并）
 
-只做以下四项：
+只做以下四项，**均已合并**（2026-10-22）：
 
-1. **PR 审查意见回流**：PR/MR 上的审查意见可一键「让 AI 再改改」，修改推送回同一 PR。
-2. **定时任务**：按计划自动运行流程（如每晚补单测、每周依赖检查），结果进入「需要你处理」等待确认；合并仍需用户点击（D16）。设计见 [22-scheduled-tasks.md](22-scheduled-tasks.md)（D90–D92）。
-3. **PPT 制作**：设计稿 `ppt*.html` 为参考，开发前先写设计文档：[23-ppt.md](23-ppt.md)（D93–D96）。
-4. **更多数据库**：PostgreSQL、openGauss / GaussDB（复用 PostgreSQL 驱动）、SQL Server、GoldenDB（MySQL 协议，复用 mysql2，作为独立类型列出），均在 `DbDriver` 扩展点下实现，保持只读（D07）。
+1. **PR 审查意见回流**：PR/MR 上的审查意见可一键「让 AI 再改改」，修改推送回同一 PR。设计见 [21-review-feedback.md](21-review-feedback.md)（D87–D89），PR #24。
+2. **定时任务**：按计划自动运行流程（如每晚补单测、每周依赖检查），结果进入「需要你处理」等待确认；合并仍需用户点击（D16）。设计见 [22-scheduled-tasks.md](22-scheduled-tasks.md)（D90–D92），PR #25。
+3. **PPT 制作**：设计稿 `ppt*.html` 为参考，开发前先写设计文档：[23-ppt.md](23-ppt.md)（D93–D96），PR #23。
+4. **更多数据库**：PostgreSQL、openGauss / GaussDB（默认只存 sha256 口令，pg 无法登录，改用华为维护的 pg 分支 gaussdb-node，D97）、SQL Server、GoldenDB（MySQL 协议，复用 mysql2，作为独立类型列出），均在 `DbDriver` 扩展点下实现，保持只读（D07）。设计见 [24-databases.md](24-databases.md)（D97–D99），PR #26、#27。
 
 ### 5.3 明确不做
 
