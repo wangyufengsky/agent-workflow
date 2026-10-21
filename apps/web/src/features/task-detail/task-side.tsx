@@ -1,4 +1,4 @@
-import type { TaskDetailDTO } from '@aw/shared';
+import { InboxKind, type TaskDetailDTO } from '@aw/shared';
 import { Link } from '@tanstack/react-router';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
@@ -23,13 +23,15 @@ export function TaskSide({
   pro?: boolean;
 }) {
   const node = task.nodes.find((n) => n.id === selectedId);
+  // The failure panel above the canvas already says why the task failed and offers retry.
+  const inbox = task.openInbox.filter((item) => item.kind !== InboxKind.Failure);
   return (
     <aside className={styles.side}>
-      {task.openInbox.length > 0 && (
+      {inbox.length > 0 && (
         <Panel title={C.sideAttention}>
           <div className="col">
-            {task.openInbox.map((item) => (
-              <InboxCard key={item.id} item={item} />
+            {inbox.map((item) => (
+              <InboxCard key={item.id} item={item} showTask={false} />
             ))}
           </div>
         </Panel>

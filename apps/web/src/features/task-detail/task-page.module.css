@@ -61,6 +61,87 @@
   padding-left: 10px;
 }
 
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* A labelled part of the result card: its label sits 8px above the content (`.sec-t`). */
+.block {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.blockHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.blockHead > h3 {
+  margin-bottom: 0;
+}
+
+.stepSummaries {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepTitle {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.planSteps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.planSteps > li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.planSteps > li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.instructions {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--sub);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.bullets {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ink-2);
+  line-height: 1.7;
+}
+
 .headline {
   font-size: 16px;
   font-weight: 500;

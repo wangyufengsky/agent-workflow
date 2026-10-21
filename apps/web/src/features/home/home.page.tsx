@@ -1,10 +1,10 @@
-import { InboxStatus, isTerminalState, TaskStatus, taskMachine } from '@aw/shared';
+import { InboxStatus, TaskDisplayGroup, type TaskSummaryDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { EmptyState } from '../../components/empty-state.tsx';
 import { HOME_COPY } from '../../copy/home.ts';
-import { HOME_TASK_COPY as C, INBOX_COPY } from '../../copy/tasks.ts';
+import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
 import { HomeAssistantEntry } from '../assistant/home-assistant-entry.tsx';
 import { inboxQuery } from '../inbox/inbox.queries.ts';
 import { InboxCard } from '../inbox/inbox-card.tsx';
@@ -19,6 +19,34 @@ const RECENT_SHOWN = 5;
 
 const route = getRouteApi(ROUTE_IDS.home);
 
+/**
+ * Task sections below the open items (14 §3.2), by display state. Tasks waiting for the user (a question, a plan, a
+ * failure) are not repeated here: their items above say what to do.
+ */
+const SECTIONS: { title: string; groups: TaskDisplayGroup[]; limit?: number }[] = [
+  {
+    title: C.inProgress,
+    groups: [TaskDisplayGroup.Preparing, TaskDisplayGroup.Running, TaskDisplayGroup.Paused, TaskDisplayGroup.Merging],
+  },
+  { title: C.toMerge, groups: [TaskDisplayGroup.Review] },
+  { title: C.recent, groups: [TaskDisplayGroup.Completed], limit: RECENT_SHOWN },
+];
+
+function TaskSection({ title, tasks }: { title: string; tasks: TaskSummaryDTO[] }) {
+  return (
+    <section className="section">
+      <div className="section-head">
+        <h2 className="section-title">{title}</h2>
+      </div>
+      <div className="grid-2">
+        {tasks.map((t) => (
+          <TaskCard key={t.id} task={t} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /** Home (14 §3.2): start a task in one step, then what needs you, what runs and what finished. */
 export function HomePage() {
   const projects = useQuery(projectsQuery).data ?? [];
@@ -27,12 +55,10 @@ export function HomePage() {
   const projectId = projects.some((p) => p.id === search.projectId) ? search.projectId : projects[0]?.id;
   const tasks = useQuery(tasksQuery()).data ?? [];
   const attention = useQuery(inboxQuery({ status: InboxStatus.Open })).data ?? [];
-  const inProgress = tasks.filter((t) => !isTerminalState(taskMachine, t.status));
-  const recent = tasks.filter((t) => t.status === TaskStatus.Completed).slice(0, RECENT_SHOWN);
-  const label = (taskId: string | null) => {
-    const task = tasks.find((t) => t.id === taskId);
-    return task === undefined ? undefined : INBOX_COPY.inTask(task.key, task.title);
-  };
+  const sections = SECTIONS.map((section) => ({
+    title: section.title,
+    tasks: tasks.filter((t) => section.groups.includes(t.displayGroup)).slice(0, section.limit),
+  }));
 
   return (
     <div className="page">
@@ -72,36 +98,16 @@ export function HomePage() {
           </div>
           <div className="col">
             {attention.slice(0, ATTENTION_SHOWN).map((item) => (
-              <InboxCard key={item.id} item={item} taskLabel={label(item.taskId)} />
+              <InboxCard key={item.id} item={item} />
             ))}
           </div>
         </section>
       )}
-      <section className="section">
-        <div className="section-head">
-          <h2 className="section-title">{C.inProgress}</h2>
-        </div>
-        {inProgress.length === 0 ? (
-          <p className="hint">{C.noneInProgress}</p>
-        ) : (
-          <div className="grid-2">
-            {inProgress.map((t) => (
-              <TaskCard key={t.id} task={t} />
-            ))}
-          </div>
-        )}
-      </section>
-      {recent.length > 0 && (
-        <section className="section">
-          <div className="section-head">
-            <h2 className="section-title">{C.recent}</h2>
-          </div>
-          <div className="grid-2">
-            {recent.map((t) => (
-              <TaskCard key={t.id} task={t} />
-            ))}
-          </div>
-        </section>
+      {sections.map((section) =>
+        section.tasks.length === 0 ? null : <TaskSection key={section.title} {...section} />,
+      )}
+      {attention.length === 0 && sections.every((section) => section.tasks.length === 0) && (
+        <p className="hint">{C.noneInProgress}</p>
       )}
     </div>
   );

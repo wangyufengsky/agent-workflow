@@ -1,6 +1,7 @@
 import { NODE_INSTRUCTIONS_MAX_CHARS, PLAN_MAX_NODES } from '../constants/limits.ts';
 import { RequiredStepPosition } from '../enums/workflow.ts';
 import { type PlanProblem, PlanProblemCode } from '../errors/plan-problems.ts';
+import { transitiveDependencies } from './plan-dependencies.ts';
 import type { PlanGraph, PlanNodeSpec, RequiredStep } from './plan-graph.ts';
 
 export type PlanRules = {
@@ -119,26 +120,14 @@ function checkRequiredStepOrder(
   byKey: ReadonlyMap<string, PlanNodeSpec>,
   requiredSteps: PlanRules['requiredSteps'],
 ): PlanProblem[] {
-  const ancestors = new Map<string, Set<string>>();
-  const ancestorsOf = (node: PlanNodeSpec): Set<string> => {
-    const known = ancestors.get(node.key);
-    if (known !== undefined) return known;
-    const result = new Set<string>();
-    for (const key of node.dependsOn) {
-      const dependency = byKey.get(key);
-      if (dependency === undefined) continue;
-      result.add(key);
-      for (const a of ancestorsOf(dependency)) result.add(a);
-    }
-    ancestors.set(node.key, result);
-    return result;
-  };
+  const nodes = [...byKey.values()];
+  const ancestorsOf = (node: PlanNodeSpec) => transitiveDependencies(nodes, node.key);
 
   const problems: PlanProblem[] = [];
   for (const step of requiredSteps) {
     const stepNode = byKey.get(step.key);
     if (step.position === undefined || stepNode === undefined) continue;
-    const others = [...byKey.values()].filter((n) => n.key !== step.key);
+    const others = nodes.filter((n) => n.key !== step.key);
     const misplaced = (
       step.position === RequiredStepPosition.First
         ? others.filter((n) => !ancestorsOf(n).has(step.key))

@@ -11,7 +11,7 @@ import { StatusBadge } from '../../components/status-badge.tsx';
 import { Tabs } from '../../components/tabs.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { NODE_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
-import { TranscriptView } from '../attempts/transcript-view.tsx';
+import { ProcessView } from '../attempts/process-view.tsx';
 import { NodeBadge } from '../tasks/task-badge.tsx';
 import { nodeDiffFileQuery, nodeDiffQuery, nodeQuery } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
@@ -120,11 +120,11 @@ export function Changes({ node }: { node: NodeDetailDTO }) {
   );
 }
 
-/** Session replay of the step's latest execute attempt, following new lines while running. */
-function Process({ node }: { node: NodeDetailDTO }) {
+/** The step's latest execute attempt in the simple view, following new lines while running (14 §3.4「过程」). */
+export function Process({ node }: { node: NodeDetailDTO }) {
   const [follow, setFollow] = useState(true);
   const end = useRef<HTMLDivElement>(null);
-  const attempt = node.attempts.filter((a) => a.kind === AttemptKind.Execute).at(-1);
+  const attempt = latestExecute(node);
   useEffect(() => {
     if (follow) end.current?.scrollIntoView({ block: 'end' });
   });
@@ -138,13 +138,37 @@ function Process({ node }: { node: NodeDetailDTO }) {
           <span>{C.follow}</span>
         </label>
       </span>
-      <TranscriptView attemptId={attempt.id} />
+      <ProcessView attemptId={attempt.id} progress={attempt.endedAt === null ? attempt.progress : null} />
       <div ref={end} />
     </div>
   );
 }
 
-/** Step details in a drawer (14 §3.4): output, changes, process; the pro view links to the full page (M5-04). */
+const latestExecute = (node: NodeDetailDTO) => node.attempts.filter((a) => a.kind === AttemptKind.Execute).at(-1);
+
+/** A step without output yet opens on what the AI is doing; otherwise on its output. */
+export const firstTab = (node: NodeDetailDTO) =>
+  node.result === null && latestExecute(node) !== undefined ? 'process' : 'output';
+
+/** The three tabs of a step in the simple view (14 §3.4). */
+export function NodeTabs({ node }: { node: NodeDetailDTO }) {
+  return (
+    <Tabs
+      key={node.id}
+      defaultValue={firstTab(node)}
+      items={[
+        { value: 'output', label: C.output, content: <Output node={node} /> },
+        { value: 'changes', label: C.changes, content: <Changes node={node} /> },
+        { value: 'process', label: C.process, content: <Process node={node} /> },
+      ]}
+    />
+  );
+}
+
+/**
+ * Step details in a drawer beside the canvas (14 §3.4): output, changes, process; clicking another step on the canvas
+ * shows that one. The pro view links to the full page (M5-04).
+ */
 export function NodeDrawer({
   taskId,
   nodeId,
@@ -162,7 +186,8 @@ export function NodeDrawer({
       open={nodeId !== undefined}
       onOpenChange={(open) => !open && onClose()}
       title={node.data?.title ?? ''}
-      size="wide"
+      size="lg"
+      modal={false}
     >
       {node.isPending && nodeId !== undefined && <p className="hint">{COMMON_COPY.loading}</p>}
       {node.isError && <ErrorState error={node.error} onRetry={() => void node.refetch()} />}
@@ -177,13 +202,7 @@ export function NodeDrawer({
               </Link>
             )}
           </span>
-          <Tabs
-            items={[
-              { value: 'output', label: C.output, content: <Output node={node.data} /> },
-              { value: 'changes', label: C.changes, content: <Changes node={node.data} /> },
-              { value: 'process', label: C.process, content: <Process node={node.data} /> },
-            ]}
-          />
+          <NodeTabs node={node.data} />
         </div>
       )}
     </Drawer>

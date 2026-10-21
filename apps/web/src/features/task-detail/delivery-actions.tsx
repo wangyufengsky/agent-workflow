@@ -227,16 +227,19 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
             {C.createPr}
           </Button>
         </span>
-        {!canPr && project.data !== undefined && (
-          <Link to={ROUTES.project} params={{ projectId: task.project.id }} className="hint">
-            {C.prBindRemote}
-          </Link>
-        )}
         <Button onClick={() => setOpen('revise')}>{C.revise}</Button>
         <Button variant="ghost" onClick={() => setOpen('discard')}>
           {C.discard}
         </Button>
       </div>
+      {!canPr && project.data !== undefined && (
+        <p className="hint">
+          {C.prNeedsRemote}{' '}
+          <Link to={ROUTES.project} params={{ projectId: task.project.id }} className="link">
+            {C.prBindRemote}
+          </Link>
+        </p>
+      )}
       {(deliver.isError || changes.isError) && open === undefined && (
         <ErrorState error={deliver.isError ? deliver.error : changes.error} />
       )}

@@ -10,3 +10,25 @@
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+.models {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.models > li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+  padding: var(--s-2) 0;
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+
+.models > li + li {
+  border-top: 1px solid var(--line);
+}
