@@ -46,7 +46,8 @@ function classify(tool: string, input: Record<string, unknown>): 'search' | { re
 const slashed = (path: string) => path.replaceAll('\\', '/');
 
 /**
- * The research stages from the turn's session stream (18 §2.1): no extra reporting by the model, only its tool calls.
+ * The research stages from the turn's session stream (18 §2.1): no extra reporting by the model, only its tool calls
+ * and the answer text it writes after them.
  * `basePath` (the repository) is cut from file paths so they read as the citations do: with `/` separators, also for
  * the native `C:\…` paths opencode reports on Windows (17 §3.10).
  */
@@ -55,6 +56,8 @@ export function researchSteps(entries: readonly TranscriptEntry[], basePath: str
   const reads: string[] = [];
   let submitted = false;
   let rejected = false;
+  /** Text after the last research call: the answer is being written (18 §5.5). */
+  let writing = false;
   const base = slashed(basePath);
   const prefix = base.endsWith('/') ? base : `${base}/`;
   for (const entry of entries) {
@@ -62,11 +65,13 @@ export function researchSteps(entries: readonly TranscriptEntry[], basePath: str
       rejected = entry.data.status === 'error';
       continue;
     }
+    if (entry.kind === TranscriptEntryKind.Text && entry.data.text.trim() !== '') writing = true;
     if (entry.kind !== TranscriptEntryKind.ToolCall) continue;
     if (entry.data.tool === SUBMIT) {
       submitted = true;
       continue;
     }
+    writing = false;
     const kind = classify(entry.data.tool, entry.data.input);
     if (kind === 'search') searches++;
     else if (kind !== undefined) {
@@ -75,12 +80,7 @@ export function researchSteps(entries: readonly TranscriptEntry[], basePath: str
       if (!reads.includes(label)) reads.push(label);
     }
   }
-  const current: ResearchStep = submitted
-    ? 'answer'
-    : reads.length > 0
-      ? 'read'
-      : searches > 0
-        ? 'search'
-        : 'understand';
+  const current: ResearchStep =
+    submitted || writing ? 'answer' : reads.length > 0 ? 'read' : searches > 0 ? 'search' : 'understand';
   return { current, searches, reads, rejected };
 }

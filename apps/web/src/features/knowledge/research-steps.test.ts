@@ -44,6 +44,20 @@ describe('researchSteps', () => {
     expect(researchSteps(entries, 'C:\\Users\\me\\repo').reads).toEqual(['src/refund.ts']);
   });
 
+  it('查完资料后开始写正文即进入组织回答；之后再查资料又回到读取', () => {
+    const text = (t: string): TranscriptEntry => ({
+      seq: ++seq,
+      ts: 0,
+      partId: `p${seq}`,
+      kind: TranscriptEntryKind.Text,
+      data: { text: t },
+    });
+    const read = call('read', { filePath: '/repo/a.ts' });
+    expect(researchSteps([read, text('It is [1].')], '/repo').current).toBe('answer');
+    const more = [read, text('Let me check.'), call('read', { filePath: '/repo/b.ts' })];
+    expect(researchSteps(more, '/repo').current).toBe('read');
+  });
+
   it('提交回答后进入组织回答；被拒绝时标出正在修正，重提通过后不再标出', () => {
     const rejected = [call('agent-workflow_submit_answer'), result('agent-workflow_submit_answer', 'error')];
     expect(researchSteps(rejected, '/repo')).toMatchObject({ current: 'answer', rejected: true });

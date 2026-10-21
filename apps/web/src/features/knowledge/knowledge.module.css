@@ -505,3 +505,35 @@
   gap: var(--s-2);
   margin-top: var(--s-1);
 }
+
+/* Draft answers (18 §5.5): markers wait for the citation check */
+.pendingMark {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin: 0 1px;
+  padding: 0 4px;
+  border-radius: var(--r-xs);
+  background: var(--fill-3);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  vertical-align: super;
+  line-height: 1;
+  cursor: help;
+}
+.modelPick {
+  max-width: 220px;
+  height: 28px;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--sub);
+  font-size: var(--fs-xs);
+}
+.modelTag {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+}

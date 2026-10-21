@@ -1,10 +1,9 @@
-import { type KnowledgeTurnDTO, KnowledgeTurnStatus } from '@aw/shared';
+import { type KnowledgeTurnDTO, KnowledgeTurnStatus, type TranscriptEntry } from '@aw/shared';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { Icon } from '../../components/icon.tsx';
 import { KNOWLEDGE_COPY as C } from '../../copy/knowledge.ts';
-import { attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
 import styles from './knowledge.module.css';
 import { RESEARCH_STEPS, researchSteps } from './research-steps.ts';
 
@@ -15,8 +14,16 @@ const READS_SHOWN = 8;
  * The research process of one question (18 §2.1): open while researching, folded into one line once there is an
  * answer. The stages come from the turn's session stream.
  */
-export function ResearchCard({ turn, repoPath }: { turn: KnowledgeTurnDTO; repoPath: string }) {
-  const { entries } = useTranscript(attemptTranscript(turn.attempt.id));
+export function ResearchCard({
+  turn,
+  entries,
+  repoPath,
+}: {
+  turn: KnowledgeTurnDTO;
+  /** The turn's session stream. */
+  entries: readonly TranscriptEntry[];
+  repoPath: string;
+}) {
   const progress = researchSteps(entries, repoPath);
   const researching = turn.status === KnowledgeTurnStatus.Researching;
   const [open, setOpen] = useState<boolean | undefined>(undefined);

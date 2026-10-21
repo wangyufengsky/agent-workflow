@@ -1,6 +1,6 @@
 # 18 · 知识问答（v1.1）
 
-> 状态：**v1.1 已实现**（任务 K-01…K-11，见 [05](05-dev-plan.md#v11--知识问答)）。需要用户拍板的取舍记在 [02](02-decisions.md) D67–D69（待用户确认），实现按其中的保守方案。
+> 状态：**v1.1 已实现**（任务 K-01…K-11；流式回答与模型选择为 K-12…K-15，见 [05](05-dev-plan.md#v11--知识问答)）。用户已确认 D67（2026-10-22：范围按对话固定、研究员不提问维持，回答改为流式，新增模型选择）与 D69；D68 中研究不计入调度并发一项仍待确认。
 
 ## 1. 定位
 
@@ -40,8 +40,9 @@
   | 读取原文 | `read`、bash 的 `cat` `head` `tail` `git show`、`webfetch`、`db_query`：逐个列出文件 / 网址 / 查询 |
   | 组织回答 | 调用 `submit_answer` 之后；被拒绝时显示「引用有误，正在修正」 |
   `report_progress` 的最新一句（尝试的「当前进展」）显示在卡片标题旁。
-- **回答**：Markdown；引用编号 `[n]` 渲染为可点击的上标。回答在 `submit_answer` 通过校验后一次出现（不流式，D67：引用要先校验）。回答下方列出引用卡（编号、文件路径与行号 / 连接与查询 / 网页标题，点击同样打开原文）。
-- **停止**：研究中输入框右侧的按钮变为「停止」，停止后这一轮显示「已停止」，可以「重新提问」（同一问题作为新一轮）。
+- **回答（流式，D67 ②）**：研究员查完资料后先把回答作为普通正文写出，界面边写边显示这份**草稿**；草稿中的引用编号渲染为灰色的「待核对」，不可点击（§5.5）。`submit_answer` 通过引用校验后，以提交的正文替换草稿，编号变为可点击的上标，回答下方列出引用卡（编号、文件路径与行号 / 连接与查询 / 网页标题，点击同样打开原文）。校验失败时草稿保持「待核对」，研究过程卡显示「引用有误，正在修正」，以修正后通过校验的版本为准；未经校验的编号永远不会变成可点击。
+- **模型（D67 ④）**：输入框角落有一个小的模型选择（简单与专业模式都显示），选项为 opencode 的 provider 列表（与角色页同源），默认 `ai.defaultModel`，未设置时为「默认模型」（opencode 自己的默认）。每一轮可以换模型，续问也可以；这一轮的模型显示在研究员一行与对话记录中。
+- **停止**：研究中输入框右侧的按钮变为「停止」，停止后这一轮显示「已停止」；已写出的草稿保留，标为「已停止，引用未核对」，可以「重新提问」（同一问题作为新一轮）。
 - **失败**（未提交、超时、会话出错、应用重启中断）：显示原因（按错误码的文案）与「重新提问」。
 - **等待你允许**：研究员要运行只读白名单以外的命令时，权限请求进入「需要你处理」（与任务相同，03 §2.5）；这一轮显示「等待你允许一条命令」与「去处理」链接。
 - 一个对话同时只有一轮在研究；研究中输入框可以输入但不能发送。
@@ -114,8 +115,8 @@
 | --- | --- | --- | --- |
 | `knowledge.list` | `GET /knowledge/conversations?projectId&query&limit&cursor` | read | 对话列表（`KnowledgeConversationSummaryDTO`），按 `updated_at` 倒序，游标分页；`query` 匹配问题与回答 |
 | `knowledge.get` | `GET /knowledge/conversations/:id` | read | 对话详情：项目、范围、全部轮次（`KnowledgeTurnDTO`） |
-| `knowledge.ask` | `POST /knowledge/conversations` `{ projectId, question, sources }` | read | 新建对话并开始第一轮，返回详情（201） |
-| `knowledge.followUp` | `POST /knowledge/conversations/:id/turns` `{ question }` | read | 续问：同一会话的新一轮；上一轮还在研究 → `KNOWLEDGE_CONVERSATION_BUSY` |
+| `knowledge.ask` | `POST /knowledge/conversations` `{ projectId, question, sources, model? }` | read | 新建对话并开始第一轮，返回详情（201） |
+| `knowledge.followUp` | `POST /knowledge/conversations/:id/turns` `{ question, model? }` | read | 续问：同一会话的新一轮；上一轮还在研究 → `KNOWLEDGE_CONVERSATION_BUSY` |
 | `knowledge.stop` | `POST /knowledge/conversations/:id/stop` | write | 中止研究中的一轮（尝试 `aborted`）；没有研究中的一轮 → `STATE_TRANSITION_INVALID` |
 | `knowledge.delete` | `DELETE /knowledge/conversations/:id` | critical | 删除对话（§3） |
 | `knowledge.citation` | `GET /knowledge/turns/:turnId/citations/:index` | read | 一处引用的原文（§6.3）；`index` 从 1 起 |
@@ -126,6 +127,7 @@ type KnowledgeSources = { code: boolean; docs: boolean; database: boolean; web: 
 type KnowledgeTurnDTO = {
   id: string; seq: number; question: string;
   status: KnowledgeTurnStatus;                 // researching | answered | stopped | failed
+  model: string | null;                         // 这一轮的模型（研究尝试的 model 列）；null = opencode 默认
   attempt: AttemptSummaryDTO;                   // 进展、错误、用时；会话流按 attempt.id 读取
   awaitingInput: boolean;                       // 有待处理的权限请求
   answer: string | null;
@@ -143,11 +145,12 @@ type KnowledgeConversationDTO = {
 type KnowledgeConversationSummaryDTO = {
   id: string; title: string; project: { id: string; name: string };
   turnCount: number;
-  latest: { status: KnowledgeTurnStatus; answerExcerpt: string | null; citationCount: number; error: ErrorInfo | null };
+  latest: { status: KnowledgeTurnStatus; model: string | null; answerExcerpt: string | null; citationCount: number; error: ErrorInfo | null };
   updatedAt: number;
 };
 ```
 
+- `model`：`provider/model`、`null`（opencode 默认）或省略（`ai.defaultModel`，应用助手的调用即如此）；格式不对 → `VALIDATION_FAILED`。
 - 发起时 opencode 未就绪 → `OPENCODE_NOT_READY`（503），什么都不写。
 - 项目没有关联数据库却勾选了 `database` → `VALIDATION_FAILED`（`details.issues` 指向 `sources.database`）。
 - SSE：`knowledge.updated { conversationId }`（新一轮、提交答案、尝试结束、删除时发出），界面据此刷新对话与列表；研究过程的实时片段沿用 `attempt.transcript` 与 `attempt.updated`。
@@ -183,6 +186,7 @@ type KnowledgeConversationSummaryDTO = {
 ### 5.2 尝试类型 `research`
 
 - `AttemptKind.Research`；提交工具 `ATTEMPT_SUBMIT_TOOL.research = submit_answer`；`nudge.md` 照常提醒；超时用 `attempt.timeoutMinutes`。
+- 模型：这一轮的 `model`（请求给出的，或 `ai.defaultModel`）记录在研究尝试上并随每条消息发送；续问可以换模型（`continueSession` 带新模型），同一 opencode 会话里前后轮可以是不同模型。
 - 首条消息 `start-research.md`：项目名、问题、本对话的资料范围（勾选项、关联数据库名称、网络开关）、引用规则（§6）；续问 `research-followup.md`：新问题，提醒仍需 `submit_answer`。
 - 不计入调度器的并发上限（D68：研究是用户当场发起、等着看的）。
 
@@ -201,6 +205,15 @@ type KnowledgeConversationSummaryDTO = {
 | `report_progress` | 允许；最新一句显示在研究过程卡上 |
 | `db_list_connections` / `db_describe` / `db_query` | 允许；连接来自对话的项目。范围不含数据库时 `db_list_connections` 返回空列表，其他两个返回 `DB_CONNECTION_NOT_FOUND`（与调试尝试相同） |
 | `get_task_context` `get_node_output` `get_task_diff` `submit_*` `ask_user` | 不允许（`MCP_TOOL_NOT_ALLOWED`）。研究员不向用户提问：问题有歧义时在回答里写明理解与假设 |
+
+### 5.5 流式回答（D67 ②）
+
+- **研究员怎么写**：协议提示词要求研究期间不在工具调用之间写说明；查完后先把完整回答作为正文写出（Markdown，`[n]` 标注），**然后**调用 `submit_answer` 提交同样的正文与引用。`submit_answer` 的契约不变，回答以提交的正文为准。
+- **草稿怎么来**：研究尝试的会话流照常记录模型正文（`text` 条目，同一 `partId` 多行），研究尝试的流式正文每增长 `KNOWLEDGE_DRAFT_FLUSH_CHARS`（24）个字符就写一次会话流并经 SSE `attempt.transcript` 推送（其他尝试仍是 `TRANSCRIPT_TEXT_FLUSH_CHARS`），所以草稿持久化、刷新页面后还在、与工具调用保持先后顺序。草稿 = 最后一个（非 `submit_answer` 的）工具调用之后的 `text` 条目（`answerDraft(entries)`，`shared/knowledge/draft.ts`，前端与测试共用）：研究员在工具调用之间写的零星说明，随后的工具调用一到就不再算草稿。
+- **显示规则**：研究中（含校验失败后修正中）显示草稿，编号灰色「待核对」；`answered` 显示提交的正文与可点击的引用；`stopped` / `failed` 有草稿时显示草稿与「已停止，引用未核对」。
+- **tokens**：正文输出两遍（正文 + `submit_answer` 参数），多出的输出 tokens 约等于回答长度（数百到一千多）；研究阶段读文件的输入 tokens 通常是它的几十倍，影响很小。另一种做法是 `submit_answer` 只提交引用、回答取模型最后一段正文，省掉这部分 tokens，但模型的最后一段正文常夹带别的话，回答与校验对象可能不一致，所以不采用。
+- 应用助手的异步调用（§4a）不变：助手收到的仍是通过校验后的最终回答。
+- 模型不先写正文、直接提交时没有草稿，界面在提交通过后直接显示回答（不会出现未经校验的可点击引用）。live 中 `deepseek-v4.1-flash` 起初就这样做，首条消息与协议提示词随后写明「先写正文、再提交」的两步顺序，此后三次 live 都先流式写出正文（草稿与提交的回答一致）。
 
 ## 6. 引用
 
@@ -296,5 +309,6 @@ apps/web/src/features/knowledge/       页面、研究过程卡、回答与引�
 | 集成 | `knowledge.int.test.ts`（FakeOpencode）：提问 → 会话的目录 / agent / 规则正确 → `submit_answer` 通过后轮次 `answered`、引用与 excerpt 正确；引用校验每个子码（不存在的文件、越界行号、`..` 与符号链接越界、`.git`、范围外来源、未知标注、未用引用、未知连接）且返回 hint，修正后重提成功；只读：研究会话的规则无 edit、bash 写命令 ask、`task` deny、网络默认 deny；续问沿用同一 opencode 会话且上一轮研究中时 `KNOWLEDGE_CONVERSATION_BUSY`；停止 → `stopped`；未提交 → 提醒 → `failed`；读取原文（窗口、`changed`、文件删除后 404、编号越界 404）；删除对话清理尝试与会话流；删除项目时研究中拒绝、结束后级联；`research` 尝试不能调用 `submit_result` / `ask_user`；数据库引用（Docker MySQL）：原文重新执行只读查询 |
 | `@opencode` | 注入后 `aw-researcher` 在 opencode 配置中可见 |
 | 集成（助手） | `assistant.knowledge.int.test.ts`：`knowledge_ask` 不需确认、立即返回 `researching`；研究完成后助手会话收到带引用与链接的回答消息、对话中有导航卡片；研究失败时收到错误码与原因 |
-| E2E | J13：对助手提问 → 「正在查资料」→ 导航卡片与带引用的回答 → 点引用看到原文 → 卡片「打开」进入知识对话页。J12（FakeOpencode）：首屏 → 提问 → 研究过程（检索、读取）→ 带引用的回答 → 点击引用看原文（高亮、下一处）→ 续问 → 对话记录中出现并可回到对话；J9 走查加入知识问答三个状态 |
-| live | `live/knowledge.live.test.ts`：对 `ts-stats` 提一个有确定答案的问题，断言回答带有效引用且引用指向正确的文件，报告写到 `live/reports/knowledge-*.json` |
+| 集成（流式与模型） | `knowledge.int.test.ts`：草稿在提交前以 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 的粒度写进会话流、提交后回答为提交的正文；校验失败时仍在研究、没有回答、草稿保留；停止后草稿保留；四轮分别用请求的模型、换模型、`ai.defaultModel`、opencode 默认，记录在轮次上并随首条消息发送 |
+| E2E | J14：草稿与「待核对」编号 → 提交通过后可点击；换模型续问后对话与对话记录显示模型。J13：对助手提问 → 「正在查资料」→ 导航卡片与带引用的回答 → 点引用看到原文 → 卡片「打开」进入知识对话页。J12（FakeOpencode）：首屏 → 提问 → 研究过程（检索、读取）→ 带引用的回答 → 点击引用看原文（高亮、下一处）→ 续问 → 对话记录中出现并可回到对话；J9 走查加入知识问答三个状态 |
+| live | `live/knowledge.live.test.ts`（K-15 起另断言回答先以正文流式写出）：对 `ts-stats` 提一个有确定答案的问题，断言回答带有效引用且引用指向正确的文件，报告写到 `live/reports/knowledge-*.json` |

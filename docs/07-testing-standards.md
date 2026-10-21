@@ -79,7 +79,8 @@
 | J11 | 对助手说开始任务 → 确认卡片 → 任务运行（v1.1，`shell-assistant.browser.spec.ts`；同文件另有主页输入 → 面板、`open_page` 跳转、「总是允许」→ 设置页撤销的冒烟） | 浏览器 |
 | J12 | 知识问答：提问 → 研究过程（检索、读取）→ 带引用的回答 → 点击引用看原文（高亮、下一处、Esc）→ 续问 → 对话记录中回到对话（v1.1，`project-knowledge.browser.spec.ts`；FakeOpencode 的 `tool` 步骤报告只读的原生工具调用） | 浏览器 |
 | J13 | 对助手提问（知识问答）→「正在查资料」→ 导航卡片与带引用的回答 → 点引用看到原文 → 卡片「打开」进入知识对话页（v1.1，`project-knowledge.browser.spec.ts`） | 浏览器 |
-| J14 | Electron 启动冒烟（`launch.electron.spec.ts`，`pnpm e2e:smoke`）：构建后的应用启动后端、显示引导页（各项检测有结果）、正常退出（main 等后端停止 opencode 后退出）。不需要 opencode 与模型，三平台 CI 运行（17 §4.1） | Electron |
+| J14 | 知识问答流式回答与模型：草稿出现、引用编号「待核对」不可点 → 提交通过后变为可点击的引用；换模型续问，对话与对话记录显示各轮模型（v1.1，`project-knowledge.browser.spec.ts`） | 浏览器 |
+| J15 | Electron 启动冒烟（`launch.electron.spec.ts`，`pnpm e2e:smoke`）：构建后的应用启动后端、显示引导页（各项检测有结果）、正常退出（main 等后端停止 opencode 后退出）。不需要 opencode 与模型，三平台 CI 运行（17 §4.1） | Electron |
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 
@@ -106,5 +107,5 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 不设全局覆盖率百分比。
 - 以下模块要求分支覆盖率 ≥ 90%：`shared/fsm`、`shared/workflow`（计划校验）、`scheduler`、`mcp.registry`。
 - 本地 `pnpm verify`：check + test + test:int + build，另加 e2e（浏览器）必须全绿；`test:oc` 在装有 opencode 的机器上随 `pnpm verify:full` 执行。
-- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J14，Linux 用 xvfb），Ubuntu 与 Windows 另打安装包。数据库集成测试只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
+- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J15，Linux 用 xvfb），Ubuntu 与 Windows 另打安装包。数据库集成测试只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
 - 测试失败时禁止 `.skip` 合并；确需暂时跳过须附任务编号与原因，并在一周内处理。

@@ -12,6 +12,7 @@ export function Composer({
   pending,
   onSend,
   onStop,
+  tools,
   children,
 }: {
   placeholder: string;
@@ -22,6 +23,8 @@ export function Composer({
   pending: boolean;
   onSend(question: string, clear: () => void): void;
   onStop?: () => void;
+  /** In the box's bottom corner: the model picker. */
+  tools?: ReactNode;
   /** Shown under the box: the sources. */
   children?: ReactNode;
 }) {
@@ -49,6 +52,7 @@ export function Composer({
           onKeyDown={onKeyDown}
         />
         <div className={styles.composerBar}>
+          {tools}
           <span className="hint grow">{blockedReason ?? C.inputHint}</span>
           {researching && onStop !== undefined ? (
             <Button icon="stop" onClick={onStop}>

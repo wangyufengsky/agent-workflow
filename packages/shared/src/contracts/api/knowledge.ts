@@ -15,6 +15,15 @@ export const knowledgeSourcesSchema = z
 export type KnowledgeSources = z.infer<typeof knowledgeSourcesSchema>;
 
 const question = z.string().trim().min(1).max(KNOWLEDGE_QUESTION_MAX_CHARS);
+/**
+ * The turn's model (D67 ④): `provider/model`, null for opencode's default, left out for `ai.defaultModel` (the
+ * assistant's calls).
+ */
+const model = z
+  .string()
+  .regex(/^[^/]+\/.+$/, 'provider/model')
+  .nullable()
+  .optional();
 
 /** A stored citation (18 §6.1): numbered by its position in the turn, from 1. */
 export const citationSchema = z.discriminatedUnion('type', [
@@ -37,6 +46,8 @@ export const knowledgeTurnSchema = z.object({
   seq: z.number(),
   question: z.string(),
   status: knowledgeTurnStatusSchema,
+  /** The turn's model, recorded on its research attempt; null is opencode's default. */
+  model: z.string().nullable(),
   /** Progress, error and timing; the research process is this attempt's transcript. */
   attempt: attemptSummarySchema,
   /** A permission request of the researcher waits in「需要你处理」. */
@@ -69,6 +80,7 @@ export const knowledgeConversationSummarySchema = z.object({
   turnCount: z.number(),
   latest: z.object({
     status: knowledgeTurnStatusSchema,
+    model: z.string().nullable(),
     /** The answer's beginning as plain text. */
     answerExcerpt: z.string().nullable(),
     citationCount: z.number(),
@@ -94,10 +106,11 @@ export const askKnowledgeRequestSchema = z.object({
   projectId: z.string(),
   question,
   sources: knowledgeSourcesSchema,
+  model,
 });
 export type AskKnowledgeRequest = z.infer<typeof askKnowledgeRequestSchema>;
 
-export const followUpKnowledgeRequestSchema = z.object({ id: z.string(), question });
+export const followUpKnowledgeRequestSchema = z.object({ id: z.string(), question, model });
 
 /** The original behind one citation (18 §6.3). */
 export const citationSourceSchema = z.discriminatedUnion('type', [

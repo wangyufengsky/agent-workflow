@@ -55,7 +55,7 @@ const liveTranscriptQuery = (source: TranscriptSource) =>
 
 /**
  * Display order of pages followed by live lines: each line once (by seq); a streaming part keeps the position where
- * it first appeared and shows its latest text (10 §3). Pages cover lines 1…n without gaps, so a live line not in
+ * it first appeared and shows its latest text, whichever source brought that line (10 §3). Pages cover lines 1…n without gaps, so a live line not in
  * them comes after all of them.
  */
 export function transcriptEntries(
@@ -71,7 +71,8 @@ export function transcriptEntries(
     const partId = 'partId' in entry ? entry.partId : undefined;
     const at = partId === undefined ? undefined : indexOfPart.get(partId);
     if (at !== undefined) {
-      entries[at] = entry;
+      // A page keeps a part's last line only, so an older line of it may come later from the live lines.
+      if (entry.seq > (entries[at]?.seq ?? 0)) entries[at] = entry;
       continue;
     }
     if (partId !== undefined) indexOfPart.set(partId, entries.length);

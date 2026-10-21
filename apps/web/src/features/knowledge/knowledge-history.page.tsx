@@ -47,6 +47,7 @@ function Row({ item, onDelete }: { item: KnowledgeConversationSummaryDTO; onDele
           <span className={styles.historyMeta}>
             <StatusBadge tone={STATUS_TONE.knowledgeTurn[latest.status]} label={C.status[latest.status]} />
             <span className="hint">{item.project.name}</span>
+            <span className="hint mono">{C.modelOf(latest.model)}</span>
             <span className="hint">{C.turns(item.turnCount)}</span>
             {latest.citationCount > 0 && <span className="hint">{C.citationCount(latest.citationCount)}</span>}
           </span>

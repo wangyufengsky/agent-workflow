@@ -1,8 +1,9 @@
 import { existsSync, symlinkSync } from 'node:fs';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  answerDraft,
   askKnowledgeOp,
   CitationProblemCode,
   deleteKnowledgeOp,
@@ -19,6 +20,8 @@ import {
   readonlyBashRules,
   ServerEventType,
   stopKnowledgeOp,
+  type TranscriptPage,
+  updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
@@ -65,6 +68,18 @@ async function ask(projectId: string, question: string, sources = CODE_AND_DOCS)
   await ended;
   await t.fake.settled();
   return (await t.call(getKnowledgeOp, { id: res.body.id })).body;
+}
+
+async function transcript(attemptId: string) {
+  const res = await t.request({ method: 'GET', url: `/attempts/${attemptId}/transcript` });
+  const page: TranscriptPage = JSON.parse(res.body);
+  return page.entries;
+}
+
+/** Lines of text in the attempt's JSONL: each flush of a streaming part is one. */
+async function rawTextLines(attemptId: string): Promise<number> {
+  const file = join(t.dataDir, 'runs', 'knowledge', `${attemptId}.jsonl`);
+  return (await readFile(file, 'utf8')).split('\n').filter((line) => line.includes('"kind":"text"')).length;
 }
 
 const answering = (answer = 'Here [1].') =>
@@ -349,6 +364,105 @@ describe('知识问答', () => {
     const next = await ask(p.id, 'two');
     expect(next.turns[0]?.status).toBe(KnowledgeTurnStatus.Answered);
     expect(t.logs.filter((l) => l.level >= 50)).toEqual([]);
+  });
+
+  it('流式回答：草稿在提交前细粒度地写进会话流；校验通过后以提交的正文为回答', async () => {
+    const { project: p } = await project();
+    const draft = 'The refund is rounded to cents in `refund()` before the fee is applied [1], see the guide.';
+    t.fake.enqueue(
+      script()
+        .tool('read', { filePath: 'src/refund.ts' })
+        .text(draft)
+        .callTool('submit_answer', {
+          answer: 'Rounded in `refund()` [1].',
+          citations: [fileCitation('src/refund.ts', 3, 3)],
+        }),
+      RESEARCHER,
+    );
+    const turn = (await ask(p.id, 'Where is the refund rounded?')).turns[0];
+    if (turn === undefined) throw new Error('no turn');
+
+    const entries = await transcript(turn.attempt.id);
+    const submitAt = entries.findIndex((e) => e.kind === 'tool_call' && e.data.tool === 'agent-workflow_submit_answer');
+    const drafts = entries.slice(0, submitAt).filter((e) => e.kind === 'text');
+    // Pages show each streaming part once; the raw lines are the flushes.
+    expect(await rawTextLines(turn.attempt.id)).toBeGreaterThanOrEqual(Math.floor(draft.length / 24));
+    expect(drafts.map((e) => (e.kind === 'text' ? e.data.text : ''))).toEqual([draft]);
+    expect(answerDraft(entries.slice(0, submitAt))).toBe(draft);
+    expect(turn).toMatchObject({ status: KnowledgeTurnStatus.Answered, answer: 'Rounded in `refund()` [1].' });
+  });
+
+  it('校验失败时这一轮仍在研究、没有回答，草稿保留；停止后草稿仍在，轮次为已停止', async () => {
+    const { project: p } = await project();
+    const draft = 'It is rounded in refund [1].';
+    t.fake.enqueue(
+      script()
+        .text(draft)
+        .callTool('submit_answer', { answer: draft, citations: [fileCitation('src/missing.ts', 1, 1)] })
+        .hang(),
+      RESEARCHER,
+    );
+    const rejected = waitForEvent(t.app.events, ServerEventType.AttemptTranscript, (d) =>
+      d.entries.some((e) => e.kind === 'tool_result' && e.data.tool === 'agent-workflow_submit_answer'),
+    );
+    const { body } = await t.call(askKnowledgeOp, { projectId: p.id, question: 'q', sources: CODE_AND_DOCS });
+    await rejected;
+
+    const researching = (await t.call(getKnowledgeOp, { id: body.id })).body.turns[0];
+    expect(researching).toMatchObject({ status: KnowledgeTurnStatus.Researching, answer: null, citations: [] });
+    expect(answerDraft(await transcript(researching?.attempt.id ?? ''))).toBe(draft);
+
+    const stopped = (await t.call(stopKnowledgeOp, { id: body.id })).body.turns[0];
+    expect(stopped).toMatchObject({ status: KnowledgeTurnStatus.Stopped, answer: null });
+    await t.fake.settled();
+    expect(answerDraft(await transcript(stopped?.attempt.id ?? ''))).toBe(draft);
+  });
+
+  it('每一轮按选的模型发起并记录：首问、换模型续问、默认模型', async () => {
+    const { project: p } = await project();
+    await t.call(updateSettingsOp, { 'ai.defaultModel': 'opencode/fake-model' });
+    t.fake.enqueue(answering(), RESEARCHER);
+    const ended = turnEnds();
+    const { body } = await t.call(askKnowledgeOp, {
+      projectId: p.id,
+      question: 'one',
+      sources: CODE_AND_DOCS,
+      model: 'opencode/fake-model-2',
+    });
+    await ended;
+    await t.fake.settled();
+    for (const [question, model] of [
+      ['two', 'opencode/fake-model'],
+      ['three', undefined],
+      ['four', null],
+    ] as const) {
+      t.fake.enqueue(answering(), RESEARCHER);
+      const next = turnEnds();
+      await t.call(followUpKnowledgeOp, { id: body.id, question, ...(model === undefined ? {} : { model }) });
+      await next;
+      await t.fake.settled();
+    }
+
+    const { body: conversation } = await t.call(getKnowledgeOp, { id: body.id });
+    expect(conversation.turns.map((turn) => turn.model)).toEqual([
+      'opencode/fake-model-2',
+      'opencode/fake-model',
+      'opencode/fake-model',
+      null,
+    ]);
+    // The first message of each turn goes with its model, on the one session.
+    const firsts = t.fake.prompts.filter((prompt) => !prompt.text.includes('agent-workflow_submit_answer`. Your'));
+    expect(firsts.map((prompt) => prompt.model?.modelId ?? null)).toEqual([
+      'fake-model-2',
+      'fake-model',
+      'fake-model',
+      null,
+    ]);
+    expect(new Set(t.fake.prompts.map((prompt) => prompt.sessionId)).size).toBe(1);
+    const { body: list } = await t.call(listKnowledgeOp, {});
+    expect(list.items[0]?.latest.model).toBeNull();
+    const invalid = await t.call(followUpKnowledgeOp, { id: body.id, question: 'five', model: 'no-slash' });
+    expect(invalid.status).toBe(400);
   });
 
   it('项目没有关联数据库时不能把数据库选为资料来源', async () => {
