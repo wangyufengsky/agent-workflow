@@ -14,6 +14,7 @@ export const ATTEMPT_KIND_LABEL: Record<AttemptKind, string> = {
   [AttemptKind.Plan]: '规划',
   [AttemptKind.Execute]: '执行',
   [AttemptKind.Review]: '评审',
+  [AttemptKind.Research]: '知识研究',
 };
 
 export const TRANSCRIPT_SYSTEM_LABEL: Record<TranscriptSystemEvent, string> = {

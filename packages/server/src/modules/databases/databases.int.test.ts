@@ -1,11 +1,15 @@
 import {
+  askKnowledgeOp,
   createDbConnectionOp,
   dbSchemaOp,
   deleteDbConnectionOp,
   ErrorCode,
+  getKnowledgeOp,
   getProjectOp,
+  knowledgeCitationOp,
   listDbConnectionsOp,
   queryDbOp,
+  ServerEventType,
   setProjectDbConnectionsOp,
   testDbConnectionOp,
   updateDbConnectionOp,
@@ -15,6 +19,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { testCipher } from '../../../test/helpers/cipher.ts';
+import { waitForEvent } from '../../../test/helpers/events.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
 import { startMysql, type TestMysql } from '../../../test/helpers/mysql.ts';
 import { addProject, createTask, nodeReaches } from '../../../test/helpers/tasks.ts';
@@ -221,6 +226,70 @@ describe('数据库工具（12 §6.9–6.11）', () => {
     expect((await call('db_query', { connection: 'shop-db', sql: 'SELECT nope FROM items' })).body).toMatchObject({
       code: ErrorCode.DbQueryFailed,
       details: { driverMessage: expect.stringContaining("Unknown column 'nope'") },
+    });
+  });
+});
+
+describe('知识问答的数据库来源（18 §6）', () => {
+  it('研究员查询关联的数据库并引用；连接与只读都经过校验，打开原文时重新执行查询', async () => {
+    const { body: shop } = await t.call(createDbConnectionOp, connectionInput('shop-db'));
+    const { project } = await addProject(t);
+    await t.call(setProjectDbConnectionsOp, { id: project.id, connectionIds: [shop.id] });
+    const sql = "SELECT name, price FROM items WHERE name = 'a'";
+    t.fake.enqueue(
+      script()
+        .callTool('db_list_connections')
+        .callTool('db_query', { connection: 'shop-db', sql })
+        .callTool('submit_answer', {
+          answer: 'a costs 1.50 [1] [2].',
+          citations: [
+            { type: 'database', connection: 'other-db', sql },
+            { type: 'database', connection: 'shop-db', sql: 'DELETE FROM items' },
+          ],
+        })
+        .callTool('submit_answer', {
+          answer: 'a costs 1.50 [1].',
+          citations: [{ type: 'database', connection: 'shop-db', sql }],
+        }),
+      { agent: 'aw-researcher' },
+    );
+    const answered = waitForEvent(
+      t.app.events,
+      ServerEventType.AttemptUpdated,
+      (d) => d.attempt.status === 'succeeded',
+    );
+    const { body } = await t.call(askKnowledgeOp, {
+      projectId: project.id,
+      question: 'What does a cost?',
+      sources: { code: false, docs: false, database: true, web: false },
+    });
+    await answered;
+    await t.fake.settled();
+
+    expect(t.fake.toolCalls.map((c) => [c.name, c.isError])).toEqual([
+      ['db_list_connections', false],
+      ['db_query', false],
+      ['submit_answer', true],
+      ['submit_answer', false],
+    ]);
+    expect(t.fake.toolCalls[0]?.result).toEqual({
+      connections: [{ name: 'shop-db', type: 'mysql', database: mysql.database }],
+    });
+    expect(t.fake.toolCalls[2]?.result).toMatchObject({
+      code: ErrorCode.KnowledgeCitationInvalid,
+      details: {
+        problems: [
+          { citation: 1, code: 'UNKNOWN_CONNECTION' },
+          { citation: 2, code: 'QUERY_NOT_READONLY' },
+        ],
+      },
+    });
+    const turn = (await t.call(getKnowledgeOp, { id: body.id })).body.turns[0];
+    expect(turn?.citations).toEqual([{ type: 'database', connection: 'shop-db', sql }]);
+    expect((await t.call(knowledgeCitationOp, { turnId: turn?.id ?? '', index: 1 })).body).toMatchObject({
+      type: 'database',
+      connection: 'shop-db',
+      result: { columns: ['name', 'price'], rows: [['a', '1.50']] },
     });
   });
 });

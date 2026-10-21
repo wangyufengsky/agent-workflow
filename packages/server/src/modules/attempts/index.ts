@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { ServerEventType } from '@aw/shared';
+import { AttemptKind, ServerEventType } from '@aw/shared';
 import type { FastifyInstance } from 'fastify';
 import type { EventBus } from '../../core/event-bus.ts';
 import { attemptOperations } from './attempts.operations.ts';
@@ -12,6 +12,7 @@ export { createSessionView, type SessionView } from './attempts.session-view.ts'
 export { createTranscriptStore, type NewTranscriptEntry, type TranscriptStore } from './attempts.transcript.ts';
 
 const DEBUG_RUN_DIR = 'debug';
+const KNOWLEDGE_RUN_DIR = 'knowledge';
 
 export type { AttemptSignal, AttemptsService, ResumeInput, StartAttemptInput } from './attempts.service.ts';
 
@@ -19,9 +20,14 @@ export function createAttemptsModule(
   deps: Omit<AttemptsServiceDeps, 'transcripts'> & { dataDir: string; events: EventBus },
 ) {
   const runsDir = join(deps.dataDir, 'runs');
-  const transcripts = createTranscriptStore<{ id: string; taskId: string | null }>({
-    // Debug attempts belong to no task; their transcripts live under `runs/debug/`.
-    fileOf: (attempt) => join(runsDir, attempt.taskId ?? DEBUG_RUN_DIR, `${attempt.id}.jsonl`),
+  const transcripts = createTranscriptStore<{ id: string; taskId: string | null; kind: AttemptKind }>({
+    // Research and debug attempts belong to no task; their transcripts live under `runs/knowledge/` and `runs/debug/`.
+    fileOf: (attempt) =>
+      join(
+        runsDir,
+        attempt.taskId ?? (attempt.kind === AttemptKind.Research ? KNOWLEDGE_RUN_DIR : DEBUG_RUN_DIR),
+        `${attempt.id}.jsonl`,
+      ),
     onAppend: (attempt, entries) =>
       deps.events.publish({ type: ServerEventType.AttemptTranscript, data: { attemptId: attempt.id, entries } }),
     clock: deps.clock,

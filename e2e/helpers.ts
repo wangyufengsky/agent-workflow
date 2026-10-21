@@ -49,6 +49,8 @@ export async function createProject(request: APIRequestContext, checkCommand: st
 export type FakeStep =
   | { type: 'edit'; file: string; content: string }
   | { type: 'text'; text: string }
+  /** A native read-only tool call (`read`, `grep` …), reported only. */
+  | { type: 'tool'; tool: string; input: Record<string, unknown> }
   /** `server: 'assistant'` calls the assistant MCP (15 §3); the execution MCP otherwise. */
   | { type: 'callTool'; server?: 'exec' | 'assistant'; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
@@ -84,6 +86,19 @@ export async function queueTurn(
     data: { match: { ...rest, directory }, steps },
   });
   if (!res.ok()) throw new Error(`queueing a fake turn failed: ${res.status()} ${await res.text()}`);
+}
+
+/** Queues a turn for the knowledge researcher of this project (its sessions run in the project repository, 18 §5). */
+export async function queueResearchTurn(
+  request: APIRequestContext,
+  project: E2EProject,
+  steps: FakeStep[],
+): Promise<void> {
+  const res = await request.post(`${API_BASE}/dev/fake-opencode/scripts`, {
+    headers: AUTH,
+    data: { match: { agent: 'aw-researcher', directory: project.repoPath }, steps },
+  });
+  if (!res.ok()) throw new Error(`queueing a research turn failed: ${res.status()} ${await res.text()}`);
 }
 
 /** Queues a turn for the next message to the app assistant (its sessions run as `aw-assistant`). */

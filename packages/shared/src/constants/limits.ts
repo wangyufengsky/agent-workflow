@@ -31,3 +31,19 @@ export const LIST_PAGE_MAX = 100;
 export const ASSISTANT_TITLE_MAX_CHARS = 40;
 /** One message to the assistant. */
 export const ASSISTANT_MESSAGE_MAX_CHARS = 20_000;
+/** Knowledge Q&A (18 §7). */
+export const KNOWLEDGE_QUESTION_MAX_CHARS = 4000;
+/** A conversation's title taken from its first question is cut to this length. */
+export const KNOWLEDGE_TITLE_MAX_CHARS = 80;
+export const KNOWLEDGE_ANSWER_MAX_CHARS = 20_000;
+export const KNOWLEDGE_MAX_CITATIONS = 20;
+/** Lines one file citation may span. */
+export const KNOWLEDGE_CITATION_MAX_LINES = 200;
+/** The cited lines kept with a file citation, to show without reading the file and to tell whether it changed. */
+export const KNOWLEDGE_EXCERPT_MAX_CHARS = 4000;
+/** Lines shown before and after a cited range in the source panel. */
+export const KNOWLEDGE_SOURCE_CONTEXT_LINES = 40;
+/** Rows of a cited query shown when its source is opened. */
+export const KNOWLEDGE_QUERY_ROWS = 50;
+/** The latest answer's excerpt in the conversation list. */
+export const KNOWLEDGE_ANSWER_EXCERPT_CHARS = 160;

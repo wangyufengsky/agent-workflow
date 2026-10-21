@@ -38,6 +38,15 @@ import {
 } from './git.ts';
 import { countInboxOp, dismissInboxOp, listInboxOp, resolveInboxOp } from './inbox.ts';
 import {
+  askKnowledgeOp,
+  deleteKnowledgeOp,
+  followUpKnowledgeOp,
+  getKnowledgeOp,
+  knowledgeCitationOp,
+  listKnowledgeOp,
+  stopKnowledgeOp,
+} from './knowledge.ts';
+import {
   clearProjectHostingOp,
   createProjectOp,
   deleteProjectOp,
@@ -105,6 +114,7 @@ export * from './debug.ts';
 export * from './define.ts';
 export * from './git.ts';
 export * from './inbox.ts';
+export * from './knowledge.ts';
 export * from './projects.ts';
 export * from './settings.ts';
 export * from './system.ts';
@@ -202,4 +212,11 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   listConfirmationsOp,
   confirmAssistantCallOp,
   cancelAssistantCallOp,
+  listKnowledgeOp,
+  getKnowledgeOp,
+  askKnowledgeOp,
+  followUpKnowledgeOp,
+  stopKnowledgeOp,
+  deleteKnowledgeOp,
+  knowledgeCitationOp,
 ];

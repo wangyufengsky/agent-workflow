@@ -39,12 +39,15 @@ export const AssistantPage = {
   Databases: 'databases',
   Tools: 'tools',
   Runtime: 'runtime',
+  Knowledge: 'knowledge',
+  KnowledgeConversation: 'knowledge_conversation',
+  KnowledgeHistory: 'knowledge_history',
 } as const;
 export type AssistantPage = (typeof AssistantPage)[keyof typeof AssistantPage];
 export const assistantPageSchema = z.enum(AssistantPage);
 
 /** Ids a page is about; on the task page `nodeId` is the selected step. */
-export type AssistantPageParam = 'taskId' | 'nodeId' | 'projectId' | 'workflowKey';
+export type AssistantPageParam = 'taskId' | 'nodeId' | 'projectId' | 'workflowKey' | 'knowledgeConversationId';
 
 /** Params each page needs to be opened. */
 export const ASSISTANT_PAGE_PARAMS = {
@@ -64,6 +67,9 @@ export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.Databases]: [],
   [AssistantPage.Tools]: [],
   [AssistantPage.Runtime]: [],
+  [AssistantPage.Knowledge]: [],
+  [AssistantPage.KnowledgeConversation]: ['knowledgeConversationId'],
+  [AssistantPage.KnowledgeHistory]: [],
 } as const satisfies Record<AssistantPage, readonly AssistantPageParam[]>;
 
 /**

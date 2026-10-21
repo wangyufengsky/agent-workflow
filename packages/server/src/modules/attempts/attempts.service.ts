@@ -13,7 +13,7 @@ import {
   OPENCODE_AGENT_NAME,
   type PermissionDecision,
   type PermissionPayload,
-  type RoleBaseAgent,
+  type SessionAgent,
   type TranscriptPage,
   TranscriptSystemEvent,
 } from '@aw/shared';
@@ -34,12 +34,14 @@ import {
 export type AttemptsServiceDeps = AttemptStateDeps & { settings: SettingsService; prompts: Prompts };
 
 export type StartAttemptInput = {
+  /** Given by an owner that records the attempt before the session can call back (a knowledge turn, 18 §5.3). */
+  id?: string;
   kind: AttemptKind;
   taskId: string | null;
   nodeId: string | null;
   roleId: string | null;
-  /** The role's base agent: decides the opencode agent and its bash rules (12 §2). */
-  agent: RoleBaseAgent;
+  /** The role's base agent, or the researcher: decides the opencode agent and its session rules (12 §2). */
+  agent: SessionAgent;
   /** Session working directory: the task worktree. */
   directory: string;
   /** Session title, `<taskKey> · <node title>` (12 §4.1). */
@@ -52,10 +54,12 @@ export type StartAttemptInput = {
   prompt: string;
   /** Check commands a read-only session may run without asking (12 §2). */
   checkCommands?: readonly string[];
+  /** The researcher may use the web (18 §5.1). */
+  web?: boolean;
 };
 
 /** What re-attaching to a persisted session needs after a restart: the session state lived in memory. */
-export type ResumeInput = { agent: RoleBaseAgent; system: string | undefined };
+export type ResumeInput = { agent: SessionAgent; system: string | undefined };
 
 const ACTIVE: readonly AttemptStatus[] = [AttemptStatus.Starting, AttemptStatus.Running];
 
@@ -107,7 +111,11 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
 
   return {
     get: (id: string): AttemptDTO => toDto(mustFind(id)),
+    /** Summaries of several attempts at once (a list page), by id. */
+    summaries: (ids: readonly string[]): Map<string, AttemptSummaryDTO> =>
+      new Map(repo.findMany(ids).map((a) => [a.id, state.toSummary(a)])),
     isReady: (): boolean => opencode.isConnected(),
+    requireReady,
     onSignal: state.onSignal,
 
     /** Execute and review attempts of a node, oldest first. */
@@ -130,7 +138,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     async start(input: StartAttemptInput): Promise<AttemptDTO> {
       requireReady();
       const model = input.model === null ? undefined : parseModelRef(input.model);
-      const id = randomUUID();
+      const id = input.id ?? randomUUID();
       repo.insert({
         id,
         taskId: input.taskId,
@@ -155,7 +163,10 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
           directory: input.directory,
           title: input.title,
           agent,
-          permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), input.checkCommands),
+          permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
+            checkCommands: input.checkCommands,
+            web: input.web,
+          }),
         });
       } catch (err) {
         return toDto(move(mustFind(id), AttemptEvent.StartFailed, errorOf(err)));
@@ -188,13 +199,16 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
      * A new plan attempt on the session of an earlier one (re-planning, 12 §4.3): the model keeps what it read and
      * receives `prompt` as the next message. Synchronous up to sending, like `start`.
      */
-    async continueSession(previousId: string, input: { prompt: string } & ResumeInput): Promise<AttemptDTO> {
+    async continueSession(
+      previousId: string,
+      input: { id?: string; prompt: string } & ResumeInput,
+    ): Promise<AttemptDTO> {
       requireReady();
       const previous = mustFind(previousId);
       if (previous.opencodeSessionId === null) {
         throw new AppError(ErrorCode.AttemptNotFound, `Attempt ${previousId} has no session`, { id: previousId });
       }
-      const id = randomUUID();
+      const id = input.id ?? randomUUID();
       repo.insert({
         id,
         taskId: previous.taskId,
@@ -304,6 +318,24 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     resumeIfAnswered(attemptId: string): void {
       const session = state.sessionOf(attemptId);
       if (session !== undefined) reactions.resume(session);
+    },
+
+    /**
+     * Deletes ended attempts with their transcripts (a deleted knowledge conversation, 18 §3). A session that just
+     * ended may still be winding down (the submit call returning, the abort after it): it is stopped and no longer
+     * followed, so its last events find no attempt to update and the abort we would have sent after the submit is
+     * not lost.
+     */
+    delete(ids: readonly string[]): void {
+      const attempts = ids.map(mustFind);
+      for (const attempt of attempts) {
+        const session = state.sessionOf(attempt.id);
+        if (session === undefined) continue;
+        state.releaseSession(session);
+        state.inBackground(attempt.id, () => state.stopSession(session));
+      }
+      repo.deleteMany(ids);
+      for (const attempt of attempts) transcripts.remove(attempt);
     },
 
     transcript(id: string, afterSeq: number): TranscriptPage {

@@ -64,6 +64,13 @@
       "when": 1792543163533,
       "tag": "0008_assistant",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792549131365,
+      "tag": "0009_knowledge",
+      "breakpoints": true
     }
   ]
 }

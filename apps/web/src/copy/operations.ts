@@ -89,6 +89,13 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.assistant.confirmations': '助手的确认记录',
   'op.assistant.confirm': '确认助手的操作',
   'op.assistant.cancelConfirmation': '取消助手的操作',
+  'op.knowledge.list': '知识问答对话记录',
+  'op.knowledge.get': '查看知识问答对话',
+  'op.knowledge.ask': '向项目提问',
+  'op.knowledge.followUp': '继续追问',
+  'op.knowledge.stop': '停止研究',
+  'op.knowledge.delete': '删除知识问答对话',
+  'op.knowledge.citation': '查看引用原文',
 };
 
 /** The title of an operation by its contract's `title` key; the unit test keeps every key covered. */
