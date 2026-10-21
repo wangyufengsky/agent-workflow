@@ -2,6 +2,7 @@
 const ICON_PATHS = {
   home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',
   folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+  file: 'M6 3h8l4 4v14H6zM14 3v4h4',
   plus: 'M12 5v14M5 12h14',
   flow: 'M3 3h7v6H3zM14 15h7v6h-7zM6.5 9v2.5A3.5 3.5 0 0 0 10 15h4',
   list: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',

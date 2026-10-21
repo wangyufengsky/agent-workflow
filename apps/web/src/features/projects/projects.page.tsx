@@ -7,6 +7,7 @@ import { Dialog } from '../../components/dialog.tsx';
 import { EmptyState } from '../../components/empty-state.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
+import { PathText } from '../../components/path-text.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { PROJECTS_COPY as C } from '../../copy/projects.ts';
@@ -54,7 +55,7 @@ export function ProjectsPage() {
                 {p.defaultBranch}
               </span>
             </span>
-            <span className="hint mono ellipsis">{p.repoPath}</span>
+            <PathText path={p.repoPath} className="hint" />
             <span className="hint">
               {C.checkCommand}：<span className="mono">{p.checkCommand ?? C.noCheckCommand}</span>
             </span>

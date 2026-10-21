@@ -78,7 +78,13 @@ function RuntimePanel() {
             <Button icon="refresh" pending={restart.isPending} disabled={!canRestart} onClick={() => restart.mutate()}>
               {r.status === RuntimeStatus.Ready ? C.restart : C.start}
             </Button>
-            <span className="hint">{C.restartHint}</span>
+            <span className="hint">
+              {r.status === RuntimeStatus.Ready
+                ? C.restartHint
+                : r.status === RuntimeStatus.Starting
+                  ? C.startingHint
+                  : C.startHint}
+            </span>
           </span>
         ) : (
           <span className="row">
@@ -124,10 +130,21 @@ function ModelsPanel() {
   return (
     <Panel title={C.models}>
       {models.available.length > 0 ? (
-        <p className="hint">
-          {C.modelsCount(models.available.length)}
-          {models.defaultModel === undefined ? null : ` · ${C.defaultModel(models.defaultModel)}`}
-        </p>
+        <div className="col">
+          <span className="hint">{C.modelsCount(models.available.length)}</span>
+          <ul className={styles.models} data-testid="runtime-models">
+            {models.available.map((m) => {
+              const id = `${m.providerId}/${m.modelId}`;
+              return (
+                <li key={id}>
+                  <span className="grow ellipsis">{m.name}</span>
+                  <span className="mono hint ellipsis">{id}</span>
+                  {id === models.defaultModel && <span className="chip">{C.defaultChip}</span>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       ) : opencode.status === RuntimeStatus.Ready ? (
         <>
           <p className="hint">{C.noModels}</p>
