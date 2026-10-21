@@ -70,8 +70,7 @@ describe('环境检测', () => {
   it('PATH 中没有 git 时 git 未安装', async () => {
     await appWithPath({ git: false });
     const { body } = await t.call(getEnvironmentOp, {});
-    expect(body.git).toEqual({ installed: false });
-    expect(body.ready).toBe(false);
+    expect(body).toMatchObject({ git: { installed: false }, ready: false });
   });
 });
 

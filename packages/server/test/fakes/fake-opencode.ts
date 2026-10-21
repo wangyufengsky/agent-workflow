@@ -53,14 +53,17 @@ export type FakeScript = ReturnType<typeof script>;
 
 export type FakeSession = CreateSessionInput & { id: string };
 
-/** Which session a queued script is for: every given field must be contained in the session's (substring match). */
+/**
+ * Which session a queued script is for: every given field must be contained in the session's (substring match).
+ * `directory` is written with `/` on every platform (`/<project>/<taskKey>`); Windows paths are compared that way.
+ */
 export type ScriptMatch = { title?: string; agent?: string; directory?: string };
 
 const matches = (session: FakeSession, match: ScriptMatch | undefined) =>
   match === undefined ||
   ((match.title === undefined || session.title.includes(match.title)) &&
     (match.agent === undefined || session.agent.includes(match.agent)) &&
-    (match.directory === undefined || session.directory.includes(match.directory)));
+    (match.directory === undefined || session.directory.replaceAll('\\', '/').includes(match.directory)));
 export type ToolCallRecord = { sessionId: string; name: string; isError: boolean; result: unknown };
 
 const DELTA_CHARS = 8;
