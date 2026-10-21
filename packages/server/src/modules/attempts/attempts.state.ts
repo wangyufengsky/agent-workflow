@@ -63,7 +63,7 @@ export type AttemptStateDeps = {
   log: Logger;
   opencode: OpencodeClient;
   inbox: InboxService;
-  transcripts: TranscriptStore;
+  transcripts: TranscriptStore<{ id: string; taskId: string | null }>;
 };
 
 /** An expected failure (opencode request, not ready …) as the error recorded on the attempt; anything else is a bug. */

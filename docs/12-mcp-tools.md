@@ -288,8 +288,9 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 ## 7. 实现结构
 
 ```
+core/http/mcp-endpoint.ts   McpServer + StreamableHTTPServerTransport，挂载到 Fastify（/mcp/exec 与 /mcp/assistant 共用）；校验各自的令牌
 modules/mcp/
-├─ mcp.server.ts        McpServer + StreamableHTTPServerTransport，挂载到 Fastify /mcp/exec；校验执行 MCP 令牌
+├─ index.ts             组装工具，挂载 /mcp/exec
 ├─ mcp.registry.ts      工具注册表：definition → 自动生成 tools/list，统一做归属解析（取出 __aw_session）、类型授权、zod 校验、错误映射
 └─ tools/
    ├─ get-task-context.tool.ts
