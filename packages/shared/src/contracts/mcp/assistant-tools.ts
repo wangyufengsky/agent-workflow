@@ -71,3 +71,14 @@ export const listFilesOutputSchema = z.object({
 /** `reveal_file`: `path` relative to the conversation's files directory. */
 export const revealFileInputSchema = z.object({ path: z.string().min(1) });
 export const revealedOutputSchema = z.object({ revealed: z.literal(true) });
+
+/**
+ * What a write or critical operation tool returns while its call waits for the user (15 §4); the panel shows the
+ * confirmation card in place of the call.
+ */
+export const needsConfirmationOutputSchema = z.object({
+  status: z.literal('needs_confirmation'),
+  confirmation_id: z.string(),
+  instruction: z.string(),
+});
+export type NeedsConfirmationOutput = z.infer<typeof needsConfirmationOutputSchema>;

@@ -10,6 +10,7 @@ import {
   gitTreeEntrySchema,
   gitWorktreeSchema,
 } from '../contracts/api/git.ts';
+import { InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -116,6 +117,7 @@ export const gitFileOp = defineOperationContract({
 export const gitFetchOp = defineOperationContract({
   ...common,
   id: 'git.fetch',
+  refs: { id: InputRef.Project },
   title: 'op.git.fetch',
   description: 'Fetch every remote of the project and prune deleted remote branches',
   input: byProject,
@@ -138,6 +140,7 @@ export const listWorktreesOp = defineOperationContract({
 export const pruneWorktreesOp = defineOperationContract({
   ...common,
   id: 'worktrees.prune',
+  refs: { id: InputRef.Project },
   title: 'op.worktrees.prune',
   description:
     'Remove worktrees left behind by finished or cancelled tasks (their branches are kept) and prune stale entries',

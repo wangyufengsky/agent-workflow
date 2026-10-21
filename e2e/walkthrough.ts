@@ -22,6 +22,12 @@ export async function inspectPage(page: Page): Promise<PageReport> {
   // colours (14 §4), so nearly every text would be undecided. Drop the images while axe runs; the theme contrast unit
   // test checks text where those gradients are strongest. Colours still easing in after the theme was applied would
   // be measured mid-way, so transitions end at once.
+  // Messages fade in (the assistant panel, D84): axe waits for one-shot animations; looping indicators keep running.
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every((a) => a.playState !== 'running' || a.effect?.getComputedTiming().iterations === Number.POSITIVE_INFINITY),
+  );
   const noImages = await page.addStyleTag({
     content: '*, *::before, *::after { background-image: none !important; transition: none !important; }',
   });

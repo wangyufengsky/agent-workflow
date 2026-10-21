@@ -90,5 +90,12 @@ export const warmTheme: ThemeDefinition = {
     glow: 'radial-gradient(ellipse 62% 380px at 50% -170px,rgba(137,88,63,0.07),rgba(137,88,63,0) 70%)',
     dots: 'radial-gradient(rgba(48,45,40,0.11) 1px,transparent 1.2px)',
     'shadow-card': '0 1px 0 rgba(255,255,255,.03) inset',
+    frost: 'rgba(255,254,250,.8)',
+    'frost-card': 'rgba(255,255,255,.7)',
+    'frost-edge': 'rgba(255,255,255,.85)',
+    'frost-filter': 'blur(28px) saturate(150%)',
+    'frost-shadow': '0 24px 60px rgba(48,45,40,.16),0 3px 10px rgba(48,45,40,.07)',
+    'frost-sheen': 'linear-gradient(180deg,rgba(255,255,255,.6),rgba(255,255,255,0) 160px)',
+    aura: 'conic-gradient(from 200deg,#89583f,#c4906a,#6c568e,#1b626c,#89583f)',
   },
 };

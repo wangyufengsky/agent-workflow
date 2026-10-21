@@ -7,7 +7,7 @@ import {
   knowledgeConversationSummarySchema,
   listKnowledgeQuerySchema,
 } from '../contracts/api/knowledge.ts';
-import { EntityKind } from '../enums/entity.ts';
+import { EntityKind, InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -66,6 +66,7 @@ export const followUpKnowledgeOp = defineOperationContract({
 export const stopKnowledgeOp = defineOperationContract({
   ...common,
   id: 'knowledge.stop',
+  refs: { id: InputRef.KnowledgeConversation },
   title: 'op.knowledge.stop',
   description: 'Stop the question a knowledge conversation is researching',
   input: byId,
@@ -77,6 +78,7 @@ export const stopKnowledgeOp = defineOperationContract({
 export const deleteKnowledgeOp = defineOperationContract({
   ...common,
   id: 'knowledge.delete',
+  refs: { id: InputRef.KnowledgeConversation },
   title: 'op.knowledge.delete',
   description: 'Delete a knowledge conversation with its research records',
   input: byId,

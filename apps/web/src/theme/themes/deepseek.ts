@@ -91,5 +91,12 @@ export const deepseekTheme: ThemeDefinition = {
     glow: 'radial-gradient(ellipse 62% 420px at 50% -170px,rgba(77,107,254,.18),rgba(77,107,254,0) 70%)',
     dots: 'radial-gradient(rgba(255,255,255,.07) 1px,transparent 1.2px)',
     'shadow-card': '0 1px 0 rgba(255,255,255,.03) inset',
+    frost: 'rgba(20,20,23,.8)',
+    'frost-card': 'rgba(255,255,255,.035)',
+    'frost-edge': 'rgba(255,255,255,.1)',
+    'frost-filter': 'blur(28px) saturate(160%)',
+    'frost-shadow': '0 24px 64px rgba(0,0,0,.55),0 4px 14px rgba(0,0,0,.3)',
+    'frost-sheen': 'linear-gradient(180deg,rgba(169,188,255,.08),rgba(169,188,255,0) 160px)',
+    aura: 'conic-gradient(from 200deg,#4865f2,#a9bcff,#c9b5ef,#79cbcd,#4865f2)',
   },
 };

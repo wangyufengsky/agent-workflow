@@ -153,7 +153,7 @@ test('J13 对助手提问 → 正在查资料 → 带引用的回答 → 点引�
   await expect(card).toContainText('知识问答对话');
   await expect(card).toContainText('退款在哪里四舍五入？');
   await expect(panel).toContainText('退款在 refund() 中四舍五入到分');
-  await panel.getByRole('link', { name: '[1]' }).click();
+  await panel.getByRole('link', { name: '引用 1' }).click();
   const source = page.getByRole('complementary', { name: '引用原文' });
   await expect(source.getByTestId('citation-lines').locator('[data-cited="true"]')).toContainText('Math.round');
   await expect(panel).toBeVisible();
