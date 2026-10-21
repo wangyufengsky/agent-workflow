@@ -1,6 +1,7 @@
 import {
   type AssistantConfirmationDTO,
   type AssistantConversationDTO,
+  MCP_ASSISTANT_TOOL_PREFIX,
   needsConfirmationOutputSchema,
   PermissionDecision,
   type TranscriptEntry,
@@ -36,10 +37,10 @@ import { type ToolResult, ToolRow } from './tool-row.tsx';
 const STAGGER_STEPS = 6;
 
 /** A call that waits for the user shows as its confirmation card, not as a row of its own (15 §4). */
-function waitsForConfirmation(result: ToolResult | undefined): boolean {
+function waitsForConfirmation(tool: string, result: ToolResult | undefined): boolean {
+  // Only the app's own tools answer with JSON (assistant.tools.ts); other tools may print anything.
+  if (!tool.startsWith(MCP_ASSISTANT_TOOL_PREFIX)) return false;
   if (result?.data.status !== 'completed' || result.data.output === undefined) return false;
-  // Only the app's tools answer with JSON; other output never starts an object.
-  if (!result.data.output.startsWith('{')) return false;
   return needsConfirmationOutputSchema.safeParse(JSON.parse(result.data.output)).success;
 }
 
@@ -111,6 +112,8 @@ type Rendered = {
   confirmations: ReadonlyMap<string, AssistantConfirmationDTO>;
   results: ReadonlyMap<string, ToolResult>;
   pro: boolean;
+  /** Where the latest turn starts: the last user message's `seq`. */
+  turnStart: number;
   /** The text the assistant is writing right now gets a typing caret. */
   streamingKey: string | number | undefined;
 };
@@ -148,8 +151,10 @@ function Body({ entry, ctx }: { entry: TranscriptEntry; ctx: Rendered }): ReactN
       );
     case TranscriptEntryKind.ToolCall: {
       const result = ctx.results.get(entry.data.callId);
-      if (waitsForConfirmation(result)) return null;
-      return <ToolRow call={entry} result={result} busy={ctx.conversation.busy} pro={ctx.pro} />;
+      if (waitsForConfirmation(entry.data.tool, result)) return null;
+      // Only a call of the turn in progress can still run; one left without a result earlier was stopped.
+      const running = ctx.conversation.busy && entry.seq > ctx.turnStart;
+      return <ToolRow call={entry} result={result} busy={running} pro={ctx.pro} />;
     }
     case TranscriptEntryKind.ToolResult:
       // Shown with its call.
@@ -231,6 +236,7 @@ function Stream({
       new Map(entries.flatMap((e) => (e.kind === TranscriptEntryKind.ToolResult ? [[e.data.callId, e] as const] : []))),
     [entries],
   );
+  const turnStart = entries.findLast((e) => e.kind === TranscriptEntryKind.UserMessage)?.seq ?? -1;
   const streamingKey =
     conversation.busy && last?.kind === TranscriptEntryKind.Text && last.data.text !== '' ? keyOf(last) : undefined;
   const ctx = useMemo<Rendered>(
@@ -239,9 +245,10 @@ function Stream({
       confirmations: new Map((confirmations ?? []).map((c) => [c.id, c])),
       results,
       pro,
+      turnStart,
       streamingKey,
     }),
-    [conversation, confirmations, results, pro, streamingKey],
+    [conversation, confirmations, results, pro, turnStart, streamingKey],
   );
   // Writing text shows its caret and a running call its own shimmer; otherwise the panel shows it is thinking.
   const runningCall = last?.kind === TranscriptEntryKind.ToolCall && !results.has(last.data.callId);
