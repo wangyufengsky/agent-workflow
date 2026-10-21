@@ -39,9 +39,12 @@ function isMissing(err: unknown): boolean {
   return err instanceof Error && 'code' in err && (err.code === 'ENOENT' || err.code === 'ENOTDIR');
 }
 
-/** Splits like an editor numbers lines: a final newline does not start another line. */
+/**
+ * Splits like an editor numbers lines: a final newline does not start another line, and CRLF (a Windows checkout
+ * with `core.autocrlf`, 17 §3.4) is a line break like LF.
+ */
 function linesOf(text: string): string[] {
-  const lines = text.split('\n');
+  const lines = text.split(/\r?\n/);
   if (lines.at(-1) === '') lines.pop();
   return lines;
 }

@@ -26,3 +26,30 @@ mac:
   category: public.app-category.developer-tools
   # Unsigned until a Developer ID certificate is available (M6-04).
   identity: null
+# Windows and Linux (v1.1, 17 §3.8, D76): x64 only, unsigned. Artifact names without spaces.
+win:
+  # electron-builder converts the 1024 px PNG (extracted from icon.icns) to .ico.
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: x64
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: agent-workflow-${version}-setup-${arch}.${ext}
+linux:
+  icon: build/icon.png
+  executableName: agent-workflow
+  category: Development
+  maintainer: wangyufeng (https://github.com/wangyufengsky/agent-workflow)
+  target:
+    - target: AppImage
+      arch: x64
+    - target: deb
+      arch: x64
+appImage:
+  artifactName: agent-workflow-${version}-${arch}.${ext}
+deb:
+  packageName: agent-workflow
+  artifactName: agent-workflow_${version}_${arch}.${ext}

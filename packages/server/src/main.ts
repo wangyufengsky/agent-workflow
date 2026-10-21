@@ -1,4 +1,4 @@
-import { MCP_ASSISTANT_PATH, MCP_EXEC_PATH } from '@aw/shared';
+import { backendShutdownMessageSchema, MCP_ASSISTANT_PATH, MCP_EXEC_PATH } from '@aw/shared';
 import { buildApp } from './app.ts';
 import { loadConfig } from './core/config.ts';
 import { type CredentialCipher, createPortCipher, parentPortTransport } from './modules/credentials/index.ts';
@@ -45,4 +45,17 @@ fake?.fake.connectMcp({
   exec: { url: `http://127.0.0.1:${address.port}${MCP_EXEC_PATH}`, token: app.mcpToken },
   assistant: { url: `http://127.0.0.1:${address.port}${MCP_ASSISTANT_PATH}`, token: app.assistantMcpToken },
 });
+
+/** Closing the server stops opencode with its process tree (D73); only then may the process exit. */
+async function shutdown(): Promise<void> {
+  await server.close();
+  process.exit(0);
+}
+process.parentPort?.on('message', ({ data }) => {
+  if (backendShutdownMessageSchema.safeParse(data).success) void shutdown();
+});
+// Plain Node (`pnpm dev:server`): opencode leads its own process group, so Ctrl+C would not reach it.
+process.once('SIGINT', () => void shutdown());
+process.once('SIGTERM', () => void shutdown());
+
 await app.start(address.port);

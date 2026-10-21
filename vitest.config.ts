@@ -14,7 +14,17 @@ export default defineConfig({
           exclude: [...IGNORE, '**/*.int.test.ts', '**/*.oc.test.ts'],
         },
       },
-      { test: { name: 'int', include: [`${SOURCES}/*.int.test.ts`], exclude: IGNORE } },
+      {
+        test: {
+          name: 'int',
+          include: [`${SOURCES}/*.int.test.ts`],
+          exclude: IGNORE,
+          // Real git and processes: a git-heavy test takes 1–2 s here, several times that on a busy CI runner and on
+          // Windows, where process creation is slow (17 §4.1).
+          testTimeout: 30_000,
+          setupFiles: ['packages/server/test/setup/git-config.ts'],
+        },
+      },
       {
         test: {
           name: 'oc',

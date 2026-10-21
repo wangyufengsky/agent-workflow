@@ -39,6 +39,11 @@ describe('researchSteps', () => {
     });
   });
 
+  it('Windows 上 opencode 报告的原生路径同样去掉仓库路径，以 / 分隔显示', () => {
+    const entries = [call('read', { filePath: 'C:\\Users\\me\\repo\\src\\refund.ts' })];
+    expect(researchSteps(entries, 'C:\\Users\\me\\repo').reads).toEqual(['src/refund.ts']);
+  });
+
   it('查完资料后开始写正文即进入组织回答；之后再查资料又回到读取', () => {
     const text = (t: string): TranscriptEntry => ({
       seq: ++seq,

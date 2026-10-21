@@ -1,0 +1,91 @@
+# Three-platform CI (docs/17 §4.1, D76). Tests that need the real opencode and a model (test:oc, test:live, J10) are
+# not run here: they stay on the developer's machine.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Allow Chromium's sandbox for Electron (Ubuntu 24.04 restricts unprivileged user namespaces)
+        if: runner.os == 'Linux'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      # Later steps run even when an earlier one failed: one round shows every problem of a platform.
+      # `pnpm verify` step by step, so the integration tests can leave out the MySQL tests where they cannot run.
+      - name: pnpm check
+        if: ${{ !cancelled() }}
+        run: pnpm check
+      - name: pnpm test
+        if: ${{ !cancelled() }}
+        run: pnpm test
+      - name: test:int
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: |
+          docker pull mysql:8.4
+          pnpm test:int
+      # databases.int.test.ts needs the Linux container mysql:8.4: the Windows runner's Docker runs only Windows
+      # containers and the macOS runner has no Docker. It only talks to MySQL over TCP, so the ubuntu run covers it.
+      - name: test:int (without the MySQL tests, see above)
+        if: ${{ !cancelled() && runner.os != 'Linux' }}
+        shell: bash
+        # Explicit file list: vitest's --exclude flag does not reach the files of a configured project.
+        run: pnpm test:int $(git ls-files '*.int.test.ts' | grep -v '/databases.int.test.ts$')
+      - name: pnpm build
+        if: ${{ !cancelled() }}
+        run: pnpm build
+
+      - name: pnpm e2e
+        id: e2e
+        if: ${{ !cancelled() }}
+        run: pnpm e2e
+      # Before the Electron smoke: Playwright empties test-results/ at the start of every run.
+      - name: Upload E2E traces
+        if: ${{ !cancelled() && steps.e2e.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-${{ runner.os }}
+          path: test-results/
+      - name: Electron launch smoke
+        if: ${{ !cancelled() && runner.os != 'Linux' }}
+        run: pnpm e2e:smoke
+      - name: Electron launch smoke (virtual display)
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        run: xvfb-run -a pnpm e2e:smoke
+
+      - name: Package (NSIS / AppImage + deb)
+        if: ${{ !cancelled() && runner.os != 'macOS' }}
+        run: pnpm dist
+      - name: Upload installers
+        if: ${{ !cancelled() && runner.os != 'macOS' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ runner.os }}
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
+          if-no-files-found: error

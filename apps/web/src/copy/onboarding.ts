@@ -1,3 +1,8 @@
+import type { Platform } from '@aw/shared';
+
+/** Install commands and examples differ by operating system (17 §3.7). */
+type PerPlatform = Record<Platform, string>;
+
 export const ONBOARDING_COPY = {
   title: '欢迎使用 Agent Workflow',
   lede: '开始之前，先确认这台电脑上的开发环境。',
@@ -7,8 +12,16 @@ export const ONBOARDING_COPY = {
   git: {
     title: 'Git',
     installed: (version: string) => `已安装 ${version}`,
-    missing: '没有找到 Git。安装 Xcode 命令行工具即可获得：',
-    fix: 'xcode-select --install',
+    missing: {
+      darwin: '没有找到 Git。安装 Xcode 命令行工具即可获得：',
+      win32: '没有找到 Git for Windows（本应用需要其中的 Git Bash）。在终端安装：',
+      linux: '没有找到 Git。在终端安装：',
+    } satisfies PerPlatform,
+    fix: {
+      darwin: 'xcode-select --install',
+      win32: 'winget install --id Git.Git -e',
+      linux: 'sudo apt install git',
+    } satisfies PerPlatform,
   },
   opencode: {
     title: 'opencode 1.19.0',
@@ -17,7 +30,11 @@ export const ONBOARDING_COPY = {
     mismatch: (version: string) => `已安装的版本是 ${version}，本应用需要 1.19.0。在终端切换版本：`,
     fix: 'npm install -g opencode-ai@1.19.0',
     choosePath: '已安装在其他位置？填写 opencode 可执行文件的路径：',
-    pathPlaceholder: '/usr/local/bin/opencode',
+    pathPlaceholder: {
+      darwin: '/usr/local/bin/opencode',
+      win32: 'C:\\Users\\你\\AppData\\Roaming\\npm\\opencode.cmd',
+      linux: '/home/你/.opencode/bin/opencode',
+    } satisfies PerPlatform,
     usePath: '使用此路径',
   },
   models: {
@@ -27,6 +44,17 @@ export const ONBOARDING_COPY = {
     available: (n: number) => `${n} 个模型可用`,
     none: '还没有可用的模型。在终端登录一个模型提供方：',
     fix: 'opencode auth login',
+  },
+  credentials: {
+    title: '凭据存储',
+    available: '可以安全保存托管平台令牌与数据库密码。',
+    unavailableBadge: '不可用',
+    unavailable: '系统没有可用的密钥服务，暂时不能保存托管平台令牌与数据库密码（其他功能不受影响）。安装后重启应用：',
+    fix: {
+      darwin: null,
+      win32: null,
+      linux: 'sudo apt install gnome-keyring',
+    } satisfies Record<Platform, string | null>,
   },
   copyCommand: '复制命令',
   copied: '已复制',

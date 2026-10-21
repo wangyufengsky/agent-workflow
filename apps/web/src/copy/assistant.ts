@@ -1,9 +1,17 @@
-import { AssistantConfirmationStatus, EntityKind, OperationRisk } from '@aw/shared';
+import { AssistantConfirmationStatus, EntityKind, OperationRisk, type Platform } from '@aw/shared';
+import { MOD_KEY, UI_PLATFORM } from '../app/platform.ts';
+
+/** The system file manager differs by platform (17 §3.7). */
+const REVEAL: Record<Platform, string> = {
+  darwin: '在 Finder 中显示',
+  win32: '在资源管理器中显示',
+  linux: '在文件管理器中显示',
+};
 
 /** The app assistant (15 §6). */
 export const ASSISTANT_COPY = {
   panel: '应用助手',
-  open: '打开助手（⌘J）',
+  open: `打开助手（${MOD_KEY}J）`,
   close: '收起助手',
   untitled: '新对话',
   newConversation: '新对话',
@@ -12,14 +20,14 @@ export const ASSISTANT_COPY = {
   deleteConfirm: '删除后消息、确认记录和助手生成的文件都会删除。',
   empty: '告诉助手你想做什么，比如「明天几号」「列出我的项目」「在订单服务里修一下登录报错」。',
   inputLabel: '发给助手的消息',
-  inputPlaceholder: '问助手，或让它帮你做事…（⌘↵ 发送）',
+  inputPlaceholder: `问助手，或让它帮你做事…（${MOD_KEY}↵ 发送）`,
   send: '发送',
   stop: '停止',
   working: '助手正在处理…',
   toolLine: (tool: string) => `调用 ${tool}`,
   toolFailed: (tool: string) => `调用 ${tool} 失败`,
   attachment: '助手生成的文件',
-  reveal: '在 Finder 中显示',
+  reveal: REVEAL[UI_PLATFORM],
   permissionTitle: '助手请求权限',
   permissionAllowOnce: '允许一次',
   permissionAlways: '总是允许',

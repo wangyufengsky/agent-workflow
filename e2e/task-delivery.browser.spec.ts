@@ -5,15 +5,19 @@ import { API_BASE, AUTH } from './env.ts';
 import {
   createProject,
   type E2EProject,
+  GIT_HEAVY_SPECS_SLOW,
   git,
   passReview,
   patchSettings,
   queueTurn,
   startTask,
   submitResult,
+  TASK_RUN_TIMEOUT_MS,
 } from './helpers.ts';
 
 // Journeys J5 and J6 (07 §5): delivery from the result card, with FakeOpencode playing the AI sessions.
+
+test.slow(GIT_HEAVY_SPECS_SLOW, 'several task runs and merges per test (17 §4.1)');
 
 test.beforeEach(({ request }) =>
   patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple', 'delivery.defaultStrategy': 'squash' }),
@@ -34,7 +38,9 @@ async function fixInReview(
   ]);
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
   await startTask(page, project, /修 Bug/, requirement);
-  await expect(page.getByTestId('result-card').getByRole('button', { name: '合并到 main' })).toBeVisible();
+  await expect(page.getByTestId('result-card').getByRole('button', { name: '合并到 main' })).toBeVisible({
+    timeout: TASK_RUN_TIMEOUT_MS,
+  });
   return page.url();
 }
 
@@ -52,13 +58,16 @@ test('J5 合并到 main（squash）→ 主分支有提交、worktree 已清理�
   await page.keyboard.press('Escape');
 
   await result.getByRole('button', { name: '合并到 main' }).click();
-  await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main');
+  await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main', { timeout: TASK_RUN_TIMEOUT_MS });
   await expect(page.getByTestId('task-page').getByText('已完成', { exact: true }).first()).toBeVisible();
 
   expect(git(project.repoPath, 'log', '-1', '--format=%s', 'main')).toMatch(/^问候语写错了 \(T-\d+\)$/);
   expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe('export const greet = () => "你好";');
-  expect(git(project.repoPath, 'worktree', 'list', '--porcelain').match(/^worktree /gm)).toHaveLength(1);
-  expect(git(project.repoPath, 'branch', '--list', 'aw/*')).toBe('');
+  // The worktree and branch are cleaned up after the merge is reported.
+  await expect
+    .poll(() => git(project.repoPath, 'worktree', 'list', '--porcelain').match(/^worktree /gm))
+    .toHaveLength(1);
+  await expect.poll(() => git(project.repoPath, 'branch', '--list', 'aw/*')).toBe('');
 });
 
 test('J6 两个任务改同一文件 → 第二个合并冲突 → 交给 AI 解决 → 合并成功', async ({ page, request }) => {
@@ -72,7 +81,7 @@ test('J6 两个任务改同一文件 → 第二个合并冲突 → 交给 AI 解
 
   await page.goto(first);
   await page.getByTestId('result-card').getByRole('button', { name: '合并到 main' }).click();
-  await expect(page.getByTestId('delivery-outcome')).toContainText('已合并到 main');
+  await expect(page.getByTestId('delivery-outcome')).toContainText('已合并到 main', { timeout: TASK_RUN_TIMEOUT_MS });
 
   await page.goto(second);
   const result = page.getByTestId('result-card');
@@ -89,10 +98,10 @@ test('J6 两个任务改同一文件 → 第二个合并冲突 → 交给 AI 解
     submitResult('保留了两边的改动'),
   ]);
   await result.getByRole('button', { name: '交给 AI 解决冲突' }).click();
-  await expect(result.getByRole('button', { name: '合并到 main' })).toBeVisible();
+  await expect(result.getByRole('button', { name: '合并到 main' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
   await expect(result).not.toContainText('时有冲突');
   await result.getByRole('button', { name: '合并到 main' }).click();
-  await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main');
+  await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main', { timeout: TASK_RUN_TIMEOUT_MS });
   expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe(resolved.trimEnd());
 });
 
@@ -146,7 +155,7 @@ test('三个任务同时运行改同一文件：各自分支与工作区互不�
     const result = page.getByTestId('result-card');
     await result.getByRole('button', { name: '合并到 main' }).click();
     if (i > 0) {
-      await expect(result.getByTestId('delivery-conflict')).toContainText('greet.ts');
+      await expect(result.getByTestId('delivery-conflict')).toContainText('greet.ts', { timeout: TASK_RUN_TIMEOUT_MS });
       const resolved = `${expected}，${words[i]}`;
       await queueTurn(request, project, { title: '解决合并冲突', taskKey: task.key }, [
         { type: 'edit', file: 'greet.ts', content: `export const greet = () => "${resolved}";\n` },
@@ -159,8 +168,13 @@ test('三个任务同时运行改同一文件：各自分支与工作区互不�
     } else {
       expected = words[0] ?? '';
     }
-    await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main');
+    await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main', {
+      timeout: TASK_RUN_TIMEOUT_MS,
+    });
     expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe(`export const greet = () => "${expected}";`);
   }
-  expect(git(project.repoPath, 'worktree', 'list', '--porcelain').match(/^worktree /gm)).toHaveLength(1);
+  // The last merge's worktree is removed after the merge is reported.
+  await expect
+    .poll(() => git(project.repoPath, 'worktree', 'list', '--porcelain').match(/^worktree /gm))
+    .toHaveLength(1);
 });

@@ -8,4 +8,5 @@ const MARKER = 'aw-dev-plaintext:';
 export const devPlaintextCipher: CredentialCipher = {
   encrypt: async (plaintext) => new TextEncoder().encode(MARKER + plaintext),
   decrypt: async (ciphertext) => new TextDecoder().decode(ciphertext).slice(MARKER.length),
+  isAvailable: async () => true,
 };

@@ -14,8 +14,10 @@ import {
   type SubmitReviewInput,
 } from '@aw/shared';
 import { execa } from 'execa';
+import type { Clock } from '../../core/clock.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import { locateShell } from '../git/index.ts';
 import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 
@@ -25,6 +27,7 @@ export type AcceptanceServiceDeps = {
   settings: SettingsService;
   prompts: Prompts;
   log: Logger;
+  clock: Clock;
   /** Environment of check commands (PATH to the project's tools). */
   env: NodeJS.ProcessEnv;
 };
@@ -62,7 +65,15 @@ export function tailOf(output: string): string {
  * Acceptance checks of a node (03 §4.2 `AcceptanceCheck`): `command` runs in the worktree, `ai_review` is a review
  * attempt that ends with `submit_review`. A pending review is kept in memory: after a restart its node starts over.
  */
-export function createAcceptanceService({ attempts, roles, settings, prompts, log, env }: AcceptanceServiceDeps) {
+export function createAcceptanceService({
+  attempts,
+  roles,
+  settings,
+  prompts,
+  log,
+  clock,
+  env,
+}: AcceptanceServiceDeps) {
   /** Open reviews by the node under review (a node runs at most one review at a time). */
   const pending = new Map<string, { focus: string | null; settle: (outcome: ReviewOutcome) => void }>();
 
@@ -90,21 +101,34 @@ export function createAcceptanceService({ attempts, roles, settings, prompts, lo
   });
 
   return {
-    /** Runs the command in the worktree; exit code 0 within ACCEPTANCE_COMMAND_TIMEOUT_MS passes. */
+    /**
+     * Runs the command in the worktree; exit code 0 within ACCEPTANCE_COMMAND_TIMEOUT_MS passes. A timeout or the
+     * signal ends the command with everything it started (D73).
+     */
     async runCommand(directory: string, command: string, signal: AbortSignal): Promise<CommandCheckResult> {
-      const result = await execa(command, {
+      const child = execa(command, {
         cwd: directory,
-        // A check command is a shell command line by definition (`pnpm test`, `mvn -q test && …`).
-        shell: true,
+        // A check command is a POSIX shell command line on every platform (`pnpm test`, `mvn -q test && …`, D73).
+        shell: await locateShell(env),
         env,
         extendEnv: false,
         all: true,
         reject: false,
-        timeout: ACCEPTANCE_COMMAND_TIMEOUT_MS,
-        cancelSignal: signal,
         stdin: 'ignore',
+        // A shell ended alone leaves its commands running, holding the output and worktree files (D73).
+        killDescendants: true,
       });
-      const timedOut = result.timedOut;
+      let timedOut = false;
+      const stop = () => child.kill();
+      const cancelTimeout = clock.schedule(ACCEPTANCE_COMMAND_TIMEOUT_MS, () => {
+        timedOut = true;
+        stop();
+      });
+      if (signal.aborted) stop();
+      else signal.addEventListener('abort', stop, { once: true });
+      const result = await child;
+      cancelTimeout();
+      signal.removeEventListener('abort', stop);
       const exitCode = timedOut ? null : (result.exitCode ?? null);
       log.info({ directory, command, exitCode, timedOut }, 'acceptance command finished');
       return {

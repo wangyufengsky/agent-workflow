@@ -33,7 +33,8 @@ export const HOME_TASK_COPY = {
   requirementPlaceholder: '描述你的需求……（支持粘贴长文本）',
   confirmPlan: '运行前让我确认计划',
   start: '开始',
-  startShortcut: '⌘↵',
+  /** After the platform's modifier key (`MOD_KEY`). */
+  startShortcut: '↵',
   noProjectTitle: '先添加一个项目',
   noProjectBody: '选择一个本地 Git 仓库，AI 会在独立的分支和工作区里完成任务。',
   addProject: '添加项目',

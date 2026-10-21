@@ -1,0 +1,6 @@
+# Checked out with LF on every platform: Biome and the generated docs check compare exact text (17 §3.4).
+* text=auto eol=lf
+*.icns binary
+*.png binary
+*.ico binary
+*.cmd text eol=crlf

@@ -27,8 +27,11 @@ export type OpencodeRuntimeDeps = {
   env: NodeJS.ProcessEnv;
   /** Setting `opencode.binaryPath`, read at each detection. */
   binaryPath: () => string | null;
-  /** `OPENCODE_CONFIG_CONTENT` for the next launch (12 §2); built per launch because it holds the MCP endpoint. */
-  configContent: () => string;
+  /**
+   * `OPENCODE_CONFIG_CONTENT` for the next launch (12 §2); built per launch because it holds the MCP endpoint.
+   * Rejects when opencode cannot be hosted safely here (no Git Bash on Windows, D72).
+   */
+  configContent: () => Promise<string>;
   log: Logger;
   events: EventBus;
   clock: Clock;
@@ -38,7 +41,16 @@ export type OpencodeRuntimeDeps = {
 const SERVE_ARGS = ['serve', '--hostname', '127.0.0.1', '--port', '0', '--print-logs', '--log-level', 'WARN'];
 
 function spawnServe(path: string, env: NodeJS.ProcessEnv) {
-  return execa(path, SERVE_ARGS, { env, extendEnv: false, stdin: 'ignore', buffer: false, reject: false });
+  return execa(path, SERVE_ARGS, {
+    env,
+    extendEnv: false,
+    stdin: 'ignore',
+    buffer: false,
+    reject: false,
+    // Stopping ends its bash commands and language servers too: on Windows they would outlive it, holding worktree
+    // files (D73).
+    killDescendants: true,
+  });
 }
 
 type Exit = { code: number | undefined; signal: string | undefined };
@@ -92,8 +104,8 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
   }
 
   /** Spawns `opencode serve` and resolves with its address; rejects if it exits or stays silent too long. */
-  function launch(path: string): { launched: Process; address: Promise<string> } {
-    const child = spawnServe(path, { ...deps.env, OPENCODE_CONFIG_CONTENT: deps.configContent() });
+  function launch(path: string, configContent: string): { launched: Process; address: Promise<string> } {
+    const child = spawnServe(path, { ...deps.env, OPENCODE_CONFIG_CONTENT: configContent });
     const logFile = openLog();
     const launched: Process = {
       child,
@@ -171,7 +183,17 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       await stopProcess();
     }
     setState({ status: RuntimeStatus.Starting, path, version, requiredVersion: OPENCODE_VERSION });
-    const { launched, address } = launch(path);
+    let configContent: string;
+    try {
+      configContent = await deps.configContent();
+    } catch (err) {
+      // Recovery with a defined meaning: opencode cannot be hosted here, so it does not start; the log says why.
+      log.error({ err }, 'opencode configuration failed');
+      transition(runtimeMachine, RuntimeStatus.Starting, RuntimeEvent.Exited);
+      setState({ status: RuntimeStatus.Crashed, path, version, requiredVersion: OPENCODE_VERSION });
+      return snapshot();
+    }
+    const { launched, address } = launch(path, configContent);
     proc = launched;
     void launched.exited.then((exit) => onExit(launched, exit));
     try {
@@ -223,9 +245,15 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       setState(detected);
       return detected;
     },
-    /** Starts a stopped runtime (backend startup); a no-op when opencode is not hostable. */
-    async startIfStopped(): Promise<void> {
-      if ((await snapshot()).status === RuntimeStatus.Stopped) await boot(RuntimeEvent.Start);
+    /**
+     * Starts a runtime that is down: `stopped` at backend startup, or `crashed` when the user rechecks the environment
+     * after fixing what made it fail (Git Bash installed on Windows, D72), with the automatic restart armed again as
+     * for a manual start. A no-op when opencode is not hostable or already running.
+     */
+    async startIfDown(): Promise<void> {
+      const { status } = await snapshot();
+      if (status === RuntimeStatus.Crashed) autoRestartArmed = true;
+      if (status === RuntimeStatus.Stopped || status === RuntimeStatus.Crashed) await boot(RuntimeEvent.Start);
     },
     /** User action on the runtime page: restart a ready runtime or start a crashed / stopped one. */
     async restart(): Promise<RuntimeDTO> {
@@ -251,8 +279,14 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       const text = await readFile(join(deps.logDir, file), 'utf8');
       return { file, lines: text.replace(/\n$/, '').split('\n').slice(-lines) };
     },
-    /** Stops the process for good (backend shutdown); no state transition. */
-    stop: stopProcess,
+    /**
+     * Backend shutdown (app quit): sessions of a ready runtime are lost first, as when it crashes or restarts, so
+     * requests failing while the process tree ends do not fail their attempts; no state transition.
+     */
+    async shutdown(): Promise<void> {
+      if (proc !== undefined && sdk !== undefined) for (const listener of lostListeners) listener();
+      await stopProcess();
+    },
     /** SDK client of the ready runtime. */
     sdk(): Sdk {
       if (sdk === undefined) throw new AppError(ErrorCode.OpencodeNotReady, 'opencode is not ready');

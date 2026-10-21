@@ -15,7 +15,7 @@
 | 单元 | Vitest | 纯逻辑：状态机表、计划校验、调度决策函数、git 输出解析器、配置生成、检查点解析、错误映射、主题对比度 | 无 IO | 被测文件旁 `*.test.ts` | `pnpm test` |
 | 集成 | Vitest | 模块 service 与 HTTP/MCP 接口：从 API 或 MCP 调用到数据库与 Git 结果 | 真实 SQLite（临时文件）、真实 git（临时仓库）、Docker 中的真实 MySQL（项目数据库，需本机 Docker）、FakeOpencode、假 Hosting 服务 | `*.int.test.ts` | `pnpm test:int` |
 | opencode 集成 | Vitest，标记 `@opencode` | runtime 托管、配置注入、插件、事件解析 | 本机真实 opencode 1.19.0，**不调用模型**（只启动、读配置、建会话、发 `noReply` 消息）；唯一例外是 bridge 插件测试（只有模型能让 opencode 调用工具），用免费模型 `TEST_MODEL`（默认 `opencode-go/deepseek-v4.1-flash`，D62） | `*.oc.test.ts` | `pnpm test:oc`（先构建插件） |
-| E2E | Playwright | 关键用户旅程（§5） | 浏览器模式：后端 + FakeOpencode；Electron 模式：打包产物 | `e2e/` | `pnpm e2e` / `pnpm e2e:electron` |
+| E2E | Playwright | 关键用户旅程（§5） | 浏览器模式：后端 + FakeOpencode，后端托管构建出的前端（不经 Vite 开发服务器，17 §4.1）；Electron 模式：打包产物 | `e2e/` | `pnpm e2e` / `pnpm e2e:electron` |
 | live | Vitest，标记 `@live` | 真实模型跑内置流程 | 真实 opencode + 模型 + 示例仓库 | `live/` | `pnpm test:live`（手动，不进 CI） |
 | 性能 | Playwright（`playwright.perf.config.ts`） | M6-02 的三项实测：20 节点计划画布的帧率、5 MB 会话流的首屏时间、10 个并发任务时的帧率与长任务；只输出数字到 `perf-results/`（不提交），不作通过/失败门槛 | 生产构建的前端 + 开发模式后端（FakeOpencode） | `e2e/*.perf.spec.ts` | `pnpm perf`（手动） |
 
@@ -56,7 +56,8 @@
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
 | `createTestApp()` | `test/helpers/app.ts` | 启动后端（临时数据目录、随机端口），返回类型化 API 调用 `call(op, input)`、`mcpUrl`、FakeOpencode；`realOpencode: true` 用于 `@opencode` 测试；MCP SDK 客户端见 `test/helpers/mcp.ts` |
 | `build.*()` | `test/builders/` | 最小测试数据构造器，只填测试关心的字段，其余用合法默认值 |
-| `waitForEvent(type, predicate)` | `test/helpers/events.ts` | 订阅 event-bus 等待事件，带超时（默认 5s）；**替代一切 sleep** |
+| `waitForEvent(type, predicate)` | `test/helpers/events.ts` | 订阅 event-bus 等待事件，带超时（默认 20s，慢的 CI runner 与 Windows 上一个任务要几秒）；**替代一切 sleep** |
+| git 环境 | `test/setup/git-config.ts`（int 项目的 setupFiles） | 集成测试中的 git 不读开发者的全局与系统配置，且不猜测提交者身份（`user.useConfigOnly`）：结果与全新 CI runner 一致；需要身份的地方必须显式给出（后端用 `BACKEND_COMMITTER`，测试仓库用 `createTestRepo` 的身份） |
 | `FakeClock` | `test/helpers/clock.ts` | 注入时钟，测试超时与 nudge 逻辑，不真实等待 |
 
 后端代码中需要时间的地方（超时、时间戳）通过注入的 `clock` 获取，不直接调 `Date.now()` / `setTimeout`，以便测试控制。
@@ -79,6 +80,7 @@
 | J12 | 知识问答：提问 → 研究过程（检索、读取）→ 带引用的回答 → 点击引用看原文（高亮、下一处、Esc）→ 续问 → 对话记录中回到对话（v1.1，`project-knowledge.browser.spec.ts`；FakeOpencode 的 `tool` 步骤报告只读的原生工具调用） | 浏览器 |
 | J13 | 对助手提问（知识问答）→「正在查资料」→ 导航卡片与带引用的回答 → 点引用看到原文 → 卡片「打开」进入知识对话页（v1.1，`project-knowledge.browser.spec.ts`） | 浏览器 |
 | J14 | 知识问答流式回答与模型：草稿出现、引用编号「待核对」不可点 → 提交通过后变为可点击的引用；换模型续问，对话与对话记录显示各轮模型（v1.1，`project-knowledge.browser.spec.ts`） | 浏览器 |
+| J15 | Electron 启动冒烟（`launch.electron.spec.ts`，`pnpm e2e:smoke`）：构建后的应用启动后端、显示引导页（各项检测有结果）、正常退出（main 等后端停止 opencode 后退出）。不需要 opencode 与模型，三平台 CI 运行（17 §4.1） | Electron |
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 
@@ -104,5 +106,6 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 
 - 不设全局覆盖率百分比。
 - 以下模块要求分支覆盖率 ≥ 90%：`shared/fsm`、`shared/workflow`（计划校验）、`scheduler`、`mcp.registry`。
-- CI（本地 `pnpm verify`）：check + test + test:int + e2e（浏览器）必须全绿；`test:oc` 在装有 opencode 的机器上随 `pnpm verify:full` 执行。
+- 本地 `pnpm verify`：check + test + test:int + build，另加 e2e（浏览器）必须全绿；`test:oc` 在装有 opencode 的机器上随 `pnpm verify:full` 执行。
+- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J15，Linux 用 xvfb），Ubuntu 与 Windows 另打安装包。数据库集成测试只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
 - 测试失败时禁止 `.skip` 合并；确需暂时跳过须附任务编号与原因，并在一周内处理。

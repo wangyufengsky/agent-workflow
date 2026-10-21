@@ -11,6 +11,15 @@ export const RuntimeStatus = {
 export type RuntimeStatus = (typeof RuntimeStatus)[keyof typeof RuntimeStatus];
 export const runtimeStatusSchema = z.enum(RuntimeStatus);
 
+/** Operating system the app runs on (`process.platform` values, 17 §1). */
+export const Platform = {
+  Darwin: 'darwin',
+  Win32: 'win32',
+  Linux: 'linux',
+} as const;
+export type Platform = (typeof Platform)[keyof typeof Platform];
+export const platformSchema = z.enum(Platform);
+
 export const DbType = {
   Mysql: 'mysql',
 } as const;

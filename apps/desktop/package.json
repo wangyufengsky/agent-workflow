@@ -7,7 +7,7 @@
     "typecheck": "tsc --noEmit -p .",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "dist": "electron-vite build && electron-builder --mac --arm64"
+    "dist": "electron-vite build && electron-builder"
   },
   "devDependencies": {
     "@aw/server": "workspace:*",
@@ -22,5 +22,6 @@
   "productName": "Agent Workflow",
   "version": "1.0.0",
   "description": "Local AI development workflow desktop app",
-  "author": "wangyufeng"
+  "author": "wangyufeng",
+  "homepage": "https://github.com/wangyufengsky/agent-workflow"
 }

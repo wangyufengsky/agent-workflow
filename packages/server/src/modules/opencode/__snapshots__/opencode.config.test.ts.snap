@@ -1883,8 +1883,5 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "url": "http://127.0.0.1:4000/mcp/assistant",
     },
   },
-  "plugin": [
-    "file:///Applications/Agent%20Workflow.app/Contents/Resources/opencode-plugin/agent-workflow-bridge.js",
-  ],
 }
 `;

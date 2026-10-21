@@ -43,7 +43,7 @@ describe('交给 AI 解决冲突（13 §4）', () => {
     });
     const review = backInReview(second.id);
     const { body: running } = await t.call(requestChangesOp, { id: second.id, reason: 'conflict' });
-    expect(running.status).toBe('running');
+    expect(running).toMatchObject({ status: 'running' });
     expect(running.nodes.map((n) => [n.key, n.kind, n.dependsOn])).toEqual([
       ['locate', 'normal', []],
       ['fix', 'normal', ['locate']],

@@ -34,5 +34,5 @@ export const SETTINGS_COPY = {
   defaultStrategy: '「合并」按钮的合并方式',
   deleteBranch: '合并后删除任务分支',
   binaryPath: 'opencode 可执行文件',
-  binaryPathHint: '留空则从 PATH 与 ~/.opencode/bin 查找；修改后到运行环境页重新检测。',
+  binaryPathHint: '留空则从 PATH 与主目录下的 .opencode/bin 查找；修改后到运行环境页重新检测。',
 } as const;

@@ -169,3 +169,21 @@
 | K-13 | 后端：研究尝试的流式正文按 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 写会话流；每一轮按请求的模型（或 `ai.defaultModel`）发起，续问可换模型（`continueSession` 带模型）；研究员协议提示词改为先写正文再提交 | 集成测试：草稿在提交前以细粒度出现在会话流中、提交后轮次 `answered` 且回答为提交的正文；校验失败后仍在研究、草稿保留；停止后草稿保留；两轮不同模型各自记录并随消息发送 |
 | K-14 | 界面：草稿流式显示、编号「待核对」不可点击、校验通过后替换为可点击引用、停止时「已停止，引用未核对」；输入框角落的模型选择（首屏与续问），每一轮与对话记录显示模型 | 单测见 K-12；E2E 见 K-15 |
 | K-15 | E2E：正文流式出现、编号先待核对后可点击、换模型续问后对话与对话记录显示对应模型；live：默认模型一次流式问答冒烟 | `pnpm e2e`、`pnpm test:oc` 通过；live 通过 |
+
+## v1.1 · Windows 与 Linux
+
+> 状态：**已完成**（2026-10-21），待合并。设计见 [17-cross-platform.md](17-cross-platform.md)，决策 D71–D76。验收：三平台 CI（`.github/workflows/ci.yml`）全绿 + 本机 macOS `pnpm verify`、`pnpm e2e`、`pnpm test:oc`、`pnpm e2e:smoke`；Windows 与 Linux 真机安装与首次引导由用户完成（17 §5）。与计划的差异：`.cmd` 启动与结束进程树用 execa 10 自带的能力（不自写）；浏览器 E2E 改由后端托管构建出的前端（Vite 开发服务器的 HMR 断线重载是 M6 遗留偶发失败的根因，17 §4.1）；合并 main 时把应用助手与知识问答纳入排查（17 §3.9、§3.10）。顺带修复的根因缺陷：冲突预合并缺少提交者身份、知识引用对 CRLF 文件带 `\r`、研究过程在 Windows 上显示绝对路径、助手确认卡片与对话状态在首次读取进行中到达时丢失。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| X-01 | 设计文档 17、任务拆分、决策 D71–D76；仓库 `.gitattributes`（`* text=auto eol=lf`） | 文档评审通过；Windows 检出后 `pnpm check` 不因换行失败 |
+| X-02 | 后端平台模块 `core/platform.ts`：`envValue`（Windows 不区分大小写）、`pathDirs`、`homeDir`、`findExecutable`（`.exe` / `.cmd`）、`fromGitPath`、`gitPlatformArgs`、`gitBashOf`；`.cmd` 的启动与结束进程树用 execa 10 自带的能力（Windows 命令解析、`killDescendants`）；业务代码不出现 `process.platform` | 单测覆盖纯函数（以 `path.win32` / `path.posix` 参数化，不依赖运行平台）；`grep process.platform packages/server/src` 只有该文件 |
+| X-03 | opencode 查找与托管：Windows 上 `opencode.exe` / `opencode.cmd`、`%USERPROFILE%\.opencode\bin`；停止与重启时结束进程树；应用退出时 main 请后端先停止 opencode（`backend.shutdown`） | 系统集成测试（伪造 PATH 与主目录）在三平台通过：未安装、版本不符、PATH 中找到、主目录中找到、设置路径优先 |
+| X-04 | Windows 上 opencode 的 shell 固定为 Git Bash（注入配置 `shell`）；找不到 Git Bash 时 Git 检测未就绪、opencode 不启动 | 配置快照含 / 不含 `shell` 两种；17 §3.3 写明依据（opencode 1.19.0 源码） |
+| X-05 | 检查命令：POSIX shell（Windows 上 Git Bash）、注入时钟计时、超时与中止结束进程树 | 集成测试：超时（FakeClock）与中止都结束命令且结果为未通过；三平台 CI 通过 |
+| X-06 | git：读取路径的入口规范化（`readRepoRoot`、`listWorktrees`）；Windows 上 `core.longpaths` | 项目、worktree、交付、Git 管理台的集成测试在 Windows CI 上通过（不改断言） |
+| X-07 | 凭据：Linux 上 `basic_text` / `unknown` 后端视为不可用；credential port 新增 `status`；`EnvironmentDTO.credentials`；引导页「凭据存储」警告项 | 单测：后端名称 → 可用性；集成测试：环境检测报告凭据可用性；E2E 引导页不受影响 |
+| X-08 | 引导页与文案按平台：`EnvironmentDTO.platform`、安装命令、opencode 路径示例、设置说明；快捷键显示 ⌘ / Ctrl | 每个平台都有文案（`satisfies Record<Platform, …>`，由类型检查保证）；浏览器 E2E 在三平台通过 |
+| X-09 | 打包：electron-builder 增加 win nsis x64、linux AppImage + deb x64、`icon.png`、维护者与可执行文件名；`pnpm dist` 构建当前平台 | CI 在 windows 与 ubuntu 上打出安装包并上传 artifact |
+| X-10 | CI：GitHub Actions 三平台矩阵（verify 各步骤、浏览器 E2E、Electron 启动冒烟，Linux 用 xvfb）；数据库集成测试只在 ubuntu 运行并写明原因 | 三平台全绿 |
+| X-11 | 文档收尾：03 §7 数据目录、11 环境接口、07 CI 与 Electron 冒烟、14 引导页、README 各平台安装、本节状态 | 文档与代码一致 |

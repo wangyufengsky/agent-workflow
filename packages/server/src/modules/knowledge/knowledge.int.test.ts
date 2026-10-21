@@ -312,6 +312,22 @@ describe('知识问答', () => {
     expect(gone.body).toMatchObject({ error: { code: ErrorCode.KnowledgeSourceUnavailable } });
   });
 
+  it('CRLF 换行的文件（Windows 检出）：引用的行与摘录不带回车符', async () => {
+    const { project: p, repo } = await project();
+    await writeFile(join(repo.path, 'src/crlf.ts'), 'const a = 1;\r\nconst b = 2;\r\n');
+    t.fake.enqueue(
+      script().callTool('submit_answer', { answer: 'Here [1].', citations: [fileCitation('src/crlf.ts', 1, 2)] }),
+      RESEARCHER,
+    );
+    const turn = (await ask(p.id, 'q')).turns[0];
+    if (turn === undefined) throw new Error('no turn');
+    expect(turn.citations[0]).toMatchObject({ excerpt: 'const a = 1;\nconst b = 2;' });
+    expect((await t.call(knowledgeCitationOp, { turnId: turn.id, index: 1 })).body).toMatchObject({
+      lines: ['const a = 1;', 'const b = 2;'],
+      lineCount: 2,
+    });
+  });
+
   it('删除对话同时删除它的研究记录；删除项目时一并删除对话', async () => {
     const { project: p } = await project();
     t.fake.enqueue(answering(), RESEARCHER);

@@ -118,6 +118,8 @@ test('J13 对助手提问 → 正在查资料 → 带引用的回答 → 点引�
   ]);
 
   await page.goto(`/?projectId=${project.id}`);
+  // The shell's shortcuts listen once the page has rendered.
+  await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
   await panel.getByLabel('发给助手的消息').fill('退款在哪里四舍五入？');

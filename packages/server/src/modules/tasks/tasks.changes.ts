@@ -13,7 +13,7 @@ import {
   taskMachine,
   transition,
 } from '@aw/shared';
-import { gitFailure, runGit, unmergedFiles } from '../git/index.ts';
+import { BACKEND_COMMITTER, gitFailure, runGit, unmergedFiles } from '../git/index.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
@@ -40,7 +40,8 @@ export function createTaskChanges(
   async function mergeTarget(task: Task, targetBranch: string): Promise<string[]> {
     const ctx = state.runContext(task);
     return locks.run(ctx.repoPath, async () => {
-      const args = ['merge', '--no-ff', '--no-commit', '--end-of-options', targetBranch];
+      // git needs an identity even for a merge it does not commit yet; the backend's, as for every merge (D52).
+      const args = [...BACKEND_COMMITTER, 'merge', '--no-ff', '--no-commit', '--end-of-options', targetBranch];
       const result = await runGit(args, { cwd: ctx.directory, okExitCodes: [0, 1] });
       const files = await unmergedFiles(ctx.directory);
       if (result.exitCode === 1 && files.length === 0) throw gitFailure(args, result);

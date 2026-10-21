@@ -5,6 +5,22 @@ import { join } from 'node:path';
 import { type APIRequestContext, expect, type Page } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 
+/**
+ * Waits that span a whole task run (worktree, steps with checks and commits, review) until its result card, or a merge
+ * (several git commands under the repository lock, then the worktree removal). Measured
+ * in CI (17 §4.1): J4 from start to failure takes 0.2 s on macOS, 0.8 s on Ubuntu and 3.6 s on the Windows runner,
+ * where every git and shell process start costs ~100 ms or more; J7 / J5 runs crossed 5 s there, and creating one
+ * worktree took up to 9.3 s, and a squash merge waiting for the lock behind two running tasks 2.9 s before its cleanup.
+ * Only Windows waits longer.
+ */
+export const TASK_RUN_TIMEOUT_MS = process.platform === 'win32' ? 20_000 : 5_000;
+
+/**
+ * Specs that chain several task runs and merges in one test exceed the 30 s test budget on the Windows runner, where
+ * a single squash merge once took 16 s (17 §4.1); they are marked `test.slow` there only.
+ */
+export const GIT_HEAVY_SPECS_SLOW = process.platform === 'win32';
+
 /** Runs git in a repository (`LC_ALL=C`, like the backend) and returns its trimmed output. */
 export function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', ...args], {
@@ -125,5 +141,6 @@ export async function startTask(page: Page, project: E2EProject, workflow: RegEx
   await page.getByRole('group', { name: '流程' }).getByRole('button', { name: workflow }).click();
   await page.getByLabel('需求').fill(requirement);
   await page.getByRole('button', { name: /^开始/ }).click();
-  await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/);
+  // Starting creates the task's worktree first (up to 9 s on the Windows runner).
+  await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/, { timeout: TASK_RUN_TIMEOUT_MS });
 }

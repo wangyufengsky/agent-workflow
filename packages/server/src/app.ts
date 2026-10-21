@@ -34,7 +34,7 @@ import {
 import { createDatabasesModule, mysqlDriver } from './modules/databases/index.ts';
 import { createDebugModule } from './modules/debug/index.ts';
 import { createDeliveryModule } from './modules/delivery/index.ts';
-import { createRepoLocks } from './modules/git/index.ts';
+import { createRepoLocks, locateOpencodeShell } from './modules/git/index.ts';
 import { type HostingEndpoints, PUBLIC_HOSTING } from './modules/hosting/index.ts';
 import { createInboxModule, type InboxService } from './modules/inbox/index.ts';
 import { createKnowledgeModule, type KnowledgeService } from './modules/knowledge/index.ts';
@@ -137,9 +137,10 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const runtime = createOpencodeRuntime({
     env,
     binaryPath: () => settings.service.get('opencode.binaryPath'),
-    configContent: () => {
+    configContent: async () => {
       if (apiPort === undefined) throw new Error('opencode started before the API listens');
       const api = `http://127.0.0.1:${apiPort}`;
+      const shell = await locateOpencodeShell(env);
       return JSON.stringify(
         buildOpencodeConfig({
           mcpUrl: `${api}${MCP_EXEC_PATH}`,
@@ -148,6 +149,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
           assistantMcpToken,
           pluginFile: config.opencodePluginFile,
           prompts,
+          shell,
         }),
       );
     },
@@ -156,15 +158,23 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     clock,
     logDir: join(config.dataDir, 'logs'),
   });
-  server.addHook('onClose', () => runtime.stop());
   const opencode = deps.opencode ?? createRuntimeClient(runtime, log);
+  // Before the API and database close: opencode's last requests and events still reach a working backend.
+  server.addHook('preClose', () => opencode.shutdown());
   // The hosted runtime can start only once the API listens (its MCP endpoint needs the port) and when no fake
   // replaces it; start() decides that, after which a recheck may start a newly hostable runtime too.
   let hosting = false;
   const startHostedRuntime = async () => {
-    if (hosting) await runtime.startIfStopped();
+    if (hosting) await runtime.startIfDown();
   };
-  const system = createSystemModule({ config, env, runtime, opencode, startRuntime: startHostedRuntime });
+  const system = createSystemModule({
+    config,
+    env,
+    runtime,
+    opencode,
+    credentials: credentials.service,
+    startRuntime: startHostedRuntime,
+  });
   const databases = createDatabasesModule({
     db: database.db,
     clock,
@@ -214,6 +224,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     settings: settings.service,
     prompts,
     log,
+    clock,
     env,
   });
   const nodes = createNodesModule({

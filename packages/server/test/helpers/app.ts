@@ -64,6 +64,8 @@ export async function createTestApp({
   const logDestination = { write: (line: string) => void logs.push(JSON.parse(line)) };
   const config = loadConfig({ AW_API_TOKEN: TEST_TOKEN, AW_DATA_DIR: dataDir, AW_LOG_LEVEL: 'info', NODE_ENV: 'test' });
   const fake = reusedFake ?? createFakeOpencode();
+  // A backend starting again has its own runtime (the previous one may have been shut down with it).
+  fake.reconnect();
   const app = await buildApp(config, { ...deps, logDestination, ...(realOpencode ? {} : { opencode: fake }) });
   routes?.(app.server);
   await app.server.listen({ host: '127.0.0.1', port: 0 });

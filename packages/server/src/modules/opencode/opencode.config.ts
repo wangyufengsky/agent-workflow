@@ -24,6 +24,8 @@ export type OpencodeConfigInput = {
   assistantMcpToken: string;
   pluginFile: string;
   prompts: Prompts;
+  /** Pinned shell (Git Bash on Windows, D72); otherwise opencode uses the user's own. */
+  shell: string | undefined;
 };
 
 type AgentPermission = {
@@ -130,6 +132,7 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
         permission: ASSISTANT_PERMISSION,
       },
     },
+    ...(input.shell === undefined ? {} : { shell: input.shell }),
   };
 }
 

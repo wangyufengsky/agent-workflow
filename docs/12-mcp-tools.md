@@ -35,7 +35,8 @@
     "aw-researcher": { "mode": "primary", "description": "agent-workflow researcher", "prompt": "<protocol-research.md>", "permission": { "edit": "deny", "question": "deny", "webfetch": "deny", "websearch": "deny", "task": "deny", "external_directory": "deny", "agent-workflow-app_*": "deny" } },
     // v1.1 应用助手（15 §2）：只看到助手 MCP 的工具
     "aw-assistant": { "mode": "primary", "description": "agent-workflow assistant", "prompt": "<protocol-assistant.md>", "permission": { "edit": "allow", "question": "deny", "webfetch": "ask", "external_directory": "deny", "agent-workflow_*": "deny" } }
-  }
+  },
+  "shell": "C:\\Program Files\\Git\\bin\\bash.exe"   // 仅 Windows：Git Bash，bash 规则按 bash 语法匹配（D72）
 }
 ```
 

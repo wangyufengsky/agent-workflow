@@ -11,6 +11,7 @@ export {
   readRepoRoot,
 } from './git.queries.ts';
 export { distance, fetchAll, type GitRef, isAncestor, listBranches, mergeBase } from './git.refs.ts';
+export { locateOpencodeShell, locateShell } from './git.shell.ts';
 export { hasMergeHead, readStatus, unmergedFiles } from './git.status.ts';
 export { readFile, readTree } from './git.tree.ts';
 export { type GitWorktree, listWorktrees } from './git.worktrees.ts';

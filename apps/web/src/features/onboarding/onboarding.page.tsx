@@ -1,4 +1,4 @@
-import { type EnvironmentDTO, RuntimeStatus, StatusTone } from '@aw/shared';
+import { type EnvironmentDTO, type Platform, RuntimeStatus, StatusTone } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -13,7 +13,7 @@ import { CheckRow } from './check-row.tsx';
 import { CopyCommand } from './copy-command.tsx';
 import { environmentQuery, useRecheckEnvironment } from './environment.queries.ts';
 
-function GitCheck({ git }: { git: EnvironmentDTO['git'] }) {
+function GitCheck({ git, platform }: { git: EnvironmentDTO['git']; platform: Platform }) {
   if (git.installed) {
     return (
       <CheckRow title={C.git.title} tone={StatusTone.Ok} badge={C.ready}>
@@ -23,13 +23,21 @@ function GitCheck({ git }: { git: EnvironmentDTO['git'] }) {
   }
   return (
     <CheckRow title={C.git.title} tone={StatusTone.Danger} badge={C.notReady}>
-      <span className="hint">{C.git.missing}</span>
-      <CopyCommand command={C.git.fix} />
+      <span className="hint">{C.git.missing[platform]}</span>
+      <CopyCommand command={C.git.fix[platform]} />
     </CheckRow>
   );
 }
 
-function OpencodeCheck({ opencode, onRecheck }: { opencode: EnvironmentDTO['opencode']; onRecheck: () => void }) {
+function OpencodeCheck({
+  opencode,
+  platform,
+  onRecheck,
+}: {
+  opencode: EnvironmentDTO['opencode'];
+  platform: Platform;
+  onRecheck: () => void;
+}) {
   const [path, setPath] = useState('');
   const update = useUpdateSettings();
   if (opencode.status !== RuntimeStatus.NotInstalled && opencode.status !== RuntimeStatus.VersionMismatch) {
@@ -58,7 +66,7 @@ function OpencodeCheck({ opencode, onRecheck }: { opencode: EnvironmentDTO['open
         <input
           id="opencode-path"
           className="input ctl mono grow"
-          placeholder={C.opencode.pathPlaceholder}
+          placeholder={C.opencode.pathPlaceholder[platform]}
           value={path}
           onChange={(e) => setPath(e.target.value)}
         />
@@ -96,6 +104,24 @@ function ModelsCheck({ environment }: { environment: EnvironmentDTO }) {
   );
 }
 
+/** Secrets need an OS key store; without one only storing tokens and passwords fails, so this is a warning (D74). */
+function CredentialsCheck({ environment }: { environment: EnvironmentDTO }) {
+  if (environment.credentials.available) {
+    return (
+      <CheckRow title={C.credentials.title} tone={StatusTone.Ok} badge={C.ready}>
+        <span className="hint">{C.credentials.available}</span>
+      </CheckRow>
+    );
+  }
+  const fix = C.credentials.fix[environment.platform];
+  return (
+    <CheckRow title={C.credentials.title} tone={StatusTone.Warn} badge={C.credentials.unavailableBadge}>
+      <span className="hint">{C.credentials.unavailable}</span>
+      {fix !== null && <CopyCommand command={fix} />}
+    </CheckRow>
+  );
+}
+
 /** First-run checks, then the first project (14 §3.1). */
 export function OnboardingPage() {
   const environment = useQuery(environmentQuery);
@@ -119,9 +145,14 @@ export function OnboardingPage() {
         {environment.data !== undefined && (
           <>
             <div className="card list list-sep">
-              <GitCheck git={environment.data.git} />
-              <OpencodeCheck opencode={environment.data.opencode} onRecheck={() => recheck.mutate()} />
+              <GitCheck git={environment.data.git} platform={environment.data.platform} />
+              <OpencodeCheck
+                opencode={environment.data.opencode}
+                platform={environment.data.platform}
+                onRecheck={() => recheck.mutate()}
+              />
               <ModelsCheck environment={environment.data} />
+              <CredentialsCheck environment={environment.data} />
             </div>
             <section className="section">
               <div className="section-head">

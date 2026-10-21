@@ -174,7 +174,11 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
           }),
         });
       } catch (err) {
-        return toDto(move(mustFind(id), AttemptEvent.StartFailed, errorOf(err)));
+        const current = mustFind(id);
+        // The runtime went away while the session was being created (crash, restart, app quit): the attempt is
+        // interrupted already and the failed request was part of that.
+        if (current.status !== AttemptStatus.Starting) return toDto(current);
+        return toDto(move(current, AttemptEvent.StartFailed, errorOf(err)));
       }
       repo.setSession(id, sessionId);
       const attempt = mustFind(id);

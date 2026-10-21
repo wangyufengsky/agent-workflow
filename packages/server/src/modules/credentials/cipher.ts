@@ -10,6 +10,8 @@ import {
 export type CredentialCipher = {
   encrypt(plaintext: string): Promise<Uint8Array>;
   decrypt(ciphertext: Uint8Array): Promise<string>;
+  /** Whether secrets can be stored at all; onboarding shows it (D74). */
+  isAvailable(): Promise<boolean>;
 };
 
 /** Message channel to the process that owns safeStorage (Electron `process.parentPort` in production). */
@@ -26,6 +28,7 @@ export const unavailableCipher: CredentialCipher = {
   decrypt: async () => {
     throw new AppError(ErrorCode.CredentialUnavailable, 'No credential encryption available in this process');
   },
+  isAvailable: async () => false,
 };
 
 /** Request/response over the transport; main answers each request id once. */
@@ -53,6 +56,16 @@ export function createPortCipher(transport: CipherTransport): CredentialCipher {
   return {
     encrypt: async (plaintext) => Buffer.from(await request('encrypt', plaintext), 'base64'),
     decrypt: (ciphertext) => request('decrypt', Buffer.from(ciphertext).toString('base64')),
+    async isAvailable() {
+      try {
+        await request('status', '');
+        return true;
+      } catch (err) {
+        // Recovery with a defined meaning: an unavailable store is the answer, shown on onboarding.
+        if (err instanceof AppError && err.code === ErrorCode.CredentialUnavailable) return false;
+        throw err;
+      }
+    },
   };
 }
 

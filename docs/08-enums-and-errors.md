@@ -100,6 +100,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | 枚举 | 值 |
 | --- | --- |
 | `RuntimeStatus` | `not_installed` · `version_mismatch` · `stopped` · `starting` · `ready` · `crashed` |
+| `Platform` | `darwin` · `win32` · `linux`（运行应用的操作系统，17 §1） |
 | `DbType` | `mysql` |
 | `CredentialKind` | `git_token` · `db_password` |
 | `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` · `confirmation` · `attachment` · `entity_ref`（后三种仅助手对话，10 §3） |

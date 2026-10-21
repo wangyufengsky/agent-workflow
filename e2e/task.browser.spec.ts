@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { createProject, passReview, patchSettings, queueTurn, startTask, submitResult } from './helpers.ts';
+import {
+  createProject,
+  passReview,
+  patchSettings,
+  queueTurn,
+  startTask,
+  submitResult,
+  TASK_RUN_TIMEOUT_MS,
+} from './helpers.ts';
 
 // Journeys J1–J4 (07 §5): the AI sessions are played by FakeOpencode, scripted per step.
 
@@ -29,7 +37,7 @@ test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开�
 
   await startTask(page, project, /新功能开发/, '新增问候函数\n返回中文问候语。');
   const result = page.getByTestId('result-card');
-  await expect(result).toContainText('检查全部通过');
+  await expect(result).toContainText('检查全部通过', { timeout: TASK_RUN_TIMEOUT_MS });
   await expect(result).toContainText('改动 1 个文件 +1 −0');
   await expect(result).toContainText('greet.ts');
   await expect(page.getByTestId('task-page').getByText('待合并', { exact: true }).first()).toBeVisible();
@@ -57,7 +65,7 @@ test('J2 AI 阻塞提问 → 在需要你处理中作答 → 节点继续 → �
   await question.getByRole('button', { name: '提交' }).click();
   await page.keyboard.press('Escape');
 
-  await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤');
+  await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
 });
 
 test('J3 权限请求 → 允许一次 → 继续', async ({ page, request }) => {
@@ -73,7 +81,7 @@ test('J3 权限请求 → 允许一次 → 继续', async ({ page, request }) =>
   const permission = page.getByTestId('inbox-permission');
   await expect(permission).toContainText('rm -rf dist');
   await permission.getByRole('button', { name: '允许一次' }).click();
-  await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤');
+  await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
 });
 
 test('J4 检查失败 → 自动重试成功；另一步骤预算耗尽 → 任务失败 → 用户重试 → 完成', async ({ page, request }) => {
@@ -85,10 +93,12 @@ test('J4 检查失败 → 自动重试成功；另一步骤预算耗尽 → 任�
         type: 'callTool',
         name: 'submit_plan',
         args: {
-          summary: '两个独立的步骤，最后整体验证。',
+          summary: '先生成标记文件，再更新说明，最后整体验证。',
           nodes: [
             { key: 'a', title: '生成标记文件', role: 'developer', instructions: 'Create ok.txt' },
-            { key: 'b', title: '更新说明', role: 'developer', instructions: 'Update docs' },
+            // After a: otherwise b may use up its budget (failing the task, which stops dispatching) before a's retry
+            // starts, depending on how long a's check takes.
+            { key: 'b', title: '更新说明', role: 'developer', instructions: 'Update docs', depends_on: ['a'] },
             { key: 'final_verify', title: '整体验证', role: 'tester', instructions: 'Verify', depends_on: ['a', 'b'] },
           ],
         },
@@ -103,14 +113,14 @@ test('J4 检查失败 → 自动重试成功；另一步骤预算耗尽 → 任�
 
     await startTask(page, project, /新功能开发/, '生成标记文件并更新说明');
     const failure = page.getByTestId('failure-panel');
-    await expect(failure).toContainText('「更新说明」多次尝试仍没有完成');
+    await expect(failure).toContainText('「更新说明」多次尝试仍没有完成', { timeout: TASK_RUN_TIMEOUT_MS });
     await expect(page.getByTestId('step-a')).toContainText('完成');
 
     await queueTurn(request, project, { title: '更新说明' }, [submitResult('已更新说明')]);
     await queueTurn(request, project, { title: '整体验证' }, [submitResult('全部通过')]);
     await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
     await failure.getByRole('button', { name: '重试' }).click();
-    await expect(page.getByTestId('result-card')).toContainText('检查全部通过');
+    await expect(page.getByTestId('result-card')).toContainText('检查全部通过', { timeout: TASK_RUN_TIMEOUT_MS });
   } finally {
     await patchSettings(request, { 'node.maxAttempts': 3 });
   }

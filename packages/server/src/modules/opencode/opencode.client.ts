@@ -35,6 +35,11 @@ export type OpencodeClient = {
   /** Models of the providers the user has connected, and the configured default `provider/model`. */
   listModels(): Promise<{ available: ModelInfo[]; defaultModel?: string }>;
   subscribe(listener: (event: OpencodeEvent) => void): () => void;
+  /**
+   * The backend shuts down (app quit): opencode goes with it. Its sessions are lost like in a crash (`runtime_lost`,
+   * attempts interrupted, not failed) before the process tree is ended (09 §4, D73).
+   */
+  shutdown(): Promise<void>;
 };
 
 /** `provider/model` → parts; the model id itself may contain `/`. */
@@ -93,6 +98,7 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
 
   return {
     isConnected: runtime.isReady,
+    shutdown: runtime.shutdown,
     async createSession({ directory, title, agent, permission }) {
       const { data } = await request('session.create', () =>
         runtime.sdk().session.create({ directory, title, agent, permission }, THROW),

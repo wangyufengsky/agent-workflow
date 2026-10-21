@@ -1,7 +1,11 @@
 import type { ServerEvent, ServerEventType } from '@aw/shared';
 import type { EventBus } from '../../src/core/event-bus.ts';
 
-const DEFAULT_TIMEOUT_MS = 5000;
+/**
+ * A whole task (git worktree, sessions, checks, commits) can lie between subscribing and the event: under a loaded CI
+ * runner or on Windows that takes several seconds (17 §4.1). Still below the int project's test timeout.
+ */
+const DEFAULT_TIMEOUT_MS = 20_000;
 
 type EventData<T extends ServerEventType> = Extract<ServerEvent, { type: T }>['data'];
 

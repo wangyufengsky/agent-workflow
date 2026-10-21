@@ -107,7 +107,8 @@ export function helperTools(deps: HelperToolDeps): AssistantTool[] {
     },
     {
       name: AssistantToolName.RevealFile,
-      description: 'Show one of your files in Finder; path is relative to the files directory, as list_files gives it',
+      description:
+        'Show one of your files in the system file manager; path is relative to the files directory, as list_files gives it',
       input: revealFileInputSchema,
       mode: UiMode.Simple,
       handler(input, { conversation }) {

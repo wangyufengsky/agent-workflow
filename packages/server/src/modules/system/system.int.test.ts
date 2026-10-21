@@ -1,5 +1,4 @@
-import { execFileSync } from 'node:child_process';
-import { chmod, mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -11,24 +10,18 @@ import {
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
-
-const REAL_GIT = execFileSync('/bin/sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+import { testCipher } from '../../../test/helpers/cipher.ts';
+import { isolatedEnv, writeFakeVersion } from '../../../test/helpers/executables.ts';
 
 let bin: string;
 let home: string;
 let t: TestApp;
 
-async function fakeOpencode(dir: string, version: string): Promise<string> {
-  const file = join(dir, 'opencode');
-  await writeFile(file, `#!/bin/sh\necho ${version}\n`);
-  await chmod(file, 0o755);
-  return file;
-}
+const fakeOpencode = (dir: string, version: string) => writeFakeVersion(dir, 'opencode', version);
 
-/** App whose PATH holds only our fake bin dir (with git linked in) and whose HOME has no ~/.opencode. */
+/** App whose PATH holds only our fake bin dir (and git) and whose home has no .opencode. */
 async function appWithPath(options: { git: boolean }) {
-  if (options.git) await symlink(REAL_GIT, join(bin, 'git'));
-  t = await createTestApp({ env: { PATH: bin, HOME: home } });
+  t = await createTestApp({ env: await isolatedEnv(bin, home, options) });
 }
 
 beforeEach(async () => {
@@ -77,8 +70,21 @@ describe('环境检测', () => {
   it('PATH 中没有 git 时 git 未安装', async () => {
     await appWithPath({ git: false });
     const { body } = await t.call(getEnvironmentOp, {});
-    expect(body.git).toEqual({ installed: false });
-    expect(body.ready).toBe(false);
+    expect(body).toMatchObject({ git: { installed: false }, ready: false });
+  });
+});
+
+describe('凭据存储（D74）', () => {
+  it('报告能否保存令牌与密码；不可用不影响环境就绪', async () => {
+    await fakeOpencode(bin, OPENCODE_VERSION);
+    const env = await isolatedEnv(bin, home, { git: true });
+    t = await createTestApp({ env, cipher: testCipher });
+    expect((await t.call(getEnvironmentOp, {})).body.credentials).toEqual({ available: true });
+
+    // No encryption backend (Linux without a secret service): the store is unavailable, the rest still ready.
+    await t.close();
+    t = await createTestApp({ env });
+    expect((await t.call(getEnvironmentOp, {})).body).toMatchObject({ credentials: { available: false }, ready: true });
   });
 });
 
