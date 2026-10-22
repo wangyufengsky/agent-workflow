@@ -99,6 +99,32 @@ export const retryTaskOp = defineOperationContract({
   http: { method: 'POST', path: '/tasks/:id/retry' },
 });
 
+export const updateCheckCommandOp = defineOperationContract({
+  ...common,
+  id: 'tasks.updateCheckCommand',
+  refs: { id: InputRef.Task },
+  title: 'op.tasks.updateCheckCommand',
+  description:
+    "Replace the check command a failed task's step failed on in the task's unfinished steps (and the project's check command when updateProject), then check the submitted result again",
+  input: z.object({ id: z.string(), command: z.string().trim().min(1), updateProject: z.boolean() }),
+  output: taskDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/check-command' },
+});
+
+export const skipCheckOp = defineOperationContract({
+  ...common,
+  id: 'tasks.skipCheck',
+  refs: { id: InputRef.Task },
+  title: 'op.tasks.skipCheck',
+  description:
+    "Skip the check command the app's environment could not run in the task's unfinished steps and go on; the result is marked unverified",
+  input: byId,
+  output: taskDetailSchema,
+  risk: OperationRisk.Critical,
+  http: { method: 'POST', path: '/tasks/:id/skip-check' },
+});
+
 export const cancelTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.cancel',

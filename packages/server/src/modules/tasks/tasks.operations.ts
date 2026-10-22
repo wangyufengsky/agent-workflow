@@ -24,10 +24,12 @@ import {
   reviewCommentsOp,
   reviseFromReviewOp,
   saveDraftPlanOp,
+  skipCheckOp,
   skipNodeOp,
   startTaskOp,
   taskDiffFileOp,
   taskDiffOp,
+  updateCheckCommandOp,
 } from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
 import type { TasksService } from './tasks.service.ts';
@@ -40,6 +42,10 @@ export function tasksOperations(tasks: TasksService) {
     implement(getTaskTimelineOp, ({ id, afterId }) => ({ items: tasks.timeline(id, afterId) })),
     implement(startTaskOp, ({ id }) => tasks.start(id)),
     implement(retryTaskOp, ({ id }) => tasks.retry(id)),
+    implement(updateCheckCommandOp, ({ id, command, updateProject }) =>
+      tasks.updateCheckCommand(id, command, updateProject),
+    ),
+    implement(skipCheckOp, ({ id }) => tasks.skipCheck(id)),
     implement(cancelTaskOp, ({ id, keepBranch }) => tasks.cancel(id, keepBranch ?? false)),
     implement(confirmPlanOp, ({ id, version }) => tasks.confirmPlan(id, version)),
     implement(replanOp, ({ id, feedback }) => tasks.replan(id, feedback)),

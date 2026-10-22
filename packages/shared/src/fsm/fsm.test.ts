@@ -51,6 +51,8 @@ const CASES: Array<{ name: string; machine: Machine<string, string>; illegal: Ar
     illegal: [
       ['pending', 'dispatch'],
       ['done', 'retry'],
+      ['ready', 'recheck'],
+      ['running', 'check_unrunnable'],
       ['waiting_input', 'result_submitted'],
       ['skipped', 'cancel'],
     ],

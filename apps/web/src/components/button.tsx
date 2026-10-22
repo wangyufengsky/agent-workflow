@@ -3,7 +3,7 @@ import { Icon, type IconName } from './icon.tsx';
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'ghost' | 'brand' | 'danger';
-  size?: 'sm' | 'lg';
+  size?: 'sm' | 'lg' | undefined;
   icon?: IconName;
   /** Shows a spinner and disables the button while a request runs (11 §1: no duplicate submits). */
   pending?: boolean;

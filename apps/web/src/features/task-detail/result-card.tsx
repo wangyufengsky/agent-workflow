@@ -18,6 +18,7 @@ import { Panel } from '../../components/panel.tsx';
 import { DELIVERY_COPY as D } from '../../copy/delivery.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { skippedCommands } from '../tasks/skipped-checks.ts';
 import { taskDiffFileQuery, taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { DeliveryActions } from './delivery-actions.tsx';
 import { ReviewComments } from './review-comments.tsx';
@@ -61,8 +62,17 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
   if (result === null) return <p className="hint">{C.resultPending}</p>;
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
   const failedChecks = result.checks.filter((c) => !c.passed).length;
+  const skipped = skippedCommands(result);
+  // One skipped check per step that had the command; the commands are listed once each.
+  const skippedCount = result.checks.filter((c) => c.skipped).length;
   const checks =
-    result.checks.length === 0 ? C.noChecks : failedChecks === 0 ? C.checksPassed : C.checksFailed(failedChecks);
+    result.checks.length === 0
+      ? C.noChecks
+      : failedChecks > 0
+        ? C.checksFailed(failedChecks)
+        : skippedCount > 0
+          ? C.checksSkipped(skippedCount, skipped)
+          : C.checksPassed;
   // The diff is read from the worktree, which goes away once the task is delivered or cancelled.
   const browsable = task.git.worktreeStatus === WorktreeStatus.Ready;
   return (
@@ -72,7 +82,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
           <p className={`${styles.headline} grow`}>
             <Icon name="check" />
             {C.resultHeadline(result.nodeSummaries.length, result.filesChanged, result.insertions, result.deletions)} ·{' '}
-            {checks}
+            <Markdown inline source={checks} />
           </p>
           {/* 23 §2.5: the result as a PPT for the team. */}
           <Link to={ROUTES.pptNew} search={{ taskId: task.id }} className="btn ghost sm">

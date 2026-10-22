@@ -17,10 +17,11 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { SCHEDULES_COPY } from '../../copy/schedules.ts';
-import { INBOX_COPY as C } from '../../copy/tasks.ts';
+import { INBOX_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
 import { attemptQuery } from '../attempts/attempt.queries.ts';
 import { schedulesQuery } from '../schedules/schedules.queries.ts';
-import { failureText } from '../tasks/failure-text.ts';
+import { CheckFailureActions } from '../tasks/check-failure-actions.tsx';
+import { failureText, unrunnableDetails } from '../tasks/failure-text.ts';
 import { taskQuery, tasksQuery } from '../tasks/tasks.queries.ts';
 import { type InboxResponse, useDismissInbox, useResolveInbox } from './inbox.queries.ts';
 import styles from './inbox-card.module.css';
@@ -153,11 +154,14 @@ function FailureCard({ item, resolve, pending }: CardProps<typeof InboxKind.Fail
   const { error } = item.payload;
   return (
     <>
-      <p className={styles.title}>{failureText(item.payload.phase, error)}</p>
+      <p className={styles.title}>
+        <Markdown inline source={failureText(item.payload.phase, error)} />
+      </p>
       <div className={styles.actions}>
         <Button variant="primary" size="sm" disabled={pending} onClick={() => resolve({ action: FailureAction.Retry })}>
-          {C.retry}
+          {unrunnableDetails(error) === undefined ? C.retry : TASK_COPY.recheck}
         </Button>
+        {item.taskId !== null && <CheckFailureActions taskId={item.taskId} error={error} size="sm" />}
         <Button variant="danger" size="sm" disabled={pending} onClick={() => resolve({ action: FailureAction.Cancel })}>
           {C.cancelTask}
         </Button>

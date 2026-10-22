@@ -49,6 +49,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.NodeNotFound]: '这个步骤不存在。',
   [ErrorCode.NodeNotEditable]: '这个步骤已经开始，不能再修改或删除。',
   [ErrorCode.NodeAttemptsExhausted]: '有一个步骤多次尝试仍没有完成。',
+  [ErrorCode.CheckCommandUnrunnable]: '有一个步骤的检查命令在应用环境里无法运行。',
   [ErrorCode.AttemptNotFound]: '这次尝试不存在。',
   [ErrorCode.AttemptNoResult]: 'AI 停下来了，但没有给出结果。',
   [ErrorCode.AttemptTimeout]: 'AI 会话超过了时限。',

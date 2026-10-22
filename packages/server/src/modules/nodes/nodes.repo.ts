@@ -1,12 +1,12 @@
 import {
-  type Acceptance,
   AppError,
-  acceptanceSchema,
   type CheckResult,
   checkResultSchema,
   ErrorCode,
+  type NodeAcceptance,
   type NodeResult,
   type NodeStatus,
+  nodeAcceptanceSchema,
   nodeResultSchema,
 } from '@aw/shared';
 import { and, asc, eq, inArray } from 'drizzle-orm';
@@ -20,7 +20,7 @@ type NodeRow = typeof nodesTable.$inferSelect;
 /** A node with its JSON columns parsed and its role's key and name. */
 export type Node = Omit<NodeRow, 'dependsOn' | 'acceptance' | 'result' | 'checkResults'> & {
   dependsOn: string[];
-  acceptance: Acceptance;
+  acceptance: NodeAcceptance;
   result: NodeResult | null;
   checkResults: CheckResult[] | null;
   roleKey: string;
@@ -29,13 +29,13 @@ export type Node = Omit<NodeRow, 'dependsOn' | 'acceptance' | 'result' | 'checkR
 
 export type NewNode = Omit<NodeRow, 'dependsOn' | 'acceptance' | 'result' | 'checkResults'> & {
   dependsOn: string[];
-  acceptance: Acceptance;
+  acceptance: NodeAcceptance;
 };
 
 /** What a plan version defines about a node; a plan adjustment rewrites it for nodes that have not started. */
 export type NodeDefinition = Pick<NodeRow, 'planId' | 'title' | 'roleId' | 'instructions' | 'kind' | 'position'> & {
   dependsOn: string[];
-  acceptance: Acceptance;
+  acceptance: NodeAcceptance;
 };
 
 /** Columns a transition may change together with the status. */
@@ -54,7 +54,7 @@ function toNode(row: { nodes: NodeRow; roleKey: string; roleName: string }): Nod
   return {
     ...n,
     dependsOn: keysSchema.parse(JSON.parse(n.dependsOn)),
-    acceptance: acceptanceSchema.parse(JSON.parse(n.acceptance)),
+    acceptance: nodeAcceptanceSchema.parse(JSON.parse(n.acceptance)),
     result: n.result === null ? null : nodeResultSchema.parse(JSON.parse(n.result)),
     checkResults: n.checkResults === null ? null : z.array(checkResultSchema).parse(JSON.parse(n.checkResults)),
     roleKey,
@@ -118,6 +118,13 @@ export function createNodesRepo(db: DbExecutor) {
           dependsOn: JSON.stringify(definition.dependsOn),
           acceptance: JSON.stringify(definition.acceptance),
         })
+        .where(eq(t.id, id))
+        .run();
+    },
+    /** A user's change to a step's checks (D116); not part of the state machine. */
+    setAcceptance(id: string, acceptance: NodeAcceptance, updatedAt: number): void {
+      db.update(t)
+        .set({ acceptance: JSON.stringify(acceptance), updatedAt })
         .where(eq(t.id, id))
         .run();
     },
