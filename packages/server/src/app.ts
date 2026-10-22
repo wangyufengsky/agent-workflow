@@ -212,6 +212,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     opencode,
     inbox: inbox.service,
     settings: settings.service,
+    projects: projects.service,
     prompts,
     dataDir: config.dataDir,
   });

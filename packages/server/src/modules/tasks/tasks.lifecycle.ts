@@ -316,6 +316,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       const start = attempts.start({
         kind: AttemptKind.Plan,
         taskId,
+        projectId: task.projectId,
         nodeId: null,
         roleId: planner.id,
         agent: planner.baseAgent,

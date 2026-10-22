@@ -78,7 +78,7 @@ Electron `app.getPath('userData')`，目录名为产品名：
 | 长路径（> 260 字符） | Node 的 fs 自动处理；Git for Windows 需要 `core.longpaths=true`。`runGit` 在 Windows 上固定加 `-c core.longpaths=true`（`platform.GIT_PLATFORM_ARGS`），不改用户的全局配置。Windows 本身的长路径开关（组策略 `LongPathsEnabled`）影响用户的构建工具，README 中说明 |
 | `core.autocrlf` | 不覆盖用户配置：任务 worktree 与用户主工作区的检出方式一致，提交内容由 git 规范化。本仓库自身加 `.gitattributes`（`* text=auto eol=lf`），否则 Windows 上 Biome 格式检查与状态机文档校验会因 CRLF 失败 |
 | `LC_ALL=C` | Git for Windows 用 gettext，同样遵守 `LC_ALL`，保留 |
-| worktree 删除时文件被占用 | 根因是仍在运行的进程（opencode 的 bash 子进程、检查命令启动的 node / java）持有工作区里的文件或把它当作当前目录。处理根因：中止与超时时终止整个进程树（§3.5）。删除仍失败时照常进入 `remove_failed`，Git 管理台可再次清理，不加重试 |
+| worktree 删除时文件被占用 | 根因是仍在运行的进程（opencode 的 bash 子进程、检查命令启动的 node / java）持有工作区里的文件或把它当作当前目录。处理根因：中止与超时时终止整个进程树（§3.5）。删除仍失败时照常进入 `remove_failed`，Git 工作台可再次清理，不加重试 |
 | `diff --no-index /dev/null` | git 在 Windows 上也把 `/dev/null` 识别为空文件，不变 |
 
 ### 3.5 子进程

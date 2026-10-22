@@ -46,26 +46,28 @@
 - 每个 agent 的权限 deny 另一套 MCP 的工具（`agent-workflow-app_*` / `agent-workflow_*`）：opencode 去掉被整体 deny 的工具，执行任务的会话看不到几十个助手工具，助手也看不到执行工具；即使调用了，归属也会失败（12 §3、15 §2）。
 - agent 只放不随设置变化的权限；**bash 规则在 `session.create` 时以会话级 `permission` 规则集传入**（D35，`sessionPermissionRules`），格式 `[{ permission: 'bash', pattern, action }]`。opencode 取**最后一条**匹配的规则，所以兜底的 `*` 放在最前。
 - 原生 `question` 工具禁用，提问只走 MCP `ask_user`（D36）。
-- **bash 规则集**（`shared/constants/opencode.ts`：planner 与 reviewer 用 `readonlyBashRules(checkCommands)`，executor 按 `ai.bashPolicy` 用 `BASH_PERMISSION_PRESETS`）：
+- **bash 规则集**（`shared/constants/opencode.ts`：planner 与 reviewer 用 `readonlyBashRules(checkCommands, allowedBash)`，executor 按 `ai.bashPolicy` 用 `BASH_PERMISSION_PRESETS`；`allowedBash` 是项目中「总是允许」记下的模式，D101）：
   - Git 只读子命令：`git status* git log* git diff* git show* git blame* git grep* git ls-files* git rev-parse*`。
   - 只读规则，按顺序（最后一条匹配的规则生效）：
     1. `*` ask。
     2. 版本查询 allow（D64）：单条命令 `<程序> --version` / `-version` / `-V`、`go version`；`-v` 只对 `node npm npx pnpm yarn bun mvn gradle docker`（别的程序里 `-v` 常是 verbose，如 `rake -v` 会运行默认任务）。程序名前还有别的词（`rm -rf src --version`、`PATH=. node --version`）或程序是路径（`./deploy.sh --version`）时 ask；`npx <包> --version` 也 ask（没有 TTY 时 npx 默认 `--yes`，会下载并运行任意包），只有 `npx --version` 本身放行。
-    3. 只读白名单 allow：`ls* cat* head* tail* rg* grep* find* wc* echo* pwd which*` 与 Git 只读子命令（D61）。
+    3. 只读白名单 allow：`ls* cat* head* tail* rg* grep* find* wc* echo* pwd which*` 与 Git 只读子命令（D61）；以及（D100，写成 `X *`，`du` 不会顺带放行 `dump`）文本过滤 `sort` `uniq`（只带 `-` 开头的参数，第二个文件参数是输出）`cut` `tr` `nl`、只打印的 `sed -n`（脚本以 `p` 结尾）、归档与类文件列表 `unzip -l` `unzip -Z` `jar tf` / `tvf` / `-tf` / `-tvf` / `--list` `javap`、文件信息 `file` `stat` `du` `tree` `diff`、查找 `command -v` / `-V` `type` `basename` `dirname` `realpath` `readlink`。`xargs`、`env`、`sh -c`、`command <程序>` 等会运行任意命令的不放行；`awk` 也不放行（程序可来自文件、`@include`、`-l` 扩展，`-o` / `-p` 写文件，逃逸列举不全）；前置环境变量（`PATH=… mvn -v`）仍询问（D64）。
     4. 同一工具的测试命令 allow（只在有检查命令的只读会话，D64）：检查命令以下列工具开头时放行对应的测试写法，该工具的其他子命令（`mvn deploy`、`npm publish`、`npm install`）不放行：
        - npm / pnpm / yarn / bun / node：`npm test`、`npm run test`、`npm t`、`pnpm test`、`pnpm run test`、`yarn test`、`yarn run test`、`bun run test`、`node --test`、`pnpm vitest run`、`pnpm exec vitest run`，可带任意参数。
        - `npx vitest` / `npx jest`：只有检查命令本身用 npx 运行该工具时才放行 `npx vitest run` / `npx jest`（可带任意参数）；npx 在项目没装该包时会下载并运行它。
        - mvn / ./mvnw：`mvn` / `./mvnw` + 可选的 `-q`、`-o`（任意顺序）+ `test`；./gradlew / gradle：`test` 与 `-q test`。之后**只能跟一个以 `-` 开头的参数**（`mvn test -Dtest=Foo#bar`），Gradle 还可以是 `--tests <过滤>`：再多一个词可能是另一个阶段或任务（`mvn test deploy`、`mvn -q test install`、`./gradlew test publish`），通配符分不清它和第二个参数，所以第二个参数也询问（`mvn test -Dtest=X -o`）。用这两个工具的检查命令本身也按这个形状放行，不再是 `<checkCommand>*`（因此 `mvn -q test > f` 也询问）。
        - go：`go test`，可带任意参数，但 `-exec` / `-toolexec`（用别的程序代替测试二进制或编译器）在第 7 步之后仍 ask。
        - pytest / python / python3：`pytest`、`python -m pytest`、`python3 -m pytest`，可带任意参数。
-    5. 逃逸写法 ask（D63）：任何重定向（`*>*`，也包括 `2>&1`、`2>/dev/null`）、`find` 的 `-exec` / `-execdir` / `-ok` / `-okdir` / `-delete` / `-fprint*` / `-fls`、`rg --pre`、`git … --output`、`git grep -O` / `--open-files-in-pager`。
-    6. 第 2、4 步的命令后接结尾单独的 ` 2>&1` 再 allow（`java -version` 把版本打到 stderr，模型常写 `mvn test 2>&1 | tail`），随后 `*>*>*` ask：再有第二个重定向（`mvn test > f 2>&1`）仍询问。
+    4a. 项目中总是允许的模式 allow（D101，`project_bash_rules`，如 `./scripts/mvn.sh -q *`）：排在逃逸写法之前，所以带重定向等写法仍询问。
+    5. 逃逸写法 ask（D63、D100）：任何重定向（`*>*`，也包括 `2>&1`、`2>/dev/null`）、`find` 的 `-exec` / `-execdir` / `-ok` / `-okdir` / `-delete` / `-fprint*` / `-fls`、`rg --pre`、`git … --output`、`git grep -O` / `--open-files-in-pager`；`sed` 的 `-i` / `-I`（原地修改）、`-f`（脚本来自文件）、`-e`（后续脚本），以及脚本中的 `w` / `W`（写文件）/ `e`（执行）——通配符解析不了脚本，所以这三个字母出现在无引号脚本结尾的 `p` 之前、或出现在引号内时都询问（地址正则含这些字母时会多问）；`sort -o` / `--output` / `--compress-program`；`uniq` 的第二个参数；`javap -J`（JVM 选项可加载 agent）；`file -C` / `--compile`；`tree -o` / `-R`。
+    6. 第 2、3、4、4a 步的命令后接结尾单独的 ` 2>&1` 或 ` 2>/dev/null` 再 allow（`java -version` 把版本打到 stderr，模型常写 `mvn test 2>&1 | tail`、`ls ~/.m2 2>/dev/null`；两者都不写文件，D100），随后 `*>*>*` ask：再有第二个重定向（`mvn test > f 2>&1`）仍询问。
     7. 项目检查命令本身 allow（`<checkCommand>*`，带参数或重定向也放行；Maven / Gradle 的检查命令除外，见第 4 步；评审会话还包括被评审节点验收中的命令检查，即 `$PROJECT_CHECK` 展开后的命令）：运行检查是只读角色了解代码状态的常规手段，询问会频繁打扰用户（D51）。规划与评审会话、以及只读角色执行的步骤（如代码审查流程中评审者的步骤）都带检查命令。
-    8. 测试工具自己的逃逸参数 ask（D64）：`go test *-exec*`、`go test *-toolexec*`，排在检查命令之后，所以检查命令 `go test ./...` 也带不进 `-exec`。
+    8. 第 5 步的命令逃逸（重定向除外）再 ask 一遍，使第 6 步的结尾重定向带不进它们（`find . -delete 2>/dev/null`）；然后是测试工具自己的逃逸参数 ask（D64）：`go test *-exec*`、`go test *-toolexec*`，排在检查命令之后，所以检查命令 `go test ./...` 也带不进 `-exec`。
   - `node -e`、`python -c`、`bash -c`、`sh -c` 等内联脚本始终 ask；规划者与评审者的协议提示词要求用项目测试命令或读文件来验证，不写临时脚本、不建临时文件（D64）。
   - opencode 1.19 对每条子命令（tree-sitter 的 `command` 节点，文本含其重定向）单独匹配，`X *` 形式的规则也匹配 `X` 本身，任一子命令不是 allow 就询问；单测 `server/modules/opencode/opencode.permissions.test.ts` 按此语义校验，live `permissions.live.test.ts` 在真实 opencode 上验证（含 `java -version && rm …` 中的 `rm` 仍询问）。
   - `ai.bashPolicy = auto`（默认）：`*` allow；`git *` deny（其他所有 Git 命令都可能改动 refs 或工作区，不逐个列举）；Git 只读子命令再 allow。
-  - `ai.bashPolicy = ask`：不带检查命令的只读规则（第 1–3、5、6 步）。
+  - `ai.bashPolicy = ask`：不带检查命令的只读规则（第 1–3、4a、5、6、8 步）。
+  - **项目级「总是允许」**（D101）：opencode 的「总是允许」只对当前会话生效，且按它的命令前缀表放得很宽（`unzip -l x.jar` → `unzip *`）。用户在「需要你处理」中对 bash 请求选「总是允许」时，后端在回复 opencode 之外，把请求的每条子命令按「程序 + 开头的选项（到第一个不以 `-` 开头的参数为止）+ ` *`」记到该尝试所属项目（`attempts.project_id`）的 `project_bash_rules`（`projectBashPatterns`：`unzip -l x.jar` → `unzip -l *`、`./scripts/mvn.sh -q test 2>&1` → `./scripts/mvn.sh -q *`、`javap -p -cp "$JAR" Foo` → `javap -p -cp *`、`make` → `make *`），所以批准列表不等于批准解压。Git（模型不写 Git，12 §1）与前置变量赋值（`PATH=… mvn -v`，D64）的子命令不记，只留在 opencode 的会话里。项目之后新建的只读会话（规划、评审、研究员、PPT 写作者，以及 `ask` 策略的执行者）带上这些模式（第 4a、6 步）；研究员与 PPT 写作者在项目主仓库中运行（D69），这正是模式要窄的原因。`auto` 策略的执行者本来就放行 Git 以外的命令，规则不变。已在运行的会话不受撤销影响（D35）。没有项目的调试运行不记。
 - 知识研究员（v1.1，18 §5.1）的会话级规则：不带检查命令的 `readonlyBashRules()`；对话打开网络检索时末尾再加 `webfetch *` 与 `websearch *` allow（agent 规则在前、会话规则在后，最后匹配生效；被整体 deny 的工具不出现在工具列表中，见 §8）。会话目录为项目主仓库，不建 worktree。
 - PPT 写作者（v1.2，23 §7.1）的会话级规则：不带检查命令的 `readonlyBashRules()`，没有网络；会话目录为项目仓库，没有项目时为 `<数据目录>/ppt/blank/`。
 - 角色差异不靠多个 agent：会话使用角色的 `base_agent` 对应的 agent（与尝试类型无关：只读的「代码审查」步骤以 reviewer 身份执行 `execute` 尝试，用 `submit_result` 提交报告），角色提示词通过每次 prompt 的 `system` 字段追加，模型通过 prompt 的 `model` 字段指定。因此修改角色无需重启 opencode。评审检查（`review` 尝试）固定使用内置 `reviewer` 角色。

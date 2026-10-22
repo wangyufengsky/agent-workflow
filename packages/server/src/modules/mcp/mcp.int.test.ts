@@ -26,6 +26,7 @@ async function activeSession(kind: AttemptKind): Promise<string> {
     kind,
     agent: RoleBaseAgent.Executor,
     taskId: null,
+    projectId: null,
     nodeId: null,
     roleId: null,
     directory: repo.path,

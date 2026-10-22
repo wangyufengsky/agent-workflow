@@ -397,28 +397,35 @@
   border-color: var(--wait-line);
 }
 
+/* Neutral text with a dot in the tone: tinted text on a tinted chip falls under 4.5:1 on light card backgrounds. */
 .reviewBadge {
   display: inline-flex;
   align-items: center;
   flex: none;
-  gap: 4px;
+  gap: 5px;
   height: 18px;
-  padding: 0 6px;
+  padding: 0 7px;
   border-radius: var(--r-pill);
   font-size: 11px;
   white-space: nowrap;
-  color: var(--warn);
-  background: var(--warn-fill);
+  color: var(--ink-2);
+  background: var(--fill-3);
 }
 
-.reviewBadge[data-tone="ok"] {
-  color: var(--ok);
-  background: var(--ok-fill);
+.reviewBadge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warn);
 }
 
-.reviewBadge[data-tone="run"] {
-  color: var(--run);
-  background: var(--run-fill);
+.reviewBadge[data-tone="ok"]::before {
+  background: var(--ok);
+}
+
+.reviewBadge[data-tone="run"]::before {
+  background: var(--run);
 }
 
 .more {

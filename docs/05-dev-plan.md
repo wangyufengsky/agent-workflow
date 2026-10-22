@@ -287,7 +287,7 @@
 | GW-01 | 设计文档 27、D108–D110、四主题原型 | 用户确认 |
 | GW-02 | 后端 Git 写操作（`git.write.ts`、`git.remote.ts`；`delivery.merge.ts` 的合并按身份参数化）、扩展的读操作（状态、改动、提交详情、日志筛选）、操作契约与风险等级；任务分支与主工作区的边界 | 集成测试（真实 Git 与 bare 远端）：每个写操作的成功路径与特有错误码、用户身份与钩子、钩子拒绝、推送被拒、拉取不能快进、冲突时目标不变、任务分支被拒 |
 | GW-03 | 合并任务：系统流程 `merge_branch`（`WorkflowKind.System`）、`tasks.merge_source`、准备阶段的预合并 | 集成测试：冲突交给 AI → 解决 → 合并后目标有两边的改动；系统流程不出现在列表 |
-| GW-04 | `git-reviews` 模块：表与迁移 `0014_git_workbench`、`git_review` / `commit_message` 尝试、agent `aw-code-reviewer`、MCP `submit_findings` / `submit_commit_message`、提示词 | 集成测试（FakeOpencode）：审查分支、问题校验退回与修正、同项目一次一个、删项目被挡；草拟成功、没有暂存、AI 未提交 |
+| GW-04 | `git-reviews` 模块：表与迁移 `0015_git_workbench`、`git_review` / `commit_message` 尝试、agent `aw-code-reviewer`、MCP `submit_findings` / `submit_commit_message`、提示词 | 集成测试（FakeOpencode）：审查分支、问题校验退回与修正、同项目一次一个、删项目被挡；草拟成功、没有暂存、AI 未提交 |
 | GW-05 | 前端：概览卡片、三栏工作台（工具条、左栏、提交列表与图谱、提交详情、审查面板、改动视图、分支视图、对话框）；diff 的问题标记与定位；窗口回到前台时重读主工作区 | 单测：图谱泳道；E2E 见 GW-06 |
 | GW-06 | E2E J24（两个用例）与 J9 走查的工作台画面 | `pnpm e2e` 通过 |
 | GW-07 | 文档同步：02、03、04、07、08、10、11、12、13、14、README | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |

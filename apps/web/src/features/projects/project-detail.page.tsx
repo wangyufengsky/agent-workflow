@@ -16,6 +16,7 @@ import { PROJECTS_COPY as C } from '../../copy/projects.ts';
 import { ProjectDatabases } from '../databases/project-databases.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { HostingPanel } from './hosting-form.tsx';
+import { ProjectAllowedBash } from './project-allowed-bash.tsx';
 import { projectQuery, useDeleteProject, useUpdateProject } from './projects.queries.ts';
 
 const route = getRouteApi(ROUTE_IDS.project);
@@ -127,6 +128,13 @@ export function ProjectDetailPage() {
         <section className="section">
           <Panel title={DATABASES_COPY.projectSection}>
             <ProjectDatabases key={`${p.id}:${p.dbConnectionIds.join(',')}`} project={p} />
+          </Panel>
+        </section>
+      )}
+      {pro && (
+        <section className="section">
+          <Panel title={C.allowedBash}>
+            <ProjectAllowedBash project={p} />
           </Panel>
         </section>
       )}

@@ -199,6 +199,286 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
+      "action": "allow",
+      "pattern": "sort",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p'",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p"",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink *",
+      "permission": "bash",
+    },
+    {
       "action": "ask",
       "pattern": "*>*",
       "permission": "bash",
@@ -246,6 +526,141 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-i*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-I*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-f*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-e*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*w*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*w*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*W*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*W*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*e*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*e*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *--compress-program*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "uniq -* ?*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "javap *-J*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *-C*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *--compile*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-R*",
       "permission": "bash",
     },
     {
@@ -344,8 +759,1033 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
+      "action": "allow",
+      "pattern": "ls* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "echo* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git blame* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "ls* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "echo* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git blame* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
       "action": "ask",
       "pattern": "*>*>*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-exec*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-ok*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-delete*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fprint*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fls*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "rg *--pre*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git *--output*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *-O*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-i*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-I*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-f*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-e*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*w*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*w*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*W*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*W*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*e*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*e*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *--compress-program*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "uniq -* ?*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "javap *-J*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *-C*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *--compile*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-R*",
       "permission": "bash",
     },
   ],
@@ -546,6 +1986,286 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
+      "action": "allow",
+      "pattern": "sort",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p'",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p"",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink *",
+      "permission": "bash",
+    },
+    {
       "action": "ask",
       "pattern": "*>*",
       "permission": "bash",
@@ -593,6 +2313,141 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-i*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-I*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-f*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-e*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*w*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*w*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*W*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*W*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*e*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*e*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *--compress-program*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "uniq -* ?*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "javap *-J*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *-C*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *--compile*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-R*",
       "permission": "bash",
     },
     {
@@ -691,8 +2546,1033 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
+      "action": "allow",
+      "pattern": "ls* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "echo* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git blame* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "ls* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "echo* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git blame* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
       "action": "ask",
       "pattern": "*>*>*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-exec*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-ok*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-delete*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fprint*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fls*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "rg *--pre*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git *--output*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *-O*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-i*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-I*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-f*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-e*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*w*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*w*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*W*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*W*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*e*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*e*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *--compress-program*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "uniq -* ?*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "javap *-J*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *-C*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *--compile*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-R*",
       "permission": "bash",
     },
   ],
@@ -893,6 +3773,286 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
+      "action": "allow",
+      "pattern": "sort",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p'",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p"",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink *",
+      "permission": "bash",
+    },
+    {
       "action": "ask",
       "pattern": "*>*",
       "permission": "bash",
@@ -940,6 +4100,141 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-i*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-I*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-f*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-e*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*w*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*w*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*W*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*W*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*e*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*e*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *--compress-program*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "uniq -* ?*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "javap *-J*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *-C*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *--compile*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-R*",
       "permission": "bash",
     },
     {
@@ -1038,8 +4333,1033 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
       "permission": "bash",
     },
     {
+      "action": "allow",
+      "pattern": "ls* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "echo* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git blame* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "ls* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "echo* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git blame* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
       "action": "ask",
       "pattern": "*>*>*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-exec*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-ok*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-delete*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fprint*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fls*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "rg *--pre*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git *--output*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *-O*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-i*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-I*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-f*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-e*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*w*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*w*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*W*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*W*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*e*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*e*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *--compress-program*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "uniq -* ?*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "javap *-J*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *-C*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *--compile*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-R*",
       "permission": "bash",
     },
   ],
@@ -1297,6 +5617,286 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "permission": "bash",
     },
     {
+      "action": "allow",
+      "pattern": "sort",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p'",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p"",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink *",
+      "permission": "bash",
+    },
+    {
       "action": "ask",
       "pattern": "*>*",
       "permission": "bash",
@@ -1344,6 +5944,141 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-i*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-I*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-f*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-e*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*w*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*w*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*W*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*W*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*e*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*e*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *--compress-program*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "uniq -* ?*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "javap *-J*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *-C*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *--compile*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-R*",
       "permission": "bash",
     },
     {
@@ -1442,8 +6177,1033 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "permission": "bash",
     },
     {
+      "action": "allow",
+      "pattern": "ls* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "echo* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git blame* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "ls* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "echo* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git blame* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
       "action": "ask",
       "pattern": "*>*>*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-exec*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-ok*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-delete*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fprint*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fls*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "rg *--pre*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git *--output*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *-O*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-i*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-I*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-f*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-e*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*w*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*w*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*W*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*W*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*e*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*e*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *--compress-program*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "uniq -* ?*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "javap *-J*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *-C*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *--compile*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-R*",
       "permission": "bash",
     },
   ],
@@ -1644,6 +7404,286 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "permission": "bash",
     },
     {
+      "action": "allow",
+      "pattern": "sort",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p'",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p"",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath *",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink *",
+      "permission": "bash",
+    },
+    {
       "action": "ask",
       "pattern": "*>*",
       "permission": "bash",
@@ -1691,6 +7731,141 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-i*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-I*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-f*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-e*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*w*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*w*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*W*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*W*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*e*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*e*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *--compress-program*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "uniq -* ?*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "javap *-J*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *-C*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *--compile*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-R*",
       "permission": "bash",
     },
     {
@@ -1789,8 +7964,1033 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "permission": "bash",
     },
     {
+      "action": "allow",
+      "pattern": "ls* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "echo* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git blame* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink * 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* --version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "* -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "* * -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "*/* -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "node -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npm -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "npx -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pnpm -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "yarn -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "bun -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "mvn -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "gradle -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "docker -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "go version 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "ls* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cat* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "head* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tail* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "rg* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "grep* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "find* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "wc* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "echo* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "pwd 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "which* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git status* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git log* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git diff* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git show* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git blame* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git grep* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-files* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-parse* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sort * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "uniq -* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "cut * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tr * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "nl * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p' * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "sed -n *p" * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -l * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "unzip -Z * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar tvf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar -tvf * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "jar --list * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "javap * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "file * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "stat * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "du * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "tree * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "diff * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -v * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "command -V * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "type * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "basename * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "dirname * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "realpath * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "readlink * 2>/dev/null",
+      "permission": "bash",
+    },
+    {
       "action": "ask",
       "pattern": "*>*>*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-exec*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-ok*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-delete*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fprint*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "find *-fls*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "rg *--pre*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git *--output*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *-O*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-i*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-I*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-f*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed *-e*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *w*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*w*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*w*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *W*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*W*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*W*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p' *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *e*p" *",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *'*e*'*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sed -n *"*e*"*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "sort *--compress-program*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "uniq -* ?*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "javap *-J*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *-C*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "file *--compile*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-o*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "tree *-R*",
       "permission": "bash",
     },
   ],

@@ -2,7 +2,7 @@ import { pathToFileURL } from 'node:url';
 import { PromptName, type Prompts } from '@aw/builtin';
 import {
   BASH_PERMISSION_PRESETS,
-  type BashPolicy,
+  BashPolicy,
   MCP_ASSISTANT_SERVER_NAME,
   MCP_ASSISTANT_TOOL_PREFIX,
   MCP_SERVER_NAME,
@@ -159,7 +159,8 @@ const WEB_RULES: readonly PermissionRule[] = [
  * Read-only sessions may also run `checkCommands` (the project check and the node's command checks) and the usual
  * test commands of the same tool without asking: running the checks is how a planner or reviewer learns the state of
  * the code, and asking would interrupt the user on every review (D51, D64). The researcher runs no checks; `web`
- * turns its web tools on (D69).
+ * turns its web tools on (D69). `allowedBash` are the patterns the user always allowed in the project (D101); every
+ * read-only set takes them, executors under `auto` already run everything but Git.
  */
 export function sessionPermissionRules(
   base: SessionAgent,
@@ -167,10 +168,20 @@ export function sessionPermissionRules(
   {
     checkCommands = [],
     web = false,
-  }: { checkCommands?: readonly string[] | undefined; web?: boolean | undefined } = {},
+    allowedBash = [],
+  }: {
+    checkCommands?: readonly string[] | undefined;
+    web?: boolean | undefined;
+    allowedBash?: readonly string[] | undefined;
+  } = {},
 ): PermissionRule[] {
-  if (base === SessionAgent.Executor) return [...BASH_PERMISSION_PRESETS[bashPolicy]];
-  if (base === SessionAgent.Researcher) return [...readonlyBashRules(), ...(web ? WEB_RULES : [])];
-  if (base === SessionAgent.SlidesWriter || base === SessionAgent.CodeReviewer) return readonlyBashRules();
-  return readonlyBashRules(checkCommands);
+  if (base === SessionAgent.Executor) {
+    return bashPolicy === BashPolicy.Auto
+      ? [...BASH_PERMISSION_PRESETS[bashPolicy]]
+      : readonlyBashRules([], allowedBash);
+  }
+  if (base === SessionAgent.Researcher) return [...readonlyBashRules([], allowedBash), ...(web ? WEB_RULES : [])];
+  if (base === SessionAgent.SlidesWriter || base === SessionAgent.CodeReviewer)
+    return readonlyBashRules([], allowedBash);
+  return readonlyBashRules(checkCommands, allowedBash);
 }

@@ -135,6 +135,7 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
         id: attemptId,
         kind: AttemptKind.GitReview,
         agent: SessionAgent.CodeReviewer,
+        projectId: project.id,
         taskId: null,
         nodeId: null,
         roleId: reviewer.id,

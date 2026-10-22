@@ -63,6 +63,17 @@
 | db_connection_id | TEXT → db_connections，ON DELETE CASCADE |
 | PK(project_id, db_connection_id) | |
 
+### project_bash_rules（v1.2 后，D101）
+
+项目中「总是允许」的 bash 模式；项目之后新建的只读会话带上它们（12 §2）。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| project_id | TEXT → projects，ON DELETE CASCADE | |
+| pattern | TEXT | opencode 通配模式，如 `unzip *` |
+| created_at | INTEGER | 首次记下的时间；再次「总是允许」不更新 |
+| PK(project_id, pattern) | | |
+
 ### roles
 
 | 列 | 类型 | 说明 |
@@ -138,7 +149,7 @@ type Acceptance = {
 | base_branch | TEXT | |
 | base_commit | TEXT NULL | worktree 创建时的基线 |
 | branch | TEXT NULL | |
-| merge_source | TEXT NULL | 合并任务的来源（27 §3.6，迁移 `0014_git_workbench`）：worktree 从它建出，准备阶段把 `base_branch` 合并进来 |
+| merge_source | TEXT NULL | 合并任务的来源（27 §3.6，迁移 `0015_git_workbench`）：worktree 从它建出，准备阶段把 `base_branch` 合并进来 |
 | current_plan_id | TEXT NULL | 当前生效（confirmed）版本（无外键：plans 引用 tasks，两张表不能互相引用，D43） |
 | result | TEXT(JSON) NULL | 结果卡数据 `TaskResultDTO`：`{ summary, filesChanged, insertions, deletions, files[], checks[], nodeSummaries[], assumptions[] }`（进入 `review` 时生成） |
 | created_at / updated_at / started_at / finished_at | INTEGER | |
@@ -209,6 +220,7 @@ type Acceptance = {
 | id | TEXT PK | |
 | task_id | TEXT NULL → tasks，CASCADE | 空 = 调试尝试（仅开发构建，M2-09）、知识问答的 `research` 尝试（v1.1，由 `knowledge_turns` 指向）或 PPT 的 `deck_outline` / `deck_slides` 尝试（v1.2，由 `deck_runs` 指向），不属于任何任务 |
 | node_id | TEXT NULL → nodes，CASCADE | `execute` 类为所执行的节点，`review` 类为被评审的节点；`plan` 类与调试尝试为空 |
+| project_id | TEXT NULL → projects，SET NULL | 会话所在的项目：任务的尝试为任务的项目，知识问答为对话的项目，PPT 为其项目；调试尝试与不属于项目的 PPT 为空。续用会话的尝试沿用。权限条目的「总是允许」记到这个项目，新建会话带上项目的总是允许模式（D101；迁移 0014 按任务、知识对话与 PPT 补上） |
 | kind | TEXT | `AttemptKind` |
 | seq | INTEGER | 同一节点（或同一任务的 plan 类、或不属于任务的同类尝试）内序号 |
 | status | TEXT | `AttemptStatus` |
@@ -245,7 +257,7 @@ payload / response：
 | kind | payload | response |
 | --- | --- | --- |
 | `question` | `{ question, options?: string[], blocking: boolean, defaultAssumption?: string }` | `{ answer: string }` 或 `{ assumed: true, value }`（未问用户、按假设继续时直接以 resolved 写入，作为记录） |
-| `permission` | `{ opencodePermissionId, sessionId, directory, permission, patterns[] }` | `{ decision: PermissionDecision }` |
+| `permission` | `{ opencodePermissionId, sessionId, directory, permission, patterns[] }`（`patterns` 为询问的子命令原文；bash 请求选「总是允许」时由它们得出记到项目的模式，D101） | `{ decision: PermissionDecision }` |
 | `acceptance` | `{}` | `{ accepted: boolean, feedback?: string }` |
 | `plan` | `{ planId, version }` | `{ confirmed: true }` 或 `{ replanFeedback }` |
 | `failure` | `{ phase, error }` | `{ action: 'retry' | 'cancel' }` |
@@ -500,7 +512,7 @@ payload / response：
 
 ## 4e. Git 工作台（v1.2）
 
-见 [27-git-workbench.md §7.2](27-git-workbench.md#72-数据10-增补)，迁移 `0014_git_workbench`（另给 `tasks` 加 `merge_source`）。
+见 [27-git-workbench.md §7.2](27-git-workbench.md#72-数据10-增补)，迁移 `0015_git_workbench`（另给 `tasks` 加 `merge_source`）。
 
 ### git_reviews
 

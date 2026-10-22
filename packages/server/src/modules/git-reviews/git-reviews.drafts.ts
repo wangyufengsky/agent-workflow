@@ -97,6 +97,7 @@ export function createCommitDrafts({ clock, log, attempts, projects, roles, sett
           id: attemptId,
           kind: AttemptKind.CommitMessage,
           agent: SessionAgent.CodeReviewer,
+          projectId: project.id,
           taskId: null,
           nodeId: null,
           roleId: reviewer.id,

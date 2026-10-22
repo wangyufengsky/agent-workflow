@@ -12,6 +12,8 @@ export const MCP_SESSION_ARG = '__aw_session';
 export const OPENCODE_START_TIMEOUT_MS = 30_000;
 
 export type PermissionAction = 'allow' | 'ask' | 'deny';
+/** opencode's permission type of shell commands. */
+export const BASH_PERMISSION = 'bash';
 export type PermissionRule = { permission: string; pattern: string; action: PermissionAction };
 
 /** Git subcommands that only read; every other git command writes refs or the worktree, which is the backend's job. */
@@ -27,7 +29,8 @@ const GIT_READONLY = [
 ];
 /**
  * Commands that only read the workspace or print; allowed without asking under every policy. Models exploring a
- * repository chain them with `echo` separators (M6-05 live runs, D61).
+ * repository chain them with `echo` separators (M6-05 live runs, D61). The second group (D100) is written `X *`, so
+ * `du` does not also allow `dump`; `sed` only prints (`-n` and a script ending in `p`), `uniq` without an output file.
  */
 const BASH_READONLY = [
   'ls*',
@@ -42,15 +45,49 @@ const BASH_READONLY = [
   'pwd',
   'which*',
   ...GIT_READONLY,
+  'sort *',
+  'uniq',
+  'uniq -*',
+  'cut *',
+  'tr *',
+  'nl *',
+  ...['p', "p'", 'p"'].map((end) => `sed -n *${end} *`),
+  'unzip -l *',
+  'unzip -Z *',
+  ...['tf', 'tvf', '-tf', '-tvf', '--list'].map((list) => `jar ${list} *`),
+  'javap *',
+  'file *',
+  'stat *',
+  'du *',
+  'tree *',
+  'diff *',
+  'command -v *',
+  'command -V *',
+  'type *',
+  'basename *',
+  'dirname *',
+  'realpath *',
+  'readlink *',
 ];
 
 /**
- * Arguments that make a command of the read-only list write files or run other programs; such commands ask again
- * (D63). opencode matches each sub-command's full text, redirections included, so a redirect is caught here too.
+ * sed commands that write (`w`, `W`) or run (`e`) inside a script (D100). Wildcards cannot parse the script, so these
+ * ask when such a letter comes before the `p` that ends an unquoted script, or anywhere inside quotes; an address
+ * regex with one of the letters asks too.
  */
-const BASH_READONLY_ESCAPES = [
-  // Redirection: `cat a > b`, `echo x >> f`; also `2>&1`, which only `STDERR_TO_STDOUT` and the check commands allow again.
-  '*>*',
+const SED_SCRIPT_ESCAPES = ['w', 'W', 'e'].flatMap((letter) => [
+  ...['p', "p'", 'p"'].map((end) => `sed -n *${letter}*${end} *`),
+  `sed -n *'*${letter}*'*`,
+  `sed -n *"*${letter}*"*`,
+]);
+
+/**
+ * Arguments that make a command of the read-only list write files or run other programs; such commands ask again
+ * (D63, D100). opencode matches each sub-command's full text, redirections included, so a redirect is caught by
+ * `REDIRECT`; the others are `COMMAND_ESCAPES`.
+ */
+const REDIRECT = '*>*';
+const COMMAND_ESCAPES = [
   'find *-exec*',
   'find *-ok*',
   'find *-delete*',
@@ -60,6 +97,22 @@ const BASH_READONLY_ESCAPES = [
   'git *--output*',
   'git grep *-O*',
   'git grep *--open-files-in-pager*',
+  // In-place editing (`-I` on macOS), a script from a file, or more scripts after the first.
+  'sed *-i*',
+  'sed *-I*',
+  'sed *-f*',
+  'sed *-e*',
+  ...SED_SCRIPT_ESCAPES,
+  'sort *-o*',
+  'sort *--compress-program*',
+  // Two file arguments: the second is the output.
+  'uniq -* ?*',
+  // Options for the JVM, which can load an agent.
+  'javap *-J*',
+  'file *-C*',
+  'file *--compile*',
+  'tree *-o*',
+  'tree *-R*',
 ];
 
 /** Flags that only print a program's version (D64). */
@@ -126,16 +179,23 @@ const TEST_RUNNERS: readonly TestRunner[] = [
   },
 ];
 
-/** The only redirection allowed back after the escapes, for test commands and version queries (`java -version` prints to stderr). */
-const STDERR_TO_STDOUT = ' 2>&1';
+/**
+ * The only redirections allowed back after the escapes, at the end of a command (`java -version` prints to stderr):
+ * stderr into stdout, or thrown away (D100). Neither writes a file.
+ */
+const STDERR_SUFFIXES = [' 2>&1', ' 2>/dev/null'];
 
-const bash = (pattern: string, action: PermissionAction): PermissionRule => ({ permission: 'bash', pattern, action });
+const bash = (pattern: string, action: PermissionAction): PermissionRule => ({
+  permission: BASH_PERMISSION,
+  pattern,
+  action,
+});
 
 /**
  * A version query is one command: a program name and the flag (`java -version`). The asks take back longer commands
  * that only end in the flag: `rm -rf src --version`, and `npx <package> --version`, which without a TTY installs and
  * runs any package from the registry; and paths, which run whatever the file is (`./deploy.sh --version`). `suffix`
- * is `''` or `STDERR_TO_STDOUT`.
+ * is `''` or one of `STDERR_SUFFIXES`.
  */
 const versionQueryRules = (suffix: string): PermissionRule[] => [
   ...VERSION_FLAGS.flatMap((flag) => [
@@ -149,8 +209,26 @@ const versionQueryRules = (suffix: string): PermissionRule[] => [
 
 const startsWithWords = (command: string, words: string) => command === words || command.startsWith(`${words} `);
 
+/** `NAME=value` before a command changes what runs (`PATH=. node`), so such a command is not remembered (D64). */
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
 /**
- * Rules allowing `command` with the arguments its runner permits, followed by `suffix` (`''` or `STDERR_TO_STDOUT`).
+ * What「总是允许」on a bash request remembers for the project (D101): for each sub-command the program and the options
+ * the user saw, up to the first other argument, and ` *` (`unzip -l x.jar` → `unzip -l *`, so extracting still asks).
+ * Not Git, which the model never writes (12 §1), nor commands after an assignment; those stay with opencode's session.
+ */
+export function projectBashPatterns(commands: readonly string[]): string[] {
+  const patterns = commands.flatMap((command) => {
+    const [program = '', ...args] = command.trim().split(/\s+/);
+    if (program === '' || program === 'git' || ASSIGNMENT.test(program)) return [];
+    const end = args.findIndex((arg) => !arg.startsWith('-'));
+    return [[program, ...args.slice(0, end === -1 ? args.length : end), '*'].join(' ')];
+  });
+  return [...new Set(patterns)];
+}
+
+/**
+ * Rules allowing `command` with the arguments its runner permits, followed by `suffix` (`''` or one of `STDERR_SUFFIXES`).
  * The asks use ` ?*` rather than ` *`: opencode also matches a pattern ending in ` *` without that part.
  */
 function testCommandRules(command: string, runner: TestRunner, suffix: string): PermissionRule[] {
@@ -169,13 +247,22 @@ function testCommandRules(command: string, runner: TestRunner, suffix: string): 
   ];
 }
 
+/** `pattern` followed by `suffix`; a trailing ` *` may match nothing, so `X *` also gets `X<suffix>`. */
+const withSuffix = (pattern: string, suffix: string) =>
+  pattern.endsWith(' *') ? [`${pattern.slice(0, -2)}${suffix}`, `${pattern}${suffix}`] : [`${pattern}${suffix}`];
+
 /**
  * Bash rules of read-only sessions (12 §2). opencode applies the last matching rule, so the catch-all comes first:
- * version queries and the read-only list, the test commands of the check's tool, then the escapes (D63); after them
- * the same version queries and test commands followed by `2>&1` alone, a second redirection asks again, the other
- * check commands (`<checkCommand>*`, D51), and last the test runners' own escapes.
+ * version queries and the read-only list, the test commands of the check's tool and the project's always-allowed
+ * patterns (`allowedBash`, D101), then the escapes (D63, D100); after them the same allows followed by one stderr
+ * redirection alone (`2>&1`, `2>/dev/null`), a second redirection asks again, the other check commands
+ * (`<checkCommand>*`, D51), and last the command escapes again, so a suffix does not let them through, with the test
+ * runners' own escapes.
  */
-export function readonlyBashRules(checkCommands: readonly string[] = []): PermissionRule[] {
+export function readonlyBashRules(
+  checkCommands: readonly string[] = [],
+  allowedBash: readonly string[] = [],
+): PermissionRule[] {
   const checks = [...new Set(checkCommands.map((c) => c.trim()))];
   const runners = TEST_RUNNERS.filter((r) => checks.some((c) => r.tools.some((t) => startsWithWords(c, t))));
   // A check command run by a `flag` runner gets that runner's shape instead of `<checkCommand>*`.
@@ -186,16 +273,22 @@ export function readonlyBashRules(checkCommands: readonly string[] = []): Permis
       runner,
     })),
   );
+  const allows = (suffix: string): PermissionRule[] => [
+    ...versionQueryRules(suffix),
+    ...BASH_READONLY.flatMap((p) => withSuffix(p, suffix)).map((p) => bash(p, 'allow')),
+    ...tests.flatMap(({ command, runner }) => testCommandRules(command, runner, suffix)),
+    ...allowedBash.flatMap((p) => withSuffix(p, suffix)).map((p) => bash(p, 'allow')),
+  ];
+  const escapes = COMMAND_ESCAPES.map((p) => bash(p, 'ask'));
   return [
     bash('*', 'ask'),
-    ...versionQueryRules(''),
-    ...BASH_READONLY.map((p) => bash(p, 'allow')),
-    ...tests.flatMap(({ command, runner }) => testCommandRules(command, runner, '')),
-    ...BASH_READONLY_ESCAPES.map((p) => bash(p, 'ask')),
-    ...versionQueryRules(STDERR_TO_STDOUT),
-    ...tests.flatMap(({ command, runner }) => testCommandRules(command, runner, STDERR_TO_STDOUT)),
+    ...allows(''),
+    bash(REDIRECT, 'ask'),
+    ...escapes,
+    ...STDERR_SUFFIXES.flatMap(allows),
     bash('*>*>*', 'ask'),
     ...checks.filter((c) => shaped(c) === undefined).map((c) => bash(`${c}*`, 'allow')),
+    ...escapes,
     ...runners.flatMap((r) => r.escapes ?? []).map((p) => bash(p, 'ask')),
   ];
 }

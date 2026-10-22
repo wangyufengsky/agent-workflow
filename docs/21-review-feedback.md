@@ -72,7 +72,7 @@
 审查者可能在平台上直接提交了建议（GitHub「Commit suggestion」、GitLab「Apply suggestion」），远端分支会比本地多出提交。修改前在仓库锁内：
 
 1. `git fetch origin refs/heads/<branch>`（HTTPS 远端同推送一样经环境变量带令牌，09 §7）。
-2. 本地分支不存在（被用户删掉）→ 从远端的提交重建；与远端相同或落后于远端 → 快进到远端；领先远端（上次推送失败）→ 保持；**两边分叉** → 409 `BRANCH_DIVERGED`，不做任何改动（不 rebase、不 merge、不覆盖，由用户在 Git 管理台处理）。
+2. 本地分支不存在（被用户删掉）→ 从远端的提交重建；与远端相同或落后于远端 → 快进到远端；领先远端（上次推送失败）→ 保持；**两边分叉** → 409 `BRANCH_DIVERGED`，不做任何改动（不 rebase、不 merge、不覆盖，由用户在 Git 工作台处理）。
 
 ### 4.2 重建 worktree
 

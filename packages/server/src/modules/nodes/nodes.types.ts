@@ -28,6 +28,7 @@ export type NodesServiceDeps = {
 /** What running a node needs to know about its task; the tasks module provides it. */
 export type NodeRunContext = {
   taskId: string;
+  projectId: string;
   taskKey: string;
   taskTitle: string;
   requirement: string;

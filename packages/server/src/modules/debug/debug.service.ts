@@ -79,6 +79,7 @@ export function createDebugService({ attempts, settings, prompts }: DebugService
         kind: AttemptKind.Execute,
         agent: RoleBaseAgent.Executor,
         taskId: null,
+        projectId: null,
         nodeId: null,
         roleId: null,
         directory: input.directory,
