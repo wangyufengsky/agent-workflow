@@ -716,7 +716,10 @@ const SHOTS: Shot[] = [
     url: (s) => `/?projectId=${s.project.id}`,
     ready: heading('Everything is a Workflow.'),
     open: async (page) => {
-      await page.getByRole('group', { name: '直接开始' }).getByRole('button', { name: '新功能开发' }).click();
+      await page
+        .getByRole('group', { name: '直接开始' })
+        .getByRole('button', { name: '新功能开发', exact: true })
+        .click();
       await page.getByText('更多选项').click();
       return page.getByLabel('标题');
     },

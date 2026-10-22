@@ -277,3 +277,17 @@
 | DB-06 | 界面：连接对话框的类型选择与说明、端口随类型切换；连接卡片显示类型；测试结果显示服务器版本 | E2E 见 DB-07；J9 走查数据库页无报错 |
 | DB-07 | E2E J21（FakeOpencode + PostgreSQL 容器） | `pnpm e2e` 通过 |
 | DB-08 | 文档同步：01、03（依赖与扩展点）、07（J21、容器辅助）、08、10、11、12、14、17、README、CI 拉取镜像与排除 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
+
+## v1.2 之后 · 以助手为主的主页与打开动画
+
+> 状态：**已完成**（2026-10-22）。设计见 [28-home-assistant.md](28-home-assistant.md)；决策 D111（主页以助手为主，一个输入框两种模式）、D112（主页与 ⌘J 面板同一组对话、接力）、D113（打开动画）用户已确认（按推荐方案）。验收：本机 macOS `pnpm verify`、`pnpm e2e`（含 J25 与四主题走查 J9）、`pnpm test:oc`、`pnpm e2e:smoke`（J15）。与设计稿的出入见 28 §7。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| H-01 | 设计文档 28、决策 D111–D113 | 用户确认 |
+| H-02 | shared：`AssistantPage` 五个页面、`ui.introAnimation`、`launchPreferencesSchema` 与 `AwBridge.setLaunchPreferences` | 类型检查通过 |
+| H-03 | 主页：标语、两种模式的输入框、直接开始、建议、最近对话、工作概览、对话中视图与工作概览栏 | J1、J7、J8、J17、J19 通过 |
+| H-04 | 主页与面板的接力：主页上不显示面板、⌘J 聚焦主页输入框、离开与回到主页、助手带用户离开时的视图过渡 | 单测 `panelFollowsUser`；J25 |
+| H-05 | 打开动画：`splashHtml`、main 先开窗口并行启动后端、`launch.json`、设置项、后端提前退出的提示 | 单测 `launch.json`；J15；实测写入 28 §5.2 |
+| H-06 | 文档同步（01、02、03、07、08、11、14、15）与 J9 走查 | `pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
+

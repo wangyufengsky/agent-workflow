@@ -106,7 +106,13 @@ export function HomeComposer({
           className={styles.input}
           rows={docked ? 1 : 3}
           aria-label={workflow === undefined ? C.inputLabel : HOME_TASK_COPY.requirement}
-          placeholder={docked ? C.conversationPlaceholder : C.placeholder}
+          placeholder={
+            workflow !== undefined
+              ? HOME_TASK_COPY.requirementPlaceholder
+              : docked
+                ? C.conversationPlaceholder
+                : C.placeholder
+          }
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
