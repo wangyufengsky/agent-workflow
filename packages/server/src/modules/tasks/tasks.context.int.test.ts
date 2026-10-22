@@ -68,7 +68,7 @@ describe('任务上下文类 MCP 工具（12 §6.1–6.3）', () => {
           { key: 'developer', name: '开发工程师' },
           { key: 'tester', name: '测试工程师' },
         ],
-        requiredSteps: [{ key: 'final_verify', roleKey: 'tester' }],
+        requiredSteps: [{ key: 'final_verify', roleKey: 'developer' }],
         maxNodes: 20,
       },
       upstream: [],
