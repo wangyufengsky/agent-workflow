@@ -1,6 +1,6 @@
 # 17 · Windows 与 Linux 支持（v1.1）
 
-v1.0 只验收了 macOS arm64（D13），代码按跨平台抽象编写。本文说明 v1.1 支持 Windows 与 Linux 时各模块的平台差异和处理方式；任务拆分见 [05 §v1.1 跨平台](05-dev-plan.md#v11--windows-与-linux)，决策见 02 的 D71–D76、D81、D82。
+v1.0 只验收了 macOS arm64（D13），代码按跨平台抽象编写。本文说明 v1.1 支持 Windows 与 Linux 时各模块的平台差异和处理方式；任务拆分见 [05 §v1.1 跨平台](05-dev-plan.md#v11--windows-与-linux)，决策见 02 的 D71–D76、D81、D82、D115。
 
 ## 1. 目标平台
 
@@ -25,7 +25,7 @@ v1.0 只验收了 macOS arm64（D13），代码按跨平台抽象编写。本文
 
 1. **平台差异只在三处处理**，业务代码里不写 `process.platform`：
    - 后端 `packages/server/src/core/platform.ts`：环境变量（PATH、主目录）、可执行文件查找、命令行 shell、终止进程树、git 的平台参数、git 输出路径的规范化。
-   - 桌面 main `apps/desktop/src/main/`：safeStorage 的可用性判断（只有 Linux 有差异）、菜单与关于面板。
+   - 桌面 main `apps/desktop/src/main/`：safeStorage 的可用性判断（只有 Linux 有差异）、菜单与关于面板、交给后端的 PATH（macOS / Linux 取自登录 shell，§3.12）。
    - 前端 `apps/web/src/app/platform.ts`：按 `EnvironmentDTO.platform` 选安装命令文案；快捷键显示（⌘ / Ctrl）。
 2. **路径只经 `node:path`**，不手写分隔符；来自 git 的路径先规范化再与本机路径比较（§3.4）。
 3. **同一套行为，不按平台降级**。做不到同样安全的地方（Windows 的 shell、Linux 的凭据）明确要求前置条件或明确失败，不退回到更弱的实现。
@@ -67,7 +67,7 @@ Electron `app.getPath('userData')`，目录名为产品名：
 - Git Bash 的位置由 `git --exec-path`（如 `C:/Program Files/Git/mingw64/libexec/git-core`）上溯三级得到 Git 安装根目录，取 `<根目录>\bin\bash.exe`。用 `--exec-path` 而不是 PATH 中 `git.exe` 的位置，是因为 scoop 等安装方式在 PATH 里放的是转发程序。
 - 找不到 Git Bash（例如只有 MinGit）时：引导页 Git 一项显示「未就绪」并说明需要 Git for Windows；托管 opencode 不启动（启动时生成配置失败 → 运行时 `crashed`，日志写明原因）。不退回到 PowerShell。装好后在引导页点「重新检测」即可：重新检测会再次启动 `crashed` 的运行时，不必重启应用。
 - 只注入 `shell`，不改 opencode 的其他行为；用户自己的 opencode 配置里的 `shell` 在 Windows 上被覆盖（注入配置优先，S3）。
-- macOS / Linux 不注入，opencode 用用户的 `$SHELL`（login shell 带来用户的 PATH，如 nvm）。用户若把 opencode 的 `shell` 配成 PowerShell 等非 POSIX shell，规则同样不成立——这是 v1.0 起就有的前提，记在「发现但未处理」中（§7）。
+- macOS / Linux 不注入，opencode 用用户的 `$SHELL`。它以 `-l` 运行，只读 `.zprofile` 等登录脚本，写在 `.zshrc` 里的 PATH（Homebrew、nvm、sdkman 常见）要靠后端本身的 PATH 带进来（§3.12）。用户若把 opencode 的 `shell` 配成 PowerShell 等非 POSIX shell，规则同样不成立——这是 v1.0 起就有的前提，记在「发现但未处理」中（§7）。
 
 ### 3.4 Git
 
@@ -161,6 +161,22 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 - 数据库 MySQL 驱动、托管平台 HTTP：与平台无关。
 - 后端脚本（`scripts/*.mjs|ts`）只用 `node:path`；`scripts/check-prod-bundle.mjs` 读取构建产物，跨平台。
 
+
+### 3.12 从 Finder / 桌面启动时的 PATH（D115）
+
+**问题。** 从 Finder、Dock 或 Launchpad 启动时，launchd 给应用的 PATH 只有 `/usr/bin:/bin:/usr/sbin:/sbin`；Linux 从桌面启动器启动时同样只有系统会话的 PATH，没有 `~/.nvm`、`~/.sdkman` 等。后端把这个 PATH 传给检查命令（`/bin/sh -c`，`extendEnv: false`）、opencode 与 git，于是 `mvn`、`pnpm`、`node`、`java` 在终端里能用、在应用里报 `command not found`（退出码 127）。opencode 的 bash 以 `$SHELL -l -c` 运行，只读登录脚本，写在 `.zshrc` 里的 PATH 也拿不到。
+
+**处理。** 桌面 main（`shell-path.ts`）在启动后端前运行一次 `<登录 shell> -ilc 'printf 标记; printenv PATH; printf 标记'`：
+
+- 登录 shell 取用户账户里登记的那个（`os.userInfo().shell`），`-i -l` 与终端打开时读同样的启动脚本（`.zprofile`、`.zshrc`、`.bash_profile`、`.bashrc` 等）。shell 在自己的会话中运行（`detached`），从终端启动时不会抢占终端。
+- 启动脚本可能在命令前后打印横幅等杂讯，只取两个标记之间的内容；读到第二个标记就结束等待，不等启动脚本留下的后台进程关闭输出。`printf` 与 `printenv` 在 sh、bash、zsh、fish 中写法相同。
+- 合并：当前 PATH 已包含登录 shell 的全部目录（从终端启动）时**原样不变**；否则按登录 shell 的顺序，再接上只有当前 PATH 才有的目录（`/opt/homebrew/bin` 排在 `/usr/bin` 之前，`/usr/bin/java`、`/usr/bin/git` 是转发程序）。
+- 10 s 内没有打印出 PATH、shell 失败或退出时：main 的日志写明原因（含 shell 的 stderr 结尾），后端沿用原 PATH，应用照常启动。
+- 只取 PATH；其他变量（`JAVA_HOME` 等）不取（D115 的可选方案）。Windows 不处理：PATH 来自注册表，每个进程都完整。
+- 本机实测（zsh、Homebrew）约 50 ms，与打开动画（1.2 s）同时进行。
+
+**测试。** `shell-path.int.test.ts` 用一个假的登录 shell（启动时打印杂讯并加入 `/opt/fake-brew/bin`）验证：从 Finder 启动时后端的 PATH 按登录 shell 的顺序带上该目录；从终端启动时不变；shell 失败或不结束时沿用原 PATH。假 shell 是 sh 脚本，这三例在 Windows 上跳过（该机制在 Windows 上不运行，「Windows 不问登录 shell」一例三平台都运行）。从打包应用里真正读到用户的 shell 配置只能手工验证：`pnpm dist` 打包、从 Finder 启动，跑一个 `mvn` 或 `pnpm` 检查命令。
+
 ## 4. 测试与 CI
 
 ### 4.1 GitHub Actions（`.github/workflows/ci.yml`）
@@ -220,6 +236,7 @@ macOS 仍是一个 job，按上面的顺序串行跑完：它约 3 分钟，比�
 - `test/helpers/executables.ts`：`writeFakeExecutable(dir, name, source)` 写一个用 Node 运行 JS 模块 `source` 的假命令（Windows 上是 npm 形式的 `<name>.cmd`，其他平台是可执行的 sh 脚本）；`isolatedEnv(bin, home, { git })` 构造只找得到 `bin`（和 git）的环境（POSIX 上软链接 git；Windows 上加入 git 自己的目录，因为 Git for Windows 的 `git.exe` 依赖安装目录的相对位置，另保留 `SystemRoot`、`ComSpec` 等 Windows 程序需要的变量）。
 - E2E 中跨整个任务运行的等待：`e2e/helpers.ts` 的 `TASK_RUN_TIMEOUT_MS`（只在 Windows 上放宽，数据见 §4.1）。
 - 浏览器 E2E 的假 opencode：`e2e/fixtures/bin/` 同时有 `opencode`（sh）与 `opencode.cmd`；PATH 用 `path.delimiter` 拼接，主目录同时设 `HOME` 与 `USERPROFILE`。
+- 唯一的例外：`apps/desktop/src/main/shell-path.int.test.ts` 中读登录 shell 的三例在 Windows 上跳过（`describe.skipIf`），被测机制只在 macOS / Linux 运行（§3.12）。
 
 ### 4.3 CI 耗时（D81）
 
