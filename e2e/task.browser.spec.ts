@@ -171,11 +171,17 @@ test('J4 检查失败 → 自动重试成功；另一步骤预算耗尽 → 任�
     const failure = page.getByTestId('failure-panel');
     await expect(failure).toContainText('执行步骤「更新说明」时多次尝试仍没有完成', { timeout: TASK_RUN_TIMEOUT_MS });
     await expect(page.getByTestId('step-a')).toContainText('完成');
+    // Why the step's last attempt did not get it done, and that the finished step stays (D118).
+    await expect(failure.getByTestId('last-failure')).toHaveText('AI 最后一次没有提交结果就停下了。');
+    await expect(failure).toContainText('已完成的 1 个步骤会保留，重试从这一步继续。');
 
     await queueTurn(request, project, { title: '更新说明' }, [submitResult('已更新说明')]);
     await queueTurn(request, project, { title: '整体验证' }, [submitResult('全部通过')]);
     await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
-    await failure.getByRole('button', { name: '重试' }).click();
+    await failure.getByRole('button', { name: '带上说明重试…' }).click();
+    const note = page.getByRole('dialog', { name: '带上说明重试' });
+    await note.getByLabel('给 AI 的说明').fill('说明写在 README.md 里。');
+    await note.getByRole('button', { name: '重试', exact: true }).click();
     await expect(page.getByTestId('result-card')).toContainText('检查全部通过', { timeout: TASK_RUN_TIMEOUT_MS });
   } finally {
     await patchSettings(request, { 'node.maxAttempts': 3 });

@@ -41,7 +41,7 @@ export function tasksOperations(tasks: TasksService) {
     implement(getTaskOp, ({ id }) => tasks.detail(id)),
     implement(getTaskTimelineOp, ({ id, afterId }) => ({ items: tasks.timeline(id, afterId) })),
     implement(startTaskOp, ({ id }) => tasks.start(id)),
-    implement(retryTaskOp, ({ id }) => tasks.retry(id)),
+    implement(retryTaskOp, ({ id, feedback }) => tasks.retry(id, feedback)),
     implement(updateCheckCommandOp, ({ id, command, updateProject }) =>
       tasks.updateCheckCommand(id, command, updateProject),
     ),

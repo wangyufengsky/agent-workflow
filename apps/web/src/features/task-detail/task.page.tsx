@@ -11,7 +11,7 @@ import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { taskQuery } from '../tasks/tasks.queries.ts';
 import { FailurePanel } from './failure-panel.tsx';
-import { NodeDrawer } from './node-drawer.tsx';
+import { NodeDrawer, type NodeTab } from './node-drawer.tsx';
 import { PausedBanner } from './paused-banner.tsx';
 import { PlanReview } from './plan-review.tsx';
 import { PlanningProgress } from './planning-progress.tsx';
@@ -26,7 +26,12 @@ const route = getRouteApi(ROUTE_IDS.task);
 /** The task's steps are all behind it: the canvas's end pill shows it. */
 const FINISHED_TASK: readonly TaskStatus[] = [TaskStatus.Review, TaskStatus.Merging, TaskStatus.Completed];
 
-type Selection = { selected: string | undefined; select: (id: string) => void; open: (id: string) => void };
+type Selection = {
+  selected: string | undefined;
+  select: (id: string) => void;
+  /** Opens the step's details drawer, on `tab` when given. */
+  open: (id: string, tab?: NodeTab) => void;
+};
 type MainProps = { task: TaskDetailDTO; selection: Selection; pro: boolean };
 
 /** Canvas of the task's steps with the side panel. */
@@ -78,7 +83,7 @@ function StepsMain(props: MainProps) {
   return (
     <div className="col">
       {paused && <PausedBanner task={task} pro={props.pro} onAdjust={() => setAdjusting(true)} />}
-      {failed && <FailurePanel task={task} />}
+      {failed && <FailurePanel task={task} onOpenStep={props.selection.open} />}
       {(!failed || task.nodes.length > 0) && <StepsView {...props} />}
     </div>
   );
@@ -132,9 +137,9 @@ export function TaskPage() {
   const selection: Selection = {
     selected: node,
     select: (id) => void navigate({ search: (prev) => ({ ...prev, node: id }), replace: true }),
-    open: (id) => void navigate({ search: (prev) => ({ ...prev, node: id, open: true }) }),
+    open: (id, tab) => void navigate({ search: (prev) => ({ ...prev, node: id, open: true, tab }) }),
   };
-  const { open } = route.useSearch();
+  const { open, tab } = route.useSearch();
   if (task.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (task.isError) return <ErrorState error={task.error} onRetry={() => void task.refetch()} />;
   return (
@@ -149,6 +154,7 @@ export function TaskPage() {
       <NodeDrawer
         taskId={taskId}
         nodeId={open === true ? node : undefined}
+        tab={tab}
         pro={pro}
         onClose={() => void navigate({ search: (prev) => ({ ...prev, open: false }), replace: true })}
       />

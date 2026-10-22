@@ -122,6 +122,9 @@
 .body[data-size="card"] {
   --stream-h: 300px;
 }
+.body[data-size="side"] {
+  --stream-h: 240px;
+}
 /* A running stream keeps its height while it grows; an ended one is no taller than its content. */
 .body {
   height: var(--stream-h);

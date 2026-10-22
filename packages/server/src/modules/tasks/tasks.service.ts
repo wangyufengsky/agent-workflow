@@ -190,8 +190,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       lifecycle.start(id);
       return detail(id);
     },
-    retry(id: string): TaskDetailDTO {
-      lifecycle.retry(id);
+    retry(id: string, feedback?: string): TaskDetailDTO {
+      lifecycle.retry(id, { feedback });
       return detail(id);
     },
     async updateCheckCommand(id: string, command: string, updateProject: boolean): Promise<TaskDetailDTO> {

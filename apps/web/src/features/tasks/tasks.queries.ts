@@ -203,7 +203,8 @@ function useTaskMutation<I>(run: (input: I) => Promise<TaskDetailDTO>) {
 
 export const useCreateTask = () => useTaskMutation((input: CreateTaskRequest) => callOperation(createTaskOp, input));
 export const useCancelTask = () => useTaskMutation((id: string) => callOperation(cancelTaskOp, { id }));
-export const useRetryTask = () => useTaskMutation((id: string) => callOperation(retryTaskOp, { id }));
+export const useRetryTask = () =>
+  useTaskMutation((input: { id: string; feedback?: string }) => callOperation(retryTaskOp, input));
 export const useSkipCheck = () => useTaskMutation((id: string) => callOperation(skipCheckOp, { id }));
 
 /** The new check command may become the project's too (D116). */

@@ -516,7 +516,14 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
      * picks have their submitted result checked again instead of another attempt: by default, those whose check
      * command could not run (D116).
      */
-    retry(taskId: string, recheck: (node: Node) => boolean = (node) => nodes.unrunnableCheck(node) !== null): void {
+    /** `feedback` is the user's note for the failed steps' next attempt (D118). */
+    retry(
+      taskId: string,
+      {
+        recheck = (node) => nodes.unrunnableCheck(node) !== null,
+        feedback,
+      }: { recheck?: (node: Node) => boolean; feedback?: string | undefined } = {},
+    ): void {
       const task = get(taskId);
       if (task.failedPhase === null) throw new Error(`Failed task ${taskId} has no failed phase`);
       const target = RETRY_TARGET[task.failedPhase];
@@ -525,7 +532,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
         if (target === TaskStatus.Running) {
           for (const node of nodes.listByTask(taskId).filter((n) => n.status === NodeStatus.Failed)) {
             if (recheck(node)) nodes.recheck(node.id, state.runContext(retried));
-            else nodes.retry(node.id);
+            else nodes.retry(node.id, feedback);
           }
         }
         inbox.resolveOpen({ taskId, kind: InboxKind.Failure }, { action: FailureAction.Retry });

@@ -20,6 +20,10 @@ import { NodeBadge } from '../tasks/task-badge.tsx';
 import { nodeDiffFileQuery, nodeDiffQuery, nodeQuery } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
 
+/** The tabs of a step's details (14 §3.4); the task page's `?tab=` opens the drawer on one. */
+export const NodeTab = { Output: 'output', Changes: 'changes', Process: 'process' } as const;
+export type NodeTab = (typeof NodeTab)[keyof typeof NodeTab];
+
 /** A check's outcome; a command check may also have been skipped, or not run in the app's environment (D116). */
 function checkBadge(check: CheckResult): { tone: StatusTone; label: string } {
   if (check.kind === AcceptanceCheckKind.Command && check.skipped) return { tone: 'warn', label: C.checkSkipped };
@@ -44,20 +48,31 @@ function Check({ check }: { check: CheckResult }) {
       {check.kind === AcceptanceCheckKind.Command ? (
         <pre className={styles.output}>{check.output}</pre>
       ) : (
-        <div className="col">
-          <Markdown source={check.output} />
-          <ul>
-            {check.issues.map((issue) => (
-              <li key={`${issue.path}:${issue.line}:${issue.description}`}>
-                [{issue.severity}]{' '}
-                {issue.path === undefined ? '' : `${issue.path}${issue.line === undefined ? '' : `:${issue.line}`} `}
-                <Markdown inline source={issue.description} />
-              </li>
-            ))}
-          </ul>
-        </div>
+        <ReviewOutcome check={check} />
       )}
     </details>
+  );
+}
+
+/** An AI review's summary and its issues, each with its location. */
+export function ReviewOutcome({
+  check,
+}: {
+  check: Extract<CheckResult, { kind: typeof AcceptanceCheckKind.AiReview }>;
+}) {
+  return (
+    <div className="col">
+      <Markdown source={check.output} />
+      <ul>
+        {check.issues.map((issue) => (
+          <li key={`${issue.path}:${issue.line}:${issue.description}`}>
+            [{issue.severity}]{' '}
+            {issue.path === undefined ? '' : `${issue.path}${issue.line === undefined ? '' : `:${issue.line}`} `}
+            <Markdown inline source={issue.description} />
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -172,19 +187,19 @@ export function Process({ node }: { node: NodeDetailDTO }) {
 const latestExecute = (node: NodeDetailDTO) => node.attempts.filter((a) => a.kind === AttemptKind.Execute).at(-1);
 
 /** A step without output yet opens on what the AI is doing; otherwise on its output. */
-export const firstTab = (node: NodeDetailDTO) =>
-  node.result === null && latestExecute(node) !== undefined ? 'process' : 'output';
+export const firstTab = (node: NodeDetailDTO): NodeTab =>
+  node.result === null && latestExecute(node) !== undefined ? NodeTab.Process : NodeTab.Output;
 
-/** The three tabs of a step in the simple view (14 §3.4). */
-export function NodeTabs({ node }: { node: NodeDetailDTO }) {
+/** The three tabs of a step in the simple view (14 §3.4), opening on `tab` when one is asked for. */
+export function NodeTabs({ node, tab }: { node: NodeDetailDTO; tab?: NodeTab | undefined }) {
   return (
     <Tabs
-      key={node.id}
-      defaultValue={firstTab(node)}
+      key={`${node.id}-${tab}`}
+      defaultValue={tab ?? firstTab(node)}
       items={[
-        { value: 'output', label: C.output, content: <Output node={node} /> },
-        { value: 'changes', label: C.changes, content: <Changes node={node} /> },
-        { value: 'process', label: C.process, content: <Process node={node} /> },
+        { value: NodeTab.Output, label: C.output, content: <Output node={node} /> },
+        { value: NodeTab.Changes, label: C.changes, content: <Changes node={node} /> },
+        { value: NodeTab.Process, label: C.process, content: <Process node={node} /> },
       ]}
     />
   );
@@ -197,11 +212,13 @@ export function NodeTabs({ node }: { node: NodeDetailDTO }) {
 export function NodeDrawer({
   taskId,
   nodeId,
+  tab,
   pro,
   onClose,
 }: {
   taskId: string;
   nodeId: string | undefined;
+  tab?: NodeTab | undefined;
   pro: boolean;
   onClose: () => void;
 }) {
@@ -227,7 +244,7 @@ export function NodeDrawer({
               </Link>
             )}
           </span>
-          <NodeTabs node={node.data} />
+          <NodeTabs node={node.data} tab={tab} />
         </div>
       )}
     </Drawer>
