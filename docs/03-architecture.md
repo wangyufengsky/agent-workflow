@@ -85,7 +85,7 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | 路由 | @tanstack/react-router | 1.170.45 |
 | 服务端状态 | @tanstack/react-query | 5.104.4 |
 | 界面状态 | zustand | 5.0.15 |
-| 画布 | @xyflow/react + elkjs | 12.12.0 / 0.12.0 |
+| 画布 | @xyflow/react（布局为自写的分层算法 `canvas/layout.ts`，D105） | 12.12.0 |
 | 无样式组件 | @radix-ui/react-dialog、@radix-ui/react-tabs（Dialog、Drawer、命令面板、Tabs）；Popover、Tooltip、DropdownMenu、Select 引入时锁定 | 1.3.1 / 1.2.1 |
 | Markdown 渲染 | react-markdown + remark-gfm（不渲染原始 HTML，模型产出的摘要与报告） | 10.1.0 / 4.0.1 |
 | 表单 | react-hook-form + @hookform/resolvers | 引入时锁定（M1 表单字段少，用受控组件） |

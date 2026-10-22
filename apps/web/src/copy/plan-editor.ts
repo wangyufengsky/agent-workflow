@@ -2,6 +2,22 @@ import { PlanProblemCode, WorkflowProblemCode } from '@aw/shared';
 
 export const CANVAS_COPY = {
   locked: '已开始，不能修改',
+  progressLabel: '任务进度画布',
+  planLabel: '计划画布',
+  workflowLabel: '流程画布',
+  start: '开始',
+  end: '结束',
+  controls: '画布缩放',
+  zoomIn: '放大',
+  zoomOut: '缩小',
+  zoomReset: '回到 100%',
+  fit: '适应画布',
+  minimap: '小地图',
+  insert: (from: string, to: string) => `在「${from}」和「${to}」之间插入步骤`,
+  addMenu: (title: string) => `在「${title}」后添加步骤`,
+  addNext: '添加下一步',
+  addParallel: '添加并行步骤',
+  remove: (title: string) => `删除「${title}」`,
 } as const;
 
 export const PLAN_EDITOR_COPY = {
@@ -9,7 +25,13 @@ export const PLAN_EDITOR_COPY = {
   addStep: '添加步骤',
   newStepTitle: '新步骤',
   step: '步骤',
-  noSelection: '在画布上点选一个步骤，或添加步骤。从一个步骤右侧的圆点拖到另一个步骤左侧即可连线（后者依赖前者）。',
+  settings: '流程设置',
+  noSelection: '点选一个步骤修改它；在连线中间点 + 插入步骤，在步骤右侧点 + 添加下一步。',
+  undo: '撤销',
+  redo: '重做',
+  problemCount: (n: number) => `${n} 个问题`,
+  noProblemsShort: '没有问题',
+  removed: (title: string) => `已删除「${title}」，前后步骤已自动相连`,
   key: '标识',
   keyHint: '小写字母、数字与下划线，计划内唯一',
   keyPattern: '只能用小写字母、数字与下划线（最长 40）',

@@ -24,7 +24,7 @@ test('J8 专业模式：复制内置流程 → 修改 → 用它跑通一个任�
   await expect(page).toHaveURL(/\/workflows\/my_bugfix$/);
 
   const editor = page.getByTestId('plan-editor');
-  await editor.getByLabel('步骤', { exact: true }).selectOption({ label: '修复（fix）' });
+  await editor.getByTestId('step-fix').click();
   await editor.getByTestId('plan-node-form').getByLabel('标题').fill('修复根因');
   await page.getByRole('button', { name: '保存为新版本' }).click();
   await expect(page.getByText('已保存为第 2 版')).toBeVisible();

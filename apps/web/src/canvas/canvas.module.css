@@ -2,28 +2,41 @@
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 360px;
+  min-height: 420px;
   background-color: var(--bg-sunken);
   background-image: var(--dots);
   background-size: 22px 22px;
   border-radius: var(--r-md);
   overflow: hidden;
-  --xy-edge-stroke-default: var(--edge);
-  --xy-edge-stroke-width-default: 1.6;
   --xy-node-background-color-default: transparent;
   --xy-node-border-default: none;
+  --xy-node-boxshadow-selected-default: none;
   --xy-minimap-background-color-default: var(--panel);
   --xy-minimap-mask-background-color-default: var(--shade);
   --xy-minimap-node-background-color-default: var(--fill-4);
-  --xy-controls-button-background-color-default: var(--float);
-  --xy-controls-button-color-default: var(--ink-2);
-  --xy-controls-button-border-color-default: var(--line-2);
   --xy-attribution-background-color-default: transparent;
 }
 
+.canvas:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Steps glide to their new place when the layout changes (26 §7). */
+.canvas :global(.react-flow__node) {
+  transition: transform 0.24s var(--ease);
+}
+
+.canvas :global(.react-flow__node:focus-visible) {
+  outline: none;
+}
+
+/* ---------- 步骤卡片（26 §4） ---------- */
+
 .node {
-  width: 220px;
-  height: 72px;
+  position: relative;
+  width: 100%;
+  height: 100%;
   border-radius: 14px;
   background: var(--node-bg);
   border: 1px solid var(--line-2);
@@ -36,6 +49,14 @@
   transition:
     border-color 0.4s,
     box-shadow 0.4s;
+  animation: nodeIn 0.18s var(--ease) both;
+}
+
+@keyframes nodeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
 }
 
 .node:hover {
@@ -54,7 +75,9 @@
   box-shadow:
     0 0 0 4px var(--run-glow),
     0 10px 30px var(--shade-2);
-  animation: breathe 2.4s ease-in-out infinite;
+  animation:
+    nodeIn 0.18s var(--ease) both,
+    breathe 2.4s ease-in-out infinite;
 }
 
 .tone-wait {
@@ -69,6 +92,19 @@
   border-color: var(--danger-line);
 }
 
+.status-skipped,
+.status-cancelled {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.selected.tone-run {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 4px var(--accent-fill),
+    0 10px 30px var(--shade-2);
+}
+
 @keyframes breathe {
   50% {
     box-shadow:
@@ -77,17 +113,21 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .tone-run {
-    animation: none;
-  }
-}
-
-.top {
+/* Every row is one line: text that does not fit ends in an ellipsis, the full text is in the tooltip (26 §4.2). */
+.row {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  height: 20px;
+}
+
+.row > :global(.badge) {
+  flex: none;
+  height: 20px;
+  font-size: 11px;
+  padding: 0 7px;
+  gap: 5px;
 }
 
 .title {
@@ -96,24 +136,56 @@
   font-size: 13.5px;
   font-weight: 500;
   color: var(--ink);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
+.lock {
+  flex: none;
+  display: inline-flex;
   color: var(--muted);
-  min-width: 0;
 }
 
-.meta > span:last-child {
+.avatar {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--role);
+  background: color-mix(in srgb, var(--role) 16%, transparent);
+}
+
+.role1 {
+  --role: var(--role-1);
+}
+.role2 {
+  --role: var(--role-2);
+}
+.role3 {
+  --role: var(--role-3);
+}
+.role4 {
+  --role: var(--role-4);
+}
+.role5 {
+  --role: var(--role-5);
+}
+.role6 {
+  --role: var(--role-6);
+}
+
+.role {
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .count {
@@ -123,15 +195,372 @@
   font-variant-numeric: tabular-nums;
 }
 
+.desc {
+  font-size: 11.5px;
+  line-height: 18px;
+  height: 18px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .handle {
   opacity: 0;
   pointer-events: none;
 }
 
-.handleVisible {
-  width: 10px;
-  height: 10px;
+/* ---------- 端点与占位卡 ---------- */
+
+.pill {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--r-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--fill-3);
+  border: 1px solid var(--line-2);
+  font-size: 12.5px;
+  color: var(--sub);
+  cursor: default;
+}
+
+.pillDone {
+  color: var(--ok);
+  border-color: var(--ok-line);
+  background: var(--ok-fill);
+}
+
+.placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  border: 1.5px dashed var(--line-3);
+  background: var(--fill-1);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  cursor: default;
+}
+
+/* ---------- 编辑：+ / − 与菜单（26 §5） ---------- */
+
+.plus,
+.minus,
+.insert {
+  display: grid;
+  place-items: center;
   border-radius: 50%;
-  background: var(--accent);
-  border: 2px solid var(--node-bg);
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
+}
+
+.plus {
+  position: absolute;
+  right: -13px;
+  top: 50%;
+  margin-top: -13px;
+  width: 26px;
+  height: 26px;
+  background: var(--primary-bg);
+  color: var(--primary-ink);
+  box-shadow: 0 4px 14px var(--shade-2);
+}
+
+.minus {
+  position: absolute;
+  right: -9px;
+  top: -9px;
+  width: 20px;
+  height: 20px;
+  background: var(--raised);
+  border: 1px solid var(--line-3);
+  color: var(--sub);
+}
+
+.minus:hover {
+  color: var(--danger);
+  border-color: var(--danger-line);
+}
+
+.insertAt {
+  position: absolute;
+  pointer-events: all;
+}
+
+.insert {
+  width: 22px;
+  height: 22px;
+  background: var(--raised);
+  border: 1px solid var(--line-3);
+  color: var(--sub);
+  pointer-events: all;
+  opacity: 0.7;
+}
+
+.insert:hover,
+.insert:focus-visible {
+  opacity: 1;
+  color: var(--ink);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-fill);
+}
+
+.menu {
+  position: absolute;
+  left: calc(100% + 20px);
+  top: 50%;
+  z-index: 5;
+  min-width: 160px;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--overlay);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+}
+
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.menu button:hover,
+.menu button:focus-visible {
+  background: var(--fill-3);
+  color: var(--ink);
+}
+
+/* ---------- 概览样式：缩放低于 75%（26 §4.5） ---------- */
+
+.compact .node {
+  justify-content: center;
+  padding: 10px 14px;
+}
+
+.compact .row:not(.headRow),
+.compact .desc,
+.compact .row > :global(.badge) {
+  display: none;
+}
+
+.compact .headRow {
+  height: auto;
+}
+
+.compact .title {
+  font-size: 22px;
+  line-height: 1.3;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.compact .node::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.compact .tone-idle::after {
+  background: var(--idle);
+}
+.compact .tone-run::after {
+  background: var(--run);
+}
+.compact .tone-wait::after {
+  background: var(--wait);
+}
+.compact .tone-ok::after {
+  background: var(--ok);
+}
+.compact .tone-danger::after {
+  background: var(--danger);
+}
+
+.compact .pill {
+  font-size: 18px;
+}
+
+.compact .placeholder .title {
+  font-size: 20px;
+}
+
+.compact .placeholder .desc {
+  display: block;
+  font-size: 15px;
+  height: auto;
+  line-height: 1.3;
+}
+
+.compact .plus,
+.compact .minus,
+.compact .insert {
+  scale: 1.6;
+}
+
+.compact .menu {
+  scale: 1.6;
+  transform-origin: left top;
+}
+
+/* ---------- 连线（26 §7） ---------- */
+
+.edgePlan :global(.react-flow__edge-path),
+.edgePending :global(.react-flow__edge-path),
+.edgeDone :global(.react-flow__edge-path),
+.edgeLive :global(.react-flow__edge-path),
+.edgeFailed :global(.react-flow__edge-path) {
+  fill: none;
+  stroke-width: 1.6;
+  transition: stroke 0.65s;
+}
+
+/* Text tokens, not `--edge`: they meet 4.5:1 on every theme's sunken canvas (14 §5). */
+.edgePlan :global(.react-flow__edge-path) {
+  stroke: var(--muted);
+}
+
+.edgePending :global(.react-flow__edge-path) {
+  stroke: var(--muted);
+  stroke-dasharray: 6 5;
+}
+
+.edgeDone :global(.react-flow__edge-path) {
+  stroke: var(--ok);
+  stroke-width: 2;
+}
+
+.edgeLive :global(.react-flow__edge-path) {
+  stroke: var(--run);
+  stroke-width: 2;
+  stroke-dasharray: 6 6;
+  animation: flow 1.2s linear infinite;
+}
+
+.edgeFailed :global(.react-flow__edge-path) {
+  stroke: var(--danger);
+  stroke-width: 2;
+}
+
+@keyframes flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+/* ---------- 控件条（26 §2.1） ---------- */
+
+.controls {
+  margin: 14px;
+}
+
+.controlGroup {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: var(--float);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line-2);
+}
+
+.controlGroup :global(.icon-btn) {
+  width: 28px;
+  height: 28px;
+}
+
+.controlGroup :global(.icon-btn:disabled) {
+  opacity: 0.35;
+}
+
+.on {
+  color: var(--accent);
+  background: var(--accent-fill);
+}
+
+.zoomLevel {
+  min-width: 46px;
+  height: 28px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  color: var(--sub);
+  font-variant-numeric: tabular-nums;
+}
+
+.zoomLevel:hover {
+  color: var(--ink);
+  background: var(--fill-3);
+}
+
+.controlSep {
+  width: 1px;
+  height: 16px;
+  background: var(--line-2);
+  margin: 0 4px;
+}
+
+/* ---------- 焦点与悬停显示（放在最后：选择器更具体） ---------- */
+
+.canvas :global(.react-flow__node:focus-visible) .node {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Shown on hover, selection and focus; otherwise out of the way. */
+.node .plus,
+.node .minus {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.node:hover .plus,
+.node:hover .minus,
+.node.selected .plus,
+.node.selected .minus,
+.plus:focus-visible,
+.minus:focus-visible,
+.plus[aria-expanded="true"],
+.canvas :global(.react-flow__node:focus-visible) .plus,
+.canvas :global(.react-flow__node:focus-visible) .minus {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas :global(.react-flow__node),
+  .node,
+  .tone-run,
+  .plus,
+  .minus,
+  .insert {
+    transition: none;
+    animation: none;
+  }
+
+  .edgeLive :global(.react-flow__edge-path) {
+    animation: none;
+  }
 }
