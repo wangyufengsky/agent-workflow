@@ -1,10 +1,12 @@
 import {
   AttemptKind,
+  BASH_PERMISSION,
   FailureAction,
   type InboxItemDTO,
   type InboxItemOf,
   InboxKind,
   PermissionDecision,
+  projectBashPatterns,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
@@ -67,6 +69,8 @@ function QuestionCard({ item, resolve, pending }: CardProps<typeof InboxKind.Que
 }
 
 function PermissionCard({ item, resolve, pending }: CardProps<typeof InboxKind.Permission>) {
+  // What「总是允许」remembers for the project (D101); other permissions stay with the session.
+  const remembered = item.payload.permission === BASH_PERMISSION ? projectBashPatterns(item.payload.always) : [];
   return (
     <>
       <span className="sub">
@@ -94,6 +98,7 @@ function PermissionCard({ item, resolve, pending }: CardProps<typeof InboxKind.P
           {C.reject}
         </Button>
       </div>
+      {remembered.length > 0 && <p className="hint">{C.alwaysRemembers(remembered.join('、'))}</p>}
     </>
   );
 }

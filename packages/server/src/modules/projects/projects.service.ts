@@ -11,6 +11,7 @@ import {
   PROJECT_SLUG_MAX,
   type ProjectDetailDTO,
   type ProjectDTO,
+  projectBashPatterns,
   type SetHostingRequest,
   toSlug,
   type UpdateProjectRequest,
@@ -74,6 +75,7 @@ export function createProjectsService({ db, clock, credentials, databases, hosti
       ...project,
       inferredHosting: origin === undefined ? null : parseRemoteUrl(origin),
       dbConnectionIds: databases.linkedIds(project.id),
+      allowedBash: repo.allowedBash(project.id),
     };
   }
 
@@ -153,6 +155,21 @@ export function createProjectsService({ db, clock, credentials, databases, hosti
     setDbConnections(id: string, connectionIds: readonly string[]): Promise<ProjectDetailDTO> {
       const project = require(id);
       databases.setProjectLinks(id, connectionIds);
+      return detail(project);
+    },
+
+    /** Bash patterns the project's later AI sessions run without asking (D101). */
+    allowedBash: (id: string): string[] => repo.allowedBash(id),
+
+    /** 「总是允许」on a bash request of one of the project's sessions: opencode's patterns, Git aside (D101). */
+    rememberBash(id: string, always: readonly string[]): void {
+      repo.addAllowedBash(id, projectBashPatterns(always), clock.now());
+    },
+
+    /** Later sessions ask again; the sessions already running keep their rules (D35). */
+    removeAllowedBash(id: string, pattern: string): Promise<ProjectDetailDTO> {
+      const project = require(id);
+      repo.removeAllowedBash(id, pattern);
       return detail(project);
     },
 

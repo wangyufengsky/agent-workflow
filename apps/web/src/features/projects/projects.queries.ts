@@ -6,6 +6,7 @@ import {
   getProjectOp,
   listProjectsOp,
   type ProjectDetailDTO,
+  removeProjectAllowedBashOp,
   type SetHostingRequest,
   setProjectHostingOp,
   type UpdateProjectRequest,
@@ -71,3 +72,5 @@ function useProjectMutation<I>(run: (input: I) => Promise<ProjectDetailDTO>) {
 export const useSetHosting = () =>
   useProjectMutation((input: SetHostingRequest) => callOperation(setProjectHostingOp, input));
 export const useClearHosting = () => useProjectMutation((id: string) => callOperation(clearProjectHostingOp, { id }));
+export const useRemoveAllowedBash = () =>
+  useProjectMutation((input: { id: string; pattern: string }) => callOperation(removeProjectAllowedBashOp, input));

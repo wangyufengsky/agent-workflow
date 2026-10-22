@@ -67,6 +67,8 @@ export type OpencodeEvent =
       permissionId: string;
       permission: string;
       patterns: string[];
+      /** What opencode would allow for the rest of the session on「总是允许」: per sub-command, its prefix and ` *`. */
+      always: string[];
     }
   | { type: typeof E.RuntimeLost };
 
@@ -144,6 +146,7 @@ const payloadSchema = z.discriminatedUnion('type', [
       sessionID: z.string(),
       permission: z.string(),
       patterns: z.array(z.string()),
+      always: z.array(z.string()),
     }),
   }),
 ]);
@@ -232,6 +235,7 @@ export function parseGlobalEvent(raw: unknown): OpencodeEvent | undefined {
         permissionId: p.id,
         permission: p.permission,
         patterns: p.patterns,
+        always: p.always,
       };
     }
   }

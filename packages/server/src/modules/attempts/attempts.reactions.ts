@@ -90,6 +90,7 @@ export function watchSessions(state: AttemptState, deps: { opencode: OpencodeCli
         directory: event.directory,
         permission: event.permission,
         patterns: event.patterns,
+        always: event.always,
       },
     });
     state.park(session, attempt);

@@ -3,6 +3,7 @@ import {
   createProjectOp,
   getProjectOp,
   listProjectsOp,
+  removeProjectAllowedBashOp,
   setProjectDbConnectionsOp,
   setProjectHostingOp,
   updateProjectOp,
@@ -18,6 +19,7 @@ export function projectsOperations(projects: ProjectsService) {
     implement(getProjectOp, ({ id }) => projects.get(id)),
     implement(updateProjectOp, (input) => projects.update(input)),
     implement(setProjectDbConnectionsOp, ({ id, connectionIds }) => projects.setDbConnections(id, connectionIds)),
+    implement(removeProjectAllowedBashOp, ({ id, pattern }) => projects.removeAllowedBash(id, pattern)),
     implement(setProjectHostingOp, (input) => projects.setHosting(input)),
     implement(clearProjectHostingOp, ({ id }) => projects.clearHosting(id)),
   ];

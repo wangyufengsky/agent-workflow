@@ -2,9 +2,11 @@ import {
   countInboxOp,
   dismissInboxOp,
   ErrorCode,
+  getProjectOp,
   getTaskOp,
   type InboxItemDTO,
   listInboxOp,
+  removeProjectAllowedBashOp,
   resolveInboxOp,
   updateSettingsOp,
 } from '@aw/shared';
@@ -131,6 +133,38 @@ describe('ask_user（12 §6.7）', () => {
     await done;
     expect(t.fake.permissionReplies).toEqual([{ permissionId: asked.payload.opencodePermissionId, reply: 'once' }]);
     expect(t.fake.prompts[1]?.text).toContain('Answer: verbose');
+  });
+});
+
+describe('权限的「总是允许」记到项目（D101）', () => {
+  it('bash 的总是允许按 opencode 给出的模式记到项目（Git 除外），之后的会话带上；在项目中撤销后列表清空', async () => {
+    // Under `ask` executors use the read-only rules, which take the project's patterns.
+    await t.call(updateSettingsOp, { 'ai.bashPolicy': 'ask' });
+    const { project } = await addProject(t, { checkCommand: null });
+    t.fake.enqueue(
+      script()
+        .requestPermission('bash', ['./scripts/mvn.sh -q test 2>&1', 'git push origin'])
+        .callTool('submit_result', { summary: 'Located' }),
+      locate,
+    );
+    t.fake.enqueue(script().hang(), { title: '修复' });
+    const permission = inboxOpens(t, 'permission');
+    await createTask(t, { projectId: project.id, workflow: 'bugfix' });
+    const asked = (await permission).item;
+    if (asked.kind !== 'permission') throw new Error('expected a permission item');
+    expect(asked.payload.always).toEqual(['./scripts/mvn.sh *', 'git *']);
+
+    const fixing = nodeReaches(t, 'fix', 'running');
+    await t.call(resolveInboxOp, { id: asked.id, response: { decision: 'always' } });
+    await fixing;
+    expect(t.fake.permissionReplies).toEqual([{ permissionId: asked.payload.opencodePermissionId, reply: 'always' }]);
+    expect((await t.call(getProjectOp, { id: project.id })).body.allowedBash).toEqual(['./scripts/mvn.sh *']);
+    const fix = t.fake.sessions.find((s) => s.title.includes('· 修复'));
+    expect(fix?.permission).toContainEqual({ permission: 'bash', pattern: './scripts/mvn.sh *', action: 'allow' });
+    expect(fix?.permission).not.toContainEqual({ permission: 'bash', pattern: 'git *', action: 'allow' });
+
+    const revoked = await t.call(removeProjectAllowedBashOp, { id: project.id, pattern: './scripts/mvn.sh *' });
+    expect(revoked.body.allowedBash).toEqual([]);
   });
 });
 

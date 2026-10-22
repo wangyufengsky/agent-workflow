@@ -41,4 +41,10 @@ export const PROJECTS_COPY = {
   deleteBody: '只会从本应用中移除，仓库本身和其中的文件不受影响。',
   deleted: '项目已删除',
   back: '项目',
+  allowedBash: '总是允许的命令',
+  allowedBashHint:
+    '在「需要你处理」中对命令选择「总是允许」后记在这里，本项目之后的 AI 会话运行它们不再询问；重定向等写文件的写法仍会询问。撤销后，之后的会话重新询问。',
+  allowedBashNone: '还没有总是允许的命令。',
+  revoke: '撤销',
+  revoked: '已撤销',
 } as const;
