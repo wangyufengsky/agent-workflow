@@ -14,7 +14,7 @@
 | --- | --- | --- | --- | --- | --- |
 | 单元 | Vitest | 纯逻辑：状态机表、计划校验、调度决策函数、git 输出解析器、配置生成、检查点解析、错误映射、主题对比度 | 无 IO | 被测文件旁 `*.test.ts` | `pnpm test` |
 | 集成 | Vitest | 模块 service 与 HTTP/MCP 接口：从 API 或 MCP 调用到数据库与 Git 结果 | 真实 SQLite（临时文件）、真实 git（临时仓库）、Docker 中的真实 MySQL（项目数据库，需本机 Docker；PostgreSQL、openGauss、SQL Server 可选，24 §7）、FakeOpencode、假 Hosting 服务 | `*.int.test.ts` | `pnpm test:int` |
-| opencode 集成 | Vitest，标记 `@opencode` | runtime 托管、配置注入、插件、事件解析 | 本机真实 opencode 1.19.0，**不调用模型**（只启动、读配置、建会话、发 `noReply` 消息）；唯一例外是 bridge 插件测试（只有模型能让 opencode 调用工具），用免费模型 `TEST_MODEL`（默认 `opencode-go/deepseek-v4.1-flash`，D62） | `*.oc.test.ts` | `pnpm test:oc`（先构建插件） |
+| opencode 集成 | Vitest，标记 `@opencode` | runtime 托管、配置注入、插件、事件解析 | 本机真实 opencode 1.19.0，**不调用模型**（只启动、读配置、建会话、发 `noReply` 消息）；唯一例外是 bridge 插件测试（只有模型能让 opencode 调用工具），用免费模型 `TEST_MODEL`（默认 `opencode-go/deepseek-v4.1-flash`，D62）。需要 opencode 运行工具但不必调用模型的测试（如 `opencode.permissions.oc.test.ts` 检查 bash 规则在真实 opencode 上的判定），用测试内的本地 OpenAI 兼容服务按脚本返回工具调用（opencode 内置 `@ai-sdk/openai-compatible`，经 `OPENCODE_CONFIG` 指向的临时配置注册） | `*.oc.test.ts` | `pnpm test:oc`（先构建插件） |
 | E2E | Playwright | 关键用户旅程（§5） | 浏览器模式：后端 + FakeOpencode，后端托管构建出的前端（不经 Vite 开发服务器，17 §4.1）；后端由 global setup（`e2e/global-setup.ts`）启动，监听系统分配的端口并回报，多个 worktree 可同时运行（`AW_DEV_API_PORT` 可指定端口，D78）；Electron 模式：打包产物 | `e2e/` | `pnpm e2e` / `pnpm e2e:electron` |
 | live | Vitest，标记 `@live` | 真实模型跑内置流程 | 真实 opencode + 模型 + 示例仓库 | `live/` | `pnpm test:live`（手动，不进 CI） |
 | 性能 | Playwright（`playwright.perf.config.ts`） | M6-02 的三项实测：20 节点计划画布的帧率、5 MB 会话流的首屏时间、10 个并发任务时的帧率与长任务；只输出数字到 `perf-results/`（不提交），不作通过/失败门槛 | 生产构建的前端 + 开发模式后端（FakeOpencode） | `e2e/*.perf.spec.ts` | `pnpm perf`（手动） |
@@ -68,7 +68,7 @@
 | --- | --- | --- |
 | J1 | 简单模式：选项目 → 新功能流程 → 输入需求 → 开始 → 结果卡显示改动与检查通过 | 浏览器 |
 | J2 | AI 阻塞提问 → 需要你处理中作答 → 节点继续 → 完成 | 浏览器 |
-| J3 | 权限请求 → 允许一次 → 继续 | 浏览器 |
+| J3 | 权限请求 → 允许一次 → 继续；下一步的 bash 请求 → 卡片提示将记住的模式 →「总是允许」→ 专业模式项目详情「总是允许的命令」中可见并撤销（D101） | 浏览器 |
 | J4 | 检查命令失败 → 自动重试成功；另一节点预算耗尽 → 任务失败 → 用户重试 → 完成 | 浏览器 |
 | J5 | 合并到 main（squash）→ 主分支有提交、worktree 已清理、任务已完成 | 浏览器 |
 | J6 | 两个任务改同一文件 → 第二个合并冲突 → 交给 AI 解决 → 合并成功；另有三任务版（01 §5 第 3 条）：三个任务同时运行（各自等待一个权限请求）、各自分支与工作区，依次合并，第二、三个冲突交给 AI 解决 | 浏览器 |

@@ -39,6 +39,7 @@ export type ReviewCheckResult = Extract<CheckResult, { kind: typeof AcceptanceCh
 export type ReviewRequest = {
   nodeId: string;
   taskId: string;
+  projectId: string;
   taskKey: string;
   taskTitle: string;
   requirement: string;
@@ -159,6 +160,7 @@ export function createAcceptanceService({
         const attempt = await attempts.start({
           kind: AttemptKind.Review,
           taskId: request.taskId,
+          projectId: request.projectId,
           nodeId: request.nodeId,
           roleId: reviewer.id,
           agent: reviewer.baseAgent,

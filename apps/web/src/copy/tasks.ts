@@ -195,6 +195,8 @@ export const INBOX_COPY = {
   wantsTo: 'AI 想要执行',
   allowOnce: '允许一次',
   allowAlways: '总是允许',
+  alwaysRemembers: (patterns: string) =>
+    `「总是允许」会为本项目记住 ${patterns}，之后的会话不再询问；可在项目设置中撤销。`,
   reject: '拒绝',
   accept: '通过',
   rejectStep: '驳回',

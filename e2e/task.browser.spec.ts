@@ -68,20 +68,36 @@ test('J2 AI 阻塞提问 → 在需要你处理中作答 → 节点继续 → �
   await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
 });
 
-test('J3 权限请求 → 允许一次 → 继续', async ({ page, request }) => {
+test('J3 权限请求 → 允许一次 → 继续；总是允许 → 记到项目 → 专业模式的项目设置中撤销（D101）', async ({
+  page,
+  request,
+}) => {
   const project = await createProject(request, null);
   await queueTurn(request, project, { title: '定位根因' }, [
     { type: 'permission', permission: 'bash', patterns: ['rm -rf dist'] },
     submitResult('清理后复现了问题'),
   ]);
-  await queueTurn(request, project, { title: '修复' }, [submitResult('已修复')]);
+  await queueTurn(request, project, { title: '修复' }, [
+    { type: 'permission', permission: 'bash', patterns: ['./scripts/build.sh --clean'] },
+    submitResult('已修复'),
+  ]);
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
 
   await startTask(page, project, /修 Bug/, '构建产物残留导致测试失败');
   const permission = page.getByTestId('inbox-permission');
   await expect(permission).toContainText('rm -rf dist');
   await permission.getByRole('button', { name: '允许一次' }).click();
+  await expect(permission).toContainText('./scripts/build.sh --clean');
+  await expect(permission).toContainText('「总是允许」会为本项目记住 ./scripts/build.sh --clean *');
+  await permission.getByRole('button', { name: '总是允许' }).click();
   await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
+
+  await patchSettings(request, { 'ui.mode': 'pro' });
+  await page.goto(`/projects/${project.id}`);
+  const allowed = page.getByRole('list', { name: '总是允许的命令' });
+  await expect(allowed).toContainText('./scripts/build.sh --clean *');
+  await allowed.getByRole('button', { name: '撤销' }).click();
+  await expect(page.getByText('还没有总是允许的命令。')).toBeVisible();
 });
 
 test('J4 检查失败 → 自动重试成功；另一步骤预算耗尽 → 任务失败 → 用户重试 → 完成', async ({ page, request }) => {
