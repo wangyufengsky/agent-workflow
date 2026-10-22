@@ -85,6 +85,7 @@ export function FailurePanel({
 /** What the failed step's last attempt ran into, read from the step (D118). */
 function LastTry({ taskId, nodeId }: { taskId: string; nodeId: string }) {
   const node = useQuery(nodeQuery(taskId, nodeId));
+  if (node.isError) return <ErrorState error={node.error} onRetry={() => void node.refetch()} />;
   if (node.data === undefined) return null;
   const last = lastFailure(node.data);
   return last === null ? null : <LastFailureView last={last} />;
