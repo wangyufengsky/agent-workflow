@@ -99,6 +99,13 @@
       "when": 1792599595785,
       "tag": "0013_decks",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1792641837407,
+      "tag": "0014_project_bash_rules",
+      "breakpoints": true
     }
   ]
 }

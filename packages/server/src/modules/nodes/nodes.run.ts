@@ -97,6 +97,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
             {
               nodeId,
               taskId: ctx.taskId,
+              projectId: ctx.projectId,
               taskKey: ctx.taskKey,
               taskTitle: ctx.taskTitle,
               requirement: ctx.requirement,
@@ -191,6 +192,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
       const start = attempts.start({
         kind: AttemptKind.Execute,
         taskId: ctx.taskId,
+        projectId: ctx.projectId,
         nodeId,
         roleId: role.id,
         agent: role.baseAgent,

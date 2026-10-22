@@ -306,6 +306,7 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
       kind: AttemptKind.Execute,
       agent: RoleBaseAgent.Executor,
       taskId: null,
+      projectId: null,
       nodeId: null,
       roleId: null,
       directory: repo.path,

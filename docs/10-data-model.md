@@ -63,6 +63,17 @@
 | db_connection_id | TEXT → db_connections，ON DELETE CASCADE |
 | PK(project_id, db_connection_id) | |
 
+### project_bash_rules（v1.2 后，D101）
+
+项目中「总是允许」的 bash 模式；项目之后新建的只读会话带上它们（12 §2）。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| project_id | TEXT → projects，ON DELETE CASCADE | |
+| pattern | TEXT | opencode 通配模式，如 `unzip *` |
+| created_at | INTEGER | 首次记下的时间；再次「总是允许」不更新 |
+| PK(project_id, pattern) | | |
+
 ### roles
 
 | 列 | 类型 | 说明 |
@@ -208,6 +219,7 @@ type Acceptance = {
 | id | TEXT PK | |
 | task_id | TEXT NULL → tasks，CASCADE | 空 = 调试尝试（仅开发构建，M2-09）、知识问答的 `research` 尝试（v1.1，由 `knowledge_turns` 指向）或 PPT 的 `deck_outline` / `deck_slides` 尝试（v1.2，由 `deck_runs` 指向），不属于任何任务 |
 | node_id | TEXT NULL → nodes，CASCADE | `execute` 类为所执行的节点，`review` 类为被评审的节点；`plan` 类与调试尝试为空 |
+| project_id | TEXT NULL → projects，SET NULL | 会话所在的项目：任务的尝试为任务的项目，知识问答为对话的项目，PPT 为其项目；调试尝试与不属于项目的 PPT 为空。续用会话的尝试沿用。权限条目的「总是允许」记到这个项目，新建会话带上项目的总是允许模式（D101；迁移 0014 按任务、知识对话与 PPT 补上） |
 | kind | TEXT | `AttemptKind` |
 | seq | INTEGER | 同一节点（或同一任务的 plan 类、或不属于任务的同类尝试）内序号 |
 | status | TEXT | `AttemptStatus` |
@@ -244,7 +256,7 @@ payload / response：
 | kind | payload | response |
 | --- | --- | --- |
 | `question` | `{ question, options?: string[], blocking: boolean, defaultAssumption?: string }` | `{ answer: string }` 或 `{ assumed: true, value }`（未问用户、按假设继续时直接以 resolved 写入，作为记录） |
-| `permission` | `{ opencodePermissionId, sessionId, directory, permission, patterns[] }` | `{ decision: PermissionDecision }` |
+| `permission` | `{ opencodePermissionId, sessionId, directory, permission, patterns[] }`（`patterns` 为询问的子命令原文；bash 请求选「总是允许」时由它们得出记到项目的模式，D101） | `{ decision: PermissionDecision }` |
 | `acceptance` | `{}` | `{ accepted: boolean, feedback?: string }` |
 | `plan` | `{ planId, version }` | `{ confirmed: true }` 或 `{ replanFeedback }` |
 | `failure` | `{ phase, error }` | `{ action: 'retry' | 'cancel' }` |
