@@ -513,7 +513,7 @@ type Shot = {
   /** Visible once the page has its content. */
   ready: (page: Page) => Locator;
   /** Opens a dialog, drawer or editor before the screenshot. */
-  open?: (page: Page) => Promise<Locator>;
+  open?: (page: Page, s: Seed) => Promise<Locator>;
   /** The document itself scrolls (a page outside the shell): the screenshot takes all of it. */
   fullPage?: boolean;
   /**
@@ -530,14 +530,17 @@ const node = (task: Task, key: string) => {
   if (found === undefined) throw new Error(`node ${key} not found`);
   return found.id;
 };
-/** Opens the assistant panel, on the conversation titled `title` when given. */
-async function openAssistant(page: Page, title?: string): Promise<Locator> {
+/**
+ * Opens the assistant panel, on conversation `id` when given. By id, not title: after a failed theme Playwright runs
+ * `beforeAll` again in a new worker against the same backend, so every seeded title then exists twice.
+ */
+async function openAssistant(page: Page, id?: string): Promise<Locator> {
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
   await expect(panel).toBeVisible();
-  if (title !== undefined) {
+  if (id !== undefined) {
     await panel.getByRole('button', { name: '切换对话' }).click();
-    await page.getByRole('menuitemradio', { name: title }).click();
+    await page.getByTestId(`conversation-${id}`).click();
   }
   return panel;
 }
@@ -718,8 +721,8 @@ const SHOTS: Shot[] = [
     mode: UiMode.Simple,
     url: (s) => `/tasks/${s.running.id}`,
     ready: testId('progress-canvas'),
-    open: async (page) => {
-      const panel = await openAssistant(page, '项目整理');
+    open: async (page, s) => {
+      const panel = await openAssistant(page, s.assistantConversation);
       await expect(panel.getByTestId('confirmation-card')).toContainText('检查命令');
       await expect(panel.getByTestId('entity-card')).toBeVisible();
       return panel;
@@ -730,8 +733,8 @@ const SHOTS: Shot[] = [
     mode: UiMode.Simple,
     url: (s) => `/tasks/${s.running.id}`,
     ready: testId('progress-canvas'),
-    open: async (page) => {
-      const panel = await openAssistant(page, '失败任务排查');
+    open: async (page, s) => {
+      const panel = await openAssistant(page, s.assistantBusy);
       await expect(panel.getByTestId('assistant-thinking')).toBeVisible();
       return panel;
     },
@@ -997,8 +1000,8 @@ const SHOTS: Shot[] = [
     mode: UiMode.Pro,
     url: (s) => `/git/${s.project.id}?view=commits`,
     ready: testId('git-status'),
-    open: async (page) => {
-      const panel = await openAssistant(page, '项目整理');
+    open: async (page, s) => {
+      const panel = await openAssistant(page, s.assistantConversation);
       await panel.getByTestId('assistant-action').first().locator('summary').click();
       await expect(panel.getByText('agent-workflow-app_projects_list')).toBeVisible();
       return panel;
@@ -1046,7 +1049,7 @@ test.describe('J9 走查：两种模式下全部页面无报错、无对比度�
         await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
         await expect(shot.ready(page)).toBeVisible();
         await expect(page.getByText('正在加载…')).toHaveCount(0);
-        if (shot.open !== undefined) await expect(await shot.open(page)).toBeVisible();
+        if (shot.open !== undefined) await expect(await shot.open(page, s)).toBeVisible();
         await page.evaluate(() => document.fonts.ready);
         // Pages render failures through ErrorState, the only role="alert" element.
         await expect.soft(page.getByRole('alert'), shot.name).toHaveCount(0);

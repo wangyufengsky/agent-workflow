@@ -35,6 +35,7 @@ export function ConversationMenu({
             key={c.id}
             type="button"
             role="menuitemradio"
+            data-testid={`conversation-${c.id}`}
             aria-checked={c.id === active.id}
             className={styles.menuItem}
             onClick={() => {

@@ -90,10 +90,10 @@ describe('ask_user（12 §6.7）', () => {
     expect(res.body).toMatchObject({ status: 'resolved', response: { answer: 'a' } });
     await done;
     await t.fake.settled();
-    const answer = t.fake.prompts.at(-1);
+    // Once locate is done the fix step starts in a session of its own, so the answer is not necessarily the last prompt.
+    const answer = t.fake.prompts.find((p) => p.text.includes('Answer: a'));
     expect(answer?.sessionId).toBe(t.fake.prompts[0]?.sessionId);
     expect(answer?.text).toContain('Question: Which table?');
-    expect(answer?.text).toContain('Answer: a');
     expect(toolResult('get_task_context')[0]).toMatchObject({
       answeredQuestions: [{ question: 'Which table?', answer: 'a' }],
     });
