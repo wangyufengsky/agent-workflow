@@ -56,7 +56,7 @@ packages/builtin/
 | deliverable | `code_changes` |
 | allowedRoles | `developer` `tester` |
 | 规划指引 | 2–8 个节点；先数据/接口后实现后测试；能并行的节点不要串行依赖 |
-| requiredSteps | `final_verify`（position: last）·「整体验证」· tester · 「运行完整检查，修复本任务引入的失败，确认需求每一条都已实现」· acceptance `{ checks: [command $PROJECT_CHECK, ai_review(focus: 需求完整性与正确性)], manual: false }` |
+| requiredSteps | `final_verify`（position: last）·「整体验证」· developer · 「运行完整检查，修复本任务引入的失败，确认需求每一条都已实现」· acceptance `{ checks: [command $PROJECT_CHECK, ai_review(focus: 需求完整性与正确性)], manual: false }` |
 | defaultAcceptance | `{ checks: [command $PROJECT_CHECK], manual: false }` |
 | checkpoints | confirm_plan `false`，accept_each_node `false` |
 
@@ -98,7 +98,7 @@ packages/builtin/
 | deliverable | `code_changes` |
 | allowedRoles | `developer` `tester` |
 | 规划指引 | 行为保持不变；每个节点后测试都应通过；拆成可独立验证的小步 |
-| requiredSteps | `baseline`（position: first）·「建立基线」· tester ·「运行现有测试并记录结果；若重构范围缺少覆盖，先补特征测试」→ `final_verify`（position: last）·「整体验证」· tester · acceptance `[command $PROJECT_CHECK, ai_review(focus: 外部行为是否保持不变)]` |
+| requiredSteps | `baseline`（position: first）·「建立基线」· tester ·「运行现有测试并记录结果；若重构范围缺少覆盖，先补特征测试」→ `final_verify`（position: last）·「整体验证」· developer · acceptance `[command $PROJECT_CHECK, ai_review(focus: 外部行为是否保持不变)]` |
 | defaultAcceptance | `{ checks: [command $PROJECT_CHECK], manual: false }` |
 
 > requiredSteps 的 `position`：`first` 要求其他所有节点（传递地）依赖它；`last` 要求它（传递地）依赖所有其他节点。违反时 `PLAN_INVALID` 子码 `REQUIRED_STEP_ORDER`。

@@ -22,7 +22,7 @@ describe('计划（M3-04）', () => {
     const valid = planArgs([
       { key: 'a', acceptance: { command: '$PROJECT_CHECK -- a.test.ts', manual: true } },
       { key: 'b', depends_on: ['a'], acceptance: { ai_review: true } },
-      { ...finalVerify(['b']), role: 'developer', title: 'Verify everything', acceptance: {} },
+      { ...finalVerify(['b']), role: 'tester', title: 'Verify everything', acceptance: {} },
     ]);
     t.fake.enqueue(script().callTool('submit_plan', invalid).callTool('submit_plan', valid).hang(), planner);
     const confirmed = await new Promise<string>((resolve) => {
@@ -49,7 +49,7 @@ describe('计划（M3-04）', () => {
 
     const { body: task } = await t.call(getTaskOp, { id: confirmed });
     const byKey = Object.fromEntries(task.nodes.map((n) => [n.key, n]));
-    expect(byKey.final_verify).toMatchObject({ title: '整体验证', roleKey: 'tester' });
+    expect(byKey.final_verify).toMatchObject({ title: '整体验证', roleKey: 'developer' });
     const acceptance = async (key: string) =>
       (await t.call(getNodeOp, { id: confirmed, nodeId: byKey[key]?.id ?? '' })).body.acceptance;
     // $PROJECT_CHECK became the project's check command; the workflow default applies where none was given.

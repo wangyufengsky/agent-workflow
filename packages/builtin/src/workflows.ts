@@ -36,7 +36,7 @@ const noCheckpoints = { confirm_plan: false, accept_each_node: false };
 const finalVerify = (instructions: string, focus: string) => ({
   key: 'final_verify',
   title: '整体验证',
-  roleKey: BuiltinRoleKey.Tester,
+  roleKey: BuiltinRoleKey.Developer,
   instructions,
   dependsOn: [],
   acceptance: { checks: [projectCheck, aiReview(focus)], manual: false },
