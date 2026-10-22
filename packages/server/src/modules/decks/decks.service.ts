@@ -252,6 +252,7 @@ export function createDecksService(deps: DecksServiceDeps) {
             kind: work.kind,
             agent: SessionAgent.SlidesWriter,
             taskId: null,
+            projectId: deck.projectId,
             nodeId: null,
             roleId: null,
             directory: deck.projectId === null ? blankDir : projects.getRecord(deck.projectId).repoPath,

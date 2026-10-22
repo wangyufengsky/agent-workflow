@@ -53,11 +53,12 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | --- | --- | --- |
 | GET | `/projects` | `{ items: ProjectDTO[] }`（按添加时间） |
 | POST | `/projects` | `{ repoPath, name? }` → 201 `ProjectDetailDTO`；`repoPath` 须为仓库根目录的绝对路径（子目录、非仓库、不存在 → 400 `PROJECT_PATH_NOT_GIT_REPO`），读取默认分支（`origin/HEAD`，否则当前分支；HEAD 游离且无 `origin/HEAD` → 400 `GIT_BASE_BRANCH_NOT_FOUND`），推断检查命令（13 §1） |
-| GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting` + 关联的数据库连接 `dbConnectionIds`（M5-07） |
+| GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting` + 关联的数据库连接 `dbConnectionIds`（M5-07）+ 总是允许的 bash 模式 `allowedBash: string[]`（按记下的时间，D101） |
 | PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand?: string \| null }`；分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND` |
 | DELETE | `/projects/:id` | 有非终态任务时 409 `PROJECT_HAS_ACTIVE_TASKS` |
 | PUT | `/projects/:id/hosting` | `{ provider, baseUrl?, repo, token }`（`token` 为凭据字段）→ `ProjectDetailDTO`；保存前调用平台 API 读取该仓库验证令牌（令牌无效或看不到仓库 401 `HOSTING_AUTH_FAILED`，其他失败 502 `HOSTING_API_ERROR`），通过后加密保存（再次绑定替换原令牌）。GitHub 忽略 `baseUrl`；GitLab 不填即 gitlab.com |
 | DELETE | `/projects/:id/hosting` | 解除绑定并删除凭据 → `ProjectDetailDTO`；删除项目时同样删除其凭据 |
+| DELETE | `/projects/:id/allowed-bash` 🅿 | `?pattern=` 撤销一条总是允许的 bash 模式 → `ProjectDetailDTO`；不存在的模式不报错。之后新建的会话重新询问，运行中的会话不变（D101）。模式只由「需要你处理」中权限条目的「总是允许」添加（§7），没有添加接口 |
 | PUT | `/projects/:id/db-connections` 🅿 | `{ connectionIds: string[] }` 覆盖关联 → `ProjectDetailDTO`；不存在的连接 404 `DB_CONNECTION_NOT_FOUND`。项目的 AI 会话只能用关联的连接（12 §6.9） |
 
 远端 `repo` 默认从 `git remote get-url origin` 推断（`inferredHosting`：`github.com` → GitHub，其他主机 → GitLab，非 `gitlab.com` 时 `baseUrl = https://<host>`），前端预填。
@@ -211,7 +212,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/inbox/:id/resolve` | `{ response }`，`response` 为对应 kind 的回应（见 10 §inbox_items；`question` 只接受 `{ answer }`）；不符合该 kind 400 `VALIDATION_FAILED`；已关闭 409 `INBOX_ITEM_CLOSED`；回答问题时 opencode 未就绪 503 `OPENCODE_NOT_READY`（条目保持打开） |
 | POST | `/inbox/:id/dismiss` | 仅 `failure` / `delivery` / `schedule_failure` 可忽略 |
 
-`resolve` 是各业务动作的统一入口：`question` → 答案发回会话；`permission` → 回复 opencode；`acceptance` → 节点 accept/reject；`plan` → 等同 plan confirm/replan；`failure` → 任务 retry/cancel；`delivery` 不通过 resolve，而是 `deliver` 成功后自动 resolved；`schedule_failure` 同样不通过 resolve，恢复定时任务时自动 resolved（22 §5）。
+`resolve` 是各业务动作的统一入口：`question` → 答案发回会话；`permission` → 回复 opencode（bash 请求选 `always` 时还把 payload 的每条子命令按「命令 + 开头的选项 + ` *`」记到项目，Git 与前置变量赋值的除外，D101）；`acceptance` → 节点 accept/reject；`plan` → 等同 plan confirm/replan；`failure` → 任务 retry/cancel；`delivery` 不通过 resolve，而是 `deliver` 成功后自动 resolved；`schedule_failure` 同样不通过 resolve，恢复定时任务时自动 resolved（22 §5）。
 
 ## 8. Git（专业模式）
 

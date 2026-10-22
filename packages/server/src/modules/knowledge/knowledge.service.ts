@@ -208,6 +208,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
             kind: AttemptKind.Research,
             agent: SessionAgent.Researcher,
             taskId: null,
+            projectId: project.id,
             nodeId: null,
             roleId: null,
             directory: project.repoPath,

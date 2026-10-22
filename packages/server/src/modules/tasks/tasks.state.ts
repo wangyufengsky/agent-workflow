@@ -171,6 +171,7 @@ export function createTaskState(deps: TasksServiceDeps) {
     const project = projects.getRecord(task.projectId);
     return {
       taskId: task.id,
+      projectId: task.projectId,
       taskKey: task.key,
       taskTitle: task.title,
       requirement: task.requirement,

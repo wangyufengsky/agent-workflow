@@ -1,4 +1,11 @@
-import { BashPolicy, type PermissionAction, type PermissionRule, RoleBaseAgent } from '@aw/shared';
+import {
+  BashPolicy,
+  type PermissionAction,
+  type PermissionRule,
+  projectBashPatterns,
+  RoleBaseAgent,
+  SessionAgent,
+} from '@aw/shared';
 import { describe, expect, it } from 'vitest';
 import { sessionPermissionRules } from './opencode.config.ts';
 
@@ -12,16 +19,37 @@ function matches(pattern: string, text: string): boolean {
   return new RegExp(`^${source}$`, 's').test(text);
 }
 
+/** Splits at `&&`, `||`, `;` and `|` outside quotes, as opencode's bash parser does for the commands below. */
+function subCommands(command: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let quote: string | undefined;
+  for (let i = 0; i < command.length; i++) {
+    const c = command.charAt(i);
+    if (quote !== undefined) {
+      if (c === quote) quote = undefined;
+      current += c;
+    } else if (c === "'" || c === '"') {
+      quote = c;
+      current += c;
+    } else if (c === ';' || c === '|' || (c === '&' && command.charAt(i + 1) === '&')) {
+      if (command.charAt(i + 1) === c) i++;
+      parts.push(current.trim());
+      current = '';
+    } else current += c;
+  }
+  return [...parts, current.trim()];
+}
+
 /**
  * How opencode 1.19 decides a bash call (12 §2, D35): each sub-command is evaluated on its own text, redirections
- * included, the last matching rule wins, and the call asks as soon as one sub-command is not allowed. The sub-commands
- * here are split at `&&`, `||`, `;` and `|`, which is what opencode's parser does for the commands below
- * (`permissions.live.test.ts` checks it on the real opencode).
+ * included, the last matching rule wins, and the call asks as soon as one sub-command is not allowed
+ * (`permissions.live.test.ts` and `opencode.permissions.oc.test.ts` check it on the real opencode).
  */
 function decide(rules: readonly PermissionRule[], command: string): PermissionAction {
-  const actions = command
-    .split(/\s*(?:&&|\|\||[|;])\s*/)
-    .map((sub) => rules.findLast((r) => r.permission === 'bash' && matches(r.pattern, sub))?.action ?? 'ask');
+  const actions = subCommands(command).map(
+    (sub) => rules.findLast((r) => r.permission === 'bash' && matches(r.pattern, sub))?.action ?? 'ask',
+  );
   if (actions.includes('deny')) return 'deny';
   return actions.every((a) => a === 'allow') ? 'allow' : 'ask';
 }
@@ -98,7 +126,81 @@ const NOT_VERSION_QUERIES = [
   'sh -c "rm x"',
 ];
 
+/**
+ * Commands read-only sessions ran in a user's project (T-1 of opencode-workflow-java-test), each of which used to ask
+ * (D100): filters, archive and class listings, file facts, lookups, and stderr thrown away.
+ */
+const READS_D100 = [
+  'find src config db scripts docs -type f | sort',
+  'cat .gitignore; echo ---; sed -n 1,60p docs/x.md',
+  "sed -n '1,60p' docs/architecture.md",
+  "sed -n '/TODO/p' src/App.java",
+  'unzip -l ~/.m2/repository/org/x/x-1.0.jar | grep Inventory | head',
+  'unzip -Z -1 lib/x.jar',
+  'jar tf lib/x.jar | sort | uniq -c',
+  'javap -p -cp "$JAR" com.example.Inventory',
+  'command -v mvn; ls ~/.m2 2>/dev/null',
+  'grep -rniE "stock|inventory" --include=*.java . 2>/dev/null | grep -v test',
+  'find . -name "*.sql" 2>/dev/null | head -20',
+  'cut -d: -f1 /etc/passwd | tr a-z A-Z',
+  'file target/app.jar',
+  'stat -f %z pom.xml',
+  'du -sh src',
+  'tree -L 2 src',
+  'diff -u a.txt b.txt',
+  'type mvn',
+  'basename src/main/App.java; dirname src/main/App.java; realpath pom.xml',
+  'wc -l src/*.java 2>&1',
+];
+/** Each still writes a file or runs another program, so it asks even though the command is on the list (D100). */
+const ESCAPES_D100 = [
+  'sed -i s/a/b/ pom.xml',
+  'sed -n -i 1p pom.xml',
+  'sed -n 1p pom.xml -i',
+  "sed -n '1,5w out.txt' pom.xml",
+  "sed -n '1w out.txt;1p' pom.xml",
+  "sed -n 's/a/b/ep' pom.xml",
+  'sed -n -f script.sed pom.xml',
+  'sed 1,60p docs/x.md',
+  // awk is a programming language: programs come from files, libraries and options that write (D100).
+  "awk -F, '{print $2}' data.csv",
+  "awk -oout.awk '{print}' data.csv",
+  'awk -l x',
+  `awk '@include "x"'`,
+  'awk \'BEGIN{system("rm -rf src")}\'',
+  'awk \'{print > "out.txt"}\' data.csv',
+  'awk \'{print | "sh"}\' data.csv',
+  'awk \'BEGIN{"date" | getline d}\'',
+  'awk -f prog.awk data.csv',
+  'sort -o sorted.txt data.txt',
+  'sort --output=sorted.txt data.txt',
+  'uniq in.txt out.txt',
+  'unzip x.zip',
+  'unzip -o x.zip -d out',
+  'javap -J-javaagent:evil.jar Foo',
+  'file -C -m magic',
+  'tree -o tree.txt',
+  'ls > files.txt',
+  'cat a 2>/dev/null > b',
+  'find . -delete 2>/dev/null',
+  'sort data.txt 2>/dev/null > out.txt',
+  'xargs rm < files.txt',
+  'find . -name "*.class" | xargs rm',
+  'command mvn test',
+  'env rm x',
+  'PATH=/opt/homebrew/bin:$PATH mvn -v',
+  './scripts/mvn.sh -q test 2>&1 | tail -40',
+];
+
 describe.each(READONLY_PRESETS)('只读 bash 规则（%s）', (_name, rules) => {
+  it.each(READS_D100)('只读的过滤、列表与查询命令放行（D100）：%s', (command) => {
+    expect(decide(rules, command)).toBe('allow');
+  });
+
+  it.each(ESCAPES_D100)('白名单命令的写文件与执行写法、其他程序照常询问（D100）：%s', (command) => {
+    expect(decide(rules, command)).toBe('ask');
+  });
+
   it.each(ESCAPES)('会写文件或执行其他程序的命令不被放行：%s', (command) => {
     expect(decide(rules, command)).toBe('ask');
   });
@@ -263,5 +365,71 @@ describe('没有项目检查命令或检查命令不是已知测试工具时', (
     const rules = reviewer(checks);
     for (const command of ['mvn test', 'npm test', 'go test ./...', 'pytest'])
       expect(decide(rules, command), command).toBe('ask');
+  });
+});
+
+/**
+ * Patterns the user always allowed in a project (D101) join the read-only rules of its later sessions: the command
+ * runs without asking, with `2>&1` or `2>/dev/null` too, but redirections and the D63 / D100 escapes still ask.
+ */
+describe('项目级「总是允许」的命令（D101）', () => {
+  const allowed = ['./scripts/mvn.sh *', 'make *'];
+  const presets = [
+    ['规划者', sessionPermissionRules(RoleBaseAgent.Planner, BashPolicy.Auto, { allowedBash: allowed })],
+    ['评审者', sessionPermissionRules(RoleBaseAgent.Reviewer, BashPolicy.Auto, { allowedBash: allowed })],
+    ['执行者 ask 策略', sessionPermissionRules(RoleBaseAgent.Executor, BashPolicy.Ask, { allowedBash: allowed })],
+  ] as const;
+
+  it.each(presets)('%s：放行记住的命令，重定向与其他命令照常询问', (_name, rules) => {
+    for (const command of [
+      './scripts/mvn.sh -q test 2>&1 | tail -40',
+      './scripts/mvn.sh -q test',
+      './scripts/mvn.sh 2>/dev/null',
+      'make lint',
+    ])
+      expect(decide(rules, command), command).toBe('allow');
+    for (const command of [
+      './scripts/mvn.sh -q test > out.txt',
+      './scripts/mvn.sh -q test 2>&1 > out.txt',
+      './scripts/other.sh',
+      'mvn deploy',
+    ])
+      expect(decide(rules, command), command).toBe('ask');
+  });
+
+  it('执行者 auto 策略的规则不变：除 Git 外本来都放行', () => {
+    expect(sessionPermissionRules(RoleBaseAgent.Executor, BashPolicy.Auto, { allowedBash: allowed })).toEqual(
+      sessionPermissionRules(RoleBaseAgent.Executor, BashPolicy.Auto),
+    );
+  });
+});
+
+/**
+ * What「总是允许」remembers for the project (D101): the command and the options the user saw, up to the first other
+ * argument, so approving `unzip -l x.jar` does not also allow extracting. Git and commands after an assignment are not
+ * remembered.
+ */
+describe('项目中记住的模式（D101）', () => {
+  it.each([
+    [['unzip -l ~/.m2/x.jar'], ['unzip -l *']],
+    [
+      ['./scripts/mvn.sh -q test 2>&1', 'tail -40'],
+      ['./scripts/mvn.sh -q *', 'tail -40 *'],
+    ],
+    [['javap -p -cp "$JAR" com.example.Inventory'], ['javap -p -cp *']],
+    [['make'], ['make *']],
+    [['git push origin main', 'PATH=/opt/homebrew/bin:$PATH mvn -v'], []],
+    [['ls a', 'ls b'], ['ls *']],
+  ])('%j → %j', (commands, patterns) => {
+    expect(projectBashPatterns(commands)).toEqual(patterns);
+  });
+
+  it('记住 unzip -l 后，同一项目的会话仍询问解压', () => {
+    const rules = sessionPermissionRules(SessionAgent.Researcher, BashPolicy.Auto, {
+      allowedBash: projectBashPatterns(['unzip -l lib/x.jar']),
+    });
+    expect(decide(rules, 'unzip -l lib/y.jar')).toBe('allow');
+    expect(decide(rules, 'unzip lib/x.jar')).toBe('ask');
+    expect(decide(rules, 'unzip -o lib/x.jar -d out')).toBe('ask');
   });
 });

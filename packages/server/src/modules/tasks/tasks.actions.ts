@@ -67,7 +67,7 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
           const { decision } = parseInput(permissionResponseSchema, response);
           const attemptId = attemptOf(item);
           // opencode first: if it cannot take the reply, the item stays open for another try.
-          await attempts.replyPermission(item.payload, decision);
+          await attempts.replyPermission(attemptId, item.payload, decision);
           inbox.resolve(item, { decision });
           attempts.resumeIfAnswered(attemptId);
           break;
