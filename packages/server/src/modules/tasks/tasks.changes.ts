@@ -14,9 +14,24 @@ import {
   taskMachine,
   transition,
 } from '@aw/shared';
-import { BACKEND_COMMITTER, gitFailure, runGit, unmergedFiles } from '../git/index.ts';
+import { BACKEND_COMMITTER, gitFailure, type RepoLocks, runGit, unmergedFiles } from '../git/index.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
+
+/**
+ * Merges `target` into a task worktree and leaves the conflict markers for a step to resolve (13 §4, 27 §3.6); the
+ * merge stays in progress and the step's commit concludes it. Returns the conflicted files.
+ */
+export function mergeIntoWorktree(locks: RepoLocks, repoPath: string, dir: string, target: string): Promise<string[]> {
+  return locks.run(repoPath, async () => {
+    // git needs an identity even for a merge it does not commit yet; the backend's, as for every merge (D52).
+    const args = [...BACKEND_COMMITTER, 'merge', '--no-ff', '--no-commit', '--end-of-options', target];
+    const result = await runGit(args, { cwd: dir, okExitCodes: [0, 1] });
+    const files = await unmergedFiles(dir);
+    if (result.exitCode === 1 && files.length === 0) throw gitFailure(args, result);
+    return files;
+  });
+}
 
 /** Nodes nothing else depends on: the new step comes after all of them (13 §4). */
 const leafKeys = (nodes: ReadonlyArray<{ key: string; dependsOn: readonly string[] }>) =>
@@ -34,21 +49,11 @@ export function createTaskChanges(
   const { unit, prompts, projects, workflows, plans, nodes, inbox, locks } = deps;
   const { get, move } = state;
 
-  /**
-   * Merges the target branch into the task worktree and leaves the conflict markers for the step (13 §4); the
-   * merge stays in progress and the step's commit concludes it. Returns the conflicted files.
-   */
-  async function mergeTarget(task: Task, targetBranch: string): Promise<string[]> {
+  /** Merges the target into the task worktree for a conflict step (13 §4); returns the conflicted files. */
+  const mergeTarget = (task: Task, targetBranch: string): Promise<string[]> => {
     const ctx = state.runContext(task);
-    return locks.run(ctx.repoPath, async () => {
-      // git needs an identity even for a merge it does not commit yet; the backend's, as for every merge (D52).
-      const args = [...BACKEND_COMMITTER, 'merge', '--no-ff', '--no-commit', '--end-of-options', targetBranch];
-      const result = await runGit(args, { cwd: ctx.directory, okExitCodes: [0, 1] });
-      const files = await unmergedFiles(ctx.directory);
-      if (result.exitCode === 1 && files.length === 0) throw gitFailure(args, result);
-      return files;
-    });
-  }
+    return mergeIntoWorktree(locks, ctx.repoPath, ctx.directory, targetBranch);
+  };
 
   function nextKey(taskId: string, prefix: string): string {
     const taken = nodes.listByTask(taskId).filter((n) => n.key.startsWith(prefix)).length;

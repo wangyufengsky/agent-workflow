@@ -83,6 +83,8 @@ const AGENT_PERMISSION: Record<SessionAgent, AgentPermission & { [ASSISTANT_TOOL
   [SessionAgent.Researcher]: READ_ONLY_WRITER,
   // The PPT writer reads like the researcher and never uses the web (23 §7.1).
   [SessionAgent.SlidesWriter]: READ_ONLY_WRITER,
+  // The Git workbench's reviewer reads the user's repository and never uses the web (27 §4.3).
+  [SessionAgent.CodeReviewer]: READ_ONLY_WRITER,
 };
 
 /**
@@ -103,6 +105,7 @@ const AGENT_PROMPT: Record<SessionAgent, PromptName> = {
   [SessionAgent.Reviewer]: PromptName.ProtocolReview,
   [SessionAgent.Researcher]: PromptName.ProtocolResearch,
   [SessionAgent.SlidesWriter]: PromptName.ProtocolSlides,
+  [SessionAgent.CodeReviewer]: PromptName.ProtocolCodeReview,
 };
 
 /** Injected as `OPENCODE_CONFIG_CONTENT` and merged by opencode with the user's own configuration (12 §2, S3). */
@@ -168,6 +171,6 @@ export function sessionPermissionRules(
 ): PermissionRule[] {
   if (base === SessionAgent.Executor) return [...BASH_PERMISSION_PRESETS[bashPolicy]];
   if (base === SessionAgent.Researcher) return [...readonlyBashRules(), ...(web ? WEB_RULES : [])];
-  if (base === SessionAgent.SlidesWriter) return readonlyBashRules();
+  if (base === SessionAgent.SlidesWriter || base === SessionAgent.CodeReviewer) return readonlyBashRules();
   return readonlyBashRules(checkCommands);
 }

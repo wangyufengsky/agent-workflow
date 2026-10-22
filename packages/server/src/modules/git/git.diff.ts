@@ -94,17 +94,46 @@ export async function diffWorktree(cwd: string, from: string): Promise<DiffFile[
   return [...merge(parseNameStatus(names.stdout), parseNumstat(counts.stdout)), ...untracked];
 }
 
+/** Staged changes: the index against HEAD (against nothing before the first commit). */
+export async function diffStaged(cwd: string): Promise<DiffFile[]> {
+  const [names, counts] = await Promise.all([
+    runGit(['diff', '--cached', '--name-status', '-z', '-M'], { cwd }),
+    runGit(['diff', '--cached', '--numstat', '-z', '-M'], { cwd }),
+  ]);
+  return merge(parseNameStatus(names.stdout), parseNumstat(counts.stdout));
+}
+
+/** Unstaged changes: the worktree against the index, untracked files as additions. */
+export async function diffUnstaged(cwd: string): Promise<DiffFile[]> {
+  const [names, counts, untracked] = await Promise.all([
+    runGit(['diff', '--name-status', '-z'], { cwd }),
+    runGit(['diff', '--numstat', '-z'], { cwd }),
+    untrackedFiles(cwd),
+  ]);
+  return [...merge(parseNameStatus(names.stdout), parseNumstat(counts.stdout)), ...untracked];
+}
+
+/** Unified diff of one staged file (index against HEAD) or unstaged file (worktree against index, untracked whole). */
+export async function diffChangeFile(cwd: string, path: string, staged: boolean): Promise<string> {
+  if (staged) return (await runGit(['diff', '--cached', '-M', '--', path], { cwd, verbatim: true })).stdout;
+  if (await isUntracked(cwd, path)) return diffAgainstNothing(cwd, path);
+  return (await runGit(['diff', '--', path], { cwd, verbatim: true })).stdout;
+}
+
+async function isUntracked(cwd: string, path: string): Promise<boolean> {
+  const { stdout } = await runGit(['ls-files', '--others', '--exclude-standard', '--', path], { cwd });
+  return stdout.trim() !== '';
+}
+
+async function diffAgainstNothing(cwd: string, path: string): Promise<string> {
+  // --no-index exits 1 when the files differ, which they always do against /dev/null.
+  return (await runGit(['diff', '--no-index', '--', '/dev/null', path], { cwd, okExitCodes: [1], verbatim: true }))
+    .stdout;
+}
+
 /** Unified diff of one file of the worktree against a commit; an untracked file diffs against nothing. */
 export async function diffWorktreeFile(cwd: string, from: string, path: string): Promise<string> {
-  const untracked = await runGit(['ls-files', '--others', '--exclude-standard', '--', path], { cwd });
-  if (untracked.stdout.trim() !== '') {
-    const { stdout } = await runGit(['diff', '--no-index', '--', '/dev/null', path], {
-      cwd,
-      okExitCodes: [1],
-      verbatim: true,
-    });
-    return stdout;
-  }
+  if (await isUntracked(cwd, path)) return diffAgainstNothing(cwd, path);
   return (await runGit(['diff', '-M', from, '--', path], { cwd, verbatim: true })).stdout;
 }
 

@@ -30,6 +30,8 @@ export const tasksTable = sqliteTable(
     baseBranch: text('base_branch').notNull(),
     baseCommit: text('base_commit'),
     branch: text('branch'),
+    /** A merge task's source (27 §3.6): its worktree starts there and the base branch is merged in. */
+    mergeSource: text('merge_source'),
     // No foreign key: plans reference their task, and two tables cannot import each other.
     currentPlanId: text('current_plan_id'),
     /** JSON `TaskResultDTO`. */

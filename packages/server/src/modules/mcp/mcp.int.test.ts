@@ -62,6 +62,8 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.SubmitAnswer,
       McpToolName.SubmitOutline,
       McpToolName.SubmitSlide,
+      McpToolName.SubmitFindings,
+      McpToolName.SubmitCommitMessage,
     ]);
     const submit = tools.find((tool) => tool.name === McpToolName.SubmitResult);
     expect(submit?.inputSchema).toMatchObject({ type: 'object', required: ['summary'] });

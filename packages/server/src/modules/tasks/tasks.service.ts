@@ -1,3 +1,4 @@
+import { mergeTaskText, SystemWorkflowKey } from '@aw/builtin';
 import {
   AppError,
   type AttemptDTO,
@@ -154,6 +155,30 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       const baseBranch = await lifecycle.checkCreate(input);
       const id = lifecycle.insertDraft({ ...input, baseBranch });
       if (input.start !== false) lifecycle.start(id);
+      return detail(id);
+    },
+    /**
+     * The Git workbench's 「交给 AI 解决」 (27 §3.6): a task of the system workflow `merge_branch` whose worktree
+     * starts at `source` and merges `target` in; the user merges its result into `target` from the result card.
+     */
+    createMergeTask({
+      projectId,
+      source,
+      target,
+    }: {
+      projectId: string;
+      source: string;
+      target: string;
+    }): TaskDetailDTO {
+      const workflow = workflows.system(SystemWorkflowKey.MergeBranch);
+      const id = lifecycle.insertDraft({
+        projectId,
+        workflowId: workflow.id,
+        ...mergeTaskText(source, target),
+        baseBranch: target,
+        mergeSource: source,
+      });
+      lifecycle.start(id);
       return detail(id);
     },
     /** Creating several tasks in one transaction (batches, 20 §2): check once, insert drafts, start after commit. */

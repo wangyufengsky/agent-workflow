@@ -37,7 +37,16 @@ export type TaskChanges = Partial<
 
 export type NewTask = Pick<
   TaskRow,
-  'id' | 'projectId' | 'workflowId' | 'title' | 'requirement' | 'status' | 'baseBranch' | 'createdAt' | 'updatedAt'
+  | 'id'
+  | 'projectId'
+  | 'workflowId'
+  | 'title'
+  | 'requirement'
+  | 'status'
+  | 'baseBranch'
+  | 'mergeSource'
+  | 'createdAt'
+  | 'updatedAt'
 > & { checkpoints: Checkpoints };
 
 // JSON columns: parsed at the boundary (06 §9).

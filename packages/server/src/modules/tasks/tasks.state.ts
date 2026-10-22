@@ -25,6 +25,7 @@ import type { AttemptsService } from '../attempts/index.ts';
 import type { DatabasesService } from '../databases/index.ts';
 import type { DeliveriesService } from '../delivery/index.ts';
 import type { RepoLocks } from '../git/index.ts';
+import type { GitReviewsService } from '../git-reviews/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { NodeRunContext, NodesService } from '../nodes/index.ts';
@@ -55,6 +56,7 @@ export type TasksServiceDeps = {
   deliveries: DeliveriesService;
   databases: DatabasesService;
   knowledge: KnowledgeService;
+  gitReviews: GitReviewsService;
   locks: RepoLocks;
   dataDir: string;
 };

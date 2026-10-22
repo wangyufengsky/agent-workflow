@@ -14,6 +14,8 @@ export const EntityKind = {
   Batch: 'batch',
   /** A PPT (23). */
   Deck: 'deck',
+  /** An AI review in the Git workbench (27 §4). */
+  GitReview: 'git_review',
   /** A workflow run on a schedule (22). */
   Schedule: 'schedule',
 } as const;

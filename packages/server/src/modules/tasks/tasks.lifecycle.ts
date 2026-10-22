@@ -27,13 +27,15 @@ import {
   TaskStatus,
   validatePlanGraph,
   type WorkflowDTO,
+  WorkflowKind,
   WorkflowPlanning,
   WorkflowProblemCode,
   WorktreeStatus,
 } from '@aw/shared';
-import { branchExists } from '../git/index.ts';
+import { branchExists, hasMergeHead } from '../git/index.ts';
 import { planGraphFromSubmission, validateSubmission } from '../plans/index.ts';
 import type { Worktree } from '../worktrees/index.ts';
+import { mergeIntoWorktree } from './tasks.changes.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
@@ -55,8 +57,22 @@ const RETRY_TARGET = {
  * cancelling and retrying. Node dispatch and the derived task events belong to the scheduler.
  */
 export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
-  const { unit, clock, log, settings, prompts, projects, workflows, roles, worktrees, plans, nodes, attempts, inbox } =
-    deps;
+  const {
+    unit,
+    clock,
+    log,
+    settings,
+    prompts,
+    projects,
+    workflows,
+    roles,
+    worktrees,
+    plans,
+    nodes,
+    attempts,
+    inbox,
+    locks,
+  } = deps;
   const { repo, get, move, fail } = state;
 
   /** Work started by a call that does not wait for it; an unexpected failure is logged with the task. */
@@ -170,7 +186,13 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
               projectSlug: project.slug,
               repoPath: project.repoPath,
               baseBranch: task.baseBranch,
+              ...(task.mergeSource === null ? {} : { startPoint: task.mergeSource }),
             });
+      // A merge task starts at its source with the base branch merged in, conflicts left for its step (27 §3.6). A
+      // preparation resumed after a restart may find the merge already under way.
+      if (task.mergeSource !== null && !(await hasMergeHead(worktree.path))) {
+        await mergeIntoWorktree(locks, project.repoPath, worktree.path, task.baseBranch);
+      }
     } catch (err) {
       if (!(err instanceof AppError)) throw err;
       const current = get(taskId);
@@ -226,7 +248,12 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
     /** What creating a task needs (11 §5.1): its project, workflow and base branch exist; resolves the branch. */
     async checkCreate(input: Pick<CreateTaskRequest, 'projectId' | 'workflowId' | 'baseBranch'>): Promise<string> {
       const project = projects.getRecord(input.projectId);
-      workflows.get(input.workflowId);
+      // System workflows are started by the app only (27 §3.6).
+      if (workflows.get(input.workflowId).kind === WorkflowKind.System) {
+        throw new AppError(ErrorCode.WorkflowNotFound, `Workflow ${input.workflowId} not found`, {
+          id: input.workflowId,
+        });
+      }
       const baseBranch = input.baseBranch ?? project.defaultBranch;
       if (!(await branchExists(project.repoPath, baseBranch))) {
         throw new AppError(ErrorCode.GitBaseBranchNotFound, 'Base branch does not exist', { branch: baseBranch });
@@ -235,7 +262,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
     },
 
     /** Inserts a draft task whose project, workflow and base branch `checkCreate` accepted; returns its id. */
-    insertDraft(input: Omit<CreateTaskRequest, 'start'> & { baseBranch: string }): string {
+    insertDraft(input: Omit<CreateTaskRequest, 'start'> & { baseBranch: string; mergeSource?: string }): string {
       const workflow = workflows.get(input.workflowId);
       // Request > workflow definition > setting (11 §5.1); fixed for the task's lifetime.
       const checkpoints = {
@@ -254,6 +281,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
           requirement: input.requirement,
           status: TaskStatus.Draft,
           baseBranch: input.baseBranch,
+          mergeSource: input.mergeSource ?? null,
           checkpoints,
           createdAt: now,
           updatedAt: now,

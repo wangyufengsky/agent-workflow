@@ -43,17 +43,33 @@ import {
 import type { OperationContract } from './define.ts';
 import {
   gitBranchesOp,
+  gitChangeFileOp,
+  gitChangesOp,
   gitCommitOp,
+  gitCreateBranchOp,
+  gitCreateCommitOp,
+  gitCreatePullRequestOp,
+  gitDeleteBranchOp,
   gitDiffFileOp,
   gitDiffOp,
+  gitDraftCommitMessageOp,
   gitFetchOp,
   gitFileOp,
   gitLogOp,
+  gitMergeOp,
+  gitMergeWithAiOp,
+  gitPullOp,
+  gitPushOp,
+  gitPushPreviewOp,
+  gitStageOp,
   gitStatusOp,
+  gitSwitchBranchOp,
   gitTreeOp,
+  gitUnstageOp,
   listWorktreesOp,
   pruneWorktreesOp,
 } from './git.ts';
+import { getGitReviewOp, listGitReviewsOp, startGitReviewOp, stopGitReviewOp } from './git-reviews.ts';
 import { countInboxOp, dismissInboxOp, listInboxOp, resolveInboxOp } from './inbox.ts';
 import { insightsSummaryOp, insightsTasksOp } from './insights.ts';
 import {
@@ -146,6 +162,7 @@ export * from './debug.ts';
 export * from './decks.ts';
 export * from './define.ts';
 export * from './git.ts';
+export * from './git-reviews.ts';
 export * from './inbox.ts';
 export * from './insights.ts';
 export * from './knowledge.ts';
@@ -248,6 +265,25 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   gitTreeOp,
   gitFileOp,
   gitFetchOp,
+  gitChangesOp,
+  gitChangeFileOp,
+  gitStageOp,
+  gitUnstageOp,
+  gitCreateCommitOp,
+  gitDraftCommitMessageOp,
+  gitPushPreviewOp,
+  gitPushOp,
+  gitPullOp,
+  gitCreateBranchOp,
+  gitSwitchBranchOp,
+  gitDeleteBranchOp,
+  gitMergeOp,
+  gitMergeWithAiOp,
+  gitCreatePullRequestOp,
+  startGitReviewOp,
+  listGitReviewsOp,
+  getGitReviewOp,
+  stopGitReviewOp,
   listWorktreesOp,
   pruneWorktreesOp,
   listConversationsOp,

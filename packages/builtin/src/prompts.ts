@@ -38,6 +38,10 @@ export const PromptName = {
   DeckOutlineRevise: 'deck-outline-revise',
   DeckSlides: 'deck-slides',
   DeckSlidesRevise: 'deck-slides-revise',
+  /** The Git workbench's reviewer: its agent prompt, a review's and a commit message draft's first message (27 §4). */
+  ProtocolCodeReview: 'protocol-code-review',
+  StartGitReview: 'start-git-review',
+  StartCommitMessage: 'start-commit-message',
 } as const;
 export type PromptName = (typeof PromptName)[keyof typeof PromptName];
 
@@ -81,6 +85,9 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.DeckOutlineRevise]: read(PromptName.DeckOutlineRevise),
     [PromptName.DeckSlides]: read(PromptName.DeckSlides),
     [PromptName.DeckSlidesRevise]: read(PromptName.DeckSlidesRevise),
+    [PromptName.ProtocolCodeReview]: read(PromptName.ProtocolCodeReview),
+    [PromptName.StartGitReview]: read(PromptName.StartGitReview),
+    [PromptName.StartCommitMessage]: read(PromptName.StartCommitMessage),
   };
 }
 

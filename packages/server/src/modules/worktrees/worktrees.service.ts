@@ -37,6 +37,8 @@ export type CreateWorktreeInput = {
   projectSlug: string;
   repoPath: string;
   baseBranch: string;
+  /** Where the branch starts when not at the base branch: a merge task's source (27 §3.6). */
+  startPoint?: string;
 };
 
 /** `aw/<taskKey>-<slug>`; titles without ASCII letters or digits give just `aw/<taskKey>` (08 §4.1). */
@@ -99,7 +101,8 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
         // Stored with symlinks resolved, as git reports it (`git worktree list`), so the two can be matched.
         await mkdir(parent, { recursive: true });
         const path = join(await realpath(parent), input.taskKey);
-        const { stdout } = await runGit(['rev-parse', '--verify', `refs/heads/${input.baseBranch}^{commit}`], { cwd });
+        const start = input.startPoint ?? `refs/heads/${input.baseBranch}`;
+        const { stdout } = await runGit(['rev-parse', '--verify', '--end-of-options', `${start}^{commit}`], { cwd });
         const id = randomUUID();
         repo.insert({
           id,

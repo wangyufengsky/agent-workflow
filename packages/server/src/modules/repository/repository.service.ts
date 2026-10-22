@@ -4,6 +4,7 @@ import {
   ErrorCode,
   type FileDiffDTO,
   type GitBranchDTO,
+  type GitChangesDTO,
   type GitCommitDetailDTO,
   type GitCommitDTO,
   type GitFileDTO,
@@ -16,17 +17,24 @@ import {
 } from '@aw/shared';
 import type { Logger } from '../../core/logger.ts';
 import {
+  diffChangeFile,
   diffCommits,
   diffCommitsFile,
+  diffStaged,
+  diffUnstaged,
   distance,
   fetchAll,
+  type LogFilter,
   limitDiff,
   listBranches,
   listWorktrees,
   type RepoLocks,
   readCommit,
+  readFetchedAt,
   readFile,
+  readIdentity,
   readLog,
+  readOperation,
   readStatus,
   readTree,
   runGit,
@@ -44,6 +52,19 @@ export type RepositoryServiceDeps = {
 };
 
 const taskRef = (task: Task) => ({ id: task.id, key: task.key, status: task.status });
+
+/** The commit `search` abbreviates, when it is a SHA prefix of a commit reachable from `ref`. */
+async function commitOnRef(repo: string, ref: string, search: string): Promise<GitCommitDTO | undefined> {
+  if (!/^[0-9a-f]{4,64}$/i.test(search)) return undefined;
+  const sha = await runGit(['rev-parse', '--verify', '--quiet', `${search}^{commit}`], {
+    cwd: repo,
+    okExitCodes: [0, 1, 128],
+  });
+  if (sha.exitCode !== 0) return undefined;
+  const commit = sha.stdout.trim();
+  const reachable = await runGit(['merge-base', '--is-ancestor', commit, ref], { cwd: repo, okExitCodes: [0, 1] });
+  return reachable.exitCode === 0 ? (await readLog(repo, commit, 1, 0))[0] : undefined;
+}
 
 /** The Git console (11 §8): what the project repository holds, read with machine formats (06 §2.3). */
 export function createRepositoryService({ projects, tasks, worktrees, locks, log }: RepositoryServiceDeps) {
@@ -88,7 +109,27 @@ export function createRepositoryService({ projects, tasks, worktrees, locks, log
   }
 
   return {
-    status: (projectId: string): Promise<GitStatusDTO> => readStatus(repoOf(projectId)),
+    /** The main worktree (27 §6.2): branch, changes, an unfinished operation, who commits, when last fetched. */
+    async status(projectId: string): Promise<GitStatusDTO> {
+      const repo = repoOf(projectId);
+      const [status, operation, identity, fetchedAt] = await Promise.all([
+        readStatus(repo),
+        readOperation(repo),
+        readIdentity(repo),
+        readFetchedAt(repo),
+      ]);
+      return { ...status, operation, identity, fetchedAt };
+    },
+
+    async changes(projectId: string): Promise<GitChangesDTO> {
+      const repo = repoOf(projectId);
+      const [staged, unstaged] = await Promise.all([diffStaged(repo), diffUnstaged(repo)]);
+      return { staged, unstaged };
+    },
+
+    async changeFile(projectId: string, path: string, staged: boolean): Promise<FileDiffDTO> {
+      return limitDiff(path, await diffChangeFile(repoOf(projectId), path, staged));
+    },
 
     async branches(projectId: string): Promise<GitBranchDTO[]> {
       const byBranch = new Map(
@@ -100,27 +141,35 @@ export function createRepositoryService({ projects, tasks, worktrees, locks, log
       }));
     },
 
-    /** Pages are offsets into the log: the cursor is the number of commits already shown. */
+    /**
+     * Pages are offsets into the log: the cursor is the number of commits already shown. A search that is a SHA
+     * prefix of a commit on `ref` finds that commit (27 §6.2).
+     */
     async log(
       projectId: string,
       ref: string,
       limit: number,
       cursor: string | undefined,
+      filter: LogFilter = {},
     ): Promise<{ items: GitCommitDTO[]; nextCursor: string | null }> {
       const repo = repoOf(projectId);
       await requireObject(repo, `${ref}^{commit}`);
+      if (filter.search !== undefined && cursor === undefined) {
+        const bySha = await commitOnRef(repo, ref, filter.search);
+        if (bySha !== undefined) return { items: [bySha], nextCursor: null };
+      }
       const skip = cursor === undefined ? 0 : Number(cursor);
-      const commits = await readLog(repo, ref, limit + 1, skip);
+      const commits = await readLog(repo, ref, limit + 1, skip, filter);
       return {
         items: commits.slice(0, limit),
         nextCursor: commits.length > limit ? String(skip + limit) : null,
       };
     },
 
-    async commit(projectId: string, sha: string): Promise<GitCommitDetailDTO> {
+    async commit(projectId: string, sha: string, parent: number | undefined): Promise<GitCommitDetailDTO> {
       const repo = repoOf(projectId);
       await requireObject(repo, `${sha}^{commit}`);
-      return readCommit(repo, sha);
+      return readCommit(repo, sha, parent);
     },
 
     // `from` may also be a tree: the empty tree a root commit is compared with.
