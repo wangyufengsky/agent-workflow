@@ -122,3 +122,17 @@ export const setProjectDbConnectionsOp = defineOperationContract({
   credentialFields: [],
   mode: UiMode.Pro,
 });
+
+export const removeProjectAllowedBashOp = defineOperationContract({
+  id: 'projects.removeAllowedBash',
+  refs: { id: InputRef.Project },
+  title: 'op.projects.removeAllowedBash',
+  description: "Revoke a bash pattern the user always allowed for the project's AI sessions; later sessions ask again",
+  input: z.object({ id: z.string(), pattern: z.string().min(1) }),
+  output: projectDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'DELETE', path: '/projects/:id/allowed-bash' },
+  expose: { palette: false, assistant: true },
+  credentialFields: [],
+  mode: UiMode.Pro,
+});

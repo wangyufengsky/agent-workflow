@@ -8,11 +8,12 @@ import {
   AttemptStatus,
   type AttemptSummaryDTO,
   attemptMachine,
+  BASH_PERMISSION,
   ErrorCode,
   isTerminalState,
   KNOWLEDGE_DRAFT_FLUSH_CHARS,
   OPENCODE_AGENT_NAME,
-  type PermissionDecision,
+  PermissionDecision,
   type PermissionPayload,
   type SessionAgent,
   TRANSCRIPT_TEXT_FLUSH_CHARS,
@@ -20,6 +21,7 @@ import {
   TranscriptSystemEvent,
 } from '@aw/shared';
 import { parseModelRef, sessionPermissionRules } from '../opencode/index.ts';
+import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { watchSessions } from './attempts.reactions.ts';
 import type { Attempt } from './attempts.repo.ts';
@@ -33,7 +35,11 @@ import {
   systemEntry,
 } from './attempts.state.ts';
 
-export type AttemptsServiceDeps = AttemptStateDeps & { settings: SettingsService; prompts: Prompts };
+export type AttemptsServiceDeps = AttemptStateDeps & {
+  settings: SettingsService;
+  prompts: Prompts;
+  projects: Pick<ProjectsService, 'allowedBash' | 'rememberBash'>;
+};
 
 export type StartAttemptInput = {
   /** Given by an owner that records the attempt before the session can call back (a knowledge turn, 18 §5.3). */
@@ -42,6 +48,8 @@ export type StartAttemptInput = {
   taskId: string | null;
   nodeId: string | null;
   roleId: string | null;
+  /** The project the session works in: its always-allowed bash patterns join the session rules (D101). */
+  projectId: string | null;
   /** The role's base agent, or the researcher: decides the opencode agent and its session rules (12 §2). */
   agent: SessionAgent;
   /** Session working directory: the task worktree. */
@@ -67,7 +75,7 @@ const ACTIVE: readonly AttemptStatus[] = [AttemptStatus.Starting, AttemptStatus.
 
 /** Attempt lifecycle (09 §4) and the session protocol (12 §4); opencode-driven end conditions are in the reactions. */
 export function createAttemptsService(deps: AttemptsServiceDeps) {
-  const { clock, opencode, settings, transcripts } = deps;
+  const { clock, opencode, settings, transcripts, projects } = deps;
   const state = createAttemptState(deps);
   const { repo, mustFind, move, record, toDto } = state;
   const reactions = watchSessions(state, deps);
@@ -149,6 +157,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         taskId: input.taskId,
         nodeId: input.nodeId,
         roleId: input.roleId,
+        projectId: input.projectId,
         kind: input.kind,
         seq: repo.nextSeq(input),
         status: AttemptStatus.Starting,
@@ -171,6 +180,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
           permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
             checkCommands: input.checkCommands,
             web: input.web,
+            allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
           }),
         });
       } catch (err) {
@@ -227,6 +237,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         taskId: previous.taskId,
         nodeId: previous.nodeId,
         roleId: previous.roleId,
+        projectId: previous.projectId,
         kind,
         seq: repo.nextSeq({ ...previous, kind }),
         status: AttemptStatus.Starting,
@@ -318,13 +329,20 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       reactions.resume(session);
     },
 
-    /** The user's decision on a permission request goes back to opencode, and the turn continues (D34). */
-    async replyPermission(payload: PermissionPayload, reply: PermissionDecision): Promise<void> {
+    /**
+     * The user's decision on a permission request goes back to opencode, and the turn continues (D34). opencode keeps
+     * 「总是允许」for the session only; a bash one is remembered for the project's later sessions too (D101).
+     */
+    async replyPermission(attemptId: string, payload: PermissionPayload, reply: PermissionDecision): Promise<void> {
       await opencode.replyPermission({
         permissionId: payload.opencodePermissionId,
         directory: payload.directory,
         reply,
       });
+      const { projectId } = mustFind(attemptId);
+      if (reply === PermissionDecision.Always && payload.permission === BASH_PERMISSION && projectId !== null) {
+        projects.rememberBash(projectId, payload.patterns);
+      }
     },
 
     /** Once nothing is left to wait for (the permission item was resolved), the session resumes. */

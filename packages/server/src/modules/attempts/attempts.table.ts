@@ -1,6 +1,7 @@
 import type { AttemptKind, AttemptStatus } from '@aw/shared';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { nodesTable } from '../nodes/nodes.table.ts';
+import { projectsTable } from '../projects/projects.table.ts';
 import { rolesTable } from '../roles/roles.table.ts';
 import { tasksTable } from '../tasks/tasks.table.ts';
 
@@ -10,6 +11,8 @@ export const attemptsTable = sqliteTable(
   {
     id: text('id').primaryKey(),
     taskId: text('task_id').references(() => tasksTable.id, { onDelete: 'cascade' }),
+    /** The project the session works in, whose always-allowed bash patterns it gets (D101); null for debug runs. */
+    projectId: text('project_id').references(() => projectsTable.id, { onDelete: 'set null' }),
     /** The node an execute attempt works on, or the node a review attempt reviews; null for plan attempts. */
     nodeId: text('node_id').references(() => nodesTable.id, { onDelete: 'cascade' }),
     kind: text('kind').$type<AttemptKind>().notNull(),

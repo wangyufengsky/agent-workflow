@@ -222,7 +222,9 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `MCP_ASSISTANT_TOOL_PREFIX` | `agent-workflow-app_` | 助手 MCP 工具名的前缀；bridge 插件对两种前缀都注入会话 id |
 | `MCP_SESSION_ARG` | `__aw_session` | bridge 插件注入的会话 id 参数名（12 §3） |
 | `BASH_PERMISSION_PRESETS` | `auto` / `ask` 两套规则 | 执行者的会话级 bash 规则（12 §2） |
-| `readonlyBashRules(checkCommands)` | 函数 | 规划与评审会话的会话级 bash 规则，`ask` 策略即不带检查命令的这一套（12 §2，D64） |
+| `readonlyBashRules(checkCommands, allowedBash)` | 函数 | 规划与评审会话的会话级 bash 规则，`ask` 策略即不带检查命令的这一套；`allowedBash` 为项目中总是允许的模式（12 §2，D64、D100、D101） |
+| `BASH_PERMISSION` | `bash` | opencode 中 shell 命令的权限类型 |
+| `projectBashPatterns(commands)` | 函数 | bash 请求的「总是允许」中记到项目的模式：每条子命令的程序与开头的选项（到第一个不以 `-` 开头的参数为止）加 ` *`，去重；Git 与前置变量赋值的不记（D101） |
 
 ### 4.2 限制值（`constants/limits.ts`）
 

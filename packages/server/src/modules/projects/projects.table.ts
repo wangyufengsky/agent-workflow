@@ -1,5 +1,5 @@
 import type { HostingProvider } from '@aw/shared';
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { credentialsTable } from '../credentials/index.ts';
 
 export const projectsTable = sqliteTable('projects', {
@@ -18,3 +18,17 @@ export const projectsTable = sqliteTable('projects', {
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });
+
+/** 10 §project_bash_rules: bash patterns the user always allowed for the project's AI sessions (D101). */
+export const projectBashRulesTable = sqliteTable(
+  'project_bash_rules',
+  {
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projectsTable.id, { onDelete: 'cascade' }),
+    /** opencode wildcard, e.g. `unzip *`. */
+    pattern: text('pattern').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.projectId, t.pattern] })],
+);

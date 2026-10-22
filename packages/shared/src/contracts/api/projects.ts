@@ -30,6 +30,8 @@ export const projectDetailSchema = projectSchema.extend({
   inferredHosting: hostingRefSchema.nullable(),
   /** Database connections the project's AI sessions may query (M5-07). */
   dbConnectionIds: z.array(z.string()),
+  /** Bash patterns the user always allowed for the project's AI sessions, oldest first (D101). */
+  allowedBash: z.array(z.string()),
 });
 export type ProjectDetailDTO = z.infer<typeof projectDetailSchema>;
 
