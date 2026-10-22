@@ -142,6 +142,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
 export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   'ui.mode': SETTINGS_COPY.mode,
   'ui.theme': SETTINGS_COPY.theme,
+  'ui.introAnimation': SETTINGS_COPY.intro,
   'ai.askOnUncertainty': SETTINGS_COPY.uncertainty,
   'ai.defaultModel': SETTINGS_COPY.defaultModel,
   'scheduler.maxConcurrentAttempts': SETTINGS_COPY.concurrency,

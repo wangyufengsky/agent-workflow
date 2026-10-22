@@ -43,6 +43,8 @@ test('J17 主页「补单元测试」的「批量」→ 选 3 个目录 → 三�
   }
 
   await page.goto(`/?projectId=${project.id}`);
+  // Batch and schedule entries belong to「开始任务」mode of a fixed workflow (D111).
+  await page.getByRole('group', { name: '直接开始' }).getByRole('button', { name: '补单元测试' }).click();
   await page.getByRole('link', { name: '批量运行「补单元测试」' }).click();
   await expect(page.getByRole('heading', { name: '新建批量任务' })).toBeVisible();
   await expect(page.getByLabel('需求模板')).toHaveValue('为 {{target}} 补充单元测试，覆盖主要行为与边界情况。');

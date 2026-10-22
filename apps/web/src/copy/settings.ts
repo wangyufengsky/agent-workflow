@@ -9,6 +9,8 @@ export const SETTINGS_COPY = {
   appearance: '外观',
   theme: '主题',
   themeHint: '跟随系统时，深色用 DeepSeek 深色，浅色用 GitHub 白。',
+  intro: '打开动画',
+  introHint: '应用启动时播放一段 1 秒左右的动画，下次启动生效。',
   mode: '界面模式',
   proMode: '专业模式',
   proModeHint: '开启后显示流程编排、计划编辑、Git 管理台、角色、数据库等功能。',

@@ -5,6 +5,7 @@ import { ExternalLink } from '../../components/external-link.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
 import styles from './assistant.module.css';
+import { followAssistant } from './handoff.ts';
 
 /** A knowledge answer cites as `[[n]](link)` (18 §4a): the mark reads as a small numbered chip. */
 const CITATION = /^\[(\d+)\]$/;
@@ -20,7 +21,7 @@ function InAppLink({ href, children }: { href: string; children: ReactNode }) {
       aria-label={citation === undefined ? undefined : KNOWLEDGE_COPY.citationMark(Number(citation))}
       onClick={(e) => {
         e.preventDefault();
-        void navigate({ href });
+        followAssistant(() => navigate({ href }));
       }}
     >
       {citation ?? children}

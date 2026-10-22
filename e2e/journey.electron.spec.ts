@@ -74,7 +74,7 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
   await page.screenshot({ path: join(SHOTS, 'onboarding.png') });
   await page.getByLabel('仓库目录').fill(fixtureRepo());
   await page.getByRole('button', { name: '添加项目' }).click();
-  await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Everything is a Workflow.' })).toBeVisible();
 
   let api = await backend(page);
   const settings = await request.patch(`${api.base}/settings`, {
@@ -84,7 +84,7 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
   expect(settings.ok()).toBe(true);
 
   await page
-    .getByRole('group', { name: '流程' })
+    .getByRole('group', { name: '直接开始' })
     .getByRole('button', { name: /修 Bug/ })
     .click();
   await page
@@ -99,7 +99,7 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
   await app.close();
   app = await launch();
   page = await app.firstWindow();
-  await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Everything is a Workflow.' })).toBeVisible();
   api = await backend(page);
   await playTheUser(page);
   await page.getByRole('navigation').getByRole('link', { name: '任务', exact: true }).click();

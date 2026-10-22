@@ -2,6 +2,9 @@
   "name": "@aw/web",
   "private": true,
   "type": "module",
+  "exports": {
+    "./splash": "./src/splash/splash-page.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",
     "dev": "vite",

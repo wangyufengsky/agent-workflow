@@ -46,6 +46,12 @@ export const AssistantPage = {
   /** PPT (23 §2): the list and one PPT's workspace. */
   Ppt: 'ppt',
   PptDeck: 'ppt_deck',
+  /** Batches (20), scheduled tasks (22) and the environment checks (14 §3.1a), D111. */
+  Batches: 'batches',
+  Batch: 'batch',
+  Schedules: 'schedules',
+  Schedule: 'schedule',
+  Environment: 'environment',
 } as const;
 export type AssistantPage = (typeof AssistantPage)[keyof typeof AssistantPage];
 export const assistantPageSchema = z.enum(AssistantPage);
@@ -58,7 +64,9 @@ export type AssistantPageParam =
   | 'workflowKey'
   | 'knowledgeConversationId'
   | 'deckId'
-  | 'slideId';
+  | 'slideId'
+  | 'batchId'
+  | 'scheduleId';
 
 /** Params each page needs to be opened. */
 export const ASSISTANT_PAGE_PARAMS = {
@@ -84,6 +92,11 @@ export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.Insights]: [],
   [AssistantPage.Ppt]: [],
   [AssistantPage.PptDeck]: ['deckId'],
+  [AssistantPage.Batches]: [],
+  [AssistantPage.Batch]: ['batchId'],
+  [AssistantPage.Schedules]: [],
+  [AssistantPage.Schedule]: ['scheduleId'],
+  [AssistantPage.Environment]: [],
 } as const satisfies Record<AssistantPage, readonly AssistantPageParam[]>;
 
 /**

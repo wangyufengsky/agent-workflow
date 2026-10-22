@@ -290,7 +290,7 @@ test('10 个并发任务：主页与任务页在持续推送下不卡顿', async
     await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
   }
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Everything is a Workflow.' })).toBeVisible();
   const startedAt = performance.now();
   for (let i = 0; i < 10; i++) ids.push(await start(request, project, 'bugfix', `并发任务 ${i}：订单时间显示错了`));
 

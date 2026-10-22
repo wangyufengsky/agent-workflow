@@ -3,9 +3,11 @@ import { type GetAppStatusOutput, MCP_ASSISTANT_PATH, MCP_ASSISTANT_SERVER_NAME 
 import type { FastifyInstance } from 'fastify';
 import { registerMcpEndpoint } from '../../core/http/mcp-endpoint.ts';
 import type { OperationImpl } from '../../core/operations/operations.ts';
+import type { BatchesService } from '../batches/index.ts';
 import type { DecksService } from '../decks/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
+import type { SchedulesService } from '../schedules/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import type { WorkflowsService } from '../workflows/index.ts';
 import { createConfirmations } from './assistant.confirmations.ts';
@@ -28,6 +30,8 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context'> & {
   workflows: WorkflowsService;
   knowledge: KnowledgeService;
   decks: DecksService;
+  batches: BatchesService;
+  schedules: SchedulesService;
   /** Every other operation of the app; the assistant's tools are generated from them (15 §3). */
   operations: readonly OperationImpl[];
   appStatus(): Promise<GetAppStatusOutput>;

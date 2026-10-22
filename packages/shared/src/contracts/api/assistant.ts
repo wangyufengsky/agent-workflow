@@ -45,6 +45,8 @@ export const assistantPageRefSchema = z
         deckId: z.string().min(1).optional(),
         /** On a PPT's workspace: the selected page. */
         slideId: z.string().min(1).optional(),
+        batchId: z.string().min(1).optional(),
+        scheduleId: z.string().min(1).optional(),
       })
       .default({}),
   })

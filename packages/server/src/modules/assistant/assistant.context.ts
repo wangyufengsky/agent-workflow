@@ -9,9 +9,11 @@ import {
   type TaskDetailDTO,
   UiMode,
 } from '@aw/shared';
+import type { BatchesService } from '../batches/index.ts';
 import type { DecksService } from '../decks/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
+import type { SchedulesService } from '../schedules/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import type { WorkflowsService } from '../workflows/index.ts';
 
@@ -62,6 +64,9 @@ const STATIC_PAGES: Partial<Record<AssistantPage, string>> = {
   [AssistantPage.KnowledgeHistory]: 'the knowledge Q&A history',
   [AssistantPage.Insights]: 'the quality and usage page (how much AI did, how well, and what it cost)',
   [AssistantPage.Ppt]: 'the PPT list (slide decks made from a brief and material)',
+  [AssistantPage.Batches]: 'the batch list (one fixed workflow run over many targets)',
+  [AssistantPage.Schedules]: 'the scheduled task list (a fixed workflow started at set times)',
+  [AssistantPage.Environment]: 'the environment checks (Git, opencode, models, credential storage)',
 };
 
 function param(ref: AssistantPageRef, name: AssistantPageParam): string {
@@ -78,10 +83,13 @@ export type ContextDeps = {
   workflows: WorkflowsService;
   knowledge: KnowledgeService;
   decks: DecksService;
+  batches: BatchesService;
+  schedules: SchedulesService;
 };
 
 /** What the model is told with every message (15 §2): time, interface mode, and the page the user is on. */
-export function createContextRenderer({ prompts, tasks, projects, workflows, knowledge, decks }: ContextDeps) {
+export function createContextRenderer(deps: ContextDeps) {
+  const { prompts, tasks, projects, workflows, knowledge, decks, batches, schedules } = deps;
   /** The ids of the page come from the renderer: a missing entity is a NOT_FOUND like any other input. */
   function describeTask(task: TaskDetailDTO, nodeId: string | undefined, prefix: string): string {
     const base = `${prefix} of task ${task.key} "${task.title}" (task id ${task.id}, status ${task.status}, project "${task.project.name}", project id ${task.project.id})`;
@@ -127,6 +135,14 @@ export function createContextRenderer({ prompts, tasks, projects, workflows, kno
         if (slide === undefined)
           throw new AppError(ErrorCode.DeckSlideNotFound, `Page ${slideId} not found`, { slideId });
         return `${base}, page ${slide.seq} "${slide.title}" selected (slide id ${slide.id})`;
+      }
+      case AssistantPage.Batch: {
+        const batch = batches.detail(param(ref, 'batchId'));
+        return `the page of batch ${batch.key} "${batch.title}" (batch id ${batch.id}, project "${batch.project.name}", workflow "${batch.workflow.name}", ${batch.ended} of ${batch.total} tasks ended)`;
+      }
+      case AssistantPage.Schedule: {
+        const schedule = schedules.detail(param(ref, 'scheduleId'));
+        return `the page of scheduled task "${schedule.title}" (schedule id ${schedule.id}, status ${schedule.status}, project "${schedule.project.name}", workflow key ${schedule.workflow.key})`;
       }
       default:
         throw new Error(`Page ${page} has no description`);

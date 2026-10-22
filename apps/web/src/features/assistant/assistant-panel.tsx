@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import { useRouterState } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
+import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -107,10 +109,12 @@ function Panel({ open, onClosed }: { open: boolean; onClosed: () => void }) {
 
 /**
  * The global assistant panel (15 §6, D84): a frosted sheet floating over the page rather than a column beside it, so
- * pages keep their width. It stays mounted while it plays its closing animation, then unmounts.
+ * pages keep their width. It stays mounted while it plays its closing animation, then unmounts. The home page shows
+ * the conversation itself, so there the panel is closed (D112).
  */
 export function AssistantPanel() {
-  const open = useUiStore((s) => s.assistantOpen);
+  const onHome = useRouterState({ select: (s) => s.location.pathname === ROUTES.home });
+  const open = useUiStore((s) => s.assistantOpen) && !onHome;
   const [mounted, setMounted] = useState(open);
   if (open && !mounted) setMounted(true);
   return mounted ? <Panel open={open} onClosed={() => setMounted(false)} /> : null;
