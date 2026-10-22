@@ -65,6 +65,7 @@ export function ResearchCard({
         pro={pro}
         size="card"
         testId="research-process"
+        foldOnEnd
       />
     </>
   );

@@ -111,6 +111,7 @@ function Box({
   pro,
   size,
   testId,
+  foldOnEnd,
 }: {
   attempt: AttemptDTO;
   entries: readonly TranscriptEntry[];
@@ -120,9 +121,9 @@ function Box({
   const ended = state !== 'running';
   const stored = useUiStore((s) => s.streamOpen[attempt.id]);
   const setStreamOpen = useUiStore((s) => s.setStreamOpen);
-  // A stream that has ended opens folded; one that ends while watched stays open (25 §4.5).
+  // A stream that has ended opens folded; one that ends while watched stays open unless it folds on end (25 §4.5).
   const [openedRunning] = useState(!ended);
-  const open = stored ?? openedRunning;
+  const open = stored ?? (foldOnEnd === true ? !ended : openedRunning);
   const items = useMemo(
     () => streamItems(entries, { directory: attempt.directory, pro, ended }),
     [entries, attempt.directory, pro, ended],
@@ -208,6 +209,8 @@ type StreamProps = {
   pro: boolean;
   size: StreamSize;
   testId?: string;
+  /** Folds as soon as the attempt ends, even while watched (the knowledge research card once answered, 18 §2.1). */
+  foldOnEnd?: boolean;
 };
 
 /**
