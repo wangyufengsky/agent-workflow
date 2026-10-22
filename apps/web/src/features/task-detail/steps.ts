@@ -23,5 +23,6 @@ export function stepsOfPlan(graph: PlanGraph, roles: readonly RoleDTO[]): Canvas
     title: node.title,
     role: roles.find((r) => r.key === node.roleKey)?.name ?? node.roleKey,
     dependsOn: node.dependsOn,
+    description: node.instructions.split('\n')[0] ?? '',
   }));
 }

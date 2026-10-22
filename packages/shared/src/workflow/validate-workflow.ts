@@ -73,16 +73,30 @@ export function validateWorkflowDefinition({ planning, definition }: WorkflowSha
   return problems;
 }
 
-/** Required steps are copied into every AI plan: unique keys, allowed roles, instructions within the limit. */
+/**
+ * Required steps are copied into every AI plan: unique keys, allowed roles, instructions within the limit, and at
+ * most one `first` and one `last` step: two `first` steps would each have to come before the other, so no plan could
+ * satisfy them (REQUIRED_STEP_ORDER, 08 §5.4).
+ */
 function requiredStepProblems({ requiredSteps = [], allowedRoles }: WorkflowDefinition): WorkflowProblem[] {
   const problems: WorkflowProblem[] = [];
   const seen = new Set<string>();
+  const placed = new Set<string>();
   for (const step of requiredSteps) {
     const at = { field: 'requiredSteps', nodeKey: step.key };
     if (seen.has(step.key)) {
       problems.push({ ...at, code: PlanProblemCode.DuplicateKey, message: `Duplicate step key ${step.key}` });
     }
     seen.add(step.key);
+    if (step.position !== undefined && placed.has(step.position)) {
+      problems.push({
+        ...at,
+        code: PlanProblemCode.RequiredStepOrder,
+        message: `Only one required step can be ${step.position}`,
+        details: { position: step.position },
+      });
+    }
+    if (step.position !== undefined) placed.add(step.position);
     if (!allowedRoles.includes(step.roleKey)) {
       problems.push({
         ...at,
