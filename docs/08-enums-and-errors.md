@@ -44,6 +44,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `PlanSource` | `ai` · `template` · `user` |
 | `CheckpointKey` | `confirm_plan`（运行前确认计划）· `accept_each_node`（每个节点人工验收）· `ask_on_uncertainty`（不确定时停下来问） |
 | `AcceptanceCheckKind` | `command`（在 worktree 运行命令，退出码 0 为通过）· `ai_review`（评审角色会话） |
+| `CheckUnrunnableReason` | `not_found`（退出码 127，shell 找不到检查命令点名的程序）· `not_executable`（126，程序没有执行权限）：检查命令在应用环境里无法运行（D116，09 §3） |
 | `TaskEventEntity` | `task` · `node` · `attempt` · `plan` · `delivery`（`task_events.entity`） |
 
 各状态含义与转换见 [09-state-machines.md](09-state-machines.md)。
@@ -385,7 +386,8 @@ class AppError extends Error {
 | `PLAN_INVALID` | 400 | 计划图校验失败；`details.problems[]`，每项 `{ code, nodeKey?, message }`，子码见 5.3 |
 | `NODE_NOT_FOUND` | 404 | |
 | `NODE_NOT_EDITABLE` | 409 | 调整计划时修改了已开始的节点 |
-| `NODE_ATTEMPTS_EXHAUSTED` | — | 节点用完重试预算仍未通过（记录在任务的 `failure` 上，不作为 HTTP 错误）；`details: { nodeKey, nodeTitle, feedback }` |
+| `NODE_ATTEMPTS_EXHAUSTED` | — | 节点用完重试预算仍未通过（记录在任务的 `failure` 上，不作为 HTTP 错误）；`details: { nodeKey, nodeTitle, feedback, command }`，`command` 为最近一次已提交结果未通过的命令检查（可「修改检查命令」，D116），失败在尝试本身或 AI 评审时为 `null` |
+| `CHECK_COMMAND_UNRUNNABLE` | — | 节点的检查命令在应用环境里无法运行（D116，记录在任务的 `failure` 上，不作为 HTTP 错误，不消耗预算）；`details: { nodeKey, nodeTitle, command, program, reason }`，`reason` 为 `CheckUnrunnableReason` |
 | **尝试 / opencode** | | |
 | `ATTEMPT_NOT_FOUND` | 404 | |
 | `ATTEMPT_NO_RESULT` | — | 会话结束但未提交结果（记录在尝试上，不作为 HTTP 错误） |

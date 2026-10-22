@@ -34,7 +34,7 @@ packages/builtin/
 
 项目可设置 `checkCommand`（如 `pnpm test`、`mvn -q test`），添加项目时根据仓库文件推断并预填（`package.json` → 包管理器 + `test` 脚本；`pom.xml` → `mvn -q test`；`build.gradle*` → `./gradlew test`；`go.mod` → `go test ./...`；`pyproject.toml` → `pytest`），用户可改可清空。
 
-流程中验收命令写作 `$PROJECT_CHECK`，计划确认物化节点时替换；项目未设置时该检查被移除（不报错），只保留其他检查。
+流程中验收命令写作 `$PROJECT_CHECK`，计划确认物化节点时替换；项目未设置时该检查被移除（不报错），只保留其他检查。替换后的命令冻结在步骤上，之后改项目的检查命令不影响已确认的计划；任务因检查命令失败后，用户可以「修改检查命令」改写这个任务未完成步骤中的命令（可同时设为项目的检查命令），检查命令在应用环境里无法运行时还可以「跳过这项检查」（D116，09 §3）。
 
 
 ## 2. 内置角色
@@ -56,7 +56,7 @@ packages/builtin/
 | deliverable | `code_changes` |
 | allowedRoles | `developer` `tester` |
 | 规划指引 | 2–8 个节点；先数据/接口后实现后测试；能并行的节点不要串行依赖 |
-| requiredSteps | `final_verify`（position: last）·「整体验证」· tester · 「运行完整检查，修复本任务引入的失败，确认需求每一条都已实现」· acceptance `{ checks: [command $PROJECT_CHECK, ai_review(focus: 需求完整性与正确性)], manual: false }` |
+| requiredSteps | `final_verify`（position: last）·「整体验证」· developer · 「运行完整检查，修复本任务引入的失败，确认需求每一条都已实现」· acceptance `{ checks: [command $PROJECT_CHECK, ai_review(focus: 需求完整性与正确性)], manual: false }` |
 | defaultAcceptance | `{ checks: [command $PROJECT_CHECK], manual: false }` |
 | checkpoints | confirm_plan `false`，accept_each_node `false` |
 
@@ -98,7 +98,7 @@ packages/builtin/
 | deliverable | `code_changes` |
 | allowedRoles | `developer` `tester` |
 | 规划指引 | 行为保持不变；每个节点后测试都应通过；拆成可独立验证的小步 |
-| requiredSteps | `baseline`（position: first）·「建立基线」· tester ·「运行现有测试并记录结果；若重构范围缺少覆盖，先补特征测试」→ `final_verify`（position: last）·「整体验证」· tester · acceptance `[command $PROJECT_CHECK, ai_review(focus: 外部行为是否保持不变)]` |
+| requiredSteps | `baseline`（position: first）·「建立基线」· tester ·「运行现有测试并记录结果；若重构范围缺少覆盖，先补特征测试」→ `final_verify`（position: last）·「整体验证」· developer · acceptance `[command $PROJECT_CHECK, ai_review(focus: 外部行为是否保持不变)]` |
 | defaultAcceptance | `{ checks: [command $PROJECT_CHECK], manual: false }` |
 
 > requiredSteps 的 `position`：`first` 要求其他所有节点（传递地）依赖它；`last` 要求它（传递地）依赖所有其他节点。违反时 `PLAN_INVALID` 子码 `REQUIRED_STEP_ORDER`。

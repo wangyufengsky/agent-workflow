@@ -98,7 +98,7 @@ stateDiagram-v2
 **由节点推导的任务事件**（调度器在每次节点状态变化后判断）：
 
 - `all_nodes_finished`：所有节点 ∈ {`done`, `skipped`}。
-- `fail`（running 阶段）：存在 `failed` 节点 且 没有 `running/verifying/waiting_input` 的节点。一旦存在 `failed` 节点，调度器不再派发新节点。
+- `fail`（running 阶段）：存在 `failed` 节点 且 没有 `running/verifying/waiting_input` 的节点。一旦存在 `failed` 节点，调度器不再派发新节点。失败码：节点的检查命令无法运行 → `CHECK_COMMAND_UNRUNNABLE`，否则 `NODE_ATTEMPTS_EXHAUSTED`（08）。
 - `changes_requested`：用户「让 AI 再改改」或「交给 AI 解决冲突」→ 新建计划版本，追加一个 `revise` 节点（依赖所有叶子节点），确认后回到 `running`。
 - `review_feedback`（21）：已完成的 PR 任务「让 AI 按意见再改改」→ 抓取并快进任务分支、重建 worktree（worktree `restore`）→ 同上追加 `review_fix_<n>` 节点，`completed → running`，`finishedAt` 清空。
 
@@ -135,11 +135,13 @@ stateDiagram-v2
   verifying --> done: checks_passed
   verifying --> ready: checks_failed
   verifying --> failed: checks_failed
+  verifying --> failed: check_unrunnable
   verifying --> ready: interrupted
   verifying --> cancelled: cancel
   awaiting_acceptance --> done: accept
   awaiting_acceptance --> ready: reject
   awaiting_acceptance --> cancelled: cancel
+  failed --> verifying: recheck
   failed --> ready: retry
   failed --> skipped: skip
   failed --> cancelled: cancel
@@ -153,7 +155,10 @@ stateDiagram-v2
 
 | 规则 | 说明 |
 | --- | --- |
-| 预算 | 每个节点最多 `node.maxAttempts` 次 `execute` 尝试；`checks_failed` 与 `attempt_failed` 都消耗预算；`reject`（人工驳回）与 `retry`（用户手动重试）不受预算限制，`retry` 会重置计数 |
+| 预算 | 每个节点最多 `node.maxAttempts` 次 `execute` 尝试；`checks_failed` 与 `attempt_failed` 都消耗预算；`reject`（人工驳回）与 `retry`（用户手动重试）不受预算限制，`retry` 会重置计数；`check_unrunnable` 不消耗（这次尝试退回） |
+| 检查命令无法运行（D116） | 命令检查退出 127 / 126，且输出里 shell 自己的报错行（`<shell>: [line N: \| N: ]<程序>: command not found \| not found \| No such file or directory`，126 为 `Permission denied`）点名的程序是检查命令自己直接运行的（按 `&&` `\|\|` `;` `\|` 分出的每段的第一个词，跳过前置 `NAME=value`）：`verifying → failed`（`check_unrunnable`），不发回 AI（`retryFeedback` 不变）、不消耗预算、后面的检查不再跑；任务照常 `fail`，失败码 `CHECK_COMMAND_UNRUNNABLE`。其他情况（检查命令里的脚本缺依赖、工具自己的报错）仍是 `checks_failed` |
+| 重新检查 | `recheck`（`failed → verifying`）：用这一步已提交的结果重新跑验收，不新建尝试，计数记为 1。任务 `retry` 时，检查命令无法运行的失败步骤走 `recheck`；「修改检查命令」后，最近一次执行尝试已提交结果、未通过命令检查的失败步骤走 `recheck`（11 §5） |
+| 跳过检查 | 「跳过这项检查」给未完成步骤中这条命令检查标 `skipped`：验收时不运行，记一条 `skipped: true, passed: true` 的结果（不挡住步骤），其余检查照常；结果卡与 PR 说明写明未验证 |
 | 重试携带反馈 | 回到 `ready` 时记录 `retryFeedback`（检查失败输出 / 评审问题 / 驳回意见 / 失败原因），下次尝试的提示词附带 |
 | `waiting_input` | 两种来源：会话空闲且有未回答的阻塞问题；opencode 权限请求待处理。等待期间尝试仍是 `running`（不计超时），因此仍可能失败（用户中止 → `attempt_failed`）或中断（运行时消失时待处理的权限请求随之失效 → `interrupted`） |
 | 人工验收 | 节点 `acceptance.manual=true` 或任务开启 `accept_each_node` 时进入 `awaiting_acceptance`，并创建 `acceptance` 类 inbox 条目 |
@@ -161,7 +166,7 @@ stateDiagram-v2
 | 依赖变化 | `deps_unmet`：暂停调整使 `ready` 节点多了未完成的依赖 → `pending` |
 | 重启恢复 | `running`/`verifying` 的节点：其尝试标 `interrupted`，节点回 `ready`（不消耗预算）；等待阻塞问题答案的 `waiting_input` 保持不变（opencode 会话持久化，回答后在同一会话继续）；等待权限的 `waiting_input` 回 `ready`（权限请求随 opencode 进程失效，条目 dismiss） |
 
-**`result_submitted` 的目标选择**：有 `acceptance.checks` → `verifying`；否则需要人工验收 → `awaiting_acceptance`；否则 → `done`。`checks_passed` 同理（需人工验收 → `awaiting_acceptance`，否则 `done`）；`checks_failed` / `attempt_failed` 有预算 → `ready`，无预算 → `failed`；`interrupted`（重启恢复）→ `ready`。
+**`result_submitted` 的目标选择**：有 `acceptance.checks` → `verifying`；否则需要人工验收 → `awaiting_acceptance`；否则 → `done`。`checks_passed` 同理（需人工验收 → `awaiting_acceptance`，否则 `done`）；`checks_failed` / `attempt_failed` 有预算 → `ready`，无预算 → `failed`；`check_unrunnable` → `failed`；`recheck` → `verifying`；`interrupted`（重启恢复）→ `ready`。
 
 **`verifying`** 依次执行检查：`command` 在 worktree 中运行（超时 `ACCEPTANCE_COMMAND_TIMEOUT_MS`）；`ai_review` 创建 `review` 类尝试，`submit_review` 返回 `pass/fail`。任一失败即 `checks_failed`。
 

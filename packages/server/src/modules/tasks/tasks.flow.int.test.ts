@@ -118,7 +118,7 @@ describe('任务主链路（新功能开发，简单模式）', () => {
       expect(session?.permission).toContainEqual({ permission: 'bash', pattern: 'test -f greet.ts*', action: 'allow' });
     }
     const verify = t.fake.prompts.find((p) => p.text.includes('Your step: 整体验证'));
-    expect(verify?.system).toContain('Role: tester');
+    expect(verify?.system).toContain('Role: developer');
     const timeline = (await t.call(getTaskTimelineOp, { id: task.id })).body.items;
     expect(timeline.filter((e) => e.entity === 'task').map((e) => e.toStatus)).toEqual([
       'preparing',
