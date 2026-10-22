@@ -244,7 +244,18 @@ async function seed(request: APIRequestContext): Promise<Seed> {
           "import { toLocal } from './time';\n\ntest('formats in UTC whatever the server time zone is', () => expect(toLocal(1700000000000)).toBe('2023-11-14T22:13:20.000Z'));\n",
       },
       { type: 'tool', tool: 'bash', input: { command: 'pnpm test' } },
-      submitResult('统一按 UTC 换算，并补充了 `toLocal` 的说明。'),
+      {
+        type: 'callTool',
+        name: 'submit_result',
+        args: {
+          summary: '统一按 UTC 换算，并补充了 `toLocal` 的说明。',
+          // The drawer's「改动」lists these, each path above what changed (14 §3.4).
+          changes: [
+            { path: file, description: '改用 `toISOString()`，不再依赖服务器本地时区' },
+            { path: file.replace(/\.ts$/, '.test.ts'), description: '新增测试：在任何时区下都输出 UTC 时间' },
+          ],
+        },
+      },
     ]);
     await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
   };
