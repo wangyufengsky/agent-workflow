@@ -60,7 +60,7 @@ describe('检查命令', () => {
     expect(result.output.trim()).toBe('checked');
   });
 
-  it('真实 shell 找不到检查命令点名的程序时，结果标明无法运行（D115）', async () => {
+  it('真实 shell 找不到检查命令点名的程序时，结果标明无法运行（D116）', async () => {
     const result = await service().runCommand(dir, 'aw-no-such-tool -q test', new AbortController().signal);
     expect(result).toMatchObject({
       passed: false,

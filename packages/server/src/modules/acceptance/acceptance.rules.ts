@@ -27,7 +27,7 @@ function programsOf(command: string): Set<string> {
 }
 
 /**
- * Whether the app's environment could not run a check command (D115): the shell exited 127 or 126 and its own error
+ * Whether the app's environment could not run a check command (D116): the shell exited 127 or 126 and its own error
  * line (`<shell>: [line N: |N: ]<program>: <message>`; the shell's name differs by platform) names a program the command line itself runs. Anything else is
  * an ordinary failing check, for the model to fix (a dependency the project's own scripts miss, a tool's own error).
  */

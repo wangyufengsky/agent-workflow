@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { unrunnableOf } from './acceptance.rules.ts';
 
-describe('检查命令无法运行的判定（D115）', () => {
+describe('检查命令无法运行的判定（D116）', () => {
   it.each([
     ['mvn -q test', 127, '/bin/sh: mvn: command not found', 'mvn'],
     ['mvn -q test', 127, '/bin/sh: 1: mvn: not found', 'mvn'],

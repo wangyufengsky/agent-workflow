@@ -206,7 +206,7 @@ export const useCancelTask = () => useTaskMutation((id: string) => callOperation
 export const useRetryTask = () => useTaskMutation((id: string) => callOperation(retryTaskOp, { id }));
 export const useSkipCheck = () => useTaskMutation((id: string) => callOperation(skipCheckOp, { id }));
 
-/** The new check command may become the project's too (D115). */
+/** The new check command may become the project's too (D116). */
 export function useUpdateCheckCommand() {
   const queryClient = useQueryClient();
   return useMutation({

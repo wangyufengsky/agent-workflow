@@ -13,7 +13,7 @@ import styles from './task-page.module.css';
 
 /**
  * Failed task (14 §3.3): which phase or step, why in the user's words, technical details folded; retry, which checks
- * again when the check command could not run, and the ways out of a failing check command (D115). The only place the
+ * again when the check command could not run, and the ways out of a failing check command (D116). The only place the
  * task page shows the failure: its inbox item is left out of the side panel.
  */
 export function FailurePanel({ task }: { task: TaskDetailDTO }) {

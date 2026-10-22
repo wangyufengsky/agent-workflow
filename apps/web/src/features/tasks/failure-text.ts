@@ -5,7 +5,7 @@ import { TASK_COPY } from '../../copy/tasks.ts';
 
 /**
  * `details` of `NODE_ATTEMPTS_EXHAUSTED` (08): the step that ran out of attempts, its last check feedback and the
- * command check it failed on (failures recorded before D115 have none).
+ * command check it failed on (failures recorded before D116 have none).
  */
 const exhaustedSchema = z.object({
   nodeTitle: z.string(),
@@ -13,7 +13,7 @@ const exhaustedSchema = z.object({
   command: z.string().nullable().default(null),
 });
 
-/** `details` of `CHECK_COMMAND_UNRUNNABLE` (08, D115). */
+/** `details` of `CHECK_COMMAND_UNRUNNABLE` (08, D116). */
 const unrunnableSchema = z.object({
   nodeTitle: z.string(),
   command: z.string(),
@@ -27,7 +27,7 @@ export const exhaustedDetails = (error: ErrorInfo) =>
 export const unrunnableDetails = (error: ErrorInfo) =>
   error.code === ErrorCode.CheckCommandUnrunnable ? unrunnableSchema.parse(error.details) : undefined;
 
-/** The check command a failed task stopped on, which the user may change (D115); null when it failed otherwise. */
+/** The check command a failed task stopped on, which the user may change (D116); null when it failed otherwise. */
 export const failedCommandOf = (error: ErrorInfo): string | null =>
   unrunnableDetails(error)?.command ?? exhaustedDetails(error)?.command ?? null;
 

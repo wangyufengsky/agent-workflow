@@ -16,7 +16,7 @@ type CommandCheck = Extract<NodeAcceptance['checks'][number], { kind: typeof Acc
 const UNFINISHED: readonly NodeStatus[] = [NodeStatus.Pending, NodeStatus.Ready, NodeStatus.Failed];
 
 /**
- * A failed task's ways out when a check command stopped it (D115): replace the command, or skip it when the app's
+ * A failed task's ways out when a check command stopped it (D116): replace the command, or skip it when the app's
  * environment cannot run it, in the task's unfinished steps (their acceptance was frozen when the plan was
  * confirmed, 13 §1); then the task goes on and the submitted results are checked again.
  */

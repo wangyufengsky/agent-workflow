@@ -20,7 +20,7 @@ import { NodeBadge } from '../tasks/task-badge.tsx';
 import { nodeDiffFileQuery, nodeDiffQuery, nodeQuery } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
 
-/** A check's outcome; a command check may also have been skipped, or not run in the app's environment (D115). */
+/** A check's outcome; a command check may also have been skipped, or not run in the app's environment (D116). */
 function checkBadge(check: CheckResult): { tone: StatusTone; label: string } {
   if (check.kind === AcceptanceCheckKind.Command && check.skipped) return { tone: 'warn', label: C.checkSkipped };
   if (check.kind === AcceptanceCheckKind.Command && check.unrunnable !== null)

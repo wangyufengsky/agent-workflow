@@ -23,7 +23,7 @@ import type { createNodesRepo, Node, NodeChanges } from './nodes.repo.ts';
 import { feedbackFromAttempt, feedbackFromChecks, feedbackFromRejection, nextAfterFailure } from './nodes.rules.ts';
 import type { NodeRunContext, NodesServiceDeps } from './nodes.types.ts';
 
-/** A check command the app's environment could not run, and why (D115). */
+/** A check command the app's environment could not run, and why (D116). */
 export type UnrunnableCheck = { command: string; program: string; reason: CheckUnrunnableReason };
 
 type NodeState = {
@@ -76,7 +76,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
 
   const doneChanges = (sha: string | null): NodeChanges => ({ commitSha: sha, finishedAt: clock.now() });
 
-  /** A check the user skipped after it could not run (D115): not run, and it does not hold the step back. */
+  /** A check the user skipped after it could not run (D116): not run, and it does not hold the step back. */
   const skippedResult = (command: string): CheckResult => ({
     kind: AcceptanceCheckKind.Command,
     command,
@@ -154,7 +154,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     // Cancelled (or otherwise moved on) while the checks ran.
     if (node.status !== NodeStatus.Verifying) return;
     if (results.some((r) => r.kind === AcceptanceCheckKind.Command && r.unrunnable !== null)) {
-      // The environment, not the model, failed: no feedback, and the attempt does not count (D115).
+      // The environment, not the model, failed: no feedback, and the attempt does not count (D116).
       move(node, NodeEvent.CheckUnrunnable, NodeStatus.Failed, {
         checkResults: results,
         attemptCount: Math.max(0, node.attemptCount - 1),
@@ -196,7 +196,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
   });
 
   /**
-   * The failing command check a failed step stopped on, when its last attempt submitted a result (D115): null when the
+   * The failing command check a failed step stopped on, when its last attempt submitted a result (D116): null when the
    * step failed in its attempt or on another kind of check.
    */
   function failedCommand(node: Node): CommandCheckResult | null {
@@ -315,7 +315,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     },
 
     /**
-     * The checks run again on the step's submitted result, with a fresh budget and without another attempt (D115).
+     * The checks run again on the step's submitted result, with a fresh budget and without another attempt (D116).
      * Verification starts once the surrounding transaction commits.
      */
     recheck(nodeId: string, ctx: NodeRunContext): Node {
@@ -326,7 +326,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
 
     failedCommand,
 
-    /** The check command a failed step stopped on because the environment could not run it (D115). */
+    /** The check command a failed step stopped on because the environment could not run it (D116). */
     unrunnableCheck(node: Node): UnrunnableCheck | null {
       const check = failedCommand(node);
       if (check === null || check.unrunnable === null) return null;

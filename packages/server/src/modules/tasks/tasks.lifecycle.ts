@@ -514,7 +514,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
     /**
      * Continue a failed task from its failed phase (09 §2); failed nodes get a fresh budget. The failed nodes `recheck`
      * picks have their submitted result checked again instead of another attempt: by default, those whose check
-     * command could not run (D115).
+     * command could not run (D116).
      */
     retry(taskId: string, recheck: (node: Node) => boolean = (node) => nodes.unrunnableCheck(node) !== null): void {
       const task = get(taskId);

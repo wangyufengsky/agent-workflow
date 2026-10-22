@@ -151,7 +151,7 @@ type Acceptance = {
 | branch | TEXT NULL | |
 | merge_source | TEXT NULL | 合并任务的来源（27 §3.6，迁移 `0015_git_workbench`）：worktree 从它建出，准备阶段把 `base_branch` 合并进来 |
 | current_plan_id | TEXT NULL | 当前生效（confirmed）版本（无外键：plans 引用 tasks，两张表不能互相引用，D43） |
-| result | TEXT(JSON) NULL | 结果卡数据 `TaskResultDTO`：`{ summary, filesChanged, insertions, deletions, files[], checks[], nodeSummaries[], assumptions[] }`（`checks[]` 每项 `{ nodeKey, nodeTitle, kind, passed, command, skipped }`，`command` 只有命令检查有，`skipped` 为用户跳过的检查，D115）（进入 `review` 时生成） |
+| result | TEXT(JSON) NULL | 结果卡数据 `TaskResultDTO`：`{ summary, filesChanged, insertions, deletions, files[], checks[], nodeSummaries[], assumptions[] }`（`checks[]` 每项 `{ nodeKey, nodeTitle, kind, passed, command, skipped }`，`command` 只有命令检查有，`skipped` 为用户跳过的检查，D116）（进入 `review` 时生成） |
 | created_at / updated_at / started_at / finished_at | INTEGER | |
 
 索引：`(project_id, status)`、`(status, updated_at)`。
@@ -200,13 +200,13 @@ type Acceptance = {
 | role_id | TEXT → roles | |
 | instructions | TEXT | |
 | depends_on | TEXT(JSON) | node key 列表 |
-| acceptance | TEXT(JSON) | 解析后的 `Acceptance`（`NodeAcceptance`）：计划确认时冻结（13 §1）；用户可在任务失败后改写其中的命令检查，或给无法运行的命令检查标 `skipped: true`（D115） |
+| acceptance | TEXT(JSON) | 解析后的 `Acceptance`（`NodeAcceptance`）：计划确认时冻结（13 §1）；用户可在任务失败后改写其中的命令检查，或给无法运行的命令检查标 `skipped: true`（D116） |
 | kind | TEXT | `normal` / `revise` |
 | status | TEXT | `NodeStatus` |
 | attempt_count | INTEGER | 消耗的预算 |
 | retry_feedback | TEXT NULL | 下次尝试附带 |
 | result | TEXT(JSON) NULL | 最近一次 `submit_result` 内容 |
-| check_results | TEXT(JSON) NULL | `CheckResult[]`：命令检查 `{ kind: command, command, passed, output, exitCode, timedOut, unrunnable, skipped }`（输出保留末尾 `ACCEPTANCE_OUTPUT_MAX_CHARS`；`unrunnable: { program, reason } | null` 为应用环境无法运行，`skipped` 为用户跳过、未运行且不挡住步骤（`passed` 为 true），D115；之前写入的行没有这两项，读出为 `null` / `false`）；AI 评审 `{ kind: ai_review, focus, passed, output, attemptId, issues[] }` |
+| check_results | TEXT(JSON) NULL | `CheckResult[]`：命令检查 `{ kind: command, command, passed, output, exitCode, timedOut, unrunnable, skipped }`（输出保留末尾 `ACCEPTANCE_OUTPUT_MAX_CHARS`；`unrunnable: { program, reason } | null` 为应用环境无法运行，`skipped` 为用户跳过、未运行且不挡住步骤（`passed` 为 true），D116；之前写入的行没有这两项，读出为 `null` / `false`）；AI 评审 `{ kind: ai_review, focus, passed, output, attemptId, issues[] }` |
 | commit_sha | TEXT NULL | |
 | position | INTEGER | 画布与列表排序 |
 | created_at / updated_at / started_at / finished_at | INTEGER | |

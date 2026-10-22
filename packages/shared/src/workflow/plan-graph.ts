@@ -18,7 +18,7 @@ export type Acceptance = z.infer<typeof acceptanceSchema>;
 
 /**
  * A node's acceptance as it runs (10 §nodes `acceptance`): the plan's, resolved (13 §1). A command check the user
- * skipped after it could not run stays, marked `skipped` (D115); plans never carry the mark.
+ * skipped after it could not run stays, marked `skipped` (D116); plans never carry the mark.
  */
 export const nodeAcceptanceSchema = z.object({
   checks: z.array(

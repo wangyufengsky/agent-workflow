@@ -103,7 +103,7 @@ export const AcceptanceCheckKind = {
 export type AcceptanceCheckKind = (typeof AcceptanceCheckKind)[keyof typeof AcceptanceCheckKind];
 export const acceptanceCheckKindSchema = z.enum(AcceptanceCheckKind);
 
-/** Why a check command could not run in the app's environment (D115): its program is missing or not executable. */
+/** Why a check command could not run in the app's environment (D116): its program is missing or not executable. */
 export const CheckUnrunnableReason = {
   NotFound: 'not_found',
   NotExecutable: 'not_executable',

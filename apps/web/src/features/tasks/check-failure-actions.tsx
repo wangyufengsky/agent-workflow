@@ -13,7 +13,7 @@ import { failedCommandOf, unrunnableDetails } from './failure-text.ts';
 import { taskQuery, useSkipCheck, useUpdateCheckCommand } from './tasks.queries.ts';
 
 /**
- * A failed task's ways out besides retrying when a check command stopped it (D115): change the command, or skip it
+ * A failed task's ways out besides retrying when a check command stopped it (D116): change the command, or skip it
  * when the app's environment could not run it. The task page and the inbox card offer the same.
  */
 export function CheckFailureActions({ taskId, error, size }: { taskId: string; error: ErrorInfo; size?: 'sm' }) {
@@ -52,7 +52,7 @@ function EditCheckDialog({ taskId, command, onClose }: { taskId: string; command
 
 /**
  * Prefilled with the project's check command when it differs from the failed one (the user already changed the
- * project), otherwise with the failed command; becoming the project's by default when the failed one was (D115).
+ * project), otherwise with the failed command; becoming the project's by default when the failed one was (D116).
  */
 function EditCheckForm({
   taskId,

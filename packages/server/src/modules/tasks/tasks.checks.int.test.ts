@@ -45,7 +45,7 @@ const fixNode = (task: TaskDetailDTO) => {
 };
 const fixSessions = () => t.fake.sessions.filter((s) => s.agent === 'aw-executor' && s.title.endsWith('· 修复'));
 
-describe('检查命令因环境无法运行（D115）', () => {
+describe('检查命令因环境无法运行（D116）', () => {
   it('不发回 AI、不消耗次数，任务停下说明原因；环境修好后重试只重新检查，不重跑 AI', async () => {
     const task = await failsOnCheck('./check.sh');
     expect(task).toMatchObject({

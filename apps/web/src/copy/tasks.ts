@@ -116,7 +116,7 @@ export const TASK_COPY = {
   failedStep: (title: string) => `执行步骤「${title}」时多次尝试仍没有完成。`,
   retry: '重试',
   retried: '已重新开始',
-  // 检查命令无法运行（D115）
+  // 检查命令无法运行（D116）
   unrunnable: (step: string, command: string, program: string, reason: CheckUnrunnableReason) =>
     `步骤「${step}」的检查命令 \`${command}\` ${
       reason === CheckUnrunnableReason.NotFound

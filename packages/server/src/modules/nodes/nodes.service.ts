@@ -218,7 +218,7 @@ export function createNodesService(deps: NodesServiceDeps) {
       for (const node of touched) publish(node);
     },
 
-    /** The task's checks changed by the user (D115): a step's acceptance, which no transition touches. */
+    /** The task's checks changed by the user (D116): a step's acceptance, which no transition touches. */
     setAcceptance(nodeId: string, acceptance: NodeAcceptance): void {
       repo.setAcceptance(nodeId, acceptance, clock.now());
     },

@@ -17,7 +17,7 @@ describe('操作清单的标注（M5-10）', () => {
     expect(declared).toEqual(secrets);
   });
 
-  it('删除、取消、合并、推送类操作与跳过检查是 critical（D27、D108、D115）', () => {
+  it('删除、取消、合并、推送类操作与跳过检查是 critical（D27、D108、D116）', () => {
     const critical = OPERATION_CONTRACTS.filter((op) => op.risk === OperationRisk.Critical).map((op) => op.id);
     expect(critical.sort()).toEqual(
       [

@@ -100,7 +100,7 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
     },
 
     /**
-     * `fail` in running: a node used up its budget, or its check command could not run (D115), and nothing else is
+     * `fail` in running: a node used up its budget, or its check command could not run (D116), and nothing else is
      * still working (09 §2).
      */
     failRunning(taskId: string): void {

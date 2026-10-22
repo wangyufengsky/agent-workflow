@@ -121,7 +121,7 @@ export function createNodesRepo(db: DbExecutor) {
         .where(eq(t.id, id))
         .run();
     },
-    /** A user's change to a step's checks (D115); not part of the state machine. */
+    /** A user's change to a step's checks (D116); not part of the state machine. */
     setAcceptance(id: string, acceptance: NodeAcceptance, updatedAt: number): void {
       db.update(t)
         .set({ acceptance: JSON.stringify(acceptance), updatedAt })

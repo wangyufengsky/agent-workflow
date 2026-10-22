@@ -66,9 +66,9 @@ export const checkResultSchema = z.discriminatedUnion('kind', [
     /** Null when the command did not exit by itself (timeout). */
     exitCode: z.number().nullable(),
     timedOut: z.boolean(),
-    /** The app's environment could not run the command's program (D115); null for a check that ran. */
+    /** The app's environment could not run the command's program (D116); null for a check that ran. */
     unrunnable: z.object({ program: z.string(), reason: checkUnrunnableReasonSchema }).nullable().default(null),
-    /** The user skipped the check after it could not run (D115): not run, does not hold the step back. */
+    /** The user skipped the check after it could not run (D116): not run, does not hold the step back. */
     skipped: z.boolean().default(false),
   }),
   z.object({
@@ -153,9 +153,9 @@ export const taskResultSchema = z.object({
       nodeTitle: z.string(),
       kind: acceptanceCheckKindSchema,
       passed: z.boolean(),
-      /** A command check's command (results written before D115 have none). */
+      /** A command check's command (results written before D116 have none). */
       command: z.string().nullable().default(null),
-      /** Skipped by the user, so not verified (D115). */
+      /** Skipped by the user, so not verified (D116). */
       skipped: z.boolean().default(false),
     }),
   ),

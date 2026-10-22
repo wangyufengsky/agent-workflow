@@ -106,7 +106,7 @@ export function createAcceptanceService({
     /**
      * Runs the command in the worktree; exit code 0 within ACCEPTANCE_COMMAND_TIMEOUT_MS passes. A timeout or the
      * signal ends the command with everything it started (D73). A command the environment cannot run is told apart
-     * (`unrunnable`, D115).
+     * (`unrunnable`, D116).
      */
     async runCommand(directory: string, command: string, signal: AbortSignal): Promise<CommandCheckResult> {
       const child = execa(command, {

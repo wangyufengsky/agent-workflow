@@ -90,7 +90,7 @@ function PullRequestForm({
   pending: boolean;
 }) {
   const [title, setTitle] = useState(task.title);
-  // A reviewer on the platform does not see the result card: unverified checks are said in the body too (D115).
+  // A reviewer on the platform does not see the result card: unverified checks are said in the body too (D116).
   const [body, setBody] = useState(() => {
     if (task.result === null) return '';
     const skipped = skippedCommands(task.result);

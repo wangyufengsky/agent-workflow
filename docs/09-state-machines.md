@@ -156,7 +156,7 @@ stateDiagram-v2
 | 规则 | 说明 |
 | --- | --- |
 | 预算 | 每个节点最多 `node.maxAttempts` 次 `execute` 尝试；`checks_failed` 与 `attempt_failed` 都消耗预算；`reject`（人工驳回）与 `retry`（用户手动重试）不受预算限制，`retry` 会重置计数；`check_unrunnable` 不消耗（这次尝试退回） |
-| 检查命令无法运行（D115） | 命令检查退出 127 / 126，且输出里 shell 自己的报错行（`<shell>: [line N: \| N: ]<程序>: command not found \| not found \| No such file or directory`，126 为 `Permission denied`）点名的程序是检查命令自己直接运行的（按 `&&` `\|\|` `;` `\|` 分出的每段的第一个词，跳过前置 `NAME=value`）：`verifying → failed`（`check_unrunnable`），不发回 AI（`retryFeedback` 不变）、不消耗预算、后面的检查不再跑；任务照常 `fail`，失败码 `CHECK_COMMAND_UNRUNNABLE`。其他情况（检查命令里的脚本缺依赖、工具自己的报错）仍是 `checks_failed` |
+| 检查命令无法运行（D116） | 命令检查退出 127 / 126，且输出里 shell 自己的报错行（`<shell>: [line N: \| N: ]<程序>: command not found \| not found \| No such file or directory`，126 为 `Permission denied`）点名的程序是检查命令自己直接运行的（按 `&&` `\|\|` `;` `\|` 分出的每段的第一个词，跳过前置 `NAME=value`）：`verifying → failed`（`check_unrunnable`），不发回 AI（`retryFeedback` 不变）、不消耗预算、后面的检查不再跑；任务照常 `fail`，失败码 `CHECK_COMMAND_UNRUNNABLE`。其他情况（检查命令里的脚本缺依赖、工具自己的报错）仍是 `checks_failed` |
 | 重新检查 | `recheck`（`failed → verifying`）：用这一步已提交的结果重新跑验收，不新建尝试，计数记为 1。任务 `retry` 时，检查命令无法运行的失败步骤走 `recheck`；「修改检查命令」后，最近一次执行尝试已提交结果、未通过命令检查的失败步骤走 `recheck`（11 §5） |
 | 跳过检查 | 「跳过这项检查」给未完成步骤中这条命令检查标 `skipped`：验收时不运行，记一条 `skipped: true, passed: true` 的结果（不挡住步骤），其余检查照常；结果卡与 PR 说明写明未验证 |
 | 重试携带反馈 | 回到 `ready` 时记录 `retryFeedback`（检查失败输出 / 评审问题 / 驳回意见 / 失败原因），下次尝试的提示词附带 |
