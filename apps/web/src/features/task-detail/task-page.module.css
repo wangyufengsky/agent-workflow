@@ -175,6 +175,18 @@
   font-size: 13px;
 }
 
+/* A step's listed change: the path, which may be long and unbroken, then what changed below it. */
+.change {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.changePath {
+  overflow-wrap: anywhere;
+}
+
 .fileLink {
   text-align: left;
   color: var(--ink-2);

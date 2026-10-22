@@ -131,8 +131,8 @@ export function Changes({ node }: { node: NodeDetailDTO }) {
       {changes.length > 0 && (
         <ul className={styles.files}>
           {changes.map((c) => (
-            <li key={c.path} className={styles.file}>
-              <span className="mono">{c.path}</span>
+            <li key={c.path} className={styles.change}>
+              <span className={`mono ${styles.changePath}`}>{c.path}</span>
               <span className="hint">
                 <Markdown inline source={c.description} />
               </span>
