@@ -1,4 +1,4 @@
-import { InboxKind, NodeStatus, TaskDisplayGroup } from '@aw/shared';
+import { CheckUnrunnableReason, InboxKind, NodeStatus, TaskDisplayGroup } from '@aw/shared';
 
 export const TASK_DISPLAY_LABEL: Record<TaskDisplayGroup, string> = {
   [TaskDisplayGroup.Preparing]: '准备中',
@@ -116,11 +116,36 @@ export const TASK_COPY = {
   failedStep: (title: string) => `执行步骤「${title}」时多次尝试仍没有完成。`,
   retry: '重试',
   retried: '已重新开始',
+  // 检查命令无法运行（D115）
+  unrunnable: (step: string, command: string, program: string, reason: CheckUnrunnableReason) =>
+    `步骤「${step}」的检查命令 \`${command}\` ${
+      reason === CheckUnrunnableReason.NotFound
+        ? `在应用环境里找不到程序 \`${program}\``
+        : `里的程序 \`${program}\` 没有执行权限`
+    }。这不是 AI 的问题：代码没有被判为不通过，AI 也没有重做。`,
+  recheck: '重新检查',
+  rechecked: '正在重新检查',
+  editCheck: '修改检查命令…',
+  editCheckTitle: '修改检查命令',
+  editCheckBody: '这个任务里还没完成的步骤都改用新命令，然后用 AI 已经交的结果重新检查。',
+  editCheckField: '检查命令',
+  editCheckProject: '同时设为项目的检查命令',
+  editCheckSave: '保存并重新检查',
+  skipCheck: '跳过这项检查…',
+  skipCheckTitle: '跳过这项检查',
+  skipCheckBody: (command: string) =>
+    `跳过后，这个任务之后的步骤都不再运行 \`${command}\`，结果标为「未验证」。合并前请自己确认代码能通过检查。`,
+  skipCheckConfirm: '跳过并继续',
+  checkSkipped: '已跳过这项检查',
   // 结果卡
   resultHeadline: (steps: number, files: number, add: number, del: number) =>
     `已完成 ${steps} 个步骤 · 改动 ${files} 个文件 +${add} −${del}`,
   checksPassed: '检查全部通过',
   checksFailed: (n: number) => `${n} 项检查未通过`,
+  checksSkipped: (n: number, commands: readonly string[]) =>
+    `有 ${n} 项检查没有运行：${commands.map((c) => `\`${c}\``).join('、')}（已跳过）`,
+  prUnverified: (commands: readonly string[]) =>
+    `未验证：应用环境无法运行检查 ${commands.map((c) => `\`${c}\``).join('、')}，已跳过。`,
   noChecks: '没有自动检查',
   summary: '摘要',
   changedFiles: '改动文件',
@@ -153,6 +178,10 @@ export const NODE_COPY = {
   checks: '检查',
   checkPassed: '通过',
   checkFailed: '未通过',
+  checkSkipped: '已跳过',
+  checkUnrunnable: '无法运行',
+  unrunnableHint: (program: string, reason: CheckUnrunnableReason) =>
+    reason === CheckUnrunnableReason.NotFound ? `找不到程序 ${program}` : `程序 ${program} 没有执行权限`,
   commandCheck: (command: string) => `运行 ${command}`,
   reviewCheck: 'AI 评审',
   timedOut: '超时',

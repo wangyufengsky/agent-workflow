@@ -33,6 +33,7 @@ import {
   WorktreeStatus,
 } from '@aw/shared';
 import { branchExists, hasMergeHead } from '../git/index.ts';
+import type { Node } from '../nodes/index.ts';
 import { planGraphFromSubmission, validateSubmission } from '../plans/index.ts';
 import type { Worktree } from '../worktrees/index.ts';
 import { mergeIntoWorktree } from './tasks.changes.ts';
@@ -510,16 +511,22 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       }
     },
 
-    /** Continue a failed task from its failed phase (09 §2); failed nodes get a fresh budget. */
-    retry(taskId: string): void {
+    /**
+     * Continue a failed task from its failed phase (09 §2); failed nodes get a fresh budget. The failed nodes `recheck`
+     * picks have their submitted result checked again instead of another attempt: by default, those whose check
+     * command could not run (D115).
+     */
+    retry(taskId: string, recheck: (node: Node) => boolean = (node) => nodes.unrunnableCheck(node) !== null): void {
       const task = get(taskId);
       if (task.failedPhase === null) throw new Error(`Failed task ${taskId} has no failed phase`);
       const target = RETRY_TARGET[task.failedPhase];
       unit.transact(() => {
-        move(task, TaskEvent.Retry, target, { failedPhase: null, failure: null, finishedAt: null });
+        const retried = move(task, TaskEvent.Retry, target, { failedPhase: null, failure: null, finishedAt: null });
         if (target === TaskStatus.Running) {
-          for (const node of nodes.listByTask(taskId).filter((n) => n.status === NodeStatus.Failed))
-            nodes.retry(node.id);
+          for (const node of nodes.listByTask(taskId).filter((n) => n.status === NodeStatus.Failed)) {
+            if (recheck(node)) nodes.recheck(node.id, state.runContext(retried));
+            else nodes.retry(node.id);
+          }
         }
         inbox.resolveOpen({ taskId, kind: InboxKind.Failure }, { action: FailureAction.Retry });
       });

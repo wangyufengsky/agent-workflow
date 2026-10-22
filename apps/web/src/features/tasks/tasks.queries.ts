@@ -36,6 +36,7 @@ import {
   reviewCommentsOp,
   reviseFromReviewOp,
   saveDraftPlanOp,
+  skipCheckOp,
   skipNodeOp,
   startTaskOp,
   type TaskDetailDTO,
@@ -45,6 +46,7 @@ import {
   taskDiffOp,
   type UpdateRoleRequest,
   type UpdateWorkflowRequest,
+  updateCheckCommandOp,
   updateRoleOp,
   updateWorkflowOp,
 } from '@aw/shared';
@@ -202,6 +204,21 @@ function useTaskMutation<I>(run: (input: I) => Promise<TaskDetailDTO>) {
 export const useCreateTask = () => useTaskMutation((input: CreateTaskRequest) => callOperation(createTaskOp, input));
 export const useCancelTask = () => useTaskMutation((id: string) => callOperation(cancelTaskOp, { id }));
 export const useRetryTask = () => useTaskMutation((id: string) => callOperation(retryTaskOp, { id }));
+export const useSkipCheck = () => useTaskMutation((id: string) => callOperation(skipCheckOp, { id }));
+
+/** The new check command may become the project's too (D115). */
+export function useUpdateCheckCommand() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; command: string; updateProject: boolean }) =>
+      callOperation(updateCheckCommandOp, input),
+    onSuccess: async (task, input) => {
+      queryClient.setQueryData(queryKeys.task(task.id), task);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.taskLists });
+      if (input.updateProject) await queryClient.invalidateQueries({ queryKey: queryKeys.project(task.project.id) });
+    },
+  });
+}
 export const useConfirmPlan = () =>
   useTaskMutation((input: { id: string; version: number }) => callOperation(confirmPlanOp, input));
 export const useDeliver = () => useTaskMutation((input: DeliverRequest) => callOperation(deliverTaskOp, input));

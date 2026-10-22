@@ -6,6 +6,7 @@ import {
   AttemptKind,
   AttemptStatus,
   type CheckResult,
+  type CheckUnrunnableReason,
   ErrorCode,
   InboxKind,
   NodeEvent,
@@ -15,11 +16,15 @@ import {
   type SubmitResultInput,
   transition,
 } from '@aw/shared';
+import type { CommandCheckResult } from '../acceptance/index.ts';
 import type { Attempt } from '../attempts/index.ts';
 import { BACKEND_COMMITTER, hasMergeHead, runGit } from '../git/index.ts';
 import type { createNodesRepo, Node, NodeChanges } from './nodes.repo.ts';
 import { feedbackFromAttempt, feedbackFromChecks, feedbackFromRejection, nextAfterFailure } from './nodes.rules.ts';
 import type { NodeRunContext, NodesServiceDeps } from './nodes.types.ts';
+
+/** A check command the app's environment could not run, and why (D115). */
+export type UnrunnableCheck = { command: string; program: string; reason: CheckUnrunnableReason };
 
 type NodeState = {
   repo: ReturnType<typeof createNodesRepo>;
@@ -71,6 +76,18 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
 
   const doneChanges = (sha: string | null): NodeChanges => ({ commitSha: sha, finishedAt: clock.now() });
 
+  /** A check the user skipped after it could not run (D115): not run, and it does not hold the step back. */
+  const skippedResult = (command: string): CheckResult => ({
+    kind: AcceptanceCheckKind.Command,
+    command,
+    passed: true,
+    output: '',
+    exitCode: null,
+    timedOut: false,
+    unrunnable: null,
+    skipped: true,
+  });
+
   function requestAcceptance(node: Node): void {
     inbox.create({
       kind: InboxKind.Acceptance,
@@ -91,7 +108,11 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
       const results: CheckResult[] = [];
       for (const check of node.acceptance.checks) {
         if (check.kind === AcceptanceCheckKind.Command) {
-          results.push(await acceptance.runCommand(ctx.directory, check.command, controller.signal));
+          results.push(
+            check.skipped === true
+              ? skippedResult(check.command)
+              : await acceptance.runCommand(ctx.directory, check.command, controller.signal),
+          );
         } else {
           const outcome = await acceptance.review(
             {
@@ -132,6 +153,15 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     const node = get(nodeId);
     // Cancelled (or otherwise moved on) while the checks ran.
     if (node.status !== NodeStatus.Verifying) return;
+    if (results.some((r) => r.kind === AcceptanceCheckKind.Command && r.unrunnable !== null)) {
+      // The environment, not the model, failed: no feedback, and the attempt does not count (D115).
+      move(node, NodeEvent.CheckUnrunnable, NodeStatus.Failed, {
+        checkResults: results,
+        attemptCount: Math.max(0, node.attemptCount - 1),
+        finishedAt: clock.now(),
+      });
+      return;
+    }
     if (!results.every((r) => r.passed)) {
       fail(node, NodeEvent.ChecksFailed, feedbackFromChecks(results), { checkResults: results });
       return;
@@ -164,6 +194,18 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     else if (type === 'input_answered' && node.status === NodeStatus.WaitingInput) move(node, NodeEvent.InputAnswered);
     else if (type === 'ended') onAttemptEnded(node, attempt);
   });
+
+  /**
+   * The failing command check a failed step stopped on, when its last attempt submitted a result (D115): null when the
+   * step failed in its attempt or on another kind of check.
+   */
+  function failedCommand(node: Node): CommandCheckResult | null {
+    if (node.status !== NodeStatus.Failed) return null;
+    const last = attempts.listByNode(node.id).findLast((a) => a.kind === AttemptKind.Execute);
+    if (last?.status !== AttemptStatus.Succeeded) return null;
+    const failed = node.checkResults?.find((r) => !r.passed);
+    return failed?.kind === AcceptanceCheckKind.Command ? failed : null;
+  }
 
   /** Work started by a call that does not wait for it; an unexpected failure is logged with the node. */
   const inBackground = (nodeId: string, work: () => Promise<void>): void => {
@@ -270,6 +312,25 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         retryFeedback: feedback === undefined ? node.retryFeedback : feedbackFromRejection(feedback),
         finishedAt: null,
       });
+    },
+
+    /**
+     * The checks run again on the step's submitted result, with a fresh budget and without another attempt (D115).
+     * Verification starts once the surrounding transaction commits.
+     */
+    recheck(nodeId: string, ctx: NodeRunContext): Node {
+      const node = move(get(nodeId), NodeEvent.Recheck, NodeStatus.Verifying, { attemptCount: 1, finishedAt: null });
+      unit.afterCommit(() => inBackground(nodeId, () => verify(nodeId, ctx)));
+      return node;
+    },
+
+    failedCommand,
+
+    /** The check command a failed step stopped on because the environment could not run it (D115). */
+    unrunnableCheck(node: Node): UnrunnableCheck | null {
+      const check = failedCommand(node);
+      if (check === null || check.unrunnable === null) return null;
+      return { command: check.command, ...check.unrunnable };
     },
 
     stopVerification(nodeId: string): void {

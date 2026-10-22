@@ -60,6 +60,15 @@ describe('检查命令', () => {
     expect(result.output.trim()).toBe('checked');
   });
 
+  it('真实 shell 找不到检查命令点名的程序时，结果标明无法运行（D115）', async () => {
+    const result = await service().runCommand(dir, 'aw-no-such-tool -q test', new AbortController().signal);
+    expect(result).toMatchObject({
+      passed: false,
+      exitCode: 127,
+      unrunnable: { program: 'aw-no-such-tool', reason: 'not_found' },
+    });
+  });
+
   it('超时后结束命令及其子进程，结果为超时未通过', async () => {
     const running = service().runCommand(dir, LONG_RUNNING, new AbortController().signal);
     await created('started');

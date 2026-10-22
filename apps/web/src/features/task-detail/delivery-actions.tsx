@@ -24,6 +24,7 @@ import { DELIVERY_COPY as C } from '../../copy/delivery.ts';
 import { TASK_COPY } from '../../copy/tasks.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
+import { skippedCommands } from '../tasks/skipped-checks.ts';
 import { useCancelTask, useDeliver, useRequestChanges } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
 
@@ -89,7 +90,12 @@ function PullRequestForm({
   pending: boolean;
 }) {
   const [title, setTitle] = useState(task.title);
-  const [body, setBody] = useState(task.result?.summary ?? '');
+  // A reviewer on the platform does not see the result card: unverified checks are said in the body too (D115).
+  const [body, setBody] = useState(() => {
+    if (task.result === null) return '';
+    const skipped = skippedCommands(task.result);
+    return skipped.length === 0 ? task.result.summary : `${task.result.summary}\n\n${TASK_COPY.prUnverified(skipped)}`;
+  });
   return (
     <div className="col">
       <div className="field">

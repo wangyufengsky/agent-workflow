@@ -53,6 +53,7 @@ export const ErrorCode = {
   NodeNotFound: 'NODE_NOT_FOUND',
   NodeNotEditable: 'NODE_NOT_EDITABLE',
   NodeAttemptsExhausted: 'NODE_ATTEMPTS_EXHAUSTED',
+  CheckCommandUnrunnable: 'CHECK_COMMAND_UNRUNNABLE',
   // 尝试 / opencode
   AttemptNotFound: 'ATTEMPT_NOT_FOUND',
   AttemptNoResult: 'ATTEMPT_NO_RESULT',
@@ -157,6 +158,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.NodeNotFound]: 404,
   [ErrorCode.NodeNotEditable]: 409,
   [ErrorCode.NodeAttemptsExhausted]: null,
+  [ErrorCode.CheckCommandUnrunnable]: null,
   [ErrorCode.AttemptNotFound]: 404,
   [ErrorCode.AttemptNoResult]: null,
   [ErrorCode.AttemptTimeout]: null,

@@ -4,6 +4,7 @@ import {
   EDITABLE_NODE_STATUSES,
   ErrorCode,
   isTerminalState,
+  type NodeAcceptance,
   type NodeDetailDTO,
   NodeEvent,
   NodeKind,
@@ -215,6 +216,11 @@ export function createNodesService(deps: NodesServiceDeps) {
         });
       });
       for (const node of touched) publish(node);
+    },
+
+    /** The task's checks changed by the user (D115): a step's acceptance, which no transition touches. */
+    setAcceptance(nodeId: string, acceptance: NodeAcceptance): void {
+      repo.setAcceptance(nodeId, acceptance, clock.now());
     },
 
     /** Pro mode (09 §3): a skipped step counts as finished for the steps depending on it. */

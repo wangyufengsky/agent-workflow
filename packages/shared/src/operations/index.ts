@@ -136,10 +136,12 @@ import {
   reviewCommentsOp,
   reviseFromReviewOp,
   saveDraftPlanOp,
+  skipCheckOp,
   skipNodeOp,
   startTaskOp,
   taskDiffFileOp,
   taskDiffOp,
+  updateCheckCommandOp,
 } from './tasks.ts';
 import {
   createRoleOp,
@@ -221,6 +223,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getTaskTimelineOp,
   startTaskOp,
   retryTaskOp,
+  updateCheckCommandOp,
+  skipCheckOp,
   cancelTaskOp,
   pauseTaskOp,
   resumeTaskOp,

@@ -20,6 +20,7 @@ import type { AttemptsService } from '../attempts/index.ts';
 import { locateShell } from '../git/index.ts';
 import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
+import { unrunnableOf } from './acceptance.rules.ts';
 
 export type AcceptanceServiceDeps = {
   attempts: AttemptsService;
@@ -104,7 +105,8 @@ export function createAcceptanceService({
   return {
     /**
      * Runs the command in the worktree; exit code 0 within ACCEPTANCE_COMMAND_TIMEOUT_MS passes. A timeout or the
-     * signal ends the command with everything it started (D73).
+     * signal ends the command with everything it started (D73). A command the environment cannot run is told apart
+     * (`unrunnable`, D115).
      */
     async runCommand(directory: string, command: string, signal: AbortSignal): Promise<CommandCheckResult> {
       const child = execa(command, {
@@ -131,14 +133,18 @@ export function createAcceptanceService({
       cancelTimeout();
       signal.removeEventListener('abort', stop);
       const exitCode = timedOut ? null : (result.exitCode ?? null);
-      log.info({ directory, command, exitCode, timedOut }, 'acceptance command finished');
+      const output = result.all ?? '';
+      const unrunnable = unrunnableOf(command, exitCode, output);
+      log.info({ directory, command, exitCode, timedOut, unrunnable }, 'acceptance command finished');
       return {
         kind: AcceptanceCheckKind.Command,
         command,
         passed: exitCode === 0,
-        output: tailOf(result.all ?? ''),
+        output: tailOf(output),
         exitCode,
         timedOut,
+        unrunnable,
+        skipped: false,
       };
     },
 

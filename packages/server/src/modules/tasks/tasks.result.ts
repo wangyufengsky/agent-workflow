@@ -1,4 +1,5 @@
 import {
+  AcceptanceCheckKind,
   AppError,
   ErrorCode,
   InboxKind,
@@ -65,6 +66,8 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
           nodeTitle: node.title,
           kind: c.kind,
           passed: c.passed,
+          command: c.kind === AcceptanceCheckKind.Command ? c.command : null,
+          skipped: c.kind === AcceptanceCheckKind.Command && c.skipped,
         })),
       ),
       nodeSummaries,
@@ -96,16 +99,35 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
       });
     },
 
-    /** `fail` in running: a node used up its budget and nothing else is still working (09 §2). */
+    /**
+     * `fail` in running: a node used up its budget, or its check command could not run (D115), and nothing else is
+     * still working (09 §2).
+     */
     failRunning(taskId: string): void {
       const task = get(taskId);
       const failed = nodes.listByTask(taskId).find((n) => n.status === NodeStatus.Failed);
       if (failed === undefined) throw new Error(`Task ${task.key} has no failed node`);
-      fail(task, TaskFailedPhase.Running, {
-        code: ErrorCode.NodeAttemptsExhausted,
-        message: `Step ${failed.key} failed after ${failed.attemptCount} attempts`,
-        details: { nodeKey: failed.key, nodeTitle: failed.title, feedback: failed.retryFeedback },
-      });
+      const step = { nodeKey: failed.key, nodeTitle: failed.title };
+      const unrunnable = nodes.unrunnableCheck(failed);
+      fail(
+        task,
+        TaskFailedPhase.Running,
+        unrunnable === null
+          ? {
+              code: ErrorCode.NodeAttemptsExhausted,
+              message: `Step ${failed.key} failed after ${failed.attemptCount} attempts`,
+              details: {
+                ...step,
+                feedback: failed.retryFeedback,
+                command: nodes.failedCommand(failed)?.command ?? null,
+              },
+            }
+          : {
+              code: ErrorCode.CheckCommandUnrunnable,
+              message: `Step ${failed.key} check \`${unrunnable.command}\` cannot run: ${unrunnable.program} ${unrunnable.reason}`,
+              details: { ...step, ...unrunnable },
+            },
+      );
     },
   };
 }

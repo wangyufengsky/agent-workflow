@@ -1,4 +1,4 @@
-import { AcceptanceCheckKind, AttemptKind, type CheckResult, type NodeDetailDTO } from '@aw/shared';
+import { AcceptanceCheckKind, AttemptKind, type CheckResult, type NodeDetailDTO, type StatusTone } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -20,14 +20,26 @@ import { NodeBadge } from '../tasks/task-badge.tsx';
 import { nodeDiffFileQuery, nodeDiffQuery, nodeQuery } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
 
+/** A check's outcome; a command check may also have been skipped, or not run in the app's environment (D115). */
+function checkBadge(check: CheckResult): { tone: StatusTone; label: string } {
+  if (check.kind === AcceptanceCheckKind.Command && check.skipped) return { tone: 'warn', label: C.checkSkipped };
+  if (check.kind === AcceptanceCheckKind.Command && check.unrunnable !== null)
+    return { tone: 'danger', label: C.checkUnrunnable };
+  return check.passed ? { tone: 'ok', label: C.checkPassed } : { tone: 'danger', label: C.checkFailed };
+}
+
 function Check({ check }: { check: CheckResult }) {
   const label = check.kind === AcceptanceCheckKind.Command ? C.commandCheck(check.command) : C.reviewCheck;
+  const badge = checkBadge(check);
   return (
     <details>
       <summary className="row">
-        <StatusBadge tone={check.passed ? 'ok' : 'danger'} label={check.passed ? C.checkPassed : C.checkFailed} />
+        <StatusBadge tone={badge.tone} label={badge.label} />
         <span className="mono ellipsis">{label}</span>
         {check.kind === AcceptanceCheckKind.Command && check.timedOut && <span className="hint">{C.timedOut}</span>}
+        {check.kind === AcceptanceCheckKind.Command && check.unrunnable !== null && (
+          <span className="hint">{C.unrunnableHint(check.unrunnable.program, check.unrunnable.reason)}</span>
+        )}
       </summary>
       {check.kind === AcceptanceCheckKind.Command ? (
         <pre className={styles.output}>{check.output}</pre>

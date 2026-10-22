@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { dbTypeSchema } from '../../enums/system.ts';
 import { attemptKindSchema, nodeStatusSchema } from '../../enums/task.ts';
 import { workflowDeliverableSchema } from '../../enums/workflow.ts';
-import { acceptanceSchema, planNodeSpecSchema } from '../../workflow/plan-graph.ts';
+import { nodeAcceptanceSchema, planNodeSpecSchema } from '../../workflow/plan-graph.ts';
 
 export const getTaskContextInputSchema = z.object({});
 
@@ -41,7 +41,7 @@ export const getTaskContextOutputSchema = z.object({
       title: z.string(),
       role: z.string(),
       instructions: z.string(),
-      acceptance: acceptanceSchema,
+      acceptance: nodeAcceptanceSchema,
       dependsOn: z.array(z.string()),
     })
     .optional(),

@@ -23,6 +23,7 @@ import type { EventBus } from '../../core/event-bus.ts';
 import { listTaskEvents } from '../timeline/index.ts';
 import { createTaskActions } from './tasks.actions.ts';
 import { createTaskChanges } from './tasks.changes.ts';
+import { createTaskChecks } from './tasks.checks.ts';
 import { createTaskContext } from './tasks.context.ts';
 import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
@@ -40,6 +41,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   const results = createTaskResults(deps, state);
   const context = createTaskContext(deps, state);
   const actions = createTaskActions(deps, state, lifecycle);
+  const checks = createTaskChecks(deps, state, lifecycle);
   const diffs = createTaskDiffs(deps, state);
   const delivery = createTaskDelivery(deps, state);
   const changes = createTaskChanges(deps, state, delivery.current);
@@ -190,6 +192,14 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     },
     retry(id: string): TaskDetailDTO {
       lifecycle.retry(id);
+      return detail(id);
+    },
+    async updateCheckCommand(id: string, command: string, updateProject: boolean): Promise<TaskDetailDTO> {
+      await checks.updateCheckCommand(id, command, updateProject);
+      return detail(id);
+    },
+    skipCheck(id: string): TaskDetailDTO {
+      checks.skipCheck(id);
       return detail(id);
     },
     async cancel(id: string, keepBranch: boolean): Promise<TaskDetailDTO> {

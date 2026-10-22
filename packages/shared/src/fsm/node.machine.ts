@@ -10,6 +10,8 @@ export const NodeEvent = {
   ResultSubmitted: 'result_submitted',
   ChecksPassed: 'checks_passed',
   ChecksFailed: 'checks_failed',
+  CheckUnrunnable: 'check_unrunnable',
+  Recheck: 'recheck',
   AttemptFailed: 'attempt_failed',
   Interrupted: 'interrupted',
   Accept: 'accept',
@@ -55,12 +57,15 @@ export const nodeMachine = defineMachine<NodeStatus, NodeEvent>({
     [S.Verifying]: {
       [E.ChecksPassed]: [S.AwaitingAcceptance, S.Done],
       [E.ChecksFailed]: [S.Ready, S.Failed],
+      // A check command the app's environment cannot run is not the model's failure (D115).
+      [E.CheckUnrunnable]: [S.Failed],
       [E.Interrupted]: [S.Ready],
       [E.Cancel]: [S.Cancelled],
     },
     [S.AwaitingAcceptance]: { [E.Accept]: [S.Done], [E.Reject]: [S.Ready], [E.Cancel]: [S.Cancelled] },
     [S.Done]: {},
-    [S.Failed]: { [E.Retry]: [S.Ready], [E.Skip]: [S.Skipped], [E.Cancel]: [S.Cancelled] },
+    // `recheck`: the checks run again on the submitted result, without another attempt (D115).
+    [S.Failed]: { [E.Retry]: [S.Ready], [E.Recheck]: [S.Verifying], [E.Skip]: [S.Skipped], [E.Cancel]: [S.Cancelled] },
     [S.Skipped]: {},
     [S.Cancelled]: {},
   },

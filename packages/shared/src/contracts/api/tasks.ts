@@ -9,6 +9,7 @@ import { worktreeStatusSchema } from '../../enums/git.ts';
 import {
   AcceptanceCheckKind,
   acceptanceCheckKindSchema,
+  checkUnrunnableReasonSchema,
   nodeStatusSchema,
   planSourceSchema,
   planStatusSchema,
@@ -19,7 +20,7 @@ import {
 } from '../../enums/task.ts';
 import { nodeKindSchema, workflowDeliverableSchema, workflowPlanningSchema } from '../../enums/workflow.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
-import { acceptanceSchema, planGraphSchema } from '../../workflow/plan-graph.ts';
+import { nodeAcceptanceSchema, planGraphSchema } from '../../workflow/plan-graph.ts';
 import { diffFileSchema } from '../mcp/get-task-diff.ts';
 import { submitResultInputSchema } from '../mcp/submit-result.ts';
 import { reviewIssueSchema } from '../mcp/submit-review.ts';
@@ -65,6 +66,10 @@ export const checkResultSchema = z.discriminatedUnion('kind', [
     /** Null when the command did not exit by itself (timeout). */
     exitCode: z.number().nullable(),
     timedOut: z.boolean(),
+    /** The app's environment could not run the command's program (D115); null for a check that ran. */
+    unrunnable: z.object({ program: z.string(), reason: checkUnrunnableReasonSchema }).nullable().default(null),
+    /** The user skipped the check after it could not run (D115): not run, does not hold the step back. */
+    skipped: z.boolean().default(false),
   }),
   z.object({
     kind: z.literal(AcceptanceCheckKind.AiReview),
@@ -99,7 +104,7 @@ export type NodeSummaryDTO = z.infer<typeof nodeSummarySchema>;
 export const nodeDetailSchema = nodeSummarySchema.extend({
   taskId: z.string(),
   instructions: z.string(),
-  acceptance: acceptanceSchema,
+  acceptance: nodeAcceptanceSchema,
   result: nodeResultSchema.nullable(),
   checkResults: z.array(checkResultSchema).nullable(),
   retryFeedback: z.string().nullable(),
@@ -143,7 +148,16 @@ export const taskResultSchema = z.object({
   deletions: z.number(),
   files: z.array(diffFileSchema),
   checks: z.array(
-    z.object({ nodeKey: z.string(), nodeTitle: z.string(), kind: acceptanceCheckKindSchema, passed: z.boolean() }),
+    z.object({
+      nodeKey: z.string(),
+      nodeTitle: z.string(),
+      kind: acceptanceCheckKindSchema,
+      passed: z.boolean(),
+      /** A command check's command (results written before D115 have none). */
+      command: z.string().nullable().default(null),
+      /** Skipped by the user, so not verified (D115). */
+      skipped: z.boolean().default(false),
+    }),
   ),
   nodeSummaries: z.array(z.object({ key: z.string(), title: z.string(), summary: z.string() })),
   /** Assumptions made without asking: plan, node results and questions the model answered itself. */

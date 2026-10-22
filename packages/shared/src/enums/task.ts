@@ -103,6 +103,14 @@ export const AcceptanceCheckKind = {
 export type AcceptanceCheckKind = (typeof AcceptanceCheckKind)[keyof typeof AcceptanceCheckKind];
 export const acceptanceCheckKindSchema = z.enum(AcceptanceCheckKind);
 
+/** Why a check command could not run in the app's environment (D115): its program is missing or not executable. */
+export const CheckUnrunnableReason = {
+  NotFound: 'not_found',
+  NotExecutable: 'not_executable',
+} as const;
+export type CheckUnrunnableReason = (typeof CheckUnrunnableReason)[keyof typeof CheckUnrunnableReason];
+export const checkUnrunnableReasonSchema = z.enum(CheckUnrunnableReason);
+
 /** What the simple-mode UI shows for a task; derived by `resolveTaskDisplayGroup`. */
 export const TaskDisplayGroup = {
   Preparing: 'preparing',
