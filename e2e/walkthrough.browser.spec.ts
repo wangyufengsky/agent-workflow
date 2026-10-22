@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { THEME_IDS, type ThemeId, UiMode } from '@aw/shared';
+import { API_PREFIX, THEME_IDS, type ThemeId, UiMode } from '@aw/shared';
 import { type APIRequestContext, expect, type Locator, type Page, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import {
@@ -452,7 +452,14 @@ type Shot = {
   open?: (page: Page) => Promise<Locator>;
   /** The document itself scrolls (a page outside the shell): the screenshot takes all of it. */
   fullPage?: boolean;
+  /**
+   * Seen as on a first run: the seed has projects, and with any project `/onboarding` leads to `/environment`
+   * (14 §3.1a), so the page's project list answers empty.
+   */
+  firstRun?: boolean;
 };
+
+const PROJECT_LIST = (url: URL) => url.pathname === `${API_PREFIX}/projects`;
 
 const node = (task: Task, key: string) => {
   const found = task.nodes.find((n) => n.key === key);
@@ -474,7 +481,15 @@ const heading = (name: string | RegExp) => (page: Page) => page.getByRole('headi
 const testId = (id: string) => (page: Page) => page.getByTestId(id).first();
 
 const SHOTS: Shot[] = [
-  { name: 'onboarding', mode: UiMode.Simple, url: () => '/onboarding', ready: testId('check-Git') },
+  {
+    name: 'onboarding',
+    mode: UiMode.Simple,
+    url: () => '/onboarding',
+    // The first-run page itself, not the environment page it leads to once a project exists.
+    ready: (page) => page.getByLabel('仓库目录'),
+    firstRun: true,
+  },
+  { name: 'environment', mode: UiMode.Simple, url: () => '/environment', ready: testId('check-Git') },
   {
     name: 'home',
     mode: UiMode.Simple,
@@ -810,6 +825,7 @@ test.describe('J9 走查：两种模式下全部页面无报错、无对比度�
       for (const shot of SHOTS) {
         await patchSettings(request, { 'ui.theme': theme satisfies ThemeId, 'ui.mode': shot.mode });
         await page.setViewportSize({ width: WIDTH, height: HEIGHT });
+        if (shot.firstRun === true) await page.route(PROJECT_LIST, (route) => route.fulfill({ json: { items: [] } }));
         await page.goto(shot.url(s));
         await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
         await expect(shot.ready(page)).toBeVisible();
@@ -826,6 +842,7 @@ test.describe('J9 走查：两种模式下全部页面无报错、无对比度�
           animations: 'disabled',
           fullPage: shot.fullPage === true,
         });
+        if (shot.firstRun === true) await page.unroute(PROJECT_LIST);
       }
       writeFileSync(join(dir, 'report.json'), `${JSON.stringify(reports, null, 2)}\n`);
       const problems = Object.entries(reports)
