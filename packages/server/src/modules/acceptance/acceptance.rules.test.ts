@@ -7,6 +7,7 @@ describe('检查命令无法运行的判定（D116）', () => {
     ['mvn -q test', 127, '/bin/sh: 1: mvn: not found', 'mvn'],
     ['mvn -q test', 127, '/usr/bin/bash: line 1: mvn: command not found', 'mvn'],
     ['cd api && CI=1 mvn -q test', 127, 'Scanning…\n/bin/sh: mvn: command not found\n', 'mvn'],
+    ['JAVA_OPTS="-Xmx1g -Dfoo=bar" mvn test', 127, '/bin/sh: mvn: command not found', 'mvn'],
     ['./gradlew test', 127, '/bin/sh: ./gradlew: No such file or directory', './gradlew'],
   ])('`%s` 退出 %i 且 shell 报出它点名的程序：找不到', (command, exitCode, output, program) => {
     expect(unrunnableOf(command, exitCode, output)).toEqual({ program, reason: 'not_found' });

@@ -11,17 +11,15 @@ const SHELL_ERRORS: Record<number, { reason: CheckUnrunnableReason; messages: re
   126: { reason: CheckUnrunnableReason.NotExecutable, messages: ['Permission denied'] },
 };
 
-const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+/** Leading `NAME=value` assignments; a value may be quoted and hold spaces (`JAVA_OPTS="-Xmx1g -Dx=y"`). */
+const ASSIGNMENTS = /^(?:[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|[^\s"']+)*\s+)*/;
 
 /** The programs a command line runs itself: the first word of each part between `&&` `||` `;` `|`, after assignments. */
 function programsOf(command: string): Set<string> {
   return new Set(
     command.split(/&&|\|\||;|\|/).flatMap((part) => {
-      const program = part
-        .trim()
-        .split(/\s+/)
-        .find((word) => !ASSIGNMENT.test(word));
-      return program === undefined || program === '' ? [] : [program];
+      const [program = ''] = part.trim().replace(ASSIGNMENTS, '').split(/\s+/);
+      return program === '' ? [] : [program];
     }),
   );
 }

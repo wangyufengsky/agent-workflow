@@ -63,13 +63,15 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
   const failedChecks = result.checks.filter((c) => !c.passed).length;
   const skipped = skippedCommands(result);
+  // One skipped check per step that had the command; the commands are listed once each.
+  const skippedCount = result.checks.filter((c) => c.skipped).length;
   const checks =
     result.checks.length === 0
       ? C.noChecks
       : failedChecks > 0
         ? C.checksFailed(failedChecks)
-        : skipped.length > 0
-          ? C.checksSkipped(skipped.length, skipped)
+        : skippedCount > 0
+          ? C.checksSkipped(skippedCount, skipped)
           : C.checksPassed;
   // The diff is read from the worktree, which goes away once the task is delivered or cancelled.
   const browsable = task.git.worktreeStatus === WorktreeStatus.Ready;
