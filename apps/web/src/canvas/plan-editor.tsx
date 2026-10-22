@@ -1,35 +1,44 @@
-import '@xyflow/react/dist/base.css';
-import { type NodeStatus, type PlanGraph, type PlanRules, type RoleDTO, transitiveDependencies } from '@aw/shared';
 import {
-  type Connection,
-  type Edge,
-  MiniMap,
-  type Node,
-  ReactFlow,
-  ReactFlowProvider,
-  useReactFlow,
-  useStore,
-} from '@xyflow/react';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+  lockedChanges,
+  type NodeStatus,
+  type PlanGraph,
+  PlanProblemCode,
+  type PlanRules,
+  type RoleDTO,
+  validatePlanGraph,
+} from '@aw/shared';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Button } from '../components/button.tsx';
 import { Panel } from '../components/panel.tsx';
+import { Tabs } from '../components/tabs.tsx';
 import { PLAN_EDITOR_COPY as C } from '../copy/plan-editor.ts';
-import styles from './canvas.module.css';
-import { CANVAS_FIT, EDGE_PLAN } from './canvas-style.ts';
+import type { CanvasEdit } from './canvas-edit.ts';
+import { FlowCanvas } from './flow-canvas.tsx';
+import { START } from './layout.ts';
 import type { EditorProblem, PlanLock } from './plan-check.ts';
 import editorStyles from './plan-editor.module.css';
-import { addNode, connect, disconnect, removeNode, renameNode, updateNode } from './plan-graph-edit.ts';
+import {
+  type Added,
+  addAfter,
+  addAtEnd,
+  addParallel,
+  insertBetween,
+  type NewStep,
+  removeAndReconnect,
+  renameNode,
+  updateNode,
+} from './plan-graph-edit.ts';
 import { PlanNodeForm } from './plan-node-form.tsx';
-import { TaskNode, type TaskNodeData } from './task-node.tsx';
-import { useGraphLayout } from './use-graph-layout.ts';
-import { useNodeSizes } from './use-node-sizes.ts';
-
-const NODE_TYPES = { task: TaskNode };
-const MINIMAP_FROM = 12;
+import type { CanvasStep } from './task-node.tsx';
+import type { History } from './use-history.ts';
 
 type Props = {
-  graph: PlanGraph;
-  onChange: (graph: PlanGraph) => void;
+  /** The canvas region's accessible name. */
+  label: string;
+  /** The graph and its undo history; the caller owns both. */
+  history: Pick<History<PlanGraph>, 'value' | 'undo' | 'canUndo'> & {
+    change: (graph: PlanGraph, mergeKey?: string) => void;
+  };
   /** `planEditRules` for a task's plan; the workflow's roles for a fixed workflow's template. */
   rules: PlanRules;
   roles: readonly RoleDTO[];
@@ -39,213 +48,204 @@ type Props = {
   statuses?: ReadonlyMap<string, NodeStatus> | undefined;
   /** `checkPlan` of the graph; the caller also uses it to allow saving. */
   problems: readonly EditorProblem[];
-  /** Save / confirm / cancel buttons of the caller. */
+  /** The toolbar above the canvas; `addStep` is the editor's 添加步骤 (26 §5.1). */
+  toolbar: (addStep: () => void) => ReactNode;
+  /** Save / confirm / cancel buttons of the caller, under the problems. */
   actions?: ReactNode;
+  /** The workflow editor's 流程设置 (26 §6.3): the side panel gets a tab for it. */
+  settings?: ReactNode;
 };
 
-type FlowProps = Pick<Props, 'graph' | 'onChange' | 'roles' | 'statuses'> & {
-  isLocked: (key: string) => boolean;
-  selected: string | undefined;
-  onSelect: (key: string | undefined) => void;
-};
+const Tab = { Step: 'step', Settings: 'settings' } as const;
 
-/** The editable canvas: drag from a step's right handle to another's left one to add a dependency. */
-function EditorFlow({ graph, onChange, roles, statuses, isLocked, selected, onSelect }: FlowProps) {
-  const { fitView } = useReactFlow();
-  const keys = useMemo(() => new Set(graph.nodes.map((n) => n.key)), [graph]);
-  const edges = useMemo<Edge[]>(
-    () =>
-      graph.nodes.flatMap((node) =>
-        node.dependsOn
-          .filter((key) => keys.has(key))
-          .map((key) => ({
-            id: `${key}->${node.key}`,
-            source: key,
-            target: node.key,
-            // A started step keeps its dependencies.
-            deletable: !isLocked(node.key),
-            style: EDGE_PLAN,
-          })),
-      ),
-    [graph, keys, isLocked],
-  );
-  const positions = useGraphLayout({ nodes: graph.nodes.map((n) => ({ id: n.key })), edges });
-  const fitted = useRef(false);
-  const measured = useStore((state) => state.width > 0 && state.height > 0);
+const orderProblems = (graph: PlanGraph, rules: PlanRules) =>
+  validatePlanGraph(graph, rules).filter((p) => p.code === PlanProblemCode.RequiredStepOrder).length;
+
+/**
+ * Plan editor (26 §5, 14 §5): + on edges and steps adds steps already connected, − removes one and joins its
+ * neighbours, the side panel edits the selected step; the problems are the backend's (same `validatePlanGraph`).
+ */
+export function PlanEditor({
+  label,
+  history,
+  rules,
+  roles,
+  lock,
+  statuses,
+  problems,
+  toolbar,
+  actions,
+  settings,
+}: Props) {
+  const graph = history.value;
+  const [selected, setSelectedKey] = useState<string | undefined>(graph.nodes[0]?.key);
+  const [tab, setTab] = useState<string>(Tab.Step);
+  const setSelected = (key: string | undefined) => {
+    setSelectedKey(key);
+    if (key !== undefined) setTab(Tab.Step);
+  };
+  const [reveal, setReveal] = useState<string | undefined>();
+  const [removed, setRemoved] = useState<string | undefined>();
+  const [focusTitle, setFocusTitle] = useState(0);
+  const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (fitted.current || !measured || positions.size === 0) return;
-    fitted.current = true;
-    requestAnimationFrame(() => void fitView(CANVAS_FIT));
-  }, [measured, positions, fitView]);
+    if (focusTitle > 0) titleRef.current?.select();
+  }, [focusTitle]);
 
-  const { onNodesChange, measured: sizeOf } = useNodeSizes();
+  const locked = lock?.locked ?? new Set<string>();
   const roleName = (key: string) => roles.find((r) => r.key === key)?.name ?? key;
-  const nodes: Node<TaskNodeData>[] = graph.nodes.map((n) => {
+  const change = (next: PlanGraph, mergeKey?: string) => {
+    setRemoved(undefined);
+    history.change(next, mergeKey);
+  };
+
+  // Only edits whose result adds no locked-step change and no required-step order problem are offered (26 §5.4).
+  const lockedNow = lock === undefined ? 0 : lockedChanges(lock.base, graph, lock.locked).length;
+  const orderNow = orderProblems(graph, rules);
+  const allowed = (next: PlanGraph) =>
+    (lock === undefined || lockedChanges(lock.base, next, lock.locked).length <= lockedNow) &&
+    orderProblems(next, rules) <= orderNow;
+  const newStep = (like: string | undefined): NewStep => {
+    const roleKey = graph.nodes.find((n) => n.key === like)?.roleKey;
+    return {
+      title: C.newStepTitle,
+      roleKey: roleKey !== undefined && rules.allowedRoles.includes(roleKey) ? roleKey : (rules.allowedRoles[0] ?? ''),
+      instructions: '',
+    };
+  };
+  const added = ({ graph: next, key }: Added) => {
+    change(next);
+    setSelected(key);
+    setReveal(key);
+    setFocusTitle((n) => n + 1);
+  };
+  const blank = newStep(undefined);
+  const edit: CanvasEdit = {
+    canInsert: (a, b) => allowed(insertBetween(graph, a, b, blank).graph),
+    canAddAfter: (key) => allowed(addAfter(graph, key, blank).graph),
+    canAddParallel: (key) => allowed(addParallel(graph, key, blank).graph),
+    canRemove: (key) => allowed(removeAndReconnect(graph, key)),
+    insert: (a, b) => added(insertBetween(graph, a, b, newStep(a === START ? b : a))),
+    addAfter: (key) => added(addAfter(graph, key, newStep(key))),
+    addParallel: (key) => added(addParallel(graph, key, newStep(key))),
+    remove: (key) => {
+      const title = graph.nodes.find((n) => n.key === key)?.title ?? key;
+      change(removeAndReconnect(graph, key));
+      setRemoved(title);
+      if (selected === key) setSelected(undefined);
+    },
+  };
+  const addStep = () =>
+    selected !== undefined && edit.canAddAfter(selected)
+      ? edit.addAfter(selected)
+      : added(addAtEnd(graph, newStep(undefined)));
+
+  const steps: CanvasStep[] = graph.nodes.map((n) => {
     const status = statuses?.get(n.key);
     return {
       id: n.key,
-      type: 'task',
-      position: positions.get(n.key) ?? { x: 0, y: 0 },
-      data: {
-        step: {
-          id: n.key,
-          key: n.key,
-          title: n.title === '' ? n.key : n.title,
-          role: roleName(n.roleKey),
-          dependsOn: n.dependsOn,
-          ...(status === undefined ? {} : { status }),
-        },
-        selected: n.key === selected,
-        connectable: true,
-        locked: isLocked(n.key),
-      },
-      deletable: !isLocked(n.key),
-      draggable: false,
-      ...sizeOf(n.key),
+      key: n.key,
+      title: n.title === '' ? n.key : n.title,
+      role: roleName(n.roleKey),
+      dependsOn: n.dependsOn,
+      description: n.instructions.split('\n')[0] ?? '',
+      locked: locked.has(n.key),
+      ...(status === undefined ? {} : { status }),
     };
   });
-
-  const isValidConnection = (c: Connection | Edge) =>
-    c.source !== c.target &&
-    !isLocked(c.target) &&
-    !graph.nodes.some((n) => n.key === c.target && n.dependsOn.includes(c.source)) &&
-    !transitiveDependencies(graph.nodes, c.source).has(c.target);
-
-  return (
-    <ReactFlow
-      nodes={nodes}
-      onNodesChange={onNodesChange}
-      edges={edges}
-      nodeTypes={NODE_TYPES}
-      nodesDraggable={false}
-      nodesConnectable
-      elementsSelectable
-      isValidConnection={isValidConnection}
-      onConnect={(c) => onChange(connect(graph, c.source, c.target))}
-      // One callback for both: deleting a step also deletes its edges.
-      onDelete={({ nodes: removed, edges: cut }) => {
-        const withoutNodes = removed.reduce((g, n) => removeNode(g, n.id), graph);
-        onChange(cut.reduce((g, e) => disconnect(g, e.source, e.target), withoutNodes));
-        if (removed.some((n) => n.id === selected)) onSelect(undefined);
-      }}
-      onNodeClick={(_e, node) => onSelect(node.id)}
-      onPaneClick={() => onSelect(undefined)}
-      zoomOnDoubleClick={false}
-      deleteKeyCode={['Backspace', 'Delete']}
-      proOptions={{ hideAttribution: true }}
-      minZoom={0.3}
-      maxZoom={1.5}
-    >
-      {graph.nodes.length > MINIMAP_FROM && <MiniMap pannable zoomable />}
-    </ReactFlow>
-  );
-}
-
-/**
- * Plan editor (M5-01, 14 §5): add, connect and remove steps on the canvas, edit the selected step in the side panel,
- * and see the problems the backend would report (same `validatePlanGraph`). Controlled: the caller keeps the graph.
- */
-export function PlanEditor({ graph, onChange, rules, roles, lock, statuses, problems, actions }: Props) {
-  const [selected, setSelected] = useState<string | undefined>(graph.nodes[0]?.key);
-  const isLocked = useMemo(() => {
-    const locked = lock?.locked ?? new Set<string>();
-    return (key: string) => locked.has(key);
-  }, [lock]);
   const node = graph.nodes.find((n) => n.key === selected);
-  const add = () => {
-    const created = addNode(graph, {
-      title: C.newStepTitle,
-      roleKey: rules.allowedRoles[0] ?? '',
-      instructions: '',
-      dependsOn: [],
-    });
-    onChange(created.graph);
-    setSelected(created.key);
-  };
+  const stepPanels = (
+    <>
+      <Panel title={C.step}>
+        {node === undefined ? (
+          <p className="hint">{C.noSelection}</p>
+        ) : (
+          <PlanNodeForm
+            graph={graph}
+            node={node}
+            allowedRoles={rules.allowedRoles}
+            roles={roles}
+            locked={locked.has(node.key)}
+            titleRef={titleRef}
+            onPatch={(patch) =>
+              change(updateNode(graph, node.key, patch), `${node.key}:${Object.keys(patch).join(',')}`)
+            }
+            onRename={(key) => {
+              change(renameNode(graph, node.key, key));
+              setSelected(key);
+            }}
+            onRemove={edit.canRemove(node.key) ? () => edit.remove(node.key) : undefined}
+          />
+        )}
+      </Panel>
+      <Panel title={C.problems}>
+        <div className="col">
+          {problems.length === 0 ? (
+            <p className="hint">{C.noProblems}</p>
+          ) : (
+            <ul className={editorStyles.problems} data-testid="plan-problems">
+              {problems.map((p) => (
+                <li key={`${p.key}-${p.message}`}>
+                  {p.key === undefined ? (
+                    p.message
+                  ) : (
+                    <button type="button" className={editorStyles.problemLink} onClick={() => setSelected(p.key)}>
+                      {p.message}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {actions}
+        </div>
+      </Panel>
+    </>
+  );
 
   return (
-    <div className={editorStyles.layout} data-testid="plan-editor">
-      <section className={styles.canvas} aria-label={C.canvasLabel}>
-        <ReactFlowProvider>
-          <EditorFlow
-            graph={graph}
-            onChange={onChange}
-            roles={roles}
-            statuses={statuses}
-            isLocked={isLocked}
-            selected={selected}
+    <div className={editorStyles.editor} data-testid="plan-editor">
+      <div className={editorStyles.toolbar}>{toolbar(addStep)}</div>
+      <div className={editorStyles.layout}>
+        <div className={editorStyles.canvas}>
+          <FlowCanvas
+            steps={steps}
+            label={label}
+            selectedId={selected}
             onSelect={setSelected}
+            onOpen={(key) => {
+              setSelected(key);
+              setFocusTitle((n) => n + 1);
+            }}
+            edit={edit}
+            revealId={reveal}
           />
-        </ReactFlowProvider>
-      </section>
-      <aside className={editorStyles.side}>
-        <Panel
-          title={C.step}
-          actions={
-            <Button size="sm" icon="plus" onClick={add}>
-              {C.addStep}
-            </Button>
-          }
-        >
-          <div className="col">
-            <select
-              className="select"
-              aria-label={C.step}
-              value={selected ?? ''}
-              onChange={(e) => setSelected(e.target.value === '' ? undefined : e.target.value)}
-            >
-              <option value="">—</option>
-              {graph.nodes.map((n) => (
-                <option key={n.key} value={n.key}>
-                  {n.title === '' ? n.key : `${n.title}（${n.key}）`}
-                </option>
-              ))}
-            </select>
-            {node === undefined ? (
-              <p className="hint">{C.noSelection}</p>
-            ) : (
-              <PlanNodeForm
-                graph={graph}
-                node={node}
-                allowedRoles={rules.allowedRoles}
-                roles={roles}
-                locked={isLocked(node.key)}
-                onPatch={(patch) => onChange(updateNode(graph, node.key, patch))}
-                onRename={(key) => {
-                  onChange(renameNode(graph, node.key, key));
-                  setSelected(key);
-                }}
-                onRemove={() => {
-                  onChange(removeNode(graph, node.key));
-                  setSelected(undefined);
-                }}
-              />
-            )}
-          </div>
-        </Panel>
-        <Panel title={C.problems}>
-          <div className="col">
-            {problems.length === 0 ? (
-              <p className="hint">{C.noProblems}</p>
-            ) : (
-              <ul className={editorStyles.problems} data-testid="plan-problems">
-                {problems.map((p) => (
-                  <li key={`${p.key}-${p.message}`}>
-                    {p.key === undefined ? (
-                      p.message
-                    ) : (
-                      <button type="button" className={editorStyles.problemLink} onClick={() => setSelected(p.key)}>
-                        {p.message}
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {actions}
-          </div>
-        </Panel>
-      </aside>
+          {removed !== undefined && (
+            <div className={editorStyles.notice} role="status">
+              <span>{C.removed(removed)}</span>
+              {history.canUndo && (
+                <Button size="sm" onClick={history.undo}>
+                  {C.undo}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+        <aside className={editorStyles.side}>
+          {settings === undefined ? (
+            stepPanels
+          ) : (
+            <Tabs
+              value={tab}
+              onValueChange={setTab}
+              items={[
+                { value: Tab.Step, label: C.step, content: <div className="col">{stepPanels}</div> },
+                { value: Tab.Settings, label: C.settings, content: settings },
+              ]}
+            />
+          )}
+        </aside>
+      </div>
     </div>
   );
 }

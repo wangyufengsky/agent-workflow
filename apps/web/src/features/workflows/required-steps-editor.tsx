@@ -1,151 +1,140 @@
-import { type RequiredStep, RequiredStepPosition, type RoleDTO } from '@aw/shared';
-import { AcceptanceEditor } from '../../canvas/acceptance-editor.tsx';
-import { Button } from '../../components/button.tsx';
+import type { RequiredStep, RoleDTO } from '@aw/shared';
+import { type ReactNode, useState } from 'react';
+import type { CanvasEdit } from '../../canvas/canvas-edit.ts';
+import { FlowCanvas } from '../../canvas/flow-canvas.tsx';
+import editorStyles from '../../canvas/plan-editor.module.css';
+import type { CanvasStep } from '../../canvas/task-node.tsx';
+import { Panel } from '../../components/panel.tsx';
+import { Tabs } from '../../components/tabs.tsx';
+import { CANVAS_COPY, PLAN_EDITOR_COPY } from '../../copy/plan-editor.ts';
 import { WORKFLOW_EDITOR_COPY as C } from '../../copy/workflows.ts';
-import styles from './workflows.module.css';
+import { RequiredStepForm } from './required-step-form.tsx';
+import { addRequired, insertPosition, insertRequired, PLANNED, shapeDependencies } from './required-steps.ts';
 
-const POSITION_LABEL = {
-  [RequiredStepPosition.First]: C.positionFirst,
-  [RequiredStepPosition.Last]: C.positionLast,
-} as const;
+type Props = {
+  steps: readonly RequiredStep[];
+  onChange: (steps: RequiredStep[], mergeKey?: string) => void;
+  /** A built-in workflow: the shape is shown, not edited. */
+  readonly: boolean;
+  allowedRoles: readonly string[];
+  roles: readonly RoleDTO[];
+  /** The page's toolbar; `addStep` adds a step the plans must contain anywhere. */
+  toolbar: (addStep: () => void) => ReactNode;
+  settings: ReactNode;
+  /** Content of the problems panel. */
+  problems: ReactNode;
+};
 
-/** A step's fields with the optional ones left out when empty (exactOptionalPropertyTypes). */
-function withPosition(step: RequiredStep, position: string): RequiredStep {
-  const { position: _old, ...rest } = step;
-  return position === RequiredStepPosition.First || position === RequiredStepPosition.Last
-    ? { ...rest, position }
-    : rest;
-}
+const Tab = { Step: 'step', Settings: 'settings' } as const;
 
-/** Steps every AI plan of the workflow must contain (10 §workflows `requiredSteps`, 08 §5.3). */
+/**
+ * An AI workflow's shape (26 §6.3): its `first` required steps, the planner's steps, its `last` required steps. The +
+ * before or after the planner's steps adds a required step there; the side panel edits the selected one.
+ */
 export function RequiredStepsEditor({
   steps,
   onChange,
+  readonly,
   allowedRoles,
   roles,
-}: {
-  steps: readonly RequiredStep[];
-  onChange: (steps: RequiredStep[]) => void;
-  allowedRoles: readonly string[];
-  roles: readonly RoleDTO[];
-}) {
-  const set = (index: number, step: RequiredStep) => onChange(steps.map((s, i) => (i === index ? step : s)));
-  const roleName = (key: string) => roles.find((r) => r.key === key)?.name ?? key;
-  const add = () => {
-    const taken = new Set(steps.map((s) => s.key));
-    let n = steps.length + 1;
-    while (taken.has(`required_${n}`)) n += 1;
-    onChange([
-      ...steps,
-      { key: `required_${n}`, title: '', roleKey: allowedRoles[0] ?? '', instructions: '', dependsOn: [] },
-    ]);
+  toolbar,
+  settings,
+  problems,
+}: Props) {
+  const [selected, setSelected] = useState<string | undefined>();
+  const [tab, setTab] = useState<string>(Tab.Settings);
+  const [reveal, setReveal] = useState<string | undefined>();
+  const select = (key: string | undefined) => {
+    setSelected(key);
+    if (key !== undefined) setTab(Tab.Step);
   };
+  const roleName = (key: string) => roles.find((r) => r.key === key)?.name ?? key;
+  const blank = { title: PLAN_EDITOR_COPY.newStepTitle, roleKey: allowedRoles[0] ?? '', instructions: '' };
+  const added = (next: { steps: RequiredStep[]; key: string }) => {
+    onChange(next.steps);
+    select(next.key);
+    setReveal(next.key);
+  };
+
+  const remove = (key: string) => {
+    onChange(steps.filter((s) => s.key !== key));
+    if (selected === key) setSelected(undefined);
+  };
+
+  const shape = shapeDependencies(steps);
+  const canvasSteps: CanvasStep[] = steps.map((s) => ({
+    id: s.key,
+    key: s.key,
+    title: s.title === '' ? s.key : s.title,
+    role: roleName(s.roleKey),
+    dependsOn: shape.steps.get(s.key) ?? [],
+    description: s.instructions.split('\n')[0] ?? '',
+  }));
+  const edit: CanvasEdit | undefined = readonly
+    ? undefined
+    : {
+        canInsert: (a, b) => insertPosition(steps, a, b) !== undefined,
+        canAddAfter: () => false,
+        canAddParallel: () => false,
+        canRemove: () => true,
+        insert: (a, b) => added(insertRequired(steps, a, b, blank)),
+        addAfter: () => undefined,
+        addParallel: () => undefined,
+        remove,
+      };
+  const index = steps.findIndex((s) => s.key === selected);
+  const step = steps[index];
+
+  const stepPanels = (
+    <>
+      <Panel title={PLAN_EDITOR_COPY.step}>
+        {step === undefined || readonly ? (
+          <p className="hint">{C.noRequiredSelection}</p>
+        ) : (
+          <RequiredStepForm
+            step={step}
+            onChange={(next, field) => {
+              onChange(
+                steps.map((s, i) => (i === index ? next : s)),
+                `${index}:${field}`,
+              );
+              setSelected(next.key);
+            }}
+            onRemove={() => remove(step.key)}
+            allowedRoles={allowedRoles}
+            roles={roles}
+          />
+        )}
+      </Panel>
+      <Panel title={PLAN_EDITOR_COPY.problems}>{problems}</Panel>
+    </>
+  );
+
   return (
-    <div className="col">
-      <p className="hint">{C.requiredHint}</p>
-      {steps.map((step, index) => {
-        const id = `required-${index}`;
-        return (
-          // Keys may be edited, so the position identifies the card while typing.
-          // biome-ignore lint/suspicious/noArrayIndexKey: see above
-          <fieldset key={index} className="card pad col" aria-label={step.title === '' ? step.key : step.title}>
-            <div className={styles.fieldGrid}>
-              <div className="field">
-                <label className="label" htmlFor={`${id}-key`}>
-                  {C.stepKey}
-                </label>
-                <input
-                  id={`${id}-key`}
-                  className="input mono"
-                  value={step.key}
-                  onChange={(e) => set(index, { ...step, key: e.target.value })}
-                />
-              </div>
-              <div className="field">
-                <label className="label" htmlFor={`${id}-title`}>
-                  {C.stepTitle}
-                </label>
-                <input
-                  id={`${id}-title`}
-                  className="input"
-                  value={step.title}
-                  onChange={(e) => set(index, { ...step, title: e.target.value })}
-                />
-              </div>
-              <div className="field">
-                <label className="label" htmlFor={`${id}-role`}>
-                  {C.stepRole}
-                </label>
-                <select
-                  id={`${id}-role`}
-                  className="select"
-                  value={step.roleKey}
-                  onChange={(e) => set(index, { ...step, roleKey: e.target.value })}
-                >
-                  {(allowedRoles.includes(step.roleKey) ? allowedRoles : [...allowedRoles, step.roleKey]).map((key) => (
-                    <option key={key} value={key}>
-                      {roleName(key)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label className="label" htmlFor={`${id}-position`}>
-                  {C.position}
-                </label>
-                <select
-                  id={`${id}-position`}
-                  className="select"
-                  value={step.position ?? ''}
-                  onChange={(e) => set(index, withPosition(step, e.target.value))}
-                >
-                  <option value="">{C.positionNone}</option>
-                  {Object.values(RequiredStepPosition).map((p) => (
-                    <option key={p} value={p}>
-                      {POSITION_LABEL[p]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="field">
-              <label className="label" htmlFor={`${id}-instructions`}>
-                {C.stepInstructions}
-              </label>
-              <textarea
-                id={`${id}-instructions`}
-                className="textarea"
-                rows={3}
-                value={step.instructions}
-                onChange={(e) => set(index, { ...step, instructions: e.target.value })}
-              />
-            </div>
-            <AcceptanceEditor
-              idPrefix={id}
-              value={step.acceptance}
-              onChange={(acceptance) => {
-                const { acceptance: _old, ...rest } = step;
-                set(index, acceptance === undefined ? rest : { ...rest, acceptance });
-              }}
-              allowDefault
-            />
-            <div className="row">
-              <Button
-                size="sm"
-                variant="ghost"
-                icon="trash"
-                onClick={() => onChange(steps.filter((_, i) => i !== index))}
-              >
-                {C.removeRequired}
-              </Button>
-            </div>
-          </fieldset>
-        );
-      })}
-      <div className="row">
-        <Button size="sm" icon="plus" onClick={add}>
-          {C.addRequired}
-        </Button>
+    <div className={editorStyles.editor} data-testid="required-steps-editor">
+      <div className={editorStyles.toolbar}>{toolbar(() => added(addRequired(steps, blank)))}</div>
+      <div className={editorStyles.layout}>
+        <div className={editorStyles.canvas}>
+          <FlowCanvas
+            steps={canvasSteps}
+            label={CANVAS_COPY.workflowLabel}
+            placeholder={{ id: PLANNED, title: C.plannedTitle, description: C.plannedHint, dependsOn: shape.planned }}
+            selectedId={selected}
+            onSelect={select}
+            edit={edit}
+            revealId={reveal}
+          />
+        </div>
+        <aside className={editorStyles.side}>
+          <Tabs
+            value={tab}
+            onValueChange={setTab}
+            items={[
+              { value: Tab.Step, label: PLAN_EDITOR_COPY.step, content: <div className="col">{stepPanels}</div> },
+              { value: Tab.Settings, label: PLAN_EDITOR_COPY.settings, content: settings },
+            ]}
+          />
+        </aside>
       </div>
     </div>
   );
