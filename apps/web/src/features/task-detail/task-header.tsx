@@ -5,6 +5,7 @@ import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { Markdown } from '../../components/markdown.tsx';
 import { toast } from '../../components/toast.tsx';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
@@ -67,7 +68,12 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
         )}
       </div>
       <span className="hint">{C.meta(task.key, task.project.name, task.workflow.name)}</span>
-      {doing !== null && <span className={styles.doing}>{C.doing(doing)}</span>}
+      {doing !== null && (
+        <span className={styles.doing}>
+          {C.doing}
+          <Markdown inline source={doing} />
+        </span>
+      )}
       {task.status === TaskStatus.Draft && <span className="hint">{C.draft}</span>}
       {start.isError && <ErrorState error={start.error} />}
       {pause.isError && <ErrorState error={pause.error} />}

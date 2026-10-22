@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
+import { Markdown } from '../../components/markdown.tsx';
 import { PPT_COPY as C } from '../../copy/ppt.ts';
 import styles from './ppt.module.css';
 import { useGenerateDeck, useReviseOutline, useUpdateOutline } from './ppt.queries.ts';
@@ -145,7 +146,9 @@ export function OutlineEditor({ deck, model }: { deck: DeckDTO; model: string | 
           {deck.understanding.assumptions.length > 0 && (
             <ul className={styles.assumptions} aria-label={C.assumptions}>
               {deck.understanding.assumptions.map((a) => (
-                <li key={a}>{a}</li>
+                <li key={a}>
+                  <Markdown inline source={a} />
+                </li>
               ))}
             </ul>
           )}

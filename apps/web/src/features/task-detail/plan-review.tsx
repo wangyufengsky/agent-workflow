@@ -26,7 +26,9 @@ function PlanSteps({ graph, roles }: { graph: PlanGraph; roles: readonly RoleDTO
             <span className={`${styles.stepTitle} grow`}>{n.title}</span>
             <span className="chip">{roles.find((r) => r.key === n.roleKey)?.name ?? n.roleKey}</span>
           </span>
-          <p className={styles.instructions}>{n.instructions}</p>
+          <p className={styles.instructions}>
+            <Markdown inline source={n.instructions} />
+          </p>
         </li>
       ))}
     </ol>
@@ -66,7 +68,9 @@ export function PlanReview({ task, pro }: { task: TaskDetailDTO; pro: boolean })
                 <h3 className="sec-t">{C.assumptions}</h3>
                 <ul className={styles.bullets}>
                   {plan.assumptions.map((a) => (
-                    <li key={a}>{a}</li>
+                    <li key={a}>
+                      <Markdown inline source={a} />
+                    </li>
                   ))}
                 </ul>
               </section>

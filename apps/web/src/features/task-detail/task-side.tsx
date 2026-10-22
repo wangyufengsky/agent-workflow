@@ -2,6 +2,7 @@ import { InboxKind, type TaskDetailDTO } from '@aw/shared';
 import { Link } from '@tanstack/react-router';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
+import { Markdown } from '../../components/markdown.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { InboxCard } from '../inbox/inbox-card.tsx';
@@ -26,7 +27,7 @@ export function TaskSide({
   // The failure panel above the canvas already says why the task failed and offers retry.
   const inbox = task.openInbox.filter((item) => item.kind !== InboxKind.Failure);
   return (
-    <aside className={styles.side}>
+    <aside className={styles.side} data-testid="task-side">
       {inbox.length > 0 && (
         <Panel title={C.sideAttention}>
           <div className="col">
@@ -48,7 +49,7 @@ export function TaskSide({
             <span className="hint">
               {node.roleName} · {C.attempts(node.attemptCount)}
             </span>
-            {node.resultSummary !== null && <p className="sub">{node.resultSummary}</p>}
+            {node.resultSummary !== null && <Markdown source={node.resultSummary} />}
             <div className="row">
               <Button size="sm" icon="chevRight" onClick={() => onOpen(node.id)}>
                 {C.viewNode}

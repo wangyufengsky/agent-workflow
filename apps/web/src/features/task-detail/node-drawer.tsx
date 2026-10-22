@@ -1,8 +1,11 @@
 import { AcceptanceCheckKind, AttemptKind, type CheckResult, type NodeDetailDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
+import { Button } from '../../components/button.tsx';
 import { DiffBrowser } from '../../components/diff/diff-browser.tsx';
+import { DiffDialog } from '../../components/diff/diff-dialog.tsx';
 import { Drawer } from '../../components/drawer.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
@@ -10,6 +13,7 @@ import { StatusBadge } from '../../components/status-badge.tsx';
 import { Tabs } from '../../components/tabs.tsx';
 import { STREAM_COPY } from '../../copy/attempts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
+import { DIFF_COPY } from '../../copy/diff.ts';
 import { NODE_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
 import { ConversationStream } from '../stream/conversation-stream.tsx';
 import { NodeBadge } from '../tasks/task-badge.tsx';
@@ -35,7 +39,7 @@ function Check({ check }: { check: CheckResult }) {
               <li key={`${issue.path}:${issue.line}:${issue.description}`}>
                 [{issue.severity}]{' '}
                 {issue.path === undefined ? '' : `${issue.path}${issue.line === undefined ? '' : `:${issue.line}`} `}
-                {issue.description}
+                <Markdown inline source={issue.description} />
               </li>
             ))}
           </ul>
@@ -56,7 +60,9 @@ export function Output({ node }: { node: NodeDetailDTO }) {
           <h3 className="sec-t">{C.assumptions}</h3>
           <ul>
             {result.assumptions.map((a) => (
-              <li key={a}>{a}</li>
+              <li key={a}>
+                <Markdown inline source={a} />
+              </li>
             ))}
           </ul>
         </>
@@ -81,17 +87,18 @@ export function Output({ node }: { node: NodeDetailDTO }) {
       {node.retryFeedback !== null && (
         <details>
           <summary className="hint">{C.retryFeedback}</summary>
-          <pre className={styles.output}>{node.retryFeedback}</pre>
+          <Markdown source={node.retryFeedback} />
         </details>
       )}
     </div>
   );
 }
 
-/** A step's listed changes and its commit's diff (14 §3.4「改动」). */
+/** A step's listed changes and its commit's diff (14 §3.4「改动」); the large view shows it almost full screen. */
 export function Changes({ node }: { node: NodeDetailDTO }) {
   const changes = node.result?.changes ?? [];
   const diff = useQuery(nodeDiffQuery(node.taskId, node.id));
+  const [expanded, setExpanded] = useState(false);
   return (
     <div className="col">
       {changes.length > 0 && (
@@ -99,7 +106,9 @@ export function Changes({ node }: { node: NodeDetailDTO }) {
           {changes.map((c) => (
             <li key={c.path} className={styles.file}>
               <span className="mono">{c.path}</span>
-              <span className="hint ellipsis">{c.description}</span>
+              <span className="hint">
+                <Markdown inline source={c.description} />
+              </span>
             </li>
           ))}
         </ul>
@@ -108,12 +117,25 @@ export function Changes({ node }: { node: NodeDetailDTO }) {
         <p className="hint">{C.changesEmpty}</p>
       ) : (
         <>
-          <span className="chip mono">{C.commit(node.commitSha)}</span>
+          <span className="row">
+            <span className="chip mono">{C.commit(node.commitSha)}</span>
+            <span className="grow" />
+            <Button size="sm" variant="ghost" icon="expand" onClick={() => setExpanded(true)}>
+              {DIFF_COPY.expand}
+            </Button>
+          </span>
           {diff.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
           {diff.isError && <ErrorState error={diff.error} onRetry={() => void diff.refetch()} />}
           {diff.data !== undefined && (
             <DiffBrowser files={diff.data.files} fileQuery={nodeDiffFileQuery(node.taskId, node.id)} />
           )}
+          <DiffDialog
+            open={expanded}
+            onOpenChange={setExpanded}
+            title={C.changesOf(node.title)}
+            query={nodeDiffQuery(node.taskId, node.id)}
+            fileQuery={nodeDiffFileQuery(node.taskId, node.id)}
+          />
         </>
       )}
     </div>
