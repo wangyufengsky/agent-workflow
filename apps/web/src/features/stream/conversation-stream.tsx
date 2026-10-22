@@ -19,8 +19,8 @@ import { type StreamItem, streamItems } from './stream-items.ts';
 import { ThinkingBlock } from './thinking-block.tsx';
 import { useStickToBottom } from './use-stick-to-bottom.ts';
 
-/** The box's fixed height (25 §3): beside the canvas in the drawer, on a page, inside a card. */
-export type StreamSize = 'drawer' | 'page' | 'card';
+/** The box's fixed height (25 §3): beside the canvas in the drawer, on a page, inside a card, in the task's side panel. */
+export type StreamSize = 'drawer' | 'page' | 'card' | 'side';
 
 type BoxState = 'running' | 'done' | 'failed' | 'stopped';
 const boxState = (a: AttemptDTO): BoxState => {

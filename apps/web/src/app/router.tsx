@@ -37,6 +37,7 @@ import { SchedulePage } from '../features/schedules/schedule.page.tsx';
 import { SchedulesPage } from '../features/schedules/schedules.page.tsx';
 import { SettingsPage } from '../features/settings/settings.page.tsx';
 import { settingsQuery, useSettings } from '../features/settings/settings.queries.ts';
+import { NodeTab } from '../features/task-detail/node-drawer.tsx';
 import { TaskPage } from '../features/task-detail/task.page.tsx';
 import { TasksPage } from '../features/tasks/tasks.page.tsx';
 import { ToolsPage } from '../features/tools/tools.page.tsx';
@@ -148,11 +149,12 @@ const tasksRoute = createRoute({
 const taskRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.task,
-  // `?node=<id>` selects a step on the canvas; `open` shows its details drawer (14 §3.4); `details` shows the pro view
-  // of this task in simple mode (D19).
+  // `?node=<id>` selects a step on the canvas; `open` shows its details drawer (14 §3.4) on its `tab`; `details` shows
+  // the pro view of this task in simple mode (D19).
   validateSearch: z.object({
     node: z.string().optional(),
     open: z.boolean().optional(),
+    tab: z.enum(NodeTab).optional(),
     details: z.boolean().optional(),
   }),
   component: TaskPage,

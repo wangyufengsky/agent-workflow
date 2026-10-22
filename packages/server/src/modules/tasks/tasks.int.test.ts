@@ -140,7 +140,7 @@ describe('任务状态机（09 §2）', () => {
     expect(t.fake.sessions.filter((s) => s.agent === 'aw-planner')).toHaveLength(2);
   });
 
-  it('running → failed（节点预算耗尽）→ 重试重置预算 → running → review', async () => {
+  it('running → failed（节点预算耗尽）→ 带说明重试重置预算 → running → review', async () => {
     await t.call(updateSettingsOp, { 'node.maxAttempts': 1 });
     const { project } = await addProject(t, { checkCommand: null });
     const failed = taskReaches(t, 'failed');
@@ -158,9 +158,12 @@ describe('任务状态机（09 §2）', () => {
 
     scriptBugfix();
     const review = taskReaches(t, 'review');
-    const retried = await t.call(retryTaskOp, { id: task.id });
+    const retried = await t.call(retryTaskOp, { id: task.id, feedback: 'Start the fixture database first.' });
     expect(retried.body.status).toBe('running');
     await review;
+    // The user's note reached the failed step's next attempt (D118).
+    const locate = t.fake.prompts.filter((p) => p.text.includes('Your step: 定位根因')).at(-1);
+    expect(locate?.text).toContain('Start the fixture database first.');
   });
 
   it('running → cancelled：中止会话、取消节点、关闭条目、删除工作区与分支', async () => {

@@ -59,7 +59,7 @@ export function createTaskChecks(deps: TasksServiceDeps, state: TaskState, lifec
       if (updateProject) await projects.update({ id: task.projectId, checkCommand: command });
       unit.transact(() => {
         rewrite(taskId, check.command, () => ({ kind: AcceptanceCheckKind.Command, command }));
-        lifecycle.retry(taskId, (node) => nodes.failedCommand(node) !== null);
+        lifecycle.retry(taskId, { recheck: (node) => nodes.failedCommand(node) !== null });
       });
     },
 
