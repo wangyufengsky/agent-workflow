@@ -67,7 +67,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 | 枚举 | 值 | 说明 |
 | --- | --- | --- |
-| `WorkflowKind` | `builtin` · `custom` · `system` | 内置流程只读，可复制为自定义；`system` 只由应用自己发起（Git 工作台的合并任务 `merge_branch`，27 §3.6），不列出、不能复制、不能用于新建任务 |
+| `WorkflowKind` | `builtin` · `custom` · `system` | 内置流程只读，可复制为自定义；`system` 只由应用自己发起（Git 工作台的合并任务 `system.merge_branch`，27 §3.6），不列出、不能复制、不能用于新建任务 |
 | `WorkflowPlanning` | `fixed` · `ai` | 固定 DAG / AI 在约束内规划 |
 | `WorkflowDeliverable` | `code_changes` · `report` | 代码审查等只读流程产出报告，不合并 |
 | `RoleBaseAgent` | `planner` · `executor` · `reviewer` | 对应注入 opencode 的 agent `aw-planner` / `aw-executor` / `aw-reviewer`，决定权限基线 |

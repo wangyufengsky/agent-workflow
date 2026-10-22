@@ -522,6 +522,7 @@ payload / response：
 | project_id | TEXT → projects，CASCADE | |
 | target | TEXT | `GitReviewTarget` |
 | label | TEXT | 分支名或短 SHA，显示用 |
+| parent | INTEGER NULL | 提交的审查对比的是第几个父提交（从 1 起），重新审查按同一个父提交；其他对象为空 |
 | from_sha | TEXT | 审查的 diff 的起点（工作区改动为 HEAD，提交为所选的父提交，分支与区间为 merge-base） |
 | to_sha | TEXT NULL | 终点；空 = 主工作区的未提交改动 |
 | focus | TEXT NULL | 用户填的关注点 |

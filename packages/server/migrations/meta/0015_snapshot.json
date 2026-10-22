@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7bcd6d12-03be-4379-add7-8e287873bd3d",
+  "id": "1b4e4cab-6df1-410b-a401-23f9e0114a86",
   "prevId": "8db2dece-7a70-4439-897a-04d2b0f89cad",
   "tables": {
     "assistant_confirmations": {
@@ -1203,6 +1203,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "parent": {
+          "name": "parent",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "to_sha": {

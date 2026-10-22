@@ -55,7 +55,11 @@ function ChangeRow({
         <StatusCode status={file.status} untracked={untracked} />
         <span className={styles.changeName}>
           <span className={styles.file}>{file.path.slice(slash + 1)}</span>
-          {slash > 0 && <span className={styles.dir}>{file.path.slice(0, slash + 1)}</span>}
+          {file.oldPath !== undefined ? (
+            <span className={styles.dir}>{C.renamedFrom(file.oldPath)}</span>
+          ) : (
+            slash > 0 && <span className={styles.dir}>{file.path.slice(0, slash + 1)}</span>
+          )}
         </span>
       </button>
       <LineCounts file={file} />
@@ -84,7 +88,7 @@ export function ChangesList({
   const unstage = useUnstage(projectId);
   if (changes.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (changes.isError) return <ErrorState error={changes.error} onRetry={() => void changes.refetch()} />;
-  const { staged, unstaged } = changes.data;
+  const { staged, unstaged, conflicted } = changes.data;
   const group = (side: ChangeSide, files: readonly DiffFile[]) => (
     <>
       <div className={styles.group}>
@@ -109,7 +113,23 @@ export function ChangesList({
   );
   return (
     <div data-testid="git-changes">
-      {staged.length + unstaged.length === 0 && <p className="hint">{C.noChanges}</p>}
+      {staged.length + unstaged.length + conflicted.length === 0 && <p className="hint">{C.noChanges}</p>}
+      {conflicted.length > 0 && (
+        <>
+          <div className={styles.group}>
+            {C.conflicted} {conflicted.length}
+          </div>
+          {conflicted.map((path) => (
+            <div key={path} className={styles.change} data-testid="git-conflicted">
+              <span className={styles.code} data-status="deleted">
+                {C.conflictCode}
+              </span>
+              <span className={`${styles.changeName} mono`}>{path}</span>
+            </div>
+          ))}
+          <p className="hint">{C.conflictedHint}</p>
+        </>
+      )}
       {group('staged', staged)}
       {group('unstaged', unstaged)}
       {(stage.isError || unstage.isError) && <ErrorState error={stage.error ?? unstage.error} />}

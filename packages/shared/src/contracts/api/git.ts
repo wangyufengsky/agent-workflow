@@ -144,8 +144,15 @@ export const gitWorktreeSchema = z.object({
 });
 export type GitWorktreeDTO = z.infer<typeof gitWorktreeSchema>;
 
-/** `GET /projects/:id/git/changes`: the main worktree's uncommitted changes; untracked files are unstaged additions. */
-export const gitChangesSchema = z.object({ staged: z.array(diffFileSchema), unstaged: z.array(diffFileSchema) });
+/**
+ * `GET /projects/:id/git/changes`: the main worktree's uncommitted changes; untracked files are unstaged additions,
+ * paths a conflict left unmerged are listed apart.
+ */
+export const gitChangesSchema = z.object({
+  staged: z.array(diffFileSchema),
+  unstaged: z.array(diffFileSchema),
+  conflicted: z.array(z.string()),
+});
 export type GitChangesDTO = z.infer<typeof gitChangesSchema>;
 
 export const commitMessageSchema = z.string().trim().min(1).max(COMMIT_MESSAGE_MAX_CHARS);
@@ -212,6 +219,8 @@ export const gitReviewSchema = z.object({
   /** The diff reviewed: `from` → `to`; `to` null for the worktree's uncommitted changes. */
   from: z.string(),
   to: z.string().nullable(),
+  /** For a commit: the parent (1-based) it was compared with; null for other targets. */
+  parent: z.number().nullable(),
   focus: z.string().nullable(),
   files: z.array(diffFileSchema),
   status: attemptStatusSchema,

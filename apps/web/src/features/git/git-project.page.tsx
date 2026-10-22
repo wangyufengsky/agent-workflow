@@ -1,6 +1,6 @@
 import { DiffSide, GitReviewTarget, type GitStatusDTO, type ProjectDetailDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
+import { getRouteApi, Link, Navigate, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
@@ -30,6 +30,7 @@ import {
 } from './git.queries.ts';
 import { type GitDialog, GitDialogs } from './git-dialogs.tsx';
 import { GitMenu } from './git-menu.tsx';
+import { reviewSearch, reviewTarget } from './review-location.ts';
 import { ReviewPanel } from './review-panel.tsx';
 import { WorktreesTab } from './worktrees-tab.tsx';
 
@@ -298,14 +299,9 @@ function ReviewView({ projectId, reviewId }: { projectId: string; reviewId: stri
   if (review.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (review.isError) return <ErrorState error={review.error} />;
   const r = review.data;
-  const target =
-    r.target === GitReviewTarget.Branch
-      ? { kind: r.target, branch: r.label }
-      : r.target === GitReviewTarget.Range
-        ? { kind: r.target, from: r.from, to: r.to ?? r.from }
-        : r.target === GitReviewTarget.Commit
-          ? { kind: r.target, sha: r.to ?? r.from }
-          : { kind: r.target };
+  const place = reviewSearch(r);
+  // A worktree or commit review is shown where its diff is (a link to one may still name this view).
+  if (place.view !== 'review') return <Navigate to={ROUTES.gitProject} params={{ projectId }} search={place} replace />;
   return (
     <div className={styles.changes}>
       <section className={styles.detail}>
@@ -318,7 +314,7 @@ function ReviewView({ projectId, reviewId }: { projectId: string; reviewId: stri
         </div>
         <ReviewPanel
           projectId={projectId}
-          target={target}
+          target={reviewTarget(r)}
           reviews={[r]}
           onLocate={(f) => setFocus({ path: f.path, line: f.line, side: f.side ?? DiffSide.New })}
         />
@@ -348,7 +344,6 @@ function Workbench({ project, status }: { project: ProjectDetailDTO; status: Git
   const navigate = route.useNavigate();
   const [dialog, setDialog] = useState<GitDialog | null>(null);
   const [changePick, setChangePick] = useState<ChangePick | undefined>(undefined);
-  const [showWorktreeReview, setShowWorktreeReview] = useState(false);
   const startReview = useStartReview(project.id);
   useRefreshOnFocus(project.id);
   const go: Go = (next) => void navigate({ search: { ...search, ...next } });
@@ -367,8 +362,8 @@ function Workbench({ project, status }: { project: ProjectDetailDTO; status: Git
           projectId={project.id}
           status={status}
           picked={changePick}
-          showReview={showWorktreeReview}
-          onShowReview={setShowWorktreeReview}
+          showReview={search.tab === 'review'}
+          onShowReview={(show) => go({ tab: show ? 'review' : undefined })}
           onPick={setChangePick}
           onPush={(branch) => setDialog({ kind: 'push', branch })}
         />

@@ -1,7 +1,6 @@
 import type { ProjectDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from '@tanstack/react-router';
-import { useEffect } from 'react';
+import { Link, Navigate } from '@tanstack/react-router';
 import { ROUTES } from '../../app/routes.ts';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
@@ -12,6 +11,7 @@ import { projectsQuery } from '../projects/projects.queries.ts';
 import styles from './git.module.css';
 import { gitLastCommitQuery, gitReviewQuery, gitReviewsQuery, gitStatusQuery } from './git.queries.ts';
 import { Avatar, ReviewBadge } from './git-parts.tsx';
+import { reviewSearch } from './review-location.ts';
 
 function ProjectCard({ project }: { project: ProjectDTO }) {
   const status = useQuery(gitStatusQuery(project.id));
@@ -119,17 +119,6 @@ export function GitConsolePage() {
  */
 export function GitReviewRedirect({ reviewId }: { reviewId: string }) {
   const review = useQuery(gitReviewQuery(reviewId));
-  const navigate = useNavigate();
-  const projectId = review.data?.projectId;
-  useEffect(() => {
-    if (projectId === undefined) return;
-    void navigate({
-      to: ROUTES.gitProject,
-      params: { projectId },
-      search: { view: 'review', review: reviewId },
-      replace: true,
-    });
-  }, [navigate, projectId, reviewId]);
   if (review.isError) {
     return (
       <div className="page">
@@ -137,5 +126,13 @@ export function GitReviewRedirect({ reviewId }: { reviewId: string }) {
       </div>
     );
   }
-  return <p className="page hint">{COMMON_COPY.loading}</p>;
+  if (review.data === undefined) return <p className="page hint">{COMMON_COPY.loading}</p>;
+  return (
+    <Navigate
+      to={ROUTES.gitProject}
+      params={{ projectId: review.data.projectId }}
+      search={reviewSearch(review.data)}
+      replace
+    />
+  );
 }

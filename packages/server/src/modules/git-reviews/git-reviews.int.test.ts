@@ -115,6 +115,37 @@ describe('AI 审查（27 §4）', () => {
   });
 });
 
+describe('AI 审查的对象与并发（27 §4.2、§4.3）', () => {
+  it('同时发起两次审查：只有一次开始，另一次 GIT_REVIEW_RUNNING', async () => {
+    const { project } = await projectWithBranch();
+    t.fake.enqueue(script().hang(), REVIEWER);
+    t.fake.enqueue(script().hang(), REVIEWER);
+    const target = { kind: 'branch', branch: 'feature' } as const;
+    const results = await Promise.all([
+      t.call(startGitReviewOp, { id: project.id, target }),
+      t.call(startGitReviewOp, { id: project.id, target }),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(t.fake.sessions.filter((s) => s.agent === 'aw-code-reviewer')).toHaveLength(1);
+  });
+
+  it('审查合并提交时记下对比的父提交，审查记录可以按同一个父提交重来', async () => {
+    const { repo, project } = await projectWithBranch();
+    // Against its second parent (feature) the merge brings what main did meanwhile.
+    await writeFile(join(repo.path, 'main.ts'), 'export const main = 1;\n');
+    await repo.git('add', '-A');
+    await repo.git('commit', '-q', '-m', 'Main work');
+    await repo.git('merge', '-q', '--no-ff', 'feature', '-m', 'Merge feature');
+    const merge = (await repo.git('rev-parse', 'HEAD')).trim();
+    t.fake.enqueue(script().hang(), REVIEWER);
+    const { body } = await t.call(startGitReviewOp, {
+      id: project.id,
+      target: { kind: 'commit', sha: merge, parent: 2 },
+    });
+    expect(body).toMatchObject({ target: 'commit', parent: 2, from: (await repo.git('rev-parse', 'feature')).trim() });
+  });
+});
+
 describe('AI 草拟提交信息（27 §7.3）', () => {
   it('按已暂存的改动草拟并直接返回；没有暂存时 GIT_NOTHING_TO_COMMIT；AI 没有提交时 COMMIT_DRAFT_FAILED', async () => {
     const { repo, project } = await addProject(t);

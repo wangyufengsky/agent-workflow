@@ -10,19 +10,23 @@ const NAME_STATUS: Readonly<Record<string, DiffFile['status']>> = {
   T: DiffFileStatus.Modified,
 };
 
-/** `--name-status -z`: `M\0path\0`, renames `R100\0old\0new\0`. */
-export function parseNameStatus(output: string): Array<{ path: string; status: DiffFile['status'] }> {
+type NamedFile = { path: string; status: DiffFile['status']; oldPath?: string };
+
+/** `--name-status -z`: `M\0path\0`, renames `R100\0old\0new\0` (the old path is kept). */
+export function parseNameStatus(output: string): NamedFile[] {
   const fields = output.split('\0');
-  const files: Array<{ path: string; status: DiffFile['status'] }> = [];
+  const files: NamedFile[] = [];
   for (let i = 0; i < fields.length - 1; ) {
     const code = fields[i] ?? '';
     const letter = code.charAt(0);
     const status = NAME_STATUS[letter];
     if (status === undefined) throw new Error(`Unexpected git name-status ${code}`);
-    const path = letter === 'R' || letter === 'C' ? fields[i + 2] : fields[i + 1];
-    if (path === undefined) throw new Error(`Truncated git name-status output at ${code}`);
-    files.push({ path, status });
-    i += letter === 'R' || letter === 'C' ? 3 : 2;
+    const moved = letter === 'R' || letter === 'C';
+    const path = moved ? fields[i + 2] : fields[i + 1];
+    const oldPath = fields[i + 1];
+    if (path === undefined || oldPath === undefined) throw new Error(`Truncated git name-status output at ${code}`);
+    files.push(moved ? { path, status, oldPath } : { path, status });
+    i += moved ? 3 : 2;
   }
   return files;
 }
@@ -47,13 +51,13 @@ export function parseNumstat(output: string): Map<string, { additions: number | 
 }
 
 function merge(
-  names: Array<{ path: string; status: DiffFile['status'] }>,
+  names: NamedFile[],
   counts: Map<string, { additions: number | null; deletions: number | null }>,
 ): DiffFile[] {
-  return names.map(({ path, status }) => {
-    const count = counts.get(path);
-    if (count === undefined) throw new Error(`git numstat has no entry for ${path}`);
-    return { path, status, ...count };
+  return names.map((file) => {
+    const count = counts.get(file.path);
+    if (count === undefined) throw new Error(`git numstat has no entry for ${file.path}`);
+    return { ...file, ...count };
   });
 }
 
@@ -94,11 +98,17 @@ export async function diffWorktree(cwd: string, from: string): Promise<DiffFile[
   return [...merge(parseNameStatus(names.stdout), parseNumstat(counts.stdout)), ...untracked];
 }
 
+/**
+ * Paths left unmerged by a conflict are neither staged nor unstaged: they are listed apart (`unmergedFiles`), so both
+ * lists leave them out (`--diff-filter=u`).
+ */
+const NOT_UNMERGED = '--diff-filter=u';
+
 /** Staged changes: the index against HEAD (against nothing before the first commit). */
 export async function diffStaged(cwd: string): Promise<DiffFile[]> {
   const [names, counts] = await Promise.all([
-    runGit(['diff', '--cached', '--name-status', '-z', '-M'], { cwd }),
-    runGit(['diff', '--cached', '--numstat', '-z', '-M'], { cwd }),
+    runGit(['diff', '--cached', '--name-status', '-z', '-M', NOT_UNMERGED], { cwd }),
+    runGit(['diff', '--cached', '--numstat', '-z', '-M', NOT_UNMERGED], { cwd }),
   ]);
   return merge(parseNameStatus(names.stdout), parseNumstat(counts.stdout));
 }
@@ -106,8 +116,8 @@ export async function diffStaged(cwd: string): Promise<DiffFile[]> {
 /** Unstaged changes: the worktree against the index, untracked files as additions. */
 export async function diffUnstaged(cwd: string): Promise<DiffFile[]> {
   const [names, counts, untracked] = await Promise.all([
-    runGit(['diff', '--name-status', '-z'], { cwd }),
-    runGit(['diff', '--numstat', '-z'], { cwd }),
+    runGit(['diff', '--name-status', '-z', NOT_UNMERGED], { cwd }),
+    runGit(['diff', '--numstat', '-z', NOT_UNMERGED], { cwd }),
     untrackedFiles(cwd),
   ]);
   return [...merge(parseNameStatus(names.stdout), parseNumstat(counts.stdout)), ...untracked];

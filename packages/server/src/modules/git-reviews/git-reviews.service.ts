@@ -10,6 +10,7 @@ import {
   type GitReviewDTO,
   GitReviewTarget,
   type GitReviewTargetInput,
+  type ProjectDTO,
   ServerEventType,
   SessionAgent,
   type SubmitFindingsInput,
@@ -71,6 +72,7 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
       label: review.label,
       from: review.fromSha,
       to: review.toSha,
+      parent: review.parent,
       focus: review.focus,
       files: review.files,
       status: attempt.status,
@@ -91,13 +93,71 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
 
   const isRunning = (review: Review) => ACTIVE.includes(attempts.get(review.attemptId).status);
 
+  /**
+   * Projects whose review is being started: between the check and the review's row, resolving the diff awaits git,
+   * and a second request in that window would start a second (billable) session.
+   */
+  const starting = new Set<string>();
+
   function assertIdle(projectId: string): void {
+    if (starting.has(projectId)) {
+      throw new AppError(ErrorCode.GitReviewRunning, 'A review of this project is being started', { projectId });
+    }
     const running = repo.list(projectId).find(isRunning);
     if (running !== undefined) {
       throw new AppError(ErrorCode.GitReviewRunning, 'A review of this project is still running', {
         reviewId: running.id,
       });
     }
+  }
+
+  /** Resolves the diff, starts the review's attempt and records the review; the caller awaits the start. */
+  async function begin(project: ProjectDTO, input: GitReviewTargetInput, focus: string | undefined) {
+    const target = await resolveTarget(project.repoPath, project.defaultBranch, input);
+    if (target.files.length === 0) {
+      throw new AppError(ErrorCode.ValidationFailed, 'There are no changes to review', {
+        issues: [{ path: ['target'], message: 'no changes' }],
+      });
+    }
+    const reviewer = roles.getByKey(BuiltinRoleKey.Reviewer);
+    const attemptId = randomUUID();
+    const started = attempts.start({
+      id: attemptId,
+      kind: AttemptKind.GitReview,
+      agent: SessionAgent.CodeReviewer,
+      projectId: project.id,
+      taskId: null,
+      nodeId: null,
+      roleId: reviewer.id,
+      directory: project.repoPath,
+      title: `${SESSION_TITLE_PREFIX} · ${project.name} · ${target.label}`,
+      model: reviewer.model ?? settings.get('ai.defaultModel'),
+      prompt: renderTemplate(prompts[PromptName.StartGitReview], {
+        projectName: project.name,
+        scope: SCOPE[target.target](target.label),
+        readCommands: readCommands(target),
+        files: target.files.map(fileLine).join('\n'),
+        focus: focus ?? EMPTY_SECTION,
+      }),
+    });
+    const review = {
+      id: randomUUID(),
+      projectId: project.id,
+      target: target.target,
+      label: target.label,
+      fromSha: target.from,
+      parent: target.parent,
+      toSha: target.to,
+      focus: focus ?? null,
+      attemptId,
+      files: target.files,
+      createdAt: clock.now(),
+    };
+    unit.transact(() => {
+      repo.insert(review);
+      publish(review);
+    });
+    return { review, started };
   }
 
   attempts.onSignal(({ type, attempt }) => {
@@ -123,51 +183,14 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
       const project = projects.getRecord(projectId);
       attempts.requireReady();
       assertIdle(projectId);
-      const target = await resolveTarget(project.repoPath, project.defaultBranch, input);
-      if (target.files.length === 0) {
-        throw new AppError(ErrorCode.ValidationFailed, 'There are no changes to review', {
-          issues: [{ path: ['target'], message: 'no changes' }],
-        });
+      starting.add(projectId);
+      try {
+        const { review, started } = await begin(project, input, focus);
+        await started;
+        return toDto(mustFind(review.id));
+      } finally {
+        starting.delete(projectId);
       }
-      const reviewer = roles.getByKey(BuiltinRoleKey.Reviewer);
-      const attemptId = randomUUID();
-      const started = attempts.start({
-        id: attemptId,
-        kind: AttemptKind.GitReview,
-        agent: SessionAgent.CodeReviewer,
-        projectId: project.id,
-        taskId: null,
-        nodeId: null,
-        roleId: reviewer.id,
-        directory: project.repoPath,
-        title: `${SESSION_TITLE_PREFIX} · ${project.name} · ${target.label}`,
-        model: reviewer.model ?? settings.get('ai.defaultModel'),
-        prompt: renderTemplate(prompts[PromptName.StartGitReview], {
-          projectName: project.name,
-          scope: SCOPE[target.target](target.label),
-          readCommands: readCommands(target),
-          files: target.files.map(fileLine).join('\n'),
-          focus: focus ?? EMPTY_SECTION,
-        }),
-      });
-      const review = {
-        id: randomUUID(),
-        projectId,
-        target: target.target,
-        label: target.label,
-        fromSha: target.from,
-        toSha: target.to,
-        focus: focus ?? null,
-        attemptId,
-        files: target.files,
-        createdAt: clock.now(),
-      };
-      unit.transact(() => {
-        repo.insert(review);
-        publish(review);
-      });
-      await started;
-      return toDto(mustFind(review.id));
     },
 
     async stop(id: string): Promise<GitReviewDTO> {

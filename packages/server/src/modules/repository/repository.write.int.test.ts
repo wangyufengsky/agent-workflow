@@ -11,6 +11,7 @@ import {
   gitCreateCommitOp,
   gitDeleteBranchOp,
   gitFetchOp,
+  gitLogOp,
   gitMergeOp,
   gitMergeWithAiOp,
   gitPullOp,
@@ -79,6 +80,7 @@ describe('Git 工作台：暂存与提交（27 §3.2）', () => {
     await writeFile(join(repo.path, 'new.ts'), 'new\n');
     expect((await t.call(gitChangesOp, { id: project.id })).body).toEqual({
       staged: [],
+      conflicted: [],
       unstaged: [
         { path: 'a.ts', status: 'modified', additions: 1, deletions: 1 },
         { path: 'new.ts', status: 'added', additions: 1, deletions: 0 },
@@ -129,6 +131,49 @@ describe('Git 工作台：暂存与提交（27 §3.2）', () => {
       400,
       ErrorCode.GitIdentityMissing,
     ]);
+  });
+});
+
+describe('Git 工作台：改动的特殊状态（27 §6.3）', () => {
+  it('暂存的改名列出原路径；取消暂存时连同原路径一起取消，不留下半个改名', async () => {
+    const { repo, project } = await setUp({ 'a.ts': 'a\n' });
+    await repo.git('mv', 'a.ts', 'b.ts');
+    const { body: before } = await t.call(gitChangesOp, { id: project.id });
+    expect(before.staged).toEqual([{ path: 'b.ts', oldPath: 'a.ts', status: 'renamed', additions: 0, deletions: 0 }]);
+
+    await t.call(gitUnstageOp, { id: project.id, paths: ['b.ts'] });
+    const { body: after } = await t.call(gitChangesOp, { id: project.id });
+    expect(after.staged).toEqual([]);
+    expect(after.unstaged.map((f) => [f.path, f.status])).toEqual([
+      ['a.ts', 'deleted'],
+      ['b.ts', 'added'],
+    ]);
+  });
+
+  it('主工作区有没解决完的合并冲突时，冲突文件单独列出，其余改动照常分组', async () => {
+    const { repo, project } = await setUp({ 'greet.ts': 'hi\n', 'other.ts': 'o\n' });
+    await repo.git('checkout', '-q', '-b', 'clash');
+    await commitFile(repo, 'greet.ts', 'hey\n', 'Hey');
+    await repo.git('checkout', '-q', 'main');
+    await writeFile(join(repo.path, 'other.ts'), 'o2\n');
+    await commitFile(repo, 'greet.ts', 'hello\n', 'Hello');
+    await runGit(['merge', 'clash'], { cwd: repo.path, okExitCodes: [1] });
+    await writeFile(join(repo.path, 'other.ts'), 'o3\n');
+
+    const { status, body } = await t.call(gitChangesOp, { id: project.id });
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ conflicted: ['greet.ts'], staged: [], unstaged: [{ path: 'other.ts' }] });
+    expect((await t.call(gitStatusOp, { id: project.id })).body.operation).toBe('merge');
+  });
+});
+
+describe('Git 工作台：提交筛选（27 §6.2）', () => {
+  it('第一页（cursor 为 0）按 SHA 前缀找到分支上的提交', async () => {
+    const { repo, project } = await setUp();
+    await commitFile(repo, 'x.ts', 'x\n', 'Add x');
+    const sha = (await repo.git('rev-parse', 'HEAD~1')).trim();
+    const { body } = await t.call(gitLogOp, { id: project.id, ref: 'main', cursor: '0', search: sha.slice(0, 7) });
+    expect(body).toEqual({ items: [expect.objectContaining({ sha, subject: 'init' })], nextCursor: null });
   });
 });
 
@@ -280,7 +325,7 @@ describe('Git 工作台：合并（27 §3.5）', () => {
     const review = waitForEvent(t.app.events, ServerEventType.TaskUpdated, (d) => d.status === 'review');
     const { status, body: task } = await t.call(gitMergeWithAiOp, { id: project.id, source: 'clash', target: 'main' });
     expect(status).toBe(201);
-    expect(task).toMatchObject({ title: '合并 clash → main', workflow: { key: 'merge_branch' } });
+    expect(task).toMatchObject({ title: '合并 clash → main', workflow: { key: 'system.merge_branch' } });
     expect(task.git.baseBranch).toBe('main');
     await review;
     await t.fake.settled();
@@ -297,7 +342,7 @@ describe('Git 工作台：合并（27 §3.5）', () => {
     expect(done).toMatchObject({ status: 'completed', lastDelivery: { status: 'succeeded' } });
     expect(await readFile(join(repo.path, 'greet.ts'), 'utf8')).toBe(resolved);
     // The system workflow is not one the user can pick.
-    expect((await t.call(listWorkflowsOp, {})).body.items.map((w) => w.key)).not.toContain('merge_branch');
+    expect((await t.call(listWorkflowsOp, {})).body.items.map((w) => w.key)).not.toContain('system.merge_branch');
   });
 });
 

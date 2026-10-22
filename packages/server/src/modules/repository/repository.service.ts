@@ -38,6 +38,7 @@ import {
   readStatus,
   readTree,
   runGit,
+  unmergedFiles,
 } from '../git/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { Task, TasksService } from '../tasks/index.ts';
@@ -123,8 +124,13 @@ export function createRepositoryService({ projects, tasks, worktrees, locks, log
 
     async changes(projectId: string): Promise<GitChangesDTO> {
       const repo = repoOf(projectId);
-      const [staged, unstaged] = await Promise.all([diffStaged(repo), diffUnstaged(repo)]);
-      return { staged, unstaged };
+      const [staged, unstaged, conflicted] = await Promise.all([
+        diffStaged(repo),
+        diffUnstaged(repo),
+        unmergedFiles(repo),
+      ]);
+      // git also compares an unmerged path's worktree with one side of the conflict; it is a conflict, not a change.
+      return { staged, unstaged: unstaged.filter((f) => !conflicted.includes(f.path)), conflicted };
     },
 
     async changeFile(projectId: string, path: string, staged: boolean): Promise<FileDiffDTO> {
@@ -154,11 +160,11 @@ export function createRepositoryService({ projects, tasks, worktrees, locks, log
     ): Promise<{ items: GitCommitDTO[]; nextCursor: string | null }> {
       const repo = repoOf(projectId);
       await requireObject(repo, `${ref}^{commit}`);
-      if (filter.search !== undefined && cursor === undefined) {
+      const skip = cursor === undefined ? 0 : Number(cursor);
+      if (filter.search !== undefined && skip === 0) {
         const bySha = await commitOnRef(repo, ref, filter.search);
         if (bySha !== undefined) return { items: [bySha], nextCursor: null };
       }
-      const skip = cursor === undefined ? 0 : Number(cursor);
       const commits = await readLog(repo, ref, limit + 1, skip, filter);
       return {
         items: commits.slice(0, limit),

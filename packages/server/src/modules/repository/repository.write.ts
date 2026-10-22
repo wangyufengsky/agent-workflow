@@ -17,6 +17,7 @@ import {
   commit,
   createBranch,
   deleteBranch,
+  diffStaged,
   fastForward,
   fetchRemote,
   hasStagedChanges,
@@ -114,11 +115,15 @@ export function createRepositoryWrites({ projects, tasks, locks }: RepositoryWri
       });
     },
 
+    /** A staged rename is unstaged whole: its old path too, or the old file would stay staged as deleted. */
     async unstage(projectId: string, paths: readonly string[]): Promise<void> {
       const repo = repoOf(projectId);
       await locks.run(repo, async () => {
         await assertNoOperation(repo);
-        await unstage(repo, paths);
+        const renamedFrom = (await diffStaged(repo)).flatMap((f) =>
+          f.oldPath !== undefined && paths.includes(f.path) ? [f.oldPath] : [],
+        );
+        await unstage(repo, [...paths, ...renamedFrom]);
       });
     },
 

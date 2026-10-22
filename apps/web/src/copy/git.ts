@@ -135,6 +135,10 @@ export const GIT_COPY = {
     [GitReviewTarget.Range]: '区间',
   } satisfies Record<GitReviewTargetType, string>,
   // 改动视图
+  conflicted: '有冲突',
+  conflictCode: 'UU',
+  conflictedHint: '这些文件的合并冲突还没解决：在编辑器中解决并在终端完成合并后，这里会恢复正常。',
+  renamedFrom: (oldPath: string) => `由 ${oldPath} 改名`,
   staged: '已暂存',
   unstaged: '未暂存',
   untracked: '新',

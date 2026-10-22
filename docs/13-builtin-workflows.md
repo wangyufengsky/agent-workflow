@@ -115,11 +115,11 @@ packages/builtin/
 
 ### 4a. 系统流程（v1.2）
 
-`WorkflowKind.System`：随内置流程同步入库（`packages/builtin/src/system-workflows.ts`），只由应用自己发起，不出现在流程列表、开始任务页、批量与定时任务中，不能复制，按 key 查找时视为不存在（`WORKFLOW_NOT_FOUND`）。
+`WorkflowKind.System`：随内置流程同步入库（`packages/builtin/src/system-workflows.ts`），只由应用自己发起，不出现在流程列表、开始任务页、批量与定时任务中，不能复制，按 key 查找时视为不存在（`WORKFLOW_NOT_FOUND`）。key 带点（`system.`），用户流程的 key（`DEFINITION_KEY_PATTERN`）不能含点，所以两者不会重名：否则同步系统流程会把用户的同名流程变成旧版本、从列表中消失。
 
 | key | 名称 | 说明 |
 | --- | --- | --- |
-| `merge_branch` | 合并分支 | Git 工作台的合并冲突「交给 AI 解决」（27 §3.6）：固定流程，模板只有一个节点 `resolve_conflicts`「解决合并冲突」（developer，检查为项目检查命令）。任务的 `merge_source` 为来源、`base_branch` 为目标；worktree 从来源建出，准备阶段由后端 `git merge --no-ff --no-commit <目标>` 留下冲突标记，节点完成时后端的提交结束这次合并；之后照常检查、待合并，由用户合并回目标 |
+| `system.merge_branch` | 合并分支 | Git 工作台的合并冲突「交给 AI 解决」（27 §3.6）：固定流程，模板只有一个节点 `resolve_conflicts`「解决合并冲突」（developer，检查为项目检查命令）。任务的 `merge_source` 为来源、`base_branch` 为目标；worktree 从来源建出，准备阶段由后端 `git merge --no-ff --no-commit <目标>` 留下冲突标记，节点完成时后端的提交结束这次合并；之后照常检查、待合并，由用户合并回目标 |
 
 ## 5. 自定义流程（专业模式）
 

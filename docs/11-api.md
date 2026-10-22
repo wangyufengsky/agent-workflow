@@ -227,9 +227,9 @@ type AttemptDTO = AttemptSummaryDTO & {
 | GET | `/projects/:id/git/tree?ref&path` | 目录浏览（目录在前；`path` 为空即仓库根） |
 | GET | `/projects/:id/git/file?ref&path` | 文件内容；二进制返回 `{ binary: true }`，超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }` |
 | POST | `/projects/:id/git/fetch` | `git fetch --all --prune`（仓库锁内） |
-| GET | `/projects/:id/git/changes` | 未提交的改动 `{ staged, unstaged }`（`DiffFile[]`，未跟踪文件是 unstaged 中的 added） |
+| GET | `/projects/:id/git/changes` | 未提交的改动 `{ staged, unstaged, conflicted }`（`DiffFile[]`，未跟踪文件是 unstaged 中的 added，改名带 `oldPath`；合并冲突没解决完的路径只在 `conflicted` 中） |
 | GET | `/projects/:id/git/changes/file?path&side` | 一个文件的 diff：`side = staged`（暂存区对 HEAD）或 `unstaged`（工作区对暂存区，未跟踪文件对空） |
-| POST | `/projects/:id/git/stage`、`/unstage` | `{ paths }`：整文件暂存（含删除）/ 取消暂存，write |
+| POST | `/projects/:id/git/stage`、`/unstage` | `{ paths }`：整文件暂存（含删除）/ 取消暂存（暂存的改名连同原路径一起取消），write |
 | POST | `/projects/:id/git/commits` | `{ message }` → 201 新提交；以用户身份提交并运行钩子（钩子拒绝为 `GIT_COMMAND_FAILED`，stderr 为钩子输出）；`GIT_NOTHING_TO_COMMIT`、`GIT_IDENTITY_MISSING`、`GIT_OPERATION_IN_PROGRESS`，write |
 | POST | `/projects/:id/git/commit-message` | `{}` 或 `{ from, to }` → `{ subject, body }`：AI 草拟已暂存改动或压缩合并的提交信息，等它写完（最长 `COMMIT_DRAFT_TIMEOUT_MS`）；`GIT_NOTHING_TO_COMMIT`、`COMMIT_DRAFT_FAILED`、`OPENCODE_NOT_READY`；read，不给助手 |
 | GET | `/projects/:id/git/push?branch` | 推送预览：远端分支、是否新建、将推送的提交（最多 `GIT_PUSH_COMMITS_SHOWN` 个）与总数 |
@@ -239,7 +239,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/projects/:id/git/switch` | `{ branch }`：本地分支直接切换，远端分支建本地跟踪分支；`WORKTREE_DIRTY`、`GIT_BRANCH_IN_USE`、`GIT_BRANCH_EXISTS`、`GIT_BRANCH_OWNED_BY_TASK`，write |
 | DELETE | `/projects/:id/git/branches/:name?force` | 删除本地分支；默认分支、当前分支或检出在别处 `GIT_BRANCH_IN_USE`，未合并且没有 `force` 时 `GIT_BRANCH_NOT_MERGED`，critical |
 | POST | `/projects/:id/git/merge` | `{ source, target, strategy: merge \| squash, message }` → `{ merged: true, commit }` 或 `{ merged: false, conflictFiles }`（冲突时已中止，目标不变）；以用户身份；目标检出在主工作区时要求它干净（`WORKTREE_DIRTY`），检出在别处 `GIT_BRANCH_IN_USE`，任务分支 `GIT_BRANCH_OWNED_BY_TASK`，critical |
-| POST | `/projects/:id/git/merge-task` | `{ source, target }` → 201 任务（`merge_branch` 系统流程，27 §3.6），write，`produces: task` |
+| POST | `/projects/:id/git/merge-task` | `{ source, target }` → 201 任务（`system.merge_branch` 系统流程，27 §3.6），write，`produces: task` |
 | POST | `/projects/:id/git/pull-requests` | `{ branch, base, title, body }` → 201 `{ url, existed }`：该分支已有打开的 PR 时直接返回它；`HOSTING_NOT_CONFIGURED`，critical |
 | POST | `/projects/:id/git/reviews` | `{ target, focus? }` → 201 审查 `GitReviewDTO`（`target`：`{ kind: worktree }`、`{ kind: commit, sha, parent? }`、`{ kind: branch, branch }`、`{ kind: range, from, to }`）；没有改动 400，同项目已有进行中的审查 409 `GIT_REVIEW_RUNNING`，`OPENCODE_NOT_READY`；write，`produces: git_review` |
 | GET | `/projects/:id/git/reviews?to` | 审查列表，新的在前；`to` 只列该提交的 |

@@ -15,6 +15,8 @@ export const gitReviewsTable = sqliteTable(
     /** A branch name or a short SHA, for display. */
     label: text('label').notNull(),
     fromSha: text('from_sha').notNull(),
+    /** For a commit: which parent (1-based) it is compared with, so that it can be reviewed against it again. */
+    parent: integer('parent'),
     /** Null for the main worktree's uncommitted changes. */
     toSha: text('to_sha'),
     focus: text('focus'),

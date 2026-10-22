@@ -8,10 +8,14 @@ import {
 import { BuiltinRoleKey } from './roles.ts';
 import type { BuiltinWorkflow } from './workflows.ts';
 
-/** Workflows the app starts itself (`WorkflowKind.System`); never listed or chosen by the user. */
+/**
+ * Workflows the app starts itself (`WorkflowKind.System`); never listed or chosen by the user. Their keys have a dot,
+ * which `DEFINITION_KEY_PATTERN` does not allow, so a user's workflow can never have the same key: seeding one would
+ * otherwise make it the latest version of the user's workflow and hide that.
+ */
 export const SystemWorkflowKey = {
   /** The Git workbench's 「交给 AI 解决」 after a conflicting merge (27 §3.6). */
-  MergeBranch: 'merge_branch',
+  MergeBranch: 'system.merge_branch',
 } as const;
 export type SystemWorkflowKey = (typeof SystemWorkflowKey)[keyof typeof SystemWorkflowKey];
 

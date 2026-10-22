@@ -4,6 +4,7 @@ CREATE TABLE `git_reviews` (
 	`target` text NOT NULL,
 	`label` text NOT NULL,
 	`from_sha` text NOT NULL,
+	`parent` integer,
 	`to_sha` text,
 	`focus` text,
 	`attempt_id` text NOT NULL,

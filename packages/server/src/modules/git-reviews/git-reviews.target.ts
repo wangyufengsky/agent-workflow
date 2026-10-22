@@ -20,6 +20,8 @@ export type ResolvedTarget = {
   label: string;
   from: string;
   to: string | null;
+  /** The commit's parent compared with (1-based); null for other targets. */
+  parent: number | null;
   files: DiffFile[];
 };
 
@@ -62,18 +64,33 @@ export async function resolveTarget(
         label: head.branch ?? short(head.commit),
         from: head.commit,
         to: null,
+        parent: null,
         files: await diffWorktree(repo, head.commit),
       };
     }
     case GitReviewTarget.Commit: {
       const to = await commitOf(repo, input.sha);
       const from = await parentOf(repo, to, input.parent ?? 1);
-      return { target: input.kind, label: short(to), from, to, files: await diffCommits(repo, from, to) };
+      return {
+        target: input.kind,
+        label: short(to),
+        from,
+        to,
+        parent: input.parent ?? 1,
+        files: await diffCommits(repo, from, to),
+      };
     }
     case GitReviewTarget.Branch: {
       const to = await commitOf(repo, input.branch);
       const from = await mergeBase(repo, await commitOf(repo, defaultBranch), to);
-      return { target: input.kind, label: input.branch, from, to, files: await diffCommits(repo, from, to) };
+      return {
+        target: input.kind,
+        label: input.branch,
+        from,
+        to,
+        parent: null,
+        files: await diffCommits(repo, from, to),
+      };
     }
     case GitReviewTarget.Range: {
       const to = await commitOf(repo, input.to);
@@ -83,6 +100,7 @@ export async function resolveTarget(
         label: `${input.from}..${input.to}`,
         from,
         to,
+        parent: null,
         files: await diffCommits(repo, from, to),
       };
     }
