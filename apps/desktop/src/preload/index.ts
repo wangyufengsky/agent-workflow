@@ -17,6 +17,7 @@ const bridge: AwBridge = {
   exportPdf: (deckId, fileName) => ipcRenderer.invoke('aw:export-pdf', deckId, fileName),
   saveFile: (fileName, bytes) => ipcRenderer.invoke('aw:save-file', fileName, bytes),
   printSettled: (result) => ipcRenderer.send('aw:print-settled', result),
+  setLaunchPreferences: (preferences) => ipcRenderer.send('aw:launch-preferences', preferences),
 };
 
 contextBridge.exposeInMainWorld('aw', bridge);

@@ -7,6 +7,8 @@ import { ThemePreference, themePreferenceSchema, UiMode, uiModeSchema } from '..
 export const settingsSchema = z.strictObject({
   'ui.mode': uiModeSchema,
   'ui.theme': themePreferenceSchema,
+  /** Play the opening animation when the app starts (28 §5, D113); takes effect at the next start. */
+  'ui.introAnimation': z.boolean(),
   'ai.askOnUncertainty': z.boolean(),
   /** `provider/model`; null uses opencode's default model. */
   'ai.defaultModel': z.string().min(1).nullable(),
@@ -34,6 +36,7 @@ export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 export const SETTING_DEFAULTS: Settings = {
   'ui.mode': UiMode.Simple,
   'ui.theme': ThemePreference.System,
+  'ui.introAnimation': true,
   'ai.askOnUncertainty': false,
   'ai.defaultModel': null,
   'ai.bashPolicy': BashPolicy.Auto,
@@ -52,6 +55,7 @@ export const SETTING_DEFAULTS: Settings = {
 export const SETTING_MODE: Record<SettingKey, UiMode> = {
   'ui.mode': UiMode.Simple,
   'ui.theme': UiMode.Simple,
+  'ui.introAnimation': UiMode.Simple,
   'ai.askOnUncertainty': UiMode.Simple,
   'ai.defaultModel': UiMode.Pro,
   'ai.bashPolicy': UiMode.Pro,

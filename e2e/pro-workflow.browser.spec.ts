@@ -31,7 +31,7 @@ test('J8 专业模式：复制内置流程 → 修改 → 用它跑通一个任�
 
   await page.goto(`/?projectId=${project.id}`);
   await page
-    .getByRole('group', { name: '流程' })
+    .getByRole('group', { name: '直接开始' })
     .getByRole('button', { name: /我的修 Bug/ })
     .click();
   await page.getByLabel('需求').fill('订单金额四舍五入错误');

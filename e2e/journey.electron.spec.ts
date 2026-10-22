@@ -19,6 +19,14 @@ function launch(): Promise<ElectronApplication> {
   return electron.launch(executablePath ? { executablePath, args } : { args: ['apps/desktop', ...args] });
 }
 
+/**
+ * The window shows the opening animation as a `data:` page first, then loads the app from the backend (28 §5.2, D113);
+ * the animation shows the same wordmark as the home page, so waiting for the app means waiting for its address.
+ */
+async function appLoaded(page: Page): Promise<void> {
+  await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 60_000 });
+}
+
 /** The backend this window talks to: its random port and per-launch token. */
 async function backend(page: Page) {
   const token = await page.evaluate(() => window.aw?.apiToken ?? '');
@@ -74,7 +82,7 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
   await page.screenshot({ path: join(SHOTS, 'onboarding.png') });
   await page.getByLabel('仓库目录').fill(fixtureRepo());
   await page.getByRole('button', { name: '添加项目' }).click();
-  await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Everything is a Workflow.' })).toBeVisible();
 
   let api = await backend(page);
   const settings = await request.patch(`${api.base}/settings`, {
@@ -84,7 +92,7 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
   expect(settings.ok()).toBe(true);
 
   await page
-    .getByRole('group', { name: '流程' })
+    .getByRole('group', { name: '直接开始' })
     .getByRole('button', { name: /修 Bug/ })
     .click();
   await page
@@ -99,7 +107,8 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
   await app.close();
   app = await launch();
   page = await app.firstWindow();
-  await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
+  await appLoaded(page);
+  await expect(page.getByRole('heading', { name: 'Everything is a Workflow.' })).toBeVisible();
   api = await backend(page);
   await playTheUser(page);
   await page.getByRole('navigation').getByRole('link', { name: '任务', exact: true }).click();

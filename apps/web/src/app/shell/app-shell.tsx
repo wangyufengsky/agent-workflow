@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+import { Link, Outlet, useNavigate, useRouter, useRouterState } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { CommandPalette } from '../../components/command-palette.tsx';
 import { Icon } from '../../components/icon.tsx';
@@ -7,6 +7,8 @@ import { ASSISTANT_COPY } from '../../copy/assistant.ts';
 import { NAV_COPY } from '../../copy/nav.ts';
 import { AssistantPanel } from '../../features/assistant/assistant-panel.tsx';
 import { useAssistantRequests } from '../../features/assistant/assistant-requests.ts';
+import { useAssistantHandoff } from '../../features/assistant/handoff.ts';
+import { DEFAULT_START_WORKFLOW } from '../../features/home/workflow-icon.ts';
 import { useSettings } from '../../features/settings/settings.queries.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { NAV_ITEMS, navItemsFor } from '../navigation.ts';
@@ -17,17 +19,30 @@ import { RuntimeChip } from './runtime-chip.tsx';
 import { ThemeSwitch } from './theme-switch.tsx';
 import { usePaletteItems } from './use-palette-items.ts';
 
-/** Global shortcuts (14 §2): ⌘K palette, ⌘J assistant panel, ⌘N start a task, ⌘, settings. */
+/** The assistant button and ⌘J: the panel, or on the home page its own input, which holds the conversation (D112). */
+function toggleAssistant(onHome: boolean) {
+  if (onHome) useUiStore.getState().focusHomeInput();
+  else useUiStore.setState((s) => ({ assistantOpen: !s.assistantOpen }));
+}
+
+/** 「开始任务」: the home input in that mode with the default workflow (28 §2.2). */
+const START_TASK = { to: ROUTES.home, search: { workflow: DEFAULT_START_WORKFLOW } } as const;
+
+/** Global shortcuts (14 §2): ⌘K palette, ⌘J assistant, ⌘N start a task, ⌘, settings. */
 function useShortcuts() {
   const navigate = useNavigate();
+  const router = useRouter();
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       const actions: Record<string, () => void> = {
         k: () => setPaletteOpen(true),
-        j: () => useUiStore.setState((s) => ({ assistantOpen: !s.assistantOpen })),
-        n: () => void navigate({ to: ROUTES.home }),
+        j: () => toggleAssistant(router.state.location.pathname === ROUTES.home),
+        n: () => {
+          void navigate(START_TASK);
+          useUiStore.getState().focusHomeInput();
+        },
         ',': () => void navigate({ to: ROUTES.settings }),
       };
       const action = actions[e.key.toLowerCase()];
@@ -37,7 +52,7 @@ function useShortcuts() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [navigate, setPaletteOpen]);
+  }, [navigate, router, setPaletteOpen]);
 }
 
 /** Shell pages reached from the top bar rather than the sidebar. */
@@ -58,10 +73,11 @@ export function AppShell() {
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   const paletteItems = usePaletteItems();
   const title = useCurrentTitle();
-  const assistantOpen = useUiStore((s) => s.assistantOpen);
-  const setAssistantOpen = useUiStore((s) => s.setAssistantOpen);
+  const onHome = useRouterState({ select: (s) => s.location.pathname === ROUTES.home });
+  const assistantOpen = useUiStore((s) => s.assistantOpen) && !onHome;
   useShortcuts();
   useAssistantRequests();
+  useAssistantHandoff();
 
   return (
     <div className="app">
@@ -75,7 +91,7 @@ export function AppShell() {
             <span className="brand-sub">{NAV_COPY.brandSub}</span>
           </span>
         </div>
-        <Link to={ROUTES.home} className="nav-cta">
+        <Link {...START_TASK} className="nav-cta" onClick={() => useUiStore.getState().focusHomeInput()}>
           <Icon name="plus" />
           {NAV_COPY.startTask}
         </Link>
@@ -108,7 +124,7 @@ export function AppShell() {
             icon="sparkle"
             label={assistantOpen ? ASSISTANT_COPY.close : ASSISTANT_COPY.open}
             aria-pressed={assistantOpen}
-            onClick={() => setAssistantOpen(!assistantOpen)}
+            onClick={() => toggleAssistant(onHome)}
           />
           <ThemeSwitch />
         </header>

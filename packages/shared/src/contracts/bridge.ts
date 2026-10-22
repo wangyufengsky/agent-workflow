@@ -1,5 +1,13 @@
 import { z } from 'zod';
+import { themeIdSchema } from '../enums/ui.ts';
 import { type ErrorInfo, errorInfoSchema } from '../errors/codes.ts';
+
+/**
+ * How the next start looks before the backend (and so the settings) is up (28 §5.3): the theme the renderer applied
+ * and whether to play the opening animation. Main keeps it in `<userData>/launch.json`.
+ */
+export const launchPreferencesSchema = z.object({ theme: themeIdSchema, intro: z.boolean() });
+export type LaunchPreferences = z.infer<typeof launchPreferencesSchema>;
 
 /** What the print view tells the hidden window that loaded it (23 §6.1): ready to print, or why it cannot render. */
 export const printSettledSchema = z.discriminatedUnion('ok', [
@@ -27,6 +35,8 @@ export interface AwBridge {
   saveFile(fileName: string, bytes: Uint8Array): Promise<string | null>;
   /** The print view rendered every page with its fonts, or could not (the PPT is gone, the backend failed). */
   printSettled(result: PrintSettled): void;
+  /** Remembers the applied theme and the opening-animation setting for the next start (28 §5.3). */
+  setLaunchPreferences(preferences: LaunchPreferences): void;
 }
 
 /** Path of a PPT's print view, the page the hidden window prints (23 §6.1). */

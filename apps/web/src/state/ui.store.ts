@@ -13,6 +13,12 @@ type UiState = {
   setPaletteOpen(open: boolean): void;
   assistantOpen: boolean;
   setAssistantOpen(open: boolean): void;
+  /**
+   * Bumped to focus the home page's input: there ⌘J and the top bar's assistant button go to the page's own input
+   * instead of the panel (D112).
+   */
+  homeInputFocus: number;
+  focusHomeInput(): void;
   /** The conversation shown in the panel; null shows the most recent one. */
   activeConversationId: string | null;
   setActiveConversation(id: string | null): void;
@@ -37,6 +43,8 @@ export const useUiStore = create<UiState>((set) => ({
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   assistantOpen: false,
   setAssistantOpen: (assistantOpen) => set({ assistantOpen }),
+  homeInputFocus: 0,
+  focusHomeInput: () => set((s) => ({ homeInputFocus: s.homeInputFocus + 1 })),
   activeConversationId: null,
   setActiveConversation: (activeConversationId) => set({ activeConversationId }),
   assistantRequest: null,

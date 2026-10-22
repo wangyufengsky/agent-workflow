@@ -15,7 +15,7 @@ test('首次启动：环境检测通过 → 添加项目 → 切换主题与模�
   await page.getByLabel('仓库目录').fill(repo);
   await page.getByRole('button', { name: '添加项目' }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Everything is a Workflow.' })).toBeVisible();
 
   // With a project, the sidebar's runtime chip opens the checks inside the shell, not the first-run page.
   await page.getByTestId('runtime-chip').click();

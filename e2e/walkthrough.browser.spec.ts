@@ -47,6 +47,8 @@ type Seed = {
   schedule: string;
   /** An assistant conversation that keeps working until the walkthrough ends. */
   assistantBusy: string;
+  /** The assistant conversation with every kind of message, shown on the home page too (D112). */
+  assistantConversation: string;
   /** PPTs (23): one whose outline waits for confirmation, one made with a page in every layout. */
   deckOutline: string;
   deckMade: string;
@@ -162,7 +164,7 @@ async function seedAssistant(
   request: APIRequestContext,
   project: E2EProject,
   knowledge: { id: string; turnId: string },
-): Promise<string> {
+): Promise<{ busy: string; conversation: string }> {
   const busy = await api<{ id: string }>(request, 'POST', '/assistant/conversations', { title: '失败任务排查' });
   await queueAssistantTurn(request, [
     { type: 'tool', tool: 'read', input: { filePath: 'notes.md' } },
@@ -213,7 +215,7 @@ async function seedAssistant(
     )
     .toBe(1);
   await settledConversation(request, conversation.id);
-  return busy.id;
+  return { busy: busy.id, conversation: conversation.id };
 }
 
 /** One task per state the task page renders differently (14 §3.3), each in its own project so scripts stay apart. */
@@ -392,7 +394,7 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     frequency: { kind: 'weekly', weekdays: [1, 3, 5], time: '09:00' },
   });
   await api(request, 'POST', `/schedules/${schedule.id}/run`);
-  const assistantBusy = await seedAssistant(request, reviewProject, { id: knowledge.id, turnId: knowledgeTurn.id });
+  const assistant = await seedAssistant(request, reviewProject, { id: knowledge.id, turnId: knowledgeTurn.id });
 
   const pptProject = await createProject(request, null);
   type Deck = { id: string; status: string };
@@ -453,7 +455,8 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     knowledgeDraft: draft.id,
     batch: batch.id,
     schedule: schedule.id,
-    assistantBusy,
+    assistantBusy: assistant.busy,
+    assistantConversation: assistant.conversation,
     deckOutline: deckOutline.id,
     deckMade: deckMade.id,
   };
@@ -511,13 +514,27 @@ const SHOTS: Shot[] = [
     name: 'home',
     mode: UiMode.Simple,
     url: (s) => `/?projectId=${s.project.id}`,
-    ready: heading('今天想让 AI 做什么？'),
+    ready: heading('Everything is a Workflow.'),
+  },
+  {
+    // 「开始任务」mode of the one input (D111).
+    name: 'home-task',
+    mode: UiMode.Simple,
+    url: (s) => `/?projectId=${s.project.id}&workflow=bugfix&requirement=${encodeURIComponent('订单时间显示错了')}`,
+    ready: (page) => page.getByText('开始任务 · 修 Bug'),
+  },
+  {
+    // A conversation on the home page, the work rail beside it (28 §2.1).
+    name: 'home-conversation',
+    mode: UiMode.Simple,
+    url: (s) => `/?projectId=${s.project.id}&conversation=${s.assistantConversation}`,
+    ready: testId('confirmation-card'),
   },
   {
     name: 'palette',
     mode: UiMode.Simple,
     url: (s) => `/?projectId=${s.project.id}`,
-    ready: heading('今天想让 AI 做什么？'),
+    ready: heading('Everything is a Workflow.'),
     open: async (page) => {
       await page.keyboard.press('ControlOrMeta+k');
       return page.getByRole('dialog', { name: '命令面板' });
@@ -641,8 +658,9 @@ const SHOTS: Shot[] = [
   {
     name: 'assistant-welcome',
     mode: UiMode.Simple,
-    url: () => '/',
-    ready: heading('今天想让 AI 做什么？'),
+    // On the home page ⌘J goes to the page's own input (D112); the panel is opened elsewhere.
+    url: () => '/tasks',
+    ready: (page) => page.getByRole('table'),
     open: async (page) => {
       const panel = await openAssistant(page);
       await panel.getByRole('button', { name: '新对话' }).click();
@@ -747,8 +765,12 @@ const SHOTS: Shot[] = [
     name: 'pro-home',
     mode: UiMode.Pro,
     url: (s) => `/?projectId=${s.project.id}`,
-    ready: heading('今天想让 AI 做什么？'),
+    ready: heading('Everything is a Workflow.'),
     open: async (page) => {
+      await page
+        .getByRole('group', { name: '直接开始' })
+        .getByRole('button', { name: '新功能开发', exact: true })
+        .click();
       await page.getByText('更多选项').click();
       return page.getByLabel('标题');
     },
