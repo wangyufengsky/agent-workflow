@@ -1,4 +1,4 @@
-import { CheckUnrunnableReason, InboxKind, NodeStatus, TaskDisplayGroup } from '@aw/shared';
+import { CheckUnrunnableReason, ErrorCode, InboxKind, NodeStatus, TaskDisplayGroup } from '@aw/shared';
 
 export const TASK_DISPLAY_LABEL: Record<TaskDisplayGroup, string> = {
   [TaskDisplayGroup.Preparing]: '准备中',
@@ -70,6 +70,14 @@ export const TASK_COPY = {
   back: '← 任务',
   meta: (key: string, project: string, workflow: string) => `${key} · ${project} · ${workflow}`,
   doing: '正在：',
+  // 执行中的进度与耗时（D118）
+  stepsDone: (done: number, total: number) => `已完成 ${done} / ${total} 步`,
+  elapsed: (ms: number) => {
+    const minutes = Math.floor(ms / 60_000);
+    if (minutes < 1) return '刚开始';
+    return minutes < 60 ? `已用 ${minutes} 分钟` : `已用 ${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟`;
+  },
+  sideCurrent: '当前步骤',
   showDetails: '显示详细信息',
   startDraft: '开始',
   draft: '草稿：还没有开始，开始后会建立独立工作区。',
@@ -114,8 +122,35 @@ export const TASK_COPY = {
   failedTitle: '任务没有完成',
   failedPhase: { preparing: '准备工作区时', planning: '规划时', running: '执行步骤时', merging: '合并时' },
   failedStep: (title: string) => `执行步骤「${title}」时多次尝试仍没有完成。`,
+  failedCheck: (title: string, command: string) => `步骤「${title}」多次尝试后，检查 \`${command}\` 仍没有通过。`,
   retry: '重试',
   retried: '已重新开始',
+  // 失败的原因与出口（D118）
+  lastCommand: (command: string, exitCode: number | null, timedOut: boolean) =>
+    `最后一次运行 \`${command}\` ${timedOut ? '超时了' : `退出码为 ${exitCode}`}，输出的最后几行：`,
+  lastReview: '最后一次 AI 评审没有通过：',
+  lastAttempt: (aborted: boolean, code: string | undefined) => {
+    if (aborted) return 'AI 最后一次的尝试被中止了。';
+    switch (code) {
+      case ErrorCode.AttemptNoResult:
+        return 'AI 最后一次没有提交结果就停下了。';
+      case ErrorCode.AttemptTimeout:
+        return 'AI 最后一次超时了。';
+      case ErrorCode.AttemptSessionError:
+        return 'AI 最后一次的会话出错了。';
+      default:
+        return 'AI 最后一次没有完成这一步。';
+    }
+  },
+  fullOutput: '展开全部输出',
+  tailOutput: '只看最后几行',
+  keptSteps: (n: number) => `已完成的 ${n} 个步骤会保留，重试从这一步继续。`,
+  retryWithNote: '带上说明重试…',
+  retryNoteTitle: '带上说明重试',
+  retryNoteBody: '这句说明会随这一步的下一次尝试一起交给 AI，例如「测试前要先启动本地数据库」。',
+  retryNoteField: '给 AI 的说明',
+  retryNotePlaceholder: '告诉 AI 这次要注意什么……',
+  viewStepProcess: '查看这一步的过程',
   // 检查命令无法运行（D116）
   unrunnable: (step: string, command: string, program: string, reason: CheckUnrunnableReason) =>
     `步骤「${step}」的检查命令 \`${command}\` ${
