@@ -1,6 +1,6 @@
 # 28 · 以助手为主的主页与打开动画
 
-> 状态：**设计稿，待用户确认**（D111–D113）。确认后按 §9 实现。原型与截图：[assets/28-home-assistant/](assets/28-home-assistant/)（`prototype.html` 可直接在浏览器中打开：`?theme=deepseek|warm|spdb|github_white`，`?view=idle|task|conv|handoff|splash`；`splash` 实时播放，点击重播。截图：`idle-*`、`task-*`、`conv-*`、`handoff-*`，打开动画为 `splash-*.gif` 与关键帧 `splash-frames-*.png`（0.12 / 0.3 / 0.55 / 1.2s））。
+> 状态：D111–D113 **用户已确认**（2026-10-22，按推荐方案），实现中（§9）。原型与截图：[assets/28-home-assistant/](assets/28-home-assistant/)（`prototype.html` 可直接在浏览器中打开：`?theme=deepseek|warm|spdb|github_white`，`?view=idle|task|conv|handoff|splash`；`splash` 实时播放，点击重播。截图：`idle-*`、`task-*`、`conv-*`、`handoff-*`，打开动画为 `splash-*.gif` 与关键帧 `splash-frames-*.png`（0.12 / 0.3 / 0.55 / 1.2s））。
 
 ## 1. 来由与范围
 
