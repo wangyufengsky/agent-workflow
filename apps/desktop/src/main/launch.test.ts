@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SYSTEM_THEME_MAP, ThemeId } from '@aw/shared';
@@ -19,7 +19,10 @@ describe('launch.json（28 §5.3）', () => {
     expect(readLaunchPreferences(path, true)).toEqual({ theme: ThemeId.Warm, intro: false });
   });
 
-  it('文件损坏或内容不对时按首次启动处理', () => {
+  it('文件读不出、损坏或内容不对时按首次启动处理', () => {
+    const unreadable = file();
+    mkdirSync(unreadable);
+    expect(readLaunchPreferences(unreadable, true)).toEqual({ theme: SYSTEM_THEME_MAP.dark, intro: true });
     const broken = file();
     writeFileSync(broken, '{"theme":');
     expect(readLaunchPreferences(broken, false)).toEqual({ theme: SYSTEM_THEME_MAP.light, intro: true });

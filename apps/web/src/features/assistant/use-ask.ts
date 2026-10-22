@@ -19,11 +19,20 @@ export function useAsk() {
 
   const sendTo = (target: AssistantConversationDTO, text: string, onSent?: () => void) => {
     if (onHome) {
-      useUiStore.setState({ activeConversationId: target.id });
-      void navigate({ to: ROUTES.home, search: (s) => ({ projectId: s.projectId, conversation: target.id }) });
-    } else {
-      useUiStore.setState({ assistantOpen: true, activeConversationId: target.id });
+      // Only once the message is accepted: the input that sent it keeps the text and shows why it was not.
+      send.mutate(
+        { id: target.id, text, context: page },
+        {
+          onSuccess: () => {
+            onSent?.();
+            useUiStore.setState({ activeConversationId: target.id });
+            void navigate({ to: ROUTES.home, search: (s) => ({ projectId: s.projectId, conversation: target.id }) });
+          },
+        },
+      );
+      return;
     }
+    useUiStore.setState({ assistantOpen: true, activeConversationId: target.id });
     send.mutate({ id: target.id, text, context: page }, { ...(onSent === undefined ? {} : { onSuccess: onSent }) });
   };
   const ask = (text: string, conversation: AssistantConversationDTO | undefined, onSent?: () => void) => {
