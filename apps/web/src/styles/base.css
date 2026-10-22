@@ -1317,6 +1317,49 @@ button.card:hover,
     opacity: 1;
   }
 }
+/*
+ * Working effects shared by the assistant panel and the conversation stream (D84, 25 §4.6). `.shimmer`: a line of light
+ * passing over words while something runs; the mask only changes opacity, so the text keeps its real colour (axe
+ * measures it). `.caret`: the typing caret at the end of text being written.
+ */
+.shimmer {
+  mask-image: linear-gradient(
+    100deg,
+    color-mix(in srgb, currentColor 55%, transparent) 35%,
+    currentColor 50%,
+    color-mix(in srgb, currentColor 55%, transparent) 65%
+  );
+  mask-size: 300% 100%;
+  animation: shimmer 2.2s linear infinite;
+}
+@keyframes shimmer {
+  from {
+    mask-position: 100% 0;
+  }
+  to {
+    mask-position: 0 0;
+  }
+}
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: -0.15em;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: caret 1s steps(2, jump-none) infinite;
+}
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    mask-image: none;
+  }
+}
 /* Reduced motion overrides every component animation, so it has to be !important. */
 @media (prefers-reduced-motion: reduce) {
   *,

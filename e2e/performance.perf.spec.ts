@@ -234,10 +234,10 @@ test('单会话流 5 MB：首屏时间与接口分页', async ({ page, request }
   }
   const allPagesMs = performance.now() - apiStart;
 
-  // UI: on the step page showing the review attempt, switch to the 5 MB execute attempt and time until its first
-  // entries are on screen (the next frame after they are in the DOM).
+  // UI: on the step page with the review attempt open, open the 5 MB execute attempt's stream and time until its
+  // first entries are on screen (the next frame after they are in the DOM).
   await page.goto(`/tasks/${id}/nodes/${fix.id}?attempt=${review.id}`);
-  await expect(page.getByTestId('transcript')).toBeVisible();
+  await expect(page.getByTestId('stream-scroll')).toBeVisible();
   const switchMs = await page.evaluate(async (label) => {
     const button = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes(label));
     if (button === undefined) throw new Error(`no button ${label}`);
@@ -245,7 +245,8 @@ test('单会话流 5 MB：首屏时间与接口分页', async ({ page, request }
     button.click();
     await new Promise<void>((resolve) => {
       const check = () => {
-        if (document.querySelector('[data-testid="transcript"]')?.textContent?.includes('PERF-START')) resolve();
+        const streams = [...document.querySelectorAll('[data-testid="stream-scroll"]')];
+        if (streams.some((el) => el.textContent?.includes('PERF-START'))) resolve();
         else requestAnimationFrame(check);
       };
       check();
@@ -254,8 +255,9 @@ test('单会话流 5 MB：首屏时间与接口分页', async ({ page, request }
     return performance.now() - t0;
   }, `执行 #${execute.seq}`);
 
-  // Scrolling the loaded stream.
-  const list = page.getByTestId('transcript');
+  // Scrolling the loaded stream, inside its box.
+  const list = page.getByTestId('stream-scroll').filter({ hasText: 'PERF-START' });
+  await list.hover();
   const scroll = await measureFrames(page, async () => {
     for (let i = 0; i < 60; i++) await page.mouse.wheel(0, 400);
   });

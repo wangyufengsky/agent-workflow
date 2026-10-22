@@ -309,7 +309,7 @@ payload / response：
 | kind | data |
 | --- | --- |
 | `user_message` | `{ text }`（我们发给会话的提示词 / 答案 / 提醒） |
-| `text` | `{ text }`，带 `partId`（模型正文；流式时同一 `partId` 多行，每行是到当时为止的全文：每增长 `TRANSCRIPT_TEXT_FLUSH_CHARS` 写一次（知识问答的 `research` 尝试为 `KNOWLEDGE_DRAFT_FLUSH_CHARS`，回答草稿因此流式显示，18 §5.5），片段结束再写一次；读取时按 `partId` 取最后一行） |
+| `text` | `{ text, offset }`，带 `partId`（模型正文；流式时同一 `partId` 多行，每行是**增量**：从第 `offset` 个字符起的新内容，每增长 `TRANSCRIPT_TEXT_FLUSH_CHARS` 写一次，片段结束时写余下部分（结束时的全文与已写的不同，从共同前缀之后写）；读取时按 seq 依次合并，`全文 = 全文.slice(0, offset) + text`（`mergePiece`，`shared/transcript/parts.ts`）。D104 之前的行没有 `offset`，是到当时为止的全文，读作 `offset` 0） |
 | `reasoning` | 同 `text` |
 | `tool_call` | `{ tool, callId, input }`（工具开始运行时一次） |
 | `tool_result` | `{ tool, callId, status: 'completed' \| 'error', output?, error? }` |
@@ -321,7 +321,7 @@ payload / response：
 | `attachment` | `{ path }`（仅助手对话：助手写入对话文件目录 `files/<id>/` 的文件，`path` 相对该目录） |
 | `entity_ref` | `{ kind: EntityKind, id, title }`（仅助手对话：助手调用的操作执行成功后产出的对象，界面渲染为导航卡片，D66） |
 
-读取：`GET /attempts/:id/transcript?afterSeq=` 每页 `TRANSCRIPT_PAGE_SIZE` 行；seq 从 1 起逐行连续编号（第 i 行即 seq i+1），所以一页就是按行切出的一段，只解析这一段（M6-02：5 MB、约六千行的文件，每页约 20 ms）；页内同一 `partId` 只保留最后一行、放在它首次出现的位置。界面先显示第一页，其余页在后台接着读；读页期间经 SSE 到达的行另存一处，显示时与各页按 seq 去重合并（`transcriptEntries`），因此读页与追加交错时不丢行。
+读取：`GET /attempts/:id/transcript?afterSeq=` 每页 `TRANSCRIPT_PAGE_SIZE` 行；seq 从 1 起逐行连续编号（第 i 行即 seq i+1），所以一页就是按行切出的一段，只解析这一段（M6-02：5 MB、约六千行的文件，每页约 20 ms）；页内同一 `partId` 的行合并为一条（`offset` 为第一行的、`text` 为合并后的增量，seq 与时间取最后一行），放在它首次出现的位置，后一页接着合并。界面先显示第一页，其余页在后台接着读；读页期间经 SSE 到达的行另存一处：各页连续覆盖 1…n 行，所以只取 seq 大于最后一页的实时行，按 seq 去重排序后接着合并（`transcriptEntries`），读页与追加交错时不丢行也不重复。
 
 ## 4. 助手（v1.1）
 

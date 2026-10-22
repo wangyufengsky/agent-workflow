@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { formatDateTime } from '../../copy/common.ts';
 import { PPT_COPY as C } from '../../copy/ppt.ts';
 import { attemptQuery } from '../attempts/attempt.queries.ts';
-import { TranscriptView } from '../attempts/transcript-view.tsx';
+import { AttemptView } from '../attempts/attempt-view.tsx';
 import styles from './ppt.module.css';
 
 function RunRecord({ run }: { run: DeckRunDTO }) {
@@ -15,7 +15,7 @@ function RunRecord({ run }: { run: DeckRunDTO }) {
         {run.instruction !== null && ` · ${run.instruction}`}
       </summary>
       {attempt !== undefined && <p className="hint">{C.usage(attempt.tokensInput, attempt.tokensOutput)}</p>}
-      <TranscriptView attemptId={run.attempt.id} />
+      <AttemptView attemptId={run.attempt.id} />
     </details>
   );
 }

@@ -165,7 +165,7 @@
 | K-09 | E2E（FakeOpencode）：J12「提问 → 研究过程 → 带引用的回答 → 点击引用看原文 → 续问 → 对话记录」；J9 走查加入知识问答 | `pnpm e2e` 通过，走查截图含知识问答首屏、回答 + 原文面板、对话记录 |
 | K-10 | live（真实 opencode + `TEST_MODEL`）：对 `ts-stats` 提有确定答案的问题；文档收尾（03、07、14、本节状态段） | `live/knowledge.live.test.ts` 通过：回答带有效引用且指向正确的文件；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
 | K-11 | 应用助手调用知识问答（18 §4a）：提问与续问为 read 并声明 `produces: knowledge_conversation`；工具立即返回 `researching`，这一轮结束后带引用的回答（或错误）与导航卡片作为下一条消息发回助手会话；助手面板中的应用内链接（引用、对话页）在面板旁打开；`AssistantPage` 加入知识问答页面 | 集成测试：立即返回 `researching`、回答消息含引用与链接、导航卡片、失败路径；E2E J13 |
-| K-12 | 契约：`ask` / `followUp` 的可选 `model`；轮次 DTO 与列表摘要的 `model`；常量 `KNOWLEDGE_DRAFT_FLUSH_CHARS`；`answerDraft(entries)`；02 D67 / D69 确认 | 单测：`answerDraft`（工具调用之间的说明不算草稿、`submit_answer` 之后不截断） |
+| K-12 | 契约：`ask` / `followUp` 的可选 `model`；轮次 DTO 与列表摘要的 `model`；常量 `KNOWLEDGE_DRAFT_FLUSH_CHARS`（D104 起删除，所有尝试按 32 个字符写增量行）；`answerDraft(entries)`；02 D67 / D69 确认 | 单测：`answerDraft`（工具调用之间的说明不算草稿、`submit_answer` 之后不截断） |
 | K-13 | 后端：研究尝试的流式正文按 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 写会话流；每一轮按请求的模型（或 `ai.defaultModel`）发起，续问可换模型（`continueSession` 带模型）；研究员协议提示词改为先写正文再提交 | 集成测试：草稿在提交前以细粒度出现在会话流中、提交后轮次 `answered` 且回答为提交的正文；校验失败后仍在研究、草稿保留；停止后草稿保留；两轮不同模型各自记录并随消息发送 |
 | K-14 | 界面：草稿流式显示、编号「待核对」不可点击、校验通过后替换为可点击引用、停止时「已停止，引用未核对」；输入框角落的模型选择（首屏与续问），每一轮与对话记录显示模型 | 单测见 K-12；E2E 见 K-15 |
 | K-15 | E2E：正文流式出现、编号先待核对后可点击、换模型续问后对话与对话记录显示对应模型；live：默认模型一次流式问答冒烟 | `pnpm e2e`、`pnpm test:oc` 通过；live 通过 |

@@ -16,7 +16,6 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { KNOWLEDGE_COPY as C } from '../../copy/knowledge.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
 import { attemptQuery, attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
-import { TranscriptView } from '../attempts/transcript-view.tsx';
 import { projectQuery, projectsQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { Answer, DraftAnswer } from './answer.tsx';
@@ -145,19 +144,14 @@ export function KnowledgeWelcomePage() {
   );
 }
 
-/** Pro view of a turn: its session stream, model and usage. */
+/** Pro view of a turn: its model and usage; the stream itself shows pro details in the research card (25 §5). */
 function TurnDetails({ attemptId }: { attemptId: string }) {
   const attempt = useQuery(attemptQuery(attemptId)).data;
+  if (attempt === undefined) return null;
   return (
-    <details className={styles.turnDetails}>
-      <summary className="hint">{C.transcript}</summary>
-      {attempt !== undefined && (
-        <p className="hint">
-          {C.model(attempt.model)} · {C.usage(attempt.tokensInput, attempt.tokensOutput, attempt.cost)}
-        </p>
-      )}
-      <TranscriptView attemptId={attemptId} />
-    </details>
+    <p className="hint" data-testid="knowledge-turn-usage">
+      {C.model(attempt.model)} · {C.usage(attempt.tokensInput, attempt.tokensOutput, attempt.cost)}
+    </p>
   );
 }
 
@@ -192,7 +186,7 @@ function Turn({
         <span className="label">{C.researcher}</span>
         <span className={styles.modelTag}>{C.modelOf(turn.model)}</span>
       </div>
-      <ResearchCard turn={turn} entries={entries} repoPath={repoPath} />
+      <ResearchCard turn={turn} entries={entries} repoPath={repoPath} pro={pro} />
       {draft !== undefined && <DraftAnswer draft={draft} stopped={ended} />}
       {turn.answer !== null && (
         <Answer answer={turn.answer} citations={turn.citations} active={activeCitation} onCite={onCite} />

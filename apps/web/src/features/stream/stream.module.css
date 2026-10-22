@@ -1,0 +1,492 @@
+/*
+ * The conversation stream (25 §4): a box of fixed height that scrolls inside. Tokens only; the working effects
+ * `.shimmer` / `.caret` are global (base.css), and reduced motion stops every animation there.
+ */
+
+/* ---------- 盒子 ---------- */
+.box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  overflow: hidden;
+}
+/* Working: a line of light runs along the top edge (D84's edge flow). */
+.box[data-state="running"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background:
+    linear-gradient(90deg, transparent, var(--run) 45%, var(--accent) 55%, transparent) -100% 0 / 50% 100% no-repeat;
+  animation: edge-flow 2.4s var(--ease) infinite;
+  z-index: 2;
+}
+@keyframes edge-flow {
+  to {
+    background-position: 200% 0;
+  }
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding-right: var(--s-3);
+}
+.box[data-open="true"] .head {
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 44px;
+  padding: 0 var(--s-3) 0 var(--s-4);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  text-align: left;
+}
+.toggle:hover {
+  background: var(--fill-1);
+}
+.state {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+.box[data-state="running"] .state {
+  color: var(--run);
+}
+.box[data-state="done"] .state {
+  color: var(--ok);
+  background: var(--ok-fill);
+}
+.box[data-state="failed"] .state {
+  color: var(--danger);
+  background: var(--danger-fill);
+}
+.box[data-state="stopped"] .state {
+  color: var(--muted);
+  background: var(--fill-3);
+}
+.title {
+  flex: none;
+  font-weight: 600;
+  color: var(--ink);
+}
+.now {
+  min-width: 0;
+  flex: 0 1 auto;
+  color: var(--run);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.meta {
+  min-width: 0;
+  flex: 1;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chevron {
+  flex: none;
+  display: inline-flex;
+  color: var(--muted);
+  transition: transform var(--t-mid) var(--ease);
+}
+[aria-expanded="true"] > .chevron {
+  transform: rotate(90deg);
+}
+.body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  animation: body-in var(--t-mid) var(--ease);
+}
+.body[data-size="drawer"] {
+  --stream-h: max(320px, calc(100dvh - 240px));
+}
+.body[data-size="page"] {
+  --stream-h: clamp(360px, calc(100dvh - 340px), 640px);
+}
+.body[data-size="card"] {
+  --stream-h: 300px;
+}
+/* A running stream keeps its height while it grows; an ended one is no taller than its content. */
+.body {
+  height: var(--stream-h);
+}
+.box:not([data-state="running"]) .body {
+  height: auto;
+  max-height: var(--stream-h);
+}
+@keyframes body-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--s-3) var(--s-4) var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  overflow-wrap: anywhere;
+}
+/* Back to the newest content, once the user scrolled up. */
+.latest {
+  position: absolute;
+  left: 50%;
+  bottom: var(--s-3);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-2);
+  background: var(--raised);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  box-shadow: var(--shadow-card);
+  animation: latest-in var(--t-mid) var(--ease-spring);
+  z-index: 3;
+}
+.unseen {
+  color: var(--accent);
+}
+@keyframes latest-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.96);
+  }
+}
+
+/* ---------- 条目 ---------- */
+.item {
+  min-width: 0;
+}
+.item[data-enter="true"] {
+  animation: item-in 0.32s var(--ease) both;
+}
+@keyframes item-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.text {
+  padding: 2px 0;
+}
+.text [class] {
+  font-size: 13.5px;
+}
+/* Being written: the typing caret after the last line (the same caret as base.css's `.caret`). */
+.text[data-writing="true"] > * > :last-child::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: -0.15em;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: blink 1s steps(2, jump-none) infinite;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* 思考 */
+.thinking {
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--fill-1);
+}
+.thinking[data-writing="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+.thinkingHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: var(--fs-sm);
+  color: var(--sub);
+  text-align: left;
+}
+button.thinkingHead:hover {
+  color: var(--ink);
+}
+.thinkingIcon {
+  display: inline-flex;
+  color: var(--accent);
+}
+.thinkingLabel {
+  flex: none;
+}
+.thinkingPreview {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.thinkingHead .chevron {
+  margin-left: auto;
+}
+.thinkingBody,
+.thinkingTail {
+  margin: 0 10px 10px;
+  padding-left: 12px;
+  box-shadow: inset 2px 0 0 var(--line-3);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--sub);
+  white-space: pre-wrap;
+}
+/* Being written: only the last lines show, fading out at the top as if scrolling up. */
+.thinkingTail {
+  max-height: calc(5 * 1.7em);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  mask-image: linear-gradient(to bottom, transparent, black 2.2em);
+}
+
+/* 动作条 */
+.actionHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 30px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  text-align: left;
+  min-width: 0;
+}
+button.actionHead:hover {
+  background: var(--fill-2);
+}
+.actionMark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+.action[data-state="ok"] .actionMark {
+  color: var(--ok);
+}
+.action[data-state="failed"] .actionMark {
+  color: var(--danger);
+}
+.action[data-state="running"] .actionMark {
+  color: var(--run);
+}
+.pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: beat 1.6s var(--ease) infinite;
+}
+@keyframes beat {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+.verb {
+  flex: none;
+  color: var(--ink);
+}
+.action[data-state="running"] .verb {
+  color: var(--run);
+}
+.subject {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.delta {
+  flex: none;
+  font: 12px var(--font-mono);
+}
+.added {
+  color: var(--ok);
+}
+.removed {
+  color: var(--danger);
+}
+.failedNote {
+  margin-left: auto;
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--danger);
+}
+.actionHead .chevron {
+  margin-left: auto;
+}
+.failedNote + .chevron {
+  margin-left: 0;
+}
+.actionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 2px 0 6px 34px;
+}
+.rawLabel {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.raw {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-sunken);
+  font: 12px / 1.6 var(--font-mono);
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow: auto;
+}
+.raw[data-failed="true"] {
+  color: var(--danger);
+  background: var(--danger-fill);
+  border-color: var(--danger-line);
+}
+
+/* 动作组 */
+.groupHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 30px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  color: var(--sub);
+  text-align: left;
+}
+.groupHead:hover {
+  background: var(--fill-2);
+  color: var(--ink);
+}
+.groupIcon {
+  display: inline-flex;
+  color: var(--ok);
+}
+.groupBody {
+  margin-left: 10px;
+  padding-left: var(--s-2);
+  box-shadow: inset 1px 0 0 var(--line-2);
+}
+
+/* 其他 */
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.notice::before,
+.notice::after {
+  content: "";
+  flex: 1;
+  min-width: var(--s-4);
+  height: 1px;
+  background: var(--line);
+}
+.wait {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--wait-line);
+  background: var(--wait-fill);
+  color: var(--wait);
+  font-size: var(--fs-sm);
+}
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-2) 10px;
+  border-radius: var(--r-sm);
+  background: var(--danger-fill);
+  color: var(--danger);
+  font-size: var(--fs-sm);
+}
+.prompt {
+  border-radius: var(--r-md);
+  border: 1px dashed var(--line-3);
+  padding: var(--s-2) 10px;
+  font-size: var(--fs-sm);
+}
+.promptLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  margin-bottom: var(--s-1);
+}
+.promptText {
+  color: var(--ink-2);
+}
+.clamped {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.clamped[data-open="false"] {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.more {
+  margin-top: var(--s-1);
+  font-size: var(--fs-xs);
+  color: var(--accent);
+}

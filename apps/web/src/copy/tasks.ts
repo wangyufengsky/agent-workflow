@@ -160,14 +160,10 @@ export const NODE_COPY = {
   changesEmpty: '这一步没有记录改动。',
   commit: (sha: string) => `提交 ${sha.slice(0, 8)}`,
   noAttempt: '这一步还没有开始。',
-  follow: '跟随最新',
-  attemptOf: (n: number) => `第 ${n} 次尝试`,
 } as const;
 
 export const NODE_PAGE_COPY = {
   back: (key: string, title: string) => `← ${key} · ${title}`,
-  attempts: '尝试',
-  attempt: (kind: string, seq: number) => `${kind} #${seq}`,
   actions: '操作',
   instructions: '指令',
 } as const;
