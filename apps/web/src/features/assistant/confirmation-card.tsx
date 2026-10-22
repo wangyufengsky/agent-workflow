@@ -28,7 +28,7 @@ function DeliveryImpact({ taskId }: { taskId: string }) {
 function Outcome({ confirmation }: { confirmation: AssistantConfirmationDTO }) {
   const { status, result } = confirmation;
   if (status === AssistantConfirmationStatus.Cancelled) return <p className={styles.outcome}>{C.status.cancelled}</p>;
-  if (result === null) return <p className={`${styles.outcome} ${styles.shimmer}`}>{C.running}</p>;
+  if (result === null) return <p className={`${styles.outcome} shimmer`}>{C.running}</p>;
   if (result.ok) {
     return (
       <p className={styles.outcome} data-tone="ok">

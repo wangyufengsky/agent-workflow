@@ -37,13 +37,19 @@ const entry = { seq: z.number(), ts: z.number() };
 const part = { ...entry, partId: z.string() };
 
 /**
+ * A streamed text or reasoning line: the characters from `offset` on (D104). Lines written before D104 carry the whole
+ * text and no offset, which is the same as offset 0.
+ */
+const piece = z.object({ text: z.string(), offset: z.number().int().nonnegative().default(0) });
+
+/**
  * One line of `runs/<taskId>/<attemptId>.jsonl` and of the assistant's `conversations/<id>.jsonl` (10 §3). Streaming
- * text repeats its `partId`; the last line wins.
+ * text repeats its `partId`; its lines merge in order (`mergePiece`).
  */
 export const transcriptEntrySchema = z.discriminatedUnion('kind', [
   z.object({ ...entry, kind: z.literal(TranscriptEntryKind.UserMessage), data: z.object({ text: z.string() }) }),
-  z.object({ ...part, kind: z.literal(TranscriptEntryKind.Text), data: z.object({ text: z.string() }) }),
-  z.object({ ...part, kind: z.literal(TranscriptEntryKind.Reasoning), data: z.object({ text: z.string() }) }),
+  z.object({ ...part, kind: z.literal(TranscriptEntryKind.Text), data: piece }),
+  z.object({ ...part, kind: z.literal(TranscriptEntryKind.Reasoning), data: piece }),
   z.object({
     ...entry,
     kind: z.literal(TranscriptEntryKind.ToolCall),

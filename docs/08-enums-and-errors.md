@@ -247,7 +247,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DB_QUERY_TIMEOUT_MS` | 15000 |
 | `DB_CONNECT_TIMEOUT_MS` | 10000（建立到项目数据库的连接） |
 | `TRANSCRIPT_PAGE_SIZE` | 200 |
-| `TRANSCRIPT_TEXT_FLUSH_CHARS` | 200（流式文本每增长这么多字符写一次会话流） |
+| `TRANSCRIPT_TEXT_FLUSH_CHARS` | 32（流式正文与思考每增长这么多字符写一行增量，D104） |
 | `REPORT_PROGRESS_MAX_CHARS` | 200 |
 | `RESULT_SUMMARY_MAX_CHARS` | 4000 |
 | `SSE_REPLAY_BUFFER` | 1000（条） |
@@ -279,7 +279,6 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `GIT_REVIEW_SUMMARY_MAX_CHARS` / `GIT_REVIEW_FINDING_TITLE_MAX_CHARS` / `GIT_REVIEW_FINDING_TEXT_MAX_CHARS` | 2000 / 120 / 2000 |
 | `COMMIT_DRAFT_DIFF_MAX_BYTES` | 60000（草拟提交信息时交给 AI 的 diff，27 §7.3） |
 | `COMMIT_DRAFT_TIMEOUT_MS` | 120000（草拟超时即中止，请求返回 `COMMIT_DRAFT_FAILED`） |
-| `KNOWLEDGE_DRAFT_FLUSH_CHARS` | 24（研究尝试的流式正文写会话流的粒度，回答草稿因此流式显示，18 §5.5） |
 | `DECK_BRIEF_MAX_CHARS` | 4000（PPT 的要求） |
 | `DECK_TITLE_MAX_CHARS` | 60（PPT 标题；创建时取要求的首行，大纲返回后用 AI 给的标题） |
 | `DECK_MATERIALS_MAX` | 10（一份 PPT 的资料数） |

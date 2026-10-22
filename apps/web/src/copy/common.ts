@@ -1,13 +1,11 @@
 const DATE_TIME = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
 const DATE_TIME_SECONDS = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'medium' });
-const TIME_SECONDS = new Intl.DateTimeFormat('zh-CN', { timeStyle: 'medium' });
 const TIME = new Intl.DateTimeFormat('zh-CN', { timeStyle: 'short' });
 const MONTH_DAY = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' });
 
 /** Every date shown in the app is formatted here, in the interface's language rather than the system locale. */
 export const formatDateTime = (ms: number) => DATE_TIME.format(ms);
 export const formatDateTimeSeconds = (ms: number) => DATE_TIME_SECONDS.format(ms);
-export const formatTimeSeconds = (ms: number) => TIME_SECONDS.format(ms);
 export const formatTime = (ms: number) => TIME.format(ms);
 /** `10月22日周四`: a day heading. */
 export const formatMonthDay = (ms: number) => MONTH_DAY.format(ms);

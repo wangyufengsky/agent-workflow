@@ -28,6 +28,7 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [21-review-feedback.md](21-review-feedback.md) | PR 审查意见回流（v1.2）：取回意见、按意见修改、推送回同一个 PR | 全员 |
 | [22-scheduled-tasks.md](22-scheduled-tasks.md) | 定时任务（v1.2）：频率与时区、到点运行、补跑与跳过、失败暂停、页面、数据与 API | 全员 |
 | [23-ppt.md](23-ppt.md) | PPT 制作（v1.2）：场景、大纲与逐页制作、版式与主题、导出、与助手 | 全员 |
+| [25-conversation-stream.md](25-conversation-stream.md) | 会话流重设计（v1.2 体验修正）：共用的固定高度会话流、思考显示、结束后收起、增量存储（D102–D104） | 开发 / 设计 |
 | [27-git-workbench.md](27-git-workbench.md) | Git 工作台（重做，v1.2）：手动提交 / 推送 / 合并、AI 审查、与任务 worktree 的边界、三栏界面 | 全员 |
 
 ## 维护规则

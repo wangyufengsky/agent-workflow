@@ -65,4 +65,5 @@ export * from './knowledge/draft.ts';
 export * from './naming.ts';
 export * from './operations/index.ts';
 export * from './schedule/schedule.ts';
+export * from './transcript/parts.ts';
 export * from './workflow/index.ts';
