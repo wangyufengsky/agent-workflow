@@ -95,7 +95,7 @@ export const planArgs = (nodes: PlanNodeArgs[], extra: { assumptions?: string[] 
 /** The required last step of the feature workflow, as the planner must include it. */
 export const finalVerify = (dependsOn: string[]): PlanNodeArgs => ({
   key: 'final_verify',
-  role: 'tester',
+  role: 'developer',
   depends_on: dependsOn,
 });
 
