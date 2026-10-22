@@ -117,9 +117,10 @@ test('J13 对助手提问 → 正在查资料 → 带引用的回答 → 点引�
     answer('退款在 `refund()` 中四舍五入到分 [1]。', [file('src/refund.ts', 3, 3)]),
   ]);
 
-  await page.goto(`/?projectId=${project.id}`);
+  // Away from home, where ⌘J goes to the page's own input (D112).
+  await page.goto('/settings');
   // The shell's shortcuts listen once the page has rendered.
-  await expect(page.getByRole('heading', { name: 'Everything is a Workflow.' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('heading', { name: '设置' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
   await panel.getByLabel('发给助手的消息').fill('退款在哪里四舍五入？');
