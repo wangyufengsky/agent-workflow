@@ -30,7 +30,7 @@ const loginShell = () =>
   );
 
 // Windows has no login shell to ask; that case is the last test and runs everywhere.
-describe.skipIf(process.platform === Platform.Win32)('后端的 PATH 取自登录 shell（D115）', () => {
+describe.skipIf(process.platform === Platform.Win32)('后端的 PATH 取自登录 shell（D117）', () => {
   it('从 Finder 启动时带上登录 shell 加入的目录，顺序按登录 shell', async () => {
     const env = await withLoginShellPath(Platform.Darwin, { PATH: GUI_PATH, HOME: '/Users/me' }, loginShell());
     expect(env).toEqual({ PATH: `/opt/fake-brew/bin:${GUI_PATH}`, HOME: '/Users/me' });

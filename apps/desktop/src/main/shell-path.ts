@@ -61,7 +61,7 @@ export function mergePath(current: string, login: string): string {
 
 /**
  * `env` with the PATH of the user's login shell, for the backend and through it check commands, opencode and git
- * (17 §3.12, D115). Windows has no login shell: its PATH comes from the registry for every process. When the shell
+ * (17 §3.12, D117). Windows has no login shell: its PATH comes from the registry for every process. When the shell
  * fails the reason is logged and `env` kept: the app still starts, and commands that need the missing directories
  * fail with "command not found" as before.
  */

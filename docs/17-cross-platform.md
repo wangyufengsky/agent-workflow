@@ -1,6 +1,6 @@
 # 17 · Windows 与 Linux 支持（v1.1）
 
-v1.0 只验收了 macOS arm64（D13），代码按跨平台抽象编写。本文说明 v1.1 支持 Windows 与 Linux 时各模块的平台差异和处理方式；任务拆分见 [05 §v1.1 跨平台](05-dev-plan.md#v11--windows-与-linux)，决策见 02 的 D71–D76、D81、D82、D115。
+v1.0 只验收了 macOS arm64（D13），代码按跨平台抽象编写。本文说明 v1.1 支持 Windows 与 Linux 时各模块的平台差异和处理方式；任务拆分见 [05 §v1.1 跨平台](05-dev-plan.md#v11--windows-与-linux)，决策见 02 的 D71–D76、D81、D82、D117。
 
 ## 1. 目标平台
 
@@ -162,7 +162,7 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 - 后端脚本（`scripts/*.mjs|ts`）只用 `node:path`；`scripts/check-prod-bundle.mjs` 读取构建产物，跨平台。
 
 
-### 3.12 从 Finder / 桌面启动时的 PATH（D115）
+### 3.12 从 Finder / 桌面启动时的 PATH（D117）
 
 **问题。** 从 Finder、Dock 或 Launchpad 启动时，launchd 给应用的 PATH 只有 `/usr/bin:/bin:/usr/sbin:/sbin`；Linux 从桌面启动器启动时同样只有系统会话的 PATH，没有 `~/.nvm`、`~/.sdkman` 等。后端把这个 PATH 传给检查命令（`/bin/sh -c`，`extendEnv: false`）、opencode 与 git，于是 `mvn`、`pnpm`、`node`、`java` 在终端里能用、在应用里报 `command not found`（退出码 127）。opencode 的 bash 以 `$SHELL -l -c` 运行，只读登录脚本，写在 `.zshrc` 里的 PATH 也拿不到。
 
@@ -172,7 +172,7 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 - 启动脚本可能在命令前后打印横幅等杂讯，只取两个标记之间的内容；读到第二个标记就结束等待，不等启动脚本留下的后台进程关闭输出。`printf` 与 `printenv` 在 sh、bash、zsh、fish 中写法相同。
 - 合并：当前 PATH 已包含登录 shell 的全部目录（从终端启动）时**原样不变**；否则按登录 shell 的顺序，再接上只有当前 PATH 才有的目录（`/opt/homebrew/bin` 排在 `/usr/bin` 之前，`/usr/bin/java`、`/usr/bin/git` 是转发程序）。
 - 10 s 内没有打印出 PATH、shell 失败或退出时：main 的日志写明原因（含 shell 的 stderr 结尾），后端沿用原 PATH，应用照常启动。
-- 只取 PATH；其他变量（`JAVA_HOME` 等）不取（D115 的可选方案）。Windows 不处理：PATH 来自注册表，每个进程都完整。
+- 只取 PATH；其他变量（`JAVA_HOME` 等）不取（D117 的可选方案）。Windows 不处理：PATH 来自注册表，每个进程都完整。
 - 本机实测（zsh、Homebrew）约 50 ms，与打开动画（1.2 s）同时进行。
 
 **测试。** `shell-path.int.test.ts` 用一个假的登录 shell（启动时打印杂讯并加入 `/opt/fake-brew/bin`）验证：从 Finder 启动时后端的 PATH 按登录 shell 的顺序带上该目录；从终端启动时不变；shell 失败或不结束时沿用原 PATH。假 shell 是 sh 脚本，这三例在 Windows 上跳过（该机制在 Windows 上不运行，「Windows 不问登录 shell」一例三平台都运行）。从打包应用里真正读到用户的 shell 配置只能手工验证：`pnpm dist` 打包、从 Finder 启动，跑一个 `mvn` 或 `pnpm` 检查命令。

@@ -11,7 +11,7 @@ export type Backend = { port: number; stop(): Promise<void> };
 /**
  * Starts the backend in a utilityProcess and resolves once it is listening. The window already has `apiToken`: it is
  * created first, to show the opening animation while this runs (28 §5.2). The backend gets the login shell's PATH
- * (D115): started from Finder the app has only the system directories.
+ * (D117): started from Finder the app has only the system directories.
  */
 export async function startBackend(isDev: boolean, apiToken: string): Promise<Backend> {
   // `shell` is null only on Windows, which has no login shell to ask.
