@@ -206,6 +206,11 @@ describe('其他条目', () => {
     // A delivery is a result waiting to be merged, not something holding a task up.
     expect(blockingCount).toBe(0);
     expect((await t.call(countInboxOp, {})).body.blocking).toBe(0);
+    // Lists filter on the server, so a page of deliveries cannot hide an older blocking item.
+    const listed = async (blocking: boolean) =>
+      (await t.call(listInboxOp, { status: 'open', blocking })).body.items.map((i) => i.kind);
+    expect(await listed(true)).toEqual([]);
+    expect(await listed(false)).toEqual(['delivery']);
     expect((await t.call(resolveInboxOp, { id: item.id, response: { confirmed: true } })).body).toMatchObject({
       error: { code: ErrorCode.ValidationFailed },
     });

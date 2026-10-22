@@ -99,7 +99,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 | 枚举 | 值 |
 | --- | --- |
-| `InboxKind` | `question` · `permission` · `acceptance` · `plan` · `failure` · `delivery` · `schedule_failure`（v1.2，定时任务到点没能开始任务，不属于任何任务，22 §5）；常量 `BLOCKING_INBOX_KINDS` 为除 `delivery` 外的所有种类：卡住任务、等用户行动的条目，徽标只数它们（D119） |
+| `InboxKind` | `question` · `permission` · `acceptance` · `plan` · `failure` · `delivery` · `schedule_failure`（v1.2，定时任务到点没能开始任务，不属于任何任务，22 §5）；常量 `NON_BLOCKING_INBOX_KINDS`（`delivery`：做完、等合并的结果）与 `BLOCKING_INBOX_KINDS`（其余所有种类：卡住任务、等用户行动的条目，徽标只数它们）（D119） |
 | `InboxStatus` | `open` · `resolved` · `dismissed` |
 | `PermissionDecision` | `once` · `always` · `reject`（与 opencode 取值一致） |
 

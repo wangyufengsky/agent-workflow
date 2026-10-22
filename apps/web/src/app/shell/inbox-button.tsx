@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { Drawer } from '../../components/drawer.tsx';
 import { INBOX_COPY as C } from '../../copy/tasks.ts';
-import { inboxCountQuery, inboxQuery, splitInbox } from '../../features/inbox/inbox.queries.ts';
+import { inboxCountQuery, inboxQuery } from '../../features/inbox/inbox.queries.ts';
 import { InboxCard } from '../../features/inbox/inbox-card.tsx';
 import { ROUTES } from '../routes.ts';
 
@@ -16,7 +16,8 @@ import { ROUTES } from '../routes.ts';
 export function InboxButton() {
   const [open, setOpen] = useState(false);
   const count = useQuery(inboxCountQuery).data ?? 0;
-  const items = useQuery({ ...inboxQuery({ status: InboxStatus.Open }), enabled: open });
+  const blocking = useQuery({ ...inboxQuery({ status: InboxStatus.Open, blocking: true }), enabled: open });
+  const deliveries = useQuery({ ...inboxQuery({ status: InboxStatus.Open, blocking: false }), enabled: open });
   return (
     <>
       <Button variant={count > 0 ? 'brand' : 'ghost'} icon="inbox" onClick={() => setOpen(true)}>
@@ -32,14 +33,15 @@ export function InboxButton() {
           </Link>
         }
       >
-        {items.data !== undefined && <InboxGroups items={items.data} />}
+        {blocking.data !== undefined && deliveries.data !== undefined && (
+          <InboxGroups blocking={blocking.data} deliveries={deliveries.data} />
+        )}
       </Drawer>
     </>
   );
 }
 
-function InboxGroups({ items }: { items: InboxItemDTO[] }) {
-  const { blocking, deliveries } = splitInbox(items);
+function InboxGroups({ blocking, deliveries }: { blocking: InboxItemDTO[]; deliveries: InboxItemDTO[] }) {
   return (
     <div className="col">
       {blocking.length === 0 && <p className="hint">{deliveries.length === 0 ? C.empty : C.noneWaiting}</p>}
@@ -48,7 +50,7 @@ function InboxGroups({ items }: { items: InboxItemDTO[] }) {
       ))}
       {deliveries.length > 0 && (
         <>
-          <h3 className="sec-t">{C.toMerge(deliveries.length)}</h3>
+          <h3 className="sec-t">{C.toMerge}</h3>
           {deliveries.map((item) => (
             <InboxCard key={item.id} item={item} />
           ))}

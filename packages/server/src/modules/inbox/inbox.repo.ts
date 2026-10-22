@@ -14,7 +14,13 @@ import { inboxItemsTable } from './inbox.table.ts';
 type InboxRow = typeof inboxItemsTable.$inferSelect;
 
 /** Which items a query or an automatic dismissal concerns. */
-export type InboxScope = { taskId?: string; nodeId?: string; attemptId?: string; kind?: InboxKind };
+export type InboxScope = {
+  taskId?: string;
+  nodeId?: string;
+  attemptId?: string;
+  kind?: InboxKind;
+  kinds?: readonly InboxKind[];
+};
 
 function toItem(row: InboxRow): InboxItemDTO {
   // JSON columns: parsed at the boundary with the schema of the item's kind (06 §9).
@@ -33,6 +39,7 @@ function whereOf(scope: InboxScope, status?: InboxStatus): SQL | undefined {
     ...(scope.nodeId === undefined ? [] : [eq(t.nodeId, scope.nodeId)]),
     ...(scope.attemptId === undefined ? [] : [eq(t.attemptId, scope.attemptId)]),
     ...(scope.kind === undefined ? [] : [eq(t.kind, scope.kind)]),
+    ...(scope.kinds === undefined ? [] : [inArray(t.kind, [...scope.kinds])]),
   );
 }
 
@@ -91,9 +98,7 @@ export function createInboxRepo(db: DbExecutor) {
       const row = db
         .select({ n: count() })
         .from(inboxItemsTable)
-        .where(
-          and(eq(inboxItemsTable.status, InboxStatus.Open), inArray(inboxItemsTable.kind, [...BLOCKING_INBOX_KINDS])),
-        )
+        .where(whereOf({ kinds: BLOCKING_INBOX_KINDS }, InboxStatus.Open))
         .get();
       return row?.n ?? 0;
     },

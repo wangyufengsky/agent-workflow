@@ -204,7 +204,7 @@ export const INBOX_COPY = {
   // 两组（D119）
   waiting: '等你回答或决定',
   noneWaiting: '没有等你回答或决定的事情。',
-  toMerge: (n: number) => `等你合并（${n}）`,
+  toMerge: '等你合并',
   empty: '没有需要处理的事情',
   emptyBody: 'AI 提问、请求权限或需要你验收时会出现在这里。',
   open: (n: number) => (n === 0 ? '需要你处理' : `需要你处理（${n}）`),

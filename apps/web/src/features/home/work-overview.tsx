@@ -6,7 +6,7 @@ import { BATCHES_COPY } from '../../copy/batches.ts';
 import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
 import { BatchCard } from '../batches/batch-card.tsx';
 import { batchesQuery } from '../batches/batches.queries.ts';
-import { inboxQuery, splitInbox } from '../inbox/inbox.queries.ts';
+import { inboxQuery } from '../inbox/inbox.queries.ts';
 import { InboxCard } from '../inbox/inbox-card.tsx';
 import { TaskRow } from '../tasks/task-row.tsx';
 import { tasksQuery } from '../tasks/tasks.queries.ts';
@@ -32,7 +32,7 @@ const SECTIONS: { title: string; groups: TaskDisplayGroup[]; limit?: number }[] 
 export function useWork() {
   const tasks = useQuery(tasksQuery()).data ?? [];
   // Results waiting to be merged are the「待合并」section, not something holding a task up (D119).
-  const attention = splitInbox(useQuery(inboxQuery({ status: InboxStatus.Open })).data ?? []).blocking;
+  const attention = useQuery(inboxQuery({ status: InboxStatus.Open, blocking: true })).data ?? [];
   // Batches whose tasks have not all ended (20 §4).
   const batches = (useQuery(batchesQuery()).data ?? []).filter((b) => b.ended < b.total);
   const sections = SECTIONS.map((section) => ({

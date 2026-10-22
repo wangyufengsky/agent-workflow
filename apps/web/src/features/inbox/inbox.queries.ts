@@ -1,5 +1,4 @@
 import {
-  BLOCKING_INBOX_KINDS,
   countInboxOp,
   dismissInboxOp,
   type InboxItemDTO,
@@ -18,7 +17,8 @@ import type { z } from 'zod';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 
-export type InboxFilter = { status?: InboxStatus; taskId?: string };
+/** `blocking`: only the items holding something up (true) or only the deliveries (false), filtered by the server. */
+export type InboxFilter = { status?: InboxStatus; taskId?: string; blocking?: boolean };
 
 export const inboxQuery = (filter: InboxFilter) =>
   queryOptions({
@@ -66,12 +66,3 @@ export type InboxResponse = z.input<typeof resolveInboxOp.input>['response'];
 export const useResolveInbox = () =>
   useInboxMutation((input: { id: string; response: InboxResponse }) => callOperation(resolveInboxOp, input));
 export const useDismissInbox = () => useInboxMutation((id: string) => callOperation(dismissInboxOp, { id }));
-
-/**
- * Items that hold something up until the user acts, apart from results waiting to be merged (D119): those are listed
- * after them and not counted.
- */
-export function splitInbox(items: readonly InboxItemDTO[]): { blocking: InboxItemDTO[]; deliveries: InboxItemDTO[] } {
-  const blocking = items.filter((item) => BLOCKING_INBOX_KINDS.includes(item.kind));
-  return { blocking, deliveries: items.filter((item) => !BLOCKING_INBOX_KINDS.includes(item.kind)) };
-}

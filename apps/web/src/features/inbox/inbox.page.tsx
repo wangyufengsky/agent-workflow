@@ -8,16 +8,21 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { INBOX_COPY as C } from '../../copy/tasks.ts';
 import { tasksQuery } from '../tasks/tasks.queries.ts';
-import { inboxPagesQuery, splitInbox } from './inbox.queries.ts';
+import { inboxPagesQuery } from './inbox.queries.ts';
 import { InboxCard } from './inbox-card.tsx';
 
-/** Open items holding something up, grouped by task; then the results waiting to be merged (14 §3.6, D119). */
+/**
+ * Open items holding something up, grouped by task; then the results waiting to be merged (14 §3.6, D119). The server
+ * filters each group, so each pages on its own.
+ */
 export function InboxPage() {
-  const pages = useInfiniteQuery(inboxPagesQuery({ status: InboxStatus.Open }));
-  const items = pages.data?.pages.flatMap((page) => page.items);
+  const blocking = useInfiniteQuery(inboxPagesQuery({ status: InboxStatus.Open, blocking: true }));
+  const deliveries = useInfiniteQuery(inboxPagesQuery({ status: InboxStatus.Open, blocking: false }));
+  const waiting = blocking.data?.pages.flatMap((page) => page.items);
+  const toMerge = deliveries.data?.pages.flatMap((page) => page.items);
   const tasks = useQuery(tasksQuery());
-  const { blocking, deliveries } = splitInbox(items ?? []);
-  const groups = Map.groupBy(blocking, (item: InboxItemDTO) => item.taskId ?? '');
+  const groups = Map.groupBy(waiting ?? [], (item: InboxItemDTO) => item.taskId ?? '');
+  const empty = waiting?.length === 0 && toMerge?.length === 0;
   return (
     <div className="page">
       <div className="page-head">
@@ -26,15 +31,18 @@ export function InboxPage() {
           <p className="lede">{C.lede}</p>
         </div>
       </div>
-      {pages.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
-      {pages.isError && <ErrorState error={pages.error} onRetry={() => void pages.refetch()} />}
-      {items?.length === 0 && <EmptyState icon="inbox" title={C.empty} body={C.emptyBody} />}
-      {items !== undefined && items.length > 0 && (
-        <h2 className="sec-t" data-testid="inbox-waiting">
-          {C.waiting}
-        </h2>
+      {(blocking.isPending || deliveries.isPending) && <p className="hint">{COMMON_COPY.loading}</p>}
+      {blocking.isError && <ErrorState error={blocking.error} onRetry={() => void blocking.refetch()} />}
+      {deliveries.isError && <ErrorState error={deliveries.error} onRetry={() => void deliveries.refetch()} />}
+      {empty && <EmptyState icon="inbox" title={C.empty} body={C.emptyBody} />}
+      {waiting !== undefined && toMerge !== undefined && !empty && (
+        <>
+          <h2 className="sec-t" data-testid="inbox-waiting">
+            {C.waiting}
+          </h2>
+          {waiting.length === 0 && <p className="hint">{C.noneWaiting}</p>}
+        </>
       )}
-      {items !== undefined && items.length > 0 && blocking.length === 0 && <p className="hint">{C.noneWaiting}</p>}
       {[...groups].map(([taskId, group]) => {
         const task = tasks.data?.find((t) => t.id === taskId);
         return (
@@ -54,25 +62,35 @@ export function InboxPage() {
           </section>
         );
       })}
-      {deliveries.length > 0 && (
+      <LoadMore pages={blocking} />
+      {toMerge !== undefined && toMerge.length > 0 && (
         <section className="section" data-testid="inbox-to-merge">
           <div className="section-head">
-            <h2 className="sec-t">{C.toMerge(deliveries.length)}</h2>
+            <h2 className="sec-t">{C.toMerge}</h2>
           </div>
           <div className="col">
-            {deliveries.map((item) => (
+            {toMerge.map((item) => (
               <InboxCard key={item.id} item={item} />
             ))}
           </div>
         </section>
       )}
-      {pages.hasNextPage && (
-        <div className="row">
-          <Button pending={pages.isFetchingNextPage} onClick={() => void pages.fetchNextPage()}>
-            {COMMON_COPY.loadMore}
-          </Button>
-        </div>
-      )}
+      <LoadMore pages={deliveries} />
+    </div>
+  );
+}
+
+function LoadMore({
+  pages,
+}: {
+  pages: { hasNextPage: boolean; isFetchingNextPage: boolean; fetchNextPage: () => Promise<unknown> };
+}) {
+  if (!pages.hasNextPage) return null;
+  return (
+    <div className="row">
+      <Button pending={pages.isFetchingNextPage} onClick={() => void pages.fetchNextPage()}>
+        {COMMON_COPY.loadMore}
+      </Button>
     </div>
   );
 }

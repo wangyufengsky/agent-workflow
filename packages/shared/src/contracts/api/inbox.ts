@@ -104,6 +104,8 @@ export const inboxCursorSchema = z.string().regex(/^\d+\.[0-9a-f-]+$/);
 export const listInboxQuerySchema = z.object({
   status: inboxStatusSchema.optional(),
   taskId: z.string().optional(),
+  /** true: only `BLOCKING_INBOX_KINDS`; false: only the others (deliveries); absent: all (D119). */
+  blocking: z.union([z.boolean(), z.stringbool()]).optional(),
   limit: z.coerce.number().int().min(1).max(LIST_PAGE_MAX).default(LIST_PAGE_DEFAULT),
   cursor: inboxCursorSchema.optional(),
 });
