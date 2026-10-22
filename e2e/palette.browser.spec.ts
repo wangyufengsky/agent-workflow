@@ -17,7 +17,7 @@ test('⌘K 命令面板：切换主题、打开任务', async ({ page, request }
 
   await page.goto('/');
   // The shell's shortcuts listen once the page has rendered.
-  await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Everything is a Workflow.' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+k');
   const palette = page.getByRole('dialog', { name: '命令面板' });
   await palette.getByRole('combobox').fill('DeepSeek');

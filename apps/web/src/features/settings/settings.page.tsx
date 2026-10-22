@@ -33,6 +33,22 @@ export function SettingsPage() {
             />
             <p className="hint">{C.themeHint}</p>
           </div>
+          <div className="row">
+            <div className="grow col">
+              <span className="label" id="intro-label">
+                {C.intro}
+              </span>
+              <span className="hint">{C.introHint}</span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              className="switch"
+              aria-checked={settings['ui.introAnimation']}
+              aria-labelledby="intro-label"
+              onClick={() => set({ 'ui.introAnimation': !settings['ui.introAnimation'] })}
+            />
+          </div>
         </Panel>
         <Panel title={C.mode}>
           <div className="row">

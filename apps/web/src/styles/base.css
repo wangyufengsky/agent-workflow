@@ -1552,3 +1552,17 @@ legend {
 fieldset.field > legend {
   margin-bottom: 8px;
 }
+
+/* ---------- 应用助手：主页与面板之间的接力（D112） ---------- */
+/* The home page's stream and the panel's carry the name `assistant-stream`; leaving home morphs one into the other. */
+::view-transition-group(assistant-stream) {
+  animation-duration: 0.36s;
+  animation-timing-function: var(--ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}

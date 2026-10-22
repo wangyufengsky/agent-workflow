@@ -1,15 +1,16 @@
-import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { type BackendShutdownMessage, devPorts } from '@aw/shared';
 import { app, utilityProcess } from 'electron';
 import { serveCredentialRequests } from './credentials.ts';
 
 /** `stop` asks the backend to shut down (it stops opencode first) and resolves once it has exited. */
-export type Backend = { port: number; apiToken: string; stop(): Promise<void> };
+export type Backend = { port: number; stop(): Promise<void> };
 
-/** Starts the backend in a utilityProcess and resolves once it is listening. */
-export function startBackend(isDev: boolean): Promise<Backend> {
-  const apiToken = randomBytes(32).toString('hex');
+/**
+ * Starts the backend in a utilityProcess and resolves once it is listening. The window already has `apiToken`: it is
+ * created first, to show the opening animation while this runs (28 §5.2).
+ */
+export function startBackend(isDev: boolean, apiToken: string): Promise<Backend> {
   const child = utilityProcess.fork(join(import.meta.dirname, 'server.js'), [], {
     serviceName: 'agent-workflow-backend',
     stdio: 'inherit',
@@ -42,7 +43,6 @@ export function startBackend(isDev: boolean): Promise<Backend> {
       const shutdown: BackendShutdownMessage = { type: 'backend.shutdown' };
       resolve({
         port: message.port,
-        apiToken,
         stop: async () => {
           child.postMessage(shutdown);
           await exited;

@@ -24,6 +24,7 @@ import { scheduleQuery } from '../schedules/schedules.queries.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import { rolesQuery, taskQuery, workflowsQuery } from '../tasks/tasks.queries.ts';
 import styles from './cards.module.css';
+import { followAssistant } from './handoff.ts';
 
 /** What the card knows about the object now: still loading, gone, or there (with a status for tasks). */
 type Presence =
@@ -71,8 +72,8 @@ function Shell({ entity, presence }: { entity: EntityRef; presence: Presence }) 
           <span className={`${styles.cardTitle} ellipsis`}>{entity.title}</span>
         </span>
         {deleted ? <span className={styles.chip}>{C.deleted}</span> : presence.state === 'present' && presence.status}
-        {/* The panel stays open: only the page beside it changes (15 §6). */}
-        <Button size="sm" disabled={deleted} onClick={() => void route.open(navigate, entity.id)}>
+        {/* The panel shows the conversation beside the page it opens, also from the home page (15 §6, D112). */}
+        <Button size="sm" disabled={deleted} onClick={() => followAssistant(() => route.open(navigate, entity.id))}>
           {C.open}
         </Button>
       </div>

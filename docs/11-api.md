@@ -294,7 +294,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `assistant.updated` | `AssistantConversationDTO` | 对话列表与面板（忙碌、待回复的权限请求） |
 | `assistant.transcript` | `{ conversationId, entries: TranscriptEntry[] }` | 追加到面板的消息流；含 `confirmation`（确认卡片）、`attachment`（文件）、`entity_ref`（`{ kind, id, title }`，产出对象的导航卡片，D66）条目（10 §3） |
 | `assistant.confirmation` | `AssistantConfirmationDTO` | 确认卡片的状态与结果 |
-| `assistant.navigate` | `{ conversationId, target: AssistantPageRef }` | 助手调用 `open_page`：面板旁跳转，面板保持打开 |
+| `assistant.navigate` | `{ conversationId, target: AssistantPageRef }` | 助手调用 `open_page`：跳转，面板打开并显示该对话（目标为主页时由主页显示对话，D112） |
 | `assistant.open_form` | `{ conversationId, form: AssistantForm, values }` | 助手调用 `open_form`：打开表单并预填（不含凭据字段） |
 | `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
 | `knowledge.updated` | `{ conversationId }` | 知识问答：新一轮、答案提交、一轮结束、权限请求等待或已处理、删除时；对话与列表重新拉取（研究过程与流式回答的草稿沿用 `attempt.transcript`：研究尝试的正文每 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 个字符推送一次，草稿 = 最后一个非提交工具调用之后的正文，18 §5.5） |
@@ -313,7 +313,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/assistant/conversations` | `{ title? }` → 201；opencode 会话在第一条消息时创建 |
 | GET | `/assistant/conversations/:id` | 不存在 404 `ASSISTANT_CONVERSATION_NOT_FOUND` |
 | DELETE | `/assistant/conversations/:id` | 204；连同确认、消息流 JSONL 与 `files/<id>/` |
-| POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在回复时 409 `ASSISTANT_BUSY` |
+| POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey?, knowledgeConversationId?, deckId?, slideId?, batchId?, scheduleId? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在回复时 409 `ASSISTANT_BUSY` |
 | POST | `/assistant/conversations/:id/abort` | 停止本轮回复 |
 | POST | `/assistant/conversations/:id/permissions/:permissionId` | `{ reply: PermissionDecision }`：回复助手会话的权限请求（bash / webfetch 询问），不存在 404 `NOT_FOUND` |
 | GET | `/assistant/conversations/:id/transcript?afterSeq=` | 消息流分页（非清单路由，格式同 `/attempts/:id/transcript`；`done` 恒为 false：对话不会结束） |
@@ -409,6 +409,7 @@ interface AwBridge {
   exportPdf(deckId: string, fileName: string): Promise<PdfExport>;       // 隐藏窗口打印 /ppt/:id/print，保存到用户选择的位置（23 §6.1）
   saveFile(fileName: string, bytes: Uint8Array): Promise<string | null>; // 渲染进程生成的文件（.pptx，23 §6.2）；取消为 null
   printSettled(result: PrintSettled): void;                              // 打印视图告诉隐藏窗口：可以打印，或为什么不能显示
+  setLaunchPreferences(preferences: LaunchPreferences): void;           // 应用的主题与是否播放打开动画，main 写入 launch.json 供下次启动（28 §5.3）
 }
 type PrintSettled = { ok: true } | { ok: false; error: ErrorInfo };
 type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorInfo };   // path 为 null：用户取消了保存

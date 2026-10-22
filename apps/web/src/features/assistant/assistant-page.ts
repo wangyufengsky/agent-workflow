@@ -27,6 +27,11 @@ const PAGE_ROUTE = {
   [AssistantPage.Insights]: ROUTES.insights,
   [AssistantPage.Ppt]: ROUTES.ppt,
   [AssistantPage.PptDeck]: ROUTES.pptDeck,
+  [AssistantPage.Batches]: ROUTES.batches,
+  [AssistantPage.Batch]: ROUTES.batch,
+  [AssistantPage.Schedules]: ROUTES.schedules,
+  [AssistantPage.Schedule]: ROUTES.schedule,
+  [AssistantPage.Environment]: ROUTES.environment,
 } as const satisfies Record<AssistantPage, string>;
 
 const PAGE_OF_ROUTE = new Map<string, AssistantPage>(
@@ -59,6 +64,8 @@ export function useAssistantPage(): AssistantPageRef {
         knowledgeConversationId: text(params.conversationId),
         deckId: text(params.deckId),
         slideId: text(search.slide),
+        batchId: text(params.batchId),
+        scheduleId: text(params.scheduleId),
       };
       return {
         page,
@@ -103,6 +110,10 @@ export function useOpenAssistantPage() {
             params: { deckId: param(ref, 'deckId') },
             search: ref.params.slideId === undefined ? {} : { slide: ref.params.slideId },
           });
+        case AssistantPage.Batch:
+          return navigate({ to: ROUTES.batch, params: { batchId: param(ref, 'batchId') } });
+        case AssistantPage.Schedule:
+          return navigate({ to: ROUTES.schedule, params: { scheduleId: param(ref, 'scheduleId') } });
         default:
           return navigate({ to: PAGE_ROUTE[ref.page] });
       }

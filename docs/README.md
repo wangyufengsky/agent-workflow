@@ -31,6 +31,7 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [25-conversation-stream.md](25-conversation-stream.md) | 会话流重设计（v1.2 体验修正）：共用的固定高度会话流、思考显示、结束后收起、增量存储（D102–D104） | 开发 / 设计 |
 | [26-canvas.md](26-canvas.md) | 流程画布与流程页重设计：视图控件、自动布局、节点卡片、+ / − 编辑、流程编辑页 | 开发 / 设计 |
 | [27-git-workbench.md](27-git-workbench.md) | Git 工作台（重做，v1.2）：手动提交 / 推送 / 合并、AI 审查、与任务 worktree 的边界、三栏界面 | 全员 |
+| [28-home-assistant.md](28-home-assistant.md) | 以助手为主的主页（一个输入框两种模式、对话中视图、与 ⌘J 面板的接力）、助手能力盘点、打开动画 | 全员 |
 
 ## 维护规则
 

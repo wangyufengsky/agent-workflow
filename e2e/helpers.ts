@@ -164,12 +164,15 @@ export const appTool = (name: string, args: Record<string, unknown>): FakeStep =
   args,
 });
 
-/** Home page of the project (the select writes the same `?projectId=`), then workflow, requirement and start. */
+/**
+ * Home page of the project (the select writes the same `?projectId=`), then a workflow under「直接开始」, which puts
+ * the input in「开始任务」mode (D111), the requirement and start.
+ */
 export async function startTask(page: Page, project: E2EProject, workflow: RegExp, requirement: string): Promise<void> {
   await page.goto(`/?projectId=${project.id}`);
+  await page.getByRole('group', { name: '直接开始' }).getByRole('button', { name: workflow }).click();
   const projectSelect = page.getByLabel('项目', { exact: true });
   if ((await projectSelect.count()) > 0) await expect(projectSelect).toHaveValue(project.id);
-  await page.getByRole('group', { name: '流程' }).getByRole('button', { name: workflow }).click();
   await page.getByLabel('需求').fill(requirement);
   await page.getByRole('button', { name: /^开始/ }).click();
   // Starting creates the task's worktree first (up to 9 s on the Windows runner).

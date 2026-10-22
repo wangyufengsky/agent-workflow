@@ -1,6 +1,7 @@
 import { taskDisplayGroupSchema } from '@aw/shared';
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect } from '@tanstack/react-router';
+import { useEffect } from 'react';
 import { z } from 'zod';
 import { useServerEvents } from '../api/server-events.ts';
 import { ErrorState } from '../components/error-state.tsx';
@@ -48,7 +49,13 @@ import { AppShell } from './shell/app-shell.tsx';
 export type RouterContext = { queryClient: QueryClient };
 
 function Root() {
-  useAppliedTheme(useSettings()['ui.theme']);
+  const settings = useSettings();
+  const theme = useAppliedTheme(settings['ui.theme']);
+  const intro = settings['ui.introAnimation'];
+  // The next start shows its window and opening animation before the backend is up (28 §5.3).
+  useEffect(() => {
+    window.aw?.setLaunchPreferences({ theme, intro });
+  }, [theme, intro]);
   useServerEvents();
   return (
     <>
@@ -122,8 +129,10 @@ const homeRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.home,
   // The project to start a task in; kept in the URL so a reload or link keeps it. A workflow key and requirement
-  // prefill the form (the report card's「据此修复」).
+  // put the input in「开始任务」mode prefilled (the report card's「据此修复」); a conversation shows it on the page
+  // (28 §2.1).
   validateSearch: z.object({
+    conversation: z.string().optional(),
     projectId: z.string().optional(),
     workflow: z.string().optional(),
     requirement: z.string().optional(),

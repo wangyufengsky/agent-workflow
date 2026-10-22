@@ -18,7 +18,7 @@ test.afterAll(({ request }) => patchSettings(request, { 'ui.mode': 'simple' }));
 async function startBugfix(page: Page, project: E2EProject, requirement: string, confirmPlan: boolean) {
   await page.goto(`/?projectId=${project.id}`);
   await page
-    .getByRole('group', { name: '流程' })
+    .getByRole('group', { name: '直接开始' })
     .getByRole('button', { name: /修 Bug/ })
     .click();
   await page.getByLabel('需求').fill(requirement);
