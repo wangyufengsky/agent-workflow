@@ -12,19 +12,23 @@ import {
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
-import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { AcceptanceEditor } from '../../canvas/acceptance-editor.tsx';
-import { checkPlan } from '../../canvas/plan-check.ts';
+import { EditTools } from '../../canvas/edit-tools.tsx';
+import { checkPlan, type EditorProblem } from '../../canvas/plan-check.ts';
+import editorStyles from '../../canvas/plan-editor.module.css';
 import { PlanEditor } from '../../canvas/plan-editor.tsx';
+import { ProblemCount } from '../../canvas/problem-count.tsx';
 import { ProgressCanvas } from '../../canvas/progress-canvas.tsx';
+import { useHistory } from '../../canvas/use-history.ts';
 import { Button } from '../../components/button.tsx';
 import { EmptyState } from '../../components/empty-state.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
-import { PLAN_PROBLEM_LABEL, WORKFLOW_PROBLEM_LABEL } from '../../copy/plan-editor.ts';
+import { CANVAS_COPY, PLAN_EDITOR_COPY, PLAN_PROBLEM_LABEL, WORKFLOW_PROBLEM_LABEL } from '../../copy/plan-editor.ts';
 import {
   WORKFLOW_EDITOR_COPY as C,
   WORKFLOW_DELIVERABLE_LABEL,
@@ -70,222 +74,281 @@ function Versions({ workflowKey }: { workflowKey: string }) {
   );
 }
 
-/** Editing one workflow (M5-05, 13 §5); a built-in one is shown read-only. Saving adds a version. */
+type Draft = { name: string; description: string; definition: WorkflowDefinition };
+
+/** 流程设置 (26 §6.3): everything about the workflow except its steps. */
+function Settings({
+  workflow,
+  roles,
+  draft,
+  onChange,
+  readonly,
+}: {
+  workflow: WorkflowDTO;
+  roles: readonly RoleDTO[];
+  draft: Draft;
+  onChange: (patch: Partial<Draft>, mergeKey?: string) => void;
+  readonly: boolean;
+}) {
+  const { definition } = draft;
+  const patch = (changes: Partial<WorkflowDefinition>, mergeKey?: string) =>
+    onChange({ definition: { ...definition, ...changes } }, mergeKey);
+  return (
+    <fieldset className="col" disabled={readonly} data-testid="workflow-settings">
+      <div className="field">
+        <label className="label" htmlFor="workflow-edit-description">
+          {WORKFLOWS_COPY.description}
+        </label>
+        <textarea
+          id="workflow-edit-description"
+          className="textarea"
+          rows={2}
+          value={draft.description}
+          onChange={(e) => onChange({ description: e.target.value }, 'description')}
+        />
+        <span className="hint">
+          {WORKFLOWS_COPY.planning}：{WORKFLOW_PLANNING_LABEL[workflow.planning]} · {WORKFLOWS_COPY.deliverable}：
+          {WORKFLOW_DELIVERABLE_LABEL[workflow.deliverable]} · <span className="mono">{workflow.key}</span>
+        </span>
+      </div>
+      <fieldset className={`field ${styles.roles}`}>
+        <legend className="label">{C.roles}</legend>
+        {roles.map((role) => (
+          <label key={role.key} className="check">
+            <input
+              type="checkbox"
+              checked={definition.allowedRoles.includes(role.key)}
+              onChange={(e) =>
+                patch({
+                  allowedRoles: e.target.checked
+                    ? [...definition.allowedRoles, role.key]
+                    : definition.allowedRoles.filter((k) => k !== role.key),
+                })
+              }
+            />
+            <span>{role.name}</span>
+          </label>
+        ))}
+      </fieldset>
+      <fieldset className="field">
+        <legend className="label">{C.checkpoints}</legend>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={definition.checkpoints.confirm_plan}
+            onChange={(e) => patch({ checkpoints: { ...definition.checkpoints, confirm_plan: e.target.checked } })}
+          />
+          <span>{C.confirmPlan}</span>
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={definition.checkpoints.accept_each_node}
+            onChange={(e) => patch({ checkpoints: { ...definition.checkpoints, accept_each_node: e.target.checked } })}
+          />
+          <span>{C.acceptEachNode}</span>
+        </label>
+        <span className="hint">{C.checkpointsHint}</span>
+      </fieldset>
+      <div className="field">
+        <span className="label">{C.defaultAcceptance}</span>
+        <span className="hint">{C.defaultAcceptanceHint}</span>
+        <AcceptanceEditor
+          idPrefix="workflow-default"
+          value={definition.defaultAcceptance}
+          onChange={(acceptance) => acceptance !== undefined && patch({ defaultAcceptance: acceptance })}
+          allowDefault={false}
+        />
+      </div>
+      {workflow.planning === WorkflowPlanning.Ai && (
+        <>
+          <div className="field">
+            <label className="label" htmlFor="workflow-planner">
+              {C.plannerRole}
+            </label>
+            <select
+              id="workflow-planner"
+              className="select"
+              value={definition.plannerRole ?? ''}
+              onChange={(e) => patch({ plannerRole: e.target.value })}
+            >
+              {roles.map((role) => (
+                <option key={role.key} value={role.key}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="workflow-guidance">
+              {C.guidance}
+            </label>
+            <textarea
+              id="workflow-guidance"
+              className="textarea"
+              rows={6}
+              placeholder={C.guidancePlaceholder}
+              value={definition.plannerGuidance ?? ''}
+              aria-describedby="workflow-guidance-hint"
+              onChange={(e) => {
+                const { plannerGuidance: _old, ...rest } = definition;
+                onChange(
+                  { definition: e.target.value === '' ? rest : { ...rest, plannerGuidance: e.target.value } },
+                  'guidance',
+                );
+              }}
+            />
+            <span id="workflow-guidance-hint" className="hint">
+              {C.guidanceHint}
+            </span>
+          </div>
+        </>
+      )}
+      <Versions workflowKey={workflow.key} />
+    </fieldset>
+  );
+}
+
+/**
+ * Editing one workflow (M5-05, 13 §5), canvas first (26 §6.3, D107): the toolbar, the steps on the canvas and a side
+ * panel with the selected step and 流程设置. A built-in workflow is shown read-only. Saving adds a version.
+ */
 function WorkflowEditor({ workflow, roles }: { workflow: WorkflowDTO; roles: readonly RoleDTO[] }) {
   const readonly = workflow.kind === WorkflowKind.Builtin;
   const update = useUpdateWorkflow();
-  const [name, setName] = useState(workflow.name);
-  const [description, setDescription] = useState(workflow.description);
-  const [definition, setDefinition] = useState<WorkflowDefinition>(workflow.definition);
-  const patch = (changes: Partial<WorkflowDefinition>) => setDefinition({ ...definition, ...changes });
+  const history = useHistory<Draft>({
+    name: workflow.name,
+    description: workflow.description,
+    definition: workflow.definition,
+  });
+  const draft = history.value;
+  const { definition } = draft;
+  const change = (patch: Partial<Draft>, mergeKey?: string) => history.change({ ...draft, ...patch }, mergeKey);
   const fixed = workflow.planning === WorkflowPlanning.Fixed;
   const template = definition.template ?? { nodes: [] };
   const templateRules = { allowedRoles: definition.allowedRoles, requiredSteps: [] };
   const templateProblems = fixed ? checkPlan(template, templateRules, undefined) : [];
-  // Template problems show in the plan editor; the rest of the definition's problems here.
-  const problems = validateWorkflowDefinition({ planning: workflow.planning, definition }, roles).filter(
+  // Template problems come from the plan check; the rest of the definition's problems from here.
+  const definitionProblems = validateWorkflowDefinition({ planning: workflow.planning, definition }, roles).filter(
     (p) => !fixed || p.field !== 'template',
   );
   const incomplete = (definition.requiredSteps ?? []).some(
     (s) => s.title.trim() === '' || s.instructions.trim() === '',
   );
-  const canSave =
-    !readonly && name.trim() !== '' && problems.length === 0 && templateProblems.length === 0 && !incomplete;
+  const problems: EditorProblem[] = [
+    ...(draft.name.trim() === '' ? [{ key: undefined, message: C.nameRequired }] : []),
+    ...definitionProblems.map((p) => ({ key: p.nodeKey, message: problemLabel(p) })),
+    ...templateProblems,
+    ...(incomplete ? [{ key: undefined, message: C.requiredIncomplete }] : []),
+  ];
   const save = () =>
     update.mutate(
-      { id: workflow.id, name: name.trim(), description, definition },
+      { id: workflow.id, name: draft.name.trim(), description: draft.description, definition },
       { onSuccess: (saved) => toast(C.saved(saved.version)) },
     );
 
-  return (
+  const toolbar = (tools: ReactNode) => (
+    <>
+      <Link to={ROUTES.workflows} className="crumbs">
+        {C.back}
+      </Link>
+      <h1 className="sr">{draft.name}</h1>
+      <input
+        className={`input ${styles.name}`}
+        aria-label={WORKFLOWS_COPY.name}
+        value={draft.name}
+        readOnly={readonly}
+        onChange={(e) => change({ name: e.target.value }, 'name')}
+      />
+      <span className="badge st-accent">
+        {readonly
+          ? C.builtinBadge
+          : `${WORKFLOW_PLANNING_LABEL[workflow.planning]} · ${WORKFLOWS_COPY.version(workflow.version)}`}
+      </span>
+      <span className="grow" />
+      {readonly ? (
+        <span className="hint">{C.readonly}</span>
+      ) : (
+        <>
+          {history.changes > 0 && <span className="hint">{C.unsaved(history.changes)}</span>}
+          {tools}
+          <ProblemCount count={problems.length} />
+          <Button
+            variant="primary"
+            size="sm"
+            icon="check"
+            pending={update.isPending}
+            disabled={problems.length > 0 || history.changes === 0}
+            onClick={save}
+          >
+            {C.save}
+          </Button>
+        </>
+      )}
+    </>
+  );
+  const problemList = (
     <div className="col">
-      {readonly && (
-        <div className="banner">
-          <span className="grow">{C.readonly}</span>
-        </div>
+      {problems.length === 0 ? (
+        <p className="hint">{C.noProblems}</p>
+      ) : (
+        <ul className={styles.problems} data-testid="workflow-problems">
+          {problems.map((p) => (
+            <li key={`${p.key}-${p.message}`}>{p.message}</li>
+          ))}
+        </ul>
       )}
-      <div className={styles.layout}>
-        <fieldset className="col" disabled={readonly}>
-          <Panel title={C.basics}>
-            <div className="col">
-              <div className="field">
-                <label className="label" htmlFor="workflow-edit-name">
-                  {WORKFLOWS_COPY.name}
-                </label>
-                <input
-                  id="workflow-edit-name"
-                  className="input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label className="label" htmlFor="workflow-edit-description">
-                  {WORKFLOWS_COPY.description}
-                </label>
-                <textarea
-                  id="workflow-edit-description"
-                  className="textarea"
-                  rows={2}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </div>
-              <span className="hint">
-                {WORKFLOWS_COPY.planning}：{WORKFLOW_PLANNING_LABEL[workflow.planning]} · {WORKFLOWS_COPY.deliverable}：
-                {WORKFLOW_DELIVERABLE_LABEL[workflow.deliverable]} · <span className="mono">{workflow.key}</span>
-              </span>
-            </div>
-          </Panel>
-          <Panel title={C.roles}>
-            <fieldset className={styles.roles} aria-label={C.roles}>
-              {roles.map((role) => (
-                <label key={role.key} className="check">
-                  <input
-                    type="checkbox"
-                    checked={definition.allowedRoles.includes(role.key)}
-                    onChange={(e) =>
-                      patch({
-                        allowedRoles: e.target.checked
-                          ? [...definition.allowedRoles, role.key]
-                          : definition.allowedRoles.filter((k) => k !== role.key),
-                      })
-                    }
-                  />
-                  <span>{role.name}</span>
-                </label>
-              ))}
-            </fieldset>
-          </Panel>
-          <Panel title={C.checkpoints}>
-            <div className="col">
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={definition.checkpoints.confirm_plan}
-                  onChange={(e) =>
-                    patch({ checkpoints: { ...definition.checkpoints, confirm_plan: e.target.checked } })
-                  }
-                />
-                <span>{C.confirmPlan}</span>
-              </label>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={definition.checkpoints.accept_each_node}
-                  onChange={(e) =>
-                    patch({ checkpoints: { ...definition.checkpoints, accept_each_node: e.target.checked } })
-                  }
-                />
-                <span>{C.acceptEachNode}</span>
-              </label>
-              <span className="hint">{C.checkpointsHint}</span>
-            </div>
-          </Panel>
-          <Panel title={C.defaultAcceptance}>
-            <div className="col">
-              <span className="hint">{C.defaultAcceptanceHint}</span>
-              <AcceptanceEditor
-                idPrefix="workflow-default"
-                value={definition.defaultAcceptance}
-                onChange={(acceptance) => acceptance !== undefined && patch({ defaultAcceptance: acceptance })}
-                allowDefault={false}
-              />
-            </div>
-          </Panel>
-          {!fixed && (
-            <Panel title={C.planner}>
-              <div className="col">
-                <div className="field">
-                  <label className="label" htmlFor="workflow-planner">
-                    {C.plannerRole}
-                  </label>
-                  <select
-                    id="workflow-planner"
-                    className="select"
-                    value={definition.plannerRole ?? ''}
-                    onChange={(e) => patch({ plannerRole: e.target.value })}
-                  >
-                    {roles.map((role) => (
-                      <option key={role.key} value={role.key}>
-                        {role.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field">
-                  <label className="label" htmlFor="workflow-guidance">
-                    {C.guidance}
-                  </label>
-                  <textarea
-                    id="workflow-guidance"
-                    className="textarea"
-                    rows={6}
-                    placeholder={C.guidancePlaceholder}
-                    value={definition.plannerGuidance ?? ''}
-                    aria-describedby="workflow-guidance-hint"
-                    onChange={(e) => {
-                      const { plannerGuidance: _old, ...rest } = definition;
-                      setDefinition(e.target.value === '' ? rest : { ...rest, plannerGuidance: e.target.value });
-                    }}
-                  />
-                  <span id="workflow-guidance-hint" className="hint">
-                    {C.guidanceHint}
-                  </span>
-                </div>
-                <h3 className="sec-t">{C.requiredSteps}</h3>
-                <RequiredStepsEditor
-                  steps={definition.requiredSteps ?? []}
-                  onChange={(requiredSteps) => patch({ requiredSteps })}
-                  allowedRoles={definition.allowedRoles}
-                  roles={roles}
-                />
-              </div>
-            </Panel>
-          )}
-        </fieldset>
-        <aside className="col">
-          <Panel title={C.problems}>
-            <div className="col">
-              {problems.length === 0 ? (
-                <p className="hint">{C.noProblems}</p>
-              ) : (
-                <ul className={styles.problems} data-testid="workflow-problems">
-                  {problems.map((p) => (
-                    <li key={`${p.field}-${p.code}-${p.nodeKey}-${p.message}`}>{problemLabel(p)}</li>
-                  ))}
-                </ul>
-              )}
-              {update.isError && <ErrorState error={update.error} />}
-              {!readonly && (
-                <Button variant="primary" icon="check" pending={update.isPending} disabled={!canSave} onClick={save}>
-                  {C.save}
-                </Button>
-              )}
-            </div>
-          </Panel>
-          <Versions workflowKey={workflow.key} />
-        </aside>
-      </div>
-      {fixed && (
-        <section className="section">
-          <h2 className="section-title">{C.template}</h2>
-          {readonly ? (
-            <div className={styles.readonlyCanvas}>
-              <ProgressCanvas steps={stepsOfPlan(template, roles)} />
-            </div>
-          ) : (
-            <PlanEditor
-              graph={template}
-              onChange={(graph: PlanGraph) => patch({ template: graph })}
-              rules={templateRules}
-              roles={roles}
-              problems={templateProblems}
-            />
-          )}
-        </section>
-      )}
+      {update.isError && <ErrorState error={update.error} />}
     </div>
+  );
+  const settings = <Settings workflow={workflow} roles={roles} draft={draft} onChange={change} readonly={readonly} />;
+
+  if (!fixed) {
+    return (
+      <RequiredStepsEditor
+        steps={definition.requiredSteps ?? []}
+        onChange={(requiredSteps, mergeKey) => change({ definition: { ...definition, requiredSteps } }, mergeKey)}
+        readonly={readonly}
+        allowedRoles={definition.allowedRoles}
+        roles={roles}
+        toolbar={(addStep) => toolbar(<EditTools history={history} addStep={addStep} />)}
+        settings={settings}
+        problems={problemList}
+      />
+    );
+  }
+  if (readonly) {
+    return (
+      <div className={editorStyles.editor}>
+        <div className={editorStyles.toolbar}>{toolbar(null)}</div>
+        <div className={editorStyles.layout}>
+          <div className={editorStyles.canvas}>
+            <ProgressCanvas steps={stepsOfPlan(template, roles)} label={CANVAS_COPY.workflowLabel} />
+          </div>
+          <aside className={editorStyles.side}>
+            <Panel title={PLAN_EDITOR_COPY.settings}>{settings}</Panel>
+          </aside>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <PlanEditor
+      label={CANVAS_COPY.workflowLabel}
+      history={{
+        value: template,
+        change: (graph: PlanGraph, mergeKey?: string) =>
+          change({ definition: { ...definition, template: graph } }, mergeKey),
+        undo: history.undo,
+        canUndo: history.canUndo,
+      }}
+      rules={templateRules}
+      roles={roles}
+      problems={problems}
+      toolbar={(addStep) => toolbar(<EditTools history={history} addStep={addStep} />)}
+      actions={update.isError ? <ErrorState error={update.error} /> : undefined}
+      settings={settings}
+    />
   );
 }
 
@@ -299,14 +362,6 @@ export function WorkflowEditorPage() {
   const error = list.error ?? workflow.error ?? roles.error;
   return (
     <div className="page wide">
-      <div className="page-head">
-        <div className="grow col">
-          <Link to={ROUTES.workflows} className="crumbs">
-            {C.back}
-          </Link>
-          <h1 className="title">{workflow.data?.name ?? key}</h1>
-        </div>
-      </div>
       {error !== null && <ErrorState error={error} />}
       {list.data !== undefined && summary === undefined && <EmptyState icon="flow" title={C.notFound} />}
       {(workflow.isPending || roles.isPending) && summary !== undefined && (

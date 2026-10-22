@@ -434,7 +434,7 @@ class AppError extends Error {
 
 ### 5.4 流程定义校验子码（`WORKFLOW_DEFINITION_INVALID.details.problems[].code`）
 
-枚举 `WorkflowProblemCode`（`shared/errors/workflow-problems.ts`）；校验函数 `validateWorkflowDefinition({ planning, definition }, roles)` 位于 `shared/workflow`，流程编排器与后端（`POST /workflows/validate`、新建、修改）共用。每项带 `field`（`allowedRoles` / `plannerRole` / `template` / `requiredSteps`）。固定流程的模板按 5.3 的计划校验（允许角色为流程的 `allowedRoles`，无必经步骤），必经步骤检查重复 key（`DUPLICATE_KEY`）、角色是否允许（`UNKNOWN_ROLE`）、指令长度（`INSTRUCTIONS_TOO_LONG`），这些沿用 5.3 的子码。
+枚举 `WorkflowProblemCode`（`shared/errors/workflow-problems.ts`）；校验函数 `validateWorkflowDefinition({ planning, definition }, roles)` 位于 `shared/workflow`，流程编排器与后端（`POST /workflows/validate`、新建、修改）共用。每项带 `field`（`allowedRoles` / `plannerRole` / `template` / `requiredSteps`）。固定流程的模板按 5.3 的计划校验（允许角色为流程的 `allowedRoles`，无必经步骤），必经步骤检查重复 key（`DUPLICATE_KEY`）、角色是否允许（`UNKNOWN_ROLE`）、指令长度（`INSTRUCTIONS_TOO_LONG`）、最先与最后的步骤各至多一个（`REQUIRED_STEP_ORDER`：两个最先的步骤都要排在对方之前，没有计划能满足），这些沿用 5.3 的子码。
 
 | 子码 | 含义 |
 | --- | --- |

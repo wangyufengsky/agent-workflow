@@ -7,6 +7,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { toast } from '../../components/toast.tsx';
+import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { rolesQuery, useConfirmPlan, useReplan } from '../tasks/tasks.queries.ts';
 import { stepsOfPlan } from './steps.ts';
@@ -51,7 +52,7 @@ export function PlanReview({ task, pro }: { task: TaskDetailDTO; pro: boolean })
   };
   return (
     <div className={styles.layout}>
-      <ProgressCanvas steps={stepsOfPlan(plan.graph, roles.data ?? [])} />
+      <ProgressCanvas steps={stepsOfPlan(plan.graph, roles.data ?? [])} label={CANVAS_COPY.planLabel} />
       <aside className={styles.side}>
         <Panel title={`${C.planTitle} · ${C.planVersion(plan.version)}`}>
           <div className={styles.result}>

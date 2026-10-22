@@ -6,6 +6,7 @@ import { ROUTE_IDS } from '../../app/routes.ts';
 import { ProgressCanvas } from '../../canvas/progress-canvas.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
+import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { taskQuery } from '../tasks/tasks.queries.ts';
@@ -22,6 +23,8 @@ import { TaskPlanEditor } from './task-plan-editor.tsx';
 import { TaskSide } from './task-side.tsx';
 
 const route = getRouteApi(ROUTE_IDS.task);
+/** The task's steps are all behind it: the canvas's end pill shows it. */
+const FINISHED_TASK: readonly TaskStatus[] = [TaskStatus.Review, TaskStatus.Merging, TaskStatus.Completed];
 
 type Selection = { selected: string | undefined; select: (id: string) => void; open: (id: string) => void };
 type MainProps = { task: TaskDetailDTO; selection: Selection; pro: boolean };
@@ -32,6 +35,8 @@ function StepsView({ task, selection, pro }: MainProps) {
     <div className={styles.layout}>
       <ProgressCanvas
         steps={stepsOfNodes(task)}
+        label={CANVAS_COPY.progressLabel}
+        finished={FINISHED_TASK.includes(task.status)}
         selectedId={selection.selected}
         onSelect={selection.select}
         onOpen={selection.open}

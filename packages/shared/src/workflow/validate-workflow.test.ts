@@ -51,4 +51,17 @@ describe('validateWorkflowDefinition', () => {
       ['INSTRUCTIONS_TOO_LONG', 'requiredSteps'],
     ]);
   });
+
+  it('最先或最后的必经步骤多于一个时返回 REQUIRED_STEP_ORDER：没有计划能同时满足', () => {
+    const requiredSteps = [
+      { ...step, key: 'a', position: 'first' as const },
+      { ...step, key: 'b', position: 'first' as const },
+      { ...step, key: 'c', position: 'last' as const },
+      { ...step, key: 'd', position: 'last' as const },
+    ];
+    expect(codes('ai', { ...base, plannerRole: 'planner', requiredSteps })).toEqual([
+      ['REQUIRED_STEP_ORDER', 'requiredSteps'],
+      ['REQUIRED_STEP_ORDER', 'requiredSteps'],
+    ]);
+  });
 });

@@ -1,5 +1,5 @@
 import { dependencyCandidates, type PlanGraph, type PlanNodeSpec, type RoleDTO } from '@aw/shared';
-import { useState } from 'react';
+import { type RefObject, useState } from 'react';
 import { Button } from '../components/button.tsx';
 import { PLAN_EDITOR_COPY as C } from '../copy/plan-editor.ts';
 import { AcceptanceEditor } from './acceptance-editor.tsx';
@@ -12,9 +12,12 @@ type Props = {
   allowedRoles: readonly string[];
   roles: readonly RoleDTO[];
   locked: boolean;
+  /** The title field, focused when a step is added or opened (26 §5.1). */
+  titleRef: RefObject<HTMLInputElement | null>;
   onPatch: (patch: NodePatch) => void;
   onRename: (key: string) => void;
-  onRemove: () => void;
+  /** Absent when removing the step is not allowed (26 §5.4). */
+  onRemove: (() => void) | undefined;
 };
 
 /** The key is committed on blur or Enter once it is valid and free; until then the field shows why not. */
@@ -50,10 +53,20 @@ function KeyField({ graph, node, locked, onRename }: Pick<Props, 'graph' | 'node
 }
 
 /**
- * Fields of the selected step (14 §5): dependencies as checkboxes too, so the plan can be edited without dragging; only
- * steps that do not already depend on this one are offered, so a dependency never closes a cycle.
+ * Fields of the selected step (26 §5.6): extra dependencies are checkboxes (26 §5.3); only steps that do not already
+ * depend on this one are offered, so a dependency never closes a cycle.
  */
-export function PlanNodeForm({ graph, node, allowedRoles, roles, locked, onPatch, onRename, onRemove }: Props) {
+export function PlanNodeForm({
+  graph,
+  node,
+  allowedRoles,
+  roles,
+  locked,
+  titleRef,
+  onPatch,
+  onRename,
+  onRemove,
+}: Props) {
   const upstream = dependencyCandidates(graph.nodes, node.key);
   const roleKeys = allowedRoles.includes(node.roleKey) ? allowedRoles : [...allowedRoles, node.roleKey];
   const roleName = (key: string) => roles.find((r) => r.key === key)?.name ?? key;
@@ -68,6 +81,7 @@ export function PlanNodeForm({ graph, node, allowedRoles, roles, locked, onPatch
         </label>
         <input
           id="plan-node-title"
+          ref={titleRef}
           className="input"
           value={node.title}
           disabled={locked}
@@ -133,7 +147,7 @@ export function PlanNodeForm({ graph, node, allowedRoles, roles, locked, onPatch
         disabled={locked}
         allowDefault
       />
-      {!locked && (
+      {onRemove !== undefined && (
         <div className="row">
           <Button variant="danger" size="sm" icon="trash" onClick={onRemove}>
             {C.removeStep}

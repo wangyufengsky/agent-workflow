@@ -1,12 +1,15 @@
 import { type NodeStatus, type PlanGraph, planEditRules, type TaskDetailDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { EditTools } from '../../canvas/edit-tools.tsx';
 import { checkPlan, type PlanLock } from '../../canvas/plan-check.ts';
 import { PlanEditor } from '../../canvas/plan-editor.tsx';
+import { ProblemCount } from '../../canvas/problem-count.tsx';
+import { useHistory } from '../../canvas/use-history.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
+import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { rolesQuery, useSaveDraftPlan, workflowQuery } from '../tasks/tasks.queries.ts';
 
@@ -25,7 +28,8 @@ export function TaskPlanEditor({ task, base, lock, statuses, onDone }: Props) {
   const roles = useQuery(rolesQuery);
   const workflow = useQuery(workflowQuery(task.workflow.id));
   const save = useSaveDraftPlan();
-  const [graph, setGraph] = useState(base.graph);
+  const history = useHistory(base.graph);
+  const graph = history.value;
   if (workflow.isError) return <ErrorState error={workflow.error} onRetry={() => void workflow.refetch()} />;
   if (roles.isError) return <ErrorState error={roles.error} onRetry={() => void roles.refetch()} />;
   if (workflow.data === undefined || roles.data === undefined) return <p className="hint">{COMMON_COPY.loading}</p>;
@@ -33,8 +37,14 @@ export function TaskPlanEditor({ task, base, lock, statuses, onDone }: Props) {
   const problems = checkPlan(graph, rules, lock);
   return (
     <PlanEditor
-      graph={graph}
-      onChange={setGraph}
+      label={CANVAS_COPY.planLabel}
+      history={history}
+      toolbar={(addStep) => (
+        <>
+          <EditTools history={history} addStep={addStep} />
+          <ProblemCount count={problems.length} />
+        </>
+      )}
       rules={rules}
       roles={roles.data}
       lock={lock}

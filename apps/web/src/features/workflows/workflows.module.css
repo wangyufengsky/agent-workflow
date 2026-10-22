@@ -1,10 +1,3 @@
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 16px;
-  align-items: start;
-}
-
 .roles {
   display: flex;
   flex-wrap: wrap;
@@ -28,8 +21,12 @@
   font-size: 13px;
 }
 
-.readonlyCanvas {
-  height: 420px;
+/* The workflow's name, edited in place in the toolbar (26 §6.3). */
+.name {
+  width: 240px;
+  height: 32px;
+  font-size: 16px;
+  font-weight: 500;
 }
 
 /* Fields side by side: the stacked-field spacing of base.css does not apply across columns. */

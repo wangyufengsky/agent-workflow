@@ -1,8 +1,50 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 36px;
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   gap: 16px;
-  min-height: 560px;
+  height: calc(100vh - 260px);
+  min-height: 480px;
+}
+
+.canvas {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* After a removal: what happened, and undo (26 §5.2). */
+.notice {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--r-pill);
+  background: var(--overlay);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-pop);
+  font-size: 13px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  z-index: 5;
 }
 
 .side {
@@ -10,7 +52,7 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  max-height: 820px;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -28,4 +70,8 @@
 
 .problemLink:hover {
   text-decoration: underline;
+}
+
+.count {
+  margin-left: auto;
 }
