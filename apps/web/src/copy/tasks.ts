@@ -235,7 +235,11 @@ export const NODE_PAGE_COPY = {
 
 export const INBOX_COPY = {
   title: '需要你处理',
-  lede: 'AI 遇到需要你决定的事情时会出现在这里，处理后任务会继续。',
+  lede: 'AI 遇到需要你决定的事情时会出现在这里，处理后任务会继续；做完、等你合并的结果列在最后。',
+  // 两组（D119）
+  waiting: '等你回答或决定',
+  noneWaiting: '没有等你回答或决定的事情。',
+  toMerge: '等你合并',
   empty: '没有需要处理的事情',
   emptyBody: 'AI 提问、请求权限或需要你验收时会出现在这里。',
   open: (n: number) => (n === 0 ? '需要你处理' : `需要你处理（${n}）`),

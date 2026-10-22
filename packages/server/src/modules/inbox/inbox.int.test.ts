@@ -83,7 +83,7 @@ describe('ask_user（12 §6.7）', () => {
     expect(detail.displayGroup).toBe('needs_attention');
     const [question] = detail.openInbox;
     expect(question).toMatchObject({ kind: 'question', payload: { options: ['a', 'b'], blocking: true } });
-    expect((await t.call(countInboxOp, {})).body.open).toBe(1);
+    expect((await t.call(countInboxOp, {})).body.blocking).toBe(1);
 
     const done = nodeReaches(t, 'locate', 'done');
     const res = await t.call(resolveInboxOp, { id: question?.id ?? '', response: { answer: 'a' } });
@@ -196,13 +196,21 @@ describe('其他条目', () => {
     ]);
   });
 
-  it('待合并时有投递条目：不能作答，可以忽略；问题条目不能忽略', async () => {
+  it('待合并时有投递条目：不计入徽标（D119），不能作答，可以忽略；问题条目不能忽略', async () => {
     t.fake.enqueue(submit('Located'), locate);
     t.fake.enqueue(submit('Fixed'), { title: '· 修复' });
     t.fake.enqueue(script().callTool('submit_review', { verdict: 'pass', summary: 'ok' }), { agent: 'aw-reviewer' });
     const delivery = inboxOpens(t, 'delivery');
     await bugfixTask();
-    const item = (await delivery).item;
+    const { item, blockingCount } = await delivery;
+    // A delivery is a result waiting to be merged, not something holding a task up.
+    expect(blockingCount).toBe(0);
+    expect((await t.call(countInboxOp, {})).body.blocking).toBe(0);
+    // Lists filter on the server, so a page of deliveries cannot hide an older blocking item.
+    const listed = async (blocking: boolean) =>
+      (await t.call(listInboxOp, { status: 'open', blocking })).body.items.map((i) => i.kind);
+    expect(await listed(true)).toEqual([]);
+    expect(await listed(false)).toEqual(['delivery']);
     expect((await t.call(resolveInboxOp, { id: item.id, response: { confirmed: true } })).body).toMatchObject({
       error: { code: ErrorCode.ValidationFailed },
     });

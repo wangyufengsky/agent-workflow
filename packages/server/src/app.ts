@@ -410,7 +410,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       uiMode: settings.service.get('ui.mode'),
       projects: projects.service.list().length,
       activeTasks: tasks.service.listByStatus(activeTaskStatuses).length,
-      openInbox: inbox.service.countOpen(),
+      blockingInbox: inbox.service.countBlocking(),
     }),
   });
   assistant.register(server);

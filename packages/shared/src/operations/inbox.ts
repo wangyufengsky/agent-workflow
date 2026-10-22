@@ -23,9 +23,9 @@ export const countInboxOp = defineOperationContract({
   ...common,
   id: 'inbox.count',
   title: 'op.inbox.count',
-  description: 'Number of open items that need the user',
+  description: 'Number of open items that hold something up until the user acts (deliveries excluded)',
   input: z.object({}),
-  output: z.object({ open: z.number() }),
+  output: z.object({ blocking: z.number() }),
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/inbox/count' },
 });

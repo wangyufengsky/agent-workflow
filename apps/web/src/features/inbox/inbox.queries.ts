@@ -17,7 +17,8 @@ import type { z } from 'zod';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 
-export type InboxFilter = { status?: InboxStatus; taskId?: string };
+/** `blocking`: only the items holding something up (true) or only the deliveries (false), filtered by the server. */
+export type InboxFilter = { status?: InboxStatus; taskId?: string; blocking?: boolean };
 
 export const inboxQuery = (filter: InboxFilter) =>
   queryOptions({
@@ -40,12 +41,12 @@ export const inboxPagesQuery = (filter: InboxFilter) =>
 
 export const inboxCountQuery = queryOptions({
   queryKey: queryKeys.inboxCount,
-  queryFn: async () => (await callOperation(countInboxOp, {})).open,
+  queryFn: async () => (await callOperation(countInboxOp, {})).blocking,
 });
 
 /** SSE `inbox.updated`: the badge count comes with the event; lists refetch. */
-export async function updateInbox(qc: QueryClient, openCount: number): Promise<void> {
-  qc.setQueryData(queryKeys.inboxCount, openCount);
+export async function updateInbox(qc: QueryClient, blockingCount: number): Promise<void> {
+  qc.setQueryData(queryKeys.inboxCount, blockingCount);
   await qc.invalidateQueries({ queryKey: [...queryKeys.inbox, 'list'] });
 }
 

@@ -27,3 +27,21 @@
   display: flex;
   gap: 8px;
 }
+
+/* A task on one line (D119): the title keeps its room, the rest gives way first. */
+.row {
+  min-width: 0;
+}
+.rowTitle {
+  flex: 0 1 auto;
+  max-width: 45%;
+  font-weight: 500;
+}
+.rowMeta {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.rowTime {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}

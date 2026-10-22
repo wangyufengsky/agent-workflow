@@ -1,12 +1,26 @@
-import { AppError, ErrorCode, type InboxItemDTO, type InboxKind, InboxStatus, inboxItemSchema } from '@aw/shared';
-import { and, count, desc, eq, lt, or, type SQL } from 'drizzle-orm';
+import {
+  AppError,
+  BLOCKING_INBOX_KINDS,
+  ErrorCode,
+  type InboxItemDTO,
+  type InboxKind,
+  InboxStatus,
+  inboxItemSchema,
+} from '@aw/shared';
+import { and, count, desc, eq, inArray, lt, or, type SQL } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { inboxItemsTable } from './inbox.table.ts';
 
 type InboxRow = typeof inboxItemsTable.$inferSelect;
 
 /** Which items a query or an automatic dismissal concerns. */
-export type InboxScope = { taskId?: string; nodeId?: string; attemptId?: string; kind?: InboxKind };
+export type InboxScope = {
+  taskId?: string;
+  nodeId?: string;
+  attemptId?: string;
+  kind?: InboxKind;
+  kinds?: readonly InboxKind[];
+};
 
 function toItem(row: InboxRow): InboxItemDTO {
   // JSON columns: parsed at the boundary with the schema of the item's kind (06 §9).
@@ -25,6 +39,7 @@ function whereOf(scope: InboxScope, status?: InboxStatus): SQL | undefined {
     ...(scope.nodeId === undefined ? [] : [eq(t.nodeId, scope.nodeId)]),
     ...(scope.attemptId === undefined ? [] : [eq(t.attemptId, scope.attemptId)]),
     ...(scope.kind === undefined ? [] : [eq(t.kind, scope.kind)]),
+    ...(scope.kinds === undefined ? [] : [inArray(t.kind, [...scope.kinds])]),
   );
 }
 
@@ -78,11 +93,12 @@ export function createInboxRepo(db: DbExecutor) {
         .all()
         .map(toItem);
     },
-    countOpen(): number {
+    /** The badge count (D119): open items that hold something up. */
+    countBlocking(): number {
       const row = db
         .select({ n: count() })
         .from(inboxItemsTable)
-        .where(eq(inboxItemsTable.status, InboxStatus.Open))
+        .where(whereOf({ kinds: BLOCKING_INBOX_KINDS }, InboxStatus.Open))
         .get();
       return row?.n ?? 0;
     },

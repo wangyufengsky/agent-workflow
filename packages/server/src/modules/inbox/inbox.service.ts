@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   AppError,
+  BLOCKING_INBOX_KINDS,
   ErrorCode,
   InboxEvent,
   type InboxItemDTO,
@@ -9,6 +10,7 @@ import {
   InboxStatus,
   inboxMachine,
   type ListInboxQuery,
+  NON_BLOCKING_INBOX_KINDS,
   ServerEventType,
   transition,
 } from '@aw/shared';
@@ -42,7 +44,7 @@ export function createInboxService({ db, unit, clock, log }: InboxServiceDeps) {
   }
 
   function publish(item: InboxItemDTO): void {
-    unit.publish({ type: ServerEventType.InboxUpdated, data: { item, openCount: repo.countOpen() } });
+    unit.publish({ type: ServerEventType.InboxUpdated, data: { item, blockingCount: repo.countBlocking() } });
   }
 
   function close(item: InboxItemDTO, event: InboxEvent, response?: unknown): InboxItemDTO {
@@ -76,11 +78,18 @@ export function createInboxService({ db, unit, clock, log }: InboxServiceDeps) {
     list: (scope: InboxScope, status?: InboxStatus): InboxItemDTO[] => repo.list(scope, status),
     listOpen: (scope: InboxScope): InboxItemDTO[] => repo.list(scope, InboxStatus.Open),
     /** A page of the「需要你处理」list (11 §7), newest first. */
-    page({ status, taskId, limit, cursor }: ListInboxQuery): { items: InboxItemDTO[]; nextCursor: string | null } {
+    page({ status, taskId, blocking, limit, cursor }: ListInboxQuery): {
+      items: InboxItemDTO[];
+      nextCursor: string | null;
+    } {
       const at = cursor === undefined ? -1 : cursor.indexOf('.');
       const after =
         cursor === undefined ? undefined : { createdAt: Number(cursor.slice(0, at)), id: cursor.slice(at + 1) };
-      const rows = repo.page(taskId === undefined ? {} : { taskId }, status, after, limit + 1);
+      const scope = {
+        ...(taskId === undefined ? {} : { taskId }),
+        ...(blocking === undefined ? {} : { kinds: blocking ? BLOCKING_INBOX_KINDS : NON_BLOCKING_INBOX_KINDS }),
+      };
+      const rows = repo.page(scope, status, after, limit + 1);
       const items = rows.slice(0, limit);
       const last = items.at(-1);
       return {
@@ -88,7 +97,7 @@ export function createInboxService({ db, unit, clock, log }: InboxServiceDeps) {
         nextCursor: rows.length > limit && last !== undefined ? `${last.createdAt}.${last.id}` : null,
       };
     },
-    countOpen: (): number => repo.countOpen(),
+    countBlocking: (): number => repo.countBlocking(),
 
     create: (input: NewInboxItem): InboxItemDTO => insert(input, InboxStatus.Open, null),
 

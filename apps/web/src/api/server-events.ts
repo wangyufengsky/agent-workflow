@@ -65,7 +65,7 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
     case ServerEventType.DeliveryUpdated:
       return qc.invalidateQueries({ queryKey: queryKeys.task(event.data.taskId), exact: true });
     case ServerEventType.InboxUpdated:
-      await updateInbox(qc, event.data.openCount);
+      await updateInbox(qc, event.data.blockingCount);
       // Questions and permission requests are counted as interruptions, a knowledge researcher's too.
       return refreshInsights(qc);
     case ServerEventType.AssistantUpdated:
