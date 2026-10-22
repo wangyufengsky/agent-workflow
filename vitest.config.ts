@@ -33,6 +33,9 @@ export default defineConfig({
           testTimeout: 120_000,
           // Hooks start opencode, which the runtime allows OPENCODE_START_TIMEOUT_MS (30 s) to come up.
           hookTimeout: 60_000,
+          // Files one after another: each hosts its own opencode on the user's opencode database, and processes
+          // starting together fail with "database is locked".
+          fileParallelism: false,
         },
       },
       {
