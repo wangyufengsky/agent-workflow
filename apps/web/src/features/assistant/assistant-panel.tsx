@@ -71,7 +71,11 @@ function Panel({ open, onClosed }: { open: boolean; onClosed: () => void }) {
           <ErrorState error={conversations.error} onRetry={() => void conversations.refetch()} />
         )}
         {active === undefined ? (
-          conversations.isSuccess && <AssistantWelcome conversation={undefined} />
+          conversations.isSuccess && (
+            <div className={styles.feed}>
+              <AssistantWelcome conversation={undefined} />
+            </div>
+          )
         ) : (
           <MessageList key={active.id} conversation={active} />
         )}

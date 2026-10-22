@@ -31,6 +31,9 @@ type UiState = {
    */
   pendingForm: PendingForm | null;
   setPendingForm(form: PendingForm | null): void;
+  /** Conversation streams the user opened or closed (25 §4.5), by attempt id, kept until the app reloads. */
+  streamOpen: Record<string, boolean>;
+  setStreamOpen(attemptId: string, open: boolean): void;
 };
 
 export type PendingForm = { seq: number; form: AssistantForm; values: Record<string, unknown> };
@@ -49,6 +52,8 @@ export const useUiStore = create<UiState>((set) => ({
     set((s) => ({ assistantRequest: { seq: (s.assistantRequest?.seq ?? 0) + 1, request } })),
   pendingForm: null,
   setPendingForm: (pendingForm) => set({ pendingForm }),
+  streamOpen: {},
+  setStreamOpen: (attemptId, open) => set((s) => ({ streamOpen: { ...s.streamOpen, [attemptId]: open } })),
 }));
 
 /** The prefill the assistant left for `form`, if any (15 §5: never a credential). */

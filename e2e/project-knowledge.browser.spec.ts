@@ -61,11 +61,14 @@ test('J12 提问 → 研究过程 → 带引用的回答 → 点击引用看原�
   const turn = page.getByTestId('knowledge-turn').first();
   await expect(turn).toContainText('退款金额在哪里四舍五入？');
   await expect(turn.getByRole('button', { name: '引用 1' })).toBeVisible();
-  // Folded once answered: one read, open shows the stages and what was read.
+  // Folded once answered: one read; open shows what the researcher did, the calls in a row folded (25 §4.3).
   const process = turn.getByTestId('research-process');
-  await expect(process).toContainText('研究过程 · 读取 1 份原文');
-  await process.locator('summary').click();
-  await expect(process).toContainText('检索 1 次');
+  const toggle = process.getByRole('button', { name: /研究过程/ });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(process).toContainText('读取 1 份原文');
+  await toggle.click();
+  await process.getByTestId('stream-group').getByRole('button').click();
+  await expect(process).toContainText('搜索Math.round');
   await expect(process).toContainText('src/refund.ts');
 
   await turn.getByRole('button', { name: '引用 1' }).click();

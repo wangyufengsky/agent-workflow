@@ -227,6 +227,14 @@
 .messages {
   /* The home page's stream has the same name: leaving home moves the conversation here (D112). */
   view-transition-name: assistant-stream;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* The scrolling message stream inside; 「回到最新」floats over its bottom (25 §4.1). */
+.feed {
   flex: 1;
   min-height: 0;
   overflow-y: auto;

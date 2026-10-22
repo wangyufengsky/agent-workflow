@@ -29,6 +29,8 @@ export type McpEndpoint = { url: string; token: string };
 export type FakeStep =
   | { type: 'edit'; file: string; content: string }
   | { type: 'text'; text: string }
+  /** The model's reasoning, streamed like text (25 §2.1). */
+  | { type: 'think'; text: string }
   /** A native tool call that only reads (`read`, `grep`, a bash command …): reported, nothing happens. */
   | { type: 'tool'; tool: string; input: Record<string, unknown>; output: string }
   | { type: 'callTool'; server: FakeMcpServer; name: string; args: Record<string, unknown> }
@@ -54,6 +56,8 @@ export function script() {
     tool: (tool: string, input: Record<string, unknown>, output = '') => add({ type: 'tool', tool, input, output }),
     /** Streams assistant text in small deltas. */
     text: (text: string) => add({ type: 'text', text }),
+    /** Streams reasoning in small deltas. */
+    think: (text: string) => add({ type: 'think', text }),
     /** Calls one of our MCP tools over HTTP, with the session id injected as the bridge plugin would. */
     callTool: (name: string, args: Record<string, unknown> = {}) =>
       add({ type: 'callTool', server: 'exec', name, args }),
@@ -190,12 +194,14 @@ export function createFakeOpencode() {
           emit({ type: E.Tool, ...ids, callId: partId, tool, status: ToolCallStatus.Completed, input, output });
           break;
         }
-        case 'text': {
-          emit({ type: E.Text, ...ids, kind: 'text', text: '', done: false });
+        case 'text':
+        case 'think': {
+          const kind = step.type === 'text' ? 'text' : 'reasoning';
+          emit({ type: E.Text, ...ids, kind, text: '', done: false });
           for (let i = 0; i < step.text.length; i += DELTA_CHARS) {
             emit({ type: E.TextDelta, ...ids, delta: step.text.slice(i, i + DELTA_CHARS) });
           }
-          emit({ type: E.Text, ...ids, kind: 'text', text: step.text, done: true });
+          emit({ type: E.Text, ...ids, kind, text: step.text, done: true });
           break;
         }
         case 'callTool': {

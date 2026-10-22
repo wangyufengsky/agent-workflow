@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>会话流原型 · docs/25</title>
+<!-- 静态原型：主题令牌由 apps/web/src/theme/themes/*.ts 生成（themes.css），基础样式直接引用应用的 base.css。
+     打开方式：浏览器打开本文件，?theme=deepseek|warm|spdb|github_white&scene=drawer|drawer-done|node|knowledge；?still=1 关闭模拟流式。 -->
+<link rel="stylesheet" href="../../apps/web/src/styles/base.css">
+<link rel="stylesheet" href="themes.css">
+<link rel="stylesheet" href="stream.css">
+<style>
+  body { overflow: hidden; }
+  .stage { width: 1280px; height: 860px; display: flex; background: var(--bg); position: relative; overflow: hidden; }
+  .side-nav { width: 210px; flex: none; background: var(--sidebar); border-right: 1px solid var(--line); padding: 18px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--sub); }
+  .side-nav .p-brand { color: var(--ink); font-weight: 600; margin-bottom: 14px; }
+  .side-nav .on { background: var(--fill-3); color: var(--ink); border-radius: 8px; }
+  .side-nav span { padding: 7px 10px; }
+  .p-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .topbar { height: 56px; flex: none; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 24px; font-weight: 600; color: var(--ink); }
+  .p-content { flex: 1; min-height: 0; overflow: hidden; padding: 24px 32px; }
+  .canvas-ph { position: absolute; inset: 56px 520px 0 210px; padding: 24px 32px; }
+  .canvas-ph .cv { margin-top: 16px; height: 560px; border-radius: 16px; border: 1px solid var(--line); background: radial-gradient(var(--line-2) 1px, transparent 1px) 0 0 / 18px 18px, var(--surface); }
+  .p-drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 520px; background: var(--panel); border-left: 1px solid var(--line-2); box-shadow: var(--shadow-card); display: flex; flex-direction: column; }
+  .p-drawer-h { height: 64px; flex: none; display: flex; align-items: center; padding: 0 20px; font-size: 16px; font-weight: 600; color: var(--ink); border-bottom: 1px solid var(--line); }
+  .p-drawer-b { flex: 1; min-height: 0; padding: 14px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+  .p-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+  .p-tabs span { padding: 6px 12px 9px; font-size: 13.5px; color: var(--sub); }
+  .p-tabs .on { color: var(--ink); box-shadow: inset 0 -2px 0 var(--ink); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 12px; }
+  .pill.run { background: var(--run-fill); color: var(--run); }
+  .pill.ok { background: var(--ok-fill); color: var(--ok); }
+  .pill.bad { background: var(--danger-fill); color: var(--danger); }
+  .pill.wait { background: var(--wait-fill); color: var(--wait); }
+  .fill { flex: 1; min-height: 0; }
+  .fill .cs { height: 100%; }
+  .fill .cs[data-open="true"] .cs-body { flex: 1; }
+  .node-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; margin-top: 14px; }
+  .aside { border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+  .aside h3 { font-size: 14px; padding: 14px 16px; border-bottom: 1px solid var(--line); color: var(--ink); }
+  .aside .ins { margin: 12px 16px; font-size: 13px; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 9; -webkit-box-orient: vertical; overflow: hidden; }
+  .aside .more { display: block; padding: 0 16px 14px; }
+  .p-stack { display: flex; flex-direction: column; gap: 10px; }
+  .p-crumbs { font-size: 13px; color: var(--sub); }
+  h1.p-t { font-size: 26px; color: var(--ink); margin-top: 6px; font-weight: 600; }
+  .p-sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  .kq { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .q { align-self: flex-end; max-width: 80%; background: var(--bubble); color: var(--ink); padding: 10px 14px; border-radius: 16px 16px 6px 16px; font-size: 14px; }
+  .who { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--sub); }
+  .who .av { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; background: var(--accent-fill); color: var(--accent); }
+  .who .tag { font-size: 11.5px; color: var(--muted); border: 1px solid var(--line-2); border-radius: 6px; padding: 0 6px; }
+  .steps { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
+  .steps b { font-weight: 500; color: var(--ok); }
+  .steps i { font-style: normal; color: var(--run); }
+  .answer { font-size: 14px; line-height: 1.8; color: var(--ink-2); }
+  .answer .cite-p { display: inline-flex; min-width: 18px; height: 17px; padding: 0 4px; margin: 0 2px; border-radius: 5px; font: 500 11px var(--font-mono); color: var(--muted); background: var(--fill-3); justify-content: center; vertical-align: 1px; }
+  .draft-note { font-size: 12px; color: var(--muted); }
+  .composer { margin-top: auto; border: 1px solid var(--line-2); border-radius: 16px; background: var(--surface); height: 76px; padding: 12px 16px; color: var(--faint); font-size: 14px; }
+  .cap { font-size: 11.5px; color: var(--faint); margin-bottom: -6px; }
+  .label-cap { position: absolute; right: 12px; bottom: 10px; font: 11px var(--font-mono); color: var(--faint); }
+</style>
+</head>
+<body>
+<div class="stage" id="stage"></div>
+<script>
+const P = {
+  check: 'M5 12.5l4.5 4.5L19 7.5', x: 'M6 6l12 12M18 6 6 18', chev: 'M9 6l6 6-6 6', sparkle: 'M12 3l1.8 5.6L19.5 10l-5.7 1.6L12 17l-1.8-5.4L4.5 10l5.7-1.4z',
+  alert: 'M12 3 2 20h20zM12 10v4M12 17h.01', down: 'M12 5v14M6 13l6 6 6-6', lock: 'M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3', book: 'M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z',
+  layers: 'M12 3 2 8l10 5 10-5zM2 13l10 5 10-5', msg: 'M4 5h16v11H8l-4 4z', stop: 'M6 6h12v12H6z',
+};
+const ic = (n, cls = 'sm') => `<svg class="i ${cls}" viewBox="0 0 24 24"><path d="${P[n]}"/></svg>`;
+const q = new URLSearchParams(location.search);
+document.body.dataset.theme = q.get('theme') || 'deepseek';
+const scene = q.get('scene') || 'drawer';
+const still = q.get('still') === '1';
+
+// ---------- 条目 ----------
+const text = (html, caret) => `<div class="it it-text"><p>${html}${caret ? '<span class="caret" aria-hidden="true"></span>' : ''}</p></div>`;
+const think = ({ secs, body, open = false, live = false }) => `
+  <div class="it it-think" data-open="${open}" data-live="${live}">
+    <div class="it-think-h"><span class="ic">${ic('sparkle')}</span>
+      ${live ? '<span class="lbl shimmer">正在思考</span>' : `<span class="lbl">思考了 ${secs} 秒</span>`}
+      ${live ? '' : `<span class="pv">${body.split('\n')[0]}</span>`}
+      ${live ? '' : `<span class="chev">${ic('chev')}</span>`}
+    </div>
+    <div class="it-think-b">${live ? `<span>${body}<span class="caret" aria-hidden="true"></span></span>` : body}</div>
+  </div>`;
+const act = ({ state = 'ok', verb, subj = '', delta, note, open = false, expandable = false, body = '' }) => `
+  <div class="it it-act" data-state="${state}" data-open="${open}" data-expandable="${expandable}">
+    <div class="it-act-h">
+      <span class="st">${state === 'running' ? '<span class="pulse-dot"></span>' : ic(state === 'ok' ? 'check' : 'x')}</span>
+      <span class="verb ${state === 'running' ? 'shimmer' : ''}">${verb}</span><span class="subj" title="${subj}">${subj}</span>
+      ${delta ? `<span class="delta"><span class="a">+${delta[0]}</span> <span class="r">−${delta[1]}</span></span>` : ''}
+      ${note ? `<span class="note">${note}</span>` : ''}
+      ${expandable ? `<span class="chev">${ic('chev')}</span>` : ''}
+    </div>
+    <div class="it-act-b">${body}</div>
+  </div>`;
+const group = (summary, inner, open = false) => `
+  <div class="it it-group" data-open="${open}">
+    <div class="it-group-h"><span class="chev">${ic('chev')}</span><span class="p-stack">${ic('layers')}</span><span>${summary}</span></div>
+    <div class="it-group-b">${inner}</div>
+  </div>`;
+const notice = (t) => `<div class="it it-notice">${t}</div>`;
+const wait = (t) => `<div class="it it-wait">${ic('lock')}<span class="grow">${t}</span><a class="btn sm">去处理</a></div>`;
+const prompt = (t) => `<div class="it it-prompt"><div class="k">${ic('msg')}发给 AI 的消息</div><div class="v">${t}</div><button class="more">展开全部</button></div>`;
+const latest = (n) => `<button class="cs-latest">${ic('down')}回到最新${n ? ` · <span class="n">${n} 条新内容</span>` : ''}</button>`;
+
+const box = ({ state, open = true, title, meta = '', now = '', items = '', pill = '', height }) => `
+  <section class="cs" data-state="${state}" data-open="${open}">
+    <header class="cs-head">
+      <span class="cs-state">${state === 'running' ? '<span class="spin"></span>' : ic(state === 'done' ? 'check' : 'x')}</span>
+      <span class="cs-title">${title}</span>
+      ${now ? `<span class="cs-now">${now}</span>` : ''}
+      ${meta ? `<span class="cs-meta">${meta}</span>` : ''}
+      <span class="cs-chev">${ic('chev')}</span>
+    </header>
+    <div class="cs-body" ${height ? `style="height:${height}px"` : ''}><div class="cs-scroll">${items}</div>${pill}</div>
+  </section>`;
+
+const REASON_1 = `The export drops the last row. Let me look at how rows are sliced in src/export.ts before touching anything.
+The loop in buildRows() uses i < rows.length - 1, which skips the final element — that matches the symptom.
+But I should confirm with a failing test first instead of guessing.`;
+const REASON_LIVE = `The test now fails for the right reason: expected 3 rows, got 2.
+Fixing the bound to i < rows.length should be enough; nothing else depends on the off-by-one.
+I'll also check whether the CSV header row is counted separately — it is written before the loop, so it's fine.
+Next: apply the edit, then run pnpm test again`;
+
+const drawerShell = (content, statusPill = '<span class="pill run"><span class="dot pulse"></span>进行中</span>') => `
+  <nav class="side-nav"><span class="p-brand">Agent Workflow</span><span>主页</span><span class="on">任务</span><span>项目</span><span>知识问答</span><span>PPT</span><span>质量与用量</span></nav>
+  <div class="p-main"><div class="topbar">任务</div></div>
+  <div class="canvas-ph"><div class="p-crumbs">← 任务</div><h1 class="p-t">导出的报表缺少最后一行</h1><div class="p-sub">T-3 · 订单服务 · 修 Bug</div><div class="cv"></div></div>
+  <aside class="p-drawer">
+    <div class="p-drawer-h">定位根因</div>
+    <div class="p-drawer-b">
+      <div class="row" style="gap:10px">${statusPill}<span class="hint">开发工程师</span></div>
+      <div class="p-tabs"><span>产出</span><span>改动</span><span class="on">过程</span></div>
+      ${content}
+    </div>
+  </aside>`;
+
+const scenes = {
+  // ① 简单模式 · 抽屉「过程」· 运行中：固定高度、贴底跟随、正在思考
+  drawer: () => drawerShell(`<div class="fill">${box({
+    state: 'running', title: '执行过程', now: '正在复现缺少最后一行的问题', meta: '· 2 分 14 秒',
+    items:
+      text('先看导出逻辑，确认最后一行是在哪里丢的。') +
+      think({ secs: 6, body: REASON_1 }) +
+      act({ verb: '查看', subj: 'src/export.ts' }) +
+      act({ verb: '搜索', subj: '"rows.length - 1"' }) +
+      act({ verb: '查看', subj: 'test/export.test.ts' }) +
+      text('找到了：<code>buildRows()</code> 的循环条件是 <code>i &lt; rows.length - 1</code>，会漏掉最后一个元素。先补一个能复现的测试。') +
+      act({ verb: '编辑', subj: 'test/export.test.ts', delta: [14, 0] }) +
+      act({ state: 'failed', verb: '运行', subj: 'pnpm test -- export', note: '退出码 1', expandable: true }) +
+      notice('AI 汇报：正在复现缺少最后一行的问题') +
+      think({ live: true, body: REASON_LIVE }),
+  })}</div>`),
+
+  // ② 简单模式 · 抽屉 · 已结束：默认收起成一行，展开后连续动作折叠成组；上翻后出现「回到最新」
+  'drawer-done': () => drawerShell(`
+    <div class="cap">默认：结束后收起成一行</div>${box({ state: "done", open: false, title: "执行过程", meta: "已提交结果 · 思考 4 段 · 18 个动作 · 用时 6 分 32 秒" })}<div class="cap">点击箭头展开：连续的动作折叠成组，思考默认收起</div>
+    <div class="fill">${box({
+      state: 'done', title: '执行过程', meta: '已提交结果 · 思考 4 段 · 18 个动作 · 用时 6 分 32 秒',
+      items:
+        text('先看导出逻辑，确认最后一行是在哪里丢的。') +
+        think({ secs: 6, body: REASON_1 }) +
+        group('查看 3 个文件 · 搜索 2 次', '') +
+        text('找到了：<code>buildRows()</code> 的循环条件是 <code>i &lt; rows.length - 1</code>，会漏掉最后一个元素。') +
+        group('编辑 1 个文件 · 运行 2 条命令（1 条失败）',
+          act({ verb: '编辑', subj: 'test/export.test.ts', delta: [14, 0] }) +
+          act({ state: 'failed', verb: '运行', subj: 'pnpm test -- export', note: '退出码 1', expandable: true, open: true,
+            body: '<pre class="raw err">✖ exports every row (3.1ms)\n  AssertionError: expected 2 to equal 3</pre>' }) +
+          act({ verb: '编辑', subj: 'src/export.ts', delta: [1, 1] }), true) +
+        think({ secs: 4, body: REASON_LIVE, open: false }) +
+        group('运行 2 条命令 · 提交结果', ''),
+      
+    })}</div>`, '<span class="pill ok">已完成</span>'),
+
+  // ③ 专业模式 · 完整步骤页：各次尝试纵向排列，结束的默认收起；完整输入输出、发给 AI 的消息；指令换行
+  node: () => `
+    <nav class="side-nav"><span class="p-brand">Agent Workflow</span><span>主页</span><span class="on">任务</span><span>项目</span><span>知识问答</span><span>Git</span><span>流程</span><span>角色</span></nav>
+    <div class="p-main"><div class="topbar">任务</div><div class="p-content">
+      <div class="p-crumbs">← T-3 · 导出的报表缺少最后一行</div>
+      <div class="row" style="justify-content:space-between"><h1 class="p-t">修复</h1><span class="pill run"><span class="dot pulse"></span>进行中</span></div>
+      <div class="p-sub">开发工程师 · 尝试 3 次 · <span class="mono">fix</span></div>
+      <div class="p-tabs" style="margin-top:14px"><span class="on">过程</span><span>产出</span><span>改动</span></div>
+      <div class="node-grid">
+        <div class="p-stack">
+          ${box({ state: 'failed', open: false, title: '执行 #1', meta: '失败 · 检查未通过：pnpm test 退出码 1 · 输入 18.2k · 输出 2.1k tokens · 4 分 10 秒' })}
+          ${box({ state: 'done', open: false, title: '评审 #2', meta: '已提交结果 · 驳回：缺少回归测试 · 输入 6.4k · 输出 0.9k tokens · 1 分 02 秒' })}
+          ${box({
+            state: 'running', title: '执行 #3', now: '正在补回归测试', meta: '· opencode-go/deepseek-v4.1-flash · 输入 9.8k · 输出 1.2k tokens · 提醒 0 次', height: 430,
+            items:
+              prompt('Task T-3: 导出的报表缺少最后一行\n\n## Step fix (修复)\n按上一步找到的根因修复问题（修根因，不是掩盖症状，不加兜底逻辑），让复现测试通过，且不破坏其他测试。\n\n## Review feedback\n缺少回归测试：请在 test/export.test.ts 中补充 rows 为空、1 行、3 行的用例。') +
+              think({ secs: 5, open: true, body: 'Reviewer asked for regression tests covering 0, 1 and 3 rows.\nThe existing test only covers 3 rows; I will parametrise it.' }) +
+              act({ verb: '查看', subj: '/Users/wangyufeng/work/order-service/.aw/worktrees/T-3/test/export.test.ts', expandable: true }) +
+              act({ verb: '编辑', subj: 'test/export.test.ts', delta: [22, 6], expandable: true, open: true,
+                body: '<span class="k">内部工具名 <span class="mono">edit</span> · 输入</span><pre class="raw">{\n  "filePath": "test/export.test.ts",\n  "oldString": "it(\'exports every row\', () => {",\n  "newString": "for (const n of [0, 1, 3]) {\\n  it(`exports ${n} rows`, () => {"\n}</pre><span class="k">输出</span><pre class="raw">Edit applied successfully.</pre>' }) +
+              act({ state: "running", verb: "运行", subj: "pnpm test -- export", expandable: true }),
+            pill: latest(2),
+          })}
+        </div>
+        <aside class="aside"><h3>指令</h3>
+          <div class="ins">按上一步找到的根因修复问题（修根因，不是掩盖症状，不加兜底逻辑），让复现测试通过，且不破坏其他测试。涉及文件：apps/order-service/src/main/java/com/example/orders/export/OrderReportExporter.java、apps/order-service/src/test/java/com/example/orders/export/OrderReportExporterTest.java；参考 https://internal.example.com/wiki/orders/export-format-specification-v2#last-row-handling 中关于最后一行的说明。完成后运行 mvn -q -pl apps/order-service test，确认 17 个测试全部通过。</div>
+          <button class="more">展开全部</button>
+        </aside>
+      </div>
+    </div></div>`,
+
+  // ④ 知识问答：研究过程卡内是同一个会话流盒子；上一轮结束后收起成一行
+  knowledge: () => `
+    <nav class="side-nav"><span class="p-brand">Agent Workflow</span><span>主页</span><span>任务</span><span>项目</span><span class="on">知识问答</span><span>PPT</span></nav>
+    <div class="p-main"><div class="topbar">知识问答 · 订单服务</div><div class="p-content" style="display:flex;flex-direction:column">
+      <div class="kq" style="flex:1;min-height:0">
+        <div class="q">项目里有定时任务吗？</div>
+        ${box({ state: 'done', open: false, title: '研究过程', meta: '思考 3 段 · 读取 4 份原文 · 用时 38 秒' })}
+        <div class="answer">没有。README 明确写着不包含产品调度功能 <span class="cite-p">1</span>，启动类上也没有 <code>@EnableScheduling</code> <span class="cite-p">2</span>。</div>
+        <div class="q">那如果要加每分钟的数据库连接检查，应该放在哪里？</div>
+        <div class="who"><span class="av">${ic('book')}</span>研究员<span class="tag">deepseek-v4.1-flash</span></div>
+        ${box({
+          state: "running", title: "研究过程", meta: '<span class="steps"><b>✓ 理解问题</b> · <b>✓ 检索资料 3 次</b> · <i>读取原文</i> · 组织回答</span>', height: 300,
+          items:
+            think({ secs: 4, body: 'The user wants a per-minute DB health check. I need the app entry point, the datasource config and any existing @Configuration classes.' }) +
+            act({ verb: '搜索', subj: '"@Configuration"' }) +
+            act({ verb: '查看', subj: 'src/main/java/com/example/tasks/TaskApplication.java' }) +
+            act({ verb: '查看', subj: 'src/main/resources/application.yml' }) +
+            think({ live: true, body: 'TaskApplication has no @EnableScheduling, and the datasource is HikariCP via spring.datasource.\nA @Scheduled(cron = "0 * * * * *") bean in a new config package fits the existing layout.\nI should cite the application class and the yml lines for the pool' }),
+        })}
+        <div class="answer">建议在 <code>com.example.tasks.config</code> 下新建 <code>DbHealthCheckConfig</code>，在启动类上加 <code>@EnableScheduling</code> <span class="cite-p">1</span>，用现有的 <code>JdbcTemplate</code> 执行 <code>SELECT 1</code><span class="caret" aria-hidden="true"></span></div>
+        <div class="draft-note">引用待核对</div>
+      </div>
+    </div></div>`,
+};
+document.getElementById('stage').innerHTML = scenes[scene]();
+
+// 点击开合（原型交互）；实现用 <details>/按钮与 aria-expanded
+document.addEventListener('click', (e) => {
+  const h = e.target.closest('.cs-head, .it-think-h, .it-group-h, .it-act[data-expandable="true"] .it-act-h');
+  if (!h) return;
+  const el = h.parentElement;
+  el.dataset.open = el.dataset.open === 'true' ? 'false' : 'true';
+});
+
+// 贴底：运行中的盒子初始滚到底；drawer-done 演示上翻后的状态
+for (const s of document.querySelectorAll('.cs[data-open="true"] .cs-scroll')) s.scrollTop = scene === "node" ? 0 : s.scrollHeight;
+
+// 模拟流式：正在思考的块逐字增长（?still=1 关闭，截图时用）
+if (!still) {
+  const live = document.querySelector('.it-think[data-live="true"] .it-think-b > span');
+  if (live) {
+    const more = ' — then I will run the whole suite once more to make sure nothing else regressed, and submit the result with the changed files.';
+    let i = 0;
+    const caret = live.querySelector('.caret');
+    const t = setInterval(() => {
+      if (i >= more.length) return clearInterval(t);
+      caret.before(more.slice(i, i + 3)); i += 3;
+      const s = live.closest('.cs-scroll'); s.scrollTop = s.scrollHeight;
+    }, 60);
+  }
+}
+</script>
+</body>
+</html>

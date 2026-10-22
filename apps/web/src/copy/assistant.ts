@@ -36,7 +36,6 @@ export const ASSISTANT_COPY = {
   send: '发送',
   stop: '停止',
   thinking: '正在思考',
-  reasoning: '思考过程',
   toolFailed: '没有成功',
   toolStopped: '已中断',
   toolName: '工具',

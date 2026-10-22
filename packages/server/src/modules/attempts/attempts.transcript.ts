@@ -1,6 +1,12 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { TRANSCRIPT_PAGE_SIZE, type TranscriptEntry, type TranscriptPage, transcriptEntrySchema } from '@aw/shared';
+import {
+  mergePiece,
+  TRANSCRIPT_PAGE_SIZE,
+  type TranscriptEntry,
+  type TranscriptPage,
+  transcriptEntrySchema,
+} from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 
 /** An entry before the store numbers and timestamps it. */
@@ -50,8 +56,9 @@ export function createTranscriptStore<S extends { id: string }>({
     },
 
     /**
-     * Entries after `afterSeq`, one page at a time. Within a page a streaming part shows once, with its last text, at
-     * the position where it started; later pages (and SSE) may repeat the part, which readers replace by `partId`.
+     * Entries after `afterSeq`, one page at a time. Within a page a streaming part shows once, at the position where it
+     * started, with its lines merged into one piece (D104) and the seq and time of its last line; later pages (and SSE)
+     * continue the part, which readers merge by `partId`.
      */
     read(subject: S, afterSeq: number, isEnded: boolean): TranscriptPage {
       const all = lines(fileOf(subject));
@@ -65,7 +72,10 @@ export function createTranscriptStore<S extends { id: string }>({
         const partId = 'partId' in entry ? entry.partId : undefined;
         const at = partId === undefined ? undefined : indexOfPart.get(partId);
         if (at !== undefined) {
-          merged[at] = entry;
+          const before = merged[at];
+          // Only text and reasoning lines have a partId.
+          if (before !== undefined && 'partId' in before && 'partId' in entry)
+            merged[at] = { ...entry, data: mergePiece(before.data, entry.data) };
           continue;
         }
         if (partId !== undefined) indexOfPart.set(partId, merged.length);

@@ -5,7 +5,7 @@ import { Panel } from '../../components/panel.tsx';
 import { toolActionLabel } from '../../copy/attempts.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { attemptQuery, attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
-import { relativeTo, toolAction } from '../attempts/process-lines.ts';
+import { relativeTo, toolAction } from '../stream/stream-items.ts';
 import styles from './task-page.module.css';
 
 /** The planning session's latest tool call, as one line. */
