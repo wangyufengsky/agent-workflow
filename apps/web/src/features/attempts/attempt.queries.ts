@@ -4,6 +4,7 @@ import {
   type AttemptSummaryDTO,
   abortAttemptOp,
   getAttemptOp,
+  mergePiece,
   startDebugAttemptOp,
   type TranscriptEntry,
   type TranscriptPage,
@@ -54,9 +55,9 @@ const liveTranscriptQuery = (source: TranscriptSource) =>
   queryOptions<TranscriptEntry[]>({ queryKey: source.liveKey, queryFn: skipToken });
 
 /**
- * Display order of pages followed by live lines: each line once (by seq); a streaming part keeps the position where
- * it first appeared and shows its latest text, whichever source brought that line (10 §3). Pages cover lines 1…n without gaps, so a live line not in
- * them comes after all of them.
+ * Display order of pages followed by live lines (10 §3): pages cover lines 1…n without gaps, so only live lines after
+ * the last page count, each once and in seq order. A streaming part keeps the position where it first appeared and
+ * its lines merge into its text as they come (D104), whichever source brought them.
  */
 export function transcriptEntries(
   pages: readonly TranscriptPage[],
@@ -64,19 +65,27 @@ export function transcriptEntries(
 ): TranscriptEntry[] {
   const entries: TranscriptEntry[] = [];
   const indexOfPart = new Map<string, number>();
-  const seen = new Set<number>();
-  for (const entry of [...pages.flatMap((p) => p.entries), ...live]) {
-    if (seen.has(entry.seq)) continue;
-    seen.add(entry.seq);
-    const partId = 'partId' in entry ? entry.partId : undefined;
-    const at = partId === undefined ? undefined : indexOfPart.get(partId);
-    if (at !== undefined) {
-      // A page keeps a part's last line only, so an older line of it may come later from the live lines.
-      if (entry.seq > (entries[at]?.seq ?? 0)) entries[at] = entry;
-      continue;
+  const add = (entry: TranscriptEntry) => {
+    if (!('partId' in entry)) {
+      entries.push(entry);
+      return;
     }
-    if (partId !== undefined) indexOfPart.set(partId, entries.length);
-    entries.push(entry);
+    const at = indexOfPart.get(entry.partId);
+    const before = at === undefined ? undefined : entries[at];
+    if (at === undefined || before === undefined || !('partId' in before)) {
+      indexOfPart.set(entry.partId, entries.length);
+      entries.push(entry);
+      return;
+    }
+    entries[at] = { ...entry, data: mergePiece(before.data, entry.data) };
+  };
+  for (const page of pages) for (const entry of page.entries) add(entry);
+  const covered = pages.at(-1)?.lastSeq ?? 0;
+  const seen = new Set<number>();
+  for (const entry of [...live].sort((a, b) => a.seq - b.seq)) {
+    if (entry.seq <= covered || seen.has(entry.seq)) continue;
+    seen.add(entry.seq);
+    add(entry);
   }
   return entries;
 }

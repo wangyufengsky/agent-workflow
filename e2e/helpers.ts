@@ -65,6 +65,7 @@ export async function createProject(request: APIRequestContext, checkCommand: st
 export type FakeStep =
   | { type: 'edit'; file: string; content: string }
   | { type: 'text'; text: string }
+  | { type: 'think'; text: string }
   /** A native read-only tool call (`read`, `grep` …), reported only. */
   | { type: 'tool'; tool: string; input: Record<string, unknown>; output?: string }
   /** `server: 'assistant'` calls the assistant MCP (15 §3); the execution MCP otherwise. */
