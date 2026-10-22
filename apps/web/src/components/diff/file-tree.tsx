@@ -1,5 +1,5 @@
 import type { DiffFile } from '@aw/shared';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { DIFF_COPY as C } from '../../copy/diff.ts';
 import styles from './diff.module.css';
 
@@ -31,6 +31,12 @@ function buildTree(files: readonly DiffFile[]): TreeDir {
     return { ...dir, dirs };
   };
   return compact(root);
+}
+
+/** The files in the order the tree lists them: a directory's subdirectories first, then its files. */
+export function treeOrder(files: readonly DiffFile[]): DiffFile[] {
+  const walk = (dir: TreeDir): DiffFile[] => [...dir.dirs.flatMap(walk), ...dir.files];
+  return walk(buildTree(files));
 }
 
 function Stat({ file }: { file: DiffFile }) {
@@ -92,8 +98,14 @@ export function FileTree({
   onSelect: (path: string) => void;
 }) {
   const tree = useMemo(() => buildTree(files), [files]);
+  const nav = useRef<HTMLElement>(null);
+  // A file picked by keyboard in the large view may be below the fold of the list.
+  useEffect(() => {
+    if (selected !== undefined)
+      nav.current?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' });
+  }, [selected]);
   return (
-    <nav aria-label={C.files} className={styles.treeRoot}>
+    <nav aria-label={C.files} className={styles.treeRoot} ref={nav}>
       <Dir dir={tree} selected={selected} onSelect={onSelect} />
     </nav>
   );

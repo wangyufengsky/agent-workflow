@@ -145,6 +145,7 @@ export const TASK_COPY = {
 export const NODE_COPY = {
   output: '产出',
   changes: '改动',
+  changesOf: (step: string) => `改动 · ${step}`,
   process: '过程',
   summary: '摘要',
   assumptions: '假设',

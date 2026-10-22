@@ -225,8 +225,11 @@ async function seedAssistant(
 /** One task per state the task page renders differently (14 §3.3), each in its own project so scripts stay apart. */
 async function seed(request: APIRequestContext): Promise<Seed> {
   const fixScripts = async (project: E2EProject, file: string) => {
+    // Markdown as models write it (14 §2.2): a heading, emphasis, inline code and a code block with a long line.
     await queueTurn(request, project, { title: '定位根因' }, [
-      submitResult('找到了根因：时区换算用了服务器本地时区。'),
+      submitResult(
+        `## 复现与根因定位\n\n**根因**：\`${file}:1\` 用服务器本地时区换算，部署在 UTC+8 时早 8 小时。\n\n\`\`\`text\n✖ toLocal(1700000000000) expected '2023-11-14T22:13:20.000Z' but received '2023-11-15T06:13:20.000+08:00' (server time zone)\n\`\`\``,
+      ),
     ]);
     await queueTurn(request, project, { title: '修复' }, [
       { type: 'think', text: 'The timestamps are formatted with the server time zone.\nConvert in UTC instead.' },
@@ -234,6 +237,12 @@ async function seed(request: APIRequestContext): Promise<Seed> {
       { type: 'tool', tool: 'read', input: { filePath: file } },
       { type: 'tool', tool: 'grep', input: { pattern: 'toLocal' } },
       { type: 'edit', file, content: 'export const toLocal = (t: number) => new Date(t).toISOString();\n' },
+      {
+        type: 'edit',
+        file: file.replace(/\.ts$/, '.test.ts'),
+        content:
+          "import { toLocal } from './time';\n\ntest('formats in UTC whatever the server time zone is', () => expect(toLocal(1700000000000)).toBe('2023-11-14T22:13:20.000Z'));\n",
+      },
       { type: 'tool', tool: 'bash', input: { command: 'pnpm test' } },
       submitResult('统一按 UTC 换算，并补充了 `toLocal` 的说明。'),
     ]);
@@ -629,6 +638,43 @@ const SHOTS: Shot[] = [
       const dialog = page.getByRole('dialog', { name: '改动' });
       await expect(dialog.getByTestId('diff-view')).toBeVisible();
       return dialog;
+    },
+  },
+  {
+    // A step's summary in the side panel, rendered from Markdown (14 §2.2).
+    name: 'task-review-step',
+    mode: UiMode.Simple,
+    url: (s) => `/tasks/${s.review.id}?node=${node(s.review, 'locate')}`,
+    ready: testId('result-card'),
+    open: async (page) => {
+      await page.getByText('查看步骤', { exact: true }).click();
+      return page.getByTestId('task-side').getByRole('heading', { name: '复现与根因定位' });
+    },
+  },
+  {
+    // The step drawer's changes: the tree above the diff, which keeps the drawer's width (14 §2.3).
+    name: 'node-drawer-changes',
+    mode: UiMode.Simple,
+    url: (s) => `/tasks/${s.review.id}?node=${node(s.review, 'fix')}&open=true`,
+    ready: testId('result-card'),
+    open: async (page) => {
+      await page.getByRole('tab', { name: '改动' }).click();
+      await expect(page.getByTestId('diff-view')).toBeVisible();
+      return page.getByRole('dialog');
+    },
+  },
+  {
+    // The large view (D114).
+    name: 'node-changes-large',
+    mode: UiMode.Simple,
+    url: (s) => `/tasks/${s.review.id}?node=${node(s.review, 'fix')}&open=true`,
+    ready: testId('result-card'),
+    open: async (page) => {
+      await page.getByRole('tab', { name: '改动' }).click();
+      await page.getByRole('button', { name: '放大查看' }).click();
+      const large = page.getByRole('dialog', { name: '改动 · 修复' });
+      await expect(large.getByTestId('diff-view')).toBeVisible();
+      return large;
     },
   },
   {

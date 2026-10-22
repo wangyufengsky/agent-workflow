@@ -32,7 +32,8 @@ export function FileDiff({
 
 /**
  * File tree + one file's diff, unified or side by side (M4-07). The Git workbench controls which file is open (a
- * finding's location opens it at its line) and marks the lines its review found something on (27 §4.5).
+ * finding's location opens it at its line) and marks the lines its review found something on (27 §4.5). In a narrow
+ * place (the step drawer) the tree sits above the diff; `fill` takes the whole height of its parent (the large view).
  */
 export function DiffBrowser({
   files,
@@ -41,6 +42,7 @@ export function DiffBrowser({
   onSelect,
   marks,
   focus,
+  fill = false,
 }: {
   files: readonly DiffFile[];
   fileQuery: FileDiffQuery;
@@ -48,6 +50,7 @@ export function DiffBrowser({
   onSelect?: ((path: string) => void) | undefined;
   marks?: ((path: string) => readonly DiffMark[]) | undefined;
   focus?: DiffFocus | undefined;
+  fill?: boolean;
 }) {
   const [own, setOwn] = useState<string | undefined>(undefined);
   const picked = controlled ?? own;
@@ -57,32 +60,34 @@ export function DiffBrowser({
   // The first file until one is picked; a picked file that left the list falls back the same way.
   const selected = files.some((f) => f.path === picked) ? picked : files[0]?.path;
   return (
-    <div className={styles.browser}>
-      <FileTree files={files} selected={selected} onSelect={setPicked} />
-      <section className={styles.pane} aria-label={selected}>
-        <div className={styles.toolbar}>
-          <span className="mono grow ellipsis">{selected}</span>
-          {/* biome-ignore lint/a11y/useSemanticElements: a segmented control, not a form fieldset */}
-          <div className="seg" role="group" aria-label={C.viewMode}>
-            {(['unified', 'split'] as const).map((m) => (
-              <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>
-                {C[m]}
-              </button>
-            ))}
+    <div className={styles.frame} data-fill={fill || undefined}>
+      <div className={styles.browser}>
+        <FileTree files={files} selected={selected} onSelect={setPicked} />
+        <section className={styles.pane} aria-label={selected}>
+          <div className={styles.toolbar}>
+            <span className="mono grow ellipsis">{selected}</span>
+            {/* biome-ignore lint/a11y/useSemanticElements: a segmented control, not a form fieldset */}
+            <div className={`seg ${styles.modes}`} role="group" aria-label={C.viewMode}>
+              {(['unified', 'split'] as const).map((m) => (
+                <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>
+                  {C[m]}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-        {selected === undefined ? (
-          <p className="hint">{C.pickFile}</p>
-        ) : (
-          <FileDiff
-            path={selected}
-            query={fileQuery}
-            mode={mode}
-            marks={marks?.(selected)}
-            focus={selected === controlled ? focus : undefined}
-          />
-        )}
-      </section>
+          {selected === undefined ? (
+            <p className="hint">{C.pickFile}</p>
+          ) : (
+            <FileDiff
+              path={selected}
+              query={fileQuery}
+              mode={mode}
+              marks={marks?.(selected)}
+              focus={selected === controlled ? focus : undefined}
+            />
+          )}
+        </section>
+      </div>
     </div>
   );
 }

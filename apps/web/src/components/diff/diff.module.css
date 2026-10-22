@@ -1,5 +1,10 @@
 /* Diff browser (M4-07): file tree, unified and side-by-side views; syntax colours map shiki's CSS variables to theme tokens. */
 
+/* The layout follows the room the browser has, not the window: the step drawer is narrow on any screen. */
+.frame {
+  container-type: inline-size;
+}
+
 .browser {
   display: grid;
   grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
@@ -164,6 +169,7 @@
 .sign {
   color: var(--sub);
   user-select: none;
+  vertical-align: top;
 }
 
 .code {
@@ -217,4 +223,82 @@
 
 .line[data-focus] td {
   background: var(--accent-fill);
+}
+
+/* The large view (D114): the tree and the diff scroll on their own and fill the dialog. */
+.frame[data-fill] {
+  height: 100%;
+}
+
+.frame[data-fill] .browser {
+  height: 100%;
+  min-height: 0;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.frame[data-fill] .treeRoot,
+.frame[data-fill] .scroll {
+  max-height: none;
+}
+
+.frame[data-fill] .pane {
+  min-height: 0;
+}
+
+.frame[data-fill] .scroll {
+  flex: 1;
+}
+
+/* Narrow: the tree above the diff so the code keeps the full width; side by side would leave each side a sliver. */
+@container (width < 640px) {
+  .browser {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .treeRoot {
+    max-height: 160px;
+  }
+
+  .modes {
+    display: none;
+  }
+}
+
+/* The large view (D114): almost the whole window, the browser fills what the header leaves. */
+:global(.scrim).largeScrim {
+  /* Above the step drawer it opens from, which stays on the page without a scrim of its own. */
+  z-index: 50;
+}
+
+:global(.dialog).large {
+  display: flex;
+  flex-direction: column;
+  width: calc(100vw - 48px);
+  height: calc(100vh - 48px);
+}
+
+.large:focus-visible {
+  outline: none;
+}
+
+.dialogHead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-3) var(--s-3) var(--s-5);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+.dialogHead h2 {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.dialogBody {
+  flex: 1;
+  min-height: 0;
+  padding: var(--s-4) var(--s-5) var(--s-5);
 }

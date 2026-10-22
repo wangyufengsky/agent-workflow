@@ -10,6 +10,7 @@ import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
+import { DiffDialog } from '../../components/diff/diff-dialog.tsx';
 import { ExternalLink } from '../../components/external-link.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { Markdown } from '../../components/markdown.tsx';
@@ -17,7 +18,7 @@ import { Panel } from '../../components/panel.tsx';
 import { DELIVERY_COPY as D } from '../../copy/delivery.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
-import { ChangesDrawer } from './changes-drawer.tsx';
+import { taskDiffFileQuery, taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { DeliveryActions } from './delivery-actions.tsx';
 import { ReviewComments } from './review-comments.tsx';
 import styles from './task-page.module.css';
@@ -54,7 +55,8 @@ function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
 
 /** Result card (14 §3.5): what was done, the changes, and the delivery decisions while in review. */
 export function ResultCard({ task }: { task: TaskDetailDTO }) {
-  const [viewing, setViewing] = useState(false);
+  // The large diff opens on the file clicked, or the first one (D114).
+  const [viewing, setViewing] = useState<{ path: string | undefined } | null>(null);
   const { result } = task;
   if (result === null) return <p className="hint">{C.resultPending}</p>;
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
@@ -99,7 +101,9 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
             <h3 className="sec-t">{C.assumptions}</h3>
             <ul className={styles.bullets}>
               {result.assumptions.map((a) => (
-                <li key={a}>{a}</li>
+                <li key={a}>
+                  <Markdown inline source={a} />
+                </li>
               ))}
             </ul>
           </section>
@@ -109,7 +113,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
             <div className={styles.blockHead}>
               <h3 className="sec-t grow">{C.changedFiles}</h3>
               {browsable && (
-                <Button size="sm" variant="ghost" onClick={() => setViewing(true)}>
+                <Button size="sm" variant="ghost" onClick={() => setViewing({ path: undefined })}>
                   {D.viewChanges}
                 </Button>
               )}
@@ -121,7 +125,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
                     <button
                       type="button"
                       className={`mono grow ellipsis ${styles.fileLink}`}
-                      onClick={() => setViewing(true)}
+                      onClick={() => setViewing({ path: f.path })}
                     >
                       {f.path}
                     </button>
@@ -138,7 +142,16 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
         {task.status === TaskStatus.Completed && task.pullRequest !== null && <ReviewComments task={task} />}
         {task.status === TaskStatus.Review && <DeliveryActions task={task} />}
       </div>
-      {browsable && <ChangesDrawer task={task} open={viewing} onOpenChange={setViewing} />}
+      {browsable && (
+        <DiffDialog
+          open={viewing !== null}
+          onOpenChange={(open) => !open && setViewing(null)}
+          title={D.changesTitle}
+          query={taskDiffQuery(task.id)}
+          fileQuery={taskDiffFileQuery(task.id)}
+          path={viewing?.path}
+        />
+      )}
     </Panel>
   );
 }

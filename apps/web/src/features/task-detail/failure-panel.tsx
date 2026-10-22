@@ -1,6 +1,7 @@
 import type { TaskDetailDTO } from '@aw/shared';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { Markdown } from '../../components/markdown.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
@@ -26,8 +27,8 @@ export function FailurePanel({ task }: { task: TaskDetailDTO }) {
           <summary className="hint">{COMMON_COPY.errorDetails}</summary>
           <pre className={styles.output}>
             {failure.code} · {failure.message}
-            {exhausted?.feedback === undefined || exhausted.feedback === null ? '' : `\n\n${exhausted.feedback}`}
           </pre>
+          {exhausted?.feedback !== undefined && exhausted.feedback !== null && <Markdown source={exhausted.feedback} />}
         </details>
         <div className={styles.actions}>
           <Button

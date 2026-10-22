@@ -18,4 +18,6 @@ export const DIFF_COPY = {
     [DiffFileStatus.Renamed]: '重命名',
   },
   binaryStat: '二进制',
+  expand: '放大查看',
+  keysHint: '↑ ↓ 或 j k 切换文件 · Esc 关闭',
 } as const;

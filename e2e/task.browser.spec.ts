@@ -13,7 +13,10 @@ import {
 
 test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
 
-test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开始 → 结果卡显示改动与检查通过', async ({ page, request }) => {
+test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开始 → 结果卡显示改动与检查通过 → 步骤摘要与大视图 diff', async ({
+  page,
+  request,
+}) => {
   const project = await createProject(request, 'true');
   await queueTurn(request, project, { agent: 'aw-planner' }, [
     {
@@ -30,7 +33,8 @@ test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开�
   ]);
   await queueTurn(request, project, { title: '实现问候函数' }, [
     { type: 'edit', file: 'greet.ts', content: 'export const greet = () => "你好";\n' },
-    submitResult('新增 greet()'),
+    { type: 'edit', file: 'greet.test.ts', content: 'assert(greet() === "你好");\n' },
+    submitResult('## 实现思路\n\n新增 `greet()`，返回中文问候语。\n\n```ts\nexport const greet = () => "你好";\n```'),
   ]);
   await queueTurn(request, project, { title: '整体验证' }, [submitResult('检查通过')]);
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
@@ -38,9 +42,33 @@ test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开�
   await startTask(page, project, /新功能开发/, '新增问候函数\n返回中文问候语。');
   const result = page.getByTestId('result-card');
   await expect(result).toContainText('检查全部通过', { timeout: TASK_RUN_TIMEOUT_MS });
-  await expect(result).toContainText('改动 1 个文件 +1 −0');
+  await expect(result).toContainText('改动 2 个文件 +2 −0');
   await expect(result).toContainText('greet.ts');
   await expect(page.getByTestId('task-page').getByText('待合并', { exact: true }).first()).toBeVisible();
+
+  // The step's summary in the side panel is Markdown, not its source (14 §2.2).
+  await page.getByText('查看步骤', { exact: true }).click();
+  await page.getByTestId('step-impl').click();
+  const side = page.getByTestId('task-side');
+  await expect(side.getByRole('heading', { name: '实现思路' })).toBeVisible();
+  await expect(side.locator('pre code')).toHaveText('export const greet = () => "你好";');
+  await expect(side).not.toContainText('##');
+
+  // The step's changes open almost full screen; j and ↑ switch files in the list's order (14 §2.3).
+  await side.getByRole('button', { name: '查看详情' }).click();
+  await page.getByRole('tab', { name: '改动' }).click();
+  await page.getByRole('button', { name: '放大查看' }).click();
+  const large = page.getByRole('dialog', { name: '改动 · 实现问候函数' });
+  const files = large.getByRole('navigation', { name: '改动文件' });
+  await expect(files.getByRole('button', { pressed: true })).toContainText('greet.test.ts');
+  await expect(large.getByTestId('diff-view')).toContainText('assert(greet() === "你好");');
+  await page.keyboard.press('j');
+  await expect(files.getByRole('button', { pressed: true })).toContainText('greet.ts');
+  await expect(large.getByTestId('diff-view')).toContainText('export const greet = () => "你好";');
+  await page.keyboard.press('ArrowUp');
+  await expect(files.getByRole('button', { pressed: true })).toContainText('greet.test.ts');
+  await page.keyboard.press('Escape');
+  await expect(large).toBeHidden();
 });
 
 test('J2 AI 阻塞提问 → 在需要你处理中作答 → 节点继续 → 完成', async ({ page, request }) => {

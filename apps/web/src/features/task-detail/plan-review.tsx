@@ -66,7 +66,9 @@ export function PlanReview({ task, pro }: { task: TaskDetailDTO; pro: boolean })
                 <h3 className="sec-t">{C.assumptions}</h3>
                 <ul className={styles.bullets}>
                   {plan.assumptions.map((a) => (
-                    <li key={a}>{a}</li>
+                    <li key={a}>
+                      <Markdown inline source={a} />
+                    </li>
                   ))}
                 </ul>
               </section>
