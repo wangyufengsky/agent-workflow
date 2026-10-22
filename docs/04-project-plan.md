@@ -63,6 +63,10 @@
 3. **PPT 制作**：设计稿 `ppt*.html` 为参考，开发前先写设计文档：[23-ppt.md](23-ppt.md)（D93–D96），PR #23。
 4. **更多数据库**：PostgreSQL、openGauss / GaussDB（默认只存 sha256 口令，pg 无法登录，改用华为维护的 pg 分支 gaussdb-node，D97）、SQL Server、GoldenDB（MySQL 协议，复用 mysql2，作为独立类型列出），均在 `DbDriver` 扩展点下实现，保持只读（D07）。设计见 [24-databases.md](24-databases.md)（D97–D99），PR #26、#27。
 
+另有用户试用安装包后的反馈，按设计确认后实现：
+
+5. **Git 工作台重做**：在主工作区里暂存、提交、推送、拉取，建 / 切 / 删分支，合并（冲突交给 AI 的合并任务），AI 只读审查（结构化问题），按设计稿重做三栏界面。设计见 [27-git-workbench.md](27-git-workbench.md)（D108–D110）。
+
 ### 5.3 明确不做
 
 - 对外 MCP（供 Claude Desktop / Cursor 等外部工具调用）：应用助手已通过助手 MCP 使用全部操作，无外部需求；操作清单保留扩展能力。

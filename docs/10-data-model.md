@@ -138,6 +138,7 @@ type Acceptance = {
 | base_branch | TEXT | |
 | base_commit | TEXT NULL | worktree 创建时的基线 |
 | branch | TEXT NULL | |
+| merge_source | TEXT NULL | 合并任务的来源（27 §3.6，迁移 `0014_git_workbench`）：worktree 从它建出，准备阶段把 `base_branch` 合并进来 |
 | current_plan_id | TEXT NULL | 当前生效（confirmed）版本（无外键：plans 引用 tasks，两张表不能互相引用，D43） |
 | result | TEXT(JSON) NULL | 结果卡数据 `TaskResultDTO`：`{ summary, filesChanged, insertions, deletions, files[], checks[], nodeSummaries[], assumptions[] }`（进入 `review` 时生成） |
 | created_at / updated_at / started_at / finished_at | INTEGER | |
@@ -497,9 +498,32 @@ payload / response：
 
 索引：`(deck_id, seq)`、`(attempt_id)`。
 
+## 4e. Git 工作台（v1.2）
+
+见 [27-git-workbench.md §7.2](27-git-workbench.md#72-数据10-增补)，迁移 `0014_git_workbench`（另给 `tasks` 加 `merge_source`）。
+
+### git_reviews
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| project_id | TEXT → projects，CASCADE | |
+| target | TEXT | `GitReviewTarget` |
+| label | TEXT | 分支名或短 SHA，显示用 |
+| from_sha | TEXT | 审查的 diff 的起点（工作区改动为 HEAD，提交为所选的父提交，分支与区间为 merge-base） |
+| to_sha | TEXT NULL | 终点；空 = 主工作区的未提交改动 |
+| focus | TEXT NULL | 用户填的关注点 |
+| attempt_id | TEXT → attempts | `git_review` 尝试；审查的状态即它的状态，无状态列 |
+| files | TEXT(JSON) | 开始时的改动文件清单 `DiffFile[]`，校验与界面都用它 |
+| summary | TEXT NULL | `submit_findings` 的结论 |
+| findings | TEXT(JSON) NULL | `GitFindingDTO[]` |
+| created_at / finished_at | INTEGER | `finished_at` 在尝试结束（任何终态）时写入 |
+
+索引：`(project_id, created_at)`、`(attempt_id)`。AI 草拟提交信息不存库（27 §7.3），只留下它的 `commit_message` 尝试。
+
 ## 5. 删除与清理
 
-- 删除项目：要求无非终态任务、没有研究中的知识对话；级联删除其任务及全部关联数据和 `runs/<taskId>` 目录，以及知识对话、其 `research` 尝试与会话流，以及批次（外键级联，20 §6）与定时任务及其运行记录（22 §8）。
+- 删除项目：要求无非终态任务、没有研究中的知识对话、没有进行中的 Git 审查；级联删除其任务及全部关联数据和 `runs/<taskId>` 目录，以及知识对话、其 `research` 尝试与会话流，以及批次（外键级联，20 §6）与定时任务及其运行记录（22 §8），以及 Git 审查与其 `git_review` 尝试。
 - 删除定时任务：删除其运行记录，关闭其未处理的 `schedule_failure` 条目（dismissed）；开出的任务保留。
 - 删除知识对话：要求没有研究中的一轮；删除轮次、其尝试（权限条目随之级联）与 `runs/knowledge/<attemptId>.jsonl`。
 - 删除 PPT：要求没有进行中的 AI 工作（`DECK_BUSY`）；删除其尝试（会话流 `runs/ppt/<attemptId>.jsonl` 随之删除，权限条目级联），再删除 PPT（页面、资料、工作记录级联）。删除项目时 PPT 的 `project_id` 置空。

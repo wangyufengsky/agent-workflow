@@ -4,7 +4,7 @@
 
 M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktree）和「拉取远端」「清理遗留 worktree」两个写操作。本文把它补成一个**用户自己的 Git 工作台**：在主工作区里暂存、提交、推送、拉取，建 / 切 / 删分支，合并（冲突可交给 AI），让 AI 只读地审查改动、提交或分支并给出结构化问题；界面按设计稿 `originals/git/` 重做为三栏工作台。
 
-决策：**D108**（手动操作的范围、边界与风险）、**D109**（AI 审查的实现方式）、**D110**（界面、模式与 AI 草拟提交信息），均**待用户确认**。原型：[design/27-git-workbench/prototype.html](design/27-git-workbench/prototype.html)（`?view=&theme=` 切换八个画面与四套主题）；截图在 [design/27-git-workbench/screens/](design/27-git-workbench/screens/)（实现合并前删除，只保留原型）。
+决策：**D108**（手动操作的范围、边界与风险）、**D109**（AI 审查的实现方式）、**D110**（界面、模式与 AI 草拟提交信息），用户 2026-10-22 确认按推荐方案实现。原型：[design/27-git-workbench/prototype.html](design/27-git-workbench/prototype.html)（`?view=&theme=` 切换八个画面与四套主题；确认设计时的截图在 PR #34 的描述中）。实现见 [05 · v1.2 Git 工作台重做](05-dev-plan.md#v12--git-工作台重做)。
 
 ## 1. 现状与设计稿的差距
 
@@ -55,7 +55,7 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 | 操作 | 执行 | 前置条件（不满足 → 错误，不做任何改动） | 风险 |
 | --- | --- | --- | --- |
 | 暂存 / 取消暂存 | `git add -- <paths>`；`git restore --staged -- <paths>`（还没有提交时 `git rm --cached`） | 文件级，不做行块暂存 | write |
-| 提交 | `git commit -F -`（提交信息经 stdin） | 有已暂存的改动（`GIT_NOTHING_TO_COMMIT`）；用户身份已配置（`GIT_IDENTITY_MISSING`）；主工作区没有进行中的合并 / 变基（`GIT_OPERATION_IN_PROGRESS`） | write |
+| 提交 | `git commit --cleanup=strip -m <信息>` | 有已暂存的改动（`GIT_NOTHING_TO_COMMIT`）；用户身份已配置（`GIT_IDENTITY_MISSING`）；主工作区没有进行中的合并 / 变基（`GIT_OPERATION_IN_PROGRESS`） | write |
 | 推送 | `git push --porcelain --set-upstream origin refs/heads/<b>:refs/heads/<b>` | 分支不属于进行中的任务；远端拒绝（非快进）→ `GIT_PUSH_REJECTED` | **critical** |
 | 获取远端（已有） | `git fetch --all --prune` | — | write |
 | 拉取 | 获取上游所在远端后 `git merge --ff-only @{upstream}` | 当前分支有上游（`GIT_NO_UPSTREAM`）；主工作区干净（`WORKTREE_DIRTY`）；不能快进 → `BRANCH_DIVERGED` | write |
@@ -72,7 +72,7 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 
 ### 3.2 提交
 
-- 提交信息：标题（必填，≤ 72 字符提示但不强制）+ 正文，经 stdin 交给 `git commit -F -`。
+- 提交信息：标题（必填）+ 正文，作为一个参数交给 `git commit -m`（execa 参数数组，不经 shell）。
 - 作者与提交者来自用户的 git 配置；提交面板显示「作者：name &lt;email&gt;」，取自 `git var GIT_AUTHOR_IDENT`（读不到即 `GIT_IDENTITY_MISSING`，提示在终端设置 `user.name` / `user.email`）。
 - 运行用户的 `pre-commit` / `commit-msg` 钩子；钩子拒绝时 git 以非 0 退出，返回 `GIT_COMMAND_FAILED`，界面把 stderr（钩子输出）展开显示，暂存区不变，可修改后重试；不提供跳过钩子。
 - 「提交并推送」是提交按钮下拉里的选项：前端依次调用两个操作，提交失败就不推送；推送仍弹 critical 确认。
@@ -107,7 +107,7 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 1. 新的内置流程 `merge_branch`「合并分支」：`planning = fixed`，模板只有一个解决冲突的节点（developer、`revise-conflict.md`、检查为项目检查命令）；不出现在主页的流程列表里，只能从工作台发起。
 2. 任务的基础分支 = **目标**（结果卡默认合并回目标；任务 diff 相对目标，正是将要并入的内容），worktree 的起点 = **来源**（新分支 `aw/T-n-merge-<来源>`）。
 3. worktree 就绪后、物化计划前，后端在任务 worktree 中执行 `git merge --no-ff --no-commit <目标>`（与「交给 AI 解决」的 `mergeTarget` 同一函数），保留冲突标记；节点完成时后端的提交结束这次合并。
-4. 之后一切照常：检查、待合并、用户在结果卡点「合并」（D16）。任务分支已包含目标，结果卡默认用「变基」策略即快进（D52），目标得到来源的改动与冲突的解决；来源分支不变。
+4. 之后一切照常：检查、待合并、用户在结果卡点「合并」（D16）。任务分支已包含目标，选「变基」即快进（D52），其他本地策略也可以；目标得到来源的改动与冲突的解决；来源分支不变。
 
 代价：一个隐藏的内置流程、任务准备阶段多一个「按流程先合并」的步骤（约 60 行）、工作台的入口；这个任务出现在任务列表与「需要你处理」中（它本来就要用户合并）。备选是工作台冲突只给「我自己处理」，不做 AI 解决。
 
@@ -173,7 +173,7 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 
 ### 4.6 据此修复
 
-不做设计稿的「一键修复 → 隔离副本 → 校验 → 提交 → 推送 → 合并」专用流程：任务流水线本来就是「独立分支与 worktree 中修改 → 检查 → 用户合并或建 PR」。「据此修复」打开开始任务页并预填：项目、流程「修 Bug」、基础分支（审查分支时为该分支，审查提交时为当前分支）、需求（所选问题的渲染：位置、说明、建议）。这与代码审查任务结果卡的「据此修复」（13 §3.4）是同一个入口。工作区改动的审查不提供据此修复（未提交的改动不在任何分支上），按钮禁用并说明「先提交，再审查提交」。
+不做设计稿的「一键修复 → 隔离副本 → 校验 → 提交 → 推送 → 合并」专用流程：任务流水线本来就是「独立分支与 worktree 中修改 → 检查 → 用户合并或建 PR」。「据此修复」打开开始任务页并预填：项目、流程「修 Bug」、需求（所选问题的渲染：严重度、标题、位置、说明、建议）；基础分支默认为项目默认分支，可在开始任务页的更多选项中改。这与代码审查任务结果卡的「据此修复」（13 §3.4）是同一个入口。工作区改动的审查不提供据此修复（未提交的改动不在任何分支上），按钮禁用并说明「先提交，再审查提交」。
 
 ## 5. 与主工作区、任务 worktree 的边界
 
@@ -230,12 +230,13 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 
 ### 7.1 操作（11 §8 增补）
 
-已有的读操作保留；`git.status` 增加 `staged` / `unstaged` 两组、`operation`（`merge | rebase | cherry_pick | null`）、`identity`（`{ name, email } | null`）、`fetchedAt`；`git.log` 增加 `author`、`search`；`git.commit` 增加 `parent`（选择对比的父）、`committer*`、`branches`（包含该提交的本地分支）。
+已有的读操作保留；`git.status` 增加 `operation`（`merge | rebase | cherry_pick | revert | null`）、`identity`（`{ name, email } | null`）、`fetchedAt`；`git.log` 增加 `author`、`search`；`git.commit` 增加 `parent`（选择对比的父）、`committer*`、`branches`（包含该提交的本地分支）；新增 `git.changes`（`{ staged, unstaged }`）与 `git.changeFile`（`?path&side`）、`git.pushPreview`（推送确认用）。完整路径见 11 §8。
 
 | 操作 | 方法与路径 | 风险 | 助手 |
 | --- | --- | --- | --- |
 | `git.stage` / `git.unstage` | `POST /projects/:id/git/stage`、`/unstage` `{ paths }` | write | 是 |
-| `git.workingDiffFile` | `GET /projects/:id/git/working/file?path&staged` | read | 是 |
+| `git.changes` / `git.changeFile` | `GET /projects/:id/git/changes`、`/changes/file?path&side` | read | 是 |
+| `git.pushPreview` | `GET /projects/:id/git/push?branch` | read | 是 |
 | `git.createCommit` | `POST /projects/:id/git/commits` `{ message }` → 新提交 | write | 是 |
 | `git.draftCommitMessage` | `POST /projects/:id/git/commit-message` `{ staged: true } \| { from, to }` → `{ subject, body }` | read | 否（界面辅助） |
 | `git.push` | `POST /projects/:id/git/push` `{ branch }` | critical | 是 |
@@ -247,7 +248,7 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 | `git.mergeWithAi` | `POST /projects/:id/git/merge-task` `{ source, target }` → 任务（`produces: task`） | write | 是 |
 | `git.createPullRequest` | `POST /projects/:id/git/pull-requests` `{ branch, base, title, body }` → `{ url, existed }` | critical | 是 |
 | `gitReviews.start` | `POST /projects/:id/git/reviews` `{ target, focus? }` → 审查（`produces: git_review`） | write | 是 |
-| `gitReviews.list` / `get` | `GET /projects/:id/git/reviews?targetSha`、`GET /git/reviews/:reviewId` | read | 是 |
+| `gitReviews.list` / `get` | `GET /projects/:id/git/reviews?to`、`GET /git/reviews/:reviewId` | read | 是 |
 | `gitReviews.stop` | `POST /git/reviews/:reviewId/stop` | write | 是 |
 
 全部 `mode = pro`（D65 ①：简单模式下助手看不到这些工具）。助手调用 write 出现确认卡片（可「总是允许」），critical 每次确认（D27）。
@@ -279,7 +280,7 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 - 集成（真实 Git 临时仓库 + bare 远端，`createTestRepo`）：每个写操作一个成功路径 + 其特有错误码；提交用用户身份且运行钩子（测试仓库放一个拒绝的 `pre-commit`）；推送被拒；拉取不能快进；合并两种方式与冲突（目标不变）；任务分支被拒（`GIT_BRANCH_OWNED_BY_TASK`）；合并任务的准备阶段留下冲突标记；与任务交付并发时经仓库锁串行。
 - 集成（FakeOpencode）：审查的 `submit_findings` 成功、`PATH_NOT_IN_DIFF` 后修正重提、非审查尝试调用被拒；草拟提交信息成功与失败。
 - 单元：图谱泳道计算、`--porcelain` 推送结果解析、状态的暂存 / 未暂存拆分。
-- E2E **J24**（`git-workbench.browser.spec.ts`）：专业模式 → 工作台 → 改动视图暂存一个文件 →「AI 草拟」填入草稿 → 提交 → 新建分支并切换 → 再提交 → 「AI 审查」该分支（FakeOpencode 提交两个问题）→ 点问题位置，diff 打开到该行 →「合并到 main」（压缩，确认）→ 推送 main（确认）→ bare 远端的 main 有该提交；另一用例：合并冲突 →「交给 AI 解决」→ 任务完成后在结果卡合并 → main 有解决后的内容。J9 的走查改为截工作台的提交、改动、分支、审查结果与合并对话框。
+- E2E **J24**（`pro-git.browser.spec.ts`）：专业模式 → 工作台 → 改动视图暂存一个文件 →「AI 草拟」填入草稿 → 提交 → 新建分支并切换 → 再提交 → 「AI 审查」该分支（FakeOpencode 提交两个问题）→ 点问题位置，diff 打开到该行 →「合并到 main」（压缩，确认）→ 推送 main（确认）→ bare 远端的 main 有该提交；另一用例：合并冲突 →「交给 AI 解决」→ 任务完成后在结果卡合并 → main 有解决后的内容。J9 的走查改为截工作台的提交、改动、分支、审查结果与合并对话框。
 
 ## 10. 实现拆分（确认后）
 

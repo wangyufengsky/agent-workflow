@@ -8,9 +8,11 @@ import {
   createProject,
   createRepo,
   type E2EProject,
+  git,
   passReview,
   patchSettings,
   queueAssistantTurn,
+  queueCodeReviewerTurn,
   queueResearchTurn,
   queueTurn,
   queueWriterTurn,
@@ -46,6 +48,8 @@ type Seed = {
   schedule: string;
   /** An assistant conversation that keeps working until the walkthrough ends. */
   assistantBusy: string;
+  /** The Git workbench (27): the review project's main commit, reviewed by the AI with one finding. */
+  gitCommit: string;
   /** PPTs (23): one whose outline waits for confirmation, one made with a page in every layout. */
   deckOutline: string;
   deckMade: string;
@@ -352,6 +356,36 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     )
     .toBe(true);
 
+  // A reviewed commit and a branch of the user's own to merge, in the Git workbench (27).
+  git(reviewProject.repoPath, 'branch', 'feature/walkthrough');
+  const gitCommit = git(reviewProject.repoPath, 'rev-parse', 'main');
+  await queueCodeReviewerTurn(request, reviewProject, [
+    {
+      type: 'callTool',
+      name: 'submit_findings',
+      args: {
+        summary: '脚本可以运行；测试命令缺少覆盖率，建议补上。',
+        findings: [
+          {
+            severity: 'major',
+            category: 'tests',
+            path: 'package.json',
+            line: 1,
+            title: '测试脚本没有收集覆盖率',
+            description: '`vitest run` 不会报告哪些代码没有被测到。',
+            suggestion: '改为 `vitest run --coverage`。',
+          },
+        ],
+      },
+    },
+  ]);
+  const gitReview = await api<{ id: string }>(request, 'POST', `/projects/${reviewProject.id}/git/reviews`, {
+    target: { kind: 'commit', sha: gitCommit },
+  });
+  await expect
+    .poll(async () => (await api<{ status: string }>(request, 'GET', `/git/reviews/${gitReview.id}`)).status)
+    .toBe('succeeded');
+
   const batchProject = await createProject(request, null);
   await queueTurn(request, batchProject, { title: '代码审查' }, [submitResult('审查完成：发现 2 个问题。')]);
   await queueTurn(request, batchProject, { title: '代码审查' }, [{ type: 'hang' }]);
@@ -439,6 +473,7 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     assistantBusy,
     deckOutline: deckOutline.id,
     deckMade: deckMade.id,
+    gitCommit,
   };
 }
 
@@ -727,12 +762,65 @@ const SHOTS: Shot[] = [
   },
   { name: 'pro-project', mode: UiMode.Pro, url: (s) => `/projects/${s.project.id}`, ready: heading(/.+/) },
   { name: 'pro-settings', mode: UiMode.Pro, url: () => '/settings', ready: (page) => page.getByText('专业设置') },
-  { name: 'pro-git', mode: UiMode.Pro, url: () => '/git', ready: heading('Git 管理台') },
-  ...(['branches', 'commits', 'files', 'worktrees'] as const).map(
-    (tab): Shot => ({
-      name: `pro-git-${tab}`,
+  {
+    name: 'pro-git',
+    mode: UiMode.Pro,
+    url: () => '/git',
+    ready: (page) => page.getByTestId('git-project-card').first(),
+  },
+  {
+    name: 'pro-git-changes',
+    mode: UiMode.Pro,
+    url: (s) => `/git/${s.project.id}?view=changes`,
+    ready: testId('git-changes'),
+  },
+  {
+    name: 'pro-git-commit',
+    mode: UiMode.Pro,
+    url: (s) => `/git/${s.project.id}?view=commits&sha=${s.gitCommit}`,
+    ready: (page) => page.getByTestId('git-commit').getByTestId('diff-view'),
+  },
+  {
+    name: 'pro-git-review',
+    mode: UiMode.Pro,
+    url: (s) => `/git/${s.project.id}?view=commits&sha=${s.gitCommit}&tab=review`,
+    ready: testId('git-review-verdict'),
+  },
+  {
+    name: 'pro-git-branches',
+    mode: UiMode.Pro,
+    url: (s) => `/git/${s.project.id}?view=branches`,
+    ready: (page) => page.getByTestId('git-branch').first(),
+  },
+  {
+    name: 'pro-git-merge',
+    mode: UiMode.Pro,
+    url: (s) => `/git/${s.project.id}?view=branches`,
+    ready: (page) => page.getByTestId('git-branch').first(),
+    open: async (page) => {
+      await page
+        .getByTestId('git-branch')
+        .filter({ hasText: 'feature/walkthrough' })
+        .getByRole('button', { name: '合并到 main' })
+        .click();
+      return page.getByRole('dialog', { name: '合并到 main' });
+    },
+  },
+  {
+    name: 'pro-git-push',
+    mode: UiMode.Pro,
+    url: (s) => `/git/${s.project.id}?view=commits`,
+    ready: testId('git-status'),
+    open: async (page) => {
+      await page.getByTestId('git-status').getByRole('button', { name: /^推送/ }).click();
+      return page.getByRole('dialog', { name: '推送 main 到 origin？' });
+    },
+  },
+  ...(['files', 'worktrees'] as const).map(
+    (view): Shot => ({
+      name: `pro-git-${view}`,
       mode: UiMode.Pro,
-      url: (s) => `/git/${s.project.id}?tab=${tab}`,
+      url: (s) => `/git/${s.project.id}?view=${view}`,
       ready: testId('git-status'),
     }),
   ),
@@ -779,7 +867,7 @@ const SHOTS: Shot[] = [
   {
     name: 'pro-assistant-panel',
     mode: UiMode.Pro,
-    url: (s) => `/git/${s.project.id}?tab=commits`,
+    url: (s) => `/git/${s.project.id}?view=commits`,
     ready: testId('git-status'),
     open: async (page) => {
       const panel = await openAssistant(page, '项目整理');
