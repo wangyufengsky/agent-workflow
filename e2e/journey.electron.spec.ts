@@ -19,6 +19,14 @@ function launch(): Promise<ElectronApplication> {
   return electron.launch(executablePath ? { executablePath, args } : { args: ['apps/desktop', ...args] });
 }
 
+/**
+ * The window shows the opening animation as a `data:` page first, then loads the app from the backend (28 §5.2, D113);
+ * the animation shows the same wordmark as the home page, so waiting for the app means waiting for its address.
+ */
+async function appLoaded(page: Page): Promise<void> {
+  await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 60_000 });
+}
+
 /** The backend this window talks to: its random port and per-launch token. */
 async function backend(page: Page) {
   const token = await page.evaluate(() => window.aw?.apiToken ?? '');
@@ -99,6 +107,7 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
   await app.close();
   app = await launch();
   page = await app.firstWindow();
+  await appLoaded(page);
   await expect(page.getByRole('heading', { name: 'Everything is a Workflow.' })).toBeVisible();
   api = await backend(page);
   await playTheUser(page);
