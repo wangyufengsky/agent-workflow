@@ -250,16 +250,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
-      "pattern": "awk",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk *",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
       "pattern": "sed -n *p",
       "permission": "bash",
     },
@@ -635,46 +625,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "ask",
-      "pattern": "awk *system*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *|*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-f*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-E*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *--exec*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-i*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-l*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *@load*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
       "pattern": "sort *-o*",
       "permission": "bash",
     },
@@ -951,16 +901,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "nl * 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk * 2>&1",
       "permission": "bash",
     },
     {
@@ -1435,16 +1375,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
-      "pattern": "awk 2>/dev/null",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk * 2>/dev/null",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
       "pattern": "sed -n *p 2>/dev/null",
       "permission": "bash",
     },
@@ -1816,46 +1746,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "sed -n *"*e*"*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *system*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *|*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-f*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-E*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *--exec*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-i*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-l*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *@load*",
       "permission": "bash",
     },
     {
@@ -2147,16 +2037,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
-      "pattern": "awk",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk *",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
       "pattern": "sed -n *p",
       "permission": "bash",
     },
@@ -2532,46 +2412,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "ask",
-      "pattern": "awk *system*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *|*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-f*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-E*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *--exec*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-i*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-l*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *@load*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
       "pattern": "sort *-o*",
       "permission": "bash",
     },
@@ -2848,16 +2688,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "nl * 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk * 2>&1",
       "permission": "bash",
     },
     {
@@ -3332,16 +3162,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
-      "pattern": "awk 2>/dev/null",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk * 2>/dev/null",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
       "pattern": "sed -n *p 2>/dev/null",
       "permission": "bash",
     },
@@ -3713,46 +3533,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "sed -n *"*e*"*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *system*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *|*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-f*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-E*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *--exec*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-i*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-l*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *@load*",
       "permission": "bash",
     },
     {
@@ -4044,16 +3824,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
-      "pattern": "awk",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk *",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
       "pattern": "sed -n *p",
       "permission": "bash",
     },
@@ -4429,46 +4199,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "ask",
-      "pattern": "awk *system*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *|*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-f*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-E*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *--exec*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-i*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-l*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *@load*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
       "pattern": "sort *-o*",
       "permission": "bash",
     },
@@ -4745,16 +4475,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "nl * 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk * 2>&1",
       "permission": "bash",
     },
     {
@@ -5229,16 +4949,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
-      "pattern": "awk 2>/dev/null",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk * 2>/dev/null",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
       "pattern": "sed -n *p 2>/dev/null",
       "permission": "bash",
     },
@@ -5610,46 +5320,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "sed -n *"*e*"*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *system*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *|*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-f*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-E*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *--exec*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-i*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-l*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *@load*",
       "permission": "bash",
     },
     {
@@ -5998,16 +5668,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "allow",
-      "pattern": "awk",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk *",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
       "pattern": "sed -n *p",
       "permission": "bash",
     },
@@ -6383,46 +6043,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "ask",
-      "pattern": "awk *system*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *|*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-f*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-E*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *--exec*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-i*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-l*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *@load*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
       "pattern": "sort *-o*",
       "permission": "bash",
     },
@@ -6699,16 +6319,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "allow",
       "pattern": "nl * 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk * 2>&1",
       "permission": "bash",
     },
     {
@@ -7183,16 +6793,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "allow",
-      "pattern": "awk 2>/dev/null",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk * 2>/dev/null",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
       "pattern": "sed -n *p 2>/dev/null",
       "permission": "bash",
     },
@@ -7564,46 +7164,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "ask",
       "pattern": "sed -n *"*e*"*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *system*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *|*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-f*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-E*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *--exec*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-i*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-l*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *@load*",
       "permission": "bash",
     },
     {
@@ -7895,16 +7455,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "allow",
-      "pattern": "awk",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk *",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
       "pattern": "sed -n *p",
       "permission": "bash",
     },
@@ -8280,46 +7830,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "ask",
-      "pattern": "awk *system*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *|*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-f*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-E*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *--exec*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-i*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-l*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *@load*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
       "pattern": "sort *-o*",
       "permission": "bash",
     },
@@ -8596,16 +8106,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "allow",
       "pattern": "nl * 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk 2>&1",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk * 2>&1",
       "permission": "bash",
     },
     {
@@ -9080,16 +8580,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "allow",
-      "pattern": "awk 2>/dev/null",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
-      "pattern": "awk * 2>/dev/null",
-      "permission": "bash",
-    },
-    {
-      "action": "allow",
       "pattern": "sed -n *p 2>/dev/null",
       "permission": "bash",
     },
@@ -9461,46 +8951,6 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "ask",
       "pattern": "sed -n *"*e*"*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *system*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *|*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-f*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-E*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *--exec*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-i*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *-l*",
-      "permission": "bash",
-    },
-    {
-      "action": "ask",
-      "pattern": "awk *@load*",
       "permission": "bash",
     },
     {

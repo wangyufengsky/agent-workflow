@@ -341,7 +341,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       });
       const { projectId } = mustFind(attemptId);
       if (reply === PermissionDecision.Always && payload.permission === BASH_PERMISSION && projectId !== null) {
-        projects.rememberBash(projectId, payload.always);
+        projects.rememberBash(projectId, payload.patterns);
       }
     },
 

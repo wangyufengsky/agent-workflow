@@ -212,7 +212,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/inbox/:id/resolve` | `{ response }`，`response` 为对应 kind 的回应（见 10 §inbox_items；`question` 只接受 `{ answer }`）；不符合该 kind 400 `VALIDATION_FAILED`；已关闭 409 `INBOX_ITEM_CLOSED`；回答问题时 opencode 未就绪 503 `OPENCODE_NOT_READY`（条目保持打开） |
 | POST | `/inbox/:id/dismiss` | 仅 `failure` / `delivery` / `schedule_failure` 可忽略 |
 
-`resolve` 是各业务动作的统一入口：`question` → 答案发回会话；`permission` → 回复 opencode（bash 请求选 `always` 时还把 payload 的 `always` 模式记到项目，Git 开头的除外，D101）；`acceptance` → 节点 accept/reject；`plan` → 等同 plan confirm/replan；`failure` → 任务 retry/cancel；`delivery` 不通过 resolve，而是 `deliver` 成功后自动 resolved；`schedule_failure` 同样不通过 resolve，恢复定时任务时自动 resolved（22 §5）。
+`resolve` 是各业务动作的统一入口：`question` → 答案发回会话；`permission` → 回复 opencode（bash 请求选 `always` 时还把 payload 的每条子命令按「命令 + 开头的选项 + ` *`」记到项目，Git 与前置变量赋值的除外，D101）；`acceptance` → 节点 accept/reject；`plan` → 等同 plan confirm/replan；`failure` → 任务 retry/cancel；`delivery` 不通过 resolve，而是 `deliver` 成功后自动 resolved；`schedule_failure` 同样不通过 resolve，恢复定时任务时自动 resolved（22 §5）。
 
 ## 8. Git（专业模式）
 

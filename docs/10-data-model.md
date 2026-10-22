@@ -256,7 +256,7 @@ payload / response：
 | kind | payload | response |
 | --- | --- | --- |
 | `question` | `{ question, options?: string[], blocking: boolean, defaultAssumption?: string }` | `{ answer: string }` 或 `{ assumed: true, value }`（未问用户、按假设继续时直接以 resolved 写入，作为记录） |
-| `permission` | `{ opencodePermissionId, sessionId, directory, permission, patterns[], always[] }`（`always` 为 opencode 给出的「总是允许」模式；迁移 0014 为之前的条目按每条子命令的第一个词加 ` *` 补上，D101） | `{ decision: PermissionDecision }` |
+| `permission` | `{ opencodePermissionId, sessionId, directory, permission, patterns[] }`（`patterns` 为询问的子命令原文；bash 请求选「总是允许」时由它们得出记到项目的模式，D101） | `{ decision: PermissionDecision }` |
 | `acceptance` | `{}` | `{ accepted: boolean, feedback?: string }` |
 | `plan` | `{ planId, version }` | `{ confirmed: true }` 或 `{ replanFeedback }` |
 | `failure` | `{ phase, error }` | `{ action: 'retry' | 'cancel' }` |

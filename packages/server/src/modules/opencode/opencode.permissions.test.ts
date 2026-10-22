@@ -1,4 +1,11 @@
-import { BashPolicy, type PermissionAction, type PermissionRule, RoleBaseAgent } from '@aw/shared';
+import {
+  BashPolicy,
+  type PermissionAction,
+  type PermissionRule,
+  projectBashPatterns,
+  RoleBaseAgent,
+  SessionAgent,
+} from '@aw/shared';
 import { describe, expect, it } from 'vitest';
 import { sessionPermissionRules } from './opencode.config.ts';
 
@@ -135,7 +142,6 @@ const READS_D100 = [
   'command -v mvn; ls ~/.m2 2>/dev/null',
   'grep -rniE "stock|inventory" --include=*.java . 2>/dev/null | grep -v test',
   'find . -name "*.sql" 2>/dev/null | head -20',
-  "awk -F, '{print $2}' data.csv | sort | uniq",
   'cut -d: -f1 /etc/passwd | tr a-z A-Z',
   'file target/app.jar',
   'stat -f %z pom.xml',
@@ -156,6 +162,11 @@ const ESCAPES_D100 = [
   "sed -n 's/a/b/ep' pom.xml",
   'sed -n -f script.sed pom.xml',
   'sed 1,60p docs/x.md',
+  // awk is a programming language: programs come from files, libraries and options that write (D100).
+  "awk -F, '{print $2}' data.csv",
+  "awk -oout.awk '{print}' data.csv",
+  'awk -l x',
+  `awk '@include "x"'`,
   'awk \'BEGIN{system("rm -rf src")}\'',
   'awk \'{print > "out.txt"}\' data.csv',
   'awk \'{print | "sh"}\' data.csv',
@@ -390,5 +401,35 @@ describe('项目级「总是允许」的命令（D101）', () => {
     expect(sessionPermissionRules(RoleBaseAgent.Executor, BashPolicy.Auto, { allowedBash: allowed })).toEqual(
       sessionPermissionRules(RoleBaseAgent.Executor, BashPolicy.Auto),
     );
+  });
+});
+
+/**
+ * What「总是允许」remembers for the project (D101): the command and the options the user saw, up to the first other
+ * argument, so approving `unzip -l x.jar` does not also allow extracting. Git and commands after an assignment are not
+ * remembered.
+ */
+describe('项目中记住的模式（D101）', () => {
+  it.each([
+    [['unzip -l ~/.m2/x.jar'], ['unzip -l *']],
+    [
+      ['./scripts/mvn.sh -q test 2>&1', 'tail -40'],
+      ['./scripts/mvn.sh -q *', 'tail -40 *'],
+    ],
+    [['javap -p -cp "$JAR" com.example.Inventory'], ['javap -p -cp *']],
+    [['make'], ['make *']],
+    [['git push origin main', 'PATH=/opt/homebrew/bin:$PATH mvn -v'], []],
+    [['ls a', 'ls b'], ['ls *']],
+  ])('%j → %j', (commands, patterns) => {
+    expect(projectBashPatterns(commands)).toEqual(patterns);
+  });
+
+  it('记住 unzip -l 后，同一项目的会话仍询问解压', () => {
+    const rules = sessionPermissionRules(SessionAgent.Researcher, BashPolicy.Auto, {
+      allowedBash: projectBashPatterns(['unzip -l lib/x.jar']),
+    });
+    expect(decide(rules, 'unzip -l lib/y.jar')).toBe('allow');
+    expect(decide(rules, 'unzip lib/x.jar')).toBe('ask');
+    expect(decide(rules, 'unzip -o lib/x.jar -d out')).toBe('ask');
   });
 });

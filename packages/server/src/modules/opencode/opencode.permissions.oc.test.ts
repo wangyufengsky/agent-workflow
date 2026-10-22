@@ -18,7 +18,7 @@ import { OpencodeEventType, ToolCallStatus } from './opencode.events.ts';
 const PROVIDER = 'aw-scripted';
 const MODEL = 'scripted';
 const RUN = 'RUN: ';
-const PROJECT_PATTERNS = ['./scripts/check.sh *'];
+const PROJECT_PATTERNS = ['./scripts/check.sh -q *'];
 
 const ALLOWED = [
   './scripts/check.sh -q 2>&1 | tail -5',
@@ -28,7 +28,8 @@ const ALLOWED = [
 ];
 // Each is harmless in the temporary repository should it run after all.
 const ASKED = [
-  './scripts/check.sh > out.txt',
+  './scripts/check.sh -q > out.txt',
+  './scripts/check.sh deploy',
   "sed -n '1w copy.txt' README.md",
   'find . -name nothing-here -delete 2>/dev/null',
   'cat README.md | xargs echo',

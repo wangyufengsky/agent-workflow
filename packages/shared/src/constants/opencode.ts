@@ -51,7 +51,6 @@ const BASH_READONLY = [
   'cut *',
   'tr *',
   'nl *',
-  'awk *',
   ...['p', "p'", 'p"'].map((end) => `sed -n *${end} *`),
   'unzip -l *',
   'unzip -Z *',
@@ -104,15 +103,6 @@ const COMMAND_ESCAPES = [
   'sed *-f*',
   'sed *-e*',
   ...SED_SCRIPT_ESCAPES,
-  // A program from a file or a library, and pipes to or from commands (`print | "sh"`, `"cmd" | getline`).
-  'awk *system*',
-  'awk *|*',
-  'awk *-f*',
-  'awk *-E*',
-  'awk *--exec*',
-  'awk *-i*',
-  'awk *-l*',
-  'awk *@load*',
   'sort *-o*',
   'sort *--compress-program*',
   // Two file arguments: the second is the output.
@@ -219,12 +209,23 @@ const versionQueryRules = (suffix: string): PermissionRule[] => [
 
 const startsWithWords = (command: string, words: string) => command === words || command.startsWith(`${words} `);
 
+/** `NAME=value` before a command changes what runs (`PATH=. node`), so such a command is not remembered (D64). */
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
 /**
- * The patterns of a bash request's「总是允许」that are remembered for the project (D101): opencode's own (`unzip *`),
- * except Git ones, since the model never writes Git (12 §1); those stay with opencode's session.
+ * What「总是允许」on a bash request remembers for the project (D101): for each sub-command the program and the options
+ * the user saw, up to the first other argument, and ` *` (`unzip -l x.jar` → `unzip -l *`, so extracting still asks).
+ * Not Git, which the model never writes (12 §1), nor commands after an assignment; those stay with opencode's session.
  */
-export const projectBashPatterns = (always: readonly string[]): string[] =>
-  always.filter((pattern) => !startsWithWords(pattern, 'git'));
+export function projectBashPatterns(commands: readonly string[]): string[] {
+  const patterns = commands.flatMap((command) => {
+    const [program = '', ...args] = command.trim().split(/\s+/);
+    if (program === '' || program === 'git' || ASSIGNMENT.test(program)) return [];
+    const end = args.findIndex((arg) => !arg.startsWith('-'));
+    return [[program, ...args.slice(0, end === -1 ? args.length : end), '*'].join(' ')];
+  });
+  return [...new Set(patterns)];
+}
 
 /**
  * Rules allowing `command` with the arguments its runner permits, followed by `suffix` (`''` or one of `STDERR_SUFFIXES`).

@@ -233,8 +233,6 @@ export function createFakeOpencode() {
             permissionId,
             permission,
             patterns,
-            // opencode's prefix for commands it has no arity for: the first word (`rm -rf dist` → `rm *`).
-            always: patterns.map((p) => `${p.split(' ')[0]} *`),
           });
           await replied;
           break;

@@ -161,9 +161,9 @@ export function createProjectsService({ db, clock, credentials, databases, hosti
     /** Bash patterns the project's later AI sessions run without asking (D101). */
     allowedBash: (id: string): string[] => repo.allowedBash(id),
 
-    /** 「总是允许」on a bash request of one of the project's sessions: opencode's patterns, Git aside (D101). */
-    rememberBash(id: string, always: readonly string[]): void {
-      repo.addAllowedBash(id, projectBashPatterns(always), clock.now());
+    /** 「总是允许」on a bash request of one of the project's sessions: its commands with their leading options (D101). */
+    rememberBash(id: string, commands: readonly string[]): void {
+      repo.addAllowedBash(id, projectBashPatterns(commands), clock.now());
     },
 
     /** Later sessions ask again; the sessions already running keep their rules (D35). */

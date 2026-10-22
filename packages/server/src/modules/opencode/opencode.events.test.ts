@@ -36,7 +36,7 @@ describe('opencode 全局事件解析', () => {
     expect(bash.at(-1)).toMatchObject({ input: { command: 'ls' }, output: 'README.md\nhello.txt\n' });
   });
 
-  it('权限请求带目录、匹配模式与「总是允许」的模式', () => {
+  it('权限请求带目录与匹配模式', () => {
     expect(parsed.find((e) => e.type === E.PermissionAsked)).toEqual({
       type: E.PermissionAsked,
       sessionId: 'ses_eac74a387ffeMgXo9hDGXzyQPQ',
@@ -44,7 +44,6 @@ describe('opencode 全局事件解析', () => {
       permissionId: 'per_1538b763f00126bX5oaRtvGt4W',
       permission: 'bash',
       patterns: ['ls'],
-      always: ['ls *'],
     });
   });
 

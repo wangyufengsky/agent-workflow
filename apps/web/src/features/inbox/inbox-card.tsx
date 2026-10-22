@@ -70,7 +70,7 @@ function QuestionCard({ item, resolve, pending }: CardProps<typeof InboxKind.Que
 
 function PermissionCard({ item, resolve, pending }: CardProps<typeof InboxKind.Permission>) {
   // What「总是允许」remembers for the project (D101); other permissions stay with the session.
-  const remembered = item.payload.permission === BASH_PERMISSION ? projectBashPatterns(item.payload.always) : [];
+  const remembered = item.payload.permission === BASH_PERMISSION ? projectBashPatterns(item.payload.patterns) : [];
   return (
     <>
       <span className="sub">

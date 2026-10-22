@@ -88,14 +88,14 @@ test('J3 权限请求 → 允许一次 → 继续；总是允许 → 记到项�
   await expect(permission).toContainText('rm -rf dist');
   await permission.getByRole('button', { name: '允许一次' }).click();
   await expect(permission).toContainText('./scripts/build.sh --clean');
-  await expect(permission).toContainText('「总是允许」会为本项目记住 ./scripts/build.sh *');
+  await expect(permission).toContainText('「总是允许」会为本项目记住 ./scripts/build.sh --clean *');
   await permission.getByRole('button', { name: '总是允许' }).click();
   await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
 
   await patchSettings(request, { 'ui.mode': 'pro' });
   await page.goto(`/projects/${project.id}`);
   const allowed = page.getByRole('list', { name: '总是允许的命令' });
-  await expect(allowed).toContainText('./scripts/build.sh *');
+  await expect(allowed).toContainText('./scripts/build.sh --clean *');
   await allowed.getByRole('button', { name: '撤销' }).click();
   await expect(page.getByText('还没有总是允许的命令。')).toBeVisible();
 });

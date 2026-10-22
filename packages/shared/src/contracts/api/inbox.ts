@@ -25,9 +25,8 @@ export const permissionPayloadSchema = z.object({
   directory: z.string(),
   /** opencode permission type, e.g. `bash`, `webfetch`. */
   permission: z.string(),
+  /** The sub-commands asked about; on「总是允许」bash ones are remembered for the project too (D101). */
   patterns: z.array(z.string()),
-  /** opencode's patterns for「总是允许」(`unzip *`); bash ones are remembered for the project too (D101). */
-  always: z.array(z.string()),
 });
 export type PermissionPayload = z.infer<typeof permissionPayloadSchema>;
 export const permissionResponseSchema = z.object({ decision: permissionDecisionSchema });
