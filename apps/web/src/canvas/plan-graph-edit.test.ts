@@ -1,12 +1,14 @@
-import type { PlanGraph } from '@aw/shared';
+import { type PlanGraph, RequiredStepPosition } from '@aw/shared';
 import { describe, expect, it } from 'vitest';
 import { END, START } from './layout.ts';
 import {
   addAfter,
   addAtEnd,
   addParallel,
+  addStep,
   connect,
   disconnect,
+  editGuard,
   insertBetween,
   removeAndReconnect,
   renameNode,
@@ -70,5 +72,30 @@ describe('计划画布的编辑', () => {
       renameProblem(diamond, 'a', 'b'),
       renameProblem(diamond, 'a', 'a2'),
     ]).toEqual(['pattern', 'taken', null]);
+  });
+
+  it('添加步骤只在结果合法时进行：选中最后的必经步骤时既不能接在它后面，也不能接在最后', () => {
+    const plan: PlanGraph = { nodes: [node('a'), node('verify', 'a')] };
+    const rules = {
+      allowedRoles: ['developer'],
+      requiredSteps: [{ key: 'verify', position: RequiredStepPosition.Last }],
+    };
+    const allowed = editGuard(plan, rules, undefined);
+    expect(addStep(plan, 'verify', step, allowed)).toBeUndefined();
+    expect(addStep(plan, undefined, step, allowed)).toBeUndefined();
+    expect(deps(addStep(plan, 'a', step, allowed)?.graph ?? plan)).toEqual({
+      a: [],
+      verify: ['step_3'],
+      step_3: ['a'],
+    });
+  });
+
+  it('暂停调整时不能改动已开始的步骤', () => {
+    const plan: PlanGraph = { nodes: [node('a'), node('b', 'a')] };
+    const rules = { allowedRoles: ['developer'], requiredSteps: [] };
+    const allowed = editGuard(plan, rules, { base: plan, locked: new Set(['b']) });
+    expect(allowed(addAfter(plan, 'a', step).graph)).toBe(false);
+    expect(allowed(addAfter(plan, 'b', step).graph)).toBe(true);
+    expect(allowed(removeAndReconnect(plan, 'b'))).toBe(false);
   });
 });

@@ -54,8 +54,9 @@ export type FlowCanvasProps = {
   finished?: boolean | undefined;
   /** Editable canvas: + on edges and steps, − on steps (26 §5). */
   edit?: CanvasEdit | undefined;
-  /** A step just added: panned into view if it is outside. */
+  /** A step just added: panned into view once if it is outside, then `onRevealed` clears the request. */
   revealId?: string | undefined;
+  onRevealed?: (() => void) | undefined;
   testId?: string;
 };
 
@@ -78,7 +79,19 @@ function edgeTone(source: NodeStatus | undefined, target: NodeStatus | undefined
 }
 
 function Flow(props: FlowCanvasProps) {
-  const { steps, label, placeholder, selectedId, onSelect, onOpen, finished = false, edit, revealId, testId } = props;
+  const {
+    steps,
+    label,
+    placeholder,
+    selectedId,
+    onSelect,
+    onOpen,
+    finished = false,
+    edit,
+    revealId,
+    onRevealed,
+    testId,
+  } = props;
   const { setViewport, getViewport, zoomIn, zoomOut } = useReactFlow();
   const width = useStore((s) => s.width);
   const height = useStore((s) => s.height);
@@ -115,11 +128,17 @@ function Flow(props: FlowCanvasProps) {
     if (width > 0 && height > 0 && !moved.current) fitRef.current(0);
   }, [width, height]);
 
+  // A reveal request is used once: later renders (typing in the step's form) keep the user's view.
+  const revealed = useRef(onRevealed);
+  revealed.current = onRevealed;
   useEffect(() => {
+    if (revealId === undefined) return;
     const box = layout.placed.find((p) => p.step.id === revealId)?.box;
-    if (box === undefined) return;
-    const next = revealViewport(box, getViewport(), latest.current.width, latest.current.height);
-    if (next !== null) void setViewport(next, { duration: motionMs(300) });
+    if (box !== undefined) {
+      const next = revealViewport(box, getViewport(), latest.current.width, latest.current.height);
+      if (next !== null) void setViewport(next, { duration: motionMs(300) });
+    }
+    revealed.current?.();
   }, [revealId, layout, getViewport, setViewport]);
 
   const statusOf = useMemo(() => new Map(steps.map((s) => [s.id, s.status])), [steps]);

@@ -19,6 +19,8 @@ function withPosition(step: RequiredStep, position: string): RequiredStep {
 
 type Props = {
   step: RequiredStep;
+  /** Positions another step already has: a second `first` or `last` step could never be satisfied. */
+  taken: ReadonlySet<RequiredStep['position']>;
   /** A changed step; `field` names what changed, so typing into one field is one undo step. */
   onChange: (step: RequiredStep, field: string) => void;
   onRemove: () => void;
@@ -27,7 +29,7 @@ type Props = {
 };
 
 /** One step every AI plan of the workflow must contain (10 §workflows `requiredSteps`, 08 §5.3; 26 §6.3). */
-export function RequiredStepForm({ step, onChange, onRemove, allowedRoles, roles }: Props) {
+export function RequiredStepForm({ step, taken, onChange, onRemove, allowedRoles, roles }: Props) {
   const roleName = (key: string) => roles.find((r) => r.key === key)?.name ?? key;
   return (
     <div className="col" data-testid="required-step-form">
@@ -55,7 +57,7 @@ export function RequiredStepForm({ step, onChange, onRemove, allowedRoles, roles
           >
             <option value="">{C.positionNone}</option>
             {Object.values(RequiredStepPosition).map((p) => (
-              <option key={p} value={p}>
+              <option key={p} value={p} disabled={taken.has(p)}>
                 {POSITION_LABEL[p]}
               </option>
             ))}

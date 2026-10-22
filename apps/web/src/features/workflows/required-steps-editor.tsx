@@ -93,6 +93,7 @@ export function RequiredStepsEditor({
         ) : (
           <RequiredStepForm
             step={step}
+            taken={new Set(steps.filter((s) => s !== step).map((s) => s.position))}
             onChange={(next, field) => {
               onChange(
                 steps.map((s, i) => (i === index ? next : s)),
@@ -123,6 +124,7 @@ export function RequiredStepsEditor({
             onSelect={select}
             edit={edit}
             revealId={reveal}
+            onRevealed={() => setReveal(undefined)}
           />
         </div>
         <aside className={editorStyles.side}>

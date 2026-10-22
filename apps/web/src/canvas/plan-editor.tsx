@@ -1,12 +1,4 @@
-import {
-  lockedChanges,
-  type NodeStatus,
-  type PlanGraph,
-  PlanProblemCode,
-  type PlanRules,
-  type RoleDTO,
-  validatePlanGraph,
-} from '@aw/shared';
+import type { NodeStatus, PlanGraph, PlanRules, RoleDTO } from '@aw/shared';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Button } from '../components/button.tsx';
 import { Panel } from '../components/panel.tsx';
@@ -20,8 +12,9 @@ import editorStyles from './plan-editor.module.css';
 import {
   type Added,
   addAfter,
-  addAtEnd,
   addParallel,
+  addStep,
+  editGuard,
   insertBetween,
   type NewStep,
   removeAndReconnect,
@@ -48,8 +41,8 @@ type Props = {
   statuses?: ReadonlyMap<string, NodeStatus> | undefined;
   /** `checkPlan` of the graph; the caller also uses it to allow saving. */
   problems: readonly EditorProblem[];
-  /** The toolbar above the canvas; `addStep` is the editor's 添加步骤 (26 §5.1). */
-  toolbar: (addStep: () => void) => ReactNode;
+  /** The toolbar above the canvas; `addStep` is the editor's 添加步骤 (26 §5.1), undefined when no step can be added. */
+  toolbar: (addStep: (() => void) | undefined) => ReactNode;
   /** Save / confirm / cancel buttons of the caller, under the problems. */
   actions?: ReactNode;
   /** The workflow editor's 流程设置 (26 §6.3): the side panel gets a tab for it. */
@@ -57,9 +50,6 @@ type Props = {
 };
 
 const Tab = { Step: 'step', Settings: 'settings' } as const;
-
-const orderProblems = (graph: PlanGraph, rules: PlanRules) =>
-  validatePlanGraph(graph, rules).filter((p) => p.code === PlanProblemCode.RequiredStepOrder).length;
 
 /**
  * Plan editor (26 §5, 14 §5): + on edges and steps adds steps already connected, − removes one and joins its
@@ -100,11 +90,7 @@ export function PlanEditor({
   };
 
   // Only edits whose result adds no locked-step change and no required-step order problem are offered (26 §5.4).
-  const lockedNow = lock === undefined ? 0 : lockedChanges(lock.base, graph, lock.locked).length;
-  const orderNow = orderProblems(graph, rules);
-  const allowed = (next: PlanGraph) =>
-    (lock === undefined || lockedChanges(lock.base, next, lock.locked).length <= lockedNow) &&
-    orderProblems(next, rules) <= orderNow;
+  const allowed = editGuard(graph, rules, lock);
   const newStep = (like: string | undefined): NewStep => {
     const roleKey = graph.nodes.find((n) => n.key === like)?.roleKey;
     return {
@@ -135,10 +121,8 @@ export function PlanEditor({
       if (selected === key) setSelected(undefined);
     },
   };
-  const addStep = () =>
-    selected !== undefined && edit.canAddAfter(selected)
-      ? edit.addAfter(selected)
-      : added(addAtEnd(graph, newStep(undefined)));
+  const toAdd = addStep(graph, selected, newStep(selected), allowed);
+  const addStepNow = toAdd === undefined ? undefined : () => added(toAdd);
 
   const steps: CanvasStep[] = graph.nodes.map((n) => {
     const status = statuses?.get(n.key);
@@ -205,7 +189,7 @@ export function PlanEditor({
 
   return (
     <div className={editorStyles.editor} data-testid="plan-editor">
-      <div className={editorStyles.toolbar}>{toolbar(addStep)}</div>
+      <div className={editorStyles.toolbar}>{toolbar(addStepNow)}</div>
       <div className={editorStyles.layout}>
         <div className={editorStyles.canvas}>
           <FlowCanvas
@@ -219,6 +203,7 @@ export function PlanEditor({
             }}
             edit={edit}
             revealId={reveal}
+            onRevealed={() => setReveal(undefined)}
           />
           {removed !== undefined && (
             <div className={editorStyles.notice} role="status">

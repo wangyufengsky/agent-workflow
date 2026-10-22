@@ -22,24 +22,24 @@ describe('AI 规划流程的形状', () => {
     expect(Object.fromEntries(steps)).toEqual({ baseline: [], docs: ['baseline'], verify: [PLANNED, 'docs'] });
   });
 
-  it('规划步骤之前的 + 加最先的步骤，之后的加最后的步骤，并按画布上的位置排列', () => {
-    expect([insertPosition(shape, START, 'baseline'), insertPosition(shape, 'verify', END)]).toEqual([
+  it('没有最先或最后的步骤时，规划步骤前后的 + 加上它，并按画布上的位置排列', () => {
+    const middle = [step('docs')];
+    expect([insertPosition(middle, START, PLANNED), insertPosition(middle, PLANNED, END)]).toEqual([
       RequiredStepPosition.First,
       RequiredStepPosition.Last,
     ]);
-    expect(insertPosition(shape, 'baseline', 'docs')).toBeUndefined();
-    expect(order(insertRequired(shape, 'baseline', PLANNED, blank).steps)).toEqual([
-      'baseline:first',
-      'required_4:first',
-      'docs:-',
-      'verify:last',
-    ]);
-    expect(order(insertRequired(shape, PLANNED, 'verify', blank).steps)).toEqual([
-      'baseline:first',
-      'docs:-',
-      'required_4:last',
-      'verify:last',
-    ]);
+    expect(order(insertRequired(middle, START, PLANNED, blank).steps)).toEqual(['required_2:first', 'docs:-']);
+    expect(order(insertRequired(middle, PLANNED, END, blank).steps)).toEqual(['docs:-', 'required_2:last']);
     expect(order(addRequired(shape, blank).steps)).toEqual(['baseline:first', 'docs:-', 'required_4:-', 'verify:last']);
+  });
+
+  it('已有最先（最后）的步骤时它两侧没有 +：第二个最先（最后）的步骤没有计划能满足', () => {
+    expect([
+      insertPosition(shape, START, 'baseline'),
+      insertPosition(shape, 'baseline', PLANNED),
+      insertPosition(shape, PLANNED, 'verify'),
+      insertPosition(shape, 'verify', END),
+      insertPosition(shape, 'baseline', 'docs'),
+    ]).toEqual([undefined, undefined, undefined, undefined, undefined]);
   });
 });

@@ -34,11 +34,15 @@ export function shapeDependencies(steps: readonly RequiredStep[]): {
   return { steps: deps, planned };
 }
 
-/** Where a + on the edge `source` → `target` adds a step: before the planner's steps, after them, or nowhere. */
+/**
+ * Where a + on the edge `source` → `target` adds a step: right before the planner's steps when there is no `first`
+ * step yet, right after them when there is no `last` one, otherwise nowhere. A second `first` (or `last`) step could
+ * never be satisfied by a plan (`validateWorkflowDefinition`), so no + offers one.
+ */
 export function insertPosition(steps: readonly RequiredStep[], source: string, target: string) {
   const { first, last } = groupsOf(steps);
-  if (target === PLANNED || first.some((s) => s.key === target)) return RequiredStepPosition.First;
-  if (source === PLANNED || last.some((s) => s.key === source)) return RequiredStepPosition.Last;
+  if (target === PLANNED && first.length === 0) return RequiredStepPosition.First;
+  if (source === PLANNED && last.length === 0) return RequiredStepPosition.Last;
   return undefined;
 }
 
@@ -52,10 +56,7 @@ function freeKey(steps: readonly RequiredStep[]): string {
 
 type NewRequired = Pick<RequiredStep, 'title' | 'roleKey' | 'instructions'>;
 
-/**
- * Adds a step on the edge `source` → `target` (see `insertPosition`), in its place within its group; the array is
- * stored grouped (first, unplaced, last), which keeps the order the shape shows.
- */
+/** Adds the `first` or `last` step a + on the edge offers (`insertPosition`); the array keeps the shape's order. */
 export function insertRequired(
   steps: readonly RequiredStep[],
   source: string,
@@ -63,17 +64,10 @@ export function insertRequired(
   step: NewRequired,
 ): { steps: RequiredStep[]; key: string } {
   const key = freeKey(steps);
-  const { first, any, last } = groupsOf(steps);
-  const position = insertPosition(steps, source, target);
   const created = { ...step, key, dependsOn: [] };
-  if (position === RequiredStepPosition.First) {
-    const before = target === PLANNED ? first.length : first.findIndex((s) => s.key === target);
-    const next = { ...created, position };
-    return { steps: [...first.slice(0, before), next, ...first.slice(before), ...any, ...last], key };
-  }
-  const after = source === PLANNED ? 0 : last.findIndex((s) => s.key === source) + 1;
-  const next = { ...created, position: RequiredStepPosition.Last };
-  return { steps: [...first, ...any, ...last.slice(0, after), next, ...last.slice(after)], key };
+  return insertPosition(steps, source, target) === RequiredStepPosition.First
+    ? { steps: [{ ...created, position: RequiredStepPosition.First }, ...steps], key }
+    : { steps: [...steps, { ...created, position: RequiredStepPosition.Last }], key };
 }
 
 /** A step the plans must contain somewhere (no position). */

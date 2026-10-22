@@ -8,7 +8,8 @@ export function EditTools({
   addStep,
 }: {
   history: Pick<History<unknown>, 'undo' | 'redo' | 'canUndo' | 'canRedo'>;
-  addStep: () => void;
+  /** Undefined when no step can be added with a valid result (26 §5.4): the button is disabled. */
+  addStep: (() => void) | undefined;
 }) {
   return (
     <>
@@ -18,7 +19,7 @@ export function EditTools({
       <Button variant="ghost" size="sm" icon="redo" disabled={!history.canRedo} onClick={history.redo}>
         {C.redo}
       </Button>
-      <Button size="sm" icon="plus" onClick={addStep}>
+      <Button size="sm" icon="plus" disabled={addStep === undefined} onClick={addStep}>
         {C.addStep}
       </Button>
     </>

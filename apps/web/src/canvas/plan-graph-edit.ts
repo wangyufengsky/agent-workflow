@@ -1,13 +1,18 @@
 import {
   type Acceptance,
+  lockedChanges,
   NODE_KEY_PATTERN,
   type PlanGraph,
   type PlanNodeSpec,
+  PlanProblemCode,
+  type PlanRules,
   transitiveDependencies,
+  validatePlanGraph,
 } from '@aw/shared';
 import { START } from './layout.ts';
+import type { PlanLock } from './plan-check.ts';
 
-/** Edits of the plan editor (14 §5) as pure functions of the graph; validation is `validatePlanGraph`'s job. */
+/** Edits of the plan editor (26 §5) as pure functions of the graph; validation is `validatePlanGraph`'s job. */
 
 const mapNodes = (graph: PlanGraph, f: (n: PlanNodeSpec) => PlanNodeSpec): PlanGraph => ({ nodes: graph.nodes.map(f) });
 
@@ -61,6 +66,39 @@ export function addAtEnd(graph: PlanGraph, step: NewStep): Added {
   const key = freeKey(graph);
   const last = graph.nodes.filter((n) => !graph.nodes.some((m) => m.dependsOn.includes(n.key))).map((n) => n.key);
   return { graph: withNode(graph, { ...step, key, dependsOn: last }, (n) => n.dependsOn), key };
+}
+
+const orderProblems = (graph: PlanGraph, rules: PlanRules) =>
+  validatePlanGraph(graph, rules).filter((p) => p.code === PlanProblemCode.RequiredStepOrder).length;
+
+/**
+ * Whether an edit of `current` may be offered (26 §5.4): its result changes no more locked steps and breaks no more
+ * required-step positions than `current` already does.
+ */
+export function editGuard(
+  current: PlanGraph,
+  rules: PlanRules,
+  lock: PlanLock | undefined,
+): (next: PlanGraph) => boolean {
+  const lockedNow = lock === undefined ? 0 : lockedChanges(lock.base, current, lock.locked).length;
+  const orderNow = orderProblems(current, rules);
+  return (next) =>
+    (lock === undefined || lockedChanges(lock.base, next, lock.locked).length <= lockedNow) &&
+    orderProblems(next, rules) <= orderNow;
+}
+
+/**
+ * The toolbar's 添加步骤 (26 §5.1): after the selected step, else after all last steps, whichever the guard allows;
+ * undefined when neither is, and the button is disabled.
+ */
+export function addStep(
+  graph: PlanGraph,
+  selected: string | undefined,
+  step: NewStep,
+  allowed: (next: PlanGraph) => boolean,
+): Added | undefined {
+  const candidates = [...(selected === undefined ? [] : [addAfter(graph, selected, step)]), addAtEnd(graph, step)];
+  return candidates.find((c) => allowed(c.graph));
 }
 
 /**

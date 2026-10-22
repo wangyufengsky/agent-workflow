@@ -94,7 +94,9 @@ async function insideCanvas(page: Page, testId: string): Promise<boolean> {
   );
 }
 
-test('J23 画布：在连线上插入步骤 → 删除后前后自动相连 → 撤销 → 滑出后适应画布 → 保存', async ({ page, request }) => {
+test('J23 画布：在连线上插入步骤 → 滑出后适应画布 → 删除后前后自动相连 → 撤销 → 保存', async ({ page, request }) => {
+  // View moves are instant, so where the view is can be checked right after each step.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const project = await createProject(request, null);
   await startBugfix(page, project, '导出的报表缺少最后一行', true);
   await page.getByRole('button', { name: '编辑计划' }).click();
@@ -105,9 +107,20 @@ test('J23 画布：在连线上插入步骤 → 删除后前后自动相连 → 
   await expect(editor.getByTestId('step-step_3')).toBeVisible();
   const form = editor.getByTestId('plan-node-form');
   await form.getByLabel('标题').fill('写复现测试');
-  await form.getByLabel('指令').fill('写一个失败的测试复现缺少最后一行');
   await expect(editor.getByRole('button', { name: '在「定位根因」和「写复现测试」之间插入步骤' })).toBeVisible();
   await expect(editor.getByRole('button', { name: '在「写复现测试」和「修复」之间插入步骤' })).toBeVisible();
+
+  // Scrolled far away, the view stays there while the step is edited, and 适应画布 brings every step back.
+  await page.getByRole('region', { name: '计划画布' }).hover();
+  await page.mouse.wheel(2000, 0);
+  await expect.poll(() => insideCanvas(page, 'step-step_3')).toBe(false);
+  await form.getByLabel('指令').fill('写一个失败的测试复现缺少最后一行');
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(done)));
+  expect(await insideCanvas(page, 'step-step_3')).toBe(false);
+  await editor.getByRole('button', { name: '适应画布' }).click();
+  for (const step of ['step-locate', 'step-step_3', 'step-fix']) {
+    await expect.poll(() => insideCanvas(page, step)).toBe(true);
+  }
 
   // − removes it and joins its neighbours again; undo brings it back.
   await editor.getByRole('button', { name: '删除「写复现测试」' }).click();
@@ -115,15 +128,6 @@ test('J23 画布：在连线上插入步骤 → 删除后前后自动相连 → 
   await expect(editor.getByRole('button', { name: '在「定位根因」和「修复」之间插入步骤' })).toBeVisible();
   await editor.getByRole('status').getByRole('button', { name: '撤销' }).click();
   await expect(editor.getByTestId('step-step_3')).toBeVisible();
-
-  // Scrolled far away, 适应画布 brings every step back into view.
-  await page.getByRole('region', { name: '计划画布' }).hover();
-  await page.mouse.wheel(2000, 0);
-  await expect.poll(() => insideCanvas(page, 'step-locate')).toBe(false);
-  await editor.getByRole('button', { name: '适应画布' }).click();
-  for (const step of ['step-locate', 'step-step_3', 'step-fix']) {
-    await expect.poll(() => insideCanvas(page, step)).toBe(true);
-  }
 
   await editor.getByRole('button', { name: '保存修改' }).click();
   await expect(page.getByText('AI 的计划 · 第 2 版')).toBeVisible();
