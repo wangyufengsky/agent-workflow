@@ -41,7 +41,7 @@ export const KNOWLEDGE_COPY = {
   } satisfies Record<KnowledgeTurnStatus, string>,
   process: '研究过程',
   processSummary: (reads: number, seconds: number | null) =>
-    `研究过程 · 读取 ${reads} 份原文${seconds === null ? '' : ` · 用时 ${seconds}s`}`,
+    `读取 ${reads} 份原文${seconds === null ? '' : ` · 用时 ${seconds} 秒`}`,
   step: {
     understand: '理解问题',
     search: '检索资料',
@@ -49,7 +49,6 @@ export const KNOWLEDGE_COPY = {
     answer: '组织回答',
   } satisfies Record<ResearchStep, string>,
   searches: (n: number) => `检索 ${n} 次`,
-  reads: (n: number) => `已读 ${n} 份`,
   rejected: '引用有误，正在修正',
   waiting: '等待中',
   awaitingInput: '研究员想运行一条只读白名单以外的命令，等待你允许。',
@@ -75,7 +74,6 @@ export const KNOWLEDGE_COPY = {
   rowsTruncated: '只显示前几行。',
   openInBrowser: '在浏览器中打开',
   details: '显示详细信息',
-  transcript: '会话流',
   model: (model: string | null) => `模型：${model ?? '默认'}`,
   usage: (input: number | null, output: number | null, cost: number | null) =>
     `用量：输入 ${input ?? 0} · 输出 ${output ?? 0} tokens${cost === null ? '' : ` · $${cost.toFixed(4)}`}`,

@@ -1,7 +1,6 @@
 import { AcceptanceCheckKind, AttemptKind, type CheckResult, type NodeDetailDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { useEffect, useRef, useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { DiffBrowser } from '../../components/diff/diff-browser.tsx';
 import { Drawer } from '../../components/drawer.tsx';
@@ -9,9 +8,10 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { StatusBadge } from '../../components/status-badge.tsx';
 import { Tabs } from '../../components/tabs.tsx';
+import { STREAM_COPY } from '../../copy/attempts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { NODE_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
-import { ProcessView } from '../attempts/process-view.tsx';
+import { ConversationStream } from '../stream/conversation-stream.tsx';
 import { NodeBadge } from '../tasks/task-badge.tsx';
 import { nodeDiffFileQuery, nodeDiffQuery, nodeQuery } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
@@ -120,27 +120,18 @@ export function Changes({ node }: { node: NodeDetailDTO }) {
   );
 }
 
-/** The step's latest execute attempt in the simple view, following new lines while running (14 §3.4「过程」). */
+/** The step's latest execute attempt in the simple view (14 §3.4「过程」, 25 §3). */
 export function Process({ node }: { node: NodeDetailDTO }) {
-  const [follow, setFollow] = useState(true);
-  const end = useRef<HTMLDivElement>(null);
   const attempt = latestExecute(node);
-  useEffect(() => {
-    if (follow) end.current?.scrollIntoView({ block: 'end' });
-  });
   if (attempt === undefined) return <p className="hint">{C.noAttempt}</p>;
   return (
-    <div className="col">
-      <span className="row">
-        <span className="hint grow">{C.attemptOf(attempt.seq)}</span>
-        <label className="check">
-          <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
-          <span>{C.follow}</span>
-        </label>
-      </span>
-      <ProcessView attemptId={attempt.id} progress={attempt.endedAt === null ? attempt.progress : null} />
-      <div ref={end} />
-    </div>
+    <ConversationStream
+      key={attempt.id}
+      attemptId={attempt.id}
+      title={STREAM_COPY.processTitle}
+      pro={false}
+      size="drawer"
+    />
   );
 }
 

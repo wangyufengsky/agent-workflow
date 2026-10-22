@@ -9,7 +9,7 @@ const text = (t: string): TranscriptEntry => ({
   ts: 0,
   partId: `p${seq}`,
   kind: TranscriptEntryKind.Text,
-  data: { text: t },
+  data: { text: t, offset: 0 },
 });
 const call = (tool: string): TranscriptEntry => ({
   seq: ++seq,

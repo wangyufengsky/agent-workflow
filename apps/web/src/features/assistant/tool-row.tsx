@@ -46,9 +46,7 @@ export function ToolRow({
       <span className={styles.actionIcon} aria-hidden="true">
         {state === 'running' ? <span className={styles.actionPulse} /> : <Icon name={STATE_ICON[state]} size="sm" />}
       </span>
-      <span className={state === 'running' ? `${styles.actionTitle} ${styles.shimmer}` : styles.actionTitle}>
-        {info.title}
-      </span>
+      <span className={state === 'running' ? `${styles.actionTitle} shimmer` : styles.actionTitle}>{info.title}</span>
       {info.subject !== undefined && <span className={styles.actionSubject}>{info.subject}</span>}
       {state === 'failed' && <span className={styles.actionNote}>{C.toolFailed}</span>}
       {state === 'stopped' && <span className={styles.actionNote}>{C.toolStopped}</span>}

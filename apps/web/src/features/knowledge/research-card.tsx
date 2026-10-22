@@ -1,56 +1,54 @@
 import { type KnowledgeTurnDTO, KnowledgeTurnStatus, type TranscriptEntry } from '@aw/shared';
 import { Link } from '@tanstack/react-router';
-import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { Icon } from '../../components/icon.tsx';
 import { KNOWLEDGE_COPY as C } from '../../copy/knowledge.ts';
+import { ConversationStream } from '../stream/conversation-stream.tsx';
 import styles from './knowledge.module.css';
 import { RESEARCH_STEPS, researchSteps } from './research-steps.ts';
 
-/** Reads listed on the card; the rest are counted. */
-const READS_SHOWN = 8;
+/** The four stages in one line, the current one marked (18 §2.1). */
+function Stages({ progress }: { progress: ReturnType<typeof researchSteps> }) {
+  const currentIndex = RESEARCH_STEPS.indexOf(progress.current);
+  return (
+    <span className={styles.stages}>
+      {RESEARCH_STEPS.map((step, i) => {
+        const state = i < currentIndex ? 'done' : i === currentIndex ? 'current' : 'pending';
+        return (
+          <span key={step} className={styles.stage} data-state={state}>
+            {state === 'done' && <Icon name="check" size="sm" />}
+            {C.step[step]}
+            {step === 'search' && progress.searches > 0 && ` ${C.searches(progress.searches)}`}
+            {step === 'answer' && progress.rejected && ` · ${C.rejected}`}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 
 /**
- * The research process of one question (18 §2.1): open while researching, folded into one line once there is an
- * answer. The stages come from the turn's session stream.
+ * The research process of one question (18 §2.1, 25 §3): the turn's conversation stream in a box, the stages in its
+ * header while researching; folded into one line once there is an answer.
  */
 export function ResearchCard({
   turn,
   entries,
   repoPath,
+  pro,
 }: {
   turn: KnowledgeTurnDTO;
   /** The turn's session stream. */
   entries: readonly TranscriptEntry[];
   repoPath: string;
+  pro: boolean;
 }) {
   const progress = researchSteps(entries, repoPath);
   const researching = turn.status === KnowledgeTurnStatus.Researching;
-  const [open, setOpen] = useState<boolean | undefined>(undefined);
   const { startedAt, endedAt } = turn.attempt;
   const seconds = endedAt === null ? null : Math.max(1, Math.round((endedAt - startedAt) / 1000));
-  const currentIndex = RESEARCH_STEPS.indexOf(progress.current);
-
   return (
-    <details
-      className={styles.process}
-      open={open ?? researching}
-      onToggle={(e) => setOpen(e.currentTarget.open)}
-      data-testid="research-process"
-    >
-      <summary className={styles.processHead}>
-        {researching ? (
-          <>
-            <span className="dot pulse" aria-hidden="true" />
-            <span>
-              {C.process} · {C.step[progress.current]}
-            </span>
-            {turn.attempt.progress !== null && <span className="hint ellipsis">{turn.attempt.progress}</span>}
-          </>
-        ) : (
-          <span>{C.processSummary(progress.reads.length, seconds)}</span>
-        )}
-      </summary>
+    <>
       {turn.awaitingInput && (
         <p className={styles.waiting}>
           <Icon name="alert" size="sm" />
@@ -60,37 +58,14 @@ export function ResearchCard({
           </Link>
         </p>
       )}
-      <ol className={styles.steps}>
-        {RESEARCH_STEPS.map((step, i) => {
-          const state = i < currentIndex || !researching ? 'done' : i === currentIndex ? 'current' : 'pending';
-          return (
-            <li key={step} className={styles.step} data-state={state}>
-              <span className={styles.stepMark} aria-hidden="true">
-                {state === 'done' ? <Icon name="check" size="sm" /> : i + 1}
-              </span>
-              <span className="col grow">
-                <span>{C.step[step]}</span>
-                {step === 'search' && progress.searches > 0 && (
-                  <span className="hint">{C.searches(progress.searches)}</span>
-                )}
-                {step === 'read' && progress.reads.length > 0 && (
-                  <span className={styles.reads}>
-                    {progress.reads.slice(0, READS_SHOWN).map((read) => (
-                      <span key={read} className="mono ellipsis">
-                        {read}
-                      </span>
-                    ))}
-                    {progress.reads.length > READS_SHOWN && (
-                      <span className="hint">{C.reads(progress.reads.length)}</span>
-                    )}
-                  </span>
-                )}
-                {step === 'answer' && progress.rejected && researching && <span className="hint">{C.rejected}</span>}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-    </details>
+      <ConversationStream
+        attemptId={turn.attempt.id}
+        title={C.process}
+        summary={researching ? <Stages progress={progress} /> : C.processSummary(progress.reads.length, seconds)}
+        pro={pro}
+        size="card"
+        testId="research-process"
+      />
+    </>
   );
 }
