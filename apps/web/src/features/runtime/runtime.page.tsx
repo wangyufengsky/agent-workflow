@@ -89,7 +89,7 @@ function RuntimePanel() {
         ) : (
           <span className="row">
             <span className="hint">{C.notHostable}</span>
-            <Link to={ROUTES.onboarding}>{C.openOnboarding}</Link>
+            <Link to={ROUTES.environment}>{C.openOnboarding}</Link>
           </span>
         )
       }

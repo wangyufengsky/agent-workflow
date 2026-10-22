@@ -1,7 +1,7 @@
 import { type EnvironmentDTO, type Platform, RuntimeStatus, StatusTone } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -122,53 +122,79 @@ function CredentialsCheck({ environment }: { environment: EnvironmentDTO }) {
   );
 }
 
-/** First-run checks, then the first project (14 §3.1). */
-export function OnboardingPage() {
+/**
+ * The environment checks (14 §3.1) under a page head with「重新检测」; the first-run page adds the first project below
+ * them once everything is ready.
+ */
+export function EnvironmentChecks({
+  title,
+  lede,
+  children,
+}: {
+  title: string;
+  lede: string;
+  children?: (environment: EnvironmentDTO) => ReactNode;
+}) {
   const environment = useQuery(environmentQuery);
   const recheck = useRecheckEnvironment();
-  const navigate = useNavigate();
-
   return (
-    <div className="content">
-      <div className="page narrow">
-        <div className="page-head">
-          <div className="grow">
-            <h1 className="title">{C.title}</h1>
-            <p className="lede">{C.lede}</p>
-          </div>
-          <Button icon="refresh" pending={recheck.isPending} onClick={() => recheck.mutate()}>
-            {C.recheck}
-          </Button>
+    <div className="page narrow">
+      <div className="page-head">
+        <div className="grow">
+          <h1 className="title">{title}</h1>
+          <p className="lede">{lede}</p>
         </div>
-        {environment.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
-        {environment.isError && <ErrorState error={environment.error} onRetry={() => void environment.refetch()} />}
-        {environment.data !== undefined && (
-          <>
-            <div className="card list list-sep">
-              <GitCheck git={environment.data.git} platform={environment.data.platform} />
-              <OpencodeCheck
-                opencode={environment.data.opencode}
-                platform={environment.data.platform}
-                onRecheck={() => recheck.mutate()}
-              />
-              <ModelsCheck environment={environment.data} />
-              <CredentialsCheck environment={environment.data} />
-            </div>
-            <section className="section">
-              <div className="section-head">
-                <h2 className="section-title">{C.addFirstProject}</h2>
-              </div>
-              <p className="hint">{C.addFirstProjectHint}</p>
-              <div className="divider" />
-              {environment.data.ready ? (
-                <AddProjectForm onAdded={() => void navigate({ to: ROUTES.home })} />
-              ) : (
-                <div className="banner warn">{C.envNotReady}</div>
-              )}
-            </section>
-          </>
-        )}
+        <Button icon="refresh" pending={recheck.isPending} onClick={() => recheck.mutate()}>
+          {C.recheck}
+        </Button>
       </div>
+      {environment.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
+      {environment.isError && <ErrorState error={environment.error} onRetry={() => void environment.refetch()} />}
+      {environment.data !== undefined && (
+        <>
+          <div className="card list list-sep">
+            <GitCheck git={environment.data.git} platform={environment.data.platform} />
+            <OpencodeCheck
+              opencode={environment.data.opencode}
+              platform={environment.data.platform}
+              onRecheck={() => recheck.mutate()}
+            />
+            <ModelsCheck environment={environment.data} />
+            <CredentialsCheck environment={environment.data} />
+          </div>
+          {children?.(environment.data)}
+        </>
+      )}
     </div>
   );
+}
+
+/** First-run checks, then the first project (14 §3.1); outside the shell, shown only while there is no project. */
+export function OnboardingPage() {
+  const navigate = useNavigate();
+  return (
+    <div className="content">
+      <EnvironmentChecks title={C.title} lede={C.lede}>
+        {(environment) => (
+          <section className="section">
+            <div className="section-head">
+              <h2 className="section-title">{C.addFirstProject}</h2>
+            </div>
+            <p className="hint">{C.addFirstProjectHint}</p>
+            <div className="divider" />
+            {environment.ready ? (
+              <AddProjectForm onAdded={() => void navigate({ to: ROUTES.home })} />
+            ) : (
+              <div className="banner warn">{C.envNotReady}</div>
+            )}
+          </section>
+        )}
+      </EnvironmentChecks>
+    </div>
+  );
+}
+
+/** The same checks inside the shell (14 §3.1a): where the sidebar's runtime chip leads in simple mode. */
+export function EnvironmentPage() {
+  return <EnvironmentChecks title={C.environmentTitle} lede={C.environmentLede} />;
 }
