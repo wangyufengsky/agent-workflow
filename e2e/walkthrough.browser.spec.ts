@@ -8,6 +8,7 @@ import {
   createProject,
   createRepo,
   type E2EProject,
+  type FakeStep,
   passReview,
   patchSettings,
   queueAssistantTurn,
@@ -222,7 +223,10 @@ async function seed(request: APIRequestContext): Promise<Seed> {
       submitResult('找到了根因：时区换算用了服务器本地时区。'),
     ]);
     await queueTurn(request, project, { title: '修复' }, [
+      { type: 'think', text: 'The timestamps are formatted with the server time zone.\nConvert in UTC instead.' },
       { type: 'text', text: '时区换算用了服务器本地时区，改为统一按 UTC 换算。' },
+      { type: 'tool', tool: 'read', input: { filePath: file } },
+      { type: 'tool', tool: 'grep', input: { pattern: 'toLocal' } },
       { type: 'edit', file, content: 'export const toLocal = (t: number) => new Date(t).toISOString();\n' },
       { type: 'tool', tool: 'bash', input: { command: 'pnpm test' } },
       submitResult('统一按 UTC 换算，并补充了 `toLocal` 的说明。'),
@@ -241,8 +245,21 @@ async function seed(request: APIRequestContext): Promise<Seed> {
   const runningProject = await createProject(request, null);
   await queueTurn(request, runningProject, { title: '定位根因' }, [
     { type: 'text', text: '先看导出逻辑，确认最后一行是在哪里丢的。' },
-    { type: 'tool', tool: 'read', input: { filePath: 'src/export.ts' } },
+    { type: 'think', text: 'The export drops the last row.\nThe loop bound in buildRows() looks off by one.' },
+    ...Array.from(
+      { length: 12 },
+      (_, i): FakeStep => ({
+        type: 'tool',
+        tool: 'read',
+        input: { filePath: `src/export/part-${i}.ts` },
+      }),
+    ),
     { type: 'callTool', name: 'report_progress', args: { message: '正在复现缺少最后一行的问题' } },
+    // Still thinking when the walkthrough looks: the stream shows its last lines live (25 §4.2).
+    {
+      type: 'think',
+      text: 'The test should fail for the right reason: 3 rows expected, 2 exported.\nThen fix the bound to i < rows.length.',
+    },
     { type: 'hang' },
   ]);
   const running = await startWorkflow(request, runningProject, 'bugfix', '导出的报表缺少最后一行');
@@ -516,6 +533,17 @@ const SHOTS: Shot[] = [
     open: async (page) => page.getByRole('dialog'),
   },
   {
+    // Scrolled up while the stream follows: 「回到最新」(25 §4.1).
+    name: 'task-running-drawer-latest',
+    mode: UiMode.Simple,
+    url: (s) => `/tasks/${s.running.id}?node=${node(s.running, 'locate')}&open=true`,
+    ready: testId('stream-scroll'),
+    open: async (page) => {
+      await page.getByTestId('stream-scroll').evaluate((el) => el.scrollTo({ top: 0 }));
+      return page.getByRole('button', { name: /回到最新/ });
+    },
+  },
+  {
     name: 'task-question',
     mode: UiMode.Simple,
     url: (s) => `/tasks/${s.question.id}`,
@@ -562,6 +590,29 @@ const SHOTS: Shot[] = [
     mode: UiMode.Simple,
     url: (s) => `/tasks/${s.review.id}/nodes/${node(s.review, 'fix')}`,
     ready: testId('node-page'),
+  },
+  {
+    // An ended step's process folds to one line (25 §4.5).
+    name: 'node-page-process',
+    mode: UiMode.Simple,
+    url: (s) => `/tasks/${s.review.id}/nodes/${node(s.review, 'fix')}`,
+    ready: testId('node-page'),
+    open: async (page) => {
+      await page.getByRole('tab', { name: '过程' }).click();
+      return page.getByTestId('conversation-stream');
+    },
+  },
+  {
+    // Opened: the calls in a row fold into a group, the thinking is folded (25 §4.2, §4.3).
+    name: 'node-page-process-open',
+    mode: UiMode.Simple,
+    url: (s) => `/tasks/${s.review.id}/nodes/${node(s.review, 'fix')}`,
+    ready: testId('node-page'),
+    open: async (page) => {
+      await page.getByRole('tab', { name: '过程' }).click();
+      await page.getByRole('button', { name: /执行过程/ }).click();
+      return page.getByTestId('stream-group');
+    },
   },
   { name: 'inbox', mode: UiMode.Simple, url: () => '/inbox', ready: testId('inbox-question') },
   {
@@ -723,7 +774,14 @@ const SHOTS: Shot[] = [
     name: 'pro-node-page',
     mode: UiMode.Pro,
     url: (s) => `/tasks/${s.review.id}/nodes/${node(s.review, 'fix')}`,
-    ready: testId('transcript'),
+    ready: testId('conversation-stream'),
+    open: async (page) => {
+      await page.getByRole('button', { name: /执行 #1/ }).click();
+      // Ended, so the calls in a row are folded into a group first.
+      await page.getByTestId('stream-group').first().getByRole('button').first().click();
+      await page.getByTestId('stream-action').first().getByRole('button').click();
+      return page.getByText('内部工具名').first();
+    },
   },
   { name: 'pro-project', mode: UiMode.Pro, url: (s) => `/projects/${s.project.id}`, ready: heading(/.+/) },
   { name: 'pro-settings', mode: UiMode.Pro, url: () => '/settings', ready: (page) => page.getByText('专业设置') },
@@ -771,9 +829,11 @@ const SHOTS: Shot[] = [
     url: (s) => `/knowledge/${s.knowledge.id}`,
     ready: testId('knowledge-turn'),
     open: async (page) => {
-      const details = page.getByText('会话流');
-      await details.click();
-      return page.getByTestId('knowledge-turn');
+      await page
+        .getByTestId('research-process')
+        .getByRole('button', { name: /研究过程/ })
+        .click();
+      return page.getByTestId('stream-scroll');
     },
   },
   {

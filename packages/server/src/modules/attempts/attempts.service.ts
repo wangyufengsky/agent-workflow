@@ -4,19 +4,17 @@ import {
   AppError,
   type AttemptDTO,
   AttemptEvent,
-  AttemptKind,
+  type AttemptKind,
   AttemptStatus,
   type AttemptSummaryDTO,
   attemptMachine,
   BASH_PERMISSION,
   ErrorCode,
   isTerminalState,
-  KNOWLEDGE_DRAFT_FLUSH_CHARS,
   OPENCODE_AGENT_NAME,
   PermissionDecision,
   type PermissionPayload,
   type SessionAgent,
-  TRANSCRIPT_TEXT_FLUSH_CHARS,
   type TranscriptPage,
   TranscriptSystemEvent,
 } from '@aw/shared';
@@ -94,10 +92,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     const { promise: released, resolve: release } = Promise.withResolvers<void>();
     const tracked: LiveSession = {
       ...session,
-      // A research answer streams as its draft (18 §5.5): its text is written to the transcript more often.
-      view: createSessionView(
-        attempt.kind === AttemptKind.Research ? KNOWLEDGE_DRAFT_FLUSH_CHARS : TRANSCRIPT_TEXT_FLUSH_CHARS,
-      ),
+      view: createSessionView(),
       timeoutMs,
       cancelTimeout: parked ? () => undefined : clock.schedule(timeoutMs, () => reactions.timeOut(attempt.id)),
       stopAfterSubmit: false,

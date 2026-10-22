@@ -7,6 +7,7 @@ import type { FakeOpencode, FakeStep } from './fake-opencode.ts';
 const stepSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('edit'), file: z.string(), content: z.string() }),
   z.object({ type: z.literal('text'), text: z.string() }),
+  z.object({ type: z.literal('think'), text: z.string() }),
   z.object({
     type: z.literal('tool'),
     tool: z.string(),

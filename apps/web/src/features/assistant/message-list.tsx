@@ -9,7 +9,7 @@ import {
   UiMode,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, type ReactNode, useMemo, useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
@@ -19,6 +19,10 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { useTranscript } from '../attempts/attempt.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
+import { LatestButton } from '../stream/latest-button.tsx';
+import { thinkingSeconds } from '../stream/stream-items.ts';
+import { ThinkingBlock } from '../stream/thinking-block.tsx';
+import { useStickToBottom } from '../stream/use-stick-to-bottom.ts';
 import styles from './assistant.module.css';
 import {
   assistantFilesQuery,
@@ -114,8 +118,10 @@ type Rendered = {
   pro: boolean;
   /** Where the latest turn starts: the last user message's `seq`. */
   turnStart: number;
-  /** The text the assistant is writing right now gets a typing caret. */
-  streamingKey: string | number | undefined;
+  /** The text or thinking the assistant is writing right now (a typing caret, the thinking's last lines). */
+  writingKey: string | number | undefined;
+  /** How long each thinking part took, by `partId`. */
+  seconds: ReadonlyMap<string, number>;
 };
 
 const keyOf = (entry: TranscriptEntry) => ('partId' in entry ? entry.partId : entry.seq);
@@ -130,24 +136,17 @@ function Body({ entry, ctx }: { entry: TranscriptEntry; ctx: Rendered }): ReactN
       );
     case TranscriptEntryKind.Text:
       return (
-        <div className={ctx.streamingKey === keyOf(entry) ? `${styles.reply} ${styles.streaming}` : styles.reply}>
+        <div className={ctx.writingKey === keyOf(entry) ? `${styles.reply} ${styles.streaming}` : styles.reply}>
           <ReplyMarkdown source={entry.data.text} />
         </div>
       );
     case TranscriptEntryKind.Reasoning:
       return (
-        <details className={cards.action}>
-          <summary className={cards.actionHead}>
-            <span className={cards.actionIcon} aria-hidden="true">
-              <Icon name="sparkle" size="sm" />
-            </span>
-            <span className={cards.actionTitle}>{C.reasoning}</span>
-            <span className={cards.actionChevron} aria-hidden="true">
-              <Icon name="chevRight" size="sm" />
-            </span>
-          </summary>
-          <p className={cards.actionBody}>{entry.data.text}</p>
-        </details>
+        <ThinkingBlock
+          text={entry.data.text}
+          seconds={ctx.seconds.get(entry.partId)}
+          writing={ctx.writingKey === entry.partId}
+        />
       );
     case TranscriptEntryKind.ToolCall: {
       const result = ctx.results.get(entry.data.callId);
@@ -213,7 +212,7 @@ function Thinking() {
   return (
     <div className={`${styles.message} ${styles.thinking}`} role="status" data-testid="assistant-thinking">
       <span className={styles.orb} data-busy aria-hidden="true" />
-      <span className={cards.shimmer}>{C.thinking}</span>
+      <span className="shimmer">{C.thinking}</span>
     </div>
   );
 }
@@ -229,7 +228,6 @@ function Stream({
   const pro = useSettings()['ui.mode'] === UiMode.Pro;
   // What was there when the conversation opened is staggered; what arrives later fades in at once.
   const [opened] = useState(entries.length);
-  const end = useRef<HTMLDivElement>(null);
   const last = entries.at(-1);
   const results = useMemo(
     () =>
@@ -237,8 +235,9 @@ function Stream({
     [entries],
   );
   const turnStart = entries.findLast((e) => e.kind === TranscriptEntryKind.UserMessage)?.seq ?? -1;
-  const streamingKey =
-    conversation.busy && last?.kind === TranscriptEntryKind.Text && last.data.text !== '' ? keyOf(last) : undefined;
+  const writingKey =
+    conversation.busy && last !== undefined && 'partId' in last && last.data.text !== '' ? keyOf(last) : undefined;
+  const seconds = useMemo(() => thinkingSeconds(entries), [entries]);
   const ctx = useMemo<Rendered>(
     () => ({
       conversation,
@@ -246,32 +245,41 @@ function Stream({
       results,
       pro,
       turnStart,
-      streamingKey,
+      writingKey,
+      seconds,
     }),
-    [conversation, confirmations, results, pro, turnStart, streamingKey],
+    [conversation, confirmations, results, pro, turnStart, writingKey, seconds],
   );
-  // Writing text shows its caret and a running call its own shimmer; otherwise the panel shows it is thinking.
+  // Writing text or thinking shows itself and a running call its own shimmer; otherwise the panel shows it is thinking.
   const runningCall = last?.kind === TranscriptEntryKind.ToolCall && !results.has(last.data.callId);
-  const thinking = conversation.busy && streamingKey === undefined && !runningCall;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scrolls when a message arrives or grows.
-  useEffect(() => {
-    // Newer browsers return a promise from scrollIntoView; an effect may only return its clean-up.
-    void end.current?.scrollIntoView({ block: 'end' });
-  }, [entries.length, last, conversation.busy, confirmations]);
+  const thinking = conversation.busy && writingKey === undefined && !runningCall;
+  const lastLength = last !== undefined && 'partId' in last ? last.data.text.length : 0;
+  // Follows the newest message until the user scrolls up (25 §4.1).
+  const stick = useStickToBottom(
+    `${entries.length}:${lastLength}:${conversation.busy}:${confirmations?.length ?? 0}`,
+    entries.length,
+  );
 
-  if (entries.length === 0 && !conversation.busy) return <AssistantWelcome conversation={conversation} />;
+  if (entries.length === 0 && !conversation.busy)
+    return (
+      <div className={styles.feed}>
+        <AssistantWelcome conversation={conversation} />
+      </div>
+    );
   return (
     <>
-      {entries.map((entry, i) => (
-        <Message
-          key={keyOf(entry)}
-          entry={entry}
-          ctx={ctx}
-          step={i < opened ? Math.max(0, STAGGER_STEPS - (opened - i)) : 0}
-        />
-      ))}
-      {thinking && <Thinking />}
-      <div ref={end} />
+      <div className={styles.feed} ref={stick.ref} onScroll={stick.onScroll}>
+        {entries.map((entry, i) => (
+          <Message
+            key={keyOf(entry)}
+            entry={entry}
+            ctx={ctx}
+            step={i < opened ? Math.max(0, STAGGER_STEPS - (opened - i)) : 0}
+          />
+        ))}
+        {thinking && <Thinking />}
+      </div>
+      {!stick.following && <LatestButton unseen={stick.unseen} onClick={stick.toLatest} />}
     </>
   );
 }
@@ -279,9 +287,15 @@ function Stream({
 /** The conversation's message stream (15 §6), kept scrolled to the newest message. */
 export function MessageList({ conversation }: { conversation: AssistantConversationDTO }) {
   const { pages, entries } = useTranscript(conversationTranscript(conversation.id));
-  if (pages.data === undefined) {
-    if (pages.isError) return <ErrorState error={pages.error} onRetry={() => void pages.refetch()} />;
-    return <p className="hint">{COMMON_COPY.loading}</p>;
-  }
+  if (pages.data === undefined)
+    return (
+      <div className={styles.feed}>
+        {pages.isError ? (
+          <ErrorState error={pages.error} onRetry={() => void pages.refetch()} />
+        ) : (
+          <p className="hint">{COMMON_COPY.loading}</p>
+        )}
+      </div>
+    );
   return <Stream conversation={conversation} entries={entries} />;
 }

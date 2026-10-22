@@ -8,8 +8,8 @@ export const DB_QUERY_TIMEOUT_MS = 15_000;
 /** Opening a connection to a project database (test, schema, the AI's database tools). */
 export const DB_CONNECT_TIMEOUT_MS = 10_000;
 export const TRANSCRIPT_PAGE_SIZE = 200;
-/** A streaming text part is written to the transcript again once it grew by this many characters (10 §3). */
-export const TRANSCRIPT_TEXT_FLUSH_CHARS = 200;
+/** A streaming text or reasoning part writes the characters it grew by once there are this many (10 §3, D104). */
+export const TRANSCRIPT_TEXT_FLUSH_CHARS = 32;
 /** SSE events kept in memory for `Last-Event-ID` replay. */
 export const SSE_REPLAY_BUFFER = 1000;
 export const DIFF_FILE_MAX_BYTES = 1_048_576;
@@ -58,8 +58,6 @@ export const KNOWLEDGE_SOURCE_CONTEXT_LINES = 40;
 export const KNOWLEDGE_QUERY_ROWS = 50;
 /** The latest answer's excerpt in the conversation list. */
 export const KNOWLEDGE_ANSWER_EXCERPT_CHARS = 160;
-/** A research attempt's streaming text is written to its transcript this often, so the answer draft streams (18 §5.5). */
-export const KNOWLEDGE_DRAFT_FLUSH_CHARS = 24;
 /** Days a custom quality and usage period may span (19 §2.2). */
 export const INSIGHTS_MAX_DAYS = 366;
 /** PPT (23 §10). */

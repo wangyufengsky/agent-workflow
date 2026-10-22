@@ -1,0 +1,534 @@
+/* 会话流原型样式（docs/25）：只用主题令牌与 base.css 的尺度变量；实现时迁入 features/stream/stream.module.css。 */
+
+/* ---------- 容器 ---------- */
+.cs {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  overflow: hidden;
+}
+/* 工作中：顶边一道流光（D84 的 edge-flow，颜色取运行色）。 */
+.cs[data-state="running"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--run) 45%, var(--accent) 55%, transparent) -100% 0 / 50% 100% no-repeat;
+  animation: edge-flow 2.4s var(--ease) infinite;
+  z-index: 2;
+}
+@keyframes edge-flow {
+  to {
+    background-position: 200% 0;
+  }
+}
+.cs-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 44px;
+  padding: 0 var(--s-3) 0 var(--s-4);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  cursor: pointer;
+  user-select: none;
+}
+.cs-head:hover {
+  background: var(--fill-1);
+}
+.cs[data-open="true"] .cs-head {
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.cs-title {
+  font-weight: 600;
+  color: var(--ink);
+  flex: none;
+}
+.cs-meta {
+  color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-now {
+  color: var(--run);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-chev {
+  margin-left: auto;
+  display: inline-flex;
+  color: var(--muted);
+  transition: transform var(--t-mid) var(--ease);
+}
+.cs[data-open="true"] .cs-chev {
+  transform: rotate(90deg);
+}
+.cs-state {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+.cs[data-state="done"] .cs-state {
+  color: var(--ok);
+  background: var(--ok-fill);
+}
+.cs[data-state="failed"] .cs-state {
+  color: var(--danger);
+  background: var(--danger-fill);
+}
+.cs[data-state="running"] .cs-state {
+  color: var(--run);
+}
+.cs-body {
+  position: relative;
+  display: none;
+  min-height: 0;
+}
+.cs[data-open="true"] .cs-body {
+  display: flex;
+  flex-direction: column;
+  animation: body-in var(--t-mid) var(--ease);
+}
+@keyframes body-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.cs-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--s-3) var(--s-4) var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  overflow-wrap: anywhere;
+}
+/* 回到最新：用户上翻后出现，点击回到底部并恢复跟随。 */
+.cs-latest {
+  position: absolute;
+  left: 50%;
+  bottom: var(--s-3);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-2);
+  background: var(--raised);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  box-shadow: var(--shadow-card);
+  animation: latest-in var(--t-mid) var(--ease-spring);
+  z-index: 3;
+}
+.cs-latest .n {
+  color: var(--accent);
+}
+@keyframes latest-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.96);
+  }
+}
+
+/* ---------- 条目 ---------- */
+.it {
+  animation: item-in 0.32s var(--ease) both;
+}
+@keyframes item-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.it-text {
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--ink-2);
+  padding: 2px 0;
+}
+.it-text > * + * {
+  margin-top: 6px;
+}
+.it-text code {
+  font: 12.25px var(--font-mono);
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--fill-3);
+  color: var(--ink);
+}
+.it-text pre {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-sunken);
+  font: 12px/1.7 var(--font-mono);
+  color: var(--ink-2);
+  overflow-x: auto;
+  white-space: pre;
+}
+/* 正在写：行尾闪烁的打字光标。 */
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -2px;
+  border-radius: 1.5px;
+  background: var(--accent);
+  animation: caret 1.05s steps(2, jump-none) infinite;
+}
+@keyframes caret {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+/* 思考 */
+.it-think {
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--fill-1);
+}
+.it-think-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: var(--fs-sm);
+  color: var(--sub);
+  cursor: pointer;
+}
+.it-think-h:hover {
+  color: var(--ink);
+}
+.it-think-h .ic {
+  color: var(--accent);
+  display: inline-flex;
+}
+.it-think-h .lbl {
+  flex: none;
+}
+.it-think-h .pv {
+  color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: italic;
+}
+.it-think-h .chev {
+  margin-left: auto;
+  display: inline-flex;
+  color: var(--muted);
+  transition: transform var(--t-fast) var(--ease);
+}
+.it-think[data-open="true"] .it-think-h .chev {
+  transform: rotate(90deg);
+}
+.it-think[data-open="true"] .it-think-h .pv {
+  display: none;
+}
+.it-think-b {
+  display: none;
+  margin: 0 10px 10px;
+  padding-left: 12px;
+  box-shadow: inset 2px 0 0 var(--line-3);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--sub);
+  white-space: pre-wrap;
+}
+.it-think[data-open="true"] .it-think-b {
+  display: block;
+}
+/* 正在思考：只露出最后几行，顶部渐隐，像在往上滚动。 */
+.it-think[data-live="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+.it-think[data-live="true"] .it-think-b {
+  display: block;
+  max-height: calc(5 * 1.7em);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  mask-image: linear-gradient(to bottom, transparent, black 2.2em);
+}
+.shimmer {
+  background: linear-gradient(90deg, currentColor 0 40%, transparent 50%, currentColor 60% 100%) 100% 0 / 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 1.8s linear infinite;
+}
+@keyframes shimmer {
+  to {
+    background-position: -150% 0;
+  }
+}
+
+/* 动作条：一次工具调用一行 */
+.it-act {
+  border-radius: var(--r-sm);
+}
+.it-act-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  min-width: 0;
+}
+.it-act[data-expandable="true"] .it-act-h {
+  cursor: pointer;
+}
+.it-act[data-expandable="true"] .it-act-h:hover {
+  background: var(--fill-2);
+}
+.it-act .st {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+.it-act[data-state="ok"] .st {
+  color: var(--ok);
+}
+.it-act[data-state="failed"] .st {
+  color: var(--danger);
+}
+.it-act[data-state="running"] .st {
+  color: var(--run);
+}
+.it-act .verb {
+  flex: none;
+  color: var(--ink);
+}
+.it-act .subj {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--sub);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.it-act .delta {
+  flex: none;
+  font: 12px var(--font-mono);
+}
+.it-act .delta .a {
+  color: var(--ok);
+}
+.it-act .delta .r {
+  color: var(--danger);
+}
+.it-act .note {
+  margin-left: auto;
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--danger);
+}
+.it-act .chev {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  color: var(--muted);
+}
+.it-act .note + .chev {
+  margin-left: 0;
+}
+.it-act[data-open="true"] .chev {
+  transform: rotate(90deg);
+}
+.it-act-b {
+  display: none;
+  margin: 2px 0 6px 34px;
+  flex-direction: column;
+  gap: 6px;
+}
+.it-act[data-open="true"] .it-act-b {
+  display: flex;
+}
+.it-act-b .k {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.raw {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-sunken);
+  font: 12px/1.6 var(--font-mono);
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow: auto;
+}
+.raw.err {
+  color: var(--danger);
+  background: var(--danger-fill);
+  border-color: var(--danger-line);
+}
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.6s var(--ease) infinite;
+}
+.it-act[data-state="running"] .verb {
+  color: var(--run);
+}
+
+/* 折叠的一组动作（结束后连续的工具调用） */
+.it-group-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  color: var(--sub);
+  cursor: pointer;
+}
+.it-group-h:hover {
+  background: var(--fill-2);
+  color: var(--ink);
+}
+.it-group-h .stack {
+  display: inline-flex;
+  color: var(--ok);
+}
+.it-group-h .chev {
+  display: inline-flex;
+  color: var(--muted);
+}
+.it-group[data-open="true"] .it-group-h .chev {
+  transform: rotate(90deg);
+}
+.it-group-b {
+  display: none;
+  margin-left: 10px;
+  padding-left: 8px;
+  box-shadow: inset 1px 0 0 var(--line-2);
+}
+.it-group[data-open="true"] .it-group-b {
+  display: block;
+}
+
+/* 其他 */
+.it-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  padding: 2px 0;
+}
+.it-notice::before,
+.it-notice::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.it-wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--wait-line);
+  background: var(--wait-fill);
+  color: var(--wait);
+  font-size: var(--fs-sm);
+}
+.it-wait .grow {
+  min-width: 0;
+}
+.it-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--danger-fill);
+  color: var(--danger);
+  font-size: var(--fs-sm);
+}
+/* 发给 AI 的消息（专业）：默认最多 4 行，可展开 */
+.it-prompt {
+  border-radius: var(--r-md);
+  border: 1px dashed var(--line-3);
+  padding: 8px 10px;
+  font-size: var(--fs-sm);
+}
+.it-prompt .k {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  margin-bottom: 4px;
+}
+.it-prompt .v {
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.more {
+  margin-top: 4px;
+  font-size: var(--fs-xs);
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cs[data-state="running"]::before,
+  .shimmer,
+  .caret,
+  .pulse-dot {
+    animation: none;
+  }
+  .shimmer {
+    -webkit-text-fill-color: currentColor;
+    background: none;
+  }
+  .it,
+  .cs-latest,
+  .cs[data-open="true"] .cs-body {
+    animation: none;
+  }
+}

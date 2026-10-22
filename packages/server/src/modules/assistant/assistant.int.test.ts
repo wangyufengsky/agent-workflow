@@ -65,7 +65,7 @@ describe('助手对话（A-02、A-03）', () => {
     const { entries } = await transcript(c.id);
     expect(entries.map((e) => [e.kind, e.data])).toEqual([
       ['user_message', { text: '明天几号？\n顺便列出项目' }],
-      ['text', { text: '明天是 10 月 11 日。' }],
+      ['text', { text: '明天是 10 月 11 日。', offset: 0 }],
     ]);
   });
 

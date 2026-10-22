@@ -1,6 +1,5 @@
 import { AttemptKind, AttemptStatus, McpToolName, TranscriptSystemEvent } from '@aw/shared';
-import type { ActionState, ToolAction } from '../features/attempts/process-lines.ts';
-import { formatDateTimeSeconds, formatTimeSeconds } from './common.ts';
+import type { StreamAction, ToolAction } from '../features/stream/stream-items.ts';
 
 export const ATTEMPT_STATUS_LABEL: Record<AttemptStatus, string> = {
   [AttemptStatus.Starting]: '启动中',
@@ -32,27 +31,9 @@ export const TRANSCRIPT_SYSTEM_LABEL: Record<TranscriptSystemEvent, string> = {
 };
 
 export const ATTEMPT_COPY = {
-  title: (kind: AttemptKind, seq: number) => `${ATTEMPT_KIND_LABEL[kind]}尝试 #${seq}`,
-  progress: '当前进展',
-  model: '模型',
   defaultModel: 'opencode 默认',
-  nudges: '提醒次数',
-  tokens: '用量',
   tokenUsage: (input: number, output: number) => `输入 ${input} · 输出 ${output} tokens`,
-  cost: '成本',
-  costValue: (usd: number) => `$${usd.toFixed(4)}`,
-  time: '时间',
-  timeRange: (start: number, end: number | null) =>
-    `${formatDateTimeSeconds(start)} → ${end === null ? '进行中' : formatTimeSeconds(end)}`,
-  error: '错误',
   abort: '中止',
-  transcript: '会话流',
-  transcriptEmpty: '还没有内容。',
-  userMessage: '发给 AI 的消息',
-  reasoning: '思考',
-  toolCall: (tool: string) => `调用 ${tool}`,
-  toolResult: (tool: string) => `${tool} 的结果`,
-  toolFailed: (tool: string) => `${tool} 出错`,
   permission: (permission: string, patterns: string) => `请求权限：${permission} ${patterns}`,
 } as const;
 
@@ -86,35 +67,97 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.SubmitSlide]: '提交一页',
 };
 
-/** One tool call in the user's words:「编辑 src/a.ts +12 −3」「运行 pnpm test」. */
-export function toolActionLabel(action: ToolAction): string {
+/** One tool call in the user's words, as a verb and what it works on:「编辑」「src/a.ts」. */
+export function toolActionText(action: ToolAction): { verb: string; subject: string } {
   switch (action.kind) {
     case 'edit':
-      return `编辑 ${action.path} +${action.added} −${action.removed}`;
+      return { verb: '编辑', subject: action.path };
     case 'write':
-      return `写入 ${action.path} +${action.lines}`;
+      return { verb: '写入', subject: action.path };
     case 'read':
-      return `查看 ${action.path}`;
+      return { verb: '查看', subject: action.path };
     case 'run':
-      return `运行 ${action.command}`;
+      return { verb: '运行', subject: action.command };
     case 'search':
-      return `搜索 ${action.query}`;
+      return { verb: '搜索', subject: action.query };
     case 'fetch':
-      return `打开网页 ${action.url}`;
+      return { verb: '打开网页', subject: action.url };
     case 'todo':
-      return '整理待办';
+      return { verb: '整理待办', subject: '' };
     case 'app':
-      return action.detail === undefined || action.detail === ''
-        ? APP_TOOL_LABEL[action.name]
-        : `${APP_TOOL_LABEL[action.name]}：${action.detail}`;
+      return { verb: APP_TOOL_LABEL[action.name], subject: action.detail ?? '' };
     case 'other':
-      return `使用工具 ${action.tool}`;
+      return { verb: '使用工具', subject: action.tool };
   }
 }
 
-export const PROCESS_COPY = {
-  now: '当前进展',
-  empty: 'AI 还没有开始写内容。',
-  state: { running: '进行中', ok: '成功', failed: '失败' } satisfies Record<ActionState, string>,
-  permission: (permission: string, patterns: string) => `请求权限：${permission} ${patterns}`,
+/** The lines a call added and removed, when it edits a file:「+12 −3」. */
+export function toolActionDelta(action: ToolAction): { added: number; removed: number } | undefined {
+  if (action.kind === 'edit') return { added: action.added, removed: action.removed };
+  if (action.kind === 'write') return { added: action.lines, removed: 0 };
+  return undefined;
+}
+
+/** One tool call as one line:「编辑 src/a.ts +12 −3」「运行 pnpm test」. */
+export function toolActionLabel(action: ToolAction): string {
+  const { verb, subject } = toolActionText(action);
+  const delta = toolActionDelta(action);
+  return [verb, subject, delta === undefined ? '' : `+${delta.added} −${delta.removed}`]
+    .filter((p) => p !== '')
+    .join(' ');
+}
+
+const GROUP_PARTS: [ToolAction['kind'][], (n: number) => string][] = [
+  [['read'], (n) => `查看 ${n} 个文件`],
+  [['search', 'fetch'], (n) => `搜索 ${n} 次`],
+  [['edit', 'write'], (n) => `编辑 ${n} 个文件`],
+  [['run'], (n) => `运行 ${n} 条命令`],
+  [['app', 'todo', 'other'], (n) => `${n} 个其他动作`],
+];
+
+/** A folded run of calls:「查看 3 个文件 · 搜索 2 次 · 1 个失败」. */
+export function actionGroupSummary(actions: readonly StreamAction[]): string {
+  const parts = GROUP_PARTS.flatMap(([kinds, label]) => {
+    const n = actions.filter((a) => kinds.includes(a.action.kind)).length;
+    return n === 0 ? [] : [label(n)];
+  });
+  const failed = actions.filter((a) => a.state === 'failed').length;
+  return [...parts, ...(failed === 0 ? [] : [`${failed} 个失败`])].join(' · ');
+}
+
+export const STREAM_COPY = {
+  processTitle: '执行过程',
+  researchTitle: '研究过程',
+  attemptTitle: (kind: AttemptKind, seq: number) => `${ATTEMPT_KIND_LABEL[kind]} #${seq}`,
+  empty: 'AI 还没有开始。',
+  summary: (status: string, thoughts: number, actions: number, duration: string) =>
+    [status, thoughts === 0 ? '' : `思考 ${thoughts} 段`, `${actions} 个动作`, `用时 ${duration}`]
+      .filter((p) => p !== '')
+      .join(' · '),
+  duration: (ms: number) => {
+    const s = Math.max(1, Math.round(ms / 1000));
+    return s < 60 ? `${s} 秒` : `${Math.floor(s / 60)} 分 ${String(s % 60).padStart(2, '0')} 秒`;
+  },
+  pro: (model: string, tokens: string | null, nudges: number) =>
+    [model, tokens ?? '', `提醒 ${nudges} 次`].filter((p) => p !== '').join(' · '),
+  thinking: '正在思考',
+  thought: (seconds: number) => `思考了 ${seconds} 秒`,
+  thinkingDone: '思考',
+  prompt: '发给 AI 的消息',
+  more: '展开全部',
+  less: '收起',
+  latest: '回到最新',
+  unseen: (n: number) => `${n} 条新内容`,
+  toggle: (title: string) => `展开或收起${title}`,
+  progress: (text: string) => `AI 汇报：${text}`,
+  wait: (permission: string, patterns: string) => `等待你允许：${permission} ${patterns}`,
+  goHandle: '去处理',
+  state: { running: '进行中', ok: '成功', failed: '失败', stopped: '已中断' } satisfies Record<
+    StreamAction['state'],
+    string
+  >,
+  failedNote: '失败',
+  toolName: '内部工具名',
+  input: '输入',
+  output: '输出',
 } as const;

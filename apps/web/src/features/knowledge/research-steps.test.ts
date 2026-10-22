@@ -50,7 +50,7 @@ describe('researchSteps', () => {
       ts: 0,
       partId: `p${seq}`,
       kind: TranscriptEntryKind.Text,
-      data: { text: t },
+      data: { text: t, offset: 0 },
     });
     const read = call('read', { filePath: '/repo/a.ts' });
     expect(researchSteps([read, text('It is [1].')], '/repo').current).toBe('answer');
