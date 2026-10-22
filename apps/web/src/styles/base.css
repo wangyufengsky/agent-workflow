@@ -1031,11 +1031,14 @@ button.card:hover,
   color: var(--accent);
   background: var(--accent-fill);
 }
+/* A pill of fixed height: it never shrinks or wraps in a row; the text beside it gives way instead. */
 .chip {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 6px;
   height: 24px;
+  white-space: nowrap;
   padding: 0 10px;
   border-radius: var(--r-pill);
   font-size: 12px;
