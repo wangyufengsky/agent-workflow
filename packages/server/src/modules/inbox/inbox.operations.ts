@@ -6,7 +6,7 @@ import type { InboxService } from './inbox.service.ts';
 export function inboxOperations(inbox: InboxService) {
   return [
     implement(listInboxOp, (query) => inbox.page(query)),
-    implement(countInboxOp, () => ({ open: inbox.countOpen() })),
+    implement(countInboxOp, () => ({ blocking: inbox.countBlocking() })),
     implement(dismissInboxOp, ({ id }) => inbox.dismiss(id)),
   ];
 }

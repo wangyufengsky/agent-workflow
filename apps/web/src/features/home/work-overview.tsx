@@ -6,9 +6,9 @@ import { BATCHES_COPY } from '../../copy/batches.ts';
 import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
 import { BatchCard } from '../batches/batch-card.tsx';
 import { batchesQuery } from '../batches/batches.queries.ts';
-import { inboxQuery } from '../inbox/inbox.queries.ts';
+import { inboxQuery, splitInbox } from '../inbox/inbox.queries.ts';
 import { InboxCard } from '../inbox/inbox-card.tsx';
-import { TaskCard } from '../tasks/task-card.tsx';
+import { TaskRow } from '../tasks/task-row.tsx';
 import { tasksQuery } from '../tasks/tasks.queries.ts';
 
 /** How many open items and finished tasks the home page lists (14 §3.2). */
@@ -31,7 +31,8 @@ const SECTIONS: { title: string; groups: TaskDisplayGroup[]; limit?: number }[] 
 /** What is going on, for the overview under the idle home page and the rail beside a conversation (28 §2.1). */
 export function useWork() {
   const tasks = useQuery(tasksQuery()).data ?? [];
-  const attention = useQuery(inboxQuery({ status: InboxStatus.Open })).data ?? [];
+  // Results waiting to be merged are the「待合并」section, not something holding a task up (D119).
+  const attention = splitInbox(useQuery(inboxQuery({ status: InboxStatus.Open })).data ?? []).blocking;
   // Batches whose tasks have not all ended (20 §4).
   const batches = (useQuery(batchesQuery()).data ?? []).filter((b) => b.ended < b.total);
   const sections = SECTIONS.map((section) => ({
@@ -47,9 +48,9 @@ function TaskSection({ title, tasks }: { title: string; tasks: TaskSummaryDTO[] 
       <div className="section-head">
         <h2 className="section-title">{title}</h2>
       </div>
-      <div className="grid-2">
+      <div className="card list list-sep">
         {tasks.map((t) => (
-          <TaskCard key={t.id} task={t} />
+          <TaskRow key={t.id} task={t} />
         ))}
       </div>
     </section>

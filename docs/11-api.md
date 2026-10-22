@@ -210,7 +210,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/inbox?status&taskId&limit&cursor` | `{ items: InboxItemDTO[], nextCursor }`，按创建时间（同时按 id）倒序分页（§1）；`/inbox/count` 返回 `{ open }` 用于徽标 |
+| GET | `/inbox?status&taskId&limit&cursor` | `{ items: InboxItemDTO[], nextCursor }`，按创建时间（同时按 id）倒序分页（§1）；`/inbox/count` 返回 `{ blocking }` 用于徽标：打开且属于 `BLOCKING_INBOX_KINDS`（除 `delivery` 外的所有种类）的条目数（D119） |
 | POST | `/inbox/:id/resolve` | `{ response }`，`response` 为对应 kind 的回应（见 10 §inbox_items；`question` 只接受 `{ answer }`）；不符合该 kind 400 `VALIDATION_FAILED`；已关闭 409 `INBOX_ITEM_CLOSED`；回答问题时 opencode 未就绪 503 `OPENCODE_NOT_READY`（条目保持打开） |
 | POST | `/inbox/:id/dismiss` | 仅 `failure` / `delivery` / `schedule_failure` 可忽略 |
 
@@ -289,7 +289,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `plan.updated` | `{ taskId, plan: PlanDTO }` | |
 | `attempt.updated` | `{ taskId, nodeId, attempt: AttemptSummaryDTO }`（调试尝试 `taskId`、`nodeId` 为 null） | 状态、提醒次数、当前进展变化时 |
 | `attempt.transcript` | `{ attemptId, entries: TranscriptEntry[] }` | 追加到正在查看的会话流 |
-| `inbox.updated` | `{ item: InboxItemDTO, openCount }` | 徽标与列表 |
+| `inbox.updated` | `{ item: InboxItemDTO, blockingCount }` | 徽标（同 `/inbox/count`，D119）与列表 |
 | `delivery.updated` | `{ taskId, delivery: DeliveryDTO }` | |
 | `runtime.updated` | `RuntimeDTO` | 运行环境指示 |
 | `settings.updated` | `{ keys: SettingKey[] }` | 重新拉设置（主题、模式即时生效） |

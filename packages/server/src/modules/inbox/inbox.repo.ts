@@ -1,5 +1,13 @@
-import { AppError, ErrorCode, type InboxItemDTO, type InboxKind, InboxStatus, inboxItemSchema } from '@aw/shared';
-import { and, count, desc, eq, lt, or, type SQL } from 'drizzle-orm';
+import {
+  AppError,
+  BLOCKING_INBOX_KINDS,
+  ErrorCode,
+  type InboxItemDTO,
+  type InboxKind,
+  InboxStatus,
+  inboxItemSchema,
+} from '@aw/shared';
+import { and, count, desc, eq, inArray, lt, or, type SQL } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { inboxItemsTable } from './inbox.table.ts';
 
@@ -78,11 +86,14 @@ export function createInboxRepo(db: DbExecutor) {
         .all()
         .map(toItem);
     },
-    countOpen(): number {
+    /** The badge count (D119): open items that hold something up. */
+    countBlocking(): number {
       const row = db
         .select({ n: count() })
         .from(inboxItemsTable)
-        .where(eq(inboxItemsTable.status, InboxStatus.Open))
+        .where(
+          and(eq(inboxItemsTable.status, InboxStatus.Open), inArray(inboxItemsTable.kind, [...BLOCKING_INBOX_KINDS])),
+        )
         .get();
       return row?.n ?? 0;
     },

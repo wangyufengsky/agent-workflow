@@ -35,7 +35,7 @@
 | 工具 | 风险 | 说明 |
 | --- | --- | --- |
 | `get_current_time` | read | `{ now, date, weekday, timeZone, utcOffset }`：用户所在时区（后端进程的系统时区）的当地时间 |
-| `get_app_status` | read | `{ runtime, uiMode, projects, activeTasks, openInbox }` |
+| `get_app_status` | read | `{ runtime, uiMode, projects, activeTasks, blockingInbox }`（`blockingInbox` 同徽标，不含待合并，D119） |
 | `open_page` | read | `{ page: AssistantPage, params }`（各页面需要的参数为 `ASSISTANT_PAGE_PARAMS`）→ SSE `assistant.navigate`，界面在面板旁跳转 |
 | `open_form` | read | `{ form: AssistantForm, values }` → SSE `assistant.open_form`；`values` 按该表单所提交操作的助手输入（不含凭据字段）的 partial 校验，带凭据字段 `VALIDATION_FAILED` |
 | `list_files` / `reveal_file` | read | 列出 / 在 Finder 中显示 `files/<id>/` 下的文件（路径相对该目录，越界或不存在 `VALIDATION_FAILED`；显示经 SSE `assistant.reveal_file` 由 preload 完成） |

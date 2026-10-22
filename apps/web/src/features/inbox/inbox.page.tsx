@@ -8,15 +8,16 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { INBOX_COPY as C } from '../../copy/tasks.ts';
 import { tasksQuery } from '../tasks/tasks.queries.ts';
-import { inboxPagesQuery } from './inbox.queries.ts';
+import { inboxPagesQuery, splitInbox } from './inbox.queries.ts';
 import { InboxCard } from './inbox-card.tsx';
 
-/** Open items grouped by task (14 §3.6). */
+/** Open items holding something up, grouped by task; then the results waiting to be merged (14 §3.6, D119). */
 export function InboxPage() {
   const pages = useInfiniteQuery(inboxPagesQuery({ status: InboxStatus.Open }));
   const items = pages.data?.pages.flatMap((page) => page.items);
   const tasks = useQuery(tasksQuery());
-  const groups = Map.groupBy(items ?? [], (item: InboxItemDTO) => item.taskId ?? '');
+  const { blocking, deliveries } = splitInbox(items ?? []);
+  const groups = Map.groupBy(blocking, (item: InboxItemDTO) => item.taskId ?? '');
   return (
     <div className="page">
       <div className="page-head">
@@ -28,6 +29,12 @@ export function InboxPage() {
       {pages.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
       {pages.isError && <ErrorState error={pages.error} onRetry={() => void pages.refetch()} />}
       {items?.length === 0 && <EmptyState icon="inbox" title={C.empty} body={C.emptyBody} />}
+      {items !== undefined && items.length > 0 && (
+        <h2 className="sec-t" data-testid="inbox-waiting">
+          {C.waiting}
+        </h2>
+      )}
+      {items !== undefined && items.length > 0 && blocking.length === 0 && <p className="hint">{C.noneWaiting}</p>}
       {[...groups].map(([taskId, group]) => {
         const task = tasks.data?.find((t) => t.id === taskId);
         return (
@@ -47,6 +54,18 @@ export function InboxPage() {
           </section>
         );
       })}
+      {deliveries.length > 0 && (
+        <section className="section" data-testid="inbox-to-merge">
+          <div className="section-head">
+            <h2 className="sec-t">{C.toMerge(deliveries.length)}</h2>
+          </div>
+          <div className="col">
+            {deliveries.map((item) => (
+              <InboxCard key={item.id} item={item} />
+            ))}
+          </div>
+        </section>
+      )}
       {pages.hasNextPage && (
         <div className="row">
           <Button pending={pages.isFetchingNextPage} onClick={() => void pages.fetchNextPage()}>

@@ -32,8 +32,8 @@ export const getAppStatusOutputSchema = z.object({
   projects: z.number(),
   /** Tasks not in a final state. */
   activeTasks: z.number(),
-  /** Open「需要你处理」items. */
-  openInbox: z.number(),
+  /** Open「需要你处理」items that hold something up; results waiting to be merged are not counted (D119). */
+  blockingInbox: z.number(),
 });
 export type GetAppStatusOutput = z.infer<typeof getAppStatusOutputSchema>;
 

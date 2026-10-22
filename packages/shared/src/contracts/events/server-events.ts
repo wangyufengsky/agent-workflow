@@ -27,7 +27,7 @@ export const serverEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal(ServerEventType.InboxUpdated),
-    data: z.object({ item: inboxItemSchema, openCount: z.number() }),
+    data: z.object({ item: inboxItemSchema, blockingCount: z.number() }),
   }),
   z.object({
     type: z.literal(ServerEventType.AttemptUpdated),

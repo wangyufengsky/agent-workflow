@@ -42,7 +42,7 @@ export function createInboxService({ db, unit, clock, log }: InboxServiceDeps) {
   }
 
   function publish(item: InboxItemDTO): void {
-    unit.publish({ type: ServerEventType.InboxUpdated, data: { item, openCount: repo.countOpen() } });
+    unit.publish({ type: ServerEventType.InboxUpdated, data: { item, blockingCount: repo.countBlocking() } });
   }
 
   function close(item: InboxItemDTO, event: InboxEvent, response?: unknown): InboxItemDTO {
@@ -88,7 +88,7 @@ export function createInboxService({ db, unit, clock, log }: InboxServiceDeps) {
         nextCursor: rows.length > limit && last !== undefined ? `${last.createdAt}.${last.id}` : null,
       };
     },
-    countOpen: (): number => repo.countOpen(),
+    countBlocking: (): number => repo.countBlocking(),
 
     create: (input: NewInboxItem): InboxItemDTO => insert(input, InboxStatus.Open, null),
 

@@ -13,6 +13,14 @@ export const InboxKind = {
 export type InboxKind = (typeof InboxKind)[keyof typeof InboxKind];
 export const inboxKindSchema = z.enum(InboxKind);
 
+/**
+ * Open items of these kinds hold something up until the user acts, and the badges count only them (D119). A delivery
+ * is a finished result waiting to be merged: listed apart, not counted.
+ */
+export const BLOCKING_INBOX_KINDS: readonly InboxKind[] = Object.values(InboxKind).filter(
+  (kind) => kind !== InboxKind.Delivery,
+);
+
 /** Open items of these kinds turn any non-terminal task into the「需要你处理」display group (08 §2.2). */
 export const ATTENTION_INBOX_KINDS: readonly InboxKind[] = [
   InboxKind.Question,

@@ -1,4 +1,5 @@
 import {
+  BLOCKING_INBOX_KINDS,
   countInboxOp,
   dismissInboxOp,
   type InboxItemDTO,
@@ -40,12 +41,12 @@ export const inboxPagesQuery = (filter: InboxFilter) =>
 
 export const inboxCountQuery = queryOptions({
   queryKey: queryKeys.inboxCount,
-  queryFn: async () => (await callOperation(countInboxOp, {})).open,
+  queryFn: async () => (await callOperation(countInboxOp, {})).blocking,
 });
 
 /** SSE `inbox.updated`: the badge count comes with the event; lists refetch. */
-export async function updateInbox(qc: QueryClient, openCount: number): Promise<void> {
-  qc.setQueryData(queryKeys.inboxCount, openCount);
+export async function updateInbox(qc: QueryClient, blockingCount: number): Promise<void> {
+  qc.setQueryData(queryKeys.inboxCount, blockingCount);
   await qc.invalidateQueries({ queryKey: [...queryKeys.inbox, 'list'] });
 }
 
@@ -65,3 +66,12 @@ export type InboxResponse = z.input<typeof resolveInboxOp.input>['response'];
 export const useResolveInbox = () =>
   useInboxMutation((input: { id: string; response: InboxResponse }) => callOperation(resolveInboxOp, input));
 export const useDismissInbox = () => useInboxMutation((id: string) => callOperation(dismissInboxOp, { id }));
+
+/**
+ * Items that hold something up until the user acts, apart from results waiting to be merged (D119): those are listed
+ * after them and not counted.
+ */
+export function splitInbox(items: readonly InboxItemDTO[]): { blocking: InboxItemDTO[]; deliveries: InboxItemDTO[] } {
+  const blocking = items.filter((item) => BLOCKING_INBOX_KINDS.includes(item.kind));
+  return { blocking, deliveries: items.filter((item) => !BLOCKING_INBOX_KINDS.includes(item.kind)) };
+}

@@ -364,7 +364,7 @@ describe('助手专用工具（A-05）', () => {
   it('get_app_status：运行环境、模式与各项数量', async () => {
     await addProject(t);
     const { body } = await call(AssistantToolName.GetAppStatus);
-    expect(body).toMatchObject({ uiMode: 'simple', projects: 1, activeTasks: 0, openInbox: 0 });
+    expect(body).toMatchObject({ uiMode: 'simple', projects: 1, activeTasks: 0, blockingInbox: 0 });
   });
 
   it('open_page：推送跳转事件；缺少页面需要的参数时 VALIDATION_FAILED', async () => {
