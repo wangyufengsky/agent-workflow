@@ -10,6 +10,8 @@ export type DiffFileStatus = (typeof DiffFileStatus)[keyof typeof DiffFileStatus
 
 export const diffFileSchema = z.object({
   path: z.string(),
+  /** A renamed file's path before the rename. */
+  oldPath: z.string().optional(),
   status: z.enum(DiffFileStatus),
   /** Null for binary files. */
   additions: z.number().nullable(),

@@ -15,11 +15,13 @@ export { createTranscriptStore, type NewTranscriptEntry, type TranscriptStore } 
 const DEBUG_RUN_DIR = 'debug';
 const KNOWLEDGE_RUN_DIR = 'knowledge';
 const PPT_RUN_DIR = 'ppt';
+const GIT_RUN_DIR = 'git';
 
 /** Where the transcript of an attempt that belongs to no task lives. */
 function runDirOf(kind: AttemptKind): string {
   if (kind === AttemptKind.Research) return KNOWLEDGE_RUN_DIR;
   if (kind === AttemptKind.DeckOutline || kind === AttemptKind.DeckSlides) return PPT_RUN_DIR;
+  if (kind === AttemptKind.GitReview || kind === AttemptKind.CommitMessage) return GIT_RUN_DIR;
   return DEBUG_RUN_DIR;
 }
 
@@ -30,8 +32,8 @@ export function createAttemptsModule(
 ) {
   const runsDir = join(deps.dataDir, 'runs');
   const transcripts = createTranscriptStore<{ id: string; taskId: string | null; kind: AttemptKind }>({
-    // Research, PPT and debug attempts belong to no task; their transcripts live under `runs/knowledge/`,
-    // `runs/ppt/` and `runs/debug/`.
+    // Research, PPT, Git workbench and debug attempts belong to no task; their transcripts live under
+    // `runs/knowledge/`, `runs/ppt/`, `runs/git/` and `runs/debug/`.
     fileOf: (attempt) => join(runsDir, attempt.taskId ?? runDirOf(attempt.kind), `${attempt.id}.jsonl`),
     onAppend: (attempt, entries) =>
       deps.events.publish({ type: ServerEventType.AttemptTranscript, data: { attemptId: attempt.id, entries } }),

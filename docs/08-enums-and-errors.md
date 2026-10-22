@@ -38,7 +38,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TaskStatus` | `draft` · `preparing` · `planning` · `plan_review` · `running` · `paused` · `review` · `merging` · `completed` · `failed` · `cancelled` |
 | `TaskFailedPhase` | `preparing` · `planning` · `running` · `merging` |
 | `NodeStatus` | `pending` · `ready` · `running` · `waiting_input` · `verifying` · `awaiting_acceptance` · `done` · `failed` · `skipped` · `cancelled` |
-| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2）· `deck_outline`（PPT 的大纲）· `deck_slides`（PPT 的若干页：制作或修改，23 §4；两者在同一个会话中，`continueSession` 可换 kind） |
+| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2）· `deck_outline`（PPT 的大纲）· `deck_slides`（PPT 的若干页：制作或修改，23 §4；两者在同一个会话中，`continueSession` 可换 kind）· `git_review`（Git 工作台的 AI 审查，不属于任务，27 §4.3）· `commit_message`（AI 草拟提交信息，27 §7.3） |
 | `AttemptStatus` | `starting` · `running` · `succeeded` · `failed` · `aborted` · `interrupted` |
 | `PlanStatus` | `draft` · `confirmed` · `superseded` |
 | `PlanSource` | `ai` · `template` · `user` |
@@ -67,7 +67,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 | 枚举 | 值 | 说明 |
 | --- | --- | --- |
-| `WorkflowKind` | `builtin` · `custom` | 内置流程只读，可复制为自定义 |
+| `WorkflowKind` | `builtin` · `custom` · `system` | 内置流程只读，可复制为自定义；`system` 只由应用自己发起（Git 工作台的合并任务 `system.merge_branch`，27 §3.6），不列出、不能复制、不能用于新建任务 |
 | `WorkflowPlanning` | `fixed` · `ai` | 固定 DAG / AI 在约束内规划 |
 | `WorkflowDeliverable` | `code_changes` · `report` | 代码审查等只读流程产出报告，不合并 |
 | `RoleBaseAgent` | `planner` · `executor` · `reviewer` | 对应注入 opencode 的 agent `aw-planner` / `aw-executor` / `aw-reviewer`，决定权限基线 |
@@ -85,6 +85,12 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `HostingProvider` | `github` · `gitlab` |
 | `ChangeRequestReason` | `user`（让 AI 再改改）· `conflict`（交给 AI 解决冲突）· `review`（按 PR 审查意见修改，21）；`request-changes` 的 `reason` 只接受前两个，`review` 只经 `review-feedback` 发起 |
 | `ReviewCommentKind` | `thread`（未解决的审查讨论，通常在某个文件的某一行）· `general`（对话中的评论或审查总结）（21 §2.2） |
+| `GitOperation` | `merge` · `rebase` · `cherry_pick` · `revert`：主工作区里用户没做完的操作（27 §5） |
+| `GitMergeStrategy` | `merge`（合并提交）· `squash`（压缩为一个提交）：Git 工作台的合并方式（27 §3.5） |
+| `GitReviewTarget` | `worktree` · `commit` · `branch` · `range`：AI 审查的对象（27 §4.2） |
+| `FindingSeverity` | `blocker` · `major` · `minor` |
+| `FindingCategory` | `correctness` · `security` · `performance` · `maintainability` · `tests` |
+| `DiffSide` | `new` · `old`：审查问题的行号属于改动后还是改动前的版本 |
 
 `LOCAL_MERGE_STRATEGIES`（`squash` / `merge` / `rebase`，即 `delivery.defaultStrategy` 的取值）与 `isLocalMerge` 在同一文件。
 
@@ -118,7 +124,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `AssistantConfirmationStatus` | `pending` · `confirmed` · `cancelled` | 确认卡片（09 §10） |
 | `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` | 助手专用工具（15 §3）；其余工具由操作清单生成 |
 | `AssistantPage` | `home` · `tasks` · `task` · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` · `ppt` · `ppt_deck`（23 §9） · `batches` · `batch` · `schedules` · `schedule` · `environment`（28 §4） | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId` / `deckId` / `batchId` / `scheduleId`；PPT 工作台另可带选中的页 `slideId`） |
-| `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） · `schedule`（22 §10） · `deck`（23 §9） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
+| `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） · `schedule`（22 §10） · `deck`（23 §9） · `git_review`（27 §7.1） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
 | `InputRef` | `EntityKind` 的全部取值 · `inbox_item` · `node`（同一输入中 `id` 所指任务的步骤） · `attempt` | 操作契约 `refs`：输入字段指向的对象（`enums/entity.ts`）；助手确认卡片据此把 id 显示为对象名称，标签为对象类型（D84）；`workflow` 字段可以是流程 id 或 key |
 | `AssistantForm` | `tasks.create` · `projects.create` · `projects.setHosting` · `databases.create` · `databases.update` | `open_form` 能打开的表单，以其提交的操作命名（`ASSISTANT_FORM_OPERATION`）；预填值的 schema 为该操作的助手输入（不含凭据字段）的 partial |
 
@@ -129,7 +135,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `KnowledgeTurnStatus` | `researching` · `answered` · `stopped` · `failed` | 一轮的状态，由其 `research` 尝试的状态推导（`knowledgeTurnStatusOf`，18 §3），不存储 |
 | `KnowledgeSourceKind` | `code` · `docs` · `database` · `web` | 资料范围与引用的来源类别；文件按 `classifySource(path)` 分为代码或文档（`KNOWLEDGE_DOC_DIRS`、`KNOWLEDGE_DOC_EXTENSIONS`） |
 | `CitationType` | `file` · `database` · `web` | `submit_answer` 的引用类型（18 §6.1） |
-| `SessionAgent` | `planner` · `executor` · `reviewer` · `researcher` · `slides_writer` | 会话以哪个 agent 运行（`enums/workflow.ts`）；角色的基础类型 `RoleBaseAgent` 只有前三个；`slides_writer` 为 PPT 写作者（23 §7.1） |
+| `SessionAgent` | `planner` · `executor` · `reviewer` · `researcher` · `slides_writer` · `code_reviewer` | 会话以哪个 agent 运行（`enums/workflow.ts`）；角色的基础类型 `RoleBaseAgent` 只有前三个；`slides_writer` 为 PPT 写作者（23 §7.1）；`code_reviewer` 为 Git 工作台的只读审查与草拟提交信息（27 §4.3） |
 
 ### 2.9 质量与用量（v1.1，`enums/insights.ts`）
 
@@ -192,7 +198,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | --- | --- | --- |
 | `APP_ID` | `agent-workflow` | 数据目录名、MCP server 名 |
 | `OPENCODE_VERSION` | `1.19.0` | 精确匹配，不匹配则 `version_mismatch` |
-| `OPENCODE_AGENT_NAME` | `{ planner: 'aw-planner', executor: 'aw-executor', reviewer: 'aw-reviewer', researcher: 'aw-researcher', slides_writer: 'aw-slides' }` | 按 `SessionAgent`；`aw-researcher` 为知识研究员（v1.1，18 §5.1），`aw-slides` 为 PPT 写作者（v1.2，23 §7.1） |
+| `OPENCODE_AGENT_NAME` | `{ planner: 'aw-planner', executor: 'aw-executor', reviewer: 'aw-reviewer', researcher: 'aw-researcher', slides_writer: 'aw-slides' }` | 按 `SessionAgent`；`aw-researcher` 为知识研究员（v1.1，18 §5.1），`aw-slides` 为 PPT 写作者（v1.2，23 §7.1），`code_reviewer: 'aw-code-reviewer'` 为 Git 工作台的审查员（v1.2，27 §4.3） |
 | `MCP_SERVER_NAME` | `agent-workflow` | 执行 MCP；opencode 中工具名为 `agent-workflow_<tool>` |
 | `MCP_ASSISTANT_SERVER_NAME` | `agent-workflow-app` | 助手 MCP（v1.1）；opencode 中工具名为 `agent-workflow-app_<tool>` |
 | `OPENCODE_ASSISTANT_AGENT` | `aw-assistant` | 助手的 agent（v1.1） |
@@ -266,6 +272,13 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `KNOWLEDGE_SOURCE_CONTEXT_LINES` | 40（原文面板中引用区间前后各显示的行数） |
 | `KNOWLEDGE_QUERY_ROWS` | 50（打开数据库引用时重新执行查询返回的行数） |
 | `KNOWLEDGE_ANSWER_EXCERPT_CHARS` | 160（对话记录中最后一轮回答的摘要） |
+| `COMMIT_MESSAGE_MAX_CHARS` | 10000（提交信息，27 §3.2） |
+| `GIT_PUSH_COMMITS_SHOWN` | 20（推送确认列出的提交） |
+| `GIT_REVIEW_FOCUS_MAX_CHARS` | 200（审查的关注点） |
+| `GIT_REVIEW_FINDINGS_MAX` | 50（一次审查的问题数，27 §4.4） |
+| `GIT_REVIEW_SUMMARY_MAX_CHARS` / `GIT_REVIEW_FINDING_TITLE_MAX_CHARS` / `GIT_REVIEW_FINDING_TEXT_MAX_CHARS` | 2000 / 120 / 2000 |
+| `COMMIT_DRAFT_DIFF_MAX_BYTES` | 60000（草拟提交信息时交给 AI 的 diff，27 §7.3） |
+| `COMMIT_DRAFT_TIMEOUT_MS` | 120000（草拟超时即中止，请求返回 `COMMIT_DRAFT_FAILED`） |
 | `DECK_BRIEF_MAX_CHARS` | 4000（PPT 的要求） |
 | `DECK_TITLE_MAX_CHARS` | 60（PPT 标题；创建时取要求的首行，大纲返回后用 AI 给的标题） |
 | `DECK_MATERIALS_MAX` | 10（一份 PPT 的资料数） |
@@ -342,7 +355,16 @@ class AppError extends Error {
 | `GIT_COMMAND_FAILED` | 500 | `details: { args, exitCode, stderr }` |
 | `GIT_BASE_BRANCH_NOT_FOUND` | 400 | |
 | `WORKTREE_CREATE_FAILED` | 500 | |
-| `WORKTREE_DIRTY` | 409 | 合并前 worktree 有未提交改动（正常流程由后端自动提交，出现即缺陷或用户手动改动） |
+| `WORKTREE_DIRTY` | 409 | 合并前 worktree 有未提交改动（正常流程由后端自动提交，出现即缺陷或用户手动改动）；Git 工作台切换分支、拉取与在检出的目标上合并时主工作区有改动（`details: { path, files }`，27 §3） |
+| `GIT_NOTHING_TO_COMMIT` | 409 | 没有已暂存的改动（27 §3.2） |
+| `GIT_IDENTITY_MISSING` | 400 | git 没有 `user.name` / `user.email`，无法以用户身份提交 |
+| `GIT_OPERATION_IN_PROGRESS` | 409 | 主工作区有未完成的合并 / 变基 / cherry-pick / revert；`details: { operation, path }` |
+| `GIT_PUSH_REJECTED` | 409 | 远端分支有本地没有的提交，推送被拒（不强推）；`details: { branch }` |
+| `GIT_NO_UPSTREAM` | 409 | 当前分支没有上游，不能拉取 |
+| `GIT_BRANCH_EXISTS` | 409 | 同名本地分支已存在 |
+| `GIT_BRANCH_IN_USE` | 409 | 分支是默认分支或检出在某个工作区，不能删除或切换到它；`details: { branch, path }` |
+| `GIT_BRANCH_NOT_MERGED` | 409 | 删除未合并的分支要 `force` |
+| `GIT_BRANCH_OWNED_BY_TASK` | 409 | 分支属于没结束的任务，只能在任务页交付；`details: { branch, task: { id, key } }`（27 §5） |
 | **托管平台** | | |
 | `HOSTING_NOT_CONFIGURED` | 400 | 选择 PR 交付但项目未绑定远端 |
 | `HOSTING_AUTH_FAILED` | 401 | 令牌无效或权限不足 |
@@ -406,7 +428,11 @@ class AppError extends Error {
 | `DELIVERY_INTERRUPTED` | — | 应用在交付过程中退出（记录在 delivery 上，重启后任务回到 `review`） |
 | **PR 审查意见回流（21）** | | |
 | `PULL_REQUEST_NOT_OPEN` | 409 | 任务没有以 PR 交付，或它的 PR/MR 已合并或关闭；`details: { taskId, branch? }` |
-| `BRANCH_DIVERGED` | 409 | 本地任务分支与 PR 的远端分支各有对方没有的提交，不做任何改动；`details: { branch }` |
+| `BRANCH_DIVERGED` | 409 | 本地分支与远端分支各有对方没有的提交（PR 审查意见回流、Git 工作台的拉取），不做任何改动；`details: { branch }` |
+| `GIT_REVIEW_NOT_FOUND` | 404 | Git 工作台的审查不存在（27 §7.1） |
+| `GIT_REVIEW_RUNNING` | 409 | 同一项目已有进行中的审查；删除项目时也会因此拒绝 |
+| `GIT_REVIEW_FINDINGS_INVALID` | — | `submit_findings` 的问题与审查的 diff 不符；`details.problems[]`（§5.6）与 `files` |
+| `COMMIT_DRAFT_FAILED` | 502 | AI 没有草拟出提交信息（会话失败、超时或没有调用 `submit_commit_message`） |
 | **数据库** | | |
 | `DB_CONNECTION_NOT_FOUND` | 404 | 不存在，或（MCP 工具）不是任务项目关联的连接 |
 | `DB_CONNECTION_ALREADY_EXISTS` | 409 | 连接名称已被使用（MCP 工具按名称找连接） |
@@ -448,3 +474,7 @@ class AppError extends Error {
 ### 5.5 引用校验子码（`KNOWLEDGE_CITATION_INVALID.details.problems[].code`）
 
 枚举 `CitationProblemCode`，hint 为常量 `CITATION_PROBLEM_HINT`（英文，给模型看），均在 `shared/errors/citation-problems.ts`；各子码的含义与 hint 见 [18 §6.2](18-knowledge.md#62-校验knowledge_citation_invaliddetailsproblems)：`OUTSIDE_PROJECT` · `FILE_NOT_FOUND` · `LINE_OUT_OF_RANGE` · `RANGE_TOO_LONG` · `SOURCE_NOT_SELECTED` · `UNKNOWN_CONNECTION` · `QUERY_NOT_READONLY` · `UNKNOWN_MARKER` · `UNUSED_CITATION`。
+
+### 5.6 审查问题校验子码（`GIT_REVIEW_FINDINGS_INVALID.details.problems[].code`）
+
+枚举 `FindingProblemCode`，hint 为常量 `FINDING_PROBLEM_HINT`（英文，给模型看），在 `shared/errors/finding-problems.ts`；每项带 `index`（问题在 `findings` 中的位置）：`PATH_NOT_IN_DIFF`（文件不在审查开始时的改动清单中）· `LINE_OUT_OF_RANGE`（行号不在所指版本的文件里，带 `lineCount`）（27 §4.4）。

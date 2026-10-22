@@ -13,6 +13,8 @@ export const reportProgressTool = (attempts: AttemptsService) =>
       AttemptKind.Research,
       AttemptKind.DeckOutline,
       AttemptKind.DeckSlides,
+      AttemptKind.GitReview,
+      AttemptKind.CommitMessage,
     ],
     input: reportProgressInputSchema,
     output: reportProgressOutputSchema,

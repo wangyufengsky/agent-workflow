@@ -3,6 +3,8 @@ import { z } from 'zod';
 export const WorkflowKind = {
   Builtin: 'builtin',
   Custom: 'custom',
+  /** Built in and started only by the app itself (the Git workbench's merge task, 27 §3.6); never listed. */
+  System: 'system',
 } as const;
 export type WorkflowKind = (typeof WorkflowKind)[keyof typeof WorkflowKind];
 export const workflowKindSchema = z.enum(WorkflowKind);
@@ -33,7 +35,13 @@ export const roleBaseAgentSchema = z.enum(RoleBaseAgent);
  * Who an attempt's session runs as (12 §2): a role's base agent, the knowledge researcher (18 §5.1) or the PPT writer
  * (23 §7.1).
  */
-export const SessionAgent = { ...RoleBaseAgent, Researcher: 'researcher', SlidesWriter: 'slides_writer' } as const;
+export const SessionAgent = {
+  ...RoleBaseAgent,
+  Researcher: 'researcher',
+  SlidesWriter: 'slides_writer',
+  /** Reviews diffs and drafts commit messages in the Git workbench, read-only (27 §4.3). */
+  CodeReviewer: 'code_reviewer',
+} as const;
 export type SessionAgent = (typeof SessionAgent)[keyof typeof SessionAgent];
 
 export const RoleKind = {

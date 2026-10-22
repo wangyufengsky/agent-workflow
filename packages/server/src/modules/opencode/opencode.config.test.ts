@@ -21,7 +21,7 @@ function config(shell: string | undefined) {
 }
 
 describe('opencode 配置生成', () => {
-  it('注入两套 MCP、三个基础 agent、知识研究员、PPT 写作者、助手 agent 与 bridge 插件', () => {
+  it('注入两套 MCP、三个基础 agent、知识研究员、PPT 写作者、Git 审查员、助手 agent 与 bridge 插件', () => {
     // The plugin URL depends on the platform's absolute paths (a drive letter on Windows).
     const { plugin, ...rest } = config(undefined);
     expect(plugin).toEqual([pathToFileURL(PLUGIN_FILE).href]);

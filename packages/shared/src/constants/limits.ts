@@ -113,3 +113,16 @@ export const SLIDE_TEXT_LIMITS = {
 } as const;
 /** Text that does not fit is shrunk down to this scale before the page is flagged (23 §5.4). */
 export const SLIDE_FIT_MIN_SCALE = 0.8;
+/** Git workbench (27): a commit message, the commits a push confirmation lists, a review's focus. */
+export const COMMIT_MESSAGE_MAX_CHARS = 10_000;
+export const GIT_PUSH_COMMITS_SHOWN = 20;
+export const GIT_REVIEW_FOCUS_MAX_CHARS = 200;
+/** `submit_findings` (27 §4.4). */
+export const GIT_REVIEW_FINDINGS_MAX = 50;
+export const GIT_REVIEW_SUMMARY_MAX_CHARS = 2000;
+export const GIT_REVIEW_FINDING_TITLE_MAX_CHARS = 120;
+export const GIT_REVIEW_FINDING_TEXT_MAX_CHARS = 2000;
+/** The diff a commit message draft is written from is cut to this size (27 §7.3). */
+export const COMMIT_DRAFT_DIFF_MAX_BYTES = 60_000;
+/** A draft that takes longer is stopped (27 §7.3): the request waits for it. */
+export const COMMIT_DRAFT_TIMEOUT_MS = 120_000;

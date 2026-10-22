@@ -1,18 +1,5 @@
 import { AppError, ErrorCode } from '@aw/shared';
-import { branchExists, isAncestor, type RepoLocks, runGit } from '../git/index.ts';
-
-/**
- * Over HTTPS git sends the project's token as an extra header; it travels in the environment, never in the arguments
- * (which are logged). Remotes over SSH use the user's own keys.
- */
-const originEnv = (authorization: string) => ({
-  ...process.env,
-  GIT_CONFIG_COUNT: '1',
-  GIT_CONFIG_KEY_0: 'http.extraHeader',
-  GIT_CONFIG_VALUE_0: `Authorization: ${authorization}`,
-  // Never wait for a password prompt nobody can answer.
-  GIT_TERMINAL_PROMPT: '0',
-});
+import { branchExists, isAncestor, originEnv, type RepoLocks, runGit } from '../git/index.ts';
 
 export type OriginBranchInput = { repoPath: string; branch: string; authorization: string };
 

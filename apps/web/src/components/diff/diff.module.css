@@ -154,7 +154,8 @@
 .no {
   padding: 0 var(--s-2);
   text-align: right;
-  color: var(--faint);
+  /* Readable on the added / deleted row tints too (axe colour contrast). */
+  color: var(--muted);
   user-select: none;
   vertical-align: top;
   font-variant-numeric: tabular-nums;
@@ -183,4 +184,37 @@
 
 .code[data-kind="none"] {
   background: var(--fill-1);
+}
+
+/* Review findings on lines (27 §4.5): a dot by the line number, a bar along the code; the focused line is tinted. */
+.line[data-mark] .no:nth-child(2) {
+  position: relative;
+}
+
+.line[data-mark] .no:nth-child(2)::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: var(--sub);
+}
+
+.line[data-mark="major"] .no:nth-child(2)::before {
+  background: var(--warn);
+}
+
+.line[data-mark="blocker"] .no:nth-child(2)::before {
+  background: var(--danger);
+}
+
+.line[data-mark] .code {
+  box-shadow: inset 2px 0 0 var(--warn);
+}
+
+.line[data-focus] td {
+  background: var(--accent-fill);
 }

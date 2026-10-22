@@ -44,6 +44,10 @@ export const serverEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal(ServerEventType.AssistantUpdated), data: assistantConversationSchema }),
   z.object({ type: z.literal(ServerEventType.KnowledgeUpdated), data: z.object({ conversationId: z.string() }) }),
   z.object({ type: z.literal(ServerEventType.DeckUpdated), data: z.object({ deckId: z.string() }) }),
+  z.object({
+    type: z.literal(ServerEventType.GitReviewUpdated),
+    data: z.object({ reviewId: z.string(), projectId: z.string() }),
+  }),
   z.object({ type: z.literal(ServerEventType.ScheduleUpdated), data: z.object({ scheduleId: z.string() }) }),
   z.object({
     type: z.literal(ServerEventType.AssistantTranscript),

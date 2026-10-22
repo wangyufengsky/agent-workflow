@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AppError, DeliveryStrategy, ErrorCode, type LocalMergeStrategy } from '@aw/shared';
+import { AppError, DeliveryStrategy, ErrorCode, GitMergeStrategy, type LocalMergeStrategy } from '@aw/shared';
 import {
   BACKEND_COMMITTER,
   branchExists,
@@ -28,8 +28,16 @@ export type LocalMergeInput = {
 
 export type MergeOutcome = { merged: true; commitSha: string } | { merged: false; conflictFiles: string[] };
 
+/**
+ * Who a merge commits as: the backend for a task's delivery (D52: its identity, no hooks or signing), the user in the
+ * Git workbench (27 §2: their identity, hooks and signing).
+ */
+type Committer = { identity: readonly string[]; hooks: boolean };
+const BACKEND: Committer = { identity: BACKEND_COMMITTER, hooks: false };
+const USER: Committer = { identity: [], hooks: true };
+
 /** Where the target branch is checked out (normally the user's main worktree), if anywhere. */
-async function targetHolder(repoPath: string, targetBranch: string): Promise<string | undefined> {
+export async function targetHolder(repoPath: string, targetBranch: string): Promise<string | undefined> {
   return (await listWorktrees(repoPath)).find((w) => w.branch === targetBranch)?.path;
 }
 
@@ -77,45 +85,56 @@ async function conflictOrFailure(
   abort: readonly string[],
 ): Promise<MergeOutcome> {
   const conflictFiles = await unmergedFiles(cwd);
+  // A user's hook can stop a merge with nothing conflicting (27 §2); undo it as well, then report the failure. The
+  // abort finds nothing to undo when git stopped before starting (exit 128).
+  await runGit(abort, { cwd, okExitCodes: conflictFiles.length === 0 ? [0, 128] : [0] });
   if (conflictFiles.length === 0) throw gitFailure(args, result);
-  await runGit(abort, { cwd });
   return { merged: false, conflictFiles };
 }
 
 const head = async (cwd: string) => (await runGit(['rev-parse', 'HEAD'], { cwd })).stdout.trim();
 
+/** Merges `source` into the branch checked out (and clean) in `dir`, as merge commit or squash. */
+async function mergeOrSquash(
+  dir: string,
+  source: string,
+  squash: boolean,
+  message: string,
+  { identity, hooks }: Committer,
+): Promise<MergeOutcome> {
+  const accept = { okExitCodes: [0, 1] };
+  const noVerify = hooks ? [] : ['--no-verify'];
+  if (squash) {
+    const args = [...identity, 'merge', '--squash', '--quiet', '--end-of-options', source];
+    const result = await runGit(args, { cwd: dir, ...accept });
+    // A squash leaves no MERGE_HEAD, so `merge --abort` cannot undo it; `reset --merge` restores the index.
+    if (result.exitCode === 1) return conflictOrFailure(dir, args, result, ['reset', '--merge']);
+    const staged = await runGit(['diff', '--cached', '--quiet'], { cwd: dir, okExitCodes: [0, 1] });
+    // Nothing to commit: the target already has every change (e.g. a delivery repeated after an interruption).
+    if (staged.exitCode === 1) {
+      try {
+        await runGit([...identity, 'commit', '--quiet', ...noVerify, '-m', message], { cwd: dir });
+      } catch (err) {
+        // A rejecting hook leaves the squashed changes staged in the user's worktree; put it back as it was.
+        await runGit(['reset', '--merge'], { cwd: dir });
+        throw err;
+      }
+    }
+    return { merged: true, commitSha: await head(dir) };
+  }
+  const args = [...identity, 'merge', '--no-ff', ...noVerify, '--quiet', '-m', message, '--end-of-options', source];
+  const result = await runGit(args, { cwd: dir, ...accept });
+  if (result.exitCode === 1) return conflictOrFailure(dir, args, result, ['merge', '--abort']);
+  return { merged: true, commitSha: await head(dir) };
+}
+
 /** Runs the strategy in `dir`, where the target branch is checked out and clean. */
 async function mergeIn(dir: string, input: LocalMergeInput): Promise<MergeOutcome> {
   const accept = { okExitCodes: [0, 1] };
   switch (input.strategy) {
-    case DeliveryStrategy.Squash: {
-      const args = [...BACKEND_COMMITTER, 'merge', '--squash', '--quiet', '--end-of-options', input.branch];
-      const result = await runGit(args, { cwd: dir, ...accept });
-      // A squash leaves no MERGE_HEAD, so `merge --abort` cannot undo it; `reset --merge` restores the index.
-      if (result.exitCode === 1) return conflictOrFailure(dir, args, result, ['reset', '--merge']);
-      const staged = await runGit(['diff', '--cached', '--quiet'], { cwd: dir, okExitCodes: [0, 1] });
-      // Nothing to commit: the target already has every change (e.g. a delivery repeated after an interruption).
-      if (staged.exitCode === 1) {
-        await runGit([...BACKEND_COMMITTER, 'commit', '--quiet', '--no-verify', '-m', input.message], { cwd: dir });
-      }
-      return { merged: true, commitSha: await head(dir) };
-    }
-    case DeliveryStrategy.Merge: {
-      const args = [
-        ...BACKEND_COMMITTER,
-        'merge',
-        '--no-ff',
-        '--no-verify',
-        '--quiet',
-        '-m',
-        input.message,
-        '--end-of-options',
-        input.branch,
-      ];
-      const result = await runGit(args, { cwd: dir, ...accept });
-      if (result.exitCode === 1) return conflictOrFailure(dir, args, result, ['merge', '--abort']);
-      return { merged: true, commitSha: await head(dir) };
-    }
+    case DeliveryStrategy.Squash:
+    case DeliveryStrategy.Merge:
+      return mergeOrSquash(dir, input.branch, input.strategy === DeliveryStrategy.Squash, input.message, BACKEND);
     case DeliveryStrategy.Rebase: {
       // A branch that already contains the target (a resolved conflict merged it in) is fast-forwarded as it is:
       // rebasing it would replay the resolved conflict.
@@ -131,24 +150,47 @@ async function mergeIn(dir: string, input: LocalMergeInput): Promise<MergeOutcom
 }
 
 /**
- * Merges the task branch into the target in the main repository (09 §7), under the repository lock. The merge runs
- * where the target is checked out; when it is checked out nowhere, in a temporary worktree removed afterwards.
+ * Runs `merge` where `target` is checked out, under the repository lock; when it is checked out nowhere, in a
+ * temporary worktree removed afterwards.
  */
-export function mergeLocally(locks: RepoLocks, input: LocalMergeInput): Promise<MergeOutcome> {
-  return locks.run(input.repoPath, async () => {
-    const holder = await targetHolder(input.repoPath, input.targetBranch);
-    if (holder !== undefined) return mergeIn(holder, input);
+function inTargetWorktree(
+  locks: RepoLocks,
+  repoPath: string,
+  target: string,
+  merge: (dir: string) => Promise<MergeOutcome>,
+): Promise<MergeOutcome> {
+  return locks.run(repoPath, async () => {
+    const holder = await targetHolder(repoPath, target);
+    if (holder !== undefined) return merge(holder);
     const parent = await mkdtemp(join(tmpdir(), 'aw-merge-'));
     const dir = join(parent, 'target');
     try {
-      await runGit(['worktree', 'add', '--quiet', dir, input.targetBranch], { cwd: input.repoPath });
+      await runGit(['worktree', 'add', '--quiet', dir, target], { cwd: repoPath });
       try {
-        return await mergeIn(dir, input);
+        return await merge(dir);
       } finally {
-        await runGit(['worktree', 'remove', '--force', dir], { cwd: input.repoPath });
+        await runGit(['worktree', 'remove', '--force', dir], { cwd: repoPath });
       }
     } finally {
       await rm(parent, { recursive: true, force: true });
     }
   });
+}
+
+/** Merges the task branch into the target in the main repository (09 §7). */
+export function mergeLocally(locks: RepoLocks, input: LocalMergeInput): Promise<MergeOutcome> {
+  return inTargetWorktree(locks, input.repoPath, input.targetBranch, (dir) => mergeIn(dir, input));
+}
+
+/**
+ * The Git workbench's merge (27 §3.5): `source` (any branch or commit) into the local branch `target`, as the user.
+ * The caller checked that the target's worktree is clean; conflicts are aborted and reported, the target unchanged.
+ */
+export function mergeAsUser(
+  locks: RepoLocks,
+  input: { repoPath: string; source: string; target: string; strategy: GitMergeStrategy; message: string },
+): Promise<MergeOutcome> {
+  return inTargetWorktree(locks, input.repoPath, input.target, (dir) =>
+    mergeOrSquash(dir, input.source, input.strategy === GitMergeStrategy.Squash, input.message, USER),
+  );
 }

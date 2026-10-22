@@ -17,6 +17,8 @@ export const ATTEMPT_KIND_LABEL: Record<AttemptKind, string> = {
   [AttemptKind.Research]: '知识研究',
   [AttemptKind.DeckOutline]: 'PPT 大纲',
   [AttemptKind.DeckSlides]: 'PPT 页面',
+  [AttemptKind.GitReview]: 'Git 审查',
+  [AttemptKind.CommitMessage]: '草拟提交信息',
 };
 
 export const TRANSCRIPT_SYSTEM_LABEL: Record<TranscriptSystemEvent, string> = {
@@ -65,6 +67,8 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.SubmitAnswer]: '提交回答',
   [McpToolName.SubmitOutline]: '提交大纲',
   [McpToolName.SubmitSlide]: '提交一页',
+  [McpToolName.SubmitFindings]: '提交审查问题',
+  [McpToolName.SubmitCommitMessage]: '提交草拟的提交信息',
 };
 
 /** One tool call in the user's words, as a verb and what it works on:「编辑」「src/a.ts」. */

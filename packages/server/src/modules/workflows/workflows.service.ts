@@ -50,9 +50,12 @@ export function createWorkflowsService({ db, clock, log, roles }: WorkflowsServi
     return workflow;
   }
 
+  /** The listed version of a key; system workflows are not the user's to name (27 §3.6). */
   function latestByKey(key: string): WorkflowDTO {
     const workflow = repo.findLatest(key);
-    if (workflow === undefined) throw new AppError(ErrorCode.WorkflowNotFound, `Workflow ${key} not found`, { key });
+    if (workflow === undefined || workflow.kind === WorkflowKind.System) {
+      throw new AppError(ErrorCode.WorkflowNotFound, `Workflow ${key} not found`, { key });
+    }
     return workflow;
   }
 
@@ -68,7 +71,7 @@ export function createWorkflowsService({ db, clock, log, roles }: WorkflowsServi
   }
 
   function assertCustom(workflow: WorkflowDTO): void {
-    if (workflow.kind === WorkflowKind.Builtin) {
+    if (workflow.kind !== WorkflowKind.Custom) {
       throw new AppError(
         ErrorCode.WorkflowReadonly,
         'Built-in workflows are read-only; copy the workflow to change it',
@@ -95,8 +98,18 @@ export function createWorkflowsService({ db, clock, log, roles }: WorkflowsServi
   }
 
   return {
-    list: (): WorkflowSummaryDTO[] => repo.listLatest().map(toSummary),
+    list: (): WorkflowSummaryDTO[] =>
+      repo
+        .listLatest()
+        .filter((w) => w.kind !== WorkflowKind.System)
+        .map(toSummary),
     get,
+    /** The current version of a system workflow, which only the app starts (27 §3.6). */
+    system(key: string): WorkflowDTO {
+      const workflow = repo.findLatest(key);
+      if (workflow?.kind !== WorkflowKind.System) throw new Error(`System workflow ${key} is not seeded`);
+      return workflow;
+    },
     /** The listed version of a key (scheduled tasks run it, 22 §1); WORKFLOW_NOT_FOUND once deleted. */
     latest: latestByKey,
     versions(key: string): WorkflowSummaryDTO[] {
@@ -118,7 +131,7 @@ export function createWorkflowsService({ db, clock, log, roles }: WorkflowsServi
           const latest = txRepo.findLatest(seed.key);
           if (latest !== undefined && contentOf(latest) === contentOf(seed)) continue;
           const version = (latest?.version ?? 0) + 1;
-          txRepo.insertLatest({ ...seed, id: randomUUID(), version, kind: WorkflowKind.Builtin, createdAt: now });
+          txRepo.insertLatest({ ...seed, id: randomUUID(), version, createdAt: now });
           log.info({ workflow: seed.key, version }, 'builtin workflow version added');
         }
       });
@@ -130,6 +143,9 @@ export function createWorkflowsService({ db, clock, log, roles }: WorkflowsServi
         throw new AppError(ErrorCode.WorkflowAlreadyExists, `Workflow ${key} already exists`, { key });
       }
       const source = copyFrom === undefined ? undefined : get(copyFrom);
+      if (source?.kind === WorkflowKind.System) {
+        throw new AppError(ErrorCode.WorkflowNotFound, `Workflow ${copyFrom} not found`, { id: copyFrom });
+      }
       const { planning, deliverable, definition } = source ?? fields;
       // The request schema requires these without copyFrom.
       if (planning === undefined || deliverable === undefined || definition === undefined) {

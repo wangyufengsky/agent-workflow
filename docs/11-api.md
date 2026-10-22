@@ -214,19 +214,37 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 `resolve` 是各业务动作的统一入口：`question` → 答案发回会话；`permission` → 回复 opencode（bash 请求选 `always` 时还把 payload 的每条子命令按「命令 + 开头的选项 + ` *`」记到项目，Git 与前置变量赋值的除外，D101）；`acceptance` → 节点 accept/reject；`plan` → 等同 plan confirm/replan；`failure` → 任务 retry/cancel；`delivery` 不通过 resolve，而是 `deliver` 成功后自动 resolved；`schedule_failure` 同样不通过 resolve，恢复定时任务时自动 resolved（22 §5）。
 
-## 8. Git（专业模式）
+## 8. Git 工作台（专业模式，27）
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/projects/:id/git/status` | 主工作区：当前分支、提交、上游与 ahead/behind、是否干净、改动文件（porcelain 两字母代码） |
+| GET | `/projects/:id/git/status` | 主工作区：当前分支、提交、上游与 ahead/behind、是否干净、改动文件（porcelain 两字母代码）、未完成的操作 `operation`、提交身份 `identity`、上次获取时间 `fetchedAt` |
 | GET | `/projects/:id/git/branches` | 本地与远端分支（不含 `origin/HEAD` 这类符号引用），标注当前分支与所属任务（`task: { id, key, status }`） |
-| GET | `/projects/:id/git/log?ref&limit&cursor` | 提交列表 `{ items, nextCursor }`，`cursor` 为已显示的提交数 |
-| GET | `/projects/:id/git/commits/:sha` | 提交详情 + 相对第一个父提交的文件列表（根提交与空树比较） |
+| GET | `/projects/:id/git/log?ref&limit&cursor&author&search` | 提交列表 `{ items, nextCursor }`，`cursor` 为已显示的提交数；`author` 按作者姓名或邮箱、`search` 按提交信息筛选（不区分大小写），`search` 是 `ref` 上某个提交的 SHA 前缀时只返回该提交 |
+| GET | `/projects/:id/git/commits/:sha?parent` | 提交详情（含提交者、包含它的本地分支）+ 相对第 `parent` 个父提交（默认 1）的文件列表（根提交与空树比较） |
 | GET | `/projects/:id/git/diff?from&to` | 任意两个 ref 的文件列表 `DiffDTO` |
 | GET | `/projects/:id/git/diff/file?from&to&path` | 单文件 unified diff（`FileDiffDTO`，超过 `DIFF_FILE_MAX_BYTES` 只返回大小） |
 | GET | `/projects/:id/git/tree?ref&path` | 目录浏览（目录在前；`path` 为空即仓库根） |
 | GET | `/projects/:id/git/file?ref&path` | 文件内容；二进制返回 `{ binary: true }`，超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }` |
 | POST | `/projects/:id/git/fetch` | `git fetch --all --prune`（仓库锁内） |
+| GET | `/projects/:id/git/changes` | 未提交的改动 `{ staged, unstaged, conflicted }`（`DiffFile[]`，未跟踪文件是 unstaged 中的 added，改名带 `oldPath`；合并冲突没解决完的路径只在 `conflicted` 中） |
+| GET | `/projects/:id/git/changes/file?path&side` | 一个文件的 diff：`side = staged`（暂存区对 HEAD）或 `unstaged`（工作区对暂存区，未跟踪文件对空） |
+| POST | `/projects/:id/git/stage`、`/unstage` | `{ paths }`：整文件暂存（含删除）/ 取消暂存（暂存的改名连同原路径一起取消），write |
+| POST | `/projects/:id/git/commits` | `{ message }` → 201 新提交；以用户身份提交并运行钩子（钩子拒绝为 `GIT_COMMAND_FAILED`，stderr 为钩子输出）；`GIT_NOTHING_TO_COMMIT`、`GIT_IDENTITY_MISSING`、`GIT_OPERATION_IN_PROGRESS`，write |
+| POST | `/projects/:id/git/commit-message` | `{}` 或 `{ from, to }` → `{ subject, body }`：AI 草拟已暂存改动或压缩合并的提交信息，等它写完（最长 `COMMIT_DRAFT_TIMEOUT_MS`）；`GIT_NOTHING_TO_COMMIT`、`COMMIT_DRAFT_FAILED`、`OPENCODE_NOT_READY`；read，不给助手 |
+| GET | `/projects/:id/git/push?branch` | 推送预览：远端分支、是否新建、将推送的提交（最多 `GIT_PUSH_COMMITS_SHOWN` 个）与总数 |
+| POST | `/projects/:id/git/push` | `{ branch }`：推送到 origin 的同名分支，不强推，没有上游时设为上游；绑定了远端时带项目令牌（D53），否则用用户自己的凭据；`GIT_PUSH_REJECTED`、`GIT_BRANCH_OWNED_BY_TASK`，critical |
+| POST | `/projects/:id/git/pull` | 获取当前分支的上游并快进；`GIT_NO_UPSTREAM`、`WORKTREE_DIRTY`、`BRANCH_DIVERGED`，write |
+| POST | `/projects/:id/git/branches` | `{ name, startPoint, switch }` → 204；名称不合法或以 `aw/` 开头 400 `VALIDATION_FAILED`，`GIT_BRANCH_EXISTS`；`switch` 时要求主工作区干净，write |
+| POST | `/projects/:id/git/switch` | `{ branch }`：本地分支直接切换，远端分支建本地跟踪分支；`WORKTREE_DIRTY`、`GIT_BRANCH_IN_USE`、`GIT_BRANCH_EXISTS`、`GIT_BRANCH_OWNED_BY_TASK`，write |
+| DELETE | `/projects/:id/git/branches/:name?force` | 删除本地分支；默认分支、当前分支或检出在别处 `GIT_BRANCH_IN_USE`，未合并且没有 `force` 时 `GIT_BRANCH_NOT_MERGED`，critical |
+| POST | `/projects/:id/git/merge` | `{ source, target, strategy: merge \| squash, message }` → `{ merged: true, commit }` 或 `{ merged: false, conflictFiles }`（冲突时已中止，目标不变）；以用户身份；目标检出在主工作区时要求它干净（`WORKTREE_DIRTY`），检出在别处 `GIT_BRANCH_IN_USE`，任务分支 `GIT_BRANCH_OWNED_BY_TASK`，critical |
+| POST | `/projects/:id/git/merge-task` | `{ source, target }` → 201 任务（`system.merge_branch` 系统流程，27 §3.6），write，`produces: task` |
+| POST | `/projects/:id/git/pull-requests` | `{ branch, base, title, body }` → 201 `{ url, existed }`：该分支已有打开的 PR 时直接返回它；`HOSTING_NOT_CONFIGURED`，critical |
+| POST | `/projects/:id/git/reviews` | `{ target, focus? }` → 201 审查 `GitReviewDTO`（`target`：`{ kind: worktree }`、`{ kind: commit, sha, parent? }`、`{ kind: branch, branch }`、`{ kind: range, from, to }`）；没有改动 400，同项目已有进行中的审查 409 `GIT_REVIEW_RUNNING`，`OPENCODE_NOT_READY`；write，`produces: git_review` |
+| GET | `/projects/:id/git/reviews?to` | 审查列表，新的在前；`to` 只列该提交的 |
+| GET | `/git/reviews/:reviewId` | 一次审查；`GIT_REVIEW_NOT_FOUND` |
+| POST | `/git/reviews/:reviewId/stop` | 停止进行中的审查，write |
 | GET | `/projects/:id/worktrees` | 所有 worktree（含非本应用创建的，标注 `managed`），关联任务、分支、脏状态、相对项目默认分支的 ahead/behind；目录已不存在的标 `prunable` |
 | POST | `/projects/:id/worktrees/prune` | 删除终态任务遗留的 worktree（保留分支）并 `git worktree prune`，返回新的列表 |
 
@@ -281,6 +299,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
 | `knowledge.updated` | `{ conversationId }` | 知识问答：新一轮、答案提交、一轮结束、权限请求等待或已处理、删除时；对话与列表重新拉取（研究过程与流式回答的草稿沿用 `attempt.transcript`：研究尝试的正文每 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 个字符推送一次，草稿 = 最后一个非提交工具调用之后的正文，18 §5.5） |
 | `schedule.updated` | `{ scheduleId }` | 定时任务（v1.2）：创建、修改、暂停 / 恢复、每次运行、删除后；定时任务列表与详情重新拉取（查询挂在任务列表前缀下，开出的任务状态变化也会刷新，22 §9） |
+| `git_review.updated` | `{ reviewId, projectId }` | Git 工作台的审查开始、提交问题、结束时；审查与列表重新拉取（27 §7.4） |
 | `deck.updated` | `{ deckId }` | PPT：AI 工作开始与结束、每次提交通过、权限请求等待或已处理、页面修改、删除时；PPT 与列表重新拉取（23 §8） |
 | `resync` | `{}` | 全部失效 |
 

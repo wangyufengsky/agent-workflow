@@ -76,4 +76,6 @@ export const queryKeys = {
     resource,
     params,
   ],
+  /** One AI review of the Git workbench, read by id (assistant cards open it without the project). */
+  gitReview: (reviewId: string) => ['gitReview', reviewId],
 } as const;

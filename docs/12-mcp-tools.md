@@ -141,17 +141,19 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `submit_result` | execute | 提交节点结果 |
 | `submit_review` | review | 提交评审结论 |
 | `ask_user` | plan · execute | 向用户提问 |
-| `report_progress` | plan · execute · review · research · deck_outline · deck_slides | 上报一句当前进展 |
+| `report_progress` | plan · execute · review · research · deck_outline · deck_slides · git_review · commit_message | 上报一句当前进展 |
 | `db_list_connections` | plan · execute · review · research | 列出项目关联的数据库 |
 | `db_describe` | plan · execute · review · research | 查看表结构 |
 | `db_query` | plan · execute · review · research | 只读查询 |
 | `submit_answer` | research | 提交带引用的回答（v1.1 知识问答，18 §6） |
 | `submit_outline` | deck_outline | 提交 PPT 大纲与 AI 的理解（v1.2，23 §7.3） |
 | `submit_slide` | deck_slides | 按页码提交 PPT 的一页（v1.2，23 §7.3） |
+| `submit_findings` | git_review | 提交 Git 工作台审查的结论与结构化问题（v1.2，27 §4.4） |
+| `submit_commit_message` | commit_message | 提交草拟的提交信息（v1.2，27 §7.3） |
 
 工具名在 opencode 中显示为 `agent-workflow_<name>`（名称常量 `McpToolName`）。输入/输出 schema 位于 `shared/contracts/mcp/<tool>.ts`；下文用 TS 类型描述。
 
-M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07。调试尝试（开发构建，不属于任务）仍可用 `get_task_context`（返回任务编号 `DEBUG`）、`report_progress`、`submit_result`（直接使尝试 `succeeded`，返回 `next: 'done'`）；调试尝试不属于任何项目，`db_list_connections` 返回空列表，其他数据库工具返回 `DB_CONNECTION_NOT_FOUND`。知识问答的 `research` 尝试（v1.1）用对话的项目；对话的资料范围不含数据库时与调试尝试相同。PPT 的尝试（v1.2）不能用数据库工具与任务工具（`MCP_TOOL_NOT_ALLOWED`）。
+M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07。调试尝试（开发构建，不属于任务）仍可用 `get_task_context`（返回任务编号 `DEBUG`）、`report_progress`、`submit_result`（直接使尝试 `succeeded`，返回 `next: 'done'`）；调试尝试不属于任何项目，`db_list_connections` 返回空列表，其他数据库工具返回 `DB_CONNECTION_NOT_FOUND`。知识问答的 `research` 尝试（v1.1）用对话的项目；对话的资料范围不含数据库时与调试尝试相同。PPT 的尝试（v1.2）与 Git 工作台的 `git_review` / `commit_message` 尝试（v1.2，agent `aw-code-reviewer`，权限同研究员，会话目录为项目主仓库）不能用数据库工具与任务工具（`MCP_TOOL_NOT_ALLOWED`）。
 
 ---
 
@@ -322,6 +324,17 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 行为：`page` 必须是这次工作的目标页之一（否则 `VALIDATION_FAILED`，`path = ['page']`，消息列出目标页码）；通过 → 写入这一页的内容与讲稿（这次工作第一次覆盖已有内容时，旧内容存为上一版）；同一页可以重复提交，以最后一次为准；全部目标页都提交过时尝试 `succeeded`。
 输出：`{ accepted: true, remaining: number[] }`（这次工作还没提交的页码）
 错误：`VALIDATION_FAILED`、`MCP_RESULT_ALREADY_SUBMITTED`。
+
+### 6.15 `submit_findings`（v1.2）
+
+只用于 `git_review` 尝试（Git 工作台的 AI 审查，27 §4.4）。输入：`{ summary: string; findings: Array<{ severity: 'blocker' | 'major' | 'minor'; category: 'correctness' | 'security' | 'performance' | 'maintainability' | 'tests'; path: string; line?: number; end_line?: number; side?: 'new' | 'old'; title: string; description: string; suggestion?: string }> }`（最多 `GIT_REVIEW_FINDINGS_MAX` 个，可以为空）。
+行为：每个问题的文件须在审查开始时记录的改动清单中，行号须在所指版本（`new` 为审查的终点或工作区，`old` 为起点）的文件里；不通过 → `GIT_REVIEW_FINDINGS_INVALID`，`details.problems[]`（08 §5.6，每项带 `index` 与 hint）与 `details.files`；通过 → 写入审查的结论与问题，尝试 `succeeded`，发 `git_review.updated`。
+输出：`{ accepted: true }`
+错误：`GIT_REVIEW_FINDINGS_INVALID`、`VALIDATION_FAILED`、`MCP_RESULT_ALREADY_SUBMITTED`。
+
+### 6.16 `submit_commit_message`（v1.2）
+
+只用于 `commit_message` 尝试（27 §7.3）。输入：`{ subject: string; body?: string }`。行为：草稿交给等待中的请求，尝试 `succeeded`。输出：`{ accepted: true }`。
 
 ## 7. 实现结构
 

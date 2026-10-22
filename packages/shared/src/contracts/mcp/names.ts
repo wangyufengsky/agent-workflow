@@ -16,6 +16,8 @@ export const McpToolName = {
   SubmitAnswer: 'submit_answer',
   SubmitOutline: 'submit_outline',
   SubmitSlide: 'submit_slide',
+  SubmitFindings: 'submit_findings',
+  SubmitCommitMessage: 'submit_commit_message',
 } as const;
 export type McpToolName = (typeof McpToolName)[keyof typeof McpToolName];
 
@@ -28,4 +30,6 @@ export const ATTEMPT_SUBMIT_TOOL = {
   [AttemptKind.DeckOutline]: McpToolName.SubmitOutline,
   // Called once per page; the attempt is submitted with the last of its pages (23 §4.1).
   [AttemptKind.DeckSlides]: McpToolName.SubmitSlide,
+  [AttemptKind.GitReview]: McpToolName.SubmitFindings,
+  [AttemptKind.CommitMessage]: McpToolName.SubmitCommitMessage,
 } as const satisfies Record<AttemptKind, McpToolName>;

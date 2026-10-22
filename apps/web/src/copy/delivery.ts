@@ -40,7 +40,7 @@ export const DELIVERY_COPY = {
   resolveMyself: '我自己处理',
   resolveMyselfTitle: '自己解决冲突',
   resolveMyselfBody: '在任务的工作区里合入目标分支、解决冲突并提交，然后回到这里再次点击合并：',
-  resolveMyselfGit: '在 Git 管理台中查看',
+  resolveMyselfGit: '在 Git 工作台中查看',
   failedTitle: '上次合并没有成功',
   reviewTitle: '审查意见',
   reviewFetch: '取回审查意见',

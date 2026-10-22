@@ -14,6 +14,8 @@ import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
 import { frequencyText } from '../../copy/schedules.ts';
 import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
+import { gitReviewQuery } from '../git/git.queries.ts';
+import { ReviewBadge } from '../git/git-parts.tsx';
 import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
 import { deckCounts, deckStatusLabel } from '../ppt/deck-status.ts';
 import { deckQuery } from '../ppt/ppt.queries.ts';
@@ -138,6 +140,13 @@ function DeckEntityCard({ entity }: { entity: EntityRef }) {
   return <Shell entity={entity} presence={byDetail(query, ErrorCode.DeckNotFound, status)} />;
 }
 
+function GitReviewEntityCard({ entity }: { entity: EntityRef }) {
+  // `git_review.updated` keeps this query current while the review runs (27 §7.4).
+  const query = useQuery(gitReviewQuery(entity.id));
+  const status = query.data === undefined ? undefined : <ReviewBadge review={query.data} />;
+  return <Shell entity={entity} presence={byDetail(query, ErrorCode.GitReviewNotFound, status)} />;
+}
+
 function ScheduleEntityCard({ entity }: { entity: EntityRef }) {
   const query = useQuery(scheduleQuery(entity.id));
   const status =
@@ -166,5 +175,7 @@ export function EntityCard({ entity }: { entity: EntityRef }) {
       return <DeckEntityCard entity={entity} />;
     case EntityKind.Schedule:
       return <ScheduleEntityCard entity={entity} />;
+    case EntityKind.GitReview:
+      return <GitReviewEntityCard entity={entity} />;
   }
 }

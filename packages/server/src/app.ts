@@ -37,6 +37,7 @@ import { createDebugModule } from './modules/debug/index.ts';
 import { createDecksModule, type DecksService } from './modules/decks/index.ts';
 import { createDeliveryModule } from './modules/delivery/index.ts';
 import { createRepoLocks, locateOpencodeShell } from './modules/git/index.ts';
+import { createGitReviewsModule } from './modules/git-reviews/index.ts';
 import { type HostingEndpoints, PUBLIC_HOSTING } from './modules/hosting/index.ts';
 import { createInboxModule, type InboxService } from './modules/inbox/index.ts';
 import { createInsightsModule } from './modules/insights/index.ts';
@@ -258,6 +259,17 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     settings: settings.service,
     prompts,
   });
+  const gitReviews = createGitReviewsModule({
+    db: database.db,
+    unit,
+    clock,
+    log,
+    attempts: attempts.service,
+    projects: projects.service,
+    roles: roles.service,
+    settings: settings.service,
+    prompts,
+  });
   const tasks = createTasksModule({
     db: database.db,
     unit,
@@ -277,6 +289,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     deliveries: deliveries.service,
     databases: databases.service,
     knowledge: knowledge.service,
+    gitReviews: gitReviews.service,
     locks,
     dataDir: config.dataDir,
   });
@@ -344,6 +357,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     debug: debug.service,
     knowledge: knowledge.service,
     decks: decks.service,
+    gitReviews: gitReviews.service,
+    commitDrafts: gitReviews.drafts,
     log,
   });
   mcp.register(server);
@@ -365,6 +380,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...inbox.operations,
     ...attempts.operations,
     ...repository.operations,
+    ...gitReviews.operations,
     ...mcp.operations,
     // The debug entry exists in development builds only (M2-09).
     ...(config.nodeEnv === 'production' ? [] : debug.operations),

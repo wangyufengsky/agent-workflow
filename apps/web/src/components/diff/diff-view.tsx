@@ -1,6 +1,6 @@
 import type { FileDiffDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Fragment, useMemo } from 'react';
+import { Fragment, useEffect, useMemo, useRef } from 'react';
 import { queryKeys } from '../../api/query-keys.ts';
 import { DIFF_COPY as C } from '../../copy/diff.ts';
 import styles from './diff.module.css';
@@ -8,6 +8,14 @@ import { highlight, type ThemedToken } from './highlight.ts';
 import { type DiffHunk, type DiffLine, parseUnifiedDiff, toSplitRows } from './parse-diff.ts';
 
 export type DiffMode = 'unified' | 'split';
+
+/** A line an AI review found something on (27 §4.5): a dot by its number, coloured by severity. */
+export type DiffMark = { line: number; side: 'new' | 'old'; severity: string; title: string };
+/** A line to scroll to and highlight. */
+export type DiffFocus = { line: number; side: 'new' | 'old' };
+
+const atLine = (line: DiffLine, at: { line: number; side: 'new' | 'old' }) =>
+  (at.side === 'old' ? line.oldNo : line.newNo) === at.line && (at.side === 'old' || line.kind !== 'del');
 
 type Tokens = { old: Map<number, ThemedToken[]>; new: Map<number, ThemedToken[]> };
 
@@ -62,17 +70,38 @@ function Code({ line, tokens }: { line: DiffLine; tokens: Tokens | null | undefi
 
 const SIGN = { context: ' ', add: '+', del: '−' } as const;
 
-function UnifiedRows({ hunk, tokens }: { hunk: DiffHunk; tokens: Tokens | null | undefined }) {
-  return hunk.lines.map((line) => (
-    <tr key={`${line.oldNo}-${line.newNo}`} className={styles.line} data-kind={line.kind}>
-      <td className={styles.no}>{line.oldNo}</td>
-      <td className={styles.no}>{line.newNo}</td>
-      <td className={styles.sign}>{SIGN[line.kind]}</td>
-      <td className={styles.code}>
-        <Code line={line} tokens={tokens} />
-      </td>
-    </tr>
-  ));
+function UnifiedRows({
+  hunk,
+  tokens,
+  marks,
+  focus,
+}: {
+  hunk: DiffHunk;
+  tokens: Tokens | null | undefined;
+  marks: readonly DiffMark[];
+  focus: DiffFocus | undefined;
+}) {
+  return hunk.lines.map((line) => {
+    const mark = marks.find((m) => atLine(line, m));
+    return (
+      <tr
+        key={`${line.oldNo}-${line.newNo}`}
+        className={styles.line}
+        data-kind={line.kind}
+        data-mark={mark?.severity}
+        data-focus={focus !== undefined && atLine(line, focus) ? true : undefined}
+      >
+        <td className={styles.no}>{line.oldNo}</td>
+        <td className={styles.no} title={mark?.title}>
+          {line.newNo}
+        </td>
+        <td className={styles.sign}>{SIGN[line.kind]}</td>
+        <td className={styles.code}>
+          <Code line={line} tokens={tokens} />
+        </td>
+      </tr>
+    );
+  });
 }
 
 function SplitRows({ hunk, tokens }: { hunk: DiffHunk; tokens: Tokens | null | undefined }) {
@@ -91,8 +120,24 @@ function SplitRows({ hunk, tokens }: { hunk: DiffHunk; tokens: Tokens | null | u
 }
 
 /** One file's diff, unified or side by side, highlighted once the grammar is loaded (plain text until then). */
-export function DiffView({ file, mode }: { file: FileDiffDTO; mode: DiffMode }) {
+export function DiffView({
+  file,
+  mode,
+  marks = [],
+  focus,
+}: {
+  file: FileDiffDTO;
+  mode: DiffMode;
+  marks?: readonly DiffMark[] | undefined;
+  focus?: DiffFocus | undefined;
+}) {
   const parsed = useMemo(() => ('diff' in file ? parseUnifiedDiff(file.diff) : undefined), [file]);
+  const scroller = useRef<HTMLDivElement>(null);
+  // Scrolling is a side effect on the rendered rows, so it runs after they are in the document.
+  useEffect(() => {
+    if (focus === undefined) return;
+    scroller.current?.querySelector('[data-focus]')?.scrollIntoView({ block: 'center' });
+  }, [focus]);
   const tokens = useQuery({
     queryKey: queryKeys.syntax(file.path, 'diff' in file ? digest(file.diff) : ''),
     queryFn: () => tokenize(file.path, parsed?.hunks ?? []),
@@ -103,8 +148,8 @@ export function DiffView({ file, mode }: { file: FileDiffDTO; mode: DiffMode }) 
   if (parsed === undefined || parsed.binary) return <p className="hint">{C.binary}</p>;
   if (parsed.hunks.length === 0) return <p className="hint">{C.empty}</p>;
   return (
-    <div className={styles.scroll}>
-      <table className={styles.table} data-mode={mode} data-testid="diff-view">
+    <div className={styles.scroll} ref={scroller} data-testid="diff-view">
+      <table className={styles.table} data-mode={mode}>
         {/* Fixed layout takes column widths from the first row, which is a hunk header spanning all of them. */}
         <colgroup>
           {mode === 'unified' ? (
@@ -130,7 +175,7 @@ export function DiffView({ file, mode }: { file: FileDiffDTO; mode: DiffMode }) 
                 <td colSpan={4}>{hunk.header}</td>
               </tr>
               {mode === 'unified' ? (
-                <UnifiedRows hunk={hunk} tokens={tokens.data} />
+                <UnifiedRows hunk={hunk} tokens={tokens.data} marks={marks} focus={focus} />
               ) : (
                 <SplitRows hunk={hunk} tokens={tokens.data} />
               )}

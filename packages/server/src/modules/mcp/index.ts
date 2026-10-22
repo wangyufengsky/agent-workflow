@@ -7,6 +7,7 @@ import type { AcceptanceService } from '../acceptance/index.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { DebugService } from '../debug/index.ts';
 import type { DecksService } from '../decks/index.ts';
+import type { CommitDrafts, GitReviewsService } from '../git-reviews/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import { createToolRegistry, type McpToolDefinition } from './mcp.registry.ts';
@@ -17,6 +18,8 @@ import { getTaskContextTool } from './tools/get-task-context.tool.ts';
 import { getTaskDiffTool } from './tools/get-task-diff.tool.ts';
 import { reportProgressTool } from './tools/report-progress.tool.ts';
 import { submitAnswerTool } from './tools/submit-answer.tool.ts';
+import { submitCommitMessageTool } from './tools/submit-commit-message.tool.ts';
+import { submitFindingsTool } from './tools/submit-findings.tool.ts';
 import { submitOutlineTool } from './tools/submit-outline.tool.ts';
 import { submitPlanTool } from './tools/submit-plan.tool.ts';
 import { submitResultTool } from './tools/submit-result.tool.ts';
@@ -33,10 +36,23 @@ export type McpModuleDeps = {
   debug: DebugService;
   knowledge: KnowledgeService;
   decks: DecksService;
+  gitReviews: GitReviewsService;
+  commitDrafts: CommitDrafts;
   log: Logger;
 };
 
-export function createMcpModule({ token, attempts, tasks, acceptance, debug, knowledge, decks, log }: McpModuleDeps) {
+export function createMcpModule({
+  token,
+  attempts,
+  tasks,
+  acceptance,
+  debug,
+  knowledge,
+  decks,
+  gitReviews,
+  commitDrafts,
+  log,
+}: McpModuleDeps) {
   const tools: McpToolDefinition[] = [
     getTaskContextTool(tasks, debug),
     getNodeOutputTool(tasks),
@@ -52,6 +68,8 @@ export function createMcpModule({ token, attempts, tasks, acceptance, debug, kno
     submitAnswerTool(knowledge),
     submitOutlineTool(decks),
     submitSlideTool(decks),
+    submitFindingsTool(gitReviews),
+    submitCommitMessageTool(commitDrafts),
   ];
   const registry = createToolRegistry(tools, attempts, log);
   return {

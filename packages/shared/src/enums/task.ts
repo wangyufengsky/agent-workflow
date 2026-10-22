@@ -52,6 +52,10 @@ export const AttemptKind = {
   DeckOutline: 'deck_outline',
   /** Makes or revises some pages of a PPT (23 §4). */
   DeckSlides: 'deck_slides',
+  /** A read-only review of a diff in the Git workbench (27 §4); belongs to no task. */
+  GitReview: 'git_review',
+  /** Drafts a commit message from a diff (27 §7.3); belongs to no task. */
+  CommitMessage: 'commit_message',
 } as const;
 export type AttemptKind = (typeof AttemptKind)[keyof typeof AttemptKind];
 export const attemptKindSchema = z.enum(AttemptKind);

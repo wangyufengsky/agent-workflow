@@ -131,6 +131,7 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
     async deleteProject(projectId: string): Promise<void> {
       projects.getRecord(projectId);
       deps.knowledge.assertProjectIdle(projectId);
+      deps.gitReviews.assertProjectIdle(projectId);
       const tasks = state.repo.list({ projectId });
       const active = tasks.filter((t) => !isTerminalState(taskMachine, t.status));
       if (active.length > 0) {
@@ -141,6 +142,7 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
       deps.unit.transact(() => {
         state.repo.deleteByProject(projectId);
         deps.knowledge.deleteByProject(projectId);
+        deps.gitReviews.deleteByProject(projectId);
         projects.delete(projectId);
       });
       await Promise.all(tasks.map((t) => rm(join(dataDir, 'runs', t.id), { recursive: true, force: true })));

@@ -160,6 +160,8 @@ agent-workflow/
 │  │        ├─ inbox/  delivery/
 │  │        ├─ knowledge/          知识问答（v1.1，18）：对话、research 尝试、引用校验与原文
 │  │        ├─ decks/              PPT（v1.2，23）：大纲、页面、资料快照、deck_outline / deck_slides 尝试
+│  │        ├─ repository/         Git 工作台（27）：读仓库、用户自己的 Git 操作（repository.write.ts）
+│  │        ├─ git-reviews/        Git 工作台的 AI 审查与草拟提交信息（v1.2，27 §4、§7.3）
 │  │        └─ databases/          drivers/{mysql,postgres,sqlserver}
 │  ├─ builtin/                 内置流程与角色（数据 + prompts/*.md）
 │  └─ opencode-plugin/         agent-workflow-bridge（注入 sessionID 到本项目 MCP 工具参数）；`pnpm build:plugin` 去掉类型生成 dist/agent-workflow-bridge.js
@@ -192,6 +194,7 @@ modules/tasks/
 - 知识问答（v1.1，18 §8）：`knowledge` 在 `attempts`、`projects`、`databases`、`inbox` 之上，`tasks`（删除项目）与 `mcp` 之下；研究尝试的 `task_id` 为空，由 `knowledge_turns` 指向。
 - PR 审查意见回流（v1.2，21）：编排在 `tasks/tasks.review.ts`（取回意见、发起修改），用 `hosting`（`GitHostingProvider` 新增按分支查找打开的 PR 与读取审查意见）、`delivery`（抓取并快进任务分支）、`worktrees`（`restore` 重建）与「再改改」的节点追加（`tasks.changes.ts` 的 `appendRevision`）；不新增模块与表。
 - PPT（v1.2，23 §12）：`decks` 在 `attempts`、`projects`、`tasks`（任务结果快照）、`knowledge`（对话快照）、`inbox` 之上，`mcp` 与 `assistant` 之下；PPT 尝试的 `task_id` 为空，由 `deck_runs` 指向。删除项目时 PPT 的 `project_id` 由外键置空，`tasks` 不需要知道 PPT。
+- Git 工作台（v1.2，27）：`repository` 在 `projects`（项目与远端令牌）、`tasks`（任务分支的归属、合并任务）、`worktrees`、`delivery`（`mergeAsUser`：与交付共用一套合并实现，只换身份与钩子）之上；`git-reviews` 在 `attempts`、`projects`、`roles`、`settings` 之上，`tasks`（删除项目）与 `mcp` 之下，审查尝试的 `task_id` 为空，由 `git_reviews` 指向。
 - 批量任务（v1.1，20 §9）：`batches` 在 `tasks`、`workflows`、`settings` 之上，`assistant` 之下；`tasks` 不知道批次（批次表引用任务表）。
 - 定时任务（v1.2，22 §11）：`schedules` 在 `tasks`、`workflows`、`inbox` 之上，`assistant` 之下；`tasks` 不知道定时任务（运行表引用任务表）。检查循环（`schedules.timer.ts`）用注入时钟，`app.start` 时与调度器一起启动，收到 `schedule.updated` 时重排；时区换算在 `core/time-zone.ts`，质量与用量共用。
 - 任务域的服务分层（D45）：`inbox`、`plans`、`timeline`、`worktrees` → `attempts` → `acceptance` → `nodes` → `tasks` → `scheduler`；`mcp` 在最上层。`assistant`（v1.1）与 `mcp` 同在最上层：它从 `app.ts` 拿到其余所有模块的操作实现来生成工具，并用 `attempts` 的会话流存储与会话视图、`tasks` / `projects` / `workflows` 查页面上的名称。尝试经 `attempts.onSignal` 通知其所有者（节点、规划、评审），不反向依赖；需要完整任务上下文的入口（`inbox.resolve`、`projects.delete`、节点通过/驳回/重试、删除流程与角色）由 `tasks` 实现。`databases` 在 `projects` 之下（项目详情列出关联的连接），任务上下文与数据库 MCP 工具经 `tasks` 使用它；`workflows` 依赖 `roles`（校验流程定义）。

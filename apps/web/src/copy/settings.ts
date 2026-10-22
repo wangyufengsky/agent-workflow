@@ -13,7 +13,7 @@ export const SETTINGS_COPY = {
   introHint: '应用启动时播放一段 1 秒左右的动画，下次启动生效。',
   mode: '界面模式',
   proMode: '专业模式',
-  proModeHint: '开启后显示流程编排、计划编辑、Git 管理台、角色、数据库等功能。',
+  proModeHint: '开启后显示流程编排、计划编辑、Git 工作台、角色、数据库等功能。',
   ai: 'AI',
   uncertainty: 'AI 遇到不确定的地方时',
   assume: '做出合理假设并写明',

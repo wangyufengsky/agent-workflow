@@ -17,7 +17,7 @@ describe('操作清单的标注（M5-10）', () => {
     expect(declared).toEqual(secrets);
   });
 
-  it('删除、取消、合并类操作是 critical（D27）', () => {
+  it('删除、取消、合并、推送类操作是 critical（D27、D108）', () => {
     const critical = OPERATION_CONTRACTS.filter((op) => op.risk === OperationRisk.Critical).map((op) => op.id);
     expect(critical.sort()).toEqual(
       [
@@ -27,6 +27,10 @@ describe('操作清单的标注（M5-10）', () => {
         'batches.deliver',
         'databases.delete',
         'decks.delete',
+        'git.createPullRequest',
+        'git.deleteBranch',
+        'git.merge',
+        'git.push',
         'inbox.resolve',
         'knowledge.delete',
         'projects.delete',

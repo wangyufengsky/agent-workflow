@@ -122,6 +122,19 @@ export async function queueResearchTurn(
   if (!res.ok()) throw new Error(`queueing a research turn failed: ${res.status()} ${await res.text()}`);
 }
 
+/** Queues a turn for the Git workbench's reviewer of this project: a review or a commit message draft (27 §4.3). */
+export async function queueCodeReviewerTurn(
+  request: APIRequestContext,
+  project: E2EProject,
+  steps: FakeStep[],
+): Promise<void> {
+  const res = await request.post(`${API_BASE}/dev/fake-opencode/scripts`, {
+    headers: AUTH,
+    data: { match: { agent: 'aw-code-reviewer', directory: project.repoPath }, steps },
+  });
+  if (!res.ok()) throw new Error(`queueing a code reviewer turn failed: ${res.status()} ${await res.text()}`);
+}
+
 /** Queues a turn for the PPT writer of this project (its sessions run in the project repository, 23 §7.1). */
 export async function queueWriterTurn(
   request: APIRequestContext,

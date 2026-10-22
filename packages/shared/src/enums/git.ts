@@ -69,3 +69,60 @@ export const ReviewCommentKind = {
 } as const;
 export type ReviewCommentKind = (typeof ReviewCommentKind)[keyof typeof ReviewCommentKind];
 export const reviewCommentKindSchema = z.enum(ReviewCommentKind);
+
+/** A multi-step git operation the user left unfinished in the main worktree (27 §5). */
+export const GitOperation = {
+  Merge: 'merge',
+  Rebase: 'rebase',
+  CherryPick: 'cherry_pick',
+  Revert: 'revert',
+} as const;
+export type GitOperation = (typeof GitOperation)[keyof typeof GitOperation];
+export const gitOperationSchema = z.enum(GitOperation);
+
+/** How the Git workbench merges one branch into another (27 §3.5); no rebase there. */
+export const GitMergeStrategy = {
+  Merge: 'merge',
+  Squash: 'squash',
+} as const;
+export type GitMergeStrategy = (typeof GitMergeStrategy)[keyof typeof GitMergeStrategy];
+export const gitMergeStrategySchema = z.enum(GitMergeStrategy);
+
+/** What an AI review in the Git workbench looks at (27 §4.2). */
+export const GitReviewTarget = {
+  /** Uncommitted changes of the main worktree against HEAD. */
+  Worktree: 'worktree',
+  Commit: 'commit',
+  /** A branch against its merge base with the project's default branch. */
+  Branch: 'branch',
+  /** Any two refs, from their merge base. */
+  Range: 'range',
+} as const;
+export type GitReviewTarget = (typeof GitReviewTarget)[keyof typeof GitReviewTarget];
+export const gitReviewTargetSchema = z.enum(GitReviewTarget);
+
+export const FindingSeverity = {
+  Blocker: 'blocker',
+  Major: 'major',
+  Minor: 'minor',
+} as const;
+export type FindingSeverity = (typeof FindingSeverity)[keyof typeof FindingSeverity];
+export const findingSeveritySchema = z.enum(FindingSeverity);
+
+export const FindingCategory = {
+  Correctness: 'correctness',
+  Security: 'security',
+  Performance: 'performance',
+  Maintainability: 'maintainability',
+  Tests: 'tests',
+} as const;
+export type FindingCategory = (typeof FindingCategory)[keyof typeof FindingCategory];
+export const findingCategorySchema = z.enum(FindingCategory);
+
+/** Which side of a diff a finding's line numbers count on. */
+export const DiffSide = {
+  New: 'new',
+  Old: 'old',
+} as const;
+export type DiffSide = (typeof DiffSide)[keyof typeof DiffSide];
+export const diffSideSchema = z.enum(DiffSide);

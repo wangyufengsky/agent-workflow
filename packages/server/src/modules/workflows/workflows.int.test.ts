@@ -63,6 +63,16 @@ describe('内置流程与角色', () => {
     expect(workflows.list()).toHaveLength(5);
   });
 
+  it('系统流程的 key 不占用户的命名空间：用户的 merge_branch 流程在同步内置流程后仍是最新版本并列出', async () => {
+    const bugfix = (await t.call(listWorkflowsOp, {})).body.items.find((w) => w.key === 'bugfix');
+    const mine = await t.call(createWorkflowOp, { copyFrom: bugfix?.id ?? '', key: 'merge_branch', name: '我的合并' });
+    expect(mine.status).toBe(201);
+
+    t.app.services.workflows.syncBuiltin(loadBuiltinWorkflows(promptsDir));
+    expect(t.app.services.workflows.latest('merge_branch')).toMatchObject({ id: mine.body.id, kind: 'custom' });
+    expect((await t.call(listWorkflowsOp, {})).body.items.map((w) => w.key)).toContain('merge_branch');
+  });
+
   it('内置角色的提示词或基础 agent 变化时就地更新', async () => {
     const { roles } = t.app.services;
     roles.syncBuiltin(
