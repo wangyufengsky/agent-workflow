@@ -47,7 +47,8 @@ export type StreamItem =
   | { kind: 'wait'; key: string; permission: string; patterns: string[]; waiting: boolean }
   /** A `report_progress` line. */
   | { kind: 'progress'; key: string; text: string }
-  | { kind: 'notice'; key: string; event: TranscriptSystemEvent }
+  /** `waiting`: the session stopped here for your answer (`awaiting_input` last, nothing came after). */
+  | { kind: 'notice'; key: string; event: TranscriptSystemEvent; waiting: boolean }
   | { kind: 'error'; key: string; error: ErrorInfo };
 
 const text = (value: unknown) => (typeof value === 'string' ? value : '');
@@ -206,7 +207,7 @@ export function streamItems(
         items.push({ kind: 'wait', key, permission: e.data.permission, patterns: e.data.patterns, waiting: false });
         break;
       case TranscriptEntryKind.System:
-        if (!QUIET_EVENTS.has(e.data.event)) items.push({ kind: 'notice', key, event: e.data.event });
+        if (!QUIET_EVENTS.has(e.data.event)) items.push({ kind: 'notice', key, event: e.data.event, waiting: false });
         break;
       case TranscriptEntryKind.Error:
         items.push({ kind: 'error', key, error: e.data });
@@ -218,6 +219,13 @@ export function streamItems(
   if (ended) return grouped(items);
   const last = items.at(-1);
   if (last?.kind === 'text' || last?.kind === 'thinking') items[items.length - 1] = { ...last, writing: true };
+  // A further permission asked while the session already waits gets no notice of its own.
   else if (last?.kind === 'wait') items[items.length - 1] = { ...last, waiting: true };
+  else if (last?.kind === 'notice' && last.event === TranscriptSystemEvent.AwaitingInput) {
+    // The session parks right after a permission request (attempts.state.ts): the request shows the wait itself.
+    const before = items.at(-2);
+    if (before?.kind === 'wait') items.splice(-2, 2, { ...before, waiting: true });
+    else items[items.length - 1] = { ...last, waiting: true };
+  }
   return items;
 }

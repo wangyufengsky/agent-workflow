@@ -75,6 +75,16 @@ const Item = memo(function Item({ item, pro }: { item: StreamItem; pro: boolean 
     case 'progress':
       return <p className={styles.notice}>{C.progress(item.text)}</p>;
     case 'notice':
+      if (item.waiting)
+        return (
+          <p className={styles.wait}>
+            <Icon name="alert" size="sm" />
+            <span className="grow">{TRANSCRIPT_SYSTEM_LABEL[item.event]}</span>
+            <Link to={ROUTES.inbox} className="btn sm">
+              {C.goHandle}
+            </Link>
+          </p>
+        );
       return <p className={styles.notice}>{TRANSCRIPT_SYSTEM_LABEL[item.event]}</p>;
     case 'error':
       return (

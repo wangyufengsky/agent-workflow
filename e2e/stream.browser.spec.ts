@@ -63,6 +63,7 @@ test('J22 步骤的会话流：思考、固定高度、上翻后回到最新、�
   const stream = page.getByRole('dialog').getByTestId('conversation-stream');
   await expect(stream.getByRole('button', { name: /执行过程/ })).toHaveAttribute('aria-expanded', 'true');
   await expect(stream).toContainText('等待你允许：bash pnpm test');
+  await expect(stream.getByRole('link', { name: '去处理' })).toBeVisible();
 
   // A box of fixed height: the content scrolls inside it and the stream follows the bottom.
   const scroll = stream.getByTestId('stream-scroll');

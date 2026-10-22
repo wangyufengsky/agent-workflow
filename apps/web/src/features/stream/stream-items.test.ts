@@ -44,6 +44,8 @@ const shown = (items: StreamItem[]) =>
         return `progress: ${i.text}`;
       case 'wait':
         return `wait ${i.permission}${i.waiting ? ' (waiting)' : ''}`;
+      case 'notice':
+        return `notice ${i.event}${i.waiting ? ' (waiting)' : ''}`;
       default:
         return i.kind;
     }
@@ -91,8 +93,29 @@ describe('streamItems', () => {
       kind: TranscriptEntryKind.Permission,
       data: { permissionId: 'q', permission: 'bash', patterns: ['rm *'] },
     };
-    expect(shown(items([ask]))).toEqual(['wait bash (waiting)']);
     expect(shown(items([ask], { ended: true }))).toEqual(['wait bash']);
+  });
+
+  it('会话因权限或提问停下等你时（权限之后后端追加 awaiting_input），那一条显示在等待', () => {
+    const ask: TranscriptEntry = {
+      seq: ++seq,
+      ts: 0,
+      kind: TranscriptEntryKind.Permission,
+      data: { permissionId: 'q', permission: 'bash', patterns: ['rm *'] },
+    };
+    const awaiting: TranscriptEntry = {
+      seq: ++seq,
+      ts: 0,
+      kind: TranscriptEntryKind.System,
+      data: { event: TranscriptSystemEvent.AwaitingInput },
+    };
+    // The permission line itself says what it waits for; the notice is not repeated.
+    expect(shown(items([part('text', 'a'), ask, awaiting]))).toEqual(['a', 'wait bash (waiting)']);
+    // A blocking question: the notice says the session waits for you.
+    const question = call('q1', 'agent-workflow_ask_user', { question: '哪个环境？', blocking: true });
+    expect(shown(items([question, awaiting]))).toEqual(['向你提问 [running]', 'notice awaiting_input (waiting)']);
+    // Answered: the session goes on, nothing waits any more.
+    expect(shown(items([ask, awaiting, part('text', 'b')]))).toEqual(['wait bash', 'notice awaiting_input', 'b▍']);
   });
 
   it('结束后连续 3 个及以上的动作折叠成组，没有结果的调用为已中断', () => {
