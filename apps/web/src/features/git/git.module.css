@@ -667,7 +667,6 @@
 
 .finding input {
   margin: 3px 0 0;
-  accent-color: var(--accent);
 }
 
 .findingTitle {
@@ -1139,7 +1138,6 @@
 
 .option input {
   margin: 3px 0 0;
-  accent-color: var(--accent);
 }
 
 .option b {
