@@ -18,7 +18,7 @@ import { InsightsPage, insightsSearchSchema } from '../features/insights/insight
 import { KnowledgeConversationPage, KnowledgeWelcomePage } from '../features/knowledge/knowledge.page.tsx';
 import { KnowledgeHistoryPage } from '../features/knowledge/knowledge-history.page.tsx';
 import { NodePage } from '../features/node-detail/node.page.tsx';
-import { OnboardingPage } from '../features/onboarding/onboarding.page.tsx';
+import { EnvironmentPage, OnboardingPage } from '../features/onboarding/onboarding.page.tsx';
 import { PptDeckPage } from '../features/ppt/ppt-deck.page.tsx';
 import { PptListPage } from '../features/ppt/ppt-list.page.tsx';
 import { PptNewPage } from '../features/ppt/ppt-new.page.tsx';
@@ -69,10 +69,15 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
   ),
 });
 
+/** First run only: once a project exists the checks live inside the shell (14 §3.1). */
 const onboardingRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: ROUTES.onboarding,
   component: OnboardingPage,
+  beforeLoad: async ({ context }) => {
+    const projects = await context.queryClient.ensureQueryData(projectsQuery);
+    if (projects.length > 0) throw redirect({ to: ROUTES.environment });
+  },
 });
 
 /** Everything with the sidebar; without any project the first run goes through onboarding (14 §3.1). */
@@ -279,6 +284,7 @@ const routeTree = rootRoute.addChildren([
     pptNewRoute,
     pptDeckRoute,
     page(ROUTES.settings, SettingsPage),
+    page(ROUTES.environment, EnvironmentPage),
     gitRoute,
     gitProjectRoute,
     proOnlyPage(ROUTES.workflows, WorkflowsPage),

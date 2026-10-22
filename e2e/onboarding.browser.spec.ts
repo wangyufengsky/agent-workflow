@@ -17,6 +17,15 @@ test('首次启动：环境检测通过 → 添加项目 → 切换主题与模�
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('heading', { name: '今天想让 AI 做什么？' })).toBeVisible();
 
+  // With a project, the sidebar's runtime chip opens the checks inside the shell, not the first-run page.
+  await page.getByTestId('runtime-chip').click();
+  await expect(page).toHaveURL(/\/environment$/);
+  await expect(page.getByTestId('check-Git')).toContainText('已就绪');
+  await expect(page.getByRole('navigation').getByRole('link', { name: '项目' })).toBeVisible();
+  await expect(page.getByLabel('仓库目录')).toHaveCount(0);
+  await page.goto('/onboarding');
+  await expect(page).toHaveURL(/\/environment$/);
+
   // The project with inferred check command is listed.
   await page.getByRole('navigation').getByRole('link', { name: '项目' }).click();
   await expect(page.getByText('pnpm test').or(page.getByText('npm test'))).toBeVisible();

@@ -6,6 +6,8 @@ type PerPlatform = Record<Platform, string>;
 export const ONBOARDING_COPY = {
   title: '欢迎使用 Agent Workflow',
   lede: '开始之前，先确认这台电脑上的开发环境。',
+  environmentTitle: '开发环境',
+  environmentLede: '本应用用到的 Git、opencode 与模型在这台电脑上是否就绪。',
   recheck: '重新检测',
   ready: '已就绪',
   notReady: '未就绪',

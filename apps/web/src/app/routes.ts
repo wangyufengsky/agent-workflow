@@ -1,6 +1,9 @@
 /** Route paths (14 §1); TanStack Router uses `$param`. */
 export const ROUTES = {
+  /** First run only: without any project every shell page leads here (14 §3.1). */
   onboarding: '/onboarding',
+  /** The same environment checks inside the shell (14 §3.1a). */
+  environment: '/environment',
   home: '/',
   tasks: '/tasks',
   task: '/tasks/$taskId',

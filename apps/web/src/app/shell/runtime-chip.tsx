@@ -15,7 +15,7 @@ export function RuntimeChip() {
   const { status } = data;
   return (
     <Link
-      to={mode === UiMode.Pro ? ROUTES.runtime : ROUTES.onboarding}
+      to={mode === UiMode.Pro ? ROUTES.runtime : ROUTES.environment}
       className="runtime-chip"
       data-testid="runtime-chip"
     >

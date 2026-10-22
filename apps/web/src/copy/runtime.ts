@@ -25,7 +25,7 @@ export const RUNTIME_COPY = {
   restartHint: '重启会中断正在进行的 AI 会话，之后可以重试。',
   startHint: 'opencode 没有在运行，启动后 AI 会话才能进行。',
   startingHint: '正在启动，稍候即可使用。',
-  notHostable: '当前无法托管 opencode，请到首次启动页查看如何安装。',
+  notHostable: '当前无法托管 opencode，请到环境检测页查看如何安装。',
   openOnboarding: '查看环境检测',
   models: '可用的模型',
   modelsCount: (n: number) => `${n} 个模型`,
