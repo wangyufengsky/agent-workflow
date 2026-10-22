@@ -159,12 +159,9 @@ function Box({
           <span className={styles.title}>{title}</span>
           {!ended && attempt.progress !== null && <span className={styles.now}>{attempt.progress}</span>}
           <span className={styles.meta}>
-            {[summary ?? defaultSummary, meta]
-              .filter((p) => p !== null && p !== undefined)
-              .map((p, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: two fixed slots.
-                <span key={i}>{p}</span>
-              ))}
+            {summary ?? defaultSummary}
+            {(summary ?? defaultSummary) !== null && meta !== undefined && ' · '}
+            {meta}
           </span>
           <span className={styles.chevron} aria-hidden="true">
             <Icon name="chevRight" size="sm" />

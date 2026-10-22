@@ -93,15 +93,10 @@
 .meta {
   min-width: 0;
   flex: 1;
-  display: flex;
-  gap: var(--s-2);
   color: var(--muted);
   overflow: hidden;
-  white-space: nowrap;
-}
-.meta > span {
-  overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .chevron {
   flex: none;
@@ -119,13 +114,21 @@
   animation: body-in var(--t-mid) var(--ease);
 }
 .body[data-size="drawer"] {
-  height: max(320px, calc(100dvh - 240px));
+  --stream-h: max(320px, calc(100dvh - 240px));
 }
 .body[data-size="page"] {
-  height: clamp(360px, calc(100dvh - 340px), 640px);
+  --stream-h: clamp(360px, calc(100dvh - 340px), 640px);
 }
 .body[data-size="card"] {
-  height: 300px;
+  --stream-h: 300px;
+}
+/* A running stream keeps its height while it grows; an ended one is no taller than its content. */
+.body {
+  height: var(--stream-h);
+}
+.box:not([data-state="running"]) .body {
+  height: auto;
+  max-height: var(--stream-h);
 }
 @keyframes body-in {
   from {

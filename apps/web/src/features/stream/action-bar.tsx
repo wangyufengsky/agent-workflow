@@ -69,10 +69,10 @@ export function ActionBar({ item, pro }: { item: StreamAction; pro: boolean }) {
                 {C.toolName} <span className="mono">{item.tool}</span> · {C.input}
               </span>
               <pre className={styles.raw}>{rawInput(item.input)}</pre>
-              {item.output !== undefined && <span className={styles.rawLabel}>{C.output}</span>}
+              {item.output !== undefined && item.output !== '' && <span className={styles.rawLabel}>{C.output}</span>}
             </>
           )}
-          {item.output !== undefined && (
+          {item.output !== undefined && item.output !== '' && (
             <pre className={styles.raw} data-failed={item.state === 'failed'}>
               {item.output}
             </pre>
