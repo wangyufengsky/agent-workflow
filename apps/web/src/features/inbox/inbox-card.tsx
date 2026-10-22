@@ -42,13 +42,16 @@ function QuestionCard({ item, resolve, pending }: CardProps<typeof InboxKind.Que
       <Markdown source={item.payload.question} />
       {item.payload.blocking && <span className="hint">{C.blocking}</span>}
       {item.payload.defaultAssumption !== undefined && (
-        <span className="hint">{C.defaultAssumption(item.payload.defaultAssumption)}</span>
+        <span className="hint">
+          {C.defaultAssumption}
+          <Markdown inline source={item.payload.defaultAssumption} />
+        </span>
       )}
       {item.payload.options !== undefined && (
         <div className={styles.options}>
           {item.payload.options.map((option) => (
             <Button key={option} size="sm" disabled={pending} onClick={() => resolve({ answer: option })}>
-              {option}
+              <Markdown inline source={option} />
             </Button>
           ))}
         </div>

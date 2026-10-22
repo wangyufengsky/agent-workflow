@@ -26,7 +26,9 @@ function PlanSteps({ graph, roles }: { graph: PlanGraph; roles: readonly RoleDTO
             <span className={`${styles.stepTitle} grow`}>{n.title}</span>
             <span className="chip">{roles.find((r) => r.key === n.roleKey)?.name ?? n.roleKey}</span>
           </span>
-          <p className={styles.instructions}>{n.instructions}</p>
+          <p className={styles.instructions}>
+            <Markdown inline source={n.instructions} />
+          </p>
         </li>
       ))}
     </ol>

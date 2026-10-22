@@ -1,6 +1,7 @@
 import { AttemptKind, type TaskDetailDTO, TaskStatus, TranscriptEntryKind } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Icon } from '../../components/icon.tsx';
+import { Markdown } from '../../components/markdown.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { toolActionLabel } from '../../copy/attempts.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
@@ -48,7 +49,7 @@ export function PlanningProgress({ task }: { task: TaskDetailDTO }) {
       </ol>
       {attempt !== undefined && attempt.progress !== null && (
         <p className={styles.activity}>
-          {C.planningNow}：{attempt.progress}
+          {C.planningNow}：<Markdown inline source={attempt.progress} />
         </p>
       )}
       {attempt !== undefined && <LastAction attemptId={attempt.id} />}

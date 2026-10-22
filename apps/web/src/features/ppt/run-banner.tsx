@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { Markdown } from '../../components/markdown.tsx';
 import { PPT_COPY as C } from '../../copy/ppt.ts';
 import styles from './ppt.module.css';
 import { useGenerateDeck, useReviseOutline, useStopDeck } from './ppt.queries.ts';
@@ -39,7 +40,11 @@ export function RunBanner({ deck }: { deck: DeckDTO }) {
         <span className="spin" aria-hidden="true" />
         <div className="grow col">
           <span>{line}</span>
-          {run.attempt.progress !== null && <span className="hint">{run.attempt.progress}</span>}
+          {run.attempt.progress !== null && (
+            <span className="hint">
+              <Markdown inline source={run.attempt.progress} />
+            </span>
+          )}
           {run.awaitingInput && (
             <span className={styles.waiting}>
               {C.waitingPermission}

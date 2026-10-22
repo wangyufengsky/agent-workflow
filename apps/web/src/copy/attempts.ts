@@ -153,7 +153,7 @@ export const STREAM_COPY = {
   latest: '回到最新',
   unseen: (n: number) => `${n} 条新内容`,
   toggle: (title: string) => `展开或收起${title}`,
-  progress: (text: string) => `AI 汇报：${text}`,
+  progress: 'AI 汇报：',
   wait: (permission: string, patterns: string) => `等待你允许：${permission} ${patterns}`,
   goHandle: '去处理',
   state: { running: '进行中', ok: '成功', failed: '失败', stopped: '已中断' } satisfies Record<

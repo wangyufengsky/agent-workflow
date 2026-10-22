@@ -14,6 +14,7 @@ import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { Markdown } from '../../components/markdown.tsx';
 import { toast } from '../../components/toast.tsx';
 import { BATCH_DELIVERY_NOTE, BATCHES_COPY as C } from '../../copy/batches.ts';
 import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
@@ -138,7 +139,9 @@ export function BatchPage() {
                       <span className={styles.note}>{note}</span>
                     )}
                   </td>
-                  <td className="hint">{item.task.progress ?? item.task.currentStep ?? ''}</td>
+                  <td className="hint">
+                    <Markdown inline source={item.task.progress ?? item.task.currentStep ?? ''} />
+                  </td>
                 </tr>
               );
             })}

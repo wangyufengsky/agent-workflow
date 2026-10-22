@@ -69,7 +69,7 @@ export const TASKS_COPY = {
 export const TASK_COPY = {
   back: '← 任务',
   meta: (key: string, project: string, workflow: string) => `${key} · ${project} · ${workflow}`,
-  doing: (step: string) => `正在：${step}`,
+  doing: '正在：',
   showDetails: '显示详细信息',
   startDraft: '开始',
   draft: '草稿：还没有开始，开始后会建立独立工作区。',
@@ -185,7 +185,7 @@ export const INBOX_COPY = {
     [InboxKind.ScheduleFailure]: '定时任务没能开始',
   },
   blocking: 'AI 在等这个答案',
-  defaultAssumption: (value: string) => `不回答时 AI 会假设：${value}`,
+  defaultAssumption: '不回答时 AI 会假设：',
   answerPlaceholder: '输入你的回答……',
   submit: '提交',
   answered: '已发送回答',

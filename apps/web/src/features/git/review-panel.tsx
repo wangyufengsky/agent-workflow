@@ -144,7 +144,9 @@ function Finding({
           {C.severity[finding.severity]}
         </span>
         <span className={styles.category}>{C.category[finding.category]}</span>
-        <b>{finding.title}</b>
+        <b>
+          <Markdown inline source={finding.title} />
+        </b>
       </div>
       <div className={styles.findingBody}>
         <button type="button" className={styles.location} onClick={onLocate}>

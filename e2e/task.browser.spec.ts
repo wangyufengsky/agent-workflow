@@ -77,18 +77,30 @@ test('J2 AI 阻塞提问 → 在需要你处理中作答 → 节点继续 → �
     {
       type: 'callTool',
       name: 'ask_user',
-      args: { question: '问题出现在哪个环境？', blocking: true },
+      args: {
+        question: '问题出现在哪个环境？',
+        blocking: true,
+        options: ['预发 `staging`', '**生产**'],
+        default_assumption: '按 **预发** 环境处理',
+      },
     },
   ]);
   await queueTurn(request, project, { title: '定位根因' }, [submitResult('预发环境的时区导致')]);
   await queueTurn(request, project, { title: '修复' }, [submitResult('修复时区处理')]);
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
 
+  // Asked rather than assumed, so the card shows the default assumption; the task keeps the setting it started with.
+  await patchSettings(request, { 'ai.askOnUncertainty': true });
   await startTask(page, project, /修 Bug/, '订单时间显示错了');
+  await patchSettings(request, { 'ai.askOnUncertainty': false });
   await expect(page.getByText('需要你处理', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: /需要你处理（\d+）/ }).click();
   const drawer = page.getByRole('dialog', { name: '需要你处理' });
   const question = drawer.getByTestId('inbox-question').filter({ hasText: '问题出现在哪个环境？' });
+  // Everything the model wrote on the card is Markdown, not its source (14 §2.2).
+  await expect(question.getByRole('button', { name: '预发 staging' }).locator('code')).toHaveText('staging');
+  await expect(question.locator('strong', { hasText: '预发' })).toBeVisible();
+  await expect(question).not.toContainText('**');
   await question.getByLabel('输入你的回答……').fill('预发环境');
   await question.getByRole('button', { name: '提交' }).click();
   await page.keyboard.press('Escape');

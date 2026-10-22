@@ -73,7 +73,12 @@ const Item = memo(function Item({ item, pro }: { item: StreamItem; pro: boolean 
         </p>
       );
     case 'progress':
-      return <p className={styles.notice}>{C.progress(item.text)}</p>;
+      return (
+        <p className={styles.notice}>
+          {C.progress}
+          <Markdown inline source={item.text} />
+        </p>
+      );
     case 'notice':
       if (item.waiting)
         return (
@@ -167,7 +172,11 @@ function Box({
             {state === 'running' ? <span className="spin" /> : <Icon name={STATE_ICON[state]} size="sm" />}
           </span>
           <span className={styles.title}>{title}</span>
-          {!ended && attempt.progress !== null && <span className={styles.now}>{attempt.progress}</span>}
+          {!ended && attempt.progress !== null && (
+            <span className={styles.now}>
+              <Markdown inline source={attempt.progress} />
+            </span>
+          )}
           <span className={styles.meta}>
             {summary ?? defaultSummary}
             {(summary ?? defaultSummary) !== null && meta !== undefined && ' · '}
