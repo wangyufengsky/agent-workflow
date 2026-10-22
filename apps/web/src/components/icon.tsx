@@ -44,6 +44,11 @@ const ICON_PATHS = {
   undo: 'M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
   chevLeft: 'M15 6l-6 6 6 6',
   arrowUp: 'M12 19V5M5 12l7-7 7 7',
+  chevDown: 'M6 9l6 6 6-6',
+  merge: 'M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21V9a9 9 0 0 0 9 9',
+  more: 'M5 12h.01M12 12h.01M19 12h.01',
+  expand: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
+  external: 'M14 4h6v6M20 4l-9 9M18 14v6H4V6h6',
 } as const;
 export type IconName = keyof typeof ICON_PATHS;
 

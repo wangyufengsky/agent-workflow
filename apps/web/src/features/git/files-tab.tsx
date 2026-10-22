@@ -15,7 +15,7 @@ function FileContent({ projectId, refName, path }: { projectId: string; refName:
   if ('binary' in f) return <p className="hint">{C.binary}</p>;
   if ('tooLarge' in f) return <p className="hint">{C.tooLarge(Math.ceil(f.size / 1024))}</p>;
   return (
-    <pre className={styles.code} data-testid="git-file">
+    <pre className={styles.fileContent} data-testid="git-file">
       {f.content}
     </pre>
   );

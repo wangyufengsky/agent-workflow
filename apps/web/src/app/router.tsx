@@ -10,8 +10,8 @@ import { BatchesPage } from '../features/batches/batches.page.tsx';
 import { NewBatchPage } from '../features/batches/new-batch.page.tsx';
 import { DatabasesPage } from '../features/databases/databases.page.tsx';
 import { ComponentGalleryPage } from '../features/dev/component-gallery.page.tsx';
-import { GitConsolePage } from '../features/git/git-console.page.tsx';
-import { GIT_TABS, GitProjectPage } from '../features/git/git-project.page.tsx';
+import { GitConsolePage, GitReviewRedirect } from '../features/git/git-console.page.tsx';
+import { DETAIL_TABS, GIT_VIEWS, GitProjectPage } from '../features/git/git-project.page.tsx';
 import { HomePage } from '../features/home/home.page.tsx';
 import { InboxPage } from '../features/inbox/inbox.page.tsx';
 import { InsightsPage, insightsSearchSchema } from '../features/insights/insights.page.tsx';
@@ -181,19 +181,39 @@ const gitRoute = createRoute({
 const gitProjectRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.gitProject,
-  // The open tab and what it shows: a ref's log or one commit, a directory or file of the tree.
+  // The view and what it shows (27 §6.2): a ref's log with its filters, one commit (the parent it is compared with,
+  // its tab, the file and line open in its diff), a directory or file of the tree, or one review.
   validateSearch: z.object({
-    tab: z.enum(GIT_TABS).optional(),
+    view: z.enum(GIT_VIEWS).optional(),
     ref: z.string().optional(),
+    author: z.string().optional(),
+    q: z.string().optional(),
     sha: z.string().optional(),
+    parent: z.number().int().min(1).optional(),
+    tab: z.enum(DETAIL_TABS).optional(),
     path: z.string().optional(),
+    line: z.number().int().min(1).optional(),
+    side: z.enum(['new', 'old']).optional(),
     file: z.boolean().optional(),
+    review: z.string().optional(),
   }),
   component: () => (
     <ProOnly>
       <GitProjectPage />
     </ProOnly>
   ),
+});
+const gitReviewRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.gitReview,
+  component: function GitReviewRoute() {
+    const { reviewId } = gitReviewRoute.useParams();
+    return (
+      <ProOnly>
+        <GitReviewRedirect reviewId={reviewId} />
+      </ProOnly>
+    );
+  },
 });
 // Knowledge Q&A (18 §2): the first screen keeps the chosen project in the address; a conversation keeps the open
 // citation (`turn` + `cite`) and the pro view of simple mode (`details`); the history keeps its filters.
@@ -286,6 +306,7 @@ const routeTree = rootRoute.addChildren([
     page(ROUTES.settings, SettingsPage),
     page(ROUTES.environment, EnvironmentPage),
     gitRoute,
+    gitReviewRoute,
     gitProjectRoute,
     proOnlyPage(ROUTES.workflows, WorkflowsPage),
     proOnlyPage(ROUTES.workflow, WorkflowEditorPage),

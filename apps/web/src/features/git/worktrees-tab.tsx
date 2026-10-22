@@ -16,26 +16,21 @@ import { usePruneWorktrees, worktreesQuery } from './git.queries.ts';
 /** Every worktree of the repository (11 §8): ours with their tasks, the user's, and stale entries. */
 export function WorktreesTab({ projectId }: { projectId: string }) {
   const worktrees = useQuery(worktreesQuery(projectId));
-  const prune = usePruneWorktrees();
+  const prune = usePruneWorktrees(projectId);
   const [confirming, setConfirming] = useState(false);
   if (worktrees.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (worktrees.isError) return <ErrorState error={worktrees.error} onRetry={() => void worktrees.refetch()} />;
   return (
     <div className="col">
-      <div className={styles.toolbar}>
-        <span className="grow" />
-        <Button icon="trash" onClick={() => setConfirming(true)}>
+      <div className={styles.tableHead}>
+        <h3>{C.views.worktrees}</h3>
+        <span className={styles.spacer} />
+        <Button size="sm" icon="trash" onClick={() => setConfirming(true)}>
           {C.prune}
         </Button>
       </div>
       {worktrees.data.length === 0 && <p className="hint">{C.noWorktrees}</p>}
-      <table className={styles.table} data-layout="fixed">
-        <colgroup>
-          <col className={styles.wide} />
-          <col />
-          <col />
-          <col />
-        </colgroup>
+      <table className={styles.table}>
         <thead>
           <tr>
             <th>{C.path}</th>
@@ -85,7 +80,7 @@ export function WorktreesTab({ projectId }: { projectId: string }) {
               variant="danger"
               pending={prune.isPending}
               onClick={() =>
-                prune.mutate(projectId, {
+                prune.mutate(undefined, {
                   onSuccess: () => {
                     toast(C.pruned);
                     setConfirming(false);

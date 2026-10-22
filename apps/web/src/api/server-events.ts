@@ -15,6 +15,7 @@ import {
   updateConversation,
 } from '../features/assistant/assistant.queries.ts';
 import { appendTranscript, attemptTranscript, updateAttempt } from '../features/attempts/attempt.queries.ts';
+import { refreshGitReview } from '../features/git/git.queries.ts';
 import { updateInbox } from '../features/inbox/inbox.queries.ts';
 import { refreshKnowledge } from '../features/knowledge/knowledge.queries.ts';
 import { refreshDecks } from '../features/ppt/ppt.queries.ts';
@@ -81,6 +82,8 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       return refreshKnowledge(qc);
     case ServerEventType.DeckUpdated:
       return refreshDecks(qc);
+    case ServerEventType.GitReviewUpdated:
+      return refreshGitReview(qc, event.data.projectId, event.data.reviewId);
     case ServerEventType.ScheduleUpdated:
       await refreshSchedules(qc, event.data.scheduleId);
       return;

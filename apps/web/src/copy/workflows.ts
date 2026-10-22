@@ -3,6 +3,7 @@ import { RoleBaseAgent, WorkflowDeliverable, WorkflowKind, WorkflowPlanning } fr
 export const WORKFLOW_KIND_LABEL: Record<WorkflowKind, string> = {
   [WorkflowKind.Builtin]: '内置',
   [WorkflowKind.Custom]: '自定义',
+  [WorkflowKind.System]: '系统',
 };
 
 export const WORKFLOW_PLANNING_LABEL: Record<WorkflowPlanning, string> = {
