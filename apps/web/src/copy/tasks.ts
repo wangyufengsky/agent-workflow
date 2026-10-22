@@ -50,7 +50,7 @@ export const HOME_TASK_COPY = {
   title: '标题',
   titlePlaceholder: '默认取需求的第一行',
   baseBranch: '基于分支',
-  defaultBranch: '项目默认分支',
+  defaultBranch: (name: string) => `项目默认分支（${name}）`,
   acceptEachNode: '每个步骤由我验收',
   askOnUncertainty: '不确定时停下来问我',
   saveDraft: '保存草稿',

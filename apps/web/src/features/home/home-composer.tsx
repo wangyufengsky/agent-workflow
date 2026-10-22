@@ -56,6 +56,12 @@ export function HomeComposer({
     workflowId: workflows.data?.find((w) => w.key === workflowKey)?.id,
     requirement: text,
   });
+  const project = projects.find((p) => p.id === projectId);
+  // A base branch belongs to the project it was picked in.
+  const changeProject = (id: string) => {
+    task.setOptions({ ...task.options, baseBranch: null });
+    onProjectChange(id);
+  };
   const shown = workflows.data?.filter((w) => task.pro || w.kind === WorkflowKind.Builtin);
   const workflow = shown?.find((w) => w.key === workflowKey);
   const busy = conversation?.busy === true;
@@ -86,18 +92,36 @@ export function HomeComposer({
       <form className={styles.box} data-mode={workflow === undefined ? 'ask' : 'task'} onSubmit={submit}>
         {workflow !== undefined && (
           <div className={styles.modeHead}>
-            <span className={styles.modeTag}>
-              <Icon name={workflowIcon(workflow.key)} size="sm" />
-              {C.startTask(workflow.name)}
-              <button
-                type="button"
-                className={styles.modeClear}
-                aria-label={C.askInstead}
-                onClick={() => setWorkflowKey(undefined)}
-              >
-                <Icon name="x" size="sm" />
-              </button>
-            </span>
+            <div className={styles.modeRow}>
+              <span className={styles.modeTag}>
+                <Icon name={workflowIcon(workflow.key)} size="sm" />
+                {C.startTask(workflow.name)}
+                <button
+                  type="button"
+                  className={styles.modeClear}
+                  aria-label={C.askInstead}
+                  onClick={() => setWorkflowKey(undefined)}
+                >
+                  <Icon name="x" size="sm" />
+                </button>
+              </span>
+              {/* The task's project, always shown: the base branch and the batch / schedule links depend on it. */}
+              <label className={styles.projectPick}>
+                <span aria-hidden="true">{HOME_TASK_COPY.project}</span>
+                <select
+                  className={styles.pillSelect}
+                  aria-label={HOME_TASK_COPY.project}
+                  value={projectId}
+                  onChange={(e) => changeProject(e.target.value)}
+                >
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <span className={styles.modeDescription}>{workflow.description}</span>
           </div>
         )}
@@ -117,28 +141,14 @@ export function HomeComposer({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
         />
-        {workflow !== undefined && task.pro && (
-          <MoreOptionsFields projectId={projectId} value={task.options} onChange={task.setOptions} />
+        {workflow !== undefined && task.pro && project !== undefined && (
+          <MoreOptionsFields project={project} value={task.options} onChange={task.setOptions} />
         )}
         <div className={styles.boxFoot}>
           {workflow === undefined ? (
             <span className={`${styles.hint} grow`}>{C.askHint}</span>
           ) : (
             <>
-              {projects.length > 1 && (
-                <select
-                  className={styles.pillSelect}
-                  aria-label={HOME_TASK_COPY.project}
-                  value={projectId}
-                  onChange={(e) => onProjectChange(e.target.value)}
-                >
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              )}
               <label className="check">
                 <input
                   type="checkbox"

@@ -150,6 +150,19 @@
   align-items: flex-start;
   gap: var(--s-1);
 }
+.modeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.projectPick {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
 .modeTag {
   display: inline-flex;
   align-items: center;

@@ -1,6 +1,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { API_PREFIX } from '@aw/shared';
 import { expect, type Page, test } from '@playwright/test';
 import {
   createProject,
@@ -169,4 +170,37 @@ test('J24 合并冲突交给 AI：工作台合并冲突 → 合并任务解决�
   await result.getByRole('button', { name: '合并到 main' }).click();
   await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main', { timeout: TASK_RUN_TIMEOUT_MS });
   expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe(resolved.trim());
+});
+
+test('主页开始任务：总能看到并选择项目，基于分支只列所选项目的分支，换项目后回到默认分支', async ({
+  page,
+  request,
+}) => {
+  const a = await createProject(request, null);
+  const b = await createProject(request, null);
+  git(a.repoPath, 'branch', 'feature/only-in-a');
+  await page.goto(`/?projectId=${a.id}`);
+  await page.getByRole('group', { name: '直接开始' }).getByRole('button', { name: '修 Bug', exact: true }).click();
+  const project = page.getByLabel('项目', { exact: true });
+  await expect(project).toHaveValue(a.id);
+
+  await page.getByText('更多选项').click();
+  const branch = page.getByLabel('基于分支');
+  await expect(branch.locator('option').first()).toHaveText(/^项目默认分支（.+）$/);
+  await branch.selectOption('feature/only-in-a');
+
+  await project.selectOption(b.id);
+  await expect(branch).toHaveValue('');
+  await expect(branch.locator('option', { hasText: 'feature/only-in-a' })).toHaveCount(0);
+
+  // What is sent: the task is for b on its default branch, not on the branch picked in a. Nothing is created.
+  let sent: Record<string, unknown> | undefined;
+  await page.route(`**${API_PREFIX}/tasks`, (route) => {
+    sent = route.request().postDataJSON();
+    return route.abort();
+  });
+  await page.getByLabel('需求').fill('只看请求');
+  await page.getByRole('button', { name: /^开始/ }).click();
+  await expect.poll(() => sent).toMatchObject({ projectId: b.id });
+  expect(sent).not.toHaveProperty('baseBranch');
 });
