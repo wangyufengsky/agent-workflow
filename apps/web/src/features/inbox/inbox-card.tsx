@@ -225,7 +225,7 @@ export function InboxCard({ item, showTask = true }: { item: InboxItemDTO; showT
   return (
     <article className={styles.card} data-testid={`inbox-${item.kind}`}>
       <header className={styles.head}>
-        <span className="chip">{C.kind[item.kind]}</span>
+        <span className={`chip ${styles.kind}`}>{C.kind[item.kind]}</span>
         {label !== undefined && <span className="ellipsis">{label}</span>}
       </header>
       {item.kind === InboxKind.Question && <QuestionCard item={item} {...props} />}
