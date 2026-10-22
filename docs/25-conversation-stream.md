@@ -191,9 +191,9 @@ features/stream/
 
 | | DeepSeek 深色 | 暖色 | SPDB | GitHub 白 |
 | --- | --- | --- | --- | --- |
-| 抽屉 · 运行中 | ![](25-conversation-stream/screenshots/drawer-deepseek.png) | ![](25-conversation-stream/screenshots/drawer-warm.png) | ![](25-conversation-stream/screenshots/drawer-spdb.png) | ![](25-conversation-stream/screenshots/drawer-github_white.png) |
-| 抽屉 · 结束后 | ![](25-conversation-stream/screenshots/drawer-done-deepseek.png) | ![](25-conversation-stream/screenshots/drawer-done-warm.png) | ![](25-conversation-stream/screenshots/drawer-done-spdb.png) | ![](25-conversation-stream/screenshots/drawer-done-github_white.png) |
-| 专业步骤页 | ![](25-conversation-stream/screenshots/node-deepseek.png) | ![](25-conversation-stream/screenshots/node-warm.png) | ![](25-conversation-stream/screenshots/node-spdb.png) | ![](25-conversation-stream/screenshots/node-github_white.png) |
-| 知识问答 | ![](25-conversation-stream/screenshots/knowledge-deepseek.png) | ![](25-conversation-stream/screenshots/knowledge-warm.png) | ![](25-conversation-stream/screenshots/knowledge-spdb.png) | ![](25-conversation-stream/screenshots/knowledge-github_white.png) |
+| 抽屉 · 运行中 | ![](25-conversation-stream/images/drawer-deepseek.png) | ![](25-conversation-stream/images/drawer-warm.png) | ![](25-conversation-stream/images/drawer-spdb.png) | ![](25-conversation-stream/images/drawer-github_white.png) |
+| 抽屉 · 结束后 | ![](25-conversation-stream/images/drawer-done-deepseek.png) | ![](25-conversation-stream/images/drawer-done-warm.png) | ![](25-conversation-stream/images/drawer-done-spdb.png) | ![](25-conversation-stream/images/drawer-done-github_white.png) |
+| 专业步骤页 | ![](25-conversation-stream/images/node-deepseek.png) | ![](25-conversation-stream/images/node-warm.png) | ![](25-conversation-stream/images/node-spdb.png) | ![](25-conversation-stream/images/node-github_white.png) |
+| 知识问答 | ![](25-conversation-stream/images/knowledge-deepseek.png) | ![](25-conversation-stream/images/knowledge-warm.png) | ![](25-conversation-stream/images/knowledge-spdb.png) | ![](25-conversation-stream/images/knowledge-github_white.png) |
 
 截图为 1280×860、`prefers-reduced-motion`（动效静止）。原型的外框（侧栏、画布、页头）只是示意，以现有页面为准；原型中两个说明小字（「默认：结束后收起成一行」等）不进入产品。
