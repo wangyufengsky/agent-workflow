@@ -700,10 +700,65 @@ svg.i.lg {
   cursor: pointer;
 }
 .check input {
+  margin: 2px 0 0;
+}
+/*
+ * Checkboxes and radios are drawn with the theme's tokens rather than the system control (14 §4): the border is the
+ * muted text colour (non-text contrast), a checked box takes the primary button's colours.
+ */
+input:is([type="checkbox"], [type="radio"]) {
+  appearance: none;
+  flex: none;
+  display: inline-grid;
+  place-content: center;
   width: 16px;
   height: 16px;
-  margin: 2px 0 0;
-  accent-color: var(--brand);
+  margin: 0;
+  border: 1.5px solid var(--muted);
+  border-radius: 5px;
+  background: var(--panel);
+  cursor: pointer;
+  transition:
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease);
+}
+input[type="radio"] {
+  border-radius: 50%;
+}
+input:is([type="checkbox"], [type="radio"])::before {
+  content: "";
+  background: var(--primary-ink);
+  transform: scale(0);
+  transition: transform var(--t-fast) var(--ease-spring);
+}
+input[type="checkbox"]::before {
+  width: 12px;
+  height: 12px;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+input[type="checkbox"]:indeterminate::before {
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8h8' stroke='%23000' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+input[type="radio"]::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+input:is([type="checkbox"], [type="radio"]):is(:checked, :indeterminate) {
+  border-color: var(--primary-bg);
+  background: var(--primary-bg);
+}
+input:is([type="checkbox"], [type="radio"]):is(:checked, :indeterminate)::before {
+  transform: scale(1);
+}
+input:is([type="checkbox"], [type="radio"]):hover:not(:disabled, :checked, :indeterminate) {
+  border-color: var(--ink);
+}
+input:is([type="checkbox"], [type="radio"]):disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .switch {
   position: relative;

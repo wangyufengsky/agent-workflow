@@ -62,6 +62,15 @@ describe.each(THEME_IDS)('主题 %s 对比度', (id) => {
     }
   });
 
+  // Checkboxes and radios (base.css): unchecked, the border is `muted`, covered above; checked, the box takes the
+  // primary button's colours, a non-text control that needs 3:1 against the surface and for its tick (WCAG 1.4.11).
+  it('勾选后的勾选框与单选框：底色与 bg / panel / sidebar、勾与底色 ≥ 3:1', () => {
+    for (const surface of SURFACES) {
+      expect(contrast(color('primary-bg'), color(surface)), `primary-bg on ${surface}`).toBeGreaterThanOrEqual(3);
+    }
+    expect(contrast(color('primary-ink'), color('primary-bg')), 'primary-ink on primary-bg').toBeGreaterThanOrEqual(3);
+  });
+
   // The shell layers a decorative gradient over its solid colour (base.css: main = glow over bg, sidebar = glass over
   // sidebar); text has to stay readable where the gradient is strongest. The E2E walkthrough leaves them to this test.
   it('正文与次要文字在外框渐变最浓处 ≥ 4.5:1', () => {

@@ -1,4 +1,4 @@
-import { TASK_TITLE_MAX_CHARS } from '@aw/shared';
+import { type ProjectDTO, TASK_TITLE_MAX_CHARS } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
 import { gitBranchesQuery } from '../git/git.queries.ts';
@@ -15,15 +15,16 @@ export type MoreOptions = {
 export const NO_OPTIONS: MoreOptions = { title: '', baseBranch: null, acceptEachNode: null, askOnUncertainty: null };
 
 export function MoreOptionsFields({
-  projectId,
+  project,
   value,
   onChange,
 }: {
-  projectId: string;
+  /** The branches listed are this project's; the default is its default branch. */
+  project: ProjectDTO;
   value: MoreOptions;
   onChange: (value: MoreOptions) => void;
 }) {
-  const branches = useQuery({ ...gitBranchesQuery(projectId), enabled: projectId !== '' });
+  const branches = useQuery(gitBranchesQuery(project.id));
   const askDefault = useSettings()['ai.askOnUncertainty'];
   const local = branches.data?.filter((b) => !b.remote) ?? [];
   return (
@@ -55,7 +56,7 @@ export function MoreOptionsFields({
             value={value.baseBranch ?? ''}
             onChange={(e) => onChange({ ...value, baseBranch: e.target.value === '' ? null : e.target.value })}
           >
-            <option value="">{C.defaultBranch}</option>
+            <option value="">{C.defaultBranch(project.defaultBranch)}</option>
             {local.map((b) => (
               <option key={b.name} value={b.name}>
                 {b.name}

@@ -171,8 +171,7 @@ export const appTool = (name: string, args: Record<string, unknown>): FakeStep =
 export async function startTask(page: Page, project: E2EProject, workflow: RegExp, requirement: string): Promise<void> {
   await page.goto(`/?projectId=${project.id}`);
   await page.getByRole('group', { name: '直接开始' }).getByRole('button', { name: workflow }).click();
-  const projectSelect = page.getByLabel('项目', { exact: true });
-  if ((await projectSelect.count()) > 0) await expect(projectSelect).toHaveValue(project.id);
+  await expect(page.getByLabel('项目', { exact: true })).toHaveValue(project.id);
   await page.getByLabel('需求').fill(requirement);
   await page.getByRole('button', { name: /^开始/ }).click();
   // Starting creates the task's worktree first (up to 9 s on the Windows runner).
