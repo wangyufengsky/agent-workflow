@@ -131,6 +131,8 @@ packages/builtin/
 - 删除自定义流程：被任务用过的版本保留但不再列出（D57）。
 - 自定义角色：复制或新建（key、名称、基础类型、提示词、模型），被流程或任务用过的角色不能删除。
 
-## 6. 待实施：需求清单与资料上下文
+## 6. 需求清单与资料上下文（附件 U1、清单 Q-02 已实现）
 
 30 / 31 实施后，任务的附件清单与验收清单经 `get_task_context` 对规划、执行、评审都可见。有清单的任务，物化计划时追加系统步骤「核验验收清单」（`NodeKind.Verify`，内置 reviewer 角色，提示词 `verify-requirements`），依赖所有其他叶节点；固定流程与规划流程相同，不改变五种内置流程的默认步骤。「再改改」、PR 意见回流、冲突修改追加的节点之后同样再追加一个核验节点。
+
+实现细节（Q-02）：核验步骤的键是 `verify_requirements`，「再改改」等追加的是 `verify_requirements_<n>`；起草计划（模板、AI 提交、用户编辑）与物化时都会补上或更新它（`tasks.verify.ts` 的 `withVerifyStep`），用户在专业模式删掉它，保存后会补回。指令模板是 `prompts/verify-requirements.md`，列出每项的 id、核验方式与预期；只读 reviewer 用 `submit_result` 结束，只对 `ai_review` 项给结论。

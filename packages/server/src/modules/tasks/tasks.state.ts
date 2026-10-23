@@ -43,6 +43,7 @@ import { recordTaskEvent } from '../timeline/index.ts';
 import type { WorkflowsService } from '../workflows/index.ts';
 import type { WorktreesService } from '../worktrees/index.ts';
 import { createTasksRepo, type Task, type TaskChanges } from './tasks.repo.ts';
+import { createVerifySteps } from './tasks.verify.ts';
 
 export type TasksServiceDeps = {
   db: Db;
@@ -221,6 +222,7 @@ export function createTaskState(deps: TasksServiceDeps) {
     attachmentsOf,
     promptRequirement,
     runContext,
+    verify: createVerifySteps(deps),
   };
 }
 export type TaskState = ReturnType<typeof createTaskState>;

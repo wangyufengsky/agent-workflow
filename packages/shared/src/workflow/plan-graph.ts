@@ -4,8 +4,11 @@ import { nodeKindSchema, requiredStepPositionSchema } from '../enums/workflow.ts
 
 export const NODE_KEY_PATTERN = /^[a-z0-9_]{1,40}$/;
 
+/** `requirementItemId`: the checklist item a verify step's command check decides (31 §2.2). */
+const requirementItemId = z.string().optional();
+
 export const acceptanceCheckSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal(AcceptanceCheckKind.Command), command: z.string().min(1) }),
+  z.object({ kind: z.literal(AcceptanceCheckKind.Command), command: z.string().min(1), requirementItemId }),
   z.object({ kind: z.literal(AcceptanceCheckKind.AiReview), focus: z.string().min(1).optional() }),
 ]);
 export type AcceptanceCheck = z.infer<typeof acceptanceCheckSchema>;
@@ -27,6 +30,7 @@ export const nodeAcceptanceSchema = z.object({
         kind: z.literal(AcceptanceCheckKind.Command),
         command: z.string().min(1),
         skipped: z.literal(true).optional(),
+        requirementItemId,
       }),
       z.object({ kind: z.literal(AcceptanceCheckKind.AiReview), focus: z.string().min(1).optional() }),
     ]),

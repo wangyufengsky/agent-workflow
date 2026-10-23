@@ -45,6 +45,8 @@ export const PromptName = {
   StartCommitMessage: 'start-commit-message',
   /** The files the user attached to a task or an assistant message, as the model reads them (30 §3.2). */
   Attachments: 'attachments',
+  /** The instructions of the verify step (31 §2.2). */
+  VerifyRequirements: 'verify-requirements',
 } as const;
 export type PromptName = (typeof PromptName)[keyof typeof PromptName];
 
@@ -93,6 +95,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.StartGitReview]: read(PromptName.StartGitReview),
     [PromptName.StartCommitMessage]: read(PromptName.StartCommitMessage),
     [PromptName.Attachments]: read(PromptName.Attachments),
+    [PromptName.VerifyRequirements]: read(PromptName.VerifyRequirements),
   };
 }
 

@@ -117,6 +117,7 @@ export function createDebugService({ attempts, settings, prompts }: DebugService
         answeredQuestions: [],
         userFeedback: [],
         databases: [],
+        requirements: [],
       };
     },
 

@@ -85,7 +85,8 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
   const materializeInput = (task: Task, plan: PlanDTO, workflow: WorkflowDTO) => ({
     taskId: task.id,
     planId: plan.id,
-    graph: plan.graph,
+    // The checklist may have changed since the plan was drafted (31 §2.1).
+    graph: state.verify.withVerifyStep(task.id, plan.graph),
     checkCommand: projects.getRecord(task.projectId).checkCommand,
     defaultAcceptance: workflow.definition.defaultAcceptance,
     acceptEachNode: task.checkpoints.accept_each_node,
@@ -157,7 +158,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       const plan = plans.createDraft({
         taskId: task.id,
         source: PlanSource.Template,
-        graph: template,
+        graph: state.verify.withVerifyStep(task.id, template),
         summary: null,
         assumptions: [],
         feedback: null,
@@ -367,7 +368,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
         const plan = plans.createDraft({
           taskId: task.id,
           source: PlanSource.Ai,
-          graph: planGraphFromSubmission(input, workflow.definition),
+          graph: state.verify.withVerifyStep(task.id, planGraphFromSubmission(input, workflow.definition)),
           summary: input.summary,
           assumptions: input.assumptions ?? [],
           feedback: pendingReplanFeedback(task.id),
@@ -440,7 +441,8 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       return plans.createDraft({
         taskId,
         source: PlanSource.User,
-        graph,
+        // A user who removed the verify step gets it back: it is not theirs to drop (31 §2.2).
+        graph: state.verify.withVerifyStep(taskId, graph),
         summary: latest.summary,
         assumptions: latest.assumptions,
         feedback: null,

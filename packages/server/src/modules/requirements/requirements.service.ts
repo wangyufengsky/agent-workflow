@@ -2,17 +2,30 @@ import { randomUUID } from 'node:crypto';
 import {
   AppError,
   ErrorCode,
+  type RequirementConclusion,
   type RequirementItem,
   type RequirementItemInput,
+  type RequirementResultSource,
   requirementItemsInputSchema,
   type TaskRequirementsDTO,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
-import { createRequirementsRepo } from './requirements.repo.ts';
+import { createRequirementsRepo, type Revision } from './requirements.repo.ts';
 import { displayStatus } from './requirements.status.ts';
 
 export type RequirementsServiceDeps = { db: Db; clock: Clock };
+
+/** One conclusion to record; the current version and the time are added. */
+export type NewRequirementResult = {
+  itemId: string;
+  source: RequirementResultSource;
+  conclusion: RequirementConclusion;
+  note: string;
+  output: string | null;
+  nodeId: string | null;
+  commitSha: string;
+};
 
 /**
  * A task's acceptance checklist (31): immutable versions and the conclusions on their items. When the checklist may
@@ -22,6 +35,19 @@ export function createRequirementsService({ db, clock }: RequirementsServiceDeps
   const repo = createRequirementsRepo(db);
 
   return {
+    /** The task's current version; undefined without a checklist. */
+    current: (taskId: string): Revision | undefined => repo.listRevisions(taskId)[0],
+
+    /** Appends conclusions about the current version, inside the caller's transaction. */
+    record(taskId: string, results: readonly NewRequirementResult[]): void {
+      const [current] = repo.listRevisions(taskId);
+      if (current === undefined) throw new Error(`Task ${taskId} has no checklist to record conclusions on`);
+      const createdAt = clock.now();
+      repo.insertResults(
+        results.map((result) => ({ ...result, id: randomUUID(), taskId, revisionId: current.id, createdAt })),
+      );
+    },
+
     /**
      * Saves `inputs` as the task's next version, inside the caller's transaction. An input with an `id` keeps that
      * item of the current version (its conclusions stay its own, if stale); one without gets a new id.

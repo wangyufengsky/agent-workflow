@@ -535,7 +535,7 @@ class AppError extends Error {
 | AssistantToolName 增量（U-02 已实现） | read_attachment |
 | InputRef 增量（U-03 已实现） | attachment（确认卡把附件 ID 显示为文件名） |
 | McpToolName 增量（U-02 已实现） | read_attachment |
-| NodeKind 增量 | verify（核验验收清单的系统步骤） |
+| NodeKind 增量（Q-02 已实现） | verify（核验验收清单的系统步骤） |
 | RequirementVerification（Q-01 已实现，下同） | command · ai_review · manual |
 | RequirementResultSource | command · ai · user |
 | RequirementConclusion | pass · fail · unverified · waive（命令与 AI 只给前三种，用户给 pass · fail · waive） |
@@ -558,5 +558,5 @@ class AppError extends Error {
 | ATTACHMENT_TOO_LARGE | 413 | 大小或单次输入个数超限，`details.limit` 为超过的那个上限值 |
 | ATTACHMENT_SOURCE_INVALID | 400 | 项目文件越界（含 `.git` 内）、指向根外的符号链接、不存在或非普通文件（`details.reason`：`outside` · `missing`）、行号超出末尾（`details.lineCount`），或任务在该项目没有可用的工作区 |
 | REQUIREMENTS_NOT_EDITABLE（Q-01 已实现） | 409 | 任务状态不允许编辑清单（只有 `draft`、`plan_review`、`review` 可以），或不在 `review` 时请求重新核验／人工结论 |
-| REQUIREMENT_RESULTS_INVALID | 400 | 非核验节点提交 `requirement_results`，或项不属于当前版本、不是 AI 核验项、重复 |
+| REQUIREMENT_RESULTS_INVALID（Q-02 已实现） | —（只经执行 MCP 返回） | 非核验节点提交 `requirement_results`，或项不属于当前版本、不是 AI 核验项、重复 |
 | REQUIREMENTS_UNACKNOWLEDGED | 409 | 交付时有未满足的必需项，而没有带 `acknowledgedRequirementsRevisionId` 或它不是当前清单版本；`details.items` 列出这些项 |

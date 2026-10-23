@@ -38,6 +38,8 @@ import { createTaskState, type TasksServiceDeps } from './tasks.state.ts';
 export function createTasksService(deps: TasksServiceDeps & { events: EventBus }) {
   const { db, plans, nodes, attempts, inbox, worktrees, workflows } = deps;
   const state = createTaskState(deps);
+  // A finished verify step's conclusions are written with it (31 §2.2).
+  nodes.onVerified((node, commitSha) => state.verify.record(node, commitSha));
   const lifecycle = createTaskLifecycle(deps, state);
   const results = createTaskResults(deps, state);
   const context = createTaskContext(deps, state);
@@ -273,7 +275,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
 
     /** `submit_result` of a task's execute attempt (12 §6.5). */
     async submitResult(attempt: AttemptDTO, input: SubmitResultInput): Promise<ResultNext> {
-      if (attempt.taskId === null) throw new Error(`Attempt ${attempt.id} belongs to no task`);
+      if (attempt.taskId === null || attempt.nodeId === null) throw new Error(`Attempt ${attempt.id} is no step's`);
+      state.verify.checkResults(attempt.taskId, nodes.get(attempt.nodeId), input.requirement_results);
       return nodes.submitResult(attempt, input, state.runContext(state.get(attempt.taskId)));
     },
 

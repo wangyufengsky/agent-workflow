@@ -27,6 +27,12 @@ export function createRequirementsRepo(db: DbExecutor) {
     listRevisions(taskId: string): Revision[] {
       return db.select().from(v).where(eq(v.taskId, taskId)).orderBy(desc(v.seq)).all().map(toRevision);
     },
+    insertResults(results: ReadonlyArray<typeof r.$inferInsert>): void {
+      if (results.length > 0)
+        db.insert(r)
+          .values([...results])
+          .run();
+    },
     /** In the order they were given. */
     listResults(taskId: string): RequirementResultDTO[] {
       return (

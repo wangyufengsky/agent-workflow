@@ -1,4 +1,4 @@
-import { PromptName, renderTemplate, SYSTEM_NODES } from '@aw/builtin';
+import { PromptName, renderTemplate, SYSTEM_NODES, VERIFY_NODE } from '@aw/builtin';
 import {
   AppError,
   AttachmentOwnerKind,
@@ -18,6 +18,7 @@ import {
 import { BACKEND_COMMITTER, gitFailure, type RepoLocks, runGit, unmergedFiles } from '../git/index.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
+import { leafKeys } from './tasks.verify.ts';
 
 /**
  * Merges `target` into a task worktree and leaves the conflict markers for a step to resolve (13 §4, 27 §3.6); the
@@ -33,10 +34,6 @@ export function mergeIntoWorktree(locks: RepoLocks, repoPath: string, dir: strin
     return files;
   });
 }
-
-/** Nodes nothing else depends on: the new step comes after all of them (13 §4). */
-const leafKeys = (nodes: ReadonlyArray<{ key: string; dependsOn: readonly string[] }>) =>
-  nodes.filter((n) => !nodes.some((other) => other.dependsOn.includes(n.key))).map((n) => n.key);
 
 /**
  * Sending a task back to the AI (09 §2 `changes_requested`, 13 §4; `review_feedback`, 21 §3): a new plan version with one more step —
@@ -83,28 +80,30 @@ export function createTaskChanges(
       acceptance: system.acceptance,
       kind: NodeKind.Revise,
     };
+    // With a checklist, the change is verified again after it (31 §2.3).
+    const check = state.verify.stepAfter(task.id, nextKey(task.id, `${VERIFY_NODE.keyPrefix}_`), [spec.key]);
+    const added = check === undefined ? [spec] : [spec, check];
     const workflow = workflows.get(task.workflowId);
     unit.transact(() => {
       const plan = plans.createDraft({
         taskId: task.id,
         source: PlanSource.User,
-        graph: { nodes: [...confirmed.graph.nodes, spec] },
+        graph: { nodes: [...confirmed.graph.nodes, ...added] },
         summary: confirmed.summary,
         assumptions: confirmed.assumptions,
         feedback: revision.feedback,
         createdByAttemptId: null,
       });
       plans.confirm(plan.id);
-      const node = nodes.append(
-        {
-          taskId: task.id,
-          planId: plan.id,
-          checkCommand: projects.getRecord(task.projectId).checkCommand,
-          defaultAcceptance: workflow.definition.defaultAcceptance,
-          acceptEachNode: task.checkpoints.accept_each_node,
-        },
-        spec,
-      );
+      const input = {
+        taskId: task.id,
+        planId: plan.id,
+        checkCommand: projects.getRecord(task.projectId).checkCommand,
+        defaultAcceptance: workflow.definition.defaultAcceptance,
+        acceptEachNode: task.checkpoints.accept_each_node,
+      };
+      const [node] = added.map((s) => nodes.append(input, s));
+      if (node === undefined) throw new Error('No step was appended');
       deps.attachments.bind({ kind: AttachmentOwnerKind.TaskFeedback, id: node.id }, attachmentIds);
       // The task leaves review; reaching it again opens a new delivery item.
       inbox.dismissOpen({ taskId: task.id, kind: InboxKind.Delivery });
