@@ -514,7 +514,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 - **状态机（09）**：`previewMachine`（09 §12，B-02 已加）；节点 `verifying` 的检查顺序为命令 → 页面体检 → AI 评审。
 - **API（11）**：
   - **B1 已有**：操作 `previews.get` / `start` / `stop` / `trial`（11 §13f）；`browser.openLoginTab` `{ url }`、`browser.closeUserTab`、`browser.listSiteLogins`、`browser.clearSiteLogin` `{ host }`（11 §13f′）；SSE `preview.updated`。
-  - **B2 再加**：`browser.openUserTab` `{ taskId }`（返回 `tabId`）、`browser.navigateUserTab`；非清单路由 `GET /attempts/:attemptId/browser/:file`（尝试的截图与画面）、`GET /tasks/:taskId/browser/:file`（页面体检截图）；SSE `browser.frame`；`tasks.requestChanges` 输入加可选 `page: { path, viewport, includeScreenshot }`。
+  - **B2 再加**（契约在 B2-01 已定义，`shared/operations/browser.ts`，随 B2-04 / B2-05 的实现挂进操作清单）：`browser.openUserTab` `{ taskId }`（返回 `tabId`）、`browser.navigateUserTab`、`browser.setUserViewport`、`browser.listFrames`；非清单路由 `GET /attempts/:attemptId/browser/:file`（尝试的截图与画面）、`GET /tasks/:taskId/browser/:file`（页面体检截图）；SSE `browser.frame`；`tasks.requestChanges` 输入加可选 `page: { tabId }`（后端自己读取那个标签页的路径、视口与日志，不接受界面传来的页面信息）。
   - **B3 再加**：`browser.read`、`browser.readUrl`。
 - **MCP（12）**：§6 的 11 个工具（B1 已有，12 §6.17）；知识问答 `web` 引用的 `CitationDTO` 加 `excerpt`（18 §6，B3）。
 - **preload**：`aw.browser.place(tabId, rect | null)`、`aw.browser.back / forward / reload(tabId)`、`aw.browser.openDevTools(tabId)`。用户标签页的地址导航经后端 `browser.navigateUserTab`，统一检查来源。

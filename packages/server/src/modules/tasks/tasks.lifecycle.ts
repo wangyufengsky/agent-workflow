@@ -33,7 +33,7 @@ import {
   WorktreeStatus,
 } from '@aw/shared';
 import { branchExists, hasMergeHead } from '../git/index.ts';
-import type { Node } from '../nodes/index.ts';
+import { acceptanceProject, type Node } from '../nodes/index.ts';
 import { planGraphFromSubmission, validateSubmission } from '../plans/index.ts';
 import type { Worktree } from '../worktrees/index.ts';
 import { mergeIntoWorktree } from './tasks.changes.ts';
@@ -85,7 +85,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
     taskId: task.id,
     planId: plan.id,
     graph: plan.graph,
-    checkCommand: projects.getRecord(task.projectId).checkCommand,
+    ...acceptanceProject(projects.getRecord(task.projectId)),
     defaultAcceptance: workflow.definition.defaultAcceptance,
     acceptEachNode: task.checkpoints.accept_each_node,
   });

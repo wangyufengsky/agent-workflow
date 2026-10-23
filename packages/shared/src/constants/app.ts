@@ -1,5 +1,6 @@
 import { ViewportPreset } from '../enums/browser.ts';
 import { DbType, dbTypeSchema } from '../enums/system.ts';
+import { AcceptanceCheckKind } from '../enums/task.ts';
 import { SessionAgent } from '../enums/workflow.ts';
 
 export const APP_ID = 'agent-workflow';
@@ -112,6 +113,15 @@ export const VIEWPORT_SIZES = {
   [ViewportPreset.Tablet]: { width: 768, height: 1024, mobile: true },
   [ViewportPreset.Mobile]: { width: 390, height: 844, mobile: true },
 } as const satisfies Record<ViewportPreset, { width: number; height: number; mobile: boolean }>;
+/** Viewports a page check uses when its step names none (29 §7.1). */
+export const PAGE_CHECK_VIEWPORTS = [ViewportPreset.Desktop, ViewportPreset.Mobile] as const;
+/** Checks of a step run in this order (29 §7.2): no page check once a command failed, no review on a broken page. */
+export const CHECK_KIND_ORDER = [
+  AcceptanceCheckKind.Command,
+  AcceptanceCheckKind.Browser,
+  AcceptanceCheckKind.AiReview,
+] as const;
+
 /** Keys `browser_press` accepts (29 §6), by their DOM `KeyboardEvent.key` names. */
 export const BROWSER_KEYS = [
   'Enter',

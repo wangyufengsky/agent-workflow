@@ -129,6 +129,7 @@ export const TASK_COPY = {
   lastCommand: (command: string, exitCode: number | null, timedOut: boolean) =>
     `最后一次运行 \`${command}\` ${timedOut ? '超时了' : `退出码为 ${exitCode}`}，输出的最后几行：`,
   lastReview: '最后一次 AI 评审没有通过：',
+  lastPage: '最后一次页面体检没有通过：',
   lastAttempt: (aborted: boolean, code: string | undefined) => {
     if (aborted) return 'AI 最后一次的尝试被中止了。';
     switch (code) {
@@ -220,6 +221,7 @@ export const NODE_COPY = {
     reason === CheckUnrunnableReason.NotFound ? `找不到程序 ${program}` : `程序 ${program} 没有执行权限`,
   commandCheck: (command: string) => `运行 ${command}`,
   reviewCheck: 'AI 评审',
+  pageCheck: '页面体检',
   timedOut: '超时',
   noResult: '还没有产出。',
   retryFeedback: '上次未通过的原因',

@@ -40,6 +40,11 @@ export const requestChangesSchema = z.object({
   id: z.string(),
   reason: changeRequestReasonSchema,
   feedback: z.string().trim().min(1).optional(),
+  /**
+   * The user's preview tab whose current page goes with the feedback (29 §2.3): the backend reads its path,
+   * viewport, console errors and failed requests itself.
+   */
+  page: z.object({ tabId: z.string() }).optional(),
 });
 export type RequestChangesRequest = z.infer<typeof requestChangesSchema>;
 

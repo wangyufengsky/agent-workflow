@@ -114,6 +114,7 @@ export const ErrorCode = {
   BrowserLoginRequired: 'BROWSER_LOGIN_REQUIRED',
   BrowserRefStale: 'BROWSER_REF_STALE',
   BrowserActionFailed: 'BROWSER_ACTION_FAILED',
+  BrowserCheckUnrunnable: 'BROWSER_CHECK_UNRUNNABLE',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 export const ERROR_CODES = Object.values(ErrorCode);
@@ -214,6 +215,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.BrowserLoginRequired]: 409,
   [ErrorCode.BrowserRefStale]: null,
   [ErrorCode.BrowserActionFailed]: null,
+  [ErrorCode.BrowserCheckUnrunnable]: null,
 } as const satisfies Record<ErrorCode, number | null>;
 
 /** `{ code, message, details? }` as stored on tasks / attempts and returned in HTTP error bodies. */

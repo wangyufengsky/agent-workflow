@@ -15,6 +15,7 @@ import {
   transition,
 } from '@aw/shared';
 import { BACKEND_COMMITTER, gitFailure, type RepoLocks, runGit, unmergedFiles } from '../git/index.ts';
+import { acceptanceProject } from '../nodes/index.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
@@ -97,7 +98,7 @@ export function createTaskChanges(
         {
           taskId: task.id,
           planId: plan.id,
-          checkCommand: projects.getRecord(task.projectId).checkCommand,
+          ...acceptanceProject(projects.getRecord(task.projectId)),
           defaultAcceptance: workflow.definition.defaultAcceptance,
           acceptEachNode: task.checkpoints.accept_each_node,
         },

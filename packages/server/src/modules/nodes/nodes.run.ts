@@ -113,6 +113,9 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
               ? skippedResult(check.command)
               : await acceptance.runCommand(ctx.directory, check.command, controller.signal),
           );
+        } else if (check.kind === AcceptanceCheckKind.Browser) {
+          // TODO(B2-02): run the page check; until then a plan cannot carry one (no workflow or prompt names it).
+          throw new Error(`Node ${nodeId} has a page check, which this build cannot run yet`);
         } else {
           const outcome = await acceptance.review(
             {

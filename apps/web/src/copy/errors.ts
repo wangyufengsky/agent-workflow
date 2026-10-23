@@ -98,4 +98,5 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.BrowserLoginRequired]: '这个网站需要登录，先在设置的「网站登录」里登录。',
   [ErrorCode.BrowserRefStale]: '页面已经变了，需要重新读取页面。',
   [ErrorCode.BrowserActionFailed]: '没能在页面上完成这个操作。',
+  [ErrorCode.BrowserCheckUnrunnable]: '有一个步骤的页面体检在应用环境里无法运行：页面预览没能启动。',
 };

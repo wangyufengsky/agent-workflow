@@ -353,6 +353,8 @@ export const requestChangesOp = defineOperationContract({
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/request-changes' },
+  // A preview tab is the user's own: the assistant has none to attach.
+  assistantOmit: ['page'],
 });
 
 export const reviewCommentsOp = defineOperationContract({

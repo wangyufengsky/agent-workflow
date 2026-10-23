@@ -111,6 +111,13 @@ function LastFailureView({ last }: { last: LastFailure }) {
         </div>
       );
     }
+    case 'page':
+      return (
+        <div className="col" data-testid="last-failure">
+          <span>{C.lastPage}</span>
+          <pre className={styles.output}>{last.check.output}</pre>
+        </div>
+      );
     case 'review':
       return (
         <div className="col" data-testid="last-failure">

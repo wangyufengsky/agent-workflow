@@ -208,6 +208,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   closeUserTabOp,
   listSiteLoginsOp,
   clearSiteLoginOp,
+  // B2-04 / B2-05 add openUserTabOp, navigateUserTabOp, setUserViewportOp and listBrowserFramesOp with their handlers.
   listDbConnectionsOp,
   createDbConnectionOp,
   updateDbConnectionOp,

@@ -1,5 +1,14 @@
 import { z } from 'zod';
-import { openLoginTabRequestSchema, siteLoginsSchema, userTabSchema } from '../contracts/api/browser.ts';
+import {
+  browserFrameSchema,
+  navigateUserTabRequestSchema,
+  openLoginTabRequestSchema,
+  openUserTabRequestSchema,
+  setUserViewportRequestSchema,
+  siteLoginsSchema,
+  userTabSchema,
+} from '../contracts/api/browser.ts';
+import { InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -49,4 +58,50 @@ export const clearSiteLoginOp = defineOperationContract({
   output: siteLoginsSchema,
   risk: OperationRisk.Write,
   http: { method: 'DELETE', path: '/browser/site-logins/:host' },
+});
+
+export const openUserTabOp = defineOperationContract({
+  ...common,
+  id: 'browser.openUserTab',
+  title: 'op.browser.openUserTab',
+  description: "Open the user's own tab on the task's page preview, starting the preview when needed",
+  input: openUserTabRequestSchema,
+  output: userTabSchema,
+  refs: { taskId: InputRef.Task },
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:taskId/preview/tabs', status: 201 },
+});
+
+export const navigateUserTabOp = defineOperationContract({
+  ...common,
+  id: 'browser.navigateUserTab',
+  title: 'op.browser.navigateUserTab',
+  description: "Open a path of the task's preview in the user's tab",
+  input: navigateUserTabRequestSchema,
+  output: z.void(),
+  risk: OperationRisk.Read,
+  http: { method: 'POST', path: '/browser/tabs/:tabId/navigate' },
+});
+
+export const setUserViewportOp = defineOperationContract({
+  ...common,
+  id: 'browser.setUserViewport',
+  title: 'op.browser.setUserViewport',
+  description: "Show the user's tab at desktop, tablet or mobile size",
+  input: setUserViewportRequestSchema,
+  output: z.void(),
+  risk: OperationRisk.Read,
+  http: { method: 'POST', path: '/browser/tabs/:tabId/viewport' },
+});
+
+export const listBrowserFramesOp = defineOperationContract({
+  ...common,
+  id: 'browser.listFrames',
+  title: 'op.browser.listFrames',
+  description: "What an attempt's browser actions left on the page, in order",
+  input: z.object({ attemptId: z.string() }),
+  output: z.object({ items: z.array(browserFrameSchema) }),
+  refs: { attemptId: InputRef.Attempt },
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/attempts/:attemptId/browser-frames' },
 });
