@@ -2,7 +2,7 @@ export const COMPANION_COPY = {
   name: '小鲸鱼',
   appearance: 'AI 助手形象',
   appearanceHint: '应用内助手与桌宠共用所选形象，切换后立即生效。',
-  appearances: { orb: '光球（默认）', whale: '小鲸鱼' },
+  appearances: { orb: '极光光球（默认）', whale: '小鲸鱼' },
   moods: {
     idle: '轻轻呼吸',
     thinking: '思考旋转',

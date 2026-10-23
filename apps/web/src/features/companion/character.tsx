@@ -2,6 +2,7 @@ import { CompanionAppearance } from '@aw/shared';
 import { useState, useSyncExternalStore } from 'react';
 import { COMPANION_COPY as C } from '../../copy/companion.ts';
 import { useSettings } from '../settings/settings.queries.ts';
+import { Aurora } from './aurora.tsx';
 import styles from './character.module.css';
 import { CHARACTER_CLIPS, CHARACTER_POSTER, type CharacterMood, clipUrl } from './character-assets.ts';
 import { useCompanionUi, useCompanionWorking } from './companion-events.ts';
@@ -65,7 +66,9 @@ export function Character({
         role="img"
         aria-label={`${C.appearances[appearance]} · ${C.moods[mood]}`}
       >
-        <span className={orb.body} />
+        <span className={orb.body}>
+          <Aurora animated={animated && (size === 'lg' || size === 'pet')} mood={mood} />
+        </span>
         <span className={orb.ring} />
       </span>
     );

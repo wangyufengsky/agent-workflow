@@ -1,4 +1,4 @@
-import type { CompanionBridge } from '@aw/shared';
+import type { CompanionBridge, CompanionLayout } from '@aw/shared';
 import { ipcRenderer } from 'electron';
 
 export const companionBridge: CompanionBridge = {
@@ -9,6 +9,14 @@ export const companionBridge: CompanionBridge = {
       : null,
   configure: (config, labels) => ipcRenderer.invoke('aw:companion-configure', config, labels),
   setInteractive: (value) => ipcRenderer.send('aw:companion-interactive', value),
+  setPanel: (panel) => ipcRenderer.invoke('aw:companion-panel', panel),
+  onLayout: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, layout: CompanionLayout) => listener(layout);
+    ipcRenderer.on('aw:companion-layout', receive);
+    return () => {
+      ipcRenderer.removeListener('aw:companion-layout', receive);
+    };
+  },
   startDrag: (point) => ipcRenderer.send('aw:companion-drag-start', point),
   moveDrag: (point) => ipcRenderer.send('aw:companion-drag-move', point),
   endDrag: () => ipcRenderer.send('aw:companion-drag-end'),

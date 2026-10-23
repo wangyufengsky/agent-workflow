@@ -330,7 +330,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/assistant/whisper` | `assistant.whisper`，`{}` → `{ text }`（1–120 字符）；沿用默认模型，独立 `aw-companion` 会话，禁用全部工具，不保存到工作聊天；并发 409 `ASSISTANT_BUSY`，运行时不可用 `OPENCODE_NOT_READY`，空输出／模型错误／取消／超时 `OPENCODE_REQUEST_FAILED`。write，不暴露给助手或命令面板 |
 | POST | `/assistant/whisper/stop` | `assistant.stopWhisper`，`{}` → 204；取消在途生成并清理临时会话；无在途请求时仍成功 |
 
-桌宠复用全部对话端点，`AssistantPage.Desktop = desktop` 的参数为空。角色窗口的本地 IPC 边界见 [32 §4](32-companion-assistant.md#4-实现分层)。
+桌宠复用全部对话端点，`AssistantPage.Desktop = desktop` 的参数为空。角色窗口的本地 IPC（`configure({ enabled, size })`、`setPanel(none | chat | bubble)`、`onLayout`）边界见 [32 §4](32-companion-assistant.md#4-实现分层)。
 
 ## 13a. 知识问答（v1.1）
 

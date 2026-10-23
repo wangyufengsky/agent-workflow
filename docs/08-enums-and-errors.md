@@ -336,7 +336,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |
 | `opencode.binaryPath` | `null`（从 PATH 与 `~/.opencode/bin` 查找；助手不能修改，D65） | 专业 |
 | `assistant.alwaysAllow` | `[]`（操作 id 列表；只有 write 级生效，critical 即使在列表中也每次确认；助手自己不能修改，D65；v1.1） | 简单 |
-| `companion.appearance` | `orb`（`CompanionAppearance`：`orb` / `whale`，默认原有光球；32 §3） | 简单 |
+| `companion.appearance` | `orb`（`CompanionAppearance`：`orb` / `whale`，默认极光光球；32 §3） | 简单 |
 | `companion.enabled` | `false`（桌面显示助手） | 简单 |
 | `companion.animations` | `true`（系统减少动态效果仍优先） | 简单 |
 | `companion.size` | `180`（整数 120–300） | 简单 |

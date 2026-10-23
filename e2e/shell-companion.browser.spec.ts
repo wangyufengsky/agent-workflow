@@ -23,6 +23,7 @@ test('默认光球可预览工作与完成动画，切换鲸鱼会持久化并�
   const preview = page.locator('[data-size="lg"]');
   await page.getByRole('button', { name: '工作环绕', exact: true }).click();
   await expect(preview).toHaveAttribute('data-mood', 'working');
+  await expect(preview.locator('canvas')).toHaveAttribute('data-active', 'true');
   expect(
     await preview.evaluate((el) =>
       el.getAnimations({ subtree: true }).some((a) => a.effect?.getTiming().iterations === Infinity),
@@ -47,10 +48,32 @@ test('默认光球可预览工作与完成动画，切换鲸鱼会持久化并�
   await page.screenshot({ path: 'screenshots/companion/whale-dark.png' });
   await shape.selectOption('orb');
   await expect(preview).toHaveAttribute('data-animated', 'false');
+  await expect(preview.locator('canvas')).toHaveAttribute('data-active', 'false');
+  await expect(preview.locator('img')).toBeVisible();
   // 主题切换的颜色过渡与角色的循环 CSS 动画不同；减少动态效果须停用后者。
   expect(
     await preview.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => a instanceof CSSAnimation).length),
   ).toBe(0);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await expect(preview.locator('canvas')).toHaveAttribute('data-active', 'true');
+  await page.screenshot({ path: 'screenshots/companion/aurora-dark.png' });
+  await page.getByRole('switch', { name: '播放角色动画', exact: true }).click();
+  await expect(preview.locator('canvas')).toHaveAttribute('data-active', 'false');
+  await expect(preview.locator('img')).toBeVisible();
+});
+
+test('极光失去 GPU 上下文后保留静态形象', async ({ page, request }) => {
+  await patchSettings(request, { 'companion.appearance': 'orb', 'companion.animations': true });
+  await page.goto('/companion');
+  const orb = page.locator('[data-size="pet"]');
+  await expect(orb.locator('canvas')).toHaveAttribute('data-active', 'true');
+  await orb.locator('canvas').evaluate((node: HTMLCanvasElement) => {
+    const extension = node.getContext('webgl')?.getExtension('WEBGL_lose_context');
+    if (extension === null || extension === undefined) throw new Error('Context loss extension unavailable');
+    extension.loseContext();
+  });
+  await expect(orb.locator('canvas')).toHaveAttribute('data-active', 'false');
+  await expect(orb.locator('img')).toBeVisible();
 });
 
 test('桌宠页面复用助手聊天、碎碎念隔离，鲸鱼素材失败有显式提示', async ({ page, request }) => {

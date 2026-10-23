@@ -4,13 +4,18 @@ import {
   COMPANION_PATH,
   COMPANION_WINDOW,
   type CompanionLabels,
+  type CompanionPanel,
+  type CompanionRect,
   companionConfigSchema,
   companionConversationSchema,
   companionInteractiveSchema,
   companionLabelsSchema,
   companionNoticeSchema,
+  companionPanelSchema,
   companionPathSchema,
   companionPointSchema,
+  companionPositionSchema,
+  SETTING_DEFAULTS,
 } from '@aw/shared';
 import {
   app,
@@ -23,7 +28,7 @@ import {
   Tray,
   type WebPreferences,
 } from 'electron';
-import { fitCompanion } from './companion-geometry.ts';
+import { placeCompanion } from './companion-geometry.ts';
 
 /** 一个宿主窗口管理角色窗口；关闭主界面时仍保持已认证的后端连接。 */
 export function createCompanionHost(
@@ -37,7 +42,10 @@ export function createCompanionHost(
   let enabled = false;
   let quitting = false;
   let active: string | null = null;
-  let drag: { cursor: { x: number; y: number }; bounds: Electron.Rectangle } | undefined;
+  let drag: { cursor: { x: number; y: number }; anchor: CompanionRect } | undefined;
+  let anchor: CompanionRect | undefined;
+  let panel: CompanionPanel = 'none';
+  let size = SETTING_DEFAULTS['companion.size'];
   let labels: CompanionLabels;
   const positionFile = join(app.getPath('userData'), 'companion-position.json');
   const origin = new URL(baseUrl).origin;
@@ -64,8 +72,11 @@ export function createCompanionHost(
   };
   const report = (err: unknown) => console.error('companion operation failed', err);
   const fit = () => {
-    if (pet === undefined) return;
-    pet.setBounds(fitCompanion(pet.getBounds(), screen.getDisplayMatching(pet.getBounds()).workArea));
+    if (pet === undefined || anchor === undefined) return;
+    const placed = placeCompanion(anchor, screen.getDisplayMatching(anchor).workArea, panel);
+    anchor = placed.anchor;
+    pet.setBounds(placed.bounds);
+    pet.webContents.send('aw:companion-layout', placed.layout);
   };
   const showPet = async () => {
     if (pet !== undefined) {
@@ -74,14 +85,24 @@ export function createCompanionHost(
     }
     const area = screen.getPrimaryDisplay().workArea;
     const position = existsSync(positionFile)
-      ? companionPointSchema.parse(JSON.parse(readFileSync(positionFile, 'utf8')))
+      ? companionPositionSchema.parse(JSON.parse(readFileSync(positionFile, 'utf8')))
       : {
-          x: area.x + area.width - COMPANION_WINDOW.width - COMPANION_WINDOW.margin,
-          y: area.y + area.height - COMPANION_WINDOW.height - COMPANION_WINDOW.margin,
+          version: 2,
+          x: area.x + area.width - size - COMPANION_WINDOW.margin,
+          y: area.y + area.height - Math.round(size * 1.2) - COMPANION_WINDOW.margin,
         };
-    const bounds = { ...COMPANION_WINDOW, ...position };
+    // 旧文件记录 460×680 窗口左上角，迁移为角色本身的屏幕坐标。
+    anchor = {
+      x: position.x + (position.version === 2 ? 0 : 460 - COMPANION_WINDOW.margin - size),
+      y: position.y + (position.version === 2 ? 0 : 680 - COMPANION_WINDOW.margin - Math.round(size * 1.2)),
+      width: size,
+      height: Math.round(size * 1.2),
+    };
+    panel = 'none';
+    const placed = placeCompanion(anchor, screen.getDisplayMatching(anchor).workArea, panel);
+    anchor = placed.anchor;
     pet = new BrowserWindow({
-      ...fitCompanion(bounds, screen.getDisplayMatching(bounds).workArea),
+      ...placed.bounds,
       show: false,
       frame: false,
       transparent: true,
@@ -95,7 +116,8 @@ export function createCompanionHost(
       },
     });
     const window = pet;
-    window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // 不把整个应用转换为 UIElementApplication；主窗口与 Dock 应保持可见。
+    window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
     window.setIgnoreMouseEvents(true, { forward: true });
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', (event, target) => {
@@ -116,7 +138,10 @@ export function createCompanionHost(
       if (!window.isDestroyed()) throw error;
       return;
     }
-    if (!window.isDestroyed()) window.showInactive();
+    if (!window.isDestroyed()) {
+      fit();
+      window.showInactive();
+    }
   };
   const updateTray = () => {
     if (tray === undefined) return;
@@ -140,7 +165,18 @@ export function createCompanionHost(
   ipcMain.handle('aw:companion-configure', async (event, raw: unknown, rawLabels: unknown) => {
     requireKnown(event);
     labels = companionLabelsSchema.parse(rawLabels);
-    enabled = companionConfigSchema.parse(raw).enabled;
+    const config = companionConfigSchema.parse(raw);
+    enabled = config.enabled;
+    size = config.size;
+    if (anchor !== undefined) {
+      anchor = {
+        x: Math.round(anchor.x + (anchor.width - size) / 2),
+        y: Math.round(anchor.y + (anchor.height - Math.round(size * 1.2)) / 2),
+        width: size,
+        height: Math.round(size * 1.2),
+      };
+      fit();
+    }
     if (enabled) {
       if (tray === undefined) {
         // 本应用的中性模板图标，与临时角色素材无关。
@@ -162,31 +198,37 @@ export function createCompanionHost(
     requireKnown(event);
     await openMain(path === undefined ? undefined : pathSchema.parse(path));
   });
+  ipcMain.handle('aw:companion-panel', (event, raw: unknown) => {
+    requireKnown(event);
+    if (event.sender !== pet?.webContents) throw new Error('Only the companion can place its panel');
+    panel = companionPanelSchema.parse(raw);
+    fit();
+  });
   ipcMain.on('aw:companion-interactive', (event, raw: unknown) => {
     if (event.sender !== pet?.webContents) return;
     const interactive = companionInteractiveSchema.parse(raw);
     pet.setIgnoreMouseEvents(!interactive, { forward: true });
   });
   ipcMain.on('aw:companion-drag-start', (event, raw: unknown) => {
-    if (event.sender !== pet?.webContents) return;
+    if (event.sender !== pet?.webContents || anchor === undefined) return;
     // 起点和后续移动使用同一组屏幕坐标，避免 IPC 到达时系统光标已移动造成偏移。
-    drag = { cursor: companionPointSchema.parse(raw), bounds: pet.getBounds() };
+    drag = { cursor: companionPointSchema.parse(raw), anchor };
   });
   ipcMain.on('aw:companion-drag-move', (event, raw: unknown) => {
     if (event.sender !== pet?.webContents || drag === undefined) return;
     const point = companionPointSchema.parse(raw);
-    const bounds = {
-      ...drag.bounds,
-      x: drag.bounds.x + point.x - drag.cursor.x,
-      y: drag.bounds.y + point.y - drag.cursor.y,
+    anchor = {
+      ...drag.anchor,
+      x: drag.anchor.x + point.x - drag.cursor.x,
+      y: drag.anchor.y + point.y - drag.cursor.y,
     };
-    pet.setBounds(fitCompanion(bounds, screen.getDisplayMatching(bounds).workArea));
+    fit();
   });
   ipcMain.on('aw:companion-drag-end', (event) => {
-    if (event.sender !== pet?.webContents) return;
+    if (event.sender !== pet?.webContents || anchor === undefined) return;
     drag = undefined;
-    const { x, y } = pet.getBounds();
-    writeFileSync(positionFile, JSON.stringify({ x, y }));
+    const { x, y } = anchor;
+    writeFileSync(positionFile, JSON.stringify({ version: 2, x, y }));
   });
   ipcMain.handle('aw:companion-conversation-get', (event) => {
     requireKnown(event);
@@ -219,6 +261,13 @@ export function createCompanionHost(
   });
   screen.on('display-removed', fit);
   screen.on('display-metrics-changed', fit);
+  const activate = () => void openMain().catch(report);
+  app.on('activate', activate);
+  main.once('closed', () => {
+    app.off('activate', activate);
+    screen.off('display-removed', fit);
+    screen.off('display-metrics-changed', fit);
+  });
   return {
     beforeQuit: () => {
       quitting = true;

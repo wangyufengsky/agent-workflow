@@ -3,18 +3,18 @@
   place-items: center;
   position: relative;
   flex: none;
-  width: 24px;
-  height: 24px;
+  width: 36px;
+  height: 36px;
   vertical-align: middle;
   isolation: isolate;
 }
 .frame[data-size="xs"] {
-  width: 12px;
-  height: 12px;
+  width: 24px;
+  height: 24px;
 }
 .frame[data-size="lg"] {
-  width: 72px;
-  height: 72px;
+  width: 132px;
+  height: 132px;
 }
 .frame[data-size="pet"] {
   width: 100%;
@@ -22,19 +22,27 @@
 }
 .body {
   position: absolute;
-  width: 72%;
+  width: 116%;
   aspect-ratio: 1;
-  border-radius: 50%;
-  background: var(--aura);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 20%, transparent);
+  pointer-events: none;
 }
-.body::after {
-  content: "";
+.texture,
+.flow {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
-  background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--on-brand) 75%, transparent), transparent 58%);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--on-brand) 25%, transparent);
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.texture[hidden] {
+  display: none;
+}
+.flow {
+  opacity: 0;
+}
+.flow[data-active="true"] {
+  opacity: 1;
 }
 .ring {
   position: absolute;
@@ -48,8 +56,7 @@
 }
 .frame[data-mood="thinking"] .ring,
 .frame[data-mood="working"] .ring {
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-  border-top-color: var(--accent);
+  border-top-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .frame[data-mood="thinking"] .ring::before,
 .frame[data-mood="working"] .ring::before {
@@ -81,7 +88,7 @@
 }
 .frame[data-animated="true"][data-mood="thinking"] .body,
 .frame[data-animated="true"][data-mood="working"] .body {
-  animation: orbit 7s linear infinite;
+  animation: breathe 2.4s ease-in-out infinite;
 }
 
 .frame[data-animated="true"][data-mood="success"] .body {
