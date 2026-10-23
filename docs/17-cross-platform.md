@@ -87,6 +87,7 @@ Electron `app.getPath('userData')`，目录名为产品名：
 | --- | --- | --- |
 | `opencode serve` | 自成进程组（`detached`），停止时向进程组发 `SIGTERM` | 没有信号，`TerminateProcess` 只结束 opencode 本身，bash 子进程与语言服务会留下。用 `taskkill /pid <pid> /T /F` 结束进程树 |
 | 检查命令（`acceptance.runCommand`） | `/bin/sh -c`，自成进程组；超时 / 中止时向进程组发 `SIGTERM` | Git Bash `-c`（与 opencode 同一个 shell，D73）；超时 / 中止时 `taskkill /T /F` |
+| 页面预览的开发服务器（v1.3，`previews.process.ts`，29 §4） | 与检查命令同一个 POSIX shell、`killDescendants`；停止、空闲、worktree 删除前与应用退出时结束整棵进程树（macOS 上实测没有残留，29 §12 V5） | 同检查命令（Git Bash，`taskkill /T`）；**未在 Windows 上验证**（CI 停跑）。worktree 删除前先结束它，否则 Windows 上文件被占用（`worktrees.onBeforeRemove`） |
 | git | 正常退出，不需要终止 | 同左 |
 
 两者都用 execa 的 `killDescendants` 启动（POSIX 上自成进程组，Windows 上停止时运行 `taskkill /T`），`child.kill()` 即结束整棵进程树。只结束 shell 本身时，它启动的命令（`a && b` 中的 `b`、后台的测试进程）继续运行并占着输出管道，execa 的结果要等它们结束才返回。
@@ -152,6 +153,12 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 - 引用路径校验（`knowledge.citations.ts`）：模型给出的路径用 `path.resolve` 接到 `realpath` 后的仓库根下，再用 `relative` 判断是否越界（Windows 上跨盘符时 `relative` 返回绝对路径，被拒绝；`/etc/hosts` 在 Windows 上也是绝对路径）；`.git` 目录的判断在 `realpath` 之后再做一次，Windows 上写成 `.GIT` 也会被 `realpath` 还原成磁盘上的大小写而拒绝。存储与显示的引用路径统一为 `/` 分隔（`relative(...).split(sep).join('/')`），文件类型分类按 `/` 进行，三平台一致。
 - **行号与 CRLF**：Windows 上 `core.autocrlf=true` 的检出文件是 CRLF。按行切分原先只认 `\n`，每行会带着 `\r` 进入摘录与原文窗口；改为同时识别 `\r\n`（集成测试覆盖），行号不变。
 - 研究会话的 JSONL 在 `runs/knowledge/<attemptId>.jsonl`，经 `node:path` 拼接；`aw-researcher` 与执行会话共用 opencode 的 `shell` 配置（Windows 上为 Git Bash，D72），只读规则按 bash 语义成立。
+
+### 3.10a 浏览器（v1.3，29）
+
+- 离屏 `WebContentsView`、`webContents.debugger`、请求拦截用的都是 Electron 的跨平台接口，平台差异只有 DPR：AI 的标签页一律用设备指标设视口、DPR 为 1，截图在三个平台一致。实测只在 macOS 上做过（29 §12），Windows 与 Linux 未验证。
+- 预览命令的推断（`projects.inference.ts`）在三个平台一致；命令由 POSIX shell 执行，`$PORT` 与 `PORT` 环境变量同样有效。
+- 浏览器 E2E 的后端把 `HOME` 换成临时目录，开发用的浏览器宿主（playwright-core）按 `HOME` 找浏览器，`e2e/global-setup.ts` 因此按平台设 `PLAYWRIGHT_BROWSERS_PATH`（macOS `~/Library/Caches/ms-playwright`、Linux `~/.cache/ms-playwright`、Windows `%LOCALAPPDATA%\ms-playwright`）。
 
 ### 3.11 其他检查过、无需改动的点
 

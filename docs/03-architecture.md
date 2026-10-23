@@ -4,9 +4,11 @@
 
 ```
 ┌──────────────────────────── Electron 应用 ────────────────────────────┐
-│ main（薄）：窗口、菜单、文件夹选择、safeStorage 加解密、子进程生命周期   │
+│ main（薄）：窗口、菜单、文件夹选择、safeStorage 加解密、子进程生命周期、 │
+│            浏览器标签页（WebContentsView，v1.3，29 §5.1）              │
 │   │ preload：暴露 window.aw = { apiToken, appVersion, selectDirectory,│
-│   │          openExternal, revealInFinder }（不含加解密）             │
+│   │          openExternal, revealInFinder, exportPdf, …, browser }    │
+│   │          （不含加解密；browser 只放置与导航用户自己的标签页）      │
 │   ▼                                                                   │
 │ renderer（React，由后端同源托管）── 相对路径 /api/v1 + SSE ──┐        │
 │                                                         ▼              │
@@ -18,6 +20,7 @@
 │   ├─ /mcp/assistant 助手 MCP（v1.1，独立令牌，server agent-workflow-app） │
 │   ├─ SQLite（app.db）+ JSONL 日志                                       │
 │   ├─ git CLI / GitHub / GitLab / 项目数据库驱动                          │
+│   ├─ 子进程：任务 worktree 的开发服务器（页面预览，v1.3，29 §4）          │
 │   └─ 子进程：opencode serve 1.19.0（127.0.0.1:随机端口）                 │
 │         └─ 配置注入：mcp.agent-workflow → .../mcp/exec                 │
 │                     mcp.agent-workflow-app → .../mcp/assistant（v1.1） │
@@ -31,7 +34,8 @@
 - **main 不含业务逻辑**。凡需要系统能力（选目录、加解密）的，renderer 通过 preload 调 main；后端需要加解密时经 utilityProcess 的 `MessagePort` 请求 main。
 - **后端是唯一的状态权威**。renderer 不直接碰 Git、SQLite、opencode、项目数据库。
 - **凭据加解密**：后端经 utilityProcess 的 `process.parentPort` 发 `credential.request`（`encrypt` / `decrypt`，协议 schema 在 `shared/contracts/credential-port.ts`），main 用 safeStorage 处理后回 `credential.response`；safeStorage 不可用时后端抛 `CREDENTIAL_UNAVAILABLE`。
-- **后端可独立运行**：`pnpm --filter server dev` 用系统 Node 24 启动，renderer 用浏览器打开即可开发与跑 E2E（此时 safeStorage 由开发用的明文适配器替代，仅限 `NODE_ENV=development`；该分支在生产构建中被常量折叠删除，`pnpm build` 末尾的 `scripts/check-prod-bundle.mjs` 校验产物中不存在它）。
+- **浏览器标签页**（v1.3，29 §5）：后端经同一个 `process.parentPort` 发 `browser.request`（`open` / `setPolicy` / `close` / `cdp`，协议在 `shared/contracts/browser-port.ts`），main 回 `browser.response` 并主动发 `browser.cdpEvent` / `browser.blocked` / `browser.gone`。main 只做视图、CDP 转发与按共享的 `blockReason` 拦请求；动作层、快照与规则判断在后端 `browser` 模块。应用退出时 main 关闭所有标签页（不在窗口里的离屏视图会挡住 Electron 退出）。
+- **后端可独立运行**：`pnpm --filter server dev` 用系统 Node 24 启动，renderer 用浏览器打开即可开发与跑 E2E（此时 safeStorage 由开发用的明文适配器替代，浏览器标签页由 playwright-core 启动的 Chromium 承载，仅限 `NODE_ENV=development`；这些分支在生产构建中被常量折叠删除，`pnpm build` 末尾的 `scripts/check-prod-bundle.mjs` 校验产物中不存在它们）。
 - 令牌：每次启动随机生成 renderer 令牌与各 MCP 令牌，只存在内存；端口均为随机端口，仅绑定 127.0.0.1。开发时后端固定 `DEV_API_PORT`，Vite 把 `/api/v1` 代理过去（D31）。
 - **两套 MCP 权限隔离**：执行 MCP 只给执行任务的 AI 会话用，工具绑定到所属尝试；助手 MCP（v1.1，见 [15-assistant.md](15-assistant.md)）给应用助手用，能力来自操作清单，写操作需用户确认。
 
@@ -106,6 +110,7 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | 日志 | pino | 10.4.0 |
 | 测试 | vitest / @playwright/test | 5.0.5 / 1.64.1 |
 | 界面走查的对比度检查 | @axe-core/playwright（E2E 中只跑 `color-contrast` 规则，M6-01） | 4.13.0 |
+| 开发与测试用的浏览器宿主（v1.3，29 §5.2） | playwright-core（server 的 devDependency，只在 `NODE_ENV=development` 加载，不进安装包） | 1.64.1 |
 | 类型 | @types/node / @types/react / @types/react-dom | 24.19.2 / 19.3.0 / 19.3.0 |
 | 代码质量 | @biomejs/biome / dependency-cruiser / typescript | 2.5.15 / 18.6.0 / **6.0.3**（D29） |
 | 静态文件 | @fastify/static | 10.1.6 |
@@ -289,8 +294,10 @@ export function taskOperations(tasks: TasksService) {
 │  └─ opencode-YYYYMMDD.log    opencode stdout/stderr
 ├─ runs/
 │  └─ <taskId>/
-│     └─ <attemptId>.jsonl     会话流（消息/片段/工具调用镜像）；任务时间线在 SQLite task_events
-│        （知识问答每一轮的会话流在 runs/knowledge/<attemptId>.jsonl，v1.1；PPT 的在 runs/ppt/<attemptId>.jsonl，v1.2）
+│     ├─ <attemptId>.jsonl     会话流（消息/片段/工具调用镜像）；任务时间线在 SQLite task_events
+│     │  （知识问答每一轮的会话流在 runs/knowledge/<attemptId>.jsonl，v1.1；PPT 的在 runs/ppt/<attemptId>.jsonl，v1.2）
+│     ├─ preview.log           页面预览的开发服务器输出（v1.3，29 §4.2）
+│     └─ browser/<attemptId>/  尝试的截图（v1.3，29 §5.7；知识问答的在 runs/knowledge/browser/<attemptId>/）
 ├─ worktrees/
 │  └─ <projectSlug>/<taskKey>/ 任务 worktree（默认位置，可在设置中改）
 └─ assistant/                  助手工作目录（v1.1）：会话 directory；files/<对话 id>/ 生成的文件，conversations/<对话 id>.jsonl 消息流
@@ -313,3 +320,5 @@ export function taskOperations(tasks: TasksService) {
 - 助手 MCP（v1.1）：独立令牌；调用按会话归属到助手对话（执行任务的会话调用不了）；写操作经用户确认；凭据字段不进入工具 schema，凭据只能在表单中由用户输入；助手不能修改「总是允许」、opencode 路径、bash 策略与 worktree 目录（D65）。
 - 助手会话：`directory` 为 `<数据目录>/assistant/`，`external_directory: deny`，bash 为只读规则、其余询问。
 - 数据库工具：只读事务（SQL Server 为从不提交的事务）+ 按方言的语句检查 + 行数与超时限制（24 §4）。
+- 浏览器（v1.3，29 §5.4）：AI 的标签页只打开任务预览地址与设置 `browser.sites` 允许的网站，只读网站上 AI 发出的写请求与 WebSocket 由 main 在网络层拦下；用户标签页中规则不允许的地址交给系统浏览器；下载、权限请求、文件选择框一律拒绝；不开远程调试端口；工具返回的页面内容在工具说明与提示词中标为数据、不是指令；应用不向页面填写任何已保存的凭据，网站登录由用户在设置里自己完成。助手不能修改 `browser.sites`（D65 的同一思路）。
+- 页面预览（v1.3，29 §4）：开发服务器以项目配置的命令在任务 worktree 里运行（与检查命令同一个 shell、`killDescendants`），只监听后端分配的 127.0.0.1 端口；worktree 删除前与应用退出时结束整棵进程树。

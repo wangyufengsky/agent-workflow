@@ -1,6 +1,6 @@
 # 29 · 内置浏览器与页面预览
 
-> 状态：D120–D125 **用户已确认**（2026-10-23），未实现。按 §13 的分期拆进 05，实现时在同一提交更新 08 / 09 / 10 / 11 / 12 / 13 / 14。
+> 状态：D120–D125 **用户已确认**（2026-10-23）。**B1 已实现**（05 的 B-01…B-08，分支 `feat/B-browser`）：预览服务、浏览器宿主与动作层、执行 MCP 浏览器工具、项目与设置界面；B2（页面体检、预览页签与观看画面、「附上当前页面」）与 B3（助手、知识问答的引用摘录、PPT 网页资料）未开始。实现中与设计稿不同的地方已改在各节里（如 §5.2 的宿主接口、§5.7 的截图、§4.1 推断的位置）。
 
 ## 1. 定位
 
@@ -513,11 +513,10 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 - **错误码（08）**：`PREVIEW_NOT_CONFIGURED`、`PREVIEW_START_FAILED`（`details.logTail`）、`PREVIEW_LIMIT_REACHED`、`BROWSER_SITE_NOT_ALLOWED`（`details.host`）、`BROWSER_LOGIN_REQUIRED`（`details.url`）、`BROWSER_REF_STALE`、`BROWSER_ACTION_FAILED`（`details.reason`：`not_visible` · `covered` · `disabled` · `detached` · `not_focusable`；`details.coveredBy`）（以上 B-02 已加）；`BROWSER_NOT_OPEN`（B3，助手 `browser.read`）、`BROWSER_CHECK_UNRUNNABLE`（B2，任务的 `failure` 上，同 `CHECK_COMMAND_UNRUNNABLE`，不作为 HTTP 错误）在实现那一期加。
 - **状态机（09）**：`previewMachine`（09 §12，B-02 已加）；节点 `verifying` 的检查顺序为命令 → 页面体检 → AI 评审。
 - **API（11）**：
-  - 操作：`previews.get` / `previews.start` / `previews.stop` / `previews.trial`（项目设置的试运行）、`browser.read`、`browser.readUrl`、`browser.openUserTab` `{ taskId }`（返回 `tabId`）、`browser.navigateUserTab`、`browser.openLoginTab` `{ url }`、`browser.listSiteLogins` / `browser.clearSiteLogin` `{ host }`；
-  - 非清单路由：`GET /attempts/:attemptId/browser/:file`（尝试的截图与画面）、`GET /tasks/:taskId/browser/:file`（页面体检截图）；
-  - SSE：`preview.updated`、`browser.frame`；
-  - `tasks.requestChanges` 输入加可选 `page: { path, viewport, includeScreenshot }`。
-- **MCP（12）**：§6 的 11 个工具；知识问答 `web` 引用的 `CitationDTO` 加 `excerpt`（18 §6）。
+  - **B1 已有**：操作 `previews.get` / `start` / `stop` / `trial`（11 §13f）；`browser.openLoginTab` `{ url }`、`browser.closeUserTab`、`browser.listSiteLogins`、`browser.clearSiteLogin` `{ host }`（11 §13f′）；SSE `preview.updated`。
+  - **B2 再加**：`browser.openUserTab` `{ taskId }`（返回 `tabId`）、`browser.navigateUserTab`；非清单路由 `GET /attempts/:attemptId/browser/:file`（尝试的截图与画面）、`GET /tasks/:taskId/browser/:file`（页面体检截图）；SSE `browser.frame`；`tasks.requestChanges` 输入加可选 `page: { path, viewport, includeScreenshot }`。
+  - **B3 再加**：`browser.read`、`browser.readUrl`。
+- **MCP（12）**：§6 的 11 个工具（B1 已有，12 §6.17）；知识问答 `web` 引用的 `CitationDTO` 加 `excerpt`（18 §6，B3）。
 - **preload**：`aw.browser.place(tabId, rect | null)`、`aw.browser.back / forward / reload(tabId)`、`aw.browser.openDevTools(tabId)`。用户标签页的地址导航经后端 `browser.navigateUserTab`，统一检查来源。
 
 ## 11. 实现结构
