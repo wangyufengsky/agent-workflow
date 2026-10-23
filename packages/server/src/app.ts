@@ -404,6 +404,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...system.operations,
     ...projects.operations,
     ...previews.operations,
+    ...browser.operations,
     ...databases.operations,
     ...roles.operations,
     ...workflows.operations,

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -42,6 +43,13 @@ export type BrowserServiceDeps = {
 export type BrowserOwner = { id: string; taskId: string | null; projectId: string | null; filesDir: string };
 
 type Session = { owner: BrowserOwner; tabs: Partial<Record<BrowserTabKind, Tab>>; current: Tab | null; shots: number };
+
+/** The websites' partition: the user's logins, which the AI's website tabs share (29 §5.4). */
+const SITES_PARTITION = 'persist:aw-sites';
+const cookiesSchema = z.object({
+  cookies: z.array(z.object({ name: z.string(), domain: z.string(), path: z.string() })),
+});
+const hostOfCookie = (domain: string) => domain.replace(/^\./, '');
 
 /** Host or path fragments of login pages, besides `browser.loginUrlPatterns` (29 §5.4). */
 const LOGIN_HINTS = ['login', 'signin', 'sign-in', 'sso', 'cas', 'oauth'];
@@ -90,7 +98,7 @@ export function createBrowserService({ host, clock, log, events, settings, proje
       tabId: `${owner.id}:${kind}`,
       kind,
       // The preview tab starts clean for each attempt; websites share the user's logins (29 §5.3).
-      partition: kind === BrowserTabKind.Preview ? `aw-attempt-${owner.id}` : 'persist:aw-sites',
+      partition: kind === BrowserTabKind.Preview ? `aw-attempt-${owner.id}` : SITES_PARTITION,
       policy: policyFor(owner),
       site: kind === BrowserTabKind.Site,
     });
@@ -116,6 +124,33 @@ export function createBrowserService({ host, clock, log, events, settings, proje
     tab.begin();
     await run(tab);
     return tab.result(await tab.settle());
+  }
+
+  /** A short-lived offscreen tab of the websites' partition, for its cookies and storage. */
+  async function withSitesTab<T>(
+    run: (cdp: (method: string, params?: Record<string, unknown>) => Promise<unknown>) => Promise<T>,
+  ) {
+    const tabId = `sites:${randomUUID()}`;
+    await host.request({
+      kind: 'open',
+      tabId,
+      partition: SITES_PARTITION,
+      userFacing: false,
+      viewport: VIEWPORT_SIZES.desktop,
+      policy: { previewOrigins: [], sites: [] },
+    });
+    try {
+      return await run((method, params) => host.request({ kind: 'cdp', tabId, method, params }));
+    } finally {
+      await host.request({ kind: 'close', tabId });
+    }
+  }
+
+  async function siteLogins(): Promise<{ hosts: string[] }> {
+    return withSitesTab(async (cdp) => {
+      const { cookies } = cookiesSchema.parse(await cdp('Network.getAllCookies'));
+      return { hosts: [...new Set(cookies.map((c) => hostOfCookie(c.domain)))].sort() };
+    });
   }
 
   async function close(ownerId: string): Promise<void> {
@@ -232,6 +267,47 @@ export function createBrowserService({ host, clock, log, events, settings, proje
     },
 
     close,
+
+    /**
+     * A tab on the window for the user to log in to a website (29 §8.6): the websites' partition keeps the login
+     * for the AI's website tabs. Addresses the rules deny go to the system browser, as in every user tab.
+     */
+    async openLoginTab(url: string): Promise<{ tabId: string }> {
+      const tabId = `login:${randomUUID()}`;
+      await host.request({
+        kind: 'open',
+        tabId,
+        partition: SITES_PARTITION,
+        userFacing: true,
+        viewport: null,
+        policy: { previewOrigins: [], sites: settings.get('browser.sites') },
+      });
+      await host.request({ kind: 'cdp', tabId, method: 'Page.navigate', params: { url } });
+      return { tabId };
+    },
+
+    closeUserTab: async (tabId: string): Promise<void> => {
+      await host.request({ kind: 'close', tabId });
+    },
+
+    siteLogins,
+
+    /** Logs out of a website: its cookies and its pages' storage in the websites' partition go. */
+    async clearSiteLogin(siteHost: string): Promise<{ hosts: string[] }> {
+      await withSitesTab(async (cdp) => {
+        const { cookies } = cookiesSchema.parse(await cdp('Network.getAllCookies'));
+        for (const cookie of cookies.filter((c) => hostOfCookie(c.domain) === siteHost)) {
+          await cdp('Network.deleteCookies', { name: cookie.name, domain: cookie.domain, path: cookie.path });
+        }
+        for (const scheme of ['http', 'https']) {
+          await cdp('Storage.clearDataForOrigin', {
+            origin: `${scheme}://${siteHost}`,
+            storageTypes: 'local_storage,indexeddb,cache_storage,service_workers',
+          });
+        }
+      });
+      return siteLogins();
+    },
 
     async closeAll(): Promise<void> {
       await Promise.all([...sessions.keys()].map((id) => close(id)));

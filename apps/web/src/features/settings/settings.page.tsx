@@ -8,6 +8,7 @@ import { AssistantSettings } from './assistant-settings.tsx';
 import { ProSettings } from './pro-settings.tsx';
 import { NumberSetting, Segmented } from './setting-inputs.tsx';
 import { useSettings, useUpdateSettings } from './settings.queries.ts';
+import { WebsiteSettings } from './website-settings.tsx';
 
 /** Settings (14 §3.7): the simple ones, and in pro mode the pro keys of `SETTING_MODE` (M5-08). */
 export function SettingsPage() {
@@ -95,6 +96,7 @@ export function SettingsPage() {
           </div>
         </Panel>
         <AssistantSettings settings={settings} set={set} />
+        <WebsiteSettings settings={settings} set={set} />
         {isPro && <ProSettings settings={settings} set={set} />}
         {update.isError && <ErrorState error={update.error} />}
         <AboutPanel />

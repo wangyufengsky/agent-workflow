@@ -5,7 +5,11 @@ import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import {
   AttemptStatus,
+  clearSiteLoginOp,
+  closeUserTabOp,
   ErrorCode,
+  listSiteLoginsOp,
+  openLoginTabOp,
   ServerEventType,
   type SiteAccess,
   updateProjectOp,
@@ -51,7 +55,9 @@ let t: TestApp;
 beforeAll(async () => {
   server = createServer((req, res) => {
     if (req.method !== 'GET') writes.push(`${req.method} ${req.url}`);
-    const body = PAGES[req.url ?? ''];
+    // A website's login: the session cookie it sets.
+    if (req.url === '/sign-in') res.setHeader('set-cookie', 'sid=s3cret; Path=/; HttpOnly');
+    const body = req.url === '/sign-in' ? page('<p>已登录</p>') : PAGES[req.url ?? ''];
     res.writeHead(body === undefined ? 404 : 200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(body ?? 'not found');
   });
@@ -192,6 +198,25 @@ describe('浏览器：动作层', () => {
     const shot = await browser.screenshot(owner, { fullPage: false });
     const saved = await readFile(join(owner.filesDir, 'browser', owner.id, shot.file));
     expect(saved.subarray(0, 3)).toEqual(Buffer.from([0xff, 0xd8, 0xff]));
+  });
+});
+
+describe('浏览器：网站登录', () => {
+  it('在登录标签页里登录后列出该网站，退出登录后不再列出', async () => {
+    await browserFor();
+    const opened = await t.call(openLoginTabOp, { url: `${origin}/sign-in` });
+    expect(opened.status).toBe(201);
+    await t.call(closeUserTabOp, { tabId: opened.body.tabId });
+
+    expect((await t.call(listSiteLoginsOp, {})).body.hosts).toContain('127.0.0.1');
+    const cleared = await t.call(clearSiteLoginOp, { host: '127.0.0.1' });
+    expect(cleared.body.hosts).not.toContain('127.0.0.1');
+    expect((await t.call(listSiteLoginsOp, {})).body.hosts).not.toContain('127.0.0.1');
+  });
+
+  it('登录地址必须是 http(s)', async () => {
+    await browserFor();
+    expect((await t.call(openLoginTabOp, { url: 'file:///etc/passwd' })).status).toBe(400);
   });
 });
 

@@ -7,6 +7,7 @@ export * from './constants/settings.ts';
 export * from './contracts/api/assistant.ts';
 export * from './contracts/api/attempts.ts';
 export * from './contracts/api/batches.ts';
+export * from './contracts/api/browser.ts';
 export * from './contracts/api/databases.ts';
 export * from './contracts/api/decks.ts';
 export * from './contracts/api/delivery.ts';

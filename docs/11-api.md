@@ -389,6 +389,17 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/tasks/:taskId/preview/stop` | `previews.stop` | write | → `Preview`（`stopped`） |
 | POST | `/projects/:projectId/preview/trial` | `previews.trial` | write | 在主工作区启动一次（不运行安装命令），就绪后立即停止 → `{ url, logTail }`；没能就绪 502 `PREVIEW_START_FAILED` |
 
+### 13f′. 网站登录（v1.3，29 §8.6）
+
+`mode = simple`，不进命令面板与助手（网站登录是用户自己的事）。
+
+| 方法 | 路径 | 操作 | 风险 | 说明 |
+| --- | --- | --- | --- | --- |
+| POST | `/browser/login-tabs` | `browser.openLoginTab` | write | `{ url }`（http(s)）→ 201 `{ tabId }`：在网站分区（`persist:aw-sites`）打开一个用户标签页，由界面经 `aw.browser.place` 放到窗口上；规则不允许的地址交给系统浏览器 |
+| DELETE | `/browser/tabs/:tabId` | `browser.closeUserTab` | write | 204 |
+| GET | `/browser/site-logins` | `browser.listSiteLogins` | read | `{ hosts }`：网站分区里有 Cookie 的主机（用分区里一个临时离屏标签页的 `Network.getAllCookies`） |
+| DELETE | `/browser/site-logins/:host` | `browser.clearSiteLogin` | write | 删除该主机的 Cookie 与页面存储（`Storage.clearDataForOrigin`）→ `{ hosts }` |
+
 ## 13e. PPT（v1.2）
 
 见 [23-ppt.md §8](23-ppt.md#8-api操作清单)。全部 `mode = simple`、`expose.assistant = true`、不进命令面板（D96）；改动内容的 write 操作在有 AI 工作进行中时 409 `DECK_BUSY`；发起 AI 工作时 opencode 未就绪 503。`model` 同知识问答（`provider/model`、`null` 或省略）。

@@ -32,6 +32,7 @@ export const queryKeys = {
   schedule: (id: string) => ['tasks', 'list', 'schedule', id],
   task: (id: string) => ['tasks', 'detail', id],
   preview: (taskId: string) => ['tasks', 'detail', taskId, 'preview'],
+  siteLogins: ['browser', 'site-logins'],
   /** Outside the task detail's prefix: read from the platform only when the user asks, never refreshed by events. */
   reviewComments: (id: string) => ['review-comments', id],
   node: (taskId: string, nodeId: string) => ['tasks', 'detail', taskId, 'nodes', nodeId],
