@@ -1,5 +1,6 @@
 export { detectOpencode, type OpencodeDetection } from './opencode.binary.ts';
 export {
+  type AssistantPrompt,
   type CreateSessionInput,
   createRuntimeClient,
   type ModelRef,
@@ -20,4 +21,5 @@ export {
   parseGlobalEvent,
   ToolCallStatus,
 } from './opencode.events.ts';
+export { createMessageId } from './opencode.message-id.ts';
 export { createOpencodeRuntime, type OpencodeRuntime, type OpencodeRuntimeDeps } from './opencode.runtime.ts';

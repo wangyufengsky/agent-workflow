@@ -9,6 +9,8 @@ export type AssistantUiRequest =
 
 /** Pure UI state only (06 §4); server data stays in TanStack Query. */
 type UiState = {
+  activePreview: { taskId: string; tabId: string } | null;
+  setActivePreview(preview: { taskId: string; tabId: string } | null): void;
   paletteOpen: boolean;
   setPaletteOpen(open: boolean): void;
   assistantOpen: boolean;
@@ -42,6 +44,8 @@ type UiState = {
 export type PendingForm = { seq: number; form: AssistantForm; values: Record<string, unknown> };
 
 export const useUiStore = create<UiState>((set) => ({
+  activePreview: null,
+  setActivePreview: (activePreview) => set({ activePreview }),
   paletteOpen: false,
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   assistantOpen: false,

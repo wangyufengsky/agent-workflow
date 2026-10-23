@@ -337,7 +337,9 @@ payload / response：
 | --- | --- | --- |
 | id | TEXT PK | |
 | title | TEXT | 默认取第一条消息的首行（`ASSISTANT_TITLE_MAX_CHARS`） |
-| opencode_session_id | TEXT NULL | 第一条消息时创建；MCP 调用归属的依据 |
+| opencode_session_id | TEXT NULL | 第一条消息时创建；MCP 调用归属的依据；已隔离会话运行于真实路径 `assistant/files/<id>/` |
+| isolated | INTEGER boolean DEFAULT 0 | 迁移 0020：旧记录为 false，新建为 true；首次发送前把旧原生会话迁移到独立目录 |
+| retired_session_id | TEXT NULL | 迁移 0020：等待清理的旧原生会话；持久化后才删除，失败保留供跨重启重试，禁止回到旧目录运行 |
 | created_at / updated_at | INTEGER | `updated_at` 随每条消息更新，列表按它倒序 |
 
 索引：`(opencode_session_id)`、`(updated_at)`。
@@ -383,6 +385,25 @@ payload / response：
 索引：`(conversation_id)`。事件游标与 `assistant_outbox` 消息在同一事务提交，重复 SSE 不重复入队。启动时批量补扫最新真实状态；若停机间发生多个未消费状态，以当前状态为准，不把已经结束的失败重新呈现为当前失败。`review`、`failed`、`completed` 入队；其他状态只推进游标。已入队消息保留发生时间和事件编号，恢复只重投消息，不重新执行任务。删除任务会删除跟进记录；删除对话同时清理其跟进和 outbox。
 
 消息流：`<数据目录>/assistant/conversations/<id>.jsonl`，格式同 §3（多 `confirmation`、`attachment`、`entity_ref` 三种条目）；记录用户的消息、模型的正文与工具调用、权限请求、错误；后端代发的确认结果消息与每轮注入的 `system` 不记录（卡片显示结果）。
+
+### assistant_turns
+
+助手在创建外部会话或发送消息前保存轮次，包含用户消息与应用回传消息。历史聊天不补造轮次或零用量；统计起点为本对话首条轮次的开始时间。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | INTEGER PK AUTOINCREMENT | 轮次顺序，同一时钟刻度也稳定 |
+| conversation_id | TEXT → assistant_conversations，CASCADE | 删除对话时清理 |
+| source | TEXT | `user` 或 `app`（确认结果等回传） |
+| status / end_reason | TEXT / TEXT NULL | `AssistantTurnStatus` / `AssistantTurnEvent`，见 09 §14 |
+| model | TEXT NULL | 本轮开始时的模型设置；空表示运行时默认 |
+| started_at / ended_at | INTEGER / INTEGER NULL | 注入 Clock 的毫秒时间 |
+| elapsed_ms | INTEGER NULL | 正常结束为墙钟耗时，含权限等待；后端重启发现的未结束轮次为未知，不能把离线时间算入 |
+| tokens_input / tokens_output | INTEGER NULL | 实际 `StepFinished` 报告之和；未报告保持 NULL，实际报告零保留 0 |
+| timeout_ms | INTEGER | 本轮开始时 `attempt.timeoutMinutes` 的快照 |
+| message_ids / step_ids | TEXT(JSON string[]) | 将实际报告关联至原轮次，按 step part id 去重，重放与迟到报告不重复累计 |
+
+索引：`(conversation_id, started_at)`、`(status)`。后端重启将遗留 `running` 转为 `interrupted / backend_restart`；运行时消失用 `runtime_lost`。用量可在轮次结束后通过已关联的 message id 补报，未知所属轮次的报告不猜测归属。
 
 ## 4a. 知识问答（v1.1）
 
@@ -569,7 +590,7 @@ payload / response：
 - 删除定时任务：删除其运行记录，关闭其未处理的 `schedule_failure` 条目（dismissed）；开出的任务保留。
 - 删除知识对话：要求没有研究中的一轮；删除轮次、其尝试（权限条目随之级联）与 `runs/knowledge/<attemptId>.jsonl`。
 - 删除 PPT：要求没有进行中的 AI 工作（`DECK_BUSY`）；删除其尝试（会话流 `runs/ppt/<attemptId>.jsonl` 随之删除，权限条目级联），再删除 PPT（页面、资料、工作记录级联）。删除项目时 PPT 的 `project_id` 置空。
-- 删除助手对话：级联删除其确认，并删除 `assistant/conversations/<id>.jsonl` 与 `assistant/files/<id>/`。
+- 删除助手对话：先停止并删除底层 opencode 会话（含待清理旧会话），失败保留本地对话；成功后级联删除其确认，并删除 `assistant/conversations/<id>.jsonl` 与 `assistant/files/<id>/`。
 - 任务终态后 worktree 删除，但任务、计划、节点、尝试、会话流保留（供回看）。
 - 不做自动过期清理（v1）。设置页显示数据目录占用。
 

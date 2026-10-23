@@ -211,6 +211,13 @@ export function createPreviewsService({
   });
 
   return {
+    projectOf(taskId: string): string {
+      const worktree = worktrees.findByTask(taskId);
+      if (worktree === undefined || worktree.status !== WorktreeStatus.Ready) {
+        throw new AppError(ErrorCode.StateTransitionInvalid, 'The task has no worktree to preview', { taskId });
+      }
+      return worktree.projectId;
+    },
     get: (taskId: string): Preview => toPreview(taskId, entries.get(taskId)),
 
     /**
@@ -220,17 +227,6 @@ export function createPreviewsService({
     hasRun: (taskId: string): boolean => ran.has(taskId),
 
     /** The project of the task whose preview this is (its worktree's). */
-    projectOf(taskId: string): string {
-      const worktree = worktrees.findByTask(taskId);
-      if (worktree === undefined) {
-        throw new AppError(ErrorCode.StateTransitionInvalid, 'The task has no worktree to preview', {
-          entity: 'preview',
-          taskId,
-        });
-      }
-      return worktree.projectId;
-    },
-
     /**
      * Starts the task's preview, or joins a start in progress; resolves once it is running (29 §4.2). `queue`: wait
      * for room under the limit instead of failing (a page check, 29 §4.4).

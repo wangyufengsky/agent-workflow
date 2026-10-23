@@ -92,7 +92,7 @@ features/stream/
 | `group` | 结束后连续 ≥ 3 个 `action` | 摘要「查看 3 个文件 · 搜索 2 次 · 运行 1 条命令（1 条失败）」；含失败的组自动展开 |
 | `prompt` | `user_message` | 只在专业模式 |
 | `wait` | `permission` | 「等待你允许：…」；会话正停在这里时加「去处理」：后端在权限请求后追加 `awaiting_input`（`attempts.state.ts` 的 `park`），所以「运行中且最后是 `awaiting_input`、前一条是权限」即在等这条权限，此时不再单独显示那条系统事件；会话已在等待时又来的权限请求没有新的 `awaiting_input`，最后一条是权限也算在等 |
-| `notice` | `system` | 分隔线样式的一句话（已提醒、重试中、超时、已中止、运行时消失）；运行中最后一条是 `awaiting_input`（阻塞提问）时显示为等待条与「去处理」 |
+| `notice` | `system` | 分隔线样式的一句话（已提醒、重试中、超时、已中止、运行时消失、助手目录升级）；运行中最后一条是 `awaiting_input`（阻塞提问）时显示为等待条与「去处理」 |
 | `error` | `error` | danger 底的一行，错误码文案 |
 
 `report_progress` 在运行中显示在标题行（「当前进展」），流里只保留一行 `notice`「AI 汇报：…」，不再重复成动作行。

@@ -1,4 +1,4 @@
-import type { AssistantConfirmationStatus } from '@aw/shared';
+import type { AssistantConfirmationStatus, AssistantTurnEvent, AssistantTurnStatus } from '@aw/shared';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { tasksTable } from '../tasks/tasks.table.ts';
 
@@ -9,6 +9,9 @@ export const assistantConversationsTable = sqliteTable(
     id: text('id').primaryKey(),
     title: text('title').notNull(),
     opencodeSessionId: text('opencode_session_id'),
+    /** 旧会话目录不可由 opencode 请求参数改变，首次恢复时迁到独立会话。 */
+    isolated: integer('isolated', { mode: 'boolean' }).notNull().default(false),
+    retiredSessionId: text('retired_session_id'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
@@ -66,4 +69,32 @@ export const assistantTaskFollowupsTable = sqliteTable(
     createdAt: integer('created_at').notNull(),
   },
   (t) => [index('assistant_task_followups_conversation_idx').on(t.conversationId)],
+);
+
+/** 每次外部发送前持久化，未报告 tokens 保持 NULL；结束只能经助手轮次状态机。 */
+export const assistantTurnsTable = sqliteTable(
+  'assistant_turns',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    conversationId: text('conversation_id')
+      .notNull()
+      .references(() => assistantConversationsTable.id, { onDelete: 'cascade' }),
+    source: text('source').$type<'user' | 'app'>().notNull(),
+    status: text('status').$type<AssistantTurnStatus>().notNull(),
+    endReason: text('end_reason').$type<AssistantTurnEvent>(),
+    model: text('model'),
+    startedAt: integer('started_at').notNull(),
+    endedAt: integer('ended_at'),
+    elapsedMs: integer('elapsed_ms'),
+    tokensInput: integer('tokens_input'),
+    tokensOutput: integer('tokens_output'),
+    timeoutMs: integer('timeout_ms').notNull(),
+    /** JSON：跨重放识别已记录的步骤，以及将迟到用量归回原轮次。 */
+    messageIds: text('message_ids').notNull(),
+    stepIds: text('step_ids').notNull(),
+  },
+  (t) => [
+    index('assistant_turns_conversation_idx').on(t.conversationId, t.startedAt),
+    index('assistant_turns_status_idx').on(t.status),
+  ],
 );

@@ -10,6 +10,7 @@ import type { FastifyInstance } from 'fastify';
 import { registerMcpEndpoint } from '../../core/http/mcp-endpoint.ts';
 import type { OperationImpl } from '../../core/operations/operations.ts';
 import type { BatchesService } from '../batches/index.ts';
+import type { BrowserService } from '../browser/index.ts';
 import type { DecksService } from '../decks/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
@@ -41,6 +42,7 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context'> & {
   decks: DecksService;
   batches: BatchesService;
   schedules: SchedulesService;
+  browser: BrowserService;
   /** Every other operation of the app; the assistant's tools are generated from them (15 §3). */
   operations: readonly OperationImpl[];
   appStatus(): Promise<GetAppStatusOutput>;
@@ -87,7 +89,13 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     stopWhisper: whisper.stop,
     start: taskRelay.start,
     registry,
-    operations: assistantOperations(conversations, confirmations, whisper, createAssistantSnapshots(deps)),
+    operations: assistantOperations(
+      conversations,
+      confirmations,
+      whisper,
+      createAssistantSnapshots(deps),
+      deps.browser,
+    ),
     register(server: FastifyInstance) {
       registerAssistantRoutes(server, conversations);
       registerMcpEndpoint(server, {

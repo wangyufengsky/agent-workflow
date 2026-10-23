@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { APP_LICENSE, APP_SOURCE_URL, browserRectSchema, type LaunchPreferences } from '@aw/shared';
 import { splashBackground, splashHtml } from '@aw/web/splash';
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell, type WebPreferences } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell, type WebPreferences } from 'electron';
 import { type Backend, startBackend } from './backend.ts';
 import { createCompanionHost } from './companion.ts';
 import { serveExports } from './export.ts';
@@ -111,17 +111,22 @@ app.whenReady().then(async () => {
   await openApp(window, backend);
 });
 
+async function finishQuit(running: Backend): Promise<void> {
+  // 窗口已关闭；先结束本应用默认会话的请求与预连接，避免后端等待 NetworkService 的空闲 socket。
+  await session.defaultSession.closeAllConnections();
+  await running.stop();
+  // The backend closed its own tabs as it stopped; what is left would keep Electron from exiting (B-04).
+  running.browser.closeAll();
+  app.quit();
+}
+
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', () => companion?.beforeQuit());
 app.on('will-quit', (event) => {
   const running = backend;
   if (running === undefined) return;
-  // Quit again once the backend has stopped opencode and exited (17 §3.5). It closes its own tabs as it stops; what is
-  // left would keep Electron from exiting (B-04).
+  // Quit again once the backend has stopped opencode and exited (17 §3.5).
   event.preventDefault();
   backend = undefined;
-  void running.stop().then(() => {
-    running.browser.closeAll();
-    app.quit();
-  });
+  void finishQuit(running);
 });

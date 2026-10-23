@@ -1,5 +1,6 @@
 import {
   abortAssistantOp,
+  bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
   createConversationOp,
@@ -333,6 +334,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   pruneWorktreesOp,
   listConversationsOp,
   snapshotAssistantContextOp,
+  bindAssistantPreviewOp,
   createConversationOp,
   getConversationOp,
   deleteConversationOp,

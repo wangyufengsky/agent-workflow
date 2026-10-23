@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   AssistantToolName,
@@ -312,6 +312,7 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     const delivered = waitForEvent(t.app.events, ServerEventType.AssistantUpdated, (c) => c.busy);
     await t.app.services.assistant.replyPermission(conversationId, request.permissionId, 'reject');
     await delivered;
+    await t.fake.settled();
     expect(t.fake.prompts.at(-1)?.text).toContain('The user confirmed `projects_update`');
   });
 
@@ -446,7 +447,7 @@ describe('助手专用工具（A-05）', () => {
     });
     const revealed = waitForEvent(t.app.events, ServerEventType.AssistantRevealFile);
     await call(AssistantToolName.RevealFile, { path: 'docs/a.md' });
-    expect(await revealed).toEqual({ conversationId, absolutePath: join(dir, 'docs', 'a.md') });
+    expect(await revealed).toEqual({ conversationId, absolutePath: realpathSync(join(dir, 'docs', 'a.md')) });
 
     for (const path of ['../../outside.md', '/etc/hosts', 'missing.md']) {
       const { isError, body } = await call(AssistantToolName.RevealFile, { path });

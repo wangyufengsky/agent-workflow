@@ -20,6 +20,13 @@ export const openLoginTabRequestSchema = z.object({
 });
 export const userTabSchema = z.object({ tabId: z.string() });
 export type UserTab = z.infer<typeof userTabSchema>;
+/** `browser_read` (15, 29 §8.1): the user's preview tab the UI bound to the conversation, as the assistant reads it. */
+export const readPreviewSchema = browserPageSchema.extend({
+  settled: z.boolean(),
+  taskId: z.string(),
+  viewport: viewportPresetSchema,
+  logs: browserLogsOutputSchema,
+});
 
 /** Hosts with cookies in the websites' login partition. */
 export const siteLoginsSchema = z.object({ hosts: z.array(z.string()) });
@@ -43,7 +50,8 @@ export type BrowserFrame = z.infer<typeof browserFrameSchema>;
 export const openUserTabRequestSchema = z.object({ taskId: z.string() });
 export const navigateUserTabRequestSchema = z.object({
   tabId: z.string(),
-  path: z.string().startsWith('/'),
+  /** A path of the preview: `//host` would leave it. */
+  path: z.string().regex(/^\/(?!\/)/),
 });
 export const setUserViewportRequestSchema = z.object({ tabId: z.string(), preset: viewportPresetSchema });
 

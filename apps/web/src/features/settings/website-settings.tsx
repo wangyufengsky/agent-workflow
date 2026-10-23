@@ -143,7 +143,7 @@ function SiteLogins() {
       </div>
       {!desktop && <p className="hint">{C.loginDesktopOnly}</p>}
       {open.isError && <ErrorState error={open.error} />}
-      {tabId !== null && <div ref={area} className={styles.loginArea} />}
+      {tabId !== null && <div ref={area} className={styles.loginArea} data-testid="login-area" />}
       <span className="label">{C.logins}</span>
       {logins.isError && <ErrorState error={logins.error} onRetry={() => void logins.refetch()} />}
       {logins.data?.hosts.length === 0 && <p className="hint">{C.loginsNone}</p>}

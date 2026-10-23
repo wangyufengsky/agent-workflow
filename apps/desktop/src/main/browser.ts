@@ -7,6 +7,7 @@ import {
   type BrowserRect,
   blockReason,
   browserPortRequestSchema,
+  browserShortcutSchema,
   urlAccess,
 } from '@aw/shared';
 import { type BrowserWindow, type Session, type UtilityProcess, WebContentsView } from 'electron';
@@ -94,6 +95,18 @@ export function createBrowserTabs({ window, emit, openExternal }: BrowserTabsDep
     configure(contents.session);
     tabs.set(op.tabId, tab);
     byContents.set(contents.id, tab);
+
+    contents.on('before-input-event', (event, input) => {
+      if (!tab.userFacing || input.type !== 'keyDown' || (!input.meta && !input.control)) return;
+      const shortcut = browserShortcutSchema.safeParse(input.key.toLowerCase());
+      if (!shortcut.success) return;
+      event.preventDefault();
+      const win = window();
+      if (win !== null) {
+        win.webContents.focus();
+        win.webContents.send('aw:browser-shortcut', shortcut.data);
+      }
+    });
 
     // `window.open` of an allowed address stays in this tab: one tab per session (29 §5.3).
     contents.setWindowOpenHandler(({ url }) => {

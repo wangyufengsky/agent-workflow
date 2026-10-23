@@ -56,6 +56,7 @@
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
 | `createChromiumHost()` | `src/modules/browser/host.chromium.ts` | 浏览器集成测试的宿主：真实 Chromium（playwright-core），`createTestApp({ browserHost })` 注入；页面快照的单元测试输入是从 Chromium 录下的无障碍树 `test/fixtures/browser/orders.ax.json`（对应 `orders.html`），不手编 |
 | `e2e/fixtures/browser-host/main.cjs` | — | Electron 中运行真实的 main `browser.ts`（Electron 自带的 Node 直接加载 TypeScript）加本地 HTTP / WebSocket 服务，代替后端发 `browser.request`；`browser-host.electron.spec.ts` 经 `app.evaluate` 驱动，不需要构建应用（29 §14，B-04） |
+| `e2e/fixtures/user-preview/main.cjs` | 仅 opencode | 独立临时数据的真实后端、原生 `WebContentsView`、构建后的 preload 和 renderer；`user-preview.electron.spec.ts` 验证用户预览、原生快捷键、助手浮层隐藏/恢复、真实文字读取、离开页签解绑。先 `pnpm build`；不使用用户工作区或现有数据库 |
 | `createTestApp()` | `test/helpers/app.ts` | 启动后端（临时数据目录、随机端口），返回类型化 API 调用 `call(op, input)`、`mcpUrl`、FakeOpencode；`realOpencode: true` 用于 `@opencode` 测试；MCP SDK 客户端见 `test/helpers/mcp.ts` |
 | `build.*()` | `test/builders/` | 最小测试数据构造器，只填测试关心的字段，其余用合法默认值 |
 | `waitForEvent(type, predicate)` | `test/helpers/events.ts` | 订阅 event-bus 等待事件，带超时（默认 20s，慢的 CI runner 与 Windows 上一个任务要几秒）；**替代一切 sleep** |
@@ -82,7 +83,7 @@
 | J12 | 知识问答：提问 → 研究过程（检索、读取）→ 带引用的回答 → 点击引用看原文（高亮、下一处、Esc）→ 续问 → 对话记录中回到对话（v1.1，`project-knowledge.browser.spec.ts`；FakeOpencode 的 `tool` 步骤报告只读的原生工具调用） | 浏览器 |
 | J13 | 对助手提问（知识问答）→「正在查资料」→ 导航卡片与带引用的回答 → 点引用看到原文 → 卡片「打开」进入知识对话页（v1.1，`project-knowledge.browser.spec.ts`） | 浏览器 |
 | J14 | 知识问答流式回答与模型：草稿出现、引用编号「待核对」不可点 → 提交通过后变为可点击的引用；换模型续问，对话与对话记录显示各轮模型（v1.1，`project-knowledge.browser.spec.ts`） | 浏览器 |
-| J15 | Electron 启动冒烟（`launch.electron.spec.ts`，`pnpm e2e:smoke`）：窗口先显示打开动画（点击跳过，D113），构建后的应用启动后端、显示引导页（各项检测有结果）、前端把主题与动画开关写入 `launch.json`、正常退出（main 等后端停止 opencode 后退出）。不需要 opencode 与模型，三平台 CI 运行（17 §4.1） | Electron |
+| J15 | Electron 启动冒烟（`launch.electron.spec.ts`，`pnpm e2e:smoke`）：窗口先显示打开动画（点击跳过，D113），构建后的应用启动后端、显示引导页（各项检测有结果）、前端把主题与动画开关写入 `launch.json`、正常退出（main 等后端停止 opencode 后退出）；另用真实 TCP 转发与默认会话预连接复现退出等待环，确认未发送请求的连接也随应用退出释放。不需要 opencode 与模型，三平台 CI 运行（17 §4.1） | Electron |
 | J16 | 质量与用量：FakeOpencode 造任务后，简单视图本周三个数、专业视图用量与质量的数字正确；钻取失败原因 → 任务列表 → 任务页；四主题切换无报错（v1.1，`task-insights.browser.spec.ts`） | 浏览器 |
 | J17 | 批量任务：主页「补单元测试」的「批量」→ 在目录树中选 3 个目录（按行输入页显示同样的目标）→ 创建 → 三个任务各自跑完到待合并 → 「合并全部待合并的」确认 → 主分支 3 个提交、批次「已全部结束」（v1.1，`task-batch.browser.spec.ts`，20） | 浏览器 |
 | J18 | PR 审查意见回流：修 Bug 任务创建 PR → 审查者在 PR 上留下讨论与评论 → 结果卡「取回审查意见」（默认全选）→ 取消一条、填补充说明 →「让 AI 按意见再改改」→ 回到待合并、主按钮为「推送到 PR」→ 推送 → 远端同一分支有 AI 的修改、主分支不变（v1.2，`task-review.browser.spec.ts`，21） | 浏览器 |

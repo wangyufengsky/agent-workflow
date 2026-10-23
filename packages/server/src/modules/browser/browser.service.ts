@@ -147,15 +147,20 @@ export function createBrowserService({
   const sessions = new Map<string, Session>();
   /** The user's own preview tabs (29 §8.1), by tab id. */
   const userTabs = new Map<string, { tab: Tab; taskId: string; projectId: string }>();
+  /** The preview tab the UI bound to each assistant conversation (15, 29 §8.1): only what the user is looking at. */
+  const boundPreviews = new Map<string, string>();
+  /** User preview operations waiting on the page; closing the browser ends them. */
+  const waiting = new Set<AbortController>();
+  /** Opens of a task's preview tab in progress: a second open joins the first. */
+  const openingUserTabs = new Map<string, Promise<UserTabState>>();
   const actions = createActions(clock);
   const unsubscribeHost = host.onEvent((event) => {
     // The page that placed a user's preview tab started over and main closed it (29 §8.1): let go of its preview.
     if (event.type === 'browser.gone') {
       const entry = userTabs.get(event.tabId);
       if (entry === undefined) return;
-      userTabs.delete(event.tabId);
+      forgetUserTab(event.tabId);
       entry.tab.dispose();
-      previews.release(entry.taskId);
       return;
     }
     if (event.type !== 'browser.unownedBlocked') return;
@@ -342,6 +347,105 @@ export function createBrowserService({
     };
   }
 
+  /**
+   * A user preview operation within BROWSER_READ_TIMEOUT_MS (29 §8.1): past it the operation fails with
+   * BROWSER_READ_FAILED; only this wait ends, not the user's page. Late CDP answers are dropped by the signal.
+   */
+  async function withinDeadline<T>(work: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    const abort = new AbortController();
+    waiting.add(abort);
+    const interrupted = Promise.withResolvers<never>();
+    const onAbort = () => interrupted.reject(abort.signal.reason);
+    abort.signal.addEventListener('abort', onAbort, { once: true });
+    const cancel = clock.schedule(BROWSER_READ_TIMEOUT_MS, () =>
+      abort.abort(
+        new AppError(ErrorCode.BrowserReadFailed, 'The user preview operation timed out', {
+          reason: 'timeout',
+          timeoutMs: BROWSER_READ_TIMEOUT_MS,
+        }),
+      ),
+    );
+    try {
+      return await Promise.race([work(abort.signal), interrupted.promise]);
+    } finally {
+      cancel();
+      waiting.delete(abort);
+      abort.signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  /** The running preview's origin, or BROWSER_NOT_OPEN for the assistant (a stopped preview reads nothing). */
+  function runningPreviewUrl(taskId: string): string {
+    const preview = previews.get(taskId);
+    if (preview.state !== PreviewState.Running || preview.url === null) {
+      throw new AppError(ErrorCode.BrowserNotOpen, 'The selected task preview is not running', { taskId });
+    }
+    return preview.url;
+  }
+
+  /** Conversations bound to the tab lose it. */
+  function unbindPreview(tabId: string): void {
+    for (const [conversationId, bound] of boundPreviews) if (bound === tabId) boundPreviews.delete(conversationId);
+  }
+
+  /** The tab is no longer the user's: unbound, and its preview free to idle. */
+  function forgetUserTab(tabId: string): void {
+    const entry = userTabs.get(tabId);
+    if (entry === undefined) return;
+    userTabs.delete(tabId);
+    unbindPreview(tabId);
+    previews.release(entry.taskId);
+  }
+
+  /**
+   * Opens a path of the task's running preview; a path that would leave its origin (`/\\host`) is refused, a page that
+   * does not load is an error, not content.
+   */
+  async function navigatePreview(tab: Tab, taskId: string, path: string, signal: AbortSignal): Promise<void> {
+    const origin = runningPreviewUrl(taskId);
+    const url = new URL(path, origin);
+    if (url.origin !== origin) throw new AppError(ErrorCode.ValidationFailed, 'Preview navigation needs a local path');
+    const { errorText } = navigateSchema.parse(await tab.cdp('Page.navigate', { url: url.href }));
+    signal.throwIfAborted();
+    if (errorText !== undefined) {
+      throw new AppError(ErrorCode.BrowserReadFailed, 'The preview page could not be loaded', { reason: errorText });
+    }
+  }
+
+  /** A new preview tab of the task, timed from the preview being ready; a tab that does not open in time goes. */
+  async function openNewUserTab(taskId: string): Promise<UserTabState> {
+    await previews.start(taskId);
+    const projectId = previews.projectOf(taskId);
+    const tabId = `user-preview:${randomUUID()}`;
+    let tab: Tab | undefined;
+    try {
+      return await withinDeadline(async (signal) => {
+        tab = await openTab({
+          host,
+          clock,
+          log,
+          tabId,
+          kind: BrowserTabKind.Preview,
+          partition: `persist:aw-preview-${projectId}`,
+          policy: policyFor({ taskId, projectId }),
+          site: false,
+          userFacing: true,
+          signal,
+        });
+        signal.throwIfAborted();
+        userTabs.set(tabId, { tab, taskId, projectId });
+        previews.acquire(taskId);
+        tab.onChange(() => events.publish({ type: ServerEventType.BrowserTabUpdated, data: userTabState(tabId) }));
+        await navigatePreview(tab, taskId, projects.getRecord(projectId).preview?.pages[0] ?? '/', signal);
+        return userTabState(tabId);
+      });
+    } catch (err) {
+      if (userTabs.has(tabId)) await closeUserTab(tabId);
+      else await tab?.close();
+      throw err;
+    }
+  }
+
   function userTabOf(tabId: string) {
     const entry = userTabs.get(tabId);
     if (entry === undefined) throw new AppError(ErrorCode.NotFound, `No preview tab ${tabId}`, { tabId });
@@ -360,9 +464,8 @@ export function createBrowserService({
       await host.request({ kind: 'close', tabId });
       return;
     }
-    userTabs.delete(tabId);
+    forgetUserTab(tabId);
     await entry.tab.close();
-    previews.release(entry.taskId);
   }
 
   events.subscribe((event) => {
@@ -391,6 +494,13 @@ export function createBrowserService({
       for (const { tab, owner } of tabs) {
         tab.setPolicy(policyFor(owner)).catch((err: unknown) => log.error({ err }, 'browser policy update failed'));
       }
+    }
+    // A stopped preview's page is gone: the assistant may not read it any more (the user reopens it).
+    if (
+      event.type === ServerEventType.PreviewUpdated &&
+      (event.data.state === PreviewState.Stopped || event.data.state === PreviewState.Failed)
+    ) {
+      for (const [tabId, entry] of userTabs) if (entry.taskId === event.data.taskId) unbindPreview(tabId);
     }
   });
 
@@ -661,33 +771,89 @@ export function createBrowserService({
      * project's first key page; its address and error counts follow by `browser.tab_updated`.
      */
     async openUserTab(taskId: string): Promise<UserTabState> {
-      const preview = await previews.start(taskId);
-      const projectId = previews.projectOf(taskId);
-      const tabId = `preview:${randomUUID()}`;
-      const tab = await openTab({
-        host,
-        clock,
-        log,
-        tabId,
-        kind: BrowserTabKind.Preview,
-        partition: `persist:aw-preview-${projectId}`,
-        policy: policyFor({ taskId, projectId }),
-        site: false,
-        userFacing: true,
-      });
-      userTabs.set(tabId, { tab, taskId, projectId });
-      previews.acquire(taskId);
-      tab.onChange(() => events.publish({ type: ServerEventType.BrowserTabUpdated, data: userTabState(tabId) }));
-      const first = projects.getRecord(projectId).preview?.pages[0] ?? '/';
-      await tab.cdp('Page.navigate', { url: `${preview.url}${first}` });
-      return userTabState(tabId);
+      const pending = openingUserTabs.get(taskId);
+      if (pending !== undefined) return pending;
+      // One preview tab per task: opening it again shows it, following the preview's new origin after a restart.
+      const existing = [...userTabs.entries()].find(([, entry]) => entry.taskId === taskId);
+      if (existing !== undefined) {
+        const [tabId, { tab, projectId }] = existing;
+        const preview = await previews.start(taskId);
+        return withinDeadline(async (signal) => {
+          await tab.setPolicy(policyFor({ taskId, projectId }));
+          signal.throwIfAborted();
+          if (tab.url() === '' || new URL(tab.url()).origin !== preview.url) {
+            await navigatePreview(tab, taskId, projects.getRecord(projectId).preview?.pages[0] ?? '/', signal);
+          }
+          return userTabState(tabId);
+        });
+      }
+      const opening = openNewUserTab(taskId);
+      openingUserTabs.set(taskId, opening);
+      try {
+        return await opening;
+      } finally {
+        openingUserTabs.delete(taskId);
+      }
     },
 
-    /** Opens a path of the task's preview in the user's tab (the preview may have restarted on another port). */
-    async navigateUserTab(tabId: string, path: string): Promise<void> {
+    /**
+     * Opens a path of the task's preview in the user's tab (the preview may have restarted on another port), within
+     * BROWSER_READ_TIMEOUT_MS; the tab stays when it times out.
+     */
+    navigateUserTab(tabId: string, path: string): Promise<void> {
       const { tab, taskId } = userTabOf(tabId);
-      const preview = await previews.start(taskId);
-      await tab.cdp('Page.navigate', { url: `${preview.url}${path}` });
+      return withinDeadline((signal) => navigatePreview(tab, taskId, path, signal));
+    },
+
+    /**
+     * The UI binds the preview the user is looking at to the assistant's conversation, or unbinds it (15, 29 §8.1):
+     * the model cannot, and a message's page parameters grant nothing.
+     */
+    bindPreview(conversationId: string, selection: { taskId: string; tabId: string } | null): void {
+      if (selection === null) {
+        boundPreviews.delete(conversationId);
+        return;
+      }
+      const entry = userTabs.get(selection.tabId);
+      if (entry === undefined) throw new AppError(ErrorCode.BrowserNotOpen, 'No user preview tab is open');
+      if (entry.taskId !== selection.taskId) {
+        throw new AppError(ErrorCode.BrowserNotOpen, 'The preview belongs to another task');
+      }
+      runningPreviewUrl(entry.taskId);
+      boundPreviews.set(conversationId, selection.tabId);
+    },
+
+    /**
+     * `browser_read`: the bound preview's address, viewport, text and errors, within BROWSER_READ_TIMEOUT_MS. A page
+     * the user left, closed or stopped while it settled is not returned.
+     */
+    async readPreview(conversationId: string) {
+      const tabId = boundPreviews.get(conversationId);
+      if (tabId === undefined) {
+        throw new AppError(ErrorCode.BrowserNotOpen, 'No user-selected preview for this conversation');
+      }
+      const entry = userTabs.get(tabId);
+      if (entry === undefined) throw new AppError(ErrorCode.BrowserNotOpen, 'No user preview tab is open');
+      const { tab, taskId } = entry;
+      runningPreviewUrl(taskId);
+      return withinDeadline(async (signal) => {
+        const settled = await tab.settle();
+        signal.throwIfAborted();
+        const snapshot = await tab.snapshot();
+        signal.throwIfAborted();
+        if (boundPreviews.get(conversationId) !== tabId || !userTabs.has(tabId)) {
+          throw new AppError(ErrorCode.BrowserNotOpen, 'The selected preview changed while reading');
+        }
+        runningPreviewUrl(taskId);
+        return {
+          ...snapshot,
+          taskId,
+          tab: BrowserTabKind.Preview,
+          viewport: tab.viewport.preset,
+          settled,
+          logs: tab.logs('open'),
+        };
+      });
     },
 
     /** Desktop fills the tab's place on the window; tablet and mobile emulate their size inside it. */
@@ -760,6 +926,9 @@ export function createBrowserService({
     },
 
     async closeAll(): Promise<void> {
+      for (const abort of waiting) abort.abort(new AppError(ErrorCode.BrowserNotOpen, 'The browser is closing'));
+      // An open that fails reports it to its caller; closing waits for it, then for the other tabs.
+      await Promise.allSettled([...openingUserTabs.values()]);
       unsubscribeHost();
       await Promise.all([...sessions.keys()].map((id) => close(id)));
       await Promise.all([...userTabs.keys()].map((id) => closeUserTab(id)));

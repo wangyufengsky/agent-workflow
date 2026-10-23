@@ -71,6 +71,7 @@ export const TranscriptSystemEvent = {
   TimedOut: 'timed_out',
   Aborted: 'aborted',
   RuntimeLost: 'runtime_lost',
+  AssistantIsolated: 'assistant_isolated',
 } as const;
 export type TranscriptSystemEvent = (typeof TranscriptSystemEvent)[keyof typeof TranscriptSystemEvent];
 export const transcriptSystemEventSchema = z.enum(TranscriptSystemEvent);

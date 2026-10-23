@@ -41,6 +41,8 @@ test('网站登录的标签页在 ⌘K 打开时离开窗口，关闭后回来',
     const alone = await views();
     await page.getByLabel('网站地址').fill(`http://127.0.0.1:${address.port}/`);
     await page.getByRole('button', { name: '打开并登录' }).click();
+    // Only the visible part of the area is placed: the login area sits below the fold of the settings page.
+    await page.getByTestId('login-area').scrollIntoViewIfNeeded();
     await expect.poll(views).toBe((alone ?? 0) + 1);
 
     await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');

@@ -206,10 +206,18 @@ export function MyPreview({
     },
   });
   const running = preview.state === PreviewState.Running;
-  const { mutate: openTab, isIdle: notOpened } = open;
+  const { mutate: openTab, isIdle: notOpened, reset: resetOpen } = open;
   useEffect(() => {
     if (active && desktop && running && notOpened) openTab();
   }, [active, desktop, running, notOpened, openTab]);
+  // A stopped preview's page is gone: its tab closes, and a restart opens a new one on the new port rather than
+  // reviving the old page (and its binding to the assistant).
+  const stopped = preview.state === PreviewState.Stopped || preview.state === PreviewState.Failed;
+  useEffect(() => {
+    if (!stopped) return;
+    setTabId(null);
+    resetOpen();
+  }, [stopped, resetOpen]);
   // The tab goes with the task page; on another page nobody would place it again. While open, a change request may
   // attach its page.
   const setPreviewTab = useUiStore((s) => s.setPreviewTab);
@@ -221,7 +229,14 @@ export function MyPreview({
       void callOperation(closeUserTabOp, { tabId });
     };
   }, [tabId, task.id, setPreviewTab]);
-  usePlacedTab(active && running ? tabId : null, area);
+  const shown = active && running && desktop ? tabId : null;
+  usePlacedTab(shown, area);
+  // What the user is looking at is what the assistant may read (`browser_read`, 15); nothing on another tab.
+  useEffect(() => {
+    if (shown === null) return;
+    useUiStore.getState().setActivePreview({ taskId: task.id, tabId: shown });
+    return () => useUiStore.getState().setActivePreview(null);
+  }, [shown, task.id]);
 
   const navigate = (path: string) => tabId !== null && void callOperation(navigateUserTabOp, { tabId, path });
   const restart = useMutation({
@@ -284,7 +299,10 @@ export function MyPreview({
         </div>
       ) : running && error === null ? (
         // The user's tab is a native view placed over this area (29 §8.1).
-        <div ref={area} className={styles.page} data-testid="preview-area" />
+        <>
+          <div ref={area} className={styles.page} data-testid="preview-area" />
+          <p className="hint">{C.assistantHint}</p>
+        </>
       ) : (
         <PreviewScreen
           task={task}

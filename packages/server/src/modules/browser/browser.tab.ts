@@ -87,7 +87,7 @@ export type TabInput = {
 };
 
 /**
- * One AI tab (29 §5.3): its page's refs, logs and network, and what changed since the action began (navigation,
+ * One browser tab (29 §5.3): its page's refs, logs and network, and what changed since the action began (navigation,
  * dialogs, blocked writes, new errors) for the action's result.
  */
 export async function openTab({
@@ -147,6 +147,8 @@ export async function openTab({
         onLoad();
         return;
       case 'Page.javascriptDialogOpening': {
+        // 用户自己操作的页面由用户处理对话框，读取页面不能替用户点确认。
+        if (userFacing) return;
         const { type, message } = dialogSchema.parse(params);
         // An unanswered dialog freezes the page: alert and confirm are accepted, prompt dismissed (29 §5.5).
         const accept = type !== 'prompt';
