@@ -158,8 +158,13 @@ export function createBrowserTabs({ window, emit, openExternal }: BrowserTabsDep
       }
     },
 
-    /** The renderer puts a user tab over an area of the window, or takes it off (29 §8.1). */
+    /**
+     * The renderer puts a user tab over an area of the window, or takes it off (29 §8.1). Taking it off comes after
+     * the backend closed it when the user is done with it (the page's cleanup runs once the close answered): closing
+     * already took it off.
+     */
     place(tabId: string, rect: BrowserRect | null): void {
+      if (rect === null && !tabs.has(tabId)) return;
       const tab = userTab(tabId);
       const win = window();
       if (win === null) return;
