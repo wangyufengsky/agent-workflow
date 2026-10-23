@@ -42,6 +42,8 @@ export const SCHEDULE_EVERY_HOURS = [1, 2, 3, 4, 6, 8, 12] as const;
 export const ASSISTANT_TITLE_MAX_CHARS = 40;
 /** One message to the assistant. */
 export const ASSISTANT_MESSAGE_MAX_CHARS = 20_000;
+/** 一次显式附加的文字或任务上下文；超过时由用户缩短，任务快照注明截断。 */
+export const ASSISTANT_CONTEXT_MAX_CHARS = 12_000;
 /** Knowledge Q&A (18 §7). */
 export const KNOWLEDGE_QUESTION_MAX_CHARS = 4000;
 /** A conversation's title taken from its first question is cut to this length. */

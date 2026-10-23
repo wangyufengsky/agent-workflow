@@ -316,6 +316,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | --- | --- | --- |
 | GET | `/assistant/conversations` | `{ items: AssistantConversationDTO[] }`，最近更新在前；`AssistantConversationDTO = { id, title, busy, pendingPermissions: Array<{ permissionId, permission, patterns }>, createdAt, updatedAt }`（`busy` 与权限请求只在内存中，重启后为空） |
 | POST | `/assistant/conversations` | `{ title? }` → 201；opencode 会话在第一条消息时创建 |
+| POST | `/assistant/context-snapshots` | `assistant.snapshotContext`，`{ source: { kind: 'task', taskId, nodeId? } \| { kind: 'selection', text, page: AssistantPageRef } }` → 201 `AttachmentDTO`。用户显式附加文字，write，不暴露给助手或命令面板。任务／步骤信息由后端读取；不存在 404 `TASK_NOT_FOUND` / `NODE_NOT_FOUND`，步骤必须属于任务。选中文字 trim 后 1–12000 字符，超长／空白／多余字段 400 `VALIDATION_FAILED`；仅文字，NUL 等仍由附件边界拒绝。结果是固定的文本附件，使用现有查看、移除、绑定与清理接口 |
 | GET | `/assistant/conversations/:id` | 不存在 404 `ASSISTANT_CONVERSATION_NOT_FOUND` |
 | DELETE | `/assistant/conversations/:id` | 204；连同确认、待发消息、任务跟进记录、消息流 JSONL 与 `files/<id>/` |
 | POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey?, knowledgeConversationId?, deckId?, slideId?, batchId?, scheduleId? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在创建会话、发送请求或等待模型回复时 409 `ASSISTANT_BUSY` |

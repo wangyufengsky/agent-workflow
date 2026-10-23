@@ -7,6 +7,7 @@ import { AttachmentBar, dropFilesInto, pasteFilesInto } from '../attachments/att
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
 import styles from './assistant.module.css';
 import { useAbortAssistant } from './assistant.queries.ts';
+import { ContextAttachments } from './context-attachments.tsx';
 import { useAsk } from './use-ask.ts';
 
 /** The input at the bottom (15 §6): it grows with the text, ⌘↵ sends, and while the assistant works it can stop it. */
@@ -57,6 +58,7 @@ export function Composer({
           onPaste={pasteFilesInto(files)}
         />
         <AttachmentBar draft={files} />
+        <ContextAttachments draft={files} />
         <div className={styles.inputRow}>
           <span className={styles.inputHint}>{C.sendHint}</span>
           {busy && conversation !== undefined ? (

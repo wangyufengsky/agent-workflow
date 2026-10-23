@@ -281,6 +281,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `SCHEDULE_EVERY_HOURS` | `[1, 2, 3, 4, 6, 8, 12]`（`hourly` 可选的间隔，24 的约数，D90） |
 | `ASSISTANT_TITLE_MAX_CHARS` | 40（助手对话标题取第一条消息的首行） |
 | `ASSISTANT_MESSAGE_MAX_CHARS` | 20000（一条发给助手的消息） |
+| `ASSISTANT_CONTEXT_MAX_CHARS` | 12000（一次显式附加的选中文字；任务／步骤快照正文超长时注明截断） |
 | `KNOWLEDGE_QUESTION_MAX_CHARS` | 4000（一次提问） |
 | `KNOWLEDGE_TITLE_MAX_CHARS` | 80（知识对话标题取第一次提问的首行） |
 | `KNOWLEDGE_ANSWER_MAX_CHARS` | 20000（`submit_answer` 的回答） |

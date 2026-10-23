@@ -14,6 +14,7 @@ import { SCHEDULES_COPY } from '../../copy/schedules.ts';
 import { HOME_TASK_COPY } from '../../copy/tasks.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { useAbortAssistant } from '../assistant/assistant.queries.ts';
+import { ContextAttachments } from '../assistant/context-attachments.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
 import { AttachmentBar, dropFilesInto, pasteFilesInto } from '../attachments/attachment-bar.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
@@ -167,6 +168,7 @@ export function HomeComposer({
           draft={files}
           projectFiles={project === undefined ? undefined : { projectId: project.id, refName: 'HEAD' }}
         />
+        {workflow === undefined && <ContextAttachments draft={files} />}
         {workflow !== undefined && task.pro && project !== undefined && (
           <MoreOptionsFields project={project} value={task.options} onChange={task.setOptions} />
         )}
