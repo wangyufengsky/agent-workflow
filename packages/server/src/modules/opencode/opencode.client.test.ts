@@ -1,3 +1,4 @@
+import { ErrorCode } from '@aw/shared';
 import { pino } from 'pino';
 import { describe, expect, it } from 'vitest';
 import { createRuntimeClient } from './opencode.client.ts';
@@ -43,5 +44,41 @@ describe('opencode 事件分发（D70）', () => {
         err: expect.objectContaining({ stack: expect.stringContaining('handler bug') }),
       }),
     ]);
+  });
+});
+
+describe('opencode 会话删除错误映射', () => {
+  it.each([
+    ['网络故障', new Error('connection refused')],
+    [
+      '服务端故障',
+      new Error('server failed', {
+        cause: { status: 500, body: { name: 'NotFoundError', data: { message: 'failed' } } },
+      }),
+    ],
+    [
+      '其他 404',
+      new Error('route missing', {
+        cause: { status: 404, body: { name: 'RouteNotFoundError', data: { message: 'missing' } } },
+      }),
+    ],
+    ['未识别的响应', new Error('unexpected error', { cause: { status: 404, body: { name: 'NotFoundError' } } })],
+  ])('%s 不能被当作已经删除，仍向调用方报错', async (_label, error) => {
+    const runtime = {
+      onEvent: () => () => undefined,
+      onLost: () => () => undefined,
+      sdk: () => ({
+        session: {
+          delete: async () => {
+            throw error;
+          },
+        },
+      }),
+    } as unknown as OpencodeRuntime;
+    const client = createRuntimeClient(runtime, pino({ level: 'silent' }));
+    await expect(client.deleteSession({ sessionId: 'ses_missing', directory: '/tmp/aw-repo' })).rejects.toMatchObject({
+      code: ErrorCode.OpencodeRequestFailed,
+      details: { operation: 'session.delete', error: error.message },
+    });
   });
 });

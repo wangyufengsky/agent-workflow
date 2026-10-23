@@ -141,6 +141,13 @@
       "when": 1792775582900,
       "tag": "0019_assistant_task_followups",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1792777588351,
+      "tag": "0020_assistant_session_isolation",
+      "breakpoints": true
     }
   ]
 }

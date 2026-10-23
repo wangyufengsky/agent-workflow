@@ -1,10 +1,16 @@
 import { AppError, ErrorCode, type ModelInfo, type PermissionDecision, type PermissionRule } from '@aw/shared';
+import { z } from 'zod';
 import type { Logger } from '../../core/logger.ts';
 import { type OpencodeEvent, OpencodeEventType, parseGlobalEvent } from './opencode.events.ts';
 import type { OpencodeRuntime } from './opencode.runtime.ts';
 
 /** Error responses are thrown (and translated by `request`) instead of returned. */
 const THROW = { throwOnError: true } as const;
+
+const sessionNotFoundCauseSchema = z.object({
+  status: z.literal(404),
+  body: z.object({ name: z.literal('NotFoundError'), data: z.object({ message: z.string() }) }),
+});
 
 export type ModelRef = { providerId: string; modelId: string };
 
@@ -31,6 +37,7 @@ export type OpencodeClient = {
   /** Sends a message and returns at once (`prompt_async`); progress arrives as events. */
   prompt(input: PromptInput): Promise<void>;
   abort(input: { sessionId: string; directory: string }): Promise<void>;
+  /** Already missing sessions count as deleted, so interrupted cleanup can be retried. */
   deleteSession(input: { sessionId: string; directory: string }): Promise<void>;
   replyPermission(input: { permissionId: string; directory: string; reply: PermissionDecision }): Promise<void>;
   /** Models of the providers the user has connected, and the configured default `provider/model`. */
@@ -125,7 +132,15 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
       await request('session.abort', () => runtime.sdk().session.abort({ sessionID: sessionId, directory }, THROW));
     },
     async deleteSession({ sessionId, directory }) {
-      await request('session.delete', () => runtime.sdk().session.delete({ sessionID: sessionId, directory }, THROW));
+      await request('session.delete', async () => {
+        try {
+          await runtime.sdk().session.delete({ sessionID: sessionId, directory }, THROW);
+        } catch (err) {
+          // 原生删除成功后，本地清理可能中断；只将 SDK 明确返回的会话不存在视为已完成。
+          if (err instanceof Error && sessionNotFoundCauseSchema.safeParse(err.cause).success) return;
+          throw err;
+        }
+      });
     },
     async replyPermission({ permissionId, directory, reply }) {
       await request('permission.reply', () =>

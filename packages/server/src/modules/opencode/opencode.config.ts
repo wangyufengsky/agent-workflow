@@ -94,6 +94,8 @@ const AGENT_PERMISSION: Record<SessionAgent, AgentPermission & { [ASSISTANT_TOOL
  */
 const ASSISTANT_PERMISSION = {
   edit: 'allow',
+  // 原生子代理使用自己的权限，不能代替应用任务的明确授权边界。
+  task: 'deny',
   question: 'deny',
   webfetch: 'ask',
   external_directory: 'deny',
@@ -152,8 +154,8 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
   };
 }
 
-/** The assistant's session bash rules (15 §2): the read-only rules without check commands; anything else asks. */
-export const assistantPermissionRules = (): PermissionRule[] => readonlyBashRules();
+/** shell 的部分读命令不检查 external_directory；助手所有 shell 命令必须先由用户授权（15 §2）。 */
+export const assistantPermissionRules = (): PermissionRule[] => [{ permission: 'bash', pattern: '*', action: 'ask' }];
 
 /** A knowledge conversation with web access on (18 §5.1): after the agent's denies, so the last match allows. */
 const WEB_RULES: readonly PermissionRule[] = [

@@ -58,6 +58,22 @@ describe('@opencode 客户端与配置注入', () => {
     });
   });
 
+  it('重复删除已经不存在的真实会话仍然成功，允许中断后重试清理', async () => {
+    const repo = await createTestRepo();
+    const client = t.app.services.opencode;
+    const sessionId = await client.createSession({
+      directory: repo.path,
+      title: 'Idempotent session cleanup',
+      agent: OPENCODE_ASSISTANT_AGENT,
+      permission: [],
+    });
+    await client.deleteSession({ sessionId, directory: repo.path });
+    await expect(
+      t.app.services.runtime.sdk().session.get({ sessionID: sessionId, directory: repo.path }, { throwOnError: true }),
+    ).rejects.toMatchObject({ cause: { status: 404, body: { name: 'NotFoundError' } } });
+    await expect(client.deleteSession({ sessionId, directory: repo.path })).resolves.toBeUndefined();
+  });
+
   it('在目录中建会话并带上会话级 bash 规则；可列出模型', async () => {
     const repo = await createTestRepo();
     const permission = sessionPermissionRules(RoleBaseAgent.Executor, BashPolicy.Ask);

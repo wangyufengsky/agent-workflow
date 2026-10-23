@@ -84,6 +84,13 @@ export function createTranscriptStore<S extends { id: string }>({
       return { entries: merged, lastSeq: page.at(-1)?.seq ?? afterSeq, hasMore, done: isEnded && !hasMore };
     },
 
+    /** 升级会话时只回放最近的可见文字，避免把完整历史一次装入模型。 */
+    tail(subject: S, count: number): TranscriptEntry[] {
+      return lines(fileOf(subject))
+        .slice(-count)
+        .map((line) => transcriptEntrySchema.parse(JSON.parse(line)));
+    },
+
     /** The subject is gone (a deleted conversation); its file is removed by the caller. */
     forget(subject: S): void {
       lastSeq.delete(subject.id);
