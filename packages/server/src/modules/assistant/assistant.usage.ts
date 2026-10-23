@@ -42,6 +42,7 @@ export function createAssistantUsage(deps: {
       const state: Active = { turn, remainingMs: timeoutMs, armedAt: null, cancel: () => undefined };
       active.set(conversationId, state);
       arm(state);
+      return turn.model;
     },
     isRunning: (id: string) => active.has(id),
     finish(id: string, event: AssistantTurnEvent) {

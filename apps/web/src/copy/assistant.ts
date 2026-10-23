@@ -8,6 +8,7 @@ import {
   type Platform,
 } from '@aw/shared';
 import { MOD_KEY, UI_PLATFORM } from '../app/platform.ts';
+import { formatDateTime } from './common.ts';
 
 /** The system file manager differs by platform (17 §3.7). */
 const REVEAL: Record<Platform, string> = {
@@ -93,8 +94,8 @@ export const ASSISTANT_USAGE_COPY = {
   limit: (ms: number) => `时限 ${ms / 60_000} 分钟（不含权限等待）`,
   total: (input: number | null, output: number | null, unknown: number) =>
     `会话累计已报告 ${input === null || output === null ? '—' : (input + output).toLocaleString()} tokens${unknown === 0 ? '' : ` · ${unknown} 轮用量未报告`}`,
-  since: (at: number) => `自 ${new Date(at).toLocaleString()} 开始记录；更早的对话用量未知，不补算为零。`,
-  recordedSince: (at: number) => `自 ${new Date(at).toLocaleString()} 起；此前未知`,
+  since: (at: number) => `自 ${formatDateTime(at)} 开始记录；更早的对话用量未知，不补算为零。`,
+  recordedSince: (at: number) => `自 ${formatDateTime(at)} 起；此前未知`,
 } as const;
 
 /** opencode's own tools (12 §2), keyed by the name opencode reports. */

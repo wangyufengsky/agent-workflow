@@ -45,6 +45,12 @@ async function hang(id: string) {
 describe('助手真实用量与单轮时限', () => {
   it('外部请求前记录轮次，累计实际报告；未报告、发送失败不伪造为零', async () => {
     const id = await create();
+    const createSession = t.fake.createSession.bind(t.fake);
+    vi.spyOn(t.fake, 'createSession').mockImplementationOnce(async (input) => {
+      // 外部会话尚在建立时用户改设置，不应改变本轮实际模型与账本快照。
+      await t.call(updateSettingsOp, { 'ai.defaultModel': 'provider/next-turn' });
+      return createSession(input);
+    });
     const original = t.fake.prompt.bind(t.fake);
     vi.spyOn(t.fake, 'prompt').mockImplementationOnce(async (input) => {
       expect((await get(id)).usage.latest).toMatchObject({ status: AssistantTurnStatus.Running, tokensInput: null });
@@ -65,8 +71,10 @@ describe('助手真实用量与单轮时限', () => {
         elapsedMs: 250,
         tokensInput: 120,
         tokensOutput: 30,
+        model: null,
       },
     });
+    expect(t.fake.prompts[0]?.model).toBeUndefined();
     t.fake.failNextPrompt();
     expect((await send(id)).status).toBe(502);
     expect((await get(id)).usage).toMatchObject({

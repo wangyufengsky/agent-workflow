@@ -36,7 +36,7 @@ test('主页、侧栏与桌宠共享真实用量；未报告与实际零值分�
   await expect(usage).toContainText('会话累计已报告 48 tokens · 1 轮用量未报告');
   await page.getByRole('button', { name: '停止', exact: true }).click();
   await expect(usage).toContainText('已停止 · 用量未报告');
-  await page.screenshot({ path: testInfo.outputPath('assistant-usage-light.png') });
+  await page.screenshot({ path: testInfo.outputPath('assistant-usage-light.png'), animations: 'disabled' });
 
   // 独立桌宠页从服务器读取最近对话，实际报告 0 仍是已知值。
   await patchSettings(request, { 'ui.theme': 'deepseek' });
@@ -54,5 +54,6 @@ test('主页、侧栏与桌宠共享真实用量；未报告与实际零值分�
   await page.reload();
   await page.getByRole('button', { name: '和我说说话', exact: true }).click();
   await expect(usage).toContainText('已完成 · 输入 0 · 输出 0 tokens');
-  await page.screenshot({ path: testInfo.outputPath('assistant-usage-dark.png') });
+  await expect(page.getByText('实际零用量。', { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('assistant-usage-dark.png'), animations: 'disabled' });
 });

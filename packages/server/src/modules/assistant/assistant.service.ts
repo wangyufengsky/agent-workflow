@@ -223,14 +223,18 @@ export function createAssistantService(deps: AssistantServiceDeps) {
   }
 
   /** 建会话之前占住发送入口；请求返回前的空闲事件只结束模型回合，不释放发送权。 */
-  async function runTurn(c: Conversation, source: 'user' | 'app', send: () => Promise<void>): Promise<void> {
+  async function runTurn(
+    c: Conversation,
+    source: 'user' | 'app',
+    send: (model: string | null) => Promise<void>,
+  ): Promise<void> {
     const state = liveOf(c.id);
     state.sending = true;
     state.busy = true;
-    usage.start(c.id, source);
+    const model = usage.start(c.id, source);
     publish(c.id);
     try {
-      await send();
+      await send(model);
     } catch (err) {
       state.busy = false;
       usage.finish(c.id, AssistantTurnEvent.Error);
@@ -243,8 +247,13 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     if (!state.busy && usage.get(c.id).latest?.status === AssistantTurnStatus.Completed) flushLater(c.id);
   }
 
-  async function prompt(c: Conversation, sessionId: string, systemText: string, text: string): Promise<void> {
-    const model = settings.get('ai.defaultModel');
+  async function prompt(
+    c: Conversation,
+    sessionId: string,
+    systemText: string,
+    text: string,
+    model: string | null,
+  ): Promise<void> {
     await opencode.prompt({
       sessionId,
       directory: filesDir(c.id),
@@ -261,11 +270,11 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     if (state.busy || state.sending || state.deleting || state.stopping || !opencode.isConnected()) return;
     if (repo.pendingMessages(id).length === 0) return;
     const c = get(id);
-    await runTurn(c, 'app', async () => {
+    await runTurn(c, 'app', async (model) => {
       const sessionId = await sessionOf(c);
       if (!usage.isRunning(id)) return;
       const queued = repo.pendingMessages(id);
-      await prompt(c, sessionId, system(c, state.page, 'app'), queued.map((m) => m.text).join('\n\n'));
+      await prompt(c, sessionId, system(c, state.page, 'app'), queued.map((m) => m.text).join('\n\n'), model);
       repo.acknowledgeMessages(queued.map((m) => m.id));
     });
   }
@@ -494,7 +503,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       const systemText = system(c, page, 'user');
       const titled = c.title === '' ? { ...c, title: titleOf(text) } : c;
       repo.updateConversation(id, { title: titled.title, updatedAt: clock.now() });
-      await runTurn(titled, 'user', async () => {
+      await runTurn(titled, 'user', async (model) => {
         const sessionId = await sessionOf(titled);
         if (!usage.isRunning(id)) return;
         // The conversation keeps its files even when the model cannot be reached: they were sent (30 §2).
@@ -517,6 +526,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           sessionId,
           systemText,
           [...queued.map((m) => m.text), text, ...(section === '' ? [] : [section])].join('\n\n'),
+          model,
         );
         repo.acknowledgeMessages(queued.map((m) => m.id));
       });
