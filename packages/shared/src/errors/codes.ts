@@ -112,6 +112,7 @@ export const ErrorCode = {
   PreviewLimitReached: 'PREVIEW_LIMIT_REACHED',
   BrowserSiteNotAllowed: 'BROWSER_SITE_NOT_ALLOWED',
   BrowserLoginRequired: 'BROWSER_LOGIN_REQUIRED',
+  BrowserReadFailed: 'BROWSER_READ_FAILED',
   BrowserRefStale: 'BROWSER_REF_STALE',
   BrowserActionFailed: 'BROWSER_ACTION_FAILED',
   // 附件（30）
@@ -217,6 +218,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.PreviewLimitReached]: 409,
   [ErrorCode.BrowserSiteNotAllowed]: 403,
   [ErrorCode.BrowserLoginRequired]: 409,
+  [ErrorCode.BrowserReadFailed]: 502,
   [ErrorCode.BrowserRefStale]: null,
   [ErrorCode.BrowserActionFailed]: null,
   [ErrorCode.AttachmentNotFound]: 404,

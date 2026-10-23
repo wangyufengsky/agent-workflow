@@ -14,6 +14,7 @@ import {
   ErrorCode,
   PreviewState,
   ServerEventType,
+  SiteAccess,
   urlAccess,
   VIEWPORT_SIZES,
   type ViewportPreset,
@@ -179,6 +180,50 @@ export function createBrowserService({ host, clock, log, events, settings, proje
   });
 
   return {
+    /** 助手按明确地址读取网站，不把任何尝试的页面冒充为用户当前页面。 */
+    async readUrl(url: string) {
+      const normalized = new URL(url).href;
+      // 即使用户允许任务操作这个网站，助手读取也不能触发页面脚本的写请求。
+      const policy: BrowserPolicy = {
+        previewOrigins: [],
+        sites: settings.get('browser.sites').map((rule) => ({ ...rule, access: SiteAccess.Read })),
+      };
+      if (urlAccess(normalized, policy) === null) {
+        throw new AppError(ErrorCode.BrowserSiteNotAllowed, 'No website rule allows this address', {
+          host: new URL(normalized).host,
+        });
+      }
+      const tab = await openTab({
+        host,
+        clock,
+        log,
+        tabId: `assistant-read:${randomUUID()}`,
+        kind: BrowserTabKind.Site,
+        partition: SITES_PARTITION,
+        policy,
+        site: true,
+      });
+      try {
+        const navigation = z
+          .object({ errorText: z.string().optional() })
+          .parse(await tab.cdp('Page.navigate', { url: normalized }));
+        if (navigation.errorText !== undefined) {
+          throw new AppError(ErrorCode.BrowserReadFailed, 'The website could not be loaded', {
+            url: normalized,
+            reason: navigation.errorText,
+          });
+        }
+        const settled = await tab.settle();
+        const page = await tab.snapshot();
+        if (await loginPage(tab, page.url)) {
+          throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: page.url });
+        }
+        return { ...page, tab: BrowserTabKind.Site, settled, logs: tab.logs('open') };
+      } finally {
+        await tab.close();
+      }
+    },
+
     /**
      * `browser_open` (29 §6): a path starting with / opens in the task's preview (started first when needed), a full
      * address in the preview tab or the website tab by the policy.

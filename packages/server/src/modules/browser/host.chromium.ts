@@ -32,7 +32,9 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
   }
 
   async function open(op: Extract<BrowserPortOp, { kind: 'open' }>): Promise<null> {
-    const context = contexts.get(op.partition) ?? (await (await browser()).newContext({ acceptDownloads: false }));
+    const context =
+      contexts.get(op.partition) ??
+      (await (await browser()).newContext({ acceptDownloads: false, serviceWorkers: 'block' }));
     contexts.set(op.partition, context);
     const page = await context.newPage();
     const tab: Tab = { page, session: await context.newCDPSession(page), policy: op.policy, userFacing: op.userFacing };
@@ -42,9 +44,16 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
       if (reason !== null) emit({ type: 'browser.blocked', tabId: op.tabId, url, method, reason });
       return reason;
     };
-    await page.route('**/*', async (route, request) => {
-      if (blocked(request.url(), request.method(), false) === null) await route.fallback();
-      else await route.abort('blockedbyclient');
+    // Playwright 的 route 只交付重定向链的首次请求；CDP 在每一跳发送前检查，和 Electron 一致。
+    tab.session.on('Fetch.requestPaused', async ({ requestId, request }) => {
+      if (blocked(request.url, request.method, false) === null) {
+        await tab.session.send('Fetch.continueRequest', { requestId });
+      } else {
+        await tab.session.send('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' });
+      }
+    });
+    await tab.session.send('Fetch.enable', {
+      patterns: [{ urlPattern: 'http://*' }, { urlPattern: 'https://*' }],
     });
     await page.routeWebSocket(/.*/, (ws) => {
       if (blocked(ws.url(), 'GET', true) === null) ws.connectToServer();

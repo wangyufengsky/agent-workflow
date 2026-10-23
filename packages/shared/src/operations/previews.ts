@@ -5,8 +5,8 @@ import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
 
-// The assistant gets previews in B3 (29 §9).
-const common = { expose: { palette: false, assistant: false }, credentialFields: [], mode: UiMode.Simple } as const;
+// 助手只能管理任务预览；主工作区的试运行仍由用户在项目设置操作。
+const common = { expose: { palette: false, assistant: true }, credentialFields: [], mode: UiMode.Simple } as const;
 const byTask = z.object({ taskId: z.string() });
 
 export const getPreviewOp = defineOperationContract({
@@ -48,6 +48,7 @@ export const stopPreviewOp = defineOperationContract({
 
 export const trialPreviewOp = defineOperationContract({
   ...common,
+  expose: { palette: false, assistant: false },
   id: 'previews.trial',
   title: 'op.previews.trial',
   description: "Start the project's page preview once in its main workspace to check the settings, then stop it",

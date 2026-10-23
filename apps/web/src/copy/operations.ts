@@ -21,6 +21,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.projects.get': '查看项目',
   'op.projects.update': '修改项目',
   'op.previews.get': '查看页面预览',
+  'op.browser.readUrl': '读取网页文字',
   'op.previews.start': '启动页面预览',
   'op.previews.stop': '停止页面预览',
   'op.previews.trial': '试运行页面预览',

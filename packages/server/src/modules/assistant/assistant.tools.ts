@@ -108,6 +108,10 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
 }
 
 const COMMON_HINTS: Partial<Record<ErrorCode, string>> = {
+  [ErrorCode.BrowserSiteNotAllowed]: 'The website rules do not allow this address. Do not bypass the rules.',
+  [ErrorCode.BrowserLoginRequired]:
+    'Ask the user to log in under Settings > Websites, then read the address again. Never ask for or enter credentials.',
+  [ErrorCode.BrowserReadFailed]: 'Explain the page load failure to the user using details.reason.',
   [ErrorCode.ValidationFailed]: 'Fix the arguments listed in details.issues and call the tool again.',
   [ErrorCode.McpConversationUnresolved]:
     'This session is not an assistant conversation of agent-workflow; do not call these tools.',
