@@ -6,6 +6,7 @@ import {
   AppError,
   ATTEMPT_STATUSES,
   AttemptStatus,
+  BROWSER_READ_TIMEOUT_MS,
   type BrowserActionOutput,
   type BrowserKey,
   type BrowserPage,
@@ -14,6 +15,7 @@ import {
   ErrorCode,
   PreviewState,
   ServerEventType,
+  SiteAccess,
   urlAccess,
   VIEWPORT_SIZES,
   type ViewportPreset,
@@ -61,6 +63,11 @@ const ENDED = new Set<string>(
 export function createBrowserService({ host, clock, log, events, settings, projects, previews }: BrowserServiceDeps) {
   const sessions = new Map<string, Session>();
   const actions = createActions(clock);
+  const unsubscribeHost = host.onEvent((event) => {
+    if (event.type !== 'browser.unownedBlocked') return;
+    // URL 可能带访问令牌，结构化日志只保留资源种类与清理结果。
+    log.warn({ source: event.source, cleanupError: event.cleanupError }, 'browser unowned worker blocked');
+  });
 
   function policyFor(owner: BrowserOwner): BrowserPolicy {
     const preview = owner.taskId === null ? null : previews.get(owner.taskId);
@@ -179,6 +186,73 @@ export function createBrowserService({ host, clock, log, events, settings, proje
   });
 
   return {
+    /** 助手按明确地址读取网站，不把任何尝试的页面冒充为用户当前页面。 */
+    async readUrl(url: string) {
+      const normalized = new URL(url).href;
+      // 即使用户允许任务操作这个网站，助手读取也不能触发页面脚本的写请求。
+      const policy: BrowserPolicy = {
+        previewOrigins: [],
+        sites: settings.get('browser.sites').map((rule) => ({ ...rule, access: SiteAccess.Read })),
+      };
+      if (urlAccess(normalized, policy) === null) {
+        throw new AppError(ErrorCode.BrowserSiteNotAllowed, 'No website rule allows this address', {
+          host: new URL(normalized).host,
+        });
+      }
+      const abort = new AbortController();
+      let tab: Tab | undefined;
+      const timeout = Promise.withResolvers<never>();
+      const cancelDeadline = clock.schedule(BROWSER_READ_TIMEOUT_MS, () => {
+        const error = new AppError(ErrorCode.BrowserReadFailed, 'The website read timed out', {
+          url: normalized,
+          reason: 'timeout',
+          timeoutMs: BROWSER_READ_TIMEOUT_MS,
+        });
+        abort.abort(error);
+        timeout.reject(error);
+      });
+      async function read() {
+        tab = await openTab({
+          host,
+          clock,
+          log,
+          tabId: `assistant-read:${randomUUID()}`,
+          kind: BrowserTabKind.Site,
+          partition: SITES_PARTITION,
+          policy,
+          site: true,
+          signal: abort.signal,
+        });
+        abort.signal.throwIfAborted();
+        const navigation = z
+          .object({ errorText: z.string().optional() })
+          .parse(await tab.cdp('Page.navigate', { url: normalized }));
+        abort.signal.throwIfAborted();
+        if (navigation.errorText !== undefined) {
+          throw new AppError(ErrorCode.BrowserReadFailed, 'The website could not be loaded', {
+            url: normalized,
+            reason: navigation.errorText,
+          });
+        }
+        const settled = await tab.settle();
+        abort.signal.throwIfAborted();
+        const page = await tab.snapshot();
+        abort.signal.throwIfAborted();
+        const needsLogin = await loginPage(tab, page.url);
+        abort.signal.throwIfAborted();
+        if (needsLogin) {
+          throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: page.url });
+        }
+        return { ...page, tab: BrowserTabKind.Site, settled, logs: tab.logs('open') };
+      }
+      try {
+        return await Promise.race([read(), timeout.promise]);
+      } finally {
+        cancelDeadline();
+        if (tab !== undefined) await tab.close();
+      }
+    },
+
     /**
      * `browser_open` (29 §6): a path starting with / opens in the task's preview (started first when needed), a full
      * address in the preview tab or the website tab by the policy.
@@ -310,6 +384,7 @@ export function createBrowserService({ host, clock, log, events, settings, proje
     },
 
     async closeAll(): Promise<void> {
+      unsubscribeHost();
       await Promise.all([...sessions.keys()].map((id) => close(id)));
     },
   };

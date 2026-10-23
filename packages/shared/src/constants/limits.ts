@@ -139,6 +139,8 @@ export const PREVIEW_PAGES_MAX = 10;
 export const BROWSER_ACTION_TIMEOUT_MS = 5000;
 export const BROWSER_SETTLE_QUIET_MS = 500;
 export const BROWSER_SETTLE_TIMEOUT_MS = 10_000;
+/** 助手一次网页文字读取的总时限，包含打开、导航与提取。 */
+export const BROWSER_READ_TIMEOUT_MS = 30_000;
 /** The longest `browser_wait_for` (29 §6). */
 export const BROWSER_WAIT_FOR_MAX_MS = 10_000;
 /** A page snapshot is cut to this many characters (29 §5.6). */
