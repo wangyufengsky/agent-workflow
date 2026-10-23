@@ -15,6 +15,6 @@
 - 原生客户端：4/4 通过；重复删除缺失 session 修前失败、修后成功。错误映射单元：5/5 通过，其他 404、500、网络异常仍失败。
 - 历史恢复：2/2 单元通过；中段修订的错误文本先复现再修复。
 - 全量单元：719/719 通过。完整 check 通过（生成迁移元数据格式化、配置预期快照同步）。
-- 全量集成：349/349 通过，另有 1 个既有 SQL Server 环境跳过；生产构建通过。首轮发现 macOS `/var` 与 `/private/var` 同一文件的路径预期差异，按 `realpathSync` 校验同一真实文件后全量重跑通过。此记录不把本地协议模型称为真实语言理解能力验收。
+- 全量集成：349/349 通过，另有 1 个既有 SQL Server 不适用场景跳过（主键 INCLUDE 列）；生产构建通过。首轮发现 macOS `/var` 与 `/private/var` 同一文件的路径预期差异，按 `realpathSync` 校验同一真实文件后全量重跑通过。此记录不把本地协议模型称为真实语言理解能力验收。
 
 本机日志位于 `/private/tmp/aw-assistant-lifecycle-*` 与 `/private/tmp/aw-assistant-context-recovery-*`。新迁移由 drizzle-kit 基于已合并 0019 生成，未修改 Claude 的工作区和迁移。

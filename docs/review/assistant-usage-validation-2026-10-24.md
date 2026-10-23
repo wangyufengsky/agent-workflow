@@ -40,7 +40,7 @@ UI 用例 `shell-assistant-usage.browser.spec.ts`：主页→侧栏→桌宠共�
 |---|---|---|
 | `pnpm check` | 全部通过，含类型、Biome、依赖、CSS、状态机文档同步 | `/private/tmp/ap05-final-check.log` |
 | `pnpm exec vitest run --project unit --maxWorkers=2` | 59 文件，725 用例通过 | `/private/tmp/ap05-final-unit.log` |
-| `pnpm exec vitest run --project int --maxWorkers=2` | 63 文件，375 用例通过，1 条既有 SQL Server 环境跳过，121.36 秒 | `/private/tmp/ap05-final-int.log` |
+| `pnpm exec vitest run --project int --maxWorkers=2` | 63 文件，375 用例通过，1 条既有 SQL Server 不适用场景跳过（主键 INCLUDE 列），121.36 秒 | `/private/tmp/ap05-final-int.log` |
 | `pnpm build` | 生产构建与 bundle 检查通过 | `/private/tmp/ap05-final-build.log` |
 | `pnpm exec vitest run --project oc packages/server/src/modules/assistant/assistant.lifecycle.oc.test.ts --maxWorkers=1` | 真实 opencode 2 用例通过，9.58 秒 | `/private/tmp/ap05-final-native.log` |
 | `pnpm exec playwright test e2e/shell-assistant-usage.browser.spec.ts e2e/shell-assistant-context.browser.spec.ts e2e/user-preview.browser.spec.ts --project=browser --workers=1` | 5 用例通过，11.0 秒 | `/private/tmp/ap05-final-e2e.log` |

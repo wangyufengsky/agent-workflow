@@ -16,7 +16,7 @@
 | AP-03b | 显式用户预览页与当前页文本读取 | 先补当前代码缺失的用户预览页签及归属；读取用户明确打开的页面文本、控制台与请求错误；无预览页返回明确错误，不猜测 AI 页签；不增加助手点击或视觉输入 | 已合并 · PR #66 |
 | AP-04 | 会话文件目录隔离与删除清理 | 原生会话只在自身文件目录运行；旧会话有明确兼容路径；删除聊天清理底层 opencode 会话与本地资源；真实运行时验证路径边界及删除 | 已合并 · PR #64 |
 | AP-05 | 用量、耗时与运行约束 | 显示实际 token 用量及耗时；中断、错误、重启有一致记录；必要的运行限制明确生效且可理解，无金额预算功能 | 已合并 · PR #67 |
-| AP-06 | 真实多轮助手评测 | 覆盖文本理解、任务创建确认及回传、网页读取、目录隔离与停止；记录工具选择、错误和真实模型证据，修复实际复现问题 | 两组真实多轮行为验证通过，正在整理首轮失败与实际局限并提交 PR |
+| AP-06 | 真实多轮助手评测 | 覆盖文本理解、任务创建确认及回传、网页读取、目录隔离与停止；记录工具选择、错误和真实模型证据，修复实际复现问题 | 已合并 · PR #68；两组成功样本与首次失败均留证 |
 | AP-07 | 最终验证与明早验收说明 | 串行合并后完整 verify、浏览器 E2E、真实 opencode / Electron 验证；记录 PR、提交、测试、已知限制及用户检查入口 | 进行中 |
 | AP-L1 | 截图、PDF、视觉输入 | 用户明确暂缓 | 暂缓 |
 | AP-L2 | 长期记忆 | 先确定保存 / 查看 / 修改 / 删除边界 | 后续设计 |
@@ -54,6 +54,7 @@
 | AP-04 会话隔离 | [#64](https://github.com/wangyufengsky/agent-workflow/pull/64) | `0ccb735` | [生命周期验证](assistant-session-lifecycle-validation-2026-10-24.md) |
 | AP-03b 用户预览 | [#66](https://github.com/wangyufengsky/agent-workflow/pull/66) | `7b7bcb8` | [预览验证](assistant-user-preview-2026-10-24.md) |
 | AP-05 用量与停止控制 | [#67](https://github.com/wangyufengsky/agent-workflow/pull/67) | `c2044b7` | [用量验证](assistant-usage-validation-2026-10-24.md) |
+| AP-06 真实多轮评测 | [#68](https://github.com/wangyufengsky/agent-workflow/pull/68) | `739ee40` | [真实评测记录](assistant-real-evaluation-2026-10-24.md) |
 
 待完成项仍需集成、真实模型验证或最终主干验收；未完成状态不代表已经交付。
 
