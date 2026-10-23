@@ -56,3 +56,20 @@ UI 用例 `shell-assistant-usage.browser.spec.ts`：主页→侧栏→桌宠共�
 后续仅修改 E2E：context/usage 使用自动 fixture 捕获本页面创建接口返回的聊天 ID，在 finally 停止并删除本例自己创建的会话；不清空共享后端、不删除其他用例的聊天。context 的侧栏场景及 J11 显式创建新聊天并等待界面激活，J11 原有断言全部保留。产品代码冻结。
 
 组合 `shell-assistant-context` 3 条 + `shell-assistant-usage` 1 条 + `shell-assistant` 4 条连续运行，最终 8/8 通过。证据：`/private/tmp/aw-final-acceptance/assistant-isolation-green.log` 与 `assistant-isolation-green-results/`。完整 browser/OC/Electron 在该测试修复提交后由独立 agent 重跑。
+
+## 合并前完整验收
+
+独立执行者在固定提交 `211f96c9cda09581d5628e28f8dc3430fb87f057`（生产代码与 `401ed5e` 相同）上串行完成全套；后续仅补本节证据。
+
+| 验证 | 结果 | 证据 |
+|---|---|---|
+| 最新测试修复后的 `pnpm check` | 通过 | `/private/tmp/aw-final-acceptance/premerge-check-after-isolation.log` |
+| 完整浏览器 E2E，1 worker、0 retry | 56 通过，0 跳过、0 flaky；325.66 秒 | `premerge-browser-r2.log`、`premerge-browser-r2.json` |
+| `pnpm test:oc` | 5 文件、9 用例通过，0 跳过；45.78 秒 | `premerge-oc.log` |
+| 完整 Electron E2E，1 worker、0 retry | 11 通过，0 跳过、0 flaky；117.89 秒 | `premerge-electron.log`、`premerge-electron.json` |
+
+相对证据路径均位于 `/private/tmp/aw-final-acceptance/`。浏览器四主题各 78 页，共 312 张截图；对比度与横向溢出报告均为零。独立查看四主题各自的主页与助手面板，以及用量明暗截图，文字、确认卡、输入框与用量行可读，无新增遮挡。
+
+OC 套件的 bridge 用例调用实际配置模型，其余用例使用真实原生运行时的无模型请求或本地可控模型响应。Electron 的 J10 使用真实模型，完成引导、添加测试项目、修复任务、执行中退出重开并继续到结果卡；其他桌面用例覆盖原生浏览器、桌宠、启动退出、已有 PDF 导出及用户预览。已有 PDF 导出回归不代表本轮增加助手 PDF 输入能力。
+
+本轮按现行 D82 进行本机 macOS 验收；仓库 GitHub Actions 仅手动触发，未把本机结果写成跨平台 CI 已通过。
