@@ -54,3 +54,7 @@
 | AP-04 会话隔离 | [#64](https://github.com/wangyufengsky/agent-workflow/pull/64) | `0ccb735` | [生命周期验证](assistant-session-lifecycle-validation-2026-10-24.md) |
 
 待完成项仍需集成、真实模型验证或最终主干验收；未完成状态不代表已经交付。
+
+## 并行开发的边界
+
+只读确认 Claude 的 [B2 PR #63](https://github.com/wangyufengsky/agent-workflow/pull/63) 尚未合并，包含完整页面体检、AI 动作画面与更完整的任务预览。该 PR 已说明与主干存在冲突。本轮 AP-03b 只补助手读取明确用户页面所需的预览入口、归属和文本读取，不代表整套 B2 已完成；没有操作 PR #63 或其分支。后续合并 B2 时需统一重名的用户浏览器接口并重新验证，不应直接叠加两套实现。
