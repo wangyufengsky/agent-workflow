@@ -21,8 +21,6 @@ import { SlideView } from './slide/slide-view.tsx';
 import { useWidth } from './slide/use-width.ts';
 import { SlidePanel } from './slide-panel.tsx';
 
-const THUMB_WIDTH = 132;
-
 function Thumb({
   deck,
   slide,
@@ -41,6 +39,9 @@ function Thumb({
   onOverflow(id: string, overflow: boolean): void;
 }) {
   const report = useCallback((value: boolean) => onOverflow(slide.id, value), [onOverflow, slide.id]);
+  // The page fills what the button has left beside its number, inside its padding and border.
+  const frame = useRef<HTMLSpanElement>(null);
+  const width = useWidth(frame);
   return (
     <button
       type="button"
@@ -51,13 +52,17 @@ function Thumb({
       data-testid="slide-thumb"
     >
       <span className={styles.thumbNo}>{slide.seq}</span>
-      <SlideView
-        content={slide.content}
-        placeholder={slide.title}
-        theme={deck.theme}
-        width={THUMB_WIDTH}
-        onOverflow={report}
-      />
+      <span ref={frame} className={styles.thumbSlide}>
+        {width > 0 && (
+          <SlideView
+            content={slide.content}
+            placeholder={slide.title}
+            theme={deck.theme}
+            width={width}
+            onOverflow={report}
+          />
+        )}
+      </span>
       {making && <span className={styles.thumbState}>{C.pageMaking}</span>}
       {overflow && (
         <span className={styles.thumbWarn} title={C.overflow}>

@@ -4,10 +4,12 @@ import { join } from 'node:path';
 import { API_PREFIX } from '@aw/shared';
 import { expect, type Page, test } from '@playwright/test';
 import {
+  box,
   createProject,
   type E2EProject,
   GIT_HEAVY_SPECS_SLOW,
   git,
+  MIN_WINDOW,
   patchSettings,
   queueCodeReviewerTurn,
   queueTurn,
@@ -65,6 +67,11 @@ test('J24 Git 工作台：暂存 → AI 草拟并提交 → 新建分支再提�
   // Stage, let the AI draft the message, commit as the user.
   await page.getByRole('button', { name: '暂存 greet.ts' }).click();
   await expect(page.getByTestId('git-changes')).toContainText('已暂存 1');
+  // In the smallest window the diff still gets the room to read code, beside the commit form.
+  const initial = page.viewportSize() ?? MIN_WINDOW;
+  await page.setViewportSize(MIN_WINDOW);
+  expect((await box(page.getByTestId('diff-view'))).width).toBeGreaterThan(360);
+  await page.setViewportSize(initial);
   await queueCodeReviewerTurn(request, project, [
     { type: 'callTool', name: 'submit_commit_message', args: { subject: 'feat: say hello', body: 'Friendlier.' } },
   ]);
@@ -73,6 +80,12 @@ test('J24 Git 工作台：暂存 → AI 草拟并提交 → 新建分支再提�
   await page.getByRole('button', { name: '提交 1 个文件' }).click();
   await toast(page, '已提交');
   expect(git(project.repoPath, 'log', '-1', '--format=%an|%s|%b')).toBe('Zhang Wei|feat: say hello|Friendlier.');
+  // So do a commit's details beside the log.
+  await page.setViewportSize(MIN_WINDOW);
+  await workbench(page, project, `?view=commits&sha=${git(project.repoPath, 'rev-parse', 'HEAD')}`);
+  expect((await box(page.getByTestId('git-commit'))).width).toBeGreaterThan(320);
+  await page.setViewportSize(initial);
+  await workbench(page, project);
 
   // A branch of the user's own, switched to, with one more commit.
   await page.getByRole('button', { name: '当前分支' }).click();

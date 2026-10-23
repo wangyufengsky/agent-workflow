@@ -175,7 +175,8 @@
 .code {
   padding: 0 var(--s-2);
   white-space: pre-wrap;
-  word-break: break-all;
+  /* Lines wrap between words; only a word longer than the line is broken. */
+  overflow-wrap: anywhere;
 }
 
 .line[data-kind="add"] td,

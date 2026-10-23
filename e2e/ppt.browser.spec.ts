@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { createProject, type FakeStep, patchSettings, queueWriterTurn } from './helpers.ts';
+import { box, createProject, type FakeStep, MIN_WINDOW, patchSettings, queueWriterTurn } from './helpers.ts';
 
 // J20 (23 §13): from a project to a PPT — the outline written, edited and confirmed, the pages made one by one, a page
 // edited by hand, revised by the AI and restored, another theme, the PowerPoint export, the show and the print view.
@@ -65,6 +65,14 @@ test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 
   await expect(page.getByRole('heading', { name: '订单服务退款改造' })).toBeVisible();
   const pages = page.getByTestId('outline-page');
   await expect(pages).toHaveCount(3);
+  // The layout picker keeps to its width; a page's title and points get the rest of the row, down to the smallest window.
+  const initial = page.viewportSize() ?? MIN_WINDOW;
+  for (const size of [initial, MIN_WINDOW]) {
+    await page.setViewportSize(size);
+    expect((await box(page.getByLabel('第 2 页 标题'))).width).toBeGreaterThan(400);
+    expect((await box(page.getByLabel('第 2 页 要点（每行一条）'))).width).toBeGreaterThan(400);
+  }
+  await page.setViewportSize(initial);
   await page.getByLabel('第 2 页 标题').fill('接口为什么慢');
   await page.getByLabel('第 2 页 要点（每行一条）').fill('超过 10 万条时 8 秒\n导出只能半夜跑');
   await page.getByRole('button', { name: '删除第 3 页' }).click();
@@ -85,6 +93,11 @@ test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 
   ]);
   await page.getByRole('button', { name: '确认大纲，开始制作' }).click();
   await expect(page.getByTestId('slide-thumb')).toHaveCount(3);
+  // A thumbnail stays inside its button, so the selected page's outline is whole (2 px border).
+  for (const thumb of await page.getByTestId('slide-thumb').all()) {
+    const button = await box(thumb);
+    expect((await box(thumb.getByTestId('slide-canvas'))).right).toBeLessThanOrEqual(button.right - 2);
+  }
   await expect(page.getByTestId('slide-preview')).toContainText('订单服务退款改造');
   await expect(page.getByRole('button', { name: '导出 PowerPoint' })).toBeEnabled();
 
@@ -100,6 +113,15 @@ test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 
   await expect(bullets).toHaveValue('超过 10 万条时 **8 秒**\n导出只能半夜跑\n客服 经常收到投诉');
   await page.getByLabel('讲稿').click();
   await expect(preview).toContainText('客服 经常收到投诉');
+
+  // In the smallest window the page is still big enough to proofread, and stays in view while its notes are edited.
+  await page.setViewportSize(MIN_WINDOW);
+  expect((await box(preview)).width).toBeGreaterThan(420);
+  await page.getByLabel('讲稿').scrollIntoViewIfNeeded();
+  const shown = await preview.boundingBox();
+  expect(shown?.y ?? -1).toBeGreaterThanOrEqual(0);
+  expect((shown?.y ?? 0) + (shown?.height ?? 0)).toBeLessThanOrEqual(MIN_WINDOW.height);
+  await page.setViewportSize(initial);
 
   // The AI revises it; the version before can be restored.
   await queueWriterTurn(request, project, [

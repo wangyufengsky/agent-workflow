@@ -191,6 +191,12 @@
   background: var(--panel);
 }
 
+/* As wide as its longest layout name: forms fill their row, which here left the title and points none. */
+.outlineLayout {
+  flex: none;
+  width: auto;
+}
+
 .outlineNo {
   min-width: 24px;
   padding-top: var(--s-2);
@@ -241,6 +247,11 @@
   border-color: var(--accent);
 }
 
+.thumbSlide {
+  flex: 1;
+  min-width: 0;
+}
+
 .thumbNo {
   min-width: 14px;
   color: var(--muted);
@@ -276,8 +287,37 @@
 }
 
 .preview {
+  /* Stays in view while the page's fields and notes beside it are edited further down. */
+  position: sticky;
+  top: var(--s-4);
   min-width: 0;
   border-radius: var(--r-sm);
+}
+
+/*
+ * Windows narrower than the default, down to the smallest (1024): the pages run in a strip above and the fields
+ * narrow, so the page shown is big enough to proofread.
+ */
+@media (max-width: 1279px) {
+  .stage {
+    grid-template-columns: minmax(0, 1fr) 260px;
+  }
+  .rail {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .rail .thumb {
+    flex: none;
+    width: 152px;
+  }
+  .railActions {
+    flex: none;
+    flex-wrap: nowrap;
+  }
 }
 
 .preview:focus-visible {

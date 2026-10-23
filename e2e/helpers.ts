@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type APIRequestContext, expect, type Page } from '@playwright/test';
+import { type APIRequestContext, expect, type Locator, type Page } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 
 /**
@@ -176,4 +176,17 @@ export async function startTask(page: Page, project: E2EProject, workflow: RegEx
   await page.getByRole('button', { name: /^开始/ }).click();
   // Starting creates the task's worktree first (up to 9 s on the Windows runner).
   await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/, { timeout: TASK_RUN_TIMEOUT_MS });
+}
+
+/** The smallest window the desktop app allows (`minWidth` / `minHeight` in apps/desktop). */
+export const MIN_WINDOW = { width: 1024, height: 700 };
+
+/**
+ * Where an element is drawn. Layout checks measure the room a field or a button actually gets: a squeezed column or a
+ * button pushed out of its card overflows nothing the page-wide overflow scan looks at.
+ */
+export async function box(locator: Locator): Promise<{ left: number; right: number; width: number }> {
+  const rect = await locator.boundingBox();
+  if (rect === null) throw new Error('The element is not drawn');
+  return { left: rect.x, right: rect.x + rect.width, width: rect.width };
 }

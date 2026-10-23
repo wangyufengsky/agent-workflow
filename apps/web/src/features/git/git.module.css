@@ -775,6 +775,22 @@
   min-height: 0;
 }
 
+/*
+ * Windows narrower than the default, down to the smallest (1024): the navigation, the log and the commit form give up
+ * width, so a commit's details and the diff keep room to read.
+ */
+@media (max-width: 1279px) {
+  .cols {
+    grid-template-columns: 180px 300px minmax(0, 1fr);
+  }
+  .cols[data-columns="two"] {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+  .changes {
+    grid-template-columns: minmax(0, 1fr) 230px;
+  }
+}
+
 .changes > * {
   min-height: 0;
   overflow: auto;
