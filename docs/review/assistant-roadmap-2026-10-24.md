@@ -17,7 +17,7 @@
 | AP-04 | 会话文件目录隔离与删除清理 | 原生会话只在自身文件目录运行；旧会话有明确兼容路径；删除聊天清理底层 opencode 会话与本地资源；真实运行时验证路径边界及删除 | 已合并 · PR #64 |
 | AP-05 | 用量、耗时与运行约束 | 显示实际 token 用量及耗时；中断、错误、重启有一致记录；必要的运行限制明确生效且可理解，无金额预算功能 | 已合并 · PR #67 |
 | AP-06 | 真实多轮助手评测 | 覆盖文本理解、任务创建确认及回传、网页读取、目录隔离与停止；记录工具选择、错误和真实模型证据，修复实际复现问题 | 已合并 · PR #68；两组成功样本与首次失败均留证 |
-| AP-07a | 终验发现的桌面退出超时 | 保留原始失败与 trace；定位应用退出根因，补回归后按独立分支 / PR 合并；不放宽超时或重试掩盖 | 修复中：已用真实 Electron 预连接稳定复现退出等待环 |
+| AP-07a | 终验发现的桌面退出超时 | 保留原始失败与 trace；定位应用退出根因，补回归后按独立分支 / PR 合并；不放宽超时或重试掩盖 | 已合并 · PR #69；真实预连接回归先红后绿 |
 | AP-07 | 最终验证与明早验收说明 | 串行合并后完整 verify、浏览器 E2E、真实 opencode / Electron 验证；记录 PR、提交、测试、已知限制及用户检查入口 | 进行中 |
 | AP-L1 | 截图、PDF、视觉输入 | 用户明确暂缓 | 暂缓 |
 | AP-L2 | 长期记忆 | 先确定保存 / 查看 / 修改 / 删除边界 | 后续设计 |
@@ -43,6 +43,7 @@
 | AP-03b | codex/assistant-user-preview | Codex 管理的 assistant-user-preview/agent-workflow-dev |
 | AP-05 | codex/assistant-usage-limits | Codex 管理的 assistant-usage-limits/agent-workflow-dev |
 | AP-06 | codex/assistant-real-evaluation | Codex 管理的 assistant-real-evaluation/agent-workflow-dev |
+| AP-07a 退出修复 | codex/assistant-desktop-close-diagnostics | Codex 管理的 assistant-user-preview/agent-workflow-dev |
 
 ## 已合并记录
 
@@ -56,8 +57,9 @@
 | AP-03b 用户预览 | [#66](https://github.com/wangyufengsky/agent-workflow/pull/66) | `7b7bcb8` | [预览验证](assistant-user-preview-2026-10-24.md) |
 | AP-05 用量与停止控制 | [#67](https://github.com/wangyufengsky/agent-workflow/pull/67) | `c2044b7` | [用量验证](assistant-usage-validation-2026-10-24.md) |
 | AP-06 真实多轮评测 | [#68](https://github.com/wangyufengsky/agent-workflow/pull/68) | `739ee40` | [真实评测记录](assistant-real-evaluation-2026-10-24.md) |
+| AP-07a 桌面退出修复 | [#69](https://github.com/wangyufengsky/agent-workflow/pull/69) | `1ed178a` | [根因与红绿回归](desktop-preconnect-shutdown-2026-10-24.md) |
 
-待完成项仍需集成、真实模型验证或最终主干验收；未完成状态不代表已经交付。
+能力切片与退出修复均已合并；AP-07 正在同一最终主干上完整验收，尚未预填通过结果。
 
 ## 并行开发的边界
 
@@ -69,32 +71,18 @@ AP-06 观察到模型偶尔为明确的任务创建请求额外申请项目 shel
 
 真实任务的实际文件和 Git 断言正确，检查通过；但任务执行摘要把 `hello\n` 的六个字节写成七字节，助手回传沿用了该描述。模型摘要仍可能传播细节错误，应以实际文件、检查和交付状态为准。两个多轮案例提供场景证据，不代表广泛能力基准，也不足以直接决定工具路由架构重构。
 
+## 终验发现并修复的退出问题
+
+先前在 `c2044b7` / `739ee40` 上的完整 Electron 验收，两次在桌宠用例 `finally app.close()` 超时，业务断言已经通过。后来的单例、顺序诊断和一轮原始完整 11/11 通过均保留，但未据此宣称已修复。
+
+受控实验最终稳定复现了默认会话预连接的等待环：NetworkService 持有未发送 HTTP 请求的连接，后端等待连接关闭，main 又等待后端退出。仅释放默认会话连接即可使应用正常结束。PR #69 调整退出顺序，并新增真实 TCP 转发 + Electron 永久回归，旧代码先失败、修复后与原启动及桌宠用例一起 3/3 通过。退出会取消本应用默认会话中的在途请求，再走原有后端清理；没有扩大到其他网站分区，也未增加超时、重试或强杀。
+
+原始失败没有实时 socket 现场，因此受控实验确认的是可确定复现、与原症状一致的退出等待环。完整诊断、排除项、首次测试观察器错误与正式回归证据见 [桌面退出修复记录](desktop-preconnect-shutdown-2026-10-24.md)。
+
 ## 合并后最终验证
 
-功能主干固定为 `c2044b7b8a0810139fe3a3749b953ad294b150a1`，在干净的独立 Codex 工作区执行完整终验。随后 AP-06 合并为 `739ee40`，只新增真实评测脚本与报告；逐项比对确认除 `live/`、`docs/` 外，终验源码与该主干没有差异。最终交付分支也只修改文档。AP-06 合并后的完整 `pnpm check` 及独立评测 TypeScript 检查另行通过。
+最终功能基线固定为 `1ed178a95fecddd57c8ae700599040944283e52b`，包含所有能力切片、真实评测代码和退出修复。完整静态检查、单元、集成、构建、浏览器、OpenCode 和 Electron 正在该干净主干上串行执行；本节待结果后填写。交付说明分支仅修改文档。
 
-| 合并后检查 | 结果 | 耗时 |
-| --- | --- | ---: |
-| 静态检查 | 类型、Biome、依赖边界、CSS、状态机文档同步全部通过 | 墙钟 16.16 秒 |
-| 全量单元 | 59 文件，725 项通过 | Vitest 5.24 秒 |
-| 全量集成，最多 2 worker | 63 文件，375 项通过、1 项不适用场景跳过 | Vitest 125.40 秒 |
-| 生产构建 | 插件、桌面构建及生产 bundle 检查通过 | 墙钟 3.36 秒 |
-| 浏览器 E2E，1 worker、0 retry | 56 项通过，无跳过或 flaky | 328.925 秒 |
-| 原生 OpenCode 全套 | 5 文件，9 项通过 | Vitest 46.23 秒 |
-| Electron 全套，1 worker、0 retry | 最新原始代码全套 11 项通过；此前两轮同一退出超时仍在定位，不能据此称已修复 | 最新 106.400 秒；先前失败 180.767 / 159.132 秒 |
+先前 `c2044b7` 的完整检查、725 项单元、375 项集成、56 项浏览器和 9 项 OpenCode 已通过；该批结果属于退出修复之前，不混记为最终基线。日志、JSON、trace 与截图保留在本机 `/private/tmp/aw-final-acceptance/postmerge-*`，修复后的最终证据使用 `final-release-*`。
 
-唯一集成跳过是 SQL Server 的「主键 INCLUDE 列不标为主键」，由 `includedColumnTable` 的适用条件决定，不是缺少数据库环境。数据库引擎的其他用例实际运行。浏览器四主题各 78 个页面、共 312 张截图，对比度与横向溢出检查均为零；另人工抽查每套主题的助手面板。
-
-日志、JSON、trace 与截图保留在本机 `/private/tmp/aw-final-acceptance/postmerge-*`。AP-06 合并后的新增文件静态检查分别为 `final-evaluation-check.log`、`final-evaluation-tsc.log`。本轮没有手动触发 GitHub Actions；以上是现行规范要求的本机 macOS 验收，Windows / Linux 与安装包验收未在本轮运行。
-
-
-Electron 首轮的桌宠用例已完成会话/形象同步、拖动、主窗恢复和截图，禁用设置已持久化；超时范围位于后续关闭事件等待或应用退出。首轮未启用 Electron trace，JSON 未给出具体调用栈。相同源码单例开启 `pw:api` 与 trace 后通过，PATCH、桌宠关闭事件和应用退出均完成（退出 467 ms），这只能说明没有复现，不能声称问题已修复。首次失败与后续诊断证据分别保留，未延长超时或削弱断言。
-
-
-随后在最新主干 `739ee40` 的独立诊断分支中按原顺序执行前七条桌面用例，只临时记录关闭阶段事件：7/7 通过（15.906 秒），原生桌宠 `contents.destroyed/window.closed`、Playwright `pet.close` 先后相隔约 1–2 ms，应用最终退出码 0。临时日志代码已恢复，工作树干净，没有据此改动产品或延长超时。随后恢复原始测试，在该干净主干上开启详细 trace 的完整 Electron 再次出现同一超时（10 项通过、1 项超时）。调用链确认 PATCH 已完成、桌宠关闭事件已收到、窗口数量断言已通过；挂起的是 `e2e/companion.electron.spec.ts:95` 的 `finally await app.close()`。因此单例与顺序诊断通过不代表修复；AP-07a 继续聚焦应用退出、后端停止与 Playwright 收尾链，不延长超时或增加重试。
-
-
-完全恢复诊断前的生产与测试源码、重新构建后，外部观察器下的原始完整 Electron 套件 11/11 通过（106.400 秒，墙钟 107.18 秒，0 retry）。观察器只跟踪本次测试派生的进程，未进入产品或改变测试断言；本轮未出现挂起，因此没有捕捉到失败现场。带临时阶段日志的其他诊断通过不能作为产品修复。此前两次失败仍保留，AP-07a 继续以 OpenCode 尚在启动时退出这一共同阶段做受控验证。
-
-
-后续受控实验排除了 OpenCode 初始化门闩：真实运行时保持 `starting` 时后端在 20 ms 内关闭。真实 TCP 零字节连接及未完整请求头则均阻止 `app.close()`，销毁实验连接后立即结束。进一步由 Electron 默认会话 `preconnect` 建立到本后端的连接，确认应用退出等待 5 秒仍有双端 `ESTABLISHED`；仅关闭该默认会话的连接后，主进程在 136 ms 内退出，`app.close()` 在 151 ms 内完成。AP-07a 将据此在窗口关闭后先释放默认会话的网络连接，再等待后端正常收尾。该动作会取消默认会话的在途请求，不是只关闭空闲连接；独立网站分区不扩大处理。正式回归与修复 PR 待完成。
+唯一集成条件跳过是 SQL Server 的「主键 INCLUDE 列不标为主键」，由 `includedColumnTable` 的适用条件决定，不是缺少数据库环境。数据库引擎的其他用例实际运行。本轮没有手动触发 GitHub Actions；按现行规范进行本机 macOS 验收，Windows / Linux 与安装包验收未在本轮运行。
