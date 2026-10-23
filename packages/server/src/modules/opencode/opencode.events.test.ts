@@ -47,6 +47,17 @@ describe('opencode 全局事件解析', () => {
     });
   });
 
+  it('真实用量报告保留消息与步骤标识，供所属轮次匹配和重放去重', () => {
+    expect(parsed.find((event) => event.type === E.StepFinished)).toEqual({
+      type: E.StepFinished,
+      sessionId: 'ses_eac74a387ffeMgXo9hDGXzyQPQ',
+      messageId: 'msg_1538b5d19001aSulM6ndvCetJc',
+      partId: 'prt_1538b723d001f2I80CqDGxK1Ua',
+      tokens: { input: 9736, output: 63 },
+      cost: 0,
+    });
+  });
+
   it('重试状态与会话错误', () => {
     const retry = parseGlobalEvent({
       directory: '/tmp/aw-repo',

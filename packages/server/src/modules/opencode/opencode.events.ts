@@ -55,7 +55,14 @@ export type OpencodeEvent =
       output?: string;
       error?: string;
     }
-  | { type: typeof E.StepFinished; sessionId: string; tokens: { input: number; output: number }; cost: number }
+  | {
+      type: typeof E.StepFinished;
+      sessionId: string;
+      messageId: string;
+      partId: string;
+      tokens: { input: number; output: number };
+      cost: number;
+    }
   | { type: typeof E.Retry; sessionId: string; message: string | undefined }
   | { type: typeof E.Idle; sessionId: string }
   /** `error` is opencode's error object (`{ name, data }`), absent when opencode gives none. */
@@ -182,7 +189,7 @@ function toPartEvent(raw: unknown): OpencodeEvent | undefined {
         ...(part.state.error === undefined ? {} : { error: part.state.error }),
       };
     case 'step-finish':
-      return { type: E.StepFinished, sessionId: part.sessionID, tokens: part.tokens, cost: part.cost };
+      return { type: E.StepFinished, ...ids, tokens: part.tokens, cost: part.cost };
   }
 }
 

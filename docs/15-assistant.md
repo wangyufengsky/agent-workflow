@@ -127,6 +127,14 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 | 工作中 | 面板顶边一道流光、头部标识旋转并呼吸、「正在思考」文字流光（遮罩只改透明度，文字颜色不变）；正在写的正文末尾闪烁的打字光标；运行中的动作条标题流光 | 循环动效全部停止，保留静态状态 |
 | 对话列表 | popover（`@starting-style` 淡入缩放），CSS 锚点定位在标题下方 | 只淡入 |
 
+### 6.2 单轮用量与运行时限
+
+主页、侧栏、桌宠在输入区共用用量行：本轮／最近一轮的状态、实际输入与输出 tokens、耗时，以及会话累计已报告 tokens 和未报告轮次数。统计起点直接显示，起点之前的历史为未知。模型确实报告零时显示 0；没有报告时显示「用量未报告」，即使已经正常结束也不伪造为零。只记录 `StepFinished` 的 input / output，不含缓存与推理 tokens，不记录金额预算或余额。
+
+创建外部会话或发送前先保存 `assistant_turns`，用户消息与应用回传都计为独立轮次；`StepFinished` 保留 message id 与 part id，按所属轮次累计并持久化去重。迟到报告仍归原轮次。结束事件由状态机记录为完成、用户停止、失败、超时或中断；运行时消失与后端重启各有原因。重启发现未结束轮次只标中断，不自动重发；其耗时未知，避免把离线时段误算成运行时间。
+
+沿用专业设置 `attempt.timeoutMinutes`（默认 60 分钟），设置文案说明同时作用于任务尝试和助手单轮；本轮开始时固定该值。助手等待权限期间暂停，权限全部回复后继续剩余时长；耗时显示仍为含等待的墙钟时间。超时通过注入 Clock 触发停止，不自动重试；外部会话创建迟到时也不再发送已超时的消息。
+
 ## 7. v1.0 需要预留的地基
 
 | 预留 | 位置 |
@@ -149,7 +157,8 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 
 ```
 server/src/modules/assistant/
-├─ assistant.table.ts / .repo.ts   对话、确认、持久化待发队列与任务跟进表
+├─ assistant.table.ts / .repo.ts   对话、确认、持久化待发队列、任务跟进与轮次表
+├─ assistant.usage.ts / .repo.ts   实际报告累计、重放去重、Clock 时限与轮次结束原因
 ├─ assistant.service.ts           对话、会话、事件 → 消息流、忙碌、权限请求、附件、待发消息
 ├─ assistant.tasks.ts / .tasks.repo.ts  任务原对话归属、状态回报与启动补扫
 ├─ assistant.context.ts           每轮 system（当地时间 localTime、页面描述）
@@ -167,6 +176,7 @@ server/src/modules/assistant/
 | 恢复回归 | `assistant.recovery.int.test.ts`：并发首条消息互斥；void 成功结果与旧记录兼容；断线、发送失败和重启后的结果回传且不重执行业务；建会话失败释放；空闲事件早于发送响应时按序投递；旧页面对象删除后的成功回传 |
 | 任务回传 | `assistant.tasks.int.test.ts`：确认/总是允许两条路径在首次任务事件前登记；真实 Git 任务待验收与交付；忙碌、断线、发送失败和重启补扫；事件去重；删除原对话、界面任务、取消确认不跟进；登记失败原子回滚 |
 | 文字上下文 | `assistant.snapshots.int.test.ts`：任务变化后保持快照原文、来源与时间，步骤归属、失效对象、选中文字作为不可信资料、长度与严格字段边界；`shell-assistant-context.browser.spec.ts`：主页选区编辑、侧栏任务快照、预览移除、与文件共存、发送后读取、开始任务模式不出现上下文入口，以及生成中移除后迟到的响应不再打开预览或带入消息 |
+| 用量回归 | `assistant.usage.int.test.ts`：真实 SQLite 持久化、捕获的真实事件重放去重、迟到用量归属、失败发送、运行时丢失与重启；FakeClock 验证权限等待暂停、剩余时限恢复、超时不重试与建会话迟到 |
 | `@opencode` | 注入后 `aw-assistant` 与 `agent-workflow-app` 出现在 opencode 配置中，两套 MCP 都已连接 |
 | E2E | J11「对助手说开始任务 → 确认卡片 → 任务卡片状态更新 → 打开任务页」；直接执行出现项目卡片、删除后「已删除」；主页建议 → 对话显示在主页、`open_page` 带用户离开时面板接着显示对话、「确认并总是允许」→ 设置页撤销；J25 主页对话与接力；J9 走查含助手面板（简单与专业）与主页对话 |
 | live | `live/assistant.live.test.ts`：真实模型查明天的日期并列出项目（调用 `get_current_time` 与 `projects_list`，回复含两者），报告写到 `live/reports/assistant-*.json` |

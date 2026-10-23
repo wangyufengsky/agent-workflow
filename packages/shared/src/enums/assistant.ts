@@ -10,6 +10,29 @@ export type AssistantConfirmationStatus =
   (typeof AssistantConfirmationStatus)[keyof typeof AssistantConfirmationStatus];
 export const assistantConfirmationStatusSchema = z.enum(AssistantConfirmationStatus);
 
+/** 一次助手消息的执行结果；不把中断或用量缺失当作正常完成。 */
+export const AssistantTurnStatus = {
+  Running: 'running',
+  Completed: 'completed',
+  Aborted: 'aborted',
+  Failed: 'failed',
+  Interrupted: 'interrupted',
+  TimedOut: 'timed_out',
+} as const;
+export type AssistantTurnStatus = (typeof AssistantTurnStatus)[keyof typeof AssistantTurnStatus];
+export const assistantTurnStatusSchema = z.enum(AssistantTurnStatus);
+
+export const AssistantTurnEvent = {
+  Idle: 'idle',
+  Abort: 'abort',
+  Error: 'error',
+  RuntimeLost: 'runtime_lost',
+  BackendRestart: 'backend_restart',
+  Timeout: 'timeout',
+} as const;
+export type AssistantTurnEvent = (typeof AssistantTurnEvent)[keyof typeof AssistantTurnEvent];
+export const assistantTurnEventSchema = z.enum(AssistantTurnEvent);
+
 /** Assistant-only MCP tools (15 §3); the other assistant tools come from the operation registry. */
 export const AssistantToolName = {
   GetCurrentTime: 'get_current_time',

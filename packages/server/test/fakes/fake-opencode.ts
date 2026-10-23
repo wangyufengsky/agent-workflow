@@ -255,7 +255,14 @@ export function createFakeOpencode() {
           return;
       }
     }
-    emit({ type: E.StepFinished, sessionId, tokens: { input: used.input, output: used.output }, cost: 0 });
+    emit({
+      type: E.StepFinished,
+      sessionId,
+      messageId,
+      partId: nextId('step'),
+      tokens: { input: used.input, output: used.output },
+      cost: 0,
+    });
     emit({ type: E.Idle, sessionId });
   }
 
@@ -288,6 +295,8 @@ export function createFakeOpencode() {
     holdSessions(): void;
     /** The next `prompt` request fails with OPENCODE_REQUEST_FAILED while the runtime stays connected. */
     failNextPrompt(): void;
+    /** 重放真实捕获的事件，验证迟到报告和重复投递。 */
+    replay(events: readonly OpencodeEvent[]): void;
     reconnect(): void;
     close(): Promise<void>;
   } = {
@@ -311,6 +320,9 @@ export function createFakeOpencode() {
     },
     failNextPrompt() {
       failPrompt = true;
+    },
+    replay(events) {
+      for (const event of events) emit(event);
     },
     crash() {
       connected = false;

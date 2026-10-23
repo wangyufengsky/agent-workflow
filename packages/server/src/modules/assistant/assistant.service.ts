@@ -13,6 +13,9 @@ import {
   type AssistantPageRef,
   type AssistantPermissionRequestDTO,
   AssistantToolName,
+  AssistantTurnEvent,
+  AssistantTurnStatus,
+  type AssistantUsageDTO,
   AttachmentOwnerKind,
   ErrorCode,
   MCP_ASSISTANT_TOOL_PREFIX,
@@ -50,6 +53,7 @@ import type { SettingsService } from '../settings/index.ts';
 import { type ContextRenderer, localTime } from './assistant.context.ts';
 import { recoveryContext } from './assistant.recovery-context.ts';
 import { type Conversation, createAssistantRepo } from './assistant.repo.ts';
+import { createAssistantUsage } from './assistant.usage.ts';
 
 export type AssistantServiceDeps = {
   db: Db;
@@ -75,6 +79,7 @@ type Live = {
   deleting: boolean;
   /** The user asked to stop: the abort's own error is not the conversation's. */
   aborting: boolean;
+  stopping: boolean;
   view: SessionView;
   permissions: Map<string, AssistantPermissionRequestDTO>;
   /** Files already shown as attachments. */
@@ -103,6 +108,14 @@ export function createAssistantService(deps: AssistantServiceDeps) {
   // opencode 使用真实路径判断目录边界，macOS 的 /var 等别名也必须先规范化。
   const directory = join(realpathSync(deps.dataDir), ASSISTANT_DIR);
   const live = new Map<string, Live>();
+  const usage = createAssistantUsage({
+    ...deps,
+    onTimeout(id) {
+      stopTurn(id, AssistantTurnEvent.Timeout).catch((err: unknown) =>
+        log.error({ err, conversationId: id }, 'assistant timeout abort failed'),
+      );
+    },
+  });
   /** opencode session id → conversation id, for the sessions this run has used. */
   const sessions = new Map<string, string>();
   const transcripts = createTranscriptStore<{ id: string }>({
@@ -122,6 +135,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         sending: false,
         deleting: false,
         aborting: false,
+        stopping: false,
         view: createSessionView(),
         permissions: new Map(),
         attached: new Set(),
@@ -140,13 +154,14 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     return conversation;
   }
 
-  function toDto(c: Conversation): AssistantConversationDTO {
+  function toDto(c: Conversation, summary: AssistantUsageDTO = usage.get(c.id)): AssistantConversationDTO {
     const state = liveOf(c.id);
     return {
       id: c.id,
       title: c.title,
-      busy: state.busy || state.sending || state.deleting,
+      busy: state.busy || state.sending || state.deleting || state.stopping,
       pendingPermissions: [...state.permissions.values()],
+      usage: summary,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
     };
@@ -208,22 +223,24 @@ export function createAssistantService(deps: AssistantServiceDeps) {
   }
 
   /** 建会话之前占住发送入口；请求返回前的空闲事件只结束模型回合，不释放发送权。 */
-  async function runTurn(c: Conversation, send: () => Promise<void>): Promise<void> {
+  async function runTurn(c: Conversation, source: 'user' | 'app', send: () => Promise<void>): Promise<void> {
     const state = liveOf(c.id);
     state.sending = true;
     state.busy = true;
+    usage.start(c.id, source);
     publish(c.id);
     try {
       await send();
     } catch (err) {
       state.busy = false;
+      usage.finish(c.id, AssistantTurnEvent.Error);
       throw err;
     } finally {
       state.sending = false;
       publish(c.id);
     }
     // 空闲事件可能早于请求响应，此时补发请求期间入队的消息。
-    if (!state.busy) flushLater(c.id);
+    if (!state.busy && usage.get(c.id).latest?.status === AssistantTurnStatus.Completed) flushLater(c.id);
   }
 
   async function prompt(c: Conversation, sessionId: string, systemText: string, text: string): Promise<void> {
@@ -241,11 +258,12 @@ export function createAssistantService(deps: AssistantServiceDeps) {
   /** Sends what waits in the outbox, once the session can take it. */
   async function flush(id: string): Promise<void> {
     const state = liveOf(id);
-    if (state.busy || state.sending || state.deleting || !opencode.isConnected()) return;
+    if (state.busy || state.sending || state.deleting || state.stopping || !opencode.isConnected()) return;
     if (repo.pendingMessages(id).length === 0) return;
     const c = get(id);
-    await runTurn(c, async () => {
+    await runTurn(c, 'app', async () => {
       const sessionId = await sessionOf(c);
+      if (!usage.isRunning(id)) return;
       const queued = repo.pendingMessages(id);
       await prompt(c, sessionId, system(c, state.page, 'app'), queued.map((m) => m.text).join('\n\n'));
       repo.acknowledgeMessages(queued.map((m) => m.id));
@@ -280,6 +298,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       state.permissions.clear();
       if (!state.busy) continue;
       state.busy = false;
+      usage.finish(id, AssistantTurnEvent.RuntimeLost);
       record(get(id), [{ kind: TranscriptEntryKind.System, data: { event: TranscriptSystemEvent.RuntimeLost } }]);
       publish(id);
     }
@@ -294,16 +313,21 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     if (id === undefined) return;
     const c = get(id);
     const state = liveOf(id);
-    if (event.type === OpencodeEventType.Error && state.aborting) {
-      record(c, [{ kind: TranscriptEntryKind.System, data: { event: TranscriptSystemEvent.Aborted } }]);
-    } else {
+    if (!(event.type === OpencodeEventType.Error && state.aborting)) {
       record(c, state.view.toEntries(event));
     }
     switch (event.type) {
+      case OpencodeEventType.Message:
+        if (event.role === 'assistant') usage.message(id, event.messageId);
+        return;
+      case OpencodeEventType.StepFinished:
+        if (usage.step(id, event.messageId, event.partId, event.tokens)) publish(id);
+        return;
       case OpencodeEventType.Tool:
         onToolEvent(c, state, event);
         return;
       case OpencodeEventType.PermissionAsked:
+        usage.pause(id);
         state.permissions.set(event.permissionId, {
           permissionId: event.permissionId,
           permission: event.permission,
@@ -314,7 +338,10 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       // A session error ends the turn like idle does; opencode does not always follow it with an idle event.
       case OpencodeEventType.Error:
       case OpencodeEventType.Idle:
+        // 中止的响应屏障负责确认结束；不能把它自己的 error 当成模型失败。
+        if (state.stopping || state.deleting) return;
         if (!state.busy) return;
+        usage.finish(id, event.type === OpencodeEventType.Error ? AssistantTurnEvent.Error : AssistantTurnEvent.Idle);
         state.busy = false;
         state.aborting = false;
         state.permissions.clear();
@@ -328,9 +355,64 @@ export function createAssistantService(deps: AssistantServiceDeps) {
 
   opencode.subscribe(onEvent);
 
+  /** 中止请求尚未完成时仍锁住发送入口，避免旧会话结束事件落到下一轮。 */
+  async function stopTurn(id: string, reason: typeof AssistantTurnEvent.Abort | typeof AssistantTurnEvent.Timeout) {
+    const c = get(id);
+    const state = liveOf(id);
+    if (state.deleting) throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is being deleted`, { id });
+    if ((!state.busy && !state.sending) || state.stopping) return;
+    state.stopping = true;
+    state.aborting = true;
+    usage.pause(id);
+    publish(id);
+    try {
+      if (c.opencodeSessionId !== null)
+        await opencode.abort({ sessionId: c.opencodeSessionId, directory: filesDir(id) });
+      usage.finish(id, reason);
+      record(c, [
+        {
+          kind: TranscriptEntryKind.System,
+          data: {
+            event:
+              reason === AssistantTurnEvent.Timeout ? TranscriptSystemEvent.TimedOut : TranscriptSystemEvent.Aborted,
+          },
+        },
+      ]);
+      state.busy = false;
+      state.permissions.clear();
+    } catch (err) {
+      usage.finish(id, AssistantTurnEvent.Error);
+      record(c, [
+        {
+          kind: TranscriptEntryKind.Error,
+          data: {
+            code: ErrorCode.OpencodeRequestFailed,
+            message: 'Assistant stop failed; retry stopping before sending another message',
+          },
+        },
+      ]);
+      throw err;
+    } finally {
+      state.stopping = false;
+      state.aborting = false;
+      publish(id);
+    }
+    // 保留用户停止后的应用通知接力；超时不自动开始下一轮。
+    if (reason === AssistantTurnEvent.Abort) flushLater(id);
+  }
+
   return {
     get: (id: string): AssistantConversationDTO => toDto(get(id)),
-    list: (): AssistantConversationDTO[] => repo.listConversations().map(toDto),
+    list: (): AssistantConversationDTO[] => {
+      const conversations = repo.listConversations();
+      const summaries = usage.summaries(conversations.map((c) => c.id));
+      return conversations.map((c) => {
+        const summary = summaries.get(c.id);
+        if (summary === undefined) throw new Error('Missing assistant usage summary');
+        return toDto(c, summary);
+      });
+    },
+    dispose: usage.dispose,
     /** The conversation an assistant MCP call comes from (15 §2). */
     findBySession: (sessionId: string): Conversation | undefined => repo.findBySession(sessionId),
     filesDir,
@@ -355,14 +437,19 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     async delete(id: string): Promise<void> {
       const c = get(id);
       const state = liveOf(id);
-      if (state.sending || state.deleting)
+      if (state.sending || state.deleting || state.stopping)
         throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is busy`, { id });
       state.deleting = true;
+      usage.pause(id);
       try {
         if (c.opencodeSessionId !== null) {
           if (state.busy) {
             state.aborting = true;
             await opencode.abort({ sessionId: c.opencodeSessionId, directory: filesDir(id) });
+            usage.finish(id, AssistantTurnEvent.Abort);
+            state.busy = false;
+            state.permissions.clear();
+            record(c, [{ kind: TranscriptEntryKind.System, data: { event: TranscriptSystemEvent.Aborted } }]);
           }
           await opencode.deleteSession({
             sessionId: c.opencodeSessionId,
@@ -370,6 +457,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           });
         }
         if (c.retiredSessionId !== null) await opencode.deleteSession({ sessionId: c.retiredSessionId, directory });
+        usage.finish(id, AssistantTurnEvent.Abort);
         unit.transact(() => {
           attachments.release(AttachmentOwnerKind.AssistantMessage, [id]);
           repo.deleteConversation(id);
@@ -383,7 +471,10 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       } finally {
         state.aborting = false;
         state.deleting = false;
-        if (live.has(id)) publish(id);
+        if (live.has(id)) {
+          if (state.busy && state.permissions.size === 0) usage.resume(id);
+          publish(id);
+        }
       }
     },
 
@@ -396,15 +487,16 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     }: SendAssistantMessageRequest): Promise<AssistantConversationDTO> {
       const c = get(id);
       const state = liveOf(id);
-      if (state.busy || state.sending || state.deleting)
+      if (state.busy || state.sending || state.deleting || state.stopping)
         throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is busy`, { id });
       if (!opencode.isConnected()) throw new AppError(ErrorCode.OpencodeNotReady, 'opencode is not ready');
       // Rendered first: a page about a deleted entity fails before anything is recorded.
       const systemText = system(c, page, 'user');
       const titled = c.title === '' ? { ...c, title: titleOf(text) } : c;
       repo.updateConversation(id, { title: titled.title, updatedAt: clock.now() });
-      await runTurn(titled, async () => {
+      await runTurn(titled, 'user', async () => {
         const sessionId = await sessionOf(titled);
+        if (!usage.isRunning(id)) return;
         // The conversation keeps its files even when the model cannot be reached: they were sent (30 §2).
         attachments.bind({ kind: AttachmentOwnerKind.AssistantMessage, id }, attachmentIds);
         const sent = attachmentIds.map((attachmentId) => attachments.get(attachmentId));
@@ -455,12 +547,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     flush,
 
     async abort(id: string): Promise<AssistantConversationDTO> {
-      const c = get(id);
-      const state = liveOf(id);
-      if (state.busy && c.opencodeSessionId !== null) {
-        state.aborting = true;
-        await opencode.abort({ sessionId: c.opencodeSessionId, directory: filesDir(id) });
-      }
+      await stopTurn(id, AssistantTurnEvent.Abort);
       return toDto(get(id));
     },
 
@@ -476,6 +563,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       }
       await opencode.replyPermission({ permissionId, directory: filesDir(id), reply });
       state.permissions.delete(permissionId);
+      if (state.permissions.size === 0) usage.resume(id);
       return publish(id);
     },
 
