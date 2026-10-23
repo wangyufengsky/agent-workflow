@@ -42,7 +42,7 @@ function OutlineRow({
     <li className={styles.outlineRow} data-testid="outline-page">
       <span className={styles.outlineNo}>{n}</span>
       <select
-        className="select"
+        className={`select ${styles.outlineLayout}`}
         aria-label={`${C.page(n)} ${C.layout}`}
         value={page.layout}
         disabled={disabled}
