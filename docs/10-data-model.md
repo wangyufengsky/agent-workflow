@@ -37,6 +37,7 @@
 | repo_path | TEXT UNIQUE | 仓库根目录绝对路径 |
 | default_branch | TEXT | 添加时读取，可改 |
 | check_command | TEXT NULL | 项目检查命令，验收中的 `$PROJECT_CHECK`（见 13 §1） |
+| preview | TEXT(JSON) NULL | 页面预览设置 `ProjectPreview`（29 §4.1，迁移 `0016_project_preview`）：读出时按 `projectPreviewSchema` 解析；null 为没有预览。预览本身只在内存里，不建表 |
 | hosting_provider | TEXT NULL | `HostingProvider` |
 | hosting_base_url | TEXT NULL | 自建 GitLab 地址；GitHub 为空 |
 | hosting_repo | TEXT NULL | `owner/name` 或 GitLab project path |

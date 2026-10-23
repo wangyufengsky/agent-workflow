@@ -52,6 +52,7 @@ import {
   type OpencodeRuntime,
 } from './modules/opencode/index.ts';
 import { createPlansModule } from './modules/plans/index.ts';
+import { createPreviewsModule, type PreviewsService } from './modules/previews/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
 import { createRepositoryModule } from './modules/repository/index.ts';
 import { createRolesModule, type RolesService } from './modules/roles/index.ts';
@@ -97,6 +98,7 @@ export type App = {
     nodes: NodesService;
     inbox: InboxService;
     worktrees: WorktreesService;
+    previews: PreviewsService;
     assistant: AssistantService;
     knowledge: KnowledgeService;
     decks: DecksService;
@@ -224,6 +226,18 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     settings: settings.service,
     dataDir: config.dataDir,
   });
+  const previews = createPreviewsModule({
+    clock,
+    log,
+    events,
+    env,
+    settings: settings.service,
+    projects: projects.service,
+    worktrees: worktrees.service,
+    dataDir: config.dataDir,
+  });
+  // Dev servers end with the backend: nothing else stops them once it is gone.
+  server.addHook('preClose', () => previews.service.stopAll());
   const plans = createPlansModule({ db: database.db, unit, clock, log });
   const deliveries = createDeliveryModule({ db: database.db, unit, clock, log });
   const acceptance = createAcceptanceModule({
@@ -367,6 +381,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...settings.operations,
     ...system.operations,
     ...projects.operations,
+    ...previews.operations,
     ...databases.operations,
     ...roles.operations,
     ...workflows.operations,
@@ -438,6 +453,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       nodes: nodes.service,
       inbox: inbox.service,
       worktrees: worktrees.service,
+      previews: previews.service,
       assistant: assistant.service,
       knowledge: knowledge.service,
       decks: decks.service,

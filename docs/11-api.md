@@ -54,12 +54,14 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | GET | `/projects` | `{ items: ProjectDTO[] }`（按添加时间） |
 | POST | `/projects` | `{ repoPath, name? }` → 201 `ProjectDetailDTO`；`repoPath` 须为仓库根目录的绝对路径（子目录、非仓库、不存在 → 400 `PROJECT_PATH_NOT_GIT_REPO`），读取默认分支（`origin/HEAD`，否则当前分支；HEAD 游离且无 `origin/HEAD` → 400 `GIT_BASE_BRANCH_NOT_FOUND`），推断检查命令（13 §1） |
 | GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting` + 关联的数据库连接 `dbConnectionIds`（M5-07）+ 总是允许的 bash 模式 `allowedBash: string[]`（按记下的时间，D101） |
-| PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand?: string \| null }`；分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND` |
+| PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand?: string \| null, preview?: ProjectPreview \| null }`；分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND`；`preview` 为页面预览设置（29 §4.1：`command`、`setupCommand`、`readyPath`、`pages`、`extraOrigins`），`extraOrigins` 每项须为来源（`http(s)://主机[:端口]`），否则 400 |
 | DELETE | `/projects/:id` | 有非终态任务时 409 `PROJECT_HAS_ACTIVE_TASKS` |
 | PUT | `/projects/:id/hosting` | `{ provider, baseUrl?, repo, token }`（`token` 为凭据字段）→ `ProjectDetailDTO`；保存前调用平台 API 读取该仓库验证令牌（令牌无效或看不到仓库 401 `HOSTING_AUTH_FAILED`，其他失败 502 `HOSTING_API_ERROR`），通过后加密保存（再次绑定替换原令牌）。GitHub 忽略 `baseUrl`；GitLab 不填即 gitlab.com |
 | DELETE | `/projects/:id/hosting` | 解除绑定并删除凭据 → `ProjectDetailDTO`；删除项目时同样删除其凭据 |
 | DELETE | `/projects/:id/allowed-bash` 🅿 | `?pattern=` 撤销一条总是允许的 bash 模式 → `ProjectDetailDTO`；不存在的模式不报错。之后新建的会话重新询问，运行中的会话不变（D101）。模式只由「需要你处理」中权限条目的「总是允许」添加（§7），没有添加接口 |
 | PUT | `/projects/:id/db-connections` 🅿 | `{ connectionIds: string[] }` 覆盖关联 → `ProjectDetailDTO`；不存在的连接 404 `DB_CONNECTION_NOT_FOUND`。项目的 AI 会话只能用关联的连接（12 §6.9） |
+
+`ProjectDTO.preview` 为页面预览设置，添加项目时按 `package.json` 推断（29 §4.1），没有可推断的脚本时为 null。
 
 远端 `repo` 默认从 `git remote get-url origin` 推断（`inferredHosting`：`github.com` → GitHub，其他主机 → GitLab，非 `gitlab.com` 时 `baseUrl = https://<host>`），前端预填。
 
@@ -300,6 +302,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `assistant.open_form` | `{ conversationId, form: AssistantForm, values }` | 助手调用 `open_form`：打开表单并预填（不含凭据字段） |
 | `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
 | `knowledge.updated` | `{ conversationId }` | 知识问答：新一轮、答案提交、一轮结束、权限请求等待或已处理、删除时；对话与列表重新拉取（研究过程与流式回答的草稿沿用 `attempt.transcript`：研究尝试的正文每 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 个字符推送一次，草稿 = 最后一个非提交工具调用之后的正文，18 §5.5） |
+| `preview.updated` | `Preview`（`{ taskId, state, url, logTail }`） | 页面预览（v1.3，29 §4.2）：每次状态变化后；任务页的预览页签直接用它更新 |
 | `schedule.updated` | `{ scheduleId }` | 定时任务（v1.2）：创建、修改、暂停 / 恢复、每次运行、删除后；定时任务列表与详情重新拉取（查询挂在任务列表前缀下，开出的任务状态变化也会刷新，22 §9） |
 | `git_review.updated` | `{ reviewId, projectId }` | Git 工作台的审查开始、提交问题、结束时；审查与列表重新拉取（27 §7.4） |
 | `deck.updated` | `{ deckId }` | PPT：AI 工作开始与结束、每次提交通过、权限请求等待或已处理、页面修改、删除时；PPT 与列表重新拉取（23 §8） |
@@ -374,6 +377,17 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/schedules/:id/resume` | `schedules.resume` | write | `paused → active`，从现在起算下一次；关闭该定时任务的 `schedule_failure` 条目 |
 | POST | `/schedules/:id/run` | `schedules.run` | write | 立即运行一次（`trigger = manual`，不改计划时刻）→ `ScheduleDetailDTO`；上一次的任务未结束 409 `SCHEDULE_BUSY`；开不了任务时直接返回错误（不自动暂停） |
 | DELETE | `/schedules/:id` | `schedules.delete` | critical | 204；运行记录随之删除，开出的任务保留 |
+
+## 13f. 页面预览（v1.3，29 §4）
+
+`mode = simple`，本期不进命令面板与助手（助手在 B3 接入）。
+
+| 方法 | 路径 | 操作 | 风险 | 说明 |
+| --- | --- | --- | --- | --- |
+| GET | `/tasks/:taskId/preview` | `previews.get` | read | `Preview`：`{ taskId, state, url, logTail }`；没有启动过的为 `stopped` |
+| POST | `/tasks/:taskId/preview/start` | `previews.start` | write | 启动（或等待正在进行的启动）到就绪 → `Preview`。任务没有就绪的 worktree 409 `STATE_TRANSITION_INVALID`；项目没有预览设置 409 `PREVIEW_NOT_CONFIGURED`；没能就绪 502 `PREVIEW_START_FAILED`（`details.logTail`）；达到上限且都有标签页在用 409 `PREVIEW_LIMIT_REACHED` |
+| POST | `/tasks/:taskId/preview/stop` | `previews.stop` | write | → `Preview`（`stopped`） |
+| POST | `/projects/:projectId/preview/trial` | `previews.trial` | write | 在主工作区启动一次（不运行安装命令），就绪后立即停止 → `{ url, logTail }`；没能就绪 502 `PREVIEW_START_FAILED` |
 
 ## 13e. PPT（v1.2）
 

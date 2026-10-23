@@ -128,6 +128,8 @@ export const COMMIT_DRAFT_DIFF_MAX_BYTES = 60_000;
 export const COMMIT_DRAFT_TIMEOUT_MS = 120_000;
 /** Page previews (29 §4): starting one, probing its ready path, the log tail kept when it fails, its key pages. */
 export const PREVIEW_START_TIMEOUT_MS = 120_000;
+/** The setup command (dependency install) of a worktree's first start; a cold install takes minutes. */
+export const PREVIEW_SETUP_TIMEOUT_MS = 600_000;
 export const PREVIEW_PROBE_INTERVAL_MS = 1000;
 export const PREVIEW_LOG_TAIL_CHARS = 4000;
 export const PREVIEW_PAGES_MAX = 10;

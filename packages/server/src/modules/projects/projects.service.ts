@@ -22,7 +22,7 @@ import type { CredentialsService } from '../credentials/index.ts';
 import type { DatabasesService } from '../databases/index.ts';
 import { branchExists, readDefaultBranch, readOriginUrl, readRepoRoot } from '../git/index.ts';
 import { createHostingProvider, type GitHostingProvider, type HostingEndpoints } from '../hosting/index.ts';
-import { inferRepoCheckCommand, parseRemoteUrl } from './projects.inference.ts';
+import { inferRepoCheckCommand, inferRepoPreview, parseRemoteUrl } from './projects.inference.ts';
 import { createProjectsRepo } from './projects.repo.ts';
 
 export type ProjectsServiceDeps = {
@@ -107,6 +107,7 @@ export function createProjectsService({ db, clock, credentials, databases, hosti
         repoPath,
         defaultBranch,
         checkCommand: await inferRepoCheckCommand(repoPath),
+        preview: await inferRepoPreview(repoPath),
         createdAt: now,
         updatedAt: now,
       });

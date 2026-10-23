@@ -81,6 +81,7 @@ import {
   listKnowledgeOp,
   stopKnowledgeOp,
 } from './knowledge.ts';
+import { getPreviewOp, startPreviewOp, stopPreviewOp, trialPreviewOp } from './previews.ts';
 import {
   clearProjectHostingOp,
   createProjectOp,
@@ -169,6 +170,7 @@ export * from './git-reviews.ts';
 export * from './inbox.ts';
 export * from './insights.ts';
 export * from './knowledge.ts';
+export * from './previews.ts';
 export * from './projects.ts';
 export * from './schedules.ts';
 export * from './settings.ts';
@@ -196,6 +198,10 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   clearProjectHostingOp,
   setProjectDbConnectionsOp,
   removeProjectAllowedBashOp,
+  getPreviewOp,
+  startPreviewOp,
+  stopPreviewOp,
+  trialPreviewOp,
   listDbConnectionsOp,
   createDbConnectionOp,
   updateDbConnectionOp,

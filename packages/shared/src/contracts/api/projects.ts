@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { hostingProviderSchema } from '../../enums/git.ts';
+import { projectPreviewSchema } from './previews.ts';
 
 export const hostingRefSchema = z.object({
   provider: hostingProviderSchema,
@@ -20,6 +21,8 @@ export const projectSchema = z.object({
   checkCommand: z.string().nullable(),
   /** Bound remote (M4-05); only whether a token is stored is exposed. */
   hosting: hostingRefSchema.extend({ hasToken: z.boolean() }).nullable(),
+  /** Page preview settings (29 §4.1); null when the project has no preview. */
+  preview: projectPreviewSchema.nullable(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -47,6 +50,7 @@ export const updateProjectRequestSchema = z.object({
   name: z.string().trim().min(1).optional(),
   defaultBranch: z.string().min(1).optional(),
   checkCommand: z.string().trim().min(1).nullable().optional(),
+  preview: projectPreviewSchema.nullable().optional(),
 });
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
 

@@ -189,7 +189,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `BrowserActionFailure` | `not_visible` · `covered` · `disabled` · `detached` · `not_focusable` | `BROWSER_ACTION_FAILED.details.reason`（29 §5.5） |
 | `BrowserBlockReason` | `not_allowed` · `read_only` | main 拦下请求的原因（29 §5.4） |
 
-网站规则 `siteRuleSchema`（`{ pattern, access }`，`*` 代表任意字符、整个主机名不区分大小写匹配）、`urlAccess(url, policy)`（预览来源 → 预览，否则第一条匹配的网站规则，都不是为 null）与 `blockReason(request, policy, readOnlyEnforced)` 在 `browser/policy.ts`，main 与后端共用。
+网站规则 `siteRuleSchema`（`{ pattern, access }`，`*` 代表任意字符、整个主机名不区分大小写匹配）、`urlAccess(url, policy)`（预览来源 → 预览，否则第一条匹配的网站规则，都不是为 null）与 `blockReason(request, policy, readOnlyEnforced)` 在 `browser/policy.ts`，main 与后端共用。`ServerEventType` 另有 `preview.updated`（11 §11）。
 
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 
@@ -308,6 +308,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `SLIDE_TEXT_LIMITS` | 各版式字段的字数与条数上限（标题 40、要点每条 60 至多 6 条、卡片 2–4 张、步骤 2–6 步、表格 2–5 列 1–8 行、代码 16 行每行 80 字……），按 1280×720 画布与最小字号定；`submit_slide` 与手动修改共用（`slideContentSchema`） |
 | `SLIDE_FIT_MIN_SCALE` | 0.8（文字放不下时先缩到的最小比例，之后提示「文字可能放不下」，23 §5.4） |
 | `PREVIEW_START_TIMEOUT_MS` / `PREVIEW_PROBE_INTERVAL_MS` | 120000 / 1000（页面预览就绪的时限与探测间隔，29 §4.2） |
+| `PREVIEW_SETUP_TIMEOUT_MS` | 600000（worktree 第一次启动前的安装命令） |
 | `PREVIEW_LOG_TAIL_CHARS` | 4000（预览起不来时保留的日志末尾） |
 | `PREVIEW_PAGES_MAX` | 10（项目预览配置的关键页面数） |
 | `BROWSER_ACTION_TIMEOUT_MS` | 5000（等目标可以点中，29 §5.5） |

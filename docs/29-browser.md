@@ -116,11 +116,11 @@
 | `pages` | 关键页面，页面体检的默认页面，1–10 个 | `["/", "/orders"]` |
 | `extraOrigins` | 额外允许的来源，如另起的本地接口服务 | `["http://127.0.0.1:8080"]` |
 
-**添加项目时推断**（与 `checkCommand` 的推断同处，13 §1），用户可改、可清空：
+**添加项目时推断**（与 `checkCommand` 的推断同处：`projects/projects.inference.ts`，13 §1），用户可改、可清空：
 
 | 仓库特征 | `command` | `setupCommand` |
 | --- | --- | --- |
-| `package.json` 的 `dev` 脚本含 `vite` | pnpm：`pnpm run dev --port $PORT --strictPort`；npm：`npm run dev -- --port $PORT --strictPort`；yarn：`yarn dev --port $PORT --strictPort` | 按锁文件：`pnpm install --frozen-lockfile` / `npm ci` / `yarn install --frozen-lockfile` |
+| `package.json` 的 `dev` 脚本含 `vite` | pnpm：`pnpm run dev --port $PORT --strictPort`；npm：`npm run dev -- --port $PORT --strictPort`；yarn / bun：`yarn run dev` / `bun run dev` 加同样的参数（未实测） | 按锁文件：`pnpm install --frozen-lockfile` / `npm ci` / `yarn install --frozen-lockfile` |
 | 其他有 `dev` 或 `start` 脚本的（含 Next、Create React App） | `<pm> run dev`（只靠 `PORT` 环境变量，Next 与 CRA 都读它） | 同上 |
 | 其他（Java、Go…） | 不推断 | — |
 
@@ -139,10 +139,10 @@ stopped ──start──▶ starting ──ready──▶ running ──stop / 
 failed ──start──▶ starting
 ```
 
-- **启动**：第一次需要时启动（AI 调用浏览器工具、页面体检、用户点「打开预览」、助手 `previews.start`）。`setupCommand` 只在这个 worktree 第一次启动时运行，成功后记在内存里；应用重启后再运行一次（依赖已装好时很快）。
+- **启动**：第一次需要时启动（AI 调用浏览器工具、页面体检、用户点「打开预览」、助手 `previews.start`）。`setupCommand` 只在这个 worktree 第一次启动时运行（最长 `PREVIEW_SETUP_TIMEOUT_MS`，600000），成功后记在内存里；应用重启后再运行一次（依赖已装好时很快）。
 - **就绪**：每次进程输出新内容时，以及每 `PREVIEW_PROBE_INTERVAL_MS`（1000）请求一次 `readyPath`，得到任何 HTTP 响应（包括 404、500）即 `running`。超过 `PREVIEW_START_TIMEOUT_MS`（120000）或进程退出则 `failed`，保留日志末尾 `PREVIEW_LOG_TAIL_CHARS`（4000）字符。
 - **日志**：stdout / stderr 写到 `runs/<taskId>/preview.log`。
-- **停止**：任务进入终态、worktree 删除、应用退出时停止。没有浏览器会话、没有活动尝试的时间达到设置 `preview.idleMinutes`（默认 10）也会停止。停止时结束整棵进程树（`core/platform.ts`，与检查命令同一套实现，17 §3）。
+- **停止**：worktree 删除前（`worktrees.onBeforeRemove`；任务合并或取消时删除 worktree）、应用退出时停止。没有标签页在用的时间达到设置 `preview.idleMinutes`（默认 10）也会停止：浏览器会话打开时登记使用（`acquire`）、关闭时注销（`release`），AI 的标签页随尝试结束关闭，所以「没有标签页在用」已包含没有活动尝试在用。停止时结束整棵进程树（execa `killDescendants`，与检查命令同一套实现，17 §3）。状态每次变化发 SSE `preview.updated`。
 
 ### 4.3 端口
 
@@ -152,7 +152,7 @@ failed ──start──▶ starting
 
 设置 `preview.maxRunning`（默认 3）。开发服务器很占内存，批量任务时尤其明显。
 
-- 达到上限时，先停掉最久没用、且没有活动尝试的预览；
+- 达到上限时，先停掉没有标签页在用、空闲最久的预览；
 - 都在用时，AI 的工具返回 `PREVIEW_LIMIT_REACHED`（提示：不用浏览器继续，并在 notes 里说明没有做页面验证）；
 - 页面体检则排队，等有空位再开始，计入检查用时，不算失败。
 
@@ -466,7 +466,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 项目设置新增一节，字段同 §4.1。
 
 - 推断出的值预填，旁注「根据 package.json 推断」；
-- 「试运行」：在主工作区启动一次并打开 `readyPath`，显示成功或日志末尾，结束后停止；
+- 「试运行」：在主工作区启动一次（不运行安装命令：主工作区是用户自己的，依赖由用户维护）并等 `readyPath` 就绪，显示成功或日志末尾，结束后停止；
 - 简单模式只显示启动命令和关键页面，其余字段折叠在「更多设置」里。
 
 ### 8.6 设置「网站」
@@ -527,8 +527,8 @@ packages/shared/src/
   fsm/preview.machine.ts          previewMachine
   browser/policy.ts               网站规则、urlAccess、blockReason（main 与后端共用）
 packages/server/src/modules/
-  previews/                       推断（previews.infer.ts，纯函数）、进程（previews.process.ts，经 core/platform.ts）、
-                                  服务（启动 / 就绪 / 空闲 / 上限）、操作
+  previews/                       进程（previews.process.ts：安装、端口、启动、就绪探测、超时）、
+                                  服务（状态机、空闲、上限、worktree 删除前停止）、操作；推断在 projects/projects.inference.ts
   browser/                        宿主（browser.host.ts 接口，host.electron.ts，host.chromium.ts 仅开发）、
                                   会话（browser.sessions.ts）、动作层（browser.actions.ts + browser.settle.ts 纯函数）、
                                   快照（browser.snapshot.ts，纯函数：AX 树 → 文本）、体检（browser.check.ts + pageCheckVerdict）、
@@ -570,7 +570,7 @@ packages/builtin/prompts/         protocol-execute / protocol-review / protocol-
 按 07 的原则：测行为，用真实的 Chromium 和真实的进程，不 mock CDP。
 
 - **单元**：
-  - `previews.infer`：用表格驱动，输入是固定的 `package.json` 和锁文件；
+  - `inferPreview`（`projects.inference.ts`）：用表格驱动，输入是固定的 `package.json` 和锁文件；
   - `pageCheckVerdict`：每条判定规则；
   - `browser.settle` 和「点中」判断：输入事件序列与注入时钟；
   - `browser.snapshot`：输入是从真实 Chromium 录下的无障碍树（固定文件），断言精简规则和截断；

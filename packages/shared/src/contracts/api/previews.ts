@@ -33,3 +33,7 @@ export const previewSchema = z.object({
   logTail: z.string(),
 });
 export type Preview = z.infer<typeof previewSchema>;
+
+/** A trial run in the project's main workspace became ready and was stopped again (29 §8.5). */
+export const previewTrialSchema = z.object({ url: z.string(), logTail: z.string() });
+export type PreviewTrial = z.infer<typeof previewTrialSchema>;
