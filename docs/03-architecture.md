@@ -330,3 +330,16 @@ export function taskOperations(tasks: TasksService) {
 preload 通过主进程提供的窗口标记区分 `main`、`companion` 和辅助窗口（`null`）；PDF 导出等辅助窗口不配置桌宠、不参与跨窗会话选择或桌宠提醒。主窗口负责向原生层发出系统通知，桌宠保留自身的可见提醒队列。
 
 `features/companion` 集中提供极光 WebGL 流动／CSS 状态动画／静态降级和鲸鱼 WebM 适配，语义动作与素材解耦；设置默认光球。无新增运行时依赖。临时鲸鱼素材的来源／哈希／使用限制放在 `public/companion/whale`，后续原创替换不改变助手 API。碎碎念通过既有 opencode 客户端新建无工具临时会话，单次超时与取消后清理；不混入持久助手历史。
+
+## 11. 待实施架构增量：附件与需求验收清单
+
+[30](30-attachments.md) / [31](31-requirements-checklist.md) 的设计约束（精简版），源码尚未增加这些模块。
+
+- `attachments`：保存、校验、正文分页读取、引用、清理。只接收所有者（kind + id）与允许读取的根目录，不依赖 `tasks`、`assistant`。记录存在即可用，没有上传／处理状态机。
+- `requirements`：清单版本、逐项结论记录、显示状态纯函数；只依赖底层设施，不依赖 `tasks`、`nodes`、`acceptance`。
+- `tasks` 组合二者：绑定附件、编辑时机守卫、物化时追加核验节点（`NodeKind.Verify`）、节点完成时写结论、交付时的清单摘要。`assistant` 在自己的事务里绑定附件。`attempts` 只接收所有者准备好的附件，不反查所有者。
+- `nodes`：只有 `NodeKind.Verify` 的检查「只记录不拦截」；其他节点不变。
+- 首版只有文本附件，`opencode` 适配层不变。
+- 不新增 `AttemptKind`、`AcceptanceCheckKind`、`TaskStatus`、调度队列或通用文件服务层。
+- 数据目录新增 `attachments/<id>/original`；附件不写进 Git worktree。
+- 上传与原件读取是认证的二进制非清单路由（与 `attempts.routes.ts` 的会话记录路由同类）；其余为操作清单中的 JSON 操作。

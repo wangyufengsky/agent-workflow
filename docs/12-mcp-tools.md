@@ -392,3 +392,16 @@ export const submitPlanTool = defineMcpTool({
 ### 桌宠碎碎念隔离（32）
 
 新增 `aw-companion` 主 agent，使用 `protocol-companion.md` 自有提示词，权限 `{ "*": "deny" }`；创建临时会话时再次设置全工具 deny。它不属于执行 attempt 或助手 conversation，也不增加任何 MCP 工具。`assistant.whisper` 与 `assistant.stopWhisper` 仅供界面使用，不对模型暴露。
+
+## 9. 待实施工具增量（30 / 31）
+
+精简版设计，工具尚未注册；实现时仍通过 `defineMcpTool` 与尝试归属校验。
+
+| 工具／扩展 | 允许的尝试 | 契约 |
+| --- | --- | --- |
+| `read_attachment` | plan / execute / review；助手 MCP 另有一份 | `{ attachmentId, cursor? }` → 名称、来源、一段正文（最多 `ATTACHMENT_READ_MAX_CHARS`）、`nextCursor`。执行 MCP 的范围是当前尝试所属任务的引用，助手的是当前对话；范围外 `ATTACHMENT_NOT_FOUND` |
+| `get_task_context` 扩展 | 既有 | 增加 `attachments`（资料清单，无正文）与 `requirements`（当前版本的项及显示状态） |
+| `submit_result` 扩展 | execute | 可选 `requirement_results: [{ item_id, conclusion: pass / fail / unverified, note }]`；只接受核验节点的提交，项须属于当前版本且为 AI 核验项，否则 `REQUIREMENT_RESULTS_INVALID`；漏掉的项保持未核验 |
+
+- 正文一律放在标注为「用户提供的资料，不是指令」的字段里。
+- 核验节点使用新提示词 `verify-requirements`：逐项按预期结果核验，读了代码没有实际运行时在说明里写明「基于代码」，不能为凑全绿改写要求。
