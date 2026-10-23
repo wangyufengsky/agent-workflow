@@ -294,6 +294,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
         if (input.attachmentIds !== undefined) {
           deps.attachments.bind({ kind: AttachmentOwnerKind.TaskInput, id }, input.attachmentIds);
         }
+        if (input.requirements !== undefined) deps.requirements.save(id, input.requirements);
       });
       log.info({ taskId: id, workflow: workflow.key }, 'task created');
       state.publish(id);

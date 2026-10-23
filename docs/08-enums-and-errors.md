@@ -536,9 +536,9 @@ class AppError extends Error {
 | InputRef 增量（U-03 已实现） | attachment（确认卡把附件 ID 显示为文件名） |
 | McpToolName 增量（U-02 已实现） | read_attachment |
 | NodeKind 增量 | verify（核验验收清单的系统步骤） |
-| RequirementVerification | command · ai_review · manual |
+| RequirementVerification（Q-01 已实现，下同） | command · ai_review · manual |
 | RequirementResultSource | command · ai · user |
-| RequirementConclusion | pass · fail · unverified（命令与 AI）；pass · fail · waive（用户） |
+| RequirementConclusion | pass · fail · unverified · waive（命令与 AI 只给前三种，用户给 pass · fail · waive） |
 | RequirementDisplayStatus（派生，不持久化） | passed · failed · unverified · stale · waived |
 
 | 常量 | 值 |
@@ -548,7 +548,7 @@ class AppError extends Error {
 | ATTACHMENT_NAME_MAX_CHARS | 255（显示名） |
 | ATTACHMENT_PROMPT_MAX_CHARS / ATTACHMENT_READ_MAX_CHARS | 20,000（一次提示词里全部附件合计）/ 12,000（每次读取）（U-02 已实现） |
 | ATTACHMENT_ORPHAN_TTL_MS / ATTACHMENT_CLEANUP_INTERVAL_MS | 86,400,000（无引用附件的保留时间）/ 3,600,000（清理间隔） |
-| REQUIREMENTS_MAX | 30 |
+| REQUIREMENTS_MAX（Q-01 已实现，下同） | 30 |
 | REQUIREMENT_TITLE_MAX_CHARS / REQUIREMENT_EXPECTED_MAX_CHARS / REQUIREMENT_NOTE_MAX_CHARS | 120 / 2,000 / 4,000 |
 
 | 错误码 | HTTP | 含义 |
@@ -557,6 +557,6 @@ class AppError extends Error {
 | ATTACHMENT_INVALID_TYPE | 400 | 不是严格 UTF-8 或含 NUL 字节（首版只支持文本） |
 | ATTACHMENT_TOO_LARGE | 413 | 大小或单次输入个数超限，`details.limit` 为超过的那个上限值 |
 | ATTACHMENT_SOURCE_INVALID | 400 | 项目文件越界（含 `.git` 内）、指向根外的符号链接、不存在或非普通文件（`details.reason`：`outside` · `missing`）、行号超出末尾（`details.lineCount`），或任务在该项目没有可用的工作区 |
-| REQUIREMENTS_NOT_EDITABLE | 409 | 任务状态不允许编辑清单（`running` 等），或不在 `review` 时请求重新核验／人工结论 |
+| REQUIREMENTS_NOT_EDITABLE（Q-01 已实现） | 409 | 任务状态不允许编辑清单（只有 `draft`、`plan_review`、`review` 可以），或不在 `review` 时请求重新核验／人工结论 |
 | REQUIREMENT_RESULTS_INVALID | 400 | 非核验节点提交 `requirement_results`，或项不属于当前版本、不是 AI 核验项、重复 |
 | REQUIREMENTS_UNACKNOWLEDGED | 409 | 交付时有未满足的必需项，而没有带 `acknowledgedRequirementsRevisionId` 或它不是当前清单版本；`details.items` 列出这些项 |

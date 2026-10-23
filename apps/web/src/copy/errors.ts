@@ -102,4 +102,5 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.AttachmentInvalidType]: '目前只支持文本文件（UTF-8 编码），图片和其他格式请改用文字描述。',
   [ErrorCode.AttachmentTooLarge]: '资料太大或太多了：每次最多 10 个，单个不超过 5 MB。',
   [ErrorCode.AttachmentSourceInvalid]: '读不了这个文件：它不在项目目录里、不是普通文件或已不存在。',
+  [ErrorCode.RequirementsNotEditable]: '任务正在执行，现在不能修改验收清单；等它停下或进入待合并再改。',
 };

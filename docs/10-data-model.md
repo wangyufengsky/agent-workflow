@@ -566,9 +566,8 @@ payload / response：
 
 | 表／字段 | 关键字段／约束 |
 | --- | --- |
-| tasks.requirements_revision_id | 可空 FK；没有清单的任务为 null |
-| requirement_revisions | id、task_id FK、seq、items JSON、created_at；UNIQUE(task_id, seq)；只追加 |
-| requirement_results | id、task_id FK、revision_id FK、item_id、source、conclusion、note、output（命令输出末尾，按既有输出上限截断）、node_id 可空（用户结论为 null）、commit_sha、created_at；只追加 |
+| requirement_revisions | id、task_id FK（级联）、seq、items JSON、created_at；UNIQUE(task_id, seq)；只追加。当前版本就是 seq 最大的一条，任务表不另存（迁移 0018，Q-01 已实现） |
+| requirement_results | id、task_id FK（级联）、revision_id FK（级联）、item_id、source、conclusion、note、output（命令输出末尾，按既有输出上限截断）、node_id 可空（用户结论为 null，不设外键）、commit_sha、created_at；只追加，按插入顺序读取（同一毫秒的两条不靠时间区分）（表已建，写入在 Q-02 / Q-03） |
 | deliveries.requirements_summary | 可空 JSON：revisionId、commitSha、逐项显示状态；旧交付为 null |
 
 items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`expected`、`required`、`verification`（`{ kind: 'command', command }` / `{ kind: 'ai_review' }` / `{ kind: 'manual' }`）。核验节点的命令检查在节点 acceptance 中带 `requirementItemId`，用于把检查结果对应到项。

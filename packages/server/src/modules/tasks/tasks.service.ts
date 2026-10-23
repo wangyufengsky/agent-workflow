@@ -29,6 +29,7 @@ import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
 import type { StatusMatch } from './tasks.repo.ts';
+import { createTaskRequirements } from './tasks.requirements.ts';
 import { createTaskResults } from './tasks.result.ts';
 import { createTaskReview } from './tasks.review.ts';
 import { createTaskState, type TasksServiceDeps } from './tasks.state.ts';
@@ -40,6 +41,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   const lifecycle = createTaskLifecycle(deps, state);
   const results = createTaskResults(deps, state);
   const context = createTaskContext(deps, state);
+  const requirements = createTaskRequirements(deps, state);
   const actions = createTaskActions(deps, state, lifecycle);
   const checks = createTaskChecks(deps, state, lifecycle);
   const diffs = createTaskDiffs(deps, state);
@@ -281,6 +283,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     deleteWorkflow: actions.deleteWorkflow,
     deleteRole: actions.deleteRole,
     ...context,
+    ...requirements,
     submitPlan: lifecycle.submitPlan,
     startPlanning: lifecycle.startPlanning,
     finishRunning: results.finishRunning,

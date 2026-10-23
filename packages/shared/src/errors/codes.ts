@@ -119,6 +119,8 @@ export const ErrorCode = {
   AttachmentInvalidType: 'ATTACHMENT_INVALID_TYPE',
   AttachmentTooLarge: 'ATTACHMENT_TOO_LARGE',
   AttachmentSourceInvalid: 'ATTACHMENT_SOURCE_INVALID',
+  // 需求验收清单（31）
+  RequirementsNotEditable: 'REQUIREMENTS_NOT_EDITABLE',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 export const ERROR_CODES = Object.values(ErrorCode);
@@ -223,6 +225,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.AttachmentInvalidType]: 400,
   [ErrorCode.AttachmentTooLarge]: 413,
   [ErrorCode.AttachmentSourceInvalid]: 400,
+  [ErrorCode.RequirementsNotEditable]: 409,
 } as const satisfies Record<ErrorCode, number | null>;
 
 /** `{ code, message, details? }` as stored on tasks / attempts and returned in HTTP error bodies. */

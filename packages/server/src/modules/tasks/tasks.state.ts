@@ -36,6 +36,7 @@ import type { KnowledgeService } from '../knowledge/index.ts';
 import type { NodeRunContext, NodesService } from '../nodes/index.ts';
 import type { PlansService } from '../plans/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
+import type { RequirementsService } from '../requirements/index.ts';
 import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { recordTaskEvent } from '../timeline/index.ts';
@@ -58,6 +59,7 @@ export type TasksServiceDeps = {
   nodes: NodesService;
   attempts: AttemptsService;
   attachments: AttachmentsService;
+  requirements: RequirementsService;
   inbox: InboxService;
   deliveries: DeliveriesService;
   databases: DatabasesService;
