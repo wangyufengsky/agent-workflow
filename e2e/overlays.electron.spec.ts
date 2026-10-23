@@ -50,7 +50,7 @@ test('网站登录的标签页在 ⌘K 打开时离开窗口，关闭后回来',
     await expect(page.getByRole('dialog')).toBeHidden();
     await expect.poll(views).toBe((alone ?? 0) + 1);
 
-    await page.getByRole('button', { name: '完成' }).click();
+    await page.getByRole('button', { name: '完成', exact: true }).click();
     await expect.poll(views).toBe(alone);
   } finally {
     await app.close();

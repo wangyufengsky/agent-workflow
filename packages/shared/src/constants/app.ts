@@ -18,6 +18,9 @@ export const OPENCODE_AGENT_NAME = {
 } as const satisfies Record<SessionAgent, string>;
 /** The app assistant's agent (15 §2); not a role base agent. */
 export const OPENCODE_ASSISTANT_AGENT = 'aw-assistant';
+export const OPENCODE_COMPANION_AGENT = 'aw-companion';
+export const COMPANION_WHISPER_TIMEOUT_MS = 60_000;
+export const COMPANION_WHISPER_MAX_CHARS = 120;
 export const MCP_SERVER_NAME = 'agent-workflow';
 export const MCP_ASSISTANT_SERVER_NAME = 'agent-workflow-app';
 export const TASK_KEY_PREFIX = 'T-';
@@ -32,6 +35,10 @@ export const PROJECT_SLUG_MAX = 40;
 export const API_PREFIX = '/api/v1';
 export const MCP_EXEC_PATH = '/mcp/exec';
 export const MCP_ASSISTANT_PATH = '/mcp/assistant';
+/** Attachment originals under the data directory (30 §3.1): `attachments/<id>/original`. */
+export const ATTACHMENTS_DIR = 'attachments';
+/** Request header carrying an upload's URL-encoded display name (11 §14.1). */
+export const ATTACHMENT_NAME_HEADER = 'x-attachment-name';
 /**
  * Assistant working directory under the data directory (03 §7): its sessions run there; generated files go to
  * `files/<conversationId>/`, message streams to `conversations/<conversationId>.jsonl`.

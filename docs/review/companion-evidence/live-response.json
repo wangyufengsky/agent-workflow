@@ -1,0 +1,31 @@
+{
+  "model": "opencode-go/deepseek-v4.1-flash",
+  "whisper": {
+    "text": "今天想喝杯热可可，甜甜的那种。"
+  },
+  "transcript": {
+    "entries": [
+      {
+        "seq": 1,
+        "ts": 1792739109654,
+        "kind": "user_message",
+        "data": {
+          "text": "这是桌宠连接测试，请只回复：桌宠对话已连通。不需要调用工具。"
+        }
+      },
+      {
+        "seq": 2,
+        "ts": 1792739131440,
+        "partId": "prt_167943ff3001rNGNdusMIhP0mC",
+        "kind": "text",
+        "data": {
+          "text": "桌宠对话已连通。",
+          "offset": 0
+        }
+      }
+    ],
+    "lastSeq": 2,
+    "hasMore": false,
+    "done": false
+  }
+}

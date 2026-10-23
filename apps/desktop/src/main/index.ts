@@ -4,6 +4,7 @@ import { APP_LICENSE, APP_SOURCE_URL, browserRectSchema, type LaunchPreferences 
 import { splashBackground, splashHtml } from '@aw/web/splash';
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell, type WebPreferences } from 'electron';
 import { type Backend, startBackend } from './backend.ts';
+import { createCompanionHost } from './companion.ts';
 import { serveExports } from './export.ts';
 import { readLaunchPreferences, writeLaunchPreferences } from './launch.ts';
 
@@ -12,6 +13,7 @@ const LAUNCH_FILE = 'launch.json';
 
 const isDev = process.env.ELECTRON_RENDERER_URL !== undefined;
 let backend: Backend | undefined;
+let companion: ReturnType<typeof createCompanionHost> | undefined;
 
 type Window = { win: BrowserWindow; webPreferences: WebPreferences };
 
@@ -33,7 +35,10 @@ function createWindow(apiToken: string, launch: LaunchPreferences): Window {
     minWidth: 1024,
     minHeight: 700,
     backgroundColor: splashBackground(launch),
-    webPreferences,
+    webPreferences: {
+      ...webPreferences,
+      additionalArguments: [...webPreferences.additionalArguments, '--aw-main-window'],
+    },
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   return { win, webPreferences };
@@ -43,6 +48,7 @@ function createWindow(apiToken: string, launch: LaunchPreferences): Window {
 async function openApp({ win, webPreferences }: Window, b: Backend): Promise<void> {
   const url = process.env.ELECTRON_RENDERER_URL ?? `http://127.0.0.1:${b.port}/`;
   serveExports(url, webPreferences);
+  companion = createCompanionHost(win, url, webPreferences, () => app.quit());
   // Never navigate the privileged window away from the app; open external links in the browser.
   win.webContents.on('will-navigate', (event, target) => {
     if (!target.startsWith(url)) event.preventDefault();
@@ -106,6 +112,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => app.quit());
+app.on('before-quit', () => companion?.beforeQuit());
 app.on('will-quit', (event) => {
   const running = backend;
   if (running === undefined) return;

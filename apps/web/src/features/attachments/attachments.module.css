@@ -1,0 +1,165 @@
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.draft {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.card {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--fill-2);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+/* A sent attachment is a button of its own; it has no remove button to leave room for. */
+button.card {
+  padding-right: 10px;
+}
+
+button.card:hover,
+.open:hover {
+  color: var(--ink);
+}
+
+.draft[data-state="failed"] .card {
+  background: var(--danger-fill);
+  box-shadow: inset 0 0 0 1px var(--danger-line);
+}
+
+.open {
+  display: inline-flex;
+  min-width: 0;
+  color: inherit;
+}
+
+.fileName {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 240px;
+}
+
+.fileBase {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileExt {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.meta {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.remove {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  transition: background var(--t-fast);
+}
+
+.add:hover {
+  background: var(--fill-3);
+  color: var(--ink-2);
+}
+
+.preview {
+  max-height: 50vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--fill-2);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.crumb {
+  color: var(--accent);
+}
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 4px;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.entry:hover {
+  background: var(--fill-2);
+}
+
+.entry[aria-pressed="true"] {
+  background: var(--accent-fill);
+  color: var(--accent-ink);
+}

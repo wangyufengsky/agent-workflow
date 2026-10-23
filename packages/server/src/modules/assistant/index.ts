@@ -1,5 +1,11 @@
 import type { Prompts } from '@aw/builtin';
-import { type GetAppStatusOutput, MCP_ASSISTANT_PATH, MCP_ASSISTANT_SERVER_NAME } from '@aw/shared';
+import {
+  attachmentIdsSchema,
+  createTaskOp,
+  type GetAppStatusOutput,
+  MCP_ASSISTANT_PATH,
+  MCP_ASSISTANT_SERVER_NAME,
+} from '@aw/shared';
 import type { FastifyInstance } from 'fastify';
 import { registerMcpEndpoint } from '../../core/http/mcp-endpoint.ts';
 import type { OperationImpl } from '../../core/operations/operations.ts';
@@ -17,7 +23,10 @@ import { createKnowledgeRelay, KNOWLEDGE_QUESTION_OPS } from './assistant.knowle
 import { assistantOperations } from './assistant.operations.ts';
 import { registerAssistantRoutes } from './assistant.routes.ts';
 import { type AssistantServiceDeps, createAssistantService } from './assistant.service.ts';
+import { createAssistantSnapshots } from './assistant.snapshots.ts';
+import { createTaskRelay } from './assistant.tasks.ts';
 import { createAssistantToolRegistry, operationTools } from './assistant.tools.ts';
+import { createWhisperService } from './assistant.whisper.ts';
 
 export type { AssistantService } from './assistant.service.ts';
 
@@ -39,9 +48,12 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context'> & {
 
 /** The app assistant (15): conversations, the confirmation flow and the assistant MCP. */
 export function createAssistantModule(deps: AssistantModuleDeps) {
+  const whisper = createWhisperService(deps);
   const context = createContextRenderer(deps);
   const conversations = createAssistantService({ ...deps, context });
+  const taskRelay = createTaskRelay({ ...deps, conversations });
   const confirmations = createConfirmations({
+    run: taskRelay.run,
     ...deps,
     conversations,
     operations: new Map(deps.operations.map((impl) => [impl.contract.id, impl])),
@@ -51,9 +63,20 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     [
       ...operationTools(deps.operations, {
         settings: deps.settings,
+        run: taskRelay.run,
         requestConfirmation: confirmations.request,
         recordProduced: conversations.recordProduced,
         deferred: new Map(KNOWLEDGE_QUESTION_OPS.map((id) => [id, relay.researching])),
+        scoped: new Map([
+          [
+            createTaskOp.id,
+            (conversationId, input) =>
+              conversations.assertOwnAttachments(
+                conversationId,
+                attachmentIdsSchema.optional().parse(input.attachmentIds) ?? [],
+              ),
+          ],
+        ]),
       }),
       ...helperTools({ ...deps, conversations }),
     ],
@@ -61,8 +84,10 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
   );
   return {
     service: conversations,
+    stopWhisper: whisper.stop,
+    start: taskRelay.start,
     registry,
-    operations: assistantOperations(conversations, confirmations),
+    operations: assistantOperations(conversations, confirmations, whisper, createAssistantSnapshots(deps)),
     register(server: FastifyInstance) {
       registerAssistantRoutes(server, conversations);
       registerMcpEndpoint(server, {

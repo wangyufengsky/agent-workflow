@@ -47,7 +47,15 @@ const piece = z.object({ text: z.string(), offset: z.number().int().nonnegative(
  * text repeats its `partId`; its lines merge in order (`mergePiece`).
  */
 export const transcriptEntrySchema = z.discriminatedUnion('kind', [
-  z.object({ ...entry, kind: z.literal(TranscriptEntryKind.UserMessage), data: z.object({ text: z.string() }) }),
+  z.object({
+    ...entry,
+    kind: z.literal(TranscriptEntryKind.UserMessage),
+    // `attachments`: what an assistant message carried (30 §5), shown under it; the model read them with the text.
+    data: z.object({
+      text: z.string(),
+      attachments: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
+    }),
+  }),
   z.object({ ...part, kind: z.literal(TranscriptEntryKind.Text), data: piece }),
   z.object({ ...part, kind: z.literal(TranscriptEntryKind.Reasoning), data: piece }),
   z.object({

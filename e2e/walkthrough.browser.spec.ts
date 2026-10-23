@@ -623,6 +623,24 @@ const SHOTS: Shot[] = [
     ready: (page) => page.getByText('开始任务 · 修 Bug'),
   },
   {
+    // The attachment bar holding as many files as one input takes, one with a long name (30 §2).
+    name: 'home-attachments',
+    mode: UiMode.Simple,
+    url: (s) => `/?projectId=${s.project.id}&workflow=bugfix&requirement=${encodeURIComponent('订单时间显示错了')}`,
+    ready: (page) => page.getByText('开始任务 · 修 Bug'),
+    open: async (page) => {
+      const names = Array.from({ length: 10 }, (_, i) =>
+        i === 0 ? '订单时间显示错误的复现步骤与预发环境日志摘录_2026-10-23_最终版.md' : `notes-${i + 1}.md`,
+      );
+      await page
+        .locator('input[type="file"]')
+        .setInputFiles(names.map((name) => ({ name, mimeType: 'text/markdown', buffer: Buffer.from(`${name}\n`) })));
+      const list = page.getByRole('list', { name: '附加的资料' });
+      await expect(list.getByRole('button', { name: /^查看 / })).toHaveCount(names.length);
+      return list;
+    },
+  },
+  {
     // A conversation on the home page, the work rail beside it (28 §2.1).
     name: 'home-conversation',
     mode: UiMode.Simple,

@@ -1,6 +1,7 @@
 import { PromptName, renderTemplate, SYSTEM_NODES } from '@aw/builtin';
 import {
   AppError,
+  AttachmentOwnerKind,
   ChangeRequestReason,
   type DeliveryDTO,
   DeliveryStatus,
@@ -69,6 +70,7 @@ export function createTaskChanges(
     task: Task,
     revision: { reason: ChangeRequestReason; instructions: string; feedback: string | null },
     event: typeof TaskEvent.ChangesRequested | typeof TaskEvent.ReviewFeedback,
+    attachmentIds: readonly string[] = [],
   ): void {
     const confirmed = plans.confirmed(task.id);
     if (confirmed === undefined) throw new Error(`Task ${task.key} has no confirmed plan`);
@@ -94,7 +96,7 @@ export function createTaskChanges(
         createdByAttemptId: null,
       });
       plans.confirm(plan.id);
-      nodes.append(
+      const node = nodes.append(
         {
           taskId: task.id,
           planId: plan.id,
@@ -104,6 +106,7 @@ export function createTaskChanges(
         },
         spec,
       );
+      deps.attachments.bind({ kind: AttachmentOwnerKind.TaskFeedback, id: node.id }, attachmentIds);
       // The task leaves review; reaching it again opens a new delivery item.
       inbox.dismissOpen({ taskId: task.id, kind: InboxKind.Delivery });
       // A completed task is not finished any more (21 §7).
@@ -116,6 +119,7 @@ export function createTaskChanges(
       taskId: string,
       reason: RequestChangesRequest['reason'],
       feedback: string | undefined,
+      attachmentIds: readonly string[] = [],
       page?: RequestChangesRequest['page'],
     ): Promise<void> {
       const task = get(taskId);
@@ -146,7 +150,12 @@ export function createTaskChanges(
           files: files.map((f) => `- \`${f}\``).join('\n'),
         });
       }
-      appendRevision(task, { reason, instructions, feedback: feedback ?? null }, TaskEvent.ChangesRequested);
+      appendRevision(
+        task,
+        { reason, instructions, feedback: feedback ?? null },
+        TaskEvent.ChangesRequested,
+        attachmentIds,
+      );
     },
 
     appendRevision,

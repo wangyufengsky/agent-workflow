@@ -52,6 +52,7 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.GetTaskContext,
       McpToolName.GetNodeOutput,
       McpToolName.GetTaskDiff,
+      McpToolName.ReadAttachment,
       McpToolName.SubmitPlan,
       McpToolName.SubmitResult,
       McpToolName.SubmitReview,

@@ -112,9 +112,15 @@ export const ErrorCode = {
   PreviewLimitReached: 'PREVIEW_LIMIT_REACHED',
   BrowserSiteNotAllowed: 'BROWSER_SITE_NOT_ALLOWED',
   BrowserLoginRequired: 'BROWSER_LOGIN_REQUIRED',
+  BrowserReadFailed: 'BROWSER_READ_FAILED',
   BrowserRefStale: 'BROWSER_REF_STALE',
   BrowserActionFailed: 'BROWSER_ACTION_FAILED',
   BrowserCheckUnrunnable: 'BROWSER_CHECK_UNRUNNABLE',
+  // 附件（30）
+  AttachmentNotFound: 'ATTACHMENT_NOT_FOUND',
+  AttachmentInvalidType: 'ATTACHMENT_INVALID_TYPE',
+  AttachmentTooLarge: 'ATTACHMENT_TOO_LARGE',
+  AttachmentSourceInvalid: 'ATTACHMENT_SOURCE_INVALID',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 export const ERROR_CODES = Object.values(ErrorCode);
@@ -213,9 +219,14 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.PreviewLimitReached]: 409,
   [ErrorCode.BrowserSiteNotAllowed]: 403,
   [ErrorCode.BrowserLoginRequired]: 409,
+  [ErrorCode.BrowserReadFailed]: 502,
   [ErrorCode.BrowserRefStale]: null,
   [ErrorCode.BrowserActionFailed]: null,
   [ErrorCode.BrowserCheckUnrunnable]: null,
+  [ErrorCode.AttachmentNotFound]: 404,
+  [ErrorCode.AttachmentInvalidType]: 400,
+  [ErrorCode.AttachmentTooLarge]: 413,
+  [ErrorCode.AttachmentSourceInvalid]: 400,
 } as const satisfies Record<ErrorCode, number | null>;
 
 /** `{ code, message, details? }` as stored on tasks / attempts and returned in HTTP error bodies. */

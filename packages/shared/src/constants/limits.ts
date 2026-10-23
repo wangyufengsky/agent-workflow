@@ -42,6 +42,8 @@ export const SCHEDULE_EVERY_HOURS = [1, 2, 3, 4, 6, 8, 12] as const;
 export const ASSISTANT_TITLE_MAX_CHARS = 40;
 /** One message to the assistant. */
 export const ASSISTANT_MESSAGE_MAX_CHARS = 20_000;
+/** 一次显式附加的文字或任务上下文；超过时由用户缩短，任务快照注明截断。 */
+export const ASSISTANT_CONTEXT_MAX_CHARS = 12_000;
 /** Knowledge Q&A (18 §7). */
 export const KNOWLEDGE_QUESTION_MAX_CHARS = 4000;
 /** A conversation's title taken from its first question is cut to this length. */
@@ -137,6 +139,8 @@ export const PREVIEW_PAGES_MAX = 10;
 export const BROWSER_ACTION_TIMEOUT_MS = 5000;
 export const BROWSER_SETTLE_QUIET_MS = 500;
 export const BROWSER_SETTLE_TIMEOUT_MS = 10_000;
+/** 助手一次网页文字读取的总时限，包含打开、导航与提取。 */
+export const BROWSER_READ_TIMEOUT_MS = 30_000;
 /** The longest `browser_wait_for` (29 §6). */
 export const BROWSER_WAIT_FOR_MAX_MS = 10_000;
 /** A page snapshot is cut to this many characters (29 §5.6). */
@@ -146,3 +150,12 @@ export const BROWSER_FRAME_WIDTH = 960;
 export const BROWSER_FRAME_QUALITY = 60;
 /** A page check's full-page screenshot stops at this height in CSS pixels (29 §7.2). */
 export const PAGE_CHECK_SHOT_MAX_HEIGHT = 8000;
+/** Attachments (30): one input's count, one file's size, a display name, and how long an unsent one is kept. */
+export const ATTACHMENTS_PER_INPUT_MAX = 10;
+export const ATTACHMENT_BYTES_MAX = 5 * 1024 * 1024;
+export const ATTACHMENT_NAME_MAX_CHARS = 255;
+export const ATTACHMENT_ORPHAN_TTL_MS = 24 * 60 * 60 * 1000;
+export const ATTACHMENT_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+/** What the model gets of attachments (30 §3.2): all of one input's text in the prompt, and one `read_attachment` page. */
+export const ATTACHMENT_PROMPT_MAX_CHARS = 20_000;
+export const ATTACHMENT_READ_MAX_CHARS = 12_000;

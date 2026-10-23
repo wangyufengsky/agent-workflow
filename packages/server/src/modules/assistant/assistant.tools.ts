@@ -19,6 +19,7 @@ import type { Logger } from '../../core/logger.ts';
 import type { OperationImpl } from '../../core/operations/operations.ts';
 import type { SettingsService } from '../settings/index.ts';
 import type { Conversation } from './assistant.repo.ts';
+import type { TaskRelay } from './assistant.tasks.ts';
 
 export type AssistantToolContext = { conversation: Conversation };
 
@@ -46,6 +47,7 @@ const RISK_NOTE: Record<OperationRisk, string> = {
 
 export type OperationToolDeps = {
   settings: SettingsService;
+  run: TaskRelay['run'];
   /** Records the object an operation produced in the conversation (D66). */
   recordProduced(conversationId: string, contract: OperationContract, output: unknown): void;
   /**
@@ -53,6 +55,11 @@ export type OperationToolDeps = {
    * instead of the output; their navigation card comes with that message.
    */
   deferred: ReadonlyMap<string, (conversationId: string, output: unknown) => unknown>;
+  /**
+   * Checks of an operation's input that depend on the calling conversation (attachments it may pass on, 30 §2.2);
+   * they run before the call runs or waits for a confirmation, so the card never offers what would be refused.
+   */
+  scoped: ReadonlyMap<string, (conversationId: string, input: Record<string, unknown>) => void>;
   /** Records a pending confirmation for a call the user has to approve. */
   requestConfirmation(
     conversationId: string,
@@ -77,12 +84,13 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
         input: assistantInputSchema(contract),
         mode: contract.mode,
         async handler(input, { conversation }) {
+          deps.scoped.get(contract.id)?.(conversation.id, input);
           const allowed =
             contract.risk === OperationRisk.Read ||
             (contract.risk === OperationRisk.Write && deps.settings.get('assistant.alwaysAllow').includes(contract.id));
           if (allowed) {
             // A failing operation answers with its error code, like any tool (12 §5).
-            const output = await impl.run(input);
+            const output = await deps.run(conversation.id, impl, input);
             const deferred = deps.deferred.get(contract.id);
             if (deferred !== undefined) return deferred(conversation.id, output);
             deps.recordProduced(conversation.id, contract, output);
@@ -100,6 +108,10 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
 }
 
 const COMMON_HINTS: Partial<Record<ErrorCode, string>> = {
+  [ErrorCode.BrowserSiteNotAllowed]: 'The website rules do not allow this address. Do not bypass the rules.',
+  [ErrorCode.BrowserLoginRequired]:
+    'Ask the user to log in under Settings > Websites, then read the address again. Never ask for or enter credentials.',
+  [ErrorCode.BrowserReadFailed]: 'Explain the page load failure to the user using details.reason.',
   [ErrorCode.ValidationFailed]: 'Fix the arguments listed in details.issues and call the tool again.',
   [ErrorCode.McpConversationUnresolved]:
     'This session is not an assistant conversation of agent-workflow; do not call these tools.',

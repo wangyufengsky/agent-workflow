@@ -42,7 +42,7 @@ export const listTasksOp = defineOperationContract({
 export const createTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.create',
-  refs: { projectId: InputRef.Project, workflowId: InputRef.Workflow },
+  refs: { projectId: InputRef.Project, workflowId: InputRef.Workflow, attachmentIds: InputRef.Attachment },
   title: 'op.tasks.create',
   description: 'Create a development task in a project with a workflow and start it (unless start is false)',
   input: createTaskRequestSchema,
@@ -365,8 +365,8 @@ export const requestChangesOp = defineOperationContract({
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/request-changes' },
-  // A preview tab is the user's own: the assistant has none to attach.
-  assistantOmit: ['page'],
+  // A preview tab is the user's own: the assistant has none to attach. Nor can it attach files yet (30 §2.2).
+  assistantOmit: ['page', 'attachmentIds'],
 });
 
 export const reviewCommentsOp = defineOperationContract({

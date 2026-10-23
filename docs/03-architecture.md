@@ -323,3 +323,24 @@ export function taskOperations(tasks: TasksService) {
 - 数据库工具：只读事务（SQL Server 为从不提交的事务）+ 按方言的语句检查 + 行数与超时限制（24 §4）。
 - 浏览器（v1.3，29 §5.4）：AI 的标签页只打开任务预览地址与设置 `browser.sites` 允许的网站，只读网站上 AI 发出的写请求与 WebSocket 由 main 在网络层拦下；用户标签页中规则不允许的地址交给系统浏览器；下载、权限请求、文件选择框一律拒绝；不开远程调试端口；工具返回的页面内容在工具说明与提示词中标为数据、不是指令；应用不向页面填写任何已保存的凭据，网站登录由用户在设置里自己完成。助手不能修改 `browser.sites`（D65 的同一思路）。
 - 页面预览（v1.3，29 §4）：开发服务器以项目配置的命令在任务 worktree 里运行（与检查命令同一个 shell、`killDescendants`），只监听后端分配的 127.0.0.1 端口；worktree 删除前与应用退出时结束整棵进程树。
+
+## 10. 角色助手与桌宠扩展（32）
+
+同一后端服务主窗口和 `/companion` 透明窗口，后者使用相同 sandbox/contextIsolation 配置。固定 preload 方法处理显示、拖动、跨窗选择与主窗导航；输入经 shared schema 校验，导航限制当前应用源。业务对话与任务依旧经 HTTP/SSE；通知前态仅用于判重，不构成第二个业务状态源。桌宠位置保存在 userData 的 `companion-position.json`，v2 存储角色锚点（兼容迁移旧窗口坐标），恢复及屏幕变化时保证至少 64px 可见；面板按可用方向展开且不移动角色；启用桌宠时关闭主窗口隐藏，明确退出仍等待后端停止。
+
+preload 通过主进程提供的窗口标记区分 `main`、`companion` 和辅助窗口（`null`）；PDF 导出等辅助窗口不配置桌宠、不参与跨窗会话选择或桌宠提醒。主窗口负责向原生层发出系统通知，桌宠保留自身的可见提醒队列。
+
+`features/companion` 集中提供极光 WebGL 流动／CSS 状态动画／静态降级和鲸鱼 WebM 适配，语义动作与素材解耦；设置默认光球。无新增运行时依赖。临时鲸鱼素材的来源／哈希／使用限制放在 `public/companion/whale`，后续原创替换不改变助手 API。碎碎念通过既有 opencode 客户端新建无工具临时会话，单次超时与取消后清理；不混入持久助手历史。
+
+## 11. 待实施架构增量：附件与需求验收清单
+
+[30](30-attachments.md) / [31](31-requirements-checklist.md) 的设计约束（精简版）。`attachments` 已在 U-01 加入源码，其余尚未实现。
+
+- `attachments`（U-01 已实现）：保存、校验、正文分页读取（U-02）、引用、清理。只接收所有者（kind + id），读项目文件时依赖 `projects`、`worktrees` 取根目录，不依赖 `tasks`、`assistant`。记录存在即可用，没有上传／处理状态机。
+- `requirements`：清单版本、逐项结论记录、显示状态纯函数；只依赖底层设施，不依赖 `tasks`、`nodes`、`acceptance`。
+- `tasks` 组合二者：绑定附件、编辑时机守卫、物化时追加核验节点（`NodeKind.Verify`）、节点完成时写结论、交付时的清单摘要。`assistant` 在自己的事务里绑定附件。`attempts` 只接收所有者准备好的附件，不反查所有者。
+- `nodes`：只有 `NodeKind.Verify` 的检查「只记录不拦截」；其他节点不变。
+- 首版只有文本附件，`opencode` 适配层不变。
+- 不新增 `AttemptKind`、`AcceptanceCheckKind`、`TaskStatus`、调度队列或通用文件服务层。
+- 数据目录新增 `attachments/<id>/original`；附件不写进 Git worktree。
+- 上传与原件读取是认证的二进制非清单路由（与 `attempts.routes.ts` 的会话记录路由同类）；其余为操作清单中的 JSON 操作。

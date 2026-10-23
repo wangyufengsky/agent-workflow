@@ -351,10 +351,36 @@ payload / response：
 | operation_id | TEXT | 操作清单 id |
 | input | TEXT(JSON) | 助手给出的参数（已按助手 schema 校验，不含凭据字段） |
 | status | TEXT | `AssistantConfirmationStatus`（09 §10） |
-| result | TEXT(JSON) NULL | 确认后：`{ ok: true, output }` 或 `{ ok: false, error }`；取消为空 |
+| result | TEXT(JSON) NULL | 确认后：`{ ok: true, output }` 或 `{ ok: false, error }`；无返回值的成功操作用 `output: null`，读取旧版缺失 output 的成功记录时同样转为 null；取消为空 |
 | created_at / resolved_at | INTEGER | |
 
 索引：`(conversation_id, created_at)`。
+
+### assistant_outbox
+
+迁移 `0018_assistant_outbox`；保存尚未成功交给 opencode 的应用消息（确认结果、取消通知或普通任务状态回报）。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | INTEGER PK AUTOINCREMENT | 入队顺序 |
+| conversation_id | TEXT → assistant_conversations，CASCADE | 删除对话时清理待发消息 |
+| text | TEXT | 已渲染的结果消息 |
+| created_at | INTEGER | 入队时间 |
+
+索引：`(conversation_id, id)`。确认结果与入队在同一事务保存；取消状态与入队也在同一事务保存。按 id 顺序发送，只在发送成功后删除本次读取的消息，期间新入队的消息继续保留。断线、发送失败与后端重启不会丢失队列，待下一次发送时恢复；恢复只投递消息，不重新执行业务操作。若外部已接受消息而本地尚未删除队列时进程退出，恢复可能重复通知，不承诺跨进程的恰好一次投递。
+
+### assistant_task_followups
+
+迁移 `0019_assistant_task_followups`；仅登记通过助手 `tasks.create` 成功创建的普通任务，确认后执行与总是允许共用同一入口。任务与归属在同一事务插入，首次状态事件发布及任务启动前已提交；登记失败时整个创建回滚。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| task_id | TEXT PK → tasks，CASCADE | 一个任务只有一个原始对话 |
+| conversation_id | TEXT → assistant_conversations，CASCADE | 删除原对话即停止跟进 |
+| last_event_id | INTEGER DEFAULT 0 | 已消费的最新任务级 `task_events.id`，不是节点或进度事件 |
+| created_at | INTEGER | 登记时间 |
+
+索引：`(conversation_id)`。事件游标与 `assistant_outbox` 消息在同一事务提交，重复 SSE 不重复入队。启动时批量补扫最新真实状态；若停机间发生多个未消费状态，以当前状态为准，不把已经结束的失败重新呈现为当前失败。`review`、`failed`、`completed` 入队；其他状态只推进游标。已入队消息保留发生时间和事件编号，恢复只重投消息，不重新执行任务。删除任务会删除跟进记录；删除对话同时清理其跟进和 outbox。
 
 消息流：`<数据目录>/assistant/conversations/<id>.jsonl`，格式同 §3（多 `confirmation`、`attachment`、`entity_ref` 三种条目）；记录用户的消息、模型的正文与工具调用、权限请求、错误；后端代发的确认结果消息与每轮注入的 `system` 不记录（卡片显示结果）。
 
@@ -546,3 +572,31 @@ payload / response：
 - 删除助手对话：级联删除其确认，并删除 `assistant/conversations/<id>.jsonl` 与 `assistant/files/<id>/`。
 - 任务终态后 worktree 删除，但任务、计划、节点、尝试、会话流保留（供回看）。
 - 不做自动过期清理（v1）。设置页显示数据目录占用。
+
+## 6. 待实施数据设计（30 / 31）
+
+精简版设计，未生成迁移；实施时按当时的迁移顺序编号。
+
+### 6.1 附件
+
+| 表 | 关键字段／约束 |
+| --- | --- |
+| attachments | id、source、name（显示名）、size_bytes、origin JSON（项目文件快照才有：projectId、taskId、相对路径、行范围、读取时间）、created_at；索引 created_at。磁盘路径只由 id 派生：`attachments/<id>/original`（迁移 0017，U-01 已实现） |
+| attachment_refs | owner_kind、owner_id、attachment_id FK、ordinal、created_at；主键 (owner_kind, owner_id, attachment_id)，索引 attachment_id |
+
+- 所有者在自己的事务里创建／删除引用：删除任务时删除该任务（task_input）与其节点（task_feedback）的引用；删除助手对话时删除 assistant_message 引用。多态 owner 没有外键，由所有者模块负责。
+- 助手会话 JSONL 的用户消息增加可选 `attachments: [{ id, name }]`，只作展示。
+- 清理：在一个事务里删除没有引用且创建超过 `ATTACHMENT_ORPHAN_TTL_MS` 的记录，提交后再删文件；绑定在事务里先确认记录存在再插入引用，因此不会与清理交错（30 §4）。删文件失败留下的、目录中没有记录的残留按年龄清理。
+
+### 6.2 需求清单
+
+| 表／字段 | 关键字段／约束 |
+| --- | --- |
+| tasks.requirements_revision_id | 可空 FK；没有清单的任务为 null |
+| requirement_revisions | id、task_id FK、seq、items JSON、created_at；UNIQUE(task_id, seq)；只追加 |
+| requirement_results | id、task_id FK、revision_id FK、item_id、source、conclusion、note、output（命令输出末尾，按既有输出上限截断）、node_id 可空（用户结论为 null）、commit_sha、created_at；只追加 |
+| deliveries.requirements_summary | 可空 JSON：revisionId、commitSha、逐项显示状态；旧交付为 null |
+
+items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`expected`、`required`、`verification`（`{ kind: 'command', command }` / `{ kind: 'ai_review' }` / `{ kind: 'manual' }`）。核验节点的命令检查在节点 acceptance 中带 `requirementItemId`，用于把检查结果对应到项。
+
+删除任务时级联删除清单版本与结论。

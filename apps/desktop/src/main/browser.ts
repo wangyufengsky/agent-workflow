@@ -45,7 +45,7 @@ export function createBrowserTabs({ window, emit, openExternal }: BrowserTabsDep
     configured.add(ses);
     ses.webRequest.onBeforeRequest({ urls: WEB_SCHEMES }, (details, callback) => {
       const tab = details.webContentsId === undefined ? undefined : byContents.get(details.webContentsId);
-      // A request no tab of ours made (a service worker of the page): nothing allowed it.
+      // Worker 请求若无法归属单个标签页，不继承同分区中任一用户页或 AI 页的权限。
       const reason =
         tab === undefined
           ? BrowserBlockReason.NotAllowed
@@ -54,6 +54,9 @@ export function createBrowserTabs({ window, emit, openExternal }: BrowserTabsDep
               tab.policy,
               !tab.userFacing,
             );
+      if (tab === undefined) {
+        emit({ type: 'browser.unownedBlocked', url: details.url, source: details.resourceType });
+      }
       if (reason !== null && tab !== undefined) {
         emit({ type: 'browser.blocked', tabId: tab.tabId, url: details.url, method: details.method, reason });
         if (tab.userFacing && details.resourceType === 'mainFrame' && reason === BrowserBlockReason.NotAllowed) {

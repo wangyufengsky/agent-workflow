@@ -2,9 +2,13 @@ import type { Prompts } from '@aw/builtin';
 import {
   AppError,
   ATTENTION_INBOX_KINDS,
+  type AttachmentDTO,
+  AttachmentOwnerKind,
   ErrorCode,
   type ErrorInfo,
   InboxKind,
+  MCP_TOOL_PREFIX,
+  McpToolName,
   NodeStatus,
   resolveTaskDisplayGroup,
   ServerEventType,
@@ -21,6 +25,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { Logger } from '../../core/logger.ts';
+import type { AttachmentsService } from '../attachments/index.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DatabasesService } from '../databases/index.ts';
@@ -53,6 +58,7 @@ export type TasksServiceDeps = {
   plans: PlansService;
   nodes: NodesService;
   attempts: AttemptsService;
+  attachments: AttachmentsService;
   browser: BrowserService;
   inbox: InboxService;
   deliveries: DeliveriesService;
@@ -165,6 +171,23 @@ export function createTaskState(deps: TasksServiceDeps) {
   }
 
   /** What running a node of the task needs (its worktree must be ready). */
+  /** The task's attachments (30 §2.2): those of its requirement, then of each change asked for, in order. */
+  function attachmentsOf(task: Task): AttachmentDTO[] {
+    return deps.attachments.listByOwners([
+      { kind: AttachmentOwnerKind.TaskInput, id: task.id },
+      ...nodes.listByTask(task.id).map((node) => ({ kind: AttachmentOwnerKind.TaskFeedback, id: node.id })),
+    ]);
+  }
+
+  /** The requirement as the task's AI sessions read it: followed by the attached files (30 §3.2). */
+  function promptRequirement(task: Task): string {
+    const section = deps.attachments.promptSection(
+      attachmentsOf(task),
+      `${MCP_TOOL_PREFIX}${McpToolName.ReadAttachment}`,
+    );
+    return section === '' ? task.requirement : `${task.requirement}\n\n${section}`;
+  }
+
   function runContext(task: Task): NodeRunContext {
     const worktree = worktrees.findByTask(task.id);
     if (worktree?.status !== WorktreeStatus.Ready) {
@@ -178,7 +201,7 @@ export function createTaskState(deps: TasksServiceDeps) {
       projectId: task.projectId,
       taskKey: task.key,
       taskTitle: task.title,
-      requirement: task.requirement,
+      requirement: promptRequirement(task),
       directory: worktree.path,
       repoPath: project.repoPath,
       checkCommand: project.checkCommand,
@@ -186,6 +209,18 @@ export function createTaskState(deps: TasksServiceDeps) {
     };
   }
 
-  return { repo, get, attentionTaskIds, summaries, summary, publish, move, fail, runContext };
+  return {
+    repo,
+    get,
+    attentionTaskIds,
+    summaries,
+    summary,
+    publish,
+    move,
+    fail,
+    attachmentsOf,
+    promptRequirement,
+    runContext,
+  };
 }
 export type TaskState = ReturnType<typeof createTaskState>;

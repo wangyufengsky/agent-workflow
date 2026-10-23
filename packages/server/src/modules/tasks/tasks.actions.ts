@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { PromptName, renderTemplate } from '@aw/builtin';
 import {
   AppError,
+  AttachmentOwnerKind,
   acceptanceResponseSchema,
   ErrorCode,
   FailureAction,
@@ -139,7 +140,13 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
           tasks: active.map((t) => t.key),
         });
       }
+      const nodeIds = tasks.flatMap((t) => nodes.listByTask(t.id).map((n) => n.id));
       deps.unit.transact(() => {
+        deps.attachments.release(
+          AttachmentOwnerKind.TaskInput,
+          tasks.map((t) => t.id),
+        );
+        deps.attachments.release(AttachmentOwnerKind.TaskFeedback, nodeIds);
         state.repo.deleteByProject(projectId);
         deps.knowledge.deleteByProject(projectId);
         deps.gitReviews.deleteByProject(projectId);

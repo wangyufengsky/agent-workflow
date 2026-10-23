@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AssistantForm } from '../../enums/assistant.ts';
+import { AssistantForm, AssistantPage } from '../../enums/assistant.ts';
 import { runtimeStatusSchema } from '../../enums/system.ts';
 import { uiModeSchema } from '../../enums/ui.ts';
 import { createDbConnectionOp, updateDbConnectionOp } from '../../operations/databases.ts';
@@ -37,7 +37,10 @@ export const getAppStatusOutputSchema = z.object({
 });
 export type GetAppStatusOutput = z.infer<typeof getAppStatusOutputSchema>;
 
-export const openPageInputSchema = assistantPageRefSchema;
+/** desktop 只是消息来源，主窗口不能导航成桌宠窗口。 */
+export const openPageInputSchema = assistantPageRefSchema.safeExtend({
+  page: z.enum(Object.values(AssistantPage).filter((page) => page !== AssistantPage.Desktop)),
+});
 export const openedOutputSchema = z.object({ opened: z.literal(true) });
 
 /** The operation each form submits; its credential fields are typed by the user, never prefilled (D28). */

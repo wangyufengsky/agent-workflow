@@ -82,6 +82,8 @@ export type TabInput = {
   site: boolean;
   /** The user's own tab, placed on the window by the renderer (29 §8.1): sized by its place, files can be chosen. */
   userFacing?: boolean;
+  /** 短期读取的整体截止也覆盖初始化；迟到的宿主资源必须立即释放。 */
+  signal?: AbortSignal;
 };
 
 /**
@@ -98,6 +100,7 @@ export async function openTab({
   policy,
   site,
   userFacing = false,
+  signal,
 }: TabInput) {
   const viewport: { preset: ViewportPreset } = { preset: 'desktop' };
   let refs = new Map<string, number>();
@@ -116,6 +119,7 @@ export async function openTab({
   let url = '';
   let page = { console: 0, exceptions: 0, requests: 0 };
   let onLoad = () => {};
+  let cancelLoad = () => {};
   /** Told when the page's address or its error counts change. */
   let changed = () => {};
 
@@ -211,7 +215,7 @@ export async function openTab({
   }
 
   const unsubscribe = host.onEvent((event) => {
-    if (event.tabId !== tabId) return;
+    if (event.type === 'browser.unownedBlocked' || event.tabId !== tabId) return;
     if (event.type === 'browser.cdpEvent') onCdp(event.method, event.params);
     else if (event.type === 'browser.blocked') {
       blockedUrls.set(event.url, event.reason);
@@ -221,18 +225,50 @@ export async function openTab({
     }
   });
 
-  await host.request({
-    kind: 'open',
-    tabId,
-    partition,
-    userFacing,
-    viewport: userFacing ? null : VIEWPORT_SIZES.desktop,
-    policy,
-  });
-  for (const domain of ['Page', 'Runtime', 'Network', 'DOM', 'Accessibility']) await cdp(`${domain}.enable`);
-  // File choosers would open a dialog nobody answers (29 §5.4); the user answers their own.
-  if (!userFacing) await cdp('Page.setInterceptFileChooserDialog', { enabled: true });
-  if (site) await cdp('Page.addScriptToEvaluateOnNewDocument', { source: NO_REALTIME });
+  async function initialize(): Promise<void> {
+    for (const domain of ['Page', 'Runtime', 'Network', 'DOM', 'Accessibility']) {
+      await cdp(`${domain}.enable`);
+      signal?.throwIfAborted();
+    }
+    // File choosers would open a dialog nobody answers (29 §5.4); the user answers their own.
+    if (!userFacing) await cdp('Page.setInterceptFileChooserDialog', { enabled: true });
+    signal?.throwIfAborted();
+    if (site) await cdp('Page.addScriptToEvaluateOnNewDocument', { source: NO_REALTIME });
+    signal?.throwIfAborted();
+  }
+
+  let opened = false;
+  let removeAbortListener = () => {};
+  try {
+    signal?.throwIfAborted();
+    await host.request({
+      kind: 'open',
+      tabId,
+      partition,
+      userFacing,
+      viewport: userFacing ? null : VIEWPORT_SIZES.desktop,
+      policy,
+    });
+    opened = true;
+    signal?.throwIfAborted();
+    if (signal === undefined) await initialize();
+    else {
+      // 初始化中的 CDP 也可能不回应；截止要立即进入清理，不能只在下一次 await 后检查。
+      const aborted = new Promise<never>((_resolve, reject) => {
+        const onAbort = () => reject(signal.reason);
+        signal.addEventListener('abort', onAbort, { once: true });
+        removeAbortListener = () => signal.removeEventListener('abort', onAbort);
+      });
+      await Promise.race([initialize(), aborted]);
+    }
+  } catch (err) {
+    unsubscribe();
+    network.close();
+    if (opened) await host.request({ kind: 'close', tabId });
+    throw err;
+  } finally {
+    removeAbortListener();
+  }
 
   async function evaluate(expression: string): Promise<unknown> {
     const { result } = evaluateSchema.parse(
@@ -305,11 +341,15 @@ export async function openTab({
       const deadline = clock.now() + BROWSER_SETTLE_TIMEOUT_MS;
       if (!since.loaded) {
         const loaded = await new Promise<boolean>((resolve) => {
-          const cancel = clock.schedule(BROWSER_SETTLE_TIMEOUT_MS, () => resolve(false));
-          onLoad = () => {
+          const finish = (loaded: boolean) => {
             cancel();
-            resolve(true);
+            onLoad = () => {};
+            cancelLoad = () => {};
+            resolve(loaded);
           };
+          const cancel = clock.schedule(BROWSER_SETTLE_TIMEOUT_MS, () => finish(false));
+          onLoad = () => finish(true);
+          cancelLoad = () => finish(false);
         });
         if (!loaded) return false;
       }
@@ -365,6 +405,8 @@ export async function openTab({
     setPolicy: (next: BrowserPolicy) => host.request({ kind: 'setPolicy', tabId, policy: next }),
 
     async close(): Promise<void> {
+      cancelLoad();
+      network.close();
       unsubscribe();
       await host.request({ kind: 'close', tabId });
     },

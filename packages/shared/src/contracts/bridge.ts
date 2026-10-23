@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { themeIdSchema } from '../enums/ui.ts';
 import { type ErrorInfo, errorInfoSchema } from '../errors/codes.ts';
+import type { CompanionBridge } from './companion.ts';
 
 /**
  * How the next start looks before the backend (and so the settings) is up (28 §5.3): the theme the renderer applied
@@ -21,6 +22,7 @@ export type PdfExport = { ok: true; path: string | null } | { ok: false; error: 
 
 /** Capabilities the Electron preload exposes to the renderer as `window.aw`. */
 export interface AwBridge {
+  companion: CompanionBridge;
   apiToken: string;
   appVersion: string;
   selectDirectory(): Promise<string | null>;

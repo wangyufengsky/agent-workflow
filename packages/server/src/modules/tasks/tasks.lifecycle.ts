@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { PromptName, renderTemplate } from '@aw/builtin';
 import {
   AppError,
+  AttachmentOwnerKind,
   type AttemptDTO,
   AttemptKind,
   AttemptStatus,
@@ -273,22 +274,27 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       };
       const id = randomUUID();
       const now = clock.now();
-      repo.insert(
-        {
-          id,
-          projectId: input.projectId,
-          workflowId: workflow.id,
-          title: input.title ?? firstLine(input.requirement).slice(0, TASK_TITLE_MAX_CHARS),
-          requirement: input.requirement,
-          status: TaskStatus.Draft,
-          baseBranch: input.baseBranch,
-          mergeSource: input.mergeSource ?? null,
-          checkpoints,
-          createdAt: now,
-          updatedAt: now,
-        },
-        TASK_KEY_PREFIX,
-      );
+      unit.transact(() => {
+        repo.insert(
+          {
+            id,
+            projectId: input.projectId,
+            workflowId: workflow.id,
+            title: input.title ?? firstLine(input.requirement).slice(0, TASK_TITLE_MAX_CHARS),
+            requirement: input.requirement,
+            status: TaskStatus.Draft,
+            baseBranch: input.baseBranch,
+            mergeSource: input.mergeSource ?? null,
+            checkpoints,
+            createdAt: now,
+            updatedAt: now,
+          },
+          TASK_KEY_PREFIX,
+        );
+        if (input.attachmentIds !== undefined) {
+          deps.attachments.bind({ kind: AttachmentOwnerKind.TaskInput, id }, input.attachmentIds);
+        }
+      });
       log.info({ taskId: id, workflow: workflow.key }, 'task created');
       state.publish(id);
       return id;
@@ -330,7 +336,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
           taskKey: task.key,
           taskTitle: task.title,
           workflowName: workflow.name,
-          requirement: task.requirement,
+          requirement: state.promptRequirement(task),
           uncertaintyRule: prompts[task.checkpoints.ask_on_uncertainty ? PromptName.RuleAsk : PromptName.RuleAssume],
         }),
       });

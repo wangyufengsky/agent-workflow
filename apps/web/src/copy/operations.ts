@@ -1,4 +1,5 @@
 import { UiMode } from '@aw/shared';
+import { COMPANION_COPY } from './companion.ts';
 import { DELIVERY_COPY } from './delivery.ts';
 import { PPT_COPY } from './ppt.ts';
 import { SETTINGS_COPY } from './settings.ts';
@@ -20,6 +21,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.projects.get': '查看项目',
   'op.projects.update': '修改项目',
   'op.previews.get': '查看页面预览',
+  'op.browser.readUrl': '读取网页文字',
   'op.previews.start': '启动页面预览',
   'op.previews.stop': '停止页面预览',
   'op.previews.trial': '试运行页面预览',
@@ -46,6 +48,9 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.databases.query': '只读查询数据库',
   'op.attempts.get': '查看 AI 会话',
   'op.attempts.abort': '中止 AI 会话',
+  'op.attachments.get': '查看资料',
+  'op.attachments.remove': '移除资料',
+  'op.attachments.snapshotProjectFile': '添加项目文件',
   'op.debug.startAttempt': '调试：发起一次执行尝试',
   'op.workflows.list': '流程列表',
   'op.workflows.get': '查看流程',
@@ -122,11 +127,14 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.gitReviews.stop': '停止 AI 审查',
   'op.worktrees.list': 'worktree 总览',
   'op.worktrees.prune': '清理遗留 worktree',
+  'op.assistant.whisper': '生成碎碎念',
+  'op.assistant.stopWhisper': '停止碎碎念',
   'op.assistant.list': '助手对话列表',
   'op.assistant.create': '新建助手对话',
   'op.assistant.get': '查看助手对话',
   'op.assistant.delete': '删除助手对话',
   'op.assistant.send': '发消息给助手',
+  'op.assistant.snapshotContext': '附上助手文字上下文',
   'op.assistant.abort': '停止助手',
   'op.assistant.replyPermission': '回复助手的权限请求',
   'op.assistant.files': '助手生成的文件',
@@ -176,6 +184,13 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
  * their label from what they name (`INPUT_REF_LABEL`). A unit test keeps every field of a confirmed operation covered.
  */
 export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
+  'companion.appearance': COMPANION_COPY.appearance,
+  'companion.enabled': COMPANION_COPY.desktop,
+  'companion.animations': COMPANION_COPY.animations,
+  'companion.size': COMPANION_COPY.size,
+  'companion.whisper': COMPANION_COPY.whisper,
+  'companion.whisperMinutes': COMPANION_COPY.whisperMinutes,
+  'companion.notifications': COMPANION_COPY.notifications,
   'ui.mode': SETTINGS_COPY.mode,
   'ui.theme': SETTINGS_COPY.theme,
   'ui.introAnimation': SETTINGS_COPY.intro,
@@ -213,6 +228,7 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   prompt: '提示词',
   model: '模型',
   requirement: '需求',
+  attachmentIds: '附加的资料',
   requirementTemplate: '需求模板',
   targets: '目标',
   frequency: '多久一次',

@@ -96,6 +96,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       result: task.result,
       lastDelivery: delivery.lastDelivery(id),
       pullRequest: review.pullRequestOf(id),
+      attachments: state.attachmentsOf(task),
     };
   }
 
@@ -181,9 +182,14 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       return listTaskEvents(db, id, afterId);
     },
 
-    async create(input: CreateTaskRequest): Promise<TaskDetailDTO> {
+    async create(input: CreateTaskRequest, onCreated?: (taskId: string) => void): Promise<TaskDetailDTO> {
       const baseBranch = await lifecycle.checkCreate(input);
-      const id = lifecycle.insertDraft({ ...input, baseBranch });
+      // 助手归属与任务同时提交，启动前已可跟进；登记失败时不留下无归属的任务。
+      const id = deps.unit.transact(() => {
+        const created = lifecycle.insertDraft({ ...input, baseBranch });
+        onCreated?.(created);
+        return created;
+      });
       if (input.start !== false) lifecycle.start(id);
       return detail(id);
     },
@@ -242,9 +248,10 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       id: string,
       reason: RequestChangesRequest['reason'],
       feedback: string | undefined,
+      attachmentIds?: readonly string[],
       page?: RequestChangesRequest['page'],
     ): Promise<TaskDetailDTO> {
-      await changes.requestChanges(id, reason, feedback, page);
+      await changes.requestChanges(id, reason, feedback, attachmentIds, page);
       return detail(id);
     },
     reviewComments: review.reviewComments,

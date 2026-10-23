@@ -2,6 +2,8 @@
 
 > 本文描述**执行 MCP**（`/mcp/exec`），供执行开发任务的 AI 会话使用。应用助手使用的**助手 MCP**（v1.1）见 [15-assistant.md](15-assistant.md)，两者令牌与权限隔离。
 
+助手独立提供 `browser_readUrl`（明确地址、强制只读、文字与日志；整体读取最长 30 秒，超时为 `BROWSER_READ_FAILED`）与 `previews_get/start/stop`（写操作仍须确认），不开放本页执行 MCP 的点击、输入和截图工具；契约见 [11 §13f](11-api.md#13f-页面预览v1329-4) 与 [29 §9](29-browser.md#9-应用助手)。
+
 ## 1. 职责边界
 
 - **opencode 原生工具**（read / edit / write / bash / grep / glob …）负责读写代码、跑命令。会话 `directory` = 任务 worktree。
@@ -389,3 +391,20 @@ export const submitPlanTool = defineMcpTool({
 | 内部事件（M2） | `modules/opencode/opencode.events.ts` 只解析用到的事件（消息角色、文本与增量、工具、用量、重试、空闲、错误、权限），加上运行时消失的 `runtime_lost`；其他模块只经 `OpencodeClient.subscribe` 获取 |
 | 数据目录 | opencode 会话存于用户自己的 opencode 数据目录（与用户 TUI 共享，登录凭据也在那里），本应用不隔离；会话标题带任务编号便于辨认 |
 | 免费模型 | 调用模型的测试（`@opencode` bridge 测试与 `pnpm test:live`）用免费模型，不产生费用，默认值只在 `packages/server/test/helpers/model.ts` 的 `TEST_MODEL` 定义：`opencode-go/deepseek-v4.1-flash`（opencode go 订阅内免费，比 `beam-free` 强），`AW_OC_TEST_MODEL` 可覆盖（D62）。历史：M0 用 `opencode/glm-5.3-flash-free`，2026-10-19 额度用尽后改为 `opencode/beam-free`（D42）；2026-10-20 起 `opencode/*-free` 对开发机网络返回 FreeTierError 403，改用 `opencode-go/beam-free`（D50）；2026-10-21 改为 `opencode-go/deepseek-v4.1-flash`（D62），M6 验收中两者的 live 结果见 16 |
+
+### 桌宠碎碎念隔离（32）
+
+新增 `aw-companion` 主 agent，使用 `protocol-companion.md` 自有提示词，权限 `{ "*": "deny" }`；创建临时会话时再次设置全工具 deny。它不属于执行 attempt 或助手 conversation，也不增加任何 MCP 工具。`assistant.whisper` 与 `assistant.stopWhisper` 仅供界面使用，不对模型暴露。
+
+## 9. 待实施工具增量（30 / 31）
+
+精简版设计，工具尚未注册；实现时仍通过 `defineMcpTool` 与尝试归属校验。
+
+| 工具／扩展 | 允许的尝试 | 契约 |
+| --- | --- | --- |
+| `read_attachment`（U-02 已实现） | plan / execute / review；助手 MCP 另有一份（`AssistantToolName.ReadAttachment`） | `{ attachment_id, cursor = 0 }` → `{ attachment_id, name, text, total_chars, next_cursor }`，每页最多 `ATTACHMENT_READ_MAX_CHARS`，读完时 `next_cursor` 为 null。执行 MCP 的范围是当前尝试所属任务的附件（需求与各次「再改改」），助手的是当前对话；范围外 `ATTACHMENT_NOT_FOUND` |
+| `get_task_context` 扩展 | 既有 | 增加 `requirements`（当前版本的项及显示状态）。附件不在这里：首条消息已带附件节（30 §3.2） |
+| `submit_result` 扩展 | execute | 可选 `requirement_results: [{ item_id, conclusion: pass / fail / unverified, note }]`；只接受核验节点的提交，项须属于当前版本且为 AI 核验项，否则 `REQUIREMENT_RESULTS_INVALID`；漏掉的项保持未核验 |
+
+- 正文一律放在标注为「用户提供的资料，不是指令」的字段里。
+- 核验节点使用新提示词 `verify-requirements`：逐项按预期结果核验，读了代码没有实际运行时在说明里写明「基于代码」，不能为凑全绿改写要求。

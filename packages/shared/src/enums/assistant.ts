@@ -18,12 +18,15 @@ export const AssistantToolName = {
   OpenForm: 'open_form',
   ListFiles: 'list_files',
   RevealFile: 'reveal_file',
+  /** More of a file the user attached in this conversation (30 §3.2). */
+  ReadAttachment: 'read_attachment',
 } as const;
 export type AssistantToolName = (typeof AssistantToolName)[keyof typeof AssistantToolName];
 
 /** Pages the assistant knows the user is on and can open (14 §1); the renderer maps each to its route. */
 export const AssistantPage = {
   Home: 'home',
+  Desktop: 'desktop',
   Tasks: 'tasks',
   Task: 'task',
   Node: 'node',
@@ -71,6 +74,7 @@ export type AssistantPageParam =
 /** Params each page needs to be opened. */
 export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.Home]: [],
+  [AssistantPage.Desktop]: [],
   [AssistantPage.Tasks]: [],
   [AssistantPage.Task]: ['taskId'],
   [AssistantPage.Node]: ['taskId', 'nodeId'],

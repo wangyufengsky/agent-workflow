@@ -6,6 +6,7 @@ import {
   navigateUserTabOp,
   openLoginTabOp,
   openUserTabOp,
+  readWebsiteOp,
   setUserViewportOp,
   userTabLogsOp,
 } from '@aw/shared';
@@ -23,5 +24,6 @@ export function browserOperations(browser: BrowserService) {
     implement(setUserViewportOp, ({ tabId, preset }) => browser.setUserViewport(tabId, preset)),
     implement(userTabLogsOp, ({ tabId }) => browser.userTabLogs(tabId)),
     implement(listBrowserFramesOp, ({ attemptId }) => ({ items: browser.frames(attemptId) })),
+    implement(readWebsiteOp, ({ url }) => browser.readUrl(url)),
   ];
 }

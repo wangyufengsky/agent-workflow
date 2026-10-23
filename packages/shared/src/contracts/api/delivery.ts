@@ -6,6 +6,7 @@ import {
   reviewCommentKindSchema,
 } from '../../enums/git.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
+import { attachmentIdsSchema } from './attachments.ts';
 
 /** One merge or pull request of a task (10 §deliveries). */
 export const deliverySchema = z.object({
@@ -45,6 +46,8 @@ export const requestChangesSchema = z.object({
    * viewport, console errors and failed requests itself.
    */
   page: z.object({ tabId: z.string() }).optional(),
+  /** Files attached to the feedback (30); the steps from this change on see them. */
+  attachmentIds: attachmentIdsSchema.optional(),
 });
 export type RequestChangesRequest = z.infer<typeof requestChangesSchema>;
 

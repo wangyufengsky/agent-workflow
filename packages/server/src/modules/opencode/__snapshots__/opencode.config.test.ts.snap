@@ -9026,6 +9026,14 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       },
       "prompt": "<protocol-code-review.md>",
     },
+    "aw-companion": {
+      "description": "companion small talk",
+      "mode": "primary",
+      "permission": {
+        "*": "deny",
+      },
+      "prompt": "<protocol-companion.md>",
+    },
     "aw-executor": {
       "description": "agent-workflow executor",
       "mode": "primary",

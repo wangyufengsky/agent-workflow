@@ -235,6 +235,7 @@ type BrowserHost = {
 - 默认 `[{ pattern: '*', access: 'read' }]`：所有网站可浏览，都只读。用户可以收窄（例如只留内网域名），或给某些网站放开操作。
 - **只读**的实现：AI 会话的标签页对这类网站发出的非 `GET` / `HEAD` / `OPTIONS` 请求（表单提交、`fetch` / `xhr` 写请求）在 `session.webRequest.onBeforeRequest` 里取消。按请求的 `webContentsId` 只拦 AI 的标签页，用户自己登录时不受影响。动作结果写明「已拦下 POST /api/comments（这个网站只允许浏览）」。用 `POST` 做查询的单页应用会因此读不到数据，把它设为可操作即可。这一层由网络层保证，不依赖模型是否听话。
 - **只读也覆盖非 HTTP 的写通道**：建立连接后的 WebSocket 消息 `onBeforeRequest` 看不到，所以只读网站的 `ws:` / `wss:` 连接（`resourceType = webSocket`）直接取消；AI 网站标签页在每个文档创建时（`Page.addScriptToEvaluateOnNewDocument`）去掉 `RTCPeerConnection` 与 `WebTransport`。AI 没有执行任意 JS 的工具（§6），能触发的写通道只剩表单、`fetch` / `xhr` / `sendBeacon`（都是非 GET 的 HTTP 请求）、WebSocket 与这两者，都已覆盖。靠 WebSocket 推送数据的页面（实时看板）在只读下没有数据，设为可操作即可。
+- **Worker 必须有可确认的归属**：Electron 请求层拒绝无法关联到标签页的 Worker 请求；开发 Chromium 在共享 Worker 执行前暂停并关闭它，因为 SharedWorker 可由同一登录分区的多个标签页共享，无法可靠选用单个页面的权限。拒绝事件 `browser.unownedBlocked` 由后端记录，不默认继承用户页面权限。依赖 SharedWorker 的网站可能缺少部分功能，用户登录页也遵守这条未归属限制。
 - **只读按 HTTP 方法判断**：有副作用的 `GET`（如 `/delete?id=1` 这种不规范的接口）拦不住。这类网站不要放进规则，或收窄规则只放文档类网站。
 - **可操作**：与项目预览一样。AI 以用户登录的身份操作这个网站，所以只给明确需要的网站放开。
 - **不允许的地址**：主框架导航返回 `BROWSER_SITE_NOT_ALLOWED`；子框架和子资源拦下，记为被拦的请求。
@@ -493,14 +494,21 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 
 ## 9. 应用助手
 
+2026-10-24 先接入明确地址的只读文字与预览进程管理。下表 `previews.get/start/stop`、`browser.readUrl` 已实现；`browser.read` 与启动后跳到预览页签仍依赖 B2 的用户预览页签及归属关联，尚未实现。不能以某个 AI 会话或最近任务代替「用户当前页」。截图、PDF、视觉输入本期不做。
+
+`browser.readUrl` 的整体截止为 `BROWSER_READ_TIMEOUT_MS`（30000），覆盖打开、导航、稳定与提取。到期以 `BROWSER_READ_FAILED` / `details.reason = timeout` 失败，关闭临时页并取消页面等待计时器；冷启动尚未交付的标签页在交付时检查取消信号并释放。页面稳定的 10000 ms 预算仍单独存在，仅返回 `settled: false`；整体截止不能用部分结果代替失败。
+
 | 操作 | 风险 | 说明 |
 | --- | --- | --- |
-| `previews.start` `{ taskId }` | write | 启动（或复用）任务的预览，界面跳到该任务的预览页签；确认卡片可设「总是允许」 |
+| `previews.get` `{ taskId }` | read | 读取任务预览的状态、明确地址与日志末尾 |
+| `previews.start` `{ taskId }` | write | 启动（或复用）任务的预览并返回地址；确认卡片可设「总是允许」。跳到预览页签待 B2 |
 | `previews.stop` `{ taskId }` | write | 停止预览 |
 | `browser.read` `{}` | read | 用户当前打开的预览页签（「我的预览」）的地址、视口、快照、控制台错误与失败的请求；没有打开的预览页签时返回 `BROWSER_NOT_OPEN` |
-| `browser.readUrl` `{ url }` | read | 用网站会话打开地址（按网站规则，允许的才打开），等页面稳定后返回标题与快照，然后关闭 |
+| `browser.readUrl` `{ url }` | read | 用已有网站登录打开明确的 http(s) 地址，强制只读（包括可操作网站）；返回最终地址、标题、文字快照、稳定标记与错误日志，然后关闭临时标签页 |
 
 助手本期不能点击或输入：它没有被测应用的上下文（不知道改了什么），误操作的后果也不在任何 worktree 的保护里。真实需求出现时，再按同样的动作层开放给它。
+
+网页文字是不可信资料，不是给助手的新指令。已有网站规则继续控制初始导航、子请求与重定向；需要登录时请用户在设置里完成，工具不接收凭据。浏览器加载错误显式返回 `BROWSER_READ_FAILED`，不把浏览器错误页当作读到的网站内容。`settled: false` 表示在既有稳定等待时限内页面仍在变化，不能据此声称页面已完整加载。
 
 ## 10. 数据、接口、枚举与错误码
 
@@ -516,7 +524,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
   - `SiteAccess`：`read` · `interact`；
   - `DeckMaterialKind` 加 `web`；
   - `CheckUnrunnableReason` 加 `preview_never_started` · `preview_not_configured`；`nodeAcceptanceSchema` 的页面体检同样可以标 `skipped`。
-- **常量（08）**：`PREVIEW_START_TIMEOUT_MS` 120000、`PREVIEW_PROBE_INTERVAL_MS` 1000、`PREVIEW_LOG_TAIL_CHARS` 4000、`BROWSER_ACTION_TIMEOUT_MS` 5000、`BROWSER_SETTLE_QUIET_MS` 500、`BROWSER_SETTLE_TIMEOUT_MS` 10000、`BROWSER_SNAPSHOT_MAX_CHARS` 12000、`VIEWPORT_SIZES`。
+- **常量（08）**：`PREVIEW_START_TIMEOUT_MS` 120000、`PREVIEW_PROBE_INTERVAL_MS` 1000、`PREVIEW_LOG_TAIL_CHARS` 4000、`BROWSER_ACTION_TIMEOUT_MS` 5000、`BROWSER_SETTLE_QUIET_MS` 500、`BROWSER_SETTLE_TIMEOUT_MS` 10000、`BROWSER_READ_TIMEOUT_MS` 30000、`BROWSER_SNAPSHOT_MAX_CHARS` 12000、`VIEWPORT_SIZES`。
 - **错误码（08）**：`PREVIEW_NOT_CONFIGURED`、`PREVIEW_START_FAILED`（`details.logTail`）、`PREVIEW_LIMIT_REACHED`、`BROWSER_SITE_NOT_ALLOWED`（`details.host`）、`BROWSER_LOGIN_REQUIRED`（`details.url`）、`BROWSER_REF_STALE`、`BROWSER_ACTION_FAILED`（`details.reason`：`not_visible` · `covered` · `disabled` · `detached` · `not_focusable`；`details.coveredBy`）（以上 B-02 已加）；`BROWSER_NOT_OPEN`（B3，助手 `browser.read`）、`BROWSER_CHECK_UNRUNNABLE`（B2，任务的 `failure` 上，同 `CHECK_COMMAND_UNRUNNABLE`，不作为 HTTP 错误）在实现那一期加。
 - **状态机（09）**：`previewMachine`（09 §12，B-02 已加）；节点 `verifying` 的检查顺序为命令 → 页面体检 → AI 评审。
 - **API（11）**：
@@ -607,7 +615,5 @@ packages/builtin/prompts/         protocol-execute / protocol-review / protocol-
 ## 15. 与统一附件／需求清单的衔接（补充设计，未实现）
 
 - [30](30-attachments.md) 的附件入口属于应用输入，不改变 §1 / §5.4 的网站文件上传与下载禁令。
-- 「附上当前页面」把截图与文字日志注册为有来源的输入附件，保留路径、视口和时间；原有 requestChanges.page 表达捕获意图，由后端实际捕获，不能接受 renderer 编造的检查结果。图片能力识别共用 §5.7。
-- 页面体检／浏览器动作若被 [31](31-requirements-checklist.md) 引用，需先登记不可变检查／证据 ID、内容指纹与元信息；离开页面、关闭会话、清理 worktree 后仍能查看。没有 task 的网站会话不能作为任意任务的通过证据。
-- §7 的健康判定保持 D124：没有报错不自动证明搜索、分页、数据保存等业务要求满足；可访问性／溢出提醒可作为逐项 AI 评审依据，但不能伪装成已通过的业务断言。
-- 任务反馈附新资料或代码改变后，清单结论按 31 失效。浏览器未就绪时，命令／人工／代码评审清单仍可独立使用。
+- 30 首版只支持文本附件。以后加图片时沿用本文 §5.7 的做法：后端不判断模型能力，交给 opencode 处理；界面提示用 §12 V3 的字段。
+- 「附上当前页面」与附件的合并、页面体检作为 [31](31-requirements-checklist.md) 清单项的依据，都留到 B2 之后另行确认。§7 的健康判定保持 D124：没有报错不自动证明业务要求满足。

@@ -120,6 +120,27 @@
       "when": 1792728673288,
       "tag": "0016_project_preview",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1792741828526,
+      "tag": "0017_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1792772072125,
+      "tag": "0018_assistant_outbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1792775582900,
+      "tag": "0019_assistant_task_followups",
+      "breakpoints": true
     }
   ]
 }

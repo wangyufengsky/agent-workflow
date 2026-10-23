@@ -21,9 +21,11 @@ export const PromptName = {
   RuleAssume: 'rule-assume',
   /** The app assistant's agent prompt and its per-turn messages (15). */
   ProtocolAssistant: 'protocol-assistant',
+  ProtocolCompanion: 'protocol-companion',
   AssistantContext: 'assistant-context',
   AssistantConfirmed: 'assistant-confirmed',
   AssistantCancelled: 'assistant-cancelled',
+  AssistantTaskUpdated: 'assistant-task-updated',
   /** The outcome of a knowledge question the assistant asked, sent to its session (18 §4a). */
   AssistantKnowledgeAnswered: 'assistant-knowledge-answered',
   AssistantKnowledgeFailed: 'assistant-knowledge-failed',
@@ -42,6 +44,8 @@ export const PromptName = {
   ProtocolCodeReview: 'protocol-code-review',
   StartGitReview: 'start-git-review',
   StartCommitMessage: 'start-commit-message',
+  /** The files the user attached to a task or an assistant message, as the model reads them (30 §3.2). */
+  Attachments: 'attachments',
 } as const;
 export type PromptName = (typeof PromptName)[keyof typeof PromptName];
 
@@ -71,9 +75,11 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.RuleAsk]: read(PromptName.RuleAsk),
     [PromptName.RuleAssume]: read(PromptName.RuleAssume),
     [PromptName.ProtocolAssistant]: read(PromptName.ProtocolAssistant),
+    [PromptName.ProtocolCompanion]: read(PromptName.ProtocolCompanion),
     [PromptName.AssistantContext]: read(PromptName.AssistantContext),
     [PromptName.AssistantConfirmed]: read(PromptName.AssistantConfirmed),
     [PromptName.AssistantCancelled]: read(PromptName.AssistantCancelled),
+    [PromptName.AssistantTaskUpdated]: read(PromptName.AssistantTaskUpdated),
     [PromptName.AssistantKnowledgeAnswered]: read(PromptName.AssistantKnowledgeAnswered),
     [PromptName.AssistantKnowledgeFailed]: read(PromptName.AssistantKnowledgeFailed),
     [PromptName.ProtocolResearch]: read(PromptName.ProtocolResearch),
@@ -88,6 +94,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.ProtocolCodeReview]: read(PromptName.ProtocolCodeReview),
     [PromptName.StartGitReview]: read(PromptName.StartGitReview),
     [PromptName.StartCommitMessage]: read(PromptName.StartCommitMessage),
+    [PromptName.Attachments]: read(PromptName.Attachments),
   };
 }
 

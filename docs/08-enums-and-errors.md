@@ -124,7 +124,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | --- | --- | --- |
 | `AssistantConfirmationStatus` | `pending` · `confirmed` · `cancelled` | 确认卡片（09 §10） |
 | `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` | 助手专用工具（15 §3）；其余工具由操作清单生成 |
-| `AssistantPage` | `home` · `tasks` · `task` · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` · `ppt` · `ppt_deck`（23 §9） · `batches` · `batch` · `schedules` · `schedule` · `environment`（28 §4） | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId` / `deckId` / `batchId` / `scheduleId`；PPT 工作台另可带选中的页 `slideId`） |
+| `AssistantPage` | `desktop`（桌宠来源，不带任务参数） · `home` · `tasks` · `task` · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` · `ppt` · `ppt_deck`（23 §9） · `batches` · `batch` · `schedules` · `schedule` · `environment`（28 §4） | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId` / `deckId` / `batchId` / `scheduleId`；PPT 工作台另可带选中的页 `slideId`） |
 | `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） · `schedule`（22 §10） · `deck`（23 §9） · `git_review`（27 §7.1） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
 | `InputRef` | `EntityKind` 的全部取值 · `inbox_item` · `node`（同一输入中 `id` 所指任务的步骤） · `attempt` | 操作契约 `refs`：输入字段指向的对象（`enums/entity.ts`）；助手确认卡片据此把 id 显示为对象名称，标签为对象类型（D84）；`workflow` 字段可以是流程 id 或 key |
 | `AssistantForm` | `tasks.create` · `projects.create` · `projects.setHosting` · `databases.create` · `databases.update` | `open_form` 能打开的表单，以其提交的操作命名（`ASSISTANT_FORM_OPERATION`）；预填值的 schema 为该操作的助手输入（不含凭据字段）的 partial |
@@ -219,6 +219,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `OPENCODE_AGENT_NAME` | `{ planner: 'aw-planner', executor: 'aw-executor', reviewer: 'aw-reviewer', researcher: 'aw-researcher', slides_writer: 'aw-slides' }` | 按 `SessionAgent`；`aw-researcher` 为知识研究员（v1.1，18 §5.1），`aw-slides` 为 PPT 写作者（v1.2，23 §7.1），`code_reviewer: 'aw-code-reviewer'` 为 Git 工作台的审查员（v1.2，27 §4.3） |
 | `MCP_SERVER_NAME` | `agent-workflow` | 执行 MCP；opencode 中工具名为 `agent-workflow_<tool>` |
 | `MCP_ASSISTANT_SERVER_NAME` | `agent-workflow-app` | 助手 MCP（v1.1）；opencode 中工具名为 `agent-workflow-app_<tool>` |
+| `OPENCODE_COMPANION_AGENT` / `COMPANION_WHISPER_TIMEOUT_MS` / `COMPANION_WHISPER_MAX_CHARS` | `aw-companion` / `60000` / `120` | 独立无工具碎碎念与单次超时（32 §3.4） |
 | `OPENCODE_ASSISTANT_AGENT` | `aw-assistant` | 助手的 agent（v1.1） |
 | `TASK_KEY_PREFIX` | `T-` | 任务编号 `T-<自增>` |
 | `BATCH_KEY_PREFIX` | `B-` | 批次编号 `B-<自增>`（20 §6） |
@@ -285,6 +286,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `SCHEDULE_EVERY_HOURS` | `[1, 2, 3, 4, 6, 8, 12]`（`hourly` 可选的间隔，24 的约数，D90） |
 | `ASSISTANT_TITLE_MAX_CHARS` | 40（助手对话标题取第一条消息的首行） |
 | `ASSISTANT_MESSAGE_MAX_CHARS` | 20000（一条发给助手的消息） |
+| `ASSISTANT_CONTEXT_MAX_CHARS` | 12000（一次显式附加的选中文字；任务／步骤快照正文超长时注明截断） |
 | `KNOWLEDGE_QUESTION_MAX_CHARS` | 4000（一次提问） |
 | `KNOWLEDGE_TITLE_MAX_CHARS` | 80（知识对话标题取第一次提问的首行） |
 | `KNOWLEDGE_ANSWER_MAX_CHARS` | 20000（`submit_answer` 的回答） |
@@ -317,6 +319,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `PREVIEW_LOG_TAIL_CHARS` | 4000（预览起不来时保留的日志末尾） |
 | `PREVIEW_PAGES_MAX` | 10（项目预览配置的关键页面数） |
 | `BROWSER_ACTION_TIMEOUT_MS` | 5000（等目标可以点中，29 §5.5） |
+| `BROWSER_READ_TIMEOUT_MS` | 30000（助手文字读取从打开到提取的整体截止，超时关闭临时标签页） |
 | `BROWSER_SETTLE_QUIET_MS` / `BROWSER_SETTLE_TIMEOUT_MS` | 500 / 10000（动作后等页面稳定：请求清零、DOM 无变动各持续多久，最多等多久） |
 | `BROWSER_WAIT_FOR_MAX_MS` | 10000（`browser_wait_for` 最长等待） |
 | `BROWSER_SNAPSHOT_MAX_CHARS` | 12000（页面快照的长度上限，29 §5.6） |
@@ -340,6 +343,13 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |
 | `opencode.binaryPath` | `null`（从 PATH 与 `~/.opencode/bin` 查找；助手不能修改，D65） | 专业 |
 | `assistant.alwaysAllow` | `[]`（操作 id 列表；只有 write 级生效，critical 即使在列表中也每次确认；助手自己不能修改，D65；v1.1） | 简单 |
+| `companion.appearance` | `orb`（`CompanionAppearance`：`orb` / `whale`，默认极光光球；32 §3） | 简单 |
+| `companion.enabled` | `false`（桌面显示助手） | 简单 |
+| `companion.animations` | `true`（系统减少动态效果仍优先） | 简单 |
+| `companion.size` | `180`（整数 120–300） | 简单 |
+| `companion.whisper` | `false`（自动碎碎念） | 简单 |
+| `companion.whisperMinutes` | `15`（整数 1–120 分钟） | 简单 |
+| `companion.notifications` | `true`（后台系统通知；应用内提醒独立显示） | 简单 |
 | `preview.maxRunning` | `3`（同时运行的页面预览，29 §4.4） | 专业 |
 | `preview.idleMinutes` | `10`（没有标签页、没有活动尝试多久后停止预览） | 专业 |
 | `browser.sites` | `[{ pattern: '*', access: 'read' }]`（网站规则，按顺序取第一条匹配，无匹配不允许；助手不能修改，D65 的同一思路，29 §5.4） | 简单 |
@@ -483,6 +493,7 @@ class AppError extends Error {
 | `PREVIEW_LIMIT_REACHED` | 409 | 同时运行的预览已达 `preview.maxRunning`，且都有标签页在用（29 §4.4）；`details: { maxRunning, taskIds }`，`taskIds` 为占用中的任务 |
 | `BROWSER_SITE_NOT_ALLOWED` | 403 | 地址既不是任务预览，也没有网站规则允许（29 §5.4）；`details: { host }` |
 | `BROWSER_LOGIN_REQUIRED` | 409 | 打开网站后到了登录页；`details: { url }`（登录页地址） |
+| `BROWSER_READ_FAILED` | 502 | 助手网页导航失败（含重定向被网站规则拦截）或整体读取超时；`details: { url, reason, timeoutMs? }`，reason 为浏览器返回的加载错误，或超时的 `timeout`（携带 timeoutMs） |
 | `BROWSER_REF_STALE` | — | 元素编号已作废（页面导航过），先重新读取快照；仅 MCP |
 | `BROWSER_ACTION_FAILED` | — | 动作没能完成；`details: { reason, coveredBy? }`，`reason` 为 `BrowserActionFailure`；仅 MCP |
 
@@ -521,3 +532,40 @@ class AppError extends Error {
 ### 5.6 审查问题校验子码（`GIT_REVIEW_FINDINGS_INVALID.details.problems[].code`）
 
 枚举 `FindingProblemCode`，hint 为常量 `FINDING_PROBLEM_HINT`（英文，给模型看），在 `shared/errors/finding-problems.ts`；每项带 `index`（问题在 `findings` 中的位置）：`PATH_NOT_IN_DIFF`（文件不在审查开始时的改动清单中）· `LINE_OUT_OF_RANGE`（行号不在所指版本的文件里，带 `lineCount`）（27 §4.4）。
+
+## 6. 待实施契约：统一附件与需求清单
+
+以下是 30 / 31（精简版）的设计登记。**附件的枚举、常量与错误码已在 U-01 加入 shared**（`enums/attachment.ts`、`constants/limits.ts`、`errors/codes.ts`）；其余未加入源码，不能当作当前接口可用。
+
+| 枚举／类型 | 值 |
+| --- | --- |
+| AttachmentSource | upload · project_file |
+| AttachmentOwnerKind | task_input（owner 为任务）· task_feedback（owner 为追加的修改节点）· assistant_message（owner 为助手对话） |
+| AssistantToolName 增量（U-02 已实现） | read_attachment |
+| InputRef 增量（U-03 已实现） | attachment（确认卡把附件 ID 显示为文件名） |
+| McpToolName 增量（U-02 已实现） | read_attachment |
+| NodeKind 增量 | verify（核验验收清单的系统步骤） |
+| RequirementVerification | command · ai_review · manual |
+| RequirementResultSource | command · ai · user |
+| RequirementConclusion | pass · fail · unverified（命令与 AI）；pass · fail · waive（用户） |
+| RequirementDisplayStatus（派生，不持久化） | passed · failed · unverified · stale · waived |
+
+| 常量 | 值 |
+| --- | --- |
+| ATTACHMENTS_PER_INPUT_MAX | 10 |
+| ATTACHMENT_BYTES_MAX | 5 MiB |
+| ATTACHMENT_NAME_MAX_CHARS | 255（显示名） |
+| ATTACHMENT_PROMPT_MAX_CHARS / ATTACHMENT_READ_MAX_CHARS | 20,000（一次提示词里全部附件合计）/ 12,000（每次读取）（U-02 已实现） |
+| ATTACHMENT_ORPHAN_TTL_MS / ATTACHMENT_CLEANUP_INTERVAL_MS | 86,400,000（无引用附件的保留时间）/ 3,600,000（清理间隔） |
+| REQUIREMENTS_MAX | 30 |
+| REQUIREMENT_TITLE_MAX_CHARS / REQUIREMENT_EXPECTED_MAX_CHARS / REQUIREMENT_NOTE_MAX_CHARS | 120 / 2,000 / 4,000 |
+
+| 错误码 | HTTP | 含义 |
+| --- | --- | --- |
+| ATTACHMENT_NOT_FOUND | 404 | 不存在或不在当前范围（其他任务／对话），不泄露内容 |
+| ATTACHMENT_INVALID_TYPE | 400 | 不是严格 UTF-8 或含 NUL 字节（首版只支持文本） |
+| ATTACHMENT_TOO_LARGE | 413 | 大小或单次输入个数超限，`details.limit` 为超过的那个上限值 |
+| ATTACHMENT_SOURCE_INVALID | 400 | 项目文件越界（含 `.git` 内）、指向根外的符号链接、不存在或非普通文件（`details.reason`：`outside` · `missing`）、行号超出末尾（`details.lineCount`），或任务在该项目没有可用的工作区 |
+| REQUIREMENTS_NOT_EDITABLE | 409 | 任务状态不允许编辑清单（`running` 等），或不在 `review` 时请求重新核验／人工结论 |
+| REQUIREMENT_RESULTS_INVALID | 400 | 非核验节点提交 `requirement_results`，或项不属于当前版本、不是 AI 核验项、重复 |
+| REQUIREMENTS_UNACKNOWLEDGED | 409 | 交付时有未满足的必需项，而没有带 `acknowledgedRequirementsRevisionId` 或它不是当前清单版本；`details.items` 列出这些项 |
