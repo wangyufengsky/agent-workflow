@@ -49,7 +49,7 @@ export function ProjectPreviewForm({ project }: { project: ProjectDetailDTO }) {
             extraOrigins: lines(extraOrigins),
           };
     // Saving remounts this form (it is keyed by the project's update time), so the toast follows the promise:
-    // per-call callbacks of an unmounted mutation do not run.
+    // per-call callbacks of an unmounted mutation do not run. A failure shows through the mutation's state.
     update.mutateAsync({ id: project.id, preview }).then(
       () => toast(C.saved),
       () => undefined,

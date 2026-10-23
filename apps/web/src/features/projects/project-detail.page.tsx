@@ -32,15 +32,19 @@ function ProjectForm({ project }: { project: ProjectDetailDTO }) {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const command = checkCommand.trim();
-    update.mutate(
-      {
+    // Saving remounts this form (keyed by the project's update time): per-call callbacks of a mutation whose
+    // component unmounted never run, so the toast follows the promise. A failure shows through the mutation's state.
+    update
+      .mutateAsync({
         id: project.id,
         name: name.trim(),
         defaultBranch: defaultBranch.trim(),
         checkCommand: command === '' ? null : command,
-      },
-      { onSuccess: () => toast(C.saved) },
-    );
+      })
+      .then(
+        () => toast(C.saved),
+        () => undefined,
+      );
   };
 
   return (
