@@ -388,3 +388,7 @@ export const submitPlanTool = defineMcpTool({
 | 内部事件（M2） | `modules/opencode/opencode.events.ts` 只解析用到的事件（消息角色、文本与增量、工具、用量、重试、空闲、错误、权限），加上运行时消失的 `runtime_lost`；其他模块只经 `OpencodeClient.subscribe` 获取 |
 | 数据目录 | opencode 会话存于用户自己的 opencode 数据目录（与用户 TUI 共享，登录凭据也在那里），本应用不隔离；会话标题带任务编号便于辨认 |
 | 免费模型 | 调用模型的测试（`@opencode` bridge 测试与 `pnpm test:live`）用免费模型，不产生费用，默认值只在 `packages/server/test/helpers/model.ts` 的 `TEST_MODEL` 定义：`opencode-go/deepseek-v4.1-flash`（opencode go 订阅内免费，比 `beam-free` 强），`AW_OC_TEST_MODEL` 可覆盖（D62）。历史：M0 用 `opencode/glm-5.3-flash-free`，2026-10-19 额度用尽后改为 `opencode/beam-free`（D42）；2026-10-20 起 `opencode/*-free` 对开发机网络返回 FreeTierError 403，改用 `opencode-go/beam-free`（D50）；2026-10-21 改为 `opencode-go/deepseek-v4.1-flash`（D62），M6 验收中两者的 live 结果见 16 |
+
+### 桌宠碎碎念隔离（32）
+
+新增 `aw-companion` 主 agent，使用 `protocol-companion.md` 自有提示词，权限 `{ "*": "deny" }`；创建临时会话时再次设置全工具 deny。它不属于执行 attempt 或助手 conversation，也不增加任何 MCP 工具。`assistant.whisper` 与 `assistant.stopWhisper` 仅供界面使用，不对模型暴露。

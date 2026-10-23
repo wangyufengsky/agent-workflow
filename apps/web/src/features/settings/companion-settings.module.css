@@ -1,0 +1,13 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.preview {
+  align-items: center;
+}
+.motions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}

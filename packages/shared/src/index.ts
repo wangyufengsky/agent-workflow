@@ -24,6 +24,7 @@ export * from './contracts/api/workflows.ts';
 export * from './contracts/backend-port.ts';
 export * from './contracts/bridge.ts';
 export * from './contracts/browser-port.ts';
+export * from './contracts/companion.ts';
 export * from './contracts/credential-port.ts';
 export * from './contracts/deck/slide.ts';
 export * from './contracts/events/server-events.ts';

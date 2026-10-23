@@ -327,6 +327,11 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/assistant/confirmations/:id/confirm` | `{ alwaysAllow? }`：执行操作并把结果作为下一条消息发回会话；`alwaysAllow` 只允许 write 级（critical 400 `VALIDATION_FAILED`），同时把操作加入 `assistant.alwaysAllow`；已处理 409 `STATE_TRANSITION_INVALID`；不存在 404 `ASSISTANT_CONFIRMATION_NOT_FOUND` |
 | POST | `/assistant/confirmations/:id/cancel` | 会话收到「用户取消了该操作」 |
 
+| POST | `/assistant/whisper` | `assistant.whisper`，`{}` → `{ text }`（1–120 字符）；沿用默认模型，独立 `aw-companion` 会话，禁用全部工具，不保存到工作聊天；并发 409 `ASSISTANT_BUSY`，运行时不可用 `OPENCODE_NOT_READY`，空输出／模型错误／取消／超时 `OPENCODE_REQUEST_FAILED`。write，不暴露给助手或命令面板 |
+| POST | `/assistant/whisper/stop` | `assistant.stopWhisper`，`{}` → 204；取消在途生成并清理临时会话；无在途请求时仍成功 |
+
+桌宠复用全部对话端点，`AssistantPage.Desktop = desktop` 的参数为空。角色窗口的本地 IPC 边界见 [32 §4](32-companion-assistant.md#4-实现分层)。
+
 ## 13a. 知识问答（v1.1）
 
 见 [18-knowledge.md §4](18-knowledge.md#4-api操作清单)。全部 `mode = simple`、`expose.assistant = true`、不进命令面板（D68）。

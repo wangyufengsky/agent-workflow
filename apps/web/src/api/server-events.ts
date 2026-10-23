@@ -15,6 +15,7 @@ import {
   updateConversation,
 } from '../features/assistant/assistant.queries.ts';
 import { appendTranscript, attemptTranscript, updateAttempt } from '../features/attempts/attempt.queries.ts';
+import { connectCompanionEvents } from '../features/companion/companion-events.ts';
 import { refreshGitReview } from '../features/git/git.queries.ts';
 import { updateInbox } from '../features/inbox/inbox.queries.ts';
 import { refreshKnowledge } from '../features/knowledge/knowledge.queries.ts';
@@ -108,15 +109,24 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
 export function useServerEvents(): void {
   const queryClient = useQueryClient();
   useEffect(() => {
+    const companion = window.aw?.companion.surface === null ? undefined : connectCompanionEvents(queryClient);
     const source = new EventSource(`${API_PREFIX}/events?token=${encodeURIComponent(apiToken())}`);
     for (const { shape } of serverEventSchema.options) {
       const type = shape.type.value;
       source.addEventListener(type, (message) => {
         // The backend is a boundary: events are parsed with the shared schema.
-        void applyEvent(queryClient, serverEventSchema.parse({ type, data: JSON.parse(message.data) }));
+        const event = serverEventSchema.parse({ type, data: JSON.parse(message.data) });
+        companion?.event(event);
+        void applyEvent(queryClient, event);
       });
     }
-    source.addEventListener(ServerEventType.Resync, () => void queryClient.invalidateQueries());
-    return () => source.close();
+    source.addEventListener(ServerEventType.Resync, () => {
+      void queryClient.invalidateQueries();
+      void companion?.resync();
+    });
+    return () => {
+      source.close();
+      companion?.close();
+    };
   }, [queryClient]);
 }

@@ -2,6 +2,19 @@ import { expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import { appTool, createProject, createRepo, patchSettings, queueAssistantTurn, queueTurn } from './helpers.ts';
 
+let hangingProjectId: string | undefined;
+test.afterEach(async ({ request }) => {
+  if (hangingProjectId === undefined) return;
+  const projectId = hangingProjectId;
+  hangingProjectId = undefined;
+  // 本文件故意挂起执行以观察忙碌状态；结束后释放共享后端的调度槽位。
+  const tasks = await (await request.get(`${API_BASE}/tasks?projectId=${projectId}`, { headers: AUTH })).json();
+  for (const task of tasks.items) {
+    const response = await request.post(`${API_BASE}/tasks/${task.id}/cancel`, { headers: AUTH, data: {} });
+    expect(response.ok()).toBe(true);
+  }
+});
+
 // J11 and the panel smoke (A-06–A-08): the assistant's turns are played by FakeOpencode through the assistant MCP.
 // The file name sorts after onboarding.browser.spec.ts, which needs the shared backend without any project.
 
@@ -11,6 +24,7 @@ test.beforeEach(({ request }) =>
 
 test('J11 对助手说开始任务 → 确认卡片 → 任务运行', async ({ page, request }) => {
   const project = await createProject(request, null);
+  hangingProjectId = project.id;
   const workflows: { items: { id: string; key: string }[] } = await (
     await request.get(`${API_BASE}/workflows`, { headers: AUTH })
   ).json();
@@ -157,6 +171,7 @@ test('J25 主页：让助手开始任务 → 主页上的确认卡片 → 导航
   const bugfix = workflows.items.find((w) => w.key === 'bugfix');
   if (bugfix === undefined) throw new Error('no bugfix workflow');
   const requirement = '主页开的任务：登录页记不住密码';
+  hangingProjectId = project.id;
   await queueAssistantTurn(request, [
     appTool('tasks_create', { projectId: project.id, workflowId: bugfix.id, requirement }),
     { type: 'text', text: '用修 Bug 流程来做，请在卡片上确认。' },

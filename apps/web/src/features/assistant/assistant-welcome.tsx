@@ -1,6 +1,7 @@
 import type { AssistantConversationDTO } from '@aw/shared';
 import { ErrorState } from '../../components/error-state.tsx';
 import { ASSISTANT_COPY as C } from '../../copy/assistant.ts';
+import { Character } from '../companion/character.tsx';
 import styles from './assistant.module.css';
 import { useAsk } from './use-ask.ts';
 
@@ -9,7 +10,7 @@ export function AssistantWelcome({ conversation }: { conversation: AssistantConv
   const { ask, isPending, error } = useAsk();
   return (
     <div className={styles.welcome}>
-      <span className={styles.orb} data-size="lg" aria-hidden="true" />
+      <Character size="lg" />
       <h2 className={styles.greeting}>{C.greeting}</h2>
       <p className={styles.welcomeBody}>{C.empty}</p>
       <div className={styles.suggestions}>

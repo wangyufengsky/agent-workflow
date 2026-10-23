@@ -21,6 +21,7 @@ export const PromptName = {
   RuleAssume: 'rule-assume',
   /** The app assistant's agent prompt and its per-turn messages (15). */
   ProtocolAssistant: 'protocol-assistant',
+  ProtocolCompanion: 'protocol-companion',
   AssistantContext: 'assistant-context',
   AssistantConfirmed: 'assistant-confirmed',
   AssistantCancelled: 'assistant-cancelled',
@@ -71,6 +72,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.RuleAsk]: read(PromptName.RuleAsk),
     [PromptName.RuleAssume]: read(PromptName.RuleAssume),
     [PromptName.ProtocolAssistant]: read(PromptName.ProtocolAssistant),
+    [PromptName.ProtocolCompanion]: read(PromptName.ProtocolCompanion),
     [PromptName.AssistantContext]: read(PromptName.AssistantContext),
     [PromptName.AssistantConfirmed]: read(PromptName.AssistantConfirmed),
     [PromptName.AssistantCancelled]: read(PromptName.AssistantCancelled),

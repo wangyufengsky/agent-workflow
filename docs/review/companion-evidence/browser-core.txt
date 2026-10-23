@@ -1,0 +1,84 @@
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 39 tests using 1 worker
+
+(node:28514) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [browser] › e2e/components.browser.spec.ts:7:3 › 组件走查截图：deepseek (1.3s)
+  ✓   2 [browser] › e2e/components.browser.spec.ts:7:3 › 组件走查截图：warm (704ms)
+  ✓   3 [browser] › e2e/components.browser.spec.ts:7:3 › 组件走查截图：spdb (718ms)
+  ✓   4 [browser] › e2e/components.browser.spec.ts:7:3 › 组件走查截图：github_white (862ms)
+
+  ✓   5 [browser] › e2e/onboarding.browser.spec.ts:6:1 › 首次启动：环境检测通过 → 添加项目 → 切换主题与模式无需刷新 (1.3s)
+
+  ✓   6 [browser] › e2e/palette.browser.spec.ts:7:1 › ⌘K 命令面板：切换主题、打开任务 (589ms)
+
+  ✓   7 [browser] › e2e/ppt.browser.spec.ts:31:1 › J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 让 AI 改 → 恢复上一版 → 换风格 → 导出 PowerPoint → 放映 (2.0s)
+
+  ✓   8 [browser] › e2e/pro-databases.browser.spec.ts:32:1 › J21 添加 PostgreSQL 连接 → 测试连接 → 浏览表结构 → 关联项目 → AI 只读查询并引用 (2.4s)
+
+  ✓   9 [browser] › e2e/pro-git.browser.spec.ts:58:1 › J24 Git 工作台：暂存 → AI 草拟并提交 → 新建分支再提交 → AI 审查分支并定位问题 → 压缩合并到 main → 推送 (10.2s)
+
+  ✓  10 [browser] › e2e/pro-git.browser.spec.ts:152:1 › J24 合并冲突交给 AI：工作台合并冲突 → 合并任务解决冲突 → 在结果卡合并 → main 有两边的改动 (4.1s)
+
+  ✓  11 [browser] › e2e/pro-git.browser.spec.ts:188:1 › 主页开始任务：总能看到并选择项目，基于分支只列所选项目的分支，换项目后回到默认分支 (1.2s)
+
+  ✓  12 [browser] › e2e/pro-plan.browser.spec.ts:31:1 › J7 专业模式：开启确认计划 → 编辑计划（在连线上加步骤）→ 确认 → 按新计划执行 (3.4s)
+
+  ✓  13 [browser] › e2e/pro-plan.browser.spec.ts:62:1 › 步骤操作冒烟：暂停 → 跳过步骤 → 中止会话 → 继续执行 (3.4s)
+
+  ✓  14 [browser] › e2e/pro-plan.browser.spec.ts:97:1 › J23 画布：在连线上插入步骤 → 滑出后适应画布 → 删除后前后自动相连 → 撤销 → 保存 (2.6s)
+
+  ✓  15 [browser] › e2e/pro-workflow.browser.spec.ts:18:1 › J8 专业模式：复制内置流程 → 修改 → 用它跑通一个任务 (3.4s)
+  ✓  16 [browser] › e2e/pro-workflow.browser.spec.ts:67:1 › 简单模式直接打开专业页面：说明属于专业模式，可一键开启 (552ms)
+
+  ✓  17 [browser] › e2e/project-knowledge.browser.spec.ts:40:1 › J12 提问 → 研究过程 → 带引用的回答 → 点击引用看原文 → 续问 → 对话记录 (2.0s)
+
+  ✓  18 [browser] › e2e/project-knowledge.browser.spec.ts:104:1 › J13 对助手提问 → 正在查资料 → 带引用的回答 → 点引用看原文 → 卡片打开知识问答对话 (2.7s)
+
+  ✓  19 [browser] › e2e/project-knowledge.browser.spec.ts:175:1 › J14 回答流式出现：引用先待核对、提交通过后可点击；换模型续问，对话与记录显示模型 (2.1s)
+
+  ✓  20 [browser] › e2e/shell-assistant.browser.spec.ts:25:1 › J11 对助手说开始任务 → 确认卡片 → 任务运行 (2.4s)
+
+  ✓  21 [browser] › e2e/shell-assistant.browser.spec.ts:82:1 › 主页的建议在主页上提问；open_page 带用户离开时面板接着显示对话；卡片上「总是允许」后可在设置中撤销 (3.4s)
+
+  ✓  22 [browser] › e2e/shell-assistant.browser.spec.ts:121:1 › 总是允许的调用直接执行并出现对象卡片；对象删除后卡片显示「已删除」 (2.6s)
+
+  ✓  23 [browser] › e2e/shell-assistant.browser.spec.ts:163:1 › J25 主页：让助手开始任务 → 主页上的确认卡片 → 导航卡片与工作概览 → 打开任务页，面板接着显示同一对话 (3.1s)
+
+  ✓  24 [browser] › e2e/shell-companion.browser.spec.ts:13:1 › 默认光球可预览工作与完成动画，切换鲸鱼会持久化并遵守减少动态效果 (2.1s)
+  ✓  25 [browser] › e2e/shell-companion.browser.spec.ts:56:1 › 桌宠页面复用助手聊天、碎碎念隔离，鲸鱼素材失败有显式提示 (888ms)
+
+  ✓  26 [browser] › e2e/shell-companion.browser.spec.ts:88:1 › 真实任务事件驱动光球庆祝，待检查与完成分别提醒，旧通知不覆盖新通知 (3.0s)
+
+  ✓  27 [browser] › e2e/stream.browser.spec.ts:29:1 › J22 步骤的会话流：思考、固定高度、上翻后回到最新、结束后收起成一行、专业步骤页 (5.1s)
+
+  ✓  28 [browser] › e2e/stream.browser.spec.ts:119:1 › J22 知识问答的研究过程：正在思考，停止后保留会话流 (1.0s)
+
+  ✓  29 [browser] › e2e/task-batch.browser.spec.ts:23:1 › J17 主页「补单元测试」的「批量」→ 选 3 个目录 → 三个任务各自跑完 → 合并全部 → 主分支 3 个提交 (4.0s)
+
+  ✓  30 [browser] › e2e/task-delivery.browser.spec.ts:47:1 › J5 合并到 main（squash）→ 主分支有提交、worktree 已清理、任务已完成 (1.7s)
+
+  ✓  31 [browser] › e2e/task-delivery.browser.spec.ts:73:1 › J6 两个任务改同一文件 → 第二个合并冲突 → 交给 AI 解决 → 合并成功 (4.1s)
+
+  ✓  32 [browser] › e2e/task-delivery.browser.spec.ts:108:1 › 三个任务同时运行改同一文件：各自分支与工作区互不阻塞；依次合并，第二、三个冲突交给 AI 解决（01 §5 第 3 条） (3.3s)
+
+  ✓  33 [browser] › e2e/task-insights.browser.spec.ts:37:1 › J16 质量与用量：简单视图本周三个数，专业视图用量与质量，钻取失败原因到任务页，四主题切换 (3.3s)
+
+  ✓  34 [browser] › e2e/task-review.browser.spec.ts:30:1 › J18 PR 审查意见 → 取回并勾选 → AI 按意见修改 → 推送到同一个 PR (3.1s)
+
+  ✓  35 [browser] › e2e/task-schedule.browser.spec.ts:22:1 › J19 主页「补单元测试」的「定时」→ 每周一、五 03:30 → 立即运行一次 → 「需要你处理」注明来自定时任务 → 合并 → 暂停 (2.3s)
+
+  ✓  36 [browser] › e2e/task.browser.spec.ts:16:1 › J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开始 → 结果卡显示改动与检查通过 → 步骤摘要与大视图 diff (1.7s)
+
+  ✓  37 [browser] › e2e/task.browser.spec.ts:74:1 › J2 AI 阻塞提问 → 在需要你处理中作答 → 节点继续 → 完成 (1.4s)
+
+  ✓  38 [browser] › e2e/task.browser.spec.ts:111:1 › J3 权限请求 → 允许一次 → 继续；总是允许 → 记到项目 → 专业模式的项目设置中撤销（D101） (1.6s)
+
+  ✓  39 [browser] › e2e/task.browser.spec.ts:143:1 › J4 检查失败 → 自动重试成功；另一步骤预算耗尽 → 任务失败 → 用户重试 → 完成 (2.0s)
+
+  39 passed (1.8m)

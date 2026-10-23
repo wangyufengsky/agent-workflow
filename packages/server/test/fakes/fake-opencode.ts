@@ -367,6 +367,10 @@ export function createFakeOpencode() {
       turns.add(turn);
       void turn.finally(() => turns.delete(turn));
     },
+    async deleteSession({ sessionId }) {
+      const index = sessions.findIndex((s) => s.id === sessionId);
+      if (index >= 0) sessions.splice(index, 1);
+    },
     async abort({ sessionId }) {
       aborts.push(sessionId);
       // An HTTP request to opencode: events already on their way arrive first, like the usage of the step that just
