@@ -162,6 +162,7 @@ const taskRoute = createRoute({
     open: z.boolean().optional(),
     tab: z.enum(NodeTab).optional(),
     details: z.boolean().optional(),
+    preview: z.boolean().optional(),
   }),
   component: TaskPage,
 });

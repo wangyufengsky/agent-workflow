@@ -113,6 +113,7 @@ export const ErrorCode = {
   BrowserSiteNotAllowed: 'BROWSER_SITE_NOT_ALLOWED',
   BrowserLoginRequired: 'BROWSER_LOGIN_REQUIRED',
   BrowserReadFailed: 'BROWSER_READ_FAILED',
+  BrowserNotOpen: 'BROWSER_NOT_OPEN',
   BrowserRefStale: 'BROWSER_REF_STALE',
   BrowserActionFailed: 'BROWSER_ACTION_FAILED',
   // 附件（30）
@@ -219,6 +220,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.BrowserSiteNotAllowed]: 403,
   [ErrorCode.BrowserLoginRequired]: 409,
   [ErrorCode.BrowserReadFailed]: 502,
+  [ErrorCode.BrowserNotOpen]: 409,
   [ErrorCode.BrowserRefStale]: null,
   [ErrorCode.BrowserActionFailed]: null,
   [ErrorCode.AttachmentNotFound]: 404,

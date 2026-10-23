@@ -97,6 +97,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.BrowserSiteNotAllowed]: '这个网站不在允许的范围内，可以在设置的「网站」里添加规则。',
   [ErrorCode.BrowserLoginRequired]: '这个网站需要登录，先在设置的「网站登录」里登录。',
   [ErrorCode.BrowserReadFailed]: '网页加载失败，请检查地址或网络连接。',
+  [ErrorCode.BrowserNotOpen]: '请先在桌面版打开任务的「我的预览」。',
   [ErrorCode.BrowserRefStale]: '页面已经变了，需要重新读取页面。',
   [ErrorCode.BrowserActionFailed]: '没能在页面上完成这个操作。',
   [ErrorCode.AttachmentNotFound]: '这份资料不存在或已失效，请重新添加。',

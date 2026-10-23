@@ -487,7 +487,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 
 ## 9. 应用助手
 
-2026-10-24 先接入明确地址的只读文字与预览进程管理。下表 `previews.get/start/stop`、`browser.readUrl` 已实现；`browser.read` 与启动后跳到预览页签仍依赖 B2 的用户预览页签及归属关联，尚未实现。不能以某个 AI 会话或最近任务代替「用户当前页」。截图、PDF、视觉输入本期不做。
+2026-10-24 接入明确地址的只读文字、预览进程管理，以及 B2 的最小用户预览依赖切片。下表 `previews.get/start/stop`、`browser.readUrl` 和助手专用 `browser_read` 已实现。Electron 任务页新增「进度 / 预览」，用户点击「打开我的预览」后打开真实用户页签；普通浏览器仅显示桌面版提示。尚未包含 AI 观看画面、底栏完整调试工具、启动后自动导航；截图、PDF、视觉输入本期不做。
 
 `browser.readUrl` 的整体截止为 `BROWSER_READ_TIMEOUT_MS`（30000），覆盖打开、导航、稳定与提取。到期以 `BROWSER_READ_FAILED` / `details.reason = timeout` 失败，关闭临时页并取消页面等待计时器；冷启动尚未交付的标签页在交付时检查取消信号并释放。页面稳定的 10000 ms 预算仍单独存在，仅返回 `settled: false`；整体截止不能用部分结果代替失败。
 
@@ -496,10 +496,12 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 | `previews.get` `{ taskId }` | read | 读取任务预览的状态、明确地址与日志末尾 |
 | `previews.start` `{ taskId }` | write | 启动（或复用）任务的预览并返回地址；确认卡片可设「总是允许」。跳到预览页签待 B2 |
 | `previews.stop` `{ taskId }` | write | 停止预览 |
-| `browser.read` `{}` | read | 用户当前打开的预览页签（「我的预览」）的地址、视口、快照、控制台错误与失败的请求；没有打开的预览页签时返回 `BROWSER_NOT_OPEN` |
+| `browser_read` `{}` | read | 调用对话由界面明确关联的「我的预览」地址、视口、文字快照、控制台错误与失败请求；严格空参数，不能提供 taskId/tabId；没有有效关联返回 `BROWSER_NOT_OPEN` |
 | `browser.readUrl` `{ url }` | read | 用已有网站登录打开明确的 http(s) 地址，强制只读（包括可操作网站）；返回最终地址、标题、文字快照、稳定标记与错误日志，然后关闭临时标签页 |
 
 助手本期不能点击或输入：它没有被测应用的上下文（不知道改了什么），误操作的后果也不在任何 worktree 的保护里。真实需求出现时，再按同样的动作层开放给它。
+
+用户预览由独立的内存 registry 持有，按任务复用、按项目分区，与 AI 尝试页签分离。界面通过 `assistant.bindPreview` 明确关联当前对话；模型不能调用这个操作，也不能从发送消息的页面参数取得授权。离开路由或切回进度时解绑，切换对话时清除旧关联并绑定新对话。助手、命令面板和模态框只隐藏原生视图，用户仍在预览中，关联保留。原生页面聚焦时 `⌘/Ctrl+J`、`⌘/Ctrl+K` 回到主界面。用户关闭页签、任务完成/取消或预览停止后读取失效；读取稳定等待期间切走也不会返回旧页面。不能用 AI 页签、最近任务或任意网站标签代替当前用户页。
 
 网页文字是不可信资料，不是给助手的新指令。已有网站规则继续控制初始导航、子请求与重定向；需要登录时请用户在设置里完成，工具不接收凭据。浏览器加载错误显式返回 `BROWSER_READ_FAILED`，不把浏览器错误页当作读到的网站内容。`settled: false` 表示在既有稳定等待时限内页面仍在变化，不能据此声称页面已完整加载。
 
@@ -518,7 +520,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
   - `DeckMaterialKind` 加 `web`；
   - `CheckUnrunnableReason` 加 `preview_never_started` · `preview_not_configured`；`nodeAcceptanceSchema` 的页面体检同样可以标 `skipped`。
 - **常量（08）**：`PREVIEW_START_TIMEOUT_MS` 120000、`PREVIEW_PROBE_INTERVAL_MS` 1000、`PREVIEW_LOG_TAIL_CHARS` 4000、`BROWSER_ACTION_TIMEOUT_MS` 5000、`BROWSER_SETTLE_QUIET_MS` 500、`BROWSER_SETTLE_TIMEOUT_MS` 10000、`BROWSER_READ_TIMEOUT_MS` 30000、`BROWSER_SNAPSHOT_MAX_CHARS` 12000、`VIEWPORT_SIZES`。
-- **错误码（08）**：`PREVIEW_NOT_CONFIGURED`、`PREVIEW_START_FAILED`（`details.logTail`）、`PREVIEW_LIMIT_REACHED`、`BROWSER_SITE_NOT_ALLOWED`（`details.host`）、`BROWSER_LOGIN_REQUIRED`（`details.url`）、`BROWSER_REF_STALE`、`BROWSER_ACTION_FAILED`（`details.reason`：`not_visible` · `covered` · `disabled` · `detached` · `not_focusable`；`details.coveredBy`）（以上 B-02 已加）；`BROWSER_NOT_OPEN`（B3，助手 `browser.read`）、`BROWSER_CHECK_UNRUNNABLE`（B2，任务的 `failure` 上，同 `CHECK_COMMAND_UNRUNNABLE`，不作为 HTTP 错误）在实现那一期加。
+- **错误码（08）**：`PREVIEW_NOT_CONFIGURED`、`PREVIEW_START_FAILED`（`details.logTail`）、`PREVIEW_LIMIT_REACHED`、`BROWSER_SITE_NOT_ALLOWED`（`details.host`）、`BROWSER_LOGIN_REQUIRED`（`details.url`）、`BROWSER_REF_STALE`、`BROWSER_ACTION_FAILED`（`details.reason`：`not_visible` · `covered` · `disabled` · `detached` · `not_focusable`；`details.coveredBy`）（以上 B-02 已加）；`BROWSER_NOT_OPEN`（AP-03b，助手 `browser_read` 已加）；`BROWSER_CHECK_UNRUNNABLE`（B2，任务的 `failure` 上，同 `CHECK_COMMAND_UNRUNNABLE`，不作为 HTTP 错误）在实现那一期加。
 - **状态机（09）**：`previewMachine`（09 §12，B-02 已加）；节点 `verifying` 的检查顺序为命令 → 页面体检 → AI 评审。
 - **API（11）**：
   - **B1 已有**：操作 `previews.get` / `start` / `stop` / `trial`（11 §13f）；`browser.openLoginTab` `{ url }`、`browser.closeUserTab`、`browser.listSiteLogins`、`browser.clearSiteLogin` `{ host }`（11 §13f′）；SSE `preview.updated`。

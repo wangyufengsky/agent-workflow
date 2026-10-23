@@ -4,6 +4,7 @@ import {
   type AssistantConversationDTO,
   type AssistantPageRef,
   abortAssistantOp,
+  bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
   createConversationOp,
@@ -18,7 +19,17 @@ import {
 import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
+import { useUiStore } from '../../state/ui.store.ts';
 import type { TranscriptSource } from '../attempts/attempt.queries.ts';
+
+/** 与界面绑定更新串行：首次消息一定在它的当前预览关联写入后发送。 */
+export const PREVIEW_BINDING_SCOPE = { id: 'assistant-preview-binding' };
+export const useBindPreview = () =>
+  useMutation({
+    scope: PREVIEW_BINDING_SCOPE,
+    mutationFn: (input: { id: string; preview: { taskId: string; tabId: string } | null }) =>
+      callOperation(bindAssistantPreviewOp, input),
+  });
 
 export const conversationsQuery = queryOptions({
   queryKey: queryKeys.assistantConversations,
@@ -86,11 +97,15 @@ export function useCreateConversation() {
 
 // The conversation's busy state and permission requests arrive in order over SSE (`assistant.updated`). These
 // responses are not written to the cache: one can arrive after the event saying the turn already ended.
-export const useSendMessage = () =>
-  useMutation({
-    mutationFn: (input: { id: string; text: string; context: AssistantPageRef }) =>
-      callOperation(sendAssistantMessageOp, input),
+export function useSendMessage() {
+  const bind = useBindPreview();
+  return useMutation({
+    mutationFn: async (input: { id: string; text: string; context: AssistantPageRef }) => {
+      await bind.mutateAsync({ id: input.id, preview: useUiStore.getState().activePreview });
+      return callOperation(sendAssistantMessageOp, input);
+    },
   });
+}
 export const useAbortAssistant = () =>
   useMutation({ mutationFn: (id: string) => callOperation(abortAssistantOp, { id }) });
 export const useReplyAssistantPermission = () =>

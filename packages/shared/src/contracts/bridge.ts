@@ -3,6 +3,9 @@ import { themeIdSchema } from '../enums/ui.ts';
 import { type ErrorInfo, errorInfoSchema } from '../errors/codes.ts';
 import type { CompanionBridge } from './companion.ts';
 
+export const browserShortcutSchema = z.enum(['j', 'k']);
+export type BrowserShortcut = z.infer<typeof browserShortcutSchema>;
+
 /**
  * How the next start looks before the backend (and so the settings) is up (28 §5.3): the theme the renderer applied
  * and whether to play the opening animation. Main keeps it in `<userData>/launch.json`.
@@ -41,6 +44,7 @@ export interface AwBridge {
   setLaunchPreferences(preferences: LaunchPreferences): void;
   /** The user's own browser tabs (29 §8.1), opened by the backend; only user-facing tabs answer. */
   browser: {
+    onShortcut(listener: (key: BrowserShortcut) => void): () => void;
     /** Puts the tab over this area of the window (CSS pixels), or takes it off the window with null. */
     place(tabId: string, rect: BrowserRect | null): void;
     back(tabId: string): void;
