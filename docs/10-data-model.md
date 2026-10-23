@@ -351,10 +351,23 @@ payload / response：
 | operation_id | TEXT | 操作清单 id |
 | input | TEXT(JSON) | 助手给出的参数（已按助手 schema 校验，不含凭据字段） |
 | status | TEXT | `AssistantConfirmationStatus`（09 §10） |
-| result | TEXT(JSON) NULL | 确认后：`{ ok: true, output }` 或 `{ ok: false, error }`；取消为空 |
+| result | TEXT(JSON) NULL | 确认后：`{ ok: true, output }` 或 `{ ok: false, error }`；无返回值的成功操作用 `output: null`，读取旧版缺失 output 的成功记录时同样转为 null；取消为空 |
 | created_at / resolved_at | INTEGER | |
 
 索引：`(conversation_id, created_at)`。
+
+### assistant_outbox
+
+迁移 `0018_assistant_outbox`；保存尚未成功交给 opencode 的应用消息（确认结果或取消通知）。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | INTEGER PK AUTOINCREMENT | 入队顺序 |
+| conversation_id | TEXT → assistant_conversations，CASCADE | 删除对话时清理待发消息 |
+| text | TEXT | 已渲染的结果消息 |
+| created_at | INTEGER | 入队时间 |
+
+索引：`(conversation_id, id)`。确认结果与入队在同一事务保存；取消状态与入队也在同一事务保存。按 id 顺序发送，只在发送成功后删除本次读取的消息，期间新入队的消息继续保留。断线、发送失败与后端重启不会丢失队列，待下一次发送时恢复；恢复只投递消息，不重新执行业务操作。若外部已接受消息而本地尚未删除队列时进程退出，恢复可能重复通知，不承诺跨进程的恰好一次投递。
 
 消息流：`<数据目录>/assistant/conversations/<id>.jsonl`，格式同 §3（多 `confirmation`、`attachment`、`entity_ref` 三种条目）；记录用户的消息、模型的正文与工具调用、权限请求、错误；后端代发的确认结果消息与每轮注入的 `system` 不记录（卡片显示结果）。
 

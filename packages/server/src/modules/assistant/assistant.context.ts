@@ -70,6 +70,19 @@ const STATIC_PAGES: Partial<Record<AssistantPage, string>> = {
   [AssistantPage.Environment]: 'the environment checks (Git, opencode, models, credential storage)',
 };
 
+/** 系统回传可能发生在页面对象删除之后；其他错误仍然显式失败。 */
+const DELETED_PAGE_ERRORS: ReadonlySet<ErrorCode> = new Set([
+  ErrorCode.TaskNotFound,
+  ErrorCode.NodeNotFound,
+  ErrorCode.ProjectNotFound,
+  ErrorCode.WorkflowNotFound,
+  ErrorCode.KnowledgeConversationNotFound,
+  ErrorCode.DeckNotFound,
+  ErrorCode.DeckSlideNotFound,
+  ErrorCode.BatchNotFound,
+  ErrorCode.ScheduleNotFound,
+]);
+
 function param(ref: AssistantPageRef, name: AssistantPageParam): string {
   const value = ref.params[name];
   // assistantPageRefSchema requires each page's params (ASSISTANT_PAGE_PARAMS).
@@ -150,12 +163,25 @@ export function createContextRenderer(deps: ContextDeps) {
     }
   }
 
+  function describeContextPage(ref: AssistantPageRef | undefined, source: 'user' | 'app'): string {
+    if (ref === undefined) return 'unknown (the message was sent by the app)';
+    try {
+      return describePage(ref);
+    } catch (err) {
+      if (source === 'app' && err instanceof AppError && DELETED_PAGE_ERRORS.has(err.code)) {
+        return `The page from the user's last message (${ref.page}, ${JSON.stringify(ref.params)}) no longer exists (${err.code}). Do not treat it as their current page.`;
+      }
+      throw err;
+    }
+  }
+
   return {
     render(input: {
       time: GetCurrentTimeOutput;
       uiMode: UiMode;
       page: AssistantPageRef | undefined;
       filesDir: string;
+      source: 'user' | 'app';
     }) {
       const { time } = input;
       return renderTemplate(prompts[PromptName.AssistantContext], {
@@ -168,7 +194,7 @@ export function createContextRenderer(deps: ContextDeps) {
           input.uiMode === UiMode.Simple
             ? 'Pro-mode functions are not available; the user can switch to pro mode in the settings.'
             : 'All functions are available.',
-        page: input.page === undefined ? 'unknown (the message was sent by the app)' : describePage(input.page),
+        page: describeContextPage(input.page, input.source),
         filesDir: input.filesDir,
       });
     },

@@ -127,6 +127,13 @@
       "when": 1792741828526,
       "tag": "0017_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1792772072125,
+      "tag": "0018_assistant_outbox",
+      "breakpoints": true
     }
   ]
 }

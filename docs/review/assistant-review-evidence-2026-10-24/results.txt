@@ -1,0 +1,120 @@
+
+ RUN  v5.0.5 /Users/wangyufeng/IdeaProjects/agent-workflow-dev
+
+ ❯ |int| packages/server/test/assistant-review-probes.int.test.ts (4 tests | 4 failed) 671ms
+   × 同一新对话的并发首条消息只能创建一个会话，另一条应拒绝为 busy 145ms
+   × 在项目页确认删除项目后，接口仍成功返回操作结果并回传给助手 197ms
+   × 已执行且在等待回传的确认结果在后端重启后仍随下一条消息送达 170ms
+   × 确认期间原页面对象被删除，不应影响已经成功执行的操作回传 158ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |int| packages/server/test/assistant-review-probes.int.test.ts > 同一新对话的并发首条消息只能创建一个会话，另一条应拒绝为 busy
+AssertionError: expected { statuses: [ 200, 200 ], sessions: 2 } to deeply equal { statuses: [ 200, 409 ], sessions: 1 }
+
+- Expected
++ Received
+
+  {
+-   "sessions": 1,
++   "sessions": 2,
+    "statuses": [
++     200,
+      200,
+-     409,
+    ],
+  }
+
+ ❯ packages/server/test/assistant-review-probes.int.test.ts:38:6
+     36|   await app.fake.settled();
+     37|   expect({ statuses: results.map((r) => r.status).sort(), sessions: ap…
+     38|     .toEqual({ statuses: [200, 409], sessions: 1 });
+       |      ^
+     39| });
+     40|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |int| packages/server/test/assistant-review-probes.int.test.ts > 在项目页确认删除项目后，接口仍成功返回操作结果并回传给助手
+AssertionError: expected { confirmStatus: 500, …(4) } to match object { confirmStatus: 200, …(3) }
+(5 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "cardsBody": {
+-     "items": [
+-       {
+-         "result": {
+-           "ok": true,
+-         },
++     "error": {
++       "code": "INTERNAL_ERROR",
++       "message": "Internal server error",
+      },
+-     ],
+    },
+-   "cardsStatus": 200,
+-   "confirmStatus": 200,
++   "cardsStatus": 500,
++   "confirmStatus": 500,
+    "projectStatus": 404,
+  }
+
+ ❯ packages/server/test/assistant-review-probes.int.test.ts:55:8
+     53|     const cards = await app.call(listConfirmationsOp, { id: c.id });
+     54|     expect({ confirmStatus: confirmed.status, confirmBody: confirmed.b…
+     55|       .toMatchObject({ confirmStatus: 200, projectStatus: 404, cardsSt…
+       |        ^
+     56|   } finally { await mcp.close(); }
+     57| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |int| packages/server/test/assistant-review-probes.int.test.ts > 已执行且在等待回传的确认结果在后端重启后仍随下一条消息送达
+AssertionError: expected '继续' to contain 'The user confirmed `projects_update`'
+
+Expected: "The user confirmed `projects_update`"
+Received: "继续"
+
+ ❯ packages/server/test/assistant-review-probes.int.test.ts:80:41
+     78|   await app.call(sendAssistantMessageOp, { id: c.id, text: '继续', conte…
+     79|   await app.fake.settled();
+     80|   expect(app.fake.prompts.at(-1)?.text).toContain('The user confirmed …
+       |                                         ^
+     81| });
+     82|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |int| packages/server/test/assistant-review-probes.int.test.ts > 确认期间原页面对象被删除，不应影响已经成功执行的操作回传
+AssertionError: expected { status: 404, …(2) } to match object { status: 200, result: { ok: true } }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "result": {
+      "ok": true,
+    },
+-   "status": 200,
++   "status": 404,
+  }
+
+ ❯ packages/server/test/assistant-review-probes.int.test.ts:97:8
+     95|     const cards = await app.call(listConfirmationsOp, { id: c.id });
+     96|     expect({ status: confirmed.status, body: confirmed.body, result: c…
+     97|       .toMatchObject({ status: 200, result: { ok: true } });
+       |        ^
+     98|   } finally { await mcp.close(); }
+     99| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed (4)
+   Start at  00:05:06
+   Duration  2.74s (import 54%, tests 26%, transform 20%)

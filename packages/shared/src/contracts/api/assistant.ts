@@ -79,7 +79,8 @@ export const replyAssistantPermissionRequestSchema = z.object({
 
 /** What the backend did with a confirmed call: the operation's output or its error. */
 export const assistantConfirmationResultSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), output: z.unknown() }),
+  // 旧版 void 结果序列化后没有 output；读出时统一为可持久化的 null。
+  z.object({ ok: z.literal(true), output: z.unknown().default(null) }),
   z.object({ ok: z.literal(false), error: errorInfoSchema }),
 ]);
 export type AssistantConfirmationResult = z.infer<typeof assistantConfirmationResultSchema>;
