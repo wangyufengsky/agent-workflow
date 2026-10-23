@@ -75,7 +75,7 @@
 
 ## 5. 接入现有架构
 
-- 后端新增 `attachments` 模块：保存、校验、读取正文、引用、清理。它只接收已解析的所有者（kind + id）和允许读取的根目录，不 import `tasks`、`assistant`。
+- 后端新增 `attachments` 模块（U-01 已实现）：保存、校验、引用、清理。它接收已解析的所有者（kind + id），读项目文件时经 `projects` / `worktrees` 取根目录，不 import `tasks`、`assistant`。安全定位仓库文件的逻辑与知识问答共用 `core/repo-files.ts`。
 - `tasks`、`assistant` 负责范围：在各自事务里调用 `attachments.bind`；执行 MCP 的 `read_attachment` 按当前尝试所属任务限定范围，助手的按当前对话限定；模型传入的 ID 不在范围内一律 `ATTACHMENT_NOT_FOUND`。
 - `attempts` 只接收所有者准备好的附件文字，不反查任务。
 

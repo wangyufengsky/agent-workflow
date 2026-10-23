@@ -518,7 +518,7 @@ class AppError extends Error {
 
 ## 6. 待实施契约：统一附件与需求清单
 
-以下是 30 / 31（精简版）的设计登记，**未加入 shared 源码，不能当作当前接口可用**。
+以下是 30 / 31（精简版）的设计登记。**附件的枚举、常量与错误码已在 U-01 加入 shared**（`enums/attachment.ts`、`constants/limits.ts`、`errors/codes.ts`）；其余未加入源码，不能当作当前接口可用。
 
 | 枚举／类型 | 值 |
 | --- | --- |
@@ -534,17 +534,18 @@ class AppError extends Error {
 | --- | --- |
 | ATTACHMENTS_PER_INPUT_MAX | 10 |
 | ATTACHMENT_BYTES_MAX | 5 MiB |
+| ATTACHMENT_NAME_MAX_CHARS | 255（显示名） |
 | ATTACHMENT_PROMPT_MAX_CHARS / ATTACHMENT_READ_MAX_CHARS | 20,000（一次输入的全部文本附件合计）/ 12,000（每次读取） |
-| ATTACHMENT_ORPHAN_TTL_MS | 86,400,000（无引用附件的保留时间） |
+| ATTACHMENT_ORPHAN_TTL_MS / ATTACHMENT_CLEANUP_INTERVAL_MS | 86,400,000（无引用附件的保留时间）/ 3,600,000（清理间隔） |
 | REQUIREMENTS_MAX | 30 |
 | REQUIREMENT_TITLE_MAX_CHARS / REQUIREMENT_EXPECTED_MAX_CHARS / REQUIREMENT_NOTE_MAX_CHARS | 120 / 2,000 / 4,000 |
 
 | 错误码 | HTTP | 含义 |
 | --- | --- | --- |
 | ATTACHMENT_NOT_FOUND | 404 | 不存在或不在当前范围（其他任务／对话），不泄露内容 |
-| ATTACHMENT_INVALID_TYPE | 400 | `details.reason: not_text`：不是严格 UTF-8 或含 NUL 字节（首版只支持文本） |
-| ATTACHMENT_TOO_LARGE | 413 | 大小或单次输入个数超限，`details.limit` 指明哪一项 |
-| ATTACHMENT_SOURCE_INVALID | 400 | 项目文件越界、指向根外的符号链接、非普通文件或不可读 |
+| ATTACHMENT_INVALID_TYPE | 400 | 不是严格 UTF-8 或含 NUL 字节（首版只支持文本） |
+| ATTACHMENT_TOO_LARGE | 413 | 大小或单次输入个数超限，`details.limit` 为超过的那个上限值 |
+| ATTACHMENT_SOURCE_INVALID | 400 | 项目文件越界（含 `.git` 内）、指向根外的符号链接、不存在或非普通文件（`details.reason`：`outside` · `missing`）、行号超出末尾（`details.lineCount`），或任务在该项目没有可用的工作区 |
 | REQUIREMENTS_NOT_EDITABLE | 409 | 任务状态不允许编辑清单（`running` 等），或不在 `review` 时请求重新核验／人工结论 |
 | REQUIREMENT_RESULTS_INVALID | 400 | 非核验节点提交 `requirement_results`，或项不属于当前版本、不是 AI 核验项、重复 |
 | REQUIREMENTS_UNACKNOWLEDGED | 409 | 交付时有未满足的必需项，而没有带 `acknowledgedRequirementsRevisionId` 或它不是当前清单版本；`details.items` 列出这些项 |

@@ -325,9 +325,9 @@ export function taskOperations(tasks: TasksService) {
 
 ## 10. 待实施架构增量：附件与需求验收清单
 
-[30](30-attachments.md) / [31](31-requirements-checklist.md) 的设计约束（精简版），源码尚未增加这些模块。
+[30](30-attachments.md) / [31](31-requirements-checklist.md) 的设计约束（精简版）。`attachments` 已在 U-01 加入源码，其余尚未实现。
 
-- `attachments`：保存、校验、正文分页读取、引用、清理。只接收所有者（kind + id）与允许读取的根目录，不依赖 `tasks`、`assistant`。记录存在即可用，没有上传／处理状态机。
+- `attachments`（U-01 已实现）：保存、校验、正文分页读取（U-02）、引用、清理。只接收所有者（kind + id），读项目文件时依赖 `projects`、`worktrees` 取根目录，不依赖 `tasks`、`assistant`。记录存在即可用，没有上传／处理状态机。
 - `requirements`：清单版本、逐项结论记录、显示状态纯函数；只依赖底层设施，不依赖 `tasks`、`nodes`、`acceptance`。
 - `tasks` 组合二者：绑定附件、编辑时机守卫、物化时追加核验节点（`NodeKind.Verify`）、节点完成时写结论、交付时的清单摘要。`assistant` 在自己的事务里绑定附件。`attempts` 只接收所有者准备好的附件，不反查所有者。
 - `nodes`：只有 `NodeKind.Verify` 的检查「只记录不拦截」；其他节点不变。

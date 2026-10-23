@@ -459,13 +459,13 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 
 | 操作 | 方法与路径 | 风险／曝光 | 输入 → 结果 |
 | --- | --- | --- | --- |
-| （非清单）上传 | POST `/attachments` | 仅 UI | 二进制请求体（后端按原始字节校验文本，30 §3.1）；`X-Attachment-Name` 为 URL 编码的文件名 → `AttachmentDTO`；校验失败返回错误、不留记录 |
-| （非清单）原件 | GET `/attachments/:id/content` | 仅 UI | 原件字节 |
+| （非清单）上传 | POST `/attachments` | 仅 UI | `Content-Type: application/octet-stream` 的二进制请求体（后端按原始字节校验文本，30 §3.1）；`X-Attachment-Name` 为 URL 编码的文件名 → 201 `AttachmentDTO`；校验失败返回错误、不留记录 |
+| （非清单）原件 | GET `/attachments/:id/content` | 仅 UI | 原件字节，`text/plain; charset=utf-8` 加 `nosniff` |
 | attachments.snapshotProjectFile | POST `/attachments/project-file` | write；仅 UI | `{ projectId, taskId?, path, lines? }` → `AttachmentDTO` |
 | attachments.get | GET `/attachments/:id` | read；UI | `AttachmentDTO`（不含绝对路径） |
-| attachments.remove | DELETE `/attachments/:id` | write；仅 UI | 只能删除尚无引用的附件 |
+| attachments.remove | DELETE `/attachments/:id` | write；仅 UI | 只能删除尚无引用的附件，已发送的返回 `VALIDATION_FAILED` |
 
-两条非清单路由使用与 JSON API 相同的令牌校验，不在 URL query 放令牌；原件以下载方式返回，不作为同源 HTML 执行。
+以上为 U-01 已实现的部分。两条非清单路由使用与 JSON API 相同的令牌校验，不在 URL query 放令牌；原件以纯文本返回，不作为同源 HTML 执行。
 
 `createTask`、`requestChanges`、助手发送消息增加可选 `attachmentIds`（最多 `ATTACHMENTS_PER_INPUT_MAX`），后端在业务事务内绑定。助手的创建任务工具只接受当前对话已引用的附件。
 

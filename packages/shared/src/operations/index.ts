@@ -11,6 +11,7 @@ import {
   replyAssistantPermissionOp,
   sendAssistantMessageOp,
 } from './assistant.ts';
+import { getAttachmentOp, removeAttachmentOp, snapshotProjectFileOp } from './attachments.ts';
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
 import { createBatchOp, deliverBatchOp, getBatchOp, listBatchesOp } from './batches.ts';
 import { clearSiteLoginOp, closeUserTabOp, listSiteLoginsOp, openLoginTabOp } from './browser.ts';
@@ -160,6 +161,7 @@ import {
 } from './workflows.ts';
 
 export * from './assistant.ts';
+export * from './attachments.ts';
 export * from './attempts.ts';
 export * from './batches.ts';
 export * from './browser.ts';
@@ -217,6 +219,9 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   queryDbOp,
   getAttemptOp,
   abortAttemptOp,
+  getAttachmentOp,
+  removeAttachmentOp,
+  snapshotProjectFileOp,
   startDebugAttemptOp,
   listWorkflowsOp,
   getWorkflowOp,
