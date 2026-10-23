@@ -263,7 +263,7 @@ stateDiagram-v2
 
 本地合并流程（`delivery.merge.ts`，D52）：
 
-1. 检查（任一不满足即返回错误，不建 delivery、不改状态）：目标分支存在（`DELIVERY_TARGET_NOT_FOUND`）；任务 worktree 没有未提交改动（`WORKTREE_DIRTY`）；目标分支检出所在的工作区（通常是用户的主工作区）干净，否则 `DELIVERY_TARGET_DIRTY`（不碰用户改动）。
+1. 检查（任一不满足即返回错误，不建 delivery、不改状态）：目标分支存在（`DELIVERY_TARGET_NOT_FOUND`）；任务 worktree 没有未提交改动（`WORKTREE_DIRTY`）；目标分支检出所在的工作区（通常是用户的主工作区）干净，否则 `DELIVERY_TARGET_DIRTY`（不碰用户改动）。合并本身在仓库锁内进行，锁内、合并前再查一次这个工作区是否干净：检查与合并之间有人暂存了文件时同样 `DELIVERY_TARGET_DIRTY`（交付记为失败，任务回到待合并），压缩合并的提交因此不会带上用户暂存的文件。应用外的 git 进程不受这把锁约束。
 2. 建 delivery（`running`），任务 `deliver → merging`。
 3. 在仓库锁内、在**主仓库**中合并：目标分支检出在哪个工作区就在哪里合并（用户主工作区在目标分支上时其文件随之更新）；没有检出时在临时 worktree 中合并后删除。提交者为 `GIT_COMMIT_IDENTITY`、`--no-verify`、关闭签名（同 D48）。
    - `squash`：`git merge --squash` → 提交「<任务标题> (<任务编号>)」；目标分支已含全部改动时不提交。冲突时 `git reset --merge`（squash 没有 MERGE_HEAD，`merge --abort` 不可用）。

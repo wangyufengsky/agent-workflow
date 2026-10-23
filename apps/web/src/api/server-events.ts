@@ -40,7 +40,7 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       // Whether models are available depends on the runtime.
       return qc.invalidateQueries({ queryKey: queryKeys.environment });
     case ServerEventType.AttemptUpdated:
-      updateAttempt(qc, event.data.attempt);
+      await updateAttempt(qc, event.data.attempt);
       // A research turn's progress line and status are part of its knowledge conversation (18 §4).
       if (event.data.attempt.kind === AttemptKind.Research) await refreshKnowledge(qc);
       // A PPT's progress line and status come from its AI work's attempt (23 §4.3).

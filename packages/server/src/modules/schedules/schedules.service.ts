@@ -148,6 +148,25 @@ export function createSchedulesService({
     return dto?.activeTask ?? null;
   };
 
+  /** One task at a time per schedule (D91, 22 §7). */
+  const assertIdle = (id: string): void => {
+    const running = activeTask(id);
+    if (running !== null) {
+      throw new AppError(ErrorCode.ScheduleBusy, `Task ${running.key} of schedule ${id} has not ended`, {
+        taskId: running.id,
+      });
+    }
+  };
+
+  /** A due run that found the previous task still going is recorded and does nothing else. */
+  function skipRun(schedule: Schedule, occasion: RunOccasion): void {
+    unit.transact(() => {
+      repo.insertRun(newRun(schedule.id, occasion, ScheduleRunOutcome.Skipped));
+      publish(schedule.id);
+    });
+    log.info({ scheduleId: schedule.id }, 'scheduled run skipped, previous task not ended');
+  }
+
   const newRun = (scheduleId: string, occasion: RunOccasion, outcome: ScheduleRunOutcome): ScheduleRun => ({
     id: randomUUID(),
     scheduleId,
@@ -158,7 +177,11 @@ export function createSchedulesService({
     createdAt: clock.now(),
   });
 
-  /** Starts the run's task like `tasks.create` does, without plan confirmation (22 §1); throws when it cannot. */
+  /**
+   * Starts the run's task like `tasks.create` does, without plan confirmation (22 §1); throws when it cannot. Whether
+   * the schedule is idle is checked again where the task is created: two starts may both have passed the earlier
+   * check while `checkCreate` ran.
+   */
   async function startTask(schedule: Schedule, occasion: RunOccasion): Promise<string> {
     const workflow = fixedWorkflow(schedule.workflowKey);
     const baseBranch = await tasks.checkCreate({
@@ -167,6 +190,7 @@ export function createSchedulesService({
       ...(schedule.baseBranch === null ? {} : { baseBranch: schedule.baseBranch }),
     });
     const taskId = unit.transact(() => {
+      assertIdle(schedule.id);
       const id = tasks.insertDraft({
         projectId: schedule.projectId,
         workflowId: workflow.id,
@@ -211,19 +235,17 @@ export function createSchedulesService({
     // Moved on first: whatever this run does, the schedule is not due again until its next time.
     repo.update(schedule.id, { nextRunAt: nextRunAfter(schedule.frequency, now, timeZone), updatedAt: now });
     if (activeTask(schedule.id) !== null) {
-      unit.transact(() => {
-        repo.insertRun(newRun(schedule.id, occasion, ScheduleRunOutcome.Skipped));
-        publish(schedule.id);
-      });
-      log.info({ scheduleId: schedule.id }, 'scheduled run skipped, previous task not ended');
+      skipRun(schedule, occasion);
       return;
     }
     try {
       await startTask(schedule, occasion);
     } catch (err) {
-      // Translated into a failed run: the schedule pauses and the user gets an inbox item (22 §5).
       if (!(err instanceof AppError)) throw err;
-      failRun(get(schedule.id), occasion, err);
+      // A manual run started meanwhile: like any run that finds a task going, this one is skipped.
+      if (err.code === ErrorCode.ScheduleBusy) skipRun(schedule, occasion);
+      // Otherwise a failed run: the schedule pauses and the user gets an inbox item (22 §5).
+      else failRun(get(schedule.id), occasion, err);
     }
   }
 
@@ -323,12 +345,7 @@ export function createSchedulesService({
     /** 「立即运行一次」(22 §7): its schedule stays; a failure is the caller's error, the schedule does not pause. */
     async run(id: string): Promise<ScheduleDetailDTO> {
       const schedule = get(id);
-      const running = activeTask(id);
-      if (running !== null) {
-        throw new AppError(ErrorCode.ScheduleBusy, `Task ${running.key} of schedule ${id} has not ended`, {
-          taskId: running.id,
-        });
-      }
+      assertIdle(id);
       const now = clock.now();
       await startTask(schedule, { trigger: ScheduleRunTrigger.Manual, dueAt: now, missed: 0 });
       return detail(id);

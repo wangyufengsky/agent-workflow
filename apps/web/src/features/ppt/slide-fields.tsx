@@ -15,27 +15,37 @@ const cells = (line: string) => line.split(CELL_SEPARATOR).map((c) => c.trim());
 /** An optional field left empty is left out. */
 const optional = (text: string) => (text.trim() === '' ? undefined : text.trim());
 
+/**
+ * A field shows the text as typed and hands it on at each keystroke. Fields parse it into the draft (lines, cells, an
+ * optional value), and showing the parsed draft instead would drop a new line or a space as soon as it is typed. The
+ * form is remade for each version from the server, so `initial` is all it needs from outside.
+ */
 function Text({
   label,
-  value,
+  initial,
   rows,
   onChange,
 }: {
   label: string;
-  value: string;
+  initial: string;
   rows?: number;
-  onChange(value: string): void;
+  onChange(text: string): void;
 }) {
   const id = useId();
+  const [text, setText] = useState(initial);
+  const change = (next: string) => {
+    setText(next);
+    onChange(next);
+  };
   return (
     <div className="field">
       <label className="label" htmlFor={id}>
         {label}
       </label>
       {rows === undefined ? (
-        <input id={id} className="input" value={value} onChange={(e) => onChange(e.target.value)} />
+        <input id={id} className="input" value={text} onChange={(e) => change(e.target.value)} />
       ) : (
-        <textarea id={id} className="textarea" rows={rows} value={value} onChange={(e) => onChange(e.target.value)} />
+        <textarea id={id} className="textarea" rows={rows} value={text} onChange={(e) => change(e.target.value)} />
       )}
     </div>
   );
@@ -67,7 +77,7 @@ export function SlideFields({
   };
 
   const titleField = draft.layout !== SlideLayout.Quote && (
-    <Text label={F.title} value={draft.title} onChange={(title) => setDraft({ ...draft, title })} />
+    <Text label={F.title} initial={draft.title} onChange={(title) => setDraft({ ...draft, title })} />
   );
 
   return (
@@ -83,7 +93,7 @@ export function SlideFields({
       {(draft.layout === SlideLayout.Cover || draft.layout === SlideLayout.Section) && (
         <Text
           label={F.subtitle}
-          value={draft.subtitle ?? ''}
+          initial={draft.subtitle ?? ''}
           onChange={(v) => setDraft({ ...draft, subtitle: optional(v) })}
         />
       )}
@@ -91,7 +101,7 @@ export function SlideFields({
         <Text
           label={F.bullets}
           rows={6}
-          value={draft.bullets.join('\n')}
+          initial={draft.bullets.join('\n')}
           onChange={(v) => setDraft({ ...draft, bullets: lines(v) })}
         />
       )}
@@ -101,13 +111,13 @@ export function SlideFields({
             <span className="sub-label">{side === 'left' ? F.left : F.right}</span>
             <Text
               label={F.heading}
-              value={draft[side].heading}
+              initial={draft[side].heading}
               onChange={(heading) => setColumn(draft, side, { ...draft[side], heading })}
             />
             <Text
               label={F.bullets}
               rows={4}
-              value={draft[side].bullets.join('\n')}
+              initial={draft[side].bullets.join('\n')}
               onChange={(v) => setColumn(draft, side, { ...draft[side], bullets: lines(v) })}
             />
           </div>
@@ -118,7 +128,7 @@ export function SlideFields({
           <div key={i} className="col">
             <Text
               label={`${F.heading} ${i + 1}`}
-              value={card.heading}
+              initial={card.heading}
               onChange={(heading) =>
                 setDraft({ ...draft, cards: draft.cards.map((c, j) => (j === i ? { ...c, heading } : c)) })
               }
@@ -126,7 +136,7 @@ export function SlideFields({
             <Text
               label={`${F.body} ${i + 1}`}
               rows={2}
-              value={card.body}
+              initial={card.body}
               onChange={(body) =>
                 setDraft({ ...draft, cards: draft.cards.map((c, j) => (j === i ? { ...c, body } : c)) })
               }
@@ -139,14 +149,14 @@ export function SlideFields({
           <div key={i} className="col">
             <Text
               label={`${F.label} ${i + 1}`}
-              value={step.label}
+              initial={step.label}
               onChange={(label) =>
                 setDraft({ ...draft, steps: draft.steps.map((s, j) => (j === i ? { ...s, label } : s)) })
               }
             />
             <Text
               label={`${F.detail} ${i + 1}`}
-              value={step.detail ?? ''}
+              initial={step.detail ?? ''}
               onChange={(v) =>
                 setDraft({ ...draft, steps: draft.steps.map((s, j) => (j === i ? { ...s, detail: optional(v) } : s)) })
               }
@@ -159,14 +169,14 @@ export function SlideFields({
           <div key={i} className="grid-2">
             <Text
               label={`${F.value} ${i + 1}`}
-              value={stat.value}
+              initial={stat.value}
               onChange={(value) =>
                 setDraft({ ...draft, stats: draft.stats.map((s, j) => (j === i ? { ...s, value } : s)) })
               }
             />
             <Text
               label={`${F.statLabel} ${i + 1}`}
-              value={stat.label}
+              initial={stat.label}
               onChange={(label) =>
                 setDraft({ ...draft, stats: draft.stats.map((s, j) => (j === i ? { ...s, label } : s)) })
               }
@@ -177,20 +187,20 @@ export function SlideFields({
         <>
           <Text
             label={F.columns}
-            value={draft.columns.join(` ${CELL_SEPARATOR} `)}
+            initial={draft.columns.join(` ${CELL_SEPARATOR} `)}
             onChange={(v) => setDraft({ ...draft, columns: cells(v) })}
           />
           <Text
             label={F.rows}
             rows={6}
-            value={draft.rows.map((row) => row.join(` ${CELL_SEPARATOR} `)).join('\n')}
+            initial={draft.rows.map((row) => row.join(` ${CELL_SEPARATOR} `)).join('\n')}
             onChange={(v) => setDraft({ ...draft, rows: lines(v).map(cells) })}
           />
         </>
       )}
       {draft.layout === SlideLayout.Code && (
         <>
-          <Text label={F.language} value={draft.language} onChange={(language) => setDraft({ ...draft, language })} />
+          <Text label={F.language} initial={draft.language} onChange={(language) => setDraft({ ...draft, language })} />
           <label className="field">
             <span className="label">{F.code}</span>
             <textarea
@@ -202,17 +212,17 @@ export function SlideFields({
           </label>
           <Text
             label={F.caption}
-            value={draft.caption ?? ''}
+            initial={draft.caption ?? ''}
             onChange={(v) => setDraft({ ...draft, caption: optional(v) })}
           />
         </>
       )}
       {draft.layout === SlideLayout.Quote && (
         <>
-          <Text label={F.quote} rows={3} value={draft.quote} onChange={(quote) => setDraft({ ...draft, quote })} />
+          <Text label={F.quote} rows={3} initial={draft.quote} onChange={(quote) => setDraft({ ...draft, quote })} />
           <Text
             label={F.attribution}
-            value={draft.attribution ?? ''}
+            initial={draft.attribution ?? ''}
             onChange={(v) => setDraft({ ...draft, attribution: optional(v) })}
           />
         </>
