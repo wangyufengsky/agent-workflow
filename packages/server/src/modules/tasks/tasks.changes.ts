@@ -47,7 +47,7 @@ export function createTaskChanges(
   state: TaskState,
   currentDelivery: (taskId: string) => DeliveryDTO | null,
 ) {
-  const { unit, prompts, projects, workflows, plans, nodes, inbox, locks } = deps;
+  const { unit, prompts, projects, workflows, plans, nodes, inbox, locks, browser } = deps;
   const { get, move } = state;
 
   /** Merges the target into the task worktree for a conflict step (13 §4); returns the conflicted files. */
@@ -116,6 +116,7 @@ export function createTaskChanges(
       taskId: string,
       reason: RequestChangesRequest['reason'],
       feedback: string | undefined,
+      page?: RequestChangesRequest['page'],
     ): Promise<void> {
       const task = get(taskId);
       transition(taskMachine, task.status, TaskEvent.ChangesRequested);
@@ -126,8 +127,10 @@ export function createTaskChanges(
             issues: [{ path: ['feedback'], message: 'required when reason is user' }],
           });
         }
+        // The page the user looked at goes with the feedback, read from their own tab (29 §2.3).
+        const withPage = page === undefined ? feedback : `${feedback}\n\n${browser.pageNote(taskId, page.tabId)}`;
         instructions = renderTemplate(prompts[PromptName.Revise], {
-          feedback,
+          feedback: withPage,
           resultSummary: task.result?.summary ?? '',
         });
       } else {

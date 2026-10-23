@@ -334,7 +334,7 @@ export async function openTab({
     },
 
     /** The result of an action (29 §6): what happened since `begin`, and the page now. */
-    async result(settled: boolean): Promise<BrowserActionOutput> {
+    async result(settled: boolean): Promise<Omit<BrowserActionOutput, 'frame'>> {
       return {
         ...(await tab.snapshot()),
         tab: kind,

@@ -327,6 +327,14 @@ createServer((req, res) => {
     const broken = tabUpdated((s) => s.url.endsWith('/broken') && s.consoleErrors === 1 && s.failedRequests === 1);
     await t.call(navigateUserTabOp, { tabId: opened.tabId, path: '/broken' });
     await broken;
+    // What a change request of the user carries along with their feedback (29 §2.3).
+    const note = t.app.services.browser.pageNote(task.id, opened.tabId);
+    expect(note).toContain('looking at /broken of the preview (desktop, 1280×800)');
+    expect(note).toContain('- boom');
+    expect(note).toMatch(/- GET http:\/\/127\.0\.0\.1:\d+\/missing\.png → 404/);
+    expect(() => t.app.services.browser.pageNote('another-task', opened.tabId)).toThrow(
+      expect.objectContaining({ code: ErrorCode.ValidationFailed }),
+    );
     // Errors count per page: back on a clean page they start over.
     const clean = tabUpdated((s) => s.url.endsWith('/orders'));
     await t.call(navigateUserTabOp, { tabId: opened.tabId, path: '/orders' });

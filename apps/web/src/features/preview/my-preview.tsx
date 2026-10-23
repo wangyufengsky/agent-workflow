@@ -25,6 +25,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { ExternalLink } from '../../components/external-link.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
 import { PREVIEW_PANE_COPY as C } from '../../copy/browser.ts';
+import { useUiStore } from '../../state/ui.store.ts';
 import { Segmented } from '../settings/setting-inputs.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { taskQuery } from '../tasks/tasks.queries.ts';
@@ -209,13 +210,17 @@ export function MyPreview({
   useEffect(() => {
     if (active && desktop && running && notOpened) openTab();
   }, [active, desktop, running, notOpened, openTab]);
-  // The tab goes with the task page; on another page nobody would place it again.
-  useEffect(
-    () => () => {
-      if (tabId !== null) void callOperation(closeUserTabOp, { tabId });
-    },
-    [tabId],
-  );
+  // The tab goes with the task page; on another page nobody would place it again. While open, a change request may
+  // attach its page.
+  const setPreviewTab = useUiStore((s) => s.setPreviewTab);
+  useEffect(() => {
+    if (tabId === null) return;
+    setPreviewTab(task.id, tabId);
+    return () => {
+      setPreviewTab(task.id, null);
+      void callOperation(closeUserTabOp, { tabId });
+    };
+  }, [tabId, task.id, setPreviewTab]);
   usePlacedTab(active && running ? tabId : null, area);
 
   const navigate = (path: string) => tabId !== null && void callOperation(navigateUserTabOp, { tabId, path });

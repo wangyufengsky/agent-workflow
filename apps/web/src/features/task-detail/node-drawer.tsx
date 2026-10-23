@@ -22,6 +22,7 @@ import { STREAM_COPY } from '../../copy/attempts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DIFF_COPY } from '../../copy/diff.ts';
 import { NODE_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
+import { PageCheckResultView } from '../preview/page-check-result.tsx';
 import { ConversationStream } from '../stream/conversation-stream.tsx';
 import { NodeBadge } from '../tasks/task-badge.tsx';
 import { nodeDiffFileQuery, nodeDiffQuery, nodeQuery } from '../tasks/tasks.queries.ts';
@@ -53,7 +54,7 @@ function checkKey(check: CheckResult): string {
   }
 }
 
-function Check({ check }: { check: CheckResult }) {
+function Check({ taskId, check }: { taskId: string; check: CheckResult }) {
   const label =
     check.kind === AcceptanceCheckKind.Command
       ? C.commandCheck(check.command)
@@ -73,8 +74,9 @@ function Check({ check }: { check: CheckResult }) {
       </summary>
       {check.kind === AcceptanceCheckKind.AiReview ? (
         <ReviewOutcome check={check} />
+      ) : check.kind === AcceptanceCheckKind.Browser ? (
+        <PageCheckResultView taskId={taskId} check={check} />
       ) : (
-        // TODO(B2-07): a page check shows each page and viewport with its errors, warnings and screenshot.
         <pre className={styles.output}>{check.output}</pre>
       )}
     </details>
@@ -137,7 +139,7 @@ export function Output({ node }: { node: NodeDetailDTO }) {
         <>
           <h3 className="sec-t">{C.checks}</h3>
           {node.checkResults.map((check) => (
-            <Check key={`${check.kind}-${checkKey(check)}`} check={check} />
+            <Check key={`${check.kind}-${checkKey(check)}`} taskId={node.taskId} check={check} />
           ))}
         </>
       )}

@@ -9,8 +9,9 @@ import { Panel } from '../../components/panel.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { PageCheckResultView } from '../preview/page-check-result.tsx';
 import { CheckFailureActions } from '../tasks/check-failure-actions.tsx';
-import { failedNodeKeyOf, failureText, unrunnableDetails } from '../tasks/failure-text.ts';
+import { checkUnrunnable, failedNodeKeyOf, failureText, pageUnrunnableDetails } from '../tasks/failure-text.ts';
 import { nodeQuery, useRetryTask } from '../tasks/tasks.queries.ts';
 import { type LastFailure, lastFailure, outputTail } from './last-failure.ts';
 import { NodeTab, ReviewOutcome } from './node-drawer.tsx';
@@ -38,7 +39,8 @@ export function FailurePanel({
   const nodeKey = failure === null ? undefined : failedNodeKeyOf(failure);
   const step = task.nodes.find((n) => n.key === nodeKey);
   if (failure === null || failedPhase === null) return null;
-  const unrunnable = unrunnableDetails(failure) !== undefined;
+  const unrunnable = checkUnrunnable(failure);
+  const page = pageUnrunnableDetails(failure);
   const done = task.nodes.filter((n) => n.status === NodeStatus.Done).length;
   return (
     <Panel title={C.failedTitle}>
@@ -47,6 +49,12 @@ export function FailurePanel({
           <Markdown inline source={failureText(failedPhase, failure)} />
         </p>
         {step !== undefined && !unrunnable && <LastTry taskId={task.id} nodeId={step.id} />}
+        {page !== undefined && page.logTail !== '' && (
+          <details>
+            <summary className="hint">{C.pageUnrunnableLog}</summary>
+            <pre className={styles.output}>{page.logTail}</pre>
+          </details>
+        )}
         {step !== undefined && done > 0 && <p className="hint">{C.keptSteps(done)}</p>}
         <div className={styles.actions}>
           <Button
@@ -88,10 +96,10 @@ function LastTry({ taskId, nodeId }: { taskId: string; nodeId: string }) {
   if (node.isError) return <ErrorState error={node.error} onRetry={() => void node.refetch()} />;
   if (node.data === undefined) return null;
   const last = lastFailure(node.data);
-  return last === null ? null : <LastFailureView last={last} />;
+  return last === null ? null : <LastFailureView taskId={taskId} last={last} />;
 }
 
-function LastFailureView({ last }: { last: LastFailure }) {
+function LastFailureView({ taskId, last }: { taskId: string; last: LastFailure }) {
   const [full, setFull] = useState(false);
   switch (last.kind) {
     case 'command': {
@@ -115,7 +123,7 @@ function LastFailureView({ last }: { last: LastFailure }) {
       return (
         <div className="col" data-testid="last-failure">
           <span>{C.lastPage}</span>
-          <pre className={styles.output}>{last.check.output}</pre>
+          <PageCheckResultView taskId={taskId} check={last.check} />
         </div>
       );
     case 'review':

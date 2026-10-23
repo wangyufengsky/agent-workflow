@@ -210,7 +210,7 @@ export function createBrowserService({
    * What the page shows after an action, for the user to watch (29 §8.2): the visible part scaled to
    * BROWSER_FRAME_WIDTH, indexed and announced; never given to the model.
    */
-  async function frame(owner: BrowserOwner, tab: Tab, tool: ActingTool, url: string): Promise<void> {
+  async function frame(owner: BrowserOwner, tab: Tab, tool: ActingTool, url: string): Promise<string> {
     const session = sessionOf(owner);
     const { cssVisualViewport: v } = visualViewportSchema.parse(await tab.cdp('Page.getLayoutMetrics'));
     const { data } = z.object({ data: z.string() }).parse(
@@ -233,6 +233,7 @@ export function createBrowserService({
     await writeFile(join(dir, item.file), Buffer.from(data, 'base64'));
     await appendFile(join(dir, FRAMES_INDEX), `${JSON.stringify(item)}\n`);
     events.publish({ type: ServerEventType.BrowserFrame, data: item });
+    return item.file;
   }
 
   /** Runs an action on the current tab and reports what it did to the page (29 §6), leaving a frame. */
@@ -245,8 +246,7 @@ export function createBrowserService({
     tab.begin();
     await run(tab);
     const output = await tab.result(await tab.settle());
-    await frame(owner, tab, tool, output.url);
-    return output;
+    return { ...output, frame: await frame(owner, tab, tool, output.url) };
   }
 
   /** A short-lived offscreen tab of the websites' partition, for its cookies and storage. */
@@ -407,8 +407,8 @@ export function createBrowserService({
       session.current = tab;
       tab.begin();
       await tab.cdp('Page.navigate', { url: normalized });
-      const output = await tab.result(await tab.settle());
-      await frame(owner, tab, McpToolName.BrowserOpen, output.url);
+      const settled = await tab.result(await tab.settle());
+      const output = { ...settled, frame: await frame(owner, tab, McpToolName.BrowserOpen, settled.url) };
       if (access.tab === BrowserTabKind.Site && (await loginPage(tab, output.url))) {
         throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: output.url });
       }
@@ -439,8 +439,7 @@ export function createBrowserService({
       const tab = current(owner);
       const met = await actions.waitFor(tab, input);
       const page = await tab.snapshot();
-      await frame(owner, tab, McpToolName.BrowserWaitFor, page.url);
-      return { ...page, tab: tab.kind, met };
+      return { ...page, tab: tab.kind, met, frame: await frame(owner, tab, McpToolName.BrowserWaitFor, page.url) };
     },
 
     inspect: (owner: BrowserOwner, ref: string) => actions.inspect(current(owner), ref),
@@ -621,6 +620,34 @@ export function createBrowserService({
     },
 
     closeUserTab,
+
+    /**
+     * What the user's preview tab shows, written into their change request (29 §2.3): its path and viewport, the
+     * current page's console errors and failed requests. The tab must be on this task's preview.
+     */
+    pageNote(taskId: string, tabId: string): string {
+      const { tab, taskId: owner } = userTabOf(tabId);
+      if (owner !== taskId) {
+        throw new AppError(ErrorCode.ValidationFailed, "The tab shows another task's preview", {
+          issues: [{ path: ['page', 'tabId'], message: 'not a preview tab of this task' }],
+        });
+      }
+      const url = tab.url();
+      const { width, height } = VIEWPORT_SIZES[tab.viewport.preset];
+      const { errors, requests } = tab.pageLogs();
+      return [
+        `The user was looking at ${url === '' ? '/' : new URL(url).pathname + new URL(url).search} of the preview (${tab.viewport.preset}, ${width}×${height}).`,
+        errors.length === 0
+          ? 'Console errors: none.'
+          : [
+              'Console errors:',
+              ...errors.map((e) => `- ${e.message}${e.source === null ? '' : ` (${e.source})`}`),
+            ].join('\n'),
+        requests.length === 0
+          ? 'Failed requests: none.'
+          : ['Failed requests:', ...requests.map((r) => `- ${r.method} ${r.url} → ${r.status ?? r.error}`)].join('\n'),
+      ].join('\n');
+    },
 
     userTabLogs(tabId: string) {
       const { errors, requests } = userTabOf(tabId).tab.pageLogs();

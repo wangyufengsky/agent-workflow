@@ -1,4 +1,4 @@
-import { SiteAccess } from '@aw/shared';
+import { type PageCheckError, type PageCheckUnrunnable, type PageCheckWarning, SiteAccess } from '@aw/shared';
 
 /** The project's page preview (29 §8.5). */
 export const PREVIEW_COPY = {
@@ -105,4 +105,37 @@ export const PREVIEW_PANE_COPY = {
   notPassed: '未通过',
   errors: (n: number) => `${n} 个错误`,
   noShots: '这次体检没有截图。',
+} as const;
+
+/** A page check's result (29 §7.4, §8.3): each page at each viewport. */
+export const PAGE_CHECK_COPY = {
+  passed: '通过',
+  notPassed: '未通过',
+  error: {
+    navigation: '页面没有打开',
+    exception: '未捕获的异常',
+    console: '控制台错误',
+    request: '请求失败',
+  } as Record<PageCheckError, string>,
+  warning: {
+    request: '接口返回 4xx',
+    blocked: '请求被拦下',
+    a11y: '可访问性问题',
+    overflow: '页面会横向滚动',
+    unsettled: '页面 10 秒内没有稳定',
+  } as Record<PageCheckWarning, string>,
+  /** Warnings whose own message adds nothing to the label. */
+  plainWarnings: ['overflow', 'unsettled'] as readonly PageCheckWarning[],
+  unrunnable: {
+    preview_never_started: '预览在这个任务的工作区里一直没有启动起来，页面体检没法运行。',
+    preview_not_configured: '项目的页面预览设置已删除，页面体检没法运行。',
+  } as Record<PageCheckUnrunnable, string>,
+  skipped: '这项检查被跳过了，页面没有验证。',
+  enlarge: (path: string, viewport: string) => `放大 ${path}（${viewport}）`,
+  shot: (path: string, viewport: string) => `${path} · ${viewport}`,
+  noPages: '没有检查页面。',
+  section: '页面',
+  morePages: (n: number) => `其余 ${n} 页`,
+  openPreview: '打开预览',
+  log: '预览日志末尾',
 } as const;

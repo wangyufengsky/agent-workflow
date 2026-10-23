@@ -22,9 +22,10 @@ import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DELIVERY_COPY as C } from '../../copy/delivery.ts';
 import { TASK_COPY } from '../../copy/tasks.ts';
+import { useUiStore } from '../../state/ui.store.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
-import { skippedCommands } from '../tasks/skipped-checks.ts';
+import { skippedChecks } from '../tasks/skipped-checks.ts';
 import { useCancelTask, useDeliver, useRequestChanges } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
 
@@ -93,7 +94,7 @@ function PullRequestForm({
   // A reviewer on the platform does not see the result card: unverified checks are said in the body too (D116).
   const [body, setBody] = useState(() => {
     if (task.result === null) return '';
-    const skipped = skippedCommands(task.result);
+    const skipped = skippedChecks(task.result);
     return skipped.length === 0 ? task.result.summary : `${task.result.summary}\n\n${TASK_COPY.prUnverified(skipped)}`;
   });
   return (
@@ -323,10 +324,18 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
 
 function ReviseDialog({ task, open, onClose }: { task: TaskDetailDTO; open: boolean; onClose: () => void }) {
   const [feedback, setFeedback] = useState('');
+  // Offered while the user's preview tab of this task is open (29 §2.3).
+  const tabId = useUiStore((s) => s.previewTabs[task.id]);
+  const [attach, setAttach] = useState(true);
   const changes = useRequestChanges();
   const send = () =>
     changes.mutate(
-      { id: task.id, reason: ChangeRequestReason.User, feedback: feedback.trim() },
+      {
+        id: task.id,
+        reason: ChangeRequestReason.User,
+        feedback: feedback.trim(),
+        ...(tabId !== undefined && attach ? { page: { tabId } } : {}),
+      },
       {
         onSuccess: () => {
           toast(C.revised);
@@ -353,6 +362,12 @@ function ReviseDialog({ task, open, onClose }: { task: TaskDetailDTO; open: bool
         value={feedback}
         onChange={(e) => setFeedback(e.target.value)}
       />
+      {tabId !== undefined && (
+        <label className="check" title={C.attachPageHint}>
+          <input type="checkbox" checked={attach} onChange={(e) => setAttach(e.target.checked)} />
+          <span>{C.attachPage}</span>
+        </label>
+      )}
       {changes.isError && <ErrorState error={changes.error} />}
     </Dialog>
   );

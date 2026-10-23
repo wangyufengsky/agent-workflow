@@ -18,7 +18,8 @@ import { Panel } from '../../components/panel.tsx';
 import { DELIVERY_COPY as D } from '../../copy/delivery.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
-import { skippedCommands } from '../tasks/skipped-checks.ts';
+import { ResultPages } from '../preview/result-pages.tsx';
+import { skippedChecks } from '../tasks/skipped-checks.ts';
 import { taskDiffFileQuery, taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { DeliveryActions } from './delivery-actions.tsx';
 import { ReviewComments } from './review-comments.tsx';
@@ -62,7 +63,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
   if (result === null) return <p className="hint">{C.resultPending}</p>;
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
   const failedChecks = result.checks.filter((c) => !c.passed).length;
-  const skipped = skippedCommands(result);
+  const skipped = skippedChecks(result);
   // One skipped check per step that had the command; the commands are listed once each.
   const skippedCount = result.checks.filter((c) => c.skipped).length;
   const checks =
@@ -90,6 +91,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
             {PPT_COPY.makeDeck}
           </Link>
         </div>
+        <ResultPages task={task} />
         <DeliveryOutcome task={task} />
         <section className={styles.block}>
           <h3 className="sec-t">{report ? C.report : C.summary}</h3>

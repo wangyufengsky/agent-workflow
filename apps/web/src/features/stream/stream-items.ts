@@ -19,6 +19,9 @@ export type ToolAction =
   | { kind: 'app'; name: McpToolName; detail?: string }
   | { kind: 'other'; tool: string };
 
+/** The frame a browser action's result names (`"frame":"f3.jpg"`, 12 §6.17). */
+const FRAME_IN_RESULT = /"frame":"(f\d+\.jpg)"/;
+
 /** A tool call's outcome; `stopped`: the session ended before it reported one. */
 export type ActionState = 'running' | 'ok' | 'failed' | 'stopped';
 
@@ -31,6 +34,8 @@ export type StreamAction = {
   tool: string;
   input: Record<string, unknown>;
   output: string | undefined;
+  /** A browser action's frame (29 §5.7, §8.3), named in its result. */
+  frame?: string;
 };
 
 /** One item of the conversation stream (25 §3.1). */
@@ -211,7 +216,17 @@ export function streamItems(
         const state: ActionState =
           result === undefined ? (ended ? 'stopped' : 'running') : result.data.status === 'error' ? 'failed' : 'ok';
         const output = result?.data.status === 'error' ? result.data.error : result?.data.output;
-        items.push({ kind: 'action', key, action: toolAction(tool, input, relative), state, tool, input, output });
+        const frame = state === 'ok' ? FRAME_IN_RESULT.exec(output ?? '')?.[1] : undefined;
+        items.push({
+          kind: 'action',
+          key,
+          action: toolAction(tool, input, relative),
+          state,
+          tool,
+          input,
+          output,
+          ...(frame === undefined ? {} : { frame }),
+        });
         break;
       }
       case TranscriptEntryKind.Permission:
