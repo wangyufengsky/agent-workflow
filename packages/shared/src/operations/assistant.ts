@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { COMPANION_WHISPER_MAX_CHARS } from '../constants/app.ts';
 import {
   assistantConfirmationSchema,
   assistantConversationSchema,
@@ -137,4 +138,25 @@ export const cancelAssistantCallOp = defineOperationContract({
   output: assistantConfirmationSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/assistant/confirmations/:id/cancel' },
+});
+
+export const whisperOp = defineOperationContract({
+  ...common,
+  id: 'assistant.whisper',
+  title: 'op.assistant.whisper',
+  description: 'Generate one companion remark in an isolated session without tools',
+  input: z.object({}),
+  output: z.object({ text: z.string().min(1).max(COMPANION_WHISPER_MAX_CHARS) }),
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/assistant/whisper' },
+});
+export const stopWhisperOp = defineOperationContract({
+  ...common,
+  id: 'assistant.stopWhisper',
+  title: 'op.assistant.stopWhisper',
+  description: 'Cancel the companion remark in progress',
+  input: z.object({}),
+  output: z.void(),
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/assistant/whisper/stop', status: 204 },
 });

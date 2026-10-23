@@ -19,6 +19,7 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { useTranscript } from '../attempts/attempt.queries.ts';
+import { Character } from '../companion/character.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { LatestButton } from '../stream/latest-button.tsx';
 import { thinkingSeconds } from '../stream/stream-items.ts';
@@ -215,7 +216,7 @@ const Message = memo(function Message({ entry, ctx, step }: { entry: TranscriptE
 function Thinking() {
   return (
     <div className={`${styles.message} ${styles.thinking}`} role="status" data-testid="assistant-thinking">
-      <span className={styles.orb} data-busy aria-hidden="true" />
+      <Character mood="thinking" />
       <span className="shimmer">{C.thinking}</span>
     </div>
   );

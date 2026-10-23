@@ -12,6 +12,7 @@ import { useAssistantPage } from './assistant-page.ts';
  */
 export function useAsk() {
   const page = useAssistantPage();
+  const onDesktop = window.location.pathname === '/companion';
   const onHome = useRouterState({ select: (s) => s.location.pathname === ROUTES.home });
   const navigate = useNavigate();
   const create = useCreateConversation();
@@ -40,7 +41,7 @@ export function useAsk() {
       });
       return;
     }
-    useUiStore.setState({ assistantOpen: true, activeConversationId: target.id });
+    useUiStore.setState({ assistantOpen: !onDesktop, activeConversationId: target.id });
     send.mutate(message, { ...(onSent === undefined ? {} : { onSuccess: onSent }) });
   };
   /** `attachmentIds`: files sent with the message (30 §2). */

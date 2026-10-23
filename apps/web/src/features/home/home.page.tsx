@@ -13,6 +13,7 @@ import { conversationsQuery } from '../assistant/assistant.queries.ts';
 import { ConversationMenu, titleOf } from '../assistant/conversation-menu.tsx';
 import { MessageList } from '../assistant/message-list.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
+import { Character } from '../companion/character.tsx';
 import { projectsQuery } from '../projects/projects.queries.ts';
 import styles from './home.module.css';
 import { HomeComposer } from './home-composer.tsx';
@@ -109,7 +110,7 @@ function HomeConversation({
     <div className={styles.conversation}>
       <div className={styles.conversationMain}>
         <header className={styles.conversationHead}>
-          <span className={styles.orb} aria-hidden="true" />
+          <Character mood={conversation.busy ? 'thinking' : undefined} />
           <ConversationMenu
             conversations={conversations}
             active={conversation}

@@ -389,6 +389,8 @@ svg.i.lg {
   flex: 1;
 }
 .content {
+  /* 让屏幕阅读器标签等绝对定位元素归属滚动区，不撑高整个文档。 */
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;

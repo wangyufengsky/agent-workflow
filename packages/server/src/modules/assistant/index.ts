@@ -24,6 +24,7 @@ import { assistantOperations } from './assistant.operations.ts';
 import { registerAssistantRoutes } from './assistant.routes.ts';
 import { type AssistantServiceDeps, createAssistantService } from './assistant.service.ts';
 import { createAssistantToolRegistry, operationTools } from './assistant.tools.ts';
+import { createWhisperService } from './assistant.whisper.ts';
 
 export type { AssistantService } from './assistant.service.ts';
 
@@ -45,6 +46,7 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context'> & {
 
 /** The app assistant (15): conversations, the confirmation flow and the assistant MCP. */
 export function createAssistantModule(deps: AssistantModuleDeps) {
+  const whisper = createWhisperService(deps);
   const context = createContextRenderer(deps);
   const conversations = createAssistantService({ ...deps, context });
   const confirmations = createConfirmations({
@@ -77,8 +79,9 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
   );
   return {
     service: conversations,
+    stopWhisper: whisper.stop,
     registry,
-    operations: assistantOperations(conversations, confirmations),
+    operations: assistantOperations(conversations, confirmations, whisper),
     register(server: FastifyInstance) {
       registerAssistantRoutes(server, conversations);
       registerMcpEndpoint(server, {
