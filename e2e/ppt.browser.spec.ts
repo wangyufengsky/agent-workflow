@@ -92,9 +92,14 @@ test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 
   await page.getByRole('button', { name: '第 2 页 接口为什么慢' }).click();
   const preview = page.getByTestId('slide-preview');
   await expect(preview).toContainText('超过 10 万条时 8 秒');
-  await page.getByLabel('要点（每行一条）').fill('超过 10 万条时 **8 秒**\n导出只能半夜跑\n客服经常收到投诉');
+  const bullets = page.getByLabel('要点（每行一条）');
+  await bullets.fill('超过 10 万条时 **8 秒**\n导出只能半夜跑');
+  // Typed key by key, as people do: Enter starts a new point and spaces stay while editing.
+  await bullets.press('Enter');
+  await bullets.pressSequentially('客服 经常收到投诉');
+  await expect(bullets).toHaveValue('超过 10 万条时 **8 秒**\n导出只能半夜跑\n客服 经常收到投诉');
   await page.getByLabel('讲稿').click();
-  await expect(preview).toContainText('客服经常收到投诉');
+  await expect(preview).toContainText('客服 经常收到投诉');
 
   // The AI revises it; the version before can be restored.
   await queueWriterTurn(request, project, [
@@ -103,9 +108,9 @@ test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 
   await page.getByRole('textbox', { name: '让 AI 改' }).fill('精简到一条');
   await page.getByRole('button', { name: '发送' }).click();
   await expect(preview).toContainText('10 万条以上要 8 秒');
-  await expect(preview).not.toContainText('客服经常收到投诉');
+  await expect(preview).not.toContainText('客服 经常收到投诉');
   await page.getByRole('button', { name: '恢复上一版' }).click();
-  await expect(preview).toContainText('客服经常收到投诉');
+  await expect(preview).toContainText('客服 经常收到投诉');
 
   // Another theme: shown at once, nothing is made again.
   await page.getByLabel('风格').selectOption('deepseek');
@@ -129,7 +134,7 @@ test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 
   await page.keyboard.press('ArrowRight');
   await expect(show).toContainText('2 / 3');
   await page.keyboard.press('Escape');
-  await expect(page.getByTestId('slide-preview')).toContainText('客服经常收到投诉');
+  await expect(page.getByTestId('slide-preview')).toContainText('客服 经常收到投诉');
 
   // The print view the desktop app prints to PDF: every page once.
   const deckId = new URL(page.url()).pathname.split('/')[2];
