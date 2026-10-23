@@ -42,7 +42,8 @@ export type NodeDefinition = Pick<NodeRow, 'planId' | 'title' | 'roleId' | 'inst
 export type NodeChanges = Partial<
   Pick<NodeRow, 'attemptCount' | 'retryFeedback' | 'commitSha' | 'startedAt' | 'finishedAt'> & {
     result: NodeResult;
-    checkResults: CheckResult[];
+    /** Null while a new result waits for its checks. */
+    checkResults: CheckResult[] | null;
   }
 >;
 
@@ -67,7 +68,9 @@ function serialize(changes: NodeChanges) {
   return {
     ...rest,
     ...(result === undefined ? {} : { result: JSON.stringify(result) }),
-    ...(checkResults === undefined ? {} : { checkResults: JSON.stringify(checkResults) }),
+    ...(checkResults === undefined
+      ? {}
+      : { checkResults: checkResults === null ? null : JSON.stringify(checkResults) }),
   };
 }
 

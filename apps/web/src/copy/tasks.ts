@@ -214,6 +214,7 @@ export const NODE_COPY = {
   checkPassed: '通过',
   checkFailed: '未通过',
   checkSkipped: '已跳过',
+  checking: '正在检查这一次的结果……',
   checkUnrunnable: '无法运行',
   unrunnableHint: (program: string, reason: CheckUnrunnableReason) =>
     reason === CheckUnrunnableReason.NotFound ? `找不到程序 ${program}` : `程序 ${program} 没有执行权限`,

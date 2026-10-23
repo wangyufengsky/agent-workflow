@@ -271,8 +271,10 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
       unit.transact(() => {
         attempts.markSubmitted(attempt.id);
         const current = get(node.id);
+        // The previous result's checks say nothing about this one; why it failed stays in retryFeedback.
         move(current, NodeEvent.ResultSubmitted, target, {
           result: input,
+          checkResults: null,
           ...(target === NodeStatus.Done ? doneChanges(sha) : {}),
         });
         if (target === NodeStatus.AwaitingAcceptance) requestAcceptance(current);
@@ -319,7 +321,11 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
      * Verification starts once the surrounding transaction commits.
      */
     recheck(nodeId: string, ctx: NodeRunContext): Node {
-      const node = move(get(nodeId), NodeEvent.Recheck, NodeStatus.Verifying, { attemptCount: 1, finishedAt: null });
+      const node = move(get(nodeId), NodeEvent.Recheck, NodeStatus.Verifying, {
+        attemptCount: 1,
+        checkResults: null,
+        finishedAt: null,
+      });
       unit.afterCommit(() => inBackground(nodeId, () => verify(nodeId, ctx)));
       return node;
     },

@@ -40,6 +40,7 @@ describe('任务上下文类 MCP 工具（12 §6.1–6.3）', () => {
         .callTool('get_node_output', { node_key: 'a' })
         .callTool('get_node_output', { node_key: 'final_verify' })
         .callTool('get_task_diff')
+        .callTool('get_task_diff', { path: '' })
         .callTool('get_task_diff', { path: 'b.txt' })
         .callTool('get_task_diff', { path: 'nope.txt' })
         .callTool('submit_result', { summary: 'Wrote b' }),
@@ -102,7 +103,7 @@ describe('任务上下文类 MCP 工具（12 §6.1–6.3）', () => {
     });
     expect(missing).toMatchObject({ code: ErrorCode.McpNodeNotFound, hint: expect.stringContaining('finished step') });
 
-    const [planDiff, files, one, unknown] = results('get_task_diff');
+    const [planDiff, files, emptyPath, one, unknown] = results('get_task_diff');
     expect(planDiff?.result).toMatchObject({ code: ErrorCode.McpToolNotAllowed });
     // a.txt is committed, b.txt not yet: both count against the base commit.
     expect(files?.result).toEqual({
@@ -111,6 +112,8 @@ describe('任务上下文类 MCP 工具（12 §6.1–6.3）', () => {
         { path: 'b.txt', status: 'added', additions: 1, deletions: 0 },
       ],
     });
+    // Models that fill every argument send an empty path to mean「all files」.
+    expect(emptyPath?.result).toEqual(files?.result);
     expect(one?.result).toMatchObject({ path: 'b.txt', diff: expect.stringContaining('+two') });
     expect(unknown?.result).toMatchObject({
       code: ErrorCode.ValidationFailed,
