@@ -214,6 +214,26 @@ describe('定时任务：创建、立即运行与删除（22 §9）', () => {
     expect(busy.body).toMatchObject({ error: { code: ErrorCode.ScheduleBusy } });
   });
 
+  it('同时点两次「立即运行」：只开一个任务，另一次 409 SCHEDULE_BUSY', async () => {
+    await open();
+    const { project } = await addProject(t, { checkCommand: null });
+    const schedule = await createSchedule(project.id);
+    queueReview(1);
+    const review = taskReaches(t, 'review');
+
+    // Both pass the first check before either has created its task.
+    const both = await Promise.all([
+      t.call(runScheduleOp, { id: schedule.id }),
+      t.call(runScheduleOp, { id: schedule.id }),
+    ]);
+    await review;
+    await t.fake.settled();
+
+    expect(both.map((r) => r.status).sort()).toEqual([200, 409]);
+    const { body } = await t.call(getScheduleOp, { id: schedule.id });
+    expect(body.runs).toMatchObject([{ trigger: 'manual', outcome: 'started' }]);
+  });
+
   it('不存在的定时任务 404；删除项目后定时任务随之删除', async () => {
     await open();
     const { project } = await addProject(t);
