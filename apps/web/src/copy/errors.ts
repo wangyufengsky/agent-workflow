@@ -64,6 +64,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.AssistantConversationNotFound]: '这个助手对话不存在，可能已被删除。',
   [ErrorCode.AssistantConfirmationNotFound]: '这条确认不存在，可能所在的对话已被删除。',
   [ErrorCode.AssistantBusy]: '助手还在处理上一条消息，请等它回复后再发，或先停止它。',
+  [ErrorCode.AssistantContextChanged]: '当前预览或对话已切换，本条消息尚未发送。请确认后重试。',
   [ErrorCode.BatchNotFound]: '这个批量任务不存在，可能所属项目已被删除。',
   [ErrorCode.ScheduleNotFound]: '这个定时任务不存在，可能已被删除。',
   [ErrorCode.ScheduleBusy]: '上一次运行的任务还没结束，处理完它再运行。',

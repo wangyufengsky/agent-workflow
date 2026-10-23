@@ -314,7 +314,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `PREVIEW_LOG_TAIL_CHARS` | 4000（预览起不来时保留的日志末尾） |
 | `PREVIEW_PAGES_MAX` | 10（项目预览配置的关键页面数） |
 | `BROWSER_ACTION_TIMEOUT_MS` | 5000（等目标可以点中，29 §5.5） |
-| `BROWSER_READ_TIMEOUT_MS` | 30000（助手文字读取从打开到提取的整体截止，超时关闭临时标签页） |
+| `BROWSER_READ_TIMEOUT_MS` | 30000（助手文字读取与用户导航的整体截止；临时/新页超时关闭，已有用户页保留） |
 | `BROWSER_SETTLE_QUIET_MS` / `BROWSER_SETTLE_TIMEOUT_MS` | 500 / 10000（动作后等页面稳定：请求清零、DOM 无变动各持续多久，最多等多久） |
 | `BROWSER_WAIT_FOR_MAX_MS` | 10000（`browser_wait_for` 最长等待） |
 | `BROWSER_SNAPSHOT_MAX_CHARS` | 12000（页面快照的长度上限，29 §5.6） |
@@ -443,6 +443,7 @@ class AppError extends Error {
 | `ASSISTANT_CONVERSATION_NOT_FOUND` | 404 | |
 | `ASSISTANT_CONFIRMATION_NOT_FOUND` | 404 | |
 | `ASSISTANT_BUSY` | 409 | 助手正在回复时又发来消息（先等它结束或停止它） |
+| `ASSISTANT_CONTEXT_CHANGED` | 409 | 关联等待期间当前预览或对话已切换；该消息尚未发送，保留草稿供用户确认后重试 |
 | **批量任务（v1.1）** | | |
 | `BATCH_NOT_FOUND` | 404 | 批次不存在（所属项目已删除时随之删除） |
 | **定时任务（v1.2）** | | |

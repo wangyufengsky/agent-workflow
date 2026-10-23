@@ -433,6 +433,8 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 关闭仍使用 `DELETE /browser/tabs/:tabId`，同时删除它的会话关联。任务完成或取消也关闭页签。助手专用的 `browser_read` 没有 HTTP 操作和 tab 参数，只读取调用会话由界面关联的用户页，输出 `{ taskId, url, title, tab: 'preview', viewport, page, settled, logs }`。未关联或已失效返回 `BROWSER_NOT_OPEN`。离开任务预览页签立即解绑，助手/命令面板浮层仅隐藏原生视图，不解绑；首次发送消息先完成绑定更新，防止新对话误读旧页。
 
+用户预览读取和导航也有 30 秒整体截止，超时为 `BROWSER_READ_FAILED`（`details.reason = timeout`）。读取或已有页的导航超时只结束本次等待、丢弃迟到结果，保留用户页及关联；用户解决页面对话框后可再读。首次打开在预览服务就绪后开始此截止，初始化/导航失败会关闭新页。应用退出中止所有用户浏览器等待，清理正在创建的页签，不等挂起的 CDP 回应；预览服务本身仍使用原有启动时限。
+
 ## 13e. PPT（v1.2）
 
 见 [23-ppt.md §8](23-ppt.md#8-api操作清单)。全部 `mode = simple`、`expose.assistant = true`、不进命令面板（D96）；改动内容的 write 操作在有 AI 工作进行中时 409 `DECK_BUSY`；发起 AI 工作时 opencode 未就绪 503。`model` 同知识问答（`provider/model`、`null` 或省略）。

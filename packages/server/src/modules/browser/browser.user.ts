@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   AppError,
+  BROWSER_READ_TIMEOUT_MS,
   type BrowserPolicy,
   BrowserTabKind,
   ErrorCode,
@@ -38,6 +39,31 @@ export function createUserBrowser({ host, clock, log, events, previews, projects
   const tabs = new Map<string, UserTab>();
   const opening = new Map<string, Promise<UserPreviewTab>>();
   const selected = new Map<string, string>();
+  const waiting = new Set<AbortController>();
+
+  /** 只取消本次等待，不中断用户页面；迟到的 CDP 结果由 signal 检查丢弃。 */
+  async function withinDeadline<T>(work: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    const abort = new AbortController();
+    waiting.add(abort);
+    const interrupted = Promise.withResolvers<never>();
+    const onAbort = () => interrupted.reject(abort.signal.reason);
+    abort.signal.addEventListener('abort', onAbort, { once: true });
+    const cancel = clock.schedule(BROWSER_READ_TIMEOUT_MS, () =>
+      abort.abort(
+        new AppError(ErrorCode.BrowserReadFailed, 'The user preview operation timed out', {
+          reason: 'timeout',
+          timeoutMs: BROWSER_READ_TIMEOUT_MS,
+        }),
+      ),
+    );
+    try {
+      return await Promise.race([work(abort.signal), interrupted.promise]);
+    } finally {
+      cancel();
+      waiting.delete(abort);
+      abort.signal.removeEventListener('abort', onAbort);
+    }
+  }
 
   function requireTab(tabId: string): UserTab {
     const tab = tabs.get(tabId);
@@ -74,7 +100,7 @@ export function createUserBrowser({ host, clock, log, events, previews, projects
     const entry = forget(tabId);
     if (entry !== undefined) await entry.tab.close();
   }
-  async function navigate(tabId: string, path: string): Promise<void> {
+  async function navigate(tabId: string, path: string, signal: AbortSignal): Promise<void> {
     const entry = requireTab(tabId);
     const { taskId, tab } = entry;
     const origin = previewUrl(taskId);
@@ -83,6 +109,7 @@ export function createUserBrowser({ host, clock, log, events, previews, projects
     const result = z
       .object({ errorText: z.string().optional() })
       .parse(await tab.cdp('Page.navigate', { url: url.href }));
+    signal.throwIfAborted();
     if (result.errorText !== undefined) {
       throw new AppError(ErrorCode.BrowserReadFailed, 'The preview page could not be loaded', {
         reason: result.errorText,
@@ -93,24 +120,34 @@ export function createUserBrowser({ host, clock, log, events, previews, projects
   async function openNew(taskId: string): Promise<UserPreviewTab> {
     await previews.start(taskId);
     const projectId = previews.projectOf(taskId);
-    const tab = await openTab({
-      host,
-      clock,
-      log,
-      tabId: `user-preview:${randomUUID()}`,
-      kind: BrowserTabKind.Preview,
-      partition: `persist:aw-preview-${projectId}`,
-      policy: policyFor(taskId, projectId),
-      site: false,
-      userFacing: true,
-    });
-    tabs.set(tab.tabId, { taskId, projectId, origin: previewUrl(taskId), tab });
-    previews.acquire(taskId);
+    let tab: Tab | undefined;
+    let registered = false;
     try {
-      await navigate(tab.tabId, '/');
-      return { tabId: tab.tabId, viewport: tab.viewport.preset };
+      return await withinDeadline(async (signal) => {
+        tab = await openTab({
+          host,
+          clock,
+          log,
+          tabId: `user-preview:${randomUUID()}`,
+          kind: BrowserTabKind.Preview,
+          partition: `persist:aw-preview-${projectId}`,
+          policy: policyFor(taskId, projectId),
+          site: false,
+          userFacing: true,
+          signal,
+        });
+        signal.throwIfAborted();
+        tabs.set(tab.tabId, { taskId, projectId, origin: previewUrl(taskId), tab });
+        previews.acquire(taskId);
+        registered = true;
+        await navigate(tab.tabId, '/', signal);
+        return { tabId: tab.tabId, viewport: tab.viewport.preset };
+      });
     } catch (err) {
-      await close(tab.tabId);
+      if (tab !== undefined) {
+        if (registered) await close(tab.tabId);
+        else await tab.close();
+      }
       throw err;
     }
   }
@@ -148,15 +185,18 @@ export function createUserBrowser({ host, clock, log, events, previews, projects
   return {
     owns: (tabId: string) => tabs.has(tabId),
     async open(taskId: string) {
+      const pending = opening.get(taskId);
+      if (pending !== undefined) return pending;
       const existing = [...tabs.values()].find((tab) => tab.taskId === taskId);
       if (existing !== undefined) {
         await previews.start(taskId);
-        await existing.tab.setPolicy(policyFor(taskId, existing.projectId));
-        if (previewUrl(taskId) !== existing.origin) await navigate(existing.tab.tabId, '/');
-        return { tabId: existing.tab.tabId, viewport: existing.tab.viewport.preset };
+        return withinDeadline(async (signal) => {
+          await existing.tab.setPolicy(policyFor(taskId, existing.projectId));
+          signal.throwIfAborted();
+          if (previewUrl(taskId) !== existing.origin) await navigate(existing.tab.tabId, '/', signal);
+          return { tabId: existing.tab.tabId, viewport: existing.tab.viewport.preset };
+        });
       }
-      const pending = opening.get(taskId);
-      if (pending !== undefined) return pending;
       const result = openNew(taskId);
       opening.set(taskId, result);
       try {
@@ -165,7 +205,7 @@ export function createUserBrowser({ host, clock, log, events, previews, projects
         opening.delete(taskId);
       }
     },
-    navigate,
+    navigate: (tabId: string, path: string) => withinDeadline((signal) => navigate(tabId, path, signal)),
     close,
     bind(conversationId: string, selection: PreviewSelection | null): void {
       if (selection === null) {
@@ -184,21 +224,25 @@ export function createUserBrowser({ host, clock, log, events, previews, projects
         throw new AppError(ErrorCode.BrowserNotOpen, 'No user-selected preview for this conversation');
       const { tab, taskId } = requireTab(tabId);
       previewUrl(taskId);
-      const settled = await tab.settle();
-      const snapshot = await tab.snapshot();
-      // 稳定等待期间用户可能切走、关闭或停掉预览；不再返回已经失去关联的页面。
-      if (selected.get(conversationId) !== tabId || !tabs.has(tabId)) {
-        throw new AppError(ErrorCode.BrowserNotOpen, 'The selected preview changed while reading');
-      }
-      previewUrl(taskId);
-      return {
-        ...snapshot,
-        taskId,
-        tab: BrowserTabKind.Preview,
-        viewport: tab.viewport.preset,
-        settled,
-        logs: tab.logs('open'),
-      };
+      return withinDeadline(async (signal) => {
+        const settled = await tab.settle();
+        signal.throwIfAborted();
+        const snapshot = await tab.snapshot();
+        signal.throwIfAborted();
+        // 稳定等待期间用户可能切走、关闭或停掉预览；不再返回已经失去关联的页面。
+        if (selected.get(conversationId) !== tabId || !tabs.has(tabId)) {
+          throw new AppError(ErrorCode.BrowserNotOpen, 'The selected preview changed while reading');
+        }
+        previewUrl(taskId);
+        return {
+          ...snapshot,
+          taskId,
+          tab: BrowserTabKind.Preview,
+          viewport: tab.viewport.preset,
+          settled,
+          logs: tab.logs('open'),
+        };
+      });
     },
     async viewport(tabId: string, preset: ViewportPreset): Promise<void> {
       const { tab } = requireTab(tabId);
@@ -206,6 +250,7 @@ export function createUserBrowser({ host, clock, log, events, previews, projects
       tab.viewport.preset = preset;
     },
     async closeAll(): Promise<void> {
+      for (const abort of waiting) abort.abort(new AppError(ErrorCode.BrowserNotOpen, 'The browser is closing'));
       // 打开失败已经由原调用报告；收尾仍须等它结束并关闭其他页签。
       await Promise.allSettled([...opening.values()]);
       await Promise.all([...tabs.keys()].map(close));

@@ -71,6 +71,7 @@ export const ErrorCode = {
   AssistantConversationNotFound: 'ASSISTANT_CONVERSATION_NOT_FOUND',
   AssistantConfirmationNotFound: 'ASSISTANT_CONFIRMATION_NOT_FOUND',
   AssistantBusy: 'ASSISTANT_BUSY',
+  AssistantContextChanged: 'ASSISTANT_CONTEXT_CHANGED',
   // 批量任务
   BatchNotFound: 'BATCH_NOT_FOUND',
   // 定时任务
@@ -188,6 +189,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.AssistantConversationNotFound]: 404,
   [ErrorCode.AssistantConfirmationNotFound]: 404,
   [ErrorCode.AssistantBusy]: 409,
+  [ErrorCode.AssistantContextChanged]: 409,
   [ErrorCode.BatchNotFound]: 404,
   [ErrorCode.ScheduleNotFound]: 404,
   [ErrorCode.ScheduleBusy]: 409,

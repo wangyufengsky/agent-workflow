@@ -2,22 +2,23 @@ import {
   API_PREFIX,
   type AssistantConfirmationDTO,
   type AssistantConversationDTO,
-  type AssistantPageRef,
   abortAssistantOp,
   bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
   createConversationOp,
   deleteConversationOp,
+  ErrorCode,
   listAssistantFilesOp,
   listConfirmationsOp,
   listConversationsOp,
   type PermissionDecision,
   replyAssistantPermissionOp,
+  type SendAssistantMessageRequest,
   sendAssistantMessageOp,
 } from '@aw/shared';
 import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
-import { callOperation } from '../../api/client.ts';
+import { ApiError, callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import type { TranscriptSource } from '../attempts/attempt.queries.ts';
@@ -100,9 +101,25 @@ export function useCreateConversation() {
 export function useSendMessage() {
   const bind = useBindPreview();
   return useMutation({
-    mutationFn: async (input: { id: string; text: string; context: AssistantPageRef }) => {
-      await bind.mutateAsync({ id: input.id, preview: useUiStore.getState().activePreview });
-      return callOperation(sendAssistantMessageOp, input);
+    mutationFn: async (input: SendAssistantMessageRequest) => {
+      const before = useUiStore.getState();
+      let changed = false;
+      // 连续离开再返回也算切换：旧消息不能借等待中的关联重新获得页面。
+      const unsubscribe = useUiStore.subscribe((state) => {
+        if (state.activePreview !== before.activePreview || state.activeConversationId !== before.activeConversationId)
+          changed = true;
+      });
+      try {
+        await bind.mutateAsync({ id: input.id, preview: before.activePreview });
+        if (changed)
+          throw new ApiError(409, {
+            code: ErrorCode.AssistantContextChanged,
+            message: 'The preview or conversation changed before the message was sent',
+          });
+        return callOperation(sendAssistantMessageOp, input);
+      } finally {
+        unsubscribe();
+      }
     },
   });
 }

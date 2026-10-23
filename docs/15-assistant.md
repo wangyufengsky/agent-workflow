@@ -2,7 +2,7 @@
 
 > 状态：**v1.1 已实现**（任务 A-01…A-11，见 [05](05-dev-plan.md#v11--应用助手约-2-周v10-发布后)）。v1.0 交付了它的地基：操作清单（[03 §5](03-architecture.md#5-操作清单operation-registry)）与 ⌘K 命令面板。实现中按保守方案收紧的取舍见 D65（①② 用户已确认，③ 待确认）。
 
-2026-10-24 增补：助手可用 `browser_readUrl` 读取明确网址的文字结构与错误日志，沿用网站登录和规则，并强制只读（无法归属标签页的 Worker 被拒绝并记录）；整体读取最长 30 秒，截止显式失败并关闭临时页；可用 `previews_get/start/stop` 管理任务预览，启动/停止继续经过写操作确认。未开放当前用户预览页读取（尚缺用户页签归属）、页面点击/输入或截图/PDF，见 [29 §9](29-browser.md#9-应用助手)。
+2026-10-24 增补：助手可用 `browser_readUrl` 读取明确网址的文字结构与错误日志，沿用网站登录和规则，并强制只读（无法归属标签页的 Worker 被拒绝并记录）；整体读取最长 30 秒，截止显式失败并关闭临时页；可用 `previews_get/start/stop` 管理任务预览，启动/停止继续经过写操作确认。桌面版用户显式打开「我的预览」后，`browser_read` 可读取当前对话关联的用户页；关联等待期间切换预览或对话会取消本次发送并保留草稿。未开放助手页面点击/输入或截图/PDF，见 [29 §9](29-browser.md#9-应用助手)。
 
 ## 1. 定位
 
@@ -46,7 +46,7 @@ opencode 1.19 的已有会话目录不能通过发送参数或 fork 改变。迁
 | --- | --- | --- |
 | `get_current_time` | read | `{ now, date, weekday, timeZone, utcOffset }`：用户所在时区（后端进程的系统时区）的当地时间 |
 | `get_app_status` | read | `{ runtime, uiMode, projects, activeTasks, blockingInbox }`（`blockingInbox` 同徽标，不含待合并，D119） |
-| `browser_read` | read | 严格空参数；只读当前对话由界面绑定的「我的预览」文字、地址、视口和错误日志；无关联或预览失效为 `BROWSER_NOT_OPEN`，不能用任务或 tab 参数猜测当前页（29 §9） |
+| `browser_read` | read | 严格空参数；只读当前对话由界面绑定的「我的预览」文字、地址、视口和错误日志；无关联或预览失效为 `BROWSER_NOT_OPEN`，不能用任务或 tab 参数猜测当前页。整体最多 30 秒，超时为 `BROWSER_READ_FAILED`，保留用户页与关联（29 §9） |
 | `open_page` | read | `{ page: AssistantPage, params }`（各页面需要的参数为 `ASSISTANT_PAGE_PARAMS`）→ SSE `assistant.navigate`，界面在面板旁跳转 |
 | `open_form` | read | `{ form: AssistantForm, values }` → SSE `assistant.open_form`；`values` 按该表单所提交操作的助手输入（不含凭据字段）的 partial 校验，带凭据字段 `VALIDATION_FAILED` |
 | `list_files` / `reveal_file` | read | 列出 / 在 Finder 中显示 `files/<id>/` 下的文件（路径相对该目录，越界或不存在 `VALIDATION_FAILED`；显示经 SSE `assistant.reveal_file` 由 preload 完成） |

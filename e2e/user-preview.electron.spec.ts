@@ -64,7 +64,7 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
   for (const theme of THEME_IDS) {
     await request.patch(`${api}/settings`, { headers, data: { 'ui.theme': theme } });
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
-    await page.screenshot({ path: `screenshots/user-preview-${theme}.png` });
+    await page.screenshot({ path: `screenshots/user-preview-${theme}.png`, animations: 'disabled' });
   }
   // renderer 截图不含原生子视图，另外保存该真实 WebContents 的画面用于走查。
   const nativeImage = await app.evaluate(async ({ BrowserWindow }) => {
@@ -74,6 +74,38 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
     return (await contents.capturePage()).toPNG().toString('base64');
   });
   writeFileSync('screenshots/user-preview-native.png', Buffer.from(nativeImage, 'base64'));
+
+  // 原生视图不能越过滚动 main 盖住应用顶栏；缩窗并滚动制造真实的部分可见区域。
+  const originalBounds = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getBounds());
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1280, 600));
+  await page.getByRole('main').evaluate((main) => {
+    main.scrollTop = main.scrollHeight;
+  });
+  await expect
+    .poll(async () => {
+      const main = await page.getByRole('main').boundingBox();
+      const area = await page.getByTestId('user-preview-area').boundingBox();
+      const bounds = await app.evaluate(({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()[0]?.contentView.children[0]?.getBounds(),
+      );
+      return (
+        main !== null &&
+        area !== null &&
+        bounds !== undefined &&
+        area.y < main.y &&
+        bounds.y >= main.y &&
+        bounds.y + bounds.height <= main.y + main.height
+      );
+    })
+    .toBe(true);
+  if (originalBounds === undefined) throw new Error('No app window');
+  await app.evaluate(
+    ({ BrowserWindow }, bounds) => BrowserWindow.getAllWindows()[0]?.setBounds(bounds),
+    originalBounds,
+  );
+  await page.getByRole('main').evaluate((main) => {
+    main.scrollTop = 0;
+  });
 
   // 焦点在原生页面里时，真实快捷键也必须回到主界面。
   await app.evaluate(({ BrowserWindow }) => {
@@ -128,14 +160,45 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
   await expect.poll(nativeCount).toBe(0);
 
   await page.getByRole('tab', { name: '预览', exact: true }).click();
+  const rebound = page.waitForResponse(
+    (response) =>
+      response.url().endsWith(`/assistant/conversations/${id}/preview`) &&
+      response.request().postDataJSON()?.preview !== null,
+  );
   await page.getByRole('button', { name: '打开我的预览', exact: true }).click();
   await expect.poll(nativeCount).toBe(1);
+  expect((await rebound).status()).toBe(204);
+
+  // 关联已经写入后暂缓 PUT 回应；用户离开时，这条等待中的消息必须取消并保留草稿。
+  await page.keyboard.press('ControlOrMeta+j');
+  const bindingReached = Promise.withResolvers<void>();
+  const releaseBinding = Promise.withResolvers<void>();
+  await page.route(`**/assistant/conversations/${id}/preview`, async (route) => {
+    if (route.request().postDataJSON()?.preview === null) return route.continue();
+    const response = await route.fetch();
+    bindingReached.resolve();
+    await releaseBinding.promise;
+    return route.fulfill({ response });
+  });
+  let racedMessages = 0;
+  page.on('request', (request) => {
+    if (request.url().endsWith(`/assistant/conversations/${id}/messages`) && request.method() === 'POST')
+      racedMessages += 1;
+  });
+  await page.getByRole('textbox', { name: '发给助手的消息' }).fill('等待关联时我已经离开了预览');
+  await page.getByRole('button', { name: '发送', exact: true }).click();
+  await bindingReached.promise;
   const routeUnbound = page.waitForResponse(
     (response) =>
       response.url().endsWith(`/assistant/conversations/${id}/preview`) &&
       response.request().postDataJSON()?.preview === null,
   );
   await page.getByRole('navigation').getByRole('link', { name: '项目', exact: true }).click();
+  await expect(page.getByTestId('user-preview-area')).toHaveCount(0);
+  releaseBinding.resolve();
   expect((await routeUnbound).status()).toBe(204);
   await expect.poll(nativeCount).toBe(0);
+  await expect(page.getByText('当前预览或对话已切换，本条消息尚未发送。请确认后重试。')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: '发给助手的消息' })).toHaveValue('等待关联时我已经离开了预览');
+  expect(racedMessages).toBe(0);
 });
