@@ -281,6 +281,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `SCHEDULE_EVERY_HOURS` | `[1, 2, 3, 4, 6, 8, 12]`（`hourly` 可选的间隔，24 的约数，D90） |
 | `ASSISTANT_TITLE_MAX_CHARS` | 40（助手对话标题取第一条消息的首行） |
 | `ASSISTANT_MESSAGE_MAX_CHARS` | 20000（一条发给助手的消息） |
+| `ASSISTANT_CONTEXT_MAX_CHARS` | 12000（一次显式附加的选中文字；任务／步骤快照正文超长时注明截断） |
 | `KNOWLEDGE_QUESTION_MAX_CHARS` | 4000（一次提问） |
 | `KNOWLEDGE_TITLE_MAX_CHARS` | 80（知识对话标题取第一次提问的首行） |
 | `KNOWLEDGE_ANSWER_MAX_CHARS` | 20000（`submit_answer` 的回答） |
@@ -313,6 +314,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `PREVIEW_LOG_TAIL_CHARS` | 4000（预览起不来时保留的日志末尾） |
 | `PREVIEW_PAGES_MAX` | 10（项目预览配置的关键页面数） |
 | `BROWSER_ACTION_TIMEOUT_MS` | 5000（等目标可以点中，29 §5.5） |
+| `BROWSER_READ_TIMEOUT_MS` | 30000（助手文字读取从打开到提取的整体截止，超时关闭临时标签页） |
 | `BROWSER_SETTLE_QUIET_MS` / `BROWSER_SETTLE_TIMEOUT_MS` | 500 / 10000（动作后等页面稳定：请求清零、DOM 无变动各持续多久，最多等多久） |
 | `BROWSER_WAIT_FOR_MAX_MS` | 10000（`browser_wait_for` 最长等待） |
 | `BROWSER_SNAPSHOT_MAX_CHARS` | 12000（页面快照的长度上限，29 §5.6） |
@@ -485,6 +487,7 @@ class AppError extends Error {
 | `PREVIEW_LIMIT_REACHED` | 409 | 同时运行的预览已达 `preview.maxRunning`，且都有活动尝试（29 §4.4） |
 | `BROWSER_SITE_NOT_ALLOWED` | 403 | 地址既不是任务预览，也没有网站规则允许（29 §5.4）；`details: { host }` |
 | `BROWSER_LOGIN_REQUIRED` | 409 | 打开网站后到了登录页；`details: { url }`（登录页地址） |
+| `BROWSER_READ_FAILED` | 502 | 助手网页导航失败（含重定向被网站规则拦截）或整体读取超时；`details: { url, reason, timeoutMs? }`，reason 为浏览器返回的加载错误，或超时的 `timeout`（携带 timeoutMs） |
 | `BROWSER_REF_STALE` | — | 元素编号已作废（页面导航过），先重新读取快照；仅 MCP |
 | `BROWSER_ACTION_FAILED` | — | 动作没能完成；`details: { reason, coveredBy? }`，`reason` 为 `BrowserActionFailure`；仅 MCP |
 

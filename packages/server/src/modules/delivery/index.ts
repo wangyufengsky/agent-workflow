@@ -10,6 +10,7 @@ export {
 } from './delivery.merge.ts';
 export { pushBranch, syncBranchFromOrigin } from './delivery.push.ts';
 export type { DeliveriesService } from './delivery.service.ts';
+export { deliveriesTable } from './delivery.table.ts';
 
 export function createDeliveryModule(deps: DeliveriesServiceDeps) {
   return { service: createDeliveriesService(deps) };

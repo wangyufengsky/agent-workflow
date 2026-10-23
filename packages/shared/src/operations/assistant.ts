@@ -8,7 +8,9 @@ import {
   createConversationRequestSchema,
   replyAssistantPermissionRequestSchema,
   sendAssistantMessageRequestSchema,
+  snapshotAssistantContextRequestSchema,
 } from '../contracts/api/assistant.ts';
+import { attachmentSchema } from '../contracts/api/attachments.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -16,6 +18,17 @@ import { defineOperationContract } from './define.ts';
 const byId = z.object({ id: z.string() });
 // The panel's own operations: never assistant tools (the assistant must not confirm its own calls) nor palette items.
 const common = { expose: { palette: false, assistant: false }, credentialFields: [], mode: UiMode.Simple } as const;
+
+export const snapshotAssistantContextOp = defineOperationContract({
+  ...common,
+  id: 'assistant.snapshotContext',
+  title: 'op.assistant.snapshotContext',
+  description: 'Save explicitly selected text or current task details as an immutable text attachment',
+  input: snapshotAssistantContextRequestSchema,
+  output: attachmentSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/assistant/context-snapshots', status: 201 },
+});
 
 export const listConversationsOp = defineOperationContract({
   ...common,

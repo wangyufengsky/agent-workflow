@@ -10,13 +10,14 @@ import {
   listConversationsOp,
   replyAssistantPermissionOp,
   sendAssistantMessageOp,
+  snapshotAssistantContextOp,
   stopWhisperOp,
   whisperOp,
 } from './assistant.ts';
 import { getAttachmentOp, removeAttachmentOp, snapshotProjectFileOp } from './attachments.ts';
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
 import { createBatchOp, deliverBatchOp, getBatchOp, listBatchesOp } from './batches.ts';
-import { clearSiteLoginOp, closeUserTabOp, listSiteLoginsOp, openLoginTabOp } from './browser.ts';
+import { clearSiteLoginOp, closeUserTabOp, listSiteLoginsOp, openLoginTabOp, readWebsiteOp } from './browser.ts';
 import {
   createDbConnectionOp,
   dbSchemaOp,
@@ -219,6 +220,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   closeUserTabOp,
   listSiteLoginsOp,
   clearSiteLoginOp,
+  readWebsiteOp,
   listDbConnectionsOp,
   createDbConnectionOp,
   updateDbConnectionOp,
@@ -323,6 +325,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   listWorktreesOp,
   pruneWorktreesOp,
   listConversationsOp,
+  snapshotAssistantContextOp,
   createConversationOp,
   getConversationOp,
   deleteConversationOp,

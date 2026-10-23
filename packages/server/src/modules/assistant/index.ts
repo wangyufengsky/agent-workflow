@@ -23,6 +23,8 @@ import { createKnowledgeRelay, KNOWLEDGE_QUESTION_OPS } from './assistant.knowle
 import { assistantOperations } from './assistant.operations.ts';
 import { registerAssistantRoutes } from './assistant.routes.ts';
 import { type AssistantServiceDeps, createAssistantService } from './assistant.service.ts';
+import { createAssistantSnapshots } from './assistant.snapshots.ts';
+import { createTaskRelay } from './assistant.tasks.ts';
 import { createAssistantToolRegistry, operationTools } from './assistant.tools.ts';
 import { createWhisperService } from './assistant.whisper.ts';
 
@@ -49,7 +51,9 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
   const whisper = createWhisperService(deps);
   const context = createContextRenderer(deps);
   const conversations = createAssistantService({ ...deps, context });
+  const taskRelay = createTaskRelay({ ...deps, conversations });
   const confirmations = createConfirmations({
+    run: taskRelay.run,
     ...deps,
     conversations,
     operations: new Map(deps.operations.map((impl) => [impl.contract.id, impl])),
@@ -59,6 +63,7 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     [
       ...operationTools(deps.operations, {
         settings: deps.settings,
+        run: taskRelay.run,
         requestConfirmation: confirmations.request,
         recordProduced: conversations.recordProduced,
         deferred: new Map(KNOWLEDGE_QUESTION_OPS.map((id) => [id, relay.researching])),
@@ -80,8 +85,9 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
   return {
     service: conversations,
     stopWhisper: whisper.stop,
+    start: taskRelay.start,
     registry,
-    operations: assistantOperations(conversations, confirmations, whisper),
+    operations: assistantOperations(conversations, confirmations, whisper, createAssistantSnapshots(deps)),
     register(server: FastifyInstance) {
       registerAssistantRoutes(server, conversations);
       registerMcpEndpoint(server, {

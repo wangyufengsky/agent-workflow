@@ -316,19 +316,24 @@ type AttemptDTO = AttemptSummaryDTO & {
 | --- | --- | --- |
 | GET | `/assistant/conversations` | `{ items: AssistantConversationDTO[] }`，最近更新在前；`AssistantConversationDTO = { id, title, busy, pendingPermissions: Array<{ permissionId, permission, patterns }>, createdAt, updatedAt }`（`busy` 与权限请求只在内存中，重启后为空） |
 | POST | `/assistant/conversations` | `{ title? }` → 201；opencode 会话在第一条消息时创建 |
+| POST | `/assistant/context-snapshots` | `assistant.snapshotContext`，`{ source: { kind: 'task', taskId, nodeId? } \| { kind: 'selection', text, page: AssistantPageRef } }` → 201 `AttachmentDTO`。用户显式附加文字，write，不暴露给助手或命令面板。任务／步骤信息由后端读取；不存在 404 `TASK_NOT_FOUND` / `NODE_NOT_FOUND`，步骤必须属于任务。选中文字 trim 后 1–12000 字符，超长／空白／多余字段 400 `VALIDATION_FAILED`；仅文字，NUL 等仍由附件边界拒绝。结果是固定的文本附件，使用现有查看、移除、绑定与清理接口 |
 | GET | `/assistant/conversations/:id` | 不存在 404 `ASSISTANT_CONVERSATION_NOT_FOUND` |
-| DELETE | `/assistant/conversations/:id` | 204；连同确认、消息流 JSONL 与 `files/<id>/` |
-| POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey?, knowledgeConversationId?, deckId?, slideId?, batchId?, scheduleId? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在回复时 409 `ASSISTANT_BUSY` |
+| DELETE | `/assistant/conversations/:id` | 204；连同确认、待发消息、任务跟进记录、消息流 JSONL 与 `files/<id>/` |
+| POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey?, knowledgeConversationId?, deckId?, slideId?, batchId?, scheduleId? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在创建会话、发送请求或等待模型回复时 409 `ASSISTANT_BUSY` |
 | POST | `/assistant/conversations/:id/abort` | 停止本轮回复 |
 | POST | `/assistant/conversations/:id/permissions/:permissionId` | `{ reply: PermissionDecision }`：回复助手会话的权限请求（bash / webfetch 询问），不存在 404 `NOT_FOUND` |
 | GET | `/assistant/conversations/:id/transcript?afterSeq=` | 消息流分页（非清单路由，格式同 `/attempts/:id/transcript`；`done` 恒为 false：对话不会结束） |
 | GET | `/assistant/conversations/:id/files` | `{ items: Array<{ path, absolutePath, size, modifiedAt }> }`：`files/<id>/` 下助手写的文件 |
-| GET | `/assistant/conversations/:id/confirmations` | `{ items: AssistantConfirmationDTO[] }`，按创建时间；`AssistantConfirmationDTO = { id, conversationId, operationId, title, risk, input, status, result: { ok: true, output } \| { ok: false, error } \| null, createdAt, resolvedAt }` |
+| GET | `/assistant/conversations/:id/confirmations` | `{ items: AssistantConfirmationDTO[] }`，按创建时间；`AssistantConfirmationDTO = { id, conversationId, operationId, title, risk, input, status, result: { ok: true, output } \| { ok: false, error } \| null, createdAt, resolvedAt }`；无返回值的成功操作及旧版缺失 output 的成功记录均返回 `output: null` |
 | POST | `/assistant/confirmations/:id/confirm` | `{ alwaysAllow? }`：执行操作并把结果作为下一条消息发回会话；`alwaysAllow` 只允许 write 级（critical 400 `VALIDATION_FAILED`），同时把操作加入 `assistant.alwaysAllow`；已处理 409 `STATE_TRANSITION_INVALID`；不存在 404 `ASSISTANT_CONFIRMATION_NOT_FOUND` |
 | POST | `/assistant/confirmations/:id/cancel` | 会话收到「用户取消了该操作」 |
 
 | POST | `/assistant/whisper` | `assistant.whisper`，`{}` → `{ text }`（1–120 字符）；沿用默认模型，独立 `aw-companion` 会话，禁用全部工具，不保存到工作聊天；并发 409 `ASSISTANT_BUSY`，运行时不可用 `OPENCODE_NOT_READY`，空输出／模型错误／取消／超时 `OPENCODE_REQUEST_FAILED`。write，不暴露给助手或命令面板 |
 | POST | `/assistant/whisper/stop` | `assistant.stopWhisper`，`{}` → 204；取消在途生成并清理临时会话；无在途请求时仍成功 |
+
+确认结果与待发通知持久化在同一事务；会话忙、运行时不可用或发送失败时保留通知，重启后可随下一条用户消息投递，投递成功才移除，不重新执行业务操作。应用回传结果时，若用户上一条消息所在页面的对象已被删除，system 明确说明该页面已失效，仍正常发送结果；用户主动发送消息时仍严格校验所报页面对象。
+
+助手通过 `tasks.create`（用户确认或已总是允许）创建的普通任务，后续 `review` / `failed` / `completed` 会回到原对话。HTTP 输入输出契约不变，不跟进界面直接创建、取消确认或其他对话的任务。通知带任务编号、页面链接、事件时间、已有结果及检查结论；失败带阶段与原因，完成带实际交付记录。`review` 仅表示等待验收；跳过的检查不算通过，创建 PR 不等于已合并。通知不触发重试或交付。应用启动与运行时恢复 ready 后尝试投递；助手忙时等本轮结束，发送失败仍可随下一条用户消息继续。外部已接收但本地未确认删除时的崩溃仍可能导致重复通知。
 
 桌宠复用全部对话端点，`AssistantPage.Desktop = desktop` 的参数为空。角色窗口的本地 IPC（`configure({ enabled, size })`、`setPanel(none | chat | bubble)`、`onLayout`）边界见 [32 §4](32-companion-assistant.md#4-实现分层)。
 
@@ -385,7 +390,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 ## 13f. 页面预览（v1.3，29 §4）
 
-`mode = simple`，本期不进命令面板与助手（助手在 B3 接入）。
+`mode = simple`，不进命令面板。`get` / `start` / `stop` 已接入助手，启动和停止按 write 确认（支持「总是允许」）；主工作区的 `trial` 不暴露给助手。
 
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -404,6 +409,16 @@ type AttemptDTO = AttemptSummaryDTO & {
 | DELETE | `/browser/tabs/:tabId` | `browser.closeUserTab` | write | 204 |
 | GET | `/browser/site-logins` | `browser.listSiteLogins` | read | `{ hosts }`：网站分区里有 Cookie 的主机（用分区里一个临时离屏标签页的 `Network.getAllCookies`） |
 | DELETE | `/browser/site-logins/:host` | `browser.clearSiteLogin` | write | 删除该主机的 Cookie 与页面存储（`Storage.clearDataForOrigin`）→ `{ hosts }` |
+
+### 13f″. 助手网页文字读取（29 §9）
+
+| 方法 | 路径 | 操作 | 风险 | 说明 |
+| --- | --- | --- | --- | --- |
+| POST | `/browser/read-url` | `browser.readUrl` | read | `{ url }`（http(s)）→ `{ url, title, tab: 'site', page, settled, logs }`；`page` 为有长度限制的文字结构，`logs` 为控制台错误/提醒、异常与失败请求（12 §6.17） |
+
+`mode = simple`、`expose.assistant = true`。使用 `persist:aw-sites` 的已有登录，按网站规则限制地址与重定向；即使某条规则是可操作，读取时也强制只读，拦截非 GET/HEAD/OPTIONS 请求与 WebSocket。无法归属标签页的 Worker 不继承权限，拒绝并记录日志。整体读取最长 `BROWSER_READ_TIMEOUT_MS`（30000），超时返回 502 `BROWSER_READ_FAILED`（`details.reason = timeout`）。临时标签页在成功、登录要求、导航失败或超时后均关闭，不改变用户的标签页与执行任务的浏览器会话。
+
+错误：非法地址或 URL 中携带用户名/密码为 400 `VALIDATION_FAILED`；规则不允许的初始地址 403 `BROWSER_SITE_NOT_ALLOWED`；登录页 409 `BROWSER_LOGIN_REQUIRED`；导航失败（含被拒绝的重定向）502 `BROWSER_READ_FAILED`。没有图片/PDF、点击或输入能力；当前用户预览页的 `browser.read` 尚依赖用户预览页签，未开放。
 
 ## 13e. PPT（v1.2）
 
@@ -454,7 +469,7 @@ type PrintSettled = { ok: true } | { ok: false; error: ErrorInfo };
 type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorInfo };   // path 为 null：用户取消了保存
 ```
 
-加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。浏览器标签页同样：后端经同一通道发 `browser.request`（`shared/contracts/browser-port.ts`：`open` / `setPolicy` / `close` / `cdp`），main 回 `browser.response`，并主动发 `browser.cdpEvent` / `browser.blocked` / `browser.gone`（29 §5.1）。
+加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。浏览器标签页同样：后端经同一通道发 `browser.request`（`shared/contracts/browser-port.ts`：`open` / `setPolicy` / `close` / `cdp`），main 回 `browser.response`，并主动发 `browser.cdpEvent` / `browser.blocked` / `browser.unownedBlocked`（无法归属标签页的 Worker 拦截，后端记日志）/ `browser.gone`（29 §5.1）。
 
 ## 14. 待实施 API：附件与需求清单
 

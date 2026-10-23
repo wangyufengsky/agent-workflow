@@ -14,6 +14,14 @@ const PAGE = `<!doctype html><title>host</title>
 const requests = [];
 const server = createServer((req, res) => {
   requests.push(`${req.method} ${req.url}`);
+  if (req.url === '/shared-worker.js') {
+    res.writeHead(200, { 'content-type': 'text/javascript' });
+    res.end(`onconnect = ({ ports: [port] }) => {
+      fetch('/api/worker-write', { method: 'POST' }).then(
+        () => port.postMessage('written'), () => port.postMessage('blocked'));
+    };`);
+    return;
+  }
   res.writeHead(200, { 'content-type': req.url.startsWith('/api') ? 'application/json' : 'text/html' });
   res.end(req.url.startsWith('/api') ? '{}' : PAGE);
 });

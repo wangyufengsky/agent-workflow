@@ -15,7 +15,7 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
   // Launched with the first tab: a development backend that never browses starts no browser.
   let launched: Promise<Browser> | undefined;
   const browser = () => {
-    launched ??= chromium.launch({ headless: true });
+    launched ??= launch();
     return launched;
   };
   const contexts = new Map<string, BrowserContext>();
@@ -25,6 +25,35 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
     for (const listener of listeners) listener(event);
   };
 
+  async function launch(): Promise<Browser> {
+    const instance = await chromium.launch({ headless: true });
+    try {
+      const session = await instance.newBrowserCDPSession();
+      // SharedWorker 可由同分区多个标签页共用，不能继承其中某个页面的权限。
+      // 先在执行前暂停再关闭；仅给页面装 Fetch 拦截器看不到 Worker 内部发起的请求。
+      session.on('Target.attachedToTarget', async ({ targetInfo }) => {
+        const event = { type: 'browser.unownedBlocked' as const, url: targetInfo.url, source: targetInfo.type };
+        try {
+          await session.send('Target.closeTarget', { targetId: targetInfo.targetId });
+          emit(event);
+        } catch (err) {
+          // 关闭浏览器与目标清理可能相遇；目标仍暂停，不恢复执行，显式记录清理失败。
+          emit({ ...event, cleanupError: err instanceof Error ? err.message : String(err) });
+        }
+      });
+      await session.send('Target.setAutoAttach', {
+        autoAttach: true,
+        waitForDebuggerOnStart: true,
+        flatten: true,
+        filter: [{ type: 'shared_worker' }, { exclude: true }],
+      });
+      return instance;
+    } catch (err) {
+      await instance.close();
+      throw err;
+    }
+  }
+
   function tabOf(tabId: string): Tab {
     const tab = tabs.get(tabId);
     if (tab === undefined) throw new Error(`No browser tab ${tabId}`);
@@ -32,7 +61,9 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
   }
 
   async function open(op: Extract<BrowserPortOp, { kind: 'open' }>): Promise<null> {
-    const context = contexts.get(op.partition) ?? (await (await browser()).newContext({ acceptDownloads: false }));
+    const context =
+      contexts.get(op.partition) ??
+      (await (await browser()).newContext({ acceptDownloads: false, serviceWorkers: 'block' }));
     contexts.set(op.partition, context);
     const page = await context.newPage();
     const tab: Tab = { page, session: await context.newCDPSession(page), policy: op.policy, userFacing: op.userFacing };
@@ -42,9 +73,16 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
       if (reason !== null) emit({ type: 'browser.blocked', tabId: op.tabId, url, method, reason });
       return reason;
     };
-    await page.route('**/*', async (route, request) => {
-      if (blocked(request.url(), request.method(), false) === null) await route.fallback();
-      else await route.abort('blockedbyclient');
+    // Playwright 的 route 只交付重定向链的首次请求；CDP 在每一跳发送前检查，和 Electron 一致。
+    tab.session.on('Fetch.requestPaused', async ({ requestId, request }) => {
+      if (blocked(request.url, request.method, false) === null) {
+        await tab.session.send('Fetch.continueRequest', { requestId });
+      } else {
+        await tab.session.send('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' });
+      }
+    });
+    await tab.session.send('Fetch.enable', {
+      patterns: [{ urlPattern: 'http://*' }, { urlPattern: 'https://*' }],
     });
     await page.routeWebSocket(/.*/, (ws) => {
       if (blocked(ws.url(), 'GET', true) === null) ws.connectToServer();

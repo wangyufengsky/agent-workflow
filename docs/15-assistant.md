@@ -2,6 +2,8 @@
 
 > 状态：**v1.1 已实现**（任务 A-01…A-11，见 [05](05-dev-plan.md#v11--应用助手约-2-周v10-发布后)）。v1.0 交付了它的地基：操作清单（[03 §5](03-architecture.md#5-操作清单operation-registry)）与 ⌘K 命令面板。实现中按保守方案收紧的取舍见 D65（①② 用户已确认，③ 待确认）。
 
+2026-10-24 增补：助手可用 `browser_readUrl` 读取明确网址的文字结构与错误日志，沿用网站登录和规则，并强制只读（无法归属标签页的 Worker 被拒绝并记录）；整体读取最长 30 秒，截止显式失败并关闭临时页；可用 `previews_get/start/stop` 管理任务预览，启动/停止继续经过写操作确认。未开放当前用户预览页读取（尚缺用户页签归属）、页面点击/输入或截图/PDF，见 [29 §9](29-browser.md#9-应用助手)。
+
 ## 1. 定位
 
 全局助手：用户用自然语言说想做什么，助手调用应用的各项功能（项目、任务、流程、数据库、Git、以后的知识库与 PPT）完成，或完成简单的通用工作（查日期、生成文档）。
@@ -18,8 +20,8 @@
 | 原生工具 | agent 权限 `edit: allow`、`external_directory: deny`（只能写助手目录）、`webfetch: ask`、`question: deny`（D36）；bash 为会话级规则 `readonlyBashRules()`（不带检查命令的只读规则，其余 ask，12 §2）；会话的权限询问在面板中以卡片回复（允许一次 / 总是允许 / 拒绝，只在内存中，随 opencode 进程失效） |
 | 应用工具 | **助手 MCP**（`/mcp/assistant`，server 名 `agent-workflow-app`），与执行 MCP 分开、令牌分开；bridge 插件对 `agent-workflow_` 与 `agent-workflow-app_` 两种前缀都注入会话 id，调用按会话归属到对话（不属于任何对话 → `MCP_CONVERSATION_UNRESOLVED`）；`aw-assistant` 的权限 deny `agent-workflow_*`，规划 / 执行 / 评审 agent deny `agent-workflow-app_*`，各自只看到自己那套工具 |
 | 用户外部 MCP | opencode 合并用户全局配置，用户自己配置的 MCP（如日历）助手可直接使用 |
-| 上下文 | 每轮 `system` 注入（模板 `assistant-context.md`）：用户发消息时的当地时间、星期、时区与 UTC 偏移、界面模式、当前页面与选中对象（任务编号与标题、状态、项目；选中的步骤；项目名称与仓库；流程名称）、对话文件目录。页面由前端随消息发送（`AssistantPageRef`），名称由后端查出；指向不存在的对象时消息不发送（如 `TASK_NOT_FOUND`） |
-| 对话存储 | 表 `assistant_conversations`、`assistant_confirmations`（10 §4，迁移 0008）；消息流 JSONL `<数据目录>/assistant/conversations/<id>.jsonl`（格式同 10 §3，另有 `confirmation`、`attachment`、`entity_ref` 三种条目）；助手写入 `files/<id>/` 的文件（opencode `write` / `edit` 工具）记为附件条目 |
+| 上下文 | 每轮 `system` 注入（模板 `assistant-context.md`）：用户发消息时的当地时间、星期、时区与 UTC 偏移、界面模式、当前页面与选中对象（任务编号与标题、状态、项目；选中的步骤；项目名称与仓库；流程名称）、对话文件目录。页面由前端随消息发送（`AssistantPageRef`），名称由后端查出；新用户消息指向不存在的对象时不发送（如 `TASK_NOT_FOUND`）。系统结果回传使用上一条用户消息的页面，若对象已删除则明确说明不再存在，不阻断结果回传；其他错误仍然抛出 |
+| 对话存储 | 表 `assistant_conversations`、`assistant_confirmations`（迁移 0008）与持久化待发队列 `assistant_outbox`（迁移 0018）及 `assistant_task_followups`（迁移 0019，10 §4）；消息流 JSONL `<数据目录>/assistant/conversations/<id>.jsonl`（格式同 10 §3，另有 `confirmation`、`attachment`、`entity_ref` 三种条目）；助手写入 `files/<id>/` 的文件（opencode `write` / `edit` 工具）记为附件条目 |
 
 ## 3. 助手 MCP 工具
 
@@ -56,10 +58,20 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 
 1. 工具返回 `{ status: 'needs_confirmation', confirmation_id, instruction }`（instruction 要求模型用一句话说明并结束本轮），后端写 `assistant_confirmations`（`pending`），消息流追加 `confirmation` 条目，推送 `assistant.confirmation`。
 2. 界面在对话中渲染确认卡片：操作标题、参数（对象显示名称、字段用中文标签，§6.1）、影响说明（write：可「确认并总是允许」；critical：每次确认），合并（`tasks.deliver`）另显示将合并的改动统计。
-3. 用户确认 → 先转为 `confirmed`（再点一次 409，不会执行两次）→ 后端执行操作 → 结果 `{ ok: true, output }` 或 `{ ok: false, error }` 写入 `result` → 用模板 `assistant-confirmed.md` 把结果作为下一条消息发回同一会话；取消 → `cancelled`，发回 `assistant-cancelled.md`（用户取消了该操作）。会话还在回复时消息先排队，本轮结束（空闲）后发出；opencode 不可用时随用户的下一条消息一起发出。
+3. 用户确认 → 先转为 `confirmed`（再点一次 409，不会执行两次）→ 后端执行操作 → 结果 `{ ok: true, output }` 或 `{ ok: false, error }` 与模板 `assistant-confirmed.md` 生成的待发消息在同一事务保存（无返回值的成功操作用 `output: null`，兼容旧记录缺失 output）→ 回传同一会话；取消 → 在同一事务保存 `cancelled` 与 `assistant-cancelled.md` 消息。会话还在回复或发送请求尚未返回时消息先排队，本轮结束后发出；opencode 不可用或发送失败时保留队列，后端重启后也可随用户的下一条消息发出。只有收到发送成功响应才移除当次消息，不移除期间新入队的消息；恢复只投递结果，不重新执行操作。
 4. `alwaysAllow: true` 只接受 write 级（critical 400 `VALIDATION_FAILED`），同时把操作 id 加入设置 `assistant.alwaysAllow`。之后该操作直接执行；critical 即使被写进列表也照样确认。
 
 设置项 `assistant.alwaysAllow: string[]`（操作 id 列表），设置页「助手」分组可查看与撤销；助手自己不能修改它（D65）。后端代发的确认结果消息不记入消息流（卡片显示结果）。
+
+### 4.1 普通任务结果回到原对话
+
+助手调用 `tasks.create` 创建的普通任务会持久化关联原对话。确认后执行和总是允许共用同一执行入口，归属与任务插入同事务，启动任务前已登记；取消确认、失败的创建和界面直接创建不会登记。任务的 `TaskUpdated` 只是唤醒信号，权威是 `task_events` 与当前任务数据。
+
+- 到 `review`：汇报已有结果、验证情况和任务入口，明确“开发完成，等待验收”，不能说已接受、合并或交付。
+- 到 `failed`：汇报阶段、已记录的失败原因与可用的步骤/命令信息，由用户决定下一步。
+- 到 `completed`：按实际交付记录说明完成方式、目标分支、提交或 PR；创建 PR 不能说已合并，报告交付不能说代码合并。跳过检查不算通过，无记录不推断成功。
+- 状态快照与事件游标、outbox 同事务保存；重复进度或状态广播不重复入队。启动时补扫未消费任务的最新状态，不逐条重播已经过时的状态。忙碌时排队，断线/失败保留，应用启动、运行时 ready 和下一条用户消息均可恢复投递；删除原对话停止跟进。崩溃时外部是否已收到消息的边界仍可能重复投递，不能宣称跨进程恰好一次。
+- 通知模板 `assistant-task-updated.md` 只要求汇报及给出下一步建议，不自动重试、重新建任务、验收、合并或发布。所有后续写操作继续遵循已有确认规则。
 
 ## 5. 凭据不经过对话
 
@@ -72,6 +84,9 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 - 助手面板（`features/assistant/`）：`⌘J` 或顶栏的助手按钮开合；**浮在主内容之上**（顶栏下方、右侧，宽 `--drawer-md`，不遮罩），页面宽度不变，未被覆盖的部分照常可用，被覆盖的部分收起面板后操作（D84）。头部：助手标识、对话切换（标题即按钮，弹出对话列表）、新对话、删除、收起；消息流（§6.1）；输入框（随内容增高，`⌘↵` 发送；助手回复中发送键变为「停止」）；`Esc` 收起（对话列表打开时只关列表）。
 - 空对话显示欢迎：标识、「有什么可以帮你？」、一句说明与四条建议，点建议即发送。
 - 对话的忙碌状态与权限请求只以 SSE `assistant.updated` 为准（按顺序到达）；发送、停止、回复权限的响应不写缓存，否则可能晚于「本轮已结束」的事件被应用。
+- 同一对话在首次异步建会话前占住发送入口；空闲事件早于发送响应时，入口仍保持占用，避免用户消息与系统回传交错。建会话或发送失败会释放入口，未送达的系统消息保留。
+- **显式文字上下文**：主页的「问助手」、侧栏与桌宠共用「附上选中文字」，只在点击时读取当前 DOM 选区，弹窗可编辑或粘贴；不读剪贴板、表单或整个页面。任务／步骤页面另有「附上任务详情／步骤详情」，由后端按任务与步骤 ID 读取允许字段。两者生成现有文本附件后自动打开全文预览，发送前可再次查看或移除；上传未完成或失败时不能发送。主页「开始任务」模式没有助手上下文按钮。
+- 上下文快照写明来源、采集时间、任务更新时间，并声明是用户资料而非指令。任务快照包含身份、状态、需求、失败阶段与错误码／消息、结果摘要与步骤摘要；步骤快照包含所属任务、指令、状态、结果摘要、检查是否通过与尝试错误。不会附带原始日志、错误 details、凭据配置或工作区绝对路径。任务改变后仍发送已预览版本；选中文字的页面只作为来源说明，即使对象已经不存在，也不将旧文字视为最新状态。当前页面随消息发送的严格校验保持不变。截图、PDF、视觉输入不在本次范围。
 - 导航卡片（A-11，D66）：助手执行的操作若在契约上声明了 `produces`（开始任务、新建批量任务、新建定时任务、添加项目、新建流程 / 角色、新建数据库连接、知识问答），执行成功后消息流出现 `entity_ref` 卡片：图标、对象类型与标题、状态（任务的显示状态随 `task.updated` 实时更新）、「打开」。对象类型 → 页面只在 `web/src/app/entity-routes.ts` 定义；「打开」只跳转页面，面板保持打开；对象已删除时显示「已删除」并禁用按钮。
 - 主页（D111，28 §2）：标语、两种模式的输入框、「直接开始」流程、「试试问」建议（点即在新对话中提问，对话显示在主页）、最近对话；对话中为消息流（同一组件）+ 右侧工作概览栏。主页上没有面板，`⌘J` 与顶栏助手按钮聚焦主页输入框。
 - 助手触发的 `open_page` / `open_form`、导航卡片「打开」、回答中的应用内链接：跳转并打开面板显示该对话（从主页离开时消息流以视图过渡移入面板，D112）；`open_form` 开始任务回到主页，输入框为「开始任务」模式并预填；`reveal_file` 经 preload 在 Finder 中显示（浏览器开发模式没有）。
@@ -125,8 +140,9 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 
 ```
 server/src/modules/assistant/
-├─ assistant.table.ts / .repo.ts   两张表
+├─ assistant.table.ts / .repo.ts   对话、确认、持久化待发队列与任务跟进表
 ├─ assistant.service.ts           对话、会话、事件 → 消息流、忙碌、权限请求、附件、待发消息
+├─ assistant.tasks.ts / .tasks.repo.ts  任务原对话归属、状态回报与启动补扫
 ├─ assistant.context.ts           每轮 system（当地时间 localTime、页面描述）
 ├─ assistant.confirmations.ts     确认、取消、执行、结果消息
 ├─ assistant.tools.ts             由操作清单生成工具；注册表（归属、模式、校验、错误映射）
@@ -138,6 +154,9 @@ server/src/modules/assistant/
 | --- | --- |
 | 单元 | `localTime` 跨日与各时区偏移；确认状态机；操作清单标注（`assistant.*` 不暴露给助手）；配置快照（两套 MCP、助手 agent、互相 deny） |
 | 集成 | `assistant.mcp.int.test.ts` 另覆盖 `entity_ref`（确认后执行与直接执行，失败不写）；`assistant.int.test.ts`：对话增删查与消息流、会话目录 / agent / bash 规则 / 每轮 system、`ASSISTANT_BUSY` 与停止、面板中的权限请求、附件、删除时清理；`assistant.mcp.int.test.ts`：令牌隔离、工具生成与过滤、read / write / 总是允许 / critical / 取消 / 忙时确认、`MCP_CONVERSATION_UNRESOLVED`、`MCP_TOOL_NOT_ALLOWED`、凭据与 D65 字段被拒、全部助手专用工具；`databases.int.test.ts`：`databases.query` |
+| 恢复回归 | `assistant.recovery.int.test.ts`：并发首条消息互斥；void 成功结果与旧记录兼容；断线、发送失败和重启后的结果回传且不重执行业务；建会话失败释放；空闲事件早于发送响应时按序投递；旧页面对象删除后的成功回传 |
+| 任务回传 | `assistant.tasks.int.test.ts`：确认/总是允许两条路径在首次任务事件前登记；真实 Git 任务待验收与交付；忙碌、断线、发送失败和重启补扫；事件去重；删除原对话、界面任务、取消确认不跟进；登记失败原子回滚 |
+| 文字上下文 | `assistant.snapshots.int.test.ts`：任务变化后保持快照原文、来源与时间，步骤归属、失效对象、选中文字作为不可信资料、长度与严格字段边界；`shell-assistant-context.browser.spec.ts`：主页选区编辑、侧栏任务快照、预览移除、与文件共存、发送后读取、开始任务模式不出现上下文入口，以及生成中移除后迟到的响应不再打开预览或带入消息 |
 | `@opencode` | 注入后 `aw-assistant` 与 `agent-workflow-app` 出现在 opencode 配置中，两套 MCP 都已连接 |
 | E2E | J11「对助手说开始任务 → 确认卡片 → 任务卡片状态更新 → 打开任务页」；直接执行出现项目卡片、删除后「已删除」；主页建议 → 对话显示在主页、`open_page` 带用户离开时面板接着显示对话、「确认并总是允许」→ 设置页撤销；J25 主页对话与接力；J9 走查含助手面板（简单与专业）与主页对话 |
 | live | `live/assistant.live.test.ts`：真实模型查明天的日期并列出项目（调用 `get_current_time` 与 `projects_list`，回复含两者），报告写到 `live/reports/assistant-*.json` |

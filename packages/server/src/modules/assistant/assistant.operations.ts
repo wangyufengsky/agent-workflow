@@ -10,20 +10,24 @@ import {
   listConversationsOp,
   replyAssistantPermissionOp,
   sendAssistantMessageOp,
+  snapshotAssistantContextOp,
   stopWhisperOp,
   whisperOp,
 } from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
 import type { Confirmations } from './assistant.confirmations.ts';
 import type { AssistantService } from './assistant.service.ts';
+import type { AssistantSnapshots } from './assistant.snapshots.ts';
 import type { WhisperService } from './assistant.whisper.ts';
 
 export function assistantOperations(
   conversations: AssistantService,
   confirmations: Confirmations,
   whisper: WhisperService,
+  snapshots: AssistantSnapshots,
 ) {
   return [
+    implement(snapshotAssistantContextOp, (input) => snapshots.create(input)),
     implement(whisperOp, () => whisper.generate()),
     implement(stopWhisperOp, () => whisper.stop()),
     implement(listConversationsOp, () => ({ items: conversations.list() })),

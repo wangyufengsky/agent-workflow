@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ASSISTANT_MESSAGE_MAX_CHARS } from '../../constants/limits.ts';
+import { ASSISTANT_CONTEXT_MAX_CHARS, ASSISTANT_MESSAGE_MAX_CHARS } from '../../constants/limits.ts';
 import {
   ASSISTANT_PAGE_PARAMS,
   assistantConfirmationStatusSchema,
@@ -60,6 +60,22 @@ export const assistantPageRefSchema = z
   });
 export type AssistantPageRef = z.infer<typeof assistantPageRefSchema>;
 
+/** 用户明确选择的文字；页面仅为来源说明，不表示内容可信或仍然最新。 */
+const assistantContextSourceSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('task'),
+    taskId: z.string().min(1),
+    nodeId: z.string().min(1).optional(),
+  }),
+  z.strictObject({
+    kind: z.literal('selection'),
+    text: z.string().trim().min(1).max(ASSISTANT_CONTEXT_MAX_CHARS),
+    page: assistantPageRefSchema,
+  }),
+]);
+export const snapshotAssistantContextRequestSchema = z.strictObject({ source: assistantContextSourceSchema });
+export type SnapshotAssistantContextRequest = z.infer<typeof snapshotAssistantContextRequestSchema>;
+
 export const createConversationRequestSchema = z.object({ title: z.string().trim().min(1).optional() });
 
 export const sendAssistantMessageRequestSchema = z.object({
@@ -79,7 +95,8 @@ export const replyAssistantPermissionRequestSchema = z.object({
 
 /** What the backend did with a confirmed call: the operation's output or its error. */
 export const assistantConfirmationResultSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), output: z.unknown() }),
+  // 旧版 void 结果序列化后没有 output；读出时统一为可持久化的 null。
+  z.object({ ok: z.literal(true), output: z.unknown().default(null) }),
   z.object({ ok: z.literal(false), error: errorInfoSchema }),
 ]);
 export type AssistantConfirmationResult = z.infer<typeof assistantConfirmationResultSchema>;

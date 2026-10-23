@@ -25,6 +25,7 @@ export const PromptName = {
   AssistantContext: 'assistant-context',
   AssistantConfirmed: 'assistant-confirmed',
   AssistantCancelled: 'assistant-cancelled',
+  AssistantTaskUpdated: 'assistant-task-updated',
   /** The outcome of a knowledge question the assistant asked, sent to its session (18 §4a). */
   AssistantKnowledgeAnswered: 'assistant-knowledge-answered',
   AssistantKnowledgeFailed: 'assistant-knowledge-failed',
@@ -80,6 +81,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.AssistantContext]: read(PromptName.AssistantContext),
     [PromptName.AssistantConfirmed]: read(PromptName.AssistantConfirmed),
     [PromptName.AssistantCancelled]: read(PromptName.AssistantCancelled),
+    [PromptName.AssistantTaskUpdated]: read(PromptName.AssistantTaskUpdated),
     [PromptName.AssistantKnowledgeAnswered]: read(PromptName.AssistantKnowledgeAnswered),
     [PromptName.AssistantKnowledgeFailed]: read(PromptName.AssistantKnowledgeFailed),
     [PromptName.ProtocolResearch]: read(PromptName.ProtocolResearch),

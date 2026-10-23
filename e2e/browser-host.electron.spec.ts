@@ -159,3 +159,30 @@ test('不允许的地址：AI 标签页里被拦下，用户标签页交给系�
   );
   expect(blocked).toEqual([['ai', 'not_allowed']]);
 });
+
+test('共享 Worker 的请求无法归属标签页时拒绝写入，并报告未归属的拦截', async () => {
+  await openTab({
+    tabId: 'ai',
+    partition: 'persist:aw-sites',
+    userFacing: false,
+    sites: [{ pattern: '127.0.0.1', access: 'read' }],
+  });
+  expect(
+    await evaluate(
+      'ai',
+      `new Promise((resolve) => {
+    const worker = new SharedWorker('/shared-worker.js');
+    worker.port.onmessage = ({ data }) => { worker.port.close(); resolve(data); };
+    worker.onerror = () => resolve('blocked');
+  })`,
+    ),
+  ).toBe('blocked');
+  const result = await app.evaluate(() => {
+    const h = globalThis.harness as Harness;
+    return { requests: h.requests, blocked: h.events.filter((e) => e.type === 'browser.unownedBlocked') };
+  });
+  expect(result.requests).not.toContain('POST /api/worker-write');
+  expect(result.blocked).toEqual(
+    expect.arrayContaining([expect.objectContaining({ url: expect.stringMatching(/\/api\/worker-write$/) })]),
+  );
+});
