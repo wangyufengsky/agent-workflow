@@ -212,7 +212,12 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       return detail(id);
     },
     async deliver(id: string, request: Omit<DeliverRequest, 'id'>): Promise<TaskDetailDTO> {
-      await delivery.deliver(id, request);
+      const checklist = await requirements.deliveryCheck(id, request.acknowledgedRequirementsRevisionId);
+      await delivery.deliver(id, request, checklist);
+      return detail(id);
+    },
+    reverifyRequirements(id: string): TaskDetailDTO {
+      changes.reverifyRequirements(id);
       return detail(id);
     },
     async requestChanges(

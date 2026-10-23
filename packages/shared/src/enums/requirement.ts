@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { assertNever } from '../errors/app-error.ts';
 
 /** How an item of a task's acceptance checklist is verified (31 §2). */
 export const RequirementVerification = {
@@ -43,3 +44,18 @@ export const RequirementDisplayStatus = {
 } as const;
 export type RequirementDisplayStatus = (typeof RequirementDisplayStatus)[keyof typeof RequirementDisplayStatus];
 export const requirementDisplayStatusSchema = z.enum(RequirementDisplayStatus);
+
+/** A required item in this state is not met yet: delivery asks the user to accept it (31 §4). */
+export function isUnmet(status: RequirementDisplayStatus): boolean {
+  switch (status) {
+    case RequirementDisplayStatus.Passed:
+    case RequirementDisplayStatus.Waived:
+      return false;
+    case RequirementDisplayStatus.Failed:
+    case RequirementDisplayStatus.Unverified:
+    case RequirementDisplayStatus.Stale:
+      return true;
+    default:
+      return assertNever(status);
+  }
+}

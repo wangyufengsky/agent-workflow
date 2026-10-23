@@ -1,10 +1,14 @@
 import {
   createTaskOp,
+  decideRequirementOp,
+  deliverTaskOp,
   ErrorCode,
   getRequirementsOp,
   getTaskOp,
+  getTaskTimelineOp,
   type RequirementItemInput,
   requestChangesOp,
+  reverifyRequirementsOp,
   ServerEventType,
   startTaskOp,
   type TaskRequirementsDTO,
@@ -197,5 +201,122 @@ describe('核验验收清单步骤（31 §2.2，Q-02）', () => {
       ['api', []],
       ['final_verify', ['api']],
     ]);
+  });
+});
+
+/** A bug-fix task with `requirements`, run to review; its verify step concludes nothing, so every item is open. */
+async function inReviewWith(requirements: RequirementItemInput[]) {
+  const { project } = await addProject(t);
+  const { body: task } = await t.call(createTaskOp, {
+    projectId: project.id,
+    workflowId: await workflowId(t, 'bugfix'),
+    requirement: '订单搜索不到',
+    start: false,
+    requirements,
+  });
+  const directory = `/${task.key}`;
+  t.fake.enqueue(script().callTool('submit_result', { summary: 'Found it' }), { title: '· 定位根因', directory });
+  t.fake.enqueue(script().edit('search.ts', 'fixed\n').callTool('submit_result', { summary: 'Fixed' }), {
+    title: '· 修复',
+    directory,
+  });
+  t.fake.enqueue(script().callTool('submit_review', { verdict: 'pass', summary: 'Right' }), {
+    agent: 'aw-reviewer',
+    directory,
+  });
+  t.fake.enqueue(script().callTool('submit_result', { summary: 'Checked' }), { title: '· 核验验收清单', directory });
+  const review = reaches(task.id, 'review');
+  await t.call(startTaskOp, { id: task.id });
+  await review;
+  await t.fake.settled();
+  const { body: view } = await t.call(getRequirementsOp, { id: task.id });
+  return { task, view };
+}
+
+describe('人工结论、重新核验与交付提醒（31 §2.3、§4，Q-03）', () => {
+  it('待合并时用户可以给结论：接受未完成必须写原因；不在待合并时不行', async () => {
+    const { task, view } = await inReviewWith(CHECKLIST.slice(0, 2));
+    const [search, tests] = view.items;
+    const noReason = await t.call(decideRequirementOp, { id: task.id, itemId: tests?.id ?? '', conclusion: 'waive' });
+    expect([noReason.status, noReason.raw.json().error.code]).toEqual([400, ErrorCode.ValidationFailed]);
+
+    await t.call(decideRequirementOp, { id: task.id, itemId: search?.id ?? '', conclusion: 'pass', note: '亲自试过' });
+    const { body } = await t.call(decideRequirementOp, {
+      id: task.id,
+      itemId: tests?.id ?? '',
+      conclusion: 'waive',
+      note: '测试环境暂时没有数据库',
+    });
+    expect(statuses(body)).toEqual([
+      ['按订单号搜索', 'passed', 'user'],
+      ['单元测试通过', 'waived', 'user'],
+    ]);
+
+    t.fake.enqueue(script().hang(), { title: '· 核验验收清单', directory: `/${task.key}` });
+    const running = reaches(task.id, 'running');
+    await t.call(reverifyRequirementsOp, { id: task.id });
+    await running;
+    const late = await t.call(decideRequirementOp, { id: task.id, itemId: search?.id ?? '', conclusion: 'pass' });
+    expect([late.status, late.raw.json().error.code]).toEqual([409, ErrorCode.RequirementsNotEditable]);
+  });
+
+  it('重新核验追加一个核验步骤，按当前清单再跑一遍', async () => {
+    const { task } = await inReviewWith(CHECKLIST.slice(2, 3));
+    t.fake.enqueue(script().callTool('submit_result', { summary: 'Checked again' }), {
+      title: '· 核验验收清单',
+      directory: `/${task.key}`,
+    });
+    const review = reaches(task.id, 'review');
+    const { body: running } = await t.call(reverifyRequirementsOp, { id: task.id });
+    expect(running.nodes.at(-1)).toMatchObject({
+      key: 'verify_requirements_1',
+      kind: 'verify',
+      dependsOn: ['verify_requirements'],
+    });
+    await review;
+    await t.fake.settled();
+    const { body: view } = await t.call(getRequirementsOp, { id: task.id });
+    expect(statuses(view)).toEqual([['能构建', 'passed', 'command']]);
+  });
+
+  it('有未满足的必需项时，交付要确认当前这一版清单；交付记下清单摘要', async () => {
+    const { task, view } = await inReviewWith([
+      ...CHECKLIST.slice(0, 1),
+      { title: '文档', expected: '写了说明', required: false },
+    ]);
+    const refused = await t.call(deliverTaskOp, { id: task.id, strategy: 'squash' });
+    expect([refused.status, refused.raw.json().error]).toMatchObject([
+      409,
+      {
+        code: ErrorCode.RequirementsUnacknowledged,
+        details: { revisionId: view.revision?.id, items: [{ title: '按订单号搜索' }] },
+      },
+    ]);
+    const stale = await t.call(deliverTaskOp, {
+      id: task.id,
+      strategy: 'squash',
+      acknowledgedRequirementsRevisionId: 'v0',
+    });
+    expect(stale.raw.json().error.code).toBe(ErrorCode.RequirementsUnacknowledged);
+
+    const { body: done } = await t.call(deliverTaskOp, {
+      id: task.id,
+      strategy: 'squash',
+      acknowledgedRequirementsRevisionId: view.revision?.id ?? '',
+    });
+    expect(done.status).toBe('completed');
+    const { body: timeline } = await t.call(getTaskTimelineOp, { id: task.id });
+    const delivered = timeline.items.find(
+      (e) => e.entity === 'delivery' && e.payload !== null && 'requirements' in e.payload,
+    );
+    expect(delivered?.payload).toMatchObject({
+      requirements: {
+        revisionId: view.revision?.id,
+        items: [
+          { title: '按订单号搜索', required: true, status: 'unverified' },
+          { title: '文档', required: false, status: 'unverified' },
+        ],
+      },
+    });
   });
 });

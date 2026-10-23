@@ -1,0 +1,159 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.editList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: var(--r-md);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.editRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Sized to its options, so the command and 「必需」 fit on the same row. */
+.kind {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.index {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.toggle:hover {
+  background: var(--fill-3);
+  color: var(--ink-2);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  border-radius: var(--r-md);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.item[data-unmet] {
+  box-shadow: inset 0 0 0 1px var(--warn);
+}
+
+.item > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.itemTitle {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px 10px;
+  min-width: 0;
+}
+
+.status {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-sm);
+  background: var(--fill-3);
+  color: var(--ink-2);
+}
+
+.status[data-status="passed"] {
+  background: var(--ok-fill);
+  color: var(--ok);
+}
+
+.status[data-status="failed"] {
+  background: var(--danger-fill);
+  color: var(--danger);
+}
+
+.status[data-status="stale"],
+.status[data-status="unverified"] {
+  background: var(--warn-fill);
+  color: var(--warn);
+}
+
+.output {
+  max-height: 200px;
+  overflow: auto;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--fill-2);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

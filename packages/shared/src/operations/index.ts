@@ -97,7 +97,12 @@ import {
   setProjectHostingOp,
   updateProjectOp,
 } from './projects.ts';
-import { getRequirementsOp, replaceRequirementsOp } from './requirements.ts';
+import {
+  decideRequirementOp,
+  getRequirementsOp,
+  replaceRequirementsOp,
+  reverifyRequirementsOp,
+} from './requirements.ts';
 import {
   createScheduleOp,
   deleteScheduleOp,
@@ -228,6 +233,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   snapshotProjectFileOp,
   getRequirementsOp,
   replaceRequirementsOp,
+  decideRequirementOp,
+  reverifyRequirementsOp,
   startDebugAttemptOp,
   listWorkflowsOp,
   getWorkflowOp,

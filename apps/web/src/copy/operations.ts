@@ -47,6 +47,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.attachments.snapshotProjectFile': '添加项目文件',
   'op.requirements.get': '查看验收清单',
   'op.requirements.replace': '修改验收清单',
+  'op.requirements.decide': '人工确认验收项',
+  'op.tasks.reverifyRequirements': '重新核验验收清单',
   'op.debug.startAttempt': '调试：发起一次执行尝试',
   'op.workflows.list': '流程列表',
   'op.workflows.get': '查看流程',

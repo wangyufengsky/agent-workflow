@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { replaceRequirementsSchema, taskRequirementsSchema } from '../contracts/api/requirements.ts';
+import {
+  decideRequirementSchema,
+  replaceRequirementsSchema,
+  taskRequirementsSchema,
+} from '../contracts/api/requirements.ts';
+import { taskDetailSchema } from '../contracts/api/tasks.ts';
 import { InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
@@ -31,4 +36,30 @@ export const replaceRequirementsOp = defineOperationContract({
   output: taskRequirementsSchema,
   risk: OperationRisk.Write,
   http: { method: 'PUT', path: '/tasks/:id/requirements' },
+});
+
+export const decideRequirementOp = defineOperationContract({
+  ...common,
+  // The user's own verdict on the result: never the assistant's, nor a palette shortcut (11 §14.2).
+  expose: { palette: false, assistant: false },
+  id: 'requirements.decide',
+  refs: { id: InputRef.Task },
+  title: 'op.requirements.decide',
+  description: 'Pass, fail or accept as not done one item of the checklist of a task in review, with a note',
+  input: decideRequirementSchema,
+  output: taskRequirementsSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/requirements/:itemId/decisions' },
+});
+
+export const reverifyRequirementsOp = defineOperationContract({
+  ...common,
+  id: 'tasks.reverifyRequirements',
+  refs: { id: InputRef.Task },
+  title: 'op.tasks.reverifyRequirements',
+  description: 'Verify a task in review against its current acceptance checklist again: one more read-only step',
+  input: z.object({ id: z.string() }),
+  output: taskDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/requirements/reverify' },
 });

@@ -7,6 +7,7 @@ import {
   type ErrorInfo,
   InboxKind,
   isLocalMerge,
+  type RequirementsDeliverySummary,
   TaskEvent,
   TaskEventEntity,
   TaskStatus,
@@ -153,7 +154,11 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
 
   return {
     current,
-    async deliver(taskId: string, request: Omit<DeliverRequest, 'id'>): Promise<void> {
+    async deliver(
+      taskId: string,
+      request: Omit<DeliverRequest, 'id'>,
+      requirements: RequirementsDeliverySummary | null,
+    ): Promise<void> {
       const task = get(taskId);
       transition(taskMachine, task.status, TaskEvent.Deliver, TaskStatus.Merging);
       const report = workflows.get(task.workflowId).deliverable === WorkflowDeliverable.Report;
@@ -171,6 +176,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
             taskId,
             strategy: DeliveryStrategy.ReportOnly,
             targetBranch: task.baseBranch,
+            requirements,
           });
           recordSuccess(taskId, delivery, {});
         });
@@ -189,7 +195,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
       const hosting =
         request.strategy === DeliveryStrategy.PullRequest ? await projects.hostingOf(task.projectId) : undefined;
       const delivery = unit.transact(() => {
-        const started = deliveries.start({ taskId, strategy: request.strategy, targetBranch });
+        const started = deliveries.start({ taskId, strategy: request.strategy, targetBranch, requirements });
         move(task, TaskEvent.Deliver, TaskStatus.Merging);
         return started;
       });

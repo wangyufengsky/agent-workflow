@@ -6,6 +6,7 @@ import {
   REQUIREMENTS_MAX,
 } from '../../constants/limits.ts';
 import {
+  RequirementConclusion,
   RequirementVerification,
   requirementConclusionSchema,
   requirementDisplayStatusSchema,
@@ -73,6 +74,30 @@ export const taskRequirementsSchema = z.object({
   history: z.array(requirementRevisionSummarySchema),
 });
 export type TaskRequirementsDTO = z.infer<typeof taskRequirementsSchema>;
+
+/** `POST /tasks/:id/requirements/:itemId/decisions` (31 §2.3): the user's own conclusion; accepting needs a reason. */
+export const decideRequirementSchema = z
+  .object({
+    id: z.string(),
+    itemId: z.string(),
+    conclusion: z.enum([RequirementConclusion.Pass, RequirementConclusion.Fail, RequirementConclusion.Waive]),
+    note: z.string().trim().max(REQUIREMENT_NOTE_MAX_CHARS).default(''),
+  })
+  .refine((d) => d.conclusion !== RequirementConclusion.Waive || d.note !== '', {
+    message: 'Accepting an unmet item needs a reason',
+    path: ['note'],
+  });
+export type DecideRequirementRequest = z.input<typeof decideRequirementSchema>;
+
+/** What a delivery recorded of the checklist (31 §4), in its timeline event. */
+export const requirementsDeliverySummarySchema = z.object({
+  revisionId: z.string(),
+  commitSha: z.string().nullable(),
+  items: z.array(
+    z.object({ id: z.string(), title: z.string(), required: z.boolean(), status: requirementDisplayStatusSchema }),
+  ),
+});
+export type RequirementsDeliverySummary = z.infer<typeof requirementsDeliverySummarySchema>;
 
 /** `PUT /tasks/:id/requirements`: the whole checklist as it should be; saved as a new version. */
 export const replaceRequirementsSchema = z.object({ id: z.string(), items: requirementItemsInputSchema });

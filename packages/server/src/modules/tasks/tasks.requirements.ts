@@ -1,7 +1,10 @@
 import {
   AppError,
   ErrorCode,
+  isUnmet,
   type RequirementItemInput,
+  RequirementResultSource,
+  type RequirementsDeliverySummary,
   type TaskRequirementsDTO,
   TaskStatus,
   WorktreeStatus,
@@ -45,6 +48,54 @@ export function createTaskRequirements(deps: TasksServiceDeps, state: TaskState)
         state.publish(task.id);
       });
       return view(task.id);
+    },
+
+    /** The user's own conclusion on one item (31 §2.3): for the result being reviewed, about its current commit. */
+    async decideRequirement(
+      taskId: string,
+      itemId: string,
+      decision: { conclusion: 'pass' | 'fail' | 'waive'; note: string },
+    ): Promise<TaskRequirementsDTO> {
+      const task = state.get(taskId);
+      const commitSha = await currentCommit(task);
+      if (task.status !== TaskStatus.Review || commitSha === null) {
+        throw new AppError(ErrorCode.RequirementsNotEditable, `Task ${task.key} is not waiting for review`, {
+          status: task.status,
+        });
+      }
+      if (!requirements.current(task.id)?.items.some((item) => item.id === itemId)) {
+        throw new AppError(ErrorCode.NotFound, `No item ${itemId} in the checklist`, { itemId });
+      }
+      unit.transact(() => {
+        requirements.record(task.id, [
+          { itemId, source: RequirementResultSource.User, ...decision, output: null, nodeId: null, commitSha },
+        ]);
+        state.publish(task.id);
+      });
+      return view(task.id);
+    },
+
+    /**
+     * Before delivery (31 §4): what the checklist says now, to keep with the delivery. Required items that are not
+     * met need the user's acceptance of exactly this version; null without a checklist.
+     */
+    async deliveryCheck(taskId: string, acknowledged: string | undefined): Promise<RequirementsDeliverySummary | null> {
+      const task = state.get(taskId);
+      const commitSha = await currentCommit(task);
+      const { revision, items } = requirements.view(task.id, commitSha);
+      if (revision === null) return null;
+      const unmet = items.filter((item) => item.required && isUnmet(item.status));
+      if (unmet.length > 0 && acknowledged !== revision.id) {
+        throw new AppError(ErrorCode.RequirementsUnacknowledged, 'Required checklist items are not met', {
+          revisionId: revision.id,
+          items: unmet.map(({ id, title, status }) => ({ id, title, status })),
+        });
+      }
+      return {
+        revisionId: revision.id,
+        commitSha,
+        items: items.map(({ id, title, required, status }) => ({ id, title, required, status })),
+      };
     },
   };
 }

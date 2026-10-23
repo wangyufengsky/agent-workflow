@@ -179,6 +179,7 @@ export async function updateTask(qc: QueryClient, summary: TaskSummaryDTO): Prom
     qc.invalidateQueries({ queryKey: queryKeys.taskLists }),
     // The detail's plan, nodes, items and result change with its state; refetch it in the background.
     qc.invalidateQueries({ queryKey: detail, exact: true }),
+    qc.invalidateQueries({ queryKey: queryKeys.taskRequirements(summary.id) }),
   ]);
 }
 

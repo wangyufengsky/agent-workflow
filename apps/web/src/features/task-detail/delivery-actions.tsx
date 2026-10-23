@@ -25,6 +25,7 @@ import { TASK_COPY } from '../../copy/tasks.ts';
 import { AttachmentBar, dropFilesInto, pasteFilesInto } from '../attachments/attachment-bar.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
+import { UnmetNotice, useDeliveryAcknowledgement } from '../requirements/unmet-notice.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { skippedCommands } from '../tasks/skipped-checks.ts';
 import { useCancelTask, useDeliver, useRequestChanges } from '../tasks/tasks.queries.ts';
@@ -132,6 +133,8 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
   const deliver = useDeliver();
   const changes = useRequestChanges();
   const cancel = useCancelTask();
+  const acknowledgement = useDeliveryAcknowledgement(task.id);
+  const { ack, blocked } = acknowledgement;
   const navigate = useNavigate();
   const [open, setOpen] = useState<Open>(undefined);
   const close = () => setOpen(undefined);
@@ -142,39 +145,44 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
 
   const merge = (strategy: LocalMergeStrategy, targetBranch: string) =>
-    deliver.mutate({ id: task.id, strategy, targetBranch }, { onSuccess: close });
+    deliver.mutate({ id: task.id, ...ack, strategy, targetBranch }, { onSuccess: close });
 
   if (report) {
     return (
-      <div className={styles.actions}>
-        <Button
-          variant="primary"
-          pending={deliver.isPending}
-          onClick={() => deliver.mutate({ id: task.id, strategy: DeliveryStrategy.ReportOnly })}
-        >
-          {C.complete}
-        </Button>
-        <Button
-          onClick={() =>
-            void navigate({
-              to: ROUTES.home,
-              search: {
-                projectId: task.project.id,
-                workflow: 'bugfix',
-                requirement: C.fixRequirement(task.result?.summary ?? ''),
-              },
-            })
-          }
-        >
-          {C.fixFromReport}
-        </Button>
-        {deliver.isError && <ErrorState error={deliver.error} />}
+      <div className="col">
+        <UnmetNotice acknowledgement={acknowledgement} />
+        <div className={styles.actions}>
+          <Button
+            variant="primary"
+            pending={deliver.isPending}
+            disabled={blocked}
+            onClick={() => deliver.mutate({ id: task.id, ...ack, strategy: DeliveryStrategy.ReportOnly })}
+          >
+            {C.complete}
+          </Button>
+          <Button
+            onClick={() =>
+              void navigate({
+                to: ROUTES.home,
+                search: {
+                  projectId: task.project.id,
+                  workflow: 'bugfix',
+                  requirement: C.fixRequirement(task.result?.summary ?? ''),
+                },
+              })
+            }
+          >
+            {C.fixFromReport}
+          </Button>
+          {deliver.isError && <ErrorState error={deliver.error} />}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="col">
+      <UnmetNotice acknowledgement={acknowledgement} />
       {conflict !== null && (
         <div className="banner warn" role="status" data-testid="delivery-conflict">
           <Icon name="alert" />
@@ -221,7 +229,8 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
             variant="primary"
             icon="git"
             pending={deliver.isPending && open === undefined}
-            onClick={() => deliver.mutate({ id: task.id, strategy: DeliveryStrategy.PullRequest })}
+            disabled={blocked}
+            onClick={() => deliver.mutate({ id: task.id, ...ack, strategy: DeliveryStrategy.PullRequest })}
           >
             {C.pushToPr}
           </Button>
@@ -231,6 +240,7 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
               variant="primary"
               icon="git"
               pending={deliver.isPending && open === undefined}
+              disabled={blocked}
               onClick={() => merge(settings['delivery.defaultStrategy'], task.git.baseBranch)}
             >
               {C.merge(task.git.baseBranch)}
@@ -280,7 +290,7 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
           task={task}
           pending={deliver.isPending}
           onCreate={(pr) =>
-            deliver.mutate({ id: task.id, strategy: DeliveryStrategy.PullRequest, pr }, { onSuccess: close })
+            deliver.mutate({ id: task.id, ...ack, strategy: DeliveryStrategy.PullRequest, pr }, { onSuccess: close })
           }
         />
         {deliver.isError && <ErrorState error={deliver.error} />}
@@ -323,8 +333,19 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
   );
 }
 
-function ReviseDialog({ task, open, onClose }: { task: TaskDetailDTO; open: boolean; onClose: () => void }) {
-  const [feedback, setFeedback] = useState('');
+/** 「让 AI 再改改」; `initialFeedback` starts the text, e.g. for one checklist item (31 §2.3). */
+export function ReviseDialog({
+  task,
+  open,
+  onClose,
+  initialFeedback = '',
+}: {
+  task: TaskDetailDTO;
+  open: boolean;
+  onClose: () => void;
+  initialFeedback?: string;
+}) {
+  const [feedback, setFeedback] = useState(initialFeedback);
   const files = useAttachmentDraft();
   const changes = useRequestChanges();
   const send = () =>
