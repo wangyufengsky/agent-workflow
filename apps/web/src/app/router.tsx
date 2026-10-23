@@ -1,4 +1,4 @@
-import { taskDisplayGroupSchema } from '@aw/shared';
+import { COMPANION_PATH, taskDisplayGroupSchema } from '@aw/shared';
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect } from '@tanstack/react-router';
 import { useEffect } from 'react';
@@ -9,6 +9,9 @@ import { ToastHost } from '../components/toast.tsx';
 import { BatchPage } from '../features/batches/batch.page.tsx';
 import { BatchesPage } from '../features/batches/batches.page.tsx';
 import { NewBatchPage } from '../features/batches/new-batch.page.tsx';
+import { CompanionPage } from '../features/companion/companion.page.tsx';
+import { CompanionNoticeHost } from '../features/companion/companion-notice.tsx';
+import { useCompanionSync } from '../features/companion/use-companion-sync.ts';
 import { DatabasesPage } from '../features/databases/databases.page.tsx';
 import { ComponentGalleryPage } from '../features/dev/component-gallery.page.tsx';
 import { GitConsolePage, GitReviewRedirect } from '../features/git/git-console.page.tsx';
@@ -58,10 +61,13 @@ function Root() {
     window.aw?.setLaunchPreferences({ theme, intro });
   }, [theme, intro]);
   useServerEvents();
+  const companionError = useCompanionSync();
   return (
     <>
+      {companionError !== null && <ErrorState error={companionError} />}
       <Outlet />
       <ToastHost />
+      <CompanionNoticeHost />
     </>
   );
 }
@@ -288,7 +294,10 @@ const projectRoute = createRoute({
   component: ProjectDetailPage,
 });
 
+const companionRoute = createRoute({ getParentRoute: () => rootRoute, path: COMPANION_PATH, component: CompanionPage });
+
 const routeTree = rootRoute.addChildren([
+  companionRoute,
   onboardingRoute,
   pptPlayRoute,
   pptPrintRoute,

@@ -1,0 +1,15 @@
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 3 tests using 1 worker
+
+(node:38047) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [electron] › e2e/companion.electron.spec.ts:6:1 › 真实桌宠窗口：沙盒、默认光球、会话与形象同步、主窗隐藏恢复、关闭桌宠 (3.9s)
+  ✓  2 [electron] › e2e/launch.electron.spec.ts:10:1 › 构建后的应用启动后显示引导页并能正常退出 (2.3s)
+  ✓  3 [electron] › e2e/ppt-export.electron.spec.ts:51:1 › 导出 PDF：每页一张、文件以 %PDF 开头；PPT 不存在时返回错误而不是一直等待 (3.2s)
+
+  3 passed (14.9s)

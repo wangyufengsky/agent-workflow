@@ -10,6 +10,8 @@ import {
   listConversationsOp,
   replyAssistantPermissionOp,
   sendAssistantMessageOp,
+  stopWhisperOp,
+  whisperOp,
 } from './assistant.ts';
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
 import { createBatchOp, deliverBatchOp, getBatchOp, listBatchesOp } from './batches.ts';
@@ -297,6 +299,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getConversationOp,
   deleteConversationOp,
   sendAssistantMessageOp,
+  whisperOp,
+  stopWhisperOp,
   abortAssistantOp,
   replyAssistantPermissionOp,
   listAssistantFilesOp,

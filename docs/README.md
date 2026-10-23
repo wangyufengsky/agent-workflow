@@ -35,6 +35,8 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 
 ## 维护规则
 
+角色助手与桌宠的阶段设计、临时鲸鱼素材及后续原创角色替换路线见 [32-companion-assistant.md](32-companion-assistant.md)。
+
 - 改枚举、状态机、API、MCP 工具、表结构时，**同一个提交**更新对应文档。
 - 文档只写结论和约束，不写过程记录；过程讨论结论进 `02-decisions.md`。
 - 设计稿 `opencode-workflow-design-showcase/` 只作为视觉与交互参考，以本目录文档为准；二者冲突时按 [14-ui-spec.md](14-ui-spec.md) 的改进清单执行。

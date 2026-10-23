@@ -1,0 +1,43 @@
+
+> agent-workflow@ check /Users/wangyufeng/.codex/worktrees/whale-assistant/agent-workflow-dev
+> pnpm typecheck && pnpm lint && pnpm lint:deps && pnpm lint:css && pnpm gen:fsm-docs --check
+
+
+> agent-workflow@ typecheck /Users/wangyufeng/.codex/worktrees/whale-assistant/agent-workflow-dev
+> pnpm -r --parallel typecheck
+
+Scope: 6 of 7 workspace projects
+apps/desktop typecheck$ tsc --noEmit -p .
+apps/web typecheck$ tsc --noEmit -p .
+packages/builtin typecheck$ tsc --noEmit -p .
+packages/opencode-plugin typecheck$ tsc --noEmit -p .
+packages/shared typecheck$ tsc --noEmit -p .
+packages/server typecheck$ tsc --noEmit -p .
+packages/shared typecheck: Done
+packages/builtin typecheck: Done
+packages/opencode-plugin typecheck: Done
+apps/desktop typecheck: Done
+packages/server typecheck: Done
+apps/web typecheck: Done
+
+> agent-workflow@ lint /Users/wangyufeng/.codex/worktrees/whale-assistant/agent-workflow-dev
+> biome check .
+
+Checked 855 files in 1032ms. No fixes applied.
+
+> agent-workflow@ lint:deps /Users/wangyufeng/.codex/worktrees/whale-assistant/agent-workflow-dev
+> depcruise apps packages --config .dependency-cruiser.cjs
+
+
+✔ no dependency violations found (781 modules, 3547 dependencies cruised)
+
+
+> agent-workflow@ lint:css /Users/wangyufeng/.codex/worktrees/whale-assistant/agent-workflow-dev
+> node scripts/lint-css.mjs
+
+lint:css ok (30 files)
+
+> agent-workflow@ gen:fsm-docs /Users/wangyufeng/.codex/worktrees/whale-assistant/agent-workflow-dev
+> node scripts/gen-fsm-docs.ts --check
+
+gen:fsm-docs ok (10 machines in sync)

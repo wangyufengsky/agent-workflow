@@ -27,6 +27,7 @@ export function useAssistantRequests(): void {
     if (request === null || request.seq === handled.current) return;
     handled.current = request.seq;
     const r = request.request;
+    if (r.kind !== 'reveal' && window.aw !== undefined) void window.aw.companion.openMain();
     switch (r.kind) {
       case 'navigate':
         if (r.target.page === AssistantPage.Home) void openPage(r.target);

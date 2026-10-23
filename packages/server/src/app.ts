@@ -167,7 +167,11 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   const opencode = deps.opencode ?? createRuntimeClient(runtime, log);
   // Before the API and database close: opencode's last requests and events still reach a working backend.
-  server.addHook('preClose', () => opencode.shutdown());
+  server.addHook('preClose', async () => {
+    // 临时碎碎念会话须在运行时关闭前取消并删除。
+    await assistant.stopWhisper();
+    await opencode.shutdown();
+  });
   // The hosted runtime can start only once the API listens (its MCP endpoint needs the port) and when no fake
   // replaces it; start() decides that, after which a recheck may start a newly hostable runtime too.
   let hosting = false;

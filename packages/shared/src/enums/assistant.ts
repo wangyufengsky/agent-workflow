@@ -24,6 +24,7 @@ export type AssistantToolName = (typeof AssistantToolName)[keyof typeof Assistan
 /** Pages the assistant knows the user is on and can open (14 §1); the renderer maps each to its route. */
 export const AssistantPage = {
   Home: 'home',
+  Desktop: 'desktop',
   Tasks: 'tasks',
   Task: 'task',
   Node: 'node',
@@ -71,6 +72,7 @@ export type AssistantPageParam =
 /** Params each page needs to be opened. */
 export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.Home]: [],
+  [AssistantPage.Desktop]: [],
   [AssistantPage.Tasks]: [],
   [AssistantPage.Task]: ['taskId'],
   [AssistantPage.Node]: ['taskId', 'nodeId'],

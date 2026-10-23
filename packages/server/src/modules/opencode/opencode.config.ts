@@ -9,6 +9,7 @@ import {
   MCP_TOOL_PREFIX,
   OPENCODE_AGENT_NAME,
   OPENCODE_ASSISTANT_AGENT,
+  OPENCODE_COMPANION_AGENT,
   type PermissionAction,
   type PermissionRule,
   readonlyBashRules,
@@ -134,6 +135,12 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
     plugin: [pathToFileURL(input.pluginFile).href],
     agent: {
       ...Object.fromEntries(agents),
+      [OPENCODE_COMPANION_AGENT]: {
+        mode: 'primary',
+        description: 'companion small talk',
+        prompt: input.prompts[PromptName.ProtocolCompanion],
+        permission: { '*': 'deny' },
+      },
       [OPENCODE_ASSISTANT_AGENT]: {
         mode: 'primary',
         description: 'agent-workflow assistant',

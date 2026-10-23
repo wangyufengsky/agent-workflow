@@ -308,3 +308,11 @@ export function taskOperations(tasks: TasksService) {
 - 助手 MCP（v1.1）：独立令牌；调用按会话归属到助手对话（执行任务的会话调用不了）；写操作经用户确认；凭据字段不进入工具 schema，凭据只能在表单中由用户输入；助手不能修改「总是允许」、opencode 路径、bash 策略与 worktree 目录（D65）。
 - 助手会话：`directory` 为 `<数据目录>/assistant/`，`external_directory: deny`，bash 为只读规则、其余询问。
 - 数据库工具：只读事务（SQL Server 为从不提交的事务）+ 按方言的语句检查 + 行数与超时限制（24 §4）。
+
+## 10. 角色助手与桌宠扩展（32）
+
+同一后端服务主窗口和 `/companion` 透明窗口，后者使用相同 sandbox/contextIsolation 配置。固定 preload 方法处理显示、拖动、跨窗选择与主窗导航；输入经 shared schema 校验，导航限制当前应用源。业务对话与任务依旧经 HTTP/SSE；通知前态仅用于判重，不构成第二个业务状态源。桌宠位置保存在 userData 的 `companion-position.json`，恢复及屏幕变化时限制到工作区；启用桌宠时关闭主窗口隐藏，明确退出仍等待后端停止。
+
+preload 通过主进程提供的窗口标记区分 `main`、`companion` 和辅助窗口（`null`）；PDF 导出等辅助窗口不配置桌宠、不参与跨窗会话选择或桌宠提醒。主窗口负责向原生层发出系统通知，桌宠保留自身的可见提醒队列。
+
+`features/companion` 集中提供光球 CSS 动画和鲸鱼 WebM 适配，语义动作与素材解耦；设置默认光球。无新增运行时依赖。临时鲸鱼素材的来源／哈希／使用限制放在 `public/companion/whale`，后续原创替换不改变助手 API。碎碎念通过既有 opencode 客户端新建无工具临时会话，单次超时与取消后清理；不混入持久助手历史。

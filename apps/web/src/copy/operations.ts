@@ -1,4 +1,5 @@
 import { UiMode } from '@aw/shared';
+import { COMPANION_COPY } from './companion.ts';
 import { DELIVERY_COPY } from './delivery.ts';
 import { PPT_COPY } from './ppt.ts';
 import { SETTINGS_COPY } from './settings.ts';
@@ -108,6 +109,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.gitReviews.stop': '停止 AI 审查',
   'op.worktrees.list': 'worktree 总览',
   'op.worktrees.prune': '清理遗留 worktree',
+  'op.assistant.whisper': '生成碎碎念',
+  'op.assistant.stopWhisper': '停止碎碎念',
   'op.assistant.list': '助手对话列表',
   'op.assistant.create': '新建助手对话',
   'op.assistant.get': '查看助手对话',
@@ -162,6 +165,13 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
  * their label from what they name (`INPUT_REF_LABEL`). A unit test keeps every field of a confirmed operation covered.
  */
 export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
+  'companion.appearance': COMPANION_COPY.appearance,
+  'companion.enabled': COMPANION_COPY.desktop,
+  'companion.animations': COMPANION_COPY.animations,
+  'companion.size': COMPANION_COPY.size,
+  'companion.whisper': COMPANION_COPY.whisper,
+  'companion.whisperMinutes': COMPANION_COPY.whisperMinutes,
+  'companion.notifications': COMPANION_COPY.notifications,
   'ui.mode': SETTINGS_COPY.mode,
   'ui.theme': SETTINGS_COPY.theme,
   'ui.introAnimation': SETTINGS_COPY.intro,

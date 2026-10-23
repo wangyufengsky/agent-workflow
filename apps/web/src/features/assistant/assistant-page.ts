@@ -6,6 +6,7 @@ import { ROUTES } from '../../app/routes.ts';
 /** The route of each page the assistant knows (14 §1). */
 const PAGE_ROUTE = {
   [AssistantPage.Home]: ROUTES.home,
+  [AssistantPage.Desktop]: '/companion',
   [AssistantPage.Tasks]: ROUTES.tasks,
   [AssistantPage.Task]: ROUTES.task,
   [AssistantPage.Node]: ROUTES.node,

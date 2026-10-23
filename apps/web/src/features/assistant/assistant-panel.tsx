@@ -8,6 +8,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
 import { ASSISTANT_COPY as C } from '../../copy/assistant.ts';
 import { useUiStore } from '../../state/ui.store.ts';
+import { Character } from '../companion/character.tsx';
 import styles from './assistant.module.css';
 import { conversationsQuery, useCreateConversation, useDeleteConversation } from './assistant.queries.ts';
 import { AssistantWelcome } from './assistant-welcome.tsx';
@@ -49,7 +50,7 @@ function Panel({ open, onClosed }: { open: boolean; onClosed: () => void }) {
       }}
     >
       <header className={styles.head}>
-        <span className={styles.orb} data-busy={busy || undefined} aria-hidden="true" />
+        <Character mood={busy ? 'thinking' : undefined} />
         {active === undefined ? (
           <span className={styles.headTitle}>{C.panel}</span>
         ) : (

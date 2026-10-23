@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { DeliveryStrategy, localMergeStrategySchema } from '../enums/git.ts';
 import { BashPolicy, bashPolicySchema } from '../enums/system.ts';
-import { ThemePreference, themePreferenceSchema, UiMode, uiModeSchema } from '../enums/ui.ts';
+import {
+  CompanionAppearance,
+  companionAppearanceSchema,
+  ThemePreference,
+  themePreferenceSchema,
+  UiMode,
+  uiModeSchema,
+} from '../enums/ui.ts';
 
 /** User settings (08 §4.3): key → value schema. Unknown keys are rejected. */
 export const settingsSchema = z.strictObject({
@@ -26,6 +33,13 @@ export const settingsSchema = z.strictObject({
   'opencode.binaryPath': z.string().min(1).nullable(),
   /** Operation ids the v1.1 assistant may run without confirmation (write risk only). */
   'assistant.alwaysAllow': z.array(z.string()),
+  'companion.enabled': z.boolean(),
+  'companion.appearance': companionAppearanceSchema,
+  'companion.animations': z.boolean(),
+  'companion.size': z.number().int().min(120).max(300),
+  'companion.whisper': z.boolean(),
+  'companion.whisperMinutes': z.number().int().min(1).max(120),
+  'companion.notifications': z.boolean(),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export type SettingKey = keyof Settings;
@@ -49,6 +63,13 @@ export const SETTING_DEFAULTS: Settings = {
   'delivery.deleteBranchAfterMerge': true,
   'opencode.binaryPath': null,
   'assistant.alwaysAllow': [],
+  'companion.enabled': false,
+  'companion.appearance': CompanionAppearance.Orb,
+  'companion.animations': true,
+  'companion.size': 180,
+  'companion.whisper': false,
+  'companion.whisperMinutes': 15,
+  'companion.notifications': true,
 };
 
 /** Lowest UI mode in which the settings page shows each key. */
@@ -68,4 +89,11 @@ export const SETTING_MODE: Record<SettingKey, UiMode> = {
   'delivery.deleteBranchAfterMerge': UiMode.Pro,
   'opencode.binaryPath': UiMode.Pro,
   'assistant.alwaysAllow': UiMode.Simple,
+  'companion.enabled': UiMode.Simple,
+  'companion.appearance': UiMode.Simple,
+  'companion.animations': UiMode.Simple,
+  'companion.size': UiMode.Simple,
+  'companion.whisper': UiMode.Simple,
+  'companion.whisperMinutes': UiMode.Simple,
+  'companion.notifications': UiMode.Simple,
 };

@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+export const CompanionAppearance = { Orb: 'orb', Whale: 'whale' } as const;
+export type CompanionAppearance = (typeof CompanionAppearance)[keyof typeof CompanionAppearance];
+export const companionAppearanceSchema = z.enum(CompanionAppearance);
+
 export const UiMode = {
   Simple: 'simple',
   Pro: 'pro',
