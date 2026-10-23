@@ -116,6 +116,15 @@ const CASES: Array<{ name: string; machine: Machine<string, string>; illegal: Ar
     ],
   },
   {
+    name: 'assistantTurn',
+    machine: MACHINES.assistantTurn,
+    illegal: [
+      ['completed', 'error'],
+      ['timed_out', 'idle'],
+      ['interrupted', 'abort'],
+    ],
+  },
+  {
     name: 'schedule',
     machine: MACHINES.schedule,
     illegal: [

@@ -77,6 +77,7 @@ export function ProSettings({ settings, set }: { settings: Settings; set: (patch
           value={settings['attempt.timeoutMinutes']}
           onCommit={(n) => set({ 'attempt.timeoutMinutes': n })}
         />
+        <p className="hint">{C.timeoutHint}</p>
       </div>
       <div className="field">
         <span className="label">{C.defaultStrategy}</span>

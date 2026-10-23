@@ -123,6 +123,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | 枚举 | 值 | 说明 |
 | --- | --- | --- |
 | `AssistantConfirmationStatus` | `pending` · `confirmed` · `cancelled` | 确认卡片（09 §10） |
+| `AssistantTurnStatus` | `running` · `completed` · `aborted` · `failed` · `interrupted` · `timed_out` | 助手单轮运行状态（09 §14），用量未知与状态独立 |
+| `AssistantTurnEvent` | `idle` · `abort` · `error` · `runtime_lost` · `backend_restart` · `timeout` | 助手轮次的结束原因，运行时丢失与后端重启分别保存 |
 | `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` | 助手专用工具（15 §3）；其余工具由操作清单生成 |
 | `AssistantPage` | `desktop`（桌宠来源，不带任务参数） · `home` · `tasks` · `task` · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` · `ppt` · `ppt_deck`（23 §9） · `batches` · `batch` · `schedules` · `schedule` · `environment`（28 §4） | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId` / `deckId` / `batchId` / `scheduleId`；PPT 工作台另可带选中的页 `slideId`） |
 | `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） · `schedule`（22 §10） · `deck`（23 §9） · `git_review`（27 §7.1） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
@@ -332,7 +334,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `scheduler.maxConcurrentAttempts` | `4` | 简单 |
 | `scheduler.maxConcurrentNodesPerTask` | `2` | 专业 |
 | `node.maxAttempts` | `3` | 专业 |
-| `attempt.timeoutMinutes` | `60` | 专业 |
+| `attempt.timeoutMinutes` | `60` | 专业；任务尝试与助手单轮时限。助手权限等待暂停计时，回复后继续剩余时长，超时停止且不自动重试 |
 | `worktree.rootDir` | `null`（使用 `<数据目录>/worktrees`；助手不能修改，D65） | 专业 |
 | `delivery.defaultStrategy` | `squash`（可选 `squash` / `merge` / `rebase`；PR 有单独按钮） | 专业 |
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |

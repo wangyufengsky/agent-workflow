@@ -148,6 +148,13 @@
       "when": 1792777588351,
       "tag": "0020_assistant_session_isolation",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1792780150143,
+      "tag": "0021_assistant_usage",
+      "breakpoints": true
     }
   ]
 }

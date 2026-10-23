@@ -314,7 +314,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/assistant/conversations` | `{ items: AssistantConversationDTO[] }`，最近更新在前；`AssistantConversationDTO = { id, title, busy, pendingPermissions: Array<{ permissionId, permission, patterns }>, createdAt, updatedAt }`（`busy` 与权限请求只在内存中，重启后为空） |
+| GET | `/assistant/conversations` | `{ items: AssistantConversationDTO[] }`，最近更新在前；`AssistantConversationDTO = { id, title, busy, pendingPermissions: Array<{ permissionId, permission, patterns }>, usage: AssistantUsageDTO, createdAt, updatedAt }`（`busy` 与权限请求只在内存中，重启后为空；`usage` 持久化） |
 | POST | `/assistant/conversations` | `{ title? }` → 201；opencode 会话在第一条消息时创建 |
 | POST | `/assistant/context-snapshots` | `assistant.snapshotContext`，`{ source: { kind: 'task', taskId, nodeId? } \| { kind: 'selection', text, page: AssistantPageRef } }` → 201 `AttachmentDTO`。用户显式附加文字，write，不暴露给助手或命令面板。任务／步骤信息由后端读取；不存在 404 `TASK_NOT_FOUND` / `NODE_NOT_FOUND`，步骤必须属于任务。选中文字 trim 后 1–12000 字符，超长／空白／多余字段 400 `VALIDATION_FAILED`；仅文字，NUL 等仍由附件边界拒绝。结果是固定的文本附件，使用现有查看、移除、绑定与清理接口 |
 | GET | `/assistant/conversations/:id` | 不存在 404 `ASSISTANT_CONVERSATION_NOT_FOUND` |
@@ -335,6 +335,8 @@ type AttemptDTO = AttemptSummaryDTO & {
 确认结果与待发通知持久化在同一事务；会话忙、运行时不可用或发送失败时保留通知，重启后可随下一条用户消息投递，投递成功才移除，不重新执行业务操作。应用回传结果时，若用户上一条消息所在页面的对象已被删除，system 明确说明该页面已失效，仍正常发送结果；用户主动发送消息时仍严格校验所报页面对象。
 
 助手通过 `tasks.create`（用户确认或已总是允许）创建的普通任务，后续 `review` / `failed` / `completed` 会回到原对话。HTTP 输入输出契约不变，不跟进界面直接创建、取消确认或其他对话的任务。通知带任务编号、页面链接、事件时间、已有结果及检查结论；失败带阶段与原因，完成带实际交付记录。`review` 仅表示等待验收；跳过的检查不算通过，创建 PR 不等于已合并。通知不触发重试或交付。应用启动与运行时恢复 ready 后尝试投递；助手忙时等本轮结束，发送失败仍可随下一条用户消息继续。外部已接收但本地未确认删除时的崩溃仍可能导致重复通知。
+
+`AssistantUsageDTO = { latest: AssistantTurnDTO | null, recordedFrom: number | null, turns, unknownTurns, tokensInput: number | null, tokensOutput: number | null }`。`latest` 包含 `id, source, status, endReason, model, startedAt, endedAt, elapsedMs, tokensInput, tokensOutput, timeoutMs`。未开始记录时 `latest` / `recordedFrom` / tokens 为 null；已有轮次但模型未报告的用量仍为 null，累计只加已知报告，`unknownTurns` 单独列出。`source` 区分 `user` / `app`；结束状态与原因见 08。后端重启中断的耗时未知，其他结束轮次记录 Clock 的实际墙钟耗时；运行中读取时计算至当前时刻。`assistant.updated` 同步这些值，三个聊天入口共用。
 
 桌宠复用全部对话端点，`AssistantPage.Desktop = desktop` 的参数为空。角色窗口的本地 IPC（`configure({ enabled, size })`、`setPanel(none | chat | bubble)`、`onLayout`）边界见 [32 §4](32-companion-assistant.md#4-实现分层)。
 

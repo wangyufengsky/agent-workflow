@@ -1,12 +1,14 @@
 import {
   AssistantConfirmationStatus,
   AssistantToolName,
+  AssistantTurnStatus,
   EntityKind,
   InputRef,
   OperationRisk,
   type Platform,
 } from '@aw/shared';
 import { MOD_KEY, UI_PLATFORM } from '../app/platform.ts';
+import { formatDateTime } from './common.ts';
 
 /** The system file manager differs by platform (17 §3.7). */
 const REVEAL: Record<Platform, string> = {
@@ -66,6 +68,34 @@ export const ASSISTANT_COPY = {
     open: '问助手',
     suggestionsLabel: '试试问助手',
   },
+} as const;
+
+export const ASSISTANT_USAGE_COPY = {
+  label: '助手用量',
+  current: '本轮',
+  latest: '最近一轮',
+  elapsed: '耗时（含等待）',
+  unknownElapsed: '未知',
+  stoppedByRestart: '后端重启中断',
+  stoppedByRuntime: '运行时中断',
+  status: {
+    [AssistantTurnStatus.Running]: '进行中',
+    [AssistantTurnStatus.Completed]: '已完成',
+    [AssistantTurnStatus.Aborted]: '已停止',
+    [AssistantTurnStatus.Failed]: '失败',
+    [AssistantTurnStatus.Interrupted]: '已中断',
+    [AssistantTurnStatus.TimedOut]: '超时已停止',
+  },
+  tokens: (input: number | null, output: number | null) =>
+    input === null || output === null
+      ? '用量未报告'
+      : `输入 ${input.toLocaleString()} · 输出 ${output.toLocaleString()} tokens`,
+  duration: (ms: number) => `${(ms / 1000).toFixed(1)} 秒`,
+  limit: (ms: number) => `时限 ${ms / 60_000} 分钟（不含权限等待）`,
+  total: (input: number | null, output: number | null, unknown: number) =>
+    `会话累计已报告 ${input === null || output === null ? '—' : (input + output).toLocaleString()} tokens${unknown === 0 ? '' : ` · ${unknown} 轮用量未报告`}`,
+  since: (at: number) => `自 ${formatDateTime(at)} 开始记录；更早的对话用量未知，不补算为零。`,
+  recordedSince: (at: number) => `自 ${formatDateTime(at)} 起；此前未知`,
 } as const;
 
 /** opencode's own tools (12 §2), keyed by the name opencode reports. */
