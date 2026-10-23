@@ -9,6 +9,9 @@ export const assistantConversationsTable = sqliteTable(
     id: text('id').primaryKey(),
     title: text('title').notNull(),
     opencodeSessionId: text('opencode_session_id'),
+    /** 旧会话目录不可由 opencode 请求参数改变，首次恢复时迁到独立会话。 */
+    isolated: integer('isolated', { mode: 'boolean' }).notNull().default(false),
+    retiredSessionId: text('retired_session_id'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },

@@ -30,6 +30,7 @@ export const TRANSCRIPT_SYSTEM_LABEL: Record<TranscriptSystemEvent, string> = {
   [TranscriptSystemEvent.TimedOut]: '超过时限，已中止会话',
   [TranscriptSystemEvent.Aborted]: '已中止会话',
   [TranscriptSystemEvent.RuntimeLost]: 'opencode 已退出，会话中断',
+  [TranscriptSystemEvent.AssistantIsolated]: '对话将使用独立文件目录，聊天记录保留，最近文字作为参考恢复',
 };
 
 export const ATTEMPT_COPY = {

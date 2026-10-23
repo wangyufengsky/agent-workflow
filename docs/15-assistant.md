@@ -16,12 +16,20 @@
 | 项 | 设计 |
 | --- | --- |
 | 模型与运行 | 复用托管的 opencode；agent `aw-assistant`（提示词 `packages/builtin/prompts/protocol-assistant.md`）；每个对话一个 opencode 会话，第一条消息时创建；模型用设置 `ai.defaultModel`（为空时 opencode 默认） |
-| 工作目录 | `<数据目录>/assistant/`，会话 `directory` 指向这里；生成的文档存放在 `assistant/files/<conversationId>/`（每轮上下文写明该目录） |
-| 原生工具 | agent 权限 `edit: allow`、`external_directory: deny`（只能写助手目录）、`webfetch: ask`、`question: deny`（D36）；bash 为会话级规则 `readonlyBashRules()`（不带检查命令的只读规则，其余 ask，12 §2）；会话的权限询问在面板中以卡片回复（允许一次 / 总是允许 / 拒绝，只在内存中，随 opencode 进程失效） |
+| 工作目录 | 会话 `directory`、发送、停止、权限回复都指向真实路径 `<数据目录>/assistant/files/<conversationId>/`；生成文档的相对路径从这里计算，每轮上下文写明绝对目录（不能把 `/var` 与 `/private/var` 等别名当不同边界） |
+| 原生工具 | agent 权限 `edit: allow`、`external_directory: deny`（原生文件工具仅在本对话目录读写）、`webfetch: ask`、`question: deny`（D36）、`task: deny`（原生子代理不会完整继承权限）；bash 为会话级 `*: ask`，所有 shell 命令都需用户授权（12 §2）；会话的权限询问在面板中以卡片回复（允许一次 / 总是允许 / 拒绝，只在内存中，随 opencode 进程失效） |
 | 应用工具 | **助手 MCP**（`/mcp/assistant`，server 名 `agent-workflow-app`），与执行 MCP 分开、令牌分开；bridge 插件对 `agent-workflow_` 与 `agent-workflow-app_` 两种前缀都注入会话 id，调用按会话归属到对话（不属于任何对话 → `MCP_CONVERSATION_UNRESOLVED`）；`aw-assistant` 的权限 deny `agent-workflow_*`，规划 / 执行 / 评审 agent deny `agent-workflow-app_*`，各自只看到自己那套工具 |
 | 用户外部 MCP | opencode 合并用户全局配置，用户自己配置的 MCP（如日历）助手可直接使用 |
 | 上下文 | 每轮 `system` 注入（模板 `assistant-context.md`）：用户发消息时的当地时间、星期、时区与 UTC 偏移、界面模式、当前页面与选中对象（任务编号与标题、状态、项目；选中的步骤；项目名称与仓库；流程名称）、对话文件目录。页面由前端随消息发送（`AssistantPageRef`），名称由后端查出；新用户消息指向不存在的对象时不发送（如 `TASK_NOT_FOUND`）。系统结果回传使用上一条用户消息的页面，若对象已删除则明确说明不再存在，不阻断结果回传；其他错误仍然抛出 |
 | 对话存储 | 表 `assistant_conversations`、`assistant_confirmations`（迁移 0008）与持久化待发队列 `assistant_outbox`（迁移 0018）及 `assistant_task_followups`（迁移 0019，10 §4）；消息流 JSONL `<数据目录>/assistant/conversations/<id>.jsonl`（格式同 10 §3，另有 `confirmation`、`attachment`、`entity_ref` 三种条目）；助手写入 `files/<id>/` 的文件（opencode `write` / `edit` 工具）记为附件条目 |
+
+这里是工作目录与工具权限边界，不是操作系统沙箱。opencode 1.19 对 `head` / `rg` 等 shell 命令不完整检查目录，故助手不自动放行所谓只读 shell；用户主动批准 shell 或自己配置的外部 MCP 可具有更广访问能力。应用 `tasks_create` 仍按原有确认流程创建独立任务，不通过原生 `task` 子代理逃逸权限。
+
+### 2.1 旧会话升级与删除
+
+opencode 1.19 的已有会话目录不能通过发送参数或 fork 改变。迁移 0020 为旧记录标记尚未隔离，首次继续对话时同事务摘除旧 session id、保存待清理 id，并把最近 200 条消息流中的可见用户/助手文字（至多 12,000 字符）放入持久化 outbox；不恢复工具输入、工具输出、内部推理或权限授权。界面原始 JSONL 保留，加入目录升级说明。旧会话清理成功后再在独立目录建原生会话，发送成功才确认恢复文字，后续正常轮次不重复注入。清理失败保留待清理 id，重启后继续，不退回旧共享目录。
+
+删除聊天先锁住新消息与系统回传，必要时停止模型，再删除原生会话与待清理旧会话，成功后才释放附件引用、级联清理数据库和移除文件。外部清理失败保留聊天供重试；异步首次建会话/发送尚未返回时拒绝删除，避免迟到的新 session 成为孤儿。
 
 ## 3. 助手 MCP 工具
 
@@ -154,6 +162,7 @@ server/src/modules/assistant/
 | --- | --- |
 | 单元 | `localTime` 跨日与各时区偏移；确认状态机；操作清单标注（`assistant.*` 不暴露给助手）；配置快照（两套 MCP、助手 agent、互相 deny） |
 | 集成 | `assistant.mcp.int.test.ts` 另覆盖 `entity_ref`（确认后执行与直接执行，失败不写）；`assistant.int.test.ts`：对话增删查与消息流、会话目录 / agent / bash 规则 / 每轮 system、`ASSISTANT_BUSY` 与停止、面板中的权限请求、附件、删除时清理；`assistant.mcp.int.test.ts`：令牌隔离、工具生成与过滤、read / write / 总是允许 / critical / 取消 / 忙时确认、`MCP_CONVERSATION_UNRESOLVED`、`MCP_TOOL_NOT_ALLOWED`、凭据与 D65 字段被拒、全部助手专用工具；`databases.int.test.ts`：`databases.query` |
+| 会话生命周期 | `assistant.lifecycle.int.test.ts`：目录隔离、外部删除失败保留、首次发送/删除屏障、删除时排队消息、旧会话升级跨重启；`assistant.lifecycle.oc.test.ts`：真实 opencode 的同目录读写、跨对话读写拒绝、跨目录 shell 需授权、原生子代理不暴露、旧会话迁移与底层删除；本地模型只指定工具调用，不替代原生工具和权限判断 |
 | 恢复回归 | `assistant.recovery.int.test.ts`：并发首条消息互斥；void 成功结果与旧记录兼容；断线、发送失败和重启后的结果回传且不重执行业务；建会话失败释放；空闲事件早于发送响应时按序投递；旧页面对象删除后的成功回传 |
 | 任务回传 | `assistant.tasks.int.test.ts`：确认/总是允许两条路径在首次任务事件前登记；真实 Git 任务待验收与交付；忙碌、断线、发送失败和重启补扫；事件去重；删除原对话、界面任务、取消确认不跟进；登记失败原子回滚 |
 | 文字上下文 | `assistant.snapshots.int.test.ts`：任务变化后保持快照原文、来源与时间，步骤归属、失效对象、选中文字作为不可信资料、长度与严格字段边界；`shell-assistant-context.browser.spec.ts`：主页选区编辑、侧栏任务快照、预览移除、与文件共存、发送后读取、开始任务模式不出现上下文入口，以及生成中移除后迟到的响应不再打开预览或带入消息 |

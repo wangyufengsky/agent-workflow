@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import {
   AppError,
   ASSISTANT_CONVERSATIONS_DIR,
   ASSISTANT_DIR,
   ASSISTANT_FILES_DIR,
+  ASSISTANT_RECOVERY_ENTRIES,
   ASSISTANT_TITLE_MAX_CHARS,
   type AssistantConversationDTO,
   type AssistantFileDTO,
@@ -47,6 +48,7 @@ import {
 } from '../opencode/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { type ContextRenderer, localTime } from './assistant.context.ts';
+import { recoveryContext } from './assistant.recovery-context.ts';
 import { type Conversation, createAssistantRepo } from './assistant.repo.ts';
 
 export type AssistantServiceDeps = {
@@ -69,6 +71,8 @@ type Live = {
   busy: boolean;
   /** 外部请求尚未返回时，空闲事件也不能放行下一次发送。 */
   sending: boolean;
+  /** 删除外部会话期间禁止新发送和自动回传。 */
+  deleting: boolean;
   /** The user asked to stop: the abort's own error is not the conversation's. */
   aborting: boolean;
   view: SessionView;
@@ -90,13 +94,14 @@ const titleOf = (text: string) =>
     .slice(0, ASSISTANT_TITLE_MAX_CHARS);
 
 /**
- * Assistant conversations (15): each is one opencode session of `aw-assistant` running in `<data dir>/assistant/`.
+ * Assistant conversations (15): each is one opencode session of `aw-assistant` running in its own `<data dir>/assistant/files/<id>/`.
  * Messages go out with the per-turn context; the session's events become the conversation's message stream.
  */
 export function createAssistantService(deps: AssistantServiceDeps) {
   const { db, unit, events, clock, log, opencode, settings, attachments, context } = deps;
   const repo = createAssistantRepo(db);
-  const directory = join(deps.dataDir, ASSISTANT_DIR);
+  // opencode 使用真实路径判断目录边界，macOS 的 /var 等别名也必须先规范化。
+  const directory = join(realpathSync(deps.dataDir), ASSISTANT_DIR);
   const live = new Map<string, Live>();
   /** opencode session id → conversation id, for the sessions this run has used. */
   const sessions = new Map<string, string>();
@@ -115,6 +120,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       state = {
         busy: false,
         sending: false,
+        deleting: false,
         aborting: false,
         view: createSessionView(),
         permissions: new Map(),
@@ -139,7 +145,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     return {
       id: c.id,
       title: c.title,
-      busy: state.busy || state.sending,
+      busy: state.busy || state.sending || state.deleting,
       pendingPermissions: [...state.permissions.values()],
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
@@ -162,18 +168,35 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       uiMode: settings.get('ui.mode'),
       page,
       source,
-      filesDir: `${ASSISTANT_FILES_DIR}/${c.id}/ (absolute: ${filesDir(c.id)})`,
+      filesDir: `. (absolute: ${filesDir(c.id)})`,
     });
   }
 
   async function sessionOf(c: Conversation): Promise<string> {
-    if (c.opencodeSessionId !== null) {
-      sessions.set(c.opencodeSessionId, c.id);
-      return c.opencodeSessionId;
+    let current = c;
+    if (!current.isolated) {
+      const previousSession = current.opencodeSessionId;
+      const history = recoveryContext(transcripts.tail(c, ASSISTANT_RECOVERY_ENTRIES));
+      unit.transact(() => {
+        repo.updateConversation(c.id, { isolated: true, retiredSessionId: previousSession, opencodeSessionId: null });
+        if (previousSession !== null) repo.enqueueMessage(c.id, history, clock.now());
+      });
+      if (previousSession !== null)
+        record(c, [{ kind: TranscriptEntryKind.System, data: { event: TranscriptSystemEvent.AssistantIsolated } }]);
+      current = get(c.id);
+    }
+    // 删除失败时保留退休 id；下次恢复继续清理，绝不回到旧目录运行。
+    if (current.retiredSessionId !== null) {
+      await opencode.deleteSession({ sessionId: current.retiredSessionId, directory });
+      repo.updateConversation(c.id, { retiredSessionId: null });
+    }
+    if (current.opencodeSessionId !== null) {
+      sessions.set(current.opencodeSessionId, c.id);
+      return current.opencodeSessionId;
     }
     mkdirSync(filesDir(c.id), { recursive: true });
     const sessionId = await opencode.createSession({
-      directory,
+      directory: filesDir(c.id),
       title: `Assistant · ${c.title}`,
       agent: OPENCODE_ASSISTANT_AGENT,
       permission: assistantPermissionRules(),
@@ -203,11 +226,11 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     if (!state.busy) flushLater(c.id);
   }
 
-  async function prompt(sessionId: string, systemText: string, text: string): Promise<void> {
+  async function prompt(c: Conversation, sessionId: string, systemText: string, text: string): Promise<void> {
     const model = settings.get('ai.defaultModel');
     await opencode.prompt({
       sessionId,
-      directory,
+      directory: filesDir(c.id),
       agent: OPENCODE_ASSISTANT_AGENT,
       ...(model === null ? {} : { model: parseModelRef(model) }),
       system: systemText,
@@ -218,12 +241,13 @@ export function createAssistantService(deps: AssistantServiceDeps) {
   /** Sends what waits in the outbox, once the session can take it. */
   async function flush(id: string): Promise<void> {
     const state = liveOf(id);
-    if (state.busy || state.sending || !opencode.isConnected()) return;
-    const queued = repo.pendingMessages(id);
-    if (queued.length === 0) return;
+    if (state.busy || state.sending || state.deleting || !opencode.isConnected()) return;
+    if (repo.pendingMessages(id).length === 0) return;
     const c = get(id);
     await runTurn(c, async () => {
-      await prompt(await sessionOf(c), system(c, state.page, 'app'), queued.map((m) => m.text).join('\n\n'));
+      const sessionId = await sessionOf(c);
+      const queued = repo.pendingMessages(id);
+      await prompt(c, sessionId, system(c, state.page, 'app'), queued.map((m) => m.text).join('\n\n'));
       repo.acknowledgeMessages(queued.map((m) => m.id));
     });
   }
@@ -245,7 +269,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     if (event.status !== ToolCallStatus.Completed || !FILE_WRITING_TOOLS.has(event.tool)) return;
     const { filePath } = event.input;
     if (typeof filePath !== 'string') return;
-    const path = relative(filesDir(c.id), resolve(directory, filePath));
+    const path = relative(filesDir(c.id), resolve(filesDir(c.id), filePath));
     if (path.startsWith('..') || isAbsolute(path) || state.attached.has(path)) return;
     state.attached.add(path);
     record(c, [{ kind: TranscriptEntryKind.Attachment, data: { path } }]);
@@ -314,29 +338,53 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     create(title: string | undefined): AssistantConversationDTO {
       const now = clock.now();
       const id = randomUUID();
-      repo.insertConversation({ id, title: title ?? '', opencodeSessionId: null, createdAt: now, updatedAt: now });
+      repo.insertConversation({
+        id,
+        title: title ?? '',
+        opencodeSessionId: null,
+        isolated: true,
+        retiredSessionId: null,
+        createdAt: now,
+        updatedAt: now,
+      });
       log.info({ conversationId: id }, 'assistant conversation created');
       return publish(id);
     },
 
-    /** The session stops first; then the rows (confirmations cascade), the message stream and the files go. */
+    /** 先清理运行时资源；外部删除失败则保留本地记录，用户可在恢复后重试。 */
     async delete(id: string): Promise<void> {
       const c = get(id);
       const state = liveOf(id);
-      if (state.busy && c.opencodeSessionId !== null) {
-        await opencode.abort({ sessionId: c.opencodeSessionId, directory });
+      if (state.sending || state.deleting)
+        throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is busy`, { id });
+      state.deleting = true;
+      try {
+        if (c.opencodeSessionId !== null) {
+          if (state.busy) {
+            state.aborting = true;
+            await opencode.abort({ sessionId: c.opencodeSessionId, directory: filesDir(id) });
+          }
+          await opencode.deleteSession({
+            sessionId: c.opencodeSessionId,
+            directory: c.isolated ? filesDir(id) : directory,
+          });
+        }
+        if (c.retiredSessionId !== null) await opencode.deleteSession({ sessionId: c.retiredSessionId, directory });
+        unit.transact(() => {
+          attachments.release(AttachmentOwnerKind.AssistantMessage, [id]);
+          repo.deleteConversation(id);
+        });
+        if (c.opencodeSessionId !== null) sessions.delete(c.opencodeSessionId);
+        live.delete(id);
+        transcripts.forget(c);
+        rmSync(join(directory, ASSISTANT_CONVERSATIONS_DIR, `${id}.jsonl`), { force: true });
+        rmSync(filesDir(id), { recursive: true, force: true });
+        log.info({ conversationId: id }, 'assistant conversation deleted');
+      } finally {
+        state.aborting = false;
+        state.deleting = false;
+        if (live.has(id)) publish(id);
       }
-      if (c.opencodeSessionId !== null) sessions.delete(c.opencodeSessionId);
-      live.delete(id);
-      // Together: a conversation that survives a failed delete keeps its attachments (30 §4).
-      unit.transact(() => {
-        attachments.release(AttachmentOwnerKind.AssistantMessage, [id]);
-        repo.deleteConversation(id);
-      });
-      transcripts.forget(c);
-      rmSync(join(directory, ASSISTANT_CONVERSATIONS_DIR, `${id}.jsonl`), { force: true });
-      rmSync(filesDir(id), { recursive: true, force: true });
-      log.info({ conversationId: id }, 'assistant conversation deleted');
     },
 
     /** A user message, with the page they are on (15 §2). Messages waiting in the outbox go along with it. */
@@ -348,7 +396,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     }: SendAssistantMessageRequest): Promise<AssistantConversationDTO> {
       const c = get(id);
       const state = liveOf(id);
-      if (state.busy || state.sending)
+      if (state.busy || state.sending || state.deleting)
         throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is busy`, { id });
       if (!opencode.isConnected()) throw new AppError(ErrorCode.OpencodeNotReady, 'opencode is not ready');
       // Rendered first: a page about a deleted entity fails before anything is recorded.
@@ -373,6 +421,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           `${MCP_ASSISTANT_TOOL_PREFIX}${AssistantToolName.ReadAttachment}`,
         );
         await prompt(
+          c,
           sessionId,
           systemText,
           [...queued.map((m) => m.text), text, ...(section === '' ? [] : [section])].join('\n\n'),
@@ -410,7 +459,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       const state = liveOf(id);
       if (state.busy && c.opencodeSessionId !== null) {
         state.aborting = true;
-        await opencode.abort({ sessionId: c.opencodeSessionId, directory });
+        await opencode.abort({ sessionId: c.opencodeSessionId, directory: filesDir(id) });
       }
       return toDto(get(id));
     },
@@ -425,7 +474,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       if (!state.permissions.has(permissionId)) {
         throw new AppError(ErrorCode.NotFound, `No open permission request ${permissionId}`, { permissionId });
       }
-      await opencode.replyPermission({ permissionId, directory, reply });
+      await opencode.replyPermission({ permissionId, directory: filesDir(id), reply });
       state.permissions.delete(permissionId);
       return publish(id);
     },
