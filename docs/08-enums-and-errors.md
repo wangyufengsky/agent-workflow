@@ -177,6 +177,20 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 `ServerEventType` 另有 `deck.updated`（11 §11）。
 
+### 2.13 页面预览与浏览器（v1.3，`enums/browser.ts`，29）
+
+| 枚举 | 值 | 说明 |
+| --- | --- | --- |
+| `PreviewState` | `stopped` · `starting` · `running` · `failed` | 任务 worktree 的页面预览，只在内存里，经 `previewMachine`（09 §12） |
+| `BrowserSessionKind` | `user` · `attempt` · `check` · `site` | 标签页属于谁（29 §5.3） |
+| `BrowserTabKind` | `preview` · `site` | 一次尝试的两个标签页：任务预览、网站 |
+| `SiteAccess` | `read` · `interact` | 网站规则的权限：只读浏览（AI 标签页的写请求与 WebSocket 被拦下）、可操作（29 §5.4） |
+| `ViewportPreset` | `desktop` · `tablet` · `mobile` | 视口预设，尺寸为 `VIEWPORT_SIZES` |
+| `BrowserActionFailure` | `not_visible` · `covered` · `disabled` · `detached` · `not_focusable` | `BROWSER_ACTION_FAILED.details.reason`（29 §5.5） |
+| `BrowserBlockReason` | `not_allowed` · `read_only` | main 拦下请求的原因（29 §5.4） |
+
+网站规则 `siteRuleSchema`（`{ pattern, access }`，`*` 代表任意字符、整个主机名不区分大小写匹配）、`urlAccess(url, policy)`（预览来源 → 预览，否则第一条匹配的网站规则，都不是为 null）与 `blockReason(request, policy, readOnlyEnforced)` 在 `browser/policy.ts`，main 与后端共用。`ServerEventType` 另有 `preview.updated`（11 §11）。
+
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 
 `STATUS_TONE.task` / `.node` / `.attempt` / `.knowledgeTurn` / `.deck` / `.runtime` / `.taskDisplay` / `.schedule`（类型保证每个值都有映射，单测再校验一次）。`schedule`（v1.2）：`active` → `ok`，`paused` → `wait`。`knowledgeTurn`：`researching` → `run`，`answered` → `ok`，`stopped` → `idle`，`failed` → `danger`。`deck`（v1.2）：`outlining` / `generating` → `run`，`outline_ready` → `wait`，`incomplete` → `warn`，`failed` → `danger`，`ready` → `ok`。`runtime`：`ready` → `ok`，`starting` → `run`，`stopped` → `wait`，`not_installed` / `version_mismatch` / `crashed` → `danger`。
@@ -233,6 +247,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `readonlyBashRules(checkCommands, allowedBash)` | 函数 | 规划与评审会话的会话级 bash 规则，`ask` 策略即不带检查命令的这一套；`allowedBash` 为项目中总是允许的模式（12 §2，D64、D100、D101） |
 | `BASH_PERMISSION` | `bash` | opencode 中 shell 命令的权限类型 |
 | `projectBashPatterns(commands)` | 函数 | bash 请求的「总是允许」中记到项目的模式：每条子命令的程序与开头的选项（到第一个不以 `-` 开头的参数为止）加 ` *`，去重；Git 与前置变量赋值的不记（D101） |
+| `VIEWPORT_SIZES` | 桌面 1280×800、平板 768×1024、手机 390×844（后两者为移动设备） | 视口预设的 CSS 像素，一律经设备指标设置，DPR 为 1（29 §5.2） |
+| `BROWSER_KEYS` | `Enter` `Escape` `Tab` `Backspace` `Delete` `Space` 四个方向键 `Home` `End` `PageUp` `PageDown` | `browser_press` 接受的按键 |
 
 ### 4.2 限制值（`constants/limits.ts`）
 
@@ -292,6 +308,14 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `SLIDE_NOTES_MAX_CHARS` | 1000（一页的讲稿） |
 | `SLIDE_TEXT_LIMITS` | 各版式字段的字数与条数上限（标题 40、要点每条 60 至多 6 条、卡片 2–4 张、步骤 2–6 步、表格 2–5 列 1–8 行、代码 16 行每行 80 字……），按 1280×720 画布与最小字号定；`submit_slide` 与手动修改共用（`slideContentSchema`） |
 | `SLIDE_FIT_MIN_SCALE` | 0.8（文字放不下时先缩到的最小比例，之后提示「文字可能放不下」，23 §5.4） |
+| `PREVIEW_START_TIMEOUT_MS` / `PREVIEW_PROBE_INTERVAL_MS` | 120000 / 1000（页面预览就绪的时限与探测间隔，29 §4.2） |
+| `PREVIEW_SETUP_TIMEOUT_MS` | 600000（worktree 第一次启动前的安装命令） |
+| `PREVIEW_LOG_TAIL_CHARS` | 4000（预览起不来时保留的日志末尾） |
+| `PREVIEW_PAGES_MAX` | 10（项目预览配置的关键页面数） |
+| `BROWSER_ACTION_TIMEOUT_MS` | 5000（等目标可以点中，29 §5.5） |
+| `BROWSER_SETTLE_QUIET_MS` / `BROWSER_SETTLE_TIMEOUT_MS` | 500 / 10000（动作后等页面稳定：请求清零、DOM 无变动各持续多久，最多等多久） |
+| `BROWSER_WAIT_FOR_MAX_MS` | 10000（`browser_wait_for` 最长等待） |
+| `BROWSER_SNAPSHOT_MAX_CHARS` | 12000（页面快照的长度上限，29 §5.6） |
 
 ### 4.3 用户设置（`constants/settings.ts`，键 → 默认值）
 
@@ -319,6 +343,10 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `companion.whisper` | `false`（自动碎碎念） | 简单 |
 | `companion.whisperMinutes` | `15`（整数 1–120 分钟） | 简单 |
 | `companion.notifications` | `true`（后台系统通知；应用内提醒独立显示） | 简单 |
+| `preview.maxRunning` | `3`（同时运行的页面预览，29 §4.4） | 专业 |
+| `preview.idleMinutes` | `10`（没有标签页、没有活动尝试多久后停止预览） | 专业 |
+| `browser.sites` | `[{ pattern: '*', access: 'read' }]`（网站规则，按顺序取第一条匹配，无匹配不允许；助手不能修改，D65 的同一思路，29 §5.4） | 简单 |
+| `browser.loginUrlPatterns` | `[]`（内置规则之外识别登录页的主机或路径片段） | 专业 |
 
 「模式」列表示该设置在哪种界面模式下出现在设置页（常量 `SETTING_MODE`）。值的 schema 为 `settingsSchema`（strict：未知键拒绝），默认值为 `SETTING_DEFAULTS`。
 
@@ -452,6 +480,13 @@ class AppError extends Error {
 | `DB_QUERY_FAILED` | 400 | SQL 错误；`details.driverMessage` |
 | **凭据** | | |
 | `CREDENTIAL_UNAVAILABLE` | 500 | safeStorage 不可用或解密失败 |
+| `PREVIEW_NOT_CONFIGURED` | 409 | 项目没有页面预览配置（29 §4.1）；浏览器工具打开预览路径时同此码 |
+| `PREVIEW_START_FAILED` | 502 | 页面预览没能就绪（进程退出或超时）；`details: { logTail }` |
+| `PREVIEW_LIMIT_REACHED` | 409 | 同时运行的预览已达 `preview.maxRunning`，且都有活动尝试（29 §4.4） |
+| `BROWSER_SITE_NOT_ALLOWED` | 403 | 地址既不是任务预览，也没有网站规则允许（29 §5.4）；`details: { host }` |
+| `BROWSER_LOGIN_REQUIRED` | 409 | 打开网站后到了登录页；`details: { url }`（登录页地址） |
+| `BROWSER_REF_STALE` | — | 元素编号已作废（页面导航过），先重新读取快照；仅 MCP |
+| `BROWSER_ACTION_FAILED` | — | 动作没能完成；`details: { reason, coveredBy? }`，`reason` 为 `BrowserActionFailure`；仅 MCP |
 
 ### 5.3 计划校验子码（`PLAN_INVALID.details.problems[].code`）
 

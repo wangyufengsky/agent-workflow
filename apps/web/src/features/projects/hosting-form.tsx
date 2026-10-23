@@ -34,21 +34,23 @@ function BindForm({ project, prefill, onDone }: { project: ProjectDetailDTO; pre
   const bind = useSetHosting();
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    bind.mutate(
-      {
+    // Binding remounts the panel (keyed by the project's update time), which drops per-call callbacks of the
+    // mutation: what follows the save hangs on the promise. A failure shows through the mutation's state.
+    bind
+      .mutateAsync({
         id: project.id,
         provider,
         ...(provider === HostingProvider.Gitlab && baseUrl.trim() !== '' ? { baseUrl: baseUrl.trim() } : {}),
         repo: repo.trim(),
         token: token.trim(),
-      },
-      {
-        onSuccess: () => {
+      })
+      .then(
+        () => {
           toast(C.hostingSaved);
           onDone();
         },
-      },
-    );
+        () => undefined,
+      );
   };
   return (
     <form onSubmit={submit} aria-label={C.remote}>
@@ -158,7 +160,12 @@ export function HostingPanel({ project }: { project: ProjectDetailDTO }) {
         <Button
           variant="ghost"
           pending={clear.isPending}
-          onClick={() => clear.mutate(project.id, { onSuccess: () => toast(C.hostingCleared) })}
+          onClick={() =>
+            clear.mutateAsync(project.id).then(
+              () => toast(C.hostingCleared),
+              () => undefined,
+            )
+          }
         >
           {C.hostingClear}
         </Button>

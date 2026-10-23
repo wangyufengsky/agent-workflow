@@ -18,6 +18,17 @@ export const McpToolName = {
   SubmitSlide: 'submit_slide',
   SubmitFindings: 'submit_findings',
   SubmitCommitMessage: 'submit_commit_message',
+  BrowserOpen: 'browser_open',
+  BrowserSnapshot: 'browser_snapshot',
+  BrowserClick: 'browser_click',
+  BrowserType: 'browser_type',
+  BrowserSelect: 'browser_select',
+  BrowserPress: 'browser_press',
+  BrowserWaitFor: 'browser_wait_for',
+  BrowserInspect: 'browser_inspect',
+  BrowserLogs: 'browser_logs',
+  BrowserViewport: 'browser_viewport',
+  BrowserScreenshot: 'browser_screenshot',
 } as const;
 export type McpToolName = (typeof McpToolName)[keyof typeof McpToolName];
 

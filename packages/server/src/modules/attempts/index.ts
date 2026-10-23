@@ -42,6 +42,9 @@ export function createAttemptsModule(
   const service = createAttemptsService({ ...deps, transcripts });
   return {
     service,
+    /** The directory of an attempt's transcript, where files it makes go too (a screenshot, 29 §5.7). */
+    filesDirOf: (attempt: { taskId: string | null; kind: AttemptKind }) =>
+      join(runsDir, attempt.taskId ?? runDirOf(attempt.kind)),
     operations: attemptOperations(service),
     registerRoutes: (server: FastifyInstance) => registerAttemptRoutes(server, service),
   };

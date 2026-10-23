@@ -6,6 +6,7 @@ import { assistantConfirmationSchema, assistantConversationSchema, assistantPage
 import { attemptSummarySchema, transcriptEntrySchema } from '../api/attempts.ts';
 import { deliverySchema } from '../api/delivery.ts';
 import { inboxItemSchema } from '../api/inbox.ts';
+import { previewSchema } from '../api/previews.ts';
 import { runtimeSchema } from '../api/system.ts';
 import { nodeSummarySchema, planSummarySchema, taskSummarySchema } from '../api/tasks.ts';
 
@@ -49,6 +50,7 @@ export const serverEventSchema = z.discriminatedUnion('type', [
     data: z.object({ reviewId: z.string(), projectId: z.string() }),
   }),
   z.object({ type: z.literal(ServerEventType.ScheduleUpdated), data: z.object({ scheduleId: z.string() }) }),
+  z.object({ type: z.literal(ServerEventType.PreviewUpdated), data: previewSchema }),
   z.object({
     type: z.literal(ServerEventType.AssistantTranscript),
     data: z.object({ conversationId: z.string(), entries: z.array(transcriptEntrySchema) }),

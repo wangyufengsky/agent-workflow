@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { APP_LICENSE, APP_SOURCE_URL, type LaunchPreferences } from '@aw/shared';
+import { APP_LICENSE, APP_SOURCE_URL, browserRectSchema, type LaunchPreferences } from '@aw/shared';
 import { splashBackground, splashHtml } from '@aw/web/splash';
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, shell, type WebPreferences } from 'electron';
 import { type Backend, startBackend } from './backend.ts';
@@ -65,6 +65,13 @@ ipcMain.handle('aw:open-external', async (_e, url: string) => {
   await shell.openExternal(url);
 });
 ipcMain.handle('aw:reveal-in-finder', (_e, path: string) => shell.showItemInFolder(path));
+// The user's browser tabs (29 §8.1): the renderer is a boundary, its arguments are parsed.
+ipcMain.on('aw:browser-place', (_e, tabId: unknown, rect: unknown) =>
+  backend?.browser.place(String(tabId), browserRectSchema.nullable().parse(rect)),
+);
+for (const action of ['back', 'forward', 'reload', 'openDevTools'] as const) {
+  ipcMain.on(`aw:browser-${action}`, (_e, tabId: unknown) => backend?.browser[action](String(tabId)));
+}
 
 app.setAboutPanelOptions({
   applicationName: 'Agent Workflow',
@@ -84,7 +91,11 @@ app.whenReady().then(async () => {
     .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml(launch))}`)
     .then(() => window.win.webContents.executeJavaScript('window.splash.done'));
   try {
-    backend = await startBackend(isDev, apiToken);
+    backend = await startBackend(isDev, apiToken, {
+      window: () => window.win,
+      // Only web addresses reach the system browser (29 §5.4).
+      openExternal: (url) => void shell.openExternal(url),
+    });
   } catch (e) {
     console.error('backend failed to start', e);
     await animated;
@@ -101,6 +112,7 @@ app.on('before-quit', () => companion?.beforeQuit());
 app.on('will-quit', (event) => {
   const running = backend;
   if (running === undefined) return;
+  running.browser.closeAll();
   // Quit again once the backend has stopped opencode and exited (17 §3.5).
   event.preventDefault();
   backend = undefined;

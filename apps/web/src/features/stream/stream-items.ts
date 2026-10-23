@@ -98,10 +98,21 @@ export function toolAction(
   }
   const name = APP_TOOLS.get(tool);
   if (name === undefined) return { kind: 'other', tool };
-  if (name === McpToolName.ReportProgress) return { kind: 'app', name, detail: text(input.message) };
-  if (name === McpToolName.DbQuery) return { kind: 'app', name, detail: text(input.sql) };
-  return { kind: 'app', name };
+  const detail = APP_TOOL_DETAIL[name]?.(input);
+  return detail === undefined ? { kind: 'app', name } : { kind: 'app', name, detail };
 }
+
+/** What a call of our tool works on, shown after its label:「打开页面 /orders」「输入 R-1001」. */
+const APP_TOOL_DETAIL: Partial<Record<McpToolName, (input: Record<string, unknown>) => string>> = {
+  [McpToolName.ReportProgress]: (input) => text(input.message),
+  [McpToolName.DbQuery]: (input) => text(input.sql),
+  [McpToolName.BrowserOpen]: (input) => text(input.url),
+  [McpToolName.BrowserType]: (input) => text(input.text),
+  [McpToolName.BrowserPress]: (input) => text(input.key),
+  [McpToolName.BrowserWaitFor]: (input) => text(input.text) || text(input.textGone),
+  [McpToolName.BrowserViewport]: (input) => text(input.preset),
+  [McpToolName.BrowserSelect]: (input) => (Array.isArray(input.values) ? input.values.map(String).join('、') : ''),
+};
 
 const slashed = (path: string) => path.replaceAll('\\', '/');
 

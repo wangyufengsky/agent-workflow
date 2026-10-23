@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { HostingProvider, type HostingRef } from '@aw/shared';
+import { HostingProvider, type HostingRef, type ProjectPreview } from '@aw/shared';
 import { z } from 'zod';
 
 const SCP_LIKE = /^[\w.-]+@([\w.-]+):(.+)$/;
@@ -59,17 +59,62 @@ export function inferCheckCommand(rootFiles: ReadonlySet<string>, packageJson: u
   return BUILD_FILE_COMMAND.find(([file]) => rootFiles.has(file))?.[1] ?? null;
 }
 
+/**
+ * How each package manager runs a script and passes it flags (29 §12 V5): pnpm 10, yarn and bun hand flags after the
+ * script name to it, while npm needs `--` (and swallows the flag's name without it); pnpm would pass a `--` on.
+ */
+const PACKAGE_MANAGERS: ReadonlyArray<{ lockfile: string; run: string; flags: string; setup: string }> = [
+  { lockfile: 'pnpm-lock.yaml', run: 'pnpm run', flags: '', setup: 'pnpm install --frozen-lockfile' },
+  { lockfile: 'yarn.lock', run: 'yarn run', flags: '', setup: 'yarn install --frozen-lockfile' },
+  { lockfile: 'bun.lock', run: 'bun run', flags: '', setup: 'bun install --frozen-lockfile' },
+  { lockfile: 'bun.lockb', run: 'bun run', flags: '', setup: 'bun install --frozen-lockfile' },
+  { lockfile: 'package-lock.json', run: 'npm run', flags: ' --', setup: 'npm ci' },
+];
+const NO_LOCKFILE = { run: 'npm run', flags: ' --', setup: 'npm install' };
+const PREVIEW_SCRIPTS = ['dev', 'start'] as const;
+
+/**
+ * Page preview guessed from root files (29 §4.1): package.json with a `dev` (else `start`) script. Vite does not read
+ * PORT, so it gets `--port`; other dev servers (Next, Create React App) read the PORT variable the preview sets.
+ * null when nothing applies; the user can edit either way.
+ */
+export function inferPreview(rootFiles: ReadonlySet<string>, packageJson: unknown): ProjectPreview | null {
+  if (!rootFiles.has('package.json')) return null;
+  const scripts = packageJsonSchema.safeParse(packageJson).data?.scripts ?? {};
+  const script = PREVIEW_SCRIPTS.find((name) => scripts[name] !== undefined);
+  if (script === undefined) return null;
+  const pm = PACKAGE_MANAGERS.find((p) => rootFiles.has(p.lockfile)) ?? NO_LOCKFILE;
+  const port = scripts[script]?.includes('vite') ? `${pm.flags} --port $PORT --strictPort` : '';
+  return {
+    command: `${pm.run} ${script}${port}`,
+    setupCommand: pm.setup,
+    readyPath: '/',
+    pages: ['/'],
+    extraOrigins: [],
+  };
+}
+
 async function readJson(file: string): Promise<unknown> {
   try {
     return JSON.parse(await readFile(file, 'utf8'));
   } catch {
-    // An unreadable or malformed package.json only means there is no test script to infer from.
+    // An unreadable or malformed package.json only means there is no script to infer from.
     return undefined;
   }
 }
 
-export async function inferRepoCheckCommand(repoRoot: string): Promise<string | null> {
+async function readRoot(repoRoot: string): Promise<{ files: Set<string>; packageJson: unknown }> {
   const files = new Set(await readdir(repoRoot));
   const packageJson = files.has('package.json') ? await readJson(join(repoRoot, 'package.json')) : undefined;
+  return { files, packageJson };
+}
+
+export async function inferRepoCheckCommand(repoRoot: string): Promise<string | null> {
+  const { files, packageJson } = await readRoot(repoRoot);
   return inferCheckCommand(files, packageJson);
+}
+
+export async function inferRepoPreview(repoRoot: string): Promise<ProjectPreview | null> {
+  const { files, packageJson } = await readRoot(repoRoot);
+  return inferPreview(files, packageJson);
 }

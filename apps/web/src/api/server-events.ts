@@ -88,6 +88,9 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
     case ServerEventType.ScheduleUpdated:
       await refreshSchedules(qc, event.data.scheduleId);
       return;
+    case ServerEventType.PreviewUpdated:
+      qc.setQueryData(queryKeys.preview(event.data.taskId), event.data);
+      return;
     case ServerEventType.AssistantConfirmation:
       return updateConfirmation(qc, event.data);
     // Requests of the assistant to the renderer, carried out by the shell (15 §6).

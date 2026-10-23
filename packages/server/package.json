@@ -34,6 +34,7 @@
     "@types/node": "24.19.2",
     "@types/pg": "8.23.1",
     "@types/pg-cursor": "2.7.2",
-    "drizzle-kit": "0.31.11"
+    "drizzle-kit": "0.31.11",
+    "playwright-core": "1.64.1"
   }
 }

@@ -39,7 +39,25 @@ export interface AwBridge {
   printSettled(result: PrintSettled): void;
   /** Remembers the applied theme and the opening-animation setting for the next start (28 §5.3). */
   setLaunchPreferences(preferences: LaunchPreferences): void;
+  /** The user's own browser tabs (29 §8.1), opened by the backend; only user-facing tabs answer. */
+  browser: {
+    /** Puts the tab over this area of the window (CSS pixels), or takes it off the window with null. */
+    place(tabId: string, rect: BrowserRect | null): void;
+    back(tabId: string): void;
+    forward(tabId: string): void;
+    reload(tabId: string): void;
+    openDevTools(tabId: string): void;
+  };
 }
+
+/** An area of the window, as the renderer measures it; main parses it like any input from the renderer. */
+export const browserRectSchema = z.object({
+  x: z.number().int(),
+  y: z.number().int(),
+  width: z.number().int().min(0),
+  height: z.number().int().min(0),
+});
+export type BrowserRect = z.infer<typeof browserRectSchema>;
 
 /** Path of a PPT's print view, the page the hidden window prints (23 §6.1). */
 export const pptPrintPath = (deckId: string) => `/ppt/${encodeURIComponent(deckId)}/print`;

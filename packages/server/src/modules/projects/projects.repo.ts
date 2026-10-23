@@ -1,4 +1,4 @@
-import type { HostingRef, ProjectDTO } from '@aw/shared';
+import { type HostingRef, type ProjectDTO, type ProjectPreview, projectPreviewSchema } from '@aw/shared';
 import { and, asc, eq } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { projectBashRulesTable, projectsTable } from './projects.table.ts';
@@ -7,8 +7,18 @@ type ProjectRow = typeof projectsTable.$inferSelect;
 export type NewProject = Omit<ProjectRow, 'hostingProvider' | 'hostingBaseUrl' | 'hostingRepo' | 'hostingCredentialId'>;
 /** Undefined fields are left unchanged. */
 export type ProjectChanges = { [K in 'name' | 'defaultBranch' | 'checkCommand']?: ProjectRow[K] | undefined } & {
+  preview?: ProjectPreview | null | undefined;
   updatedAt: number;
 };
+
+/** The column is a boundary (06 §1): parsed, never trusted. */
+function previewOf(json: string | null): ProjectPreview | null {
+  return json === null ? null : projectPreviewSchema.parse(JSON.parse(json));
+}
+
+function previewJson(preview: ProjectPreview | null): string | null {
+  return preview === null ? null : JSON.stringify(preview);
+}
 
 /** A bound remote, or null to unbind. */
 export type ProjectHosting = (HostingRef & { credentialId: string }) | null;
@@ -21,6 +31,7 @@ function toProject(row: ProjectRow): ProjectDTO {
     repoPath: row.repoPath,
     defaultBranch: row.defaultBranch,
     checkCommand: row.checkCommand,
+    preview: previewOf(row.preview),
     hosting:
       row.hostingProvider === null || row.hostingRepo === null
         ? null
@@ -57,8 +68,10 @@ export function createProjectsRepo(db: DbExecutor) {
           .map((r) => r.slug),
       );
     },
-    insert(project: NewProject): void {
-      db.insert(projectsTable).values(project).run();
+    insert({ preview, ...project }: Omit<NewProject, 'preview'> & { preview: ProjectPreview | null }): void {
+      db.insert(projectsTable)
+        .values({ ...project, preview: previewJson(preview) })
+        .run();
     },
     hostingCredentialId(id: string): string | null {
       const row = db
@@ -80,8 +93,11 @@ export function createProjectsRepo(db: DbExecutor) {
         .where(eq(projectsTable.id, id))
         .run();
     },
-    update(id: string, changes: ProjectChanges): void {
-      db.update(projectsTable).set(changes).where(eq(projectsTable.id, id)).run();
+    update(id: string, { preview, ...changes }: ProjectChanges): void {
+      db.update(projectsTable)
+        .set({ ...changes, ...(preview === undefined ? {} : { preview: previewJson(preview) }) })
+        .where(eq(projectsTable.id, id))
+        .run();
     },
     delete(id: string): void {
       db.delete(projectsTable).where(eq(projectsTable.id, id)).run();

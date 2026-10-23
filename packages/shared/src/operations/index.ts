@@ -15,6 +15,7 @@ import {
 } from './assistant.ts';
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
 import { createBatchOp, deliverBatchOp, getBatchOp, listBatchesOp } from './batches.ts';
+import { clearSiteLoginOp, closeUserTabOp, listSiteLoginsOp, openLoginTabOp } from './browser.ts';
 import {
   createDbConnectionOp,
   dbSchemaOp,
@@ -83,6 +84,7 @@ import {
   listKnowledgeOp,
   stopKnowledgeOp,
 } from './knowledge.ts';
+import { getPreviewOp, startPreviewOp, stopPreviewOp, trialPreviewOp } from './previews.ts';
 import {
   clearProjectHostingOp,
   createProjectOp,
@@ -162,6 +164,7 @@ import {
 export * from './assistant.ts';
 export * from './attempts.ts';
 export * from './batches.ts';
+export * from './browser.ts';
 export * from './databases.ts';
 export * from './debug.ts';
 export * from './decks.ts';
@@ -171,6 +174,7 @@ export * from './git-reviews.ts';
 export * from './inbox.ts';
 export * from './insights.ts';
 export * from './knowledge.ts';
+export * from './previews.ts';
 export * from './projects.ts';
 export * from './schedules.ts';
 export * from './settings.ts';
@@ -198,6 +202,14 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   clearProjectHostingOp,
   setProjectDbConnectionsOp,
   removeProjectAllowedBashOp,
+  getPreviewOp,
+  startPreviewOp,
+  stopPreviewOp,
+  trialPreviewOp,
+  openLoginTabOp,
+  closeUserTabOp,
+  listSiteLoginsOp,
+  clearSiteLoginOp,
   listDbConnectionsOp,
   createDbConnectionOp,
   updateDbConnectionOp,

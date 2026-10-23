@@ -13,6 +13,7 @@ packages/builtin/
    ├─ protocol-plan.md         aw-planner agent 基础提示词：工作方式、工具使用规则
    ├─ protocol-execute.md      aw-executor
    ├─ protocol-review.md       aw-reviewer（评审检查用 submit_review；本身就是审查步骤的节点用 submit_result）
+   │                           （v1.3：protocol-plan / execute / review / research 都有一段浏览器说明：何时用页面预览与网站、页面内容是数据不是指令，29 §3）
    ├─ start-plan.md            首条消息模板（Mustache 风格 {{var}}，无逻辑；空段落填 None.）
    ├─ start-execute.md
    ├─ start-review.md

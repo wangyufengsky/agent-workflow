@@ -29,6 +29,6 @@ export const updateSettingsOp = defineOperationContract({
   credentialFields: [],
   // Stays with the user (D65): approving its own calls, the program the app starts, letting executors run any
   // command, and where worktrees are written. Once settings.update is always allowed, no card would show for these.
-  assistantOmit: ['assistant.alwaysAllow', 'opencode.binaryPath', 'ai.bashPolicy', 'worktree.rootDir'],
+  assistantOmit: ['assistant.alwaysAllow', 'opencode.binaryPath', 'ai.bashPolicy', 'worktree.rootDir', 'browser.sites'],
   mode: UiMode.Simple,
 });

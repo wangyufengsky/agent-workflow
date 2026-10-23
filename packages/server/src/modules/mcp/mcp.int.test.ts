@@ -65,6 +65,17 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.SubmitSlide,
       McpToolName.SubmitFindings,
       McpToolName.SubmitCommitMessage,
+      McpToolName.BrowserOpen,
+      McpToolName.BrowserSnapshot,
+      McpToolName.BrowserClick,
+      McpToolName.BrowserType,
+      McpToolName.BrowserSelect,
+      McpToolName.BrowserPress,
+      McpToolName.BrowserWaitFor,
+      McpToolName.BrowserInspect,
+      McpToolName.BrowserLogs,
+      McpToolName.BrowserViewport,
+      McpToolName.BrowserScreenshot,
     ]);
     const submit = tools.find((tool) => tool.name === McpToolName.SubmitResult);
     expect(submit?.inputSchema).toMatchObject({ type: 'object', required: ['summary'] });

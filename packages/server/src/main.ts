@@ -1,6 +1,7 @@
 import { backendShutdownMessageSchema, MCP_ASSISTANT_PATH, MCP_EXEC_PATH } from '@aw/shared';
 import { buildApp } from './app.ts';
 import { loadConfig } from './core/config.ts';
+import { type BrowserHost, createPortBrowserHost, parentPortBrowserTransport } from './modules/browser/index.ts';
 import { type CredentialCipher, createPortCipher, parentPortTransport } from './modules/credentials/index.ts';
 
 async function selectCipher(): Promise<CredentialCipher | undefined> {
@@ -10,6 +11,18 @@ async function selectCipher(): Promise<CredentialCipher | undefined> {
   // production bundle, so the plaintext adapter is not shipped (verified by scripts/check-prod-bundle.mjs).
   if (process.env.NODE_ENV === 'development') {
     return (await import('./modules/credentials/dev-plaintext-cipher.ts')).devPlaintextCipher;
+  }
+  return undefined;
+}
+
+/**
+ * Browser tabs (29 §5.2): Electron main holds them in the desktop app; plain Node in development uses a Chromium of
+ * playwright-core, folded away in production bundles like the cipher above.
+ */
+async function selectBrowserHost(): Promise<BrowserHost | undefined> {
+  if (process.parentPort !== undefined) return createPortBrowserHost(parentPortBrowserTransport(process.parentPort));
+  if (process.env.NODE_ENV === 'development') {
+    return (await import('./modules/browser/host.chromium.ts')).createChromiumHost();
   }
   return undefined;
 }
@@ -41,10 +54,12 @@ async function selectFakeHosting() {
 
 const config = loadConfig(process.env);
 const cipher = await selectCipher();
+const browserHost = await selectBrowserHost();
 const fake = await selectFakeOpencode();
 const fakeHosting = await selectFakeHosting();
 const app = await buildApp(config, {
   ...(cipher === undefined ? {} : { cipher }),
+  ...(browserHost === undefined ? {} : { browserHost }),
   ...(fake === undefined ? {} : { opencode: fake.fake }),
   ...(fakeHosting === undefined ? {} : { hosting: fakeHosting.fake.endpoints }),
 });

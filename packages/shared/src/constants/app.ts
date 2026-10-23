@@ -1,3 +1,4 @@
+import { ViewportPreset } from '../enums/browser.ts';
 import { DbType, dbTypeSchema } from '../enums/system.ts';
 import { SessionAgent } from '../enums/workflow.ts';
 
@@ -107,3 +108,28 @@ export function readOnlyStatementGroups(): Array<{ types: DbType[]; statements: 
   }
   return groups;
 }
+
+/** CSS pixels of each viewport preset (29 §6 `browser_viewport`); always set through device metrics, DPR 1. */
+export const VIEWPORT_SIZES = {
+  [ViewportPreset.Desktop]: { width: 1280, height: 800, mobile: false },
+  [ViewportPreset.Tablet]: { width: 768, height: 1024, mobile: true },
+  [ViewportPreset.Mobile]: { width: 390, height: 844, mobile: true },
+} as const satisfies Record<ViewportPreset, { width: number; height: number; mobile: boolean }>;
+/** Keys `browser_press` accepts (29 §6), by their DOM `KeyboardEvent.key` names. */
+export const BROWSER_KEYS = [
+  'Enter',
+  'Escape',
+  'Tab',
+  'Backspace',
+  'Delete',
+  'Space',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+] as const;
+export type BrowserKey = (typeof BROWSER_KEYS)[number];

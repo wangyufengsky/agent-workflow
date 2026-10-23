@@ -20,6 +20,13 @@ const bridge: AwBridge = {
   saveFile: (fileName, bytes) => ipcRenderer.invoke('aw:save-file', fileName, bytes),
   printSettled: (result) => ipcRenderer.send('aw:print-settled', result),
   setLaunchPreferences: (preferences) => ipcRenderer.send('aw:launch-preferences', preferences),
+  browser: {
+    place: (tabId, rect) => ipcRenderer.send('aw:browser-place', tabId, rect),
+    back: (tabId) => ipcRenderer.send('aw:browser-back', tabId),
+    forward: (tabId) => ipcRenderer.send('aw:browser-forward', tabId),
+    reload: (tabId) => ipcRenderer.send('aw:browser-reload', tabId),
+    openDevTools: (tabId) => ipcRenderer.send('aw:browser-openDevTools', tabId),
+  },
 };
 
 contextBridge.exposeInMainWorld('aw', bridge);

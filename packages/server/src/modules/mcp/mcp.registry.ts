@@ -16,6 +16,11 @@ import type { Logger } from '../../core/logger.ts';
 
 export type McpToolContext = { attempt: AttemptDTO };
 
+/** Images a tool returns beside its output (a screenshot, 29 §5.7): MCP image content, kept out of the JSON. */
+export const MCP_IMAGES = Symbol('mcp images');
+export type McpImage = { data: string; mimeType: string };
+type ToolReturn<O extends z.ZodType> = z.input<O> & { [MCP_IMAGES]?: readonly McpImage[] };
+
 /** One execution MCP tool (03 §4.2 extension point): schema, allowed attempt kinds and a handler that only forwards. */
 export type McpToolDefinition<
   I extends z.ZodObject = z.ZodObject,
@@ -29,7 +34,7 @@ export type McpToolDefinition<
   output: O;
   /** Tool-specific advice per error code, returned to the model with the error (08 §5.1). */
   hints?: Partial<Record<ErrorCode, string>>;
-  handler(input: z.output<I>, ctx: McpToolContext): z.input<O> | Promise<z.input<O>>;
+  handler(input: z.output<I>, ctx: McpToolContext): ToolReturn<O> | Promise<ToolReturn<O>>;
 };
 
 export function defineMcpTool<I extends z.ZodObject, O extends z.ZodType<Record<string, unknown>>>(
@@ -127,9 +132,12 @@ export function createToolRegistry(
         if (!parsed.success) {
           throw new AppError(ErrorCode.ValidationFailed, 'Tool arguments are invalid', { issues: parsed.error.issues });
         }
-        const output = tool.output.parse(await tool.handler(parsed.data, { attempt }));
+        const returned = await tool.handler(parsed.data, { attempt });
+        const output = tool.output.parse(returned);
         log.info({ tool: name, attemptId: attempt.id }, 'mcp tool called');
-        return { content: [{ type: 'text', text: JSON.stringify(output) }], structuredContent: output };
+        // opencode hands images to models with image input and tells the others they cannot see them (29 §12 V4).
+        const images = (returned[MCP_IMAGES] ?? []).map((image) => ({ type: 'image' as const, ...image }));
+        return { content: [{ type: 'text', text: JSON.stringify(output) }, ...images], structuredContent: output };
       } catch (err) {
         if (err instanceof AppError) {
           log.info({ tool: name, code: err.code }, 'mcp tool failed');

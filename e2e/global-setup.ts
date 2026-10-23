@@ -1,7 +1,7 @@
 import { execSync, fork } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { DEV_PORT_ENV, devPorts } from '@aw/shared';
 import { E2E_HOSTING, E2E_TOKEN } from './env.ts';
@@ -12,6 +12,13 @@ import { E2E_HOSTING, E2E_TOKEN } from './env.ts';
  * take the port between choosing and listening, and checkouts run E2E side by side (D78). Workers start after this
  * and inherit the runner's environment, so the port reaches baseURL and `API_BASE` through `AW_DEV_API_PORT`.
  */
+function playwrightBrowsers(): string {
+  if (process.platform === 'darwin') return join(homedir(), 'Library', 'Caches', 'ms-playwright');
+  if (process.platform === 'win32')
+    return join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'ms-playwright');
+  return join(homedir(), '.cache', 'ms-playwright');
+}
+
 export default async function globalSetup(): Promise<() => Promise<void>> {
   const home = mkdtempSync(join(tmpdir(), 'aw-e2e-home-'));
   const webDir = join(home, 'web');
@@ -21,6 +28,9 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH';
   const env = {
     ...process.env,
+    // The browser module's development host (29 §5.2) finds Playwright's browsers by HOME, which is replaced below:
+    // point it at their default place (Playwright's documented cache directory of each platform).
+    PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH ?? playwrightBrowsers(),
     VITE_AW_API_TOKEN: E2E_TOKEN,
     AW_WEB_DIR: webDir,
     AW_API_TOKEN: E2E_TOKEN,

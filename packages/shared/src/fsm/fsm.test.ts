@@ -124,6 +124,16 @@ const CASES: Array<{ name: string; machine: Machine<string, string>; illegal: Ar
       ['paused', 'start_failed'],
     ],
   },
+  {
+    name: 'preview',
+    machine: MACHINES.preview,
+    illegal: [
+      ['stopped', 'ready'],
+      ['running', 'start'],
+      ['failed', 'ready'],
+      ['failed', 'stop'],
+    ],
+  },
 ];
 
 it('每个状态机都有用例', () => {
