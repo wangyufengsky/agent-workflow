@@ -84,6 +84,18 @@ describe('streamItems', () => {
     expect(items(entries, { pro: true }).map((i) => i.kind)).toContain('prompt');
   });
 
+  it('浏览器工具写成人话，带上打开的地址或输入的文字', () => {
+    const entries = [
+      call('b1', 'agent-workflow_browser_open', { url: '/orders' }),
+      result('b1', 'agent-workflow_browser_open', 'completed'),
+      call('b2', 'agent-workflow_browser_type', { ref: 'e3', text: 'R-1001' }),
+      result('b2', 'agent-workflow_browser_type', 'completed'),
+      call('b3', 'agent-workflow_browser_click', { ref: 'e4' }),
+      result('b3', 'agent-workflow_browser_click', 'completed'),
+    ];
+    expect(shown(items(entries))).toEqual(['打开页面 /orders [ok]', '输入 R-1001 [ok]', '点击 [ok]']);
+  });
+
   it('运行中最后一段思考或正文正在写；最后是权限请求时在等待', () => {
     expect(shown(items([part('text', 'a'), part('reasoning', 'b')]))).toEqual(['a', 'thinking 1s ▍: b']);
     expect(shown(items([part('reasoning', 'b'), part('text', 'a')]))).toEqual(['thinking 1s: b', 'a▍']);

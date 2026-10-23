@@ -27,6 +27,12 @@ import { type AssistantService, createAssistantModule } from './modules/assistan
 import { type AttemptsService, createAttemptsModule } from './modules/attempts/index.ts';
 import { createBatchesModule } from './modules/batches/index.ts';
 import {
+  type BrowserHost,
+  type BrowserService,
+  createBrowserModule,
+  unavailableBrowserHost,
+} from './modules/browser/index.ts';
+import {
   type CredentialCipher,
   type CredentialsService,
   createCredentialsModule,
@@ -52,6 +58,7 @@ import {
   type OpencodeRuntime,
 } from './modules/opencode/index.ts';
 import { createPlansModule } from './modules/plans/index.ts';
+import { createPreviewsModule, type PreviewsService } from './modules/previews/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
 import { createRepositoryModule } from './modules/repository/index.ts';
 import { createRolesModule, type RolesService } from './modules/roles/index.ts';
@@ -80,6 +87,8 @@ export type AppDeps = {
   dbQueryTimeoutMs?: number;
   /** IANA time zone the assistant tells the time in and insights count days in; the system's by default. */
   timeZone?: string;
+  /** Where browser tabs live (29 §5.2): Electron main, or a Chromium in development and tests; none otherwise. */
+  browserHost?: BrowserHost;
 };
 
 export type App = {
@@ -97,6 +106,8 @@ export type App = {
     nodes: NodesService;
     inbox: InboxService;
     worktrees: WorktreesService;
+    previews: PreviewsService;
+    browser: BrowserService;
     assistant: AssistantService;
     knowledge: KnowledgeService;
     decks: DecksService;
@@ -224,6 +235,29 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     settings: settings.service,
     dataDir: config.dataDir,
   });
+  const previews = createPreviewsModule({
+    clock,
+    log,
+    events,
+    env,
+    settings: settings.service,
+    projects: projects.service,
+    worktrees: worktrees.service,
+    dataDir: config.dataDir,
+  });
+  // Dev servers end with the backend: nothing else stops them once it is gone.
+  server.addHook('preClose', () => previews.service.stopAll());
+  const browser = createBrowserModule({
+    host: deps.browserHost ?? unavailableBrowserHost,
+    clock,
+    log,
+    events,
+    settings: settings.service,
+    projects: projects.service,
+    previews: previews.service,
+  });
+  // Before the previews stop: a tab holds a preview's lease.
+  server.addHook('preClose', () => browser.service.closeAll());
   const plans = createPlansModule({ db: database.db, unit, clock, log });
   const deliveries = createDeliveryModule({ db: database.db, unit, clock, log });
   const acceptance = createAcceptanceModule({
@@ -359,6 +393,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     decks: decks.service,
     gitReviews: gitReviews.service,
     commitDrafts: gitReviews.drafts,
+    browser: browser.service,
+    filesDirOf: attempts.filesDirOf,
     log,
   });
   mcp.register(server);
@@ -367,6 +403,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...settings.operations,
     ...system.operations,
     ...projects.operations,
+    ...previews.operations,
+    ...browser.operations,
     ...databases.operations,
     ...roles.operations,
     ...workflows.operations,
@@ -438,6 +476,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       nodes: nodes.service,
       inbox: inbox.service,
       worktrees: worktrees.service,
+      previews: previews.service,
+      browser: browser.service,
       assistant: assistant.service,
       knowledge: knowledge.service,
       decks: decks.service,

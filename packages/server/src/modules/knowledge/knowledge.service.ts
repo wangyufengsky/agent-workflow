@@ -245,6 +245,11 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
     }
   }
 
+  /** Whether the question may use the web: then the researcher may also browse websites (29 §2.8). */
+  function webAllowed(attempt: AttemptDTO): boolean {
+    return turnOf(attempt).conversation.sources.web;
+  }
+
   /** The research attempt's project, for the database tools; none when databases are not a source (18 §5.4). */
   function databaseProject(attempt: AttemptDTO): string | undefined {
     const { conversation } = turnOf(attempt);
@@ -272,6 +277,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
   });
 
   return {
+    webAllowed,
     get: detail,
 
     /** Each turn that ended, in any way (answered, stopped, failed); the app assistant relays the outcome (18 §4a). */

@@ -1,6 +1,6 @@
 # 29 · 内置浏览器与页面预览
 
-> 状态：D120–D125 **用户已确认**（2026-10-23），未实现。按 §13 的分期拆进 05，实现时在同一提交更新 08 / 09 / 10 / 11 / 12 / 13 / 14。
+> 状态：D120–D125 **用户已确认**（2026-10-23）。**B1 已实现**（05 的 B-01…B-08，分支 `feat/B-browser`）：预览服务、浏览器宿主与动作层、执行 MCP 浏览器工具、项目与设置界面；B2（页面体检、预览页签与观看画面、「附上当前页面」）与 B3（助手、知识问答的引用摘录、PPT 网页资料）未开始。实现中与设计稿不同的地方已改在各节里（如 §5.2 的宿主接口、§5.7 的截图、§4.1 推断的位置）。
 
 ## 1. 定位
 
@@ -116,11 +116,11 @@
 | `pages` | 关键页面，页面体检的默认页面，1–10 个 | `["/", "/orders"]` |
 | `extraOrigins` | 额外允许的来源，如另起的本地接口服务 | `["http://127.0.0.1:8080"]` |
 
-**添加项目时推断**（与 `checkCommand` 的推断同处，13 §1），用户可改、可清空：
+**添加项目时推断**（与 `checkCommand` 的推断同处：`projects/projects.inference.ts`，13 §1），用户可改、可清空：
 
 | 仓库特征 | `command` | `setupCommand` |
 | --- | --- | --- |
-| `package.json` 的 `dev` 脚本含 `vite` | pnpm：`pnpm run dev --port $PORT --strictPort`；npm：`npm run dev -- --port $PORT --strictPort`；yarn：`yarn dev --port $PORT --strictPort` | 按锁文件：`pnpm install --frozen-lockfile` / `npm ci` / `yarn install --frozen-lockfile` |
+| `package.json` 的 `dev` 脚本含 `vite` | pnpm：`pnpm run dev --port $PORT --strictPort`；npm：`npm run dev -- --port $PORT --strictPort`；yarn / bun：`yarn run dev` / `bun run dev` 加同样的参数（未实测） | 按锁文件：`pnpm install --frozen-lockfile` / `npm ci` / `yarn install --frozen-lockfile` |
 | 其他有 `dev` 或 `start` 脚本的（含 Next、Create React App） | `<pm> run dev`（只靠 `PORT` 环境变量，Next 与 CRA 都读它） | 同上 |
 | 其他（Java、Go…） | 不推断 | — |
 
@@ -130,7 +130,7 @@
 
 ### 4.2 一个预览的生命周期
 
-每个任务 worktree 最多一个预览，只存在内存里（不建表）。状态只经状态机（`shared/fsm` 新增 `previewTransitions`，09 新增一节）：
+每个任务 worktree 最多一个预览，只存在内存里（不建表）。状态只经状态机（`shared/fsm` 的 `previewMachine`，09 §12）：
 
 ```
 stopped ──start──▶ starting ──ready──▶ running ──stop / idle / worktree 删除──▶ stopped
@@ -139,10 +139,10 @@ stopped ──start──▶ starting ──ready──▶ running ──stop / 
 failed ──start──▶ starting
 ```
 
-- **启动**：第一次需要时启动（AI 调用浏览器工具、页面体检、用户点「打开预览」、助手 `previews.start`）。`setupCommand` 只在这个 worktree 第一次启动时运行，成功后记在内存里；应用重启后再运行一次（依赖已装好时很快）。
+- **启动**：第一次需要时启动（AI 调用浏览器工具、页面体检、用户点「打开预览」、助手 `previews.start`）。`setupCommand` 只在这个 worktree 第一次启动时运行（最长 `PREVIEW_SETUP_TIMEOUT_MS`，600000），成功后记在内存里；应用重启后再运行一次（依赖已装好时很快）。
 - **就绪**：每次进程输出新内容时，以及每 `PREVIEW_PROBE_INTERVAL_MS`（1000）请求一次 `readyPath`，得到任何 HTTP 响应（包括 404、500）即 `running`。超过 `PREVIEW_START_TIMEOUT_MS`（120000）或进程退出则 `failed`，保留日志末尾 `PREVIEW_LOG_TAIL_CHARS`（4000）字符。
 - **日志**：stdout / stderr 写到 `runs/<taskId>/preview.log`。
-- **停止**：任务进入终态、worktree 删除、应用退出时停止。没有浏览器会话、没有活动尝试的时间达到设置 `preview.idleMinutes`（默认 10）也会停止。停止时结束整棵进程树（`core/platform.ts`，与检查命令同一套实现，17 §3）。
+- **停止**：worktree 删除前（`worktrees.onBeforeRemove`；任务合并或取消时删除 worktree）、应用退出时停止。没有标签页在用的时间达到设置 `preview.idleMinutes`（默认 10）也会停止：浏览器会话打开时登记使用（`acquire`）、关闭时注销（`release`），AI 的标签页随尝试结束关闭，所以「没有标签页在用」已包含没有活动尝试在用。停止时结束整棵进程树（execa `killDescendants`，与检查命令同一套实现，17 §3）。状态每次变化发 SSE `preview.updated`。
 
 ### 4.3 端口
 
@@ -152,7 +152,7 @@ failed ──start──▶ starting
 
 设置 `preview.maxRunning`（默认 3）。开发服务器很占内存，批量任务时尤其明显。
 
-- 达到上限时，先停掉最久没用、且没有活动尝试的预览；
+- 达到上限时，先停掉没有标签页在用、空闲最久的预览；
 - 都在用时，AI 的工具返回 `PREVIEW_LIMIT_REACHED`（提示：不用浏览器继续，并在 notes 里说明没有做页面验证）；
 - 页面体检则排队，等有空位再开始，计入检查用时，不算失败。
 
@@ -169,30 +169,32 @@ renderer ── REST / SSE ──▶ 后端 utilityProcess：modules/browser
    ▼                          │ parentPort：shared/contracts/browser-port.ts
 main（薄）：browser.ts ◀───────┘
    · 创建 / 销毁 WebContentsView（用户标签页贴在主窗口上；AI 会话离屏）
-   · webContents.debugger：attach / sendCommand / 事件转发（只转发后端订阅的域）
+   · webContents.debugger：attach / sendCommand / 事件转发（CDP 只对后端启用的域发事件）
    · 导航拦截：will-navigate、will-frame-navigate、setWindowOpenHandler、
      session.webRequest（按后端给的规则放行、拦下或只读拦截写请求；用户标签页中不允许的地址用系统浏览器打开）
-   · capturePage
+   · 截图走 CDP 的 Page.captureScreenshot（离屏视图上可用，§12 V1），main 不另提供
 ```
 
-main 只提供机制，不做判断。用哪个分区、放行哪些来源、什么时候算稳定、怎样算点中，都由后端决定，与凭据端口的分工相同（03 §1）。
+main 只提供机制，不做判断。判断请求放行与否的是共享的纯函数 `blockReason`（`shared/browser/policy.ts`）：每个分区一个 `onBeforeRequest`（Electron 每个会话只允许一个），按请求的 `webContentsId` 找到标签页；找不到标签页的请求（页面的 Service Worker）一律拦下。用户标签页（`userFacing`）不设设备指标，大小随 renderer 给的区域；AI 与体检的标签页离屏、按视口设设备指标。**应用退出时 main 关闭所有标签页**：实测发现只要还有一个不在窗口里的离屏视图，Electron 在 `quit` 之后也不退出。
+
+用哪个分区、放行哪些来源、什么时候算稳定、怎样算点中，都由后端决定，与凭据端口的分工相同（03 §1）。
 
 ### 5.2 宿主接口（新扩展点 `BrowserHost`）
 
 ```ts
-interface BrowserHost {
-  open(input: { tabId: string; partition: string; allowedOrigins: string[]; visible: boolean; viewport: Viewport }): Promise<void>;
-  close(tabId: string): Promise<void>;
-  cdp(tabId: string, method: string, params?: object, sessionId?: string): Promise<unknown>;
-  onEvent(listener: (tabId: string, method: string, params: unknown, sessionId?: string) => void): () => void;
-  capture(tabId: string, opts: { format: 'png' | 'jpeg'; clip?: Rect }): Promise<Uint8Array>;
-}
+// modules/browser/browser.host.ts：请求与事件即 shared/contracts/browser-port.ts 的 BrowserPortOp（open / setPolicy /
+// close / cdp）与 BrowserPortEvent，两种实现都只是把它们送到标签页所在的地方
+type BrowserHost = {
+  request(op: BrowserPortOp): Promise<unknown>;
+  onEvent(listener: (event: BrowserPortEvent) => void): () => void;
+};
 ```
 
 | 实现 | 用于 |
 | --- | --- |
-| `electron`：经 parentPort 请 main 执行 | 桌面版 |
-| `chromium`：用 devDependency 中 `playwright-core` 启动的 Chromium，`newCDPSession` 转发 | 后端独立运行的开发模式、集成测试与浏览器 E2E。与开发用的明文凭据适配器一样，只在 `NODE_ENV=development` 下存在，生产构建中被常量折叠删除，`scripts/check-prod-bundle.mjs` 校验 |
+| `host.port.ts`：经 parentPort 请 main 执行（按 id 对应回应，事件主动送来） | 桌面版 |
+| `host.chromium.ts`：server 的 devDependency `playwright-core` 启动的 Chromium，第一次打开标签页时才启动；CDP 经 `newCDPSession` 转发（只转发 `BROWSER_CDP_EVENTS` 列出的事件）；请求用 `page.route` / `page.routeWebSocket` 按同一个 `blockReason` 拦下；`window.open` 用初始化脚本改为在本标签页打开；注册空的 `dialog` 监听，免得 Playwright 抢先关掉弹窗 | 后端独立运行的开发模式与集成测试。与开发用的明文凭据适配器一样，只在 `NODE_ENV=development` 下加载，生产构建中被常量折叠删除，`scripts/check-prod-bundle.mjs` 检查标记 `aw-dev-chromium-host` |
+| 无宿主（`unavailableBrowserHost`） | 生产环境的纯 Node（不支持的运行方式）：每次使用都 `INTERNAL_ERROR` |
 
 03 §4.2 的扩展点表新增这一行。动作层、快照、体检只依赖这个接口，所以两种宿主下行为一致，测试跑的是真实 Chromium。
 
@@ -296,6 +298,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 ```
 
 - 总长超过 `BROWSER_SNAPSHOT_MAX_CHARS`（12000）时，先截断长列表和表格的行，再截断最深的子树，末尾注明截断了什么。
+- 一行只有普通单元格的表格行压成一条：`row "R-1001 · 张三 · ¥120.00"`；行里有可操作元素时按层级展开。
 - 收起的下拉框只写当前值和选项个数（`combobox "切换主题" value="暖色" (5 个选项)`），不逐个列出选项；展开后才列出（§12 V6）。
 - 同源 iframe 展开；跨域 iframe 只列地址。
 - 编号按文档顺序生成，同一页面内稳定。
@@ -304,7 +307,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 
 - `browser_screenshot` 总是存文件作为证据给用户看，**并且总是**以 MCP `image` 内容随工具结果返回。模型支持图片时能看到；不支持时 opencode 会告诉模型它读不了这张图，不报错（§12 V4）。所以后端不判断模型能力，工具说明里写明：看不到图片时用 `browser_snapshot` / `browser_inspect`。
 - 返回的截图压成 JPEG（宽不超过 1280，质量 70）。opencode 把工具返回的图片以 data URL 存在它自己的会话里（工具片段的 `state.attachments`），体积要控制住。本应用的会话流镜像不复制 `attachments`，只记一条「截图」动作。
-- 每个动作后另存一张 JPEG 缩略图（宽 960，质量 60，约 40 KB），作为观看画面（§8.2），不交给模型。一次尝试 50 个动作约 2 MB，随 `runs/` 一起保留与清理。
+- 每个动作后另存一张 JPEG 缩略图（宽 960，质量 60，约 40 KB；用 `Page.captureScreenshot` 的 `clip.scale` 缩小，不需要图像库），作为观看画面（§8.2），不交给模型。随 B2 的观看界面一起实现。一次尝试 50 个动作约 2 MB，随 `runs/` 一起保留与清理。
 - **存放位置按归属**，与会话流 JSONL 的目录规则一致（10 §3）：
   - 尝试的截图与画面：`<该尝试会话流所在目录>/browser/<attemptId>/`，即任务的尝试为 `runs/<taskId>/browser/<attemptId>/`，知识问答的 `research` 尝试为 `runs/knowledge/browser/<attemptId>/`。按尝试读取：`GET /attempts/:attemptId/browser/:file`，后端由尝试解析目录，所以没有任务的尝试也能取到；
   - 页面体检的截图：`runs/<taskId>/browser/checks/<nodeId>/<检查序号>/`，按任务读取：`GET /tasks/:taskId/browser/:file`；
@@ -465,15 +468,16 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 项目设置新增一节，字段同 §4.1。
 
 - 推断出的值预填，旁注「根据 package.json 推断」；
-- 「试运行」：在主工作区启动一次并打开 `readyPath`，显示成功或日志末尾，结束后停止；
+- 「试运行」：在主工作区启动一次（不运行安装命令：主工作区是用户自己的，依赖由用户维护）并等 `readyPath` 就绪，显示成功或日志末尾，结束后停止；
 - 简单模式只显示启动命令和关键页面，其余字段折叠在「更多设置」里。
 
 ### 8.6 设置「网站」
 
 设置页新增一节，简单模式也显示：
 
-- **网站规则**：一个有序列表，每行包括地址通配、「只读浏览 / 可操作」、删除和拖动排序；末尾说明「没有匹配的网站不允许打开」。默认一行「全部网站 · 只读浏览」。
+- **网站规则**：一个有序列表，每行包括地址通配、「只读浏览 / 可操作」、上移、下移和删除（不做拖动），改完「保存规则」一起保存；说明「没有匹配的网站不能打开」。默认一行 `*` · 只读浏览。
 - **网站登录**：输入地址后点「打开并登录」，页面区域显示一个真实标签页（`site` 会话，贴在窗口上），用户自己登录，完成后点「完成」关闭。下方列出已有登录状态的网站，可以「退出登录」（清除该主机在 `persist:aw-sites` 中的 Cookie 与存储）。
+- 登录标签页是盖在页面上的原生视图：⌘K、⌘J 打开时把它隐藏的机制随 B2 的预览页签一起做（§8.1），B-07 的登录区域还没有。
 - **AI 在任务中遇到需要登录**：`ask_user` 的提问里附上「去登录」链接，直接打开这里并预填地址。
 
 ### 8.7 浏览器开发模式
@@ -506,39 +510,40 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
   - `DeckMaterialKind` 加 `web`；
   - `CheckUnrunnableReason` 加 `preview_never_started` · `preview_not_configured`；`nodeAcceptanceSchema` 的页面体检同样可以标 `skipped`。
 - **常量（08）**：`PREVIEW_START_TIMEOUT_MS` 120000、`PREVIEW_PROBE_INTERVAL_MS` 1000、`PREVIEW_LOG_TAIL_CHARS` 4000、`BROWSER_ACTION_TIMEOUT_MS` 5000、`BROWSER_SETTLE_QUIET_MS` 500、`BROWSER_SETTLE_TIMEOUT_MS` 10000、`BROWSER_SNAPSHOT_MAX_CHARS` 12000、`VIEWPORT_SIZES`。
-- **错误码（08）**：`PREVIEW_NOT_CONFIGURED`、`PREVIEW_START_FAILED`（`details.logTail`）、`PREVIEW_LIMIT_REACHED`、`BROWSER_UNAVAILABLE`（没有宿主）、`BROWSER_NOT_OPEN`、`BROWSER_SITE_NOT_ALLOWED`（`details.host`）、`BROWSER_LOGIN_REQUIRED`（`details.url`）、`BROWSER_REF_STALE`、`BROWSER_ACTION_FAILED`（`details.reason`：`not_visible` · `covered` · `disabled` · `detached` · `not_focusable`；`details.coveredBy`）、`BROWSER_CHECK_UNRUNNABLE`（任务的 `failure` 上，同 `CHECK_COMMAND_UNRUNNABLE`，不作为 HTTP 错误）。
-- **状态机（09）**：`previewTransitions`；节点 `verifying` 的检查顺序为命令 → 页面体检 → AI 评审。
+- **错误码（08）**：`PREVIEW_NOT_CONFIGURED`、`PREVIEW_START_FAILED`（`details.logTail`）、`PREVIEW_LIMIT_REACHED`、`BROWSER_SITE_NOT_ALLOWED`（`details.host`）、`BROWSER_LOGIN_REQUIRED`（`details.url`）、`BROWSER_REF_STALE`、`BROWSER_ACTION_FAILED`（`details.reason`：`not_visible` · `covered` · `disabled` · `detached` · `not_focusable`；`details.coveredBy`）（以上 B-02 已加）；`BROWSER_NOT_OPEN`（B3，助手 `browser.read`）、`BROWSER_CHECK_UNRUNNABLE`（B2，任务的 `failure` 上，同 `CHECK_COMMAND_UNRUNNABLE`，不作为 HTTP 错误）在实现那一期加。
+- **状态机（09）**：`previewMachine`（09 §12，B-02 已加）；节点 `verifying` 的检查顺序为命令 → 页面体检 → AI 评审。
 - **API（11）**：
-  - 操作：`previews.get` / `previews.start` / `previews.stop` / `previews.trial`（项目设置的试运行）、`browser.read`、`browser.readUrl`、`browser.openUserTab` `{ taskId }`（返回 `tabId`）、`browser.navigateUserTab`、`browser.openLoginTab` `{ url }`、`browser.listSiteLogins` / `browser.clearSiteLogin` `{ host }`；
-  - 非清单路由：`GET /attempts/:attemptId/browser/:file`（尝试的截图与画面）、`GET /tasks/:taskId/browser/:file`（页面体检截图）；
-  - SSE：`preview.updated`、`browser.frame`；
-  - `tasks.requestChanges` 输入加可选 `page: { path, viewport, includeScreenshot }`。
-- **MCP（12）**：§6 的 11 个工具；知识问答 `web` 引用的 `CitationDTO` 加 `excerpt`（18 §6）。
+  - **B1 已有**：操作 `previews.get` / `start` / `stop` / `trial`（11 §13f）；`browser.openLoginTab` `{ url }`、`browser.closeUserTab`、`browser.listSiteLogins`、`browser.clearSiteLogin` `{ host }`（11 §13f′）；SSE `preview.updated`。
+  - **B2 再加**：`browser.openUserTab` `{ taskId }`（返回 `tabId`）、`browser.navigateUserTab`；非清单路由 `GET /attempts/:attemptId/browser/:file`（尝试的截图与画面）、`GET /tasks/:taskId/browser/:file`（页面体检截图）；SSE `browser.frame`；`tasks.requestChanges` 输入加可选 `page: { path, viewport, includeScreenshot }`。
+  - **B3 再加**：`browser.read`、`browser.readUrl`。
+- **MCP（12）**：§6 的 11 个工具（B1 已有，12 §6.17）；知识问答 `web` 引用的 `CitationDTO` 加 `excerpt`（18 §6，B3）。
 - **preload**：`aw.browser.place(tabId, rect | null)`、`aw.browser.back / forward / reload(tabId)`、`aw.browser.openDevTools(tabId)`。用户标签页的地址导航经后端 `browser.navigateUserTab`，统一检查来源。
 
 ## 11. 实现结构
 
 ```
 packages/shared/src/
-  contracts/browser-port.ts       后端 ↔ main 协议（open / close / cdp / event / capture / place）
+  contracts/browser-port.ts       后端 ↔ main 协议（open / setPolicy / close / cdp；事件 cdpEvent / blocked / gone）
   contracts/mcp/browser.ts        11 个工具的输入输出
   contracts/api/previews.ts       预览配置、状态、操作
-  fsm/preview.ts                  previewTransitions
+  fsm/preview.machine.ts          previewMachine
+  browser/policy.ts               网站规则、urlAccess、blockReason（main 与后端共用）
 packages/server/src/modules/
-  previews/                       推断（previews.infer.ts，纯函数）、进程（previews.process.ts，经 core/platform.ts）、
-                                  服务（启动 / 就绪 / 空闲 / 上限）、操作
-  browser/                        宿主（browser.host.ts 接口，host.electron.ts，host.chromium.ts 仅开发）、
-                                  会话（browser.sessions.ts）、动作层（browser.actions.ts + browser.settle.ts 纯函数）、
-                                  快照（browser.snapshot.ts，纯函数：AX 树 → 文本）、体检（browser.check.ts + pageCheckVerdict）、
-                                  画面（browser.frames.ts）、操作
+  previews/                       进程（previews.process.ts：安装、端口、启动、就绪探测、超时）、
+                                  服务（状态机、空闲、上限、worktree 删除前停止）、操作；推断在 projects/projects.inference.ts
+  browser/                        宿主（browser.host.ts 接口，host.port.ts，host.chromium.ts 仅开发）、
+                                  标签页（browser.tab.ts：打开步骤、日志、网络、弹窗、动作前后的变化）、
+                                  动作层（browser.actions.ts）、网络空闲（browser.settle.ts，注入时钟）、
+                                  快照（browser.snapshot.ts，纯函数：AX 树 → 文本）、服务（browser.service.ts：每个尝试两个标签页、
+                                  规则与登录、截图）；B2 加体检（browser.check.ts + pageCheckVerdict）与动作画面
   acceptance/                     新增 runBrowserCheck，调用 browser 的 index
   mcp/tools/browser-*.ts
-apps/desktop/src/main/browser.ts  视图、debugger 转发、导航拦截、capturePage
+apps/desktop/src/main/browser.ts  视图、debugger 转发、按 blockReason 拦截请求、不允许的地址交给系统浏览器
 apps/web/src/features/preview/    预览页签、会话选择、观看画面、底栏抽屉、放置视图
 packages/builtin/prompts/         protocol-execute / protocol-review / protocol-plan 的浏览器说明；workflows 加页面体检
 ```
 
-**依赖方向**：`acceptance → browser → previews → projects / worktrees`。`browser` 订阅 `attempt` 结束和任务终态的领域事件来关闭会话、停止预览，不依赖 `attempts` 和 `tasks`。`mcp` 与 `assistant` 在最上层调用 `browser` 和 `previews` 的 index。
+**依赖方向**：`acceptance → browser → previews → projects / worktrees`。`browser` 订阅事件总线上的 `attempt.updated`（尝试结束即关闭它的标签页、注销预览的使用）与 `preview.updated`（预览换了端口，更新同一任务标签页的规则），不依赖 `attempts` 和 `tasks`。`mcp` 与 `assistant` 在最上层调用 `browser` 和 `previews` 的 index。
 
 ## 12. 开发前实测
 
@@ -558,7 +563,7 @@ packages/builtin/prompts/         protocol-execute / protocol-review / protocol-
 
 | 期 | 内容 | 完成标准 |
 | --- | --- | --- |
-| B1 地基 | V1–V7 实测（已完成，§12）；`BrowserHost` 两种实现；预览服务；动作层与快照；执行 MCP 工具（含网站标签页、只读拦截、登录检测）；会话流动作文案；项目设置「页面预览」与推断；设置「网站」（规则与登录）。任务见 05 的 B-01…B-08 | 真实模型在示例前端仓库里改一个按钮，用浏览器工具验证并提交（`pnpm test:oc` 新增一例）：默认免费模型（支持图片）跑一次，再用一个不支持图片的模型跑一次，确认只靠快照也能完成 |
+| B1 地基 | （B-06：完成标准的那一例放在 `live/browser.live.test.ts`：07 规定 `test:oc` 不调用模型，调用模型的进 live）V1–V7 实测（已完成，§12）；`BrowserHost` 两种实现；预览服务；动作层与快照；执行 MCP 工具（含网站标签页、只读拦截、登录检测）；会话流动作文案；项目设置「页面预览」与推断；设置「网站」（规则与登录）。任务见 05 的 B-01…B-08 | 真实模型在示例前端仓库里改一个按钮，用浏览器工具验证并提交（`pnpm test:oc` 新增一例）：默认免费模型（支持图片）跑一次，再用一个不支持图片的模型跑一次，确认只靠快照也能完成 |
 | B2 验收与界面 | `browser` 检查与判定；内置流程与提示词；节点详情；任务页预览页签（我的预览、观看画面、底栏）；结果卡「页面」区；「附上当前页面」 | 四主题走查截图；Electron 旅程新增一条：打开预览、不允许的地址交给系统浏览器、网站登录后 AI 的网站标签页带着登录状态 |
 | B3 助手、知识问答、PPT | `previews.start` / `stop`、`browser.read`、`browser.readUrl`；研究员的浏览器工具与 `web` 引用摘录；PPT 网页资料 | 助手回答「这个页面为什么报错」用到控制台错误；知识问答用登录后的内网页面回答并能打开引用摘录 |
 | 后续（另行确认） | 页面对比（改动前后截图逐像素对比，结果卡显示变化区域）；定时「页面巡检」流程；接手 AI 的会话；跨域 iframe；助手操作页面 | — |
@@ -568,11 +573,11 @@ packages/builtin/prompts/         protocol-execute / protocol-review / protocol-
 按 07 的原则：测行为，用真实的 Chromium 和真实的进程，不 mock CDP。
 
 - **单元**：
-  - `previews.infer`：用表格驱动，输入是固定的 `package.json` 和锁文件；
+  - `inferPreview`（`projects.inference.ts`）：用表格驱动，输入是固定的 `package.json` 和锁文件；
   - `pageCheckVerdict`：每条判定规则；
   - `browser.settle` 和「点中」判断：输入事件序列与注入时钟；
   - `browser.snapshot`：输入是从真实 Chromium 录下的无障碍树（固定文件），断言精简规则和截断；
-  - `previewTransitions`。
+  - `previewMachine`；`urlAccess` / `blockReason`。
 - **集成（真实 Chromium，`chromium` 宿主）**：用本地 HTTP 服务提供的固定页面，覆盖：
   - 被弹层挡住的按钮：先返回 `covered`，弹层消失后再点击成功；
   - 延迟渲染的元素；

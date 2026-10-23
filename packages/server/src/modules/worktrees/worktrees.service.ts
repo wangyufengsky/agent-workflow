@@ -55,6 +55,8 @@ const messageOf = (err: AppError) => {
 /** One worktree and branch per task (D08, D20); refs and the worktree list change only under the repository lock. */
 export function createWorktreesService({ db, clock, log, locks, settings, dataDir }: WorktreesServiceDeps) {
   const repo = createWorktreesRepo(db);
+  /** Modules above stop what runs in a worktree before it goes (a page preview): running processes hold its files. */
+  const beforeRemove = new Set<(worktree: Worktree) => Promise<void>>();
 
   function mustFind(id: string): Worktree {
     const worktree = repo.find(id);
@@ -71,6 +73,7 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
 
   async function remove(worktree: Worktree, options: { repoPath: string; deleteBranch: boolean }): Promise<void> {
     const removing = move(worktree, WorktreeEvent.Remove);
+    for (const listener of beforeRemove) await listener(removing);
     try {
       await locks.run(options.repoPath, async () => {
         const cwd = options.repoPath;
@@ -88,6 +91,10 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
   }
 
   return {
+    onBeforeRemove(listener: (worktree: Worktree) => Promise<void>): () => void {
+      beforeRemove.add(listener);
+      return () => beforeRemove.delete(listener);
+    },
     findByTask: (taskId: string): Worktree | undefined => repo.findByTask(taskId),
     listByProject: (projectId: string): Worktree[] => repo.listByProject(projectId),
 

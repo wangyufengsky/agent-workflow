@@ -106,6 +106,14 @@ export const ErrorCode = {
   DbQueryFailed: 'DB_QUERY_FAILED',
   // 凭据
   CredentialUnavailable: 'CREDENTIAL_UNAVAILABLE',
+  // 页面预览与浏览器（29）
+  PreviewNotConfigured: 'PREVIEW_NOT_CONFIGURED',
+  PreviewStartFailed: 'PREVIEW_START_FAILED',
+  PreviewLimitReached: 'PREVIEW_LIMIT_REACHED',
+  BrowserSiteNotAllowed: 'BROWSER_SITE_NOT_ALLOWED',
+  BrowserLoginRequired: 'BROWSER_LOGIN_REQUIRED',
+  BrowserRefStale: 'BROWSER_REF_STALE',
+  BrowserActionFailed: 'BROWSER_ACTION_FAILED',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 export const ERROR_CODES = Object.values(ErrorCode);
@@ -199,6 +207,13 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.DbQueryTimeout]: 504,
   [ErrorCode.DbQueryFailed]: 400,
   [ErrorCode.CredentialUnavailable]: 500,
+  [ErrorCode.PreviewNotConfigured]: 409,
+  [ErrorCode.PreviewStartFailed]: 502,
+  [ErrorCode.PreviewLimitReached]: 409,
+  [ErrorCode.BrowserSiteNotAllowed]: 403,
+  [ErrorCode.BrowserLoginRequired]: 409,
+  [ErrorCode.BrowserRefStale]: null,
+  [ErrorCode.BrowserActionFailed]: null,
 } as const satisfies Record<ErrorCode, number | null>;
 
 /** `{ code, message, details? }` as stored on tasks / attempts and returned in HTTP error bodies. */

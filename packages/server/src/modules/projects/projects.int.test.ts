@@ -90,6 +90,31 @@ describe('修改与删除项目', () => {
     expect((await t.call(getProjectOp, { id: created.id })).body.name).toBe('订单服务');
   });
 
+  it('添加时推断页面预览；修改后读回同样的设置，可清空，地址不是来源时拒绝', async () => {
+    const repo = await createTestRepo({
+      files: { 'package.json': JSON.stringify({ scripts: { dev: 'vite' } }), 'pnpm-lock.yaml': '' },
+    });
+    const { body: created } = await t.call(createProjectOp, { repoPath: repo.path });
+    expect(created.preview).toMatchObject({ command: 'pnpm run dev --port $PORT --strictPort', pages: ['/'] });
+
+    const preview = {
+      command: 'pnpm dev --port $PORT',
+      setupCommand: null,
+      readyPath: '/health',
+      pages: ['/', '/orders'],
+      extraOrigins: ['http://127.0.0.1:8080'],
+    };
+    await t.call(updateProjectOp, { id: created.id, preview });
+    expect((await t.call(getProjectOp, { id: created.id })).body.preview).toEqual(preview);
+    expect((await t.call(updateProjectOp, { id: created.id, preview: null })).body.preview).toBeNull();
+
+    const invalid = await t.call(updateProjectOp, {
+      id: created.id,
+      preview: { ...preview, extraOrigins: ['http://127.0.0.1:8080/api'] },
+    });
+    expect(invalid.status).toBe(400);
+  });
+
   it('默认分支不存在时返回 400 GIT_BASE_BRANCH_NOT_FOUND', async () => {
     const { body: created } = await t.call(createProjectOp, { repoPath: (await createTestRepo()).path });
     const res = await t.call(updateProjectOp, { id: created.id, defaultBranch: 'nope' });

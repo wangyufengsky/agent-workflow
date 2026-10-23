@@ -54,6 +54,9 @@ const ICON_PATHS = {
   more: 'M5 12h.01M12 12h.01M19 12h.01',
   expand: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
   external: 'M14 4h6v6M20 4l-9 9M18 14v6H4V6h6',
+  chevron: 'M9 6l6 6-6 6',
+  'arrow-up': 'M12 19V5M6 11l6-6 6 6',
+  'arrow-down': 'M12 5v14M6 13l6 6 6-6',
 } as const;
 export type IconName = keyof typeof ICON_PATHS;
 

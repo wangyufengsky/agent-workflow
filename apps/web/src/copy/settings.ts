@@ -19,6 +19,9 @@ export const SETTINGS_COPY = {
   assume: '做出合理假设并写明',
   ask: '停下来问我',
   concurrency: '同时运行的 AI 会话数',
+  previewMaxRunning: '同时运行的页面预览数',
+  previewIdleMinutes: '页面预览空闲多久后停止（分钟）',
+  loginUrlPatterns: '识别登录页的地址片段',
   concurrencyHint: '多个任务同时进行时，最多并行的 AI 会话数量。',
   // 专业项（08 §4.3）
   pro: '专业设置',

@@ -68,5 +68,16 @@ export const TOOLS_COPY = {
     [McpToolName.SubmitFindings]:
       'Git 工作台：提交审查结论与结构化问题（严重度、类别、文件、行、建议）。文件不在本次改动中或行号越界时返回问题，AI 修正后再提交。',
     [McpToolName.SubmitCommitMessage]: 'Git 工作台：提交草拟的提交信息（标题与正文），填进提交框由你修改。',
+    [McpToolName.BrowserOpen]: '浏览器：打开任务的页面预览（需要时先启动它），或按「网站」设置打开网站；返回页面结构。',
+    [McpToolName.BrowserSnapshot]: '浏览器：读取当前页面的结构，可操作的元素带编号。',
+    [McpToolName.BrowserClick]: '浏览器：点击页面上的元素；被遮住、不可见或禁用时返回原因。',
+    [McpToolName.BrowserType]: '浏览器：在输入框里输入文字，可先清空、输入后按回车。',
+    [McpToolName.BrowserSelect]: '浏览器：在下拉框里选择选项。',
+    [McpToolName.BrowserPress]: '浏览器：按一个键，如回车、Esc、方向键。',
+    [McpToolName.BrowserWaitFor]: '浏览器：等某段文字在页面上出现或消失。',
+    [McpToolName.BrowserInspect]: '浏览器：查看元素的位置、尺寸、是否被遮住与部分样式。',
+    [McpToolName.BrowserLogs]: '浏览器：查看控制台错误、未捕获的异常与失败的请求。',
+    [McpToolName.BrowserViewport]: '浏览器：切换桌面、平板或手机尺寸。',
+    [McpToolName.BrowserScreenshot]: '浏览器：截图并保存给你看；模型支持图片时也能看到截图。',
   } satisfies Record<McpToolName, string>,
 } as const;

@@ -54,6 +54,8 @@
 | `FakeHosting` | `test/fakes/fake-hosting.ts` | 本地 HTTP 服务模拟 GitHub/GitLab 用到的少数端点（读仓库、建 PR/MR、按分支查找打开的 PR/MR、GitHub GraphQL 审查讨论、GitLab 讨论），只认一个令牌；`createTestApp({ hosting: fake.endpoints })` 指向它；断言 `pullRequests`；`failNextPullRequest(status)` 模拟平台报错；`addReviewThread(head, …)` / `addComment(head, …)` 扮演审查者、`closePullRequest(head)` 模拟 PR 已合并或关闭（21）。浏览器 E2E 中后端以 `AW_FAKE_HOSTING_TOKEN` / `AW_FAKE_HOSTING_REPO`（仅开发模式）使用它，spec 经开发接口 `POST /api/v1/dev/fake-hosting/review-threads`、`/comments` 添加意见 |
 | `startMysql()` 等 | `test/helpers/db-containers.ts` | 用 Docker 启动一个数据库（随机本地端口、空库 `shop`），等它可以连接（日志中的就绪行；openGauss 的日志写文件，改为等 Docker 健康检查通过的事件）后返回连接参数、`exec(sql)`（管理员身份）与 `stop()`：`startMysql`（MySQL 8.4）、`startPostgres`（17.6）、`startOpenGauss`（7.0.0-RC3，只用 sha256 认证）、`startSqlServer`（2022）；数据库集成测试在 `beforeAll` 中启动一次。镜像需先 `docker pull`（`DB_IMAGE`）：MySQL 必需，其余没有拉取时 `imageAvailable` 打印 `docker pull` 命令、相应用例跳过 |
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
+| `createChromiumHost()` | `src/modules/browser/host.chromium.ts` | 浏览器集成测试的宿主：真实 Chromium（playwright-core），`createTestApp({ browserHost })` 注入；页面快照的单元测试输入是从 Chromium 录下的无障碍树 `test/fixtures/browser/orders.ax.json`（对应 `orders.html`），不手编 |
+| `e2e/fixtures/browser-host/main.cjs` | — | Electron 中运行真实的 main `browser.ts`（Electron 自带的 Node 直接加载 TypeScript）加本地 HTTP / WebSocket 服务，代替后端发 `browser.request`；`browser-host.electron.spec.ts` 经 `app.evaluate` 驱动，不需要构建应用（29 §14，B-04） |
 | `createTestApp()` | `test/helpers/app.ts` | 启动后端（临时数据目录、随机端口），返回类型化 API 调用 `call(op, input)`、`mcpUrl`、FakeOpencode；`realOpencode: true` 用于 `@opencode` 测试；MCP SDK 客户端见 `test/helpers/mcp.ts` |
 | `build.*()` | `test/builders/` | 最小测试数据构造器，只填测试关心的字段，其余用合法默认值 |
 | `waitForEvent(type, predicate)` | `test/helpers/events.ts` | 订阅 event-bus 等待事件，带超时（默认 20s，慢的 CI runner 与 Windows 上一个任务要几秒）；**替代一切 sleep** |
@@ -90,6 +92,7 @@
 | J22 | 会话流：步骤运行中抽屉「过程」的盒子展开、思考收起为「思考了 N 秒」可展开、等待权限 → 内容在固定高度内滚动并贴底 → 上翻后「回到最新」、点击回到底部 → 允许后步骤结束，过程收起为一行摘要（结果 · 思考 1 段 · N 个动作），展开后连续的读取折叠成组 → 专业步骤页各次尝试纵向排列、已结束的收起、长指令不横向溢出；知识问答研究过程卡里「正在思考」与阶段 → 停止后收起、展开仍有思考（v1.2，`stream.browser.spec.ts`，25） | 浏览器 |
 | J23 | 画布（26）：专业模式编辑计划 → 点两步之间连线上的 + 插入步骤（与两侧相连）→ 滚动到图外后继续编辑这一步，视野不被拉回 → 「适应画布」，全部步骤回到画布内 → 用 − 删除后前后自动相连 → 撤销 → 保存为新版本（`pro-plan.browser.spec.ts`） | 浏览器 |
 | J24 | Git 工作台：改动视图暂存 →「AI 草拟」提交信息 → 以用户身份提交 → 新建分支并切换 → 再提交 → 分支的「AI 审查」（FakeOpencode 提交一个问题）→ 点问题位置，diff 定位到该行 → 切回 main，压缩合并该分支 → 推送确认列出提交 → bare 远端 main 与本地一致；另一用例：工作台合并冲突 →「交给 AI 解决」开出合并任务 → AI 解决 → 结果卡合并 → main 有两边的改动（v1.2，`pro-git.browser.spec.ts`，27） | 浏览器 |
+| J26 | 页面预览与网站（v1.3，29 §8.5–§8.6，`project-preview.browser.spec.ts`）：项目页填写启动命令与关键页面 → 保存、刷新后仍在 → 试运行显示「已就绪」与日志末尾 → 改成会退出的命令再试运行，显示错误与日志末尾；设置「网站」添加规则、改为可操作、上移 → 保存 → 刷新后顺序与权限不变；浏览器版提示登录窗口只在桌面版、没有已登录的网站。E2E 的后端把 `HOME` 换成临时目录，全局启动因此显式设置 `PLAYWRIGHT_BROWSERS_PATH`，开发用的浏览器宿主才找得到浏览器 | 浏览器 |
 | J25 | 主页以助手为主（28，D111–D112）：主页上 ⌘J 聚焦输入框 → 让助手开始任务 → 主页消息流中的确认卡片 → 确认 → 导航卡片与工作概览栏出现该任务 → 卡片「打开」→ 任务页，面板显示同一对话 → 回到主页对话移回主页、面板收起（`shell-assistant.browser.spec.ts`）。浏览器 E2E 没有 Electron 的打开动画，不受其影响；动画由 J15 覆盖 | 浏览器 |
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
@@ -100,6 +103,7 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 示例仓库：`live/fixtures/` 下的小项目，各带一个已知缺陷和一个功能需求：`ts-stats`（TypeScript + `node --test`，M3-12）；`java-inventory`（Java 17 + Maven + JUnit 5，M6-05）。说明见 `live/fixtures/README.md`。
 - M3-12 冒烟 `live/smoke.live.test.ts`：`bugfix` 与 `feature` 各跑一次，报告写到 `live/reports/smoke-<时间>.json`（尝试、提醒次数、用量、`submit_*` 调用成败）。
 - 用例（M6-05 `live/workflows.live.test.ts`，与冒烟合起来）：五个内置流程各一次（Java 项目上的修 Bug、代码审查、重构，TypeScript 项目上的新功能、补单测、修 Bug）；统计 `submit_*` 调用成功率、尝试次数、耗时、成本，输出报告到 `live/reports/`。另有 `mcp-errors.live.test.ts`（工具错误码让模型改正计划，01 §5 第 7 条）与 `permissions.live.test.ts`（只读会话的 bash 规则在真实 opencode 上的效果，D63）。辅助代码在 `live/live-app.ts`；各套件依次运行（`fileParallelism: false`）。
+- 浏览器 `live/browser.live.test.ts`（v1.3 B1 的完成标准，29 §13）：示例仓库 `todo-web`（零依赖的 Node 静态服务器），新功能流程给页面加「清空」按钮并在页面预览里验证；默认免费模型（能看图）与一个没有图片输入的模型（`AW_LIVE_TEXT_MODEL`，默认 `opencode-go/glm-5.3`）各跑一次，断言任务到待合并、会话里有成功的 `browser_open` 与 `browser_click`。浏览器用开发宿主（playwright-core 的 Chromium）。
 - 应用助手 `live/assistant.live.test.ts`（A-09）：让助手查明天的日期并列出项目，断言调用了 `get_current_time` 与 `projects_list`、回复含明天的日期与项目名，报告写到 `live/reports/assistant-<时间>.json`。
 - 不作为通过/失败的硬门槛（模型有随机性），但内置提示词改动的 PR 必须附 live 报告对比。
 

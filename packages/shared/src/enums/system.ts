@@ -117,6 +117,8 @@ export const ServerEventType = {
   GitReviewUpdated: 'git_review.updated',
   /** A schedule was created, changed, ran or was deleted (22 §9). */
   ScheduleUpdated: 'schedule.updated',
+  /** A task's page preview changed state (29 §4.2). */
+  PreviewUpdated: 'preview.updated',
   Resync: 'resync',
 } as const;
 export type ServerEventType = (typeof ServerEventType)[keyof typeof ServerEventType];

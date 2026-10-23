@@ -37,6 +37,7 @@
 | repo_path | TEXT UNIQUE | 仓库根目录绝对路径 |
 | default_branch | TEXT | 添加时读取，可改 |
 | check_command | TEXT NULL | 项目检查命令，验收中的 `$PROJECT_CHECK`（见 13 §1） |
+| preview | TEXT(JSON) NULL | 页面预览设置 `ProjectPreview`（29 §4.1，迁移 `0016_project_preview`）：读出时按 `projectPreviewSchema` 解析；null 为没有预览。预览本身只在内存里，不建表 |
 | hosting_provider | TEXT NULL | `HostingProvider` |
 | hosting_base_url | TEXT NULL | 自建 GitLab 地址；GitHub 为空 |
 | hosting_repo | TEXT NULL | `owner/name` 或 GitLab project path |
@@ -298,6 +299,8 @@ payload / response：
 | created_at / finished_at | INTEGER | |
 
 ## 3. JSONL 会话流
+
+运行目录 `runs/<taskId>/`（或 `runs/knowledge/` 等）里还有页面预览的输出 `preview.log` 与浏览器截图 `browser/<attemptId>/`（v1.3，29 §4.2、§5.7），读会话流时只读 `*.jsonl`。
 
 路径：`<数据目录>/runs/<taskId>/<attemptId>.jsonl`（调试尝试为 `runs/debug/<attemptId>.jsonl`，知识问答的 `research` 尝试为 `runs/knowledge/<attemptId>.jsonl`，PPT 的尝试为 `runs/ppt/<attemptId>.jsonl`）。每次尝试一个文件，只追加（同步追加，保持事件顺序），由尝试模块把 opencode 事件转换后写入，同时经 SSE 推送 `attempt.transcript` 事件。schema 为 `shared/contracts/api/attempts.ts` 的 `transcriptEntrySchema`。
 

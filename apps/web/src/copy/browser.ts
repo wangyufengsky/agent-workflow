@@ -1,0 +1,51 @@
+import { SiteAccess } from '@aw/shared';
+
+/** The project's page preview (29 §8.5). */
+export const PREVIEW_COPY = {
+  section: '页面预览',
+  lede: '任务进行时，AI 在这里配置的开发服务器上打开页面检查改动；你也可以在任务页预览。',
+  command: '启动命令',
+  commandHint: '在任务的工作区根目录运行。$PORT 会换成应用分配的端口，同时设为 PORT 环境变量。留空表示不使用页面预览。',
+  pages: '关键页面',
+  pagesHint: '每行一个路径，以 / 开头；页面体检默认检查这些页面。',
+  more: '更多设置',
+  setupCommand: '安装命令',
+  setupCommandHint: '每个任务的工作区第一次启动前运行一次，例如 pnpm install --frozen-lockfile；留空表示不运行。',
+  readyPath: '就绪路径',
+  readyPathHint: '访问这个路径得到响应就算启动好了。',
+  extraOrigins: '额外允许的地址',
+  extraOriginsHint: '每行一个，如 http://127.0.0.1:8080，页面会用到的其他本地服务。',
+  save: '保存',
+  saved: '页面预览设置已保存',
+  trial: '试运行',
+  trialHint: '在主工作区启动一次，就绪后立即停止（不运行安装命令）。',
+  trialOk: (url: string) => `已在 ${url} 就绪，随后已停止。`,
+  log: '日志末尾',
+} as const;
+
+/** The websites the AI may open, and the user's logins to them (29 §5.4, §8.6). */
+export const WEBSITES_COPY = {
+  section: '网站',
+  lede: 'AI 可以打开哪些网站。按顺序取第一条匹配的规则；没有匹配的网站不能打开。只读浏览时，AI 发出的写请求会被拦下。',
+  pattern: '地址',
+  patternPlaceholder: '*.corp.example.com',
+  access: '权限',
+  accessLabel: { [SiteAccess.Read]: '只读浏览', [SiteAccess.Interact]: '可操作' } as Record<SiteAccess, string>,
+  moveUp: '上移',
+  moveDown: '下移',
+  remove: '删除规则',
+  add: '添加规则',
+  save: '保存规则',
+  saved: '网站规则已保存',
+  none: '没有规则：AI 不能打开任何网站。',
+  login: '网站登录',
+  loginLede: '需要登录的网站，在这里自己登录一次，AI 会用这个登录状态浏览；应用从不保存或填写密码。',
+  loginUrl: '网站地址',
+  loginOpen: '打开并登录',
+  loginDone: '完成',
+  loginDesktopOnly: '登录窗口只在桌面版中显示。',
+  logins: '已登录的网站',
+  loginsNone: '还没有登录过的网站。',
+  logout: '退出登录',
+  loggedOut: (host: string) => `已退出 ${host}`,
+} as const;

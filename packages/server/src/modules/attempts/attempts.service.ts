@@ -119,6 +119,8 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
 
   return {
     get: (id: string): AttemptDTO => toDto(mustFind(id)),
+    /** The project the attempt's session works in (none for debug attempts and PPTs without a project). */
+    projectOf: (id: string): string | null => mustFind(id).projectId,
     /** Summaries of several attempts at once (a list page), by id. */
     summaries: (ids: readonly string[]): Map<string, AttemptSummaryDTO> =>
       new Map(repo.findMany(ids).map((a) => [a.id, state.toSummary(a)])),

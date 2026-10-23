@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { siteRuleSchema } from '../browser/policy.ts';
+import { SiteAccess } from '../enums/browser.ts';
 import { DeliveryStrategy, localMergeStrategySchema } from '../enums/git.ts';
 import { BashPolicy, bashPolicySchema } from '../enums/system.ts';
 import { ThemePreference, themePreferenceSchema, UiMode, uiModeSchema } from '../enums/ui.ts';
@@ -26,6 +28,14 @@ export const settingsSchema = z.strictObject({
   'opencode.binaryPath': z.string().min(1).nullable(),
   /** Operation ids the v1.1 assistant may run without confirmation (write risk only). */
   'assistant.alwaysAllow': z.array(z.string()),
+  /** Page previews running at once (29 §4.4); dev servers are memory-hungry. */
+  'preview.maxRunning': z.number().int().min(1),
+  /** A preview with no browser tab and no active attempt stops after this long (29 §4.2). */
+  'preview.idleMinutes': z.number().int().min(1),
+  /** Website rules in order (29 §5.4); a site no rule matches cannot be opened. */
+  'browser.sites': z.array(siteRuleSchema),
+  /** Host or path fragments that mark a login page, besides the built-in ones (29 §5.4). */
+  'browser.loginUrlPatterns': z.array(z.string().min(1)),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export type SettingKey = keyof Settings;
@@ -49,6 +59,10 @@ export const SETTING_DEFAULTS: Settings = {
   'delivery.deleteBranchAfterMerge': true,
   'opencode.binaryPath': null,
   'assistant.alwaysAllow': [],
+  'preview.maxRunning': 3,
+  'preview.idleMinutes': 10,
+  'browser.sites': [{ pattern: '*', access: SiteAccess.Read }],
+  'browser.loginUrlPatterns': [],
 };
 
 /** Lowest UI mode in which the settings page shows each key. */
@@ -68,4 +82,8 @@ export const SETTING_MODE: Record<SettingKey, UiMode> = {
   'delivery.deleteBranchAfterMerge': UiMode.Pro,
   'opencode.binaryPath': UiMode.Pro,
   'assistant.alwaysAllow': UiMode.Simple,
+  'preview.maxRunning': UiMode.Pro,
+  'preview.idleMinutes': UiMode.Pro,
+  'browser.sites': UiMode.Simple,
+  'browser.loginUrlPatterns': UiMode.Pro,
 };

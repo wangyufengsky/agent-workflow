@@ -126,3 +126,18 @@ export const GIT_REVIEW_FINDING_TEXT_MAX_CHARS = 2000;
 export const COMMIT_DRAFT_DIFF_MAX_BYTES = 60_000;
 /** A draft that takes longer is stopped (27 §7.3): the request waits for it. */
 export const COMMIT_DRAFT_TIMEOUT_MS = 120_000;
+/** Page previews (29 §4): starting one, probing its ready path, the log tail kept when it fails, its key pages. */
+export const PREVIEW_START_TIMEOUT_MS = 120_000;
+/** The setup command (dependency install) of a worktree's first start; a cold install takes minutes. */
+export const PREVIEW_SETUP_TIMEOUT_MS = 600_000;
+export const PREVIEW_PROBE_INTERVAL_MS = 1000;
+export const PREVIEW_LOG_TAIL_CHARS = 4000;
+export const PREVIEW_PAGES_MAX = 10;
+/** Browser actions (29 §5.5): waiting for a target to be hittable, and for the page to settle afterwards. */
+export const BROWSER_ACTION_TIMEOUT_MS = 5000;
+export const BROWSER_SETTLE_QUIET_MS = 500;
+export const BROWSER_SETTLE_TIMEOUT_MS = 10_000;
+/** The longest `browser_wait_for` (29 §6). */
+export const BROWSER_WAIT_FOR_MAX_MS = 10_000;
+/** A page snapshot is cut to this many characters (29 §5.6). */
+export const BROWSER_SNAPSHOT_MAX_CHARS = 12_000;

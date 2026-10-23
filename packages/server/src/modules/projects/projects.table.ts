@@ -11,6 +11,8 @@ export const projectsTable = sqliteTable('projects', {
   repoPath: text('repo_path').notNull().unique(),
   defaultBranch: text('default_branch').notNull(),
   checkCommand: text('check_command'),
+  /** `ProjectPreview` as JSON (29 §4.1); null when the project has no preview. */
+  preview: text('preview'),
   hostingProvider: text('hosting_provider').$type<HostingProvider>(),
   hostingBaseUrl: text('hosting_base_url'),
   hostingRepo: text('hosting_repo'),

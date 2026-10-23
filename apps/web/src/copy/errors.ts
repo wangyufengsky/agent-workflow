@@ -91,4 +91,11 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.DbQueryTimeout]: '查询超过了时限。',
   [ErrorCode.DbQueryFailed]: '查询执行失败，SQL 可能有误。',
   [ErrorCode.CredentialUnavailable]: '系统钥匙串不可用，无法保存令牌或密码。',
+  [ErrorCode.PreviewNotConfigured]: '这个项目还没有设置页面预览，先在项目设置里填写启动命令。',
+  [ErrorCode.PreviewStartFailed]: '页面预览没能启动，查看服务日志找原因，或修改预览设置。',
+  [ErrorCode.PreviewLimitReached]: '同时运行的页面预览已达上限，先停掉一个再试。',
+  [ErrorCode.BrowserSiteNotAllowed]: '这个网站不在允许的范围内，可以在设置的「网站」里添加规则。',
+  [ErrorCode.BrowserLoginRequired]: '这个网站需要登录，先在设置的「网站登录」里登录。',
+  [ErrorCode.BrowserRefStale]: '页面已经变了，需要重新读取页面。',
+  [ErrorCode.BrowserActionFailed]: '没能在页面上完成这个操作。',
 };
