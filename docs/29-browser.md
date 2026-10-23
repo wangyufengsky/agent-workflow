@@ -221,6 +221,8 @@ interface BrowserHost {
 - 按顺序取第一条匹配的规则，没有匹配的为**不允许**。
 - 默认 `[{ pattern: '*', access: 'read' }]`：所有网站可浏览，都只读。用户可以收窄（例如只留内网域名），或给某些网站放开操作。
 - **只读**的实现：AI 会话的标签页对这类网站发出的非 `GET` / `HEAD` / `OPTIONS` 请求（表单提交、`fetch` / `xhr` 写请求）在 `session.webRequest.onBeforeRequest` 里取消。按请求的 `webContentsId` 只拦 AI 的标签页，用户自己登录时不受影响。动作结果写明「已拦下 POST /api/comments（这个网站只允许浏览）」。用 `POST` 做查询的单页应用会因此读不到数据，把它设为可操作即可。这一层由网络层保证，不依赖模型是否听话。
+- **只读也覆盖非 HTTP 的写通道**：建立连接后的 WebSocket 消息 `onBeforeRequest` 看不到，所以只读网站的 `ws:` / `wss:` 连接（`resourceType = webSocket`）直接取消；AI 网站标签页在每个文档创建时（`Page.addScriptToEvaluateOnNewDocument`）去掉 `RTCPeerConnection` 与 `WebTransport`。AI 没有执行任意 JS 的工具（§6），能触发的写通道只剩表单、`fetch` / `xhr` / `sendBeacon`（都是非 GET 的 HTTP 请求）、WebSocket 与这两者，都已覆盖。靠 WebSocket 推送数据的页面（实时看板）在只读下没有数据，设为可操作即可。
+- **只读按 HTTP 方法判断**：有副作用的 `GET`（如 `/delete?id=1` 这种不规范的接口）拦不住。这类网站不要放进规则，或收窄规则只放文档类网站。
 - **可操作**：与项目预览一样。AI 以用户登录的身份操作这个网站，所以只给明确需要的网站放开。
 - **不允许的地址**：主框架导航返回 `BROWSER_SITE_NOT_ALLOWED`；子框架和子资源拦下，记为被拦的请求。
 
@@ -252,7 +254,11 @@ interface BrowserHost {
 2. **滚动到可见**：`DOM.scrollIntoViewIfNeeded`。
 3. **等稳定**：连续两帧 `DOM.getBoxModel` 位置不变（用 rAF 节拍。离屏会话关闭后台节流，见 §12 V1）。
 4. **确认点中**：取元素中心点，`DOM.getNodeForLocation` 命中的节点是目标或其后代；否则等待，直到 `BROWSER_ACTION_TIMEOUT_MS`（5000）。仍被挡住时返回 `BROWSER_ACTION_FAILED`，`details.reason = covered`，`details.coveredBy` 为挡住它的元素描述（如 `div.modal-backdrop`）。不可见、禁用、已从文档移除分别为 `not_visible` / `disabled` / `detached`。
-5. **执行**：`Input.dispatchMouseEvent`（按下、松开）/ `Input.insertText` / `Input.dispatchKeyEvent`；选择框通过 `DOM.resolveNode` 设值并派发 `input`、`change` 事件。
+5. **执行**：
+   - 点击：`Input.dispatchMouseEvent`（按下、松开）；
+   - 输入（`browser_type`）：先按上面的方式点击目标让它获得焦点，再确认 `document.activeElement` 是目标或在目标内（富文本编辑器）；不是则返回 `BROWSER_ACTION_FAILED`，`details.reason = not_focusable`。`clear` 时全选（按平台的 ⌘A / Ctrl+A，`Input.dispatchKeyEvent`）再删除，然后 `Input.insertText`，`submit` 时再按回车。`Input.insertText` 写入的是当前焦点，所以不能省掉聚焦这一步；
+   - 按键（`browser_press`）：`Input.dispatchKeyEvent`，作用于当前焦点；
+   - 选择框：通过 `DOM.resolveNode` 设值并派发 `input`、`change` 事件。
 6. **等页面稳定**：动作后若发生导航，等 `Page.lifecycleEvent` 的 `load`；然后等允许来源的进行中请求清零、DOM 无变动，各持续 `BROWSER_SETTLE_QUIET_MS`（500）。最多等 `BROWSER_SETTLE_TIMEOUT_MS`（10000），超时不算失败，结果里标 `settled: false`。
 7. **弹窗**：`alert` 确定，`confirm` 确定，`prompt` 取消（`Page.handleJavaScriptDialog`），并在结果里写明「页面弹出确认框“确定删除？”，已点确定」。不处理的话页面会卡住。
 8. **返回动作后的页面摘要**（§6），省一次 `browser_snapshot`。
@@ -285,8 +291,12 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 ### 5.7 模型能力与截图
 
 - 后端从 opencode 的模型信息判断当前尝试所用模型是否支持图片输入（字段待 §12 V3 实测），结果按模型缓存。
-- `browser_screenshot` 总是存文件（`runs/<taskId>/browser/`）作为证据给用户看；模型支持图片时，在工具结果里附上图片内容（需 §12 V4 确认 opencode 会把 MCP 返回的图片交给模型），否则只返回「已保存，你的模型不支持图片输入，请用 browser_snapshot / browser_inspect」。
+- `browser_screenshot` 总是存文件作为证据给用户看；模型支持图片时，在工具结果里附上图片内容（需 §12 V4 确认 opencode 会把 MCP 返回的图片交给模型），否则只返回「已保存，你的模型不支持图片输入，请用 browser_snapshot / browser_inspect」。
 - 每个动作后另存一张 JPEG 缩略图（宽 960，质量 60，约 40 KB），作为观看画面（§8.2），不交给模型。一次尝试 50 个动作约 2 MB，随 `runs/` 一起保留与清理。
+- **存放位置按归属**，与会话流 JSONL 的目录规则一致（10 §3）：
+  - 尝试的截图与画面：`<该尝试会话流所在目录>/browser/<attemptId>/`，即任务的尝试为 `runs/<taskId>/browser/<attemptId>/`，知识问答的 `research` 尝试为 `runs/knowledge/browser/<attemptId>/`。按尝试读取：`GET /attempts/:attemptId/browser/:file`，后端由尝试解析目录，所以没有任务的尝试也能取到；
+  - 页面体检的截图：`runs/<taskId>/browser/checks/<nodeId>/<检查序号>/`，按任务读取：`GET /tasks/:taskId/browser/:file`；
+  - 文件名由后端生成（序号 + 扩展名），读取时只接受这个格式，不拼接用户给的路径。
 
 ## 6. 执行 MCP 工具
 
@@ -374,15 +384,24 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
     path: string; viewport: ViewportPreset; httpStatus: number | null;
     errors: { kind: 'navigation' | 'exception' | 'console' | 'request'; message: string; source: string | null }[];
     warnings: { kind: 'request' | 'blocked' | 'a11y' | 'overflow' | 'unsettled'; message: string }[];
-    screenshot: string;                  // runs/<taskId>/browser/ 下的文件名
+    screenshot: string;                  // 相对 runs/<taskId>/browser/ 的路径（checks/<nodeId>/<序号>/<n>.png）
   }[];
   output: string;                        // 给 AI 看的文字总结（失败后的反馈也用它）
-  unrunnable: { reason: 'preview_start_failed' | 'preview_not_configured'; logTail: string } | null;
+  unrunnable: { reason: 'preview_never_started' | 'preview_not_configured'; logTail: string } | null;
   skipped: boolean;
 }
 ```
 
-**预览起不来**按 D116 的「无法运行」处理：这项检查记为无法运行，节点按检查失败走重试。最后一次仍无法运行时，任务失败页给出「修改页面预览设置」（打开项目设置的预览一节）与「跳过这项检查」，语义与命令检查相同（D116）。
+**预览起不来时，先区分是环境问题还是改动造成的**，规则按 D116 的精神放窄：
+
+- **无法运行**（`check_unrunnable`，09 §3 的同一个事件，从命令检查推广到页面体检）满足以下任一：
+  - 这个 worktree 里预览**从没成功启动过**（安装命令失败、启动超时、进程退出）：命令或端口写错、依赖装不上，属于环境或配置问题，AI 改代码解决不了；
+  - 项目的预览配置在计划确认之后被删了（`preview_not_configured`）。
+
+  处理与 D116 相同：`verifying → failed`，不发回 AI（`retryFeedback` 不变），**不消耗预算**，后面的检查不再跑；任务照常失败，失败码 `BROWSER_CHECK_UNRUNNABLE`（`details: { nodeKey, nodeTitle, reason, logTail }`）。出口：
+  - 「修改页面预览设置」：打开项目设置的预览一节，保存后这个步骤走 `recheck`，用已提交的结果重新验收，不新建尝试；
+  - 「跳过这项检查」：给未完成步骤中的这项页面体检标 `skipped`，结果卡与 PR 说明写明未验证。
+- **普通的检查失败**：这个 worktree 里预览**成功启动过**，这次却起不来（多半是这次改动弄坏了开发服务器，如配置文件写错）。按检查失败处理：日志末尾作为反馈发回 AI，消耗预算，与命令检查失败相同。
 
 ## 8. 界面
 
@@ -473,13 +492,13 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
   - `ViewportPreset`：`desktop` · `tablet` · `mobile`；
   - `SiteAccess`：`read` · `interact`；
   - `DeckMaterialKind` 加 `web`；
-  - `CheckUnrunnableReason` 加 `preview_start_failed` · `preview_not_configured`。
+  - `CheckUnrunnableReason` 加 `preview_never_started` · `preview_not_configured`；`nodeAcceptanceSchema` 的页面体检同样可以标 `skipped`。
 - **常量（08）**：`PREVIEW_START_TIMEOUT_MS` 120000、`PREVIEW_PROBE_INTERVAL_MS` 1000、`PREVIEW_LOG_TAIL_CHARS` 4000、`BROWSER_ACTION_TIMEOUT_MS` 5000、`BROWSER_SETTLE_QUIET_MS` 500、`BROWSER_SETTLE_TIMEOUT_MS` 10000、`BROWSER_SNAPSHOT_MAX_CHARS` 12000、`VIEWPORT_SIZES`。
-- **错误码（08）**：`PREVIEW_NOT_CONFIGURED`、`PREVIEW_START_FAILED`（`details.logTail`）、`PREVIEW_LIMIT_REACHED`、`BROWSER_UNAVAILABLE`（没有宿主）、`BROWSER_NOT_OPEN`、`BROWSER_SITE_NOT_ALLOWED`（`details.host`）、`BROWSER_LOGIN_REQUIRED`（`details.url`）、`BROWSER_REF_STALE`、`BROWSER_ACTION_FAILED`（`details.reason`：`not_visible` · `covered` · `disabled` · `detached`；`details.coveredBy`）。
+- **错误码（08）**：`PREVIEW_NOT_CONFIGURED`、`PREVIEW_START_FAILED`（`details.logTail`）、`PREVIEW_LIMIT_REACHED`、`BROWSER_UNAVAILABLE`（没有宿主）、`BROWSER_NOT_OPEN`、`BROWSER_SITE_NOT_ALLOWED`（`details.host`）、`BROWSER_LOGIN_REQUIRED`（`details.url`）、`BROWSER_REF_STALE`、`BROWSER_ACTION_FAILED`（`details.reason`：`not_visible` · `covered` · `disabled` · `detached` · `not_focusable`；`details.coveredBy`）、`BROWSER_CHECK_UNRUNNABLE`（任务的 `failure` 上，同 `CHECK_COMMAND_UNRUNNABLE`，不作为 HTTP 错误）。
 - **状态机（09）**：`previewTransitions`；节点 `verifying` 的检查顺序为命令 → 页面体检 → AI 评审。
 - **API（11）**：
   - 操作：`previews.get` / `previews.start` / `previews.stop` / `previews.trial`（项目设置的试运行）、`browser.read`、`browser.readUrl`、`browser.openUserTab` `{ taskId }`（返回 `tabId`）、`browser.navigateUserTab`、`browser.openLoginTab` `{ url }`、`browser.listSiteLogins` / `browser.clearSiteLogin` `{ host }`；
-  - 非清单路由：`GET /tasks/:taskId/browser/:file`（截图与画面）；
+  - 非清单路由：`GET /attempts/:attemptId/browser/:file`（尝试的截图与画面）、`GET /tasks/:taskId/browser/:file`（页面体检截图）；
   - SSE：`preview.updated`、`browser.frame`；
   - `tasks.requestChanges` 输入加可选 `page: { path, viewport, includeScreenshot }`。
 - **MCP（12）**：§6 的 11 个工具；知识问答 `web` 引用的 `CitationDTO` 加 `excerpt`（18 §6）。
@@ -519,7 +538,7 @@ packages/builtin/prompts/         protocol-execute / protocol-review / protocol-
 | V4 | MCP 工具结果里的 `image` 内容会被 opencode 1.19.0 交给模型 | 截图一律只存文件、不交给模型 |
 | V5 | Vite / Next 的端口参数推断；Windows 上 `pnpm dev` 的进程树能结束干净（`killDescendants`） | 推断表收窄；Windows 按 17 §3 的已知问题处理 |
 | V6 | 快照在中等规模单页应用（用本应用自己的页面）上的长度与耗时 | 调整精简规则与上限 |
-| V7 | `session.webRequest.onBeforeRequest` 的 `details.webContentsId` 在共用分区里能区分 AI 标签页与用户的登录标签页（只读拦截依赖它） | AI 网站标签页改用单独的持久分区，从登录分区复制 Cookie（`session.cookies`）后再打开 |
+| V7 | `session.webRequest.onBeforeRequest` 的 `details.webContentsId` 在共用分区里能区分 AI 标签页与用户的登录标签页，且 WebSocket 连接以 `resourceType = webSocket` 经过它（只读拦截依赖这两点） | AI 网站标签页改用单独的持久分区，从登录分区复制 Cookie（`session.cookies`）后再打开 |
 
 ## 13. 分期
 
