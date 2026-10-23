@@ -1,0 +1,18 @@
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 6 tests using 1 worker
+
+(node:74394) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [electron] › e2e/browser-host.electron.spec.ts:81:1 › 离屏标签页：CDP 点击与输入生效，视口为给定的尺寸 (2.0s)
+  ✓  2 [electron] › e2e/browser-host.electron.spec.ts:114:1 › 只读网站：AI 标签页的写请求与 WebSocket 被拦下并报告，同一分区里用户标签页照常 (1.4s)
+  ✓  3 [electron] › e2e/browser-host.electron.spec.ts:137:1 › 不允许的地址：AI 标签页里被拦下，用户标签页交给系统浏览器 (1.9s)
+  ✓  4 [electron] › e2e/companion.electron.spec.ts:6:1 › 真实桌宠窗口：沙盒、默认光球、会话与形象同步、主窗隐藏恢复、关闭桌宠 (27.5s)
+  ✓  5 [electron] › e2e/launch.electron.spec.ts:10:1 › 构建后的应用启动后显示引导页并能正常退出 (5.8s)
+  ✓  6 [electron] › e2e/ppt-export.electron.spec.ts:51:1 › 导出 PDF：每页一张、文件以 %PDF 开头；PPT 不存在时返回错误而不是一直等待 (6.6s)
+
+  6 passed (59.2s)

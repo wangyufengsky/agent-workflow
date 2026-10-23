@@ -1,5 +1,6 @@
 import type { AwBridge } from '@aw/shared';
 import { contextBridge, ipcRenderer } from 'electron';
+import { companionBridge } from './companion.ts';
 
 function arg(name: string): string {
   const prefix = `--${name}=`;
@@ -9,6 +10,7 @@ function arg(name: string): string {
 }
 
 const bridge: AwBridge = {
+  companion: companionBridge,
   apiToken: arg('aw-api-token'),
   appVersion: arg('aw-app-version'),
   selectDirectory: () => ipcRenderer.invoke('aw:select-directory'),

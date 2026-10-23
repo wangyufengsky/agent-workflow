@@ -2,6 +2,7 @@ import type { AssistantConversationDTO } from '@aw/shared';
 import { useId, useRef } from 'react';
 import { Icon } from '../../components/icon.tsx';
 import { ASSISTANT_COPY as C } from '../../copy/assistant.ts';
+import { Character } from '../companion/character.tsx';
 import styles from './assistant.module.css';
 
 export const titleOf = (c: AssistantConversationDTO) => (c.title === '' ? C.untitled : c.title);
@@ -44,7 +45,7 @@ export function ConversationMenu({
             }}
           >
             <span className="ellipsis grow">{titleOf(c)}</span>
-            {c.busy && <span className={styles.orb} data-busy data-size="sm" aria-hidden="true" />}
+            {c.busy && <Character size="xs" mood="thinking" />}
             {c.id === active.id && <Icon name="check" size="sm" />}
           </button>
         ))}

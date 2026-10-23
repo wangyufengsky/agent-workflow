@@ -31,6 +31,7 @@ export type OpencodeClient = {
   /** Sends a message and returns at once (`prompt_async`); progress arrives as events. */
   prompt(input: PromptInput): Promise<void>;
   abort(input: { sessionId: string; directory: string }): Promise<void>;
+  deleteSession(input: { sessionId: string; directory: string }): Promise<void>;
   replyPermission(input: { permissionId: string; directory: string; reply: PermissionDecision }): Promise<void>;
   /** Models of the providers the user has connected, and the configured default `provider/model`. */
   listModels(): Promise<{ available: ModelInfo[]; defaultModel?: string }>;
@@ -122,6 +123,9 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
     },
     async abort({ sessionId, directory }) {
       await request('session.abort', () => runtime.sdk().session.abort({ sessionID: sessionId, directory }, THROW));
+    },
+    async deleteSession({ sessionId, directory }) {
+      await request('session.delete', () => runtime.sdk().session.delete({ sessionID: sessionId, directory }, THROW));
     },
     async replyPermission({ permissionId, directory, reply }) {
       await request('permission.reply', () =>

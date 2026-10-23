@@ -50,6 +50,7 @@ export function localTime(ms: number, timeZone: string): GetCurrentTimeOutput {
 
 const STATIC_PAGES: Partial<Record<AssistantPage, string>> = {
   [AssistantPage.Home]: 'the home page (start a task)',
+  [AssistantPage.Desktop]: 'the desktop companion chat; no project or task page is selected',
   [AssistantPage.Tasks]: 'the task list',
   [AssistantPage.Inbox]: 'the list of items that need the user',
   [AssistantPage.Projects]: 'the project list',

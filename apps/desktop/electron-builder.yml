@@ -7,6 +7,7 @@ directories:
 files:
   - out/**
   - package.json
+  - build/icon.png
 extraResources:
   # Built by `pnpm build:plugin` (M2-03).
   - from: ../../packages/opencode-plugin/dist
