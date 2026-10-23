@@ -79,13 +79,25 @@ export type TabInput = {
   site: boolean;
   /** 短期读取的整体截止也覆盖初始化；迟到的宿主资源必须立即释放。 */
   signal?: AbortSignal;
+  userFacing?: boolean;
 };
 
 /**
- * One AI tab (29 §5.3): its page's refs, logs and network, and what changed since the action began (navigation,
+ * One browser tab (29 §5.3): its page's refs, logs and network, and what changed since the action began (navigation,
  * dialogs, blocked writes, new errors) for the action's result.
  */
-export async function openTab({ host, clock, log, tabId, kind, partition, policy, site, signal }: TabInput) {
+export async function openTab({
+  host,
+  clock,
+  log,
+  tabId,
+  kind,
+  partition,
+  policy,
+  site,
+  userFacing = false,
+  signal,
+}: TabInput) {
   const viewport: { preset: ViewportPreset } = { preset: 'desktop' };
   let refs = new Map<string, number>();
   const consoleEntries: ConsoleEntry[] = [];
@@ -118,6 +130,8 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
         onLoad();
         return;
       case 'Page.javascriptDialogOpening': {
+        // 用户自己操作的页面由用户处理对话框，读取页面不能替用户点确认。
+        if (userFacing) return;
         const { type, message } = dialogSchema.parse(params);
         // An unanswered dialog freezes the page: alert and confirm are accepted, prompt dismissed (29 §5.5).
         const accept = type !== 'prompt';
@@ -193,8 +207,8 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
       await cdp(`${domain}.enable`);
       signal?.throwIfAborted();
     }
-    // File choosers would open a dialog nobody answers (29 §5.4).
-    await cdp('Page.setInterceptFileChooserDialog', { enabled: true });
+    // AI 页签没有人回答文件选择框；用户自己的预览保留原生文件选择。
+    if (!userFacing) await cdp('Page.setInterceptFileChooserDialog', { enabled: true });
     signal?.throwIfAborted();
     if (site) await cdp('Page.addScriptToEvaluateOnNewDocument', { source: NO_REALTIME });
     signal?.throwIfAborted();
@@ -208,7 +222,7 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
       kind: 'open',
       tabId,
       partition,
-      userFacing: false,
+      userFacing,
       viewport: VIEWPORT_SIZES.desktop,
       policy,
     });

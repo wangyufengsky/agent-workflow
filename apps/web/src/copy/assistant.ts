@@ -93,6 +93,7 @@ export const TOOL_COPY = {
     [AssistantToolName.ListFiles]: '列出生成的文件',
     [AssistantToolName.RevealFile]: REVEAL[UI_PLATFORM],
     [AssistantToolName.ReadAttachment]: '读取附加的资料',
+    [AssistantToolName.ReadBrowser]: '读取我的预览',
   } satisfies Record<AssistantToolName, string>,
   /** opencode's own tools (12 §2); the user's own MCP servers show as `external`. */
   native: NATIVE_TOOL,

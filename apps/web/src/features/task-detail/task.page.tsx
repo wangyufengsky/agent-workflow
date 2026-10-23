@@ -5,9 +5,13 @@ import { useState } from 'react';
 import { ROUTE_IDS } from '../../app/routes.ts';
 import { ProgressCanvas } from '../../canvas/progress-canvas.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { Tabs } from '../../components/tabs.tsx';
+import { TASK_PREVIEW_COPY } from '../../copy/browser.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { TaskPreview } from '../preview/task-preview.tsx';
+import { projectQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { taskQuery } from '../tasks/tasks.queries.ts';
 import { FailurePanel } from './failure-panel.tsx';
@@ -150,7 +154,7 @@ export function TaskPage() {
         details={isPro ? undefined : details === true}
         onDetailsChange={(on) => void navigate({ search: (prev) => ({ ...prev, details: on }), replace: true })}
       />
-      <TaskMain task={task.data} selection={selection} pro={pro} />
+      <TaskContent task={task.data} selection={selection} pro={pro} />
       <NodeDrawer
         taskId={taskId}
         nodeId={open === true ? node : undefined}
@@ -159,5 +163,29 @@ export function TaskPage() {
         onClose={() => void navigate({ search: (prev) => ({ ...prev, open: false }), replace: true })}
       />
     </div>
+  );
+}
+
+function TaskContent(props: MainProps) {
+  const project = useQuery(projectQuery(props.task.project.id));
+  const { preview } = route.useSearch();
+  const navigate = route.useNavigate();
+  if (project.isError) return <ErrorState error={project.error} />;
+  if (project.data?.preview === null || project.data === undefined) return <TaskMain {...props} />;
+  return (
+    <Tabs
+      value={preview === true ? 'preview' : 'progress'}
+      onValueChange={(value) =>
+        void navigate({ search: (previous) => ({ ...previous, preview: value === 'preview' }) })
+      }
+      items={[
+        { value: 'progress', label: TASK_PREVIEW_COPY.progress, content: <TaskMain {...props} /> },
+        {
+          value: 'preview',
+          label: TASK_PREVIEW_COPY.title,
+          content: <TaskPreview key={props.task.id} task={props.task} />,
+        },
+      ]}
+    />
   );
 }

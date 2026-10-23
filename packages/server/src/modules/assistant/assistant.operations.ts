@@ -1,5 +1,6 @@
 import {
   abortAssistantOp,
+  bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
   createConversationOp,
@@ -15,6 +16,7 @@ import {
   whisperOp,
 } from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
+import type { BrowserService } from '../browser/index.ts';
 import type { Confirmations } from './assistant.confirmations.ts';
 import type { AssistantService } from './assistant.service.ts';
 import type { AssistantSnapshots } from './assistant.snapshots.ts';
@@ -25,6 +27,7 @@ export function assistantOperations(
   confirmations: Confirmations,
   whisper: WhisperService,
   snapshots: AssistantSnapshots,
+  browser: BrowserService,
 ) {
   return [
     implement(snapshotAssistantContextOp, (input) => snapshots.create(input)),
@@ -33,7 +36,15 @@ export function assistantOperations(
     implement(listConversationsOp, () => ({ items: conversations.list() })),
     implement(createConversationOp, ({ title }) => conversations.create(title)),
     implement(getConversationOp, ({ id }) => conversations.get(id)),
-    implement(deleteConversationOp, ({ id }) => conversations.delete(id)),
+    implement(deleteConversationOp, async ({ id }) => {
+      await conversations.delete(id);
+      browser.bindPreview(id, null);
+    }),
+    implement(bindAssistantPreviewOp, ({ id, preview }) => {
+      // 取消关联是幂等清理；删除对话后的界面卸载仍会发送它。
+      if (preview !== null) conversations.get(id);
+      browser.bindPreview(id, preview);
+    }),
     implement(sendAssistantMessageOp, (input) => conversations.send(input)),
     implement(abortAssistantOp, ({ id }) => conversations.abort(id)),
     implement(replyAssistantPermissionOp, ({ id, permissionId, reply }) =>

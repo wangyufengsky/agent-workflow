@@ -131,7 +131,7 @@ describe('助手网页文字与任务预览', () => {
     expect(names).toEqual(
       expect.arrayContaining(['browser_readUrl', 'previews_get', 'previews_start', 'previews_stop']),
     );
-    expect(names.filter((name) => name.startsWith('browser_'))).toEqual(['browser_readUrl']);
+    expect(names.filter((name) => name.startsWith('browser_')).sort()).toEqual(['browser_read', 'browser_readUrl']);
     expect(names).not.toContain('previews_trial');
 
     const timersBefore = pendingTimers.size;

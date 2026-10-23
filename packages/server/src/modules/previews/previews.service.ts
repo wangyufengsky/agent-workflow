@@ -178,6 +178,13 @@ export function createPreviewsService({
   });
 
   return {
+    projectOf(taskId: string): string {
+      const worktree = worktrees.findByTask(taskId);
+      if (worktree === undefined || worktree.status !== WorktreeStatus.Ready) {
+        throw new AppError(ErrorCode.StateTransitionInvalid, 'The task has no worktree to preview', { taskId });
+      }
+      return worktree.projectId;
+    },
     get: (taskId: string): Preview => toPreview(taskId, entries.get(taskId)),
 
     /** Starts the task's preview, or joins a start in progress; resolves once it is running (29 §4.2). */

@@ -30,6 +30,7 @@ import type { SettingsService } from '../settings/index.ts';
 import { createActions } from './browser.actions.ts';
 import type { BrowserHost } from './browser.host.ts';
 import { openTab, type Tab } from './browser.tab.ts';
+import { createUserBrowser } from './browser.user.ts';
 
 export type BrowserServiceDeps = {
   host: BrowserHost;
@@ -68,6 +69,7 @@ export function createBrowserService({ host, clock, log, events, settings, proje
     // URL 可能带访问令牌，结构化日志只保留资源种类与清理结果。
     log.warn({ source: event.source, cleanupError: event.cleanupError }, 'browser unowned worker blocked');
   });
+  const users = createUserBrowser({ host, clock, log, events, settings, projects, previews });
 
   function policyFor(owner: BrowserOwner): BrowserPolicy {
     const preview = owner.taskId === null ? null : previews.get(owner.taskId);
@@ -186,6 +188,11 @@ export function createBrowserService({ host, clock, log, events, settings, proje
   });
 
   return {
+    openUserTab: users.open,
+    navigateUserTab: users.navigate,
+    setUserViewport: users.viewport,
+    bindPreview: users.bind,
+    readPreview: users.read,
     /** 助手按明确地址读取网站，不把任何尝试的页面冒充为用户当前页面。 */
     async readUrl(url: string) {
       const normalized = new URL(url).href;
@@ -361,7 +368,8 @@ export function createBrowserService({ host, clock, log, events, settings, proje
     },
 
     closeUserTab: async (tabId: string): Promise<void> => {
-      await host.request({ kind: 'close', tabId });
+      if (users.owns(tabId)) await users.close(tabId);
+      else await host.request({ kind: 'close', tabId });
     },
 
     siteLogins,
@@ -385,6 +393,7 @@ export function createBrowserService({ host, clock, log, events, settings, proje
 
     async closeAll(): Promise<void> {
       unsubscribeHost();
+      await users.closeAll();
       await Promise.all([...sessions.keys()].map((id) => close(id)));
     },
   };

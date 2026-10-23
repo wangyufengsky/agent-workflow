@@ -8,6 +8,7 @@ import { NAV_COPY } from '../../copy/nav.ts';
 import { AssistantPanel } from '../../features/assistant/assistant-panel.tsx';
 import { useAssistantRequests } from '../../features/assistant/assistant-requests.ts';
 import { useAssistantHandoff } from '../../features/assistant/handoff.ts';
+import { PreviewBinding } from '../../features/assistant/preview-binding.tsx';
 import { DEFAULT_START_WORKFLOW } from '../../features/home/workflow-icon.ts';
 import { useSettings } from '../../features/settings/settings.queries.ts';
 import { useUiStore } from '../../state/ui.store.ts';
@@ -34,6 +35,10 @@ function useShortcuts() {
   const router = useRouter();
   const setPaletteOpen = useUiStore((s) => s.setPaletteOpen);
   useEffect(() => {
+    const unsubscribe = window.aw?.browser.onShortcut((key) => {
+      if (key === 'k') setPaletteOpen(true);
+      else toggleAssistant(router.state.location.pathname === ROUTES.home);
+    });
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       const actions: Record<string, () => void> = {
@@ -51,7 +56,10 @@ function useShortcuts() {
       action();
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      unsubscribe?.();
+    };
   }, [navigate, router, setPaletteOpen]);
 }
 
@@ -129,6 +137,7 @@ export function AppShell() {
           <ThemeSwitch />
         </header>
         <main className="content">
+          <PreviewBinding />
           <Outlet />
         </main>
       </div>

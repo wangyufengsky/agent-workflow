@@ -2,7 +2,7 @@ import { type BrowserPolicy, type BrowserPortEvent, type BrowserPortOp, blockRea
 import { type Browser, type BrowserContext, type CDPSession, chromium, type Page } from 'playwright-core';
 import { BROWSER_CDP_EVENTS, type BrowserHost } from './browser.host.ts';
 
-type Tab = { page: Page; session: CDPSession; policy: BrowserPolicy; userFacing: boolean };
+type Tab = { page: Page; session: CDPSession; targetId: string; policy: BrowserPolicy; userFacing: boolean };
 
 /**
  * Development and tests only (plain Node has no Electron): tabs in a Chromium of playwright-core, cancelling requests
@@ -14,6 +14,7 @@ export const DEV_CHROMIUM_HOST_MARKER = 'aw-dev-chromium-host';
 export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
   // Launched with the first tab: a development backend that never browses starts no browser.
   let launched: Promise<Browser> | undefined;
+  let control: CDPSession | undefined;
   const browser = () => {
     launched ??= launch();
     return launched;
@@ -29,6 +30,7 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
     const instance = await chromium.launch({ headless: true });
     try {
       const session = await instance.newBrowserCDPSession();
+      control = session;
       // SharedWorker 可由同分区多个标签页共用，不能继承其中某个页面的权限。
       // 先在执行前暂停再关闭；仅给页面装 Fetch 拦截器看不到 Worker 内部发起的请求。
       session.on('Target.attachedToTarget', async ({ targetInfo }) => {
@@ -66,7 +68,9 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
       (await (await browser()).newContext({ acceptDownloads: false, serviceWorkers: 'block' }));
     contexts.set(op.partition, context);
     const page = await context.newPage();
-    const tab: Tab = { page, session: await context.newCDPSession(page), policy: op.policy, userFacing: op.userFacing };
+    const session = await context.newCDPSession(page);
+    const { targetInfo } = await session.send('Target.getTargetInfo');
+    const tab: Tab = { page, session, targetId: targetInfo.targetId, policy: op.policy, userFacing: op.userFacing };
     tabs.set(op.tabId, tab);
     const blocked = (url: string, method: string, isWebSocket: boolean) => {
       const reason = blockReason({ url, method, isWebSocket }, tab.policy, !tab.userFacing);
@@ -109,6 +113,33 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
     return null;
   }
 
+  async function close(tabId: string): Promise<null> {
+    const tab = tabs.get(tabId);
+    if (tab === undefined || tab.page.isClosed()) {
+      tabs.delete(tabId);
+      return null;
+    }
+    const targetControl = control;
+    if (targetControl === undefined) throw new Error('No browser target control session');
+    const failed = Promise.withResolvers<never>();
+    // Chromium 156 的导航可替换正在关闭的旧 RFH，丢掉关闭状态（crbug.com/559040906）。
+    // 新主 frame 提交是目标再次有效的证据；只响应这个事件关闭同一页，不做定时重试。
+    const onCommit = (frame: ReturnType<Page['mainFrame']>) => {
+      if (frame !== tab.page.mainFrame()) return;
+      targetControl.send('Target.closeTarget', { targetId: tab.targetId }).catch((err: unknown) => {
+        if (!tab.page.isClosed()) failed.reject(err);
+      });
+    };
+    tab.page.on('framenavigated', onCommit);
+    try {
+      await Promise.race([tab.page.close(), failed.promise]);
+      tabs.delete(tabId);
+      return null;
+    } finally {
+      tab.page.off('framenavigated', onCommit);
+    }
+  }
+
   return {
     async request(op) {
       switch (op.kind) {
@@ -118,9 +149,7 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
           tabOf(op.tabId).policy = op.policy;
           return null;
         case 'close':
-          await tabOf(op.tabId).page.close();
-          tabs.delete(op.tabId);
-          return null;
+          return close(op.tabId);
         case 'cdp':
           // The port carries CDP method names as strings, as Electron's debugger takes them.
           return tabOf(op.tabId).session.send(op.method as Parameters<CDPSession['send']>[0], op.params);

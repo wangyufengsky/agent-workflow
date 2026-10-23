@@ -321,6 +321,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | DELETE | `/assistant/conversations/:id` | 204；先中止运行并删除底层会话，失败保留本地对话以便重试；成功后清理确认、待发消息、任务跟进记录、消息流 JSONL 与 `files/<id>/`。正在异步建会话/发送或另一删除中返回 409 `ASSISTANT_BUSY`，防止孤儿会话和删除期间回传 |
 | POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey?, knowledgeConversationId?, deckId?, slideId?, batchId?, scheduleId? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在创建会话、发送请求、删除或等待模型回复时 409 `ASSISTANT_BUSY` |
 | POST | `/assistant/conversations/:id/abort` | 停止本轮回复 |
+| PUT | `/assistant/conversations/:id/preview` | `assistant.bindPreview`，界面专用、不对助手开放；`{ preview: { taskId, tabId } \| null }` → 204。只接受属于该任务的真实用户预览，不能绑定 AI 页签；`null` 解除关联，删除后的清理也幂等。仅保存在内存 |
 | POST | `/assistant/conversations/:id/permissions/:permissionId` | `{ reply: PermissionDecision }`：回复助手会话的权限请求（bash / webfetch 询问），不存在 404 `NOT_FOUND` |
 | GET | `/assistant/conversations/:id/transcript?afterSeq=` | 消息流分页（非清单路由，格式同 `/attempts/:id/transcript`；`done` 恒为 false：对话不会结束） |
 | GET | `/assistant/conversations/:id/files` | `{ items: Array<{ path, absolutePath, size, modifiedAt }> }`：`files/<id>/` 下助手写的文件 |
@@ -418,7 +419,21 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 `mode = simple`、`expose.assistant = true`。使用 `persist:aw-sites` 的已有登录，按网站规则限制地址与重定向；即使某条规则是可操作，读取时也强制只读，拦截非 GET/HEAD/OPTIONS 请求与 WebSocket。无法归属标签页的 Worker 不继承权限，拒绝并记录日志。整体读取最长 `BROWSER_READ_TIMEOUT_MS`（30000），超时返回 502 `BROWSER_READ_FAILED`（`details.reason = timeout`）。临时标签页在成功、登录要求、导航失败或超时后均关闭，不改变用户的标签页与执行任务的浏览器会话。
 
-错误：非法地址或 URL 中携带用户名/密码为 400 `VALIDATION_FAILED`；规则不允许的初始地址 403 `BROWSER_SITE_NOT_ALLOWED`；登录页 409 `BROWSER_LOGIN_REQUIRED`；导航失败（含被拒绝的重定向）502 `BROWSER_READ_FAILED`。没有图片/PDF、点击或输入能力；当前用户预览页的 `browser.read` 尚依赖用户预览页签，未开放。
+错误：非法地址或 URL 中携带用户名/密码为 400 `VALIDATION_FAILED`；规则不允许的初始地址 403 `BROWSER_SITE_NOT_ALLOWED`；登录页 409 `BROWSER_LOGIN_REQUIRED`；导航失败（含被拒绝的重定向）502 `BROWSER_READ_FAILED`。没有图片/PDF、点击或输入能力。
+
+### 13f‴. 用户预览页签（29 §8.1、§9）
+
+以下操作只供界面使用（`expose.assistant = false`），使用项目的 `persist:aw-preview-<projectId>` 分区；与 AI 尝试页签分开。每个任务复用一个用户页签。
+
+| 方法 | 路径 | 操作 | 说明 |
+| --- | --- | --- | --- |
+| POST | `/browser/preview-tabs` | `browser.openUserTab` | `{ taskId }` → `{ tabId, viewport }`；启动或复用任务预览，创建真实用户页签；已有页签保留当前页面及视口，预览重启换地址后回到 `/` |
+| POST | `/browser/preview-tabs/:tabId/navigate` | `browser.navigateUserTab` | `{ path }` → 204；仅允许该任务预览来源内的绝对路径，拒绝 `//` 和反斜线跳转到其他来源 |
+| POST | `/browser/preview-tabs/:tabId/viewport` | `browser.setUserViewport` | `{ preset: 'desktop' \| 'tablet' \| 'mobile' }` → 204 |
+
+关闭仍使用 `DELETE /browser/tabs/:tabId`，同时删除它的会话关联。任务完成或取消也关闭页签。助手专用的 `browser_read` 没有 HTTP 操作和 tab 参数，只读取调用会话由界面关联的用户页，输出 `{ taskId, url, title, tab: 'preview', viewport, page, settled, logs }`。未关联或已失效返回 `BROWSER_NOT_OPEN`。离开任务预览页签立即解绑，助手/命令面板浮层仅隐藏原生视图，不解绑；首次发送消息先完成绑定更新，防止新对话误读旧页。
+
+用户预览读取和导航也有 30 秒整体截止，超时为 `BROWSER_READ_FAILED`（`details.reason = timeout`）。读取或已有页的导航超时只结束本次等待、丢弃迟到结果，保留用户页及关联；用户解决页面对话框后可再读。首次打开在预览服务就绪后开始此截止，初始化/导航失败会关闭新页。应用退出中止所有用户浏览器等待，清理正在创建的页签，不等挂起的 CDP 回应；预览服务本身仍使用原有启动时限。
 
 ## 13e. PPT（v1.2）
 
@@ -458,6 +473,7 @@ interface AwBridge {
   printSettled(result: PrintSettled): void;                              // 打印视图告诉隐藏窗口：可以打印，或为什么不能显示
   setLaunchPreferences(preferences: LaunchPreferences): void;           // 应用的主题与是否播放打开动画，main 写入 launch.json 供下次启动（28 §5.3）
   browser: {                                                             // 用户自己的浏览器标签页（v1.3，29 §8.1）；标签页由后端打开，非用户标签页不响应
+    onShortcut(listener: (key: 'j' | 'k') => void): () => void;          // 用户页聚焦时转发 ⌘/Ctrl+J/K；卸载时取消监听
     place(tabId: string, rect: BrowserRect | null): void;                // 贴到窗口的这块区域（CSS 像素），null 为取下；main 按 browserRectSchema 解析
     back(tabId: string): void;
     forward(tabId: string): void;
