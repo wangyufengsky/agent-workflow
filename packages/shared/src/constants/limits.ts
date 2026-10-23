@@ -44,6 +44,9 @@ export const ASSISTANT_TITLE_MAX_CHARS = 40;
 export const ASSISTANT_MESSAGE_MAX_CHARS = 20_000;
 /** 一次显式附加的文字或任务上下文；超过时由用户缩短，任务快照注明截断。 */
 export const ASSISTANT_CONTEXT_MAX_CHARS = 12_000;
+/** 旧会话隔离升级时回放的最近记录和文字上限。 */
+export const ASSISTANT_RECOVERY_ENTRIES = 200;
+export const ASSISTANT_RECOVERY_MAX_CHARS = 12_000;
 /** Knowledge Q&A (18 §7). */
 export const KNOWLEDGE_QUESTION_MAX_CHARS = 4000;
 /** A conversation's title taken from its first question is cut to this length. */

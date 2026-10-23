@@ -73,6 +73,7 @@
 - 知识研究员（v1.1，18 §5.1）的会话级规则：不带检查命令的 `readonlyBashRules()`；对话打开网络检索时末尾再加 `webfetch *` 与 `websearch *` allow（agent 规则在前、会话规则在后，最后匹配生效；被整体 deny 的工具不出现在工具列表中，见 §8）。会话目录为项目主仓库，不建 worktree。
 - PPT 写作者（v1.2，23 §7.1）的会话级规则：不带检查命令的 `readonlyBashRules()`，没有网络；会话目录为项目仓库，没有项目时为 `<数据目录>/ppt/blank/`。
 - 角色差异不靠多个 agent：会话使用角色的 `base_agent` 对应的 agent（与尝试类型无关：只读的「代码审查」步骤以 reviewer 身份执行 `execute` 尝试，用 `submit_result` 提交报告），角色提示词通过每次 prompt 的 `system` 字段追加，模型通过 prompt 的 `model` 字段指定。因此修改角色无需重启 opencode。评审检查（`review` 尝试）固定使用内置 `reviewer` 角色。
+- **应用助手**（15 §2）：会话 bash 规则统一 `*: ask`，不继承任务的只读命令自动放行；真实 opencode 1.19 的 `head` / `rg` 等命令可能不检查 `external_directory`。原生 `task` 子代理禁用，因为不完整继承父助手权限；应用 `tasks_create` 仍按操作清单的确认策略执行。
 - 修改 `ai.bashPolicy` 对之后新建的会话立即生效，无需重启 opencode。
 
 ## 3. 调用归属（哪个尝试在调用工具）

@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type AssistantConversationDTO,
@@ -12,7 +12,6 @@ import {
   listConfirmationsOp,
   listConversationsOp,
   OPENCODE_ASSISTANT_AGENT,
-  readonlyBashRules,
   replyAssistantPermissionOp,
   ServerEventType,
   sendAssistantMessageOp,
@@ -77,9 +76,9 @@ describe('助手对话（A-02、A-03）', () => {
 
     expect(t.fake.sessions).toEqual([
       expect.objectContaining({
-        directory: join(t.dataDir, 'assistant'),
+        directory: join(realpathSync(t.dataDir), 'assistant', 'files', c.id),
         agent: OPENCODE_ASSISTANT_AGENT,
-        permission: readonlyBashRules(),
+        permission: [{ permission: 'bash', pattern: '*', action: 'ask' }],
       }),
     ]);
     const [sent] = t.fake.prompts;
@@ -87,7 +86,7 @@ describe('助手对话（A-02、A-03）', () => {
     expect(sent?.system).toContain('2025-10-10T04:30:00+08:00 (Friday), time zone Asia/Shanghai (UTC+08:00)');
     expect(sent?.system).toContain('Interface mode: simple');
     expect(sent?.system).toContain(`task ${task.key} "${task.title}" (task id ${task.id}`);
-    expect(sent?.system).toContain(`files/${c.id}/`);
+    expect(sent?.system).toContain(join(realpathSync(t.dataDir), 'assistant', 'files', c.id));
   });
 
   it('所在页面指向不存在的任务时不发送（TASK_NOT_FOUND）', async () => {
@@ -158,10 +157,9 @@ describe('助手对话（A-02、A-03）', () => {
 
   it('写入对话文件目录的文件作为附件出现，删除对话时连同确认、消息流与文件一起删除', async () => {
     const c = await newConversation();
-    t.fake.enqueue(
-      script().edit(`files/${c.id}/周报.md`, '# 周报').callAppTool('projects_update', { id: 'p1', name: 'x' }),
-      { agent: OPENCODE_ASSISTANT_AGENT },
-    );
+    t.fake.enqueue(script().edit('周报.md', '# 周报').callAppTool('projects_update', { id: 'p1', name: 'x' }), {
+      agent: OPENCODE_ASSISTANT_AGENT,
+    });
     await say(c.id, '写一份周报');
 
     const { entries } = await transcript(c.id);
@@ -176,7 +174,7 @@ describe('助手对话（A-02、A-03）', () => {
     expect((await t.call(getConversationOp, { id: c.id })).body).toMatchObject({
       error: { code: ErrorCode.AssistantConversationNotFound },
     });
-    expect(existsSync(join(t.dataDir, 'assistant', 'files', c.id))).toBe(false);
+    expect(existsSync(join(realpathSync(t.dataDir), 'assistant', 'files', c.id))).toBe(false);
     expect(existsSync(join(t.dataDir, 'assistant', 'conversations', `${c.id}.jsonl`))).toBe(false);
   });
 });

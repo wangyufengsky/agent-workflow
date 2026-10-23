@@ -112,7 +112,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DbType` | `mysql` · `postgresql` · `opengauss`（openGauss / GaussDB）· `sqlserver` · `goldendb`（MySQL 协议）（v1.2，24 §1） |
 | `CredentialKind` | `git_token` · `db_password` |
 | `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` · `confirmation` · `attachment` · `entity_ref`（后三种仅助手对话，10 §3） |
-| `TranscriptSystemEvent` | `attempt_started` · `nudged` · `retrying` · `result_submitted` · `awaiting_input`（等待用户回答或授权）· `timed_out` · `aborted` · `runtime_lost`（`system` 会话流条目记录的事件，文案在前端） |
+| `TranscriptSystemEvent` | `attempt_started` · `nudged` · `retrying` · `result_submitted` · `awaiting_input`（等待用户回答或授权）· `timed_out` · `aborted` · `runtime_lost` · `assistant_isolated`（旧助手会话切换到独立目录；`system` 会话流条目记录的事件，文案在前端） |
 | `McpToolName` | 执行 MCP 工具名（12 §6）；`ATTEMPT_SUBMIT_TOOL` 为每种尝试的提交工具 |
 | `BashPolicy` | `auto`（默认放行，禁止 Git 写操作）· `ask`（只读命令放行，其余询问） |
 | `OperationRisk` | `read` · `write` · `critical`（操作清单风险等级，决定助手确认行为，见 15 §4） |
@@ -230,7 +230,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DEV_API_PORT` / `DEV_WEB_PORT` | `47821` / `47822` | 仅开发；生产后端随机端口（D31）。环境变量 `AW_DEV_API_PORT` / `AW_DEV_WEB_PORT`（`DEV_PORT_ENV`）覆盖，经 `devPorts(env)` 读取；浏览器 E2E 默认由系统分配（D78） |
 | `MCP_EXEC_PATH` | `/mcp/exec` | |
 | `MCP_ASSISTANT_PATH` | `/mcp/assistant` | v1.1 |
-| `ASSISTANT_DIR` / `ASSISTANT_FILES_DIR` / `ASSISTANT_CONVERSATIONS_DIR` | `assistant` / `files` / `conversations` | 助手工作目录 `<数据目录>/assistant/`，对话文件 `files/<id>/`，消息流 `conversations/<id>.jsonl` |
+| `ASSISTANT_DIR` / `ASSISTANT_FILES_DIR` / `ASSISTANT_CONVERSATIONS_DIR` | `assistant` / `files` / `conversations` | 助手会话工作目录 `<数据目录>/assistant/files/<id>/`，对话文件相对该目录，消息流 `conversations/<id>.jsonl` |
 | `KNOWLEDGE_DOC_DIRS` / `KNOWLEDGE_DOC_EXTENSIONS` | `docs` `doc` / `.md` `.mdx` `.markdown` `.txt` `.rst` `.adoc` | 被引用的文件位于这些目录下或带这些扩展名时为文档，否则为代码（18 §6.1） |
 | `PROJECT_CHECK_PLACEHOLDER` | `$PROJECT_CHECK` | 验收命令中代表项目检查命令，物化节点时替换（13 §1） |
 | `GIT_COMMIT_IDENTITY` | `agent-workflow <agent-workflow@localhost>` | 节点完成时后端提交的作者与提交者（09 §3） |

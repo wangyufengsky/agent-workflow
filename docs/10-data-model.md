@@ -337,7 +337,9 @@ payload / response：
 | --- | --- | --- |
 | id | TEXT PK | |
 | title | TEXT | 默认取第一条消息的首行（`ASSISTANT_TITLE_MAX_CHARS`） |
-| opencode_session_id | TEXT NULL | 第一条消息时创建；MCP 调用归属的依据 |
+| opencode_session_id | TEXT NULL | 第一条消息时创建；MCP 调用归属的依据；已隔离会话运行于真实路径 `assistant/files/<id>/` |
+| isolated | INTEGER boolean DEFAULT 0 | 迁移 0020：旧记录为 false，新建为 true；首次发送前把旧原生会话迁移到独立目录 |
+| retired_session_id | TEXT NULL | 迁移 0020：等待清理的旧原生会话；持久化后才删除，失败保留供跨重启重试，禁止回到旧目录运行 |
 | created_at / updated_at | INTEGER | `updated_at` 随每条消息更新，列表按它倒序 |
 
 索引：`(opencode_session_id)`、`(updated_at)`。
@@ -569,7 +571,7 @@ payload / response：
 - 删除定时任务：删除其运行记录，关闭其未处理的 `schedule_failure` 条目（dismissed）；开出的任务保留。
 - 删除知识对话：要求没有研究中的一轮；删除轮次、其尝试（权限条目随之级联）与 `runs/knowledge/<attemptId>.jsonl`。
 - 删除 PPT：要求没有进行中的 AI 工作（`DECK_BUSY`）；删除其尝试（会话流 `runs/ppt/<attemptId>.jsonl` 随之删除，权限条目级联），再删除 PPT（页面、资料、工作记录级联）。删除项目时 PPT 的 `project_id` 置空。
-- 删除助手对话：级联删除其确认，并删除 `assistant/conversations/<id>.jsonl` 与 `assistant/files/<id>/`。
+- 删除助手对话：先停止并删除底层 opencode 会话（含待清理旧会话），失败保留本地对话；成功后级联删除其确认，并删除 `assistant/conversations/<id>.jsonl` 与 `assistant/files/<id>/`。
 - 任务终态后 worktree 删除，但任务、计划、节点、尝试、会话流保留（供回看）。
 - 不做自动过期清理（v1）。设置页显示数据目录占用。
 
@@ -592,7 +594,7 @@ payload / response：
 
 | 表／字段 | 关键字段／约束 |
 | --- | --- |
-| requirement_revisions | id、task_id FK（级联）、seq、items JSON、created_at；UNIQUE(task_id, seq)；只追加。当前版本就是 seq 最大的一条，任务表不另存（迁移 0020，Q-01 已实现） |
+| requirement_revisions | id、task_id FK（级联）、seq、items JSON、created_at；UNIQUE(task_id, seq)；只追加。当前版本就是 seq 最大的一条，任务表不另存（迁移 0021，Q-01 已实现） |
 | requirement_results | id、task_id FK（级联）、revision_id FK（级联）、item_id、source、conclusion、note、output（命令输出末尾，按既有输出上限截断）、node_id 可空（用户结论为 null，不设外键）、commit_sha、created_at；只追加，按插入顺序读取（同一毫秒的两条不靠时间区分）（表已建，写入在 Q-02 / Q-03） |
 | 交付时的清单摘要（Q-03 已实现） | 不另加列：记在这次交付的时间线事件 `payload.requirements` 里（`RequirementsDeliverySummary`：revisionId、commitSha、逐项 id／标题／是否必需／显示状态）；没有清单的交付没有这个字段 |
 

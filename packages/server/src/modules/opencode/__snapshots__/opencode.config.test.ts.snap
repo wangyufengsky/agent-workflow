@@ -9008,6 +9008,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "edit": "allow",
         "external_directory": "deny",
         "question": "deny",
+        "task": "deny",
         "webfetch": "ask",
       },
       "prompt": "<protocol-assistant.md>",
