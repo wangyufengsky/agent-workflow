@@ -331,8 +331,7 @@ export function taskOperations(tasks: TasksService) {
 - `requirements`：清单版本、逐项结论记录、显示状态纯函数；只依赖底层设施，不依赖 `tasks`、`nodes`、`acceptance`。
 - `tasks` 组合二者：绑定附件、编辑时机守卫、物化时追加核验节点（`NodeKind.Verify`）、节点完成时写结论、交付时的清单摘要。`assistant` 在自己的事务里绑定附件。`attempts` 只接收所有者准备好的附件，不反查所有者。
 - `nodes`：只有 `NodeKind.Verify` 的检查「只记录不拦截」；其他节点不变。
-- `opencode` 适配层的 `prompt` 增加 file part（图片 data URL）；其他模块仍不直接调用 SDK。
+- 首版只有文本附件，`opencode` 适配层不变。
 - 不新增 `AttemptKind`、`AcceptanceCheckKind`、`TaskStatus`、调度队列或通用文件服务层。
 - 数据目录新增 `attachments/<id>/original`；附件不写进 Git worktree。
 - 上传与原件读取是认证的二进制非清单路由（与 `attempts.routes.ts` 的会话记录路由同类）；其余为操作清单中的 JSON 操作。
-- 读取图片尺寸的直接依赖在 U-00 选定后登记到本文依赖清单，不 import 传递依赖。

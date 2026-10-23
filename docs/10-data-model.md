@@ -555,7 +555,7 @@ payload / response：
 
 | 表 | 关键字段／约束 |
 | --- | --- |
-| attachments | id、source、display_name、media_type、size_bytes、sha256、meta JSON（图片宽高；项目文件的 projectId、可选 taskId、相对路径、行范围、读取时间）、created_at。磁盘路径只由 id 派生：`attachments/<id>/original` |
+| attachments | id、source、display_name、media_type、size_bytes、sha256、meta JSON（项目文件的 projectId、可选 taskId、相对路径、行范围、读取时间）、created_at。磁盘路径只由 id 派生：`attachments/<id>/original` |
 | attachment_refs | id、attachment_id FK、owner_kind、owner_id、ordinal、created_at；UNIQUE(owner_kind, owner_id, attachment_id) |
 
 - 所有者在自己的事务里创建／删除引用：删除任务时删除该任务（task_input）与其节点（task_feedback）的引用；删除助手对话时删除 assistant_message 引用。多态 owner 没有外键，由所有者模块负责。

@@ -395,7 +395,7 @@ export const submitPlanTool = defineMcpTool({
 
 | 工具／扩展 | 允许的尝试 | 契约 |
 | --- | --- | --- |
-| `read_attachment` | plan / execute / review；助手 MCP 另有一份 | `{ attachmentId, cursor? }` → 名称、来源、一段正文（最多 `ATTACHMENT_READ_MAX_CHARS`）、`nextCursor`。执行 MCP 的范围是当前尝试所属任务的引用，助手的是当前对话；范围外 `ATTACHMENT_NOT_FOUND`。图片返回元信息并说明已随提示词发送 |
+| `read_attachment` | plan / execute / review；助手 MCP 另有一份 | `{ attachmentId, cursor? }` → 名称、来源、一段正文（最多 `ATTACHMENT_READ_MAX_CHARS`）、`nextCursor`。执行 MCP 的范围是当前尝试所属任务的引用，助手的是当前对话；范围外 `ATTACHMENT_NOT_FOUND` |
 | `get_task_context` 扩展 | 既有 | 增加 `attachments`（资料清单，无正文）与 `requirements`（当前版本的项及显示状态） |
 | `submit_result` 扩展 | execute | 可选 `requirement_results: [{ item_id, conclusion: pass / fail / unverified, note }]`；只接受核验节点的提交，项须属于当前版本且为 AI 核验项，否则 `REQUIREMENT_RESULTS_INVALID`；漏掉的项保持未核验 |
 
