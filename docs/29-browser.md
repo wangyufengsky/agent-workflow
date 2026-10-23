@@ -1,6 +1,6 @@
 # 29 · 内置浏览器与页面预览
 
-> 状态：D120–D125 **用户已确认**（2026-10-23）。**B1 已实现**（05 的 B-01…B-08，分支 `feat/B-browser`）：预览服务、浏览器宿主与动作层、执行 MCP 浏览器工具、项目与设置界面；B2（页面体检、预览页签与观看画面、「附上当前页面」）与 B3（助手、知识问答的引用摘录、PPT 网页资料）未开始。实现中与设计稿不同的地方已改在各节里（如 §5.2 的宿主接口、§5.7 的截图、§4.1 推断的位置）。
+> 状态：D120–D125 **用户已确认**（2026-10-23）。**B1 已实现**（05 的 B-01…B-08，分支 `feat/B-browser`）：预览服务、浏览器宿主与动作层、执行 MCP 浏览器工具、项目与设置界面；B2 进行中（分支 `feat/B2-browser`：B2-01 契约与物化、B2-02 后端页面体检已完成；预览页签与观看画面、「附上当前页面」未开始），B3（助手、知识问答的引用摘录、PPT 网页资料）未开始。实现中与设计稿不同的地方已改在各节里（如 §5.2 的宿主接口、§5.7 的截图、§4.1 推断的位置）。
 
 ## 1. 定位
 
@@ -310,7 +310,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 - 每个动作后另存一张 JPEG 缩略图（宽 960，质量 60，约 40 KB；用 `Page.captureScreenshot` 的 `clip.scale` 缩小，不需要图像库），作为观看画面（§8.2），不交给模型。随 B2 的观看界面一起实现。一次尝试 50 个动作约 2 MB，随 `runs/` 一起保留与清理。
 - **存放位置按归属**，与会话流 JSONL 的目录规则一致（10 §3）：
   - 尝试的截图与画面：`<该尝试会话流所在目录>/browser/<attemptId>/`，即任务的尝试为 `runs/<taskId>/browser/<attemptId>/`，知识问答的 `research` 尝试为 `runs/knowledge/browser/<attemptId>/`。按尝试读取：`GET /attempts/:attemptId/browser/:file`，后端由尝试解析目录，所以没有任务的尝试也能取到；
-  - 页面体检的截图：`runs/<taskId>/browser/checks/<nodeId>/<检查序号>/`，按任务读取：`GET /tasks/:taskId/browser/:file`；
+  - 页面体检的截图：`runs/<taskId>/browser/checks/<nodeId>/<检查时刻>/<n>.jpg`（全页，高度到 `PAGE_CHECK_SHOT_MAX_HEIGHT` 为止），按任务读取：`GET /tasks/:taskId/browser/*`；
   - 文件名由后端生成（序号 + 扩展名），读取时只接受这个格式，不拼接用户给的路径。
 
 ## 6. 执行 MCP 工具
@@ -366,9 +366,9 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 
 在 `verifying` 中，排在命令检查之后、AI 评审之前（页面起不来时不必再花一次评审）。对每个页面和每个视口：
 
-1. 用 `check` 会话打开（预览未启动则启动；排队见 §4.4）。
+1. 用 `check` 会话打开（每次体检一个干净的离屏标签页，分区 `aw-check-<nodeId>`；预览未启动则启动；排队见 §4.4，由 `previews.start` 的 `queue` 等到有空位）。
 2. 等页面稳定（§5.5 第 6 步）。
-3. 收集事实：主文档的 HTTP 状态与导航错误；`Runtime.exceptionThrown`；`console.error`；失败的请求；`document.scrollingElement.scrollWidth > innerWidth`（横向溢出）；注入 axe-core 只跑 `critical` / `serious` 影响级别的规则（axe-core 已是测试依赖 `@axe-core/playwright` 的底层；运行时直接打包 `axe-core` 4.x，约 500 KB，在页面里 `Runtime.evaluate` 注入。它是**新增的运行时依赖**，许可证 MPL-2.0：只按原样打包、不修改源码时没有额外义务。不想加这个依赖时，去掉可访问性提醒这一项，其余判定不变）。
+3. 收集事实：主文档的 HTTP 状态与导航错误；`Runtime.exceptionThrown`；`console.error`；失败的请求；`document.scrollingElement.scrollWidth > innerWidth`（横向溢出）；注入 axe-core 只跑 `critical` / `serious` 影响级别的规则（axe-core 已是测试依赖 `@axe-core/playwright` 的底层；运行时直接打包 `axe-core` 4.x（`axe.source` 是约 1.3 MB 的脚本字符串），在页面里 `Runtime.evaluate` 注入。它是**新增的运行时依赖**，许可证 MPL-2.0：只按原样打包、不修改源码时没有额外义务。不想加这个依赖时，去掉可访问性提醒这一项，其余判定不变）。
 4. 截全页图。
 
 ### 7.3 判定（纯函数 `pageCheckVerdict`）
@@ -399,7 +399,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
     path: string; viewport: ViewportPreset; httpStatus: number | null;
     errors: { kind: 'navigation' | 'exception' | 'console' | 'request'; message: string; source: string | null }[];
     warnings: { kind: 'request' | 'blocked' | 'a11y' | 'overflow' | 'unsettled'; message: string }[];
-    screenshot: string;                  // 相对 runs/<taskId>/browser/ 的路径（checks/<nodeId>/<序号>/<n>.png）
+    screenshot: string | null;           // 相对 runs/<taskId>/browser/ 的路径（checks/<nodeId>/<检查时刻>/<n>.jpg）；导航失败时为 null
   }[];
   output: string;                        // 给 AI 看的文字总结（失败后的反馈也用它）
   unrunnable: { reason: 'preview_never_started' | 'preview_not_configured'; logTail: string } | null;
@@ -410,7 +410,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 **预览起不来时，先区分是环境问题还是改动造成的**，规则按 D116 的精神放窄：
 
 - **无法运行**（`check_unrunnable`，09 §3 的同一个事件，从命令检查推广到页面体检）满足以下任一：
-  - 这个 worktree 里预览**从没成功启动过**（安装命令失败、启动超时、进程退出）：命令或端口写错、依赖装不上，属于环境或配置问题，AI 改代码解决不了；
+  - 这个 worktree 里预览**从没成功启动过**（实现上为「自应用启动以来这个任务的预览从没就绪过」，`previews.hasRun`；安装命令失败、启动超时、进程退出）：命令或端口写错、依赖装不上，属于环境或配置问题，AI 改代码解决不了；
   - 项目的预览配置在计划确认之后被删了（`preview_not_configured`）。
 
   处理与 D116 相同：`verifying → failed`，不发回 AI（`retryFeedback` 不变），**不消耗预算**，后面的检查不再跑；任务照常失败，失败码 `BROWSER_CHECK_UNRUNNABLE`（`details: { nodeKey, nodeTitle, reason, logTail }`）。出口：

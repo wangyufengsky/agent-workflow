@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
+  AcceptanceCheckKind,
   AppError,
   ATTEMPT_STATUSES,
   AttemptStatus,
@@ -12,12 +13,15 @@ import {
   type BrowserPolicy,
   BrowserTabKind,
   ErrorCode,
+  PAGE_CHECK_SHOT_MAX_HEIGHT,
+  PageCheckUnrunnable,
   PreviewState,
   ServerEventType,
   urlAccess,
   VIEWPORT_SIZES,
   type ViewportPreset,
 } from '@aw/shared';
+import axe from 'axe-core';
 import { z } from 'zod';
 import type { Clock } from '../../core/clock.ts';
 import type { EventBus } from '../../core/event-bus.ts';
@@ -26,6 +30,7 @@ import type { PreviewsService } from '../previews/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { createActions } from './browser.actions.ts';
+import { type PageCheckPage, type PageCheckResult, pageCheckOutput, pageCheckVerdict } from './browser.check.ts';
 import type { BrowserHost } from './browser.host.ts';
 import { openTab, type Tab } from './browser.tab.ts';
 
@@ -37,6 +42,16 @@ export type BrowserServiceDeps = {
   settings: SettingsService;
   projects: ProjectsService;
   previews: PreviewsService;
+  /** Page checks' screenshots go under `runs/<taskId>/browser/` (29 §7.4). */
+  dataDir: string;
+};
+
+export type PageCheckRequest = {
+  taskId: string;
+  projectId: string;
+  nodeId: string;
+  pages: readonly string[];
+  viewports: readonly ViewportPreset[];
 };
 
 /** Who uses the browser (an attempt, 29 §5.3) and where its screenshots go (beside its transcript, 29 §5.7). */
@@ -57,12 +72,43 @@ const ENDED = new Set<string>(
   ATTEMPT_STATUSES.filter((s) => s !== AttemptStatus.Starting && s !== AttemptStatus.Running),
 );
 
+const navigateSchema = z.object({ errorText: z.string().optional() });
+const layoutSchema = z.object({ cssContentSize: z.object({ width: z.number(), height: z.number() }) });
+const a11ySchema = z.array(z.object({ id: z.string(), help: z.string(), nodes: z.number() }));
+/** axe-core's rules of critical or serious impact only (29 §7.2); `axe` was injected first. */
+const AXE_RUN = `axe.run(document, { resultTypes: ['violations'] }).then((r) => r.violations
+  .filter((v) => v.impact === 'critical' || v.impact === 'serious')
+  .map((v) => ({ id: v.id, help: v.help, nodes: v.nodes.length })))`;
+const OVERFLOW = 'document.scrollingElement.scrollWidth > innerWidth';
+
+const pageCheckResult = (
+  pages: PageCheckResult['pages'],
+  output: string,
+  unrunnable: PageCheckResult['unrunnable'] = null,
+): PageCheckResult => ({
+  kind: AcceptanceCheckKind.Browser,
+  passed: unrunnable === null && pages.length > 0 && pages.every((p) => p.errors.length === 0),
+  pages,
+  output,
+  unrunnable,
+  skipped: false,
+});
+
 /** The AI's browser (29 §5–§6): an owner's two tabs, what they may open, and the tools' actions on them. */
-export function createBrowserService({ host, clock, log, events, settings, projects, previews }: BrowserServiceDeps) {
+export function createBrowserService({
+  host,
+  clock,
+  log,
+  events,
+  settings,
+  projects,
+  previews,
+  dataDir,
+}: BrowserServiceDeps) {
   const sessions = new Map<string, Session>();
   const actions = createActions(clock);
 
-  function policyFor(owner: BrowserOwner): BrowserPolicy {
+  function policyFor(owner: Pick<BrowserOwner, 'taskId' | 'projectId'>): BrowserPolicy {
     const preview = owner.taskId === null ? null : previews.get(owner.taskId);
     const extra = owner.projectId === null ? [] : (projects.getRecord(owner.projectId).preview?.extraOrigins ?? []);
     return {
@@ -159,6 +205,48 @@ export function createBrowserService({ host, clock, log, events, settings, proje
     sessions.delete(ownerId);
     for (const tab of Object.values(session.tabs)) await tab.close();
     if (session.tabs.preview !== undefined && session.owner.taskId !== null) previews.release(session.owner.taskId);
+  }
+
+  /**
+   * One page at one viewport (29 §7.2): its facts judged, and its full page captured into `dir` as `shot` when it
+   * loaded.
+   */
+  async function checkPage(
+    tab: Tab,
+    url: string,
+    dir: string,
+    shot: string,
+  ): Promise<Omit<PageCheckPage, 'path' | 'viewport'>> {
+    tab.begin();
+    const { errorText } = navigateSchema.parse(await tab.cdp('Page.navigate', { url }));
+    if (errorText !== undefined) {
+      const facts = { ...tab.facts(), navigationError: errorText, overflow: false, a11y: [], settled: true };
+      return { ...pageCheckVerdict(facts), screenshot: null };
+    }
+    const settled = await tab.settle();
+    const overflow = (await tab.evaluate(OVERFLOW)) === true;
+    await tab.evaluate(axe.source);
+    const a11y = a11ySchema.parse(await tab.evaluate(AXE_RUN));
+    const { cssContentSize } = layoutSchema.parse(await tab.cdp('Page.getLayoutMetrics'));
+    const { data } = z.object({ data: z.string() }).parse(
+      await tab.cdp('Page.captureScreenshot', {
+        format: 'jpeg',
+        quality: 70,
+        captureBeyondViewport: true,
+        clip: {
+          x: 0,
+          y: 0,
+          width: cssContentSize.width,
+          height: Math.min(cssContentSize.height, PAGE_CHECK_SHOT_MAX_HEIGHT),
+          scale: 1,
+        },
+      }),
+    );
+    await writeFile(join(dir, shot), Buffer.from(data, 'base64'));
+    return {
+      ...pageCheckVerdict({ ...tab.facts(), navigationError: null, overflow, a11y, settled }),
+      screenshot: shot,
+    };
   }
 
   events.subscribe((event) => {
@@ -267,6 +355,73 @@ export function createBrowserService({ host, clock, log, events, settings, proje
     },
 
     close,
+
+    /**
+     * The page check (29 §7): the task's preview (started, queued at the limit), then every page at every viewport
+     * in a clean tab. A preview that never started in this worktree, or is no longer configured, cannot run the check
+     * (D116); one that ran before and now fails to start is the change's doing, an ordinary failure.
+     */
+    async pageCheck(request: PageCheckRequest, signal: AbortSignal): Promise<PageCheckResult> {
+      const { taskId, nodeId } = request;
+      let origin: string;
+      try {
+        const preview = await previews.start(taskId, { queue: signal });
+        if (preview.url === null) throw new Error(`Preview of task ${taskId} is running without an address`);
+        origin = preview.url;
+      } catch (err) {
+        if (signal.aborted) return pageCheckResult([], 'The page check was stopped');
+        if (!(err instanceof AppError)) throw err;
+        if (err.code === ErrorCode.PreviewNotConfigured) {
+          return pageCheckResult([], 'The project has no page preview', {
+            reason: PageCheckUnrunnable.PreviewNotConfigured,
+            logTail: '',
+          });
+        }
+        if (err.code !== ErrorCode.PreviewStartFailed) throw err;
+        const logTail = z.object({ logTail: z.string() }).parse(err.details).logTail;
+        const output = `The page preview did not start:\n\n${logTail}`;
+        return previews.hasRun(taskId)
+          ? pageCheckResult([], output)
+          : pageCheckResult([], output, { reason: PageCheckUnrunnable.PreviewNeverStarted, logTail });
+      }
+      const tab = await openTab({
+        host,
+        clock,
+        log,
+        tabId: `check:${nodeId}:${randomUUID()}`,
+        kind: BrowserTabKind.Preview,
+        partition: `aw-check-${nodeId}`,
+        policy: policyFor(request),
+        site: false,
+      });
+      previews.acquire(taskId);
+      // Forward slashes: the path is also the screenshot's address (29 §7.4).
+      const relative = `checks/${nodeId}/${clock.now()}`;
+      const dir = join(dataDir, 'runs', taskId, 'browser', relative);
+      mkdirSync(dir, { recursive: true });
+      const pages: PageCheckResult['pages'] = [];
+      try {
+        for (const path of request.pages) {
+          for (const viewport of request.viewports) {
+            if (signal.aborted) return pageCheckResult(pages, 'The page check was stopped');
+            const { width, height, mobile } = VIEWPORT_SIZES[viewport];
+            await tab.cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
+            const shot = `${pages.length + 1}.jpg`;
+            const page = await checkPage(tab, `${origin}${path}`, dir, shot);
+            pages.push({
+              path,
+              viewport,
+              ...page,
+              screenshot: page.screenshot === null ? null : `${relative}/${shot}`,
+            });
+          }
+        }
+      } finally {
+        await tab.close();
+        previews.release(taskId);
+      }
+      return pageCheckResult(pages, pageCheckOutput(pages));
+    },
 
     /**
      * A tab on the window for the user to log in to a website (29 §8.6): the websites' partition keeps the login

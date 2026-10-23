@@ -96,7 +96,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/tasks/:id/resume` 🅿 | `paused → running`；未确认的调整草稿被取代 |
 | POST | `/tasks/:id/retry` | `{ feedback? }`：`failed → <failedPhase>`；`feedback`（D118）作为重试的失败步骤下一次尝试的说明（同 `nodes/:nodeId/retry`），其他阶段的失败忽略它；检查命令无法运行而失败的步骤 `recheck`（用已提交的结果重新检查，不重跑 AI，D116），其余失败步骤 `retry` |
 | POST | `/tasks/:id/check-command` | `{ command, updateProject }`（D116）：只限在执行阶段因命令检查失败的任务（`CHECK_COMMAND_UNRUNNABLE`，或 `NODE_ATTEMPTS_EXHAUSTED` 且最近一次已提交的结果未通过命令检查），否则 409 `STATE_TRANSITION_INVALID`；任务未完成的步骤（`pending` / `ready` / `failed`）中与失败命令相同的命令检查换成 `command`，`updateProject` 时同时设为项目的检查命令；然后重试：已提交结果的失败步骤 `recheck`（预算重置），其余 `retry` |
-| POST | `/tasks/:id/skip-check` | （D116）只限因 `CHECK_COMMAND_UNRUNNABLE` 失败的任务，否则 409 `STATE_TRANSITION_INVALID`；未完成步骤中这条命令检查标 `skipped`，然后重试（失败步骤 `recheck`）；结果卡与 PR 说明写明未验证 |
+| POST | `/tasks/:id/skip-check` | （D116）只限因 `CHECK_COMMAND_UNRUNNABLE` 或 `BROWSER_CHECK_UNRUNNABLE` 失败的任务，否则 409 `STATE_TRANSITION_INVALID`；未完成步骤中这条命令检查（或所有页面体检）标 `skipped`，然后重试（失败步骤 `recheck`）；结果卡与 PR 说明写明未验证 |
 | POST | `/tasks/:id/cancel` | `{ keepBranch?: boolean }` |
 | POST | `/tasks/:id/request-changes` | `{ reason: 'user' \| 'conflict', feedback?, page?: { tabId } }`（`page`：用户预览标签页的当前页面随意见交给 AI，后端自己读取路径、视口、控制台错误与失败请求，29 §2.3；v1.3 B2，助手不能设置）；`review → running`，追加「按反馈修改」或「解决合并冲突」节点（13 §4）。`user` 必须带 `feedback`；`conflict` 要求最近一次交付为 `conflict`；否则 400 `VALIDATION_FAILED` |
 | POST | `/tasks/:id/deliver` | `{ strategy, targetBranch?, pr?: { title, body } }`；见 §5.3 |
@@ -190,6 +190,7 @@ type ReviewCommentsDTO = {
 | POST | `/tasks/:id/nodes/:nodeId/retry` | `failed → ready`，`{ feedback? }` |
 | POST | `/tasks/:id/nodes/:nodeId/skip` 🅿 | `pending` / `ready` / `failed` → `skipped`，返回 `NodeDetailDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
 | GET | `/attempts/:id` | `AttemptDTO`；不存在 404 `ATTEMPT_NOT_FOUND` |
+| GET | `/tasks/:taskId/browser/*` | 页面体检的截图（非清单路由，29 §5.7）：`*` 为检查结果里 `screenshot` 的相对路径（`checks/<nodeId>/<检查时刻>/<n>.jpg`），只读 `runs/<taskId>/browser/` 下的 `.jpg`，其余 404 `NOT_FOUND`；`image/jpeg` |
 | GET | `/attempts/:id/transcript?afterSeq` | `{ entries: TranscriptEntry[], lastSeq, hasMore: boolean, done: boolean }`（非清单路由，10 §3）：`lastSeq` 为本页最大 seq（空页为请求的 `afterSeq`），`hasMore` 表示本页之后已有写入的行（以 `afterSeq = lastSeq` 继续读），`done` 表示尝试已结束且已读到末尾 |
 | POST | `/attempts/:id/abort` 🅿 | 中止进行中的尝试（节点按 `attempt_failed` 处理）；非 `running` 409 `STATE_TRANSITION_INVALID` |
 | POST | `/debug/attempts` | 仅开发构建（M2-09）：`{ directory, requirement, model? }` → 201 `AttemptDTO`；对 Git 目录发起一次不属于任务的 `execute` 尝试。目录不在 Git 仓库中 400 `PROJECT_PATH_NOT_GIT_REPO`；opencode 未就绪 503 `OPENCODE_NOT_READY` |

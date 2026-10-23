@@ -16,6 +16,7 @@ function service() {
   const unused = {} as never;
   const deps: AcceptanceServiceDeps = {
     attempts: { onSignal: () => () => undefined } as never,
+    browser: unused,
     roles: unused,
     settings: unused,
     prompts: unused,

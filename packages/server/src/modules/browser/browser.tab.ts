@@ -18,9 +18,9 @@ import type { BrowserHost } from './browser.host.ts';
 import { createNetworkTracker } from './browser.settle.ts';
 import { axNodeSchema, formatSnapshot } from './browser.snapshot.ts';
 
-type ConsoleEntry = { level: 'error' | 'warning'; text: string; source: string | null };
-type ExceptionEntry = { message: string; source: string | null };
-type RequestEntry = {
+export type ConsoleEntry = { level: 'error' | 'warning'; text: string; source: string | null };
+export type ExceptionEntry = { message: string; source: string | null };
+export type RequestEntry = {
   method: string;
   url: string;
   status: number | null;
@@ -94,6 +94,8 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
   let logCursor = { console: 0, exceptions: 0, requests: 0 };
   const since = { navigated: false, dialog: null as string | null, blockedWrites: [] as string[], loaded: true };
   let mark = { console: 0, exceptions: 0, failed: 0 };
+  /** Where this action's entries start, for the facts of one page (a page check, 29 §7.2). */
+  let start = { console: 0, exceptions: 0, requests: 0 };
   let onLoad = () => {};
 
   const cdp = (method: string, params?: Record<string, unknown>) =>
@@ -225,6 +227,16 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
       since.dialog = null;
       since.blockedWrites = [];
       mark = { console: consoleErrors(), exceptions: exceptions.length, failed: failedRequests().length };
+      start = { console: consoleEntries.length, exceptions: exceptions.length, requests: requests.size };
+    },
+
+    /** What the page did since `begin`: its console, uncaught exceptions and every request in order. */
+    facts(): { console: ConsoleEntry[]; exceptions: ExceptionEntry[]; requests: RequestEntry[] } {
+      return {
+        console: consoleEntries.slice(start.console),
+        exceptions: exceptions.slice(start.exceptions),
+        requests: [...requests.values()].slice(start.requests),
+      };
     },
 
     /** The page loaded (when it navigated), then network and DOM quiet; false when that took too long (29 §5.5). */

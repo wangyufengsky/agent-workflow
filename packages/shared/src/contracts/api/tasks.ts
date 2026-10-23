@@ -183,7 +183,7 @@ export const taskResultSchema = z.object({
       passed: z.boolean(),
       /** A command check's command (results written before D116 have none). */
       command: z.string().nullable().default(null),
-      /** Skipped by the user, so not verified (D116). */
+      /** Skipped by the user, so not verified (D116; a page check, 29 §7.4). */
       skipped: z.boolean().default(false),
     }),
   ),

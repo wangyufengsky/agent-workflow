@@ -118,7 +118,7 @@ export const skipCheckOp = defineOperationContract({
   refs: { id: InputRef.Task },
   title: 'op.tasks.skipCheck',
   description:
-    "Skip the check command the app's environment could not run in the task's unfinished steps and go on; the result is marked unverified",
+    "Skip the check the app's environment could not run (a check command, or the page check when the preview never started) in the task's unfinished steps and go on; the result is marked unverified",
   input: byId,
   output: taskDetailSchema,
   risk: OperationRisk.Critical,

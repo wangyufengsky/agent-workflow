@@ -67,7 +67,7 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
           kind: c.kind,
           passed: c.passed,
           command: c.kind === AcceptanceCheckKind.Command ? c.command : null,
-          skipped: c.kind === AcceptanceCheckKind.Command && c.skipped,
+          skipped: c.kind !== AcceptanceCheckKind.AiReview && c.skipped,
         })),
       ),
       nodeSummaries,
@@ -122,11 +122,22 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
                 command: nodes.failedCommand(failed)?.command ?? null,
               },
             }
-          : {
-              code: ErrorCode.CheckCommandUnrunnable,
-              message: `Step ${failed.key} check \`${unrunnable.command}\` cannot run: ${unrunnable.program} ${unrunnable.reason}`,
-              details: { ...step, ...unrunnable },
-            },
+          : unrunnable.kind === AcceptanceCheckKind.Command
+            ? {
+                code: ErrorCode.CheckCommandUnrunnable,
+                message: `Step ${failed.key} check \`${unrunnable.command}\` cannot run: ${unrunnable.program} ${unrunnable.reason}`,
+                details: {
+                  ...step,
+                  command: unrunnable.command,
+                  program: unrunnable.program,
+                  reason: unrunnable.reason,
+                },
+              }
+            : {
+                code: ErrorCode.BrowserCheckUnrunnable,
+                message: `Step ${failed.key} page check cannot run: ${unrunnable.reason}`,
+                details: { ...step, reason: unrunnable.reason, logTail: unrunnable.logTail },
+              },
       );
     },
   };
