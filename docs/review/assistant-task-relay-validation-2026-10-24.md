@@ -11,7 +11,7 @@
 - 完整验证：check 通过；712 单元测试通过；332 集成测试通过、1 条既有 SQL Server 条件跳过；生产构建和产物检查通过。执行步骤等价 pnpm verify，Vitest 限制 maxWorkers=2。
 - 助手 / 任务定向回归：17 文件 92 项通过，其中 6 项新的任务回传用例覆盖创建原子性、来源隔离、事件去重、真实 Git 交付、忙碌、断线、重启、发送失败、删除与回滚。
 - 助手及桌宠浏览器 E2E：仓库默认单 worker 下 8/8 通过。首次误用 2 workers 导致共享 FakeOpencode 脚本队列串扰；恢复既有串行配置后全过，没有修改产品断言。
-- 新通知模板真实模型：opencode-go/deepseek-v4.1-flash 连续三轮通知语义验证通过（约 22 秒）。区分待验收、跳过检查、失败原因、PR 已创建但未合并；三轮没有工具调用或模型错误。这是模板语义验收，真实任务关联和回传链路由上面的 SQLite/Git 集成测试覆盖，不把通知样本当完整开发流程验收。
-- 原始日志：本机 /private/tmp/aw-assistant-task-relay-verify.log、aw-assistant-task-relay-e2e-serial.log、aw-assistant-task-relay-live.log。真实模型报告保存在该工作区 live/reports/assistant-notifications-2026-10-23T17-34-34.608Z.json。
+- 新通知模板真实模型：opencode-go/deepseek-v4.1-flash 连续三轮通知语义验证通过（约 22 秒）。区分待验收、跳过检查、失败原因、PR 已创建但未合并；三轮没有工具调用或模型错误。逐字审读发现失败通知曾把“最终结果为空”推断成“没有改动”，因此补强提示词并增加否定断言；最终三轮重跑通过，明确未知部分改动。这是模板语义验收，真实任务关联和回传链路由上面的 SQLite/Git 集成测试覆盖，不把通知样本当完整开发流程验收。
+- 原始日志：本机 /private/tmp/aw-assistant-task-relay-verify.log、aw-assistant-task-relay-e2e-serial.log、aw-assistant-task-relay-live-final.log。真实模型报告保存在该工作区 live/reports/assistant-notifications-2026-10-23T17-41-29.467Z.json。
 
 迁移为 drizzle-kit 生成的 0019_assistant_task_followups，基于已合并的 0018_assistant_outbox；没有修改 Claude 的迁移或工作区。GitHub CI 只有手动触发，本次没有把不存在的自动 CI 检查当成通过。

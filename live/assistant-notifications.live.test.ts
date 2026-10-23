@@ -111,5 +111,6 @@ it('@live 连续任务通知区分待验收、失败和 PR 创建，跳过检查
   expect(reports[0]?.reply).toMatch(/待.*验收|等待.*验收|需要.*验收/);
   expect(reports[0]?.reply).toMatch(/跳过|未.{0,6}(执行|验证|运行)/);
   expect(reports[1]?.reply).toContain('日期边界断言失败');
+  expect(reports[1]?.reply).not.toMatch(/(?:^|[，。；：])(?:因此|所以|故)?(?:未|没有)产生.{0,12}(改动|更改|变更)/);
   expect(reports[2]?.reply).toMatch(/(未|没有|尚未).{0,6}合并|等待.{0,6}(审查|合并)/);
 });
