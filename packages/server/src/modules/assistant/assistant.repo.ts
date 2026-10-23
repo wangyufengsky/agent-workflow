@@ -5,10 +5,10 @@ import {
   assistantConfirmationResultSchema,
   ErrorCode,
 } from '@aw/shared';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
-import { assistantConfirmationsTable, assistantConversationsTable } from './assistant.table.ts';
+import { assistantConfirmationsTable, assistantConversationsTable, assistantOutboxTable } from './assistant.table.ts';
 
 export type Conversation = typeof assistantConversationsTable.$inferSelect;
 
@@ -31,7 +31,22 @@ function toConfirmation(row: typeof assistantConfirmationsTable.$inferSelect): C
 export function createAssistantRepo(db: DbExecutor) {
   const conversations = assistantConversationsTable;
   const confirmations = assistantConfirmationsTable;
+  const outbox = assistantOutboxTable;
   return {
+    enqueueMessage(conversationId: string, text: string, createdAt: number): void {
+      db.insert(outbox).values({ conversationId, text, createdAt }).run();
+    },
+    pendingMessages(conversationId: string): Array<{ id: number; text: string }> {
+      return db
+        .select({ id: outbox.id, text: outbox.text })
+        .from(outbox)
+        .where(eq(outbox.conversationId, conversationId))
+        .orderBy(asc(outbox.id))
+        .all();
+    },
+    acknowledgeMessages(ids: number[]): void {
+      db.delete(outbox).where(inArray(outbox.id, ids)).run();
+    },
     insertConversation(row: Conversation): void {
       db.insert(conversations).values(row).run();
     },

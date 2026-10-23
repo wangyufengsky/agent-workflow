@@ -318,17 +318,19 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/assistant/conversations` | `{ title? }` → 201；opencode 会话在第一条消息时创建 |
 | GET | `/assistant/conversations/:id` | 不存在 404 `ASSISTANT_CONVERSATION_NOT_FOUND` |
 | DELETE | `/assistant/conversations/:id` | 204；连同确认、消息流 JSONL 与 `files/<id>/` |
-| POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey?, knowledgeConversationId?, deckId?, slideId?, batchId?, scheduleId? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在回复时 409 `ASSISTANT_BUSY` |
+| POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey?, knowledgeConversationId?, deckId?, slideId?, batchId?, scheduleId? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在创建会话、发送请求或等待模型回复时 409 `ASSISTANT_BUSY` |
 | POST | `/assistant/conversations/:id/abort` | 停止本轮回复 |
 | POST | `/assistant/conversations/:id/permissions/:permissionId` | `{ reply: PermissionDecision }`：回复助手会话的权限请求（bash / webfetch 询问），不存在 404 `NOT_FOUND` |
 | GET | `/assistant/conversations/:id/transcript?afterSeq=` | 消息流分页（非清单路由，格式同 `/attempts/:id/transcript`；`done` 恒为 false：对话不会结束） |
 | GET | `/assistant/conversations/:id/files` | `{ items: Array<{ path, absolutePath, size, modifiedAt }> }`：`files/<id>/` 下助手写的文件 |
-| GET | `/assistant/conversations/:id/confirmations` | `{ items: AssistantConfirmationDTO[] }`，按创建时间；`AssistantConfirmationDTO = { id, conversationId, operationId, title, risk, input, status, result: { ok: true, output } \| { ok: false, error } \| null, createdAt, resolvedAt }` |
+| GET | `/assistant/conversations/:id/confirmations` | `{ items: AssistantConfirmationDTO[] }`，按创建时间；`AssistantConfirmationDTO = { id, conversationId, operationId, title, risk, input, status, result: { ok: true, output } \| { ok: false, error } \| null, createdAt, resolvedAt }`；无返回值的成功操作及旧版缺失 output 的成功记录均返回 `output: null` |
 | POST | `/assistant/confirmations/:id/confirm` | `{ alwaysAllow? }`：执行操作并把结果作为下一条消息发回会话；`alwaysAllow` 只允许 write 级（critical 400 `VALIDATION_FAILED`），同时把操作加入 `assistant.alwaysAllow`；已处理 409 `STATE_TRANSITION_INVALID`；不存在 404 `ASSISTANT_CONFIRMATION_NOT_FOUND` |
 | POST | `/assistant/confirmations/:id/cancel` | 会话收到「用户取消了该操作」 |
 
 | POST | `/assistant/whisper` | `assistant.whisper`，`{}` → `{ text }`（1–120 字符）；沿用默认模型，独立 `aw-companion` 会话，禁用全部工具，不保存到工作聊天；并发 409 `ASSISTANT_BUSY`，运行时不可用 `OPENCODE_NOT_READY`，空输出／模型错误／取消／超时 `OPENCODE_REQUEST_FAILED`。write，不暴露给助手或命令面板 |
 | POST | `/assistant/whisper/stop` | `assistant.stopWhisper`，`{}` → 204；取消在途生成并清理临时会话；无在途请求时仍成功 |
+
+确认结果与待发通知持久化在同一事务；会话忙、运行时不可用或发送失败时保留通知，重启后可随下一条用户消息投递，投递成功才移除，不重新执行业务操作。应用回传结果时，若用户上一条消息所在页面的对象已被删除，system 明确说明该页面已失效，仍正常发送结果；用户主动发送消息时仍严格校验所报页面对象。
 
 桌宠复用全部对话端点，`AssistantPage.Desktop = desktop` 的参数为空。角色窗口的本地 IPC（`configure({ enabled, size })`、`setPanel(none | chat | bubble)`、`onLayout`）边界见 [32 §4](32-companion-assistant.md#4-实现分层)。
 

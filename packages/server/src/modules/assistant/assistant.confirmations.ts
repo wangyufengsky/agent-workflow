@@ -15,6 +15,7 @@ import {
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
+import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { EventBus } from '../../core/event-bus.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { OperationImpl } from '../../core/operations/operations.ts';
@@ -24,6 +25,7 @@ import type { AssistantService } from './assistant.service.ts';
 
 export type ConfirmationsDeps = {
   db: Db;
+  unit: UnitOfWork;
   events: EventBus;
   clock: Clock;
   log: Logger;
@@ -41,7 +43,8 @@ export async function runOperation(
   log: Logger,
 ): Promise<AssistantConfirmationResult> {
   try {
-    return { ok: true, output: await impl.run(input) };
+    const output = await impl.run(input);
+    return { ok: true, output: output === undefined ? null : output };
   } catch (err) {
     if (err instanceof AppError) return { ok: false, error: err.toInfo() };
     log.error({ err, operationId: impl.contract.id }, 'assistant operation crashed');
@@ -126,31 +129,37 @@ export function createConfirmations(deps: ConfirmationsDeps) {
       }
       publish(id);
       const result = await runOperation(impl, c.input, log);
-      repo.setConfirmationResult(id, result);
+      deps.unit.transact(() => {
+        repo.setConfirmationResult(id, result);
+        conversations.queueMessage(
+          c.conversationId,
+          renderTemplate(prompts[PromptName.AssistantConfirmed], {
+            tool: assistantToolName(c.operationId),
+            confirmationId: id,
+            result: JSON.stringify(result, null, 2),
+          }),
+        );
+      });
       if (result.ok) conversations.recordProduced(c.conversationId, impl.contract, result.output);
       const dto = publish(id);
-      await conversations.deliver(
-        c.conversationId,
-        renderTemplate(prompts[PromptName.AssistantConfirmed], {
-          tool: assistantToolName(c.operationId),
-          confirmationId: id,
-          result: JSON.stringify(result, null, 2),
-        }),
-      );
+      await conversations.flush(c.conversationId);
       return dto;
     },
 
     async cancel(id: string): Promise<AssistantConfirmationDTO> {
       const c = get(id);
-      resolve(c, AssistantConfirmationEvent.Cancel);
+      deps.unit.transact(() => {
+        resolve(c, AssistantConfirmationEvent.Cancel);
+        conversations.queueMessage(
+          c.conversationId,
+          renderTemplate(prompts[PromptName.AssistantCancelled], {
+            tool: assistantToolName(c.operationId),
+            confirmationId: id,
+          }),
+        );
+      });
       const dto = publish(id);
-      await conversations.deliver(
-        c.conversationId,
-        renderTemplate(prompts[PromptName.AssistantCancelled], {
-          tool: assistantToolName(c.operationId),
-          confirmationId: id,
-        }),
-      );
+      await conversations.flush(c.conversationId);
       return dto;
     },
   };

@@ -1,0 +1,99 @@
+import {
+  confirmAssistantCallOp, createConversationOp, getProjectOp, listConfirmationsOp,
+  MCP_SESSION_ARG, sendAssistantMessageOp, deleteProjectOp,
+} from '@aw/shared';
+import { afterEach, expect, it, vi } from 'vitest';
+import { createTestApp, type TestApp } from './helpers/app.ts';
+import { addProject } from './helpers/tasks.ts';
+import { callTool, connectMcp } from './helpers/mcp.ts';
+
+let t: TestApp | undefined;
+afterEach(async () => { vi.restoreAllMocks(); await t?.close(); });
+const HOME = { page: 'home', params: {} } as const;
+
+it('同一新对话的并发首条消息只能创建一个会话，另一条应拒绝为 busy', async () => {
+  t = await createTestApp();
+  const app = t;
+  const c = (await app.call(createConversationOp, {})).body;
+  const entered = Promise.withResolvers<void>();
+  const enteredAgain = Promise.withResolvers<void>();
+  let entries = 0;
+  const release = Promise.withResolvers<void>();
+  const original = app.fake.createSession.bind(app.fake);
+  vi.spyOn(app.fake, 'createSession').mockImplementation(async (input) => {
+    entries += 1;
+    if (entries === 1) entered.resolve(); else enteredAgain.resolve();
+    await release.promise;
+    return original(input);
+  });
+  const first = app.call(sendAssistantMessageOp, { id: c.id, text: '窗口 A', context: HOME });
+  await entered.promise;
+  const second = app.call(sendAssistantMessageOp, { id: c.id, text: '窗口 B', context: HOME });
+  // Release when the second request either enters the external call or is rejected as busy.
+  await Promise.race([enteredAgain.promise, second]);
+  release.resolve();
+  const results = await Promise.all([first, second]);
+  await app.fake.settled();
+  expect({ statuses: results.map((r) => r.status).sort(), sessions: app.fake.sessions.length })
+    .toEqual({ statuses: [200, 409], sessions: 1 });
+});
+
+it('在项目页确认删除项目后，接口仍成功返回操作结果并回传给助手', async () => {
+  t = await createTestApp();
+  const app = t;
+  const { project } = await addProject(app);
+  const c = (await app.call(createConversationOp, {})).body;
+  await app.call(sendAssistantMessageOp, { id: c.id, text: '删除当前项目', context: { page: 'project', params: { projectId: project.id } } });
+  await app.fake.settled();
+  const mcp = await connectMcp(app.assistantMcpUrl, app.app.assistantMcpToken);
+  try {
+    const { body } = await callTool(mcp, 'projects_delete', { id: project.id, [MCP_SESSION_ARG]: app.fake.sessions[0]?.id });
+    const confirmed = await app.call(confirmAssistantCallOp, { id: String(body.confirmation_id) });
+    const gone = await app.call(getProjectOp, { id: project.id });
+    const cards = await app.call(listConfirmationsOp, { id: c.id });
+    expect({ confirmStatus: confirmed.status, confirmBody: confirmed.body, projectStatus: gone.status, cardsStatus: cards.status, cardsBody: cards.body })
+      .toMatchObject({ confirmStatus: 200, projectStatus: 404, cardsStatus: 200, cardsBody: { items: [{ result: { ok: true } }] } });
+  } finally { await mcp.close(); }
+});
+
+it('已执行且在等待回传的确认结果在后端重启后仍随下一条消息送达', async () => {
+  t = await createTestApp();
+  let app = t;
+  const { project } = await addProject(app);
+  const c = (await app.call(createConversationOp, {})).body;
+  await app.call(sendAssistantMessageOp, { id: c.id, text: '改项目名', context: HOME });
+  await app.fake.settled();
+  const mcp = await connectMcp(app.assistantMcpUrl, app.app.assistantMcpToken);
+  const { body } = await callTool(mcp, 'projects_update', { id: project.id, name: '已确认的新名称', [MCP_SESSION_ARG]: app.fake.sessions[0]?.id });
+  app.fake.crash();
+  const confirmed = await app.call(confirmAssistantCallOp, { id: String(body.confirmation_id) });
+  expect(confirmed.status).toBe(200);
+  expect((await app.call(getProjectOp, { id: project.id })).body.name).toBe('已确认的新名称');
+  await mcp.close();
+  const dataDir = app.dataDir;
+  const fake = app.fake;
+  await app.close();
+  t = await createTestApp({ dataDir, fake });
+  app = t;
+  await app.call(sendAssistantMessageOp, { id: c.id, text: '继续', context: HOME });
+  await app.fake.settled();
+  expect(app.fake.prompts.at(-1)?.text).toContain('The user confirmed `projects_update`');
+});
+
+it('确认期间原页面对象被删除，不应影响已经成功执行的操作回传', async () => {
+  t = await createTestApp();
+  const app = t;
+  const { project } = await addProject(app);
+  const c = (await app.call(createConversationOp, {})).body;
+  await app.call(sendAssistantMessageOp, { id: c.id, text: '切到专业模式', context: { page: 'project', params: { projectId: project.id } } });
+  await app.fake.settled();
+  const mcp = await connectMcp(app.assistantMcpUrl, app.app.assistantMcpToken);
+  try {
+    const { body } = await callTool(mcp, 'settings_update', { 'ui.mode': 'pro', [MCP_SESSION_ARG]: app.fake.sessions[0]?.id });
+    expect((await app.call(deleteProjectOp, { id: project.id })).status).toBe(204);
+    const confirmed = await app.call(confirmAssistantCallOp, { id: String(body.confirmation_id) });
+    const cards = await app.call(listConfirmationsOp, { id: c.id });
+    expect({ status: confirmed.status, body: confirmed.body, result: cards.body.items[0]?.result })
+      .toMatchObject({ status: 200, result: { ok: true } });
+  } finally { await mcp.close(); }
+});

@@ -67,12 +67,12 @@ export type AssistantServiceDeps = {
 /** What we keep about a conversation while the app runs; lost on restart like the session's turn (D46). */
 type Live = {
   busy: boolean;
+  /** 外部请求尚未返回时，空闲事件也不能放行下一次发送。 */
+  sending: boolean;
   /** The user asked to stop: the abort's own error is not the conversation's. */
   aborting: boolean;
   view: SessionView;
   permissions: Map<string, AssistantPermissionRequestDTO>;
-  /** Messages for the model (confirmation results) waiting until it can take them: its turn ended, or it is back. */
-  outbox: string[];
   /** Files already shown as attachments. */
   attached: Set<string>;
   /** Where the user was at their last message; told to the model with messages the app sends. */
@@ -114,10 +114,10 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     if (state === undefined) {
       state = {
         busy: false,
+        sending: false,
         aborting: false,
         view: createSessionView(),
         permissions: new Map(),
-        outbox: [],
         attached: new Set(),
         page: undefined,
       };
@@ -139,7 +139,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     return {
       id: c.id,
       title: c.title,
-      busy: state.busy,
+      busy: state.busy || state.sending,
       pendingPermissions: [...state.permissions.values()],
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
@@ -156,11 +156,12 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     transcripts.append(c, entries);
   }
 
-  function system(c: Conversation, page: AssistantPageRef | undefined): string {
+  function system(c: Conversation, page: AssistantPageRef | undefined, source: 'user' | 'app'): string {
     return context.render({
       time: localTime(clock.now(), deps.timeZone),
       uiMode: settings.get('ui.mode'),
       page,
+      source,
       filesDir: `${ASSISTANT_FILES_DIR}/${c.id}/ (absolute: ${filesDir(c.id)})`,
     });
   }
@@ -183,40 +184,57 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     return sessionId;
   }
 
-  /** Starts a turn; the conversation is busy until the session goes idle. */
-  async function prompt(c: Conversation, sessionId: string, systemText: string, text: string): Promise<void> {
+  /** 建会话之前占住发送入口；请求返回前的空闲事件只结束模型回合，不释放发送权。 */
+  async function runTurn(c: Conversation, send: () => Promise<void>): Promise<void> {
     const state = liveOf(c.id);
+    state.sending = true;
     state.busy = true;
     publish(c.id);
-    const model = settings.get('ai.defaultModel');
     try {
-      await opencode.prompt({
-        sessionId,
-        directory,
-        agent: OPENCODE_ASSISTANT_AGENT,
-        ...(model === null ? {} : { model: parseModelRef(model) }),
-        system: systemText,
-        text,
-      });
+      await send();
     } catch (err) {
       state.busy = false;
-      publish(c.id);
       throw err;
+    } finally {
+      state.sending = false;
+      publish(c.id);
     }
+    // 空闲事件可能早于请求响应，此时补发请求期间入队的消息。
+    if (!state.busy) flushLater(c.id);
+  }
+
+  async function prompt(sessionId: string, systemText: string, text: string): Promise<void> {
+    const model = settings.get('ai.defaultModel');
+    await opencode.prompt({
+      sessionId,
+      directory,
+      agent: OPENCODE_ASSISTANT_AGENT,
+      ...(model === null ? {} : { model: parseModelRef(model) }),
+      system: systemText,
+      text,
+    });
   }
 
   /** Sends what waits in the outbox, once the session can take it. */
   async function flush(id: string): Promise<void> {
     const state = liveOf(id);
-    if (state.busy || state.outbox.length === 0 || !opencode.isConnected()) return;
+    if (state.busy || state.sending || !opencode.isConnected()) return;
+    const queued = repo.pendingMessages(id);
+    if (queued.length === 0) return;
     const c = get(id);
-    const text = state.outbox.splice(0).join('\n\n');
-    try {
-      await prompt(c, await sessionOf(c), system(c, state.page), text);
-    } catch (err) {
-      state.outbox.unshift(text);
-      throw err;
-    }
+    await runTurn(c, async () => {
+      await prompt(await sessionOf(c), system(c, state.page, 'app'), queued.map((m) => m.text).join('\n\n'));
+      repo.acknowledgeMessages(queued.map((m) => m.id));
+    });
+  }
+
+  function flushLater(id: string): void {
+    flush(id).catch((err: unknown) => log.error({ err, conversationId: id }, 'assistant message not sent'));
+  }
+
+  function queueMessage(id: string, text: string): void {
+    get(id);
+    repo.enqueueMessage(id, text, clock.now());
   }
 
   function onToolEvent(
@@ -277,7 +295,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         state.aborting = false;
         state.permissions.clear();
         publish(id);
-        flush(id).catch((err: unknown) => log.error({ err, conversationId: id }, 'assistant message not sent'));
+        flushLater(id);
         return;
       default:
         return;
@@ -330,40 +348,37 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     }: SendAssistantMessageRequest): Promise<AssistantConversationDTO> {
       const c = get(id);
       const state = liveOf(id);
-      if (state.busy) throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is busy`, { id });
+      if (state.busy || state.sending)
+        throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is busy`, { id });
       if (!opencode.isConnected()) throw new AppError(ErrorCode.OpencodeNotReady, 'opencode is not ready');
       // Rendered first: a page about a deleted entity fails before anything is recorded.
-      const systemText = system(c, page);
+      const systemText = system(c, page, 'user');
       const titled = c.title === '' ? { ...c, title: titleOf(text) } : c;
       repo.updateConversation(id, { title: titled.title, updatedAt: clock.now() });
-      const sessionId = await sessionOf(titled);
-      // The conversation keeps its files even when the model cannot be reached: they were sent (30 §2).
-      attachments.bind({ kind: AttachmentOwnerKind.AssistantMessage, id }, attachmentIds);
-      const sent = attachmentIds.map((attachmentId) => attachments.get(attachmentId));
-      record(c, [
-        {
-          kind: TranscriptEntryKind.UserMessage,
-          data: sent.length === 0 ? { text } : { text, attachments: sent.map((a) => ({ id: a.id, name: a.name })) },
-        },
-      ]);
-      state.page = page;
-      const queued = state.outbox.splice(0);
-      const section = attachments.promptSection(
-        sent,
-        `${MCP_ASSISTANT_TOOL_PREFIX}${AssistantToolName.ReadAttachment}`,
-      );
-      try {
+      await runTurn(titled, async () => {
+        const sessionId = await sessionOf(titled);
+        // The conversation keeps its files even when the model cannot be reached: they were sent (30 §2).
+        attachments.bind({ kind: AttachmentOwnerKind.AssistantMessage, id }, attachmentIds);
+        const sent = attachmentIds.map((attachmentId) => attachments.get(attachmentId));
+        record(c, [
+          {
+            kind: TranscriptEntryKind.UserMessage,
+            data: sent.length === 0 ? { text } : { text, attachments: sent.map((a) => ({ id: a.id, name: a.name })) },
+          },
+        ]);
+        state.page = page;
+        const queued = repo.pendingMessages(id);
+        const section = attachments.promptSection(
+          sent,
+          `${MCP_ASSISTANT_TOOL_PREFIX}${AssistantToolName.ReadAttachment}`,
+        );
         await prompt(
-          get(id),
           sessionId,
           systemText,
-          [...queued, text, ...(section === '' ? [] : [section])].join('\n\n'),
+          [...queued.map((m) => m.text), text, ...(section === '' ? [] : [section])].join('\n\n'),
         );
-      } catch (err) {
-        // The model has not seen them: they go with the next message.
-        state.outbox.unshift(...queued);
-        throw err;
-      }
+        repo.acknowledgeMessages(queued.map((m) => m.id));
+      });
       return toDto(get(id));
     },
 
@@ -383,9 +398,12 @@ export function createAssistantService(deps: AssistantServiceDeps) {
 
     /** A message from the app (a confirmation's result): now if the session can take it, else when it can. */
     async deliver(id: string, text: string): Promise<void> {
-      liveOf(id).outbox.push(text);
+      queueMessage(id, text);
       await flush(id);
     },
+    /** 确认结果与待发消息由调用者在同一事务提交，提交后才能发送。 */
+    queueMessage,
+    flush,
 
     async abort(id: string): Promise<AssistantConversationDTO> {
       const c = get(id);

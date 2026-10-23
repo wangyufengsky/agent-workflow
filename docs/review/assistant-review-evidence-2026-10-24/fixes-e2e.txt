@@ -1,0 +1,26 @@
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 8 tests using 1 worker
+
+(node:30967) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+  ✓  1 [browser] › e2e/shell-assistant.browser.spec.ts:25:1 › J11 对助手说开始任务 → 确认卡片 → 任务运行 (3.1s)
+
+  ✓  2 [browser] › e2e/shell-assistant.browser.spec.ts:82:1 › 主页的建议在主页上提问；open_page 带用户离开时面板接着显示对话；卡片上「总是允许」后可在设置中撤销 (3.3s)
+
+  ✓  3 [browser] › e2e/shell-assistant.browser.spec.ts:121:1 › 总是允许的调用直接执行并出现对象卡片；对象删除后卡片显示「已删除」 (1.2s)
+
+  ✓  4 [browser] › e2e/shell-assistant.browser.spec.ts:163:1 › J25 主页：让助手开始任务 → 主页上的确认卡片 → 导航卡片与工作概览 → 打开任务页，面板接着显示同一对话 (2.2s)
+
+  ✓  5 [browser] › e2e/shell-companion.browser.spec.ts:13:1 › 默认光球可预览工作与完成动画，切换鲸鱼会持久化并遵守减少动态效果 (1.5s)
+  ✓  6 [browser] › e2e/shell-companion.browser.spec.ts:65:1 › 极光失去 GPU 上下文后保留静态形象 (361ms)
+  ✓  7 [browser] › e2e/shell-companion.browser.spec.ts:79:1 › 桌宠页面复用助手聊天、碎碎念隔离，鲸鱼素材失败有显式提示 (726ms)
+
+  ✓  8 [browser] › e2e/shell-companion.browser.spec.ts:111:1 › 真实任务事件驱动光球庆祝，待检查与完成分别提醒，旧通知不覆盖新通知 (1.3s)
+
+  8 passed (22.1s)

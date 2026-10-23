@@ -36,3 +36,17 @@ export const assistantConfirmationsTable = sqliteTable(
   },
   (t) => [index('assistant_confirmations_conversation_idx').on(t.conversationId, t.createdAt)],
 );
+
+/** 待回传的应用消息：确认结果和入队在同一事务提交，模型接受后才移除。 */
+export const assistantOutboxTable = sqliteTable(
+  'assistant_outbox',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    conversationId: text('conversation_id')
+      .notNull()
+      .references(() => assistantConversationsTable.id, { onDelete: 'cascade' }),
+    text: text('text').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('assistant_outbox_conversation_idx').on(t.conversationId, t.id)],
+);
