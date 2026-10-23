@@ -30,7 +30,7 @@ export function createAssistantUsage(deps: {
   }
 
   return {
-    start(conversationId: string, source: 'user' | 'app') {
+    start(conversationId: string, source: 'user' | 'app', messageId: string) {
       const timeoutMs = deps.settings.get('attempt.timeoutMinutes') * 60_000;
       const turn = repo.create({
         conversationId,
@@ -39,10 +39,12 @@ export function createAssistantUsage(deps: {
         startedAt: deps.clock.now(),
         timeoutMs,
       });
+      repo.addMessage(turn, messageId);
+      turn.messageIds.push(messageId);
       const state: Active = { turn, remainingMs: timeoutMs, armedAt: null, cancel: () => undefined };
       active.set(conversationId, state);
       arm(state);
-      return turn.model;
+      return { id: turn.id, model: turn.model };
     },
     isRunning: (id: string) => active.has(id),
     finish(id: string, event: AssistantTurnEvent) {
@@ -63,11 +65,16 @@ export function createAssistantUsage(deps: {
       const state = active.get(id);
       if (state !== undefined && state.armedAt === null) arm(state);
     },
-    message(id: string, messageId: string) {
-      const state = active.get(id);
-      if (state === undefined || repo.byMessage(id, messageId) !== undefined) return;
-      repo.addMessage(state.turn, messageId);
-      state.turn.messageIds.push(messageId);
+    message(id: string, messageId: string, parentMessageId: string | undefined) {
+      if (parentMessageId === undefined || repo.byMessage(id, messageId) !== undefined) return;
+      const turn = repo.byMessage(id, parentMessageId);
+      // 原生 assistant.parentID 指向发起本轮的 user message，迟到消息仍归旧轮。
+      if (turn === undefined) return;
+      repo.addMessage(turn, messageId);
+    },
+    ownsActiveMessage(id: string, messageId: string): boolean {
+      const running = active.get(id);
+      return running !== undefined && repo.byMessage(id, messageId)?.id === running.turn.id;
     },
     step(id: string, messageId: string, partId: string, tokens: { input: number; output: number }) {
       return deps.unit.transact(() => {

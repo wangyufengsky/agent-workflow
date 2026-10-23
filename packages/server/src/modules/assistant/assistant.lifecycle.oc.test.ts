@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
+  AssistantTurnStatus,
+  abortAssistantOp,
   createConversationOp,
   deleteConversationOp,
   OPENCODE_ASSISTANT_AGENT,
@@ -14,7 +16,7 @@ import {
   type TranscriptPage,
   updateSettingsOp,
 } from '@aw/shared';
-import { afterAll, beforeAll, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
@@ -50,6 +52,11 @@ function scriptedModel(): Server {
       const last = messages.at(-1);
       const text =
         typeof last?.content === 'string' ? last.content : (last?.content ?? []).map((p) => p.text ?? '').join('');
+      if (text.includes('WAIT_FOR_ABORT')) {
+        res.setHeader('content-type', 'text/event-stream');
+        res.flushHeaders();
+        return;
+      }
       const instruction =
         last?.role === 'user' && text.includes(TOOL_PREFIX)
           ? callSchema.parse(JSON.parse(text.slice(text.lastIndexOf(TOOL_PREFIX) + TOOL_PREFIX.length)))
@@ -105,6 +112,7 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await t.close();
+  model.closeAllConnections();
   await new Promise<void>((resolve, reject) => model.close((error) => (error ? reject(error) : resolve())));
 });
 
@@ -206,4 +214,69 @@ it('@opencode 助手可读写自己目录，不能读取或覆盖另一个对话
     { throwOnError: true },
   );
   expect(remaining.map((s) => s.id)).not.toContain(migrated?.id);
+});
+
+it('@opencode 刚派发即停止不会漏过启动，随后短问完成；无效模型与 agent 的前置错误也会结束请求', async () => {
+  const c = (await t.call(createConversationOp, {})).body;
+  // 先建立原生 session，让下一次停止正好落在同步 prompt 派发与 Runner 注册之间。
+  const ready = waitForEvent(t.app.events, ServerEventType.AssistantUpdated, (d) => d.id === c.id && !d.busy);
+  await t.call(sendAssistantMessageOp, { id: c.id, text: 'hello', context: { page: 'home', params: {} } });
+  await ready;
+  let session: string | undefined;
+  const dispatched = Promise.withResolvers<void>();
+  const original = t.app.services.opencode.promptAssistant.bind(t.app.services.opencode);
+  vi.spyOn(t.app.services.opencode, 'promptAssistant').mockImplementationOnce((input) => {
+    session = input.sessionId;
+    const handle = original(input);
+    dispatched.resolve();
+    return handle;
+  });
+  const sending = t.call(sendAssistantMessageOp, {
+    id: c.id,
+    text: 'WAIT_FOR_ABORT',
+    context: { page: 'home', params: {} },
+  });
+  await dispatched.promise;
+  expect((await t.call(abortAssistantOp, { id: c.id })).status).toBe(200);
+  await sending;
+  expect(t.app.services.assistant.get(c.id)).toMatchObject({
+    busy: false,
+    usage: { latest: { status: AssistantTurnStatus.Aborted } },
+  });
+  const completed = waitForEvent(t.app.events, ServerEventType.AssistantUpdated, (d) => d.id === c.id && !d.busy);
+  await t.call(sendAssistantMessageOp, { id: c.id, text: 'answer briefly', context: { page: 'home', params: {} } });
+  await completed;
+  expect(t.app.services.assistant.get(c.id).usage.latest?.status).toBe(AssistantTurnStatus.Completed);
+  const permission = waitForEvent(
+    t.app.events,
+    ServerEventType.AssistantUpdated,
+    (d) => d.id === c.id && d.pendingPermissions.length > 0,
+  );
+  await t.call(sendAssistantMessageOp, {
+    id: c.id,
+    text: `${TOOL_PREFIX}${JSON.stringify({ name: 'bash', arguments: { command: 'echo permission', description: 'Permission stop regression' } })}`,
+    context: { page: 'home', params: {} },
+  });
+  await permission;
+  expect((await t.call(abortAssistantOp, { id: c.id })).status).toBe(200);
+  expect(t.app.services.assistant.get(c.id)).toMatchObject({ busy: false, pendingPermissions: [] });
+  if (session === undefined) throw new Error('Expected session');
+  for (const invalid of ['model', 'agent']) {
+    const handle = original({
+      sessionId: session,
+      directory: t.app.services.assistant.filesDir(c.id),
+      messageId: `msg_native_${invalid}`,
+      agent: invalid === 'agent' ? 'nonexistent-agent' : OPENCODE_ASSISTANT_AGENT,
+      model:
+        invalid === 'model'
+          ? { providerId: 'nonexistent-provider', modelId: 'model' }
+          : { providerId: 'aw-assistant-scripted', modelId: 'model' },
+      text: 'hello',
+    });
+    await Promise.all([
+      handle.accepted.catch(() => undefined),
+      expect(handle.completed).rejects.toMatchObject({ details: { responseReceived: true } }),
+    ]);
+  }
+  await t.call(deleteConversationOp, { id: c.id });
 });

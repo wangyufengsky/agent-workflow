@@ -32,7 +32,13 @@ export type OpencodeError = { name: string; data: Record<string, unknown> };
 
 const E = OpencodeEventType;
 export type OpencodeEvent =
-  | { type: typeof E.Message; sessionId: string; messageId: string; role: 'user' | 'assistant' }
+  | {
+      type: typeof E.Message;
+      sessionId: string;
+      messageId: string;
+      role: 'user' | 'assistant';
+      parentMessageId?: string;
+    }
   | {
       type: typeof E.Text;
       sessionId: string;
@@ -72,6 +78,7 @@ export type OpencodeEvent =
       sessionId: string;
       directory: string;
       permissionId: string;
+      messageId?: string;
       permission: string;
       patterns: string[];
     }
@@ -112,7 +119,7 @@ const payloadSchema = z.discriminatedUnion('type', [
     type: z.literal('message.updated'),
     properties: z.object({
       sessionID: z.string(),
-      info: z.object({ id: z.string(), role: z.enum(['user', 'assistant']) }),
+      info: z.object({ id: z.string(), role: z.enum(['user', 'assistant']), parentID: z.string().optional() }),
     }),
   }),
   z.object({
@@ -151,6 +158,7 @@ const payloadSchema = z.discriminatedUnion('type', [
       sessionID: z.string(),
       permission: z.string(),
       patterns: z.array(z.string()),
+      tool: z.object({ messageID: z.string() }).optional(),
     }),
   }),
 ]);
@@ -208,6 +216,7 @@ export function parseGlobalEvent(raw: unknown): OpencodeEvent | undefined {
         sessionId: event.properties.sessionID,
         messageId: event.properties.info.id,
         role: event.properties.info.role,
+        ...(event.properties.info.parentID === undefined ? {} : { parentMessageId: event.properties.info.parentID }),
       };
     case 'message.part.updated':
       return HANDLED_PART_TYPES.has(event.properties.part.type) ? toPartEvent(event.properties.part) : undefined;
@@ -237,6 +246,7 @@ export function parseGlobalEvent(raw: unknown): OpencodeEvent | undefined {
         sessionId: p.sessionID,
         directory,
         permissionId: p.id,
+        ...(p.tool === undefined ? {} : { messageId: p.tool.messageID }),
         permission: p.permission,
         patterns: p.patterns,
       };

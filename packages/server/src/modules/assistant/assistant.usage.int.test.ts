@@ -1,10 +1,15 @@
 import { readFileSync } from 'node:fs';
 import {
+  AppError,
   AssistantPage,
   AssistantTurnEvent,
   AssistantTurnStatus,
+  ATTACHMENT_NAME_HEADER,
+  type AttachmentDTO,
   abortAssistantOp,
   createConversationOp,
+  deleteConversationOp,
+  ErrorCode,
   getConversationOp,
   replyAssistantPermissionOp,
   ServerEventType,
@@ -12,7 +17,7 @@ import {
   updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { script } from '../../../test/fakes/fake-opencode.ts';
+import { createFakeOpencode, script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { createFakeClock, type FakeClock } from '../../../test/helpers/clock.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
@@ -100,6 +105,7 @@ describe('助手真实用量与单轮时限', () => {
     const steps = raw.map(parseGlobalEvent).filter((event) => event?.type === OpencodeEventType.StepFinished);
     const first = steps[0];
     if (first === undefined) throw new Error('Recorded fixture lacks usage');
+    const oldMessage = message;
     const replay = { ...first, sessionId: message.sessionId, messageId: message.messageId };
     t.fake.replay([replay, replay]);
     expect((await get(id)).usage.tokensInput).toBe(first.tokens.input);
@@ -109,8 +115,9 @@ describe('助手真实用量与单轮时限', () => {
     await send(id);
     await t.fake.settled();
     // 旧消息的另一条迟到 step 仍归旧轮；再次重放同一条不会增加。
-    const late = { ...replay, partId: `${replay.partId}-late` };
-    t.fake.replay([replay, late, late]);
+    const lateMessage = { ...oldMessage, messageId: `${oldMessage.messageId}-late` };
+    const late = { ...replay, messageId: lateMessage.messageId, partId: `${replay.partId}-late` };
+    t.fake.replay([replay, lateMessage, late, late]);
     expect((await get(id)).usage).toMatchObject({
       tokensInput: first.tokens.input * 2 + 5,
       tokensOutput: first.tokens.output * 2 + 2,
@@ -215,13 +222,27 @@ describe('助手真实用量与单轮时限', () => {
       await release.promise;
       return original(input);
     });
-    const pending = send(id);
+    const uploaded = await t.request({
+      method: 'POST',
+      url: '/attachments',
+      headers: { 'content-type': 'application/octet-stream', [ATTACHMENT_NAME_HEADER]: 'notes.md' },
+      payload: 'preserved attachment',
+    });
+    const attachment = uploaded.json<AttachmentDTO>();
+    const request = { id, text: '未发送的草稿', context: HOME, attachmentIds: [attachment.id] };
+    const pending = t.call(sendAssistantMessageOp, request);
     await entered.promise;
     clock.advance(60_000);
     release.resolve();
-    await pending;
+    expect((await pending).status).toBe(409);
     expect((await get(id)).usage.latest?.status).toBe(AssistantTurnStatus.TimedOut);
     expect(t.fake.prompts).toEqual([]);
+    expect((await t.request({ method: 'GET', url: `/attachments/${attachment.id}/content` })).body).toBe(
+      'preserved attachment',
+    );
+    expect((await t.call(sendAssistantMessageOp, request)).status).toBe(200);
+    await t.fake.settled();
+    expect(t.fake.prompts.at(-1)?.text).toContain('preserved attachment');
   });
 
   it('超时停止请求失败时保留忙碌，不谎报停止，也不自动重试', async () => {
@@ -231,8 +252,8 @@ describe('助手真实用量与单轮时限', () => {
     vi.spyOn(t.fake, 'abort').mockRejectedValueOnce(new Error('abort unavailable'));
     const failed = waitForEvent(
       t.app.events,
-      ServerEventType.AssistantUpdated,
-      (c) => c.id === id && c.usage.latest?.status === AssistantTurnStatus.Failed,
+      ServerEventType.AssistantTranscript,
+      (c) => c.conversationId === id && c.entries.some((e) => e.kind === 'error'),
     );
     clock.advance(60_000);
     await failed;
@@ -245,5 +266,262 @@ describe('助手真实用量与单轮时限', () => {
     expect((await get(id)).busy).toBe(false);
     expect(t.fake.abort).toHaveBeenCalledTimes(2);
     expect(t.fake.prompts).toHaveLength(1);
+  });
+
+  it.each(['stop', 'delete'] as const)(
+    '%s 响应尚未返回时，阻止另一种收尾与新消息；限时不重复中止',
+    async (operation) => {
+      await t.call(updateSettingsOp, { 'attempt.timeoutMinutes': 1 });
+      const id = await create();
+      await hang(id);
+      clock.advance(55_000);
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const original = t.fake.abort.bind(t.fake);
+      const abort = vi.spyOn(t.fake, 'abort').mockImplementationOnce(async (input) => {
+        await original(input);
+        entered.resolve();
+        await release.promise;
+      });
+      const first = operation === 'stop' ? t.call(abortAssistantOp, { id }) : t.call(deleteConversationOp, { id });
+      await entered.promise;
+      expect(await get(id)).toMatchObject({ busy: true, usage: { latest: { status: AssistantTurnStatus.Running } } });
+      const other =
+        operation === 'stop' ? await t.call(deleteConversationOp, { id }) : await t.call(abortAssistantOp, { id });
+      expect(other.status).toBe(409);
+      expect((await send(id)).status).toBe(409);
+      clock.advance(9_000);
+      expect(abort).toHaveBeenCalledTimes(1);
+      release.resolve();
+      expect((await first).status).toBe(operation === 'stop' ? 200 : 204);
+      await t.fake.settled();
+      if (operation === 'stop') {
+        expect((await get(id)).usage.latest?.status).toBe(AssistantTurnStatus.Aborted);
+        expect((await t.call(deleteConversationOp, { id })).status).toBe(204);
+      }
+      clock.advance(120_000);
+      expect(abort).toHaveBeenCalledTimes(1);
+      expect(t.fake.prompts).toHaveLength(1);
+      expect(t.logs.filter((entry) => entry.level >= 50)).toEqual([]);
+    },
+  );
+
+  it('删除时停止成功但底层删除失败，保留已中止的轮次且不再触发时限', async () => {
+    await t.call(updateSettingsOp, { 'attempt.timeoutMinutes': 1 });
+    const id = await create();
+    await hang(id);
+    vi.spyOn(t.fake, 'deleteSession').mockRejectedValueOnce(new Error('delete unavailable'));
+    expect((await t.call(deleteConversationOp, { id })).status).toBe(500);
+    await t.fake.settled();
+    expect(await get(id)).toMatchObject({ busy: false, usage: { latest: { status: AssistantTurnStatus.Aborted } } });
+    clock.advance(120_000);
+    expect(t.fake.aborts).toHaveLength(1);
+    expect((await t.call(deleteConversationOp, { id })).status).toBe(204);
+  });
+
+  it('删除时停止失败，仍运行的轮次恢复剩余时限', async () => {
+    await t.call(updateSettingsOp, { 'attempt.timeoutMinutes': 1 });
+    const id = await create();
+    await hang(id);
+    clock.advance(20_000);
+    vi.spyOn(t.fake, 'abort').mockRejectedValueOnce(new Error('abort unavailable'));
+    expect((await t.call(deleteConversationOp, { id })).status).toBe(500);
+    expect((await get(id)).usage.latest?.status).toBe(AssistantTurnStatus.Running);
+    clock.advance(39_999);
+    expect((await get(id)).busy).toBe(true);
+    const stopped = waitForEvent(t.app.events, ServerEventType.AssistantUpdated, (c) => c.id === id && !c.busy);
+    clock.advance(1);
+    await stopped;
+    expect((await get(id)).usage.latest?.status).toBe(AssistantTurnStatus.TimedOut);
+    expect(t.fake.abort).toHaveBeenCalledTimes(2);
+  });
+
+  it('刚派发尚未开始时先等本轮启动，启动确认失败有界返回且保留忙碌，用户可以重试', async () => {
+    const id = await create();
+    const dispatched = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const original = t.fake.prompt.bind(t.fake);
+    vi.spyOn(t.fake, 'prompt').mockImplementationOnce(async (input) => {
+      dispatched.resolve();
+      await release.promise;
+      await original(input);
+    });
+    t.fake.enqueue(script().hang().text('不会到达'));
+    const sending = send(id);
+    await dispatched.promise;
+    const stopping = t.app.services.assistant.abort(id);
+    const rejected = expect(stopping).rejects.toMatchObject({ code: ErrorCode.OpencodeRequestFailed });
+    clock.advance(10_000);
+    await rejected;
+    expect(t.fake.aborts).toEqual([]);
+    expect((await get(id)).busy).toBe(true);
+    expect((await send(id)).status).toBe(409);
+    release.resolve();
+    await sending;
+    await t.call(abortAssistantOp, { id });
+    expect(t.fake.aborts).toHaveLength(1);
+    expect((await get(id)).usage.latest?.status).toBe(AssistantTurnStatus.Aborted);
+  });
+
+  it('停止 HTTP 超过确认期限仍锁住会话，重试等待原请求且不重复 abort', async () => {
+    const id = await create();
+    await hang(id);
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const original = t.fake.abort.bind(t.fake);
+    const abort = vi.spyOn(t.fake, 'abort').mockImplementationOnce(async (input) => {
+      await original(input);
+      entered.resolve();
+      await release.promise;
+    });
+    const first = t.app.services.assistant.abort(id);
+    const failed = expect(first).rejects.toMatchObject({ code: ErrorCode.OpencodeRequestFailed });
+    await entered.promise;
+    clock.advance(10_000);
+    await failed;
+    expect((await get(id)).busy).toBe(true);
+    expect((await send(id)).status).toBe(409);
+    const retry = t.app.services.assistant.abort(id);
+    release.resolve();
+    await retry;
+    expect(abort).toHaveBeenCalledTimes(1);
+    expect((await get(id)).usage.latest?.status).toBe(AssistantTurnStatus.Aborted);
+  });
+
+  it.each(['manual', 'timeout'] as const)('%s 停止确认超界后不重试，原请求迟到成功仍保留停止原因', async (source) => {
+    await t.call(updateSettingsOp, { 'attempt.timeoutMinutes': 1 });
+    const id = await create();
+    await hang(id);
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const original = t.fake.abort.bind(t.fake);
+    vi.spyOn(t.fake, 'abort').mockImplementationOnce(async (input) => {
+      await original(input);
+      entered.resolve();
+      await release.promise;
+    });
+    const failed = waitForEvent(
+      t.app.events,
+      ServerEventType.AssistantTranscript,
+      (data) => data.conversationId === id && data.entries.some((e) => e.kind === 'error'),
+    );
+    const stopping = source === 'manual' ? t.app.services.assistant.abort(id).catch(() => undefined) : undefined;
+    if (source === 'timeout') clock.advance(60_000);
+    await entered.promise;
+    clock.advance(10_000);
+    await failed;
+    await stopping;
+    expect((await get(id)).busy).toBe(true);
+    const finished = waitForEvent(
+      t.app.events,
+      ServerEventType.AssistantUpdated,
+      (data) => data.id === id && !data.busy,
+    );
+    release.resolve();
+    await finished;
+    expect((await get(id)).usage.latest?.status).toBe(
+      source === 'manual' ? AssistantTurnStatus.Aborted : AssistantTurnStatus.TimedOut,
+    );
+    expect(t.fake.abort).toHaveBeenCalledTimes(1);
+  });
+
+  it('权限等待时停止会取消本轮，不等用户再回答权限', async () => {
+    const id = await create();
+    t.fake.enqueue(script().requestPermission('bash', ['echo test']).text('不会到达'));
+    const asked = waitForEvent(
+      t.app.events,
+      ServerEventType.AssistantUpdated,
+      (data) => data.id === id && data.pendingPermissions.length > 0,
+    );
+    await send(id);
+    await asked;
+    expect((await t.call(abortAssistantOp, { id })).status).toBe(200);
+    expect(await get(id)).toMatchObject({
+      busy: false,
+      pendingPermissions: [],
+      usage: { latest: { status: AssistantTurnStatus.Aborted } },
+    });
+  });
+
+  it.each([false, true])('未知 HTTP 传输失败不放行下一轮；停止迟到=%s 仍释放底层工作', async (late) => {
+    const id = await create();
+    const original = t.fake.promptAssistant.bind(t.fake);
+    const broken = Promise.withResolvers<never>();
+    vi.spyOn(t.fake, 'promptAssistant').mockImplementationOnce((input) => {
+      const handle = original(input);
+      return { ...handle, completed: Promise.race([handle.completed, broken.promise]) };
+    });
+    await hang(id);
+    const failed = waitForEvent(
+      t.app.events,
+      ServerEventType.AssistantTranscript,
+      (data) => data.conversationId === id && data.entries.some((e) => e.kind === 'error'),
+    );
+    broken.reject(new AppError(ErrorCode.OpencodeRequestFailed, 'connection reset'));
+    await failed;
+    expect((await get(id)).busy).toBe(true);
+    expect((await get(id)).usage.latest?.status).toBe(AssistantTurnStatus.Running);
+    expect((await send(id)).status).toBe(409);
+    if (late) {
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const abort = t.fake.abort.bind(t.fake);
+      vi.spyOn(t.fake, 'abort').mockImplementationOnce(async (input) => {
+        await abort(input);
+        entered.resolve();
+        await release.promise;
+      });
+      const rejected = expect(t.app.services.assistant.abort(id)).rejects.toMatchObject({
+        code: ErrorCode.OpencodeRequestFailed,
+      });
+      await entered.promise;
+      clock.advance(10_000);
+      await rejected;
+      const stopped = waitForEvent(
+        t.app.events,
+        ServerEventType.AssistantUpdated,
+        (data) => data.id === id && !data.busy,
+      );
+      release.resolve();
+      await stopped;
+    } else await t.call(abortAssistantOp, { id });
+    expect(t.fake.aborts).toHaveLength(1);
+    expect(await get(id)).toMatchObject({ busy: false, usage: { latest: { status: AssistantTurnStatus.Aborted } } });
+  });
+  it('中止的 HTTP 回应先到，旧 Error 与多个 Idle 随后按 SSE 顺序抵达时不结束下一轮', async () => {
+    await t.close();
+    const fake = createFakeOpencode();
+    const subscribe = fake.subscribe.bind(fake);
+    const pending: Array<() => void> = [];
+    let held = false;
+    const nextMessage = Promise.withResolvers<void>();
+    fake.subscribe = (listener) =>
+      subscribe((event) => {
+        if (!held) return listener(event);
+        pending.push(() => listener(event));
+        if (event.type === OpencodeEventType.Message && event.role === 'assistant') nextMessage.resolve();
+      });
+    t = await createTestApp({ fake, clock });
+    const id = await create();
+    await hang(id);
+    held = true;
+    expect((await t.call(abortAssistantOp, { id })).status).toBe(200);
+    await fake.settled();
+    const session = fake.sessions[0];
+    if (session === undefined) throw new Error('Expected session');
+    // 真实 1.19 的 processor halt 和 runner cleanup 各发一个 Idle。
+    fake.replay([{ type: OpencodeEventType.Idle, sessionId: session.id }]);
+    fake.enqueue(script().text('第二轮仍在工作').hang().text('不会到达'));
+    const sending = send(id);
+    await nextMessage.promise;
+    held = false;
+    for (const deliver of pending) deliver();
+    await sending;
+    expect(await get(id)).toMatchObject({
+      busy: true,
+      usage: { turns: 2, latest: { status: AssistantTurnStatus.Running, tokensInput: null } },
+    });
+    expect(t.app.services.assistant.transcript(id, 0).entries.filter((entry) => entry.kind === 'error')).toEqual([]);
+    await t.call(abortAssistantOp, { id });
   });
 });

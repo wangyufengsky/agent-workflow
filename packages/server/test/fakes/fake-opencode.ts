@@ -16,6 +16,7 @@ import {
   type CreateSessionInput,
   OpencodeEventType as E,
   type OpencodeClient,
+  type OpencodeError,
   type OpencodeEvent,
   type PromptInput,
   ToolCallStatus,
@@ -109,7 +110,7 @@ export function createFakeOpencode() {
   const queue: Array<{ script: Pick<FakeScript, 'steps'>; match: ScriptMatch | undefined }> = [];
   /** Resolvers of `hang` steps, per session, released by abort(). */
   const hanging = new Map<string, Array<() => void>>();
-  const pendingPermissions = new Map<string, (reply: PermissionDecision) => void>();
+  const pendingPermissions = new Map<string, { sessionId: string; resolve: (reply: PermissionDecision) => void }>();
   /** Bumped by abort(): a turn stops when its session's generation changed (later prompts play normally). */
   const generation = new Map<string, number>();
   let connected = true;
@@ -160,14 +161,28 @@ export function createFakeOpencode() {
     return connected;
   }
 
-  async function play(session: FakeSession, steps: readonly FakeStep[]): Promise<void> {
+  const completions = new WeakMap<PromptInput, Promise<OpencodeError | undefined>>();
+
+  async function play(
+    session: FakeSession,
+    steps: readonly FakeStep[],
+    parentMessageId?: string,
+  ): Promise<OpencodeError | undefined> {
     const sessionId = session.id;
     const turnGeneration = generation.get(sessionId) ?? 0;
     const messageId = nextId('fake_msg');
-    emit({ type: E.Message, sessionId, messageId, role: 'assistant' });
+    if (parentMessageId !== undefined) emit({ type: E.Message, sessionId, messageId: parentMessageId, role: 'user' });
+    emit({
+      type: E.Message,
+      sessionId,
+      messageId,
+      role: 'assistant',
+      ...(parentMessageId === undefined ? {} : { parentMessageId }),
+    });
     let used = { input: 100, output: 20 };
     for (const step of steps) {
-      if ((generation.get(sessionId) ?? 0) !== turnGeneration || closed) return;
+      if ((generation.get(sessionId) ?? 0) !== turnGeneration || closed)
+        return { name: 'MessageAbortedError', data: { message: 'Aborted' } };
       const partId = nextId('fake_prt');
       const ids = { sessionId, messageId, partId };
       switch (step.type) {
@@ -230,13 +245,16 @@ export function createFakeOpencode() {
         }
         case 'permission': {
           const permissionId = nextId('fake_per');
-          const replied = new Promise<PermissionDecision>((resolve) => pendingPermissions.set(permissionId, resolve));
+          const replied = new Promise<PermissionDecision>((resolve) =>
+            pendingPermissions.set(permissionId, { sessionId, resolve }),
+          );
           const { permission, patterns } = step;
           emit({
             type: E.PermissionAsked,
             sessionId,
             directory: session.directory,
             permissionId,
+            messageId,
             permission,
             patterns,
           });
@@ -252,7 +270,7 @@ export function createFakeOpencode() {
         case 'error':
           emit({ type: E.Error, sessionId, error: { name: step.name, data: { message: step.message } } });
           if (step.idle) emit({ type: E.Idle, sessionId });
-          return;
+          return { name: step.name, data: { message: step.message } };
       }
     }
     emit({
@@ -316,7 +334,11 @@ export function createFakeOpencode() {
       queue.push({ script: s, match });
     },
     async settled() {
-      await Promise.all(turns);
+      // 请求完成回调还可能继续投递 outbox；事件循环推进到这些回调完成后再检查新增轮次。
+      do {
+        await Promise.all(turns);
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      } while (turns.size > 0);
     },
     failNextPrompt() {
       failPrompt = true;
@@ -368,16 +390,54 @@ export function createFakeOpencode() {
       if (!connected) throw new Error('FakeOpencode is not connected');
       if (failPrompt) {
         failPrompt = false;
-        throw new AppError(ErrorCode.OpencodeRequestFailed, 'opencode session.promptAsync failed');
+        throw new AppError(ErrorCode.OpencodeRequestFailed, 'opencode session.promptAsync failed', {
+          responseReceived: true,
+        });
       }
       const session = sessionOf(input.sessionId);
       prompts.push(input);
       const index = queue.findIndex((q) => matches(session, q.match));
       const steps = index === -1 ? [] : (queue.splice(index, 1)[0]?.script.steps ?? []);
       // Like prompt_async: return at once, the turn plays out as events.
-      const turn = new Promise<void>((resolve) => setImmediate(resolve)).then(() => play(session, steps));
+      const completion = new Promise<void>((resolve) => setImmediate(resolve)).then(() =>
+        play(session, steps, input.messageId),
+      );
+      completions.set(input, completion);
+      const turn = completion.then(() => undefined);
       turns.add(turn);
       void turn.finally(() => turns.delete(turn));
+    },
+    promptAssistant(input) {
+      const accepted = Promise.withResolvers<void>();
+      const started = Promise.withResolvers<void>();
+      let running = false;
+      const lost = Promise.withResolvers<never>();
+      const unsubscribe = fake.subscribe((event) => {
+        if (event.type === E.RuntimeLost) lost.reject(new Error('opencode runtime lost'));
+        if (event.type === E.Message && event.sessionId === input.sessionId && event.messageId === input.messageId)
+          accepted.resolve();
+        if (
+          event.type === E.Message &&
+          event.sessionId === input.sessionId &&
+          event.parentMessageId === input.messageId
+        ) {
+          running = true;
+          started.resolve();
+        }
+      });
+      const completed = Promise.race([fake.prompt(input).then(() => completions.get(input)), lost.promise])
+        .then(
+          (error) => {
+            accepted.resolve();
+            return { error };
+          },
+          (error: unknown) => {
+            accepted.reject(error);
+            throw error;
+          },
+        )
+        .finally(unsubscribe);
+      return { accepted: accepted.promise, started: started.promise, isRunning: async () => running, completed };
     },
     async deleteSession({ sessionId }) {
       const index = sessions.findIndex((s) => s.id === sessionId);
@@ -391,6 +451,11 @@ export function createFakeOpencode() {
       generation.set(sessionId, (generation.get(sessionId) ?? 0) + 1);
       for (const release of hanging.get(sessionId) ?? []) release();
       hanging.delete(sessionId);
+      for (const [id, pending] of pendingPermissions) {
+        if (pending.sessionId !== sessionId) continue;
+        pendingPermissions.delete(id);
+        pending.resolve('reject');
+      }
       emit({ type: E.Error, sessionId, error: { name: 'MessageAbortedError', data: { message: 'Aborted' } } });
       emit({ type: E.Idle, sessionId });
     },
@@ -399,7 +464,7 @@ export function createFakeOpencode() {
       if (resolve === undefined) throw new Error(`FakeOpencode has no pending permission ${permissionId}`);
       permissionReplies.push({ permissionId, reply });
       pendingPermissions.delete(permissionId);
-      resolve(reply);
+      resolve.resolve(reply);
     },
     async listModels() {
       return { available: models };

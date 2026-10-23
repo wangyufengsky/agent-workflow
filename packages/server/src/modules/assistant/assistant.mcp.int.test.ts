@@ -312,6 +312,7 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     const delivered = waitForEvent(t.app.events, ServerEventType.AssistantUpdated, (c) => c.busy);
     await t.app.services.assistant.replyPermission(conversationId, request.permissionId, 'reject');
     await delivered;
+    await t.fake.settled();
     expect(t.fake.prompts.at(-1)?.text).toContain('The user confirmed `projects_update`');
   });
 
