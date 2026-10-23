@@ -10,10 +10,10 @@ const LONG_LIVED = new Set(['EventSource', 'WebSocket']);
 export function createNetworkTracker(clock: Clock, quietMs: number) {
   const inFlight = new Set<string>();
   let lastChange = clock.now();
-  const waiters = new Set<() => void>();
+  const waiters = new Map<() => void, (quiet: boolean) => void>();
   const changed = () => {
     lastChange = clock.now();
-    for (const check of waiters) check();
+    for (const check of waiters.keys()) check();
   };
   return {
     onEvent(method: string, params: { requestId?: string; type?: string }): void {
@@ -27,6 +27,10 @@ export function createNetworkTracker(clock: Clock, quietMs: number) {
       ) {
         changed();
       }
+    },
+    close(): void {
+      for (const finish of waiters.values()) finish(false);
+      inFlight.clear();
     },
     whenQuiet(timeoutMs: number): Promise<boolean> {
       return new Promise((resolve) => {
@@ -44,7 +48,7 @@ export function createNetworkTracker(clock: Clock, quietMs: number) {
           cancelQuiet = clock.schedule(wait, () => finish(true));
         };
         const cancelTimeout = clock.schedule(timeoutMs, () => finish(false));
-        waiters.add(check);
+        waiters.set(check, finish);
         check();
       });
     },

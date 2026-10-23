@@ -73,6 +73,13 @@ export const browserPortEventSchema = z.discriminatedUnion('type', [
     method: z.string(),
     reason: browserBlockReasonSchema,
   }),
+  /** 不能归属单个标签页的 Worker 不继承任何页面权限；宿主拒绝后交后端记录。 */
+  z.object({
+    type: z.literal('browser.unownedBlocked'),
+    url: z.string(),
+    source: z.string(),
+    cleanupError: z.string().optional(),
+  }),
   /** The tab's renderer is gone or the view was destroyed; the backend drops the tab. */
   z.object({ type: z.literal('browser.gone'), tabId: tabIdSchema, reason: z.string() }),
 ]);

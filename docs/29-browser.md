@@ -235,6 +235,7 @@ type BrowserHost = {
 - 默认 `[{ pattern: '*', access: 'read' }]`：所有网站可浏览，都只读。用户可以收窄（例如只留内网域名），或给某些网站放开操作。
 - **只读**的实现：AI 会话的标签页对这类网站发出的非 `GET` / `HEAD` / `OPTIONS` 请求（表单提交、`fetch` / `xhr` 写请求）在 `session.webRequest.onBeforeRequest` 里取消。按请求的 `webContentsId` 只拦 AI 的标签页，用户自己登录时不受影响。动作结果写明「已拦下 POST /api/comments（这个网站只允许浏览）」。用 `POST` 做查询的单页应用会因此读不到数据，把它设为可操作即可。这一层由网络层保证，不依赖模型是否听话。
 - **只读也覆盖非 HTTP 的写通道**：建立连接后的 WebSocket 消息 `onBeforeRequest` 看不到，所以只读网站的 `ws:` / `wss:` 连接（`resourceType = webSocket`）直接取消；AI 网站标签页在每个文档创建时（`Page.addScriptToEvaluateOnNewDocument`）去掉 `RTCPeerConnection` 与 `WebTransport`。AI 没有执行任意 JS 的工具（§6），能触发的写通道只剩表单、`fetch` / `xhr` / `sendBeacon`（都是非 GET 的 HTTP 请求）、WebSocket 与这两者，都已覆盖。靠 WebSocket 推送数据的页面（实时看板）在只读下没有数据，设为可操作即可。
+- **Worker 必须有可确认的归属**：Electron 请求层拒绝无法关联到标签页的 Worker 请求；开发 Chromium 在共享 Worker 执行前暂停并关闭它，因为 SharedWorker 可由同一登录分区的多个标签页共享，无法可靠选用单个页面的权限。拒绝事件 `browser.unownedBlocked` 由后端记录，不默认继承用户页面权限。依赖 SharedWorker 的网站可能缺少部分功能，用户登录页也遵守这条未归属限制。
 - **只读按 HTTP 方法判断**：有副作用的 `GET`（如 `/delete?id=1` 这种不规范的接口）拦不住。这类网站不要放进规则，或收窄规则只放文档类网站。
 - **可操作**：与项目预览一样。AI 以用户登录的身份操作这个网站，所以只给明确需要的网站放开。
 - **不允许的地址**：主框架导航返回 `BROWSER_SITE_NOT_ALLOWED`；子框架和子资源拦下，记为被拦的请求。
@@ -488,6 +489,8 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 
 2026-10-24 先接入明确地址的只读文字与预览进程管理。下表 `previews.get/start/stop`、`browser.readUrl` 已实现；`browser.read` 与启动后跳到预览页签仍依赖 B2 的用户预览页签及归属关联，尚未实现。不能以某个 AI 会话或最近任务代替「用户当前页」。截图、PDF、视觉输入本期不做。
 
+`browser.readUrl` 的整体截止为 `BROWSER_READ_TIMEOUT_MS`（30000），覆盖打开、导航、稳定与提取。到期以 `BROWSER_READ_FAILED` / `details.reason = timeout` 失败，关闭临时页并取消页面等待计时器；冷启动尚未交付的标签页在交付时检查取消信号并释放。页面稳定的 10000 ms 预算仍单独存在，仅返回 `settled: false`；整体截止不能用部分结果代替失败。
+
 | 操作 | 风险 | 说明 |
 | --- | --- | --- |
 | `previews.get` `{ taskId }` | read | 读取任务预览的状态、明确地址与日志末尾 |
@@ -514,7 +517,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
   - `SiteAccess`：`read` · `interact`；
   - `DeckMaterialKind` 加 `web`；
   - `CheckUnrunnableReason` 加 `preview_never_started` · `preview_not_configured`；`nodeAcceptanceSchema` 的页面体检同样可以标 `skipped`。
-- **常量（08）**：`PREVIEW_START_TIMEOUT_MS` 120000、`PREVIEW_PROBE_INTERVAL_MS` 1000、`PREVIEW_LOG_TAIL_CHARS` 4000、`BROWSER_ACTION_TIMEOUT_MS` 5000、`BROWSER_SETTLE_QUIET_MS` 500、`BROWSER_SETTLE_TIMEOUT_MS` 10000、`BROWSER_SNAPSHOT_MAX_CHARS` 12000、`VIEWPORT_SIZES`。
+- **常量（08）**：`PREVIEW_START_TIMEOUT_MS` 120000、`PREVIEW_PROBE_INTERVAL_MS` 1000、`PREVIEW_LOG_TAIL_CHARS` 4000、`BROWSER_ACTION_TIMEOUT_MS` 5000、`BROWSER_SETTLE_QUIET_MS` 500、`BROWSER_SETTLE_TIMEOUT_MS` 10000、`BROWSER_READ_TIMEOUT_MS` 30000、`BROWSER_SNAPSHOT_MAX_CHARS` 12000、`VIEWPORT_SIZES`。
 - **错误码（08）**：`PREVIEW_NOT_CONFIGURED`、`PREVIEW_START_FAILED`（`details.logTail`）、`PREVIEW_LIMIT_REACHED`、`BROWSER_SITE_NOT_ALLOWED`（`details.host`）、`BROWSER_LOGIN_REQUIRED`（`details.url`）、`BROWSER_REF_STALE`、`BROWSER_ACTION_FAILED`（`details.reason`：`not_visible` · `covered` · `disabled` · `detached` · `not_focusable`；`details.coveredBy`）（以上 B-02 已加）；`BROWSER_NOT_OPEN`（B3，助手 `browser.read`）、`BROWSER_CHECK_UNRUNNABLE`（B2，任务的 `failure` 上，同 `CHECK_COMMAND_UNRUNNABLE`，不作为 HTTP 错误）在实现那一期加。
 - **状态机（09）**：`previewMachine`（09 §12，B-02 已加）；节点 `verifying` 的检查顺序为命令 → 页面体检 → AI 评审。
 - **API（11）**：

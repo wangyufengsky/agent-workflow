@@ -6,6 +6,16 @@ const sent = (requestId: string, type = 'Fetch') => ['Network.requestWillBeSent'
 const done = (requestId: string) => ['Network.loadingFinished', { requestId }] as const;
 
 describe('createNetworkTracker', () => {
+  it('关闭时立即结束网络等待，之后推进时钟不再等待页面请求', async () => {
+    const clock = createFakeClock();
+    const tracker = createNetworkTracker(clock, 500);
+    tracker.onEvent(...sent('pending'));
+    const quiet = tracker.whenQuiet(10_000);
+    tracker.close();
+    await expect(quiet).resolves.toBe(false);
+    clock.advance(10_000);
+  });
+
   it('没有请求在进行、且安静满 500ms 才算稳定', async () => {
     const clock = createFakeClock();
     const tracker = createNetworkTracker(clock, 500);

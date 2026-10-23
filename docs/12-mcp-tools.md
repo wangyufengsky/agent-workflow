@@ -2,7 +2,7 @@
 
 > 本文描述**执行 MCP**（`/mcp/exec`），供执行开发任务的 AI 会话使用。应用助手使用的**助手 MCP**（v1.1）见 [15-assistant.md](15-assistant.md)，两者令牌与权限隔离。
 
-助手独立提供 `browser_readUrl`（明确地址、强制只读、文字与日志）与 `previews_get/start/stop`（写操作仍须确认），不开放本页执行 MCP 的点击、输入和截图工具；契约见 [11 §13f](11-api.md#13f-页面预览v1329-4) 与 [29 §9](29-browser.md#9-应用助手)。
+助手独立提供 `browser_readUrl`（明确地址、强制只读、文字与日志；整体读取最长 30 秒，超时为 `BROWSER_READ_FAILED`）与 `previews_get/start/stop`（写操作仍须确认），不开放本页执行 MCP 的点击、输入和截图工具；契约见 [11 §13f](11-api.md#13f-页面预览v1329-4) 与 [29 §9](29-browser.md#9-应用助手)。
 
 ## 1. 职责边界
 

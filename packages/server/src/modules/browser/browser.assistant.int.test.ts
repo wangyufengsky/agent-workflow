@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
 import { addProject, createTask, taskReaches } from '../../../test/helpers/tasks.ts';
+import { systemClock } from '../../core/clock.ts';
 import { createChromiumHost } from './host.chromium.ts';
 
 let server: Server;
@@ -31,17 +32,31 @@ let conversationId: string;
 let session: Record<string, string>;
 const writes: string[] = [];
 const readHosts: string[] = [];
+const pendingTimers = new Set<() => void>();
 
 beforeAll(async () => {
   server = createServer((req, res) => {
     readHosts.push(req.headers.host ?? '');
     if (req.method !== 'GET') writes.push(`${req.method} ${req.url}`);
+    if (req.url === '/shared-worker.js') {
+      res.writeHead(200, { 'content-type': 'text/javascript' });
+      res.end(`onconnect = ({ ports: [port] }) => {
+        fetch('/worker-write', { method: 'POST' }).then(
+          () => port.postMessage('written'), () => port.postMessage('blocked'));
+      };`);
+      return;
+    }
     if (req.url === '/redirect') {
       res.writeHead(302, { location: `${origin.replace('127.0.0.1', 'localhost')}/article` });
       res.end();
       return;
     }
     const pages: Record<string, string> = {
+      '/shared-worker': `<h1>共享 Worker</h1><p id="result">等待</p><script>
+        const worker = new SharedWorker('/shared-worker.js');
+        worker.port.onmessage = ({ data }) => { result.textContent = data; };
+        worker.onerror = () => { result.textContent = 'blocked'; };
+      </script>`,
       '/article': '<title>项目说明</title><h1>发布步骤</h1><p>先检查，再发布。</p>',
       '/errors': '<title>错误页</title><script>console.error("页面错误")</script><script src="/missing.js"></script>',
       '/login': '<input type="password" aria-label="密码">',
@@ -71,7 +86,24 @@ beforeEach(async () => {
   writes.length = 0;
   readHosts.length = 0;
   host = createChromiumHost();
-  t = await createTestApp({ browserHost: host });
+  t = await createTestApp({
+    browserHost: host,
+    clock: {
+      now: systemClock.now,
+      schedule(ms, fn) {
+        const fire = () => {
+          pendingTimers.delete(fire);
+          fn();
+        };
+        pendingTimers.add(fire);
+        const cancel = systemClock.schedule(ms, fire);
+        return () => {
+          pendingTimers.delete(fire);
+          cancel();
+        };
+      },
+    },
+  });
   await t.call(updateSettingsOp, { 'browser.sites': [{ pattern: '127.0.0.1', access: 'interact' }] });
   mcp = await connectMcp(t.assistantMcpUrl, t.app.assistantMcpToken);
   conversationId = (await t.call(createConversationOp, {})).body.id;
@@ -102,7 +134,9 @@ describe('助手网页文字与任务预览', () => {
     expect(names.filter((name) => name.startsWith('browser_'))).toEqual(['browser_readUrl']);
     expect(names).not.toContain('previews_trial');
 
+    const timersBefore = pendingTimers.size;
     const read = await call('browser_readUrl', { url: `${origin}/errors` });
+    expect(pendingTimers.size).toBe(timersBefore);
     expect(read).toMatchObject({
       isError: false,
       body: {
@@ -130,7 +164,9 @@ describe('助手网页文字与任务预览', () => {
         .sort();
     const before = await targets();
 
+    const timersBefore = pendingTimers.size;
     const read = await t.call(readWebsiteOp, { url: `${origin}/account` });
+    expect(pendingTimers.size).toBe(timersBefore);
     expect(read.status).toBe(200);
     expect(read.body.page).toContain('欢迎回来');
     expect(read.body.logs.requests).toEqual(
@@ -140,6 +176,15 @@ describe('助手网页文字与任务预览', () => {
     );
     expect(writes).toEqual([]);
     expect(await targets()).toEqual(before);
+  });
+
+  it('共享 Worker 无法归属单个标签页时拒绝运行，不向只读网站写入并记录原因', async () => {
+    const read = await t.call(readWebsiteOp, { url: `${origin}/shared-worker` });
+    expect(read.status).toBe(200);
+    expect(writes).toEqual([]);
+    expect(t.logs).toEqual(
+      expect.arrayContaining([expect.objectContaining({ msg: 'browser unowned worker blocked' })]),
+    );
   });
 
   it('拒绝非法与未授权地址，登录页与导航失败显式报错；失败路径不留下标签页', async () => {
@@ -166,7 +211,9 @@ describe('助手网页文字与任务预览', () => {
       [`${origin}/login`, 409, ErrorCode.BrowserLoginRequired],
       [`${origin}/redirect`, 502, ErrorCode.BrowserReadFailed],
     ] as const) {
+      const timersBefore = pendingTimers.size;
       const read = await t.call(readWebsiteOp, { url });
+      expect(pendingTimers.size).toBe(timersBefore);
       expect(read.status).toBe(status);
       expect(read.body).toMatchObject({ error: { code } });
       expect(await targets()).toEqual(before);

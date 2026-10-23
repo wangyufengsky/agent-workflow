@@ -416,7 +416,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | --- | --- | --- | --- | --- |
 | POST | `/browser/read-url` | `browser.readUrl` | read | `{ url }`（http(s)）→ `{ url, title, tab: 'site', page, settled, logs }`；`page` 为有长度限制的文字结构，`logs` 为控制台错误/提醒、异常与失败请求（12 §6.17） |
 
-`mode = simple`、`expose.assistant = true`。使用 `persist:aw-sites` 的已有登录，按网站规则限制地址与重定向；即使某条规则是可操作，读取时也强制只读，拦截非 GET/HEAD/OPTIONS 请求与 WebSocket。临时标签页在成功、登录要求或导航失败后均关闭，不改变用户的标签页与执行任务的浏览器会话。
+`mode = simple`、`expose.assistant = true`。使用 `persist:aw-sites` 的已有登录，按网站规则限制地址与重定向；即使某条规则是可操作，读取时也强制只读，拦截非 GET/HEAD/OPTIONS 请求与 WebSocket。无法归属标签页的 Worker 不继承权限，拒绝并记录日志。整体读取最长 `BROWSER_READ_TIMEOUT_MS`（30000），超时返回 502 `BROWSER_READ_FAILED`（`details.reason = timeout`）。临时标签页在成功、登录要求、导航失败或超时后均关闭，不改变用户的标签页与执行任务的浏览器会话。
 
 错误：非法地址或 URL 中携带用户名/密码为 400 `VALIDATION_FAILED`；规则不允许的初始地址 403 `BROWSER_SITE_NOT_ALLOWED`；登录页 409 `BROWSER_LOGIN_REQUIRED`；导航失败（含被拒绝的重定向）502 `BROWSER_READ_FAILED`。没有图片/PDF、点击或输入能力；当前用户预览页的 `browser.read` 尚依赖用户预览页签，未开放。
 
@@ -469,7 +469,7 @@ type PrintSettled = { ok: true } | { ok: false; error: ErrorInfo };
 type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorInfo };   // path 为 null：用户取消了保存
 ```
 
-加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。浏览器标签页同样：后端经同一通道发 `browser.request`（`shared/contracts/browser-port.ts`：`open` / `setPolicy` / `close` / `cdp`），main 回 `browser.response`，并主动发 `browser.cdpEvent` / `browser.blocked` / `browser.gone`（29 §5.1）。
+加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。浏览器标签页同样：后端经同一通道发 `browser.request`（`shared/contracts/browser-port.ts`：`open` / `setPolicy` / `close` / `cdp`），main 回 `browser.response`，并主动发 `browser.cdpEvent` / `browser.blocked` / `browser.unownedBlocked`（无法归属标签页的 Worker 拦截，后端记日志）/ `browser.gone`（29 §5.1）。
 
 ## 14. 待实施 API：附件与需求清单
 
