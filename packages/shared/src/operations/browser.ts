@@ -1,9 +1,13 @@
 import { z } from 'zod';
 import {
+  navigatePreviewTabRequestSchema,
   openLoginTabRequestSchema,
+  openPreviewTabRequestSchema,
+  previewTabViewportRequestSchema,
   readWebsiteRequestSchema,
   readWebsiteSchema,
   siteLoginsSchema,
+  userPreviewTabSchema,
   userTabSchema,
 } from '../contracts/api/browser.ts';
 import { OperationRisk } from '../enums/system.ts';
@@ -12,6 +16,37 @@ import { defineOperationContract } from './define.ts';
 
 // Website logins are the user's own, done in the settings page (29 §8.6); the assistant has no part in them.
 const common = { expose: { palette: false, assistant: false }, credentialFields: [], mode: UiMode.Simple } as const;
+
+export const openPreviewTabOp = defineOperationContract({
+  ...common,
+  id: 'browser.openUserTab',
+  title: 'op.browser.openUserTab',
+  description: "Open the user's own task preview tab",
+  input: openPreviewTabRequestSchema,
+  output: userPreviewTabSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/browser/preview-tabs' },
+});
+export const navigatePreviewTabOp = defineOperationContract({
+  ...common,
+  id: 'browser.navigateUserTab',
+  title: 'op.browser.navigateUserTab',
+  description: "Navigate the user's preview to a path of its task",
+  input: navigatePreviewTabRequestSchema,
+  output: z.void(),
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/browser/preview-tabs/:tabId/navigate' },
+});
+export const setPreviewViewportOp = defineOperationContract({
+  ...common,
+  id: 'browser.setUserViewport',
+  title: 'op.browser.setUserViewport',
+  description: "Change the user's preview viewport",
+  input: previewTabViewportRequestSchema,
+  output: z.void(),
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/browser/preview-tabs/:tabId/viewport' },
+});
 
 export const readWebsiteOp = defineOperationContract({
   ...common,

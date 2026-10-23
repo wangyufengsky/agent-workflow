@@ -4,6 +4,8 @@ import {
   ASSISTANT_PAGE_PARAMS,
   assistantConfirmationStatusSchema,
   assistantPageSchema,
+  assistantTurnEventSchema,
+  assistantTurnStatusSchema,
 } from '../../enums/assistant.ts';
 import { permissionDecisionSchema } from '../../enums/inbox.ts';
 import { operationRiskSchema } from '../../enums/system.ts';
@@ -18,12 +20,39 @@ export const assistantPermissionRequestSchema = z.object({
 });
 export type AssistantPermissionRequestDTO = z.infer<typeof assistantPermissionRequestSchema>;
 
+export const assistantTurnSchema = z.object({
+  id: z.number(),
+  source: z.enum(['user', 'app']),
+  status: assistantTurnStatusSchema,
+  endReason: assistantTurnEventSchema.nullable(),
+  model: z.string().nullable(),
+  startedAt: z.number(),
+  endedAt: z.number().nullable(),
+  elapsedMs: z.number().nullable(),
+  tokensInput: z.number().nullable(),
+  tokensOutput: z.number().nullable(),
+  timeoutMs: z.number(),
+});
+export type AssistantTurnDTO = z.infer<typeof assistantTurnSchema>;
+
+export const assistantUsageSchema = z.object({
+  latest: assistantTurnSchema.nullable(),
+  /** 只统计开始记录后的轮次，旧消息历史不会回填。 */
+  recordedFrom: z.number().nullable(),
+  turns: z.number(),
+  unknownTurns: z.number(),
+  tokensInput: z.number().nullable(),
+  tokensOutput: z.number().nullable(),
+});
+export type AssistantUsageDTO = z.infer<typeof assistantUsageSchema>;
+
 /** `AssistantConversationDTO` (11 §13): `busy` while the assistant works on a turn. */
 export const assistantConversationSchema = z.object({
   id: z.string(),
   title: z.string(),
   busy: z.boolean(),
   pendingPermissions: z.array(assistantPermissionRequestSchema),
+  usage: assistantUsageSchema,
   createdAt: z.number(),
   updatedAt: z.number(),
 });

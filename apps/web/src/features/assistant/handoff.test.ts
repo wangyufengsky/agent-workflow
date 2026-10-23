@@ -2,8 +2,15 @@ import { type AssistantConfirmationDTO, AssistantConfirmationStatus, type Assist
 import { describe, expect, it } from 'vitest';
 import { panelFollowsUser } from './handoff.ts';
 
-const conversation = (busy: boolean): AssistantConversationDTO =>
-  ({ id: 'c1', title: '', busy, pendingPermissions: [], createdAt: 0, updatedAt: 0 }) as AssistantConversationDTO;
+const conversation = (busy: boolean): AssistantConversationDTO => ({
+  id: 'c1',
+  title: '',
+  busy,
+  pendingPermissions: [],
+  createdAt: 0,
+  updatedAt: 0,
+  usage: { latest: null, recordedFrom: null, turns: 0, unknownTurns: 0, tokensInput: null, tokensOutput: null },
+});
 const confirmation = (status: AssistantConfirmationStatus) => ({ id: 'k', status }) as AssistantConfirmationDTO;
 
 describe('用户自己离开主页时面板是否接着显示对话（D112）', () => {

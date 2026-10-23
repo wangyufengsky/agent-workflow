@@ -56,6 +56,7 @@
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
 | `createChromiumHost()` | `src/modules/browser/host.chromium.ts` | 浏览器集成测试的宿主：真实 Chromium（playwright-core），`createTestApp({ browserHost })` 注入；页面快照的单元测试输入是从 Chromium 录下的无障碍树 `test/fixtures/browser/orders.ax.json`（对应 `orders.html`），不手编 |
 | `e2e/fixtures/browser-host/main.cjs` | — | Electron 中运行真实的 main `browser.ts`（Electron 自带的 Node 直接加载 TypeScript）加本地 HTTP / WebSocket 服务，代替后端发 `browser.request`；`browser-host.electron.spec.ts` 经 `app.evaluate` 驱动，不需要构建应用（29 §14，B-04） |
+| `e2e/fixtures/user-preview/main.cjs` | 仅 opencode | 独立临时数据的真实后端、原生 `WebContentsView`、构建后的 preload 和 renderer；`user-preview.electron.spec.ts` 验证用户预览、原生快捷键、助手浮层隐藏/恢复、真实文字读取、离开页签解绑。先 `pnpm build`；不使用用户工作区或现有数据库 |
 | `createTestApp()` | `test/helpers/app.ts` | 启动后端（临时数据目录、随机端口），返回类型化 API 调用 `call(op, input)`、`mcpUrl`、FakeOpencode；`realOpencode: true` 用于 `@opencode` 测试；MCP SDK 客户端见 `test/helpers/mcp.ts` |
 | `build.*()` | `test/builders/` | 最小测试数据构造器，只填测试关心的字段，其余用合法默认值 |
 | `waitForEvent(type, predicate)` | `test/helpers/events.ts` | 订阅 event-bus 等待事件，带超时（默认 20s，慢的 CI runner 与 Windows 上一个任务要几秒）；**替代一切 sleep** |

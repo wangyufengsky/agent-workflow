@@ -108,6 +108,8 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
 }
 
 const COMMON_HINTS: Partial<Record<ErrorCode, string>> = {
+  [ErrorCode.BrowserNotOpen]:
+    'Ask the user to open their task preview in the desktop app. Do not substitute an AI-owned tab or the most recent task.',
   [ErrorCode.BrowserSiteNotAllowed]: 'The website rules do not allow this address. Do not bypass the rules.',
   [ErrorCode.BrowserLoginRequired]:
     'Ask the user to log in under Settings > Websites, then read the address again. Never ask for or enter credentials.',

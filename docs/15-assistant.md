@@ -2,7 +2,7 @@
 
 > 状态：**v1.1 已实现**（任务 A-01…A-11，见 [05](05-dev-plan.md#v11--应用助手约-2-周v10-发布后)）。v1.0 交付了它的地基：操作清单（[03 §5](03-architecture.md#5-操作清单operation-registry)）与 ⌘K 命令面板。实现中按保守方案收紧的取舍见 D65（①② 用户已确认，③ 待确认）。
 
-2026-10-24 增补：助手可用 `browser_readUrl` 读取明确网址的文字结构与错误日志，沿用网站登录和规则，并强制只读（无法归属标签页的 Worker 被拒绝并记录）；整体读取最长 30 秒，截止显式失败并关闭临时页；可用 `previews_get/start/stop` 管理任务预览，启动/停止继续经过写操作确认。未开放当前用户预览页读取（尚缺用户页签归属）、页面点击/输入或截图/PDF，见 [29 §9](29-browser.md#9-应用助手)。
+2026-10-24 增补：助手可用 `browser_readUrl` 读取明确网址的文字结构与错误日志，沿用网站登录和规则，并强制只读（无法归属标签页的 Worker 被拒绝并记录）；整体读取最长 30 秒，截止显式失败并关闭临时页；可用 `previews_get/start/stop` 管理任务预览，启动/停止继续经过写操作确认。桌面版用户显式打开「我的预览」后，`browser_read` 可读取当前对话关联的用户页；关联等待期间切换预览或对话会取消本次发送并保留草稿。未开放助手页面点击/输入或截图/PDF，见 [29 §9](29-browser.md#9-应用助手)。
 
 ## 1. 定位
 
@@ -46,6 +46,7 @@ opencode 1.19 的已有会话目录不能通过发送参数或 fork 改变。迁
 | --- | --- | --- |
 | `get_current_time` | read | `{ now, date, weekday, timeZone, utcOffset }`：用户所在时区（后端进程的系统时区）的当地时间 |
 | `get_app_status` | read | `{ runtime, uiMode, projects, activeTasks, blockingInbox }`（`blockingInbox` 同徽标，不含待合并，D119） |
+| `browser_read` | read | 严格空参数；只读当前对话由界面绑定的「我的预览」文字、地址、视口和错误日志；无关联或预览失效为 `BROWSER_NOT_OPEN`，不能用任务或 tab 参数猜测当前页。整体最多 30 秒，超时为 `BROWSER_READ_FAILED`，保留用户页与关联（29 §9） |
 | `open_page` | read | `{ page: AssistantPage, params }`（各页面需要的参数为 `ASSISTANT_PAGE_PARAMS`）→ SSE `assistant.navigate`，界面在面板旁跳转 |
 | `open_form` | read | `{ form: AssistantForm, values }` → SSE `assistant.open_form`；`values` 按该表单所提交操作的助手输入（不含凭据字段）的 partial 校验，带凭据字段 `VALIDATION_FAILED` |
 | `list_files` / `reveal_file` | read | 列出 / 在 Finder 中显示 `files/<id>/` 下的文件（路径相对该目录，越界或不存在 `VALIDATION_FAILED`；显示经 SSE `assistant.reveal_file` 由 preload 完成） |
@@ -126,6 +127,16 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 | 工作中 | 面板顶边一道流光、头部标识旋转并呼吸、「正在思考」文字流光（遮罩只改透明度，文字颜色不变）；正在写的正文末尾闪烁的打字光标；运行中的动作条标题流光 | 循环动效全部停止，保留静态状态 |
 | 对话列表 | popover（`@starting-style` 淡入缩放），CSS 锚点定位在标题下方 | 只淡入 |
 
+### 6.2 单轮用量与运行时限
+
+主页、侧栏、桌宠在输入区共用用量行：本轮／最近一轮的状态、实际输入与输出 tokens、耗时，以及会话累计已报告 tokens 和未报告轮次数。统计起点直接显示，起点之前的历史为未知。模型确实报告零时显示 0；没有报告时显示「用量未报告」，即使已经正常结束也不伪造为零。只记录 `StepFinished` 的 input / output，不含缓存与推理 tokens，不记录金额预算或余额。
+
+创建外部会话或发送前先保存 `assistant_turns`，用户消息与应用回传都计为独立轮次；`StepFinished` 保留 message id 与 part id，按所属轮次累计并持久化去重。迟到报告仍归原轮次。助手使用独立的同步原生 HTTP 请求关联每轮完成（接受后即可清空输入，任务尝试仍走原有异步入口）；裸 session Idle / Error 不能结束另一轮。显式 user message id 与 assistant.parentID 绑定用量，原生响应中的错误与请求前置失败会结束该轮；未知传输故障保留忙碌并允许停止。结束结果由状态机记录为完成、用户停止、失败、超时或中断；运行时消失与后端重启各有原因。重启发现未结束轮次只标中断，不自动重发；其耗时未知，避免把离线时段误算成运行时间。
+
+沿用专业设置 `attempt.timeoutMinutes`（默认 60 分钟），设置文案说明同时作用于任务尝试和助手单轮；本轮开始时固定该值。助手等待权限期间暂停，权限全部回复后继续剩余时长；耗时显示仍为含等待的墙钟时间。超时通过注入 Clock 触发停止，不自动重试；外部会话创建迟到时也不再发送已超时的消息，发送返回非成功以保留草稿与附件。
+
+停止先通过本轮 assistant marker 或原生 busy/retry 状态确认 Runner 已启动，再发一次 abort，同时等待该请求的关联结束。整个确认最多 10 秒（Clock），无法确认则明确失败、保持忙碌供重试；已发出的 abort 仍保留屏障，重试等待同一个请求，不重复发 abort。迟到成功按原停止/超时原因收尾。idle、SSE 断流和未知 HTTP 传输错误均不能单独证明停止成功。
+
 ## 7. v1.0 需要预留的地基
 
 | 预留 | 位置 |
@@ -148,7 +159,8 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 
 ```
 server/src/modules/assistant/
-├─ assistant.table.ts / .repo.ts   对话、确认、持久化待发队列与任务跟进表
+├─ assistant.table.ts / .repo.ts   对话、确认、持久化待发队列、任务跟进与轮次表
+├─ assistant.usage.ts / .repo.ts   实际报告累计、重放去重、Clock 时限与轮次结束原因
 ├─ assistant.service.ts           对话、会话、事件 → 消息流、忙碌、权限请求、附件、待发消息
 ├─ assistant.tasks.ts / .tasks.repo.ts  任务原对话归属、状态回报与启动补扫
 ├─ assistant.context.ts           每轮 system（当地时间 localTime、页面描述）
@@ -166,6 +178,7 @@ server/src/modules/assistant/
 | 恢复回归 | `assistant.recovery.int.test.ts`：并发首条消息互斥；void 成功结果与旧记录兼容；断线、发送失败和重启后的结果回传且不重执行业务；建会话失败释放；空闲事件早于发送响应时按序投递；旧页面对象删除后的成功回传 |
 | 任务回传 | `assistant.tasks.int.test.ts`：确认/总是允许两条路径在首次任务事件前登记；真实 Git 任务待验收与交付；忙碌、断线、发送失败和重启补扫；事件去重；删除原对话、界面任务、取消确认不跟进；登记失败原子回滚 |
 | 文字上下文 | `assistant.snapshots.int.test.ts`：任务变化后保持快照原文、来源与时间，步骤归属、失效对象、选中文字作为不可信资料、长度与严格字段边界；`shell-assistant-context.browser.spec.ts`：主页选区编辑、侧栏任务快照、预览移除、与文件共存、发送后读取、开始任务模式不出现上下文入口，以及生成中移除后迟到的响应不再打开预览或带入消息 |
+| 用量回归 | `assistant.usage.int.test.ts`：真实 SQLite 持久化、捕获的真实事件重放去重、迟到用量归属、失败发送、运行时丢失与重启；FakeClock 验证权限等待暂停、剩余时限恢复、超时不重试与建会话迟到 |
 | `@opencode` | 注入后 `aw-assistant` 与 `agent-workflow-app` 出现在 opencode 配置中，两套 MCP 都已连接 |
 | E2E | J11「对助手说开始任务 → 确认卡片 → 任务卡片状态更新 → 打开任务页」；直接执行出现项目卡片、删除后「已删除」；主页建议 → 对话显示在主页、`open_page` 带用户离开时面板接着显示对话、「确认并总是允许」→ 设置页撤销；J25 主页对话与接力；J9 走查含助手面板（简单与专业）与主页对话 |
 | live | `live/assistant.live.test.ts`：真实模型查明天的日期并列出项目（调用 `get_current_time` 与 `projects_list`，回复含两者），报告写到 `live/reports/assistant-*.json` |

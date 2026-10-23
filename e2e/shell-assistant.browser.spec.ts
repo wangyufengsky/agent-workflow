@@ -52,6 +52,10 @@ test('J11 对助手说开始任务 → 确认卡片 → 任务运行', async ({ 
   const panel = page.getByRole('complementary', { name: '应用助手' });
   await expect(panel).toBeVisible();
   expect((await page.locator('main').boundingBox())?.width).toBe(pageWidth);
+  // 唯一用户消息属于本例新建聊天，不依赖共享后端没有其他历史。
+  await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  await expect(panel.getByRole('button', { name: '切换对话', exact: true })).toHaveText('新对话');
+  await expect(panel.getByTestId('assistant-user-message')).toHaveCount(0);
   await panel.getByLabel('发给助手的消息').fill('帮我修一下：助手开的任务：退款金额少算了运费');
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
   await expect(panel.getByTestId('assistant-user-message')).toHaveText('帮我修一下：助手开的任务：退款金额少算了运费');

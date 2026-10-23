@@ -386,6 +386,25 @@ payload / response：
 
 消息流：`<数据目录>/assistant/conversations/<id>.jsonl`，格式同 §3（多 `confirmation`、`attachment`、`entity_ref` 三种条目）；记录用户的消息、模型的正文与工具调用、权限请求、错误；后端代发的确认结果消息与每轮注入的 `system` 不记录（卡片显示结果）。
 
+### assistant_turns
+
+助手在创建外部会话或发送消息前保存轮次，包含用户消息与应用回传消息。历史聊天不补造轮次或零用量；统计起点为本对话首条轮次的开始时间。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | INTEGER PK AUTOINCREMENT | 轮次顺序，同一时钟刻度也稳定 |
+| conversation_id | TEXT → assistant_conversations，CASCADE | 删除对话时清理 |
+| source | TEXT | `user` 或 `app`（确认结果等回传） |
+| status / end_reason | TEXT / TEXT NULL | `AssistantTurnStatus` / `AssistantTurnEvent`，见 09 §14 |
+| model | TEXT NULL | 本轮开始时的模型设置；空表示运行时默认 |
+| started_at / ended_at | INTEGER / INTEGER NULL | 注入 Clock 的毫秒时间 |
+| elapsed_ms | INTEGER NULL | 正常结束为墙钟耗时，含权限等待；后端重启发现的未结束轮次为未知，不能把离线时间算入 |
+| tokens_input / tokens_output | INTEGER NULL | 实际 `StepFinished` 报告之和；未报告保持 NULL，实际报告零保留 0 |
+| timeout_ms | INTEGER | 本轮开始时 `attempt.timeoutMinutes` 的快照 |
+| message_ids / step_ids | TEXT(JSON string[]) | 将实际报告关联至原轮次，按 step part id 去重，重放与迟到报告不重复累计 |
+
+索引：`(conversation_id, started_at)`、`(status)`。后端重启将遗留 `running` 转为 `interrupted / backend_restart`；运行时消失用 `runtime_lost`。用量可在轮次结束后通过已关联的 message id 补报，未知所属轮次的报告不猜测归属。
+
 ## 4a. 知识问答（v1.1）
 
 见 [18-knowledge.md §3](18-knowledge.md#3-数据模型)，迁移 `0009_knowledge`。
@@ -594,7 +613,7 @@ payload / response：
 
 | 表／字段 | 关键字段／约束 |
 | --- | --- |
-| requirement_revisions | id、task_id FK（级联）、seq、items JSON、created_at；UNIQUE(task_id, seq)；只追加。当前版本就是 seq 最大的一条，任务表不另存（迁移 0021，Q-01 已实现） |
+| requirement_revisions | id、task_id FK（级联）、seq、items JSON、created_at；UNIQUE(task_id, seq)；只追加。当前版本就是 seq 最大的一条，任务表不另存（迁移 0022，Q-01 已实现） |
 | requirement_results | id、task_id FK（级联）、revision_id FK（级联）、item_id、source、conclusion、note、output（命令输出末尾，按既有输出上限截断）、node_id 可空（用户结论为 null，不设外键）、commit_sha、created_at；只追加，按插入顺序读取（同一毫秒的两条不靠时间区分）（表已建，写入在 Q-02 / Q-03） |
 | 交付时的清单摘要（Q-03 已实现） | 不另加列：记在这次交付的时间线事件 `payload.requirements` 里（`RequirementsDeliverySummary`：revisionId、commitSha、逐项 id／标题／是否必需／显示状态）；没有清单的交付没有这个字段 |
 

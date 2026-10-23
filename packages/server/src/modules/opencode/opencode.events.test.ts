@@ -42,8 +42,20 @@ describe('opencode 全局事件解析', () => {
       sessionId: 'ses_eac74a387ffeMgXo9hDGXzyQPQ',
       directory: '/tmp/aw-repo',
       permissionId: 'per_1538b763f00126bX5oaRtvGt4W',
+      messageId: 'msg_1538b72b8001PShaIBPviQmH3V',
       permission: 'bash',
       patterns: ['ls'],
+    });
+  });
+
+  it('真实用量报告保留消息与步骤标识，供所属轮次匹配和重放去重', () => {
+    expect(parsed.find((event) => event.type === E.StepFinished)).toEqual({
+      type: E.StepFinished,
+      sessionId: 'ses_eac74a387ffeMgXo9hDGXzyQPQ',
+      messageId: 'msg_1538b5d19001aSulM6ndvCetJc',
+      partId: 'prt_1538b723d001f2I80CqDGxK1Ua',
+      tokens: { input: 9736, output: 63 },
+      cost: 0,
     });
   });
 

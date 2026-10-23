@@ -1,4 +1,4 @@
-import type { AwBridge } from '@aw/shared';
+import type { AwBridge, BrowserShortcut } from '@aw/shared';
 import { contextBridge, ipcRenderer } from 'electron';
 import { companionBridge } from './companion.ts';
 
@@ -21,6 +21,13 @@ const bridge: AwBridge = {
   printSettled: (result) => ipcRenderer.send('aw:print-settled', result),
   setLaunchPreferences: (preferences) => ipcRenderer.send('aw:launch-preferences', preferences),
   browser: {
+    onShortcut: (listener) => {
+      const receive = (_event: Electron.IpcRendererEvent, key: BrowserShortcut) => listener(key);
+      ipcRenderer.on('aw:browser-shortcut', receive);
+      return () => {
+        ipcRenderer.removeListener('aw:browser-shortcut', receive);
+      };
+    },
     place: (tabId, rect) => ipcRenderer.send('aw:browser-place', tabId, rect),
     back: (tabId) => ipcRenderer.send('aw:browser-back', tabId),
     forward: (tabId) => ipcRenderer.send('aw:browser-forward', tabId),

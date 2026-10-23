@@ -1,4 +1,24 @@
-import { SiteAccess } from '@aw/shared';
+import { SiteAccess, ViewportPreset } from '@aw/shared';
+
+export const TASK_PREVIEW_COPY = {
+  title: '预览',
+  progress: '进度',
+  mine: '我的预览',
+  open: '打开我的预览',
+  reopen: '重新打开预览',
+  stop: '停止预览',
+  back: '后退',
+  forward: '前进',
+  reload: '刷新',
+  path: '预览路径',
+  go: '打开路径',
+  viewport: '预览视口',
+  presets: { [ViewportPreset.Desktop]: '桌面', [ViewportPreset.Tablet]: '平板', [ViewportPreset.Mobile]: '手机' },
+  desktopOnly: '我的预览只在桌面版中显示。助手读取当前预览也需要桌面版。',
+  noWorktree: '任务准备好工作区后可以打开预览。',
+  logs: '服务日志',
+  assistantHint: '可以打开助手询问当前页面。助手只读取文字和错误信息，浮层打开时预览暂时隐藏。',
+} as const;
 
 /** The project's page preview (29 §8.5). */
 export const PREVIEW_COPY = {

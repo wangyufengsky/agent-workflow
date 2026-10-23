@@ -40,7 +40,7 @@ export const INSIGHTS_COPY = {
   tokensOutput: '输出 tokens',
   tokensTotal: 'tokens 合计',
   attempts: 'AI 会话',
-  assistantNotCounted: '应用助手对话的用量没有记录，不在统计内。',
+  assistantNotCounted: '本页统计任务与知识问答；助手的单轮和会话用量显示在对话输入框旁，不计入此页。',
   trendTitle: '每天的 tokens',
   trendTable: '每天的数据',
   date: '日期',

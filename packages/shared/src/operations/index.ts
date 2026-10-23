@@ -1,5 +1,6 @@
 import {
   abortAssistantOp,
+  bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
   createConversationOp,
@@ -17,7 +18,16 @@ import {
 import { getAttachmentOp, removeAttachmentOp, snapshotProjectFileOp } from './attachments.ts';
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
 import { createBatchOp, deliverBatchOp, getBatchOp, listBatchesOp } from './batches.ts';
-import { clearSiteLoginOp, closeUserTabOp, listSiteLoginsOp, openLoginTabOp, readWebsiteOp } from './browser.ts';
+import {
+  clearSiteLoginOp,
+  closeUserTabOp,
+  listSiteLoginsOp,
+  navigatePreviewTabOp,
+  openLoginTabOp,
+  openPreviewTabOp,
+  readWebsiteOp,
+  setPreviewViewportOp,
+} from './browser.ts';
 import {
   createDbConnectionOp,
   dbSchemaOp,
@@ -221,6 +231,9 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   listSiteLoginsOp,
   clearSiteLoginOp,
   readWebsiteOp,
+  openPreviewTabOp,
+  navigatePreviewTabOp,
+  setPreviewViewportOp,
   listDbConnectionsOp,
   createDbConnectionOp,
   updateDbConnectionOp,
@@ -326,6 +339,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   pruneWorktreesOp,
   listConversationsOp,
   snapshotAssistantContextOp,
+  bindAssistantPreviewOp,
   createConversationOp,
   getConversationOp,
   deleteConversationOp,

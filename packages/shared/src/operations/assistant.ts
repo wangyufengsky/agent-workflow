@@ -85,6 +85,18 @@ export const sendAssistantMessageOp = defineOperationContract({
   http: { method: 'POST', path: '/assistant/conversations/:id/messages' },
 });
 
+/** 仅界面可更新当前预览关联，模型不能自行指定或激活标签页。 */
+export const bindAssistantPreviewOp = defineOperationContract({
+  ...common,
+  id: 'assistant.bindPreview',
+  title: 'op.assistant.bindPreview',
+  description: 'Bind or clear the user-selected preview for this conversation',
+  input: byId.extend({ preview: z.object({ taskId: z.string(), tabId: z.string() }).nullable() }),
+  output: z.void(),
+  risk: OperationRisk.Write,
+  http: { method: 'PUT', path: '/assistant/conversations/:id/preview' },
+});
+
 export const abortAssistantOp = defineOperationContract({
   ...common,
   id: 'assistant.abort',

@@ -184,6 +184,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('preClose', async () => {
     // 临时碎碎念会话须在运行时关闭前取消并删除。
     await assistant.stopWhisper();
+    assistant.service.dispose();
     await opencode.shutdown();
   });
   // The hosted runtime can start only once the API listens (its MCP endpoint needs the port) and when no fake
@@ -451,6 +452,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   ];
   const activeTaskStatuses = TASK_STATUSES.filter((s) => !isTerminalState(taskMachine, s));
   const assistant = createAssistantModule({
+    browser: browser.service,
     db: database.db,
     unit,
     events,

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { viewportPresetSchema } from '../../enums/browser.ts';
 import { browserLogsOutputSchema, browserPageSchema } from '../mcp/browser.ts';
 
 /** 助手只读网页：沿用网站登录状态，但不开放页面操作。 */
@@ -18,6 +19,18 @@ export const openLoginTabRequestSchema = z.object({
 });
 export const userTabSchema = z.object({ tabId: z.string() });
 export type UserTab = z.infer<typeof userTabSchema>;
+export const userPreviewTabSchema = userTabSchema.extend({ viewport: viewportPresetSchema });
+export type UserPreviewTab = z.infer<typeof userPreviewTabSchema>;
+
+export const openPreviewTabRequestSchema = z.object({ taskId: z.string() });
+export const navigatePreviewTabRequestSchema = userTabSchema.extend({ path: z.string().regex(/^\/(?!\/)/) });
+export const previewTabViewportRequestSchema = userTabSchema.extend({ preset: viewportPresetSchema });
+export const readPreviewSchema = browserPageSchema.extend({
+  settled: z.boolean(),
+  taskId: z.string(),
+  viewport: viewportPresetSchema,
+  logs: browserLogsOutputSchema,
+});
 
 /** Hosts with cookies in the websites' login partition. */
 export const siteLoginsSchema = z.object({ hosts: z.array(z.string()) });

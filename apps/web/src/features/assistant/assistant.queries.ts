@@ -2,23 +2,35 @@ import {
   API_PREFIX,
   type AssistantConfirmationDTO,
   type AssistantConversationDTO,
-  type AssistantPageRef,
   abortAssistantOp,
+  bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
   createConversationOp,
   deleteConversationOp,
+  ErrorCode,
   listAssistantFilesOp,
   listConfirmationsOp,
   listConversationsOp,
   type PermissionDecision,
   replyAssistantPermissionOp,
+  type SendAssistantMessageRequest,
   sendAssistantMessageOp,
 } from '@aw/shared';
 import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
-import { callOperation } from '../../api/client.ts';
+import { ApiError, callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
+import { useUiStore } from '../../state/ui.store.ts';
 import type { TranscriptSource } from '../attempts/attempt.queries.ts';
+
+/** 与界面绑定更新串行：首次消息一定在它的当前预览关联写入后发送。 */
+export const PREVIEW_BINDING_SCOPE = { id: 'assistant-preview-binding' };
+export const useBindPreview = () =>
+  useMutation({
+    scope: PREVIEW_BINDING_SCOPE,
+    mutationFn: (input: { id: string; preview: { taskId: string; tabId: string } | null }) =>
+      callOperation(bindAssistantPreviewOp, input),
+  });
 
 export const conversationsQuery = queryOptions({
   queryKey: queryKeys.assistantConversations,
@@ -86,11 +98,31 @@ export function useCreateConversation() {
 
 // The conversation's busy state and permission requests arrive in order over SSE (`assistant.updated`). These
 // responses are not written to the cache: one can arrive after the event saying the turn already ended.
-export const useSendMessage = () =>
-  useMutation({
-    mutationFn: (input: { id: string; text: string; context: AssistantPageRef }) =>
-      callOperation(sendAssistantMessageOp, input),
+export function useSendMessage() {
+  const bind = useBindPreview();
+  return useMutation({
+    mutationFn: async (input: SendAssistantMessageRequest) => {
+      const before = useUiStore.getState();
+      let changed = false;
+      // 连续离开再返回也算切换：旧消息不能借等待中的关联重新获得页面。
+      const unsubscribe = useUiStore.subscribe((state) => {
+        if (state.activePreview !== before.activePreview || state.activeConversationId !== before.activeConversationId)
+          changed = true;
+      });
+      try {
+        await bind.mutateAsync({ id: input.id, preview: before.activePreview });
+        if (changed)
+          throw new ApiError(409, {
+            code: ErrorCode.AssistantContextChanged,
+            message: 'The preview or conversation changed before the message was sent',
+          });
+        return callOperation(sendAssistantMessageOp, input);
+      } finally {
+        unsubscribe();
+      }
+    },
   });
+}
 export const useAbortAssistant = () =>
   useMutation({ mutationFn: (id: string) => callOperation(abortAssistantOp, { id }) });
 export const useReplyAssistantPermission = () =>

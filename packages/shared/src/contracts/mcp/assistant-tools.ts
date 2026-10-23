@@ -37,6 +37,9 @@ export const getAppStatusOutputSchema = z.object({
 });
 export type GetAppStatusOutput = z.infer<typeof getAppStatusOutputSchema>;
 
+/** 当前用户预览只能由界面关联，模型不能用参数自行选择页签。 */
+export const readBrowserInputSchema = z.strictObject({});
+
 /** desktop 只是消息来源，主窗口不能导航成桌宠窗口。 */
 export const openPageInputSchema = assistantPageRefSchema.safeExtend({
   page: z.enum(Object.values(AssistantPage).filter((page) => page !== AssistantPage.Desktop)),

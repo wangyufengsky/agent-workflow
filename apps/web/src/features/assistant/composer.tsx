@@ -8,6 +8,7 @@ import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
 import styles from './assistant.module.css';
 import { useAbortAssistant } from './assistant.queries.ts';
 import { ContextAttachments } from './context-attachments.tsx';
+import { UsageLine } from './usage-line.tsx';
 import { useAsk } from './use-ask.ts';
 
 /** The input at the bottom (15 §6): it grows with the text, ⌘↵ sends, and while the assistant works it can stop it. */
@@ -45,6 +46,7 @@ export function Composer({
   return (
     <form className={styles.composer} onSubmit={submit} {...dropFilesInto(files)}>
       {error !== null && <ErrorState error={error} />}
+      {conversation !== undefined && <UsageLine usage={conversation.usage} />}
       <div className={styles.inputBox}>
         <textarea
           ref={inputRef}

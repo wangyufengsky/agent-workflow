@@ -15,6 +15,7 @@ import { HOME_TASK_COPY } from '../../copy/tasks.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { useAbortAssistant } from '../assistant/assistant.queries.ts';
 import { ContextAttachments } from '../assistant/context-attachments.tsx';
+import { UsageLine } from '../assistant/usage-line.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
 import { AttachmentBar, dropFilesInto, pasteFilesInto } from '../attachments/attachment-bar.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
@@ -119,6 +120,7 @@ export function HomeComposer({
         onSubmit={submit}
         {...dropFilesInto(files)}
       >
+        {workflow === undefined && conversation !== undefined && <UsageLine usage={conversation.usage} />}
         {workflow !== undefined && (
           <div className={styles.modeHead}>
             <div className={styles.modeRow}>

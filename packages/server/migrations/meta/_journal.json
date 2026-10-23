@@ -152,8 +152,15 @@
     {
       "idx": 21,
       "version": "6",
-      "when": 1792780293488,
-      "tag": "0021_requirements",
+      "when": 1792780150143,
+      "tag": "0021_assistant_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1792784214757,
+      "tag": "0022_requirements",
       "breakpoints": true
     }
   ]
