@@ -190,8 +190,8 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 
 ### 6.3 `get_task_diff`
 
-输入：`{ path?: string }`
-输出：无 path 时 `{ files: Array<{ path; status: 'added'|'modified'|'deleted'|'renamed'; additions; deletions }> }`；有 path 时 `{ path, diff: string }`（未提交改动 + 已提交改动，相对 `baseCommit`）。
+输入：`{ path?: string }`（空字符串同不传：有的模型每个参数都要填，会传 `""` 表示全部；真实会话中曾为此连续失败 7 次）
+输出：无 path（或为空）时 `{ files: Array<{ path; status: 'added'|'modified'|'deleted'|'renamed'; additions; deletions }> }`；有 path 时 `{ path, diff: string }`（未提交改动 + 已提交改动，相对 `baseCommit`）。
 错误：`VALIDATION_FAILED`（path 不在 diff 中）。
 
 ### 6.4 `submit_plan`

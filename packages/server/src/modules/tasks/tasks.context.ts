@@ -201,7 +201,7 @@ export function createTaskContext(deps: TasksServiceDeps, state: TaskState) {
       const worktree = readyWorktree(task);
       const base = await taskDiffBase(worktree.path, task.baseBranch);
       const files = await diffWorktree(worktree.path, base);
-      if (path === undefined) return { files };
+      if (path === undefined || path === '') return { files };
       const file = files.find((f) => f.path === path);
       if (file === undefined) {
         throw new AppError(ErrorCode.ValidationFailed, `${path} has no changes in this task`, {

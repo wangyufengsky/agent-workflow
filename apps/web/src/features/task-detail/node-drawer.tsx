@@ -1,4 +1,11 @@
-import { AcceptanceCheckKind, AttemptKind, type CheckResult, type NodeDetailDTO, type StatusTone } from '@aw/shared';
+import {
+  AcceptanceCheckKind,
+  AttemptKind,
+  type CheckResult,
+  type NodeDetailDTO,
+  NodeStatus,
+  type StatusTone,
+} from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -98,6 +105,12 @@ export function Output({ node }: { node: NodeDetailDTO }) {
         <>
           <h3 className="sec-t">{C.notes}</h3>
           <Markdown source={result.notes} />
+        </>
+      )}
+      {node.status === NodeStatus.Verifying && node.checkResults === null && (
+        <>
+          <h3 className="sec-t">{C.checks}</h3>
+          <p className="hint">{C.checking}</p>
         </>
       )}
       {node.checkResults !== null && node.checkResults.length > 0 && (

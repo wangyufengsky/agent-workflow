@@ -21,7 +21,8 @@ export type DiffFile = z.infer<typeof diffFileSchema>;
 
 /** `get_task_diff` (12 §6.3): committed and uncommitted changes of the worktree against the task's base commit. */
 export const getTaskDiffInputSchema = z.object({
-  path: z.string().min(1).optional().describe('A changed file; omit to list every changed file'),
+  // Empty lists every file too: models that fill every argument send "" rather than leaving it out.
+  path: z.string().optional().describe('A changed file; omit or leave empty to list every changed file'),
 });
 export const getTaskDiffOutputSchema = z.union([
   z.object({ files: z.array(diffFileSchema) }),

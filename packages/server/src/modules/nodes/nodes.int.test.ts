@@ -5,11 +5,13 @@ import {
   getNodeOp,
   getTaskOp,
   rejectNodeOp,
+  ServerEventType,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
+import { waitForEvent } from '../../../test/helpers/events.ts';
 import { addProject, createTask, inboxOpens, nodeReaches, taskReaches } from '../../../test/helpers/tasks.ts';
 
 let t: TestApp;
@@ -89,6 +91,29 @@ describe('节点状态机（09 §3）', () => {
     });
     const second = t.fake.prompts.filter((p) => p.text.includes('Your step: 修复'))[1];
     expect(second?.text).toContain('exited with code 1');
+  });
+
+  it('再次检查时不再带着上一份结果的检查结果；上次没通过的原因仍在 retryFeedback', async () => {
+    const { project } = await addProject(t, { checkCommand: 'test -f fix.txt' });
+    t.fake.enqueue(submit('Located'), locate);
+    t.fake.enqueue(submit('Fixed without the file'), fix);
+    t.fake.enqueue(script().edit('fix.txt', 'x\n').callTool('submit_result', { summary: 'Fixed' }), fix);
+    // The first result's review passes; the second result's review keeps the step verifying.
+    t.fake.enqueue(script().callTool('submit_review', { verdict: 'pass', summary: 'ok' }), { agent: 'aw-reviewer' });
+    t.fake.enqueue(script().hang(), { agent: 'aw-reviewer' });
+    const second = waitForEvent(
+      t.app.events,
+      ServerEventType.NodeUpdated,
+      (d) => d.node.key === 'fix' && d.node.status === 'verifying' && d.node.attemptCount === 2,
+    );
+    const task = await createTask(t, { projectId: project.id, workflow: 'bugfix' });
+    await second;
+
+    expect(await nodeOf(task.id, 'fix')).toMatchObject({
+      status: 'verifying',
+      checkResults: null,
+      retryFeedback: expect.stringContaining('`test -f fix.txt` exited with code 1'),
+    });
   });
 
   it('verifying → ready（AI 评审不通过，问题作为反馈）；不通过却没有 blocker/major 时 VALIDATION_FAILED', async () => {
