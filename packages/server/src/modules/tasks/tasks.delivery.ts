@@ -161,6 +161,18 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
     ): Promise<void> {
       const task = get(taskId);
       transition(taskMachine, task.status, TaskEvent.Deliver, TaskStatus.Merging);
+      /**
+       * The checklist the user acknowledged is the one delivered (31 §4): checked again in the transaction that
+       * starts the delivery, since it may be saved anew while the Git checks run. After that it can no longer change.
+       */
+      const assertChecklistUnchanged = () => {
+        const current = deps.requirements.current(taskId)?.id ?? null;
+        if (current !== (requirements?.revisionId ?? null)) {
+          throw new AppError(ErrorCode.RequirementsUnacknowledged, 'The checklist changed since it was checked', {
+            revisionId: current,
+          });
+        }
+      };
       const report = workflows.get(task.workflowId).deliverable === WorkflowDeliverable.Report;
       if (report !== (request.strategy === DeliveryStrategy.ReportOnly)) {
         throw new AppError(
@@ -172,6 +184,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
       if (report) {
         // A report needs no merge: it is accepted as it is.
         unit.transact(() => {
+          assertChecklistUnchanged();
           const delivery = deliveries.start({
             taskId,
             strategy: DeliveryStrategy.ReportOnly,
@@ -195,6 +208,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
       const hosting =
         request.strategy === DeliveryStrategy.PullRequest ? await projects.hostingOf(task.projectId) : undefined;
       const delivery = unit.transact(() => {
+        assertChecklistUnchanged();
         const started = deliveries.start({ taskId, strategy: request.strategy, targetBranch, requirements });
         move(task, TaskEvent.Deliver, TaskStatus.Merging);
         return started;

@@ -38,10 +38,13 @@ function MergeOptions({
   task,
   onMerge,
   pending,
+  blocked,
 }: {
   task: TaskDetailDTO;
   onMerge: (strategy: LocalMergeStrategy, target: string) => void;
   pending: boolean;
+  /** Unmet checklist items not accepted yet (31 §4). */
+  blocked: boolean;
 }) {
   const [strategy, setStrategy] = useState<LocalMergeStrategy>(useSettings()['delivery.defaultStrategy']);
   const [target, setTarget] = useState(task.git.baseBranch);
@@ -74,7 +77,7 @@ function MergeOptions({
         variant="primary"
         icon="git"
         pending={pending}
-        disabled={target.trim() === ''}
+        disabled={target.trim() === '' || blocked}
         onClick={() => onMerge(strategy, target.trim())}
       >
         {C.mergeNow}
@@ -87,10 +90,13 @@ function PullRequestForm({
   task,
   onCreate,
   pending,
+  blocked,
 }: {
   task: TaskDetailDTO;
   onCreate: (pr: { title: string; body: string }) => void;
   pending: boolean;
+  /** Unmet checklist items not accepted yet (31 §4). */
+  blocked: boolean;
 }) {
   const [title, setTitle] = useState(task.title);
   // A reviewer on the platform does not see the result card: unverified checks are said in the body too (D116).
@@ -116,7 +122,7 @@ function PullRequestForm({
       <Button
         variant="primary"
         pending={pending}
-        disabled={title.trim() === ''}
+        disabled={title.trim() === '' || blocked}
         onClick={() => onCreate({ title: title.trim(), body })}
       >
         {C.prCreate}
@@ -246,7 +252,7 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
               {C.merge(task.git.baseBranch)}
             </Button>
             {pro && (
-              <Button variant="ghost" size="sm" onClick={() => setOpen('options')}>
+              <Button variant="ghost" size="sm" disabled={blocked} onClick={() => setOpen('options')}>
                 {C.mergeOptions}
               </Button>
             )}
@@ -254,7 +260,7 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
         )}
         {pullRequest === null && (
           <span title={canPr ? undefined : C.prNeedsRemote}>
-            <Button disabled={!canPr} onClick={() => setOpen('pr')}>
+            <Button disabled={!canPr || blocked} onClick={() => setOpen('pr')}>
               {C.createPr}
             </Button>
           </span>
@@ -282,13 +288,14 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
       )}
 
       <Dialog open={open === 'options'} onOpenChange={(o) => !o && close()} title={C.mergeOptionsTitle}>
-        <MergeOptions task={task} onMerge={merge} pending={deliver.isPending} />
+        <MergeOptions task={task} onMerge={merge} pending={deliver.isPending} blocked={blocked} />
         {deliver.isError && <ErrorState error={deliver.error} />}
       </Dialog>
       <Dialog open={open === 'pr'} onOpenChange={(o) => !o && close()} title={C.prTitle}>
         <PullRequestForm
           task={task}
           pending={deliver.isPending}
+          blocked={blocked}
           onCreate={(pr) =>
             deliver.mutate({ id: task.id, ...ack, strategy: DeliveryStrategy.PullRequest, pr }, { onSuccess: close })
           }

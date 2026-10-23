@@ -11,18 +11,17 @@ import { requirementsQuery } from './requirements.queries.ts';
  */
 export function useDeliveryAcknowledgement(taskId: string) {
   const { data } = useQuery(requirementsQuery(taskId));
-  const [accepted, setAccepted] = useState(false);
+  // The version the user accepted, not a flag: a checklist saved since (or another task's) is not accepted by it.
+  const [acceptedRevision, setAcceptedRevision] = useState<string>();
   const unmet = data?.items.filter((i) => i.required && isUnmet(i.status)) ?? [];
   const revisionId = data?.revision?.id;
+  const accepted = revisionId !== undefined && acceptedRevision === revisionId;
   return {
     unmet,
     accepted,
-    setAccepted,
+    setAccepted: (on: boolean) => setAcceptedRevision(on ? revisionId : undefined),
     blocked: unmet.length > 0 && !accepted,
-    ack:
-      unmet.length > 0 && accepted && revisionId !== undefined
-        ? { acknowledgedRequirementsRevisionId: revisionId }
-        : {},
+    ack: unmet.length > 0 && accepted ? { acknowledgedRequirementsRevisionId: revisionId } : {},
   };
 }
 
