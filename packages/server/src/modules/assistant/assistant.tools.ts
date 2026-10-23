@@ -19,6 +19,7 @@ import type { Logger } from '../../core/logger.ts';
 import type { OperationImpl } from '../../core/operations/operations.ts';
 import type { SettingsService } from '../settings/index.ts';
 import type { Conversation } from './assistant.repo.ts';
+import type { TaskRelay } from './assistant.tasks.ts';
 
 export type AssistantToolContext = { conversation: Conversation };
 
@@ -46,6 +47,7 @@ const RISK_NOTE: Record<OperationRisk, string> = {
 
 export type OperationToolDeps = {
   settings: SettingsService;
+  run: TaskRelay['run'];
   /** Records the object an operation produced in the conversation (D66). */
   recordProduced(conversationId: string, contract: OperationContract, output: unknown): void;
   /**
@@ -88,7 +90,7 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
             (contract.risk === OperationRisk.Write && deps.settings.get('assistant.alwaysAllow').includes(contract.id));
           if (allowed) {
             // A failing operation answers with its error code, like any tool (12 §5).
-            const output = await impl.run(input);
+            const output = await deps.run(conversation.id, impl, input);
             const deferred = deps.deferred.get(contract.id);
             if (deferred !== undefined) return deferred(conversation.id, output);
             deps.recordProduced(conversation.id, contract, output);

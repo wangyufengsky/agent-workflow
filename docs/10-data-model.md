@@ -358,7 +358,7 @@ payload / response：
 
 ### assistant_outbox
 
-迁移 `0018_assistant_outbox`；保存尚未成功交给 opencode 的应用消息（确认结果或取消通知）。
+迁移 `0018_assistant_outbox`；保存尚未成功交给 opencode 的应用消息（确认结果、取消通知或普通任务状态回报）。
 
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
@@ -368,6 +368,19 @@ payload / response：
 | created_at | INTEGER | 入队时间 |
 
 索引：`(conversation_id, id)`。确认结果与入队在同一事务保存；取消状态与入队也在同一事务保存。按 id 顺序发送，只在发送成功后删除本次读取的消息，期间新入队的消息继续保留。断线、发送失败与后端重启不会丢失队列，待下一次发送时恢复；恢复只投递消息，不重新执行业务操作。若外部已接受消息而本地尚未删除队列时进程退出，恢复可能重复通知，不承诺跨进程的恰好一次投递。
+
+### assistant_task_followups
+
+迁移 `0019_assistant_task_followups`；仅登记通过助手 `tasks.create` 成功创建的普通任务，确认后执行与总是允许共用同一入口。任务与归属在同一事务插入，首次状态事件发布及任务启动前已提交；登记失败时整个创建回滚。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| task_id | TEXT PK → tasks，CASCADE | 一个任务只有一个原始对话 |
+| conversation_id | TEXT → assistant_conversations，CASCADE | 删除原对话即停止跟进 |
+| last_event_id | INTEGER DEFAULT 0 | 已消费的最新任务级 `task_events.id`，不是节点或进度事件 |
+| created_at | INTEGER | 登记时间 |
+
+索引：`(conversation_id)`。事件游标与 `assistant_outbox` 消息在同一事务提交，重复 SSE 不重复入队。启动时批量补扫最新真实状态；若停机间发生多个未消费状态，以当前状态为准，不把已经结束的失败重新呈现为当前失败。`review`、`failed`、`completed` 入队；其他状态只推进游标。已入队消息保留发生时间和事件编号，恢复只重投消息，不重新执行任务。删除任务会删除跟进记录；删除对话同时清理其跟进和 outbox。
 
 消息流：`<数据目录>/assistant/conversations/<id>.jsonl`，格式同 §3（多 `confirmation`、`attachment`、`entity_ref` 三种条目）；记录用户的消息、模型的正文与工具调用、权限请求、错误；后端代发的确认结果消息与每轮注入的 `system` 不记录（卡片显示结果）。
 

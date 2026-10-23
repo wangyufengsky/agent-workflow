@@ -520,6 +520,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       schedules.timer.start();
       await attachments.service.startCleanup();
       await startHostedRuntime();
+      await assistant.start();
     },
     close: () => server.close(),
   };

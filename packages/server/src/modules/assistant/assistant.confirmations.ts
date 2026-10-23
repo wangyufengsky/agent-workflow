@@ -22,6 +22,7 @@ import type { OperationImpl } from '../../core/operations/operations.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { type Confirmation, createAssistantRepo } from './assistant.repo.ts';
 import type { AssistantService } from './assistant.service.ts';
+import type { TaskRelay } from './assistant.tasks.ts';
 
 export type ConfirmationsDeps = {
   db: Db;
@@ -32,6 +33,7 @@ export type ConfirmationsDeps = {
   settings: SettingsService;
   prompts: Prompts;
   conversations: AssistantService;
+  run: TaskRelay['run'];
   /** Operations the assistant can call, by id. */
   operations: ReadonlyMap<string, OperationImpl>;
 };
@@ -39,11 +41,11 @@ export type ConfirmationsDeps = {
 /** Runs an operation the way its REST route would; a failure is the result the model is told about. */
 export async function runOperation(
   impl: OperationImpl,
-  input: unknown,
+  execute: () => Promise<unknown>,
   log: Logger,
 ): Promise<AssistantConfirmationResult> {
   try {
-    const output = await impl.run(input);
+    const output = await execute();
     return { ok: true, output: output === undefined ? null : output };
   } catch (err) {
     if (err instanceof AppError) return { ok: false, error: err.toInfo() };
@@ -128,7 +130,7 @@ export function createConfirmations(deps: ConfirmationsDeps) {
         if (!allowed.includes(c.operationId)) settings.update({ 'assistant.alwaysAllow': [...allowed, c.operationId] });
       }
       publish(id);
-      const result = await runOperation(impl, c.input, log);
+      const result = await runOperation(impl, () => deps.run(c.conversationId, impl, c.input), log);
       deps.unit.transact(() => {
         repo.setConfirmationResult(id, result);
         conversations.queueMessage(
