@@ -547,4 +547,4 @@ class AppError extends Error {
 | ATTACHMENT_SOURCE_INVALID | 400 | 项目文件越界、指向根外的符号链接、非普通文件或不可读 |
 | REQUIREMENTS_NOT_EDITABLE | 409 | 任务状态不允许编辑清单（`running` 等），或不在 `review` 时请求重新核验／人工结论 |
 | REQUIREMENT_RESULTS_INVALID | 400 | 非核验节点提交 `requirement_results`，或项不属于当前版本、不是 AI 核验项、重复 |
-| REQUIREMENTS_UNACKNOWLEDGED | 409 | 交付时有未满足的必需项而没有带 `acknowledgeUnmetRequirements`；`details.items` 列出这些项 |
+| REQUIREMENTS_UNACKNOWLEDGED | 409 | 交付时有未满足的必需项，而没有带 `acknowledgedRequirementsRevisionId` 或它不是当前清单版本；`details.items` 列出这些项 |

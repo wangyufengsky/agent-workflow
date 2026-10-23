@@ -560,7 +560,7 @@ payload / response：
 
 - 所有者在自己的事务里创建／删除引用：删除任务时删除该任务（task_input）与其节点（task_feedback）的引用；删除助手对话时删除 assistant_message 引用。多态 owner 没有外键，由所有者模块负责。
 - 助手会话 JSONL 的用户消息增加可选 `attachments: [{ id, name, mediaType }]`，只作展示。
-- 清理：没有引用且创建超过 `ATTACHMENT_ORPHAN_TTL_MS` 的附件，先删文件、再删记录；删文件失败留到下次。目录中没有记录的残留按年龄清理。
+- 清理：在一个事务里删除没有引用且创建超过 `ATTACHMENT_ORPHAN_TTL_MS` 的记录，提交后再删文件；绑定在事务里先确认记录存在再插入引用，因此不会与清理交错（30 §4）。删文件失败留下的、目录中没有记录的残留按年龄清理。
 
 ### 6.2 需求清单
 

@@ -479,5 +479,5 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 | tasks.reverifyRequirements | POST `/tasks/:id/requirements/reverify` | write；UI / 助手确认 | 只在 `review`；追加一个核验节点 |
 
 - `createTask` 增加可选 `requirements: items`，与任务同一事务创建第一个版本。
-- 交付（本地合并、创建／更新 PR、报告完成）增加可选 `acknowledgeUnmetRequirements: true`：有未满足的必需项而未带它时返回 `REQUIREMENTS_UNACKNOWLEDGED`；交付记录保存清单摘要。
+- 交付（本地合并、创建／更新 PR、报告完成）增加可选 `acknowledgedRequirementsRevisionId`：界面对话框或助手确认卡列出未满足项时所依据的清单版本。有未满足的必需项时，缺少它或与当前版本不同都返回 `REQUIREMENTS_UNACKNOWLEDGED`，用户需要看着新版本重新确认；交付记录保存清单摘要。
 - SSE：`requirements.updated { taskId }`，界面重新获取。
