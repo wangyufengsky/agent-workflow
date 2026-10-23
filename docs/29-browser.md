@@ -182,20 +182,19 @@ main 只提供机制，不做判断。判断请求放行与否的是共享的纯
 ### 5.2 宿主接口（新扩展点 `BrowserHost`）
 
 ```ts
-interface BrowserHost {
-  // 参数与事件即 shared/contracts/browser-port.ts 的 op 与 BrowserPortEvent
-  open(input: { tabId: string; partition: string; userFacing: boolean; viewport: Viewport; policy: BrowserPolicy }): Promise<void>;
-  setPolicy(tabId: string, policy: BrowserPolicy): Promise<void>;
-  close(tabId: string): Promise<void>;
-  cdp(tabId: string, method: string, params?: object, sessionId?: string): Promise<unknown>;
+// modules/browser/browser.host.ts：请求与事件即 shared/contracts/browser-port.ts 的 BrowserPortOp（open / setPolicy /
+// close / cdp）与 BrowserPortEvent，两种实现都只是把它们送到标签页所在的地方
+type BrowserHost = {
+  request(op: BrowserPortOp): Promise<unknown>;
   onEvent(listener: (event: BrowserPortEvent) => void): () => void;
-}
+};
 ```
 
 | 实现 | 用于 |
 | --- | --- |
-| `electron`：经 parentPort 请 main 执行 | 桌面版 |
-| `chromium`：用 devDependency 中 `playwright-core` 启动的 Chromium，`newCDPSession` 转发 | 后端独立运行的开发模式、集成测试与浏览器 E2E。与开发用的明文凭据适配器一样，只在 `NODE_ENV=development` 下存在，生产构建中被常量折叠删除，`scripts/check-prod-bundle.mjs` 校验 |
+| `host.port.ts`：经 parentPort 请 main 执行（按 id 对应回应，事件主动送来） | 桌面版 |
+| `host.chromium.ts`：server 的 devDependency `playwright-core` 启动的 Chromium，第一次打开标签页时才启动；CDP 经 `newCDPSession` 转发（只转发 `BROWSER_CDP_EVENTS` 列出的事件）；请求用 `page.route` / `page.routeWebSocket` 按同一个 `blockReason` 拦下；`window.open` 用初始化脚本改为在本标签页打开；注册空的 `dialog` 监听，免得 Playwright 抢先关掉弹窗 | 后端独立运行的开发模式与集成测试。与开发用的明文凭据适配器一样，只在 `NODE_ENV=development` 下加载，生产构建中被常量折叠删除，`scripts/check-prod-bundle.mjs` 检查标记 `aw-dev-chromium-host` |
+| 无宿主（`unavailableBrowserHost`） | 生产环境的纯 Node（不支持的运行方式）：每次使用都 `INTERNAL_ERROR` |
 
 03 §4.2 的扩展点表新增这一行。动作层、快照、体检只依赖这个接口，所以两种宿主下行为一致，测试跑的是真实 Chromium。
 
@@ -299,6 +298,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 ```
 
 - 总长超过 `BROWSER_SNAPSHOT_MAX_CHARS`（12000）时，先截断长列表和表格的行，再截断最深的子树，末尾注明截断了什么。
+- 一行只有普通单元格的表格行压成一条：`row "R-1001 · 张三 · ¥120.00"`；行里有可操作元素时按层级展开。
 - 收起的下拉框只写当前值和选项个数（`combobox "切换主题" value="暖色" (5 个选项)`），不逐个列出选项；展开后才列出（§12 V6）。
 - 同源 iframe 展开；跨域 iframe 只列地址。
 - 编号按文档顺序生成，同一页面内稳定。
@@ -307,7 +307,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 
 - `browser_screenshot` 总是存文件作为证据给用户看，**并且总是**以 MCP `image` 内容随工具结果返回。模型支持图片时能看到；不支持时 opencode 会告诉模型它读不了这张图，不报错（§12 V4）。所以后端不判断模型能力，工具说明里写明：看不到图片时用 `browser_snapshot` / `browser_inspect`。
 - 返回的截图压成 JPEG（宽不超过 1280，质量 70）。opencode 把工具返回的图片以 data URL 存在它自己的会话里（工具片段的 `state.attachments`），体积要控制住。本应用的会话流镜像不复制 `attachments`，只记一条「截图」动作。
-- 每个动作后另存一张 JPEG 缩略图（宽 960，质量 60，约 40 KB），作为观看画面（§8.2），不交给模型。一次尝试 50 个动作约 2 MB，随 `runs/` 一起保留与清理。
+- 每个动作后另存一张 JPEG 缩略图（宽 960，质量 60，约 40 KB；用 `Page.captureScreenshot` 的 `clip.scale` 缩小，不需要图像库），作为观看画面（§8.2），不交给模型。随 B2 的观看界面一起实现。一次尝试 50 个动作约 2 MB，随 `runs/` 一起保留与清理。
 - **存放位置按归属**，与会话流 JSONL 的目录规则一致（10 §3）：
   - 尝试的截图与画面：`<该尝试会话流所在目录>/browser/<attemptId>/`，即任务的尝试为 `runs/<taskId>/browser/<attemptId>/`，知识问答的 `research` 尝试为 `runs/knowledge/browser/<attemptId>/`。按尝试读取：`GET /attempts/:attemptId/browser/:file`，后端由尝试解析目录，所以没有任务的尝试也能取到；
   - 页面体检的截图：`runs/<taskId>/browser/checks/<nodeId>/<检查序号>/`，按任务读取：`GET /tasks/:taskId/browser/:file`；
@@ -531,10 +531,11 @@ packages/shared/src/
 packages/server/src/modules/
   previews/                       进程（previews.process.ts：安装、端口、启动、就绪探测、超时）、
                                   服务（状态机、空闲、上限、worktree 删除前停止）、操作；推断在 projects/projects.inference.ts
-  browser/                        宿主（browser.host.ts 接口，host.electron.ts，host.chromium.ts 仅开发）、
-                                  会话（browser.sessions.ts）、动作层（browser.actions.ts + browser.settle.ts 纯函数）、
-                                  快照（browser.snapshot.ts，纯函数：AX 树 → 文本）、体检（browser.check.ts + pageCheckVerdict）、
-                                  画面（browser.frames.ts）、操作
+  browser/                        宿主（browser.host.ts 接口，host.port.ts，host.chromium.ts 仅开发）、
+                                  标签页（browser.tab.ts：打开步骤、日志、网络、弹窗、动作前后的变化）、
+                                  动作层（browser.actions.ts）、网络空闲（browser.settle.ts，注入时钟）、
+                                  快照（browser.snapshot.ts，纯函数：AX 树 → 文本）、服务（browser.service.ts：每个尝试两个标签页、
+                                  规则与登录、截图）；B2 加体检（browser.check.ts + pageCheckVerdict）与动作画面
   acceptance/                     新增 runBrowserCheck，调用 browser 的 index
   mcp/tools/browser-*.ts
 apps/desktop/src/main/browser.ts  视图、debugger 转发、按 blockReason 拦截请求、不允许的地址交给系统浏览器
@@ -542,7 +543,7 @@ apps/web/src/features/preview/    预览页签、会话选择、观看画面、�
 packages/builtin/prompts/         protocol-execute / protocol-review / protocol-plan 的浏览器说明；workflows 加页面体检
 ```
 
-**依赖方向**：`acceptance → browser → previews → projects / worktrees`。`browser` 订阅 `attempt` 结束和任务终态的领域事件来关闭会话、停止预览，不依赖 `attempts` 和 `tasks`。`mcp` 与 `assistant` 在最上层调用 `browser` 和 `previews` 的 index。
+**依赖方向**：`acceptance → browser → previews → projects / worktrees`。`browser` 订阅事件总线上的 `attempt.updated`（尝试结束即关闭它的标签页、注销预览的使用）与 `preview.updated`（预览换了端口，更新同一任务标签页的规则），不依赖 `attempts` 和 `tasks`。`mcp` 与 `assistant` 在最上层调用 `browser` 和 `previews` 的 index。
 
 ## 12. 开发前实测
 

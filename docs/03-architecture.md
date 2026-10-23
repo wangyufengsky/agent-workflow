@@ -163,6 +163,7 @@ agent-workflow/
 │  │        ├─ repository/         Git 工作台（27）：读仓库、用户自己的 Git 操作（repository.write.ts）
 │  │        ├─ git-reviews/        Git 工作台的 AI 审查与草拟提交信息（v1.2，27 §4、§7.3）
 │  │        ├─ previews/           页面预览（v1.3，29 §4）：任务 worktree 里的开发服务器，只在内存里
+│  │        ├─ browser/            AI 的浏览器（v1.3，29 §5）：宿主、标签页、动作层、快照
 │  │        └─ databases/          drivers/{mysql,postgres,sqlserver}
 │  ├─ builtin/                 内置流程与角色（数据 + prompts/*.md）
 │  └─ opencode-plugin/         agent-workflow-bridge（注入 sessionID 到本项目 MCP 工具参数）；`pnpm build:plugin` 去掉类型生成 dist/agent-workflow-bridge.js
@@ -195,6 +196,7 @@ modules/tasks/
 - 知识问答（v1.1，18 §8）：`knowledge` 在 `attempts`、`projects`、`databases`、`inbox` 之上，`tasks`（删除项目）与 `mcp` 之下；研究尝试的 `task_id` 为空，由 `knowledge_turns` 指向。
 - PR 审查意见回流（v1.2，21）：编排在 `tasks/tasks.review.ts`（取回意见、发起修改），用 `hosting`（`GitHostingProvider` 新增按分支查找打开的 PR 与读取审查意见）、`delivery`（抓取并快进任务分支）、`worktrees`（`restore` 重建）与「再改改」的节点追加（`tasks.changes.ts` 的 `appendRevision`）；不新增模块与表。
 - 页面预览（v1.3，29 §4）：`previews` 在 `projects`（预览设置）、`worktrees`、`settings` 之上，将来的 `browser` 与 `acceptance` 之下。预览设置的推断在 `projects/projects.inference.ts`（添加项目时由 `projects` 调用，它不能依赖 `previews`）。worktree 删除前须先结束其中的开发服务器（17 §3），`worktrees` 提供 `onBeforeRemove` 钩子，由 `previews` 注册。
+- 浏览器（v1.3，29 §5、§11）：`browser` 在 `previews`、`projects`、`settings` 之上，将来的 `acceptance`、`mcp`、`assistant` 之下；尝试结束与预览换端口经事件总线得知，不依赖 `attempts`。宿主由 `AppDeps.browserHost` 注入（`main.ts` 按环境选择）。
 - PPT（v1.2，23 §12）：`decks` 在 `attempts`、`projects`、`tasks`（任务结果快照）、`knowledge`（对话快照）、`inbox` 之上，`mcp` 与 `assistant` 之下；PPT 尝试的 `task_id` 为空，由 `deck_runs` 指向。删除项目时 PPT 的 `project_id` 由外键置空，`tasks` 不需要知道 PPT。
 - Git 工作台（v1.2，27）：`repository` 在 `projects`（项目与远端令牌）、`tasks`（任务分支的归属、合并任务）、`worktrees`、`delivery`（`mergeAsUser`：与交付共用一套合并实现，只换身份与钩子）之上；`git-reviews` 在 `attempts`、`projects`、`roles`、`settings` 之上，`tasks`（删除项目）与 `mcp` 之下，审查尝试的 `task_id` 为空，由 `git_reviews` 指向。
 - 批量任务（v1.1，20 §9）：`batches` 在 `tasks`、`workflows`、`settings` 之上，`assistant` 之下；`tasks` 不知道批次（批次表引用任务表）。
@@ -213,6 +215,7 @@ modules/tasks/
 | 验收方式 | `acceptance` 模块的检查函数（`runCommand` / `review`，结果为 `CheckResult`） | command、ai_review |
 | 主题 | `ThemeDefinition`（数据） | 4 套 |
 | 流程与角色 | `WorkflowDefinition` / `RoleDefinition`（数据） | 5 个流程、4 个角色 |
+| 浏览器宿主（v1.3，29 §5.2） | `BrowserHost`（`request(op)` / `onEvent`） | 经 parentPort 由 Electron main 执行（桌面版）；playwright-core 的 Chromium（仅开发与测试） |
 | 执行 MCP 工具 | `McpToolDefinition`（schema + handler + 允许的尝试类型） | 见 12-mcp-tools |
 | 功能操作 | `OperationContract` + `implement()`（见 §5） | 各模块 |
 

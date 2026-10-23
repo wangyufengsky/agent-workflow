@@ -27,6 +27,12 @@ import { type AssistantService, createAssistantModule } from './modules/assistan
 import { type AttemptsService, createAttemptsModule } from './modules/attempts/index.ts';
 import { createBatchesModule } from './modules/batches/index.ts';
 import {
+  type BrowserHost,
+  type BrowserService,
+  createBrowserModule,
+  unavailableBrowserHost,
+} from './modules/browser/index.ts';
+import {
   type CredentialCipher,
   type CredentialsService,
   createCredentialsModule,
@@ -81,6 +87,8 @@ export type AppDeps = {
   dbQueryTimeoutMs?: number;
   /** IANA time zone the assistant tells the time in and insights count days in; the system's by default. */
   timeZone?: string;
+  /** Where browser tabs live (29 §5.2): Electron main, or a Chromium in development and tests; none otherwise. */
+  browserHost?: BrowserHost;
 };
 
 export type App = {
@@ -99,6 +107,7 @@ export type App = {
     inbox: InboxService;
     worktrees: WorktreesService;
     previews: PreviewsService;
+    browser: BrowserService;
     assistant: AssistantService;
     knowledge: KnowledgeService;
     decks: DecksService;
@@ -238,6 +247,17 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   // Dev servers end with the backend: nothing else stops them once it is gone.
   server.addHook('preClose', () => previews.service.stopAll());
+  const browser = createBrowserModule({
+    host: deps.browserHost ?? unavailableBrowserHost,
+    clock,
+    log,
+    events,
+    settings: settings.service,
+    projects: projects.service,
+    previews: previews.service,
+  });
+  // Before the previews stop: a tab holds a preview's lease.
+  server.addHook('preClose', () => browser.service.closeAll());
   const plans = createPlansModule({ db: database.db, unit, clock, log });
   const deliveries = createDeliveryModule({ db: database.db, unit, clock, log });
   const acceptance = createAcceptanceModule({
@@ -454,6 +474,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       inbox: inbox.service,
       worktrees: worktrees.service,
       previews: previews.service,
+      browser: browser.service,
       assistant: assistant.service,
       knowledge: knowledge.service,
       decks: decks.service,

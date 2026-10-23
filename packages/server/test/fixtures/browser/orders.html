@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh">
+<head><meta charset="utf-8"><title>退款单</title></head>
+<body>
+<nav aria-label="主导航"><a href="/">首页</a> <a href="/orders">退款单</a></nav>
+<main>
+  <h1>退款单</h1>
+  <p>按订单号搜索退款记录。</p>
+  <label>搜索订单号 <input id="search" type="search"></label>
+  <button type="button" id="export">导出</button>
+  <label><input type="checkbox" checked> 只看已退款</label>
+  <label>状态 <select><option>全部</option><option>已退款</option><option>处理中</option></select></label>
+  <table>
+    <caption>退款单列表</caption>
+    <thead><tr><th>单号</th><th>客户</th><th>金额</th></tr></thead>
+    <tbody>
+      <tr><td>R-1001</td><td>张三</td><td>¥120.00</td></tr>
+      <tr><td>R-1002</td><td>李四</td><td>¥88.00</td></tr>
+      <tr><td>R-1003</td><td>王五</td><td>¥45.50</td></tr>
+      <tr><td>R-1004</td><td>赵六</td><td>¥300.00</td></tr>
+      <tr><td>R-1005</td><td>钱七</td><td>¥12.00</td></tr>
+      <tr><td>R-1006</td><td>孙八</td><td>¥66.00</td></tr>
+      <tr><td>R-1007</td><td>周九</td><td>¥9.90</td></tr>
+    </tbody>
+  </table>
+  <nav aria-label="分页"><button type="button" disabled>上一页</button> <button type="button">2</button></nav>
+  <div hidden>隐藏的内容</div>
+</main>
+</body>
+</html>
