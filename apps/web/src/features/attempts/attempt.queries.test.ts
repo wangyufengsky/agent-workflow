@@ -1,6 +1,8 @@
-import type { TranscriptEntry, TranscriptPage } from '@aw/shared';
+import type { AttemptDTO, AttemptSummaryDTO, TranscriptEntry, TranscriptPage } from '@aw/shared';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
-import { transcriptEntries } from './attempt.queries.ts';
+import { queryKeys } from '../../api/query-keys.ts';
+import { transcriptEntries, updateAttempt } from './attempt.queries.ts';
 
 const text = (seq: number, partId: string, value: string, offset: number): TranscriptEntry => ({
   seq,
@@ -45,5 +47,31 @@ describe('会话流的显示顺序', () => {
   it('D104 之前写的整段行替换已有文本', () => {
     const pages = [page([text(1, 'p', 'draft', 0), text(2, 'p', 'final text', 0)], 2, false)];
     expect(shown(transcriptEntries(pages, []))).toEqual([[2, 'final text']]);
+  });
+});
+
+const attempt = (status: 'running' | 'succeeded') => ({ id: 'a1', status }) as unknown as AttemptDTO;
+
+describe('attempt.updated 更新尝试缓存', () => {
+  it('首次读取还在进行时到达的结束事件不会被那次（更早的）读取结果覆盖', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let answerFirstRead: (a: AttemptDTO) => void = () => {};
+    let reads = 0;
+    const observer = new QueryObserver(qc, {
+      queryKey: queryKeys.attempt('a1'),
+      // The first read is answered late, with the state from before the event; later reads see the current state.
+      queryFn: () =>
+        ++reads === 1
+          ? new Promise<AttemptDTO>((resolve) => {
+              answerFirstRead = resolve;
+            })
+          : Promise.resolve(attempt('succeeded')),
+    });
+    const unsubscribe = observer.subscribe(() => {});
+    const updated = updateAttempt(qc, attempt('succeeded') as unknown as AttemptSummaryDTO);
+    answerFirstRead(attempt('running'));
+    await updated;
+    expect(qc.getQueryData<AttemptDTO>(queryKeys.attempt('a1'))?.status).toBe('succeeded');
+    unsubscribe();
   });
 });

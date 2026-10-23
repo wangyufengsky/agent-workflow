@@ -112,11 +112,16 @@ export function useTranscript(source: TranscriptSource) {
   return { pages, entries };
 }
 
-/** SSE: a summary update refreshes the loaded attempt without a request. */
-export function updateAttempt(qc: QueryClient, summary: AttemptSummaryDTO): void {
-  qc.setQueryData<AttemptDTO>(queryKeys.attempt(summary.id), (old) =>
-    old === undefined ? old : { ...old, ...summary },
-  );
+/**
+ * SSE `attempt.updated`: the loaded attempt shows the summary at once, then is read again. A read already under way
+ * started before the event, so its answer would undo it: it is cancelled first, as for a task (`updateTask`).
+ */
+export async function updateAttempt(qc: QueryClient, summary: AttemptSummaryDTO): Promise<void> {
+  const key = queryKeys.attempt(summary.id);
+  // Cancelled first: cancelling restores the state from before the read, which would undo the update.
+  await qc.cancelQueries({ queryKey: key, exact: true });
+  qc.setQueryData<AttemptDTO>(key, (old) => (old === undefined ? old : { ...old, ...summary }));
+  await qc.invalidateQueries({ queryKey: key, exact: true });
 }
 
 export function useAbortAttempt() {
