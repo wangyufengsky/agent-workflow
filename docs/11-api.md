@@ -426,9 +426,16 @@ interface AwBridge {
   saveFile(fileName: string, bytes: Uint8Array): Promise<string | null>; // 渲染进程生成的文件（.pptx，23 §6.2）；取消为 null
   printSettled(result: PrintSettled): void;                              // 打印视图告诉隐藏窗口：可以打印，或为什么不能显示
   setLaunchPreferences(preferences: LaunchPreferences): void;           // 应用的主题与是否播放打开动画，main 写入 launch.json 供下次启动（28 §5.3）
+  browser: {                                                             // 用户自己的浏览器标签页（v1.3，29 §8.1）；标签页由后端打开，非用户标签页不响应
+    place(tabId: string, rect: BrowserRect | null): void;                // 贴到窗口的这块区域（CSS 像素），null 为取下；main 按 browserRectSchema 解析
+    back(tabId: string): void;
+    forward(tabId: string): void;
+    reload(tabId: string): void;
+    openDevTools(tabId: string): void;
+  };
 }
 type PrintSettled = { ok: true } | { ok: false; error: ErrorInfo };
 type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorInfo };   // path 为 null：用户取消了保存
 ```
 
-加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。
+加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。浏览器标签页同样：后端经同一通道发 `browser.request`（`shared/contracts/browser-port.ts`：`open` / `setPolicy` / `close` / `cdp`），main 回 `browser.response`，并主动发 `browser.cdpEvent` / `browser.blocked` / `browser.gone`（29 §5.1）。

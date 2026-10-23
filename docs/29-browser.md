@@ -175,7 +175,9 @@ main（薄）：browser.ts ◀───────┘
    · 截图走 CDP 的 Page.captureScreenshot（离屏视图上可用，§12 V1），main 不另提供
 ```
 
-main 只提供机制，不做判断。用哪个分区、放行哪些来源、什么时候算稳定、怎样算点中，都由后端决定，与凭据端口的分工相同（03 §1）。
+main 只提供机制，不做判断。判断请求放行与否的是共享的纯函数 `blockReason`（`shared/browser/policy.ts`）：每个分区一个 `onBeforeRequest`（Electron 每个会话只允许一个），按请求的 `webContentsId` 找到标签页；找不到标签页的请求（页面的 Service Worker）一律拦下。用户标签页（`userFacing`）不设设备指标，大小随 renderer 给的区域；AI 与体检的标签页离屏、按视口设设备指标。**应用退出时 main 关闭所有标签页**：实测发现只要还有一个不在窗口里的离屏视图，Electron 在 `quit` 之后也不退出。
+
+用哪个分区、放行哪些来源、什么时候算稳定、怎样算点中，都由后端决定，与凭据端口的分工相同（03 §1）。
 
 ### 5.2 宿主接口（新扩展点 `BrowserHost`）
 

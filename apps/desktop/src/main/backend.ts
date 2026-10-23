@@ -2,18 +2,23 @@ import { userInfo } from 'node:os';
 import { join } from 'node:path';
 import { type BackendShutdownMessage, devPorts, platformSchema } from '@aw/shared';
 import { app, utilityProcess } from 'electron';
+import { type BrowserTabs, type BrowserTabsDeps, serveBrowserRequests } from './browser.ts';
 import { serveCredentialRequests } from './credentials.ts';
 import { withLoginShellPath } from './shell-path.ts';
 
 /** `stop` asks the backend to shut down (it stops opencode first) and resolves once it has exited. */
-export type Backend = { port: number; stop(): Promise<void> };
+export type Backend = { port: number; browser: BrowserTabs; stop(): Promise<void> };
 
 /**
  * Starts the backend in a utilityProcess and resolves once it is listening. The window already has `apiToken`: it is
  * created first, to show the opening animation while this runs (28 §5.2). The backend gets the login shell's PATH
  * (D117): started from Finder the app has only the system directories.
  */
-export async function startBackend(isDev: boolean, apiToken: string): Promise<Backend> {
+export async function startBackend(
+  isDev: boolean,
+  apiToken: string,
+  browser: Omit<BrowserTabsDeps, 'emit'>,
+): Promise<Backend> {
   // `shell` is null only on Windows, which has no login shell to ask.
   const env = await withLoginShellPath(platformSchema.parse(process.platform), process.env, userInfo().shell ?? '');
   const child = utilityProcess.fork(join(import.meta.dirname, 'server.js'), [], {
@@ -38,6 +43,7 @@ export async function startBackend(isDev: boolean, apiToken: string): Promise<Ba
     },
   });
   serveCredentialRequests(child);
+  const tabs = serveBrowserRequests(child, browser);
 
   return new Promise((resolve, reject) => {
     child.once('exit', (code) => reject(new Error(`Backend exited before it was ready (code ${code})`)));
@@ -48,6 +54,7 @@ export async function startBackend(isDev: boolean, apiToken: string): Promise<Ba
       const shutdown: BackendShutdownMessage = { type: 'backend.shutdown' };
       resolve({
         port: message.port,
+        browser: tabs,
         stop: async () => {
           child.postMessage(shutdown);
           await exited;

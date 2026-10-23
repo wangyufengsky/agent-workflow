@@ -20,8 +20,13 @@ export const browserPortOpSchema = z.discriminatedUnion('kind', [
      * read-only websites are cancelled.
      */
     userFacing: z.boolean(),
-    /** Set through device metrics: an offscreen view has no size of its own (29 §12 V1). */
-    viewport: z.object({ width: z.number().int().min(1), height: z.number().int().min(1), mobile: z.boolean() }),
+    /**
+     * Set through device metrics: an offscreen view has no size of its own (29 §12 V1). Null for a user-facing tab,
+     * which takes the size of the area the renderer places it in.
+     */
+    viewport: z
+      .object({ width: z.number().int().min(1), height: z.number().int().min(1), mobile: z.boolean() })
+      .nullable(),
     policy: browserPolicySchema,
   }),
   /** The preview's origin changes when it restarts on another port. */
