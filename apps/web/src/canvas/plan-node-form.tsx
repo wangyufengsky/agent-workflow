@@ -140,6 +140,8 @@ export function PlanNodeForm({
         ))}
       </fieldset>
       <AcceptanceEditor
+        // Another step's checks start afresh (the page paths keep their text as typed).
+        key={node.key}
         idPrefix="plan-node"
         legend={C.acceptance}
         value={node.acceptance}

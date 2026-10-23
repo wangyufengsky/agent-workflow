@@ -102,7 +102,11 @@ export function createTaskContext(deps: TasksServiceDeps, state: TaskState) {
           workflow: workflow.name,
           deliverable: workflow.deliverable,
         },
-        project: { name: project.name, defaultBranch: project.defaultBranch },
+        project: {
+          name: project.name,
+          defaultBranch: project.defaultBranch,
+          previewPages: project.preview?.pages ?? null,
+        },
         workspace: { path: worktree.path, branch: worktree.branch, baseCommit: worktree.baseCommit },
         attempt: {
           kind: attempt.kind,

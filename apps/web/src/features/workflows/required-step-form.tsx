@@ -105,6 +105,7 @@ export function RequiredStepForm({ step, taken, onChange, onRemove, allowedRoles
         />
       </div>
       <AcceptanceEditor
+        key={step.key}
         idPrefix="required"
         value={step.acceptance}
         onChange={(acceptance) => {

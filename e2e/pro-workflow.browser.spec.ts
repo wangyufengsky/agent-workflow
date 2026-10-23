@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { API_BASE, AUTH } from './env.ts';
 import {
   box,
   createProject,
@@ -34,9 +35,19 @@ test('J8 专业模式：复制内置流程 → 修改 → 用它跑通一个任�
 
   const editor = page.getByTestId('plan-editor');
   await editor.getByTestId('step-fix').click();
-  await editor.getByTestId('plan-node-form').getByLabel('标题').fill('修复根因');
+  const form = editor.getByTestId('plan-node-form');
+  await form.getByLabel('标题').fill('修复根因');
+  // Editing one check keeps the others, the page check included (29 §7.1).
+  await expect(form.getByLabel('页面体检')).toBeChecked();
+  await form.getByLabel('评审重点（可选）').fill('是否修复了根因');
   await page.getByRole('button', { name: '保存为新版本' }).click();
   await expect(page.getByText('已保存为第 2 版')).toBeVisible();
+  const get = async (path: string) => (await request.get(`${API_BASE}${path}`, { headers: AUTH })).json();
+  const latest = (await get('/workflows/by-key/my_bugfix/versions')).items[0];
+  const fix = (await get(`/workflows/${latest.id}`)).definition.template.nodes.find(
+    (n: { key: string }) => n.key === 'fix',
+  );
+  expect(fix.acceptance.checks.map((c: { kind: string }) => c.kind)).toEqual(['command', 'browser', 'ai_review']);
 
   // A copied fixed workflow has the most actions (edit, copy, batch, schedule, delete): all stay in its card.
   const initial = page.viewportSize() ?? MIN_WINDOW;

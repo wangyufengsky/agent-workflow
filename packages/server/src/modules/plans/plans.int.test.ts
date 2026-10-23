@@ -1,4 +1,4 @@
-import { ErrorCode, getNodeOp, getPlanOp, getTaskOp, listPlansOp, replanOp } from '@aw/shared';
+import { ErrorCode, getNodeOp, getPlanOp, getTaskOp, listPlansOp, replanOp, updateProjectOp } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
@@ -78,6 +78,39 @@ describe('计划（M3-04）', () => {
     const verify = body.nodes.find((n) => n.key === 'final_verify');
     const { body: node } = await t.call(getNodeOp, { id: task.id, nodeId: verify?.id ?? '' });
     expect(node.acceptance).toEqual({ checks: [{ kind: 'ai_review', focus: '需求完整性与正确性' }], manual: false });
+  });
+
+  it('项目有页面预览：规划能看到关键页面，步骤要求的页面与必经步骤的关键页面在确认时冻结（29 §7.1）', async () => {
+    const { project } = await addProject(t, { checkCommand: 'npm test' });
+    const preview = { command: 'npm run dev', setupCommand: null, readyPath: '/', extraOrigins: [] };
+    await t.call(updateProjectOp, { id: project.id, preview: { ...preview, pages: ['/', '/orders'] } });
+    const plan = planArgs([
+      { key: 'form', acceptance: { command: '$PROJECT_CHECK', pages: ['/orders/new'] } },
+      finalVerify(['form']),
+    ]);
+    t.fake.enqueue(script().callTool('get_task_context', {}).callTool('submit_plan', plan), planner);
+    t.fake.enqueue(script().hang(), { title: '· form' });
+    const running = taskReaches(t, 'running');
+    const task = await createTask(t, { projectId: project.id, workflow: 'feature' });
+    await running;
+    expect(t.fake.toolCalls[0]?.result).toMatchObject({ project: { previewPages: ['/', '/orders'] } });
+    // Later changes to the project's pages do not reach a confirmed plan.
+    await t.call(updateProjectOp, { id: project.id, preview: { ...preview, pages: ['/changed'] } });
+
+    const { body } = await t.call(getTaskOp, { id: task.id });
+    const acceptance = async (key: string) =>
+      (await t.call(getNodeOp, { id: task.id, nodeId: body.nodes.find((n) => n.key === key)?.id ?? '' })).body
+        .acceptance.checks;
+    const viewports = ['desktop', 'mobile'];
+    expect(await acceptance('form')).toEqual([
+      { kind: 'command', command: 'npm test' },
+      { kind: 'browser', pages: ['/orders/new'], viewports },
+    ]);
+    expect(await acceptance('final_verify')).toEqual([
+      { kind: 'command', command: 'npm test' },
+      { kind: 'browser', pages: ['/', '/orders'], viewports },
+      { kind: 'ai_review', focus: '需求完整性与正确性' },
+    ]);
   });
 
   it('确认计划检查点：按意见重新规划在同一会话中进行，新版本记录反馈，旧草稿被取代', async () => {

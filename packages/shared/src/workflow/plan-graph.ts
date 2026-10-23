@@ -7,7 +7,7 @@ import { nodeKindSchema, requiredStepPositionSchema } from '../enums/workflow.ts
 export const NODE_KEY_PATTERN = /^[a-z0-9_]{1,40}$/;
 
 const pagePathSchema = z.string().startsWith('/');
-const pageCheckPagesSchema = z.array(pagePathSchema).min(1).max(PREVIEW_PAGES_MAX);
+export const pageCheckPagesSchema = z.array(pagePathSchema).min(1).max(PREVIEW_PAGES_MAX);
 const pageCheckViewportsSchema = z.array(viewportPresetSchema).min(1);
 
 export const acceptanceCheckSchema = z.discriminatedUnion('kind', [

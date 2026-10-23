@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { NODE_INSTRUCTIONS_MAX_CHARS } from '../../constants/limits.ts';
-import { NODE_KEY_PATTERN } from '../../workflow/plan-graph.ts';
+import { NODE_KEY_PATTERN, pageCheckPagesSchema } from '../../workflow/plan-graph.ts';
 
 export const PLAN_SUMMARY_MAX_CHARS = 2000;
 export const NODE_TITLE_MAX_CHARS = 60;
@@ -28,6 +28,11 @@ export const submitPlanInputSchema = z.object({
               .min(1)
               .optional()
               .describe('Shell command that must exit 0; $PROJECT_CHECK runs the project check'),
+            pages: pageCheckPagesSchema
+              .optional()
+              .describe(
+                "Paths of the task's page preview to check after the step (e.g. ['/orders']), at desktop and mobile size; ignored when the project has no preview",
+              ),
             ai_review: z.boolean().optional().describe('Have another AI session review the step'),
             manual: z.boolean().optional().describe('Ask the user to accept the step'),
           })

@@ -101,7 +101,7 @@ export function createDebugService({ attempts, settings, prompts }: DebugService
           workflow: 'debug',
           deliverable: WorkflowDeliverable.CodeChanges,
         },
-        project: { name: basename(run.directory), defaultBranch: run.branch },
+        project: { name: basename(run.directory), defaultBranch: run.branch, previewPages: null },
         workspace: { path: run.directory, branch: run.branch, baseCommit: run.baseCommit },
         attempt: { kind: attempt.kind, seq: attempt.seq },
         askOnUncertainty: settings.get('ai.askOnUncertainty'),

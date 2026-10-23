@@ -167,7 +167,7 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 ```ts
 {
   task: { key: string; title: string; requirement: string; workflow: string; deliverable: 'code_changes' | 'report' };
-  project: { name: string; defaultBranch: string };
+  project: { name: string; defaultBranch: string; previewPages: string[] | null };  // 页面预览的关键页面，没有预览为 null（v1.3，29 §4）
   workspace: { path: string; branch: string; baseCommit: string };
   attempt: { kind: AttemptKind; seq: number; retryFeedback?: string };
   askOnUncertainty: boolean;
@@ -209,12 +209,12 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
     role: string;                        // 角色 key，须在 allowedRoles 内
     instructions: string;                // 1..NODE_INSTRUCTIONS_MAX_CHARS
     depends_on?: string[];
-    acceptance?: { command?: string; ai_review?: boolean; manual?: boolean };
+    acceptance?: { command?: string; pages?: string[]; ai_review?: boolean; manual?: boolean };  // pages：页面体检的路径（v1.3，29 §7.1）
   }>;
 }
 ```
 
-行为：校验（08 §5.3 子码，`details.problems[]` 每项带该子码的 `hint`）→ 通过则创建 `draft` 计划版本（`source=ai`），尝试 `succeeded`，任务发 `plan_submitted`。`requiredSteps` 中的节点若未出现由校验报 `MISSING_REQUIRED_STEP`（模型须原样包含，可改 instructions 与 depends_on）；存入计划时必经步骤的 title、角色与验收以流程定义为准。`acceptance` 省略时物化节点用流程的 `defaultAcceptance`。
+行为：校验（08 §5.3 子码，`details.problems[]` 每项带该子码的 `hint`）→ 通过则创建 `draft` 计划版本（`source=ai`），尝试 `succeeded`，任务发 `plan_submitted`。`requiredSteps` 中的节点若未出现由校验报 `MISSING_REQUIRED_STEP`（模型须原样包含，可改 instructions 与 depends_on）；存入计划时必经步骤的 title、角色与验收以流程定义为准。`acceptance` 省略时物化节点用流程的 `defaultAcceptance`；写了则整体替换默认（顺序为 command、pages、ai_review）。`pages` 变为页面体检 `{ kind: 'browser', pages }`，视口取默认，项目没有页面预览时物化移除。
 输出：`{ version: number, accepted: true }`
 错误：`PLAN_INVALID`（details.problems）、`MCP_RESULT_ALREADY_SUBMITTED`、`MCP_TOOL_NOT_ALLOWED`。
 

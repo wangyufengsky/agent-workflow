@@ -48,6 +48,9 @@ export const PLAN_EDITOR_COPY = {
   commandHint: '$PROJECT_CHECK 代表项目的检查命令',
   addCommand: '添加命令',
   removeCommand: '删除命令',
+  pageCheck: '页面体检',
+  pageCheckPages: '页面路径（可选，空格分隔）',
+  pageCheckHint: '在页面预览里打开这些页面，桌面与手机各看一遍；留空时用项目的关键页面，项目没有页面预览时不检查',
   aiReview: 'AI 评审',
   reviewFocus: '评审重点（可选）',
   manual: '人工验收',
@@ -56,6 +59,7 @@ export const PLAN_EDITOR_COPY = {
   problems: '校验结果',
   noProblems: '计划可以保存。',
   incomplete: (key: string) => `步骤 ${key} 的标题、指令与检查命令不能为空`,
+  badPages: (key: string) => `步骤 ${key} 的页面路径要以 / 开头`,
   lockedChanged: (keys: string[]) => `已开始的步骤不能修改或删除：${keys.join('、')}`,
 } as const;
 

@@ -1,18 +1,49 @@
 import { type Acceptance, type AcceptanceCheck, AcceptanceCheckKind } from '@aw/shared';
+import { useState } from 'react';
 import { Button } from '../components/button.tsx';
 import { IconButton } from '../components/icon-button.tsx';
 import { PLAN_EDITOR_COPY as C } from '../copy/plan-editor.ts';
 
 type CommandCheck = Extract<AcceptanceCheck, { kind: typeof AcceptanceCheckKind.Command }>;
+type PageCheck = Extract<AcceptanceCheck, { kind: typeof AcceptanceCheckKind.Browser }>;
 type ReviewCheck = Extract<AcceptanceCheck, { kind: typeof AcceptanceCheckKind.AiReview }>;
+type Parts = {
+  commands: CommandCheck[];
+  page: PageCheck | undefined;
+  review: ReviewCheck | undefined;
+  manual: boolean;
+};
 
-/** Commands first, then the AI review: the order the checks run in (09 §3 `verifying`). */
-function compose(commands: CommandCheck[], review: ReviewCheck | undefined, manual: boolean): Acceptance {
-  return { checks: [...commands, ...(review === undefined ? [] : [review])], manual };
+/** Commands, the page check, then the AI review: the order the checks run in (09 §3 `verifying`). */
+function compose({ commands, page, review, manual }: Parts): Acceptance {
+  return {
+    checks: [...commands, ...(page === undefined ? [] : [page]), ...(review === undefined ? [] : [review])],
+    manual,
+  };
+}
+
+/** The page check's paths as typed (separated by spaces or commas); none means the project's key pages. */
+function PagesInput({ check, onChange }: { check: PageCheck; onChange: (check: PageCheck) => void }) {
+  // The text is kept as typed: parsing it back on every keystroke would swallow the separator being typed.
+  const [text, setText] = useState((check.pages ?? []).join(' '));
+  return (
+    <input
+      className="input mono"
+      aria-label={C.pageCheckPages}
+      placeholder={C.pageCheckPages}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        const pages = e.target.value.split(/[\s,，]+/).filter((p) => p !== '');
+        const { pages: _, ...rest } = check;
+        onChange(pages.length === 0 ? rest : { ...rest, pages });
+      }}
+    />
+  );
 }
 
 /**
- * A step's checks (10 §workflows `Acceptance`): commands, an AI review and manual acceptance. `undefined` means the
+ * A step's checks (10 §workflows `Acceptance`): commands, a page check, an AI review and manual acceptance. `undefined` means the
  * workflow's default, offered when `allowDefault` (plan steps; not the workflow default itself). Without `legend` the
  * surrounding panel's title names the group.
  */
@@ -34,11 +65,10 @@ export function AcceptanceEditor({
   const usesDefault = allowDefault && value === undefined;
   const acceptance = value ?? { checks: [], manual: false };
   const commands = acceptance.checks.filter((c): c is CommandCheck => c.kind === AcceptanceCheckKind.Command);
+  const page = acceptance.checks.find((c): c is PageCheck => c.kind === AcceptanceCheckKind.Browser);
   const review = acceptance.checks.find((c): c is ReviewCheck => c.kind === AcceptanceCheckKind.AiReview);
-  const set = (next: { commands?: CommandCheck[]; review?: ReviewCheck | undefined; manual?: boolean }) =>
-    onChange(
-      compose(next.commands ?? commands, 'review' in next ? next.review : review, next.manual ?? acceptance.manual),
-    );
+  const set = (next: Partial<Parts>) =>
+    onChange(compose({ commands, page, review, manual: acceptance.manual, ...next }));
 
   return (
     <fieldset className="field" disabled={disabled} aria-label={legend === undefined ? C.acceptance : undefined}>
@@ -88,6 +118,20 @@ export function AcceptanceEditor({
             </Button>
             <span className="hint">{C.commandHint}</span>
           </div>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={page !== undefined}
+              onChange={(e) => set({ page: e.target.checked ? { kind: AcceptanceCheckKind.Browser } : undefined })}
+            />
+            <span>{C.pageCheck}</span>
+          </label>
+          {page !== undefined && (
+            <>
+              <PagesInput check={page} onChange={(next) => set({ page: next })} />
+              <span className="hint">{C.pageCheckHint}</span>
+            </>
+          )}
           <label className="check">
             <input
               type="checkbox"
