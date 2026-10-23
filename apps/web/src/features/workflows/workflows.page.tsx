@@ -200,7 +200,8 @@ export function WorkflowsPage() {
               {WORKFLOW_PLANNING_LABEL[w.planning]} · {WORKFLOW_DELIVERABLE_LABEL[w.deliverable]} ·{' '}
               {C.version(w.version)}
             </span>
-            <div className="row">
+            {/* Up to five actions: they wrap rather than leave the card in a narrow window. */}
+            <div className="row wrap">
               <Link to={ROUTES.workflow} params={{ key: w.key }} className="btn secondary sm">
                 {w.kind === WorkflowKind.Builtin ? C.view : C.edit}
               </Link>

@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { createProject, passReview, patchSettings, queueTurn, submitResult, TASK_RUN_TIMEOUT_MS } from './helpers.ts';
+import {
+  box,
+  createProject,
+  MIN_WINDOW,
+  passReview,
+  patchSettings,
+  queueTurn,
+  submitResult,
+  TASK_RUN_TIMEOUT_MS,
+} from './helpers.ts';
 
 // J8 (07 §5): a copied built-in workflow, changed and used for a task; AI sessions are played by FakeOpencode.
 
@@ -28,6 +37,19 @@ test('J8 专业模式：复制内置流程 → 修改 → 用它跑通一个任�
   await editor.getByTestId('plan-node-form').getByLabel('标题').fill('修复根因');
   await page.getByRole('button', { name: '保存为新版本' }).click();
   await expect(page.getByText('已保存为第 2 版')).toBeVisible();
+
+  // A copied fixed workflow has the most actions (edit, copy, batch, schedule, delete): all stay in its card.
+  const initial = page.viewportSize() ?? MIN_WINDOW;
+  await page.setViewportSize(MIN_WINDOW);
+  await page.goto('/workflows');
+  const card = page.getByRole('article', { name: '我的修 Bug' });
+  const edge = await box(card);
+  for (const action of await card.locator('a, button').all()) {
+    const drawn = await box(action);
+    expect(drawn.right).toBeLessThanOrEqual(edge.right);
+    expect(drawn.left).toBeGreaterThanOrEqual(edge.left);
+  }
+  await page.setViewportSize(initial);
 
   await page.goto(`/?projectId=${project.id}`);
   await page
