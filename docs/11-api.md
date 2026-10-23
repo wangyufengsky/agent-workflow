@@ -467,7 +467,7 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 
 以上为 U-01 已实现的部分。两条非清单路由使用与 JSON API 相同的令牌校验，不在 URL query 放令牌；原件以纯文本返回，不作为同源 HTML 执行。
 
-`createTask`、`requestChanges`、助手发送消息增加可选 `attachmentIds`（最多 `ATTACHMENTS_PER_INPUT_MAX`，U-02 已实现），后端在业务写入时绑定：任务与需求同一事务，「再改改」挂在追加的修改节点上，助手消息挂在对话上（同一附件在后续消息再次发送不重复引用）；有不存在的 ID 时返回 `ATTACHMENT_NOT_FOUND`，任务不创建。`createTask` / `requestChanges` 的 `attachmentIds` 目前列在 `assistantOmit` 里：助手要能转交当前对话已引用的附件，留到 U-03 加上对话范围检查后开放。
+`TaskDetailDTO` 增加 `attachments`（需求的附件，再加每次「再改改」的附件，按顺序；U-03）。`createTask`、`requestChanges`、助手发送消息增加可选 `attachmentIds`（最多 `ATTACHMENTS_PER_INPUT_MAX`，U-02 已实现），后端在业务写入时绑定：任务与需求同一事务，「再改改」挂在追加的修改节点上，助手消息挂在对话上（同一附件在后续消息再次发送不重复引用）；有不存在的 ID 时返回 `ATTACHMENT_NOT_FOUND`，任务不创建。`createTask` / `requestChanges` 的 `attachmentIds` 目前列在 `assistantOmit` 里：助手要能转交当前对话已引用的附件，留到 U-03 加上对话范围检查后开放。
 
 ### 14.2 需求清单
 

@@ -94,6 +94,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       result: task.result,
       lastDelivery: delivery.lastDelivery(id),
       pullRequest: review.pullRequestOf(id),
+      attachments: state.attachmentsOf(task),
     };
   }
 

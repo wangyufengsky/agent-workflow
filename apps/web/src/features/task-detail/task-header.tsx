@@ -9,6 +9,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { toast } from '../../components/toast.tsx';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import { useCancelTask, usePauseTask, useResumeTask, useStartTask } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
@@ -73,6 +74,8 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
         )}
       </div>
       <span className="hint">{C.meta(task.key, task.project.name, task.workflow.name)}</span>
+      {/* In the header, which stays as the task moves on: the main area below changes its layout by state. */}
+      {task.attachments.length > 0 && <SentAttachments attachments={task.attachments} />}
       {WORKING.includes(task.status) && <Progress task={task} doing={doing} />}
       {task.status === TaskStatus.Draft && <span className="hint">{C.draft}</span>}
       {start.isError && <ErrorState error={start.error} />}

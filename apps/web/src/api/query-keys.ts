@@ -8,6 +8,9 @@ export const queryKeys = {
   runtime: ['system', 'runtime'],
   health: ['system', 'health'],
   attempt: (id: string) => ['attempts', id],
+  /** An attachment's original never changes (30 §3.1). */
+  attachment: (id: string) => ['attachments', id],
+  attachmentContent: (id: string) => ['attachments', id, 'content'],
   transcript: (id: string) => ['attempts', id, 'transcript'],
   transcriptLive: (id: string) => ['attempts', id, 'transcript-live'],
   workflows: ['workflows'],

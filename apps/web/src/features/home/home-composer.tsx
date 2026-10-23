@@ -15,6 +15,8 @@ import { HOME_TASK_COPY } from '../../copy/tasks.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { useAbortAssistant } from '../assistant/assistant.queries.ts';
 import { useAsk } from '../assistant/use-ask.ts';
+import { AttachmentBar, dropFilesInto, pasteFilesInto } from '../attachments/attachment-bar.tsx';
+import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
 import { workflowsQuery } from '../tasks/tasks.queries.ts';
 import styles from './home.module.css';
 import { MoreOptionsFields } from './more-options.tsx';
@@ -51,10 +53,14 @@ export function HomeComposer({
   const abort = useAbortAssistant();
   const input = useRef<HTMLTextAreaElement>(null);
   const focusSeq = useUiStore((s) => s.homeInputFocus);
+  const files = useAttachmentDraft();
   const task = useStartTask({
     projectId,
     workflowId: workflows.data?.find((w) => w.key === workflowKey)?.id,
     requirement: text,
+    attachmentIds: files.ids,
+    attachmentsBlocked: files.blocked,
+    onStarted: files.clear,
   });
   const project = projects.find((p) => p.id === projectId);
   // A base branch belongs to the project it was picked in.
@@ -74,7 +80,17 @@ export function HomeComposer({
 
   const send = () => {
     if (workflow !== undefined) task.start();
-    else if (!empty && !busy) ask.ask(text.trim(), conversation, () => setText(''));
+    else if (!empty && !busy && !files.blocked) {
+      ask.ask(
+        text.trim(),
+        conversation,
+        () => {
+          setText('');
+          files.clear();
+        },
+        files.ids,
+      );
+    }
   };
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -89,7 +105,12 @@ export function HomeComposer({
 
   return (
     <div className={styles.composerArea} data-docked={docked || undefined}>
-      <form className={styles.box} data-mode={workflow === undefined ? 'ask' : 'task'} onSubmit={submit}>
+      <form
+        className={styles.box}
+        data-mode={workflow === undefined ? 'ask' : 'task'}
+        onSubmit={submit}
+        {...dropFilesInto(files)}
+      >
         {workflow !== undefined && (
           <div className={styles.modeHead}>
             <div className={styles.modeRow}>
@@ -140,6 +161,11 @@ export function HomeComposer({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
+          onPaste={pasteFilesInto(files)}
+        />
+        <AttachmentBar
+          draft={files}
+          projectFiles={project === undefined ? undefined : { projectId: project.id, refName: 'HEAD' }}
         />
         {workflow !== undefined && task.pro && project !== undefined && (
           <MoreOptionsFields project={project} value={task.options} onChange={task.setOptions} />
@@ -232,7 +258,7 @@ export function HomeComposer({
                 className={styles.send}
                 aria-label={C.send}
                 title={C.send}
-                disabled={empty || ask.isPending}
+                disabled={empty || ask.isPending || files.blocked}
               >
                 {ask.isPending ? <span className="spin" aria-hidden="true" /> : <Icon name="arrowUp" size="sm" />}
               </button>
