@@ -22,7 +22,7 @@
 | Chromium 浏览器整组 | 5 文件、30 用例通过，含只读网站/SharedWorker、临时页清理、用户归属、旧关联失效、超时后恢复、并发打开与退出；命令 `pnpm exec vitest run --project int packages/server/src/modules/browser --maxWorkers=1`；日志 `/private/tmp/aw-user-preview-review-browser-all.log` |
 | 真实桌面与普通浏览器 | 2 用例通过，真实 Electron 11.8 秒、总计 19.2 秒；真实原生 view、快捷键焦点、助手读取、隐藏/恢复、外部重启、路由解绑、PUT 回应屏障下取消消息和保留草稿、缩窗滚动的 native bounds 裁切；日志 `/private/tmp/aw-user-preview-review-ui.log` |
 | 最新主线静态与构建 | 基于 `0ccb735`，`pnpm check`、`pnpm build` 与生产包边界检查全部通过；日志 `/private/tmp/aw-user-preview-integrated-check.log`、`/private/tmp/aw-user-preview-integrated-build.log` |
-| 最新主线全量验证 | 719 单测通过；62 文件、357 集成用例通过、1 项既有环境跳过（126.10 秒，`--maxWorkers=2`）；日志 `/private/tmp/aw-user-preview-integrated-unit.log`、`/private/tmp/aw-user-preview-integrated-int.log` |
+| 最新主线全量验证 | 719 单测通过；62 文件、357 集成用例通过、1 项既有 SQL Server 不适用场景跳过（主键 INCLUDE 列）（126.10 秒，`--maxWorkers=2`）；日志 `/private/tmp/aw-user-preview-integrated-unit.log`、`/private/tmp/aw-user-preview-integrated-int.log` |
 | 最新主线集成界面 | 5 E2E 通过（19.5 秒）：AP-02 的任务详情快照与附加文件、主页选中文字、快照移除后的迟到回应 3 项，以及用户预览的普通浏览器/真实 Electron 2 项；消息请求断言保留完整 `attachmentIds`。日志 `/private/tmp/aw-user-preview-integrated-ui.log` |
 | 视觉走查 | 四主题截图与真实原生 WebContents 单独截图存于本地忽略目录 `screenshots/user-preview-*.png`。renderer 截图不包含原生子视图，因此额外检查 native 图像，真实页显示「只有用户预览的内容」 |
 
