@@ -1,18 +1,23 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   AcceptanceCheckKind,
   AppError,
   ATTEMPT_STATUSES,
   AttemptStatus,
+  BROWSER_FRAME_QUALITY,
+  BROWSER_FRAME_WIDTH,
   type BrowserActionOutput,
+  type BrowserFrame,
   type BrowserKey,
   type BrowserPage,
   type BrowserPolicy,
   BrowserTabKind,
+  browserFrameSchema,
   ErrorCode,
+  McpToolName,
   PAGE_CHECK_SHOT_MAX_HEIGHT,
   PageCheckUnrunnable,
   PreviewState,
@@ -44,6 +49,8 @@ export type BrowserServiceDeps = {
   previews: PreviewsService;
   /** Page checks' screenshots go under `runs/<taskId>/browser/` (29 §7.4). */
   dataDir: string;
+  /** Where an attempt's files go (its transcript's directory), to read its screenshots and frames back (29 §5.7). */
+  attemptFilesDir: (attemptId: string) => string;
 };
 
 export type PageCheckRequest = {
@@ -57,7 +64,22 @@ export type PageCheckRequest = {
 /** Who uses the browser (an attempt, 29 §5.3) and where its screenshots go (beside its transcript, 29 §5.7). */
 export type BrowserOwner = { id: string; taskId: string | null; projectId: string | null; filesDir: string };
 
-type Session = { owner: BrowserOwner; tabs: Partial<Record<BrowserTabKind, Tab>>; current: Tab | null; shots: number };
+type Session = {
+  owner: BrowserOwner;
+  tabs: Partial<Record<BrowserTabKind, Tab>>;
+  current: Tab | null;
+  shots: number;
+  frames: number;
+};
+/** The tools whose action may change the page: each leaves a frame for the user to watch (29 §8.2). */
+type ActingTool =
+  | typeof McpToolName.BrowserOpen
+  | typeof McpToolName.BrowserClick
+  | typeof McpToolName.BrowserType
+  | typeof McpToolName.BrowserSelect
+  | typeof McpToolName.BrowserPress
+  | typeof McpToolName.BrowserViewport
+  | typeof McpToolName.BrowserWaitFor;
 
 /** The websites' partition: the user's logins, which the AI's website tabs share (29 §5.4). */
 const SITES_PARTITION = 'persist:aw-sites';
@@ -73,6 +95,18 @@ const ENDED = new Set<string>(
 );
 
 const navigateSchema = z.object({ errorText: z.string().optional() });
+const visualViewportSchema = z.object({
+  cssVisualViewport: z.object({
+    pageX: z.number(),
+    pageY: z.number(),
+    clientWidth: z.number(),
+    clientHeight: z.number(),
+  }),
+});
+/** An attempt's frames, one JSON line each, beside their images (29 §5.7). */
+const FRAMES_INDEX = 'frames.jsonl';
+/** The only files read back from an attempt's folder: screenshots (`3.jpg`) and frames (`f3.jpg`). */
+export const ATTEMPT_FILE = /^f?\d+\.jpg$/;
 const layoutSchema = z.object({ cssContentSize: z.object({ width: z.number(), height: z.number() }) });
 const a11ySchema = z.array(z.object({ id: z.string(), help: z.string(), nodes: z.number() }));
 /** axe-core's rules of critical or serious impact only (29 §7.2); `axe` was injected first. */
@@ -104,6 +138,7 @@ export function createBrowserService({
   projects,
   previews,
   dataDir,
+  attemptFilesDir,
 }: BrowserServiceDeps) {
   const sessions = new Map<string, Session>();
   const actions = createActions(clock);
@@ -120,7 +155,7 @@ export function createBrowserService({
   function sessionOf(owner: BrowserOwner): Session {
     const existing = sessions.get(owner.id);
     if (existing !== undefined) return existing;
-    const session: Session = { owner, tabs: {}, current: null, shots: 0 };
+    const session: Session = { owner, tabs: {}, current: null, shots: 0, frames: 0 };
     sessions.set(owner.id, session);
     return session;
   }
@@ -164,12 +199,50 @@ export function createBrowserService({
     return (await tab.evaluate('document.querySelectorAll("input[type=password]").length')) === 1;
   }
 
-  /** Runs an action on the current tab and reports what it did to the page (29 §6). */
-  async function act(owner: BrowserOwner, run: (tab: Tab) => Promise<void>): Promise<BrowserActionOutput> {
+  /** The folder of an owner's screenshots and frames (29 §5.7). */
+  const ownerDir = (owner: Pick<BrowserOwner, 'id' | 'filesDir'>) => join(owner.filesDir, 'browser', owner.id);
+
+  /**
+   * What the page shows after an action, for the user to watch (29 §8.2): the visible part scaled to
+   * BROWSER_FRAME_WIDTH, indexed and announced; never given to the model.
+   */
+  async function frame(owner: BrowserOwner, tab: Tab, tool: ActingTool, url: string): Promise<void> {
+    const session = sessionOf(owner);
+    const { cssVisualViewport: v } = visualViewportSchema.parse(await tab.cdp('Page.getLayoutMetrics'));
+    const { data } = z.object({ data: z.string() }).parse(
+      await tab.cdp('Page.captureScreenshot', {
+        format: 'jpeg',
+        quality: BROWSER_FRAME_QUALITY,
+        clip: {
+          x: v.pageX,
+          y: v.pageY,
+          width: v.clientWidth,
+          height: v.clientHeight,
+          scale: Math.min(1, BROWSER_FRAME_WIDTH / v.clientWidth),
+        },
+      }),
+    );
+    const dir = ownerDir(owner);
+    mkdirSync(dir, { recursive: true });
+    const seq = ++session.frames;
+    const item: BrowserFrame = { attemptId: owner.id, taskId: owner.taskId, seq, tool, url, file: `f${seq}.jpg` };
+    await writeFile(join(dir, item.file), Buffer.from(data, 'base64'));
+    await appendFile(join(dir, FRAMES_INDEX), `${JSON.stringify(item)}\n`);
+    events.publish({ type: ServerEventType.BrowserFrame, data: item });
+  }
+
+  /** Runs an action on the current tab and reports what it did to the page (29 §6), leaving a frame. */
+  async function act(
+    owner: BrowserOwner,
+    tool: ActingTool,
+    run: (tab: Tab) => Promise<void>,
+  ): Promise<BrowserActionOutput> {
     const tab = current(owner);
     tab.begin();
     await run(tab);
-    return tab.result(await tab.settle());
+    const output = await tab.result(await tab.settle());
+    await frame(owner, tab, tool, output.url);
+    return output;
   }
 
   /** A short-lived offscreen tab of the websites' partition, for its cookies and storage. */
@@ -296,6 +369,7 @@ export function createBrowserService({
       tab.begin();
       await tab.cdp('Page.navigate', { url: normalized });
       const output = await tab.result(await tab.settle());
+      await frame(owner, tab, McpToolName.BrowserOpen, output.url);
       if (access.tab === BrowserTabKind.Site && (await loginPage(tab, output.url))) {
         throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: output.url });
       }
@@ -307,15 +381,16 @@ export function createBrowserService({
       return { ...(await tab.snapshot()), tab: tab.kind };
     },
 
-    click: (owner: BrowserOwner, ref: string) => act(owner, (tab) => actions.click(tab, ref)),
+    click: (owner: BrowserOwner, ref: string) => act(owner, McpToolName.BrowserClick, (tab) => actions.click(tab, ref)),
     type: (owner: BrowserOwner, ref: string, input: { text: string; clear: boolean; submit: boolean }) =>
-      act(owner, (tab) => actions.type(tab, ref, input)),
+      act(owner, McpToolName.BrowserType, (tab) => actions.type(tab, ref, input)),
     select: (owner: BrowserOwner, ref: string, values: readonly string[]) =>
-      act(owner, (tab) => actions.select(tab, ref, values)),
-    press: (owner: BrowserOwner, key: BrowserKey) => act(owner, (tab) => actions.press(tab, key)),
+      act(owner, McpToolName.BrowserSelect, (tab) => actions.select(tab, ref, values)),
+    press: (owner: BrowserOwner, key: BrowserKey) =>
+      act(owner, McpToolName.BrowserPress, (tab) => actions.press(tab, key)),
 
     viewport: (owner: BrowserOwner, preset: ViewportPreset) =>
-      act(owner, async (tab) => {
+      act(owner, McpToolName.BrowserViewport, async (tab) => {
         const { width, height, mobile } = VIEWPORT_SIZES[preset];
         await tab.cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
         tab.viewport.preset = preset;
@@ -324,7 +399,9 @@ export function createBrowserService({
     async waitFor(owner: BrowserOwner, input: { text: string; gone: boolean; timeoutMs: number }) {
       const tab = current(owner);
       const met = await actions.waitFor(tab, input);
-      return { ...(await tab.snapshot()), tab: tab.kind, met };
+      const page = await tab.snapshot();
+      await frame(owner, tab, McpToolName.BrowserWaitFor, page.url);
+      return { ...page, tab: tab.kind, met };
     },
 
     inspect: (owner: BrowserOwner, ref: string) => actions.inspect(current(owner), ref),
@@ -347,7 +424,7 @@ export function createBrowserService({
           ...(clip === undefined ? {} : { clip }),
         }),
       );
-      const dir = join(owner.filesDir, 'browser', owner.id);
+      const dir = ownerDir(owner);
       mkdirSync(dir, { recursive: true });
       const file = `${++session.shots}.jpg`;
       await writeFile(join(dir, file), Buffer.from(data, 'base64'));
@@ -355,6 +432,22 @@ export function createBrowserService({
     },
 
     close,
+
+    /** An attempt's frames in order (29 §8.2); also after it ended or the app restarted. */
+    frames(attemptId: string): BrowserFrame[] {
+      const index = join(ownerDir({ id: attemptId, filesDir: attemptFilesDir(attemptId) }), FRAMES_INDEX);
+      if (!existsSync(index)) return [];
+      return readFileSync(index, 'utf8')
+        .split('\n')
+        .filter((line) => line !== '')
+        .map((line) => browserFrameSchema.parse(JSON.parse(line)));
+    },
+
+    /** The path of an attempt's screenshot or frame (29 §5.7); only names the backend gives (ATTEMPT_FILE). */
+    attemptFile(attemptId: string, file: string): string {
+      if (!ATTEMPT_FILE.test(file)) throw new AppError(ErrorCode.NotFound, 'No such file', { file });
+      return join(ownerDir({ id: attemptId, filesDir: attemptFilesDir(attemptId) }), file);
+    },
 
     /**
      * The page check (29 §7): the task's preview (started, queued at the limit), then every page at every viewport

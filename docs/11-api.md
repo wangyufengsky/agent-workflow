@@ -190,6 +190,7 @@ type ReviewCommentsDTO = {
 | POST | `/tasks/:id/nodes/:nodeId/retry` | `failed → ready`，`{ feedback? }` |
 | POST | `/tasks/:id/nodes/:nodeId/skip` 🅿 | `pending` / `ready` / `failed` → `skipped`，返回 `NodeDetailDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
 | GET | `/attempts/:id` | `AttemptDTO`；不存在 404 `ATTEMPT_NOT_FOUND` |
+| GET | `/attempts/:attemptId/browser/:file` | 尝试的截图（`<n>.jpg`）与动作画面（`f<n>.jpg`）（非清单路由，29 §5.7）：目录由尝试解析（会话流所在目录下的 `browser/<attemptId>/`），没有任务的尝试也能取到；文件名只接受这两种格式，其余 404 `NOT_FOUND`，尝试不存在 404 `ATTEMPT_NOT_FOUND`；`image/jpeg` |
 | GET | `/tasks/:taskId/browser/*` | 页面体检的截图（非清单路由，29 §5.7）：`*` 为检查结果里 `screenshot` 的相对路径（`checks/<nodeId>/<检查时刻>/<n>.jpg`），只读 `runs/<taskId>/browser/` 下的 `.jpg`，其余 404 `NOT_FOUND`；`image/jpeg` |
 | GET | `/attempts/:id/transcript?afterSeq` | `{ entries: TranscriptEntry[], lastSeq, hasMore: boolean, done: boolean }`（非清单路由，10 §3）：`lastSeq` 为本页最大 seq（空页为请求的 `afterSeq`），`hasMore` 表示本页之后已有写入的行（以 `afterSeq = lastSeq` 继续读），`done` 表示尝试已结束且已读到末尾 |
 | POST | `/attempts/:id/abort` 🅿 | 中止进行中的尝试（节点按 `attempt_failed` 处理）；非 `running` 409 `STATE_TRANSITION_INVALID` |
@@ -401,6 +402,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | DELETE | `/browser/tabs/:tabId` | `browser.closeUserTab` | write | 204 |
 | GET | `/browser/site-logins` | `browser.listSiteLogins` | read | `{ hosts }`：网站分区里有 Cookie 的主机（用分区里一个临时离屏标签页的 `Network.getAllCookies`） |
 | DELETE | `/browser/site-logins/:host` | `browser.clearSiteLogin` | write | 删除该主机的 Cookie 与页面存储（`Storage.clearDataForOrigin`）→ `{ hosts }` |
+| GET | `/attempts/:attemptId/browser-frames` | `browser.listFrames` | read | `{ items: BrowserFrame[] }`：一次尝试的动作画面，按 `seq` 排列（读尝试目录里的 `frames.jsonl`，尝试结束、应用重启后照样可读；没有画面为空列表；v1.3 B2，29 §8.2） |
 
 ## 13e. PPT（v1.2）
 

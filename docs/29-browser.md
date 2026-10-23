@@ -1,6 +1,6 @@
 # 29 · 内置浏览器与页面预览
 
-> 状态：D120–D125 **用户已确认**（2026-10-23）。**B1 已实现**（05 的 B-01…B-08，分支 `feat/B-browser`）：预览服务、浏览器宿主与动作层、执行 MCP 浏览器工具、项目与设置界面；B2 进行中（分支 `feat/B2-browser`：B2-01 契约与物化、B2-02 后端页面体检、B2-03 内置流程与规划已完成；预览页签与观看画面、「附上当前页面」未开始），B3（助手、知识问答的引用摘录、PPT 网页资料）未开始。实现中与设计稿不同的地方已改在各节里（如 §5.2 的宿主接口、§5.7 的截图、§4.1 推断的位置）。
+> 状态：D120–D125 **用户已确认**（2026-10-23）。**B1 已实现**（05 的 B-01…B-08，分支 `feat/B-browser`）：预览服务、浏览器宿主与动作层、执行 MCP 浏览器工具、项目与设置界面；B2 进行中（分支 `feat/B2-browser`：B2-01 契约与物化、B2-02 后端页面体检、B2-03 内置流程与规划、B2-04 动作画面已完成；预览页签与观看画面、「附上当前页面」未开始），B3（助手、知识问答的引用摘录、PPT 网页资料）未开始。实现中与设计稿不同的地方已改在各节里（如 §5.2 的宿主接口、§5.7 的截图、§4.1 推断的位置）。
 
 ## 1. 定位
 
@@ -307,7 +307,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 
 - `browser_screenshot` 总是存文件作为证据给用户看，**并且总是**以 MCP `image` 内容随工具结果返回。模型支持图片时能看到；不支持时 opencode 会告诉模型它读不了这张图，不报错（§12 V4）。所以后端不判断模型能力，工具说明里写明：看不到图片时用 `browser_snapshot` / `browser_inspect`。
 - 返回的截图压成 JPEG（宽不超过 1280，质量 70）。opencode 把工具返回的图片以 data URL 存在它自己的会话里（工具片段的 `state.attachments`），体积要控制住。本应用的会话流镜像不复制 `attachments`，只记一条「截图」动作。
-- 每个动作后另存一张 JPEG 缩略图（宽 960，质量 60，约 40 KB；用 `Page.captureScreenshot` 的 `clip.scale` 缩小，不需要图像库），作为观看画面（§8.2），不交给模型。随 B2 的观看界面一起实现。一次尝试 50 个动作约 2 MB，随 `runs/` 一起保留与清理。
+- 每个可能改变页面的动作（`browser_open` `browser_click` `browser_type` `browser_select` `browser_press` `browser_viewport` `browser_wait_for`）成功后另存一张 JPEG 缩略图 `f<seq>.jpg`（视口可见部分，宽 `BROWSER_FRAME_WIDTH` = 960，质量 60，约 40 KB；用 `Page.captureScreenshot` 的 `clip.scale` 缩小，不需要图像库），作为观看画面（§8.2），不交给模型；同时在同目录的 `frames.jsonl` 追加一行 `BrowserFrame` 并发 SSE `browser.frame`，`browser.listFrames` 读这个索引。一次尝试 50 个动作约 2 MB，随 `runs/` 一起保留与清理。
 - **存放位置按归属**，与会话流 JSONL 的目录规则一致（10 §3）：
   - 尝试的截图与画面：`<该尝试会话流所在目录>/browser/<attemptId>/`，即任务的尝试为 `runs/<taskId>/browser/<attemptId>/`，知识问答的 `research` 尝试为 `runs/knowledge/browser/<attemptId>/`。按尝试读取：`GET /attempts/:attemptId/browser/:file`，后端由尝试解析目录，所以没有任务的尝试也能取到；
   - 页面体检的截图：`runs/<taskId>/browser/checks/<nodeId>/<检查时刻>/<n>.jpg`（全页，高度到 `PAGE_CHECK_SHOT_MAX_HEIGHT` 为止），按任务读取：`GET /tasks/:taskId/browser/*`；

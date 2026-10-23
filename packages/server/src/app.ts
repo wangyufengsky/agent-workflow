@@ -256,6 +256,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     projects: projects.service,
     previews: previews.service,
     dataDir: config.dataDir,
+    attemptFilesDir: (attemptId) => attempts.filesDirOf(attempts.service.get(attemptId)),
   });
   // Before the previews stop: a tab holds a preview's lease.
   server.addHook('preClose', () => browser.service.closeAll());

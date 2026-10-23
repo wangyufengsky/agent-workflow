@@ -27,6 +27,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.browser.closeUserTab': '关闭浏览器标签页',
   'op.browser.listSiteLogins': '已登录的网站',
   'op.browser.clearSiteLogin': '退出网站登录',
+  'op.browser.listFrames': 'AI 浏览器动作的画面',
   'op.projects.delete': '删除项目',
   'op.projects.setHosting': '绑定远端仓库',
   'op.projects.clearHosting': '解除远端绑定',

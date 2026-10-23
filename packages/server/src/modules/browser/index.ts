@@ -13,6 +13,6 @@ export function createBrowserModule(deps: BrowserServiceDeps) {
   return {
     service,
     operations: browserOperations(service),
-    registerRoutes: (server: FastifyInstance) => registerBrowserRoutes(server, deps.dataDir),
+    registerRoutes: (server: FastifyInstance) => registerBrowserRoutes(server, service, deps.dataDir),
   };
 }

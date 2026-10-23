@@ -300,7 +300,7 @@ payload / response：
 
 ## 3. JSONL 会话流
 
-运行目录 `runs/<taskId>/`（或 `runs/knowledge/` 等）里还有页面预览的输出 `preview.log` 与浏览器截图 `browser/<attemptId>/`（v1.3，29 §4.2、§5.7），读会话流时只读 `*.jsonl`。
+运行目录 `runs/<taskId>/`（或 `runs/knowledge/` 等）里还有页面预览的输出 `preview.log` 与浏览器截图、动作画面及其索引 `browser/<attemptId>/`（`<n>.jpg`、`f<n>.jpg`、`frames.jsonl`）、页面体检截图 `browser/checks/`（v1.3，29 §4.2、§5.7），读会话流时只读 `*.jsonl`。
 
 路径：`<数据目录>/runs/<taskId>/<attemptId>.jsonl`（调试尝试为 `runs/debug/<attemptId>.jsonl`，知识问答的 `research` 尝试为 `runs/knowledge/<attemptId>.jsonl`，PPT 的尝试为 `runs/ppt/<attemptId>.jsonl`）。每次尝试一个文件，只追加（同步追加，保持事件顺序），由尝试模块把 opencode 事件转换后写入，同时经 SSE 推送 `attempt.transcript` 事件。schema 为 `shared/contracts/api/attempts.ts` 的 `transcriptEntrySchema`。
 

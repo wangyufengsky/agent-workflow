@@ -141,5 +141,8 @@ export const BROWSER_SETTLE_TIMEOUT_MS = 10_000;
 export const BROWSER_WAIT_FOR_MAX_MS = 10_000;
 /** A page snapshot is cut to this many characters (29 §5.6). */
 export const BROWSER_SNAPSHOT_MAX_CHARS = 12_000;
+/** The thumbnail kept after each AI browser action for the user to watch (29 §5.7): its width and JPEG quality. */
+export const BROWSER_FRAME_WIDTH = 960;
+export const BROWSER_FRAME_QUALITY = 60;
 /** A page check's full-page screenshot stops at this height in CSS pixels (29 §7.2). */
 export const PAGE_CHECK_SHOT_MAX_HEIGHT = 8000;
