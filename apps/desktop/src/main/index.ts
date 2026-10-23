@@ -47,6 +47,10 @@ async function openApp({ win, webPreferences }: Window, b: Backend): Promise<voi
   win.webContents.on('will-navigate', (event, target) => {
     if (!target.startsWith(url)) event.preventDefault();
   });
+  // A reload starts the page over: nothing of it places the user's tabs any more, so they leave the window (29 §8.1).
+  win.webContents.on('did-start-navigation', (details) => {
+    if (details.isMainFrame && !details.isSameDocument) b.browser.takeOffWindow();
+  });
   await win.loadURL(url);
 }
 
@@ -105,9 +109,12 @@ app.on('window-all-closed', () => app.quit());
 app.on('will-quit', (event) => {
   const running = backend;
   if (running === undefined) return;
-  running.browser.closeAll();
-  // Quit again once the backend has stopped opencode and exited (17 §3.5).
+  // Quit again once the backend has stopped opencode and exited (17 §3.5). It closes its own tabs as it stops; what is
+  // left would keep Electron from exiting (B-04).
   event.preventDefault();
   backend = undefined;
-  void running.stop().then(() => app.quit());
+  void running.stop().then(() => {
+    running.browser.closeAll();
+    app.quit();
+  });
 });

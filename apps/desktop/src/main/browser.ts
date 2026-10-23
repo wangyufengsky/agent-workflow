@@ -182,7 +182,20 @@ export function createBrowserTabs({ window, emit, openExternal }: BrowserTabsDep
     reload: (tabId: string) => userTab(tabId).view.webContents.reload(),
     openDevTools: (tabId: string) => userTab(tabId).view.webContents.openDevTools({ mode: 'detach' }),
 
-    /** On quit: an open offscreen view keeps Electron from exiting even after `quit` (found in B-04). */
+    /** Every user tab leaves the window (the page that placed them reloaded); the tabs stay open. */
+    takeOffWindow(): void {
+      const win = window();
+      for (const tab of tabs.values()) {
+        if (!tab.onWindow) continue;
+        if (win !== null && !win.isDestroyed()) win.contentView.removeChildView(tab.view);
+        tab.onWindow = false;
+      }
+    },
+
+    /**
+     * After the backend stopped on quit: what it left open, since an open offscreen view keeps Electron from exiting
+     * even after `quit` (found in B-04).
+     */
     closeAll(): void {
       for (const tab of [...tabs.values()]) {
         forget(tab);
