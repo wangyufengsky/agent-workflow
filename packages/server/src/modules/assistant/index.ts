@@ -89,7 +89,13 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     stopWhisper: whisper.stop,
     start: taskRelay.start,
     registry,
-    operations: assistantOperations(conversations, confirmations, whisper, createAssistantSnapshots(deps), deps.browser),
+    operations: assistantOperations(
+      conversations,
+      confirmations,
+      whisper,
+      createAssistantSnapshots(deps),
+      deps.browser,
+    ),
     register(server: FastifyInstance) {
       registerAssistantRoutes(server, conversations);
       registerMcpEndpoint(server, {
