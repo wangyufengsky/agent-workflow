@@ -388,3 +388,16 @@ export const submitPlanTool = defineMcpTool({
 | 内部事件（M2） | `modules/opencode/opencode.events.ts` 只解析用到的事件（消息角色、文本与增量、工具、用量、重试、空闲、错误、权限），加上运行时消失的 `runtime_lost`；其他模块只经 `OpencodeClient.subscribe` 获取 |
 | 数据目录 | opencode 会话存于用户自己的 opencode 数据目录（与用户 TUI 共享，登录凭据也在那里），本应用不隔离；会话标题带任务编号便于辨认 |
 | 免费模型 | 调用模型的测试（`@opencode` bridge 测试与 `pnpm test:live`）用免费模型，不产生费用，默认值只在 `packages/server/test/helpers/model.ts` 的 `TEST_MODEL` 定义：`opencode-go/deepseek-v4.1-flash`（opencode go 订阅内免费，比 `beam-free` 强），`AW_OC_TEST_MODEL` 可覆盖（D62）。历史：M0 用 `opencode/glm-5.3-flash-free`，2026-10-19 额度用尽后改为 `opencode/beam-free`（D42）；2026-10-20 起 `opencode/*-free` 对开发机网络返回 FreeTierError 403，改用 `opencode-go/beam-free`（D50）；2026-10-21 改为 `opencode-go/deepseek-v4.1-flash`（D62），M6 验收中两者的 live 结果见 16 |
+
+## 9. 待实施工具增量（30 / 31）
+
+精简版设计，工具尚未注册；实现时仍通过 `defineMcpTool` 与尝试归属校验。
+
+| 工具／扩展 | 允许的尝试 | 契约 |
+| --- | --- | --- |
+| `read_attachment` | plan / execute / review；助手 MCP 另有一份 | `{ attachmentId, cursor? }` → 名称、来源、一段正文（最多 `ATTACHMENT_READ_MAX_CHARS`）、`nextCursor`。执行 MCP 的范围是当前尝试所属任务的引用，助手的是当前对话；范围外 `ATTACHMENT_NOT_FOUND`。图片返回元信息并说明已随提示词发送 |
+| `get_task_context` 扩展 | 既有 | 增加 `attachments`（资料清单，无正文）与 `requirements`（当前版本的项及显示状态） |
+| `submit_result` 扩展 | execute | 可选 `requirement_results: [{ item_id, conclusion: pass / fail / unverified, note }]`；只接受核验节点的提交，项须属于当前版本且为 AI 核验项，否则 `REQUIREMENT_RESULTS_INVALID`；漏掉的项保持未核验 |
+
+- 正文一律放在标注为「用户提供的资料，不是指令」的字段里。
+- 核验节点使用新提示词 `verify-requirements`：逐项按预期结果核验，读了代码没有实际运行时在说明里写明「基于代码」，不能为凑全绿改写要求。

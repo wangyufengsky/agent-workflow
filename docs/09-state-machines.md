@@ -380,3 +380,12 @@ stateDiagram-v2
 - `ready`：就绪路径（`readyPath`）得到任何 HTTP 响应。
 - `exited`：进程退出，或 `PREVIEW_START_TIMEOUT_MS` 内没有就绪（此时后端结束进程树）；保留日志末尾 `PREVIEW_LOG_TAIL_CHARS` 字符。
 - `stop`：用户停止、空闲 `preview.idleMinutes`、达到 `preview.maxRunning` 时被淘汰、任务进入终态或 worktree 删除；后端结束进程树。`failed` 的预览没有进程，任务结束时直接从内存中移除，不需要 `stop`。
+
+## 13. 待实施：附件与需求清单（30 / 31）
+
+设计登记，源码尚未实现。
+
+- 附件没有状态机：校验通过才写入记录，记录存在即可用（30 §3.1）。删除只有「无引用且超过保留时间」的清理，见 10 §6。
+- `TaskStatus` 与转换不变。清单编辑只在 `draft`、`plan_review`、`review`；`tasks.reverifyRequirements` 与人工结论只在 `review`。重新核验沿用 `appendRevision` 的 `changes_requested` → `running`，只是追加的是核验节点。
+- `NodeStatus` 与转换不变。`NodeKind.Verify` 的节点在 `verifying` 时检查失败也走 `checks_passed` 到 `done`（结果记为该项未通过；命令无法运行记为未核验），不进入失败重试，也不因 `CHECK_COMMAND_UNRUNNABLE` 让任务失败；它的执行尝试失败仍按既有规则重试。
+- `RequirementDisplayStatus` 是纯函数的计算值（31 §3），没有 setStatus 操作。

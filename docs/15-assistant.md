@@ -141,3 +141,9 @@ server/src/modules/assistant/
 | `@opencode` | 注入后 `aw-assistant` 与 `agent-workflow-app` 出现在 opencode 配置中，两套 MCP 都已连接 |
 | E2E | J11「对助手说开始任务 → 确认卡片 → 任务卡片状态更新 → 打开任务页」；直接执行出现项目卡片、删除后「已删除」；主页建议 → 对话显示在主页、`open_page` 带用户离开时面板接着显示对话、「确认并总是允许」→ 设置页撤销；J25 主页对话与接力；J9 走查含助手面板（简单与专业）与主页对话 |
 | live | `live/assistant.live.test.ts`：真实模型查明天的日期并列出项目（调用 `get_current_time` 与 `projects_list`，回复含两者），报告写到 `live/reports/assistant-*.json` |
+
+## 10. 待实施：统一附件与清单
+
+按 [30](30-attachments.md) / [31](31-requirements-checklist.md) 接入；当前输入仍只有文字。用户消息的附件与现有「助手生成的文件」是不同记录。助手的 `read_attachment` 只能读当前对话的附件；创建任务时可以带上它们，确认卡列出名称。
+
+助手可以帮用户拆验收要求，经确认卡创建带清单的任务或替换清单（write 确认），也可以请求重新核验；逐项人工结论不向助手曝光。交付确认卡列出未满足的必需项。模型看不到图片时如实说明。

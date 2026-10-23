@@ -450,3 +450,34 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 ```
 
 加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。浏览器标签页同样：后端经同一通道发 `browser.request`（`shared/contracts/browser-port.ts`：`open` / `setPolicy` / `close` / `cdp`），main 回 `browser.response`，并主动发 `browser.cdpEvent` / `browser.blocked` / `browser.gone`（29 §5.1）。
+
+## 14. 待实施 API：附件与需求清单
+
+30 / 31（精简版）的契约设计，未注册到操作清单。
+
+### 14.1 附件
+
+| 操作 | 方法与路径 | 风险／曝光 | 输入 → 结果 |
+| --- | --- | --- | --- |
+| （非清单）上传 | POST `/attachments` | 仅 UI | 二进制请求体；`Content-Type` 为声明的媒体类型，`X-Attachment-Name` 为 URL 编码的文件名 → `AttachmentDTO`；校验失败返回错误、不留记录 |
+| （非清单）原件 | GET `/attachments/:id/content` | 仅 UI | 原件字节；图片缩略图由界面用原件生成 Blob URL |
+| attachments.snapshotProjectFile | POST `/attachments/project-file` | write；仅 UI | `{ projectId, taskId?, path, lines? }` → `AttachmentDTO` |
+| attachments.get | GET `/attachments/:id` | read；UI | `AttachmentDTO`（不含绝对路径） |
+| attachments.remove | DELETE `/attachments/:id` | write；仅 UI | 只能删除尚无引用的附件 |
+
+两条非清单路由使用与 JSON API 相同的令牌校验，不在 URL query 放令牌；原件以下载方式返回，不作为同源 HTML 执行。
+
+`createTask`、`requestChanges`、助手发送消息增加可选 `attachmentIds`（最多 `ATTACHMENTS_PER_INPUT_MAX`），后端在业务事务内绑定。助手的创建任务工具只接受当前对话已引用的附件。
+
+### 14.2 需求清单
+
+| 操作 | 方法与路径 | 风险／曝光 | 输入 → 结果 |
+| --- | --- | --- | --- |
+| requirements.get | GET `/tasks/:id/requirements` | read；UI / 助手 | 当前版本、逐项显示状态与最新结论、历史版本摘要 |
+| requirements.replace | PUT `/tasks/:id/requirements` | write；UI / 助手确认 | `{ items }` → 新版本；确认卡列出每项与命令，突出删除和改为可选的项 |
+| requirements.decide | POST `/tasks/:id/requirements/:itemId/decisions` | write；仅 UI（不向助手和命令面板曝光） | `{ conclusion: pass / fail / waive, note }`；waive 必须有 note；只在 `review` |
+| tasks.reverifyRequirements | POST `/tasks/:id/requirements/reverify` | write；UI / 助手确认 | 只在 `review`；追加一个核验节点 |
+
+- `createTask` 增加可选 `requirements: items`，与任务同一事务创建第一个版本。
+- 交付（本地合并、创建／更新 PR、报告完成）增加可选 `acknowledgeUnmetRequirements: true`：有未满足的必需项而未带它时返回 `REQUIREMENTS_UNACKNOWLEDGED`；交付记录保存清单摘要。
+- SSE：`requirements.updated { taskId }`，界面重新获取。

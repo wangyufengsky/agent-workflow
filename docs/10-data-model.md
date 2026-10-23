@@ -546,3 +546,31 @@ payload / response：
 - 删除助手对话：级联删除其确认，并删除 `assistant/conversations/<id>.jsonl` 与 `assistant/files/<id>/`。
 - 任务终态后 worktree 删除，但任务、计划、节点、尝试、会话流保留（供回看）。
 - 不做自动过期清理（v1）。设置页显示数据目录占用。
+
+## 6. 待实施数据设计（30 / 31）
+
+精简版设计，未生成迁移；实施时按当时的迁移顺序编号。
+
+### 6.1 附件
+
+| 表 | 关键字段／约束 |
+| --- | --- |
+| attachments | id、source、display_name、media_type、size_bytes、sha256、meta JSON（图片宽高；项目文件的 projectId、可选 taskId、相对路径、行范围、读取时间）、created_at。磁盘路径只由 id 派生：`attachments/<id>/original` |
+| attachment_refs | id、attachment_id FK、owner_kind、owner_id、ordinal、created_at；UNIQUE(owner_kind, owner_id, attachment_id) |
+
+- 所有者在自己的事务里创建／删除引用：删除任务时删除该任务（task_input）与其节点（task_feedback）的引用；删除助手对话时删除 assistant_message 引用。多态 owner 没有外键，由所有者模块负责。
+- 助手会话 JSONL 的用户消息增加可选 `attachments: [{ id, name, mediaType }]`，只作展示。
+- 清理：没有引用且创建超过 `ATTACHMENT_ORPHAN_TTL_MS` 的附件，先删文件、再删记录；删文件失败留到下次。目录中没有记录的残留按年龄清理。
+
+### 6.2 需求清单
+
+| 表／字段 | 关键字段／约束 |
+| --- | --- |
+| tasks.requirements_revision_id | 可空 FK；没有清单的任务为 null |
+| requirement_revisions | id、task_id FK、seq、items JSON、created_at；UNIQUE(task_id, seq)；只追加 |
+| requirement_results | id、task_id FK、revision_id FK、item_id、source、conclusion、note、output（命令输出末尾，按既有输出上限截断）、node_id 可空（用户结论为 null）、commit_sha、created_at；只追加 |
+| deliveries.requirements_summary | 可空 JSON：revisionId、commitSha、逐项显示状态；旧交付为 null |
+
+items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`expected`、`required`、`verification`（`{ kind: 'command', command }` / `{ kind: 'ai_review' }` / `{ kind: 'manual' }`）。核验节点的命令检查在节点 acceptance 中带 `requirementItemId`，用于把检查结果对应到项。
+
+删除任务时级联删除清单版本与结论。

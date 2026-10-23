@@ -33,6 +33,8 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [27-git-workbench.md](27-git-workbench.md) | Git 工作台（重做，v1.2）：手动提交 / 推送 / 合并、AI 审查、与任务 worktree 的边界、三栏界面 | 全员 |
 | [28-home-assistant.md](28-home-assistant.md) | 以助手为主的主页（一个输入框两种模式、对话中视图、与 ⌘J 面板的接力）、助手能力盘点、打开动画 | 全员 |
 | [29-browser.md](29-browser.md) | 内置浏览器与页面预览（设计已确认，B1 已实现）：预览服务、浏览器宿主与动作层、执行 MCP 浏览器工具、AI 访问（内网）网站与登录、页面体检、预览页签、接入的模块（D120–D125） | 全员 |
+| [30-attachments.md](30-attachments.md) | 统一附件输入（设计稿，未实现）：任务、助手、「再改改」带文本／图片／项目文件，保存、范围与模型输入 | 全员 |
+| [31-requirements-checklist.md](31-requirements-checklist.md) | 需求验收清单（设计稿，未实现）：可编辑清单、核验步骤、逐项结论与过期、人工确认、交付提醒 | 全员 |
 
 ## 维护规则
 

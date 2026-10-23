@@ -322,3 +322,17 @@ export function taskOperations(tasks: TasksService) {
 - 数据库工具：只读事务（SQL Server 为从不提交的事务）+ 按方言的语句检查 + 行数与超时限制（24 §4）。
 - 浏览器（v1.3，29 §5.4）：AI 的标签页只打开任务预览地址与设置 `browser.sites` 允许的网站，只读网站上 AI 发出的写请求与 WebSocket 由 main 在网络层拦下；用户标签页中规则不允许的地址交给系统浏览器；下载、权限请求、文件选择框一律拒绝；不开远程调试端口；工具返回的页面内容在工具说明与提示词中标为数据、不是指令；应用不向页面填写任何已保存的凭据，网站登录由用户在设置里自己完成。助手不能修改 `browser.sites`（D65 的同一思路）。
 - 页面预览（v1.3，29 §4）：开发服务器以项目配置的命令在任务 worktree 里运行（与检查命令同一个 shell、`killDescendants`），只监听后端分配的 127.0.0.1 端口；worktree 删除前与应用退出时结束整棵进程树。
+
+## 10. 待实施架构增量：附件与需求验收清单
+
+[30](30-attachments.md) / [31](31-requirements-checklist.md) 的设计约束（精简版），源码尚未增加这些模块。
+
+- `attachments`：保存、校验、正文分页读取、引用、清理。只接收所有者（kind + id）与允许读取的根目录，不依赖 `tasks`、`assistant`。记录存在即可用，没有上传／处理状态机。
+- `requirements`：清单版本、逐项结论记录、显示状态纯函数；只依赖底层设施，不依赖 `tasks`、`nodes`、`acceptance`。
+- `tasks` 组合二者：绑定附件、编辑时机守卫、物化时追加核验节点（`NodeKind.Verify`）、节点完成时写结论、交付时的清单摘要。`assistant` 在自己的事务里绑定附件。`attempts` 只接收所有者准备好的附件，不反查所有者。
+- `nodes`：只有 `NodeKind.Verify` 的检查「只记录不拦截」；其他节点不变。
+- `opencode` 适配层的 `prompt` 增加 file part（图片 data URL）；其他模块仍不直接调用 SDK。
+- 不新增 `AttemptKind`、`AcceptanceCheckKind`、`TaskStatus`、调度队列或通用文件服务层。
+- 数据目录新增 `attachments/<id>/original`；附件不写进 Git worktree。
+- 上传与原件读取是认证的二进制非清单路由（与 `attempts.routes.ts` 的会话记录路由同类）；其余为操作清单中的 JSON 操作。
+- 读取图片尺寸的直接依赖在 U-00 选定后登记到本文依赖清单，不 import 传递依赖。
