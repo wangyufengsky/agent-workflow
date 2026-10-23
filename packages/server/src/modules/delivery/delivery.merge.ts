@@ -66,12 +66,16 @@ export async function checkDeliverable(input: {
   }
   if (!input.checkTargetWorktree) return;
   const holder = await targetHolder(input.repoPath, input.targetBranch);
-  if (holder === undefined) return;
+  if (holder !== undefined) await assertTargetClean(holder, input.targetBranch);
+}
+
+/** The worktree with the target checked out has nothing uncommitted, staged or not. */
+async function assertTargetClean(holder: string, targetBranch: string): Promise<void> {
   const status = await readStatus(holder);
   if (!status.clean) {
     throw new AppError(ErrorCode.DeliveryTargetDirty, 'The target branch is checked out with uncommitted changes', {
       path: holder,
-      branch: input.targetBranch,
+      branch: targetBranch,
       files: status.files.map((f) => f.path),
     });
   }
@@ -151,17 +155,22 @@ async function mergeIn(dir: string, input: LocalMergeInput): Promise<MergeOutcom
 
 /**
  * Runs `merge` where `target` is checked out, under the repository lock; when it is checked out nowhere, in a
- * temporary worktree removed afterwards.
+ * temporary worktree removed afterwards. `ready` checks the worktree holding the target inside the same lock, right
+ * before the merge: a check made before the lock could be outdated by then, and a squash commits the whole index.
  */
 function inTargetWorktree(
   locks: RepoLocks,
   repoPath: string,
   target: string,
+  ready: (holder: string) => Promise<void>,
   merge: (dir: string) => Promise<MergeOutcome>,
 ): Promise<MergeOutcome> {
   return locks.run(repoPath, async () => {
     const holder = await targetHolder(repoPath, target);
-    if (holder !== undefined) return merge(holder);
+    if (holder !== undefined) {
+      await ready(holder);
+      return merge(holder);
+    }
     const parent = await mkdtemp(join(tmpdir(), 'aw-merge-'));
     const dir = join(parent, 'target');
     try {
@@ -179,18 +188,25 @@ function inTargetWorktree(
 
 /** Merges the task branch into the target in the main repository (09 §7). */
 export function mergeLocally(locks: RepoLocks, input: LocalMergeInput): Promise<MergeOutcome> {
-  return inTargetWorktree(locks, input.repoPath, input.targetBranch, (dir) => mergeIn(dir, input));
+  return inTargetWorktree(
+    locks,
+    input.repoPath,
+    input.targetBranch,
+    (holder) => assertTargetClean(holder, input.targetBranch),
+    (dir) => mergeIn(dir, input),
+  );
 }
 
 /**
  * The Git workbench's merge (27 §3.5): `source` (any branch or commit) into the local branch `target`, as the user.
- * The caller checked that the target's worktree is clean; conflicts are aborted and reported, the target unchanged.
+ * `ready` is the caller's check of the target's worktree; conflicts are aborted and reported, the target unchanged.
  */
 export function mergeAsUser(
   locks: RepoLocks,
   input: { repoPath: string; source: string; target: string; strategy: GitMergeStrategy; message: string },
+  ready: (holder: string) => Promise<void>,
 ): Promise<MergeOutcome> {
-  return inTargetWorktree(locks, input.repoPath, input.target, (dir) =>
+  return inTargetWorktree(locks, input.repoPath, input.target, ready, (dir) =>
     mergeOrSquash(dir, input.source, input.strategy === GitMergeStrategy.Squash, input.message, USER),
   );
 }

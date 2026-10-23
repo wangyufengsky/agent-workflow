@@ -265,11 +265,10 @@ export function createRepositoryWrites({ projects, tasks, locks }: RepositoryWri
           path: holder,
         });
       }
-      if (holder !== undefined) {
-        await assertNoOperation(holder);
-        await assertClean(holder);
-      }
-      const outcome = await mergeAsUser(locks, { repoPath: repo, ...input });
+      const outcome = await mergeAsUser(locks, { repoPath: repo, ...input }, async (dir) => {
+        await assertNoOperation(dir);
+        await assertClean(dir);
+      });
       return outcome.merged
         ? { merged: true, commit: outcome.commitSha }
         : { merged: false, conflictFiles: outcome.conflictFiles };

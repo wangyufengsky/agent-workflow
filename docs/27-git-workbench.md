@@ -62,7 +62,7 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 | 新建分支 | `git branch -- <name> <start>`，可选「并切换」 | 名称合法（`git check-ref-format --branch`）且不以 `aw/` 开头（任务分支前缀）；不存在（`GIT_BRANCH_EXISTS`） | write |
 | 切换分支 | `git switch <b>`；远端分支 → `git switch --track <remote>/<b>` 建本地跟踪分支 | 主工作区干净（`WORKTREE_DIRTY`）；分支没有在别的 worktree 检出（`GIT_BRANCH_IN_USE`，任务的 → `GIT_BRANCH_OWNED_BY_TASK`） | write |
 | 删除分支 | `git branch -d`；确认后可 `-D` | 不是当前分支、不是项目默认分支、没有在任何 worktree 检出（`GIT_BRANCH_IN_USE`）；不属于进行中的任务；未合并 → `GIT_BRANCH_NOT_MERGED`，界面再确认一次后以 `force` 删除 | **critical** |
-| 合并 | `merge --no-ff` 或 `merge --squash` + 提交（§3.5） | 目标是本地分支、不属于进行中的任务；目标检出的工作区干净 | **critical** |
+| 合并 | `merge --no-ff` 或 `merge --squash` + 提交（§3.5） | 目标是本地分支、不属于进行中的任务；目标检出的工作区没有进行中的操作且干净（这两项在仓库锁内、合并前检查） | **critical** |
 | 合并冲突交给 AI | 开一个「合并分支」任务（§3.6） | 刚才的合并冲突 | write（之后的合并仍需点击） |
 | 创建 PR / MR | 已有的 `GitHostingProvider.createPullRequest`；该分支已有打开的 PR 时直接返回它 | 项目已绑定远端（`HOSTING_NOT_CONFIGURED`）；分支已推送 | **critical** |
 | AI 草拟提交信息 | 只读的短会话（§7.3） | opencode 就绪 | read |
