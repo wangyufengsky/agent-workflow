@@ -6,7 +6,7 @@ import { createRepo, git } from './helpers.ts';
 
 // J30 (29 §8.1): the task page's preview tab in the built app. The user starts the task's preview; their own tab is
 // a real page of it placed in the window: it follows the address bar, counts the page's console errors, leaves the
-// window on the progress tab and when the app's page reloads, and the app still quits with the tab open. A bug-fix
+// window on the progress tab, closes when the app's page reloads, and the app still quits with the tab open. A bug-fix
 // task waiting for its plan to be confirmed has its worktree, so no opencode or model is needed.
 
 const SERVER = `import { createServer } from 'node:http';
@@ -37,7 +37,7 @@ function api(page: Page, method: string, path: string, body?: unknown): Promise<
   );
 }
 
-test('J30 任务页预览：真实页面放进窗口，跟随地址栏，统计控制台错误；切到进度或重新加载时离开窗口，开着时也能正常退出', async () => {
+test('J30 任务页预览：真实页面放进窗口，跟随地址栏，统计控制台错误；切到进度时离开窗口、重新加载时关闭，开着时也能正常退出', async () => {
   // Launching the app, the task's worktree and the dev server's start add up past the default 30 s.
   test.setTimeout(180_000);
   const repoPath = createRepo();
@@ -78,6 +78,8 @@ test('J30 任务页预览：真实页面放进窗口，跟随地址栏，统计�
           : '';
       });
     const alone = await views();
+    const contents = () => app.evaluate(({ webContents }) => webContents.getAllWebContents().length);
+    const before = await contents();
 
     await page.goto(new URL(`/tasks/${task.id}?view=preview`, page.url()).href);
     const pane = page.getByTestId('preview-pane');
@@ -101,9 +103,10 @@ test('J30 任务页预览：真实页面放进窗口，跟随地址栏，统计�
     await page.getByRole('tab', { name: '预览' }).click();
     await expect.poll(views).toBe(alone + 1);
 
-    // A reload starts the page over: the tab leaves the window although no cleanup of the page ran.
+    // A reload starts the page over: no cleanup of the page ran, yet the tab closes rather than lingering hidden.
     await page.goto(new URL('/tasks', page.url()).href);
     await expect.poll(views).toBe(alone);
+    await expect.poll(contents).toBe(before);
   } finally {
     await app.close();
   }

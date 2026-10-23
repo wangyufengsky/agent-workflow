@@ -175,7 +175,7 @@ main（薄）：browser.ts ◀───────┘
    · 截图走 CDP 的 Page.captureScreenshot（离屏视图上可用，§12 V1），main 不另提供
 ```
 
-main 只提供机制，不做判断。判断请求放行与否的是共享的纯函数 `blockReason`（`shared/browser/policy.ts`）：每个分区一个 `onBeforeRequest`（Electron 每个会话只允许一个），按请求的 `webContentsId` 找到标签页；找不到标签页的请求（页面的 Service Worker）一律拦下。用户标签页（`userFacing`）不设设备指标，大小随 renderer 给的区域；AI 与体检的标签页离屏、按视口设设备指标。**应用退出时**后端先停止并关闭自己的标签页，main 等它退出后再关闭剩下的：实测发现只要还有一个不在窗口里的离屏视图，Electron 在 `quit` 之后也不退出；而 main 若先关掉全部，后端停止时关闭用户标签页的请求会出错，后端不能退出（B2-08 的 J30 发现）。窗口的页面重新加载（新文档）时 main 把用户标签页全部移出窗口：页面的清理没有运行，不移走就会留在新页面上；标签页本身仍开着，任务结束时关闭。
+main 只提供机制，不做判断。判断请求放行与否的是共享的纯函数 `blockReason`（`shared/browser/policy.ts`）：每个分区一个 `onBeforeRequest`（Electron 每个会话只允许一个），按请求的 `webContentsId` 找到标签页；找不到标签页的请求（页面的 Service Worker）一律拦下。用户标签页（`userFacing`）不设设备指标，大小随 renderer 给的区域；AI 与体检的标签页离屏、按视口设设备指标。**应用退出时**后端先停止并关闭自己的标签页，main 等它退出后再关闭剩下的：实测发现只要还有一个不在窗口里的离屏视图，Electron 在 `quit` 之后也不退出；而 main 若先关掉全部，后端停止时关闭用户标签页的请求会出错，后端不能退出（B2-08 的 J30 发现）。窗口的页面重新加载（新文档）时 main 关闭全部用户标签页并逐个发 `browser.gone`：新页面不知道它们的 id，页面的清理也没有运行；后端收到后丢掉预览标签页的记录、注销对预览的使用（不然预览不会因空闲停止，每次重新加载还多一个看不见的标签页）。
 
 用哪个分区、放行哪些来源、什么时候算稳定、怎样算点中，都由后端决定，与凭据端口的分工相同（03 §1）。
 
@@ -452,7 +452,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 - **放置**：renderer 量出页面区域的矩形，经 preload `aw.browser.place(tabId, rect)` 让 main 把视图贴上去；离开页签、打开对话框或浮层时 `place(tabId, null)` 隐藏。原生视图盖在 DOM 之上，所以 ⌘K、⌘J 打开时必须隐藏它，用浮层关闭事件恢复。实现（B2-05）：`usePlacedTab` 用 `MutationObserver` 看页面上有没有打开的 Radix 对话框（`[role="dialog"][data-state="open"]`，对话框、抽屉与 ⌘K 都是），加上界面状态里的助手面板；标签页被后端关闭后界面再 `place(tabId, null)` 时 main 什么也不做（关闭时已经移走）。
 - **用户标签页**（B2-05）：`browser.openUserTab` 打开（分区 `persist:aw-preview-<projectId>`，不拦截文件选择），`navigateUserTab` 换路径，`setUserViewport` 换尺寸；底栏的数字来自 SSE `browser.tab_updated`（当前页面的控制台错误含未捕获异常、失败请求含 ≥ 400），主框架开始加载新文档时归零。
 
-实现（B2-06）：页签与各画面见 14 §3.3；会话列表来自 `GET /tasks/:id/preview/sessions`（尝试状态随 `attempt.updated` 刷新），画面与截图经带令牌的请求读取后以 `data:` 地址显示（`<img>` 带不了令牌）；底栏明细为 `browser.userTabLogs`；达到上限时 `PREVIEW_LIMIT_REACHED` 的 `details.taskIds` 列出占用中的任务。用户的标签页在回到「进度」时离开窗口、离开任务页时关闭（不等任务结束），窗口页面重新加载时离开窗口（§5.1）。
+实现（B2-06）：页签与各画面见 14 §3.3；会话列表来自 `GET /tasks/:id/preview/sessions`（尝试状态随 `attempt.updated` 刷新），画面与截图经带令牌的请求读取后以 `data:` 地址显示（`<img>` 带不了令牌）；底栏明细为 `browser.userTabLogs`；达到上限时 `PREVIEW_LIMIT_REACHED` 的 `details.taskIds` 列出占用中的任务。用户的标签页在回到「进度」时离开窗口、离开任务页时关闭（不等任务结束），窗口页面重新加载时由 main 关闭（§5.1）。
 
 ### 8.2 观看 AI 的会话
 

@@ -149,6 +149,15 @@ export function createBrowserService({
   const userTabs = new Map<string, { tab: Tab; taskId: string; projectId: string }>();
   const actions = createActions(clock);
   const unsubscribeHost = host.onEvent((event) => {
+    // The page that placed a user's preview tab started over and main closed it (29 §8.1): let go of its preview.
+    if (event.type === 'browser.gone') {
+      const entry = userTabs.get(event.tabId);
+      if (entry === undefined) return;
+      userTabs.delete(event.tabId);
+      entry.tab.dispose();
+      previews.release(entry.taskId);
+      return;
+    }
     if (event.type !== 'browser.unownedBlocked') return;
     // URL 可能带访问令牌，结构化日志只保留资源种类与清理结果。
     log.warn({ source: event.source, cleanupError: event.cleanupError }, 'browser unowned worker blocked');

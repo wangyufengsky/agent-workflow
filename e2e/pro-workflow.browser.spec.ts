@@ -40,6 +40,11 @@ test('J8 专业模式：复制内置流程 → 修改 → 用它跑通一个任�
   // Editing one check keeps the others, the page check included (29 §7.1).
   await expect(form.getByLabel('页面体检')).toBeChecked();
   await form.getByLabel('评审重点（可选）').fill('是否修复了根因');
+  // Undone page paths leave the field too, so editing it again does not bring them back.
+  const paths = form.getByLabel('页面路径（可选，空格分隔）');
+  await paths.fill('/orders');
+  await editor.getByRole('button', { name: '撤销' }).first().click();
+  await expect(paths).toHaveValue('');
   await page.getByRole('button', { name: '保存为新版本' }).click();
   await expect(page.getByText('已保存为第 2 版')).toBeVisible();
   const get = async (path: string) => (await request.get(`${API_BASE}${path}`, { headers: AUTH })).json();

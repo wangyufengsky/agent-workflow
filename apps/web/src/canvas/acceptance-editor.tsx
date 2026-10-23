@@ -23,9 +23,14 @@ function compose({ commands, page, review, manual }: Parts): Acceptance {
 }
 
 /** The page check's paths as typed (separated by spaces or commas); none means the project's key pages. */
+const pathsOf = (text: string) => text.split(/[\s,，]+/).filter((p) => p !== '');
+
 function PagesInput({ check, onChange }: { check: PageCheck; onChange: (check: PageCheck) => void }) {
-  // The text is kept as typed: parsing it back on every keystroke would swallow the separator being typed.
-  const [text, setText] = useState((check.pages ?? []).join(' '));
+  // The text is kept as typed: parsing it back on every keystroke would swallow the separator being typed. Paths that
+  // changed from elsewhere (undo, redo) replace it.
+  const paths = (check.pages ?? []).join(' ');
+  const [text, setText] = useState(paths);
+  if (pathsOf(text).join(' ') !== paths) setText(paths);
   return (
     <input
       className="input mono"
@@ -34,7 +39,7 @@ function PagesInput({ check, onChange }: { check: PageCheck; onChange: (check: P
       value={text}
       onChange={(e) => {
         setText(e.target.value);
-        const pages = e.target.value.split(/[\s,，]+/).filter((p) => p !== '');
+        const pages = pathsOf(e.target.value);
         const { pages: _, ...rest } = check;
         onChange(pages.length === 0 ? rest : { ...rest, pages });
       }}

@@ -185,13 +185,16 @@ export function createBrowserTabs({ window, emit, openExternal }: BrowserTabsDep
     reload: (tabId: string) => userTab(tabId).view.webContents.reload(),
     openDevTools: (tabId: string) => userTab(tabId).view.webContents.openDevTools({ mode: 'detach' }),
 
-    /** Every user tab leaves the window (the page that placed them reloaded); the tabs stay open. */
-    takeOffWindow(): void {
-      const win = window();
-      for (const tab of tabs.values()) {
-        if (!tab.onWindow) continue;
-        if (win !== null && !win.isDestroyed()) win.contentView.removeChildView(tab.view);
-        tab.onWindow = false;
+    /**
+     * The page that placed the user's tabs started over (a reload): nothing of it knows their ids any more, so they
+     * close, and the backend hears they are gone and lets go of what they held (a preview, 29 §8.1).
+     */
+    closeUserTabs(): void {
+      for (const tab of [...tabs.values()]) {
+        if (!tab.userFacing) continue;
+        forget(tab);
+        tab.view.webContents.close();
+        emit({ type: 'browser.gone', tabId: tab.tabId, reason: 'the app page started over' });
       }
     },
 

@@ -53,9 +53,9 @@ async function openApp({ win, webPreferences }: Window, b: Backend): Promise<voi
   win.webContents.on('will-navigate', (event, target) => {
     if (!target.startsWith(url)) event.preventDefault();
   });
-  // A reload starts the page over: nothing of it places the user's tabs any more, so they leave the window (29 §8.1).
+  // A reload starts the page over: nothing of it knows the user's tabs any more, so they close (29 §8.1).
   win.webContents.on('did-start-navigation', (details) => {
-    if (details.isMainFrame && !details.isSameDocument) b.browser.takeOffWindow();
+    if (details.isMainFrame && !details.isSameDocument) b.browser.closeUserTabs();
   });
   await win.loadURL(url);
 }

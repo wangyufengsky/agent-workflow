@@ -404,10 +404,15 @@ export async function openTab({
 
     setPolicy: (next: BrowserPolicy) => host.request({ kind: 'setPolicy', tabId, policy: next }),
 
-    async close(): Promise<void> {
+    /** Stops listening; the host's tab is already gone (closed by main, 29 §8.1). */
+    dispose(): void {
       cancelLoad();
       network.close();
       unsubscribe();
+    },
+
+    async close(): Promise<void> {
+      tab.dispose();
       await host.request({ kind: 'close', tabId });
     },
   };

@@ -5,6 +5,7 @@ import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import {
   AttemptStatus,
+  type BrowserPortEvent,
   clearSiteLoginOp,
   closeUserTabOp,
   ErrorCode,
@@ -22,6 +23,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { addProject, createTask, taskReaches } from '../../../test/helpers/tasks.ts';
+import type { BrowserHost } from './browser.host.ts';
 import type { BrowserOwner } from './browser.service.ts';
 import { createChromiumHost } from './host.chromium.ts';
 
@@ -280,9 +282,30 @@ createServer((req, res) => {
   });
 });
 
+/** The Chromium host, and a way to report a tab gone as main does when the app's page starts over (29 §8.1). */
+function reportingGone(inner: BrowserHost) {
+  const listeners = new Set<(event: BrowserPortEvent) => void>();
+  const wrapped: BrowserHost = {
+    request: (op) => inner.request(op),
+    onEvent(listener) {
+      listeners.add(listener);
+      const off = inner.onEvent(listener);
+      return () => {
+        listeners.delete(listener);
+        off();
+      };
+    },
+  };
+  const gone = (tabId: string) => {
+    for (const listener of listeners) listener({ type: 'browser.gone', tabId, reason: 'the app page started over' });
+  };
+  return { host: wrapped, gone };
+}
+
 describe('浏览器：用户自己的预览标签页（29 §8.1）', () => {
-  it('打开任务预览的首个关键页面，切换路径与尺寸，地址与当前页面的错误数随事件更新；关闭后不能再用', async () => {
-    t = await createTestApp({ browserHost: host });
+  it('打开任务预览的首个关键页面，切换路径与尺寸，地址与当前页面的错误数随事件更新；关闭或页面重新加载后不能再用', async () => {
+    const reporting = reportingGone(host);
+    t = await createTestApp({ browserHost: reporting.host });
     const { project } = await addProject(t, {
       files: {
         'server.mjs': `import { createServer } from 'node:http';
@@ -346,5 +369,10 @@ createServer((req, res) => {
 
     expect((await t.call(closeUserTabOp, { tabId: opened.tabId })).status).toBe(204);
     expect((await t.call(navigateUserTabOp, { tabId: opened.tabId, path: '/orders' })).status).toBe(404);
+
+    // Main closed it because the app's page started over: the backend lets go of it as well.
+    const { body: again } = await t.call(openUserTabOp, { taskId: task.id });
+    reporting.gone(again.tabId);
+    expect((await t.call(navigateUserTabOp, { tabId: again.tabId, path: '/orders' })).status).toBe(404);
   });
 });
