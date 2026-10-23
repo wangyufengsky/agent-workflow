@@ -10,6 +10,7 @@ import {
   listConversationsOp,
   replyAssistantPermissionOp,
   sendAssistantMessageOp,
+  snapshotAssistantContextOp,
   stopWhisperOp,
   whisperOp,
 } from './assistant.ts';
@@ -312,6 +313,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   listWorktreesOp,
   pruneWorktreesOp,
   listConversationsOp,
+  snapshotAssistantContextOp,
   createConversationOp,
   getConversationOp,
   deleteConversationOp,

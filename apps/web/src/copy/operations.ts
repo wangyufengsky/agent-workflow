@@ -127,6 +127,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.assistant.get': '查看助手对话',
   'op.assistant.delete': '删除助手对话',
   'op.assistant.send': '发消息给助手',
+  'op.assistant.snapshotContext': '附上助手文字上下文',
   'op.assistant.abort': '停止助手',
   'op.assistant.replyPermission': '回复助手的权限请求',
   'op.assistant.files': '助手生成的文件',
