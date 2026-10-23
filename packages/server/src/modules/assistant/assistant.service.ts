@@ -362,6 +362,20 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       return toDto(get(id));
     },
 
+    /**
+     * The assistant passes on only files the user attached in this conversation (30 §2.2): an id from elsewhere is
+     * answered as if it did not exist.
+     */
+    assertOwnAttachments(conversationId: string, attachmentIds: readonly string[]): void {
+      const own = new Set(
+        attachments.listByOwner({ kind: AttachmentOwnerKind.AssistantMessage, id: conversationId }).map((a) => a.id),
+      );
+      const foreign = attachmentIds.filter((id) => !own.has(id));
+      if (foreign.length > 0) {
+        throw new AppError(ErrorCode.AttachmentNotFound, 'Not attachments of this conversation', { ids: foreign });
+      }
+    },
+
     /** A message from the app (a confirmation's result): now if the session can take it, else when it can. */
     async deliver(id: string, text: string): Promise<void> {
       liveOf(id).outbox.push(text);

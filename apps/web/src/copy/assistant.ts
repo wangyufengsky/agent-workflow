@@ -141,4 +141,5 @@ export const INPUT_REF_LABEL = {
   [InputRef.InboxItem]: '待处理条目',
   [InputRef.Node]: '步骤',
   [InputRef.Attempt]: 'AI 会话',
+  [InputRef.Attachment]: '资料',
 } satisfies Record<InputRef, string>;

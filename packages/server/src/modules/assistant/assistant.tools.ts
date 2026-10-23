@@ -53,6 +53,11 @@ export type OperationToolDeps = {
    * instead of the output; their navigation card comes with that message.
    */
   deferred: ReadonlyMap<string, (conversationId: string, output: unknown) => unknown>;
+  /**
+   * Checks of an operation's input that depend on the calling conversation (attachments it may pass on, 30 §2.2);
+   * they run before the call runs or waits for a confirmation, so the card never offers what would be refused.
+   */
+  scoped: ReadonlyMap<string, (conversationId: string, input: Record<string, unknown>) => void>;
   /** Records a pending confirmation for a call the user has to approve. */
   requestConfirmation(
     conversationId: string,
@@ -77,6 +82,7 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
         input: assistantInputSchema(contract),
         mode: contract.mode,
         async handler(input, { conversation }) {
+          deps.scoped.get(contract.id)?.(conversation.id, input);
           const allowed =
             contract.risk === OperationRisk.Read ||
             (contract.risk === OperationRisk.Write && deps.settings.get('assistant.alwaysAllow').includes(contract.id));

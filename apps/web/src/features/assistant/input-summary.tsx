@@ -5,6 +5,7 @@ import { CONFIRMATION_COPY, INPUT_REF_LABEL } from '../../copy/assistant.ts';
 import { INPUT_FIELD_LABEL, INPUT_VALUE_LABEL } from '../../copy/operations.ts';
 import { frequencyText } from '../../copy/schedules.ts';
 import { INBOX_COPY } from '../../copy/tasks.ts';
+import { attachmentQuery } from '../attachments/attachments.api.ts';
 import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
 import { inboxQuery } from '../inbox/inbox.queries.ts';
@@ -140,6 +141,21 @@ function InboxItemRef({ ids }: { ids: string[] }) {
   );
 }
 
+function AttachmentName({ id }: { id: string }) {
+  const query = useQuery(attachmentQuery(id));
+  return <Named ids={[id]} names={[query.data?.name]} query={query} />;
+}
+
+function AttachmentRef({ ids }: { ids: string[] }) {
+  return (
+    <>
+      {ids.map((id) => (
+        <AttachmentName key={id} id={id} />
+      ))}
+    </>
+  );
+}
+
 function RefValue({ kind, value, input }: { kind: InputRef; value: unknown; input: Input }) {
   const ids = idsSchema.parse(value);
   const [first = ''] = ids;
@@ -168,6 +184,8 @@ function RefValue({ kind, value, input }: { kind: InputRef; value: unknown; inpu
       return <InboxItemRef ids={ids} />;
     case InputRef.Attempt:
       return <span className="mono">{first.slice(0, 8)}</span>;
+    case InputRef.Attachment:
+      return <AttachmentRef ids={ids} />;
   }
 }
 

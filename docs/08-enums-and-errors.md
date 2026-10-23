@@ -525,6 +525,7 @@ class AppError extends Error {
 | AttachmentSource | upload · project_file |
 | AttachmentOwnerKind | task_input（owner 为任务）· task_feedback（owner 为追加的修改节点）· assistant_message（owner 为助手对话） |
 | AssistantToolName 增量（U-02 已实现） | read_attachment |
+| InputRef 增量（U-03 已实现） | attachment（确认卡把附件 ID 显示为文件名） |
 | McpToolName 增量（U-02 已实现） | read_attachment |
 | NodeKind 增量 | verify（核验验收清单的系统步骤） |
 | RequirementVerification | command · ai_review · manual |

@@ -210,6 +210,7 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   prompt: '提示词',
   model: '模型',
   requirement: '需求',
+  attachmentIds: '附加的资料',
   requirementTemplate: '需求模板',
   targets: '目标',
   frequency: '多久一次',

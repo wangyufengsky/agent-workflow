@@ -41,7 +41,7 @@ export const listTasksOp = defineOperationContract({
 export const createTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.create',
-  refs: { projectId: InputRef.Project, workflowId: InputRef.Workflow },
+  refs: { projectId: InputRef.Project, workflowId: InputRef.Workflow, attachmentIds: InputRef.Attachment },
   title: 'op.tasks.create',
   description: 'Create a development task in a project with a workflow and start it (unless start is false)',
   input: createTaskRequestSchema,
@@ -50,8 +50,6 @@ export const createTaskOp = defineOperationContract({
   http: { method: 'POST', path: '/tasks', status: 201 },
   // The palette opens the home page's start form with it (14 §2.1).
   expose: { palette: true, assistant: true },
-  // Only attachments of the assistant's own conversation may be passed on; until that check exists, none (30 §2.2).
-  assistantOmit: ['attachmentIds'],
   produces: { kind: EntityKind.Task, ref: (task) => ({ id: task.id, title: `${task.key} · ${task.title}` }) },
 });
 
