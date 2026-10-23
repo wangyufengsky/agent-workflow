@@ -524,6 +524,8 @@ class AppError extends Error {
 | --- | --- |
 | AttachmentSource | upload · project_file |
 | AttachmentOwnerKind | task_input（owner 为任务）· task_feedback（owner 为追加的修改节点）· assistant_message（owner 为助手对话） |
+| AssistantToolName 增量（U-02 已实现） | read_attachment |
+| McpToolName 增量（U-02 已实现） | read_attachment |
 | NodeKind 增量 | verify（核验验收清单的系统步骤） |
 | RequirementVerification | command · ai_review · manual |
 | RequirementResultSource | command · ai · user |
@@ -535,7 +537,7 @@ class AppError extends Error {
 | ATTACHMENTS_PER_INPUT_MAX | 10 |
 | ATTACHMENT_BYTES_MAX | 5 MiB |
 | ATTACHMENT_NAME_MAX_CHARS | 255（显示名） |
-| ATTACHMENT_PROMPT_MAX_CHARS / ATTACHMENT_READ_MAX_CHARS | 20,000（一次输入的全部文本附件合计）/ 12,000（每次读取） |
+| ATTACHMENT_PROMPT_MAX_CHARS / ATTACHMENT_READ_MAX_CHARS | 20,000（一次提示词里全部附件合计）/ 12,000（每次读取）（U-02 已实现） |
 | ATTACHMENT_ORPHAN_TTL_MS / ATTACHMENT_CLEANUP_INTERVAL_MS | 86,400,000（无引用附件的保留时间）/ 3,600,000（清理间隔） |
 | REQUIREMENTS_MAX | 30 |
 | REQUIREMENT_TITLE_MAX_CHARS / REQUIREMENT_EXPECTED_MAX_CHARS / REQUIREMENT_NOTE_MAX_CHARS | 120 / 2,000 / 4,000 |

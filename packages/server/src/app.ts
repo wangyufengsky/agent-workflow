@@ -254,6 +254,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     log,
     projects: projects.service,
     worktrees: worktrees.service,
+    prompts,
     dataDir: config.dataDir,
   });
   server.addHook('preClose', async () => {
@@ -334,6 +335,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     plans: plans.service,
     nodes: nodes.service,
     attempts: attempts.service,
+    attachments: attachments.service,
     inbox: inbox.service,
     deliveries: deliveries.service,
     databases: databases.service,
@@ -456,6 +458,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     decks: decks.service,
     batches: batches.service,
     schedules: schedules.service,
+    attachments: attachments.service,
     dataDir: config.dataDir,
     timeZone,
     token: assistantMcpToken,

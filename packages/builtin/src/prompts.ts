@@ -42,6 +42,8 @@ export const PromptName = {
   ProtocolCodeReview: 'protocol-code-review',
   StartGitReview: 'start-git-review',
   StartCommitMessage: 'start-commit-message',
+  /** The files the user attached to a task or an assistant message, as the model reads them (30 §3.2). */
+  Attachments: 'attachments',
 } as const;
 export type PromptName = (typeof PromptName)[keyof typeof PromptName];
 
@@ -88,6 +90,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.ProtocolCodeReview]: read(PromptName.ProtocolCodeReview),
     [PromptName.StartGitReview]: read(PromptName.StartGitReview),
     [PromptName.StartCommitMessage]: read(PromptName.StartCommitMessage),
+    [PromptName.Attachments]: read(PromptName.Attachments),
   };
 }
 

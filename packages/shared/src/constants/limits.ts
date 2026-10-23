@@ -147,3 +147,6 @@ export const ATTACHMENT_BYTES_MAX = 5 * 1024 * 1024;
 export const ATTACHMENT_NAME_MAX_CHARS = 255;
 export const ATTACHMENT_ORPHAN_TTL_MS = 24 * 60 * 60 * 1000;
 export const ATTACHMENT_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+/** What the model gets of attachments (30 §3.2): all of one input's text in the prompt, and one `read_attachment` page. */
+export const ATTACHMENT_PROMPT_MAX_CHARS = 20_000;
+export const ATTACHMENT_READ_MAX_CHARS = 12_000;

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ATTACHMENT_NAME_MAX_CHARS } from '../../constants/limits.ts';
+import { ATTACHMENT_NAME_MAX_CHARS, ATTACHMENTS_PER_INPUT_MAX } from '../../constants/limits.ts';
 import { attachmentSourceSchema } from '../../enums/attachment.ts';
 
 /** A 1-based, inclusive line range of a project file. */
@@ -33,6 +33,9 @@ export type AttachmentDTO = z.infer<typeof attachmentSchema>;
 
 /** The display name sent with an upload, URL-encoded in the `ATTACHMENT_NAME_HEADER` header. */
 export const attachmentNameSchema = z.string().trim().min(1).max(ATTACHMENT_NAME_MAX_CHARS);
+
+/** The attachments sent with one input, in their order (30 §2); bound to it in the same transaction. */
+export const attachmentIdsSchema = z.array(z.string()).max(ATTACHMENTS_PER_INPUT_MAX);
 
 /** `POST /attachments/project-file` (30 §2.1). */
 export const snapshotProjectFileSchema = z.object({

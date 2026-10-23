@@ -150,6 +150,15 @@ describe('引用与清理', () => {
     expect(service().listByOwner(task('t1'))).toEqual([]);
   });
 
+  it('同时进行的清理与移除互不干扰', async () => {
+    const orphans = await Promise.all(['a\n', 'b\n', 'c\n'].map((text) => uploaded(text)));
+    const draft = await uploaded('draft\n');
+    clock.advance(ATTACHMENT_ORPHAN_TTL_MS + HOUR);
+    await Promise.all([service().cleanup(), service().cleanup(), t.call(removeAttachmentOp, { id: draft.id })]);
+    for (const { id } of orphans) expect((await t.call(getAttachmentOp, { id })).status).toBe(404);
+    expect(await storedDirs()).toEqual([]);
+  });
+
   it('没有记录的残留目录按年龄清理', async () => {
     const dir = join(t.dataDir, ATTACHMENTS_DIR, 'left-by-a-crash');
     await writeFile(`${dir}.keep`, '');

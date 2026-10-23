@@ -214,8 +214,9 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       id: string,
       reason: RequestChangesRequest['reason'],
       feedback: string | undefined,
+      attachmentIds?: readonly string[],
     ): Promise<TaskDetailDTO> {
-      await changes.requestChanges(id, reason, feedback);
+      await changes.requestChanges(id, reason, feedback, attachmentIds);
       return detail(id);
     },
     reviewComments: review.reviewComments,

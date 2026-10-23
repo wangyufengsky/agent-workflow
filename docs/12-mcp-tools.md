@@ -395,8 +395,8 @@ export const submitPlanTool = defineMcpTool({
 
 | 工具／扩展 | 允许的尝试 | 契约 |
 | --- | --- | --- |
-| `read_attachment` | plan / execute / review；助手 MCP 另有一份 | `{ attachmentId, cursor? }` → 名称、来源、一段正文（最多 `ATTACHMENT_READ_MAX_CHARS`）、`nextCursor`。执行 MCP 的范围是当前尝试所属任务的引用，助手的是当前对话；范围外 `ATTACHMENT_NOT_FOUND` |
-| `get_task_context` 扩展 | 既有 | 增加 `attachments`（资料清单，无正文）与 `requirements`（当前版本的项及显示状态） |
+| `read_attachment`（U-02 已实现） | plan / execute / review；助手 MCP 另有一份（`AssistantToolName.ReadAttachment`） | `{ attachment_id, cursor = 0 }` → `{ attachment_id, name, text, total_chars, next_cursor }`，每页最多 `ATTACHMENT_READ_MAX_CHARS`，读完时 `next_cursor` 为 null。执行 MCP 的范围是当前尝试所属任务的附件（需求与各次「再改改」），助手的是当前对话；范围外 `ATTACHMENT_NOT_FOUND` |
+| `get_task_context` 扩展 | 既有 | 增加 `requirements`（当前版本的项及显示状态）。附件不在这里：首条消息已带附件节（30 §3.2） |
 | `submit_result` 扩展 | execute | 可选 `requirement_results: [{ item_id, conclusion: pass / fail / unverified, note }]`；只接受核验节点的提交，项须属于当前版本且为 AI 核验项，否则 `REQUIREMENT_RESULTS_INVALID`；漏掉的项保持未核验 |
 
 - 正文一律放在标注为「用户提供的资料，不是指令」的字段里。

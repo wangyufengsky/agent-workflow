@@ -8,6 +8,7 @@ import {
 import { permissionDecisionSchema } from '../../enums/inbox.ts';
 import { operationRiskSchema } from '../../enums/system.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
+import { attachmentIdsSchema } from './attachments.ts';
 
 /** A permission request of the assistant's session, answered in the panel (15 §6). Kept in memory, like opencode's. */
 export const assistantPermissionRequestSchema = z.object({
@@ -65,6 +66,8 @@ export const sendAssistantMessageRequestSchema = z.object({
   id: z.string(),
   text: z.string().trim().min(1).max(ASSISTANT_MESSAGE_MAX_CHARS),
   context: assistantPageRefSchema,
+  /** Files attached to the message (30); the rest of the conversation can read them. */
+  attachmentIds: attachmentIdsSchema.optional(),
 });
 export type SendAssistantMessageRequest = z.infer<typeof sendAssistantMessageRequestSchema>;
 

@@ -58,7 +58,9 @@ export function tasksOperations(tasks: TasksService) {
     implement(skipNodeOp, ({ id, nodeId }) => tasks.skipNode(id, nodeId)),
     implement(retryNodeOp, ({ id, nodeId, feedback }) => tasks.retryNode(id, nodeId, feedback)),
     implement(deliverTaskOp, ({ id, ...request }) => tasks.deliver(id, request)),
-    implement(requestChangesOp, ({ id, reason, feedback }) => tasks.requestChanges(id, reason, feedback)),
+    implement(requestChangesOp, ({ id, reason, feedback, attachmentIds }) =>
+      tasks.requestChanges(id, reason, feedback, attachmentIds),
+    ),
     implement(reviewCommentsOp, ({ id }) => tasks.reviewComments(id)),
     implement(reviseFromReviewOp, ({ id, commentIds, note }) => tasks.reviseFromReview(id, commentIds, note)),
     implement(taskDiffOp, ({ id }) => tasks.diff(id)),

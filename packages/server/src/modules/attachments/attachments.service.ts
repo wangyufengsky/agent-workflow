@@ -1,17 +1,22 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
+import { PromptName, type Prompts, renderTemplate } from '@aw/builtin';
 import {
   AppError,
   ATTACHMENT_BYTES_MAX,
   ATTACHMENT_CLEANUP_INTERVAL_MS,
   ATTACHMENT_ORPHAN_TTL_MS,
+  ATTACHMENT_PROMPT_MAX_CHARS,
+  ATTACHMENT_READ_MAX_CHARS,
   ATTACHMENTS_DIR,
   ATTACHMENTS_PER_INPUT_MAX,
   type AttachmentDTO,
   type AttachmentOwnerKind,
   AttachmentSource,
   ErrorCode,
+  type ReadAttachmentOutput,
   type SnapshotProjectFileRequest,
   WorktreeStatus,
 } from '@aw/shared';
@@ -31,6 +36,7 @@ export type AttachmentsServiceDeps = {
   log: Logger;
   projects: ProjectsService;
   worktrees: WorktreesService;
+  prompts: Prompts;
   dataDir: string;
 };
 
@@ -39,6 +45,9 @@ const tooLarge = (limit: 'bytes' | 'count') =>
   new AppError(ErrorCode.AttachmentTooLarge, `Attachment ${limit} limit exceeded`, {
     limit: limit === 'bytes' ? ATTACHMENT_BYTES_MAX : ATTACHMENTS_PER_INPUT_MAX,
   });
+
+/** File names go into attribute values of the prompt's `<attachment>` tags. */
+const attr = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 
 /** Only text is accepted for now (30 §3.1): strict UTF-8 without NUL bytes, whatever the name or MIME type says. */
 function asText(bytes: Uint8Array): string {
@@ -60,6 +69,7 @@ export function createAttachmentsService({
   log,
   projects,
   worktrees,
+  prompts,
   dataDir,
 }: AttachmentsServiceDeps) {
   const repo = createAttachmentsRepo(db);
@@ -84,6 +94,20 @@ export function createAttachmentsService({
     return attachment;
   }
 
+  /**
+   * Synchronous: prompts are rendered where a step is dispatched, which must not wait (an attachment is at most
+   * `ATTACHMENT_BYTES_MAX`).
+   */
+  const textOf = (id: string) => readFileSync(join(dirOf(id), ORIGINAL), 'utf8');
+
+  /** One attachment as the prompt shows it: whole, or its first `budget` characters and where to continue. */
+  function promptItem(attachment: AttachmentDTO, text: string, budget: number): string {
+    const path = attachment.origin === null ? '' : ` path="${attr(attachment.origin.path)}"`;
+    const head = `<attachment attachment_id="${attachment.id}" name="${attr(attachment.name)}" source="${attachment.source}"${path}`;
+    if (text.length <= budget) return `${head}>\n${text}\n</attachment>`;
+    return `${head} shown="first ${budget} of ${text.length} characters" cursor="${budget}">\n${text.slice(0, budget)}\n</attachment>`;
+  }
+
   /** The worktree of `taskId` when given, else the project's main working tree (30 §2.1). */
   function rootOf(projectId: string, taskId: string | undefined): string {
     const project = projects.getRecord(projectId);
@@ -98,7 +122,19 @@ export function createAttachmentsService({
     return worktree.path;
   }
 
-  async function cleanup(): Promise<void> {
+  /**
+   * Directory removals run one after another: a cleanup round lists the directories and then looks at each, so a
+   * removal running alongside it would take a directory away under its feet.
+   */
+  let removals: Promise<unknown> = Promise.resolve();
+  function serialized(work: () => Promise<void>): Promise<void> {
+    // The previous step's failure belongs to its own caller; the next step runs either way.
+    const step = removals.then(work, work);
+    removals = step;
+    return step;
+  }
+
+  async function cleanRound(): Promise<void> {
     const before = clock.now() - ATTACHMENT_ORPHAN_TTL_MS;
     // Rows go first, in one transaction: a send binding the same attachment either committed its reference before
     // (the row is kept) or finds no row (ATTACHMENT_NOT_FOUND); no reference can end up without its original (30 §4).
@@ -119,19 +155,14 @@ export function createAttachmentsService({
     }
   }
 
+  const cleanup = () => serialized(cleanRound);
+
   let cancel: (() => void) | undefined;
-  let running: Promise<void> | undefined;
   function tick(): void {
-    running = (async () => {
-      try {
-        await cleanup();
-      } catch (err) {
-        // A failed round leaves its leftovers to the next one (30 §4); a person looks at the log.
-        log.error({ err }, 'attachment cleanup failed');
-      } finally {
-        running = undefined;
-      }
-    })();
+    cleanup().catch((err: unknown) => {
+      // A failed round leaves its leftovers to the next one (30 §4); a person looks at the log.
+      log.error({ err }, 'attachment cleanup failed');
+    });
     cancel = clock.schedule(ATTACHMENT_CLEANUP_INTERVAL_MS, tick);
   }
 
@@ -145,9 +176,12 @@ export function createAttachmentsService({
       cancel?.();
       cancel = undefined;
     },
-    /** Resolves once the cleanup in progress, if any, ended. */
+    /** Resolves once the removals queued so far ended, however they ended (their callers hear about failures). */
     settled: async (): Promise<void> => {
-      await running;
+      await removals.then(
+        () => undefined,
+        () => undefined,
+      );
     },
     cleanup,
 
@@ -224,7 +258,7 @@ export function createAttachmentsService({
         }
         repo.delete(id);
       });
-      await rm(dirOf(id), { recursive: true, force: true });
+      await serialized(() => rm(dirOf(id), { recursive: true, force: true }));
     },
 
     /**
@@ -244,6 +278,46 @@ export function createAttachmentsService({
       repo.insertRefs(owner, attachmentIds, clock.now());
     },
     listByOwner: (owner: Owner): AttachmentDTO[] => repo.listByOwner(owner),
+    /** The owners' attachments in order, each once (the same attachment may be referenced by several of them). */
+    listByOwners(owners: readonly Owner[]): AttachmentDTO[] {
+      const byId = new Map<string, AttachmentDTO>();
+      for (const owner of owners) {
+        for (const attachment of repo.listByOwner(owner)) {
+          if (!byId.has(attachment.id)) byId.set(attachment.id, attachment);
+        }
+      }
+      return [...byId.values()];
+    },
+
+    /**
+     * The prompt section for these attachments (30 §3.2), empty without any. All text goes in while the total fits
+     * `ATTACHMENT_PROMPT_MAX_CHARS`; otherwise each gets an equal share and the model reads the rest with `readTool`.
+     */
+    promptSection(attachments: readonly AttachmentDTO[], readTool: string): string {
+      if (attachments.length === 0) return '';
+      const withText = attachments.map((attachment) => ({ attachment, text: textOf(attachment.id) }));
+      const total = withText.reduce((sum, { text }) => sum + text.length, 0);
+      const budget =
+        total <= ATTACHMENT_PROMPT_MAX_CHARS
+          ? Number.POSITIVE_INFINITY
+          : Math.floor(ATTACHMENT_PROMPT_MAX_CHARS / attachments.length);
+      const items = withText.map(({ attachment, text }) => promptItem(attachment, text, budget)).join('\n\n');
+      return renderTemplate(prompts[PromptName.Attachments], { readTool, items });
+    },
+
+    /** One page of an attachment's text; the caller has checked the attachment is visible to its reader. */
+    read(id: string, cursor: number): ReadAttachmentOutput {
+      const attachment = require(id);
+      const text = textOf(id);
+      const end = cursor + ATTACHMENT_READ_MAX_CHARS;
+      return {
+        attachment_id: id,
+        name: attachment.name,
+        text: text.slice(cursor, end),
+        total_chars: text.length,
+        next_cursor: end < text.length ? end : null,
+      };
+    },
     /** Drops the owners' references, in the owner's deleting transaction; the originals go with the next cleanup. */
     release(kind: AttachmentOwnerKind, ownerIds: readonly string[]): void {
       repo.deleteRefs(kind, ownerIds);

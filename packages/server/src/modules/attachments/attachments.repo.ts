@@ -54,16 +54,18 @@ export function createAttachmentsRepo(db: DbExecutor) {
             createdAt,
           })),
         )
+        // An assistant conversation may carry the same file again in a later message: it keeps its first reference.
+        .onConflictDoNothing()
         .run();
     },
-    /** The owner's attachments in the order they were sent. */
+    /** The owner's attachments in the order they were sent: by message, then by position in it. */
     listByOwner(owner: Owner): AttachmentDTO[] {
       return db
         .select({ attachment: a })
         .from(r)
         .innerJoin(a, eq(a.id, r.attachmentId))
         .where(and(eq(r.ownerKind, owner.kind), eq(r.ownerId, owner.id)))
-        .orderBy(asc(r.ordinal))
+        .orderBy(asc(r.createdAt), asc(r.ordinal))
         .all()
         .map(({ attachment }) => toAttachment(attachment));
     },

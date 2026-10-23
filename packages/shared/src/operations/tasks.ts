@@ -50,6 +50,8 @@ export const createTaskOp = defineOperationContract({
   http: { method: 'POST', path: '/tasks', status: 201 },
   // The palette opens the home page's start form with it (14 §2.1).
   expose: { palette: true, assistant: true },
+  // Only attachments of the assistant's own conversation may be passed on; until that check exists, none (30 §2.2).
+  assistantOmit: ['attachmentIds'],
   produces: { kind: EntityKind.Task, ref: (task) => ({ id: task.id, title: `${task.key} · ${task.title}` }) },
 });
 
@@ -353,6 +355,8 @@ export const requestChangesOp = defineOperationContract({
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/request-changes' },
+  // As for tasks.create: the assistant cannot attach files yet (30 §2.2).
+  assistantOmit: ['attachmentIds'],
 });
 
 export const reviewCommentsOp = defineOperationContract({

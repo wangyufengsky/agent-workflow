@@ -13,6 +13,7 @@ import {
   InboxStatus,
   type NodeOutput,
   PLAN_MAX_NODES,
+  type ReadAttachmentOutput,
   type TaskContext,
   type TaskDiffOutput,
   WorkflowPlanning,
@@ -194,6 +195,14 @@ export function createTaskContext(deps: TasksServiceDeps, state: TaskState) {
 
     /** `get_node_output` (12 §6.2). */
     nodeOutput: (attempt: AttemptDTO, key: string): NodeOutput => nodes.output(taskOf(attempt).id, key),
+
+    /** `read_attachment` (12 §9): only the attachments of the attempt's own task. */
+    readAttachment(attempt: AttemptDTO, attachmentId: string, cursor: number): ReadAttachmentOutput {
+      if (!state.attachmentsOf(taskOf(attempt)).some((a) => a.id === attachmentId)) {
+        throw new AppError(ErrorCode.AttachmentNotFound, 'Not an attachment of this task', { attachmentId });
+      }
+      return deps.attachments.read(attachmentId, cursor);
+    },
 
     /** `get_task_diff` (12 §6.3): the worktree, committed or not, against the base commit. */
     async taskDiff(attempt: AttemptDTO, path: string | undefined): Promise<TaskDiffOutput> {

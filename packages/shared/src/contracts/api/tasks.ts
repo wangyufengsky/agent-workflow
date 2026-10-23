@@ -24,6 +24,7 @@ import { nodeAcceptanceSchema, planGraphSchema } from '../../workflow/plan-graph
 import { diffFileSchema } from '../mcp/get-task-diff.ts';
 import { submitResultInputSchema } from '../mcp/submit-result.ts';
 import { reviewIssueSchema } from '../mcp/submit-review.ts';
+import { attachmentIdsSchema } from './attachments.ts';
 import { attemptSummarySchema } from './attempts.ts';
 import { deliverySchema, taskPullRequestSchema } from './delivery.ts';
 import { inboxItemSchema } from './inbox.ts';
@@ -48,6 +49,8 @@ export const createTaskRequestSchema = z.object({
   checkpoints: checkpointsSchema.partial().optional(),
   /** Default true; false saves a draft (pro mode). */
   start: z.boolean().optional(),
+  /** Files attached to the requirement (30); every step of the task sees them. */
+  attachmentIds: attachmentIdsSchema.optional(),
 });
 export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
 

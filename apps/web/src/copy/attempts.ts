@@ -56,6 +56,7 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.GetTaskContext]: '读取任务背景',
   [McpToolName.GetNodeOutput]: '读取前面步骤的产出',
   [McpToolName.GetTaskDiff]: '查看任务的改动',
+  [McpToolName.ReadAttachment]: '读取附加的资料',
   [McpToolName.SubmitPlan]: '提交计划',
   [McpToolName.SubmitResult]: '提交结果',
   [McpToolName.SubmitReview]: '提交评审意见',
