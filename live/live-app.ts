@@ -19,6 +19,7 @@ import {
   type TranscriptEntry,
   updateSettingsOp,
 } from '@aw/shared';
+import type { BrowserHost } from '../packages/server/src/modules/browser/index.ts';
 import { runGit } from '../packages/server/src/modules/git/index.ts';
 import { createTestApp, type TestApp } from '../packages/server/test/helpers/app.ts';
 import { waitForEvent } from '../packages/server/test/helpers/events.ts';
@@ -29,7 +30,7 @@ export const TASK_TIMEOUT_MS = 25 * 60_000;
 const ENDED: readonly TaskStatus[] = [TaskStatus.Review, TaskStatus.Failed, TaskStatus.Cancelled];
 const IDENTITY = ['-c', 'user.name=aw-live', '-c', 'user.email=aw-live@example.com'];
 
-export type Fixture = 'ts-stats' | 'java-inventory';
+export type Fixture = 'ts-stats' | 'java-inventory' | 'todo-web';
 
 type Report = {
   workflow: string;
@@ -63,8 +64,9 @@ export type LiveApp = {
   close(): Promise<void>;
 };
 
-export async function startLiveApp(name: string): Promise<LiveApp> {
-  const t = await createTestApp({ realOpencode: true });
+/** `browserHost`: the browser the AI's browser tools use (29 §5.2); without one they fail. */
+export async function startLiveApp(name: string, options: { browserHost?: BrowserHost } = {}): Promise<LiveApp> {
+  const t = await createTestApp({ realOpencode: true, ...options });
   await t.app.start(t.port);
   const { body: runtime } = await t.call(getRuntimeOp, {});
   if (runtime.status !== 'ready') throw new Error(`opencode is not ready: ${runtime.status}`);
@@ -78,7 +80,7 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
   async function addFixtureProject(fixture: Fixture): Promise<string> {
     const repo = await realpath(await mkdtemp(join(tmpdir(), 'aw-live-')));
     await cp(new URL(`fixtures/${fixture}`, import.meta.url).pathname, repo, { recursive: true });
-    await writeFile(join(repo, '.gitignore'), 'target/\n');
+    await writeFile(join(repo, '.gitignore'), 'target/\nnode_modules/\n');
     for (const args of [
       ['init', '-q', '-b', 'main'],
       ['add', '-A'],
@@ -94,7 +96,8 @@ export async function startLiveApp(name: string): Promise<LiveApp> {
   async function submitCalls(taskId: string): Promise<Report['submitCalls']> {
     const dir = join(t.dataDir, 'runs', taskId);
     const counts = { ok: 0, failed: 0 };
-    for (const file of await readdir(dir)) {
+    // The run directory also holds the page preview's log and the browser's screenshots (29 §4.2, §5.7).
+    for (const file of (await readdir(dir)).filter((f) => f.endsWith('.jsonl'))) {
       const entries: TranscriptEntry[] = (await readFile(join(dir, file), 'utf8'))
         .trim()
         .split('\n')

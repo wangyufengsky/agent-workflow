@@ -393,6 +393,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     decks: decks.service,
     gitReviews: gitReviews.service,
     commitDrafts: gitReviews.drafts,
+    browser: browser.service,
+    filesDirOf: attempts.filesDirOf,
     log,
   });
   mcp.register(server);
