@@ -48,3 +48,11 @@ UI 用例 `shell-assistant-usage.browser.spec.ts`：主页→侧栏→桌宠共�
 `assistant.usage.int.test.ts` 共 18 个回归。已查看本地忽略目录 `screenshots/assistant-usage-light.png` 与 `screenshots/assistant-usage-dark.png`，用量行与未知/实际零区分可见。合并前完整 browser / OC / Electron 由另一位 agent 在同一提交上独立执行并另行记录。
 
 边界：原生测试使用本地可控模型响应，不代表真实远程模型的质量评估；历史未报告用量保持未知。停止确认失败时用户会看到错误且会话继续保持忙碌，可重试；只有可信响应、原生停止确认或 runtime lost 才解除占用。
+
+## 完整浏览器验收发现的测试隔离问题
+
+在 `401ed5e` 的完整浏览器首轮，J11 的“唯一用户消息”断言命中了前一个 usage 用例留下的三条旧消息；当前消息实际上已经发送并生成确认卡。J11 提前失败后没有消费下一段 fake 脚本，之后出现队列错位。原始 46 通过／7 失败／3 未执行的日志与 trace 保留在 `/private/tmp/aw-final-acceptance/premerge-browser.log`、`premerge-browser-results/`。
+
+后续仅修改 E2E：context/usage 使用自动 fixture 捕获本页面创建接口返回的聊天 ID，在 finally 停止并删除本例自己创建的会话；不清空共享后端、不删除其他用例的聊天。context 的侧栏场景及 J11 显式创建新聊天并等待界面激活，J11 原有断言全部保留。产品代码冻结。
+
+组合 `shell-assistant-context` 3 条 + `shell-assistant-usage` 1 条 + `shell-assistant` 4 条连续运行，最终 8/8 通过。证据：`/private/tmp/aw-final-acceptance/assistant-isolation-green.log` 与 `assistant-isolation-green-results/`。完整 browser/OC/Electron 在该测试修复提交后由独立 agent 重跑。

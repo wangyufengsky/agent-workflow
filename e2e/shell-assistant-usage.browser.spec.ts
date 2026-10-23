@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect } from '@playwright/test';
+import { test } from './assistant-fixtures.ts';
 import { createProject, patchSettings, queueAssistantTurn } from './helpers.ts';
 
 test('主页、侧栏与桌宠共享真实用量；未报告与实际零值分别显示', async ({ page, request }, testInfo) => {
