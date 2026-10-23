@@ -1,5 +1,6 @@
 import { mergeTaskText, SystemWorkflowKey } from '@aw/builtin';
 import {
+  AcceptanceCheckKind,
   AppError,
   type AttemptDTO,
   type CreateTaskRequest,
@@ -9,6 +10,7 @@ import {
   type NodeDetailDTO,
   type PlanDTO,
   type PlanGraph,
+  type PreviewSessions,
   type RequestChangesRequest,
   type ResultNext,
   resolveTaskDisplayGroup,
@@ -148,6 +150,32 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     listByStatus: (statuses: readonly TaskStatus[]) => state.repo.list({ statuses }),
     /** Every task of a project, for the Git console. */
     listByProject: (projectId: string) => state.repo.list({ projectId }),
+    /** What the preview tab can show besides the user's own preview (29 §8.1). */
+    previewSessions(id: string): PreviewSessions {
+      state.get(id);
+      return {
+        attempts: deps.attempts
+          .listByTask(id)
+          .map((a) => ({
+            attemptId: a.id,
+            nodeId: a.nodeId,
+            kind: a.kind,
+            status: a.status,
+            frames: deps.browser.frames(a.id).length,
+          }))
+          .filter((a) => a.frames > 0),
+        checks: deps.nodes
+          .listByTask(id)
+          .flatMap((node) =>
+            (node.checkResults ?? []).flatMap((c) =>
+              c.kind === AcceptanceCheckKind.Browser && c.pages.length > 0
+                ? [{ nodeId: node.id, passed: c.passed }]
+                : [],
+            ),
+          ),
+      };
+    },
+
     timeline: (id: string, afterId: number) => {
       state.get(id);
       return listTaskEvents(db, id, afterId);

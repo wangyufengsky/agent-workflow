@@ -31,6 +31,8 @@ type Task = { id: string; status: string; nodes: { id: string; key: string; stat
 type Seed = {
   project: E2EProject;
   running: Task;
+  /** A running task whose AI session opened a page of its preview (29 §8.1–§8.2). */
+  preview: Task;
   question: Task;
   planReview: Task;
   failed: Task;
@@ -133,6 +135,7 @@ async function startWorkflow(
   workflowKey: string,
   requirement: string,
   confirmPlan = false,
+  acceptEachNode = false,
 ): Promise<string> {
   const workflows = await api<{ items: { id: string; key: string }[] }>(request, 'GET', '/workflows');
   const workflow = workflows.items.find((w) => w.key === workflowKey);
@@ -141,7 +144,7 @@ async function startWorkflow(
     projectId: project.id,
     workflowId: workflow.id,
     requirement,
-    checkpoints: { confirm_plan: confirmPlan },
+    checkpoints: { confirm_plan: confirmPlan, accept_each_node: acceptEachNode },
   });
   return task.id;
 }
@@ -224,6 +227,10 @@ async function seedAssistant(
 
 /** One task per state the task page renders differently (14 §3.3), each in its own project so scripts stay apart. */
 async function seed(request: APIRequestContext): Promise<Seed> {
+  // Several scenes keep an AI session working on purpose, and specs before this one may have left theirs: room for
+  // the steps the seed needs finished, put back once it is done (03 §8, the scheduler's global limit).
+  const settings = await api<Record<string, unknown>>(request, 'GET', '/settings');
+  await patchSettings(request, { 'scheduler.maxConcurrentAttempts': 16 });
   const fixScripts = async (project: E2EProject, file: string) => {
     // Markdown as models write it (14 §2.2): a heading, emphasis, inline code and a code block with a long line.
     await queueTurn(request, project, { title: '定位根因' }, [
@@ -493,11 +500,45 @@ async function seed(request: APIRequestContext): Promise<Seed> {
   await api(request, 'POST', `/decks/${deckMade.id}/generate`, {});
   await deckReaches(deckMade.id, 'ready');
 
+  // Last: its first browser action starts the browser host, which would slow the batch above.
+  const previewProject = await createProject(request, null);
+  writeFileSync(
+    join(previewProject.repoPath, 'server.mjs'),
+    `import { createServer } from 'node:http';
+createServer((req, res) => {
+  res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+  res.end('<title>订单</title><h1>订单列表</h1><p>共 3 笔订单</p>');
+}).listen(Number(process.env.PORT), '127.0.0.1', () => console.log('listening'));
+`,
+  );
+  git(previewProject.repoPath, 'add', '-A');
+  git(previewProject.repoPath, 'commit', '-q', '-m', 'dev server');
+  await api(request, 'PATCH', `/projects/${previewProject.id}`, {
+    preview: { command: 'node server.mjs', setupCommand: null, readyPath: '/', pages: ['/orders'], extraOrigins: [] },
+  });
+  await queueTurn(request, previewProject, { title: '定位根因' }, [
+    { type: 'callTool', name: 'browser_open', args: { url: '/orders' } },
+    { type: 'callTool', name: 'browser_viewport', args: { preset: 'mobile' } },
+    submitResult('列表在窄屏上被截断'),
+  ]);
+  // The step waits for the user's acceptance: the task is running, with no AI session holding a slot or the preview.
+  const preview = await startWorkflow(request, previewProject, 'bugfix', '订单列表在手机上显示不全', false, true);
+  await expect
+    .poll(
+      async () => (await api<Task>(request, 'GET', `/tasks/${preview}`)).nodes.find((n) => n.key === 'locate')?.status,
+      {
+        timeout: 20_000,
+      },
+    )
+    .toBe('awaiting_acceptance');
+
   const completedReview = await waitForStatus(request, completed, 'review');
+  await patchSettings(request, { 'scheduler.maxConcurrentAttempts': settings['scheduler.maxConcurrentAttempts'] });
   await api(request, 'POST', `/tasks/${completedReview.id}/deliver`, { strategy: 'squash' });
   return {
     project: reviewProject,
     running: await waitForStatus(request, running, 'running'),
+    preview: await waitForStatus(request, preview, 'running'),
     question: await waitForStatus(request, question, 'running'),
     planReview: await waitForStatus(request, planReview, 'plan_review'),
     failed: await waitForStatus(request, failed, 'failed'),
@@ -871,6 +912,28 @@ const SHOTS: Shot[] = [
     },
   },
   {
+    // The preview tab; the browser build points to the desktop app for the live page (29 §8.7), a stopped preview to
+    // its start.
+    name: 'task-preview',
+    mode: UiMode.Simple,
+    url: (s) => `/tasks/${s.preview.id}?view=preview`,
+    // The preview may have stopped for idleness on a slow runner; the pane shows either way.
+    ready: testId('preview-pane'),
+  },
+  {
+    // What the AI saw after each action (29 §8.2), with the pro bottom bar.
+    name: 'pro-task-preview-frames',
+    mode: UiMode.Pro,
+    url: (s) => `/tasks/${s.preview.id}?view=preview`,
+    // The preview may have stopped for idleness on a slow runner; the pane shows either way.
+    ready: testId('preview-pane'),
+    open: async (page) => {
+      await page.getByLabel('查看').selectOption({ index: 1 });
+      await expect(page.getByRole('list', { name: '动作' })).toContainText('2. 切换尺寸');
+      return page.getByRole('img', { name: /切换尺寸/ });
+    },
+  },
+  {
     name: 'pro-task-running',
     mode: UiMode.Pro,
     url: (s) => `/tasks/${s.running.id}`,
@@ -1039,6 +1102,7 @@ test.describe('J9 走查：两种模式下全部页面无报错、无对比度�
     // A failed seed is already reported by beforeAll; there is nothing running to stop then.
     if (s !== undefined) {
       await api(request, 'POST', `/tasks/${s.running.id}/cancel`);
+      await api(request, 'POST', `/tasks/${s.preview.id}/cancel`);
       await api(request, 'POST', `/assistant/conversations/${s.assistantBusy}/abort`);
     }
     await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' });

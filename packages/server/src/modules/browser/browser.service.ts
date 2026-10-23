@@ -622,6 +622,14 @@ export function createBrowserService({
 
     closeUserTab,
 
+    userTabLogs(tabId: string) {
+      const { errors, requests } = userTabOf(tabId).tab.pageLogs();
+      return {
+        errors,
+        requests: requests.map(({ method, url, status, error }) => ({ method, url, status, error })),
+      };
+    },
+
     siteLogins,
 
     /** Logs out of a website: its cookies and its pages' storage in the websites' partition go. */

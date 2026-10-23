@@ -22,6 +22,7 @@ import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import type { BrowserService } from '../browser/index.ts';
 import type { DatabasesService } from '../databases/index.ts';
 import type { DeliveriesService } from '../delivery/index.ts';
 import type { RepoLocks } from '../git/index.ts';
@@ -52,6 +53,7 @@ export type TasksServiceDeps = {
   plans: PlansService;
   nodes: NodesService;
   attempts: AttemptsService;
+  browser: BrowserService;
   inbox: InboxService;
   deliveries: DeliveriesService;
   databases: DatabasesService;

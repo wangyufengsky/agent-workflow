@@ -10,6 +10,7 @@ import {
   getNodeOp,
   getTaskOp,
   getTaskTimelineOp,
+  listPreviewSessionsOp,
   listTasksOp,
   nodeDiffFileOp,
   nodeDiffOp,
@@ -37,6 +38,7 @@ import type { TasksService } from './tasks.service.ts';
 export function tasksOperations(tasks: TasksService) {
   return [
     implement(listTasksOp, (query) => tasks.list(query)),
+    implement(listPreviewSessionsOp, ({ id }) => tasks.previewSessions(id)),
     implement(createTaskOp, (input) => tasks.create(input)),
     implement(getTaskOp, ({ id }) => tasks.detail(id)),
     implement(getTaskTimelineOp, ({ id, afterId }) => ({ items: tasks.timeline(id, afterId) })),

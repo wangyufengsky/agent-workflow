@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { viewportPresetSchema } from '../../enums/browser.ts';
+import { attemptKindSchema, attemptStatusSchema } from '../../enums/task.ts';
 
 /** `POST /browser/login-tabs` (29 §8.6): a tab the user logs in to a website in. */
 export const openLoginTabRequestSchema = z.object({
@@ -46,3 +47,32 @@ export const userTabStateSchema = z.object({
   failedRequests: z.number().int(),
 });
 export type UserTabState = z.infer<typeof userTabStateSchema>;
+
+/**
+ * `GET /tasks/:id/preview/sessions` (29 §8.1): what the preview tab can show besides the user's own preview, the AI
+ * sessions that used the browser (with their frames) and the steps whose page check left screenshots.
+ */
+export const previewSessionsSchema = z.object({
+  attempts: z.array(
+    z.object({
+      attemptId: z.string(),
+      nodeId: z.string().nullable(),
+      kind: attemptKindSchema,
+      status: attemptStatusSchema,
+      frames: z.number().int(),
+    }),
+  ),
+  checks: z.array(z.object({ nodeId: z.string(), passed: z.boolean() })),
+});
+export type PreviewSessions = z.infer<typeof previewSessionsSchema>;
+
+/** `GET /browser/tabs/:tabId/logs` (29 §8.1): what the bottom bar's counts are made of, for the current page. */
+export const userTabLogsSchema = z.object({
+  /** Console errors and uncaught exceptions, in order. */
+  errors: z.array(z.object({ message: z.string(), source: z.string().nullable() })),
+  /** Requests that failed or answered ≥ 400. */
+  requests: z.array(
+    z.object({ method: z.string(), url: z.string(), status: z.number().nullable(), error: z.string().nullable() }),
+  ),
+});
+export type UserTabLogs = z.infer<typeof userTabLogsSchema>;

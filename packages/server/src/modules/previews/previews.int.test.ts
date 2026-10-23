@@ -155,7 +155,9 @@ describe('页面预览', () => {
     t.app.services.previews.acquire(second.task.id);
     const { status, raw } = await t.call(startPreviewOp, { taskId: first.task.id });
     expect(status).toBe(409);
-    expect(raw.json()).toMatchObject({ error: { code: ErrorCode.PreviewLimitReached } });
+    expect(raw.json()).toMatchObject({
+      error: { code: ErrorCode.PreviewLimitReached, details: { maxRunning: 1, taskIds: [second.task.id] } },
+    });
 
     // A page check waits for room (29 §4.4): the other preview's tab lets go of it.
     const queued = t.app.services.previews.start(first.task.id, { queue: new AbortController().signal });

@@ -322,6 +322,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     plans: plans.service,
     nodes: nodes.service,
     attempts: attempts.service,
+    browser: browser.service,
     inbox: inbox.service,
     deliveries: deliveries.service,
     databases: databases.service,

@@ -269,13 +269,21 @@ export async function openTab({
 
     /** Console errors (uncaught exceptions included) and failed requests of the current document (29 §8.1). */
     pageCounts(): { consoleErrors: number; failedRequests: number } {
-      const reqs = [...requests.values()].slice(page.requests);
+      const logs = tab.pageLogs();
+      return { consoleErrors: logs.errors.length, failedRequests: logs.requests.length };
+    },
+
+    /** The current document's console errors with its uncaught exceptions, and its failed requests (29 §8.1). */
+    pageLogs(): { errors: ExceptionEntry[]; requests: RequestEntry[] } {
       return {
-        consoleErrors:
-          consoleEntries.slice(page.console).filter((e) => e.level === 'error').length +
-          exceptions.length -
-          page.exceptions,
-        failedRequests: reqs.filter((r) => r.error !== null || (r.status ?? 0) >= 400).length,
+        errors: [
+          ...consoleEntries
+            .slice(page.console)
+            .filter((e) => e.level === 'error')
+            .map((e) => ({ message: e.text, source: e.source })),
+          ...exceptions.slice(page.exceptions),
+        ],
+        requests: [...requests.values()].slice(page.requests).filter((r) => r.error !== null || (r.status ?? 0) >= 400),
       };
     },
 

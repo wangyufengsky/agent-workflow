@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { previewSessionsSchema } from '../contracts/api/browser.ts';
 import {
   deliverRequestSchema,
   requestChangesSchema,
@@ -62,6 +63,17 @@ export const getTaskOp = defineOperationContract({
   output: taskDetailSchema,
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/tasks/:id' },
+});
+
+export const listPreviewSessionsOp = defineOperationContract({
+  ...common,
+  id: 'tasks.previewSessions',
+  title: 'op.tasks.previewSessions',
+  description: 'The AI sessions of a task that used the browser and the steps whose page check left screenshots',
+  input: byId,
+  output: previewSessionsSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/preview/sessions' },
 });
 
 export const getTaskTimelineOp = defineOperationContract({

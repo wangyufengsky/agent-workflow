@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Prompts } from '@aw/builtin';
 import {
   AppError,
+  ATTEMPT_STATUSES,
   type AttemptDTO,
   AttemptEvent,
   type AttemptKind,
@@ -134,6 +135,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     listActiveAll: (): AttemptSummaryDTO[] => repo.listByStatus(ACTIVE).map(state.toSummary),
     /** Active (starting / running) attempts of a task. */
     listActive: (taskId: string): AttemptSummaryDTO[] => repo.listByTask(taskId, ACTIVE).map(state.toSummary),
+    listByTask: (taskId: string): AttemptSummaryDTO[] => repo.listByTask(taskId, ATTEMPT_STATUSES).map(state.toSummary),
     latestPlanAttempt: (taskId: string): AttemptDTO | undefined => {
       const attempt = repo.findLatestPlan(taskId);
       return attempt === undefined ? undefined : toDto(attempt);

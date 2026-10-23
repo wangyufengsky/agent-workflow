@@ -22,6 +22,7 @@ import {
   openLoginTabOp,
   openUserTabOp,
   setUserViewportOp,
+  userTabLogsOp,
 } from './browser.ts';
 import {
   createDbConnectionOp,
@@ -134,6 +135,7 @@ import {
   getTaskOp,
   getTaskTimelineOp,
   listPlansOp,
+  listPreviewSessionsOp,
   listTasksOp,
   nodeDiffFileOp,
   nodeDiffOp,
@@ -221,6 +223,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   openUserTabOp,
   navigateUserTabOp,
   setUserViewportOp,
+  userTabLogsOp,
   listDbConnectionsOp,
   createDbConnectionOp,
   updateDbConnectionOp,
@@ -246,6 +249,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   createTaskOp,
   getTaskOp,
   getTaskTimelineOp,
+  listPreviewSessionsOp,
   startTaskOp,
   retryTaskOp,
   updateCheckCommandOp,

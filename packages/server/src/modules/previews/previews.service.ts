@@ -133,6 +133,7 @@ export function createPreviewsService({
       if (queue === undefined) {
         throw new AppError(ErrorCode.PreviewLimitReached, 'Every running preview is in use', {
           maxRunning: settings.get('preview.maxRunning'),
+          taskIds: active.map((e) => e.taskId),
         });
       }
       queue.throwIfAborted();

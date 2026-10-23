@@ -1,0 +1,231 @@
+/* The task page's preview tab (29 §8.1): a toolbar, the page area and a bottom bar, filling the window below the header. */
+.pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  height: calc(100vh - 280px);
+  min-height: 460px;
+}
+
+.session {
+  align-self: flex-start;
+  width: auto;
+  max-width: 100%;
+}
+
+.fill,
+.mine {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.fill[hidden] {
+  display: none;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  padding-bottom: var(--s-2);
+}
+
+.origin {
+  font-size: 13px;
+  color: var(--sub);
+  white-space: nowrap;
+}
+
+.address {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+/* The user's tab is a native view placed over this area. */
+.page {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--fill-2);
+}
+
+.screen {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  min-height: 0;
+  padding: var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.screen > p {
+  margin: 0;
+}
+
+.log {
+  overflow: auto;
+  align-self: stretch;
+  max-height: 320px;
+  margin: 0;
+  padding: var(--s-2);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: var(--fill-1);
+  border-radius: var(--r-sm);
+}
+
+.runningList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+  padding-top: var(--s-2);
+  font-size: 13px;
+}
+
+.state::before {
+  content: "●";
+  margin-right: 4px;
+  color: var(--sub);
+}
+.state[data-state="running"]::before {
+  color: var(--ok);
+}
+.state[data-state="failed"]::before {
+  color: var(--danger);
+}
+.state[data-state="starting"]::before {
+  color: var(--warn);
+}
+
+.counts {
+  padding: 0;
+  font: inherit;
+  color: var(--sub);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.counts.bad {
+  color: var(--danger);
+}
+
+.barActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  margin-left: auto;
+}
+
+.logList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  list-style: none;
+  word-break: break-all;
+}
+
+.frames {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--s-2);
+  min-height: 0;
+}
+
+.frameHead {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.frame {
+  overflow: auto;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.frame img,
+.shot img {
+  display: block;
+  max-width: 100%;
+}
+
+/* A mobile-sized frame sits in the middle of the area, as the page would on the phone. */
+.frame img {
+  margin: 0 auto;
+}
+
+.imagePending {
+  min-height: 160px;
+  background: var(--fill-1);
+}
+
+.frameList {
+  overflow-y: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.frameList button {
+  width: 100%;
+  padding: 4px var(--s-2);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.frameList button:hover {
+  background: var(--fill-1);
+}
+
+.frameList button[aria-current="true"] {
+  background: var(--fill-2);
+}
+
+.shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--s-3);
+  overflow-y: auto;
+}
+
+.shot {
+  margin: 0;
+}
+
+.shot figcaption {
+  margin-top: var(--s-1);
+  font-size: 13px;
+  color: var(--sub);
+}

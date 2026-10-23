@@ -7,6 +7,7 @@ import {
   openLoginTabOp,
   openUserTabOp,
   setUserViewportOp,
+  userTabLogsOp,
 } from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
 import type { BrowserService } from './browser.service.ts';
@@ -20,6 +21,7 @@ export function browserOperations(browser: BrowserService) {
     implement(openUserTabOp, ({ taskId }) => browser.openUserTab(taskId)),
     implement(navigateUserTabOp, ({ tabId, path }) => browser.navigateUserTab(tabId, path)),
     implement(setUserViewportOp, ({ tabId, preset }) => browser.setUserViewport(tabId, preset)),
+    implement(userTabLogsOp, ({ tabId }) => browser.userTabLogs(tabId)),
     implement(listBrowserFramesOp, ({ attemptId }) => ({ items: browser.frames(attemptId) })),
   ];
 }

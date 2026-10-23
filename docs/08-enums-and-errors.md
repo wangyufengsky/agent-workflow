@@ -480,7 +480,7 @@ class AppError extends Error {
 | `CREDENTIAL_UNAVAILABLE` | 500 | safeStorage 不可用或解密失败 |
 | `PREVIEW_NOT_CONFIGURED` | 409 | 项目没有页面预览配置（29 §4.1）；浏览器工具打开预览路径时同此码 |
 | `PREVIEW_START_FAILED` | 502 | 页面预览没能就绪（进程退出或超时）；`details: { logTail }` |
-| `PREVIEW_LIMIT_REACHED` | 409 | 同时运行的预览已达 `preview.maxRunning`，且都有活动尝试（29 §4.4） |
+| `PREVIEW_LIMIT_REACHED` | 409 | 同时运行的预览已达 `preview.maxRunning`，且都有标签页在用（29 §4.4）；`details: { maxRunning, taskIds }`，`taskIds` 为占用中的任务 |
 | `BROWSER_SITE_NOT_ALLOWED` | 403 | 地址既不是任务预览，也没有网站规则允许（29 §5.4）；`details: { host }` |
 | `BROWSER_LOGIN_REQUIRED` | 409 | 打开网站后到了登录页；`details: { url }`（登录页地址） |
 | `BROWSER_REF_STALE` | — | 元素编号已作废（页面导航过），先重新读取快照；仅 MCP |

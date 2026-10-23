@@ -90,6 +90,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | GET | `/tasks?projectId&status&displayGroup&limit&cursor` | `{ items: TaskSummaryDTO[], nextCursor }`，按 `updatedAt`（同时按编号）倒序分页（§1，`LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX`）；`displayGroup` 在查询中过滤（由 `resolveTaskDisplayGroup` 推出每个状态与是否有打开的提问 / 权限 / 验收条目的组合），每页都是满的；游标为上一页最后一个任务的 `<updatedAt>.<seq>`，格式不对 400 `VALIDATION_FAILED` |
 | POST | `/tasks` | 创建，见下 |
 | GET | `/tasks/:id` | `TaskDetailDTO` |
+| GET | `/tasks/:id/preview/sessions` | `{ attempts: [{ attemptId, nodeId, kind, status, frames }], checks: [{ nodeId, passed }] }`：任务预览页签可看的会话（v1.3 B2，29 §8.1）——留下过动作画面的尝试，与最近一次页面体检有截图的步骤 |
 | GET | `/tasks/:id/timeline?afterId` | `{ items: TaskEventDTO[] }`：`id > afterId` 的 `task_events`，按 id 升序 |
 | POST | `/tasks/:id/start` | `draft → preparing` |
 | POST | `/tasks/:id/pause` 🅿 | `running → paused`：不再派发新步骤，进行中的步骤继续 |
@@ -389,7 +390,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |
 | GET | `/tasks/:taskId/preview` | `previews.get` | read | `Preview`：`{ taskId, state, url, logTail }`；没有启动过的为 `stopped` |
-| POST | `/tasks/:taskId/preview/start` | `previews.start` | write | 启动（或等待正在进行的启动）到就绪 → `Preview`。任务没有就绪的 worktree 409 `STATE_TRANSITION_INVALID`；项目没有预览设置 409 `PREVIEW_NOT_CONFIGURED`；没能就绪 502 `PREVIEW_START_FAILED`（`details.logTail`）；达到上限且都有标签页在用 409 `PREVIEW_LIMIT_REACHED` |
+| POST | `/tasks/:taskId/preview/start` | `previews.start` | write | 启动（或等待正在进行的启动）到就绪 → `Preview`。任务没有就绪的 worktree 409 `STATE_TRANSITION_INVALID`；项目没有预览设置 409 `PREVIEW_NOT_CONFIGURED`；没能就绪 502 `PREVIEW_START_FAILED`（`details.logTail`）；达到上限且都有标签页在用 409 `PREVIEW_LIMIT_REACHED`（`details: { maxRunning, taskIds }`，占用中的任务） |
 | POST | `/tasks/:taskId/preview/stop` | `previews.stop` | write | → `Preview`（`stopped`） |
 | POST | `/projects/:projectId/preview/trial` | `previews.trial` | write | 在主工作区启动一次（不运行安装命令），就绪后立即停止 → `{ url, logTail }`；没能就绪 502 `PREVIEW_START_FAILED` |
 
@@ -405,6 +406,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | DELETE | `/browser/site-logins/:host` | `browser.clearSiteLogin` | write | 删除该主机的 Cookie 与页面存储（`Storage.clearDataForOrigin`）→ `{ hosts }` |
 | POST | `/tasks/:taskId/preview/tabs` | `browser.openUserTab` | write | 启动任务的预览（需要时；达到上限 409 `PREVIEW_LIMIT_REACHED`，不排队）→ 201 `UserTabState`：用户自己的标签页（分区 `persist:aw-preview-<projectId>`，被测应用的登录保留），登记对预览的使用（不因空闲停止），打开项目的第一个关键页面，由界面经 `aw.browser.place` 放到窗口上；任务完成或取消时关闭（v1.3 B2，29 §8.1） |
 | POST | `/browser/tabs/:tabId/navigate` | `browser.navigateUserTab` | read | `{ path }`（以 `/` 开头）在用户的预览标签页打开任务预览的这个路径（预览已停止时先启动）；不是预览标签页 404 `NOT_FOUND` |
+| GET | `/browser/tabs/:tabId/logs` | `browser.userTabLogs` | read | `{ errors: [{ message, source }], requests: [{ method, url, status, error }] }`：用户预览标签页当前页面的控制台错误（含未捕获异常）与失败请求，底栏抽屉的明细（v1.3 B2） |
 | POST | `/browser/tabs/:tabId/viewport` | `browser.setUserViewport` | read | `{ preset }`：桌面铺满放置区域，平板 / 手机在区域里模拟该尺寸（`Emulation.setDeviceMetricsOverride`）|
 | GET | `/attempts/:attemptId/browser-frames` | `browser.listFrames` | read | `{ items: BrowserFrame[] }`：一次尝试的动作画面，按 `seq` 排列（读尝试目录里的 `frames.jsonl`，尝试结束、应用重启后照样可读；没有画面为空列表；v1.3 B2，29 §8.2） |
 

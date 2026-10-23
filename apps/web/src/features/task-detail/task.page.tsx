@@ -1,13 +1,17 @@
-import { EDITABLE_NODE_STATUSES, type TaskDetailDTO, TaskStatus, UiMode } from '@aw/shared';
+import { EDITABLE_NODE_STATUSES, type TaskDetailDTO, TaskStatus, UiMode, WorktreeStatus } from '@aw/shared';
+import * as RadixTabs from '@radix-ui/react-tabs';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTE_IDS } from '../../app/routes.ts';
 import { ProgressCanvas } from '../../canvas/progress-canvas.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { PreviewPane } from '../preview/preview-pane.tsx';
+import { projectQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { taskQuery } from '../tasks/tasks.queries.ts';
 import { FailurePanel } from './failure-panel.tsx';
@@ -25,6 +29,8 @@ import { TaskSide } from './task-side.tsx';
 const route = getRouteApi(ROUTE_IDS.task);
 /** The task's steps are all behind it: the canvas's end pill shows it. */
 const FINISHED_TASK: readonly TaskStatus[] = [TaskStatus.Review, TaskStatus.Merging, TaskStatus.Completed];
+/** Its preview tabs close and its worktree may be gone (29 §5.3). */
+const ENDED_TASK: readonly TaskStatus[] = [TaskStatus.Completed, TaskStatus.Cancelled];
 
 type Selection = {
   selected: string | undefined;
@@ -139,7 +145,8 @@ export function TaskPage() {
     select: (id) => void navigate({ search: (prev) => ({ ...prev, node: id }), replace: true }),
     open: (id, tab) => void navigate({ search: (prev) => ({ ...prev, node: id, open: true, tab }) }),
   };
-  const { open, tab } = route.useSearch();
+  const { open, tab, view } = route.useSearch();
+  const project = useQuery({ ...projectQuery(task.data?.project.id ?? ''), enabled: task.data !== undefined });
   if (task.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (task.isError) return <ErrorState error={task.error} onRetry={() => void task.refetch()} />;
   return (
@@ -150,7 +157,38 @@ export function TaskPage() {
         details={isPro ? undefined : details === true}
         onDetailsChange={(on) => void navigate({ search: (prev) => ({ ...prev, details: on }), replace: true })}
       />
-      <TaskMain task={task.data} selection={selection} pro={pro} />
+      {project.data?.preview !== null &&
+      project.data !== undefined &&
+      task.data.git.worktreeStatus === WorktreeStatus.Ready &&
+      !ENDED_TASK.includes(task.data.status) ? (
+        <RadixTabs.Root
+          value={view ?? 'progress'}
+          onValueChange={(next) =>
+            void navigate({
+              search: (prev) => ({ ...prev, view: next === 'preview' ? 'preview' : undefined }),
+              replace: true,
+            })
+          }
+        >
+          <RadixTabs.List className="tabs">
+            <RadixTabs.Trigger value="progress" className="tab">
+              {PREVIEW_PANE_COPY.tabProgress}
+            </RadixTabs.Trigger>
+            <RadixTabs.Trigger value="preview" className="tab">
+              {PREVIEW_PANE_COPY.tabPreview}
+            </RadixTabs.Trigger>
+          </RadixTabs.List>
+          <RadixTabs.Content value="progress" className="tab-panel">
+            <TaskMain task={task.data} selection={selection} pro={pro} />
+          </RadixTabs.Content>
+          {/* Kept mounted on the progress tab: the user's preview tab stays open, only off the window. */}
+          <RadixTabs.Content value="preview" className="tab-panel" forceMount hidden={view !== 'preview'}>
+            <PreviewPane task={task.data} active={view === 'preview'} pro={pro} />
+          </RadixTabs.Content>
+        </RadixTabs.Root>
+      ) : (
+        <TaskMain task={task.data} selection={selection} pro={pro} />
+      )}
       <NodeDrawer
         taskId={taskId}
         nodeId={open === true ? node : undefined}

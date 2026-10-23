@@ -6,6 +6,7 @@ import {
   openUserTabRequestSchema,
   setUserViewportRequestSchema,
   siteLoginsSchema,
+  userTabLogsSchema,
   userTabSchema,
   userTabStateSchema,
 } from '../contracts/api/browser.ts';
@@ -93,6 +94,17 @@ export const setUserViewportOp = defineOperationContract({
   output: z.void(),
   risk: OperationRisk.Read,
   http: { method: 'POST', path: '/browser/tabs/:tabId/viewport' },
+});
+
+export const userTabLogsOp = defineOperationContract({
+  ...common,
+  id: 'browser.userTabLogs',
+  title: 'op.browser.userTabLogs',
+  description: "The console errors and failed requests of the current page in the user's preview tab",
+  input: userTabSchema,
+  output: userTabLogsSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/browser/tabs/:tabId/logs' },
 });
 
 export const listBrowserFramesOp = defineOperationContract({

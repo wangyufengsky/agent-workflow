@@ -32,6 +32,12 @@ export const queryKeys = {
   schedule: (id: string) => ['tasks', 'list', 'schedule', id],
   task: (id: string) => ['tasks', 'detail', id],
   preview: (taskId: string) => ['tasks', 'detail', taskId, 'preview'],
+  /** Under the task detail: a step's new page check result is a new session (29 §8.1). */
+  previewSessions: (taskId: string) => ['tasks', 'detail', taskId, 'preview', 'sessions'],
+  browserFrames: (attemptId: string) => ['attempts', attemptId, 'browser-frames'],
+  /** The user's preview tab: set from its opening and `browser.tab_updated`, never fetched. */
+  userTab: (tabId: string) => ['browser', 'tabs', tabId],
+  userTabLogs: (tabId: string) => ['browser', 'tabs', tabId, 'logs'],
   siteLogins: ['browser', 'site-logins'],
   /** Outside the task detail's prefix: read from the platform only when the user asks, never refreshed by events. */
   reviewComments: (id: string) => ['review-comments', id],
