@@ -130,7 +130,7 @@
 
 ### 4.2 一个预览的生命周期
 
-每个任务 worktree 最多一个预览，只存在内存里（不建表）。状态只经状态机（`shared/fsm` 新增 `previewTransitions`，09 新增一节）：
+每个任务 worktree 最多一个预览，只存在内存里（不建表）。状态只经状态机（`shared/fsm` 的 `previewMachine`，09 §12）：
 
 ```
 stopped ──start──▶ starting ──ready──▶ running ──stop / idle / worktree 删除──▶ stopped
@@ -169,10 +169,10 @@ renderer ── REST / SSE ──▶ 后端 utilityProcess：modules/browser
    ▼                          │ parentPort：shared/contracts/browser-port.ts
 main（薄）：browser.ts ◀───────┘
    · 创建 / 销毁 WebContentsView（用户标签页贴在主窗口上；AI 会话离屏）
-   · webContents.debugger：attach / sendCommand / 事件转发（只转发后端订阅的域）
+   · webContents.debugger：attach / sendCommand / 事件转发（CDP 只对后端启用的域发事件）
    · 导航拦截：will-navigate、will-frame-navigate、setWindowOpenHandler、
      session.webRequest（按后端给的规则放行、拦下或只读拦截写请求；用户标签页中不允许的地址用系统浏览器打开）
-   · capturePage
+   · 截图走 CDP 的 Page.captureScreenshot（离屏视图上可用，§12 V1），main 不另提供
 ```
 
 main 只提供机制，不做判断。用哪个分区、放行哪些来源、什么时候算稳定、怎样算点中，都由后端决定，与凭据端口的分工相同（03 §1）。
@@ -181,11 +181,12 @@ main 只提供机制，不做判断。用哪个分区、放行哪些来源、什
 
 ```ts
 interface BrowserHost {
-  open(input: { tabId: string; partition: string; allowedOrigins: string[]; visible: boolean; viewport: Viewport }): Promise<void>;
+  // 参数与事件即 shared/contracts/browser-port.ts 的 op 与 BrowserPortEvent
+  open(input: { tabId: string; partition: string; userFacing: boolean; viewport: Viewport; policy: BrowserPolicy }): Promise<void>;
+  setPolicy(tabId: string, policy: BrowserPolicy): Promise<void>;
   close(tabId: string): Promise<void>;
   cdp(tabId: string, method: string, params?: object, sessionId?: string): Promise<unknown>;
-  onEvent(listener: (tabId: string, method: string, params: unknown, sessionId?: string) => void): () => void;
-  capture(tabId: string, opts: { format: 'png' | 'jpeg'; clip?: Rect }): Promise<Uint8Array>;
+  onEvent(listener: (event: BrowserPortEvent) => void): () => void;
 }
 ```
 
@@ -506,8 +507,8 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
   - `DeckMaterialKind` 加 `web`；
   - `CheckUnrunnableReason` 加 `preview_never_started` · `preview_not_configured`；`nodeAcceptanceSchema` 的页面体检同样可以标 `skipped`。
 - **常量（08）**：`PREVIEW_START_TIMEOUT_MS` 120000、`PREVIEW_PROBE_INTERVAL_MS` 1000、`PREVIEW_LOG_TAIL_CHARS` 4000、`BROWSER_ACTION_TIMEOUT_MS` 5000、`BROWSER_SETTLE_QUIET_MS` 500、`BROWSER_SETTLE_TIMEOUT_MS` 10000、`BROWSER_SNAPSHOT_MAX_CHARS` 12000、`VIEWPORT_SIZES`。
-- **错误码（08）**：`PREVIEW_NOT_CONFIGURED`、`PREVIEW_START_FAILED`（`details.logTail`）、`PREVIEW_LIMIT_REACHED`、`BROWSER_UNAVAILABLE`（没有宿主）、`BROWSER_NOT_OPEN`、`BROWSER_SITE_NOT_ALLOWED`（`details.host`）、`BROWSER_LOGIN_REQUIRED`（`details.url`）、`BROWSER_REF_STALE`、`BROWSER_ACTION_FAILED`（`details.reason`：`not_visible` · `covered` · `disabled` · `detached` · `not_focusable`；`details.coveredBy`）、`BROWSER_CHECK_UNRUNNABLE`（任务的 `failure` 上，同 `CHECK_COMMAND_UNRUNNABLE`，不作为 HTTP 错误）。
-- **状态机（09）**：`previewTransitions`；节点 `verifying` 的检查顺序为命令 → 页面体检 → AI 评审。
+- **错误码（08）**：`PREVIEW_NOT_CONFIGURED`、`PREVIEW_START_FAILED`（`details.logTail`）、`PREVIEW_LIMIT_REACHED`、`BROWSER_SITE_NOT_ALLOWED`（`details.host`）、`BROWSER_LOGIN_REQUIRED`（`details.url`）、`BROWSER_REF_STALE`、`BROWSER_ACTION_FAILED`（`details.reason`：`not_visible` · `covered` · `disabled` · `detached` · `not_focusable`；`details.coveredBy`）（以上 B-02 已加）；`BROWSER_NOT_OPEN`（B3，助手 `browser.read`）、`BROWSER_CHECK_UNRUNNABLE`（B2，任务的 `failure` 上，同 `CHECK_COMMAND_UNRUNNABLE`，不作为 HTTP 错误）在实现那一期加。
+- **状态机（09）**：`previewMachine`（09 §12，B-02 已加）；节点 `verifying` 的检查顺序为命令 → 页面体检 → AI 评审。
 - **API（11）**：
   - 操作：`previews.get` / `previews.start` / `previews.stop` / `previews.trial`（项目设置的试运行）、`browser.read`、`browser.readUrl`、`browser.openUserTab` `{ taskId }`（返回 `tabId`）、`browser.navigateUserTab`、`browser.openLoginTab` `{ url }`、`browser.listSiteLogins` / `browser.clearSiteLogin` `{ host }`；
   - 非清单路由：`GET /attempts/:attemptId/browser/:file`（尝试的截图与画面）、`GET /tasks/:taskId/browser/:file`（页面体检截图）；
@@ -520,10 +521,11 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 
 ```
 packages/shared/src/
-  contracts/browser-port.ts       后端 ↔ main 协议（open / close / cdp / event / capture / place）
+  contracts/browser-port.ts       后端 ↔ main 协议（open / setPolicy / close / cdp；事件 cdpEvent / blocked / gone）
   contracts/mcp/browser.ts        11 个工具的输入输出
   contracts/api/previews.ts       预览配置、状态、操作
-  fsm/preview.ts                  previewTransitions
+  fsm/preview.machine.ts          previewMachine
+  browser/policy.ts               网站规则、urlAccess、blockReason（main 与后端共用）
 packages/server/src/modules/
   previews/                       推断（previews.infer.ts，纯函数）、进程（previews.process.ts，经 core/platform.ts）、
                                   服务（启动 / 就绪 / 空闲 / 上限）、操作
@@ -533,7 +535,7 @@ packages/server/src/modules/
                                   画面（browser.frames.ts）、操作
   acceptance/                     新增 runBrowserCheck，调用 browser 的 index
   mcp/tools/browser-*.ts
-apps/desktop/src/main/browser.ts  视图、debugger 转发、导航拦截、capturePage
+apps/desktop/src/main/browser.ts  视图、debugger 转发、按 blockReason 拦截请求、不允许的地址交给系统浏览器
 apps/web/src/features/preview/    预览页签、会话选择、观看画面、底栏抽屉、放置视图
 packages/builtin/prompts/         protocol-execute / protocol-review / protocol-plan 的浏览器说明；workflows 加页面体检
 ```
@@ -572,7 +574,7 @@ packages/builtin/prompts/         protocol-execute / protocol-review / protocol-
   - `pageCheckVerdict`：每条判定规则；
   - `browser.settle` 和「点中」判断：输入事件序列与注入时钟；
   - `browser.snapshot`：输入是从真实 Chromium 录下的无障碍树（固定文件），断言精简规则和截断；
-  - `previewTransitions`。
+  - `previewMachine`；`urlAccess` / `blockReason`。
 - **集成（真实 Chromium，`chromium` 宿主）**：用本地 HTTP 服务提供的固定页面，覆盖：
   - 被弹层挡住的按钮：先返回 `covered`，弹层消失后再点击成功；
   - 延迟渲染的元素；

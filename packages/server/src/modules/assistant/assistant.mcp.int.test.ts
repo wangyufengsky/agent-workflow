@@ -96,7 +96,13 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     expect(schemas).not.toMatch(/"(password|token)"/);
     const settings = Object.keys(tools.find((tool) => tool.name === 'settings_update')?.inputSchema.properties ?? {});
     expect(settings).toContain('ui.theme');
-    for (const omitted of ['assistant.alwaysAllow', 'opencode.binaryPath', 'ai.bashPolicy', 'worktree.rootDir']) {
+    for (const omitted of [
+      'assistant.alwaysAllow',
+      'opencode.binaryPath',
+      'ai.bashPolicy',
+      'worktree.rootDir',
+      'browser.sites',
+    ]) {
       expect(settings).not.toContain(omitted);
     }
     expect(JSON.stringify(tools)).not.toContain(MCP_SESSION_ARG);

@@ -358,3 +358,25 @@ stateDiagram-v2
 - `resume`：用户恢复，从现在起计算 `next_run_at`（暂停期间错过的不补），并把该定时任务未关闭的 `schedule_failure` 条目记为 `resolved`。
 - `start_failed`：到点时开不了任务（`checkCreate` 等抛出 `AppError`）；同一事务内记一条 `failed` 运行、创建 `schedule_failure` 条目（D91）。「立即运行一次」失败不触发它，错误直接返回给用户。
 - 到点运行本身不改变状态：每次到点在 `schedule_runs` 记一条 `started` / `skipped` / `failed`，并推进 `next_run_at`（22 §4）。
+
+## 12. 页面预览 Preview（v1.3）
+
+<!-- fsm:preview 由 pnpm gen:fsm-docs 生成，勿手改 -->
+```mermaid
+stateDiagram-v2
+  [*] --> stopped
+  stopped --> starting: start
+  starting --> running: ready
+  starting --> failed: exited
+  starting --> stopped: stop
+  running --> failed: exited
+  running --> stopped: stop
+  failed --> starting: start
+```
+<!-- /fsm:preview -->
+
+- 每个任务 worktree 最多一个预览，只存在内存里（[29 §4.2](29-browser.md#42-一个预览的生命周期)）；应用重启后都是 `stopped`。
+- `start`：第一次需要时（AI 的浏览器工具、页面体检、用户「打开预览」、助手）。这个 worktree 第一次启动前先运行项目的安装命令。
+- `ready`：就绪路径（`readyPath`）得到任何 HTTP 响应。
+- `exited`：进程退出，或 `PREVIEW_START_TIMEOUT_MS` 内没有就绪（此时后端结束进程树）；保留日志末尾 `PREVIEW_LOG_TAIL_CHARS` 字符。
+- `stop`：用户停止、空闲 `preview.idleMinutes`、达到 `preview.maxRunning` 时被淘汰、任务进入终态或 worktree 删除；后端结束进程树。`failed` 的预览没有进程，任务结束时直接从内存中移除，不需要 `stop`。

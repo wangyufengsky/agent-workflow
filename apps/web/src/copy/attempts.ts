@@ -69,6 +69,17 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.SubmitSlide]: '提交一页',
   [McpToolName.SubmitFindings]: '提交审查问题',
   [McpToolName.SubmitCommitMessage]: '提交草拟的提交信息',
+  [McpToolName.BrowserOpen]: '打开页面',
+  [McpToolName.BrowserSnapshot]: '读取页面',
+  [McpToolName.BrowserClick]: '点击',
+  [McpToolName.BrowserType]: '输入',
+  [McpToolName.BrowserSelect]: '选择',
+  [McpToolName.BrowserPress]: '按键',
+  [McpToolName.BrowserWaitFor]: '等待页面',
+  [McpToolName.BrowserInspect]: '查看元素',
+  [McpToolName.BrowserLogs]: '查看控制台',
+  [McpToolName.BrowserViewport]: '切换尺寸',
+  [McpToolName.BrowserScreenshot]: '截图',
 };
 
 /** One tool call in the user's words, as a verb and what it works on:「编辑」「src/a.ts」. */
