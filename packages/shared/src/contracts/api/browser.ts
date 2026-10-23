@@ -33,3 +33,16 @@ export const navigateUserTabRequestSchema = z.object({
   path: z.string().startsWith('/'),
 });
 export const setUserViewportRequestSchema = z.object({ tabId: z.string(), preset: viewportPresetSchema });
+
+/** The user's preview tab as the bottom bar shows it (29 §8.1); SSE `browser.tab_updated` when it changes. */
+export const userTabStateSchema = z.object({
+  tabId: z.string(),
+  taskId: z.string(),
+  /** The page's address; empty until the first page loads. */
+  url: z.string(),
+  viewport: viewportPresetSchema,
+  /** Of the current page: console errors (uncaught exceptions included) and requests that failed or answered ≥ 400. */
+  consoleErrors: z.number().int(),
+  failedRequests: z.number().int(),
+});
+export type UserTabState = z.infer<typeof userTabStateSchema>;

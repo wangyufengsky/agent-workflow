@@ -192,7 +192,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `PageCheckError` | `navigation` · `exception` · `console` · `request` | 让页面不通过的事实（29 §7.3） |
 | `PageCheckWarning` | `request` · `blocked` · `a11y` · `overflow` · `unsettled` | 页面体检只提醒的事实（29 §7.3） |
 
-网站规则 `siteRuleSchema`（`{ pattern, access }`，`*` 代表任意字符、整个主机名不区分大小写匹配）、`urlAccess(url, policy)`（预览来源 → 预览，否则第一条匹配的网站规则，都不是为 null）与 `blockReason(request, policy, readOnlyEnforced)` 在 `browser/policy.ts`，main 与后端共用。`ServerEventType` 另有 `preview.updated`、`browser.frame`（11 §11）。
+网站规则 `siteRuleSchema`（`{ pattern, access }`，`*` 代表任意字符、整个主机名不区分大小写匹配）、`urlAccess(url, policy)`（预览来源 → 预览，否则第一条匹配的网站规则，都不是为 null）与 `blockReason(request, policy, readOnlyEnforced)` 在 `browser/policy.ts`，main 与后端共用。`ServerEventType` 另有 `preview.updated`、`browser.frame`、`browser.tab_updated`（11 §11）。
 
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 

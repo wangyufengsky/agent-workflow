@@ -1,6 +1,6 @@
 # 29 · 内置浏览器与页面预览
 
-> 状态：D120–D125 **用户已确认**（2026-10-23）。**B1 已实现**（05 的 B-01…B-08，分支 `feat/B-browser`）：预览服务、浏览器宿主与动作层、执行 MCP 浏览器工具、项目与设置界面；B2 进行中（分支 `feat/B2-browser`：B2-01 契约与物化、B2-02 后端页面体检、B2-03 内置流程与规划、B2-04 动作画面已完成；预览页签与观看画面、「附上当前页面」未开始），B3（助手、知识问答的引用摘录、PPT 网页资料）未开始。实现中与设计稿不同的地方已改在各节里（如 §5.2 的宿主接口、§5.7 的截图、§4.1 推断的位置）。
+> 状态：D120–D125 **用户已确认**（2026-10-23）。**B1 已实现**（05 的 B-01…B-08，分支 `feat/B-browser`）：预览服务、浏览器宿主与动作层、执行 MCP 浏览器工具、项目与设置界面；B2 进行中（分支 `feat/B2-browser`：B2-01 契约与物化、B2-02 后端页面体检、B2-03 内置流程与规划、B2-04 动作画面、B2-05 用户标签页与浮层已完成；预览页签与观看画面、「附上当前页面」未开始），B3（助手、知识问答的引用摘录、PPT 网页资料）未开始。实现中与设计稿不同的地方已改在各节里（如 §5.2 的宿主接口、§5.7 的截图、§4.1 推断的位置）。
 
 ## 1. 定位
 
@@ -447,7 +447,8 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
   - 启动失败：日志末尾、「重试」、「修改预览设置」；
   - 空闲停止：「预览已停止（10 分钟没有使用）」与「重新启动」；
   - 达到上限：说明哪些任务的预览在运行，「停止某个」。
-- **放置**：renderer 量出页面区域的矩形，经 preload `aw.browser.place(tabId, rect)` 让 main 把视图贴上去；离开页签、打开对话框或浮层时 `place(tabId, null)` 隐藏。原生视图盖在 DOM 之上，所以 ⌘K、⌘J 打开时必须隐藏它，用浮层关闭事件恢复。
+- **放置**：renderer 量出页面区域的矩形，经 preload `aw.browser.place(tabId, rect)` 让 main 把视图贴上去；离开页签、打开对话框或浮层时 `place(tabId, null)` 隐藏。原生视图盖在 DOM 之上，所以 ⌘K、⌘J 打开时必须隐藏它，用浮层关闭事件恢复。实现（B2-05）：`usePlacedTab` 用 `MutationObserver` 看页面上有没有打开的 Radix 对话框（`[role="dialog"][data-state="open"]`，对话框、抽屉与 ⌘K 都是），加上界面状态里的助手面板；标签页被后端关闭后界面再 `place(tabId, null)` 时 main 什么也不做（关闭时已经移走）。
+- **用户标签页**（B2-05）：`browser.openUserTab` 打开（分区 `persist:aw-preview-<projectId>`，不拦截文件选择），`navigateUserTab` 换路径，`setUserViewport` 换尺寸；底栏的数字来自 SSE `browser.tab_updated`（当前页面的控制台错误含未捕获异常、失败请求含 ≥ 400），主框架开始加载新文档时归零。
 
 ### 8.2 观看 AI 的会话
 
@@ -478,7 +479,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 
 - **网站规则**：一个有序列表，每行包括地址通配、「只读浏览 / 可操作」、上移、下移和删除（不做拖动），改完「保存规则」一起保存；说明「没有匹配的网站不能打开」。默认一行 `*` · 只读浏览。
 - **网站登录**：输入地址后点「打开并登录」，页面区域显示一个真实标签页（`site` 会话，贴在窗口上），用户自己登录，完成后点「完成」关闭。下方列出已有登录状态的网站，可以「退出登录」（清除该主机在 `persist:aw-sites` 中的 Cookie 与存储）。
-- 登录标签页是盖在页面上的原生视图：⌘K、⌘J 打开时把它隐藏的机制随 B2 的预览页签一起做（§8.1），B-07 的登录区域还没有。
+- 登录标签页是盖在页面上的原生视图：与预览页签共用 `features/preview/use-placed-tab.ts`，任一 Radix 对话框（对话框、抽屉、⌘K）或 ⌘J 助手面板打开时离开窗口，关闭后回来（§8.1，B2-05）。
 - **AI 在任务中遇到需要登录**：`ask_user` 的提问里附上「去登录」链接，直接打开这里并预填地址。
 
 ### 8.7 浏览器开发模式
@@ -515,7 +516,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 - **状态机（09）**：`previewMachine`（09 §12，B-02 已加）；节点 `verifying` 的检查顺序为命令 → 页面体检 → AI 评审。
 - **API（11）**：
   - **B1 已有**：操作 `previews.get` / `start` / `stop` / `trial`（11 §13f）；`browser.openLoginTab` `{ url }`、`browser.closeUserTab`、`browser.listSiteLogins`、`browser.clearSiteLogin` `{ host }`（11 §13f′）；SSE `preview.updated`。
-  - **B2 再加**（契约在 B2-01 已定义，`shared/operations/browser.ts`，随 B2-04 / B2-05 的实现挂进操作清单）：`browser.openUserTab` `{ taskId }`（返回 `tabId`）、`browser.navigateUserTab`、`browser.setUserViewport`、`browser.listFrames`；非清单路由 `GET /attempts/:attemptId/browser/:file`（尝试的截图与画面）、`GET /tasks/:taskId/browser/:file`（页面体检截图）；SSE `browser.frame`；`tasks.requestChanges` 输入加可选 `page: { tabId }`（后端自己读取那个标签页的路径、视口与日志，不接受界面传来的页面信息）。
+  - **B2 再加**（契约在 B2-01 已定义，`shared/operations/browser.ts`，随 B2-04 / B2-05 的实现挂进操作清单）：`browser.openUserTab` `{ taskId }`（返回 `UserTabState`）、`browser.navigateUserTab`、`browser.setUserViewport`、`browser.listFrames`；非清单路由 `GET /attempts/:attemptId/browser/:file`（尝试的截图与画面）、`GET /tasks/:taskId/browser/:file`（页面体检截图）；SSE `browser.frame`；`tasks.requestChanges` 输入加可选 `page: { tabId }`（后端自己读取那个标签页的路径、视口与日志，不接受界面传来的页面信息）。
   - **B3 再加**：`browser.read`、`browser.readUrl`。
 - **MCP（12）**：§6 的 11 个工具（B1 已有，12 §6.17）；知识问答 `web` 引用的 `CitationDTO` 加 `excerpt`（18 §6，B3）。
 - **preload**：`aw.browser.place(tabId, rect | null)`、`aw.browser.back / forward / reload(tabId)`、`aw.browser.openDevTools(tabId)`。用户标签页的地址导航经后端 `browser.navigateUserTab`，统一检查来源。

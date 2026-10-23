@@ -30,7 +30,9 @@ export type RequestEntry = {
 };
 
 /** CDP event params the tab reads; they come from the browser, so they are parsed (06 §1). */
-const frameNavigatedSchema = z.object({ frame: z.object({ parentId: z.string().optional() }) });
+const frameNavigatedSchema = z.object({
+  frame: z.object({ id: z.string(), url: z.string(), parentId: z.string().optional() }),
+});
 const dialogSchema = z.object({ type: z.string(), message: z.string() });
 const exceptionSchema = z.object({
   exceptionDetails: z.object({
@@ -46,6 +48,7 @@ const consoleSchema = z.object({
 });
 const requestSentSchema = z.object({
   requestId: z.string(),
+  frameId: z.string().optional(),
   type: z.string().optional(),
   request: z.object({ url: z.string(), method: z.string() }),
 });
@@ -77,13 +80,25 @@ export type TabInput = {
   policy: BrowserPolicy;
   /** Websites lose their realtime write channels (29 §5.4). */
   site: boolean;
+  /** The user's own tab, placed on the window by the renderer (29 §8.1): sized by its place, files can be chosen. */
+  userFacing?: boolean;
 };
 
 /**
  * One AI tab (29 §5.3): its page's refs, logs and network, and what changed since the action began (navigation,
  * dialogs, blocked writes, new errors) for the action's result.
  */
-export async function openTab({ host, clock, log, tabId, kind, partition, policy, site }: TabInput) {
+export async function openTab({
+  host,
+  clock,
+  log,
+  tabId,
+  kind,
+  partition,
+  policy,
+  site,
+  userFacing = false,
+}: TabInput) {
   const viewport: { preset: ViewportPreset } = { preset: 'desktop' };
   let refs = new Map<string, number>();
   const consoleEntries: ConsoleEntry[] = [];
@@ -96,7 +111,13 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
   let mark = { console: 0, exceptions: 0, failed: 0 };
   /** Where this action's entries start, for the facts of one page (a page check, 29 §7.2). */
   let start = { console: 0, exceptions: 0, requests: 0 };
+  /** The main frame and its address, and where its current document's entries start (the user's counts, 29 §8.1). */
+  let mainFrame: string | null = null;
+  let url = '';
+  let page = { console: 0, exceptions: 0, requests: 0 };
   let onLoad = () => {};
+  /** Told when the page's address or its error counts change. */
+  let changed = () => {};
 
   const cdp = (method: string, params?: Record<string, unknown>) =>
     host.request({ kind: 'cdp', tabId, method, params });
@@ -105,13 +126,18 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
 
   function onCdp(method: string, params: unknown): void {
     switch (method) {
-      case 'Page.frameNavigated':
-        if (frameNavigatedSchema.parse(params).frame.parentId !== undefined) return;
+      case 'Page.frameNavigated': {
+        const { frame } = frameNavigatedSchema.parse(params);
+        if (frame.parentId !== undefined) return;
+        mainFrame = frame.id;
+        url = frame.url;
         // Refs name nodes of the page that was left (29 §5.5).
         refs = new Map();
         since.navigated = true;
         since.loaded = false;
+        changed();
         return;
+      }
       case 'Page.loadEventFired':
         since.loaded = true;
         onLoad();
@@ -130,6 +156,7 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
       case 'Runtime.exceptionThrown': {
         const { exceptionDetails: d } = exceptionSchema.parse(params);
         exceptions.push({ message: d.exception?.description ?? d.text, source: d.url ?? null });
+        changed();
         return;
       }
       case 'Runtime.consoleAPICalled': {
@@ -139,10 +166,15 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
           .map((a) => (typeof a.value === 'string' ? a.value : (a.description ?? String(a.value))))
           .join(' ');
         consoleEntries.push({ level: type, text, source: stackTrace?.callFrames[0]?.url ?? null });
+        if (type === 'error') changed();
         return;
       }
       case 'Network.requestWillBeSent': {
-        const { requestId, type, request } = requestSentSchema.parse(params);
+        const { requestId, frameId, type, request } = requestSentSchema.parse(params);
+        // A new document of the main frame starts its page's counts, its own request included.
+        if (type === 'Document' && frameId === mainFrame && !requests.has(requestId)) {
+          page = { console: consoleEntries.length, exceptions: exceptions.length, requests: requests.size };
+        }
         requests.set(requestId, {
           method: request.method,
           url: request.url,
@@ -158,6 +190,7 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
         const { requestId, response } = responseSchema.parse(params);
         const entry = requests.get(requestId);
         if (entry !== undefined) entry.status = response.status;
+        if (response.status >= 400) changed();
         return;
       }
       case 'Network.loadingFinished':
@@ -171,6 +204,7 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
           entry.blocked = blockedUrls.get(entry.url) ?? null;
         }
         network.onEvent(method, { requestId });
+        changed();
         return;
       }
     }
@@ -191,13 +225,13 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
     kind: 'open',
     tabId,
     partition,
-    userFacing: false,
-    viewport: VIEWPORT_SIZES.desktop,
+    userFacing,
+    viewport: userFacing ? null : VIEWPORT_SIZES.desktop,
     policy,
   });
   for (const domain of ['Page', 'Runtime', 'Network', 'DOM', 'Accessibility']) await cdp(`${domain}.enable`);
-  // File choosers would open a dialog nobody answers (29 §5.4).
-  await cdp('Page.setInterceptFileChooserDialog', { enabled: true });
+  // File choosers would open a dialog nobody answers (29 §5.4); the user answers their own.
+  if (!userFacing) await cdp('Page.setInterceptFileChooserDialog', { enabled: true });
   if (site) await cdp('Page.addScriptToEvaluateOnNewDocument', { source: NO_REALTIME });
 
   async function evaluate(expression: string): Promise<unknown> {
@@ -228,6 +262,25 @@ export async function openTab({ host, clock, log, tabId, kind, partition, policy
       since.blockedWrites = [];
       mark = { console: consoleErrors(), exceptions: exceptions.length, failed: failedRequests().length };
       start = { console: consoleEntries.length, exceptions: exceptions.length, requests: requests.size };
+    },
+
+    /** The main frame's address (empty before the first navigation). */
+    url: () => url,
+
+    /** Console errors (uncaught exceptions included) and failed requests of the current document (29 §8.1). */
+    pageCounts(): { consoleErrors: number; failedRequests: number } {
+      const reqs = [...requests.values()].slice(page.requests);
+      return {
+        consoleErrors:
+          consoleEntries.slice(page.console).filter((e) => e.level === 'error').length +
+          exceptions.length -
+          page.exceptions,
+        failedRequests: reqs.filter((r) => r.error !== null || (r.status ?? 0) >= 400).length,
+      };
+    },
+
+    onChange(listener: () => void): void {
+      changed = listener;
     },
 
     /** What the page did since `begin`: its console, uncaught exceptions and every request in order. */

@@ -305,6 +305,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
 | `knowledge.updated` | `{ conversationId }` | 知识问答：新一轮、答案提交、一轮结束、权限请求等待或已处理、删除时；对话与列表重新拉取（研究过程与流式回答的草稿沿用 `attempt.transcript`：研究尝试的正文每 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 个字符推送一次，草稿 = 最后一个非提交工具调用之后的正文，18 §5.5） |
 | `browser.frame` | `BrowserFrame`（`{ attemptId, taskId, seq, tool, url, file }`） | AI 浏览器动作后的画面（v1.3 B2，29 §8.2）；任务页「预览」页签观看 AI 会话时跟随最新一张 |
+| `browser.tab_updated` | `UserTabState`（`{ tabId, taskId, url, viewport, consoleErrors, failedRequests }`） | 用户的预览标签页换了页面、尺寸，或当前页面的控制台错误（含未捕获异常）与失败请求（网络错误或 ≥ 400）数变了（v1.3 B2，29 §8.1）；计数随主框架的新文档重新开始 |
 | `preview.updated` | `Preview`（`{ taskId, state, url, logTail }`） | 页面预览（v1.3，29 §4.2）：每次状态变化后；任务页的预览页签直接用它更新 |
 | `schedule.updated` | `{ scheduleId }` | 定时任务（v1.2）：创建、修改、暂停 / 恢复、每次运行、删除后；定时任务列表与详情重新拉取（查询挂在任务列表前缀下，开出的任务状态变化也会刷新，22 §9） |
 | `git_review.updated` | `{ reviewId, projectId }` | Git 工作台的审查开始、提交问题、结束时；审查与列表重新拉取（27 §7.4） |
@@ -399,9 +400,12 @@ type AttemptDTO = AttemptSummaryDTO & {
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |
 | POST | `/browser/login-tabs` | `browser.openLoginTab` | write | `{ url }`（http(s)）→ 201 `{ tabId }`：在网站分区（`persist:aw-sites`）打开一个用户标签页，由界面经 `aw.browser.place` 放到窗口上；规则不允许的地址交给系统浏览器 |
-| DELETE | `/browser/tabs/:tabId` | `browser.closeUserTab` | write | 204 |
+| DELETE | `/browser/tabs/:tabId` | `browser.closeUserTab` | write | 204：关闭登录标签页或预览标签页（预览标签页同时注销对预览的使用） |
 | GET | `/browser/site-logins` | `browser.listSiteLogins` | read | `{ hosts }`：网站分区里有 Cookie 的主机（用分区里一个临时离屏标签页的 `Network.getAllCookies`） |
 | DELETE | `/browser/site-logins/:host` | `browser.clearSiteLogin` | write | 删除该主机的 Cookie 与页面存储（`Storage.clearDataForOrigin`）→ `{ hosts }` |
+| POST | `/tasks/:taskId/preview/tabs` | `browser.openUserTab` | write | 启动任务的预览（需要时；达到上限 409 `PREVIEW_LIMIT_REACHED`，不排队）→ 201 `UserTabState`：用户自己的标签页（分区 `persist:aw-preview-<projectId>`，被测应用的登录保留），登记对预览的使用（不因空闲停止），打开项目的第一个关键页面，由界面经 `aw.browser.place` 放到窗口上；任务完成或取消时关闭（v1.3 B2，29 §8.1） |
+| POST | `/browser/tabs/:tabId/navigate` | `browser.navigateUserTab` | read | `{ path }`（以 `/` 开头）在用户的预览标签页打开任务预览的这个路径（预览已停止时先启动）；不是预览标签页 404 `NOT_FOUND` |
+| POST | `/browser/tabs/:tabId/viewport` | `browser.setUserViewport` | read | `{ preset }`：桌面铺满放置区域，平板 / 手机在区域里模拟该尺寸（`Emulation.setDeviceMetricsOverride`）|
 | GET | `/attempts/:attemptId/browser-frames` | `browser.listFrames` | read | `{ items: BrowserFrame[] }`：一次尝试的动作画面，按 `seq` 排列（读尝试目录里的 `frames.jsonl`，尝试结束、应用重启后照样可读；没有画面为空列表；v1.3 B2，29 §8.2） |
 
 ## 13e. PPT（v1.2）

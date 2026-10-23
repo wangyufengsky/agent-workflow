@@ -22,6 +22,8 @@ import {
   PageCheckUnrunnable,
   PreviewState,
   ServerEventType,
+  TaskStatus,
+  type UserTabState,
   urlAccess,
   VIEWPORT_SIZES,
   type ViewportPreset,
@@ -141,6 +143,8 @@ export function createBrowserService({
   attemptFilesDir,
 }: BrowserServiceDeps) {
   const sessions = new Map<string, Session>();
+  /** The user's own preview tabs (29 §8.1), by tab id. */
+  const userTabs = new Map<string, { tab: Tab; taskId: string; projectId: string }>();
   const actions = createActions(clock);
 
   function policyFor(owner: Pick<BrowserOwner, 'taskId' | 'projectId'>): BrowserPolicy {
@@ -322,19 +326,54 @@ export function createBrowserService({
     };
   }
 
+  function userTabOf(tabId: string) {
+    const entry = userTabs.get(tabId);
+    if (entry === undefined) throw new AppError(ErrorCode.NotFound, `No preview tab ${tabId}`, { tabId });
+    return entry;
+  }
+
+  function userTabState(tabId: string): UserTabState {
+    const { tab, taskId } = userTabOf(tabId);
+    return { tabId, taskId, url: tab.url(), viewport: tab.viewport.preset, ...tab.pageCounts() };
+  }
+
+  async function closeUserTab(tabId: string): Promise<void> {
+    const entry = userTabs.get(tabId);
+    if (entry === undefined) {
+      // A login tab (29 §8.6): only the host has it.
+      await host.request({ kind: 'close', tabId });
+      return;
+    }
+    userTabs.delete(tabId);
+    await entry.tab.close();
+    previews.release(entry.taskId);
+  }
+
   events.subscribe((event) => {
+    // A finished task's preview tabs close; the browser module does not depend on tasks (29 §5.3, §11).
+    if (
+      event.type === ServerEventType.TaskUpdated &&
+      (event.data.status === TaskStatus.Completed || event.data.status === TaskStatus.Cancelled)
+    ) {
+      for (const [tabId, entry] of userTabs) {
+        if (entry.taskId !== event.data.id) continue;
+        closeUserTab(tabId).catch((err: unknown) => log.error({ err }, 'preview tab close failed'));
+      }
+    }
     // An attempt's tabs end with it; the browser module does not depend on attempts (29 §11).
     if (event.type === ServerEventType.AttemptUpdated && ENDED.has(event.data.attempt.status)) {
       close(event.data.attempt.id).catch((err: unknown) => log.error({ err }, 'browser tabs close failed'));
     }
     // A preview restarted on another port: the tabs of its task follow its origin.
     if (event.type === ServerEventType.PreviewUpdated && event.data.state === PreviewState.Running) {
-      for (const session of sessions.values()) {
-        if (session.owner.taskId !== event.data.taskId) continue;
-        const policy = policyFor(session.owner);
-        for (const tab of Object.values(session.tabs)) {
-          tab.setPolicy(policy).catch((err: unknown) => log.error({ err }, 'browser policy update failed'));
-        }
+      const tabs = [
+        ...[...sessions.values()].flatMap((s) =>
+          s.owner.taskId === event.data.taskId ? Object.values(s.tabs).map((tab) => ({ tab, owner: s.owner })) : [],
+        ),
+        ...[...userTabs.values()].filter((u) => u.taskId === event.data.taskId).map((u) => ({ tab: u.tab, owner: u })),
+      ];
+      for (const { tab, owner } of tabs) {
+        tab.setPolicy(policyFor(owner)).catch((err: unknown) => log.error({ err }, 'browser policy update failed'));
       }
     }
   });
@@ -534,9 +573,54 @@ export function createBrowserService({
       return { tabId };
     },
 
-    closeUserTab: async (tabId: string): Promise<void> => {
-      await host.request({ kind: 'close', tabId });
+    /**
+     * The user's own tab on the task's preview (29 §8.1), started when needed: placed on the window by the renderer,
+     * in the project's partition so logins to the app under test last, holding the preview from idling. Opens the
+     * project's first key page; its address and error counts follow by `browser.tab_updated`.
+     */
+    async openUserTab(taskId: string): Promise<UserTabState> {
+      const preview = await previews.start(taskId);
+      const projectId = previews.projectOf(taskId);
+      const tabId = `preview:${randomUUID()}`;
+      const tab = await openTab({
+        host,
+        clock,
+        log,
+        tabId,
+        kind: BrowserTabKind.Preview,
+        partition: `persist:aw-preview-${projectId}`,
+        policy: policyFor({ taskId, projectId }),
+        site: false,
+        userFacing: true,
+      });
+      userTabs.set(tabId, { tab, taskId, projectId });
+      previews.acquire(taskId);
+      tab.onChange(() => events.publish({ type: ServerEventType.BrowserTabUpdated, data: userTabState(tabId) }));
+      const first = projects.getRecord(projectId).preview?.pages[0] ?? '/';
+      await tab.cdp('Page.navigate', { url: `${preview.url}${first}` });
+      return userTabState(tabId);
     },
+
+    /** Opens a path of the task's preview in the user's tab (the preview may have restarted on another port). */
+    async navigateUserTab(tabId: string, path: string): Promise<void> {
+      const { tab, taskId } = userTabOf(tabId);
+      const preview = await previews.start(taskId);
+      await tab.cdp('Page.navigate', { url: `${preview.url}${path}` });
+    },
+
+    /** Desktop fills the tab's place on the window; tablet and mobile emulate their size inside it. */
+    async setUserViewport(tabId: string, preset: ViewportPreset): Promise<void> {
+      const { tab } = userTabOf(tabId);
+      if (preset === 'desktop') await tab.cdp('Emulation.clearDeviceMetricsOverride');
+      else {
+        const { width, height, mobile } = VIEWPORT_SIZES[preset];
+        await tab.cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 0, mobile });
+      }
+      tab.viewport.preset = preset;
+      events.publish({ type: ServerEventType.BrowserTabUpdated, data: userTabState(tabId) });
+    },
+
+    closeUserTab,
 
     siteLogins,
 
@@ -559,6 +643,7 @@ export function createBrowserService({
 
     async closeAll(): Promise<void> {
       await Promise.all([...sessions.keys()].map((id) => close(id)));
+      await Promise.all([...userTabs.keys()].map((id) => closeUserTab(id)));
     },
   };
 }

@@ -4,7 +4,7 @@ import { assistantFormSchema } from '../../enums/assistant.ts';
 import { ServerEventType } from '../../enums/system.ts';
 import { assistantConfirmationSchema, assistantConversationSchema, assistantPageRefSchema } from '../api/assistant.ts';
 import { attemptSummarySchema, transcriptEntrySchema } from '../api/attempts.ts';
-import { browserFrameSchema } from '../api/browser.ts';
+import { browserFrameSchema, userTabStateSchema } from '../api/browser.ts';
 import { deliverySchema } from '../api/delivery.ts';
 import { inboxItemSchema } from '../api/inbox.ts';
 import { previewSchema } from '../api/previews.ts';
@@ -53,6 +53,7 @@ export const serverEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal(ServerEventType.ScheduleUpdated), data: z.object({ scheduleId: z.string() }) }),
   z.object({ type: z.literal(ServerEventType.PreviewUpdated), data: previewSchema }),
   z.object({ type: z.literal(ServerEventType.BrowserFrame), data: browserFrameSchema }),
+  z.object({ type: z.literal(ServerEventType.BrowserTabUpdated), data: userTabStateSchema }),
   z.object({
     type: z.literal(ServerEventType.AssistantTranscript),
     data: z.object({ conversationId: z.string(), entries: z.array(transcriptEntrySchema) }),

@@ -13,7 +13,16 @@ import {
 } from './assistant.ts';
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
 import { createBatchOp, deliverBatchOp, getBatchOp, listBatchesOp } from './batches.ts';
-import { clearSiteLoginOp, closeUserTabOp, listBrowserFramesOp, listSiteLoginsOp, openLoginTabOp } from './browser.ts';
+import {
+  clearSiteLoginOp,
+  closeUserTabOp,
+  listBrowserFramesOp,
+  listSiteLoginsOp,
+  navigateUserTabOp,
+  openLoginTabOp,
+  openUserTabOp,
+  setUserViewportOp,
+} from './browser.ts';
 import {
   createDbConnectionOp,
   dbSchemaOp,
@@ -209,7 +218,9 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   listSiteLoginsOp,
   clearSiteLoginOp,
   listBrowserFramesOp,
-  // B2-05 adds openUserTabOp, navigateUserTabOp and setUserViewportOp with their handlers.
+  openUserTabOp,
+  navigateUserTabOp,
+  setUserViewportOp,
   listDbConnectionsOp,
   createDbConnectionOp,
   updateDbConnectionOp,

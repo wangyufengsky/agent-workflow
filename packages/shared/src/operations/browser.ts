@@ -7,6 +7,7 @@ import {
   setUserViewportRequestSchema,
   siteLoginsSchema,
   userTabSchema,
+  userTabStateSchema,
 } from '../contracts/api/browser.ts';
 import { InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
@@ -66,7 +67,7 @@ export const openUserTabOp = defineOperationContract({
   title: 'op.browser.openUserTab',
   description: "Open the user's own tab on the task's page preview, starting the preview when needed",
   input: openUserTabRequestSchema,
-  output: userTabSchema,
+  output: userTabStateSchema,
   refs: { taskId: InputRef.Task },
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:taskId/preview/tabs', status: 201 },
