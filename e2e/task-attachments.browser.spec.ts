@@ -48,8 +48,17 @@ test('开始任务时附上文件：不支持的先移除才能开始，任务�
   await expect(page.getByRole('status').filter({ hasText: '暂不支持图片' })).toBeVisible();
   await expect(attached).toBeHidden();
 
-  await picker.setInputFiles([text('notes.md', '订单号是 12 位数字\n'), text('dump.bin', '\u0000\u0001')]);
+  await picker.setInputFiles([
+    text('notes.md', '订单号是 12 位数字\n'),
+    text('extra.md', '不需要了\n'),
+    text('dump.bin', '\u0000\u0001'),
+  ]);
   await expect(attached.getByRole('button', { name: '查看 notes.md' })).toBeVisible();
+  // An uploaded file removed from the input is deleted on the server too.
+  await expect(attached.getByRole('button', { name: '查看 extra.md' })).toBeVisible();
+  const deleted = page.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes('/attachments/'));
+  await attached.getByRole('button', { name: '移除 extra.md' }).click();
+  expect((await deleted).status()).toBe(204);
   await expect(attached.getByRole('alert')).toContainText('目前只支持文本文件');
   const start = page.getByRole('button', { name: /^开始/ });
   await expect(start).toBeDisabled();

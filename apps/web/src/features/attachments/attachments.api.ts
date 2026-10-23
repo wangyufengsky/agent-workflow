@@ -6,6 +6,7 @@ import {
   ErrorCode,
   errorResponseSchema,
   getAttachmentOp,
+  removeAttachmentOp,
   type SnapshotProjectFileRequest,
   snapshotProjectFileOp,
 } from '@aw/shared';
@@ -31,6 +32,8 @@ export async function uploadAttachment(file: File): Promise<AttachmentDTO> {
   if (!res.ok) throw await failure(res);
   return attachmentSchema.parse(await res.json());
 }
+
+export const removeAttachment = (id: string) => callOperation(removeAttachmentOp, { id });
 
 export const snapshotProjectFile = (input: SnapshotProjectFileRequest) => callOperation(snapshotProjectFileOp, input);
 

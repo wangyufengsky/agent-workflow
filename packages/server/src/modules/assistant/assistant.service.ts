@@ -27,6 +27,7 @@ import {
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
+import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { EventBus } from '../../core/event-bus.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttachmentsService } from '../attachments/index.ts';
@@ -50,6 +51,7 @@ import { type Conversation, createAssistantRepo } from './assistant.repo.ts';
 
 export type AssistantServiceDeps = {
   db: Db;
+  unit: UnitOfWork;
   events: EventBus;
   clock: Clock;
   log: Logger;
@@ -92,7 +94,7 @@ const titleOf = (text: string) =>
  * Messages go out with the per-turn context; the session's events become the conversation's message stream.
  */
 export function createAssistantService(deps: AssistantServiceDeps) {
-  const { db, events, clock, log, opencode, settings, attachments, context } = deps;
+  const { db, unit, events, clock, log, opencode, settings, attachments, context } = deps;
   const repo = createAssistantRepo(db);
   const directory = join(deps.dataDir, ASSISTANT_DIR);
   const live = new Map<string, Live>();
@@ -308,8 +310,11 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       }
       if (c.opencodeSessionId !== null) sessions.delete(c.opencodeSessionId);
       live.delete(id);
-      attachments.release(AttachmentOwnerKind.AssistantMessage, [id]);
-      repo.deleteConversation(id);
+      // Together: a conversation that survives a failed delete keeps its attachments (30 §4).
+      unit.transact(() => {
+        attachments.release(AttachmentOwnerKind.AssistantMessage, [id]);
+        repo.deleteConversation(id);
+      });
       transcripts.forget(c);
       rmSync(join(directory, ASSISTANT_CONVERSATIONS_DIR, `${id}.jsonl`), { force: true });
       rmSync(filesDir(id), { recursive: true, force: true });

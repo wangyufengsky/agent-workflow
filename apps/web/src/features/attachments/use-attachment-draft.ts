@@ -6,7 +6,7 @@ import {
 } from '@aw/shared';
 import { useState } from 'react';
 import { ATTACHMENTS_COPY as C } from '../../copy/attachments.ts';
-import { snapshotProjectFile, tooLargeError, uploadAttachment } from './attachments.api.ts';
+import { removeAttachment, snapshotProjectFile, tooLargeError, uploadAttachment } from './attachments.api.ts';
 
 /** One attachment of the input being written: uploading, ready to send, or failed with the backend's error. */
 export type DraftAttachment =
@@ -67,7 +67,13 @@ export function useAttachmentDraft() {
     notice,
     addFiles,
     addProjectFile,
-    remove: (key: string) => setItems((list) => list.filter((item) => item.key !== key)),
+    /** An uploaded one is deleted on the server too, so adding and removing files does not pile them up there. */
+    remove(key: string): void {
+      const item = items.find((i) => i.key === key);
+      setItems((list) => list.filter((i) => i.key !== key));
+      if (item?.state !== 'ready') return;
+      removeAttachment(item.attachment.id).catch(() => setNotice(C.removeFailed));
+    },
     clear: () => {
       setItems([]);
       setNotice(undefined);

@@ -449,6 +449,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const activeTaskStatuses = TASK_STATUSES.filter((s) => !isTerminalState(taskMachine, s));
   const assistant = createAssistantModule({
     db: database.db,
+    unit,
     events,
     clock,
     log,

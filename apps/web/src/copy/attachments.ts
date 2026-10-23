@@ -11,6 +11,7 @@ export const ATTACHMENTS_COPY = {
   imageUnsupported: '暂不支持图片，请用文字描述截图里的内容。',
   tooMany: `每次最多附加 ${ATTACHMENTS_PER_INPUT_MAX} 个资料。`,
   notReady: '有资料还在上传或上传失败，处理好再发送。',
+  removeFailed: '资料已从输入里移除，但后台没删掉；它会在 24 小时后自动清理。',
   size: (bytes: number) =>
     bytes < 1024
       ? `${bytes} B`
