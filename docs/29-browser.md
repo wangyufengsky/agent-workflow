@@ -10,7 +10,7 @@
 
 **原则。**
 
-1. **文字优先，截图给人**（D121）。本地部署的模型多数没有图片输入。AI 读的是带编号的页面结构文本，截图总是保存下来给用户看；模型支持图片时才把截图也交给它。
+1. **文字优先，截图给人**（D121）。本地部署的模型多数没有图片输入。AI 读的是带编号的页面结构文本，截图总是保存下来给用户看，也随工具结果返回：模型支持图片就能看到，不支持时 opencode 会告诉它看不到（§12 V4）。
 2. **两类地址，两种权限**（D122）：
    - **项目预览**：任务自己的页面，可以随意点击、填写、提交；
    - **网站**：按设置里的网站规则开放。默认所有网站都能浏览，但只读：拦下页面发出的写请求，可以按网站放开操作。
@@ -120,12 +120,13 @@
 
 | 仓库特征 | `command` | `setupCommand` |
 | --- | --- | --- |
-| `package.json` 的 `dev` 脚本含 `vite` | `<pm> run dev -- --port $PORT --strictPort` | 按锁文件：`pnpm install --frozen-lockfile` / `npm ci` / `yarn install --frozen-lockfile` |
-| `dev` 脚本含 `next dev` | `<pm> run dev -- -p $PORT` | 同上 |
-| 其他有 `dev` 或 `start` 脚本的 | `<pm> run dev`（只靠 `PORT` 环境变量） | 同上 |
+| `package.json` 的 `dev` 脚本含 `vite` | pnpm：`pnpm run dev --port $PORT --strictPort`；npm：`npm run dev -- --port $PORT --strictPort`；yarn：`yarn dev --port $PORT --strictPort` | 按锁文件：`pnpm install --frozen-lockfile` / `npm ci` / `yarn install --frozen-lockfile` |
+| 其他有 `dev` 或 `start` 脚本的（含 Next、Create React App） | `<pm> run dev`（只靠 `PORT` 环境变量，Next 与 CRA 都读它） | 同上 |
 | 其他（Java、Go…） | 不推断 | — |
 
 `pages` 默认 `["/"]`，`readyPath` 默认 `/`。
+
+包管理器之间传参方式不同（§12 V5）：pnpm 10 会把 `--` 原样传给脚本，Vite 收到 `--` 后不再解析后面的 `--port`；npm 会吞掉 `--`，不加 `--` 时连参数名都会被吞掉。所以推断出的命令按包管理器分别写。
 
 ### 4.2 一个预览的生命周期
 
@@ -194,6 +195,16 @@ interface BrowserHost {
 | `chromium`：用 devDependency 中 `playwright-core` 启动的 Chromium，`newCDPSession` 转发 | 后端独立运行的开发模式、集成测试与浏览器 E2E。与开发用的明文凭据适配器一样，只在 `NODE_ENV=development` 下存在，生产构建中被常量折叠删除，`scripts/check-prod-bundle.mjs` 校验 |
 
 03 §4.2 的扩展点表新增这一行。动作层、快照、体检只依赖这个接口，所以两种宿主下行为一致，测试跑的是真实 Chromium。
+
+**打开一个标签页的固定步骤**（§12 V1）：
+
+1. 建离屏视图（`webPreferences.offscreen: true`、`backgroundThrottling: false`，不放进任何窗口）；用户标签页是放进主窗口的普通视图。
+2. 加载 `about:blank`。视图还没加载过页面时没有渲染进程，挂调试器后 `Page.enable` 会一直不返回。
+3. `debugger.attach`。
+4. 用 `Emulation.setDeviceMetricsOverride` 设视口。不放进窗口的离屏视图视口是 0×0，命中测试会找不到节点；设了以后尺寸确定、DPR 为 1，截图可重复。`browser_viewport` 也用同一个命令。
+5. 网站标签页在导航前注册 `Page.addScriptToEvaluateOnNewDocument`（§5.4），然后导航。
+
+不用隐藏的 `BrowserWindow`：它的 DPR 跟随屏幕（Retina 上为 2），可用高度受标题栏影响，截图不可重复。也不能用不放进窗口的普通视图：它不渲染。每个标签页的渲染进程约 100 MB，所以 AI 的标签页在尝试结束时关闭，用户标签页离开页签后隐藏、任务终态时关闭（§5.3）。
 
 ### 5.3 会话（标签页）
 
@@ -285,13 +296,14 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 ```
 
 - 总长超过 `BROWSER_SNAPSHOT_MAX_CHARS`（12000）时，先截断长列表和表格的行，再截断最深的子树，末尾注明截断了什么。
-- 同源 iframe 展开；跨域 iframe 只列地址（§12 V6 之后再定是否展开）。
+- 收起的下拉框只写当前值和选项个数（`combobox "切换主题" value="暖色" (5 个选项)`），不逐个列出选项；展开后才列出（§12 V6）。
+- 同源 iframe 展开；跨域 iframe 只列地址。
 - 编号按文档顺序生成，同一页面内稳定。
 
 ### 5.7 模型能力与截图
 
-- 后端从 opencode 的模型信息判断当前尝试所用模型是否支持图片输入（字段待 §12 V3 实测），结果按模型缓存。
-- `browser_screenshot` 总是存文件作为证据给用户看；模型支持图片时，在工具结果里附上图片内容（需 §12 V4 确认 opencode 会把 MCP 返回的图片交给模型），否则只返回「已保存，你的模型不支持图片输入，请用 browser_snapshot / browser_inspect」。
+- `browser_screenshot` 总是存文件作为证据给用户看，**并且总是**以 MCP `image` 内容随工具结果返回。模型支持图片时能看到；不支持时 opencode 会告诉模型它读不了这张图，不报错（§12 V4）。所以后端不判断模型能力，工具说明里写明：看不到图片时用 `browser_snapshot` / `browser_inspect`。
+- 返回的截图压成 JPEG（宽不超过 1280，质量 70）。opencode 把工具返回的图片以 data URL 存在它自己的会话里（工具片段的 `state.attachments`），体积要控制住。本应用的会话流镜像不复制 `attachments`，只记一条「截图」动作。
 - 每个动作后另存一张 JPEG 缩略图（宽 960，质量 60，约 40 KB），作为观看画面（§8.2），不交给模型。一次尝试 50 个动作约 2 MB，随 `runs/` 一起保留与清理。
 - **存放位置按归属**，与会话流 JSONL 的目录规则一致（10 §3）：
   - 尝试的截图与画面：`<该尝试会话流所在目录>/browser/<attemptId>/`，即任务的尝试为 `runs/<taskId>/browser/<attemptId>/`，知识问答的 `research` 尝试为 `runs/knowledge/browser/<attemptId>/`。按尝试读取：`GET /attempts/:attemptId/browser/:file`，后端由尝试解析目录，所以没有任务的尝试也能取到；
@@ -528,23 +540,25 @@ packages/builtin/prompts/         protocol-execute / protocol-review / protocol-
 
 **依赖方向**：`acceptance → browser → previews → projects / worktrees`。`browser` 订阅 `attempt` 结束和任务终态的领域事件来关闭会话、停止预览，不依赖 `attempts` 和 `tasks`。`mcp` 与 `assistant` 在最上层调用 `browser` 和 `previews` 的 index。
 
-## 12. 开发前要实测的项（同 M0 的做法）
+## 12. 开发前实测
 
-| # | 要确认的 | 不成立时 |
-| --- | --- | --- |
-| V1 | 离屏 `WebContentsView`（`webPreferences.offscreen: true`，`backgroundThrottling: false`）上 `debugger.attach`、`Input.dispatch*`、`getFullAXTree`、`capturePage` 都正常，rAF 正常运行 | 改用隐藏的 `BrowserWindow`（PPT 导出已这样用） |
-| V2 | 用户标签页打开 DevTools 时，`debugger` 能否同时挂着（`browser.read` 需要） | DevTools 打开时 `browser.read` 返回 `BROWSER_UNAVAILABLE`，提示先关掉开发者工具 |
-| V3 | opencode 1.19.0 的模型信息里有输入模态字段（models.dev 的 `modalities.input` / `attachment`），以及从哪个接口取 | 设置里加「当前模型支持图片」手动开关 |
-| V4 | MCP 工具结果里的 `image` 内容会被 opencode 1.19.0 交给模型 | 截图一律只存文件、不交给模型 |
-| V5 | Vite / Next 的端口参数推断；Windows 上 `pnpm dev` 的进程树能结束干净（`killDescendants`） | 推断表收窄；Windows 按 17 §3 的已知问题处理 |
-| V6 | 快照在中等规模单页应用（用本应用自己的页面）上的长度与耗时 | 调整精简规则与上限 |
-| V7 | `session.webRequest.onBeforeRequest` 的 `details.webContentsId` 在共用分区里能区分 AI 标签页与用户的登录标签页，且 WebSocket 连接以 `resourceType = webSocket` 经过它（只读拦截依赖这两点） | AI 网站标签页改用单独的持久分区，从登录分区复制 Cookie（`session.cookies`）后再打开 |
+2026-10-23，在 macOS 上用 Electron 44.9.0、opencode 1.19.0 实测。实测代码按 M0 的做法用完即删，不进仓库。
+
+| # | 要确认的 | 结果 | 对设计的影响 |
+| --- | --- | --- | --- |
+| V1 | 离屏视图能否被 CDP 驱动 | **通过，有两个前提**。离屏 `WebContentsView`（`offscreen: true`、`backgroundThrottling: false`，不放进窗口）上，以下都正常：<br>· attach；<br>· `Input.dispatchMouseEvent` 点击；<br>· 点击聚焦后 `Input.insertText`；<br>· `getFullAXTree`；<br>· `capturePage` 与 `Page.captureScreenshot`；<br>· rAF 约 60 帧/秒。<br>两个前提：① 视图还没加载过页面时挂调试器，`Page.enable` 会一直不返回；② 视口是 0×0（`innerWidth` 为 0，命中测试返回 "No node found"），用 `Emulation.setDeviceMetricsOverride` 设置后为 1280×800、DPR 1。<br>对照：不离屏、不放进窗口的普通视图不渲染（rAF 为 0、点击无效、截图报 `UnknownVizError`）；隐藏的 `BrowserWindow` 能用，但 DPR 为 2、高度 768。<br>每个标签页的渲染进程约 100 MB | §5.2 固定了打开标签页的步骤：先 `about:blank`，再挂调试器，再设视口。不用隐藏窗口 |
+| V2 | DevTools 与调试器能否共存 | **通过**。先开 DevTools 再挂调试器、先挂调试器再开 DevTools，都成功，两者能同时使用。关掉 DevTools 后调试器仍挂着，没有 `detach` 事件 | 「开发者工具」按钮和 `browser.read` 可以同时使用，不需要退路 |
+| V3 | 模型信息里有没有图片输入字段 | **有**：`GET /config/providers` → `providers[].models[<id>].capabilities.input.image`（布尔），另有 `capabilities.attachment`。<br>默认免费模型 `opencode-go/deepseek-v4.1-flash` 标为支持图片；`glm-5.3`、`deepseek-v4-pro` 等标为不支持 | 浏览器功能用不到它（见 V4），留给需要提前提示「这个模型看不到图」的界面 |
+| V4 | MCP 工具返回的图片会不会交给模型 | **会**。用一个本地 stdio MCP 工具返回 `text` 加一张 64×64 纯绿 PNG：<br>· `deepseek-v4.1-flash` 答「Green」；<br>· 不支持图片的 `glm-5.3` 收到 opencode 的说明（这个模型读不了图片），答 `NO_IMAGE`，没有报错。<br>opencode 把图片以 data URL 存在工具片段的 `state.attachments` 里 | §5.7 简化：截图总是随工具结果返回，由 opencode 按模型能力处理，后端不判断模型能力；截图压成 JPEG 控制体积 |
+| V5 | 端口参数推断与结束进程树 | **推断表要按包管理器分别写**：<br>· pnpm 10 把 `--` 原样传给脚本（`pnpm run dev -- --port 1` 收到 `["--","--port","1"]`），Vite 不解析 `--port`，在自己配置的端口启动；<br>· npm 会吞掉 `--`，不加 `--` 时连参数名也被吞掉。<br>用本仓库的 `apps/web`（Vite 8.3.4）实测：<br>· `pnpm run dev --port $PORT --strictPort` 与 `npm run dev -- --port $PORT --strictPort` 约 0.4–0.6 秒就绪；<br>· 带 `--` 的 pnpm 写法按就绪探测超时失败，日志里能看到 Vite 实际监听的地址；<br>· `--strictPort` 遇到端口被占用立即退出（退出码 1）；<br>· execa `killDescendants` 结束后端口释放，没有残留进程。<br>**没有验证**：Windows 与 Linux（CI 停跑）、yarn（本机没有）、Next（本仓库没有；按官方文档，`next dev` 读 `PORT` 环境变量） | §4.1 推断表按包管理器改写，Next 与 CRA 只靠 `PORT` 环境变量。Windows 与 Linux 等 CI 恢复后验证，17 §3 的已知问题照旧 |
+| V6 | 快照的长度与耗时 | 本应用自己的页面（专业模式，本仓库作为项目，离屏视图 1280×800）：<br>· 多数页面 DOM 70–240 个元素、无障碍树 76–381 个节点，取树 3–23 ms；<br>· 最大的是 Git 工作台（DOM 575、树 703），取树 27 ms。粗略格式化后（只含角色与名称，不含正文）141 行、4209 字符、78 个编号。<br>收起的主题下拉框把全部选项都列了出来 | 12000 字符的上限够用（计入正文后估计翻倍）。§5.6 补一条：收起的下拉框只写当前值与选项个数 |
+| V7 | 只读拦截的两个前提 | **通过**。两个标签页共用 `persist:aw-sites` 分区时，`onBeforeRequest` 的 `webContentsId` 能区分 AI 标签页与用户标签页；WebSocket 以 `resourceType = webSocket`（方法为 `GET`）经过它。<br>只拦 AI 标签页时：<br>· AI 标签页：`POST` 失败、`GET` 返回 200、WebSocket 失败（服务端没收到升级请求）；<br>· 用户标签页：`POST` 返回 200、WebSocket 连上。<br>`Page.addScriptToEvaluateOnNewDocument` 去掉 `RTCPeerConnection` / `WebTransport` 后，页面里两者都是 `undefined`（脚本要在导航前注册） | 按设计实现，不需要退路 |
 
 ## 13. 分期
 
 | 期 | 内容 | 完成标准 |
 | --- | --- | --- |
-| B1 地基 | V1–V7 实测；`BrowserHost` 两种实现；预览服务；动作层与快照；执行 MCP 工具（含网站标签页、只读拦截、登录检测）；会话流动作文案；项目设置「页面预览」与推断；设置「网站」（规则与登录） | 真实模型（默认免费模型，只有文字）在示例前端仓库里改一个按钮，用浏览器工具验证并提交（`pnpm test:oc` 新增一例） |
+| B1 地基 | V1–V7 实测（已完成，§12）；`BrowserHost` 两种实现；预览服务；动作层与快照；执行 MCP 工具（含网站标签页、只读拦截、登录检测）；会话流动作文案；项目设置「页面预览」与推断；设置「网站」（规则与登录）。任务见 05 的 B-01…B-08 | 真实模型在示例前端仓库里改一个按钮，用浏览器工具验证并提交（`pnpm test:oc` 新增一例）：默认免费模型（支持图片）跑一次，再用一个不支持图片的模型跑一次，确认只靠快照也能完成 |
 | B2 验收与界面 | `browser` 检查与判定；内置流程与提示词；节点详情；任务页预览页签（我的预览、观看画面、底栏）；结果卡「页面」区；「附上当前页面」 | 四主题走查截图；Electron 旅程新增一条：打开预览、不允许的地址交给系统浏览器、网站登录后 AI 的网站标签页带着登录状态 |
 | B3 助手、知识问答、PPT | `previews.start` / `stop`、`browser.read`、`browser.readUrl`；研究员的浏览器工具与 `web` 引用摘录；PPT 网页资料 | 助手回答「这个页面为什么报错」用到控制台错误；知识问答用登录后的内网页面回答并能打开引用摘录 |
 | 后续（另行确认） | 页面对比（改动前后截图逐像素对比，结果卡显示变化区域）；定时「页面巡检」流程；接手 AI 的会话；跨域 iframe；助手操作页面 | — |
@@ -577,3 +591,11 @@ packages/builtin/prompts/         protocol-execute / protocol-review / protocol-
 - **E2E**：四主题走查新增预览页签的各个状态、节点详情的体检结果、结果卡「页面」区。
 - **Electron E2E**：真实的 `WebContentsView` 放置与隐藏（⌘K 打开时隐藏）、不允许的地址交给系统浏览器（桩住 `openExternal`）。
 - **live**：§13 B1 的完成标准那一例。
+
+## 15. 与统一附件／需求清单的衔接（补充设计，未实现）
+
+- [30](30-attachments.md) 的附件入口属于应用输入，不改变 §1 / §5.4 的网站文件上传与下载禁令。
+- 「附上当前页面」把截图与文字日志注册为有来源的输入附件，保留路径、视口和时间；原有 requestChanges.page 表达捕获意图，由后端实际捕获，不能接受 renderer 编造的检查结果。图片能力识别共用 §5.7。
+- 页面体检／浏览器动作若被 [31](31-requirements-checklist.md) 引用，需先登记不可变检查／证据 ID、内容指纹与元信息；离开页面、关闭会话、清理 worktree 后仍能查看。没有 task 的网站会话不能作为任意任务的通过证据。
+- §7 的健康判定保持 D124：没有报错不自动证明搜索、分页、数据保存等业务要求满足；可访问性／溢出提醒可作为逐项 AI 评审依据，但不能伪装成已通过的业务断言。
+- 任务反馈附新资料或代码改变后，清单结论按 31 失效。浏览器未就绪时，命令／人工／代码评审清单仍可独立使用。
