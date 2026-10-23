@@ -1,6 +1,6 @@
 # agent-workflow · AI 编码助手须知
 
-当前阶段：**v1.2 开发完成**（v1.1：应用助手、知识问答、Windows / Linux、质量与用量、批量任务；v1.2：PR 审查意见回流、定时任务、PPT、更多数据库，见 `docs/04-project-plan.md` §5），待用户检查后发布。v1.3 内置浏览器与页面预览（`docs/29-browser.md`，D120–D125）的 B1 已在分支 `feat/B-browser` 完成（05 的 B-01…B-08），B2、B3 未开始。v1.0 验收报告见 `docs/16-acceptance-v1.0.md`。开始任何开发任务前，先读：
+当前阶段：**v1.2 开发完成**（v1.1：应用助手、知识问答、Windows / Linux、质量与用量、批量任务；v1.2：PR 审查意见回流、定时任务、PPT、更多数据库，见 `docs/04-project-plan.md` §5），待用户检查后发布。v1.3 内置浏览器与页面预览（`docs/29-browser.md`，D120–D125）的 B1 已合并（05 的 B-01…B-08），B2 已在分支 `feat/B2-browser` 完成（05 的 B2-01…B2-08），B3 未开始。v1.0 验收报告见 `docs/16-acceptance-v1.0.md`。开始任何开发任务前，先读：
 
 1. `docs/06-coding-standards.md`：找根因不兜底、不过度防御、状态只经状态机、一处定义。
 2. `docs/07-testing-standards.md`：测行为不测实现、少而有效、真实 SQLite/Git、缺陷先写失败测试、禁止 sleep。

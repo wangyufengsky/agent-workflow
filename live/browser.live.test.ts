@@ -1,6 +1,13 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { TaskStatus, type TranscriptEntry, updateSettingsOp } from '@aw/shared';
+import {
+  AcceptanceCheckKind,
+  getNodeOp,
+  listPreviewSessionsOp,
+  TaskStatus,
+  type TranscriptEntry,
+  updateSettingsOp,
+} from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createChromiumHost } from '../packages/server/src/modules/browser/host.chromium.ts';
 import { TEST_MODEL } from '../packages/server/test/helpers/model.ts';
@@ -9,7 +16,8 @@ import { type LiveApp, outcome, startLiveApp, TASK_TIMEOUT_MS } from './live-app
 /**
  * B1's completion test (29 §13): a real model changes a page of todo-web and checks it in the browser through the
  * page preview, once with the default free model (it reads images) and once with a model without image input, which
- * has only the page snapshot. Run by hand: `pnpm test:live live/browser.live.test.ts`; AW_LIVE_TEXT_MODEL picks the
+ * has only the page snapshot. B2's too: the feature workflow's final verification runs the page check of the
+ * project's key pages (29 §7), and every browser action left a frame (29 §5.7). Run by hand: `pnpm test:live live/browser.live.test.ts`; AW_LIVE_TEXT_MODEL picks the
  * text-only model.
  */
 const TEXT_ONLY_MODEL = process.env.AW_LIVE_TEXT_MODEL ?? 'opencode-go/glm-5.3';
@@ -59,6 +67,17 @@ describe('@live 浏览器：改页面并在页面预览里验证', () => {
       expect(calls).toContainEqual({ tool: 'browser_click', ok: true });
       const html = await readFile(join(task.git.worktreePath ?? '', 'public/index.html'), 'utf8');
       expect(html).toContain('清空');
+
+      const verify = task.nodes.find((n) => n.key === 'final_verify');
+      const { body: node } = await live.t.call(getNodeOp, { id: task.id, nodeId: verify?.id ?? '' });
+      const check = node.checkResults?.find((c) => c.kind === AcceptanceCheckKind.Browser);
+      expect(check).toMatchObject({ passed: true, skipped: false, unrunnable: null });
+      expect(check?.kind === AcceptanceCheckKind.Browser && check.pages.map((p) => p.viewport)).toEqual([
+        'desktop',
+        'mobile',
+      ]);
+      const { body: sessions } = await live.t.call(listPreviewSessionsOp, { id: task.id });
+      expect(sessions.attempts.some((a) => a.frames > 0)).toBe(true);
     },
     TASK_TIMEOUT_MS,
   );
