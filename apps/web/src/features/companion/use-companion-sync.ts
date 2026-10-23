@@ -11,7 +11,9 @@ import { useSettings } from '../settings/settings.queries.ts';
 export const isCompanionWindow = () => window.location.pathname === COMPANION_PATH;
 
 export function useCompanionSync(): unknown {
-  const enabled = useSettings()['companion.enabled'];
+  const settings = useSettings();
+  const enabled = settings['companion.enabled'];
+  const size = settings['companion.size'];
   const router = useRouter();
   const qc = useQueryClient();
   const [error, setError] = useState<unknown>(null);
@@ -22,13 +24,13 @@ export function useCompanionSync(): unknown {
     const configure = async () => {
       if (!enabled) await callOperation(stopWhisperOp, {});
       if (cancelled) return;
-      await bridge.configure({ enabled }, { open: C.openApp, hide: C.hide, quit: C.quit });
+      await bridge.configure({ enabled, size }, { open: C.openApp, hide: C.hide, quit: C.quit });
     };
     void configure().catch(setError);
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, size]);
   useEffect(() => {
     const bridge = window.aw?.companion;
     if (bridge === undefined || bridge.surface === null) return;
