@@ -18,6 +18,7 @@ import { dbDescribeTool, dbListConnectionsTool, dbQueryTool } from './tools/db-t
 import { getNodeOutputTool } from './tools/get-node-output.tool.ts';
 import { getTaskContextTool } from './tools/get-task-context.tool.ts';
 import { getTaskDiffTool } from './tools/get-task-diff.tool.ts';
+import { readAttachmentTool } from './tools/read-attachment.tool.ts';
 import { reportProgressTool } from './tools/report-progress.tool.ts';
 import { submitAnswerTool } from './tools/submit-answer.tool.ts';
 import { submitCommitMessageTool } from './tools/submit-commit-message.tool.ts';
@@ -64,6 +65,7 @@ export function createMcpModule({
     getTaskContextTool(tasks, debug),
     getNodeOutputTool(tasks),
     getTaskDiffTool(tasks),
+    readAttachmentTool(tasks),
     submitPlanTool(tasks),
     submitResultTool(tasks, debug),
     submitReviewTool(acceptance),

@@ -114,6 +114,11 @@ export const ErrorCode = {
   BrowserLoginRequired: 'BROWSER_LOGIN_REQUIRED',
   BrowserRefStale: 'BROWSER_REF_STALE',
   BrowserActionFailed: 'BROWSER_ACTION_FAILED',
+  // 附件（30）
+  AttachmentNotFound: 'ATTACHMENT_NOT_FOUND',
+  AttachmentInvalidType: 'ATTACHMENT_INVALID_TYPE',
+  AttachmentTooLarge: 'ATTACHMENT_TOO_LARGE',
+  AttachmentSourceInvalid: 'ATTACHMENT_SOURCE_INVALID',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 export const ERROR_CODES = Object.values(ErrorCode);
@@ -214,6 +219,10 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.BrowserLoginRequired]: 409,
   [ErrorCode.BrowserRefStale]: null,
   [ErrorCode.BrowserActionFailed]: null,
+  [ErrorCode.AttachmentNotFound]: 404,
+  [ErrorCode.AttachmentInvalidType]: 400,
+  [ErrorCode.AttachmentTooLarge]: 413,
+  [ErrorCode.AttachmentSourceInvalid]: 400,
 } as const satisfies Record<ErrorCode, number | null>;
 
 /** `{ code, message, details? }` as stored on tasks / attempts and returned in HTTP error bodies. */

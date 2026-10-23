@@ -36,5 +36,7 @@ export const InputRef = {
   /** A step of the task named by the same input's `id`. */
   Node: 'node',
   Attempt: 'attempt',
+  /** Files the user attached in the assistant conversation (30 §2.2). */
+  Attachment: 'attachment',
 } as const;
 export type InputRef = (typeof InputRef)[keyof typeof InputRef];

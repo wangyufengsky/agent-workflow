@@ -17,6 +17,7 @@ import { ASSISTANT_COPY as C } from '../../copy/assistant.ts';
 import { ATTEMPT_COPY, TRANSCRIPT_SYSTEM_LABEL } from '../../copy/attempts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
+import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { useTranscript } from '../attempts/attempt.queries.ts';
 import { Character } from '../companion/character.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
@@ -131,8 +132,11 @@ function Body({ entry, ctx }: { entry: TranscriptEntry; ctx: Rendered }): ReactN
   switch (entry.kind) {
     case TranscriptEntryKind.UserMessage:
       return (
-        <div className={styles.user} data-testid="assistant-user-message">
-          {entry.data.text}
+        <div className={styles.userTurn}>
+          <div className={styles.user} data-testid="assistant-user-message">
+            {entry.data.text}
+          </div>
+          {entry.data.attachments !== undefined && <SentAttachments attachments={entry.data.attachments} />}
         </div>
       );
     case TranscriptEntryKind.Text:

@@ -18,6 +18,8 @@ export const AssistantToolName = {
   OpenForm: 'open_form',
   ListFiles: 'list_files',
   RevealFile: 'reveal_file',
+  /** More of a file the user attached in this conversation (30 §3.2). */
+  ReadAttachment: 'read_attachment',
 } as const;
 export type AssistantToolName = (typeof AssistantToolName)[keyof typeof AssistantToolName];
 

@@ -555,11 +555,11 @@ payload / response：
 
 | 表 | 关键字段／约束 |
 | --- | --- |
-| attachments | id、source、display_name、media_type、size_bytes、sha256、meta JSON（项目文件的 projectId、可选 taskId、相对路径、行范围、读取时间）、created_at。磁盘路径只由 id 派生：`attachments/<id>/original` |
-| attachment_refs | id、attachment_id FK、owner_kind、owner_id、ordinal、created_at；UNIQUE(owner_kind, owner_id, attachment_id) |
+| attachments | id、source、name（显示名）、size_bytes、origin JSON（项目文件快照才有：projectId、taskId、相对路径、行范围、读取时间）、created_at；索引 created_at。磁盘路径只由 id 派生：`attachments/<id>/original`（迁移 0017，U-01 已实现） |
+| attachment_refs | owner_kind、owner_id、attachment_id FK、ordinal、created_at；主键 (owner_kind, owner_id, attachment_id)，索引 attachment_id |
 
 - 所有者在自己的事务里创建／删除引用：删除任务时删除该任务（task_input）与其节点（task_feedback）的引用；删除助手对话时删除 assistant_message 引用。多态 owner 没有外键，由所有者模块负责。
-- 助手会话 JSONL 的用户消息增加可选 `attachments: [{ id, name, mediaType }]`，只作展示。
+- 助手会话 JSONL 的用户消息增加可选 `attachments: [{ id, name }]`，只作展示。
 - 清理：在一个事务里删除没有引用且创建超过 `ATTACHMENT_ORPHAN_TTL_MS` 的记录，提交后再删文件；绑定在事务里先确认记录存在再插入引用，因此不会与清理交错（30 §4）。删文件失败留下的、目录中没有记录的残留按年龄清理。
 
 ### 6.2 需求清单

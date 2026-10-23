@@ -11,7 +11,10 @@ import {
   type AssistantFileDTO,
   type AssistantPageRef,
   type AssistantPermissionRequestDTO,
+  AssistantToolName,
+  AttachmentOwnerKind,
   ErrorCode,
+  MCP_ASSISTANT_TOOL_PREFIX,
   OPENCODE_ASSISTANT_AGENT,
   type OperationContract,
   type PermissionDecision,
@@ -24,8 +27,10 @@ import {
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
+import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { EventBus } from '../../core/event-bus.ts';
 import type { Logger } from '../../core/logger.ts';
+import type { AttachmentsService } from '../attachments/index.ts';
 import {
   createSessionView,
   createTranscriptStore,
@@ -46,11 +51,13 @@ import { type Conversation, createAssistantRepo } from './assistant.repo.ts';
 
 export type AssistantServiceDeps = {
   db: Db;
+  unit: UnitOfWork;
   events: EventBus;
   clock: Clock;
   log: Logger;
   opencode: OpencodeClient;
   settings: SettingsService;
+  attachments: AttachmentsService;
   context: ContextRenderer;
   dataDir: string;
   /** IANA zone the user's times are given in (15 §2). */
@@ -87,7 +94,7 @@ const titleOf = (text: string) =>
  * Messages go out with the per-turn context; the session's events become the conversation's message stream.
  */
 export function createAssistantService(deps: AssistantServiceDeps) {
-  const { db, events, clock, log, opencode, settings, context } = deps;
+  const { db, unit, events, clock, log, opencode, settings, attachments, context } = deps;
   const repo = createAssistantRepo(db);
   const directory = join(deps.dataDir, ASSISTANT_DIR);
   const live = new Map<string, Live>();
@@ -303,7 +310,11 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       }
       if (c.opencodeSessionId !== null) sessions.delete(c.opencodeSessionId);
       live.delete(id);
-      repo.deleteConversation(id);
+      // Together: a conversation that survives a failed delete keeps its attachments (30 §4).
+      unit.transact(() => {
+        attachments.release(AttachmentOwnerKind.AssistantMessage, [id]);
+        repo.deleteConversation(id);
+      });
       transcripts.forget(c);
       rmSync(join(directory, ASSISTANT_CONVERSATIONS_DIR, `${id}.jsonl`), { force: true });
       rmSync(filesDir(id), { recursive: true, force: true });
@@ -311,7 +322,12 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     },
 
     /** A user message, with the page they are on (15 §2). Messages waiting in the outbox go along with it. */
-    async send({ id, text, context: page }: SendAssistantMessageRequest): Promise<AssistantConversationDTO> {
+    async send({
+      id,
+      text,
+      context: page,
+      attachmentIds = [],
+    }: SendAssistantMessageRequest): Promise<AssistantConversationDTO> {
       const c = get(id);
       const state = liveOf(id);
       if (state.busy) throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is busy`, { id });
@@ -321,17 +337,48 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       const titled = c.title === '' ? { ...c, title: titleOf(text) } : c;
       repo.updateConversation(id, { title: titled.title, updatedAt: clock.now() });
       const sessionId = await sessionOf(titled);
-      record(c, [{ kind: TranscriptEntryKind.UserMessage, data: { text } }]);
+      // The conversation keeps its files even when the model cannot be reached: they were sent (30 §2).
+      attachments.bind({ kind: AttachmentOwnerKind.AssistantMessage, id }, attachmentIds);
+      const sent = attachmentIds.map((attachmentId) => attachments.get(attachmentId));
+      record(c, [
+        {
+          kind: TranscriptEntryKind.UserMessage,
+          data: sent.length === 0 ? { text } : { text, attachments: sent.map((a) => ({ id: a.id, name: a.name })) },
+        },
+      ]);
       state.page = page;
       const queued = state.outbox.splice(0);
+      const section = attachments.promptSection(
+        sent,
+        `${MCP_ASSISTANT_TOOL_PREFIX}${AssistantToolName.ReadAttachment}`,
+      );
       try {
-        await prompt(get(id), sessionId, systemText, [...queued, text].join('\n\n'));
+        await prompt(
+          get(id),
+          sessionId,
+          systemText,
+          [...queued, text, ...(section === '' ? [] : [section])].join('\n\n'),
+        );
       } catch (err) {
         // The model has not seen them: they go with the next message.
         state.outbox.unshift(...queued);
         throw err;
       }
       return toDto(get(id));
+    },
+
+    /**
+     * The assistant passes on only files the user attached in this conversation (30 §2.2): an id from elsewhere is
+     * answered as if it did not exist.
+     */
+    assertOwnAttachments(conversationId: string, attachmentIds: readonly string[]): void {
+      const own = new Set(
+        attachments.listByOwner({ kind: AttachmentOwnerKind.AssistantMessage, id: conversationId }).map((a) => a.id),
+      );
+      const foreign = attachmentIds.filter((id) => !own.has(id));
+      if (foreign.length > 0) {
+        throw new AppError(ErrorCode.AttachmentNotFound, 'Not attachments of this conversation', { ids: foreign });
+      }
     },
 
     /** A message from the app (a confirmation's result): now if the session can take it, else when it can. */

@@ -50,6 +50,7 @@ export const TOOLS_COPY = {
     [McpToolName.GetTaskContext]: '读取任务的需求、当前步骤、检查方式、前面步骤的结果，以及用户的回答与反馈。',
     [McpToolName.GetNodeOutput]: '读取本任务中某个已完成步骤的完整产出：摘要、改动文件、注意事项与检查结果。',
     [McpToolName.GetTaskDiff]: '查看任务工作区相对基线的改动：文件列表，或某个文件的 diff。',
+    [McpToolName.ReadAttachment]: '分页读取用户附加的资料（提示词里只放了开头时）。',
     [McpToolName.SubmitPlan]: '提交计划：步骤、角色、指令与依赖。计划不合规时返回问题，AI 修改后再提交。',
     [McpToolName.SubmitResult]: '步骤完成后提交结果；每次尝试只能提交一次，之后进入检查。',
     [McpToolName.SubmitReview]: '提交评审结论：通过，或列出问题及位置。',

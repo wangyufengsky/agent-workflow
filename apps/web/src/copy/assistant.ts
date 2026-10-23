@@ -77,6 +77,7 @@ export const TOOL_COPY = {
     [AssistantToolName.OpenForm]: '打开表单',
     [AssistantToolName.ListFiles]: '列出生成的文件',
     [AssistantToolName.RevealFile]: REVEAL[UI_PLATFORM],
+    [AssistantToolName.ReadAttachment]: '读取附加的资料',
   } satisfies Record<AssistantToolName, string>,
   /** opencode's own tools (12 §2); the user's own MCP servers show as `external`. */
   native: NATIVE_TOOL,
@@ -140,4 +141,5 @@ export const INPUT_REF_LABEL = {
   [InputRef.InboxItem]: '待处理条目',
   [InputRef.Node]: '步骤',
   [InputRef.Attempt]: 'AI 会话',
+  [InputRef.Attachment]: '资料',
 } satisfies Record<InputRef, string>;

@@ -2,6 +2,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   AssistantToolName,
+  ATTACHMENT_NAME_HEADER,
+  type AttachmentDTO,
   AttemptKind,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
@@ -176,6 +178,42 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     expect(await entityRefs()).toEqual([
       { kind: 'task', id: (output as { id: string }).id, title: 'T-1 · 订单时间显示错了' },
     ]);
+  });
+
+  it('「开始任务」只能转交本对话里的附件：别的附件直接报错、不出确认卡；确认后任务带上附件（30 §2.2）', async () => {
+    const { project } = await addProject(t);
+    const upload = async (name: string) =>
+      (
+        await t.request({
+          method: 'POST',
+          url: '/attachments',
+          headers: { 'content-type': 'application/octet-stream', [ATTACHMENT_NAME_HEADER]: name },
+          payload: `${name}\n`,
+        })
+      ).json<AttachmentDTO>();
+    const [own, elsewhere] = [await upload('own.md'), await upload('elsewhere.md')];
+    const idle = becomesIdle();
+    await t.call(sendAssistantMessageOp, {
+      id: conversationId,
+      text: '需求说明在附件里',
+      context: { page: 'home', params: {} },
+      attachmentIds: [own.id],
+    });
+    await idle;
+    const task = {
+      projectId: project.id,
+      workflowId: await workflowId(t, 'bugfix'),
+      requirement: '按附件修',
+      start: false,
+    };
+
+    const refused = await call('tasks_create', { ...task, attachmentIds: [elsewhere.id] });
+    expect(refused).toMatchObject({ isError: true, body: { code: ErrorCode.AttachmentNotFound } });
+    expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toEqual([]);
+
+    const { body } = await call('tasks_create', { ...task, attachmentIds: [own.id] });
+    const res = await decide(String(body.confirmation_id), 'confirm');
+    expect(res.body.result).toMatchObject({ ok: true, output: { attachments: [{ id: own.id, name: 'own.md' }] } });
   });
 
   it('确认后执行「批量任务」：批次与子任务已创建，消息流出现指向该批次的 entity_ref（20 §8）', async () => {

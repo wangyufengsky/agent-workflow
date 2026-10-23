@@ -41,7 +41,7 @@ export const listTasksOp = defineOperationContract({
 export const createTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.create',
-  refs: { projectId: InputRef.Project, workflowId: InputRef.Workflow },
+  refs: { projectId: InputRef.Project, workflowId: InputRef.Workflow, attachmentIds: InputRef.Attachment },
   title: 'op.tasks.create',
   description: 'Create a development task in a project with a workflow and start it (unless start is false)',
   input: createTaskRequestSchema,
@@ -353,6 +353,8 @@ export const requestChangesOp = defineOperationContract({
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/request-changes' },
+  // As for tasks.create: the assistant cannot attach files yet (30 §2.2).
+  assistantOmit: ['attachmentIds'],
 });
 
 export const reviewCommentsOp = defineOperationContract({

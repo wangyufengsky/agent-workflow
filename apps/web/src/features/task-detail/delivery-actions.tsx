@@ -22,6 +22,8 @@ import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DELIVERY_COPY as C } from '../../copy/delivery.ts';
 import { TASK_COPY } from '../../copy/tasks.ts';
+import { AttachmentBar, dropFilesInto, pasteFilesInto } from '../attachments/attachment-bar.tsx';
+import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { skippedCommands } from '../tasks/skipped-checks.ts';
@@ -323,13 +325,20 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
 
 function ReviseDialog({ task, open, onClose }: { task: TaskDetailDTO; open: boolean; onClose: () => void }) {
   const [feedback, setFeedback] = useState('');
+  const files = useAttachmentDraft();
   const changes = useRequestChanges();
   const send = () =>
     changes.mutate(
-      { id: task.id, reason: ChangeRequestReason.User, feedback: feedback.trim() },
+      {
+        id: task.id,
+        reason: ChangeRequestReason.User,
+        feedback: feedback.trim(),
+        ...(files.ids.length === 0 ? {} : { attachmentIds: files.ids }),
+      },
       {
         onSuccess: () => {
           toast(C.revised);
+          files.clear();
           onClose();
         },
       },
@@ -340,7 +349,12 @@ function ReviseDialog({ task, open, onClose }: { task: TaskDetailDTO; open: bool
       onOpenChange={(o) => !o && onClose()}
       title={C.reviseTitle}
       footer={
-        <Button variant="primary" pending={changes.isPending} disabled={feedback.trim() === ''} onClick={send}>
+        <Button
+          variant="primary"
+          pending={changes.isPending}
+          disabled={feedback.trim() === '' || files.blocked}
+          onClick={send}
+        >
           {C.reviseSend}
         </Button>
       }
@@ -352,6 +366,16 @@ function ReviseDialog({ task, open, onClose }: { task: TaskDetailDTO; open: bool
         placeholder={C.revisePlaceholder}
         value={feedback}
         onChange={(e) => setFeedback(e.target.value)}
+        onPaste={pasteFilesInto(files)}
+        {...dropFilesInto(files)}
+      />
+      <AttachmentBar
+        draft={files}
+        projectFiles={
+          task.git.branch === null
+            ? undefined
+            : { projectId: task.project.id, refName: task.git.branch, taskId: task.id }
+        }
       />
       {changes.isError && <ErrorState error={changes.error} />}
     </Dialog>

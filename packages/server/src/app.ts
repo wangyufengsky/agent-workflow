@@ -24,6 +24,7 @@ import { mountOperations, type OperationImpl } from './core/operations/operation
 import { registerSseHub } from './core/sse/sse-hub.ts';
 import { createAcceptanceModule } from './modules/acceptance/index.ts';
 import { type AssistantService, createAssistantModule } from './modules/assistant/index.ts';
+import { type AttachmentsService, createAttachmentsModule } from './modules/attachments/index.ts';
 import { type AttemptsService, createAttemptsModule } from './modules/attempts/index.ts';
 import { createBatchesModule } from './modules/batches/index.ts';
 import {
@@ -100,6 +101,7 @@ export type App = {
     runtime: OpencodeRuntime;
     opencode: OpencodeClient;
     attempts: AttemptsService;
+    attachments: AttachmentsService;
     roles: RolesService;
     workflows: WorkflowsService;
     tasks: TasksService;
@@ -249,6 +251,20 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     worktrees: worktrees.service,
     dataDir: config.dataDir,
   });
+  const attachments = createAttachmentsModule({
+    db: database.db,
+    unit,
+    clock,
+    log,
+    projects: projects.service,
+    worktrees: worktrees.service,
+    prompts,
+    dataDir: config.dataDir,
+  });
+  server.addHook('preClose', async () => {
+    attachments.service.stopCleanup();
+    await attachments.service.settled();
+  });
   // Dev servers end with the backend: nothing else stops them once it is gone.
   server.addHook('preClose', () => previews.service.stopAll());
   const browser = createBrowserModule({
@@ -323,6 +339,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     plans: plans.service,
     nodes: nodes.service,
     attempts: attempts.service,
+    attachments: attachments.service,
     inbox: inbox.service,
     deliveries: deliveries.service,
     databases: databases.service,
@@ -403,10 +420,12 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   mcp.register(server);
   attempts.registerRoutes(server);
+  attachments.registerRoutes(server);
   const operations: OperationImpl[] = [
     ...settings.operations,
     ...system.operations,
     ...projects.operations,
+    ...attachments.operations,
     ...previews.operations,
     ...browser.operations,
     ...databases.operations,
@@ -430,6 +449,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const activeTaskStatuses = TASK_STATUSES.filter((s) => !isTerminalState(taskMachine, s));
   const assistant = createAssistantModule({
     db: database.db,
+    unit,
     events,
     clock,
     log,
@@ -443,6 +463,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     decks: decks.service,
     batches: batches.service,
     schedules: schedules.service,
+    attachments: attachments.service,
     dataDir: config.dataDir,
     timeZone,
     token: assistantMcpToken,
@@ -474,6 +495,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       runtime,
       opencode,
       attempts: attempts.service,
+      attachments: attachments.service,
       roles: roles.service,
       workflows: workflows.service,
       tasks: tasks.service,
@@ -496,6 +518,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       scheduler.start();
       // Schedules missed while the app was closed are due now and run once (22 §4).
       schedules.timer.start();
+      await attachments.service.startCleanup();
       await startHostedRuntime();
     },
     close: () => server.close(),

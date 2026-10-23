@@ -1,5 +1,11 @@
 import type { Prompts } from '@aw/builtin';
-import { type GetAppStatusOutput, MCP_ASSISTANT_PATH, MCP_ASSISTANT_SERVER_NAME } from '@aw/shared';
+import {
+  attachmentIdsSchema,
+  createTaskOp,
+  type GetAppStatusOutput,
+  MCP_ASSISTANT_PATH,
+  MCP_ASSISTANT_SERVER_NAME,
+} from '@aw/shared';
 import type { FastifyInstance } from 'fastify';
 import { registerMcpEndpoint } from '../../core/http/mcp-endpoint.ts';
 import type { OperationImpl } from '../../core/operations/operations.ts';
@@ -56,6 +62,16 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
         requestConfirmation: confirmations.request,
         recordProduced: conversations.recordProduced,
         deferred: new Map(KNOWLEDGE_QUESTION_OPS.map((id) => [id, relay.researching])),
+        scoped: new Map([
+          [
+            createTaskOp.id,
+            (conversationId, input) =>
+              conversations.assertOwnAttachments(
+                conversationId,
+                attachmentIdsSchema.optional().parse(input.attachmentIds) ?? [],
+              ),
+          ],
+        ]),
       }),
       ...helperTools({ ...deps, conversations }),
     ],
