@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": [
+    "assistant-evaluation.ts",
+    "assistant-turn-evidence.ts",
+    "assistant-web-fixture.ts",
+    "assistant-context.live.test.ts",
+    "assistant-workflow.live.test.ts",
+    "../packages/server/src/**/*.d.ts"
+  ]
+}
