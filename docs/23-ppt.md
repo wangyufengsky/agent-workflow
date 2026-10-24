@@ -281,7 +281,7 @@ AI 提交、应用保存与渲染的都是 `SlideContent`（`shared/contracts/de
 - 每页另有 `notes`（讲稿，≤ `SLIDE_NOTES_MAX_CHARS`）。
 - 没有配图、图标与图表（D93 的代价；§11）。流程与架构用 `steps` / `cards` 表达。
 
-### 5.2 主题（与应用主题相同，D146 起五套）
+### 5.2 主题（与应用主题相同，D152 起五套）
 
 - 每套应用主题（`ThemeDefinition`，14 §4）新增一组**幻灯片调色板** `slides: SlidePalette`：`bg` `surface` `ink` `sub` `accent` `onAccent` `line` `codeBg` `codeInk`，全部为不透明的 `#rrggbb`（PPTX 只接受纯色；应用令牌里有半透明色与渐变，不能直接用）。调色板只在主题文件里定义，界面渲染与 PPTX 导出都读它（一处定义，06 §1.4）。
 - 一份 PPT 的主题与应用当前主题无关：渲染时把该 PPT 主题的调色板写成幻灯片容器上的 CSS 变量（`--slide-bg` 等，不写 `:root`），所以应用是深色主题时也能正确预览一份浅色主题的 PPT。

@@ -1,4 +1,4 @@
--- Theme ids renamed (D146): deepseek → default first, since `deepseek` now names the new blue-and-white theme.
+-- Theme ids renamed (D152): deepseek → default first, since `deepseek` now names the new blue-and-white theme.
 UPDATE `settings` SET `value` = '"default"' WHERE `key` = 'ui.theme' AND `value` = '"deepseek"';--> statement-breakpoint
 UPDATE `settings` SET `value` = '"claude_code"' WHERE `key` = 'ui.theme' AND `value` = '"warm"';--> statement-breakpoint
 UPDATE `settings` SET `value` = '"codex"' WHERE `key` = 'ui.theme' AND `value` = '"github_white"';--> statement-breakpoint

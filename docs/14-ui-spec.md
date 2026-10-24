@@ -254,7 +254,7 @@ web/src/theme/
 ├─ tokens.ts             THEME_TOKEN_NAMES 与 ThemeTokens 类型（键与设计稿 skins.css 变量一一对应）
 ├─ theme-definition.ts   ThemeDefinition 类型
 ├─ themes/
-│  ├─ default.ts       默认：深色（D146）
+│  ├─ default.ts       默认：深色（D152）
 │  ├─ claude-code.ts   Claude Code：暖色
 │  ├─ spdb.ts          SPDB：白、红、蓝
 │  ├─ codex.ts         Codex：白
