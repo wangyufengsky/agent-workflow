@@ -570,7 +570,7 @@ async function seed(request: APIRequestContext): Promise<Seed> {
   const deckMade = await api<Deck>(request, 'POST', '/decks', {
     brief: '退款改造评审',
     projectId: pptProject.id,
-    theme: 'deepseek',
+    theme: 'default',
   });
   await deckReaches(deckMade.id, 'outline_ready');
   await queueWriterTurn(
@@ -1302,7 +1302,7 @@ test.describe('J9 走查：两种模式下全部页面无报错、无对比度�
       await api(request, 'POST', `/tasks/${s.preview.id}/cancel`);
       await api(request, 'POST', `/assistant/conversations/${s.assistantBusy}/abort`);
     }
-    await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' });
+    await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
     await request.dispose();
   });
 

@@ -19,7 +19,7 @@ test.afterEach(async ({ request }) => {
 // The file name sorts after onboarding.browser.spec.ts, which needs the shared backend without any project.
 
 test.beforeEach(({ request }) =>
-  patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple', 'assistant.alwaysAllow': [] }),
+  patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple', 'assistant.alwaysAllow': [] }),
 );
 
 test('J11 对助手说开始任务 → 确认卡片 → 任务运行', async ({ page, request }) => {

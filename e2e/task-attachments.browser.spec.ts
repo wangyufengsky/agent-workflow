@@ -15,7 +15,7 @@ import {
 // Attachments (30, U-03): the files are real uploads through the input's file picker.
 // The file name sorts after onboarding.browser.spec.ts, which needs the shared backend without any project.
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
 // One project for both: every project in the shared backend makes the Git overview of the walkthrough slower.
 let project: E2EProject;

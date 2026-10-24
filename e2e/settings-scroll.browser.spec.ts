@@ -3,7 +3,7 @@ import { createProject, patchSettings } from './helpers.ts';
 
 test('设置页滚到底再向上滚动，顶栏与侧栏留在视口中且无整页黑色空白', async ({ page, request }) => {
   await createProject(request, null);
-  await patchSettings(request, { 'ui.mode': 'pro', 'ui.theme': 'deepseek', 'companion.appearance': 'whale' });
+  await patchSettings(request, { 'ui.mode': 'pro', 'ui.theme': 'default', 'companion.appearance': 'whale' });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/settings');
   await page.getByRole('heading', { name: '关于', exact: true }).scrollIntoViewIfNeeded();

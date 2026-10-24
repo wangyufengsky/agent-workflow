@@ -6,7 +6,7 @@ import { createProject, patchSettings } from './helpers.ts';
 // save remounts it: the confirmation must not depend on the form still being mounted.
 
 test('项目基本信息与远端仓库：保存、绑定、解除绑定后都有提示', async ({ page, request }) => {
-  await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' });
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
   const project = await createProject(request, null);
   await page.goto(`/projects/${project.id}`);
 

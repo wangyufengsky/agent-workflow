@@ -12,10 +12,11 @@ export type UiMode = (typeof UiMode)[keyof typeof UiMode];
 export const uiModeSchema = z.enum(UiMode);
 
 export const ThemeId = {
-  Deepseek: 'deepseek',
-  Warm: 'warm',
+  Default: 'default',
+  ClaudeCode: 'claude_code',
   Spdb: 'spdb',
-  GithubWhite: 'github_white',
+  Codex: 'codex',
+  Deepseek: 'deepseek',
 } as const;
 export type ThemeId = (typeof ThemeId)[keyof typeof ThemeId];
 export const THEME_IDS = Object.values(ThemeId);
@@ -30,8 +31,8 @@ export const themePreferenceSchema = z.enum(ThemePreference);
 
 /** Theme used for each OS colour scheme when the preference is `system`. */
 export const SYSTEM_THEME_MAP = {
-  dark: ThemeId.Deepseek,
-  light: ThemeId.GithubWhite,
+  dark: ThemeId.Default,
+  light: ThemeId.Codex,
 } as const satisfies Record<'dark' | 'light', ThemeId>;
 
 /** Status colour tone; each maps to theme tokens `--{tone}`, `--{tone}-fill`, `--{tone}-line`. */

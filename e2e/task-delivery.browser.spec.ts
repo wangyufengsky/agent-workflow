@@ -20,7 +20,7 @@ import {
 test.slow(GIT_HEAVY_SPECS_SLOW, 'several task runs and merges per test (17 §4.1)');
 
 test.beforeEach(({ request }) =>
-  patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple', 'delivery.defaultStrategy': 'squash' }),
+  patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple', 'delivery.defaultStrategy': 'squash' }),
 );
 
 /** A bug-fix task whose fix step writes `content` into greet.ts, run until its result card waits for a decision. */

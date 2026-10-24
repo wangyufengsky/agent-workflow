@@ -24,7 +24,7 @@ import {
 test.slow(GIT_HEAVY_SPECS_SLOW, 'several git operations per test (17 §4.1)');
 
 test.beforeEach(({ request }) =>
-  patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'pro', 'delivery.defaultStrategy': 'squash' }),
+  patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'pro', 'delivery.defaultStrategy': 'squash' }),
 );
 test.afterEach(({ request }) => patchSettings(request, { 'ui.mode': 'simple' }));
 

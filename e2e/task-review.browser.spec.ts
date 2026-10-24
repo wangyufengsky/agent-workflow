@@ -20,7 +20,7 @@ import {
 
 test.slow(GIT_HEAVY_SPECS_SLOW, 'two task runs and two pushes (17 §4.1)');
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
 async function devPost(request: APIRequestContext, path: string, data: unknown): Promise<void> {
   const res = await request.post(`${API_BASE}/dev/fake-hosting/${path}`, { headers: AUTH, data });

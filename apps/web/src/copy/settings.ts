@@ -8,7 +8,7 @@ export const SETTINGS_COPY = {
   source: '源代码',
   appearance: '外观',
   theme: '主题',
-  themeHint: '跟随系统时，深色用 DeepSeek 深色，浅色用 GitHub 白。',
+  themeHint: '跟随系统时，深色用「默认」，浅色用 Codex。',
   intro: '打开动画',
   introHint: '应用启动时播放一段 1 秒左右的动画，下次启动生效。',
   mode: '界面模式',

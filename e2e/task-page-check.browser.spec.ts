@@ -47,7 +47,7 @@ async function previewProject(request: Parameters<typeof createProject>[0], comm
 const decoded = (image: ReturnType<Page['getByRole']>) =>
   expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
 test('J29 页面体检不通过 → 下一次尝试修好后通过；步骤详情看每页与动作画面，结果卡显示页面', async ({
   page,

@@ -1,4 +1,4 @@
-import type { InsightsSummaryDTO } from '@aw/shared';
+import { type InsightsSummaryDTO, THEME_IDS } from '@aw/shared';
 import { type APIRequestContext, expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import { createProject, type E2EProject, passReview, patchSettings, queueTurn, submitResult } from './helpers.ts';
@@ -34,11 +34,11 @@ async function runAndMerge(request: APIRequestContext, project: E2EProject, requ
   return task;
 }
 
-test('J16 质量与用量：简单视图本周三个数，专业视图用量与质量，钻取失败原因到任务页，四主题切换', async ({
+test('J16 质量与用量：简单视图本周三个数，专业视图用量与质量，钻取失败原因到任务页，全部主题切换', async ({
   page,
   request,
 }) => {
-  await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' });
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   // The check passes once the step changed something: a fix that submits nothing fails it.
@@ -99,7 +99,7 @@ test('J16 质量与用量：简单视图本周三个数，专业视图用量与�
   await expect(page).toHaveURL(new RegExp(`/tasks/${retried.id}`));
 
   // Every theme renders the page; chart and bars take their colours from its tokens.
-  for (const theme of ['deepseek', 'warm', 'spdb', 'github_white']) {
+  for (const theme of THEME_IDS) {
     await patchSettings(request, { 'ui.theme': theme });
     await page.goto('/insights?period=last_7_days');
     await expect(page.getByTestId('insights-usage')).toBeVisible();

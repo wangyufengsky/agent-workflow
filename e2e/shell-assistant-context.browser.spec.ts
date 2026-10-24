@@ -3,7 +3,7 @@ import { test } from './assistant-fixtures.ts';
 import { API_BASE, AUTH } from './env.ts';
 import { addFromMenu, createProject, patchSettings, pickWorkflow, queueAssistantTurn } from './helpers.ts';
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
 test('任务详情快照可预览移除，与文件一起随侧栏消息发送', async ({ page, request }, testInfo) => {
   const project = await createProject(request, null);
@@ -86,8 +86,8 @@ test('主页显式选中文字可修改后附上；开始任务模式不显示�
   const preview = page.getByRole('dialog', { name: '选中文字.txt', exact: true });
   await expect(preview).toContainText('订单导出仍然丢失前导零');
   await expect(preview).toContainText('用户选取或粘贴的文字');
-  await patchSettings(request, { 'ui.theme': 'deepseek' });
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'deepseek');
+  await patchSettings(request, { 'ui.theme': 'default' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'default');
   await page.screenshot({ path: testInfo.outputPath('context-dark.png') });
   await preview.getByRole('button', { name: '关闭', exact: true }).click();
   await queueAssistantTurn(request, [{ type: 'text', text: '已读取你附上的这段文字。' }]);

@@ -124,7 +124,7 @@ describe('PPT', () => {
         brief: '把这次修复做成 3 页汇报',
         materials: [{ kind: 'task', taskId: task.id }],
         slideCount: 3,
-        theme: 'warm',
+        theme: 'claude_code',
       });
       id = res.body.id;
       return res;
@@ -145,7 +145,7 @@ describe('PPT', () => {
     let deck = await get(id);
     expect(deck).toMatchObject({
       title: '问候模块上线',
-      theme: 'warm',
+      theme: 'claude_code',
       status: DeckStatus.OutlineReady,
       project: { id: project.id },
       understanding: UNDERSTANDING,

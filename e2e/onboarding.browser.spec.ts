@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createRepo, patchSettings } from './helpers.ts';
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
 test('首次启动：环境检测通过 → 添加项目 → 切换主题与模式无需刷新', async ({ page }) => {
   const repo = createRepo();
@@ -37,10 +37,11 @@ test('首次启动：环境检测通过 → 添加项目 → 切换主题与模�
   await page.getByRole('navigation').getByRole('link', { name: '设置' }).click();
   const html = page.locator('html');
   for (const [label, id, bg] of [
-    ['DeepSeek 深色', 'deepseek', '#0a0a0a'],
-    ['暖色', 'warm', '#f8f7f3'],
+    ['默认', 'default', '#0a0a0a'],
+    ['Claude Code', 'claude_code', '#f8f7f3'],
     ['SPDB', 'spdb', '#ffffff'],
-    ['GitHub 白', 'github_white', '#ffffff'],
+    ['Codex', 'codex', '#ffffff'],
+    ['DeepSeek', 'deepseek', '#ffffff'],
   ] as const) {
     await page.getByRole('group', { name: '主题' }).getByRole('button', { name: label }).click();
     await expect(html).toHaveAttribute('data-theme', id);
