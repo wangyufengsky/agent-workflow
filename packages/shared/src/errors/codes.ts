@@ -128,6 +128,12 @@ export const ErrorCode = {
   RequirementsNotEditable: 'REQUIREMENTS_NOT_EDITABLE',
   RequirementResultsInvalid: 'REQUIREMENT_RESULTS_INVALID',
   RequirementsUnacknowledged: 'REQUIREMENTS_UNACKNOWLEDGED',
+  // 团队（33）
+  TeamAnalysisNotFound: 'TEAM_ANALYSIS_NOT_FOUND',
+  TeamAnalysisExists: 'TEAM_ANALYSIS_EXISTS',
+  TeamAnalysisInvalid: 'TEAM_ANALYSIS_INVALID',
+  /** The app stopped while the analysis was queued or running. */
+  TeamAnalysisInterrupted: 'TEAM_ANALYSIS_INTERRUPTED',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 export const ERROR_CODES = Object.values(ErrorCode);
@@ -240,6 +246,10 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.RequirementsNotEditable]: 409,
   [ErrorCode.RequirementResultsInvalid]: null,
   [ErrorCode.RequirementsUnacknowledged]: 409,
+  [ErrorCode.TeamAnalysisNotFound]: 404,
+  [ErrorCode.TeamAnalysisExists]: 409,
+  [ErrorCode.TeamAnalysisInvalid]: null,
+  [ErrorCode.TeamAnalysisInterrupted]: null,
 } as const satisfies Record<ErrorCode, number | null>;
 
 /** `{ code, message, details? }` as stored on tasks / attempts and returned in HTTP error bodies. */

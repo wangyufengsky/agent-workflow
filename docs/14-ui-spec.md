@@ -22,6 +22,7 @@
 | `/ppt`、`/ppt/new`、`/ppt/:deckId` | PPT（v1.2）：列表（搜索、项目筛选）、新建（`?projectId=&taskId=&knowledgeConversationId=` 预选资料，「做成 PPT」入口用它）、工作台（`?slide=` 选中的页，`?details=true` 简单模式下的专业视图） | 全部 | `ppt-works.html`、`ppt.html`、`ppt-studio.html`，见 [23-ppt.md §2](23-ppt.md#2-页面与交互) |
 | `/ppt/:deckId/play`、`/ppt/:deckId/print` | 放映（全屏翻页，`?slide=`）与打印视图（导出 PDF 时由隐藏窗口打印），都在外壳之外 | 全部 | 新增 |
 | `/insights` | 质量与用量（v1.1）：简单模式为本周三个数，专业模式为用量、趋势、拆分、质量与钻取（`?period=&from=&to=&drill=&key=`） | 全部（两种视图） | `insights.html`，见 [19-insights.md §3](19-insights.md#3-页面与交互) |
+| `/team`、`/team/:projectId`、`/team/:projectId/members/:member` | 团队（v1.3，33 §5）：`/team` 跳到本次运行里上次看的项目（没有时第一个项目）；概览（合计、按成员堆叠的趋势、成员表、成员对比、模块分布、非成员、为全部成员生成 AI 分析）；成员页（指标与上一段、趋势、工作构成、改动分布、身份、AI 分析、提交）。`?ref=&period=&from=&to=&granularity=` 两页共用，切换项目时保留；专业模式多「统计口径」抽屉 | 全部 | 新增，见 [33-team.md §5](33-team.md#5-页面) |
 | `/settings` | 设置 | 全部（专业项按模式显示） | `settings.html` |
 | `/git`、`/git/:projectId`、`/git/reviews/:reviewId` | Git 工作台（27 §6）：项目卡片；三栏工作台（`?view=changes\|commits\|branches\|files\|worktrees\|review`，`ref`、`author`、`q`、`sha`、`parent`、`tab`、`path`、`line`、`side`、`file`、`review` 记录所看的内容）；审查的链接（助手卡片）跳到它所在项目的工作台 | 专业 | `git/index.html`、`delivery/git.html` |
 | `/workflows`、`/workflows/:key` | 流程列表与编排器（`:key` 为流程 key，编辑其最新版本） | 专业 | `workflows.html`、`workflow-editor.html` |
@@ -39,6 +40,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'knowledge', route: ROUTES.knowledge, label: COPY.nav.knowledge, icon: 'book',     visibleIn: ['simple', 'pro'] },   // v1.1
   { id: 'ppt',       route: ROUTES.ppt,       label: COPY.nav.ppt,       icon: 'slides',   visibleIn: ['simple', 'pro'] },   // v1.2
   { id: 'insights',  route: ROUTES.insights,  label: COPY.nav.insights,  icon: 'chart',    visibleIn: ['simple', 'pro'] },   // v1.1
+  { id: 'team',      route: ROUTES.teamIndex, label: COPY.nav.team,      icon: 'team',     visibleIn: ['simple', 'pro'] },   // v1.3
   { id: 'git',       route: ROUTES.git,       label: COPY.nav.git,       icon: 'gitRepo',  visibleIn: ['pro'], group: 'pro' },
   { id: 'workflows', route: ROUTES.workflows, label: COPY.nav.workflows, icon: 'flow',     visibleIn: ['pro'], group: 'pro' },
   // roles, databases, tools, runtime ...

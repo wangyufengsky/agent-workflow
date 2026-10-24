@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { INSIGHTS_COPY as C, formatDay } from '../../copy/insights.ts';
 import styles from './insights.module.css';
 
-/** A series and its colour: a theme token by position (insights.module.css `.s0`, `.s1`). */
-export type BarSeries = { name: string; tone: 's0' | 's1' };
+/** Series colours: theme tokens by position (insights.module.css `.s0`…`.s7`), and a neutral one for the rest. */
+export const SERIES_TONES = ['s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7'] as const;
+export type SeriesTone = (typeof SERIES_TONES)[number] | 'sRest';
+/** A series and its colour. */
+export type BarSeries = { name: string; tone: SeriesTone };
 /** One day: a value per series, in the order of the chart's series. */
 export type BarDay = { date: string; values: readonly { series: BarSeries; value: number }[] };
 
@@ -37,20 +40,28 @@ export function BarChart({
   days,
   format,
   formatAxis,
+  formatDate = formatDay,
+  tableCaption = C.trendTable,
+  max,
 }: {
   label: string;
   series: readonly BarSeries[];
   days: readonly BarDay[];
   format: (value: number) => string;
   formatAxis: (value: number) => string;
+  /** A column's label; days by default, a bucket's first day otherwise. */
+  formatDate?: (date: string) => string;
+  tableCaption?: string;
+  /** The axis' top when the values have a fixed range (a rate's 1), whatever the data reach. */
+  max?: number;
 }) {
   const [active, setActive] = useState<BarDay | null>(null);
-  const ticks = niceTicks(Math.max(0, ...days.map((d) => d.values.reduce((sum, v) => sum + v.value, 0))));
+  const ticks = niceTicks(max ?? Math.max(0, ...days.map((d) => d.values.reduce((sum, v) => sum + v.value, 0))));
   const top = Math.max(...ticks);
   const height = (value: number) => (top === 0 ? 0 : (value / top) * 100);
   const every = Math.ceil(days.length / MAX_DATE_LABELS);
   const readout = (day: BarDay) =>
-    [formatDay(day.date), ...day.values.map((v) => `${v.series.name} ${format(v.value)}`)].join(' · ');
+    [formatDate(day.date), ...day.values.map((v) => `${v.series.name} ${format(v.value)}`)].join(' · ');
 
   return (
     <figure className={styles.chart} aria-label={label}>
@@ -99,11 +110,11 @@ export function BarChart({
       </div>
       <div className={styles.dates} aria-hidden="true">
         {days.map((day, i) => (
-          <span key={day.date}>{i % every === 0 ? formatDay(day.date) : ''}</span>
+          <span key={day.date}>{i % every === 0 ? formatDate(day.date) : ''}</span>
         ))}
       </div>
       <table className="sr">
-        <caption>{C.trendTable}</caption>
+        <caption>{tableCaption}</caption>
         <thead>
           <tr>
             <th>{C.date}</th>
@@ -115,7 +126,7 @@ export function BarChart({
         <tbody>
           {days.map((day) => (
             <tr key={day.date}>
-              <td>{formatDay(day.date)}</td>
+              <td>{formatDate(day.date)}</td>
               {day.values.map((v) => (
                 <td key={v.series.name}>{format(v.value)}</td>
               ))}

@@ -38,7 +38,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TaskStatus` | `draft` · `preparing` · `planning` · `plan_review` · `running` · `paused` · `review` · `merging` · `completed` · `failed` · `cancelled` |
 | `TaskFailedPhase` | `preparing` · `planning` · `running` · `merging` |
 | `NodeStatus` | `pending` · `ready` · `running` · `waiting_input` · `verifying` · `awaiting_acceptance` · `done` · `failed` · `skipped` · `cancelled` |
-| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2）· `deck_outline`（PPT 的大纲）· `deck_slides`（PPT 的若干页：制作或修改，23 §4；两者在同一个会话中，`continueSession` 可换 kind）· `git_review`（Git 工作台的 AI 审查，不属于任务，27 §4.3）· `commit_message`（AI 草拟提交信息，27 §7.3） |
+| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2）· `deck_outline`（PPT 的大纲）· `deck_slides`（PPT 的若干页：制作或修改，23 §4；两者在同一个会话中，`continueSession` 可换 kind）· `git_review`（Git 工作台的 AI 审查，不属于任务，27 §4.3）· `commit_message`（AI 草拟提交信息，27 §7.3）· `team_analysis`（团队页的 AI 成员分析，不属于任务，33 §6.3） |
 | `AttemptStatus` | `starting` · `running` · `succeeded` · `failed` · `aborted` · `interrupted` |
 | `PlanStatus` | `draft` · `confirmed` · `superseded` |
 | `PlanSource` | `ai` · `template` · `user` |
@@ -198,6 +198,19 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 网站规则 `siteRuleSchema`（`{ pattern, access }`，`*` 代表任意字符、整个主机名不区分大小写匹配）、`urlAccess(url, policy)`（预览来源 → 预览，否则第一条匹配的网站规则，都不是为 null）与 `blockReason(request, policy, readOnlyEnforced)` 在 `browser/policy.ts`，main 与后端共用。`ServerEventType` 另有 `preview.updated`、`browser.frame`、`browser.tab_updated`（11 §11）。
 
+### 2.14 团队（v1.3，`enums/team.ts`，33）
+
+| 枚举 | 值 | 说明 |
+| --- | --- | --- |
+| `TeamPeriod` | `last_30_days` · `last_90_days` · `last_180_days` · `last_365_days` · `custom` | 统计的时间段（33 §4.1）；`custom` 带 `from` / `to` |
+| `TeamGranularity` | `day` · `week` · `month` | 趋势的分桶（33 §4.2），周一开始一周 |
+| `TeamWorkType` | `feature` · `fix` · `test` · `refactor` · `docs` · `chore` · `other` | 按提交标题前缀分的工作构成（33 §3.3） |
+| `TeamOtherKind` | `ai_task` · `hidden` | 非成员：本应用没有发起人记录的 AI 任务提交、设为非成员的身份（33 §2.3） |
+| `AssistantPage`（增补） | `team` · `team_member` | 助手的 `open_page` 与所在页面；`team_member` 带 `teamMember`（成员的主身份邮箱） |
+| `TeamAnalysisStatus` | `queued` · `running` · `succeeded` · `failed` · `cancelled` | AI 成员分析，经 `teamAnalysisMachine`（09 §15） |
+
+`ServerEventType` 另有 `team.scan_updated`（读取提交历史的进度）与 `team_analysis.updated`（11 §11）。
+
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 
 `STATUS_TONE.task` / `.node` / `.attempt` / `.knowledgeTurn` / `.deck` / `.runtime` / `.taskDisplay` / `.schedule`（类型保证每个值都有映射，单测再校验一次）。`schedule`（v1.2）：`active` → `ok`，`paused` → `wait`。`knowledgeTurn`：`researching` → `run`，`answered` → `ok`，`stopped` → `idle`，`failed` → `danger`。`deck`（v1.2）：`outlining` / `generating` → `run`，`outline_ready` → `wait`，`incomplete` → `warn`，`failed` → `danger`，`ready` → `ok`。`runtime`：`ready` → `ok`，`starting` → `run`，`stopped` → `wait`，`not_installed` / `version_mismatch` / `crashed` → `danger`。
@@ -280,6 +293,11 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `SSE_REPLAY_BUFFER` | 1000（条） |
 | `DIFF_FILE_MAX_BYTES` | 1048576（超过显示「文件过大」） |
 | `INSIGHTS_MAX_DAYS` | 366（质量与用量自定义时间段最多天数） |
+| `TEAM_MAX_DAYS` / `TEAM_MAX_BUCKETS` | 731 / 120（团队页自定义时间段最多天数、趋势最多分桶数，`constants/team.ts`，33 §4） |
+| `TEAM_HUGE_COMMIT_LINES` | 5000（超大提交的默认行数，项目可改，33 §2.4） |
+| `TEAM_TOP_DIRECTORIES` / `TEAM_TREND_MEMBERS` | 10 / 8（模块分布列出的目录数、团队趋势单独画出的成员数） |
+| `TEAM_ANALYSIS_SAMPLE` / `TEAM_REVIEW_MAX_LINES` | 5 / 2000（AI 成员分析抽样评审的提交数、单个提交的行数上限，33 §6.2） |
+| `TEAM_ANALYSIS_COMMITS_MAX` / `TEAM_ANALYSIS_MEMBERS_MAX` | 400 / 50（首条消息列出的提交数、一次排队的成员数） |
 | `RUNTIME_LOG_TAIL_DEFAULT` / `RUNTIME_LOG_TAIL_MAX` | 500 / 5000（运行环境日志页的行数） |
 | `LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX` | 50 / 100（任务与「需要你处理」列表每页条数，11 §1） |
 | `BATCH_TARGETS_MAX` | 20（一个批次的目标数，D85） |
@@ -507,6 +525,10 @@ class AppError extends Error {
 | `BROWSER_READ_FAILED` | 502 | 助手网页导航失败（含重定向被网站规则拦截）或整体读取超时；`details: { url, reason, timeoutMs? }`，reason 为浏览器返回的加载错误，或超时的 `timeout`（携带 timeoutMs） |
 | `BROWSER_REF_STALE` | — | 元素编号已作废（页面导航过），先重新读取快照；仅 MCP |
 | `BROWSER_ACTION_FAILED` | — | 动作没能完成；`details: { reason, coveredBy? }`，`reason` 为 `BrowserActionFailure`；仅 MCP |
+| `TEAM_ANALYSIS_NOT_FOUND` | 404 | 成员分析不存在 |
+| `TEAM_ANALYSIS_EXISTS` | 409 | 同一成员、分支、时间段已有排队或进行中的分析；`details: { member }` |
+| `TEAM_ANALYSIS_INVALID` | — | `submit_member_analysis` 与成员的提交不符；`details.problems[]`（§5.7）与 `sampled` |
+| `TEAM_ANALYSIS_INTERRUPTED` | — | 应用在分析排队或进行时退出；记在分析上 |
 
 ### 5.3 计划校验子码（`PLAN_INVALID.details.problems[].code`）
 
@@ -543,6 +565,10 @@ class AppError extends Error {
 ### 5.6 审查问题校验子码（`GIT_REVIEW_FINDINGS_INVALID.details.problems[].code`）
 
 枚举 `FindingProblemCode`，hint 为常量 `FINDING_PROBLEM_HINT`（英文，给模型看），在 `shared/errors/finding-problems.ts`；每项带 `index`（问题在 `findings` 中的位置）：`PATH_NOT_IN_DIFF`（文件不在审查开始时的改动清单中）· `LINE_OUT_OF_RANGE`（行号不在所指版本的文件里，带 `lineCount`）（27 §4.4）。
+
+### 5.7 成员分析校验子码（`TEAM_ANALYSIS_INVALID.details.problems[].code`）
+
+枚举 `TeamAnalysisProblemCode`，hint 为常量 `TEAM_ANALYSIS_PROBLEM_HINT`（英文，给模型看），在 `shared/errors/team-analysis-problems.ts`；每项带 `path`（如 `work_items[0]: <sha>`、`findings[2]`）：`COMMIT_NOT_IN_PERIOD`（引用的提交不是这位成员在时间段内的）· `COMMIT_NOT_SAMPLED`（问题所在的提交不在抽样中）· `PATH_NOT_IN_COMMIT`（文件不是该提交改动的）· `LINE_OUT_OF_RANGE`（行号不在该提交或其父提交的文件里，带 `lineCount`）（33 §6.6）。
 
 ## 6. 待实施契约：统一附件与需求清单
 

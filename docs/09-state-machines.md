@@ -413,3 +413,28 @@ stateDiagram-v2
   timed_out --> [*]
 ```
 <!-- /fsm:assistantTurn -->
+
+## 15. 成员分析 TeamAnalysis（v1.3，33 §6.4）
+
+一个项目同时只运行一个分析，其余排队（不计入调度器并发，同 D68）；排队的首条消息只在内存里。
+
+<!-- fsm:teamAnalysis 由 pnpm gen:fsm-docs 生成，勿手改 -->
+```mermaid
+stateDiagram-v2
+  [*] --> queued
+  queued --> running: start
+  queued --> failed: fail
+  queued --> cancelled: cancel
+  running --> succeeded: submit
+  running --> failed: fail
+  running --> cancelled: cancel
+  succeeded --> [*]
+  failed --> [*]
+  cancelled --> [*]
+```
+<!-- /fsm:teamAnalysis -->
+
+- `start`：轮到它时开始只读会话（`AttemptKind.TeamAnalysis`）。会话没能开始 → `fail`（记下错误），接着开始下一个。
+- `submit`：`submit_member_analysis` 校验通过，报告随之写入。
+- `fail`：会话结束却没有提交（出错、超时、运行时消失）；应用重启时，排队与运行中的分析一律 `fail`（`TEAM_ANALYSIS_INTERRUPTED`），可「重新生成」。
+- `cancel`：排队中直接取消；运行中先记为取消，再中止会话，会话结束不再改变它。

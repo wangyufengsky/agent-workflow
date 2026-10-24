@@ -8,6 +8,7 @@ import {
   cancelAssistantCallOp,
   confirmAssistantCallOp,
   createConversationOp,
+  createProjectOp,
   ErrorCode,
   getProjectOp,
   getSettingsOp,
@@ -133,6 +134,22 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
       usage: { attempts: 0, tokensInput: 0, tokensOutput: 0 },
       attention: { interruptions: 0 },
     });
+  });
+
+  it('团队（33 §8.1）：team_summary 是 read，直接返回成员的数字；发起 AI 分析要用户确认', async () => {
+    const repo = await createTestRepo();
+    const { body: project } = await t.call(createProjectOp, { repoPath: repo.path });
+    // The fake clock is 2025-10-10; the repository's one commit is authored now: a range of the days around today.
+    const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+    const range = { period: 'custom', from: day(-1), to: day(1) };
+    const { isError, body } = await call('team_summary', { id: project.id, ...range });
+    expect(isError).toBe(false);
+    expect(body).toMatchObject({ ref: 'main', members: [{ key: 'aw-test@example.com', metrics: { commits: 1 } }] });
+
+    const asked = await call('team_analyses_create', { id: project.id, ...range, members: ['aw-test@example.com'] });
+    expect(asked.body).toMatchObject({ status: 'needs_confirmation' });
+    const [card] = (await t.call(listConfirmationsOp, { id: conversationId })).body.items;
+    expect(card).toMatchObject({ operationId: 'team.analyses.create', risk: 'write', status: 'pending' });
   });
 
   it('write：返回 needs_confirmation；确认后操作生效，结果作为下一条消息发回同一会话', async () => {

@@ -10,6 +10,7 @@ export const NAV_COPY = {
   knowledge: '知识问答',
   ppt: 'PPT',
   insights: '质量与用量',
+  team: '团队',
   git: 'Git',
   workflows: '流程',
   roles: '角色',

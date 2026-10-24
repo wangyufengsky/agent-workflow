@@ -66,6 +66,7 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.SubmitSlide,
       McpToolName.SubmitFindings,
       McpToolName.SubmitCommitMessage,
+      McpToolName.SubmitMemberAnalysis,
       McpToolName.BrowserOpen,
       McpToolName.BrowserSnapshot,
       McpToolName.BrowserClick,
