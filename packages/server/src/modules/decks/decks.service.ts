@@ -35,6 +35,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import type { BrowserService } from '../browser/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
@@ -58,6 +59,7 @@ export type DecksServiceDeps = {
   projects: ProjectsService;
   tasks: TasksService;
   knowledge: KnowledgeService;
+  browser: Pick<BrowserService, 'readUrl'>;
   inbox: InboxService;
   settings: SettingsService;
   prompts: Prompts;
@@ -92,7 +94,7 @@ const newSlide = (deckId: string, seq: number, page: OutlineSlide, now: number):
 
 /** PPT (23): an outline the user confirms, pages the AI makes and revises, all on one read-only writer session. */
 export function createDecksService(deps: DecksServiceDeps) {
-  const { unit, clock, attempts, projects, tasks, knowledge, inbox, settings, prompts } = deps;
+  const { unit, clock, attempts, projects, tasks, knowledge, browser, inbox, settings, prompts } = deps;
   const repo = createDecksRepo(deps.db);
   const blankDir = join(deps.dataDir, ...BLANK_DIR);
   mkdirSync(blankDir, { recursive: true });
@@ -359,7 +361,11 @@ export function createDecksService(deps: DecksServiceDeps) {
 
     /** A new PPT from its brief and material; the writer starts on the outline (`decks.create`). */
     async create(request: CreateDeckRequest): Promise<DeckDTO> {
-      const snapshots = snapshotMaterials(request.materials, { task: tasks.detail, knowledge: knowledge.get });
+      const snapshots = await snapshotMaterials(request.materials, {
+        task: tasks.detail,
+        knowledge: knowledge.get,
+        web: browser.readUrl,
+      });
       const projectIds = new Set(
         [request.projectId, ...snapshots.map((s) => s.projectId)].filter((p) => p !== undefined && p !== null),
       );

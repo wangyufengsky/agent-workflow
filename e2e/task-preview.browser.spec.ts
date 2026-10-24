@@ -2,7 +2,16 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
-import { createProject, git, patchSettings, queueTurn, startTask, submitResult } from './helpers.ts';
+import {
+  appTool,
+  createProject,
+  git,
+  patchSettings,
+  queueAssistantTurn,
+  queueTurn,
+  startTask,
+  submitResult,
+} from './helpers.ts';
 
 // J28 (29 §8.1–§8.2): the task page's preview tab. The AI's session opens a page of the preview and leaves frames;
 // the user watches them, sees the preview's state with its way on (stopped, failed), and in the browser build is
@@ -68,3 +77,46 @@ async function taskId(page: import('@playwright/test').Page): Promise<string> {
   if (match?.[1] === undefined) throw new Error(`Not on a task page: ${page.url()}`);
   return match[1];
 }
+
+test('助手打开任务的预览页签（29 §2.6）', async ({ page, request }) => {
+  await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' });
+  const project = await createProject(request, null);
+  await request.patch(`${API_BASE}/projects/${project.id}`, {
+    headers: AUTH,
+    data: {
+      preview: { command: 'node server.mjs', setupCommand: null, readyPath: '/', pages: ['/'], extraOrigins: [] },
+    },
+  });
+  const workflows = await (await request.get(`${API_BASE}/workflows`, { headers: AUTH })).json();
+  const bugfix = workflows.items.find((w: { key: string }) => w.key === 'bugfix');
+  const task = await (
+    await request.post(`${API_BASE}/tasks`, {
+      headers: AUTH,
+      data: {
+        projectId: project.id,
+        workflowId: bugfix.id,
+        requirement: '首页报错',
+        checkpoints: { confirm_plan: true },
+      },
+    })
+  ).json();
+  await expect
+    .poll(async () => (await (await request.get(`${API_BASE}/tasks/${task.id}`, { headers: AUTH })).json()).status)
+    .toBe('plan_review');
+  await queueAssistantTurn(request, [
+    appTool('open_page', { page: 'task_preview', params: { taskId: task.id } }),
+    { type: 'text', text: '已打开预览页签。' },
+  ]);
+
+  await page.goto(`/tasks/${task.id}`);
+  await page.getByRole('button', { name: '打开助手（⌘J）' }).click();
+  const panel = page.getByRole('complementary', { name: '应用助手' });
+  // A conversation of its own: the backend is shared with the other specs.
+  await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  await panel.getByLabel('发给助手的消息').fill('打开这个任务的预览');
+  await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
+  await expect(panel.getByText('已打开预览页签。')).toBeVisible();
+  await expect(page).toHaveURL(/view=preview/);
+  await expect(page.getByRole('tab', { name: '预览' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('preview-pane')).toBeVisible();
+});

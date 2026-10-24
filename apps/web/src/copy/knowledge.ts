@@ -73,6 +73,7 @@ export const KNOWLEDGE_COPY = {
   runQuery: '只读重新执行的结果',
   rowsTruncated: '只显示前几行。',
   openInBrowser: '在浏览器中打开',
+  pageExcerpt: '研究员读到的页面正文（回答时的内容，网页之后可能已经变了）：',
   details: '显示详细信息',
   model: (model: string | null) => `模型：${model ?? '默认'}`,
   usage: (input: number | null, output: number | null, cost: number | null) =>

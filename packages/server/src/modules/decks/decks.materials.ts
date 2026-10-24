@@ -27,7 +27,14 @@ export type MaterialSnapshot = {
 export type MaterialSources = {
   task(id: string): TaskDetailDTO;
   knowledge(id: string): KnowledgeConversationDTO;
+  /** Reads the page with the website session, read only (`browser.readUrl`). */
+  web(url: string): Promise<WebPage>;
 };
+
+type WebPage = { url: string; title: string; page: string; logs: { requests: readonly WebRequest[] } };
+type WebRequest = { url: string; status: number | null; resourceType: string };
+
+const withoutHash = (url: string) => url.split('#')[0];
 
 /** The task's result for the AI: requirement, summary, assumptions and the files it changed (not the diff itself). */
 function taskSnapshot(task: TaskDetailDTO): string {
@@ -60,7 +67,9 @@ function citationLine(c: CitationDTO, i: number): string {
     case CitationType.Database:
       return `[${i + 1}] database ${c.connection}: ${c.sql}`;
     case CitationType.Web:
-      return `[${i + 1}] ${c.title ?? c.url} (${c.url})`;
+      return c.excerpt === null
+        ? `[${i + 1}] ${c.title ?? c.url} (${c.url})`
+        : `[${i + 1}] ${c.title ?? c.url} (${c.url})\n\n\`\`\`\n${c.excerpt}\n\`\`\``;
   }
 }
 
@@ -82,7 +91,24 @@ function knowledgeSnapshot(conversation: KnowledgeConversationDTO): string {
   return [`# Knowledge Q&A · ${conversation.title}`, `Project: ${conversation.project.name}`, ...sections].join('\n\n');
 }
 
-function snapshotOf(input: DeckMaterialInput, sources: MaterialSources): MaterialSnapshot {
+/** The page's text as read once; the snapshot's own header line gives way to the title and final address. */
+function webSnapshot(page: WebPage): string {
+  // A read succeeds with whatever document came back, and the logs list only failed requests (status 400 or more):
+  // an error page is not material, while a failed image or script of a good page does not matter.
+  const document = page.logs.requests.find(
+    (r) => r.resourceType === 'Document' && withoutHash(r.url) === withoutHash(page.url),
+  );
+  if (document !== undefined && document.status !== null) {
+    throw new AppError(ErrorCode.BrowserReadFailed, `The web page answered HTTP ${document.status}`, {
+      url: page.url,
+      reason: `HTTP ${document.status}`,
+      status: document.status,
+    });
+  }
+  return [`# Web page · ${page.title}`, `URL: ${page.url}`, page.page.slice(page.page.indexOf('\n') + 1)].join('\n\n');
+}
+
+async function snapshotOf(input: DeckMaterialInput, sources: MaterialSources): Promise<MaterialSnapshot> {
   switch (input.kind) {
     case DeckMaterialKind.Text:
       return {
@@ -114,12 +140,30 @@ function snapshotOf(input: DeckMaterialInput, sources: MaterialSources): Materia
         content: knowledgeSnapshot(conversation),
       };
     }
+    case DeckMaterialKind.Web: {
+      const page = await sources.web(input.url);
+      return {
+        kind: input.kind,
+        refId: page.url,
+        title: page.title === '' ? page.url : page.title,
+        projectId: null,
+        content: webSnapshot(page),
+      };
+    }
   }
 }
 
-/** Reads the material given to `decks.create` into snapshots; tasks and conversations must exist and have results. */
-export function snapshotMaterials(inputs: readonly DeckMaterialInput[], sources: MaterialSources): MaterialSnapshot[] {
-  return inputs.map((input) => snapshotOf(input, sources));
+/**
+ * Reads the material given to `decks.create` into snapshots; tasks and conversations must exist and have results, web
+ * pages must be allowed by the website rules and not ask to log in. Pages are read one after another.
+ */
+export async function snapshotMaterials(
+  inputs: readonly DeckMaterialInput[],
+  sources: MaterialSources,
+): Promise<MaterialSnapshot[]> {
+  const snapshots: MaterialSnapshot[] = [];
+  for (const input of inputs) snapshots.push(await snapshotOf(input, sources));
+  return snapshots;
 }
 
 /** The materials as one block of the first message; each is fenced so the AI tells data from instructions. */

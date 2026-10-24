@@ -84,10 +84,21 @@ function SourceBody({ source }: { source: CitationSourceDTO }) {
       );
     case CitationType.Web:
       return (
-        <p>
-          <ExternalLink href={source.url}>{C.openInBrowser}</ExternalLink>
-          <span className="hint mono"> {source.url}</span>
-        </p>
+        <>
+          <p>
+            <ExternalLink href={source.url}>{C.openInBrowser}</ExternalLink>
+            <span className="hint mono"> {source.url}</span>
+          </p>
+          {/* A page read with the browser kept what it said (29 §2.8). */}
+          {source.excerpt !== null && (
+            <>
+              <p className="hint">{C.pageExcerpt}</p>
+              <pre className={styles.excerpt} data-testid="page-excerpt">
+                {source.excerpt}
+              </pre>
+            </>
+          )}
+        </>
       );
   }
 }

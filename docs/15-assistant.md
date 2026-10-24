@@ -47,7 +47,7 @@ opencode 1.19 的已有会话目录不能通过发送参数或 fork 改变。迁
 | `get_current_time` | read | `{ now, date, weekday, timeZone, utcOffset }`：用户所在时区（后端进程的系统时区）的当地时间 |
 | `get_app_status` | read | `{ runtime, uiMode, projects, activeTasks, blockingInbox }`（`blockingInbox` 同徽标，不含待合并，D119） |
 | `browser_read` | read | 严格空参数；只读当前对话由界面绑定的「我的预览」文字、地址、视口和错误日志；无关联或预览失效为 `BROWSER_NOT_OPEN`，不能用任务或 tab 参数猜测当前页。整体最多 30 秒，超时为 `BROWSER_READ_FAILED`，保留用户页与关联（29 §9） |
-| `open_page` | read | `{ page: AssistantPage, params }`（各页面需要的参数为 `ASSISTANT_PAGE_PARAMS`）→ SSE `assistant.navigate`，界面在面板旁跳转 |
+| `open_page` | read | `{ page: AssistantPage, params }`（各页面需要的参数为 `ASSISTANT_PAGE_PARAMS`）→ SSE `assistant.navigate`，界面在面板旁跳转；`task_preview` 是任务页的预览页签（`?view=preview`，v1.3 B3，29 §2.6），用户在那里时消息带的当前页面也是它，助手启动预览后用它把用户带过去 |
 | `open_form` | read | `{ form: AssistantForm, values }` → SSE `assistant.open_form`；`values` 按该表单所提交操作的助手输入（不含凭据字段）的 partial 校验，带凭据字段 `VALIDATION_FAILED` |
 | `list_files` / `reveal_file` | read | 列出 / 在 Finder 中显示 `files/<id>/` 下的文件（路径相对该目录，越界或不存在 `VALIDATION_FAILED`；显示经 SSE `assistant.reveal_file` 由 preload 完成） |
 

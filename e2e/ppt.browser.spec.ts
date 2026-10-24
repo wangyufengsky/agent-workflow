@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { expect, test } from '@playwright/test';
+import { API_BASE, AUTH } from './env.ts';
 import { box, createProject, type FakeStep, MIN_WINDOW, patchSettings, queueWriterTurn } from './helpers.ts';
 
 // J20 (23 §13): from a project to a PPT — the outline written, edited and confirmed, the pages made one by one, a page
@@ -166,4 +168,49 @@ test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 
   // The list shows it with its first page.
   await page.goto('/ppt');
   await expect(page.getByTestId('deck-card').filter({ hasText: '订单服务退款改造' })).toContainText('3 页');
+});
+
+test('J32 网页资料：输入地址添加网页 → 生成大纲，网页正文按网站规则只读读取一次并保存（29 §2.8）', async ({
+  page,
+  request,
+}) => {
+  const site = createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(`<title>上线手册</title><h1>上线手册</h1><p>${req.url === '/runbook' ? '先灰度一成，再全量。' : ''}</p>`);
+  });
+  await new Promise<void>((resolve) => site.listen(0, '127.0.0.1', resolve));
+  const address = site.address();
+  if (address === null || typeof address === 'string') throw new Error('Expected a TCP address');
+  const url = `http://127.0.0.1:${address.port}/runbook`;
+  try {
+    await patchSettings(request, { 'browser.sites': [{ pattern: '*', access: 'read' }] });
+    const project = await createProject(request, null);
+    await queueWriterTurn(request, project, [
+      tool('submit_outline', {
+        title: '上线手册',
+        understanding: { audience: '值班同事', duration: '约 5 分钟', assumptions: [] },
+        slides: [{ layout: 'cover', title: '上线手册', points: ['先灰度'] }],
+      }),
+    ]);
+
+    await page.goto(`/projects/${project.id}`);
+    await page.getByRole('link', { name: '做成 PPT' }).click();
+    await expect(page.getByLabel('项目代码')).toHaveValue(project.id);
+    await page.getByLabel('这份 PPT 讲什么').fill('给值班同事讲上线步骤');
+    await page.getByRole('button', { name: '网页', exact: true }).click();
+    await page.getByLabel('网页地址').fill(url);
+    await page.getByLabel('网页地址').press('Enter');
+    const materials = page.getByRole('list', { name: '资料' });
+    await expect(materials).toContainText(url);
+    await expect(materials).toContainText('网页');
+    await page.getByRole('button', { name: /^生成大纲/ }).click();
+
+    await expect(page).toHaveURL(/\/ppt\/[0-9a-f-]+$/);
+    await expect(page.getByRole('heading', { name: '上线手册' })).toBeVisible();
+    const id = new URL(page.url()).pathname.split('/').at(-1);
+    const deck = await (await request.get(`${API_BASE}/decks/${id}`, { headers: AUTH })).json();
+    expect(deck.materials).toMatchObject([{ kind: 'web', refId: url, title: '上线手册' }]);
+  } finally {
+    site.close();
+  }
 });

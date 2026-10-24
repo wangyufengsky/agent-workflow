@@ -7,6 +7,7 @@
     "assistant-web-fixture.ts",
     "assistant-context.live.test.ts",
     "assistant-workflow.live.test.ts",
+    "browser-reading.live.test.ts",
     "../packages/server/src/**/*.d.ts"
   ]
 }
