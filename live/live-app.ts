@@ -1,6 +1,6 @@
 import { cp, mkdir, mkdtemp, readdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import {
   attemptMachine,
   createProjectOp,
@@ -32,6 +32,10 @@ const ENDED: readonly TaskStatus[] = [TaskStatus.Review, TaskStatus.Failed, Task
 const IDENTITY = ['-c', 'user.name=aw-live', '-c', 'user.email=aw-live@example.com'];
 
 export type Fixture = 'ts-stats' | 'java-inventory' | 'todo-web';
+/** A commit made on top of the fixture, at `date` (ISO 8601), writing `files` (path → content). */
+export type FixtureCommit = { date: string; message: string; files: Record<string, string> };
+/** The fixture's history: its own commit at `initAt`, then `commits` in order. */
+export type FixtureHistory = { initAt: string; commits: FixtureCommit[] };
 
 type Report = {
   workflow: string;
@@ -57,8 +61,8 @@ export type LiveApp = {
     workflowKey: string,
     fixture: Fixture,
     requirement: string,
-    /** `requirements`: the task's acceptance checklist (31). */
-    options?: { confirmPlan?: boolean; requirements?: RequirementItemInput[] },
+    /** `requirements`: the task's acceptance checklist (31); `history`: commits with dates (version review). */
+    options?: { confirmPlan?: boolean; requirements?: RequirementItemInput[]; history?: FixtureHistory },
   ): Promise<TaskDetailDTO>;
   /** The commands of every permission request the simulated user allowed so far (`<permission>: <patterns>`). */
   asked(): string[];
@@ -79,16 +83,24 @@ export async function startLiveApp(name: string, options: { browserHost?: Browse
   const userActions = playTheUser(t);
 
   /** A fresh Git repository with the fixture project, added as a user would: the check command is inferred. */
-  async function addFixtureProject(fixture: Fixture): Promise<string> {
+  async function addFixtureProject(fixture: Fixture, history?: FixtureHistory): Promise<string> {
     const repo = await realpath(await mkdtemp(join(tmpdir(), 'aw-live-')));
     await cp(new URL(`fixtures/${fixture}`, import.meta.url).pathname, repo, { recursive: true });
     await writeFile(join(repo, '.gitignore'), 'target/\nnode_modules/\n');
-    for (const args of [
-      ['init', '-q', '-b', 'main'],
-      ['add', '-A'],
-      ['commit', '-q', '-m', 'init'],
-    ]) {
-      await runGit([...IDENTITY, ...args], { cwd: repo });
+    await runGit([...IDENTITY, 'init', '-q', '-b', 'main'], { cwd: repo });
+    const commit = async (message: string, date: string | undefined) => {
+      const env =
+        date === undefined ? process.env : { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date };
+      await runGit([...IDENTITY, 'add', '-A'], { cwd: repo });
+      await runGit([...IDENTITY, 'commit', '-q', '-m', message], { cwd: repo, env });
+    };
+    await commit('init', history?.initAt);
+    for (const c of history?.commits ?? []) {
+      for (const [path, content] of Object.entries(c.files)) {
+        await mkdir(dirname(join(repo, path)), { recursive: true });
+        await writeFile(join(repo, path), content);
+      }
+      await commit(c.message, c.date);
     }
     const { body: project } = await t.call(createProjectOp, { repoPath: repo });
     return project.id;
@@ -119,7 +131,7 @@ export async function startLiveApp(name: string, options: { browserHost?: Browse
     async runTask(workflowKey, fixture, requirement, options = {}) {
       const confirmPlan = options.confirmPlan ?? false;
       const until = confirmPlan ? [...ENDED, TaskStatus.PlanReview] : ENDED;
-      const projectId = await addFixtureProject(fixture);
+      const projectId = await addFixtureProject(fixture, options.history);
       const workflow = (await t.call(listWorkflowsOp, {})).body.items.find((w) => w.key === workflowKey);
       if (workflow === undefined) throw new Error(`No workflow ${workflowKey}`);
       const started = Date.now();

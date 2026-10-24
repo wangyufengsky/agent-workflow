@@ -105,6 +105,7 @@ export function createSessionView() {
             },
           ];
         case E.StepFinished:
+        case E.PermissionReplied:
         case E.Idle:
         case E.RuntimeLost:
           return [];

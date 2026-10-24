@@ -1,3 +1,4 @@
+import { PermissionDecision } from '@aw/shared';
 import { z } from 'zod';
 
 /** Internal events derived from opencode's global stream (12 §8); the only opencode events other modules see. */
@@ -15,6 +16,7 @@ export const OpencodeEventType = {
   Idle: 'idle',
   Error: 'error',
   PermissionAsked: 'permission_asked',
+  PermissionReplied: 'permission_replied',
   /** The runtime went away (crash or restart): every session it hosted is gone. */
   RuntimeLost: 'runtime_lost',
 } as const;
@@ -82,6 +84,7 @@ export type OpencodeEvent =
       permission: string;
       patterns: string[];
     }
+  | { type: typeof E.PermissionReplied; sessionId: string; permissionId: string; reply: PermissionDecision }
   | { type: typeof E.RuntimeLost };
 
 // Schemas of the opencode 1.19.0 events we consume (shapes recorded in 12 §8); everything else is ignored.
@@ -115,6 +118,10 @@ const partSchema = z.discriminatedUnion('type', [
 const HANDLED_PART_TYPES: ReadonlySet<string> = new Set(['text', 'reasoning', 'tool', 'step-finish']);
 
 const payloadSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('permission.replied'),
+    properties: z.object({ sessionID: z.string(), requestID: z.string(), reply: z.enum(PermissionDecision) }),
+  }),
   z.object({
     type: z.literal('message.updated'),
     properties: z.object({
@@ -170,6 +177,7 @@ const HANDLED_TYPES: ReadonlySet<string> = new Set([
   'session.idle',
   'session.error',
   'permission.asked',
+  'permission.replied',
 ]);
 
 // Stream-level events (server.connected, heartbeats) carry no directory; instance events always do.
@@ -210,6 +218,13 @@ export function parseGlobalEvent(raw: unknown): OpencodeEvent | undefined {
   if (!HANDLED_TYPES.has(payload.type)) return undefined;
   const event = payloadSchema.parse(payload);
   switch (event.type) {
+    case 'permission.replied':
+      return {
+        type: E.PermissionReplied,
+        sessionId: event.properties.sessionID,
+        permissionId: event.properties.requestID,
+        reply: event.properties.reply,
+      };
     case 'message.updated':
       return {
         type: E.Message,

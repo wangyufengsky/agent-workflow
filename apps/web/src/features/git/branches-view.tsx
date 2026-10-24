@@ -27,7 +27,17 @@ import { GitMenu } from './git-menu.tsx';
 /** A branch of an unfinished task: read-only here, merged and pushed from the task page (27 §5). */
 export const isTaskOwned = (b: GitBranchDTO) => b.task !== null && !isTerminalState(taskMachine, b.task.status);
 
-function Compare({ projectId, from, to }: { projectId: string; from: string; to: string }) {
+function Compare({
+  projectId,
+  from,
+  to,
+  onOpenReview,
+}: {
+  projectId: string;
+  from: string;
+  to: string;
+  onOpenReview: (id: string) => void;
+}) {
   const diff = useQuery(gitDiffQuery(projectId, from, to));
   const review = useStartReview(projectId);
   if (diff.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
@@ -42,7 +52,7 @@ function Compare({ projectId, from, to }: { projectId: string; from: string; to:
           onClick={() =>
             review.mutate(
               { target: { kind: GitReviewTarget.Range, from, to } },
-              { onSuccess: () => toast(C.reviewRunning) },
+              { onSuccess: (started) => onOpenReview(started.id) },
             )
           }
         >
@@ -65,12 +75,14 @@ export function BranchesView({
   onDialog,
   onLog,
   onReviewBranch,
+  onOpenReview,
 }: {
   project: ProjectDetailDTO;
   status: GitStatusDTO;
   onDialog: (dialog: GitDialog) => void;
   onLog: (ref: string) => void;
   onReviewBranch: (branch: string) => void;
+  onOpenReview: (id: string) => void;
 }) {
   const branches = useQuery(gitBranchesQuery(project.id));
   const switchTo = useSwitchBranch(project.id);
@@ -241,7 +253,9 @@ export function BranchesView({
           {C.compareRun}
         </Button>
       </div>
-      {compared !== undefined && <Compare projectId={project.id} from={compared.from} to={compared.to} />}
+      {compared !== undefined && (
+        <Compare projectId={project.id} from={compared.from} to={compared.to} onOpenReview={onOpenReview} />
+      )}
     </section>
   );
 }
