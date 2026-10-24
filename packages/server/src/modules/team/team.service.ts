@@ -41,7 +41,14 @@ import {
 import { createTeamAnalyses } from './team.analysis.ts';
 import { resolveTeamRange } from './team.period.ts';
 import { createTeamRepo } from './team.repo.ts';
-import { reachableCommits, readCommits, readTip, SCAN_BATCH, SCAN_PROCESSES } from './team.scan.ts';
+import {
+  type ReachableCommit,
+  reachableCommits,
+  readCommits,
+  readTip,
+  SCAN_BATCH,
+  SCAN_PROCESSES,
+} from './team.scan.ts';
 
 export type TeamServiceDeps = {
   db: Db;
@@ -60,6 +67,8 @@ export type TeamServiceDeps = {
 };
 
 const COMMITS_PAGE = 50;
+/** Branch tips whose history is kept, across projects. */
+const HISTORIES_KEPT = 16;
 
 /** The team page (33): figures from a project's Git history, read once into the commit cache (D129). */
 export function createTeamService(deps: TeamServiceDeps) {
@@ -67,6 +76,21 @@ export function createTeamService(deps: TeamServiceDeps) {
   const repo = createTeamRepo(db);
   /** One reading per project at a time (33 §7.2); a second caller waits for it, then reads what is still missing. */
   const scans = new Map<string, Promise<void>>();
+  /**
+   * The history each recent tip reaches: it cannot change while the tip stays the same, and walking a long history
+   * costs a few hundred milliseconds on every request otherwise.
+   */
+  const histories = new Map<string, ReachableCommit[]>();
+  async function historyOf(repoPath: string, tip: string): Promise<ReachableCommit[]> {
+    const key = `${repoPath}\0${tip}`;
+    let history = histories.get(key);
+    if (history === undefined) {
+      history = await reachableCommits(repoPath, tip);
+      if (histories.size >= HISTORIES_KEPT) histories.delete(histories.keys().next().value ?? '');
+      histories.set(key, history);
+    }
+    return history;
+  }
   /** Commits known to be cached, by project: a commit never leaves the cache, so asking once is enough. */
   const known = new Map<string, Set<string>>();
   const knownOf = (projectId: string) => {
@@ -131,11 +155,12 @@ export function createTeamService(deps: TeamServiceDeps) {
     const ref = query.ref ?? project.defaultBranch;
     const tip = await readTip(project.repoPath, ref);
     const range = resolveTeamRange(query, clock.now(), timeZone);
-    // Back to the start of the period compared with; reverts come after what they revert, so they are read too.
-    const [shas, fetchedAt] = await Promise.all([
-      reachableCommits(project.repoPath, ref, range.previous.start),
+    // Back to the start of the period compared with; reverts come after what they revert, so they are in too.
+    const [history, fetchedAt] = await Promise.all([
+      historyOf(project.repoPath, tip.sha),
       readFetchedAt(project.repoPath),
     ]);
+    const shas = history.filter((c) => c.authoredAt >= range.previous.start).map((c) => c.sha);
     await ensureScanned(project.id, project.repoPath, shas);
     const reachable = new Set(shas);
     const stored = repo.commitsIn(project.id, range.previous.start, range.end).filter((c) => reachable.has(c.sha));

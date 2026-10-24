@@ -316,7 +316,16 @@ export function createTeamAnalyses(deps: TeamAnalysesDeps) {
       const work = await deps.work(query, keys);
       const active = repo.withStatus(ACTIVE, work.project.id);
       for (const member of work.members) {
-        if (active.some((a) => a.memberEmail === member.key && a.periodFrom === work.from && a.periodTo === work.to)) {
+        // Nothing to summarise or cite: the session could only fail (33 §6.4).
+        if (member.commits.length === 0) {
+          throw new AppError(ErrorCode.ValidationFailed, `${member.key} has no commits in this range`, {
+            issues: [{ path: ['members'], message: `no commits of ${member.key} in the range` }],
+            member: member.key,
+          });
+        }
+        const same = (a: Analysis) =>
+          a.memberEmail === member.key && a.ref === work.ref && a.periodFrom === work.from && a.periodTo === work.to;
+        if (active.some(same)) {
           throw new AppError(ErrorCode.TeamAnalysisExists, `${member.key} is being analysed for this range`, {
             member: member.key,
           });

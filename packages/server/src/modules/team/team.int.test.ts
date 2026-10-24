@@ -17,6 +17,7 @@ import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { createFakeClock } from '../../../test/helpers/clock.ts';
 import { createTestRepo, type TestRepo } from '../../../test/helpers/git.ts';
 import { zonedInstant } from '../../core/time-zone.ts';
+import { runGit } from '../git/index.ts';
 
 const TZ = 'Asia/Shanghai';
 const NOW = zonedInstant('2026-10-21', 12 * 60, TZ);
@@ -73,6 +74,38 @@ const summary = (id: string, extra: { ref?: string } = {}) =>
   t.call(teamSummaryOp, { id, period: TeamPeriod.Last30Days, ...extra });
 
 describe('团队（33）', () => {
+  it('历史中间夹着回填的旧提交时，它之前的新提交照样计入', async () => {
+    const repo = await createTestRepo();
+    await commitAs(repo, ZS, '2026-10-10', 'feat: first', { 'src/a.ts': lines(2) });
+    // Authored and committed in 2020, on top of October's work (a cherry-picked or imported commit).
+    await writeFile(join(repo.path, 'old.txt'), 'old\n');
+    await repo.git('add', '-A');
+    const old = '2020-01-01T10:00:00+08:00';
+    await runGit(
+      [
+        '-c',
+        'user.name=aw-test',
+        '-c',
+        'user.email=aw-test@example.com',
+        'commit',
+        '-q',
+        `--author=${LS}`,
+        `--date=${old}`,
+        '-m',
+        'chore: backfill',
+      ],
+      {
+        cwd: repo.path,
+        env: { ...process.env, GIT_COMMITTER_DATE: old },
+      },
+    );
+    await commitAs(repo, ZS, '2026-10-12', 'feat: second', { 'src/b.ts': lines(3) });
+    const { body: project } = await t.call(createProjectOp, { repoPath: repo.path });
+
+    const { body } = await summary(project.id);
+    expect(body.members.map((m) => [m.key, m.metrics.commits])).toEqual([['zs@corp.com', 2]]);
+  });
+
   it('成员指标：.mailmap 合并邮箱、锁文件不计行数、测试伴随、被回滚、机器人与中位数', async () => {
     const { project } = await setUp();
 

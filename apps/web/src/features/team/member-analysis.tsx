@@ -82,11 +82,14 @@ export function MemberAnalysis({
   member,
   name,
   range,
+  hasCommits,
 }: {
   query: TeamQuery;
   member: string;
   name: string;
   range: { from: string; to: string; ref: string };
+  /** Without commits in the range there is nothing to analyse. */
+  hasCommits: boolean;
 }) {
   const analyses = useQuery(teamAnalysesQuery(query.id, member));
   const cancel = useCancelAnalysis(query.id);
@@ -100,12 +103,12 @@ export function MemberAnalysis({
     <section className="section card" aria-label={C.analysisTitle} data-testid="member-analysis">
       <div className="card-head">
         <h2 className="section-title grow">{C.analysisTitle}</h2>
-        <Button variant="secondary" icon="sparkle" disabled={busy} onClick={() => setAsking(true)}>
+        <Button variant="secondary" icon="sparkle" disabled={busy || !hasCommits} onClick={() => setAsking(true)}>
           {shown === undefined ? C.analyse : C.reanalyse}
         </Button>
       </div>
       <div className="card-body col">
-        <p className="hint">{C.analysisLede}</p>
+        <p className="hint">{hasCommits ? C.analysisLede : C.nothingToAnalyse}</p>
         {analyses.isError && <ErrorState error={analyses.error} onRetry={() => void analyses.refetch()} />}
         {cancel.isError && <ErrorState error={cancel.error} />}
         {analyses.data !== undefined && shown === undefined && <p className="hint">{C.noAnalysis}</p>}

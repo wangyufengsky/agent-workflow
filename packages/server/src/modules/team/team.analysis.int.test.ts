@@ -149,8 +149,8 @@ describe('AI 成员分析（33 §6）', () => {
     );
   });
 
-  it('取消排队中与运行中的分析；会话没有提交就结束时分析失败', async () => {
-    const { project } = await setUp();
+  it('取消排队中与运行中的分析；另一分支可同时排队；没有提交的成员被拒；会话没有提交就结束时分析失败', async () => {
+    const { repo, project } = await setUp();
     t.fake.enqueue(script().hang(), REVIEWER);
     const { body } = await t.call(createTeamAnalysesOp, {
       id: project.id,
@@ -159,6 +159,27 @@ describe('AI 成员分析（33 §6）', () => {
     });
     const [zs, ls] = body.items;
     if (zs === undefined || ls === undefined) throw new Error('two analyses expected');
+
+    // Another branch is another analysis, even while this one waits.
+    await repo.git('branch', 'other');
+    const other = await t.call(createTeamAnalysesOp, {
+      id: project.id,
+      ...range,
+      ref: 'other',
+      members: ['ls@corp.com'],
+    });
+    expect(other.status).toBe(201);
+    // Nothing to analyse: a member without commits in the range is refused before any session starts.
+    const nobody = await t.call(createTeamAnalysesOp, {
+      id: project.id,
+      period: TeamPeriod.Custom,
+      from: '2020-01-01',
+      to: '2020-01-31',
+      members: ['zs@corp.com'],
+    });
+    expect(nobody.raw.json().error.code).toBe(ErrorCode.ValidationFailed);
+    const otherId = other.body.items[0]?.id ?? '';
+    expect((await t.call(cancelTeamAnalysisOp, { analysisId: otherId })).body.status).toBe('cancelled');
 
     expect((await t.call(cancelTeamAnalysisOp, { analysisId: ls.id })).body.status).toBe('cancelled');
     const cancelled = await t.call(cancelTeamAnalysisOp, { analysisId: zs.id });

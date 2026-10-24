@@ -383,7 +383,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | GET | `/projects/:id/team/commits?member&cursor` | `team.commits` | 成员在时间段内的提交，新的在前，每页 50 |
 | PUT | `/projects/:id/team/identities` | `team.identities.update` | write：`{ email, memberEmail?, displayName?, hidden? }`；合并时连同已合并到它的身份一起移动；合并到自己或到已合并的身份为 400 |
 | GET / PUT | `/projects/:id/team/settings` | `team.settings.get` / `update` | 排除与测试文件的 glob、超大提交行数；`null` 恢复默认 |
-| POST | `/projects/:id/team/analyses` | `team.analyses.create` | write，201：`{ members[], …时间段 }`，为每位成员排队一个 AI 分析；运行时未就绪 `OPENCODE_NOT_READY`；同一成员同一时间段已有排队或进行中的分析 `TEAM_ANALYSIS_EXISTS` |
+| POST | `/projects/:id/team/analyses` | `team.analyses.create` | write，201：`{ members[], …时间段 }`，为每位成员排队一个 AI 分析；运行时未就绪 `OPENCODE_NOT_READY`；同一成员、分支、时间段已有排队或进行中的分析 `TEAM_ANALYSIS_EXISTS`；成员在这段时间没有提交 `VALIDATION_FAILED` |
 | GET | `/projects/:id/team/analyses?member` | `team.analyses.list` | 新的在前 |
 | GET | `/team/analyses/:analysisId` | `team.analyses.get` | `TeamAnalysisDTO`（含报告与 `quality`） |
 | POST | `/team/analyses/:analysisId/cancel` | `team.analyses.cancel` | write：取消排队或运行中的分析 |

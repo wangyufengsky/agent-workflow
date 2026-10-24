@@ -519,7 +519,7 @@ class AppError extends Error {
 | `BROWSER_REF_STALE` | — | 元素编号已作废（页面导航过），先重新读取快照；仅 MCP |
 | `BROWSER_ACTION_FAILED` | — | 动作没能完成；`details: { reason, coveredBy? }`，`reason` 为 `BrowserActionFailure`；仅 MCP |
 | `TEAM_ANALYSIS_NOT_FOUND` | 404 | 成员分析不存在 |
-| `TEAM_ANALYSIS_EXISTS` | 409 | 同一成员、同一时间段已有排队或进行中的分析；`details: { member }` |
+| `TEAM_ANALYSIS_EXISTS` | 409 | 同一成员、分支、时间段已有排队或进行中的分析；`details: { member }` |
 | `TEAM_ANALYSIS_INVALID` | — | `submit_member_analysis` 与成员的提交不符；`details.problems[]`（§5.7）与 `sampled` |
 | `TEAM_ANALYSIS_INTERRUPTED` | — | 应用在分析排队或进行时退出；记在分析上 |
 

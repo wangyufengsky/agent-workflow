@@ -20,16 +20,21 @@ export async function readTip(repo: string, ref: string): Promise<{ sha: string;
   return { sha, committedAt: Number(committedAt) * 1000 };
 }
 
+export type ReachableCommit = { sha: string; authoredAt: number };
+
 /**
- * The commits `ref` reaches, merges left out (33 §2.2), committed since `since` (ms): a commit is committed when or
- * after it was authored, so this keeps every commit authored since then and spares walking the older history.
+ * Every commit `tip` reaches, merges left out (33 §2.2), with its author time (ms). The whole history is walked:
+ * `--since` stops at the first older commit, and a back-dated commit in the middle would hide the newer work behind
+ * it.
  */
-export async function reachableCommits(repo: string, ref: string, since: number): Promise<string[]> {
-  const { stdout } = await runGit(
-    ['rev-list', '--no-merges', `--since=@${Math.floor(since / 1000)}`, '--end-of-options', ref, '--'],
-    { cwd: repo },
-  );
-  return stdout.split('\n').filter((sha) => sha !== '');
+export async function reachableCommits(repo: string, tip: string): Promise<ReachableCommit[]> {
+  const { stdout } = await runGit(['log', '--no-merges', '--format=%H %at', '--end-of-options', tip, '--'], {
+    cwd: repo,
+  });
+  return stdout.split('\n').flatMap((line) => {
+    const [sha, authoredAt] = line.split(' ');
+    return sha === undefined || sha === '' ? [] : [{ sha, authoredAt: Number(authoredAt) * 1000 }];
+  });
 }
 
 /** What 33 §7.1 keeps of these commits, renames followed. */

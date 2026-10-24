@@ -137,6 +137,7 @@ export const TEAM_COPY = {
   cancelAnalysis: '取消',
   reanalyse: '重新生成',
   noAnalysis: '还没有这段时间的分析。',
+  nothingToAnalyse: '这段时间没有提交，没有可以分析的工作。',
   analysisOf: (from: string, to: string, ref: string) => `${from} 至 ${to} · ${ref}`,
   history: '历史分析',
   workItems: '做了什么',

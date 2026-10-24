@@ -187,6 +187,7 @@ function MemberDetail({ detail, query }: { detail: TeamMemberDetailDTO; query: T
         member={member.key}
         name={member.name}
         range={{ from: detail.period.from, to: detail.period.to, ref: detail.ref }}
+        hasCommits={member.metrics.commits > 0}
       />
       <CommitList query={query} member={member.key} />
     </>
