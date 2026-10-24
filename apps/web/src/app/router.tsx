@@ -18,6 +18,8 @@ import { GitConsolePage, GitReviewRedirect } from '../features/git/git-console.p
 import { DETAIL_TABS, GIT_VIEWS, GitProjectPage } from '../features/git/git-project.page.tsx';
 import { HomePage } from '../features/home/home.page.tsx';
 import { InboxPage } from '../features/inbox/inbox.page.tsx';
+import { InitiativePage } from '../features/initiatives/initiative.page.tsx';
+import { InitiativesPage } from '../features/initiatives/initiatives.page.tsx';
 import { InsightsPage, insightsSearchSchema } from '../features/insights/insights.page.tsx';
 import { KnowledgeConversationPage, KnowledgeWelcomePage } from '../features/knowledge/knowledge.page.tsx';
 import { KnowledgeHistoryPage } from '../features/knowledge/knowledge-history.page.tsx';
@@ -332,6 +334,8 @@ const routeTree = rootRoute.addChildren([
     page(ROUTES.batches, BatchesPage),
     batchNewRoute,
     page(ROUTES.batch, BatchPage),
+    page(ROUTES.initiatives, InitiativesPage),
+    page(ROUTES.initiative, InitiativePage),
     page(ROUTES.schedules, SchedulesPage),
     scheduleNewRoute,
     page(ROUTES.schedule, SchedulePage),

@@ -4,6 +4,7 @@ import { ROUTES } from '../../app/routes.ts';
 import { IconButton } from '../../components/icon-button.tsx';
 import { BATCHES_COPY } from '../../copy/batches.ts';
 import { HOME_COPY as C } from '../../copy/home.ts';
+import { INITIATIVES_COPY } from '../../copy/initiatives.ts';
 import { INBOX_COPY } from '../../copy/tasks.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import styles from './home.module.css';
@@ -18,7 +19,7 @@ const RAIL_MIN_WINDOW = 1180;
  */
 export function WorkRail() {
   const [open, setOpen] = useState(() => window.innerWidth >= RAIL_MIN_WINDOW);
-  const { attention, batches, sections } = useWork();
+  const { attention, batches, initiatives, sections } = useWork();
   if (!open) {
     return (
       <div className={styles.railCollapsed}>
@@ -68,6 +69,20 @@ export function WorkRail() {
           ))}
         </section>
       ))}
+      {initiatives.length > 0 && (
+        <section className={styles.railGroup}>
+          <h3 className={styles.railTitle}>{INITIATIVES_COPY.inProgress}</h3>
+          {initiatives.map((i) => (
+            <Link key={i.id} className={styles.railItem} to={ROUTES.initiative} params={{ initiativeId: i.id }}>
+              <span className="ellipsis">{i.title}</span>
+              <small>{INITIATIVES_COPY.progress(i.doneCount, i.itemCount)}</small>
+              <span className={styles.railBar}>
+                <span style={{ inlineSize: `${(100 * i.doneCount) / i.itemCount}%` }} />
+              </span>
+            </Link>
+          ))}
+        </section>
+      )}
       {batches.length > 0 && (
         <section className={styles.railGroup}>
           <h3 className={styles.railTitle}>{BATCHES_COPY.inProgress}</h3>
@@ -82,7 +97,9 @@ export function WorkRail() {
           ))}
         </section>
       )}
-      {attention.length === 0 && working.length === 0 && batches.length === 0 && <p className="hint">{C.railEmpty}</p>}
+      {attention.length === 0 && working.length === 0 && batches.length === 0 && initiatives.length === 0 && (
+        <p className="hint">{C.railEmpty}</p>
+      )}
     </aside>
   );
 }

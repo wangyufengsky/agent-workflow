@@ -1,4 +1,5 @@
 import { DeckStatus } from './deck.ts';
+import { InitiativeItemStatus, InitiativeStatus } from './initiative.ts';
 import { KnowledgeTurnStatus } from './knowledge.ts';
 import { ScheduleStatus } from './schedule.ts';
 import { RuntimeStatus } from './system.ts';
@@ -78,6 +79,21 @@ export const STATUS_TONE = {
     [ScheduleStatus.Active]: StatusTone.Ok,
     [ScheduleStatus.Paused]: StatusTone.Wait,
   },
+  initiative: {
+    [InitiativeStatus.DraftReady]: StatusTone.Wait,
+    [InitiativeStatus.InProgress]: StatusTone.Run,
+    [InitiativeStatus.PhaseDone]: StatusTone.Wait,
+    [InitiativeStatus.Done]: StatusTone.Done,
+  },
+  initiativeItem: {
+    [InitiativeItemStatus.Dropped]: StatusTone.Idle,
+    [InitiativeItemStatus.Satisfied]: StatusTone.Done,
+    [InitiativeItemStatus.PrOpen]: StatusTone.Wait,
+    [InitiativeItemStatus.InTask]: StatusTone.Run,
+    [InitiativeItemStatus.PhaseClosed]: StatusTone.Idle,
+    [InitiativeItemStatus.Waiting]: StatusTone.Idle,
+    [InitiativeItemStatus.Ready]: StatusTone.Wait,
+  },
 } as const satisfies {
   task: Record<TaskStatus, StatusTone>;
   node: Record<NodeStatus, StatusTone>;
@@ -87,4 +103,6 @@ export const STATUS_TONE = {
   runtime: Record<RuntimeStatus, StatusTone>;
   taskDisplay: Record<TaskDisplayGroup, StatusTone>;
   schedule: Record<ScheduleStatus, StatusTone>;
+  initiative: Record<InitiativeStatus, StatusTone>;
+  initiativeItem: Record<InitiativeItemStatus, StatusTone>;
 };

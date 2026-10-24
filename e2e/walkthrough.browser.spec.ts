@@ -50,6 +50,8 @@ type Seed = {
   batch: string;
   /** A code-review schedule run once by hand (22 §7). */
   schedule: string;
+  /** An initiative from「设计后开发」left as a draft for review (34 §15.4). */
+  initiative: string;
   /** An assistant conversation that keeps working until the walkthrough ends. */
   assistantBusy: string;
   /** The Git workbench (27): the review project's main commit, reviewed by the AI with one finding. */
@@ -539,6 +541,12 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     frequency: { kind: 'weekly', weekdays: [1, 3, 5], time: '09:00' },
   });
   await api(request, 'POST', `/schedules/${schedule.id}/run`);
+  const initiative = await api<{ id: string }>(request, 'POST', '/initiatives', {
+    projectId: batchProject.id,
+    templateKey: 'design_then_build',
+    requirement: '订单支持按类别统计库存',
+    review: true,
+  });
   const assistant = await seedAssistant(request, reviewProject, { id: knowledge.id, turnId: knowledgeTurn.id });
   const assistantCharts = await seedCharts(request);
 
@@ -656,6 +664,7 @@ createServer((req, res) => {
     knowledgeDraft: draft.id,
     batch: batch.id,
     schedule: schedule.id,
+    initiative: initiative.id,
     assistantBusy: assistant.busy,
     assistantConversation: assistant.conversation,
     assistantCharts,
@@ -1064,6 +1073,23 @@ const SHOTS: Shot[] = [
     },
   },
   { name: 'batches', mode: UiMode.Simple, url: () => '/batches', ready: testId('batch-card') },
+  {
+    name: 'initiative',
+    mode: UiMode.Simple,
+    url: (s) => `/initiatives/${s.initiative}`,
+    ready: testId('initiative-phase'),
+  },
+  {
+    name: 'initiative-edit',
+    mode: UiMode.Simple,
+    url: (s) => `/initiatives/${s.initiative}`,
+    ready: testId('initiative-phase'),
+    open: async (page) => {
+      await page.getByRole('button', { name: '修改阶段与工作包' }).click();
+      return page.getByTestId('initiative-editor');
+    },
+  },
+  { name: 'initiatives', mode: UiMode.Simple, url: () => '/initiatives', ready: testId('initiative-card') },
   {
     name: 'schedule-new',
     mode: UiMode.Simple,

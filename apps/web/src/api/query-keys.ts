@@ -29,6 +29,11 @@ export const queryKeys = {
   /** Batches are under the task lists' prefix: their progress is their tasks', so task events refresh them (20 §4). */
   batches: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'batches', filter],
   batch: (id: string) => ['tasks', 'list', 'batch', id],
+  /** Initiatives too: their work packages' states are their tasks' (34 §6). */
+  initiativeLists: ['tasks', 'list', 'initiatives'],
+  initiatives: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'initiatives', filter],
+  initiative: (id: string) => ['tasks', 'list', 'initiative', id],
+  initiativeTemplates: ['initiative-templates'],
   /** Schedules too: the state of the task a schedule started is part of it (22 §9). */
   scheduleLists: ['tasks', 'list', 'schedules'],
   schedules: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'schedules', filter],

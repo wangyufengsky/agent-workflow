@@ -10,12 +10,14 @@ import { Icon } from '../../components/icon.tsx';
 import { StatusBadge } from '../../components/status-badge.tsx';
 import { ENTITY_COPY as C } from '../../copy/assistant.ts';
 import { BATCHES_COPY } from '../../copy/batches.ts';
+import { INITIATIVE_STATUS_LABEL, INITIATIVES_COPY } from '../../copy/initiatives.ts';
 import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
 import { frequencyText } from '../../copy/schedules.ts';
 import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
 import { gitReviewQuery } from '../git/git.queries.ts';
 import { ReviewBadge } from '../git/git-parts.tsx';
+import { initiativeQuery } from '../initiatives/initiatives.queries.ts';
 import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
 import { deckCounts, deckStatusLabel } from '../ppt/deck-status.ts';
 import { deckQuery } from '../ppt/ppt.queries.ts';
@@ -130,6 +132,19 @@ function BatchEntityCard({ entity }: { entity: EntityRef }) {
   return <Shell entity={entity} presence={byDetail(query, ErrorCode.BatchNotFound, status)} />;
 }
 
+function InitiativeEntityCard({ entity }: { entity: EntityRef }) {
+  // Under the task lists' cache prefix: its work packages' tasks keep it current (34 §6).
+  const query = useQuery(initiativeQuery(entity.id));
+  const status =
+    query.data === undefined ? undefined : (
+      <StatusBadge
+        tone={STATUS_TONE.initiative[query.data.status]}
+        label={`${INITIATIVE_STATUS_LABEL[query.data.status]} · ${INITIATIVES_COPY.progress(query.data.doneCount, query.data.itemCount)}`}
+      />
+    );
+  return <Shell entity={entity} presence={byDetail(query, ErrorCode.InitiativeNotFound, status)} />;
+}
+
 function DeckEntityCard({ entity }: { entity: EntityRef }) {
   // `deck.updated` keeps this query current: the card follows the outline and the making (D96).
   const query = useQuery(deckQuery(entity.id));
@@ -177,5 +192,7 @@ export function EntityCard({ entity }: { entity: EntityRef }) {
       return <ScheduleEntityCard entity={entity} />;
     case EntityKind.GitReview:
       return <GitReviewEntityCard entity={entity} />;
+    case EntityKind.Initiative:
+      return <InitiativeEntityCard entity={entity} />;
   }
 }
