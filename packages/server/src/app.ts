@@ -62,6 +62,7 @@ import { createPlansModule } from './modules/plans/index.ts';
 import { createPreviewsModule, type PreviewsService } from './modules/previews/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
 import { createRepositoryModule } from './modules/repository/index.ts';
+import { createRequirementsModule } from './modules/requirements/index.ts';
 import { createRolesModule, type RolesService } from './modules/roles/index.ts';
 import { createScheduler } from './modules/scheduler/index.ts';
 import { createSchedulesModule, type SchedulesService } from './modules/schedules/index.ts';
@@ -328,6 +329,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     settings: settings.service,
     prompts,
   });
+  const requirements = createRequirementsModule({ db: database.db, clock });
   const tasks = createTasksModule({
     db: database.db,
     unit,
@@ -345,6 +347,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     attempts: attempts.service,
     browser: browser.service,
     attachments: attachments.service,
+    requirements: requirements.service,
     inbox: inbox.service,
     deliveries: deliveries.service,
     databases: databases.service,

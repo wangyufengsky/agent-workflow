@@ -11,6 +11,7 @@ import {
   ErrorCode,
   InboxKind,
   NodeEvent,
+  NodeKind,
   NodeStatus,
   nodeMachine,
   type PageCheckUnrunnable,
@@ -44,6 +45,8 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
   const { unit, clock, log, attempts, acceptance, inbox, roles, settings, prompts, locks } = deps;
   /** Verifications in progress, by node, so cancelling the task can stop them. */
   const verifications = new Map<string, AbortController>();
+  /** Told, inside the transaction that finishes it, when a verify step is done and which commit it verified. */
+  const verifiedListeners: Array<(node: Node, commitSha: string) => void> = [];
 
   /** Another attempt while budget remains, otherwise failed (09 §3). */
   function fail(node: Node, event: NodeEvent, feedback: string, changes: NodeChanges = {}): Node {
@@ -172,7 +175,8 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
           }
           results.push(outcome.result);
         }
-        if (controller.signal.aborted || results.at(-1)?.passed !== true) break;
+        // A verify step runs every check: each decides its own checklist item (31 §2.2).
+        if (controller.signal.aborted || (node.kind !== NodeKind.Verify && results.at(-1)?.passed !== true)) break;
       }
       await finishVerification(nodeId, results, ctx);
     } finally {
@@ -184,6 +188,10 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     const node = get(nodeId);
     // Cancelled (or otherwise moved on) while the checks ran.
     if (node.status !== NodeStatus.Verifying) return;
+    if (node.kind === NodeKind.Verify) {
+      await finishVerifyStep(nodeId, results, ctx);
+      return;
+    }
     if (results.some((r) => r.kind !== AcceptanceCheckKind.AiReview && r.unrunnable !== null)) {
       // The environment, not the model, failed: no feedback, and the attempt does not count (D116).
       move(node, NodeEvent.CheckUnrunnable, NodeStatus.Failed, {
@@ -207,6 +215,24 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         ...(target === NodeStatus.Done ? doneChanges(sha) : {}),
       });
       if (target === NodeStatus.AwaitingAcceptance) requestAcceptance(current);
+    });
+  }
+
+  /**
+   * A verify step's checks record conclusions and never hold it back (31 §2.2): a failing or unrunnable command is its
+   * item's conclusion, and another attempt could not change the code anyway. Done without manual acceptance.
+   */
+  async function finishVerifyStep(nodeId: string, results: CheckResult[], ctx: NodeRunContext): Promise<void> {
+    const sha = await commit(get(nodeId), ctx);
+    const head = sha ?? (await runGit(['rev-parse', 'HEAD'], { cwd: ctx.directory })).stdout.trim();
+    const current = get(nodeId);
+    if (current.status !== NodeStatus.Verifying) return;
+    unit.transact(() => {
+      const done = move(current, NodeEvent.ChecksPassed, NodeStatus.Done, {
+        checkResults: results,
+        ...doneChanges(sha),
+      });
+      for (const listener of verifiedListeners) listener(done, head);
     });
   }
 
@@ -249,6 +275,11 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
   };
 
   return {
+    /** `listener` runs in the transaction that finishes a verify step, with the commit the step verified. */
+    onVerified(listener: (node: Node, commitSha: string) => void): void {
+      verifiedListeners.push(listener);
+    },
+
     /** Starts the node's execute attempt; the node is running before this returns (the scheduler counts on it). */
     dispatch(nodeId: string, ctx: NodeRunContext): void {
       const node = get(nodeId);

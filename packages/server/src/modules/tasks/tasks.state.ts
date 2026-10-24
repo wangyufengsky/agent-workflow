@@ -37,12 +37,14 @@ import type { KnowledgeService } from '../knowledge/index.ts';
 import type { NodeRunContext, NodesService } from '../nodes/index.ts';
 import type { PlansService } from '../plans/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
+import type { RequirementsService } from '../requirements/index.ts';
 import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { recordTaskEvent } from '../timeline/index.ts';
 import type { WorkflowsService } from '../workflows/index.ts';
 import type { WorktreesService } from '../worktrees/index.ts';
 import { createTasksRepo, type Task, type TaskChanges } from './tasks.repo.ts';
+import { createVerifySteps } from './tasks.verify.ts';
 
 export type TasksServiceDeps = {
   db: Db;
@@ -60,6 +62,7 @@ export type TasksServiceDeps = {
   attempts: AttemptsService;
   attachments: AttachmentsService;
   browser: BrowserService;
+  requirements: RequirementsService;
   inbox: InboxService;
   deliveries: DeliveriesService;
   databases: DatabasesService;
@@ -221,6 +224,7 @@ export function createTaskState(deps: TasksServiceDeps) {
     attachmentsOf,
     promptRequirement,
     runContext,
+    verify: createVerifySteps(deps),
   };
 }
 export type TaskState = ReturnType<typeof createTaskState>;

@@ -34,6 +34,7 @@ import { attachmentIdsSchema, attachmentSchema } from './attachments.ts';
 import { attemptSummarySchema } from './attempts.ts';
 import { deliverySchema, taskPullRequestSchema } from './delivery.ts';
 import { inboxItemSchema } from './inbox.ts';
+import { requirementItemsInputSchema } from './requirements.ts';
 
 /** Resolved once when the task is created (11 §5.1) and never changed afterwards. */
 export const checkpointsSchema = z.object({
@@ -57,6 +58,8 @@ export const createTaskRequestSchema = z.object({
   start: z.boolean().optional(),
   /** Files attached to the requirement (30); every step of the task sees them. */
   attachmentIds: attachmentIdsSchema.optional(),
+  /** The acceptance checklist (31 §2.1); its first version is saved with the task. */
+  requirements: requirementItemsInputSchema.optional(),
 });
 export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
 

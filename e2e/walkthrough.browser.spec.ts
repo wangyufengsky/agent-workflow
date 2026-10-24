@@ -123,7 +123,12 @@ const DECK_PAGES = [
   { layout: 'quote', quote: '**可以全量上线**，导出任务下周迁到独立队列。', attribution: '评审结论' },
 ];
 
-async function api<T>(request: APIRequestContext, method: 'GET' | 'POST', path: string, data?: object): Promise<T> {
+async function api<T>(
+  request: APIRequestContext,
+  method: 'GET' | 'POST' | 'PUT',
+  path: string,
+  data?: object,
+): Promise<T> {
   const res = await request.fetch(`${API_BASE}${path}`, { method, headers: AUTH, ...(data && { data }) });
   if (!res.ok()) throw new Error(`${method} ${path} failed: ${res.status()} ${await res.text()}`);
   return res.json();
@@ -535,6 +540,27 @@ createServer((req, res) => {
   const completedReview = await waitForStatus(request, completed, 'review');
   await patchSettings(request, { 'scheduler.maxConcurrentAttempts': settings['scheduler.maxConcurrentAttempts'] });
   await api(request, 'POST', `/tasks/${completedReview.id}/deliver`, { strategy: 'squash' });
+  // The task in review has an acceptance checklist (31): the result card lists it, delivery reminds of unmet items.
+  const inReview = await waitForStatus(request, review, 'review');
+  await api(request, 'PUT', `/tasks/${inReview.id}/requirements`, {
+    items: [
+      {
+        title: '订单时间按用户所在时区显示',
+        expected: '东八区用户看到的下单时间与实际一致，跨日的订单显示在正确的日期下',
+      },
+      {
+        title: '单元测试通过',
+        expected: '退出码 0',
+        verification: { kind: 'command', command: 'pnpm test --filter order-time' },
+      },
+      {
+        title: '旧订单不受影响',
+        expected: '迁移前的订单时间显示不变',
+        required: false,
+        verification: { kind: 'manual' },
+      },
+    ],
+  });
   return {
     project: reviewProject,
     running: await waitForStatus(request, running, 'running'),
@@ -542,7 +568,7 @@ createServer((req, res) => {
     question: await waitForStatus(request, question, 'running'),
     planReview: await waitForStatus(request, planReview, 'plan_review'),
     failed: await waitForStatus(request, failed, 'failed'),
-    review: await waitForStatus(request, review, 'review'),
+    review: inReview,
     completed: await waitForStatus(request, completed, 'completed'),
     fixedKey,
     aiKey,
@@ -638,6 +664,24 @@ const SHOTS: Shot[] = [
       const list = page.getByRole('list', { name: '附加的资料' });
       await expect(list.getByRole('button', { name: /^查看 / })).toHaveCount(names.length);
       return list;
+    },
+  },
+  {
+    // 「验收要求」open when starting a task (31 §2.1): an AI item with a long expectation and a command item.
+    name: 'home-requirements',
+    mode: UiMode.Simple,
+    url: (s) => `/?projectId=${s.project.id}&workflow=bugfix&requirement=${encodeURIComponent('订单时间显示错了')}`,
+    ready: (page) => page.getByText('开始任务 · 修 Bug'),
+    open: async (page) => {
+      await page.getByRole('button', { name: '验收要求' }).click();
+      await page.getByLabel('要求 1').fill('订单时间按用户所在时区显示，跨日的订单显示在正确的日期下');
+      await page.getByLabel('预期结果 1').fill('东八区用户看到的下单时间与实际一致；凌晨下的单不会显示成前一天');
+      await page.getByRole('button', { name: '添加一项' }).click();
+      await page.getByLabel('要求 2').fill('单元测试通过');
+      await page.getByLabel('预期结果 2').fill('退出码 0');
+      await page.getByLabel('核验方式 2').selectOption('command');
+      await page.getByLabel('命令 2').fill('pnpm test --filter order-time');
+      return page.getByRole('group', { name: '验收要求' });
     },
   },
   {

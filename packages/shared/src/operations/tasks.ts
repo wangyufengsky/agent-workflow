@@ -352,6 +352,8 @@ export const deliverTaskOp = defineOperationContract({
   output: taskDetailSchema,
   risk: OperationRisk.Critical,
   http: { method: 'POST', path: '/tasks/:id/deliver' },
+  // Accepting unmet checklist items is the user's, on the task page (31 §4).
+  assistantOmit: ['acknowledgedRequirementsRevisionId'],
 });
 
 export const requestChangesOp = defineOperationContract({

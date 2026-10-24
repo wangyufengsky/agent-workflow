@@ -9,9 +9,11 @@ export const NODE_KEY_PATTERN = /^[a-z0-9_]{1,40}$/;
 const pagePathSchema = z.string().startsWith('/');
 export const pageCheckPagesSchema = z.array(pagePathSchema).min(1).max(PREVIEW_PAGES_MAX);
 const pageCheckViewportsSchema = z.array(viewportPresetSchema).min(1);
+/** `requirementItemId`: the checklist item a verify step's command check decides (31 §2.2). */
+const requirementItemId = z.string().optional();
 
 export const acceptanceCheckSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal(AcceptanceCheckKind.Command), command: z.string().min(1) }),
+  z.object({ kind: z.literal(AcceptanceCheckKind.Command), command: z.string().min(1), requirementItemId }),
   /** Without pages, the project's key pages; without viewports, PAGE_CHECK_VIEWPORTS (29 §7.1). */
   z.object({
     kind: z.literal(AcceptanceCheckKind.Browser),
@@ -40,6 +42,7 @@ export const nodeAcceptanceSchema = z.object({
         kind: z.literal(AcceptanceCheckKind.Command),
         command: z.string().min(1),
         skipped: z.literal(true).optional(),
+        requirementItemId,
       }),
       z.object({
         kind: z.literal(AcceptanceCheckKind.Browser),

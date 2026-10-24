@@ -613,11 +613,10 @@ payload / response：
 
 | 表／字段 | 关键字段／约束 |
 | --- | --- |
-| tasks.requirements_revision_id | 可空 FK；没有清单的任务为 null |
-| requirement_revisions | id、task_id FK、seq、items JSON、created_at；UNIQUE(task_id, seq)；只追加 |
-| requirement_results | id、task_id FK、revision_id FK、item_id、source、conclusion、note、output（命令输出末尾，按既有输出上限截断）、node_id 可空（用户结论为 null）、commit_sha、created_at；只追加 |
-| deliveries.requirements_summary | 可空 JSON：revisionId、commitSha、逐项显示状态；旧交付为 null |
+| requirement_revisions | id、task_id FK（级联）、seq、items JSON、created_at；UNIQUE(task_id, seq)；只追加。当前版本就是 seq 最大的一条，任务表不另存（迁移 0022，Q-01 已实现） |
+| requirement_results | id、task_id FK（级联）、revision_id FK（级联）、item_id、source、conclusion、note、output（命令输出末尾，按既有输出上限截断）、node_id 可空（用户结论为 null，不设外键）、commit_sha、created_at；只追加，按插入顺序读取（同一毫秒的两条不靠时间区分）（表已建，写入在 Q-02 / Q-03） |
+| 交付时的清单摘要（Q-03 已实现） | 不另加列：记在这次交付的时间线事件 `payload.requirements` 里（`RequirementsDeliverySummary`：revisionId、commitSha、逐项 id／标题／是否必需／显示状态）；没有清单的交付没有这个字段 |
 
-items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`expected`、`required`、`verification`（`{ kind: 'command', command }` / `{ kind: 'ai_review' }` / `{ kind: 'manual' }`）。核验节点的命令检查在节点 acceptance 中带 `requirementItemId`，用于把检查结果对应到项。
+items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`expected`、`required`、`verification`（`{ kind: 'command', command }` / `{ kind: 'ai_review' }` / `{ kind: 'manual' }`）。核验节点的命令检查在节点 acceptance 中带 `requirementItemId`（Q-02 已实现）：核验节点按顺序运行全部检查，第 i 个检查结果对应第 i 个检查，节点完成时 `tasks` 据此写入命令项的结论（通过 → pass，失败 → fail，跳过或无法运行 → unverified），AI 项的结论来自它的 `submit_result.requirement_results`；提交号是核验节点完成时工作区的 HEAD。
 
 删除任务时级联删除清单版本与结论。

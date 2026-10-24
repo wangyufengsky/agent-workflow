@@ -515,11 +515,11 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 
 | 操作 | 方法与路径 | 风险／曝光 | 输入 → 结果 |
 | --- | --- | --- | --- |
-| requirements.get | GET `/tasks/:id/requirements` | read；UI / 助手 | 当前版本、逐项显示状态与最新结论、历史版本摘要 |
-| requirements.replace | PUT `/tasks/:id/requirements` | write；UI / 助手确认 | `{ items }` → 新版本；确认卡列出每项与命令，突出删除和改为可选的项 |
-| requirements.decide | POST `/tasks/:id/requirements/:itemId/decisions` | write；仅 UI（不向助手和命令面板曝光） | `{ conclusion: pass / fail / waive, note }`；waive 必须有 note；只在 `review` |
-| tasks.reverifyRequirements | POST `/tasks/:id/requirements/reverify` | write；UI / 助手确认 | 只在 `review`；追加一个核验节点 |
+| requirements.get（Q-01 已实现） | GET `/tasks/:id/requirements` | read；UI / 助手 | `{ revision, items, history }`：当前版本、逐项 `status` 与决定它的最新结论 `latest`、旧版本摘要（新的在前）；没有清单时都为空。状态按任务工作区当前提交计算，工作区已删除时只比较版本 |
+| requirements.replace（Q-01 已实现） | PUT `/tasks/:id/requirements` | write；UI / 助手确认 | `{ items }` → 新版本，返回同 `get`；带 `id` 的项保留（必须是当前版本的项，否则 `VALIDATION_FAILED`），不带的是新项；只在 `draft`、`plan_review`、`review`，否则 `REQUIREMENTS_NOT_EDITABLE`。确认卡列出每项与命令，突出删除和改为可选的项（Q-03） |
+| requirements.decide（Q-03 已实现） | POST `/tasks/:id/requirements/:itemId/decisions` | write；仅 UI（不向助手和命令面板曝光） | `{ conclusion: pass / fail / waive, note }`；waive 必须有 note（否则 `VALIDATION_FAILED`）；只在 `review`，否则 `REQUIREMENTS_NOT_EDITABLE`；结论记为 user，绑定当前提交；返回同 `get` |
+| tasks.reverifyRequirements（Q-03 已实现） | POST `/tasks/:id/requirements/reverify` | write；UI / 助手确认 | 只在 `review`（否则 `REQUIREMENTS_NOT_EDITABLE`），没有清单时 `VALIDATION_FAILED`；追加 `verify_requirements_<n>`，任务回到 `running`；返回任务详情 |
 
-- `createTask` 增加可选 `requirements: items`，与任务同一事务创建第一个版本。
-- 交付（本地合并、创建／更新 PR、报告完成）增加可选 `acknowledgedRequirementsRevisionId`：界面对话框或助手确认卡列出未满足项时所依据的清单版本。有未满足的必需项时，缺少它或与当前版本不同都返回 `REQUIREMENTS_UNACKNOWLEDGED`，用户需要看着新版本重新确认；交付记录保存清单摘要。
+- `createTask` 增加可选 `requirements: items`（每项 `title`、`expected`，`required` 默认 true，`verification` 默认 AI 核验），与任务同一事务创建第一个版本（Q-01 已实现）。
+- 交付（本地合并、创建／更新 PR、报告完成）增加可选 `acknowledgedRequirementsRevisionId`：界面对话框或助手确认卡列出未满足项时所依据的清单版本。有未满足的必需项时，缺少它或与当前版本不同都返回 `REQUIREMENTS_UNACKNOWLEDGED`，用户需要看着新版本重新确认；交付记录保存清单摘要。（Q-03 已实现：`tasks.deliver` 先算清单，批量交付也经过它；助手的 `tasks_deliver` 不带这个字段（`assistantOmit`），有未满足项时只能由用户在任务页交付；摘要记在交付的时间线事件里，见 10 §6.2）
 - SSE：`requirements.updated { taskId }`，界面重新获取。

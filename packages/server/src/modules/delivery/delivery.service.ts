@@ -6,6 +6,7 @@ import {
   type DeliveryStrategy,
   deliveryMachine,
   type ErrorInfo,
+  type RequirementsDeliverySummary,
   ServerEventType,
   DeliveryStatus as Status,
   TaskEventEntity,
@@ -75,19 +76,30 @@ export function createDeliveriesService({ db, unit, clock, log }: DeliveriesServ
     listRunning: (): Array<DeliveryDTO & { taskId: string }> => repo.listByStatus(Status.Running),
 
     /** A new delivery, `running` (09 §7). */
-    start(input: { taskId: string; strategy: DeliveryStrategy; targetBranch: string }): DeliveryDTO {
+    /** `requirements`: the checklist as the user delivered it (31 §4), kept in the delivery's timeline event. */
+    start(input: {
+      taskId: string;
+      strategy: DeliveryStrategy;
+      targetBranch: string;
+      requirements: RequirementsDeliverySummary | null;
+    }): DeliveryDTO {
+      const { requirements, ...row } = input;
       const id = randomUUID();
       const now = clock.now();
       const status: DeliveryStatus = Status.Running;
       return unit.transact(() => {
-        repo.insert({ id, ...input, status, createdAt: now });
+        repo.insert({ id, ...row, status, createdAt: now });
         recordTaskEvent(db, {
           taskId: input.taskId,
           entity: TaskEventEntity.Delivery,
           entityId: id,
           type: 'note',
           toStatus: status,
-          payload: { strategy: input.strategy, targetBranch: input.targetBranch },
+          payload: {
+            strategy: input.strategy,
+            targetBranch: input.targetBranch,
+            ...(requirements === null ? {} : { requirements }),
+          },
           createdAt: now,
         });
         const delivery = mustFind(id);

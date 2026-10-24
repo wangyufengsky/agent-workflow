@@ -12,6 +12,7 @@ import {
   InboxStatus,
   isTerminalState,
   listWorkflowsOp,
+  type RequirementItemInput,
   resolveInboxOp,
   ServerEventType,
   type TaskDetailDTO,
@@ -56,7 +57,8 @@ export type LiveApp = {
     workflowKey: string,
     fixture: Fixture,
     requirement: string,
-    options?: { confirmPlan: boolean },
+    /** `requirements`: the task's acceptance checklist (31). */
+    options?: { confirmPlan?: boolean; requirements?: RequirementItemInput[] },
   ): Promise<TaskDetailDTO>;
   /** The commands of every permission request the simulated user allowed so far (`<permission>: <patterns>`). */
   asked(): string[];
@@ -114,8 +116,9 @@ export async function startLiveApp(name: string, options: { browserHost?: Browse
   return {
     t,
     asked: () => userActions.asked.map((a) => a.ask),
-    async runTask(workflowKey, fixture, requirement, options = { confirmPlan: false }) {
-      const until = options.confirmPlan ? [...ENDED, TaskStatus.PlanReview] : ENDED;
+    async runTask(workflowKey, fixture, requirement, options = {}) {
+      const confirmPlan = options.confirmPlan ?? false;
+      const until = confirmPlan ? [...ENDED, TaskStatus.PlanReview] : ENDED;
       const projectId = await addFixtureProject(fixture);
       const workflow = (await t.call(listWorkflowsOp, {})).body.items.find((w) => w.key === workflowKey);
       if (workflow === undefined) throw new Error(`No workflow ${workflowKey}`);
@@ -131,7 +134,8 @@ export async function startLiveApp(name: string, options: { browserHost?: Browse
         projectId,
         workflowId: workflow.id,
         requirement,
-        checkpoints: { confirm_plan: options.confirmPlan },
+        checkpoints: { confirm_plan: confirmPlan },
+        ...(options.requirements === undefined ? {} : { requirements: options.requirements }),
       });
       taskId = created.id;
       workflowOfTask.set(taskId, `${workflowKey} · ${fixture}`);

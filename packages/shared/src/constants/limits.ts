@@ -162,3 +162,8 @@ export const ATTACHMENT_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 /** What the model gets of attachments (30 §3.2): all of one input's text in the prompt, and one `read_attachment` page. */
 export const ATTACHMENT_PROMPT_MAX_CHARS = 20_000;
 export const ATTACHMENT_READ_MAX_CHARS = 12_000;
+/** A task's acceptance checklist (31): items per version, and the lengths of an item's texts and of a note. */
+export const REQUIREMENTS_MAX = 30;
+export const REQUIREMENT_TITLE_MAX_CHARS = 120;
+export const REQUIREMENT_EXPECTED_MAX_CHARS = 2000;
+export const REQUIREMENT_NOTE_MAX_CHARS = 4000;

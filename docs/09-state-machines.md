@@ -389,7 +389,7 @@ stateDiagram-v2
 
 - 附件没有状态机：校验通过才写入记录，记录存在即可用（30 §3.1）。删除只有「无引用且超过保留时间」的清理，见 10 §6。
 - `TaskStatus` 与转换不变。清单编辑只在 `draft`、`plan_review`、`review`；`tasks.reverifyRequirements` 与人工结论只在 `review`。重新核验沿用 `appendRevision` 的 `changes_requested` → `running`，只是追加的是核验节点。
-- `NodeStatus` 与转换不变。`NodeKind.Verify` 的节点在 `verifying` 时运行全部检查（不在第一个失败处停止），失败也走 `checks_passed` 到 `done`（结果记为该项未通过；命令无法运行记为未核验），不进入失败重试，也不因 `CHECK_COMMAND_UNRUNNABLE` 让任务失败；它的执行尝试失败仍按既有规则重试。
+- `NodeStatus` 与转换不变。`NodeKind.Verify` 的节点在 `verifying` 时运行全部检查（不在第一个失败处停止），失败也走 `checks_passed` 到 `done`（结果记为该项未通过；命令无法运行记为未核验），不进入失败重试，也不因 `CHECK_COMMAND_UNRUNNABLE` 让任务失败；它的执行尝试失败仍按既有规则重试。（Q-02 已实现：`nodes.run.ts` 的 `finishVerifyStep`，完成时在同一事务里通知 `tasks` 写结论）
 - `RequirementDisplayStatus` 是纯函数的计算值（31 §3），没有 setStatus 操作。
 
 ## 14. 助手单轮

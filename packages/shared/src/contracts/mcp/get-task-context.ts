@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { requirementVerificationKindSchema } from '../../enums/requirement.ts';
 import { dbTypeSchema } from '../../enums/system.ts';
 import { attemptKindSchema, nodeStatusSchema } from '../../enums/task.ts';
 import { workflowDeliverableSchema } from '../../enums/workflow.ts';
@@ -64,5 +65,15 @@ export const getTaskContextOutputSchema = z.object({
     })
     .optional(),
   databases: z.array(z.object({ name: z.string(), type: dbTypeSchema })),
+  /** The task's acceptance checklist (31 §2.2), current version; empty without one. */
+  requirements: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      expected: z.string(),
+      required: z.boolean(),
+      verification: requirementVerificationKindSchema,
+    }),
+  ),
 });
 export type TaskContext = z.infer<typeof getTaskContextOutputSchema>;
