@@ -256,9 +256,9 @@ web/src/theme/
 ├─ themes/
 │  ├─ default.ts       默认：深色（D152）
 │  ├─ claude-code.ts   Claude Code：暖色
-│  ├─ spdb.ts          SPDB：白、红、蓝
 │  ├─ codex.ts         Codex：白
-│  └─ deepseek.ts      DeepSeek：蓝白
+│  ├─ deepseek.ts      DeepSeek：蓝白
+│  └─ dracula.ts       Dracula：深紫（D154）
 ├─ registry.ts           THEMES: Record<ThemeId, ThemeDefinition>
 ├─ apply-theme.ts        resolveTheme(preference, prefersDark)；applyTheme 把 tokens 写成 :root CSS 变量，设置 color-scheme 与 data-theme
 └─ use-applied-theme.ts  按设置应用主题，system 时跟随 prefers-color-scheme

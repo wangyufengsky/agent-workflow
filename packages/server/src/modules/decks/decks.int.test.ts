@@ -304,7 +304,7 @@ describe('PPT', () => {
 
     const busy = await get(deck.id);
     expect(busy.status).toBe(DeckStatus.Generating);
-    expect((await t.call(updateDeckOp, { id: deck.id, theme: 'spdb' })).status).toBe(200);
+    expect((await t.call(updateDeckOp, { id: deck.id, theme: 'dracula' })).status).toBe(200);
     const page1 = busy.slides[0];
     if (page1 === undefined) throw new Error('no page 1');
     expect(

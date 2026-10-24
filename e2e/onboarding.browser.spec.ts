@@ -39,9 +39,9 @@ test('首次启动：环境检测通过 → 添加项目 → 切换主题与模�
   for (const [label, id, bg] of [
     ['默认', 'default', '#0a0a0a'],
     ['Claude Code', 'claude_code', '#f8f7f3'],
-    ['SPDB', 'spdb', '#ffffff'],
     ['Codex', 'codex', '#ffffff'],
     ['DeepSeek', 'deepseek', '#ffffff'],
+    ['Dracula', 'dracula', '#282a36'],
   ] as const) {
     await page.getByRole('group', { name: '主题' }).getByRole('button', { name: label }).click();
     await expect(html).toHaveAttribute('data-theme', id);
