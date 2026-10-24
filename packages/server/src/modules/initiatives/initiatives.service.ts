@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
+import { BuiltinRoleKey, type Prompts } from '@aw/builtin';
 import {
   AppError,
   AttachmentOwnerKind,
+  type AttemptDTO,
+  AttemptKind,
+  attemptMachine,
   type CreateInitiativeRequest,
   createInitiativeRequestSchema,
   type DeliverInitiativePhaseResponse,
@@ -19,6 +23,8 @@ import {
   InitiativeItemStatus,
   type InitiativeProblem,
   InitiativeProblemCode,
+  type InitiativeRunDTO,
+  InitiativeRunMode,
   InitiativeStatus,
   type InitiativeSummaryDTO,
   type InitiativeTemplateDTO,
@@ -26,13 +32,21 @@ import {
   initiativeStatusOf,
   isBatchDeliverable,
   isInitiativeItemDone,
+  isTerminalState,
   type ListInitiativesQuery,
   type LocalMergeStrategy,
+  MCP_TOOL_PREFIX,
+  McpToolName,
+  type ReadAttachmentOutput,
   renderTemplateRequirement,
   ServerEventType,
+  SessionAgent,
+  type SubmitBreakdownInput,
   validateInitiativeDraft,
   WorkflowDeliverable,
   type WorkflowDTO,
+  WorkflowKind,
+  type WorkflowSummaryDTO,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
@@ -40,11 +54,21 @@ import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { EventBus } from '../../core/event-bus.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttachmentsService } from '../attachments/index.ts';
+import type { AttemptsService } from '../attempts/index.ts';
+import type { ProjectsService } from '../projects/index.ts';
+import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import type { WorkflowsService } from '../workflows/index.ts';
 import { type DoneItem, renderBackground } from './initiatives.background.ts';
-import { createInitiativesRepo, type Initiative, type InitiativeItem, itemColumns } from './initiatives.repo.ts';
+import { draftOf, type RefineItem, rebreakdownStep, refineStep, startMessage } from './initiatives.breakdown.ts';
+import {
+  createInitiativesRepo,
+  type Initiative,
+  type InitiativeItem,
+  type InitiativeRun,
+  itemColumns,
+} from './initiatives.repo.ts';
 import { createInitiativeTemplates } from './initiatives.templates.ts';
 
 export type InitiativesServiceDeps = {
@@ -57,9 +81,14 @@ export type InitiativesServiceDeps = {
   workflows: WorkflowsService;
   tasks: TasksService;
   attachments: AttachmentsService;
+  attempts: AttemptsService;
+  projects: ProjectsService;
+  roles: RolesService;
+  prompts: Prompts;
 };
 
 const firstLine = (text: string) => text.trim().split('\n')[0]?.trim() ?? '';
+const SESSION_TITLE_PREFIX = 'Initiative';
 const invalid = (problems: InitiativeProblem[]) =>
   new AppError(ErrorCode.InitiativeBreakdownInvalid, 'The phases and work packages are invalid', { problems });
 
@@ -81,6 +110,10 @@ export function createInitiativesService({
   workflows,
   tasks,
   attachments,
+  attempts,
+  projects,
+  roles,
+  prompts,
 }: InitiativesServiceDeps) {
   const repo = createInitiativesRepo(db);
   const templates = createInitiativeTemplates(repo, unit, clock);
@@ -164,8 +197,25 @@ export function createInitiativesService({
   const isDone = (status: InitiativeItemStatus) =>
     status === InitiativeItemStatus.Satisfied || status === InitiativeItemStatus.Dropped;
 
+  /** The latest breakdown or refinement and whether its session is still at work. */
+  function latestRun(initiativeId: string): { run: InitiativeRun; attempt: AttemptDTO } | undefined {
+    const run = repo.runs(initiativeId).at(-1);
+    return run === undefined ? undefined : { run, attempt: attempts.get(run.attemptId) };
+  }
+  const isBusy = (initiativeId: string) => {
+    const latest = latestRun(initiativeId);
+    return latest !== undefined && !isTerminalState(attemptMachine, latest.attempt.status);
+  };
+  function assertIdle(initiativeId: string): void {
+    if (isBusy(initiativeId)) {
+      throw new AppError(ErrorCode.InitiativeBusy, 'A breakdown of the initiative is under way', { id: initiativeId });
+    }
+  }
+
   function statusOf(initiative: Initiative, items: readonly ItemView[]): InitiativeStatus {
+    const latest = latestRun(initiative.id);
     return initiativeStatusOf({
+      run: latest === undefined ? null : { active: !isTerminalState(attemptMachine, latest.attempt.status) },
       breakdownRev: initiative.breakdownRev,
       confirmedRev: initiative.confirmedRev,
       openedPhase: initiative.openedPhase,
@@ -199,9 +249,30 @@ export function createInitiativesService({
       requirement: initiative.requirement,
       baseBranch: initiative.baseBranch,
       confirmItemPlans: initiative.confirmItemPlans,
+      allowedWorkflows: initiative.allowedWorkflows,
+      summary: initiative.summary,
+      understanding: initiative.understanding,
+      coverage: initiative.coverage,
+      latestRun: runDto(initiative.id),
       phases: initiative.phases.map((phase, i) => ({ ...phase, opened: i + 1 <= initiative.openedPhase })),
       items: items.map((item) => item.dto),
       attachments: attachments.listByOwner(owner(id)),
+    };
+  }
+
+  function runDto(initiativeId: string): InitiativeRunDTO | null {
+    const latest = latestRun(initiativeId);
+    if (latest === undefined) return null;
+    const { run, attempt } = latest;
+    return {
+      seq: run.seq,
+      mode: run.mode,
+      attemptId: run.attemptId,
+      status: attempt.status,
+      instruction: run.instruction,
+      openPhase: run.openPhase,
+      error: attempt.error,
+      createdAt: run.createdAt,
     };
   }
 
@@ -342,12 +413,18 @@ export function createInitiativesService({
   });
   // Initiatives are deleted with their project; their source attachments' references go with them (34 §9).
   tasks.onProjectDeleted((projectId) => {
-    attachments.release(AttachmentOwnerKind.Initiative, repo.idsOfProject(projectId));
+    const ids = repo.idsOfProject(projectId);
+    for (const id of ids) assertIdle(id);
+    attachments.release(AttachmentOwnerKind.Initiative, ids);
+    // The runs point at their attempts: the initiatives go first, then the attempts (34 §9).
+    const attemptIds = repo.runAttemptIds(ids);
+    for (const id of ids) repo.delete(id);
+    attempts.delete(attemptIds);
   });
 
-  /** A user edit (34 §5.2): rules of the draft, and work that started, finished or was dropped stays as it was. */
-  function checkEdit(initiative: Initiative, current: readonly ItemView[], draft: InitiativeDraft): void {
-    const problems = validateInitiativeDraft(draft, { workflowExists });
+  /** Work that started, finished or was dropped stays exactly as it was, whoever rewrites the draft (34 §5.2, §8.4). */
+  function lockedProblems(current: readonly ItemView[], draft: InitiativeDraft): InitiativeProblem[] {
+    const problems: InitiativeProblem[] = [];
     const next = new Map(draft.items.map((item) => [item.key, item]));
     const same = (a: InitiativeItemSpec, b: InitiativeItem) =>
       JSON.stringify(itemColumns(a)) === JSON.stringify(itemColumns({ ...b, workflow: b.workflowKey }));
@@ -362,6 +439,12 @@ export function createInitiativesService({
         });
       }
     }
+    return problems;
+  }
+
+  /** A user edit (34 §5.2): rules of the draft, and the work already under way kept. */
+  function checkEdit(initiative: Initiative, current: readonly ItemView[], draft: InitiativeDraft): void {
+    const problems = [...validateInitiativeDraft(draft, { workflowExists }), ...lockedProblems(current, draft)];
     if (problems.length > 0) throw invalid(problems);
     if (draft.phases.length < initiative.openedPhase) {
       throw new AppError(ErrorCode.InitiativeNotEditable, 'An opened phase cannot be removed', {
@@ -369,6 +452,153 @@ export function createInitiativesService({
       });
     }
   }
+
+  /** Replaces the phases and the work packages (callers checked what may change); inside the caller's transaction. */
+  function writeDraft(id: string, current: readonly ItemView[], draft: InitiativeDraft, now: number): void {
+    repo.update(id, { phases: draft.phases, updatedAt: now });
+    const byKey = new Map(current.map((item) => [item.key, item]));
+    const kept = new Set(draft.items.map((item) => item.key));
+    for (const item of current) if (!kept.has(item.key)) repo.deleteItem(item.id);
+    draft.items.forEach((item, ordinal) => {
+      const existing = byKey.get(item.key);
+      if (existing === undefined) {
+        repo.insertItem({
+          id: randomUUID(),
+          initiativeId: id,
+          ordinal,
+          ...itemColumns(item),
+          createdAt: now,
+          updatedAt: now,
+        });
+      } else {
+        repo.updateItem(existing.id, { ordinal, ...itemColumns(item), updatedAt: now });
+      }
+    });
+  }
+
+  /** The workflows the AI may give work packages: the initiative's, else every listed one (34 §5.1). */
+  function allowedWorkflowsOf(initiative: Initiative): WorkflowSummaryDTO[] {
+    const listed = workflows.list().filter((w) => w.kind !== WorkflowKind.System);
+    return initiative.allowedWorkflows === null
+      ? listed
+      : listed.filter((w) => initiative.allowedWorkflows?.includes(w.key));
+  }
+
+  const draftOfItems = (initiative: Initiative, items: readonly ItemView[]): InitiativeDraft => ({
+    phases: initiative.phases,
+    items: items.map(({ key, title, phase, workflowKey, requirement, dependsOn, acceptance }) => ({
+      key,
+      title,
+      phase,
+      workflow: workflowKey,
+      requirement,
+      dependsOn,
+      acceptance,
+    })),
+  });
+
+  /**
+   * Starts one breakdown run (34 §8.1): on the initiative's session when it has one (the reviewer remembers what it
+   * read), otherwise a new read-only session in the project's repository whose first message carries the requirement.
+   * The attempt row is written before the session can call back, the run row right after it.
+   */
+  async function startRun(
+    initiative: Initiative,
+    mode: InitiativeRunMode,
+    step: string,
+    extra: { instruction: string | null; openPhase: number | null },
+  ): Promise<void> {
+    attempts.requireReady();
+    assertIdle(initiative.id);
+    const runs = repo.runs(initiative.id);
+    const previous = runs.at(-1);
+    const session = previous === undefined ? null : attempts.get(previous.attemptId).opencodeSessionId;
+    const planner = roles.getByKey(BuiltinRoleKey.Planner);
+    const model = planner.model ?? settings.get('ai.defaultModel');
+    const attemptId = randomUUID();
+    const project = projects.getRecord(initiative.projectId);
+    const first = () =>
+      startMessage(prompts, {
+        projectName: project.name,
+        baseBranch: initiative.baseBranch,
+        requirement: initiative.requirement,
+        attachments: attachments.promptSection(
+          attachments.listByOwner(owner(initiative.id)),
+          `${MCP_TOOL_PREFIX}${McpToolName.ReadAttachment}`,
+        ),
+        workflows: allowedWorkflowsOf(initiative),
+      });
+    const started =
+      previous !== undefined && session !== null
+        ? attempts.continueSession(previous.attemptId, {
+            id: attemptId,
+            kind: AttemptKind.Breakdown,
+            prompt: step,
+            model,
+            agent: SessionAgent.CodeReviewer,
+            system: undefined,
+          })
+        : attempts.start({
+            id: attemptId,
+            kind: AttemptKind.Breakdown,
+            agent: SessionAgent.CodeReviewer,
+            taskId: null,
+            projectId: initiative.projectId,
+            nodeId: null,
+            roleId: planner.id,
+            directory: project.repoPath,
+            title: `${SESSION_TITLE_PREFIX} · ${INITIATIVE_KEY_PREFIX}${initiative.seq}`,
+            model,
+            prompt: step === '' ? first() : `${first()}\n\n${step}`,
+          });
+    const now = clock.now();
+    unit.transact(() => {
+      repo.insertRun({
+        id: randomUUID(),
+        initiativeId: initiative.id,
+        seq: runs.length + 1,
+        attemptId,
+        mode,
+        instruction: extra.instruction,
+        openPhase: extra.openPhase,
+        createdAt: now,
+      });
+      repo.update(initiative.id, { updatedAt: now });
+    });
+    log.info({ initiativeId: initiative.id, mode }, 'initiative breakdown started');
+    publish(initiative.id);
+    await started;
+  }
+
+  /** A refinement (D136): the current draft with what each work package's state is, and what finished. */
+  function startRefine(initiative: Initiative, instruction: string | null, openPhase: number | null): Promise<void> {
+    const items = views(initiative);
+    const state = (item: ItemView): RefineItem['state'] =>
+      item.droppedAt !== null
+        ? 'dropped'
+        : isDone(item.dto.status)
+          ? 'done'
+          : item.taskId !== null
+            ? 'started'
+            : 'open';
+    const draft = draftOfItems(initiative, items);
+    const step = refineStep(prompts, {
+      baseBranch: initiative.baseBranch,
+      phases: initiative.phases,
+      items: draft.items.map((spec, i) => ({ ...spec, state: state(items[i] as ItemView) })),
+      done: items.filter((item) => isDone(item.dto.status)).map(doneItem),
+      openedPhase: initiative.openedPhase,
+      instruction,
+    });
+    return startRun(initiative, InitiativeRunMode.Refine, step, { instruction, openPhase });
+  }
+
+  // A breakdown ending changes what the page shows: a draft, or a failure to retry.
+  attempts.onSignal(({ type, attempt }) => {
+    if (type !== 'ended' || attempt.kind !== AttemptKind.Breakdown) return;
+    const run = repo.runOfAttempt(attempt.id);
+    if (run !== undefined) publish(run.initiativeId);
+  });
 
   function itemOf(initiative: Initiative, key: string): ItemView {
     const item = views(initiative).find((i) => i.key === key);
@@ -383,6 +613,58 @@ export function createInitiativesService({
     new AppError(ErrorCode.InitiativeItemNotReady, `Work package ${item.key} is ${item.dto.status}`, {
       status: item.dto.status,
     });
+
+  /** An initiative the AI breaks down (34 §5.1): no phases yet; the first run starts at once. */
+  async function createBrokenDown(
+    input: ReturnType<typeof createInitiativeRequestSchema.parse>,
+  ): Promise<InitiativeDetailDTO> {
+    attempts.requireReady();
+    const allowed = input.allowedWorkflows ?? null;
+    const unknown = (allowed ?? []).filter((key) => !workflowExists(key));
+    if (unknown.length > 0) {
+      throw invalid(
+        unknown.map((key) => ({
+          code: InitiativeProblemCode.UnknownWorkflow,
+          message: `Workflow ${key} does not exist`,
+          details: { workflow: key },
+        })),
+      );
+    }
+    const first = workflowOf(allowed?.[0] ?? workflows.list().find((w) => w.kind !== WorkflowKind.System)?.key ?? '');
+    if (first === null) throw new AppError(ErrorCode.WorkflowNotFound, 'No workflow to break down into', {});
+    const baseBranch = await tasks.checkCreate({
+      projectId: input.projectId,
+      workflowId: first.id,
+      baseBranch: input.baseBranch,
+    });
+    const id = randomUUID();
+    const now = clock.now();
+    unit.transact(() => {
+      repo.insert({
+        id,
+        projectId: input.projectId,
+        templateId: null,
+        baseBranch,
+        title: firstLine(input.requirement).slice(0, INITIATIVE_TITLE_MAX_CHARS),
+        requirement: input.requirement,
+        phases: [],
+        confirmItemPlans: input.confirmItemPlans,
+        allowedWorkflows: allowed,
+        summary: null,
+        understanding: null,
+        coverage: null,
+        breakdownRev: 0,
+        confirmedRev: 0,
+        openedPhase: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      if (input.attachmentIds !== undefined) attachments.bind(owner(id), input.attachmentIds);
+    });
+    log.info({ initiativeId: id }, 'initiative created for breakdown');
+    await startRun(get(id), InitiativeRunMode.Breakdown, '', { instruction: null, openPhase: null });
+    return detail(id);
+  }
 
   return {
     detail,
@@ -417,9 +699,13 @@ export function createInitiativesService({
       };
     },
 
-    /** From a composition template (34 §15.4): straight into phase 1, or a draft when the user wants to look first. */
+    /**
+     * From a composition template (34 §15.4): straight into phase 1, or a draft when the user wants to look first.
+     * Without a template, the AI breaks the requirement down into a draft for the user to confirm (34 §5.1, D133).
+     */
     async create(request: CreateInitiativeRequest): Promise<InitiativeDetailDTO> {
       const input = createInitiativeRequestSchema.parse(request);
+      if (input.templateKey === undefined) return createBrokenDown(input);
       const template = templates.get(input.templateKey);
       const draft: InitiativeDraft = {
         phases: template.phases,
@@ -460,6 +746,10 @@ export function createInitiativesService({
           requirement: input.requirement,
           phases: draft.phases,
           confirmItemPlans: input.confirmItemPlans,
+          allowedWorkflows: null,
+          summary: null,
+          understanding: null,
+          coverage: null,
           breakdownRev: 1,
           confirmedRev: input.review ? 0 : 1,
           openedPhase: input.review ? 0 : 1,
@@ -487,46 +777,38 @@ export function createInitiativesService({
     /** Replaces the phases and the work packages that have not started (34 §5.2). */
     async saveDraft(id: string, draft: InitiativeDraft): Promise<InitiativeDetailDTO> {
       const initiative = get(id);
+      assertIdle(id);
       const current = views(initiative);
       checkEdit(initiative, current, draft);
-      const now = clock.now();
-      const byKey = new Map(current.map((item) => [item.key, item]));
-      unit.transact(() => {
-        repo.update(id, { phases: draft.phases, updatedAt: now });
-        const kept = new Set(draft.items.map((item) => item.key));
-        for (const item of current) if (!kept.has(item.key)) repo.deleteItem(item.id);
-        draft.items.forEach((item, ordinal) => {
-          const existing = byKey.get(item.key);
-          if (existing === undefined) {
-            repo.insertItem({
-              id: randomUUID(),
-              initiativeId: id,
-              ordinal,
-              ...itemColumns(item),
-              createdAt: now,
-              updatedAt: now,
-            });
-          } else {
-            repo.updateItem(existing.id, { ordinal, ...itemColumns(item), updatedAt: now });
-          }
-        });
-      });
+      unit.transact(() => writeDraft(id, current, draft, clock.now()));
       publish(id);
       await reconcile(id);
       return detail(id);
     },
 
-    /** Confirms the draft; the first time, opens phase 1 (34 §5.2). */
+    /**
+     * Confirms the draft; the first time, opens phase 1 (34 §5.2). After a refinement asked for by「进入第 k 阶段」,
+     * opens that phase once everything before it is done (34 §5.5).
+     */
     async confirm(id: string): Promise<InitiativeDetailDTO> {
       const initiative = get(id);
-      const status = statusOf(initiative, views(initiative));
+      const items = views(initiative);
+      const status = statusOf(initiative, items);
       if (status !== InitiativeStatus.DraftReady) {
         throw new AppError(ErrorCode.InitiativeNotEditable, 'Nothing to confirm', { status });
       }
+      const pendingOpen = latestRun(id)?.run.openPhase ?? null;
       const now = clock.now();
       unit.transact(() => {
         repo.update(id, { confirmedRev: initiative.breakdownRev, updatedAt: now });
         if (initiative.openedPhase === 0) repo.openPhase(id, 1, now);
+        else if (
+          pendingOpen === initiative.openedPhase + 1 &&
+          pendingOpen <= initiative.phases.length &&
+          items.every((item) => item.phase >= pendingOpen || isDone(item.dto.status))
+        ) {
+          repo.openPhase(id, pendingOpen, now);
+        }
       });
       publish(id);
       await reconcile(id);
@@ -534,8 +816,9 @@ export function createInitiativesService({
     },
 
     /** 「进入第 k 阶段」(34 §5.5): the next phase, once every work package before it is done. */
-    async openPhase(id: string, phase: number): Promise<InitiativeDetailDTO> {
+    async openPhase(id: string, phase: number, refine = false): Promise<InitiativeDetailDTO> {
       const initiative = get(id);
+      assertIdle(id);
       const items = views(initiative);
       const status = statusOf(initiative, items);
       if (status === InitiativeStatus.DraftReady) {
@@ -548,10 +831,101 @@ export function createInitiativesService({
           items: pending,
         });
       }
+      if (refine) {
+        // The AI rewrites what is left on the merged code first; confirming its draft opens the phase (D136).
+        await startRefine(initiative, null, phase);
+        return detail(id);
+      }
       repo.openPhase(id, phase, clock.now());
       publish(id);
       await reconcile(id);
       return detail(id);
+    },
+
+    /** A new breakdown with the user's feedback, before the draft is confirmed (34 §5.2). */
+    async rebreakdown(id: string, instruction: string | undefined): Promise<InitiativeDetailDTO> {
+      const initiative = get(id);
+      const status = statusOf(initiative, views(initiative));
+      if (
+        initiative.confirmedRev > 0 ||
+        (status !== InitiativeStatus.DraftReady && status !== InitiativeStatus.BreakdownFailed)
+      ) {
+        throw new AppError(ErrorCode.InitiativeNotEditable, 'Only a draft not confirmed yet can be broken down again', {
+          status,
+        });
+      }
+      const draft = draftOfItems(initiative, views(initiative));
+      const step = draft.items.length === 0 ? '' : rebreakdownStep(prompts, draft, instruction ?? null);
+      await startRun(initiative, InitiativeRunMode.Rebreakdown, step, {
+        instruction: instruction ?? null,
+        openPhase: null,
+      });
+      return detail(id);
+    },
+
+    /** 「细化剩余工作包」(34 §5.5): the work packages not started, rewritten on the merged code. */
+    async refine(id: string, instruction: string | undefined): Promise<InitiativeDetailDTO> {
+      const initiative = get(id);
+      const items = views(initiative);
+      const status = statusOf(initiative, items);
+      if (initiative.confirmedRev === 0 || status === InitiativeStatus.DraftReady || status === InitiativeStatus.Done) {
+        throw new AppError(ErrorCode.InitiativeNotEditable, 'Nothing to refine now', { status });
+      }
+      await startRefine(initiative, instruction ?? null, null);
+      return detail(id);
+    },
+
+    /** `submit_breakdown` (34 §8.2): checked like a user edit (34 §8.3), then the draft waits for the user. */
+    submitBreakdown(attempt: AttemptDTO, input: SubmitBreakdownInput): void {
+      const run = repo.runOfAttempt(attempt.id);
+      if (run === undefined) throw new Error(`Breakdown attempt ${attempt.id} has no initiative run`);
+      const initiative = get(run.initiativeId);
+      const current = views(initiative);
+      const draft = draftOf(input, initiative.phases);
+      const problems = [
+        ...validateInitiativeDraft(draft, {
+          workflowExists,
+          allowedWorkflows: allowedWorkflowsOf(initiative).map((w) => w.key),
+          coverage: input.coverage,
+        }),
+        ...lockedProblems(current, draft),
+      ];
+      if (draft.phases.length < initiative.openedPhase) {
+        problems.push({
+          code: InitiativeProblemCode.PhaseOutOfRange,
+          message: `The first ${initiative.openedPhase} phases are opened already and must stay`,
+        });
+      }
+      if (problems.length > 0) throw invalid(problems);
+      const now = clock.now();
+      unit.transact(() => {
+        writeDraft(initiative.id, current, draft, now);
+        repo.update(initiative.id, {
+          summary: input.summary,
+          understanding: input.understanding,
+          coverage: input.coverage,
+          breakdownRev: initiative.breakdownRev + 1,
+          // The title the user saw while it was being broken down is the requirement's first line.
+          ...(initiative.breakdownRev === 0 ? { title: input.title } : {}),
+          updatedAt: now,
+        });
+        attempts.markSubmitted(attempt.id);
+      });
+      log.info(
+        { initiativeId: initiative.id, mode: run.mode, items: draft.items.length },
+        'initiative breakdown submitted',
+      );
+      publish(initiative.id);
+    },
+
+    /** `read_attachment` for a breakdown session: the initiative's own source files only (30 §3.2). */
+    readAttachment(attempt: AttemptDTO, attachmentId: string, cursor: number): ReadAttachmentOutput {
+      const run = repo.runOfAttempt(attempt.id);
+      if (run === undefined) throw new Error(`Breakdown attempt ${attempt.id} has no initiative run`);
+      if (!attachments.listByOwner(owner(run.initiativeId)).some((a) => a.id === attachmentId)) {
+        throw new AppError(ErrorCode.AttachmentNotFound, `Attachment ${attachmentId} not found`, { id: attachmentId });
+      }
+      return attachments.read(attachmentId, cursor);
     },
 
     /** Starts a work package by hand: after a failed start, or again after its task was cancelled (34 §5.4). */
@@ -626,9 +1000,12 @@ export function createInitiativesService({
     /** Deletes the initiative; its tasks stay ordinary tasks (34 §5.6). */
     delete(id: string): void {
       get(id);
+      assertIdle(id);
+      const attemptIds = repo.runAttemptIds([id]);
       unit.transact(() => {
         attachments.release(AttachmentOwnerKind.Initiative, [id]);
         repo.delete(id);
+        attempts.delete(attemptIds);
       });
       log.info({ initiativeId: id }, 'initiative deleted');
       publish(id);

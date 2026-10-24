@@ -9,6 +9,7 @@ import type { BrowserService } from '../browser/index.ts';
 import type { DebugService } from '../debug/index.ts';
 import type { DecksService } from '../decks/index.ts';
 import type { CommitDrafts, GitReviewsService } from '../git-reviews/index.ts';
+import type { InitiativesService } from '../initiatives/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import type { TeamService } from '../team/index.ts';
@@ -22,6 +23,7 @@ import { getTaskDiffTool } from './tools/get-task-diff.tool.ts';
 import { readAttachmentTool } from './tools/read-attachment.tool.ts';
 import { reportProgressTool } from './tools/report-progress.tool.ts';
 import { submitAnswerTool } from './tools/submit-answer.tool.ts';
+import { submitBreakdownTool } from './tools/submit-breakdown.tool.ts';
 import { submitCommitMessageTool } from './tools/submit-commit-message.tool.ts';
 import { submitFindingsTool } from './tools/submit-findings.tool.ts';
 import { submitMemberAnalysisTool } from './tools/submit-member-analysis.tool.ts';
@@ -44,6 +46,7 @@ export type McpModuleDeps = {
   gitReviews: GitReviewsService;
   commitDrafts: CommitDrafts;
   team: TeamService;
+  initiatives: InitiativesService;
   browser: BrowserService;
   /** Where an attempt's transcript and files live (29 §5.7). */
   filesDirOf: (attempt: { taskId: string | null; kind: AttemptKind }) => string;
@@ -61,6 +64,7 @@ export function createMcpModule({
   gitReviews,
   commitDrafts,
   team,
+  initiatives,
   browser,
   filesDirOf,
   log,
@@ -69,7 +73,7 @@ export function createMcpModule({
     getTaskContextTool(tasks, debug),
     getNodeOutputTool(tasks),
     getTaskDiffTool(tasks),
-    readAttachmentTool(tasks),
+    readAttachmentTool(tasks, initiatives),
     submitPlanTool(tasks),
     submitResultTool(tasks, debug),
     submitReviewTool(acceptance),
@@ -84,6 +88,7 @@ export function createMcpModule({
     submitFindingsTool(gitReviews),
     submitCommitMessageTool(commitDrafts),
     submitMemberAnalysisTool(team),
+    submitBreakdownTool(initiatives),
     ...browserTools({ browser, attempts, knowledge, filesDirOf }),
   ];
   const registry = createToolRegistry(tools, attempts, log);

@@ -38,7 +38,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TaskStatus` | `draft` · `preparing` · `planning` · `plan_review` · `running` · `paused` · `review` · `merging` · `completed` · `failed` · `cancelled` |
 | `TaskFailedPhase` | `preparing` · `planning` · `running` · `merging` |
 | `NodeStatus` | `pending` · `ready` · `running` · `waiting_input` · `verifying` · `awaiting_acceptance` · `done` · `failed` · `skipped` · `cancelled` |
-| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2）· `deck_outline`（PPT 的大纲）· `deck_slides`（PPT 的若干页：制作或修改，23 §4；两者在同一个会话中，`continueSession` 可换 kind）· `git_review`（Git 工作台的 AI 审查，不属于任务，27 §4.3）· `commit_message`（AI 草拟提交信息，27 §7.3）· `team_analysis`（团队页的 AI 成员分析，不属于任务，33 §6.3） |
+| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2）· `deck_outline`（PPT 的大纲）· `deck_slides`（PPT 的若干页：制作或修改，23 §4；两者在同一个会话中，`continueSession` 可换 kind）· `git_review`（Git 工作台的 AI 审查，不属于任务，27 §4.3）· `commit_message`（AI 草拟提交信息，27 §7.3）· `team_analysis`（团队页的 AI 成员分析，不属于任务，33 §6.3）· `breakdown`（需求计划的 AI 拆解、重新拆解与细化，不属于任务，由 `initiative_runs` 指向，34 §8） |
 | `AttemptStatus` | `starting` · `running` · `succeeded` · `failed` · `aborted` · `interrupted` |
 | `PlanStatus` | `draft` · `confirmed` · `superseded` |
 | `PlanSource` | `ai` · `template` · `user` |
@@ -163,8 +163,9 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 | 枚举 | 值 | 说明 |
 | --- | --- | --- |
-| `InitiativeStatus` | `draft_ready` · `in_progress` · `phase_done` · `done` | 需求计划的显示状态，由 `initiativeStatusOf` 推导，不存：草稿待确认（`confirmed_rev < breakdown_rev`）/ 已开启阶段还有未完成的工作包 / 已开启阶段全部完成、还有未开启的阶段 / 全部完成 |
+| `InitiativeStatus` | `breaking_down` · `breakdown_failed` · `draft_ready` · `in_progress` · `phase_done` · `done` | 需求计划的显示状态，由 `initiativeStatusOf` 推导，不存：最近一次拆解或细化的会话还在进行 / 第一次拆解结束了却没有工作包 / 草稿待确认（`confirmed_rev < breakdown_rev`）/ 已开启阶段还有未完成的工作包 / 已开启阶段全部完成、还有未开启的阶段 / 全部完成 |
 | `InitiativeItemStatus` | `dropped` · `satisfied` · `pr_open` · `in_task` · `phase_closed` · `waiting` · `ready` | 工作包的显示状态，由 `initiativeItemStatusOf` 推导：已放弃 / 已满足（本地合并进基础分支、报告完成、PR 经用户确认已合入，`isInitiativeItemDone`）/ 已开 PR 待确认合入 / 任务进行中（任务未到终态，含失败）/ 阶段未开启 / 依赖未完成 / 可以开始（没开始过，或任务已取消、合并到了别的分支）。`dropped` 与 `satisfied` 对下游视为完成 |
+| `InitiativeRunMode` | `breakdown` · `rebreakdown` · `refine` | 一次 AI 拆解做什么（`initiative_runs.mode`）：第一次拆解 / 带意见重新拆解草稿 / 按合入后的代码细化未开始的工作包（D136） |
 | `InitiativeTemplateKind` | `builtin` | 组合模板的来源；自定义模板随 N-11 加入 |
 
 需求计划没有状态机：开启的阶段（`opened_phase`）与两个版本号只增不减，是事实。只有从没开始过、没有开始失败记录的 `ready` 工作包会被自动开始；取消或开始失败后由用户「开始」。
@@ -321,6 +322,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `INITIATIVE_ITEMS_MAX` / `INITIATIVE_PHASES_MAX` / `INITIATIVE_SOURCES_MAX` | 30 / 6 / 9（一个需求计划的工作包、阶段、资料附件数；资料留一个位置给背景附件，34 §11） |
 | `INITIATIVE_TITLE_MAX_CHARS` / `INITIATIVE_ITEM_REQUIREMENT_MAX_CHARS` | 60 / 同 `REQUIREMENT_MAX_CHARS`（工作包标题；工作包的需求就是任务的需求） |
 | `INITIATIVE_PHASE_TITLE_MAX_CHARS` / `INITIATIVE_PHASE_GOAL_MAX_CHARS` / `INITIATIVE_REASON_MAX_CHARS` | 40 / 500 / 2000（阶段标题与目标、「不做这一项」的原因） |
+| `INITIATIVE_INSTRUCTION_MAX_CHARS` / `INITIATIVE_SUMMARY_MAX_CHARS` | 2000 / 2000（重新拆解与细化的意见；AI 拆解的说明与理解的范围） |
 | `SCHEDULE_CHECK_INTERVAL_MS` | 60 000（定时器最长等这么久就检查一次到期的定时任务，22 §4） |
 | `SCHEDULE_CATCH_UP_AFTER_MS` | 300 000（晚于计划时刻超过它即为补跑） |
 | `SCHEDULE_RUNS_SHOWN` | 20（定时任务页列出的最近运行数） |
@@ -500,11 +502,12 @@ class AppError extends Error {
 | **批量任务（v1.1）** | | |
 | `BATCH_NOT_FOUND` | 404 | 批次不存在（所属项目已删除时随之删除） |
 | `INITIATIVE_NOT_FOUND` | 404 | 需求计划不存在（所属项目已删除时随之删除） |
-| `INITIATIVE_BREAKDOWN_INVALID` | 400 | 阶段与工作包不合规则；`details.problems[]` 的子码 `InitiativeProblemCode`：`DUPLICATE_KEY` · `UNKNOWN_DEPENDENCY` · `CYCLE` · `DEPENDENCY_PHASE`（依赖更晚的阶段）· `EMPTY_PHASE` · `PHASE_OUT_OF_RANGE` · `UNKNOWN_WORKFLOW`（流程不存在或是系统流程）· `TEMPLATE_REQUIREMENT_MISSING`（模板没有一个工作包含 `{{requirement}}`）· `ITEM_NOT_EDITABLE`（改动或删除了已开始、已完成或已放弃的工作包），各带 `itemKey`（`validateInitiativeDraft`，34 §8.3） |
+| `INITIATIVE_BREAKDOWN_INVALID` | 400 | 阶段与工作包不合规则；`details.problems[]` 的子码 `InitiativeProblemCode`：`DUPLICATE_KEY` · `UNKNOWN_DEPENDENCY` · `CYCLE` · `DEPENDENCY_PHASE`（依赖更晚的阶段）· `EMPTY_PHASE` · `PHASE_OUT_OF_RANGE` · `UNKNOWN_WORKFLOW`（流程不存在或是系统流程）· `TEMPLATE_REQUIREMENT_MISSING`（模板没有一个工作包含 `{{requirement}}`）· `WORKFLOW_NOT_ALLOWED`（流程不在需求计划的可选范围）· `UNKNOWN_COVERAGE_ITEM`（覆盖表引用了不存在的工作包）· `ITEM_NOT_EDITABLE`（改动或删除了已开始、已完成或已放弃的工作包），各带 `itemKey`（`validateInitiativeDraft`，34 §8.3） |
 | `INITIATIVE_NOT_EDITABLE` | 409 | 需求计划当前的状态不允许这个操作（没有可确认的草稿、草稿未确认时开启阶段、删去已开启的阶段）；`details.status` |
 | `INITIATIVE_PHASE_NOT_READY` | 409 | 不是下一个阶段，或之前阶段还有未完成的工作包；`details.openedPhase`、`details.items` |
 | `INITIATIVE_ITEM_NOT_READY` | 409 | 工作包当前的状态不允许这个操作（开始、标记已合入、放弃），或开始时被另一次开始抢先；`details.status` |
 | `INITIATIVE_TEMPLATE_NOT_FOUND` | 404 | 组合模板不存在 |
+| `INITIATIVE_BUSY` | 409 | AI 正在拆解或细化这个需求计划：修改草稿、确认、开启阶段、再次拆解、删除都要等它结束 |
 | **定时任务（v1.2）** | | |
 | `SCHEDULE_NOT_FOUND` | 404 | 定时任务不存在（已删除，或所属项目已删除） |
 | `SCHEDULE_BUSY` | 409 | 「立即运行一次」时上一次开出的任务还没结束（22 §7） |

@@ -80,6 +80,8 @@ export const STATUS_TONE = {
     [ScheduleStatus.Paused]: StatusTone.Wait,
   },
   initiative: {
+    [InitiativeStatus.BreakingDown]: StatusTone.Run,
+    [InitiativeStatus.BreakdownFailed]: StatusTone.Danger,
     [InitiativeStatus.DraftReady]: StatusTone.Wait,
     [InitiativeStatus.InProgress]: StatusTone.Run,
     [InitiativeStatus.PhaseDone]: StatusTone.Wait,

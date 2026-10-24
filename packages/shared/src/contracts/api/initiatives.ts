@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  INITIATIVE_INSTRUCTION_MAX_CHARS,
   INITIATIVE_ITEM_REQUIREMENT_MAX_CHARS,
   INITIATIVE_ITEMS_MAX,
   INITIATIVE_PHASE_GOAL_MAX_CHARS,
@@ -17,12 +18,15 @@ import { batchDeliveryOutcomeSchema } from '../../enums/batch.ts';
 import { localMergeStrategySchema } from '../../enums/git.ts';
 import {
   initiativeItemStatusSchema,
+  initiativeRunModeSchema,
   initiativeStatusSchema,
   initiativeTemplateKindSchema,
 } from '../../enums/initiative.ts';
+import { attemptStatusSchema } from '../../enums/task.ts';
 import { workflowDeliverableSchema } from '../../enums/workflow.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
 import { NODE_KEY_PATTERN } from '../../workflow/plan-graph.ts';
+import { initiativeCoverageSchema, initiativeUnderstandingSchema } from '../mcp/submit-breakdown.ts';
 import { attachmentSchema } from './attachments.ts';
 import { deliverySchema } from './delivery.ts';
 import { requirementItemInputSchema } from './requirements.ts';
@@ -69,15 +73,20 @@ export const initiativeTemplateSchema = initiativeDraftSchema.extend({
 });
 export type InitiativeTemplateDTO = z.output<typeof initiativeTemplateSchema>;
 
-/** `POST /initiatives` (34 §15.4): from a composition template; AI breakdown comes with N2b. */
+/**
+ * `POST /initiatives`: from a composition template (34 §15.4), or — without `templateKey` — broken down by the AI
+ * into a draft for the user to confirm (34 §5.1, D133).
+ */
 export const createInitiativeRequestSchema = z.object({
   projectId: z.string(),
-  templateKey: z.string().regex(DEFINITION_KEY_PATTERN),
+  templateKey: z.string().regex(DEFINITION_KEY_PATTERN).optional(),
+  /** The workflows the AI may give work packages (AI breakdown only); default: every listed workflow. */
+  allowedWorkflows: z.array(z.string().regex(DEFINITION_KEY_PATTERN)).min(1).optional(),
   requirement: z.string().trim().min(1).max(REQUIREMENT_MAX_CHARS),
   attachmentIds: z.array(z.string()).max(INITIATIVE_SOURCES_MAX).optional(),
   /** Defaults to the project's default branch; every work package branches from it and merges back into it. */
   baseBranch: z.string().min(1).optional(),
-  /** 「先让我看看」: stop at the draft instead of starting the first phase. */
+  /** 「先让我看看」: stop at the draft instead of starting the first phase (templates; a breakdown always stops). */
   review: z.boolean().default(false),
   /** 「每个工作包运行前让我确认计划」: the tasks' `confirm_plan`. */
   confirmItemPlans: z.boolean().default(false),
@@ -131,10 +140,32 @@ export const initiativeItemSchema = initiativeItemSpecSchema.extend({
 });
 export type InitiativeItemDTO = z.infer<typeof initiativeItemSchema>;
 
+/** One AI breakdown or refinement (34 §9 `initiative_runs`); its state is its attempt's. */
+export const initiativeRunSchema = z.object({
+  seq: z.number(),
+  mode: initiativeRunModeSchema,
+  attemptId: z.string(),
+  status: attemptStatusSchema,
+  instruction: z.string().nullable(),
+  /** The phase confirming this run's draft opens (「进入第 k 阶段」with refinement first). */
+  openPhase: z.number().nullable(),
+  error: errorInfoSchema.nullable(),
+  createdAt: z.number(),
+});
+export type InitiativeRunDTO = z.infer<typeof initiativeRunSchema>;
+
 export const initiativeDetailSchema = initiativeSummarySchema.extend({
   requirement: z.string(),
   baseBranch: z.string(),
   confirmItemPlans: z.boolean(),
+  /** null: every listed workflow. */
+  allowedWorkflows: z.array(z.string()).nullable(),
+  /** From the latest AI breakdown; null for an initiative made from a template and not refined since. */
+  summary: z.string().nullable(),
+  understanding: initiativeUnderstandingSchema.nullable(),
+  coverage: z.array(initiativeCoverageSchema).nullable(),
+  /** The latest breakdown or refinement, if any. */
+  latestRun: initiativeRunSchema.nullable(),
   phases: z.array(initiativePhaseSchema.extend({ opened: z.boolean() })),
   /** In phase order, then in the order written. */
   items: z.array(initiativeItemSchema),
@@ -145,11 +176,15 @@ export type InitiativeDetailDTO = z.infer<typeof initiativeDetailSchema>;
 const idSchema = z.object({ id: z.string() });
 const itemRefSchema = z.object({ id: z.string(), key: z.string() });
 const phaseRefSchema = z.object({ id: z.string(), phase: z.coerce.number().int().min(1) });
+const instructionSchema = z.string().trim().min(1).max(INITIATIVE_INSTRUCTION_MAX_CHARS).optional();
 
 export const saveInitiativeDraftRequestSchema = idSchema.extend(initiativeDraftSchema.shape);
 export const getInitiativeRequestSchema = idSchema;
 export const confirmInitiativeRequestSchema = idSchema;
-export const openInitiativePhaseRequestSchema = phaseRefSchema;
+/** `refine`: the AI rewrites the work packages not started on the merged code first; confirming opens the phase. */
+export const openInitiativePhaseRequestSchema = phaseRefSchema.extend({ refine: z.boolean().default(false) });
+export const rebreakdownInitiativeRequestSchema = idSchema.extend({ instruction: instructionSchema });
+export const refineInitiativeRequestSchema = idSchema.extend({ instruction: instructionSchema });
 export const startInitiativeItemRequestSchema = itemRefSchema;
 export const confirmInitiativeItemMergedRequestSchema = itemRefSchema;
 export const dropInitiativeItemRequestSchema = itemRefSchema.extend({

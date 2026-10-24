@@ -99,6 +99,8 @@ import {
   listInitiativesOp,
   listInitiativeTemplatesOp,
   openInitiativePhaseOp,
+  rebreakdownInitiativeOp,
+  refineInitiativeOp,
   saveInitiativeDraftOp,
   startInitiativeItemOp,
 } from './initiatives.ts';
@@ -340,6 +342,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   saveInitiativeDraftOp,
   confirmInitiativeOp,
   openInitiativePhaseOp,
+  rebreakdownInitiativeOp,
+  refineInitiativeOp,
   startInitiativeItemOp,
   confirmInitiativeItemMergedOp,
   dropInitiativeItemOp,

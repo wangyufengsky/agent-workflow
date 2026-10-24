@@ -1,17 +1,57 @@
-import type { ErrorInfo, InitiativeItemSpec, InitiativePhase, InitiativeTemplateKind } from '@aw/shared';
-import { and, asc, desc, eq, isNull, lt, type SQL, sql } from 'drizzle-orm';
+import type {
+  ErrorInfo,
+  InitiativeCoverage,
+  InitiativeItemSpec,
+  InitiativePhase,
+  InitiativeTemplateKind,
+  InitiativeUnderstanding,
+} from '@aw/shared';
+import { and, asc, desc, eq, inArray, isNull, lt, type SQL, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { projectsTable } from '../projects/index.ts';
-import { initiativeItemsTable, initiativesTable, initiativeTemplatesTable } from './initiatives.table.ts';
+import {
+  initiativeItemsTable,
+  initiativeRunsTable,
+  initiativesTable,
+  initiativeTemplatesTable,
+} from './initiatives.table.ts';
 
 type InitiativeRow = typeof initiativesTable.$inferSelect;
 type ItemRow = typeof initiativeItemsTable.$inferSelect;
 
-export type Initiative = Omit<InitiativeRow, 'phases'> & {
+/** The JSON columns of an initiative, parsed. */
+type InitiativeJson = {
   phases: InitiativePhase[];
-  projectName: string;
-  template: { key: string; name: string } | null;
+  allowedWorkflows: string[] | null;
+  understanding: InitiativeUnderstanding | null;
+  coverage: InitiativeCoverage[] | null;
 };
+
+export type Initiative = Omit<InitiativeRow, keyof InitiativeJson> &
+  InitiativeJson & {
+    projectName: string;
+    template: { key: string; name: string } | null;
+  };
+
+export type InitiativeRun = typeof initiativeRunsTable.$inferSelect;
+
+const parse = <T>(value: string | null): T | null => (value === null ? null : (JSON.parse(value) as T));
+
+/** The JSON columns of an initiative, serialized. */
+function columnsOf(fields: { [K in keyof InitiativeJson]?: InitiativeJson[K] | undefined }) {
+  return {
+    ...(fields.phases === undefined ? {} : { phases: JSON.stringify(fields.phases) }),
+    ...(fields.allowedWorkflows === undefined
+      ? {}
+      : { allowedWorkflows: fields.allowedWorkflows === null ? null : JSON.stringify(fields.allowedWorkflows) }),
+    ...(fields.understanding === undefined
+      ? {}
+      : { understanding: fields.understanding === null ? null : JSON.stringify(fields.understanding) }),
+    ...(fields.coverage === undefined
+      ? {}
+      : { coverage: fields.coverage === null ? null : JSON.stringify(fields.coverage) }),
+  };
+}
 
 export type InitiativeItem = Omit<ItemRow, 'dependsOn' | 'acceptance' | 'startError'> & {
   dependsOn: string[];
@@ -66,6 +106,9 @@ export function createInitiativesRepo(db: DbExecutor) {
   }): Initiative => ({
     ...row.initiative,
     phases: JSON.parse(row.initiative.phases),
+    allowedWorkflows: parse(row.initiative.allowedWorkflows),
+    understanding: parse(row.initiative.understanding),
+    coverage: parse(row.initiative.coverage),
     projectName: row.projectName,
     template:
       row.templateKey === null || row.templateName === null ? null : { key: row.templateKey, name: row.templateName },
@@ -73,14 +116,21 @@ export function createInitiativesRepo(db: DbExecutor) {
 
   return {
     /** Numbers the initiative and inserts it; returns its seq. */
-    insert(row: Omit<InitiativeRow, 'seq' | 'phases'> & { phases: InitiativePhase[] }): number {
+    insert(row: Omit<InitiativeRow, 'seq' | keyof InitiativeJson> & InitiativeJson): number {
       const max = db
         .select({ max: sql<number | null>`max(${i.seq})` })
         .from(i)
         .get();
       const seq = (max?.max ?? 0) + 1;
       db.insert(i)
-        .values({ ...row, seq, phases: JSON.stringify(row.phases) })
+        .values({
+          ...row,
+          seq,
+          phases: JSON.stringify(row.phases),
+          allowedWorkflows: row.allowedWorkflows === null ? null : JSON.stringify(row.allowedWorkflows),
+          understanding: row.understanding === null ? null : JSON.stringify(row.understanding),
+          coverage: row.coverage === null ? null : JSON.stringify(row.coverage),
+        })
         .run();
       return seq;
     },
@@ -120,11 +170,12 @@ export function createInitiativesRepo(db: DbExecutor) {
     },
     update(
       id: string,
-      fields: Partial<Pick<InitiativeRow, 'confirmedRev' | 'updatedAt'>> & { phases?: InitiativePhase[] },
+      fields: Partial<Pick<InitiativeRow, 'confirmedRev' | 'breakdownRev' | 'title' | 'summary' | 'updatedAt'>> &
+        Partial<Pick<InitiativeJson, 'phases' | 'understanding' | 'coverage'>>,
     ) {
-      const { phases, ...rest } = fields;
+      const { phases, understanding, coverage, ...rest } = fields;
       db.update(i)
-        .set({ ...rest, ...(phases === undefined ? {} : { phases: JSON.stringify(phases) }) })
+        .set({ ...rest, ...columnsOf({ phases, understanding, coverage }) })
         .where(eq(i.id, id))
         .run();
     },
@@ -194,6 +245,31 @@ export function createInitiativesRepo(db: DbExecutor) {
     },
     deleteItem(id: string): void {
       db.delete(it).where(eq(it.id, id)).run();
+    },
+
+    runs(initiativeId: string): InitiativeRun[] {
+      return db
+        .select()
+        .from(initiativeRunsTable)
+        .where(eq(initiativeRunsTable.initiativeId, initiativeId))
+        .orderBy(asc(initiativeRunsTable.seq))
+        .all();
+    },
+    runOfAttempt(attemptId: string): InitiativeRun | undefined {
+      return db.select().from(initiativeRunsTable).where(eq(initiativeRunsTable.attemptId, attemptId)).get();
+    },
+    insertRun(run: InitiativeRun): void {
+      db.insert(initiativeRunsTable).values(run).run();
+    },
+    /** The attempts of every run of these initiatives, to delete with them. */
+    runAttemptIds(initiativeIds: readonly string[]): string[] {
+      if (initiativeIds.length === 0) return [];
+      return db
+        .select({ attemptId: initiativeRunsTable.attemptId })
+        .from(initiativeRunsTable)
+        .where(inArray(initiativeRunsTable.initiativeId, [...initiativeIds]))
+        .all()
+        .map((r) => r.attemptId);
     },
 
     templates(): InitiativeTemplate[] {

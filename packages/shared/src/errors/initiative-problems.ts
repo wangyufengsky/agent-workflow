@@ -11,6 +11,10 @@ export const InitiativeProblemCode = {
   PhaseOutOfRange: 'PHASE_OUT_OF_RANGE',
   /** The workflow does not exist, or is a system workflow. */
   UnknownWorkflow: 'UNKNOWN_WORKFLOW',
+  /** The workflow exists but is not among the initiative's allowed workflows. */
+  WorkflowNotAllowed: 'WORKFLOW_NOT_ALLOWED',
+  /** The coverage table names a work package that does not exist. */
+  UnknownCoverageItem: 'UNKNOWN_COVERAGE_ITEM',
   /** A composition template where no work package's requirement contains `{{requirement}}`. */
   TemplateRequirementMissing: 'TEMPLATE_REQUIREMENT_MISSING',
   /** An edit changed or removed a work package that already started, finished or was dropped. */

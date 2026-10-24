@@ -61,3 +61,18 @@ describe('模板的需求替换（34 §15.2）', () => {
     );
   });
 });
+
+describe('AI 拆解的附加规则（34 §8.3）', () => {
+  it('流程须在允许的范围内，覆盖表只能引用存在的工作包', () => {
+    const d = draft({ phases: [{ title: '一' }], items: [item('a', 1, [], 'code_review')] });
+    const problems = validateInitiativeDraft(d, {
+      ...rules,
+      allowedWorkflows: ['feature'],
+      coverage: [{ point: '导出', items: ['a', 'b'] }],
+    });
+    expect(problems.map((p) => [p.code, p.itemKey])).toEqual([
+      ['WORKFLOW_NOT_ALLOWED', 'a'],
+      ['UNKNOWN_COVERAGE_ITEM', 'b'],
+    ]);
+  });
+});

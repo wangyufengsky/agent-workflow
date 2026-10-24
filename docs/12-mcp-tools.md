@@ -144,7 +144,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `submit_result` | execute | 提交节点结果 |
 | `submit_review` | review | 提交评审结论 |
 | `ask_user` | plan · execute | 向用户提问 |
-| `report_progress` | plan · execute · review · research · deck_outline · deck_slides · git_review · commit_message · team_analysis | 上报一句当前进展 |
+| `report_progress` | plan · execute · review · research · deck_outline · deck_slides · git_review · commit_message · team_analysis · breakdown | 上报一句当前进展 |
 | `db_list_connections` | plan · execute · review · research | 列出项目关联的数据库 |
 | `db_describe` | plan · execute · review · research | 查看表结构 |
 | `db_query` | plan · execute · review · research | 只读查询 |
@@ -153,6 +153,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `submit_slide` | deck_slides | 按页码提交 PPT 的一页（v1.2，23 §7.3） |
 | `submit_findings` | git_review | 提交 Git 工作台审查的结论与结构化问题（v1.2，27 §4.4） |
 | `submit_commit_message` | commit_message | 提交草拟的提交信息（v1.2，27 §7.3） |
+| `submit_breakdown` | breakdown | 提交需求计划的阶段、工作包与需求覆盖表（v1.3，34 §8.2） |
 | `submit_member_analysis` | team_analysis | 提交成员的工作总结与抽样评审的问题（v1.3，33 §6.6） |
 | `browser_open` `browser_snapshot` `browser_click` `browser_type` `browser_select` `browser_press` `browser_wait_for` `browser_inspect` `browser_logs` `browser_viewport` `browser_screenshot` | plan · execute · review · research | 浏览器（v1.3，29 §6，§6.17）：打开任务的页面预览或网站、读页面、操作、查日志与布局、截图 |
 
@@ -348,6 +349,14 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 输出：`{ accepted: true }`
 错误：`TEAM_ANALYSIS_INVALID`、`VALIDATION_FAILED`、`MCP_RESULT_ALREADY_SUBMITTED`。
 
+### 6.16″ `submit_breakdown`（v1.3）
+
+只用于 `breakdown` 尝试（34 §8）。会话用 agent `aw-code-reviewer`（只读，会话目录为项目主仓库），首条消息为 `start-breakdown.md`（需求、资料附件、可选流程、上限与规则），重新拆解与细化在同一会话里发 `rebreakdown.md` / `refine-breakdown.md`。
+输入（`submitBreakdownInputSchema`）：`{ title; summary; understanding: { scope; out_of_scope[]; assumptions[]; risks[] }; phases: { title; goal }[]（1..6）; items: { key; title; phase; workflow; requirement; depends_on[]; acceptance: { title; expected; command? }[] }[]（1..30）; coverage: { point; items[] }[] }`。
+行为：转成草稿（AI 的阶段不自动开启，已有阶段保留原设置；`command` 的验收项为命令核验，其余为 AI 核验），按 `validateInitiativeDraft` 校验（含 `WORKFLOW_NOT_ALLOWED`、`UNKNOWN_COVERAGE_ITEM`）；已开始、已完成、已放弃的工作包必须原样保留（`ITEM_NOT_EDITABLE`），已开启的阶段不能删去（`PHASE_OUT_OF_RANGE`）；不通过 → `INITIATIVE_BREAKDOWN_INVALID`，`details.problems[]`；通过 → 写入阶段与工作包、说明、理解、覆盖表，`breakdown_rev + 1`（第一次拆解时标题改为 AI 给的），尝试 `succeeded`，发 `initiative.updated`。
+输出：`{ accepted: true }`
+错误：`INITIATIVE_BREAKDOWN_INVALID`、`VALIDATION_FAILED`、`MCP_RESULT_ALREADY_SUBMITTED`。
+
 ### 6.17 浏览器工具（v1.3）
 
 输入输出见 `shared/contracts/mcp/browser.ts` 与 29 §6；工具定义在 `mcp/tools/browser.tool.ts`，转发到 `browser` 模块（29 §5）。
@@ -411,7 +420,7 @@ export const submitPlanTool = defineMcpTool({
 
 | 工具／扩展 | 允许的尝试 | 契约 |
 | --- | --- | --- |
-| `read_attachment`（U-02 已实现） | plan / execute / review；助手 MCP 另有一份（`AssistantToolName.ReadAttachment`） | `{ attachment_id, cursor = 0 }` → `{ attachment_id, name, text, total_chars, next_cursor }`，每页最多 `ATTACHMENT_READ_MAX_CHARS`，读完时 `next_cursor` 为 null。执行 MCP 的范围是当前尝试所属任务的附件（需求与各次「再改改」），助手的是当前对话；范围外 `ATTACHMENT_NOT_FOUND` |
+| `read_attachment`（U-02 已实现） | plan / execute / review / breakdown（需求计划的资料附件，34 §8.1）；助手 MCP 另有一份（`AssistantToolName.ReadAttachment`） | `{ attachment_id, cursor = 0 }` → `{ attachment_id, name, text, total_chars, next_cursor }`，每页最多 `ATTACHMENT_READ_MAX_CHARS`，读完时 `next_cursor` 为 null。执行 MCP 的范围是当前尝试所属任务的附件（需求与各次「再改改」），助手的是当前对话；范围外 `ATTACHMENT_NOT_FOUND` |
 | `get_task_context` 扩展（Q-02 已实现） | 既有 | 增加 `requirements`：当前版本的项（id、标题、预期、是否必需、核验方式），没有清单时为空数组；逐项状态不在这里。附件不在这里：首条消息已带附件节（30 §3.2） |
 | `submit_result` 扩展（Q-02 已实现） | execute | 可选 `requirement_results: [{ item_id, conclusion: pass / fail / unverified, note }]`；只接受核验节点的提交，项须属于当前版本且为 AI 核验项，否则 `REQUIREMENT_RESULTS_INVALID`；漏掉的项保持未核验 |
 

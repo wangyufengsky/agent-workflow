@@ -120,6 +120,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.InitiativePhaseNotReady]: '前面阶段还有没合入、没完成的工作包，先处理它们再进入下一阶段。',
   [ErrorCode.InitiativeItemNotReady]: '这个工作包现在不能这样操作，刷新后再试。',
   [ErrorCode.InitiativeTemplateNotFound]: '这个组合模板不存在。',
+  [ErrorCode.InitiativeBusy]: 'AI 正在拆解或细化这个需求计划，等它完成再操作。',
   [ErrorCode.TeamAnalysisNotFound]: '这条成员分析不存在。',
   [ErrorCode.TeamAnalysisExists]: '这位成员这段时间的分析还在排队或进行中。',
   [ErrorCode.TeamAnalysisInvalid]: 'AI 提交的分析与提交记录对不上，AI 会修正后再提交。',

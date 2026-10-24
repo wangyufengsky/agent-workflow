@@ -16,6 +16,7 @@ export const reportProgressTool = (attempts: AttemptsService) =>
       AttemptKind.GitReview,
       AttemptKind.TeamAnalysis,
       AttemptKind.CommitMessage,
+      AttemptKind.Breakdown,
     ],
     input: reportProgressInputSchema,
     output: reportProgressOutputSchema,

@@ -406,17 +406,19 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 ## 13c′. 需求计划（v1.3，34 §10、§15）
 
-N2a 实现：从组合模板创建，AI 拆解（N2b）之后加入。全部 `mode = simple`、`expose.assistant = true`（`initiatives.saveDraft` 除外：整份改写阶段与工作包是页面编辑器的事），不进命令面板（从主页「直接开始」面板开始）；`initiatives.create` 的 `produces: initiative`，其余带 `id` 的操作 `refs.id = initiative`。
+N2a 实现组合模板，N2b 加入 AI 拆解（`templateKey` 省略时）、重新拆解与细化。全部 `mode = simple`、`expose.assistant = true`（`initiatives.saveDraft` 除外：整份改写阶段与工作包是页面编辑器的事），不进命令面板（从主页「直接开始」面板开始）；`initiatives.create` 的 `produces: initiative`，其余带 `id` 的操作 `refs.id = initiative`。
 
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |
 | GET | `/initiative-templates` | `initiativeTemplates.list` | read | `{ items: InitiativeTemplateDTO[] }`：内置组合模板，按内置顺序 |
 | GET | `/initiatives?projectId&limit&cursor` | `initiatives.list` | read | `{ items: InitiativeSummaryDTO[], nextCursor }`，按编号倒序 |
-| POST | `/initiatives` | `initiatives.create` | write | `{ projectId, templateKey, requirement, attachmentIds?（≤ 9）, baseBranch?, review = false, confirmItemPlans = false }` → 201 `InitiativeDetailDTO`；模板的 `{{requirement}}` 替换为需求后校验（`INITIATIVE_BREAKDOWN_INVALID`，替换后过长为 `VALIDATION_FAILED`）；`review` 为假时直接确认并开启第 1 阶段，可以开始的工作包立即开始 |
+| POST | `/initiatives` | `initiatives.create` | write | `{ projectId, templateKey?, allowedWorkflows?, requirement, attachmentIds?（≤ 9）, baseBranch?, review = false, confirmItemPlans = false }` → 201 `InitiativeDetailDTO`；模板的 `{{requirement}}` 替换为需求后校验（`INITIATIVE_BREAKDOWN_INVALID`，替换后过长为 `VALIDATION_FAILED`）；`review` 为假时直接确认并开启第 1 阶段，可以开始的工作包立即开始；省略 `templateKey` 时由 AI 拆解：先校验 `allowedWorkflows` 都存在，建好空的需求计划并开始一次 `breakdown` run（`breaking_down`），交上来的草稿停在 `draft_ready` 等确认 |
 | GET | `/initiatives/:id` | `initiatives.get` | read | `InitiativeDetailDTO`：阶段（含是否已开启）、工作包（显示状态、当前任务摘要、本轮交付、开始失败的原因）、资料附件；404 `INITIATIVE_NOT_FOUND` |
 | PUT | `/initiatives/:id/draft` | `initiatives.saveDraft` | write | `{ phases, items }` 整体替换；已开始、已完成、已放弃的工作包必须原样保留（`ITEM_NOT_EDITABLE`），不能删去已开启的阶段（`INITIATIVE_NOT_EDITABLE`）；已开启阶段里新加的、可以开始的工作包随即开始 |
 | POST | `/initiatives/:id/confirm` | `initiatives.confirm` | write | 只在 `draft_ready`；第一次确认时开启第 1 阶段 |
-| POST | `/initiatives/:id/phases/:phase/open` | `initiatives.openPhase` | write | 只能是下一个阶段，且之前的工作包都已完成，否则 409 `INITIATIVE_PHASE_NOT_READY`（`details.items`）；`autoOpen` 的阶段由后端自动开启 |
+| POST | `/initiatives/:id/phases/:phase/open` | `initiatives.openPhase` | write | 只能是下一个阶段，且之前的工作包都已完成，否则 409 `INITIATIVE_PHASE_NOT_READY`（`details.items`）；`autoOpen` 的阶段由后端自动开启；`refine = true` 时不开启，而是开始一次细化 run（`open_phase = k`），确认它的草稿时开启 |
+| POST | `/initiatives/:id/rebreakdown` | `initiatives.rebreakdown` | write | `{ instruction? }`；只在从未确认的 `draft_ready` / `breakdown_failed`；在原会话里带意见与当前草稿重新拆解 |
+| POST | `/initiatives/:id/refine` | `initiatives.refine` | write | `{ instruction? }`；确认过、未全部完成、不是草稿时；只能改未开始的工作包（D136） |
 | POST | `/initiatives/:id/items/:key/start` | `initiatives.startItem` | write | 只在 `ready`：开始失败后重试，或任务取消后重新开始（新建任务，旧任务留在任务列表）；否则 409 `INITIATIVE_ITEM_NOT_READY` |
 | POST | `/initiatives/:id/items/:key/merged` | `initiatives.confirmMerged` | write | 只在 `pr_open`：用户确认 PR 已合入（并已拉取到本地基础分支） |
 | POST | `/initiatives/:id/items/:key/drop` | `initiatives.dropItem` | write | `{ reason }`；在 `ready` / `waiting` / `phase_closed` / `pr_open` 时；任务进行中要先取消 |

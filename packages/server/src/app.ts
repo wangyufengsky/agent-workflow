@@ -380,6 +380,10 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     workflows: workflows.service,
     tasks: tasks.service,
     attachments: attachments.service,
+    attempts: attempts.service,
+    projects: projects.service,
+    roles: roles.service,
+    prompts,
   });
   // Built-in composition templates of this app version, like the built-in workflows (34 §15.3).
   initiatives.service.templates.syncBuiltin(BUILTIN_INITIATIVE_TEMPLATES);
@@ -455,6 +459,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     gitReviews: gitReviews.service,
     commitDrafts: gitReviews.drafts,
     team: team.service,
+    initiatives: initiatives.service,
     browser: browser.service,
     filesDirOf: attempts.filesDirOf,
     log,

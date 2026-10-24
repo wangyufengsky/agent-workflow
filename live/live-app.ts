@@ -64,6 +64,8 @@ export type LiveApp = {
     /** `requirements`: the task's acceptance checklist (31); `history`: commits with dates (version review). */
     options?: { confirmPlan?: boolean; requirements?: RequirementItemInput[]; history?: FixtureHistory },
   ): Promise<TaskDetailDTO>;
+  /** A fresh repository of the fixture, added as a project; returns the project id. */
+  addProject(fixture: Fixture, history?: FixtureHistory): Promise<string>;
   /** The commands of every permission request the simulated user allowed so far (`<permission>: <patterns>`). */
   asked(): string[];
   /** Writes `live/reports/<name>-<time>.json` and closes the app. */
@@ -128,6 +130,8 @@ export async function startLiveApp(name: string, options: { browserHost?: Browse
   return {
     t,
     asked: () => userActions.asked.map((a) => a.ask),
+    /** A fresh repository of the fixture, added as a project; for cases that start something other than a task. */
+    addProject: (fixture: Fixture, history?: FixtureHistory) => addFixtureProject(fixture, history),
     async runTask(workflowKey, fixture, requirement, options = {}) {
       const confirmPlan = options.confirmPlan ?? false;
       const until = confirmPlan ? [...ENDED, TaskStatus.PlanReview] : ENDED;

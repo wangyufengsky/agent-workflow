@@ -49,7 +49,7 @@ describe('工作包的显示状态（34 §6.1）', () => {
 });
 
 describe('需求计划的显示状态（34 §6.2）', () => {
-  const base = { breakdownRev: 1, confirmedRev: 1, openedPhase: 1, phaseCount: 2 };
+  const base = { run: null, breakdownRev: 1, confirmedRev: 1, openedPhase: 1, phaseCount: 2 };
   it('草稿待确认、阶段完成、全部完成', () => {
     const items = [
       { phase: 1, done: true },
@@ -60,6 +60,17 @@ describe('需求计划的显示状态（34 §6.2）', () => {
     expect(initiativeStatusOf({ ...base, openedPhase: 2, items })).toBe(InitiativeStatus.InProgress);
     expect(initiativeStatusOf({ ...base, openedPhase: 2, items: items.map((i) => ({ ...i, done: true })) })).toBe(
       InitiativeStatus.Done,
+    );
+  });
+
+  it('拆解或细化进行中优先；第一次拆解没留下工作包就是失败', () => {
+    const items = [{ phase: 1, done: false }];
+    expect(initiativeStatusOf({ ...base, run: { active: true }, items })).toBe(InitiativeStatus.BreakingDown);
+    expect(initiativeStatusOf({ ...base, run: { active: true }, breakdownRev: 0, items: [] })).toBe(
+      InitiativeStatus.BreakingDown,
+    );
+    expect(initiativeStatusOf({ ...base, run: { active: false }, breakdownRev: 0, confirmedRev: 0, items: [] })).toBe(
+      InitiativeStatus.BreakdownFailed,
     );
   });
 });
