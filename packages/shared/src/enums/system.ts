@@ -54,6 +54,8 @@ export const TranscriptEntryKind = {
   Attachment: 'attachment',
   /** Assistant conversations only: an object an operation produced, shown as a navigation card (D66). */
   EntityRef: 'entity_ref',
+  /** Assistant conversations only: a chart the assistant drew (34, D133). */
+  Chart: 'chart',
 } as const;
 export type TranscriptEntryKind = (typeof TranscriptEntryKind)[keyof typeof TranscriptEntryKind];
 export const transcriptEntryKindSchema = z.enum(TranscriptEntryKind);

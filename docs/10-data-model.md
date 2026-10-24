@@ -324,6 +324,7 @@ payload / response：
 | `confirmation` | `{ confirmationId }`（仅助手对话：一次等待用户确认的调用，卡片内容来自 `assistant_confirmations`） |
 | `attachment` | `{ path }`（仅助手对话：助手写入对话文件目录 `files/<id>/` 的文件，`path` 相对该目录） |
 | `entity_ref` | `{ kind: EntityKind, id, title }`（仅助手对话：助手调用的操作执行成功后产出的对象，界面渲染为导航卡片，D66） |
+| `chart` | `{ chart: ChartSpec }`（仅助手对话：`show_chart` / `show_flowchart` 校验通过后的图，`shared/contracts/chart.ts`；只做向后兼容的修改，34 §4、D133） |
 
 读取：`GET /attempts/:id/transcript?afterSeq=` 每页 `TRANSCRIPT_PAGE_SIZE` 行；seq 从 1 起逐行连续编号（第 i 行即 seq i+1），所以一页就是按行切出的一段，只解析这一段（M6-02：5 MB、约六千行的文件，每页约 20 ms）；页内同一 `partId` 的行合并为一条（`offset` 为第一行的、`text` 为合并后的增量，seq 与时间取最后一行），放在它首次出现的位置，后一页接着合并。界面先显示第一页，其余页在后台接着读；读页期间经 SSE 到达的行另存一处：各页连续覆盖 1…n 行，所以只取 seq 大于最后一页的实时行，按 seq 去重排序后接着合并（`transcriptEntries`），读页与追加交错时不丢行也不重复。
 

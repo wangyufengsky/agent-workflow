@@ -17,6 +17,7 @@ import {
   AssistantTurnStatus,
   type AssistantUsageDTO,
   AttachmentOwnerKind,
+  type ChartSpec,
   ErrorCode,
   MCP_ASSISTANT_TOOL_PREFIX,
   OPENCODE_ASSISTANT_AGENT,
@@ -797,6 +798,11 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     recordProduced(id: string, contract: OperationContract, output: unknown): void {
       const entity = producedEntity(contract, output);
       if (entity !== undefined) record(get(id), [{ kind: TranscriptEntryKind.EntityRef, data: entity }]);
+    },
+
+    /** The assistant drew a chart: it stays in the conversation's message stream (34 §4, D133). */
+    recordChart(id: string, chart: ChartSpec): void {
+      record(get(id), [{ kind: TranscriptEntryKind.Chart, data: { chart } }]);
     },
   };
 }

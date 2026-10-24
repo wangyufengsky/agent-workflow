@@ -42,6 +42,23 @@ export const SCHEDULE_EVERY_HOURS = [1, 2, 3, 4, 6, 8, 12] as const;
 export const ASSISTANT_TITLE_MAX_CHARS = 40;
 /** One message to the assistant. */
 export const ASSISTANT_MESSAGE_MAX_CHARS = 20_000;
+/** Charts the assistant draws in a conversation (34 §3, D134). */
+export const CHART_TITLE_MAX_CHARS = 60;
+/** A category, series or flowchart node label. */
+export const CHART_LABEL_MAX_CHARS = 40;
+export const CHART_CAPTION_MAX_CHARS = 200;
+export const CHART_UNIT_MAX_CHARS = 8;
+export const CHART_SERIES_MAX = 6;
+/** Categories per chart type: a month by day of bars, a quarter by day of lines, slices still told apart by colour. */
+export const CHART_CATEGORIES = {
+  bar: { min: 1, max: 31 },
+  line: { min: 2, max: 90 },
+  pie: { min: 1, max: 8 },
+} as const;
+export const FLOWCHART_NODES_MAX = 24;
+export const FLOWCHART_EDGES_MAX = 48;
+export const FLOWCHART_NODE_ID_MAX_CHARS = 32;
+export const FLOWCHART_EDGE_LABEL_MAX_CHARS = 16;
 /** 一次显式附加的文字或任务上下文；超过时由用户缩短，任务快照注明截断。 */
 export const ASSISTANT_CONTEXT_MAX_CHARS = 12_000;
 /** 旧会话隔离升级时回放的最近记录和文字上限。 */

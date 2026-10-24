@@ -111,7 +111,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `Platform` | `darwin` · `win32` · `linux`（运行应用的操作系统，17 §1） |
 | `DbType` | `mysql` · `postgresql` · `opengauss`（openGauss / GaussDB）· `sqlserver` · `goldendb`（MySQL 协议）（v1.2，24 §1） |
 | `CredentialKind` | `git_token` · `db_password` |
-| `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` · `confirmation` · `attachment` · `entity_ref`（后三种仅助手对话，10 §3） |
+| `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` · `confirmation` · `attachment` · `entity_ref` · `chart`（后四种仅助手对话，10 §3；`chart` 见 34 §4） |
 | `TranscriptSystemEvent` | `attempt_started` · `nudged` · `retrying` · `result_submitted` · `awaiting_input`（等待用户回答或授权）· `timed_out` · `aborted` · `runtime_lost` · `assistant_isolated`（旧助手会话切换到独立目录；`system` 会话流条目记录的事件，文案在前端） |
 | `McpToolName` | 执行 MCP 工具名（12 §6）；`ATTEMPT_SUBMIT_TOOL` 为每种尝试的提交工具 |
 | `BashPolicy` | `auto`（默认放行，禁止 Git 写操作）· `ask`（只读命令放行，其余询问） |
@@ -125,11 +125,13 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `AssistantConfirmationStatus` | `pending` · `confirmed` · `cancelled` | 确认卡片（09 §10） |
 | `AssistantTurnStatus` | `running` · `completed` · `aborted` · `failed` · `interrupted` · `timed_out` | 助手单轮运行状态（09 §14），用量未知与状态独立 |
 | `AssistantTurnEvent` | `idle` · `abort` · `error` · `runtime_lost` · `backend_restart` · `timeout` | 助手轮次的结束原因，运行时丢失与后端重启分别保存 |
-| `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` | 助手专用工具（15 §3）；其余工具由操作清单生成 |
+| `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` · `read_attachment` · `browser_read` · `show_chart` · `show_flowchart`（34） | 助手专用工具（15 §3）；其余工具由操作清单生成 |
 | `AssistantPage` | `desktop`（桌宠来源，不带任务参数） · `home` · `tasks` · `task` · `task_preview`（任务页的预览页签，v1.3 B3，29 §2.6） · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` · `ppt` · `ppt_deck`（23 §9） · `batches` · `batch` · `schedules` · `schedule` · `environment`（28 §4） | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId` / `deckId` / `batchId` / `scheduleId`；PPT 工作台另可带选中的页 `slideId`） |
 | `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） · `schedule`（22 §10） · `deck`（23 §9） · `git_review`（27 §7.1） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
 | `InputRef` | `EntityKind` 的全部取值 · `inbox_item` · `node`（同一输入中 `id` 所指任务的步骤） · `attempt` | 操作契约 `refs`：输入字段指向的对象（`enums/entity.ts`）；助手确认卡片据此把 id 显示为对象名称，标签为对象类型（D84）；`workflow` 字段可以是流程 id 或 key |
 | `AssistantForm` | `tasks.create` · `projects.create` · `projects.setHosting` · `databases.create` · `databases.update` | `open_form` 能打开的表单，以其提交的操作命名（`ASSISTANT_FORM_OPERATION`）；预填值的 schema 为该操作的助手输入（不含凭据字段）的 partial |
+| `ChartType` | `bar` · `line` · `pie` · `flow` | 助手画的图（34，D132）：前三种来自 `show_chart`，`flow` 来自 `show_flowchart`；会话流 `chart` 条目的 `chart.type` |
+| `FlowNodeShape` | `step` · `decision` · `terminal` | 流程图节点：步骤（默认）/ 判断 / 开始结束（34 §3.2） |
 
 ### 2.8 知识问答（v1.1，`enums/knowledge.ts`）
 
@@ -288,6 +290,10 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `SCHEDULE_EVERY_HOURS` | `[1, 2, 3, 4, 6, 8, 12]`（`hourly` 可选的间隔，24 的约数，D90） |
 | `ASSISTANT_TITLE_MAX_CHARS` | 40（助手对话标题取第一条消息的首行） |
 | `ASSISTANT_MESSAGE_MAX_CHARS` | 20000（一条发给助手的消息） |
+| `CHART_TITLE_MAX_CHARS` / `CHART_LABEL_MAX_CHARS` / `CHART_CAPTION_MAX_CHARS` / `CHART_UNIT_MAX_CHARS` | 60 / 40 / 200 / 8（助手画图的标题、类别 / 系列 / 节点标签、口径说明、单位，34 §3） |
+| `CHART_SERIES_MAX` | 6（`bar` / `line` 的系列数；`pie` 恰好 1） |
+| `CHART_CATEGORIES` | `bar` 1–31、`line` 2–90、`pie` 1–8 |
+| `FLOWCHART_NODES_MAX` / `FLOWCHART_EDGES_MAX` / `FLOWCHART_NODE_ID_MAX_CHARS` / `FLOWCHART_EDGE_LABEL_MAX_CHARS` | 24 / 48 / 32 / 16 |
 | `ASSISTANT_CONTEXT_MAX_CHARS` | 12000（一次显式附加的选中文字；任务／步骤快照正文超长时注明截断） |
 | `KNOWLEDGE_QUESTION_MAX_CHARS` | 4000（一次提问） |
 | `KNOWLEDGE_TITLE_MAX_CHARS` | 80（知识对话标题取第一次提问的首行） |

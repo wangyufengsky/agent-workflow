@@ -8,7 +8,12 @@ import {
   AttachmentOwnerKind,
   assistantFormSchema,
   assistantInputSchema,
+  CHART_CATEGORIES,
+  CHART_SERIES_MAX,
+  ChartType,
   ErrorCode,
+  FLOWCHART_EDGES_MAX,
+  FLOWCHART_NODES_MAX,
   type GetAppStatusOutput,
   getAppStatusInputSchema,
   getCurrentTimeInputSchema,
@@ -19,6 +24,8 @@ import {
   readBrowserInputSchema,
   revealFileInputSchema,
   ServerEventType,
+  showChartInputSchema,
+  showFlowchartInputSchema,
   UiMode,
 } from '@aw/shared';
 import { z } from 'zod';
@@ -124,6 +131,26 @@ export function helperTools(deps: HelperToolDeps): AssistantTool[] {
           data: { conversationId: conversation.id, form, values },
         });
         return { opened: true };
+      },
+    },
+    {
+      name: AssistantToolName.ShowChart,
+      description: `Show the user a chart in this conversation, drawn by the app in its theme. Use only figures that tools returned in this conversation; say what they count in caption. bar compares categories (${CHART_CATEGORIES.bar.max} at most, may be stacked), line shows a trend (${CHART_CATEGORIES.line.min}–${CHART_CATEGORIES.line.max} points, null for a gap, may be negative), pie shows shares of a whole (one series, ${CHART_CATEGORIES.pie.max} slices at most: merge the smallest into 其他). Up to ${CHART_SERIES_MAX} series, each with one value per category. Afterwards say the conclusion in a sentence or two; do not repeat the data as a table`,
+      input: showChartInputSchema,
+      mode: UiMode.Simple,
+      handler(input, { conversation }) {
+        conversations.recordChart(conversation.id, showChartInputSchema.parse(input));
+        return { shown: true };
+      },
+    },
+    {
+      name: AssistantToolName.ShowFlowchart,
+      description: `Show the user a flowchart in this conversation: steps, decisions (with labelled outgoing edges) and start or end nodes, top to bottom. Up to ${FLOWCHART_NODES_MAX} nodes and ${FLOWCHART_EDGES_MAX} edges; loops back to an earlier node are allowed`,
+      input: showFlowchartInputSchema,
+      mode: UiMode.Simple,
+      handler(input, { conversation }) {
+        conversations.recordChart(conversation.id, { type: ChartType.Flow, ...showFlowchartInputSchema.parse(input) });
+        return { shown: true };
       },
     },
     {

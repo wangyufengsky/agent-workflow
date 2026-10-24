@@ -44,6 +44,10 @@ export const AssistantToolName = {
   /** More of a file the user attached in this conversation (30 §3.2). */
   ReadAttachment: 'read_attachment',
   ReadBrowser: 'browser_read',
+  /** A bar, line or pie chart in the conversation (34 §3.1). */
+  ShowChart: 'show_chart',
+  /** A flowchart in the conversation (34 §3.2). */
+  ShowFlowchart: 'show_flowchart',
 } as const;
 export type AssistantToolName = (typeof AssistantToolName)[keyof typeof AssistantToolName];
 
@@ -143,3 +147,21 @@ export const AssistantForm = {
 } as const;
 export type AssistantForm = (typeof AssistantForm)[keyof typeof AssistantForm];
 export const assistantFormSchema = z.enum(AssistantForm);
+
+/** What a chart in an assistant conversation draws (34, D132); `flow` comes from `show_flowchart`. */
+export const ChartType = {
+  Bar: 'bar',
+  Line: 'line',
+  Pie: 'pie',
+  Flow: 'flow',
+} as const;
+export type ChartType = (typeof ChartType)[keyof typeof ChartType];
+
+/** A flowchart node's shape (34 §3.2). */
+export const FlowNodeShape = {
+  Step: 'step',
+  Decision: 'decision',
+  Terminal: 'terminal',
+} as const;
+export type FlowNodeShape = (typeof FlowNodeShape)[keyof typeof FlowNodeShape];
+export const flowNodeShapeSchema = z.enum(FlowNodeShape);

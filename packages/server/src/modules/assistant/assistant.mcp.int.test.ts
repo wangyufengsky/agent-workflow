@@ -57,10 +57,17 @@ const becomesIdle = () =>
 
 const call = (name: string, args: Record<string, unknown> = {}) => callTool(mcp, name, { ...args, ...session });
 
-async function entityRefs(): Promise<unknown[]> {
+async function transcript(): Promise<TranscriptPage> {
   const res = await t.request({ method: 'GET', url: `/assistant/conversations/${conversationId}/transcript` });
-  const page: TranscriptPage = JSON.parse(res.body);
-  return page.entries.flatMap((e) => (e.kind === 'entity_ref' ? [e.data] : []));
+  return JSON.parse(res.body);
+}
+
+async function entityRefs(): Promise<unknown[]> {
+  return (await transcript()).entries.flatMap((e) => (e.kind === 'entity_ref' ? [e.data] : []));
+}
+
+async function charts(): Promise<unknown[]> {
+  return (await transcript()).entries.flatMap((e) => (e.kind === 'chart' ? [e.data.chart] : []));
 }
 
 /** Confirms (or cancels) and waits until the result reached the session as the next message. */
@@ -454,5 +461,57 @@ describe('助手专用工具（A-05）', () => {
       expect(isError).toBe(true);
       expect(body).toMatchObject({ code: ErrorCode.ValidationFailed });
     }
+  });
+
+  it('show_chart：校验通过的图记进消息流，重启后仍在；不合规的输入 VALIDATION_FAILED 带 path、不记', async () => {
+    const pie = {
+      type: 'pie',
+      title: '本周任务状态',
+      categories: ['已完成', '待合并', '失败'],
+      series: [{ name: '任务数', values: [7, 2, 1] }],
+      caption: '本周开始的任务',
+    };
+    expect((await call(AssistantToolName.ShowChart, pie)).body).toEqual({ shown: true });
+
+    const { isError, body } = await call(AssistantToolName.ShowChart, {
+      ...pie,
+      series: [{ name: '任务数', values: [7, 2] }],
+    });
+    expect(isError).toBe(true);
+    expect(body).toMatchObject({
+      code: ErrorCode.ValidationFailed,
+      details: { issues: [{ path: ['series', 0, 'values'], message: '2 values for 3 categories' }] },
+    });
+    expect(await charts()).toEqual([pie]);
+
+    await mcp.close();
+    const { dataDir, fake } = t;
+    await t.close();
+    t = await createTestApp({ dataDir, fake });
+    mcp = await connectMcp(t.assistantMcpUrl, t.app.assistantMcpToken);
+    expect(await charts()).toEqual([pie]);
+  });
+
+  it('show_flowchart：记为 flow 类型的图；连线指向不存在的节点时 VALIDATION_FAILED', async () => {
+    const flow = {
+      title: '修 Bug',
+      nodes: [
+        { id: 'fix', label: '修复' },
+        { id: 'test', label: '测试通过吗？', shape: 'decision' },
+        { id: 'done', label: '待合并', shape: 'terminal' },
+      ],
+      edges: [
+        { from: 'fix', to: 'test' },
+        { from: 'test', to: 'done', label: '通过' },
+        { from: 'test', to: 'fix', label: '失败' },
+      ],
+    };
+    expect((await call(AssistantToolName.ShowFlowchart, flow)).body).toEqual({ shown: true });
+    const { body } = await call(AssistantToolName.ShowFlowchart, { ...flow, edges: [{ from: 'fix', to: 'ship' }] });
+    expect(body).toMatchObject({
+      code: ErrorCode.ValidationFailed,
+      details: { issues: [{ path: ['edges', 0, 'to'], message: 'no node with id "ship"' }] },
+    });
+    expect(await charts()).toEqual([{ type: 'flow', ...flow }]);
   });
 });

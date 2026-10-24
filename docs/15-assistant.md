@@ -21,7 +21,7 @@
 | 应用工具 | **助手 MCP**（`/mcp/assistant`，server 名 `agent-workflow-app`），与执行 MCP 分开、令牌分开；bridge 插件对 `agent-workflow_` 与 `agent-workflow-app_` 两种前缀都注入会话 id，调用按会话归属到对话（不属于任何对话 → `MCP_CONVERSATION_UNRESOLVED`）；`aw-assistant` 的权限 deny `agent-workflow_*`，规划 / 执行 / 评审 agent deny `agent-workflow-app_*`，各自只看到自己那套工具 |
 | 用户外部 MCP | opencode 合并用户全局配置，用户自己配置的 MCP（如日历）助手可直接使用 |
 | 上下文 | 每轮 `system` 注入（模板 `assistant-context.md`）：用户发消息时的当地时间、星期、时区与 UTC 偏移、界面模式、当前页面与选中对象（任务编号与标题、状态、项目；选中的步骤；项目名称与仓库；流程名称）、对话文件目录。页面由前端随消息发送（`AssistantPageRef`），名称由后端查出；新用户消息指向不存在的对象时不发送（如 `TASK_NOT_FOUND`）。系统结果回传使用上一条用户消息的页面，若对象已删除则明确说明不再存在，不阻断结果回传；其他错误仍然抛出 |
-| 对话存储 | 表 `assistant_conversations`、`assistant_confirmations`（迁移 0008）与持久化待发队列 `assistant_outbox`（迁移 0018）及 `assistant_task_followups`（迁移 0019，10 §4）；消息流 JSONL `<数据目录>/assistant/conversations/<id>.jsonl`（格式同 10 §3，另有 `confirmation`、`attachment`、`entity_ref` 三种条目）；助手写入 `files/<id>/` 的文件（opencode `write` / `edit` 工具）记为附件条目 |
+| 对话存储 | 表 `assistant_conversations`、`assistant_confirmations`（迁移 0008）与持久化待发队列 `assistant_outbox`（迁移 0018）及 `assistant_task_followups`（迁移 0019，10 §4）；消息流 JSONL `<数据目录>/assistant/conversations/<id>.jsonl`（格式同 10 §3，另有 `confirmation`、`attachment`、`entity_ref`、`chart` 四种条目）；助手写入 `files/<id>/` 的文件（opencode `write` / `edit` 工具）记为附件条目 |
 
 这里是工作目录与工具权限边界，不是操作系统沙箱。opencode 1.19 对 `head` / `rg` 等 shell 命令不完整检查目录，故助手不自动放行所谓只读 shell；用户主动批准 shell 或自己配置的外部 MCP 可具有更广访问能力。应用 `tasks_create` 仍按原有确认流程创建独立任务，不通过原生 `task` 子代理逃逸权限。
 
@@ -49,6 +49,7 @@ opencode 1.19 的已有会话目录不能通过发送参数或 fork 改变。迁
 | `browser_read` | read | 严格空参数；只读当前对话由界面绑定的「我的预览」文字、地址、视口和错误日志；无关联或预览失效为 `BROWSER_NOT_OPEN`，不能用任务或 tab 参数猜测当前页。整体最多 30 秒，超时为 `BROWSER_READ_FAILED`，保留用户页与关联（29 §9） |
 | `open_page` | read | `{ page: AssistantPage, params }`（各页面需要的参数为 `ASSISTANT_PAGE_PARAMS`）→ SSE `assistant.navigate`，界面在面板旁跳转；`task_preview` 是任务页的预览页签（`?view=preview`，v1.3 B3，29 §2.6），用户在那里时消息带的当前页面也是它，助手启动预览后用它把用户带过去 |
 | `open_form` | read | `{ form: AssistantForm, values }` → SSE `assistant.open_form`；`values` 按该表单所提交操作的助手输入（不含凭据字段）的 partial 校验，带凭据字段 `VALIDATION_FAILED` |
+| `show_chart` / `show_flowchart` | read | 在对话里画图（34，D132）：统计图（`bar` / `line` / `pie`，类别 + 系列）或流程图（节点与连线，允许回环）；输入为 strict 对象，跨字段规则与上限见 34 §3，不合规为 `VALIDATION_FAILED`（issues 带 `path` 与改法）；通过后写消息流 `chart` 条目（10 §3）并返回 `{ shown: true }`。界面渲染待 V-04 |
 | `list_files` / `reveal_file` | read | 列出 / 在 Finder 中显示 `files/<id>/` 下的文件（路径相对该目录，越界或不存在 `VALIDATION_FAILED`；显示经 SSE `assistant.reveal_file` 由 preload 完成） |
 
 第一批开放给助手的操作（v1.1）：项目、任务（含开始、取消、结果、再改改、交付）、需要你处理（列表、回答、审批）、流程与角色（读；专业模式可写）、数据库（列表、测试、结构、只读查询：新增操作 `databases.query`，与 AI 的 `db_query` 同样的只读四道关，可用于任意连接）、Git（只读）、设置。知识问答（v1.1，18 §4a）的操作已注册并 `expose.assistant`：`knowledge_ask` / `knowledge_followUp` 为 read（不需确认），工具立即返回 `researching`，回答（带引用链接）与导航卡片在研究结束后作为下一条消息送达；`knowledge_delete` 为 critical，列表、详情、引用原文为 read。PPT 模块上线时注册其操作即自动可用。各模块的覆盖盘点见 28 §4（v1.2 起批量、定时、PPT、审查意见回流都已开放；`open_page` 补了批量、定时与环境检测页）。

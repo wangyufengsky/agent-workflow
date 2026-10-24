@@ -3,6 +3,7 @@ import { entityRefSchema } from '../../enums/entity.ts';
 import { TranscriptEntryKind, transcriptSystemEventSchema } from '../../enums/system.ts';
 import { attemptKindSchema, attemptStatusSchema } from '../../enums/task.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
+import { chartSpecSchema } from '../chart.ts';
 
 /** `AttemptSummaryDTO` (11 §6): one AI session working for a node, a plan or a review. */
 export const attemptSummarySchema = z.object({
@@ -93,6 +94,7 @@ export const transcriptEntrySchema = z.discriminatedUnion('kind', [
   /** `path` is relative to the conversation's files directory. */
   z.object({ ...entry, kind: z.literal(TranscriptEntryKind.Attachment), data: z.object({ path: z.string() }) }),
   z.object({ ...entry, kind: z.literal(TranscriptEntryKind.EntityRef), data: entityRefSchema }),
+  z.object({ ...entry, kind: z.literal(TranscriptEntryKind.Chart), data: z.object({ chart: chartSpecSchema }) }),
 ]);
 export type TranscriptEntry = z.infer<typeof transcriptEntrySchema>;
 
