@@ -53,7 +53,7 @@ function RecentConversations({ conversations }: { conversations: readonly Assist
   const menu = useRef<HTMLDivElement>(null);
   if (conversations.length === 0) return null;
   return (
-    <nav className={styles.strip} aria-label={C.recent}>
+    <nav className={`${styles.strip} ${styles.recentStrip}`} aria-label={C.recent}>
       <span className={styles.cap} aria-hidden="true">
         {C.recent}
       </span>
@@ -68,8 +68,9 @@ function RecentConversations({ conversations }: { conversations: readonly Assist
           <small>{formatDateTime(c.updatedAt)}</small>
         </Link>
       ))}
-      <button type="button" className={`${styles.allConversations} grow`} popoverTarget={id}>
+      <button type="button" className={styles.allConversations} popoverTarget={id}>
         {C.allConversations}
+        <span className={styles.count}>{conversations.length}</span>
         <Icon name="chevRight" size="sm" />
       </button>
       <div ref={menu} id={id} popover="auto" className={styles.menu} role="menu" aria-label={C.allConversations}>

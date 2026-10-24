@@ -381,10 +381,15 @@
   background: var(--fill-3);
   color: var(--ink);
 }
+.recentStrip {
+  /* One row: the conversations give way (their titles are cut), 「全部对话」keeps its size at the end. */
+  flex-wrap: nowrap;
+}
 .recent {
   display: inline-flex;
   align-items: center;
   gap: var(--s-2);
+  min-width: 0;
   max-width: 240px;
   height: 30px;
   padding: 0 10px;
@@ -393,6 +398,9 @@
   color: var(--ink-2);
   font-size: var(--fs-sm);
   transition: background var(--t-fast);
+}
+.recent > span {
+  min-width: 0;
 }
 .recent:hover {
   background: var(--fill-4);
@@ -404,13 +412,38 @@
   font-size: var(--fs-xs);
 }
 .allConversations {
+  flex: none;
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: var(--s-1);
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px 0 10px;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
   color: var(--sub);
   font-size: var(--fs-sm);
+  transition:
+    background var(--t-fast),
+    color var(--t-fast);
   anchor-name: --aw-home-conversations;
+}
+.allConversations:hover,
+.allConversations:focus-visible {
+  background: var(--fill-2);
+  color: var(--ink-2);
+}
+.count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--fill-3);
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .menu {
   position: fixed;
