@@ -1,6 +1,7 @@
 import type { Prompts } from '@aw/builtin';
 import {
   attachmentIdsSchema,
+  createInitiativeOp,
   createTaskOp,
   type GetAppStatusOutput,
   MCP_ASSISTANT_PATH,
@@ -12,6 +13,7 @@ import type { OperationImpl } from '../../core/operations/operations.ts';
 import type { BatchesService } from '../batches/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DecksService } from '../decks/index.ts';
+import type { InitiativesService } from '../initiatives/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SchedulesService } from '../schedules/index.ts';
@@ -44,6 +46,7 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context'> & {
   decks: DecksService;
   batches: BatchesService;
   schedules: SchedulesService;
+  initiatives: InitiativesService;
   team: TeamService;
   browser: BrowserService;
   /** Every other operation of the app; the assistant's tools are generated from them (15 §3). */
@@ -77,14 +80,18 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
         recordProduced: conversations.recordProduced,
         deferred: new Map(KNOWLEDGE_QUESTION_OPS.map((id) => [id, relay.researching])),
         scoped: new Map([
-          [
-            createTaskOp.id,
-            (conversationId, input) =>
-              conversations.assertOwnAttachments(
-                conversationId,
-                attachmentIdsSchema.optional().parse(input.attachmentIds) ?? [],
-              ),
-          ],
+          // Only files of this conversation are handed on (30 §2.2): to a task, or to an initiative (34 §10).
+          ...[createTaskOp.id, createInitiativeOp.id].map(
+            (id) =>
+              [
+                id,
+                (conversationId: string, input: Record<string, unknown>) =>
+                  conversations.assertOwnAttachments(
+                    conversationId,
+                    attachmentIdsSchema.optional().parse(input.attachmentIds) ?? [],
+                  ),
+              ] as const,
+          ),
         ]),
       }),
       ...helperTools({ ...deps, conversations }),

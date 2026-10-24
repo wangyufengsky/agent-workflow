@@ -1,10 +1,19 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { createInitiativeOp, InitiativeStatus, ServerEventType } from '@aw/shared';
+import {
+  ATTACHMENT_NAME_HEADER,
+  type AttachmentDTO,
+  createConversationOp,
+  createInitiativeOp,
+  InitiativeStatus,
+  listConfirmationsOp,
+  ServerEventType,
+  sendAssistantMessageOp,
+} from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { waitForEvent } from '../packages/server/test/helpers/events.ts';
 import { type LiveApp, startLiveApp, TASK_TIMEOUT_MS } from './live-app.ts';
 
-/** N-08 (34 §13): the AI breakdown of an initiative on a real model, against the rules of D133. */
+/** N-08 (34 §13): the AI breakdown of an initiative on a real model, against the rules of D133; the assistant's way in. */
 const TODO = `# 待办应用二期需求
 
 1. 数据持久化：待办保存到服务端（server.mjs 增加 JSON 文件存储与 REST 接口：列表、新增、修改、删除），刷新页面后数据还在。
@@ -64,6 +73,38 @@ describe('@live 需求计划的 AI 拆解', () => {
         i.acceptance.flatMap((a) => (a.verification.kind === 'command' ? [a.verification.command] : [])),
       );
       expect(commands.filter((c) => /node -e|python -c/.test(c))).toEqual([]);
+    },
+    TASK_TIMEOUT_MS,
+  );
+  it(
+    '助手：附上需求文档说「拆成需求计划」，助手调用 initiatives_create 并带上附件，等用户确认',
+    async () => {
+      const projectId = await live.addProject('todo-web');
+      const upload = await live.t.request({
+        method: 'POST',
+        url: '/attachments',
+        headers: { 'content-type': 'application/octet-stream', [ATTACHMENT_NAME_HEADER]: '待办二期需求.md' },
+        payload: TODO,
+      });
+      const doc = upload.json<AttachmentDTO>();
+      const { body: conversation } = await live.t.call(createConversationOp, {});
+      const idle = waitForEvent(
+        live.t.app.events,
+        ServerEventType.AssistantUpdated,
+        (c) => c.id === conversation.id && !c.busy,
+        TASK_TIMEOUT_MS,
+      );
+      await live.t.call(sendAssistantMessageOp, {
+        id: conversation.id,
+        text: '附件是待办应用二期的需求文档，内容比较多。帮我在项目 todo-web 上把它拆成需求计划，分阶段做。',
+        context: { page: 'project', params: { projectId } },
+        attachmentIds: [doc.id],
+      });
+      await idle;
+
+      const { items } = (await live.t.call(listConfirmationsOp, { id: conversation.id })).body;
+      expect(items.map((c) => c.operationId)).toEqual(['initiatives.create']);
+      expect(items[0]?.input).toMatchObject({ projectId, attachmentIds: [doc.id] });
     },
     TASK_TIMEOUT_MS,
   );

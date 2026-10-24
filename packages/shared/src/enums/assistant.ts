@@ -88,6 +88,9 @@ export const AssistantPage = {
   Schedules: 'schedules',
   Schedule: 'schedule',
   Environment: 'environment',
+  /** Initiatives (34 §10): the list and one initiative. */
+  Initiatives: 'initiatives',
+  Initiative: 'initiative',
 } as const;
 export type AssistantPage = (typeof AssistantPage)[keyof typeof AssistantPage];
 export const assistantPageSchema = z.enum(AssistantPage);
@@ -103,6 +106,7 @@ export type AssistantPageParam =
   | 'slideId'
   | 'batchId'
   | 'scheduleId'
+  | 'initiativeId'
   /** A team member's main email (33 §5.1). */
   | 'teamMember';
 
@@ -139,6 +143,8 @@ export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.Schedules]: [],
   [AssistantPage.Schedule]: ['scheduleId'],
   [AssistantPage.Environment]: [],
+  [AssistantPage.Initiatives]: [],
+  [AssistantPage.Initiative]: ['initiativeId'],
 } as const satisfies Record<AssistantPage, readonly AssistantPageParam[]>;
 
 /**

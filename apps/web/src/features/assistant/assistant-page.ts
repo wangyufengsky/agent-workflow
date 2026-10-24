@@ -37,6 +37,8 @@ const PAGE_ROUTE = {
   [AssistantPage.Schedules]: ROUTES.schedules,
   [AssistantPage.Schedule]: ROUTES.schedule,
   [AssistantPage.Environment]: ROUTES.environment,
+  [AssistantPage.Initiatives]: ROUTES.initiatives,
+  [AssistantPage.Initiative]: ROUTES.initiative,
 } as const satisfies Record<AssistantPage, string>;
 
 /** The preview tab shares the task page's route; its `view` tells them apart. */
@@ -77,6 +79,7 @@ export function useAssistantPage(): AssistantPageRef {
         slideId: text(search.slide),
         batchId: text(params.batchId),
         scheduleId: text(params.scheduleId),
+        initiativeId: text(params.initiativeId),
         teamMember: text(params.member),
       };
       return {
@@ -135,6 +138,8 @@ export function useOpenAssistantPage() {
           return navigate({ to: ROUTES.batch, params: { batchId: param(ref, 'batchId') } });
         case AssistantPage.Schedule:
           return navigate({ to: ROUTES.schedule, params: { scheduleId: param(ref, 'scheduleId') } });
+        case AssistantPage.Initiative:
+          return navigate({ to: ROUTES.initiative, params: { initiativeId: param(ref, 'initiativeId') } });
         default:
           return navigate({ to: PAGE_ROUTE[ref.page] });
       }
