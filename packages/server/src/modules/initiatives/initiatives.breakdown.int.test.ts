@@ -13,6 +13,7 @@ import {
   refineInitiativeOp,
   saveInitiativeDraftOp,
   startInitiativeItemOp,
+  submitBreakdownInputSchema,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
@@ -267,6 +268,43 @@ describe('AI 拆解与逐步细化（34 §8，D133、D136）', () => {
 
     expect((await t.call(startInitiativeItemOp, { id: created.id, key: 'c' })).body).toMatchObject({
       error: { code: ErrorCode.InitiativeNotEditable },
+    });
+  });
+  it('准备开始一个工作包时细化改写了它：这次开始作废，不按旧需求建任务，也不记为开始失败', async () => {
+    const { repo, project } = await addProject(t, { files: { 'a/a.ts': 'export const a = 1;\n' }, checkCommand: null });
+    t.fake.enqueue(script().callTool('submit_breakdown', breakdown([unitTests('a', 1, 'a/')], ['基础'])), SESSION);
+    const created = await create({ projectId: project.id, requirement: '补 a 的测试' });
+    await settled();
+    // The automatic start fails while the base branch is away; a waits for the user to start it again.
+    await repo.git('branch', '-m', 'main', 'away');
+    expect((await t.call(confirmInitiativeOp, { id: created.id })).body).toMatchObject({
+      items: [{ key: 'a', status: 'ready', task: null, startError: { code: ErrorCode.GitBaseBranchNotFound } }],
+    });
+    await repo.git('branch', '-m', 'away', 'main');
+
+    t.fake.enqueue(script().hang(), SESSION);
+    const run = (await t.call(refineInitiativeOp, { id: created.id })).body.latestRun;
+    const attempt = t.app.services.attempts.get(run?.attemptId ?? '');
+    const starting = t.app.services.initiatives.startItem(created.id, 'a');
+    // While the start checks the base branch, the refinement rewrites a (no await in between).
+    const rewritten = { ...unitTests('a', 1, 'a/'), requirement: '为 a/ 补边界用例' };
+    t.app.services.initiatives.submitBreakdown(
+      attempt,
+      submitBreakdownInputSchema.parse(breakdown([rewritten], ['基础'])),
+    );
+
+    await expect(starting).rejects.toMatchObject({ code: ErrorCode.InitiativeItemNotReady });
+    expect(await detail(created.id)).toMatchObject({
+      status: 'draft_ready',
+      items: [
+        {
+          key: 'a',
+          status: 'ready',
+          task: null,
+          requirement: '为 a/ 补边界用例',
+          startError: { code: ErrorCode.GitBaseBranchNotFound },
+        },
+      ],
     });
   });
 });

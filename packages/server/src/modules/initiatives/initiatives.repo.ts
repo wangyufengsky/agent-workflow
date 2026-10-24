@@ -239,9 +239,10 @@ export function createInitiativesRepo(db: DbExecutor) {
     },
     /**
      * Gives the work package its new task unless something changed while the start was preparing: another start
-     * linked a task first (the current task must still be the one this start read), or the user dropped it (34 §14).
+     * linked a task first (the current task must still be the one this start read), the user dropped it (34 §14), or
+     * a breakdown rewrote the draft (`breakdownRev` is no longer the one this start read, 34 §8.4).
      */
-    claimItem(id: string, expectedTaskId: string | null, taskId: string, now: number): boolean {
+    claimItem(id: string, expectedTaskId: string | null, breakdownRev: number, taskId: string, now: number): boolean {
       return (
         db
           .update(it)
@@ -251,6 +252,7 @@ export function createInitiativesRepo(db: DbExecutor) {
               eq(it.id, id),
               isNull(it.droppedAt),
               expectedTaskId === null ? isNull(it.taskId) : eq(it.taskId, expectedTaskId),
+              sql`exists (select 1 from ${i} where ${i.id} = ${it.initiativeId} and ${i.breakdownRev} = ${breakdownRev})`,
             ),
           )
           .run().changes === 1

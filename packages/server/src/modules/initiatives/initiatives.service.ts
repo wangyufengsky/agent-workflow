@@ -351,8 +351,9 @@ export function createInitiativesService({
         ...(item.acceptance.length === 0 ? {} : { requirements: item.acceptance }),
         ...(initiative.confirmItemPlans ? { checkpoints: { confirm_plan: true } } : {}),
       });
-      if (!repo.claimItem(item.id, item.taskId, created, clock.now())) {
-        // Rolls the task back: another start took the work package, or the user dropped it, meanwhile.
+      if (!repo.claimItem(item.id, item.taskId, initiative.breakdownRev, created, clock.now())) {
+        // Rolls the task back: another start took the work package, the user dropped it or a breakdown rewrote it,
+        // meanwhile. Not a failure of the work package: no start error is recorded.
         throw new AppError(ErrorCode.InitiativeItemNotReady, `Work package ${item.key} changed meanwhile`, {
           status: item.dto.status,
         });
@@ -390,6 +391,7 @@ export function createInitiativesService({
         await startItem(initiative, item, items);
       } catch (err) {
         if (!(err instanceof AppError)) throw err;
+        if (err.code === ErrorCode.InitiativeItemNotReady) continue;
         repo.updateItem(item.id, { startError: err.toInfo(), updatedAt: clock.now() });
         log.warn({ initiativeId: id, item: item.key, code: err.code }, 'initiative work package could not start');
         publish(id);
@@ -962,7 +964,9 @@ export function createInitiativesService({
       try {
         await startItem(initiative, item, all);
       } catch (err) {
-        if (err instanceof AppError) repo.updateItem(item.id, { startError: err.toInfo(), updatedAt: clock.now() });
+        if (err instanceof AppError && err.code !== ErrorCode.InitiativeItemNotReady) {
+          repo.updateItem(item.id, { startError: err.toInfo(), updatedAt: clock.now() });
+        }
         throw err;
       }
       return detail(id);
