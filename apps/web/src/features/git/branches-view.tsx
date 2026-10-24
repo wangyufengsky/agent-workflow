@@ -20,7 +20,14 @@ import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
 import { GIT_COPY as C } from '../../copy/git.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import styles from './git.module.css';
-import { gitBranchesQuery, gitDiffFileQuery, gitDiffQuery, useStartReview, useSwitchBranch } from './git.queries.ts';
+import {
+  gitBranchesQuery,
+  gitCommitBeforeQuery,
+  gitDiffFileQuery,
+  gitDiffQuery,
+  useStartReview,
+  useSwitchBranch,
+} from './git.queries.ts';
 import type { GitDialog } from './git-dialogs.tsx';
 import { GitMenu } from './git-menu.tsx';
 
@@ -65,6 +72,32 @@ function Compare({
   );
 }
 
+/** A comparison from a day (27 §4.2): the start is the commit `to` was at when the day began, in local time. */
+function CompareSince({
+  projectId,
+  since,
+  to,
+  onOpenReview,
+}: {
+  projectId: string;
+  since: string;
+  to: string;
+  onOpenReview: (id: string) => void;
+}) {
+  const start = useQuery(gitCommitBeforeQuery(projectId, to, new Date(`${since}T00:00`).getTime()));
+  if (start.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
+  if (start.isError) return <ErrorState error={start.error} />;
+  if (start.data === null) return <p className="hint">{C.noCommitBefore(to, since)}</p>;
+  return (
+    <div className="col">
+      <p className="hint">
+        {C.sinceStart(start.data.sha.slice(0, 7), start.data.subject, formatDateTime(start.data.authoredAt))}
+      </p>
+      <Compare projectId={projectId} from={start.data.sha} to={to} onOpenReview={onOpenReview} />
+    </div>
+  );
+}
+
 /**
  * Local and remote branches with their tasks, upstream and distance from the default branch, and what can be done
  * with each (27 §3.4); below, any two versions compared.
@@ -88,8 +121,9 @@ export function BranchesView({
   const switchTo = useSwitchBranch(project.id);
   const [showRemote, setShowRemote] = useState(false);
   const [from, setFrom] = useState(project.defaultBranch);
+  const [since, setSince] = useState('');
   const [to, setTo] = useState('');
-  const [compared, setCompared] = useState<{ from: string; to: string } | undefined>(undefined);
+  const [compared, setCompared] = useState<{ from: string; since: string; to: string } | undefined>(undefined);
   if (branches.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (branches.isError) return <ErrorState error={branches.error} onRetry={() => void branches.refetch()} />;
   const all = branches.data;
@@ -238,7 +272,26 @@ export function BranchesView({
           <label className="label" htmlFor="compare-from">
             {C.compareFrom}
           </label>
-          <input id="compare-from" className="input mono" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <input
+            id="compare-from"
+            className="input mono"
+            value={from}
+            disabled={since !== ''}
+            onChange={(e) => setFrom(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="compare-since">
+            {C.compareSince}
+          </label>
+          <input
+            id="compare-since"
+            type="date"
+            className="input"
+            value={since}
+            max={new Date().toLocaleDateString('en-CA')}
+            onChange={(e) => setSince(e.target.value)}
+          />
         </div>
         <div className="field">
           <label className="label" htmlFor="compare-to">
@@ -247,15 +300,24 @@ export function BranchesView({
           <input id="compare-to" className="input mono" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
         <Button
-          disabled={from.trim() === '' || to.trim() === ''}
-          onClick={() => setCompared({ from: from.trim(), to: to.trim() })}
+          disabled={(since === '' && from.trim() === '') || to.trim() === ''}
+          onClick={() => setCompared({ from: from.trim(), since, to: to.trim() })}
         >
           {C.compareRun}
         </Button>
       </div>
-      {compared !== undefined && (
-        <Compare projectId={project.id} from={compared.from} to={compared.to} onOpenReview={onOpenReview} />
+      {since !== '' && (
+        <p className={styles.fine}>
+          <Icon name="info" size="sm" />
+          {C.compareSinceHint}
+        </p>
       )}
+      {compared !== undefined &&
+        (compared.since === '' ? (
+          <Compare projectId={project.id} from={compared.from} to={compared.to} onOpenReview={onOpenReview} />
+        ) : (
+          <CompareSince projectId={project.id} since={compared.since} to={compared.to} onOpenReview={onOpenReview} />
+        ))}
     </section>
   );
 }

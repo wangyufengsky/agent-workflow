@@ -200,6 +200,11 @@ export const GIT_COPY = {
   compareFrom: '从',
   compareTo: '到',
   compareRun: '比较',
+  compareSince: '或从日期',
+  compareSinceHint:
+    '按日期比较时，起点是「到」在那天 0 点之前的最后一个提交（只看它自己的第一父提交历史，不算之后才合并进来的旧提交）。',
+  noCommitBefore: (ref: string, day: string) => `${ref} 在 ${day} 之前没有提交。`,
+  sinceStart: (sha: string, subject: string, when: string) => `起点 ${sha}「${subject}」· ${when}`,
   reviewRange: '审查这段差异',
   // 对话框
   cancel: '取消',

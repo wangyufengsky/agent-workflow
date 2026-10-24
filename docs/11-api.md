@@ -229,7 +229,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | --- | --- | --- |
 | GET | `/projects/:id/git/status` | 主工作区：当前分支、提交、上游与 ahead/behind、是否干净、改动文件（porcelain 两字母代码）、未完成的操作 `operation`、提交身份 `identity`、上次获取时间 `fetchedAt` |
 | GET | `/projects/:id/git/branches` | 本地与远端分支（不含 `origin/HEAD` 这类符号引用），标注当前分支与所属任务（`task: { id, key, status }`） |
-| GET | `/projects/:id/git/log?ref&limit&cursor&author&search` | 提交列表 `{ items, nextCursor }`，`cursor` 为已显示的提交数；`author` 按作者姓名或邮箱、`search` 按提交信息筛选（不区分大小写），`search` 是 `ref` 上某个提交的 SHA 前缀时只返回该提交 |
+| GET | `/projects/:id/git/log?ref&limit&cursor&author&search&before` | 提交列表 `{ items, nextCursor }`，`cursor` 为已显示的提交数；`author` 按作者姓名或邮箱、`search` 按提交信息筛选（不区分大小写），`search` 是 `ref` 上某个提交的 SHA 前缀时只返回该提交；`before`（毫秒时间戳）只列 `ref` 自己的第一父提交历史中提交时间早于它的提交（`git log --first-parent --before`），`limit: 1` 即 `ref` 在那一刻所在的提交（按日期比较的起点，27 §4.2，D127）；与 `search` 的 SHA 前缀同用时，该提交也须在这段历史中 |
 | GET | `/projects/:id/git/commits/:sha?parent` | 提交详情（含提交者、包含它的本地分支）+ 相对第 `parent` 个父提交（默认 1）的文件列表（根提交与空树比较） |
 | GET | `/projects/:id/git/diff?from&to` | 任意两个 ref 的文件列表 `DiffDTO` |
 | GET | `/projects/:id/git/diff/file?from&to&path` | 单文件 unified diff（`FileDiffDTO`，超过 `DIFF_FILE_MAX_BYTES` 只返回大小） |

@@ -33,8 +33,8 @@ export function repositoryOperations(repository: RepositoryService, writes: Repo
   return [
     implement(gitStatusOp, ({ id }) => repository.status(id)),
     implement(gitBranchesOp, async ({ id }) => ({ items: await repository.branches(id) })),
-    implement(gitLogOp, ({ id, ref, limit, cursor, author, search }) =>
-      repository.log(id, ref, limit, cursor, { author, search }),
+    implement(gitLogOp, ({ id, ref, limit, cursor, author, search, before }) =>
+      repository.log(id, ref, limit, cursor, { author, search, before }),
     ),
     implement(gitCommitOp, ({ id, sha, parent }) => repository.commit(id, sha, parent)),
     implement(gitDiffOp, ({ id, from, to }) => repository.diff(id, from, to)),

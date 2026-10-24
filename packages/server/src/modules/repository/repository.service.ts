@@ -17,6 +17,7 @@ import {
 } from '@aw/shared';
 import type { Logger } from '../../core/logger.ts';
 import {
+  beforeArgs,
   diffChangeFile,
   diffCommits,
   diffCommitsFile,
@@ -55,7 +56,12 @@ export type RepositoryServiceDeps = {
 const taskRef = (task: Task) => ({ id: task.id, key: task.key, status: task.status });
 
 /** The commit `search` abbreviates, when it is a SHA prefix of a commit reachable from `ref`. */
-async function commitOnRef(repo: string, ref: string, search: string): Promise<GitCommitDTO | undefined> {
+async function commitOnRef(
+  repo: string,
+  ref: string,
+  search: string,
+  before: number | undefined,
+): Promise<GitCommitDTO | undefined> {
   if (!/^[0-9a-f]{4,64}$/i.test(search)) return undefined;
   const sha = await runGit(['rev-parse', '--verify', '--quiet', `${search}^{commit}`], {
     cwd: repo,
@@ -63,8 +69,14 @@ async function commitOnRef(repo: string, ref: string, search: string): Promise<G
   });
   if (sha.exitCode !== 0) return undefined;
   const commit = sha.stdout.trim();
-  const reachable = await runGit(['merge-base', '--is-ancestor', commit, ref], { cwd: repo, okExitCodes: [0, 1] });
-  return reachable.exitCode === 0 ? (await readLog(repo, commit, 1, 0))[0] : undefined;
+  // With a time, only the commits the log itself would list: the ref's first-parent history before it.
+  const reachable =
+    before === undefined
+      ? (await runGit(['merge-base', '--is-ancestor', commit, ref], { cwd: repo, okExitCodes: [0, 1] })).exitCode === 0
+      : (await runGit(['rev-list', ...beforeArgs(before), '--end-of-options', ref, '--'], { cwd: repo })).stdout
+          .split('\n')
+          .includes(commit);
+  return reachable ? (await readLog(repo, commit, 1, 0))[0] : undefined;
 }
 
 /** The Git console (11 §8): what the project repository holds, read with machine formats (06 §2.3). */
@@ -162,7 +174,7 @@ export function createRepositoryService({ projects, tasks, worktrees, locks, log
       await requireObject(repo, `${ref}^{commit}`);
       const skip = cursor === undefined ? 0 : Number(cursor);
       if (filter.search !== undefined && skip === 0) {
-        const bySha = await commitOnRef(repo, ref, filter.search);
+        const bySha = await commitOnRef(repo, ref, filter.search, filter.before);
         if (bySha !== undefined) return { items: [bySha], nextCursor: null };
       }
       const commits = await readLog(repo, ref, limit + 1, skip, filter);

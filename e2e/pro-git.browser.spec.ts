@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -183,6 +184,35 @@ test('J24 合并冲突交给 AI：工作台合并冲突 → 合并任务解决�
   await result.getByRole('button', { name: '合并到 main' }).click();
   await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main', { timeout: TASK_RUN_TIMEOUT_MS });
   expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe(resolved.trim());
+});
+
+test('J24 按日期比较：起点是 main 在那天 0 点之前的最后一个提交，只比较之后的改动', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const commitAt = (date: string, file: string) => {
+    writeFileSync(join(project.repoPath, file), `${file}\n`);
+    git(project.repoPath, 'add', file);
+    execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', 'commit', '-qm', `add ${file}`], {
+      cwd: project.repoPath,
+      env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+    });
+  };
+  commitAt('2026-09-28T10:00:00', 'before.md');
+  commitAt('2026-10-05T10:00:00', 'after.md');
+  const start = git(project.repoPath, 'rev-parse', '--short=7', 'HEAD~1');
+
+  await page.goto(`/git/${project.id}?view=branches`);
+  await page.getByLabel('或从日期').fill('2026-10-01');
+  await expect(page.getByLabel('从', { exact: true })).toBeDisabled();
+  await page.getByLabel('到', { exact: true }).fill('main');
+  await page.getByRole('button', { name: '比较', exact: true }).click();
+  await expect(page.getByText(`起点 ${start}「add before.md」`)).toBeVisible();
+  await expect(page.getByRole('button', { name: '审查这段差异' })).toBeVisible();
+  await expect(page.getByText('after.md').first()).toBeVisible();
+  await expect(page.getByText('before.md', { exact: true })).toHaveCount(0);
+
+  await page.getByLabel('或从日期').fill('2026-09-01');
+  await page.getByRole('button', { name: '比较', exact: true }).click();
+  await expect(page.getByText('main 在 2026-09-01 之前没有提交。')).toBeVisible();
 });
 
 test('主页开始任务：总能看到并选择项目，基于分支只列所选项目的分支，换项目后回到默认分支', async ({

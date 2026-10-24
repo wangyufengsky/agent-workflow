@@ -7,8 +7,14 @@ const LOG_FORMAT = '%H%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%b%x1e';
 /** The committer of one commit (`git show -s`). */
 const COMMITTER_FORMAT = '%cn%x00%ce%x00%ct';
 
-/** Which commits a log shows besides the ref: the author (name or email) and text in the message. */
-export type LogFilter = { author?: string | undefined; search?: string | undefined };
+/**
+ * Which commits a log shows besides the ref: the author (name or email), text in the message, and the ref's
+ * first-parent history committed before a time (ms).
+ */
+export type LogFilter = { author?: string | undefined; search?: string | undefined; before?: number | undefined };
+
+/** The revision options that keep to a ref's own (first-parent) history committed before `before` (ms). */
+export const beforeArgs = (before: number) => ['--first-parent', `--before=@${Math.floor(before / 1000)}`];
 
 /** `git log --format=<LOG_FORMAT>`; git puts a newline between commits. */
 export function parseLog(output: string): GitCommitDTO[] {
@@ -60,6 +66,7 @@ export async function readLog(
       `--max-count=${limit}`,
       `--skip=${skip}`,
       ...(filters.length === 0 ? [] : ['--fixed-strings', '--regexp-ignore-case', ...filters]),
+      ...(filter.before === undefined ? [] : beforeArgs(filter.before)),
       '--end-of-options',
       ref,
       '--',
