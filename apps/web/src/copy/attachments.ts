@@ -1,4 +1,5 @@
 import { ATTACHMENTS_PER_INPUT_MAX } from '@aw/shared';
+import { formatBytes } from './common.ts';
 
 /** The attachment bar and its dialogs (30 §2). */
 export const ATTACHMENTS_COPY = {
@@ -15,12 +16,7 @@ export const ATTACHMENTS_COPY = {
   tooMany: `每次最多附加 ${ATTACHMENTS_PER_INPUT_MAX} 个资料。`,
   notReady: '有资料还在上传或上传失败，处理好再发送。',
   removeFailed: '资料已从输入里移除，但后台没删掉；它会在 24 小时后自动清理。',
-  size: (bytes: number) =>
-    bytes < 1024
-      ? `${bytes} B`
-      : bytes < 1024 * 1024
-        ? `${Math.round(bytes / 1024)} KB`
-        : `${(bytes / 1024 / 1024).toFixed(1)} MB`,
+  size: formatBytes,
   fromProject: (path: string) => `项目文件 ${path}`,
   fromUpload: '上传的文件',
   loading: '正在读取…',

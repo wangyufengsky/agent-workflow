@@ -215,6 +215,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const projects = createProjectsModule({
     db: database.db,
     clock,
+    locks,
     credentials: credentials.service,
     databases: databases.service,
     hosting: deps.hosting ?? PUBLIC_HOSTING,
