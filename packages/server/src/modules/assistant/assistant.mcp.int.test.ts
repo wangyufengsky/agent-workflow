@@ -240,6 +240,60 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     expect(res.body.result).toMatchObject({ ok: true, output: { attachments: [{ id: own.id, name: 'own.md' }] } });
   });
 
+  it('「拆成需求计划」：只能转交本对话里的附件；确认后需求计划已创建，消息流出现指向它的 entity_ref（34 §10）', async () => {
+    const { project } = await addProject(t, { checkCommand: null });
+    const upload = async (name: string) =>
+      (
+        await t.request({
+          method: 'POST',
+          url: '/attachments',
+          headers: { 'content-type': 'application/octet-stream', [ATTACHMENT_NAME_HEADER]: name },
+          payload: `${name}\n`,
+        })
+      ).json<AttachmentDTO>();
+    const [own, elsewhere] = [await upload('需求.md'), await upload('elsewhere.md')];
+    const idle = becomesIdle();
+    await t.call(sendAssistantMessageOp, {
+      id: conversationId,
+      text: '把这份文档拆成需求计划',
+      context: { page: 'home', params: {} },
+      attachmentIds: [own.id],
+    });
+    await idle;
+    // A template with「先让我看看」: the draft waits for the user and nothing runs.
+    const initiative = {
+      projectId: project.id,
+      templateKey: 'tests_then_refactor',
+      review: true,
+      requirement: '整理订单模块\n先补测试再重构。',
+    };
+
+    const refused = await call('initiatives_create', { ...initiative, attachmentIds: [elsewhere.id] });
+    expect(refused).toMatchObject({ isError: true, body: { code: ErrorCode.AttachmentNotFound } });
+    expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toEqual([]);
+
+    const { body } = await call('initiatives_create', { ...initiative, attachmentIds: [own.id] });
+    expect(body).toMatchObject({ status: 'needs_confirmation' });
+    const [card] = (await t.call(listConfirmationsOp, { id: conversationId })).body.items;
+    expect(card).toMatchObject({ operationId: 'initiatives.create', risk: 'write', status: 'pending' });
+    const res = await decide(String(body.confirmation_id), 'confirm');
+    const output = res.body.result?.ok === true ? res.body.result.output : undefined;
+    expect(output).toMatchObject({
+      key: 'I-1',
+      title: '整理订单模块',
+      status: 'draft_ready',
+      attachments: [{ id: own.id, name: '需求.md' }],
+    });
+    expect(await entityRefs()).toEqual([
+      { kind: 'initiative', id: (output as { id: string }).id, title: 'I-1 · 整理订单模块' },
+    ]);
+
+    const navigated = waitForEvent(t.app.events, ServerEventType.AssistantNavigate);
+    const page = { page: 'initiative', params: { initiativeId: (output as { id: string }).id } };
+    expect((await call(AssistantToolName.OpenPage, page)).body).toEqual({ opened: true });
+    expect(await navigated).toEqual({ conversationId, target: page });
+  });
+
   it('确认后执行「批量任务」：批次与子任务已创建，消息流出现指向该批次的 entity_ref（20 §8）', async () => {
     const { project } = await addProject(t, { checkCommand: null });
     const { body } = await call('batches_create', {

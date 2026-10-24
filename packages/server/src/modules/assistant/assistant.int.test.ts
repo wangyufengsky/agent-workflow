@@ -5,6 +5,7 @@ import {
   type AssistantPageRef,
   abortAssistantOp,
   createConversationOp,
+  createInitiativeOp,
   deleteConversationOp,
   ErrorCode,
   getConversationOp,
@@ -106,6 +107,21 @@ describe('助手对话（A-02、A-03）', () => {
     });
     expect(t.fake.prompts[0]?.system).toContain(
       `the team page of member zs@corp.com in project "${project.name}" (project id ${project.id}`,
+    );
+  });
+
+  it('用户在需求计划页时，system 写明需求计划、状态与阶段（34 §10）', async () => {
+    const { project } = await addProject(t, { checkCommand: null });
+    const { body: initiative } = await t.call(createInitiativeOp, {
+      projectId: project.id,
+      templateKey: 'tests_then_refactor',
+      review: true,
+      requirement: '整理订单模块',
+    });
+    const c = await newConversation();
+    await say(c.id, '这个计划拆得怎么样？', { page: 'initiative', params: { initiativeId: initiative.id } });
+    expect(t.fake.prompts[0]?.system).toContain(
+      `the page of initiative I-1 "整理订单模块" (initiative id ${initiative.id}, status draft_ready, project "${project.name}"`,
     );
   });
 

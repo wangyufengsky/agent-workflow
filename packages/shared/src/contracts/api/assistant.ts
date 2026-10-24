@@ -77,6 +77,7 @@ export const assistantPageRefSchema = z
         slideId: z.string().min(1).optional(),
         batchId: z.string().min(1).optional(),
         scheduleId: z.string().min(1).optional(),
+        initiativeId: z.string().min(1).optional(),
         /** On a team member's page: the member's main email. */
         teamMember: z.string().min(1).optional(),
       })
