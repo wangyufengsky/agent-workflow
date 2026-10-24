@@ -38,7 +38,7 @@ export function HBarChart({
     <figure className={styles.chart} aria-label={label}>
       <figcaption className={styles.readout} aria-live="polite">
         {active !== null ? (
-          readout(active)
+          <span className={styles.value}>{readout(active)}</span>
         ) : series.length > 1 ? (
           <span className={styles.legend}>
             {series.map((s) => (
