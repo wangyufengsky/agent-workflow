@@ -171,4 +171,30 @@ describe('@live 内置流程全集', () => {
     },
     TASK_TIMEOUT_MS,
   );
+
+  it(
+    'breakdown：把多项需求拆成分阶段的工作包，只写一份拆解文档',
+    async () => {
+      const task = await live.runTask(
+        'breakdown',
+        'ts-stats',
+        [
+          '统计库二期需求：',
+          '1. 新增 percentile(values, p)：最近秩法，p 取 0–100，越界时抛错。',
+          '2. 新增 mode(values)：返回出现次数最多的值，次数相同时返回较小的值。',
+          '3. 新增 variance(values) 与 stddev(values)：总体方差与标准差。',
+          '4. 新增 summarize(values)：一次返回 average、median、stddev、最小值与最大值。',
+          '5. 所有函数对空数组抛出同一个错误类型 EmptyInputError，现有的 average 与 median 也改成这样。',
+        ].join('\n'),
+      );
+      expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
+      expect(task.result?.checks.every((c) => c.passed)).toBe(true);
+      const docs = task.result?.files.filter((f) => f.path.endsWith('.md')) ?? [];
+      expect(docs).toHaveLength(1);
+      expect(task.result?.files.some((f) => f.path.endsWith('.ts'))).toBe(false);
+      const doc = await readFile(join(task.git.worktreePath ?? '', docs[0]?.path ?? ''), 'utf8');
+      for (const name of ['percentile', 'mode', 'stddev', 'summarize', 'EmptyInputError']) expect(doc).toContain(name);
+    },
+    TASK_TIMEOUT_MS,
+  );
 });

@@ -12,6 +12,7 @@ const WORKFLOW_ICON: Readonly<Record<string, IconName>> = {
   cleanup: 'trash',
   design_proposal: 'map',
   detailed_design: 'book',
+  breakdown: 'split',
 };
 
 export const workflowIcon = (key: string): IconName => WORKFLOW_ICON[key] ?? 'flow';
