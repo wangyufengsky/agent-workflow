@@ -89,6 +89,9 @@ export function validateInitiativeDraft(draft: InitiativeDraft, rules: Initiativ
   return problems;
 }
 
-/** A template's work packages for one requirement: every placeholder replaced by it (34 §15.2). */
+/**
+ * A template's work packages for one requirement: every placeholder replaced by it (34 §15.2), literally — a
+ * replacement string would read `$&` and the like in the user's text as patterns.
+ */
 export const renderTemplateRequirement = (requirement: string, userRequirement: string): string =>
-  requirement.replaceAll(INITIATIVE_TEMPLATE_PLACEHOLDER, userRequirement);
+  requirement.replaceAll(INITIATIVE_TEMPLATE_PLACEHOLDER, () => userRequirement);

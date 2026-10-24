@@ -174,15 +174,21 @@ export function createInitiativesRepo(db: DbExecutor) {
         .run();
     },
     /**
-     * Gives the work package its new task unless another start got there first: the current task must still be the
-     * one this start read (34 §14).
+     * Gives the work package its new task unless something changed while the start was preparing: another start
+     * linked a task first (the current task must still be the one this start read), or the user dropped it (34 §14).
      */
     claimItem(id: string, expectedTaskId: string | null, taskId: string, now: number): boolean {
       return (
         db
           .update(it)
           .set({ taskId, startError: null, mergeConfirmedAt: null, updatedAt: now })
-          .where(and(eq(it.id, id), expectedTaskId === null ? isNull(it.taskId) : eq(it.taskId, expectedTaskId)))
+          .where(
+            and(
+              eq(it.id, id),
+              isNull(it.droppedAt),
+              expectedTaskId === null ? isNull(it.taskId) : eq(it.taskId, expectedTaskId),
+            ),
+          )
           .run().changes === 1
       );
     },

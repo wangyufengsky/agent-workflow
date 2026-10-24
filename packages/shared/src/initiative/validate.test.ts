@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type InitiativeDraft, initiativeDraftSchema } from '../contracts/api/initiatives.ts';
-import { validateInitiativeDraft } from './validate.ts';
+import { renderTemplateRequirement, validateInitiativeDraft } from './validate.ts';
 
 const draft = (input: unknown): InitiativeDraft => initiativeDraftSchema.parse(input);
 const known = new Set(['design_proposal', 'feature', 'code_review']);
@@ -51,5 +51,13 @@ describe('阶段与工作包的校验（34 §8.3）', () => {
       items: [{ ...item('a', 1), requirement: '{{requirement}}' }],
     });
     expect(codes(withPlaceholder, true)).toEqual([]);
+  });
+});
+
+describe('模板的需求替换（34 §15.2）', () => {
+  it('用户需求原样插入，其中的 $& 等不被当作替换符号', () => {
+    expect(renderTemplateRequirement('需求：{{requirement}}；再说一遍：{{requirement}}', '支持 $& 与 $$ 和 $`')).toBe(
+      '需求：支持 $& 与 $$ 和 $`；再说一遍：支持 $& 与 $$ 和 $`',
+    );
   });
 });

@@ -112,8 +112,9 @@ export function createInitiativesService({
     const taskIds = items.flatMap((item) => (item.taskId === null ? [] : [item.taskId]));
     const summaries = new Map(tasks.summariesOf(taskIds).map((t) => [t.id, t]));
     const facts = items.map((item) => {
-      const workflow = workflowOf(item.workflowKey);
       const task = item.taskId === null ? null : (summaries.get(item.taskId) ?? null);
+      // A started one runs the version its task pinned, which stays even when the workflow is deleted later.
+      const workflow = task === null ? workflowOf(item.workflowKey) : workflows.get(task.workflow.id);
       const lastDelivery = item.taskId === null ? null : tasks.lastDelivery(item.taskId);
       const itemFacts = {
         droppedAt: item.droppedAt,
@@ -273,9 +274,9 @@ export function createInitiativesService({
         ...(initiative.confirmItemPlans ? { checkpoints: { confirm_plan: true } } : {}),
       });
       if (!repo.claimItem(item.id, item.taskId, created, clock.now())) {
-        // Rolls the task back: another start took the work package meanwhile.
-        throw new AppError(ErrorCode.InitiativeItemNotReady, `Work package ${item.key} started meanwhile`, {
-          status: InitiativeItemStatus.InTask,
+        // Rolls the task back: another start took the work package, or the user dropped it, meanwhile.
+        throw new AppError(ErrorCode.InitiativeItemNotReady, `Work package ${item.key} changed meanwhile`, {
+          status: item.dto.status,
         });
       }
       return created;

@@ -3,7 +3,9 @@ import {
   type CreateInitiativeRequest,
   confirmInitiativeOp,
   createInitiativeOp,
+  createWorkflowOp,
   deleteProjectOp,
+  deleteWorkflowOp,
   deliverTaskOp,
   ErrorCode,
   getInitiativeOp,
@@ -19,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
-import { addProject, taskReaches } from '../../../test/helpers/tasks.ts';
+import { addProject, taskReaches, workflowId } from '../../../test/helpers/tasks.ts';
 
 let t: TestApp;
 beforeEach(async () => {
@@ -206,6 +208,38 @@ describe('阶段与解锁（34 §5.3–§5.4，D134）', () => {
     const head = (await repo.git('rev-parse', 'main')).trim();
     expect(text).toContain(`合入提交：${head}（main）`);
     expect(text).toContain('a/a.test.ts');
+  });
+
+  it('报告用的自定义流程在报告完成后被删除，工作包仍算完成（按任务的流程版本判断）', async () => {
+    const { project } = await addProject(t, { checkCommand: null });
+    const copy = await t.call(createWorkflowOp, {
+      copyFrom: await workflowId(t, 'code_review'),
+      key: 'my_review',
+      name: '我的审查',
+    });
+    expect(copy.status).toBe(201);
+    const created = await create({
+      projectId: project.id,
+      templateKey: 'design_then_build',
+      requirement: '审查',
+      review: true,
+    });
+    await t.call(saveInitiativeDraftOp, {
+      id: created.id,
+      phases: [{ title: '一' }],
+      items: [{ key: 'review', title: '审查', phase: 1, workflow: 'my_review', requirement: '审查 a/' }],
+    });
+    t.fake.enqueue(script().callTool('submit_result', { summary: 'No issues' }), { title: 'T-1 · 代码审查' });
+    const reviewed = taskReaches(t, 'review');
+    const confirmed = (await t.call(confirmInitiativeOp, { id: created.id })).body;
+    await reviewed;
+    await t.fake.settled();
+    await t.call(deliverTaskOp, { id: confirmed.items[0]?.task?.id ?? '', strategy: 'report_only' });
+
+    expect((await t.call(deleteWorkflowOp, { key: 'my_review' })).status).toBe(204);
+
+    const after = await detail(created.id);
+    expect(after).toMatchObject({ status: 'done', items: [{ status: 'satisfied', deliverable: 'report' }] });
   });
 
   it('删除项目时需求计划随之删除，资料附件的引用一起释放', async () => {
