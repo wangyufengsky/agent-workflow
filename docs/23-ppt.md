@@ -60,7 +60,7 @@
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │ 这份 PPT 讲什么？给谁看、想达到什么效果……                    │  │
 │  └──────────────────────────────────────────────────────────┘  │
-│  资料   [＋ 项目代码] [＋ 任务结果] [＋ 知识问答] [＋ 文字或文件]   │
+│  资料   [＋ 项目代码] [＋ 任务结果] [＋ 知识问答] [＋ 文字或文件] [＋ 网页] │
 │         📁 订单服务（读取代码）  ✕                                 │
 │         ✅ T-12 退款单分页查询与导出（任务结果）  ✕                  │
 │  页数   ◉ 让 AI 决定  ○ [ 8 ] 页                                  │
@@ -75,7 +75,8 @@
   - **任务结果**：选项目下的任务（已有结果的：待合并 / 已完成），快照其需求、结果摘要、假设与改动文件列表。选了任务即同时关联其项目。
   - **知识问答**：选一个知识对话，快照其每一轮的问题、回答与引用（文件路径与行号、被引用的原文）。同样关联其项目。
   - **文字或文件**：粘贴文字，或选择文本文件（`.md` `.txt` `.csv` `.json` 与常见代码文件；按 UTF-8 读取，不解析 PDF / Word，D95）。文件在界面里读成文字后提交，后端不接收文件上传。
-  - 资料都在**创建时快照**进 PPT（§3），之后任务或对话变化不影响这份 PPT。资料总字数超过 `DECK_MATERIALS_MAX_CHARS` 时不能提交，并提示去掉哪一项。
+  - **网页**（v1.3，29 §2.8）：输入 http(s) 地址。点「生成大纲」时应用用网站会话只读打开（与助手读网页 `browser.readUrl` 相同：按设置里的网站规则一律只读、沿用「网站登录」的登录状态、30 秒期限），快照标题、最终地址与页面正文。不允许的地址、要登录、打不开时创建失败并显示对应错误，不建 PPT。不关联项目。
+  - 资料都在**创建时快照**进 PPT（§3），之后任务、对话或网页变化不影响这份 PPT。资料总字数超过 `DECK_MATERIALS_MAX_CHARS` 时不能提交，并提示去掉哪一项。
 - **页数**：默认「让 AI 决定」（AI 在 `DECK_AUTO_SLIDES_MIN`–`DECK_AUTO_SLIDES_MAX` 页之间选），或指定 1–`DECK_MAX_SLIDES` 页。
 - **风格**：四套主题（与应用主题同名、同色系，§5.2），默认当前应用主题；之后随时可换，不需要重新生成。
 - **模型**：与知识问答相同的模型选择（D67 ④），默认 `ai.defaultModel`。
@@ -175,9 +176,9 @@
 | id | TEXT PK | |
 | deck_id | TEXT → decks，CASCADE | |
 | seq | INTEGER | |
-| kind | TEXT | `DeckMaterialKind`：`text` `file` `task` `knowledge` |
-| ref_id | TEXT NULL | 任务 / 知识对话 id（只用于界面跳转；不设外键，原对象删除后快照仍在） |
-| title | TEXT | 文件名、任务「编号 · 标题」、对话标题；粘贴的文字为「粘贴的文字」 |
+| kind | TEXT | `DeckMaterialKind`：`text` `file` `task` `knowledge` `web` |
+| ref_id | TEXT NULL | 任务 / 知识对话 id（只用于界面跳转；不设外键，原对象删除后快照仍在）；网页为读到的最终地址 |
+| title | TEXT | 文件名、任务「编号 · 标题」、对话标题、网页标题（没有标题时为地址）；粘贴的文字为「粘贴的文字」 |
 | content | TEXT | 快照正文（Markdown），创建时写入，之后不变 |
 
 项目代码不是一行资料，而是 `decks.project_id`。
@@ -356,7 +357,7 @@ AI 提交、应用保存与渲染的都是 `SlideContent`（`shared/contracts/de
 | --- | --- | --- | --- |
 | `decks.list` | `GET /decks?projectId&query&limit&cursor` | read | 列表（`DeckSummaryDTO`），按 `updated_at` 倒序，游标分页 |
 | `decks.get` | `GET /decks/:id` | read | 详情：要求、资料（标题与类型，不含正文）、理解、全部页、显示状态、最近的工作 |
-| `decks.create` | `POST /decks` `{ brief, projectId?, materials, slideCount?, theme?, model? }` | write | 创建并开始出大纲（201）；`produces: deck`。`materials` 为 `{ kind: text, title?, content }` / `{ kind: file, title, content }` / `{ kind: task, taskId }` / `{ kind: knowledge, conversationId }`，后两者由后端生成快照；任务或对话所属项目与 `projectId` 不一致 → `VALIDATION_FAILED` |
+| `decks.create` | `POST /decks` `{ brief, projectId?, materials, slideCount?, theme?, model? }` | write | 创建并开始出大纲（201）；`produces: deck`。`materials` 为 `{ kind: text, title?, content }` / `{ kind: file, title, content }` / `{ kind: task, taskId }` / `{ kind: knowledge, conversationId }` / `{ kind: web, url }`，后三者由后端生成快照（网页按网站规则只读读取，错误同 `browser.readUrl`）；任务或对话所属项目与 `projectId` 不一致 → `VALIDATION_FAILED` |
 | `decks.update` | `PATCH /decks/:id` `{ title?, theme? }` | write | 改名、换主题（不调用 AI） |
 | `decks.reviseOutline` | `POST /decks/:id/outline/revise` `{ instruction, model? }` | write | 按意见重写大纲；已确认大纲后 → `STATE_TRANSITION_INVALID` |
 | `decks.updateOutline` | `PUT /decks/:id/outline` `{ slides: [{ id?, layout, title, points }] }` | write | 保存手改的大纲（整体替换；有 id 的保留，没有的新建）；已确认后 → `STATE_TRANSITION_INVALID` |
@@ -438,7 +439,7 @@ packages/shared/src/
 packages/server/src/modules/decks/
 ├─ decks.table.ts / .repo.ts           四张表
 ├─ decks.service.ts                    创建、大纲、制作、修改、页操作、停止、删除；尝试结束的反应
-├─ decks.materials.ts                  任务与知识对话的快照
+├─ decks.materials.ts                  任务、知识对话与网页的快照
 ├─ decks.prompts.ts                    给写作者的版式说明、大纲与页面
 ├─ decks.operations.ts / index.ts
 packages/server/src/modules/mcp/tools/submit-outline.tool.ts、submit-slide.tool.ts
@@ -472,7 +473,7 @@ apps/desktop/src/main/export.ts        exportPdf（隐藏窗口 + printToPDF）�
 | 层 | 覆盖 |
 | --- | --- |
 | 单元 | `SlideContent` 校验（每种版式的条数与字数边界、问题列表的路径与 hint）、`deckStatusOf`（每个状态）、调色板对比度、`toPptxSlide`：生成的 .pptx 用 jszip 读回，页数、每页文字与讲稿正确（测输出不测调用）、配置快照（`aw-slides` 权限）、溢出检查的缩放逻辑 |
-| 集成 | `decks.int.test.ts`（FakeOpencode）：创建 → 会话目录 / agent / 只读规则正确、首条消息含资料快照 → `submit_outline` 通过后大纲与理解写入、页数不符被拒且有 hint → 改大纲 → 生成 → 逐页 `submit_slide`（非目标页、字数超限被拒，修正后通过）→ `ready`；按意见重写大纲沿用同一会话；修改一页写 `previous`、恢复上一版；停止 → `incomplete` → 继续制作只做剩下的页；制作中改内容 `DECK_BUSY`；未提交 → 提醒 → 失败；删除 PPT 清理尝试与会话流；删除项目后 `project` 置空；没有项目时会话目录为空白目录；任务结果快照的内容；PPT 尝试不能调用 `submit_result` / `ask_user` |
+| 集成 | `decks.int.test.ts`（FakeOpencode）：创建 → 会话目录 / agent / 只读规则正确、首条消息含资料快照 → `submit_outline` 通过后大纲与理解写入、页数不符被拒且有 hint → 改大纲 → 生成 → 逐页 `submit_slide`（非目标页、字数超限被拒，修正后通过）→ `ready`；按意见重写大纲沿用同一会话；修改一页写 `previous`、恢复上一版；停止 → `incomplete` → 继续制作只做剩下的页；制作中改内容 `DECK_BUSY`；未提交 → 提醒 → 失败；删除 PPT 清理尝试与会话流；删除项目后 `project` 置空；没有项目时会话目录为空白目录；任务结果快照的内容；PPT 尝试不能调用 `submit_result` / `ask_user`。`decks.web.int.test.ts`（真实 Chromium + 本地网页）：网页资料按只读读取一次、正文快照写入首条消息；不允许的地址 `BROWSER_SITE_NOT_ALLOWED`、要登录 `BROWSER_LOGIN_REQUIRED`，不建 PPT |
 | 集成（助手） | `decks_create` 需确认，确认后出现 `deck` 导航卡片；`decks_delete` 为 critical |
 | `@opencode` | 注入后 `aw-slides` 在 opencode 配置中可见（`pnpm test:oc`） |
 | E2E | **J20**（FakeOpencode，`ppt.browser.spec.ts`）：项目页「做成 PPT」→ 新建页预选项目 → 加一段文字、指定 3 页 → 生成大纲 → 改一页、删一页、加一页 → 确认制作 → 逐页出现 → 选中第 2 页手动改要点、预览同步 → 让 AI 改本页 → 恢复上一版 → 换主题（页面底色即时变化）→ 导出 PowerPoint（下载的 .pptx 有 3 张幻灯片与备注页）→ 放映翻页与 `Esc`；打印视图每页一张。J9 走查加入列表、新建、大纲、预览与全部版式的打印视图（四套应用主题、axe 对比度；预览的 PPT 用深色调色板） |

@@ -27,6 +27,8 @@ export type MaterialSnapshot = {
 export type MaterialSources = {
   task(id: string): TaskDetailDTO;
   knowledge(id: string): KnowledgeConversationDTO;
+  /** Reads the page with the website session, read only (`browser.readUrl`). */
+  web(url: string): Promise<{ url: string; title: string; page: string }>;
 };
 
 /** The task's result for the AI: requirement, summary, assumptions and the files it changed (not the diff itself). */
@@ -84,7 +86,12 @@ function knowledgeSnapshot(conversation: KnowledgeConversationDTO): string {
   return [`# Knowledge Q&A · ${conversation.title}`, `Project: ${conversation.project.name}`, ...sections].join('\n\n');
 }
 
-function snapshotOf(input: DeckMaterialInput, sources: MaterialSources): MaterialSnapshot {
+/** The page's text as read once; the snapshot's own header line gives way to the title and final address. */
+function webSnapshot(page: { url: string; title: string; page: string }): string {
+  return [`# Web page · ${page.title}`, `URL: ${page.url}`, page.page.slice(page.page.indexOf('\n') + 1)].join('\n\n');
+}
+
+async function snapshotOf(input: DeckMaterialInput, sources: MaterialSources): Promise<MaterialSnapshot> {
   switch (input.kind) {
     case DeckMaterialKind.Text:
       return {
@@ -116,12 +123,30 @@ function snapshotOf(input: DeckMaterialInput, sources: MaterialSources): Materia
         content: knowledgeSnapshot(conversation),
       };
     }
+    case DeckMaterialKind.Web: {
+      const page = await sources.web(input.url);
+      return {
+        kind: input.kind,
+        refId: page.url,
+        title: page.title === '' ? page.url : page.title,
+        projectId: null,
+        content: webSnapshot(page),
+      };
+    }
   }
 }
 
-/** Reads the material given to `decks.create` into snapshots; tasks and conversations must exist and have results. */
-export function snapshotMaterials(inputs: readonly DeckMaterialInput[], sources: MaterialSources): MaterialSnapshot[] {
-  return inputs.map((input) => snapshotOf(input, sources));
+/**
+ * Reads the material given to `decks.create` into snapshots; tasks and conversations must exist and have results, web
+ * pages must be allowed by the website rules and not ask to log in. Pages are read one after another.
+ */
+export async function snapshotMaterials(
+  inputs: readonly DeckMaterialInput[],
+  sources: MaterialSources,
+): Promise<MaterialSnapshot[]> {
+  const snapshots: MaterialSnapshot[] = [];
+  for (const input of inputs) snapshots.push(await snapshotOf(input, sources));
+  return snapshots;
 }
 
 /** The materials as one block of the first message; each is fenced so the AI tells data from instructions. */

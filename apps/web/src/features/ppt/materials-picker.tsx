@@ -21,13 +21,14 @@ const WITH_RESULT: readonly string[] = [TaskDisplayGroup.Review, TaskDisplayGrou
 const TEXT_FILES =
   '.md,.markdown,.txt,.csv,.json,.yaml,.yml,.xml,.html,.ts,.tsx,.js,.jsx,.java,.kt,.go,.py,.rs,.sql,.sh';
 
-type Adding = 'task' | 'knowledge' | 'text' | null;
+type Adding = 'task' | 'knowledge' | 'text' | 'web' | null;
 
 const KIND_ICON: Record<DeckMaterialKind, IconName> = {
   [DeckMaterialKind.Text]: 'file',
   [DeckMaterialKind.File]: 'file',
   [DeckMaterialKind.Task]: 'list',
   [DeckMaterialKind.Knowledge]: 'book',
+  [DeckMaterialKind.Web]: 'external',
 };
 
 /** The material's name: a task or conversation is looked up for its title. */
@@ -49,6 +50,8 @@ function MaterialTitle({ material }: { material: DeckMaterialInput }) {
       return <>{task.data === undefined ? '…' : `${task.data.key} · ${task.data.title}`}</>;
     case DeckMaterialKind.Knowledge:
       return <>{conversation.data?.title ?? '…'}</>;
+    case DeckMaterialKind.Web:
+      return <>{material.url}</>;
   }
 }
 
@@ -130,9 +133,45 @@ function TextAdder({ onAdd, onCancel }: { onAdd(material: DeckMaterialInput): vo
   );
 }
 
+/** A web page's address; the backend reads it when the PPT is created (29 §2.8). */
+function WebAdder({ onAdd, onCancel }: { onAdd(material: DeckMaterialInput): void; onCancel(): void }) {
+  const [url, setUrl] = useState('');
+  const valid = /^https?:\/\/\S+$/i.test(url.trim());
+  // Inside the page's form: Enter adds the page instead of submitting the PPT.
+  const submit = () => {
+    if (valid) onAdd({ kind: DeckMaterialKind.Web, url: url.trim() });
+  };
+  return (
+    <div className={styles.adder}>
+      <input
+        className="input"
+        type="url"
+        aria-label={C.webAddress}
+        placeholder={C.webPlaceholder}
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          submit();
+        }}
+      />
+      <div className="row">
+        <span className="hint grow">{C.webHint}</span>
+        <Button size="sm" variant="ghost" onClick={onCancel}>
+          {C.cancel}
+        </Button>
+        <Button size="sm" variant="primary" disabled={!valid} onClick={submit}>
+          {C.add}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The PPT's material (23 §2.3): a project whose code the AI may read, task results, knowledge conversations of that
- * project, pasted text and text files. Material from a project fixes the project.
+ * project, pasted text, text files and web pages. Material from a project fixes the project.
  */
 export function MaterialsPicker({
   projects,
@@ -183,6 +222,9 @@ export function MaterialsPicker({
         <Button size="sm" icon="file" onClick={() => toggle('text')}>
           {C.addText}
         </Button>
+        <Button size="sm" icon="external" onClick={() => toggle('web')}>
+          {C.addWeb}
+        </Button>
       </div>
       {adding === 'task' && projectId !== null && (
         <TaskPicker projectId={projectId} onPick={(taskId) => add({ kind: DeckMaterialKind.Task, taskId })} />
@@ -194,6 +236,7 @@ export function MaterialsPicker({
         />
       )}
       {adding === 'text' && <TextAdder onAdd={add} onCancel={() => setAdding(null)} />}
+      {adding === 'web' && <WebAdder onAdd={add} onCancel={() => setAdding(null)} />}
       {(projectId !== null || materials.length > 0) && (
         <ul className={styles.materials} aria-label={C.materials}>
           {projectId !== null && (

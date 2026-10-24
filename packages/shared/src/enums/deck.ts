@@ -28,6 +28,8 @@ export const DeckMaterialKind = {
   File: 'file',
   Task: 'task',
   Knowledge: 'knowledge',
+  /** A web page read once through the website rules (29 §2.8); its text is kept, never re-read. */
+  Web: 'web',
 } as const;
 export type DeckMaterialKind = (typeof DeckMaterialKind)[keyof typeof DeckMaterialKind];
 export const deckMaterialKindSchema = z.enum(DeckMaterialKind);

@@ -174,7 +174,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | --- | --- | --- |
 | `DeckStatus` | `outlining` · `outline_ready` · `failed` · `generating` · `incomplete` · `ready` | PPT 的显示状态，由页面与最近一次 AI 工作的尝试状态推导（`deckStatusOf`，`shared/deck/status.ts`，23 §4.3），不存储 |
 | `DeckRunKind` | `outline` · `slides` | 一次 AI 工作做什么，由其尝试的 kind 推导（`deckRunKindOf`） |
-| `DeckMaterialKind` | `text` · `file` · `task` · `knowledge` | 创建时快照的资料（23 §2.3） |
+| `DeckMaterialKind` | `text` · `file` · `task` · `knowledge` · `web` | 创建时快照的资料（23 §2.3）；`web` 为按网站规则只读读取一次的网页（29 §2.8） |
 | `SlideLayout` | `cover` · `section` · `bullets` · `two_column` · `cards` · `steps` · `stats` · `table` · `code` · `quote` | 内置版式（23 §5.1，D93）；每种版式的字段与字数上限为 `slideContentSchema`（`shared/contracts/deck/slide.ts`） |
 
 `ServerEventType` 另有 `deck.updated`（11 §11）。
