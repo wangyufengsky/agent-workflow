@@ -1,14 +1,20 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { devPorts } from '@aw/shared';
 import { defineConfig } from '@playwright/test';
 import { E2E_TOKEN } from './e2e/env.ts';
+import { redirectTmpdir } from './packages/server/test/helpers/temp.ts';
 
 // Performance measurements (M6-02, `pnpm perf`): the production build of the renderer, served by a development
 // backend whose AI sessions FakeOpencode plays, so the numbers reflect what ships while the data stays scripted.
-// Workers load this file again and inherit the runner's environment: the directory is chosen once.
-process.env.AW_PERF_HOME ??= mkdtempSync(join(tmpdir(), 'aw-perf-home-'));
+// Workers load this file again and inherit the runner's environment: the directory is chosen once, by the runner,
+// which removes it when it exits (after stopping the backend). It is the run's temporary directory too, so the specs'
+// repositories go with it.
+if (process.env.AW_PERF_HOME === undefined) {
+  const temp = redirectTmpdir('aw-perf-home-');
+  process.env.AW_PERF_HOME = temp.dir;
+  process.on('exit', () => rmSync(temp.dir, { recursive: true }));
+}
 const home = process.env.AW_PERF_HOME;
 const webDir = join(home, 'web');
 process.env.AW_PERF_DATA_DIR = join(home, 'data');

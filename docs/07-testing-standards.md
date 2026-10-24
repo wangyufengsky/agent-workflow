@@ -115,6 +115,7 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 测试名描述行为：`it('拒绝包含环的计划并返回 CYCLE')`，中文英文均可，同一文件保持一致。
 - 结构 Arrange / Act / Assert，一个测试验证一个行为；可以有多个相关断言。
 - 测试之间不共享可变状态；每个集成测试用独立临时目录与数据库。
+- 临时目录照常用 `mkdtemp(join(tmpdir(), 'aw-…'))` 创建，不在测试里各自删除：Vitest 各层的 setup（`packages/server/test/setup/temp-dir.ts`）把每个测试文件的 `os.tmpdir()`（TMPDIR，Windows 上 TEMP / TMP）指向属于该文件的一个目录，文件自己的 `afterAll` 关掉后端与进程之后整个删除；这些目录都在本次运行的一个目录里（全局 setup `temp-root.ts`），运行结束时删除，加载失败、没有运行钩子的文件留下的目录随之删除；E2E 的全局启动（`e2e/global-setup.ts`）同样把整次运行的临时目录（后端的 HOME、spec 的仓库与 Electron 配置目录、它们启动的进程的）放进一个目录，后端退出后删除；`pnpm perf` 的目录（同时是它的临时目录）在运行器退出时删除。失败的运行同样删除，排查靠 trace（§1）与日志。
 - 断言具体值，不用「不为空」「被调用过」这类弱断言代替。
 - 错误断言断言错误码：`await expect(p).rejects.toMatchObject({ code: ErrorCode.PlanInvalid })`。
 - 测试代码同样遵守 06 规范（除允许 `as` 构造数据）。

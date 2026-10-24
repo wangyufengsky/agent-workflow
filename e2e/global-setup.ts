@@ -1,9 +1,10 @@
 import { execSync, fork } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { DEV_PORT_ENV, devPorts } from '@aw/shared';
+import { redirectTmpdir } from '../packages/server/test/helpers/temp.ts';
 import { E2E_HOSTING, E2E_TOKEN } from './env.ts';
 
 /**
@@ -20,6 +21,10 @@ function playwrightBrowsers(): string {
 }
 
 export default async function globalSetup(): Promise<() => Promise<void>> {
+  // Every temporary directory of the run (the backend's home below, the specs' repositories and Electron profiles,
+  // those of the processes they start) lands in one directory, which workers inherit with the environment and which
+  // goes once the backend has exited.
+  const temp = redirectTmpdir('aw-e2e-');
   const home = mkdtempSync(join(tmpdir(), 'aw-e2e-home-'));
   const webDir = join(home, 'web');
   // In CI the backend's log goes to the job log, next to a failing spec.
@@ -76,5 +81,6 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     const exited = once(backend, 'exit');
     backend.disconnect();
     await exited;
+    rmSync(temp.dir, { recursive: true });
   };
 }
