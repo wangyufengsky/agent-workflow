@@ -26,6 +26,8 @@ import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
  */
 export function createTaskActions(deps: TasksServiceDeps, state: TaskState, lifecycle: TaskLifecycle) {
   const { inbox, attempts, nodes, roles, prompts, projects, dataDir } = deps;
+  /** Modules above tasks that keep rows of a project outside its foreign keys (initiatives' attachments, 34 §9). */
+  const projectDeletion: Array<(projectId: string) => void> = [];
 
   function attemptOf(item: InboxItemDTO): string {
     if (item.attemptId === null) throw new Error(`${item.kind} item ${item.id} has no attempt`);
@@ -149,9 +151,14 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
         state.repo.deleteByProject(projectId);
         deps.knowledge.deleteByProject(projectId);
         deps.gitReviews.deleteByProject(projectId);
+        for (const listener of projectDeletion) listener(projectId);
         projects.delete(projectId);
       });
       await Promise.all(tasks.map((t) => rm(join(dataDir, 'runs', t.id), { recursive: true, force: true })));
+    },
+    /** Called inside the deleting transaction, before the project row goes. */
+    onProjectDeleted(listener: (projectId: string) => void): void {
+      projectDeletion.push(listener);
     },
   };
 }

@@ -88,6 +88,20 @@ import {
 } from './git.ts';
 import { getGitReviewOp, listGitReviewsOp, startGitReviewOp, stopGitReviewOp } from './git-reviews.ts';
 import { countInboxOp, dismissInboxOp, listInboxOp, resolveInboxOp } from './inbox.ts';
+import {
+  confirmInitiativeItemMergedOp,
+  confirmInitiativeOp,
+  createInitiativeOp,
+  deleteInitiativeOp,
+  deliverInitiativePhaseOp,
+  dropInitiativeItemOp,
+  getInitiativeOp,
+  listInitiativesOp,
+  listInitiativeTemplatesOp,
+  openInitiativePhaseOp,
+  saveInitiativeDraftOp,
+  startInitiativeItemOp,
+} from './initiatives.ts';
 import { insightsSummaryOp, insightsTasksOp } from './insights.ts';
 import {
   askKnowledgeOp,
@@ -206,6 +220,7 @@ export * from './define.ts';
 export * from './git.ts';
 export * from './git-reviews.ts';
 export * from './inbox.ts';
+export * from './initiatives.ts';
 export * from './insights.ts';
 export * from './knowledge.ts';
 export * from './previews.ts';
@@ -314,6 +329,18 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   createBatchOp,
   getBatchOp,
   deliverBatchOp,
+  listInitiativeTemplatesOp,
+  listInitiativesOp,
+  createInitiativeOp,
+  getInitiativeOp,
+  saveInitiativeDraftOp,
+  confirmInitiativeOp,
+  openInitiativePhaseOp,
+  startInitiativeItemOp,
+  confirmInitiativeItemMergedOp,
+  dropInitiativeItemOp,
+  deliverInitiativePhaseOp,
+  deleteInitiativeOp,
   listSchedulesOp,
   createScheduleOp,
   getScheduleOp,

@@ -1,5 +1,10 @@
 export { loadBuiltinRoles, loadBuiltinWorkflows, type RoleSeed, type WorkflowSeed } from './builtins.ts';
 export {
+  BUILTIN_INITIATIVE_TEMPLATES,
+  type BuiltinInitiativeTemplate,
+  BuiltinInitiativeTemplateKey,
+} from './initiative-templates.ts';
+export {
   EMPTY_SECTION,
   loadPrompts,
   PromptName,

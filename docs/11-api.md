@@ -311,6 +311,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `browser.tab_updated` | `UserTabState`（`{ tabId, taskId, url, viewport, consoleErrors, failedRequests }`） | 用户的预览标签页换了页面、尺寸，或当前页面的控制台错误（含未捕获异常）与失败请求（网络错误或 ≥ 400）数变了（v1.3 B2，29 §8.1）；计数随主框架的新文档重新开始 |
 | `preview.updated` | `Preview`（`{ taskId, state, url, logTail }`） | 页面预览（v1.3，29 §4.2）：每次状态变化后；任务页的预览页签直接用它更新 |
 | `schedule.updated` | `{ scheduleId }` | 定时任务（v1.2）：创建、修改、暂停 / 恢复、每次运行、删除后；定时任务列表与详情重新拉取（查询挂在任务列表前缀下，开出的任务状态变化也会刷新，22 §9） |
+| `initiative.updated` | `{ initiativeId }` | 需求计划（v1.3，34 §10）：创建、修改阶段与工作包、确认、开启阶段、开始工作包、开始失败、标记已合入、放弃、删除后；工作包任务的变化另由 `task.updated` 刷新（查询挂在任务列表前缀下） |
 | `git_review.updated` | `{ reviewId, projectId }` | Git 工作台的审查开始、提交问题、结束时；审查与列表重新拉取（27 §7.4） |
 | `team.scan_updated` | `{ projectId, done, total }` | 团队页第一次读取项目的提交时的进度（33 §7.2）；界面显示进度，不重新拉取 |
 | `team_analysis.updated` | `{ projectId, analysisId }` | 成员分析排队、开始、提交、结束时；该项目的团队查询重新拉取 |
@@ -400,6 +401,27 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/batches/:id/deliver` | `batches.deliver` | critical | `{ strategy? }`（`squash` / `merge` / `rebase`，默认 `delivery.defaultStrategy`；报告流程一律 `report_only`）→ `{ batch, outcomes: [{ taskId, taskKey, target, outcome, error }] }`：按目标顺序逐个交付「待合并」的子任务（§5.3），冲突与失败的停在 `review`，其余继续 |
 
 批次不新增 SSE 事件：进度随子任务的 `task.updated` 变化，前端批次查询挂在任务列表的缓存前缀下一并刷新。
+
+## 13c′. 需求计划（v1.3，34 §10、§15）
+
+N2a 实现：从组合模板创建，AI 拆解（N2b）之后加入。全部 `mode = simple`；助手与命令面板随页面（N-07、N-11）一起开放，目前 `expose.assistant = false`。
+
+| 方法 | 路径 | 操作 | 风险 | 说明 |
+| --- | --- | --- | --- | --- |
+| GET | `/initiative-templates` | `initiativeTemplates.list` | read | `{ items: InitiativeTemplateDTO[] }`：内置组合模板，按内置顺序 |
+| GET | `/initiatives?projectId&limit&cursor` | `initiatives.list` | read | `{ items: InitiativeSummaryDTO[], nextCursor }`，按编号倒序 |
+| POST | `/initiatives` | `initiatives.create` | write | `{ projectId, templateKey, requirement, attachmentIds?（≤ 9）, baseBranch?, review = false, confirmItemPlans = false }` → 201 `InitiativeDetailDTO`；模板的 `{{requirement}}` 替换为需求后校验（`INITIATIVE_BREAKDOWN_INVALID`，替换后过长为 `VALIDATION_FAILED`）；`review` 为假时直接确认并开启第 1 阶段，可以开始的工作包立即开始 |
+| GET | `/initiatives/:id` | `initiatives.get` | read | `InitiativeDetailDTO`：阶段（含是否已开启）、工作包（显示状态、当前任务摘要、本轮交付、开始失败的原因）、资料附件；404 `INITIATIVE_NOT_FOUND` |
+| PUT | `/initiatives/:id/draft` | `initiatives.saveDraft` | write | `{ phases, items }` 整体替换；已开始、已完成、已放弃的工作包必须原样保留（`ITEM_NOT_EDITABLE`），不能删去已开启的阶段（`INITIATIVE_NOT_EDITABLE`）；已开启阶段里新加的、可以开始的工作包随即开始 |
+| POST | `/initiatives/:id/confirm` | `initiatives.confirm` | write | 只在 `draft_ready`；第一次确认时开启第 1 阶段 |
+| POST | `/initiatives/:id/phases/:phase/open` | `initiatives.openPhase` | write | 只能是下一个阶段，且之前的工作包都已完成，否则 409 `INITIATIVE_PHASE_NOT_READY`（`details.items`）；`autoOpen` 的阶段由后端自动开启 |
+| POST | `/initiatives/:id/items/:key/start` | `initiatives.startItem` | write | 只在 `ready`：开始失败后重试，或任务取消后重新开始（新建任务，旧任务留在任务列表）；否则 409 `INITIATIVE_ITEM_NOT_READY` |
+| POST | `/initiatives/:id/items/:key/merged` | `initiatives.confirmMerged` | write | 只在 `pr_open`：用户确认 PR 已合入（并已拉取到本地基础分支） |
+| POST | `/initiatives/:id/items/:key/drop` | `initiatives.dropItem` | write | `{ reason }`；在 `ready` / `waiting` / `phase_closed` / `pr_open` 时；任务进行中要先取消 |
+| POST | `/initiatives/:id/phases/:phase/deliver` | `initiatives.deliverPhase` | critical | `{ strategy? }` → `{ initiative, outcomes: [{ itemKey, taskId, taskKey, outcome, error }] }`：同批量交付（13c），只限这个阶段的工作包；报告类一律 `report_only` |
+| DELETE | `/initiatives/:id` | `initiatives.delete` | critical | 204；工作包的任务保留为普通任务 |
+
+工作包的任务就是普通任务：作答、权限、重试、再改改、交付都在任务页。任务的 `task.updated` 让后端重新计算所属需求计划：开启 `autoOpen` 的阶段、开始依赖已完成的工作包；应用启动时对已确认的需求计划做一次同样的检查。
 
 ## 13d. 定时任务（v1.2）
 

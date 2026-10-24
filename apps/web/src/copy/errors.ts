@@ -111,6 +111,13 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
     '有必需的验收项还没满足，确认这些项后才能交付；清单如果刚改过，请按新的清单重新确认。',
   [ErrorCode.RequirementResultsInvalid]: 'AI 提交的验收结论不符合要求。',
   [ErrorCode.RequirementsNotEditable]: '任务正在执行，现在不能修改验收清单；等它停下或进入待合并再改。',
+  [ErrorCode.InitiativeNotFound]: '这个需求计划不存在，可能所属项目已被删除。',
+  [ErrorCode.InitiativeBreakdownInvalid]:
+    '阶段与工作包有问题：依赖成环、指向不存在的工作包或更晚的阶段、空阶段，或流程不存在。请按提示修改。',
+  [ErrorCode.InitiativeNotEditable]: '需求计划现在的状态不允许这样操作，刷新后再试。',
+  [ErrorCode.InitiativePhaseNotReady]: '前面阶段还有没合入、没完成的工作包，先处理它们再进入下一阶段。',
+  [ErrorCode.InitiativeItemNotReady]: '这个工作包现在不能这样操作，刷新后再试。',
+  [ErrorCode.InitiativeTemplateNotFound]: '这个组合模板不存在。',
   [ErrorCode.TeamAnalysisNotFound]: '这条成员分析不存在。',
   [ErrorCode.TeamAnalysisExists]: '这位成员这段时间的分析还在排队或进行中。',
   [ErrorCode.TeamAnalysisInvalid]: 'AI 提交的分析与提交记录对不上，AI 会修正后再提交。',

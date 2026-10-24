@@ -94,13 +94,13 @@ function checkNode(node: PlanNodeSpec, byKey: ReadonlyMap<string, PlanNodeSpec>,
   return problems;
 }
 
-/** Every cycle closed by a back edge of a depth-first search, as `[a, b, ..., a]`. */
-function findCycles(byKey: ReadonlyMap<string, PlanNodeSpec>): string[][] {
+/** Every cycle closed by a back edge of a depth-first search, as `[a, b, ..., a]`; also for initiatives (34 §8.3). */
+export function findCycles(byKey: ReadonlyMap<string, { key: string; dependsOn: readonly string[] }>): string[][] {
   const cycles: string[][] = [];
   const finished = new Set<string>();
   const path: string[] = [];
 
-  const visit = (node: PlanNodeSpec): void => {
+  const visit = (node: { key: string; dependsOn: readonly string[] }): void => {
     path.push(node.key);
     for (const key of node.dependsOn) {
       const dependency = byKey.get(key);
