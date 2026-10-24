@@ -220,7 +220,7 @@ modules/tasks/
 | 数据库 | `DbDriver` | mysql（含 goldendb）、postgres（PostgreSQL 与 openGauss 两个实例）、sqlserver（v1.2，24） |
 | 验收方式 | `acceptance` 模块的检查函数（`runCommand` / `review`，结果为 `CheckResult`） | command、ai_review |
 | 主题 | `ThemeDefinition`（数据） | 4 套 |
-| 流程与角色 | `WorkflowDefinition` / `RoleDefinition`（数据） | 5 个流程、4 个角色 |
+| 流程与角色 | `WorkflowDefinition` / `RoleDefinition`（数据） | 10 个流程、4 个角色 |
 | 浏览器宿主（v1.3，29 §5.2） | `BrowserHost`（`request(op)` / `onEvent`） | 经 parentPort 由 Electron main 执行（桌面版）；playwright-core 的 Chromium（仅开发与测试） |
 | 执行 MCP 工具 | `McpToolDefinition`（schema + handler + 允许的尝试类型） | 见 12-mcp-tools |
 | 功能操作 | `OperationContract` + `implement()`（见 §5） | 各模块 |

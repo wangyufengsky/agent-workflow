@@ -30,6 +30,8 @@ export const DELIVERY_COPY = {
   complete: '完成',
   fixFromReport: '据此修复',
   fixRequirement: (report: string) => `按下面的审查报告修复问题：\n\n${report}`,
+  developFromReport: '据此开发',
+  developRequirement: (report: string) => `按下面方案设计中推荐的方案实现：\n\n${report}`,
   merging: '正在合并…',
   merged: (branch: string, sha: string) => `已合并到 ${branch} · 提交 ${sha.slice(0, 8)}`,
   prOpened: '已推送到 PR',

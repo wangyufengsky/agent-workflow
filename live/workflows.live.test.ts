@@ -8,6 +8,31 @@ import { type LiveApp, outcome, startLiveApp, TASK_TIMEOUT_MS } from './live-app
  * M6-05 live suite (07 §6): with smoke.live.test.ts every built-in workflow runs once; the Java fixture runs its
  * check with Maven. Run by hand: `pnpm test:live`.
  */
+/** ts-stats as of 2026-09-25, plus `percentile` added on 2026-10-05 with an off-by-one index and an unused helper. */
+const STATS_HISTORY = {
+  initAt: '2026-09-25T10:00:00',
+  commits: [
+    {
+      date: '2026-10-05T10:00:00',
+      message: 'add percentile',
+      files: {
+        'src/percentile.ts': [
+          '/** The value below which `p` percent of the values fall (nearest rank). */',
+          'export function percentile(values: readonly number[], p: number): number {',
+          '  const sorted = [...values].sort((a, b) => a - b);',
+          '  return sorted[Math.ceil((p / 100) * sorted.length)];',
+          '}',
+          '',
+          'function clamp(value: number, low: number, high: number): number {',
+          '  return Math.min(Math.max(value, low), high);',
+          '}',
+          '',
+        ].join('\n'),
+      },
+    },
+  ],
+};
+
 let live: LiveApp;
 beforeAll(async () => {
   live = await startLiveApp('workflows');
@@ -71,6 +96,77 @@ describe('@live 内置流程全集', () => {
       expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
       expect(task.result?.filesChanged).toBeGreaterThan(0);
       expect(task.result?.checks.every((c) => c.passed)).toBe(true);
+    },
+    TASK_TIMEOUT_MS,
+  );
+
+  it(
+    'version_review：审查 10 月 1 日以来新增的 percentile（median 的排序问题在那之前就有）',
+    async () => {
+      const task = await live.runTask(
+        'version_review',
+        'ts-stats',
+        '对比 main 分支 2026-10-01 的版本，审查之后新增的代码。',
+        { history: STATS_HISTORY },
+      );
+      expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
+      expect(task.result?.filesChanged).toBe(0);
+      expect(task.result?.summary).toContain('percentile');
+    },
+    TASK_TIMEOUT_MS,
+  );
+
+  it(
+    'security_review：静态服务器的路径穿越',
+    async () => {
+      const task = await live.runTask('security_review', 'todo-web', '审查 server.mjs 的安全问题。');
+      expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
+      expect(task.result?.filesChanged).toBe(0);
+      expect(task.result?.summary).toContain('server.mjs');
+    },
+    TASK_TIMEOUT_MS,
+  );
+
+  it(
+    'cleanup：删除没有被使用的 clamp，检查通过',
+    async () => {
+      const task = await live.runTask('cleanup', 'ts-stats', '清理 src 目录中没有被使用的代码。', {
+        history: STATS_HISTORY,
+      });
+      expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
+      expect(task.result?.checks.every((c) => c.passed)).toBe(true);
+      const source = await readFile(join(task.git.worktreePath ?? '', 'src/percentile.ts'), 'utf8');
+      expect(source).not.toContain('clamp');
+    },
+    TASK_TIMEOUT_MS,
+  );
+
+  it(
+    'design_proposal（Java）：按类别统计库存，只出方案不改代码',
+    async () => {
+      const task = await live.runTask(
+        'design_proposal',
+        'java-inventory',
+        '想给 Inventory 增加按商品类别统计库存总量的功能，请给出设计方案。',
+      );
+      expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
+      expect(task.result?.filesChanged).toBe(0);
+      expect(task.result?.summary).toContain('Inventory');
+    },
+    TASK_TIMEOUT_MS,
+  );
+
+  it(
+    'detailed_design（Java）：写设计文档，不改代码',
+    async () => {
+      const task = await live.runTask(
+        'detailed_design',
+        'java-inventory',
+        '为 Inventory 增加按商品类别统计库存总量的功能，写一份详细设计。',
+      );
+      expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
+      expect(task.result?.files.some((f) => f.path.endsWith('.md'))).toBe(true);
+      expect(task.result?.files.some((f) => f.path.endsWith('.java'))).toBe(false);
     },
     TASK_TIMEOUT_MS,
   );

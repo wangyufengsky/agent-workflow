@@ -104,6 +104,60 @@ packages/builtin/
 | requiredSteps | `baseline`（position: first）·「建立基线」· tester ·「运行现有测试并记录结果；若重构范围缺少覆盖，先补特征测试」→ `final_verify`（position: last）·「整体验证」· developer · acceptance `[command $PROJECT_CHECK, browser, ai_review(focus: 外部行为是否保持不变)]` |
 | defaultAcceptance | `{ checks: [command $PROJECT_CHECK], manual: false }` |
 
+### 3.6 `version_review` · 版本比对审查（只读，D126）
+
+| 项 | 值 |
+| --- | --- |
+| planning | `fixed` |
+| deliverable | `report` |
+| template | `review`「版本比对审查」reviewer：对比任务基础分支的当前版本（HEAD）与需求中写的起点（日期、提交、标签或分支），只审查这段时间新增与修改的代码。起点是日期时用 `git log --first-parent --before="<日期> 00:00" -1 --format=%H HEAD`（那天开始前分支上的最后一个提交）；用 `git diff <起点> HEAD` 阅读改动；summary 开头写明比对范围（起点、终点、提交数、文件数），然后是问题清单；起点之前就存在的问题不报 |
+| acceptance | 无 |
+| 交付 | 同 §3.4（「据此修复」） |
+
+用到的 git 子命令（`log` / `diff`）都在只读白名单里（D63），不需要新权限。「同分支」即任务的基础分支（专业模式在开始任务页的更多选项里选）。
+
+### 3.7 `security_review` · 安全审查（只读，D126）
+
+| 项 | 值 |
+| --- | --- |
+| planning | `fixed` |
+| deliverable | `report` |
+| template | `review`「安全审查」reviewer：按需求范围（没写时为整个仓库）检查注入（SQL、命令、路径穿越、XSS）、认证与越权、敏感信息与密钥、输入校验与反序列化、依赖与默认配置；每条问题写严重程度、位置、可被利用的方式与修改建议；只报有代码依据的问题，不联网、不运行扫描工具 |
+| acceptance | 无 |
+| 交付 | 同 §3.4（「据此修复」） |
+
+### 3.8 `cleanup` · 清理告警（D126）
+
+| 项 | 值 |
+| --- | --- |
+| planning | `fixed` |
+| deliverable | `code_changes` |
+| template | `inventory`「列出告警」developer：运行项目已有的 lint、类型检查与构建，查找未使用的代码，在 summary 列出清单与处理方式；不改文件 → `fix`「清理」developer：按清单修改；不关闭规则、不加忽略注释、不调低检查级别，误报保留并写进 notes；外部行为不变 |
+| acceptance | `inventory`：无检查；`fix`：`[command $PROJECT_CHECK, browser, ai_review(focus: 是否只做了清理而没有改变外部行为，是否用关闭规则或忽略注释掩盖告警)]` |
+| checkpoints | 全部 `false` |
+
+### 3.9 `design_proposal` · 方案设计（只读，D126）
+
+| 项 | 值 |
+| --- | --- |
+| planning | `fixed` |
+| deliverable | `report` |
+| template | `design`「方案设计」reviewer：读相关代码后写现状、两到三个可行方案（做法、要改的模块、优缺点、风险、工作量）、推荐方案与理由、实施步骤；不改文件 |
+| acceptance | 无 |
+| 交付 | 结果卡按钮「完成」与「据此开发」：以报告为需求、预选「新功能开发」回到主页（其他 `report` 流程是「据此修复」→「修 Bug」） |
+
+### 3.10 `detailed_design` · 详细设计（D126）
+
+| 项 | 值 |
+| --- | --- |
+| planning | `fixed` |
+| deliverable | `code_changes`（一份 Markdown 设计文档，经正常的检查与合并进入仓库） |
+| template | `survey`「梳理现状」developer：整理相关模块、接口、数据结构、调用链、约束，以及仓库设计文档的目录与格式；不改文件 → `write`「编写详细设计」developer：在现有设计文档目录（没有时 `docs/design/`）写文档：背景与目标、范围、总体方案、模块与职责、接口、数据与表结构变更、关键流程、异常与边界、兼容与迁移、测试方案、实施步骤；只写文档，不改代码 |
+| acceptance | `survey`：无检查；`write`：`[ai_review(focus: 设计是否与代码现状一致、是否覆盖了需求的每一点、接口与数据结构是否具体到可以直接实施)]`（只改文档，不跑项目检查） |
+| checkpoints | 全部 `false` |
+
+四个只读流程（代码审查、版本比对审查、安全审查、方案设计）共用 `reportOnly(key, title, instructions)`：只有一个 reviewer 步骤，没有检查。新流程都是固定流程，因此也能用于批量任务与定时任务（D85、D92），例如每周一次的安全审查或「审查上周新增的代码」。
+
 > requiredSteps 的 `position`：`first` 要求其他所有节点（传递地）依赖它；`last` 要求它（传递地）依赖所有其他节点。违反时 `PLAN_INVALID` 子码 `REQUIRED_STEP_ORDER`。
 
 ## 4. 系统生成的节点
@@ -135,6 +189,6 @@ packages/builtin/
 
 ## 6. 需求清单与资料上下文（附件 U1、清单 Q-02 已实现）
 
-30 / 31 实施后，任务的附件清单与验收清单经 `get_task_context` 对规划、执行、评审都可见。有清单的任务，物化计划时追加系统步骤「核验验收清单」（`NodeKind.Verify`，内置 reviewer 角色，提示词 `verify-requirements`），依赖所有其他叶节点；固定流程与规划流程相同，不改变五种内置流程的默认步骤。「再改改」、PR 意见回流、冲突修改追加的节点之后同样再追加一个核验节点。
+30 / 31 实施后，任务的附件清单与验收清单经 `get_task_context` 对规划、执行、评审都可见。有清单的任务，物化计划时追加系统步骤「核验验收清单」（`NodeKind.Verify`，内置 reviewer 角色，提示词 `verify-requirements`），依赖所有其他叶节点；固定流程与规划流程相同，不改变内置流程的默认步骤。「再改改」、PR 意见回流、冲突修改追加的节点之后同样再追加一个核验节点。
 
 实现细节（Q-02）：核验步骤的键是 `verify_requirements`，「再改改」等追加的是 `verify_requirements_<n>`；起草计划（模板、AI 提交、用户编辑）与物化时都会补上或更新它（`tasks.verify.ts` 的 `withVerifyStep`），用户在专业模式删掉它，保存后会补回。指令模板是 `prompts/verify-requirements.md`，列出每项的 id、核验方式与预期；只读 reviewer 用 `submit_result` 结束，只对 `ai_review` 项给结论。
