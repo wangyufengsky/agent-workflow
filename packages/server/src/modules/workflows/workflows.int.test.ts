@@ -28,7 +28,7 @@ afterEach(() => t.close());
 const promptsDir = loadConfig({ AW_API_TOKEN: 'x'.repeat(32), AW_DATA_DIR: '/tmp' }).promptsDir;
 
 describe('内置流程与角色', () => {
-  it('首次启动写入 4 个角色与 10 个流程，按内置顺序列出', async () => {
+  it('首次启动写入 4 个角色与 11 个流程，按内置顺序列出', async () => {
     const roles = (await t.call(listRolesOp, {})).body.items;
     expect(roles.map((r) => [r.key, r.kind, r.baseAgent])).toEqual([
       ['planner', 'builtin', 'planner'],
@@ -48,9 +48,17 @@ describe('内置流程与角色', () => {
       ['cleanup', 1, 'fixed', 'code_changes'],
       ['design_proposal', 1, 'fixed', 'report'],
       ['detailed_design', 1, 'fixed', 'code_changes'],
+      ['breakdown', 1, 'fixed', 'code_changes'],
     ]);
     const feature = (await t.call(getWorkflowOp, { id: workflows[0]?.id ?? '' })).body;
     expect(feature.definition.plannerGuidance).toContain('final_verify');
+  });
+
+  it('每个内置流程的定义都通过流程校验', async () => {
+    for (const seed of loadBuiltinWorkflows(promptsDir)) {
+      const { body } = await t.call(validateWorkflowOp, { planning: seed.planning, definition: seed.definition });
+      expect([seed.key, body.problems]).toEqual([seed.key, []]);
+    }
   });
 
   it('再次同步相同定义不产生新版本；定义变化产生新版本并保留旧版本', async () => {
@@ -65,7 +73,7 @@ describe('内置流程与角色', () => {
     expect(after).toMatchObject({ version: 2, description: '新的说明' });
     // Tasks keep referring to the version they started with.
     expect(workflows.get(before?.id ?? '')).toMatchObject({ version: 1, description: before?.description });
-    expect(workflows.list()).toHaveLength(10);
+    expect(workflows.list()).toHaveLength(11);
   });
 
   it('系统流程的 key 不占用户的命名空间：用户的 merge_branch 流程在同步内置流程后仍是最新版本并列出', async () => {

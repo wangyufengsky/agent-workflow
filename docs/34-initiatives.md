@@ -49,7 +49,7 @@ N1 先做，用一两份真实需求文档试拆；拆解质量可以接受后�
 
 ## 4. N1 · 内置流程「需求拆解」
 
-### 4.1 定义（13 §3.11）
+### 4.1 定义（13 §3.11，N-01 已实现）
 
 | 项 | 值 |
 | --- | --- |
@@ -373,7 +373,7 @@ SSE：`initiative.updated { initiativeId }`（拆解提交、草稿保存、确�
 
 | 任务 | 内容 | 完成标准 |
 | --- | --- | --- |
-| N-01 | N1：内置流程 `breakdown`（`workflows.ts`、两段指令、13 §3.11）、主页卡片 | 单元：流程定义通过 `validateWorkflowDefinition`；`pnpm test:live` 免费模型一例：对示例需求文档产出覆盖每一点、依赖无环的拆解文档 |
+| N-01（已实现） | N1：内置流程 `breakdown`（`workflows.ts`、两段指令、13 §3.11）、主页卡片 | 集成：每个内置流程的定义通过流程校验；`pnpm test:live` 免费模型一例：对 `ts-stats` 的五点需求只写一份拆解文档，每一点都出现在文档里 |
 | N-02 | 共享层：`shared/initiative/`（`validateInitiativeBreakdown`、两个状态函数）、契约与常量、错误码 | 单元覆盖 §8.3 每个子码与 §6 每种状态 |
 | N-03 | `initiatives` 模块：迁移、repo、service（创建、草稿、确认、阶段、放弃、已合入、删除）、操作清单 | 集成（真实 SQLite）：确认 → 第 1 阶段开始的任务数；阶段未完成时开启下一阶段 409 |
 | N-04 | 拆解尝试：`AttemptKind.Breakdown`、提示词、`submit_breakdown` 与校验、`read_attachment` 范围、会话复用、重启规则（09 增补） | 集成（FakeOpencode）：提交无效拆解得到子码、修正后成功；细化改动已开始的工作包得到 `ITEM_NOT_EDITABLE` |

@@ -30,6 +30,7 @@ export const BuiltinWorkflowKey = {
   Cleanup: 'cleanup',
   DesignProposal: 'design_proposal',
   DetailedDesign: 'detailed_design',
+  Breakdown: 'breakdown',
 } as const;
 
 const projectCheck = { kind: AcceptanceCheckKind.Command, command: PROJECT_CHECK_PLACEHOLDER } as const;
@@ -323,6 +324,54 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
             acceptance: {
               checks: [
                 aiReview('设计是否与代码现状一致、是否覆盖了需求的每一点、接口与数据结构是否具体到可以直接实施'),
+              ],
+              manual: false,
+            },
+          },
+        ],
+      },
+      checkpoints: noCheckpoints,
+      defaultAcceptance: unchecked,
+    },
+  },
+  {
+    key: BuiltinWorkflowKey.Breakdown,
+    name: '需求拆解',
+    description: '把一份大需求拆成分阶段的工作包，写一份拆解文档提交到仓库，之后照着逐个开任务',
+    planning: WorkflowPlanning.Fixed,
+    deliverable: WorkflowDeliverable.CodeChanges,
+    definition: {
+      allowedRoles: [BuiltinRoleKey.Developer],
+      template: {
+        nodes: [
+          {
+            key: 'survey',
+            title: '梳理需求与现状',
+            roleKey: BuiltinRoleKey.Developer,
+            instructions:
+              '通读需求与附件（附件只显示了一部分时读完全文），按需求涉及的范围读代码，在 notes 中整理：需求的要点清单（逐条编号，后面的覆盖表按这些编号对应）、涉及的现有模块与文件、接口与数据结构、约束与风险，以及仓库里设计文档放在哪个目录、用什么格式。summary 只写简要结论（要点有几条、主要涉及哪些模块、文档放在哪里），不超过 4000 字；清单与细节都放在 notes。这一步不改文件。',
+            dependsOn: [],
+            acceptance: unchecked,
+          },
+          {
+            key: 'write',
+            title: '编写拆解文档',
+            roleKey: BuiltinRoleKey.Developer,
+            instructions: [
+              '先用 agent-workflow_get_node_output 读取上一步（survey）的完整产出，需求要点清单与梳理在其中的 notes 里。然后按需求与这份梳理，把需求拆成可以分阶段实施的工作包，写成一份拆解文档，放在仓库现有的设计文档目录并沿用其格式（没有时放在 docs/plans/，Markdown，文件名用需求主题），内容依次为：',
+              '1. 概述：目标、范围、不做的内容、假设、风险。',
+              '2. 阶段：按先后列出，每个阶段写目标与完成标志；后一阶段建立在前一阶段的工作包合并之后的代码上。',
+              '3. 工作包：每个一节，写明编号与标题、所属阶段、建议流程（新功能开发、修 Bug、重构、补单元测试、详细设计等）、依赖的工作包、需求切片（可以直接作为一个任务的需求的完整文字：写清要做什么、改哪些模块与接口，不写「见上文」）、对应原需求的哪几点、验收要求（每条写要求、预期结果与核验方式：AI 核验、命令或人工确认）。',
+              '4. 需求覆盖表：原需求的每一点由哪个工作包负责；不做的点写明原因。',
+              '粒度：一个工作包是一个任务能完成并验证的改动，实施时不超过 8 个步骤；太小的合并，太大的再拆，确实拆不开的写明原因。依赖不能成环，只能依赖同一阶段或更早阶段的工作包；互不需要对方结果的工作包不要互相依赖，以便并行。',
+              '拆解要与代码现状一致，不编造不存在的模块；用需求的语言书写。只写这一份文档，不改代码。',
+            ].join('\n'),
+            dependsOn: ['survey'],
+            acceptance: {
+              checks: [
+                aiReview(
+                  '是否覆盖了需求的每一点；每个工作包是否能在一个任务里完成并验证；依赖是否无环且与阶段顺序一致；需求切片是否具体到可以直接开任务',
+                ),
               ],
               manual: false,
             },
