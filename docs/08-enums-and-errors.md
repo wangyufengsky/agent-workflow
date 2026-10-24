@@ -204,6 +204,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TeamGranularity` | `day` · `week` · `month` | 趋势的分桶（33 §4.2），周一开始一周 |
 | `TeamWorkType` | `feature` · `fix` · `test` · `refactor` · `docs` · `chore` · `other` | 按提交标题前缀分的工作构成（33 §3.3） |
 | `TeamOtherKind` | `ai_task` · `hidden` | 非成员：本应用没有发起人记录的 AI 任务提交、设为非成员的身份（33 §2.3） |
+| `AssistantPage`（增补） | `team` · `team_member` | 助手的 `open_page` 与所在页面；`team_member` 带 `teamMember`（成员的主身份邮箱） |
 | `TeamAnalysisStatus` | `queued` · `running` · `succeeded` · `failed` · `cancelled` | AI 成员分析，经 `teamAnalysisMachine`（09 §15） |
 
 `ServerEventType` 另有 `team.scan_updated`（读取提交历史的进度）与 `team_analysis.updated`（11 §11）。

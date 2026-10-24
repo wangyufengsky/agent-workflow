@@ -1,8 +1,11 @@
-import { cp, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  ASSISTANT_CONVERSATIONS_DIR,
+  ASSISTANT_DIR,
   AttemptKind,
+  createConversationOp,
   createProjectOp,
   createTeamAnalysesOp,
   getRuntimeOp,
@@ -11,7 +14,9 @@ import {
   InboxStatus,
   resolveInboxOp,
   ServerEventType,
+  sendAssistantMessageOp,
   TeamPeriod,
+  type TranscriptEntry,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -106,6 +111,49 @@ describe('@live 团队', () => {
       expect(cited.length).toBeGreaterThan(0);
       const sampled = new Set(started.sample.map((s) => s.sha));
       for (const sha of cited) expect(sampled.has(sha)).toBe(true);
+    },
+    TURN_TIMEOUT_MS,
+  );
+
+  it(
+    '助手：在团队页问「谁表现最好」，调用 team_summary 并按数字回答（报告留给人看是否打分排名）',
+    async () => {
+      const { body: conversation } = await t.call(createConversationOp, {});
+      const idle = waitForEvent(
+        t.app.events,
+        ServerEventType.AssistantUpdated,
+        (c) => c.id === conversation.id && !c.busy,
+        TURN_TIMEOUT_MS,
+      );
+      await t.call(sendAssistantMessageOp, {
+        id: conversation.id,
+        text: '近 30 天谁提交最多？谁表现最好？',
+        context: { page: 'team', params: { projectId } },
+      });
+      await idle;
+
+      const file = join(t.dataDir, ASSISTANT_DIR, ASSISTANT_CONVERSATIONS_DIR, `${conversation.id}.jsonl`);
+      const entries: TranscriptEntry[] = (await readFile(file, 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line));
+      const tools = entries.flatMap((e) => (e.kind === 'tool_call' ? [e.data.tool] : []));
+      // Text arrives in pieces, each written at its offset of the part (D104).
+      const parts = new Map<string, string>();
+      for (const e of entries) {
+        if (e.kind !== 'text') continue;
+        parts.set(e.partId, (parts.get(e.partId) ?? '').slice(0, e.data.offset) + e.data.text);
+      }
+      const reply = [...parts.values()].join('\n');
+      await mkdir(new URL('reports', import.meta.url), { recursive: true });
+      const report = new URL(
+        `reports/team-assistant-${new Date().toISOString().replaceAll(':', '-')}.json`,
+        import.meta.url,
+      );
+      await writeFile(report, JSON.stringify({ model: TEST_MODEL, tools, reply }, null, 2));
+
+      expect(tools.some((tool) => tool.endsWith('team_summary'))).toBe(true);
+      expect(reply).toContain('Zhang San');
     },
     TURN_TIMEOUT_MS,
   );

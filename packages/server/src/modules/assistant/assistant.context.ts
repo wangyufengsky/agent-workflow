@@ -137,6 +137,10 @@ export function createContextRenderer(deps: ContextDeps) {
         }[page];
         return `${where} of project "${project.name}" (project id ${project.id}, repository ${project.repoPath})`;
       }
+      case AssistantPage.TeamMember: {
+        const project = projects.getRecord(param(ref, 'projectId'));
+        return `the team page of member ${param(ref, 'teamMember')} in project "${project.name}" (project id ${project.id}; their commits, trends and AI analyses, no scores)`;
+      }
       case AssistantPage.Workflow: {
         const key = param(ref, 'workflowKey');
         const workflow = workflows.list().find((w) => w.key === key);

@@ -72,8 +72,9 @@ export const AssistantPage = {
   KnowledgeConversation: 'knowledge_conversation',
   KnowledgeHistory: 'knowledge_history',
   Insights: 'insights',
-  /** The team page of a project (33 §5). */
+  /** The team page of a project and one member of it (33 §5). */
   Team: 'team',
+  TeamMember: 'team_member',
   /** PPT (23 §2): the list and one PPT's workspace. */
   Ppt: 'ppt',
   PptDeck: 'ppt_deck',
@@ -97,7 +98,9 @@ export type AssistantPageParam =
   | 'deckId'
   | 'slideId'
   | 'batchId'
-  | 'scheduleId';
+  | 'scheduleId'
+  /** A team member's main email (33 §5.1). */
+  | 'teamMember';
 
 /** Params each page needs to be opened. */
 export const ASSISTANT_PAGE_PARAMS = {
@@ -124,6 +127,7 @@ export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.KnowledgeHistory]: [],
   [AssistantPage.Insights]: [],
   [AssistantPage.Team]: ['projectId'],
+  [AssistantPage.TeamMember]: ['projectId', 'teamMember'],
   [AssistantPage.Ppt]: [],
   [AssistantPage.PptDeck]: ['deckId'],
   [AssistantPage.Batches]: [],

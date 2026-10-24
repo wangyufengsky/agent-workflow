@@ -283,7 +283,7 @@
 | GET | `/team/analyses/:id` | `team.analyses.get` | read | 分析记录与报告 |
 | POST | `/team/analyses/:id/cancel` | `team.analyses.cancel` | write | 取消排队或运行中的分析 |
 
-全部 `mode = simple`，`team.settings.update` 为 `mode = pro`。应用助手能用 read 操作回答「张三这个月提交了多少」；`team.analyses.create` 是 write，弹确认卡。`open_page` 增加 `team`。
+全部 `mode = simple`，`team.settings.update` 为 `mode = pro`。应用助手能用 read 操作回答「张三这个月提交了多少」；`team.analyses.create` 是 write，弹确认卡。`open_page` 增加 `team`（参数 `projectId`）与 `team_member`（另加 `teamMember`，成员的主身份邮箱）；用户在这两页提问时，上下文写明项目与成员。助手提示词要求按数字回答，不替应用给人打分或排名（live：问「谁表现最好」时列出数字并说明不排名）。
 
 ### 8.2 表（10 增补，迁移 `0023_team`）
 
