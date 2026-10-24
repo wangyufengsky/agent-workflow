@@ -14,9 +14,9 @@ export const uiModeSchema = z.enum(UiMode);
 export const ThemeId = {
   Default: 'default',
   ClaudeCode: 'claude_code',
-  Spdb: 'spdb',
   Codex: 'codex',
   Deepseek: 'deepseek',
+  Dracula: 'dracula',
 } as const;
 export type ThemeId = (typeof ThemeId)[keyof typeof ThemeId];
 export const THEME_IDS = Object.values(ThemeId);

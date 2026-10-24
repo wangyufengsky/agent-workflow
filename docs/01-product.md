@@ -65,7 +65,7 @@
 | 角色 | 4 个内置角色 | 自定义角色 |
 | 数据库 | — | MySQL、PostgreSQL、openGauss / GaussDB、SQL Server、GoldenDB 连接管理（v1.2 起五种），AI 只读查询工具 |
 | 系统 | 设置：主题、专业模式、AI 不确定时的行为、并发数 | 运行环境、MCP 工具清单 |
-| 主题 | 五套主题（默认、Claude Code、SPDB、Codex、DeepSeek）一键切换 + 跟随系统 | 同左 |
+| 主题 | 五套主题（默认、Claude Code、Codex、DeepSeek、Dracula）一键切换 + 跟随系统 | 同左 |
 | 命令面板 | ⌘K 搜索页面、任务与常用操作 | 同左 |
 | 平台 | macOS（arm64），.dmg 安装包 | 同左 |
 
