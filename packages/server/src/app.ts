@@ -69,6 +69,7 @@ import { createSchedulesModule, type SchedulesService } from './modules/schedule
 import { createSettingsModule } from './modules/settings/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
 import { createTasksModule, type TasksService } from './modules/tasks/index.ts';
+import { createTeamModule } from './modules/team/index.ts';
 import { createWorkflowsModule, type WorkflowsService } from './modules/workflows/index.ts';
 import { createWorktreesModule, type WorktreesService } from './modules/worktrees/index.ts';
 
@@ -406,6 +407,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     await schedules.timer.settled();
   });
   const insights = createInsightsModule({ db: database.db, clock, timeZone, tasks: tasks.service });
+  const team = createTeamModule({ db: database.db, events, clock, timeZone, projects: projects.service });
   const repository = createRepositoryModule({
     projects: projects.service,
     tasks: tasks.service,
@@ -448,6 +450,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...knowledge.operations,
     ...decks.operations,
     ...insights.operations,
+    ...team.operations,
     ...plans.operations,
     ...inbox.operations,
     ...attempts.operations,

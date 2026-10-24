@@ -116,6 +116,8 @@ export const ServerEventType = {
   DeckUpdated: 'deck.updated',
   /** A Git workbench review started, submitted its findings or ended (27 §7.4). */
   GitReviewUpdated: 'git_review.updated',
+  /** Reading a project's commits for the team page made progress or finished (33 §7.2). */
+  TeamScanUpdated: 'team.scan_updated',
   /** A schedule was created, changed, ran or was deleted (22 §9). */
   ScheduleUpdated: 'schedule.updated',
   /** A task's page preview changed state (29 §4.2). */

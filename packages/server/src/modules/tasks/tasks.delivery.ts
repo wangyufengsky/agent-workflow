@@ -15,8 +15,10 @@ import {
   transition,
   WorkflowDeliverable,
   WorktreeStatus,
+  withRequestedBy,
 } from '@aw/shared';
 import { checkDeliverable, type MergeOutcome, mergeLocally, pushBranch } from '../delivery/index.ts';
+import { readConfiguredIdentity } from '../git/index.ts';
 import type { GitHostingProvider } from '../hosting/index.ts';
 import { latestTaskEventId } from '../timeline/index.ts';
 import type { Worktree } from '../worktrees/index.ts';
@@ -98,7 +100,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
         branch: worktree.branch,
         targetBranch: delivery.targetBranch,
         strategy,
-        message: `${task.title} (${task.key})`,
+        message: withRequestedBy(`${task.title} (${task.key})`, await readConfiguredIdentity(repoPath)),
       });
     } catch (err) {
       recordFailure(task.id, delivery, err);
