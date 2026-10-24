@@ -6,6 +6,7 @@ import {
   MIN_WINDOW,
   passReview,
   patchSettings,
+  pickWorkflow,
   queueTurn,
   submitResult,
   TASK_RUN_TIMEOUT_MS,
@@ -68,10 +69,7 @@ test('J8 专业模式：复制内置流程 → 修改 → 用它跑通一个任�
   await page.setViewportSize(initial);
 
   await page.goto(`/?projectId=${project.id}`);
-  await page
-    .getByRole('group', { name: '直接开始' })
-    .getByRole('button', { name: /我的修 Bug/ })
-    .click();
+  await pickWorkflow(page, /我的修 Bug/);
   await page.getByLabel('需求').fill('订单金额四舍五入错误');
   await page.getByRole('button', { name: /^开始/ }).click();
   const result = page.getByTestId('result-card');

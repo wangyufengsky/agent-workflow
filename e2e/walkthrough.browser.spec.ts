@@ -12,6 +12,7 @@ import {
   git,
   passReview,
   patchSettings,
+  pickWorkflow,
   queueAssistantTurn,
   queueCodeReviewerTurn,
   queueResearchTurn,
@@ -770,6 +771,35 @@ const SHOTS: Shot[] = [
     mode: UiMode.Simple,
     url: (s) => `/?projectId=${s.project.id}&conversation=${s.assistantConversation}`,
     ready: testId('confirmation-card'),
+    open: async (page) => {
+      // The docked input is two rows, the text and its foot: the user found the taller one squeezed the conversation
+      // (36 §1).
+      const box = page.locator('form').filter({ has: page.getByLabel('告诉助手，或开始任务') });
+      expect((await box.boundingBox())?.height).toBeLessThan(120);
+      return box;
+    },
+  },
+  {
+    // 「直接开始」unfolded inside the home input (36 §5).
+    name: 'home-flows',
+    mode: UiMode.Simple,
+    url: (s) => `/?projectId=${s.project.id}`,
+    ready: heading('Everything is a Workflow.'),
+    open: async (page) => {
+      await page.getByRole('button', { name: '直接开始', exact: true }).click();
+      return page.getByRole('group', { name: '选择流程开始任务' });
+    },
+  },
+  {
+    // The assistant's usage, behind its button in the input's foot (36 §3).
+    name: 'assistant-usage',
+    mode: UiMode.Simple,
+    url: (s) => `/?projectId=${s.project.id}&conversation=${s.assistantConversation}`,
+    ready: testId('confirmation-card'),
+    open: async (page) => {
+      await page.getByRole('button', { name: '助手用量', exact: true }).click();
+      return page.getByRole('dialog', { name: '助手用量' });
+    },
   },
   {
     name: 'palette',
@@ -1073,10 +1103,7 @@ const SHOTS: Shot[] = [
     url: (s) => `/?projectId=${s.project.id}`,
     ready: heading('Everything is a Workflow.'),
     open: async (page) => {
-      await page
-        .getByRole('group', { name: '直接开始' })
-        .getByRole('button', { name: '新功能开发', exact: true })
-        .click();
+      await pickWorkflow(page, '新功能开发');
       await page.getByText('更多选项').click();
       return page.getByLabel('标题');
     },

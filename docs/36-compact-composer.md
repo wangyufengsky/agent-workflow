@@ -1,6 +1,6 @@
 # 36 · 精简助手输入区
 
-> 状态：**设计稿，待用户确认**（2026-10-24）。决策 D143–D145 为推荐方案、待用户检查；需要拍板的取舍见 §8。确认前不改代码；确认后按 §9 实施（05 的 Y 系列），并把结论同步进 15 §6 / §6.2、28 §2、30 §2、14 §3.2 / §8。
+> 状态：**用户已确认**（2026-10-24，§8 五个问题都按推荐方案），**已实现**（05 的 Y-02…Y-05，待用户检查）。决策 D143–D145。结论已同步进 15 §6 / §6.2、19 §2、28 §2、30 §2、14 §3.2 / §8；实现与本文的出入见 §7 末尾。
 
 ## 1. 要解决的问题
 
@@ -153,7 +153,7 @@
 
 | 动效 | 规格 | `prefers-reduced-motion: reduce` |
 | --- | --- | --- |
-| 面板展开 | 高度 0 → 自动，`interpolate-size: allow-keywords` + `transition: height`，0.28s `--ease-spring`；`@starting-style` 配合 `transition-behavior: allow-discrete` 处理从 `hidden` 到显示 | 不做高度动画，直接出现 |
+| 面板展开 | 高度 0 → 自动，`interpolate-size: allow-keywords` + `transition: height`，0.28s（`--t-mid`）`--ease`；`@starting-style` 配合 `transition-behavior: allow-discrete` 处理从 `hidden` 到显示 | 不做高度动画，直接出现 |
 | 胶囊出现 | 每个胶囊淡入并上移 4px，0.2s，按序号错开 15ms（`--i` 自定义属性，11 个约 0.15s 内全部出现） | 无 |
 | 面板收起 | 高度与透明度反向，0.16s，结束后 `hidden` | 直接消失 |
 | 「▾」 | 展开时旋转 180°，`--t-fast` | 不旋转（仍以 `aria-expanded` 表达） |
@@ -183,7 +183,7 @@ Electron 44（Chromium 140 以上）与 Playwright 的 Chromium 都支持 `inter
 | --- | --- |
 | `+` 按钮 | `aria-label`「添加资料与上下文」 |
 | 菜单项 | 「上传文件…」「项目文件…」「附上选中文字…」「附上任务详情」「附上步骤详情」 |
-| 直接开始 | 「直接开始」（不变）；面板 `aria-label`「选择流程开始任务」；自定义流程小标题「自定义」；开始任务标签的按钮 `aria-label`「换一个流程」 |
+| 直接开始 | 「直接开始」（不变）；面板 `aria-label`「选择流程开始任务」；自定义流程小标题「自定义」；开始任务标签的按钮 `aria-label`「换一个流程 · 开始任务 · {流程名}」 |
 | 用量 | 按钮 `aria-label`「助手用量」；提示为最近一轮的一句摘要；浮层内容不变（`ASSISTANT_USAGE_COPY`） |
 | 删除 | `HOME_COPY.askHint`（「问助手 · 选一个流程可直接开始任务」） |
 
@@ -204,6 +204,10 @@ Electron 44（Chromium 140 以上）与 Playwright 的 Chromium 都支持 `inter
 | 图标 | `plus`、`paperclip`、`folder` 已有；用量图标新增一个（细线圆环 + 指针的「仪表」），与现有图标同一套 24 网格、描边由 `.i` 统一设定（1.7） |
 
 不改：后端、shared 契约、`assistant_turns`、SSE、附件与快照的接口。
+
+与上表的出入（实现时）：附件条拆为 `useAttachmentPickers`（隐藏的文件选择框与项目文件对话框，返回两个打开函数）与 `AttachmentList`，没有单独的 `AttachmentMenuItems` 组件；`context-attachments.tsx` 改为 `useContextAttachments`，返回菜单项、`capture` 与两个弹窗；「+」菜单打开时聚焦第一项靠原生 `toggle` 事件（React 不转发弹层的 `toggle`）。开始任务标签上换流程的按钮可访问名称为「换一个流程 · 开始任务 · 修 Bug」，不以「开始」开头，以免与「开始」按钮混淆。面板高度动画用 `--ease` 而不是回弹曲线：高度回弹会露出裁切。
+
+实现中顺带修的两处：①「+」菜单与用量浮层靠 `popovertarget` 的隐式锚点定位，Chromium 里 `position-anchor` 的初始值是 `normal`，要写 `position-anchor: auto` 才会用它（否则浮层落在窗口左上角）。② 输入区变矮后，J9 的「助手图表」在 1280 × 800 的首屏里露出了环形图，axe 报中心合计文字对比度不足。根因：系列色类同时给 SVG 圆环设了 `background`（本来只给 HTML 色块用），SVG 不画它，axe 却把它当作文字背后的颜色；`.ring circle` 去掉 `background` 后四套主题都通过，画面不变。
 
 ## 8. 需要用户拍板的取舍
 

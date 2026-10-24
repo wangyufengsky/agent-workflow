@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import { test } from './assistant-fixtures.ts';
 import { API_BASE, AUTH } from './env.ts';
-import { createProject, patchSettings, queueAssistantTurn } from './helpers.ts';
+import { addFromMenu, createProject, patchSettings, pickWorkflow, queueAssistantTurn } from './helpers.ts';
 
 test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
 
@@ -31,7 +31,7 @@ test('任务详情快照可预览移除，与文件一起随侧栏消息发送',
   await expect(panel.getByRole('button', { name: '切换对话', exact: true })).toHaveText('新对话');
   await expect(panel.getByLabel('发给助手的消息')).toBeEnabled();
   const snapshotName = `${task.key}-任务上下文.txt`;
-  await panel.getByRole('button', { name: '附上任务详情', exact: true }).click();
+  await addFromMenu(panel, '附上任务详情');
   const preview = page.getByRole('dialog', { name: snapshotName });
   await expect(preview).toContainText('导出订单时保留前导零');
   await expect(preview).toContainText('采集时间：');
@@ -41,10 +41,12 @@ test('任务详情快照可预览移除，与文件一起随侧栏消息发送',
   await attachments.getByRole('button', { name: `移除 ${snapshotName}` }).click();
   await expect(attachments).toBeHidden();
 
-  await panel.getByRole('button', { name: '附上任务详情', exact: true }).click();
+  await addFromMenu(panel, '附上任务详情');
   await expect(preview).toContainText('导出订单时保留前导零');
   await preview.getByRole('button', { name: '关闭', exact: true }).click();
-  await panel.locator('input[type="file"]').setInputFiles({
+  const chooser = page.waitForEvent('filechooser');
+  await addFromMenu(panel, '上传文件…');
+  await (await chooser).setFiles({
     name: '说明.txt',
     mimeType: 'text/plain',
     buffer: Buffer.from('只影响 CSV 导出'),
@@ -75,7 +77,8 @@ test('主页显式选中文字可修改后附上；开始任务模式不显示�
     selection?.removeAllRanges();
     selection?.addRange(range);
   });
-  await page.getByRole('button', { name: '附上选中文字', exact: true }).click();
+  // The selection is read as「+」is pressed, so picking the item afterwards still has it (36 §4).
+  await addFromMenu(page, '附上选中文字…');
   const input = page.getByRole('dialog', { name: '附上文字', exact: true });
   await expect(input.getByLabel('要附上的文字')).toHaveValue('万事皆流程，执行由你掌控。');
   await input.getByLabel('要附上的文字').fill('订单导出仍然丢失前导零');
@@ -94,13 +97,19 @@ test('主页显式选中文字可修改后附上；开始任务模式不显示�
   await page.getByRole('button', { name: '查看 选中文字.txt' }).click();
   await expect(preview).toContainText('订单导出仍然丢失前导零');
   await preview.getByRole('button', { name: '关闭', exact: true }).click();
-  await page
-    .getByRole('group', { name: '直接开始' })
-    .getByRole('button', { name: /修 Bug/ })
-    .click();
-  await expect(page.getByRole('button', { name: '附上选中文字', exact: true })).toBeHidden();
+  await pickWorkflow(page, /修 Bug/);
+  const add = page.getByRole('button', { name: '添加资料与上下文', exact: true });
+  await add.click();
+  await expect(page.getByRole('menuitem', { name: '项目文件…', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: '附上选中文字…', exact: true })).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(add).toBeFocused();
   await page.getByRole('button', { name: '改为问助手' }).click();
-  await expect(page.getByRole('button', { name: '附上选中文字', exact: true })).toBeVisible();
+  await add.click();
+  // Opening focuses the first item; arrow keys move through the menu, the last item being the context one.
+  await expect(page.getByRole('menuitem', { name: '上传文件…', exact: true })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('menuitem', { name: '附上选中文字…', exact: true })).toBeFocused();
 });
 
 test('生成中的文字快照被移除后，迟到的响应不会重开预览或带入消息', async ({ page, request }) => {
@@ -114,7 +123,7 @@ test('生成中的文字快照被移除后，迟到的响应不会重开预览�
     await route.fulfill({ response });
   });
   await page.goto('/');
-  await page.getByRole('button', { name: '附上选中文字', exact: true }).click();
+  await addFromMenu(page, '附上选中文字…');
   await page.getByLabel('要附上的文字').fill('这段文字不发送');
   await page.getByRole('button', { name: '添加到消息' }).click();
   await received.promise;

@@ -269,6 +269,9 @@
   transform: rotate(-90deg);
 }
 .ring circle {
+  /* The tone class's background is for HTML swatches; SVG never paints it, but a11y checkers read it as the colour
+     behind the total in the ring's hole. */
+  background: none;
   fill: none;
   stroke: var(--tone);
   stroke-width: 6;

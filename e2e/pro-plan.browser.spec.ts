@@ -4,6 +4,7 @@ import {
   type E2EProject,
   passReview,
   patchSettings,
+  pickWorkflow,
   queueTurn,
   submitResult,
   TASK_RUN_TIMEOUT_MS,
@@ -17,10 +18,7 @@ test.afterAll(({ request }) => patchSettings(request, { 'ui.mode': 'simple' }));
 /** A bug-fix task (template plan: 定位根因 → 修复), optionally waiting for the plan to be confirmed. */
 async function startBugfix(page: Page, project: E2EProject, requirement: string, confirmPlan: boolean) {
   await page.goto(`/?projectId=${project.id}`);
-  await page
-    .getByRole('group', { name: '直接开始' })
-    .getByRole('button', { name: /修 Bug/ })
-    .click();
+  await pickWorkflow(page, /修 Bug/);
   await page.getByLabel('需求').fill(requirement);
   if (confirmPlan) await page.getByLabel('运行前让我确认计划').check();
   await page.getByRole('button', { name: /^开始/ }).click();
