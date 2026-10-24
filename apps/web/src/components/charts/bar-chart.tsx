@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { INSIGHTS_COPY as C, formatDay } from '../../copy/insights.ts';
-import styles from './insights.module.css';
+import styles from './charts.module.css';
+import { type SeriesTone, toneClass } from './series.ts';
+import { niceTicks } from './ticks.ts';
 
-/** Series colours: theme tokens by position (insights.module.css `.s0`…`.s7`), and a neutral one for the rest. */
-export const SERIES_TONES = ['s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7'] as const;
-export type SeriesTone = (typeof SERIES_TONES)[number] | 'sRest';
 /** A series and its colour. */
 export type BarSeries = { name: string; tone: SeriesTone };
 /** One day: a value per series, in the order of the chart's series. */
@@ -13,26 +12,10 @@ export type BarDay = { date: string; values: readonly { series: BarSeries; value
 /** About this many date labels fit under the bars at 1280 wide. */
 const MAX_DATE_LABELS = 10;
 
-/** Round ticks (steps of 1, 2 or 5 × 10ⁿ, about four of them) from 0 to the first one at or above `max`. */
-export function niceTicks(max: number): number[] {
-  if (max <= 0) return [0];
-  const rough = max / 4;
-  const magnitude = 10 ** Math.floor(Math.log10(rough));
-  const step =
-    rough <= magnitude
-      ? magnitude
-      : rough <= 2 * magnitude
-        ? 2 * magnitude
-        : rough <= 5 * magnitude
-          ? 5 * magnitude
-          : 10 * magnitude;
-  const count = Math.ceil(max / step);
-  return Array.from({ length: count + 1 }, (_, i) => i * step);
-}
-
 /**
- * Per-day bars with the series stacked (D80: no chart library). The hovered or focused day is read out above the
- * bars; a visually hidden table carries the same numbers for screen readers.
+ * Columns of bars, the series stacked or side by side (D80: no chart library); by day unless `formatDate` says
+ * otherwise. The hovered or focused column is read out above the bars; a visually hidden table carries the same
+ * numbers for screen readers.
  */
 export function BarChart({
   label,
@@ -42,7 +25,9 @@ export function BarChart({
   formatAxis,
   formatDate = formatDay,
   tableCaption = C.trendTable,
+  columnHeader = C.date,
   max,
+  stacked = true,
 }: {
   label: string;
   series: readonly BarSeries[];
@@ -52,11 +37,17 @@ export function BarChart({
   /** A column's label; days by default, a bucket's first day otherwise. */
   formatDate?: (date: string) => string;
   tableCaption?: string;
+  /** The table's header over the column labels. */
+  columnHeader?: string;
   /** The axis' top when the values have a fixed range (a rate's 1), whatever the data reach. */
   max?: number;
+  /** false puts the series side by side in each column. */
+  stacked?: boolean;
 }) {
   const [active, setActive] = useState<BarDay | null>(null);
-  const ticks = niceTicks(max ?? Math.max(0, ...days.map((d) => d.values.reduce((sum, v) => sum + v.value, 0))));
+  const reach = (day: BarDay) =>
+    stacked ? day.values.reduce((sum, v) => sum + v.value, 0) : Math.max(0, ...day.values.map((v) => v.value));
+  const ticks = niceTicks(max ?? Math.max(0, ...days.map(reach)));
   const top = Math.max(...ticks);
   const height = (value: number) => (top === 0 ? 0 : (value / top) * 100);
   const every = Math.ceil(days.length / MAX_DATE_LABELS);
@@ -70,7 +61,7 @@ export function BarChart({
           <span className={styles.legend}>
             {series.map((s) => (
               <span key={s.name}>
-                <i className={styles[s.tone]} aria-hidden="true" />
+                <i className={toneClass(s.tone)} aria-hidden="true" />
                 {s.name}
               </span>
             ))}
@@ -91,6 +82,7 @@ export function BarChart({
               key={day.date}
               type="button"
               className={styles.column}
+              data-grouped={stacked ? undefined : ''}
               aria-label={readout(day)}
               onMouseEnter={() => setActive(day)}
               onMouseLeave={() => setActive(null)}
@@ -100,7 +92,7 @@ export function BarChart({
               {day.values.map((v) => (
                 <span
                   key={v.series.name}
-                  className={`${styles.segment} ${styles[v.series.tone]}`}
+                  className={`${styles.segment} ${toneClass(v.series.tone)}`}
                   style={{ height: `${height(v.value)}%` }}
                 />
               ))}
@@ -117,7 +109,7 @@ export function BarChart({
         <caption>{tableCaption}</caption>
         <thead>
           <tr>
-            <th>{C.date}</th>
+            <th>{columnHeader}</th>
             {series.map((s) => (
               <th key={s.name}>{s.name}</th>
             ))}

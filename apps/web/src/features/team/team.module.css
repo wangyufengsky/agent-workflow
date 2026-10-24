@@ -1,4 +1,4 @@
-/* 团队（33 §5）：颜色只用主题令牌，图表的系列色沿用 insights.module.css 的 .s0….s7 */
+/* 团队（33 §5）：颜色只用主题令牌，图表的系列色用 components/charts 的 .s0….s7 */
 .toolbar {
   display: flex;
   flex-wrap: wrap;

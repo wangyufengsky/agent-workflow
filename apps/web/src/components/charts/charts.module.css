@@ -1,0 +1,445 @@
+/* 共用图表（35 §5.1）：质量与用量、团队、助手的图都用这里的样式 */
+
+/* 系列颜色只用主题令牌（D80）：`--tone` 给 SVG 的描边与填充用，background 给 HTML 的色块用 */
+.s0 {
+  --tone: var(--accent);
+  background: var(--tone);
+}
+.s1 {
+  --tone: var(--role-2);
+  background: var(--tone);
+}
+.s2 {
+  --tone: var(--role-3);
+  background: var(--tone);
+}
+.s3 {
+  --tone: var(--role-4);
+  background: var(--tone);
+}
+.s4 {
+  --tone: var(--role-5);
+  background: var(--tone);
+}
+.s5 {
+  --tone: var(--role-6);
+  background: var(--tone);
+}
+.s6 {
+  --tone: var(--ok);
+  background: var(--tone);
+}
+.s7 {
+  --tone: var(--warn);
+  background: var(--tone);
+}
+.sRest {
+  --tone: var(--sub);
+  background: var(--tone);
+}
+.chart {
+  margin: 0;
+}
+.readout {
+  min-height: 20px;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: var(--s-3);
+}
+.legend {
+  display: inline-flex;
+  gap: var(--s-4);
+  color: var(--sub);
+}
+.legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.plot {
+  position: relative;
+  height: 180px;
+  margin-left: 56px;
+}
+.tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--line);
+}
+.tick span {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: -8px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 3px;
+}
+.column {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column-reverse;
+  border-radius: var(--r-xs) var(--r-xs) 0 0;
+}
+.column:hover,
+.column:focus-visible {
+  background: var(--fill-2);
+}
+.segment {
+  display: block;
+  width: 100%;
+  opacity: 0.85;
+}
+.column:hover .segment,
+.column:focus-visible .segment {
+  opacity: 1;
+}
+.segment:last-child {
+  border-radius: var(--r-xs) var(--r-xs) 0 0;
+}
+.dates {
+  display: flex;
+  gap: 3px;
+  margin: 6px 0 0 56px;
+}
+.dates span {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+/* 并排的柱（不堆叠）：同一列里各系列左右排开 */
+.column[data-grouped] {
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 1px;
+  /* Room between the groups, so each category's bars read as one. */
+  padding: 0 10%;
+}
+.column[data-grouped] .segment {
+  border-radius: var(--r-xs) var(--r-xs) 0 0;
+}
+
+/* 横向条：类别名在左、条在中、数值在右 */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 32%) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 22px;
+  padding: 0 var(--s-1);
+  border-radius: var(--r-xs);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  text-align: left;
+}
+.row:hover,
+.row:focus-visible {
+  background: var(--fill-2);
+}
+.rowLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.track {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  height: 14px;
+}
+.track[data-stacked] {
+  flex-direction: row;
+  justify-content: flex-start;
+}
+.track > i {
+  display: block;
+  flex: 1 1 0;
+  min-height: 3px;
+  border-radius: 0 var(--r-xs) var(--r-xs) 0;
+  opacity: 0.85;
+}
+.track[data-stacked] > i {
+  flex: none;
+  height: 100%;
+  border-radius: 0;
+}
+.track[data-stacked] > i:last-child {
+  border-radius: 0 var(--r-xs) var(--r-xs) 0;
+}
+.rowValue {
+  font-variant-numeric: tabular-nums;
+  color: var(--sub);
+}
+
+/* 折线：SVG 只画线，刻度、点与读数是 HTML */
+.lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.lines polyline {
+  fill: none;
+  stroke: var(--tone);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.lines polyline[data-dash="1"] {
+  stroke-dasharray: 6 4;
+}
+.lines polyline[data-dash="2"] {
+  stroke-dasharray: 2 3;
+}
+.zero {
+  border-top: 1px solid var(--line-3);
+}
+.point {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line-3);
+  pointer-events: none;
+}
+.slots {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.slot {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* 环形饼图：图例在右，窄时在下 */
+.pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-4);
+}
+.ring {
+  position: relative;
+  flex: none;
+  width: 140px;
+  height: 140px;
+}
+.ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.ring circle {
+  fill: none;
+  stroke: var(--tone);
+  stroke-width: 6;
+  transition: opacity var(--t-fast);
+}
+.ring[data-active] circle:not([data-active]) {
+  opacity: 0.3;
+}
+.total {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+.total strong {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--ink);
+}
+.total span {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.slices {
+  flex: 1 1 160px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.slice {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: 2px var(--s-1);
+  border-radius: var(--r-xs);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.slice:hover,
+.slice:focus-visible {
+  background: var(--fill-2);
+}
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.slice > span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.slice > span:last-child {
+  min-width: 3.2em;
+  text-align: right;
+  color: var(--muted);
+}
+
+/* 流程图：SVG 画形状与连线，文字是 HTML；最宽一层超出时在自己的框里横向滚动 */
+.flowScroll {
+  overflow-x: auto;
+  padding-bottom: var(--s-1);
+}
+.flow {
+  position: relative;
+  margin: 0 auto;
+}
+.flow svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.shape {
+  fill: var(--frost-card);
+  stroke: var(--line-3);
+  stroke-width: 1;
+}
+.shape[data-shape="decision"] {
+  fill: var(--accent-fill);
+  stroke: var(--accent-line);
+}
+.shape[data-shape="terminal"] {
+  fill: var(--fill-2);
+}
+.edge {
+  fill: none;
+  stroke: var(--line-3);
+  stroke-width: 1.25;
+}
+.edge[data-back] {
+  stroke-dasharray: 4 3;
+}
+.arrow {
+  fill: var(--line-3);
+}
+.nodeLabel {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--s-2);
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+  color: var(--ink);
+  text-align: center;
+}
+.nodeLabel > span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.nodeLabel[data-shape="decision"] {
+  padding: 0 var(--s-5);
+  font-size: var(--fs-xs);
+}
+.edgeLabel {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  color: var(--sub);
+  white-space: nowrap;
+}
+
+/* 新到达的图从 0 长到目标值；回看旧对话时不播放（35 §5.4） */
+.grow .bars {
+  animation: grow-up 0.42s var(--ease) both;
+  transform-origin: bottom;
+}
+.grow .track {
+  animation: grow-right 0.42s var(--ease) both;
+  transform-origin: left;
+}
+.grow .ring,
+.grow .lines {
+  animation: fade-ring 0.42s var(--ease) both;
+}
+@keyframes grow-up {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes grow-right {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes fade-ring {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .grow .bars,
+  .grow .track,
+  .grow .ring,
+  .grow .lines {
+    animation: none;
+  }
+}

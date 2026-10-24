@@ -1,6 +1,7 @@
 import {
   type AssistantConfirmationDTO,
   type AssistantConversationDTO,
+  AssistantToolName,
   MCP_ASSISTANT_TOOL_PREFIX,
   needsConfirmationOutputSchema,
   PermissionDecision,
@@ -34,6 +35,7 @@ import {
 } from './assistant.queries.ts';
 import { AssistantWelcome } from './assistant-welcome.tsx';
 import cards from './cards.module.css';
+import { ChartCard } from './chart-card.tsx';
 import { ConfirmationCard } from './confirmation-card.tsx';
 import { EntityCard } from './entity-card.tsx';
 import { ReplyMarkdown } from './reply-markdown.tsx';
@@ -48,6 +50,15 @@ function waitsForConfirmation(tool: string, result: ToolResult | undefined): boo
   if (!tool.startsWith(MCP_ASSISTANT_TOOL_PREFIX)) return false;
   if (result?.data.status !== 'completed' || result.data.output === undefined) return false;
   return needsConfirmationOutputSchema.safeParse(JSON.parse(result.data.output)).success;
+}
+
+const CHART_TOOLS: ReadonlySet<string> = new Set(
+  [AssistantToolName.ShowChart, AssistantToolName.ShowFlowchart].map((name) => `${MCP_ASSISTANT_TOOL_PREFIX}${name}`),
+);
+
+/** In simple mode a chart stands for the call that drew it; a failed call still shows (35 §5.4). */
+function drewChart(tool: string, result: ToolResult | undefined): boolean {
+  return CHART_TOOLS.has(tool) && result?.data.status === 'completed';
 }
 
 function AttachmentCard({ conversationId, path }: { conversationId: string; path: string }) {
@@ -128,7 +139,7 @@ type Rendered = {
 
 const keyOf = (entry: TranscriptEntry) => ('partId' in entry ? entry.partId : entry.seq);
 
-function Body({ entry, ctx }: { entry: TranscriptEntry; ctx: Rendered }): ReactNode {
+function Body({ entry, ctx, fresh }: { entry: TranscriptEntry; ctx: Rendered; fresh: boolean }): ReactNode {
   switch (entry.kind) {
     case TranscriptEntryKind.UserMessage:
       return (
@@ -156,6 +167,7 @@ function Body({ entry, ctx }: { entry: TranscriptEntry; ctx: Rendered }): ReactN
     case TranscriptEntryKind.ToolCall: {
       const result = ctx.results.get(entry.data.callId);
       if (waitsForConfirmation(entry.data.tool, result)) return null;
+      if (!ctx.pro && drewChart(entry.data.tool, result)) return null;
       // Only a call of the turn in progress can still run; one left without a result earlier was stopped.
       const running = ctx.conversation.busy && entry.seq > ctx.turnStart;
       return <ToolRow call={entry} result={result} busy={running} pro={ctx.pro} />;
@@ -180,8 +192,7 @@ function Body({ entry, ctx }: { entry: TranscriptEntry; ctx: Rendered }): ReactN
     case TranscriptEntryKind.EntityRef:
       return <EntityCard entity={entry.data} />;
     case TranscriptEntryKind.Chart:
-      // TODO(V-04): the chart card, once the shared chart components land with PR #77 (35 §5).
-      return null;
+      return <ChartCard chart={entry.data.chart} fresh={fresh} />;
     case TranscriptEntryKind.System:
       return <p className={styles.system}>{TRANSCRIPT_SYSTEM_LABEL[entry.data.event]}</p>;
     case TranscriptEntryKind.Error: {
@@ -205,8 +216,19 @@ function Body({ entry, ctx }: { entry: TranscriptEntry; ctx: Rendered }): ReactN
   }
 }
 
-const Message = memo(function Message({ entry, ctx, step }: { entry: TranscriptEntry; ctx: Rendered; step: number }) {
-  const body = Body({ entry, ctx });
+const Message = memo(function Message({
+  entry,
+  ctx,
+  step,
+  fresh,
+}: {
+  entry: TranscriptEntry;
+  ctx: Rendered;
+  step: number;
+  /** Arrived after the conversation opened: a chart grows in (35 §5.4). */
+  fresh: boolean;
+}) {
+  const body = Body({ entry, ctx, fresh });
   if (body === null) return null;
   return (
     <div className={styles.message} data-kind={entry.kind} data-step={step}>
@@ -283,6 +305,7 @@ function Stream({
             entry={entry}
             ctx={ctx}
             step={i < opened ? Math.max(0, STAGGER_STEPS - (opened - i)) : 0}
+            fresh={i >= opened}
           />
         ))}
         {thinking && <Thinking />}
