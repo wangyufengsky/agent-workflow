@@ -159,6 +159,16 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 批次没有状态枚举：进度由子任务的 `TaskDisplayGroup` 汇总（`batchCounts`），「待合并」由 `isBatchDeliverable` 判断（`shared/batch/batch.ts`，D85）。
 
+### 2.10a 需求计划（v1.3，`enums/initiative.ts`，34 §6）
+
+| 枚举 | 值 | 说明 |
+| --- | --- | --- |
+| `InitiativeStatus` | `draft_ready` · `in_progress` · `phase_done` · `done` | 需求计划的显示状态，由 `initiativeStatusOf` 推导，不存：草稿待确认（`confirmed_rev < breakdown_rev`）/ 已开启阶段还有未完成的工作包 / 已开启阶段全部完成、还有未开启的阶段 / 全部完成 |
+| `InitiativeItemStatus` | `dropped` · `satisfied` · `pr_open` · `in_task` · `phase_closed` · `waiting` · `ready` | 工作包的显示状态，由 `initiativeItemStatusOf` 推导：已放弃 / 已满足（本地合并进基础分支、报告完成、PR 经用户确认已合入，`isInitiativeItemDone`）/ 已开 PR 待确认合入 / 任务进行中（任务未到终态，含失败）/ 阶段未开启 / 依赖未完成 / 可以开始（没开始过，或任务已取消、合并到了别的分支）。`dropped` 与 `satisfied` 对下游视为完成 |
+| `InitiativeTemplateKind` | `builtin` | 组合模板的来源；自定义模板随 N-11 加入 |
+
+需求计划没有状态机：开启的阶段（`opened_phase`）与两个版本号只增不减，是事实。只有从没开始过、没有开始失败记录的 `ready` 工作包会被自动开始；取消或开始失败后由用户「开始」。
+
 ### 2.11 定时任务（v1.2，`enums/schedule.ts`）
 
 | 枚举 | 值 | 说明 |
@@ -241,6 +251,9 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TASK_KEY_PREFIX` | `T-` | 任务编号 `T-<自增>` |
 | `BATCH_KEY_PREFIX` | `B-` | 批次编号 `B-<自增>`（20 §6） |
 | `BATCH_TARGET_PLACEHOLDER` | `{{target}}` | 批次需求模板中唯一的占位符，替换为每个目标（`renderBatchRequirement`，20 §2） |
+| `INITIATIVE_KEY_PREFIX` | `I-` | 需求计划编号 `I-<seq>` |
+| `INITIATIVE_TEMPLATE_PLACEHOLDER` | `{{requirement}}` | 组合模板工作包需求中唯一的占位符，替换为用户写的需求（`renderTemplateRequirement`，34 §15.2） |
+| `INITIATIVE_BACKGROUND_NAME` | `需求计划背景.md` | 每个工作包的任务开始时生成的背景附件名（34 §7） |
 | `DB_DEFAULT_PORT` | `mysql` 3306 · `postgresql` 5432 · `opengauss` 5432 · `sqlserver` 1433 · `goldendb` 3306 | 连接表单按类型预填的端口（24 §2） |
 | `DB_READ_ONLY_STATEMENTS` | `mysql` / `goldendb`：SELECT SHOW DESCRIBE DESC EXPLAIN · `postgresql` / `opengauss`：SELECT SHOW EXPLAIN · `sqlserver`：SELECT | `db_query` 按连接类型允许的首关键字（24 §4）；语句检查、MCP 工具说明与界面文案都从它生成（`readOnlyStatementGroups`） |
 | `BRANCH_PREFIX` | `aw/` | 分支名 `aw/<taskKey>-<slug>` |
@@ -302,6 +315,9 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX` | 50 / 100（任务与「需要你处理」列表每页条数，11 §1） |
 | `BATCH_TARGETS_MAX` | 20（一个批次的目标数，D85） |
 | `BATCH_TARGET_MAX_CHARS` | 500（一个目标，单行） |
+| `INITIATIVE_ITEMS_MAX` / `INITIATIVE_PHASES_MAX` / `INITIATIVE_SOURCES_MAX` | 30 / 6 / 9（一个需求计划的工作包、阶段、资料附件数；资料留一个位置给背景附件，34 §11） |
+| `INITIATIVE_TITLE_MAX_CHARS` / `INITIATIVE_ITEM_REQUIREMENT_MAX_CHARS` | 60 / 同 `REQUIREMENT_MAX_CHARS`（工作包标题；工作包的需求就是任务的需求） |
+| `INITIATIVE_PHASE_TITLE_MAX_CHARS` / `INITIATIVE_PHASE_GOAL_MAX_CHARS` / `INITIATIVE_REASON_MAX_CHARS` | 40 / 500 / 2000（阶段标题与目标、「不做这一项」的原因） |
 | `SCHEDULE_CHECK_INTERVAL_MS` | 60 000（定时器最长等这么久就检查一次到期的定时任务，22 §4） |
 | `SCHEDULE_CATCH_UP_AFTER_MS` | 300 000（晚于计划时刻超过它即为补跑） |
 | `SCHEDULE_RUNS_SHOWN` | 20（定时任务页列出的最近运行数） |
@@ -479,6 +495,12 @@ class AppError extends Error {
 | `ASSISTANT_CONTEXT_CHANGED` | 409 | 关联等待期间当前预览或对话已切换；该消息尚未发送，保留草稿供用户确认后重试 |
 | **批量任务（v1.1）** | | |
 | `BATCH_NOT_FOUND` | 404 | 批次不存在（所属项目已删除时随之删除） |
+| `INITIATIVE_NOT_FOUND` | 404 | 需求计划不存在（所属项目已删除时随之删除） |
+| `INITIATIVE_BREAKDOWN_INVALID` | 400 | 阶段与工作包不合规则；`details.problems[]` 的子码 `InitiativeProblemCode`：`DUPLICATE_KEY` · `UNKNOWN_DEPENDENCY` · `CYCLE` · `DEPENDENCY_PHASE`（依赖更晚的阶段）· `EMPTY_PHASE` · `PHASE_OUT_OF_RANGE` · `UNKNOWN_WORKFLOW`（流程不存在或是系统流程）· `TEMPLATE_REQUIREMENT_MISSING`（模板没有一个工作包含 `{{requirement}}`）· `ITEM_NOT_EDITABLE`（改动或删除了已开始、已完成或已放弃的工作包），各带 `itemKey`（`validateInitiativeDraft`，34 §8.3） |
+| `INITIATIVE_NOT_EDITABLE` | 409 | 需求计划当前的状态不允许这个操作（没有可确认的草稿、草稿未确认时开启阶段、删去已开启的阶段）；`details.status` |
+| `INITIATIVE_PHASE_NOT_READY` | 409 | 不是下一个阶段，或之前阶段还有未完成的工作包；`details.openedPhase`、`details.items` |
+| `INITIATIVE_ITEM_NOT_READY` | 409 | 工作包当前的状态不允许这个操作（开始、标记已合入、放弃），或开始时被另一次开始抢先；`details.status` |
+| `INITIATIVE_TEMPLATE_NOT_FOUND` | 404 | 组合模板不存在 |
 | **定时任务（v1.2）** | | |
 | `SCHEDULE_NOT_FOUND` | 404 | 定时任务不存在（已删除，或所属项目已删除） |
 | `SCHEDULE_BUSY` | 409 | 「立即运行一次」时上一次开出的任务还没结束（22 §7） |
@@ -577,7 +599,7 @@ class AppError extends Error {
 | 枚举／类型 | 值 |
 | --- | --- |
 | AttachmentSource | upload · project_file |
-| AttachmentOwnerKind | task_input（owner 为任务）· task_feedback（owner 为追加的修改节点）· assistant_message（owner 为助手对话） |
+| AttachmentOwnerKind | task_input（owner 为任务）· task_feedback（owner 为追加的修改节点）· assistant_message（owner 为助手对话）· initiative（owner 为需求计划：资料原件，每个工作包的任务再引用一次，34 §7） |
 | AssistantToolName 增量（U-02 已实现） | read_attachment |
 | InputRef 增量（U-03 已实现） | attachment（确认卡把附件 ID 显示为文件名） |
 | McpToolName 增量（U-02 已实现） | read_attachment |

@@ -18,6 +18,8 @@ export const AttachmentOwnerKind = {
   TaskFeedback: 'task_feedback',
   /** A user message of an assistant conversation; the owner is the conversation. */
   AssistantMessage: 'assistant_message',
+  /** The source material of an initiative; each work package's task references it again (34 §7). */
+  Initiative: 'initiative',
 } as const;
 export type AttachmentOwnerKind = (typeof AttachmentOwnerKind)[keyof typeof AttachmentOwnerKind];
 export const attachmentOwnerKindSchema = z.enum(AttachmentOwnerKind);

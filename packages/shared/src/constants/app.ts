@@ -28,6 +28,12 @@ export const TASK_KEY_PREFIX = 'T-';
 export const BATCH_KEY_PREFIX = 'B-';
 /** The one placeholder of a batch's requirement template, replaced by each target (20 §2). */
 export const BATCH_TARGET_PLACEHOLDER = '{{target}}';
+/** An initiative is shown as `I-<seq>` (34 §9). */
+export const INITIATIVE_KEY_PREFIX = 'I-';
+/** The one placeholder of a composition template's requirements, replaced by the user's requirement (34 §15.2). */
+export const INITIATIVE_TEMPLATE_PLACEHOLDER = '{{requirement}}';
+/** Name of the attachment each work package's task gets about the initiative (34 §7). */
+export const INITIATIVE_BACKGROUND_NAME = '需求计划背景.md';
 export const BRANCH_PREFIX = 'aw/';
 export const BRANCH_SLUG_MAX = 40;
 /** Project slug: the project's directory name under the worktree root. */

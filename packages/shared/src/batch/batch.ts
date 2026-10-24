@@ -3,9 +3,12 @@ import type { DeliveryDTO } from '../contracts/api/delivery.ts';
 import { DeliveryStatus } from '../enums/git.ts';
 import { TASK_DISPLAY_GROUPS, type TaskDisplayGroup, TaskStatus } from '../enums/task.ts';
 
-/** A task's requirement in a batch: every placeholder of the template replaced by the target (20 §2). */
+/**
+ * A task's requirement in a batch: every placeholder of the template replaced by the target (20 §2), literally — a
+ * replacement string would read `$&` and the like in the target as patterns.
+ */
 export const renderBatchRequirement = (template: string, target: string): string =>
-  template.replaceAll(BATCH_TARGET_PLACEHOLDER, target);
+  template.replaceAll(BATCH_TARGET_PLACEHOLDER, () => target);
 
 /** How many tasks of a batch are in each display group (20 §4): the groups that have tasks, in display order. */
 export function batchCounts(groups: readonly TaskDisplayGroup[]): Array<{ group: TaskDisplayGroup; count: number }> {

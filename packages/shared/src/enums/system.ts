@@ -124,6 +124,8 @@ export const ServerEventType = {
   TeamAnalysisUpdated: 'team_analysis.updated',
   /** A schedule was created, changed, ran or was deleted (22 §9). */
   ScheduleUpdated: 'schedule.updated',
+  /** An initiative was created, edited, confirmed, opened a phase or started a work package (34 §10). */
+  InitiativeUpdated: 'initiative.updated',
   /** A task's page preview changed state (29 §4.2). */
   PreviewUpdated: 'preview.updated',
   /** An AI browser action left a frame (29 §8.2). */

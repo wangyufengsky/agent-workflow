@@ -206,7 +206,8 @@ modules/tasks/
 - 浏览器（v1.3，29 §5、§11）：`browser` 在 `previews`、`projects`、`settings` 之上，将来的 `acceptance`、`mcp`、`assistant` 之下；尝试结束与预览换端口经事件总线得知，不依赖 `attempts`。宿主由 `AppDeps.browserHost` 注入（`main.ts` 按环境选择）。
 - PPT（v1.2，23 §12）：`decks` 在 `attempts`、`projects`、`tasks`（任务结果快照）、`knowledge`（对话快照）、`inbox` 之上，`mcp` 与 `assistant` 之下；PPT 尝试的 `task_id` 为空，由 `deck_runs` 指向。删除项目时 PPT 的 `project_id` 由外键置空，`tasks` 不需要知道 PPT。
 - Git 工作台（v1.2，27）：`repository` 在 `projects`（项目与远端令牌）、`tasks`（任务分支的归属、合并任务）、`worktrees`、`delivery`（`mergeAsUser`：与交付共用一套合并实现，只换身份与钩子）之上；`git-reviews` 在 `attempts`、`projects`、`roles`、`settings` 之上，`tasks`（删除项目）与 `mcp` 之下，审查尝试的 `task_id` 为空，由 `git_reviews` 指向。
-- 批量任务（v1.1，20 §9）：`batches` 在 `tasks`、`workflows`、`settings` 之上，`assistant` 之下；`tasks` 不知道批次（批次表引用任务表）。
+- 批量任务（v1.1，20 §9）：`batches` 在 `tasks`、`workflows`、`settings` 之上，`assistant` 之下；`tasks` 不知道批次（批次表引用任务表）。两者共用 `tasks.deliverOutcome`（交付一个任务并返回结果，冲突与检查失败不抛错）。
+- 需求计划（v1.3，34）：`initiatives` 在 `tasks`、`workflows`、`attachments`、`settings` 之上，`assistant` 之下；`tasks` 不知道需求计划（工作包表引用任务表）。经事件总线的 `task.updated` 得知工作包任务的变化；删除项目时经 `tasks.onProjectDeleted` 释放资料附件的引用。
 - 定时任务（v1.2，22 §11）：`schedules` 在 `tasks`、`workflows`、`inbox` 之上，`assistant` 之下；`tasks` 不知道定时任务（运行表引用任务表）。检查循环（`schedules.timer.ts`）用注入时钟，`app.start` 时与调度器一起启动，收到 `schedule.updated` 时重排；时区换算在 `core/time-zone.ts`，质量与用量共用。
 - 任务域的服务分层（D45）：`inbox`、`plans`、`timeline`、`worktrees` → `attempts` → `acceptance` → `nodes` → `tasks` → `scheduler`；`mcp` 在最上层。`assistant`（v1.1）与 `mcp` 同在最上层：它从 `app.ts` 拿到其余所有模块的操作实现来生成工具，并用 `attempts` 的会话流存储与会话视图、`tasks` / `projects` / `workflows` 查页面上的名称。尝试经 `attempts.onSignal` 通知其所有者（节点、规划、评审），不反向依赖；需要完整任务上下文的入口（`inbox.resolve`、`projects.delete`、节点通过/驳回/重试、删除流程与角色）由 `tasks` 实现。`databases` 在 `projects` 之下（项目详情列出关联的连接），任务上下文与数据库 MCP 工具经 `tasks` 使用它；`workflows` 依赖 `roles`（校验流程定义）。
 - 跨服务的写入用 `core/db/unit-of-work` 的 `transact`（嵌套加入外层事务，事件在提交后发出，D44）。
