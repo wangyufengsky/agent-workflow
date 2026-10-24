@@ -36,6 +36,8 @@ export const INITIATIVES_COPY = {
   rebreakingDown: 'AI 正在按你的意见重新拆解…',
   process: '拆解过程',
   breakdownFailed: '这次没能拆出阶段与工作包。',
+  rebreakdownFailed: '这次重新拆解没有交出新的草稿，下面仍是之前的草稿；可以再「按意见重新拆解」。',
+  refineFailed: '这次细化没有交出新的草稿，剩下的工作包没有改动；可以再「细化剩余工作包」。',
   understanding: 'AI 的理解',
   scope: '范围',
   outOfScope: '不做',

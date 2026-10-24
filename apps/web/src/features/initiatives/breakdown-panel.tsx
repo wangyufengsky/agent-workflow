@@ -1,8 +1,11 @@
 import {
+  AttemptStatus,
+  attemptMachine,
   type InitiativeDetailDTO,
   InitiativeItemStatus,
   InitiativeRunMode,
   InitiativeStatus,
+  isTerminalState,
   UiMode,
 } from '@aw/shared';
 import { useState } from 'react';
@@ -122,9 +125,17 @@ const RUNNING_TEXT = {
   [InitiativeRunMode.Refine]: C.refining,
 } as const;
 
+const FAILED_TEXT = {
+  [InitiativeRunMode.Breakdown]: C.breakdownFailed,
+  [InitiativeRunMode.Rebreakdown]: C.rebreakdownFailed,
+  [InitiativeRunMode.Refine]: C.refineFailed,
+} as const;
+
 /**
- * The AI's breakdown while it works and when it failed (34 §6.2): what it is doing, its session, and a retry. The
- * session's own stream shows what it reads; the page follows `initiative.updated` when it ends.
+ * The AI's breakdown while it works and when its latest run failed (34 §6.2): what it is doing, its session, and a
+ * retry. The session's own stream shows what it reads; the page follows `initiative.updated` when it ends. A failed
+ * re-breakdown or refinement leaves the draft as it was, so the failure shows whatever the initiative's status; their
+ * retries are already on the page (the draft's「按意见重新拆解」, the header's「细化剩余工作包」).
  */
 export function BreakdownStatus({ initiative }: { initiative: InitiativeDetailDTO }) {
   const pro = useSettings()['ui.mode'] === UiMode.Pro;
@@ -147,18 +158,23 @@ export function BreakdownStatus({ initiative }: { initiative: InitiativeDetailDT
       </section>
     );
   }
-  if (initiative.status === InitiativeStatus.BreakdownFailed) {
-    return (
-      <div className="banner danger" role="alert" data-testid="initiative-breakdown">
+  if (!isTerminalState(attemptMachine, run.status) || run.status === AttemptStatus.Succeeded) return null;
+  const nothing = initiative.status === InitiativeStatus.BreakdownFailed;
+  return (
+    <section className="col" data-testid="initiative-breakdown">
+      <div className="banner danger" role="alert">
         <span className="grow">
-          {C.breakdownFailed}
+          {nothing ? C.breakdownFailed : FAILED_TEXT[run.mode]}
           {run.error !== null && ` ${ERROR_COPY[run.error.code]}`}
         </span>
-        <RebreakdownButton initiative={initiative} label={C.retry} />
+        {nothing && <RebreakdownButton initiative={initiative} label={C.retry} />}
       </div>
-    );
-  }
-  return null;
+      <details>
+        <summary className="hint">{C.process}</summary>
+        <ConversationStream attemptId={run.attemptId} title={C.process} pro={pro} size="card" />
+      </details>
+    </section>
+  );
 }
 
 /** What the AI understood and which work package does each point of the requirement (34 §5.2). */

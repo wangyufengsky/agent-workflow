@@ -37,7 +37,7 @@ const breakdown = (title: string, items: ReturnType<typeof item>[]): FakeStep =>
   },
 });
 
-test('J38 主页「让 AI 拆解」→ 拆解草稿（理解与需求覆盖）→ 按意见重新拆解 → 确认并开始第 1 阶段', async ({
+test('J38 主页「让 AI 拆解」→ 拆解草稿（理解与需求覆盖）→ 重拆失败仍是原草稿 → 按意见重新拆解 → 确认并开始第 1 阶段', async ({
   page,
   request,
 }) => {
@@ -63,6 +63,13 @@ test('J38 主页「让 AI 拆解」→ 拆解草稿（理解与需求覆盖）�
   await understanding.getByText('需求 3 点，2 点有对应工作包').click();
   await expect(understanding).toContainText('性能测试');
   await expect(page.getByTestId('initiative-phase')).toHaveCount(2);
+
+  // A re-breakdown that submits nothing fails: the draft stays as it was, and the page says so.
+  await page.getByRole('button', { name: '按意见重新拆解' }).click();
+  const failing = page.getByRole('dialog', { name: '让 AI 重新拆解？' });
+  await failing.getByRole('button', { name: '按意见重新拆解' }).click();
+  await expect(page.getByRole('alert')).toContainText('这次重新拆解没有交出新的草稿', { timeout: TASK_RUN_TIMEOUT_MS });
+  await expect(page.getByTestId('initiative-item').nth(1)).toContainText('支付测试');
 
   // Feedback: the AI breaks it down again on the same session.
   await queueBreakdownTurn(request, project, [
