@@ -601,12 +601,9 @@ payload / response：
 | ai_coauthor | INTEGER(bool) | 有其他 AI 工具的 `Co-Authored-By` |
 | requested_by_email / requested_by_name | TEXT NULL | 发起人 trailer（D130） |
 | reverts_sha | TEXT NULL | `This reverts commit <sha>` 的目标 |
+| files | TEXT(JSON) | numstat：`[path, added, deleted][]`，改名记新路径，二进制文件的增删为 null；不单独成表（33 §7.1） |
 
 索引：`(project_id, authored_at)`。
-
-### team_commit_files
-
-`(project_id → projects CASCADE, sha, path)` 为主键，`added` / `deleted` INTEGER NULL（二进制文件为空）。改名记新路径。
 
 ### team_identities
 

@@ -239,33 +239,33 @@
 
 提交按 SHA 不会变，缓存只存提交本身的事实，不存「属于哪个分支」：
 
-- `team_commits`：作者身份、显示名、作者时间、标题、trailer 解析出的标记（§2.5）、回滚的目标 SHA（`This reverts commit` 中的）。
-- `team_commit_files`：每个提交每个文件的 numstat（路径、增、删、是否二进制）。
+- `team_commits`：作者身份、显示名、作者时间、标题、trailer 解析出的标记（§2.5）、回滚的目标 SHA（`This reverts commit` 中的），以及这个提交的 numstat（`files` 列，JSON `[路径, 增, 删][]`，二进制文件的增删为空）。numstat 不单独成表：缓存每个提交只写一次、总是随提交一起读，一行一个文件的表让第一次读取的大半时间花在写库上（§7.4）。
 
 排除规则、测试规则、成员设置都在查询时套用，修改后不用重新读 Git。
 
 ### 7.2 读取
 
-- 打开团队页时：`git rev-list --no-merges --since=<上一段的开始> <ref>` 得到可达的提交（提交时间不早于作者时间，所以作者时间在范围内的都在；更早的历史不用走），与缓存求差（已知在缓存里的提交记在内存里，只问一次数据库），缺的用 `git log --no-walk --numstat -z --format=...` 分批读入（每批 500 个，解析复用 `git.diff.ts` 的 numstat 解析）。
+- 打开团队页时：`git rev-list --no-merges --since=<上一段的开始> <ref>` 得到可达的提交（提交时间不早于作者时间，所以作者时间在范围内的都在；更早的历史不用走），与缓存求差（已知在缓存里的提交记在内存里，只问一次数据库），缺的用 `git log --no-walk --numstat -z --format=...` 分批读入（每批 500 个，同时最多 4 个 git 进程，每批读完即写入；解析复用 `git.diff.ts` 的 numstat 解析）。
 - 分支被强推或换分支不影响缓存：可达集合每次现算，已缓存的提交直接复用。
-- 首次读取大仓库可能需要十几秒：请求等到读完，期间经 SSE `team.scan_updated` 报进度，页面显示「正在读取提交历史 n / m」；同一项目同时只有一次读取，第二个请求等它读完再补读还缺的。
+- 首次读取大仓库要几秒：请求等到读完，期间经 SSE `team.scan_updated` 报进度，页面显示「正在读取提交历史 n / m」；同一项目同时只有一次读取，第二个请求等它读完再补读还缺的。
 - 聚合在后端一次完成：按可达集合与时间段取缓存行，在 JS 中按时区分桶、套规则、汇总（同 19 §5）。
 
 ### 7.3 索引
 
-`team_commits(project_id, authored_at)`、`team_commit_files(project_id, sha)`；主键 `(project_id, sha)` 与 `(project_id, sha, path)`。
+`team_commits(project_id, authored_at)`；主键 `(project_id, sha)`。
 
 ### 7.4 目标
 
-实测（T-02，本机 Apple Silicon Mac，2026-10-24；`git fast-import` 造的 5 万提交、每个改 4 个文件、12 位作者、跨 400 天的仓库）：
+实测（本机 Apple Silicon Mac，2026-10-24；`git fast-import` 造的 5 万提交、每个改 4 个文件、12 位作者、跨 400 天的仓库，4.6 万个提交在一年及上一段内）：
 
-| 场景 | 耗时 |
-| --- | --- |
-| 第一次打开（读入 4.6 万个提交与 18 万文件行） | 约 13 s |
-| 之后 `last_30_days`（连同上一段 30 天） | 约 160 ms |
-| 之后 `last_365_days`（连同上一段，覆盖全部历史） | 约 1.0 s：`git rev-list` 约 300 ms、读缓存约 400 ms、套规则与汇总约 300 ms |
+| 场景 | 第一版 | 现在 |
+| --- | --- | --- |
+| 第一次打开就看 `last_365_days`（读入 4.6 万个提交） | 约 13 s | 约 3.3 s |
+| 第一次打开默认的 `last_30_days`（只读最近 60 天的 3 700 个提交） | 约 1.6 s | 约 0.6 s |
+| 之后 `last_365_days`（连同上一段，覆盖全部历史） | 约 1.0 s | 约 0.72 s |
+| 之后 `last_30_days` | 约 160 ms | 约 125 ms |
 
-原定「一年 ≤ 300 ms」没有达到：git 本身走一遍 4.6 万个提交就要约 300 ms。一年的视图要等约 1 秒（页面有骨架与读取提示），可以接受；以后需要时再把汇总下推到 SQL。
+第一版第一次读取的 13 秒里，git 分批串行读约 4.7 s、一行一个文件写 18 万行约 6.5 s；改为 numstat 存成提交行上的 JSON、4 个 git 进程并行后降到约 3.3 s。原定「一年 ≤ 300 ms」仍没有达到：`git rev-list` 走一遍 4.6 万个提交就约 300 ms，其余是读缓存与汇总；一年的视图等不到 1 秒，可以接受，以后需要时再把汇总下推到 SQL。
 
 ## 8. 接口、数据与枚举（已迁入 08–12）
 
@@ -289,10 +289,8 @@
 
 | 表 | 列 |
 | --- | --- |
-| `team_commits` | `project_id`、`sha`、`author_email`、`author_name`、`authored_at`、`subject`、`ai_marks`（JSON：`task` / `requested_by` / `coauthor`）、`requested_by_email`、`reverts_sha` |
-| `team_commit_files` | `project_id`、`sha`、`path`、`added`、`deleted`、`binary` |
+| `team_commits` | `project_id`、`sha`、`author_email`、`author_name`、`authored_at`、`subject`、`ai_task`、`ai_coauthor`、`requested_by_email`、`requested_by_name`、`reverts_sha`、`files`（JSON numstat） |
 | `team_identities` | `project_id`、`email`、`member_email`（合并到的主身份）、`display_name`、`hidden` |
-| `team_commit_files` 与 `team_commits` 的其余列 | 见 10 §4f |
 | `team_settings` | `project_id`、`exclude_globs`、`test_globs`、`huge_commit_lines`（JSON 或列，空 = 默认） |
 | `team_analyses` | `id`、`project_id`、`member_email`、`ref`、`ref_sha`（开始时的分支提交）、`period_from`、`period_to`、`status`、`commits`（JSON：可引用的提交）、`sample`（JSON `{ sha, subject, lines }[]`）、`attempt_id`、`report`（JSON）、`error`、`created_at`、`finished_at` |
 

@@ -4,6 +4,8 @@ import { type CommitFacts, parseTeamLog, TEAM_LOG_FORMAT } from './team.parse.ts
 
 /** Commits read by one `git log`: their SHAs go on its command line. */
 export const SCAN_BATCH = 500;
+/** `git log` processes at a time: computing the numstat is git's work and spreads over the cores. */
+export const SCAN_PROCESSES = 4;
 
 /** The branch's newest commit; a ref that names no commit is a 404 (the user picks it). */
 export async function readTip(repo: string, ref: string): Promise<{ sha: string; committedAt: number }> {

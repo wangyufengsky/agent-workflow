@@ -27,26 +27,16 @@ export const teamCommitsTable = sqliteTable(
     requestedByName: text('requested_by_name'),
     /** The commit this one reverts (`This reverts commit <sha>`). */
     revertsSha: text('reverts_sha'),
+    /**
+     * JSON `[path, added, deleted][]`: the numstat, renames under the new path, null counts for a binary file. One
+     * column rather than a row per file: the cache is written once per commit and always read with its commit.
+     */
+    files: text('files').notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.projectId, t.sha] }),
     index('team_commits_authored_idx').on(t.projectId, t.authoredAt),
   ],
-);
-
-/** 10 §team_commit_files: one commit's numstat, one row per file; null counts for a binary file. */
-export const teamCommitFilesTable = sqliteTable(
-  'team_commit_files',
-  {
-    projectId: text('project_id')
-      .notNull()
-      .references(() => projectsTable.id, { onDelete: 'cascade' }),
-    sha: text('sha').notNull(),
-    path: text('path').notNull(),
-    added: integer('added'),
-    deleted: integer('deleted'),
-  },
-  (t) => [primaryKey({ columns: [t.projectId, t.sha, t.path] })],
 );
 
 /** 10 §team_identities: how an author email counts (33 §2.3); emails without a row are their own members. */

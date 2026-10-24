@@ -41,7 +41,7 @@ import {
 import { createTeamAnalyses } from './team.analysis.ts';
 import { resolveTeamRange } from './team.period.ts';
 import { createTeamRepo } from './team.repo.ts';
-import { reachableCommits, readCommits, readTip, SCAN_BATCH } from './team.scan.ts';
+import { reachableCommits, readCommits, readTip, SCAN_BATCH, SCAN_PROCESSES } from './team.scan.ts';
 
 export type TeamServiceDeps = {
   db: Db;
@@ -78,17 +78,23 @@ export function createTeamService(deps: TeamServiceDeps) {
     return set;
   };
 
+  /** Reads the missing commits in batches, several git processes at a time; each batch is stored as it arrives. */
   async function scan(projectId: string, repoPath: string, missing: string[]): Promise<void> {
     const total = missing.length;
-    events.publish({ type: ServerEventType.TeamScanUpdated, data: { projectId, done: 0, total } });
-    for (let done = 0; done < total; ) {
-      const batch = missing.slice(done, done + SCAN_BATCH);
-      const commits = await readCommits(repoPath, batch);
-      db.transaction((tx) => createTeamRepo(tx).insertCommits(projectId, commits));
-      for (const sha of batch) knownOf(projectId).add(sha);
-      done += batch.length;
-      events.publish({ type: ServerEventType.TeamScanUpdated, data: { projectId, done, total } });
-    }
+    const batches: string[][] = [];
+    for (let i = 0; i < total; i += SCAN_BATCH) batches.push(missing.slice(i, i + SCAN_BATCH));
+    let done = 0;
+    events.publish({ type: ServerEventType.TeamScanUpdated, data: { projectId, done, total } });
+    const worker = async () => {
+      for (let batch = batches.shift(); batch !== undefined; batch = batches.shift()) {
+        const commits = await readCommits(repoPath, batch);
+        db.transaction((tx) => createTeamRepo(tx).insertCommits(projectId, commits));
+        for (const sha of batch) knownOf(projectId).add(sha);
+        done += batch.length;
+        events.publish({ type: ServerEventType.TeamScanUpdated, data: { projectId, done, total } });
+      }
+    };
+    await Promise.all(Array.from({ length: SCAN_PROCESSES }, worker));
   }
 
   async function ensureScanned(projectId: string, repoPath: string, shas: string[]): Promise<void> {

@@ -19,16 +19,6 @@ CREATE TABLE `team_analyses` (
 --> statement-breakpoint
 CREATE INDEX `team_analyses_project_idx` ON `team_analyses` (`project_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `team_analyses_attempt_idx` ON `team_analyses` (`attempt_id`);--> statement-breakpoint
-CREATE TABLE `team_commit_files` (
-	`project_id` text NOT NULL,
-	`sha` text NOT NULL,
-	`path` text NOT NULL,
-	`added` integer,
-	`deleted` integer,
-	PRIMARY KEY(`project_id`, `sha`, `path`),
-	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade
-);
---> statement-breakpoint
 CREATE TABLE `team_commits` (
 	`project_id` text NOT NULL,
 	`sha` text NOT NULL,
@@ -41,6 +31,7 @@ CREATE TABLE `team_commits` (
 	`requested_by_email` text,
 	`requested_by_name` text,
 	`reverts_sha` text,
+	`files` text NOT NULL,
 	PRIMARY KEY(`project_id`, `sha`),
 	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade
 );

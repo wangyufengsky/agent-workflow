@@ -2,12 +2,18 @@ import { and, eq, gte, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import type { Identity, StoredCommit } from './team.aggregate.ts';
 import type { CommitFacts, CommitFile } from './team.parse.ts';
-import { teamCommitFilesTable, teamCommitsTable, teamIdentitiesTable, teamSettingsTable } from './team.table.ts';
+import { teamCommitsTable, teamIdentitiesTable, teamSettingsTable } from './team.table.ts';
 
 /** SHAs per `IN (…)`, well under SQLite's variable limit. */
 const SHAS_PER_QUERY = 900;
-/** File rows per insert: five columns each, well under SQLite's variable limit. */
-const FILE_ROWS_PER_INSERT = 2000;
+/** Commits per insert: twelve columns each, well under SQLite's variable limit. */
+const COMMITS_PER_INSERT = 1000;
+
+type FileRow = [path: string, added: number | null, deleted: number | null];
+const filesJson = (files: readonly CommitFile[]) =>
+  JSON.stringify(files.map((f): FileRow => [f.path, f.added, f.deleted]));
+const filesOfJson = (json: string): CommitFile[] =>
+  (JSON.parse(json) as FileRow[]).map(([path, added, deleted]) => ({ path, added, deleted }));
 
 export type StoredSettings = {
   excludeGlobs: string[] | null;
@@ -18,7 +24,6 @@ export type StoredSettings = {
 /** The commit cache and the team settings of 33 §7, §8.2. */
 export function createTeamRepo(db: DbExecutor) {
   const c = teamCommitsTable;
-  const f = teamCommitFilesTable;
 
   return {
     /** Which of these commits are cached already. */
@@ -37,29 +42,24 @@ export function createTeamRepo(db: DbExecutor) {
 
     /** Commits read once more by a second reading are already there and kept. */
     insertCommits(projectId: string, commits: CommitFacts[]): void {
-      if (commits.length === 0) return;
-      db.insert(c)
-        .values(
-          commits.map((commit) => ({
-            projectId,
-            sha: commit.sha,
-            authorEmail: commit.authorEmail,
-            authorName: commit.authorName,
-            authoredAt: commit.authoredAt,
-            subject: commit.subject,
-            aiTask: commit.aiTask,
-            aiCoauthor: commit.aiCoauthor,
-            requestedByEmail: commit.requestedBy?.email ?? null,
-            requestedByName: commit.requestedBy?.name ?? null,
-            revertsSha: commit.revertsSha,
-          })),
-        )
-        .onConflictDoNothing()
-        .run();
-      const files = commits.flatMap((commit) => commit.files.map((file) => ({ projectId, sha: commit.sha, ...file })));
-      for (let i = 0; i < files.length; i += FILE_ROWS_PER_INSERT) {
-        db.insert(f)
-          .values(files.slice(i, i + FILE_ROWS_PER_INSERT))
+      for (let i = 0; i < commits.length; i += COMMITS_PER_INSERT) {
+        db.insert(c)
+          .values(
+            commits.slice(i, i + COMMITS_PER_INSERT).map((commit) => ({
+              projectId,
+              sha: commit.sha,
+              authorEmail: commit.authorEmail,
+              authorName: commit.authorName,
+              authoredAt: commit.authoredAt,
+              subject: commit.subject,
+              aiTask: commit.aiTask,
+              aiCoauthor: commit.aiCoauthor,
+              requestedByEmail: commit.requestedBy?.email ?? null,
+              requestedByName: commit.requestedBy?.name ?? null,
+              revertsSha: commit.revertsSha,
+              files: filesJson(commit.files),
+            })),
+          )
           .onConflictDoNothing()
           .run();
       }
@@ -67,42 +67,33 @@ export function createTeamRepo(db: DbExecutor) {
 
     /** Commits authored in `[start, end)` with their files; whether a branch reaches them is the caller's question. */
     commitsIn(projectId: string, start: number, end: number): StoredCommit[] {
-      const inRange = and(eq(c.projectId, projectId), gte(c.authoredAt, start), lt(c.authoredAt, end));
-      const rows = db.select().from(c).where(inRange).all();
-      const files = db
-        .select({ sha: f.sha, path: f.path, added: f.added, deleted: f.deleted })
-        .from(f)
-        .innerJoin(c, and(eq(c.projectId, f.projectId), eq(c.sha, f.sha)))
-        .where(inRange)
-        .all();
-      const bySha = new Map<string, CommitFile[]>();
-      for (const { sha, ...file } of files) {
-        const list = bySha.get(sha);
-        if (list === undefined) bySha.set(sha, [file]);
-        else list.push(file);
-      }
-      return rows.map((r) => ({
-        sha: r.sha,
-        authorEmail: r.authorEmail,
-        authorName: r.authorName,
-        authoredAt: r.authoredAt,
-        subject: r.subject,
-        aiTask: r.aiTask,
-        aiCoauthor: r.aiCoauthor,
-        requestedByEmail: r.requestedByEmail,
-        requestedByName: r.requestedByName,
-        files: bySha.get(r.sha) ?? [],
-      }));
+      return db
+        .select()
+        .from(c)
+        .where(and(eq(c.projectId, projectId), gte(c.authoredAt, start), lt(c.authoredAt, end)))
+        .all()
+        .map((r) => ({
+          sha: r.sha,
+          authorEmail: r.authorEmail,
+          authorName: r.authorName,
+          authoredAt: r.authoredAt,
+          subject: r.subject,
+          aiTask: r.aiTask,
+          aiCoauthor: r.aiCoauthor,
+          requestedByEmail: r.requestedByEmail,
+          requestedByName: r.requestedByName,
+          files: filesOfJson(r.files),
+        }));
     },
 
     /** The paths a cached commit changed. */
     filesOf(projectId: string, sha: string): string[] {
-      return db
-        .select({ path: f.path })
-        .from(f)
-        .where(and(eq(f.projectId, projectId), eq(f.sha, sha)))
-        .all()
-        .map((r) => r.path);
+      const row = db
+        .select({ files: c.files })
+        .from(c)
+        .where(and(eq(c.projectId, projectId), eq(c.sha, sha)))
+        .get();
+      return row === undefined ? [] : filesOfJson(row.files).map((f) => f.path);
     },
 
     /** Reverting commits and what they revert. */
