@@ -281,16 +281,45 @@ details[open] > .actionHead .actionChevron {
   }
 }
 
-/* 助手画的图（35 §5）：卡片里是标题、图与口径说明 */
+/* 助手画的图（35 §5、§5.7）：左上角一抹主题色的光，头部是等宽的图类型小字与标题 */
 .chartCard {
-  gap: var(--s-2);
+  gap: var(--s-3);
+  padding: var(--s-4);
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 55%),
+    var(--frost-card);
+}
+.chartHead {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chartKind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--accent-ink);
+}
+.chartKind::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
 }
 .chartTitle {
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--ink);
 }
 .chartCaption {
   margin: 0;
+  padding-top: var(--s-2);
+  border-top: 1px dashed var(--line);
   font-size: var(--fs-xs);
   color: var(--muted);
 }

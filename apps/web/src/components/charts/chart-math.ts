@@ -54,3 +54,23 @@ export function runs(values: readonly (number | null)[]): Array<Array<{ i: numbe
 export function markedPoints(values: readonly (number | null)[], all: boolean): Array<{ i: number; value: number }> {
   return runs(values).flatMap((run) => (all || run.length === 1 ? run : []));
 }
+
+/** The gap between two slices of a ring, in percent of the ring. */
+const SLICE_GAP = 1.2;
+
+/**
+ * Where each slice of a ring starts and how long it is, in percent of a circumference of 100 (35 §5.7). Slices give
+ * up a gap so they stand apart, at most half of their own length, so a small positive value never vanishes; a lone
+ * slice is the whole ring.
+ */
+export function ringArcs(values: readonly number[]): Array<{ value: number; length: number; offset: number }> {
+  const total = values.reduce((sum, v) => sum + v, 0);
+  const apart = values.filter((v) => v > 0).length > 1;
+  let before = 0;
+  return values.map((value) => {
+    const share = (value / total) * 100;
+    const arc = { value, length: share - (apart ? Math.min(SLICE_GAP, share / 2) : 0), offset: -before };
+    before += share;
+    return arc;
+  });
+}

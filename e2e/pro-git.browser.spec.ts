@@ -90,7 +90,13 @@ test('J24 Git 工作台：暂存 → AI 草拟并提交 → 新建分支再提�
   await workbench(page, project);
 
   // A branch of the user's own, switched to, with one more commit.
-  await page.getByRole('button', { name: '当前分支' }).click();
+  const branchChip = page.getByRole('button', { name: '当前分支' });
+  await branchChip.click();
+  // The menu opens under its button, not at the window's top-left corner.
+  const chip = await box(branchChip);
+  const menu = await box(page.getByRole('menu', { name: '当前分支' }));
+  expect(menu.left).toBeCloseTo(chip.left, 0);
+  expect(menu.top - chip.bottom).toBeCloseTo(4, 0);
   await page.getByRole('menuitem', { name: '新建分支' }).click();
   await page.getByRole('textbox', { name: '分支名' }).fill('feature/bye');
   await page.getByRole('button', { name: '创建' }).click();

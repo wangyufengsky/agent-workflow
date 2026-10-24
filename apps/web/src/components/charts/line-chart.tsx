@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { markedPoints, runs } from './chart-math.ts';
 import styles from './charts.module.css';
 import { type ChartSeries, toneClass } from './series.ts';
@@ -35,6 +35,8 @@ export function LineChart({
   missing: string;
 }) {
   const [active, setActive] = useState<number | null>(null);
+  // Gradient ids usable inside url(#…): React's ids carry characters a fragment reference does not take.
+  const gradient = `line-area-${useId().replace(/[^A-Za-z0-9]/g, '')}`;
   const known = series.flatMap((s) => s.values.filter((v): v is number => v !== null));
   const ticks = niceRange(Math.min(...known), Math.max(...known));
   const low = Math.min(...ticks);
@@ -42,6 +44,8 @@ export function LineChart({
   const y = (value: number) => (span === 0 ? 0 : ((value - low) / span) * 100);
   // Each position sits in the middle of its slot, like a bar chart's column.
   const x = (i: number) => ((i + 0.5) / categories.length) * 100;
+  // The area under a line reaches down to the zero line, which the ticks always include.
+  const base = 100 - y(0);
   const every = Math.ceil(categories.length / MAX_X_LABELS);
   const shown = (value: number | null | undefined) => (value === null || value === undefined ? missing : format(value));
   const readout = (i: number) => [categories[i], ...series.map((s) => `${s.name} ${shown(s.values[i])}`)].join(' · ');
@@ -50,7 +54,7 @@ export function LineChart({
     <figure className={styles.chart} aria-label={label}>
       <figcaption className={styles.readout} aria-live="polite">
         {active !== null ? (
-          readout(active)
+          <span className={styles.value}>{readout(active)}</span>
         ) : series.length > 1 ? (
           <span className={styles.legend}>
             {series.map((s) => (
@@ -73,6 +77,36 @@ export function LineChart({
           </div>
         ))}
         <svg className={styles.lines} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            {series.map((s, index) => (
+              <linearGradient
+                key={s.name}
+                id={`${gradient}-${index}`}
+                className={toneClass(s.tone)}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop offset="0" className={styles.areaTop} />
+                <stop offset="1" className={styles.areaBottom} />
+              </linearGradient>
+            ))}
+          </defs>
+          {series.map((s, index) =>
+            runs(s.values).map((run) => (
+              <polygon
+                key={`${s.name}-${run.map((p) => p.i).join()}`}
+                className={styles.area}
+                fill={`url(#${gradient}-${index})`}
+                points={[
+                  ...run.map((p) => `${x(p.i)},${100 - y(p.value)}`),
+                  `${Math.max(...run.map((p) => x(p.i)))},${base}`,
+                  `${Math.min(...run.map((p) => x(p.i)))},${base}`,
+                ].join(' ')}
+              />
+            )),
+          )}
           {series.map((s, index) =>
             runs(s.values).map((run) => (
               <polyline

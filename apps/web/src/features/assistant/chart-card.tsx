@@ -77,8 +77,9 @@ export function ChartCard({ chart, fresh }: { chart: ChartSpec; fresh: boolean }
   return (
     <div className={`${cards.card} ${cards.chartCard}`} data-testid="assistant-chart">
       {/* The figure inside carries the title as its accessible name. */}
-      <div className={cards.chartTitle} aria-hidden="true">
-        {chart.title}
+      <div className={cards.chartHead} aria-hidden="true">
+        <span className={cards.chartKind}>{C.kind[chart.type]}</span>
+        <span className={cards.chartTitle}>{chart.title}</span>
       </div>
       <div className={fresh ? chartStyles.grow : undefined}>
         {chart.type === ChartType.Flow ? (

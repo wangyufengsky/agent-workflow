@@ -11,6 +11,7 @@ type Line = { edge: FlowEdge; back: boolean; d: string; labelAt: { x: number; y:
 
 /** Gap between an arrow's tip and the node it points at. */
 const ARROW_GAP = 2;
+const STEP_RADIUS = 8;
 
 function Shape({ shape, box }: { shape: FlowNodeShape; box: FlowBox }) {
   const { x, y, width, height } = box;
@@ -23,8 +24,18 @@ function Shape({ shape, box }: { shape: FlowNodeShape; box: FlowBox }) {
     ];
     return <polygon className={styles.shape} data-shape={shape} points={points.map((p) => p.join(',')).join(' ')} />;
   }
-  const radius = shape === FlowNodeShape.Terminal ? height / 2 : 8;
-  return <rect className={styles.shape} data-shape={shape} x={x} y={y} width={width} height={height} rx={radius} />;
+  if (shape === FlowNodeShape.Terminal) {
+    return (
+      <rect className={styles.shape} data-shape={shape} x={x} y={y} width={width} height={height} rx={height / 2} />
+    );
+  }
+  // A step is a card with an accent bar down its left edge.
+  return (
+    <g>
+      <rect className={styles.shape} data-shape={shape} x={x} y={y} width={width} height={height} rx={STEP_RADIUS} />
+      <rect className={styles.stepBar} x={x + 4} y={y + 10} width={3} height={height - 20} rx={1.5} />
+    </g>
+  );
 }
 
 /**
@@ -106,6 +117,10 @@ export function FlowChart({
                 markerEnd={`url(#${arrow})`}
               />
             ))}
+            {/* Light moving along the forward edges shows which way the flow goes. */}
+            {lines.map((line) =>
+              line.back ? null : <path key={`${line.edge.from}-${line.edge.to}`} className={styles.pulse} d={line.d} />,
+            )}
             {layout.placed.map(({ node, box }) => (
               <Shape key={node.id} shape={node.shape ?? FlowNodeShape.Step} box={box} />
             ))}
