@@ -48,6 +48,7 @@ test('J37 主页「直接开始」→「组合」的设计后开发 → 方案�
 
   const items = page.getByTestId('initiative-item');
   await expect(items.first()).toContainText('已完成');
-  await expect(items.nth(1)).toContainText('T-2', { timeout: TASK_RUN_TIMEOUT_MS });
+  // Task keys are global: other specs on this backend may have taken the next one.
+  await expect(items.nth(1)).toContainText(/T-\d+/, { timeout: TASK_RUN_TIMEOUT_MS });
   await expect(phases.nth(1)).not.toContainText('前面完成后自动开始');
 });
