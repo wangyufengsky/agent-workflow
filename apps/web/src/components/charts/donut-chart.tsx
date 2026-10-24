@@ -1,13 +1,11 @@
 import { useState } from 'react';
-import { sharePercents } from './chart-math.ts';
+import { ringArcs, sharePercents } from './chart-math.ts';
 import styles from './charts.module.css';
 import { toneClass, toneOf } from './series.ts';
 
 /** A circle of circumference 100 in a 42 × 42 box: a slice's dash length is its share in percent. */
 const RADIUS = 100 / (2 * Math.PI);
 const CENTER = 21;
-/** The gap between two slices, in percent of the ring. */
-const SLICE_GAP = 1.2;
 
 /**
  * A ring of slices with the total in the middle and a legend of values and shares (35 §5.2). Hovering or focusing a
@@ -37,13 +35,7 @@ export function DonutChart({
   const [active, setActive] = useState<number | null>(null);
   const total = values.reduce((sum, v) => sum + v, 0);
   const shares = sharePercents(values);
-  // A lone slice is the whole ring; with more, each gives up a sliver so they stand apart.
-  const gap = values.filter((v) => v > 0).length > 1 ? SLICE_GAP : 0;
-  const slices = values.map((value, i) => {
-    const before = values.slice(0, i).reduce((sum, v) => sum + v, 0);
-    const length = Math.max(0, (value / total) * 100 - gap);
-    return { value, length, offset: -(before / total) * 100, tone: toneOf(i) };
-  });
+  const slices = ringArcs(values).map((arc, i) => ({ ...arc, tone: toneOf(i) }));
   const readout = (i: number) => [categories[i], format(values[i] ?? 0), formatShare(shares[i] ?? 0)].join(' · ');
 
   return (
