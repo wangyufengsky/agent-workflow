@@ -78,6 +78,13 @@ export const gitLastCommitQuery = (id: string, ref: string) =>
     queryFn: async () => (await callOperation(gitLogOp, { id, ref, limit: 1 })).items[0] ?? null,
   });
 
+/** The commit `ref` was at when `before` (ms) came, on its own first-parent history; null if it had none (27 §4.2). */
+export const gitCommitBeforeQuery = (id: string, ref: string, before: number) =>
+  queryOptions({
+    queryKey: key(id, 'before', { ref, before }),
+    queryFn: async () => (await callOperation(gitLogOp, { id, ref, limit: 1, before })).items[0] ?? null,
+  });
+
 export const gitCommitQuery = (id: string, sha: string, parent: number | undefined) =>
   queryOptions({
     queryKey: key(id, 'commit', { sha, parent }),

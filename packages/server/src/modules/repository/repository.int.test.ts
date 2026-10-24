@@ -110,6 +110,69 @@ describe('Git 管理台（读取仓库）', () => {
     expect([missing.status, missing.raw.json().error.code]).toEqual([404, ErrorCode.NotFound]);
   });
 
+  it('按日期取起点：分支自己的历史上那天之前的最后一个提交，不取之后才合并进来的旧提交', async () => {
+    const repo = await createTestRepo();
+    // Every commit dated, the merged side commit later than main's own last commit before the day.
+    const commitAt = (date: string, message: string) =>
+      runGit(
+        [
+          '-c',
+          'user.name=aw-test',
+          '-c',
+          'user.email=aw-test@example.com',
+          'commit',
+          '-q',
+          '--allow-empty',
+          '-m',
+          message,
+        ],
+        {
+          cwd: repo.path,
+          env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+        },
+      );
+    await commitAt('2026-09-20T10:00:00+08:00', 'a');
+    await commitAt('2026-09-28T10:00:00+08:00', 'b');
+    await repo.git('switch', '-q', '-c', 'side', 'HEAD~1');
+    await commitAt('2026-09-30T10:00:00+08:00', 'side');
+    await repo.git('switch', '-q', 'main');
+    await runGit(
+      [
+        '-c',
+        'user.name=aw-test',
+        '-c',
+        'user.email=aw-test@example.com',
+        'merge',
+        '-q',
+        '--no-ff',
+        '-m',
+        'merge side',
+        'side',
+      ],
+      {
+        cwd: repo.path,
+        env: {
+          ...process.env,
+          GIT_AUTHOR_DATE: '2026-10-03T10:00:00+08:00',
+          GIT_COMMITTER_DATE: '2026-10-03T10:00:00+08:00',
+        },
+      },
+    );
+    await commitAt('2026-10-05T10:00:00+08:00', 'c');
+    const { body: project } = await t.call(createProjectOp, { repoPath: repo.path });
+
+    const before = new Date('2026-10-01T00:00:00+08:00').getTime();
+    const { body } = await t.call(gitLogOp, { id: project.id, ref: 'main', limit: 1, before });
+    expect(body.items.map((c) => c.subject)).toEqual(['b']);
+    const none = await t.call(gitLogOp, {
+      id: project.id,
+      ref: 'main',
+      limit: 1,
+      before: new Date('2026-09-01').getTime(),
+    });
+    expect(none.body.items).toEqual([]);
+  });
+
   it('任意两个版本的 diff：文件列表与单文件 unified diff', async () => {
     const { project } = await setUp();
     const { body } = await t.call(gitDiffOp, { id: project.id, from: 'main~1', to: 'main' });

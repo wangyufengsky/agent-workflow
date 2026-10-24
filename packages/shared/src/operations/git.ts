@@ -64,6 +64,11 @@ export const gitLogOp = defineOperationContract({
     author: z.string().min(1).optional(),
     /** Only commits whose message contains this, or whose SHA starts with it. */
     search: z.string().min(1).optional(),
+    /**
+     * Only the ref's own (first-parent) history committed before this time (ms): with `limit: 1`, the commit the
+     * branch was at then, the start of a review by date (27 §4.2).
+     */
+    before: z.coerce.number().int().optional(),
   }),
   output: z.object({ items: z.array(gitCommitSchema), nextCursor: z.string().nullable() }),
   risk: OperationRisk.Read,
