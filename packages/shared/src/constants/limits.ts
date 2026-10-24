@@ -42,7 +42,7 @@ export const SCHEDULE_EVERY_HOURS = [1, 2, 3, 4, 6, 8, 12] as const;
 export const ASSISTANT_TITLE_MAX_CHARS = 40;
 /** One message to the assistant. */
 export const ASSISTANT_MESSAGE_MAX_CHARS = 20_000;
-/** Charts the assistant draws in a conversation (34 §3, D134). */
+/** Charts the assistant draws in a conversation (35 §3, D140). */
 export const CHART_TITLE_MAX_CHARS = 60;
 /** A category, series or flowchart node label. */
 export const CHART_LABEL_MAX_CHARS = 40;

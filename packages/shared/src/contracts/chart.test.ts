@@ -109,7 +109,7 @@ describe('show_flowchart 的输入', () => {
 });
 
 describe('会话流的 chart 条目', () => {
-  // A line as the first release writes it: entries already on disk must keep parsing (D133).
+  // A line as the first release writes it: entries already on disk must keep parsing (D139).
   const stored = [
     { seq: 4, ts: 1761300000000, kind: 'chart', data: { chart: { ...bar, unit: '个' } } },
     { seq: 5, ts: 1761300000001, kind: 'chart', data: { chart: { type: 'flow', ...flow } } },

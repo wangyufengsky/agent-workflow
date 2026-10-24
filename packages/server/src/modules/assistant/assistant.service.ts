@@ -800,7 +800,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       if (entity !== undefined) record(get(id), [{ kind: TranscriptEntryKind.EntityRef, data: entity }]);
     },
 
-    /** The assistant drew a chart: it stays in the conversation's message stream (34 §4, D133). */
+    /** The assistant drew a chart: it stays in the conversation's message stream (35 §4, D139). */
     recordChart(id: string, chart: ChartSpec): void {
       record(get(id), [{ kind: TranscriptEntryKind.Chart, data: { chart } }]);
     },

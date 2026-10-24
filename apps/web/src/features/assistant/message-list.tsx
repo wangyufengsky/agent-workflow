@@ -180,7 +180,7 @@ function Body({ entry, ctx }: { entry: TranscriptEntry; ctx: Rendered }): ReactN
     case TranscriptEntryKind.EntityRef:
       return <EntityCard entity={entry.data} />;
     case TranscriptEntryKind.Chart:
-      // TODO(V-04): the chart card, once the shared chart components land with PR #77 (34 §5).
+      // TODO(V-04): the chart card, once the shared chart components land with PR #77 (35 §5).
       return null;
     case TranscriptEntryKind.System:
       return <p className={styles.system}>{TRANSCRIPT_SYSTEM_LABEL[entry.data.event]}</p>;

@@ -55,7 +55,7 @@ const chartShape = {
 
 type ChartFields = z.infer<z.ZodObject<typeof chartShape>>;
 
-/** The rules between fields (34 §3.1, D134), worded so the model knows how to fix the call. */
+/** The rules between fields (35 §3.1, D140), worded so the model knows how to fix the call. */
 function checkChart(chart: ChartFields, ctx: z.RefinementCtx): void {
   const { type, categories, series } = chart;
   const range = CHART_CATEGORIES[type];
@@ -90,7 +90,7 @@ function checkChart(chart: ChartFields, ctx: z.RefinementCtx): void {
   }
 }
 
-/** `show_chart` (34 §3.1): a bar, line or pie chart from figures the assistant got from other tools. */
+/** `show_chart` (35 §3.1): a bar, line or pie chart from figures the assistant got from other tools. */
 export const showChartInputSchema = z.strictObject(chartShape).superRefine(checkChart);
 export type ShowChartInput = z.infer<typeof showChartInputSchema>;
 
@@ -127,7 +127,7 @@ const flowchartShape = {
 
 type FlowchartFields = z.infer<z.ZodObject<typeof flowchartShape>>;
 
-/** Edges join known nodes; loops back are allowed, an edge to itself is not (34 §3.2). */
+/** Edges join known nodes; loops back are allowed, an edge to itself is not (35 §3.2). */
 function checkFlowchart({ nodes, edges }: FlowchartFields, ctx: z.RefinementCtx): void {
   const issue = (path: (string | number)[], message: string) => ctx.addIssue({ code: 'custom', path, message });
   const ids = nodes.map((n) => n.id);
@@ -144,12 +144,12 @@ function checkFlowchart({ nodes, edges }: FlowchartFields, ctx: z.RefinementCtx)
   }
 }
 
-/** `show_flowchart` (34 §3.2). */
+/** `show_flowchart` (35 §3.2). */
 export const showFlowchartInputSchema = z.strictObject(flowchartShape).superRefine(checkFlowchart);
 export type ShowFlowchartInput = z.infer<typeof showFlowchartInputSchema>;
 
 /**
- * A chart as the conversation's `chart` entry keeps it (10 §3, D133): the checked tool input, a flowchart tagged
+ * A chart as the conversation's `chart` entry keeps it (10 §3, D139): the checked tool input, a flowchart tagged
  * `flow`. Old entries must keep parsing, so changes only add optional fields or chart types.
  */
 export const chartSpecSchema = z.discriminatedUnion('type', [
