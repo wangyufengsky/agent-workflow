@@ -351,9 +351,9 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 
 ### 6.16″ `submit_breakdown`（v1.3）
 
-只用于 `breakdown` 尝试（34 §8）。会话用 agent `aw-code-reviewer`（只读，会话目录为项目主仓库），首条消息为 `start-breakdown.md`（需求、资料附件、可选流程、上限与规则），重新拆解与细化在同一会话里发 `rebreakdown.md` / `refine-breakdown.md`。
+只用于 `breakdown` 尝试（34 §8）。会话用 agent `aw-code-reviewer`（只读，会话目录为项目主仓库），首条消息为 `start-breakdown.md`（需求、资料附件、可选流程、上限与规则），重新拆解与细化在同一会话里发 `rebreakdown.md` / `refine-breakdown.md`（第一次拆解没交出草稿时重拆发 `retry-breakdown.md`，带上用户的意见）。
 输入（`submitBreakdownInputSchema`）：`{ title; summary; understanding: { scope; out_of_scope[]; assumptions[]; risks[] }; phases: { title; goal }[]（1..6）; items: { key; title; phase; workflow; requirement; depends_on[]; acceptance: { title; expected; command? }[] }[]（1..30）; coverage: { point; items[] }[] }`。
-行为：转成草稿（AI 的阶段不自动开启，已有阶段保留原设置；`command` 的验收项为命令核验，其余为 AI 核验），按 `validateInitiativeDraft` 校验（含 `WORKFLOW_NOT_ALLOWED`、`UNKNOWN_COVERAGE_ITEM`）；已开始、已完成、已放弃的工作包必须原样保留（`ITEM_NOT_EDITABLE`），已开启的阶段不能删去（`PHASE_OUT_OF_RANGE`）；不通过 → `INITIATIVE_BREAKDOWN_INVALID`，`details.problems[]`；通过 → 写入阶段与工作包、说明、理解、覆盖表，`breakdown_rev + 1`（第一次拆解时标题改为 AI 给的），尝试 `succeeded`，发 `initiative.updated`。
+行为：转成草稿（AI 的阶段不自动开启，已有阶段保留原设置；`command` 的验收项为命令核验，其余为 AI 核验），按 `validateInitiativeDraft` 校验（含 `WORKFLOW_NOT_ALLOWED`、`UNKNOWN_COVERAGE_ITEM`）；已开始、已完成、已放弃的工作包必须原样保留（`ITEM_NOT_EDITABLE`；它们的验收清单由后端沿用原值，工具写不出的字段——是否必需、人工核验、清单项 id——不算改动），已开启的阶段不能删去（`PHASE_OUT_OF_RANGE`）；不通过 → `INITIATIVE_BREAKDOWN_INVALID`，`details.problems[]`；通过 → 写入阶段与工作包、说明、理解、覆盖表，`breakdown_rev + 1`（第一次拆解时标题改为 AI 给的），尝试 `succeeded`，发 `initiative.updated`。
 输出：`{ accepted: true }`
 错误：`INITIATIVE_BREAKDOWN_INVALID`、`VALIDATION_FAILED`、`MCP_RESULT_ALREADY_SUBMITTED`。
 

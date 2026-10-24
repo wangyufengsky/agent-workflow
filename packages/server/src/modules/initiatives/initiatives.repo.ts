@@ -1,12 +1,19 @@
-import type {
-  ErrorInfo,
-  InitiativeCoverage,
-  InitiativeItemSpec,
-  InitiativePhase,
-  InitiativeTemplateKind,
-  InitiativeUnderstanding,
+import {
+  type ErrorInfo,
+  errorInfoSchema,
+  type InitiativeCoverage,
+  type InitiativeItemSpec,
+  type InitiativePhase,
+  type InitiativeTemplateKind,
+  type InitiativeUnderstanding,
+  initiativeCoverageSchema,
+  initiativeItemSpecSchema,
+  initiativePhaseSchema,
+  initiativeUnderstandingSchema,
+  requirementItemInputSchema,
 } from '@aw/shared';
 import { and, asc, desc, eq, inArray, isNull, lt, type SQL, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { projectsTable } from '../projects/index.ts';
 import {
@@ -35,7 +42,13 @@ export type Initiative = Omit<InitiativeRow, keyof InitiativeJson> &
 
 export type InitiativeRun = typeof initiativeRunsTable.$inferSelect;
 
-const parse = <T>(value: string | null): T | null => (value === null ? null : (JSON.parse(value) as T));
+// JSON columns are parsed at the boundary (06 §9).
+const json = <T>(schema: z.ZodType<T>, value: string): T => schema.parse(JSON.parse(value));
+const nullableJson = <T>(schema: z.ZodType<T>, value: string | null): T | null =>
+  value === null ? null : json(schema, value);
+const phasesSchema = z.array(initiativePhaseSchema);
+const keysSchema = z.array(z.string());
+const acceptanceSchema = z.array(requirementItemInputSchema);
 
 /** The JSON columns of an initiative, serialized. */
 function columnsOf(fields: { [K in keyof InitiativeJson]?: InitiativeJson[K] | undefined }) {
@@ -71,9 +84,9 @@ export type InitiativeTemplate = {
 
 const toItem = (row: ItemRow): InitiativeItem => ({
   ...row,
-  dependsOn: JSON.parse(row.dependsOn),
-  acceptance: JSON.parse(row.acceptance),
-  startError: row.startError === null ? null : JSON.parse(row.startError),
+  dependsOn: json(keysSchema, row.dependsOn),
+  acceptance: json(acceptanceSchema, row.acceptance),
+  startError: nullableJson(errorInfoSchema, row.startError),
 });
 
 /** A work package's columns from its spec. */
@@ -105,10 +118,10 @@ export function createInitiativesRepo(db: DbExecutor) {
     templateName: string | null;
   }): Initiative => ({
     ...row.initiative,
-    phases: JSON.parse(row.initiative.phases),
-    allowedWorkflows: parse(row.initiative.allowedWorkflows),
-    understanding: parse(row.initiative.understanding),
-    coverage: parse(row.initiative.coverage),
+    phases: json(phasesSchema, row.initiative.phases),
+    allowedWorkflows: nullableJson(keysSchema, row.initiative.allowedWorkflows),
+    understanding: nullableJson(initiativeUnderstandingSchema, row.initiative.understanding),
+    coverage: nullableJson(z.array(initiativeCoverageSchema), row.initiative.coverage),
     projectName: row.projectName,
     template:
       row.templateKey === null || row.templateName === null ? null : { key: row.templateKey, name: row.templateName },
@@ -280,8 +293,8 @@ export function createInitiativesRepo(db: DbExecutor) {
         .all()
         .map(({ position: _position, createdAt: _c, updatedAt: _u, ...row }) => ({
           ...row,
-          phases: JSON.parse(row.phases),
-          items: JSON.parse(row.items),
+          phases: json(phasesSchema, row.phases),
+          items: json(z.array(initiativeItemSpecSchema), row.items),
         }));
     },
     upsertTemplate(template: InitiativeTemplate, position: number, now: number): void {

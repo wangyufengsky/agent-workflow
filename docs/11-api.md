@@ -419,7 +419,7 @@ N2a 实现组合模板，N2b 加入 AI 拆解（`templateKey` 省略时）、重
 | POST | `/initiatives/:id/phases/:phase/open` | `initiatives.openPhase` | write | 只能是下一个阶段，且之前的工作包都已完成，否则 409 `INITIATIVE_PHASE_NOT_READY`（`details.items`）；`autoOpen` 的阶段由后端自动开启；`refine = true` 时不开启，而是开始一次细化 run（`open_phase = k`），确认它的草稿时开启 |
 | POST | `/initiatives/:id/rebreakdown` | `initiatives.rebreakdown` | write | `{ instruction? }`；只在从未确认的 `draft_ready` / `breakdown_failed`；在原会话里带意见与当前草稿重新拆解 |
 | POST | `/initiatives/:id/refine` | `initiatives.refine` | write | `{ instruction? }`；确认过、未全部完成、不是草稿时；只能改未开始的工作包（D136） |
-| POST | `/initiatives/:id/items/:key/start` | `initiatives.startItem` | write | 只在 `ready`：开始失败后重试，或任务取消后重新开始（新建任务，旧任务留在任务列表）；否则 409 `INITIATIVE_ITEM_NOT_READY` |
+| POST | `/initiatives/:id/items/:key/start` | `initiatives.startItem` | write | 草稿未确认时（如细化后）409 `INITIATIVE_NOT_EDITABLE`；只在 `ready`：开始失败后重试，或任务取消后重新开始（新建任务，旧任务留在任务列表）；否则 409 `INITIATIVE_ITEM_NOT_READY` |
 | POST | `/initiatives/:id/items/:key/merged` | `initiatives.confirmMerged` | write | 只在 `pr_open`：用户确认 PR 已合入（并已拉取到本地基础分支） |
 | POST | `/initiatives/:id/items/:key/drop` | `initiatives.dropItem` | write | `{ reason }`；在 `ready` / `waiting` / `phase_closed` / `pr_open` 时；任务进行中要先取消 |
 | POST | `/initiatives/:id/phases/:phase/deliver` | `initiatives.deliverPhase` | critical | `{ strategy? }` → `{ initiative, outcomes: [{ itemKey, taskId, taskKey, outcome, error }] }`：同批量交付（13c），只限这个阶段的工作包；报告类一律 `report_only` |

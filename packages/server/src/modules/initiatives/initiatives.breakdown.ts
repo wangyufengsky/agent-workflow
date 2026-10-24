@@ -10,8 +10,16 @@ import {
 } from '@aw/shared';
 import type { DoneItem } from './initiatives.background.ts';
 
-/** The AI's breakdown as a draft (34 §8.2): phases keep the gates already set (AI phases never open by themselves). */
-export function draftOf(input: SubmitBreakdownInput, current: readonly InitiativePhase[]): InitiativeDraft {
+/**
+ * The AI's breakdown as a draft (34 §8.2): phases keep the gates already set (AI phases never open by themselves).
+ * Work packages in `kept` (started, done or dropped) keep the checklist they have: the tool cannot write every field a
+ * user may set on it (required, manual checks, item ids), and it must not change anyway.
+ */
+export function draftOf(
+  input: SubmitBreakdownInput,
+  current: readonly InitiativePhase[],
+  kept: ReadonlyMap<string, InitiativeDraft['items'][number]['acceptance']>,
+): InitiativeDraft {
   return {
     phases: input.phases.map((p, i) => ({ title: p.title, goal: p.goal, autoOpen: current[i]?.autoOpen ?? false })),
     items: input.items.map((item) => ({
@@ -21,15 +29,17 @@ export function draftOf(input: SubmitBreakdownInput, current: readonly Initiativ
       workflow: item.workflow,
       requirement: item.requirement,
       dependsOn: item.depends_on,
-      acceptance: item.acceptance.map((a) => ({
-        title: a.title,
-        expected: a.expected,
-        required: true,
-        verification:
-          a.command === undefined
-            ? { kind: RequirementVerification.AiReview }
-            : { kind: RequirementVerification.Command, command: a.command },
-      })),
+      acceptance:
+        kept.get(item.key) ??
+        item.acceptance.map((a) => ({
+          title: a.title,
+          expected: a.expected,
+          required: true,
+          verification:
+            a.command === undefined
+              ? { kind: RequirementVerification.AiReview }
+              : { kind: RequirementVerification.Command, command: a.command },
+        })),
     })),
   };
 }
@@ -66,6 +76,12 @@ export const rebreakdownStep = (prompts: Prompts, draft: InitiativeDraft, instru
   renderTemplate(prompts[PromptName.Rebreakdown], {
     instruction: instruction ?? 'No particular feedback: break it down again, better.',
     draft: json(draft),
+  });
+
+/** A new try after a breakdown that submitted nothing, with the user's feedback if any (34 §5.2). */
+export const retryStep = (prompts: Prompts, instruction: string | null) =>
+  renderTemplate(prompts[PromptName.RetryBreakdown], {
+    instruction: instruction === null ? '' : `The user adds:\n\n${instruction}\n`,
   });
 
 export type RefineItem = InitiativeDraft['items'][number] & { state: 'started' | 'done' | 'dropped' | 'open' };
