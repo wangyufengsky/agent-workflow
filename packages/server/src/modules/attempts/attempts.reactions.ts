@@ -140,6 +140,10 @@ export function watchSessions(state: AttemptState, deps: { opencode: OpencodeCli
       case OpencodeEventType.PermissionAsked:
         if (running) onPermission(attempt, session, event);
         return;
+      case OpencodeEventType.PermissionReplied:
+        state.inbox.completePermission(attempt.id, event.permissionId, event.reply);
+        if (running) resume(session);
+        return;
       default:
         return;
     }
@@ -157,20 +161,17 @@ export function watchSessions(state: AttemptState, deps: { opencode: OpencodeCli
 
   deps.opencode.subscribe(onEvent);
 
-  return {
-    timeOut,
-    interruptActive,
-    /**
-     * The user answered or decided: once the session waits for nothing else it resumes. If its turn already ended,
-     * that idle is handled now (queued answers go out); otherwise the turn's own end will be.
-     */
-    resume(session: LiveSession): void {
-      if (!session.parked || state.waitsForUser(session.attemptId)) return;
-      session.parked = false;
-      session.cancelTimeout = deps.clock.schedule(session.timeoutMs, () => timeOut(session.attemptId));
-      const attempt = mustFind(session.attemptId);
-      state.signal('input_answered', attempt);
-      if (session.idle) state.inBackground(attempt.id, () => onIdle(attempt, session));
-    },
-  };
+  /**
+   * The user answered or decided: once the session waits for nothing else it resumes. If its turn already ended,
+   * that idle is handled now (queued answers go out); otherwise the turn's own end will be.
+   */
+  function resume(session: LiveSession): void {
+    if (!session.parked || state.waitsForUser(session.attemptId)) return;
+    session.parked = false;
+    session.cancelTimeout = deps.clock.schedule(session.timeoutMs, () => timeOut(session.attemptId));
+    const attempt = mustFind(session.attemptId);
+    state.signal('input_answered', attempt);
+    if (session.idle) state.inBackground(attempt.id, () => onIdle(attempt, session));
+  }
+  return { timeOut, interruptActive, resume };
 }

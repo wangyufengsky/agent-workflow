@@ -441,6 +441,7 @@ class AppError extends Error {
 | `ATTEMPT_SESSION_ERROR` | — | opencode `session.error`；`details` 为原始错误 |
 | `OPENCODE_NOT_READY` | 503 | 运行时不是 `ready` |
 | `OPENCODE_REQUEST_FAILED` | 502 | 调 opencode API 失败 |
+| `PERMISSION_REQUEST_EXPIRED` | 409 | opencode 明确返回该权限请求不存在；移除对应残留卡片，不视为已批准 |
 | **MCP 专用** | | |
 | `MCP_ATTEMPT_UNRESOLVED` | — | 无法从调用解析到活动尝试 |
 | `MCP_TOOL_NOT_ALLOWED` | — | 当前尝试类型不允许此工具 |

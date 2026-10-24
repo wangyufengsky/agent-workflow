@@ -409,6 +409,7 @@ function Workbench({ project, status }: { project: ProjectDetailDTO; status: Git
     if (view === 'branches') {
       main = (
         <BranchesView
+          onOpenReview={(reviewId) => go({ view: 'review', review: reviewId })}
           project={project}
           status={status}
           onDialog={setDialog}

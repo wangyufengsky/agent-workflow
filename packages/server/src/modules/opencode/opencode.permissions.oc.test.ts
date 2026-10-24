@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BashPolicy, OPENCODE_AGENT_NAME, type PermissionAction, RoleBaseAgent } from '@aw/shared';
+import { BashPolicy, ErrorCode, OPENCODE_AGENT_NAME, type PermissionAction, RoleBaseAgent } from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { createTestRepo, type TestRepo } from '../../../test/helpers/git.ts';
@@ -60,14 +60,12 @@ function scriptedModel(): Server {
           ? { role: 'assistant', content: 'done' }
           : {
               role: 'assistant',
-              tool_calls: [
-                {
-                  index: 0,
-                  id: `call_${Math.random().toString(36).slice(2)}`,
-                  type: 'function',
-                  function: { name: 'bash', arguments: JSON.stringify({ command, description: 'Run the command' }) },
-                },
-              ],
+              tool_calls: command.split('\n').map((command, index) => ({
+                index,
+                id: `call_${Math.random().toString(36).slice(2)}`,
+                type: 'function',
+                function: { name: 'bash', arguments: JSON.stringify({ command, description: 'Run the command' }) },
+              })),
             };
       const finish = command === undefined ? 'stop' : 'tool_calls';
       const usage = { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 };
@@ -141,11 +139,12 @@ async function decide(command: string): Promise<PermissionAction> {
     permission: sessionPermissionRules(RoleBaseAgent.Reviewer, BashPolicy.Auto, { allowedBash: PROJECT_PATTERNS }),
   });
   const { promise, resolve } = Promise.withResolvers<PermissionAction>();
+  let reply: Promise<void> | undefined;
   const unsubscribe = opencode.subscribe((event) => {
     if (!('sessionId' in event) || event.sessionId !== sessionId) return;
     if (event.type === OpencodeEventType.PermissionAsked) {
       resolve('ask');
-      void opencode.replyPermission({ permissionId: event.permissionId, directory: repo.path, reply: 'reject' });
+      reply = opencode.replyPermission({ permissionId: event.permissionId, directory: repo.path, reply: 'reject' });
     }
     if (event.type === OpencodeEventType.Tool && event.tool === 'bash' && event.status === ToolCallStatus.Completed)
       resolve('allow');
@@ -161,10 +160,59 @@ async function decide(command: string): Promise<PermissionAction> {
     return await promise;
   } finally {
     unsubscribe();
+    await reply;
   }
 }
 
 describe('@opencode 只读会话的 bash 规则与项目中总是允许的模式', () => {
+  it('并行 find 请求：总是允许后两条都收到答复事件，再答复已完成请求返回失效错误', async () => {
+    const isolatedRepo = await createTestRepo();
+    const opencode = t.app.services.opencode;
+    const agent = OPENCODE_AGENT_NAME[RoleBaseAgent.Reviewer];
+    const sessionId = await opencode.createSession({
+      directory: isolatedRepo.path,
+      title: 'Concurrent permissions',
+      agent,
+      permission: sessionPermissionRules(RoleBaseAgent.Reviewer, BashPolicy.Ask),
+    });
+    const asked: string[] = [];
+    const replied: string[] = [];
+    const pending = Promise.withResolvers<void>();
+    const done = Promise.withResolvers<void>();
+    const unsubscribe = opencode.subscribe((event) => {
+      if (!('sessionId' in event) || event.sessionId !== sessionId) return;
+      if (event.type === OpencodeEventType.PermissionAsked) {
+        asked.push(event.permissionId);
+        if (asked.length === 2) pending.resolve();
+      }
+      if (event.type === OpencodeEventType.PermissionReplied) {
+        replied.push(event.permissionId);
+        if (replied.length === 2) done.resolve();
+      }
+    });
+    try {
+      await opencode.prompt({
+        sessionId,
+        directory: isolatedRepo.path,
+        agent,
+        model: { providerId: PROVIDER, modelId: MODEL },
+        text: `${RUN}find . -name README.md -exec cat {} \\;\nfind . -name package.json -exec cat {} \\;`,
+      });
+      await pending.promise;
+      const permissionId = asked[0];
+      if (permissionId === undefined) throw new Error('missing native permission');
+      await opencode.replyPermission({ permissionId, directory: isolatedRepo.path, reply: 'always' });
+      await done.promise;
+      expect(replied.sort()).toEqual([...asked].sort());
+      await expect(
+        opencode.replyPermission({ permissionId, directory: isolatedRepo.path, reply: 'once' }),
+      ).rejects.toMatchObject({ code: ErrorCode.PermissionRequestExpired });
+    } finally {
+      unsubscribe();
+      await opencode.abort({ sessionId, directory: isolatedRepo.path });
+    }
+  });
+
   it('opencode 放行白名单与项目模式（带结尾的 stderr 重定向），逃逸写法与其他命令照常询问', async () => {
     const commands = [...ALLOWED, ...ASKED];
     const decisions = await Promise.all(commands.map(decide));

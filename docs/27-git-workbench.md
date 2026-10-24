@@ -165,6 +165,8 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 
 ### 4.5 结果
 
+- 四类审查入口共用 [25](25-conversation-stream.md) 的会话流：运行中展示实际进展、耗时、正文、思考与工具调用（可展开输入输出）；停止、失败和成功后保留历史。结束后收起，切换历史审查只展示对应尝试。「审查这段差异」启动成功即打开审查面板。
+
 - 结论卡：一句话结论、按严重度计数（阻断 / 严重 / 一般）、按类别计数、审查对象（范围、文件数、模型）。没有问题时显示肯定的结论。
 - 问题列表：按严重度或按文件分组；每条显示严重度与类别 chip、标题、`路径:行`、说明、建议（可折叠）。点位置 → 右栏 diff 打开该文件并滚动到该行、行背景高亮；diff 行号旁按严重度显示圆点，点圆点在行下展开问题卡。
 - 每条有「选入修复」复选框（默认勾选阻断与严重）；底部固定栏「已选 n 个问题 · 据此修复」。
@@ -256,6 +258,8 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 ### 7.2 数据（10 增补）
 
 `git_reviews`：`id`、`project_id`（级联删除）、`target_kind`（`worktree | commit | branch | range`）、`label`（分支名或短 SHA，显示用）、`from_sha`、`to_sha`（工作区改动为空）、`focus`、`attempt_id`、`files`（JSON：开始时的改动文件清单）、`summary`、`findings`（JSON）、`created_at`、`finished_at`。状态取其尝试的状态（同 `knowledge_turns`），不另设状态列与状态机。
+
+`GitReviewDTO` 暴露已有的 `attemptId`，前端复用 `/attempts/:id`、`/attempts/:id/transcript` 和 `attempt.updated` / `attempt.transcript`，不新增日志存储或轮询接口。
 
 ### 7.3 AI 草拟提交信息
 

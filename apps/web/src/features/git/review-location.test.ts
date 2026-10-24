@@ -4,6 +4,7 @@ import { reviewSearch, reviewTarget } from './review-location.ts';
 
 const review = (overrides: Partial<GitReviewDTO>): GitReviewDTO => ({
   id: 'r1',
+  attemptId: 'a1',
   projectId: 'p1',
   target: 'commit',
   label: 'abc1234',

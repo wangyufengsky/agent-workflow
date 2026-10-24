@@ -464,6 +464,7 @@ export function createFakeOpencode() {
       if (resolve === undefined) throw new Error(`FakeOpencode has no pending permission ${permissionId}`);
       permissionReplies.push({ permissionId, reply });
       pendingPermissions.delete(permissionId);
+      emit({ type: E.PermissionReplied, sessionId: resolve.sessionId, permissionId, reply });
       resolve.resolve(reply);
     },
     async listModels() {

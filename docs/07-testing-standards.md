@@ -104,6 +104,8 @@
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 
+审查过程回归（`review-progress.browser.spec.ts`，J24 / J22）：四类 Git 审查入口均能查看进展、思考、正文与工具输入输出，刷新后保留，完成后收起；重新审查选中新过程、历史互不串流，停止后仍可展开。任务 AI 评审在当前步骤与简单过程页可见。真实 opencode 权限回归用本地脚本模型并行触发两条 `find`，验证「总是允许」发出两条完成事件及重复答复的明确失效错误；集成覆盖 SSE / HTTP 竞争、重复投递、无关条目保留和助手同步。
+
 ## 6. live 测试
 
 - 托管平台 `live/hosting.live.test.ts`（M4-05）：无效令牌在 github.com 与 gitlab.com 上为 `HOSTING_AUTH_FAILED`；设置 `AW_LIVE_HOSTING_PROVIDER` / `AW_LIVE_HOSTING_REPO` / `AW_LIVE_HOSTING_TOKEN`（自建 GitLab 另加 `AW_LIVE_HOSTING_BASE_URL`）时验证真实令牌，再设 `AW_LIVE_HOSTING_PR_HEAD` / `AW_LIVE_HOSTING_PR_BASE` 时创建一个 PR。

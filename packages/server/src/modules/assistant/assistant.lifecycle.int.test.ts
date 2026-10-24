@@ -16,6 +16,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
+import { OpencodeEventType as E } from '../opencode/index.ts';
 
 let t: TestApp | undefined;
 afterEach(async () => {
@@ -23,6 +24,49 @@ afterEach(async () => {
   await t?.close();
 });
 const HOME = { page: 'home', params: {} } as const;
+
+it('原生自动完成其他权限后，助手同步清空卡片；重复事件和 HTTP 返回不会重复恢复', async () => {
+  t = await createTestApp();
+  const app = t;
+  const c = (await app.call(createConversationOp, {})).body;
+  app.fake.enqueue(script().requestPermission('bash', ['find . -name first']).hang());
+  const asked = waitForEvent(
+    app.app.events,
+    ServerEventType.AssistantUpdated,
+    (event) => event.id === c.id && event.pendingPermissions.length > 0,
+  );
+  await app.call(sendAssistantMessageOp, { id: c.id, text: '读取', context: HOME });
+  const permission = (await asked).pendingPermissions[0];
+  const session = app.fake.sessions.at(-1);
+  if (permission === undefined || session === undefined) throw new Error('missing permission session');
+  app.fake.replay([
+    {
+      type: E.PermissionAsked,
+      sessionId: session.id,
+      directory: session.directory,
+      permissionId: 'auto-permission',
+      permission: 'bash',
+      patterns: ['find . -name second'],
+    },
+  ]);
+  const replies = [permission.permissionId, 'auto-permission'].map((permissionId) => ({
+    type: E.PermissionReplied,
+    sessionId: session.id,
+    permissionId,
+    reply: 'always' as const,
+  }));
+  const reply = app.fake.replyPermission.bind(app.fake);
+  vi.spyOn(app.fake, 'replyPermission').mockImplementation(async (input) => {
+    app.fake.replay(replies);
+    await reply(input);
+  });
+  expect(await app.app.services.assistant.replyPermission(c.id, permission.permissionId, 'always')).toMatchObject({
+    pendingPermissions: [],
+    busy: true,
+  });
+  app.fake.replay(replies);
+  expect((await app.call(getConversationOp, { id: c.id })).body).toMatchObject({ pendingPermissions: [], busy: true });
+});
 
 it('不同对话在各自的文件目录运行；删除底层会话失败时保留聊天，成功后一起清理', async () => {
   t = await createTestApp();

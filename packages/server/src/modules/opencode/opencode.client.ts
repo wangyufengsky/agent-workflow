@@ -8,6 +8,10 @@ import type { OpencodeRuntime } from './opencode.runtime.ts';
 const THROW = { throwOnError: true } as const;
 
 const responseCauseSchema = z.object({ status: z.number() });
+const permissionNotFoundCauseSchema = z.object({
+  status: z.literal(404),
+  body: z.object({ _tag: z.literal('PermissionNotFoundError'), requestID: z.string(), message: z.string() }),
+});
 
 const sessionNotFoundCauseSchema = z.object({
   status: z.literal(404),
@@ -215,9 +219,19 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
       });
     },
     async replyPermission({ permissionId, directory, reply }) {
-      await request('permission.reply', () =>
-        runtime.sdk().permission.reply({ requestID: permissionId, directory, reply }, THROW),
-      );
+      await request('permission.reply', async () => {
+        try {
+          await runtime.sdk().permission.reply({ requestID: permissionId, directory, reply }, THROW);
+        } catch (err) {
+          const missing = err instanceof Error ? permissionNotFoundCauseSchema.safeParse(err.cause) : undefined;
+          if (missing?.success && missing.data.body.requestID === permissionId) {
+            throw new AppError(ErrorCode.PermissionRequestExpired, 'Permission request is no longer pending', {
+              permissionId,
+            });
+          }
+          throw err;
+        }
+      });
     },
     async listModels() {
       const sdk = runtime.sdk();

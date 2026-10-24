@@ -102,7 +102,9 @@ function CurrentStep({
   node: NodeSummaryDTO;
   onOpen: (nodeId: string) => void;
 }) {
-  const attempt = task.activeAttempts.find((a) => a.nodeId === node.id && a.kind === AttemptKind.Execute);
+  const attempt =
+    task.activeAttempts.find((a) => a.nodeId === node.id && a.kind === AttemptKind.Review) ??
+    task.activeAttempts.find((a) => a.nodeId === node.id && a.kind === AttemptKind.Execute);
   return (
     <Panel title={C.sideCurrent}>
       <div className="col" data-testid="current-step">
@@ -123,7 +125,7 @@ function CurrentStep({
           <ConversationStream
             key={attempt.id}
             attemptId={attempt.id}
-            title={STREAM_COPY.processTitle}
+            title={attempt.kind === AttemptKind.Review ? STREAM_COPY.reviewTitle : STREAM_COPY.processTitle}
             pro={false}
             size="side"
           />

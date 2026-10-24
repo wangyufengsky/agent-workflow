@@ -333,11 +333,21 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
      * 「总是允许」for the session only; a bash one is remembered for the project's later sessions too (D101).
      */
     async replyPermission(attemptId: string, payload: PermissionPayload, reply: PermissionDecision): Promise<void> {
-      await opencode.replyPermission({
-        permissionId: payload.opencodePermissionId,
-        directory: payload.directory,
-        reply,
-      });
+      try {
+        await opencode.replyPermission({
+          permissionId: payload.opencodePermissionId,
+          directory: payload.directory,
+          reply,
+        });
+      } catch (error) {
+        if (error instanceof AppError && error.code === ErrorCode.PermissionRequestExpired) {
+          state.inbox.completePermission(attemptId, payload.opencodePermissionId, undefined);
+          const session = state.sessionOf(attemptId);
+          if (session !== undefined) reactions.resume(session);
+        }
+        throw error;
+      }
+      state.inbox.completePermission(attemptId, payload.opencodePermissionId, reply);
       const { projectId } = mustFind(attemptId);
       if (reply === PermissionDecision.Always && payload.permission === BASH_PERMISSION && projectId !== null) {
         projects.rememberBash(projectId, payload.patterns);

@@ -814,7 +814,9 @@ const SHOTS: Shot[] = [
     ready: testId('node-page'),
     open: async (page) => {
       await page.getByRole('tab', { name: '过程' }).click();
-      return page.getByTestId('conversation-stream');
+      await expect(page.getByRole('button', { name: /执行过程/ })).toHaveAttribute('aria-expanded', 'false');
+      await expect(page.getByRole('button', { name: /评审过程/ })).toHaveAttribute('aria-expanded', 'false');
+      return page.getByTestId('conversation-stream').filter({ hasText: '评审过程' });
     },
   },
   {

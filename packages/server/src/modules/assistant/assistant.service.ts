@@ -408,6 +408,13 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     }
   }
 
+  function completePermission(id: string, permissionId: string): void {
+    const state = liveOf(id);
+    if (!state.permissions.delete(permissionId)) return;
+    if (state.permissions.size === 0) usage.resume(id);
+    publish(id);
+  }
+
   function onEvent(event: OpencodeEvent): void {
     if (event.type === OpencodeEventType.RuntimeLost) {
       onRuntimeLost();
@@ -441,6 +448,9 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           patterns: event.patterns,
         });
         publish(id);
+        return;
+      case OpencodeEventType.PermissionReplied:
+        completePermission(id, event.permissionId);
         return;
       default:
         return;
@@ -748,10 +758,15 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       if (!state.permissions.has(permissionId)) {
         throw new AppError(ErrorCode.NotFound, `No open permission request ${permissionId}`, { permissionId });
       }
-      await opencode.replyPermission({ permissionId, directory: filesDir(id), reply });
-      state.permissions.delete(permissionId);
-      if (state.permissions.size === 0) usage.resume(id);
-      return publish(id);
+      try {
+        await opencode.replyPermission({ permissionId, directory: filesDir(id), reply });
+      } catch (error) {
+        if (error instanceof AppError && error.code === ErrorCode.PermissionRequestExpired)
+          completePermission(id, permissionId);
+        throw error;
+      }
+      completePermission(id, permissionId);
+      return toDto(get(id));
     },
 
     transcript(id: string, afterSeq: number): TranscriptPage {

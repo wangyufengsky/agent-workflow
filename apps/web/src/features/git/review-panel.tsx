@@ -10,11 +10,14 @@ import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
+import { Elapsed } from '../../components/elapsed.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { Markdown } from '../../components/markdown.tsx';
+import { STREAM_COPY } from '../../copy/attempts.ts';
 import { formatDateTime } from '../../copy/common.ts';
 import { GIT_COPY as C } from '../../copy/git.ts';
+import { AttemptView } from '../attempts/attempt-view.tsx';
 import styles from './git.module.css';
 import { useStartReview, useStopReview } from './git.queries.ts';
 import { isActiveReview, severityCounts } from './git-parts.tsx';
@@ -41,10 +44,12 @@ function StartReview({
   projectId,
   target,
   again,
+  onStarted,
 }: {
   projectId: string;
   target: GitReviewTargetInput;
   again: boolean;
+  onStarted: (id: string) => void;
 }) {
   const [focus, setFocus] = useState('');
   const start = useStartReview(projectId);
@@ -68,7 +73,12 @@ function StartReview({
           variant="brand"
           icon="sparkle"
           pending={start.isPending}
-          onClick={() => start.mutate({ target, ...(focus.trim() === '' ? {} : { focus: focus.trim() }) })}
+          onClick={() =>
+            start.mutate(
+              { target, ...(focus.trim() === '' ? {} : { focus: focus.trim() }) },
+              { onSuccess: (review) => onStarted(review.id) },
+            )
+          }
         >
           {again ? C.reviewAgain : C.reviewRun}
         </Button>
@@ -187,7 +197,8 @@ export function ReviewPanel({
   const [choices, setChoices] = useState<ReadonlyMap<string, boolean>>(new Map());
   const stop = useStopReview(projectId);
   const review = reviews.find((r) => r.id === pickedId) ?? reviews[0];
-  if (review === undefined) return <StartReview projectId={projectId} target={target} again={false} />;
+  if (review === undefined)
+    return <StartReview projectId={projectId} target={target} again={false} onStarted={setPickedId} />;
   const index = reviews.length - reviews.indexOf(review);
   const findings = [...review.findings].sort(bySeverity);
   const keyOf = (f: GitFindingDTO) => `${review.id}:${f.path}:${f.line ?? ''}:${f.title}`;
@@ -215,18 +226,20 @@ export function ReviewPanel({
           <span>{C.reviewOf(index, formatDateTime(review.createdAt))}</span>
         )}
         <span className={styles.spacer} />
+        {running && <Elapsed since={review.createdAt} />}
         {running && (
           <Button size="sm" icon="stop" pending={stop.isPending} onClick={() => stop.mutate(review.id)}>
             {C.reviewStop}
           </Button>
         )}
       </div>
-      {running && (
-        <div className="banner info" role="status">
-          <span className="spin" aria-hidden="true" />
-          <div>{C.reviewRunning}</div>
-        </div>
-      )}
+      <AttemptView
+        key={review.attemptId}
+        attemptId={review.attemptId}
+        title={STREAM_COPY.reviewTitle}
+        canAbort={false}
+        foldOnEnd
+      />
       {(review.status === AttemptStatus.Failed || review.status === AttemptStatus.Interrupted) && (
         <div className="banner warn" role="status">
           <Icon name="alert" />
@@ -275,7 +288,7 @@ export function ReviewPanel({
           )}
         </>
       )}
-      {!running && <StartReview projectId={projectId} target={target} again />}
+      {!running && <StartReview projectId={projectId} target={target} again onStarted={setPickedId} />}
     </div>
   );
 }
