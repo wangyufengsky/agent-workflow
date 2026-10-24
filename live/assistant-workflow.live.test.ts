@@ -15,7 +15,8 @@ import {
   listConfirmationsOp,
   listTasksOp,
   MCP_ASSISTANT_TOOL_PREFIX,
-  openPreviewTabOp,
+  navigateUserTabOp,
+  openUserTabOp,
   PermissionDecision,
   PreviewState,
   replyAssistantPermissionOp,
@@ -271,8 +272,9 @@ it(
       expect(relay.tools).toEqual([]);
       expect(await evaluation.entries(other)).toEqual([]);
 
-      const opened = await t.call(openPreviewTabOp, { taskId });
-      expect(opened.status).toBe(200);
+      const opened = await t.call(openUserTabOp, { taskId });
+      expect(opened.status).toBe(201);
+      expect((await t.call(navigateUserTabOp, { tabId: opened.body.tabId, path: '/broken' })).status).toBe(204);
       expect((await t.call(bindAssistantPreviewOp, { id, preview: { taskId, tabId: opened.body.tabId } })).status).toBe(
         204,
       );

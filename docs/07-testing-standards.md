@@ -113,6 +113,7 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - M3-12 冒烟 `live/smoke.live.test.ts`：`bugfix` 与 `feature` 各跑一次，报告写到 `live/reports/smoke-<时间>.json`（尝试、提醒次数、用量、`submit_*` 调用成败）。
 - 用例（M6-05 `live/workflows.live.test.ts`，与冒烟合起来）：五个内置流程各一次（Java 项目上的修 Bug、代码审查、重构，TypeScript 项目上的新功能、补单测、修 Bug）；统计 `submit_*` 调用成功率、尝试次数、耗时、成本，输出报告到 `live/reports/`。另有 `mcp-errors.live.test.ts`（工具错误码让模型改正计划，01 §5 第 7 条）与 `permissions.live.test.ts`（只读会话的 bash 规则在真实 opencode 上的效果，D63）。辅助代码在 `live/live-app.ts`；各套件依次运行（`fileParallelism: false`）。
 - 浏览器 `live/browser.live.test.ts`（v1.3 B1 的完成标准，29 §13）：示例仓库 `todo-web`（零依赖的 Node 静态服务器），新功能流程给页面加「清空」按钮并在页面预览里验证；默认免费模型（能看图）与一个没有图片输入的模型（`AW_LIVE_TEXT_MODEL`，默认 `opencode-go/glm-5.3`）各跑一次，断言任务到待合并、会话里有成功的 `browser_open` 与 `browser_click`。浏览器用开发宿主（playwright-core 的 Chromium）。
+- 浏览器读取 `live/browser-reading.live.test.ts`（v1.3 B3 的完成标准，29 §13）：默认免费模型。知识问答打开网络开关，研究员用浏览器读一个要执行脚本才显示正文的本地网页并引用它，断言回答通过且 `web` 引用的摘录含页面正文；助手在任务页启动预览（确认卡片）并打开预览页签，测试扮演界面打开用户的预览并关联、把预览导航到报错的 `/broken`（`/` 保持干净，任务的页面体检才能通过），再问「这个页面为什么报错」，断言调用了 `browser_read` 且回复含控制台错误。报告写到 `live/reports/assistant-browser-reading-<时间>/`。
 - 应用助手 `live/assistant.live.test.ts`（A-09）：让助手查明天的日期并列出项目，断言调用了 `get_current_time` 与 `projects_list`、回复含明天的日期与项目名，报告写到 `live/reports/assistant-<时间>.json`。
 - 不作为通过/失败的硬门槛（模型有随机性），但内置提示词改动的 PR 必须附 live 报告对比。
 

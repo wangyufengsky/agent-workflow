@@ -26,13 +26,19 @@ export async function startAssistantWebsite(marker: string) {
   };
 }
 
-/** 与最小普通任务放在同一真实 Git 仓库，预览由应用在任务 worktree 中启动。 */
+/**
+ * 与最小普通任务放在同一真实 Git 仓库，预览由应用在任务 worktree 中启动。`/` 干净，任务的页面体检（29 §7）能通过；
+ * 用户把预览导航到 `/broken` 才看到控制台错误与失败的请求。
+ */
 export function previewServer(marker: string): string {
   return `import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 createServer((req, res) => {
   if (req.url === '/missing.js') { res.writeHead(404); res.end(''); return; }
+  const broken = req.url === '/broken'
+    ? '<script>console.error("PREVIEW-CONSOLE-${marker}")</script><script src="/missing.js"></script>'
+    : '';
   res.writeHead(200, {'content-type':'text/html; charset=utf-8'});
-  res.end('<title>用户选择的任务预览</title><h1>${marker}</h1><p>' + readFileSync('greeting.txt','utf8') + '</p><script>console.error("PREVIEW-CONSOLE-${marker}")</script><script src="/missing.js"></script>');
+  res.end('<title>用户选择的任务预览</title><h1>${marker}</h1><p>' + readFileSync('greeting.txt','utf8') + '</p>' + broken);
 }).listen(Number(process.env.PORT), '127.0.0.1');\n`;
 }
