@@ -1,0 +1,246 @@
+# 34 · 助手画图（设计稿）
+
+> 状态：**设计稿，未实现，待用户检查**（2026-10-24）。决策 D132–D136 为推荐方案；§11 列出需要用户拍板的取舍，确认后按 §10 实施（05 的 V 系列）。编号说明：团队页（33，D128–D131）在 PR #77 中尚未合并，本文从 34 与 D132 起编，避免与它冲突。
+
+## 1. 要解决的问题
+
+用户原话：助手要能「直接发送一些图形，让人更加直观的观看结果」，例如流程图、柱状图、饼状图。
+
+现在助手回答统计问题只有文字与 Markdown 表格。助手已经能取到不少数字：任务列表与状态、质量与用量（19）、团队统计（33，PR #77）、数据库只读查询（24）、Git 提交与分支。把这些数字画出来，比一段文字或一张表更快看懂；流程（内置流程的步骤、一次任务经过的阶段、用户描述的业务流程）画成流程图也比文字清楚。
+
+目标：
+
+1. 用户让助手统计、比较、说明流程时，助手在对话里**直接给出一张图**，与正文、动作条、导航卡片在同一条消息流里。
+2. 图跟随四套主题、在面板（宽 480px）与主页对话中都好看，读屏可读。
+3. 重启应用、回看旧对话，图还在、和当时一样。
+4. 不引入图表库（D80），不让模型写 SVG / HTML。
+
+不做（§9）：模型写任意 SVG / HTML / Mermaid；导出图片；任务、知识问答、PPT 等其他 AI 会话画图；图上点击钻取。
+
+## 2. 方案总览（D132）
+
+**两个助手专用工具，输入是结构化数据，前端用主题令牌渲染。**
+
+| 工具 | 画什么 | 风险 | 模式 |
+| --- | --- | --- | --- |
+| `show_chart` | 统计图：柱状图 `bar`（可堆叠）、折线图 `line`、饼图 `pie`（环形） | read | 简单（两种模式都可用） |
+| `show_flowchart` | 流程图：节点（步骤 / 判断 / 起止）与连线（可带条件文字） | read | 简单 |
+
+流程（与 `entity_ref` 导航卡片同一模式，D66）：
+
+1. 模型先用已有工具取数（如 `tasks_list`、`insights_summary`、团队统计、`databases_query`），再调用 `show_chart` / `show_flowchart`，参数是图的类型、标题、类别、系列与数值（流程图是节点与连线）。
+2. 后端在 MCP 边界用 zod 校验（§3），不通过则返回 `VALIDATION_FAILED` 与逐项 `issues`、`hint`，模型据此改正后重试；通过则把**校验后的图**作为一条 `chart` 条目追加进对话的消息流（JSONL，§4），经 SSE 推给界面，工具返回 `{ shown: true }`。
+3. 界面在消息流中把 `chart` 条目渲染为图（§5）；该次工具调用的动作条在简单模式下不单独显示（图代表了它），专业模式照常可展开看原始输入。
+4. 模型在图后用一两句话说结论（提示词要求，§6），不再把全部数字重复成表格。
+
+### 2.1 为什么是结构化数据 + 自写组件
+
+| 方案 | 结论 | 理由 |
+| --- | --- | --- |
+| **结构化数据工具 + 自写组件**（推荐） | 采用 | 校验在后端、错误能回到模型自我改正；颜色只用主题令牌，四套主题自动适配；读屏表格从同一份数据生成；存进消息流的是干净的数据，可回看；不新增依赖 |
+| 模型写 SVG / HTML，前端渲染 | 不采用 | renderer 不渲染模型的原始 HTML（`Markdown` 组件禁用 raw HTML，03 §9），为图开口子就是 XSS 面；模型写的颜色不跟主题；无障碍无从保证 |
+| Markdown 代码块 ```` ```mermaid ```` + mermaid 库 | 不采用 | mermaid 连带 d3、dagre、khroma 等，体积数 MB，与 D80 / 06 §12 冲突；主题要另配一套，不读 `var(--token)`；语法错误只在前端暴露，模型不知道自己画错了 |
+| Markdown 代码块 ```` ```chart ````（JSON）由 `ReplyMarkdown` 渲染 | 不采用 | 不需要工具往返，但没有后端校验：数据错了只能在界面上显示一块坏图，模型收不到反馈；流式输出时 JSON 不完整，要处理半截数据；数据混在正文里，不能单独做 schema 演进 |
+| 一个工具 `show_chart` 同时含流程图 | 不采用 | MCP 要求顶层是对象 schema，四种图做成一个联合类型时，模型看到的 schema 要么很松（同 `open_form` 只在 handler 里细校验），要么是嵌套 `anyOf`，免费模型更容易填错。统计图三种共用一个数据形状（类别 + 系列），流程图形状完全不同，分两个扁平 schema 最好填 |
+
+## 3. 工具输入 schema 与上限
+
+schema 在 `shared/contracts/mcp/assistant-tools.ts`（`showChartInputSchema`、`showFlowchartInputSchema`），**strict 对象**（多余字段 `VALIDATION_FAILED`）；跨字段规则用 `superRefine`，问题带 `path`，模型看得出改哪里。上限常量在 `shared/constants/limits.ts`（一处定义）。不新增错误码。
+
+### 3.1 `show_chart`
+
+```ts
+{
+  type: 'bar' | 'line' | 'pie',
+  title: string,                 // 1–60 字符，图的标题，也是 figure 的可访问名称
+  categories: string[],          // 类别 / 横轴标签，按给定顺序显示；不可重复；每个 1–40 字符
+  series: Array<{
+    name: string,                // 1–40 字符；系列之间不可重复
+    values: Array<number | null> // 与 categories 等长；null 只在 line 中允许（表示缺数据，断线）
+  }>,
+  stacked?: boolean,             // 仅 bar：多个系列堆叠；默认 false（并排）
+  unit?: string,                 // 0–8 字符，读数与纵轴后缀，如「个」「%」「tokens」「分钟」
+  caption?: string               // 0–200 字符，图下的口径 / 来源说明，如「统计本周已结束的任务」
+}
+```
+
+| 规则 | 上限 / 要求 | 违反时的 issue（示例） |
+| --- | --- | --- |
+| 类别数 | bar 1–31（一个月按天）；line 2–90（一个季度按天）；pie 1–8 | `categories: too many for a pie; merge the smallest into one named 其他` |
+| 系列数 | bar / line 1–6；pie **恰好 1** | `series: a pie has exactly one series` |
+| 等长 | 每个系列 `values.length === categories.length` | `series.1.values: 12 values for 14 categories` |
+| 数值 | 有限数（JSON 本就没有 NaN / Infinity）；bar 与 pie ≥ 0；line 可为负 | `series.0.values.3: must be ≥ 0 in a bar chart` |
+| pie 总和 | > 0 | `series.0.values: a pie needs a positive total` |
+| `stacked` | 只在 bar 中出现 | `stacked: only for bar` |
+| 重复 | 类别不可重复；系列名不可重复 | `categories.4: duplicate 「后端」` |
+
+### 3.2 `show_flowchart`
+
+```ts
+{
+  title: string,                 // 1–60 字符
+  nodes: Array<{
+    id: string,                  // 1–32 字符，[A-Za-z0-9_-]，不可重复
+    label: string,               // 1–40 字符，节点上显示的文字（最多两行，超出省略、悬停看全文）
+    shape?: 'step' | 'decision' | 'terminal'   // 步骤（圆角矩形，默认）/ 判断（菱形）/ 开始结束（胶囊）
+  }>,                            // 1–24 个
+  edges: Array<{
+    from: string, to: string,    // 必须是已有节点 id；不允许 from === to
+    label?: string               // 0–16 字符，条件文字，如「通过」「失败」
+  }>,                            // 0–48 条；同一对 from→to 不可重复
+  caption?: string               // 0–200 字符
+}
+```
+
+**允许回环**（D134）：流程里「失败 → 重试」很常见。布局按节点给定顺序做深度优先，指回已访问祖先的边视为回边，不参与分层，画成从右侧绕回的虚线箭头；其余边按分层布局（§5.3）。孤立节点（没有任何连线）允许，放在第一层。
+
+### 3.3 输出
+
+`{ shown: true }`。后端不回显数据（模型自己有），也不回传渲染结果。
+
+## 4. 存储：消息流的 `chart` 条目（D133）
+
+新增会话流条目种类 `TranscriptEntryKind.Chart = 'chart'`（10 §3），**仅助手对话**：
+
+```json
+{ "seq": 41, "ts": 1761300000000, "kind": "chart", "data": { "chart": { "type": "pie", "title": "本周任务状态", "categories": ["已完成", "待合并", "失败"], "series": [{ "name": "任务数", "values": [7, 2, 1] }] } } }
+```
+
+- `data.chart` 是 `ChartSpec = ShowChartInput | ({ type: 'flow' } & ShowFlowchartInput)`，即**校验通过后的输入**；schema 在 `shared/contracts/api/attempts.ts` 的 `transcriptEntrySchema` 中，读 JSONL 时与其他条目一样用 zod 解析（JSONL 是边界，06 §9 的同类规则）。
+- 写入：`AssistantService.recordChart(conversationId, chart)`，与 `recordProduced` 并列；同步追加 JSONL 并经 SSE `assistant.transcript` 推送，与其他条目同序。位置在该次 `tool_call` 之后、`tool_result` 之前。
+- 回看与重启：消息流文件本身就是持久的；重开对话按页读取时 `chart` 条目和其他条目一起回来，不需要新表与迁移。旧对话没有 `chart` 条目，不受影响。
+- 删除对话：随 JSONL 一起删除，无额外清理。
+- **演进约束**：`ChartSpec` 只做向后兼容的增量修改（新增可选字段、新增图类型）；收紧已有字段会让旧对话的整页读取失败。单测用一份固定的旧条目样本保证能解析。
+
+为什么不直接从 `tool_call` 的输入渲染（它也存了完整输入）：`tool_call` 记的是模型的原始输入，校验失败的调用也在里面，前端还得再判一遍哪些能画；`chart` 条目只在校验通过后写入，界面拿到的一定能画，与 `entity_ref`（操作成功才写）、`attachment`（文件写成才记）同一原则；数据形状也因此有独立的 schema，可以演进而不受工具输入改名影响。
+
+## 5. 前端
+
+### 5.1 组件与复用（D135）
+
+图表基础组件从「质量与用量」页移到共用目录，助手、质量与用量、团队三处用同一套：
+
+```
+web/src/components/charts/
+├─ series.module.css      系列颜色 .s0…s7（--accent、--role-2…--role-6 等，与 PR #77 的 SERIES_TONES 一致）与「其他」sRest
+├─ ticks.ts               niceTicks（现 insights/bar-chart.tsx 的），扩展到含负数的范围（折线图）
+├─ bar-chart.tsx          现 insights/bar-chart.tsx 移入（含 PR #77 的 formatDate、tableCaption、max）；新增横向形态
+├─ line-chart.tsx         新增：SVG 折线 + HTML 刻度
+├─ donut-chart.tsx        新增：SVG 环形 + HTML 图例
+├─ flow-chart.tsx         新增：HTML 节点 + SVG 连线，布局见 §5.3
+├─ layered-layout.ts      分层布局核心，从 canvas/layout.ts 抽出（画布与流程图共用，26 §3.2）
+└─ charts.module.css
+web/src/features/assistant/chart-card.tsx   把 ChartSpec 分派到上面的组件，加标题、说明与卡片外框
+web/src/copy/charts.ts                      图表文案（读屏表格标题、「其他」「流程步骤」「回到」等）
+```
+
+- `insights/bar-chart.tsx` 与团队页（PR #77）改为从 `components/charts/` 导入；它们的外观与行为不变（J16 与团队页的 E2E 照常通过即证明）。
+- 团队页新增的「分组柱」「比例条」（33 §5，`team-parts.tsx` 的 `CompareBars`、`ShareBar`）本次**不移动**：助手用不到，等第二个使用者出现再移（06 §1.3）。
+- 画布（`canvas/flow-canvas.tsx`，`@xyflow/react`）**不用于**对话里的流程图：对话里的图是静态的，不需要拖动、缩放、编辑；React Flow 的画布会截获滚轮，在消息流里滚动时被卡住。只复用它的分层布局算法。
+
+### 5.2 统计图
+
+共同外观：卡片（`--frost-card` 底、1px `--line-2`、`--r-md`，同 15 §6.1 的卡片）；头部标题（`--ink`）；图；图下 `caption`（`--muted` 小字）。宽度随容器（面板约 440px、主页对话更宽），高度固定 180px（饼图 160px）。
+
+| 图 | 形态 | 交互与读数 |
+| --- | --- | --- |
+| bar | **纵向**：沿用 `BarChart`（纵轴取整刻度、横轴隔几个标注、堆叠或并排）。**横向**（类别名在左、条在中、数值在右）：类别标签较长时更易读。前端按一条规则自动选（D135）：类别 ≤ 16 且最长标签的显示宽度 > 6（汉字计 2、其他计 1）时横向，否则纵向；横向高度随类别数增长（每行 22px） | 悬停 / 聚焦一列（每列是一个按钮，键盘可达），图上方读数行显示「类别 · 系列 值单位」，与现在的 `BarChart` 一致 |
+| line | SVG `viewBox` 拉伸、`vector-effect: non-scaling-stroke` 保持线宽；纵轴含 0 与负数时画 0 基线；null 处断线；点数 ≤ 31 时画圆点；系列 ≥ 2 时有图例 | 每个横轴位置一个透明的聚焦列，悬停 / 聚焦时竖线标出该位置，读数行显示各系列的值 |
+| pie | 环形（中心写总数与单位），切片顺序同类别；图例在右（窄于 360px 时在下）：色块、类别、数值、百分比；百分比用最大余数法取整，合计恰为 100% | 悬停 / 聚焦图例项高亮对应切片，读数行显示「类别 · 值单位 · 占比」 |
+
+颜色：系列（饼图为切片）按顺序取 `.s0…s5`（统计图最多 6 个系列、饼图 8 片，饼图用到 `.s7`）；只用主题令牌（06 §8），不写颜色字面量。数字格式用 `Intl.NumberFormat('zh-CN')`，最多两位小数；纵轴大数用「万」缩写（与 19 的格式函数共用）。
+
+### 5.3 流程图
+
+- **方向自上而下**：面板窄，纵向排比横向排更容易放下。每层节点水平居中，节点固定尺寸（步骤 148×40，判断 120×56 菱形，起止 120×32 胶囊），所以布局不需要测量文字；文字最多两行，超出省略号，`title` 显示全文。
+- 布局：`layered-layout.ts` 的分层算法（一个节点的层 = 最远前驱的层 + 1，层内按邻居重心排序，相同输入同样结果），流程图另加：回边先剔除（§3.2）、方向换成纵向、不加开始 / 结束胶囊（由模型用 `terminal` 节点自己画）。
+- 连线：SVG 折线 + 箭头，`--line-3` 色；条件文字放在连线中点，`--surface` 底的小胶囊；回边为虚线，从节点右侧绕回。
+- 节点：`--frost-card` 底、1px `--line-2` 描边、`--ink` 文字；判断节点 `--accent-fill` 底；起止节点 `--fill-2` 底。不做状态色（模型画的是说明图，不是实时进度）。
+- 宽度：最宽一层超出容器时，**图在自己的框内横向滚动**（`overflow-x: auto`），不撑宽面板与页面（J9 的横向溢出检查针对页面，不针对框内滚动）。见 §11 问题 4 是否另加「放大查看」。
+
+### 5.4 在消息流中的位置与动作条
+
+- `message-list.tsx` 的 `Body` 新增 `case TranscriptEntryKind.Chart: return <ChartCard chart={entry.data.chart} />`。
+- `show_chart` / `show_flowchart` 成功的调用：简单模式不显示动作条（图代表它，同确认卡片代表 `needs_confirmation` 的调用）；失败的调用照常显示失败的动作条（「画图」+ ! 图标），之后模型改正重画；专业模式所有调用都显示，可展开看工具名与原始输入输出。动词在 `TOOL_COPY`：「画图」「画流程图」。
+- 出现动画：随消息淡入上移（15 §6.1）；柱与环在首次出现时从 0 长到目标值（0.42s，`transform` / `stroke-dashoffset`），`prefers-reduced-motion: reduce` 时无动画。回看旧对话时不播放生长动画（只对本轮新到达的条目播放，与「打开对话时最后 6 条依次错开」的规则一致）。
+- 桌宠（32）复用同一消息流组件，图随容器缩放；容器窄于 280px 时横向条与饼图图例改为上下排列。
+
+### 5.5 无障碍
+
+- 每张图是 `<figure aria-label={title}>`，`caption` 在 `<figcaption>`。
+- 统计图下附视觉隐藏的数据表（`className="sr"`，同 19 §3.2 与现 `BarChart`）：表头为类别 / 各系列名，单元格带单位；饼图另有占比列。
+- 流程图下附视觉隐藏的有序列表：先按布局顺序列出节点（含形状：「判断：测试通过吗？」），再列出连线（「测试通过吗？ → 合并（通过）」）。
+- 交互元素（柱列、折线聚焦列、图例项）键盘可达，读数行 `aria-live="polite"`；SVG 本身 `aria-hidden`，信息都在表格 / 列表与按钮的 `aria-label` 里。
+- 颜色不是唯一信息：有图例与读数；折线的多系列另用实线 / 虚线 / 点线区分前三个系列。
+
+### 5.6 四套主题
+
+只用令牌，不按主题写分支。J9 走查的每套主题新增一张截图「助手图表」：同一对话里有纵向柱、横向柱、堆叠柱、折线、饼图、含判断与回环的流程图，检查 axe `color-contrast` 无问题、1280 宽无页面横向溢出（§8）。`--role-*` 系列在浅色主题（github-white、warm）上与 `--frost-card` 底的区分度在走查截图中人工确认；不够时调主题令牌，不在组件里特殊处理。
+
+## 6. 提示词与模型行为
+
+`protocol-assistant.md` 增加一段（英文，同现有风格）：
+
+- 当用户要统计、比较、看趋势、看占比，或回答里有 3 个以上可比较的数字时，先用工具取到真实数字，再调用 `show_chart`；说明步骤或流程时调用 `show_flowchart`。
+- 图里的数字**只能来自本对话中工具返回的结果**，不能估算或编造；口径（时间段、筛选条件、来源）写进 `caption`。
+- 选图：随时间变化用 `line`（或天数少时用 `bar`）；类别之间比较用 `bar`；占整体的比例用 `pie`，超过 8 类时把最小的几类合并为「其他」。
+- 画完后用一两句话说结论（最大、最小、变化），不要再把全部数据写成表格。
+- 团队成员的指标（33，D128）：按工具返回的顺序（姓名序）画，不排序、不写「排名」「第一」。
+
+工具描述（`helperTools`）写清各上限与 `pie` 只能一个系列，模型第一次就更可能填对；校验失败时 `hint` 说明怎么改（如「把最小的几类合并成“其他”」）。
+
+## 7. 简单 / 专业模式与权限
+
+- 两个工具都是 `mode = simple`、风险 read：画图不改变任何东西，不需要确认，两种模式都能用。
+- 画图本身不扩大助手能取到的数据：取数仍经各自的操作，受原有模式过滤（如数据库查询只在专业模式）。
+- 专业模式差异只在动作条（§5.4）。
+
+## 8. 错误处理
+
+| 情况 | 行为 |
+| --- | --- |
+| 输入不符合 schema 或跨字段规则 | `VALIDATION_FAILED`，`details.issues` 逐项带 `path` 与英文说明，`hint` 给出改法；不写 `chart` 条目；模型改正后重试（12 的通用错误映射） |
+| 调用不属于任何对话 | 沿用 `MCP_CONVERSATION_UNRESOLVED`（15 §2） |
+| 读消息流时 `chart` 条目解析失败 | 不应发生（只写校验过的数据，schema 只做兼容修改）；发生即缺陷，与其他条目一样让读取失败，不在前端兜底跳过（06 §1.1） |
+| 渲染 | 组件收到的一定是合法 `ChartSpec`，不写防御分支；类型穷尽用 `assertNever` |
+
+## 9. 不做
+
+- 模型写任意 SVG / HTML / Mermaid / 代码块图（§2.1）。
+- 散点图、面积图、热力图、雷达图、甘特图、地图；双纵轴；对数轴。需要时再按同一模式加 `type`（D132 的扩展方式）。
+- 导出图片 / 复制图表；图上点击钻取到页面（需要跳转时用导航卡片或 `open_page`）。
+- 任务执行、知识问答、PPT、团队 AI 分析等其他 AI 会话的画图能力（它们输出 Markdown 报告，另议）。
+- 图表数据的服务端二次核对（无法知道模型的数字是不是从工具结果里抄对的；以提示词约束与 `caption` 口径说明为主，§11 问题 5）。
+
+## 10. 实施计划（V 系列，确认后进行）
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| V-01 | 契约：`showChartInputSchema`、`showFlowchartInputSchema`、`ChartSpec`、上限常量、`TranscriptEntryKind.Chart` 与 `transcriptEntrySchema`；`AssistantToolName` 加两项 | 单元：每条跨字段规则一例被拒（等长、重复、pie 系列数与总和、bar 负数、未知节点、自环、重复边），合法样例通过；固定的旧条目样本可解析 |
+| V-02 | 后端：`helperTools` 加两个工具、`recordChart`；工具描述与 `hint`；提示词 §6 | 集成（`assistant.mcp.int.test.ts`）：FakeOpencode `callAppTool('show_chart', …)` → 消息流出现 `chart` 条目、工具结果 `{ shown: true }`；非法输入 `VALIDATION_FAILED` 带 `path`、不写条目；`createTestApp` 同数据目录重启后读消息流仍有该条目；流程图同样一例 |
+| V-03 | 前端共用组件：`components/charts/` 目录，移入 `BarChart` 与系列色，抽出 `layered-layout.ts`（画布改用它），新增横向条、折线、环形、流程图 | 单元：横向 / 纵向选择规则；含负数的取整刻度；最大余数法百分比合计 100；流程图布局（回边剔除、相同输入同样结果、孤立节点）；画布原有布局单测不变。J16 与团队页 E2E 照常通过 |
+| V-04 | 前端助手：`chart-card.tsx`、`message-list` 分派、动作条显示规则、`TOOL_COPY`、`copy/charts.ts`、动画与 reduced-motion | E2E（`shell-assistant.browser.spec.ts` 新用例）：助手画饼图与流程图 → 图的可访问名称为标题、聚焦图例读数正确、读屏表格 / 列表含数据；刷新后图仍在；简单模式无「画图」动作条、专业模式有 |
+| V-05 | 走查：J9 每套主题加「助手图表」截图（§5.6） | 四主题 axe 无对比度问题、无横向溢出；截图人工检查 |
+| V-06 | live：`live/assistant.live.test.ts` 新用例：在有若干不同状态任务的数据目录里问「按状态统计我的任务，画个饼图」 | 真实模型（默认免费模型，D62）调用了任务列表类工具与 `show_chart`（`type: pie`），图中数值合计等于任务数；报告写到 `live/reports/` |
+| V-07 | 文档同步：02、05、07（J9 / J11 与 live）、08（`AssistantToolName`、`TranscriptEntryKind`）、10 §3、14（助手章节）、15 §3 与 §6.1、19（组件位置）、28 §4、本文状态 | `pnpm verify` 通过 |
+
+顺序：V-03 依赖 PR #77 合并（它改了 `insights/bar-chart.tsx` 与系列色，见 §11 问题 1）；V-01、V-02 不依赖，可先做。
+
+## 11. 待用户确认
+
+1. **与团队页 PR #77 的先后**：推荐等 #77 合并后再动前端（V-03 起），把它扩展过的 `BarChart` 与 8 个系列色一起移到 `components/charts/`；契约与后端（V-01、V-02）可以先做。另一选择是现在就从 main 全部实现，合并时再解冲突（两边都改 `bar-chart.tsx` 与 `insights.module.css`）。
+2. **图的种类**：推荐本期 = 柱状（纵向 / 横向自动、可堆叠）+ 折线 + 饼图（环形，中心写总数）+ 流程图（步骤 / 判断 / 起止，允许回环）。是否还要别的（如面积图、甘特图），或饼图要实心而不是环形？
+3. **存储方式**：推荐新增消息流条目 `chart`（只存校验后的数据，D133）；另一选择是不加条目、直接从工具调用的输入渲染（少一个条目种类，但前端要再校验一次、失败的调用也在里面）。
+4. **窄面板里的大图**：推荐本期只做「流程图在自己的框内横向滚动」；是否要另加「放大查看」（点图打开对话框按大尺寸显示，柱、线、饼、流程图都可用）？约增加一个组件与一条 E2E。
+5. **数据可信度提示**：图里的数字由模型从工具结果抄来，后端核对不了。推荐只靠提示词约束 + 模型填写 `caption` 口径；另一选择是每张图下固定加一行小字「由助手根据本对话中的查询结果整理」。
+6. **画图后的文字**：推荐模型画完只用一两句话说结论、不重复数据表（读屏表格已有全部数字）；如果你希望正文里仍保留完整数字（便于复制），提示词改为「图后附 Markdown 表格」。
+
+## 12. 决策登记（摘要，全文见 02）
+
+| 编号 | 内容 |
+| --- | --- |
+| D132 | 助手画图用两个助手专用工具 `show_chart`（bar / line / pie）与 `show_flowchart`，输入是结构化数据，前端自写组件用主题令牌渲染；不让模型写 SVG / HTML / Mermaid，不引入图表库 |
+| D133 | 图存为消息流的 `chart` 条目（仅助手对话，校验通过后写入，schema 只做兼容修改），重启与回看从 JSONL 读出；不新增表 |
+| D134 | 上限与校验：§3 的数量与长度上限、跨字段规则，失败为 `VALIDATION_FAILED` 带 `path` 与 `hint`；流程图允许回环，回边画成虚线绕回 |
+| D135 | 图表基础组件移到 `web/src/components/charts/`，质量与用量、团队、助手共用；柱状图横向 / 纵向由前端按标签长度自动选；流程图复用画布的分层布局算法、不用 React Flow |
+| D136 | 呈现：简单模式成功的画图调用不显示动作条，专业模式可展开原始输入；每张图附读屏表格或列表；提示词要求数字只来自本对话的工具结果、口径写进 `caption`、画完一两句话说结论 |

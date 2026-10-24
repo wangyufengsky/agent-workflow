@@ -35,6 +35,7 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [29-browser.md](29-browser.md) | 内置浏览器与页面预览（设计已确认，B1 已实现）：预览服务、浏览器宿主与动作层、执行 MCP 浏览器工具、AI 访问（内网）网站与登录、页面体检、预览页签、接入的模块（D120–D125） | 全员 |
 | [30-attachments.md](30-attachments.md) | 统一附件输入（设计稿，未实现）：任务、助手、「再改改」带文本文件／项目文件，保存、范围与模型输入 | 全员 |
 | [31-requirements-checklist.md](31-requirements-checklist.md) | 需求验收清单（设计稿，未实现）：可编辑清单、核验步骤、逐项结论与过期、人工确认、交付提醒 | 全员 |
+| [34-assistant-charts.md](34-assistant-charts.md) | 助手画图（设计稿，未实现）：`show_chart` / `show_flowchart` 工具、消息流 `chart` 条目、共用图表组件、无障碍与四主题（D132–D136） | 全员 |
 
 ## 维护规则
 
