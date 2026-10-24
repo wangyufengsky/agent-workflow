@@ -317,6 +317,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     inbox: inbox.service,
     settings: settings.service,
     prompts,
+    browser: browser.service,
   });
   const gitReviews = createGitReviewsModule({
     db: database.db,

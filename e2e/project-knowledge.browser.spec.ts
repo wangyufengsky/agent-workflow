@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
@@ -253,4 +254,40 @@ test('J14 回答流式出现：引用先待核对、提交通过后可点击；�
   const row = page.getByTestId('knowledge-history-row').filter({ hasText: '退款金额怎样取整？' });
   await expect(row).toContainText('opencode/fake-model');
   await expect(row).not.toContainText('fake-model-2');
+});
+
+test('J31 研究员用浏览器读内网网页并引用：打开引用看到读到的正文摘录（29 §2.8）', async ({ page, request }) => {
+  const site = createServer((_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end('<title>退款规范</title><h1>退款规范</h1><p>退款金额四舍五入到分，手续费先扣。</p>');
+  });
+  await new Promise<void>((resolve) => site.listen(0, '127.0.0.1', resolve));
+  const address = site.address();
+  if (address === null || typeof address === 'string') throw new Error('Expected a TCP address');
+  const url = `http://127.0.0.1:${address.port}/refunds`;
+  try {
+    const project = await createProject(request, null);
+    await queueResearchTurn(request, project, [
+      { type: 'callTool', name: 'browser_open', args: { url } },
+      answer('内网的退款规范写明四舍五入到分 [1]。', [{ type: 'web', url, title: '退款规范' }]),
+    ]);
+    const asked = await request.post(`${API_BASE}/knowledge/conversations`, {
+      headers: AUTH,
+      data: {
+        projectId: project.id,
+        question: '退款怎么取整？',
+        sources: { code: true, docs: false, database: false, web: true },
+      },
+    });
+    const conversation = await asked.json();
+
+    await page.goto(`/knowledge/${conversation.id}`);
+    const turn = page.getByTestId('knowledge-turn').first();
+    await turn.getByRole('button', { name: '引用 1' }).click();
+    const panel = page.getByRole('complementary', { name: '引用原文' });
+    await expect(panel.getByRole('link', { name: '在浏览器中打开' })).toBeVisible();
+    await expect(panel.getByTestId('page-excerpt')).toContainText('退款金额四舍五入到分，手续费先扣。');
+  } finally {
+    site.close();
+  }
 });

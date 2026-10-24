@@ -38,7 +38,16 @@ export const citationSchema = z.discriminatedUnion('type', [
     excerpt: z.string(),
   }),
   z.object({ type: z.literal(CitationType.Database), connection: z.string(), sql: z.string() }),
-  z.object({ type: z.literal(CitationType.Web), url: z.string(), title: z.string().nullable() }),
+  z.object({
+    type: z.literal(CitationType.Web),
+    url: z.string(),
+    title: z.string().nullable(),
+    /**
+     * What the page said when the researcher read it with the browser, cut to `KNOWLEDGE_EXCERPT_MAX_CHARS`; null
+     * when it read the page otherwise (`webfetch`) or before v1.3 (29 §2.8).
+     */
+    excerpt: z.string().nullable().default(null),
+  }),
 ]);
 export type CitationDTO = z.infer<typeof citationSchema>;
 
@@ -133,6 +142,11 @@ export const citationSourceSchema = z.discriminatedUnion('type', [
     sql: z.string(),
     result: dbQueryOutputSchema,
   }),
-  z.object({ type: z.literal(CitationType.Web), url: z.string(), title: z.string().nullable() }),
+  z.object({
+    type: z.literal(CitationType.Web),
+    url: z.string(),
+    title: z.string().nullable(),
+    excerpt: z.string().nullable(),
+  }),
 ]);
 export type CitationSourceDTO = z.infer<typeof citationSourceSchema>;

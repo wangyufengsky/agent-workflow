@@ -44,8 +44,16 @@ const excerptOf = (lines: readonly string[], start: number, end: number) =>
     .join('\n')
     .slice(0, KNOWLEDGE_EXCERPT_MAX_CHARS);
 
-/** `connections`: the project's database connections by name, with their type (its SQL dialect, 24 §4). */
-export type CitationScope = { repoPath: string; sources: KnowledgeSources; connections: ReadonlyMap<string, DbType> };
+/**
+ * `connections`: the project's database connections by name, with their type (its SQL dialect, 24 §4); `pageText`:
+ * what a page the researcher read with the browser said (29 §2.8), null for a page it did not.
+ */
+export type CitationScope = {
+  repoPath: string;
+  sources: KnowledgeSources;
+  connections: ReadonlyMap<string, DbType>;
+  pageText(url: string): string | null;
+};
 
 async function checkCitation(
   citation: SubmittedCitation,
@@ -120,7 +128,12 @@ async function checkCitation(
         notSelected(KnowledgeSourceKind.Web);
         return undefined;
       }
-      return { type: CitationType.Web, url: citation.url, title: citation.title ?? null };
+      return {
+        type: CitationType.Web,
+        url: citation.url,
+        title: citation.title ?? null,
+        excerpt: scope.pageText(citation.url)?.slice(0, KNOWLEDGE_EXCERPT_MAX_CHARS) ?? null,
+      };
   }
 }
 

@@ -74,6 +74,8 @@ type Session = {
   current: Tab | null;
   shots: number;
   frames: number;
+  /** What each page the owner read said, by address without its fragment (29 §2.8). */
+  pages: Map<string, string>;
 };
 /** The tools whose action may change the page: each leaves a frame for the user to watch (29 §8.2). */
 type ActingTool =
@@ -99,6 +101,12 @@ const ENDED = new Set<string>(
 );
 
 const navigateSchema = z.object({ errorText: z.string().optional() });
+/** An address as a citation names a page: without its fragment. */
+function pageKey(url: string): string {
+  const parsed = new URL(url);
+  parsed.hash = '';
+  return parsed.href;
+}
 const visualViewportSchema = z.object({
   cssVisualViewport: z.object({
     pageX: z.number(),
@@ -180,7 +188,7 @@ export function createBrowserService({
   function sessionOf(owner: BrowserOwner): Session {
     const existing = sessions.get(owner.id);
     if (existing !== undefined) return existing;
-    const session: Session = { owner, tabs: {}, current: null, shots: 0, frames: 0 };
+    const session: Session = { owner, tabs: {}, current: null, shots: 0, frames: 0, pages: new Map() };
     sessions.set(owner.id, session);
     return session;
   }
@@ -258,6 +266,16 @@ export function createBrowserService({
   }
 
   /** Runs an action on the current tab and reports what it did to the page (29 §6), leaving a frame. */
+  /**
+   * Keeps what a page read by the owner said, under its address and the ones that led to it: a knowledge answer's
+   * `web` citation of it stores this text (29 §2.8). The snapshot's header line describes the tab, not the page.
+   */
+  function remember(owner: BrowserOwner, page: { url: string; page: string }, ...also: string[]): void {
+    const text = page.page.slice(page.page.indexOf('\n') + 1);
+    const { pages } = sessionOf(owner);
+    for (const url of [page.url, ...also]) if (URL.canParse(url)) pages.set(pageKey(url), text);
+  }
+
   async function act(
     owner: BrowserOwner,
     tool: ActingTool,
@@ -267,6 +285,7 @@ export function createBrowserService({
     tab.begin();
     await run(tab);
     const output = await tab.result(await tab.settle());
+    remember(owner, output);
     return { ...output, frame: await frame(owner, tab, tool, output.url) };
   }
 
@@ -605,12 +624,15 @@ export function createBrowserService({
       if (access.tab === BrowserTabKind.Site && (await loginPage(tab, output.url))) {
         throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: output.url });
       }
+      remember(owner, output, normalized);
       return output;
     },
 
     async snapshot(owner: BrowserOwner): Promise<BrowserPage> {
       const tab = current(owner);
-      return { ...(await tab.snapshot()), tab: tab.kind };
+      const page = await tab.snapshot();
+      remember(owner, page);
+      return { ...page, tab: tab.kind };
     },
 
     click: (owner: BrowserOwner, ref: string) => act(owner, McpToolName.BrowserClick, (tab) => actions.click(tab, ref)),
@@ -632,6 +654,7 @@ export function createBrowserService({
       const tab = current(owner);
       const met = await actions.waitFor(tab, input);
       const page = await tab.snapshot();
+      remember(owner, page);
       return { ...page, tab: tab.kind, met, frame: await frame(owner, tab, McpToolName.BrowserWaitFor, page.url) };
     },
 
@@ -663,6 +686,15 @@ export function createBrowserService({
     },
 
     close,
+
+    /**
+     * What a page the owner (an attempt) read in the browser said, the latest reading, or null when it did not read
+     * that address with the browser (29 §2.8).
+     */
+    pageText(ownerId: string, url: string): string | null {
+      if (!URL.canParse(url)) return null;
+      return sessions.get(ownerId)?.pages.get(pageKey(url)) ?? null;
+    },
 
     /** An attempt's frames in order (29 §8.2); also after it ended or the app restarted. */
     frames(attemptId: string): BrowserFrame[] {

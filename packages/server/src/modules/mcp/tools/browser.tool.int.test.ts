@@ -5,6 +5,8 @@ import {
   BROWSER_FRAME_WIDTH,
   type BrowserFrame,
   ErrorCode,
+  getKnowledgeOp,
+  knowledgeCitationOp,
   listBrowserFramesOp,
   listMcpToolsOp,
   MCP_SESSION_ARG,
@@ -233,5 +235,43 @@ describe('浏览器工具', () => {
 
     expect(await ask(false)).toMatchObject({ isError: true, result: { code: ErrorCode.McpToolNotAllowed } });
     expect(await ask(true)).toMatchObject({ isError: false, result: { tab: 'site', title: '工单' } });
+  });
+
+  it('研究员用浏览器读过的网页，引用存下读到的正文摘录；没用浏览器读的网页没有摘录（29 §2.8）', async () => {
+    const { project } = await addProject(t);
+    const answered = waitForEvent(
+      t.app.events,
+      ServerEventType.AttemptUpdated,
+      (d) => d.attempt.kind === 'research' && d.attempt.status === 'succeeded',
+    );
+    t.fake.enqueue(
+      script()
+        .callTool(McpToolName.BrowserOpen, { url: `${origin}/` })
+        .callTool(McpToolName.SubmitAnswer, {
+          answer: '工单页可以填标题和优先级 [1]，规范见另一处 [2]。',
+          citations: [
+            // The address the page was opened at, with a fragment the browser never saw.
+            { type: 'web', url: `${origin}/#form`, title: '工单' },
+            { type: 'web', url: `${origin}/other`, title: '别处' },
+          ],
+        }),
+      { agent: 'aw-researcher' },
+    );
+    const { body: asked } = await t.call(askKnowledgeOp, {
+      projectId: project.id,
+      question: '工单页能填什么？',
+      sources: { code: true, docs: false, database: false, web: true },
+    });
+    await answered;
+
+    const { body: conversation } = await t.call(getKnowledgeOp, { id: asked.id });
+    const turn = conversation.turns[0];
+    if (turn === undefined) throw new Error('No turn');
+    const [read, unread] = turn.citations;
+    expect(read).toMatchObject({ type: 'web', excerpt: expect.stringContaining('heading "工单" [level=1]') });
+    expect(read?.type === 'web' && read.excerpt).not.toContain('页面 /');
+    expect(unread).toMatchObject({ type: 'web', excerpt: null });
+    const { body: source } = await t.call(knowledgeCitationOp, { turnId: turn.id, index: 1 });
+    expect(source).toMatchObject({ type: 'web', url: `${origin}/#form`, excerpt: expect.stringContaining('保存') });
   });
 });

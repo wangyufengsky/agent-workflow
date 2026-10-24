@@ -60,7 +60,9 @@ function citationLine(c: CitationDTO, i: number): string {
     case CitationType.Database:
       return `[${i + 1}] database ${c.connection}: ${c.sql}`;
     case CitationType.Web:
-      return `[${i + 1}] ${c.title ?? c.url} (${c.url})`;
+      return c.excerpt === null
+        ? `[${i + 1}] ${c.title ?? c.url} (${c.url})`
+        : `[${i + 1}] ${c.title ?? c.url} (${c.url})\n\n\`\`\`\n${c.excerpt}\n\`\`\``;
   }
 }
 

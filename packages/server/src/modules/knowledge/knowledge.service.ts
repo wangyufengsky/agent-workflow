@@ -31,6 +31,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import type { BrowserService } from '../browser/index.ts';
 import type { DatabasesService } from '../databases/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
@@ -48,6 +49,8 @@ export type KnowledgeServiceDeps = {
   inbox: InboxService;
   settings: SettingsService;
   prompts: Prompts;
+  /** What the researcher read with the browser, for its `web` citations' excerpts (29 §2.8). */
+  browser: Pick<BrowserService, 'pageText'>;
 };
 
 export type TurnEnded = { conversationId: string; turnId: string };
@@ -417,6 +420,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
         repoPath: project.repoPath,
         sources: conversation.sources,
         connections: new Map(databases.forProject(project.id).map((c) => [c.name, c.type])),
+        pageText: (url) => deps.browser.pageText(attempt.id, url),
       });
       unit.transact(() => {
         repo.setAnswer(turn.id, { answer: input.answer, citations, answeredAt: clock.now() });

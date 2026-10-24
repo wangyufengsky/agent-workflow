@@ -234,7 +234,7 @@ type KnowledgeConversationSummaryDTO = {
 // 成功返回 { accepted: true }
 ```
 
-存储与 DTO（`CitationDTO`）：`file` 另存 `excerpt`（校验时读出的被引用行，截断到 `KNOWLEDGE_EXCERPT_MAX_CHARS`）与 `source: 'code' | 'docs'`（`classifySource(path)`：扩展名为 `.md .mdx .markdown .txt .rst .adoc`，或任一级目录名为 `docs` / `doc` 时为文档，其余为代码；`KNOWLEDGE_DOC_EXTENSIONS`、`KNOWLEDGE_DOC_DIRS`，不分大小写）；`database` 原样；`web` 原样。
+存储与 DTO（`CitationDTO`）：`file` 另存 `excerpt`（校验时读出的被引用行，截断到 `KNOWLEDGE_EXCERPT_MAX_CHARS`）与 `source: 'code' | 'docs'`（`classifySource(path)`：扩展名为 `.md .mdx .markdown .txt .rst .adoc`，或任一级目录名为 `docs` / `doc` 时为文档，其余为代码；`KNOWLEDGE_DOC_EXTENSIONS`、`KNOWLEDGE_DOC_DIRS`，不分大小写）；`database` 原样；`web` 另存 `excerpt`（v1.3 B3，29 §2.8）：研究员在这次尝试里用浏览器工具读过这个地址（忽略 `#` 片段；请求的地址与跳转后的最终地址都算）时为它最后读到的页面正文（页面结构文本，去掉表头行），截断到 `KNOWLEDGE_EXCERPT_MAX_CHARS`；只用 `webfetch` 读的、以及 v1.3 之前的为 `null`。
 
 引用标注 `[n]` 的识别（`citationMarkers(answer)`，`shared/knowledge/citations.ts`，后端校验与前端渲染共用）：`[` 数字 `]` 且后面不是 `(`（不是 Markdown 链接），跳过代码块与行内代码。
 
@@ -266,7 +266,7 @@ type CitationSourceDTO =
   | { type: 'file'; path: string; startLine: number; endLine: number;
       firstLine: number; lines: string[]; lineCount: number; changed: boolean }   // 窗口：区间前后各 KNOWLEDGE_SOURCE_CONTEXT_LINES 行
   | { type: 'database'; connection: string; sql: string; result: DbQueryOutput }   // 只读重新执行，KNOWLEDGE_QUERY_ROWS 行
-  | { type: 'web'; url: string; title: string | null };
+  | { type: 'web'; url: string; title: string | null; excerpt: string | null };   // excerpt 为回答时存下的正文摘录（v1.3）
 ```
 
 - 只能读取**被引用过**的原文：路径来自已存的引用，读取时再做一次 §6.2 的路径检查（文件可能已被替换为指向仓库外的符号链接）；文件已不存在 → `KNOWLEDGE_SOURCE_UNAVAILABLE`（404）。`changed` = 当前区间内容与存下的 `excerpt` 不同。
