@@ -15,7 +15,7 @@ import {
 // integration tests (schedules.int.test.ts), never by waiting here.
 
 test.beforeEach(({ request }) =>
-  patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple', 'delivery.defaultStrategy': 'squash' }),
+  patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple', 'delivery.defaultStrategy': 'squash' }),
 );
 
 const REQUIREMENT = '为最近改动的代码补充单元测试，覆盖主要行为与边界情况。';

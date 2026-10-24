@@ -12,7 +12,7 @@ import {
 
 // J7 and J23 (07 §5) and the step-operation smoke test of M5-03, in pro mode; AI sessions are played by FakeOpencode.
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'pro' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'pro' }));
 test.afterAll(({ request }) => patchSettings(request, { 'ui.mode': 'simple' }));
 
 /** A bug-fix task (template plan: 定位根因 → 修复), optionally waiting for the plan to be confirmed. */

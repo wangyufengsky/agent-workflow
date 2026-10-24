@@ -12,7 +12,7 @@ import {
 // The acceptance checklist (31, Q-03): written when starting the task, verified by the last step, decided on the
 // result card. The file name sorts after onboarding.browser.spec.ts, which needs the shared backend without projects.
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
 test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → 未满足的必需项挡住交付 → 人工确认后合并', async ({
   page,

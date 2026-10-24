@@ -25,7 +25,7 @@ createServer((req, res) => {
 `;
 
 test('J28 任务页预览：观看 AI 的画面，预览停止与启动失败时的画面', async ({ page, request }) => {
-  await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'pro' });
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'pro' });
   const project = await createProject(request, null);
   writeFileSync(join(project.repoPath, 'server.mjs'), SERVER);
   git(project.repoPath, 'add', '-A');
@@ -79,7 +79,7 @@ async function taskId(page: import('@playwright/test').Page): Promise<string> {
 }
 
 test('助手打开任务的预览页签（29 §2.6）', async ({ page, request }) => {
-  await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' });
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
   const project = await createProject(request, null);
   await request.patch(`${API_BASE}/projects/${project.id}`, {
     headers: AUTH,

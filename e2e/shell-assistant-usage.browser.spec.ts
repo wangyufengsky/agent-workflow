@@ -15,7 +15,7 @@ async function openUsage(page: Page) {
 
 test('主页、侧栏与桌宠共享真实用量；未报告与实际零值分别显示', async ({ page, request }, testInfo) => {
   await createProject(request, null);
-  await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' });
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
   await queueAssistantTurn(request, [
     { type: 'usage', input: 37, output: 11 },
     { type: 'text', text: '本轮用量已记录。' },
@@ -54,7 +54,7 @@ test('主页、侧栏与桌宠共享真实用量；未报告与实际零值分�
   await page.screenshot({ path: testInfo.outputPath('assistant-usage-light.png'), animations: 'disabled' });
 
   // 独立桌宠页从服务器读取最近对话，实际报告 0 仍是已知值。
-  await patchSettings(request, { 'ui.theme': 'deepseek' });
+  await patchSettings(request, { 'ui.theme': 'default' });
   await page.goto('/companion');
   await page.getByRole('button', { name: '和我说说话', exact: true }).click();
   usage = await openUsage(page);

@@ -29,7 +29,7 @@ const FLOW = {
   ],
 };
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
 test('助手画饼图与流程图：读数与读屏数据，刷新后仍在；简单模式只显示失败的画图动作', async ({ page, request }) => {
   const project = await createProject(request, null);

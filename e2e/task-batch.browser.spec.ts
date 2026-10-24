@@ -18,7 +18,7 @@ import {
 test.slow(GIT_HEAVY_SPECS_SLOW, 'three task runs and merges (17 §4.1)');
 
 test.beforeEach(({ request }) =>
-  patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple', 'delivery.defaultStrategy': 'squash' }),
+  patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple', 'delivery.defaultStrategy': 'squash' }),
 );
 
 test('J17 主页「补单元测试」的「批量」→ 选 3 个目录 → 三个任务各自跑完 → 合并全部 → 主分支 3 个提交', async ({

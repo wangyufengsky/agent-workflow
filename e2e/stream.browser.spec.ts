@@ -24,7 +24,7 @@ const reads: FakeStep[] = Array.from({ length: READS }, (_, i) => ({
   input: { filePath: `src/module-${i}.ts` },
 }));
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
 test('J22 步骤的会话流：思考、固定高度、上翻后回到最新、结束后收起成一行、专业步骤页', async ({ page, request }) => {
   const project = await createProject(request, null);

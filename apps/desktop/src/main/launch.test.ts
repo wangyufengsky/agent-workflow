@@ -15,8 +15,8 @@ describe('launch.json（28 §5.3）', () => {
 
   it('读回上次留下的主题与开关', () => {
     const path = file();
-    writeLaunchPreferences(path, { theme: ThemeId.Warm, intro: false });
-    expect(readLaunchPreferences(path, true)).toEqual({ theme: ThemeId.Warm, intro: false });
+    writeLaunchPreferences(path, { theme: ThemeId.ClaudeCode, intro: false });
+    expect(readLaunchPreferences(path, true)).toEqual({ theme: ThemeId.ClaudeCode, intro: false });
   });
 
   it('文件读不出、损坏或内容不对时按首次启动处理', () => {
@@ -32,6 +32,6 @@ describe('launch.json（28 §5.3）', () => {
   });
 
   it('拒绝写入不合法的偏好（来自 IPC）', () => {
-    expect(() => writeLaunchPreferences(file(), { theme: ThemeId.Warm })).toThrow();
+    expect(() => writeLaunchPreferences(file(), { theme: ThemeId.ClaudeCode })).toThrow();
   });
 });

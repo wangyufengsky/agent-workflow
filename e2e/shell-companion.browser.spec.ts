@@ -15,7 +15,7 @@ test('默认光球可预览工作与完成动画，切换鲸鱼会持久化并�
   await patchSettings(request, {
     'companion.appearance': 'orb',
     'companion.animations': true,
-    'ui.theme': 'github_white',
+    'ui.theme': 'codex',
   });
   await page.goto('/settings');
   const shape = page.getByLabel('AI 助手形象', { exact: true });
@@ -43,7 +43,7 @@ test('默认光球可预览工作与完成动画，切换鲸鱼会持久化并�
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(preview.locator('video')).toHaveCount(0);
   await expect(preview.locator('img')).toBeVisible();
-  await patchSettings(request, { 'ui.theme': 'deepseek' });
+  await patchSettings(request, { 'ui.theme': 'default' });
   await preview.scrollIntoViewIfNeeded();
   await page.screenshot({ path: 'screenshots/companion/whale-dark.png' });
   await shape.selectOption('orb');

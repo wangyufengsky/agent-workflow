@@ -5,7 +5,7 @@ import { createProject, patchSettings } from './helpers.ts';
 // M5-10 smoke test: ⌘K switches the theme and opens a task.
 
 test('⌘K 命令面板：切换主题、打开任务', async ({ page, request }) => {
-  await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' });
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
   const project = await createProject(request, null);
   const workflows = await (await request.get(`${API_BASE}/workflows`, { headers: AUTH })).json();
   const bugfix = workflows.items.find((w: { key: string }) => w.key === 'bugfix');
@@ -28,5 +28,5 @@ test('⌘K 命令面板：切换主题、打开任务', async ({ page, request }
   await palette.getByRole('combobox').fill(task.key);
   await palette.getByRole('option', { name: new RegExp(`${task.key} · 命令面板要能打开我`) }).click();
   await expect(page).toHaveURL(new RegExp(`/tasks/${task.id}`));
-  await patchSettings(request, { 'ui.theme': 'github_white' });
+  await patchSettings(request, { 'ui.theme': 'codex' });
 });

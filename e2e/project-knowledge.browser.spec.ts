@@ -36,7 +36,7 @@ const file = (path: string, start: number, end: number) => ({
   end_line: end,
 });
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
 test('J12 提问 → 研究过程 → 带引用的回答 → 点击引用看原文 → 续问 → 对话记录', async ({ page, request }) => {
   const project = await createProject(request, null);
