@@ -1,26 +1,13 @@
 import { useState } from 'react';
+import { markedPoints, runs } from './chart-math.ts';
 import styles from './charts.module.css';
 import { type ChartSeries, toneClass } from './series.ts';
 import { niceRange } from './ticks.ts';
 
 /** About this many x labels fit under a chart in the assistant panel. */
 const MAX_X_LABELS = 8;
-/** Points are marked while there are at most this many; beyond that the line says enough. */
+/** Every point is marked while there are at most this many; beyond that only isolated ones are. */
 const MAX_MARKED_POINTS = 31;
-
-/** Runs of consecutive values without gaps: each becomes one polyline. */
-function runs(values: readonly (number | null)[]): Array<Array<{ i: number; value: number }>> {
-  const out: Array<Array<{ i: number; value: number }>> = [];
-  let current: Array<{ i: number; value: number }> = [];
-  values.forEach((value, i) => {
-    if (value === null) {
-      if (current.length > 0) out.push(current);
-      current = [];
-    } else current.push({ i, value });
-  });
-  if (current.length > 0) out.push(current);
-  return out;
-}
 
 /**
  * Lines over categories (35 §5.2): null leaves a gap, negative values get a zero line, the second and third series
@@ -97,20 +84,15 @@ export function LineChart({
             )),
           )}
         </svg>
-        {categories.length <= MAX_MARKED_POINTS &&
-          series.flatMap((s) =>
-            s.values.flatMap((value, i) =>
-              value === null
-                ? []
-                : [
-                    <span
-                      key={`${s.name}-${categories[i]}`}
-                      className={`${styles.point} ${toneClass(s.tone)}`}
-                      style={{ left: `${x(i)}%`, top: `${100 - y(value)}%` }}
-                    />,
-                  ],
-            ),
-          )}
+        {series.flatMap((s) =>
+          markedPoints(s.values, categories.length <= MAX_MARKED_POINTS).map(({ i, value }) => (
+            <span
+              key={`${s.name}-${categories[i]}`}
+              className={`${styles.point} ${toneClass(s.tone)}`}
+              style={{ left: `${x(i)}%`, top: `${100 - y(value)}%` }}
+            />
+          )),
+        )}
         {active !== null && <span className={styles.cursor} style={{ left: `${x(active)}%` }} />}
         <div className={styles.slots}>
           {categories.map((category, i) => (

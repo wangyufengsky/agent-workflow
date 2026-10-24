@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isHorizontalBar, sharePercents } from './chart-math.ts';
+import { isHorizontalBar, markedPoints, sharePercents } from './chart-math.ts';
 import { layoutFlow } from './flow-layout.ts';
 import { niceRange, niceTicks } from './ticks.ts';
 
@@ -28,6 +28,14 @@ describe('柱状图方向', () => {
     expect(isHorizontalBar(['已完成', '待合并'])).toBe(false);
     expect(isHorizontalBar(['packages/server', 'apps/web'])).toBe(true);
     expect(isHorizontalBar(Array.from({ length: 17 }, (_, i) => `很长的模块名${i}`))).toBe(false);
+  });
+});
+
+describe('折线图的点', () => {
+  it('点不多时每个值都标出；点多时只标两侧都是缺值的孤点，否则它画不出来', () => {
+    const values = [3, null, 5, 6, null, 2];
+    expect(markedPoints(values, true).map((p) => p.i)).toEqual([0, 2, 3, 5]);
+    expect(markedPoints(values, false).map((p) => p.i)).toEqual([0, 5]);
   });
 });
 

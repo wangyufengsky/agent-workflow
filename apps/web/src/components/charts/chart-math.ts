@@ -32,3 +32,25 @@ export function isHorizontalBar(categories: readonly string[]): boolean {
     categories.length <= HORIZONTAL_MAX_CATEGORIES && Math.max(...categories.map(displayWidth)) > COLUMN_LABEL_WIDTH
   );
 }
+
+/** Runs of consecutive values without gaps: each becomes one polyline. */
+export function runs(values: readonly (number | null)[]): Array<Array<{ i: number; value: number }>> {
+  const out: Array<Array<{ i: number; value: number }>> = [];
+  let current: Array<{ i: number; value: number }> = [];
+  values.forEach((value, i) => {
+    if (value === null) {
+      if (current.length > 0) out.push(current);
+      current = [];
+    } else current.push({ i, value });
+  });
+  if (current.length > 0) out.push(current);
+  return out;
+}
+
+/**
+ * The points a line chart marks: all of them when `all`, otherwise only those alone between gaps, which a polyline of
+ * one point cannot draw (35 §5.2).
+ */
+export function markedPoints(values: readonly (number | null)[], all: boolean): Array<{ i: number; value: number }> {
+  return runs(values).flatMap((run) => (all || run.length === 1 ? run : []));
+}

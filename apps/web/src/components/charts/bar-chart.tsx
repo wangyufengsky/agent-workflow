@@ -54,6 +54,15 @@ export function BarChart({
   const readout = (day: BarDay) =>
     [formatDate(day.date), ...day.values.map((v) => `${v.series.name} ${format(v.value)}`)].join(' · ');
 
+  const segments = (day: BarDay) =>
+    day.values.map((v) => (
+      <span
+        key={v.series.name}
+        className={`${styles.segment} ${toneClass(v.series.tone)}`}
+        style={{ height: `${height(v.value)}%` }}
+      />
+    ));
+
   return (
     <figure className={styles.chart} aria-label={label}>
       <figcaption className={styles.readout} aria-live="polite">
@@ -82,20 +91,18 @@ export function BarChart({
               key={day.date}
               type="button"
               className={styles.column}
-              data-grouped={stacked ? undefined : ''}
               aria-label={readout(day)}
               onMouseEnter={() => setActive(day)}
               onMouseLeave={() => setActive(null)}
               onFocus={() => setActive(day)}
               onBlur={() => setActive(null)}
             >
-              {day.values.map((v) => (
-                <span
-                  key={v.series.name}
-                  className={`${styles.segment} ${toneClass(v.series.tone)}`}
-                  style={{ height: `${height(v.value)}%` }}
-                />
-              ))}
+              {stacked ? (
+                segments(day)
+              ) : (
+                // Narrower than its column, so each category's bars read as one group.
+                <span className={styles.group}>{segments(day)}</span>
+              )}
             </button>
           ))}
         </div>

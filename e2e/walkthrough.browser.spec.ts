@@ -243,10 +243,11 @@ async function seedCharts(request: APIRequestContext): Promise<string> {
     appTool('show_chart', {
       type: 'bar',
       title: '成员提交数',
-      categories: ['张三', '李四', '王五', '赵六'],
+      // Six members: grouped bars keep their gaps with more than four categories.
+      categories: ['张三', '李四', '王五', '赵六', '钱七', '孙八'],
       series: [
-        { name: '本周', values: [12, 8, 15, 5] },
-        { name: '上周', values: [9, 11, 10, 7] },
+        { name: '本周', values: [12, 8, 15, 5, 9, 3] },
+        { name: '上周', values: [9, 11, 10, 7, 6, 4] },
       ],
       unit: '个',
       caption: '主分支 · 按姓名排序',

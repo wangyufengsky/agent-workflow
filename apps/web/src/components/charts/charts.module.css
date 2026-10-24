@@ -105,6 +105,21 @@
   width: 100%;
   opacity: 0.85;
 }
+/* 并排的柱（不堆叠）：同一列里各系列左右排开，留出列宽的 20% 隔开各组（百分比相对列，不相对整个图） */
+.group {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  width: 80%;
+  height: 100%;
+  margin: 0 auto;
+}
+.group .segment {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: var(--r-xs) var(--r-xs) 0 0;
+}
+
 .column:hover .segment,
 .column:focus-visible .segment {
   opacity: 1;
@@ -124,18 +139,6 @@
   color: var(--muted);
   white-space: nowrap;
   overflow: visible;
-}
-
-/* 并排的柱（不堆叠）：同一列里各系列左右排开 */
-.column[data-grouped] {
-  flex-direction: row;
-  align-items: flex-end;
-  gap: 1px;
-  /* Room between the groups, so each category's bars read as one. */
-  padding: 0 10%;
-}
-.column[data-grouped] .segment {
-  border-radius: var(--r-xs) var(--r-xs) 0 0;
 }
 
 /* 横向条：类别名在左、条在中、数值在右 */
