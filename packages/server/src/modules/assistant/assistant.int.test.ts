@@ -97,6 +97,18 @@ describe('助手对话（A-02、A-03）', () => {
     expect(t.fake.prompts[0]?.system).toContain(`the preview tab of task ${task.key} "${task.title}"`);
   });
 
+  it('用户在团队的成员页时，system 写明项目与成员（33 §5.3）', async () => {
+    const { project } = await addProject(t);
+    const c = await newConversation();
+    await say(c.id, '他这个月做了什么？', {
+      page: 'team_member',
+      params: { projectId: project.id, teamMember: 'zs@corp.com' },
+    });
+    expect(t.fake.prompts[0]?.system).toContain(
+      `the team page of member zs@corp.com in project "${project.name}" (project id ${project.id}`,
+    );
+  });
+
   it('所在页面指向不存在的任务时不发送（TASK_NOT_FOUND）', async () => {
     const c = await newConversation();
     const res = await t.call(sendAssistantMessageOp, {

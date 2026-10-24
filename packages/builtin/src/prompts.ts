@@ -29,6 +29,8 @@ export const PromptName = {
   /** The outcome of a knowledge question the assistant asked, sent to its session (18 §4a). */
   AssistantKnowledgeAnswered: 'assistant-knowledge-answered',
   AssistantKnowledgeFailed: 'assistant-knowledge-failed',
+  /** A member analysis the assistant started has ended (33 §6). */
+  AssistantTeamAnalysis: 'assistant-team-analysis',
   /** The knowledge researcher's agent prompt, its first message and a follow-up question (18 §5). */
   ProtocolResearch: 'protocol-research',
   StartResearch: 'start-research',
@@ -44,6 +46,8 @@ export const PromptName = {
   ProtocolCodeReview: 'protocol-code-review',
   StartGitReview: 'start-git-review',
   StartCommitMessage: 'start-commit-message',
+  /** The same reviewer summarising one member's work for the team page (33 §6.3). */
+  StartTeamAnalysis: 'start-team-analysis',
   /** The files the user attached to a task or an assistant message, as the model reads them (30 §3.2). */
   Attachments: 'attachments',
   /** The instructions of the verify step (31 §2.2). */
@@ -84,6 +88,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.AssistantTaskUpdated]: read(PromptName.AssistantTaskUpdated),
     [PromptName.AssistantKnowledgeAnswered]: read(PromptName.AssistantKnowledgeAnswered),
     [PromptName.AssistantKnowledgeFailed]: read(PromptName.AssistantKnowledgeFailed),
+    [PromptName.AssistantTeamAnalysis]: read(PromptName.AssistantTeamAnalysis),
     [PromptName.ProtocolResearch]: read(PromptName.ProtocolResearch),
     [PromptName.StartResearch]: read(PromptName.StartResearch),
     [PromptName.ResearchFollowUp]: read(PromptName.ResearchFollowUp),
@@ -96,6 +101,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.ProtocolCodeReview]: read(PromptName.ProtocolCodeReview),
     [PromptName.StartGitReview]: read(PromptName.StartGitReview),
     [PromptName.StartCommitMessage]: read(PromptName.StartCommitMessage),
+    [PromptName.StartTeamAnalysis]: read(PromptName.StartTeamAnalysis),
     [PromptName.Attachments]: read(PromptName.Attachments),
     [PromptName.VerifyRequirements]: read(PromptName.VerifyRequirements),
   };

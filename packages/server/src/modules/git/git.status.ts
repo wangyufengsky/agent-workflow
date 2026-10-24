@@ -108,6 +108,20 @@ export async function readIdentity(cwd: string): Promise<GitStatusDTO['identity'
   return { name: match[1], email: match[2] };
 }
 
+/**
+ * The identity the repository's config names (`user.name`, `user.email`), without git's guess from the host name;
+ * null when either is unset.
+ */
+export async function readConfiguredIdentity(cwd: string): Promise<{ name: string; email: string } | null> {
+  const [name, email] = await Promise.all(
+    ['user.name', 'user.email'].map(async (key) => {
+      const { stdout, exitCode } = await runGit(['config', '--get', key], { cwd, okExitCodes: [0, 1] });
+      return exitCode === 0 && stdout.trim() !== '' ? stdout.trim() : null;
+    }),
+  );
+  return name == null || email == null ? null : { name, email };
+}
+
 /** When any remote was last fetched: the modification time of `FETCH_HEAD`; null if never. */
 export async function readFetchedAt(cwd: string): Promise<number | null> {
   const file = await gitPath(cwd, 'FETCH_HEAD');

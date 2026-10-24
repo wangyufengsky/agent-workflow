@@ -144,7 +144,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `submit_result` | execute | 提交节点结果 |
 | `submit_review` | review | 提交评审结论 |
 | `ask_user` | plan · execute | 向用户提问 |
-| `report_progress` | plan · execute · review · research · deck_outline · deck_slides · git_review · commit_message | 上报一句当前进展 |
+| `report_progress` | plan · execute · review · research · deck_outline · deck_slides · git_review · commit_message · team_analysis | 上报一句当前进展 |
 | `db_list_connections` | plan · execute · review · research | 列出项目关联的数据库 |
 | `db_describe` | plan · execute · review · research | 查看表结构 |
 | `db_query` | plan · execute · review · research | 只读查询 |
@@ -153,11 +153,12 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `submit_slide` | deck_slides | 按页码提交 PPT 的一页（v1.2，23 §7.3） |
 | `submit_findings` | git_review | 提交 Git 工作台审查的结论与结构化问题（v1.2，27 §4.4） |
 | `submit_commit_message` | commit_message | 提交草拟的提交信息（v1.2，27 §7.3） |
+| `submit_member_analysis` | team_analysis | 提交成员的工作总结与抽样评审的问题（v1.3，33 §6.6） |
 | `browser_open` `browser_snapshot` `browser_click` `browser_type` `browser_select` `browser_press` `browser_wait_for` `browser_inspect` `browser_logs` `browser_viewport` `browser_screenshot` | plan · execute · review · research | 浏览器（v1.3，29 §6，§6.17）：打开任务的页面预览或网站、读页面、操作、查日志与布局、截图 |
 
 工具名在 opencode 中显示为 `agent-workflow_<name>`（名称常量 `McpToolName`）。输入/输出 schema 位于 `shared/contracts/mcp/<tool>.ts`；下文用 TS 类型描述。
 
-M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07。调试尝试（开发构建，不属于任务）仍可用 `get_task_context`（返回任务编号 `DEBUG`）、`report_progress`、`submit_result`（直接使尝试 `succeeded`，返回 `next: 'done'`）；调试尝试不属于任何项目，`db_list_connections` 返回空列表，其他数据库工具返回 `DB_CONNECTION_NOT_FOUND`。知识问答的 `research` 尝试（v1.1）用对话的项目；对话的资料范围不含数据库时与调试尝试相同。PPT 的尝试（v1.2）与 Git 工作台的 `git_review` / `commit_message` 尝试（v1.2，agent `aw-code-reviewer`，权限同研究员，会话目录为项目主仓库）不能用数据库工具与任务工具（`MCP_TOOL_NOT_ALLOWED`）。
+M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07。调试尝试（开发构建，不属于任务）仍可用 `get_task_context`（返回任务编号 `DEBUG`）、`report_progress`、`submit_result`（直接使尝试 `succeeded`，返回 `next: 'done'`）；调试尝试不属于任何项目，`db_list_connections` 返回空列表，其他数据库工具返回 `DB_CONNECTION_NOT_FOUND`。知识问答的 `research` 尝试（v1.1）用对话的项目；对话的资料范围不含数据库时与调试尝试相同。PPT 的尝试（v1.2）与 Git 工作台的 `git_review` / `commit_message` 尝试（v1.2）与团队页的 `team_analysis` 尝试（v1.3，三者都用 agent `aw-code-reviewer`，权限同研究员，会话目录为项目主仓库）不能用数据库工具与任务工具（`MCP_TOOL_NOT_ALLOWED`）。
 
 ---
 
@@ -339,6 +340,13 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 ### 6.16 `submit_commit_message`（v1.2）
 
 只用于 `commit_message` 尝试（27 §7.3）。输入：`{ subject: string; body?: string }`。行为：草稿交给等待中的请求，尝试 `succeeded`。输出：`{ accepted: true }`。
+
+### 6.16′ `submit_member_analysis`（v1.3）
+
+只用于 `team_analysis` 尝试（33 §6.6）。输入：`{ summary; work_items: { title; description; commits[] }[]（1..15）; strengths / concerns: { text; commits[] }[]（各 0..5）; findings: (submit_findings 的问题 + commit)[]（0..30） }`，没有分数或等级字段。
+行为：`work_items` / `strengths` / `concerns` 引用的提交须是这位成员在时间段内的；问题的提交须在抽样中，文件须是该提交改动的，行号须在该提交（`new`）或其父提交（`old`）的文件里；不通过 → `TEAM_ANALYSIS_INVALID`，`details.problems[]`（08 §5.7）与 `details.sampled`；通过 → 写入报告，分析 `succeeded`，尝试 `succeeded`，发 `team_analysis.updated`。
+输出：`{ accepted: true }`
+错误：`TEAM_ANALYSIS_INVALID`、`VALIDATION_FAILED`、`MCP_RESULT_ALREADY_SUBMITTED`。
 
 ### 6.17 浏览器工具（v1.3）
 

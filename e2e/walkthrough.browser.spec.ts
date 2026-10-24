@@ -893,6 +893,13 @@ const SHOTS: Shot[] = [
     ready: testId('knowledge-history-row'),
   },
   { name: 'insights', mode: UiMode.Simple, url: () => '/insights', ready: testId('insights-simple') },
+  { name: 'team', mode: UiMode.Simple, url: (s) => `/team/${s.project.id}`, ready: testId('team-members') },
+  {
+    name: 'team-member',
+    mode: UiMode.Simple,
+    url: (s) => `/team/${s.project.id}/members/${encodeURIComponent('e2e@example.com')}`,
+    ready: testId('member-metrics'),
+  },
   { name: 'ppt', mode: UiMode.Simple, url: () => '/ppt', ready: testId('deck-card') },
   {
     name: 'ppt-new',

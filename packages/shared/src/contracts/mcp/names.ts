@@ -19,6 +19,7 @@ export const McpToolName = {
   SubmitSlide: 'submit_slide',
   SubmitFindings: 'submit_findings',
   SubmitCommitMessage: 'submit_commit_message',
+  SubmitMemberAnalysis: 'submit_member_analysis',
   BrowserOpen: 'browser_open',
   BrowserSnapshot: 'browser_snapshot',
   BrowserClick: 'browser_click',
@@ -44,4 +45,5 @@ export const ATTEMPT_SUBMIT_TOOL = {
   [AttemptKind.DeckSlides]: McpToolName.SubmitSlide,
   [AttemptKind.GitReview]: McpToolName.SubmitFindings,
   [AttemptKind.CommitMessage]: McpToolName.SubmitCommitMessage,
+  [AttemptKind.TeamAnalysis]: McpToolName.SubmitMemberAnalysis,
 } as const satisfies Record<AttemptKind, McpToolName>;

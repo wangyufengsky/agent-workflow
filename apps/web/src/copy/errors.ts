@@ -111,4 +111,8 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
     '有必需的验收项还没满足，确认这些项后才能交付；清单如果刚改过，请按新的清单重新确认。',
   [ErrorCode.RequirementResultsInvalid]: 'AI 提交的验收结论不符合要求。',
   [ErrorCode.RequirementsNotEditable]: '任务正在执行，现在不能修改验收清单；等它停下或进入待合并再改。',
+  [ErrorCode.TeamAnalysisNotFound]: '这条成员分析不存在。',
+  [ErrorCode.TeamAnalysisExists]: '这位成员这段时间的分析还在排队或进行中。',
+  [ErrorCode.TeamAnalysisInvalid]: 'AI 提交的分析与提交记录对不上，AI 会修正后再提交。',
+  [ErrorCode.TeamAnalysisInterrupted]: '应用在分析完成前退出了，可以重新生成。',
 };

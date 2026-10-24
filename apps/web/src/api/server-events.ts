@@ -89,6 +89,11 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       return refreshDecks(qc);
     case ServerEventType.GitReviewUpdated:
       return refreshGitReview(qc, event.data.projectId, event.data.reviewId);
+    case ServerEventType.TeamAnalysisUpdated:
+      return qc.invalidateQueries({ queryKey: queryKeys.team(event.data.projectId) });
+    case ServerEventType.TeamScanUpdated:
+      qc.setQueryData(queryKeys.teamScan(event.data.projectId), event.data);
+      return;
     case ServerEventType.ScheduleUpdated:
       await refreshSchedules(qc, event.data.scheduleId);
       return;

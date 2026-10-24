@@ -8,6 +8,7 @@ export {
   diffWorktree,
   diffWorktreeFile,
   limitDiff,
+  parseNumstat,
 } from './git.diff.ts';
 export { createRepoLocks, type RepoLocks } from './git.lock.ts';
 export { beforeArgs, type LogFilter, readCommit, readLog, readRevisions } from './git.log.ts';
@@ -24,6 +25,7 @@ export { fetchRemote, isPushRejected, originEnv, pushToOrigin } from './git.remo
 export { locateOpencodeShell, locateShell } from './git.shell.ts';
 export {
   hasMergeHead,
+  readConfiguredIdentity,
   readFetchedAt,
   readIdentity,
   readOperation,
