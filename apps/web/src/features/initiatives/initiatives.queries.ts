@@ -9,6 +9,7 @@ import {
   getInitiativeOp,
   type InitiativeDetailDTO,
   type InitiativeDraft,
+  LIST_PAGE_MAX,
   listInitiativesOp,
   listInitiativeTemplatesOp,
   openInitiativePhaseOp,
@@ -16,6 +17,7 @@ import {
   startInitiativeItemOp,
 } from '@aw/shared';
 import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import { allPages } from '../../api/all-pages.ts';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 
@@ -24,10 +26,18 @@ export const initiativeTemplatesQuery = queryOptions({
   queryFn: async () => (await callOperation(listInitiativeTemplatesOp, {})).items,
 });
 
+/** Every initiative, not only the first page: the list page and the home overview show and filter them whole. */
 export const initiativesQuery = (filter: { projectId?: string } = {}) =>
   queryOptions({
     queryKey: queryKeys.initiatives(filter),
-    queryFn: async () => (await callOperation(listInitiativesOp, { ...filter })).items,
+    queryFn: () =>
+      allPages((cursor) =>
+        callOperation(listInitiativesOp, {
+          ...filter,
+          limit: LIST_PAGE_MAX,
+          ...(cursor === undefined ? {} : { cursor }),
+        }),
+      ),
   });
 
 export const initiativeQuery = (id: string) =>
