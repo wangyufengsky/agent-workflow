@@ -1,0 +1,393 @@
+# 34 · 需求计划（大需求的拆解与分阶段）
+
+> 状态：**设计稿，未实现，决策待用户确认**（2026-10-24）。用户要求先写设计、登记待确认的决策，暂不改代码。决策见 02 的 D132–D137（均为推荐方案，待确认）。本文的枚举、常量、表、接口、工具在实施时登记到 08–12，现在不能据此视为现有能力。
+
+## 1. 要解决的问题
+
+用户给一份需求文档，希望「先分析，再拆成几个包，再分阶段做」。现在一个任务是一个分支、一份计划、一次交付，对小需求合适，大需求装不下：
+
+| 现有约束 | 出处 | 大需求下的后果 |
+| --- | --- | --- |
+| 一份计划最多 20 个步骤，规划者读完代码后一次提交 | `PLAN_MAX_NODES`，12 §6.4 | 几十个功能点塞不进一个任务；越往后的步骤离规划时读到的代码越远 |
+| 一个任务一个分支，结束时合并一次 | 09 §2 | 没有「第一阶段合并、看过再做第二阶段」的关口；检查点只有开头确认计划和逐步验收 |
+| 步骤只看到直接上游的摘要（每条 ≤ 4000 字），每一步都拿到整份需求 | `tasks.context.ts` 的 `upstream`，`RESULT_SUMMARY_MAX_CHARS` | 间接上游的决定看不到；每一步都要从整份文档里找自己负责的那一块 |
+| 任务之间没有关联 | 10 `tasks` | 第二阶段不知道第一阶段做了什么，只能靠用户复制粘贴 |
+| 报告类流程的报告就是结果摘要（≤ 4000 字） | 13 §3.4、§3.9 | 「方案设计」写不下一份大需求的拆解；「据此开发」能带过去的也就这么多 |
+| 批量任务只支持固定流程、任务之间没有先后 | D85 | 适合「同一件事做 N 遍」，不适合「N 件不同的事有先后」 |
+| 01 §4.2 写明「不做：大需求分组逐步细化」 | 01 | 需要先改这条产品决策（D132） |
+
+已有的零件够用：方案设计 / 详细设计、附件（30，U1）、验收清单（31，Q）、批量视图（20）、PPT 的「先出大纲、确认后逐页制作」（23，D95）。缺的是把它们串起来的那一层。
+
+## 2. 定位与边界
+
+**需求计划**（界面叫「需求计划」，内部命名 `initiative`）：把一份大需求拆成若干**工作包**、分成若干**阶段**，每个工作包是一个普通任务。
+
+- **每个工作包就是一个普通任务**：各自的分支、worktree、计划（流程规划或模板，仍 ≤ 20 步）、检查、「需要你处理」与交付，全部复用现有任务链路。需求计划不另起执行引擎，不改调度器、任务状态机与 `get_task_context`；`tasks` 不知道需求计划（同批次，20 §1）。
+- **需求计划没有状态机**（06 §1.5 只约束有状态的实体）：显示状态由拆解尝试的状态、子任务的显示状态、交付记录与几个只增不减的事实（确认时间、已开启的阶段）推导（同 PPT，23 §4.3）。
+- **不叠分支**（D134）：每个工作包都从需求计划的基础分支开出；下游工作包在它依赖的工作包**合入基础分支之后**才开始。阶段之间的人工关口就是合并，「合并永远由人点」（D16）不变。
+- **拆解必须确认**（D133）：AI 先交工作包草稿，用户改过、确认后才开始；AI 不向用户提问，理解与假设写在草稿上（同 D95 ①②）。
+- **逐步细化**（D136）：一个阶段合入后，可以让 AI 对着合入后的代码重新细化还没开始的工作包，确认后再开下一阶段。
+- 一个需求计划属于一个项目、一个基础分支。
+
+与已有功能的关系：
+
+| 功能 | 什么时候用 |
+| --- | --- |
+| 单个任务 | 一个分支、一次合并能做完的需求 |
+| 批量任务（20） | 同一件事对多个目标各做一遍，彼此独立 |
+| 需求计划（本文） | 一份需求要拆成内容不同、有先后、需要分阶段把关的多个任务 |
+| 方案设计 / 详细设计（13 §3.9–3.10） | 可以作为需求计划里的一个工作包（通常在第 1 阶段），产出供后续工作包参考 |
+
+## 3. 分两批实施
+
+| 批次 | 内容 | 价值 | 规模 |
+| --- | --- | --- | --- |
+| N1 | 内置流程「需求拆解」（§4）：把拆解写成仓库里的一份 Markdown 文档；用户照文档手动开任务 | 不加新模块就能验证 AI 拆得好不好；拆解文档进仓库、经代码评审 | 一个流程定义 + 两段提示词 + live 测试 |
+| N2 | 需求计划模块（§5–§11）：结构化工作包、确认、阶段、自动解锁与开始、上下文传递、逐步细化 | 大需求的完整流程 | 一个新模块、一种尝试类型、一个 MCP 工具、两个页面 |
+
+N1 先做，用一两份真实需求文档试拆；拆解质量可以接受后再做 N2（D137）。N2 的拆解也能直接读 N1 产出的文档（作为项目文件附件），两者不冲突。
+
+## 4. N1 · 内置流程「需求拆解」
+
+### 4.1 定义（13 §3.11）
+
+| 项 | 值 |
+| --- | --- |
+| key | `breakdown` |
+| planning | `fixed` |
+| deliverable | `code_changes`（一份 Markdown 拆解文档，经正常的检查与合并进入仓库；同「详细设计」，因为报告类结果只有 4000 字） |
+| template | `survey`「梳理需求与现状」developer：通读需求与附件，按需求涉及的范围读代码，整理现有模块、接口、数据结构、约束与仓库设计文档的目录；不改文件 → `write`「编写拆解文档」developer：在现有设计文档目录（没有时 `docs/plans/`）写一份拆解文档，只写文档、不改代码 |
+| acceptance | `survey`：无检查；`write`：`[ai_review(focus: 是否覆盖了需求的每一点；每个工作包是否能在一个任务里完成并验证；依赖是否无环且阶段顺序与依赖一致；需求切片是否具体到可以直接开任务)]` |
+| checkpoints | 全部 `false` |
+
+### 4.2 文档结构（写在 `write` 的指令里）
+
+1. **概述**：目标、范围、不做的内容、假设、风险。
+2. **阶段**：每个阶段的目标与完成标志。
+3. **工作包**：每个包一节：编号与标题、所属阶段、建议流程（`feature` / `bugfix` / `refactor` / `unit_tests` / `detailed_design` …）、依赖的包、**需求切片**（可以直接粘进开始任务输入框的需求原文）、对应原需求的章节、验收要求（要求 / 预期结果 / 核验方式，可以直接填进验收清单）。
+4. **需求覆盖表**：原需求的每一点 → 负责的工作包。
+
+粒度要求：一个工作包是「一个任务能完成并验证的改动」，规划时不超过 8 个步骤（`feature` 的规划指引上限）；拆不开的写明原因。
+
+### 4.3 用法
+
+拆解文档合并后，用户按阶段手动开任务：需求填该包的切片，附件选这份文档（项目文件，30 §2.1），验收要求照着填。N1 不做任何自动化，只看拆解本身的质量。
+
+## 5. N2 · 用户流程
+
+### 5.1 新建
+
+入口：主页流程卡片区的「需求计划」、任务列表页右上角、应用助手（`initiatives.create`，§10）。
+
+「新建需求计划」页 `/initiatives/new?projectId`：
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  需求计划                                                  │
+│  项目 [订单服务 ▾]   基础分支 [main ▾]（专业模式）             │
+│  ┌ 需求 ───────────────────────────────────────────────┐  │
+│  │ 按附件的《会员体系二期需求》实现……                     │  │
+│  └─────────────────────────────────────────────────────┘  │
+│  [添加资料]  📄 会员体系二期需求.md 48 KB   📄 docs/plans/…   │
+│  可选流程 ☑ 新功能开发 ☑ 修 Bug ☑ 重构 ☑ 详细设计 ☐ …（专业）  │
+│                                          [开始拆解 ⌘↵]      │
+└──────────────────────────────────────────────────────────┘
+```
+
+- **需求**：普通文本，≤ `REQUIREMENT_MAX_CHARS`；**资料**复用附件（30），最多 `INITIATIVE_SOURCES_MAX`（9）个，留一个位置给每个工作包任务的背景附件（§7）。
+- **可选流程**：工作包可以用的流程，默认是内置的代码类流程与「详细设计」；专业模式可勾选自定义流程。系统流程不出现。
+- 创建与开始拆解在一个请求里：写需求计划行与附件引用，启动拆解尝试（§8），跳到需求计划页。
+
+### 5.2 审阅与修改拆解
+
+需求计划页 `/initiatives/:id`，拆解阶段：
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  I-2 · 会员体系二期                       订单服务 · main    │
+│  拆解待确认 · 3 个阶段 · 9 个工作包                           │
+│  ▸ AI 的理解：范围 / 不做 / 假设 / 风险                       │
+│  ┌ 第 1 阶段 · 数据与接口 ──────────────────────────────┐   │
+│  │ A 会员等级表与迁移        新功能开发   依赖 —      [编辑]  │   │
+│  │ B 等级计算服务            新功能开发   依赖 A      [编辑]  │   │
+│  └─────────────────────────────────────────────────────┘   │
+│  ┌ 第 2 阶段 · 页面 ───────────────────────────────────┐   │
+│  │ C 会员中心页              新功能开发   依赖 B      [编辑]  │   │
+│  │ …                                                    │   │
+│  └─────────────────────────────────────────────────────┘   │
+│  ▸ 需求覆盖：原文 12 点，全部有对应工作包                       │
+│  [按意见重新拆解]  [+ 工作包]               [确认并开始第 1 阶段] │
+└──────────────────────────────────────────────────────────┘
+```
+
+- 每个工作包可以改：标题、阶段、流程、依赖、需求切片、验收要求（同 31 的清单项）；可以增删、在阶段内排序、移到别的阶段。两种模式都能改（拆解是否合理只有用户能判断）；专业模式另有依赖图视图（复用计划画布组件，只读）。
+- 保存时校验（§8.3）：依赖无环、依赖只能指向同一阶段或更早阶段、阶段连续且非空、流程在可选范围内、数量与长度在上限内。
+- **按意见重新拆解**：在同一个会话里发送意见与当前草稿（含手改），AI 整体重交（同 23 §4.2「按意见重写大纲」）。
+- **确认并开始第 1 阶段**：写入确认时间，开启第 1 阶段（§5.3）。之后草稿就是工作包清单本身，没有单独的「已确认版本」。
+
+### 5.3 阶段与工作包的开始
+
+- 阶段只能按顺序开启。第 1 阶段在确认时开启；第 k 阶段（k ≥ 2）在第 k−1 阶段及之前的工作包**全部满足**（§6）后，由用户点「进入第 k 阶段」开启（D134）。
+- 阶段开启后，其中**可以开始**的工作包立即各自创建并启动一个任务；阶段内有依赖的工作包，在依赖满足（合入）后由后端自动开始。开启阶段这一下点击就是「开始这个阶段的工作」，之后不再逐个确认。
+- 开始一个工作包 = 调用与开始任务页相同的创建（`tasks.create`）：项目、基础分支、工作包的流程（最新版本）、需求切片、来源附件 + 背景附件（§7）、验收清单（31，`createTask.requirements`）。检查点按流程与设置解析；需求计划上有一个选项「每个工作包运行前让我确认计划」（默认关，对应 `confirm_plan`）。
+- 并发全部交给调度器（同 20 §3）。
+
+### 5.4 执行、交付与解锁
+
+- 工作包任务的作答、权限、失败重试、再改改、交付，都在任务页做，与单个任务相同。需求计划页每行显示任务编号、显示状态与当前进展，点开到任务页。
+- 交付后后端判断工作包是否满足（§6）：以本地合并（squash / merge / rebase）合入需求计划的基础分支 → 立即满足，下游自动开始；以 PR 交付 → 显示「已开 PR，合入并拉取到本地 main 后点『已合入』」，用户点了才算满足（D134 ③）；报告类流程「完成」即满足。
+- 「合并本阶段全部待合并的（n）」：与批量交付（20 §5，D86）相同，逐个执行 `tasks.deliver`，冲突的停下、其余继续；风险等级 `critical`。复用 `batches` 的逐个交付实现（抽成两者共用的函数）。
+- 任务失败：工作包显示任务的失败，处理方式在任务页。任务被取消：工作包回到「可以开始」，用户可以「重新开始」（新建一个任务，旧任务留在任务列表）或「不做这一项」。
+- **不做这一项**：填写原因后工作包记为已放弃，对下游视为满足；确认框列出受影响的下游工作包，提醒检查它们的需求切片。
+
+### 5.5 进入下一阶段与逐步细化
+
+「进入第 k 阶段」对话框：
+
+```
+┌ 进入第 2 阶段 ─────────────────────────────────┐
+│ 第 1 阶段 2 个工作包已合入 main。                 │
+│ ☑ 先让 AI 按合入后的代码细化剩下的 7 个工作包       │
+│   （约几分钟；细化完由你确认后再开始）              │
+│                         [取消]  [进入第 2 阶段]   │
+└──────────────────────────────────────────────────┘
+```
+
+- 勾选（默认，D136）：启动一次细化尝试（§8.4），需求计划回到「拆解待确认」，只有未开始的工作包可改；用户审阅后点「确认并开始第 k 阶段」。
+- 不勾选：直接开启第 k 阶段。
+- 不在两个阶段之间时（例如第 2 阶段正在进行），也可以在需求计划页点「细化剩余工作包」，只改尚未开始的工作包，确认后不改变已开启的阶段。
+
+### 5.6 结束、修改与删除
+
+- 全部工作包满足后显示「已全部完成」，附需求覆盖表与每个工作包的结果摘要、合入提交。
+- 「复制为 Markdown」：把当前的阶段与工作包（含结论）复制成一份文档，用户可以自己放进仓库（D133 ⑤）。
+- 删除需求计划：只删需求计划自己的行与附件引用，工作包的任务保留为普通任务；拆解或细化进行中不能删（`INITIATIVE_BUSY`）。
+
+## 6. 显示状态（推导，不存）
+
+### 6.1 工作包 `InitiativeItemStatus`
+
+`initiativeItemStatusOf(item, task, lastDelivery, openedPhase, depsSatisfied)`（`shared/initiative/status.ts`，单测覆盖每种状态）：
+
+| 状态 | 条件 | 文案 |
+| --- | --- | --- |
+| `dropped` | 有放弃时间 | 已放弃（原因） |
+| `satisfied` | 当前任务 `completed`，且：报告类流程；或最近一次成功交付为本地合并、目标分支 = 基础分支；或有「已合入」确认时间 | 已合入（提交） |
+| `pr_open` | 当前任务 `completed`，最近一次成功交付为 `pull_request`，没有「已合入」确认 | 已开 PR，待合入 |
+| `in_task` | 有当前任务且未终态 | 任务的 `TaskDisplayGroup`（执行中 / 需要你处理 / 待合并 …） |
+| `phase_closed` | 所在阶段未开启 | 第 k 阶段 |
+| `waiting` | 阶段已开启，有依赖未满足 | 等待 B |
+| `ready` | 阶段已开启、依赖全部满足，且没有当前任务，或当前任务已取消，或当前任务以本地合并交付到了基础分支以外的分支 | 可以开始 |
+
+`satisfied` 与 `dropped` 统称**满足**。当前任务失败（`failed`）时为 `in_task`（显示「失败」），由用户在任务页重试或取消。
+
+### 6.2 需求计划 `InitiativeStatus`
+
+| 状态 | 条件 | 文案 |
+| --- | --- | --- |
+| `breaking_down` | 最近的拆解尝试进行中 | 正在拆解 / 正在细化 |
+| `breakdown_failed` | 最近的拆解尝试失败 / 停止 / 中断，且没有工作包 | 没能拆解（原因 +「重试」） |
+| `draft_ready` | 没有进行中的拆解，草稿未确认（首次拆解，或细化之后） | 拆解待确认 |
+| `in_progress` | 已确认，有工作包未满足 | 第 k / N 阶段 · 已合入 m / n |
+| `phase_done` | 已开启阶段的工作包全部满足，还有未开启的阶段 | 第 k 阶段已完成，可以进入下一阶段 |
+| `done` | 全部工作包满足 | 已全部完成 |
+
+「草稿未确认」由 `confirmed_rev < breakdown_rev` 判断：每次拆解或细化提交都让 `breakdown_rev` 加一，确认时把它写进 `confirmed_rev`；两者只增不减，是事实而不是可往返的状态（同 `decks.outline_confirmed_at`）。
+
+### 6.3 自动开始
+
+`initiatives` 订阅任务与交付事件（经 event-bus，与批次刷新相同的事件，不新增任务事件）：工作包变为满足时，找出同一需求计划里已开启阶段中变为 `ready` 的工作包，逐个开始（§5.3）。重启后启动时做一次同样的扫描，补上事件丢失的情况。开始失败（如基础分支被删除，`GIT_BASE_BRANCH_NOT_FOUND`）时工作包保持 `ready`，需求计划页显示原因与「开始」按钮。
+
+## 7. 上下文传递（D135）
+
+工作包任务看到的内容全部经现有通道进入，**不改 `get_task_context` 与任务提示词**：
+
+| 内容 | 通道 |
+| --- | --- |
+| 需求切片 | 任务的需求（`requirement`） |
+| 原需求文档与资料 | 需求计划的来源附件，新增一条 `attachment_refs`（owner 为任务）引用同一原件（30 §2.2） |
+| 需求计划背景 | 开始任务时生成的文本附件「需求计划背景.md」（同助手的「附上任务详情」，30 §2）：需求计划标题与说明、本工作包所在阶段与依赖；**已满足的工作包**（依赖与同计划中已合入的）的标题、结果摘要（`task.result.summary`）、改动文件列表、合入提交；其余工作包只列标题与阶段，并写明「不要做它们的工作」；整体为用户资料而非指令 |
+| 验收要求 | 任务的验收清单（31），最后由核验步骤逐项给结论 |
+
+- 背景附件在开始任务时快照一次，之后不变；之后才合入的工作包不会补进去（任务已在运行）。
+- 附件总长超过 `ATTACHMENT_PROMPT_MAX_CHARS` 时按 30 §3.2 截断，模型用 `read_attachment` 分页读；背景附件排在来源附件之前。
+- 不在任务之间共享 opencode 会话：每个工作包是独立任务，靠合入的代码与背景附件衔接。
+
+## 8. AI 拆解
+
+### 8.1 一次拆解
+
+- 新尝试类型 `AttemptKind.Breakdown`，不属于任务；agent `aw-code-reviewer`（只读，权限同研究员），会话目录为项目主仓库（同 Git 审查与团队分析，12 §6）。主工作区检出的不是基础分支时，新建页与「进入下一阶段」对话框提示「AI 读到的是 <分支> 上的代码」。
+- 一个需求计划同时只有一次拆解或细化（`INITIATIVE_BUSY`），不计入调度器并发上限（同 D68：用户当场发起、等着看）；同一需求计划的拆解、重新拆解与细化沿用同一个 opencode 会话（`attempts.continueSession`，同 23 §4.1），模型记得读过的代码。
+- 首条消息 `prompts/start-breakdown.md`：需求、来源附件（`prompts/attachments.md`）、可选流程清单（key、名称、说明、规划方式、产出）、上限、粒度要求（与 §4.2 相同）、提问规则（不提问，写假设）。协议提示词 `protocol-breakdown.md`。
+- 可用工具：`report_progress`、`read_attachment`（范围为需求计划的来源附件）、`submit_breakdown`，以及只读浏览器工具（读需求里的链接，规则同 protocol-plan）；不能用任务工具与数据库工具。
+- 一次成功的 `submit_breakdown` 即完成；未提交、出错、超时、被停止时按尝试的通用规则结束（09 §4），已有草稿时保留草稿。
+- 时限为 `attempt.timeoutMinutes`；模型为内置 `planner` 角色的模型 > `ai.defaultModel` > opencode 默认（同 12 §4.1）。
+
+### 8.2 `submit_breakdown`
+
+```ts
+{
+  title: string;                        // 1..INITIATIVE_TITLE_MAX_CHARS（60）
+  summary: string;                      // 给用户看的拆解说明，1..2000
+  understanding: {
+    scope: string;                      // 1..2000
+    outOfScope?: string[];
+    assumptions?: string[];
+    risks?: string[];
+  };
+  phases: Array<{ title: string; goal: string }>;          // 1..INITIATIVE_PHASES_MAX（6）
+  items: Array<{
+    key: string;                        // [a-z0-9_]{1,40}，需求计划内唯一
+    title: string;                      // 1..60
+    phase: number;                      // 1 起，对应 phases 的下标 + 1
+    workflow: string;                   // 可选流程的 key
+    requirement: string;                // 需求切片，1..INITIATIVE_ITEM_REQUIREMENT_MAX_CHARS（8000）
+    sources?: string[];                 // 对应原需求的章节或位置，给人看
+    depends_on?: string[];
+    acceptance?: Array<{                // ≤ REQUIREMENTS_MAX，同 31 的清单项
+      title: string; expected: string;
+      verification?: { kind: 'ai_review' } | { kind: 'manual' } | { kind: 'command'; command: string };
+    }>;
+  }>;                                   // 1..INITIATIVE_ITEMS_MAX（30）
+  coverage: Array<{ point: string; items: string[] }>;     // 原需求的每一点 → 工作包 key；items 可为空（写明不做的原因放进 outOfScope）
+}
+```
+
+### 8.3 校验
+
+`validateInitiativeBreakdown`（`shared/initiative/validate.ts`，工具与用户编辑共用）返回 `INITIATIVE_BREAKDOWN_INVALID`，`details.problems[]` 的子码：
+
+| 子码 | 条件 |
+| --- | --- |
+| `DUPLICATE_KEY` | key 重复 |
+| `UNKNOWN_DEPENDENCY` | 依赖不存在 |
+| `CYCLE` | 依赖成环 |
+| `DEPENDENCY_PHASE` | 依赖指向更晚的阶段 |
+| `EMPTY_PHASE` / `PHASE_OUT_OF_RANGE` | 阶段没有工作包 / 阶段号不在 1..phases.length |
+| `WORKFLOW_NOT_ALLOWED` | 流程不在可选范围内 |
+| `UNKNOWN_COVERAGE_ITEM` | 覆盖表引用了不存在的工作包 |
+| `ITEM_NOT_EDITABLE` | 细化时改动、删除了已开始或已满足的工作包（§8.4） |
+
+错误返回的格式与 hint 同 `PLAN_INVALID`（12 §5）：模型修正全部问题后整体重交。
+
+### 8.4 细化
+
+- 首条消息 `prompts/refine-breakdown.md`：当前全部工作包（标注哪些已开始、已满足、已放弃）、已满足工作包的结果摘要、改动文件与合入提交、用户的意见（可选）；要求先读合入后的代码，再整体重交。
+- 已开始（有当前任务）、已满足、已放弃的工作包必须原样保留（key、阶段、流程、需求、依赖都不变），否则 `ITEM_NOT_EDITABLE`；未开始的工作包可以改、删，也可以新增；已开启的阶段不能删除，新工作包不能放进已开启且已完成的阶段之前。
+- 后端按 key 对齐：保留的不动，改动的就地更新，删除的删除，新增的插入（同 `nodes.rematerialize` 的按 key 改写，09 §2）。
+
+## 9. 数据模型（迁移 `00NN_initiatives`）
+
+### initiatives
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| seq / key | INTEGER UNIQUE / TEXT UNIQUE | `I-<seq>` |
+| project_id | TEXT → projects，CASCADE | 删除项目时随之删除（任务先于项目删除，同 20 §6） |
+| base_branch | TEXT | |
+| title | TEXT | 创建时取需求首行，拆解后用 AI 给的标题（用户改过则不再改，`title_edited`） |
+| title_edited | INTEGER(bool) | |
+| requirement | TEXT | 原需求文本 |
+| allowed_workflows | TEXT(JSON) | 可选流程 key 列表 |
+| summary / understanding | TEXT / TEXT(JSON) | 最近一次拆解提交的说明与理解 |
+| phases | TEXT(JSON) | `[{ title, goal }]` |
+| coverage | TEXT(JSON) | 需求覆盖表 |
+| confirm_item_plans | INTEGER(bool) | 「每个工作包运行前让我确认计划」 |
+| breakdown_rev / confirmed_rev | INTEGER | §6.2；`confirmed_rev = 0` 即从未确认 |
+| opened_phase | INTEGER | 已开启到第几阶段，0 = 未开始；只增不减 |
+| created_at / updated_at | INTEGER | |
+
+来源附件为 `attachment_refs`（`owner_kind = initiative`）。
+
+### initiative_items
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| initiative_id | TEXT → initiatives，CASCADE | |
+| key | TEXT | UNIQUE(initiative_id, key) |
+| ordinal | INTEGER | 阶段内顺序 |
+| title / phase / workflow_key / requirement | TEXT / INTEGER / TEXT / TEXT | |
+| sources / depends_on / acceptance | TEXT(JSON) | |
+| task_id | TEXT NULL → tasks，SET NULL | 当前任务；重新开始时换成新任务，旧任务留在任务列表 |
+| merge_confirmed_at | INTEGER NULL | PR 交付后用户点「已合入」的时间 |
+| dropped_at / drop_reason | INTEGER NULL / TEXT NULL | 不做这一项 |
+| created_at / updated_at | INTEGER | |
+
+### initiative_runs
+
+一次拆解或细化，状态由尝试推导（同 `deck_runs`）。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| initiative_id | TEXT → initiatives，CASCADE | |
+| seq | INTEGER | |
+| attempt_id | TEXT → attempts | `AttemptKind.Breakdown` |
+| mode | TEXT | `InitiativeRunMode`：`breakdown` / `rebreakdown` / `refine` |
+| instruction | TEXT NULL | 用户意见 |
+| created_at | INTEGER | |
+
+会话流 `<数据目录>/runs/initiatives/<attemptId>.jsonl`。删除需求计划 = 删除其 runs 的尝试，再删需求计划（其余级联）。
+
+## 10. API（操作清单）
+
+| 操作 | 方法与路径 | 风险；暴露 | 说明 |
+| --- | --- | --- | --- |
+| `initiatives.create` | POST `/initiatives` | write；UI / 助手确认 | `{ projectId, baseBranch?, requirement, attachmentIds?, allowedWorkflows?, confirmItemPlans? }` → 详情；同时启动拆解 |
+| `initiatives.list` / `initiatives.get` | GET `/initiatives` / `/initiatives/:id` | read；UI / 助手 | 列表按 `updated_at` 倒序；详情含阶段、工作包与各自的显示状态、当前任务摘要、最近一次 run |
+| `initiatives.rebreakdown` | POST `/initiatives/:id/rebreakdown` | write；UI / 助手确认 | `{ instruction? }`；只在 `draft_ready` / `breakdown_failed` |
+| `initiatives.saveDraft` | PUT `/initiatives/:id/draft` | write；仅 UI | 整份阶段与工作包；校验 §8.3；只能改未开始的工作包 |
+| `initiatives.confirm` | POST `/initiatives/:id/confirm` | write；UI / 助手确认 | 写 `confirmed_rev`；首次确认开启第 1 阶段，细化后的确认开启 `toPhase`（请求带上，可省略） |
+| `initiatives.openPhase` | POST `/initiatives/:id/phases/:k/open` | write；UI / 助手确认 | `{ refine: boolean }`；`refine` 为真时启动细化、不开启阶段 |
+| `initiatives.refine` | POST `/initiatives/:id/refine` | write；UI / 助手确认 | `{ instruction? }`：细化剩余工作包，不改变已开启的阶段 |
+| `initiatives.startItem` | POST `/initiatives/:id/items/:key/start` | write；UI / 助手确认 | 只在 `ready`；开始失败后的重试与取消后的重新开始 |
+| `initiatives.confirmMerged` | POST `/initiatives/:id/items/:key/merged` | write；UI / 助手确认 | 只在 `pr_open` |
+| `initiatives.dropItem` | POST `/initiatives/:id/items/:key/drop` | write；UI / 助手确认 | `{ reason }`，必填 |
+| `initiatives.deliverPhase` | POST `/initiatives/:id/phases/:k/deliver` | critical；UI / 助手每次确认 | 同 `batches.deliver`（20 §5） |
+| `initiatives.delete` | DELETE `/initiatives/:id` | critical；UI / 助手每次确认 | 不删任务 |
+
+SSE：`initiative.updated { initiativeId }`（拆解提交、草稿保存、确认、阶段开启、工作包开始），界面重新获取；工作包任务的变化沿用任务事件刷新（同批次）。
+
+应用助手：读操作直接可用；`open_page` 增加 `initiative`。助手可以「把这份文档拆成需求计划」（`initiatives.create`，可带当前对话的附件，同 30 §2.2）、「进入下一阶段」「这一项不做了」等，写操作走确认卡片。
+
+## 11. 枚举、常量、错误码（实施时登记到 08）
+
+- 枚举：`AttemptKind.Breakdown`、`InitiativeStatus`、`InitiativeItemStatus`、`InitiativeRunMode`、`AttachmentOwnerKind.Initiative`、`McpToolName.SubmitBreakdown`。
+- 常量：`INITIATIVE_ITEMS_MAX = 30`、`INITIATIVE_PHASES_MAX = 6`、`INITIATIVE_SOURCES_MAX = 9`、`INITIATIVE_TITLE_MAX_CHARS = 60`、`INITIATIVE_ITEM_REQUIREMENT_MAX_CHARS = 8000`、`INITIATIVE_INSTRUCTION_MAX_CHARS = 2000`。
+- 错误码：`INITIATIVE_NOT_FOUND`（404）、`INITIATIVE_BUSY`（409）、`INITIATIVE_BREAKDOWN_INVALID`（400，§8.3）、`INITIATIVE_NOT_EDITABLE`（409：当前状态不允许这个操作，`details.status`）、`INITIATIVE_PHASE_NOT_READY`（409：前面的阶段还有未满足的工作包，`details.items`）、`INITIATIVE_ITEM_NOT_READY`（409：工作包不是 `ready` / `pr_open`，`details.status`）。
+
+## 12. 不做
+
+- 叠分支（下游从上游未合并的任务分支开出）：交付目标、冲突处理、上游再改改后的同步都要重写；阶段关口本来就需要合并。
+- 自动合并（D16）；阶段自动开启（首版每个阶段都由用户点开，D134）。
+- 工作包之间共享会话或共享 worktree。
+- 跨项目的需求计划（一个需求同时改前后端两个仓库）：每个仓库各建一个需求计划；以后再看是否需要。
+- 自动识别 PR 已合入并拉取：首版由用户点「已合入」（D134 ③）。
+- 工时估算、甘特图、负责人分配（本地单用户，04 §5.3）。
+- 把需求计划写回仓库：用「复制为 Markdown」或 N1 的流程。
+
+## 13. 开发拆分（N 系列）
+
+| 任务 | 内容 | 完成标准 |
+| --- | --- | --- |
+| N-01 | N1：内置流程 `breakdown`（`workflows.ts`、两段指令、13 §3.11）、主页卡片 | 单元：流程定义通过 `validateWorkflowDefinition`；`pnpm test:live` 免费模型一例：对示例需求文档产出覆盖每一点、依赖无环的拆解文档 |
+| N-02 | 共享层：`shared/initiative/`（`validateInitiativeBreakdown`、两个状态函数）、契约与常量、错误码 | 单元覆盖 §8.3 每个子码与 §6 每种状态 |
+| N-03 | `initiatives` 模块：迁移、repo、service（创建、草稿、确认、阶段、放弃、已合入、删除）、操作清单 | 集成（真实 SQLite）：确认 → 第 1 阶段开始的任务数；阶段未完成时开启下一阶段 409 |
+| N-04 | 拆解尝试：`AttemptKind.Breakdown`、提示词、`submit_breakdown` 与校验、`read_attachment` 范围、会话复用、重启规则（09 增补） | 集成（FakeOpencode）：提交无效拆解得到子码、修正后成功；细化改动已开始的工作包得到 `ITEM_NOT_EDITABLE` |
+| N-05 | 工作包开始与上下文：`tasks.create` 调用、来源附件引用、背景附件生成、验收清单；自动开始与启动时扫描 | 集成（FakeOpencode + 真实 Git）：A 本地合并后 B 自动开始，B 的首条消息含 A 的结果摘要与合入提交；PR 交付的 A 在点「已合入」前 B 不开始；重启后补开 |
+| N-06 | 阶段交付：从 `batches` 抽出逐个交付的共用函数，`initiatives.deliverPhase` | 集成：一个冲突、其余合入；批量交付的原有测试不变 |
+| N-07 | 前端：新建页、需求计划页（拆解审阅与编辑、阶段与工作包列表、进入下一阶段对话框）、列表、入口 | E2E：新建 → 确认 → 第 1 阶段合入 → 细化 → 第 2 阶段；四主题走查 |
+| N-08 | 应用助手与 live | 集成：助手创建需求计划出确认卡；`pnpm test:live` 免费模型一例：两阶段三个工作包跑通 |
+
+N-01 独立，可先交付（D137）；N-02…N-08 在 N-01 的拆解质量经用户确认后开始。
+
+## 14. 测试要点
+
+- 状态是推导的：单元测试用纯函数覆盖每种组合，不在集成测试里重复。
+- 解锁只认事实：本地合并到基础分支、报告完成、用户确认已合入、已放弃；以本地合并交付到**别的**分支不算满足（`ready`，可以重新开始）。
+- 自动开始幂等：同一个满足事件到达两次、启动扫描与事件同时到达，都只开一个任务（写 `task_id` 时 SQL 带 `WHERE task_id IS :读到的值`，影响 0 行即说明别处已开始，跳过）。
+- 背景附件：只含已满足的工作包；之后合入的不补；附件总长超限时按 30 §3.2 截断。
+- 删除需求计划后工作包的任务照常存在、可交付。
