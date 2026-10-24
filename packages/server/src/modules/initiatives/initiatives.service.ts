@@ -61,7 +61,14 @@ import type { SettingsService } from '../settings/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import type { WorkflowsService } from '../workflows/index.ts';
 import { type DoneItem, renderBackground } from './initiatives.background.ts';
-import { draftOf, type RefineItem, rebreakdownStep, refineStep, startMessage } from './initiatives.breakdown.ts';
+import {
+  draftOf,
+  type RefineItem,
+  rebreakdownStep,
+  refineStep,
+  retryStep,
+  startMessage,
+} from './initiatives.breakdown.ts';
 import {
   createInitiativesRepo,
   type Initiative,
@@ -344,8 +351,9 @@ export function createInitiativesService({
         ...(item.acceptance.length === 0 ? {} : { requirements: item.acceptance }),
         ...(initiative.confirmItemPlans ? { checkpoints: { confirm_plan: true } } : {}),
       });
-      if (!repo.claimItem(item.id, item.taskId, created, clock.now())) {
-        // Rolls the task back: another start took the work package, or the user dropped it, meanwhile.
+      if (!repo.claimItem(item.id, item.taskId, initiative.breakdownRev, created, clock.now())) {
+        // Rolls the task back: another start took the work package, the user dropped it or a breakdown rewrote it,
+        // meanwhile. Not a failure of the work package: no start error is recorded.
         throw new AppError(ErrorCode.InitiativeItemNotReady, `Work package ${item.key} changed meanwhile`, {
           status: item.dto.status,
         });
@@ -383,6 +391,7 @@ export function createInitiativesService({
         await startItem(initiative, item, items);
       } catch (err) {
         if (!(err instanceof AppError)) throw err;
+        if (err.code === ErrorCode.InitiativeItemNotReady) continue;
         repo.updateItem(item.id, { startError: err.toInfo(), updatedAt: clock.now() });
         log.warn({ initiativeId: id, item: item.key, code: err.code }, 'initiative work package could not start');
         publish(id);
@@ -442,9 +451,13 @@ export function createInitiativesService({
     return problems;
   }
 
-  /** A user edit (34 §5.2): rules of the draft, and the work already under way kept. */
+  /** A user edit (34 §5.2): rules of the draft (the allowed workflows too, as for the AI), and the work already under way kept. */
   function checkEdit(initiative: Initiative, current: readonly ItemView[], draft: InitiativeDraft): void {
-    const problems = [...validateInitiativeDraft(draft, { workflowExists }), ...lockedProblems(current, draft)];
+    const allowedWorkflows = allowedWorkflowsOf(initiative).map((w) => w.key);
+    const problems = [
+      ...validateInitiativeDraft(draft, { workflowExists, allowedWorkflows }),
+      ...lockedProblems(current, draft),
+    ];
     if (problems.length > 0) throw invalid(problems);
     if (draft.phases.length < initiative.openedPhase) {
       throw new AppError(ErrorCode.InitiativeNotEditable, 'An opened phase cannot be removed', {
@@ -855,7 +868,10 @@ export function createInitiativesService({
         });
       }
       const draft = draftOfItems(initiative, views(initiative));
-      const step = draft.items.length === 0 ? '' : rebreakdownStep(prompts, draft, instruction ?? null);
+      const step =
+        draft.items.length === 0
+          ? retryStep(prompts, instruction ?? null)
+          : rebreakdownStep(prompts, draft, instruction ?? null);
       await startRun(initiative, InitiativeRunMode.Rebreakdown, step, {
         instruction: instruction ?? null,
         openPhase: null,
@@ -881,7 +897,12 @@ export function createInitiativesService({
       if (run === undefined) throw new Error(`Breakdown attempt ${attempt.id} has no initiative run`);
       const initiative = get(run.initiativeId);
       const current = views(initiative);
-      const draft = draftOf(input, initiative.phases);
+      const kept = new Map(
+        current
+          .filter((item) => item.taskId !== null || item.droppedAt !== null)
+          .map((item) => [item.key, item.acceptance] as const),
+      );
+      const draft = draftOf(input, initiative.phases, kept);
       const problems = [
         ...validateInitiativeDraft(draft, {
           workflowExists,
@@ -931,13 +952,21 @@ export function createInitiativesService({
     /** Starts a work package by hand: after a failed start, or again after its task was cancelled (34 §5.4). */
     async startItem(id: string, key: string): Promise<InitiativeDetailDTO> {
       const initiative = get(id);
+      // A refined draft not confirmed yet may have rewritten this very work package (34 §5.5).
+      if (initiative.confirmedRev < initiative.breakdownRev) {
+        throw new AppError(ErrorCode.InitiativeNotEditable, 'Confirm the draft before starting its work packages', {
+          status: InitiativeStatus.DraftReady,
+        });
+      }
       const all = views(initiative);
       const item = all.find((i) => i.key === key) ?? itemOf(initiative, key);
       if (item.dto.status !== InitiativeItemStatus.Ready) throw notReady(item);
       try {
         await startItem(initiative, item, all);
       } catch (err) {
-        if (err instanceof AppError) repo.updateItem(item.id, { startError: err.toInfo(), updatedAt: clock.now() });
+        if (err instanceof AppError && err.code !== ErrorCode.InitiativeItemNotReady) {
+          repo.updateItem(item.id, { startError: err.toInfo(), updatedAt: clock.now() });
+        }
         throw err;
       }
       return detail(id);

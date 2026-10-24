@@ -316,10 +316,10 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 
 ## 6. 执行 MCP 工具
 
-允许的尝试类型：`plan` · `execute` · `review` · `research`。
+允许的尝试类型：`plan` · `execute` · `review` · `research` · `breakdown`。
 
 - `research` 只在对话的网络开关打开时可用，而且只能打开网站：打开预览路径返回 `MCP_TOOL_NOT_ALLOWED`，研究员没有 worktree；
-- `plan` 也只能打开网站：规划时代码还没改，预览没有意义；
+- `plan` 与 `breakdown`（需求计划的拆解，34 §8.1）也只能打开网站：代码还没改，预览没有意义；
 - 打开预览路径时，任务所属项目没有配置预览返回 `PREVIEW_NOT_CONFIGURED`（提示：这个项目没有页面预览，用代码与测试验证，并在 notes 里说明）。
 
 工具名常量进 `McpToolName`，schema 在 `shared/contracts/mcp/browser.ts`。

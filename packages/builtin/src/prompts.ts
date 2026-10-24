@@ -51,6 +51,7 @@ export const PromptName = {
   /** The same reviewer breaking a requirement into an initiative's work packages, and refining them (34 §8). */
   StartBreakdown: 'start-breakdown',
   Rebreakdown: 'rebreakdown',
+  RetryBreakdown: 'retry-breakdown',
   RefineBreakdown: 'refine-breakdown',
   /** The files the user attached to a task or an assistant message, as the model reads them (30 §3.2). */
   Attachments: 'attachments',
@@ -108,6 +109,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.StartTeamAnalysis]: read(PromptName.StartTeamAnalysis),
     [PromptName.StartBreakdown]: read(PromptName.StartBreakdown),
     [PromptName.Rebreakdown]: read(PromptName.Rebreakdown),
+    [PromptName.RetryBreakdown]: read(PromptName.RetryBreakdown),
     [PromptName.RefineBreakdown]: read(PromptName.RefineBreakdown),
     [PromptName.Attachments]: read(PromptName.Attachments),
     [PromptName.VerifyRequirements]: read(PromptName.VerifyRequirements),

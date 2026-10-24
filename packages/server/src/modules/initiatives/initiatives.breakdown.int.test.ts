@@ -10,7 +10,10 @@ import {
   type InitiativeDetailDTO,
   openInitiativePhaseOp,
   rebreakdownInitiativeOp,
+  refineInitiativeOp,
   saveInitiativeDraftOp,
+  startInitiativeItemOp,
+  submitBreakdownInputSchema,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
@@ -52,10 +55,7 @@ const breakdown = (itemsOf: ReturnType<typeof unitTests>[], phases = ['基础', 
   understanding: { scope: '补 a、b 两个模块的单元测试', assumptions: ['测试放在模块旁边'] },
   phases: phases.map((title) => ({ title, goal: `${title}完成` })),
   items: itemsOf,
-  coverage: [
-    { point: 'a 有测试', items: ['a'] },
-    { point: 'b 有测试', items: ['b'] },
-  ],
+  coverage: itemsOf.map((i) => ({ point: `${i.key} 有测试`, items: [i.key] })),
 });
 
 /** The turns of a unit-test task numbered `key` (as in batches.int.test.ts). */
@@ -136,6 +136,20 @@ describe('AI 拆解与逐步细化（34 §8，D133、D136）', () => {
     expect(first).toContain('两个模块都要有单元测试。');
     expect(first).toContain('`unit_tests`');
     expect(first).not.toContain('`feature`');
+    // The user's edits keep to the allowed workflows too.
+    const edited = {
+      phases: [{ title: '基础' }, { title: '后续' }],
+      items: [
+        { ...unitTests('a', 1, 'a/'), workflow: 'feature', dependsOn: [] },
+        { ...unitTests('b', 2, 'b/'), workflow: 'feature', dependsOn: ['a'] },
+      ],
+    };
+    expect((await t.call(saveInitiativeDraftOp, { id: created.id, ...edited })).body).toMatchObject({
+      error: {
+        code: ErrorCode.InitiativeBreakdownInvalid,
+        details: { problems: [{ code: 'WORKFLOW_NOT_ALLOWED' }, { code: 'WORKFLOW_NOT_ALLOWED' }] },
+      },
+    });
 
     queueUnitTests('T-1', 'a/');
     const aDone = taskReaches(t, 'review');
@@ -200,12 +214,97 @@ describe('AI 拆解与逐步细化（34 §8，D133、D136）', () => {
     t.fake.enqueue(script().hang(), SESSION);
     const again = (await t.call(rebreakdownInitiativeOp, { id: created.id, instruction: '导出 CSV 即可' })).body;
     expect(again).toMatchObject({ status: 'breaking_down', latestRun: { seq: 2, mode: 'rebreakdown' } });
+    // The retry carries the user's feedback, though there was no draft to show.
+    expect(t.fake.prompts.at(-1)?.text).toContain('导出 CSV 即可');
     const draft = { phases: [{ title: '一' }], items: [{ ...unitTests('a', 1, 'a/'), dependsOn: [] }] };
     expect((await t.call(saveInitiativeDraftOp, { id: created.id, ...draft })).body).toMatchObject({
       error: { code: ErrorCode.InitiativeBusy },
     });
     expect((await t.call(deleteInitiativeOp, { id: created.id })).body).toMatchObject({
       error: { code: ErrorCode.InitiativeBusy },
+    });
+  });
+
+  it('细化时：已开始的工作包保留用户设的验收项（工具写不出也不算改动）；新草稿确认前不能手动开始其中的工作包', async () => {
+    const { project } = await addProject(t, { files: { 'a/a.ts': 'export const a = 1;\n' }, checkCommand: null });
+    t.fake.enqueue(script().callTool('submit_breakdown', breakdown([unitTests('a', 1, 'a/')], ['基础'])), SESSION);
+    const created = await create({
+      projectId: project.id,
+      requirement: '补 a 的测试',
+      allowedWorkflows: ['unit_tests'],
+    });
+    await settled();
+    // The user marks a's check as a manual, optional one before confirming.
+    const acceptance = [
+      { title: '人工看一眼', expected: '测试读得懂', required: false, verification: { kind: 'manual' as const } },
+    ];
+    const saved = await t.call(saveInitiativeDraftOp, {
+      id: created.id,
+      phases: [{ title: '基础' }],
+      items: [{ ...unitTests('a', 1, 'a/'), dependsOn: [], acceptance }],
+    });
+    expect(saved.status).toBe(200);
+    t.fake.enqueue(script().hang(), { title: 'T-1 · ' });
+    const confirmed = await t.call(confirmInitiativeOp, { id: created.id });
+    expect(confirmed.status, JSON.stringify(confirmed.body)).toBe(200);
+    expect(items(confirmed.body)).toEqual([['a', 1, 'in_task', 'T-1']]);
+
+    // The refinement keeps a as it is and adds c to the open phase.
+    t.fake.enqueue(
+      script().callTool('submit_breakdown', breakdown([unitTests('a', 1, 'a/'), unitTests('c', 1, 'c/')], ['基础'])),
+      SESSION,
+    );
+    await t.call(refineInitiativeOp, { id: created.id });
+    await settled();
+    const refined = await detail(created.id);
+    expect(rejectedProblems(refined.latestRun?.attemptId ?? '')).toEqual([]);
+    expect(refined).toMatchObject({
+      status: 'draft_ready',
+      items: [
+        { key: 'a', acceptance },
+        { key: 'c', status: 'ready' },
+      ],
+    });
+
+    expect((await t.call(startInitiativeItemOp, { id: created.id, key: 'c' })).body).toMatchObject({
+      error: { code: ErrorCode.InitiativeNotEditable },
+    });
+  });
+  it('准备开始一个工作包时细化改写了它：这次开始作废，不按旧需求建任务，也不记为开始失败', async () => {
+    const { repo, project } = await addProject(t, { files: { 'a/a.ts': 'export const a = 1;\n' }, checkCommand: null });
+    t.fake.enqueue(script().callTool('submit_breakdown', breakdown([unitTests('a', 1, 'a/')], ['基础'])), SESSION);
+    const created = await create({ projectId: project.id, requirement: '补 a 的测试' });
+    await settled();
+    // The automatic start fails while the base branch is away; a waits for the user to start it again.
+    await repo.git('branch', '-m', 'main', 'away');
+    expect((await t.call(confirmInitiativeOp, { id: created.id })).body).toMatchObject({
+      items: [{ key: 'a', status: 'ready', task: null, startError: { code: ErrorCode.GitBaseBranchNotFound } }],
+    });
+    await repo.git('branch', '-m', 'away', 'main');
+
+    t.fake.enqueue(script().hang(), SESSION);
+    const run = (await t.call(refineInitiativeOp, { id: created.id })).body.latestRun;
+    const attempt = t.app.services.attempts.get(run?.attemptId ?? '');
+    const starting = t.app.services.initiatives.startItem(created.id, 'a');
+    // While the start checks the base branch, the refinement rewrites a (no await in between).
+    const rewritten = { ...unitTests('a', 1, 'a/'), requirement: '为 a/ 补边界用例' };
+    t.app.services.initiatives.submitBreakdown(
+      attempt,
+      submitBreakdownInputSchema.parse(breakdown([rewritten], ['基础'])),
+    );
+
+    await expect(starting).rejects.toMatchObject({ code: ErrorCode.InitiativeItemNotReady });
+    expect(await detail(created.id)).toMatchObject({
+      status: 'draft_ready',
+      items: [
+        {
+          key: 'a',
+          status: 'ready',
+          task: null,
+          requirement: '为 a/ 补边界用例',
+          startError: { code: ErrorCode.GitBaseBranchNotFound },
+        },
+      ],
     });
   });
 });
