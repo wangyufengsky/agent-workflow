@@ -449,7 +449,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | --- | --- | --- | --- | --- |
 | GET | `/decks?projectId&query&limit&cursor` | `decks.list` | read | `{ items: DeckSummaryDTO[], nextCursor }`，按 `updated_at` 倒序；`query` 匹配标题 |
 | GET | `/decks/:id` | `decks.get` | read | `DeckDTO`（要求、资料、理解、全部页、AI 工作记录、显示状态）；404 `DECK_NOT_FOUND` |
-| POST | `/decks` | `decks.create` | write | `{ brief, projectId?, materials, slideCount?, theme?, model? }` → 201 `DeckDTO` 并开始写大纲；`materials` 的 `{ kind: web, url }` 由后端按网站规则只读打开并存正文快照（同 `browser.readUrl`）：不允许的地址 `BROWSER_SITE_NOT_ALLOWED`、要登录 `BROWSER_LOGIN_REQUIRED`、打不开或超时 `BROWSER_READ_FAILED`；资料来自多个项目、任务没有结果、对话没有回答、资料超过 `DECK_MATERIALS_MAX_CHARS` 为 400；`produces: deck` |
+| POST | `/decks` | `decks.create` | write | `{ brief, projectId?, materials, slideCount?, theme?, model? }` → 201 `DeckDTO` 并开始写大纲；`materials` 的 `{ kind: web, url }` 由后端按网站规则只读打开并存正文快照（同 `browser.readUrl`）：不允许的地址 `BROWSER_SITE_NOT_ALLOWED`、要登录 `BROWSER_LOGIN_REQUIRED`、打不开、超时或页面本身返回 HTTP 错误（`details.status`；页面里的图片、脚本失败不算）`BROWSER_READ_FAILED`；资料来自多个项目、任务没有结果、对话没有回答、资料超过 `DECK_MATERIALS_MAX_CHARS` 为 400；`produces: deck` |
 | PATCH | `/decks/:id` | `decks.update` | write | `{ title?, theme? }`，不调用 AI |
 | POST | `/decks/:id/outline/revise` | `decks.reviseOutline` | write | `{ instruction?, model? }`：按意见重写大纲；不带意见为重新写（大纲失败后重试）；已确认大纲 409 `STATE_TRANSITION_INVALID` |
 | PUT | `/decks/:id/outline` | `decks.updateOutline` | write | `{ slides: [{ id?, layout, title, points }] }`：整体替换；已确认 409 |

@@ -28,8 +28,13 @@ export type MaterialSources = {
   task(id: string): TaskDetailDTO;
   knowledge(id: string): KnowledgeConversationDTO;
   /** Reads the page with the website session, read only (`browser.readUrl`). */
-  web(url: string): Promise<{ url: string; title: string; page: string }>;
+  web(url: string): Promise<WebPage>;
 };
+
+type WebPage = { url: string; title: string; page: string; logs: { requests: readonly WebRequest[] } };
+type WebRequest = { url: string; status: number | null; resourceType: string };
+
+const withoutHash = (url: string) => url.split('#')[0];
 
 /** The task's result for the AI: requirement, summary, assumptions and the files it changed (not the diff itself). */
 function taskSnapshot(task: TaskDetailDTO): string {
@@ -87,7 +92,19 @@ function knowledgeSnapshot(conversation: KnowledgeConversationDTO): string {
 }
 
 /** The page's text as read once; the snapshot's own header line gives way to the title and final address. */
-function webSnapshot(page: { url: string; title: string; page: string }): string {
+function webSnapshot(page: WebPage): string {
+  // A read succeeds with whatever document came back, and the logs list only failed requests (status 400 or more):
+  // an error page is not material, while a failed image or script of a good page does not matter.
+  const document = page.logs.requests.find(
+    (r) => r.resourceType === 'Document' && withoutHash(r.url) === withoutHash(page.url),
+  );
+  if (document !== undefined && document.status !== null) {
+    throw new AppError(ErrorCode.BrowserReadFailed, `The web page answered HTTP ${document.status}`, {
+      url: page.url,
+      reason: `HTTP ${document.status}`,
+      status: document.status,
+    });
+  }
   return [`# Web page · ${page.title}`, `URL: ${page.url}`, page.page.slice(page.page.indexOf('\n') + 1)].join('\n\n');
 }
 

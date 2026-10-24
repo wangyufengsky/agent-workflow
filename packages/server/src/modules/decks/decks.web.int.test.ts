@@ -15,7 +15,7 @@ beforeAll(async () => {
   server = createServer((req, res) => {
     requests.push(`${req.method} ${req.url}`);
     const pages: Record<string, string> = {
-      '/article': '<title>发布说明</title><h1>发布步骤</h1><p>先检查，再发布。</p>',
+      '/article': '<title>发布说明</title><h1>发布步骤</h1><p>先检查，再发布。</p><img src="/gone.png" alt="">',
       '/login': '<title>登录</title><input type="password" aria-label="密码">',
     };
     const body = pages[req.url ?? ''];
@@ -67,13 +67,17 @@ it('网页资料按网站规则只读打开一次，正文快照写入首条消�
   expect(requests.filter((r) => !r.startsWith('GET '))).toEqual([]);
 });
 
-it('不允许的地址与要登录的网页报对应错误，不建 PPT', async () => {
+it('不允许的地址、要登录与出错的网页报对应错误，不建 PPT', async () => {
   const create = (url: string) =>
     t.call(createDeckOp, { brief: '做成 PPT', materials: [{ kind: 'web', url }] }).then((r) => r.body);
   expect(await create(origin.replace('127.0.0.1', 'localhost'))).toMatchObject({
     error: { code: ErrorCode.BrowserSiteNotAllowed },
   });
   expect(await create(`${origin}/login`)).toMatchObject({ error: { code: ErrorCode.BrowserLoginRequired } });
+  // 页面本身 404 时不能把错误页当资料；资料页里的图片 404 不影响（上一个用例）。
+  expect(await create(`${origin}/removed`)).toMatchObject({
+    error: { code: ErrorCode.BrowserReadFailed, details: { status: 404 } },
+  });
   expect((await t.call(listDecksOp, {})).body.items).toEqual([]);
   expect(t.fake.sessions).toEqual([]);
 });
