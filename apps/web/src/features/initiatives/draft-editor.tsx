@@ -10,6 +10,8 @@ import { type Dispatch, type ReactNode, type SetStateAction, useState } from 're
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { INITIATIVES_COPY as C } from '../../copy/initiatives.ts';
+import { draftsOfInputs, inputsOf } from '../requirements/checklist-editor.tsx';
+import { ChecklistField } from '../requirements/checklist-field.tsx';
 import { workflowsQuery } from '../tasks/tasks.queries.ts';
 import styles from './initiatives.module.css';
 import { useSaveInitiativeDraft } from './initiatives.queries.ts';
@@ -147,6 +149,13 @@ export function DraftFields({
               value={item.requirement}
               onChange={(e) => setItem(item.key, { requirement: e.target.value })}
             />
+            {/* The acceptance checklist (31) the work package's task starts with. */}
+            <div className={styles.wide}>
+              <ChecklistField
+                drafts={draftsOfInputs(item.acceptance, item.key)}
+                onChange={(drafts) => setItem(item.key, { acceptance: inputsOf(drafts) })}
+              />
+            </div>
             <div className={styles.deps}>
               <span className="hint">{C.fields.dependsOn}</span>
               {draft.items

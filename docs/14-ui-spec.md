@@ -27,7 +27,7 @@
 | `/settings` | 设置 | 全部（专业项按模式显示） | `settings.html` |
 | `/git`、`/git/:projectId`、`/git/reviews/:reviewId` | Git 工作台（27 §6）：项目卡片；三栏工作台（`?view=changes\|commits\|branches\|files\|worktrees\|review`，`ref`、`author`、`q`、`sha`、`parent`、`tab`、`path`、`line`、`side`、`file`、`review` 记录所看的内容）；审查的链接（助手卡片）跳到它所在项目的工作台 | 专业 | `git/index.html`、`delivery/git.html` |
 | `/workflows`、`/workflows/:key` | 流程列表与编排器（`:key` 为流程 key，编辑其最新版本） | 专业 | `workflows.html`、`workflow-editor.html` |
-| `/initiative-templates`、`/initiative-templates/new`、`/initiative-templates/:key` | 组合模板（v1.3，34 §15.6）：列表（内置只读可复制，自定义可编辑、复制、删除）、新建页（空白、`?copy=` 复制、`?initiative=` 需求计划「存为模板」）、编辑页（标识、名称、说明与需求计划草稿相同的阶段与工作包编辑；当场列出问题，缺 `{{requirement}}` 等有问题时不能保存）；流程页右上角「组合模板」进入 | 专业 | 新增（风格同流程页） |
+| `/initiative-templates`、`/initiative-templates/new`、`/initiative-templates/:key/edit` | 组合模板（v1.3，34 §15.6）：列表（内置只读可复制，自定义可编辑、复制、删除）、新建页（空白、`?copy=` 复制、`?initiative=` 需求计划「存为模板」）、编辑页（标识、名称、说明与需求计划草稿相同的阶段与工作包编辑，每个工作包的验收要求可以查看、修改、删除；当场列出问题，缺 `{{requirement}}` 等有问题时不能保存）；流程页右上角「组合模板」进入 | 专业 | 新增（风格同流程页） |
 | `/roles` | 角色 | 专业 | `roles.html` |
 | `/databases` | 数据库连接 | 专业 | `databases.html` |
 | `/tools` | MCP 工具 | 专业 | `tools.html`（只保留 MCP 工具清单） |

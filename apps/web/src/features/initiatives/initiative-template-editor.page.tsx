@@ -17,6 +17,8 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { INITIATIVE_TEMPLATES_COPY as C, INITIATIVE_PROBLEM_LABEL } from '../../copy/initiatives.ts';
+import { REQUIREMENTS_COPY } from '../../copy/requirements.ts';
+import { draftsOfInputs, isComplete } from '../requirements/checklist-editor.tsx';
 import { workflowsQuery } from '../tasks/tasks.queries.ts';
 import { DraftFields, toDraft } from './draft-editor.tsx';
 import styles from './initiatives.module.css';
@@ -55,6 +57,9 @@ function TemplateEditor({
   const problems = [
     ...(DEFINITION_KEY_PATTERN.test(meta.key) ? [] : [C.keyProblem]),
     ...(meta.name.trim() === '' || meta.description.trim() === '' ? [C.nameRequired] : []),
+    ...(draft.items.every((item) => isComplete(draftsOfInputs(item.acceptance, item.key)))
+      ? []
+      : [REQUIREMENTS_COPY.incomplete]),
     ...validateInitiativeDraft(draft, { workflowExists, template: true }).map((p) =>
       p.itemKey === undefined
         ? INITIATIVE_PROBLEM_LABEL[p.code]

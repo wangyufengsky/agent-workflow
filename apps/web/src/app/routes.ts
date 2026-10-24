@@ -18,7 +18,8 @@ export const ROUTES = {
   /** Composition templates (34 §15.6, pro): the list, a new one (blank, a copy, or from an initiative), one to edit. */
   initiativeTemplates: '/initiative-templates',
   initiativeTemplateNew: '/initiative-templates/new',
-  initiativeTemplate: '/initiative-templates/$key',
+  // Under `/edit`, so that no template key can be taken for the new page.
+  initiativeTemplate: '/initiative-templates/$key/edit',
   /** Scheduled tasks (22): the list, a new one, one schedule, changing it. */
   schedules: '/schedules',
   scheduleNew: '/schedules/new',
@@ -67,7 +68,7 @@ export const ROUTE_IDS = {
   batch: '/_shell/batches/$batchId',
   initiative: '/_shell/initiatives/$initiativeId',
   initiativeTemplateNew: '/_shell/initiative-templates/new',
-  initiativeTemplate: '/_shell/initiative-templates/$key',
+  initiativeTemplate: '/_shell/initiative-templates/$key/edit',
   scheduleNew: '/_shell/schedules/new',
   schedule: '/_shell/schedules/$scheduleId',
   scheduleEdit: '/_shell/schedules/$scheduleId/edit',
