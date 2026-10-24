@@ -449,9 +449,13 @@ export function createInitiativesService({
     return problems;
   }
 
-  /** A user edit (34 §5.2): rules of the draft, and the work already under way kept. */
+  /** A user edit (34 §5.2): rules of the draft (the allowed workflows too, as for the AI), and the work already under way kept. */
   function checkEdit(initiative: Initiative, current: readonly ItemView[], draft: InitiativeDraft): void {
-    const problems = [...validateInitiativeDraft(draft, { workflowExists }), ...lockedProblems(current, draft)];
+    const allowedWorkflows = allowedWorkflowsOf(initiative).map((w) => w.key);
+    const problems = [
+      ...validateInitiativeDraft(draft, { workflowExists, allowedWorkflows }),
+      ...lockedProblems(current, draft),
+    ];
     if (problems.length > 0) throw invalid(problems);
     if (draft.phases.length < initiative.openedPhase) {
       throw new AppError(ErrorCode.InitiativeNotEditable, 'An opened phase cannot be removed', {

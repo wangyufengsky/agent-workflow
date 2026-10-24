@@ -135,6 +135,20 @@ describe('AI 拆解与逐步细化（34 §8，D133、D136）', () => {
     expect(first).toContain('两个模块都要有单元测试。');
     expect(first).toContain('`unit_tests`');
     expect(first).not.toContain('`feature`');
+    // The user's edits keep to the allowed workflows too.
+    const edited = {
+      phases: [{ title: '基础' }, { title: '后续' }],
+      items: [
+        { ...unitTests('a', 1, 'a/'), workflow: 'feature', dependsOn: [] },
+        { ...unitTests('b', 2, 'b/'), workflow: 'feature', dependsOn: ['a'] },
+      ],
+    };
+    expect((await t.call(saveInitiativeDraftOp, { id: created.id, ...edited })).body).toMatchObject({
+      error: {
+        code: ErrorCode.InitiativeBreakdownInvalid,
+        details: { problems: [{ code: 'WORKFLOW_NOT_ALLOWED' }, { code: 'WORKFLOW_NOT_ALLOWED' }] },
+      },
+    });
 
     queueUnitTests('T-1', 'a/');
     const aDone = taskReaches(t, 'review');
