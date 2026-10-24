@@ -45,6 +45,7 @@ export const INITIATIVES_COPY = {
   risks: '风险',
   coverage: '需求覆盖',
   coverageNone: '不做',
+  coverageRemoved: '对应的工作包已删除',
   coverageSummary: (covered: number, total: number) => `需求 ${total} 点，${covered} 点有对应工作包`,
   rebreakdown: '按意见重新拆解',
   rebreakdownTitle: '让 AI 重新拆解？',

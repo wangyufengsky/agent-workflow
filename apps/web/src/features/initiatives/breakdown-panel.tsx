@@ -17,6 +17,7 @@ import { ERROR_COPY } from '../../copy/errors.ts';
 import { INITIATIVES_COPY as C } from '../../copy/initiatives.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { ConversationStream } from '../stream/conversation-stream.tsx';
+import { coverageLines } from './coverage.ts';
 import styles from './initiatives.module.css';
 import { useRebreakdownInitiative, useRefineInitiative } from './initiatives.queries.ts';
 
@@ -181,7 +182,6 @@ export function BreakdownStatus({ initiative }: { initiative: InitiativeDetailDT
 export function Understanding({ initiative }: { initiative: InitiativeDetailDTO }) {
   const { understanding, coverage, summary } = initiative;
   if (understanding === null && coverage === null && summary === null) return null;
-  const title = (key: string) => initiative.items.find((i) => i.key === key)?.title ?? key;
   const lists: Array<[string, readonly string[]]> =
     understanding === null
       ? []
@@ -190,7 +190,7 @@ export function Understanding({ initiative }: { initiative: InitiativeDetailDTO 
           [C.assumptions, understanding.assumptions],
           [C.risks, understanding.risks],
         ];
-  const covered = coverage?.filter((line) => line.items.length > 0).length ?? 0;
+  const table = coverage === null ? null : coverageLines(coverage, initiative.items);
   return (
     <section className="card pad col" data-testid="initiative-understanding">
       {summary !== null && <p>{summary}</p>}
@@ -215,15 +215,21 @@ export function Understanding({ initiative }: { initiative: InitiativeDetailDTO 
           )}
         </details>
       )}
-      {coverage !== null && (
+      {table !== null && (
         <details>
-          <summary className="hint">{C.coverageSummary(covered, coverage.length)}</summary>
+          <summary className="hint">{C.coverageSummary(table.covered, table.lines.length)}</summary>
           <table className={styles.table}>
             <tbody>
-              {coverage.map((line) => (
+              {table.lines.map((line) => (
                 <tr key={line.point}>
                   <td>{line.point}</td>
-                  <td>{line.items.length === 0 ? C.coverageNone : line.items.map(title).join('、')}</td>
+                  <td className={line.state === 'removed' ? styles.error : undefined}>
+                    {line.state === 'skipped'
+                      ? C.coverageNone
+                      : line.state === 'removed'
+                        ? C.coverageRemoved
+                        : line.titles.join('、')}
+                  </td>
                 </tr>
               ))}
             </tbody>
