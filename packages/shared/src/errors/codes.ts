@@ -61,6 +61,7 @@ export const ErrorCode = {
   AttemptSessionError: 'ATTEMPT_SESSION_ERROR',
   OpencodeNotReady: 'OPENCODE_NOT_READY',
   OpencodeRequestFailed: 'OPENCODE_REQUEST_FAILED',
+  PermissionRequestExpired: 'PERMISSION_REQUEST_EXPIRED',
   // MCP 专用
   McpAttemptUnresolved: 'MCP_ATTEMPT_UNRESOLVED',
   McpToolNotAllowed: 'MCP_TOOL_NOT_ALLOWED',
@@ -186,6 +187,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.AttemptSessionError]: null,
   [ErrorCode.OpencodeNotReady]: 503,
   [ErrorCode.OpencodeRequestFailed]: 502,
+  [ErrorCode.PermissionRequestExpired]: 409,
   [ErrorCode.McpAttemptUnresolved]: null,
   [ErrorCode.McpToolNotAllowed]: null,
   [ErrorCode.McpResultAlreadySubmitted]: null,

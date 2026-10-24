@@ -212,6 +212,7 @@ export const gitReviewFocusSchema = z.string().trim().min(1).max(GIT_REVIEW_FOCU
 /** An AI review; its status is its attempt's (27 §7.2). */
 export const gitReviewSchema = z.object({
   id: z.string(),
+  attemptId: z.string(),
   projectId: z.string(),
   target: gitReviewTargetSchema,
   /** A branch name or a short SHA, for display. */

@@ -1,5 +1,6 @@
 import {
   BashPolicy,
+  ErrorCode,
   MCP_ASSISTANT_SERVER_NAME,
   MCP_SERVER_NAME,
   OPENCODE_AGENT_NAME,
@@ -72,6 +73,17 @@ describe('@opencode 客户端与配置注入', () => {
       t.app.services.runtime.sdk().session.get({ sessionID: sessionId, directory: repo.path }, { throwOnError: true }),
     ).rejects.toMatchObject({ cause: { status: 404, body: { name: 'NotFoundError' } } });
     await expect(client.deleteSession({ sessionId, directory: repo.path })).resolves.toBeUndefined();
+  });
+
+  it('真实 opencode 的不存在权限请求映射为明确的失效错误', async () => {
+    const repo = await createTestRepo();
+    await expect(
+      t.app.services.opencode.replyPermission({
+        permissionId: 'per_aw_missing_permission',
+        directory: repo.path,
+        reply: 'once',
+      }),
+    ).rejects.toMatchObject({ code: ErrorCode.PermissionRequestExpired });
   });
 
   it('在目录中建会话并带上会话级 bash 规则；可列出模型', async () => {

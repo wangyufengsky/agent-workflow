@@ -82,3 +82,31 @@ describe('opencode 会话删除错误映射', () => {
     });
   });
 });
+
+describe('权限失效的边界识别', () => {
+  it.each([
+    { status: 404, body: { _tag: 'PermissionNotFoundError', requestID: 'per_other', message: 'missing' } },
+    { status: 404, body: { name: 'NotFoundError', data: { message: 'missing route' } } },
+    { status: 500, body: { _tag: 'PermissionNotFoundError', requestID: 'per_1', message: 'failed' } },
+    undefined,
+  ])('非目标权限的明确 404 不得当作失效清理：%j', async (cause) => {
+    const runtime = {
+      onEvent: () => () => undefined,
+      onLost: () => () => undefined,
+      sdk: () => ({
+        permission: {
+          reply: async () => {
+            throw new Error('request failed', { cause });
+          },
+        },
+      }),
+    } as unknown as OpencodeRuntime;
+    await expect(
+      createRuntimeClient(runtime, pino({ level: 'silent' })).replyPermission({
+        permissionId: 'per_1',
+        directory: '/tmp/aw-repo',
+        reply: 'always',
+      }),
+    ).rejects.toMatchObject({ code: ErrorCode.OpencodeRequestFailed });
+  });
+});

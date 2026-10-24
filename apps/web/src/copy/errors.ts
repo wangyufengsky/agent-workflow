@@ -56,6 +56,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.AttemptSessionError]: 'AI 会话出错了（模型服务可能暂时不可用）。',
   [ErrorCode.OpencodeNotReady]: 'opencode 还没有就绪，请稍后再试。',
   [ErrorCode.OpencodeRequestFailed]: '与 opencode 通信失败。',
+  [ErrorCode.PermissionRequestExpired]: '这条权限请求已失效，已从待处理列表移除。',
   [ErrorCode.McpAttemptUnresolved]: 'AI 调用工具时没能对应到正在进行的步骤。',
   [ErrorCode.McpToolNotAllowed]: 'AI 调用了当前步骤不允许使用的工具。',
   [ErrorCode.McpResultAlreadySubmitted]: 'AI 重复提交了结果。',

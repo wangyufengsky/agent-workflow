@@ -11,6 +11,7 @@ import {
   inboxMachine,
   type ListInboxQuery,
   NON_BLOCKING_INBOX_KINDS,
+  type PermissionDecision,
   ServerEventType,
   transition,
 } from '@aw/shared';
@@ -118,6 +119,16 @@ export function createInboxService({ db, unit, clock, log }: InboxServiceDeps) {
     },
 
     resolve: (item: InboxItemDTO, response: unknown): InboxItemDTO => close(item, InboxEvent.Resolve, response),
+
+    /** 原生答复事件和 HTTP 返回都可能先到；只关闭对应的未处理请求。失效不等于批准。 */
+    completePermission(attemptId: string, permissionId: string, decision: PermissionDecision | undefined): void {
+      const item = repo
+        .list({ attemptId, kind: InboxKind.Permission }, InboxStatus.Open)
+        .find((i) => i.kind === InboxKind.Permission && i.payload.opencodePermissionId === permissionId);
+      if (item === undefined) return;
+      if (decision === undefined) close(item, InboxEvent.Dismiss);
+      else close(item, InboxEvent.Resolve, { decision });
+    },
 
     /** Resolves the open items of a scope, e.g. the plan item once the plan is confirmed through the task page. */
     resolveOpen(scope: InboxScope, response: unknown): void {

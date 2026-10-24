@@ -67,6 +67,7 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
     const attempt = attempts.get(review.attemptId);
     return {
       id: review.id,
+      attemptId: review.attemptId,
       projectId: review.projectId,
       target: review.target,
       label: review.label,

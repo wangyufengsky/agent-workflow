@@ -144,6 +144,7 @@ export function actionGroupSummary(actions: readonly StreamAction[]): string {
 
 export const STREAM_COPY = {
   processTitle: '执行过程',
+  reviewTitle: '评审过程',
   researchTitle: '研究过程',
   attemptTitle: (kind: AttemptKind, seq: number) => `${ATTEMPT_KIND_LABEL[kind]} #${seq}`,
   empty: 'AI 还没有开始。',

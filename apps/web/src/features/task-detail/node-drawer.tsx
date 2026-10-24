@@ -201,18 +201,26 @@ export function Changes({ node }: { node: NodeDetailDTO }) {
   );
 }
 
-/** The step's latest execute attempt in the simple view (14 §3.4「过程」, 25 §3). */
+/** 最近一轮执行与随后的 AI 评审共用会话流，评审中也能看到实际进展。 */
 export function Process({ node }: { node: NodeDetailDTO }) {
   const attempt = latestExecute(node);
   if (attempt === undefined) return <p className="hint">{C.noAttempt}</p>;
+  const attempts = node.attempts
+    .slice(node.attempts.indexOf(attempt))
+    .filter((a) => a.kind === AttemptKind.Execute || a.kind === AttemptKind.Review);
   return (
-    <ConversationStream
-      key={attempt.id}
-      attemptId={attempt.id}
-      title={STREAM_COPY.processTitle}
-      pro={false}
-      size="drawer"
-    />
+    <div className="col">
+      {attempts.map((a) => (
+        <ConversationStream
+          key={a.id}
+          attemptId={a.id}
+          title={a.kind === AttemptKind.Review ? STREAM_COPY.reviewTitle : STREAM_COPY.processTitle}
+          pro={false}
+          size="drawer"
+          foldOnEnd
+        />
+      ))}
+    </div>
   );
 }
 
@@ -220,7 +228,10 @@ const latestExecute = (node: NodeDetailDTO) => node.attempts.filter((a) => a.kin
 
 /** A step without output yet opens on what the AI is doing; otherwise on its output. */
 export const firstTab = (node: NodeDetailDTO): NodeTab =>
-  node.result === null && latestExecute(node) !== undefined ? NodeTab.Process : NodeTab.Output;
+  (node.result === null || node.status === NodeStatus.Verifying || node.status === NodeStatus.WaitingInput) &&
+  latestExecute(node) !== undefined
+    ? NodeTab.Process
+    : NodeTab.Output;
 
 /** The three tabs of a step in the simple view (14 §3.4), opening on `tab` when one is asked for. */
 export function NodeTabs({ node, tab }: { node: NodeDetailDTO; tab?: NodeTab | undefined }) {

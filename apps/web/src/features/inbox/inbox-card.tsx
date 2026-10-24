@@ -15,6 +15,7 @@ import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
+import { ATTEMPT_KIND_LABEL } from '../../copy/attempts.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { SCHEDULES_COPY } from '../../copy/schedules.ts';
 import { INBOX_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
@@ -201,7 +202,9 @@ function useSource(item: InboxItemDTO, showTask: boolean): string | undefined {
   if (item.kind === InboxKind.ScheduleFailure) return SCHEDULES_COPY.fromSchedule(item.title);
   if (item.taskId === null) {
     if (attempt === undefined) return undefined;
-    return attempt.kind === AttemptKind.Research ? C.fromKnowledge : C.fromPpt;
+    if (attempt.kind === AttemptKind.Research) return C.fromKnowledge;
+    if (attempt.kind === AttemptKind.DeckOutline || attempt.kind === AttemptKind.DeckSlides) return C.fromPpt;
+    return ATTEMPT_KIND_LABEL[attempt.kind];
   }
   const parts: string[] = [];
   const schedule = schedules?.find((s) => s.activeTask?.id === item.taskId);

@@ -219,6 +219,8 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/inbox/:id/resolve` | `{ response }`，`response` 为对应 kind 的回应（见 10 §inbox_items；`question` 只接受 `{ answer }`）；不符合该 kind 400 `VALIDATION_FAILED`；已关闭 409 `INBOX_ITEM_CLOSED`；回答问题时 opencode 未就绪 503 `OPENCODE_NOT_READY`（条目保持打开） |
 | POST | `/inbox/:id/dismiss` | 仅 `failure` / `delivery` / `schedule_failure` 可忽略 |
 
+权限答复以 opencode 的 `permission.replied` 事件同步：一次「总是允许」自动完成的其他请求也逐项关闭，SSE 与 HTTP 任意先后只关闭一次。原生明确返回权限不存在时关闭该残留条目并返回 409 `PERMISSION_REQUEST_EXPIRED`，不记批准规则；其他通信错误仍保留待处理条目。
+
 `resolve` 是各业务动作的统一入口：`question` → 答案发回会话；`permission` → 回复 opencode（bash 请求选 `always` 时还把 payload 的每条子命令按「命令 + 开头的选项 + ` *`」记到项目，Git 与前置变量赋值的除外，D101）；`acceptance` → 节点 accept/reject；`plan` → 等同 plan confirm/replan；`failure` → 任务 retry/cancel（修改与跳过检查命令是任务的操作 `check-command` / `skip-check`，其中的重试同样关闭条目，D116）；`delivery` 不通过 resolve，而是 `deliver` 成功后自动 resolved；`schedule_failure` 同样不通过 resolve，恢复定时任务时自动 resolved（22 §5）。
 
 ## 8. Git 工作台（专业模式，27）
@@ -248,7 +250,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/projects/:id/git/merge` | `{ source, target, strategy: merge \| squash, message }` → `{ merged: true, commit }` 或 `{ merged: false, conflictFiles }`（冲突时已中止，目标不变）；以用户身份；目标检出在主工作区时要求它干净（`WORKTREE_DIRTY`），检出在别处 `GIT_BRANCH_IN_USE`，任务分支 `GIT_BRANCH_OWNED_BY_TASK`，critical |
 | POST | `/projects/:id/git/merge-task` | `{ source, target }` → 201 任务（`system.merge_branch` 系统流程，27 §3.6），write，`produces: task` |
 | POST | `/projects/:id/git/pull-requests` | `{ branch, base, title, body }` → 201 `{ url, existed }`：该分支已有打开的 PR 时直接返回它；`HOSTING_NOT_CONFIGURED`，critical |
-| POST | `/projects/:id/git/reviews` | `{ target, focus? }` → 201 审查 `GitReviewDTO`（`target`：`{ kind: worktree }`、`{ kind: commit, sha, parent? }`、`{ kind: branch, branch }`、`{ kind: range, from, to }`）；没有改动 400，同项目已有进行中的审查 409 `GIT_REVIEW_RUNNING`，`OPENCODE_NOT_READY`；write，`produces: git_review` |
+| POST | `/projects/:id/git/reviews` | `{ target, focus? }` → 201 审查 `GitReviewDTO`（含 `attemptId`，复用尝试详情、会话流 API 与 SSE）（`target`：`{ kind: worktree }`、`{ kind: commit, sha, parent? }`、`{ kind: branch, branch }`、`{ kind: range, from, to }`）；没有改动 400，同项目已有进行中的审查 409 `GIT_REVIEW_RUNNING`，`OPENCODE_NOT_READY`；write，`produces: git_review` |
 | GET | `/projects/:id/git/reviews?to` | 审查列表，新的在前；`to` 只列该提交的 |
 | GET | `/git/reviews/:reviewId` | 一次审查；`GIT_REVIEW_NOT_FOUND` |
 | POST | `/git/reviews/:reviewId/stop` | 停止进行中的审查，write |
