@@ -49,7 +49,7 @@ opencode 1.19 的已有会话目录不能通过发送参数或 fork 改变。迁
 | `browser_read` | read | 严格空参数；只读当前对话由界面绑定的「我的预览」文字、地址、视口和错误日志；无关联或预览失效为 `BROWSER_NOT_OPEN`，不能用任务或 tab 参数猜测当前页。整体最多 30 秒，超时为 `BROWSER_READ_FAILED`，保留用户页与关联（29 §9） |
 | `open_page` | read | `{ page: AssistantPage, params }`（各页面需要的参数为 `ASSISTANT_PAGE_PARAMS`）→ SSE `assistant.navigate`，界面在面板旁跳转；`task_preview` 是任务页的预览页签（`?view=preview`，v1.3 B3，29 §2.6），用户在那里时消息带的当前页面也是它，助手启动预览后用它把用户带过去 |
 | `open_form` | read | `{ form: AssistantForm, values }` → SSE `assistant.open_form`；`values` 按该表单所提交操作的助手输入（不含凭据字段）的 partial 校验，带凭据字段 `VALIDATION_FAILED` |
-| `show_chart` / `show_flowchart` | read | 在对话里画图（35，D138）：统计图（`bar` / `line` / `pie`，类别 + 系列）或流程图（节点与连线，允许回环）；输入为 strict 对象，跨字段规则与上限见 35 §3，不合规为 `VALIDATION_FAILED`（issues 带 `path` 与改法）；通过后写消息流 `chart` 条目（10 §3）并返回 `{ shown: true }`。界面渲染待 V-04 |
+| `show_chart` / `show_flowchart` | read | 在对话里画图（35，D138）：统计图（`bar` / `line` / `pie`，类别 + 系列）或流程图（节点与连线，允许回环）；输入为 strict 对象，跨字段规则与上限见 35 §3，不合规为 `VALIDATION_FAILED`（issues 带 `path` 与改法）；通过后写消息流 `chart` 条目（10 §3）并返回 `{ shown: true }`；界面在消息流中渲染为图（§6.1） |
 | `list_files` / `reveal_file` | read | 列出 / 在 Finder 中显示 `files/<id>/` 下的文件（路径相对该目录，越界或不存在 `VALIDATION_FAILED`；显示经 SSE `assistant.reveal_file` 由 preload 完成） |
 
 第一批开放给助手的操作（v1.1）：项目、任务（含开始、取消、结果、再改改、交付）、需要你处理（列表、回答、审批）、流程与角色（读；专业模式可写）、数据库（列表、测试、结构、只读查询：新增操作 `databases.query`，与 AI 的 `db_query` 同样的只读四道关，可用于任意连接）、Git（只读）、设置。知识问答（v1.1，18 §4a）的操作已注册并 `expose.assistant`：`knowledge_ask` / `knowledge_followUp` 为 read（不需确认），工具立即返回 `researching`，回答（带引用链接）与导航卡片在研究结束后作为下一条消息送达；`knowledge_delete` 为 critical，列表、详情、引用原文为 read。PPT 模块上线时注册其操作即自动可用。各模块的覆盖盘点见 28 §4（v1.2 起批量、定时、PPT、审查意见回流都已开放；`open_page` 补了批量、定时与环境检测页）。
@@ -112,6 +112,7 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 | 用户消息 | 右对齐，`--bubble` 浅底，最大宽 86%，圆角 16px（右下 6px） |
 | 助手正文 | 无气泡、全宽 Markdown；知识问答的引用 `[[n]](link)` 显示为数字小胶囊（`aria-label`「引用 n」），点击在应用内打开原文 |
 | 动作条 | 一次工具调用一行：20px 状态图标（完成 ✓ / 失败 ! / 中断 ■ / 运行中旋转的光点）、动作（操作的中文标题，`copy/operations.ts`；助手专用工具与 opencode 原生工具的动词在 `TOOL_COPY`；用户自己的 MCP 工具为「使用外部工具」）、处理的对象（文件名、命令等，等宽弱化）。不需确认的写操作（总是允许）可展开为参数摘要；专业模式下所有动作条可展开，显示内部工具名与原始输入输出。等待确认的调用（工具返回 `needs_confirmation`，`needsConfirmationOutputSchema`）不单独成行，由确认卡片代表 |
+| 图 | 消息流的 `chart` 条目渲染为卡片：标题、图（柱状纵向 / 横向按标签长度自动选、折线、环形饼图、自上而下的流程图）、口径说明；共用 `components/charts/`，颜色只用主题令牌，每张图附读屏数据表或节点与连线列表；本轮新到达的图从 0 长出，回看时不播放。简单模式下成功的 `show_chart` / `show_flowchart` 调用不单独成行（35 §5，D138–D142） |
 | 确认卡片参数 | 「标签 · 值」两列：`refs` 声明的字段显示对象名称（任务为「编号 · 标题」），标签为对象类型；其余字段标签取 `INPUT_FIELD_LABEL`，枚举值取 `INPUT_VALUE_LABEL`，布尔为「是 / 否」，对象值为 JSON；单测保证需确认的操作每个字段都有标签 |
 | 思考 | 共用会话流的思考块（25 §4.2）：默认收起为「思考了 N 秒」与第一句预览，正在思考时露出最后几行与打字光标 |
 | 跟随 | 消息流贴底跟随，用户上翻后停止跟随，底部浮出「回到最新 · N 条新内容」（25 §4.1） |

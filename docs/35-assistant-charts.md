@@ -1,6 +1,6 @@
 # 35 · 助手画图
 
-> 状态：**设计已确认（2026-10-24，§11 六个问题都按推荐方案）**，按 §10 实施（05 的 V 系列）：V-01、V-02 已完成（契约、工具、`chart` 条目、提示词）；前端（V-03 起）等 PR #77 合并，在此之前图只记在消息流里、界面还不显示。决策 D138–D142。编号说明：团队页（33，D128–D131）在 PR #77 中尚未合并，本文从 34 与 D138 起编，避免与它冲突。
+> 状态：**设计已确认（2026-10-24，§11 六个问题都按推荐方案）**，按 §10 实施（05 的 V 系列）：V-01…V-07 已实现（2026-10-24，PR #77 合并后完成前端），待用户检查。决策 D138–D142。编号说明：团队页（33，D128–D131）在 PR #77 中尚未合并，本文从 34 与 D138 起编，避免与它冲突。
 >
 > 编号：33 与 D128–D131 是团队页（PR #77），34 与 D132–D137 是需求计划（PR #78），本文因此为 35、决策 D138–D142（原编 34 / D132–D136，2026-10-24 改号）。
 
@@ -124,19 +124,22 @@ schema 在 `shared/contracts/mcp/assistant-tools.ts`（`showChartInputSchema`、
 
 ```
 web/src/components/charts/
-├─ series.module.css      系列颜色 .s0…s7（--accent、--role-2…--role-6 等，与 PR #77 的 SERIES_TONES 一致）与「其他」sRest
-├─ ticks.ts               niceTicks（现 insights/bar-chart.tsx 的），扩展到含负数的范围（折线图）
-├─ bar-chart.tsx          现 insights/bar-chart.tsx 移入（含 PR #77 的 formatDate、tableCaption、max）；新增横向形态
-├─ line-chart.tsx         新增：SVG 折线 + HTML 刻度
+├─ charts.module.css      系列颜色 .s0…s7、sRest（--accent、--role-2…--role-6、--ok、--warn、--sub；`--tone` 供 SVG 描边）与各图样式
+├─ series.ts              SERIES_TONES、toneOf、toneClass（原在 insights/bar-chart.tsx 与 team-parts.tsx）、ChartSeries
+├─ ticks.ts               niceTicks（原在 insights/bar-chart.tsx）与 niceRange（含负数，折线图）
+├─ chart-math.ts          饼图百分比（最大余数法）、标签显示宽度、柱状图横纵选择
+├─ bar-chart.tsx          原 insights/bar-chart.tsx 移入；新增并排（stacked=false）与表头文字参数
+├─ hbar-chart.tsx         新增：横向条
+├─ line-chart.tsx         新增：SVG 折线 + HTML 刻度、点与读数
 ├─ donut-chart.tsx        新增：SVG 环形 + HTML 图例
-├─ flow-chart.tsx         新增：HTML 节点 + SVG 连线，布局见 §5.3
-├─ layered-layout.ts      分层布局核心，从 canvas/layout.ts 抽出（画布与流程图共用，26 §3.2）
-└─ charts.module.css
+├─ flow-layout.ts         新增：流程图的回边识别与自上而下分层
+├─ flow-chart.tsx         新增：SVG 形状与连线 + HTML 文字
+└─ layered-layout.ts      同层重心排序 orderLayers，从 canvas/layout.ts 抽出（画布与流程图共用，26 §3.2）
 web/src/features/assistant/chart-card.tsx   把 ChartSpec 分派到上面的组件，加标题、说明与卡片外框
-web/src/copy/charts.ts                      图表文案（读屏表格标题、「其他」「流程步骤」「回到」等）
+web/src/copy/charts.ts                      图表文案与数值格式
 ```
 
-- `insights/bar-chart.tsx` 与团队页（PR #77）改为从 `components/charts/` 导入；它们的外观与行为不变（J16 与团队页的 E2E 照常通过即证明）。
+- 质量与用量与团队页改为从 `components/charts/` 导入；它们的外观与行为不变（J16 与团队页的 E2E 照常通过即证明）。
 - 团队页新增的「分组柱」「比例条」（33 §5，`team-parts.tsx` 的 `CompareBars`、`ShareBar`）本次**不移动**：助手用不到，等第二个使用者出现再移（06 §1.3）。
 - 画布（`canvas/flow-canvas.tsx`，`@xyflow/react`）**不用于**对话里的流程图：对话里的图是静态的，不需要拖动、缩放、编辑；React Flow 的画布会截获滚轮，在消息流里滚动时被卡住。只复用它的分层布局算法。
 
@@ -228,15 +231,15 @@ web/src/copy/charts.ts                      图表文案（读屏表格标题、
 
 | # | 任务 | 完成标准 |
 | --- | --- | --- |
-| V-01 | 契约：`showChartInputSchema`、`showFlowchartInputSchema`、`ChartSpec`、上限常量、`TranscriptEntryKind.Chart` 与 `transcriptEntrySchema`；`AssistantToolName` 加两项 | 单元：每条跨字段规则一例被拒（等长、重复、pie 系列数与总和、bar 负数、未知节点、自环、重复边），合法样例通过；固定的旧条目样本可解析 |
-| V-02 | 后端：`helperTools` 加两个工具、`recordChart`；工具描述与 issue 说明；提示词 §6 | 集成（`assistant.mcp.int.test.ts`）：FakeOpencode `callAppTool('show_chart', …)` → 消息流出现 `chart` 条目、工具结果 `{ shown: true }`；非法输入 `VALIDATION_FAILED` 带 `path`、不写条目；`createTestApp` 同数据目录重启后读消息流仍有该条目；流程图同样一例 |
-| V-03 | 前端共用组件：`components/charts/` 目录，移入 `BarChart` 与系列色，抽出 `layered-layout.ts`（画布改用它），新增横向条、折线、环形、流程图 | 单元：横向 / 纵向选择规则；含负数的取整刻度；最大余数法百分比合计 100；流程图布局（回边剔除、相同输入同样结果、孤立节点）；画布原有布局单测不变。J16 与团队页 E2E 照常通过 |
-| V-04 | 前端助手：`chart-card.tsx`、`message-list` 分派、动作条显示规则、`TOOL_COPY`、`copy/charts.ts`、动画与 reduced-motion | E2E（`shell-assistant.browser.spec.ts` 新用例）：助手画饼图与流程图 → 图的可访问名称为标题、聚焦图例读数正确、读屏表格 / 列表含数据；刷新后图仍在；简单模式无「画图」动作条、专业模式有 |
-| V-05 | 走查：J9 每套主题加「助手图表」截图（§5.6） | 四主题 axe 无对比度问题、无横向溢出；截图人工检查 |
-| V-06 | live：`live/assistant.live.test.ts` 新用例：在有若干不同状态任务的数据目录里问「按状态统计我的任务，画个饼图」 | 真实模型（默认免费模型，D62）调用了任务列表类工具与 `show_chart`（`type: pie`），图中数值合计等于任务数；报告写到 `live/reports/` |
-| V-07 | 文档同步：02、05、07（J9 / J11 与 live）、08（`AssistantToolName`、`TranscriptEntryKind`）、10 §3、14（助手章节）、15 §3 与 §6.1、19（组件位置）、28 §4、本文状态 | `pnpm verify` 通过 |
+| V-01（已完成） | 契约：`showChartInputSchema`、`showFlowchartInputSchema`、`ChartSpec`、上限常量、`TranscriptEntryKind.Chart` 与 `transcriptEntrySchema`；`AssistantToolName` 加两项 | 单元：每条跨字段规则一例被拒（等长、重复、pie 系列数与总和、bar 负数、未知节点、自环、重复边），合法样例通过；固定的旧条目样本可解析 |
+| V-02（已完成） | 后端：`helperTools` 加两个工具、`recordChart`；工具描述与 issue 说明；提示词 §6 | 集成（`assistant.mcp.int.test.ts`）：FakeOpencode `callAppTool('show_chart', …)` → 消息流出现 `chart` 条目、工具结果 `{ shown: true }`；非法输入 `VALIDATION_FAILED` 带 `path`、不写条目；`createTestApp` 同数据目录重启后读消息流仍有该条目；流程图同样一例 |
+| V-03（已完成） | 前端共用组件：`components/charts/` 目录，移入 `BarChart` 与系列色，抽出 `layered-layout.ts`（画布改用它），新增横向条、折线、环形、流程图 | 单元：横向 / 纵向选择规则；含负数的取整刻度；最大余数法百分比合计 100；流程图布局（回边剔除、相同输入同样结果、孤立节点）；画布原有布局单测不变。J16 与团队页 E2E 照常通过 |
+| V-04（已完成） | 前端助手：`chart-card.tsx`、`message-list` 分派、动作条显示规则、`TOOL_COPY`、`copy/charts.ts`、动画与 reduced-motion | E2E（`shell-assistant.browser.spec.ts` 新用例）：助手画饼图与流程图 → 图的可访问名称为标题、聚焦图例读数正确、读屏表格 / 列表含数据；刷新后图仍在；简单模式无「画图」动作条、专业模式有 |
+| V-05（已完成） | 走查：J9 每套主题加「助手图表」截图（§5.6） | 四主题 axe 无对比度问题、无横向溢出；截图人工检查 |
+| V-06（已完成） | live：`live/assistant-charts.live.test.ts`：三位成员（3 / 2 / 1 个提交）的仓库里让助手统计最近 30 天每个成员的提交数并画柱状图；再把内置「修 Bug」流程画成流程图（原计划的「按状态统计任务画饼图」要先跑出多种状态的真实任务，改用团队统计，同样是先取数再画） | 真实模型调用了 `team_summary` 与 `show_chart`，柱状图里各成员的数值与提交历史一致；调用了 `show_flowchart`，至少 3 个节点、2 条连线。2026-10-24 `opencode-go/deepseek-v4.1-flash` 两例通过（30 秒）：柱状图 3 / 2 / 1 且口径写明分支与日期，流程图 7 个节点、含两处判断与回环 |
+| V-07（已完成） | 文档同步：02、05、07（J9 / J11 与 live）、08（`AssistantToolName`、`TranscriptEntryKind`）、10 §3、14（助手章节）、15 §3 与 §6.1、19（组件位置）、28 §4、本文状态 | `pnpm verify` 通过 |
 
-顺序：V-03 依赖 PR #77 合并（它改了 `insights/bar-chart.tsx` 与系列色，见 §11 问题 1）；V-01、V-02 不依赖，可先做。
+顺序：V-03 起在 PR #77 合并后进行（它改了 `insights/bar-chart.tsx` 与系列色，见 §11 问题 1）。E2E 是 07 的 J36（`shell-assistant-charts.browser.spec.ts`，原计划放在 `shell-assistant.browser.spec.ts`，单独成文件便于定位）。
 
 ## 11. 已确认的取舍
 
