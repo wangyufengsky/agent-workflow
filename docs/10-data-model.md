@@ -491,6 +491,8 @@ payload / response：
 | title / requirement | TEXT | 需求首行 / 需求原文 |
 | phases | TEXT(JSON) | 创建时的快照：`[{ title, goal, autoOpen }]` |
 | confirm_item_plans | INTEGER(bool) | 工作包任务的 `confirm_plan` |
+| allowed_workflows | TEXT(JSON) NULL | AI 拆解可用的流程 key；NULL 为全部列出的流程（迁移 `0027_initiative_runs`） |
+| summary / understanding / coverage | TEXT / TEXT(JSON) / TEXT(JSON)，都可空 | 最近一次 AI 拆解交上的说明、理解（范围、不做、假设、风险）与需求覆盖表 |
 | breakdown_rev / confirmed_rev | INTEGER | `confirmed_rev < breakdown_rev` 即草稿待确认 |
 | opened_phase | INTEGER | 已开启到第几阶段，0 为未开始 |
 | created_at / updated_at | INTEGER | 索引 `(project_id, seq)` |
@@ -512,6 +514,23 @@ payload / response：
 | merge_confirmed_at / dropped_at | INTEGER NULL | 用户确认 PR 已合入 / 放弃的时间 |
 | drop_reason | TEXT NULL | |
 | created_at / updated_at | INTEGER | |
+
+### initiative_runs
+
+一次 AI 拆解、重新拆解或细化（迁移 `0027_initiative_runs`）；状态不单独存，由尝试推导（同 `deck_runs`）。同一需求计划的各次 run 沿用同一个 opencode 会话。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| initiative_id | TEXT → initiatives，CASCADE | |
+| seq | INTEGER | 需求计划内从 1 起 |
+| attempt_id | TEXT → attempts | `AttemptKind.Breakdown`，会话流在 `runs/initiatives/` |
+| mode | TEXT | `InitiativeRunMode` |
+| instruction | TEXT NULL | 用户的意见 |
+| open_phase | INTEGER NULL | 「进入第 k 阶段」选了先细化：确认这次的草稿时开启第 k 阶段 |
+| created_at | INTEGER | 索引 `(initiative_id, seq)`、`(attempt_id)` |
+
+删除需求计划或项目时，先删需求计划（run 随之级联），再删这些尝试。
 
 ## 4c. 定时任务（v1.2）
 

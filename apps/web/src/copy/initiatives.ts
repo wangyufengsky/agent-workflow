@@ -1,6 +1,8 @@
 import { InitiativeItemStatus, InitiativeStatus } from '@aw/shared';
 
 export const INITIATIVE_STATUS_LABEL: Record<InitiativeStatus, string> = {
+  [InitiativeStatus.BreakingDown]: 'AI 拆解中',
+  [InitiativeStatus.BreakdownFailed]: '没能拆解',
   [InitiativeStatus.DraftReady]: '待确认',
   [InitiativeStatus.InProgress]: '进行中',
   [InitiativeStatus.PhaseDone]: '本阶段已完成',

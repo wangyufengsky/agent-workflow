@@ -58,6 +58,8 @@ export const AttemptKind = {
   CommitMessage: 'commit_message',
   /** Summarises one member's work and reviews a sample of their commits (33 §6); belongs to no task. */
   TeamAnalysis: 'team_analysis',
+  /** Breaks a requirement into work packages and phases, or refines the ones not started (34 §8); no task. */
+  Breakdown: 'breakdown',
 } as const;
 export type AttemptKind = (typeof AttemptKind)[keyof typeof AttemptKind];
 export const attemptKindSchema = z.enum(AttemptKind);

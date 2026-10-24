@@ -55,14 +55,20 @@ export function initiativeItemStatusOf(
   return InitiativeItemStatus.Ready;
 }
 
-/** An initiative's display state (34 §6.2) from its revisions, opened phases and which work packages are done. */
+/**
+ * An initiative's display state (34 §6.2) from its latest AI run, its revisions, opened phases and which work
+ * packages are done. `run` is null without any breakdown run.
+ */
 export function initiativeStatusOf(input: {
+  run: { active: boolean } | null;
   breakdownRev: number;
   confirmedRev: number;
   openedPhase: number;
   phaseCount: number;
   items: ReadonlyArray<{ phase: number; done: boolean }>;
 }): InitiativeStatus {
+  if (input.run?.active === true) return InitiativeStatus.BreakingDown;
+  if (input.items.length === 0) return InitiativeStatus.BreakdownFailed;
   if (input.confirmedRev < input.breakdownRev) return InitiativeStatus.DraftReady;
   if (input.items.every((item) => item.done)) return InitiativeStatus.Done;
   const openedDone = input.items.filter((item) => item.phase <= input.openedPhase).every((item) => item.done);

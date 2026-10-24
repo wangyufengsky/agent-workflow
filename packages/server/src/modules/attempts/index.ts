@@ -17,6 +17,7 @@ const KNOWLEDGE_RUN_DIR = 'knowledge';
 const PPT_RUN_DIR = 'ppt';
 const GIT_RUN_DIR = 'git';
 const TEAM_RUN_DIR = 'team';
+const INITIATIVE_RUN_DIR = 'initiatives';
 
 /** Where the transcript of an attempt that belongs to no task lives. */
 function runDirOf(kind: AttemptKind): string {
@@ -24,6 +25,7 @@ function runDirOf(kind: AttemptKind): string {
   if (kind === AttemptKind.DeckOutline || kind === AttemptKind.DeckSlides) return PPT_RUN_DIR;
   if (kind === AttemptKind.GitReview || kind === AttemptKind.CommitMessage) return GIT_RUN_DIR;
   if (kind === AttemptKind.TeamAnalysis) return TEAM_RUN_DIR;
+  if (kind === AttemptKind.Breakdown) return INITIATIVE_RUN_DIR;
   return DEBUG_RUN_DIR;
 }
 

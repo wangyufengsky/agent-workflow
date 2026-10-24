@@ -6,6 +6,10 @@ import { findCycles } from '../workflow/validate-plan-graph.ts';
 export type InitiativeDraftRules = {
   /** Whether a workflow key names a workflow a work package may run (not a system one). */
   workflowExists: (key: string) => boolean;
+  /** The initiative's allowed workflows (AI breakdown); undefined: any existing one. */
+  allowedWorkflows?: readonly string[];
+  /** The AI's coverage table, whose work package keys must exist (34 §8.3). */
+  coverage?: ReadonlyArray<{ point: string; items: readonly string[] }>;
   /** A composition template: some work package must take the user's requirement (34 §15.2). */
   template?: boolean;
 };
@@ -43,6 +47,13 @@ export function validateInitiativeDraft(draft: InitiativeDraft, rules: Initiativ
         message: `Workflow ${item.workflow} does not exist`,
         details: { workflow: item.workflow },
       });
+    } else if (rules.allowedWorkflows !== undefined && !rules.allowedWorkflows.includes(item.workflow)) {
+      problems.push({
+        code: InitiativeProblemCode.WorkflowNotAllowed,
+        itemKey: item.key,
+        message: `Workflow ${item.workflow} is not allowed; use one of ${rules.allowedWorkflows.join(', ')}`,
+        details: { workflow: item.workflow, allowed: [...rules.allowedWorkflows] },
+      });
     }
     for (const key of item.dependsOn) {
       const dependency = byKey.get(key);
@@ -75,6 +86,18 @@ export function validateInitiativeDraft(draft: InitiativeDraft, rules: Initiativ
       message: `Dependency cycle ${cycle.join(' -> ')}`,
       details: { cycle },
     });
+  }
+
+  for (const line of rules.coverage ?? []) {
+    for (const key of line.items) {
+      if (!byKey.has(key)) {
+        problems.push({
+          code: InitiativeProblemCode.UnknownCoverageItem,
+          itemKey: key,
+          message: `The coverage of "${line.point}" names ${key}, which does not exist`,
+        });
+      }
+    }
   }
 
   if (

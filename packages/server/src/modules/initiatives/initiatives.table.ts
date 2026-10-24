@@ -1,5 +1,6 @@
-import type { InitiativeTemplateKind } from '@aw/shared';
+import type { InitiativeRunMode, InitiativeTemplateKind } from '@aw/shared';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { attemptsTable } from '../attempts/attempts.table.ts';
 import { projectsTable } from '../projects/projects.table.ts';
 import { tasksTable } from '../tasks/tasks.table.ts';
 
@@ -41,6 +42,12 @@ export const initiativesTable = sqliteTable(
     /** JSON `InitiativePhase[]`. */
     phases: text('phases').notNull(),
     confirmItemPlans: integer('confirm_item_plans', { mode: 'boolean' }).notNull(),
+    /** JSON workflow keys the AI may use; null: every listed workflow. */
+    allowedWorkflows: text('allowed_workflows'),
+    /** From the latest AI breakdown (34 §8.2): the summary, JSON `InitiativeUnderstanding`, JSON coverage table. */
+    summary: text('summary'),
+    understanding: text('understanding'),
+    coverage: text('coverage'),
     breakdownRev: integer('breakdown_rev').notNull(),
     confirmedRev: integer('confirmed_rev').notNull(),
     openedPhase: integer('opened_phase').notNull(),
@@ -82,5 +89,29 @@ export const initiativeItemsTable = sqliteTable(
   (t) => [
     uniqueIndex('initiative_items_key_unique').on(t.initiativeId, t.key),
     index('initiative_items_task_idx').on(t.taskId),
+  ],
+);
+
+/** 10 §initiative_runs (34 §9): one AI breakdown or refinement; its state is its attempt's (as `deck_runs`). */
+export const initiativeRunsTable = sqliteTable(
+  'initiative_runs',
+  {
+    id: text('id').primaryKey(),
+    initiativeId: text('initiative_id')
+      .notNull()
+      .references(() => initiativesTable.id, { onDelete: 'cascade' }),
+    seq: integer('seq').notNull(),
+    attemptId: text('attempt_id')
+      .notNull()
+      .references(() => attemptsTable.id),
+    mode: text('mode').$type<InitiativeRunMode>().notNull(),
+    instruction: text('instruction'),
+    /** The phase confirming this run's draft opens (「进入第 k 阶段」with refinement first, 34 §5.5). */
+    openPhase: integer('open_phase'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [
+    index('initiative_runs_seq_idx').on(t.initiativeId, t.seq),
+    index('initiative_runs_attempt_idx').on(t.attemptId),
   ],
 );

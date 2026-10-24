@@ -20,6 +20,7 @@ export const McpToolName = {
   SubmitFindings: 'submit_findings',
   SubmitCommitMessage: 'submit_commit_message',
   SubmitMemberAnalysis: 'submit_member_analysis',
+  SubmitBreakdown: 'submit_breakdown',
   BrowserOpen: 'browser_open',
   BrowserSnapshot: 'browser_snapshot',
   BrowserClick: 'browser_click',
@@ -46,4 +47,5 @@ export const ATTEMPT_SUBMIT_TOOL = {
   [AttemptKind.GitReview]: McpToolName.SubmitFindings,
   [AttemptKind.CommitMessage]: McpToolName.SubmitCommitMessage,
   [AttemptKind.TeamAnalysis]: McpToolName.SubmitMemberAnalysis,
+  [AttemptKind.Breakdown]: McpToolName.SubmitBreakdown,
 } as const satisfies Record<AttemptKind, McpToolName>;

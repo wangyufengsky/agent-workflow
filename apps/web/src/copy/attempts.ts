@@ -19,6 +19,7 @@ export const ATTEMPT_KIND_LABEL: Record<AttemptKind, string> = {
   [AttemptKind.DeckSlides]: 'PPT 页面',
   [AttemptKind.GitReview]: 'Git 审查',
   [AttemptKind.TeamAnalysis]: '成员分析',
+  [AttemptKind.Breakdown]: '需求拆解',
   [AttemptKind.CommitMessage]: '草拟提交信息',
 };
 
@@ -72,6 +73,7 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.SubmitSlide]: '提交一页',
   [McpToolName.SubmitFindings]: '提交审查问题',
   [McpToolName.SubmitMemberAnalysis]: '提交成员分析',
+  [McpToolName.SubmitBreakdown]: '提交需求拆解',
   [McpToolName.SubmitCommitMessage]: '提交草拟的提交信息',
   [McpToolName.BrowserOpen]: '打开页面',
   [McpToolName.BrowserSnapshot]: '读取页面',

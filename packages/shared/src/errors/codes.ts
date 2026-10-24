@@ -140,6 +140,8 @@ export const ErrorCode = {
   /** The work package is not in a state that allows this; `details.status`. */
   InitiativeItemNotReady: 'INITIATIVE_ITEM_NOT_READY',
   InitiativeTemplateNotFound: 'INITIATIVE_TEMPLATE_NOT_FOUND',
+  /** A breakdown or refinement of the initiative is under way. */
+  InitiativeBusy: 'INITIATIVE_BUSY',
   // 团队（33）
   TeamAnalysisNotFound: 'TEAM_ANALYSIS_NOT_FOUND',
   TeamAnalysisExists: 'TEAM_ANALYSIS_EXISTS',
@@ -265,6 +267,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.InitiativePhaseNotReady]: 409,
   [ErrorCode.InitiativeItemNotReady]: 409,
   [ErrorCode.InitiativeTemplateNotFound]: 404,
+  [ErrorCode.InitiativeBusy]: 409,
   [ErrorCode.TeamAnalysisNotFound]: 404,
   [ErrorCode.TeamAnalysisExists]: 409,
   [ErrorCode.TeamAnalysisInvalid]: null,

@@ -13,6 +13,8 @@ import {
   initiativeTemplateSchema,
   listInitiativesQuerySchema,
   openInitiativePhaseRequestSchema,
+  rebreakdownInitiativeRequestSchema,
+  refineInitiativeRequestSchema,
   saveInitiativeDraftRequestSchema,
   startInitiativeItemRequestSchema,
 } from '../contracts/api/initiatives.ts';
@@ -52,7 +54,7 @@ export const createInitiativeOp = defineOperationContract({
   id: 'initiatives.create',
   title: 'op.initiatives.create',
   description:
-    "Start an initiative from a composition template: each work package becomes an ordinary task in its phase, using the template's workflows; {{requirement}} is replaced by the requirement",
+    'Start an initiative: with templateKey, from a composition template (each work package an ordinary task in its phase; {{requirement}} replaced by the requirement); without it, the AI breaks the requirement into phases and work packages for the user to confirm',
   input: createInitiativeRequestSchema,
   output: initiativeDetailSchema,
   refs: { projectId: InputRef.Project, attachmentIds: InputRef.Attachment },
@@ -109,11 +111,36 @@ export const openInitiativePhaseOp = defineOperationContract({
   id: 'initiatives.openPhase',
   title: 'op.initiatives.openPhase',
   description:
-    'Open the next phase once every earlier work package is merged, finished or dropped; its work packages start',
+    'Open the next phase once every earlier work package is merged, finished or dropped; its work packages start. With refine, the AI first rewrites the work packages not started on the merged code, and confirming that draft opens the phase',
   input: openInitiativePhaseRequestSchema,
   output: initiativeDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/initiatives/:id/phases/:phase/open' },
+});
+
+export const rebreakdownInitiativeOp = defineOperationContract({
+  ...common,
+  ...byId,
+  id: 'initiatives.rebreakdown',
+  title: 'op.initiatives.rebreakdown',
+  description: 'Have the AI break the requirement down again, with feedback on the draft, before it is confirmed',
+  input: rebreakdownInitiativeRequestSchema,
+  output: initiativeDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/initiatives/:id/rebreakdown' },
+});
+
+export const refineInitiativeOp = defineOperationContract({
+  ...common,
+  ...byId,
+  id: 'initiatives.refine',
+  title: 'op.initiatives.refine',
+  description:
+    'Have the AI rewrite the work packages that have not started on the code merged so far; the user confirms the new draft',
+  input: refineInitiativeRequestSchema,
+  output: initiativeDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/initiatives/:id/refine' },
 });
 
 export const startInitiativeItemOp = defineOperationContract({

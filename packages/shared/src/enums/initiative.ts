@@ -2,6 +2,10 @@ import { z } from 'zod';
 
 /** An initiative's display state (34 §6.2), derived from its facts and its items' tasks; never stored. */
 export const InitiativeStatus = {
+  /** The AI breaks the requirement down, or refines the work packages not started (34 §8). */
+  BreakingDown: 'breaking_down',
+  /** The first breakdown ended without phases and work packages. */
+  BreakdownFailed: 'breakdown_failed',
   /** The phases and items wait for the user's confirmation (「先让我看看」, 34 §15.4). */
   DraftReady: 'draft_ready',
   /** Confirmed; some item of an opened phase is not satisfied yet. */
@@ -33,6 +37,18 @@ export const InitiativeItemStatus = {
 } as const;
 export type InitiativeItemStatus = (typeof InitiativeItemStatus)[keyof typeof InitiativeItemStatus];
 export const initiativeItemStatusSchema = z.enum(InitiativeItemStatus);
+
+/** What an AI breakdown run of an initiative does (34 §8, §9 `initiative_runs`). */
+export const InitiativeRunMode = {
+  /** The first breakdown, from the requirement. */
+  Breakdown: 'breakdown',
+  /** A new breakdown of the draft with the user's feedback. */
+  Rebreakdown: 'rebreakdown',
+  /** Rewrites the work packages that have not started on the merged code (D136). */
+  Refine: 'refine',
+} as const;
+export type InitiativeRunMode = (typeof InitiativeRunMode)[keyof typeof InitiativeRunMode];
+export const initiativeRunModeSchema = z.enum(InitiativeRunMode);
 
 /** Built-in composition templates are synced with the app and read-only (34 §15.3). */
 export const InitiativeTemplateKind = {

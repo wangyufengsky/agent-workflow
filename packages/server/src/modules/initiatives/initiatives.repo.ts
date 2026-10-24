@@ -1,17 +1,70 @@
-import type { ErrorInfo, InitiativeItemSpec, InitiativePhase, InitiativeTemplateKind } from '@aw/shared';
-import { and, asc, desc, eq, isNull, lt, type SQL, sql } from 'drizzle-orm';
+import {
+  type ErrorInfo,
+  errorInfoSchema,
+  type InitiativeCoverage,
+  type InitiativeItemSpec,
+  type InitiativePhase,
+  type InitiativeTemplateKind,
+  type InitiativeUnderstanding,
+  initiativeCoverageSchema,
+  initiativeItemSpecSchema,
+  initiativePhaseSchema,
+  initiativeUnderstandingSchema,
+  requirementItemInputSchema,
+} from '@aw/shared';
+import { and, asc, desc, eq, inArray, isNull, lt, type SQL, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { projectsTable } from '../projects/index.ts';
-import { initiativeItemsTable, initiativesTable, initiativeTemplatesTable } from './initiatives.table.ts';
+import {
+  initiativeItemsTable,
+  initiativeRunsTable,
+  initiativesTable,
+  initiativeTemplatesTable,
+} from './initiatives.table.ts';
 
 type InitiativeRow = typeof initiativesTable.$inferSelect;
 type ItemRow = typeof initiativeItemsTable.$inferSelect;
 
-export type Initiative = Omit<InitiativeRow, 'phases'> & {
+/** The JSON columns of an initiative, parsed. */
+type InitiativeJson = {
   phases: InitiativePhase[];
-  projectName: string;
-  template: { key: string; name: string } | null;
+  allowedWorkflows: string[] | null;
+  understanding: InitiativeUnderstanding | null;
+  coverage: InitiativeCoverage[] | null;
 };
+
+export type Initiative = Omit<InitiativeRow, keyof InitiativeJson> &
+  InitiativeJson & {
+    projectName: string;
+    template: { key: string; name: string } | null;
+  };
+
+export type InitiativeRun = typeof initiativeRunsTable.$inferSelect;
+
+// JSON columns are parsed at the boundary (06 §9).
+const json = <T>(schema: z.ZodType<T>, value: string): T => schema.parse(JSON.parse(value));
+const nullableJson = <T>(schema: z.ZodType<T>, value: string | null): T | null =>
+  value === null ? null : json(schema, value);
+const phasesSchema = z.array(initiativePhaseSchema);
+const keysSchema = z.array(z.string());
+const acceptanceSchema = z.array(requirementItemInputSchema);
+
+/** The JSON columns of an initiative, serialized. */
+function columnsOf(fields: { [K in keyof InitiativeJson]?: InitiativeJson[K] | undefined }) {
+  return {
+    ...(fields.phases === undefined ? {} : { phases: JSON.stringify(fields.phases) }),
+    ...(fields.allowedWorkflows === undefined
+      ? {}
+      : { allowedWorkflows: fields.allowedWorkflows === null ? null : JSON.stringify(fields.allowedWorkflows) }),
+    ...(fields.understanding === undefined
+      ? {}
+      : { understanding: fields.understanding === null ? null : JSON.stringify(fields.understanding) }),
+    ...(fields.coverage === undefined
+      ? {}
+      : { coverage: fields.coverage === null ? null : JSON.stringify(fields.coverage) }),
+  };
+}
 
 export type InitiativeItem = Omit<ItemRow, 'dependsOn' | 'acceptance' | 'startError'> & {
   dependsOn: string[];
@@ -31,9 +84,9 @@ export type InitiativeTemplate = {
 
 const toItem = (row: ItemRow): InitiativeItem => ({
   ...row,
-  dependsOn: JSON.parse(row.dependsOn),
-  acceptance: JSON.parse(row.acceptance),
-  startError: row.startError === null ? null : JSON.parse(row.startError),
+  dependsOn: json(keysSchema, row.dependsOn),
+  acceptance: json(acceptanceSchema, row.acceptance),
+  startError: nullableJson(errorInfoSchema, row.startError),
 });
 
 /** A work package's columns from its spec. */
@@ -65,7 +118,10 @@ export function createInitiativesRepo(db: DbExecutor) {
     templateName: string | null;
   }): Initiative => ({
     ...row.initiative,
-    phases: JSON.parse(row.initiative.phases),
+    phases: json(phasesSchema, row.initiative.phases),
+    allowedWorkflows: nullableJson(keysSchema, row.initiative.allowedWorkflows),
+    understanding: nullableJson(initiativeUnderstandingSchema, row.initiative.understanding),
+    coverage: nullableJson(z.array(initiativeCoverageSchema), row.initiative.coverage),
     projectName: row.projectName,
     template:
       row.templateKey === null || row.templateName === null ? null : { key: row.templateKey, name: row.templateName },
@@ -73,14 +129,21 @@ export function createInitiativesRepo(db: DbExecutor) {
 
   return {
     /** Numbers the initiative and inserts it; returns its seq. */
-    insert(row: Omit<InitiativeRow, 'seq' | 'phases'> & { phases: InitiativePhase[] }): number {
+    insert(row: Omit<InitiativeRow, 'seq' | keyof InitiativeJson> & InitiativeJson): number {
       const max = db
         .select({ max: sql<number | null>`max(${i.seq})` })
         .from(i)
         .get();
       const seq = (max?.max ?? 0) + 1;
       db.insert(i)
-        .values({ ...row, seq, phases: JSON.stringify(row.phases) })
+        .values({
+          ...row,
+          seq,
+          phases: JSON.stringify(row.phases),
+          allowedWorkflows: row.allowedWorkflows === null ? null : JSON.stringify(row.allowedWorkflows),
+          understanding: row.understanding === null ? null : JSON.stringify(row.understanding),
+          coverage: row.coverage === null ? null : JSON.stringify(row.coverage),
+        })
         .run();
       return seq;
     },
@@ -120,11 +183,12 @@ export function createInitiativesRepo(db: DbExecutor) {
     },
     update(
       id: string,
-      fields: Partial<Pick<InitiativeRow, 'confirmedRev' | 'updatedAt'>> & { phases?: InitiativePhase[] },
+      fields: Partial<Pick<InitiativeRow, 'confirmedRev' | 'breakdownRev' | 'title' | 'summary' | 'updatedAt'>> &
+        Partial<Pick<InitiativeJson, 'phases' | 'understanding' | 'coverage'>>,
     ) {
-      const { phases, ...rest } = fields;
+      const { phases, understanding, coverage, ...rest } = fields;
       db.update(i)
-        .set({ ...rest, ...(phases === undefined ? {} : { phases: JSON.stringify(phases) }) })
+        .set({ ...rest, ...columnsOf({ phases, understanding, coverage }) })
         .where(eq(i.id, id))
         .run();
     },
@@ -175,9 +239,10 @@ export function createInitiativesRepo(db: DbExecutor) {
     },
     /**
      * Gives the work package its new task unless something changed while the start was preparing: another start
-     * linked a task first (the current task must still be the one this start read), or the user dropped it (34 §14).
+     * linked a task first (the current task must still be the one this start read), the user dropped it (34 §14), or
+     * a breakdown rewrote the draft (`breakdownRev` is no longer the one this start read, 34 §8.4).
      */
-    claimItem(id: string, expectedTaskId: string | null, taskId: string, now: number): boolean {
+    claimItem(id: string, expectedTaskId: string | null, breakdownRev: number, taskId: string, now: number): boolean {
       return (
         db
           .update(it)
@@ -187,6 +252,7 @@ export function createInitiativesRepo(db: DbExecutor) {
               eq(it.id, id),
               isNull(it.droppedAt),
               expectedTaskId === null ? isNull(it.taskId) : eq(it.taskId, expectedTaskId),
+              sql`exists (select 1 from ${i} where ${i.id} = ${it.initiativeId} and ${i.breakdownRev} = ${breakdownRev})`,
             ),
           )
           .run().changes === 1
@@ -194,6 +260,31 @@ export function createInitiativesRepo(db: DbExecutor) {
     },
     deleteItem(id: string): void {
       db.delete(it).where(eq(it.id, id)).run();
+    },
+
+    runs(initiativeId: string): InitiativeRun[] {
+      return db
+        .select()
+        .from(initiativeRunsTable)
+        .where(eq(initiativeRunsTable.initiativeId, initiativeId))
+        .orderBy(asc(initiativeRunsTable.seq))
+        .all();
+    },
+    runOfAttempt(attemptId: string): InitiativeRun | undefined {
+      return db.select().from(initiativeRunsTable).where(eq(initiativeRunsTable.attemptId, attemptId)).get();
+    },
+    insertRun(run: InitiativeRun): void {
+      db.insert(initiativeRunsTable).values(run).run();
+    },
+    /** The attempts of every run of these initiatives, to delete with them. */
+    runAttemptIds(initiativeIds: readonly string[]): string[] {
+      if (initiativeIds.length === 0) return [];
+      return db
+        .select({ attemptId: initiativeRunsTable.attemptId })
+        .from(initiativeRunsTable)
+        .where(inArray(initiativeRunsTable.initiativeId, [...initiativeIds]))
+        .all()
+        .map((r) => r.attemptId);
     },
 
     templates(): InitiativeTemplate[] {
@@ -204,8 +295,8 @@ export function createInitiativesRepo(db: DbExecutor) {
         .all()
         .map(({ position: _position, createdAt: _c, updatedAt: _u, ...row }) => ({
           ...row,
-          phases: JSON.parse(row.phases),
-          items: JSON.parse(row.items),
+          phases: json(phasesSchema, row.phases),
+          items: json(z.array(initiativeItemSpecSchema), row.items),
         }));
     },
     upsertTemplate(template: InitiativeTemplate, position: number, now: number): void {

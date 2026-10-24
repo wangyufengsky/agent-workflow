@@ -71,6 +71,8 @@ export const TOOLS_COPY = {
     [McpToolName.SubmitCommitMessage]: 'Git 工作台：提交草拟的提交信息（标题与正文），填进提交框由你修改。',
     [McpToolName.SubmitMemberAnalysis]:
       '团队：提交一位成员的工作总结、亮点与值得关注之处（都要引用提交）和抽样评审的问题；不打分。引用的提交不在时间段内或文件、行号不对时返回问题，AI 修正后再提交。',
+    [McpToolName.SubmitBreakdown]:
+      '需求计划：提交 AI 拆解出的阶段、工作包与需求覆盖表。依赖成环、流程不在允许范围、改动了已开始的工作包等返回问题，AI 修正后再提交。',
     [McpToolName.BrowserOpen]: '浏览器：打开任务的页面预览（需要时先启动它），或按「网站」设置打开网站；返回页面结构。',
     [McpToolName.BrowserSnapshot]: '浏览器：读取当前页面的结构，可操作的元素带编号。',
     [McpToolName.BrowserClick]: '浏览器：点击页面上的元素；被遮住、不可见或禁用时返回原因。',

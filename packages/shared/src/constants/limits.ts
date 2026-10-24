@@ -45,6 +45,10 @@ export const INITIATIVE_ITEM_REQUIREMENT_MAX_CHARS = REQUIREMENT_MAX_CHARS;
 export const INITIATIVE_PHASE_TITLE_MAX_CHARS = 40;
 export const INITIATIVE_PHASE_GOAL_MAX_CHARS = 500;
 export const INITIATIVE_REASON_MAX_CHARS = 2000;
+/** The user's feedback for a new breakdown or a refinement (34 §5.2, §5.5). */
+export const INITIATIVE_INSTRUCTION_MAX_CHARS = 2000;
+/** The AI's breakdown summary and its understanding's scope (34 §8.2). */
+export const INITIATIVE_SUMMARY_MAX_CHARS = 2000;
 /** Targets of one batch (20 §2, D85). */
 export const BATCH_TARGETS_MAX = 20;
 export const BATCH_TARGET_MAX_CHARS = 500;

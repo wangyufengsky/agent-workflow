@@ -190,12 +190,14 @@ describe('浏览器工具', () => {
     });
   });
 
-  it('规划只能打开网站；不允许浏览器的尝试类型 MCP_TOOL_NOT_ALLOWED；工具页列出允许的类型', async () => {
-    const plan = await sessionOf(AttemptKind.Plan);
-    expect((await plan(McpToolName.BrowserOpen, { url: '/orders' })).body).toMatchObject({
-      code: ErrorCode.McpToolNotAllowed,
-    });
-    expect((await plan(McpToolName.BrowserOpen, { url: `${origin}/` })).isError).toBe(false);
+  it('规划与拆解只能打开网站；不允许浏览器的尝试类型 MCP_TOOL_NOT_ALLOWED；工具页列出允许的类型', async () => {
+    for (const kind of [AttemptKind.Plan, AttemptKind.Breakdown]) {
+      const call = await sessionOf(kind);
+      expect((await call(McpToolName.BrowserOpen, { url: '/orders' })).body).toMatchObject({
+        code: ErrorCode.McpToolNotAllowed,
+      });
+      expect((await call(McpToolName.BrowserOpen, { url: `${origin}/` })).isError).toBe(false);
+    }
 
     const commit = await sessionOf(AttemptKind.CommitMessage);
     expect((await commit(McpToolName.BrowserOpen, { url: `${origin}/` })).body).toMatchObject({
@@ -207,6 +209,7 @@ describe('浏览器工具', () => {
       'execute',
       'review',
       'research',
+      'breakdown',
     ]);
   });
 
