@@ -973,6 +973,8 @@
 /* A native popover menu anchored to its button (Chromium anchor positioning). */
 .popover {
   position: fixed;
+  /* The popovertarget invoker is the implicit anchor only with `auto` (the initial value is `normal`). */
+  position-anchor: auto;
   inset: auto;
   margin: 4px 0 0;
   top: anchor(bottom);

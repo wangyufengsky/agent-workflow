@@ -185,8 +185,10 @@ export const MIN_WINDOW = { width: 1024, height: 700 };
  * Where an element is drawn. Layout checks measure the room a field or a button actually gets: a squeezed column or a
  * button pushed out of its card overflows nothing the page-wide overflow scan looks at.
  */
-export async function box(locator: Locator): Promise<{ left: number; right: number; width: number }> {
+export async function box(
+  locator: Locator,
+): Promise<{ left: number; right: number; top: number; bottom: number; width: number }> {
   const rect = await locator.boundingBox();
   if (rect === null) throw new Error('The element is not drawn');
-  return { left: rect.x, right: rect.x + rect.width, width: rect.width };
+  return { left: rect.x, right: rect.x + rect.width, top: rect.y, bottom: rect.y + rect.height, width: rect.width };
 }
