@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isHorizontalBar, markedPoints, sharePercents } from './chart-math.ts';
+import { isHorizontalBar, markedPoints, ringArcs, sharePercents } from './chart-math.ts';
 import { layoutFlow } from './flow-layout.ts';
 import { niceRange, niceTicks } from './ticks.ts';
 
@@ -20,6 +20,17 @@ describe('饼图百分比', () => {
     expect(sharePercents([1, 1, 1])).toEqual([34, 33, 33]);
     expect(sharePercents([7, 2, 1])).toEqual([70, 20, 10]);
     expect(sharePercents([2, 1, 1, 1, 1, 1]).reduce((a, b) => a + b, 0)).toBe(100);
+  });
+});
+
+describe('环形饼图的弧', () => {
+  it('切片之间留缝，但很小的正值仍有弧长；零值没有弧；只有一片时是整圈', () => {
+    const arcs = ringArcs([99, 1, 0]);
+    expect(arcs.map((a) => a.offset)).toEqual([-0, -99, -100]);
+    expect(arcs[0]?.length).toBeCloseTo(97.8);
+    expect(arcs[1]?.length).toBeCloseTo(0.5);
+    expect(arcs[2]?.length).toBe(0);
+    expect(ringArcs([0, 5]).map((a) => a.length)).toEqual([0, 100]);
   });
 });
 

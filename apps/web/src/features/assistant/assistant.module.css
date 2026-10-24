@@ -419,6 +419,79 @@
   font-size: var(--fs-xs);
   color: var(--muted);
 }
+/* The foot's round icon buttons:「+」and usage (36 §2). */
+.footIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  transition:
+    background var(--t-fast),
+    color var(--t-fast);
+}
+.footIcon:hover,
+.footIcon:has(+ :popover-open) {
+  background: var(--fill-3);
+  color: var(--ink-2);
+}
+/* Both open upwards from their button (the implicit anchor of popovertarget), flipping down when there is no room. */
+.addMenu,
+.usagePop {
+  position: fixed;
+  /* The popovertarget invoker is the implicit anchor only with `auto` (the initial value is `normal`). */
+  position-anchor: auto;
+  inset: auto;
+  bottom: anchor(top);
+  left: anchor(left);
+  position-try-fallbacks: flip-block, flip-inline;
+  margin: 0 0 6px;
+  padding: var(--s-1);
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--raised);
+  color: var(--ink-2);
+  box-shadow: var(--shadow-pop);
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+  transition:
+    opacity var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease),
+    overlay var(--t-fast) allow-discrete,
+    display var(--t-fast) allow-discrete;
+}
+.addMenu {
+  min-width: 200px;
+}
+.usagePop {
+  /* Its button is at the right of the foot: grow leftwards from the button's right edge. */
+  left: auto;
+  right: anchor(right);
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+.usagePop:popover-open {
+  display: flex;
+}
+.addMenu:popover-open,
+.usagePop:popover-open {
+  opacity: 1;
+  transform: none;
+}
+@starting-style {
+  .addMenu:popover-open,
+  .usagePop:popover-open {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
 .send {
   flex: none;
   display: grid;
@@ -462,7 +535,9 @@
   .streaming > * > :last-child::after {
     animation: none;
   }
-  .menu {
+  .menu,
+  .addMenu,
+  .usagePop {
     transform: none;
   }
 }

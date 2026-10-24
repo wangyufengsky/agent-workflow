@@ -4,6 +4,9 @@ import { ATTACHMENTS_PER_INPUT_MAX } from '@aw/shared';
 export const ATTACHMENTS_COPY = {
   add: '添加资料',
   addProjectFile: '项目文件',
+  /** The same two in the input's「+」menu (36 §4). */
+  menuUpload: '上传文件…',
+  menuProjectFile: '项目文件…',
   listLabel: '附加的资料',
   remove: (name: string) => `移除 ${name}`,
   open: (name: string) => `查看 ${name}`,

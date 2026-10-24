@@ -76,7 +76,7 @@ export function BarChart({
             ))}
           </span>
         ) : (
-          readout(active)
+          <span className={styles.value}>{readout(active)}</span>
         )}
       </figcaption>
       <div className={styles.plot}>

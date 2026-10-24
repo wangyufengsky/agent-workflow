@@ -42,8 +42,10 @@ export const ASSISTANT_COPY = {
   toolStopped: '已中断',
   toolName: '工具',
   attachment: '助手生成的文件',
+  /** The input's「+」menu (36 §4). */
+  addMenu: '添加资料与上下文',
   context: {
-    addSelection: '附上选中文字',
+    addSelection: '附上选中文字…',
     addTask: '附上任务详情',
     addNode: '附上步骤详情',
     title: '附上文字',

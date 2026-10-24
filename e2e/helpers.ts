@@ -164,13 +164,28 @@ export const appTool = (name: string, args: Record<string, unknown>): FakeStep =
   args,
 });
 
+/** Opens an input's「+」menu (36 §4) and picks `item`; `scope` is the page or the panel holding the input. */
+export async function addFromMenu(scope: Page | Locator, item: string): Promise<void> {
+  await scope.getByRole('button', { name: '添加资料与上下文', exact: true }).click();
+  await scope.getByRole('menuitem', { name: item, exact: true }).click();
+}
+
+/** Unfolds「直接开始」in the home input and picks a workflow, which puts the input in「开始任务」mode (36 §5). */
+export async function pickWorkflow(page: Page, workflow: string | RegExp): Promise<void> {
+  await page.getByRole('button', { name: '直接开始', exact: true }).click();
+  await page
+    .getByRole('group', { name: '选择流程开始任务' })
+    .getByRole('button', typeof workflow === 'string' ? { name: workflow, exact: true } : { name: workflow })
+    .click();
+}
+
 /**
  * Home page of the project (the select writes the same `?projectId=`), then a workflow under「直接开始」, which puts
  * the input in「开始任务」mode (D111), the requirement and start.
  */
 export async function startTask(page: Page, project: E2EProject, workflow: RegExp, requirement: string): Promise<void> {
   await page.goto(`/?projectId=${project.id}`);
-  await page.getByRole('group', { name: '直接开始' }).getByRole('button', { name: workflow }).click();
+  await pickWorkflow(page, workflow);
   await expect(page.getByLabel('项目', { exact: true })).toHaveValue(project.id);
   await page.getByLabel('需求').fill(requirement);
   await page.getByRole('button', { name: /^开始/ }).click();
@@ -185,8 +200,10 @@ export const MIN_WINDOW = { width: 1024, height: 700 };
  * Where an element is drawn. Layout checks measure the room a field or a button actually gets: a squeezed column or a
  * button pushed out of its card overflows nothing the page-wide overflow scan looks at.
  */
-export async function box(locator: Locator): Promise<{ left: number; right: number; width: number }> {
+export async function box(
+  locator: Locator,
+): Promise<{ left: number; right: number; top: number; bottom: number; width: number }> {
   const rect = await locator.boundingBox();
   if (rect === null) throw new Error('The element is not drawn');
-  return { left: rect.x, right: rect.x + rect.width, width: rect.width };
+  return { left: rect.x, right: rect.x + rect.width, top: rect.y, bottom: rect.y + rect.height, width: rect.width };
 }

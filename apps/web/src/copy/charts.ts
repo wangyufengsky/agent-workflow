@@ -1,4 +1,4 @@
-import { FlowNodeShape } from '@aw/shared';
+import { ChartType, FlowNodeShape } from '@aw/shared';
 
 const NUMBER = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const AXIS = new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 });
@@ -11,6 +11,12 @@ export const formatChartAxis = (n: number) => AXIS.format(n);
 
 /** The charts the assistant draws (35 §5). */
 export const CHART_COPY = {
+  kind: {
+    [ChartType.Bar]: '柱状图',
+    [ChartType.Line]: '折线图',
+    [ChartType.Pie]: '饼图',
+    [ChartType.Flow]: '流程图',
+  } satisfies Record<ChartType, string>,
   category: '类别',
   table: '图表数据',
   share: '占比',

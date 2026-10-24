@@ -1,23 +1,25 @@
 import { type AssistantConversationDTO, type ProjectDTO, WorkflowKind, WorkflowPlanning } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { MOD_KEY } from '../../app/platform.ts';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { ASSISTANT_COPY } from '../../copy/assistant.ts';
+import { ATTACHMENTS_COPY } from '../../copy/attachments.ts';
 import { BATCHES_COPY } from '../../copy/batches.ts';
 import { HOME_COPY as C } from '../../copy/home.ts';
 import { SCHEDULES_COPY } from '../../copy/schedules.ts';
 import { HOME_TASK_COPY } from '../../copy/tasks.ts';
 import { useUiStore } from '../../state/ui.store.ts';
+import { AddMenu, type AddMenuItem } from '../assistant/add-menu.tsx';
 import { useAbortAssistant } from '../assistant/assistant.queries.ts';
-import { ContextAttachments } from '../assistant/context-attachments.tsx';
-import { UsageLine } from '../assistant/usage-line.tsx';
+import { useContextAttachments } from '../assistant/context-attachments.tsx';
+import { UsageButton } from '../assistant/usage-line.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
-import { AttachmentBar, dropFilesInto, pasteFilesInto } from '../attachments/attachment-bar.tsx';
+import { AttachmentList, dropFilesInto, pasteFilesInto, useAttachmentPickers } from '../attachments/attachment-bar.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
 import type { DraftRequirement } from '../requirements/checklist-editor.tsx';
 import { ChecklistField } from '../requirements/checklist-field.tsx';
@@ -26,11 +28,13 @@ import styles from './home.module.css';
 import { MoreOptionsFields } from './more-options.tsx';
 import { useStartTask } from './use-start-task.ts';
 import { workflowIcon } from './workflow-icon.ts';
+import { WorkflowPicker } from './workflow-picker.tsx';
 
 /**
  * The home page's one input (28 §2.2, D111). It asks the assistant, or — once a workflow is picked — starts a task
  * with it in one step, without the assistant; the mode is always written in the box. `conversation` is the one the
- * page shows; asking without one starts a new conversation.
+ * page shows; asking without one starts a new conversation. The box is two rows — the text and a foot with「+」,
+ *「直接开始」, usage and send — and the workflows unfold inside it on demand (36 §2, D144–D145).
  */
 export function HomeComposer({
   conversation,
@@ -58,6 +62,10 @@ export function HomeComposer({
   const input = useRef<HTMLTextAreaElement>(null);
   const focusSeq = useUiStore((s) => s.homeInputFocus);
   const files = useAttachmentDraft();
+  const context = useContextAttachments(files);
+  const [flowsOpen, setFlowsOpen] = useState(false);
+  const flowsId = useId();
+  const flowsOpener = useRef<HTMLButtonElement>(null);
   const [checklist, setChecklist] = useState<DraftRequirement[]>([]);
   const task = useStartTask({
     projectId,
@@ -72,6 +80,10 @@ export function HomeComposer({
     },
   });
   const project = projects.find((p) => p.id === projectId);
+  const pickers = useAttachmentPickers(
+    files,
+    project === undefined ? undefined : { projectId: project.id, refName: 'HEAD' },
+  );
   // A base branch belongs to the project it was picked in.
   const changeProject = (id: string) => {
     task.setOptions({ ...task.options, baseBranch: null });
@@ -81,6 +93,18 @@ export function HomeComposer({
   const workflow = shown?.find((w) => w.key === workflowKey);
   const busy = conversation?.busy === true;
   const empty = text.trim() === '';
+  const addItems: AddMenuItem[] = [
+    { label: ATTACHMENTS_COPY.menuUpload, icon: 'paperclip', onSelect: pickers.pickFile },
+  ];
+  if (pickers.pickProjectFile !== undefined)
+    addItems.push({ label: ATTACHMENTS_COPY.menuProjectFile, icon: 'folder', onSelect: pickers.pickProjectFile });
+  // The main page's assistant context has no place in a task's requirement (15 §6).
+  if (workflow === undefined) addItems.push(...context.items);
+  // The opener is whichever button was pressed: 「直接开始」 in ask mode, the mode tag's name in task mode.
+  const toggleFlows = (opener: HTMLButtonElement) => {
+    flowsOpener.current = opener;
+    setFlowsOpen((open) => !open);
+  };
 
   // ⌘J and the top bar's assistant button bring the user here on the home page (D112).
   useEffect(() => {
@@ -120,13 +144,24 @@ export function HomeComposer({
         onSubmit={submit}
         {...dropFilesInto(files)}
       >
-        {workflow === undefined && conversation !== undefined && <UsageLine usage={conversation.usage} />}
         {workflow !== undefined && (
           <div className={styles.modeHead}>
             <div className={styles.modeRow}>
               <span className={styles.modeTag}>
-                <Icon name={workflowIcon(workflow.key)} size="sm" />
-                {C.startTask(workflow.name)}
+                <button
+                  type="button"
+                  className={styles.modeName}
+                  aria-label={`${C.changeWorkflow} · ${C.startTask(workflow.name)}`}
+                  aria-expanded={flowsOpen}
+                  aria-controls={flowsId}
+                  onClick={(e) => toggleFlows(e.currentTarget)}
+                >
+                  <Icon name={workflowIcon(workflow.key)} size="sm" />
+                  {C.startTask(workflow.name)}
+                  <span className={styles.flowsChevron} aria-hidden="true">
+                    <Icon name="chevDown" size="sm" />
+                  </span>
+                </button>
                 <button
                   type="button"
                   className={styles.modeClear}
@@ -173,18 +208,46 @@ export function HomeComposer({
           onKeyDown={onKeyDown}
           onPaste={pasteFilesInto(files)}
         />
-        <AttachmentBar
-          draft={files}
-          projectFiles={project === undefined ? undefined : { projectId: project.id, refName: 'HEAD' }}
-        />
+        <AttachmentList draft={files} />
         {workflow !== undefined && <ChecklistField drafts={checklist} onChange={setChecklist} />}
-        {workflow === undefined && <ContextAttachments draft={files} />}
         {workflow !== undefined && task.pro && project !== undefined && (
           <MoreOptionsFields project={project} value={task.options} onChange={task.setOptions} />
         )}
+        {shown !== undefined && (
+          <WorkflowPicker
+            id={flowsId}
+            open={flowsOpen}
+            workflows={shown}
+            picked={workflowKey}
+            opener={flowsOpener}
+            onPick={(key) => {
+              setWorkflowKey(key);
+              setFlowsOpen(false);
+              input.current?.focus();
+            }}
+            onClose={() => setFlowsOpen(false)}
+          />
+        )}
         <div className={styles.boxFoot}>
+          <AddMenu items={addItems} onOpen={context.capture} />
           {workflow === undefined ? (
-            <span className={`${styles.hint} grow`}>{C.askHint}</span>
+            <>
+              <button
+                type="button"
+                className={styles.flowsToggle}
+                aria-expanded={flowsOpen}
+                aria-controls={flowsId}
+                onClick={(e) => toggleFlows(e.currentTarget)}
+              >
+                <Icon name="sparkle" size="sm" />
+                {C.startNow}
+                <span className={styles.flowsChevron} aria-hidden="true">
+                  <Icon name="chevDown" size="sm" />
+                </span>
+              </button>
+              <span className="grow" />
+              {conversation !== undefined && <UsageButton usage={conversation.usage} />}
+            </>
           ) : (
             <>
               <label className="check">
@@ -279,27 +342,10 @@ export function HomeComposer({
         </div>
         {task.create.isError && <ErrorState error={task.create.error} />}
         {ask.error !== null && <ErrorState error={ask.error} />}
+        {pickers.elements}
+        {context.elements}
       </form>
       {workflows.isError && <ErrorState error={workflows.error} onRetry={() => void workflows.refetch()} />}
-      <fieldset className={styles.strip}>
-        <legend className={styles.cap}>{C.startNow}</legend>
-        {shown?.map((w) => (
-          <button
-            key={w.id}
-            type="button"
-            className={styles.chip}
-            aria-pressed={w.key === workflowKey}
-            title={w.description}
-            onClick={() => {
-              setWorkflowKey(w.key);
-              input.current?.focus();
-            }}
-          >
-            <Icon name={workflowIcon(w.key)} size="sm" />
-            {w.name}
-          </button>
-        ))}
-      </fieldset>
     </div>
   );
 }

@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { createProject, passReview, patchSettings, queueTurn, submitResult, TASK_RUN_TIMEOUT_MS } from './helpers.ts';
+import {
+  createProject,
+  passReview,
+  patchSettings,
+  pickWorkflow,
+  queueTurn,
+  submitResult,
+  TASK_RUN_TIMEOUT_MS,
+} from './helpers.ts';
 
 // The acceptance checklist (31, Q-03): written when starting the task, verified by the last step, decided on the
 // result card. The file name sorts after onboarding.browser.spec.ts, which needs the shared backend without projects.
@@ -21,10 +29,7 @@ test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → �
   await queueTurn(request, project, { title: '核验验收清单' }, [submitResult('核验完成')]);
 
   await page.goto(`/?projectId=${project.id}`);
-  await page
-    .getByRole('group', { name: '直接开始' })
-    .getByRole('button', { name: /修 Bug/ })
-    .click();
+  await pickWorkflow(page, /修 Bug/);
   await page.getByLabel('需求').fill('订单搜索不到');
   await page.getByRole('button', { name: '验收要求' }).click();
   await page.getByLabel('要求 1').fill('按订单号搜索');
@@ -79,4 +84,32 @@ test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → �
   await expect(page.getByTestId('task-page').getByText('已完成', { exact: true }).first()).toBeVisible({
     timeout: TASK_RUN_TIMEOUT_MS,
   });
+});
+
+test('「直接开始」默认收起：展开后 Esc 收起并还焦点，开始任务模式下从标签换流程（36 §5）', async ({
+  page,
+  request,
+}) => {
+  const project = await createProject(request, null);
+  await page.goto(`/?projectId=${project.id}`);
+  const toggle = page.getByRole('button', { name: '直接开始', exact: true });
+  const flows = page.getByRole('group', { name: '选择流程开始任务' });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(flows).toBeHidden();
+
+  await toggle.press('Enter');
+  await expect(flows).toBeVisible();
+  // The panel comes before the foot, so opening moves focus into it.
+  await expect(flows.getByRole('button', { name: '新功能开发', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(flows).toBeHidden();
+  await expect(toggle).toBeFocused();
+
+  await pickWorkflow(page, '修 Bug');
+  await expect(flows).toBeHidden();
+  await expect(page.getByLabel('需求')).toBeFocused();
+  await page.getByRole('button', { name: '换一个流程 · 开始任务 · 修 Bug' }).click();
+  await expect(flows.getByRole('button', { name: '修 Bug', exact: true })).toBeFocused();
+  await flows.getByRole('button', { name: '代码审查', exact: true }).click();
+  await expect(page.getByText('开始任务 · 代码审查')).toBeVisible();
 });

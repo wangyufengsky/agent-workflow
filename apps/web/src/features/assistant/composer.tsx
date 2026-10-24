@@ -3,15 +3,20 @@ import { type FormEvent, type KeyboardEvent, type RefObject, useState } from 're
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { ASSISTANT_COPY as C } from '../../copy/assistant.ts';
-import { AttachmentBar, dropFilesInto, pasteFilesInto } from '../attachments/attachment-bar.tsx';
+import { ATTACHMENTS_COPY } from '../../copy/attachments.ts';
+import { AttachmentList, dropFilesInto, pasteFilesInto, useAttachmentPickers } from '../attachments/attachment-bar.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
+import { AddMenu } from './add-menu.tsx';
 import styles from './assistant.module.css';
 import { useAbortAssistant } from './assistant.queries.ts';
-import { ContextAttachments } from './context-attachments.tsx';
-import { UsageLine } from './usage-line.tsx';
+import { useContextAttachments } from './context-attachments.tsx';
+import { UsageButton } from './usage-line.tsx';
 import { useAsk } from './use-ask.ts';
 
-/** The input at the bottom (15 §6): it grows with the text, ⌘↵ sends, and while the assistant works it can stop it. */
+/**
+ * The input at the bottom (15 §6): it grows with the text, ⌘↵ sends, and while the assistant works it can stop it.
+ * Two rows only — the text and a foot with「+」, usage and send (36 §2.3).
+ */
 export function Composer({
   conversation,
   inputRef,
@@ -21,6 +26,8 @@ export function Composer({
 }) {
   const [text, setText] = useState('');
   const files = useAttachmentDraft();
+  const pickers = useAttachmentPickers(files, undefined);
+  const context = useContextAttachments(files);
   const { ask, isPending, error } = useAsk();
   const abort = useAbortAssistant();
   const busy = conversation?.busy === true;
@@ -46,7 +53,6 @@ export function Composer({
   return (
     <form className={styles.composer} onSubmit={submit} {...dropFilesInto(files)}>
       {error !== null && <ErrorState error={error} />}
-      {conversation !== undefined && <UsageLine usage={conversation.usage} />}
       <div className={styles.inputBox}>
         <textarea
           ref={inputRef}
@@ -59,9 +65,17 @@ export function Composer({
           onKeyDown={onKeyDown}
           onPaste={pasteFilesInto(files)}
         />
-        <AttachmentBar draft={files} />
-        <ContextAttachments draft={files} />
+        <AttachmentList draft={files} />
         <div className={styles.inputRow}>
+          <AddMenu
+            items={[
+              { label: ATTACHMENTS_COPY.menuUpload, icon: 'paperclip', onSelect: pickers.pickFile },
+              ...context.items,
+            ]}
+            onOpen={context.capture}
+          />
+          <span className="grow" />
+          {conversation !== undefined && <UsageButton usage={conversation.usage} />}
           <span className={styles.inputHint}>{C.sendHint}</span>
           {busy && conversation !== undefined ? (
             <button
@@ -88,6 +102,8 @@ export function Composer({
           )}
         </div>
       </div>
+      {pickers.elements}
+      {context.elements}
     </form>
   );
 }

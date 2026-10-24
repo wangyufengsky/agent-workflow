@@ -1,9 +1,11 @@
 import { expect, test } from '@playwright/test';
 import {
+  addFromMenu,
   createProject,
   type E2EProject,
   passReview,
   patchSettings,
+  pickWorkflow,
   queueAssistantTurn,
   queueTurn,
   submitResult,
@@ -36,10 +38,7 @@ test('开始任务时附上文件：不支持的先移除才能开始，任务�
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
 
   await page.goto(`/?projectId=${project.id}`);
-  await page
-    .getByRole('group', { name: '直接开始' })
-    .getByRole('button', { name: /修 Bug/ })
-    .click();
+  await pickWorkflow(page, /修 Bug/);
   await page.getByLabel('需求').fill('订单搜索不到');
   const picker = page.locator('input[type="file"]');
   const attached = page.getByRole('list', { name: '附加的资料' });
@@ -77,7 +76,9 @@ test('问助手时附上文件：消息下面显示附件，可以打开', async
   await queueAssistantTurn(request, [{ type: 'text', text: '看到了，导出按钮放在右上角。' }]);
 
   await page.goto('/');
-  await page.locator('input[type="file"]').setInputFiles([text('spec.md', '导出按钮放在右上角\n')]);
+  const chooser = page.waitForEvent('filechooser');
+  await addFromMenu(page, '上传文件…');
+  await (await chooser).setFiles([text('spec.md', '导出按钮放在右上角\n')]);
   await expect(
     page.getByRole('list', { name: '附加的资料' }).getByRole('button', { name: '查看 spec.md' }),
   ).toBeVisible();
