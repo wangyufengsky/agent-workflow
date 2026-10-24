@@ -31,6 +31,7 @@ import {
   branchExists,
   initRepository,
   listUnignoredFiles,
+  type RepoLocks,
   readConfiguredIdentity,
   readDefaultBranch,
   readOriginUrl,
@@ -45,6 +46,8 @@ import { createProjectsRepo } from './projects.repo.ts';
 export type ProjectsServiceDeps = {
   db: Db;
   clock: Clock;
+  /** Putting a directory under Git takes its lock like any change to a repository's refs (D37). */
+  locks: RepoLocks;
   credentials: CredentialsService;
   databases: DatabasesService;
   /** Platform API addresses (FakeHosting in tests). */
@@ -129,7 +132,8 @@ async function putUnderGit(dir: string): Promise<void> {
     if (gitignore !== null) await writeFile(join(dir, '.gitignore'), gitignore);
     await stage(dir, ['.']);
     const committer = (await readConfiguredIdentity(dir)) === null ? BACKEND_COMMITTER : [];
-    await runGit([...committer, 'commit', '--quiet', '-m', GIT_INIT_COMMIT_MESSAGE], { cwd: dir });
+    // A directory whose files are all ignored still needs the base commit tasks branch from.
+    await runGit([...committer, 'commit', '--quiet', '--allow-empty', '-m', GIT_INIT_COMMIT_MESSAGE], { cwd: dir });
   } catch (e) {
     await rm(join(dir, '.git'), { recursive: true, force: true });
     if (gitignore !== null) await rm(join(dir, '.gitignore'), { force: true });
@@ -137,7 +141,7 @@ async function putUnderGit(dir: string): Promise<void> {
   }
 }
 
-export function createProjectsService({ db, clock, credentials, databases, hosting }: ProjectsServiceDeps) {
+export function createProjectsService({ db, clock, locks, credentials, databases, hosting }: ProjectsServiceDeps) {
   const repo = createProjectsRepo(db);
 
   function require(id: string): ProjectDTO {
@@ -200,8 +204,13 @@ export function createProjectsService({ db, clock, credentials, databases, hosti
     /** Puts a directory in no repository under Git, then adds it like `create` (D153). */
     async initGit(input: CreateProjectRequest): Promise<ProjectDetailDTO> {
       const dir = await resolvePlainDirectory(input.repoPath);
-      await putUnderGit(dir);
-      return add(dir, input.name);
+      // A second request for the directory would share the new repository and, failing, remove it; under the lock
+      // it is checked again and finds the repository the first one made.
+      return locks.run(dir, async () => {
+        await resolvePlainDirectory(dir);
+        await putUnderGit(dir);
+        return add(dir, input.name);
+      });
     },
 
     async update({ id, ...changes }: UpdateProjectRequest): Promise<ProjectDetailDTO> {

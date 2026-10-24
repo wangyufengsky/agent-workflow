@@ -224,6 +224,26 @@ describe('为没有 Git 的目录初始化 Git（D153）', () => {
     expect(await git(dir, 'log', '--format=%an <%ae>')).toBe('Ada <ada@example.com>');
   });
 
+  it('所有文件都被忽略时以空的第一个提交初始化', async () => {
+    const dir = await plainDir({ '.gitignore': '*\n', 'data.csv': '1,2\n' });
+    expect((await t.call(previewGitInitOp, { repoPath: dir })).body).toMatchObject({ files: 0, bytes: 0 });
+
+    expect((await t.call(initGitOp, { repoPath: dir })).status).toBe(201);
+    expect(await git(dir, 'ls-files')).toBe('');
+    expect(await git(dir, 'log', '--format=%s')).toBe('Initial commit');
+  });
+
+  it('同一目录同时初始化两次：一次成功，另一次报已是仓库，不删掉成功的那个', async () => {
+    const dir = await plainDir({ 'main.py': 'print(1)\n' });
+    const results = await Promise.all([t.call(initGitOp, { repoPath: dir }), t.call(initGitOp, { repoPath: dir })]);
+    expect(results.map((r) => r.status).sort()).toEqual([201, 400]);
+    expect(results.find((r) => r.status === 400)?.body).toMatchObject({
+      error: { code: ErrorCode.ValidationFailed },
+    });
+    expect(await git(dir, 'log', '--format=%s')).toBe('Initial commit');
+    expect((await t.call(listProjectsOp, {})).body.items.map((p) => p.repoPath)).toEqual([dir]);
+  });
+
   it('预览列出过大的文件', async () => {
     const dir = await plainDir({ 'README.md': '# x\n' });
     const video = await open(join(dir, 'demo.mp4'), 'w');
