@@ -11,7 +11,7 @@ import {
 
 // Journeys J1–J4 (07 §5): the AI sessions are played by FakeOpencode, scripted per step.
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
 test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开始 → 结果卡显示改动与检查通过 → 步骤摘要与大视图 diff', async ({
   page,

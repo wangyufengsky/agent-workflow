@@ -4,7 +4,7 @@
 
 ## 1. 路由与页面
 
-路由常量在 `web/src/app/routes.ts`（侧栏内页面挂在无路径布局路由 `_shell` 下，`getRouteApi` 用 `ROUTE_IDS`）；导航配置在 `web/src/app/navigation.ts`。没有任何项目时，侧栏内的页面都重定向到 `/onboarding`。开发构建另有 `/dev/components` 组件走查页（E2E 在四套主题下截图，生产构建不含）。
+路由常量在 `web/src/app/routes.ts`（侧栏内页面挂在无路径布局路由 `_shell` 下，`getRouteApi` 用 `ROUTE_IDS`）；导航配置在 `web/src/app/navigation.ts`。没有任何项目时，侧栏内的页面都重定向到 `/onboarding`。开发构建另有 `/dev/components` 组件走查页（E2E 在全部主题下截图，生产构建不含）。
 
 | 路由 | 页面 | 模式 | 设计参考 |
 | --- | --- | --- | --- |
@@ -254,10 +254,11 @@ web/src/theme/
 ├─ tokens.ts             THEME_TOKEN_NAMES 与 ThemeTokens 类型（键与设计稿 skins.css 变量一一对应）
 ├─ theme-definition.ts   ThemeDefinition 类型
 ├─ themes/
-│  ├─ deepseek.ts
-│  ├─ warm.ts
-│  ├─ spdb.ts
-│  └─ github-white.ts
+│  ├─ default.ts       默认：深色（D146）
+│  ├─ claude-code.ts   Claude Code：暖色
+│  ├─ spdb.ts          SPDB：白、红、蓝
+│  ├─ codex.ts         Codex：白
+│  └─ deepseek.ts      DeepSeek：蓝白
 ├─ registry.ts           THEMES: Record<ThemeId, ThemeDefinition>
 ├─ apply-theme.ts        resolveTheme(preference, prefersDark)；applyTheme 把 tokens 写成 :root CSS 变量，设置 color-scheme 与 data-theme
 └─ use-applied-theme.ts  按设置应用主题，system 时跟随 prefers-color-scheme
@@ -281,7 +282,7 @@ export type ThemeDefinition = {
 - PPT 的页面有自己的主题（与应用主题无关）：每套主题另有一组不透明的幻灯片调色板 `slides: SlidePalette`（`bg` `surface` `ink` `sub` `accent` `fill` `onFill` `line` `codeBg` `codeInk`），渲染时写成页面容器上的 `--slide-*` 变量，PowerPoint 导出也读它；单测校验其对比度（23 §5.2）。
 - 工作中的通用动效 `.shimmer`（文字流光，只改遮罩透明度）与 `.caret`（打字光标）在 `base.css`，助手面板与会话流共用（25 §4.6）。
 - 助手面板的磨砂材质与助手标识也是主题令牌（`frost`、`frost-card`、`frost-edge`、`frost-filter`、`frost-shadow`、`frost-sheen`、`aura`，D84）；与主题无关的动效令牌 `--ease-spring`、`--t-drawer` 在 `base.css`。
-- 每套主题在单测中校验：正文/次要文字在 `bg`/`panel`/`sidebar` 及其上叠加的悬停、选中底色（`fill-1`–`fill-3`、`accent-fill`）、外框装饰渐变最浓处，以及助手磨砂面板（`frost` 叠在 `bg`/`surface`/`raised` 上，及其上的 `frost-card` 与悬停底色）上对比度 ≥ 4.5:1，状态文字在其 fill（叠在 `bg` / `panel` 上）上 ≥ 4.5:1，侧栏数量徽标（`stall`）在侧栏及其悬停、选中底色上 ≥ 4.5:1，主按钮与品牌按钮（含悬停）文字 ≥ 4.5:1（沿用设计稿已校验的约束）。渲染后的页面另由 E2E 走查（J9）用 axe 的 `color-contrast` 规则在四套主题下逐页检查（M6-01）。
+- 每套主题在单测中校验：正文/次要文字在 `bg`/`panel`/`sidebar` 及其上叠加的悬停、选中底色（`fill-1`–`fill-3`、`accent-fill`）、外框装饰渐变最浓处，以及助手磨砂面板（`frost` 叠在 `bg`/`surface`/`raised` 上，及其上的 `frost-card` 与悬停底色）上对比度 ≥ 4.5:1，状态文字在其 fill（叠在 `bg` / `panel` 上）上 ≥ 4.5:1，侧栏数量徽标（`stall`）在侧栏及其悬停、选中底色上 ≥ 4.5:1，主按钮与品牌按钮（含悬停）文字 ≥ 4.5:1（沿用设计稿已校验的约束）。渲染后的页面另由 E2E 走查（J9）用 axe 的 `color-contrast` 规则在全部主题下逐页检查（M6-01）。
 
 ## 5. 流程画布（React Flow）
 
@@ -294,7 +295,7 @@ export type ThemeDefinition = {
 | 视图 | 左下角控件条：缩小、缩放百分比（点击回到 100%）、放大、适应画布、小地图（多于 12 步时默认打开）；适应画布的缩放在 0.5–1 之间，放不下时左对齐；平移限定在图外扩半个画布之内；滚轮与双指滑动平移，⌘ / Ctrl + 滚轮与捏合缩放；缩放低于 75% 时卡片只显示标题（概览样式）；首次显示时适应一次，之后保持用户视角 |
 | 键盘 | 画布区域可聚焦：`+` `-` `0` 缩放与适应、方向键平移、Tab 在步骤间移动、Enter 打开（只读）或编辑（编辑画布）、Esc 取消选中；编辑画布中 Delete 删除选中步骤，⌘Z / ⇧⌘Z 撤销重做 |
 | 状态样式 | 边框与图标颜色取 `STATUS_TONE` 对应令牌；`running` 节点有呼吸光晕；已跳过、已取消为虚线半透明（尊重 `prefers-reduced-motion`） |
-| 连线 | 计划与模板中为 `--muted` 实线；运行中的任务：上游未完成为 `--muted` 虚线，完成为 `--ok` 实线，通往进行中步骤的为 `--run` 色流动虚线，通往失败步骤的为 `--danger` 色。取文字令牌，四套主题都清晰可辨 |
+| 连线 | 计划与模板中为 `--muted` 实线；运行中的任务：上游未完成为 `--muted` 虚线，完成为 `--ok` 实线，通往进行中步骤的为 `--run` 色流动虚线，通往失败步骤的为 `--danger` 色。取文字令牌，各套主题都清晰可辨 |
 | 交互（只读） | 单击选中（侧栏摘要），双击或 Enter 打开节点详情 |
 | 交互（编辑，专业） | 连线中间的 + 插入步骤；步骤右侧的 + 菜单「添加下一步」「添加并行步骤」；步骤右上角的 −、Delete 或侧栏「删除步骤」删除后前后自动相连，提示条可撤销；工具条「撤销」「重做」「添加步骤」与问题数；只显示结果合法的 + / −（不改动已开始的步骤、不新增必经步骤位置问题）；不从圆点拖线，额外依赖在侧栏勾选（只列出不会成环的候选，shared `dependencyCandidates`）；侧栏编辑选中步骤的 key（改名同时改写依赖）、标题、角色、指令、依赖、检查；实时校验（`checkPlan`，D56），问题列表可点击定位步骤，有问题时不能保存；已开始的节点显示锁。组件 `canvas/plan-editor.tsx`，计划确认、暂停调整与流程模板共用 |
 | 流程编辑页 | 画布为主（D107）：顶部工具条（返回、名称、版本、未保存修改数、撤销重做、添加步骤、问题数、保存为新版本），右侧「步骤 / 流程设置」页签；AI 规划的流程显示必经步骤与「AI 规划的步骤」占位卡（26 §6.3） |

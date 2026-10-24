@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { THEME_IDS } from '@aw/shared';
 import { expect, test } from '@playwright/test';
 import { createProject, patchSettings, queueCodeReviewerTurn } from './helpers.ts';
 
@@ -23,11 +24,11 @@ function commitAs(repo: string, author: string, daysAgo: number, message: string
 
 const lines = (n: number) => `${Array.from({ length: n }, (_, i) => `line ${i}`).join('\n')}\n`;
 
-test('J35 团队：成员表默认按姓名、点列头排序，成员页纵向趋势，合并身份后数字合并，四主题无报错', async ({
+test('J35 团队：成员表默认按姓名、点列头排序，成员页纵向趋势，合并身份后数字合并，全部主题无报错', async ({
   page,
   request,
 }) => {
-  await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' });
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const project = await createProject(request, null);
@@ -107,7 +108,7 @@ test('J35 团队：成员表默认按姓名、点列头排序，成员页纵向�
   await expect(page.getByTestId('team-settings')).toContainText('不计行数的文件');
   await page.keyboard.press('Escape');
 
-  for (const theme of ['deepseek', 'warm', 'spdb', 'github_white']) {
+  for (const theme of THEME_IDS) {
     await patchSettings(request, { 'ui.theme': theme });
     await page.goto(`/team/${project.id}?period=last_90_days`);
     await expect(page.getByTestId('team-members')).toBeVisible();

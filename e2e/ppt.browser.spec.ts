@@ -28,7 +28,7 @@ function zipEntries(bytes: Buffer): string[] {
   return names;
 }
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
 test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 让 AI 改 → 恢复上一版 → 换风格 → 导出 PowerPoint → 放映', async ({
   page,
@@ -137,7 +137,7 @@ test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 
   await expect(preview).toContainText('客服 经常收到投诉');
 
   // Another theme: shown at once, nothing is made again.
-  await page.getByLabel('风格').selectOption('deepseek');
+  await page.getByLabel('风格').selectOption('default');
   await expect
     .poll(() => preview.getByTestId('slide-canvas').evaluate((el) => getComputedStyle(el).backgroundColor))
     .toBe('rgb(14, 15, 18)');

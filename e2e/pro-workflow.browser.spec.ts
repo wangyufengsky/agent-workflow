@@ -14,7 +14,7 @@ import {
 
 // J8 (07 §5): a copied built-in workflow, changed and used for a task; AI sessions are played by FakeOpencode.
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'pro' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'pro' }));
 test.afterAll(({ request }) => patchSettings(request, { 'ui.mode': 'simple' }));
 
 test('J8 专业模式：复制内置流程 → 修改 → 用它跑通一个任务', async ({ page, request }) => {

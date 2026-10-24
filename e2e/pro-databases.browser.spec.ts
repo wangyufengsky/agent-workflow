@@ -31,7 +31,7 @@ test.afterAll(async () => {
 
 test('J21 添加 PostgreSQL 连接 → 测试连接 → 浏览表结构 → 关联项目 → AI 只读查询并引用', async ({ page, request }) => {
   test.skip(!available, `docker pull ${DB_IMAGE.postgres}`);
-  await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'pro' });
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'pro' });
   const project = await createProject(request, null);
 
   await page.goto('/databases');

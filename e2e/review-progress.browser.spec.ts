@@ -14,7 +14,7 @@ import {
   TASK_RUN_TIMEOUT_MS,
 } from './helpers.ts';
 
-test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'pro' }));
+test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'pro' }));
 test.afterEach(({ request }) => patchSettings(request, { 'ui.mode': 'simple' }));
 
 for (const target of ['worktree', 'commit', 'branch', 'range'] as const) {
@@ -70,7 +70,7 @@ for (const target of ['worktree', 'commit', 'branch', 'range'] as const) {
     await expect(stream).toContainText('export const total = 1;');
     if (target === 'worktree') {
       await page.screenshot({ path: 'screenshots/review-progress-light.png', fullPage: true, animations: 'disabled' });
-      await patchSettings(request, { 'ui.theme': 'deepseek' });
+      await patchSettings(request, { 'ui.theme': 'default' });
       await page.reload();
       await expect(stream.getByTestId('stream-thinking')).toBeVisible();
       await stream.getByTestId('stream-thinking').getByRole('button').click();

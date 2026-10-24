@@ -13,7 +13,7 @@ const LONG = [
 ];
 
 test('最近对话：标题很长时「全部对话」仍是行尾的一行按钮，不压住对话、显示总数', async ({ page, request }) => {
-  await patchSettings(request, { 'ui.theme': 'deepseek', 'ui.mode': 'simple' });
+  await patchSettings(request, { 'ui.theme': 'default', 'ui.mode': 'simple' });
   // The shell's pages need a project; without one they lead to onboarding.
   await createProject(request, null);
   const created: string[] = [];

@@ -19,10 +19,14 @@ describe('设置 API', () => {
   });
 
   it('部分更新后返回并持久化合并结果，发出 settings.updated', async () => {
-    const res = await t.call(updateSettingsOp, { 'ui.theme': 'warm', 'scheduler.maxConcurrentAttempts': 2 });
+    const res = await t.call(updateSettingsOp, { 'ui.theme': 'claude_code', 'scheduler.maxConcurrentAttempts': 2 });
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ 'ui.theme': 'warm', 'scheduler.maxConcurrentAttempts': 2, 'ui.mode': 'simple' });
-    expect((await t.call(getSettingsOp, {})).body['ui.theme']).toBe('warm');
+    expect(res.body).toMatchObject({
+      'ui.theme': 'claude_code',
+      'scheduler.maxConcurrentAttempts': 2,
+      'ui.mode': 'simple',
+    });
+    expect((await t.call(getSettingsOp, {})).body['ui.theme']).toBe('claude_code');
     expect(published).toEqual([
       { type: 'settings.updated', data: { keys: ['ui.theme', 'scheduler.maxConcurrentAttempts'] } },
     ]);

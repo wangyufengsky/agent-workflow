@@ -1,8 +1,8 @@
 import { ThemeId } from '@aw/shared';
 import type { ThemeDefinition } from '../theme-definition.ts';
 
-export const warmTheme: ThemeDefinition = {
-  id: ThemeId.Warm,
+export const claudeCodeTheme: ThemeDefinition = {
+  id: ThemeId.ClaudeCode,
   colorScheme: 'light',
   codeTheme: 'github-light',
   slides: {

@@ -27,8 +27,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | 枚举 | 值 | 说明 |
 | --- | --- | --- |
 | `UiMode` | `simple` · `pro` | 全局界面模式，默认 `simple` |
-| `ThemeId` | `deepseek` · `warm` · `spdb` · `github_white` | 四套主题 |
-| `ThemePreference` | `ThemeId` 的全部值 · `system` | 设置值；`system` 时暗色用 `deepseek`、亮色用 `github_white`（常量 `SYSTEM_THEME_MAP`） |
+| `ThemeId` | `default` · `claude_code` · `spdb` · `codex` · `deepseek` | 五套主题（D146）：默认（深色）、Claude Code（暖色）、SPDB（白红蓝）、Codex（白）、DeepSeek（蓝白） |
+| `ThemePreference` | `ThemeId` 的全部值 · `system` | 设置值；`system` 时暗色用 `default`、亮色用 `codex`（常量 `SYSTEM_THEME_MAP`） |
 | `StatusTone` | `idle` · `run` · `wait` · `warn` · `ok` · `done` · `danger` | 状态色语气，对应主题 token `--{tone}` / `--{tone}-fill` / `--{tone}-line` |
 
 ### 2.2 任务与执行

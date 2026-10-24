@@ -510,7 +510,7 @@ payload / response：
 | title_edited | INTEGER(bool) | 用户改过名 |
 | brief | TEXT | 要求原文 |
 | slide_count_target | INTEGER NULL | 指定的页数；NULL = AI 决定 |
-| theme | TEXT | `ThemeId` |
+| theme | TEXT | `ThemeId`（D146 改名时由迁移 `0024_theme_ids` 换成新 ID） |
 | understanding | TEXT(JSON) NULL | `DeckUnderstanding`，随大纲提交 |
 | outline_confirmed_at | INTEGER NULL | 只写一次：之前为大纲阶段，之后为制作阶段 |
 | created_at / updated_at | INTEGER | 列表按 `updated_at` 倒序 |

@@ -27,7 +27,7 @@ function seedDeck(): string {
   const now = Date.now();
   db.prepare(
     `insert into decks (id, project_id, title, title_edited, brief, slide_count_target, theme, understanding,
-      outline_confirmed_at, created_at, updated_at) values (?, null, ?, 0, ?, null, 'warm', null, ?, ?, ?)`,
+      outline_confirmed_at, created_at, updated_at) values (?, null, ?, 0, ?, null, 'claude_code', null, ?, ?, ?)`,
   ).run(id, '订单服务退款改造', '向团队汇报', now, now, now);
   const slide = db.prepare(
     `insert into deck_slides (id, deck_id, seq, layout, title, points, content, notes, previous, updated_at)

@@ -138,7 +138,7 @@ test.afterAll(() => {
 
 test('20 节点计划画布：只读与编辑画布的平移、缩放、拖动步骤', async ({ page, request }) => {
   test.setTimeout(120_000);
-  await patchSettings(request, { 'ui.theme': 'deepseek', 'ui.mode': 'pro' });
+  await patchSettings(request, { 'ui.theme': 'default', 'ui.mode': 'pro' });
   const project = await createProject(request, null);
   await queueTurn(request, project, { agent: 'aw-planner' }, [
     { type: 'callTool', name: 'submit_plan', args: { summary: '二十个步骤的计划。', nodes: twentyNodePlan() } },
@@ -200,7 +200,7 @@ function fiveMegabyteTranscript(): string {
 test('单会话流 5 MB：首屏时间与接口分页', async ({ page, request }) => {
   test.setTimeout(120_000);
   if (DATA_DIR === undefined) throw new Error('AW_PERF_DATA_DIR is unset: run with playwright.perf.config.ts');
-  await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'pro' });
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'pro' });
   const project = await createProject(request, null);
   await queueTurn(request, project, { title: '定位根因' }, [submitResult('找到了根因')]);
   await queueTurn(request, project, { title: '修复' }, [submitResult('修复了')]);
@@ -275,7 +275,7 @@ test('单会话流 5 MB：首屏时间与接口分页', async ({ page, request }
 test('10 个并发任务：主页与任务页在持续推送下不卡顿', async ({ page, request }) => {
   test.setTimeout(240_000);
   await patchSettings(request, {
-    'ui.theme': 'github_white',
+    'ui.theme': 'codex',
     'ui.mode': 'simple',
     'scheduler.maxConcurrentAttempts': 10,
   });

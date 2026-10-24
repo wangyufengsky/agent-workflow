@@ -174,7 +174,7 @@ agent-workflow/
 │  │        └─ databases/          drivers/{mysql,postgres,sqlserver}
 │  ├─ builtin/                 内置流程与角色（数据 + prompts/*.md）
 │  └─ opencode-plugin/         agent-workflow-bridge（注入 sessionID 到本项目 MCP 工具参数）；`pnpm build:plugin` 去掉类型生成 dist/agent-workflow-bridge.js
-├─ e2e/                        Playwright：浏览器旅程、四主题走查（walkthrough）、Electron 旅程 J10、性能实测（*.perf.spec.ts）
+├─ e2e/                        Playwright：浏览器旅程、全主题走查（walkthrough）、Electron 旅程 J10、性能实测（*.perf.spec.ts）
 ├─ live/                       真实模型的 live 测试与示例仓库（fixtures/）
 ├─ scripts/                    构建插件、生产包检查、CSS 令牌检查、状态机文档生成
 ├─ docs/

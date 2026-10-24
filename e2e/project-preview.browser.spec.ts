@@ -12,7 +12,7 @@ createServer((req, res) => res.end('ok')).listen(Number(process.env.PORT), '127.
 `;
 
 test('J26 页面预览：保存设置、试运行成功与失败', async ({ page, request }) => {
-  await patchSettings(request, { 'ui.theme': 'github_white', 'ui.mode': 'simple' });
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
   const project = await createProject(request, null);
   writeFileSync(join(project.repoPath, 'server.mjs'), SERVER);
   await page.goto(`/projects/${project.id}`);
@@ -40,7 +40,7 @@ test('J26 页面预览：保存设置、试运行成功与失败', async ({ page
 
 test('J26 网站规则：添加、改权限、排序后保存；浏览器版不显示登录窗口', async ({ page, request }) => {
   await patchSettings(request, {
-    'ui.theme': 'github_white',
+    'ui.theme': 'codex',
     'ui.mode': 'simple',
     'browser.sites': [{ pattern: '*', access: 'read' }],
   });
