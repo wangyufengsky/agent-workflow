@@ -491,6 +491,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     decks: decks.service,
     batches: batches.service,
     schedules: schedules.service,
+    team: team.service,
     attachments: attachments.service,
     dataDir: config.dataDir,
     timeZone,

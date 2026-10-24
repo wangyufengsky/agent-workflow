@@ -5,6 +5,7 @@ import {
   ASSISTANT_CONVERSATIONS_DIR,
   ASSISTANT_DIR,
   AttemptKind,
+  confirmAssistantCallOp,
   createConversationOp,
   createProjectOp,
   createTeamAnalysesOp,
@@ -12,6 +13,7 @@ import {
   getTeamAnalysisOp,
   InboxKind,
   InboxStatus,
+  listConfirmationsOp,
   resolveInboxOp,
   ServerEventType,
   sendAssistantMessageOp,
@@ -156,5 +158,61 @@ describe('@live 团队', () => {
       expect(reply).toContain('Zhang San');
     },
     TURN_TIMEOUT_MS,
+  );
+
+  it(
+    '助手：让它分析张三的工作，确认后真实模型分析，结束后助手转述报告',
+    async () => {
+      const { body: conversation } = await t.call(createConversationOp, {});
+      const turnEnds = () =>
+        waitForEvent(
+          t.app.events,
+          ServerEventType.AssistantUpdated,
+          (c) => c.id === conversation.id && !c.busy,
+          TURN_TIMEOUT_MS,
+        );
+      let idle = turnEnds();
+      await t.call(sendAssistantMessageOp, {
+        id: conversation.id,
+        text: '帮我用 AI 分析一下 Zhang San（zs@corp.com）近 30 天的工作',
+        context: { page: 'team', params: { projectId } },
+      });
+      await idle;
+      const [card] = (await t.call(listConfirmationsOp, { id: conversation.id })).body.items;
+      expect(card).toMatchObject({ operationId: 'team.analyses.create', status: 'pending' });
+
+      const ended = waitForEvent(
+        t.app.events,
+        ServerEventType.AttemptUpdated,
+        (d) => d.attempt.kind === AttemptKind.TeamAnalysis && d.attempt.endedAt !== null,
+        TURN_TIMEOUT_MS,
+      );
+      idle = turnEnds();
+      await t.call(confirmAssistantCallOp, { id: card?.id ?? '' });
+      await idle;
+      await ended;
+      // The report arrives as the next message: the assistant's turn on it.
+      await turnEnds();
+
+      const file = join(t.dataDir, ASSISTANT_DIR, ASSISTANT_CONVERSATIONS_DIR, `${conversation.id}.jsonl`);
+      const entries: TranscriptEntry[] = (await readFile(file, 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line));
+      const parts = new Map<string, string>();
+      for (const e of entries) {
+        if (e.kind !== 'text') continue;
+        parts.set(e.partId, (parts.get(e.partId) ?? '').slice(0, e.data.offset) + e.data.text);
+      }
+      const replies = [...parts.values()];
+      await mkdir(new URL('reports', import.meta.url), { recursive: true });
+      const report = new URL(
+        `reports/team-assistant-analysis-${new Date().toISOString().replaceAll(':', '-')}.json`,
+        import.meta.url,
+      );
+      await writeFile(report, JSON.stringify({ model: TEST_MODEL, replies }, null, 2));
+      expect(replies.at(-1)).toContain('/team/');
+    },
+    3 * TURN_TIMEOUT_MS,
   );
 });

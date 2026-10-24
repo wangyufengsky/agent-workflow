@@ -586,6 +586,9 @@ payload / response：
 
 ## 4f. 团队（v1.3）
 
+（助手侧另有 `assistant_analysis_followups`：`analysis_id` PK → team_analyses CASCADE、`conversation_id` → assistant_conversations CASCADE、`reported` INTEGER(bool)、`created_at`；助手发起的成员分析结束后把报告发回发起它的对话，33 §8.1。）
+
+
 见 [33-team.md §7、§8.2](33-team.md#82-表10-增补迁移-0023_team)，迁移 `0023_team`。提交按 SHA 缓存，不会过期，也不记录「属于哪个分支」（可达集合每次用 `git rev-list` 现算，D129）。
 
 ### team_commits

@@ -1,3 +1,13 @@
+CREATE TABLE `assistant_analysis_followups` (
+	`analysis_id` text PRIMARY KEY NOT NULL,
+	`conversation_id` text NOT NULL,
+	`reported` integer DEFAULT false NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`analysis_id`) REFERENCES `team_analyses`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`conversation_id`) REFERENCES `assistant_conversations`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `assistant_analysis_followups_conversation_idx` ON `assistant_analysis_followups` (`conversation_id`);--> statement-breakpoint
 CREATE TABLE `team_analyses` (
 	`id` text PRIMARY KEY NOT NULL,
 	`project_id` text NOT NULL,
