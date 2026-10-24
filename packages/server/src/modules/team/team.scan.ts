@@ -18,9 +18,15 @@ export async function readTip(repo: string, ref: string): Promise<{ sha: string;
   return { sha, committedAt: Number(committedAt) * 1000 };
 }
 
-/** The commits `ref` reaches, merges left out (33 §2.2). */
-export async function reachableCommits(repo: string, ref: string): Promise<string[]> {
-  const { stdout } = await runGit(['rev-list', '--no-merges', '--end-of-options', ref, '--'], { cwd: repo });
+/**
+ * The commits `ref` reaches, merges left out (33 §2.2), committed since `since` (ms): a commit is committed when or
+ * after it was authored, so this keeps every commit authored since then and spares walking the older history.
+ */
+export async function reachableCommits(repo: string, ref: string, since: number): Promise<string[]> {
+  const { stdout } = await runGit(
+    ['rev-list', '--no-merges', `--since=@${Math.floor(since / 1000)}`, '--end-of-options', ref, '--'],
+    { cwd: repo },
+  );
   return stdout.split('\n').filter((sha) => sha !== '');
 }
 

@@ -312,6 +312,8 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `preview.updated` | `Preview`（`{ taskId, state, url, logTail }`） | 页面预览（v1.3，29 §4.2）：每次状态变化后；任务页的预览页签直接用它更新 |
 | `schedule.updated` | `{ scheduleId }` | 定时任务（v1.2）：创建、修改、暂停 / 恢复、每次运行、删除后；定时任务列表与详情重新拉取（查询挂在任务列表前缀下，开出的任务状态变化也会刷新，22 §9） |
 | `git_review.updated` | `{ reviewId, projectId }` | Git 工作台的审查开始、提交问题、结束时；审查与列表重新拉取（27 §7.4） |
+| `team.scan_updated` | `{ projectId, done, total }` | 团队页第一次读取项目的提交时的进度（33 §7.2）；界面显示进度，不重新拉取 |
+| `team_analysis.updated` | `{ projectId, analysisId }` | 成员分析排队、开始、提交、结束时；该项目的团队查询重新拉取 |
 | `deck.updated` | `{ deckId }` | PPT：AI 工作开始与结束、每次提交通过、权限请求等待或已处理、页面修改、删除时；PPT 与列表重新拉取（23 §8） |
 | `resync` | `{}` | 全部失效 |
 
@@ -369,6 +371,22 @@ type AttemptDTO = AttemptSummaryDTO & {
 | --- | --- | --- | --- |
 | GET | `/insights?period&from&to` | `insights.summary` | `InsightsSummaryDTO`：时间段（含时区）、tokens 用量合计（不含成本，D79）与按项目 / 流程 / 角色 / 模型 / 用途的拆分、按天趋势、质量、`attention`；`period = custom` 缺日期、其余时间段带日期、`from > to` 或超过 `INSIGHTS_MAX_DAYS` 天为 400 |
 | GET | `/insights/tasks?period&from&to` | `insights.tasks` | `{ items: InsightsTaskDTO[] }`：时间段内结束或有用量的任务及其数字（钻取用） |
+
+## 13b′. 团队（v1.3，33 §8.1）
+
+全部 `mode = simple`（`team.settings.update` 为 `pro`）、`expose.assistant = true`、不进命令面板；不打分、不排名（D128）。时间段参数 `ref?`（缺省为项目默认分支，本地或远端分支都可）、`period`（`TeamPeriod`）、`from` / `to`（只随 `custom`，最多 `TEAM_MAX_DAYS` 天）、`granularity?`（`day` 时最多 `TEAM_MAX_BUCKETS` 天）。第一次读取一个项目的提交时请求等到读完，期间发 `team.scan_updated`。
+
+| 方法 | 路径 | 操作 | 说明 |
+| --- | --- | --- | --- |
+| GET | `/projects/:id/team` | `team.summary` | `TeamSummaryDTO`：分支最新提交与上次获取时间、时间段与分桶、团队合计与上一段、中位数、按姓名排序的成员（指标、上一段、每桶的点）、非成员、模块分布、每位成员同一时间段最近的 AI 分析；分支不存在 404 |
+| GET | `/projects/:id/team/members/:member` | `team.member` | `TeamMemberDetailDTO`：一位成员（主身份邮箱）的指标、趋势、身份、改动分布；从未出现的邮箱 404 |
+| GET | `/projects/:id/team/commits?member&cursor` | `team.commits` | 成员在时间段内的提交，新的在前，每页 50 |
+| PUT | `/projects/:id/team/identities` | `team.identities.update` | write：`{ email, memberEmail?, displayName?, hidden? }`；合并时连同已合并到它的身份一起移动；合并到自己或到已合并的身份为 400 |
+| GET / PUT | `/projects/:id/team/settings` | `team.settings.get` / `update` | 排除与测试文件的 glob、超大提交行数；`null` 恢复默认 |
+| POST | `/projects/:id/team/analyses` | `team.analyses.create` | write，201：`{ members[], …时间段 }`，为每位成员排队一个 AI 分析；运行时未就绪 `OPENCODE_NOT_READY`；同一成员同一时间段已有排队或进行中的分析 `TEAM_ANALYSIS_EXISTS` |
+| GET | `/projects/:id/team/analyses?member` | `team.analyses.list` | 新的在前 |
+| GET | `/team/analyses/:analysisId` | `team.analyses.get` | `TeamAnalysisDTO`（含报告与 `quality`） |
+| POST | `/team/analyses/:analysisId/cancel` | `team.analyses.cancel` | write：取消排队或运行中的分析 |
 
 ## 13c. 批量任务（v1.1）
 

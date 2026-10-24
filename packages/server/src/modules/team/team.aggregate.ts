@@ -62,17 +62,29 @@ export type CountedCommit = {
 /** The key the commits of this app's tasks nobody is named on go under. */
 export const AI_TASK_KEY = 'ai-task';
 
-/** Whether files are counted and are tests; one answer per path, as every commit of a period asks again. */
+/** Answers of the rule sets in use, by their globs: matching a path is slow and every request asks again. */
+const ruleCaches = new Map<string, Map<string, { counted: boolean; test: boolean }>>();
+/** Rule sets kept; a project rarely has more than one at a time. */
+const RULE_CACHES_MAX = 16;
+
+/** Whether files are counted and are tests (33 §2.4). */
 function fileRules(settings: TeamSettingsDTO) {
-  const cache = new Map<string, { counted: boolean; test: boolean }>();
+  const key = JSON.stringify([settings.excludeGlobs, settings.testGlobs]);
+  let cache = ruleCaches.get(key);
+  if (cache === undefined) {
+    if (ruleCaches.size >= RULE_CACHES_MAX) ruleCaches.clear();
+    cache = new Map();
+    ruleCaches.set(key, cache);
+  }
+  const answers = cache;
   return (path: string) => {
-    let rule = cache.get(path);
+    let rule = answers.get(path);
     if (rule === undefined) {
       rule = {
         counted: !settings.excludeGlobs.some((g) => matchesGlob(path, g)),
         test: settings.testGlobs.some((g) => matchesGlob(path, g)),
       };
-      cache.set(path, rule);
+      answers.set(path, rule);
     }
     return rule;
   };

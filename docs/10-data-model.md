@@ -584,9 +584,60 @@ payload / response：
 
 索引：`(project_id, created_at)`、`(attempt_id)`。AI 草拟提交信息不存库（27 §7.3），只留下它的 `commit_message` 尝试。
 
+## 4f. 团队（v1.3）
+
+见 [33-team.md §7、§8.2](33-team.md#82-表10-增补迁移-0023_team)，迁移 `0023_team`。提交按 SHA 缓存，不会过期，也不记录「属于哪个分支」（可达集合每次用 `git rev-list` 现算，D129）。
+
+### team_commits
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| project_id | TEXT → projects，CASCADE | 主键 `(project_id, sha)` |
+| sha | TEXT | 不含合并提交 |
+| author_email / author_name | TEXT | 已应用 `.mailmap`，邮箱小写 |
+| authored_at | INTEGER | 作者时间 |
+| subject | TEXT | 提交标题 |
+| ai_task | INTEGER(bool) | 作者是 `GIT_COMMIT_IDENTITY`（本应用的任务提交） |
+| ai_coauthor | INTEGER(bool) | 有其他 AI 工具的 `Co-Authored-By` |
+| requested_by_email / requested_by_name | TEXT NULL | 发起人 trailer（D130） |
+| reverts_sha | TEXT NULL | `This reverts commit <sha>` 的目标 |
+
+索引：`(project_id, authored_at)`。
+
+### team_commit_files
+
+`(project_id → projects CASCADE, sha, path)` 为主键，`added` / `deleted` INTEGER NULL（二进制文件为空）。改名记新路径。
+
+### team_identities
+
+`(project_id → projects CASCADE, email)` 为主键；`member_email` TEXT NULL（合并到的主身份，只有一层）、`display_name` TEXT NULL、`hidden` INTEGER(bool)（设为非成员）。没有行的邮箱就是它自己这位成员。
+
+### team_settings
+
+`project_id` 主键 → projects CASCADE；`exclude_globs` / `test_globs` TEXT(JSON) NULL、`huge_commit_lines` INTEGER NULL；空 = 默认（33 §2.4）。
+
+### team_analyses
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| project_id | TEXT → projects，CASCADE | |
+| member_email | TEXT | 发起时成员的主身份 |
+| ref / ref_sha | TEXT | 分支与发起时它的最新提交 |
+| period_from / period_to | TEXT | `YYYY-MM-DD` |
+| status | TEXT | `TeamAnalysisStatus`，经 `teamAnalysisMachine`（09 §15） |
+| commits | TEXT(JSON) | 成员在时间段内的提交 SHA，报告只能引用它们 |
+| sample | TEXT(JSON) | 抽样评审的提交 `{ sha, subject, lines }[]` |
+| attempt_id | TEXT NULL | 轮到它时的 `team_analysis` 尝试 |
+| report | TEXT(JSON) NULL | `submit_member_analysis` 的输入 |
+| error | TEXT(JSON) NULL | `ErrorInfo` |
+| created_at / finished_at | INTEGER | |
+
+索引：`(project_id, created_at)`、`(attempt_id)`。
+
 ## 5. 删除与清理
 
-- 删除项目：要求无非终态任务、没有研究中的知识对话、没有进行中的 Git 审查；级联删除其任务及全部关联数据和 `runs/<taskId>` 目录，以及知识对话、其 `research` 尝试与会话流，以及批次（外键级联，20 §6）与定时任务及其运行记录（22 §8），以及 Git 审查与其 `git_review` 尝试。
+- 删除项目：要求无非终态任务、没有研究中的知识对话、没有进行中的 Git 审查；级联删除其任务及全部关联数据和 `runs/<taskId>` 目录，以及知识对话、其 `research` 尝试与会话流，以及批次（外键级联，20 §6）与定时任务及其运行记录（22 §8），以及 Git 审查与其 `git_review` 尝试，以及团队的提交缓存、身份、口径与成员分析（外键级联；`team_analysis` 尝试的 `project_id` 置空，会话流留在 `runs/team/`）。
 - 删除定时任务：删除其运行记录，关闭其未处理的 `schedule_failure` 条目（dismissed）；开出的任务保留。
 - 删除知识对话：要求没有研究中的一轮；删除轮次、其尝试（权限条目随之级联）与 `runs/knowledge/<attemptId>.jsonl`。
 - 删除 PPT：要求没有进行中的 AI 工作（`DECK_BUSY`）；删除其尝试（会话流 `runs/ppt/<attemptId>.jsonl` 随之删除，权限条目级联），再删除 PPT（页面、资料、工作记录级联）。删除项目时 PPT 的 `project_id` 置空。

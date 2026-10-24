@@ -1,13 +1,14 @@
 import { type TeamIdentityDTO, type TeamMemberDetailDTO, type TeamQuery, UiMode } from '@aw/shared';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY, formatTime } from '../../copy/common.ts';
 import { TEAM_COPY as C, formatBucket, formatCount, formatRate, WORK_TYPE_LABEL } from '../../copy/team.ts';
+import { useUiStore } from '../../state/ui.store.ts';
 import { BarChart } from '../insights/bar-chart.tsx';
 import chart from '../insights/insights.module.css';
 import { projectQuery } from '../projects/projects.queries.ts';
@@ -29,6 +30,8 @@ export function TeamMemberPage() {
   const project = useQuery(projectQuery(projectId));
   const query = teamQueryOf(projectId, search);
   const detail = useQuery(teamMemberQuery(query, member));
+  const setTeamProject = useUiStore((s) => s.setTeamProject);
+  useEffect(() => setTeamProject(projectId), [setTeamProject, projectId]);
 
   const onSearch = (change: Partial<TeamSearch>) =>
     void navigate({ to: ROUTES.teamMember, params: { projectId, member }, search: { ...search, ...change } });

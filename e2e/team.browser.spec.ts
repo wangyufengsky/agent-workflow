@@ -95,7 +95,7 @@ test('J35 团队：成员表默认按姓名、点列头排序，成员页纵向�
   await expect(report).toContainText('这段时间主要在写 a 模块。');
   await expect(report).toContainText(head.slice(0, 7));
 
-  await page.getByRole('link', { name: '团队' }).first().click();
+  await page.locator('.crumbs').getByRole('link', { name: '团队' }).click();
   // No findings in the sampled lines: none per thousand lines in the AI column.
   await expect(table.locator('tbody tr').filter({ hasText: 'Zhang San' }).locator('td').last()).toHaveText('0');
   await expect(table.locator('tbody tr')).toHaveCount(4);

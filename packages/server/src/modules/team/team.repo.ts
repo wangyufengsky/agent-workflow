@@ -4,6 +4,8 @@ import type { Identity, StoredCommit } from './team.aggregate.ts';
 import type { CommitFacts, CommitFile } from './team.parse.ts';
 import { teamCommitFilesTable, teamCommitsTable, teamIdentitiesTable, teamSettingsTable } from './team.table.ts';
 
+/** SHAs per `IN (…)`, well under SQLite's variable limit. */
+const SHAS_PER_QUERY = 900;
 /** File rows per insert: five columns each, well under SQLite's variable limit. */
 const FILE_ROWS_PER_INSERT = 2000;
 
@@ -19,15 +21,18 @@ export function createTeamRepo(db: DbExecutor) {
   const f = teamCommitFilesTable;
 
   return {
-    cachedShas(projectId: string): Set<string> {
-      return new Set(
-        db
+    /** Which of these commits are cached already. */
+    cachedOf(projectId: string, shas: readonly string[]): Set<string> {
+      const cached = new Set<string>();
+      for (let i = 0; i < shas.length; i += SHAS_PER_QUERY) {
+        const rows = db
           .select({ sha: c.sha })
           .from(c)
-          .where(eq(c.projectId, projectId))
-          .all()
-          .map((r) => r.sha),
-      );
+          .where(and(eq(c.projectId, projectId), inArray(c.sha, shas.slice(i, i + SHAS_PER_QUERY))))
+          .all();
+        for (const r of rows) cached.add(r.sha);
+      }
+      return cached;
     },
 
     /** Commits read once more by a second reading are already there and kept. */
@@ -71,7 +76,11 @@ export function createTeamRepo(db: DbExecutor) {
         .where(inRange)
         .all();
       const bySha = new Map<string, CommitFile[]>();
-      for (const { sha, ...file } of files) bySha.set(sha, [...(bySha.get(sha) ?? []), file]);
+      for (const { sha, ...file } of files) {
+        const list = bySha.get(sha);
+        if (list === undefined) bySha.set(sha, [file]);
+        else list.push(file);
+      }
       return rows.map((r) => ({
         sha: r.sha,
         authorEmail: r.authorEmail,

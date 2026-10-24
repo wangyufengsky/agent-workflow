@@ -1,6 +1,6 @@
 # 33 · 团队
 
-> 状态：**设计稿，未实施**（2026-10-24）。用户已确认的方向：组长看组员；**不做评分**，做成图表，支持同一成员不同时间段的纵向对比和成员之间的横向对比；一个项目就是一个团队，页面跟着项目切换；不纳入 PR / MR 评审数据。默认统计本地分支、可切换；任务提交加发起人 trailer（D130）。实现细节按推荐方案（D128–D131），待用户检查。任务拆分见 [05](05-dev-plan.md) 的 T 系列。
+> 状态：**已实现，待用户检查**（2026-10-24，05 的 T-01…T-08）。用户已确认的方向：组长看组员；**不做评分**，做成图表，支持同一成员不同时间段的纵向对比和成员之间的横向对比；一个项目就是一个团队，页面跟着项目切换；不纳入 PR / MR 评审数据；默认统计本地分支、可切换；任务提交加发起人 trailer（D130）。实现细节按推荐方案（D128–D131），待用户检查。
 
 ## 1. 定位
 
@@ -128,7 +128,7 @@
 
 | 路由 | 页面 |
 | --- | --- |
-| `/team` | 跳到上次看的项目；没有记录时跳到第一个项目 |
+| `/team` | 跳到本次运行里上次看的项目；没有时跳到第一个项目 |
 | `/team/:projectId` | 团队概览 |
 | `/team/:projectId/members/:memberKey` | 成员页（`memberKey` = 成员主身份的邮箱，URL 编码） |
 
@@ -186,14 +186,14 @@
 
 ### 6.3 会话
 
-- `AttemptKind.TeamAnalysis`，不属于任务（同 `git_review`，27 §4.3）；agent `aw-team-analyst`：权限与 `aw-code-reviewer` 相同（只读 bash 白名单、无编辑与联网），会话目录 = 项目主仓库；模型取内置 `reviewer` 角色。
+- `AttemptKind.TeamAnalysis`，不属于任务（同 `git_review`，27 §4.3）；沿用 Git 工作台的 agent `aw-code-reviewer`（只读 bash 白名单、无编辑与联网，它的 agent 提示词同时说明审查、草拟提交信息与成员分析三种工作），会话目录 = 项目主仓库，会话流在 `runs/team/`；模型取内置 `reviewer` 角色。首条消息模板 `start-team-analysis.md`。
 - 首条消息给出：成员的身份、时间段、分支；提交清单（SHA、日期、标题、有效改动，最多 400 条，更多时给出按周的汇总并说明）；§3 的指标；抽样提交及其读取方式（`git show <sha>`）。
 - 模型用 MCP 工具 `submit_member_analysis`（§6.6）提交；只允许 `team_analysis` 尝试调用。
 
 ### 6.4 排队
 
 - 一个项目同一时间只运行一个分析，其余排队；不计入调度器并发（同 D68）。「为全部成员生成」一次建好每个成员的分析记录并排队。
-- 状态（`TeamAnalysisStatus`，09 增补）：`queued` → `running` → `succeeded` / `failed`；`queued` / `running` 可取消 → `cancelled`。重启时 `running` 的分析按尝试的中断规则记为 `failed`（`interrupted`），可「重新生成」；`queued` 的继续排队。
+- 状态（`TeamAnalysisStatus`，09 §15）：`queued` → `running` → `succeeded` / `failed`；`queued` / `running` 可取消 → `cancelled`。排队的首条消息只在内存里，所以应用重启时排队与运行中的分析都记为 `failed`（`TEAM_ANALYSIS_INTERRUPTED`），可「重新生成」。会话没能开始时这一个失败，接着开始下一个。
 - 同一成员、时间段、分支已有 `queued` / `running` 的分析时再发起 → `TEAM_ANALYSIS_EXISTS`。
 - 分析记录保留（随项目删除）；成员合并身份后，旧分析仍挂在原主身份的邮箱下，界面一并列出。
 
@@ -246,9 +246,9 @@
 
 ### 7.2 读取
 
-- 打开团队页时：`git rev-list --no-merges <ref>` 得到可达的提交（十万级提交约百毫秒级，实现时实测），与缓存求差，缺的用 `git log --no-walk --numstat -z --format=...` 分批读入（每批 500 个，解析复用 `git.diff.ts` 的 numstat 解析）。
+- 打开团队页时：`git rev-list --no-merges --since=<上一段的开始> <ref>` 得到可达的提交（提交时间不早于作者时间，所以作者时间在范围内的都在；更早的历史不用走），与缓存求差（已知在缓存里的提交记在内存里，只问一次数据库），缺的用 `git log --no-walk --numstat -z --format=...` 分批读入（每批 500 个，解析复用 `git.diff.ts` 的 numstat 解析）。
 - 分支被强推或换分支不影响缓存：可达集合每次现算，已缓存的提交直接复用。
-- 首次读取大仓库可能需要十几秒到一分钟：后台进行，经 SSE `team.scan.updated` 报进度；同一项目同时只有一次读取，再打开页面时接着显示进度。
+- 首次读取大仓库可能需要十几秒：请求等到读完，期间经 SSE `team.scan_updated` 报进度，页面显示「正在读取提交历史 n / m」；同一项目同时只有一次读取，第二个请求等它读完再补读还缺的。
 - 聚合在后端一次完成：按可达集合与时间段取缓存行，在 JS 中按时区分桶、套规则、汇总（同 19 §5）。
 
 ### 7.3 索引
@@ -257,9 +257,17 @@
 
 ### 7.4 目标
 
-在 5 万提交、20 万文件行的仓库上，缓存就绪后 `last_365_days` 的概览 ≤ 300 ms（T-02 实测记录在本节）。
+实测（T-02，本机 Apple Silicon Mac，2026-10-24；`git fast-import` 造的 5 万提交、每个改 4 个文件、12 位作者、跨 400 天的仓库）：
 
-## 8. 接口、数据与枚举（实施时迁入 08–12）
+| 场景 | 耗时 |
+| --- | --- |
+| 第一次打开（读入 4.6 万个提交与 18 万文件行） | 约 13 s |
+| 之后 `last_30_days`（连同上一段 30 天） | 约 160 ms |
+| 之后 `last_365_days`（连同上一段，覆盖全部历史） | 约 1.0 s：`git rev-list` 约 300 ms、读缓存约 400 ms、套规则与汇总约 300 ms |
+
+原定「一年 ≤ 300 ms」没有达到：git 本身走一遍 4.6 万个提交就要约 300 ms。一年的视图要等约 1 秒（页面有骨架与读取提示），可以接受；以后需要时再把汇总下推到 SQL。
+
+## 8. 接口、数据与枚举（已迁入 08–12）
 
 ### 8.1 操作（11 增补）
 
@@ -271,6 +279,7 @@
 | PUT | `/projects/:id/team/identities` | `team.identities.update` | write | 合并身份、改显示名、设为非成员 |
 | GET / PUT | `/projects/:id/team/settings` | `team.settings.get` / `update` | read / write | 排除规则、测试规则、超大提交阈值 |
 | POST | `/projects/:id/team/analyses` | `team.analyses.create` | write | `{ members: string[], ref, period, from?, to? }`，返回建好的分析 |
+| GET | `/projects/:id/team/analyses?member` | `team.analyses.list` | read | 新的在前 |
 | GET | `/team/analyses/:id` | `team.analyses.get` | read | 分析记录与报告 |
 | POST | `/team/analyses/:id/cancel` | `team.analyses.cancel` | write | 取消排队或运行中的分析 |
 
@@ -283,18 +292,19 @@
 | `team_commits` | `project_id`、`sha`、`author_email`、`author_name`、`authored_at`、`subject`、`ai_marks`（JSON：`task` / `requested_by` / `coauthor`）、`requested_by_email`、`reverts_sha` |
 | `team_commit_files` | `project_id`、`sha`、`path`、`added`、`deleted`、`binary` |
 | `team_identities` | `project_id`、`email`、`member_email`（合并到的主身份）、`display_name`、`hidden` |
+| `team_commit_files` 与 `team_commits` 的其余列 | 见 10 §4f |
 | `team_settings` | `project_id`、`exclude_globs`、`test_globs`、`huge_commit_lines`（JSON 或列，空 = 默认） |
-| `team_analyses` | `id`、`project_id`、`member_email`、`ref`、`ref_sha`（开始时的分支提交）、`period_from`、`period_to`、`status`、`sample`（JSON SHA 列表）、`attempt_id`、`report`（JSON）、`error`、`created_at`、`finished_at` |
+| `team_analyses` | `id`、`project_id`、`member_email`、`ref`、`ref_sha`（开始时的分支提交）、`period_from`、`period_to`、`status`、`commits`（JSON：可引用的提交）、`sample`（JSON `{ sha, subject, lines }[]`）、`attempt_id`、`report`（JSON）、`error`、`created_at`、`finished_at` |
 
 ### 8.3 枚举、常量与错误码（08 增补）
 
 - `TeamPeriod`、`TeamGranularity`、`TeamWorkType`、`TeamAnalysisStatus`；`AttemptKind` 增加 `team_analysis`；`AssistantPage` 增加 `team`。
 - `TEAM_MAX_DAYS = 731`、`TEAM_MAX_BUCKETS = 120`、`TEAM_HUGE_COMMIT_LINES = 5000`（默认）、`TEAM_REVIEW_MAX_LINES = 2000`、`TEAM_ANALYSIS_SAMPLE = 5`、`TEAM_AI_COAUTHOR_PATTERNS`、默认排除与测试 glob。
-- 错误码：`TEAM_ANALYSIS_EXISTS`、`TEAM_ANALYSIS_INVALID`；分支不存在复用 Git 工作台的错误码。
+- 错误码：`TEAM_ANALYSIS_NOT_FOUND`、`TEAM_ANALYSIS_EXISTS`、`TEAM_ANALYSIS_INVALID`、`TEAM_ANALYSIS_INTERRUPTED`；分支不存在为 `NOT_FOUND`。
 
 ### 8.4 任务提交的发起人 trailer（D130）
 
-`nodes.run.ts` 的节点提交与 `delivery.merge.ts` 的 squash / 合并提交，在提交信息末尾加 `Agent-Workflow-Requested-By: 名字 <邮箱>`。名字与邮箱在任务开始时从项目仓库读 `git config user.name` / `user.email` 存到任务上；读不到时不加。作者与提交者仍是 `GIT_COMMIT_IDENTITY`（D52 不变）。
+`nodes.run.ts` 的节点提交与 `tasks.delivery.ts` 交付的 squash / 合并提交，在提交信息末尾加 `Agent-Workflow-Requested-By: 名字 <邮箱>`（`withRequestedBy`）。名字与邮箱在提交时从项目仓库的配置读（`git config user.name` / `user.email`，不用 git 按主机名猜的身份）；任一项读不到或为空时不加。作者与提交者仍是 `GIT_COMMIT_IDENTITY`（D52 不变）。
 
 ## 9. 实现结构
 
@@ -303,9 +313,9 @@
   - `team.scan.ts`：可达集合与缓存求差、分批读入、进度；
   - `team.parse.ts`：日志格式、trailer、约定式前缀、回滚目标（纯函数）；
   - `team.aggregate.ts`：套规则、分桶、§3 全部指标、中位数、上一段对比（纯函数）；
-  - `team.analysis.ts`：抽样、首条消息、排队、`submit_member_analysis` 校验；
+  - `team.analysis.ts`、`team.analysis.repo.ts`：抽样、首条消息、排队、`submit_member_analysis` 校验；
   - `team.repo.ts`、`team.service.ts`、`team.operations.ts`、`index.ts`。
-- `web/src/features/team/`：概览页、成员页、口径设置抽屉、分组柱与比例条组件、查询；文案 `web/src/copy/team.ts`。
+- `web/src/features/team/`：概览页、成员页、成员分析、口径设置抽屉、对比条与比例条组件、查询；趋势图沿用并扩展 `insights/bar-chart.tsx`（更多系列色、分桶日期与固定上限）；文案 `web/src/copy/team.ts`。
 
 ## 10. 不做
 

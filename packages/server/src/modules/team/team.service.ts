@@ -67,6 +67,16 @@ export function createTeamService(deps: TeamServiceDeps) {
   const repo = createTeamRepo(db);
   /** One reading per project at a time (33 §7.2); a second caller waits for it, then reads what is still missing. */
   const scans = new Map<string, Promise<void>>();
+  /** Commits known to be cached, by project: a commit never leaves the cache, so asking once is enough. */
+  const known = new Map<string, Set<string>>();
+  const knownOf = (projectId: string) => {
+    let set = known.get(projectId);
+    if (set === undefined) {
+      set = new Set();
+      known.set(projectId, set);
+    }
+    return set;
+  };
 
   async function scan(projectId: string, repoPath: string, missing: string[]): Promise<void> {
     const total = missing.length;
@@ -75,6 +85,7 @@ export function createTeamService(deps: TeamServiceDeps) {
       const batch = missing.slice(done, done + SCAN_BATCH);
       const commits = await readCommits(repoPath, batch);
       db.transaction((tx) => createTeamRepo(tx).insertCommits(projectId, commits));
+      for (const sha of batch) knownOf(projectId).add(sha);
       done += batch.length;
       events.publish({ type: ServerEventType.TeamScanUpdated, data: { projectId, done, total } });
     }
@@ -87,8 +98,11 @@ export function createTeamService(deps: TeamServiceDeps) {
         await running;
         continue;
       }
-      const cached = repo.cachedShas(projectId);
-      const missing = shas.filter((sha) => !cached.has(sha));
+      const seen = knownOf(projectId);
+      const unknown = shas.filter((sha) => !seen.has(sha));
+      const cached = repo.cachedOf(projectId, unknown);
+      for (const sha of cached) seen.add(sha);
+      const missing = unknown.filter((sha) => !cached.has(sha));
       if (missing.length === 0) return;
       const reading = scan(projectId, repoPath, missing).finally(() => scans.delete(projectId));
       scans.set(projectId, reading);
@@ -110,12 +124,13 @@ export function createTeamService(deps: TeamServiceDeps) {
     const project = projects.getRecord(query.id);
     const ref = query.ref ?? project.defaultBranch;
     const tip = await readTip(project.repoPath, ref);
+    const range = resolveTeamRange(query, clock.now(), timeZone);
+    // Back to the start of the period compared with; reverts come after what they revert, so they are read too.
     const [shas, fetchedAt] = await Promise.all([
-      reachableCommits(project.repoPath, ref),
+      reachableCommits(project.repoPath, ref, range.previous.start),
       readFetchedAt(project.repoPath),
     ]);
     await ensureScanned(project.id, project.repoPath, shas);
-    const range = resolveTeamRange(query, clock.now(), timeZone);
     const reachable = new Set(shas);
     const stored = repo.commitsIn(project.id, range.previous.start, range.end).filter((c) => reachable.has(c.sha));
     const reverted = new Set(

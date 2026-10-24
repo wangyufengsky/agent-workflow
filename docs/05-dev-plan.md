@@ -405,17 +405,19 @@
 | B3-04 | **已完成**（live 新增 `browser-reading.live.test.ts` 两例；修好 B2 合并后过时的 `assistant-workflow.live.test.ts`：改用 `openUserTabOp`；预览夹具的控制台错误与 404 移到 `/broken`，否则 B2 的页面体检让修 Bug 任务失败，用户把预览导航到那页再问；live 的类型检查范围加上新文件）。收尾：live（知识问答打开网络开关，用浏览器读本地网页并引用、摘录正确；助手启动预览并读当前页面的控制台错误）、文档同步（07、15、18、23、29） | `pnpm verify`、`pnpm e2e`、live 一例通过；文档与代码一致 |
 
 
-## 后续设计 · 团队（T，设计稿，未实施）
+## v1.3 期间 · 团队（T）
+
+> 状态：**已完成，待用户检查**（2026-10-24）。`pnpm verify`、J35、J9 的团队两页、live `live/team.live.test.ts`（`opencode-go/deepseek-v4.1-flash`，约 50 秒，分析完成且引用全部通过校验）。
 
 依据 [33-team.md](33-team.md)（D128–D131）。T-01…T-04 不调用 AI，可先单独交付；T-05、T-06 是 AI 成员分析；T-07 的 trailer（D130，用户已确认）不影响其余任务。
 
 | 任务 | 内容 | 完成标准 |
 | --- | --- | --- |
-| T-01 | `team` 模块：迁移 `0023_team`、`team.parse.ts`（日志格式、trailer、约定式前缀、回滚目标）、`team.scan.ts`（`rev-list` 求可达、缓存求差、分批读入、进度事件） | 单元覆盖 33 §11 的解析用例；集成：真实仓库首次读取与增量读取、强推后复用缓存、同一项目只有一次读取 |
-| T-02 | `team.aggregate.ts` 与 `team.summary` / `team.member` / `team.commits`：排除与测试规则、超大提交、身份合并与非成员、三种分桶、中位数与上一段对比；`team.identities.update`、`team.settings.*` | 单元覆盖 33 §11 的聚合用例；集成经 API 取数字；在 5 万提交的种子仓库上实测并把结果写入 33 §7.4 |
-| T-03 | 前端：导航「团队」、`/team` 路由与项目切换、概览页、成员页、分组柱与比例条组件、读取进度、口径设置抽屉（专业模式） | E2E J35 的非 AI 部分；四主题走查 |
-| T-04 | 应用助手：read 操作成为助手工具，`open_page` 增加 `team` | 集成：助手调用 `team_summary` 直接返回成员提交数 |
-| T-05 | AI 成员分析后端：`AttemptKind.TeamAnalysis`、agent 与提示词、抽样、`submit_member_analysis` 与校验、排队与取消、重启规则（09 增补） | 集成：FakeOpencode 覆盖 33 §11「分析」各项 |
-| T-06 | AI 成员分析界面：生成与全员生成的确认框（含隐私提示）、报告、历史、成员表的抽样评审列；live 一例 | E2E J35 的分析部分；`pnpm test:live` 免费模型一例，引用全部通过校验 |
-| T-07 | 任务提交与交付提交加发起人 trailer；团队页归入「经 AI 任务」 | 集成：33 §11「trailer」两项 |
-| T-08 | 文档同步：08–12 迁入正式章节，01、03、07、14 增补 | `pnpm verify` 通过 |
+| T-01（已完成） | `team` 模块：迁移 `0023_team`、`team.parse.ts`（日志格式、trailer、约定式前缀、回滚目标）、`team.scan.ts`（`rev-list` 求可达、缓存求差、分批读入、进度事件） | 单元覆盖 33 §11 的解析用例；集成：真实仓库首次读取与增量读取、强推后复用缓存、同一项目只有一次读取 |
+| T-02（已完成） | `team.aggregate.ts` 与 `team.summary` / `team.member` / `team.commits`：排除与测试规则、超大提交、身份合并与非成员、三种分桶、中位数与上一段对比；`team.identities.update`、`team.settings.*` | 单元覆盖 33 §11 的聚合用例；集成经 API 取数字；在 5 万提交的种子仓库上实测并把结果写入 33 §7.4 |
+| T-03（已完成） | 前端：导航「团队」、`/team` 路由与项目切换、概览页、成员页、分组柱与比例条组件、读取进度、口径设置抽屉（专业模式） | E2E J35 的非 AI 部分；四主题走查 |
+| T-04（已完成） | 应用助手：read 操作成为助手工具，`open_page` 增加 `team` | 集成：助手调用 `team_summary` 直接返回成员提交数 |
+| T-05（已完成） | AI 成员分析后端：`AttemptKind.TeamAnalysis`、agent 与提示词、抽样、`submit_member_analysis` 与校验、排队与取消、重启规则（09 增补） | 集成：FakeOpencode 覆盖 33 §11「分析」各项 |
+| T-06（已完成） | AI 成员分析界面：生成与全员生成的确认框（含隐私提示）、报告、历史、成员表的抽样评审列；live 一例 | E2E J35 的分析部分；`pnpm test:live` 免费模型一例，引用全部通过校验 |
+| T-07（已完成） | 任务提交与交付提交加发起人 trailer；团队页归入「经 AI 任务」 | 集成：33 §11「trailer」两项 |
+| T-08（已完成） | 文档同步：08–12 迁入正式章节，01、03、07、14 增补 | `pnpm verify` 通过 |
