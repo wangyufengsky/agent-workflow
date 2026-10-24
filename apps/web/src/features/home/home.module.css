@@ -168,13 +168,27 @@
   align-items: center;
   gap: var(--s-2);
   height: 28px;
-  padding: 0 4px 0 10px;
+  padding: 0 4px 0 2px;
   border-radius: var(--r-pill);
   background: var(--accent-fill);
   box-shadow: inset 0 0 0 1px var(--accent-line);
   color: var(--accent-ink);
   font-size: var(--fs-sm);
   font-weight: 500;
+}
+.modeName {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 24px;
+  padding: 0 4px 0 8px;
+  border-radius: var(--r-pill);
+  color: inherit;
+  font-weight: inherit;
+  transition: background var(--t-fast);
+}
+.modeName:hover {
+  background: var(--fill-3);
 }
 .modeClear {
   display: grid;
@@ -215,7 +229,7 @@
   gap: 10px;
 }
 
-/* ---- strips: workflows, suggestions, recent conversations ---- */
+/* ---- strips: suggestions, recent conversations ---- */
 .strip {
   min-width: 0;
   margin: 0;
@@ -259,6 +273,97 @@
 .composerArea[data-docked] .chip {
   height: 28px;
   padding: 0 10px;
+}
+
+/* ----「直接开始」: a pill in the foot, the workflows unfolding inside the box above it (36 §5, D145) ---- */
+.flowsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--fill-1);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  transition: background var(--t-fast);
+}
+.flowsToggle:hover {
+  background: var(--fill-3);
+}
+.flowsToggle[aria-expanded="true"] {
+  background: var(--accent-fill);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+  color: var(--accent-ink);
+}
+.flowsChevron {
+  display: inline-flex;
+  color: var(--muted);
+  transition: transform var(--t-fast) var(--ease);
+}
+[aria-expanded="true"] > .flowsChevron {
+  transform: rotate(180deg);
+}
+.flows {
+  min-width: 0;
+  margin: 0;
+  padding: var(--s-2) 0 0;
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  overflow: hidden;
+  interpolate-size: allow-keywords;
+  height: auto;
+  opacity: 1;
+  transition:
+    height var(--t-mid) var(--ease),
+    opacity var(--t-mid) var(--ease),
+    display var(--t-mid) allow-discrete;
+}
+.flows[hidden] {
+  display: none;
+  height: 0;
+  padding-top: 0;
+  opacity: 0;
+  transition-duration: 0.16s;
+}
+@starting-style {
+  .flows:not([hidden]) {
+    height: 0;
+    opacity: 0;
+  }
+}
+.flows:not([hidden]) .chip {
+  animation: chip-in 0.2s var(--ease) both;
+  animation-delay: calc(var(--i) * 15ms);
+}
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.flowsCap {
+  flex-basis: 100%;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .flows,
+  .flows[hidden],
+  .flowsChevron {
+    transition: none;
+  }
+  .flows:not([hidden]) .chip {
+    animation: none;
+  }
+  [aria-expanded="true"] > .flowsChevron {
+    transform: none;
+  }
 }
 .suggestion {
   height: 30px;

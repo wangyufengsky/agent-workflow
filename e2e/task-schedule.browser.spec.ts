@@ -4,6 +4,7 @@ import {
   git,
   passReview,
   patchSettings,
+  pickWorkflow,
   queueTurn,
   submitResult,
   TASK_RUN_TIMEOUT_MS,
@@ -32,7 +33,7 @@ test('J19 主页「补单元测试」的「定时」→ 每周一、五 03:30 �
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
 
   await page.goto(`/?projectId=${project.id}`);
-  await page.getByRole('group', { name: '直接开始' }).getByRole('button', { name: '补单元测试' }).click();
+  await pickWorkflow(page, '补单元测试');
   await page.getByRole('link', { name: '定时运行「补单元测试」' }).click();
   await expect(page.getByRole('heading', { name: '新建定时任务' })).toBeVisible();
   await expect(page.getByLabel('要做什么')).toHaveValue(REQUIREMENT);

@@ -12,6 +12,7 @@ import {
   git,
   MIN_WINDOW,
   patchSettings,
+  pickWorkflow,
   queueCodeReviewerTurn,
   queueTurn,
   submitResult,
@@ -229,7 +230,7 @@ test('主页开始任务：总能看到并选择项目，基于分支只列所�
   const b = await createProject(request, null);
   git(a.repoPath, 'branch', 'feature/only-in-a');
   await page.goto(`/?projectId=${a.id}`);
-  await page.getByRole('group', { name: '直接开始' }).getByRole('button', { name: '修 Bug', exact: true }).click();
+  await pickWorkflow(page, '修 Bug');
   const project = page.getByLabel('项目', { exact: true });
   await expect(project).toHaveValue(a.id);
 

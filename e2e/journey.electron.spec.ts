@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { type ElectronApplication, _electron as electron, expect, type Page, test } from '@playwright/test';
 import { TEST_MODEL } from '../packages/server/test/helpers/model.ts';
-import { git } from './helpers.ts';
+import { git, pickWorkflow } from './helpers.ts';
 
 // J10 (07 §5): the built app with the real opencode and the free test model (D50). AW_E2E_EXECUTABLE points at a
 // packaged binary (for example the copy of a mounted dmg, M6-04); otherwise the built, unpackaged app is launched.
@@ -91,10 +91,7 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
   });
   expect(settings.ok()).toBe(true);
 
-  await page
-    .getByRole('group', { name: '直接开始' })
-    .getByRole('button', { name: /修 Bug/ })
-    .click();
+  await pickWorkflow(page, /修 Bug/);
   await page
     .getByLabel('需求')
     .fill('median 返回了错误的结果：median([10, 9, 1]) 应该是 9，实际是 10。请找到原因并修复。');

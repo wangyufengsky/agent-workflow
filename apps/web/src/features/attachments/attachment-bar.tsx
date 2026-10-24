@@ -35,44 +35,17 @@ export function pasteFilesInto(draft: AttachmentDraft) {
 }
 
 /**
- * The attachments of an input (30 §2): cards for what is attached, and「添加资料」. With a `projectFiles` source the
- * user can also pick a file of the project.
+ * How an input picks attachments (30 §2): a file of the computer and, with a `projectFiles` source, a file of the
+ * project. `elements` (the hidden file input and the project file dialog) must be rendered by the caller.
  */
-export function AttachmentBar({
-  draft,
-  projectFiles,
-}: {
-  draft: AttachmentDraft;
-  projectFiles?: ProjectFileSource | undefined;
-}) {
+export function useAttachmentPickers(draft: AttachmentDraft, projectFiles: ProjectFileSource | undefined) {
   const picker = useRef<HTMLInputElement>(null);
   const [picking, setPicking] = useState(false);
-  const [open, setOpen] = useState<{ id: string; name: string }>();
-  return (
-    <div className={styles.bar}>
-      {draft.items.length > 0 && (
-        <ul className={styles.list} aria-label={C.listLabel}>
-          {draft.items.map((item) => (
-            <DraftCard key={item.key} item={item} onOpen={setOpen} onRemove={() => draft.remove(item.key)} />
-          ))}
-        </ul>
-      )}
-      <div className={styles.actions}>
-        <button type="button" className={styles.add} onClick={() => picker.current?.click()}>
-          <Icon name="paperclip" size="sm" />
-          {C.add}
-        </button>
-        {projectFiles !== undefined && (
-          <button type="button" className={styles.add} onClick={() => setPicking(true)}>
-            <Icon name="folder" size="sm" />
-            {C.addProjectFile}
-          </button>
-        )}
-        {draft.notice !== undefined && (
-          <span className="hint" role="status">
-            {draft.notice}
-          </span>
-        )}
+  return {
+    pickFile: () => picker.current?.click(),
+    pickProjectFile: projectFiles === undefined ? undefined : () => setPicking(true),
+    elements: (
+      <>
         <input
           ref={picker}
           type="file"
@@ -84,11 +57,62 @@ export function AttachmentBar({
             e.target.value = '';
           }}
         />
-      </div>
-      {picking && projectFiles !== undefined && (
-        <ProjectFileDialog source={projectFiles} onAdd={draft.addProjectFile} onClose={() => setPicking(false)} />
+        {picking && projectFiles !== undefined && (
+          <ProjectFileDialog source={projectFiles} onAdd={draft.addProjectFile} onClose={() => setPicking(false)} />
+        )}
+      </>
+    ),
+  };
+}
+
+/** What is attached and the draft's notice; nothing at all while there is neither (36 §4). */
+export function AttachmentList({ draft }: { draft: AttachmentDraft }) {
+  const [open, setOpen] = useState<{ id: string; name: string }>();
+  if (draft.items.length === 0 && draft.notice === undefined && open === undefined) return null;
+  return (
+    <div className={styles.bar}>
+      {draft.items.length > 0 && (
+        <ul className={styles.list} aria-label={C.listLabel}>
+          {draft.items.map((item) => (
+            <DraftCard key={item.key} item={item} onOpen={setOpen} onRemove={() => draft.remove(item.key)} />
+          ))}
+        </ul>
+      )}
+      {draft.notice !== undefined && (
+        <span className="hint" role="status">
+          {draft.notice}
+        </span>
       )}
       {open !== undefined && <AttachmentPreview id={open.id} name={open.name} onClose={() => setOpen(undefined)} />}
+    </div>
+  );
+}
+
+/** The attachments of a dialog's input (「再改改」): the list and「添加资料」「项目文件」as buttons. */
+export function AttachmentBar({
+  draft,
+  projectFiles,
+}: {
+  draft: AttachmentDraft;
+  projectFiles?: ProjectFileSource | undefined;
+}) {
+  const pickers = useAttachmentPickers(draft, projectFiles);
+  return (
+    <div className={styles.bar}>
+      <AttachmentList draft={draft} />
+      <div className={styles.actions}>
+        <button type="button" className={styles.add} onClick={pickers.pickFile}>
+          <Icon name="paperclip" size="sm" />
+          {C.add}
+        </button>
+        {pickers.pickProjectFile !== undefined && (
+          <button type="button" className={styles.add} onClick={pickers.pickProjectFile}>
+            <Icon name="folder" size="sm" />
+            {C.addProjectFile}
+          </button>
+        )}
+        {pickers.elements}
+      </div>
     </div>
   );
 }
