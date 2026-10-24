@@ -4,6 +4,7 @@ export const queryKeys = {
   environment: ['system', 'environment'],
   projects: ['projects'],
   project: (id: string) => ['projects', id],
+  gitInitPreview: (repoPath: string) => ['projects', 'git-init-preview', repoPath],
   paletteOperations: ['operations', 'palette'],
   runtime: ['system', 'runtime'],
   health: ['system', 'health'],

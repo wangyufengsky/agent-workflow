@@ -85,6 +85,9 @@ function parsePort(env: Readonly<Record<string, string | undefined>>, name: stri
 export const PROJECT_CHECK_PLACEHOLDER = '$PROJECT_CHECK';
 /** Author and committer of the commits the backend makes for finished nodes (09 §3). */
 export const GIT_COMMIT_IDENTITY = { name: 'agent-workflow', email: 'agent-workflow@localhost' } as const;
+/** Branch and message of the first commit when the app puts a directory under Git (D153). */
+export const GIT_INIT_BRANCH = 'main';
+export const GIT_INIT_COMMIT_MESSAGE = 'Initial commit';
 /** The connection form's port for each database type (24 §2). */
 export const DB_DEFAULT_PORT = {
   [DbType.Mysql]: 3306,

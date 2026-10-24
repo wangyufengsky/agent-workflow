@@ -94,6 +94,28 @@ export function inferPreview(rootFiles: ReadonlySet<string>, packageJson: unknow
   };
 }
 
+/** Ignore rules by what the root holds (D153): a build file names its tool, or the tool's output is already there. */
+const GITIGNORE_RULES: ReadonlyArray<{ applies: (name: string) => boolean; patterns: readonly string[] }> = [
+  { applies: (name) => name === 'package.json' || name === 'node_modules', patterns: ['node_modules/'] },
+  { applies: (name) => name === 'pom.xml', patterns: ['target/'] },
+  {
+    applies: (name) => /^(build|settings)\.gradle(\.kts)?$/.test(name) || name === '.gradle',
+    patterns: ['build/', '.gradle/'],
+  },
+  {
+    applies: (name) =>
+      ['pyproject.toml', 'requirements.txt', 'setup.py', 'Pipfile', '.venv'].includes(name) || name.endsWith('.py'),
+    patterns: ['__pycache__/', '.venv/'],
+  },
+];
+
+/** The `.gitignore` written when the app puts a directory under Git (D153); `.DS_Store` always. */
+export function inferGitignore(rootFiles: ReadonlySet<string>): string {
+  const names = [...rootFiles];
+  const patterns = GITIGNORE_RULES.filter((rule) => names.some(rule.applies)).flatMap((rule) => rule.patterns);
+  return `${[...patterns, '.DS_Store'].join('\n')}\n`;
+}
+
 async function readJson(file: string): Promise<unknown> {
   try {
     return JSON.parse(await readFile(file, 'utf8'));
@@ -112,6 +134,12 @@ async function readRoot(repoRoot: string): Promise<{ files: Set<string>; package
 export async function inferRepoCheckCommand(repoRoot: string): Promise<string | null> {
   const { files, packageJson } = await readRoot(repoRoot);
   return inferCheckCommand(files, packageJson);
+}
+
+/** The `.gitignore` to write into `dir`; null when it already has one. */
+export async function inferDirGitignore(dir: string): Promise<string | null> {
+  const files = new Set(await readdir(dir));
+  return files.has('.gitignore') ? null : inferGitignore(files);
 }
 
 export async function inferRepoPreview(repoRoot: string): Promise<ProjectPreview | null> {

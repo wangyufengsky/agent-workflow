@@ -253,7 +253,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ASSISTANT_DIR` / `ASSISTANT_FILES_DIR` / `ASSISTANT_CONVERSATIONS_DIR` | `assistant` / `files` / `conversations` | 助手会话工作目录 `<数据目录>/assistant/files/<id>/`，对话文件相对该目录，消息流 `conversations/<id>.jsonl` |
 | `KNOWLEDGE_DOC_DIRS` / `KNOWLEDGE_DOC_EXTENSIONS` | `docs` `doc` / `.md` `.mdx` `.markdown` `.txt` `.rst` `.adoc` | 被引用的文件位于这些目录下或带这些扩展名时为文档，否则为代码（18 §6.1） |
 | `PROJECT_CHECK_PLACEHOLDER` | `$PROJECT_CHECK` | 验收命令中代表项目检查命令，物化节点时替换（13 §1） |
-| `GIT_COMMIT_IDENTITY` | `agent-workflow <agent-workflow@localhost>` | 节点完成时后端提交的作者与提交者（09 §3） |
+| `GIT_COMMIT_IDENTITY` | `agent-workflow <agent-workflow@localhost>` | 节点完成时后端提交的作者与提交者（09 §3）；为没有 Git 的目录初始化时，git 没有配置身份也用它（D153） |
+| `GIT_INIT_BRANCH` / `GIT_INIT_COMMIT_MESSAGE` | `main` / `Initial commit` | 为没有 Git 的目录初始化时的分支与第一个提交的说明（D153，11 §3） |
 
 `constants/opencode.ts`：
 
@@ -300,6 +301,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TEAM_ANALYSIS_COMMITS_MAX` / `TEAM_ANALYSIS_MEMBERS_MAX` | 400 / 50（首条消息列出的提交数、一次排队的成员数） |
 | `RUNTIME_LOG_TAIL_DEFAULT` / `RUNTIME_LOG_TAIL_MAX` | 500 / 5000（运行环境日志页的行数） |
 | `LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX` | 50 / 100（任务与「需要你处理」列表每页条数，11 §1） |
+| `GIT_INIT_LARGE_FILE_BYTES` / `GIT_INIT_LARGE_TOTAL_BYTES` | 50 MiB / 500 MiB（初始化 Git 时单个文件、首次提交总量达到它就提醒先补忽略规则，D153） |
+| `GIT_INIT_LARGE_FILES_SHOWN` | 5（初始化确认里列出的大文件数） |
 | `BATCH_TARGETS_MAX` | 20（一个批次的目标数，D85） |
 | `BATCH_TARGET_MAX_CHARS` | 500（一个目标，单行） |
 | `SCHEDULE_CHECK_INTERVAL_MS` | 60 000（定时器最长等这么久就检查一次到期的定时任务，22 §4） |
@@ -417,7 +420,8 @@ class AppError extends Error {
 | `INTERNAL_ERROR` | 500 | 未预期异常 |
 | **项目** | | |
 | `PROJECT_NOT_FOUND` | 404 | |
-| `PROJECT_PATH_NOT_GIT_REPO` | 400 | 选择的目录不是 Git 仓库根目录 |
+| `PROJECT_PATH_NOT_GIT_REPO` | 400 | 选择的目录不是 Git 仓库根目录（仓库的子目录、不存在） |
+| `PROJECT_PATH_NO_GIT` | 400 | 选择的目录不在任何 Git 仓库里；添加项目对话框据此提出初始化 Git（D153） |
 | `PROJECT_ALREADY_EXISTS` | 409 | 同一仓库路径已添加 |
 | `PROJECT_HAS_ACTIVE_TASKS` | 409 | 删除项目时存在非终态任务 |
 | **Git / worktree** | | |

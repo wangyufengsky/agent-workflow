@@ -2,7 +2,9 @@ import {
   clearProjectHostingOp,
   createProjectOp,
   getProjectOp,
+  initGitOp,
   listProjectsOp,
+  previewGitInitOp,
   removeProjectAllowedBashOp,
   setProjectDbConnectionsOp,
   setProjectHostingOp,
@@ -16,6 +18,8 @@ export function projectsOperations(projects: ProjectsService) {
   return [
     implement(listProjectsOp, () => ({ items: projects.list() })),
     implement(createProjectOp, (input) => projects.create(input)),
+    implement(previewGitInitOp, ({ repoPath }) => projects.previewGitInit(repoPath)),
+    implement(initGitOp, (input) => projects.initGit(input)),
     implement(getProjectOp, ({ id }) => projects.get(id)),
     implement(updateProjectOp, (input) => projects.update(input)),
     implement(setProjectDbConnectionsOp, ({ id, connectionIds }) => projects.setDbConnections(id, connectionIds)),

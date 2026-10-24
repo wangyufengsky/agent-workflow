@@ -27,6 +27,13 @@ export const RUNTIME_LOG_TAIL_MAX = 5000;
 /** Page size of the task and inbox lists (11 §1 pagination): the default and the largest `limit`. */
 export const LIST_PAGE_DEFAULT = 50;
 export const LIST_PAGE_MAX = 100;
+/**
+ * Putting a directory under Git (D153): a file or a first commit this large is worth an ignore rule first; the
+ * confirmation names at most `GIT_INIT_LARGE_FILES_SHOWN` of the large files.
+ */
+export const GIT_INIT_LARGE_FILE_BYTES = 50 * 1024 * 1024;
+export const GIT_INIT_LARGE_TOTAL_BYTES = 500 * 1024 * 1024;
+export const GIT_INIT_LARGE_FILES_SHOWN = 5;
 /** Targets of one batch (20 §2, D85). */
 export const BATCH_TARGETS_MAX = 20;
 export const BATCH_TARGET_MAX_CHARS = 500;
