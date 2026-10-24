@@ -11,6 +11,10 @@ describe('批量任务（20）', () => {
     );
   });
 
+  it('目标原样插入，其中的 $& 等不被当作替换符号', () => {
+    expect(renderBatchRequirement('审查 {{target}}', 'price$&total')).toBe('审查 price$&total');
+  });
+
   it('按显示顺序汇总有任务的显示状态', () => {
     const { Completed, Running, NeedsAttention } = TaskDisplayGroup;
     expect(batchCounts([Completed, Running, Completed, NeedsAttention])).toEqual([

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { loadBuiltinRoles, loadBuiltinWorkflows, loadPrompts } from '@aw/builtin';
+import { BUILTIN_INITIATIVE_TEMPLATES, loadBuiltinRoles, loadBuiltinWorkflows, loadPrompts } from '@aw/builtin';
 import {
   DB_QUERY_TIMEOUT_MS,
   isTerminalState,
@@ -47,6 +47,7 @@ import { createRepoLocks, locateOpencodeShell } from './modules/git/index.ts';
 import { createGitReviewsModule } from './modules/git-reviews/index.ts';
 import { type HostingEndpoints, PUBLIC_HOSTING } from './modules/hosting/index.ts';
 import { createInboxModule, type InboxService } from './modules/inbox/index.ts';
+import { createInitiativesModule, type InitiativesService } from './modules/initiatives/index.ts';
 import { createInsightsModule } from './modules/insights/index.ts';
 import { createKnowledgeModule, type KnowledgeService } from './modules/knowledge/index.ts';
 import { createMcpModule } from './modules/mcp/index.ts';
@@ -116,6 +117,7 @@ export type App = {
     knowledge: KnowledgeService;
     decks: DecksService;
     schedules: SchedulesService & { settled(): Promise<void> };
+    initiatives: InitiativesService;
   };
   /** Bearer token of the execution MCP at `/mcp/exec`. */
   mcpToken: string;
@@ -367,6 +369,19 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     workflows: workflows.service,
     tasks: tasks.service,
   });
+  const initiatives = createInitiativesModule({
+    db: database.db,
+    unit,
+    events,
+    clock,
+    log,
+    settings: settings.service,
+    workflows: workflows.service,
+    tasks: tasks.service,
+    attachments: attachments.service,
+  });
+  // Built-in composition templates of this app version, like the built-in workflows (34 §15.3).
+  initiatives.service.templates.syncBuiltin(BUILTIN_INITIATIVE_TEMPLATES);
   const decks = createDecksModule({
     db: database.db,
     unit,
@@ -459,6 +474,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...workflows.operations,
     ...tasks.operations,
     ...batches.operations,
+    ...initiatives.operations,
     ...schedules.operations,
     ...knowledge.operations,
     ...decks.operations,
@@ -514,6 +530,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   team.service.analyses.recover();
   nodes.service.recover();
   tasks.service.recover();
+  initiatives.service.recover();
 
   if (config.webDir !== undefined) await server.register(fastifyStatic, { root: config.webDir });
   return {
@@ -538,6 +555,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       knowledge: knowledge.service,
       decks: decks.service,
       schedules: { ...schedules.service, settled: schedules.timer.settled },
+      initiatives: initiatives.service,
     },
     mcpToken,
     assistantMcpToken,

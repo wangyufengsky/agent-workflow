@@ -3,9 +3,12 @@ import {
   AcceptanceCheckKind,
   AppError,
   type AttemptDTO,
+  BatchDeliveryOutcome,
   type CreateTaskRequest,
   type DeliverRequest,
+  DeliveryStatus,
   ErrorCode,
+  type ErrorInfo,
   type ListTasksQuery,
   type NodeDetailDTO,
   type PlanDTO,
@@ -102,6 +105,12 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       pullRequest: review.pullRequestOf(id),
       attachments: state.attachmentsOf(task),
     };
+  }
+
+  async function deliver(id: string, request: Omit<DeliverRequest, 'id'>): Promise<TaskDetailDTO> {
+    const checklist = await requirements.deliveryCheck(id, request.acknowledgedRequirementsRevisionId);
+    await delivery.deliver(id, request, checklist);
+    return detail(id);
   }
 
   return {
@@ -221,6 +230,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       lifecycle.start(id);
       return detail(id);
     },
+    onProjectDeleted: actions.onProjectDeleted,
     /** Creating several tasks in one transaction (batches, 20 §2): check once, insert drafts, start after commit. */
     checkCreate: lifecycle.checkCreate,
     insertDraft: lifecycle.insertDraft,
@@ -244,11 +254,30 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       await lifecycle.cancel(id, keepBranch);
       return detail(id);
     },
-    async deliver(id: string, request: Omit<DeliverRequest, 'id'>): Promise<TaskDetailDTO> {
-      const checklist = await requirements.deliveryCheck(id, request.acknowledgedRequirementsRevisionId);
-      await delivery.deliver(id, request, checklist);
-      return detail(id);
+    /**
+     * Delivers one task of a group and says how it ended (batches 20 §5, initiatives 34 §5.4): a conflict or a
+     * failed check before merging is that task's outcome, so the caller goes on with the others.
+     */
+    async deliverOutcome(
+      id: string,
+      request: Omit<DeliverRequest, 'id'>,
+    ): Promise<{ outcome: BatchDeliveryOutcome; error: ErrorInfo | null }> {
+      let delivered: TaskDetailDTO;
+      try {
+        delivered = await deliver(id, request);
+      } catch (err) {
+        // A check before merging failed and nothing changed (11 §5.3): the task stays in review with the reason.
+        if (!(err instanceof AppError)) throw err;
+        return { outcome: BatchDeliveryOutcome.Failed, error: err.toInfo() };
+      }
+      if (delivered.status === TaskStatus.Completed) return { outcome: BatchDeliveryOutcome.Delivered, error: null };
+      const { lastDelivery } = delivered;
+      if (lastDelivery === null) throw new Error(`Task ${delivered.key} was delivered without a delivery record`);
+      const outcome =
+        lastDelivery.status === DeliveryStatus.Conflict ? BatchDeliveryOutcome.Conflict : BatchDeliveryOutcome.Failed;
+      return { outcome, error: lastDelivery.error };
     },
+    deliver,
     reverifyRequirements(id: string): TaskDetailDTO {
       changes.reverifyRequirements(id);
       return detail(id);

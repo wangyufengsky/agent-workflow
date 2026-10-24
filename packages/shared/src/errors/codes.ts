@@ -129,6 +129,17 @@ export const ErrorCode = {
   RequirementsNotEditable: 'REQUIREMENTS_NOT_EDITABLE',
   RequirementResultsInvalid: 'REQUIREMENT_RESULTS_INVALID',
   RequirementsUnacknowledged: 'REQUIREMENTS_UNACKNOWLEDGED',
+  // 需求计划（34）
+  InitiativeNotFound: 'INITIATIVE_NOT_FOUND',
+  /** The phases and work packages break a rule; `details.problems` (34 §8.3). */
+  InitiativeBreakdownInvalid: 'INITIATIVE_BREAKDOWN_INVALID',
+  /** The initiative's state does not allow this; `details.status`. */
+  InitiativeNotEditable: 'INITIATIVE_NOT_EDITABLE',
+  /** An earlier phase still has unsatisfied work packages; `details.items`. */
+  InitiativePhaseNotReady: 'INITIATIVE_PHASE_NOT_READY',
+  /** The work package is not in a state that allows this; `details.status`. */
+  InitiativeItemNotReady: 'INITIATIVE_ITEM_NOT_READY',
+  InitiativeTemplateNotFound: 'INITIATIVE_TEMPLATE_NOT_FOUND',
   // 团队（33）
   TeamAnalysisNotFound: 'TEAM_ANALYSIS_NOT_FOUND',
   TeamAnalysisExists: 'TEAM_ANALYSIS_EXISTS',
@@ -248,6 +259,12 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.RequirementsNotEditable]: 409,
   [ErrorCode.RequirementResultsInvalid]: null,
   [ErrorCode.RequirementsUnacknowledged]: 409,
+  [ErrorCode.InitiativeNotFound]: 404,
+  [ErrorCode.InitiativeBreakdownInvalid]: 400,
+  [ErrorCode.InitiativeNotEditable]: 409,
+  [ErrorCode.InitiativePhaseNotReady]: 409,
+  [ErrorCode.InitiativeItemNotReady]: 409,
+  [ErrorCode.InitiativeTemplateNotFound]: 404,
   [ErrorCode.TeamAnalysisNotFound]: 404,
   [ErrorCode.TeamAnalysisExists]: 409,
   [ErrorCode.TeamAnalysisInvalid]: null,

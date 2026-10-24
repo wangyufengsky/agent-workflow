@@ -190,6 +190,10 @@ packages/builtin/
 | --- | --- | --- |
 | `system.merge_branch` | 合并分支 | Git 工作台的合并冲突「交给 AI 解决」（27 §3.6）：固定流程，模板只有一个节点 `resolve_conflicts`「解决合并冲突」（developer，检查为项目检查命令）。任务的 `merge_source` 为来源、`base_branch` 为目标；worktree 从来源建出，准备阶段由后端 `git merge --no-ff --no-commit <目标>` 留下冲突标记，节点完成时后端的提交结束这次合并；之后照常检查、待合并，由用户合并回目标 |
 
+### 4b. 内置组合模板（v1.3，34 §15.3）
+
+`packages/builtin/src/initiative-templates.ts`（`BUILTIN_INITIATIVE_TEMPLATES`）：设计后开发 `design_then_build`、详细设计后开发 `detailed_design_then_build`、开发后审查 `build_then_review`、先补测试再重构 `tests_then_refactor`。每次启动按 key 就地写入 `initiative_templates`（不分版本：需求计划创建时已快照），已不在列表里的内置模板删除。工作包的需求是给模型看的中文，含 `{{requirement}}`；第 2 阶段都是 `autoOpen`。集成测试校验每个内置模板都通过 `validateInitiativeDraft`。
+
 ## 5. 自定义流程（专业模式）
 
 - 从内置流程复制（内置流程只读，D57），或新建空白（选 fixed / ai；允许角色为现有的执行类角色，ai 流程的规划者为第一个 planner 角色，fixed 流程从一个步骤开始）。

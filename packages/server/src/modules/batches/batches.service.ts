@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import {
   AppError,
   BATCH_KEY_PREFIX,
-  BatchDeliveryOutcome,
   type BatchDeliveryResultDTO,
   type BatchDetailDTO,
   type BatchItemDTO,
@@ -10,7 +9,6 @@ import {
   batchCounts,
   type CreateBatchRequest,
   type DeliverBatchResponse,
-  DeliveryStatus,
   DeliveryStrategy,
   ErrorCode,
   isBatchDeliverable,
@@ -19,7 +17,6 @@ import {
   type LocalMergeStrategy,
   renderBatchRequirement,
   TASK_TITLE_MAX_CHARS,
-  TaskStatus,
   type TaskSummaryDTO,
   taskMachine,
   WorkflowDeliverable,
@@ -109,23 +106,8 @@ export function createBatchesService({ db, unit, clock, log, settings, workflows
     item: BatchItemDTO,
     strategy: LocalMergeStrategy | typeof DeliveryStrategy.ReportOnly,
   ): Promise<BatchDeliveryResultDTO> {
-    const base = { taskId: item.task.id, taskKey: item.task.key, target: item.target };
-    let delivered: Awaited<ReturnType<TasksService['deliver']>>;
-    try {
-      delivered = await tasks.deliver(item.task.id, { strategy });
-    } catch (err) {
-      // A check before merging failed and nothing changed (11 §5.3): the task stays in review with the reason.
-      if (!(err instanceof AppError)) throw err;
-      return { ...base, outcome: BatchDeliveryOutcome.Failed, error: err.toInfo() };
-    }
-    if (delivered.status === TaskStatus.Completed) {
-      return { ...base, outcome: BatchDeliveryOutcome.Delivered, error: null };
-    }
-    const { lastDelivery } = delivered;
-    if (lastDelivery === null) throw new Error(`Task ${item.task.key} was delivered without a delivery record`);
-    const outcome =
-      lastDelivery.status === DeliveryStatus.Conflict ? BatchDeliveryOutcome.Conflict : BatchDeliveryOutcome.Failed;
-    return { ...base, outcome, error: lastDelivery.error };
+    const result = await tasks.deliverOutcome(item.task.id, { strategy });
+    return { taskId: item.task.id, taskKey: item.task.key, target: item.target, ...result };
   }
 
   return {

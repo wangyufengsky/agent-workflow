@@ -463,6 +463,56 @@ payload / response：
 | position | INTEGER | 目标顺序，从 0 起 |
 | target | TEXT | 目标原文 |
 
+## 4b′. 需求计划（v1.3）
+
+见 [34-initiatives.md §9、§15.8](34-initiatives.md)，迁移 `0026_initiatives`。需求计划没有状态列，显示状态由下列事实与工作包的任务推导（34 §6）；`breakdown_rev`、`confirmed_rev`、`opened_phase` 只增不减。资料附件为 `attachment_refs`（`owner_kind = initiative`），删除需求计划或项目时释放（项目删除经 `tasks.onProjectDeleted`）。
+
+### initiative_templates
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| key | TEXT UNIQUE | 同流程 key 的规则 |
+| kind | TEXT | `InitiativeTemplateKind`；内置模板每次启动就地重写，不分版本 |
+| name / description | TEXT | |
+| position | INTEGER | 列出顺序（内置顺序） |
+| phases / items | TEXT(JSON) | `InitiativePhase[]` / `InitiativeItemSpec[]`（需求仍含 `{{requirement}}`） |
+| created_at / updated_at | INTEGER | |
+
+### initiatives
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| seq | INTEGER UNIQUE | 编号 `I-<seq>` |
+| project_id | TEXT → projects，CASCADE | |
+| template_id | TEXT NULL → initiative_templates，SET NULL | 来源，只用于页头 |
+| base_branch | TEXT | 全部工作包的基础分支，也是合入的目标 |
+| title / requirement | TEXT | 需求首行 / 需求原文 |
+| phases | TEXT(JSON) | 创建时的快照：`[{ title, goal, autoOpen }]` |
+| confirm_item_plans | INTEGER(bool) | 工作包任务的 `confirm_plan` |
+| breakdown_rev / confirmed_rev | INTEGER | `confirmed_rev < breakdown_rev` 即草稿待确认 |
+| opened_phase | INTEGER | 已开启到第几阶段，0 为未开始 |
+| created_at / updated_at | INTEGER | 索引 `(project_id, seq)` |
+
+### initiative_items
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| initiative_id | TEXT → initiatives，CASCADE | UNIQUE(initiative_id, key) |
+| key / title | TEXT | |
+| ordinal | INTEGER | 写入的顺序 |
+| phase | INTEGER | 从 1 起 |
+| workflow_key | TEXT | 开始时用该流程的最新版本 |
+| requirement | TEXT | 任务的需求（模板已替换） |
+| depends_on / acceptance | TEXT(JSON) | 工作包 key / 验收清单项 |
+| task_id | TEXT NULL → tasks，SET NULL | 当前任务；写入时 SQL 带 `WHERE task_id IS :读到的值`，两次开始只有一次成功；索引 |
+| start_error | TEXT(JSON) NULL | 上一次开始失败的 `ErrorInfo`，成功时清空 |
+| merge_confirmed_at / dropped_at | INTEGER NULL | 用户确认 PR 已合入 / 放弃的时间 |
+| drop_reason | TEXT NULL | |
+| created_at / updated_at | INTEGER | |
+
 ## 4c. 定时任务（v1.2）
 
 见 [22-scheduled-tasks.md §8](22-scheduled-tasks.md#8-数据模型迁移-0012_schedules)，迁移 `0012_schedules`。

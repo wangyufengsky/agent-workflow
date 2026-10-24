@@ -34,6 +34,17 @@ export const LIST_PAGE_MAX = 100;
 export const GIT_INIT_LARGE_FILE_BYTES = 50 * 1024 * 1024;
 export const GIT_INIT_LARGE_TOTAL_BYTES = 500 * 1024 * 1024;
 export const GIT_INIT_LARGE_FILES_SHOWN = 5;
+/** One initiative (34 §11): work packages, phases, source attachments (one input slot is left for the background). */
+export const INITIATIVE_ITEMS_MAX = 30;
+export const INITIATIVE_PHASES_MAX = 6;
+export const INITIATIVE_SOURCES_MAX = 9;
+export const INITIATIVE_TITLE_MAX_CHARS = 60;
+/** A work package's requirement is its task's requirement. */
+export const INITIATIVE_ITEM_REQUIREMENT_MAX_CHARS = REQUIREMENT_MAX_CHARS;
+/** A phase's title and goal, and the reason for dropping a work package. */
+export const INITIATIVE_PHASE_TITLE_MAX_CHARS = 40;
+export const INITIATIVE_PHASE_GOAL_MAX_CHARS = 500;
+export const INITIATIVE_REASON_MAX_CHARS = 2000;
 /** Targets of one batch (20 §2, D85). */
 export const BATCH_TARGETS_MAX = 20;
 export const BATCH_TARGET_MAX_CHARS = 500;

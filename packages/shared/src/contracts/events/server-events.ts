@@ -51,6 +51,7 @@ export const serverEventSchema = z.discriminatedUnion('type', [
     data: z.object({ reviewId: z.string(), projectId: z.string() }),
   }),
   z.object({ type: z.literal(ServerEventType.ScheduleUpdated), data: z.object({ scheduleId: z.string() }) }),
+  z.object({ type: z.literal(ServerEventType.InitiativeUpdated), data: z.object({ initiativeId: z.string() }) }),
   z.object({
     type: z.literal(ServerEventType.TeamScanUpdated),
     /** Commits read so far out of those missing; `done = total` when the reading finished. */
