@@ -6,6 +6,8 @@ import { toneClass, toneOf } from './series.ts';
 /** A circle of circumference 100 in a 42 × 42 box: a slice's dash length is its share in percent. */
 const RADIUS = 100 / (2 * Math.PI);
 const CENTER = 21;
+/** The gap between two slices, in percent of the ring. */
+const SLICE_GAP = 1.2;
 
 /**
  * A ring of slices with the total in the middle and a legend of values and shares (35 §5.2). Hovering or focusing a
@@ -35,20 +37,25 @@ export function DonutChart({
   const [active, setActive] = useState<number | null>(null);
   const total = values.reduce((sum, v) => sum + v, 0);
   const shares = sharePercents(values);
+  // A lone slice is the whole ring; with more, each gives up a sliver so they stand apart.
+  const gap = values.filter((v) => v > 0).length > 1 ? SLICE_GAP : 0;
   const slices = values.map((value, i) => {
     const before = values.slice(0, i).reduce((sum, v) => sum + v, 0);
-    return { value, length: (value / total) * 100, offset: -(before / total) * 100, tone: toneOf(i) };
+    const length = Math.max(0, (value / total) * 100 - gap);
+    return { value, length, offset: -(before / total) * 100, tone: toneOf(i) };
   });
   const readout = (i: number) => [categories[i], format(values[i] ?? 0), formatShare(shares[i] ?? 0)].join(' · ');
 
   return (
     <figure className={styles.chart} aria-label={label}>
-      <figcaption className={styles.readout} aria-live="polite">
+      {/* The legend shows every value and the ring highlights the slice; the readout is for screen readers. */}
+      <figcaption className="sr" aria-live="polite">
         {active === null ? null : readout(active)}
       </figcaption>
       <div className={styles.pie}>
         <div className={styles.ring} data-active={active === null ? undefined : ''}>
           <svg viewBox="0 0 42 42" aria-hidden="true">
+            <circle className={styles.ringTrack} cx={CENTER} cy={CENTER} r={RADIUS} />
             {slices.map((slice, i) =>
               slice.value === 0 ? null : (
                 <circle
@@ -82,9 +89,17 @@ export function DonutChart({
                 onBlur={() => setActive(null)}
               >
                 <i className={`${styles.swatch} ${toneClass(toneOf(i))}`} aria-hidden="true" />
-                <span title={category}>{category}</span>
-                <span>{format(values[i] ?? 0)}</span>
-                <span>{formatShare(shares[i] ?? 0)}</span>
+                <span className={styles.sliceName} title={category}>
+                  {category}
+                </span>
+                <span className={styles.sliceValue}>{format(values[i] ?? 0)}</span>
+                <span className={styles.slicePercent}>{formatShare(shares[i] ?? 0)}</span>
+                <span className={styles.shareTrack} aria-hidden="true">
+                  <i
+                    className={`${styles.shareFill} ${toneClass(toneOf(i))}`}
+                    style={{ width: `${shares[i] ?? 0}%` }}
+                  />
+                </span>
               </button>
             </li>
           ))}
