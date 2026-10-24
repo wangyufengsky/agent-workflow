@@ -45,6 +45,19 @@ export const createProjectRequestSchema = z.object({
 });
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 
+/** What putting a directory that is in no Git repository under Git would do (D153, 11 §3). */
+export const gitInitPreviewSchema = z.object({
+  /** Files the first commit takes: everything not ignored, the `.gitignore` to be written included. */
+  files: z.number().int(),
+  bytes: z.number().int(),
+  /** Files of at least `GIT_INIT_LARGE_FILE_BYTES`, largest first, at most `GIT_INIT_LARGE_FILES_SHOWN`. */
+  largeFiles: z.array(z.object({ path: z.string(), bytes: z.number().int() })),
+  largeFileCount: z.number().int(),
+  /** The `.gitignore` to be written; null when the directory has one, which is kept as it is. */
+  gitignore: z.string().nullable(),
+});
+export type GitInitPreviewDTO = z.infer<typeof gitInitPreviewSchema>;
+
 export const updateProjectRequestSchema = z.object({
   id: z.string(),
   name: z.string().trim().min(1).optional(),

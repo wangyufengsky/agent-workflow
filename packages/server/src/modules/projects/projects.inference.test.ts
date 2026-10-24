@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inferCheckCommand, inferPreview, parseRemoteUrl } from './projects.inference.ts';
+import { inferCheckCommand, inferGitignore, inferPreview, parseRemoteUrl } from './projects.inference.ts';
 
 describe('parseRemoteUrl', () => {
   it.each([
@@ -84,5 +84,23 @@ describe('inferPreview', () => {
     expect(inferPreview(new Set(['pom.xml']), undefined)).toBeNull();
     expect(inferPreview(files('pnpm-lock.yaml'), { scripts: { build: 'tsc' } })).toBeNull();
     expect(inferPreview(files(), 'not json')).toBeNull();
+  });
+});
+
+describe('inferGitignore', () => {
+  const files = (...names: string[]) => new Set(names);
+
+  it.each([
+    [files('README.md'), ['.DS_Store']],
+    [files('package.json', 'src'), ['node_modules/', '.DS_Store']],
+    [files('pom.xml'), ['target/', '.DS_Store']],
+    [files('settings.gradle.kts', 'app'), ['build/', '.gradle/', '.DS_Store']],
+    [files('main.py'), ['__pycache__/', '.venv/', '.DS_Store']],
+    [
+      files('node_modules', 'pom.xml', 'requirements.txt'),
+      ['node_modules/', 'target/', '__pycache__/', '.venv/', '.DS_Store'],
+    ],
+  ])('%o', (rootFiles, lines) => {
+    expect(inferGitignore(rootFiles)).toBe(`${lines.join('\n')}\n`);
   });
 });

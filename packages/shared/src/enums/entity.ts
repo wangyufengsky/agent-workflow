@@ -18,6 +18,8 @@ export const EntityKind = {
   GitReview: 'git_review',
   /** A workflow run on a schedule (22). */
   Schedule: 'schedule',
+  /** A requirement split into work packages and phases (34). */
+  Initiative: 'initiative',
 } as const;
 export type EntityKind = (typeof EntityKind)[keyof typeof EntityKind];
 export const entityKindSchema = z.enum(EntityKind);

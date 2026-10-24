@@ -1,11 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import { realpath, stat } from 'node:fs/promises';
-import { basename, isAbsolute } from 'node:path';
+import { existsSync } from 'node:fs';
+import { lstat, realpath, rm, stat, writeFile } from 'node:fs/promises';
+import { basename, isAbsolute, join } from 'node:path';
 import {
   AppError,
   type CreateProjectRequest,
   CredentialKind,
   ErrorCode,
+  GIT_INIT_BRANCH,
+  GIT_INIT_COMMIT_MESSAGE,
+  GIT_INIT_LARGE_FILE_BYTES,
+  GIT_INIT_LARGE_FILES_SHOWN,
+  type GitInitPreviewDTO,
   HostingProvider,
   type HostingRef,
   PROJECT_SLUG_MAX,
@@ -20,14 +26,28 @@ import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
 import type { CredentialsService } from '../credentials/index.ts';
 import type { DatabasesService } from '../databases/index.ts';
-import { branchExists, readDefaultBranch, readOriginUrl, readRepoRoot } from '../git/index.ts';
+import {
+  BACKEND_COMMITTER,
+  branchExists,
+  initRepository,
+  listUnignoredFiles,
+  type RepoLocks,
+  readConfiguredIdentity,
+  readDefaultBranch,
+  readOriginUrl,
+  readRepoRoot,
+  runGit,
+  stage,
+} from '../git/index.ts';
 import { createHostingProvider, type GitHostingProvider, type HostingEndpoints } from '../hosting/index.ts';
-import { inferRepoCheckCommand, inferRepoPreview, parseRemoteUrl } from './projects.inference.ts';
+import { inferDirGitignore, inferRepoCheckCommand, inferRepoPreview, parseRemoteUrl } from './projects.inference.ts';
 import { createProjectsRepo } from './projects.repo.ts';
 
 export type ProjectsServiceDeps = {
   db: Db;
   clock: Clock;
+  /** Putting a directory under Git takes its lock like any change to a repository's refs (D37). */
+  locks: RepoLocks;
   credentials: CredentialsService;
   databases: DatabasesService;
   /** Platform API addresses (FakeHosting in tests). */
@@ -44,23 +64,84 @@ function uniqueSlug(name: string, taken: ReadonlySet<string>): string {
   return slug;
 }
 
-/** Resolves `repoPath` to the repository root it names; only a repository's root directory is accepted. */
-async function resolveRepoRoot(repoPath: string): Promise<string> {
+const notRepo = (repoPath: string) =>
+  new AppError(ErrorCode.ProjectPathNotGitRepo, 'Not the root of a Git repository', { repoPath });
+
+/** The directory `repoPath` names, resolved, and the root of the repository it is in (undefined: none). */
+async function inspectDirectory(repoPath: string): Promise<{ dir: string; root: string | undefined }> {
   if (!isAbsolute(repoPath)) {
     throw new AppError(ErrorCode.ValidationFailed, 'repoPath must be absolute', { repoPath });
   }
-  const notRepo = () => new AppError(ErrorCode.ProjectPathNotGitRepo, 'Not the root of a Git repository', { repoPath });
   const isDirectory = await stat(repoPath).then(
     (s) => s.isDirectory(),
     () => false,
   );
-  if (!isDirectory) throw notRepo();
-  const [resolved, root] = await Promise.all([realpath(repoPath), readRepoRoot(repoPath)]);
-  if (root === undefined || root !== resolved) throw notRepo();
+  if (!isDirectory) throw notRepo(repoPath);
+  const [dir, root] = await Promise.all([realpath(repoPath), readRepoRoot(repoPath)]);
+  return { dir, root };
+}
+
+/**
+ * Resolves `repoPath` to the repository root it names; only a repository's root directory is accepted. A directory in
+ * no repository can be put under Git instead (D153), hence its own code.
+ */
+async function resolveRepoRoot(repoPath: string): Promise<string> {
+  const { dir, root } = await inspectDirectory(repoPath);
+  if (root === undefined) {
+    throw new AppError(ErrorCode.ProjectPathNoGit, 'The directory is in no Git repository', { repoPath });
+  }
+  if (root !== dir) throw notRepo(repoPath);
   return root;
 }
 
-export function createProjectsService({ db, clock, credentials, databases, hosting }: ProjectsServiceDeps) {
+/**
+ * The directory to put under Git: in no repository, and without a `.git` git could not read (another owner's, a broken
+ * one), which a failed initialisation would otherwise remove.
+ */
+async function resolvePlainDirectory(repoPath: string): Promise<string> {
+  const { dir, root } = await inspectDirectory(repoPath);
+  if (root === dir) throw new AppError(ErrorCode.ValidationFailed, 'Already a Git repository', { repoPath });
+  if (root !== undefined || existsSync(join(dir, '.git'))) throw notRepo(repoPath);
+  return dir;
+}
+
+/** What the first commit of `dir` would take (D153); `gitignore` is the one to be written. */
+async function previewFirstCommit(dir: string, gitignore: string | null): Promise<GitInitPreviewDTO> {
+  const paths = await listUnignoredFiles(dir, gitignore);
+  const files = await Promise.all(paths.map(async (path) => ({ path, bytes: (await lstat(join(dir, path))).size })));
+  if (gitignore !== null) files.push({ path: '.gitignore', bytes: Buffer.byteLength(gitignore) });
+  const large = files.filter((f) => f.bytes >= GIT_INIT_LARGE_FILE_BYTES).sort((a, b) => b.bytes - a.bytes);
+  return {
+    files: files.length,
+    bytes: files.reduce((sum, f) => sum + f.bytes, 0),
+    largeFiles: large.slice(0, GIT_INIT_LARGE_FILES_SHOWN),
+    largeFileCount: large.length,
+    gitignore,
+  };
+}
+
+/**
+ * `git init` on main, the inferred `.gitignore` unless there is one, and the existing files as the first commit, by the
+ * user's identity or agent-workflow's when git has none (D153). On failure the directory is left as it was, so that
+ * adding it again starts over rather than finding a repository without commits.
+ */
+async function putUnderGit(dir: string): Promise<void> {
+  const gitignore = await inferDirGitignore(dir);
+  await initRepository(dir, GIT_INIT_BRANCH);
+  try {
+    if (gitignore !== null) await writeFile(join(dir, '.gitignore'), gitignore);
+    await stage(dir, ['.']);
+    const committer = (await readConfiguredIdentity(dir)) === null ? BACKEND_COMMITTER : [];
+    // A directory whose files are all ignored still needs the base commit tasks branch from.
+    await runGit([...committer, 'commit', '--quiet', '--allow-empty', '-m', GIT_INIT_COMMIT_MESSAGE], { cwd: dir });
+  } catch (e) {
+    await rm(join(dir, '.git'), { recursive: true, force: true });
+    if (gitignore !== null) await rm(join(dir, '.gitignore'), { force: true });
+    throw e;
+  }
+}
+
+export function createProjectsService({ db, clock, locks, credentials, databases, hosting }: ProjectsServiceDeps) {
   const repo = createProjectsRepo(db);
 
   function require(id: string): ProjectDTO {
@@ -79,6 +160,32 @@ export function createProjectsService({ db, clock, credentials, databases, hosti
     };
   }
 
+  async function add(repoPath: string, name = basename(repoPath)): Promise<ProjectDetailDTO> {
+    if (repo.findByRepoPath(repoPath) !== undefined) {
+      throw new AppError(ErrorCode.ProjectAlreadyExists, 'Repository already added', { repoPath });
+    }
+    const defaultBranch = await readDefaultBranch(repoPath);
+    if (defaultBranch === undefined) {
+      throw new AppError(ErrorCode.GitBaseBranchNotFound, 'HEAD is detached and origin has no default branch', {
+        repoPath,
+      });
+    }
+    const now = clock.now();
+    const id = randomUUID();
+    repo.insert({
+      id,
+      name,
+      slug: uniqueSlug(name, repo.slugs()),
+      repoPath,
+      defaultBranch,
+      checkCommand: await inferRepoCheckCommand(repoPath),
+      preview: await inferRepoPreview(repoPath),
+      createdAt: now,
+      updatedAt: now,
+    });
+    return detail(require(id));
+  }
+
   return {
     list: (): ProjectDTO[] => repo.list(),
     /** The stored project, without the remote inference of `get`. */
@@ -86,32 +193,24 @@ export function createProjectsService({ db, clock, credentials, databases, hosti
 
     get: (id: string): Promise<ProjectDetailDTO> => detail(require(id)),
 
-    async create(input: CreateProjectRequest): Promise<ProjectDetailDTO> {
-      const repoPath = await resolveRepoRoot(input.repoPath);
-      if (repo.findByRepoPath(repoPath) !== undefined) {
-        throw new AppError(ErrorCode.ProjectAlreadyExists, 'Repository already added', { repoPath });
-      }
-      const defaultBranch = await readDefaultBranch(repoPath);
-      if (defaultBranch === undefined) {
-        throw new AppError(ErrorCode.GitBaseBranchNotFound, 'HEAD is detached and origin has no default branch', {
-          repoPath,
-        });
-      }
-      const name = input.name ?? basename(repoPath);
-      const now = clock.now();
-      const id = randomUUID();
-      repo.insert({
-        id,
-        name,
-        slug: uniqueSlug(name, repo.slugs()),
-        repoPath,
-        defaultBranch,
-        checkCommand: await inferRepoCheckCommand(repoPath),
-        preview: await inferRepoPreview(repoPath),
-        createdAt: now,
-        updatedAt: now,
+    create: async (input: CreateProjectRequest): Promise<ProjectDetailDTO> =>
+      add(await resolveRepoRoot(input.repoPath), input.name),
+
+    async previewGitInit(repoPath: string): Promise<GitInitPreviewDTO> {
+      const dir = await resolvePlainDirectory(repoPath);
+      return previewFirstCommit(dir, await inferDirGitignore(dir));
+    },
+
+    /** Puts a directory in no repository under Git, then adds it like `create` (D153). */
+    async initGit(input: CreateProjectRequest): Promise<ProjectDetailDTO> {
+      const dir = await resolvePlainDirectory(input.repoPath);
+      // A second request for the directory would share the new repository and, failing, remove it; under the lock
+      // it is checked again and finds the repository the first one made.
+      return locks.run(dir, async () => {
+        await resolvePlainDirectory(dir);
+        await putUnderGit(dir);
+        return add(dir, input.name);
       });
-      return detail(require(id));
     },
 
     async update({ id, ...changes }: UpdateProjectRequest): Promise<ProjectDetailDTO> {

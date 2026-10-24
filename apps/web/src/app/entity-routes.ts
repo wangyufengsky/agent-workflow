@@ -28,6 +28,10 @@ export const ENTITY_ROUTES = {
     icon: 'layers',
     open: (navigate, id) => navigate({ to: ROUTES.batch, params: { batchId: id } }),
   },
+  [EntityKind.Initiative]: {
+    icon: 'split',
+    open: (navigate, id) => navigate({ to: ROUTES.initiative, params: { initiativeId: id } }),
+  },
   [EntityKind.GitReview]: {
     icon: 'sparkle',
     open: (navigate, id) => navigate({ to: ROUTES.gitReview, params: { reviewId: id } }),

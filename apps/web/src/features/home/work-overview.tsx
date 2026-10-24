@@ -1,13 +1,16 @@
-import { InboxStatus, TaskDisplayGroup, type TaskSummaryDTO } from '@aw/shared';
+import { InboxStatus, InitiativeStatus, TaskDisplayGroup, type TaskSummaryDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ROUTES } from '../../app/routes.ts';
 import { BATCHES_COPY } from '../../copy/batches.ts';
+import { INITIATIVES_COPY } from '../../copy/initiatives.ts';
 import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
 import { BatchCard } from '../batches/batch-card.tsx';
 import { batchesQuery } from '../batches/batches.queries.ts';
 import { inboxQuery } from '../inbox/inbox.queries.ts';
 import { InboxCard } from '../inbox/inbox-card.tsx';
+import { InitiativeCard } from '../initiatives/initiative-card.tsx';
+import { initiativesQuery } from '../initiatives/initiatives.queries.ts';
 import { TaskRow } from '../tasks/task-row.tsx';
 import { tasksQuery } from '../tasks/tasks.queries.ts';
 
@@ -35,11 +38,13 @@ export function useWork() {
   const attention = useQuery(inboxQuery({ status: InboxStatus.Open, blocking: true })).data ?? [];
   // Batches whose tasks have not all ended (20 §4).
   const batches = (useQuery(batchesQuery()).data ?? []).filter((b) => b.ended < b.total);
+  // Initiatives not finished yet (34 §6.2).
+  const initiatives = (useQuery(initiativesQuery()).data ?? []).filter((i) => i.status !== InitiativeStatus.Done);
   const sections = SECTIONS.map((section) => ({
     title: section.title,
     tasks: tasks.filter((t) => section.groups.includes(t.displayGroup)).slice(0, section.limit),
   }));
-  return { attention, batches, sections };
+  return { attention, batches, initiatives, sections };
 }
 
 function TaskSection({ title, tasks }: { title: string; tasks: TaskSummaryDTO[] }) {
@@ -59,7 +64,7 @@ function TaskSection({ title, tasks }: { title: string; tasks: TaskSummaryDTO[] 
 
 /** Below the idle home page: what needs the user, then batches and tasks by state (14 §3.2). */
 export function WorkOverview() {
-  const { attention, batches, sections } = useWork();
+  const { attention, batches, initiatives, sections } = useWork();
   return (
     <>
       {attention.length > 0 && (
@@ -73,6 +78,21 @@ export function WorkOverview() {
           <div className="col">
             {attention.slice(0, ATTENTION_SHOWN).map((item) => (
               <InboxCard key={item.id} item={item} />
+            ))}
+          </div>
+        </section>
+      )}
+      {initiatives.length > 0 && (
+        <section className="section">
+          <div className="section-head">
+            <h2 className="section-title grow">{INITIATIVES_COPY.inProgress}</h2>
+            <Link to={ROUTES.initiatives} className="btn ghost sm">
+              {INITIATIVES_COPY.viewAll}
+            </Link>
+          </div>
+          <div className="grid-2">
+            {initiatives.map((i) => (
+              <InitiativeCard key={i.id} initiative={i} />
             ))}
           </div>
         </section>

@@ -1,6 +1,7 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { closeSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, realpathSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { API_PREFIX, THEME_IDS, type ThemeId, UiMode } from '@aw/shared';
+import { API_PREFIX, GIT_INIT_LARGE_FILE_BYTES, THEME_IDS, type ThemeId, UiMode } from '@aw/shared';
 import { type APIRequestContext, expect, type Locator, type Page, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import {
@@ -50,6 +51,8 @@ type Seed = {
   batch: string;
   /** A code-review schedule run once by hand (22 §7). */
   schedule: string;
+  /** An initiative from「设计后开发」left as a draft for review (34 §15.4). */
+  initiative: string;
   /** An assistant conversation that keeps working until the walkthrough ends. */
   assistantBusy: string;
   /** The Git workbench (27): the review project's main commit, reviewed by the AI with one finding. */
@@ -539,6 +542,12 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     frequency: { kind: 'weekly', weekdays: [1, 3, 5], time: '09:00' },
   });
   await api(request, 'POST', `/schedules/${schedule.id}/run`);
+  const initiative = await api<{ id: string }>(request, 'POST', '/initiatives', {
+    projectId: batchProject.id,
+    templateKey: 'design_then_build',
+    requirement: '订单支持按类别统计库存',
+    review: true,
+  });
   const assistant = await seedAssistant(request, reviewProject, { id: knowledge.id, turnId: knowledgeTurn.id });
   const assistantCharts = await seedCharts(request);
 
@@ -656,6 +665,7 @@ createServer((req, res) => {
     knowledgeDraft: draft.id,
     batch: batch.id,
     schedule: schedule.id,
+    initiative: initiative.id,
     assistantBusy: assistant.busy,
     assistantConversation: assistant.conversation,
     assistantCharts,
@@ -1065,6 +1075,23 @@ const SHOTS: Shot[] = [
   },
   { name: 'batches', mode: UiMode.Simple, url: () => '/batches', ready: testId('batch-card') },
   {
+    name: 'initiative',
+    mode: UiMode.Simple,
+    url: (s) => `/initiatives/${s.initiative}`,
+    ready: testId('initiative-phase'),
+  },
+  {
+    name: 'initiative-edit',
+    mode: UiMode.Simple,
+    url: (s) => `/initiatives/${s.initiative}`,
+    ready: testId('initiative-phase'),
+    open: async (page) => {
+      await page.getByRole('button', { name: '修改阶段与工作包' }).click();
+      return page.getByTestId('initiative-editor');
+    },
+  },
+  { name: 'initiatives', mode: UiMode.Simple, url: () => '/initiatives', ready: testId('initiative-card') },
+  {
     name: 'schedule-new',
     mode: UiMode.Simple,
     url: (s) => `/schedules/new?projectId=${s.project.id}&workflow=unit_tests`,
@@ -1089,6 +1116,26 @@ const SHOTS: Shot[] = [
     ready: heading('修改定时任务'),
   },
   { name: 'projects', mode: UiMode.Simple, url: () => '/projects', ready: heading('项目') },
+  {
+    // Adding a directory without Git (D153): the confirmation with a large file, which is only previewed, never added.
+    name: 'projects-git-init',
+    mode: UiMode.Simple,
+    url: () => '/projects',
+    ready: heading('项目'),
+    open: async (page) => {
+      const dir = realpathSync(mkdtempSync(join(tmpdir(), 'aw-e2e-plain-')));
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({ scripts: { dev: 'vite' } }));
+      const video = openSync(join(dir, 'demo-recording.mp4'), 'w');
+      ftruncateSync(video, 3 * GIT_INIT_LARGE_FILE_BYTES);
+      closeSync(video);
+      await page.getByRole('button', { name: '添加项目' }).click();
+      const dialog = page.getByRole('dialog', { name: '添加项目' });
+      await dialog.getByLabel('仓库目录').fill(dir);
+      await dialog.getByRole('button', { name: '添加项目' }).click();
+      await expect(dialog.getByTestId('git-init-large')).toBeVisible();
+      return dialog;
+    },
+  },
   { name: 'project', mode: UiMode.Simple, url: (s) => `/projects/${s.project.id}`, ready: heading(/.+/) },
   { name: 'settings', mode: UiMode.Simple, url: () => '/settings', ready: heading('设置') },
   {

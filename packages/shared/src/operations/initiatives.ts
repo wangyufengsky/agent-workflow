@@ -16,13 +16,14 @@ import {
   saveInitiativeDraftRequestSchema,
   startInitiativeItemRequestSchema,
 } from '../contracts/api/initiatives.ts';
-import { InputRef } from '../enums/entity.ts';
+import { EntityKind, InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
 
-// Initiatives are a simple-mode feature (34 §10). The assistant and the palette get them together with their pages.
-const common = { expose: { palette: false, assistant: false }, credentialFields: [], mode: UiMode.Simple } as const;
+// Initiatives are a simple-mode feature the assistant can use too (34 §10); they start from the home page's panel.
+const common = { expose: { palette: false, assistant: true }, credentialFields: [], mode: UiMode.Simple } as const;
+const byId = { refs: { id: InputRef.Initiative } } as const;
 
 export const listInitiativeTemplatesOp = defineOperationContract({
   ...common,
@@ -57,10 +58,15 @@ export const createInitiativeOp = defineOperationContract({
   refs: { projectId: InputRef.Project, attachmentIds: InputRef.Attachment },
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/initiatives', status: 201 },
+  produces: {
+    kind: EntityKind.Initiative,
+    ref: (initiative) => ({ id: initiative.id, title: `${initiative.key} · ${initiative.title}` }),
+  },
 });
 
 export const getInitiativeOp = defineOperationContract({
   ...common,
+  ...byId,
   id: 'initiatives.get',
   title: 'op.initiatives.get',
   description: "An initiative's phases and work packages, each with its task, status and latest delivery",
@@ -72,6 +78,9 @@ export const getInitiativeOp = defineOperationContract({
 
 export const saveInitiativeDraftOp = defineOperationContract({
   ...common,
+  ...byId,
+  // Rewriting every phase and work package is the page's editor's job.
+  expose: { palette: false, assistant: false },
   id: 'initiatives.saveDraft',
   title: 'op.initiatives.saveDraft',
   description:
@@ -84,6 +93,7 @@ export const saveInitiativeDraftOp = defineOperationContract({
 
 export const confirmInitiativeOp = defineOperationContract({
   ...common,
+  ...byId,
   id: 'initiatives.confirm',
   title: 'op.initiatives.confirm',
   description: 'Confirm the phases and work packages; the first time, this opens phase 1 and starts its work packages',
@@ -95,6 +105,7 @@ export const confirmInitiativeOp = defineOperationContract({
 
 export const openInitiativePhaseOp = defineOperationContract({
   ...common,
+  ...byId,
   id: 'initiatives.openPhase',
   title: 'op.initiatives.openPhase',
   description:
@@ -107,6 +118,7 @@ export const openInitiativePhaseOp = defineOperationContract({
 
 export const startInitiativeItemOp = defineOperationContract({
   ...common,
+  ...byId,
   id: 'initiatives.startItem',
   title: 'op.initiatives.startItem',
   description: 'Start a work package that can start: after its start failed, or again after its task was cancelled',
@@ -118,6 +130,7 @@ export const startInitiativeItemOp = defineOperationContract({
 
 export const confirmInitiativeItemMergedOp = defineOperationContract({
   ...common,
+  ...byId,
   id: 'initiatives.confirmMerged',
   title: 'op.initiatives.confirmMerged',
   description:
@@ -130,6 +143,7 @@ export const confirmInitiativeItemMergedOp = defineOperationContract({
 
 export const dropInitiativeItemOp = defineOperationContract({
   ...common,
+  ...byId,
   id: 'initiatives.dropItem',
   title: 'op.initiatives.dropItem',
   description: 'Do not do a work package; its dependents no longer wait for it',
@@ -141,6 +155,7 @@ export const dropInitiativeItemOp = defineOperationContract({
 
 export const deliverInitiativePhaseOp = defineOperationContract({
   ...common,
+  ...byId,
   id: 'initiatives.deliverPhase',
   title: 'op.initiatives.deliverPhase',
   description:
@@ -153,6 +168,7 @@ export const deliverInitiativePhaseOp = defineOperationContract({
 
 export const deleteInitiativeOp = defineOperationContract({
   ...common,
+  ...byId,
   id: 'initiatives.delete',
   title: 'op.initiatives.delete',
   description: "Delete an initiative; its work packages' tasks stay as ordinary tasks",

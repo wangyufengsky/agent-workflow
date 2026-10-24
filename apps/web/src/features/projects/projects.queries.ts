@@ -4,8 +4,10 @@ import {
   createProjectOp,
   deleteProjectOp,
   getProjectOp,
+  initGitOp,
   listProjectsOp,
   type ProjectDetailDTO,
+  previewGitInitOp,
   removeProjectAllowedBashOp,
   type SetHostingRequest,
   setProjectHostingOp,
@@ -24,10 +26,18 @@ export const projectsQuery = queryOptions({
 export const projectQuery = (id: string) =>
   queryOptions({ queryKey: queryKeys.project(id), queryFn: () => callOperation(getProjectOp, { id }) });
 
-export function useCreateProject() {
+/** What putting a directory in no repository under Git would commit (D153); read again each time it is shown. */
+export const gitInitPreviewQuery = (repoPath: string) =>
+  queryOptions({
+    queryKey: queryKeys.gitInitPreview(repoPath),
+    queryFn: () => callOperation(previewGitInitOp, { repoPath }),
+    gcTime: 0,
+  });
+
+function useAddProject(add: (input: CreateProjectRequest) => Promise<ProjectDetailDTO>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateProjectRequest) => callOperation(createProjectOp, input),
+    mutationFn: add,
     onSuccess: async (project) => {
       queryClient.setQueryData(queryKeys.project(project.id), project);
       // Refetch even when no list is mounted: the shell's onboarding check reads the cached list next.
@@ -35,6 +45,9 @@ export function useCreateProject() {
     },
   });
 }
+
+export const useCreateProject = () => useAddProject((input) => callOperation(createProjectOp, input));
+export const useInitGit = () => useAddProject((input) => callOperation(initGitOp, input));
 
 export function useUpdateProject() {
   const queryClient = useQueryClient();

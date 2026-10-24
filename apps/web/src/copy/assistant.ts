@@ -180,6 +180,7 @@ export const ENTITY_COPY = {
     [EntityKind.Deck]: 'PPT',
     [EntityKind.GitReview]: 'Git 审查',
     [EntityKind.Schedule]: '定时任务',
+    [EntityKind.Initiative]: '需求计划',
   } satisfies Record<EntityKind, string>,
   open: '打开',
   deleted: '已删除',

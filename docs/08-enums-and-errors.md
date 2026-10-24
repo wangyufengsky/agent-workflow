@@ -127,7 +127,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `AssistantTurnEvent` | `idle` · `abort` · `error` · `runtime_lost` · `backend_restart` · `timeout` | 助手轮次的结束原因，运行时丢失与后端重启分别保存 |
 | `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` · `read_attachment` · `browser_read` · `show_chart` · `show_flowchart`（35） | 助手专用工具（15 §3）；其余工具由操作清单生成 |
 | `AssistantPage` | `desktop`（桌宠来源，不带任务参数） · `home` · `tasks` · `task` · `task_preview`（任务页的预览页签，v1.3 B3，29 §2.6） · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` · `ppt` · `ppt_deck`（23 §9） · `batches` · `batch` · `schedules` · `schedule` · `environment`（28 §4） | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId` / `deckId` / `batchId` / `scheduleId`；PPT 工作台另可带选中的页 `slideId`） |
-| `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） · `schedule`（22 §10） · `deck`（23 §9） · `git_review`（27 §7.1） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
+| `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） · `schedule`（22 §10） · `deck`（23 §9） · `git_review`（27 §7.1） · `initiative`（34 §10） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
 | `InputRef` | `EntityKind` 的全部取值 · `inbox_item` · `node`（同一输入中 `id` 所指任务的步骤） · `attempt` | 操作契约 `refs`：输入字段指向的对象（`enums/entity.ts`）；助手确认卡片据此把 id 显示为对象名称，标签为对象类型（D84）；`workflow` 字段可以是流程 id 或 key |
 | `AssistantForm` | `tasks.create` · `projects.create` · `projects.setHosting` · `databases.create` · `databases.update` | `open_form` 能打开的表单，以其提交的操作命名（`ASSISTANT_FORM_OPERATION`）；预填值的 schema 为该操作的助手输入（不含凭据字段）的 partial |
 | `ChartType` | `bar` · `line` · `pie` · `flow` | 助手画的图（35，D138）：前三种来自 `show_chart`，`flow` 来自 `show_flowchart`；会话流 `chart` 条目的 `chart.type` |
@@ -266,7 +266,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ASSISTANT_DIR` / `ASSISTANT_FILES_DIR` / `ASSISTANT_CONVERSATIONS_DIR` | `assistant` / `files` / `conversations` | 助手会话工作目录 `<数据目录>/assistant/files/<id>/`，对话文件相对该目录，消息流 `conversations/<id>.jsonl` |
 | `KNOWLEDGE_DOC_DIRS` / `KNOWLEDGE_DOC_EXTENSIONS` | `docs` `doc` / `.md` `.mdx` `.markdown` `.txt` `.rst` `.adoc` | 被引用的文件位于这些目录下或带这些扩展名时为文档，否则为代码（18 §6.1） |
 | `PROJECT_CHECK_PLACEHOLDER` | `$PROJECT_CHECK` | 验收命令中代表项目检查命令，物化节点时替换（13 §1） |
-| `GIT_COMMIT_IDENTITY` | `agent-workflow <agent-workflow@localhost>` | 节点完成时后端提交的作者与提交者（09 §3） |
+| `GIT_COMMIT_IDENTITY` | `agent-workflow <agent-workflow@localhost>` | 节点完成时后端提交的作者与提交者（09 §3）；为没有 Git 的目录初始化时，git 没有配置身份也用它（D153） |
+| `GIT_INIT_BRANCH` / `GIT_INIT_COMMIT_MESSAGE` | `main` / `Initial commit` | 为没有 Git 的目录初始化时的分支与第一个提交的说明（D153，11 §3） |
 
 `constants/opencode.ts`：
 
@@ -313,6 +314,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TEAM_ANALYSIS_COMMITS_MAX` / `TEAM_ANALYSIS_MEMBERS_MAX` | 400 / 50（首条消息列出的提交数、一次排队的成员数） |
 | `RUNTIME_LOG_TAIL_DEFAULT` / `RUNTIME_LOG_TAIL_MAX` | 500 / 5000（运行环境日志页的行数） |
 | `LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX` | 50 / 100（任务与「需要你处理」列表每页条数，11 §1） |
+| `GIT_INIT_LARGE_FILE_BYTES` / `GIT_INIT_LARGE_TOTAL_BYTES` | 50 MiB / 500 MiB（初始化 Git 时单个文件、首次提交总量达到它就提醒先补忽略规则，D153） |
+| `GIT_INIT_LARGE_FILES_SHOWN` | 5（初始化确认里列出的大文件数） |
 | `BATCH_TARGETS_MAX` | 20（一个批次的目标数，D85） |
 | `BATCH_TARGET_MAX_CHARS` | 500（一个目标，单行） |
 | `INITIATIVE_ITEMS_MAX` / `INITIATIVE_PHASES_MAX` / `INITIATIVE_SOURCES_MAX` | 30 / 6 / 9（一个需求计划的工作包、阶段、资料附件数；资料留一个位置给背景附件，34 §11） |
@@ -433,7 +436,8 @@ class AppError extends Error {
 | `INTERNAL_ERROR` | 500 | 未预期异常 |
 | **项目** | | |
 | `PROJECT_NOT_FOUND` | 404 | |
-| `PROJECT_PATH_NOT_GIT_REPO` | 400 | 选择的目录不是 Git 仓库根目录 |
+| `PROJECT_PATH_NOT_GIT_REPO` | 400 | 选择的目录不是 Git 仓库根目录（仓库的子目录、不存在） |
+| `PROJECT_PATH_NO_GIT` | 400 | 选择的目录不在任何 Git 仓库里；添加项目对话框据此提出初始化 Git（D153） |
 | `PROJECT_ALREADY_EXISTS` | 409 | 同一仓库路径已添加 |
 | `PROJECT_HAS_ACTIVE_TASKS` | 409 | 删除项目时存在非终态任务 |
 | **Git / worktree** | | |

@@ -1,3 +1,5 @@
+import { basename } from 'node:path';
+import { API_PREFIX } from '@aw/shared';
 import { expect, test } from '@playwright/test';
 import { createRepo, patchSettings } from './helpers.ts';
 
@@ -5,6 +7,11 @@ test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', '
 
 test('首次启动：环境检测通过 → 添加项目 → 切换主题与模式无需刷新', async ({ page }) => {
   const repo = createRepo();
+  // Seen as on a first run: the specs share one backend, and those before this one may have added projects.
+  const projectList = (url: URL) => url.pathname === `${API_PREFIX}/projects`;
+  await page.route(projectList, (route) =>
+    route.request().method() === 'GET' ? route.fulfill({ json: { items: [] } }) : route.fallback(),
+  );
 
   // No project yet: every page leads to onboarding.
   await page.goto('/');
@@ -13,6 +20,7 @@ test('首次启动：环境检测通过 → 添加项目 → 切换主题与模�
   await expect(page.getByTestId('check-opencode 1.19.0')).toContainText('已就绪');
 
   await page.getByLabel('仓库目录').fill(repo);
+  await page.unroute(projectList);
   await page.getByRole('button', { name: '添加项目' }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('heading', { name: 'Everything is a Workflow.' })).toBeVisible();
@@ -28,7 +36,8 @@ test('首次启动：环境检测通过 → 添加项目 → 切换主题与模�
 
   // The project with inferred check command is listed.
   await page.getByRole('navigation').getByRole('link', { name: '项目' }).click();
-  await expect(page.getByText('pnpm test').or(page.getByText('npm test'))).toBeVisible();
+  const card = page.getByRole('link').filter({ hasText: basename(repo) });
+  await expect(card.getByText('pnpm test').or(card.getByText('npm test'))).toBeVisible();
 
   // A reload would drop this marker: theme and mode must apply in place.
   await page.evaluate(() => {

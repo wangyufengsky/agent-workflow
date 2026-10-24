@@ -8,7 +8,9 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.Unauthorized]: '与后台的连接已失效，请重启应用。',
   [ErrorCode.InternalError]: '后台出现了意外错误，请重试；问题持续时查看日志。',
   [ErrorCode.ProjectNotFound]: '这个项目不存在或已被删除。',
-  [ErrorCode.ProjectPathNotGitRepo]: '所选目录不是 Git 仓库的根目录。请选择仓库的最上层目录（包含 .git 的目录）。',
+  [ErrorCode.ProjectPathNotGitRepo]:
+    '所选目录不是 Git 仓库的根目录（可能是仓库里的子目录，或目录不存在）。请选择仓库的最上层目录（包含 .git 的目录）。',
+  [ErrorCode.ProjectPathNoGit]: '所选目录还没有用 Git 管理。在「添加项目」里选择这个目录，可以为它初始化 Git。',
   [ErrorCode.ProjectAlreadyExists]: '这个仓库已经添加过了。',
   [ErrorCode.ProjectHasActiveTasks]: '这个项目还有未结束的任务，先完成或取消它们。',
   [ErrorCode.GitNotInstalled]: '没有找到 Git，请先安装 Git。',

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { setProjectDbConnectionsRequestSchema } from '../contracts/api/databases.ts';
 import {
   createProjectRequestSchema,
+  gitInitPreviewSchema,
   projectDetailSchema,
   projectSchema,
   setHostingRequestSchema,
@@ -36,6 +37,34 @@ export const createProjectOp = defineOperationContract({
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/projects', status: 201 },
   expose: { palette: true, assistant: true },
+  credentialFields: [],
+  mode: UiMode.Simple,
+  produces: { kind: EntityKind.Project, ref: (project) => ({ id: project.id, title: project.name }) },
+});
+
+export const previewGitInitOp = defineOperationContract({
+  id: 'projects.previewGitInit',
+  title: 'op.projects.previewGitInit',
+  description: 'What putting a directory that is in no Git repository under Git would commit and ignore',
+  input: z.object({ repoPath: z.string().min(1) }),
+  output: gitInitPreviewSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'POST', path: '/projects/git-init/preview' },
+  expose: { palette: false, assistant: false },
+  credentialFields: [],
+  mode: UiMode.Simple,
+});
+
+export const initGitOp = defineOperationContract({
+  id: 'projects.initGit',
+  title: 'op.projects.initGit',
+  description:
+    'Put a directory that is in no Git repository under Git (init on main, .gitignore, first commit) and add it',
+  input: createProjectRequestSchema,
+  output: projectDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/projects/git-init', status: 201 },
+  expose: { palette: false, assistant: false },
   credentialFields: [],
   mode: UiMode.Simple,
   produces: { kind: EntityKind.Project, ref: (project) => ({ id: project.id, title: project.name }) },

@@ -9,6 +9,7 @@ import { attachmentQuery } from '../attachments/attachments.api.ts';
 import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
 import { inboxQuery } from '../inbox/inbox.queries.ts';
+import { initiativeQuery } from '../initiatives/initiatives.queries.ts';
 import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
 import { deckQuery } from '../ppt/ppt.queries.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
@@ -93,6 +94,11 @@ function BatchRef({ id }: { id: string }) {
   return <Named ids={[id]} names={[query.data && `${query.data.key} · ${query.data.title}`]} query={query} />;
 }
 
+function InitiativeRef({ id }: { id: string }) {
+  const query = useQuery(initiativeQuery(id));
+  return <Named ids={[id]} names={[query.data && `${query.data.key} · ${query.data.title}`]} query={query} />;
+}
+
 function ScheduleRef({ id }: { id: string }) {
   const query = useQuery(scheduleQuery(id));
   return <Named ids={[id]} names={[query.data?.title]} query={query} />;
@@ -170,6 +176,8 @@ function RefValue({ kind, value, input }: { kind: InputRef; value: unknown; inpu
       return <KnowledgeRef id={first} />;
     case InputRef.Batch:
       return <BatchRef id={first} />;
+    case InputRef.Initiative:
+      return <InitiativeRef id={first} />;
     case InputRef.Deck:
       return <DeckRef id={first} />;
     case InputRef.Schedule:

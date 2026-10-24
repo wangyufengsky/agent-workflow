@@ -12,6 +12,9 @@ export const ROUTES = {
   batches: '/batches',
   batchNew: '/batches/new',
   batch: '/batches/$batchId',
+  /** Initiatives (34): the list and one initiative. */
+  initiatives: '/initiatives',
+  initiative: '/initiatives/$initiativeId',
   /** Scheduled tasks (22): the list, a new one, one schedule, changing it. */
   schedules: '/schedules',
   scheduleNew: '/schedules/new',
@@ -58,6 +61,7 @@ export const ROUTE_IDS = {
   workflow: '/_shell/workflows/$key',
   batchNew: '/_shell/batches/new',
   batch: '/_shell/batches/$batchId',
+  initiative: '/_shell/initiatives/$initiativeId',
   scheduleNew: '/_shell/schedules/new',
   schedule: '/_shell/schedules/$scheduleId',
   scheduleEdit: '/_shell/schedules/$scheduleId/edit',

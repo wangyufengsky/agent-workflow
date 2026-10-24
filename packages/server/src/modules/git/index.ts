@@ -10,6 +10,7 @@ export {
   limitDiff,
   parseNumstat,
 } from './git.diff.ts';
+export { initRepository, listUnignoredFiles } from './git.init.ts';
 export { createRepoLocks, type RepoLocks } from './git.lock.ts';
 export { beforeArgs, type LogFilter, readCommit, readLog, readRevisions } from './git.log.ts';
 export {

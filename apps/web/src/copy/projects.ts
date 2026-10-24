@@ -1,13 +1,33 @@
+import { GIT_INIT_BRANCH, GIT_INIT_LARGE_FILE_BYTES, GIT_INIT_LARGE_TOTAL_BYTES } from '@aw/shared';
+import { formatBytes } from './common.ts';
+
 export const PROJECTS_COPY = {
   title: '项目',
   lede: '添加到这里的本地 Git 仓库可以用来开始任务。',
   add: '添加项目',
   addTitle: '添加项目',
   repoPath: '仓库目录',
-  repoPathHint: '仓库的根目录（包含 .git 的目录）的完整路径。',
+  repoPathHint: '仓库的根目录（包含 .git 的目录）的完整路径；还没有用 Git 管理的目录也可以，添加时帮你初始化。',
   repoPathMissing: '先填写或选择仓库的根目录。',
   repoPathPlaceholder: '/Users/you/code/my-app',
   chooseFolder: '选择文件夹…',
+  /** Adding a directory that is in no Git repository (D153). */
+  gitInit: {
+    title: '这个目录还没有用 Git 管理',
+    body: '任务要在 Git 分支上进行、改完再合并回来。可以为这个目录初始化 Git，会做三件事：',
+    counting: '正在统计要纳入的文件…',
+    stepInit: `在目录里运行 git init -b ${GIT_INIT_BRANCH}`,
+    stepIgnore: (patterns: readonly string[]) => `写入 .gitignore，忽略 ${patterns.join('、')}`,
+    stepKeepIgnore: '目录里已有 .gitignore，保持不变',
+    stepCommit: (files: number, bytes: number) => `把现有的 ${files} 个文件（共 ${formatBytes(bytes)}）作为第一个提交`,
+    identity: '提交用你自己的 Git 身份；没有设置时用 agent-workflow。',
+    largeTitle: '要纳入的文件比较大',
+    largeTotal: `总量超过 ${formatBytes(GIT_INIT_LARGE_TOTAL_BYTES)}。`,
+    largeFiles: (count: number) => `有 ${count} 个文件超过 ${formatBytes(GIT_INIT_LARGE_FILE_BYTES)}：`,
+    largeHint: '构建产物、依赖、数据或视频通常不需要放进 Git，建议先在 .gitignore 里补上忽略规则再初始化。',
+    run: '初始化 Git 并添加',
+    cancel: '取消',
+  },
   added: '项目已添加',
   emptyTitle: '还没有项目',
   emptyBody: '添加一个本地 Git 仓库后就可以开始任务。',

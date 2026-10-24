@@ -10,6 +10,7 @@ export const ErrorCode = {
   // 项目
   ProjectNotFound: 'PROJECT_NOT_FOUND',
   ProjectPathNotGitRepo: 'PROJECT_PATH_NOT_GIT_REPO',
+  ProjectPathNoGit: 'PROJECT_PATH_NO_GIT',
   ProjectAlreadyExists: 'PROJECT_ALREADY_EXISTS',
   ProjectHasActiveTasks: 'PROJECT_HAS_ACTIVE_TASKS',
   // Git / worktree
@@ -159,6 +160,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.InternalError]: 500,
   [ErrorCode.ProjectNotFound]: 404,
   [ErrorCode.ProjectPathNotGitRepo]: 400,
+  [ErrorCode.ProjectPathNoGit]: 400,
   [ErrorCode.ProjectAlreadyExists]: 409,
   [ErrorCode.ProjectHasActiveTasks]: 409,
   [ErrorCode.GitNotInstalled]: 500,

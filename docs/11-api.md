@@ -52,7 +52,9 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/projects` | `{ items: ProjectDTO[] }`（按添加时间） |
-| POST | `/projects` | `{ repoPath, name? }` → 201 `ProjectDetailDTO`；`repoPath` 须为仓库根目录的绝对路径（子目录、非仓库、不存在 → 400 `PROJECT_PATH_NOT_GIT_REPO`），读取默认分支（`origin/HEAD`，否则当前分支；HEAD 游离且无 `origin/HEAD` → 400 `GIT_BASE_BRANCH_NOT_FOUND`），推断检查命令（13 §1） |
+| POST | `/projects` | `{ repoPath, name? }` → 201 `ProjectDetailDTO`；`repoPath` 须为仓库根目录的绝对路径（仓库的子目录、不存在 → 400 `PROJECT_PATH_NOT_GIT_REPO`；不在任何 Git 仓库里 → 400 `PROJECT_PATH_NO_GIT`，界面据此提出初始化 Git，D153），读取默认分支（`origin/HEAD`，否则当前分支；HEAD 游离且无 `origin/HEAD` → 400 `GIT_BASE_BRANCH_NOT_FOUND`），推断检查命令（13 §1） |
+| POST | `/projects/git-init/preview` | `projects.previewGitInit`（read，D153）：`{ repoPath }` → `GitInitPreviewDTO { files, bytes, largeFiles: { path, bytes }[], largeFileCount, gitignore: string \| null }`：首次提交将纳入的文件数与总大小（不被忽略的文件，含将写入的 `.gitignore`；用系统临时目录里的临时裸仓库 `ls-files --others --exclude-standard` 统计，所选目录不变）、不小于 `GIT_INIT_LARGE_FILE_BYTES` 的文件（从大到小最多 `GIT_INIT_LARGE_FILES_SHOWN` 个）、将写入的 `.gitignore`（目录里已有时为 null）。目录须不在任何仓库里：是仓库根目录 400 `VALIDATION_FAILED`，在仓库里、不存在或带 git 读不了的 `.git` → 400 `PROJECT_PATH_NOT_GIT_REPO` |
+| POST | `/projects/git-init` | `projects.initGit`（write，D153）：`{ repoPath, name? }` → 201 `ProjectDetailDTO`；目录要求同上。`git init -b main`，没有 `.gitignore` 时写入按根目录文件推断的规则（`package.json` / `node_modules` → `node_modules/`；`pom.xml` → `target/`；Gradle → `build/` `.gradle/`；Python → `__pycache__/` `.venv/`；总有 `.DS_Store`），`git add --all` 后以 `GIT_INIT_COMMIT_MESSAGE` 提交（git 配置了 `user.name` 与 `user.email` 时用它，否则 `GIT_COMMIT_IDENTITY`；文件全被忽略时为空提交，任务仍有起点），再同 `POST /projects` 添加。整个过程持有该目录的仓库锁（D37），同一目录的并发请求在锁内重新检查，后到的报 400 `VALIDATION_FAILED`、不会删掉先到的仓库。任一步失败时删除刚建的 `.git` 与写入的 `.gitignore`、目录恢复原样，再报原错误（如提交钩子拒绝 500 `GIT_COMMAND_FAILED`） |
 | GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting` + 关联的数据库连接 `dbConnectionIds`（M5-07）+ 总是允许的 bash 模式 `allowedBash: string[]`（按记下的时间，D101） |
 | PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand?: string \| null, preview?: ProjectPreview \| null }`；分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND`；`preview` 为页面预览设置（29 §4.1：`command`、`setupCommand`、`readyPath`、`pages`、`extraOrigins`），`extraOrigins` 每项须为来源（`http(s)://主机[:端口]`），否则 400 |
 | DELETE | `/projects/:id` | 有非终态任务时 409 `PROJECT_HAS_ACTIVE_TASKS` |
@@ -404,7 +406,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 ## 13c′. 需求计划（v1.3，34 §10、§15）
 
-N2a 实现：从组合模板创建，AI 拆解（N2b）之后加入。全部 `mode = simple`；助手与命令面板随页面（N-07、N-11）一起开放，目前 `expose.assistant = false`。
+N2a 实现：从组合模板创建，AI 拆解（N2b）之后加入。全部 `mode = simple`、`expose.assistant = true`（`initiatives.saveDraft` 除外：整份改写阶段与工作包是页面编辑器的事），不进命令面板（从主页「直接开始」面板开始）；`initiatives.create` 的 `produces: initiative`，其余带 `id` 的操作 `refs.id = initiative`。
 
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |

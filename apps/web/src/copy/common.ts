@@ -10,6 +10,19 @@ export const formatTime = (ms: number) => TIME.format(ms);
 /** `10月22日周四`: a day heading. */
 export const formatMonthDay = (ms: number) => MONTH_DAY.format(ms);
 
+const KB = 1024;
+const MB = KB * 1024;
+const GB = MB * 1024;
+/** A file or download size: `512 B`, `12 KB`, `3.4 MB`, `1.2 GB`. */
+export const formatBytes = (bytes: number) =>
+  bytes < KB
+    ? `${bytes} B`
+    : bytes < MB
+      ? `${Math.round(bytes / KB)} KB`
+      : bytes < GB
+        ? `${(bytes / MB).toFixed(1)} MB`
+        : `${(bytes / GB).toFixed(1)} GB`;
+
 export const COMMON_COPY = {
   loading: '正在加载…',
   retry: '重试',
