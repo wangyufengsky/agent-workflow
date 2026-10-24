@@ -123,6 +123,9 @@ export function createContextRenderer(deps: ContextDeps) {
         const task = tasks.detail(param(ref, 'taskId'));
         return describeTask(task, ref.params.nodeId, page === AssistantPage.Task ? 'the page' : 'the step page');
       }
+      case AssistantPage.TaskPreview:
+        // What the user looks at there is the page `browser_read` reads (29 §9).
+        return describeTask(tasks.detail(param(ref, 'taskId')), undefined, 'the preview tab');
       case AssistantPage.Project:
       case AssistantPage.GitProject: {
         const project = projects.getRecord(param(ref, 'projectId'));

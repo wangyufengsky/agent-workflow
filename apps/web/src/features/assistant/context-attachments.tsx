@@ -25,7 +25,9 @@ export function ContextAttachments({ draft }: { draft: AttachmentDraft }) {
   const [preview, setPreview] = useState<AttachmentDTO>();
   const taskId = page.params.taskId;
   const nodeId = page.params.nodeId;
-  const canAttachTask = (page.page === AssistantPage.Task || page.page === AssistantPage.Node) && taskId !== undefined;
+  const canAttachTask =
+    (page.page === AssistantPage.Task || page.page === AssistantPage.TaskPreview || page.page === AssistantPage.Node) &&
+    taskId !== undefined;
 
   function add(source: SnapshotAssistantContextRequest['source'], name: string) {
     draft.addSnapshot(name, () => callOperation(snapshotAssistantContextOp, { source }), setPreview);

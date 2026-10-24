@@ -9,6 +9,8 @@ const PAGE_ROUTE = {
   [AssistantPage.Desktop]: '/companion',
   [AssistantPage.Tasks]: ROUTES.tasks,
   [AssistantPage.Task]: ROUTES.task,
+  /** The task page with its preview tab shown (`?view=preview`, 29 §8.1). */
+  [AssistantPage.TaskPreview]: ROUTES.task,
   [AssistantPage.Node]: ROUTES.node,
   [AssistantPage.Inbox]: ROUTES.inbox,
   [AssistantPage.Projects]: ROUTES.projects,
@@ -35,8 +37,11 @@ const PAGE_ROUTE = {
   [AssistantPage.Environment]: ROUTES.environment,
 } as const satisfies Record<AssistantPage, string>;
 
+/** The preview tab shares the task page's route; its `view` tells them apart. */
 const PAGE_OF_ROUTE = new Map<string, AssistantPage>(
-  Object.values(AssistantPage).map((page) => [PAGE_ROUTE[page], page]),
+  Object.values(AssistantPage)
+    .filter((page) => page !== AssistantPage.TaskPreview)
+    .map((page) => [PAGE_ROUTE[page], page]),
 );
 
 /** The backend checked that the page has its params (`ASSISTANT_PAGE_PARAMS`). */
@@ -57,6 +62,9 @@ export function useAssistantPage(): AssistantPageRef {
       if (match === undefined || page === undefined) return { page: AssistantPage.Home, params: {} };
       const params: Record<string, unknown> = match.params;
       const search: Record<string, unknown> = match.search;
+      if (page === AssistantPage.Task && search.view === 'preview') {
+        return { page: AssistantPage.TaskPreview, params: { taskId: String(params.taskId) } };
+      }
       const ids = {
         taskId: text(params.taskId),
         nodeId: text(params.nodeId) ?? text(search.node),
@@ -89,6 +97,8 @@ export function useOpenAssistantPage() {
             params: { taskId: param(ref, 'taskId') },
             search: ref.params.nodeId === undefined ? {} : { node: ref.params.nodeId },
           });
+        case AssistantPage.TaskPreview:
+          return navigate({ to: ROUTES.task, params: { taskId: param(ref, 'taskId') }, search: { view: 'preview' } });
         case AssistantPage.Node:
           return navigate({
             to: ROUTES.node,

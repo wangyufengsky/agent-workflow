@@ -53,6 +53,8 @@ export const AssistantPage = {
   Desktop: 'desktop',
   Tasks: 'tasks',
   Task: 'task',
+  /** The task page's preview tab (29 §2.6, §8.1): the user's own preview of the task. */
+  TaskPreview: 'task_preview',
   Node: 'node',
   Inbox: 'inbox',
   Projects: 'projects',
@@ -101,6 +103,7 @@ export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.Desktop]: [],
   [AssistantPage.Tasks]: [],
   [AssistantPage.Task]: ['taskId'],
+  [AssistantPage.TaskPreview]: ['taskId'],
   [AssistantPage.Node]: ['taskId', 'nodeId'],
   [AssistantPage.Inbox]: [],
   [AssistantPage.Projects]: [],

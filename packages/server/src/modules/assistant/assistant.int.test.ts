@@ -89,6 +89,14 @@ describe('助手对话（A-02、A-03）', () => {
     expect(sent?.system).toContain(join(realpathSync(t.dataDir), 'assistant', 'files', c.id));
   });
 
+  it('用户在任务的预览页签时，system 写明所在的是预览页签（29 §2.6）', async () => {
+    const { project } = await addProject(t);
+    const task = await createTask(t, { projectId: project.id, workflow: 'feature', start: false });
+    const c = await newConversation();
+    await say(c.id, '这个页面为什么报错？', { page: 'task_preview', params: { taskId: task.id } });
+    expect(t.fake.prompts[0]?.system).toContain(`the preview tab of task ${task.key} "${task.title}"`);
+  });
+
   it('所在页面指向不存在的任务时不发送（TASK_NOT_FOUND）', async () => {
     const c = await newConversation();
     const res = await t.call(sendAssistantMessageOp, {
