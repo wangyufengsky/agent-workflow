@@ -13,6 +13,9 @@ const COMMITTER_FORMAT = '%cn%x00%ce%x00%ct';
  */
 export type LogFilter = { author?: string | undefined; search?: string | undefined; before?: number | undefined };
 
+/** The revision options that keep to a ref's own (first-parent) history committed before `before` (ms). */
+export const beforeArgs = (before: number) => ['--first-parent', `--before=@${Math.floor(before / 1000)}`];
+
 /** `git log --format=<LOG_FORMAT>`; git puts a newline between commits. */
 export function parseLog(output: string): GitCommitDTO[] {
   return output
@@ -63,7 +66,7 @@ export async function readLog(
       `--max-count=${limit}`,
       `--skip=${skip}`,
       ...(filters.length === 0 ? [] : ['--fixed-strings', '--regexp-ignore-case', ...filters]),
-      ...(filter.before === undefined ? [] : ['--first-parent', `--before=@${Math.floor(filter.before / 1000)}`]),
+      ...(filter.before === undefined ? [] : beforeArgs(filter.before)),
       '--end-of-options',
       ref,
       '--',

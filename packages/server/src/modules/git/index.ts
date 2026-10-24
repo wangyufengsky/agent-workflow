@@ -10,7 +10,7 @@ export {
   limitDiff,
 } from './git.diff.ts';
 export { createRepoLocks, type RepoLocks } from './git.lock.ts';
-export { type LogFilter, readCommit, readLog, readRevisions } from './git.log.ts';
+export { beforeArgs, type LogFilter, readCommit, readLog, readRevisions } from './git.log.ts';
 export {
   branchExists,
   readDefaultBranch,

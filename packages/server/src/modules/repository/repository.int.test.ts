@@ -164,6 +164,14 @@ describe('Git 管理台（读取仓库）', () => {
     const before = new Date('2026-10-01T00:00:00+08:00').getTime();
     const { body } = await t.call(gitLogOp, { id: project.id, ref: 'main', limit: 1, before });
     expect(body.items.map((c) => c.subject)).toEqual(['b']);
+    // A SHA search keeps to the same history: not the merged side commit, not one after the day.
+    const bySha = async (rev: string) =>
+      (
+        await t.call(gitLogOp, { id: project.id, ref: 'main', before, search: await repo.git('rev-parse', rev) })
+      ).body.items.map((c) => c.subject);
+    expect(await bySha('side')).toEqual([]);
+    expect(await bySha('main')).toEqual([]);
+    expect(await bySha('main~2')).toEqual(['b']);
     const none = await t.call(gitLogOp, {
       id: project.id,
       ref: 'main',
