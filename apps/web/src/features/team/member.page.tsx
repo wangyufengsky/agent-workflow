@@ -4,12 +4,13 @@ import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
+import { BarChart } from '../../components/charts/bar-chart.tsx';
+import { toneClass } from '../../components/charts/series.ts';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY, formatTime } from '../../copy/common.ts';
 import { TEAM_COPY as C, formatBucket, formatCount, formatRate, WORK_TYPE_LABEL } from '../../copy/team.ts';
 import { useUiStore } from '../../state/ui.store.ts';
-import { BarChart } from '../insights/bar-chart.tsx';
 import chart from '../insights/insights.module.css';
 import { projectQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
@@ -171,7 +172,7 @@ function MemberDetail({ detail, query }: { detail: TeamMemberDetailDTO; query: T
                 <span className={`mono ${styles.dirPath}`}>{d.path === '' ? C.rootDirectory : d.path}</span>
                 <span className={styles.share}>
                   <i
-                    className={chart.s0}
+                    className={toneClass('s0')}
                     style={{ width: `${(d.lines / Math.max(1, detail.directories[0]?.lines ?? 1)) * 100}%` }}
                   />
                 </span>

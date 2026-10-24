@@ -313,7 +313,7 @@
   - `team.aggregate.ts`：套规则、分桶、§3 全部指标、中位数、上一段对比（纯函数）；
   - `team.analysis.ts`、`team.analysis.repo.ts`：抽样、首条消息、排队、`submit_member_analysis` 校验；
   - `team.repo.ts`、`team.service.ts`、`team.operations.ts`、`index.ts`。
-- `web/src/features/team/`：概览页、成员页、成员分析、口径设置抽屉、对比条与比例条组件、查询；趋势图沿用并扩展 `insights/bar-chart.tsx`（更多系列色、分桶日期与固定上限）；文案 `web/src/copy/team.ts`。
+- `web/src/features/team/`：概览页、成员页、成员分析、口径设置抽屉、对比条与比例条组件、查询；趋势图沿用并扩展共用的柱状图（原 `insights/bar-chart.tsx`，35 §5.1 起在 `components/charts/`；更多系列色、分桶日期与固定上限）；文案 `web/src/copy/team.ts`。
 
 ## 10. 不做
 

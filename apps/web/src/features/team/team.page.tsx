@@ -4,12 +4,13 @@ import { getRouteApi, Navigate, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
+import { BarChart } from '../../components/charts/bar-chart.tsx';
+import { toneOf } from '../../components/charts/series.ts';
 import { EmptyState } from '../../components/empty-state.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { TEAM_COPY as C, formatBucket, formatCount, formatRate } from '../../copy/team.ts';
 import { useUiStore } from '../../state/ui.store.ts';
-import { BarChart } from '../insights/bar-chart.tsx';
 import { projectQuery, projectsQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { AnalyseAllButton } from './member-analysis.tsx';
@@ -24,7 +25,6 @@ import {
   MemberTable,
   MetricCard,
   type MetricKey,
-  toneOf,
 } from './team-parts.tsx';
 import { type TeamSearch, teamQueryOf } from './team-search.ts';
 import { TeamSettingsDrawer } from './team-settings.tsx';

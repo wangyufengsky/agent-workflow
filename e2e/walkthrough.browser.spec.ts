@@ -55,6 +55,8 @@ type Seed = {
   gitCommit: string;
   /** The assistant conversation with every kind of message, shown on the home page too (D112). */
   assistantConversation: string;
+  /** An assistant conversation with every kind of chart (35 §5.6). */
+  assistantCharts: string;
   /** PPTs (23): one whose outline waits for confirmation, one made with a page in every layout. */
   deckOutline: string;
   deckMade: string;
@@ -228,6 +230,82 @@ async function seedAssistant(
     .toBe(1);
   await settledConversation(request, conversation.id);
   return { busy: busy.id, conversation: conversation.id };
+}
+
+/**
+ * Every kind of chart the assistant draws (35 §5.6): columns side by side, horizontal and stacked bars, lines with a
+ * gap and negative values, a pie, and a flowchart with a decision and a loop back.
+ */
+async function seedCharts(request: APIRequestContext): Promise<string> {
+  const conversation = await api<{ id: string }>(request, 'POST', '/assistant/conversations', { title: '图表' });
+  const weeks = ['第 38 周', '第 39 周', '第 40 周', '第 41 周', '第 42 周', '第 43 周'];
+  await queueAssistantTurn(request, [
+    appTool('show_chart', {
+      type: 'bar',
+      title: '成员提交数',
+      // Six members: grouped bars keep their gaps with more than four categories.
+      categories: ['张三', '李四', '王五', '赵六', '钱七', '孙八'],
+      series: [
+        { name: '本周', values: [12, 8, 15, 5, 9, 3] },
+        { name: '上周', values: [9, 11, 10, 7, 6, 4] },
+      ],
+      unit: '个',
+      caption: '主分支 · 按姓名排序',
+    }),
+    appTool('show_chart', {
+      type: 'bar',
+      title: '各目录改动行数',
+      categories: ['packages/server', 'apps/web', 'packages/shared', 'docs'],
+      series: [
+        { name: '新增', values: [1240, 860, 310, 520] },
+        { name: '删除', values: [420, 390, 80, 60] },
+      ],
+      stacked: true,
+      caption: '最近 30 天',
+    }),
+    appTool('show_chart', {
+      type: 'line',
+      title: '每周净增测试数',
+      categories: weeks,
+      series: [
+        { name: '单元测试', values: [14, 9, null, -3, 6, 11] },
+        { name: '集成测试', values: [4, 2, 5, 1, -2, 3] },
+      ],
+    }),
+    appTool('show_chart', {
+      type: 'pie',
+      title: '本周任务状态',
+      categories: ['已完成', '待合并', '执行中', '失败'],
+      series: [{ name: '任务数', values: [18, 4, 3, 2] }],
+      unit: '个',
+    }),
+    appTool('show_flowchart', {
+      title: '修 Bug 流程',
+      nodes: [
+        { id: 'start', label: '开始', shape: 'terminal' },
+        { id: 'locate', label: '定位根因' },
+        { id: 'fix', label: '修复并补回归测试' },
+        { id: 'check', label: '检查命令通过吗？', shape: 'decision' },
+        { id: 'review', label: 'AI 评审' },
+        { id: 'done', label: '待合并', shape: 'terminal' },
+      ],
+      edges: [
+        { from: 'start', to: 'locate' },
+        { from: 'locate', to: 'fix' },
+        { from: 'fix', to: 'check' },
+        { from: 'check', to: 'review', label: '通过' },
+        { from: 'check', to: 'fix', label: '失败' },
+        { from: 'review', to: 'done' },
+      ],
+    }),
+    { type: 'text', text: '王五本周提交最多；单元测试在第 41 周净减 3 个。' },
+  ]);
+  await api(request, 'POST', `/assistant/conversations/${conversation.id}/messages`, {
+    text: '把这几个数字都画出来',
+    context: { page: 'home', params: {} },
+  });
+  await settledConversation(request, conversation.id);
+  return conversation.id;
 }
 
 /** One task per state the task page renders differently (14 §3.3), each in its own project so scripts stay apart. */
@@ -461,6 +539,7 @@ async function seed(request: APIRequestContext): Promise<Seed> {
   });
   await api(request, 'POST', `/schedules/${schedule.id}/run`);
   const assistant = await seedAssistant(request, reviewProject, { id: knowledge.id, turnId: knowledgeTurn.id });
+  const assistantCharts = await seedCharts(request);
 
   const pptProject = await createProject(request, null);
   type Deck = { id: string; status: string };
@@ -578,6 +657,7 @@ createServer((req, res) => {
     schedule: schedule.id,
     assistantBusy: assistant.busy,
     assistantConversation: assistant.conversation,
+    assistantCharts,
     deckOutline: deckOutline.id,
     deckMade: deckMade.id,
     gitCommit,
@@ -843,6 +923,25 @@ const SHOTS: Shot[] = [
       await expect(panel.getByTestId('entity-card')).toBeVisible();
       return panel;
     },
+  },
+  {
+    // The charts in the panel's narrow column (35 §5.6).
+    name: 'assistant-charts',
+    mode: UiMode.Simple,
+    url: (s) => `/tasks/${s.running.id}`,
+    ready: testId('progress-canvas'),
+    open: async (page, s) => {
+      const panel = await openAssistant(page, s.assistantCharts);
+      await expect(panel.getByTestId('assistant-chart')).toHaveCount(5);
+      return panel;
+    },
+  },
+  {
+    // The same charts in the home page's wider conversation.
+    name: 'home-charts',
+    mode: UiMode.Simple,
+    url: (s) => `/?projectId=${s.project.id}&conversation=${s.assistantCharts}`,
+    ready: (page) => page.getByRole('figure', { name: '修 Bug 流程' }),
   },
   {
     name: 'assistant-busy',

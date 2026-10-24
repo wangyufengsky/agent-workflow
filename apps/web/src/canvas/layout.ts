@@ -1,3 +1,5 @@
+import { orderLayers } from '../components/charts/layered-layout.ts';
+
 /** Canvas sizes (26 §3.2, §4): fixed, so the layout needs no measuring. */
 export const NODE_WIDTH = 208;
 export const NODE_HEIGHT = 88;
@@ -55,7 +57,15 @@ export function layoutGraph<T extends LayoutStep>(steps: readonly T[]): GraphLay
   ];
   if (steps.length === 0) edges.push({ source: START, target: END });
 
-  orderColumns(columns, edges);
+  // The pills count as one-step columns at both ends.
+  orderLayers(
+    columns,
+    edges,
+    new Map([
+      [START, 0],
+      [END, 0],
+    ]),
+  );
 
   const pillY = -END_HEIGHT / 2;
   const start = { x: 0, y: pillY, width: END_WIDTH, height: END_HEIGHT };
@@ -70,35 +80,4 @@ export function layoutGraph<T extends LayoutStep>(steps: readonly T[]): GraphLay
     x += NODE_WIDTH + (index === columns.length - 1 ? END_GAP : COLUMN_GAP);
   });
   return { placed, start, end: { x, y: pillY, width: END_WIDTH, height: END_HEIGHT }, edges };
-}
-
-/**
- * Barycenter sweeps over the step columns: down by upstream positions, up by downstream ones, down again. The pills
- * count as one-step columns at both ends.
- */
-function orderColumns(columns: LayoutStep[][], edges: ReadonlyArray<{ source: string; target: string }>): void {
-  const rank = new Map<string, number>([
-    [START, 0],
-    [END, 0],
-  ]);
-  const rankColumn = (list: readonly LayoutStep[]) => {
-    list.forEach((step, i) => {
-      rank.set(step.id, i - (list.length - 1) / 2);
-    });
-  };
-  const sortBy = (list: LayoutStep[], neighbours: (id: string) => string[]) => {
-    const weight = (id: string) => {
-      const known = neighbours(id).flatMap((n) => rank.get(n) ?? []);
-      return known.length === 0 ? (rank.get(id) ?? 0) : known.reduce((a, b) => a + b, 0) / known.length;
-    };
-    const sorted = list.map((step) => ({ step, weight: weight(step.id) })).sort((a, b) => a.weight - b.weight);
-    list.splice(0, list.length, ...sorted.map((s) => s.step));
-    rankColumn(list);
-  };
-  const upstream = (id: string) => edges.filter((e) => e.target === id).map((e) => e.source);
-  const downstream = (id: string) => edges.filter((e) => e.source === id).map((e) => e.target);
-  for (const list of columns) rankColumn(list);
-  for (const list of columns) sortBy(list, upstream);
-  for (const list of columns.toReversed()) sortBy(list, downstream);
-  for (const list of columns) sortBy(list, upstream);
 }

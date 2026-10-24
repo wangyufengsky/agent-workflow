@@ -5,6 +5,7 @@ import {
   type InsightsTaskDTO,
   type UsageTotals,
 } from '@aw/shared';
+import { BarChart, type BarSeries } from '../../components/charts/bar-chart.tsx';
 import { Tabs } from '../../components/tabs.tsx';
 import {
   INSIGHTS_COPY as C,
@@ -13,7 +14,6 @@ import {
   formatTokensShort,
   groupName,
 } from '../../copy/insights.ts';
-import { BarChart, type BarSeries } from './bar-chart.tsx';
 import { type Drill, drillFilter } from './drill.ts';
 import styles from './insights.module.css';
 import { StatCard } from './stat-card.tsx';

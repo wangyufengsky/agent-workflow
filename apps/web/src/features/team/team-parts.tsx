@@ -7,8 +7,8 @@ import {
   type TeamSummaryDTO,
 } from '@aw/shared';
 import { type ReactNode, useState } from 'react';
+import { type SeriesTone, toneClass, toneOf } from '../../components/charts/series.ts';
 import { TEAM_COPY as C, formatCount, formatDecimal, formatRate, WORK_TYPE_LABEL } from '../../copy/team.ts';
-import { SERIES_TONES, type SeriesTone } from '../insights/bar-chart.tsx';
 import chart from '../insights/insights.module.css';
 import styles from './team.module.css';
 
@@ -36,9 +36,6 @@ export const METRICS = [
 }[];
 export type MetricKey = (typeof METRICS)[number]['key'];
 export const metricOf = (key: MetricKey) => METRICS.find((m) => m.key === key) ?? METRICS[0];
-
-/** The member's colour in the charts, by position in the name order; the rest share a neutral one. */
-export const toneOf = (index: number): SeriesTone => SERIES_TONES[index] ?? 'sRest';
 
 /** `↑ 12%` against the period before; nothing when there is nothing to compare with. */
 export function Delta({ current, previous }: { current: number | null; previous: number | null }) {
@@ -238,7 +235,7 @@ export function CompareBars({
           <li key={member.key}>
             <span className={styles.compareName}>{member.name}</span>
             <span className={styles.compareTrack}>
-              <i className={chart[toneOf(i)]} style={{ width: `${width(value ?? 0)}%` }} />
+              <i className={toneClass(toneOf(i))} style={{ width: `${width(value ?? 0)}%` }} />
               {median !== null && <b className={styles.medianMark} style={{ left: `${width(median)}%` }} />}
             </span>
             <span className={styles.compareValue}>{value === null ? '—' : m.format(value)}</span>
@@ -259,7 +256,7 @@ export function ShareBar({ parts }: { parts: { key: string; name: string; value:
         .map((p) => (
           <i
             key={p.key}
-            className={chart[p.tone]}
+            className={toneClass(p.tone)}
             style={{ width: `${(p.value / total) * 100}%` }}
             title={`${p.name} ${formatCount(p.value)}`}
           />
@@ -317,7 +314,7 @@ export function WorkMix({ metrics }: { metrics: TeamMetricsDTO }) {
           .filter((p) => p.value > 0)
           .map((p) => (
             <li key={p.key}>
-              <i className={chart[p.tone]} aria-hidden="true" />
+              <i className={toneClass(p.tone)} aria-hidden="true" />
               {p.name} {formatCount(p.value)}
             </li>
           ))}

@@ -280,3 +280,17 @@ details[open] > .actionHead .actionChevron {
     animation: none;
   }
 }
+
+/* 助手画的图（35 §5）：卡片里是标题、图与口径说明 */
+.chartCard {
+  gap: var(--s-2);
+}
+.chartTitle {
+  font-weight: 600;
+  color: var(--ink);
+}
+.chartCaption {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}

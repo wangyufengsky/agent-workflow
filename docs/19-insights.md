@@ -193,7 +193,7 @@ type InsightsTaskDTO = {
   - `insights.aggregate.ts`：由查出的行计算 §2 的全部数字（纯函数）；
   - `insights.repo.ts`：§5 的查询，只读，读取其他模块经其 `index.ts` 导出的表；
   - `insights.service.ts`、`insights.operations.ts`、`index.ts`。
-- `web/src/features/insights/`：页面（简单 / 专业两种视图）、`bar-chart.tsx`（自写的 HTML/CSS 柱状图，D80）、`drill.ts`（钻取过滤）、查询；文案 `web/src/copy/insights.ts`。SSE `task.updated`、`attempt.updated`（含知识问答的尝试）与 `inbox.updated` 让这些查询重新读取。
+- `web/src/features/insights/`：页面（简单 / 专业两种视图）、趋势图用共用的 `components/charts/bar-chart.tsx`（自写的 HTML/CSS 柱状图，D80；35 §5.1 起与团队、助手共用）、`drill.ts`（钻取过滤）、查询；文案 `web/src/copy/insights.ts`。SSE `task.updated`、`attempt.updated`（含知识问答的尝试）与 `inbox.updated` 让这些查询重新读取。
 
 ## 8. 测试
 

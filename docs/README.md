@@ -37,6 +37,7 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [31-requirements-checklist.md](31-requirements-checklist.md) | 需求验收清单（设计稿，未实现）：可编辑清单、核验步骤、逐项结论与过期、人工确认、交付提醒 | 全员 |
 | [33-team.md](33-team.md) | 团队（v1.3，已实现，待检查）：按项目统计成员的提交与质量信号、纵向与横向对比图表、AI 成员分析（不评分、不排名，D128–D131） | 全员 |
 | [34-initiatives.md](34-initiatives.md) | 需求计划（设计稿，未实现，D137 已确认、先做 N1，D132–D136 待确认）：大需求拆成工作包与阶段、每个工作包是一个普通任务、合入后解锁下游、逐步细化；先做内置流程「需求拆解」（N1） | 全员 |
+| [35-assistant-charts.md](35-assistant-charts.md) | 助手画图（v1.3，已实现，待检查）：`show_chart` / `show_flowchart` 工具、消息流 `chart` 条目、共用图表组件、无障碍与四主题（D138–D142） | 全员 |
 
 ## 维护规则
 

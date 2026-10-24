@@ -357,6 +357,20 @@
 | W-04 | 文档同步（01、02、03、07、13、14） | `pnpm verify` 通过 |
 | W-05 | Git 工作台比较视图「或从日期」（D127）：`git/log` 的 `before`（第一父提交历史）、`CompareSince` 写明起点、文档 11 / 14 / 27 | 集成测试：侧分支上日期更晚的旧提交不被选为起点、那天之前没有提交时为空；E2E J24「按日期比较」 |
 
+## v1.3 期间 · 助手画图（V）
+
+> 状态：**设计已确认**（2026-10-24，35 §11 都按推荐方案）。设计见 [35-assistant-charts.md](35-assistant-charts.md)，决策 D138–D142。V-01…V-07 已完成（2026-10-24，V-03 起在 PR #77 合并后），待用户检查。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| V-01（已完成） | 契约：`show_chart` / `show_flowchart` 输入 schema、`ChartSpec`、上限常量、`TranscriptEntryKind.Chart` | 单元：每条跨字段规则一例被拒；旧条目样本可解析 |
+| V-02（已完成） | 后端：两个助手专用工具、`recordChart`、工具描述与提示词 | 集成：写入 `chart` 条目、非法输入 `VALIDATION_FAILED` 带 path 且不写条目、重启后仍可读 |
+| V-03（已完成） | 前端共用图表组件 `components/charts/`（移入柱状图，新增横向条、折线、环形、流程图，抽出分层布局） | 单元：横纵选择、负数刻度、百分比合计 100、流程图布局；J16 与团队页 E2E 照常通过 |
+| V-04（已完成） | 助手消息流渲染图、动作条规则、文案与动画 | E2E：饼图与流程图的可访问名称、读数、读屏数据；刷新后仍在；两种模式的动作条 |
+| V-05（已完成） | J9 四主题走查加「助手图表」 | axe 无对比度问题、无横向溢出 |
+| V-06（已完成） | live：真实模型统计成员提交数画柱状图、把内置流程画成流程图（35 §10） | 调用了 `team_summary` 与 `show_chart`、数值与提交历史一致；调用了 `show_flowchart`。2026-10-24 免费模型两例通过 |
+| V-07（已完成） | 文档同步（02、07、08、10、14、15、19、28、35） | `pnpm verify` 通过 |
+
 ## v1.3 · 内置浏览器与页面预览（B）
 
 > 状态：**B1 已完成**（2026-10-23，分支 `feat/B-browser`；验收：本机 macOS `pnpm verify`、`pnpm e2e`（含 J26 与四主题走查）、`pnpm playwright test browser-host.electron launch.electron --project electron`、`live/browser.live.test.ts` 两个模型都到待合并）。设计见 [29-browser.md](29-browser.md)；决策 D120–D125 用户 2026-10-23 确认；开发前实测 V1–V7 已完成（29 §12）。B2（验收与界面）、B3（助手、知识问答、PPT）在 B1 完成后再拆。
