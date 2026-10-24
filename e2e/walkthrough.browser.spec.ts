@@ -1,6 +1,7 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { closeSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, realpathSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { API_PREFIX, THEME_IDS, type ThemeId, UiMode } from '@aw/shared';
+import { API_PREFIX, GIT_INIT_LARGE_FILE_BYTES, THEME_IDS, type ThemeId, UiMode } from '@aw/shared';
 import { type APIRequestContext, expect, type Locator, type Page, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import {
@@ -1115,6 +1116,26 @@ const SHOTS: Shot[] = [
     ready: heading('修改定时任务'),
   },
   { name: 'projects', mode: UiMode.Simple, url: () => '/projects', ready: heading('项目') },
+  {
+    // Adding a directory without Git (D153): the confirmation with a large file, which is only previewed, never added.
+    name: 'projects-git-init',
+    mode: UiMode.Simple,
+    url: () => '/projects',
+    ready: heading('项目'),
+    open: async (page) => {
+      const dir = realpathSync(mkdtempSync(join(tmpdir(), 'aw-e2e-plain-')));
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({ scripts: { dev: 'vite' } }));
+      const video = openSync(join(dir, 'demo-recording.mp4'), 'w');
+      ftruncateSync(video, 3 * GIT_INIT_LARGE_FILE_BYTES);
+      closeSync(video);
+      await page.getByRole('button', { name: '添加项目' }).click();
+      const dialog = page.getByRole('dialog', { name: '添加项目' });
+      await dialog.getByLabel('仓库目录').fill(dir);
+      await dialog.getByRole('button', { name: '添加项目' }).click();
+      await expect(dialog.getByTestId('git-init-large')).toBeVisible();
+      return dialog;
+    },
+  },
   { name: 'project', mode: UiMode.Simple, url: (s) => `/projects/${s.project.id}`, ready: heading(/.+/) },
   { name: 'settings', mode: UiMode.Simple, url: () => '/settings', ready: heading('设置') },
   {

@@ -18,6 +18,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.system.mcpTools': 'MCP 工具清单',
   'op.projects.list': '项目列表',
   'op.projects.create': '添加项目',
+  'op.projects.previewGitInit': '查看初始化 Git 将纳入的文件',
+  'op.projects.initGit': '初始化 Git 并添加项目',
   'op.projects.get': '查看项目',
   'op.projects.update': '修改项目',
   'op.previews.get': '查看页面预览',

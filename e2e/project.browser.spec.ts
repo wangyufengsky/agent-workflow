@@ -1,6 +1,9 @@
+import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { E2E_HOSTING } from './env.ts';
-import { createProject, patchSettings } from './helpers.ts';
+import { createProject, git, patchSettings } from './helpers.ts';
 
 // The project page's forms confirm what they saved (14 §3.7). Each form is keyed by the project's update time, so a
 // save remounts it: the confirmation must not depend on the form still being mounted.
@@ -24,4 +27,33 @@ test('项目基本信息与远端仓库：保存、绑定、解除绑定后都�
 
   await page.getByRole('button', { name: '解除绑定' }).click();
   await expect(page.getByRole('status').getByText('已解除绑定')).toBeVisible();
+});
+
+test('添加没有 Git 的目录：确认初始化 Git 后照常添加项目（D153）', async ({ page, request }) => {
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
+  // Without any project every page leads to onboarding; this goes through the projects page's dialog.
+  await createProject(request, null);
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'aw-e2e-plain-')));
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }));
+  mkdirSync(join(dir, 'node_modules'));
+  writeFileSync(join(dir, 'node_modules', 'left-pad.js'), 'pad');
+
+  await page.goto('/projects');
+  await page.getByRole('button', { name: '添加项目' }).click();
+  const dialog = page.getByRole('dialog', { name: '添加项目' });
+  await dialog.getByLabel('仓库目录').fill(dir);
+  await dialog.getByRole('button', { name: '添加项目' }).click();
+
+  const confirm = dialog.getByRole('region', { name: '这个目录还没有用 Git 管理' });
+  await expect(confirm.getByRole('listitem')).toHaveText([
+    '在目录里运行 git init -b main',
+    '写入 .gitignore，忽略 node_modules/、.DS_Store',
+    /^把现有的 2 个文件（共 \d+ B）作为第一个提交$/,
+  ]);
+  await confirm.getByRole('button', { name: '初始化 Git 并添加' }).click();
+
+  await expect(page.getByRole('status').getByText('项目已添加')).toBeVisible();
+  await expect(page.getByRole('heading', { name: dir.split(/[\\/]/).pop(), level: 1 })).toBeVisible();
+  expect(git(dir, 'log', '--format=%s')).toBe('Initial commit');
+  expect(git(dir, 'ls-files')).toBe('.gitignore\npackage.json');
 });
