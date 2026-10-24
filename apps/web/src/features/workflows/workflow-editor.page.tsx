@@ -19,6 +19,7 @@ import { EditTools } from '../../canvas/edit-tools.tsx';
 import { checkPlan, type EditorProblem } from '../../canvas/plan-check.ts';
 import editorStyles from '../../canvas/plan-editor.module.css';
 import { PlanEditor } from '../../canvas/plan-editor.tsx';
+import { insertSteps } from '../../canvas/plan-graph-edit.ts';
 import { ProblemCount } from '../../canvas/problem-count.tsx';
 import { ProgressCanvas } from '../../canvas/progress-canvas.tsx';
 import { useHistory } from '../../canvas/use-history.ts';
@@ -43,6 +44,7 @@ import {
   workflowsQuery,
   workflowVersionsQuery,
 } from '../tasks/tasks.queries.ts';
+import { InsertSteps } from './insert-steps.tsx';
 import { RequiredStepsEditor } from './required-steps-editor.tsx';
 import styles from './workflows.module.css';
 
@@ -345,7 +347,23 @@ function WorkflowEditor({ workflow, roles }: { workflow: WorkflowDTO; roles: rea
       rules={templateRules}
       roles={roles}
       problems={problems}
-      toolbar={(addStep) => toolbar(<EditTools history={history} addStep={addStep} />)}
+      toolbar={(addStep) =>
+        toolbar(
+          <>
+            <EditTools history={history} addStep={addStep} />
+            <InsertSteps
+              workflowKey={workflow.key}
+              onInsert={(steps, name) => {
+                const inserted = insertSteps(template, steps);
+                // The copies' roles join the workflow's allowed roles, or the steps would be invalid here.
+                const allowedRoles = [...new Set([...definition.allowedRoles, ...steps.map((s) => s.roleKey)])];
+                change({ definition: { ...definition, template: inserted.graph, allowedRoles } });
+                toast(C.inserted(inserted.keys.length, name));
+              }}
+            />
+          </>,
+        )
+      }
       actions={update.isError ? <ErrorState error={update.error} /> : undefined}
       settings={settings}
     />

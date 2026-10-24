@@ -78,6 +78,66 @@ test('J8 专业模式：复制内置流程 → 修改 → 用它跑通一个任�
   await expect(page.getByTestId('task-page')).toContainText('我的修 Bug');
 });
 
+test('J39 专业模式：在复制的流程里插入另一个流程的步骤（重名加后缀）→ 保存 → 用它跑通一个任务', async ({
+  page,
+  request,
+}) => {
+  const project = await createProject(request, null);
+  await queueTurn(request, project, { title: '定位根因' }, [submitResult('找到了根因')]);
+  await queueTurn(request, project, { title: '修复' }, [
+    { type: 'edit', file: 'fix.txt', content: 'fixed\n' },
+    submitResult('修复了根因'),
+  ]);
+  await queueTurn(request, project, { title: '列出告警' }, [submitResult('两条未使用变量告警')]);
+  await queueTurn(request, project, { title: '清理' }, [
+    { type: 'edit', file: 'clean.txt', content: 'clean\n' },
+    submitResult('清理了告警'),
+  ]);
+  await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
+  await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
+
+  await page.goto('/workflows');
+  await page.getByRole('article', { name: '修 Bug', exact: true }).getByRole('button', { name: '复制' }).click();
+  const copy = page.getByRole('dialog');
+  await copy.getByLabel('标识').fill('bugfix_cleanup');
+  await copy.getByLabel('名称').fill('修 Bug 再清理');
+  await copy.getByRole('button', { name: '确定' }).click();
+  await expect(page).toHaveURL(/\/workflows\/bugfix_cleanup$/);
+
+  await page.getByRole('button', { name: '插入流程的步骤' }).click();
+  const dialog = page.getByRole('dialog', { name: '插入哪个流程的步骤？' });
+  // The workflow being edited is not offered; AI-planned workflows have no steps to copy.
+  await expect(dialog.getByText('修 Bug 再清理', { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText('新功能开发', { exact: true })).toHaveCount(0);
+  await dialog.getByLabel('清理告警').check();
+  await expect(dialog).toContainText('列出告警 → 清理');
+  await dialog.getByRole('button', { name: '插入' }).click();
+  await expect(page.getByText('已插入「清理告警」的 2 个步骤')).toBeVisible();
+  const editor = page.getByTestId('plan-editor');
+  await expect(editor.getByTestId('step-inventory')).toBeVisible();
+  await expect(editor.getByTestId('step-fix_2')).toBeVisible();
+  await page.getByRole('button', { name: '保存为新版本' }).click();
+  await expect(page.getByText('已保存为第 2 版')).toBeVisible();
+  const get = async (path: string) => (await request.get(`${API_BASE}${path}`, { headers: AUTH })).json();
+  const latest = (await get('/workflows/by-key/bugfix_cleanup/versions')).items[0];
+  const nodes: Array<{ key: string; dependsOn: string[] }> = (await get(`/workflows/${latest.id}`)).definition.template
+    .nodes;
+  expect(nodes.map((n) => [n.key, n.dependsOn])).toEqual([
+    ['locate', []],
+    ['fix', ['locate']],
+    ['inventory', ['fix']],
+    ['fix_2', ['inventory']],
+  ]);
+
+  await page.goto(`/?projectId=${project.id}`);
+  await pickWorkflow(page, /修 Bug 再清理/);
+  await page.getByLabel('需求').fill('订单金额四舍五入错误，顺手清理告警');
+  await page.getByRole('button', { name: /^开始/ }).click();
+  const result = page.getByTestId('result-card');
+  await expect(result).toContainText('已完成 4 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
+  await expect(result).toContainText('clean.txt');
+});
+
 test('简单模式直接打开专业页面：说明属于专业模式，可一键开启', async ({ page, request }) => {
   await patchSettings(request, { 'ui.mode': 'simple' });
   await page.goto('/workflows');

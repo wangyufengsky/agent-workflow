@@ -39,3 +39,41 @@
 .fieldGrid > :global(.field) + :global(.field) {
   margin-top: 0;
 }
+
+.sources {
+  /* Every fixed workflow is listed: the list scrolls so that the dialog's buttons stay on screen. */
+  max-height: min(48vh, 420px);
+  margin: 0;
+  padding: 0 4px 0 0;
+  overflow-y: auto;
+  border: 0;
+}
+
+.source {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 2px 10px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-2);
+}
+
+.source + .source {
+  margin-top: 8px;
+}
+
+.source:has(input:checked) {
+  border-color: var(--accent-line);
+  background: var(--accent-fill);
+}
+
+.source input {
+  margin: 3px 0 0;
+}
+
+.source small {
+  grid-column: 2;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--sub);
+}

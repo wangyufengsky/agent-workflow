@@ -92,4 +92,12 @@ export const WORKFLOW_EDITOR_COPY = {
   versions: '版本',
   latest: '最新',
   notFound: '没有这个流程',
+  /** 插入流程的步骤 (34 §15.7, D150). */
+  insertSteps: '插入流程的步骤',
+  insertTitle: '插入哪个流程的步骤？',
+  insertBody:
+    '把所选固定流程的步骤复制到最后。复制后就是这个流程自己的步骤，与原流程不再有关联；重名的步骤标识会加后缀。',
+  insertNone: '没有别的固定流程可以插入。',
+  insert: '插入',
+  inserted: (count: number, name: string) => `已插入「${name}」的 ${count} 个步骤`,
 } as const;
