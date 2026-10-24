@@ -61,11 +61,44 @@ export function addParallel(graph: PlanGraph, beside: string, step: NewStep): Ad
   return { graph: withNode(graph, { ...step, key, dependsOn: [...dependsOn] }, rewire), key };
 }
 
+const lastSteps = (graph: PlanGraph) =>
+  graph.nodes.filter((n) => !graph.nodes.some((m) => m.dependsOn.includes(n.key))).map((n) => n.key);
+
 /** A step after all current last steps: the plan's new only last step. */
 export function addAtEnd(graph: PlanGraph, step: NewStep): Added {
   const key = freeKey(graph);
-  const last = graph.nodes.filter((n) => !graph.nodes.some((m) => m.dependsOn.includes(n.key))).map((n) => n.key);
-  return { graph: withNode(graph, { ...step, key, dependsOn: last }, (n) => n.dependsOn), key };
+  return { graph: withNode(graph, { ...step, key, dependsOn: lastSteps(graph) }, (n) => n.dependsOn), key };
+}
+
+/** `base`, or `base_2`, `base_3`… the first one not taken, cut to fit the key pattern. */
+function freeCopyKey(base: string, taken: ReadonlySet<string>): string {
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n += 1) {
+    const suffix = `_${n}`;
+    const key = `${base.slice(0, 40 - suffix.length)}${suffix}`;
+    if (!taken.has(key)) return key;
+  }
+}
+
+/**
+ * 插入流程的步骤 (34 §15.7, D150): copies of another workflow's steps after all current last steps. A key this plan
+ * already uses gets a suffix (`fix_2`), the copies' dependencies follow; afterwards they are this plan's own steps.
+ */
+export function insertSteps(graph: PlanGraph, steps: readonly PlanNodeSpec[]): { graph: PlanGraph; keys: string[] } {
+  const taken = new Set(graph.nodes.map((n) => n.key));
+  const renamed = new Map<string, string>();
+  for (const step of steps) {
+    const key = freeCopyKey(step.key, taken);
+    taken.add(key);
+    renamed.set(step.key, key);
+  }
+  const last = lastSteps(graph);
+  const copies = steps.map((step) => ({
+    ...step,
+    key: renamed.get(step.key) ?? step.key,
+    dependsOn: step.dependsOn.length === 0 ? last : step.dependsOn.map((d) => renamed.get(d) ?? d),
+  }));
+  return { graph: { nodes: [...graph.nodes, ...copies] }, keys: copies.map((c) => c.key) };
 }
 
 const orderProblems = (graph: PlanGraph, rules: PlanRules) =>

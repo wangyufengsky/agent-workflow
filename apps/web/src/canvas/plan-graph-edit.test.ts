@@ -10,6 +10,7 @@ import {
   disconnect,
   editGuard,
   insertBetween,
+  insertSteps,
   removeAndReconnect,
   renameNode,
   renameProblem,
@@ -97,5 +98,23 @@ describe('计划画布的编辑', () => {
     expect(allowed(addAfter(plan, 'a', step).graph)).toBe(false);
     expect(allowed(addAfter(plan, 'b', step).graph)).toBe(true);
     expect(allowed(removeAndReconnect(plan, 'b'))).toBe(false);
+  });
+
+  it('插入流程的步骤（34 §15.7）：复制到所有末步之后，重名的 key 依次加后缀，复制内部的依赖跟着改名', () => {
+    const bugfix = [node('locate'), { ...node('fix', 'locate'), title: '修复' }];
+    const current: PlanGraph = { nodes: [node('locate'), node('fix', 'locate'), node('fix_2'), node('review', 'fix')] };
+    const { graph, keys } = insertSteps(current, bugfix);
+    expect(keys).toEqual(['locate_2', 'fix_3']);
+    expect(deps(graph)).toEqual({
+      locate: [],
+      fix: ['locate'],
+      fix_2: [],
+      review: ['fix'],
+      locate_2: ['fix_2', 'review'],
+      fix_3: ['locate_2'],
+    });
+    expect(graph.nodes.at(-1)).toMatchObject({ key: 'fix_3', title: '修复' });
+    // Into an empty plan the steps keep their keys and first steps.
+    expect(deps(insertSteps({ nodes: [] }, bugfix).graph)).toEqual({ locate: [], fix: ['locate'] });
   });
 });
