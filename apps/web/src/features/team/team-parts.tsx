@@ -4,6 +4,7 @@ import {
   type TeamMediansDTO,
   type TeamMemberDTO,
   type TeamMetricsDTO,
+  type TeamSummaryDTO,
 } from '@aw/shared';
 import { type ReactNode, useState } from 'react';
 import { TEAM_COPY as C, formatCount, formatDecimal, formatRate, WORK_TYPE_LABEL } from '../../copy/team.ts';
@@ -103,12 +104,16 @@ const sortValue = (m: TeamMetricsDTO, key: Exclude<SortKey, 'name'>): number =>
 export function MemberTable({
   members,
   medians,
+  analyses,
   onOpen,
 }: {
   members: readonly TeamMemberDTO[];
   medians: TeamMediansDTO;
+  /** Each member's latest AI analysis of the same range (33 §6.5). */
+  analyses: TeamSummaryDTO['analyses'];
   onOpen: (member: TeamMemberDTO) => void;
 }) {
+  const analysisOf = new Map(analyses.map((a) => [a.member, a]));
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: 'name', desc: false });
   const sorted = [...members].sort((x, y) => {
     const order =
@@ -136,6 +141,9 @@ export function MemberTable({
         <tr>
           {header('name', C.member)}
           {TABLE_COLUMNS.map((c) => header(c.key, c.label))}
+          <th className={chart.num} title={C.qualityHint}>
+            {C.qualityColumn}
+          </th>
         </tr>
       </thead>
       <tbody>
@@ -164,6 +172,9 @@ export function MemberTable({
             <td className={chart.num}>{formatRate(member.metrics.testRate)}</td>
             <td className={chart.num}>{formatCount(member.metrics.reverted)}</td>
             <td className={chart.num}>{formatCount(member.metrics.aiCommits)}</td>
+            <td className={chart.num}>
+              <AnalysisCell analysis={analysisOf.get(member.key)} />
+            </td>
           </tr>
         ))}
       </tbody>
@@ -180,9 +191,22 @@ export function MemberTable({
           <td className={chart.num}>{formatRate(medians.testRate)}</td>
           <td className={chart.num}>{formatDecimal(medians.reverted)}</td>
           <td className={chart.num}>{formatDecimal(medians.aiCommits)}</td>
+          <td />
         </tr>
       </tfoot>
     </table>
+  );
+}
+
+/** Blocker and major findings per thousand reviewed lines, or where the analysis stands. */
+function AnalysisCell({ analysis }: { analysis: TeamSummaryDTO['analyses'][number] | undefined }) {
+  if (analysis === undefined) return <span className="hint">—</span>;
+  const q = analysis.quality;
+  if (q === null) return <span className="hint">{C.analysisStatus[analysis.status]}</span>;
+  return (
+    <span className={styles.quality} title={C.qualityCell(q.blocker, q.major, q.minor)}>
+      {q.perKloc === null ? '—' : formatDecimal(q.perKloc.blocker + q.perKloc.major)}
+    </span>
   );
 }
 

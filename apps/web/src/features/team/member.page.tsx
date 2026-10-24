@@ -12,6 +12,7 @@ import { BarChart } from '../insights/bar-chart.tsx';
 import chart from '../insights/insights.module.css';
 import { projectQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
+import { MemberAnalysis } from './member-analysis.tsx';
 import styles from './team.module.css';
 import { teamCommitsQuery, teamMemberQuery, teamSummaryQuery, useUpdateIdentity } from './team.queries.ts';
 import { Delta, Lines, METRICS, MetricCard, WorkMix } from './team-parts.tsx';
@@ -178,6 +179,12 @@ function MemberDetail({ detail, query }: { detail: TeamMemberDetailDTO; query: T
         </section>
       </div>
 
+      <MemberAnalysis
+        query={query}
+        member={member.key}
+        name={member.name}
+        range={{ from: detail.period.from, to: detail.period.to, ref: detail.ref }}
+      />
       <CommitList query={query} member={member.key} />
     </>
   );

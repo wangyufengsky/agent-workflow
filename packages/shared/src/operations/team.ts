@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  teamAnalysesCreateSchema,
+  teamAnalysisSchema,
   teamCommitSchema,
   teamCommitsQuerySchema,
   teamIdentitySchema,
@@ -100,4 +102,55 @@ export const updateTeamSettingsOp = defineOperationContract({
   risk: OperationRisk.Write,
   mode: UiMode.Pro,
   http: { method: 'PUT', path: '/projects/:id/team/settings' },
+});
+
+// AI member analysis (33 §6, D131): a summary of the work and a review of sampled commits; no score.
+export const createTeamAnalysesOp = defineOperationContract({
+  ...common,
+  id: 'team.analyses.create',
+  refs: { id: InputRef.Project },
+  title: 'op.team.analyses.create',
+  description:
+    'Let the AI summarise what each listed member (main email) did in the period, with the commits as evidence, ' +
+    'and review a sample of their largest commits. No scores or grades. One analysis of a project runs at a time, ' +
+    `the others wait. Sends the member's code to the model. ${RANGE}`,
+  input: teamAnalysesCreateSchema,
+  output: z.object({ items: z.array(teamAnalysisSchema) }),
+  // Starts model sessions that read the repository and use model quota.
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/projects/:id/team/analyses', status: 201 },
+});
+
+export const listTeamAnalysesOp = defineOperationContract({
+  ...common,
+  id: 'team.analyses.list',
+  refs: { id: InputRef.Project },
+  title: 'op.team.analyses.list',
+  description: "AI analyses of the project's members, newest first; member (main email) limits them to one member",
+  input: z.object({ id: z.string(), member: z.string().min(1).optional() }),
+  output: z.object({ items: z.array(teamAnalysisSchema) }),
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/projects/:id/team/analyses' },
+});
+
+export const getTeamAnalysisOp = defineOperationContract({
+  ...common,
+  id: 'team.analyses.get',
+  title: 'op.team.analyses.get',
+  description: 'One AI member analysis with its report',
+  input: z.object({ analysisId: z.string() }),
+  output: teamAnalysisSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/team/analyses/:analysisId' },
+});
+
+export const cancelTeamAnalysisOp = defineOperationContract({
+  ...common,
+  id: 'team.analyses.cancel',
+  title: 'op.team.analyses.cancel',
+  description: 'Cancel an AI member analysis that is queued or running',
+  input: z.object({ analysisId: z.string() }),
+  output: teamAnalysisSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/team/analyses/:analysisId/cancel' },
 });

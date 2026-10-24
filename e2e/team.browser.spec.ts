@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { expect, test } from '@playwright/test';
-import { createProject, patchSettings } from './helpers.ts';
+import { createProject, patchSettings, queueCodeReviewerTurn } from './helpers.ts';
 
 // Journey J35 (07 §5): the team page of a project whose history has three people, one of them with two emails.
 // Dates are days before today, so that every commit falls in the default period (the last 30 days).
@@ -69,7 +69,35 @@ test('J35 团队：成员表默认按姓名、点列头排序，成员页纵向�
   await page.getByRole('dialog').getByRole('button', { name: '合并' }).click();
   await expect(page).toHaveURL(/\/members\/zs(%40|@)corp\.com/);
   await expect(page.getByTestId('member-commits').locator('tr')).toHaveCount(4);
+
+  // An AI analysis played by the fake reviewer: a summary citing the member's commit, no findings.
+  const head = execFileSync('git', ['log', '-1', '--format=%H', '--author=zs@corp.com'], { cwd: repo })
+    .toString()
+    .trim();
+  await queueCodeReviewerTurn(request, project, [
+    {
+      type: 'callTool',
+      name: 'submit_member_analysis',
+      args: {
+        summary: '这段时间主要在写 a 模块。',
+        work_items: [{ title: 'a 模块', description: '新增与修复', commits: [head] }],
+        strengths: [],
+        concerns: [],
+        findings: [],
+      },
+    },
+  ]);
+  await page.getByRole('button', { name: '生成分析' }).click();
+  await expect(page.getByRole('dialog')).toContainText('会把这位成员的提交与代码发给你设置的模型');
+  await page.getByRole('dialog').getByRole('button', { name: '开始分析' }).click();
+  const report = page.getByTestId('analysis-report');
+  await expect(report).toContainText('已完成');
+  await expect(report).toContainText('这段时间主要在写 a 模块。');
+  await expect(report).toContainText(head.slice(0, 7));
+
   await page.getByRole('link', { name: '团队' }).first().click();
+  // No findings in the sampled lines: none per thousand lines in the AI column.
+  await expect(table.locator('tbody tr').filter({ hasText: 'Zhang San' }).locator('td').last()).toHaveText('0');
   await expect(table.locator('tbody tr')).toHaveCount(4);
 
   // Pro mode adds how lines are counted.

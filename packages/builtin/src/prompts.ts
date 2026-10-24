@@ -44,6 +44,8 @@ export const PromptName = {
   ProtocolCodeReview: 'protocol-code-review',
   StartGitReview: 'start-git-review',
   StartCommitMessage: 'start-commit-message',
+  /** The same reviewer summarising one member's work for the team page (33 §6.3). */
+  StartTeamAnalysis: 'start-team-analysis',
   /** The files the user attached to a task or an assistant message, as the model reads them (30 §3.2). */
   Attachments: 'attachments',
   /** The instructions of the verify step (31 §2.2). */
@@ -96,6 +98,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.ProtocolCodeReview]: read(PromptName.ProtocolCodeReview),
     [PromptName.StartGitReview]: read(PromptName.StartGitReview),
     [PromptName.StartCommitMessage]: read(PromptName.StartCommitMessage),
+    [PromptName.StartTeamAnalysis]: read(PromptName.StartTeamAnalysis),
     [PromptName.Attachments]: read(PromptName.Attachments),
     [PromptName.VerifyRequirements]: read(PromptName.VerifyRequirements),
   };

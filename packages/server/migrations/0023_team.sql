@@ -1,3 +1,24 @@
+CREATE TABLE `team_analyses` (
+	`id` text PRIMARY KEY NOT NULL,
+	`project_id` text NOT NULL,
+	`member_email` text NOT NULL,
+	`ref` text NOT NULL,
+	`ref_sha` text NOT NULL,
+	`period_from` text NOT NULL,
+	`period_to` text NOT NULL,
+	`status` text NOT NULL,
+	`commits` text NOT NULL,
+	`sample` text NOT NULL,
+	`attempt_id` text,
+	`report` text,
+	`error` text,
+	`created_at` integer NOT NULL,
+	`finished_at` integer,
+	FOREIGN KEY (`project_id`) REFERENCES `projects`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX `team_analyses_project_idx` ON `team_analyses` (`project_id`,`created_at`);--> statement-breakpoint
+CREATE INDEX `team_analyses_attempt_idx` ON `team_analyses` (`attempt_id`);--> statement-breakpoint
 CREATE TABLE `team_commit_files` (
 	`project_id` text NOT NULL,
 	`sha` text NOT NULL,

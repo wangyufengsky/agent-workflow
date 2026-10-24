@@ -32,3 +32,15 @@ export async function readCommits(repo: string, shas: readonly string[]): Promis
   );
   return parseTeamLog(stdout);
 }
+
+/** Lines of a file in a revision; undefined when the revision has no such file. */
+export async function lineCountAt(repo: string, rev: string, path: string): Promise<number | undefined> {
+  const result = await runGit(['cat-file', '-p', `${rev}:${path}`], {
+    cwd: repo,
+    okExitCodes: [0, 128],
+    verbatim: true,
+  });
+  if (result.exitCode !== 0) return undefined;
+  const text = result.stdout;
+  return text === '' ? 0 : text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
+}

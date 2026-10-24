@@ -73,6 +73,7 @@ export * from './errors/citation-problems.ts';
 export * from './errors/codes.ts';
 export * from './errors/finding-problems.ts';
 export * from './errors/plan-problems.ts';
+export * from './errors/team-analysis-problems.ts';
 export * from './errors/workflow-problems.ts';
 export * from './fsm/index.ts';
 export * from './knowledge/citations.ts';

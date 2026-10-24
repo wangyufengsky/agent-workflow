@@ -86,6 +86,16 @@ export function createTeamRepo(db: DbExecutor) {
       }));
     },
 
+    /** The paths a cached commit changed. */
+    filesOf(projectId: string, sha: string): string[] {
+      return db
+        .select({ path: f.path })
+        .from(f)
+        .where(and(eq(f.projectId, projectId), eq(f.sha, sha)))
+        .all()
+        .map((r) => r.path);
+    },
+
     /** Reverting commits and what they revert. */
     reverts(projectId: string): { sha: string; revertsSha: string }[] {
       return db

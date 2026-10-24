@@ -260,3 +260,43 @@
   gap: 4px;
   margin-left: var(--s-2);
 }
+
+/* AI 分析 */
+.shas {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  vertical-align: middle;
+}
+.shas code {
+  padding: 0 6px;
+  border-radius: var(--r-xs);
+  background: var(--fill-2);
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+}
+.reportHead {
+  margin: var(--s-3) 0 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
+}
+.reportList {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  color: var(--ink-2);
+}
+.history {
+  margin-top: var(--s-3);
+}
+.quality {
+  color: var(--ink-2);
+}
+.findingCard {
+  grid-template-columns: minmax(0, 1fr);
+}
+.findingCard > * {
+  grid-column: 1;
+}

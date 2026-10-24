@@ -37,6 +37,17 @@ export type TeamWorkType = (typeof TeamWorkType)[keyof typeof TeamWorkType];
 export const TEAM_WORK_TYPES = Object.values(TeamWorkType);
 export const teamWorkTypeSchema = z.enum(TeamWorkType);
 
+/** An AI member analysis (33 §6.4, 09): one project runs one at a time, the others wait in line. */
+export const TeamAnalysisStatus = {
+  Queued: 'queued',
+  Running: 'running',
+  Succeeded: 'succeeded',
+  Failed: 'failed',
+  Cancelled: 'cancelled',
+} as const;
+export type TeamAnalysisStatus = (typeof TeamAnalysisStatus)[keyof typeof TeamAnalysisStatus];
+export const teamAnalysisStatusSchema = z.enum(TeamAnalysisStatus);
+
 /** Who else is counted beside the members (33 §2.3): this app's AI tasks, and identities set as not members. */
 export const TeamOtherKind = {
   AiTask: 'ai_task',

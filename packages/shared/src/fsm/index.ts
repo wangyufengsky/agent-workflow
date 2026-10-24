@@ -9,6 +9,7 @@ import { previewMachine } from './preview.machine.ts';
 import { runtimeMachine } from './runtime.machine.ts';
 import { scheduleMachine } from './schedule.machine.ts';
 import { taskMachine } from './task.machine.ts';
+import { teamAnalysisMachine } from './team-analysis.machine.ts';
 import { worktreeMachine } from './worktree.machine.ts';
 
 export * from './assistant-confirmation.machine.ts';
@@ -24,6 +25,7 @@ export * from './preview.machine.ts';
 export * from './runtime.machine.ts';
 export * from './schedule.machine.ts';
 export * from './task.machine.ts';
+export * from './team-analysis.machine.ts';
 export * from './worktree.machine.ts';
 
 /** Every machine documented in docs/09, keyed by its doc marker name. */
@@ -40,4 +42,5 @@ export const MACHINES = {
   assistantTurn: assistantTurnMachine,
   schedule: scheduleMachine,
   preview: previewMachine,
+  teamAnalysis: teamAnalysisMachine,
 } as const;

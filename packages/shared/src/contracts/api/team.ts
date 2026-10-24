@@ -1,13 +1,16 @@
 import { z } from 'zod';
-import { TEAM_MAX_BUCKETS, TEAM_MAX_DAYS } from '../../constants/team.ts';
+import { TEAM_ANALYSIS_MEMBERS_MAX, TEAM_MAX_BUCKETS, TEAM_MAX_DAYS } from '../../constants/team.ts';
 import {
   TeamGranularity,
   TeamPeriod,
+  teamAnalysisStatusSchema,
   teamGranularitySchema,
   teamOtherKindSchema,
   teamPeriodSchema,
   teamWorkTypeSchema,
 } from '../../enums/team.ts';
+import { errorInfoSchema } from '../../errors/codes.ts';
+import { gitFindingSchema } from './git.ts';
 
 const DAY_MS = 86_400_000;
 /** Days from `from` to `to`, both included (calendar dates, no time zone involved). */
@@ -165,6 +168,16 @@ export const teamDirectorySchema = z.object({
 });
 export type TeamDirectoryDTO = z.infer<typeof teamDirectorySchema>;
 
+/** Findings of the sampled commits per thousand reviewed lines (33 §6.5); null without reviewed lines. */
+export const teamAnalysisQualitySchema = z.object({
+  sampledLines: z.number(),
+  blocker: z.number(),
+  major: z.number(),
+  minor: z.number(),
+  perKloc: z.object({ blocker: z.number(), major: z.number(), minor: z.number() }).nullable(),
+});
+export type TeamAnalysisQualityDTO = z.infer<typeof teamAnalysisQualitySchema>;
+
 /** What the figures are of: the branch and its newest commit, the period and its buckets. */
 const teamScopeShape = {
   ref: z.string(),
@@ -186,6 +199,15 @@ export const teamSummarySchema = z.object({
   members: z.array(teamMemberSchema),
   others: z.array(teamOtherSchema),
   directories: z.array(teamDirectorySchema),
+  /** Each member's latest AI analysis of the same branch and dates (33 §6.5). */
+  analyses: z.array(
+    z.object({
+      id: z.string(),
+      member: z.string(),
+      status: teamAnalysisStatusSchema,
+      quality: teamAnalysisQualitySchema.nullable(),
+    }),
+  ),
 });
 export type TeamSummaryDTO = z.infer<typeof teamSummarySchema>;
 
@@ -259,3 +281,56 @@ export const teamSettingsUpdateSchema = z.object({
   hugeCommitLines: z.number().int().min(1).max(1_000_000).nullable().optional(),
 });
 export type TeamSettingsUpdate = z.infer<typeof teamSettingsUpdateSchema>;
+
+/** `POST /projects/:id/team/analyses`: queue an AI analysis of each member over the range (33 §6.4). */
+export const teamAnalysesCreateSchema = z
+  .object({ ...teamRangeShape, members: z.array(z.string().min(1)).min(1).max(TEAM_ANALYSIS_MEMBERS_MAX) })
+  .superRefine(refineRange);
+export type TeamAnalysesCreate = z.infer<typeof teamAnalysesCreateSchema>;
+
+const citedText = z.object({
+  text: z.string().min(1).max(500),
+  commits: z.array(z.string().min(7)).min(1).max(20).describe('Full SHAs of the commits it rests on'),
+});
+
+/** `submit_member_analysis` (33 §6.6): no score, no grade; every statement cites commits. */
+export const submitMemberAnalysisInputSchema = z.object({
+  summary: z.string().min(1).max(2000).describe('An overview of the work in the period, Markdown'),
+  work_items: z
+    .array(
+      z.object({
+        title: z.string().min(1).max(120),
+        description: z.string().min(1).max(1000),
+        commits: z.array(z.string().min(7)).min(1).max(50).describe('Full SHAs of the commits of this piece of work'),
+      }),
+    )
+    .min(1)
+    .max(15),
+  strengths: z.array(citedText).max(5),
+  concerns: z.array(citedText).max(5),
+  findings: z
+    .array(gitFindingSchema.extend({ commit: z.string().min(7).describe('Full SHA of the sampled commit') }))
+    .max(30),
+});
+export type SubmitMemberAnalysisInput = z.infer<typeof submitMemberAnalysisInputSchema>;
+
+export const teamAnalysisSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  /** The member's main email when the analysis was asked for. */
+  member: z.string(),
+  ref: z.string(),
+  refSha: z.string(),
+  from: z.iso.date(),
+  to: z.iso.date(),
+  status: teamAnalysisStatusSchema,
+  attemptId: z.string().nullable(),
+  error: errorInfoSchema.nullable(),
+  /** The commits reviewed, with their counted lines. */
+  sample: z.array(z.object({ sha: z.string(), subject: z.string(), lines: z.number() })),
+  report: submitMemberAnalysisInputSchema.nullable(),
+  quality: teamAnalysisQualitySchema.nullable(),
+  createdAt: z.number(),
+  finishedAt: z.number().nullable(),
+});
+export type TeamAnalysisDTO = z.infer<typeof teamAnalysisSchema>;

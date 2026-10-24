@@ -12,6 +12,7 @@ import { useUiStore } from '../../state/ui.store.ts';
 import { BarChart } from '../insights/bar-chart.tsx';
 import { projectQuery, projectsQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
+import { AnalyseAllButton } from './member-analysis.tsx';
 import styles from './team.module.css';
 import { teamSummaryQuery } from './team.queries.ts';
 import {
@@ -88,6 +89,12 @@ export function TeamPage() {
           <h1 className="title">{C.title}</h1>
           <p className="lede">{C.lede}</p>
         </div>
+        {summary.data !== undefined && (
+          <AnalyseAllButton
+            query={query}
+            members={summary.data.members.filter((m) => m.metrics.commits > 0).map((m) => m.key)}
+          />
+        )}
         {pro && (
           <Button variant="secondary" icon="settings" onClick={() => setSettingsOpen(true)}>
             {C.settingsTitle}
@@ -199,7 +206,12 @@ function Overview({ summary, onOpen }: { summary: TeamSummaryDTO; onOpen: (membe
           <span className="hint">{C.membersLede}</span>
         </div>
         <div className="card-body">
-          <MemberTable members={summary.members} medians={summary.medians} onOpen={(m) => onOpen(m.key)} />
+          <MemberTable
+            members={summary.members}
+            medians={summary.medians}
+            analyses={summary.analyses}
+            onOpen={(m) => onOpen(m.key)}
+          />
           <p className={`hint ${styles.note}`}>{C.aiNote}</p>
         </div>
       </section>

@@ -8,6 +8,12 @@ export const TEAM_MAX_BUCKETS = 120;
 export const TEAM_HUGE_COMMIT_LINES = 5000;
 /** Directories listed by changed lines (33 §3.1). */
 export const TEAM_TOP_DIRECTORIES = 10;
+/** AI member analysis (33 §6): the sampled commits, each at most this many counted lines, and the commits listed. */
+export const TEAM_ANALYSIS_SAMPLE = 5;
+export const TEAM_REVIEW_MAX_LINES = 2000;
+export const TEAM_ANALYSIS_COMMITS_MAX = 400;
+/** Members one request may queue. */
+export const TEAM_ANALYSIS_MEMBERS_MAX = 50;
 /** Members drawn one by one in the team trend; the rest are summed as「其他」 (33 §5.2). */
 export const TEAM_TREND_MEMBERS = 8;
 

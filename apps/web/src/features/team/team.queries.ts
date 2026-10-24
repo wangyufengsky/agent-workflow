@@ -1,5 +1,8 @@
 import {
+  cancelTeamAnalysisOp,
+  createTeamAnalysesOp,
   getTeamSettingsOp,
+  listTeamAnalysesOp,
   type TeamIdentityUpdate,
   type TeamQuery,
   type TeamSettingsUpdate,
@@ -65,3 +68,15 @@ export const useUpdateTeamSettings = (projectId: string) =>
   useTeamMutation(projectId, (update: Omit<TeamSettingsUpdate, 'id'>) =>
     callOperation(updateTeamSettingsOp, { id: projectId, ...update }),
   );
+
+export const teamAnalysesQuery = (projectId: string, member: string) =>
+  queryOptions({
+    queryKey: queryKeys.teamResource(projectId, 'analyses', { member }),
+    queryFn: async () => (await callOperation(listTeamAnalysesOp, { id: projectId, member })).items,
+  });
+
+export const useCreateAnalyses = (query: TeamQuery) =>
+  useTeamMutation(query.id, (members: string[]) => callOperation(createTeamAnalysesOp, { ...query, members }));
+
+export const useCancelAnalysis = (projectId: string) =>
+  useTeamMutation(projectId, (analysisId: string) => callOperation(cancelTeamAnalysisOp, { analysisId }));

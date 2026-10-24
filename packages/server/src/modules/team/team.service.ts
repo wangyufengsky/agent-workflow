@@ -1,3 +1,4 @@
+import type { Prompts } from '@aw/builtin';
 import {
   AppError,
   ErrorCode,
@@ -18,9 +19,14 @@ import {
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
+import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { EventBus } from '../../core/event-bus.ts';
+import type { Logger } from '../../core/logger.ts';
+import type { AttemptsService } from '../attempts/index.ts';
 import { readFetchedAt } from '../git/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
+import type { RolesService } from '../roles/index.ts';
+import type { SettingsService } from '../settings/index.ts';
 import {
   aggregateTeam,
   commitRow,
@@ -32,23 +38,32 @@ import {
   nameOf,
   seriesOf,
 } from './team.aggregate.ts';
+import { createTeamAnalyses } from './team.analysis.ts';
 import { resolveTeamRange } from './team.period.ts';
 import { createTeamRepo } from './team.repo.ts';
 import { reachableCommits, readCommits, readTip, SCAN_BATCH } from './team.scan.ts';
 
 export type TeamServiceDeps = {
   db: Db;
+  unit: UnitOfWork;
   events: EventBus;
   clock: Clock;
+  log: Logger;
   /** Days are counted in it, as on the quality and usage page (19 §2.2). */
   timeZone: string;
   projects: ProjectsService;
+  /** For the AI member analyses (33 §6). */
+  attempts: AttemptsService;
+  roles: RolesService;
+  settings: SettingsService;
+  prompts: Prompts;
 };
 
 const COMMITS_PAGE = 50;
 
 /** The team page (33): figures from a project's Git history, read once into the commit cache (D129). */
-export function createTeamService({ db, events, clock, timeZone, projects }: TeamServiceDeps) {
+export function createTeamService(deps: TeamServiceDeps) {
+  const { db, events, clock, timeZone, projects } = deps;
   const repo = createTeamRepo(db);
   /** One reading per project at a time (33 §7.2); a second caller waits for it, then reads what is still missing. */
   const scans = new Map<string, Promise<void>>();
@@ -144,12 +159,42 @@ export function createTeamService({ db, events, clock, timeZone, projects }: Tea
     return { ...analysed, key, group, emails: emails.sort(), names };
   }
 
+  const analyses = createTeamAnalyses({
+    ...deps,
+    filesOf: repo.filesOf,
+    repoPathOf: (projectId) => projects.getRecord(projectId).repoPath,
+    async work(query, keys) {
+      const { project, scope, range, identities, figures } = await analyse(query);
+      const byEmail = new Map(identities.map((i) => [i.email, i]));
+      return {
+        project,
+        ref: scope.ref,
+        tipSha: scope.tip.sha,
+        from: range.from,
+        to: range.to,
+        members: keys.map((key) => {
+          const group = figures.byOwner.get(key) ?? { key, current: [], previous: [] };
+          return {
+            key,
+            name: nameOf(group, byEmail),
+            emails: [...new Set([key, ...group.current.map((c) => c.authorEmail)])],
+            commits: group.current,
+            metrics: metricsOf(group.current),
+          };
+        }),
+      };
+    },
+  });
+
   return {
     async summary(query: TeamQuery): Promise<TeamSummaryDTO> {
       const { scope, figures } = await analyse(query);
       const { byOwner: _, ...rest } = figures;
-      return { ...scope, ...rest };
+      const latest = analyses.latest(query.id, scope.ref, scope.period.from, scope.period.to);
+      return { ...scope, ...rest, analyses: latest };
     },
+
+    analyses,
 
     async member(query: TeamMemberQuery): Promise<TeamMemberDetailDTO> {
       const { scope, range, identities, figures, key, group, emails, names } = await member(query);

@@ -11,6 +11,7 @@ import type { DecksService } from '../decks/index.ts';
 import type { CommitDrafts, GitReviewsService } from '../git-reviews/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { TasksService } from '../tasks/index.ts';
+import type { TeamService } from '../team/index.ts';
 import { createToolRegistry, type McpToolDefinition } from './mcp.registry.ts';
 import { askUserTool } from './tools/ask-user.tool.ts';
 import { browserTools } from './tools/browser.tool.ts';
@@ -23,6 +24,7 @@ import { reportProgressTool } from './tools/report-progress.tool.ts';
 import { submitAnswerTool } from './tools/submit-answer.tool.ts';
 import { submitCommitMessageTool } from './tools/submit-commit-message.tool.ts';
 import { submitFindingsTool } from './tools/submit-findings.tool.ts';
+import { submitMemberAnalysisTool } from './tools/submit-member-analysis.tool.ts';
 import { submitOutlineTool } from './tools/submit-outline.tool.ts';
 import { submitPlanTool } from './tools/submit-plan.tool.ts';
 import { submitResultTool } from './tools/submit-result.tool.ts';
@@ -41,6 +43,7 @@ export type McpModuleDeps = {
   decks: DecksService;
   gitReviews: GitReviewsService;
   commitDrafts: CommitDrafts;
+  team: TeamService;
   browser: BrowserService;
   /** Where an attempt's transcript and files live (29 §5.7). */
   filesDirOf: (attempt: { taskId: string | null; kind: AttemptKind }) => string;
@@ -57,6 +60,7 @@ export function createMcpModule({
   decks,
   gitReviews,
   commitDrafts,
+  team,
   browser,
   filesDirOf,
   log,
@@ -79,6 +83,7 @@ export function createMcpModule({
     submitSlideTool(decks),
     submitFindingsTool(gitReviews),
     submitCommitMessageTool(commitDrafts),
+    submitMemberAnalysisTool(team),
     ...browserTools({ browser, attempts, knowledge, filesDirOf }),
   ];
   const registry = createToolRegistry(tools, attempts, log);

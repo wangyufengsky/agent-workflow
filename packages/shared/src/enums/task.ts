@@ -56,6 +56,8 @@ export const AttemptKind = {
   GitReview: 'git_review',
   /** Drafts a commit message from a diff (27 §7.3); belongs to no task. */
   CommitMessage: 'commit_message',
+  /** Summarises one member's work and reviews a sample of their commits (33 §6); belongs to no task. */
+  TeamAnalysis: 'team_analysis',
 } as const;
 export type AttemptKind = (typeof AttemptKind)[keyof typeof AttemptKind];
 export const attemptKindSchema = z.enum(AttemptKind);

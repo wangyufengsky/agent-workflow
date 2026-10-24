@@ -1,3 +1,4 @@
+import type { TeamAnalysisStatus } from '@aw/shared';
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { projectsTable } from '../projects/projects.table.ts';
 
@@ -75,3 +76,38 @@ export const teamSettingsTable = sqliteTable('team_settings', {
   testGlobs: text('test_globs'),
   hugeCommitLines: integer('huge_commit_lines'),
 });
+
+/** 10 §team_analyses: an AI analysis of one member's work over a range of a branch (33 §6, D131). */
+export const teamAnalysesTable = sqliteTable(
+  'team_analyses',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projectsTable.id, { onDelete: 'cascade' }),
+    /** The member's main email when it was asked for. */
+    memberEmail: text('member_email').notNull(),
+    ref: text('ref').notNull(),
+    /** The branch's newest commit when it was asked for. */
+    refSha: text('ref_sha').notNull(),
+    periodFrom: text('period_from').notNull(),
+    periodTo: text('period_to').notNull(),
+    status: text('status').$type<TeamAnalysisStatus>().notNull(),
+    /** JSON string array: the member's commits in the range, which the report may cite. */
+    commits: text('commits').notNull(),
+    /** JSON `{ sha, subject, lines }[]`: the commits to review. */
+    sample: text('sample').notNull(),
+    /** Null until its turn comes. */
+    attemptId: text('attempt_id'),
+    /** JSON `SubmitMemberAnalysisInput`. */
+    report: text('report'),
+    /** JSON `ErrorInfo`. */
+    error: text('error'),
+    createdAt: integer('created_at').notNull(),
+    finishedAt: integer('finished_at'),
+  },
+  (t) => [
+    index('team_analyses_project_idx').on(t.projectId, t.createdAt),
+    index('team_analyses_attempt_idx').on(t.attemptId),
+  ],
+);

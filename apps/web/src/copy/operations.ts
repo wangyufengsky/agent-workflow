@@ -173,6 +173,10 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.team.identities.update': '修改成员身份',
   'op.team.settings.get': '团队的统计口径',
   'op.team.settings.update': '修改团队的统计口径',
+  'op.team.analyses.create': 'AI 分析成员的工作',
+  'op.team.analyses.list': '成员分析记录',
+  'op.team.analyses.get': '查看成员分析',
+  'op.team.analyses.cancel': '取消成员分析',
   'op.decks.list': 'PPT 列表',
   'op.decks.get': '查看 PPT',
   'op.decks.create': '新建 PPT',
@@ -294,6 +298,13 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   excludeGlobs: '不计行数的文件',
   testGlobs: '测试文件',
   hugeCommitLines: '超大提交的行数',
+  members: '成员',
+  ref: '分支',
+  period: '时间段',
+  from: '开始日期',
+  to: '结束日期',
+  granularity: '分桶',
+  analysisId: '成员分析',
 };
 
 /** Values of enum fields in words, by field name; other values show as given. */

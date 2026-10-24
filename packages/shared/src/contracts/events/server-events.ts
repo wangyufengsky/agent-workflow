@@ -56,6 +56,10 @@ export const serverEventSchema = z.discriminatedUnion('type', [
     /** Commits read so far out of those missing; `done = total` when the reading finished. */
     data: z.object({ projectId: z.string(), done: z.number(), total: z.number() }),
   }),
+  z.object({
+    type: z.literal(ServerEventType.TeamAnalysisUpdated),
+    data: z.object({ projectId: z.string(), analysisId: z.string() }),
+  }),
   z.object({ type: z.literal(ServerEventType.PreviewUpdated), data: previewSchema }),
   z.object({ type: z.literal(ServerEventType.BrowserFrame), data: browserFrameSchema }),
   z.object({ type: z.literal(ServerEventType.BrowserTabUpdated), data: userTabStateSchema }),

@@ -1,5 +1,9 @@
 import {
+  cancelTeamAnalysisOp,
+  createTeamAnalysesOp,
+  getTeamAnalysisOp,
   getTeamSettingsOp,
+  listTeamAnalysesOp,
   teamCommitsOp,
   teamMemberOp,
   teamSummaryOp,
@@ -17,5 +21,11 @@ export function teamOperations(team: TeamService) {
     implement(updateTeamIdentityOp, (update) => team.updateIdentity(update)),
     implement(getTeamSettingsOp, ({ id }) => team.settings(id)),
     implement(updateTeamSettingsOp, (update) => team.updateSettings(update)),
+    implement(createTeamAnalysesOp, async ({ members, ...query }) => ({
+      items: await team.analyses.create(query, members),
+    })),
+    implement(listTeamAnalysesOp, ({ id, member }) => ({ items: team.analyses.list(id, member) })),
+    implement(getTeamAnalysisOp, ({ analysisId }) => team.analyses.get(analysisId)),
+    implement(cancelTeamAnalysisOp, ({ analysisId }) => team.analyses.cancel(analysisId)),
   ];
 }

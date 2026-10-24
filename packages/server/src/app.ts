@@ -407,7 +407,19 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     await schedules.timer.settled();
   });
   const insights = createInsightsModule({ db: database.db, clock, timeZone, tasks: tasks.service });
-  const team = createTeamModule({ db: database.db, events, clock, timeZone, projects: projects.service });
+  const team = createTeamModule({
+    db: database.db,
+    unit,
+    events,
+    clock,
+    log,
+    timeZone,
+    projects: projects.service,
+    attempts: attempts.service,
+    roles: roles.service,
+    settings: settings.service,
+    prompts,
+  });
   const repository = createRepositoryModule({
     projects: projects.service,
     tasks: tasks.service,
@@ -426,6 +438,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     decks: decks.service,
     gitReviews: gitReviews.service,
     commitDrafts: gitReviews.drafts,
+    team: team.service,
     browser: browser.service,
     filesDirOf: attempts.filesDirOf,
     log,
@@ -497,6 +510,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   // Recovery from the previous run (03 §2.1): attempts first (their nodes and tasks react to the interruption), then
   // what is left of nodes and tasks. Scheduling starts once the API listens (start()).
   attempts.service.recover();
+  team.service.analyses.recover();
   nodes.service.recover();
   tasks.service.recover();
 

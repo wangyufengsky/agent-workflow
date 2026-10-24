@@ -169,7 +169,11 @@ import {
   updateCheckCommandOp,
 } from './tasks.ts';
 import {
+  cancelTeamAnalysisOp,
+  createTeamAnalysesOp,
+  getTeamAnalysisOp,
   getTeamSettingsOp,
+  listTeamAnalysesOp,
   teamCommitsOp,
   teamMemberOp,
   teamSummaryOp,
@@ -382,6 +386,10 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   updateTeamIdentityOp,
   getTeamSettingsOp,
   updateTeamSettingsOp,
+  createTeamAnalysesOp,
+  listTeamAnalysesOp,
+  getTeamAnalysisOp,
+  cancelTeamAnalysisOp,
   listDecksOp,
   getDeckOp,
   createDeckOp,
