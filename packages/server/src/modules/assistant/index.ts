@@ -60,9 +60,7 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
   const analysisRelay = createAnalysisRelay({ ...deps, conversations });
   // Work the assistant starts and later reports on: tasks (15 §6) and member analyses (33 §6).
   const run = (conversationId: string, impl: OperationImpl, input: unknown) =>
-    analysisRelay.handles(impl)
-      ? analysisRelay.run(conversationId, impl, input)
-      : taskRelay.run(conversationId, impl, input);
+    analysisRelay.handles(impl) ? analysisRelay.run(conversationId, input) : taskRelay.run(conversationId, impl, input);
   const confirmations = createConfirmations({
     run,
     ...deps,

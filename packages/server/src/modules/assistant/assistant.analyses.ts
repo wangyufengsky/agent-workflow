@@ -151,7 +151,7 @@ export function createAnalysisRelay(deps: {
       waiting.clear();
     },
     /** Runs `team.analyses.create` for a conversation and remembers it as the one to report back to. */
-    async run(conversationId: string, impl: OperationImpl, input: unknown): Promise<unknown> {
+    async run(conversationId: string, input: unknown): Promise<unknown> {
       return implement(createTeamAnalysesOp, async ({ members, ...query }) => {
         conversations.get(conversationId);
         const items = await team.analyses.create(query, members);
