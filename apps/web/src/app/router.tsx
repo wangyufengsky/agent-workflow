@@ -43,6 +43,9 @@ import { settingsQuery, useSettings } from '../features/settings/settings.querie
 import { NodeTab } from '../features/task-detail/node-drawer.tsx';
 import { TaskPage } from '../features/task-detail/task.page.tsx';
 import { TasksPage } from '../features/tasks/tasks.page.tsx';
+import { TeamMemberPage } from '../features/team/member.page.tsx';
+import { TeamIndexPage, TeamPage } from '../features/team/team.page.tsx';
+import { teamSearchSchema } from '../features/team/team-search.ts';
 import { ToolsPage } from '../features/tools/tools.page.tsx';
 import { WorkflowEditorPage } from '../features/workflows/workflow-editor.page.tsx';
 import { WorkflowsPage } from '../features/workflows/workflows.page.tsx';
@@ -265,6 +268,24 @@ const insightsRoute = createRoute({
   validateSearch: insightsSearchSchema,
   component: InsightsPage,
 });
+// The team page (33 §5.1): the branch, period and buckets stay in the address, on the member page too.
+const teamIndexRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.teamIndex,
+  component: TeamIndexPage,
+});
+const teamRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.team,
+  validateSearch: teamSearchSchema,
+  component: TeamPage,
+});
+const teamMemberRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.teamMember,
+  validateSearch: teamSearchSchema,
+  component: TeamMemberPage,
+});
 // PPT (23 §2): a new PPT keeps the material it was opened with (「做成 PPT」); the workspace keeps the selected page
 // and the pro view of simple mode. The show and the print view are full pages outside the sidebar.
 const pptNewRoute = createRoute({
@@ -322,6 +343,9 @@ const routeTree = rootRoute.addChildren([
     knowledgeHistoryRoute,
     knowledgeConversationRoute,
     insightsRoute,
+    teamIndexRoute,
+    teamRoute,
+    teamMemberRoute,
     page(ROUTES.ppt, PptListPage),
     pptNewRoute,
     pptDeckRoute,

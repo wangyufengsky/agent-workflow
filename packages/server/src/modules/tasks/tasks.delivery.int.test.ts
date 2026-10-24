@@ -9,6 +9,8 @@ import {
   getTaskTimelineOp,
   listInboxOp,
   type TaskDetailDTO,
+  TeamPeriod,
+  teamSummaryOp,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -36,6 +38,28 @@ const openDeliveryItems = async (task: TaskDetailDTO) =>
   (await t.call(listInboxOp, { taskId: task.id, status: 'open' })).body.items.filter((i) => i.kind === 'delivery');
 
 describe('交付：本地合并（09 §7）', () => {
+  it('任务提交与 squash 提交带发起人 trailer，团队页把它们算在发起人名下；仓库没有配置邮箱时不加（D130）', async () => {
+    const { repo, project } = await addProject(t, { files: GREET });
+    await repo.git('config', 'user.name', 'Zhang San');
+    await repo.git('config', 'user.email', 'zs@corp.com');
+    const task = await taskInReview(t, project.id, FIXED);
+    const trailer = 'Agent-Workflow-Requested-By: Zhang San <zs@corp.com>';
+    // git ends the trailers with a newline of their own.
+    const trailers = async (ref: string) =>
+      (await repo.git('log', '-1', '--format=%an|%(trailers:only,unfold)', ref)).trim();
+    expect(await trailers(task.git.branch ?? '')).toBe(`agent-workflow|${trailer}`);
+
+    await t.call(deliverTaskOp, { id: task.id, strategy: 'squash' });
+    expect(await trailers('main')).toBe(`agent-workflow|${trailer}`);
+    const { body } = await t.call(teamSummaryOp, { id: project.id, period: TeamPeriod.Last30Days });
+    expect(body.members.find((m) => m.key === 'zs@corp.com')?.metrics).toMatchObject({ commits: 1, taskCommits: 1 });
+    expect(body.others).toEqual([]);
+
+    await repo.git('config', 'user.email', '');
+    const other = await taskInReview(t, project.id, { 'greet.ts': 'export const greet = () => "hey";\n' });
+    expect(await trailers(other.git.branch ?? '')).toBe('agent-workflow|');
+  });
+
   it('squash：主工作区在目标分支上，合并为一个提交；任务完成，worktree 与分支已清理，交付条目已处理', async () => {
     const { repo, task } = await inReview();
     const before = (await repo.git('rev-parse', 'main')).trim();

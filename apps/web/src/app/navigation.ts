@@ -26,6 +26,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'knowledge', route: ROUTES.knowledge, label: NAV_COPY.knowledge, icon: 'book', visibleIn: BOTH },
   { id: 'ppt', route: ROUTES.ppt, label: NAV_COPY.ppt, icon: 'slides', visibleIn: BOTH },
   { id: 'insights', route: ROUTES.insights, label: NAV_COPY.insights, icon: 'chart', visibleIn: BOTH },
+  { id: 'team', route: ROUTES.teamIndex, label: NAV_COPY.team, icon: 'team', visibleIn: BOTH },
   { id: 'git', route: ROUTES.git, label: NAV_COPY.git, icon: 'git', visibleIn: PRO, group: 'pro' },
   { id: 'workflows', route: ROUTES.workflows, label: NAV_COPY.workflows, icon: 'flow', visibleIn: PRO, group: 'pro' },
   { id: 'roles', route: ROUTES.roles, label: NAV_COPY.roles, icon: 'users', visibleIn: PRO, group: 'pro' },

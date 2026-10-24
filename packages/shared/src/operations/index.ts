@@ -169,6 +169,18 @@ import {
   updateCheckCommandOp,
 } from './tasks.ts';
 import {
+  cancelTeamAnalysisOp,
+  createTeamAnalysesOp,
+  getTeamAnalysisOp,
+  getTeamSettingsOp,
+  listTeamAnalysesOp,
+  teamCommitsOp,
+  teamMemberOp,
+  teamSummaryOp,
+  updateTeamIdentityOp,
+  updateTeamSettingsOp,
+} from './team.ts';
+import {
   createRoleOp,
   createWorkflowOp,
   deleteRoleOp,
@@ -203,6 +215,7 @@ export * from './schedules.ts';
 export * from './settings.ts';
 export * from './system.ts';
 export * from './tasks.ts';
+export * from './team.ts';
 export * from './workflows.ts';
 
 /** Every operation contract; the server mounts exactly these and the copy table covers all their titles. */
@@ -367,6 +380,16 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   knowledgeCitationOp,
   insightsSummaryOp,
   insightsTasksOp,
+  teamSummaryOp,
+  teamMemberOp,
+  teamCommitsOp,
+  updateTeamIdentityOp,
+  getTeamSettingsOp,
+  updateTeamSettingsOp,
+  createTeamAnalysesOp,
+  listTeamAnalysesOp,
+  getTeamAnalysisOp,
+  cancelTeamAnalysisOp,
   listDecksOp,
   getDeckOp,
   createDeckOp,

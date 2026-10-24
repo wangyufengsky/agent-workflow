@@ -39,6 +39,9 @@ type UiState = {
   /** The user's open preview tab of each task (29 §8.1): a change request may attach its page (29 §2.3). */
   previewTabs: Record<string, string>;
   setPreviewTab(taskId: string, tabId: string | null): void;
+  /** The project the team page showed last (33 §5.1), until the app reloads. */
+  teamProjectId: string | null;
+  setTeamProject(projectId: string): void;
 };
 
 export type PendingForm = { seq: number; form: AssistantForm; values: Record<string, unknown> };
@@ -61,6 +64,8 @@ export const useUiStore = create<UiState>((set) => ({
   setPendingForm: (pendingForm) => set({ pendingForm }),
   streamOpen: {},
   setStreamOpen: (attemptId, open) => set((s) => ({ streamOpen: { ...s.streamOpen, [attemptId]: open } })),
+  teamProjectId: null,
+  setTeamProject: (teamProjectId) => set({ teamProjectId }),
   previewTabs: {},
   setPreviewTab: (taskId, tabId) =>
     set((s) => {

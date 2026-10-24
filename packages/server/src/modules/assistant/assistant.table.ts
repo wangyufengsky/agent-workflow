@@ -1,6 +1,7 @@
 import type { AssistantConfirmationStatus, AssistantTurnEvent, AssistantTurnStatus } from '@aw/shared';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { tasksTable } from '../tasks/tasks.table.ts';
+import { teamAnalysesTable } from '../team/team.table.ts';
 
 /** 10 §4 assistant_conversations: one opencode session each, created with the first message. */
 export const assistantConversationsTable = sqliteTable(
@@ -69,6 +70,23 @@ export const assistantTaskFollowupsTable = sqliteTable(
     createdAt: integer('created_at').notNull(),
   },
   (t) => [index('assistant_task_followups_conversation_idx').on(t.conversationId)],
+);
+
+/** 助手发起的成员分析（33 §6）：结束后把报告发回发起它的对话；分析或对话删除时停止跟进。 */
+export const assistantAnalysisFollowupsTable = sqliteTable(
+  'assistant_analysis_followups',
+  {
+    analysisId: text('analysis_id')
+      .primaryKey()
+      .references(() => teamAnalysesTable.id, { onDelete: 'cascade' }),
+    conversationId: text('conversation_id')
+      .notNull()
+      .references(() => assistantConversationsTable.id, { onDelete: 'cascade' }),
+    /** The report (or the failure) was queued to the conversation. */
+    reported: integer('reported', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('assistant_analysis_followups_conversation_idx').on(t.conversationId)],
 );
 
 /** 每次外部发送前持久化，未报告 tokens 保持 NULL；结束只能经助手轮次状态机。 */

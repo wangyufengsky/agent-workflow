@@ -69,6 +69,7 @@ import { createSchedulesModule, type SchedulesService } from './modules/schedule
 import { createSettingsModule } from './modules/settings/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
 import { createTasksModule, type TasksService } from './modules/tasks/index.ts';
+import { createTeamModule } from './modules/team/index.ts';
 import { createWorkflowsModule, type WorkflowsService } from './modules/workflows/index.ts';
 import { createWorktreesModule, type WorktreesService } from './modules/worktrees/index.ts';
 
@@ -406,6 +407,19 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     await schedules.timer.settled();
   });
   const insights = createInsightsModule({ db: database.db, clock, timeZone, tasks: tasks.service });
+  const team = createTeamModule({
+    db: database.db,
+    unit,
+    events,
+    clock,
+    log,
+    timeZone,
+    projects: projects.service,
+    attempts: attempts.service,
+    roles: roles.service,
+    settings: settings.service,
+    prompts,
+  });
   const repository = createRepositoryModule({
     projects: projects.service,
     tasks: tasks.service,
@@ -424,6 +438,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     decks: decks.service,
     gitReviews: gitReviews.service,
     commitDrafts: gitReviews.drafts,
+    team: team.service,
     browser: browser.service,
     filesDirOf: attempts.filesDirOf,
     log,
@@ -448,6 +463,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...knowledge.operations,
     ...decks.operations,
     ...insights.operations,
+    ...team.operations,
     ...plans.operations,
     ...inbox.operations,
     ...attempts.operations,
@@ -475,6 +491,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     decks: decks.service,
     batches: batches.service,
     schedules: schedules.service,
+    team: team.service,
     attachments: attachments.service,
     dataDir: config.dataDir,
     timeZone,
@@ -494,6 +511,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   // Recovery from the previous run (03 §2.1): attempts first (their nodes and tasks react to the interruption), then
   // what is left of nodes and tasks. Scheduling starts once the API listens (start()).
   attempts.service.recover();
+  team.service.analyses.recover();
   nodes.service.recover();
   tasks.service.recover();
 

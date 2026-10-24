@@ -16,7 +16,9 @@ import type { KnowledgeService } from '../knowledge/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SchedulesService } from '../schedules/index.ts';
 import type { TasksService } from '../tasks/index.ts';
+import type { TeamService } from '../team/index.ts';
 import type { WorkflowsService } from '../workflows/index.ts';
+import { createAnalysisRelay } from './assistant.analyses.ts';
 import { createConfirmations } from './assistant.confirmations.ts';
 import { createContextRenderer } from './assistant.context.ts';
 import { helperTools } from './assistant.helpers.ts';
@@ -42,6 +44,7 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context'> & {
   decks: DecksService;
   batches: BatchesService;
   schedules: SchedulesService;
+  team: TeamService;
   browser: BrowserService;
   /** Every other operation of the app; the assistant's tools are generated from them (15 §3). */
   operations: readonly OperationImpl[];
@@ -54,8 +57,12 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
   const context = createContextRenderer(deps);
   const conversations = createAssistantService({ ...deps, context });
   const taskRelay = createTaskRelay({ ...deps, conversations });
+  const analysisRelay = createAnalysisRelay({ ...deps, conversations });
+  // Work the assistant starts and later reports on: tasks (15 §6) and member analyses (33 §6).
+  const run = (conversationId: string, impl: OperationImpl, input: unknown) =>
+    analysisRelay.handles(impl) ? analysisRelay.run(conversationId, input) : taskRelay.run(conversationId, impl, input);
   const confirmations = createConfirmations({
-    run: taskRelay.run,
+    run,
     ...deps,
     conversations,
     operations: new Map(deps.operations.map((impl) => [impl.contract.id, impl])),
@@ -65,7 +72,7 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     [
       ...operationTools(deps.operations, {
         settings: deps.settings,
-        run: taskRelay.run,
+        run,
         requestConfirmation: confirmations.request,
         recordProduced: conversations.recordProduced,
         deferred: new Map(KNOWLEDGE_QUESTION_OPS.map((id) => [id, relay.researching])),
@@ -87,7 +94,9 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
   return {
     service: conversations,
     stopWhisper: whisper.stop,
-    start: taskRelay.start,
+    async start() {
+      await Promise.all([analysisRelay.start(), taskRelay.start()]);
+    },
     registry,
     operations: assistantOperations(
       conversations,

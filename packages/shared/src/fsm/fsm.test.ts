@@ -143,6 +143,16 @@ const CASES: Array<{ name: string; machine: Machine<string, string>; illegal: Ar
       ['failed', 'stop'],
     ],
   },
+  {
+    name: 'teamAnalysis',
+    machine: MACHINES.teamAnalysis,
+    illegal: [
+      ['queued', 'submit'],
+      ['running', 'start'],
+      ['succeeded', 'fail'],
+      ['cancelled', 'start'],
+    ],
+  },
 ];
 
 it('每个状态机都有用例', () => {

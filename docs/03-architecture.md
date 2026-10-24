@@ -170,6 +170,7 @@ agent-workflow/
 │  │        ├─ git-reviews/        Git 工作台的 AI 审查与草拟提交信息（v1.2，27 §4、§7.3）
 │  │        ├─ previews/           页面预览（v1.3，29 §4）：任务 worktree 里的开发服务器，只在内存里
 │  │        ├─ browser/            AI 的浏览器（v1.3，29 §5）：宿主、标签页、动作层、快照
+│  │        ├─ team/               团队（v1.3，33）：提交缓存与读取、按成员统计、AI 成员分析的排队与 team_analysis 尝试
 │  │        └─ databases/          drivers/{mysql,postgres,sqlserver}
 │  ├─ builtin/                 内置流程与角色（数据 + prompts/*.md）
 │  └─ opencode-plugin/         agent-workflow-bridge（注入 sessionID 到本项目 MCP 工具参数）；`pnpm build:plugin` 去掉类型生成 dist/agent-workflow-bridge.js
@@ -296,7 +297,7 @@ export function taskOperations(tasks: TasksService) {
 ├─ runs/
 │  └─ <taskId>/
 │     ├─ <attemptId>.jsonl     会话流（消息/片段/工具调用镜像）；任务时间线在 SQLite task_events
-│     │  （知识问答每一轮的会话流在 runs/knowledge/<attemptId>.jsonl，v1.1；PPT 的在 runs/ppt/<attemptId>.jsonl，v1.2）
+│     │  （知识问答每一轮的会话流在 runs/knowledge/<attemptId>.jsonl，v1.1；PPT 的在 runs/ppt/<attemptId>.jsonl，v1.2；Git 工作台的在 runs/git/，团队的成员分析在 runs/team/，v1.3）
 │     ├─ preview.log           页面预览的开发服务器输出（v1.3，29 §4.2）
 │     └─ browser/<attemptId>/  尝试的截图（v1.3，29 §5.7；知识问答的在 runs/knowledge/browser/<attemptId>/）
 ├─ worktrees/

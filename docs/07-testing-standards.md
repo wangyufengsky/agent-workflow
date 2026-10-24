@@ -103,6 +103,7 @@
 | J32 | PPT 网页资料（v1.3，29 §2.8，`ppt.browser.spec.ts`）：从项目「做成 PPT」→ 资料「网页」输入本地网页地址、回车添加，列表显示地址与「网页」→ 生成大纲 → 大纲出现，PPT 的资料是 `web`、`ref_id` 为地址、标题为网页标题 | 浏览器 |
 | J33 | 附件（30，U-03，`task-attachments.browser.spec.ts`）：开始任务时选文件 → 图片给出提示、不是文本的卡片报错且「开始」不可用 → 移除后开始 → 任务页标题下的附件打开看到原文；问助手时附上文件 → 消息下面的附件可打开 | 浏览器 |
 | J34 | 验收清单（31，Q-03，`task-requirements.browser.spec.ts`）：开始任务时填两项（AI 核验、命令 `false`）→ 核验步骤后结果卡显示两项未满足 → 交付提醒挡住合并、勾选确认后可用 → 人工「通过」一项、「接受未完成」一项（原因必填）→ 全部满足、提醒消失 → 合并完成 | 浏览器 |
+| J35 | 团队（33，T-03 / T-06，`team.browser.spec.ts`）：三个人（其中一人两个邮箱）的仓库 → 成员表默认按姓名、点「提交」列头按数值排序 → 成员页测试伴随率与提交列表 → 在另一个邮箱的成员页「合并到…」后合并为一位成员 → FakeOpencode 的成员分析：确认框写明会发送代码、报告显示总结与引用的提交、成员表的 AI 抽样评审列 → 专业模式「统计口径」抽屉 → 四主题无报错；走查 J9 含团队与成员页 | 浏览器 |
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 
@@ -116,6 +117,7 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 用例（M6-05 `live/workflows.live.test.ts`，与冒烟合起来）：内置流程各一次（Java 项目上的修 Bug、代码审查、重构、方案设计、详细设计，TypeScript 项目上的新功能、补单测、修 Bug、版本比对审查、清理告警，`todo-web` 上的安全审查；版本比对审查与清理告警用 `runTask` 的 `history` 选项预置带日期的提交）；统计 `submit_*` 调用成功率、尝试次数、耗时、成本，输出报告到 `live/reports/`。另有 `mcp-errors.live.test.ts`（工具错误码让模型改正计划，01 §5 第 7 条）与 `permissions.live.test.ts`（只读会话的 bash 规则在真实 opencode 上的效果，D63）。辅助代码在 `live/live-app.ts`；各套件依次运行（`fileParallelism: false`）。
 - 浏览器 `live/browser.live.test.ts`（v1.3 B1 的完成标准，29 §13）：示例仓库 `todo-web`（零依赖的 Node 静态服务器），新功能流程给页面加「清空」按钮并在页面预览里验证；默认免费模型（能看图）与一个没有图片输入的模型（`AW_LIVE_TEXT_MODEL`，默认 `opencode-go/glm-5.3`）各跑一次，断言任务到待合并、会话里有成功的 `browser_open` 与 `browser_click`。浏览器用开发宿主（playwright-core 的 Chromium）。
 - 浏览器读取 `live/browser-reading.live.test.ts`（v1.3 B3 的完成标准，29 §13）：默认免费模型。知识问答打开网络开关，研究员用浏览器读一个要执行脚本才显示正文的本地网页并引用它，断言回答通过且 `web` 引用的摘录含页面正文；助手在任务页启动预览（确认卡片）并打开预览页签，测试扮演界面打开用户的预览并关联、把预览导航到报错的 `/broken`（`/` 保持干净，任务的页面体检才能通过），再问「这个页面为什么报错」，断言调用了 `browser_read` 且回复含控制台错误。报告写到 `live/reports/assistant-browser-reading-<时间>/`。
+- 团队 `live/team.live.test.ts`（T-04、T-06）：`ts-stats` 上一位成员的两个提交，真实模型生成成员分析，断言分析完成、报告引用的都是这位成员的提交并通过校验；助手在团队页被问「近 30 天谁提交最多？谁表现最好？」，断言调用了 `team_summary`、回复含成员名，回复写到 `live/reports/team-assistant-<时间>.json` 供人看是否打分排名；再让助手分析一位成员、确认卡片后真实模型分析，结束后断言助手转述了报告并附成员页链接（`team-assistant-analysis-<时间>.json`）。
 - 应用助手 `live/assistant.live.test.ts`（A-09）：让助手查明天的日期并列出项目，断言调用了 `get_current_time` 与 `projects_list`、回复含明天的日期与项目名，报告写到 `live/reports/assistant-<时间>.json`。
 - 不作为通过/失败的硬门槛（模型有随机性），但内置提示词改动的 PR 必须附 live 报告对比。
 

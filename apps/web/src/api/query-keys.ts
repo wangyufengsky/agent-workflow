@@ -82,6 +82,16 @@ export const queryKeys = {
   /** Every quality and usage query shares this prefix; task updates refresh them. */
   insightsAll: ['insights'],
   insights: (view: 'summary' | 'tasks', query: Record<string, string | undefined>) => ['insights', view, query],
+  /** Every team query of a project shares this prefix; fetching the repository refreshes them. */
+  team: (projectId: string) => ['team', projectId],
+  teamResource: (projectId: string, resource: string, params: Record<string, string | undefined>) => [
+    'team',
+    projectId,
+    resource,
+    params,
+  ],
+  /** Reading the project's commits (33 §7.2): set from `team.scan_updated`, never fetched. */
+  teamScan: (projectId: string) => ['team-scan', projectId],
   git: (projectId: string) => ['git', projectId],
   gitResource: (projectId: string, resource: string, params: Record<string, string | number | undefined>) => [
     'git',
