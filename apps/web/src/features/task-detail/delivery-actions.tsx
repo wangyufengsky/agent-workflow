@@ -132,6 +132,12 @@ function PullRequestForm({
   );
 }
 
+/** The task a report starts (13 §3): a design proposal is developed, the problems of any other report fixed. */
+const reportFollowUp = (workflowKey: string) =>
+  workflowKey === 'design_proposal'
+    ? { workflow: 'feature', label: C.developFromReport, requirement: C.developRequirement }
+    : { workflow: 'bugfix', label: C.fixFromReport, requirement: C.fixRequirement };
+
 /** What the user can do with a task waiting for review (14 §3.5): merge, open a PR, ask for changes, discard. */
 export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
   const settings = useSettings();
@@ -155,6 +161,7 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
     deliver.mutate({ id: task.id, ...ack, strategy, targetBranch }, { onSuccess: close });
 
   if (report) {
+    const followUp = reportFollowUp(task.workflow.key);
     return (
       <div className="col">
         <UnmetNotice acknowledgement={acknowledgement} />
@@ -173,13 +180,13 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
                 to: ROUTES.home,
                 search: {
                   projectId: task.project.id,
-                  workflow: 'bugfix',
-                  requirement: C.fixRequirement(task.result?.summary ?? ''),
+                  workflow: followUp.workflow,
+                  requirement: followUp.requirement(task.result?.summary ?? ''),
                 },
               })
             }
           >
-            {C.fixFromReport}
+            {followUp.label}
           </Button>
           {deliver.isError && <ErrorState error={deliver.error} />}
         </div>

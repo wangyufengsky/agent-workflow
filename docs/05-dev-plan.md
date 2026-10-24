@@ -345,6 +345,17 @@
 
 实施时把 08–12 的待实施内容迁入正式章节，代码与契约同一变更更新。
 
+## v1.3 期间 · 更多内置流程（W）
+
+> 状态：**已完成，待用户检查**（2026-10-24）。设计见 [13 §3.6–3.10](13-builtin-workflows.md)，决策 D126。live（`opencode-go/deepseek-v4.1-flash`）：第一轮版本比对审查、安全审查、方案设计、详细设计到达待合并（每个约 0.7–6 分钟、成本 0.005–0.05 美元），清理告警把仓库内没有引用的导出 `percentile` 也删了，版本比对审查与方案设计的只读会话用 `git rev-list` / `git branch -a` 等白名单外命令触发了 5 次权限请求；据此收紧两条指令（导出的接口不能确认只在仓库内使用时保留；版本比对只用 `git log` / `diff` / `show`、一次一条）后重跑这两个用例均通过、权限请求 0 次。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| W-01 | `packages/builtin`：版本比对审查、安全审查、清理告警、方案设计、详细设计；只读流程共用 `reportOnly`；已有五个流程定义不变 | `workflows.int.test.ts`：10 个流程按内置顺序列出 |
+| W-02 | 前端：首页图标；方案设计的报告按钮「据此开发」→ 新功能开发 | 类型检查通过 |
+| W-03 | live：五个新用例；`runTask` 的 `history` 选项预置带日期的提交 | `pnpm test:live` 报告（手动，结果见上） |
+| W-04 | 文档同步（01、02、03、07、13、14） | `pnpm verify` 通过 |
+
 ## v1.3 · 内置浏览器与页面预览（B）
 
 > 状态：**B1 已完成**（2026-10-23，分支 `feat/B-browser`；验收：本机 macOS `pnpm verify`、`pnpm e2e`（含 J26 与四主题走查）、`pnpm playwright test browser-host.electron launch.electron --project electron`、`live/browser.live.test.ts` 两个模型都到待合并）。设计见 [29-browser.md](29-browser.md)；决策 D120–D125 用户 2026-10-23 确认；开发前实测 V1–V7 已完成（29 §12）。B2（验收与界面）、B3（助手、知识问答、PPT）在 B1 完成后再拆。
