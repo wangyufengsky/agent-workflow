@@ -128,7 +128,7 @@ describe('@live 内置流程全集', () => {
   );
 
   it(
-    'cleanup：删除没有被使用的 clamp，检查通过',
+    'cleanup：删除没有被使用的 clamp，保留导出的 percentile，检查通过',
     async () => {
       const task = await live.runTask('cleanup', 'ts-stats', '清理 src 目录中没有被使用的代码。', {
         history: STATS_HISTORY,
@@ -137,6 +137,7 @@ describe('@live 内置流程全集', () => {
       expect(task.result?.checks.every((c) => c.passed)).toBe(true);
       const source = await readFile(join(task.git.worktreePath ?? '', 'src/percentile.ts'), 'utf8');
       expect(source).not.toContain('clamp');
+      expect(source).toContain('export function percentile');
     },
     TASK_TIMEOUT_MS,
   );

@@ -204,7 +204,8 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
       [
         '对比任务基础分支的当前版本（HEAD）与需求中指定的起点，只审查这段时间新增与修改的代码。',
         '1. 确定起点：需求写的是日期时，用 `git log --first-parent --before="<日期> 00:00" -1 --format=%H HEAD` 找到那天开始前的最后一个提交；写的是提交、标签或分支时直接用它。',
-        '2. 用 `git diff --stat <起点> HEAD` 与 `git diff <起点> HEAD` 阅读改动，用 `git log --first-parent --format="%h %ad %s" --date=short <起点>..HEAD` 了解每次改动的目的，需要时读改动周围的代码。',
+        '2. 用 `git diff --stat <起点> HEAD` 与 `git diff <起点> HEAD` 阅读改动，用 `git log --first-parent --format="%h %ad %s" --date=short <起点>..HEAD` 了解每次改动的目的（提交数也从这里数），需要时读改动周围的代码。',
+        '只用 `git log`、`git diff`、`git show` 与读文件，一次运行一条命令，不用管道串联；其他 git 命令会打断用户请求许可。',
         '3. 在 summary 开头写明比对范围：起点（提交、日期、标题）、终点（HEAD）、提交数与改动文件数；然后产出问题清单，每条写明严重程度（blocker / major / minor）、位置（文件与行）、说明与修改建议。',
         '只报这段时间引入的真实问题，起点之前就存在的问题不报，不提风格偏好。',
       ].join('\n'),
@@ -245,7 +246,7 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
             title: '列出告警',
             roleKey: BuiltinRoleKey.Developer,
             instructions:
-              '按需求描述的范围（没写时为整个仓库），运行项目已有的 lint、类型检查与构建，并查找未使用的代码（没有引用的导出、函数、文件与依赖）。在 summary 中列出清单：位置、类别、打算怎么处理（修改 / 删除 / 保留并说明原因）。这一步不改文件。',
+              '按需求描述的范围（没写时为整个仓库），运行项目已有的 lint、类型检查与构建，并查找未使用的代码（没有引用的函数、文件与依赖）。导出的函数、类与接口可能在仓库外使用（库的公开接口、入口、插件、配置或反射），不能确认只在仓库内使用时一律保留。在 summary 中列出清单：位置、类别、打算怎么处理（修改 / 删除 / 保留并说明原因）。这一步不改文件。',
             dependsOn: [],
             acceptance: unchecked,
           },

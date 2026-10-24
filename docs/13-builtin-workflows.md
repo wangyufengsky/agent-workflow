@@ -110,7 +110,7 @@ packages/builtin/
 | --- | --- |
 | planning | `fixed` |
 | deliverable | `report` |
-| template | `review`「版本比对审查」reviewer：对比任务基础分支的当前版本（HEAD）与需求中写的起点（日期、提交、标签或分支），只审查这段时间新增与修改的代码。起点是日期时用 `git log --first-parent --before="<日期> 00:00" -1 --format=%H HEAD`（那天开始前分支上的最后一个提交）；用 `git diff <起点> HEAD` 阅读改动；summary 开头写明比对范围（起点、终点、提交数、文件数），然后是问题清单；起点之前就存在的问题不报 |
+| template | `review`「版本比对审查」reviewer：对比任务基础分支的当前版本（HEAD）与需求中写的起点（日期、提交、标签或分支），只审查这段时间新增与修改的代码。起点是日期时用 `git log --first-parent --before="<日期> 00:00" -1 --format=%H HEAD`（那天开始前分支上的最后一个提交）；用 `git diff <起点> HEAD` 阅读改动，只用 `git log` / `git diff` / `git show`、一次一条（其他命令会请求许可）；summary 开头写明比对范围（起点、终点、提交数、文件数），然后是问题清单；起点之前就存在的问题不报 |
 | acceptance | 无 |
 | 交付 | 同 §3.4（「据此修复」） |
 
@@ -132,7 +132,7 @@ packages/builtin/
 | --- | --- |
 | planning | `fixed` |
 | deliverable | `code_changes` |
-| template | `inventory`「列出告警」developer：运行项目已有的 lint、类型检查与构建，查找未使用的代码，在 summary 列出清单与处理方式；不改文件 → `fix`「清理」developer：按清单修改；不关闭规则、不加忽略注释、不调低检查级别，误报保留并写进 notes；外部行为不变 |
+| template | `inventory`「列出告警」developer：运行项目已有的 lint、类型检查与构建，查找未使用的代码（导出的接口不能确认只在仓库内使用时保留），在 summary 列出清单与处理方式；不改文件 → `fix`「清理」developer：按清单修改；不关闭规则、不加忽略注释、不调低检查级别，误报保留并写进 notes；外部行为不变 |
 | acceptance | `inventory`：无检查；`fix`：`[command $PROJECT_CHECK, browser, ai_review(focus: 是否只做了清理而没有改变外部行为，是否用关闭规则或忽略注释掩盖告警)]` |
 | checkpoints | 全部 `false` |
 
