@@ -406,7 +406,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 ## 13c′. 需求计划（v1.3，34 §10、§15）
 
-N2a 实现：从组合模板创建，AI 拆解（N2b）之后加入。全部 `mode = simple`；助手与命令面板随页面（N-07、N-11）一起开放，目前 `expose.assistant = false`。
+N2a 实现：从组合模板创建，AI 拆解（N2b）之后加入。全部 `mode = simple`、`expose.assistant = true`（`initiatives.saveDraft` 除外：整份改写阶段与工作包是页面编辑器的事），不进命令面板（从主页「直接开始」面板开始）；`initiatives.create` 的 `produces: initiative`，其余带 `id` 的操作 `refs.id = initiative`。
 
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |

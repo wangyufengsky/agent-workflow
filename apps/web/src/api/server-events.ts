@@ -18,6 +18,7 @@ import { appendTranscript, attemptTranscript, updateAttempt } from '../features/
 import { connectCompanionEvents } from '../features/companion/companion-events.ts';
 import { refreshGitReview } from '../features/git/git.queries.ts';
 import { updateInbox } from '../features/inbox/inbox.queries.ts';
+import { refreshInitiatives } from '../features/initiatives/initiatives.queries.ts';
 import { refreshKnowledge } from '../features/knowledge/knowledge.queries.ts';
 import { refreshDecks } from '../features/ppt/ppt.queries.ts';
 import { appendFrame } from '../features/preview/preview.queries.ts';
@@ -96,6 +97,9 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       return;
     case ServerEventType.ScheduleUpdated:
       await refreshSchedules(qc, event.data.scheduleId);
+      return;
+    case ServerEventType.InitiativeUpdated:
+      await refreshInitiatives(qc, event.data.initiativeId);
       return;
     case ServerEventType.PreviewUpdated:
       qc.setQueryData(queryKeys.preview(event.data.taskId), event.data);

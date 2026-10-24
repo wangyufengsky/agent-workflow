@@ -1,0 +1,116 @@
+.meter {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--fill-3);
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  background: var(--done);
+  transition: width var(--t-mid) var(--ease);
+}
+
+.phase {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.phaseHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  /* The same columns in every phase, whatever each row holds. */
+  table-layout: fixed;
+}
+
+.table td:nth-child(1) {
+  width: 40%;
+}
+
+.table td:nth-child(2) {
+  width: 18%;
+}
+
+.table td:nth-child(3) {
+  width: 22%;
+  overflow-wrap: anywhere;
+}
+
+.table th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-2);
+  vertical-align: top;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.note {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.error {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--fs-sm);
+  color: var(--danger);
+}
+
+.requirement {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink-2);
+}
+
+.editItem {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.editItem textarea,
+.wide {
+  grid-column: 1 / -1;
+}
+
+.deps {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+@media (max-width: 720px) {
+  .editItem {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
