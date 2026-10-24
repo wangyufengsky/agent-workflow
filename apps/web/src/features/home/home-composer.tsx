@@ -19,6 +19,8 @@ import { UsageLine } from '../assistant/usage-line.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
 import { AttachmentBar, dropFilesInto, pasteFilesInto } from '../attachments/attachment-bar.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
+import type { DraftRequirement } from '../requirements/checklist-editor.tsx';
+import { ChecklistField } from '../requirements/checklist-field.tsx';
 import { workflowsQuery } from '../tasks/tasks.queries.ts';
 import styles from './home.module.css';
 import { MoreOptionsFields } from './more-options.tsx';
@@ -56,13 +58,18 @@ export function HomeComposer({
   const input = useRef<HTMLTextAreaElement>(null);
   const focusSeq = useUiStore((s) => s.homeInputFocus);
   const files = useAttachmentDraft();
+  const [checklist, setChecklist] = useState<DraftRequirement[]>([]);
   const task = useStartTask({
     projectId,
     workflowId: workflows.data?.find((w) => w.key === workflowKey)?.id,
     requirement: text,
     attachmentIds: files.ids,
     attachmentsBlocked: files.blocked,
-    onStarted: files.clear,
+    requirements: checklist,
+    onStarted: () => {
+      files.clear();
+      setChecklist([]);
+    },
   });
   const project = projects.find((p) => p.id === projectId);
   // A base branch belongs to the project it was picked in.
@@ -170,6 +177,7 @@ export function HomeComposer({
           draft={files}
           projectFiles={project === undefined ? undefined : { projectId: project.id, refName: 'HEAD' }}
         />
+        {workflow !== undefined && <ChecklistField drafts={checklist} onChange={setChecklist} />}
         {workflow === undefined && <ContextAttachments draft={files} />}
         {workflow !== undefined && task.pro && project !== undefined && (
           <MoreOptionsFields project={project} value={task.options} onChange={task.setOptions} />

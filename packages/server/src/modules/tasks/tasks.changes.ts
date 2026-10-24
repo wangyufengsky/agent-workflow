@@ -1,4 +1,4 @@
-import { PromptName, renderTemplate, SYSTEM_NODES } from '@aw/builtin';
+import { PromptName, renderTemplate, SYSTEM_NODES, VERIFY_NODE } from '@aw/builtin';
 import {
   AppError,
   AttachmentOwnerKind,
@@ -12,12 +12,15 @@ import {
   PlanSource,
   type RequestChangesRequest,
   TaskEvent,
+  TaskStatus,
   taskMachine,
   transition,
 } from '@aw/shared';
 import { BACKEND_COMMITTER, gitFailure, type RepoLocks, runGit, unmergedFiles } from '../git/index.ts';
+import type { Node } from '../nodes/index.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
+import { leafKeys } from './tasks.verify.ts';
 
 /**
  * Merges `target` into a task worktree and leaves the conflict markers for a step to resolve (13 §4, 27 §3.6); the
@@ -33,10 +36,6 @@ export function mergeIntoWorktree(locks: RepoLocks, repoPath: string, dir: strin
     return files;
   });
 }
-
-/** Nodes nothing else depends on: the new step comes after all of them (13 §4). */
-const leafKeys = (nodes: ReadonlyArray<{ key: string; dependsOn: readonly string[] }>) =>
-  nodes.filter((n) => !nodes.some((other) => other.dependsOn.includes(n.key))).map((n) => n.key);
 
 /**
  * Sending a task back to the AI (09 §2 `changes_requested`, 13 §4; `review_feedback`, 21 §3): a new plan version with one more step —
@@ -83,37 +82,80 @@ export function createTaskChanges(
       acceptance: system.acceptance,
       kind: NodeKind.Revise,
     };
-    const workflow = workflows.get(task.workflowId);
+    // With a checklist, the change is verified again after it (31 §2.3).
+    const check = state.verify.stepAfter(task.id, nextKey(task.id, `${VERIFY_NODE.keyPrefix}_`), [spec.key]);
+    const added = check === undefined ? [spec] : [spec, check];
     unit.transact(() => {
+      const [node] = appendSteps(task, added, revision.feedback, event);
+      if (node === undefined) throw new Error('No step was appended');
+      deps.attachments.bind({ kind: AttachmentOwnerKind.TaskFeedback, id: node.id }, attachmentIds);
+    });
+  }
+
+  /**
+   * Adds `added` after the current steps in a new plan version confirmed at once (13 §4), and sends the task back to
+   * `running` with `event`. Only the new nodes are materialized.
+   */
+  function appendSteps(
+    task: Task,
+    added: readonly PlanNodeSpec[],
+    feedback: string | null,
+    event: typeof TaskEvent.ChangesRequested | typeof TaskEvent.ReviewFeedback,
+  ): Node[] {
+    const confirmed = plans.confirmed(task.id);
+    if (confirmed === undefined) throw new Error(`Task ${task.key} has no confirmed plan`);
+    const workflow = workflows.get(task.workflowId);
+    return unit.transact(() => {
       const plan = plans.createDraft({
         taskId: task.id,
         source: PlanSource.User,
-        graph: { nodes: [...confirmed.graph.nodes, spec] },
+        graph: { nodes: [...confirmed.graph.nodes, ...added] },
         summary: confirmed.summary,
         assumptions: confirmed.assumptions,
-        feedback: revision.feedback,
+        feedback,
         createdByAttemptId: null,
       });
       plans.confirm(plan.id);
-      const node = nodes.append(
-        {
-          taskId: task.id,
-          planId: plan.id,
-          checkCommand: projects.getRecord(task.projectId).checkCommand,
-          defaultAcceptance: workflow.definition.defaultAcceptance,
-          acceptEachNode: task.checkpoints.accept_each_node,
-        },
-        spec,
-      );
-      deps.attachments.bind({ kind: AttachmentOwnerKind.TaskFeedback, id: node.id }, attachmentIds);
+      const input = {
+        taskId: task.id,
+        planId: plan.id,
+        checkCommand: projects.getRecord(task.projectId).checkCommand,
+        defaultAcceptance: workflow.definition.defaultAcceptance,
+        acceptEachNode: task.checkpoints.accept_each_node,
+      };
+      const appended = added.map((spec) => nodes.append(input, spec));
       // The task leaves review; reaching it again opens a new delivery item.
       inbox.dismissOpen({ taskId: task.id, kind: InboxKind.Delivery });
       // A completed task is not finished any more (21 §7).
       move(get(task.id), event, undefined, { currentPlanId: plan.id, finishedAt: null });
+      return appended;
     });
   }
 
   return {
+    /** 「重新核验」(31 §2.3): one more verify step after everything, for a task in review. */
+    reverifyRequirements(taskId: string): void {
+      const task = get(taskId);
+      if (task.status !== TaskStatus.Review) {
+        throw new AppError(ErrorCode.RequirementsNotEditable, `Task ${task.key} is not waiting for review`, {
+          status: task.status,
+        });
+      }
+      const confirmed = plans.confirmed(task.id);
+      if (confirmed === undefined) throw new Error(`Task ${task.key} has no confirmed plan`);
+      const step = state.verify.stepAfter(
+        task.id,
+        nextKey(task.id, `${VERIFY_NODE.keyPrefix}_`),
+        leafKeys(confirmed.graph.nodes),
+      );
+      if (step === undefined) {
+        throw new AppError(ErrorCode.ValidationFailed, `Task ${task.key} has no checklist`, {
+          issues: [{ path: ['id'], message: 'the task has no acceptance checklist' }],
+        });
+      }
+      appendSteps(task, [step], null, TaskEvent.ChangesRequested);
+    },
+
     async requestChanges(
       taskId: string,
       reason: RequestChangesRequest['reason'],

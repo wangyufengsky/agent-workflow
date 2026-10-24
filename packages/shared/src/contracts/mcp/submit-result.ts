@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { RESULT_SUMMARY_MAX_CHARS } from '../../constants/limits.ts';
+import { REQUIREMENT_NOTE_MAX_CHARS, RESULT_SUMMARY_MAX_CHARS } from '../../constants/limits.ts';
+import { RequirementConclusion } from '../../enums/requirement.ts';
 
 /** `submit_result` (12 §6.5). */
 export const submitResultInputSchema = z.object({
@@ -14,6 +15,18 @@ export const submitResultInputSchema = z.object({
     .object({ tests_run: z.boolean(), tests_passed: z.boolean().optional(), details: z.string().optional() })
     .optional()
     .describe('Whether you ran the tests yourself and how it went'),
+  requirement_results: z
+    .array(
+      z.object({
+        item_id: z.string().min(1),
+        conclusion: z.enum([RequirementConclusion.Pass, RequirementConclusion.Fail, RequirementConclusion.Unverified]),
+        note: z.string().min(1).max(REQUIREMENT_NOTE_MAX_CHARS),
+      }),
+    )
+    .optional()
+    .describe(
+      'Only in the step 核验验收清单: your conclusion on each ai_review item of the checklist, with what you based it on',
+    ),
 });
 export type SubmitResultInput = z.infer<typeof submitResultInputSchema>;
 

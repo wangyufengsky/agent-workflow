@@ -34,6 +34,8 @@ export const queryKeys = {
   schedules: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'schedules', filter],
   schedule: (id: string) => ['tasks', 'list', 'schedule', id],
   task: (id: string) => ['tasks', 'detail', id],
+  /** The task's acceptance checklist (31); it changes with the task, so task events refresh it. */
+  taskRequirements: (id: string) => ['tasks', 'detail', id, 'requirements'],
   preview: (taskId: string) => ['tasks', 'detail', taskId, 'preview'],
   siteLogins: ['browser', 'site-logins'],
   /** Outside the task detail's prefix: read from the platform only when the user asks, never refreshed by events. */

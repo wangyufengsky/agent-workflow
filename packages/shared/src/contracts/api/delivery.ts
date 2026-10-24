@@ -33,6 +33,11 @@ export const deliverRequestSchema = z.object({
   targetBranch: z.string().min(1).optional(),
   /** Pull request title and description; default: the task title and the result summary. */
   pr: z.object({ title: z.string().trim().min(1), body: z.string() }).optional(),
+  /**
+   * The checklist version whose unmet required items the user saw and accepted (31 §4); required while such items
+   * exist, and only for that version.
+   */
+  acknowledgedRequirementsRevisionId: z.string().optional(),
 });
 export type DeliverRequest = z.infer<typeof deliverRequestSchema>;
 

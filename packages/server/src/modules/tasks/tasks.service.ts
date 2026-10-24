@@ -29,6 +29,7 @@ import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
 import type { StatusMatch } from './tasks.repo.ts';
+import { createTaskRequirements } from './tasks.requirements.ts';
 import { createTaskResults } from './tasks.result.ts';
 import { createTaskReview } from './tasks.review.ts';
 import { createTaskState, type TasksServiceDeps } from './tasks.state.ts';
@@ -37,9 +38,12 @@ import { createTaskState, type TasksServiceDeps } from './tasks.state.ts';
 export function createTasksService(deps: TasksServiceDeps & { events: EventBus }) {
   const { db, plans, nodes, attempts, inbox, worktrees, workflows } = deps;
   const state = createTaskState(deps);
+  // A finished verify step's conclusions are written with it (31 §2.2).
+  nodes.onVerified((node, commitSha) => state.verify.record(node, commitSha));
   const lifecycle = createTaskLifecycle(deps, state);
   const results = createTaskResults(deps, state);
   const context = createTaskContext(deps, state);
+  const requirements = createTaskRequirements(deps, state);
   const actions = createTaskActions(deps, state, lifecycle);
   const checks = createTaskChecks(deps, state, lifecycle);
   const diffs = createTaskDiffs(deps, state);
@@ -213,7 +217,12 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       return detail(id);
     },
     async deliver(id: string, request: Omit<DeliverRequest, 'id'>): Promise<TaskDetailDTO> {
-      await delivery.deliver(id, request);
+      const checklist = await requirements.deliveryCheck(id, request.acknowledgedRequirementsRevisionId);
+      await delivery.deliver(id, request, checklist);
+      return detail(id);
+    },
+    reverifyRequirements(id: string): TaskDetailDTO {
+      changes.reverifyRequirements(id);
       return detail(id);
     },
     async requestChanges(
@@ -276,7 +285,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
 
     /** `submit_result` of a task's execute attempt (12 §6.5). */
     async submitResult(attempt: AttemptDTO, input: SubmitResultInput): Promise<ResultNext> {
-      if (attempt.taskId === null) throw new Error(`Attempt ${attempt.id} belongs to no task`);
+      if (attempt.taskId === null || attempt.nodeId === null) throw new Error(`Attempt ${attempt.id} is no step's`);
+      state.verify.checkResults(attempt.taskId, nodes.get(attempt.nodeId), input.requirement_results);
       return nodes.submitResult(attempt, input, state.runContext(state.get(attempt.taskId)));
     },
 
@@ -286,6 +296,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     deleteWorkflow: actions.deleteWorkflow,
     deleteRole: actions.deleteRole,
     ...context,
+    ...requirements,
     submitPlan: lifecycle.submitPlan,
     startPlanning: lifecycle.startPlanning,
     finishRunning: results.finishRunning,

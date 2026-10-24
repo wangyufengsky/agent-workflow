@@ -109,6 +109,12 @@ import {
   updateProjectOp,
 } from './projects.ts';
 import {
+  decideRequirementOp,
+  getRequirementsOp,
+  replaceRequirementsOp,
+  reverifyRequirementsOp,
+} from './requirements.ts';
+import {
   createScheduleOp,
   deleteScheduleOp,
   getScheduleOp,
@@ -189,6 +195,7 @@ export * from './insights.ts';
 export * from './knowledge.ts';
 export * from './previews.ts';
 export * from './projects.ts';
+export * from './requirements.ts';
 export * from './schedules.ts';
 export * from './settings.ts';
 export * from './system.ts';
@@ -239,6 +246,10 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getAttachmentOp,
   removeAttachmentOp,
   snapshotProjectFileOp,
+  getRequirementsOp,
+  replaceRequirementsOp,
+  decideRequirementOp,
+  reverifyRequirementsOp,
   startDebugAttemptOp,
   listWorkflowsOp,
   getWorkflowOp,

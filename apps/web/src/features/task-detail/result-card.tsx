@@ -18,6 +18,7 @@ import { Panel } from '../../components/panel.tsx';
 import { DELIVERY_COPY as D } from '../../copy/delivery.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { skippedCommands } from '../tasks/skipped-checks.ts';
 import { taskDiffFileQuery, taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { DeliveryActions } from './delivery-actions.tsx';
@@ -91,6 +92,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
           </Link>
         </div>
         <DeliveryOutcome task={task} />
+        <RequirementsSection task={task} />
         <section className={styles.block}>
           <h3 className="sec-t">{report ? C.report : C.summary}</h3>
           {report ? (

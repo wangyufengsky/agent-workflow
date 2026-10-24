@@ -1,4 +1,4 @@
-import { AttemptKind, McpToolName, submitResultInputSchema, submitResultOutputSchema } from '@aw/shared';
+import { AttemptKind, ErrorCode, McpToolName, submitResultInputSchema, submitResultOutputSchema } from '@aw/shared';
 import type { DebugService } from '../../debug/index.ts';
 import type { TasksService } from '../../tasks/index.ts';
 import { defineMcpTool } from '../mcp.registry.ts';
@@ -11,6 +11,10 @@ export const submitResultTool = (tasks: TasksService, debug: DebugService) =>
     allowedKinds: [AttemptKind.Execute],
     input: submitResultInputSchema,
     output: submitResultOutputSchema,
+    hints: {
+      [ErrorCode.RequirementResultsInvalid]:
+        'Give requirement_results only in the step 核验验收清单, once per ai_review item of get_task_context.requirements; leave the field out otherwise.',
+    },
     handler: async (input, { attempt }) =>
       attempt.taskId === null
         ? debug.submitResult(attempt, input)

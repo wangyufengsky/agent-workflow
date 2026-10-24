@@ -174,6 +174,13 @@ export function createTaskContext(deps: TasksServiceDeps, state: TaskState) {
             }
           : {}),
         databases: databases.forProject(task.projectId).map((c) => ({ name: c.name, type: c.type })),
+        requirements: (deps.requirements.current(task.id)?.items ?? []).map((item) => ({
+          id: item.id,
+          title: item.title,
+          expected: item.expected,
+          required: item.required,
+          verification: item.verification.kind,
+        })),
       };
     },
 

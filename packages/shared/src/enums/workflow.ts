@@ -55,6 +55,8 @@ export const NodeKind = {
   Normal: 'normal',
   /** Appended by「让 AI 再改改」/「交给 AI 解决冲突」; depends on every leaf node. */
   Revise: 'revise',
+  /** 「核验验收清单」(31 §2.2): read-only, last; its checks record conclusions instead of holding the step. */
+  Verify: 'verify',
 } as const;
 export type NodeKind = (typeof NodeKind)[keyof typeof NodeKind];
 export const nodeKindSchema = z.enum(NodeKind);

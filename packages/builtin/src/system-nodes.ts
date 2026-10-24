@@ -17,6 +17,15 @@ const checked: Acceptance = {
   manual: false,
 };
 
+/** 「核验验收清单」(31 §2.2): appended after the work when the task has a checklist; read-only reviewer. */
+export const VERIFY_NODE = {
+  /** The first one is `verify_requirements`; one appended later is `verify_requirements_<n>`. */
+  keyPrefix: 'verify_requirements',
+  title: '核验验收清单',
+  roleKey: BuiltinRoleKey.Reviewer,
+  prompt: PromptName.VerifyRequirements,
+} as const;
+
 export const SYSTEM_NODES: Readonly<Record<ChangeRequestReason, SystemNode>> = {
   [ChangeRequestReason.User]: {
     keyPrefix: 'revise_',

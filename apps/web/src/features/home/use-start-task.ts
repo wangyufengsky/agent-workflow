@@ -3,7 +3,9 @@ import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { ATTACHMENTS_COPY } from '../../copy/attachments.ts';
+import { REQUIREMENTS_COPY } from '../../copy/requirements.ts';
 import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
+import { type DraftRequirement, isComplete, toInputs } from '../requirements/checklist-editor.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { useCreateTask } from '../tasks/tasks.queries.ts';
 import { type MoreOptions, NO_OPTIONS } from './more-options.tsx';
@@ -18,6 +20,7 @@ export function useStartTask({
   requirement,
   attachmentIds,
   attachmentsBlocked,
+  requirements,
   onStarted,
 }: {
   projectId: string;
@@ -27,6 +30,8 @@ export function useStartTask({
   attachmentIds: readonly string[];
   /** An attachment is uploading or failed: the task waits until it is removed (30 §2). */
   attachmentsBlocked: boolean;
+  /** The acceptance checklist being written (31 §2.1); empty for none. */
+  requirements: readonly DraftRequirement[];
   onStarted: () => void;
 }) {
   const pro = useSettings()['ui.mode'] === UiMode.Pro;
@@ -34,7 +39,9 @@ export function useStartTask({
   const [options, setOptions] = useState<MoreOptions>(NO_OPTIONS);
   const create = useCreateTask();
   const navigate = useNavigate();
-  const canStart = workflowId !== undefined && projectId !== '' && requirement.trim() !== '' && !attachmentsBlocked;
+  const checklistReady = isComplete(requirements);
+  const canStart =
+    workflowId !== undefined && projectId !== '' && requirement.trim() !== '' && !attachmentsBlocked && checklistReady;
   // Why「开始」is unavailable, said next to it (only the requirement can be missing once projects and workflows load).
   const blocked = canStart
     ? undefined
@@ -42,7 +49,9 @@ export function useStartTask({
       ? C.needsRequirement
       : attachmentsBlocked
         ? ATTACHMENTS_COPY.notReady
-        : C.needsWorkflow;
+        : !checklistReady
+          ? REQUIREMENTS_COPY.incomplete
+          : C.needsWorkflow;
 
   const start = (asDraft = false) => {
     if (!canStart) return;
@@ -62,6 +71,7 @@ export function useStartTask({
         ...(more.baseBranch === null ? {} : { baseBranch: more.baseBranch }),
         ...(asDraft ? { start: false } : {}),
         ...(attachmentIds.length === 0 ? {} : { attachmentIds: [...attachmentIds] }),
+        ...(requirements.length === 0 ? {} : { requirements: toInputs(requirements) }),
       },
       {
         onSuccess: (task) => {
