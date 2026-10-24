@@ -1,6 +1,7 @@
 import {
   type CreateTaskRequest,
   type RequirementItem,
+  type RequirementItemInput,
   RequirementVerification,
   requirementVerificationKindSchema,
 } from '@aw/shared';
@@ -38,6 +39,37 @@ export const draftsOf = (items: readonly RequirementItem[]): DraftRequirement[] 
     required: item.required,
     kind: item.verification.kind,
     command: item.verification.kind === RequirementVerification.Command ? item.verification.command : '',
+  }));
+
+/**
+ * A checklist kept as inputs while it is written (a work package's acceptance, 34 §5.2): `prefix` keys the items that
+ * have no id yet, so that their rows stay put between edits.
+ */
+export const draftsOfInputs = (items: readonly RequirementItemInput[], prefix: string): DraftRequirement[] =>
+  items.map((item, i) => {
+    const verification = item.verification ?? { kind: RequirementVerification.AiReview };
+    return {
+      key: item.id ?? `${prefix}:${i}`,
+      ...(item.id === undefined ? {} : { id: item.id }),
+      title: item.title,
+      expected: item.expected,
+      required: item.required ?? true,
+      kind: verification.kind,
+      command: verification.kind === RequirementVerification.Command ? verification.command : '',
+    };
+  });
+
+/** The items as they are being written, untrimmed (the request schema trims them on saving). */
+export const inputsOf = (drafts: readonly DraftRequirement[]) =>
+  drafts.map((d) => ({
+    ...(d.id === undefined ? {} : { id: d.id }),
+    title: d.title,
+    expected: d.expected,
+    required: d.required,
+    verification:
+      d.kind === RequirementVerification.Command
+        ? { kind: RequirementVerification.Command, command: d.command }
+        : { kind: d.kind },
   }));
 
 /** Every item has its texts, and a command item its command. */

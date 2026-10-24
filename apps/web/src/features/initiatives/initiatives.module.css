@@ -102,6 +102,20 @@
   grid-column: 1 / -1;
 }
 
+/* A template's key, name and description (34 §15.6). */
+.metaGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 8px 12px;
+}
+
+.problems {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--danger);
+  font-size: var(--fs-sm);
+}
+
 .deps {
   grid-column: 1 / -1;
   display: flex;
@@ -110,7 +124,8 @@
 }
 
 @media (max-width: 720px) {
-  .editItem {
+  .editItem,
+  .metaGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -92,7 +92,9 @@ import {
   confirmInitiativeItemMergedOp,
   confirmInitiativeOp,
   createInitiativeOp,
+  createInitiativeTemplateOp,
   deleteInitiativeOp,
+  deleteInitiativeTemplateOp,
   deliverInitiativePhaseOp,
   dropInitiativeItemOp,
   getInitiativeOp,
@@ -103,6 +105,7 @@ import {
   refineInitiativeOp,
   saveInitiativeDraftOp,
   startInitiativeItemOp,
+  updateInitiativeTemplateOp,
 } from './initiatives.ts';
 import { insightsSummaryOp, insightsTasksOp } from './insights.ts';
 import {
@@ -336,6 +339,9 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getBatchOp,
   deliverBatchOp,
   listInitiativeTemplatesOp,
+  createInitiativeTemplateOp,
+  updateInitiativeTemplateOp,
+  deleteInitiativeTemplateOp,
   listInitiativesOp,
   createInitiativeOp,
   getInitiativeOp,

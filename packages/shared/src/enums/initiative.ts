@@ -53,6 +53,8 @@ export const initiativeRunModeSchema = z.enum(InitiativeRunMode);
 /** Built-in composition templates are synced with the app and read-only (34 §15.3). */
 export const InitiativeTemplateKind = {
   Builtin: 'builtin',
+  /** Made by the user in pro mode (34 §15.6). */
+  Custom: 'custom',
 } as const;
 export type InitiativeTemplateKind = (typeof InitiativeTemplateKind)[keyof typeof InitiativeTemplateKind];
 export const initiativeTemplateKindSchema = z.enum(InitiativeTemplateKind);

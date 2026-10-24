@@ -388,7 +388,7 @@ SSE：`initiative.updated { initiativeId }`（拆解提交、草稿保存、确�
 | N-07（已实现） | 前端：新建页、需求计划页（拆解审阅与编辑、阶段与工作包列表、进入下一阶段对话框）、列表、入口 | E2E：新建 → 确认 → 第 1 阶段合入 → 细化 → 第 2 阶段；四主题走查 |
 | N-08（已实现，完整跑通的 live 除外） | 应用助手与 live | 集成：助手创建需求计划出确认卡；`pnpm test:live` 免费模型一例：两阶段三个工作包跑通 |
 
-**N2a 后端已实现**（2026-10-24）：N-02、N-03、N-05、N-06 中不涉及 AI 拆解的部分与 N-09、N-10，见 08 §2.10a、10 §4b′、11 §13c′；**N2b 后端已实现**（2026-10-25）：`AttemptKind.Breakdown` 与 `submit_breakdown`、第一次拆解 / 重新拆解 / 细化（含「进入第 k 阶段」先细化、确认时开启）、`initiative_runs`、`INITIATIVE_BUSY`、live 一例（N-04、N-08 的 live 部分）；**N-07 的拆解部分已实现**（2026-10-25）：主页「让 AI 拆解」、拆解过程、理解与覆盖表、按意见重新拆解、细化剩余工作包与「进入第 k 阶段」时勾选先细化，E2E J38；**N-08 已实现**（2026-10-25）：助手的协议提示词（大需求建需求计划、建好后打开页面让用户确认）、`open_page` 与所在页面加入需求计划、`initiatives_create` 只转交本对话的附件，live 一例（助手带附件调用 `initiatives_create`）；「两阶段三个工作包跑通」的 live（真实模型跑完多个任务，耗时长）留到以后。拆解会话可以用只读的浏览器工具打开网站（读需求里的链接）。**N2a 前端已实现**（2026-10-24）：主页「直接开始」面板的「组合」分组、需求计划列表与详情页（阶段、工作包、开启阶段、开始 / 不做 / 已合入、合并本阶段待合并的、修改未开始的工作包）、任务页与主页工作概览的入口、助手可调用（`saveDraft` 除外）与导航卡片，E2E J37。自定义模板与「存为模板」（N-11 的专业模式部分）尚未加入；在主页限定 `allowedWorkflows` 留到以后（接口已支持）。
+**N2a 后端已实现**（2026-10-24）：N-02、N-03、N-05、N-06 中不涉及 AI 拆解的部分与 N-09、N-10，见 08 §2.10a、10 §4b′、11 §13c′；**N2b 后端已实现**（2026-10-25）：`AttemptKind.Breakdown` 与 `submit_breakdown`、第一次拆解 / 重新拆解 / 细化（含「进入第 k 阶段」先细化、确认时开启）、`initiative_runs`、`INITIATIVE_BUSY`、live 一例（N-04、N-08 的 live 部分）；**N-07 的拆解部分已实现**（2026-10-25）：主页「让 AI 拆解」、拆解过程、理解与覆盖表、按意见重新拆解、细化剩余工作包与「进入第 k 阶段」时勾选先细化，E2E J38；**N-08 已实现**（2026-10-25）：助手的协议提示词（大需求建需求计划、建好后打开页面让用户确认）、`open_page` 与所在页面加入需求计划、`initiatives_create` 只转交本对话的附件，live 一例（助手带附件调用 `initiatives_create`）；「两阶段三个工作包跑通」的 live（真实模型跑完多个任务，耗时长）留到以后。拆解会话可以用只读的浏览器工具打开网站（读需求里的链接）。**N2a 前端已实现**（2026-10-24）：主页「直接开始」面板的「组合」分组、需求计划列表与详情页（阶段、工作包、开启阶段、开始 / 不做 / 已合入、合并本阶段待合并的、修改未开始的工作包）、任务页与主页工作概览的入口、助手可调用（`saveDraft` 除外）与导航卡片，E2E J37。**自定义模板与「存为模板」已实现**（N-11 的专业模式部分，2026-10-25，E2E J40）；在主页限定 `allowedWorkflows` 留到以后（接口已支持）。
 
 N-01 独立，可先交付（D137）；N-02…N-08 在 N-01 的拆解质量经用户确认后开始。组合模板 N-09…N-12 与调整后的顺序（N2a / N2b）见 §15.9（D151，用户已确认）。
 
@@ -474,6 +474,8 @@ type InitiativeTemplate = {
 
 ### 15.6 自定义模板（专业模式）
 
+> **已实现**（2026-10-25，E2E J40）：页面 `/initiative-templates`（流程页右上角「组合模板」进入），新建、复制、编辑页 `/initiative-templates/new`、`/initiative-templates/:key/edit`（编辑页放在 `/edit` 下，任何模板 key 都不会占到新建页）；「存为模板」是需求计划页页头的按钮（专业模式），打开预填了这份需求计划阶段与工作包的新建页，没有单独的 `initiatives.saveAsTemplate` 操作；编辑页当场按模板规则检查并列出问题（如缺 `{{requirement}}`、验收项没写完），有问题时不能保存；每个工作包的验收要求（31 的清单）在编辑器里可以查看、修改、删除，「存为模板」带过来的原需求计划专属验收项可以在保存前去掉（需求计划的草稿编辑同样可以改验收要求）。自定义模板只在专业模式的「直接开始」面板里出现，放在「自定义」下。
+
 - 页面 `/initiative-templates`（流程页旁的一个页签）：列表、从内置复制、新建、编辑、删除。编辑器与需求计划的草稿编辑相同（§5.2：阶段、工作包、流程、依赖、需求模板、验收要求），另有每个阶段的「自动开启」开关。
 - **存为模板**：需求计划页的更多菜单「存为模板」，把当前阶段与工作包另存为一个自定义模板；用户需要把需求切片里的具体内容改写成 `{{requirement}}` 后才能保存（校验同 §15.2）。AI 拆得好的一份大需求，可以沉淀成团队自己的套路。
 - 删除模板不影响用它创建的需求计划（快照）。
@@ -490,7 +492,7 @@ type InitiativeTemplate = {
 ### 15.8 契约增量（实施时登记到 08–12）
 
 - 表 `initiative_templates`：id、key（UNIQUE）、kind（`builtin` / `custom`）、name、description、phases JSON、items JSON、created_at / updated_at。`initiatives` 增加 `template_id TEXT NULL`（→ initiative_templates，SET NULL；只用于页头显示来源）。
-- 操作：`initiativeTemplates.list` / `get`（read；UI / 助手）；`initiativeTemplates.create` / `update` / `delete`（write；仅 UI，专业模式）；`initiatives.create` 增加 `templateId?` 与 `review?`（「先让我看看」），带 `templateId` 时不启动拆解；`initiatives.saveAsTemplate`（write；仅 UI）。
+- 操作：`initiativeTemplates.list` / `get`（read；UI / 助手）；`initiativeTemplates.create` / `update` / `delete`（write；仅 UI，专业模式）；`initiatives.create` 增加 `templateKey?` 与 `review?`（「先让我看看」），带 `templateKey` 时不启动拆解。（原计划的 `initiatives.saveAsTemplate` 没有做：「存为模板」由界面预填新建页后调用 `initiativeTemplates.create`。）
 - 错误码：`INITIATIVE_TEMPLATE_NOT_FOUND`（404）、`INITIATIVE_TEMPLATE_READONLY`（409，内置模板）、`INITIATIVE_BREAKDOWN_INVALID` 增加子码 `TEMPLATE_REQUIREMENT_MISSING`、`UNKNOWN_WORKFLOW`。
 - 常量：`INITIATIVE_TEMPLATE_PLACEHOLDER = '{{requirement}}'`。
 - 内置模板定义在 `packages/builtin/src/initiative-templates.ts`，需求模板的文字是给模型看的需求，用中文（同流程的步骤指令）。
@@ -511,7 +513,7 @@ type InitiativeTemplate = {
 | --- | --- | --- |
 | N-09（已实现，N2a 部分） | 模板的契约、表、内置模板与同步、校验增量 | 单元：`{{requirement}}` 缺失与未知流程的子码；集成：首次启动写入 4 个内置模板，同步不改动已有需求计划 |
 | N-10（已实现，N2a 部分） | 从模板创建（直接开始与「先让我看看」）、阶段自动开启 | 集成（FakeOpencode + 真实 Git）：「设计后开发」创建后方案设计任务立即开始，点「完成」后新功能开发自动开始，其首条消息含方案设计的报告 |
-| N-11（已实现，N2a 部分） | 前端：「直接开始」面板的「组合」分组、新建页的「用模板」、模板页与编辑器、存为模板 | E2E：从「直接开始」面板开始「设计后开发」走到第 2 阶段；四主题走查 |
+| N-11（已实现） | 前端：「直接开始」面板的「组合」分组、新建页的「用模板」、模板页与编辑器、存为模板 | E2E：从「直接开始」面板开始「设计后开发」走到第 2 阶段；四主题走查 |
 | N-12（已实现） | 流程编辑器「插入流程的步骤」 | 组件测试：插入「修 Bug」的两步、key 冲突时加后缀；E2E：保存后的自定义流程能跑通 |
 
 测试要点：模板快照后改模板，已有需求计划不变；`autoOpen` 的阶段在前一阶段最后一个工作包满足时只开启一次（与 §14 的自动开始幂等同一做法）；报告类阶段未点「完成」时下一阶段不开启。

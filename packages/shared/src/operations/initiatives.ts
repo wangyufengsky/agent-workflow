@@ -4,6 +4,7 @@ import {
   confirmInitiativeRequestSchema,
   createInitiativeRequestSchema,
   deleteInitiativeRequestSchema,
+  deleteInitiativeTemplateRequestSchema,
   deliverInitiativePhaseRequestSchema,
   deliverInitiativePhaseResponseSchema,
   dropInitiativeItemRequestSchema,
@@ -16,6 +17,7 @@ import {
   rebreakdownInitiativeRequestSchema,
   refineInitiativeRequestSchema,
   saveInitiativeDraftRequestSchema,
+  saveInitiativeTemplateRequestSchema,
   startInitiativeItemRequestSchema,
 } from '../contracts/api/initiatives.ts';
 import { EntityKind, InputRef } from '../enums/entity.ts';
@@ -36,6 +38,42 @@ export const listInitiativeTemplatesOp = defineOperationContract({
   output: z.object({ items: z.array(initiativeTemplateSchema) }),
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/initiative-templates' },
+});
+
+// Custom templates are a pro-mode page of their own (34 §15.6); the assistant only reads them.
+const templateEdit = { expose: { palette: false, assistant: false }, credentialFields: [], mode: UiMode.Pro } as const;
+
+export const createInitiativeTemplateOp = defineOperationContract({
+  ...templateEdit,
+  id: 'initiativeTemplates.create',
+  title: 'op.initiativeTemplates.create',
+  description: 'Create a custom composition template; at least one work package requirement contains {{requirement}}',
+  input: saveInitiativeTemplateRequestSchema,
+  output: initiativeTemplateSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/initiative-templates', status: 201 },
+});
+
+export const updateInitiativeTemplateOp = defineOperationContract({
+  ...templateEdit,
+  id: 'initiativeTemplates.update',
+  title: 'op.initiativeTemplates.update',
+  description: 'Change a custom composition template in place; initiatives made from it keep their copy',
+  input: saveInitiativeTemplateRequestSchema,
+  output: initiativeTemplateSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'PUT', path: '/initiative-templates/:key' },
+});
+
+export const deleteInitiativeTemplateOp = defineOperationContract({
+  ...templateEdit,
+  id: 'initiativeTemplates.delete',
+  title: 'op.initiativeTemplates.delete',
+  description: 'Delete a custom composition template; initiatives made from it keep their copy',
+  input: deleteInitiativeTemplateRequestSchema,
+  output: z.void(),
+  risk: OperationRisk.Critical,
+  http: { method: 'DELETE', path: '/initiative-templates/:key' },
 });
 
 export const listInitiativesOp = defineOperationContract({

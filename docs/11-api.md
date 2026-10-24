@@ -410,7 +410,10 @@ N2a 实现组合模板，N2b 加入 AI 拆解（`templateKey` 省略时）、重
 
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |
-| GET | `/initiative-templates` | `initiativeTemplates.list` | read | `{ items: InitiativeTemplateDTO[] }`：内置组合模板，按内置顺序 |
+| GET | `/initiative-templates` | `initiativeTemplates.list` | read | `{ items: InitiativeTemplateDTO[] }`：内置组合模板按内置顺序，其后是自定义模板（按创建时间） |
+| POST | `/initiative-templates` | `initiativeTemplates.create` | write（专业，仅 UI） | `{ key, name, description, phases, items }` → 201 模板；按 `validateInitiativeDraft(…, { template: true })` 校验（至少一个工作包的需求含 `{{requirement}}`，否则 `INITIATIVE_BREAKDOWN_INVALID` 子码 `TEMPLATE_REQUIREMENT_MISSING`）；key 已被占用 `INITIATIVE_TEMPLATE_ALREADY_EXISTS`。「存为模板」与「复制」都是界面预填后调用它（34 §15.6），没有单独的操作 |
+| PUT | `/initiative-templates/:key` | `initiativeTemplates.update` | write（专业，仅 UI） | 同上，就地修改；内置模板 `INITIATIVE_TEMPLATE_READONLY`；用它开始的需求计划不受影响（快照） |
+| DELETE | `/initiative-templates/:key` | `initiativeTemplates.delete` | critical（专业，仅 UI） | 204；内置模板 `INITIATIVE_TEMPLATE_READONLY`；用它开始的需求计划保留阶段与工作包，页头的来源变为空 |
 | GET | `/initiatives?projectId&limit&cursor` | `initiatives.list` | read | `{ items: InitiativeSummaryDTO[], nextCursor }`，按编号倒序 |
 | POST | `/initiatives` | `initiatives.create` | write | `{ projectId, templateKey?, allowedWorkflows?, requirement, attachmentIds?（≤ 9）, baseBranch?, review = false, confirmItemPlans = false }` → 201 `InitiativeDetailDTO`；模板的 `{{requirement}}` 替换为需求后校验（`INITIATIVE_BREAKDOWN_INVALID`，替换后过长为 `VALIDATION_FAILED`）；`review` 为假时直接确认并开启第 1 阶段，可以开始的工作包立即开始；省略 `templateKey` 时由 AI 拆解：先校验 `allowedWorkflows` 都存在，建好空的需求计划并开始一次 `breakdown` run（`breaking_down`），交上来的草稿停在 `draft_ready` 等确认 |
 | GET | `/initiatives/:id` | `initiatives.get` | read | `InitiativeDetailDTO`：阶段（含是否已开启）、工作包（显示状态、当前任务摘要、本轮交付、开始失败的原因）、资料附件；404 `INITIATIVE_NOT_FOUND` |

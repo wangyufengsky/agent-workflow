@@ -19,6 +19,11 @@ import { DETAIL_TABS, GIT_VIEWS, GitProjectPage } from '../features/git/git-proj
 import { HomePage } from '../features/home/home.page.tsx';
 import { InboxPage } from '../features/inbox/inbox.page.tsx';
 import { InitiativePage } from '../features/initiatives/initiative.page.tsx';
+import {
+  InitiativeTemplateEditorPage,
+  NewInitiativeTemplatePage,
+} from '../features/initiatives/initiative-template-editor.page.tsx';
+import { InitiativeTemplatesPage } from '../features/initiatives/initiative-templates.page.tsx';
 import { InitiativesPage } from '../features/initiatives/initiatives.page.tsx';
 import { InsightsPage, insightsSearchSchema } from '../features/insights/insights.page.tsx';
 import { KnowledgeConversationPage, KnowledgeWelcomePage } from '../features/knowledge/knowledge.page.tsx';
@@ -119,6 +124,17 @@ const proOnlyPage = <P extends string>(path: P, Component: () => React.ReactNode
       <Component />
     </ProOnly>
   ));
+// 存为模板 opens it with the initiative (`?initiative=`), 复制 with the template copied (`?copy=`).
+const initiativeTemplateNewRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.initiativeTemplateNew,
+  validateSearch: z.object({ copy: z.string().optional(), initiative: z.string().optional() }),
+  component: () => (
+    <ProOnly>
+      <NewInitiativeTemplatePage />
+    </ProOnly>
+  ),
+});
 const projectsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.projects,
@@ -360,6 +376,9 @@ const routeTree = rootRoute.addChildren([
     gitProjectRoute,
     proOnlyPage(ROUTES.workflows, WorkflowsPage),
     proOnlyPage(ROUTES.workflow, WorkflowEditorPage),
+    proOnlyPage(ROUTES.initiativeTemplates, InitiativeTemplatesPage),
+    initiativeTemplateNewRoute,
+    proOnlyPage(ROUTES.initiativeTemplate, InitiativeTemplateEditorPage),
     proOnlyPage(ROUTES.roles, RolesPage),
     proOnlyPage(ROUTES.databases, DatabasesPage),
     proOnlyPage(ROUTES.tools, ToolsPage),

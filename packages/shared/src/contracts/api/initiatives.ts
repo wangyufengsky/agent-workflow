@@ -73,6 +73,11 @@ export const initiativeTemplateSchema = initiativeDraftSchema.extend({
 });
 export type InitiativeTemplateDTO = z.output<typeof initiativeTemplateSchema>;
 
+/** `POST /initiative-templates` and `PUT /initiative-templates/:key`: a custom template (34 §15.6), in place. */
+export const saveInitiativeTemplateRequestSchema = initiativeTemplateSchema.omit({ kind: true });
+export type SaveInitiativeTemplateRequest = z.input<typeof saveInitiativeTemplateRequestSchema>;
+export const deleteInitiativeTemplateRequestSchema = z.object({ key: z.string().min(1) });
+
 /**
  * `POST /initiatives`: from a composition template (34 §15.4), or — without `templateKey` — broken down by the AI
  * into a draft for the user to confirm (34 §5.1, D133).

@@ -123,7 +123,10 @@ export function createInitiativesService({
   prompts,
 }: InitiativesServiceDeps) {
   const repo = createInitiativesRepo(db);
-  const templates = createInitiativeTemplates(repo, unit, clock);
+  const templates = createInitiativeTemplates(repo, unit, clock, (draft) => {
+    const problems = validateInitiativeDraft(draft, { workflowExists, template: true });
+    if (problems.length > 0) throw invalid(problems);
+  });
   const owner = (id: string) => ({ kind: AttachmentOwnerKind.Initiative, id });
   const publish = (initiativeId: string) =>
     events.publish({ type: ServerEventType.InitiativeUpdated, data: { initiativeId } });
@@ -693,6 +696,9 @@ export function createInitiativesService({
     templates: {
       syncBuiltin: templates.syncBuiltin,
       list: (): InitiativeTemplateDTO[] => templates.list(),
+      create: templates.create,
+      update: templates.update,
+      delete: templates.delete,
     },
 
     list({ projectId, limit, cursor }: ListInitiativesQuery): {

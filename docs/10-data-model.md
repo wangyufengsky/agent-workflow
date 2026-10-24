@@ -473,9 +473,9 @@ payload / response：
 | --- | --- | --- |
 | id | TEXT PK | |
 | key | TEXT UNIQUE | 同流程 key 的规则 |
-| kind | TEXT | `InitiativeTemplateKind`；内置模板每次启动就地重写，不分版本 |
+| kind | TEXT | `InitiativeTemplateKind`；内置模板每次启动就地重写，自定义模板由用户就地修改（34 §15.6），都不分版本 |
 | name / description | TEXT | |
-| position | INTEGER | 列出顺序（内置顺序） |
+| position | INTEGER | 内置模板的列出顺序；自定义模板为 0，列在内置模板之后、按创建时间 |
 | phases / items | TEXT(JSON) | `InitiativePhase[]` / `InitiativeItemSpec[]`（需求仍含 `{{requirement}}`） |
 | created_at / updated_at | INTEGER | |
 

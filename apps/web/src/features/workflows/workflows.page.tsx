@@ -19,6 +19,7 @@ import { Icon } from '../../components/icon.tsx';
 import { toast } from '../../components/toast.tsx';
 import { BATCHES_COPY } from '../../copy/batches.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
+import { INITIATIVE_TEMPLATES_COPY } from '../../copy/initiatives.ts';
 import { SCHEDULES_COPY } from '../../copy/schedules.ts';
 import {
   WORKFLOWS_COPY as C,
@@ -179,6 +180,11 @@ export function WorkflowsPage() {
           <h1 className="title">{C.title}</h1>
           <p className="lede">{C.lede}</p>
         </div>
+        {/* Composition templates chain workflows in phases (34 §15.6): their page sits beside this one. */}
+        <Link to={ROUTES.initiativeTemplates} className="btn secondary">
+          <Icon name="split" />
+          {INITIATIVE_TEMPLATES_COPY.entry}
+        </Link>
         <Button variant="primary" icon="plus" onClick={() => setTarget({ mode: 'create' })}>
           {C.create}
         </Button>
