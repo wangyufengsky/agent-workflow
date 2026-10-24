@@ -3,7 +3,9 @@ import {
   type CreateInitiativeRequest,
   confirmInitiativeOp,
   createInitiativeOp,
+  createInitiativeTemplateOp,
   createWorkflowOp,
+  deleteInitiativeTemplateOp,
   deleteProjectOp,
   deleteWorkflowOp,
   deliverTaskOp,
@@ -15,6 +17,7 @@ import {
   openInitiativePhaseOp,
   ServerEventType,
   saveInitiativeDraftOp,
+  updateInitiativeTemplateOp,
   validateInitiativeDraft,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -59,6 +62,91 @@ describe('组合模板（34 §15）', () => {
     expect(
       body.items.map((tpl) => [tpl.key, validateInitiativeDraft(tpl, { workflowExists, template: true })]),
     ).toEqual(body.items.map((tpl) => [tpl.key, []]));
+  });
+
+  it('自定义模板（34 §15.6）：新建、修改、删除；缺 {{requirement}} 或重名不能保存，内置模板只读；需求计划保留快照', async () => {
+    const { project } = await addProject(t, { checkCommand: null });
+    const template = {
+      key: 'review_then_fix',
+      name: '审查后修复',
+      description: '先审查，再按审查意见修复',
+      phases: [
+        { title: '审查', goal: '列出问题', autoOpen: false },
+        { title: '修复', goal: '问题修掉', autoOpen: true },
+      ],
+      items: [
+        {
+          key: 'review',
+          title: '审查',
+          phase: 1,
+          workflow: 'code_review',
+          requirement: '审查：{{requirement}}',
+          dependsOn: [],
+        },
+        {
+          key: 'fix',
+          title: '修复',
+          phase: 2,
+          workflow: 'bugfix',
+          requirement: '按审查意见修复',
+          dependsOn: ['review'],
+        },
+      ],
+    };
+
+    const missing = { ...template, items: template.items.map((i) => ({ ...i, requirement: '审查' })) };
+    expect((await t.call(createInitiativeTemplateOp, missing)).body).toMatchObject({
+      error: {
+        code: ErrorCode.InitiativeBreakdownInvalid,
+        details: { problems: [{ code: 'TEMPLATE_REQUIREMENT_MISSING' }] },
+      },
+    });
+    const created = await t.call(createInitiativeTemplateOp, template);
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ key: 'review_then_fix', kind: 'custom', name: '审查后修复' });
+    expect((await t.call(createInitiativeTemplateOp, template)).body).toMatchObject({
+      error: { code: ErrorCode.InitiativeTemplateAlreadyExists },
+    });
+    expect((await t.call(createInitiativeTemplateOp, { ...template, key: 'design_then_build' })).body).toMatchObject({
+      error: { code: ErrorCode.InitiativeTemplateAlreadyExists },
+    });
+    const builtin = (await t.call(listInitiativeTemplatesOp, {})).body.items[0];
+    expect((await t.call(updateInitiativeTemplateOp, { ...template, key: builtin?.key ?? '' })).body).toMatchObject({
+      error: { code: ErrorCode.InitiativeTemplateReadonly },
+    });
+    expect((await t.call(deleteInitiativeTemplateOp, { key: builtin?.key ?? '' })).body).toMatchObject({
+      error: { code: ErrorCode.InitiativeTemplateReadonly },
+    });
+
+    const renamed = await t.call(updateInitiativeTemplateOp, { ...template, name: '先审查再修' });
+    expect(renamed.body).toMatchObject({ key: 'review_then_fix', name: '先审查再修' });
+    // Custom templates come after the built-in ones.
+    expect((await t.call(listInitiativeTemplatesOp, {})).body.items.map((tpl) => tpl.key).at(-1)).toBe(
+      'review_then_fix',
+    );
+
+    const initiative = await create({
+      projectId: project.id,
+      templateKey: 'review_then_fix',
+      requirement: '订单模块',
+      review: true,
+    });
+    expect(initiative).toMatchObject({
+      status: 'draft_ready',
+      template: { key: 'review_then_fix', name: '先审查再修' },
+      items: [{ key: 'review', requirement: '审查：订单模块' }, { key: 'fix' }],
+    });
+    expect((await t.call(deleteInitiativeTemplateOp, { key: 'review_then_fix' })).status).toBe(204);
+    expect((await t.call(listInitiativeTemplatesOp, {})).body.items.map((tpl) => tpl.key)).not.toContain(
+      'review_then_fix',
+    );
+    expect(await detail(initiative.id)).toMatchObject({
+      template: null,
+      items: [{ key: 'review', requirement: '审查：订单模块' }, { key: 'fix' }],
+    });
+    expect((await t.call(updateInitiativeTemplateOp, template)).body).toMatchObject({
+      error: { code: ErrorCode.InitiativeTemplateNotFound },
+    });
   });
 
   it('设计后开发：方案设计立即开始；点「完成」后第 2 阶段自动开启，开发任务带着方案报告开始', async () => {

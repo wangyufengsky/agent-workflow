@@ -166,7 +166,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `InitiativeStatus` | `breaking_down` · `breakdown_failed` · `draft_ready` · `in_progress` · `phase_done` · `done` | 需求计划的显示状态，由 `initiativeStatusOf` 推导，不存：最近一次拆解或细化的会话还在进行 / 第一次拆解结束了却没有工作包 / 草稿待确认（`confirmed_rev < breakdown_rev`）/ 已开启阶段还有未完成的工作包 / 已开启阶段全部完成、还有未开启的阶段 / 全部完成 |
 | `InitiativeItemStatus` | `dropped` · `satisfied` · `pr_open` · `in_task` · `phase_closed` · `waiting` · `ready` | 工作包的显示状态，由 `initiativeItemStatusOf` 推导：已放弃 / 已满足（本地合并进基础分支、报告完成、PR 经用户确认已合入，`isInitiativeItemDone`）/ 已开 PR 待确认合入 / 任务进行中（任务未到终态，含失败）/ 阶段未开启 / 依赖未完成 / 可以开始（没开始过，或任务已取消、合并到了别的分支）。`dropped` 与 `satisfied` 对下游视为完成 |
 | `InitiativeRunMode` | `breakdown` · `rebreakdown` · `refine` | 一次 AI 拆解做什么（`initiative_runs.mode`）：第一次拆解 / 带意见重新拆解草稿 / 按合入后的代码细化未开始的工作包（D136） |
-| `InitiativeTemplateKind` | `builtin` | 组合模板的来源；自定义模板随 N-11 加入 |
+| `InitiativeTemplateKind` | `builtin` · `custom`（专业模式的自定义模板，34 §15.6） | 组合模板的来源 |
 
 需求计划没有状态机：开启的阶段（`opened_phase`）与两个版本号只增不减，是事实。只有从没开始过、没有开始失败记录的 `ready` 工作包会被自动开始；取消或开始失败后由用户「开始」。
 
@@ -507,6 +507,8 @@ class AppError extends Error {
 | `INITIATIVE_PHASE_NOT_READY` | 409 | 不是下一个阶段，或之前阶段还有未完成的工作包；`details.openedPhase`、`details.items` |
 | `INITIATIVE_ITEM_NOT_READY` | 409 | 工作包当前的状态不允许这个操作（开始、标记已合入、放弃），或开始时被另一次开始抢先；`details.status` |
 | `INITIATIVE_TEMPLATE_NOT_FOUND` | 404 | 组合模板不存在 |
+| `INITIATIVE_TEMPLATE_ALREADY_EXISTS` | 409 | 已有同样 key 的组合模板（内置或自定义） |
+| `INITIATIVE_TEMPLATE_READONLY` | 409 | 内置组合模板不能修改或删除，只能复制（34 §15.6） |
 | `INITIATIVE_BUSY` | 409 | AI 正在拆解或细化这个需求计划：修改草稿、确认、开启阶段、再次拆解、删除都要等它结束 |
 | **定时任务（v1.2）** | | |
 | `SCHEDULE_NOT_FOUND` | 404 | 定时任务不存在（已删除，或所属项目已删除） |

@@ -1,4 +1,4 @@
-import { type InitiativeTemplateDTO, WorkflowKind, type WorkflowSummaryDTO } from '@aw/shared';
+import { type InitiativeTemplateDTO, InitiativeTemplateKind, WorkflowKind, type WorkflowSummaryDTO } from '@aw/shared';
 import { type CSSProperties, type RefObject, useEffect, useRef } from 'react';
 import { Icon } from '../../components/icon.tsx';
 import { HOME_COPY as C } from '../../copy/home.ts';
@@ -11,7 +11,7 @@ import { workflowIcon } from './workflow-icon.ts';
  * The workflows under「直接开始」(36 §5, D145): inside the box, above its foot, folded until asked for. Opening moves
  * focus to the picked workflow or the first one — the panel comes before the foot, so Tab would skip it — and Esc
  * folds it back, focus returning to the button that opened it (`opener`). Composition templates follow the built-in
- * workflows under「组合」(34 §15.4).
+ * workflows under「组合」(34 §15.4); custom ones join the custom workflows under「自定义」(pro mode, 34 §15.6).
  */
 export function WorkflowPicker({
   id,
@@ -63,6 +63,22 @@ export function WorkflowPicker({
       {w.name}
     </button>
   );
+  const builtinTemplates = templates.filter((t) => t.kind === InitiativeTemplateKind.Builtin);
+  const customTemplates = templates.filter((t) => t.kind !== InitiativeTemplateKind.Builtin);
+  const templateChip = (t: InitiativeTemplateDTO, i: number) => (
+    <button
+      key={t.key}
+      type="button"
+      className={styles.chip}
+      style={{ '--i': i } as CSSProperties}
+      aria-pressed={t.key === pickedTemplate}
+      title={`${templateChain(t, workflows)}\n${t.description}`}
+      onClick={() => onPickTemplate(t.key)}
+    >
+      <Icon name="split" size="sm" />
+      {t.name}
+    </button>
+  );
   return (
     <fieldset
       ref={panel}
@@ -90,24 +106,14 @@ export function WorkflowPicker({
         <Icon name="sparkle" size="sm" />
         {INITIATIVES_COPY.aiBreakdown}
       </button>
-      {templates.map((t, i) => (
-        <button
-          key={t.key}
-          type="button"
-          className={styles.chip}
-          style={{ '--i': builtin.length + 1 + i } as CSSProperties}
-          aria-pressed={t.key === pickedTemplate}
-          title={`${templateChain(t, workflows)}\n${t.description}`}
-          onClick={() => onPickTemplate(t.key)}
-        >
-          <Icon name="split" size="sm" />
-          {t.name}
-        </button>
-      ))}
-      {custom.length > 0 && (
+      {builtinTemplates.map((t, i) => templateChip(t, builtin.length + 1 + i))}
+      {custom.length + customTemplates.length > 0 && (
         <>
           <span className={styles.flowsCap}>{C.customWorkflows}</span>
-          {custom.map((w, i) => chip(w, builtin.length + 1 + templates.length + i))}
+          {custom.map((w, i) => chip(w, builtin.length + 1 + builtinTemplates.length + i))}
+          {customTemplates.map((t, i) =>
+            templateChip(t, builtin.length + 1 + builtinTemplates.length + custom.length + i),
+          )}
         </>
       )}
     </fieldset>

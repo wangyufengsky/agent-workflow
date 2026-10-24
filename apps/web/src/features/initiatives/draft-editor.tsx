@@ -6,7 +6,7 @@ import {
   WorkflowKind,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { type Dispatch, type ReactNode, type SetStateAction, useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { INITIATIVES_COPY as C } from '../../copy/initiatives.ts';
@@ -19,7 +19,7 @@ type DraftItem = InitiativeDraft['items'][number];
 /** A work package that started, finished or was dropped stays as it is (34 §5.2, ITEM_NOT_EDITABLE). */
 const isLocked = (item: InitiativeItemDTO) => item.task !== null || item.status === InitiativeItemStatus.Dropped;
 
-const toDraft = (initiative: InitiativeDetailDTO): InitiativeDraft => ({
+export const toDraft = (initiative: InitiativeDetailDTO): InitiativeDraft => ({
   phases: initiative.phases.map(({ title, goal, autoOpen }) => ({ title, goal, autoOpen })),
   items: initiative.items.map(({ key, title, phase, workflow, requirement, dependsOn, acceptance }) => ({
     key,
@@ -40,23 +40,31 @@ const nextKey = (items: readonly DraftItem[]) => {
 };
 
 /**
- * Editing the phases and the work packages that have not started (34 §5.2): titles, phases, workflows, dependencies
- * and requirements. The server checks the whole draft (`validateInitiativeDraft`) and says what is wrong.
+ * The phases and work packages of a draft (34 §5.2) or a template (34 §15.6): titles, phases, workflows, dependencies
+ * and requirements. `locked` work packages and the first `lockedPhases` phases stay as they are.
  */
-export function DraftEditor({ initiative, onDone }: { initiative: InitiativeDetailDTO; onDone: () => void }) {
-  const [draft, setDraft] = useState(() => toDraft(initiative));
-  const save = useSaveInitiativeDraft();
+export function DraftFields({
+  draft,
+  setDraft,
+  locked = new Set(),
+  lockedPhases = 0,
+  actions,
+}: {
+  draft: InitiativeDraft;
+  setDraft: Dispatch<SetStateAction<InitiativeDraft>>;
+  locked?: ReadonlySet<string>;
+  lockedPhases?: number;
+  /** After 添加工作包: the editor's own buttons. */
+  actions: ReactNode;
+}) {
   const workflows = (useQuery(workflowsQuery).data ?? []).filter((w) => w.kind !== WorkflowKind.System);
-  const locked = new Set(initiative.items.filter(isLocked).map((i) => i.key));
-  const lockedPhases = initiative.openedPhase;
   const setItem = (key: string, change: Partial<DraftItem>) =>
     setDraft((d) => ({ ...d, items: d.items.map((i) => (i.key === key ? { ...i, ...change } : i)) }));
   const setPhase = (index: number, change: Partial<InitiativeDraft['phases'][number]>) =>
     setDraft((d) => ({ ...d, phases: d.phases.map((p, i) => (i === index ? { ...p, ...change } : p)) }));
 
   return (
-    <section className="card pad col" data-testid="initiative-editor">
-      <h2 className="section-title">{C.edit}</h2>
+    <>
       {draft.phases.map((phase, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: phases are positional, their number is what items refer to
         <div key={index} className={styles.phaseHead}>
@@ -209,15 +217,40 @@ export function DraftEditor({ initiative, onDone }: { initiative: InitiativeDeta
           {C.addItem}
         </Button>
         <span className="grow" />
-        <Button onClick={onDone}>{C.cancel}</Button>
-        <Button
-          variant="primary"
-          pending={save.isPending}
-          onClick={() => save.mutate({ id: initiative.id, ...draft }, { onSuccess: onDone })}
-        >
-          {C.save}
-        </Button>
+        {actions}
       </div>
+    </>
+  );
+}
+
+/**
+ * Editing the phases and the work packages that have not started (34 §5.2). The server checks the whole draft
+ * (`validateInitiativeDraft`) and says what is wrong.
+ */
+export function DraftEditor({ initiative, onDone }: { initiative: InitiativeDetailDTO; onDone: () => void }) {
+  const [draft, setDraft] = useState(() => toDraft(initiative));
+  const save = useSaveInitiativeDraft();
+  return (
+    <section className="card pad col" data-testid="initiative-editor">
+      <h2 className="section-title">{C.edit}</h2>
+      <DraftFields
+        draft={draft}
+        setDraft={setDraft}
+        locked={new Set(initiative.items.filter(isLocked).map((i) => i.key))}
+        lockedPhases={initiative.openedPhase}
+        actions={
+          <>
+            <Button onClick={onDone}>{C.cancel}</Button>
+            <Button
+              variant="primary"
+              pending={save.isPending}
+              onClick={() => save.mutate({ id: initiative.id, ...draft }, { onSuccess: onDone })}
+            >
+              {C.save}
+            </Button>
+          </>
+        }
+      />
       {save.isError && <ErrorState error={save.error} />}
     </section>
   );

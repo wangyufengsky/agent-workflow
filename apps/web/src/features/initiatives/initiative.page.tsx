@@ -8,6 +8,7 @@ import {
   isBatchDeliverable,
   STATUS_TONE,
   StatusTone,
+  UiMode,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
@@ -20,8 +21,13 @@ import { StatusBadge } from '../../components/status-badge.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
-import { INITIATIVES_COPY as C, INITIATIVE_ITEM_STATUS_LABEL } from '../../copy/initiatives.ts';
+import {
+  INITIATIVES_COPY as C,
+  INITIATIVE_ITEM_STATUS_LABEL,
+  INITIATIVE_TEMPLATES_COPY,
+} from '../../copy/initiatives.ts';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
+import { useSettings } from '../settings/settings.queries.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import { BreakdownStatus, hasOpenItems, RebreakdownButton, RefineButton, Understanding } from './breakdown-panel.tsx';
 import { DraftEditor } from './draft-editor.tsx';
@@ -284,6 +290,7 @@ export function InitiativePage() {
   const confirm = useConfirmInitiative();
   const remove = useDeleteInitiative();
   const navigate = useNavigate();
+  const pro = useSettings()['ui.mode'] === UiMode.Pro;
   if (initiative.isPending) return <p className="page hint">{COMMON_COPY.loading}</p>;
   if (initiative.isError) {
     return (
@@ -318,6 +325,12 @@ export function InitiativePage() {
         </div>
         {!editing && canRefine && <RefineButton initiative={i} />}
         {!editing && editable && <Button onClick={() => setEditing(true)}>{C.edit}</Button>}
+        {/* 存为模板 (34 §15.6): custom templates are a pro-mode page. */}
+        {pro && !busy && (
+          <Link to={ROUTES.initiativeTemplateNew} search={{ initiative: i.id }} className="btn ghost">
+            {INITIATIVE_TEMPLATES_COPY.saveAs}
+          </Link>
+        )}
         <Confirmed
           label={C.delete}
           title={C.deleteTitle}

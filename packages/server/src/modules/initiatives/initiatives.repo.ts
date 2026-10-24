@@ -4,7 +4,7 @@ import {
   type InitiativeCoverage,
   type InitiativeItemSpec,
   type InitiativePhase,
-  type InitiativeTemplateKind,
+  InitiativeTemplateKind,
   type InitiativeUnderstanding,
   initiativeCoverageSchema,
   initiativeItemSpecSchema,
@@ -288,16 +288,24 @@ export function createInitiativesRepo(db: DbExecutor) {
     },
 
     templates(): InitiativeTemplate[] {
-      return db
-        .select()
-        .from(tpl)
-        .orderBy(asc(tpl.position), asc(tpl.key))
-        .all()
-        .map(({ position: _position, createdAt: _c, updatedAt: _u, ...row }) => ({
-          ...row,
-          phases: json(phasesSchema, row.phases),
-          items: json(z.array(initiativeItemSpecSchema), row.items),
-        }));
+      return (
+        db
+          .select()
+          .from(tpl)
+          // Built-in ones in their order, then custom ones as they were made.
+          .orderBy(
+            sql`${tpl.kind} = ${InitiativeTemplateKind.Custom}`,
+            asc(tpl.position),
+            asc(tpl.createdAt),
+            asc(tpl.key),
+          )
+          .all()
+          .map(({ position: _position, createdAt: _c, updatedAt: _u, ...row }) => ({
+            ...row,
+            phases: json(phasesSchema, row.phases),
+            items: json(z.array(initiativeItemSpecSchema), row.items),
+          }))
+      );
     },
     upsertTemplate(template: InitiativeTemplate, position: number, now: number): void {
       const values = {

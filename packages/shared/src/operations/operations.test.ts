@@ -32,6 +32,7 @@ describe('操作清单的标注（M5-10）', () => {
         'git.merge',
         'git.push',
         'inbox.resolve',
+        'initiativeTemplates.delete',
         'initiatives.delete',
         'initiatives.deliverPhase',
         'knowledge.delete',

@@ -1348,6 +1348,18 @@ const SHOTS: Shot[] = [
     ready: heading('我的新功能开发'),
   },
   {
+    name: 'pro-initiative-templates',
+    mode: UiMode.Pro,
+    url: () => '/initiative-templates',
+    ready: (page) => page.getByRole('article').first(),
+  },
+  {
+    name: 'pro-initiative-template-new',
+    mode: UiMode.Pro,
+    url: () => '/initiative-templates/new?copy=design_then_build',
+    ready: testId('template-editor'),
+  },
+  {
     name: 'pro-insights',
     mode: UiMode.Pro,
     url: () => '/insights?period=last_30_days',

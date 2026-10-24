@@ -1,4 +1,10 @@
-import { type AssistantConversationDTO, type ProjectDTO, WorkflowKind, WorkflowPlanning } from '@aw/shared';
+import {
+  type AssistantConversationDTO,
+  InitiativeTemplateKind,
+  type ProjectDTO,
+  WorkflowKind,
+  WorkflowPlanning,
+} from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
@@ -260,7 +266,7 @@ export function HomeComposer({
             id={flowsId}
             open={flowsOpen}
             workflows={shown}
-            templates={templates.data ?? []}
+            templates={templates.data?.filter((t) => task.pro || t.kind === InitiativeTemplateKind.Builtin) ?? []}
             picked={workflowKey}
             pickedTemplate={templateKey}
             pickedBreakdown={breakdown}

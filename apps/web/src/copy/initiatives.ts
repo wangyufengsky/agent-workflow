@@ -1,4 +1,4 @@
-import { InitiativeItemStatus, InitiativeStatus } from '@aw/shared';
+import { InitiativeItemStatus, InitiativeProblemCode, InitiativeStatus, InitiativeTemplateKind } from '@aw/shared';
 
 export const INITIATIVE_STATUS_LABEL: Record<InitiativeStatus, string> = {
   [InitiativeStatus.BreakingDown]: 'AI 拆解中',
@@ -117,4 +117,56 @@ export const INITIATIVES_COPY = {
   delete: '删除需求计划',
   deleteTitle: '删除这个需求计划？',
   deleteBody: '工作包已经开出的任务会保留为普通任务。',
+} as const;
+
+/** What is wrong with phases and work packages (34 §8.3), for the template editor's list of problems. */
+export const INITIATIVE_PROBLEM_LABEL: Record<InitiativeProblemCode, string> = {
+  [InitiativeProblemCode.DuplicateKey]: '有两个工作包用了同一个标识',
+  [InitiativeProblemCode.UnknownDependency]: '依赖了不存在的工作包',
+  [InitiativeProblemCode.Cycle]: '依赖绕成了圈',
+  [InitiativeProblemCode.DependencyPhase]: '依赖了更晚阶段的工作包',
+  [InitiativeProblemCode.EmptyPhase]: '有阶段没有工作包',
+  [InitiativeProblemCode.PhaseOutOfRange]: '工作包放在了不存在的阶段',
+  [InitiativeProblemCode.UnknownWorkflow]: '流程不存在',
+  [InitiativeProblemCode.WorkflowNotAllowed]: '流程不在可选范围内',
+  [InitiativeProblemCode.UnknownCoverageItem]: '需求覆盖表引用了不存在的工作包',
+  [InitiativeProblemCode.TemplateRequirementMissing]:
+    '没有一个工作包的需求含 {{requirement}}（开始时换成用户写的需求）',
+  [InitiativeProblemCode.ItemNotEditable]: '改动了已开始的工作包',
+};
+
+export const INITIATIVE_TEMPLATE_KIND_LABEL: Record<InitiativeTemplateKind, string> = {
+  [InitiativeTemplateKind.Builtin]: '内置',
+  [InitiativeTemplateKind.Custom]: '自定义',
+};
+
+/** Custom composition templates (34 §15.6, pro mode). */
+export const INITIATIVE_TEMPLATES_COPY = {
+  title: '组合模板',
+  lede: '把几个流程按阶段排好，写一句需求就能开始。内置模板只读，复制后可以修改；改模板不影响已经开始的需求计划。',
+  entry: '组合模板',
+  back: '← 组合模板',
+  backToWorkflows: '← 流程',
+  create: '新建组合模板',
+  copy: '复制',
+  edit: '编辑',
+  delete: '删除',
+  deleteTitle: (name: string) => `删除组合模板「${name}」？`,
+  deleteBody: '用它开始的需求计划不受影响。',
+  deleted: '组合模板已删除',
+  saved: '组合模板已保存',
+  newTitle: '新建组合模板',
+  editTitle: (name: string) => `编辑「${name}」`,
+  key: '标识',
+  keyProblem: '标识要以小写字母开头，只用小写字母、数字与下划线（保存后不能改）',
+  name: '名称',
+  description: '说明',
+  placeholderHint: '工作包的需求里写 {{requirement}}，开始时换成用户写的需求；至少一个工作包要有它。',
+  fromInitiative: (key: string) => `来自需求计划 ${key}：把需求里的具体内容改写成 {{requirement}} 后再保存。`,
+  noProblems: '可以保存。',
+  nameRequired: '名称与说明不能为空',
+  notFound: '没有这个自定义组合模板',
+  copyName: (name: string) => `${name}（副本）`.slice(0, 40),
+  saveAs: '存为模板',
+  chain: (titles: readonly string[]) => titles.join(' → '),
 } as const;

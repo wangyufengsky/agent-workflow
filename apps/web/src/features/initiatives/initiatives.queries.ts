@@ -3,7 +3,9 @@ import {
   confirmInitiativeItemMergedOp,
   confirmInitiativeOp,
   createInitiativeOp,
+  createInitiativeTemplateOp,
   deleteInitiativeOp,
+  deleteInitiativeTemplateOp,
   deliverInitiativePhaseOp,
   dropInitiativeItemOp,
   getInitiativeOp,
@@ -15,8 +17,10 @@ import {
   openInitiativePhaseOp,
   rebreakdownInitiativeOp,
   refineInitiativeOp,
+  type SaveInitiativeTemplateRequest,
   saveInitiativeDraftOp,
   startInitiativeItemOp,
+  updateInitiativeTemplateOp,
 } from '@aw/shared';
 import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import { allPages } from '../../api/all-pages.ts';
@@ -27,6 +31,21 @@ export const initiativeTemplatesQuery = queryOptions({
   queryKey: queryKeys.initiativeTemplates,
   queryFn: async () => (await callOperation(listInitiativeTemplatesOp, {})).items,
 });
+
+/** Custom templates are written in place (34 §15.6): the list is read again after each change. */
+function useTemplateChange<I, O>(run: (input: I) => Promise<O>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.initiativeTemplates }),
+  });
+}
+export const useCreateInitiativeTemplate = () =>
+  useTemplateChange((input: SaveInitiativeTemplateRequest) => callOperation(createInitiativeTemplateOp, input));
+export const useUpdateInitiativeTemplate = () =>
+  useTemplateChange((input: SaveInitiativeTemplateRequest) => callOperation(updateInitiativeTemplateOp, input));
+export const useDeleteInitiativeTemplate = () =>
+  useTemplateChange((key: string) => callOperation(deleteInitiativeTemplateOp, { key }));
 
 /** Every initiative, not only the first page: the list page and the home overview show and filter them whole. */
 export const initiativesQuery = (filter: { projectId?: string } = {}) =>

@@ -2,7 +2,9 @@ import {
   confirmInitiativeItemMergedOp,
   confirmInitiativeOp,
   createInitiativeOp,
+  createInitiativeTemplateOp,
   deleteInitiativeOp,
+  deleteInitiativeTemplateOp,
   deliverInitiativePhaseOp,
   dropInitiativeItemOp,
   getInitiativeOp,
@@ -13,6 +15,7 @@ import {
   refineInitiativeOp,
   saveInitiativeDraftOp,
   startInitiativeItemOp,
+  updateInitiativeTemplateOp,
 } from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
 import type { InitiativesService } from './initiatives.service.ts';
@@ -20,6 +23,9 @@ import type { InitiativesService } from './initiatives.service.ts';
 export function initiativesOperations(initiatives: InitiativesService) {
   return [
     implement(listInitiativeTemplatesOp, () => ({ items: initiatives.templates.list() })),
+    implement(createInitiativeTemplateOp, (input) => initiatives.templates.create(input)),
+    implement(updateInitiativeTemplateOp, (input) => initiatives.templates.update(input)),
+    implement(deleteInitiativeTemplateOp, ({ key }) => initiatives.templates.delete(key)),
     implement(listInitiativesOp, (query) => initiatives.list(query)),
     implement(createInitiativeOp, (input) => initiatives.create(input)),
     implement(getInitiativeOp, ({ id }) => initiatives.detail(id)),
