@@ -127,9 +127,14 @@ export function createContextRenderer(deps: ContextDeps) {
         // What the user looks at there is the page `browser_read` reads (29 §9).
         return describeTask(tasks.detail(param(ref, 'taskId')), undefined, 'the preview tab');
       case AssistantPage.Project:
-      case AssistantPage.GitProject: {
+      case AssistantPage.GitProject:
+      case AssistantPage.Team: {
         const project = projects.getRecord(param(ref, 'projectId'));
-        const where = page === AssistantPage.Project ? 'the page' : 'the Git console';
+        const where = {
+          [AssistantPage.Project]: 'the page',
+          [AssistantPage.GitProject]: 'the Git console',
+          [AssistantPage.Team]: "the team page (each member's commits, no scores)",
+        }[page];
         return `${where} of project "${project.name}" (project id ${project.id}, repository ${project.repoPath})`;
       }
       case AssistantPage.Workflow: {

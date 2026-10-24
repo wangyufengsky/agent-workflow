@@ -28,6 +28,7 @@ const PAGE_ROUTE = {
   [AssistantPage.KnowledgeConversation]: ROUTES.knowledgeConversation,
   [AssistantPage.KnowledgeHistory]: ROUTES.knowledgeHistory,
   [AssistantPage.Insights]: ROUTES.insights,
+  [AssistantPage.Team]: ROUTES.team,
   [AssistantPage.Ppt]: ROUTES.ppt,
   [AssistantPage.PptDeck]: ROUTES.pptDeck,
   [AssistantPage.Batches]: ROUTES.batches,
@@ -108,6 +109,8 @@ export function useOpenAssistantPage() {
           return navigate({ to: ROUTES.project, params: { projectId: param(ref, 'projectId') } });
         case AssistantPage.GitProject:
           return navigate({ to: ROUTES.gitProject, params: { projectId: param(ref, 'projectId') } });
+        case AssistantPage.Team:
+          return navigate({ to: ROUTES.team, params: { projectId: param(ref, 'projectId') } });
         case AssistantPage.Workflow:
           return navigate({ to: ROUTES.workflow, params: { key: param(ref, 'workflowKey') } });
         case AssistantPage.KnowledgeConversation:

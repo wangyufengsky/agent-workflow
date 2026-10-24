@@ -72,6 +72,8 @@ export const AssistantPage = {
   KnowledgeConversation: 'knowledge_conversation',
   KnowledgeHistory: 'knowledge_history',
   Insights: 'insights',
+  /** The team page of a project (33 §5). */
+  Team: 'team',
   /** PPT (23 §2): the list and one PPT's workspace. */
   Ppt: 'ppt',
   PptDeck: 'ppt_deck',
@@ -121,6 +123,7 @@ export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.KnowledgeConversation]: ['knowledgeConversationId'],
   [AssistantPage.KnowledgeHistory]: [],
   [AssistantPage.Insights]: [],
+  [AssistantPage.Team]: ['projectId'],
   [AssistantPage.Ppt]: [],
   [AssistantPage.PptDeck]: ['deckId'],
   [AssistantPage.Batches]: [],

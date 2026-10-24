@@ -24,6 +24,10 @@ export const ROUTES = {
   knowledgeConversation: '/knowledge/$conversationId',
   knowledgeHistory: '/knowledge/history',
   insights: '/insights',
+  /** The team page (33 §5.1): the project's members, one member. */
+  teamIndex: '/team',
+  team: '/team/$projectId',
+  teamMember: '/team/$projectId/members/$member',
   /** PPT (23 §2.1): the list, a new PPT, one PPT's workspace, its full-screen show and its print view. */
   ppt: '/ppt',
   pptNew: '/ppt/new',
@@ -66,6 +70,8 @@ export const ROUTE_IDS = {
   knowledgeConversation: '/_shell/knowledge/$conversationId',
   knowledgeHistory: '/_shell/knowledge/history',
   insights: '/_shell/insights',
+  team: '/_shell/team/$projectId',
+  teamMember: '/_shell/team/$projectId/members/$member',
   ppt: '/_shell/ppt',
   pptNew: '/_shell/ppt/new',
   pptDeck: '/_shell/ppt/$deckId',

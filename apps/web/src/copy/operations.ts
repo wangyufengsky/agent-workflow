@@ -167,6 +167,12 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.knowledge.citation': '查看引用原文',
   'op.insights.summary': '质量与用量',
   'op.insights.tasks': '质量与用量的任务明细',
+  'op.team.summary': '团队概览',
+  'op.team.member': '成员详情',
+  'op.team.commits': '成员的提交',
+  'op.team.identities.update': '修改成员身份',
+  'op.team.settings.get': '团队的统计口径',
+  'op.team.settings.update': '修改团队的统计口径',
   'op.decks.list': 'PPT 列表',
   'op.decks.get': '查看 PPT',
   'op.decks.create': '新建 PPT',
@@ -280,6 +286,14 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   base: '合并到',
   body: '说明',
   focus: '关注点',
+  // The team page (33 §8.1).
+  email: '邮箱',
+  memberEmail: '合并到的成员',
+  displayName: '显示名',
+  hidden: '设为非成员',
+  excludeGlobs: '不计行数的文件',
+  testGlobs: '测试文件',
+  hugeCommitLines: '超大提交的行数',
 };
 
 /** Values of enum fields in words, by field name; other values show as given. */
