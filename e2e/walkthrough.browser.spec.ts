@@ -15,6 +15,7 @@ import {
   patchSettings,
   pickWorkflow,
   queueAssistantTurn,
+  queueBreakdownTurn,
   queueCodeReviewerTurn,
   queueResearchTurn,
   queueTurn,
@@ -53,6 +54,8 @@ type Seed = {
   schedule: string;
   /** An initiative from「设计后开发」left as a draft for review (34 §15.4). */
   initiative: string;
+  /** An initiative the AI broke down, waiting for confirmation with its understanding and coverage (34 §5.2). */
+  initiativeBreakdown: string;
   /** An assistant conversation that keeps working until the walkthrough ends. */
   assistantBusy: string;
   /** The Git workbench (27): the review project's main commit, reviewed by the AI with one finding. */
@@ -548,6 +551,53 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     requirement: '订单支持按类别统计库存',
     review: true,
   });
+  const breakdownProject = await createProject(request, null);
+  const pkg = (key: string, title: string, phase: number, depends_on: string[] = []) => ({
+    key,
+    title,
+    phase,
+    workflow: 'feature',
+    requirement: `实现${title}，并补测试`,
+    depends_on,
+  });
+  await queueBreakdownTurn(request, breakdownProject, [
+    {
+      type: 'callTool',
+      name: 'submit_breakdown',
+      args: {
+        title: '会员体系二期',
+        summary: '先建会员等级的数据与计算，再做会员中心页面；页面与积分可以并行。',
+        understanding: {
+          scope: '会员等级、积分与会员中心页面',
+          out_of_scope: ['不做付费会员'],
+          assumptions: ['等级按近一年消费计算'],
+          risks: ['历史订单数据量大，首次计算较慢'],
+        },
+        phases: [
+          { title: '数据与计算', goal: '等级与积分可以算出并查询' },
+          { title: '页面', goal: '会员中心可用' },
+        ],
+        items: [
+          pkg('levels', '会员等级表与计算', 1),
+          pkg('points', '积分累计与查询接口', 1),
+          pkg('center', '会员中心页面', 2, ['levels', 'points']),
+        ],
+        coverage: [
+          { point: '会员等级', items: ['levels'] },
+          { point: '积分', items: ['points'] },
+          { point: '会员中心页面', items: ['center'] },
+          { point: '付费会员', items: [] },
+        ],
+      },
+    },
+  ]);
+  const initiativeBreakdown = await api<{ id: string }>(request, 'POST', '/initiatives', {
+    projectId: breakdownProject.id,
+    requirement: '会员体系二期：等级、积分与会员中心',
+  });
+  await expect
+    .poll(async () => (await api<{ status: string }>(request, 'GET', `/initiatives/${initiativeBreakdown.id}`)).status)
+    .toBe('draft_ready');
   const assistant = await seedAssistant(request, reviewProject, { id: knowledge.id, turnId: knowledgeTurn.id });
   const assistantCharts = await seedCharts(request);
 
@@ -666,6 +716,7 @@ createServer((req, res) => {
     batch: batch.id,
     schedule: schedule.id,
     initiative: initiative.id,
+    initiativeBreakdown: initiativeBreakdown.id,
     assistantBusy: assistant.busy,
     assistantConversation: assistant.conversation,
     assistantCharts,
@@ -1089,6 +1140,12 @@ const SHOTS: Shot[] = [
       await page.getByRole('button', { name: '修改阶段与工作包' }).click();
       return page.getByTestId('initiative-editor');
     },
+  },
+  {
+    name: 'initiative-breakdown',
+    mode: UiMode.Simple,
+    url: (s) => `/initiatives/${s.initiativeBreakdown}`,
+    ready: testId('initiative-understanding'),
   },
   { name: 'initiatives', mode: UiMode.Simple, url: () => '/initiatives', ready: testId('initiative-card') },
   {

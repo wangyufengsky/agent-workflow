@@ -20,10 +20,14 @@ export function templateChain(template: InitiativeTemplateDTO, workflows: readon
   );
 }
 
-/** 「开始 · 组合模板」from the home input (34 §15.4): one call creates the initiative and starts its first phase. */
+/**
+ * 「开始 · 组合模板」from the home input (34 §15.4): one call creates the initiative and starts its first phase. With
+ * `breakdown` instead of a template, the AI breaks the requirement down into a draft first (34 §5.1).
+ */
 export function useStartInitiative({
   projectId,
   templateKey,
+  breakdown,
   requirement,
   attachmentIds,
   attachmentsBlocked,
@@ -31,6 +35,7 @@ export function useStartInitiative({
 }: {
   projectId: string;
   templateKey: string | undefined;
+  breakdown: boolean;
   requirement: string;
   attachmentIds: readonly string[];
   attachmentsBlocked: boolean;
@@ -40,7 +45,8 @@ export function useStartInitiative({
   const [review, setReview] = useState(false);
   const create = useCreateInitiative();
   const navigate = useNavigate();
-  const canStart = templateKey !== undefined && projectId !== '' && requirement.trim() !== '' && !attachmentsBlocked;
+  const canStart =
+    (templateKey !== undefined || breakdown) && projectId !== '' && requirement.trim() !== '' && !attachmentsBlocked;
   const blocked = canStart
     ? undefined
     : requirement.trim() === ''
@@ -53,7 +59,7 @@ export function useStartInitiative({
     create.mutate(
       {
         projectId,
-        templateKey,
+        ...(templateKey === undefined ? {} : { templateKey }),
         requirement: requirement.trim(),
         review,
         confirmItemPlans,

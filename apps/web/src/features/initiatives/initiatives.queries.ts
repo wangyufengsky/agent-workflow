@@ -13,6 +13,8 @@ import {
   listInitiativesOp,
   listInitiativeTemplatesOp,
   openInitiativePhaseOp,
+  rebreakdownInitiativeOp,
+  refineInitiativeOp,
   saveInitiativeDraftOp,
   startInitiativeItemOp,
 } from '@aw/shared';
@@ -69,7 +71,13 @@ export const useSaveInitiativeDraft = () =>
 export const useConfirmInitiative = () =>
   useInitiativeChange((id: string) => callOperation(confirmInitiativeOp, { id }));
 export const useOpenInitiativePhase = () =>
-  useInitiativeChange((input: { id: string; phase: number }) => callOperation(openInitiativePhaseOp, input));
+  useInitiativeChange((input: { id: string; phase: number; refine: boolean }) =>
+    callOperation(openInitiativePhaseOp, input),
+  );
+export const useRebreakdownInitiative = () =>
+  useInitiativeChange((input: { id: string; instruction?: string }) => callOperation(rebreakdownInitiativeOp, input));
+export const useRefineInitiative = () =>
+  useInitiativeChange((input: { id: string; instruction?: string }) => callOperation(refineInitiativeOp, input));
 export const useStartInitiativeItem = () =>
   useInitiativeChange((input: { id: string; key: string }) => callOperation(startInitiativeItemOp, input));
 export const useConfirmInitiativeItemMerged = () =>

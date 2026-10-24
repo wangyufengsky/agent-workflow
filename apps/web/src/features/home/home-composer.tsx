@@ -63,6 +63,8 @@ export function HomeComposer({
   const [text, setText] = useState(initialRequirement ?? '');
   const [workflowKey, setWorkflowKey] = useState(initialWorkflowKey);
   const [templateKey, setTemplateKey] = useState<string>();
+  // 「让 AI 拆解」: an initiative the AI breaks down, instead of one made from a template (34 §5.1).
+  const [breakdown, setBreakdown] = useState(false);
   const ask = useAsk();
   const abort = useAbortAssistant();
   const input = useRef<HTMLTextAreaElement>(null);
@@ -88,6 +90,7 @@ export function HomeComposer({
   const initiative = useStartInitiative({
     projectId,
     templateKey,
+    breakdown,
     requirement: text,
     attachmentIds: files.ids,
     attachmentsBlocked: files.blocked,
@@ -106,17 +109,25 @@ export function HomeComposer({
   const shown = workflows.data?.filter((w) => task.pro || w.kind === WorkflowKind.Builtin);
   const workflow = shown?.find((w) => w.key === workflowKey);
   const template = templates.data?.find((t) => t.key === templateKey);
-  // What the box starts besides asking: a task with a workflow, or an initiative with a template.
+  // An initiative is started from a template or by the AI's breakdown.
+  const initiativeMode = template !== undefined || breakdown;
+  // What the box starts besides asking: a task with a workflow, or an initiative.
   const mode =
     workflow !== undefined
       ? { start: C.startTask(workflow.name), icon: workflowIcon(workflow.key), description: workflow.description }
-      : template !== undefined
+      : breakdown
         ? {
-            start: INITIATIVES_COPY.startTemplate(template.name),
-            icon: 'split' as const,
-            description: `${templateChain(template, workflows.data ?? [])} · ${template.description}`,
+            start: INITIATIVES_COPY.startBreakdown,
+            icon: 'sparkle' as const,
+            description: INITIATIVES_COPY.aiBreakdownDescription,
           }
-        : undefined;
+        : template !== undefined
+          ? {
+              start: INITIATIVES_COPY.startTemplate(template.name),
+              icon: 'split' as const,
+              description: `${templateChain(template, workflows.data ?? [])} · ${template.description}`,
+            }
+          : undefined;
   const busy = conversation?.busy === true;
   const empty = text.trim() === '';
   const addItems: AddMenuItem[] = [
@@ -139,7 +150,7 @@ export function HomeComposer({
 
   const send = () => {
     if (workflow !== undefined) task.start();
-    else if (template !== undefined) initiative.start();
+    else if (initiativeMode) initiative.start();
     else if (!empty && !busy && !files.blocked) {
       ask.ask(
         text.trim(),
@@ -196,6 +207,7 @@ export function HomeComposer({
                   onClick={() => {
                     setWorkflowKey(undefined);
                     setTemplateKey(undefined);
+                    setBreakdown(false);
                   }}
                 >
                   <Icon name="x" size="sm" />
@@ -251,15 +263,25 @@ export function HomeComposer({
             templates={templates.data ?? []}
             picked={workflowKey}
             pickedTemplate={templateKey}
+            pickedBreakdown={breakdown}
             opener={flowsOpener}
             onPick={(key) => {
               setWorkflowKey(key);
               setTemplateKey(undefined);
+              setBreakdown(false);
               setFlowsOpen(false);
               input.current?.focus();
             }}
             onPickTemplate={(key) => {
               setTemplateKey(key);
+              setWorkflowKey(undefined);
+              setBreakdown(false);
+              setFlowsOpen(false);
+              input.current?.focus();
+            }}
+            onPickBreakdown={() => {
+              setBreakdown(true);
+              setTemplateKey(undefined);
               setWorkflowKey(undefined);
               setFlowsOpen(false);
               input.current?.focus();
@@ -269,7 +291,7 @@ export function HomeComposer({
         )}
         <div className={styles.boxFoot}>
           <AddMenu items={addItems} onOpen={context.capture} />
-          {template !== undefined ? (
+          {initiativeMode ? (
             <>
               <label className="check">
                 <input
@@ -279,7 +301,7 @@ export function HomeComposer({
                 />
                 <span>{INITIATIVES_COPY.confirmItemPlans}</span>
               </label>
-              {task.pro && (
+              {task.pro && template !== undefined && (
                 <label className="check">
                   <input
                     type="checkbox"
@@ -363,7 +385,7 @@ export function HomeComposer({
               )}
             </>
           )}
-          {template !== undefined ? (
+          {initiativeMode ? (
             <Button
               type="submit"
               size="sm"

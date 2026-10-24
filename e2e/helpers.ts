@@ -109,6 +109,19 @@ export async function queueTurn(
   if (!res.ok()) throw new Error(`queueing a fake turn failed: ${res.status()} ${await res.text()}`);
 }
 
+/** Queues a turn for the AI breakdown of an initiative of this project (its session runs in the project repository, 34 §8). */
+export async function queueBreakdownTurn(
+  request: APIRequestContext,
+  project: E2EProject,
+  steps: FakeStep[],
+): Promise<void> {
+  const res = await request.post(`${API_BASE}/dev/fake-opencode/scripts`, {
+    headers: AUTH,
+    data: { match: { agent: 'aw-code-reviewer', directory: project.repoPath }, steps },
+  });
+  if (!res.ok()) throw new Error(`queueing a fake turn failed: ${res.status()} ${await res.text()}`);
+}
+
 /** Queues a turn for the knowledge researcher of this project (its sessions run in the project repository, 18 §5). */
 export async function queueResearchTurn(
   request: APIRequestContext,

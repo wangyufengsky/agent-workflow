@@ -20,9 +20,11 @@ export function WorkflowPicker({
   templates,
   picked,
   pickedTemplate,
+  pickedBreakdown,
   opener,
   onPick,
   onPickTemplate,
+  onPickBreakdown,
   onClose,
 }: {
   id: string;
@@ -31,9 +33,11 @@ export function WorkflowPicker({
   templates: readonly InitiativeTemplateDTO[];
   picked: string | undefined;
   pickedTemplate: string | undefined;
+  pickedBreakdown: boolean;
   opener: RefObject<HTMLButtonElement | null>;
   onPick: (key: string) => void;
   onPickTemplate: (key: string) => void;
+  onPickBreakdown: () => void;
   onClose: () => void;
 }) {
   const panel = useRef<HTMLFieldSetElement>(null);
@@ -74,29 +78,36 @@ export function WorkflowPicker({
       }}
     >
       {builtin.map(chip)}
-      {templates.length > 0 && (
-        <>
-          <span className={styles.flowsCap}>{INITIATIVES_COPY.templates}</span>
-          {templates.map((t, i) => (
-            <button
-              key={t.key}
-              type="button"
-              className={styles.chip}
-              style={{ '--i': builtin.length + i } as CSSProperties}
-              aria-pressed={t.key === pickedTemplate}
-              title={`${templateChain(t, workflows)}\n${t.description}`}
-              onClick={() => onPickTemplate(t.key)}
-            >
-              <Icon name="split" size="sm" />
-              {t.name}
-            </button>
-          ))}
-        </>
-      )}
+      <span className={styles.flowsCap}>{INITIATIVES_COPY.templates}</span>
+      <button
+        type="button"
+        className={styles.chip}
+        style={{ '--i': builtin.length } as CSSProperties}
+        aria-pressed={pickedBreakdown}
+        title={INITIATIVES_COPY.aiBreakdownDescription}
+        onClick={onPickBreakdown}
+      >
+        <Icon name="sparkle" size="sm" />
+        {INITIATIVES_COPY.aiBreakdown}
+      </button>
+      {templates.map((t, i) => (
+        <button
+          key={t.key}
+          type="button"
+          className={styles.chip}
+          style={{ '--i': builtin.length + 1 + i } as CSSProperties}
+          aria-pressed={t.key === pickedTemplate}
+          title={`${templateChain(t, workflows)}\n${t.description}`}
+          onClick={() => onPickTemplate(t.key)}
+        >
+          <Icon name="split" size="sm" />
+          {t.name}
+        </button>
+      ))}
       {custom.length > 0 && (
         <>
           <span className={styles.flowsCap}>{C.customWorkflows}</span>
-          {custom.map((w, i) => chip(w, builtin.length + templates.length + i))}
+          {custom.map((w, i) => chip(w, builtin.length + 1 + templates.length + i))}
         </>
       )}
     </fieldset>

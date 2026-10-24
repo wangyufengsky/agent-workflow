@@ -3,6 +3,7 @@ import {
   type InitiativeDetailDTO,
   type InitiativeItemDTO,
   InitiativeItemStatus,
+  InitiativeRunMode,
   InitiativeStatus,
   isBatchDeliverable,
   STATUS_TONE,
@@ -22,6 +23,7 @@ import { ERROR_COPY } from '../../copy/errors.ts';
 import { INITIATIVES_COPY as C, INITIATIVE_ITEM_STATUS_LABEL } from '../../copy/initiatives.ts';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { TaskBadge } from '../tasks/task-badge.tsx';
+import { BreakdownStatus, hasOpenItems, RebreakdownButton, RefineButton, Understanding } from './breakdown-panel.tsx';
 import { DraftEditor } from './draft-editor.tsx';
 import { InitiativeProgress } from './initiative-card.tsx';
 import styles from './initiatives.module.css';
@@ -100,7 +102,10 @@ function Confirmed({
   );
 }
 
-/** What can be done with one work package from here; its task's own actions are on the task page. */
+/**
+ * What can be done with one work package from here; its task's own actions are on the task page. A draft waiting for
+ * confirmation may have rewritten the package, so it starts only after the draft is confirmed (11).
+ */
 function ItemActions({ initiative, item }: { initiative: InitiativeDetailDTO; item: InitiativeItemDTO }) {
   const start = useStartInitiativeItem();
   const merged = useConfirmInitiativeItemMerged();
@@ -109,7 +114,7 @@ function ItemActions({ initiative, item }: { initiative: InitiativeDetailDTO; it
   const ref = { id: initiative.id, key: item.key };
   return (
     <div className={styles.actions}>
-      {item.status === InitiativeItemStatus.Ready && (
+      {item.status === InitiativeItemStatus.Ready && initiative.status !== InitiativeStatus.DraftReady && (
         <Button size="sm" variant="primary" pending={start.isPending} onClick={() => start.mutate(ref)}>
           {C.start}
         </Button>
@@ -192,6 +197,9 @@ function Phase({ initiative, index }: { initiative: InitiativeDetailDTO; index: 
   const phase = initiative.phases[index - 1];
   const open = useOpenInitiativePhase();
   const deliver = useDeliverInitiativePhase();
+  // Refining what is left on the merged code first is the default (D136) when anything can still change.
+  const refinable = hasOpenItems(initiative, index);
+  const [refine, setRefine] = useState(refinable);
   if (phase === undefined) return null;
   const items = initiative.items.filter((item) => item.phase === index);
   const deliverable = items.filter(
@@ -213,8 +221,20 @@ function Phase({ initiative, index }: { initiative: InitiativeDetailDTO; index: 
             variant="primary"
             pending={open.isPending}
             error={open.error}
-            onConfirm={(close) => open.mutate({ id: initiative.id, phase: index }, { onSuccess: close })}
-          />
+            onConfirm={(close) =>
+              open.mutate({ id: initiative.id, phase: index, refine: refinable && refine }, { onSuccess: close })
+            }
+          >
+            {refinable && (
+              <label className="check">
+                <input type="checkbox" checked={refine} onChange={(e) => setRefine(e.target.checked)} />
+                <span>
+                  {C.refineFirst}
+                  <span className={styles.note}>{C.refineFirstHint}</span>
+                </span>
+              </label>
+            )}
+          </Confirmed>
         )}
         {deliverable > 0 && (
           <Confirmed
@@ -274,7 +294,17 @@ export function InitiativePage() {
   }
   const i = initiative.data;
   const draft = i.status === InitiativeStatus.DraftReady;
-  const editable = i.items.some((item) => item.task === null && item.status !== InitiativeItemStatus.Dropped);
+  const busy = i.status === InitiativeStatus.BreakingDown;
+  const editable = !busy && hasOpenItems(i);
+  const run = i.latestRun;
+  // After a refinement asked for by「进入第 k 阶段」, confirming opens that phase (34 §5.5).
+  const confirmLabel =
+    i.openedPhase === 0
+      ? C.confirm
+      : run?.mode === InitiativeRunMode.Refine && run.openPhase !== null
+        ? C.confirmPhase(run.openPhase)
+        : C.confirmRefined;
+  const canRefine = !busy && !draft && i.openedPhase > 0 && i.status !== InitiativeStatus.Done && hasOpenItems(i);
   return (
     <div className="page" data-testid="initiative-page">
       <div className="page-head">
@@ -286,6 +316,7 @@ export function InitiativePage() {
             {C.meta(i.project.name, i.template?.name ?? null)} · {i.baseBranch} · {formatDateTime(i.createdAt)}
           </p>
         </div>
+        {!editing && canRefine && <RefineButton initiative={i} />}
         {!editing && editable && <Button onClick={() => setEditing(true)}>{C.edit}</Button>}
         <Confirmed
           label={C.delete}
@@ -293,6 +324,7 @@ export function InitiativePage() {
           body={C.deleteBody}
           confirm={C.delete}
           variant="danger"
+          disabled={busy}
           pending={remove.isPending}
           error={remove.error}
           onConfirm={() => remove.mutate(i.id, { onSuccess: () => void navigate({ to: ROUTES.initiatives }) })}
@@ -306,11 +338,14 @@ export function InitiativePage() {
           {i.attachments.length > 0 && <SentAttachments attachments={i.attachments} />}
         </details>
       </section>
+      <BreakdownStatus initiative={i} />
+      <Understanding initiative={i} />
       {draft && !editing && (
         <div className="banner">
-          <span className="grow">{C.draftHint}</span>
+          <span className="grow">{i.openedPhase === 0 ? C.draftHint : C.draftRefinedHint}</span>
+          {i.openedPhase === 0 && run !== null && <RebreakdownButton initiative={i} label={C.rebreakdown} />}
           <Button variant="primary" pending={confirm.isPending} onClick={() => confirm.mutate(i.id)}>
-            {C.confirm}
+            {confirmLabel}
           </Button>
         </div>
       )}
