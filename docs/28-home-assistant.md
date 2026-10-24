@@ -1,5 +1,7 @@
 # 28 · 以助手为主的主页与打开动画
 
+> 输入区的精简（用量按需查看、「+」菜单、「直接开始」默认收起）见 [36](36-compact-composer.md)（D143–D145，待用户确认）；确认后同步本文 §2。
+>
 > 状态：D111–D113 **用户已确认**（2026-10-22，按推荐方案），**已实现**（§9；与设计稿的出入见 §7）。原型与截图：[assets/28-home-assistant/](assets/28-home-assistant/)（`prototype.html` 可直接在浏览器中打开：`?theme=deepseek|warm|spdb|github_white`，`?view=idle|task|conv|handoff|splash`；`splash` 实时播放，点击重播。截图：`idle-*`、`task-*`、`conv-*`、`handoff-*`，打开动画为 `splash-*.gif` 与关键帧 `splash-frames-*.png`（0.12 / 0.3 / 0.55 / 1.2s））。
 
 ## 1. 来由与范围
