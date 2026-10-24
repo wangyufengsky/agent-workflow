@@ -90,15 +90,16 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | GET | `/tasks?projectId&status&displayGroup&limit&cursor` | `{ items: TaskSummaryDTO[], nextCursor }`，按 `updatedAt`（同时按编号）倒序分页（§1，`LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX`）；`displayGroup` 在查询中过滤（由 `resolveTaskDisplayGroup` 推出每个状态与是否有打开的提问 / 权限 / 验收条目的组合），每页都是满的；游标为上一页最后一个任务的 `<updatedAt>.<seq>`，格式不对 400 `VALIDATION_FAILED` |
 | POST | `/tasks` | 创建，见下 |
 | GET | `/tasks/:id` | `TaskDetailDTO` |
+| GET | `/tasks/:id/preview/sessions` | `{ attempts: [{ attemptId, nodeId, kind, status, frames }], checks: [{ nodeId, passed }] }`：任务预览页签可看的会话（v1.3 B2，29 §8.1）——留下过动作画面的尝试，与最近一次页面体检有截图的步骤 |
 | GET | `/tasks/:id/timeline?afterId` | `{ items: TaskEventDTO[] }`：`id > afterId` 的 `task_events`，按 id 升序 |
 | POST | `/tasks/:id/start` | `draft → preparing` |
 | POST | `/tasks/:id/pause` 🅿 | `running → paused`：不再派发新步骤，进行中的步骤继续 |
 | POST | `/tasks/:id/resume` 🅿 | `paused → running`；未确认的调整草稿被取代 |
 | POST | `/tasks/:id/retry` | `{ feedback? }`：`failed → <failedPhase>`；`feedback`（D118）作为重试的失败步骤下一次尝试的说明（同 `nodes/:nodeId/retry`），其他阶段的失败忽略它；检查命令无法运行而失败的步骤 `recheck`（用已提交的结果重新检查，不重跑 AI，D116），其余失败步骤 `retry` |
 | POST | `/tasks/:id/check-command` | `{ command, updateProject }`（D116）：只限在执行阶段因命令检查失败的任务（`CHECK_COMMAND_UNRUNNABLE`，或 `NODE_ATTEMPTS_EXHAUSTED` 且最近一次已提交的结果未通过命令检查），否则 409 `STATE_TRANSITION_INVALID`；任务未完成的步骤（`pending` / `ready` / `failed`）中与失败命令相同的命令检查换成 `command`，`updateProject` 时同时设为项目的检查命令；然后重试：已提交结果的失败步骤 `recheck`（预算重置），其余 `retry` |
-| POST | `/tasks/:id/skip-check` | （D116）只限因 `CHECK_COMMAND_UNRUNNABLE` 失败的任务，否则 409 `STATE_TRANSITION_INVALID`；未完成步骤中这条命令检查标 `skipped`，然后重试（失败步骤 `recheck`）；结果卡与 PR 说明写明未验证 |
+| POST | `/tasks/:id/skip-check` | （D116）只限因 `CHECK_COMMAND_UNRUNNABLE` 或 `BROWSER_CHECK_UNRUNNABLE` 失败的任务，否则 409 `STATE_TRANSITION_INVALID`；未完成步骤中这条命令检查（或所有页面体检）标 `skipped`，然后重试（失败步骤 `recheck`）；结果卡与 PR 说明写明未验证 |
 | POST | `/tasks/:id/cancel` | `{ keepBranch?: boolean }` |
-| POST | `/tasks/:id/request-changes` | `{ reason: 'user' \| 'conflict', feedback? }`；`review → running`，追加「按反馈修改」或「解决合并冲突」节点（13 §4）。`user` 必须带 `feedback`；`conflict` 要求最近一次交付为 `conflict`；否则 400 `VALIDATION_FAILED` |
+| POST | `/tasks/:id/request-changes` | `{ reason: 'user' \| 'conflict', feedback?, page?: { tabId } }`（`page`：用户预览标签页的当前页面随意见交给 AI，后端自己读取路径、视口、控制台错误与失败请求，29 §2.3；v1.3 B2，助手不能设置）；`review → running`，追加「按反馈修改」或「解决合并冲突」节点（13 §4）。`user` 必须带 `feedback`；`conflict` 要求最近一次交付为 `conflict`；否则 400 `VALIDATION_FAILED` |
 | POST | `/tasks/:id/deliver` | `{ strategy, targetBranch?, pr?: { title, body } }`；见 §5.3 |
 | GET | `/tasks/:id/review-comments` | `ReviewCommentsDTO`：任务的 PR/MR 上的审查意见，实时取自平台；见 §5.4 |
 | POST | `/tasks/:id/review-feedback` | `{ commentIds: string[], note? }`；`completed → running`，按勾选的审查意见追加「按审查意见修改」节点；见 §5.4 |
@@ -190,6 +191,8 @@ type ReviewCommentsDTO = {
 | POST | `/tasks/:id/nodes/:nodeId/retry` | `failed → ready`，`{ feedback? }` |
 | POST | `/tasks/:id/nodes/:nodeId/skip` 🅿 | `pending` / `ready` / `failed` → `skipped`，返回 `NodeDetailDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
 | GET | `/attempts/:id` | `AttemptDTO`；不存在 404 `ATTEMPT_NOT_FOUND` |
+| GET | `/attempts/:attemptId/browser/:file` | 尝试的截图（`<n>.jpg`）与动作画面（`f<n>.jpg`）（非清单路由，29 §5.7）：目录由尝试解析（会话流所在目录下的 `browser/<attemptId>/`），没有任务的尝试也能取到；文件名只接受这两种格式，其余 404 `NOT_FOUND`，尝试不存在 404 `ATTEMPT_NOT_FOUND`；`image/jpeg` |
+| GET | `/tasks/:taskId/browser/*` | 页面体检的截图（非清单路由，29 §5.7）：`*` 为检查结果里 `screenshot` 的相对路径（`checks/<nodeId>/<检查时刻>/<n>.jpg`），只读 `runs/<taskId>/browser/` 下的 `.jpg`，其余 404 `NOT_FOUND`；`image/jpeg` |
 | GET | `/attempts/:id/transcript?afterSeq` | `{ entries: TranscriptEntry[], lastSeq, hasMore: boolean, done: boolean }`（非清单路由，10 §3）：`lastSeq` 为本页最大 seq（空页为请求的 `afterSeq`），`hasMore` 表示本页之后已有写入的行（以 `afterSeq = lastSeq` 继续读），`done` 表示尝试已结束且已读到末尾 |
 | POST | `/attempts/:id/abort` 🅿 | 中止进行中的尝试（节点按 `attempt_failed` 处理）；非 `running` 409 `STATE_TRANSITION_INVALID` |
 | POST | `/debug/attempts` | 仅开发构建（M2-09）：`{ directory, requirement, model? }` → 201 `AttemptDTO`；对 Git 目录发起一次不属于任务的 `execute` 尝试。目录不在 Git 仓库中 400 `PROJECT_PATH_NOT_GIT_REPO`；opencode 未就绪 503 `OPENCODE_NOT_READY` |
@@ -302,6 +305,8 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `assistant.open_form` | `{ conversationId, form: AssistantForm, values }` | 助手调用 `open_form`：打开表单并预填（不含凭据字段） |
 | `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
 | `knowledge.updated` | `{ conversationId }` | 知识问答：新一轮、答案提交、一轮结束、权限请求等待或已处理、删除时；对话与列表重新拉取（研究过程与流式回答的草稿沿用 `attempt.transcript`：研究尝试的正文每 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 个字符推送一次，草稿 = 最后一个非提交工具调用之后的正文，18 §5.5） |
+| `browser.frame` | `BrowserFrame`（`{ attemptId, taskId, seq, tool, url, file }`） | AI 浏览器动作后的画面（v1.3 B2，29 §8.2）；任务页「预览」页签观看 AI 会话时跟随最新一张 |
+| `browser.tab_updated` | `UserTabState`（`{ tabId, taskId, url, viewport, consoleErrors, failedRequests }`） | 用户的预览标签页换了页面、尺寸，或当前页面的控制台错误（含未捕获异常）与失败请求（网络错误或 ≥ 400）数变了（v1.3 B2，29 §8.1）；计数随主框架的新文档重新开始 |
 | `preview.updated` | `Preview`（`{ taskId, state, url, logTail }`） | 页面预览（v1.3，29 §4.2）：每次状态变化后；任务页的预览页签直接用它更新 |
 | `schedule.updated` | `{ scheduleId }` | 定时任务（v1.2）：创建、修改、暂停 / 恢复、每次运行、删除后；定时任务列表与详情重新拉取（查询挂在任务列表前缀下，开出的任务状态变化也会刷新，22 §9） |
 | `git_review.updated` | `{ reviewId, projectId }` | Git 工作台的审查开始、提交问题、结束时；审查与列表重新拉取（27 §7.4） |
@@ -398,7 +403,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |
 | GET | `/tasks/:taskId/preview` | `previews.get` | read | `Preview`：`{ taskId, state, url, logTail }`；没有启动过的为 `stopped` |
-| POST | `/tasks/:taskId/preview/start` | `previews.start` | write | 启动（或等待正在进行的启动）到就绪 → `Preview`。任务没有就绪的 worktree 409 `STATE_TRANSITION_INVALID`；项目没有预览设置 409 `PREVIEW_NOT_CONFIGURED`；没能就绪 502 `PREVIEW_START_FAILED`（`details.logTail`）；达到上限且都有标签页在用 409 `PREVIEW_LIMIT_REACHED` |
+| POST | `/tasks/:taskId/preview/start` | `previews.start` | write | 启动（或等待正在进行的启动）到就绪 → `Preview`。任务没有就绪的 worktree 409 `STATE_TRANSITION_INVALID`；项目没有预览设置 409 `PREVIEW_NOT_CONFIGURED`；没能就绪 502 `PREVIEW_START_FAILED`（`details.logTail`）；达到上限且都有标签页在用 409 `PREVIEW_LIMIT_REACHED`（`details: { maxRunning, taskIds }`，占用中的任务） |
 | POST | `/tasks/:taskId/preview/stop` | `previews.stop` | write | → `Preview`（`stopped`） |
 | POST | `/projects/:projectId/preview/trial` | `previews.trial` | write | 在主工作区启动一次（不运行安装命令），就绪后立即停止 → `{ url, logTail }`；没能就绪 502 `PREVIEW_START_FAILED` |
 
@@ -409,9 +414,14 @@ type AttemptDTO = AttemptSummaryDTO & {
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |
 | POST | `/browser/login-tabs` | `browser.openLoginTab` | write | `{ url }`（http(s)）→ 201 `{ tabId }`：在网站分区（`persist:aw-sites`）打开一个用户标签页，由界面经 `aw.browser.place` 放到窗口上；规则不允许的地址交给系统浏览器 |
-| DELETE | `/browser/tabs/:tabId` | `browser.closeUserTab` | write | 204 |
+| DELETE | `/browser/tabs/:tabId` | `browser.closeUserTab` | write | 204：关闭登录标签页或预览标签页（预览标签页同时注销对预览的使用） |
 | GET | `/browser/site-logins` | `browser.listSiteLogins` | read | `{ hosts }`：网站分区里有 Cookie 的主机（用分区里一个临时离屏标签页的 `Network.getAllCookies`） |
 | DELETE | `/browser/site-logins/:host` | `browser.clearSiteLogin` | write | 删除该主机的 Cookie 与页面存储（`Storage.clearDataForOrigin`）→ `{ hosts }` |
+| POST | `/tasks/:taskId/preview/tabs` | `browser.openUserTab` | write | 启动任务的预览（需要时；达到上限 409 `PREVIEW_LIMIT_REACHED`，不排队）→ 201 `UserTabState`：用户自己的标签页（分区 `persist:aw-preview-<projectId>`，被测应用的登录保留），登记对预览的使用（不因空闲停止），打开项目的第一个关键页面，由界面经 `aw.browser.place` 放到窗口上；任务完成或取消时关闭（v1.3 B2，29 §8.1）。每个任务一个：再次打开返回同一个标签页，预览重启换了地址后回到第一个关键页面；同时的打开共用一次。从预览就绪起 30 秒内没打开好为 `BROWSER_READ_FAILED`（`reason: timeout`），新标签页随之关闭 |
+| POST | `/browser/tabs/:tabId/navigate` | `browser.navigateUserTab` | read | `{ path }`（以 `/` 开头、不以 `//` 开头）在用户的预览标签页打开运行中的任务预览的这个路径；会离开预览来源的路径（如反斜线）400 `VALIDATION_FAILED`，预览没在运行 `BROWSER_NOT_OPEN`，页面没打开 `BROWSER_READ_FAILED`，30 秒没完成 `BROWSER_READ_FAILED`（`reason: timeout`，标签页保留）；不是预览标签页 404 `NOT_FOUND` |
+| GET | `/browser/tabs/:tabId/logs` | `browser.userTabLogs` | read | `{ errors: [{ message, source }], requests: [{ method, url, status, error }] }`：用户预览标签页当前页面的控制台错误（含未捕获异常）与失败请求，底栏抽屉的明细（v1.3 B2） |
+| POST | `/browser/tabs/:tabId/viewport` | `browser.setUserViewport` | read | `{ preset }`：桌面铺满放置区域，平板 / 手机在区域里模拟该尺寸（`Emulation.setDeviceMetricsOverride`）|
+| GET | `/attempts/:attemptId/browser-frames` | `browser.listFrames` | read | `{ items: BrowserFrame[] }`：一次尝试的动作画面，按 `seq` 排列（读尝试目录里的 `frames.jsonl`，尝试结束、应用重启后照样可读；没有画面为空列表；v1.3 B2，29 §8.2） |
 
 ### 13f″. 助手网页文字读取（29 §9）
 
@@ -425,13 +435,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 ### 13f‴. 用户预览页签（29 §8.1、§9）
 
-以下操作只供界面使用（`expose.assistant = false`），使用项目的 `persist:aw-preview-<projectId>` 分区；与 AI 尝试页签分开。每个任务复用一个用户页签。
-
-| 方法 | 路径 | 操作 | 说明 |
-| --- | --- | --- | --- |
-| POST | `/browser/preview-tabs` | `browser.openUserTab` | `{ taskId }` → `{ tabId, viewport }`；启动或复用任务预览，创建真实用户页签；已有页签保留当前页面及视口，预览重启换地址后回到 `/` |
-| POST | `/browser/preview-tabs/:tabId/navigate` | `browser.navigateUserTab` | `{ path }` → 204；仅允许该任务预览来源内的绝对路径，拒绝 `//` 和反斜线跳转到其他来源 |
-| POST | `/browser/preview-tabs/:tabId/viewport` | `browser.setUserViewport` | `{ preset: 'desktop' \| 'tablet' \| 'mobile' }` → 204 |
+用户预览页签的操作见 §13f′ 表中的 `browser.openUserTab` / `navigateUserTab` / `setUserViewport` / `userTabLogs`（只供界面使用，`expose.assistant = false`；B2 实现，项目的 `persist:aw-preview-<projectId>` 分区，与 AI 尝试页签分开，每个任务一个）。助手部分如下。
 
 关闭仍使用 `DELETE /browser/tabs/:tabId`，同时删除它的会话关联。任务完成或取消也关闭页签。助手专用的 `browser_read` 没有 HTTP 操作和 tab 参数，只读取调用会话由界面关联的用户页，输出 `{ taskId, url, title, tab: 'preview', viewport, page, settled, logs }`。未关联或已失效返回 `BROWSER_NOT_OPEN`。离开任务预览页签立即解绑，助手/命令面板浮层仅隐藏原生视图，不解绑；首次发送消息先完成绑定更新，防止新对话误读旧页。
 

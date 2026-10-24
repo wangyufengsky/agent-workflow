@@ -16,7 +16,12 @@ export const getTaskContextOutputSchema = z.object({
     workflow: z.string(),
     deliverable: workflowDeliverableSchema,
   }),
-  project: z.object({ name: z.string(), defaultBranch: z.string() }),
+  project: z.object({
+    name: z.string(),
+    defaultBranch: z.string(),
+    /** The key pages of the project's page preview; null when it has none (29 §4). */
+    previewPages: z.array(z.string()).nullable(),
+  }),
   workspace: z.object({ path: z.string(), branch: z.string(), baseCommit: z.string() }),
   attempt: z.object({ kind: attemptKindSchema, seq: z.number(), retryFeedback: z.string().optional() }),
   askOnUncertainty: z.boolean(),

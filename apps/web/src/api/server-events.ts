@@ -20,6 +20,7 @@ import { refreshGitReview } from '../features/git/git.queries.ts';
 import { updateInbox } from '../features/inbox/inbox.queries.ts';
 import { refreshKnowledge } from '../features/knowledge/knowledge.queries.ts';
 import { refreshDecks } from '../features/ppt/ppt.queries.ts';
+import { appendFrame } from '../features/preview/preview.queries.ts';
 import { refreshSchedules } from '../features/schedules/schedules.queries.ts';
 import { updateNode, updateTask } from '../features/tasks/tasks.queries.ts';
 import { useUiStore } from '../state/ui.store.ts';
@@ -46,9 +47,12 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       if (event.data.attempt.kind === AttemptKind.Research) await refreshKnowledge(qc);
       // A PPT's progress line and status come from its AI work's attempt (23 §4.3).
       if (DECK_ATTEMPT_KINDS.includes(event.data.attempt.kind)) await refreshDecks(qc);
-      // A task's active attempts (and their progress line) are part of its detail.
-      if (event.data.taskId !== null)
+      // A task's active attempts (and their progress line) are part of its detail, their status of its preview's
+      // sessions (29 §8.1).
+      if (event.data.taskId !== null) {
         await qc.invalidateQueries({ queryKey: queryKeys.task(event.data.taskId), exact: true });
+        await qc.invalidateQueries({ queryKey: queryKeys.previewSessions(event.data.taskId) });
+      }
       if (event.data.nodeId !== null && event.data.taskId !== null) {
         await qc.invalidateQueries({ queryKey: queryKeys.node(event.data.taskId, event.data.nodeId) });
       }
@@ -91,6 +95,11 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
     case ServerEventType.PreviewUpdated:
       qc.setQueryData(queryKeys.preview(event.data.taskId), event.data);
       return;
+    case ServerEventType.BrowserFrame:
+      return appendFrame(qc, event.data);
+    case ServerEventType.BrowserTabUpdated:
+      qc.setQueryData(queryKeys.userTab(event.data.tabId), event.data);
+      return qc.invalidateQueries({ queryKey: queryKeys.userTabLogs(event.data.tabId) });
     case ServerEventType.AssistantConfirmation:
       return updateConfirmation(qc, event.data);
     // Requests of the assistant to the renderer, carried out by the shell (15 §6).

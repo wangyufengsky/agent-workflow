@@ -1,4 +1,11 @@
-import { CheckUnrunnableReason, ErrorCode, InboxKind, NodeStatus, TaskDisplayGroup } from '@aw/shared';
+import {
+  CheckUnrunnableReason,
+  ErrorCode,
+  InboxKind,
+  NodeStatus,
+  PageCheckUnrunnable,
+  TaskDisplayGroup,
+} from '@aw/shared';
 
 export const TASK_DISPLAY_LABEL: Record<TaskDisplayGroup, string> = {
   [TaskDisplayGroup.Preparing]: '准备中',
@@ -129,6 +136,7 @@ export const TASK_COPY = {
   lastCommand: (command: string, exitCode: number | null, timedOut: boolean) =>
     `最后一次运行 \`${command}\` ${timedOut ? '超时了' : `退出码为 ${exitCode}`}，输出的最后几行：`,
   lastReview: '最后一次 AI 评审没有通过：',
+  lastPage: '最后一次页面体检没有通过：',
   lastAttempt: (aborted: boolean, code: string | undefined) => {
     if (aborted) return 'AI 最后一次的尝试被中止了。';
     switch (code) {
@@ -160,6 +168,15 @@ export const TASK_COPY = {
     }。这不是 AI 的问题：代码没有被判为不通过，AI 也没有重做。`,
   recheck: '重新检查',
   rechecked: '正在重新检查',
+  pageUnrunnable: (step: string, reason: PageCheckUnrunnable) =>
+    `步骤「${step}」的页面体检没法运行：${
+      reason === PageCheckUnrunnable.PreviewNeverStarted
+        ? '页面预览在这个任务的工作区里一直没有启动起来'
+        : '项目的页面预览设置已删除'
+    }。这不是 AI 的问题：代码没有被判为不通过，AI 也没有重做。`,
+  pageUnrunnableLog: '预览日志末尾',
+  editPreview: '修改页面预览设置',
+  skipPageCheckBody: '跳过后，这个任务之后的步骤都不再做页面体检，结果标为「未验证」。合并前请自己打开页面确认。',
   editCheck: '修改检查命令…',
   editCheckTitle: '修改检查命令',
   editCheckBody: '这个任务里还没完成的步骤都改用新命令，然后用 AI 已经交的结果重新检查。',
@@ -177,10 +194,8 @@ export const TASK_COPY = {
     `已完成 ${steps} 个步骤 · 改动 ${files} 个文件 +${add} −${del}`,
   checksPassed: '检查全部通过',
   checksFailed: (n: number) => `${n} 项检查未通过`,
-  checksSkipped: (n: number, commands: readonly string[]) =>
-    `有 ${n} 项检查没有运行：${commands.map((c) => `\`${c}\``).join('、')}（已跳过）`,
-  prUnverified: (commands: readonly string[]) =>
-    `未验证：应用环境无法运行检查 ${commands.map((c) => `\`${c}\``).join('、')}，已跳过。`,
+  checksSkipped: (n: number, checks: readonly string[]) => `有 ${n} 项检查没有运行：${checks.join('、')}（已跳过）`,
+  prUnverified: (checks: readonly string[]) => `未验证：应用环境无法运行检查 ${checks.join('、')}，已跳过。`,
   noChecks: '没有自动检查',
   summary: '摘要',
   changedFiles: '改动文件',
@@ -220,6 +235,7 @@ export const NODE_COPY = {
     reason === CheckUnrunnableReason.NotFound ? `找不到程序 ${program}` : `程序 ${program} 没有执行权限`,
   commandCheck: (command: string) => `运行 ${command}`,
   reviewCheck: 'AI 评审',
+  pageCheck: '页面体检',
   timedOut: '超时',
   noResult: '还没有产出。',
   retryFeedback: '上次未通过的原因',

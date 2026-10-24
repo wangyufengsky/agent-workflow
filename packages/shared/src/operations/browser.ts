@@ -1,52 +1,24 @@
 import { z } from 'zod';
 import {
-  navigatePreviewTabRequestSchema,
+  browserFrameSchema,
+  navigateUserTabRequestSchema,
   openLoginTabRequestSchema,
-  openPreviewTabRequestSchema,
-  previewTabViewportRequestSchema,
+  openUserTabRequestSchema,
   readWebsiteRequestSchema,
   readWebsiteSchema,
+  setUserViewportRequestSchema,
   siteLoginsSchema,
-  userPreviewTabSchema,
+  userTabLogsSchema,
   userTabSchema,
+  userTabStateSchema,
 } from '../contracts/api/browser.ts';
+import { InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
 
 // Website logins are the user's own, done in the settings page (29 §8.6); the assistant has no part in them.
 const common = { expose: { palette: false, assistant: false }, credentialFields: [], mode: UiMode.Simple } as const;
-
-export const openPreviewTabOp = defineOperationContract({
-  ...common,
-  id: 'browser.openUserTab',
-  title: 'op.browser.openUserTab',
-  description: "Open the user's own task preview tab",
-  input: openPreviewTabRequestSchema,
-  output: userPreviewTabSchema,
-  risk: OperationRisk.Write,
-  http: { method: 'POST', path: '/browser/preview-tabs' },
-});
-export const navigatePreviewTabOp = defineOperationContract({
-  ...common,
-  id: 'browser.navigateUserTab',
-  title: 'op.browser.navigateUserTab',
-  description: "Navigate the user's preview to a path of its task",
-  input: navigatePreviewTabRequestSchema,
-  output: z.void(),
-  risk: OperationRisk.Write,
-  http: { method: 'POST', path: '/browser/preview-tabs/:tabId/navigate' },
-});
-export const setPreviewViewportOp = defineOperationContract({
-  ...common,
-  id: 'browser.setUserViewport',
-  title: 'op.browser.setUserViewport',
-  description: "Change the user's preview viewport",
-  input: previewTabViewportRequestSchema,
-  output: z.void(),
-  risk: OperationRisk.Write,
-  http: { method: 'POST', path: '/browser/preview-tabs/:tabId/viewport' },
-});
 
 export const readWebsiteOp = defineOperationContract({
   ...common,
@@ -103,4 +75,61 @@ export const clearSiteLoginOp = defineOperationContract({
   output: siteLoginsSchema,
   risk: OperationRisk.Write,
   http: { method: 'DELETE', path: '/browser/site-logins/:host' },
+});
+
+export const openUserTabOp = defineOperationContract({
+  ...common,
+  id: 'browser.openUserTab',
+  title: 'op.browser.openUserTab',
+  description: "Open the user's own tab on the task's page preview, starting the preview when needed",
+  input: openUserTabRequestSchema,
+  output: userTabStateSchema,
+  refs: { taskId: InputRef.Task },
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:taskId/preview/tabs', status: 201 },
+});
+
+export const navigateUserTabOp = defineOperationContract({
+  ...common,
+  id: 'browser.navigateUserTab',
+  title: 'op.browser.navigateUserTab',
+  description: "Open a path of the task's preview in the user's tab",
+  input: navigateUserTabRequestSchema,
+  output: z.void(),
+  risk: OperationRisk.Read,
+  http: { method: 'POST', path: '/browser/tabs/:tabId/navigate' },
+});
+
+export const setUserViewportOp = defineOperationContract({
+  ...common,
+  id: 'browser.setUserViewport',
+  title: 'op.browser.setUserViewport',
+  description: "Show the user's tab at desktop, tablet or mobile size",
+  input: setUserViewportRequestSchema,
+  output: z.void(),
+  risk: OperationRisk.Read,
+  http: { method: 'POST', path: '/browser/tabs/:tabId/viewport' },
+});
+
+export const userTabLogsOp = defineOperationContract({
+  ...common,
+  id: 'browser.userTabLogs',
+  title: 'op.browser.userTabLogs',
+  description: "The console errors and failed requests of the current page in the user's preview tab",
+  input: userTabSchema,
+  output: userTabLogsSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/browser/tabs/:tabId/logs' },
+});
+
+export const listBrowserFramesOp = defineOperationContract({
+  ...common,
+  id: 'browser.listFrames',
+  title: 'op.browser.listFrames',
+  description: "What an attempt's browser actions left on the page, in order",
+  input: z.object({ attemptId: z.string() }),
+  output: z.object({ items: z.array(browserFrameSchema) }),
+  refs: { attemptId: InputRef.Attempt },
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/attempts/:attemptId/browser-frames' },
 });

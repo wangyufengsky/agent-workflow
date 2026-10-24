@@ -69,3 +69,34 @@ export const BrowserBlockReason = {
 } as const;
 export type BrowserBlockReason = (typeof BrowserBlockReason)[keyof typeof BrowserBlockReason];
 export const browserBlockReasonSchema = z.enum(BrowserBlockReason);
+
+/** A page check that could not run (29 §7.4): the environment failed, not the AI's change (D116). */
+export const PageCheckUnrunnable = {
+  /** The preview never became ready in this worktree: a command, port or dependency problem. */
+  PreviewNeverStarted: 'preview_never_started',
+  /** The project's preview settings were removed after the plan was confirmed. */
+  PreviewNotConfigured: 'preview_not_configured',
+} as const;
+export type PageCheckUnrunnable = (typeof PageCheckUnrunnable)[keyof typeof PageCheckUnrunnable];
+export const pageCheckUnrunnableSchema = z.enum(PageCheckUnrunnable);
+
+/** What fails a page (29 §7.3). */
+export const PageCheckError = {
+  Navigation: 'navigation',
+  Exception: 'exception',
+  Console: 'console',
+  Request: 'request',
+} as const;
+export type PageCheckError = (typeof PageCheckError)[keyof typeof PageCheckError];
+export const pageCheckErrorSchema = z.enum(PageCheckError);
+
+/** What a page check only points out (29 §7.3); passed on to the AI review. */
+export const PageCheckWarning = {
+  Request: 'request',
+  Blocked: 'blocked',
+  A11y: 'a11y',
+  Overflow: 'overflow',
+  Unsettled: 'unsettled',
+} as const;
+export type PageCheckWarning = (typeof PageCheckWarning)[keyof typeof PageCheckWarning];
+export const pageCheckWarningSchema = z.enum(PageCheckWarning);

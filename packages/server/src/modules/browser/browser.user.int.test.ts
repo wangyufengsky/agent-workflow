@@ -6,10 +6,10 @@ import {
   createConversationOp,
   ErrorCode,
   MCP_SESSION_ARG,
-  navigatePreviewTabOp,
-  openPreviewTabOp,
+  navigateUserTabOp,
+  openUserTabOp,
   sendAssistantMessageOp,
-  setPreviewViewportOp,
+  setUserViewportOp,
   startPreviewOp,
   stopPreviewOp,
   updateProjectOp,
@@ -79,17 +79,17 @@ describe('用户当前预览与助手归属', () => {
     expect(await read()).toMatchObject({ isError: true, body: { code: ErrorCode.BrowserNotOpen } });
     const a = await task();
     const b = await task();
-    const tabA = (await t.call(openPreviewTabOp, { taskId: a.id })).body.tabId;
-    const tabB = (await t.call(openPreviewTabOp, { taskId: b.id })).body.tabId;
-    await t.call(navigatePreviewTabOp, { tabId: tabA, path: '/user-a' });
-    await t.call(navigatePreviewTabOp, { tabId: tabB, path: '/user-b' });
+    const tabA = (await t.call(openUserTabOp, { taskId: a.id })).body.tabId;
+    const tabB = (await t.call(openUserTabOp, { taskId: b.id })).body.tabId;
+    await t.call(navigateUserTabOp, { tabId: tabA, path: '/user-a' });
+    await t.call(navigateUserTabOp, { tabId: tabB, path: '/user-b' });
     const owner = { id: randomUUID(), taskId: a.id, projectId, filesDir: t.dataDir };
     await t.app.services.browser.open(owner, '/ai-owned');
     expect((await bind(a.id, `${owner.id}:preview`)).body).toMatchObject({ error: { code: ErrorCode.BrowserNotOpen } });
     expect((await bind(b.id, tabA)).body).toMatchObject({ error: { code: ErrorCode.BrowserNotOpen } });
     expect((await bind(a.id, tabA)).status).toBe(204);
-    await t.call(setPreviewViewportOp, { tabId: tabA, preset: 'mobile' });
-    expect((await t.call(openPreviewTabOp, { taskId: a.id })).body).toEqual({ tabId: tabA, viewport: 'mobile' });
+    await t.call(setUserViewportOp, { tabId: tabA, preset: 'mobile' });
+    expect((await t.call(openUserTabOp, { taskId: a.id })).body).toMatchObject({ tabId: tabA, viewport: 'mobile' });
     const current = await read();
     expect(current).toMatchObject({
       isError: false,
@@ -111,7 +111,7 @@ describe('用户当前预览与助手归属', () => {
 
   it('显式取消关联、关闭页签和任务结束都会停止读取，普通用户页隐藏不改变已选关联', async () => {
     const a = await task();
-    const tabId = (await t.call(openPreviewTabOp, { taskId: a.id })).body.tabId;
+    const tabId = (await t.call(openUserTabOp, { taskId: a.id })).body.tabId;
     await bind(a.id, tabId);
     expect((await read()).isError).toBe(false);
     // 浮层的原生 place(null) 不发送取消关联；读取仍使用同一个明确选中的页面。
@@ -125,7 +125,7 @@ describe('用户当前预览与助手归属', () => {
     await bind(a.id, tabId);
     await t.call(closeUserTabOp, { tabId });
     expect(await read()).toMatchObject({ isError: true, body: { code: ErrorCode.BrowserNotOpen } });
-    const reopened = (await t.call(openPreviewTabOp, { taskId: a.id })).body.tabId;
+    const reopened = (await t.call(openUserTabOp, { taskId: a.id })).body.tabId;
     await bind(a.id, reopened);
     await t.call(cancelTaskOp, { id: a.id });
     expect(await read()).toMatchObject({ isError: true, body: { code: ErrorCode.BrowserNotOpen } });
@@ -133,18 +133,18 @@ describe('用户当前预览与助手归属', () => {
 
   it('停止的预览不可读，重开跟随新端口；用户地址栏拒绝离开任务来源', async () => {
     const a = await task();
-    const { tabId } = (await t.call(openPreviewTabOp, { taskId: a.id })).body;
+    const { tabId } = (await t.call(openUserTabOp, { taskId: a.id })).body;
     await bind(a.id, tabId);
     await t.call(stopPreviewOp, { taskId: a.id });
     expect(await read()).toMatchObject({ isError: true, body: { code: ErrorCode.BrowserNotOpen } });
     // 服务可由助手先启动；用户回来打开时仍要追到新来源，不能沿用已经停掉的旧地址。
     const restarted = (await t.call(startPreviewOp, { taskId: a.id })).body;
-    expect((await t.call(openPreviewTabOp, { taskId: a.id })).body.tabId).toBe(tabId);
+    expect((await t.call(openUserTabOp, { taskId: a.id })).body.tabId).toBe(tabId);
     expect(await read()).toMatchObject({ isError: true, body: { code: ErrorCode.BrowserNotOpen } });
     await bind(a.id, tabId);
     expect((await read()).body).toMatchObject({ title: '用户预览', url: `${restarted.url}/` });
     for (const path of ['//other.example/', '/\\other.example/']) {
-      const response = await t.call(navigatePreviewTabOp, { tabId, path });
+      const response = await t.call(navigateUserTabOp, { tabId, path });
       expect(response.body).toMatchObject({ error: { code: ErrorCode.ValidationFailed } });
     }
   });

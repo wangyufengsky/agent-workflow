@@ -21,7 +21,7 @@ import { INBOX_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
 import { attemptQuery } from '../attempts/attempt.queries.ts';
 import { schedulesQuery } from '../schedules/schedules.queries.ts';
 import { CheckFailureActions } from '../tasks/check-failure-actions.tsx';
-import { failureText, unrunnableDetails } from '../tasks/failure-text.ts';
+import { checkUnrunnable, failureText } from '../tasks/failure-text.ts';
 import { taskQuery, tasksQuery } from '../tasks/tasks.queries.ts';
 import { type InboxResponse, useDismissInbox, useResolveInbox } from './inbox.queries.ts';
 import styles from './inbox-card.module.css';
@@ -159,7 +159,7 @@ function FailureCard({ item, resolve, pending }: CardProps<typeof InboxKind.Fail
       </p>
       <div className={styles.actions}>
         <Button variant="primary" size="sm" disabled={pending} onClick={() => resolve({ action: FailureAction.Retry })}>
-          {unrunnableDetails(error) === undefined ? C.retry : TASK_COPY.recheck}
+          {checkUnrunnable(error) ? TASK_COPY.recheck : C.retry}
         </Button>
         {item.taskId !== null && <CheckFailureActions taskId={item.taskId} error={error} size="sm" />}
         <Button variant="danger" size="sm" disabled={pending} onClick={() => resolve({ action: FailureAction.Cancel })}>

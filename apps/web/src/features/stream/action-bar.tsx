@@ -1,9 +1,18 @@
 import { MCP_SESSION_ARG } from '@aw/shared';
-import { useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { Icon } from '../../components/icon.tsx';
 import { actionGroupSummary, STREAM_COPY as C, toolActionDelta, toolActionText } from '../../copy/attempts.ts';
+import { attemptFileUrl, useImage } from '../preview/preview.queries.ts';
 import styles from './stream.module.css';
 import type { StreamAction } from './stream-items.ts';
+
+/** The attempt whose stream this is: its browser actions' frames are read from it (29 §8.3). */
+export const StreamAttemptContext = createContext<string | null>(null);
+
+function Frame({ attemptId, file, alt }: { attemptId: string; file: string; alt: string }) {
+  const src = useImage(attemptFileUrl(attemptId, file));
+  return src === null ? null : <img className={styles.frame} src={src} alt={alt} />;
+}
 
 /** The input as the model gave it: the session id the bridge plugin adds is plumbing. */
 const rawInput = (input: Record<string, unknown>) =>
@@ -29,7 +38,10 @@ export function ActionBar({ item, pro }: { item: StreamAction; pro: boolean }) {
   const [open, setOpen] = useState(false);
   const { verb, subject } = toolActionText(item.action);
   const delta = toolActionDelta(item.action);
-  const expandable = pro || item.state === 'failed';
+  const attemptId = useContext(StreamAttemptContext);
+  const frame = attemptId === null ? undefined : item.frame;
+  // A browser action opens to what the page showed after it (29 §8.3).
+  const expandable = pro || item.state === 'failed' || frame !== undefined;
   const head = (
     <>
       <Mark state={item.state} />
@@ -63,6 +75,9 @@ export function ActionBar({ item, pro }: { item: StreamAction; pro: boolean }) {
       </button>
       {open && (
         <div className={styles.actionBody}>
+          {frame !== undefined && attemptId !== null && (
+            <Frame attemptId={attemptId} file={frame} alt={`${C.frame} · ${verb} ${subject}`} />
+          )}
           {pro && (
             <>
               <span className={styles.rawLabel}>
@@ -72,7 +87,7 @@ export function ActionBar({ item, pro }: { item: StreamAction; pro: boolean }) {
               {item.output !== undefined && item.output !== '' && <span className={styles.rawLabel}>{C.output}</span>}
             </>
           )}
-          {item.output !== undefined && item.output !== '' && (
+          {item.output !== undefined && item.output !== '' && (pro || item.state === 'failed') && (
             <pre className={styles.raw} data-failed={item.state === 'failed'}>
               {item.output}
             </pre>

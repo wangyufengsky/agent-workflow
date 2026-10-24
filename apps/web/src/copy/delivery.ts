@@ -23,6 +23,8 @@ export const DELIVERY_COPY = {
   reviseTitle: '让 AI 再改改',
   revisePlaceholder: '告诉 AI 还需要怎么改……',
   reviseSend: '发送',
+  attachPage: '附上当前页面',
+  attachPageHint: '把预览里当前页面的路径、尺寸、控制台错误和失败的请求一起交给 AI。',
   revised: 'AI 会按你的意见继续修改',
   discard: '放弃',
   complete: '完成',

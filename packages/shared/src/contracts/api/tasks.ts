@@ -5,6 +5,12 @@ import {
   REQUIREMENT_MAX_CHARS,
   TASK_TITLE_MAX_CHARS,
 } from '../../constants/limits.ts';
+import {
+  pageCheckErrorSchema,
+  pageCheckUnrunnableSchema,
+  pageCheckWarningSchema,
+  viewportPresetSchema,
+} from '../../enums/browser.ts';
 import { worktreeStatusSchema } from '../../enums/git.ts';
 import {
   AcceptanceCheckKind,
@@ -76,6 +82,28 @@ export const checkResultSchema = z.discriminatedUnion('kind', [
     unrunnable: z.object({ program: z.string(), reason: checkUnrunnableReasonSchema }).nullable().default(null),
     /** The user skipped the check after it could not run (D116): not run, does not hold the step back. */
     skipped: z.boolean().default(false),
+  }),
+  z.object({
+    kind: z.literal(AcceptanceCheckKind.Browser),
+    passed: z.boolean(),
+    /** One entry per page and viewport (29 §7.4). */
+    pages: z.array(
+      z.object({
+        path: z.string(),
+        viewport: viewportPresetSchema,
+        /** The main document's status; null when it did not load. */
+        httpStatus: z.number().int().nullable(),
+        errors: z.array(z.object({ kind: pageCheckErrorSchema, message: z.string(), source: z.string().nullable() })),
+        warnings: z.array(z.object({ kind: pageCheckWarningSchema, message: z.string() })),
+        /** Under `runs/<taskId>/browser/`; null when the page could not be captured. */
+        screenshot: z.string().nullable(),
+      }),
+    ),
+    /** What the AI is told (its feedback when the check fails). */
+    output: z.string(),
+    /** The preview could not run (D116): not the change's fault. */
+    unrunnable: z.object({ reason: pageCheckUnrunnableSchema, logTail: z.string() }).nullable(),
+    skipped: z.boolean(),
   }),
   z.object({
     kind: z.literal(AcceptanceCheckKind.AiReview),
@@ -161,7 +189,7 @@ export const taskResultSchema = z.object({
       passed: z.boolean(),
       /** A command check's command (results written before D116 have none). */
       command: z.string().nullable().default(null),
-      /** Skipped by the user, so not verified (D116). */
+      /** Skipped by the user, so not verified (D116; a page check, 29 §7.4). */
       skipped: z.boolean().default(false),
     }),
   ),

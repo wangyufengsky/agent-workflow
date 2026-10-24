@@ -93,7 +93,7 @@ export function createNodesService(deps: NodesServiceDeps) {
       dependsOn: spec.dependsOn,
       acceptance: resolveAcceptance(
         spec.acceptance ?? input.defaultAcceptance,
-        input.checkCommand,
+        { checkCommand: input.checkCommand, previewPages: input.previewPages },
         input.acceptEachNode,
       ),
       kind: spec.kind ?? NodeKind.Normal,

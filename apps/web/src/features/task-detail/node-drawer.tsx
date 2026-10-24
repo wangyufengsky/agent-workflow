@@ -22,6 +22,7 @@ import { STREAM_COPY } from '../../copy/attempts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DIFF_COPY } from '../../copy/diff.ts';
 import { NODE_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
+import { PageCheckResultView } from '../preview/page-check-result.tsx';
 import { ConversationStream } from '../stream/conversation-stream.tsx';
 import { NodeBadge } from '../tasks/task-badge.tsx';
 import { nodeDiffFileQuery, nodeDiffQuery, nodeQuery } from '../tasks/tasks.queries.ts';
@@ -31,16 +32,35 @@ import styles from './task-page.module.css';
 export const NodeTab = { Output: 'output', Changes: 'changes', Process: 'process' } as const;
 export type NodeTab = (typeof NodeTab)[keyof typeof NodeTab];
 
-/** A check's outcome; a command check may also have been skipped, or not run in the app's environment (D116). */
+/**
+ * A check's outcome; a command or page check may also have been skipped, or not run in the app's environment (D116).
+ */
 function checkBadge(check: CheckResult): { tone: StatusTone; label: string } {
-  if (check.kind === AcceptanceCheckKind.Command && check.skipped) return { tone: 'warn', label: C.checkSkipped };
-  if (check.kind === AcceptanceCheckKind.Command && check.unrunnable !== null)
+  if (check.kind !== AcceptanceCheckKind.AiReview && check.skipped) return { tone: 'warn', label: C.checkSkipped };
+  if (check.kind !== AcceptanceCheckKind.AiReview && check.unrunnable !== null)
     return { tone: 'danger', label: C.checkUnrunnable };
   return check.passed ? { tone: 'ok', label: C.checkPassed } : { tone: 'danger', label: C.checkFailed };
 }
 
-function Check({ check }: { check: CheckResult }) {
-  const label = check.kind === AcceptanceCheckKind.Command ? C.commandCheck(check.command) : C.reviewCheck;
+/** Steps run each check once, the commands told apart by their text. */
+function checkKey(check: CheckResult): string {
+  switch (check.kind) {
+    case AcceptanceCheckKind.Command:
+      return check.command;
+    case AcceptanceCheckKind.Browser:
+      return check.pages.map((p) => `${p.path}@${p.viewport}`).join(',');
+    case AcceptanceCheckKind.AiReview:
+      return check.attemptId;
+  }
+}
+
+function Check({ taskId, check }: { taskId: string; check: CheckResult }) {
+  const label =
+    check.kind === AcceptanceCheckKind.Command
+      ? C.commandCheck(check.command)
+      : check.kind === AcceptanceCheckKind.Browser
+        ? C.pageCheck
+        : C.reviewCheck;
   const badge = checkBadge(check);
   return (
     <details>
@@ -52,10 +72,12 @@ function Check({ check }: { check: CheckResult }) {
           <span className="hint">{C.unrunnableHint(check.unrunnable.program, check.unrunnable.reason)}</span>
         )}
       </summary>
-      {check.kind === AcceptanceCheckKind.Command ? (
-        <pre className={styles.output}>{check.output}</pre>
-      ) : (
+      {check.kind === AcceptanceCheckKind.AiReview ? (
         <ReviewOutcome check={check} />
+      ) : check.kind === AcceptanceCheckKind.Browser ? (
+        <PageCheckResultView taskId={taskId} check={check} />
+      ) : (
+        <pre className={styles.output}>{check.output}</pre>
       )}
     </details>
   );
@@ -117,10 +139,7 @@ export function Output({ node }: { node: NodeDetailDTO }) {
         <>
           <h3 className="sec-t">{C.checks}</h3>
           {node.checkResults.map((check) => (
-            <Check
-              key={`${check.kind}-${check.kind === AcceptanceCheckKind.Command ? check.command : check.attemptId}`}
-              check={check}
-            />
+            <Check key={`${check.kind}-${checkKey(check)}`} taskId={node.taskId} check={check} />
           ))}
         </>
       )}

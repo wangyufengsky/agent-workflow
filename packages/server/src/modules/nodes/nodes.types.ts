@@ -46,6 +46,8 @@ export type MaterializeInput = {
   planId: string;
   graph: PlanGraph;
   checkCommand: string | null;
+  /** The project's preview key pages; null when it has no preview (page checks are dropped then, 29 §7.1). */
+  previewPages: readonly string[] | null;
   defaultAcceptance: Acceptance;
   acceptEachNode: boolean;
 };

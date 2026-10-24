@@ -98,6 +98,8 @@ export const checkpointKeySchema = z.enum(CheckpointKey);
 
 export const AcceptanceCheckKind = {
   Command: 'command',
+  /** The page check (29 §7): the task's key pages opened in the browser, judged by facts, without a model. */
+  Browser: 'browser',
   AiReview: 'ai_review',
 } as const;
 export type AcceptanceCheckKind = (typeof AcceptanceCheckKind)[keyof typeof AcceptanceCheckKind];

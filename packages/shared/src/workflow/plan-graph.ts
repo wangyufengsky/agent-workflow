@@ -1,14 +1,25 @@
 import { z } from 'zod';
+import { PREVIEW_PAGES_MAX } from '../constants/limits.ts';
+import { viewportPresetSchema } from '../enums/browser.ts';
 import { AcceptanceCheckKind } from '../enums/task.ts';
 import { nodeKindSchema, requiredStepPositionSchema } from '../enums/workflow.ts';
 
 export const NODE_KEY_PATTERN = /^[a-z0-9_]{1,40}$/;
 
+const pagePathSchema = z.string().startsWith('/');
+export const pageCheckPagesSchema = z.array(pagePathSchema).min(1).max(PREVIEW_PAGES_MAX);
+const pageCheckViewportsSchema = z.array(viewportPresetSchema).min(1);
 /** `requirementItemId`: the checklist item a verify step's command check decides (31 §2.2). */
 const requirementItemId = z.string().optional();
 
 export const acceptanceCheckSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal(AcceptanceCheckKind.Command), command: z.string().min(1), requirementItemId }),
+  /** Without pages, the project's key pages; without viewports, PAGE_CHECK_VIEWPORTS (29 §7.1). */
+  z.object({
+    kind: z.literal(AcceptanceCheckKind.Browser),
+    pages: pageCheckPagesSchema.optional(),
+    viewports: pageCheckViewportsSchema.optional(),
+  }),
   z.object({ kind: z.literal(AcceptanceCheckKind.AiReview), focus: z.string().min(1).optional() }),
 ]);
 export type AcceptanceCheck = z.infer<typeof acceptanceCheckSchema>;
@@ -20,8 +31,9 @@ export const acceptanceSchema = z.object({
 export type Acceptance = z.infer<typeof acceptanceSchema>;
 
 /**
- * A node's acceptance as it runs (10 §nodes `acceptance`): the plan's, resolved (13 §1). A command check the user
- * skipped after it could not run stays, marked `skipped` (D116); plans never carry the mark.
+ * A node's acceptance as it runs (10 §nodes `acceptance`): the plan's, resolved (13 §1); a page check's pages and
+ * viewports are frozen then. A command or page check the user skipped after it could not run stays, marked
+ * `skipped` (D116); plans never carry the mark.
  */
 export const nodeAcceptanceSchema = z.object({
   checks: z.array(
@@ -31,6 +43,12 @@ export const nodeAcceptanceSchema = z.object({
         command: z.string().min(1),
         skipped: z.literal(true).optional(),
         requirementItemId,
+      }),
+      z.object({
+        kind: z.literal(AcceptanceCheckKind.Browser),
+        pages: pageCheckPagesSchema,
+        viewports: pageCheckViewportsSchema,
+        skipped: z.literal(true).optional(),
       }),
       z.object({ kind: z.literal(AcceptanceCheckKind.AiReview), focus: z.string().min(1).optional() }),
     ]),

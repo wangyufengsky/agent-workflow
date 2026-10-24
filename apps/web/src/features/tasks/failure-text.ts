@@ -1,4 +1,10 @@
-import { CheckUnrunnableReason, ErrorCode, type ErrorInfo, type TaskFailedPhase } from '@aw/shared';
+import {
+  CheckUnrunnableReason,
+  ErrorCode,
+  type ErrorInfo,
+  PageCheckUnrunnable,
+  type TaskFailedPhase,
+} from '@aw/shared';
 import { z } from 'zod';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { TASK_COPY } from '../../copy/tasks.ts';
@@ -22,15 +28,30 @@ const unrunnableSchema = z.object({
   reason: z.enum(CheckUnrunnableReason),
 });
 
+/** `details` of `BROWSER_CHECK_UNRUNNABLE` (08, 29 §7.4). */
+const pageUnrunnableSchema = z.object({
+  nodeKey: z.string(),
+  nodeTitle: z.string(),
+  reason: z.enum(PageCheckUnrunnable),
+  logTail: z.string(),
+});
+
 const exhaustedDetails = (error: ErrorInfo) =>
   error.code === ErrorCode.NodeAttemptsExhausted ? exhaustedSchema.parse(error.details) : undefined;
 
 export const unrunnableDetails = (error: ErrorInfo) =>
   error.code === ErrorCode.CheckCommandUnrunnable ? unrunnableSchema.parse(error.details) : undefined;
 
+export const pageUnrunnableDetails = (error: ErrorInfo) =>
+  error.code === ErrorCode.BrowserCheckUnrunnable ? pageUnrunnableSchema.parse(error.details) : undefined;
+
+/** A check the app's environment could not run stopped the task (D116): retrying checks again. */
+export const checkUnrunnable = (error: ErrorInfo): boolean =>
+  unrunnableDetails(error) !== undefined || pageUnrunnableDetails(error) !== undefined;
+
 /** The step a failed task stopped on; undefined when it failed outside the steps. */
 export const failedNodeKeyOf = (error: ErrorInfo): string | undefined =>
-  (unrunnableDetails(error) ?? exhaustedDetails(error))?.nodeKey;
+  (unrunnableDetails(error) ?? pageUnrunnableDetails(error) ?? exhaustedDetails(error))?.nodeKey;
 
 /** The check command a failed task stopped on, which the user may change (D116); null when it failed otherwise. */
 export const failedCommandOf = (error: ErrorInfo): string | null =>
@@ -45,6 +66,8 @@ export function failureText(phase: TaskFailedPhase, error: ErrorInfo): string {
   if (unrunnable !== undefined) {
     return TASK_COPY.unrunnable(unrunnable.nodeTitle, unrunnable.command, unrunnable.program, unrunnable.reason);
   }
+  const page = pageUnrunnableDetails(error);
+  if (page !== undefined) return TASK_COPY.pageUnrunnable(page.nodeTitle, page.reason);
   const exhausted = exhaustedDetails(error);
   if (exhausted === undefined) return `${TASK_COPY.failedPhase[phase]}：${ERROR_COPY[error.code]}`;
   return exhausted.command === null

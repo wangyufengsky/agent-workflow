@@ -174,9 +174,12 @@ export function createBrowserTabs({ window, emit, openExternal }: BrowserTabsDep
       }
     },
 
-    /** The renderer puts a user tab over an area of the window, or takes it off (29 §8.1). */
+    /**
+     * The renderer puts a user tab over an area of the window, or takes it off (29 §8.1). Taking it off comes after
+     * the backend closed it when the user is done with it (the page's cleanup runs once the close answered): closing
+     * already took it off.
+     */
     place(tabId: string, rect: BrowserRect | null): void {
-      // 后端结束任务与 renderer 卸载可能交错；已经关闭的视图无需再隐藏。
       if (rect === null && !tabs.has(tabId)) return;
       const tab = userTab(tabId);
       const win = window();
@@ -195,7 +198,23 @@ export function createBrowserTabs({ window, emit, openExternal }: BrowserTabsDep
     reload: (tabId: string) => userTab(tabId).view.webContents.reload(),
     openDevTools: (tabId: string) => userTab(tabId).view.webContents.openDevTools({ mode: 'detach' }),
 
-    /** On quit: an open offscreen view keeps Electron from exiting even after `quit` (found in B-04). */
+    /**
+     * The page that placed the user's tabs started over (a reload): nothing of it knows their ids any more, so they
+     * close, and the backend hears they are gone and lets go of what they held (a preview, 29 §8.1).
+     */
+    closeUserTabs(): void {
+      for (const tab of [...tabs.values()]) {
+        if (!tab.userFacing) continue;
+        forget(tab);
+        tab.view.webContents.close();
+        emit({ type: 'browser.gone', tabId: tab.tabId, reason: 'the app page started over' });
+      }
+    },
+
+    /**
+     * After the backend stopped on quit: what it left open, since an open offscreen view keeps Electron from exiting
+     * even after `quit` (found in B-04).
+     */
     closeAll(): void {
       for (const tab of [...tabs.values()]) {
         forget(tab);

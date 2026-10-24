@@ -277,6 +277,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     settings: settings.service,
     projects: projects.service,
     previews: previews.service,
+    dataDir: config.dataDir,
+    attemptFilesDir: (attemptId) => attempts.filesDirOf(attempts.service.get(attemptId)),
   });
   // Before the previews stop: a tab holds a preview's lease.
   server.addHook('preClose', () => browser.service.closeAll());
@@ -284,6 +286,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const deliveries = createDeliveryModule({ db: database.db, unit, clock, log });
   const acceptance = createAcceptanceModule({
     attempts: attempts.service,
+    browser: browser.service,
     roles: roles.service,
     settings: settings.service,
     prompts,
@@ -342,6 +345,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     plans: plans.service,
     nodes: nodes.service,
     attempts: attempts.service,
+    browser: browser.service,
     attachments: attachments.service,
     requirements: requirements.service,
     inbox: inbox.service,
@@ -424,6 +428,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   mcp.register(server);
   attempts.registerRoutes(server);
+  browser.registerRoutes(server);
   attachments.registerRoutes(server);
   const operations: OperationImpl[] = [
     ...settings.operations,

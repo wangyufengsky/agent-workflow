@@ -29,6 +29,8 @@ export const BuiltinWorkflowKey = {
 
 const projectCheck = { kind: AcceptanceCheckKind.Command, command: PROJECT_CHECK_PLACEHOLDER } as const;
 const aiReview = (focus: string) => ({ kind: AcceptanceCheckKind.AiReview, focus }) as const;
+/** The project's key pages at the default viewports; dropped when the project has no preview (29 §7.1). */
+const pageCheck = { kind: AcceptanceCheckKind.Browser } as const;
 const checked: Acceptance = { checks: [projectCheck], manual: false };
 const unchecked: Acceptance = { checks: [], manual: false };
 const noCheckpoints = { confirm_plan: false, accept_each_node: false };
@@ -39,7 +41,7 @@ const finalVerify = (instructions: string, focus: string) => ({
   roleKey: BuiltinRoleKey.Developer,
   instructions,
   dependsOn: [],
-  acceptance: { checks: [projectCheck, aiReview(focus)], manual: false },
+  acceptance: { checks: [projectCheck, pageCheck, aiReview(focus)], manual: false },
   position: RequiredStepPosition.Last,
 });
 
@@ -90,7 +92,7 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
               '按上一步找到的根因修复问题（修根因，不是掩盖症状，不加兜底逻辑），让复现测试通过，且不破坏其他测试。',
             dependsOn: ['locate'],
             acceptance: {
-              checks: [projectCheck, aiReview('是否修复了根因而非绕过症状，是否引入了兜底逻辑')],
+              checks: [projectCheck, pageCheck, aiReview('是否修复了根因而非绕过症状，是否引入了兜底逻辑')],
               manual: false,
             },
           },

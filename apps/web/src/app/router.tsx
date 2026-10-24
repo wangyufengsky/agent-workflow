@@ -156,13 +156,14 @@ const taskRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.task,
   // `?node=<id>` selects a step on the canvas; `open` shows its details drawer (14 §3.4) on its `tab`; `details` shows
-  // the pro view of this task in simple mode (D19).
+  // the pro view of this task in simple mode (D19); `view=preview` the preview tab (29 §8.1).
   validateSearch: z.object({
     node: z.string().optional(),
     open: z.boolean().optional(),
     tab: z.enum(NodeTab).optional(),
     details: z.boolean().optional(),
-    preview: z.boolean().optional(),
+    // The preview tab (29 §8.1); the progress tab without it.
+    view: z.literal('preview').optional(),
   }),
   component: TaskPage,
 });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { previewSessionsSchema } from '../contracts/api/browser.ts';
 import {
   deliverRequestSchema,
   requestChangesSchema,
@@ -64,6 +65,17 @@ export const getTaskOp = defineOperationContract({
   http: { method: 'GET', path: '/tasks/:id' },
 });
 
+export const listPreviewSessionsOp = defineOperationContract({
+  ...common,
+  id: 'tasks.previewSessions',
+  title: 'op.tasks.previewSessions',
+  description: 'The AI sessions of a task that used the browser and the steps whose page check left screenshots',
+  input: byId,
+  output: previewSessionsSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/preview/sessions' },
+});
+
 export const getTaskTimelineOp = defineOperationContract({
   ...common,
   id: 'tasks.timeline',
@@ -118,7 +130,7 @@ export const skipCheckOp = defineOperationContract({
   refs: { id: InputRef.Task },
   title: 'op.tasks.skipCheck',
   description:
-    "Skip the check command the app's environment could not run in the task's unfinished steps and go on; the result is marked unverified",
+    "Skip the check the app's environment could not run (a check command, or the page check when the preview never started) in the task's unfinished steps and go on; the result is marked unverified",
   input: byId,
   output: taskDetailSchema,
   risk: OperationRisk.Critical,
@@ -355,8 +367,8 @@ export const requestChangesOp = defineOperationContract({
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/request-changes' },
-  // As for tasks.create: the assistant cannot attach files yet (30 §2.2).
-  assistantOmit: ['attachmentIds'],
+  // A preview tab is the user's own: the assistant has none to attach. Nor can it attach files yet (30 §2.2).
+  assistantOmit: ['page', 'attachmentIds'],
 });
 
 export const reviewCommentsOp = defineOperationContract({

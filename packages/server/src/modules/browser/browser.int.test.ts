@@ -5,19 +5,25 @@ import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import {
   AttemptStatus,
+  type BrowserPortEvent,
   clearSiteLoginOp,
   closeUserTabOp,
   ErrorCode,
   listSiteLoginsOp,
+  navigateUserTabOp,
   openLoginTabOp,
+  openUserTabOp,
   ServerEventType,
   type SiteAccess,
+  setUserViewportOp,
   updateProjectOp,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
+import { waitForEvent } from '../../../test/helpers/events.ts';
 import { addProject, createTask, taskReaches } from '../../../test/helpers/tasks.ts';
+import type { BrowserHost } from './browser.host.ts';
 import type { BrowserOwner } from './browser.service.ts';
 import { createChromiumHost } from './host.chromium.ts';
 
@@ -273,5 +279,100 @@ createServer((req, res) => {
       },
     });
     await expect(browser.snapshot(owner)).rejects.toMatchObject({ code: ErrorCode.ValidationFailed });
+  });
+});
+
+/** The Chromium host, and a way to report a tab gone as main does when the app's page starts over (29 §8.1). */
+function reportingGone(inner: BrowserHost) {
+  const listeners = new Set<(event: BrowserPortEvent) => void>();
+  const wrapped: BrowserHost = {
+    request: (op) => inner.request(op),
+    onEvent(listener) {
+      listeners.add(listener);
+      const off = inner.onEvent(listener);
+      return () => {
+        listeners.delete(listener);
+        off();
+      };
+    },
+  };
+  const gone = (tabId: string) => {
+    for (const listener of listeners) listener({ type: 'browser.gone', tabId, reason: 'the app page started over' });
+  };
+  return { host: wrapped, gone };
+}
+
+describe('浏览器：用户自己的预览标签页（29 §8.1）', () => {
+  it('打开任务预览的首个关键页面，切换路径与尺寸，地址与当前页面的错误数随事件更新；关闭或页面重新加载后不能再用', async () => {
+    const reporting = reportingGone(host);
+    t = await createTestApp({ browserHost: reporting.host });
+    const { project } = await addProject(t, {
+      files: {
+        'server.mjs': `import { createServer } from 'node:http';
+const pages = {
+  '/orders': '<title>订单</title><h1>订单</h1>',
+  '/broken': '<title>坏了</title><img src="/missing.png"><script>console.error("boom")</script>',
+};
+createServer((req, res) => {
+  const body = pages[req.url];
+  res.writeHead(body === undefined ? 404 : 200, { 'content-type': 'text/html; charset=utf-8' });
+  res.end(body ?? 'not found');
+}).listen(Number(process.env.PORT), '127.0.0.1', () => console.log('listening'));`,
+      },
+    });
+    await t.call(updateProjectOp, {
+      id: project.id,
+      preview: {
+        command: 'node server.mjs',
+        setupCommand: null,
+        readyPath: '/orders',
+        pages: ['/orders'],
+        extraOrigins: [],
+      },
+    });
+    const reviewing = taskReaches(t, 'plan_review');
+    const task = await createTask(t, {
+      projectId: project.id,
+      workflow: 'bugfix',
+      checkpoints: { confirm_plan: true },
+    });
+    await reviewing;
+    const tabUpdated = (
+      matches: (s: { url: string; consoleErrors: number; failedRequests: number; viewport: string }) => boolean,
+    ) => waitForEvent(t.app.events, ServerEventType.BrowserTabUpdated, matches);
+
+    const ordersShown = tabUpdated((s) => s.url.endsWith('/orders'));
+    const { status, body: opened } = await t.call(openUserTabOp, { taskId: task.id });
+    expect(status).toBe(201);
+    expect(opened).toMatchObject({ taskId: task.id, viewport: 'desktop' });
+    expect(await ordersShown).toMatchObject({ tabId: opened.tabId, consoleErrors: 0, failedRequests: 0 });
+
+    const broken = tabUpdated((s) => s.url.endsWith('/broken') && s.consoleErrors === 1 && s.failedRequests === 1);
+    await t.call(navigateUserTabOp, { tabId: opened.tabId, path: '/broken' });
+    await broken;
+    // What a change request of the user carries along with their feedback (29 §2.3).
+    const note = t.app.services.browser.pageNote(task.id, opened.tabId);
+    expect(note).toContain('looking at /broken of the preview (desktop, 1280×800)');
+    expect(note).toContain('- boom');
+    expect(note).toMatch(/- GET http:\/\/127\.0\.0\.1:\d+\/missing\.png → 404/);
+    expect(() => t.app.services.browser.pageNote('another-task', opened.tabId)).toThrow(
+      expect.objectContaining({ code: ErrorCode.ValidationFailed }),
+    );
+    // Errors count per page: back on a clean page they start over.
+    const clean = tabUpdated((s) => s.url.endsWith('/orders'));
+    await t.call(navigateUserTabOp, { tabId: opened.tabId, path: '/orders' });
+    expect(await clean).toMatchObject({ consoleErrors: 0, failedRequests: 0 });
+
+    const mobile = tabUpdated((s) => s.viewport === 'mobile');
+    await t.call(setUserViewportOp, { tabId: opened.tabId, preset: 'mobile' });
+    await mobile;
+
+    expect((await t.call(closeUserTabOp, { tabId: opened.tabId })).status).toBe(204);
+    expect((await t.call(navigateUserTabOp, { tabId: opened.tabId, path: '/orders' })).status).toBe(404);
+
+    // Main closed it because the app's page started over: the backend lets go of it as well.
+    const { body: again } = await t.call(openUserTabOp, { taskId: task.id });
+    reporting.gone(again.tabId);
+    expect((await t.call(navigateUserTabOp, { tabId: again.tabId, path: '/orders' })).status).toBe(404);
   });
 });

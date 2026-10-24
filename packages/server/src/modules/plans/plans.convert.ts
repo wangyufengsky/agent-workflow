@@ -10,11 +10,12 @@ import {
 
 type NodeAcceptanceInput = NonNullable<SubmitPlanInput['nodes'][number]['acceptance']>;
 
-/** The model's shorthand (`command` / `ai_review` / `manual`) as an acceptance definition. */
+/** The model's shorthand (`command` / `pages` / `ai_review` / `manual`) as an acceptance definition. */
 function toAcceptance(input: NodeAcceptanceInput): Acceptance {
   return {
     checks: [
       ...(input.command === undefined ? [] : [{ kind: AcceptanceCheckKind.Command, command: input.command }]),
+      ...(input.pages === undefined ? [] : [{ kind: AcceptanceCheckKind.Browser, pages: input.pages }]),
       ...(input.ai_review === true ? [{ kind: AcceptanceCheckKind.AiReview }] : []),
     ],
     manual: input.manual ?? false,

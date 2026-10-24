@@ -20,6 +20,13 @@ export function checkPlan(graph: PlanGraph, rules: PlanRules, lock: PlanLock | u
         (n.acceptance?.checks ?? []).some((c) => c.kind === AcceptanceCheckKind.Command && blank(c.command)),
     )
     .map((n) => ({ key: n.key, message: C.incomplete(n.key) }));
+  const badPages = graph.nodes
+    .filter((n) =>
+      (n.acceptance?.checks ?? []).some(
+        (c) => c.kind === AcceptanceCheckKind.Browser && (c.pages ?? []).some((p) => !p.startsWith('/')),
+      ),
+    )
+    .map((n) => ({ key: n.key, message: C.badPages(n.key) }));
   const problems = validatePlanGraph(graph, rules).map((p) => ({
     key: p.nodeKey,
     message: `${PLAN_PROBLEM_LABEL[p.code]}${p.nodeKey === undefined ? '' : `（${p.nodeKey}）`}`,
@@ -27,6 +34,7 @@ export function checkPlan(graph: PlanGraph, rules: PlanRules, lock: PlanLock | u
   const changed = lock === undefined ? [] : lockedChanges(lock.base, graph, lock.locked);
   return [
     ...incomplete,
+    ...badPages,
     ...problems,
     ...(changed.length === 0 ? [] : [{ key: undefined, message: C.lockedChanged(changed) }]),
   ];

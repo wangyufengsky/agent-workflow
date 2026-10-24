@@ -53,6 +53,10 @@ async function openApp({ win, webPreferences }: Window, b: Backend): Promise<voi
   win.webContents.on('will-navigate', (event, target) => {
     if (!target.startsWith(url)) event.preventDefault();
   });
+  // A reload starts the page over: nothing of it knows the user's tabs any more, so they close (29 §8.1).
+  win.webContents.on('did-start-navigation', (details) => {
+    if (details.isMainFrame && !details.isSameDocument) b.browser.closeUserTabs();
+  });
   await win.loadURL(url);
 }
 
@@ -111,6 +115,8 @@ async function finishQuit(running: Backend): Promise<void> {
   // 窗口已关闭；先结束本应用默认会话的请求与预连接，避免后端等待 NetworkService 的空闲 socket。
   await session.defaultSession.closeAllConnections();
   await running.stop();
+  // The backend closed its own tabs as it stopped; what is left would keep Electron from exiting (B-04).
+  running.browser.closeAll();
   app.quit();
 }
 
@@ -119,7 +125,6 @@ app.on('before-quit', () => companion?.beforeQuit());
 app.on('will-quit', (event) => {
   const running = backend;
   if (running === undefined) return;
-  running.browser.closeAll();
   // Quit again once the backend has stopped opencode and exited (17 §3.5).
   event.preventDefault();
   backend = undefined;

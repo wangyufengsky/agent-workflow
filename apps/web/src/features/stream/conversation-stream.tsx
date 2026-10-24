@@ -11,7 +11,7 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { attemptQuery, attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
-import { ActionBar, ActionGroup } from './action-bar.tsx';
+import { ActionBar, ActionGroup, StreamAttemptContext } from './action-bar.tsx';
 import { ClampedText } from './clamped-text.tsx';
 import { LatestButton } from './latest-button.tsx';
 import styles from './stream.module.css';
@@ -200,11 +200,13 @@ function Box({
               </p>
             )}
             {items.length === 0 && <p className="hint">{C.empty}</p>}
-            {items.map((item) => (
-              <div key={item.key} className={styles.item} data-enter={!initial.has(item.key)}>
-                <Item item={item} pro={pro} />
-              </div>
-            ))}
+            <StreamAttemptContext.Provider value={attempt.id}>
+              {items.map((item) => (
+                <div key={item.key} className={styles.item} data-enter={!initial.has(item.key)}>
+                  <Item item={item} pro={pro} />
+                </div>
+              ))}
+            </StreamAttemptContext.Provider>
             {more}
           </div>
           {!stick.following && <LatestButton unseen={stick.unseen} onClick={stick.toLatest} />}

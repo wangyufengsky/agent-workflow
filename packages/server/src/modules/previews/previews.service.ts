@@ -68,6 +68,14 @@ export function createPreviewsService({
   const entries = new Map<string, Entry>();
   /** Worktrees whose setup command succeeded since the app started. */
   const setUp = new Set<string>();
+  /** Tasks whose preview became ready at least once since the app started (29 §7.4). */
+  const ran = new Set<string>();
+  /** Page checks waiting for room under the limit (29 §4.4); woken when a preview stops or a tab lets go of one. */
+  const waiting = new Set<() => void>();
+  const wake = () => {
+    for (const resume of waiting) resume();
+    waiting.clear();
+  };
 
   function toPreview(taskId: string, entry: Entry | undefined): Preview {
     return {
@@ -82,6 +90,7 @@ export function createPreviewsService({
     const to = transition(previewMachine, entry.state, event);
     log.info({ taskId: entry.taskId, from: entry.state, to, event }, 'preview transition');
     entry.state = to;
+    if (to === PreviewState.Stopped || to === PreviewState.Failed) wake();
     events.publish({ type: ServerEventType.PreviewUpdated, data: toPreview(entry.taskId, entry) });
   }
 
@@ -94,19 +103,42 @@ export function createPreviewsService({
     });
   }
 
-  /** Under `preview.maxRunning` (29 §4.4): the longest-idle preview without tabs stops to make room. */
-  async function makeRoom(taskId: string): Promise<void> {
-    const active = [...entries.values()].filter((e) => e.taskId !== taskId && ACTIVE.includes(e.state));
-    if (active.length < settings.get('preview.maxRunning')) return;
-    const idle = active
-      .filter((e) => e.state === PreviewState.Running && e.leases === 0)
-      .sort((a, b) => a.idleSince - b.idleSince)[0];
-    if (idle === undefined) {
-      throw new AppError(ErrorCode.PreviewLimitReached, 'Every running preview is in use', {
-        maxRunning: settings.get('preview.maxRunning'),
-      });
+  /** Resolves when room may have freed up, or when `signal` aborts. */
+  const room = (signal: AbortSignal) =>
+    new Promise<void>((resolve) => {
+      const resume = () => {
+        signal.removeEventListener('abort', resume);
+        waiting.delete(resume);
+        resolve();
+      };
+      waiting.add(resume);
+      signal.addEventListener('abort', resume, { once: true });
+    });
+
+  /**
+   * Under `preview.maxRunning` (29 §4.4): the longest-idle preview without tabs stops to make room. When every one
+   * is in use, `queue` waits for room (a page check) until it aborts; otherwise PREVIEW_LIMIT_REACHED.
+   */
+  async function makeRoom(taskId: string, queue: AbortSignal | undefined): Promise<void> {
+    for (;;) {
+      const active = [...entries.values()].filter((e) => e.taskId !== taskId && ACTIVE.includes(e.state));
+      if (active.length < settings.get('preview.maxRunning')) return;
+      const idle = active
+        .filter((e) => e.state === PreviewState.Running && e.leases === 0)
+        .sort((a, b) => a.idleSince - b.idleSince)[0];
+      if (idle !== undefined) {
+        await stop(idle.taskId);
+        return;
+      }
+      if (queue === undefined) {
+        throw new AppError(ErrorCode.PreviewLimitReached, 'Every running preview is in use', {
+          maxRunning: settings.get('preview.maxRunning'),
+          taskIds: active.map((e) => e.taskId),
+        });
+      }
+      queue.throwIfAborted();
+      await room(queue);
     }
-    await stop(idle.taskId);
   }
 
   async function launch(entry: Entry, directory: string, config: ProjectPreview): Promise<Preview> {
@@ -136,6 +168,7 @@ export function createPreviewsService({
         throw new AppError(ErrorCode.PreviewStartFailed, 'Stopped while starting', { logTail: previewLog.tail() });
       }
       entry.process = running;
+      ran.add(entry.taskId);
       move(entry, PreviewEvent.Ready);
       void running.exited.then(() => {
         // Stopping moved it out of running before ending the process.
@@ -187,8 +220,18 @@ export function createPreviewsService({
     },
     get: (taskId: string): Preview => toPreview(taskId, entries.get(taskId)),
 
-    /** Starts the task's preview, or joins a start in progress; resolves once it is running (29 §4.2). */
-    async start(taskId: string): Promise<Preview> {
+    /**
+     * Whether the task's preview was ever ready since the app started: a start failing after that is the change's
+     * doing, before it the environment's (29 §7.4, D116).
+     */
+    hasRun: (taskId: string): boolean => ran.has(taskId),
+
+    /** The project of the task whose preview this is (its worktree's). */
+    /**
+     * Starts the task's preview, or joins a start in progress; resolves once it is running (29 §4.2). `queue`: wait
+     * for room under the limit instead of failing (a page check, 29 §4.4).
+     */
+    async start(taskId: string, { queue }: { queue?: AbortSignal } = {}): Promise<Preview> {
       const existing = entries.get(taskId);
       if (existing?.state === PreviewState.Running) return toPreview(taskId, existing);
       if (existing?.starting !== null && existing?.starting !== undefined) return existing.starting;
@@ -205,7 +248,7 @@ export function createPreviewsService({
           projectId: worktree.projectId,
         });
       }
-      await makeRoom(taskId);
+      await makeRoom(taskId, queue);
       const entry: Entry = existing ?? {
         taskId,
         state: PreviewState.Stopped,
@@ -244,6 +287,7 @@ export function createPreviewsService({
       if (entry === undefined) return;
       entry.leases -= 1;
       scheduleIdle(entry);
+      if (entry.leases === 0) wake();
     },
 
     /** Starts the project's preview once in its main workspace, without the setup command, and stops it again. */

@@ -37,6 +37,8 @@ packages/builtin/
 
 流程中验收命令写作 `$PROJECT_CHECK`，计划确认物化节点时替换；项目未设置时该检查被移除（不报错），只保留其他检查。替换后的命令冻结在步骤上，之后改项目的检查命令不影响已确认的计划；任务因检查命令失败后，用户可以「修改检查命令」改写这个任务未完成步骤中的命令（可同时设为项目的检查命令），检查命令在应用环境里无法运行时还可以「跳过这项检查」（D116，09 §3）。
 
+页面体检（v1.3，29 §7）同理：流程里写 `{ kind: 'browser' }` 不带页面时，物化时冻结项目页面预览的关键页面（`preview.pages`），视口省略时为桌面与手机；项目没有页面预览时该检查被移除。规划可以给改页面的步骤写 `acceptance.pages`（12 §6.4），任务上下文的 `project.previewPages` 告诉规划项目有没有预览。
+
 
 ## 2. 内置角色
 
@@ -57,7 +59,7 @@ packages/builtin/
 | deliverable | `code_changes` |
 | allowedRoles | `developer` `tester` |
 | 规划指引 | 2–8 个节点；先数据/接口后实现后测试；能并行的节点不要串行依赖 |
-| requiredSteps | `final_verify`（position: last）·「整体验证」· developer · 「运行完整检查，修复本任务引入的失败，确认需求每一条都已实现」· acceptance `{ checks: [command $PROJECT_CHECK, ai_review(focus: 需求完整性与正确性)], manual: false }` |
+| requiredSteps | `final_verify`（position: last）·「整体验证」· developer · 「运行完整检查，修复本任务引入的失败，确认需求每一条都已实现」· acceptance `{ checks: [command $PROJECT_CHECK, browser, ai_review(focus: 需求完整性与正确性)], manual: false }`（`browser` 为页面体检，项目没有预览时移除） |
 | defaultAcceptance | `{ checks: [command $PROJECT_CHECK], manual: false }` |
 | checkpoints | confirm_plan `false`，accept_each_node `false` |
 
@@ -68,7 +70,7 @@ packages/builtin/
 | planning | `fixed` |
 | deliverable | `code_changes` |
 | template | `locate`「定位根因」developer：复现问题，写一个能稳定复现的失败测试，在 notes 中写明根因与证据；不修复 → `fix`「修复」developer：修复根因（不是掩盖症状），让复现测试通过，不破坏其他测试 |
-| acceptance | `locate`：无检查；`fix`：`[command $PROJECT_CHECK, ai_review(focus: 是否修复根因而非绕过症状，是否引入兜底逻辑)]` |
+| acceptance | `locate`：无检查；`fix`：`[command $PROJECT_CHECK, browser, ai_review(focus: 是否修复根因而非绕过症状，是否引入兜底逻辑)]` |
 | checkpoints | 全部 `false` |
 
 ### 3.3 `unit_tests` · 补单元测试
@@ -99,7 +101,7 @@ packages/builtin/
 | deliverable | `code_changes` |
 | allowedRoles | `developer` `tester` |
 | 规划指引 | 行为保持不变；每个节点后测试都应通过；拆成可独立验证的小步 |
-| requiredSteps | `baseline`（position: first）·「建立基线」· tester ·「运行现有测试并记录结果；若重构范围缺少覆盖，先补特征测试」→ `final_verify`（position: last）·「整体验证」· developer · acceptance `[command $PROJECT_CHECK, ai_review(focus: 外部行为是否保持不变)]` |
+| requiredSteps | `baseline`（position: first）·「建立基线」· tester ·「运行现有测试并记录结果；若重构范围缺少覆盖，先补特征测试」→ `final_verify`（position: last）·「整体验证」· developer · acceptance `[command $PROJECT_CHECK, browser, ai_review(focus: 外部行为是否保持不变)]` |
 | defaultAcceptance | `{ checks: [command $PROJECT_CHECK], manual: false }` |
 
 > requiredSteps 的 `position`：`first` 要求其他所有节点（传递地）依赖它；`last` 要求它（传递地）依赖所有其他节点。违反时 `PLAN_INVALID` 子码 `REQUIRED_STEP_ORDER`。

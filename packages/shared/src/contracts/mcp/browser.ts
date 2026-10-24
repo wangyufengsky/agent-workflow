@@ -33,6 +33,8 @@ export const browserActionOutputSchema = browserPageSchema.extend({
     exceptions: z.number().int(),
     requests: z.number().int(),
   }),
+  /** The frame kept for the user to watch (`f<n>.jpg`, 29 §5.7): the process view links the action to it. */
+  frame: z.string(),
 });
 export type BrowserActionOutput = z.infer<typeof browserActionOutputSchema>;
 
@@ -65,7 +67,7 @@ export const browserWaitForInputSchema = z
   .refine((input) => (input.text === undefined) !== (input.textGone === undefined), {
     message: 'Give exactly one of text and textGone',
   });
-export const browserWaitForOutputSchema = browserPageSchema.extend({ met: z.boolean() });
+export const browserWaitForOutputSchema = browserPageSchema.extend({ met: z.boolean(), frame: z.string() });
 
 export const browserInspectInputSchema = z.object({ ref: refSchema });
 export const browserInspectOutputSchema = z.object({

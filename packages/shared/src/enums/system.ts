@@ -120,6 +120,10 @@ export const ServerEventType = {
   ScheduleUpdated: 'schedule.updated',
   /** A task's page preview changed state (29 §4.2). */
   PreviewUpdated: 'preview.updated',
+  /** An AI browser action left a frame (29 §8.2). */
+  BrowserFrame: 'browser.frame',
+  /** The user's preview tab changed page, viewport or error counts (29 §8.1). */
+  BrowserTabUpdated: 'browser.tab_updated',
   Resync: 'resync',
 } as const;
 export type ServerEventType = (typeof ServerEventType)[keyof typeof ServerEventType];

@@ -201,13 +201,13 @@ type Acceptance = {
 | role_id | TEXT → roles | |
 | instructions | TEXT | |
 | depends_on | TEXT(JSON) | node key 列表 |
-| acceptance | TEXT(JSON) | 解析后的 `Acceptance`（`NodeAcceptance`）：计划确认时冻结（13 §1）；用户可在任务失败后改写其中的命令检查，或给无法运行的命令检查标 `skipped: true`（D116） |
+| acceptance | TEXT(JSON) | 解析后的 `Acceptance`（`NodeAcceptance`）：计划确认时冻结（13 §1；页面体检冻结 `pages` 与 `viewports`，项目没有预览时移除，29 §7.1）；用户可在任务失败后改写其中的命令检查，或给无法运行的命令检查、页面体检标 `skipped: true`（D116） |
 | kind | TEXT | `normal` / `revise` |
 | status | TEXT | `NodeStatus` |
 | attempt_count | INTEGER | 消耗的预算 |
 | retry_feedback | TEXT NULL | 下次尝试附带 |
 | result | TEXT(JSON) NULL | 最近一次 `submit_result` 内容 |
-| check_results | TEXT(JSON) NULL | 当前这份结果的检查结果；交了新结果或重新检查（D116）进入 `verifying` 时置空，检查全部跑完后写入，所以检查中为 NULL（上次没通过的原因在 `retry_feedback`）。`CheckResult[]`：命令检查 `{ kind: command, command, passed, output, exitCode, timedOut, unrunnable, skipped }`（输出保留末尾 `ACCEPTANCE_OUTPUT_MAX_CHARS`；`unrunnable: { program, reason } | null` 为应用环境无法运行，`skipped` 为用户跳过、未运行且不挡住步骤（`passed` 为 true），D116；之前写入的行没有这两项，读出为 `null` / `false`）；AI 评审 `{ kind: ai_review, focus, passed, output, attemptId, issues[] }` |
+| check_results | TEXT(JSON) NULL | 当前这份结果的检查结果；交了新结果或重新检查（D116）进入 `verifying` 时置空，检查全部跑完后写入，所以检查中为 NULL（上次没通过的原因在 `retry_feedback`）。`CheckResult[]`：命令检查 `{ kind: command, command, passed, output, exitCode, timedOut, unrunnable, skipped }`（输出保留末尾 `ACCEPTANCE_OUTPUT_MAX_CHARS`；`unrunnable: { program, reason } | null` 为应用环境无法运行，`skipped` 为用户跳过、未运行且不挡住步骤（`passed` 为 true），D116；之前写入的行没有这两项，读出为 `null` / `false`）；AI 评审 `{ kind: ai_review, focus, passed, output, attemptId, issues[] }`；页面体检 `{ kind: browser, passed, pages: [{ path, viewport, httpStatus, errors, warnings, screenshot }], output, unrunnable: { reason, logTail } \| null, skipped }`（v1.3，29 §7.4） |
 | commit_sha | TEXT NULL | |
 | position | INTEGER | 画布与列表排序 |
 | created_at / updated_at / started_at / finished_at | INTEGER | |
@@ -300,7 +300,7 @@ payload / response：
 
 ## 3. JSONL 会话流
 
-运行目录 `runs/<taskId>/`（或 `runs/knowledge/` 等）里还有页面预览的输出 `preview.log` 与浏览器截图 `browser/<attemptId>/`（v1.3，29 §4.2、§5.7），读会话流时只读 `*.jsonl`。
+运行目录 `runs/<taskId>/`（或 `runs/knowledge/` 等）里还有页面预览的输出 `preview.log` 与浏览器截图、动作画面及其索引 `browser/<attemptId>/`（`<n>.jpg`、`f<n>.jpg`、`frames.jsonl`）、页面体检截图 `browser/checks/`（v1.3，29 §4.2、§5.7），读会话流时只读 `*.jsonl`。
 
 路径：`<数据目录>/runs/<taskId>/<attemptId>.jsonl`（调试尝试为 `runs/debug/<attemptId>.jsonl`，知识问答的 `research` 尝试为 `runs/knowledge/<attemptId>.jsonl`，PPT 的尝试为 `runs/ppt/<attemptId>.jsonl`）。每次尝试一个文件，只追加（同步追加，保持事件顺序），由尝试模块把 opencode 事件转换后写入，同时经 SSE 推送 `attempt.transcript` 事件。schema 为 `shared/contracts/api/attempts.ts` 的 `transcriptEntrySchema`。
 

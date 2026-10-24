@@ -174,6 +174,7 @@ export const STREAM_COPY = {
     string
   >,
   failedNote: '失败',
+  frame: '画面',
   toolName: '内部工具名',
   input: '输入',
   output: '输出',

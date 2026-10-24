@@ -359,6 +359,21 @@
 | B-07 | **已完成**（另加网站登录的 4 个操作，E2E J26）。项目设置「页面预览」（推断预填、试运行）；设置「网站」（规则列表、网站登录、退出登录） | E2E：两处设置的保存与试运行；四主题走查截图 |
 | B-08 | **已完成**。文档同步：02、03（扩展点、依赖、目录）、07、08、10、11、12、13、14、17 | 文档与代码一致；`pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
 
+### B2 · 页面体检与预览界面
+
+> 状态：**B2 已完成**（2026-10-24，分支 `feat/B2-browser`；验收：本机 macOS `pnpm verify`、`pnpm e2e`（含 J28、J29 与四主题走查）、`pnpm playwright test browser-host.electron launch.electron overlays.electron preview.electron --project electron`、`live/browser.live.test.ts` 默认模型一例到待合并且整体验证的页面体检通过）。范围见 29 §13 的 B2 一行；依据 29 §7（页面体检）、§8（界面）、§5.7（动作画面）、§2.3（附上当前页面）。
+
+| # | 任务 | 完成标准 |
+| --- | --- | --- |
+| B2-01 | **已完成**（计划物化随之提前到这里：节点上的页面体检冻结项目关键页面与默认视口，项目没有预览即移除；四个新操作的契约先定义，随 B2-04 / B2-05 的实现挂进操作清单）。shared 契约：`AcceptanceCheckKind.Browser`；计划与节点里的页面体检配置（`pages`、`viewports`，节点上冻结、可标 `skipped`）；`checkResultSchema` 的 `browser` 结果（每页每视口的错误、提醒、截图）；`CheckUnrunnableReason` 加 `preview_never_started` / `preview_not_configured`；`BROWSER_CHECK_UNRUNNABLE`；SSE `browser.frame`；用户标签页的操作契约（`browser.openUserTab` / `navigateUserTab` / `setUserViewport`）；`tasks.requestChanges` 的 `page`；界面文案表随之补齐 | 类型检查与单测通过；08、09、10、11 同步 |
+| B2-02 | **已完成**（预览从没启动过按「自应用启动以来这个任务的预览从没就绪过」判断；达到上限时体检排队由 `previews.start` 的 `queue` 实现；截图为 JPEG）。后端页面体检：`acceptance` 的页面体检经 `browser` 模块的 `check` 标签页逐页逐视口打开、等稳定、收集事实（主文档状态、异常、`console.error`、失败与被拦的请求、横向溢出、axe-core 的严重问题）并截全页图；判定为纯函数 `pageCheckVerdict`；检查顺序固定为命令 → 页面体检 → AI 评审；预览从没启动过或配置被删为「无法运行」（D116 的同一套：不发回 AI、不消耗预算、可修改预览设置后重新检查或跳过），启动过而这次起不来按普通检查失败；截图在 `runs/<taskId>/browser/checks/`，`GET /tasks/:taskId/browser/:file` | 单测：`pageCheckVerdict` 每条规则；集成测试（真实 Chromium + 真实开发服务器）：通过、异常不通过、404 脚本不通过、接口 4xx 只提醒、从没启动过为无法运行且可跳过、启动过后起不来为检查失败 |
+| B2-03 | **已完成**（`get_task_context` 的 `project.previewPages` 让规划知道项目有没有预览；`submit_plan` 的参数为 `acceptance.pages`；内置流程定义变化即由启动同步出新版本，沿用已有的同步测试；检查编辑器补上「页面体检」，否则编辑内置步骤的其他检查会丢掉它，J8 覆盖）。内置流程与规划：`feature` / `refactor` 的「整体验证」与 `bugfix` 的「修复」加页面体检；`submit_plan` 的验收参数可以要求页面体检（可写页面）；规划指引写明改页面的步骤加页面体检并给出页面；13、12 同步 | 集成测试：有预览的项目物化出带页面的体检，没有预览的项目不带；规划提交的页面体检被冻结；内置流程同步出新版本 |
+| B2-04 | **已完成**（画面的索引为尝试目录里的 `frames.jsonl`，尝试结束与重启后照样列出；`browser_snapshot` 等只读工具不留画面）。动作画面：AI 每个动作后存一张缩略图（`Page.captureScreenshot` 的 `clip.scale`，JPEG），SSE `browser.frame`，`GET /attempts/:attemptId/browser/:file` 与列出一次尝试画面的操作 | 集成测试：动作后有画面文件与事件，没有任务的尝试也能取到 |
+| B2-05 | **已完成**（计数经 SSE `browser.tab_updated`；`openUserTab` 达到上限时直接报 `PREVIEW_LIMIT_REACHED`，界面在 B2-06 显示「达到上限」；Electron 用例 J27 用设置的网站登录区域验证浮层，顺带修了「完成」后 main 对已关闭标签页 `place(null)` 抛错、应用无法退出的问题）。用户标签页与浮层：`browser.openUserTab`（启动预览、登记使用、项目分区 `persist:aw-preview-<projectId>`）/ `navigateUserTab` / `setUserViewport`，用户标签页的控制台错误与失败请求计数；界面上浮层（⌘K、⌘J、对话框）打开时隐藏所有放置中的原生视图，设置里的网站登录区域也用它 | 集成测试：用户标签页打开预览与切换路径；Electron E2E：⌘K 打开时视图隐藏、关闭后恢复 |
+| B2-06 | **已完成**（新增 `tasks.previewSessions` 与 `browser.userTabLogs`；`PREVIEW_LIMIT_REACHED` 带上占用中的任务；用户的标签页离开任务页时关闭；E2E J28，走查加两张）。任务页「进度 / 预览」页签：会话选择（我的预览、各尝试、各次体检）、地址栏与前进后退刷新、视口、底栏（预览状态、控制台错误与失败请求、专业模式的服务日志 / 开发者工具 / 重启服务）、预览状态的各个画面（未启动、启动中日志、启动失败、空闲停止、达到上限）、观看 AI 会话的动作画面（跟随最新、回到最新） | E2E：页签切换、各状态画面、观看画面；四主题走查 |
+| B2-07 | **已完成**（「附上当前页面」只附文字，截图随 30 的附件；动作行与画面经工具返回的 `frame` 对应；E2E J29，附上页面的文字由后端集成测试覆盖，浏览器 E2E 没有桌面版的标签页）。节点详情、结果卡与「附上当前页面」：体检结果（每页每视口一行、错误与提醒、缩略图放大）、「过程」里浏览器动作可展开看画面；结果卡「页面」区与「打开预览」；「让 AI 再改改」勾选附上当前页面（后端写入路径、视口、控制台错误、失败请求）；页面体检无法运行时失败页的出口（修改页面预览设置 / 跳过这项检查） | E2E：体检不通过 → 自动重试通过；无法运行 → 跳过；附上当前页面后意见里带上页面信息 |
+| B2-08 | **已完成**（live 沿用 B1 的 `browser.live.test.ts`，加断言：整体验证的页面体检通过、尝试留下画面；Electron J30 不需要模型；J30 顺带修了「预览标签页开着时退出卡住」与「重新加载后放置的视图留在窗口上」，单独一个提交）。收尾：真实模型 live（新功能流程带页面体检）、Electron 旅程（打开预览、观看画面）、文档同步（07、08、11、12、13、14、29） | `pnpm verify`、`pnpm e2e`、Electron 测试、live 一例通过；文档与代码一致 |
+
 ### 助手浏览器增补（2026-10-24）
 
 | # | 范围 | 验证与边界 |

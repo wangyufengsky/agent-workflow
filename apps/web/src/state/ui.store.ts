@@ -36,6 +36,9 @@ type UiState = {
   /** Conversation streams the user opened or closed (25 §4.5), by attempt id, kept until the app reloads. */
   streamOpen: Record<string, boolean>;
   setStreamOpen(attemptId: string, open: boolean): void;
+  /** The user's open preview tab of each task (29 §8.1): a change request may attach its page (29 §2.3). */
+  previewTabs: Record<string, string>;
+  setPreviewTab(taskId: string, tabId: string | null): void;
 };
 
 export type PendingForm = { seq: number; form: AssistantForm; values: Record<string, unknown> };
@@ -58,6 +61,12 @@ export const useUiStore = create<UiState>((set) => ({
   setPendingForm: (pendingForm) => set({ pendingForm }),
   streamOpen: {},
   setStreamOpen: (attemptId, open) => set((s) => ({ streamOpen: { ...s.streamOpen, [attemptId]: open } })),
+  previewTabs: {},
+  setPreviewTab: (taskId, tabId) =>
+    set((s) => {
+      const { [taskId]: _closed, ...rest } = s.previewTabs;
+      return { previewTabs: tabId === null ? rest : { ...rest, [taskId]: tabId } };
+    }),
 }));
 
 /** The prefill the assistant left for `form`, if any (15 §5: never a credential). */

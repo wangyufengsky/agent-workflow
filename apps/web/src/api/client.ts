@@ -48,6 +48,13 @@ export async function callOperation<I extends z.ZodObject, O extends z.ZodType>(
   return op.output.parse(res.status === 204 ? undefined : await res.json());
 }
 
+/** A file of a non-operation endpoint (a screenshot), with the same auth and error handling. */
+export async function getBlob(url: string): Promise<Blob> {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${apiToken()}` } });
+  if (!res.ok) throw new ApiError(res.status, errorResponseSchema.parse(await res.json()).error);
+  return res.blob();
+}
+
 /** GET of a non-operation endpoint (e.g. `/operations`), with the same auth and error handling. */
 export async function getJson<S extends z.ZodType>(url: string, schema: S): Promise<z.output<S>> {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${apiToken()}` } });

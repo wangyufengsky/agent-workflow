@@ -1,6 +1,8 @@
 import type { ErrorInfo } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
+import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -9,7 +11,7 @@ import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
-import { failedCommandOf, unrunnableDetails } from './failure-text.ts';
+import { failedCommandOf, pageUnrunnableDetails, unrunnableDetails } from './failure-text.ts';
 import { taskQuery, useSkipCheck, useUpdateCheckCommand } from './tasks.queries.ts';
 
 /**
@@ -19,8 +21,20 @@ import { taskQuery, useSkipCheck, useUpdateCheckCommand } from './tasks.queries.
 export function CheckFailureActions({ taskId, error, size }: { taskId: string; error: ErrorInfo; size?: 'sm' }) {
   const [open, setOpen] = useState<'edit' | 'skip' | undefined>(undefined);
   const command = failedCommandOf(error);
-  if (command === null) return null;
   const close = () => setOpen(undefined);
+  // A page check whose preview could not run (29 §7.4): fix the preview's settings and retry, or skip it.
+  if (pageUnrunnableDetails(error) !== undefined) {
+    return (
+      <>
+        <EditPreviewLink taskId={taskId} size={size} />
+        <Button size={size} onClick={() => setOpen('skip')}>
+          {C.skipCheck}
+        </Button>
+        {open === 'skip' && <SkipCheckDialog taskId={taskId} body={C.skipPageCheckBody} onClose={close} />}
+      </>
+    );
+  }
+  if (command === null) return null;
   return (
     <>
       <Button size={size} onClick={() => setOpen('edit')}>
@@ -32,8 +46,23 @@ export function CheckFailureActions({ taskId, error, size }: { taskId: string; e
         </Button>
       )}
       {open === 'edit' && <EditCheckDialog taskId={taskId} command={command} onClose={close} />}
-      {open === 'skip' && <SkipCheckDialog taskId={taskId} command={command} onClose={close} />}
+      {open === 'skip' && <SkipCheckDialog taskId={taskId} body={C.skipCheckBody(command)} onClose={close} />}
     </>
+  );
+}
+
+/** The project's preview settings; saving them and retrying checks the page again (29 §7.4). */
+function EditPreviewLink({ taskId, size }: { taskId: string; size: 'sm' | undefined }) {
+  const task = useQuery(taskQuery(taskId)).data;
+  if (task === undefined) return null;
+  return (
+    <Link
+      className={size === undefined ? 'btn secondary' : `btn secondary ${size}`}
+      to={ROUTES.project}
+      params={{ projectId: task.project.id }}
+    >
+      {C.editPreview}
+    </Link>
   );
 }
 
@@ -103,7 +132,7 @@ function EditCheckForm({
   );
 }
 
-function SkipCheckDialog({ taskId, command, onClose }: { taskId: string; command: string; onClose: () => void }) {
+function SkipCheckDialog({ taskId, body, onClose }: { taskId: string; body: string; onClose: () => void }) {
   const skip = useSkipCheck();
   return (
     <Dialog
@@ -133,7 +162,7 @@ function SkipCheckDialog({ taskId, command, onClose }: { taskId: string; command
       }
     >
       <p>
-        <Markdown inline source={C.skipCheckBody(command)} />
+        <Markdown inline source={body} />
       </p>
       {skip.isError && <ErrorState error={skip.error} />}
     </Dialog>

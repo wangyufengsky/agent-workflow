@@ -18,6 +18,7 @@ import {
 } from '@aw/shared';
 import { BACKEND_COMMITTER, gitFailure, type RepoLocks, runGit, unmergedFiles } from '../git/index.ts';
 import type { Node } from '../nodes/index.ts';
+import { acceptanceProject } from '../nodes/index.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 import { leafKeys } from './tasks.verify.ts';
@@ -46,7 +47,7 @@ export function createTaskChanges(
   state: TaskState,
   currentDelivery: (taskId: string) => DeliveryDTO | null,
 ) {
-  const { unit, prompts, projects, workflows, plans, nodes, inbox, locks } = deps;
+  const { unit, prompts, projects, workflows, plans, nodes, inbox, locks, browser } = deps;
   const { get, move } = state;
 
   /** Merges the target into the task worktree for a conflict step (13 §4); returns the conflicted files. */
@@ -119,7 +120,7 @@ export function createTaskChanges(
       const input = {
         taskId: task.id,
         planId: plan.id,
-        checkCommand: projects.getRecord(task.projectId).checkCommand,
+        ...acceptanceProject(projects.getRecord(task.projectId)),
         defaultAcceptance: workflow.definition.defaultAcceptance,
         acceptEachNode: task.checkpoints.accept_each_node,
       };
@@ -161,6 +162,7 @@ export function createTaskChanges(
       reason: RequestChangesRequest['reason'],
       feedback: string | undefined,
       attachmentIds: readonly string[] = [],
+      page?: RequestChangesRequest['page'],
     ): Promise<void> {
       const task = get(taskId);
       transition(taskMachine, task.status, TaskEvent.ChangesRequested);
@@ -171,8 +173,10 @@ export function createTaskChanges(
             issues: [{ path: ['feedback'], message: 'required when reason is user' }],
           });
         }
+        // The page the user looked at goes with the feedback, read from their own tab (29 §2.3).
+        const withPage = page === undefined ? feedback : `${feedback}\n\n${browser.pageNote(taskId, page.tabId)}`;
         instructions = renderTemplate(prompts[PromptName.Revise], {
-          feedback,
+          feedback: withPage,
           resultSummary: task.result?.summary ?? '',
         });
       } else {

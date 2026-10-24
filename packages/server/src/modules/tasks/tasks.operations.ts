@@ -12,6 +12,7 @@ import {
   getRequirementsOp,
   getTaskOp,
   getTaskTimelineOp,
+  listPreviewSessionsOp,
   listTasksOp,
   nodeDiffFileOp,
   nodeDiffOp,
@@ -41,6 +42,7 @@ import type { TasksService } from './tasks.service.ts';
 export function tasksOperations(tasks: TasksService) {
   return [
     implement(listTasksOp, (query) => tasks.list(query)),
+    implement(listPreviewSessionsOp, ({ id }) => tasks.previewSessions(id)),
     implement(createTaskOp, (input) => tasks.create(input)),
     implement(getTaskOp, ({ id }) => tasks.detail(id)),
     implement(getRequirementsOp, ({ id }) => tasks.requirements(id)),
@@ -68,8 +70,8 @@ export function tasksOperations(tasks: TasksService) {
     implement(skipNodeOp, ({ id, nodeId }) => tasks.skipNode(id, nodeId)),
     implement(retryNodeOp, ({ id, nodeId, feedback }) => tasks.retryNode(id, nodeId, feedback)),
     implement(deliverTaskOp, ({ id, ...request }) => tasks.deliver(id, request)),
-    implement(requestChangesOp, ({ id, reason, feedback, attachmentIds }) =>
-      tasks.requestChanges(id, reason, feedback, attachmentIds),
+    implement(requestChangesOp, ({ id, reason, feedback, attachmentIds, page }) =>
+      tasks.requestChanges(id, reason, feedback, attachmentIds, page),
     ),
     implement(reviewCommentsOp, ({ id }) => tasks.reviewComments(id)),
     implement(reviseFromReviewOp, ({ id, commentIds, note }) => tasks.reviseFromReview(id, commentIds, note)),

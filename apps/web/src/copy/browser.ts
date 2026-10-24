@@ -1,24 +1,4 @@
-import { SiteAccess, ViewportPreset } from '@aw/shared';
-
-export const TASK_PREVIEW_COPY = {
-  title: '预览',
-  progress: '进度',
-  mine: '我的预览',
-  open: '打开我的预览',
-  reopen: '重新打开预览',
-  stop: '停止预览',
-  back: '后退',
-  forward: '前进',
-  reload: '刷新',
-  path: '预览路径',
-  go: '打开路径',
-  viewport: '预览视口',
-  presets: { [ViewportPreset.Desktop]: '桌面', [ViewportPreset.Tablet]: '平板', [ViewportPreset.Mobile]: '手机' },
-  desktopOnly: '我的预览只在桌面版中显示。助手读取当前预览也需要桌面版。',
-  noWorktree: '任务准备好工作区后可以打开预览。',
-  logs: '服务日志',
-  assistantHint: '可以打开助手询问当前页面。助手只读取文字和错误信息，浮层打开时预览暂时隐藏。',
-} as const;
+import { type PageCheckError, type PageCheckUnrunnable, type PageCheckWarning, SiteAccess } from '@aw/shared';
 
 /** The project's page preview (29 §8.5). */
 export const PREVIEW_COPY = {
@@ -68,4 +48,95 @@ export const WEBSITES_COPY = {
   loginsNone: '还没有登录过的网站。',
   logout: '退出登录',
   loggedOut: (host: string) => `已退出 ${host}`,
+} as const;
+
+/** The task page's preview tab (29 §8.1–§8.2). */
+export const PREVIEW_PANE_COPY = {
+  tabProgress: '进度',
+  tabPreview: '预览',
+  session: '查看',
+  mine: '我的预览',
+  aiSession: (title: string, running: boolean) => `AI：${title}${running ? '（运行中）' : ''}`,
+  checkSession: (title: string) => `检查：${title}`,
+  origin: (taskKey: string) => `${taskKey} 预览`,
+  path: '页面路径',
+  back: '后退',
+  forward: '前进',
+  reload: '刷新',
+  viewport: '尺寸',
+  viewports: { desktop: '桌面', tablet: '平板', mobile: '手机' },
+  stopped: '预览还没有启动',
+  stoppedLede: '在这个任务的工作区里启动开发服务器，页面显示的是任务分支的代码。',
+  start: '启动预览',
+  idle: (minutes: number) => `预览已停止。没有页面在用时，${minutes} 分钟后会自动停止。`,
+  restartAfterIdle: '重新启动',
+  starting: '正在启动预览……',
+  failed: '预览没有启动起来',
+  retry: '重试',
+  editSettings: '修改预览设置',
+  limit: (max: number) => `同时运行的预览已达上限（${max} 个），而且都有页面在用。停掉其中一个，再启动这个。`,
+  stopOne: '停止',
+  desktopOnly: '页面只在桌面版中显示。',
+  openExternal: '在系统浏览器打开',
+  state: { stopped: '未启动', starting: '启动中', running: '运行中', failed: '启动失败' },
+  counts: (errors: number, requests: number) => `控制台错误 ${errors} · 失败请求 ${requests}`,
+  logsTitle: '当前页面的错误',
+  consoleErrors: '控制台错误',
+  failedRequests: '失败的请求',
+  noConsoleErrors: '没有控制台错误。',
+  noFailedRequests: '没有失败的请求。',
+  serviceLog: '服务日志',
+  serviceLogEmpty: '还没有日志。',
+  devTools: '开发者工具',
+  restart: '重启服务',
+  noFrames: '这次会话还没有画面。',
+  latest: '回到最新',
+  frames: '动作',
+  tool: {
+    browser_open: '打开',
+    browser_click: '点击后',
+    browser_type: '输入后',
+    browser_select: '选择后',
+    browser_press: '按键后',
+    browser_viewport: '切换尺寸',
+    browser_wait_for: '等待后',
+  } as Record<string, string>,
+  passed: '通过',
+  notPassed: '未通过',
+  errors: (n: number) => `${n} 个错误`,
+  noShots: '这次体检没有截图。',
+  assistantHint: '可以打开助手询问当前页面。助手只读取文字和错误信息，浮层打开时预览暂时隐藏。',
+} as const;
+
+/** A page check's result (29 §7.4, §8.3): each page at each viewport. */
+export const PAGE_CHECK_COPY = {
+  passed: '通过',
+  notPassed: '未通过',
+  error: {
+    navigation: '页面没有打开',
+    exception: '未捕获的异常',
+    console: '控制台错误',
+    request: '请求失败',
+  } as Record<PageCheckError, string>,
+  warning: {
+    request: '接口返回 4xx',
+    blocked: '请求被拦下',
+    a11y: '可访问性问题',
+    overflow: '页面会横向滚动',
+    unsettled: '页面 10 秒内没有稳定',
+  } as Record<PageCheckWarning, string>,
+  /** Warnings whose own message adds nothing to the label. */
+  plainWarnings: ['overflow', 'unsettled'] as readonly PageCheckWarning[],
+  unrunnable: {
+    preview_never_started: '预览在这个任务的工作区里一直没有启动起来，页面体检没法运行。',
+    preview_not_configured: '项目的页面预览设置已删除，页面体检没法运行。',
+  } as Record<PageCheckUnrunnable, string>,
+  skipped: '这项检查被跳过了，页面没有验证。',
+  enlarge: (path: string, viewport: string) => `放大 ${path}（${viewport}）`,
+  shot: (path: string, viewport: string) => `${path} · ${viewport}`,
+  noPages: '没有检查页面。',
+  section: '页面',
+  morePages: (n: number) => `其余 ${n} 页`,
+  openPreview: '打开预览',
+  log: '预览日志末尾',
 } as const;

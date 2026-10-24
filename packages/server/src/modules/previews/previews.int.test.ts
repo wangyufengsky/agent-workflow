@@ -141,7 +141,7 @@ describe('页面预览', () => {
     await stopped;
   });
 
-  it('达到同时运行上限时停掉最久没用的空闲预览；都在用时 PREVIEW_LIMIT_REACHED', async () => {
+  it('达到同时运行上限时停掉最久没用的空闲预览；都在用时 PREVIEW_LIMIT_REACHED，页面体检则排队', async () => {
     t = await createTestApp();
     await t.call(updateSettingsOp, { 'preview.maxRunning': 1 });
     const first = await taskWithWorktree();
@@ -155,7 +155,15 @@ describe('页面预览', () => {
     t.app.services.previews.acquire(second.task.id);
     const { status, raw } = await t.call(startPreviewOp, { taskId: first.task.id });
     expect(status).toBe(409);
-    expect(raw.json()).toMatchObject({ error: { code: ErrorCode.PreviewLimitReached } });
+    expect(raw.json()).toMatchObject({
+      error: { code: ErrorCode.PreviewLimitReached, details: { maxRunning: 1, taskIds: [second.task.id] } },
+    });
+
+    // A page check waits for room (29 §4.4): the other preview's tab lets go of it.
+    const queued = t.app.services.previews.start(first.task.id, { queue: new AbortController().signal });
+    t.app.services.previews.release(second.task.id);
+    expect((await queued).state).toBe('running');
+    expect((await t.call(getPreviewOp, { taskId: second.task.id })).body.state).toBe('stopped');
   });
 
   it('试运行在主工作区启动一次，就绪后停止', async () => {

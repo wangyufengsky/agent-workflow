@@ -76,7 +76,7 @@ export type PlanNodeArgs = {
   role?: string;
   title?: string;
   depends_on?: string[];
-  acceptance?: { command?: string; ai_review?: boolean; manual?: boolean };
+  acceptance?: { command?: string; pages?: string[]; ai_review?: boolean; manual?: boolean };
 };
 
 /** `submit_plan` arguments; instructions are derived from the key. */

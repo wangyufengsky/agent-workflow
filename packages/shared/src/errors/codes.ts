@@ -117,6 +117,7 @@ export const ErrorCode = {
   BrowserNotOpen: 'BROWSER_NOT_OPEN',
   BrowserRefStale: 'BROWSER_REF_STALE',
   BrowserActionFailed: 'BROWSER_ACTION_FAILED',
+  BrowserCheckUnrunnable: 'BROWSER_CHECK_UNRUNNABLE',
   // 附件（30）
   AttachmentNotFound: 'ATTACHMENT_NOT_FOUND',
   AttachmentInvalidType: 'ATTACHMENT_INVALID_TYPE',
@@ -229,6 +230,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.BrowserNotOpen]: 409,
   [ErrorCode.BrowserRefStale]: null,
   [ErrorCode.BrowserActionFailed]: null,
+  [ErrorCode.BrowserCheckUnrunnable]: null,
   [ErrorCode.AttachmentNotFound]: 404,
   [ErrorCode.AttachmentInvalidType]: 400,
   [ErrorCode.AttachmentTooLarge]: 413,

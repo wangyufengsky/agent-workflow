@@ -493,3 +493,13 @@ button.actionHead:hover {
   font-size: var(--fs-xs);
   color: var(--accent);
 }
+
+/* A browser action's frame (29 §8.3): what the page showed after it. */
+.frame {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  margin: 4px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}

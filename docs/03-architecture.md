@@ -110,6 +110,7 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | 日志 | pino | 10.4.0 |
 | 测试 | vitest / @playwright/test | 5.0.5 / 1.64.1 |
 | 界面走查的对比度检查 | @axe-core/playwright（E2E 中只跑 `color-contrast` 规则，M6-01） | 4.13.0 |
+| 页面体检的可访问性规则（v1.3，29 §7.2） | axe-core（server 的运行时依赖，MPL-2.0，原样打包；`axe.source` 注入页面，只取 `critical` / `serious`） | 4.13.0 |
 | 开发与测试用的浏览器宿主（v1.3，29 §5.2） | playwright-core（server 的 devDependency，只在 `NODE_ENV=development` 加载，不进安装包） | 1.64.1 |
 | 类型 | @types/node / @types/react / @types/react-dom | 24.19.2 / 19.3.0 / 19.3.0 |
 | 代码质量 | @biomejs/biome / dependency-cruiser / typescript | 2.5.15 / 18.6.0 / **6.0.3**（D29） |

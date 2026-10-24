@@ -12,7 +12,9 @@ test.afterEach(async () => {
   await app.close();
 });
 
-test('我的预览：真实原生视图、助手浮层隐藏并仍可读、返回恢复、离开页签解除关联', async ({ request }) => {
+test('我的预览：真实原生视图、只放可见部分、原生页里 ⌘J 回到界面、助手浮层隐藏并仍可读、返回恢复、离开页签解除关联', async ({
+  request,
+}) => {
   app = await electron.launch({ args: ['e2e/fixtures/user-preview/main.cjs'] });
   const base = await app.evaluate(async () => globalThis.previewHarness.ready);
   const token = await app.evaluate(() => globalThis.previewHarness.token);
@@ -56,8 +58,8 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
     .toBe('plan_review');
   await page.goto(`${base}/tasks/${task.id}`);
   await page.getByRole('tab', { name: '预览', exact: true }).click();
-  await page.getByRole('button', { name: '打开我的预览', exact: true }).click();
-  await expect(page.getByTestId('user-preview-area')).toBeVisible();
+  await page.getByRole('button', { name: '启动预览', exact: true }).click();
+  await expect(page.getByTestId('preview-area')).toBeVisible();
   const nativeCount = () =>
     app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.contentView.children.length);
   await expect.poll(nativeCount).toBe(1);
@@ -75,16 +77,19 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
   });
   writeFileSync('screenshots/user-preview-native.png', Buffer.from(nativeImage, 'base64'));
 
-  // 原生视图不能越过滚动 main 盖住应用顶栏；缩窗并滚动制造真实的部分可见区域。
+  // 原生视图不能越过滚动 main 盖住应用顶栏或窗口外：缩窗并把页面区域滚到一半在 main 上方，只放可见的交集。
   const originalBounds = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getBounds());
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1280, 600));
+  // 页面区域最低 460 px，比这时的 main 高：滚动后上下两端都在可见区域之外。
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1280, 420));
   await page.getByRole('main').evaluate((main) => {
-    main.scrollTop = main.scrollHeight;
+    const area = main.querySelector('[data-testid="preview-area"]');
+    if (area === null) throw new Error('No preview area');
+    main.scrollTop += area.getBoundingClientRect().top - main.getBoundingClientRect().top + 40;
   });
   await expect
     .poll(async () => {
       const main = await page.getByRole('main').boundingBox();
-      const area = await page.getByTestId('user-preview-area').boundingBox();
+      const area = await page.getByTestId('preview-area').boundingBox();
       const bounds = await app.evaluate(({ BrowserWindow }) =>
         BrowserWindow.getAllWindows()[0]?.contentView.children[0]?.getBounds(),
       );
@@ -141,13 +146,12 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
   await page.getByRole('complementary', { name: '应用助手' }).getByRole('button', { name: '收起助手' }).click();
   await expect.poll(nativeCount).toBe(1);
 
-  // 助手的启停使用同一接口：外部重启不能让旧用户关联自动复活。
+  // 助手的启停使用同一接口：停掉时旧页签随之关闭，外部重启后打开的是新端口上的新页签，旧关联不会复活。
   await request.post(`${api}/tasks/${task.id}/preview/stop`, { headers });
-  await expect(page.getByTestId('user-preview-area')).toHaveCount(0);
+  await expect(page.getByTestId('preview-area')).toHaveCount(0);
+  await expect.poll(nativeCount).toBe(0);
   await request.post(`${api}/tasks/${task.id}/preview/start`, { headers });
-  await expect(page.getByRole('button', { name: '打开我的预览', exact: true })).toBeVisible();
-  await expect(page.getByTestId('user-preview-area')).toHaveCount(0);
-  await page.getByRole('button', { name: '打开我的预览', exact: true }).click();
+  await expect(page.getByTestId('preview-area')).toBeVisible();
   await expect.poll(nativeCount).toBe(1);
 
   const unbound = page.waitForResponse(
@@ -159,13 +163,13 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
   expect((await unbound).status()).toBe(204);
   await expect.poll(nativeCount).toBe(0);
 
-  await page.getByRole('tab', { name: '预览', exact: true }).click();
+  // 回到预览页签：同一个页签放回窗口并重新关联。
   const rebound = page.waitForResponse(
     (response) =>
       response.url().endsWith(`/assistant/conversations/${id}/preview`) &&
       response.request().postDataJSON()?.preview !== null,
   );
-  await page.getByRole('button', { name: '打开我的预览', exact: true }).click();
+  await page.getByRole('tab', { name: '预览', exact: true }).click();
   await expect.poll(nativeCount).toBe(1);
   expect((await rebound).status()).toBe(204);
 
@@ -194,7 +198,7 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
       response.request().postDataJSON()?.preview === null,
   );
   await page.getByRole('navigation').getByRole('link', { name: '项目', exact: true }).click();
-  await expect(page.getByTestId('user-preview-area')).toHaveCount(0);
+  await expect(page.getByTestId('preview-area')).toHaveCount(0);
   releaseBinding.resolve();
   expect((await routeUnbound).status()).toBe(204);
   await expect.poll(nativeCount).toBe(0);

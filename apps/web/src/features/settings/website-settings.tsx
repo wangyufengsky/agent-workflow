@@ -8,7 +8,7 @@ import {
   type SiteRule,
 } from '@aw/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import { Button } from '../../components/button.tsx';
@@ -17,6 +17,7 @@ import { IconButton } from '../../components/icon-button.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { toast } from '../../components/toast.tsx';
 import { WEBSITES_COPY as C } from '../../copy/browser.ts';
+import { usePlacedTab } from '../preview/use-placed-tab.ts';
 import { Segmented } from './setting-inputs.tsx';
 import styles from './websites.module.css';
 
@@ -89,33 +90,6 @@ function SiteRules({ rules, set }: { rules: readonly SiteRule[]; set: (patch: Pa
   );
 }
 
-/** Keeps the user's tab over `area` while it is shown: its place follows layout changes and scrolling. */
-function usePlacedTab(tabId: string | null, area: React.RefObject<HTMLDivElement | null>): void {
-  useEffect(() => {
-    const bridge = window.aw;
-    const element = area.current;
-    if (tabId === null || bridge === undefined || element === null) return;
-    const place = () => {
-      const r = element.getBoundingClientRect();
-      bridge.browser.place(tabId, {
-        x: Math.round(r.x),
-        y: Math.round(r.y),
-        width: Math.round(r.width),
-        height: Math.round(r.height),
-      });
-    };
-    place();
-    const observer = new ResizeObserver(place);
-    observer.observe(element);
-    window.addEventListener('scroll', place, true);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('scroll', place, true);
-      bridge.browser.place(tabId, null);
-    };
-  }, [tabId, area]);
-}
-
 /** Logging in to websites for the AI, in a real tab of the window, and logging out (29 §8.6). */
 function SiteLogins() {
   const queryClient = useQueryClient();
@@ -169,7 +143,7 @@ function SiteLogins() {
       </div>
       {!desktop && <p className="hint">{C.loginDesktopOnly}</p>}
       {open.isError && <ErrorState error={open.error} />}
-      {tabId !== null && <div ref={area} className={styles.loginArea} />}
+      {tabId !== null && <div ref={area} className={styles.loginArea} data-testid="login-area" />}
       <span className="label">{C.logins}</span>
       {logins.isError && <ErrorState error={logins.error} onRetry={() => void logins.refetch()} />}
       {logins.data?.hosts.length === 0 && <p className="hint">{C.loginsNone}</p>}

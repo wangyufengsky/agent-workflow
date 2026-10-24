@@ -17,6 +17,7 @@ import { execa } from 'execa';
 import type { Clock } from '../../core/clock.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import type { BrowserService, PageCheckRequest, PageCheckResult } from '../browser/index.ts';
 import { locateShell } from '../git/index.ts';
 import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
@@ -24,6 +25,7 @@ import { unrunnableOf } from './acceptance.rules.ts';
 
 export type AcceptanceServiceDeps = {
   attempts: AttemptsService;
+  browser: BrowserService;
   roles: RolesService;
   settings: SettingsService;
   prompts: Prompts;
@@ -64,11 +66,12 @@ export function tailOf(output: string): string {
 }
 
 /**
- * Acceptance checks of a node (03 §4.2 `AcceptanceCheck`): `command` runs in the worktree, `ai_review` is a review
- * attempt that ends with `submit_review`. A pending review is kept in memory: after a restart its node starts over.
+ * Acceptance checks of a node (03 §4.2 `AcceptanceCheck`): `command` runs in the worktree, `browser` opens the
+ * task's preview pages (29 §7), `ai_review` is a review attempt that ends with `submit_review`. A pending review is kept in memory: after a restart its node starts over.
  */
 export function createAcceptanceService({
   attempts,
+  browser,
   roles,
   settings,
   prompts,
@@ -103,6 +106,10 @@ export function createAcceptanceService({
   });
 
   return {
+    /** The page check (29 §7): every page at every viewport of the task's preview. */
+    runPageCheck: (request: PageCheckRequest, signal: AbortSignal): Promise<PageCheckResult> =>
+      browser.pageCheck(request, signal),
+
     /**
      * Runs the command in the worktree; exit code 0 within ACCEPTANCE_COMMAND_TIMEOUT_MS passes. A timeout or the
      * signal ends the command with everything it started (D73). A command the environment cannot run is told apart

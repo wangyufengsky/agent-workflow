@@ -157,8 +157,10 @@ stateDiagram-v2
 | --- | --- |
 | 预算 | 每个节点最多 `node.maxAttempts` 次 `execute` 尝试；`checks_failed` 与 `attempt_failed` 都消耗预算；`reject`（人工驳回）与 `retry`（用户手动重试）不受预算限制，`retry` 会重置计数；`check_unrunnable` 不消耗（这次尝试退回） |
 | 检查命令无法运行（D116） | 命令检查退出 127 / 126，且输出里 shell 自己的报错行（`<shell>: [line N: \| N: ]<程序>: command not found \| not found \| No such file or directory`，126 为 `Permission denied`）点名的程序是检查命令自己直接运行的（按 `&&` `\|\|` `;` `\|` 分出的每段的第一个词，跳过前置 `NAME=value`）：`verifying → failed`（`check_unrunnable`），不发回 AI（`retryFeedback` 不变）、不消耗预算、后面的检查不再跑；任务照常 `fail`，失败码 `CHECK_COMMAND_UNRUNNABLE`。其他情况（检查命令里的脚本缺依赖、工具自己的报错）仍是 `checks_failed` |
-| 重新检查 | `recheck`（`failed → verifying`）：用这一步已提交的结果重新跑验收，不新建尝试，计数记为 1。任务 `retry` 时，检查命令无法运行的失败步骤走 `recheck`；「修改检查命令」后，最近一次执行尝试已提交结果、未通过命令检查的失败步骤走 `recheck`（11 §5） |
-| 跳过检查 | 「跳过这项检查」给未完成步骤中这条命令检查标 `skipped`：验收时不运行，记一条 `skipped: true, passed: true` 的结果（不挡住步骤），其余检查照常；结果卡与 PR 说明写明未验证 |
+| 页面体检无法运行（29 §7.4） | 任务的预览在这个 worktree 里自应用启动以来从没就绪过（安装命令失败、启动超时、进程退出），或项目的预览配置已删除：同样是 `check_unrunnable`，失败码 `BROWSER_CHECK_UNRUNNABLE`。预览就绪过、这次却起不来，是这次改动的问题：`checks_failed`，预览日志末尾作为反馈 |
+| 检查顺序 | 命令检查 → 页面体检 → AI 评审（`CHECK_KIND_ORDER`），与验收里的书写顺序无关；一项不通过，后面的不再跑 |
+| 重新检查 | `recheck`（`failed → verifying`）：用这一步已提交的结果重新跑验收，不新建尝试，计数记为 1。任务 `retry` 时，检查无法运行（命令或页面体检）的失败步骤走 `recheck`；「修改检查命令」后，最近一次执行尝试已提交结果、未通过命令检查的失败步骤走 `recheck`（11 §5） |
+| 跳过检查 | 「跳过这项检查」给未完成步骤中这条命令检查（页面体检则是所有页面体检，它们共用任务的预览）标 `skipped`：验收时不运行，记一条 `skipped: true, passed: true` 的结果（不挡住步骤），其余检查照常；结果卡与 PR 说明写明未验证 |
 | 重试携带反馈 | 回到 `ready` 时记录 `retryFeedback`（检查失败输出 / 评审问题 / 驳回意见 / 失败原因），下次尝试的提示词附带 |
 | `waiting_input` | 两种来源：会话空闲且有未回答的阻塞问题；opencode 权限请求待处理。等待期间尝试仍是 `running`（不计超时），因此仍可能失败（用户中止 → `attempt_failed`）或中断（运行时消失时待处理的权限请求随之失效 → `interrupted`） |
 | 人工验收 | 节点 `acceptance.manual=true` 或任务开启 `accept_each_node` 时进入 `awaiting_acceptance`，并创建 `acceptance` 类 inbox 条目 |

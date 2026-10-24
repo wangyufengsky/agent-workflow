@@ -5,6 +5,7 @@ import {
   type AttemptDTO,
   AttemptKind,
   AttemptStatus,
+  CHECK_KIND_ORDER,
   type CheckResult,
   type CheckUnrunnableReason,
   ErrorCode,
@@ -13,6 +14,7 @@ import {
   NodeKind,
   NodeStatus,
   nodeMachine,
+  type PageCheckUnrunnable,
   type ResultNext,
   type SubmitResultInput,
   transition,
@@ -24,8 +26,10 @@ import type { createNodesRepo, Node, NodeChanges } from './nodes.repo.ts';
 import { feedbackFromAttempt, feedbackFromChecks, feedbackFromRejection, nextAfterFailure } from './nodes.rules.ts';
 import type { NodeRunContext, NodesServiceDeps } from './nodes.types.ts';
 
-/** A check command the app's environment could not run, and why (D116). */
-export type UnrunnableCheck = { command: string; program: string; reason: CheckUnrunnableReason };
+/** A check the app's environment could not run, and why (D116): a command, or the page check's preview (29 §7.4). */
+export type UnrunnableCheck =
+  | { kind: typeof AcceptanceCheckKind.Command; command: string; program: string; reason: CheckUnrunnableReason }
+  | { kind: typeof AcceptanceCheckKind.Browser; reason: PageCheckUnrunnable; logTail: string };
 
 type NodeState = {
   repo: ReturnType<typeof createNodesRepo>;
@@ -90,6 +94,14 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     unrunnable: null,
     skipped: true,
   });
+  const skippedPageCheck: CheckResult = {
+    kind: AcceptanceCheckKind.Browser,
+    passed: true,
+    pages: [],
+    output: '',
+    unrunnable: null,
+    skipped: true,
+  };
 
   function requestAcceptance(node: Node): void {
     inbox.create({
@@ -109,12 +121,31 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
       const node = get(nodeId);
       if (node.result === null) throw new Error(`Node ${nodeId} is verifying without a result`);
       const results: CheckResult[] = [];
-      for (const check of node.acceptance.checks) {
+      // Cheap checks first: a page that does not load needs no review (29 §7.2).
+      const checks = [...node.acceptance.checks].sort(
+        (a, b) => CHECK_KIND_ORDER.indexOf(a.kind) - CHECK_KIND_ORDER.indexOf(b.kind),
+      );
+      for (const check of checks) {
         if (check.kind === AcceptanceCheckKind.Command) {
           results.push(
             check.skipped === true
               ? skippedResult(check.command)
               : await acceptance.runCommand(ctx.directory, check.command, controller.signal),
+          );
+        } else if (check.kind === AcceptanceCheckKind.Browser) {
+          results.push(
+            check.skipped === true
+              ? skippedPageCheck
+              : await acceptance.runPageCheck(
+                  {
+                    taskId: ctx.taskId,
+                    projectId: ctx.projectId,
+                    nodeId,
+                    pages: check.pages,
+                    viewports: check.viewports,
+                  },
+                  controller.signal,
+                ),
           );
         } else {
           const outcome = await acceptance.review(
@@ -161,7 +192,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
       await finishVerifyStep(nodeId, results, ctx);
       return;
     }
-    if (results.some((r) => r.kind === AcceptanceCheckKind.Command && r.unrunnable !== null)) {
+    if (results.some((r) => r.kind !== AcceptanceCheckKind.AiReview && r.unrunnable !== null)) {
       // The environment, not the model, failed: no feedback, and the attempt does not count (D116).
       move(node, NodeEvent.CheckUnrunnable, NodeStatus.Failed, {
         checkResults: results,
@@ -222,14 +253,19 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
   });
 
   /**
-   * The failing command check a failed step stopped on, when its last attempt submitted a result (D116): null when the
-   * step failed in its attempt or on another kind of check.
+   * The failing check a failed step stopped on, when its last attempt submitted a result (D116): null when the step
+   * failed in its attempt.
    */
-  function failedCommand(node: Node): CommandCheckResult | null {
+  function failedCheck(node: Node): CheckResult | null {
     if (node.status !== NodeStatus.Failed) return null;
     const last = attempts.listByNode(node.id).findLast((a) => a.kind === AttemptKind.Execute);
     if (last?.status !== AttemptStatus.Succeeded) return null;
-    const failed = node.checkResults?.find((r) => !r.passed);
+    return node.checkResults?.find((r) => !r.passed) ?? null;
+  }
+
+  /** The failing command check a failed step stopped on (D116); null when it failed otherwise. */
+  function failedCommand(node: Node): CommandCheckResult | null {
+    const failed = failedCheck(node);
     return failed?.kind === AcceptanceCheckKind.Command ? failed : null;
   }
 
@@ -363,11 +399,13 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
 
     failedCommand,
 
-    /** The check command a failed step stopped on because the environment could not run it (D116). */
+    /** The check a failed step stopped on because the environment could not run it (D116, 29 §7.4). */
     unrunnableCheck(node: Node): UnrunnableCheck | null {
-      const check = failedCommand(node);
-      if (check === null || check.unrunnable === null) return null;
-      return { command: check.command, ...check.unrunnable };
+      const check = failedCheck(node);
+      if (check === null || check.kind === AcceptanceCheckKind.AiReview || check.unrunnable === null) return null;
+      return check.kind === AcceptanceCheckKind.Command
+        ? { kind: check.kind, command: check.command, ...check.unrunnable }
+        : { kind: check.kind, ...check.unrunnable };
     },
 
     stopVerification(nodeId: string): void {

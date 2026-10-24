@@ -92,7 +92,7 @@ Electron `app.getPath('userData')`，目录名为产品名：
 
 两者都用 execa 的 `killDescendants` 启动（POSIX 上自成进程组，Windows 上停止时运行 `taskkill /T`），`child.kill()` 即结束整棵进程树。只结束 shell 本身时，它启动的命令（`a && b` 中的 `b`、后台的测试进程）继续运行并占着输出管道，execa 的结果要等它们结束才返回。
 
-**应用退出。** 结束 utilityProcess（Windows 上即 `TerminateProcess`）不会运行后端的清理，opencode 会留下。main 在 `will-quit`、窗口已关闭后，先等待 `session.defaultSession.closeAllConnections()` 结束本应用默认会话的请求与预连接，再向后端发 `backend.shutdown`（`shared/contracts/backend-port.ts`）。Chromium 预连接可能尚未发送 HTTP 请求；如果仍由 NetworkService 持有，后端 HTTP 关闭会等待它，而 main 又在等待后端，形成退出等待环。该步骤会取消默认会话中尚未完成的网络请求；不关闭网站与预览使用的其他会话分区。后端随后按原顺序关闭 HTTP 服务并退出，main 等它退出再退出。关闭时先（`preClose`，API 与数据库仍可用）把活动尝试按 `runtime_lost` 记为 `interrupted`，再结束 opencode 进程树（09 §9）：结束进程时还在进行的请求失败，不会再把尝试记成 `failed`；`pnpm dev:server` 下 Ctrl+C（`SIGINT`）走同一路径。
+**应用退出。** 结束 utilityProcess（Windows 上即 `TerminateProcess`）不会运行后端的清理，opencode 会留下。main 在 `will-quit`、窗口已关闭后，先等待 `session.defaultSession.closeAllConnections()` 结束本应用默认会话的请求与预连接，再向后端发 `backend.shutdown`（`shared/contracts/backend-port.ts`）。Chromium 预连接可能尚未发送 HTTP 请求；如果仍由 NetworkService 持有，后端 HTTP 关闭会等待它，而 main 又在等待后端，形成退出等待环。该步骤会取消默认会话中尚未完成的网络请求；不关闭网站与预览使用的其他会话分区。后端随后按原顺序关闭 HTTP 服务并退出，main 等它退出，再关闭剩下的浏览器标签页（后端停止时先关闭自己的，29 §5.1）后退出。关闭时先（`preClose`，API 与数据库仍可用）把活动尝试按 `runtime_lost` 记为 `interrupted`，再结束 opencode 进程树（09 §9）：结束进程时还在进行的请求失败，不会再把尝试记成 `failed`；`pnpm dev:server` 下 Ctrl+C（`SIGINT`）走同一路径。
 
 - 检查命令在所有平台都由 POSIX shell 执行，`mvn -q test && …`、`./gradlew test` 的写法与推断出的检查命令（`projects.inference.ts`）在三个平台一致，不按平台推断不同命令。
 - 检查命令的超时改为注入时钟计时（原来是 execa 的 `timeout`），超时与中止都调用 `child.kill()`。
