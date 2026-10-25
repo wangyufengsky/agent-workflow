@@ -82,9 +82,11 @@ function OpencodeCheck({
 function ModelsCheck({ environment }: { environment: EnvironmentDTO }) {
   const count = environment.models.available.length;
   if (count > 0) {
+    const noContext = environment.models.available.filter((m) => m.contextLimit === null).length;
     return (
       <CheckRow title={C.models.title} tone={StatusTone.Ok} badge={C.ready}>
         <span className="hint">{C.models.available(count)}</span>
+        {noContext > 0 && <span className="hint">{C.models.noContext(noContext)}</span>}
       </CheckRow>
     );
   }

@@ -1,11 +1,4 @@
-import {
-  AppError,
-  ErrorCode,
-  type ExternalMcpStatus,
-  type ModelInfo,
-  type PermissionDecision,
-  type PermissionRule,
-} from '@aw/shared';
+import { AppError, ErrorCode, type ExternalMcpStatus, type PermissionDecision, type PermissionRule } from '@aw/shared';
 import { z } from 'zod';
 import type { Logger } from '../../core/logger.ts';
 import { type OpencodeError, type OpencodeEvent, OpencodeEventType, parseGlobalEvent } from './opencode.events.ts';
@@ -66,8 +59,12 @@ export type OpencodeClient = {
   /** Already missing sessions count as deleted, so interrupted cleanup can be retried. */
   deleteSession(input: { sessionId: string; directory: string }): Promise<void>;
   replyPermission(input: { permissionId: string; directory: string; reply: PermissionDecision }): Promise<void>;
-  /** Models of the providers the user has connected, and the configured default `provider/model`. */
-  listModels(): Promise<{ available: ModelInfo[]; defaultModel?: string }>;
+  /**
+   * Models of the providers the user has connected, and the configured default `provider/model`, as opencode sees
+   * them from `directory`: a project's own opencode configuration adds its providers there (D162). Without one, the
+   * global configuration only.
+   */
+  listModels(directory?: string): Promise<{ available: OpencodeModel[]; defaultModel?: string }>;
   /** Every MCP server of the configuration `directory` sees, by name: the app's own and the user's (28 §4). */
   mcpStatus(directory: string): Promise<Record<string, McpServerState>>;
   subscribe(listener: (event: OpencodeEvent) => void): () => void;
@@ -77,6 +74,9 @@ export type OpencodeClient = {
    */
   shutdown(): Promise<void>;
 };
+
+/** A model opencode offers; `contextLimit` is null when its provider declares none (opencode reports 0). */
+export type OpencodeModel = { providerId: string; modelId: string; name: string; contextLimit: number | null };
 
 /** `provider/model` → parts; the model id itself may contain `/`. */
 /** opencode's report of one MCP server; `error` only when it failed or needs a client registration. */
@@ -245,14 +245,20 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         }
       });
     },
-    async listModels() {
+    async listModels(directory) {
       const sdk = runtime.sdk();
+      const at = directory === undefined ? {} : { directory };
       const [{ data: providers }, { data: config }] = await Promise.all([
-        request('config.providers', () => sdk.config.providers({}, THROW)),
-        request('config.get', () => sdk.config.get({}, THROW)),
+        request('config.providers', () => sdk.config.providers(at, THROW)),
+        request('config.get', () => sdk.config.get(at, THROW)),
       ]);
       const available = providers.providers.flatMap((p) =>
-        Object.values(p.models).map((m) => ({ providerId: p.id, modelId: m.id, name: m.name })),
+        Object.values(p.models).map((m) => ({
+          providerId: p.id,
+          modelId: m.id,
+          name: m.name,
+          contextLimit: m.limit.context > 0 ? m.limit.context : null,
+        })),
       );
       return config.model === undefined ? { available } : { available, defaultModel: config.model };
     },

@@ -30,6 +30,11 @@ export const RUNTIME_COPY = {
   models: '可用的模型',
   modelsCount: (n: number) => `${n} 个模型`,
   defaultChip: '默认',
+  onlyInChip: (names: string) => `仅 ${names}`,
+  onlyInHint: '只写在这些项目自己的 opencode 配置里，其他项目用不了。',
+  noContextChip: '未声明上下文长度',
+  noContextHint:
+    '这个模型的 provider 配置里没有写 limit.context：opencode 不会自动压缩对话，较长的任务可能超出上下文而失败。在模型配置里写上 limit.context 与 limit.output。',
   noModels: '还没有可用的模型。在终端登录一个模型提供方：',
   modelsPending: 'opencode 启动后显示。',
   logs: 'opencode 日志',

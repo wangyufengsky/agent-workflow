@@ -39,13 +39,20 @@ type EnvironmentDTO = {
   platform: 'darwin' | 'win32' | 'linux';   // 后端的操作系统，引导页据此显示安装命令（D75）
   git: { installed: true; version: string } | { installed: false };   // Windows 上还要求 Git for Windows 的 Git Bash（D72）
   opencode: RuntimeDTO;
-  models: { available: Array<{ providerId: string; modelId: string; name: string }>; defaultModel?: string };
+  models: {
+    available: Array<{
+      providerId: string; modelId: string; name: string;
+      contextLimit: number | null;   // 上下文长度；provider 没写 limit.context 时为 null（D162）
+      projectIds: string[];          // 只在这些项目自己的 opencode 配置里；全局配置里的为空（D162）
+    }>;
+    defaultModel?: string;
+  };
   credentials: { available: boolean };   // 能否保存令牌与密码（safeStorage；Linux 无密钥服务时为 false，D74），不计入 ready
   ready: boolean;              // git、opencode、模型三项都满足
 };
 ```
 
-`models` 来自 opencode `/config/providers`，用于引导页判断「是否已登录至少一个模型提供方」。
+`models` 来自 opencode `/config/providers`：先取全局配置（不带目录），再按每个项目的仓库目录各取一次，合并去重（D162）；用于引导页判断「是否已登录至少一个模型提供方」，`defaultModel` 是全局配置的。
 
 opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则依次查找 `PATH` 中的 `opencode` 与主目录下的 `.opencode/bin/opencode`（Windows：`opencode.exe` 或 npm 的 `opencode.cmd`，主目录为 `%USERPROFILE%`，17 §3.2）；能执行 `--version` 且输出等于 `OPENCODE_VERSION` → `stopped`（M2 起由运行时启动），版本不同 → `version_mismatch`，找不到或无法执行 → `not_installed`。`recheck` 只在 `not_installed` / `version_mismatch` 时重新检测 opencode（运行时状态机 `recheck`），git 每次都重新检测；之后启动 `stopped` 或 `crashed` 的运行时（`crashed` 可能是环境问题已修好，如 Windows 上补装了 Git Bash，D72），并重新允许一次自动重启。
 
@@ -270,8 +277,8 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/db-connections` | `{ items: DbConnectionDTO[] }`（`{ id, name, type, host, port, database, username, tls, createdAt, updatedAt }`，不含密码） |
-| POST | `/db-connections` | `{ name, type, host, port, database, username, password, tls }`（`password` 为凭据字段，可为空串）→ 201；密码经 credentials 模块加密保存；名称已被使用 409 `DB_CONNECTION_ALREADY_EXISTS`（AI 的工具按名称找连接） |
+| GET | `/db-connections` | `{ items: DbConnectionDTO[] }`（`{ id, name, type, host, port, database, username, tlsMode, createdAt, updatedAt }`，不含密码；`tlsMode` 为 `DbTlsMode`，D166） |
+| POST | `/db-connections` | `{ name, type, host, port, database, username, password, tlsMode }`（`password` 为凭据字段，可为空串）→ 201；密码经 credentials 模块加密保存；名称已被使用 409 `DB_CONNECTION_ALREADY_EXISTS`（AI 的工具按名称找连接） |
 | PATCH | `/db-connections/:id` | 部分字段；传 `password` 时替换密码 |
 | DELETE | `/db-connections/:id` | 204；删除密码，项目关联随之删除 |
 | POST | `/db-connections/:id/test` | `{ ok, serverVersion, error }`：连接并读取服务器版本（MySQL / GoldenDB `VERSION()`，PostgreSQL / openGauss `version()` 去掉构建信息，SQL Server `SERVERPROPERTY('ProductVersion')`）；连不上时 `ok: false`、`error` 为驱动信息（不作为 HTTP 错误） |

@@ -4,6 +4,7 @@ import gaussdb from 'gaussdb-node';
 import mysql from 'mysql2/promise';
 import pg from 'pg';
 import { Connection, Request } from 'tedious';
+import type { TestCertificates } from './tls.ts';
 
 const run = promisify(execFile);
 
@@ -76,10 +77,14 @@ type ContainerSpec = {
    * passing, reported as an event.
    */
   ready: { log: RegExp } | { healthCmd: string };
+  /** `-v` mounts, `host:container[:ro]`. */
+  volumes?: string[];
+  /** Arguments after the image: options of the server command. */
+  command?: string[];
 };
 
 /** Starts the container on a random local port and waits until it is ready; returns its id and port. */
-async function startContainer({ image, env, port, ready }: ContainerSpec) {
+async function startContainer({ image, env, port, ready, volumes = [], command = [] }: ContainerSpec) {
   const health = 'healthCmd' in ready ? ['--health-cmd', ready.healthCmd, '--health-interval', '1s'] : [];
   const envArgs = Object.entries(env).flatMap(([k, v]) => ['-e', `${k}=${v}`]);
   const { stdout } = await run('docker', [
@@ -88,9 +93,11 @@ async function startContainer({ image, env, port, ready }: ContainerSpec) {
     '--rm',
     ...envArgs,
     ...health,
+    ...volumes.flatMap((v) => ['-v', v]),
     '-p',
     `127.0.0.1::${port}`,
     image,
+    ...command,
   ]);
   const id = stdout.trim();
   if ('log' in ready) await outputMatches(['docker', 'logs', '-f', id], ready.log, `${image} in ${id}`);
@@ -107,8 +114,11 @@ async function startContainer({ image, env, port, ready }: ContainerSpec) {
   };
 }
 
-/** MySQL 8.4 with an empty database `shop`. */
-export async function startMysql(): Promise<TestDatabase> {
+/**
+ * MySQL 8.4 with an empty database `shop`. Its TLS certificate is the one it generates itself (no host name, its own
+ * CA), or the server certificate of `certificates` (D166).
+ */
+export async function startMysql(certificates?: TestCertificates): Promise<TestDatabase> {
   const password = 'aw-test-root';
   const { port, stop } = await startContainer({
     image: DB_IMAGE.mysql,
@@ -116,6 +126,12 @@ export async function startMysql(): Promise<TestDatabase> {
     port: 3306,
     // The entrypoint first runs a temporary server without networking; the real one reports this port.
     ready: { log: /ready for connections.*port: 3306\b/ },
+    ...(certificates === undefined
+      ? {}
+      : {
+          volumes: [`${certificates.dir}:/certs:ro`],
+          command: ['--ssl-ca=/certs/ca.pem', '--ssl-cert=/certs/server.pem', '--ssl-key=/certs/server-key.pem'],
+        }),
   });
   const options = { host: '127.0.0.1', port, user: 'root', password, database: DATABASE, multipleStatements: true };
   return {
@@ -149,7 +165,7 @@ function pgExec(Client: typeof pg.Client, config: pg.ClientConfig) {
   };
 }
 
-/** PostgreSQL 17 with an empty database `shop`. */
+/** PostgreSQL 17 with an empty database `shop`; TLS with the image's self-signed certificate (`ssl-cert-snakeoil`). */
 export async function startPostgres(): Promise<TestDatabase> {
   const password = 'aw-test-root';
   const { port, stop } = await startContainer({
@@ -158,6 +174,10 @@ export async function startPostgres(): Promise<TestDatabase> {
     port: 5432,
     // The temporary server of the first start also reports ready, before this line.
     ready: { log: /init process complete[\s\S]*ready to accept connections/ },
+    command: [
+      ...['-c', 'ssl=on', '-c', 'ssl_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem'],
+      ...['-c', 'ssl_key_file=/etc/ssl/private/ssl-cert-snakeoil.key'],
+    ],
   });
   const config = { host: '127.0.0.1', port, user: 'postgres', password, database: DATABASE };
   return { ...config, username: config.user, exec: pgExec(pg.Client, config), stop };
@@ -202,7 +222,7 @@ function tsqlExec(port: number, password: string, database: string) {
   };
 }
 
-/** SQL Server 2022 (Developer edition) with an empty database `shop`. */
+/** SQL Server 2022 (Developer edition) with an empty database `shop`; TLS with the certificate it generates itself. */
 export async function startSqlServer(): Promise<TestDatabase> {
   const password = 'Aw-test#2026';
   const { port, stop } = await startContainer({

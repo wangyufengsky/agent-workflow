@@ -6,6 +6,7 @@ export {
   type McpServerState,
   type ModelRef,
   type OpencodeClient,
+  type OpencodeModel,
   type PromptInput,
   parseModelRef,
 } from './opencode.client.ts';
@@ -16,6 +17,7 @@ export {
   sessionPermissionRules,
 } from './opencode.config.ts';
 export {
+  describeOpencodeError,
   type OpencodeError,
   type OpencodeEvent,
   OpencodeEventType,
