@@ -1,6 +1,6 @@
 import { ErrorCode, errorInfoSchema, MasterPasswordState, unlockCredentialsOp } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, useState } from 'react';
 import { ApiError, callOperation } from '../api/client.ts';
 import { COMMON_COPY } from '../copy/common.ts';
 import { ERROR_COPY } from '../copy/errors.ts';
@@ -51,12 +51,16 @@ export function UnlockForm({ children }: { children?: ReactNode }) {
   if (environment !== undefined && environment.credentials.masterPassword !== MasterPasswordState.Locked) {
     return <span className="hint">{C.unlockedRetry}</span>;
   }
-  const submit = (e: FormEvent) => {
+  const submit = () => unlock.mutate(password, { onSuccess: () => toast(C.unlockDone) });
+  // Not a form: the error this sits under is often inside the form that failed, which a nested submit would send
+  // again. Enter would submit that form implicitly, so it unlocks here instead.
+  const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
     e.preventDefault();
-    unlock.mutate(password, { onSuccess: () => toast(C.unlockDone) });
+    if (password !== '') submit();
   };
   return (
-    <form className="col" onSubmit={submit} aria-label={C.unlock}>
+    <fieldset className="col" aria-label={C.unlock}>
       <div className="row wrap">
         <input
           className="input unlock-input"
@@ -66,13 +70,14 @@ export function UnlockForm({ children }: { children?: ReactNode }) {
           placeholder={C.password}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={onKeyDown}
         />
-        <Button type="submit" size="sm" pending={unlock.isPending} disabled={password === ''}>
+        <Button size="sm" pending={unlock.isPending} disabled={password === ''} onClick={submit}>
           {C.unlock}
         </Button>
         {children}
       </div>
       {unlock.isError && <ErrorState error={unlock.error} />}
-    </form>
+    </fieldset>
   );
 }

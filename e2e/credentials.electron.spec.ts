@@ -105,17 +105,17 @@ test.describe('Linux 凭据存储（D167）', () => {
 });
 
 /** The backend as the renderer calls it, with the app's own token. */
-function post(page: Page, path: string, body: unknown): Promise<void> {
+function send(page: Page, method: string, path: string, body: unknown): Promise<void> {
   return page.evaluate(
-    async ({ path, body }) => {
+    async ({ method, path, body }) => {
       const res = await fetch(`/api/v1${path}`, {
-        method: 'POST',
+        method,
         headers: { Authorization: `Bearer ${window.aw?.apiToken ?? ''}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`);
+      if (!res.ok) throw new Error(`${method} ${path} failed: ${res.status}`);
     },
-    { path, body },
+    { method, path, body },
   );
 }
 
@@ -128,19 +128,24 @@ async function open(userDataDir: string): Promise<{ app: ElectronApplication; pa
   return { app, page };
 }
 
-// Whatever the key store: a master password set earlier is locked again at every start (D167). Every page then says
-// so and unlocks in place (D178).
-test('主密码锁定时每个页面顶部提示，就地解锁', async () => {
-  const userDataDir = mkdtempSync(join(tmpdir(), 'aw-e2e-locked-banner-'));
+/** A project, a master password and the given settings; the app started again, so the password is locked. */
+async function openLocked(prefix: string, settings: Record<string, unknown> = {}) {
+  const userDataDir = mkdtempSync(join(tmpdir(), prefix));
   const first = await open(userDataDir);
   try {
-    await post(first.page, '/credentials/master-password', { password: 'correct horse' });
-    await post(first.page, '/projects', { repoPath: createRepo() });
+    await send(first.page, 'POST', '/credentials/master-password', { password: 'correct horse' });
+    await send(first.page, 'POST', '/projects', { repoPath: createRepo() });
+    await send(first.page, 'PATCH', '/settings', settings);
   } finally {
     await first.app.close();
   }
+  return open(userDataDir);
+}
 
-  const { app, page } = await open(userDataDir);
+// Whatever the key store: a master password set earlier is locked again at every start (D167). Every page then says
+// so and unlocks in place (D178).
+test('主密码锁定时每个页面顶部提示，就地解锁', async () => {
+  const { app, page } = await openLocked('aw-e2e-locked-banner-');
   try {
     const banner = page.getByRole('region', { name: '凭据存储' });
     await expect(banner).toContainText('本次启动还没有解锁');
@@ -150,6 +155,37 @@ test('主密码锁定时每个页面顶部提示，就地解锁', async () => {
     await banner.getByLabel('主密码', { exact: true }).fill('correct horse');
     await banner.getByRole('button', { name: '解锁' }).click();
     await expect(banner).toBeHidden();
+  } finally {
+    await app.close();
+  }
+});
+
+// The unlock under an error often sits in the form that failed (a database connection, a token): unlocking must not
+// submit that form again. Saving answers CREDENTIAL_LOCKED here on every platform, as on a Linux without a key store.
+test('表单里的错误就地解锁，不会再次提交表单', async () => {
+  const { app, page } = await openLocked('aw-e2e-locked-form-', { 'ui.mode': 'pro' });
+  try {
+    let saves = 0;
+    await page.route('**/api/v1/db-connections', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      saves += 1;
+      return route.fulfill({
+        status: 423,
+        json: { error: { code: 'CREDENTIAL_LOCKED', message: 'Master password not entered since start' } },
+      });
+    });
+    await page.goto(new URL('/databases', page.url()).href);
+    await page.getByRole('button', { name: '添加连接' }).first().click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('名称').fill('shop-db');
+    await dialog.getByLabel('主机').fill('127.0.0.1');
+    await dialog.getByLabel('数据库', { exact: true }).fill('shop');
+    await dialog.getByLabel('用户名').fill('app');
+    await dialog.getByRole('button', { name: '保存' }).click();
+    await dialog.getByLabel('主密码', { exact: true }).fill('correct horse');
+    await dialog.getByRole('button', { name: '解锁' }).click();
+    await expect(dialog).toContainText('已解锁，请再试一次');
+    expect(saves).toBe(1);
   } finally {
     await app.close();
   }
