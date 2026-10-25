@@ -78,6 +78,8 @@ jobs:
       # Only the headless shell: browser E2E runs headless.
       - run: pnpm exec playwright install --only-shell --with-deps chromium
       - run: pnpm build
+      # J21 browses a real PostgreSQL; without the image it skips (docs/07 §5).
+      - run: docker pull postgres:17.6
       # J9 runs in the walkthrough job below.
       - name: pnpm e2e (all but J9)
         id: e2e
