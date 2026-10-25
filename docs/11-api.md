@@ -231,7 +231,8 @@ type AttemptSummaryDTO = {
 };
 type AttemptDTO = AttemptSummaryDTO & {
   directory: string; opencodeSessionId: string | null;
-  tokensInput: number | null; tokensOutput: number | null; cost: number | null;
+  tokensInput: number | null; tokensOutput: number | null;
+  cost: number | null;              // 美元；还没有用量或离线环境（network.offline）时为 null（D181）
 };
 ```
 

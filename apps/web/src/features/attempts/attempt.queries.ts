@@ -124,6 +124,10 @@ export async function updateAttempt(qc: QueryClient, summary: AttemptSummaryDTO)
   await qc.invalidateQueries({ queryKey: key, exact: true });
 }
 
+/** Cached attempts are read again, their message streams are not: whether they carry a cost follows a setting (D181). */
+export const refreshAttempts = (qc: QueryClient) =>
+  qc.invalidateQueries({ queryKey: queryKeys.attemptsAll, predicate: ({ queryKey }) => queryKey.length === 2 });
+
 export function useAbortAttempt() {
   const queryClient = useQueryClient();
   return useMutation({
