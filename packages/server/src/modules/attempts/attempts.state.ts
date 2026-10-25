@@ -37,7 +37,14 @@ export type LiveSession = {
   system: string | undefined;
   view: SessionView;
   timeoutMs: number;
+  /** When the running timeout falls due. */
+  timeoutAt: number;
   cancelTimeout: () => void;
+  /**
+   * opencode is retrying a failed model request (the model service is down): the timeout is stopped with this much
+   * left until the session sends a request again (D163). Null otherwise.
+   */
+  modelWaitLeftMs: number | null;
   /** Set once the result was submitted: further generation is stopped when the submit call completes (12 §4.2). */
   stopAfterSubmit: boolean;
   /** Waiting for the user (blocking question or permission); the timeout does not run meanwhile. */

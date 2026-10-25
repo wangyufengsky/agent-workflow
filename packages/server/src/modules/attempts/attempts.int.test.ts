@@ -90,9 +90,44 @@ describe('尝试的结束条件（12 §4.2）', () => {
     await startAttempt();
     expect((await failed).attempt.error).toEqual({
       code: ErrorCode.AttemptSessionError,
-      message: 'APIError',
+      // The model service's own words, not just the error's class (D163).
+      message: 'APIError: Bad Gateway',
       details: { error: { name: 'APIError', data: { message: 'Bad Gateway' } } },
     });
+  });
+
+  it('模型服务不可用、opencode 重试期间不计入超时，恢复后照常计时（D163）', async () => {
+    await t.call(updateSettingsOp, { 'attempt.timeoutMinutes': 5 });
+    const down = 'Cannot connect to API: Unable to connect. Is the computer able to access the url?';
+    const busy = 'Service Unavailable: no healthy upstream';
+    t.fake.enqueue(script().retry(down, down, busy).text('Back again').hang());
+    const retries: Array<string | undefined> = [];
+    t.app.events.subscribe((event) => {
+      if (event.type !== ServerEventType.AttemptTranscript) return;
+      for (const e of event.data.entries)
+        if (e.kind === 'system' && e.data.event === 'retrying') retries.push(e.data.detail);
+    });
+    const waiting = waitForEvent(t.app.events, ServerEventType.AttemptTranscript, (d) =>
+      d.entries.some((e) => e.kind === 'system' && e.data.detail === busy),
+    );
+    const started = await startAttempt();
+    await waiting;
+
+    clock.advance(60 * 60_000);
+    expect((await t.call(getAttemptOp, { id: started.id })).body.status).toBe('running');
+    // Each reason is recorded once while opencode keeps retrying with it.
+    expect(retries).toEqual([down, busy]);
+
+    const back = waitForEvent(t.app.events, ServerEventType.AttemptTranscript, (d) =>
+      d.entries.some((e) => e.kind === 'text'),
+    );
+    t.fake.recoverModel();
+    await back;
+    clock.advance(5 * 60_000 - 1);
+    expect((await t.call(getAttemptOp, { id: started.id })).body.status).toBe('running');
+    const failed = reaches('failed');
+    clock.advance(1);
+    expect((await failed).attempt.error).toMatchObject({ code: ErrorCode.AttemptTimeout });
   });
 
   it('超过 attempt.timeoutMinutes 时中止会话并失败 ATTEMPT_TIMEOUT', async () => {

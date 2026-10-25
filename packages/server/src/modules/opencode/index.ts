@@ -17,6 +17,7 @@ export {
   sessionPermissionRules,
 } from './opencode.config.ts';
 export {
+  describeOpencodeError,
   type OpencodeError,
   type OpencodeEvent,
   OpencodeEventType,

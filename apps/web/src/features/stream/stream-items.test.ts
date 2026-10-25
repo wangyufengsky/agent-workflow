@@ -45,7 +45,7 @@ const shown = (items: StreamItem[]) =>
       case 'wait':
         return `wait ${i.permission}${i.waiting ? ' (waiting)' : ''}`;
       case 'notice':
-        return `notice ${i.event}${i.waiting ? ' (waiting)' : ''}`;
+        return `notice ${i.event}${i.detail === undefined ? '' : `: ${i.detail}`}${i.waiting ? ' (waiting)' : ''}`;
       default:
         return i.kind;
     }
@@ -54,6 +54,16 @@ const items = (entries: TranscriptEntry[], opts: { pro?: boolean; ended?: boolea
   streamItems(entries, { directory: '/wt/T-1', pro: opts.pro ?? false, ended: opts.ended ?? false });
 
 describe('streamItems', () => {
+  it('opencode 重试模型请求时，通知带上模型服务给出的原因（D163）', () => {
+    const retrying: TranscriptEntry = {
+      seq: ++seq,
+      ts: at(0),
+      kind: TranscriptEntryKind.System,
+      data: { event: TranscriptSystemEvent.Retrying, detail: 'Cannot connect to API: Unable to connect.' },
+    };
+    expect(shown(items([retrying]))).toEqual(['notice retrying: Cannot connect to API: Unable to connect.']);
+  });
+
   it('思考与正文都保留，思考的用时从前一条算起；工具调用写成人话并带上结果；会话开始不显示', () => {
     const entries: TranscriptEntry[] = [
       {

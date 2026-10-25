@@ -11,8 +11,13 @@ export const OpencodeEventType = {
   TextDelta: 'text_delta',
   Tool: 'tool',
   StepFinished: 'step_finished',
-  /** opencode waits before retrying a failed model request (e.g. rate limits). */
+  /**
+   * opencode waits before retrying a failed model request: the model service cannot be reached, answers 5xx or limits
+   * the rate. opencode 1.19.0 retries such requests until they succeed, without a session error (12 §8).
+   */
   Retry: 'retry',
+  /** opencode sends a model request (again, after a retry wait). */
+  Busy: 'busy',
   Idle: 'idle',
   Error: 'error',
   PermissionAsked: 'permission_asked',
@@ -31,6 +36,16 @@ export const ToolCallStatus = {
 export type ToolCallStatus = (typeof ToolCallStatus)[keyof typeof ToolCallStatus];
 
 export type OpencodeError = { name: string; data: Record<string, unknown> };
+
+/**
+ * An opencode error as one line: its class and the model service's own message, e.g. `ContextOverflowError: Bad
+ * Request: This model's maximum context length is 32768 tokens …` (D163); the class alone tells the user nothing.
+ */
+export function describeOpencodeError(error: OpencodeError | undefined): string {
+  if (error === undefined) return 'session error';
+  const { message } = error.data;
+  return typeof message === 'string' && message !== '' ? `${error.name}: ${message}` : error.name;
+}
 
 const E = OpencodeEventType;
 export type OpencodeEvent =
@@ -72,6 +87,7 @@ export type OpencodeEvent =
       cost: number;
     }
   | { type: typeof E.Retry; sessionId: string; message: string | undefined }
+  | { type: typeof E.Busy; sessionId: string }
   | { type: typeof E.Idle; sessionId: string }
   /** `error` is opencode's error object (`{ name, data }`), absent when opencode gives none. */
   | { type: typeof E.Error; sessionId: string; error: OpencodeError | undefined }
@@ -242,6 +258,7 @@ export function parseGlobalEvent(raw: unknown): OpencodeEvent | undefined {
     }
     case 'session.status': {
       const { sessionID, status } = event.properties;
+      if (status.type === 'busy') return { type: E.Busy, sessionId: sessionID };
       if (status.type !== 'retry') return undefined;
       return { type: E.Retry, sessionId: sessionID, message: status.message };
     }

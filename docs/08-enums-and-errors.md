@@ -491,7 +491,7 @@ class AppError extends Error {
 | `ATTEMPT_NOT_FOUND` | 404 | |
 | `ATTEMPT_NO_RESULT` | — | 会话结束但未提交结果（记录在尝试上，不作为 HTTP 错误） |
 | `ATTEMPT_TIMEOUT` | — | 超过 `attempt.timeoutMinutes` |
-| `ATTEMPT_SESSION_ERROR` | — | opencode `session.error`；`details` 为原始错误 |
+| `ATTEMPT_SESSION_ERROR` | — | opencode `session.error`；`message` 为「错误类名: 模型服务的原话」（外部原文，界面直接显示，D163），`details` 为原始错误。模型服务连不上、5xx、限流时 opencode 只重试、不报错，尝试等待而不是失败 |
 | `OPENCODE_NOT_READY` | 503 | 运行时不是 `ready` |
 | `OPENCODE_REQUEST_FAILED` | 502 | 调 opencode API 失败 |
 | `PERMISSION_REQUEST_EXPIRED` | 409 | opencode 明确返回该权限请求不存在；移除对应残留卡片，不视为已批准 |

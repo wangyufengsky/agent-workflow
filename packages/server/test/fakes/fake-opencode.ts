@@ -41,6 +41,8 @@ export type FakeStep =
   | { type: 'callTool'; server: FakeMcpServer; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
   | { type: 'hang' }
+  /** The model service fails: opencode reports a retry per message, then waits until `recoverModel()`. */
+  | { type: 'retry'; messages: string[] }
   /** The tokens the turn reports as used when it ends, instead of 100 input and 20 output. */
   | { type: 'usage'; input: number; output: number }
   /** `idle: false`: opencode reports the error without a following idle event. */
@@ -78,6 +80,11 @@ export function script() {
     usage: (input: number, output: number) => add({ type: 'usage', input, output }),
     /** Keeps working (never idle) until the session is aborted. */
     hang: () => add({ type: 'hang' }),
+    /**
+     * The model service cannot be reached: opencode retries the request (one `retry` status per message, `busy` before
+     * each request, as 1.19.0 does) and goes on once the test calls `recoverModel()`.
+     */
+    retry: (...messages: string[]) => add({ type: 'retry', messages }),
     /** Fails the turn with a session error. */
     error: (name: string, message: string, { idle = true }: { idle?: boolean } = {}) =>
       add({ type: 'error', name, message, idle }),
@@ -112,6 +119,8 @@ const DELTA_CHARS = 8;
 export function createFakeOpencode() {
   const listeners = new Set<(event: OpencodeEvent) => void>();
   const queue: Array<{ script: Pick<FakeScript, 'steps'>; match: ScriptMatch | undefined }> = [];
+  /** Resolvers of `retry` steps, per session, released by recoverModel() or abort(). */
+  const waitingForModel = new Map<string, Array<() => void>>();
   /** Resolvers of `hang` steps, per session, released by abort(). */
   const hanging = new Map<string, Array<() => void>>();
   const pendingPermissions = new Map<string, { sessionId: string; resolve: (reply: PermissionDecision) => void }>();
@@ -278,6 +287,16 @@ export function createFakeOpencode() {
         case 'hang':
           await new Promise<void>((resolve) => hanging.set(sessionId, [...(hanging.get(sessionId) ?? []), resolve]));
           break;
+        case 'retry':
+          for (const message of step.messages) {
+            emit({ type: E.Busy, sessionId });
+            emit({ type: E.Retry, sessionId, message });
+          }
+          await new Promise<void>((resolve) =>
+            waitingForModel.set(sessionId, [...(waitingForModel.get(sessionId) ?? []), resolve]),
+          );
+          if ((generation.get(sessionId) ?? 0) === turnGeneration) emit({ type: E.Busy, sessionId });
+          break;
         case 'error':
           emit({ type: E.Error, sessionId, error: { name: step.name, data: { message: step.message } } });
           if (step.idle) emit({ type: E.Idle, sessionId });
@@ -329,6 +348,8 @@ export function createFakeOpencode() {
     holdSessions(): void;
     /** The next `prompt` request fails with OPENCODE_REQUEST_FAILED while the runtime stays connected. */
     failNextPrompt(): void;
+    /** The model service is back: turns waiting in a `retry` step send their request again and go on. */
+    recoverModel(): void;
     /** 重放真实捕获的事件，验证迟到报告和重复投递。 */
     replay(events: readonly OpencodeEvent[]): void;
     reconnect(): void;
@@ -356,6 +377,10 @@ export function createFakeOpencode() {
         await Promise.all(turns);
         await new Promise<void>((resolve) => setImmediate(resolve));
       } while (turns.size > 0);
+    },
+    recoverModel() {
+      for (const release of [...waitingForModel.values()].flat()) release();
+      waitingForModel.clear();
     },
     failNextPrompt() {
       failPrompt = true;
@@ -466,8 +491,9 @@ export function createFakeOpencode() {
       // called a tool (opencode 1.19.0 sends step-finish right after the tool result, test/fixtures).
       await Promise.resolve();
       generation.set(sessionId, (generation.get(sessionId) ?? 0) + 1);
-      for (const release of hanging.get(sessionId) ?? []) release();
+      for (const release of [...(hanging.get(sessionId) ?? []), ...(waitingForModel.get(sessionId) ?? [])]) release();
       hanging.delete(sessionId);
+      waitingForModel.delete(sessionId);
       for (const [id, pending] of pendingPermissions) {
         if (pending.sessionId !== sessionId) continue;
         pendingPermissions.delete(id);

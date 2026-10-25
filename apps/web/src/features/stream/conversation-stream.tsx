@@ -1,4 +1,4 @@
-import { type AttemptDTO, AttemptStatus, type TranscriptEntry, TranscriptEntryKind } from '@aw/shared';
+import { type AttemptDTO, AttemptStatus, ErrorCode, type TranscriptEntry, TranscriptEntryKind } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { memo, type ReactNode, useMemo, useState } from 'react';
@@ -90,18 +90,27 @@ const Item = memo(function Item({ item, pro }: { item: StreamItem; pro: boolean 
             </Link>
           </p>
         );
-      return <p className={styles.notice}>{TRANSCRIPT_SYSTEM_LABEL[item.event]}</p>;
+      return (
+        <p className={styles.notice}>
+          {item.detail === undefined
+            ? TRANSCRIPT_SYSTEM_LABEL[item.event]
+            : C.noticeDetail(TRANSCRIPT_SYSTEM_LABEL[item.event], item.detail)}
+        </p>
+      );
     case 'error':
       return (
         <p className={styles.error}>
           <Icon name="alert" size="sm" />
           <span className="grow">
             {ERROR_COPY[item.error.code]}
-            {pro && (
+            {pro ? (
               <span className="mono">
                 {' '}
                 · {item.error.code} · {item.error.message}
               </span>
+            ) : (
+              // The model service's own words say what went wrong (D163).
+              item.error.code === ErrorCode.AttemptSessionError && <span className="mono"> {item.error.message}</span>
             )}
           </span>
         </p>
