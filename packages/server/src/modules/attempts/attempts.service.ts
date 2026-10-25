@@ -181,6 +181,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
           permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
             checkCommands: input.checkCommands,
             web: input.web,
+            offline: settings.get('network.offline'),
             allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
           }),
         });

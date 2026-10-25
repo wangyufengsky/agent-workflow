@@ -101,8 +101,8 @@ export function SettingsPage() {
         <AssistantSettings settings={settings} set={set} />
         <CompanionSettings settings={settings} set={set} />
         <WebsiteSettings settings={settings} set={set} />
+        <NetworkSettings settings={settings} set={set} isPro={isPro} />
         {isPro && <ProSettings settings={settings} set={set} />}
-        {isPro && <NetworkSettings settings={settings} set={set} />}
         {isPro && <HostingAccountsSettings />}
         {update.isError && <ErrorState error={update.error} />}
         <AboutPanel />

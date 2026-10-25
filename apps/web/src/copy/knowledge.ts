@@ -33,6 +33,7 @@ export const KNOWLEDGE_COPY = {
   databaseCount: (n: number) => `数据库（${n}）`,
   noDatabase: '这个项目没有关联数据库（在项目详情的专业模式中关联）',
   webHint: '打开后研究员可以访问公开网页，问题内容会发给搜索服务。',
+  webHintOffline: '离线环境：打开后研究员只能读内网网页（按完整地址打开），不能网络搜索。',
   status: {
     [KnowledgeTurnStatus.Researching]: '研究中',
     [KnowledgeTurnStatus.Answered]: '已回答',

@@ -2,6 +2,7 @@ import { KnowledgeSourceKind, type KnowledgeSources } from '@aw/shared';
 import { useState } from 'react';
 import { Icon } from '../../components/icon.tsx';
 import { KNOWLEDGE_COPY as C } from '../../copy/knowledge.ts';
+import { useSettings } from '../settings/settings.queries.ts';
 import styles from './knowledge.module.css';
 
 const SELECTABLE = [KnowledgeSourceKind.Code, KnowledgeSourceKind.Docs, KnowledgeSourceKind.Database] as const;
@@ -32,6 +33,7 @@ export function SourcesPicker({
   onChange?: (sources: KnowledgeSources) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const offline = useSettings()['network.offline'];
   if (onChange === undefined) {
     return (
       <p className={styles.sourcesLine} title={C.projectLocked}>
@@ -73,7 +75,7 @@ export function SourcesPicker({
               <span className="label" id="knowledge-web-label">
                 {C.sourceLabel.web}
               </span>
-              <span className="hint">{C.webHint}</span>
+              <span className="hint">{offline ? C.webHintOffline : C.webHint}</span>
             </div>
             <button
               type="button"

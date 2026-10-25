@@ -27,9 +27,15 @@ export const SETTINGS_COPY = {
   loginUrlPatterns: '识别登录页的地址片段',
   integratedAuthServers: 'Windows 集成登录的服务器',
   concurrencyHint: '多个任务同时进行时，最多并行的 AI 会话数量。',
+  // 离线环境（D168）
+  offline: '离线环境',
+  offlineHint:
+    '在内网或不能访问公网的机器上打开：opencode 不再更新模型目录、不分享会话、不下载语言服务器，模型列表中隐藏需要公网的 opencode 自带模型，知识问答只能读内网网页、不能网络搜索。',
+  offlineRestartHint: '重启 opencode 后生效；重启会中断正在进行的 AI 会话，之后可以重试。',
+  restartNow: '立即重启',
   // 专业项（08 §4.3）
   pro: '专业设置',
-  // 网络：企业 CA 与代理（D164、D165）
+  // 网络：企业 CA 与代理（D164、D165）；离线环境见上
   network: '网络',
   extraCa: '额外信任的 CA 证书',
   extraCaFile: '从文件读取…',

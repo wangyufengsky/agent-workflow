@@ -401,6 +401,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `delivery.defaultStrategy` | `squash`（可选 `squash` / `merge` / `rebase`；PR 有单独按钮） | 专业 |
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |
 | `opencode.binaryPath` | `null`（从 PATH 与 `~/.opencode/bin` 查找；助手不能修改，D65） | 专业 |
+| `network.offline` | `false`（离线环境，D168：opencode 不访问公网、隐藏自带的 Zen / Go provider、知识问答不能网络搜索；opencode 下一次启动时生效） | 简单 |
 | `assistant.alwaysAllow` | `[]`（操作 id 列表；只有 write 级生效，critical 即使在列表中也每次确认；助手自己不能修改，D65；v1.1） | 简单 |
 | `companion.appearance` | `orb`（`CompanionAppearance`：`orb` / `whale`，默认极光光球；32 §3） | 简单 |
 | `companion.enabled` | `false`（桌面显示助手） | 简单 |

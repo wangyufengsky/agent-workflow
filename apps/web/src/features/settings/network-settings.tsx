@@ -1,8 +1,12 @@
-import type { Settings } from '@aw/shared';
+import { RuntimeStatus, type Settings } from '@aw/shared';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Button } from '../../components/button.tsx';
+import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { SETTINGS_COPY as C } from '../../copy/settings.ts';
+import { runtimeQuery, useRestartRuntime } from '../runtime/runtime.queries.ts';
 import { TextSetting } from './setting-inputs.tsx';
 
 /** PEM text, saved on blur or when read from a file; empty means none (null). */
@@ -45,46 +49,91 @@ function CertificatesSetting({ value, onCommit }: { value: string | null; onComm
   );
 }
 
-/** Whom the backend trusts and which proxy it takes (D164, D165); pro mode. Inputs are keyed by the saved value. */
-export function NetworkSettings({ settings, set }: { settings: Settings; set: (patch: Partial<Settings>) => void }) {
+/**
+ * The network panel: the offline environment (D168) for everyone, and in pro mode whom the backend trusts and which
+ * proxy it takes (D164, D165; inputs are keyed by the saved value). The offline setting applies when opencode starts,
+ * so while the running one was started the other way the panel offers to restart it now.
+ */
+export function NetworkSettings({
+  settings,
+  set,
+  isPro,
+}: {
+  settings: Settings;
+  set: (patch: Partial<Settings>) => void;
+  isPro: boolean;
+}) {
+  const runtime = useQuery(runtimeQuery).data;
+  const restart = useRestartRuntime();
+  const offline = settings['network.offline'];
+  const stale = runtime?.status === RuntimeStatus.Ready && runtime.offline !== offline;
   const noProxy = settings['network.noProxy'].join(',');
   return (
     <Panel title={C.network}>
-      <div className="field">
-        <label className="label" htmlFor="setting-ca">
-          {C.extraCa}
-        </label>
-        <CertificatesSetting
-          key={settings['network.extraCaCerts'] ?? ''}
-          value={settings['network.extraCaCerts']}
-          onCommit={(pem) => set({ 'network.extraCaCerts': pem })}
+      <div className="row">
+        <div className="grow col">
+          <span className="label" id="offline-label">
+            {C.offline}
+          </span>
+          <span className="hint">{C.offlineHint}</span>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          className="switch"
+          aria-checked={offline}
+          aria-labelledby="offline-label"
+          onClick={() => set({ 'network.offline': !offline })}
         />
-        <p className="hint">{C.extraCaHint}</p>
       </div>
-      <div className="field">
-        <label className="label" htmlFor="setting-proxy">
-          {C.proxy}
-        </label>
-        <TextSetting
-          key={settings['network.proxy'] ?? ''}
-          id="setting-proxy"
-          value={settings['network.proxy']}
-          onCommit={(v) => set({ 'network.proxy': v })}
-        />
-        <p className="hint">{C.proxyHint}</p>
-      </div>
-      <div className="field">
-        <label className="label" htmlFor="setting-no-proxy">
-          {C.noProxy}
-        </label>
-        <TextSetting
-          key={noProxy}
-          id="setting-no-proxy"
-          value={noProxy === '' ? null : noProxy}
-          onCommit={(v) => set({ 'network.noProxy': (v ?? '').split(/[,\s]+/).filter((host) => host !== '') })}
-        />
-        <p className="hint">{C.noProxyHint}</p>
-      </div>
+      {stale && (
+        <div className="row">
+          <p className="hint grow">{C.offlineRestartHint}</p>
+          <Button icon="refresh" pending={restart.isPending} onClick={() => restart.mutate()}>
+            {C.restartNow}
+          </Button>
+        </div>
+      )}
+      {restart.isError && <ErrorState error={restart.error} />}
+      {isPro && (
+        <>
+          <div className="field">
+            <label className="label" htmlFor="setting-ca">
+              {C.extraCa}
+            </label>
+            <CertificatesSetting
+              key={settings['network.extraCaCerts'] ?? ''}
+              value={settings['network.extraCaCerts']}
+              onCommit={(pem) => set({ 'network.extraCaCerts': pem })}
+            />
+            <p className="hint">{C.extraCaHint}</p>
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="setting-proxy">
+              {C.proxy}
+            </label>
+            <TextSetting
+              key={settings['network.proxy'] ?? ''}
+              id="setting-proxy"
+              value={settings['network.proxy']}
+              onCommit={(v) => set({ 'network.proxy': v })}
+            />
+            <p className="hint">{C.proxyHint}</p>
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="setting-no-proxy">
+              {C.noProxy}
+            </label>
+            <TextSetting
+              key={noProxy}
+              id="setting-no-proxy"
+              value={noProxy === '' ? null : noProxy}
+              onCommit={(v) => set({ 'network.noProxy': (v ?? '').split(/[,\s]+/).filter((host) => host !== '') })}
+            />
+            <p className="hint">{C.noProxyHint}</p>
+          </div>
+        </>
+      )}
     </Panel>
   );
 }
