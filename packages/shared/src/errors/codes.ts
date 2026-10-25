@@ -37,6 +37,7 @@ export const ErrorCode = {
   HostingNotConfigured: 'HOSTING_NOT_CONFIGURED',
   HostingAuthFailed: 'HOSTING_AUTH_FAILED',
   HostingApiError: 'HOSTING_API_ERROR',
+  HostingUnreachable: 'HOSTING_UNREACHABLE',
   // 流程 / 角色
   WorkflowNotFound: 'WORKFLOW_NOT_FOUND',
   WorkflowReadonly: 'WORKFLOW_READONLY',
@@ -196,6 +197,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.HostingNotConfigured]: 400,
   [ErrorCode.HostingAuthFailed]: 401,
   [ErrorCode.HostingApiError]: 502,
+  [ErrorCode.HostingUnreachable]: 502,
   [ErrorCode.WorkflowNotFound]: 404,
   [ErrorCode.WorkflowReadonly]: 409,
   [ErrorCode.WorkflowDefinitionInvalid]: 400,

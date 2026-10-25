@@ -213,7 +213,7 @@ it('删除时停止失败不掩盖之后真正的模型错误，聊天仍可清�
   expect(entries).toContainEqual(
     expect.objectContaining({
       kind: 'error',
-      data: expect.objectContaining({ message: 'ProviderError', details: { message: '实际模型失败' } }),
+      data: expect.objectContaining({ message: 'ProviderError: 实际模型失败', details: { message: '实际模型失败' } }),
     }),
   );
   expect(entries.filter((entry) => entry.kind === 'system' && entry.data.event === 'aborted')).toEqual([]);

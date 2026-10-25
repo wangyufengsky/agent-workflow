@@ -45,6 +45,8 @@ export const ONBOARDING_COPY = {
     pendingBadge: '启动后检测',
     pending: '启动 opencode 后检测；如果还没登录模型提供方，请在终端运行：',
     available: (n: number) => `${n} 个模型可用`,
+    noContext: (n: number) =>
+      `其中 ${n} 个没有声明上下文长度（provider 配置里的 limit.context），opencode 不会自动压缩对话，较长的任务可能失败。运行环境页里有标注。`,
     none: '还没有可用的模型。在终端登录一个模型提供方：',
     fix: 'opencode auth login',
   },

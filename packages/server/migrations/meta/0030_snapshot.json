@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "91eeda0a-bb48-448f-8ebc-04233d0cc96f",
+  "id": "ea494a7e-96b0-468a-8bca-f186aa5ed0ba",
   "prevId": "845044c7-51f1-4da0-9bbb-b33c250ab2d5",
   "tables": {
     "assistant_analysis_followups": {
@@ -1021,72 +1021,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "credential_vault": {
-      "name": "credential_vault",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "integer",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "salt": {
-          "name": "salt",
-          "type": "blob",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "scrypt_n": {
-          "name": "scrypt_n",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "scrypt_r": {
-          "name": "scrypt_r",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "scrypt_p": {
-          "name": "scrypt_p",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "wrapped_key": {
-          "name": "wrapped_key",
-          "type": "blob",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "credentials": {
       "name": "credentials",
       "columns": {
@@ -1103,14 +1037,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "seal": {
-          "name": "seal",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'system'"
         },
         "ciphertext": {
           "name": "ciphertext",
@@ -1192,9 +1118,9 @@
           "notNull": true,
           "autoincrement": false
         },
-        "tls": {
-          "name": "tls",
-          "type": "integer",
+        "tls_mode": {
+          "name": "tls_mode",
+          "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false

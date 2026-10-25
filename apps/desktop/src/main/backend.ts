@@ -4,7 +4,7 @@ import { type BackendShutdownMessage, devPorts, platformSchema } from '@aw/share
 import { app, utilityProcess } from 'electron';
 import { type BrowserTabs, type BrowserTabsDeps, serveBrowserRequests } from './browser.ts';
 import { serveCredentialRequests } from './credentials.ts';
-import { withLoginShellPath } from './shell-path.ts';
+import { withLoginShellEnv } from './shell-path.ts';
 
 /** `stop` asks the backend to shut down (it stops opencode first) and resolves once it has exited. */
 export type Backend = { port: number; browser: BrowserTabs; stop(): Promise<void> };
@@ -20,7 +20,7 @@ export async function startBackend(
   browser: Omit<BrowserTabsDeps, 'emit'>,
 ): Promise<Backend> {
   // `shell` is null only on Windows, which has no login shell to ask.
-  const env = await withLoginShellPath(platformSchema.parse(process.platform), process.env, userInfo().shell ?? '');
+  const env = await withLoginShellEnv(platformSchema.parse(process.platform), process.env, userInfo().shell ?? '');
   const child = utilityProcess.fork(join(import.meta.dirname, 'server.js'), [], {
     serviceName: 'agent-workflow-backend',
     stdio: 'inherit',

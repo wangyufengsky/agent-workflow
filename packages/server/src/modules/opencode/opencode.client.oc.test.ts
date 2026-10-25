@@ -109,4 +109,23 @@ describe('@opencode 客户端与配置注入', () => {
     const models = await t.app.services.opencode.listModels();
     expect(models.available.length).toBeGreaterThan(0);
   });
+
+  it('项目 opencode 配置里的 provider 只在按项目目录列模型时出现；没有声明上下文长度的为 null（D162）', async () => {
+    const provider = {
+      npm: '@ai-sdk/openai-compatible',
+      name: 'Project LAN',
+      options: { baseURL: 'http://127.0.0.1:9/v1' },
+      models: { bare: { name: 'Bare' }, sized: { name: 'Sized', limit: { context: 32_768, output: 4096 } } },
+    };
+    const repo = await createTestRepo({
+      files: { 'opencode.json': JSON.stringify({ provider: { 'aw-lan': provider } }) },
+    });
+    const opencode = t.app.services.opencode;
+
+    expect((await opencode.listModels()).available.filter((m) => m.providerId === 'aw-lan')).toEqual([]);
+    expect((await opencode.listModels(repo.path)).available.filter((m) => m.providerId === 'aw-lan')).toEqual([
+      { providerId: 'aw-lan', modelId: 'bare', name: 'Bare', contextLimit: null },
+      { providerId: 'aw-lan', modelId: 'sized', name: 'Sized', contextLimit: 32_768 },
+    ]);
+  });
 });

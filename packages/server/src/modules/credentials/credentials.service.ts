@@ -83,8 +83,8 @@ export function createCredentialsService({ db, clock, cipher }: CredentialsServi
       return status();
     },
     /** Forgotten password: its secrets cannot be opened again; the rows stay so their owners can re-enter them. */
-    resetMasterPassword(): Promise<CredentialStatusDTO> {
-      masterPassword.reset((tx) =>
+    async resetMasterPassword(): Promise<CredentialStatusDTO> {
+      await masterPassword.reset((tx) =>
         tx
           .update(credentialsTable)
           .set({ seal: CredentialSeal.Discarded, ciphertext: Buffer.alloc(0) })

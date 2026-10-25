@@ -10,6 +10,7 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { ROLES_COPY as C } from '../../copy/roles.ts';
 import { ROLE_BASE_AGENT_LABEL, WORKFLOWS_COPY } from '../../copy/workflows.ts';
 import { environmentQuery } from '../onboarding/environment.queries.ts';
+import { usableModels } from '../onboarding/usable-models.ts';
 import { rolesQuery, useCreateRole, useDeleteRole, useUpdateRole } from '../tasks/tasks.queries.ts';
 import styles from './roles.module.css';
 
@@ -18,7 +19,8 @@ type Editing = { mode: 'create' } | { mode: 'copy'; from: RoleDTO } | { mode: 'e
 /** Models opencode offers (`provider/model`), from the environment check (M5-06). */
 function ModelSelect({ value, onChange }: { value: string | null; onChange: (model: string | null) => void }) {
   const environment = useQuery(environmentQuery);
-  const models = environment.data?.models.available ?? [];
+  // A role's model applies in every project: only the global configuration's (D162).
+  const models = usableModels(environment.data?.models.available ?? [], null);
   const ids = models.map((m) => `${m.providerId}/${m.modelId}`);
   return (
     <div className="field">

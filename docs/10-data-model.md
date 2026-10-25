@@ -24,7 +24,7 @@
 | --- | --- | --- |
 | id | TEXT PK | |
 | kind | TEXT | `CredentialKind` |
-| seal | TEXT | `CredentialSeal`，默认 `system`（D167，迁移 `0030_credential_master_password`）：由系统密钥服务还是主密码加密；主密码重置后为 `discarded` |
+| seal | TEXT | `CredentialSeal`，默认 `system`（D167，迁移 `0031_credential_master_password`）：由系统密钥服务还是主密码加密；主密码重置后为 `discarded` |
 | ciphertext | BLOB | `system`：safeStorage 加密结果；`master_password`：nonce ‖ AES-256-GCM 密文 ‖ tag（数据密钥加密）；`discarded`：空 |
 | created_at | INTEGER | |
 
@@ -81,7 +81,7 @@
 | type | TEXT | `DbType`（v1.2 起五种，24 §1） |
 | host / port / database / username | TEXT / INTEGER / TEXT / TEXT | |
 | credential_id | TEXT → credentials | 密码；删除连接后删除凭据 |
-| tls | INTEGER(bool) | |
+| tls_mode | TEXT | `DbTlsMode`（D166）；迁移 `0030_db_tls_mode` 把原来的 `tls = 1` 改为 `verify`，其余为 `off` |
 | created_at / updated_at | INTEGER | |
 
 ### project_db_connections

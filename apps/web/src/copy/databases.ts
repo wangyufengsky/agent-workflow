@@ -1,4 +1,4 @@
-import type { DbType } from '@aw/shared';
+import type { DbTlsMode, DbType } from '@aw/shared';
 
 export const DATABASES_COPY = {
   title: '数据库',
@@ -33,8 +33,24 @@ export const DATABASES_COPY = {
   username: '用户名',
   password: '密码',
   passwordKeep: '留空表示不修改',
-  tls: '使用 TLS',
-  tlsChip: 'TLS',
+  tls: 'TLS 加密',
+  tlsLabel: {
+    off: '不加密',
+    verify: '加密并校验证书',
+    no_verify: '加密但不校验证书',
+  } satisfies Record<DbTlsMode, string>,
+  /** Below the TLS select (24 §2, D166). */
+  tlsHint: {
+    off: '账号、密码与查询结果以明文传输。',
+    verify:
+      '校验服务器证书与主机名。证书由企业 CA 签发时，CA 要在系统证书库里，或加到设置「网络」的「额外信任的 CA 证书」。',
+    no_verify:
+      '传输加密，但不确认对方是不是这台数据库，可能被冒充（中间人）。用于数据库自己生成的自签名证书（如 MySQL 默认证书）。',
+  } satisfies Record<DbTlsMode, string>,
+  tlsChip: {
+    verify: 'TLS',
+    no_verify: 'TLS · 不校验证书',
+  } satisfies Record<Exclude<DbTlsMode, 'off'>, string>,
   test: '测试连接',
   testOk: (version: string) => `连接成功 · 服务器版本 ${version}`,
   testFailed: (error: string) => `连接失败：${error}`,

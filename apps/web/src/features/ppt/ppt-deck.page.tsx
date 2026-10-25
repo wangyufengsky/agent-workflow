@@ -50,7 +50,7 @@ export function PptDeckPage() {
       <RunBanner deck={d} />
       <div className="row">
         <span className="hint">{C.model}</span>
-        <ModelPicker value={model} onChange={setModel} />
+        <ModelPicker value={model} projectId={d.project === null ? null : d.project.id} onChange={setModel} />
       </div>
       {d.outlineConfirmed ? (
         <SlidesStage deck={d} selectedId={slide} model={model} />

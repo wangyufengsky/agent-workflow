@@ -1,4 +1,4 @@
-import { AppError, DB_CONNECT_TIMEOUT_MS, ErrorCode } from '@aw/shared';
+import { AppError, DB_CONNECT_TIMEOUT_MS, DbTlsMode, ErrorCode } from '@aw/shared';
 import GaussdbCursor from 'gaussdb-cursor';
 import gaussdb from 'gaussdb-node';
 import pg from 'pg';
@@ -52,6 +52,18 @@ async function run(client: Client, sql: string, values: unknown[] = []): Promise
   }
 }
 
+/** pg's `ssl` for each mode (D166); `{}` checks the certificate against Node's default CAs (D164). */
+function sslOf(mode: DbTlsMode) {
+  switch (mode) {
+    case DbTlsMode.Off:
+      return false;
+    case DbTlsMode.Verify:
+      return {};
+    case DbTlsMode.NoVerify:
+      return { rejectUnauthorized: false };
+  }
+}
+
 /** Tables, views and materialized views of the connection's current schema (24 §3). */
 const RELATION_KINDS = `('r', 'p', 'v', 'm', 'f')`;
 
@@ -82,7 +94,7 @@ function createPostgresDriver({ Client, Cursor }: PostgresLibrary): DbDriver {
       user: target.username,
       password: target.password,
       database: target.database,
-      ssl: target.tls ? {} : false,
+      ssl: sslOf(target.tlsMode),
       connectionTimeoutMillis: DB_CONNECT_TIMEOUT_MS,
       types,
     });

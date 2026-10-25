@@ -7,9 +7,11 @@ import {
   hostingError,
   type PlatformReviewComment,
   REVIEW_COMMENTS_MAX,
+  unreachableError,
 } from './hosting.types.ts';
 
 async function translate(err: unknown): Promise<never> {
+  if (err instanceof TypeError && err.cause !== undefined) throw unreachableError(err.cause);
   if (err instanceof GitbeakerRequestError && err.cause !== undefined) {
     throw hostingError(err.cause.response.status, err.cause.description);
   }

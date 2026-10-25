@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { dbTypeSchema } from '../../enums/system.ts';
+import { dbTlsModeSchema, dbTypeSchema } from '../../enums/system.ts';
 
 /** `db_connections` row (10) without its password: only the credentials module reads that (06 §11). */
 export const dbConnectionSchema = z.object({
@@ -11,7 +11,7 @@ export const dbConnectionSchema = z.object({
   port: z.number(),
   database: z.string(),
   username: z.string(),
-  tls: z.boolean(),
+  tlsMode: dbTlsModeSchema,
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -26,7 +26,7 @@ const fields = {
   username: z.string().trim().min(1),
   /** May be empty (a local server without a password). */
   password: z.string(),
-  tls: z.boolean(),
+  tlsMode: dbTlsModeSchema,
 };
 
 export const createDbConnectionRequestSchema = z.object(fields);

@@ -1,4 +1,4 @@
-import { NodeStatus, type TaskDetailDTO, TaskFailedPhase } from '@aw/shared';
+import { ErrorCode, NodeStatus, type TaskDetailDTO, TaskFailedPhase } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Button } from '../../components/button.tsx';
@@ -137,6 +137,7 @@ function LastFailureView({ taskId, last }: { taskId: string; last: LastFailure }
       return (
         <p className="hint" data-testid="last-failure">
           {C.lastAttempt(last.aborted, last.error?.code)}
+          {last.error?.code === ErrorCode.AttemptSessionError && <span className="mono"> {last.error.message}</span>}
         </p>
       );
   }

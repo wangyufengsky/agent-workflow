@@ -137,4 +137,22 @@ describe('主密码（D167）', () => {
     expect(await t.app.services.credentials.reveal(systemId)).toBe('system-token');
     await expect(t.app.services.credentials.reveal(id)).rejects.toMatchObject({ code: ErrorCode.CredentialLocked });
   });
+
+  it('重置时还在进行的解锁与修改不会把旧密钥带回来', async () => {
+    t = await createTestApp();
+    await t.call(setupMasterPasswordOp, { password: 'correct horse' });
+    await restart();
+    const { credentials } = t.app.services;
+
+    // Started first: each is still deriving its key (scrypt) when the reset arrives.
+    const unlocking = credentials.unlock('correct horse');
+    const changing = credentials.changeMasterPassword('correct horse', 'battery staple');
+    await credentials.resetMasterPassword();
+    await Promise.allSettled([unlocking, changing]);
+
+    expect((await credentials.status()).masterPassword).toBe(MasterPasswordState.None);
+    await expect(credentials.create(CredentialKind.GitToken, 'x')).rejects.toMatchObject({
+      code: ErrorCode.CredentialUnavailable,
+    });
+  });
 });

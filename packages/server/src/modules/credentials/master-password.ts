@@ -48,6 +48,15 @@ async function wrap(password: string, dataKey: Buffer) {
  */
 export function createMasterPassword({ db, clock }: { db: Db; clock: Clock }) {
   let dataKey: Buffer | undefined;
+  // Setup, unlock, change and reset run one at a time: each awaits scrypt, and a reset landing in that gap would have
+  // the key it discarded put back when the derivation finishes.
+  let queue: Promise<unknown> = Promise.resolve();
+  function serial<T>(work: () => Promise<T>): Promise<T> {
+    const result = queue.then(work);
+    // The caller gets `result` with its error; the queue only needs to know it settled.
+    queue = result.catch(() => undefined);
+    return result;
+  }
   const row = () => db.select().from(credentialVaultTable).where(eq(credentialVaultTable.id, VAULT_ID)).get();
 
   async function unwrap(password: string): Promise<Buffer> {
@@ -75,39 +84,39 @@ export function createMasterPassword({ db, clock }: { db: Db; clock: Clock }) {
       if (dataKey !== undefined) return MasterPasswordState.Unlocked;
       return row() === undefined ? MasterPasswordState.None : MasterPasswordState.Locked;
     },
-    async setup(password: string): Promise<void> {
-      if (row() !== undefined) throw new AppError(ErrorCode.MasterPasswordExists, 'A master password is set');
-      const key = randomBytes(KEY_BYTES);
-      const now = clock.now();
-      const { changes } = db
-        .insert(credentialVaultTable)
-        .values({ id: VAULT_ID, ...(await wrap(password, key)), createdAt: now, updatedAt: now })
-        .onConflictDoNothing()
-        .run();
-      // Two setups at once: the other one won while this one was deriving its key.
-      if (changes === 0) throw new AppError(ErrorCode.MasterPasswordExists, 'A master password is set');
-      dataKey = key;
-    },
-    async unlock(password: string): Promise<void> {
-      dataKey = await unwrap(password);
-    },
-    async change(currentPassword: string, newPassword: string): Promise<void> {
-      const key = await unwrap(currentPassword);
-      const wrapped = await wrap(newPassword, key);
-      db.update(credentialVaultTable)
-        .set({ ...wrapped, updatedAt: clock.now() })
-        .where(eq(credentialVaultTable.id, VAULT_ID))
-        .run();
-      dataKey = key;
-    },
+    setup: (password: string): Promise<void> =>
+      serial(async () => {
+        if (row() !== undefined) throw new AppError(ErrorCode.MasterPasswordExists, 'A master password is set');
+        const key = randomBytes(KEY_BYTES);
+        const now = clock.now();
+        db.insert(credentialVaultTable)
+          .values({ id: VAULT_ID, ...(await wrap(password, key)), createdAt: now, updatedAt: now })
+          .run();
+        dataKey = key;
+      }),
+    unlock: (password: string): Promise<void> =>
+      serial(async () => {
+        dataKey = await unwrap(password);
+      }),
+    change: (currentPassword: string, newPassword: string): Promise<void> =>
+      serial(async () => {
+        const key = await unwrap(currentPassword);
+        const wrapped = await wrap(newPassword, key);
+        db.update(credentialVaultTable)
+          .set({ ...wrapped, updatedAt: clock.now() })
+          .where(eq(credentialVaultTable.id, VAULT_ID))
+          .run();
+        dataKey = key;
+      }),
     /** Forgets the password and its key; `discardSealed` drops what the key sealed in the same transaction. */
-    reset(discardSealed: (tx: DbExecutor) => void): void {
-      db.transaction((tx) => {
-        discardSealed(tx);
-        tx.delete(credentialVaultTable).where(eq(credentialVaultTable.id, VAULT_ID)).run();
-      });
-      dataKey = undefined;
-    },
+    reset: (discardSealed: (tx: DbExecutor) => void): Promise<void> =>
+      serial(async () => {
+        db.transaction((tx) => {
+          discardSealed(tx);
+          tx.delete(credentialVaultTable).where(eq(credentialVaultTable.id, VAULT_ID)).run();
+        });
+        dataKey = undefined;
+      }),
     encrypt: (plaintext: string): Buffer => seal(unlockedKey(), Buffer.from(plaintext, 'utf8')),
     decrypt(ciphertext: Buffer): string {
       const key = unlockedKey();
