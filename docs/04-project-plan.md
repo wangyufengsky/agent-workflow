@@ -52,7 +52,7 @@
 | 质量与用量（只统计 tokens；设计 [19-insights.md](19-insights.md)） | 已合并 |
 | Windows CI 提速、E2E 端口可配置（CI 现为手动触发，D82） | 已合并 |
 | 固定模板批量任务（如一次给多个模块补单测；设计 [20-batch-tasks.md](20-batch-tasks.md)） | 已合并 |
-| 发布：用户完成 [16 「需要用户完成的项」](16-acceptance-v1.0.md#需要用户完成的项) 后打 tag、发布三平台安装包 | 待用户确认 |
+| 发布：v1.1–v1.3 一起发布为 **v1.3.0**（2026-10-25，用户决定：macOS 未签名先发、[16 「需要用户完成的项」](16-acceptance-v1.0.md#需要用户完成的项) 中的真机检查不阻塞发布）；安装包为 macOS arm64 dmg 与 Linux x64 / arm64 的 deb、AppImage，Windows 暂缓（D160） | 已发布 |
 
 ### 5.2 v1.2（原 v1.2 与 v1.3 合并）
 
