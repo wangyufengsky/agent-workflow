@@ -64,7 +64,7 @@ export function createDatabasesService({ db, clock, log, credentials, drivers, q
       database: connection.database,
       username: connection.username,
       password: await credentials.reveal(connection.credentialId),
-      tls: connection.tls,
+      tlsMode: connection.tlsMode,
     };
     return { driver: drivers[connection.type], target };
   }

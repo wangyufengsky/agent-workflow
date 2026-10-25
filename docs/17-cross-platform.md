@@ -187,6 +187,20 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 
 **测试。** `shell-path.int.test.ts` 用一个假的登录 shell（启动时打印杂讯、加入 `/opt/fake-brew/bin` 并导出变量）验证：从 Finder 启动时后端的 PATH 按登录 shell 的顺序带上该目录、补上登录 shell 导出的变量、当前已有的变量不被覆盖、shell 自身的变量不带；从终端启动时 PATH 不变、变量以当前的为准；值含换行与 `=` 时原样带上；shell 失败或不结束时沿用原环境。假 shell 是 sh 脚本，这三例在 Windows 上跳过（该机制在 Windows 上不运行，「Windows 不问登录 shell」一例三平台都运行）。从打包应用里真正读到用户的 shell 配置只能手工验证：`pnpm dist` 打包、从 Finder 启动，跑一个 `mvn` 或 `pnpm` 检查命令。
 
+### 3.13 企业 CA 与代理（D164、D165）
+
+**问题。** 后端是 Electron utilityProcess 里的 Node：TLS 只信任 Node 自带的根证书，不读系统证书库；fetch 不读 `HTTPS_PROXY`。内置浏览器（Chromium）却读系统证书库、跟随系统代理（含 PAC），所以同一个企业 GitLab 浏览器能开、后端报证书错误，github.com 在「外部走代理」的内网里后端连不上。
+
+**处理（`modules/network`）。**
+
+- 信任：后端启动时与设置 `network.extraCaCerts` 变化时调用 `tls.setDefaultCACertificates`，列表为 `bundled`（Node 内置）+ `extra`（`NODE_EXTRA_CA_CERTS`，启动时由 Node 读入；Electron 44 的 utilityProcess 实测会读）+ `system`（系统证书库）+ 设置里的证书。fetch（Octokit、Gitbeaker）与 mysql2、pg、gaussdb-node、tedious 都不传自己的 `ca`，用的就是这份默认列表。系统证书库各平台来源：macOS 为钥匙串中受信任的证书，Linux 为 OpenSSL 默认目录（`/etc/ssl/certs` 等，`update-ca-certificates` 写入的位置），Windows 为系统证书存储（Windows 暂缓，未验证）。
+- 代理：`http.setGlobalProxyFromEnv` 以「生效的代理变量」替换 fetch 的全局 dispatcher 与 `http(s).globalAgent`，每次先还原上一次的设置。生效的变量：`network.proxy` 有值时为它与 `network.noProxy`，否则为环境变量（小写优先，与 curl、Node、bun 相同）；`NO_PROXY` 总是加上 `localhost,127.0.0.1,[::1]`（Node 只认带方括号的 IPv6 写法，实测）。数据库连接是 TCP，不经代理。
+- opencode（bun 1.3.14）：每次启动带 `NODE_USE_SYSTEM_CA=1`；设置里有证书时，把「后端从 `NODE_EXTRA_CA_CERTS` 读到的 + 设置里的」写到 `<数据目录>/network/extra-ca.pem`，`NODE_EXTRA_CA_CERTS` 指向它；代理变量大小写各一份（bun 原本就读这些变量与 `NO_PROXY`，实测）。改设置后要重启 opencode 才生效（运行环境页「重启」）。
+- 与内置浏览器的差异：浏览器跟随系统代理与 PAC；后端与 opencode 只认变量与设置，不解析 PAC。只在系统设置里配了代理的用户需要在设置「网络」里填一次。
+- 不处理：需要账号密码的代理不能写进设置（设置明文保存），继续用环境变量；NTLM / Kerberos 代理认证不支持；git 推送用用户自己的 git 配置（`http.sslCAInfo`、`http.proxy`）。
+
+**测试。** `network.int.test.ts`：FakeHosting 以测试 CA 签发的证书提供 HTTPS，加 CA 前报 `HOSTING_UNREACHABLE`、加上后成功；测试代理记录 CONNECT，自建 GitLab 用只有代理能解析的主机名，验证环境变量、设置覆盖与 `noProxy`；假 opencode 记录启动环境。`network.oc.test.ts`（`@opencode`）：真实 opencode 经设置里的 CA 连上 HTTPS 的模型服务。系统证书库只能手工验证：把测试 CA 加入钥匙串（Linux：`/usr/local/share/ca-certificates` + `update-ca-certificates`），不加设置，保存企业 GitLab 的令牌。
+
 ## 4. 测试与 CI
 
 ### 4.1 GitHub Actions（`.github/workflows/ci.yml`）

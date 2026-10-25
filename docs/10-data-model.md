@@ -66,7 +66,7 @@
 | type | TEXT | `DbType`（v1.2 起五种，24 §1） |
 | host / port / database / username | TEXT / INTEGER / TEXT / TEXT | |
 | credential_id | TEXT → credentials | 密码；删除连接后删除凭据 |
-| tls | INTEGER(bool) | |
+| tls_mode | TEXT | `DbTlsMode`（D166）；迁移 `0030_db_tls_mode` 把原来的 `tls = 1` 改为 `verify`，其余为 `off` |
 | created_at / updated_at | INTEGER | |
 
 ### project_db_connections

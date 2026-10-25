@@ -7,13 +7,18 @@ import {
   hostingError,
   type PlatformReviewComment,
   REVIEW_COMMENTS_MAX,
+  unreachableError,
 } from './hosting.types.ts';
 
 /**
  * `status` and `response.data` of an Octokit RequestError; a GraphQL answer with `errors` (HTTP 200) is a platform
- * error without a status. Anything else is not a platform answer.
+ * error without a status. Octokit reports a request that got no answer as status 500 caused by fetch's TypeError.
+ * Anything else is not a platform answer.
  */
 function translate(err: unknown): never {
+  if (err instanceof Error && err.cause instanceof TypeError && err.cause.cause !== undefined) {
+    throw unreachableError(err.cause.cause);
+  }
   if (err instanceof Error && 'status' in err && typeof err.status === 'number') {
     const response = 'response' in err ? err.response : undefined;
     const body = typeof response === 'object' && response !== null && 'data' in response ? response.data : undefined;

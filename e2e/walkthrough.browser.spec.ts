@@ -439,7 +439,7 @@ async function seed(request: APIRequestContext): Promise<Seed> {
     database: 'shop',
     username: 'reader',
     password: '',
-    tls: false,
+    tlsMode: 'off',
   });
 
   // An answered knowledge question about the review project, with citations to open (K-09).

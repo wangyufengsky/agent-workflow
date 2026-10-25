@@ -277,8 +277,8 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/db-connections` | `{ items: DbConnectionDTO[] }`（`{ id, name, type, host, port, database, username, tls, createdAt, updatedAt }`，不含密码） |
-| POST | `/db-connections` | `{ name, type, host, port, database, username, password, tls }`（`password` 为凭据字段，可为空串）→ 201；密码经 credentials 模块加密保存；名称已被使用 409 `DB_CONNECTION_ALREADY_EXISTS`（AI 的工具按名称找连接） |
+| GET | `/db-connections` | `{ items: DbConnectionDTO[] }`（`{ id, name, type, host, port, database, username, tlsMode, createdAt, updatedAt }`，不含密码；`tlsMode` 为 `DbTlsMode`，D166） |
+| POST | `/db-connections` | `{ name, type, host, port, database, username, password, tlsMode }`（`password` 为凭据字段，可为空串）→ 201；密码经 credentials 模块加密保存；名称已被使用 409 `DB_CONNECTION_ALREADY_EXISTS`（AI 的工具按名称找连接） |
 | PATCH | `/db-connections/:id` | 部分字段；传 `password` 时替换密码 |
 | DELETE | `/db-connections/:id` | 204；删除密码，项目关联随之删除 |
 | POST | `/db-connections/:id/test` | `{ ok, serverVersion, error }`：连接并读取服务器版本（MySQL / GoldenDB `VERSION()`，PostgreSQL / openGauss `version()` 去掉构建信息，SQL Server `SERVERPROPERTY('ProductVersion')`）；连不上时 `ok: false`、`error` 为驱动信息（不作为 HTTP 错误） |

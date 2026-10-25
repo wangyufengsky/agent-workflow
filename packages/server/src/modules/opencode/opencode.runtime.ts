@@ -31,6 +31,8 @@ export type OpencodeRuntimeDeps = {
    * Rejects when opencode cannot be hosted safely here (no Git Bash on Windows, D72).
    */
   configContent: () => Promise<string>;
+  /** Certificate and proxy variables for the next launch (D164, D165), on top of `env`. */
+  networkEnv: () => Promise<NodeJS.ProcessEnv>;
   log: Logger;
   events: EventBus;
   clock: Clock;
@@ -102,8 +104,12 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
   }
 
   /** Spawns `opencode serve` and resolves with its address; rejects if it exits or stays silent too long. */
-  function launch(path: string, configContent: string): { launched: Process; address: Promise<string> } {
-    const child = spawnServe(path, { ...deps.env, OPENCODE_CONFIG_CONTENT: configContent });
+  function launch(
+    path: string,
+    configContent: string,
+    networkEnv: NodeJS.ProcessEnv,
+  ): { launched: Process; address: Promise<string> } {
+    const child = spawnServe(path, { ...deps.env, ...networkEnv, OPENCODE_CONFIG_CONTENT: configContent });
     const logFile = openLog();
     const launched: Process = {
       child,
@@ -182,16 +188,19 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     }
     setState({ status: RuntimeStatus.Starting, path, version });
     let configContent: string;
+    let networkEnv: NodeJS.ProcessEnv;
     try {
       configContent = await deps.configContent();
+      networkEnv = await deps.networkEnv();
     } catch (err) {
-      // Recovery with a defined meaning: opencode cannot be hosted here, so it does not start; the log says why.
+      // Recovery with a defined meaning: opencode cannot be hosted here (or its CA bundle cannot be written), so it
+      // does not start and stays retryable; the log says why.
       log.error({ err }, 'opencode configuration failed');
       transition(runtimeMachine, RuntimeStatus.Starting, RuntimeEvent.Exited);
       setState({ status: RuntimeStatus.Crashed, path, version });
       return snapshot();
     }
-    const { launched, address } = launch(path, configContent);
+    const { launched, address } = launch(path, configContent, networkEnv);
     proc = launched;
     void launched.exited.then((exit) => onExit(launched, exit));
     try {

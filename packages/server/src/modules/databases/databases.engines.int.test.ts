@@ -2,11 +2,13 @@ import {
   createDbConnectionOp,
   type DbColumn,
   type DbIndex,
+  DbTlsMode,
   DbType,
   dbSchemaOp,
   ErrorCode,
   setProjectDbConnectionsOp,
   testDbConnectionOp,
+  updateDbConnectionOp,
 } from '@aw/shared';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -35,6 +37,8 @@ type Engine = {
   type: DbType;
   image: string;
   start(): Promise<TestDatabase>;
+  /** `no_verify` for a server with a self-signed certificate (D166). */
+  tlsMode: DbTlsMode;
   /** Statements creating the fixture, one `exec` each. */
   fixture: string[];
   version: RegExp;
@@ -99,6 +103,7 @@ const ENGINES: Engine[] = [
     type: DbType.Postgresql,
     image: DB_IMAGE.postgres,
     start: startPostgres,
+    tlsMode: DbTlsMode.NoVerify,
     version: /^PostgreSQL 17\./,
     ...postgresFamily,
   },
@@ -106,6 +111,7 @@ const ENGINES: Engine[] = [
     type: DbType.Opengauss,
     image: DB_IMAGE.opengauss,
     start: startOpenGauss,
+    tlsMode: DbTlsMode.Off,
     version: /^openGauss 7\./,
     ...postgresFamily,
     // openGauss databases default to Oracle compatibility, where DATE carries a time of day.
@@ -123,6 +129,7 @@ const ENGINES: Engine[] = [
     type: DbType.Sqlserver,
     image: DB_IMAGE.sqlserver,
     start: startSqlServer,
+    tlsMode: DbTlsMode.NoVerify,
     fixture: [
       `CREATE TABLE items (
          id INT IDENTITY PRIMARY KEY,
@@ -188,7 +195,7 @@ for (const engine of ENGINES) {
         database: server.database,
         username: server.username,
         password: server.password,
-        tls: false,
+        tlsMode: engine.tlsMode,
       });
       const { project } = await addProject(t);
       connectionId = shop.id;
@@ -216,6 +223,11 @@ for (const engine of ENGINES) {
         serverVersion: expect.stringMatching(engine.version),
         error: null,
       });
+      if (engine.tlsMode === DbTlsMode.NoVerify) {
+        await t.call(updateDbConnectionOp, { id: connectionId, tlsMode: DbTlsMode.Verify });
+        expect((await t.call(testDbConnectionOp, { id: connectionId })).body).toMatchObject({ ok: false });
+        await t.call(updateDbConnectionOp, { id: connectionId, tlsMode: engine.tlsMode });
+      }
       expect((await t.call(dbSchemaOp, { id: connectionId })).body.tables).toEqual([
         { name: 'items', comment: '商品', rows: 5, columns: engine.columns },
       ]);

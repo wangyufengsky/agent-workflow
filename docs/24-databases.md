@@ -24,7 +24,7 @@
 
 ## 2. 连接参数
 
-字段与 MySQL 相同（11 §9）：名称、类型、主机、端口、数据库、用户名、密码、TLS。表单按类型给出默认端口（`DB_DEFAULT_PORT`，08 §4）：
+字段与 MySQL 相同（11 §9）：名称、类型、主机、端口、数据库、用户名、密码、TLS 加密（`DbTlsMode`）。表单按类型给出默认端口（`DB_DEFAULT_PORT`，08 §4）：
 
 | 类型 | 默认端口 | 说明（表单在类型下方显示） |
 | --- | --- | --- |
@@ -36,7 +36,15 @@
 
 切换类型时，端口还是上一个类型的默认值就跟着换，用户改过的端口不变。
 
-**TLS** 勾选后三个驱动都校验服务器证书（mysql2 `ssl: {}`、pg `ssl: {}`、tedious `encrypt: true` 且不信任未知证书）；不勾选时不加密（tedious 只加密登录包）。自签名证书的服务器需要用户在系统中信任证书，或不勾选 TLS。
+**TLS 加密**分三档（D166）：
+
+| 档 | mysql2（MySQL / GoldenDB） | pg / gaussdb-node（PostgreSQL / openGauss） | tedious（SQL Server） |
+| --- | --- | --- | --- |
+| `off` 不加密 | 不传 `ssl` | `ssl: false` | `encrypt: false`（只加密登录包） |
+| `verify` 加密并校验证书 | `ssl: {}` | `ssl: {}` | `encrypt: true` |
+| `no_verify` 加密但不校验证书 | `ssl: { rejectUnauthorized: false }` | `ssl: { rejectUnauthorized: false }` | `encrypt: true, trustServerCertificate: true` |
+
+`verify` 校验证书链与主机名，信任的是后端的默认 CA：内置根证书、`NODE_EXTRA_CA_CERTS`、系统证书库与设置 `network.extraCaCerts`（D164），企业 CA 签发、主机名正确的数据库证书这样就能校验。数据库自己生成的自签名证书（MySQL 默认证书没有主机名，PostgreSQL 镜像的 snakeoil、SQL Server 自动生成的证书）只能用 `no_verify`：传输加密，但不确认对方身份，界面写明可能被中间人冒充。不支持给单个连接附 CA 或只校验证书链、不校验主机名。
 
 **不支持**：SQL Server 的 Windows / Azure AD 登录与命名实例（需 SQL Browser，请填端口）；PostgreSQL 的 Unix socket；按连接指定 schema（D99）。
 
