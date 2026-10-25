@@ -414,6 +414,10 @@ export const submitPlanTool = defineMcpTool({
 
 新增 `aw-companion` 主 agent，使用 `protocol-companion.md` 自有提示词，权限 `{ "*": "deny" }`；创建临时会话时再次设置全工具 deny。它不属于执行 attempt 或助手 conversation，也不增加任何 MCP 工具。`assistant.whisper` 与 `assistant.stopWhisper` 仅供界面使用，不对模型暴露。
 
+### 8.1 支持范围内其他版本的实测（D156，2026-10-25）
+
+`pnpm test:oc` 分别在 opencode 1.18.0、1.18.35、1.19.4 上运行（`PATH` 前置临时安装的版本）：不调用模型的 10 个用例（托管启动与崩溃恢复、配置注入、客户端接口、事件解析、bash 权限判定、助手会话生命周期）三个版本全部通过，事件 schema 没有不匹配。唯一调用模型的 bridge 插件用例在三个版本上都因模型服务返回 `401 Invalid credential` 失败（本机 opencode go 的登录凭据失效，与版本无关），插件加载与 MCP 注入本身没有报错；凭据恢复后需补跑这一例。1.20 及以后的版本还没有发布，没有实测。
+
 ## 9. 待实施工具增量（30 / 31）
 
 精简版设计，工具尚未注册；实现时仍通过 `defineMcpTool` 与尝试归属校验。
