@@ -16,6 +16,7 @@ import type { OperationImpl } from '../../core/operations/operations.ts';
 import type { BatchesService } from '../batches/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DecksService } from '../decks/index.ts';
+import type { GitReviewsService } from '../git-reviews/index.ts';
 import type { InitiativesService } from '../initiatives/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
@@ -51,6 +52,7 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context'> & {
   batches: BatchesService;
   schedules: SchedulesService;
   initiatives: InitiativesService;
+  gitReviews: GitReviewsService;
   team: TeamService;
   browser: BrowserService;
   /** Every other operation of the app; the assistant's tools are generated from them (15 §3). */

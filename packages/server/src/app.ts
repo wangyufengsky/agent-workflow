@@ -523,6 +523,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     batches: batches.service,
     schedules: schedules.service,
     initiatives: initiatives.service,
+    gitReviews: gitReviews.service,
     team: team.service,
     attachments: attachments.service,
     dataDir: config.dataDir,

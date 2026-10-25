@@ -56,6 +56,8 @@ opencode 1.19 的已有会话目录不能通过发送参数或 fork 改变。迁
 
 没有 Git 的项目（D153）：`projects_previewGitInit`（read）与 `projects_initGit`（write）开放给助手。`projects_create` 与 `projects_initGit` 在出确认卡之前先检查目录（`prechecks`，与附件的检查同一处）：不在任何仓库里的目录让 `projects_create` 直接返回 `PROJECT_PATH_NO_GIT`，hint 让助手改用 `projects_initGit`；仓库的子目录、已添加的仓库、已是仓库的目录同样立即报错，不出用户确认了也会失败的卡片。
 
+页面（`AssistantPage`，08）覆盖界面的全部页面：新建批量、新建与修改定时任务、新建 PPT、组合模板的列表 / 新建 / 编辑页，以及某次 AI 审查（`git_review`，带 `gitReviewId`，地址跳到工作台里显示它的视图）。用户在 Git 工作台上看着某次审查时（改动视图的审查、提交详情的审查页签、分支与范围的审查视图，包括从历史里选中的那次），审查面板把它报告给界面状态，所在页面就是这次审查，而不只是工作台。用户在这些页面上时 system 写明是哪一个（模板的名称与阶段数；审查的范围、项目、状态与问题数；定时任务的修改页同定时任务页）；以前这些页面被当成主页。新增路由时没有对应页面会编译失败（只有引导页、团队入口跳转、放映与打印、开发组件页除外）。
+
 需求计划（v1.3，34 §10）：操作全部开放（`initiatives.saveDraft` 除外：改写阶段与工作包在页面上做）；`initiatives_create` 与「开始任务」一样只能转交本对话里的附件（30 §2.2），别的附件直接 `ATTACHMENT_NOT_FOUND`、不出确认卡；`open_page` 可以打开 `initiatives` / `initiative`，用户在需求计划页时 system 写明它的编号、标题、状态、项目、已开启的阶段与完成的工作包数。协议提示词写明：大需求（需求文档、多个功能要分析拆包分阶段）建需求计划而不是一个任务，不带模板时由 AI 拆解；建好后打开需求计划页让用户审阅确认；助手发起的拆解（`initiatives_create` 不带模板、`initiatives_rebreakdown`、`initiatives_refine`、带 `refine` 的 `initiatives_openPhase`）结束后，草稿或失败原因作为下一条消息送回原对话（`prompts/assistant-breakdown.md`，表 `assistant_breakdown_followups`，同成员分析的回报 33 §6）：阶段与工作包、需求覆盖里没有对应工作包的点、确认才开始；用户在页面上又开始了一次的不再回报。
 
 opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若它缓存启动时的列表，切换界面模式后列表要到 opencode 重启才更新，但调用时的模式检查保证简单模式下不会执行专业操作。

@@ -11,6 +11,7 @@ import {
 } from '@aw/shared';
 import type { BatchesService } from '../batches/index.ts';
 import type { DecksService } from '../decks/index.ts';
+import type { GitReviewsService } from '../git-reviews/index.ts';
 import type { InitiativesService } from '../initiatives/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
@@ -66,11 +67,17 @@ const STATIC_PAGES: Partial<Record<AssistantPage, string>> = {
   [AssistantPage.KnowledgeHistory]: 'the knowledge Q&A history',
   [AssistantPage.Insights]: 'the quality and usage page (how much AI did, how well, and what it cost)',
   [AssistantPage.Ppt]: 'the PPT list (slide decks made from a brief and material)',
+  [AssistantPage.PptNew]: 'the new PPT page (a brief, material and the number of pages, then an outline)',
   [AssistantPage.Batches]: 'the batch list (one fixed workflow run over many targets)',
+  [AssistantPage.BatchNew]: 'the new batch page (a project, a workflow and the targets to run it over)',
   [AssistantPage.Schedules]: 'the scheduled task list (a fixed workflow started at set times)',
+  [AssistantPage.ScheduleNew]: 'the new scheduled task page (a project, a workflow, the requirement and when it runs)',
   [AssistantPage.Environment]: 'the environment checks (Git, opencode, models, credential storage)',
   [AssistantPage.Initiatives]:
     'the initiative list (a large requirement split into phases of work packages, each package a task)',
+  [AssistantPage.InitiativeTemplates]:
+    'the list of initiative composition templates (fixed phases and work packages an initiative can start from)',
+  [AssistantPage.InitiativeTemplateNew]: 'the editor of a new initiative composition template',
 };
 
 /** 系统回传可能发生在页面对象删除之后；其他错误仍然显式失败。 */
@@ -85,6 +92,8 @@ const DELETED_PAGE_ERRORS: ReadonlySet<ErrorCode> = new Set([
   ErrorCode.BatchNotFound,
   ErrorCode.ScheduleNotFound,
   ErrorCode.InitiativeNotFound,
+  ErrorCode.InitiativeTemplateNotFound,
+  ErrorCode.GitReviewNotFound,
 ]);
 
 function param(ref: AssistantPageRef, name: AssistantPageParam): string {
@@ -104,11 +113,12 @@ export type ContextDeps = {
   batches: BatchesService;
   schedules: SchedulesService;
   initiatives: InitiativesService;
+  gitReviews: GitReviewsService;
 };
 
 /** What the model is told with every message (15 §2): time, interface mode, and the page the user is on. */
 export function createContextRenderer(deps: ContextDeps) {
-  const { prompts, tasks, projects, workflows, knowledge, decks, batches, schedules, initiatives } = deps;
+  const { prompts, tasks, projects, workflows, knowledge, decks, batches, schedules, initiatives, gitReviews } = deps;
   /** The ids of the page come from the renderer: a missing entity is a NOT_FOUND like any other input. */
   function describeTask(task: TaskDetailDTO, nodeId: string | undefined, prefix: string): string {
     const base = `${prefix} of task ${task.key} "${task.title}" (task id ${task.id}, status ${task.status}, project "${task.project.name}", project id ${task.project.id})`;
@@ -171,13 +181,24 @@ export function createContextRenderer(deps: ContextDeps) {
         const batch = batches.detail(param(ref, 'batchId'));
         return `the page of batch ${batch.key} "${batch.title}" (batch id ${batch.id}, project "${batch.project.name}", workflow "${batch.workflow.name}", ${batch.ended} of ${batch.total} tasks ended)`;
       }
-      case AssistantPage.Schedule: {
+      case AssistantPage.Schedule:
+      case AssistantPage.ScheduleEdit: {
         const schedule = schedules.detail(param(ref, 'scheduleId'));
-        return `the page of scheduled task "${schedule.title}" (schedule id ${schedule.id}, status ${schedule.status}, project "${schedule.project.name}", workflow key ${schedule.workflow.key})`;
+        const where = page === AssistantPage.Schedule ? 'the page' : 'the edit page';
+        return `${where} of scheduled task "${schedule.title}" (schedule id ${schedule.id}, status ${schedule.status}, project "${schedule.project.name}", workflow key ${schedule.workflow.key})`;
       }
       case AssistantPage.Initiative: {
         const initiative = initiatives.detail(param(ref, 'initiativeId'));
         return `the page of initiative ${initiative.key} "${initiative.title}" (initiative id ${initiative.id}, status ${initiative.status}, project "${initiative.project.name}", ${initiative.openedPhase} of ${initiative.phaseCount} phases opened, ${initiative.doneCount} of ${initiative.itemCount} work packages done)`;
+      }
+      case AssistantPage.InitiativeTemplate: {
+        const template = initiatives.templates.get(param(ref, 'templateKey'));
+        return `the editor of initiative composition template "${template.name}" (key ${template.key}, ${template.kind}, ${template.phases.length} phases, ${template.items.length} work packages)`;
+      }
+      case AssistantPage.GitReview: {
+        const review = gitReviews.get(param(ref, 'gitReviewId'));
+        const project = projects.getRecord(review.projectId);
+        return `the AI review of ${review.label} in the Git console of project "${project.name}" (review id ${review.id}, status ${review.status}, ${review.findings.length} findings)`;
       }
       default:
         throw new Error(`Page ${page} has no description`);
