@@ -231,7 +231,8 @@ describe('git 推拉用应用的 CA 与代理（D175）', () => {
 
     const untrusted = await t.call(gitPushOp, { id: project.id, branch: 'main' });
     expect(untrusted.raw.json().error).toMatchObject({ code: ErrorCode.GitCommandFailed });
-    expect(untrusted.raw.json().error.details.stderr).toContain('SSL certificate problem');
+    // OpenSSL's git says "SSL certificate problem", GnuTLS's (Debian, Ubuntu) "server certificate verification failed".
+    expect(untrusted.raw.json().error.details.stderr).toMatch(/certificate/);
 
     await t.call(updateSettingsOp, { 'network.extraCaCerts': certificates.caPem });
     expect((await t.call(gitPushOp, { id: project.id, branch: 'main' })).status).toBe(204);
@@ -254,5 +255,26 @@ describe('git 推拉用应用的 CA 与代理（D175）', () => {
     const target = new URL(server.url('origin.git')).host;
     expect(fromSettings.connects).toEqual([target, target]);
     await server.close();
+  });
+
+  it('http 远端：经代理转发到只有代理能解析的远端；不走代理的网段里按 IP 写的远端直连', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'aw-git-http-'));
+    const corpServer = await createGitHttpServer({ root, host: CORP_HOST });
+    const byIp = await createGitHttpServer({ root, host: '[::ffff:127.0.0.1]' });
+    t = await createTestApp({ cipher: testCipher });
+    await t.call(updateSettingsOp, { 'network.proxy': fromSettings.url, 'network.noProxy': ['127.0.0.0/8'] });
+    const proxied = await projectWithOrigin(t, corpServer.url, root, 'proxied.git');
+    const direct = await projectWithOrigin(t, byIp.url, root, 'direct.git');
+
+    expect((await t.call(gitPushOp, { id: proxied.id, branch: 'main' })).status).toBe(204);
+    expect((await t.call(gitPushOp, { id: direct.id, branch: 'main' })).status).toBe(204);
+    expect((await runGit(['rev-parse', 'main'], { cwd: direct.bare })).stdout).toBe(
+      (await direct.repo.git('rev-parse', 'main')).trim(),
+    );
+    // A push is two requests (refs, then the pack); only the proxied remote's reached the proxy.
+    const target = new URL(corpServer.url('proxied.git')).host;
+    expect(fromSettings.forwards).toEqual([target, target]);
+    await corpServer.close();
+    await byIp.close();
   });
 });

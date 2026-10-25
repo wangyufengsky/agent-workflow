@@ -1,16 +1,17 @@
 import { spawn } from 'node:child_process';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { createServer } from 'node:https';
+import { createServer as createHttpServer } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 
 /**
- * Git's smart HTTP protocol over HTTPS for the bare repositories under `root` (`git http-backend` as a CGI), with a
- * certificate an enterprise CA signed (D175), addressed as `host` (default 127.0.0.1). Pushing is allowed: the
- * backend takes the request as an authenticated user's.
+ * Git's smart HTTP protocol for the bare repositories under `root` (`git http-backend` as a CGI): over HTTPS with
+ * `tls`, a certificate an enterprise CA signed (D175), else plain HTTP; addressed as `host` (default 127.0.0.1).
+ * Pushing is allowed: the backend takes the request as an authenticated user's.
  */
 export async function createGitHttpServer(options: {
   root: string;
-  tls: { certPem: string; keyPem: string };
+  tls?: { certPem: string; keyPem: string };
   host?: string;
 }) {
   const handle = (req: IncomingMessage, res: ServerResponse) => {
@@ -50,12 +51,17 @@ export async function createGitHttpServer(options: {
     };
     backend.stdout.on('data', onData);
   };
-  const server = createServer({ cert: options.tls.certPem, key: options.tls.keyPem }, handle);
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const server =
+    options.tls === undefined
+      ? createHttpServer(handle)
+      : createHttpsServer({ cert: options.tls.certPem, key: options.tls.keyPem }, handle);
+  // Both address families: a test may address it as an IPv4-mapped IPv6 address.
+  await new Promise<void>((resolve) => server.listen(0, '::', resolve));
   const { port } = server.address() as AddressInfo;
   return {
     /** The URL of the bare repository `name` under `root`. */
-    url: (name: string) => `https://${options.host ?? '127.0.0.1'}:${port}/${name}`,
+    url: (name: string) =>
+      `${options.tls === undefined ? 'http' : 'https'}://${options.host ?? '127.0.0.1'}:${port}/${name}`,
     close: () =>
       new Promise<void>((resolve) => {
         server.closeAllConnections();

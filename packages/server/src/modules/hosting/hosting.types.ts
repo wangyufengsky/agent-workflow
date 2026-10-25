@@ -39,16 +39,26 @@ export function hostingError(status: number | undefined, body: unknown): AppErro
   return new AppError(ErrorCode.HostingApiError, 'The hosting platform request failed', { status, body });
 }
 
-const unansweredSchema = z.object({ code: z.string().optional(), message: z.string() });
+const unansweredSchema = z.object({ code: z.unknown().optional(), message: z.string(), cause: z.unknown().optional() });
 
 /**
  * A request the platform never answered, from the cause of fetch's `TypeError: fetch failed` (06 §2.1 translation):
- * refused, unresolved, an untrusted certificate (D164) or a proxy in the way (D165). `code` is Node's, such as
- * `UNABLE_TO_VERIFY_LEAF_SIGNATURE` or `ENOTFOUND`.
+ * refused, unresolved, an untrusted certificate (D164) or a proxy in the way (D165). The innermost cause says what
+ * happened: through the forwarding proxy (D174) fetch reports a cancelled request (a DOMException, whose code is a
+ * number) caused by the refused tunnel. `code` is Node's or undici's, such as `UNABLE_TO_VERIFY_LEAF_SIGNATURE`,
+ * `ENOTFOUND` or `UND_ERR_ABORTED`.
  */
 export function unreachableError(cause: unknown): AppError {
-  const { code, message } = unansweredSchema.parse(cause);
-  return new AppError(ErrorCode.HostingUnreachable, 'The hosting platform could not be reached', { code, message });
+  let innermost = unansweredSchema.parse(cause);
+  for (let next = unansweredSchema.safeParse(innermost.cause); next.success; ) {
+    innermost = next.data;
+    next = unansweredSchema.safeParse(innermost.cause);
+  }
+  const code = typeof innermost.code === 'string' ? innermost.code : undefined;
+  return new AppError(ErrorCode.HostingUnreachable, 'The hosting platform could not be reached', {
+    code,
+    message: innermost.message,
+  });
 }
 
 /** HTTP Basic credentials the platforms accept from git with a token as the password. */

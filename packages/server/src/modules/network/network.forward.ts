@@ -12,6 +12,9 @@ export type Route = (scheme: ProxyScheme, host: string, port: number) => URL | n
 
 const LISTEN_HOST = '127.0.0.1';
 
+/** A URL's host name as sockets take it: an IPv6 address without its brackets. */
+const bare = (hostname: string) => hostname.replace(/^\[(.*)\]$/, '$1');
+
 /** `Basic …` of a proxy URL's credentials, as an upstream proxy expects them. */
 function basicAuth(url: URL): Record<string, string> {
   if (url.username === '') return {};
@@ -23,7 +26,7 @@ function basicAuth(url: URL): Record<string, string> {
 function targetOf(authority: string): { host: string; port: number } | null {
   const match = /^(\[[^\]]+\]|[^:]+):(\d+)$/.exec(authority);
   if (match?.[1] === undefined) return null;
-  return { host: match[1].replace(/^\[(.*)\]$/, '$1'), port: Number(match[2]) };
+  return { host: bare(match[1]), port: Number(match[2]) };
 }
 
 function end(socket: Socket, status: string, extra = ''): void {
@@ -97,11 +100,12 @@ export async function createForwardProxy({ route, log }: { route: Route; log: Lo
     }
     const send = upstream.protocol === 'https:' ? httpsRequest : httpRequest;
     const ask = send({
-      host: upstream.hostname,
+      host: bare(upstream.hostname),
       port: upstream.port,
       method: 'CONNECT',
       path: req.url,
       headers: { host: req.url, ...basicAuth(upstream) },
+      // As below: the global agents lead back here.
       agent: false,
     });
     ask.on('connect', (res, socket, upstreamHead) => {
@@ -129,24 +133,28 @@ export async function createForwardProxy({ route, log }: { route: Route; log: Lo
       res.end();
       return;
     }
-    const upstream = route('http', url.hostname.replace(/^\[(.*)\]$/, '$1'), Number(url.port || 80));
+    const host = bare(url.hostname);
+    const upstream = route('http', host, Number(url.port || 80));
     const { 'proxy-authorization': _secret, 'proxy-connection': _connection, ...headers } = req.headers;
     const send = upstream?.protocol === 'https:' ? httpsRequest : httpRequest;
+    // Never the global agents: they lead back here (`routeRequests`).
     const out = send(
       upstream === null
         ? {
-            host: url.hostname,
+            host,
             port: url.port || 80,
             method: req.method,
             path: `${url.pathname}${url.search}`,
             headers,
+            agent: false,
           }
         : {
-            host: upstream.hostname,
+            host: bare(upstream.hostname),
             port: upstream.port,
             method: req.method,
             path: url.href,
             headers: { ...headers, ...basicAuth(upstream) },
+            agent: false,
           },
       (answer) => {
         res.writeHead(answer.statusCode ?? 502, answer.headers);
