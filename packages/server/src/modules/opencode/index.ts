@@ -6,6 +6,7 @@ export {
   type McpServerState,
   type ModelRef,
   type OpencodeClient,
+  type OpencodeModel,
   type PromptInput,
   parseModelRef,
 } from './opencode.client.ts';

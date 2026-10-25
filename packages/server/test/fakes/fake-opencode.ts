@@ -9,7 +9,6 @@ import {
   MCP_SERVER_NAME,
   MCP_SESSION_ARG,
   MCP_TOOL_PREFIX,
-  type ModelInfo,
   type PermissionDecision,
 } from '@aw/shared';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -22,6 +21,7 @@ import {
   type OpencodeClient,
   type OpencodeError,
   type OpencodeEvent,
+  type OpencodeModel,
   type PromptInput,
   ToolCallStatus,
 } from '../../src/modules/opencode/index.ts';
@@ -135,10 +135,11 @@ export function createFakeOpencode() {
   const toolCalls: ToolCallRecord[] = [];
   const permissionReplies: Array<{ permissionId: string; reply: PermissionDecision }> = [];
   const aborts: string[] = [];
-  const models: ModelInfo[] = [
-    { providerId: 'opencode', modelId: 'fake-model', name: 'Fake Model' },
-    { providerId: 'opencode', modelId: 'fake-model-2', name: 'Fake Model 2' },
+  const models: OpencodeModel[] = [
+    { providerId: 'opencode', modelId: 'fake-model', name: 'Fake Model', contextLimit: 128_000 },
+    { providerId: 'opencode', modelId: 'fake-model-2', name: 'Fake Model 2', contextLimit: 128_000 },
   ];
+  const projectModels = new Map<string, OpencodeModel[]>();
 
   // The app's two servers are connected, as in opencode.
   const mcpServers: Record<string, McpServerState> = {
@@ -307,7 +308,10 @@ export function createFakeOpencode() {
     permissionReplies: typeof permissionReplies;
     /** Session ids the backend aborted, in order. */
     aborts: string[];
-    models: ModelInfo[];
+    /** The global configuration's models. */
+    models: OpencodeModel[];
+    /** What a directory's own opencode configuration adds, by directory. */
+    projectModels: Map<string, OpencodeModel[]>;
     /** What `mcpStatus` reports, by server name; a test adds the user's own servers. */
     mcpServers: Record<string, McpServerState>;
     /** Where `callTool` reaches the backend's execution MCP and `callAppTool` its assistant MCP. */
@@ -336,6 +340,7 @@ export function createFakeOpencode() {
     permissionReplies,
     aborts,
     models,
+    projectModels,
     connectMcp(next) {
       endpoints = next;
       // A restarted backend listens elsewhere: reconnect on the next call.
@@ -479,8 +484,8 @@ export function createFakeOpencode() {
       emit({ type: E.PermissionReplied, sessionId: resolve.sessionId, permissionId, reply });
       resolve.resolve(reply);
     },
-    async listModels() {
-      return { available: models };
+    async listModels(directory) {
+      return { available: [...models, ...(directory === undefined ? [] : (projectModels.get(directory) ?? []))] };
     },
     mcpServers,
     async mcpStatus() {

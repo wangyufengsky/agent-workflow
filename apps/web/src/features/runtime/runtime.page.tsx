@@ -12,6 +12,7 @@ import { RUNTIME_COPY as C, RUNTIME_STATUS_LABEL } from '../../copy/runtime.ts';
 import { AttemptView } from '../attempts/attempt-view.tsx';
 import { CopyCommand } from '../onboarding/copy-command.tsx';
 import { environmentQuery } from '../onboarding/environment.queries.ts';
+import { projectsQuery } from '../projects/projects.queries.ts';
 import { DebugAttemptForm } from './debug-attempt-form.tsx';
 import styles from './runtime.module.css';
 import { runtimeLogsQuery, runtimeQuery, useRestartRuntime } from './runtime.queries.ts';
@@ -126,8 +127,10 @@ function RuntimePanel() {
 
 function ModelsPanel() {
   const environment = useQuery(environmentQuery);
+  const projects = useQuery(projectsQuery);
   if (environment.data === undefined) return null;
   const { models, opencode } = environment.data;
+  const projectNames = (ids: readonly string[]) => projects.data?.filter((p) => ids.includes(p.id)).map((p) => p.name);
   return (
     <Panel title={C.models}>
       {models.available.length > 0 ? (
@@ -136,11 +139,22 @@ function ModelsPanel() {
           <ul className={styles.rows} data-testid="runtime-models">
             {models.available.map((m) => {
               const id = `${m.providerId}/${m.modelId}`;
+              const onlyIn = m.projectIds.length > 0 ? projectNames(m.projectIds) : undefined;
               return (
                 <li key={id}>
                   <span className="grow ellipsis">{m.name}</span>
                   <span className="mono hint ellipsis">{id}</span>
                   {id === models.defaultModel && <span className="chip">{C.defaultChip}</span>}
+                  {onlyIn !== undefined && onlyIn.length > 0 && (
+                    <span className="chip" title={C.onlyInHint}>
+                      {C.onlyInChip(onlyIn.join('、'))}
+                    </span>
+                  )}
+                  {m.contextLimit === null && (
+                    <span className="chip" title={C.noContextHint}>
+                      {C.noContextChip}
+                    </span>
+                  )}
                 </li>
               );
             })}
