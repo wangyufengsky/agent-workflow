@@ -1,0 +1,18 @@
+Agent Workflow
+Copyright 2026 wangyufeng
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE),
+except for the third-party content listed below.
+
+--------------------------------------------------------------------------------
+Temporary whale character assets
+  Path:    apps/web/public/companion/whale/
+  Source:  https://github.com/PC2005-cloud/dsh-pet
+           (commit 48007b64ac0bebb2e97ac88344aed62de8399dd4)
+
+  These animations and images are NOT covered by the Apache License 2.0.
+  Upstream terms: open-source use is allowed, commercial use is prohibited, and
+  derivative works must credit the original repository wherever they are
+  introduced, shown or distributed. Anyone redistributing this product for
+  commercial purposes must remove or replace these assets, or obtain a separate
+  license from the upstream author. See apps/web/public/companion/whale/NOTICE.md.

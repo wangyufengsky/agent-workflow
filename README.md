@@ -92,4 +92,6 @@ Electron main（apps/desktop/src/main）
 
 ## 许可
 
-Apache-2.0，见 [LICENSE](LICENSE)。
+代码以 Apache-2.0 发布，见 [LICENSE](LICENSE)。
+
+例外：桌宠的临时鲸鱼素材（`apps/web/public/companion/whale/`）来自 [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)，**不适用 Apache-2.0**：允许开源使用、禁止商用，分发时须注明原作者地址。详见 [NOTICE](NOTICE)。
