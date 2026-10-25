@@ -17,7 +17,7 @@ describe('操作清单的标注（M5-10）', () => {
     expect(declared).toEqual(secrets);
   });
 
-  it('删除、取消、合并、推送类操作与跳过检查是 critical（D27、D108、D116）', () => {
+  it('删除、取消、合并、推送类操作与跳过检查、磁盘清理是 critical（D27、D108、D116、D157）', () => {
     const critical = OPERATION_CONTRACTS.filter((op) => op.risk === OperationRisk.Critical).map((op) => op.id);
     expect(critical.sort()).toEqual(
       [
@@ -39,6 +39,7 @@ describe('操作清单的标注（M5-10）', () => {
         'projects.delete',
         'roles.delete',
         'schedules.delete',
+        'system.cleanStorage',
         'tasks.cancel',
         'tasks.deliver',
         'tasks.skipCheck',
