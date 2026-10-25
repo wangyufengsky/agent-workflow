@@ -182,3 +182,25 @@ describe('尝试的结束条件（12 §4.2）', () => {
     expect(res.body).toMatchObject({ error: { code: ErrorCode.OpencodeNotReady } });
   });
 });
+
+describe('离线环境不显示费用（D181）', () => {
+  /** Two turns without a result: the first reports a cost, the nudged second the default usage. */
+  async function usedAttempt() {
+    t.fake.enqueue(script().usage(100, 20, 0.25));
+    const failed = reaches('failed');
+    const started = await startAttempt();
+    await failed;
+    return started.id;
+  }
+
+  it('在线时（对照）：尝试带上 opencode 报告的费用', async () => {
+    const id = await usedAttempt();
+    expect((await t.call(getAttemptOp, { id })).body).toMatchObject({ tokensInput: 200, tokensOutput: 40, cost: 0.25 });
+  });
+
+  it('打开离线环境后：尝试只有 tokens，费用为 null', async () => {
+    const id = await usedAttempt();
+    await t.call(updateSettingsOp, { 'network.offline': true });
+    expect((await t.call(getAttemptOp, { id })).body).toMatchObject({ tokensInput: 200, tokensOutput: 40, cost: null });
+  });
+});

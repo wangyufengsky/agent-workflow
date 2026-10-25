@@ -2,7 +2,7 @@ import type { AttemptDTO, AttemptSummaryDTO, TranscriptEntry, TranscriptPage } f
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 import { queryKeys } from '../../api/query-keys.ts';
-import { transcriptEntries, updateAttempt } from './attempt.queries.ts';
+import { refreshAttempts, transcriptEntries, updateAttempt } from './attempt.queries.ts';
 
 const text = (seq: number, partId: string, value: string, offset: number): TranscriptEntry => ({
   seq,
@@ -73,5 +73,27 @@ describe('attempt.updated 更新尝试缓存', () => {
     await updated;
     expect(qc.getQueryData<AttemptDTO>(queryKeys.attempt('a1'))?.status).toBe('succeeded');
     unsubscribe();
+  });
+});
+
+describe('离线环境切换后刷新尝试（D181）', () => {
+  it('已打开的尝试重新读取（费用随设置出现或消失），它的会话流不重读', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const reads = { attempt: 0, transcript: 0 };
+    const watch = (queryKey: readonly unknown[], counter: keyof typeof reads) =>
+      new QueryObserver(qc, {
+        queryKey,
+        queryFn: () => {
+          reads[counter] += 1;
+          return {};
+        },
+      }).subscribe(() => {});
+    watch(queryKeys.attempt('a1'), 'attempt');
+    watch(queryKeys.transcript('a1'), 'transcript');
+    await qc.refetchQueries();
+    const before = { ...reads };
+
+    await refreshAttempts(qc);
+    expect(reads).toEqual({ attempt: before.attempt + 1, transcript: before.transcript });
   });
 });

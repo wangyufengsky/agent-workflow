@@ -9,6 +9,8 @@ export const queryKeys = {
   paletteOperations: ['operations', 'palette'],
   runtime: ['system', 'runtime'],
   health: ['system', 'health'],
+  /** Every attempt key, details and their streams alike; `attempt` is the one two-part key under it. */
+  attemptsAll: ['attempts'],
   attempt: (id: string) => ['attempts', id],
   /** An attachment's original never changes (30 §3.1). */
   attachment: (id: string) => ['attachments', id],

@@ -88,6 +88,8 @@
 
   设置在下一次启动时生效，`RuntimeDTO` 的 `ready` 带启动时的 `offline`。会话级规则在 `session.create` 时取当前设置：离线时知识研究员的网络开关只追加 `webfetch *` allow（内网网页与浏览器工具照常），不追加 `websearch`。
 
+  离线环境下尝试不带费用（`AttemptDTO.cost` 为 `null`，D181），助手的 `attempts.get` 工具输出只有 tokens。opencode 在配置目录后台安装 `@opencode-ai/plugin` 没有开关可关，应用暂不处理，前提是内网机器上已装好（D182，实测见 §8.2）。
+
 ## 3. 调用归属（哪个尝试在调用工具）
 
 MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
@@ -440,12 +442,13 @@ export const submitPlanTool = defineMcpTool({
 | --- | --- | --- |
 | `models.opencode.ai`（`OPENCODE_MODELS_URL`） | 启动时（在打印监听地址之前）与之后每 60 分钟后台刷新；失败只记日志，模型目录用内置快照 | `OPENCODE_DISABLE_MODELS_FETCH`：不再访问 |
 | `opncd.ai`（`enterprise.url`） | 配置 `share: "auto"` 时每个新会话 | `OPENCODE_DISABLE_SHARE`：不再访问 |
-| `registry.npmjs.org` | 每个配置目录后台安装 `@opencode-ai/plugin`，失败记 `background dependency install failed` 警告，不阻塞 | 没有开关；有 npm 镜像时由 Bun 读 `~/.npmrc` |
+| `registry.npmjs.org` | 每个配置目录后台安装 `@opencode-ai/plugin`（见下方），失败记 `background dependency install failed` 警告；**会拖住新目录的第一次建会话** | 没有开关（D182：应用暂不处理，默认已装好）；npm 镜像读 `~/.npmrc` 或 `npm_config_registry` |
 | github.com、`go install`、`gem install` 等 | 只在用户配置打开 `lsp` 后启动语言服务器时（1.19.0 默认 `all LSPs are disabled`） | `OPENCODE_DISABLE_LSP_DOWNLOAD`：每个下载分支先判断它（读源码，未实测） |
 | 更新检查 | `serve` 不检查（只在 TUI / CLI 入口） | `OPENCODE_DISABLE_AUTOUPDATE`：为支持范围内的其他版本（D156）保留 |
 
 - `websearch` 工具只对 `opencode`、`opencode-go` provider 或打开 `OPENCODE_ENABLE_EXA` / `OPENCODE_ENABLE_PARALLEL`（含 `OPENCODE_EXPERIMENTAL`）时出现。
 - 不登录时 `opencode` provider 列出 11 个免费模型；`provider.<id>.whitelist: []` 去掉它的全部模型，provider 随之消失，用户的 `disabled_providers` 不受影响。经 `OPENCODE_CONFIG_CONTENT` 注入的 `disabled_providers` 则整体替换用户自己的（用户禁用的 provider 重新出现）。
+- `@opencode-ai/plugin` 的安装（D182，2026-10-25 读 1.19.0 源码并实测）：配置目录 = `$XDG_CONFIG_HOME/opencode`、从会话目录往上到 worktree 根的每个 `.opencode`、`~/.opencode`、`OPENCODE_CONFIG_DIR`，每个实例（目录）加载配置时对其中每个可写的目录调用一次。用的是二进制内置的 npm Arborist（不是 Bun），npm 配置照常读环境变量 `npm_config_*`、`~/.npmrc` 与目录里的 `.npmrc`（实测 `npm_config_registry` 与 `~/.npmrc` 的 `registry` 都生效）。目录里有 `node_modules`、且 package.json 的依赖名与 `@opencode-ai/plugin` 都在 package-lock.json 的 `packages[""]` 里时跳过（只比名字，不比版本），否则安装；失败什么也不留下，下次还装。配置里有插件时（应用总会注入桥接插件），opencode 加载插件前等这次安装结束，`session.create` 也就等着。实测新目录第一次 `session.create`：npm 源连接被拒 70 秒，DNS 失败 82–87 秒（第二个新目录照样再等），经代理时 `CONNECT registry.npmjs.org` 在 0、10、70 秒各一次后放弃（npm 重试两次，代理不回应时还要加上默认 5 分钟的 fetch-timeout）；目录里已装好 0.3 秒、没有请求。应用自己的桥接插件只用类型导入，运行时不需要这个包；需要它的是用户写在这些目录里的自定义工具与插件（如 `tool()`）。`opencode.offline.oc.test.ts` 把 `npm_config_registry` 指向本地服务：在线对照能看到安装请求，离线且已装好时没有任何外连。
 - `OPENCODE_DISABLE_DEFAULT_PLUGINS` 关掉的是二进制内置的插件（认证等），不联网；`OPENCODE_DISABLE_EXTERNAL_SKILLS` 只跳过扫描 `~/.claude`、`~/.agents`。两者都与离线无关。
 
 ## 9. 待实施工具增量（30 / 31）

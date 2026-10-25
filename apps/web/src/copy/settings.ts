@@ -30,7 +30,7 @@ export const SETTINGS_COPY = {
   // 离线环境（D168）
   offline: '离线环境',
   offlineHint:
-    '在内网或不能访问公网的机器上打开：opencode 不再更新模型目录、不分享会话、不下载语言服务器，模型列表中隐藏需要公网的 opencode 自带模型，知识问答只能读内网网页、不能网络搜索。',
+    '在内网或不能访问公网的机器上打开：opencode 不再更新模型目录、不分享会话、不下载语言服务器，模型列表中隐藏需要公网的 opencode 自带模型，知识问答只能读内网网页、不能网络搜索；内网模型没有单价，各处只显示 tokens、不显示费用。',
   offlineRestartHint: '重启 opencode 后生效；重启会中断正在进行的 AI 会话，之后可以重试。',
   restartNow: '立即重启',
   // 专业项（08 §4.3）
