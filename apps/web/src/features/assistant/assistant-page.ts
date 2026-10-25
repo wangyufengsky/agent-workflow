@@ -1,7 +1,7 @@
 import { AssistantPage, type AssistantPageParam, type AssistantPageRef } from '@aw/shared';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useCallback } from 'react';
-import { ROUTES } from '../../app/routes.ts';
+import { ROUTES, type RoutePath } from '../../app/routes.ts';
 
 /** The route of each page the assistant knows (14 §1). */
 const PAGE_ROUTE = {
@@ -18,6 +18,7 @@ const PAGE_ROUTE = {
   [AssistantPage.Settings]: ROUTES.settings,
   [AssistantPage.Git]: ROUTES.git,
   [AssistantPage.GitProject]: ROUTES.gitProject,
+  [AssistantPage.GitReview]: ROUTES.gitReview,
   [AssistantPage.Workflows]: ROUTES.workflows,
   [AssistantPage.Workflow]: ROUTES.workflow,
   [AssistantPage.Roles]: ROUTES.roles,
@@ -31,15 +32,37 @@ const PAGE_ROUTE = {
   [AssistantPage.Team]: ROUTES.team,
   [AssistantPage.TeamMember]: ROUTES.teamMember,
   [AssistantPage.Ppt]: ROUTES.ppt,
+  [AssistantPage.PptNew]: ROUTES.pptNew,
   [AssistantPage.PptDeck]: ROUTES.pptDeck,
   [AssistantPage.Batches]: ROUTES.batches,
+  [AssistantPage.BatchNew]: ROUTES.batchNew,
   [AssistantPage.Batch]: ROUTES.batch,
   [AssistantPage.Schedules]: ROUTES.schedules,
+  [AssistantPage.ScheduleNew]: ROUTES.scheduleNew,
   [AssistantPage.Schedule]: ROUTES.schedule,
+  [AssistantPage.ScheduleEdit]: ROUTES.scheduleEdit,
   [AssistantPage.Environment]: ROUTES.environment,
   [AssistantPage.Initiatives]: ROUTES.initiatives,
   [AssistantPage.Initiative]: ROUTES.initiative,
+  [AssistantPage.InitiativeTemplates]: ROUTES.initiativeTemplates,
+  [AssistantPage.InitiativeTemplateNew]: ROUTES.initiativeTemplateNew,
+  [AssistantPage.InitiativeTemplate]: ROUTES.initiativeTemplate,
 } as const satisfies Record<AssistantPage, string>;
+
+/**
+ * Routes the assistant never reports: the first run before the shell (onboarding), the team's index that only leads to
+ * a project's team page, full-screen pages without the panel (a PPT's show and print view) and the development
+ * gallery. Every other route must be a page above, or the user would be taken to be at home.
+ */
+type Unreported =
+  | typeof ROUTES.onboarding
+  | typeof ROUTES.teamIndex
+  | typeof ROUTES.pptPlay
+  | typeof ROUTES.pptPrint
+  | typeof ROUTES.devComponents;
+type Unmapped = Exclude<RoutePath, (typeof PAGE_ROUTE)[AssistantPage] | Unreported>;
+// Fails to compile, naming the route, when a page is added without telling the assistant about it.
+const _everyRouteIsAPage: [Unmapped] extends [never] ? true : Unmapped = true;
 
 /** The preview tab shares the task page's route; its `view` tells them apart. */
 const PAGE_OF_ROUTE = new Map<string, AssistantPage>(
@@ -69,11 +92,15 @@ export function useAssistantPage(): AssistantPageRef {
       if (page === AssistantPage.Task && search.view === 'preview') {
         return { page: AssistantPage.TaskPreview, params: { taskId: String(params.taskId) } };
       }
+      // The workflow editor and a template's editor both name their object `key`.
+      const key = text(params.key);
       const ids = {
         taskId: text(params.taskId),
         nodeId: text(params.nodeId) ?? text(search.node),
         projectId: text(params.projectId),
-        workflowKey: text(params.key),
+        workflowKey: page === AssistantPage.Workflow ? key : undefined,
+        templateKey: page === AssistantPage.InitiativeTemplate ? key : undefined,
+        gitReviewId: text(params.reviewId),
         knowledgeConversationId: text(params.conversationId),
         deckId: text(params.deckId),
         slideId: text(search.slide),
@@ -140,6 +167,12 @@ export function useOpenAssistantPage() {
           return navigate({ to: ROUTES.schedule, params: { scheduleId: param(ref, 'scheduleId') } });
         case AssistantPage.Initiative:
           return navigate({ to: ROUTES.initiative, params: { initiativeId: param(ref, 'initiativeId') } });
+        case AssistantPage.ScheduleEdit:
+          return navigate({ to: ROUTES.scheduleEdit, params: { scheduleId: param(ref, 'scheduleId') } });
+        case AssistantPage.InitiativeTemplate:
+          return navigate({ to: ROUTES.initiativeTemplate, params: { key: param(ref, 'templateKey') } });
+        case AssistantPage.GitReview:
+          return navigate({ to: ROUTES.gitReview, params: { reviewId: param(ref, 'gitReviewId') } });
         default:
           return navigate({ to: PAGE_ROUTE[ref.page] });
       }

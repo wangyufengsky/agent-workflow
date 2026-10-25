@@ -703,6 +703,7 @@ export function createInitiativesService({
     templates: {
       syncBuiltin: templates.syncBuiltin,
       list: (): InitiativeTemplateDTO[] => templates.list(),
+      get: templates.get,
       create: templates.create,
       update: templates.update,
       delete: templates.delete,

@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   type AssistantConversationDTO,
@@ -12,10 +12,12 @@ import {
   listAssistantFilesOp,
   listConfirmationsOp,
   listConversationsOp,
+  listInitiativeTemplatesOp,
   OPENCODE_ASSISTANT_AGENT,
   replyAssistantPermissionOp,
   ServerEventType,
   sendAssistantMessageOp,
+  startGitReviewOp,
   type TranscriptPage,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -122,6 +124,28 @@ describe('助手对话（A-02、A-03）', () => {
     await say(c.id, '这个计划拆得怎么样？', { page: 'initiative', params: { initiativeId: initiative.id } });
     expect(t.fake.prompts[0]?.system).toContain(
       `the page of initiative I-1 "整理订单模块" (initiative id ${initiative.id}, status draft_ready, project "${project.name}"`,
+    );
+  });
+
+  it('用户在组合模板的编辑页或某次 AI 审查时，system 写明是哪一个（34 §15.6、27 §4）', async () => {
+    const { project } = await addProject(t);
+    const template = (await t.call(listInitiativeTemplatesOp, {})).body.items.find(
+      (x) => x.key === 'tests_then_refactor',
+    );
+    writeFileSync(join(project.repoPath, 'README.md'), '改动');
+    const { body: review } = await t.call(startGitReviewOp, { id: project.id, target: { kind: 'worktree' } });
+    const c = await newConversation();
+
+    await say(c.id, '这个模板适合什么？', {
+      page: 'initiative_template',
+      params: { templateKey: 'tests_then_refactor' },
+    });
+    expect(t.fake.prompts.at(-1)?.system).toContain(
+      `the editor of initiative composition template "${template?.name}" (key tests_then_refactor, builtin`,
+    );
+    await say(c.id, '这些问题要紧吗？', { page: 'git_review', params: { gitReviewId: review.id } });
+    expect(t.fake.prompts.at(-1)?.system).toContain(
+      `the AI review of ${review.label} in the Git console of project "${project.name}" (review id ${review.id}`,
     );
   });
 
