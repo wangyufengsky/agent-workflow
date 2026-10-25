@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { API_BASE, AUTH } from './env.ts';
 import { createProject, type FakeStep, patchSettings, queueBreakdownTurn, TASK_RUN_TIMEOUT_MS } from './helpers.ts';
 
 // Journey J38 (07 §5, 34 §5.1–§5.2, §8): the AI breaks a requirement down, the user asks for changes, then confirms.
@@ -86,4 +87,39 @@ test('J38 主页「让 AI 拆解」→ 拆解草稿（理解与需求覆盖）�
   await page.getByRole('button', { name: '确认并开始第 1 阶段' }).click();
   await expect(page.getByTestId('initiative-item').first()).toContainText(/T-\d+/, { timeout: TASK_RUN_TIMEOUT_MS });
   await expect(page.getByTestId('initiative-item').nth(1)).toContainText('阶段未开始');
+});
+
+test('J41 专业模式：「让 AI 拆解」时选可选流程，默认是改动仓库的内置流程；全不选不能开始', async ({
+  page,
+  request,
+}) => {
+  await patchSettings(request, { 'ui.mode': 'pro' });
+  const project = await createProject(request, null);
+  await page.goto(`/?projectId=${project.id}`);
+  await page.getByRole('button', { name: '直接开始', exact: true }).click();
+  await page
+    .getByRole('group', { name: '选择流程开始任务' })
+    .getByRole('button', { name: '让 AI 拆解', exact: true })
+    .click();
+  await page.getByRole('textbox', { name: '需求', exact: true }).fill('给订单和支付补单元测试');
+
+  await page.getByRole('button', { name: /可选流程/ }).click();
+  const allowed = page.getByRole('group', { name: '可选流程' });
+  await expect(allowed.getByLabel('新功能开发')).toBeChecked();
+  await expect(allowed.getByLabel('详细设计')).toBeChecked();
+  await expect(allowed.getByLabel('代码审查')).not.toBeChecked();
+  for (const name of ['新功能开发', '修 Bug', '补单元测试', '重构', '清理告警', '详细设计', '需求拆解']) {
+    await allowed.getByLabel(name).uncheck();
+  }
+  await expect(page.getByText('至少选一个流程')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^开始/ })).toBeDisabled();
+  await allowed.getByLabel('补单元测试').check();
+  await allowed.getByLabel('代码审查').check();
+  await page.getByRole('button', { name: /^开始/ }).click();
+
+  await expect(page.getByTestId('initiative-page')).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  const id = new URL(page.url()).pathname.split('/').at(-1);
+  const initiative = await (await request.get(`${API_BASE}/initiatives/${id}`, { headers: AUTH })).json();
+  expect(initiative.allowedWorkflows).toEqual(['unit_tests', 'code_review']);
+  await patchSettings(request, { 'ui.mode': 'simple' });
 });

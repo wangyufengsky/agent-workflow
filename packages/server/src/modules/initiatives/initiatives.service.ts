@@ -31,6 +31,7 @@ import {
   initiativeItemStatusOf,
   initiativeStatusOf,
   isBatchDeliverable,
+  isDefaultInitiativeWorkflow,
   isInitiativeItemDone,
   isTerminalState,
   type ListInitiativesQuery,
@@ -635,8 +636,14 @@ export function createInitiativesService({
     input: ReturnType<typeof createInitiativeRequestSchema.parse>,
   ): Promise<InitiativeDetailDTO> {
     attempts.requireReady();
-    const allowed = input.allowedWorkflows ?? null;
-    const unknown = (allowed ?? []).filter((key) => !workflowExists(key));
+    // Stored as chosen, or as the default (34 §5.1); null stays for templates, whose work packages are fixed.
+    const allowed =
+      input.allowedWorkflows ??
+      workflows
+        .list()
+        .filter(isDefaultInitiativeWorkflow)
+        .map((w) => w.key);
+    const unknown = allowed.filter((key) => !workflowExists(key));
     if (unknown.length > 0) {
       throw invalid(
         unknown.map((key) => ({
@@ -646,7 +653,7 @@ export function createInitiativesService({
         })),
       );
     }
-    const first = workflowOf(allowed?.[0] ?? workflows.list().find((w) => w.kind !== WorkflowKind.System)?.key ?? '');
+    const first = workflowOf(allowed[0] ?? '');
     if (first === null) throw new AppError(ErrorCode.WorkflowNotFound, 'No workflow to break down into', {});
     const baseBranch = await tasks.checkCreate({
       projectId: input.projectId,

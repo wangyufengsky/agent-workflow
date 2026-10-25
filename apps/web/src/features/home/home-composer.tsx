@@ -28,6 +28,7 @@ import { UsageButton } from '../assistant/usage-line.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
 import { AttachmentList, dropFilesInto, pasteFilesInto, useAttachmentPickers } from '../attachments/attachment-bar.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
+import { AllowedWorkflowsField } from '../initiatives/allowed-workflows-field.tsx';
 import { initiativeTemplatesQuery } from '../initiatives/initiatives.queries.ts';
 import { templateChain, useStartInitiative } from '../initiatives/use-start-initiative.ts';
 import type { DraftRequirement } from '../requirements/checklist-editor.tsx';
@@ -71,6 +72,7 @@ export function HomeComposer({
   const [templateKey, setTemplateKey] = useState<string>();
   // 「让 AI 拆解」: an initiative the AI breaks down, instead of one made from a template (34 §5.1).
   const [breakdown, setBreakdown] = useState(false);
+  const [allowedWorkflows, setAllowedWorkflows] = useState<string[] | undefined>(undefined);
   const ask = useAsk();
   const abort = useAbortAssistant();
   const input = useRef<HTMLTextAreaElement>(null);
@@ -97,6 +99,8 @@ export function HomeComposer({
     projectId,
     templateKey,
     breakdown,
+    // Only pro mode chooses; simple mode keeps the default (34 §5.1).
+    allowedWorkflows: task.pro ? allowedWorkflows : undefined,
     requirement: text,
     attachmentIds: files.ids,
     attachmentsBlocked: files.blocked,
@@ -258,6 +262,13 @@ export function HomeComposer({
         />
         <AttachmentList draft={files} />
         {workflow !== undefined && <ChecklistField drafts={checklist} onChange={setChecklist} />}
+        {breakdown && task.pro && (
+          <AllowedWorkflowsField
+            workflows={workflows.data ?? []}
+            value={allowedWorkflows}
+            onChange={setAllowedWorkflows}
+          />
+        )}
         {workflow !== undefined && task.pro && project !== undefined && (
           <MoreOptionsFields project={project} value={task.options} onChange={task.setOptions} />
         )}

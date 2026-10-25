@@ -28,6 +28,7 @@ export function useStartInitiative({
   projectId,
   templateKey,
   breakdown,
+  allowedWorkflows,
   requirement,
   attachmentIds,
   attachmentsBlocked,
@@ -36,6 +37,8 @@ export function useStartInitiative({
   projectId: string;
   templateKey: string | undefined;
   breakdown: boolean;
+  /** The workflows the breakdown may use; undefined keeps the default (34 §5.1). */
+  allowedWorkflows: readonly string[] | undefined;
   requirement: string;
   attachmentIds: readonly string[];
   attachmentsBlocked: boolean;
@@ -45,21 +48,29 @@ export function useStartInitiative({
   const [review, setReview] = useState(false);
   const create = useCreateInitiative();
   const navigate = useNavigate();
+  const noWorkflow = breakdown && allowedWorkflows?.length === 0;
   const canStart =
-    (templateKey !== undefined || breakdown) && projectId !== '' && requirement.trim() !== '' && !attachmentsBlocked;
+    (templateKey !== undefined || breakdown) &&
+    projectId !== '' &&
+    requirement.trim() !== '' &&
+    !attachmentsBlocked &&
+    !noWorkflow;
   const blocked = canStart
     ? undefined
     : requirement.trim() === ''
       ? HOME_TASK_COPY.needsRequirement
       : attachmentsBlocked
         ? ATTACHMENTS_COPY.notReady
-        : undefined;
+        : noWorkflow
+          ? C.allowedWorkflowsNone
+          : undefined;
   const start = () => {
     if (!canStart) return;
     create.mutate(
       {
         projectId,
         ...(templateKey === undefined ? {} : { templateKey }),
+        ...(breakdown && allowedWorkflows !== undefined ? { allowedWorkflows: [...allowedWorkflows] } : {}),
         requirement: requirement.trim(),
         review,
         confirmItemPlans,
