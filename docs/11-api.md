@@ -311,6 +311,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `assistant.navigate` | `{ conversationId, target: AssistantPageRef }` | 助手调用 `open_page`：跳转，面板打开并显示该对话（目标为主页时由主页显示对话，D112） |
 | `assistant.open_form` | `{ conversationId, form: AssistantForm, values }` | 助手调用 `open_form`：打开表单并预填（不含凭据字段） |
 | `assistant.reveal_file` | `{ conversationId, absolutePath }` | 助手调用 `reveal_file`：经 preload 在 Finder 中显示 |
+| `assistant.export_deck` | `{ conversationId, deckId, format }` | 助手调用 `export_deck`：界面打开这份 PPT，由页头执行与「导出」按钮相同的导出（28 §4） |
 | `knowledge.updated` | `{ conversationId }` | 知识问答：新一轮、答案提交、一轮结束、权限请求等待或已处理、删除时；对话与列表重新拉取（研究过程与流式回答的草稿沿用 `attempt.transcript`：研究尝试的正文每 `KNOWLEDGE_DRAFT_FLUSH_CHARS` 个字符推送一次，草稿 = 最后一个非提交工具调用之后的正文，18 §5.5） |
 | `browser.frame` | `BrowserFrame`（`{ attemptId, taskId, seq, tool, url, file }`） | AI 浏览器动作后的画面（v1.3 B2，29 §8.2）；任务页「预览」页签观看 AI 会话时跟随最新一张 |
 | `browser.tab_updated` | `UserTabState`（`{ tabId, taskId, url, viewport, consoleErrors, failedRequests }`） | 用户的预览标签页换了页面、尺寸，或当前页面的控制台错误（含未捕获异常）与失败请求（网络错误或 ≥ 400）数变了（v1.3 B2，29 §8.1）；计数随主框架的新文档重新开始 |

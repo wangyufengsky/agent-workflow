@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { settingsSchema } from '../../constants/settings.ts';
 import { assistantFormSchema } from '../../enums/assistant.ts';
+import { deckExportFormatSchema } from '../../enums/deck.ts';
 import { ServerEventType } from '../../enums/system.ts';
 import { assistantConfirmationSchema, assistantConversationSchema, assistantPageRefSchema } from '../api/assistant.ts';
 import { attemptSummarySchema, transcriptEntrySchema } from '../api/attempts.ts';
@@ -84,6 +85,10 @@ export const serverEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal(ServerEventType.AssistantRevealFile),
     data: z.object({ conversationId: z.string(), absolutePath: z.string() }),
+  }),
+  z.object({
+    type: z.literal(ServerEventType.AssistantExportDeck),
+    data: z.object({ conversationId: z.string(), deckId: z.string(), format: deckExportFormatSchema }),
   }),
 ]);
 export type ServerEvent = z.infer<typeof serverEventSchema>;

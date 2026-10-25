@@ -10,8 +10,10 @@ import {
   cancelAssistantCallOp,
   confirmAssistantCallOp,
   createConversationOp,
+  createDeckOp,
   createProjectOp,
   ErrorCode,
+  generateDeckOp,
   getProjectOp,
   getSettingsOp,
   listConfirmationsOp,
@@ -19,6 +21,7 @@ import {
   OPENCODE_ASSISTANT_AGENT,
   RoleBaseAgent,
   ServerEventType,
+  SlideLayout,
   sendAssistantMessageOp,
   type TranscriptPage,
   updateSettingsOp,
@@ -533,6 +536,53 @@ describe('助手专用工具（A-05）', () => {
     });
     expect(isError).toBe(true);
     expect(body).toMatchObject({ code: ErrorCode.ValidationFailed });
+  });
+
+  it('export_deck：做好的 PPT 由界面导出（推送请求）；没做好的 DECK_NOT_READY、不存在的 DECK_NOT_FOUND', async () => {
+    const writer = { agent: 'aw-slides' };
+    const deckWork = async (start: () => Promise<unknown>) => {
+      const ended = waitForEvent(
+        t.app.events,
+        ServerEventType.AttemptUpdated,
+        (d) => d.attempt.kind.startsWith('deck_') && d.attempt.status === 'succeeded',
+      );
+      await start();
+      await ended;
+      await t.fake.settled();
+    };
+    t.fake.enqueue(
+      script().callTool('submit_outline', {
+        title: '周报',
+        understanding: { audience: '团队同事', duration: '约 5 分钟', assumptions: ['听众了解项目'] },
+        slides: [{ layout: SlideLayout.Cover, title: '周报', points: ['本周进展'] }],
+      }),
+      writer,
+    );
+    let deckId = '';
+    await deckWork(async () => {
+      deckId = (await t.call(createDeckOp, { brief: '周报', materials: [{ kind: 'text', content: '退款改好了' }] }))
+        .body.id;
+    });
+    expect(await call('export_deck', { deckId, format: 'pptx' })).toMatchObject({
+      isError: true,
+      body: { code: ErrorCode.DeckNotReady },
+    });
+
+    t.fake.enqueue(
+      script().callTool('submit_slide', {
+        page: 1,
+        content: { layout: SlideLayout.Cover, title: '周报', subtitle: '本周' },
+      }),
+      writer,
+    );
+    await deckWork(() => t.call(generateDeckOp, { id: deckId }));
+    const requested = waitForEvent(t.app.events, ServerEventType.AssistantExportDeck, () => true);
+    expect((await call('export_deck', { deckId, format: 'pptx' })).body).toEqual({ exporting: true });
+    expect(await requested).toEqual({ conversationId, deckId, format: 'pptx' });
+
+    expect(await call('export_deck', { deckId: 'gone', format: 'pdf' })).toMatchObject({
+      body: { code: ErrorCode.DeckNotFound },
+    });
   });
 
   it('list_files / reveal_file：只限本对话的文件目录', async () => {

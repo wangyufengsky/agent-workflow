@@ -80,6 +80,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.DeckNotFound]: '这份 PPT 不存在，可能已被删除。',
   [ErrorCode.DeckSlideNotFound]: '这一页不存在，可能已被删除。',
   [ErrorCode.DeckBusy]: 'AI 正在处理这份 PPT，等它做完或先停止。',
+  [ErrorCode.DeckNotReady]: '这份 PPT 的页面还没有全部做好，做好后才能导出。',
   [ErrorCode.InboxItemNotFound]: '这一项不存在。',
   [ErrorCode.InboxItemClosed]: '这一项已经处理过了。',
   [ErrorCode.DeliveryConflict]: '合并时有冲突。',

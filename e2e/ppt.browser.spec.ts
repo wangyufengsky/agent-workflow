@@ -2,7 +2,16 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
-import { box, createProject, type FakeStep, MIN_WINDOW, patchSettings, queueWriterTurn } from './helpers.ts';
+import {
+  appTool,
+  box,
+  createProject,
+  type FakeStep,
+  MIN_WINDOW,
+  patchSettings,
+  queueAssistantTurn,
+  queueWriterTurn,
+} from './helpers.ts';
 
 // J20 (23 §13): from a project to a PPT — the outline written, edited and confirmed, the pages made one by one, a page
 // edited by hand, revised by the AI and restored, another theme, the PowerPoint export, the show and the print view.
@@ -30,7 +39,7 @@ function zipEntries(bytes: Buffer): string[] {
 
 test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
-test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 让 AI 改 → 恢复上一版 → 换风格 → 导出 PowerPoint → 放映', async ({
+test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 让 AI 改 → 恢复上一版 → 换风格 → 导出 PowerPoint → 放映 → 让助手导出', async ({
   page,
   request,
 }) => {
@@ -168,6 +177,36 @@ test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 
   // The list shows it with its first page.
   await page.goto('/ppt');
   await expect(page.getByTestId('deck-card').filter({ hasText: '订单服务退款改造' })).toContainText('3 页');
+
+  // Opened and left within the app, its page stays cached; changed meanwhile, that cache is out of date and the
+  // export reads the PPT as stored.
+  await page.getByTestId('deck-card').filter({ hasText: '订单服务退款改造' }).click();
+  await expect(page.getByTestId('slide-preview')).toBeVisible();
+  await page.getByRole('link', { name: '← PPT' }).click();
+  await expect(page).toHaveURL(/\/ppt$/);
+  const stored = await (await request.get(`${API_BASE}/decks/${deckId}`, { headers: AUTH })).json();
+  const [cover] = stored.slides;
+  const changed = await request.put(`${API_BASE}/decks/${deckId}/slides/${cover.id}`, {
+    headers: AUTH,
+    data: { content: { ...cover.content, title: '助手导出前改的封面' }, notes: cover.notes },
+  });
+  expect(changed.ok()).toBe(true);
+
+  // Asked to, the assistant exports it the way the button does (28 §4): the PPT opens and the file is saved.
+  await queueAssistantTurn(request, [
+    appTool('export_deck', { deckId, format: 'pptx' }),
+    { type: 'text', text: '正在导出，请选择保存位置。' },
+  ]);
+  await page.keyboard.press('ControlOrMeta+j');
+  const panel = page.getByRole('complementary', { name: '应用助手' });
+  await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  const exported = page.waitForEvent('download');
+  await panel.getByLabel('发给助手的消息').fill('把这份 PPT 导出成 PowerPoint');
+  await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
+  const assistantFile = await exported;
+  expect(assistantFile.suggestedFilename()).toBe('订单服务退款改造.pptx');
+  expect(readFileSync(await assistantFile.path()).toString('utf8')).toContain('助手导出前改的封面');
+  await expect(page).toHaveURL(new RegExp(`/ppt/${deckId}$`));
 });
 
 test('J32 网页资料：输入地址添加网页 → 生成大纲，网页正文按网站规则只读读取一次并保存（29 §2.8）', async ({
