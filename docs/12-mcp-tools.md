@@ -416,7 +416,7 @@ export const submitPlanTool = defineMcpTool({
 
 ### 8.1 支持范围内其他版本的实测（D156，2026-10-25）
 
-`pnpm test:oc` 分别在 opencode 1.18.0、1.18.35、1.19.4 上运行（`PATH` 前置临时安装的版本）：不调用模型的 10 个用例（托管启动与崩溃恢复、配置注入、客户端接口、事件解析、bash 权限判定、助手会话生命周期）三个版本全部通过，事件 schema 没有不匹配。唯一调用模型的 bridge 插件用例在三个版本上都因模型服务返回 `401 Invalid credential` 失败（本机 opencode go 的登录凭据失效，与版本无关），插件加载与 MCP 注入本身没有报错；凭据恢复后需补跑这一例。1.20 及以后的版本还没有发布，没有实测。
+`pnpm test:oc` 分别在 opencode 1.18.0、1.18.35、1.19.4 上运行（`PATH` 前置临时安装的版本）：不调用模型的 10 个用例（托管启动与崩溃恢复、配置注入、客户端接口、事件解析、bash 权限判定、助手会话生命周期）三个版本全部通过，事件 schema 没有不匹配。唯一调用模型的 bridge 插件用例（模型经执行 MCP 调用 `submit_result`，工具收到会话的 sessionID）三个版本也都通过（`opencode-go/deepseek-v4.1-flash`）。注意：opencode 官方安装脚本装的 `~/.opencode/bin/opencode` 是包装脚本，把 `XDG_*` 指向 `~/.opencode/v1/`，登录信息存在那里；用 npm 另装的版本默认读 `~/.local/share/opencode/`，实测时要传同样的 `XDG_*`，否则会因为读到另一份登录而报 `401 Invalid credential`。1.20 及以后的版本还没有发布，没有实测。
 
 ## 9. 待实施工具增量（30 / 31）
 
