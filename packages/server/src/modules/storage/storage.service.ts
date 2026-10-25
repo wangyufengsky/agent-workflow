@@ -1,6 +1,6 @@
 import type { Dirent } from 'node:fs';
 import { lstat, readdir, rm } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   ASSISTANT_DIR,
   ATTACHMENTS_DIR,
@@ -49,8 +49,12 @@ function kindOf(name: string): StorageKind {
   }
 }
 
-/** Bytes under `path` without following symbolic links (a worktree's `node_modules` may link elsewhere). */
-async function sizeOf(path: string): Promise<number> {
+/**
+ * Bytes under `path` without following symbolic links (a worktree's `node_modules` may link elsewhere); `skip` is left
+ * out wherever it sits below `path`.
+ */
+async function sizeOf(path: string, skip?: string): Promise<number> {
+  if (path === skip) return 0;
   let stat: Awaited<ReturnType<typeof lstat>>;
   try {
     stat = await lstat(path);
@@ -61,7 +65,7 @@ async function sizeOf(path: string): Promise<number> {
   }
   if (!stat.isDirectory()) return stat.size;
   let total = 0;
-  for (const entry of await entriesOf(path)) total += await sizeOf(join(path, entry.name));
+  for (const entry of await entriesOf(path)) total += await sizeOf(join(path, entry.name), skip);
   return total;
 }
 
@@ -79,11 +83,6 @@ function isNotFound(err: unknown): boolean {
   return err instanceof Error && 'code' in err && err.code === 'ENOENT';
 }
 
-function isInside(path: string, dir: string): boolean {
-  const rel = relative(dir, path);
-  return rel !== '' && !rel.startsWith('..');
-}
-
 /**
  * Disk usage of the data directory and the worktree root, and the two cleanups (37): old log files and the session
  * records of tasks that ended long ago. Nothing else is deleted here: worktrees go with their task (or from the Git
@@ -91,7 +90,7 @@ function isInside(path: string, dir: string): boolean {
  */
 export function createStorageService({ dataDir, clock, settings, tasks }: StorageServiceDeps) {
   const terminalStatuses = TASK_STATUSES.filter((s) => isTerminalState(taskMachine, s));
-  const worktreeRoot = () => settings.get('worktree.rootDir') ?? join(dataDir, DEFAULT_WORKTREES_DIR);
+  const worktreeRoot = () => resolve(settings.get('worktree.rootDir') ?? join(dataDir, DEFAULT_WORKTREES_DIR));
 
   /** Log files older than the kept days; the newest file of each kind (`app-`, `opencode-`) is in use and stays. */
   async function oldLogs(): Promise<Array<{ path: string; bytes: number }>> {
@@ -139,10 +138,12 @@ export function createStorageService({ dataDir, clock, settings, tasks }: Storag
       [StorageKind.Attachments]: 0,
       [StorageKind.Other]: 0,
     };
-    for (const entry of await entriesOf(dataDir)) bytes[kindOf(entry.name)] += await sizeOf(join(dataDir, entry.name));
     const root = worktreeRoot();
-    // A worktree root inside the data directory is already counted with its top-level entry.
-    if (!isInside(root, dataDir)) bytes[StorageKind.Worktrees] += await sizeOf(root);
+    // The worktree root is counted once as worktrees, wherever it is: the data directory is walked without it.
+    for (const entry of await entriesOf(dataDir)) {
+      bytes[kindOf(entry.name)] += await sizeOf(join(dataDir, entry.name), root);
+    }
+    bytes[StorageKind.Worktrees] += await sizeOf(root);
     const items = Object.values(StorageKind).map((kind) => ({ kind, bytes: bytes[kind] }));
     const cleanable = await Promise.all(
       Object.values(StorageCleanTarget).map(async (target) => {

@@ -1,6 +1,13 @@
 import { mkdir, readdir, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { cancelTaskOp, cleanStorageOp, getStorageOp, STORAGE_KEEP_DAYS, StorageKind } from '@aw/shared';
+import {
+  cancelTaskOp,
+  cleanStorageOp,
+  getStorageOp,
+  STORAGE_KEEP_DAYS,
+  StorageKind,
+  updateSettingsOp,
+} from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { createFakeClock } from '../../../test/helpers/clock.ts';
@@ -46,6 +53,18 @@ describe('占用空间与清理（37）', () => {
     expect(cleaned.body.freedBytes).toBe(300);
     expect((await readdir(logs)).sort()).toEqual(['app-20260901.log', 'opencode-20260902.log']);
     expect(cleaned.body.storage.cleanable).toContainEqual({ target: 'logs', count: 0, bytes: 0 });
+  });
+
+  it('工作区根目录设在数据目录里的其他位置时计入任务工作区，不重复计入其他', async () => {
+    const root = join(t.dataDir, 'custom', 'worktrees');
+    await t.call(updateSettingsOp, { 'worktree.rootDir': root });
+    await writeAt(join(root, 'proj', 'T-1', 'a.txt'), 100, clock.now());
+    await writeAt(join(t.dataDir, 'custom', 'note.txt'), 7, clock.now());
+
+    const { body } = await t.call(getStorageOp, {});
+    expect(body.worktreeRoot).toBe(root);
+    expect(bytesOf(body, StorageKind.Worktrees)).toBe(100);
+    expect(bytesOf(body, StorageKind.Other)).toBe(7);
   });
 
   it('只清理结束超过保留天数的任务的会话记录，任务本身保留', async () => {
