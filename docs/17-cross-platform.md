@@ -120,6 +120,7 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 
 - main 在 `ready` 之前（Chromium 启动时就选定密钥服务）追加 `--password-store=gnome-libsecret`（`apps/desktop/src/main/password-store.ts`），除非用户自己传了 `--password-store`，或是 KDE 会话（`XDG_CURRENT_DESKTOP` 含 `KDE`、设置了 `KDE_FULL_SESSION`、`DESKTOP_SESSION` 以 `kde` 开头）：KWallet 里已存的密文换到 libsecret 就解不开。其他桌面环境上 Chromium 本来就选 libsecret，开关不改变什么；KeePassXC、KDE Plasma 6 的 ksecretd 也提供 Secret Service。
 - 系统密钥服务仍不可用（没装、没有登录密钥环）时：加解密请求返回失败，引导页「凭据存储」为警告（不阻止「就绪」），说明安装 `gnome-keyring`（统信、麒麟同样 `apt install`）后重启应用；装不了时可以设置主密码（14 §3.1）：由后端 credentials 模块用 scrypt 派生的密钥包住数据密钥、AES-256-GCM 加密凭据（10 §credential_vault），每次启动输入一次。仍不退回明文。
+- 锁定期间（D178）：所有页面顶部有解锁提示条，`CREDENTIAL_LOCKED` 的错误下面就地解锁；AI 的数据库工具带 hint 请用户解锁（12 §6.10）；定时任务照常运行。
 - 引导页的状态来自 `EnvironmentDTO.credentials`（后端经 credential port 的 `status` 请求询问 main，再加上主密码的状态）。
 - Playwright 的 Electron 加载器在应用之前追加 `--password-store=basic`，应用把它当作用户的选择保留：Electron E2E 里系统密钥服务总是不可用；J42 的 Secret Service 用例因此不经加载器、直接启动构建后的应用（07 §5）。
 - 开发模式（`pnpm dev:server`、浏览器 E2E）的明文适配器报告可用，与现状一致。

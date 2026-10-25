@@ -5,6 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium, type ElectronApplication, _electron as electron, expect, type Page, test } from '@playwright/test';
+import { createRepo } from './helpers.ts';
 
 /** The desktop app's `electron` dependency resolves to the path of its executable. */
 const electronPath: string = createRequire(join(process.cwd(), 'apps/desktop/package.json'))('electron');
@@ -101,4 +102,55 @@ test.describe('Linux 凭据存储（D167）', () => {
       await second.app.close();
     }
   });
+});
+
+/** The backend as the renderer calls it, with the app's own token. */
+function post(page: Page, path: string, body: unknown): Promise<void> {
+  return page.evaluate(
+    async ({ path, body }) => {
+      const res = await fetch(`/api/v1${path}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${window.aw?.apiToken ?? ''}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`);
+    },
+    { path, body },
+  );
+}
+
+async function open(userDataDir: string): Promise<{ app: ElectronApplication; page: Page }> {
+  const app = await electron.launch({ args: ['apps/desktop', `--user-data-dir=${userDataDir}`] });
+  const page = await app.firstWindow();
+  // The opening animation is a data: page that a click skips (28 §5); then the app loads from the backend.
+  await page.mouse.click(10, 10);
+  await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 60_000 });
+  return { app, page };
+}
+
+// Whatever the key store: a master password set earlier is locked again at every start (D167). Every page then says
+// so and unlocks in place (D178).
+test('主密码锁定时每个页面顶部提示，就地解锁', async () => {
+  const userDataDir = mkdtempSync(join(tmpdir(), 'aw-e2e-locked-banner-'));
+  const first = await open(userDataDir);
+  try {
+    await post(first.page, '/credentials/master-password', { password: 'correct horse' });
+    await post(first.page, '/projects', { repoPath: createRepo() });
+  } finally {
+    await first.app.close();
+  }
+
+  const { app, page } = await open(userDataDir);
+  try {
+    const banner = page.getByRole('region', { name: '凭据存储' });
+    await expect(banner).toContainText('本次启动还没有解锁');
+    await banner.getByLabel('主密码', { exact: true }).fill('wrong horse');
+    await banner.getByRole('button', { name: '解锁' }).click();
+    await expect(banner.getByRole('alert')).toBeVisible();
+    await banner.getByLabel('主密码', { exact: true }).fill('correct horse');
+    await banner.getByRole('button', { name: '解锁' }).click();
+    await expect(banner).toBeHidden();
+  } finally {
+    await app.close();
+  }
 });

@@ -477,6 +477,7 @@
 | IN-11 | Windows 集成登录（D171）：专业模式设置 `browser.integratedAuthServers`（不能只写 `*`，助手不能改），`open` 请求带 `integratedAuthServers`，main 对网站分区 `allowNTLMCredentialsForDomains`；设置页「网站」一节的输入框。不做委派（用户已确认）。同一提交登记 02、08、14、29 | 单元与类型检查；没有域环境，Kerberos / NTLM 没有自动化或手工验证（PR 中写明） |
 | IN-12 | 客户端证书（D172）：main 在应用的 `select-client-certificate` 事件里处理本应用的标签页：用户的标签页弹出证书列表，AI 的标签页不回答（停止加载，免得 Chromium 记住「不用证书」）并发 `browser.certificateRefused`，后端据此返回 `BROWSER_LOGIN_REQUIRED`。同一提交登记 02、11、29 | 类型检查；没有系统证书，未验证（PR 中写明） |
 | IN-13 | 只读网站的查询路径（D173，用户已确认）：网站规则加 `queryPaths`，`blockReason` 放行 AI 发往这些路径的 POST；设置页只读规则下的输入框；执行与规划提示词说明查询被拦时怎么办。同一提交登记 02、08、14、29 | 单元（`policy.test.ts`）：查询路径的 POST 放行，别的路径、大小写不同、`PUT`、WebSocket 仍拦下；集成（Chromium 宿主）：查询照常发出、同一网站别的写请求被拦并写进 `blockedWrites` |
+| IN-18 | 主密码未解锁时的提示（D178，用户已确认）：外壳顶部的锁定提示条（`app/shell/credentials-banner.tsx`）与 `ErrorState` 遇到 `CREDENTIAL_LOCKED` 时共用的就地解锁框（`UnlockForm`，开发环境页同用）；`db_describe` / `db_query` 与应用助手对 `CREDENTIAL_LOCKED` 的 hint。同一提交登记 02、07 §5、12、14、17 §3.6 | 集成（MCP SDK 客户端）：设置主密码、保存数据库连接、重启后执行步骤调 `db_query` 得到 `CREDENTIAL_LOCKED` 与提示 `ask_user` 的 hint（修复前没有 hint）；Electron（J42 补一例，各平台）：经 API 设置主密码并添加项目，重启后页面顶部提示条可见，主密码不对时提示条内报错，解锁后提示条消失 |
 
 ## 后续 · 存储空间与磁盘清理（ST）
 

@@ -1108,6 +1108,14 @@ button.card:hover,
   color: var(--ink);
   font-weight: 500;
 }
+/* Above the page under the header, for the whole app (D178). */
+.shell-banner {
+  flex: none;
+  margin: var(--s-3) 24px 0;
+}
+.unlock-input {
+  width: 240px;
+}
 .banner .actions {
   margin-left: auto;
   display: flex;

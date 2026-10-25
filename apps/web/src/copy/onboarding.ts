@@ -75,6 +75,9 @@ export const ONBOARDING_COPY = {
     locked: '令牌与数据库密码由主密码保护：输入主密码解锁后才能使用（每次启动一次）。',
     unlock: '解锁',
     unlockDone: '已解锁',
+    lockedBanner:
+      '令牌与数据库密码由主密码保护，本次启动还没有解锁：建 PR、推送、取回审查意见、查询数据库（包括 AI 用到数据库的步骤）都要先解锁。',
+    unlockedRetry: '已解锁，请再试一次。',
     change: '修改主密码',
     currentPassword: '当前主密码',
     newPassword: '新主密码',
