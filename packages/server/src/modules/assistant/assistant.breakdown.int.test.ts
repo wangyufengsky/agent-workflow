@@ -1,13 +1,16 @@
+import { join } from 'node:path';
 import {
   confirmAssistantCallOp,
   createConversationOp,
   MCP_SESSION_ARG,
   OPENCODE_ASSISTANT_AGENT,
+  ServerEventType,
   sendAssistantMessageOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
+import { waitForEvent } from '../../../test/helpers/events.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
 import { addProject } from '../../../test/helpers/tasks.ts';
 
@@ -88,4 +91,37 @@ it('助手发起的拆解结束后，结果作为下一条消息回到原对话�
   expect(draft?.text).toContain('"mode": "rebreakdown"');
   expect(draft?.text).toContain('核心计算');
   expect(draft?.text).toContain('测金额计算');
+});
+
+it('拆解在启动时就失败（首条提示词发不出去），同样回报原对话', async () => {
+  t.fake.failNextPrompt();
+  await confirmed('initiatives_create', { projectId, requirement: '给订单模块补测试' });
+  await settled();
+  expect(reports()).toHaveLength(1);
+  expect(reports()[0]?.text).toContain('"status": "breakdown_failed"');
+});
+
+it('助手忙时结果排队；进程重启后照样送达（不只在新拆解结束时才发）', async () => {
+  // The assistant is still answering when the breakdown ends: its outcome waits in the outbox.
+  t.fake.enqueue(script().hang(), { agent: OPENCODE_ASSISTANT_AGENT });
+  await t.call(sendAssistantMessageOp, { id: conversationId, text: '等一下', context: HOME });
+  // The assistant's own turn hangs on purpose: wait for the breakdown attempt, not for every session.
+  const ended = waitForEvent(
+    t.app.events,
+    ServerEventType.AttemptUpdated,
+    (d) => d.attempt.kind === 'breakdown' && d.attempt.endedAt !== null,
+  );
+  await confirmed('initiatives_create', { projectId, requirement: '给订单模块补测试' });
+  await ended;
+  await t.app.services.initiatives.settled();
+  expect(reports()).toEqual([]);
+
+  t.fake.crash();
+  const { dataDir, fake } = t;
+  await t.close();
+  await fake.abort({ sessionId, directory: join(dataDir, 'assistant') });
+  t = await createTestApp({ dataDir, fake });
+  await t.fake.settled();
+  expect(reports()).toHaveLength(1);
+  expect(reports()[0]?.text).toContain('"status": "breakdown_failed"');
 });

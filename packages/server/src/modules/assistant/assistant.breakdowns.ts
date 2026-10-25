@@ -2,10 +2,12 @@ import { PromptName, type Prompts, renderTemplate } from '@aw/builtin';
 import {
   attemptMachine,
   createInitiativeOp,
+  createInitiativeRequestSchema,
   type InitiativeDetailDTO,
   initiativeDetailSchema,
   isTerminalState,
   openInitiativePhaseOp,
+  openInitiativePhaseRequestSchema,
   RuntimeStatus,
   rebreakdownInitiativeOp,
   refineInitiativeOp,
@@ -30,6 +32,14 @@ const STARTS_RUN: ReadonlySet<string> = new Set([
   openInitiativePhaseOp.id,
 ]);
 
+/** Whether this call started a run: a breakdown without a template, or「进入第 k 阶段」with refinement first. */
+function startsRun(impl: OperationImpl, input: unknown): boolean {
+  if (impl.contract.id === createInitiativeOp.id)
+    return createInitiativeRequestSchema.parse(input).templateKey === undefined;
+  if (impl.contract.id === openInitiativePhaseOp.id) return openInitiativePhaseRequestSchema.parse(input).refine;
+  return true;
+}
+
 type Followup = { attemptId: string; initiativeId: string; conversationId: string };
 
 function createFollowupsRepo(db: DbExecutor) {
@@ -47,6 +57,15 @@ function createFollowupsRepo(db: DbExecutor) {
         .from(f)
         .where(initiativeId === undefined ? open : and(open, eq(f.initiativeId, initiativeId)))
         .all();
+    },
+    /** Every conversation that asked for a run, reported or not: their outcomes may still wait in the outbox. */
+    conversationIds(): string[] {
+      return db
+        .select({ id: f.conversationId })
+        .from(f)
+        .groupBy(f.conversationId)
+        .all()
+        .map((row) => row.id);
     },
     report(attemptId: string): void {
       db.update(f).set({ reported: true }).where(eq(f.attemptId, attemptId)).run();
@@ -112,17 +131,14 @@ export function createBreakdownRelay(deps: {
 }) {
   const { unit, conversations, clock, log, initiatives } = deps;
   const repo = createFollowupsRepo(deps.db);
+  /** Until the app starts sending, outcomes wait in the outbox. */
   let started = false;
-  /** Conversations given an outcome before the app started sending: sent on start. */
-  const waiting = new Set<string>();
 
-  async function flush(conversationId: string): Promise<void> {
-    try {
-      await conversations.flush(conversationId);
-    } catch (err) {
-      // The message stays in the conversation's outbox; it is sent on the next reconnect, start or message.
+  function flush(conversationId: string): Promise<void> {
+    // The message stays in the outbox when it cannot go now: it is sent on reconnect, start or the next message.
+    return conversations.flush(conversationId).catch((err: unknown) => {
       log.error({ err, conversationId }, 'initiative breakdown outcome not sent to assistant');
-    }
+    });
   }
 
   function reconcile(initiativeId?: string): void {
@@ -145,16 +161,13 @@ export function createBreakdownRelay(deps: {
       }
       return recipients;
     });
-    for (const id of recipients) {
-      if (started) void flush(id);
-      else waiting.add(id);
-    }
+    if (started) for (const id of recipients) void flush(id);
   }
 
   deps.events.subscribe((event) => {
     if (event.type === ServerEventType.InitiativeUpdated) reconcile(event.data.initiativeId);
     if (started && event.type === ServerEventType.RuntimeUpdated && event.data.status === RuntimeStatus.Ready) {
-      for (const { conversationId } of repo.pending()) void flush(conversationId);
+      for (const id of repo.conversationIds()) void flush(id);
     }
   });
   reconcile();
@@ -162,15 +175,15 @@ export function createBreakdownRelay(deps: {
   return {
     async start(): Promise<void> {
       started = true;
-      await Promise.all([...waiting].map(flush));
-      waiting.clear();
+      await Promise.all(repo.conversationIds().map(flush));
     },
     /** Runs the operation for a conversation and, when it started an AI run, remembers who to report back to. */
     async run(conversationId: string, impl: OperationImpl, input: unknown): Promise<unknown> {
       const output = await impl.run(input);
       const initiative = initiativeDetailSchema.parse(output);
       const run = initiative.latestRun;
-      if (run !== null && !isTerminalState(attemptMachine, run.status)) {
+      // A run that failed while starting has ended already; it is reported all the same.
+      if (startsRun(impl, input) && run !== null) {
         unit.transact(() => {
           conversations.get(conversationId);
           repo.insert({ attemptId: run.attemptId, initiativeId: initiative.id, conversationId }, clock.now());
