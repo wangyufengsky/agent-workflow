@@ -178,6 +178,20 @@ test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 
   await page.goto('/ppt');
   await expect(page.getByTestId('deck-card').filter({ hasText: '订单服务退款改造' })).toContainText('3 页');
 
+  // Opened and left within the app, its page stays cached; changed meanwhile, that cache is out of date and the
+  // export reads the PPT as stored.
+  await page.getByTestId('deck-card').filter({ hasText: '订单服务退款改造' }).click();
+  await expect(page.getByTestId('slide-preview')).toBeVisible();
+  await page.getByRole('link', { name: '← PPT' }).click();
+  await expect(page).toHaveURL(/\/ppt$/);
+  const stored = await (await request.get(`${API_BASE}/decks/${deckId}`, { headers: AUTH })).json();
+  const [cover] = stored.slides;
+  const changed = await request.put(`${API_BASE}/decks/${deckId}/slides/${cover.id}`, {
+    headers: AUTH,
+    data: { content: { ...cover.content, title: '助手导出前改的封面' }, notes: cover.notes },
+  });
+  expect(changed.ok()).toBe(true);
+
   // Asked to, the assistant exports it the way the button does (28 §4): the PPT opens and the file is saved.
   await queueAssistantTurn(request, [
     appTool('export_deck', { deckId, format: 'pptx' }),
@@ -189,7 +203,9 @@ test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 
   const exported = page.waitForEvent('download');
   await panel.getByLabel('发给助手的消息').fill('把这份 PPT 导出成 PowerPoint');
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
-  expect((await exported).suggestedFilename()).toBe('订单服务退款改造.pptx');
+  const assistantFile = await exported;
+  expect(assistantFile.suggestedFilename()).toBe('订单服务退款改造.pptx');
+  expect(readFileSync(await assistantFile.path()).toString('utf8')).toContain('助手导出前改的封面');
   await expect(page).toHaveURL(new RegExp(`/ppt/${deckId}$`));
 });
 

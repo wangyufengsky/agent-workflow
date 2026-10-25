@@ -8,7 +8,7 @@ import {
   themeIdSchema,
   UiMode,
 } from '@aw/shared';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
@@ -23,7 +23,7 @@ import { useUiStore } from '../../state/ui.store.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { canExportPdf, exportPdf, exportPptx, type Saved } from './export/save.ts';
 import styles from './ppt.module.css';
-import { useDeleteDeck, useUpdateDeck } from './ppt.queries.ts';
+import { deckQuery, useDeleteDeck, useUpdateDeck } from './ppt.queries.ts';
 
 /** 大纲 → 制作 → 完成, by how far the PPT is (23 §2.4). */
 function stepOf(deck: DeckDTO): number {
@@ -77,8 +77,13 @@ export function DeckHeader({ deck, details }: { deck: DeckDTO; details: boolean 
   const update = useUpdateDeck();
   const remove = useDeleteDeck();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const queryClient = useQueryClient();
   const exporting = useMutation({
-    mutationFn: (format: DeckExportFormat) => (format === DeckExportFormat.Pdf ? exportPdf(deck) : exportPptx(deck)),
+    // The PPT as stored now: the page may still show a cached version, e.g. one the assistant has since finished.
+    mutationFn: async (format: DeckExportFormat) => {
+      const latest = await queryClient.fetchQuery({ ...deckQuery(deck.id), staleTime: 0 });
+      return format === DeckExportFormat.Pdf ? exportPdf(latest) : exportPptx(latest);
+    },
     onSuccess: (saved: Saved) => {
       if (saved !== null && !('failed' in saved)) toast(C.exported);
     },
