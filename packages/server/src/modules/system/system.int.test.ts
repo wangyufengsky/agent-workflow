@@ -78,7 +78,9 @@ describe('环境检测', () => {
 
 describe('可用的模型（D162）', () => {
   it('只写在项目 opencode 配置里的 provider 也算可用，注明所属项目；没有声明上下文长度的为 null', async () => {
-    t = await createTestApp();
+    // `ready` also needs a hostable opencode: a supported fake one, not whatever the machine has installed.
+    await fakeOpencode(bin, OPENCODE_VERSION);
+    t = await createTestApp({ env: await isolatedEnv(bin, home, { git: true }) });
     // The intranet provider is configured in the repository only, not in the user's global configuration.
     t.fake.models.splice(0);
     expect((await t.call(getEnvironmentOp, {})).body).toMatchObject({ models: { available: [] }, ready: false });
