@@ -17,10 +17,13 @@ const pemCertificatesSchema = z
   .string()
   .regex(/^\s*(-----BEGIN CERTIFICATE-----\r?\n[A-Za-z0-9+/=\r\n]+-----END CERTIFICATE-----\s*)+$/);
 
-/** `http(s)://host:port` (D165); credentials would be stored in plain text with the settings (06 §11). */
+/**
+ * `http(s)://host[:port]` and nothing else (D165): no user name or password in any spelling, as the settings are stored
+ * in plain text (06 §11). The whole value is matched because this package has no URL parser to ask.
+ */
 const proxyUrlSchema = z
   .url({ protocol: /^https?$/ })
-  .refine((url) => !/^https?:\/\/[^/]*@/i.test(url), 'A proxy URL in the settings cannot hold a user name or password');
+  .regex(/^https?:\/\/[^\s/?#@\\]+\/?$/i, 'A proxy URL in the settings is http(s)://host[:port] only');
 
 /** User settings (08 §4.3): key → value schema. Unknown keys are rejected. */
 export const settingsSchema = z.strictObject({

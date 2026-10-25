@@ -188,16 +188,19 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     }
     setState({ status: RuntimeStatus.Starting, path, version });
     let configContent: string;
+    let networkEnv: NodeJS.ProcessEnv;
     try {
       configContent = await deps.configContent();
+      networkEnv = await deps.networkEnv();
     } catch (err) {
-      // Recovery with a defined meaning: opencode cannot be hosted here, so it does not start; the log says why.
+      // Recovery with a defined meaning: opencode cannot be hosted here (or its CA bundle cannot be written), so it
+      // does not start and stays retryable; the log says why.
       log.error({ err }, 'opencode configuration failed');
       transition(runtimeMachine, RuntimeStatus.Starting, RuntimeEvent.Exited);
       setState({ status: RuntimeStatus.Crashed, path, version });
       return snapshot();
     }
-    const { launched, address } = launch(path, configContent, await deps.networkEnv());
+    const { launched, address } = launch(path, configContent, networkEnv);
     proc = launched;
     void launched.exited.then((exit) => onExit(launched, exit));
     try {

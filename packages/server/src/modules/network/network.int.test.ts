@@ -1,15 +1,16 @@
-import { mkdtemp, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   ErrorCode,
   OPENCODE_VERSION,
   RuntimeStatus,
+  restartRuntimeOp,
   ServerEventType,
   setHostingAccountOp,
   updateSettingsOp,
 } from '@aw/shared';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createFakeHosting, FAKE_USER, type FakeHosting } from '../../../test/fakes/fake-hosting.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { testCipher } from '../../../test/helpers/cipher.ts';
@@ -62,10 +63,20 @@ describe('后端信任企业 CA（D164）', () => {
     expect((await saveGitlabToken(t, local)).body).toMatchObject({ account: FAKE_USER });
   });
 
-  it('不是 PEM 证书的内容不保存', async () => {
+  it('不是 PEM 证书的内容不保存；带账号密码的代理地址不保存，不论怎么写', async () => {
     t = await createTestApp({ cipher: testCipher });
     const rejected = await t.call(updateSettingsOp, { 'network.extraCaCerts': 'not a certificate' });
     expect(rejected.raw.json().error.code).toBe(ErrorCode.ValidationFailed);
+    for (const proxy of [
+      'http://alice:secret@proxy.corp.test:8080',
+      'HTTP://alice:secret@proxy.corp.test:8080',
+      'http:alice:secret@proxy.corp.test:8080',
+      'http://proxy.corp.test:8080/@alice',
+    ]) {
+      expect((await t.call(updateSettingsOp, { 'network.proxy': proxy })).raw.json().error.code).toBe(
+        ErrorCode.ValidationFailed,
+      );
+    }
   });
 });
 
@@ -101,9 +112,11 @@ describe('后端出站请求走代理（D165）', () => {
 });
 
 describe('opencode 的证书与代理（D164、D165）', () => {
-  it('启动 opencode 时带上系统证书库、设置里的 CA 与生效的代理', async () => {
-    const bin = await mkdtemp(join(tmpdir(), 'aw-bin-'));
-    const launchEnv = join(bin, 'env.json');
+  let bin: string;
+  let launchEnv: string;
+  beforeEach(async () => {
+    bin = await mkdtemp(join(tmpdir(), 'aw-bin-'));
+    launchEnv = join(bin, 'env.json');
     // Records the environment of `serve`, then exits.
     await writeFakeExecutable(
       bin,
@@ -113,6 +126,11 @@ if (process.argv[2] === '--version') console.log(${JSON.stringify(OPENCODE_VERSI
 else { writeFileSync(${JSON.stringify(launchEnv)}, JSON.stringify(process.env)); process.exit(3); }
 `,
     );
+  });
+  const crashed = (app: TestApp) =>
+    waitForEvent(app.app.events, ServerEventType.RuntimeUpdated, (r) => r.status === RuntimeStatus.Crashed);
+
+  it('启动 opencode 时带上系统证书库、设置里的 CA 与生效的代理', async () => {
     const env = { ...(await isolatedEnv(bin, bin, { git: true })), HTTPS_PROXY: 'http://env-proxy.corp.test:3128' };
     t = await createTestApp({ env, realOpencode: true });
     await t.call(updateSettingsOp, {
@@ -120,13 +138,9 @@ else { writeFileSync(${JSON.stringify(launchEnv)}, JSON.stringify(process.env));
       'network.proxy': 'http://proxy.corp.test:8080',
       'network.noProxy': ['.corp.test'],
     });
-    const crashed = waitForEvent(
-      t.app.events,
-      ServerEventType.RuntimeUpdated,
-      (r) => r.status === RuntimeStatus.Crashed,
-    );
+    const exited = crashed(t);
     await t.app.start(t.port);
-    await crashed;
+    await exited;
 
     const launched: NodeJS.ProcessEnv = JSON.parse(await readFile(launchEnv, 'utf8'));
     expect(launched).toMatchObject({
@@ -137,5 +151,23 @@ else { writeFileSync(${JSON.stringify(launchEnv)}, JSON.stringify(process.env));
       NO_PROXY: '.corp.test,localhost,127.0.0.1,[::1]',
     });
     expect(await readFile(launched.NODE_EXTRA_CA_CERTS ?? '', 'utf8')).toContain(certificates.caPem.trim());
+  });
+
+  it('写不了 CA 文件时 opencode 不启动、停在 crashed，问题解决后可以重启', async () => {
+    t = await createTestApp({ env: await isolatedEnv(bin, bin, { git: true }), realOpencode: true });
+    await t.call(updateSettingsOp, { 'network.extraCaCerts': certificates.caPem });
+    // A directory where the bundle file goes: writing it fails.
+    const bundle = join(t.dataDir, 'network', 'extra-ca.pem');
+    await mkdir(bundle, { recursive: true });
+    const failed = crashed(t);
+    await t.app.start(t.port);
+    await failed;
+    await expect(readFile(launchEnv, 'utf8')).rejects.toThrow();
+
+    await rm(bundle, { recursive: true });
+    const exited = crashed(t);
+    expect((await t.call(restartRuntimeOp, {})).status).toBe(200);
+    await exited;
+    expect(JSON.parse(await readFile(launchEnv, 'utf8'))).toMatchObject({ NODE_EXTRA_CA_CERTS: bundle });
   });
 });
