@@ -20,6 +20,7 @@ import {
   diffStaged,
   fastForward,
   fetchRemote,
+  type GitNetwork,
   hasStagedChanges,
   isValidBranchName,
   listBranches,
@@ -41,13 +42,18 @@ import {
 import type { ProjectsService } from '../projects/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 
-export type RepositoryWriteDeps = { projects: ProjectsService; tasks: TasksService; locks: RepoLocks };
+export type RepositoryWriteDeps = {
+  projects: ProjectsService;
+  tasks: TasksService;
+  locks: RepoLocks;
+  gitNetwork: () => Promise<GitNetwork>;
+};
 
 /**
  * The user's own Git operations in the Git workbench (27 §3, D108), run by the backend on the user's click: only in
  * the project's main worktree and on branches no unfinished task owns (27 §5), each under the repository lock.
  */
-export function createRepositoryWrites({ projects, tasks, locks }: RepositoryWriteDeps) {
+export function createRepositoryWrites({ projects, tasks, locks, gitNetwork }: RepositoryWriteDeps) {
   const repoOf = (projectId: string) => projects.getRecord(projectId).repoPath;
 
   /** A task's branch stays the task's until it finishes: its merges and pushes go through delivery (27 §5). */
@@ -104,7 +110,7 @@ export function createRepositoryWrites({ projects, tasks, locks }: RepositoryWri
    * uses the user's own credentials.
    */
   async function remoteEnv(projectId: string): Promise<NodeJS.ProcessEnv> {
-    return originEnv((await projects.findHosting(projectId))?.gitAuthorization());
+    return originEnv(await gitNetwork(), (await projects.findHosting(projectId))?.gitAuthorization());
   }
 
   return {

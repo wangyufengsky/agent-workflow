@@ -134,7 +134,12 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
     let url: string;
     try {
       const { repoPath } = projects.getRecord(task.projectId);
-      await pushBranch(locks, { repoPath, branch: worktree.branch, authorization: hosting.gitAuthorization() });
+      await pushBranch(locks, {
+        repoPath,
+        branch: worktree.branch,
+        authorization: hosting.gitAuthorization(),
+        network: await deps.gitNetwork(),
+      });
       // After a revision from review comments the push updates the pull request already open (21 §5).
       const open = await hosting.findOpenPullRequest(worktree.branch);
       ({ url } =

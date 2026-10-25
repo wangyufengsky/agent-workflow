@@ -11,8 +11,11 @@ test.beforeEach(async () => {
 });
 test.afterEach(() => app.close());
 
+type Network = { proxy: { rules: string; bypassRules: string } | null; certificates: string[] };
 type Harness = {
   origin: string;
+  intranet: { origin: string; corpOrigin: string; caPem: string };
+  proxy: { url: string; connects: string[] };
   tabs: { handle(op: unknown): Promise<unknown>; place(tabId: string, rect: unknown): void };
   events: Array<{ type: string; tabId?: string; method?: string; reason?: string; url?: string }>;
   requests: string[];
@@ -23,7 +26,10 @@ declare global {
   var harness: Harness | undefined;
 }
 
-/** Opens a tab and loads `path` of the test server, waiting for the page's load event as the backend would. */
+/**
+ * Opens a tab and loads `path` of the test server (or `url`), waiting for the page's load event as the backend would;
+ * the navigation's error when the page cannot load.
+ */
 async function openTab(options: {
   tabId: string;
   partition: string;
@@ -31,8 +37,10 @@ async function openTab(options: {
   sites?: Array<{ pattern: string; access: 'read' | 'interact' }>;
   preview?: boolean;
   path?: string;
-}): Promise<void> {
-  await app.evaluate(async (_electron, o) => {
+  url?: string;
+  network?: Network;
+}): Promise<string | undefined> {
+  return app.evaluate(async (_electron, o) => {
     const h = globalThis.harness as Harness;
     await h.tabs.handle({
       kind: 'open',
@@ -46,13 +54,17 @@ async function openTab(options: {
         sites: (o.sites ?? []).map((rule) => ({ queryPaths: [], ...rule })),
       },
       integratedAuthServers: [],
+      network: o.network ?? { proxy: null, certificates: [] },
     });
     if (o.userFacing) h.tabs.place(o.tabId, { x: 0, y: 0, width: 1000, height: 700 });
     const cdp = (method: string, params?: object) => h.tabs.handle({ kind: 'cdp', tabId: o.tabId, method, params });
     await cdp('Page.enable');
     const loaded = h.next((e) => e.tabId === o.tabId && e.method === 'Page.loadEventFired');
-    await cdp('Page.navigate', { url: `${h.origin}${o.path ?? '/'}` });
-    await loaded;
+    const { errorText } = (await cdp('Page.navigate', { url: o.url ?? `${h.origin}${o.path ?? '/'}` })) as {
+      errorText?: string;
+    };
+    if (errorText === undefined) await loaded;
+    return errorText;
   }, options);
 }
 
@@ -223,4 +235,31 @@ test('HTTP 认证：用户取消时页面得到 401，AI 标签页仍然没有�
   expect(await evaluate('user', 'document.title')).toBe('401');
   await openTab({ tabId: 'ai', partition, userFacing: false, sites });
   expect(await evaluate('ai', `fetch('/wiki').then((r) => r.status)`)).toBe(401);
+});
+
+test('设置里的企业 CA：没有时内网 HTTPS 网站打不开，设置加上后同一分区的新标签页打开', async () => {
+  const { intranet } = await app.evaluate(() => globalThis.harness as Harness);
+  const sites = [{ pattern: '127.0.0.1', access: 'read' as const }];
+  const partition = 'aw-sites-ca';
+  const refused = await openTab({ tabId: 'before', partition, userFacing: false, sites, url: intranet.origin });
+  expect(refused).toBe('net::ERR_CERT_AUTHORITY_INVALID');
+
+  const network = { proxy: null, certificates: [intranet.caPem] };
+  expect(await openTab({ tabId: 'after', partition, userFacing: false, sites, url: intranet.origin, network })).toBe(
+    undefined,
+  );
+  expect(await evaluate('after', 'document.title')).toBe('intranet');
+});
+
+test('设置里的代理：只有代理能解析的内网网站经代理打开', async () => {
+  const { intranet, proxy } = await app.evaluate(() => globalThis.harness as Harness);
+  const sites = [{ pattern: '*.corp.test', access: 'read' as const }];
+  const network = { proxy: { rules: proxy.url, bypassRules: '' }, certificates: [intranet.caPem] };
+  const partition = 'aw-sites-proxy';
+  expect(await openTab({ tabId: 'corp', partition, userFacing: false, sites, url: intranet.corpOrigin, network })).toBe(
+    undefined,
+  );
+  expect(await evaluate('corp', 'document.title')).toBe('intranet');
+  const { connects } = await app.evaluate(() => (globalThis.harness as Harness).proxy);
+  expect(connects).toEqual([new URL(intranet.corpOrigin).host]);
 });

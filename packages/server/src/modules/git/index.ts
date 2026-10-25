@@ -22,7 +22,7 @@ export {
   readRepoRoot,
 } from './git.queries.ts';
 export { distance, fetchAll, type GitRef, isAncestor, listBranches, mergeBase } from './git.refs.ts';
-export { fetchRemote, isPushRejected, originEnv, pushToOrigin } from './git.remote.ts';
+export { fetchRemote, type GitNetwork, isPushRejected, originEnv, pushToOrigin } from './git.remote.ts';
 export { locateOpencodeShell, locateShell } from './git.shell.ts';
 export {
   hasMergeHead,

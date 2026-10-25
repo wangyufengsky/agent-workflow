@@ -53,6 +53,7 @@ it('无响应头的导航到整体截止时显式失败，关闭页面、请求�
     viewport: null,
     policy: { previewOrigins: [], sites: [] },
     integratedAuthServers: [],
+    network: { proxy: null, certificates: [] },
   });
   const targets = async () =>
     z
@@ -112,6 +113,7 @@ it.each(['open', 'initialize'] as const)('整体截止发生在 %s 尚未交付�
     viewport: null,
     policy: { previewOrigins: [], sites: [] },
     integratedAuthServers: [],
+    network: { proxy: null, certificates: [] },
   });
   const targets = async () =>
     z
