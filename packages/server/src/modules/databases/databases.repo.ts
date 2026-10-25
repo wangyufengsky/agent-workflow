@@ -10,7 +10,7 @@ export type DbConnection = DbConnectionDTO & { credentialId: string };
 
 /** Undefined fields are left unchanged. */
 export type DbConnectionChanges = {
-  [K in 'name' | 'type' | 'host' | 'port' | 'database' | 'username' | 'tls']?: ConnectionRow[K] | undefined;
+  [K in 'name' | 'type' | 'host' | 'port' | 'database' | 'username' | 'tlsMode']?: ConnectionRow[K] | undefined;
 } & { updatedAt: number };
 
 export function createDatabasesRepo(db: DbExecutor) {

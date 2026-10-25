@@ -1,9 +1,10 @@
-import { AppError, type EnvironmentDTO, ErrorCode, type Health, RuntimeStatus } from '@aw/shared';
+import { AppError, type EnvironmentDTO, ErrorCode, type Health, type ModelInfo, RuntimeStatus } from '@aw/shared';
 import type { AppConfig } from '../../core/config.ts';
 import { host } from '../../core/platform.ts';
 import type { CredentialsService } from '../credentials/index.ts';
 import { locateShell, readGitVersion } from '../git/index.ts';
 import type { OpencodeClient, OpencodeRuntime } from '../opencode/index.ts';
+import type { ProjectsService } from '../projects/index.ts';
 
 export type SystemServiceDeps = {
   config: AppConfig;
@@ -11,6 +12,7 @@ export type SystemServiceDeps = {
   runtime: OpencodeRuntime;
   opencode: OpencodeClient;
   credentials: CredentialsService;
+  projects: Pick<ProjectsService, 'list'>;
   /** Starts the hosted runtime if it is stopped or crashed (and hosting has begun, see app.ts). */
   startRuntime: () => Promise<void>;
 };
@@ -30,12 +32,43 @@ async function detectGit(env: NodeJS.ProcessEnv): Promise<EnvironmentDTO['git']>
   }
 }
 
-export function createSystemService({ config, env, runtime, opencode, credentials, startRuntime }: SystemServiceDeps) {
+const modelKey = (m: { providerId: string; modelId: string }) => `${m.providerId}/${m.modelId}`;
+
+export function createSystemService({
+  config,
+  env,
+  runtime,
+  opencode,
+  credentials,
+  projects,
+  startRuntime,
+}: SystemServiceDeps) {
+  /**
+   * The global configuration's models, then those only a project's own opencode configuration provides (an intranet
+   * provider committed to the repository), with the projects that have them (D162).
+   */
+  async function listModels(): Promise<EnvironmentDTO['models']> {
+    const [global, ofProjects] = await Promise.all([
+      opencode.listModels(),
+      Promise.all(projects.list().map(async (p) => ({ projectId: p.id, ...(await opencode.listModels(p.repoPath)) }))),
+    ]);
+    const models = new Map<string, ModelInfo>(global.available.map((m) => [modelKey(m), { ...m, projectIds: [] }]));
+    for (const { projectId, available } of ofProjects) {
+      for (const m of available) {
+        const known = models.get(modelKey(m));
+        if (known === undefined) models.set(modelKey(m), { ...m, projectIds: [projectId] });
+        else if (known.projectIds.length > 0) known.projectIds.push(projectId);
+      }
+    }
+    const available = [...models.values()];
+    return global.defaultModel === undefined ? { available } : { available, defaultModel: global.defaultModel };
+  }
+
   async function environment(): Promise<EnvironmentDTO> {
     const runtimeState = await runtime.snapshot();
     const git = await detectGit(env);
     // Models are only known while opencode runs; the renderer refetches on runtime.updated.
-    const models = opencode.isConnected() ? await opencode.listModels() : { available: [] };
+    const models = opencode.isConnected() ? await listModels() : { available: [] };
     return {
       platform: host.os,
       git,

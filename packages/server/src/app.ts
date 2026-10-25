@@ -51,6 +51,7 @@ import { createInitiativesModule, type InitiativesService } from './modules/init
 import { createInsightsModule } from './modules/insights/index.ts';
 import { createKnowledgeModule, type KnowledgeService } from './modules/knowledge/index.ts';
 import { createMcpModule } from './modules/mcp/index.ts';
+import { createNetworkModule, validateNetworkSettings } from './modules/network/index.ts';
 import { createNodesModule, type NodesService } from './modules/nodes/index.ts';
 import {
   createOpencodeRuntime,
@@ -151,9 +152,10 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   registerErrorHandling(server, { serveSpa: config.webDir !== undefined });
   registerSseHub(server, events);
 
-  const settings = createSettingsModule({ db: database.db, events, clock });
+  const settings = createSettingsModule({ db: database.db, events, clock, validate: validateNetworkSettings });
   const credentials = createCredentialsModule({ db: database.db, clock, cipher: deps.cipher ?? unavailableCipher });
   const env = deps.env ?? process.env;
+  const network = createNetworkModule({ settings: settings.service, events, env, dataDir: config.dataDir });
   const prompts = loadPrompts(config.promptsDir);
   // Per-launch secrets of the two MCP endpoints, separate from the renderer token and from each other (D25).
   const mcpToken = randomBytes(32).toString('hex');
@@ -179,6 +181,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       });
       return { env: launchEnv, offline };
     },
+    networkEnv: network.opencodeEnv,
     log,
     events,
     clock,
@@ -198,14 +201,6 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const startHostedRuntime = async () => {
     if (hosting) await runtime.startIfDown();
   };
-  const system = createSystemModule({
-    config,
-    env,
-    runtime,
-    opencode,
-    credentials: credentials.service,
-    startRuntime: startHostedRuntime,
-  });
   const databases = createDatabasesModule({
     db: database.db,
     clock,
@@ -229,6 +224,15 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     databases: databases.service,
     hosting: hostingEndpoints,
     hostingAccounts: hostingAccounts.service,
+  });
+  const system = createSystemModule({
+    config,
+    env,
+    runtime,
+    opencode,
+    credentials: credentials.service,
+    projects: projects.service,
+    startRuntime: startHostedRuntime,
   });
   // Built-in roles and workflows of this app version are written on every start (13).
   const roles = createRolesModule({ db: database.db, clock, log });

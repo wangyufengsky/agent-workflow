@@ -37,6 +37,8 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
     '项目没有可用的 GitHub / GitLab 令牌：在项目页绑定，或在专业模式的设置里添加全局令牌。',
   [ErrorCode.HostingAuthFailed]: '令牌无效，或没有这个仓库的权限。',
   [ErrorCode.HostingApiError]: '远端平台返回了错误，请稍后再试。',
+  [ErrorCode.HostingUnreachable]:
+    '连不上远端平台。若平台用的是企业 CA 或自签名证书，在设置的「网络」里加上 CA 证书；若要经代理访问，检查代理设置。',
   [ErrorCode.WorkflowNotFound]: '这个流程不存在。',
   [ErrorCode.WorkflowReadonly]: '内置流程不能修改，可以复制后再改。',
   [ErrorCode.WorkflowDefinitionInvalid]: '流程定义有问题，按编辑器右侧列出的问题修改后再保存。',
@@ -56,7 +58,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.AttemptNotFound]: '这次尝试不存在。',
   [ErrorCode.AttemptNoResult]: 'AI 停下来了，但没有给出结果。',
   [ErrorCode.AttemptTimeout]: 'AI 会话超过了时限。',
-  [ErrorCode.AttemptSessionError]: 'AI 会话出错了（模型服务可能暂时不可用）。',
+  [ErrorCode.AttemptSessionError]: 'AI 会话出错了，模型服务返回了错误。',
   [ErrorCode.OpencodeNotReady]: 'opencode 还没有就绪，请稍后再试。',
   [ErrorCode.OpencodeRequestFailed]: '与 opencode 通信失败。',
   [ErrorCode.PermissionRequestExpired]: '这条权限请求已失效，已从待处理列表移除。',

@@ -145,7 +145,7 @@ export const TASK_COPY = {
       case ErrorCode.AttemptTimeout:
         return 'AI 最后一次超时了。';
       case ErrorCode.AttemptSessionError:
-        return 'AI 最后一次的会话出错了。';
+        return 'AI 最后一次的会话出错了，模型服务返回：';
       default:
         return 'AI 最后一次没有完成这一步。';
     }

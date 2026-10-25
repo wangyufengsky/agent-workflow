@@ -11,7 +11,17 @@ const parsed = recorded.map(parseGlobalEvent).filter((e) => e !== undefined);
 describe('opencode 全局事件解析', () => {
   it('从实测事件流得到消息、文本、工具、权限、用量与空闲事件', () => {
     expect(new Set(parsed.map((e) => e.type))).toEqual(
-      new Set([E.Message, E.Text, E.TextDelta, E.Tool, E.StepFinished, E.PermissionAsked, E.PermissionReplied, E.Idle]),
+      new Set([
+        E.Message,
+        E.Text,
+        E.TextDelta,
+        E.Tool,
+        E.StepFinished,
+        E.PermissionAsked,
+        E.PermissionReplied,
+        E.Busy,
+        E.Idle,
+      ]),
     );
     expect(parsed.at(-1)).toEqual({ type: E.Idle, sessionId: 'ses_eac74a387ffeMgXo9hDGXzyQPQ' });
   });
@@ -68,7 +78,16 @@ describe('opencode 全局事件解析', () => {
     ).toEqual({ type: 'permission_replied', sessionId: 's1', permissionId: 'p1', reply: 'always' });
   });
 
-  it('重试状态与会话错误', () => {
+  it('发出请求、重试状态与会话错误', () => {
+    const status = (status: Record<string, unknown>) =>
+      parseGlobalEvent({
+        directory: '/tmp/aw-repo',
+        payload: { type: 'session.status', properties: { sessionID: 's1', status } },
+      });
+    expect(status({ type: 'busy' })).toEqual({ type: E.Busy, sessionId: 's1' });
+    // Idle has its own event (session.idle).
+    expect(status({ type: 'idle' })).toBeUndefined();
+
     const retry = parseGlobalEvent({
       directory: '/tmp/aw-repo',
       payload: {

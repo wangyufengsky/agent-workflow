@@ -5,24 +5,30 @@ import { Platform } from '@aw/shared';
 /** Login shells with plugin managers or slow version managers take a few seconds; past this the start goes on. */
 export const LOGIN_SHELL_TIMEOUT_MS = 10_000;
 
-/** Startup files may print banners before and after the command; the PATH is what lies between these. */
-const MARKER = '__AW_LOGIN_SHELL_PATH__';
-/** `printf` and `printenv` read the same in sh, bash, zsh and fish (where `$PATH` is a list). */
-const PRINT_PATH = `printf ${MARKER}; printenv PATH; printf ${MARKER}`;
+/** Startup files may print banners before and after the command; the environment is what lies between these. */
+const MARKER = '__AW_LOGIN_SHELL_ENV__';
+/** `env -0` ends each variable with NUL, so values with newlines stay whole; the same in sh, bash, zsh and fish. */
+const PRINT_ENV = `printf ${MARKER}; env -0; printf ${MARKER}`;
+/** Describe the shell that printed them, not the user's environment. */
+const SHELL_OWN = new Set(['PWD', 'OLDPWD', 'SHLVL', '_']);
 
 /**
- * The PATH the user's login shell sets up (`<shell> -ilc`, as a terminal opens it: `.zprofile`, `.zshrc` and the
- * like), started with `env`. Resolves as soon as the PATH has been printed: a background process the startup files
+ * The environment the user's login shell sets up (`<shell> -ilc`, as a terminal opens it: `.zprofile`, `.zshrc` and
+ * the like), started with `env`. Resolves as soon as it has been printed: a background process the startup files
  * leave behind may hold the output open.
  */
-export function readLoginShellPath(shell: string, env: NodeJS.ProcessEnv, timeoutMs: number): Promise<string> {
+export function readLoginShellEnv(
+  shell: string,
+  env: NodeJS.ProcessEnv,
+  timeoutMs: number,
+): Promise<NodeJS.ProcessEnv> {
   return new Promise((resolve, reject) => {
     // Its own session: an interactive shell started from a terminal (`pnpm dev`) would otherwise take the terminal.
-    const child = spawn(shell, ['-ilc', PRINT_PATH], { env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    const child = spawn(shell, ['-ilc', PRINT_ENV], { env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => {
-      fail(new Error(`${shell} -ilc did not print PATH within ${timeoutMs} ms`));
+      fail(new Error(`${shell} -ilc did not print its environment within ${timeoutMs} ms`));
       child.kill('SIGKILL');
     }, timeoutMs);
     function fail(error: Error) {
@@ -31,19 +37,35 @@ export function readLoginShellPath(shell: string, env: NodeJS.ProcessEnv, timeou
     }
     child.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString();
-      const [, path, end] = stdout.split(MARKER);
+      const [, printed, end] = stdout.split(MARKER);
       if (end === undefined) return;
       clearTimeout(timer);
-      resolve((path as string).trim());
+      resolve(parseEnv(printed as string));
     });
     child.stderr.on('data', (chunk: Buffer) => {
       stderr += chunk.toString();
     });
     child.on('error', fail);
     child.on('close', (code, signal) =>
-      fail(new Error(`${shell} -ilc exited (${signal ?? code}) without printing PATH: ${stderr.trim().slice(-500)}`)),
+      fail(
+        new Error(
+          `${shell} -ilc exited (${signal ?? code}) without printing its environment: ${stderr.trim().slice(-500)}`,
+        ),
+      ),
     );
   });
+}
+
+/** `env -0` output: `NAME=value` entries ended by NUL; the value may hold `=` and newlines. */
+function parseEnv(printed: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const entry of printed.split('\0')) {
+    const eq = entry.indexOf('=');
+    if (eq <= 0) continue;
+    const name = entry.slice(0, eq);
+    if (!SHELL_OWN.has(name)) env[name] = entry.slice(eq + 1);
+  }
+  return env;
 }
 
 /**
@@ -60,24 +82,25 @@ export function mergePath(current: string, login: string): string {
 }
 
 /**
- * `env` with the PATH of the user's login shell, for the backend and through it check commands, opencode and git
- * (17 §3.12, D117). Windows has no login shell: its PATH comes from the registry for every process. When the shell
- * fails the reason is logged and `env` kept: the app still starts, and commands that need the missing directories
- * fail with "command not found" as before.
+ * `env` with what the user's login shell adds (17 §3.12, D117, D161): its variables that `env` does not have (an
+ * intranet provider's API key, `NODE_EXTRA_CA_CERTS`, proxies, `JAVA_HOME` …) and its PATH, for the backend and through
+ * it check commands, opencode and git. Variables `env` already has keep their value: started from a terminal they are
+ * what the user exported there. Windows has no login shell: its environment comes from the registry for every process.
+ * When the shell fails the reason is logged and `env` kept: the app still starts, and what needs the missing variables
+ * fails as before.
  */
-export async function withLoginShellPath(
+export async function withLoginShellEnv(
   os: Platform,
   env: NodeJS.ProcessEnv,
   shell: string,
   timeoutMs = LOGIN_SHELL_TIMEOUT_MS,
 ): Promise<NodeJS.ProcessEnv> {
   if (os === Platform.Win32) return env;
-  const current = env.PATH ?? '';
   try {
-    const path = mergePath(current, await readLoginShellPath(shell, env, timeoutMs));
-    return path === current ? env : { ...env, PATH: path };
+    const login = await readLoginShellEnv(shell, env, timeoutMs);
+    return { ...login, ...env, PATH: mergePath(env.PATH ?? '', login.PATH ?? '') };
   } catch (e) {
-    console.error('could not read PATH from the login shell; the backend keeps PATH', current, e);
+    console.error('could not read the environment of the login shell; the backend keeps its own', e);
     return env;
   }
 }

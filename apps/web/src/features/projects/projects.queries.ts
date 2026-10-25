@@ -42,6 +42,8 @@ function useAddProject(add: (input: CreateProjectRequest) => Promise<ProjectDeta
       queryClient.setQueryData(queryKeys.project(project.id), project);
       // Refetch even when no list is mounted: the shell's onboarding check reads the cached list next.
       await queryClient.invalidateQueries({ queryKey: queryKeys.projects, exact: true, refetchType: 'all' });
+      // The project's own opencode configuration may add models (D162).
+      await queryClient.invalidateQueries({ queryKey: queryKeys.environment });
     },
   });
 }
@@ -66,7 +68,11 @@ export function useDeleteProject() {
     mutationFn: (id: string) => callOperation(deleteProjectOp, { id }),
     onSuccess: (_result, id) => {
       queryClient.removeQueries({ queryKey: queryKeys.project(id) });
-      return queryClient.invalidateQueries({ queryKey: queryKeys.projects, exact: true, refetchType: 'all' });
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects, exact: true, refetchType: 'all' }),
+        // Models only its own opencode configuration provided go with it (D162).
+        queryClient.invalidateQueries({ queryKey: queryKeys.environment }),
+      ]);
     },
   });
 }

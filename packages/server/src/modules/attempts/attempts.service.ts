@@ -95,7 +95,9 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       ...session,
       view: createSessionView(),
       timeoutMs,
+      timeoutAt: clock.now() + timeoutMs,
       cancelTimeout: parked ? () => undefined : clock.schedule(timeoutMs, () => reactions.timeOut(attempt.id)),
+      modelWaitLeftMs: null,
       stopAfterSubmit: false,
       parked,
       // A session re-attached after a restart waits idle for its answer.

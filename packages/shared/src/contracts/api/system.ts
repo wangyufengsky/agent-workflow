@@ -36,7 +36,18 @@ export const runtimeSchema = z.discriminatedUnion('status', [
 ]);
 export type RuntimeDTO = z.infer<typeof runtimeSchema>;
 
-export const modelInfoSchema = z.object({ providerId: z.string(), modelId: z.string(), name: z.string() });
+export const modelInfoSchema = z.object({
+  providerId: z.string(),
+  modelId: z.string(),
+  name: z.string(),
+  /**
+   * Tokens of the model's context window; null when the provider's configuration declares none (a hand-written
+   * provider without `limit.context`): opencode then never compacts the conversation (D162).
+   */
+  contextLimit: z.number().int().positive().nullable(),
+  /** Projects whose own opencode configuration provides the model; empty when the global configuration does (D162). */
+  projectIds: z.array(z.string()),
+});
 export type ModelInfo = z.infer<typeof modelInfoSchema>;
 
 /** `GET /system/environment` (11 §2): what onboarding checks. */

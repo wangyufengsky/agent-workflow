@@ -118,8 +118,9 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `session.idle` 且有未回答的阻塞问题（或待处理的权限请求） | 尝试保持 `running` 但停止计时，节点 `waiting_input`；全部回答后 `prompt_async` 发送答案（`start-answer.md`，多个答案合成一条），节点回到 `running`，重新计时（D46） |
 | `session.idle` 且有已回答但未送达的答案 | 发送答案（会话忙时回答的问题，在下一次空闲时送达） |
 | `session.idle` 且未提交、无问题 | 发送提醒（`nudge.md`，按尝试类型填入对应的提交工具名），`nudges+1`；已提醒 `ATTEMPT_MAX_NUDGES` 次仍空闲 → `failed / ATTEMPT_NO_RESULT` |
-| `session.error` | `failed / ATTEMPT_SESSION_ERROR`（`details.error` 为 opencode 的错误对象） |
-| 超时 | 从 `running` 起 `attempt.timeoutMinutes`：中止会话，`failed / ATTEMPT_TIMEOUT` |
+| `session.status` 为 `retry`（模型服务连不上、5xx、限流，opencode 自己一直重试） | 尝试继续等待，超时暂停并记下剩余时间；会话再次发出请求（`busy`）或有进展时按剩余时间继续计时（D163）。会话流记「模型请求失败，opencode 稍后重试」与原因，同一原因连续重试只记一次 |
+| `session.error` | `failed / ATTEMPT_SESSION_ERROR`（`message` 为「错误类名: 模型服务的原话」，`details.error` 为 opencode 的错误对象，D163） |
+| 超时 | 从 `running` 起 `attempt.timeoutMinutes`（等待用户与等待模型服务的时间不算）：中止会话，`failed / ATTEMPT_TIMEOUT` |
 | 用户中止 | `aborted`，中止会话 |
 | opencode 进程退出 / 重启、后端重启 | 活动尝试 → `interrupted` |
 
@@ -417,8 +418,9 @@ export const submitPlanTool = defineMcpTool({
 | 权限 | `permission.asked` → `permission.reply({ requestID, directory, reply })` 后会话继续；消费 `permission.replied` 的 `sessionID/requestID/reply`，同步关闭自动获批或被拒的请求（包括助手），最后一个阻塞条目关闭后恢复计时 |
 | 规则合并（v1.1） | 发给模型的工具列表按 `merge(agent.permission, session.permission)` 计算被整体 deny 的工具（二进制中 `de.disabled(Object.keys(tools), de.merge(e.agent.permission, e.permission ?? []))`），所以会话级 allow 能重新打开 agent deny 的工具（知识研究员的网络开关，D69） |
 | 流式正文（M2） | `message.part.updated` 在文本/思考片段开始（`text` 为空）与结束（带 `time.end`）时各一次，其间是 `message.part.delta`（`field: 'text'`）；工具片段依次 `pending` → `running`（可多次，`metadata.output` 增长）→ `completed` / `error`；`step-finish` 片段带 tokens 与 cost；`server.connected`、`server.heartbeat` 不带 `directory`。样本见 `packages/server/test/fixtures/opencode-1.19.0-events.json` |
-| 重试（M2） | 模型请求失败时 `session.status` 为 `{ type: 'retry', message, next }`，会话一直等待到 `next`（如免费额度用尽），不发 `session.error` |
-| 内部事件（M2） | `modules/opencode/opencode.events.ts` 只解析用到的事件（消息角色、文本与增量、工具、用量、重试、空闲、错误、权限），加上运行时消失的 `runtime_lost`；其他模块只经 `OpencodeClient.subscribe` 获取 |
+| 重试（M2） | 模型请求失败时 `session.status` 为 `{ type: 'retry', attempt, message, next }`，会话一直等待到 `next`（如免费额度用尽），不发 `session.error`。2026-10-25 实测（D163，本地 OpenAI 兼容服务）：连接被拒（`Cannot connect to API: …`）、503、500 都是重试，间隔约 2 s、5 s、8 s、18 s 递增（观察的 20 s 内没有停止重试）；每次请求前 `session.status` 为 `busy`。不重试、直接 `session.error` 的：400 上下文超限为 `ContextOverflowError`（`data.message` 为服务返回的原话，opencode 随后自动尝试压缩一次，再报一次同样的错误后空闲），401 为 `APIError`（`statusCode: 401`、`isRetryable: false`） |
+| 模型列表（D162） | `config.providers` 不带 `directory` 时只有全局配置的 provider，项目 `opencode.json` 里的只在带该目录时出现；`opencode` 免费 provider 不登录也在列表里；自定义模型没写 `limit` 时 `limit.context` 与 `limit.output` 为 0 |
+| 内部事件（M2） | `modules/opencode/opencode.events.ts` 只解析用到的事件（消息角色、文本与增量、工具、用量、发出请求（`busy`，D163）、重试、空闲、错误、权限），加上运行时消失的 `runtime_lost`；其他模块只经 `OpencodeClient.subscribe` 获取 |
 | 数据目录 | opencode 会话存于用户自己的 opencode 数据目录（与用户 TUI 共享，登录凭据也在那里），本应用不隔离；会话标题带任务编号便于辨认 |
 | 免费模型 | 调用模型的测试（`@opencode` bridge 测试与 `pnpm test:live`）用免费模型，不产生费用，默认值只在 `packages/server/test/helpers/model.ts` 的 `TEST_MODEL` 定义：`opencode-go/deepseek-v4.1-flash`（opencode go 订阅内免费，比 `beam-free` 强），`AW_OC_TEST_MODEL` 可覆盖（D62）。历史：M0 用 `opencode/glm-5.3-flash-free`，2026-10-19 额度用尽后改为 `opencode/beam-free`（D42）；2026-10-20 起 `opencode/*-free` 对开发机网络返回 FreeTierError 403，改用 `opencode-go/beam-free`（D50）；2026-10-21 改为 `opencode-go/deepseek-v4.1-flash`（D62），M6 验收中两者的 live 结果见 16 |
 

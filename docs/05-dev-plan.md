@@ -460,11 +460,18 @@
 
 ## 后续 · 内网部署适配（IN）
 
-> 状态：**用户要求**（D168，2026-10-25，内网机器通常不能访问公网），**IN-08 已实现**，待用户检查。IN-01…IN-03（D161–D163）在 PR #112，合并时本节合在一起。
+> 状态：**用户要求**（2026-10-25，企业内网部署：内网已部署模型服务与带内网 provider 的 opencode、自建 GitLab，机器通常不能访问公网），下表各项已实现，待用户检查；决策编号见各行。
 
 | 任务 | 内容 | 完成标准 |
 | --- | --- | --- |
+| IN-01 | 后端继承登录 shell 的整个环境（`env -0`），当前已有的变量不覆盖，PATH 照旧合并（D161）。同一提交登记 02、17 §3.12 | 集成（假登录 shell）：从 Finder 启动时补上 shell 导出的变量、不带 shell 自身的变量；从终端启动时以当前的为准；值含换行与 `=` 原样带上；失败沿用原环境 |
+| IN-02 | 环境检测按每个项目的仓库目录列模型并合并（`projectIds`），模型带 `contextLimit`；引导页与运行环境页提示未声明上下文长度的模型（D162）。同一提交登记 02、11 §2、12 §8 | 集成（FakeOpencode）：只在项目配置里的模型也算就绪并注明项目；全局也有的不重复；`@opencode`：真实 opencode 只在带目录时列出项目 provider，没写 limit 的为 null |
+| IN-03 | 会话进入 opencode 重试时尝试超时暂停、恢复后按剩余时间继续（内部事件 `busy`）；会话流重试通知带原因、同一原因只记一次；`ATTEMPT_SESSION_ERROR` 的 `message` 为错误类名加模型服务原话，会话流与失败面板显示（D163）。同一提交登记 02、08、12 §4.2 / §8 | 集成（FakeOpencode `retry` 步骤与假时钟）：重试 60 分钟仍在运行，恢复后按剩余时间超时；会话报错的 message 带原话；单元：重试通知带原因 |
+| IN-04 | 后端信任企业 CA：默认 CA 设为内置根证书 + `NODE_EXTRA_CA_CERTS` + 系统证书库 + 设置 `network.extraCaCerts`（`tls.setDefaultCACertificates`，新模块 `network`，改设置立即生效；设置在保存前逐张解析）；opencode 启动时带 `NODE_USE_SYSTEM_CA=1`，有设置时 `NODE_EXTRA_CA_CERTS` 指向 `<数据目录>/network/extra-ca.pem`；托管平台请求没有得到回答时报新错误码 `HOSTING_UNREACHABLE`（带 Node 的错误码）；专业模式设置页「网络」（D164）。同一提交登记 02、03、08、14、17 §3.13 | 集成（FakeHosting HTTPS + 测试 CA）：加 CA 前 `HOSTING_UNREACHABLE`（`UNABLE_TO_VERIFY_LEAF_SIGNATURE`），加上后保存令牌成功；非 PEM 内容 `VALIDATION_FAILED`；假 opencode 记录的启动环境带 `NODE_USE_SYSTEM_CA` 与含 CA 的文件；`@opencode`：真实 opencode 经设置里的 CA 连上 HTTPS 的模型服务 |
+| IN-05 | 后端出站请求走代理：默认读 `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`（含小写），设置 `network.proxy` / `network.noProxy` 整体覆盖；Node 内置代理（`http.setGlobalProxyFromEnv`）改设置立即生效；本机地址总是直连；opencode 启动时带上大小写两套变量（D165）。同一提交登记 02、08、14、17 §3.13 | 集成（记录 CONNECT 的测试代理 + 只有代理能解析的主机名）：默认走环境变量的代理，设置的代理覆盖它，`noProxy` 里的主机直连；假 opencode 的启动环境带设置的代理与 `NO_PROXY` |
+| IN-06 | 数据库 TLS 三档 `DbTlsMode`（`off` / `verify` / `no_verify`）：表 `db_connections.tls` 换成 `tls_mode`（迁移 `0030_db_tls_mode`，原来勾选的为 `verify`），API 与操作的 `tls` 换成 `tlsMode`，四个驱动按档设置；数据库对话框改为下拉并说明「不校验证书」的风险（D166）。同一提交登记 02、08、10、11 §9、14、24 §2 | 集成（Docker MySQL，服务器证书由测试 CA 签发，账号 `REQUIRE SSL`）：不加密登录失败、`no_verify` 成功、`verify` 在设置加上 CA 前失败、加上后成功、清空后又失败；PostgreSQL（snakeoil）与 SQL Server（自生成证书）用 `no_verify` 跑全套、`verify` 失败；迁移：原 `tls = 1` 为 `verify` |
 | IN-08 | 离线环境开关（D168）：设置 `network.offline`（简单模式「网络」分组）；打开后 opencode 启动时带 `OPENCODE_DISABLE_MODELS_FETCH` / `_SHARE` / `_LSP_DOWNLOAD` / `_AUTOUPDATE`，配置隐藏 `opencode`、`opencode-go` provider 并禁止 `websearch`；知识问答网络检索离线时只读网页；`RuntimeDTO` 的 `ready` 带 `offline`，与设置不同时设置页提示重启并给「立即重启」。同一提交登记 02、08 §4.3、11 §2、12 §2 / §8、18 §5.1 | 单元：离线配置快照、研究员离线时只放行 `webfetch`；集成（假 opencode 记下启动环境）：打开后下一次启动带上开关与配置；`@opencode`：本地服务代替公网，在线（对照）时收到 models.dev 刷新与会话分享，离线时都没有、列表里没有自带 provider 而用户配置的 provider 还在 |
+| IN-09 | SSH origin 的 GitLab 平台地址按主机名匹配已保存的全局令牌地址，唯一时用它，没有或多个时为 `https://<host>`（D169）。同一提交登记 02、11 §3 | 集成（FakeHosting）：origin `git@<主机>:acme/shop.git`、全局令牌保存在 `http://<主机>:<端口>/gitlab`，`effectiveHosting` 为该地址且创建 MR 用上它的令牌；单元：唯一、没有、多个与 HTTP(S) origin 不受影响 |
 
 ## 后续 · 存储空间与磁盘清理（ST）
 

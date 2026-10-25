@@ -4,11 +4,13 @@ import { Panel } from '../../components/panel.tsx';
 import { DELIVERY_COPY } from '../../copy/delivery.ts';
 import { SETTINGS_COPY as C } from '../../copy/settings.ts';
 import { environmentQuery } from '../onboarding/environment.queries.ts';
+import { usableModels } from '../onboarding/usable-models.ts';
 import { NumberSetting, Segmented, TextSetting } from './setting-inputs.tsx';
 
 /** Pro-mode settings (08 §4.3 `SETTING_MODE` = pro, M5-08). Inputs are keyed by the saved value to reset with it. */
 export function ProSettings({ settings, set }: { settings: Settings; set: (patch: Partial<Settings>) => void }) {
-  const models = useQuery(environmentQuery).data?.models.available ?? [];
+  // The default model applies to every project: only the global configuration's (D162).
+  const models = usableModels(useQuery(environmentQuery).data?.models.available ?? [], null);
   const ids = models.map((m) => `${m.providerId}/${m.modelId}`);
   const model = settings['ai.defaultModel'];
   return (

@@ -196,7 +196,7 @@ export function PptNewPage() {
         {create.isError && <ErrorState error={create.error} />}
         <div className="row">
           <span className="hint">{C.model}</span>
-          <ModelPicker value={model} onChange={setModel} />
+          <ModelPicker value={model} projectId={projectId} onChange={setModel} />
           <span className="grow" />
           {problem !== undefined && <span className="hint">{problem}</span>}
           <Button
