@@ -172,7 +172,7 @@ agent-workflow/
 │  │        ├─ browser/            AI 的浏览器（v1.3，29 §5）：宿主、标签页、动作层、快照
 │  │        ├─ team/               团队（v1.3，33）：提交缓存与读取、按成员统计、AI 成员分析的排队与 team_analysis 尝试
 │  │        ├─ databases/          drivers/{mysql,postgres,sqlserver}
-│  │        └─ network/            信任的 CA 与代理（D164、D165）：后端的默认 CA 与全局代理，opencode 启动时的变量
+│  │        └─ network/            信任的 CA 与代理（D164、D165、D174–D176）：后端的默认 CA、转发代理与全局代理，opencode 启动时的变量，git 的配置，浏览器的设置
 │  ├─ builtin/                 内置流程与角色（数据 + prompts/*.md）
 │  └─ opencode-plugin/         agent-workflow-bridge（注入 sessionID 到本项目 MCP 工具参数）；`pnpm build:plugin` 去掉类型生成 dist/agent-workflow-bridge.js
 ├─ e2e/                        Playwright：浏览器旅程、全主题走查（walkthrough）、Electron 旅程 J10、性能实测（*.perf.spec.ts）

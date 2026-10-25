@@ -5,7 +5,7 @@ import { AppError, ErrorCode } from '@aw/shared';
 const PEM_BLOCK = /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g;
 
 /** The certificates of a PEM bundle, one PEM string each. */
-const certificatesOf = (pem: string | null): string[] => pem?.match(PEM_BLOCK) ?? [];
+export const certificatesOf = (pem: string | null): string[] => pem?.match(PEM_BLOCK) ?? [];
 
 /** VALIDATION_FAILED unless every certificate of the setting `network.extraCaCerts` parses (D164). */
 export function assertCertificates(pem: string): void {
@@ -28,12 +28,25 @@ export function assertCertificates(pem: string): void {
  * from those, so clearing the setting takes its certificates away.
  */
 export function trustCertificates(extra: string | null): void {
-  setDefaultCACertificates([
-    ...getCACertificates('bundled'),
-    ...getCACertificates('extra'),
-    ...getCACertificates('system'),
-    ...certificatesOf(extra),
-  ]);
+  setDefaultCACertificates(trusted(extra));
+}
+
+const trusted = (extra: string | null) => [
+  ...getCACertificates('bundled'),
+  ...getCACertificates('extra'),
+  ...getCACertificates('system'),
+  ...certificatesOf(extra),
+];
+
+const bundle = (certificates: string[]) => `${certificates.map((c) => c.trim()).join('\n')}\n`;
+
+/**
+ * The bundle git's `http.sslCAInfo` points to when the setting has certificates (D175): all the backend trusts. Git's
+ * OpenSSL (Linux) takes the file instead of its own bundle, so the system store and the built-in roots are in it too;
+ * Apple's libcurl adds it to the keychain. Null without the setting: git keeps the user's configuration.
+ */
+export function gitCertificatesPem(extra: string | null): string | null {
+  return certificatesOf(extra).length === 0 ? null : bundle(trusted(extra));
 }
 
 /**
@@ -44,5 +57,5 @@ export function trustCertificates(extra: string | null): void {
 export function opencodeCertificatesPem(extra: string | null): string | null {
   const own = certificatesOf(extra);
   if (own.length === 0) return null;
-  return `${[...getCACertificates('extra'), ...own].map((c) => c.trim()).join('\n')}\n`;
+  return bundle([...getCACertificates('extra'), ...own]);
 }

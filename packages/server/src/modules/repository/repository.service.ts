@@ -25,10 +25,12 @@ import {
   diffUnstaged,
   distance,
   fetchAll,
+  type GitNetwork,
   type LogFilter,
   limitDiff,
   listBranches,
   listWorktrees,
+  originEnv,
   type RepoLocks,
   readCommit,
   readFetchedAt,
@@ -51,6 +53,8 @@ export type RepositoryServiceDeps = {
   worktrees: WorktreesService;
   locks: RepoLocks;
   log: Logger;
+  /** The app's CA and proxy for reaching remotes (D175). */
+  gitNetwork: () => Promise<GitNetwork>;
 };
 
 const taskRef = (task: Task) => ({ id: task.id, key: task.key, status: task.status });
@@ -80,7 +84,7 @@ async function commitOnRef(
 }
 
 /** The Git console (11 §8): what the project repository holds, read with machine formats (06 §2.3). */
-export function createRepositoryService({ projects, tasks, worktrees, locks, log }: RepositoryServiceDeps) {
+export function createRepositoryService({ projects, tasks, worktrees, locks, log, gitNetwork }: RepositoryServiceDeps) {
   const repoOf = (projectId: string) => projects.getRecord(projectId).repoPath;
 
   /** Refs and paths come from the user: one that names nothing is a 404, not a failed git command. */
@@ -218,7 +222,8 @@ export function createRepositoryService({ projects, tasks, worktrees, locks, log
 
     async fetch(projectId: string): Promise<void> {
       const repo = repoOf(projectId);
-      await locks.run(repo, () => fetchAll(repo));
+      const env = originEnv(await gitNetwork());
+      await locks.run(repo, () => fetchAll(repo, env));
     },
 
     worktrees: worktreeList,

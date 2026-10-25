@@ -1,7 +1,7 @@
 import { AppError, ErrorCode } from '@aw/shared';
-import { branchExists, isAncestor, originEnv, type RepoLocks, runGit } from '../git/index.ts';
+import { branchExists, type GitNetwork, isAncestor, originEnv, type RepoLocks, runGit } from '../git/index.ts';
 
-export type OriginBranchInput = { repoPath: string; branch: string; authorization: string };
+export type OriginBranchInput = { repoPath: string; branch: string; authorization: string; network: GitNetwork };
 
 /** Pushes the task branch to `origin` for a pull request (09 §7), under the repository lock; never forced. */
 export async function pushBranch(locks: RepoLocks, input: OriginBranchInput): Promise<void> {
@@ -9,7 +9,7 @@ export async function pushBranch(locks: RepoLocks, input: OriginBranchInput): Pr
   await locks.run(input.repoPath, () =>
     runGit(['push', '--quiet', 'origin', `${ref}:${ref}`], {
       cwd: input.repoPath,
-      env: originEnv(input.authorization),
+      env: originEnv(input.network, input.authorization),
     }),
   );
 }
@@ -23,7 +23,7 @@ export async function syncBranchFromOrigin(locks: RepoLocks, input: OriginBranch
   const ref = `refs/heads/${input.branch}`;
   const cwd = input.repoPath;
   await locks.run(cwd, async () => {
-    await runGit(['fetch', '--quiet', 'origin', ref], { cwd, env: originEnv(input.authorization) });
+    await runGit(['fetch', '--quiet', 'origin', ref], { cwd, env: originEnv(input.network, input.authorization) });
     const remote = (await runGit(['rev-parse', '--verify', 'FETCH_HEAD^{commit}'], { cwd })).stdout.trim();
     if (!(await branchExists(cwd, input.branch))) {
       await runGit(['update-ref', ref, remote], { cwd });

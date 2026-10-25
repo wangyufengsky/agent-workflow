@@ -11,6 +11,7 @@ import {
   urlAccess,
 } from '@aw/shared';
 import { app, type BrowserWindow, type Session, type UtilityProcess, WebContentsView } from 'electron';
+import { createPartitionNetwork } from './browser-network.ts';
 import type { BrowserPrompts } from './browser-prompts.ts';
 
 type Tab = { tabId: string; view: WebContentsView; policy: BrowserPolicy; userFacing: boolean; onWindow: boolean };
@@ -36,6 +37,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
   const tabs = new Map<string, Tab>();
   const byContents = new Map<number, Tab>();
   const configured = new Set<Session>();
+  const network = createPartitionNetwork();
 
   function tabOf(tabId: string): Tab {
     const tab = tabs.get(tabId);
@@ -104,6 +106,14 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
       .then((fingerprint) => callback(certificates.find((c) => c.fingerprint === fingerprint)));
   });
 
+  // The app's own windows load the app itself, whose certificate errors stand (Electron refuses them).
+  app.on('certificate-error', (event, contents, url, error, certificate, callback) => {
+    if (!byContents.has(contents.id)) return;
+    if (!network.vouches(contents.session, error, certificate, new URL(url).hostname)) return;
+    event.preventDefault();
+    callback(true);
+  });
+
   function forget(tab: Tab): void {
     tabs.delete(tab.tabId);
     byContents.delete(tab.view.webContents.id);
@@ -127,6 +137,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
     const tab: Tab = { tabId: op.tabId, view, policy: op.policy, userFacing: op.userFacing, onWindow: false };
     configure(contents.session);
     contents.session.allowNTLMCredentialsForDomains(op.integratedAuthServers.join(','));
+    await network.apply(contents.session, op.network);
     tabs.set(op.tabId, tab);
     byContents.set(contents.id, tab);
 
