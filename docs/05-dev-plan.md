@@ -460,7 +460,7 @@
 
 ## 后续 · 内网部署适配（IN）
 
-> 状态：**用户要求**（D161–D166、D170–D173，2026-10-25，内网已部署模型服务与带内网 provider 的 opencode），**IN-01…IN-06、IN-10…IN-13 已实现**（IN-10…IN-13 为内置浏览器，PR #116），待用户检查。
+> 状态：**用户要求**（2026-10-25，企业内网部署：内网已部署模型服务与带内网 provider 的 opencode、自建 GitLab，机器通常不能访问公网），下表各项已实现，待用户检查；决策编号见各行。
 
 | 任务 | 内容 | 完成标准 |
 | --- | --- | --- |
@@ -470,6 +470,7 @@
 | IN-04 | 后端信任企业 CA：默认 CA 设为内置根证书 + `NODE_EXTRA_CA_CERTS` + 系统证书库 + 设置 `network.extraCaCerts`（`tls.setDefaultCACertificates`，新模块 `network`，改设置立即生效；设置在保存前逐张解析）；opencode 启动时带 `NODE_USE_SYSTEM_CA=1`，有设置时 `NODE_EXTRA_CA_CERTS` 指向 `<数据目录>/network/extra-ca.pem`；托管平台请求没有得到回答时报新错误码 `HOSTING_UNREACHABLE`（带 Node 的错误码）；专业模式设置页「网络」（D164）。同一提交登记 02、03、08、14、17 §3.13 | 集成（FakeHosting HTTPS + 测试 CA）：加 CA 前 `HOSTING_UNREACHABLE`（`UNABLE_TO_VERIFY_LEAF_SIGNATURE`），加上后保存令牌成功；非 PEM 内容 `VALIDATION_FAILED`；假 opencode 记录的启动环境带 `NODE_USE_SYSTEM_CA` 与含 CA 的文件；`@opencode`：真实 opencode 经设置里的 CA 连上 HTTPS 的模型服务 |
 | IN-05 | 后端出站请求走代理：默认读 `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`（含小写），设置 `network.proxy` / `network.noProxy` 整体覆盖；Node 内置代理（`http.setGlobalProxyFromEnv`）改设置立即生效；本机地址总是直连；opencode 启动时带上大小写两套变量（D165）。同一提交登记 02、08、14、17 §3.13 | 集成（记录 CONNECT 的测试代理 + 只有代理能解析的主机名）：默认走环境变量的代理，设置的代理覆盖它，`noProxy` 里的主机直连；假 opencode 的启动环境带设置的代理与 `NO_PROXY` |
 | IN-06 | 数据库 TLS 三档 `DbTlsMode`（`off` / `verify` / `no_verify`）：表 `db_connections.tls` 换成 `tls_mode`（迁移 `0030_db_tls_mode`，原来勾选的为 `verify`），API 与操作的 `tls` 换成 `tlsMode`，四个驱动按档设置；数据库对话框改为下拉并说明「不校验证书」的风险（D166）。同一提交登记 02、08、10、11 §9、14、24 §2 | 集成（Docker MySQL，服务器证书由测试 CA 签发，账号 `REQUIRE SSL`）：不加密登录失败、`no_verify` 成功、`verify` 在设置加上 CA 前失败、加上后成功、清空后又失败；PostgreSQL（snakeoil）与 SQL Server（自生成证书）用 `no_verify` 跑全套、`verify` 失败；迁移：原 `tls = 1` 为 `verify` |
+| IN-09 | SSH origin 的 GitLab 平台地址按主机名匹配已保存的全局令牌地址，唯一时用它，没有或多个时为 `https://<host>`（D169）。同一提交登记 02、11 §3 | 集成（FakeHosting）：origin `git@<主机>:acme/shop.git`、全局令牌保存在 `http://<主机>:<端口>/gitlab`，`effectiveHosting` 为该地址且创建 MR 用上它的令牌；单元：唯一、没有、多个与 HTTP(S) origin 不受影响 |
 | IN-10 | 网站的 HTTP 认证（D170）：main 处理用户标签页的 `login` 事件，经 IPC `aw:browser-prompt` 请界面弹出用户名和密码框（`features/preview/website-prompt.tsx`），回答经 main 直接交给 Chromium，不经后端；AI 的标签页不询问；后端在主文档 401 / 407 时返回 `BROWSER_LOGIN_REQUIRED`（`loginAt`）。同一提交登记 02、11、14、29 §5.4 / §8.6 | Electron（`browser-host.electron.spec.ts`）：AI 标签页 401 且没有询问；用户在自己的标签页里登录后同一分区的 AI 标签页 200；取消仍是 401。Electron 全栈（`site-login.electron.spec.ts`）：设置页对话框里登录后 `browser.readUrl` 读到页面。集成（Chromium 宿主）：401 的网站 `browser_open` 与 `browser.readUrl` 都是 `BROWSER_LOGIN_REQUIRED` |
 | IN-11 | Windows 集成登录（D171）：专业模式设置 `browser.integratedAuthServers`（不能只写 `*`，助手不能改），`open` 请求带 `integratedAuthServers`，main 对网站分区 `allowNTLMCredentialsForDomains`；设置页「网站」一节的输入框。不做委派（用户已确认）。同一提交登记 02、08、14、29 | 单元与类型检查；没有域环境，Kerberos / NTLM 没有自动化或手工验证（PR 中写明） |
 | IN-12 | 客户端证书（D172）：main 在应用的 `select-client-certificate` 事件里处理本应用的标签页：用户的标签页弹出证书列表，AI 的标签页不回答（停止加载，免得 Chromium 记住「不用证书」）并发 `browser.certificateRefused`，后端据此返回 `BROWSER_LOGIN_REQUIRED`。同一提交登记 02、11、29 | 类型检查；没有系统证书，未验证（PR 中写明） |
