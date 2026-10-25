@@ -4,10 +4,13 @@ import {
   type AttachmentDTO,
   createConversationOp,
   createInitiativeOp,
+  deliverInitiativePhaseOp,
+  type InitiativeDetailDTO,
   InitiativeStatus,
   listConfirmationsOp,
   ServerEventType,
   sendAssistantMessageOp,
+  TaskStatus,
 } from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { waitForEvent } from '../packages/server/test/helpers/events.ts';
@@ -107,5 +110,87 @@ describe('@live 需求计划的 AI 拆解', () => {
       expect(items[0]?.input).toMatchObject({ projectId, attachmentIds: [doc.id] });
     },
     TASK_TIMEOUT_MS,
+  );
+  it(
+    '两阶段三个工作包跑通（开发后审查）：开发合入后审查阶段自动开启，代码审查与安全审查都完成，需求计划全部完成',
+    async () => {
+      const projectId = await live.addProject('ts-stats');
+      const started = Date.now();
+      const ENDED: readonly string[] = [TaskStatus.Review, TaskStatus.Failed, TaskStatus.Cancelled];
+      let id = '';
+      const detail = () => live.t.app.services.initiatives.detail(id);
+      /** Waits until `done` holds for the initiative, re-checking whenever it or a task changes (07 §4: no sleeping). */
+      const until = (done: (d: InitiativeDetailDTO) => boolean) =>
+        new Promise<InitiativeDetailDTO>((resolve, reject) => {
+          const timer = setTimeout(() => {
+            off();
+            reject(
+              new Error(
+                `Timed out; initiative is ${JSON.stringify(detail().items.map((i) => [i.key, i.status, i.task?.status]))}`,
+              ),
+            );
+          }, TASK_TIMEOUT_MS);
+          const check = () => {
+            const current = detail();
+            if (!done(current)) return;
+            clearTimeout(timer);
+            off();
+            resolve(current);
+          };
+          const off = live.t.app.events.subscribe((e) => {
+            if (e.type === ServerEventType.InitiativeUpdated || e.type === ServerEventType.TaskUpdated) check();
+          });
+          check();
+        });
+      const ended = (d: InitiativeDetailDTO, keys: readonly string[]) =>
+        keys.every((key) => ENDED.includes(d.items.find((i) => i.key === key)?.task?.status ?? ''));
+      const tasksOf = (d: InitiativeDetailDTO) =>
+        d.items.map((i) => [i.key, i.status, i.task?.key ?? null, i.task?.status ?? null]);
+
+      const created = await live.t.call(createInitiativeOp, {
+        projectId,
+        templateKey: 'build_then_review',
+        requirement:
+          '在 src/stats.ts 增加 mode(values) 函数：返回出现次数最多的值，次数相同时返回其中最小的值，空数组时抛出错误；并在 test 目录补上它的测试。',
+      });
+      expect(created.status).toBe(201);
+      id = created.body.id;
+
+      const built = await until((d) => ended(d, ['build']));
+      expect(tasksOf(built)).toContainEqual(['build', 'in_task', expect.any(String), TaskStatus.Review]);
+      const first = await live.t.call(deliverInitiativePhaseOp, { id, phase: 1, strategy: 'squash' });
+      expect(first.status, JSON.stringify(first.body)).toBe(200);
+      // Satisfied by the merge, the review phase opens by itself (autoOpen) and both reviews start.
+      const reviewed = await until((d) => ended(d, ['review', 'security']));
+      expect(reviewed.openedPhase).toBe(2);
+      expect(
+        tasksOf(reviewed)
+          .filter(([key]) => key !== 'build')
+          .map(([, , , status]) => status),
+      ).toEqual([TaskStatus.Review, TaskStatus.Review]);
+      const second = await live.t.call(deliverInitiativePhaseOp, { id, phase: 2 });
+      expect(second.status, JSON.stringify(second.body)).toBe(200);
+      const done = await until((d) => d.status === InitiativeStatus.Done);
+
+      await mkdir(new URL('reports', import.meta.url), { recursive: true });
+      await writeFile(
+        new URL(`reports/initiative-run-${new Date().toISOString().replaceAll(':', '-')}.json`, import.meta.url),
+        JSON.stringify(
+          {
+            minutes: Math.round((Date.now() - started) / 6000) / 10,
+            items: tasksOf(done),
+            deliveries: [first.body, second.body],
+          },
+          null,
+          2,
+        ),
+      );
+      expect(done.items.map((i) => [i.key, i.status])).toEqual([
+        ['build', 'satisfied'],
+        ['review', 'satisfied'],
+        ['security', 'satisfied'],
+      ]);
+    },
+    3 * TASK_TIMEOUT_MS,
   );
 });
