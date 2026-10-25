@@ -6,7 +6,6 @@ import {
   ErrorCode,
   OPENCODE_LOG_FILE_PATTERN,
   OPENCODE_START_TIMEOUT_MS,
-  OPENCODE_VERSION,
   opencodeLogFile,
   type RuntimeDTO,
   RuntimeEvent,
@@ -83,8 +82,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
   }
 
   async function detect(): Promise<RuntimeDTO> {
-    const detected = await detectOpencode(deps.env, deps.binaryPath());
-    return { ...detected, requiredVersion: OPENCODE_VERSION };
+    return detectOpencode(deps.env, deps.binaryPath());
   }
 
   async function snapshot(): Promise<RuntimeDTO> {
@@ -161,7 +159,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     if (current === undefined) throw new Error('runtime exited before it was detected');
     const wasReady = current.status === RuntimeStatus.Ready;
     transition(runtimeMachine, current.status, RuntimeEvent.Exited);
-    setState({ status: RuntimeStatus.Crashed, ...located(current), requiredVersion: OPENCODE_VERSION });
+    setState({ status: RuntimeStatus.Crashed, ...located(current) });
     if (wasReady) for (const listener of lostListeners) listener();
     if (!autoRestartArmed) {
       log.error({ code, signal }, 'opencode exited; waiting for a manual restart');
@@ -182,7 +180,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       for (const listener of lostListeners) listener();
       await stopProcess();
     }
-    setState({ status: RuntimeStatus.Starting, path, version, requiredVersion: OPENCODE_VERSION });
+    setState({ status: RuntimeStatus.Starting, path, version });
     let configContent: string;
     try {
       configContent = await deps.configContent();
@@ -190,7 +188,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       // Recovery with a defined meaning: opencode cannot be hosted here, so it does not start; the log says why.
       log.error({ err }, 'opencode configuration failed');
       transition(runtimeMachine, RuntimeStatus.Starting, RuntimeEvent.Exited);
-      setState({ status: RuntimeStatus.Crashed, path, version, requiredVersion: OPENCODE_VERSION });
+      setState({ status: RuntimeStatus.Crashed, path, version });
       return snapshot();
     }
     const { launched, address } = launch(path, configContent);
@@ -209,7 +207,6 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
         version,
         url,
         startedAt: clock.now(),
-        requiredVersion: OPENCODE_VERSION,
       });
       log.info({ url, pid: launched.child.pid }, 'opencode ready');
     } catch (err) {

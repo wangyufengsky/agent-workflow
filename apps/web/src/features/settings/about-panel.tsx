@@ -1,4 +1,4 @@
-import { APP_LICENSE, APP_SOURCE_URL, OPENCODE_VERSION } from '@aw/shared';
+import { APP_LICENSE, APP_SOURCE_URL, OPENCODE_SUPPORTED_RANGE, OPENCODE_VERSION } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { ErrorState } from '../../components/error-state.tsx';
 import { ExternalLink } from '../../components/external-link.tsx';
@@ -19,7 +19,7 @@ export function AboutPanel() {
           <dt>{C.version}</dt>
           <dd className="mono">{health.data.appVersion}</dd>
           <dt>{C.opencodeVersion}</dt>
-          <dd className="mono">{OPENCODE_VERSION}</dd>
+          <dd className="mono">{C.opencodeVersions(OPENCODE_SUPPORTED_RANGE, OPENCODE_VERSION)}</dd>
           <dt>{C.nodeVersion}</dt>
           <dd className="mono">{health.data.node}</dd>
           <dt>{C.license}</dt>

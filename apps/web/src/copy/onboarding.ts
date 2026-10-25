@@ -1,4 +1,4 @@
-import type { Platform } from '@aw/shared';
+import { OPENCODE_SUPPORTED_RANGE, OPENCODE_VERSION, type Platform } from '@aw/shared';
 
 /** Install commands and examples differ by operating system (17 §3.7). */
 type PerPlatform = Record<Platform, string>;
@@ -26,11 +26,12 @@ export const ONBOARDING_COPY = {
     } satisfies PerPlatform,
   },
   opencode: {
-    title: 'opencode 1.19.0',
+    title: 'opencode',
     ok: (version: string, path: string) => `已安装 ${version}（${path}）`,
-    missing: '没有找到 opencode。在终端安装指定版本：',
-    mismatch: (version: string) => `已安装的版本是 ${version}，本应用需要 1.19.0。在终端切换版本：`,
-    fix: 'npm install -g opencode-ai@1.19.0',
+    missing: `没有找到 opencode（本应用支持 ${OPENCODE_SUPPORTED_RANGE}）。在终端安装推荐的版本：`,
+    mismatch: (version: string) =>
+      `已安装的版本是 ${version}，本应用支持 ${OPENCODE_SUPPORTED_RANGE}。在终端安装推荐的版本：`,
+    fix: `npm install -g opencode-ai@${OPENCODE_VERSION}`,
     choosePath: '已安装在其他位置？填写 opencode 可执行文件的路径：',
     pathPlaceholder: {
       darwin: '/usr/local/bin/opencode',
