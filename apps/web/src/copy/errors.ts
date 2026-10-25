@@ -100,7 +100,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.DbQueryFailed]: '查询执行失败，SQL 可能有误。',
   [ErrorCode.CredentialUnavailable]:
     '系统密钥服务不可用，无法保存令牌或密码：到「开发环境」页安装密钥服务或设置主密码。',
-  [ErrorCode.CredentialLocked]: '令牌与密码由主密码保护，还没有解锁：到「开发环境」页输入主密码。',
+  [ErrorCode.CredentialLocked]: '令牌与密码由主密码保护，本次启动还没有解锁：在下面输入主密码，解锁后再试一次。',
   [ErrorCode.CredentialLost]: '主密码重置后，这个令牌或密码已被清除，请重新填写。',
   [ErrorCode.MasterPasswordIncorrect]: '主密码不对。',
   [ErrorCode.MasterPasswordExists]: '已经设置过主密码。',
