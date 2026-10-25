@@ -361,7 +361,6 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `GIT_REVIEW_FINDINGS_MAX` | 50（一次审查的问题数，27 §4.4） |
 | `GIT_REVIEW_SUMMARY_MAX_CHARS` / `GIT_REVIEW_FINDING_TITLE_MAX_CHARS` / `GIT_REVIEW_FINDING_TEXT_MAX_CHARS` | 2000 / 120 / 2000 |
 | `COMMIT_DRAFT_DIFF_MAX_BYTES` | 60000（草拟提交信息时交给 AI 的 diff，27 §7.3） |
-| `COMMIT_DRAFT_TIMEOUT_MS` | 120000（草拟超时即中止，请求返回 `COMMIT_DRAFT_FAILED`） |
 | `DECK_BRIEF_MAX_CHARS` | 4000（PPT 的要求） |
 | `DECK_TITLE_MAX_CHARS` | 60（PPT 标题；创建时取要求的首行，大纲返回后用 AI 给的标题） |
 | `DECK_MATERIALS_MAX` | 10（一份 PPT 的资料数） |
@@ -396,7 +395,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `scheduler.maxConcurrentAttempts` | `4` | 简单 |
 | `scheduler.maxConcurrentNodesPerTask` | `2` | 专业 |
 | `node.maxAttempts` | `3` | 专业 |
-| `attempt.timeoutMinutes` | `60` | 专业；任务尝试与助手单轮时限。助手权限等待暂停计时，回复后继续剩余时长，超时停止且不自动重试 |
+| `attempt.timeoutMinutes` | `60` | 专业；任务尝试与助手单轮时限。等待用户（权限、提问）与等待模型服务（opencode 重试失败的模型请求，D163）的时间不算，之后继续剩余时长；助手超时停止且不自动重试 |
+| `git.commitDraftTimeoutSeconds` | `120`（Git 工作台「AI 草拟」提交信息的时限，超时即中止，请求返回 `COMMIT_DRAFT_FAILED`，27 §7.3；本地模型较慢时调大，D184） | 专业 |
 | `worktree.rootDir` | `null`（使用 `<数据目录>/worktrees`；助手不能修改，D65） | 专业 |
 | `delivery.defaultStrategy` | `squash`（可选 `squash` / `merge` / `rebase`；PR 有单独按钮） | 专业 |
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |

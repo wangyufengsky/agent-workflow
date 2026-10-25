@@ -6,7 +6,6 @@ import {
   AttemptKind,
   AttemptStatus,
   COMMIT_DRAFT_DIFF_MAX_BYTES,
-  COMMIT_DRAFT_TIMEOUT_MS,
   ErrorCode,
   SessionAgent,
   type SubmitCommitMessageInput,
@@ -43,7 +42,7 @@ function truncate(text: string, max: number): string {
 
 /**
  * AI commit message drafts (27 §7.3, D110): a short read-only attempt the request waits for, stopped after
- * COMMIT_DRAFT_TIMEOUT_MS. The draft only fills the user's input; nothing is committed.
+ * the setting `git.commitDraftTimeoutSeconds`. The draft only fills the user's input; nothing is committed.
  */
 export function createCommitDrafts({ clock, log, attempts, projects, roles, settings, prompts }: CommitDraftsDeps) {
   /** Drafts submitted by attempts still running, and the requests waiting for them. */
@@ -88,7 +87,7 @@ export function createCommitDrafts({ clock, log, attempts, projects, roles, sett
       const attemptId = randomUUID();
       const ended = new Promise<AttemptDTO>((resolve) => waiting.set(attemptId, resolve));
       // Not waited on forever: the request is someone at the commit box (27 §7.3).
-      const cancelTimer = clock.schedule(COMMIT_DRAFT_TIMEOUT_MS, () => {
+      const cancelTimer = clock.schedule(settings.get('git.commitDraftTimeoutSeconds') * 1000, () => {
         // The timer has no caller to report to; the attempt may have ended in the meantime.
         attempts.abort(attemptId).catch((err: unknown) => log.warn({ err, attemptId }, 'commit draft abort failed'));
       });

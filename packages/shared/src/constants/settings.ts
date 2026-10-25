@@ -39,6 +39,8 @@ export const settingsSchema = z.strictObject({
   'scheduler.maxConcurrentNodesPerTask': z.number().int().min(1),
   'node.maxAttempts': z.number().int().min(1),
   'attempt.timeoutMinutes': z.number().int().min(1),
+  /** An AI commit message draft is stopped after this long (27 §7.3); the request waits for it. */
+  'git.commitDraftTimeoutSeconds': z.number().int().min(1),
   /** Absolute directory; null means `<data dir>/worktrees`. */
   'worktree.rootDir': z.string().min(1).nullable(),
   /** Strategy of the result card's primary「合并」button; pull requests have their own button. */
@@ -91,6 +93,7 @@ export const SETTING_DEFAULTS: Settings = {
   'scheduler.maxConcurrentNodesPerTask': 2,
   'node.maxAttempts': 3,
   'attempt.timeoutMinutes': 60,
+  'git.commitDraftTimeoutSeconds': 120,
   'worktree.rootDir': null,
   'delivery.defaultStrategy': DeliveryStrategy.Squash,
   'delivery.deleteBranchAfterMerge': true,
@@ -126,6 +129,7 @@ export const SETTING_MODE: Record<SettingKey, UiMode> = {
   'scheduler.maxConcurrentNodesPerTask': UiMode.Pro,
   'node.maxAttempts': UiMode.Pro,
   'attempt.timeoutMinutes': UiMode.Pro,
+  'git.commitDraftTimeoutSeconds': UiMode.Pro,
   'worktree.rootDir': UiMode.Pro,
   'delivery.defaultStrategy': UiMode.Pro,
   'delivery.deleteBranchAfterMerge': UiMode.Pro,

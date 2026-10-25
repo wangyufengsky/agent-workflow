@@ -264,7 +264,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | GET | `/projects/:id/git/changes/file?path&side` | 一个文件的 diff：`side = staged`（暂存区对 HEAD）或 `unstaged`（工作区对暂存区，未跟踪文件对空） |
 | POST | `/projects/:id/git/stage`、`/unstage` | `{ paths }`：整文件暂存（含删除）/ 取消暂存（暂存的改名连同原路径一起取消），write |
 | POST | `/projects/:id/git/commits` | `{ message }` → 201 新提交；以用户身份提交并运行钩子（钩子拒绝为 `GIT_COMMAND_FAILED`，stderr 为钩子输出）；`GIT_NOTHING_TO_COMMIT`、`GIT_IDENTITY_MISSING`、`GIT_OPERATION_IN_PROGRESS`，write |
-| POST | `/projects/:id/git/commit-message` | `{}` 或 `{ from, to }` → `{ subject, body }`：AI 草拟已暂存改动或压缩合并的提交信息，等它写完（最长 `COMMIT_DRAFT_TIMEOUT_MS`）；`GIT_NOTHING_TO_COMMIT`、`COMMIT_DRAFT_FAILED`、`OPENCODE_NOT_READY`；read，不给助手 |
+| POST | `/projects/:id/git/commit-message` | `{}` 或 `{ from, to }` → `{ subject, body }`：AI 草拟已暂存改动或压缩合并的提交信息，等它写完（最长为设置 `git.commitDraftTimeoutSeconds`）；`GIT_NOTHING_TO_COMMIT`、`COMMIT_DRAFT_FAILED`、`OPENCODE_NOT_READY`；read，不给助手 |
 | GET | `/projects/:id/git/push?branch` | 推送预览：远端分支、是否新建、将推送的提交（最多 `GIT_PUSH_COMMITS_SHOWN` 个）与总数 |
 | POST | `/projects/:id/git/push` | `{ branch }`：推送到 origin 的同名分支，不强推，没有上游时设为上游；绑定了远端时带项目令牌（D53），否则用用户自己的凭据；`GIT_PUSH_REJECTED`、`GIT_BRANCH_OWNED_BY_TASK`，critical |
 | POST | `/projects/:id/git/pull` | 获取当前分支的上游并快进；`GIT_NO_UPSTREAM`、`WORKTREE_DIRTY`、`BRANCH_DIVERGED`，write |

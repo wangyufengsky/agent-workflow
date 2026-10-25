@@ -72,7 +72,10 @@ export const SETTINGS_COPY = {
   nodesPerTask: '每个任务同时进行的步骤数',
   maxAttempts: '每个步骤最多尝试次数',
   timeoutMinutes: '任务尝试／助手单轮的时限（分钟）',
-  timeoutHint: '助手等待权限确认时暂停计时，回复后继续剩余时限；超时停止，不会自动重试。修改后从下一轮生效。',
+  timeoutHint:
+    '等待你确认权限、回答问题，以及模型服务不可用、opencode 重试期间都暂停计时，之后继续剩余时限；助手超时停止，不会自动重试。修改后从下一轮生效。',
+  commitDraftTimeout: 'AI 草拟提交信息的时限（秒）',
+  commitDraftTimeoutHint: 'Git 工作台「AI 草拟」等待 AI 写完的最长时间，超过就停止；本地模型较慢时调大。',
   worktreeRoot: '独立工作区目录',
   worktreeRootHint: '绝对路径；留空使用数据目录下的 worktrees。只影响之后新建的任务。',
   defaultStrategy: '「合并」按钮的合并方式',

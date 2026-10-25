@@ -244,6 +244,7 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   'scheduler.maxConcurrentNodesPerTask': SETTINGS_COPY.nodesPerTask,
   'node.maxAttempts': SETTINGS_COPY.maxAttempts,
   'attempt.timeoutMinutes': SETTINGS_COPY.timeoutMinutes,
+  'git.commitDraftTimeoutSeconds': SETTINGS_COPY.commitDraftTimeout,
   'delivery.defaultStrategy': SETTINGS_COPY.defaultStrategy,
   'delivery.deleteBranchAfterMerge': SETTINGS_COPY.deleteBranch,
   'network.offline': SETTINGS_COPY.offline,

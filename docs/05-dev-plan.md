@@ -477,6 +477,8 @@
 | IN-11 | Windows 集成登录（D171）：专业模式设置 `browser.integratedAuthServers`（不能只写 `*`，助手不能改），`open` 请求带 `integratedAuthServers`，main 对网站分区 `allowNTLMCredentialsForDomains`；设置页「网站」一节的输入框。不做委派（用户已确认）。同一提交登记 02、08、14、29 | 单元与类型检查；没有域环境，Kerberos / NTLM 没有自动化或手工验证（PR 中写明） |
 | IN-12 | 客户端证书（D172）：main 在应用的 `select-client-certificate` 事件里处理本应用的标签页：用户的标签页弹出证书列表，AI 的标签页不回答（停止加载，免得 Chromium 记住「不用证书」）并发 `browser.certificateRefused`，后端据此返回 `BROWSER_LOGIN_REQUIRED`。同一提交登记 02、11、29 | 类型检查；没有系统证书，未验证（PR 中写明） |
 | IN-13 | 只读网站的查询路径（D173，用户已确认）：网站规则加 `queryPaths`，`blockReason` 放行 AI 发往这些路径的 POST；设置页只读规则下的输入框；执行与规划提示词说明查询被拦时怎么办。同一提交登记 02、08、14、29 | 单元（`policy.test.ts`）：查询路径的 POST 放行，别的路径、大小写不同、`PUT`、WebSocket 仍拦下；集成（Chromium 宿主）：查询照常发出、同一网站别的写请求被拦并写进 `blockedWrites` |
+| IN-24 | 提交信息草拟的时限改为专业设置 `git.commitDraftTimeoutSeconds`（默认 120 秒），删去常量 `COMMIT_DRAFT_TIMEOUT_MS`；设置页「专业设置」的输入项（D184）。同一提交登记 02、08、11、14、27 §7.3 | 集成（假时钟）：设为 300 秒时 299.999 秒仍在运行，到点中止并 `COMMIT_DRAFT_FAILED` |
+| IN-25 | 助手单轮在 opencode 重试模型请求期间暂停时限、恢复后按剩余时间继续，与权限等待的暂停叠加；助手会话的系统提示显示原因（D185）。同一提交登记 02、08 §4.3、15 §6.2 | 集成（FakeOpencode `retry` 步骤与假时钟）：重试 60 分钟仍在运行、没有中止，恢复后剩余时间到点超时 |
 
 ## 后续 · 存储空间与磁盘清理（ST）
 

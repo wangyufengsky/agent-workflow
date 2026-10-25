@@ -432,6 +432,8 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     // 真实错误与结束统一由本轮同步 HTTP 的 completed 处理。
     if (event.type === OpencodeEventType.Error || event.type === OpencodeEventType.Idle) return;
     record(c, state.view.toEntries(event));
+    if (event.type === OpencodeEventType.Retry) usage.waitForModel(id);
+    else usage.modelAnswering(id);
     switch (event.type) {
       case OpencodeEventType.Message:
         if (event.role === 'assistant') usage.message(id, event.messageId, event.parentMessageId);
