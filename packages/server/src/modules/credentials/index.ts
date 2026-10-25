@@ -1,3 +1,4 @@
+import { credentialsOperations } from './credentials.operations.ts';
 import { type CredentialsServiceDeps, createCredentialsService } from './credentials.service.ts';
 
 export {
@@ -12,5 +13,6 @@ export type { CredentialsService } from './credentials.service.ts';
 export { credentialsTable } from './credentials.table.ts';
 
 export function createCredentialsModule(deps: CredentialsServiceDeps) {
-  return { service: createCredentialsService(deps) };
+  const service = createCredentialsService(deps);
+  return { service, operations: credentialsOperations(service) };
 }

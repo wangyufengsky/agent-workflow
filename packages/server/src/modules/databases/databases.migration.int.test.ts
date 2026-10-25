@@ -9,17 +9,18 @@ import { openDatabase } from '../../core/db/database.ts';
 const MIGRATIONS = join(import.meta.dirname, '../../../migrations');
 const TLS_MODE_MIGRATION = '0030_db_tls_mode';
 
-/** The migrations folder as it was before `migration`. */
+/**
+ * The migrations folder as it was before `migration`: without it and every later one, since drizzle skips a migration
+ * older than the newest one already applied.
+ */
 async function migrationsBefore(migration: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'aw-migrations-'));
   await cp(MIGRATIONS, dir, { recursive: true });
-  await rm(join(dir, `${migration}.sql`));
   const journalFile = join(dir, 'meta', '_journal.json');
   const journal: { entries: Array<{ tag: string }> } = JSON.parse(await readFile(journalFile, 'utf8'));
-  await writeFile(
-    journalFile,
-    JSON.stringify({ ...journal, entries: journal.entries.filter((e) => e.tag !== migration) }),
-  );
+  const index = journal.entries.findIndex((e) => e.tag === migration);
+  for (const e of journal.entries.slice(index)) await rm(join(dir, `${e.tag}.sql`));
+  await writeFile(journalFile, JSON.stringify({ ...journal, entries: journal.entries.slice(0, index) }));
   return dir;
 }
 

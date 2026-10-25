@@ -105,10 +105,23 @@ Electron `app.getPath('userData')`，目录名为产品名：
 | Windows | DPAPI（按 Windows 用户加密） | 总可用 |
 | Linux | Secret Service（`gnome_libsecret`）或 KWallet（`kwallet` / `kwallet5` / `kwallet6`） | 取决于桌面环境 |
 
-Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写死在源码中的密钥「加密」，等同明文，而 `safeStorage.isEncryptionAvailable()` 仍返回 `true`。因此 main 判断可用性时另外要求 `safeStorage.getSelectedStorageBackend()` 不是 `basic_text` / `unknown`（D74）。不可用时：
+Linux 上 Chromium 只按桌面环境选密钥服务：`X-Cinnamon`、`Deepin`、`GNOME`、`Pantheon`、`XFCE`、`UKUI`、`Unity` 选 libsecret，KDE 选 KWallet，**其余一律 `basic_text`**：用写死在源码中的密钥「加密」，等同明文。MATE、LXQt、平铺窗口管理器、`XDG_CURRENT_DESKTOP` 为空的 xrdp / VNC 会话即使 gnome-keyring 正在运行也是这样（D167 实测，Electron 44、Linux arm64 容器，gnome-keyring 已解锁）：
 
-- 加解密请求返回失败，后端抛 `CREDENTIAL_UNAVAILABLE`（已有行为），绑定令牌、保存数据库密码的表单显示该错误的文案；不退回明文。
-- 引导页增加「凭据存储」一项（`EnvironmentDTO.credentials`，后端经 credential port 新增的 `status` 请求询问 main）：不可用时为警告（不阻止「就绪」，只有托管平台令牌与数据库密码需要它），说明安装 `gnome-keyring`（或使用 KDE 的 KWallet）后重启应用。
+| 环境 | 不加开关 | `--password-store=gnome-libsecret` |
+| --- | --- | --- |
+| 没有 `XDG_CURRENT_DESKTOP` | `basic_text`，不可用 | `gnome_libsecret`，可用（`v11` 密文，往返正确） |
+| `MATE` | `basic_text`，不可用 | `gnome_libsecret`，可用 |
+| `UKUI`（麒麟） | `gnome_libsecret`，可用 | 同左 |
+| 装了 gnome-keyring 但没有登录密钥环、也弹不出解锁框 | — | `gnome_libsecret`，不可用 |
+
+Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()` 为 `false`；只有 `setUsePlainTextEncryption(true)` 才会可用），main 仍另外要求 `safeStorage.getSelectedStorageBackend()` 不是 `basic_text` / `unknown`（D74）：这里判断错了就是明文写盘。
+
+因此（D167）：
+
+- main 在 `ready` 之前（Chromium 启动时就选定密钥服务）追加 `--password-store=gnome-libsecret`（`apps/desktop/src/main/password-store.ts`），除非用户自己传了 `--password-store`，或是 KDE 会话（`XDG_CURRENT_DESKTOP` 含 `KDE`、设置了 `KDE_FULL_SESSION`、`DESKTOP_SESSION` 以 `kde` 开头）：KWallet 里已存的密文换到 libsecret 就解不开。其他桌面环境上 Chromium 本来就选 libsecret，开关不改变什么；KeePassXC、KDE Plasma 6 的 ksecretd 也提供 Secret Service。
+- 系统密钥服务仍不可用（没装、没有登录密钥环）时：加解密请求返回失败，引导页「凭据存储」为警告（不阻止「就绪」），说明安装 `gnome-keyring`（统信、麒麟同样 `apt install`）后重启应用；装不了时可以设置主密码（14 §3.1）：由后端 credentials 模块用 scrypt 派生的密钥包住数据密钥、AES-256-GCM 加密凭据（10 §credential_vault），每次启动输入一次。仍不退回明文。
+- 引导页的状态来自 `EnvironmentDTO.credentials`（后端经 credential port 的 `status` 请求询问 main，再加上主密码的状态）。
+- Playwright 的 Electron 加载器在应用之前追加 `--password-store=basic`，应用把它当作用户的选择保留：Electron E2E 里系统密钥服务总是不可用；J42 的 Secret Service 用例因此不经加载器、直接启动构建后的应用（07 §5）。
 - 开发模式（`pnpm dev:server`、浏览器 E2E）的明文适配器报告可用，与现状一致。
 
 ### 3.7 引导页与界面文案
@@ -215,7 +228,7 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 | `test:int (os, i/2)` | `pnpm test:int --shard=i/2`（vitest 按文件分片） |
 | `e2e (os, i/2)` | `pnpm build` 后 `pnpm e2e --grep-invert @walkthrough --shard=i/2`（除 J9 外的浏览器 E2E，Playwright 按文件分片） |
 | `e2e J9 (os, i/4)` | `pnpm build` 后 `pnpm e2e --grep @walkthrough --shard=i/4`：J9 每套主题一个用例，一片一套主题 |
-| `package (os)` | `pnpm build`、Electron 启动冒烟、`pnpm dist`、上传安装包 |
+| `package (os)` | `pnpm build`、Electron 启动冒烟（含 J42 的主密码一例）、带 Secret Service 的凭据存储（`dbus-run-session` 里解锁 gnome-keyring 后以 `AW_E2E_SECRET_SERVICE=1` 再跑 `credentials.electron.spec.ts`，D167）、`pnpm dist`、上传安装包 |
 
 macOS 仍是一个 job，按上面的顺序串行跑完：它约 3 分钟，比拆分后的 Windows 还快，而 macOS runner 按 10 倍计费，拆开只增加费用。
 
