@@ -129,3 +129,30 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* 「可选流程」for an AI breakdown (34 §5.1). */
+.allowed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.toggle:hover {
+  background: var(--fill-3);
+  color: var(--ink-2);
+}

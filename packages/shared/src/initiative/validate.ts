@@ -1,7 +1,15 @@
 import { INITIATIVE_TEMPLATE_PLACEHOLDER } from '../constants/app.ts';
 import type { InitiativeDraft } from '../contracts/api/initiatives.ts';
+import { WorkflowDeliverable, WorkflowKind } from '../enums/workflow.ts';
 import { type InitiativeProblem, InitiativeProblemCode } from '../errors/initiative-problems.ts';
 import { findCycles } from '../workflow/validate-plan-graph.ts';
+
+/**
+ * The workflows an AI breakdown may use when the user does not choose (34 §5.1): the built-in ones that change the
+ * repository — the code workflows, and the design and breakdown documents they commit. Reports are left to the user.
+ */
+export const isDefaultInitiativeWorkflow = (workflow: { kind: WorkflowKind; deliverable: WorkflowDeliverable }) =>
+  workflow.kind === WorkflowKind.Builtin && workflow.deliverable === WorkflowDeliverable.CodeChanges;
 
 export type InitiativeDraftRules = {
   /** Whether a workflow key names a workflow a work package may run (not a system one). */

@@ -29,6 +29,10 @@ export const INITIATIVES_COPY = {
   /** The home panel's group of composition templates (34 §15.4), led by the AI breakdown (34 §5.1). */
   templates: '组合',
   aiBreakdown: '让 AI 拆解',
+  allowedWorkflows: '可选流程',
+  allowedWorkflowsCount: (count: number) => `可选流程（${count}）`,
+  allowedWorkflowsHint: '拆出的工作包只能用这些流程。默认是会改动仓库的内置流程。',
+  allowedWorkflowsNone: '至少选一个流程',
   aiBreakdownDescription: 'AI 读需求和代码，拆成阶段与工作包；你看过、改过、确认后才开始',
   startBreakdown: '开始 · AI 拆解需求计划',
   breakingDown: 'AI 正在拆解需求…',

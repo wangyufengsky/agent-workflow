@@ -205,7 +205,20 @@ describe('AI 拆解与逐步细化（34 §8，D133、D136）', () => {
     const { project } = await addProject(t, { checkCommand: null });
     // No script: the session ends its turn without submitting, is reminded once, and the run fails.
     const created = await create({ projectId: project.id, requirement: '加一个导出功能' });
+    // Without a choice, the work packages may use the built-in workflows that change the repository (34 §5.1).
+    expect(created.allowedWorkflows).toEqual([
+      'feature',
+      'bugfix',
+      'unit_tests',
+      'refactor',
+      'cleanup',
+      'detailed_design',
+      'breakdown',
+    ]);
     await settled();
+    const first = t.fake.prompts.find((p) => p.text.includes('## The requirement'))?.text ?? '';
+    expect(first).toContain('`feature`');
+    expect(first).not.toContain('`code_review`');
     expect(await detail(created.id)).toMatchObject({
       status: 'breakdown_failed',
       latestRun: { mode: 'breakdown', status: 'failed' },
