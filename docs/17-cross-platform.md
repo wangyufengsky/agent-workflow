@@ -7,11 +7,11 @@ v1.0 只验收了 macOS arm64（D13），代码按跨平台抽象编写。本文
 | 平台 | 架构 | 级别 | 安装包 |
 | --- | --- | --- | --- |
 | macOS 14+ | arm64 | 支持（v1.0 已验收） | dmg（未签名） |
-| Windows 10 / 11 | x64 | 支持 | NSIS 安装程序 `.exe`（未签名，可选安装目录） |
-| Ubuntu 22.04 / 24.04 | x64 | 支持 | `.deb` 与 `.AppImage` |
-| 其他 x64 Linux 发行版（Debian、Fedora、Arch 等） | x64 | 尽力支持：用 AppImage，不单独测试 | `.AppImage` |
+| Windows 10 / 11 | x64 | **暂缓**（D160）：代码与打包配置保留，不进 CI、不做真机验证 | NSIS 安装程序 `.exe`（未签名，可选安装目录） |
+| Ubuntu 22.04 / 24.04 | x64、arm64（D160） | 支持 | `.deb` 与 `.AppImage` |
+| 其他 Linux 发行版（Debian、Fedora、Arch 等） | x64、arm64 | 尽力支持：用 AppImage，不单独测试 | `.AppImage` |
 
-不支持：Windows / Linux 的 arm64、32 位系统、WSL 内运行桌面应用（WSL 中的仓库可以通过 `\\wsl$` 路径添加，但不测试）。
+不支持：Windows arm64、32 位系统、WSL 内运行桌面应用（WSL 中的仓库可以通过 `\\wsl$` 路径添加，但不测试）。
 
 **前置软件**（引导页逐项检测）：
 
@@ -133,7 +133,7 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 | --- | --- | --- |
 | macOS | dmg arm64 | 不变 |
 | Windows | NSIS x64，`oneClick: false`、可改安装目录、按用户安装 | 未签名：SmartScreen 提示「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」 |
-| Linux | AppImage x64、deb x64 | 未签名。deb 包名与可执行文件名 `agent-workflow`，维护者字段取 `linux.maintainer`；electron-builder 的默认 deb 依赖已含 `libsecret-1-0`（凭据存储，§3.6） |
+| Linux | AppImage 与 deb，各 x64、arm64（D160） | 未签名。应用不打包原生模块，两种架构在任一台机器上都能打；CI 在各自架构的运行器上用 `pnpm dist --x64` / `--arm64` 只打本机架构。deb 包名与可执行文件名 `agent-workflow`，维护者字段取 `linux.maintainer`；electron-builder 的默认 deb 依赖已含 `libsecret-1-0`（凭据存储，§3.6） |
 
 - 图标：`build/icon.svg` 渲染出 `build/icon.png`（1024 px），Windows（转 ico）与 Linux 使用；macOS 仍用 `icon.icns`。
 - `pnpm dist` 构建当前平台的安装包（`electron-builder` 不带平台参数，按各平台的 `target` 配置），CI 在各自的 runner 上运行。
@@ -188,9 +188,9 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 
 ### 4.1 GitHub Actions（`.github/workflows/ci.yml`）
 
-工作流只在手动触发时运行（见下文「何时运行与当前的验收」）。三个平台运行同一组检查与测试：`pnpm verify` 的各步骤（`check`、`test`、`test:int`、`build`）、浏览器 E2E `pnpm e2e`（FakeOpencode）、Electron 启动冒烟 `pnpm e2e:smoke`（J15：打包前的构建产物启动、后端握手、显示引导页、四项检测有结果；Linux 下用 `xvfb-run`）；ubuntu 与 windows 另外 `pnpm dist`，并把安装包（`release/*.exe`、`*.AppImage`、`*.deb`）作为 artifact 上传。依赖安装（Node 24、pnpm 10.28、按锁文件哈希缓存的 pnpm store）由 `.github/actions/setup` 统一完成。
+工作流只在手动触发时运行（见下文「何时运行与当前的验收」）。平台为 Linux x64（`ubuntu-24.04`）、Linux arm64（`ubuntu-24.04-arm`）与 macOS；Windows 暂缓，不在矩阵里（D160）。各平台运行同一组检查与测试：`pnpm verify` 的各步骤（`check`、`test`、`test:int`、`build`）、浏览器 E2E `pnpm e2e`（FakeOpencode）、Electron 启动冒烟 `pnpm e2e:smoke`（J15：打包前的构建产物启动、后端握手、显示引导页、四项检测有结果；Linux 下用 `xvfb-run`）；两个 Linux 运行器另外各打本机架构的包，并把安装包（`release/*.AppImage`、`*.deb`）作为 artifact 上传。依赖安装（Node 24、pnpm 10.28、按锁文件哈希缓存的 pnpm store）由 `.github/actions/setup` 统一完成。
 
-**ubuntu 与 windows 拆成并行的 job（D81）。** 私有仓库的 Linux 与 Windows runner 只有 2 个 vCPU：vitest 默认的 worker 数是 CPU 数减 1，集成测试逐个文件串行；浏览器 E2E 共用一个后端，本来就是一个 worker。因此在这两个平台上把测试分到同时运行的多台机器上：
+**两个 Linux 运行器拆成并行的 job（D81；原为 ubuntu 与 windows，D160 起 windows 换成 arm64）。** 拆分时仓库是私有的，runner 只有 2 个 vCPU：vitest 默认的 worker 数是 CPU 数减 1，集成测试逐个文件串行；浏览器 E2E 共用一个后端，本来就是一个 worker。因此在这两个平台上把测试分到同时运行的多台机器上：
 
 | job | 内容 |
 | --- | --- |
@@ -216,7 +216,7 @@ macOS 仍是一个 job，按上面的顺序串行跑完：它约 3 分钟，比�
 
 **Playwright 只装 Chromium 的 headless shell**（`--only-shell`，浏览器 E2E 以 headless 运行，原来也只用它），系统依赖只在 Linux 上装（`--with-deps`）：Windows 上的 `--with-deps` 会花约 3.5 分钟启用 Media Foundation 功能，没有 spec 播放媒体（§4.3）。
 
-**数据库集成测试只在 ubuntu 上运行。** `databases.int.test.ts` 与 `databases.engines.int.test.ts`（v1.2，24 §7）需要 Docker 中的 Linux 容器（`mysql:8.4`、`postgres:17.6`、openGauss、SQL Server）：GitHub 的 Windows runner 的 Docker 只能运行 Windows 容器，macOS runner 没有 Docker。工作流在这两个平台对 `test:int` 显式排除这两个文件并在步骤名与注释中写明原因；代码中不按平台跳过（缺 Docker 时测试照常失败）。该测试与平台无关（只经 TCP 访问 MySQL），在 ubuntu 上运行即覆盖。
+**数据库集成测试在两个 Linux 运行器上运行（D160 前只在 ubuntu x64）。** SQL Server 与 openGauss 只发布 x64 镜像：arm64 上不拉取，相应用例按 `db-containers.ts` 的规则跳过，由 x64 覆盖；MySQL 与 PostgreSQL 两种架构都跑。以下为原说明： `databases.int.test.ts` 与 `databases.engines.int.test.ts`（v1.2，24 §7）需要 Docker 中的 Linux 容器（`mysql:8.4`、`postgres:17.6`、openGauss、SQL Server）：GitHub 的 Windows runner 的 Docker 只能运行 Windows 容器，macOS runner 没有 Docker。工作流在这两个平台对 `test:int` 显式排除这两个文件并在步骤名与注释中写明原因；代码中不按平台跳过（缺 Docker 时测试照常失败）。该测试与平台无关（只经 TCP 访问 MySQL），在 ubuntu 上运行即覆盖。
 
 **不进 CI**：`test:oc`、`test:live`、J10（`journey.electron.spec.ts`）需要真实 opencode、登录的模型与网络，仍在本机运行。
 
@@ -298,8 +298,8 @@ macOS 不变：一个 job 2.9–3.6 分钟（改动后 3.1–3.5 分钟）。整
 | 三平台 `pnpm verify`（Windows / macOS 除数据库集成测试）、浏览器 E2E、Electron 启动冒烟 | CI 全绿 | CI |
 | Windows NSIS 与 Linux AppImage / deb 能打出来 | CI artifact | CI |
 | 本机 macOS：`pnpm verify`、`pnpm e2e`、`pnpm test:oc` | 本机运行 | 开发者 |
-| **Windows 真机**：安装 NSIS 包（SmartScreen 放行）→ 引导页三项检测（Git for Windows、opencode 1.19.0、模型）→ 添加项目 → 跑通一个「修 Bug」任务 → 合并；任务中模型执行 bash 命令时只读规则生效（规划阶段不弹权限请求）；取消运行中的任务后 worktree 能被清理 | 手动 | **需要用户完成** |
-| **Linux 真机（Ubuntu 22.04 / 24.04 桌面）**：安装 deb 与运行 AppImage（24.04 的 AppArmor 限制）→ 引导页三项检测与「凭据存储」→ 绑定托管平台令牌（GNOME Keyring 存在时成功；无密钥服务时显示 `CREDENTIAL_UNAVAILABLE`）→ 跑通一个任务 | 手动 | **需要用户完成** |
+| **Windows 真机**（暂缓，D160）：安装 NSIS 包（SmartScreen 放行）→ 引导页三项检测（Git for Windows、opencode 1.19.0、模型）→ 添加项目 → 跑通一个「修 Bug」任务 → 合并；任务中模型执行 bash 命令时只读规则生效（规划阶段不弹权限请求）；取消运行中的任务后 worktree 能被清理 | 手动 | **需要用户完成** |
+| **Linux 真机（Ubuntu 22.04 / 24.04 桌面，x64 与 arm64 各一台）**：安装 deb 与运行 AppImage（24.04 的 AppArmor 限制）→ 引导页三项检测与「凭据存储」→ 绑定托管平台令牌（GNOME Keyring 存在时成功；无密钥服务时显示 `CREDENTIAL_UNAVAILABLE`）→ 跑通一个任务 | 手动 | **需要用户完成** |
 | 真实 opencode 在 Windows / Linux 上的 `test:oc`、`test:live`、J10 | 在对应机器上运行 | **需要用户完成**（可选） |
 
 按 D82，表中的三平台 CI 与 Windows / Linux 真机验证推迟到发布正式版本之前；在此之前以本机 macOS 的全量验证为准。
