@@ -78,7 +78,7 @@ describe('全局 GitHub / GitLab 令牌（D155）', () => {
     });
   });
 
-  it('SSH origin 按主机名匹配已保存的自建 GitLab 地址（HTTP、非标准端口），创建 MR 用上它的令牌（D166）', async () => {
+  it('SSH origin 按主机名匹配已保存的自建 GitLab 地址（HTTP、非标准端口），创建 MR 用上它的令牌（D169）', async () => {
     // The fake's GitLab is http://127.0.0.1:<port>/gitlab, like an intranet GitLab whose web port is not SSH's.
     const gitlabUrl = hosting.endpoints.gitlabUrl;
     const repo = await createTestRepo({ origin: `git@${new URL(gitlabUrl).hostname}:acme/shop.git` });

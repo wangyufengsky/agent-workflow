@@ -25,7 +25,7 @@ describe('parseRemoteUrl', () => {
     expect(parseRemoteUrl(url, [])).toBeNull();
   });
 
-  // D166: an intranet GitLab's web address often differs from its SSH host in scheme and port.
+  // D169: an intranet GitLab's web address often differs from its SSH host in scheme and port.
   it('SSH origin 的地址是同主机名唯一的已保存 GitLab 地址；多个时同没有一样为 https://<主机>', () => {
     const saved = ['http://gitlab.corp:8080', 'https://other.corp'];
     const baseUrl = (url: string, addresses: string[]) => parseRemoteUrl(url, addresses)?.baseUrl;

@@ -167,7 +167,7 @@ export function createProjectsService({
     return project;
   }
 
-  /** origin's repository; an SSH origin's GitLab address is matched against the saved global ones (D166). */
+  /** origin's repository; an SSH origin's GitLab address is matched against the saved global ones (D169). */
   function inferHosting(origin: string | undefined): HostingRef | null {
     if (origin === undefined) return null;
     const gitlabAddresses = hostingAccounts

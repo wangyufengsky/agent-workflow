@@ -460,11 +460,11 @@
 
 ## 后续 · 内网部署适配（IN）
 
-> 状态：**用户要求**（2026-10-25，企业内网部署，自建 GitLab），IN-06 已实现，待用户检查。
+> 状态：**用户要求**（2026-10-25，企业内网部署，自建 GitLab），IN-09 已实现，待用户检查。
 
 | 任务 | 内容 | 完成标准 |
 | --- | --- | --- |
-| IN-06 | SSH origin 的 GitLab 平台地址按主机名匹配已保存的全局令牌地址，唯一时用它，没有或多个时为 `https://<host>`（D166）。同一提交登记 02、11 §3 | 集成（FakeHosting）：origin `git@<主机>:acme/shop.git`、全局令牌保存在 `http://<主机>:<端口>/gitlab`，`effectiveHosting` 为该地址且创建 MR 用上它的令牌；单元：唯一、没有、多个与 HTTP(S) origin 不受影响 |
+| IN-09 | SSH origin 的 GitLab 平台地址按主机名匹配已保存的全局令牌地址，唯一时用它，没有或多个时为 `https://<host>`（D169）。同一提交登记 02、11 §3 | 集成（FakeHosting）：origin `git@<主机>:acme/shop.git`、全局令牌保存在 `http://<主机>:<端口>/gitlab`，`effectiveHosting` 为该地址且创建 MR 用上它的令牌；单元：唯一、没有、多个与 HTTP(S) origin 不受影响 |
 
 ## 后续 · 存储空间与磁盘清理（ST）
 
