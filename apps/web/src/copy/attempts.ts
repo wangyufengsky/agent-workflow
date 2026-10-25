@@ -152,6 +152,8 @@ export const STREAM_COPY = {
   researchTitle: '研究过程',
   attemptTitle: (kind: AttemptKind, seq: number) => `${ATTEMPT_KIND_LABEL[kind]} #${seq}`,
   empty: 'AI 还没有开始。',
+  /** A notice and what it comes with, e.g. why opencode retries (D163). */
+  noticeDetail: (label: string, detail: string) => `${label}：${detail}`,
   summary: (status: string, thoughts: number, actions: number, duration: string) =>
     [status, thoughts === 0 ? '' : `思考 ${thoughts} 段`, `${actions} 个动作`, `用时 ${duration}`]
       .filter((p) => p !== '')

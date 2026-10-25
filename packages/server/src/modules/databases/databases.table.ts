@@ -1,4 +1,4 @@
-import type { DbType } from '@aw/shared';
+import type { DbTlsMode, DbType } from '@aw/shared';
 import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { credentialsTable } from '../credentials/credentials.table.ts';
 import { projectsTable } from '../projects/projects.table.ts';
@@ -16,7 +16,7 @@ export const dbConnectionsTable = sqliteTable('db_connections', {
   credentialId: text('credential_id')
     .notNull()
     .references(() => credentialsTable.id),
-  tls: integer('tls', { mode: 'boolean' }).notNull(),
+  tlsMode: text('tls_mode').$type<DbTlsMode>().notNull(),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

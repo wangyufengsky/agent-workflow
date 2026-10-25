@@ -5,7 +5,12 @@ import {
   TranscriptEntryKind,
   TranscriptSystemEvent,
 } from '@aw/shared';
-import { OpencodeEventType as E, type OpencodeEvent, ToolCallStatus } from '../opencode/index.ts';
+import {
+  describeOpencodeError,
+  OpencodeEventType as E,
+  type OpencodeEvent,
+  ToolCallStatus,
+} from '../opencode/index.ts';
 import type { NewTranscriptEntry } from './attempts.transcript.ts';
 
 type TextPart = {
@@ -18,13 +23,16 @@ type TextPart = {
 /**
  * What one session has streamed so far, enough to turn its events into transcript entries (10 §3):
  * the role of each message (our own prompts are recorded when sent, so user parts are skipped), the text of
- * streaming parts (what they grew by, written every `TRANSCRIPT_TEXT_FLUSH_CHARS` characters, D104), and which tool
- * calls were already recorded.
+ * streaming parts (what they grew by, written every `TRANSCRIPT_TEXT_FLUSH_CHARS` characters, D104), which tool
+ * calls were already recorded, and why opencode is retrying: while the model service stays down opencode retries for
+ * as long as it takes, and the same reason is recorded once (D163).
  */
 export function createSessionView() {
   const roles = new Map<string, 'user' | 'assistant'>();
   const parts = new Map<string, TextPart>();
   const calledTools = new Set<string>();
+  /** The reason of the retry in progress; cleared by anything the session does other than sending the request. */
+  let retrying: string | undefined;
 
   const textEntry = (partId: string, part: TextPart): NewTranscriptEntry => {
     const data = pieceBetween(part.written, part.text);
@@ -34,6 +42,7 @@ export function createSessionView() {
 
   return {
     toEntries(event: OpencodeEvent): NewTranscriptEntry[] {
+      if (event.type !== E.Retry && event.type !== E.Busy) retrying = undefined;
       switch (event.type) {
         case E.Message:
           roles.set(event.messageId, event.role);
@@ -84,6 +93,8 @@ export function createSessionView() {
             },
           ];
         case E.Retry:
+          if (retrying !== undefined && retrying === event.message) return [];
+          retrying = event.message;
           return [
             {
               kind: TranscriptEntryKind.System,
@@ -99,12 +110,13 @@ export function createSessionView() {
               kind: TranscriptEntryKind.Error,
               data: {
                 code: ErrorCode.AttemptSessionError,
-                message: event.error?.name ?? 'session error',
+                message: describeOpencodeError(event.error),
                 ...(event.error === undefined ? {} : { details: event.error.data }),
               },
             },
           ];
         case E.StepFinished:
+        case E.Busy:
         case E.PermissionReplied:
         case E.Idle:
         case E.RuntimeLost:

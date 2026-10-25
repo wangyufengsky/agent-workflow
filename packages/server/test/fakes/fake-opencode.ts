@@ -9,7 +9,6 @@ import {
   MCP_SERVER_NAME,
   MCP_SESSION_ARG,
   MCP_TOOL_PREFIX,
-  type ModelInfo,
   type PermissionDecision,
 } from '@aw/shared';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -22,6 +21,7 @@ import {
   type OpencodeClient,
   type OpencodeError,
   type OpencodeEvent,
+  type OpencodeModel,
   type PromptInput,
   ToolCallStatus,
 } from '../../src/modules/opencode/index.ts';
@@ -41,6 +41,8 @@ export type FakeStep =
   | { type: 'callTool'; server: FakeMcpServer; name: string; args: Record<string, unknown> }
   | { type: 'permission'; permission: string; patterns: string[] }
   | { type: 'hang' }
+  /** The model service fails: opencode reports a retry per message, then waits until `recoverModel()`. */
+  | { type: 'retry'; messages: string[] }
   /** The tokens the turn reports as used when it ends, instead of 100 input and 20 output. */
   | { type: 'usage'; input: number; output: number }
   /** `idle: false`: opencode reports the error without a following idle event. */
@@ -78,6 +80,11 @@ export function script() {
     usage: (input: number, output: number) => add({ type: 'usage', input, output }),
     /** Keeps working (never idle) until the session is aborted. */
     hang: () => add({ type: 'hang' }),
+    /**
+     * The model service cannot be reached: opencode retries the request (one `retry` status per message, `busy` before
+     * each request, as 1.19.0 does) and goes on once the test calls `recoverModel()`.
+     */
+    retry: (...messages: string[]) => add({ type: 'retry', messages }),
     /** Fails the turn with a session error. */
     error: (name: string, message: string, { idle = true }: { idle?: boolean } = {}) =>
       add({ type: 'error', name, message, idle }),
@@ -112,6 +119,8 @@ const DELTA_CHARS = 8;
 export function createFakeOpencode() {
   const listeners = new Set<(event: OpencodeEvent) => void>();
   const queue: Array<{ script: Pick<FakeScript, 'steps'>; match: ScriptMatch | undefined }> = [];
+  /** Resolvers of `retry` steps, per session, released by recoverModel() or abort(). */
+  const waitingForModel = new Map<string, Array<() => void>>();
   /** Resolvers of `hang` steps, per session, released by abort(). */
   const hanging = new Map<string, Array<() => void>>();
   const pendingPermissions = new Map<string, { sessionId: string; resolve: (reply: PermissionDecision) => void }>();
@@ -135,10 +144,11 @@ export function createFakeOpencode() {
   const toolCalls: ToolCallRecord[] = [];
   const permissionReplies: Array<{ permissionId: string; reply: PermissionDecision }> = [];
   const aborts: string[] = [];
-  const models: ModelInfo[] = [
-    { providerId: 'opencode', modelId: 'fake-model', name: 'Fake Model' },
-    { providerId: 'opencode', modelId: 'fake-model-2', name: 'Fake Model 2' },
+  const models: OpencodeModel[] = [
+    { providerId: 'opencode', modelId: 'fake-model', name: 'Fake Model', contextLimit: 128_000 },
+    { providerId: 'opencode', modelId: 'fake-model-2', name: 'Fake Model 2', contextLimit: 128_000 },
   ];
+  const projectModels = new Map<string, OpencodeModel[]>();
 
   // The app's two servers are connected, as in opencode.
   const mcpServers: Record<string, McpServerState> = {
@@ -277,6 +287,16 @@ export function createFakeOpencode() {
         case 'hang':
           await new Promise<void>((resolve) => hanging.set(sessionId, [...(hanging.get(sessionId) ?? []), resolve]));
           break;
+        case 'retry':
+          for (const message of step.messages) {
+            emit({ type: E.Busy, sessionId });
+            emit({ type: E.Retry, sessionId, message });
+          }
+          await new Promise<void>((resolve) =>
+            waitingForModel.set(sessionId, [...(waitingForModel.get(sessionId) ?? []), resolve]),
+          );
+          if ((generation.get(sessionId) ?? 0) === turnGeneration) emit({ type: E.Busy, sessionId });
+          break;
         case 'error':
           emit({ type: E.Error, sessionId, error: { name: step.name, data: { message: step.message } } });
           if (step.idle) emit({ type: E.Idle, sessionId });
@@ -307,7 +327,10 @@ export function createFakeOpencode() {
     permissionReplies: typeof permissionReplies;
     /** Session ids the backend aborted, in order. */
     aborts: string[];
-    models: ModelInfo[];
+    /** The global configuration's models. */
+    models: OpencodeModel[];
+    /** What a directory's own opencode configuration adds, by directory. */
+    projectModels: Map<string, OpencodeModel[]>;
     /** What `mcpStatus` reports, by server name; a test adds the user's own servers. */
     mcpServers: Record<string, McpServerState>;
     /** Where `callTool` reaches the backend's execution MCP and `callAppTool` its assistant MCP. */
@@ -325,6 +348,8 @@ export function createFakeOpencode() {
     holdSessions(): void;
     /** The next `prompt` request fails with OPENCODE_REQUEST_FAILED while the runtime stays connected. */
     failNextPrompt(): void;
+    /** The model service is back: turns waiting in a `retry` step send their request again and go on. */
+    recoverModel(): void;
     /** 重放真实捕获的事件，验证迟到报告和重复投递。 */
     replay(events: readonly OpencodeEvent[]): void;
     reconnect(): void;
@@ -336,6 +361,7 @@ export function createFakeOpencode() {
     permissionReplies,
     aborts,
     models,
+    projectModels,
     connectMcp(next) {
       endpoints = next;
       // A restarted backend listens elsewhere: reconnect on the next call.
@@ -351,6 +377,10 @@ export function createFakeOpencode() {
         await Promise.all(turns);
         await new Promise<void>((resolve) => setImmediate(resolve));
       } while (turns.size > 0);
+    },
+    recoverModel() {
+      for (const release of [...waitingForModel.values()].flat()) release();
+      waitingForModel.clear();
     },
     failNextPrompt() {
       failPrompt = true;
@@ -461,8 +491,9 @@ export function createFakeOpencode() {
       // called a tool (opencode 1.19.0 sends step-finish right after the tool result, test/fixtures).
       await Promise.resolve();
       generation.set(sessionId, (generation.get(sessionId) ?? 0) + 1);
-      for (const release of hanging.get(sessionId) ?? []) release();
+      for (const release of [...(hanging.get(sessionId) ?? []), ...(waitingForModel.get(sessionId) ?? [])]) release();
       hanging.delete(sessionId);
+      waitingForModel.delete(sessionId);
       for (const [id, pending] of pendingPermissions) {
         if (pending.sessionId !== sessionId) continue;
         pendingPermissions.delete(id);
@@ -479,8 +510,8 @@ export function createFakeOpencode() {
       emit({ type: E.PermissionReplied, sessionId: resolve.sessionId, permissionId, reply });
       resolve.resolve(reply);
     },
-    async listModels() {
-      return { available: models };
+    async listModels(directory) {
+      return { available: [...models, ...(directory === undefined ? [] : (projectModels.get(directory) ?? []))] };
     },
     mcpServers,
     async mcpStatus() {

@@ -171,7 +171,8 @@ agent-workflow/
 │  │        ├─ previews/           页面预览（v1.3，29 §4）：任务 worktree 里的开发服务器，只在内存里
 │  │        ├─ browser/            AI 的浏览器（v1.3，29 §5）：宿主、标签页、动作层、快照
 │  │        ├─ team/               团队（v1.3，33）：提交缓存与读取、按成员统计、AI 成员分析的排队与 team_analysis 尝试
-│  │        └─ databases/          drivers/{mysql,postgres,sqlserver}
+│  │        ├─ databases/          drivers/{mysql,postgres,sqlserver}
+│  │        └─ network/            信任的 CA 与代理（D164、D165）：后端的默认 CA 与全局代理，opencode 启动时的变量
 │  ├─ builtin/                 内置流程与角色（数据 + prompts/*.md）
 │  └─ opencode-plugin/         agent-workflow-bridge（注入 sessionID 到本项目 MCP 工具参数）；`pnpm build:plugin` 去掉类型生成 dist/agent-workflow-bridge.js
 ├─ e2e/                        Playwright：浏览器旅程、全主题走查（walkthrough）、Electron 旅程 J10、性能实测（*.perf.spec.ts）
@@ -322,7 +323,7 @@ export function taskOperations(tasks: TasksService) {
 - opencode 会话：`directory` 为任务 worktree；`external_directory: deny`；edit 允许；bash 按角色基线（见 13-builtin-workflows）。
 - 执行 MCP：独立令牌；每次调用根据 sessionID 解析到唯一的活动尝试，工具按尝试类型授权。
 - Git：所有调用设置 `LC_ALL=C`（D37），参数数组传参。
-- 助手 MCP（v1.1）：独立令牌；调用按会话归属到助手对话（执行任务的会话调用不了）；写操作经用户确认；凭据字段不进入工具 schema，凭据只能在表单中由用户输入；助手不能修改「总是允许」、opencode 路径、bash 策略与 worktree 目录（D65）。
+- 助手 MCP（v1.1）：独立令牌；调用按会话归属到助手对话（执行任务的会话调用不了）；写操作经用户确认；凭据字段不进入工具 schema，凭据只能在表单中由用户输入；助手不能修改「总是允许」、opencode 路径、bash 策略与 worktree 目录（D65），也不能修改信任的 CA 与代理（D164、D165）。
 - 助手会话：`directory` 为 `<数据目录>/assistant/`，`external_directory: deny`，bash 为只读规则、其余询问。
 - 数据库工具：只读事务（SQL Server 为从不提交的事务）+ 按方言的语句检查 + 行数与超时限制（24 §4）。
 - 浏览器（v1.3，29 §5.4）：AI 的标签页只打开任务预览地址与设置 `browser.sites` 允许的网站，只读网站上 AI 发出的写请求与 WebSocket 由 main 在网络层拦下；用户标签页中规则不允许的地址交给系统浏览器；下载、权限请求、文件选择框一律拒绝；不开远程调试端口；工具返回的页面内容在工具说明与提示词中标为数据、不是指令；应用不向页面填写任何已保存的凭据，网站登录由用户在设置里自己完成。助手不能修改 `browser.sites`（D65 的同一思路）。

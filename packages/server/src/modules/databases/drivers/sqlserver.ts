@@ -1,4 +1,4 @@
-import { AppError, DB_CONNECT_TIMEOUT_MS, ErrorCode } from '@aw/shared';
+import { AppError, DB_CONNECT_TIMEOUT_MS, DbTlsMode, ErrorCode } from '@aw/shared';
 import { Connection, Request, TYPES } from 'tedious';
 import { z } from 'zod';
 import type { DbDriver, DbTarget } from '../databases.driver.ts';
@@ -56,7 +56,9 @@ async function open(target: DbTarget, requestTimeoutMs: number): Promise<Connect
     options: {
       port: target.port,
       database: target.database,
-      encrypt: target.tls,
+      // Without encryption tedious still encrypts the login packet. `no_verify` takes any certificate (D166).
+      encrypt: target.tlsMode !== DbTlsMode.Off,
+      trustServerCertificate: target.tlsMode === DbTlsMode.NoVerify,
       connectTimeout: DB_CONNECT_TIMEOUT_MS,
       requestTimeout: requestTimeoutMs,
     },

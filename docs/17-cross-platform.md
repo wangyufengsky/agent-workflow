@@ -169,20 +169,37 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 - 后端脚本（`scripts/*.mjs|ts`）只用 `node:path`；`scripts/check-prod-bundle.mjs` 读取构建产物，跨平台。
 
 
-### 3.12 从 Finder / 桌面启动时的 PATH（D117）
+### 3.12 从 Finder / 桌面启动时的 PATH 与环境变量（D117、D161）
 
 **问题。** 从 Finder、Dock 或 Launchpad 启动时，launchd 给应用的 PATH 只有 `/usr/bin:/bin:/usr/sbin:/sbin`；Linux 从桌面启动器启动时同样只有系统会话的 PATH，没有 `~/.nvm`、`~/.sdkman` 等。后端把这个 PATH 传给检查命令（`/bin/sh -c`，`extendEnv: false`）、opencode 与 git，于是 `mvn`、`pnpm`、`node`、`java` 在终端里能用、在应用里报 `command not found`（退出码 127）。opencode 的 bash 以 `$SHELL -l -c` 运行，只读登录脚本，写在 `.zshrc` 里的 PATH 也拿不到。
 
-**处理。** 桌面 main（`shell-path.ts`）在启动后端前运行一次 `<登录 shell> -ilc 'printf 标记; printenv PATH; printf 标记'`：
+内网部署时同样的问题出在其他变量上：内网 provider 的 API key、`OPENCODE_DISABLE_*`、`NODE_EXTRA_CA_CERTS`、代理变量写在启动脚本里，应用里拿不到（D161）。
+
+**处理。** 桌面 main（`shell-path.ts`）在启动后端前运行一次 `<登录 shell> -ilc 'printf 标记; env -0; printf 标记'`：
 
 - 登录 shell 取用户账户里登记的那个（`os.userInfo().shell`），`-i -l` 与终端打开时读同样的启动脚本（`.zprofile`、`.zshrc`、`.bash_profile`、`.bashrc` 等）。shell 在自己的会话中运行（`detached`），从终端启动时不会抢占终端。
-- 启动脚本可能在命令前后打印横幅等杂讯，只取两个标记之间的内容；读到第二个标记就结束等待，不等启动脚本留下的后台进程关闭输出。`printf` 与 `printenv` 在 sh、bash、zsh、fish 中写法相同。
-- 合并：当前 PATH 已包含登录 shell 的全部目录（从终端启动）时**原样不变**；否则按登录 shell 的顺序，再接上只有当前 PATH 才有的目录（`/opt/homebrew/bin` 排在 `/usr/bin` 之前，`/usr/bin/java`、`/usr/bin/git` 是转发程序）。
-- 10 s 内没有打印出 PATH、shell 失败或退出时：main 的日志写明原因（含 shell 的 stderr 结尾），后端沿用原 PATH，应用照常启动。
-- 只取 PATH；其他变量（`JAVA_HOME` 等）不取（D117 的可选方案）。Windows 不处理：PATH 来自注册表，每个进程都完整。
+- 启动脚本可能在命令前后打印横幅等杂讯，只取两个标记之间的内容；读到第二个标记就结束等待，不等启动脚本留下的后台进程关闭输出。`printf` 与 `env -0` 在 sh、bash、zsh、fish 中写法相同；`env -0` 以 NUL 结束每个变量，值里的换行与 `=` 原样保留（macOS、GNU、BusyBox 的 `env` 都支持）。
+- 变量（D161）：去掉描述那个 shell 自身的 `PWD`、`OLDPWD`、`SHLVL`、`_`；当前环境已有的变量保持当前的值（从终端启动时以用户在终端里导出的为准），只补上当前没有的。
+- PATH 合并：当前 PATH 已包含登录 shell 的全部目录（从终端启动）时**原样不变**；否则按登录 shell 的顺序，再接上只有当前 PATH 才有的目录（`/opt/homebrew/bin` 排在 `/usr/bin` 之前，`/usr/bin/java`、`/usr/bin/git` 是转发程序）。
+- 10 s 内没有打印出环境、shell 失败或退出时：main 的日志写明原因（含 shell 的 stderr 结尾），后端沿用原环境，应用照常启动。
+- Windows 不处理：环境变量来自注册表，每个进程都完整。
 - 本机实测（zsh、Homebrew）约 50 ms，与打开动画（1.2 s）同时进行。
 
-**测试。** `shell-path.int.test.ts` 用一个假的登录 shell（启动时打印杂讯并加入 `/opt/fake-brew/bin`）验证：从 Finder 启动时后端的 PATH 按登录 shell 的顺序带上该目录；从终端启动时不变；shell 失败或不结束时沿用原 PATH。假 shell 是 sh 脚本，这三例在 Windows 上跳过（该机制在 Windows 上不运行，「Windows 不问登录 shell」一例三平台都运行）。从打包应用里真正读到用户的 shell 配置只能手工验证：`pnpm dist` 打包、从 Finder 启动，跑一个 `mvn` 或 `pnpm` 检查命令。
+**测试。** `shell-path.int.test.ts` 用一个假的登录 shell（启动时打印杂讯、加入 `/opt/fake-brew/bin` 并导出变量）验证：从 Finder 启动时后端的 PATH 按登录 shell 的顺序带上该目录、补上登录 shell 导出的变量、当前已有的变量不被覆盖、shell 自身的变量不带；从终端启动时 PATH 不变、变量以当前的为准；值含换行与 `=` 时原样带上；shell 失败或不结束时沿用原环境。假 shell 是 sh 脚本，这三例在 Windows 上跳过（该机制在 Windows 上不运行，「Windows 不问登录 shell」一例三平台都运行）。从打包应用里真正读到用户的 shell 配置只能手工验证：`pnpm dist` 打包、从 Finder 启动，跑一个 `mvn` 或 `pnpm` 检查命令。
+
+### 3.13 企业 CA 与代理（D164、D165）
+
+**问题。** 后端是 Electron utilityProcess 里的 Node：TLS 只信任 Node 自带的根证书，不读系统证书库；fetch 不读 `HTTPS_PROXY`。内置浏览器（Chromium）却读系统证书库、跟随系统代理（含 PAC），所以同一个企业 GitLab 浏览器能开、后端报证书错误，github.com 在「外部走代理」的内网里后端连不上。
+
+**处理（`modules/network`）。**
+
+- 信任：后端启动时与设置 `network.extraCaCerts` 变化时调用 `tls.setDefaultCACertificates`，列表为 `bundled`（Node 内置）+ `extra`（`NODE_EXTRA_CA_CERTS`，启动时由 Node 读入；Electron 44 的 utilityProcess 实测会读）+ `system`（系统证书库）+ 设置里的证书。fetch（Octokit、Gitbeaker）与 mysql2、pg、gaussdb-node、tedious 都不传自己的 `ca`，用的就是这份默认列表。系统证书库各平台来源：macOS 为钥匙串中受信任的证书，Linux 为 OpenSSL 默认目录（`/etc/ssl/certs` 等，`update-ca-certificates` 写入的位置），Windows 为系统证书存储（Windows 暂缓，未验证）。
+- 代理：`http.setGlobalProxyFromEnv` 以「生效的代理变量」替换 fetch 的全局 dispatcher 与 `http(s).globalAgent`，每次先还原上一次的设置。生效的变量：`network.proxy` 有值时为它与 `network.noProxy`，否则为环境变量（小写优先，与 curl、Node、bun 相同）；`NO_PROXY` 总是加上 `localhost,127.0.0.1,[::1]`（Node 只认带方括号的 IPv6 写法，实测）。数据库连接是 TCP，不经代理。
+- opencode（bun 1.3.14）：每次启动带 `NODE_USE_SYSTEM_CA=1`；设置里有证书时，把「后端从 `NODE_EXTRA_CA_CERTS` 读到的 + 设置里的」写到 `<数据目录>/network/extra-ca.pem`，`NODE_EXTRA_CA_CERTS` 指向它；代理变量大小写各一份（bun 原本就读这些变量与 `NO_PROXY`，实测）。改设置后要重启 opencode 才生效（运行环境页「重启」）。
+- 与内置浏览器的差异：浏览器跟随系统代理与 PAC；后端与 opencode 只认变量与设置，不解析 PAC。只在系统设置里配了代理的用户需要在设置「网络」里填一次。
+- 不处理：需要账号密码的代理不能写进设置（设置明文保存），继续用环境变量；NTLM / Kerberos 代理认证不支持；git 推送用用户自己的 git 配置（`http.sslCAInfo`、`http.proxy`）。
+
+**测试。** `network.int.test.ts`：FakeHosting 以测试 CA 签发的证书提供 HTTPS，加 CA 前报 `HOSTING_UNREACHABLE`、加上后成功；测试代理记录 CONNECT，自建 GitLab 用只有代理能解析的主机名，验证环境变量、设置覆盖与 `noProxy`；假 opencode 记录启动环境。`network.oc.test.ts`（`@opencode`）：真实 opencode 经设置里的 CA 连上 HTTPS 的模型服务。系统证书库只能手工验证：把测试 CA 加入钥匙串（Linux：`/usr/local/share/ca-certificates` + `update-ca-certificates`），不加设置，保存企业 GitLab 的令牌。
 
 ## 4. 测试与 CI
 

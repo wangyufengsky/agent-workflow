@@ -458,6 +458,23 @@
 | --- | --- | --- |
 | H-01 | 专业模式设置页「GitHub / GitLab 令牌」：按平台地址保存（验证并记下账号名）、更换、删除全局令牌（表 `hosting_accounts`，迁移 `0029_hosting_accounts`）；`projects.hostingOf` 在项目没有自己的令牌时按 origin 的平台地址用全局令牌；项目详情返回 `effectiveHosting`，Git 控制台卡片、工作台左栏、推送与建 PR 对话框、任务页「创建 PR」按它显示。同一提交登记 02（D155）、08（`HostingSource`）、10、11、14、27 | 集成（FakeHosting）：被拒的令牌不保存、同一地址再次保存是替换、删除；origin 是 GitHub 的项目没有令牌时建 PR 报 `HOSTING_NOT_CONFIGURED`，加全局令牌后成功；项目绑定的令牌优先 |
 
+## 后续 · 内网部署适配（IN）
+
+> 状态：**用户要求**（D161–D166、D170–D173，2026-10-25，内网已部署模型服务与带内网 provider 的 opencode），**IN-01…IN-06、IN-10…IN-13 已实现**（IN-10…IN-13 为内置浏览器，PR #116），待用户检查。
+
+| 任务 | 内容 | 完成标准 |
+| --- | --- | --- |
+| IN-01 | 后端继承登录 shell 的整个环境（`env -0`），当前已有的变量不覆盖，PATH 照旧合并（D161）。同一提交登记 02、17 §3.12 | 集成（假登录 shell）：从 Finder 启动时补上 shell 导出的变量、不带 shell 自身的变量；从终端启动时以当前的为准；值含换行与 `=` 原样带上；失败沿用原环境 |
+| IN-02 | 环境检测按每个项目的仓库目录列模型并合并（`projectIds`），模型带 `contextLimit`；引导页与运行环境页提示未声明上下文长度的模型（D162）。同一提交登记 02、11 §2、12 §8 | 集成（FakeOpencode）：只在项目配置里的模型也算就绪并注明项目；全局也有的不重复；`@opencode`：真实 opencode 只在带目录时列出项目 provider，没写 limit 的为 null |
+| IN-03 | 会话进入 opencode 重试时尝试超时暂停、恢复后按剩余时间继续（内部事件 `busy`）；会话流重试通知带原因、同一原因只记一次；`ATTEMPT_SESSION_ERROR` 的 `message` 为错误类名加模型服务原话，会话流与失败面板显示（D163）。同一提交登记 02、08、12 §4.2 / §8 | 集成（FakeOpencode `retry` 步骤与假时钟）：重试 60 分钟仍在运行，恢复后按剩余时间超时；会话报错的 message 带原话；单元：重试通知带原因 |
+| IN-04 | 后端信任企业 CA：默认 CA 设为内置根证书 + `NODE_EXTRA_CA_CERTS` + 系统证书库 + 设置 `network.extraCaCerts`（`tls.setDefaultCACertificates`，新模块 `network`，改设置立即生效；设置在保存前逐张解析）；opencode 启动时带 `NODE_USE_SYSTEM_CA=1`，有设置时 `NODE_EXTRA_CA_CERTS` 指向 `<数据目录>/network/extra-ca.pem`；托管平台请求没有得到回答时报新错误码 `HOSTING_UNREACHABLE`（带 Node 的错误码）；专业模式设置页「网络」（D164）。同一提交登记 02、03、08、14、17 §3.13 | 集成（FakeHosting HTTPS + 测试 CA）：加 CA 前 `HOSTING_UNREACHABLE`（`UNABLE_TO_VERIFY_LEAF_SIGNATURE`），加上后保存令牌成功；非 PEM 内容 `VALIDATION_FAILED`；假 opencode 记录的启动环境带 `NODE_USE_SYSTEM_CA` 与含 CA 的文件；`@opencode`：真实 opencode 经设置里的 CA 连上 HTTPS 的模型服务 |
+| IN-05 | 后端出站请求走代理：默认读 `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`（含小写），设置 `network.proxy` / `network.noProxy` 整体覆盖；Node 内置代理（`http.setGlobalProxyFromEnv`）改设置立即生效；本机地址总是直连；opencode 启动时带上大小写两套变量（D165）。同一提交登记 02、08、14、17 §3.13 | 集成（记录 CONNECT 的测试代理 + 只有代理能解析的主机名）：默认走环境变量的代理，设置的代理覆盖它，`noProxy` 里的主机直连；假 opencode 的启动环境带设置的代理与 `NO_PROXY` |
+| IN-06 | 数据库 TLS 三档 `DbTlsMode`（`off` / `verify` / `no_verify`）：表 `db_connections.tls` 换成 `tls_mode`（迁移 `0030_db_tls_mode`，原来勾选的为 `verify`），API 与操作的 `tls` 换成 `tlsMode`，四个驱动按档设置；数据库对话框改为下拉并说明「不校验证书」的风险（D166）。同一提交登记 02、08、10、11 §9、14、24 §2 | 集成（Docker MySQL，服务器证书由测试 CA 签发，账号 `REQUIRE SSL`）：不加密登录失败、`no_verify` 成功、`verify` 在设置加上 CA 前失败、加上后成功、清空后又失败；PostgreSQL（snakeoil）与 SQL Server（自生成证书）用 `no_verify` 跑全套、`verify` 失败；迁移：原 `tls = 1` 为 `verify` |
+| IN-10 | 网站的 HTTP 认证（D170）：main 处理用户标签页的 `login` 事件，经 IPC `aw:browser-prompt` 请界面弹出用户名和密码框（`features/preview/website-prompt.tsx`），回答经 main 直接交给 Chromium，不经后端；AI 的标签页不询问；后端在主文档 401 / 407 时返回 `BROWSER_LOGIN_REQUIRED`（`loginAt`）。同一提交登记 02、11、14、29 §5.4 / §8.6 | Electron（`browser-host.electron.spec.ts`）：AI 标签页 401 且没有询问；用户在自己的标签页里登录后同一分区的 AI 标签页 200；取消仍是 401。Electron 全栈（`site-login.electron.spec.ts`）：设置页对话框里登录后 `browser.readUrl` 读到页面。集成（Chromium 宿主）：401 的网站 `browser_open` 与 `browser.readUrl` 都是 `BROWSER_LOGIN_REQUIRED` |
+| IN-11 | Windows 集成登录（D171）：专业模式设置 `browser.integratedAuthServers`（不能只写 `*`，助手不能改），`open` 请求带 `integratedAuthServers`，main 对网站分区 `allowNTLMCredentialsForDomains`；设置页「网站」一节的输入框。不做委派（用户已确认）。同一提交登记 02、08、14、29 | 单元与类型检查；没有域环境，Kerberos / NTLM 没有自动化或手工验证（PR 中写明） |
+| IN-12 | 客户端证书（D172）：main 在应用的 `select-client-certificate` 事件里处理本应用的标签页：用户的标签页弹出证书列表，AI 的标签页不回答（停止加载，免得 Chromium 记住「不用证书」）并发 `browser.certificateRefused`，后端据此返回 `BROWSER_LOGIN_REQUIRED`。同一提交登记 02、11、29 | 类型检查；没有系统证书，未验证（PR 中写明） |
+| IN-13 | 只读网站的查询路径（D173，用户已确认）：网站规则加 `queryPaths`，`blockReason` 放行 AI 发往这些路径的 POST；设置页只读规则下的输入框；执行与规划提示词说明查询被拦时怎么办。同一提交登记 02、08、14、29 | 单元（`policy.test.ts`）：查询路径的 POST 放行，别的路径、大小写不同、`PUT`、WebSocket 仍拦下；集成（Chromium 宿主）：查询照常发出、同一网站别的写请求被拦并写进 `blockedWrites` |
+
 ## 后续 · 存储空间与磁盘清理（ST）
 
 > 状态：**用户要求**（D157，2026-10-25），**ST-01 已实现**，待用户检查。设计见 [37-storage.md](37-storage.md)。
@@ -465,17 +482,6 @@
 | 任务 | 内容 | 完成标准 |
 | --- | --- | --- |
 | ST-01 | 后端 storage 模块：`system.storage` 按 `StorageKind` 统计数据目录与工作区根目录、`system.cleanStorage` 清理旧日志（保留每类最新的一个）与结束超过 7 天的任务的 `runs/<taskId>/`；运行环境页「存储空间」面板与确认框 | 集成测试（真实文件系统）：分类统计与合计、旧日志清理保留每类最新的一个、只清理结束超过保留天数的任务且任务本身保留 |
-
-## 后续 · 内网部署适配（IN）
-
-> 状态：**用户要求**（2026-10-25，应用部署在企业内网）。本分支只含内置浏览器的 IN-10…IN-13（D170–D173），**已实现**，待用户检查；IN-01…IN-03 见 PR #112，其余编号留给企业 CA / 代理、SSH 远端、Linux 凭据、离线开关。合并时与 #112 的同名一节合并成一节。
-
-| 任务 | 内容 | 完成标准 |
-| --- | --- | --- |
-| IN-10 | 网站的 HTTP 认证（D170）：main 处理用户标签页的 `login` 事件，经 IPC `aw:browser-prompt` 请界面弹出用户名和密码框（`features/preview/website-prompt.tsx`），回答经 main 直接交给 Chromium，不经后端；AI 的标签页不询问；后端在主文档 401 / 407 时返回 `BROWSER_LOGIN_REQUIRED`（`loginAt`）。同一提交登记 02、11、14、29 §5.4 / §8.6 | Electron（`browser-host.electron.spec.ts`）：AI 标签页 401 且没有询问；用户在自己的标签页里登录后同一分区的 AI 标签页 200；取消仍是 401。Electron 全栈（`site-login.electron.spec.ts`）：设置页对话框里登录后 `browser.readUrl` 读到页面。集成（Chromium 宿主）：401 的网站 `browser_open` 与 `browser.readUrl` 都是 `BROWSER_LOGIN_REQUIRED` |
-| IN-11 | Windows 集成登录（D171）：专业模式设置 `browser.integratedAuthServers`（不能只写 `*`，助手不能改），`open` 请求带 `integratedAuthServers`，main 对网站分区 `allowNTLMCredentialsForDomains`；设置页「网站」一节的输入框。不做委派（用户已确认）。同一提交登记 02、08、14、29 | 单元与类型检查；没有域环境，Kerberos / NTLM 没有自动化或手工验证（PR 中写明） |
-| IN-12 | 客户端证书（D172）：main 在应用的 `select-client-certificate` 事件里处理本应用的标签页：用户的标签页弹出证书列表，AI 的标签页不回答（停止加载，免得 Chromium 记住「不用证书」）并发 `browser.certificateRefused`，后端据此返回 `BROWSER_LOGIN_REQUIRED`。同一提交登记 02、11、29 | 类型检查；没有系统证书，未验证（PR 中写明） |
-| IN-13 | 只读网站的查询路径（D173，用户已确认）：网站规则加 `queryPaths`，`blockReason` 放行 AI 发往这些路径的 POST；设置页只读规则下的输入框；执行与规划提示词说明查询被拦时怎么办。同一提交登记 02、08、14、29 | 单元（`policy.test.ts`）：查询路径的 POST 放行，别的路径、大小写不同、`PUT`、WebSocket 仍拦下；集成（Chromium 宿主）：查询照常发出、同一网站别的写请求被拦并写进 `blockedWrites` |
 
 ## v1.3 期间 · 精简助手输入区（Y）
 

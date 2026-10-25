@@ -1,4 +1,4 @@
-import type { DbColumn, DbIndex, DbQueryOutput, DbTable } from '@aw/shared';
+import type { DbColumn, DbIndex, DbQueryOutput, DbTable, DbTlsMode } from '@aw/shared';
 
 /** Where and as whom to connect; the password comes from the credentials module just before use. */
 export type DbTarget = {
@@ -7,7 +7,7 @@ export type DbTarget = {
   database: string;
   username: string;
   password: string;
-  tls: boolean;
+  tlsMode: DbTlsMode;
 };
 
 export type DbQueryLimits = { maxRows: number; timeoutMs: number };

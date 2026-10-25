@@ -1,4 +1,5 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer, type IncomingMessage, type RequestListener, type ServerResponse } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
 import type { HostingEndpoints } from '../../src/modules/hosting/index.ts';
 
 export type FakeMessage = { author: string; body: string; createdAt: string };
@@ -30,9 +31,15 @@ const message = (m: FakeMessageInput): FakeMessage => ({ ...m, createdAt: m.crea
 /**
  * The few GitHub and GitLab API endpoints the hosting module uses, on a local HTTP server (07 §4: the only external
  * APIs with a fake). GitHub is served under `/github` (Octokit's base URL), GitLab under `/gitlab` (Gitbeaker's host).
- * Only `token` is accepted; `repos` lists the repositories it can see.
+ * Only `token` is accepted; `repos` lists the repositories it can see. With `tls` it serves HTTPS with that certificate
+ * (a self-hosted GitLab behind an enterprise CA, D164), addressed as `host` (default 127.0.0.1).
  */
-export async function createFakeHosting(options: { token: string; repos: string[] }) {
+export async function createFakeHosting(options: {
+  token: string;
+  repos: string[];
+  tls?: { certPem: string; keyPem: string };
+  host?: string;
+}) {
   const pullRequests: FakePullRequest[] = [];
   /** Answers the next pull request with this error instead (e.g. 422: one already exists). */
   let failNext: { status: number; message: string } | undefined;
@@ -145,7 +152,7 @@ export async function createFakeHosting(options: { token: string; repos: string[
     ];
   }
 
-  const server = createServer((req, res) => {
+  const listener: RequestListener = (req, res) => {
     void (async () => {
       const url = new URL(req.url ?? '/', 'http://fake');
       const graphql = url.pathname === '/github/graphql';
@@ -194,11 +201,15 @@ export async function createFakeHosting(options: { token: string; repos: string[
         ),
       );
     })();
-  });
+  };
+  const server =
+    options.tls === undefined
+      ? createServer(listener)
+      : createHttpsServer({ cert: options.tls.certPem, key: options.tls.keyPem }, listener);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (address === null || typeof address === 'string') throw new Error('FakeHosting is not listening on TCP');
-  const base = `http://127.0.0.1:${address.port}`;
+  const base = `${options.tls === undefined ? 'http' : 'https'}://${options.host ?? '127.0.0.1'}:${address.port}`;
 
   /** The latest pull request from `head`: where reviewers comment. */
   function pullRequestOf(head: string): FakePullRequest {
