@@ -1257,7 +1257,11 @@ button.card:hover,
   z-index: 51;
   left: 50%;
   top: 50%;
+  /* A form with an error (and the unlock under it, D178) can be taller than a short window: its body scrolls. */
+  display: flex;
+  flex-direction: column;
   width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
   transform: translate(-50%, -48%) scale(0.98);
   opacity: 0;
   pointer-events: none;
@@ -1274,6 +1278,8 @@ button.card:hover,
   transform: translate(-50%, -50%);
 }
 .dialog-body {
+  min-height: 0;
+  overflow-y: auto;
   padding: 22px 22px 8px;
 }
 .dialog-body h2 {
@@ -1287,6 +1293,7 @@ button.card:hover,
   line-height: 1.65;
 }
 .dialog-foot {
+  flex: none;
   display: flex;
   justify-content: flex-end;
   gap: 8px;

@@ -5,7 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium, type ElectronApplication, _electron as electron, expect, type Page, test } from '@playwright/test';
-import { createRepo } from './helpers.ts';
+import { createRepo, MIN_WINDOW } from './helpers.ts';
 
 /** The desktop app's `electron` dependency resolves to the path of its executable. */
 const electronPath: string = createRequire(join(process.cwd(), 'apps/desktop/package.json'))('electron');
@@ -181,6 +181,10 @@ test('表单里的错误就地解锁，不会再次提交表单', async () => {
         json: { error: { code: 'CREDENTIAL_LOCKED', message: 'Master password not entered since start' } },
       });
     });
+    // The connection form with its error and the unlock is taller than the smallest window: the dialog scrolls (14 §2).
+    await app.evaluate(({ BrowserWindow }, { width, height }) => {
+      BrowserWindow.getAllWindows()[0]?.setSize(width, height);
+    }, MIN_WINDOW);
     await page.goto(new URL('/databases', page.url()).href);
     await page.getByRole('button', { name: '添加连接' }).first().click();
     const dialog = page.getByRole('dialog');
