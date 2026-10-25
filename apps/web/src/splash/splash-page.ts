@@ -38,6 +38,15 @@ export function splashHtml({ theme, intro }: LaunchPreferences): string {
 </html>`;
 }
 
+/**
+ * How long the opening plays and the fade-out before the app takes over. The script counts them with timers: a window
+ * that does not paint (hidden at start, a slow GPU, a virtual display) runs no CSS animations and fires none of their
+ * events, and waiting for one kept the window on this page.
+ */
+const INTRO_MS = 1200;
+const LEAVE_MS = 200;
+const HOLD_MS = 250;
+
 /** 1.2 s (28 §5.1): nodes pop one after another as the lines draw, the wordmark rises, the tagline fades in. */
 const STYLE = `
 *{box-sizing:border-box}
@@ -67,9 +76,9 @@ body::before{content:"";position:fixed;inset:-20%;background:radial-gradient(clo
 [data-intro="true"] .lead{animation:rise .5s cubic-bezier(.2,.7,.2,1) .3s both}
 [data-intro="true"] .emphasis{animation:rise .5s cubic-bezier(.2,.7,.2,1) .38s both}
 [data-intro="true"] .tagline{animation:fade .35s cubic-bezier(.2,.7,.2,1) .6s both}
-[data-intro="true"] .mark{animation:hold .25s linear .95s both}
+[data-intro="true"] .mark{animation:hold ${HOLD_MS / 1000}s linear ${(INTRO_MS - HOLD_MS) / 1000}s both}
 [data-intro="true"][data-state="waiting"] .spark{animation:spark 1.1s linear infinite}
-[data-state="leaving"] body{animation:out .2s cubic-bezier(.2,.7,.2,1) both}
+[data-state="leaving"] body{animation:out ${LEAVE_MS / 1000}s cubic-bezier(.2,.7,.2,1) both}
 @keyframes pop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
 @keyframes draw{to{stroke-dashoffset:0}}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -93,7 +102,7 @@ const end = () => {
   finish();
 };
 if (animate) {
-  document.querySelector('.mark').addEventListener('animationend', (e) => { if (e.animationName === 'hold') end(); });
+  setTimeout(end, ${INTRO_MS});
   addEventListener('pointerdown', end);
   addEventListener('keydown', end);
 } else end();
@@ -103,7 +112,7 @@ window.splash = {
   leave() {
     if (!animate) return Promise.resolve();
     root.dataset.state = 'leaving';
-    return new Promise((resolve) => document.body.addEventListener('animationend', () => resolve(), { once: true }));
+    return new Promise((resolve) => setTimeout(resolve, ${LEAVE_MS}));
   },
   fail() {
     root.dataset.state = 'failed';
