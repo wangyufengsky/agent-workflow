@@ -31,23 +31,23 @@ export const SETTINGS_COPY = {
   // 离线环境（D168）
   offline: '离线环境',
   offlineHint:
-    '在内网或不能访问公网的机器上打开：opencode 不再更新模型目录、不分享会话、不下载语言服务器，模型列表中隐藏需要公网的 opencode 自带模型，知识问答只能读内网网页、不能网络搜索。',
+    '在内网或不能访问公网的机器上打开：opencode 不再更新模型目录、不分享会话、不下载语言服务器，模型列表中隐藏需要公网的 opencode 自带模型，知识问答只能读内网网页、不能网络搜索；内网模型没有单价，各处只显示 tokens、不显示费用。',
   offlineRestartHint: '重启 opencode 后生效；重启会中断正在进行的 AI 会话，之后可以重试。',
   restartNow: '立即重启',
   // 专业项（08 §4.3）
   pro: '专业设置',
-  // 网络：企业 CA 与代理（D164、D165）；离线环境见上
+  // 网络：企业 CA 与代理（D164、D165、D174–D176）；离线环境见上
   network: '网络',
   extraCa: '额外信任的 CA 证书',
   extraCaFile: '从文件读取…',
   extraCaHint:
-    '后端访问 GitHub / GitLab 与数据库时，在内置根证书与系统证书库之外再信任这些 CA，保存后立即生效；opencode 在下次启动时生效（运行环境页可重启）。粘贴 PEM 格式的证书，可以多张。',
+    '在内置根证书与系统证书库之外再信任这些 CA：后端访问 GitHub / GitLab 与数据库、git 推送与拉取、内置浏览器打开网站都用它，保存后立即生效；opencode 在下次启动时生效（运行环境页可重启）。粘贴 PEM 格式的证书，可以多张。',
   proxy: '代理地址',
   proxyHint:
-    '形如 http://proxy.corp.example:8080，不能包含账号密码。留空则使用环境变量 HTTPS_PROXY / HTTP_PROXY / NO_PROXY。填写后后端与 opencode 都用它，内置浏览器仍跟随系统代理。',
+    '形如 http://proxy.corp.example:8080，不能包含账号密码。留空则使用环境变量 HTTPS_PROXY / HTTP_PROXY / NO_PROXY，内置浏览器跟随系统代理。填写后后端、opencode、git 与内置浏览器都用它。opencode 启动时已有代理的，改动立即生效；从没有代理到有代理（或反过来）要重启 opencode。',
   noProxy: '不走代理的地址',
   noProxyHint:
-    '逗号分隔，.corp.example 也匹配它的子域名；只在填写了代理地址时生效。本机地址（localhost、127.0.0.1）总是直连。',
+    '逗号分隔，可以写主机名（corp.example、.corp.example、*.corp.example 都也匹配子域名）、IP、网段（如 10.0.0.0/8）与「主机:端口」；IP 与网段只匹配网址里直接写的 IP，不解析主机名。只在填写了代理地址时生效；环境变量 NO_PROXY 里的同样写法同样有效。本机地址（localhost、127.0.0.1）总是直连。',
   // 全局 GitHub / GitLab 令牌（D155）
   hostingAccounts: 'GitHub / GitLab 令牌',
   hostingAccountsLede:

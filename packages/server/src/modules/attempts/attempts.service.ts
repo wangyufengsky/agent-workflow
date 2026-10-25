@@ -79,7 +79,7 @@ type ContinueInput = { id?: string; prompt: string; model?: string | null; kind?
 export function createAttemptsService(deps: AttemptsServiceDeps) {
   const { clock, opencode, settings, transcripts, projects, slots } = deps;
   const state = createAttemptState(deps);
-  const { repo, mustFind, move, record, toDto } = state;
+  const { repo, mustFind, move, record } = state;
   const reactions = watchSessions(state, deps);
 
   // Interactive sessions using the model (D186): attempts of no task that do not wait for the user or the model service.
@@ -108,6 +108,15 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       },
       moved: () => state.publish(mustFind(id)),
     });
+  }
+
+  /**
+   * Intranet models have no prices, so the cost opencode reports is always 0: in the offline environment no attempt
+   * carries one (D181), and the pages and the assistant only see tokens. It stays stored.
+   */
+  function toDto(attempt: Attempt): AttemptDTO {
+    const dto = state.toDto(attempt);
+    return settings.get('network.offline') ? { ...dto, cost: null } : dto;
   }
 
   function requireReady(): void {

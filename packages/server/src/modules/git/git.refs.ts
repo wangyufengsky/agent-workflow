@@ -74,9 +74,12 @@ export async function distance(repo: string, base: string, ref: string): Promise
   return { ahead, behind };
 }
 
-/** Updates remote-tracking branches of every remote, dropping deleted ones; changes refs (lock the repository). */
-export async function fetchAll(repo: string): Promise<void> {
-  await runGit(['fetch', '--all', '--prune', '--quiet'], { cwd: repo });
+/**
+ * Updates remote-tracking branches of every remote, dropping deleted ones, in `env` (`originEnv`); changes refs (lock
+ * the repository).
+ */
+export async function fetchAll(repo: string, env: NodeJS.ProcessEnv): Promise<void> {
+  await runGit(['fetch', '--all', '--prune', '--quiet'], { cwd: repo, env });
 }
 
 /** The best common ancestor of two commits. */

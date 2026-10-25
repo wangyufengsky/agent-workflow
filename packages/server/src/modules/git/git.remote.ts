@@ -2,19 +2,35 @@ import { AppError, ErrorCode } from '@aw/shared';
 import { runGit } from './git.cli.ts';
 
 /**
- * Environment for talking to `origin`. With the project's token (D53) git sends it as an extra header over HTTPS; it
- * travels in the environment, never in the arguments (which are logged). Without one, and over SSH, git uses the
- * user's own keys and credential helpers. Never wait for a password prompt nobody can answer.
+ * What reaching remotes over HTTPS takes besides the user's own git configuration (D175): `-c` settings, passed in the
+ * environment, and variables.
  */
-export function originEnv(authorization: string | undefined): NodeJS.ProcessEnv {
+export type GitNetwork = { config: ReadonlyArray<readonly [string, string]>; env: NodeJS.ProcessEnv };
+
+/**
+ * Environment for talking to a remote: the app's CA and proxy (`network`), and with the project's token (D53) an extra
+ * header git sends over HTTPS. They travel in the environment, never in the arguments (which are logged), and win over
+ * the user's configuration. Without a token, and over SSH, git uses the user's own keys and credential helpers. Never
+ * wait for a password prompt nobody can answer.
+ */
+export function originEnv(network: GitNetwork, authorization?: string): NodeJS.ProcessEnv {
+  const config = [
+    ...network.config,
+    ...(authorization === undefined ? [] : [['http.extraHeader', `Authorization: ${authorization}`] as const]),
+  ];
   return {
     ...process.env,
-    ...(authorization === undefined
+    ...network.env,
+    ...(config.length === 0
       ? {}
       : {
-          GIT_CONFIG_COUNT: '1',
-          GIT_CONFIG_KEY_0: 'http.extraHeader',
-          GIT_CONFIG_VALUE_0: `Authorization: ${authorization}`,
+          GIT_CONFIG_COUNT: String(config.length),
+          ...Object.fromEntries(
+            config.flatMap(([key, value], i) => [
+              [`GIT_CONFIG_KEY_${i}`, key],
+              [`GIT_CONFIG_VALUE_${i}`, value],
+            ]),
+          ),
         }),
     GIT_TERMINAL_PROMPT: '0',
   };

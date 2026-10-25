@@ -13,6 +13,7 @@ import {
   type BrowserActionOutput,
   type BrowserFrame,
   type BrowserKey,
+  type BrowserNetwork,
   type BrowserPage,
   type BrowserPolicy,
   BrowserTabKind,
@@ -49,6 +50,8 @@ export type BrowserServiceDeps = {
   log: Logger;
   events: EventBus;
   settings: SettingsService;
+  /** The network settings every tab's partition follows (D176). */
+  network: () => BrowserNetwork;
   projects: ProjectsService;
   previews: PreviewsService;
   /** Page checks' screenshots go under `runs/<taskId>/browser/` (29 §7.4). */
@@ -145,6 +148,7 @@ export function createBrowserService({
   log,
   events,
   settings,
+  network,
   projects,
   previews,
   dataDir,
@@ -213,6 +217,7 @@ export function createBrowserService({
       partition: kind === BrowserTabKind.Preview ? `aw-attempt-${owner.id}` : SITES_PARTITION,
       policy: policyFor(owner),
       integratedAuthServers: kind === BrowserTabKind.Site ? integratedAuthServers() : [],
+      network: network(),
       site: kind === BrowserTabKind.Site,
     });
     session.tabs[kind] = tab;
@@ -310,6 +315,7 @@ export function createBrowserService({
       viewport: VIEWPORT_SIZES.desktop,
       policy: { previewOrigins: [], sites: [] },
       integratedAuthServers: integratedAuthServers(),
+      network: network(),
     });
     try {
       return await run((method, params) => host.request({ kind: 'cdp', tabId, method, params }));
@@ -457,6 +463,7 @@ export function createBrowserService({
           partition: `persist:aw-preview-${projectId}`,
           policy: policyFor({ taskId, projectId }),
           integratedAuthServers: [],
+          network: network(),
           site: false,
           userFacing: true,
           signal,
@@ -569,6 +576,7 @@ export function createBrowserService({
           partition: SITES_PARTITION,
           policy,
           integratedAuthServers: integratedAuthServers(),
+          network: network(),
           site: true,
           signal: abort.signal,
         });
@@ -766,6 +774,7 @@ export function createBrowserService({
         partition: `aw-check-${nodeId}`,
         policy: policyFor(request),
         integratedAuthServers: [],
+        network: network(),
         site: false,
       });
       previews.acquire(taskId);
@@ -811,6 +820,7 @@ export function createBrowserService({
         viewport: null,
         policy: { previewOrigins: [], sites: settings.get('browser.sites') },
         integratedAuthServers: integratedAuthServers(),
+        network: network(),
       });
       await host.request({ kind: 'cdp', tabId, method: 'Page.navigate', params: { url } });
       return { tabId };

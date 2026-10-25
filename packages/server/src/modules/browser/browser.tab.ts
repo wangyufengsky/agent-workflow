@@ -5,6 +5,7 @@ import {
   BROWSER_SNAPSHOT_MAX_CHARS,
   type BrowserActionOutput,
   BrowserBlockReason,
+  type BrowserNetwork,
   type BrowserPolicy,
   type BrowserTabKind,
   ErrorCode,
@@ -80,6 +81,7 @@ export type TabInput = {
   policy: BrowserPolicy;
   /** Servers the partition logs in to with the user's system login (29 §5.4): the websites' partition's only. */
   integratedAuthServers: string[];
+  network: BrowserNetwork;
   /** Websites lose their realtime write channels (29 §5.4). */
   site: boolean;
   /** The user's own tab, placed on the window by the renderer (29 §8.1): sized by its place, files can be chosen. */
@@ -101,6 +103,7 @@ export async function openTab({
   partition,
   policy,
   integratedAuthServers,
+  network: partitionNetwork,
   site,
   userFacing = false,
   signal,
@@ -264,6 +267,7 @@ export async function openTab({
       viewport: userFacing ? null : VIEWPORT_SIZES.desktop,
       policy,
       integratedAuthServers,
+      network: partitionNetwork,
     });
     opened = true;
     signal?.throwIfAborted();
