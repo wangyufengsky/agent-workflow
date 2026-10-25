@@ -3,7 +3,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
-import { appTool, createProject, createRepo, patchSettings, queueAssistantTurn, queueTurn } from './helpers.ts';
+import {
+  appTool,
+  createProject,
+  createRepo,
+  newConversation,
+  patchSettings,
+  queueAssistantTurn,
+  queueTurn,
+} from './helpers.ts';
 
 let hangingProjectId: string | undefined;
 test.afterEach(async ({ request }) => {
@@ -56,7 +64,7 @@ test('J11 对助手说开始任务 → 确认卡片 → 任务运行', async ({ 
   await expect(panel).toBeVisible();
   expect((await page.locator('main').boundingBox())?.width).toBe(pageWidth);
   // 唯一用户消息属于本例新建聊天，不依赖共享后端没有其他历史。
-  await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  await newConversation(page, panel);
   await expect(panel.getByRole('button', { name: '切换对话', exact: true })).toHaveText('新对话');
   await expect(panel.getByTestId('assistant-user-message')).toHaveCount(0);
   await panel.getByLabel('发给助手的消息').fill('帮我修一下：助手开的任务：退款金额少算了运费');
@@ -165,6 +173,7 @@ test('没有 Git 的目录：确认卡片列出初始化要做的事与将纳入
   await panel.getByRole('button', { name: '新对话', exact: true }).click();
   await expect(panel.getByLabel('发给助手的消息')).toBeDisabled();
   releaseCreate();
+  await expect(panel.getByLabel('发给助手的消息')).toBeEnabled();
   await expect(panel.getByTestId('assistant-user-message')).toHaveCount(0);
   await panel.getByLabel('发给助手的消息').fill(`把 ${dir} 加成项目`);
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
@@ -197,7 +206,7 @@ test('总是允许的调用直接执行并出现对象卡片；对象删除后�
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
   // Its own conversation: the cards of an earlier test's stay out of it.
-  await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  await newConversation(page, panel);
   await panel.getByLabel('发给助手的消息').fill('把这个仓库加成项目');
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
   const card = panel.getByTestId('entity-card');

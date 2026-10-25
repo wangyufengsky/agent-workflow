@@ -6,6 +6,7 @@ import {
   appTool,
   createProject,
   git,
+  newConversation,
   patchSettings,
   queueAssistantTurn,
   queueTurn,
@@ -112,7 +113,7 @@ test('助手打开任务的预览页签（29 §2.6）', async ({ page, request }
   await page.getByRole('button', { name: /^打开助手/ }).click();
   const panel = page.getByRole('complementary', { name: '应用助手' });
   // A conversation of its own: the backend is shared with the other specs.
-  await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  await newConversation(page, panel);
   await panel.getByLabel('发给助手的消息').fill('打开这个任务的预览');
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
   await expect(panel.getByText('已打开预览页签。')).toBeVisible();

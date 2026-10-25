@@ -8,6 +8,7 @@ import {
   createProject,
   type FakeStep,
   MIN_WINDOW,
+  newConversation,
   patchSettings,
   queueAssistantTurn,
   queueWriterTurn,
@@ -199,7 +200,7 @@ test('J20 项目 → 大纲（改、删、加）→ 逐页制作 → 手改 → 
   ]);
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
-  await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  await newConversation(page, panel);
   const exported = page.waitForEvent('download');
   await panel.getByLabel('发给助手的消息').fill('把这份 PPT 导出成 PowerPoint');
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
