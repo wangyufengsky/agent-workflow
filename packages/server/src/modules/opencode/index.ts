@@ -11,8 +11,8 @@ export {
 } from './opencode.client.ts';
 export {
   assistantPermissionRules,
-  buildOpencodeConfig,
   type OpencodeConfigInput,
+  opencodeLaunchEnv,
   sessionPermissionRules,
 } from './opencode.config.ts';
 export {

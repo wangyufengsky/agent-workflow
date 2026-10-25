@@ -70,11 +70,23 @@
   - `ai.bashPolicy = auto`（默认）：`*` allow；`git *` deny（其他所有 Git 命令都可能改动 refs 或工作区，不逐个列举）；Git 只读子命令再 allow。
   - `ai.bashPolicy = ask`：不带检查命令的只读规则（第 1–3、4a、5、6、8 步）。
   - **项目级「总是允许」**（D101）：opencode 的「总是允许」只对当前会话生效，且按它的命令前缀表放得很宽（`unzip -l x.jar` → `unzip *`）。用户在「需要你处理」中对 bash 请求选「总是允许」时，后端在回复 opencode 之外，把请求的每条子命令按「程序 + 开头的选项（到第一个不以 `-` 开头的参数为止）+ ` *`」记到该尝试所属项目（`attempts.project_id`）的 `project_bash_rules`（`projectBashPatterns`：`unzip -l x.jar` → `unzip -l *`、`./scripts/mvn.sh -q test 2>&1` → `./scripts/mvn.sh -q *`、`javap -p -cp "$JAR" Foo` → `javap -p -cp *`、`make` → `make *`），所以批准列表不等于批准解压。Git（模型不写 Git，12 §1）与前置变量赋值（`PATH=… mvn -v`，D64）的子命令不记，只留在 opencode 的会话里。项目之后新建的只读会话（规划、评审、研究员、PPT 写作者，以及 `ask` 策略的执行者）带上这些模式（第 4a、6 步）；研究员与 PPT 写作者在项目主仓库中运行（D69），这正是模式要窄的原因。`auto` 策略的执行者本来就放行 Git 以外的命令，规则不变。已在运行的会话不受撤销影响（D35）。没有项目的调试运行不记。
-- 知识研究员（v1.1，18 §5.1）的会话级规则：不带检查命令的 `readonlyBashRules()`；对话打开网络检索时末尾再加 `webfetch *` 与 `websearch *` allow（agent 规则在前、会话规则在后，最后匹配生效；被整体 deny 的工具不出现在工具列表中，见 §8）。会话目录为项目主仓库，不建 worktree。
+- 知识研究员（v1.1，18 §5.1）的会话级规则：不带检查命令的 `readonlyBashRules()`；对话打开网络检索时末尾再加 `webfetch *` 与 `websearch *` allow（离线环境只加 `webfetch *`，D168）（agent 规则在前、会话规则在后，最后匹配生效；被整体 deny 的工具不出现在工具列表中，见 §8）。会话目录为项目主仓库，不建 worktree。
 - PPT 写作者（v1.2，23 §7.1）的会话级规则：不带检查命令的 `readonlyBashRules()`，没有网络；会话目录为项目仓库，没有项目时为 `<数据目录>/ppt/blank/`。
 - 角色差异不靠多个 agent：会话使用角色的 `base_agent` 对应的 agent（与尝试类型无关：只读的「代码审查」步骤以 reviewer 身份执行 `execute` 尝试，用 `submit_result` 提交报告），角色提示词通过每次 prompt 的 `system` 字段追加，模型通过 prompt 的 `model` 字段指定。因此修改角色无需重启 opencode。评审检查（`review` 尝试）固定使用内置 `reviewer` 角色。
 - **应用助手**（15 §2）：会话 bash 规则统一 `*: ask`，不继承任务的只读命令自动放行；真实 opencode 1.19 的 `head` / `rg` 等命令可能不检查 `external_directory`。原生 `task` 子代理禁用，因为不完整继承父助手权限；应用 `tasks_create` 仍按操作清单的确认策略执行。
 - 修改 `ai.bashPolicy` 对之后新建的会话立即生效，无需重启 opencode。
+- **离线环境**（`network.offline`，D168）：启动 opencode 时 `opencodeLaunchEnv` 在 `OPENCODE_CONFIG_CONTENT` 之外加上 `OPENCODE_DISABLE_MODELS_FETCH=1`、`OPENCODE_DISABLE_SHARE=1`、`OPENCODE_DISABLE_LSP_DOWNLOAD=1`、`OPENCODE_DISABLE_AUTOUPDATE=1`，配置加：
+
+  ```jsonc
+  {
+    // opencode 自带的 Zen / Go：不登录也列出、需要公网；没有模型的 provider 被去掉。
+    // 不用 disabled_providers：注入的数组会整体替换用户自己的 disabled_providers（实测）
+    "provider": { "opencode": { "whitelist": [] }, "opencode-go": { "whitelist": [] } },
+    "permission": { "websearch": "deny" }   // Exa / Parallel 在公网
+  }
+  ```
+
+  设置在下一次启动时生效，`RuntimeDTO` 的 `ready` 带启动时的 `offline`。会话级规则在 `session.create` 时取当前设置：离线时知识研究员的网络开关只追加 `webfetch *` allow（内网网页与浏览器工具照常），不追加 `websearch`。
 
 ## 3. 调用归属（哪个尝试在调用工具）
 
@@ -417,6 +429,22 @@ export const submitPlanTool = defineMcpTool({
 ### 8.1 支持范围内其他版本的实测（D156，2026-10-25）
 
 `pnpm test:oc` 分别在 opencode 1.18.0、1.18.35、1.19.4 上运行（`PATH` 前置临时安装的版本）：不调用模型的 10 个用例（托管启动与崩溃恢复、配置注入、客户端接口、事件解析、bash 权限判定、助手会话生命周期）三个版本全部通过，事件 schema 没有不匹配。唯一调用模型的 bridge 插件用例（模型经执行 MCP 调用 `submit_result`，工具收到会话的 sessionID）三个版本也都通过（`opencode-go/deepseek-v4.1-flash`）。注意：opencode 官方安装脚本装的 `~/.opencode/bin/opencode` 是包装脚本，把 `XDG_*` 指向 `~/.opencode/v1/`，登录信息存在那里；用 npm 另装的版本默认读 `~/.local/share/opencode/`，实测时要传同样的 `XDG_*`，否则会因为读到另一份登录而报 `401 Invalid credential`。1.20 及以后的版本还没有发布，没有实测。
+
+### 8.2 离线环境的外连（D168，2026-10-25）
+
+用全新的 XDG 目录启动 `opencode serve`，`HTTPS_PROXY` 指向只记录 `CONNECT`、一律回 502 的本地代理，建一个会话后观察（`opencode.offline.oc.test.ts` 改用 `OPENCODE_MODELS_URL` 与 `enterprise.url` 指向的本地服务，作为回归）：
+
+| 外连 | 何时 | 开关 |
+| --- | --- | --- |
+| `models.opencode.ai`（`OPENCODE_MODELS_URL`） | 启动时（在打印监听地址之前）与之后每 60 分钟后台刷新；失败只记日志，模型目录用内置快照 | `OPENCODE_DISABLE_MODELS_FETCH`：不再访问 |
+| `opncd.ai`（`enterprise.url`） | 配置 `share: "auto"` 时每个新会话 | `OPENCODE_DISABLE_SHARE`：不再访问 |
+| `registry.npmjs.org` | 每个配置目录后台安装 `@opencode-ai/plugin`，失败记 `background dependency install failed` 警告，不阻塞 | 没有开关；有 npm 镜像时由 Bun 读 `~/.npmrc` |
+| github.com、`go install`、`gem install` 等 | 只在用户配置打开 `lsp` 后启动语言服务器时（1.19.0 默认 `all LSPs are disabled`） | `OPENCODE_DISABLE_LSP_DOWNLOAD`：每个下载分支先判断它（读源码，未实测） |
+| 更新检查 | `serve` 不检查（只在 TUI / CLI 入口） | `OPENCODE_DISABLE_AUTOUPDATE`：为支持范围内的其他版本（D156）保留 |
+
+- `websearch` 工具只对 `opencode`、`opencode-go` provider 或打开 `OPENCODE_ENABLE_EXA` / `OPENCODE_ENABLE_PARALLEL`（含 `OPENCODE_EXPERIMENTAL`）时出现。
+- 不登录时 `opencode` provider 列出 11 个免费模型；`provider.<id>.whitelist: []` 去掉它的全部模型，provider 随之消失，用户的 `disabled_providers` 不受影响。经 `OPENCODE_CONFIG_CONTENT` 注入的 `disabled_providers` 则整体替换用户自己的（用户禁用的 provider 重新出现）。
+- `OPENCODE_DISABLE_DEFAULT_PLUGINS` 关掉的是二进制内置的插件（认证等），不联网；`OPENCODE_DISABLE_EXTERNAL_SKILLS` 只跳过扫描 `~/.claude`、`~/.agents`。两者都与离线无关。
 
 ## 9. 待实施工具增量（30 / 31）
 

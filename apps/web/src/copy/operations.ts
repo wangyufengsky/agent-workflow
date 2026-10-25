@@ -242,6 +242,7 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   'attempt.timeoutMinutes': SETTINGS_COPY.timeoutMinutes,
   'delivery.defaultStrategy': SETTINGS_COPY.defaultStrategy,
   'delivery.deleteBranchAfterMerge': SETTINGS_COPY.deleteBranch,
+  'network.offline': SETTINGS_COPY.offline,
   'preview.maxRunning': SETTINGS_COPY.previewMaxRunning,
   'preview.idleMinutes': SETTINGS_COPY.previewIdleMinutes,
   'browser.loginUrlPatterns': SETTINGS_COPY.loginUrlPatterns,

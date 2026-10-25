@@ -27,10 +27,11 @@ export type OpencodeRuntimeDeps = {
   /** Setting `opencode.binaryPath`, read at each detection. */
   binaryPath: () => string | null;
   /**
-   * `OPENCODE_CONFIG_CONTENT` for the next launch (12 §2); built per launch because it holds the MCP endpoint.
+   * Variables the next launch adds to `env` (12 §2): `OPENCODE_CONFIG_CONTENT`, and the offline switches when
+   * `offline` (D168). Built per launch because the configuration holds the MCP endpoint and follows the settings.
    * Rejects when opencode cannot be hosted safely here (no Git Bash on Windows, D72).
    */
-  configContent: () => Promise<string>;
+  launchEnv: () => Promise<{ env: Record<string, string>; offline: boolean }>;
   log: Logger;
   events: EventBus;
   clock: Clock;
@@ -102,8 +103,8 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
   }
 
   /** Spawns `opencode serve` and resolves with its address; rejects if it exits or stays silent too long. */
-  function launch(path: string, configContent: string): { launched: Process; address: Promise<string> } {
-    const child = spawnServe(path, { ...deps.env, OPENCODE_CONFIG_CONTENT: configContent });
+  function launch(path: string, env: Record<string, string>): { launched: Process; address: Promise<string> } {
+    const child = spawnServe(path, { ...deps.env, ...env });
     const logFile = openLog();
     const launched: Process = {
       child,
@@ -181,9 +182,9 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       await stopProcess();
     }
     setState({ status: RuntimeStatus.Starting, path, version });
-    let configContent: string;
+    let launchEnv: { env: Record<string, string>; offline: boolean };
     try {
-      configContent = await deps.configContent();
+      launchEnv = await deps.launchEnv();
     } catch (err) {
       // Recovery with a defined meaning: opencode cannot be hosted here, so it does not start; the log says why.
       log.error({ err }, 'opencode configuration failed');
@@ -191,7 +192,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       setState({ status: RuntimeStatus.Crashed, path, version });
       return snapshot();
     }
-    const { launched, address } = launch(path, configContent);
+    const { launched, address } = launch(path, launchEnv.env);
     proc = launched;
     void launched.exited.then((exit) => onExit(launched, exit));
     try {
@@ -207,6 +208,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
         version,
         url,
         startedAt: clock.now(),
+        offline: launchEnv.offline,
       });
       log.info({ url, pid: launched.child.pid }, 'opencode ready');
     } catch (err) {

@@ -53,11 +53,11 @@ import { createKnowledgeModule, type KnowledgeService } from './modules/knowledg
 import { createMcpModule } from './modules/mcp/index.ts';
 import { createNodesModule, type NodesService } from './modules/nodes/index.ts';
 import {
-  buildOpencodeConfig,
   createOpencodeRuntime,
   createRuntimeClient,
   type OpencodeClient,
   type OpencodeRuntime,
+  opencodeLaunchEnv,
 } from './modules/opencode/index.ts';
 import { createPlansModule } from './modules/plans/index.ts';
 import { createPreviewsModule, type PreviewsService } from './modules/previews/index.ts';
@@ -162,21 +162,22 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const runtime = createOpencodeRuntime({
     env,
     binaryPath: () => settings.service.get('opencode.binaryPath'),
-    configContent: async () => {
+    launchEnv: async () => {
       if (apiPort === undefined) throw new Error('opencode started before the API listens');
       const api = `http://127.0.0.1:${apiPort}`;
       const shell = await locateOpencodeShell(env);
-      return JSON.stringify(
-        buildOpencodeConfig({
-          mcpUrl: `${api}${MCP_EXEC_PATH}`,
-          mcpToken,
-          assistantMcpUrl: `${api}${MCP_ASSISTANT_PATH}`,
-          assistantMcpToken,
-          pluginFile: config.opencodePluginFile,
-          prompts,
-          shell,
-        }),
-      );
+      const offline = settings.service.get('network.offline');
+      const launchEnv = opencodeLaunchEnv({
+        mcpUrl: `${api}${MCP_EXEC_PATH}`,
+        mcpToken,
+        assistantMcpUrl: `${api}${MCP_ASSISTANT_PATH}`,
+        assistantMcpToken,
+        pluginFile: config.opencodePluginFile,
+        prompts,
+        shell,
+        offline,
+      });
+      return { env: launchEnv, offline };
     },
     log,
     events,

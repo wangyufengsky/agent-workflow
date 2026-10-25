@@ -25,7 +25,14 @@ export const runtimeSchema = z.discriminatedUnion('status', [
     ]),
     ...located,
   }),
-  z.object({ status: z.literal(RuntimeStatus.Ready), ...located, url: z.string(), startedAt: z.number() }),
+  z.object({
+    status: z.literal(RuntimeStatus.Ready),
+    ...located,
+    url: z.string(),
+    startedAt: z.number(),
+    /** Started in the offline environment (`network.offline`, D168); a different setting applies at the next start. */
+    offline: z.boolean(),
+  }),
 ]);
 export type RuntimeDTO = z.infer<typeof runtimeSchema>;
 

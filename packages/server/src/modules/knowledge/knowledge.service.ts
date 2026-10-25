@@ -166,6 +166,13 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
     return summary;
   }
 
+  /** Offline (D168) only intranet pages can be read: web search is denied, see `sessionPermissionRules`. */
+  function webAccess(): string {
+    return settings.get('network.offline')
+      ? 'only pages on the intranet, opened by their full address; there is no internet and no web search'
+      : 'yes';
+  }
+
   /** What the researcher may use, in its first message (18 §5.2). */
   function describeSources(conversation: Conversation): string {
     const { sources } = conversation;
@@ -176,7 +183,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
       `- Code (source files): ${yesNo(sources.code)}`,
       `- Documentation (Markdown and text files, docs directories): ${yesNo(sources.docs)}`,
       `- Databases: ${sources.database ? `yes, read-only (${connections.join(', ')})` : 'no'}`,
-      `- Web: ${sources.web ? 'yes' : 'no, do not use the web'}`,
+      `- Web: ${sources.web ? webAccess() : 'no, do not use the web'}`,
     ].join('\n');
   }
 

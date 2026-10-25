@@ -458,6 +458,14 @@
 | --- | --- | --- |
 | H-01 | 专业模式设置页「GitHub / GitLab 令牌」：按平台地址保存（验证并记下账号名）、更换、删除全局令牌（表 `hosting_accounts`，迁移 `0029_hosting_accounts`）；`projects.hostingOf` 在项目没有自己的令牌时按 origin 的平台地址用全局令牌；项目详情返回 `effectiveHosting`，Git 控制台卡片、工作台左栏、推送与建 PR 对话框、任务页「创建 PR」按它显示。同一提交登记 02（D155）、08（`HostingSource`）、10、11、14、27 | 集成（FakeHosting）：被拒的令牌不保存、同一地址再次保存是替换、删除；origin 是 GitHub 的项目没有令牌时建 PR 报 `HOSTING_NOT_CONFIGURED`，加全局令牌后成功；项目绑定的令牌优先 |
 
+## 后续 · 内网部署适配（IN）
+
+> 状态：**用户要求**（D168，2026-10-25，内网机器通常不能访问公网），**IN-08 已实现**，待用户检查。IN-01…IN-03（D161–D163）在 PR #112，合并时本节合在一起。
+
+| 任务 | 内容 | 完成标准 |
+| --- | --- | --- |
+| IN-08 | 离线环境开关（D168）：设置 `network.offline`（简单模式「网络」分组）；打开后 opencode 启动时带 `OPENCODE_DISABLE_MODELS_FETCH` / `_SHARE` / `_LSP_DOWNLOAD` / `_AUTOUPDATE`，配置隐藏 `opencode`、`opencode-go` provider 并禁止 `websearch`；知识问答网络检索离线时只读网页；`RuntimeDTO` 的 `ready` 带 `offline`，与设置不同时设置页提示重启并给「立即重启」。同一提交登记 02、08 §4.3、11 §2、12 §2 / §8、18 §5.1 | 单元：离线配置快照、研究员离线时只放行 `webfetch`；集成（假 opencode 记下启动环境）：打开后下一次启动带上开关与配置；`@opencode`：本地服务代替公网，在线（对照）时收到 models.dev 刷新与会话分享，离线时都没有、列表里没有自带 provider 而用户配置的 provider 还在 |
+
 ## 后续 · 存储空间与磁盘清理（ST）
 
 > 状态：**用户要求**（D157，2026-10-25），**ST-01 已实现**，待用户检查。设计见 [37-storage.md](37-storage.md)。

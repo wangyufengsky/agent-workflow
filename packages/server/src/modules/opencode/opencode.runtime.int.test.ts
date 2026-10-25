@@ -10,6 +10,7 @@ import {
   recheckEnvironmentOp,
   restartRuntimeOp,
   ServerEventType,
+  updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
@@ -20,7 +21,7 @@ let bin: string;
 let launches: string;
 let t: TestApp;
 
-/** An `opencode` of the right version whose `serve` exits at once, recording each launch. */
+/** An `opencode` of the right version whose `serve` exits at once, recording each launch with its `OPENCODE_*` env. */
 async function crashingOpencode(): Promise<void> {
   await writeFakeExecutable(
     bin,
@@ -29,7 +30,8 @@ async function crashingOpencode(): Promise<void> {
 if (process.argv[2] === '--version') {
   console.log(${JSON.stringify(OPENCODE_VERSION)});
 } else {
-  appendFileSync(${JSON.stringify(launches)}, 'launch\\n');
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('OPENCODE_')));
+  appendFileSync(${JSON.stringify(launches)}, JSON.stringify(env) + '\\n');
   process.exit(3);
 }
 `,
@@ -46,7 +48,12 @@ function nthCrash(n: number) {
   return (r: RuntimeDTO) => r.status === RuntimeStatus.Crashed && ++crashes === n;
 }
 
-const launchCount = async () => (await readFile(launches, 'utf8')).split('\n').filter(Boolean).length;
+const launchEnvs = async (): Promise<Record<string, string>[]> =>
+  (await readFile(launches, 'utf8'))
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+const launchCount = async () => (await launchEnvs()).length;
 
 beforeEach(async () => {
   bin = await mkdtemp(join(tmpdir(), 'aw-bin-'));
@@ -103,6 +110,30 @@ describe('opencode 运行时', () => {
     await t.call(recheckEnvironmentOp, {});
     await settled;
     expect(await launchCount()).toBe(2);
+  });
+
+  it('打开离线环境后，下一次启动带上关闭联网的开关并隐藏 opencode 自带的 provider（D168）', async () => {
+    const online = waitForEvent(t.app.events, ServerEventType.RuntimeUpdated, nthCrash(2));
+    await t.app.start(t.port);
+    await online;
+    expect((await t.call(updateSettingsOp, { 'network.offline': true })).status).toBe(200);
+    const offline = waitForEvent(t.app.events, ServerEventType.RuntimeUpdated, nthCrash(2));
+    await t.call(restartRuntimeOp, {});
+    await offline;
+
+    // Launches 1–2 online, 3–4 after the setting changed.
+    const [before, , after] = await launchEnvs();
+    expect(Object.keys(before ?? {})).toEqual(['OPENCODE_CONFIG_CONTENT']);
+    expect(after).toMatchObject({
+      OPENCODE_DISABLE_AUTOUPDATE: '1',
+      OPENCODE_DISABLE_MODELS_FETCH: '1',
+      OPENCODE_DISABLE_SHARE: '1',
+      OPENCODE_DISABLE_LSP_DOWNLOAD: '1',
+    });
+    expect(JSON.parse(after?.OPENCODE_CONFIG_CONTENT ?? '{}')).toMatchObject({
+      provider: { opencode: { whitelist: [] }, 'opencode-go': { whitelist: [] } },
+      permission: { websearch: 'deny' },
+    });
   });
 
   it('opencode 未安装时不能重启', async () => {

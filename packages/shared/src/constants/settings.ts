@@ -33,6 +33,8 @@ export const settingsSchema = z.strictObject({
   'delivery.deleteBranchAfterMerge': z.boolean(),
   /** null looks the binary up on PATH and in `~/.opencode/bin`. */
   'opencode.binaryPath': z.string().min(1).nullable(),
+  /** No internet here (intranet, D168): opencode starts without what needs it; applies at its next start. */
+  'network.offline': z.boolean(),
   /** Operation ids the v1.1 assistant may run without confirmation (write risk only). */
   'assistant.alwaysAllow': z.array(z.string()),
   'companion.enabled': z.boolean(),
@@ -72,6 +74,7 @@ export const SETTING_DEFAULTS: Settings = {
   'delivery.defaultStrategy': DeliveryStrategy.Squash,
   'delivery.deleteBranchAfterMerge': true,
   'opencode.binaryPath': null,
+  'network.offline': false,
   'assistant.alwaysAllow': [],
   'companion.enabled': false,
   'companion.appearance': CompanionAppearance.Orb,
@@ -102,6 +105,7 @@ export const SETTING_MODE: Record<SettingKey, UiMode> = {
   'delivery.defaultStrategy': UiMode.Pro,
   'delivery.deleteBranchAfterMerge': UiMode.Pro,
   'opencode.binaryPath': UiMode.Pro,
+  'network.offline': UiMode.Simple,
   'assistant.alwaysAllow': UiMode.Simple,
   'companion.enabled': UiMode.Simple,
   'companion.appearance': UiMode.Simple,

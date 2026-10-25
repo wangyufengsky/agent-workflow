@@ -33,7 +33,7 @@
 type RuntimeDTO =
   | { status: 'not_installed'; path?: string }      // path：找到但无法执行时
   | { status: 'version_mismatch' | 'stopped' | 'starting' | 'crashed'; path: string; version: string }   // 支持的范围见 08 §4 OPENCODE_SUPPORTED_VERSIONS（D156）
-  | { status: 'ready'; path: string; version: string; url: string; startedAt: number };
+  | { status: 'ready'; path: string; version: string; url: string; startedAt: number; offline: boolean };   // offline：启动时的 network.offline（D168），与当前设置不同时要重启才生效
 
 type EnvironmentDTO = {
   platform: 'darwin' | 'win32' | 'linux';   // 后端的操作系统，引导页据此显示安装命令（D75）

@@ -9122,3 +9122,19 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
   },
 }
 `;
+
+exports[`opencode 配置生成 > 离线环境下隐藏 opencode 自带的 provider、禁用 websearch（D168），在线时不设置 1`] = `
+{
+  "permission": {
+    "websearch": "deny",
+  },
+  "provider": {
+    "opencode": {
+      "whitelist": [],
+    },
+    "opencode-go": {
+      "whitelist": [],
+    },
+  },
+}
+`;
