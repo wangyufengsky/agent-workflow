@@ -13,6 +13,7 @@ import {
   MIN_WINDOW,
   patchSettings,
   pickWorkflow,
+  queueAssistantTurn,
   queueCodeReviewerTurn,
   queueTurn,
   submitResult,
@@ -134,6 +135,19 @@ test('J24 Git 工作台：暂存 → AI 草拟并提交 → 新建分支再提�
   await expect(review.getByTestId('git-review-verdict')).toContainText('建议合并前修复', {
     timeout: TASK_RUN_TIMEOUT_MS,
   });
+  // Asked about it, the assistant is told this review, not only the workbench (15 §2).
+  const reviewId = new URL(page.url()).searchParams.get('review');
+  await queueAssistantTurn(request, [{ type: 'text', text: '这条问题要先修。' }]);
+  await page.keyboard.press('ControlOrMeta+j');
+  const panel = page.getByRole('complementary', { name: '应用助手' });
+  await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  const sent = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/messages'));
+  await panel.getByLabel('发给助手的消息').fill('这些问题要紧吗？');
+  await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
+  expect((await sent).postDataJSON().context).toEqual({ page: 'git_review', params: { gitReviewId: reviewId } });
+  await expect(panel).toContainText('这条问题要先修。');
+  await page.keyboard.press('ControlOrMeta+j');
+  await expect(panel).toBeHidden();
   await review.getByRole('button', { name: 'bye.ts:2' }).click();
   await expect(page.locator('[data-focus]')).toContainText('export const b = 2;');
 

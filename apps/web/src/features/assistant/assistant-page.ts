@@ -1,7 +1,8 @@
 import { AssistantPage, type AssistantPageParam, type AssistantPageRef } from '@aw/shared';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ROUTES, type RoutePath } from '../../app/routes.ts';
+import { useUiStore } from '../../state/ui.store.ts';
 
 /** The route of each page the assistant knows (14 §1). */
 const PAGE_ROUTE = {
@@ -80,9 +81,13 @@ function param(ref: AssistantPageRef, name: AssistantPageParam): string {
 
 const text = (value: unknown) => (typeof value === 'string' ? value : undefined);
 
-/** Where the user is, sent with each message (15 §2): the page and the ids it is about, the selected step included. */
+/**
+ * Where the user is, sent with each message (15 §2): the page and the ids it is about, the selected step included. On
+ * the Git workbench a review it shows, in any view, is the page.
+ */
 export function useAssistantPage(): AssistantPageRef {
-  return useRouterState({
+  const shownGitReview = useUiStore((s) => s.shownGitReview);
+  const route = useRouterState({
     select: (state): AssistantPageRef => {
       const match = state.matches.at(-1);
       const page = match === undefined ? undefined : PAGE_OF_ROUTE.get(match.fullPath);
@@ -116,6 +121,13 @@ export function useAssistantPage(): AssistantPageRef {
     },
     structuralSharing: true,
   });
+  return useMemo(
+    () =>
+      route.page === AssistantPage.GitProject && shownGitReview !== null
+        ? { page: AssistantPage.GitReview, params: { gitReviewId: shownGitReview } }
+        : route,
+    [route, shownGitReview],
+  );
 }
 
 /** Opens a page for the assistant's `open_page` (15 §6): next to the panel, which stays open. */
