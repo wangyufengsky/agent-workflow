@@ -35,6 +35,12 @@ const discussionsSchema = z.array(
   }),
 );
 
+/** The user name a token signs in as; HOSTING_AUTH_FAILED when GitLab rejects it (D155). */
+export async function gitlabAccount(token: string, host: string): Promise<string> {
+  const user = await new Gitlab({ host, token }).Users.showCurrentUser().catch(translate);
+  return user.username;
+}
+
 /** GitLab (gitlab.com or self-hosted at `host`) through Gitbeaker (D08); `repo` is the project path. */
 export function createGitlabProvider(repo: string, token: string, host: string): GitHostingProvider {
   const api = new Gitlab({ host, token });

@@ -36,6 +36,14 @@ export const HostingProvider = {
 export type HostingProvider = (typeof HostingProvider)[keyof typeof HostingProvider];
 export const hostingProviderSchema = z.enum(HostingProvider);
 
+/** Whose token signs a project in to its platform (D155): its own binding, or the global one for origin's platform. */
+export const HostingSource = {
+  Project: 'project',
+  Global: 'global',
+} as const;
+export type HostingSource = (typeof HostingSource)[keyof typeof HostingSource];
+export const hostingSourceSchema = z.enum(HostingSource);
+
 /** Local merge strategies (09 §7); the others push (pull_request) or merge nothing (report_only). */
 export const LOCAL_MERGE_STRATEGIES = [
   DeliveryStrategy.Squash,

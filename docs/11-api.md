@@ -55,17 +55,20 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/projects` | `{ repoPath, name? }` → 201 `ProjectDetailDTO`；`repoPath` 须为仓库根目录的绝对路径（仓库的子目录、不存在 → 400 `PROJECT_PATH_NOT_GIT_REPO`；不在任何 Git 仓库里 → 400 `PROJECT_PATH_NO_GIT`，界面据此提出初始化 Git，D153），读取默认分支（`origin/HEAD`，否则当前分支；HEAD 游离且无 `origin/HEAD` → 400 `GIT_BASE_BRANCH_NOT_FOUND`），推断检查命令（13 §1） |
 | POST | `/projects/git-init/preview` | `projects.previewGitInit`（read，D153；助手可用）：`{ repoPath }` → `GitInitPreviewDTO { files, bytes, largeFiles: { path, bytes }[], largeFileCount, gitignore: string \| null }`：首次提交将纳入的文件数与总大小（不被忽略的文件，含将写入的 `.gitignore`；用系统临时目录里的临时裸仓库 `ls-files --others --exclude-standard` 统计，所选目录不变）、不小于 `GIT_INIT_LARGE_FILE_BYTES` 的文件（从大到小最多 `GIT_INIT_LARGE_FILES_SHOWN` 个）、将写入的 `.gitignore`（目录里已有时为 null）。目录须不在任何仓库里：是仓库根目录 400 `VALIDATION_FAILED`，在仓库里、不存在或带 git 读不了的 `.git` → 400 `PROJECT_PATH_NOT_GIT_REPO` |
 | POST | `/projects/git-init` | `projects.initGit`（write，D153；助手可用，确认卡显示首次提交将纳入的内容，15 §4）：`{ repoPath, name? }` → 201 `ProjectDetailDTO`；目录要求同上。`git init -b main`，没有 `.gitignore` 时写入按根目录文件推断的规则（`package.json` / `node_modules` → `node_modules/`；`pom.xml` → `target/`；Gradle → `build/` `.gradle/`；Python → `__pycache__/` `.venv/`；总有 `.DS_Store`），`git add --all` 后以 `GIT_INIT_COMMIT_MESSAGE` 提交（git 配置了 `user.name` 与 `user.email` 时用它，否则 `GIT_COMMIT_IDENTITY`；文件全被忽略时为空提交，任务仍有起点），再同 `POST /projects` 添加。整个过程持有该目录的仓库锁（D37），同一目录的并发请求在锁内重新检查，后到的报 400 `VALIDATION_FAILED`、不会删掉先到的仓库。任一步失败时删除刚建的 `.git` 与写入的 `.gitignore`、目录恢复原样，再报原错误（如提交钩子拒绝 500 `GIT_COMMAND_FAILED`） |
-| GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting` + 关联的数据库连接 `dbConnectionIds`（M5-07）+ 总是允许的 bash 模式 `allowedBash: string[]`（按记下的时间，D101） |
+| GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting` + 实际生效的远端 `effectiveHosting: { provider, baseUrl, repo, source: HostingSource } \| null`（项目绑定且有令牌 → `project`；否则绑定或推断的仓库所在平台地址有全局令牌 → `global`；都没有为 null，D155）+ 关联的数据库连接 `dbConnectionIds`（M5-07）+ 总是允许的 bash 模式 `allowedBash: string[]`（按记下的时间，D101） |
 | PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand?: string \| null, preview?: ProjectPreview \| null }`；分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND`；`preview` 为页面预览设置（29 §4.1：`command`、`setupCommand`、`readyPath`、`pages`、`extraOrigins`），`extraOrigins` 每项须为来源（`http(s)://主机[:端口]`），否则 400 |
 | DELETE | `/projects/:id` | 有非终态任务时 409 `PROJECT_HAS_ACTIVE_TASKS` |
 | PUT | `/projects/:id/hosting` | `{ provider, baseUrl?, repo, token }`（`token` 为凭据字段）→ `ProjectDetailDTO`；保存前调用平台 API 读取该仓库验证令牌（令牌无效或看不到仓库 401 `HOSTING_AUTH_FAILED`，其他失败 502 `HOSTING_API_ERROR`），通过后加密保存（再次绑定替换原令牌）。GitHub 忽略 `baseUrl`；GitLab 不填即 gitlab.com |
 | DELETE | `/projects/:id/hosting` | 解除绑定并删除凭据 → `ProjectDetailDTO`；删除项目时同样删除其凭据 |
+| GET | `/hosting-accounts` 🅿 | `hostingAccounts.list`（read，D155）：`{ items: HostingAccountDTO[] }`，`HostingAccountDTO { id, provider, baseUrl, account, createdAt, updatedAt }`（按平台、地址），不含令牌 |
+| PUT | `/hosting-accounts` 🅿 | `hostingAccounts.set`（write）：`{ provider, baseUrl?, token }`（`token` 为凭据字段）→ `HostingAccountDTO`；保存前读取令牌的当前用户验证（被拒 401 `HOSTING_AUTH_FAILED`，其他失败 502 `HOSTING_API_ERROR`）；`baseUrl` 去掉末尾斜杠，`https://gitlab.com` 视为空；同一平台地址已有令牌时替换 |
+| DELETE | `/hosting-accounts/:id` 🅿 | `hostingAccounts.remove`（write）：删除全局令牌与其凭据；不存在 404 `NOT_FOUND`。全局令牌的三个操作不暴露给助手 |
 | DELETE | `/projects/:id/allowed-bash` 🅿 | `?pattern=` 撤销一条总是允许的 bash 模式 → `ProjectDetailDTO`；不存在的模式不报错。之后新建的会话重新询问，运行中的会话不变（D101）。模式只由「需要你处理」中权限条目的「总是允许」添加（§7），没有添加接口 |
 | PUT | `/projects/:id/db-connections` 🅿 | `{ connectionIds: string[] }` 覆盖关联 → `ProjectDetailDTO`；不存在的连接 404 `DB_CONNECTION_NOT_FOUND`。项目的 AI 会话只能用关联的连接（12 §6.9） |
 
 `ProjectDTO.preview` 为页面预览设置，添加项目时按 `package.json` 推断（29 §4.1），没有可推断的脚本时为 null。
 
-远端 `repo` 默认从 `git remote get-url origin` 推断（`inferredHosting`：`github.com` → GitHub，其他主机 → GitLab，非 `gitlab.com` 时 `baseUrl = https://<host>`），前端预填。
+远端 `repo` 默认从 `git remote get-url origin` 推断（`inferredHosting`：`github.com` → GitHub，其他主机 → GitLab，非 `gitlab.com` 时 `baseUrl` 为 HTTP(S) origin 自己的协议、主机与端口，SSH origin 为 `https://<host>`；全局令牌按这个地址匹配，D155），前端预填。
 
 ## 4. 流程与角色
 
@@ -151,13 +154,13 @@ type TaskDetailDTO = {
 ### 5.3 交付
 
 - `strategy ∈ { squash, merge, rebase }`：本地合并到 `targetBranch`（默认 `baseBranch`），见 09 §7。合并前的检查失败直接返回错误、不改状态：`DELIVERY_TARGET_NOT_FOUND`、`WORKTREE_DIRTY`、`DELIVERY_TARGET_DIRTY`（目标分支检出在有未提交改动的工作区）。成功 → 任务 `completed`。冲突 → 任务回 `review`，`lastDelivery.status = conflict`，`conflictFiles` 列出文件；前端提供「交给 AI 解决」（= `request-changes` with `reason: 'conflict'`）。其他 git 失败 → 任务回 `review`，`lastDelivery.status = failed`，`error` 为原因。以上都返回操作后的 `TaskDetailDTO`。
-- `pull_request`：项目未绑定远端 → 400 `HOSTING_NOT_CONFIGURED`（不改状态）。在仓库锁内把任务分支推送到 `origin`（HTTPS 远端经环境变量 `http.extraHeader` 带上令牌，不出现在命令参数中；SSH 远端用用户自己的密钥）→ 创建 PR/MR（`targetBranch` 为目标，标题与说明默认为任务标题与结果摘要，可用 `pr` 指定）→ 任务 `completed`，`prUrl` 记录在 delivery；worktree 删除，分支保留。推送或平台失败 → `lastDelivery.status = failed`，任务回 `review`。推送后先按分支查找打开的 PR/MR：已有（按审查意见修改后再次交付）就沿用它、不改标题与说明，`prUrl` 为同一个地址（21 §5）。
+- `pull_request`：项目没有可用令牌（自己的或全局的，D155）→ 400 `HOSTING_NOT_CONFIGURED`（不改状态）。在仓库锁内把任务分支推送到 `origin`（HTTPS 远端经环境变量 `http.extraHeader` 带上令牌，不出现在命令参数中；SSH 远端用用户自己的密钥）→ 创建 PR/MR（`targetBranch` 为目标，标题与说明默认为任务标题与结果摘要，可用 `pr` 指定）→ 任务 `completed`，`prUrl` 记录在 delivery；worktree 删除，分支保留。推送或平台失败 → `lastDelivery.status = failed`，任务回 `review`。推送后先按分支查找打开的 PR/MR：已有（按审查意见修改后再次交付）就沿用它、不改标题与说明，`prUrl` 为同一个地址（21 §5）。
 - `report_only`：仅 `deliverable = report` 的任务可用，直接 `completed`。
 - `deliverable = report` 的任务使用其他策略 → 400 `VALIDATION_FAILED`。
 
 ### 5.4 PR 审查意见（v1.2，21）
 
-- `GET /tasks/:id/review-comments`（`tasks.reviewComments`，read）：任务的最近一次成功交付必须是 PR，且该分支上的 PR/MR 仍打开，否则 409 `PULL_REQUEST_NOT_OPEN`；项目未绑定远端 400 `HOSTING_NOT_CONFIGURED`；平台错误 `HOSTING_AUTH_FAILED` / `HOSTING_API_ERROR`。返回：
+- `GET /tasks/:id/review-comments`（`tasks.reviewComments`，read）：任务的最近一次成功交付必须是 PR，且该分支上的 PR/MR 仍打开，否则 409 `PULL_REQUEST_NOT_OPEN`；项目没有可用令牌 400 `HOSTING_NOT_CONFIGURED`；平台错误 `HOSTING_AUTH_FAILED` / `HOSTING_API_ERROR`。返回：
 
 ```ts
 type ReviewCommentsDTO = {

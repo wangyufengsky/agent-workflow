@@ -5,7 +5,9 @@ import {
   GitOperation,
   GitReviewTarget,
   type GitReviewTarget as GitReviewTargetType,
+  type HostingProvider,
 } from '@aw/shared';
+import { PROJECTS_COPY } from './projects.ts';
 
 /** The Git workbench (27, pro mode). */
 export const GIT_COPY = {
@@ -23,7 +25,12 @@ export const GIT_COPY = {
   noUpstream: '无上游',
   count: (n: number) => `${n} 个`,
   hostingBound: '远端已绑定',
-  hostingNone: '未绑定远端',
+  // origin 的平台有全局令牌，项目自己没有（D155）
+  hostingGlobal: (provider: HostingProvider) => `${PROJECTS_COPY.providers[provider]} · 全局令牌`,
+  // origin 是 GitHub / GitLab，但项目与设置里都没有令牌
+  hostingNoToken: (provider: HostingProvider) => `${PROJECTS_COPY.providers[provider]} 未绑定令牌`,
+  // origin 不存在，或不是能识别的 GitHub / GitLab 地址
+  hostingNoRemote: '没有 GitHub / GitLab 远端',
   repoUnreadable: '读不到这个仓库的 Git 信息：路径可能已不存在。仓库移动过的话，在项目页更新路径。',
   toProject: '去项目页',
   // 页头工具条
@@ -60,7 +67,11 @@ export const GIT_COPY = {
   current: '当前',
   remote: '远端',
   hostingCard: (repo: string) => `${repo} · 推送与 PR 用项目令牌`,
-  hostingCardNone: '推送用你自己的 Git 凭据；在项目页绑定远端后可创建 PR。',
+  hostingCardGlobal: (repo: string) => `${repo} · 推送与 PR 用设置里的全局令牌`,
+  hostingCardNoToken: (repo: string) =>
+    `origin 是 ${repo}；推送用你自己的 Git 凭据。在项目页或设置里添加令牌后可创建 PR。`,
+  hostingCardNoRemote:
+    '推送用你自己的 Git 凭据；创建 PR 需要 origin 指向 GitHub 或 GitLab，并在项目页或设置里添加令牌。',
   // 提交列表
   commits: '提交',
   commitsOf: (ref: string) => `${ref}`,
@@ -246,6 +257,7 @@ export const GIT_COPY = {
   pushMore: (n: number) => `还有 ${n} 个更早的提交`,
   pushNothing: '远端分支已经包含全部提交。',
   pushNoteToken: (repo: string) => `远端是 ${repo}，使用项目绑定的令牌。`,
+  pushNoteGlobal: (repo: string) => `远端是 ${repo}，使用设置里的全局令牌。`,
   pushNoteOwn: '使用你自己的 Git 凭据（SSH 密钥或系统凭据管理器）。',
   pushNoForce: '不会强推：远端有你本地没有的提交时推送会被拒绝，先拉取再推送。',
   pushRun: '推送',
@@ -264,7 +276,7 @@ export const GIT_COPY = {
   prCreated: '已创建 PR',
   prExisted: '这个分支已有打开的 PR',
   prOpen: '打开 PR',
-  prNeedsHosting: '项目还没有绑定 GitHub / GitLab 远端，在项目页绑定后可创建 PR。',
+  prNeedsHosting: '项目没有可用的 GitHub / GitLab 令牌，在项目页或设置里添加后可创建 PR。',
   // 文件与 worktree（沿用）
   ref: '版本',
   root: '根目录',

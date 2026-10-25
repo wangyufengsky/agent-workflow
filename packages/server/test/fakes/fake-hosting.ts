@@ -22,6 +22,9 @@ export type FakePullRequest = {
 /** The input of a seeded comment: `createdAt` defaults to now. */
 export type FakeMessageInput = { author: string; body: string; createdAt?: string };
 
+/** The user name every accepted token signs in as. */
+export const FAKE_USER = 'octo';
+
 const message = (m: FakeMessageInput): FakeMessage => ({ ...m, createdAt: m.createdAt ?? new Date().toISOString() });
 
 /**
@@ -150,14 +153,19 @@ export async function createFakeHosting(options: { token: string; repos: string[
       const gitlab = /^\/gitlab\/api\/v4\/projects\/([^/]+)(\/merge_requests(?:\/(\d+)\/discussions)?)?$/.exec(
         url.pathname,
       );
+      // The signed-in user of a token (D155).
+      const user = url.pathname === '/github/user' || url.pathname === '/gitlab/api/v4/user';
       const match = github ?? gitlab;
-      if (!graphql && (match === null || match[1] === undefined)) return send(res, 404, { message: 'Not Found' });
-      const provider = github === null && !graphql ? 'gitlab' : 'github';
+      if (!graphql && !user && (match === null || match[1] === undefined)) {
+        return send(res, 404, { message: 'Not Found' });
+      }
+      const provider = url.pathname.startsWith('/gitlab/') ? 'gitlab' : 'github';
       const token =
         provider === 'github'
           ? req.headers.authorization?.replace(/^(token|Bearer) /, '')
           : req.headers['private-token'];
       if (token !== options.token) return send(res, 401, { message: '401 Unauthorized' });
+      if (user) return send(res, 200, provider === 'github' ? { login: FAKE_USER } : { username: FAKE_USER });
 
       if (graphql) {
         const { variables } = (await readJson(req)) as { variables: { owner: string; name: string; number: number } };
