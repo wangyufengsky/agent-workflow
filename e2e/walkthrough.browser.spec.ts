@@ -32,6 +32,8 @@ const HEIGHT = 800;
 
 type Task = { id: string; status: string; nodes: { id: string; key: string; status: string }[] };
 type Seed = {
+  /** Projects that specs before this one (and earlier seeds) left in the shared backend. */
+  otherProjects: ReadonlySet<string>;
   project: E2EProject;
   running: Task;
   /** A running task whose AI session opened a page of its preview (29 §8.1–§8.2). */
@@ -317,6 +319,7 @@ async function seedCharts(request: APIRequestContext): Promise<string> {
 
 /** One task per state the task page renders differently (14 §3.3), each in its own project so scripts stay apart. */
 async function seed(request: APIRequestContext): Promise<Seed> {
+  const others = await api<{ items: { id: string }[] }>(request, 'GET', '/projects');
   // Several scenes keep an AI session working on purpose, and specs before this one may have left theirs: room for
   // the steps the seed needs finished, put back once it is done (03 §8, the scheduler's global limit).
   const settings = await api<Record<string, unknown>>(request, 'GET', '/settings');
@@ -701,6 +704,7 @@ createServer((req, res) => {
     ],
   });
   return {
+    otherProjects: new Set(others.items.map((p) => p.id)),
     project: reviewProject,
     running: await waitForStatus(request, running, 'running'),
     preview: await waitForStatus(request, preview, 'running'),
@@ -741,6 +745,12 @@ type Shot = {
    * (14 §3.1a), so the page's project list answers empty.
    */
   firstRun?: boolean;
+  /**
+   * The page's project list holds only the seed's projects, as on a backend of its own (the CI walkthrough job). In
+   * the full `pnpm e2e` run J9 comes last, after the other specs added dozens of repositories, and a page that reads
+   * every project's repository would show them all and take as long as they do.
+   */
+  seedProjectsOnly?: boolean;
 };
 
 const PROJECT_LIST = (url: URL) => url.pathname === `${API_PREFIX}/projects`;
@@ -1271,6 +1281,7 @@ const SHOTS: Shot[] = [
     mode: UiMode.Pro,
     url: () => '/git',
     ready: (page) => page.getByTestId('git-project-card').first(),
+    seedProjectsOnly: true,
   },
   {
     name: 'pro-git-changes',
@@ -1433,6 +1444,13 @@ test.describe('J9 走查：两种模式下全部页面无报错、无对比度�
         await patchSettings(request, { 'ui.theme': theme satisfies ThemeId, 'ui.mode': shot.mode });
         await page.setViewportSize({ width: WIDTH, height: HEIGHT });
         if (shot.firstRun === true) await page.route(PROJECT_LIST, (route) => route.fulfill({ json: { items: [] } }));
+        if (shot.seedProjectsOnly === true) {
+          await page.route(PROJECT_LIST, async (route) => {
+            const response = await route.fetch();
+            const { items } = (await response.json()) as { items: { id: string }[] };
+            await route.fulfill({ response, json: { items: items.filter((p) => !s.otherProjects.has(p.id)) } });
+          });
+        }
         await page.goto(shot.url(s));
         await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
         await expect(shot.ready(page)).toBeVisible();
@@ -1449,7 +1467,7 @@ test.describe('J9 走查：两种模式下全部页面无报错、无对比度�
           animations: 'disabled',
           fullPage: shot.fullPage === true,
         });
-        if (shot.firstRun === true) await page.unroute(PROJECT_LIST);
+        if (shot.firstRun === true || shot.seedProjectsOnly === true) await page.unroute(PROJECT_LIST);
       }
       writeFileSync(join(dir, 'report.json'), `${JSON.stringify(reports, null, 2)}\n`);
       const problems = Object.entries(reports)

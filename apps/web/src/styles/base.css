@@ -1250,6 +1250,9 @@ button.card:hover,
   left: 50%;
   top: 50%;
   width: min(440px, calc(100vw - 32px));
+  /* Centred on the window: a form taller than a short window scrolls instead of losing its top and its buttons. */
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   transform: translate(-50%, -48%) scale(0.98);
   opacity: 0;
   pointer-events: none;

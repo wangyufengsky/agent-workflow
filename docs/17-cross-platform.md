@@ -228,7 +228,7 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 | --- | --- |
 | `check (os)` | `pnpm check`、`pnpm test` |
 | `test:int (os, i/2)` | `pnpm test:int --shard=i/2`（vitest 按文件分片） |
-| `e2e (os, i/2)` | `pnpm build` 后 `pnpm e2e --grep-invert @walkthrough --shard=i/2`（除 J9 外的浏览器 E2E，Playwright 按文件分片） |
+| `e2e (os, i/2)` | `pnpm build`、拉取 `postgres:17.6`（J21 要用，没有镜像时跳过）后 `pnpm e2e --grep-invert @walkthrough --shard=i/2`（除 J9 外的浏览器 E2E，Playwright 按文件分片） |
 | `e2e J9 (os, i/4)` | `pnpm build` 后 `pnpm e2e --grep @walkthrough --shard=i/4`：J9 每套主题一个用例，一片一套主题 |
 | `package (os)` | `pnpm build`、Electron 启动冒烟（含 J42 的主密码一例）、带 Secret Service 的凭据存储（`dbus-run-session` 里解锁 gnome-keyring 后以 `AW_E2E_SECRET_SERVICE=1` 再跑 `credentials.electron.spec.ts`，D167）、`pnpm dist`、上传安装包 |
 
