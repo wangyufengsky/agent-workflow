@@ -17,7 +17,7 @@ test('首次启动：环境检测通过 → 添加项目 → 切换主题与模�
   await page.goto('/');
   await expect(page).toHaveURL(/\/onboarding$/);
   await expect(page.getByTestId('check-Git')).toContainText('已就绪');
-  await expect(page.getByTestId('check-opencode 1.19.0')).toContainText('已就绪');
+  await expect(page.getByTestId('check-opencode')).toContainText('已就绪');
 
   await page.getByLabel('仓库目录').fill(repo);
   await page.unroute(projectList);

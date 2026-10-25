@@ -76,7 +76,7 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
 
   // First launch: onboarding with the real environment.
   await expect(page.getByRole('heading', { name: '欢迎使用 Agent Workflow' })).toBeVisible();
-  for (const check of ['Git', 'opencode 1.19.0', '可用的模型']) {
+  for (const check of ['Git', 'opencode', '可用的模型']) {
     await expect(page.getByTestId(`check-${check}`)).toContainText('已就绪', { timeout: 60_000 });
   }
   await page.screenshot({ path: join(SHOTS, 'onboarding.png') });

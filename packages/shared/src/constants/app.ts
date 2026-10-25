@@ -8,8 +8,33 @@ export const APP_SOURCE_URL = 'https://github.com/wangyufengsky/agent-workflow';
 /** How to add an MCP server to opencode, linked from the settings' list of the user's own (28 §4). */
 export const OPENCODE_MCP_DOCS_URL = 'https://opencode.ai/docs/mcp-servers/';
 export const APP_LICENSE = 'Apache-2.0';
-/** Exact opencode version this app hosts; any other version is `version_mismatch`. */
+/** The opencode version this app is built and tested against (SDK, recorded events); onboarding installs it. */
 export const OPENCODE_VERSION = '1.19.0';
+/**
+ * opencode versions this app hosts (D156): `min` and later, through every patch release of the `max` minor
+ * version; any other version is `version_mismatch`.
+ */
+export const OPENCODE_SUPPORTED_VERSIONS = { min: [1, 18, 0], max: [1, 90] } as const;
+/** `OPENCODE_SUPPORTED_VERSIONS` as onboarding and the runtime page show it. */
+export const OPENCODE_SUPPORTED_RANGE = `${OPENCODE_SUPPORTED_VERSIONS.min.join('.')} – ${OPENCODE_SUPPORTED_VERSIONS.max.join('.')}.x`;
+
+/** Whether `opencode --version` output is a release inside `OPENCODE_SUPPORTED_VERSIONS`. */
+export function isSupportedOpencodeVersion(version: string): boolean {
+  if (!/^\d+\.\d+\.\d+$/.test(version)) return false;
+  const parts = version.split('.').map(Number);
+  return (
+    compareVersions(parts, OPENCODE_SUPPORTED_VERSIONS.min) >= 0 &&
+    compareVersions(parts.slice(0, OPENCODE_SUPPORTED_VERSIONS.max.length), OPENCODE_SUPPORTED_VERSIONS.max) <= 0
+  );
+}
+
+function compareVersions(a: readonly number[], b: readonly number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (a[i] ?? 0) - (b[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
 export const OPENCODE_AGENT_NAME = {
   [SessionAgent.Planner]: 'aw-planner',
   [SessionAgent.Executor]: 'aw-executor',

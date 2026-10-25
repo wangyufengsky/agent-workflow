@@ -29,9 +29,9 @@
 
 ```ts
 type RuntimeDTO =
-  | { status: 'not_installed'; path?: string; requiredVersion: '1.19.0' }      // path：找到但无法执行时
-  | { status: 'version_mismatch' | 'stopped' | 'starting' | 'crashed'; path: string; version: string; requiredVersion: '1.19.0' }
-  | { status: 'ready'; path: string; version: string; requiredVersion: '1.19.0'; url: string; startedAt: number };
+  | { status: 'not_installed'; path?: string }      // path：找到但无法执行时
+  | { status: 'version_mismatch' | 'stopped' | 'starting' | 'crashed'; path: string; version: string }   // 支持的范围见 08 §4 OPENCODE_SUPPORTED_VERSIONS（D156）
+  | { status: 'ready'; path: string; version: string; url: string; startedAt: number };
 
 type EnvironmentDTO = {
   platform: 'darwin' | 'win32' | 'linux';   // 后端的操作系统，引导页据此显示安装命令（D75）

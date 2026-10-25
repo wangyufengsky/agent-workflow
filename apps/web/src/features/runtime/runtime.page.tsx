@@ -1,4 +1,4 @@
-import { RUNTIME_LOG_TAIL_DEFAULT, RuntimeStatus, STATUS_TONE } from '@aw/shared';
+import { OPENCODE_SUPPORTED_RANGE, RUNTIME_LOG_TAIL_DEFAULT, RuntimeStatus, STATUS_TONE } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -101,8 +101,8 @@ function RuntimePanel() {
             <dd className="mono">{r.version}</dd>
           </>
         )}
-        <dt>{C.requiredVersion}</dt>
-        <dd className="mono">{r.requiredVersion}</dd>
+        <dt>{C.supportedVersions}</dt>
+        <dd className="mono">{OPENCODE_SUPPORTED_RANGE}</dd>
         {r.path !== undefined && (
           <>
             <dt>{C.path}</dt>
