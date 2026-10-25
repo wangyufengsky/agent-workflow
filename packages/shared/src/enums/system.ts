@@ -38,6 +38,25 @@ export const CredentialKind = {
 export type CredentialKind = (typeof CredentialKind)[keyof typeof CredentialKind];
 export const credentialKindSchema = z.enum(CredentialKind);
 
+/** What sealed a stored credential (D167): the OS key store, the master password, or nothing any more. */
+export const CredentialSeal = {
+  System: 'system',
+  MasterPassword: 'master_password',
+  /** The master password was reset: the secret is gone and must be entered again. */
+  Discarded: 'discarded',
+} as const;
+export type CredentialSeal = (typeof CredentialSeal)[keyof typeof CredentialSeal];
+
+/** The master password that protects credentials where the OS has no key store (D167). */
+export const MasterPasswordState = {
+  None: 'none',
+  /** Set, not yet entered since the backend started. */
+  Locked: 'locked',
+  Unlocked: 'unlocked',
+} as const;
+export type MasterPasswordState = (typeof MasterPasswordState)[keyof typeof MasterPasswordState];
+export const masterPasswordStateSchema = z.enum(MasterPasswordState);
+
 export const TranscriptEntryKind = {
   UserMessage: 'user_message',
   Text: 'text',

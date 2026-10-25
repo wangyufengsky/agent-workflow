@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { platformSchema, RuntimeStatus, storageCleanTargetSchema, storageKindSchema } from '../../enums/system.ts';
+import { MASTER_PASSWORD_MAX_LENGTH, MASTER_PASSWORD_MIN_LENGTH } from '../../constants/limits.ts';
+import {
+  masterPasswordStateSchema,
+  platformSchema,
+  RuntimeStatus,
+  storageCleanTargetSchema,
+  storageKindSchema,
+} from '../../enums/system.ts';
 import { attemptKindSchema } from '../../enums/task.ts';
 import { McpToolName } from '../mcp/names.ts';
 
@@ -32,6 +39,24 @@ export type RuntimeDTO = z.infer<typeof runtimeSchema>;
 export const modelInfoSchema = z.object({ providerId: z.string(), modelId: z.string(), name: z.string() });
 export type ModelInfo = z.infer<typeof modelInfoSchema>;
 
+/** Where secrets can be stored (D74, D167); also the answer of the master password operations. */
+export const credentialStatusSchema = z.object({
+  /** A secret can be saved now: the OS key store works, or the master password is unlocked. */
+  available: z.boolean(),
+  /** The OS key store works (safeStorage; on Linux a Secret Service or KWallet). */
+  system: z.boolean(),
+  masterPassword: masterPasswordStateSchema,
+});
+export type CredentialStatusDTO = z.infer<typeof credentialStatusSchema>;
+
+const masterPasswordSchema = z.string().min(MASTER_PASSWORD_MIN_LENGTH).max(MASTER_PASSWORD_MAX_LENGTH);
+export const setupMasterPasswordRequestSchema = z.object({ password: masterPasswordSchema });
+export const unlockCredentialsRequestSchema = z.object({ password: z.string() });
+export const changeMasterPasswordRequestSchema = z.object({
+  currentPassword: z.string(),
+  newPassword: masterPasswordSchema,
+});
+
 /** `GET /system/environment` (11 §2): what onboarding checks. */
 export const environmentSchema = z.object({
   /** Decides the install commands onboarding shows (17 §3.7). */
@@ -46,7 +71,7 @@ export const environmentSchema = z.object({
     defaultModel: z.string().optional(),
   }),
   /** Secrets (hosting tokens, database passwords) can be stored; not part of `ready` (D74). */
-  credentials: z.object({ available: z.boolean() }),
+  credentials: credentialStatusSchema,
   ready: z.boolean(),
 });
 export type EnvironmentDTO = z.infer<typeof environmentSchema>;

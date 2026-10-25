@@ -458,6 +458,14 @@
 | --- | --- | --- |
 | H-01 | 专业模式设置页「GitHub / GitLab 令牌」：按平台地址保存（验证并记下账号名）、更换、删除全局令牌（表 `hosting_accounts`，迁移 `0029_hosting_accounts`）；`projects.hostingOf` 在项目没有自己的令牌时按 origin 的平台地址用全局令牌；项目详情返回 `effectiveHosting`，Git 控制台卡片、工作台左栏、推送与建 PR 对话框、任务页「创建 PR」按它显示。同一提交登记 02（D155）、08（`HostingSource`）、10、11、14、27 | 集成（FakeHosting）：被拒的令牌不保存、同一地址再次保存是替换、删除；origin 是 GitHub 的项目没有令牌时建 PR 报 `HOSTING_NOT_CONFIGURED`，加全局令牌后成功；项目绑定的令牌优先 |
 
+## 后续 · 内网部署适配（IN）
+
+> 状态：**用户要求**（2026-10-25，内网桌面里有不少没有密钥服务的 Linux），**IN-07 已实现**，待用户检查。其他 IN 任务在各自的分支，合并时本节合在一起。
+
+| 任务 | 内容 | 完成标准 |
+| --- | --- | --- |
+| IN-07 | Linux 凭据存储（D167）：main 在 `ready` 前对非 KDE 会话追加 `--password-store=gnome-libsecret`（用户自己传了不覆盖）；后端 credentials 模块的主密码（scrypt 派生密钥包住数据密钥，表 `credential_vault`、`credentials.seal`，迁移 `0030_credential_master_password`）与 `credentials.*` 四个操作；`EnvironmentDTO.credentials` 增加 `system`、`masterPassword`；引导页 / 开发环境页「凭据存储」的设置、解锁、修改、重置。同一提交更新 02、03、08、10、11、14、17 | 单元：开关的选择（不认识的桌面环境、KDE、用户自选、非 Linux）；集成（真实 SQLite）：设置后保存且库中无明文、重启后锁定与错误主密码、修改后只有新密码能解锁、重置后 `CREDENTIAL_LOST` 与重新填写、系统密钥服务后来可用时新凭据存系统；Electron J42（CI 的两个 Linux 运行器，xvfb 下没有桌面环境）：没有 Secret Service 时设置主密码、重启后解锁；gnome-keyring 已解锁时引导页「凭据存储」为已就绪（系统密钥服务） |
+
 ## 后续 · 存储空间与磁盘清理（ST）
 
 > 状态：**用户要求**（D157，2026-10-25），**ST-01 已实现**，待用户检查。设计见 [37-storage.md](37-storage.md)。

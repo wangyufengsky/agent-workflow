@@ -208,3 +208,7 @@ export const REQUIREMENTS_MAX = 30;
 export const REQUIREMENT_TITLE_MAX_CHARS = 120;
 export const REQUIREMENT_EXPECTED_MAX_CHARS = 2000;
 export const REQUIREMENT_NOTE_MAX_CHARS = 4000;
+
+/** Master password (D167): a short one is cheap to guess offline from a copied app.db, scrypt or not. */
+export const MASTER_PASSWORD_MIN_LENGTH = 8;
+export const MASTER_PASSWORD_MAX_LENGTH = 1024;

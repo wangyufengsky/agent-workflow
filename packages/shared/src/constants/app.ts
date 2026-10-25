@@ -117,6 +117,11 @@ function parsePort(env: Readonly<Record<string, string | undefined>>, name: stri
 /** Written in acceptance commands for the project's check command; replaced when nodes are created (13 §1). */
 export const PROJECT_CHECK_PLACEHOLDER = '$PROJECT_CHECK';
 /** Author and committer of the commits the backend makes for finished nodes (09 §3). */
+/**
+ * scrypt cost for a new master password (D167): 128 MiB and about half a second per guess, so a copied app.db is slow
+ * to brute-force. Each vault keeps the parameters it was made with.
+ */
+export const MASTER_PASSWORD_SCRYPT = { N: 2 ** 17, r: 8, p: 1 } as const;
 export const GIT_COMMIT_IDENTITY = { name: 'agent-workflow', email: 'agent-workflow@localhost' } as const;
 /** Branch and message of the first commit when the app puts a directory under Git (D153). */
 export const GIT_INIT_BRANCH = 'main';

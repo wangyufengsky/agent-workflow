@@ -7,6 +7,7 @@ import { type Backend, startBackend } from './backend.ts';
 import { createCompanionHost } from './companion.ts';
 import { serveExports } from './export.ts';
 import { readLaunchPreferences, writeLaunchPreferences } from './launch.ts';
+import { passwordStoreSwitch } from './password-store.ts';
 
 /** In the user data directory: how the next start looks before the backend is up (28 §5.3). */
 const LAUNCH_FILE = 'launch.json';
@@ -76,6 +77,10 @@ ipcMain.on('aw:browser-place', (_e, tabId: unknown, rect: unknown) =>
 for (const action of ['back', 'forward', 'reload', 'openDevTools'] as const) {
   ipcMain.on(`aw:browser-${action}`, (_e, tabId: unknown) => backend?.browser[action](String(tabId)));
 }
+
+// Chromium chooses its key store as it starts, so before `ready` (17 §3.6).
+const passwordStore = passwordStoreSwitch(process.platform, process.env, app.commandLine.hasSwitch('password-store'));
+if (passwordStore !== undefined) app.commandLine.appendSwitch('password-store', passwordStore);
 
 app.setAboutPanelOptions({
   applicationName: 'Agent Workflow',
