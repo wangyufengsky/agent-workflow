@@ -1,5 +1,6 @@
 import type { AssistantConfirmationStatus, AssistantTurnEvent, AssistantTurnStatus } from '@aw/shared';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { initiativesTable } from '../initiatives/initiatives.table.ts';
 import { tasksTable } from '../tasks/tasks.table.ts';
 import { teamAnalysesTable } from '../team/team.table.ts';
 
@@ -87,6 +88,27 @@ export const assistantAnalysisFollowupsTable = sqliteTable(
     createdAt: integer('created_at').notNull(),
   },
   (t) => [index('assistant_analysis_followups_conversation_idx').on(t.conversationId)],
+);
+
+/**
+ * AI breakdowns of initiatives the assistant started (34 §10): the run's attempt, its initiative and the conversation
+ * its outcome goes back to, like a member analysis (33 §6).
+ */
+export const assistantBreakdownFollowupsTable = sqliteTable(
+  'assistant_breakdown_followups',
+  {
+    attemptId: text('attempt_id').primaryKey(),
+    initiativeId: text('initiative_id')
+      .notNull()
+      .references(() => initiativesTable.id, { onDelete: 'cascade' }),
+    conversationId: text('conversation_id')
+      .notNull()
+      .references(() => assistantConversationsTable.id, { onDelete: 'cascade' }),
+    /** The outcome was queued to the conversation, or a newer run took the initiative over. */
+    reported: integer('reported', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('assistant_breakdown_followups_initiative_idx').on(t.initiativeId)],
 );
 
 /** 每次外部发送前持久化，未报告 tokens 保持 NULL；结束只能经助手轮次状态机。 */
