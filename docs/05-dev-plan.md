@@ -458,6 +458,14 @@
 | --- | --- | --- |
 | H-01 | 专业模式设置页「GitHub / GitLab 令牌」：按平台地址保存（验证并记下账号名）、更换、删除全局令牌（表 `hosting_accounts`，迁移 `0029_hosting_accounts`）；`projects.hostingOf` 在项目没有自己的令牌时按 origin 的平台地址用全局令牌；项目详情返回 `effectiveHosting`，Git 控制台卡片、工作台左栏、推送与建 PR 对话框、任务页「创建 PR」按它显示。同一提交登记 02（D155）、08（`HostingSource`）、10、11、14、27 | 集成（FakeHosting）：被拒的令牌不保存、同一地址再次保存是替换、删除；origin 是 GitHub 的项目没有令牌时建 PR 报 `HOSTING_NOT_CONFIGURED`，加全局令牌后成功；项目绑定的令牌优先 |
 
+## 后续 · 内网部署适配（IN）
+
+> 状态：**用户要求**（2026-10-25，企业内网部署，自建 GitLab），IN-06 已实现，待用户检查。
+
+| 任务 | 内容 | 完成标准 |
+| --- | --- | --- |
+| IN-06 | SSH origin 的 GitLab 平台地址按主机名匹配已保存的全局令牌地址，唯一时用它，没有或多个时为 `https://<host>`（D166）。同一提交登记 02、11 §3 | 集成（FakeHosting）：origin `git@<主机>:acme/shop.git`、全局令牌保存在 `http://<主机>:<端口>/gitlab`，`effectiveHosting` 为该地址且创建 MR 用上它的令牌；单元：唯一、没有、多个与 HTTP(S) origin 不受影响 |
+
 ## 后续 · 存储空间与磁盘清理（ST）
 
 > 状态：**用户要求**（D157，2026-10-25），**ST-01 已实现**，待用户检查。设计见 [37-storage.md](37-storage.md)。

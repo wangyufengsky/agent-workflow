@@ -5,23 +5,30 @@ import { z } from 'zod';
 
 const SCP_LIKE = /^[\w.-]+@([\w.-]+):(.+)$/;
 
+/** Several saved addresses on one host are ambiguous, so they too fall back to `https://<host>` (D166). */
+function sshWebAddress(host: string, gitlabAddresses: readonly string[]): string {
+  const [only, ...others] = gitlabAddresses.filter((address) => new URL(address).hostname === host);
+  return only !== undefined && others.length === 0 ? only : `https://${host}`;
+}
+
 /**
  * Hosting remote from an origin URL; github.com is GitHub, any other host is (possibly self-hosted) GitLab. A GitLab's
- * address is an HTTP(S) origin's own scheme and port; over SSH only the host is known, so `https://<host>`.
+ * address is an HTTP(S) origin's own scheme and port. Over SSH only the host is known, and an intranet GitLab's web
+ * address often has another scheme or port (D166): the one saved GitLab address on that host, else `https://<host>`.
  */
-export function parseRemoteUrl(url: string): HostingRef | null {
+export function parseRemoteUrl(url: string, gitlabAddresses: readonly string[]): HostingRef | null {
   let host: string;
   let web: string;
   let path: string;
   const scp = SCP_LIKE.exec(url);
   if (scp?.[1] !== undefined && scp[2] !== undefined) {
     host = scp[1];
-    web = `https://${host}`;
+    web = sshWebAddress(host, gitlabAddresses);
     path = scp[2];
   } else if (/^(https?|ssh):\/\//.test(url)) {
     const parsed = new URL(url);
     host = parsed.hostname;
-    web = parsed.protocol === 'ssh:' ? `https://${host}` : parsed.origin;
+    web = parsed.protocol === 'ssh:' ? sshWebAddress(host, gitlabAddresses) : parsed.origin;
     path = parsed.pathname;
   } else {
     return null;

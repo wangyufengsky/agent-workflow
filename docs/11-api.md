@@ -70,7 +70,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 
 `ProjectDTO.preview` 为页面预览设置，添加项目时按 `package.json` 推断（29 §4.1），没有可推断的脚本时为 null。
 
-远端 `repo` 默认从 `git remote get-url origin` 推断（`inferredHosting`：`github.com` → GitHub，其他主机 → GitLab，非 `gitlab.com` 时 `baseUrl` 为 HTTP(S) origin 自己的协议、主机与端口，SSH origin 为 `https://<host>`；全局令牌按这个地址匹配，D155），前端预填。
+远端 `repo` 默认从 `git remote get-url origin` 推断（`inferredHosting`：`github.com` → GitHub，其他主机 → GitLab，非 `gitlab.com` 时 `baseUrl` 为 HTTP(S) origin 自己的协议、主机与端口，SSH origin 只知道主机名：已保存的 GitLab 全局令牌里恰好有一个地址在这个主机上就用它（内网 GitLab 的 Web 地址常是 `http://` 或非标准端口，D166），没有或有多个时为 `https://<host>`；全局令牌按这个地址匹配，D155），前端预填。
 
 ## 4. 流程与角色
 
