@@ -77,4 +77,23 @@ describe('全局 GitHub / GitLab 令牌（D155）', () => {
       source: 'project',
     });
   });
+
+  it('SSH origin 按主机名匹配已保存的自建 GitLab 地址（HTTP、非标准端口），创建 MR 用上它的令牌（D169）', async () => {
+    // The fake's GitLab is http://127.0.0.1:<port>/gitlab, like an intranet GitLab whose web port is not SSH's.
+    const gitlabUrl = hosting.endpoints.gitlabUrl;
+    const repo = await createTestRepo({ origin: `git@${new URL(gitlabUrl).hostname}:acme/shop.git` });
+    await repo.git('switch', '-q', '-c', 'feature');
+    const { body: project } = await t.call(createProjectOp, { repoPath: repo.path });
+    await t.call(setHostingAccountOp, { provider: 'gitlab', baseUrl: gitlabUrl, token: TOKEN });
+
+    expect((await t.call(getProjectOp, { id: project.id })).body.effectiveHosting).toEqual({
+      provider: 'gitlab',
+      baseUrl: gitlabUrl,
+      repo: 'acme/shop',
+      source: 'global',
+    });
+    const pr = { id: project.id, branch: 'feature', base: 'main', title: '加一个功能' };
+    expect((await t.call(gitCreatePullRequestOp, pr)).status).toBe(201);
+    expect(hosting.pullRequests.map((p) => [p.provider, p.repo, p.head])).toEqual([['gitlab', 'acme/shop', 'feature']]);
+  });
 });

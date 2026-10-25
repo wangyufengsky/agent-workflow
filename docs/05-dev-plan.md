@@ -460,7 +460,7 @@
 
 ## 后续 · 内网部署适配（IN）
 
-> 状态：**用户要求**（D161–D166，2026-10-25，内网已部署模型服务与带内网 provider 的 opencode），**IN-01…IN-07 已实现**，待用户检查（IN-07 是 Linux 凭据存储，D167）。
+> 状态：**用户要求**（2026-10-25，企业内网部署：内网已部署模型服务与带内网 provider 的 opencode、自建 GitLab，机器通常不能访问公网），下表各项已实现，待用户检查；决策编号见各行。
 
 | 任务 | 内容 | 完成标准 |
 | --- | --- | --- |
@@ -471,6 +471,7 @@
 | IN-05 | 后端出站请求走代理：默认读 `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`（含小写），设置 `network.proxy` / `network.noProxy` 整体覆盖；Node 内置代理（`http.setGlobalProxyFromEnv`）改设置立即生效；本机地址总是直连；opencode 启动时带上大小写两套变量（D165）。同一提交登记 02、08、14、17 §3.13 | 集成（记录 CONNECT 的测试代理 + 只有代理能解析的主机名）：默认走环境变量的代理，设置的代理覆盖它，`noProxy` 里的主机直连；假 opencode 的启动环境带设置的代理与 `NO_PROXY` |
 | IN-06 | 数据库 TLS 三档 `DbTlsMode`（`off` / `verify` / `no_verify`）：表 `db_connections.tls` 换成 `tls_mode`（迁移 `0030_db_tls_mode`，原来勾选的为 `verify`），API 与操作的 `tls` 换成 `tlsMode`，四个驱动按档设置；数据库对话框改为下拉并说明「不校验证书」的风险（D166）。同一提交登记 02、08、10、11 §9、14、24 §2 | 集成（Docker MySQL，服务器证书由测试 CA 签发，账号 `REQUIRE SSL`）：不加密登录失败、`no_verify` 成功、`verify` 在设置加上 CA 前失败、加上后成功、清空后又失败；PostgreSQL（snakeoil）与 SQL Server（自生成证书）用 `no_verify` 跑全套、`verify` 失败；迁移：原 `tls = 1` 为 `verify` |
 | IN-07 | Linux 凭据存储（D167）：main 在 `ready` 前对非 KDE 会话追加 `--password-store=gnome-libsecret`（用户自己传了不覆盖）；后端 credentials 模块的主密码（scrypt 派生密钥包住数据密钥，表 `credential_vault`、`credentials.seal`，迁移 `0031_credential_master_password`）与 `credentials.*` 四个操作；`EnvironmentDTO.credentials` 增加 `system`、`masterPassword`；引导页 / 开发环境页「凭据存储」的设置、解锁、修改、重置。同一提交更新 02、03、08、10、11、14、17 | 单元：开关的选择（不认识的桌面环境、KDE、用户自选、非 Linux）；集成（真实 SQLite）：设置后保存且库中无明文、重启后锁定与错误主密码、修改后只有新密码能解锁、重置后 `CREDENTIAL_LOST` 与重新填写、系统密钥服务后来可用时新凭据存系统；Electron J42（CI 的两个 Linux 运行器，xvfb 下没有桌面环境）：没有 Secret Service 时设置主密码、重启后解锁；gnome-keyring 已解锁时引导页「凭据存储」为已就绪（系统密钥服务） |
+| IN-09 | SSH origin 的 GitLab 平台地址按主机名匹配已保存的全局令牌地址，唯一时用它，没有或多个时为 `https://<host>`（D169）。同一提交登记 02、11 §3 | 集成（FakeHosting）：origin `git@<主机>:acme/shop.git`、全局令牌保存在 `http://<主机>:<端口>/gitlab`，`effectiveHosting` 为该地址且创建 MR 用上它的令牌；单元：唯一、没有、多个与 HTTP(S) origin 不受影响 |
 
 ## 后续 · 存储空间与磁盘清理（ST）
 
