@@ -31,6 +31,18 @@ export const DbType = {
 export type DbType = (typeof DbType)[keyof typeof DbType];
 export const dbTypeSchema = z.enum(DbType);
 
+/**
+ * TLS of a project database connection (24 §2, D166): `verify` checks the certificate chain against the backend's
+ * trusted CAs (D164) and the host name; `no_verify` encrypts without checking who answers.
+ */
+export const DbTlsMode = {
+  Off: 'off',
+  Verify: 'verify',
+  NoVerify: 'no_verify',
+} as const;
+export type DbTlsMode = (typeof DbTlsMode)[keyof typeof DbTlsMode];
+export const dbTlsModeSchema = z.enum(DbTlsMode);
+
 export const CredentialKind = {
   GitToken: 'git_token',
   DbPassword: 'db_password',

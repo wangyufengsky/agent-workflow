@@ -7,6 +7,7 @@ import { AboutPanel } from './about-panel.tsx';
 import { AssistantSettings } from './assistant-settings.tsx';
 import { CompanionSettings } from './companion-settings.tsx';
 import { HostingAccountsSettings } from './hosting-accounts.tsx';
+import { NetworkSettings } from './network-settings.tsx';
 import { ProSettings } from './pro-settings.tsx';
 import { NumberSetting, Segmented } from './setting-inputs.tsx';
 import { useSettings, useUpdateSettings } from './settings.queries.ts';
@@ -101,6 +102,7 @@ export function SettingsPage() {
         <CompanionSettings settings={settings} set={set} />
         <WebsiteSettings settings={settings} set={set} />
         {isPro && <ProSettings settings={settings} set={set} />}
+        {isPro && <NetworkSettings settings={settings} set={set} />}
         {isPro && <HostingAccountsSettings />}
         {update.isError && <ErrorState error={update.error} />}
         <AboutPanel />

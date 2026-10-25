@@ -28,6 +28,18 @@ export const SETTINGS_COPY = {
   concurrencyHint: '多个任务同时进行时，最多并行的 AI 会话数量。',
   // 专业项（08 §4.3）
   pro: '专业设置',
+  // 网络：企业 CA 与代理（D164、D165）
+  network: '网络',
+  extraCa: '额外信任的 CA 证书',
+  extraCaFile: '从文件读取…',
+  extraCaHint:
+    '后端访问 GitHub / GitLab 与数据库时，在内置根证书与系统证书库之外再信任这些 CA，保存后立即生效；opencode 在下次启动时生效（运行环境页可重启）。粘贴 PEM 格式的证书，可以多张。',
+  proxy: '代理地址',
+  proxyHint:
+    '形如 http://proxy.corp.example:8080，不能包含账号密码。留空则使用环境变量 HTTPS_PROXY / HTTP_PROXY / NO_PROXY。填写后后端与 opencode 都用它，内置浏览器仍跟随系统代理。',
+  noProxy: '不走代理的地址',
+  noProxyHint:
+    '逗号分隔，.corp.example 也匹配它的子域名；只在填写了代理地址时生效。本机地址（localhost、127.0.0.1）总是直连。',
   // 全局 GitHub / GitLab 令牌（D155）
   hostingAccounts: 'GitHub / GitLab 令牌',
   hostingAccountsLede:

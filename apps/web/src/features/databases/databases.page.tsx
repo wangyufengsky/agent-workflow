@@ -3,7 +3,9 @@ import {
   createDbConnectionRequestSchema,
   DB_DEFAULT_PORT,
   type DbConnectionDTO,
+  DbTlsMode,
   DbType,
+  dbTlsModeSchema,
   dbTypeSchema,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
@@ -52,7 +54,7 @@ function ConnectionDialog({
   const [database, setDatabase] = useState(prefill.database ?? connection?.database ?? '');
   const [username, setUsername] = useState(prefill.username ?? connection?.username ?? '');
   const [password, setPassword] = useState('');
-  const [tls, setTls] = useState(prefill.tls ?? connection?.tls ?? false);
+  const [tlsMode, setTlsMode] = useState<DbTlsMode>(prefill.tlsMode ?? connection?.tlsMode ?? DbTlsMode.Off);
   const create = useCreateDbConnection();
   const update = useUpdateDbConnection();
   const mutation = connection === undefined ? create : update;
@@ -73,7 +75,7 @@ function ConnectionDialog({
       port: portNumber,
       database: database.trim(),
       username: username.trim(),
-      tls,
+      tlsMode,
     };
     const done = {
       onSuccess: () => {
@@ -175,10 +177,23 @@ function ConnectionDialog({
           />,
           connection === undefined ? undefined : C.passwordKeep,
         )}
-        <label className="check">
-          <input type="checkbox" checked={tls} onChange={(e) => setTls(e.target.checked)} />
-          <span>{C.tls}</span>
-        </label>
+        {field(
+          'db-tls',
+          C.tls,
+          <select
+            id="db-tls"
+            className="select"
+            value={tlsMode}
+            onChange={(e) => setTlsMode(dbTlsModeSchema.parse(e.target.value))}
+          >
+            {dbTlsModeSchema.options.map((m) => (
+              <option key={m} value={m}>
+                {C.tlsLabel[m]}
+              </option>
+            ))}
+          </select>,
+          C.tlsHint[tlsMode],
+        )}
         {mutation.isError && <ErrorState error={mutation.error} />}
         <div className="row">
           <Button type="submit" variant="primary" pending={mutation.isPending} disabled={!valid}>
@@ -246,7 +261,7 @@ function ConnectionCard({
         </span>
         <span className="section-title grow ellipsis">{connection.name}</span>
         <span className="chip">{C.typeLabel[connection.type]}</span>
-        {connection.tls && <span className="chip">{C.tlsChip}</span>}
+        {connection.tlsMode !== DbTlsMode.Off && <span className="chip">{C.tlsChip[connection.tlsMode]}</span>}
       </span>
       <span className="hint mono ellipsis">
         {connection.username}@{connection.host}:{connection.port}/{connection.database}

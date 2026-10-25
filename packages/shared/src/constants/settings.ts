@@ -12,6 +12,16 @@ import {
   uiModeSchema,
 } from '../enums/ui.ts';
 
+/** One or more PEM certificates (D164); the backend parses each before saving (Node's X509 is not here). */
+const pemCertificatesSchema = z
+  .string()
+  .regex(/^\s*(-----BEGIN CERTIFICATE-----\r?\n[A-Za-z0-9+/=\r\n]+-----END CERTIFICATE-----\s*)+$/);
+
+/** `http(s)://host:port` (D165); credentials would be stored in plain text with the settings (06 §11). */
+const proxyUrlSchema = z
+  .url({ protocol: /^https?$/ })
+  .refine((url) => !/^https?:\/\/[^/]*@/i.test(url), 'A proxy URL in the settings cannot hold a user name or password');
+
 /** User settings (08 §4.3): key → value schema. Unknown keys are rejected. */
 export const settingsSchema = z.strictObject({
   'ui.mode': uiModeSchema,
@@ -50,6 +60,12 @@ export const settingsSchema = z.strictObject({
   'browser.sites': z.array(siteRuleSchema),
   /** Host or path fragments that mark a login page, besides the built-in ones (29 §5.4). */
   'browser.loginUrlPatterns': z.array(z.string().min(1)),
+  /** CAs trusted besides the built-in roots and the system store (D164); null: none. */
+  'network.extraCaCerts': pemCertificatesSchema.nullable(),
+  /** Replaces the proxy environment variables when set (D165); null: they apply. */
+  'network.proxy': proxyUrlSchema.nullable(),
+  /** Hosts reached directly while `network.proxy` is set; `.corp.example` also matches its subdomains. */
+  'network.noProxy': z.array(z.string().regex(/^[^\s,]+$/)),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export type SettingKey = keyof Settings;
@@ -84,6 +100,9 @@ export const SETTING_DEFAULTS: Settings = {
   'preview.idleMinutes': 10,
   'browser.sites': [{ pattern: '*', access: SiteAccess.Read }],
   'browser.loginUrlPatterns': [],
+  'network.extraCaCerts': null,
+  'network.proxy': null,
+  'network.noProxy': [],
 };
 
 /** Lowest UI mode in which the settings page shows each key. */
@@ -114,4 +133,7 @@ export const SETTING_MODE: Record<SettingKey, UiMode> = {
   'preview.idleMinutes': UiMode.Pro,
   'browser.sites': UiMode.Simple,
   'browser.loginUrlPatterns': UiMode.Pro,
+  'network.extraCaCerts': UiMode.Pro,
+  'network.proxy': UiMode.Pro,
+  'network.noProxy': UiMode.Pro,
 };

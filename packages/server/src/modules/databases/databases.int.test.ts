@@ -1,6 +1,7 @@
 import {
   askKnowledgeOp,
   createDbConnectionOp,
+  DbTlsMode,
   DbType,
   dbSchemaOp,
   deleteDbConnectionOp,
@@ -67,14 +68,14 @@ const connectionInput = (name: string, password = mysql.password, type: DbType =
   database: mysql.database,
   username: mysql.username,
   password,
-  tls: false,
+  tlsMode: DbTlsMode.Off,
 });
 
 describe('数据库连接（11 §9）', () => {
   it('增改删、测试连接、浏览表结构、项目关联；DTO 不含密码', async () => {
     const created = await t.call(createDbConnectionOp, connectionInput('shop-db'));
     expect(created.status).toBe(201);
-    expect(created.body).toMatchObject({ name: 'shop-db', database: 'shop', tls: false });
+    expect(created.body).toMatchObject({ name: 'shop-db', database: 'shop', tlsMode: DbTlsMode.Off });
     expect(Object.keys(created.body)).not.toContain('password');
     const { id } = created.body;
     expect((await t.call(createDbConnectionOp, connectionInput('shop-db'))).body).toMatchObject({

@@ -1,4 +1,4 @@
-import { AppError, DB_CONNECT_TIMEOUT_MS, ErrorCode } from '@aw/shared';
+import { AppError, DB_CONNECT_TIMEOUT_MS, DbTlsMode, ErrorCode } from '@aw/shared';
 import mysql from 'mysql2';
 import { z } from 'zod';
 import type { DbDriver, DbTarget } from '../databases.driver.ts';
@@ -42,6 +42,18 @@ function queryError(err: unknown): AppError {
   return new AppError(ErrorCode.DbQueryFailed, 'The statement failed', details);
 }
 
+/** mysql2's `ssl` for each mode (D166); `{}` checks the certificate against Node's default CAs (D164). */
+function sslOf(mode: DbTlsMode) {
+  switch (mode) {
+    case DbTlsMode.Off:
+      return {};
+    case DbTlsMode.Verify:
+      return { ssl: {} };
+    case DbTlsMode.NoVerify:
+      return { ssl: { rejectUnauthorized: false } };
+  }
+}
+
 async function open(target: DbTarget): Promise<Connection> {
   const connection = mysql.createConnection({
     host: target.host,
@@ -49,7 +61,7 @@ async function open(target: DbTarget): Promise<Connection> {
     user: target.username,
     password: target.password,
     database: target.database,
-    ...(target.tls ? { ssl: {} } : {}),
+    ...sslOf(target.tlsMode),
     connectTimeout: DB_CONNECT_TIMEOUT_MS,
     // Values must survive JSON: dates and big numbers as strings.
     dateStrings: true,

@@ -113,6 +113,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `StorageCleanTarget` | `logs` · `transcripts`（37 §3） |
 | `Platform` | `darwin` · `win32` · `linux`（运行应用的操作系统，17 §1） |
 | `DbType` | `mysql` · `postgresql` · `opengauss`（openGauss / GaussDB）· `sqlserver` · `goldendb`（MySQL 协议）（v1.2，24 §1） |
+| `DbTlsMode` | `off`（不加密）· `verify`（加密并校验证书链与主机名，信任列表同 D164）· `no_verify`（加密但不校验证书）（D166，24 §2） |
 | `CredentialKind` | `git_token` · `db_password` |
 | `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` · `confirmation` · `attachment` · `entity_ref` · `chart`（后四种仅助手对话，10 §3；`chart` 见 35 §4） |
 | `TranscriptSystemEvent` | `attempt_started` · `nudged` · `retrying` · `result_submitted` · `awaiting_input`（等待用户回答或授权）· `timed_out` · `aborted` · `runtime_lost` · `assistant_isolated`（旧助手会话切换到独立目录；`system` 会话流条目记录的事件，文案在前端） |
@@ -408,6 +409,9 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `preview.idleMinutes` | `10`（没有标签页、没有活动尝试多久后停止预览） | 专业 |
 | `browser.sites` | `[{ pattern: '*', access: 'read' }]`（网站规则，按顺序取第一条匹配，无匹配不允许；助手不能修改，D65 的同一思路，29 §5.4） | 简单 |
 | `browser.loginUrlPatterns` | `[]`（内置规则之外识别登录页的主机或路径片段） | 专业 |
+| `network.extraCaCerts` | `null`（PEM，一张或多张；后端与 opencode 在内置根证书与系统证书库之外再信任它们；边界检查 PEM 结构，后端保存前逐张解析；助手不能修改，D164） | 专业 |
+| `network.proxy` | `null`（`http(s)://主机:端口`，不含账号密码；`null` 时用环境变量 `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`；助手不能修改，D165） | 专业 |
+| `network.noProxy` | `[]`（`network.proxy` 生效时直连的主机，`.corp.example` 匹配子域名；本机地址总是直连；助手不能修改，D165） | 专业 |
 
 「模式」列表示该设置在哪种界面模式下出现在设置页（常量 `SETTING_MODE`）。值的 schema 为 `settingsSchema`（strict：未知键拒绝），默认值为 `SETTING_DEFAULTS`。
 
@@ -468,6 +472,7 @@ class AppError extends Error {
 | `HOSTING_NOT_CONFIGURED` | 400 | 需要平台（PR、审查意见）但项目没有可用的令牌：自己没绑定，origin 的平台地址也没有全局令牌（D155） |
 | `HOSTING_AUTH_FAILED` | 401 | 令牌无效或权限不足 |
 | `HOSTING_API_ERROR` | 502 | `details: { status, body }` |
+| `HOSTING_UNREACHABLE` | 502 | 请求没有得到平台的回答：连不上、域名解析失败、证书不受信任（D164）或代理不通（D165）；`details: { code, message }`（Node 的错误码，如 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`、`ENOTFOUND`） |
 | **流程 / 角色** | | |
 | `WORKFLOW_NOT_FOUND` | 404 | |
 | `WORKFLOW_READONLY` | 409 | 修改内置流程 |

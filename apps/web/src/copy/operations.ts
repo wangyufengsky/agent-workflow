@@ -258,7 +258,7 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   port: '端口',
   database: '数据库',
   username: '用户名',
-  tls: 'TLS',
+  tlsMode: 'TLS',
   key: '标识',
   description: '说明',
   planning: '规划方式',

@@ -51,6 +51,7 @@ import { createInitiativesModule, type InitiativesService } from './modules/init
 import { createInsightsModule } from './modules/insights/index.ts';
 import { createKnowledgeModule, type KnowledgeService } from './modules/knowledge/index.ts';
 import { createMcpModule } from './modules/mcp/index.ts';
+import { createNetworkModule, validateNetworkSettings } from './modules/network/index.ts';
 import { createNodesModule, type NodesService } from './modules/nodes/index.ts';
 import {
   buildOpencodeConfig,
@@ -151,9 +152,10 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   registerErrorHandling(server, { serveSpa: config.webDir !== undefined });
   registerSseHub(server, events);
 
-  const settings = createSettingsModule({ db: database.db, events, clock });
+  const settings = createSettingsModule({ db: database.db, events, clock, validate: validateNetworkSettings });
   const credentials = createCredentialsModule({ db: database.db, clock, cipher: deps.cipher ?? unavailableCipher });
   const env = deps.env ?? process.env;
+  const network = createNetworkModule({ settings: settings.service, events, env, dataDir: config.dataDir });
   const prompts = loadPrompts(config.promptsDir);
   // Per-launch secrets of the two MCP endpoints, separate from the renderer token and from each other (D25).
   const mcpToken = randomBytes(32).toString('hex');
@@ -178,6 +180,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
         }),
       );
     },
+    networkEnv: network.opencodeEnv,
     log,
     events,
     clock,
