@@ -11,6 +11,8 @@ import { Icon } from '../../components/icon.tsx';
 import { CONFIRMATION_COPY as C } from '../../copy/assistant.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { operationTitle } from '../../copy/operations.ts';
+import { GitInitSummary } from '../projects/git-init-summary.tsx';
+import { gitInitPreviewQuery } from '../projects/projects.queries.ts';
 import { taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { useCancelCall, useConfirmCall } from './assistant.queries.ts';
 import styles from './cards.module.css';
@@ -61,6 +63,16 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
   const title = operationTitle(confirmation.title);
   const busy = confirm.isPending || cancel.isPending;
   const taskId = confirmation.input.id;
+  const repoPath = confirmation.input.repoPath;
+  const gitInitPath =
+    confirmation.operationId === 'projects.initGit' && typeof repoPath === 'string' ? repoPath : undefined;
+  // Putting a directory under Git commits every file not ignored: as in the add-project form, it is confirmed only
+  // once what the first commit takes is shown (D153).
+  const gitInit = useQuery({
+    ...gitInitPreviewQuery(gitInitPath ?? ''),
+    enabled: pending && gitInitPath !== undefined,
+  });
+  const awaitsPreview = gitInitPath !== undefined && !gitInit.isSuccess;
   return (
     <section
       className={styles.card}
@@ -84,6 +96,13 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
       {pending && confirmation.operationId === 'tasks.deliver' && typeof taskId === 'string' && (
         <DeliveryImpact taskId={taskId} />
       )}
+      {pending &&
+        gitInitPath !== undefined &&
+        (gitInit.isError ? (
+          <ErrorState error={gitInit.error} onRetry={() => void gitInit.refetch()} />
+        ) : (
+          gitInit.data !== undefined && <GitInitSummary preview={gitInit.data} />
+        ))}
       {pending ? (
         <>
           <p className={styles.note}>{C.impact[confirmation.risk]}</p>
@@ -92,7 +111,7 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
               variant="primary"
               size="sm"
               pending={confirm.isPending && confirm.variables?.alwaysAllow === false}
-              disabled={busy}
+              disabled={busy || awaitsPreview}
               onClick={() => confirm.mutate({ id: confirmation.id, alwaysAllow: false })}
             >
               {C.confirm}
@@ -101,7 +120,7 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
               <Button
                 size="sm"
                 pending={confirm.isPending && confirm.variables?.alwaysAllow === true}
-                disabled={busy}
+                disabled={busy || awaitsPreview}
                 onClick={() => confirm.mutate({ id: confirmation.id, alwaysAllow: true })}
               >
                 {C.confirmAlways}

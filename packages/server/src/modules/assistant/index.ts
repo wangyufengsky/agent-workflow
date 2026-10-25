@@ -2,17 +2,21 @@ import type { Prompts } from '@aw/builtin';
 import {
   attachmentIdsSchema,
   createInitiativeOp,
+  createProjectOp,
   createTaskOp,
   type GetAppStatusOutput,
+  initGitOp,
   MCP_ASSISTANT_PATH,
   MCP_ASSISTANT_SERVER_NAME,
 } from '@aw/shared';
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { registerMcpEndpoint } from '../../core/http/mcp-endpoint.ts';
 import type { OperationImpl } from '../../core/operations/operations.ts';
 import type { BatchesService } from '../batches/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DecksService } from '../decks/index.ts';
+import type { GitReviewsService } from '../git-reviews/index.ts';
 import type { InitiativesService } from '../initiatives/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
@@ -48,6 +52,7 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context'> & {
   batches: BatchesService;
   schedules: SchedulesService;
   initiatives: InitiativesService;
+  gitReviews: GitReviewsService;
   team: TeamService;
   browser: BrowserService;
   /** Every other operation of the app; the assistant's tools are generated from them (15 §3). */
@@ -84,7 +89,7 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
         requestConfirmation: confirmations.request,
         recordProduced: conversations.recordProduced,
         deferred: new Map(KNOWLEDGE_QUESTION_OPS.map((id) => [id, relay.researching])),
-        scoped: new Map([
+        prechecks: new Map([
           // Only files of this conversation are handed on (30 §2.2): to a task, or to an initiative (34 §10).
           ...[createTaskOp.id, createInitiativeOp.id].map(
             (id) =>
@@ -97,6 +102,9 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
                   ),
               ] as const,
           ),
+          // A directory the user would add only to have it refused is answered at once, with its code's hint (D153).
+          [createProjectOp.id, (_, input) => deps.projects.assertAddable(z.string().parse(input.repoPath))],
+          [initGitOp.id, (_, input) => deps.projects.assertInitable(z.string().parse(input.repoPath))],
         ]),
       }),
       ...helperTools({ ...deps, conversations }),

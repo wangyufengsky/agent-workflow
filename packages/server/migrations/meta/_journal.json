@@ -204,6 +204,13 @@
       "when": 1792886341615,
       "tag": "0028_assistant_breakdown_followups",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1792894332437,
+      "tag": "0029_hosting_accounts",
+      "breakpoints": true
     }
   ]
 }

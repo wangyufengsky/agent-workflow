@@ -43,6 +43,9 @@ type UiState = {
   /** The user's open preview tab of each task (29 §8.1): a change request may attach its page (29 §2.3). */
   previewTabs: Record<string, string>;
   setPreviewTab(taskId: string, tabId: string | null): void;
+  /** The AI review the Git workbench shows (27 §4.5), whichever view and history entry: where the user is (15 §2). */
+  shownGitReview: string | null;
+  setShownGitReview(reviewId: string | null): void;
   /** The project the team page showed last (33 §5.1), until the app reloads. */
   teamProjectId: string | null;
   setTeamProject(projectId: string): void;
@@ -71,6 +74,8 @@ export const useUiStore = create<UiState>((set) => ({
   setPendingExport: (pendingExport) => set({ pendingExport }),
   streamOpen: {},
   setStreamOpen: (attemptId, open) => set((s) => ({ streamOpen: { ...s.streamOpen, [attemptId]: open } })),
+  shownGitReview: null,
+  setShownGitReview: (shownGitReview) => set({ shownGitReview }),
   teamProjectId: null,
   setTeamProject: (teamProjectId) => set({ teamProjectId }),
   previewTabs: {},

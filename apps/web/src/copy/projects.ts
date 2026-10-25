@@ -40,6 +40,8 @@ export const PROJECTS_COPY = {
   remote: '远端仓库',
   remoteInferred: (provider: string, repo: string) => `从 origin 识别为 ${provider} · ${repo}`,
   remoteNone: '没有识别到 GitHub / GitLab 远端',
+  remoteGlobal: (provider: string, repo: string) =>
+    `未单独绑定：使用设置里的全局 ${provider} 令牌访问 ${repo}。在这里绑定后改用项目自己的令牌。`,
   providers: { github: 'GitHub', gitlab: 'GitLab' },
   hostingProvider: '平台',
   hostingBaseUrl: 'GitLab 地址',

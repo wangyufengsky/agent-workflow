@@ -33,7 +33,8 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.GitReviewRunning]: '这个项目正在进行一次 AI 审查，结束后再开始新的。',
   [ErrorCode.GitReviewFindingsInvalid]: 'AI 提交的审查问题与改动不符。',
   [ErrorCode.CommitDraftFailed]: 'AI 没能草拟出提交信息，请自己填写或稍后再试。',
-  [ErrorCode.HostingNotConfigured]: '项目还没有绑定远端仓库，先在项目设置里绑定。',
+  [ErrorCode.HostingNotConfigured]:
+    '项目没有可用的 GitHub / GitLab 令牌：在项目页绑定，或在专业模式的设置里添加全局令牌。',
   [ErrorCode.HostingAuthFailed]: '令牌无效，或没有这个仓库的权限。',
   [ErrorCode.HostingApiError]: '远端平台返回了错误，请稍后再试。',
   [ErrorCode.WorkflowNotFound]: '这个流程不存在。',

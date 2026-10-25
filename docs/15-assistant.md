@@ -55,6 +55,10 @@ opencode 1.19 的已有会话目录不能通过发送参数或 fork 改变。迁
 
 第一批开放给助手的操作（v1.1）：项目、任务（含开始、取消、结果、再改改、交付）、需要你处理（列表、回答、审批）、流程与角色（读；专业模式可写）、数据库（列表、测试、结构、只读查询：新增操作 `databases.query`，与 AI 的 `db_query` 同样的只读四道关，可用于任意连接）、Git（只读）、设置。知识问答（v1.1，18 §4a）的操作已注册并 `expose.assistant`：`knowledge_ask` / `knowledge_followUp` 为 read（不需确认），工具立即返回 `researching`，回答（带引用链接）与导航卡片在研究结束后作为下一条消息送达；`knowledge_delete` 为 critical，列表、详情、引用原文为 read。PPT 模块上线时注册其操作即自动可用。各模块的覆盖盘点见 28 §4（v1.2 起批量、定时、PPT、审查意见回流都已开放；`open_page` 补了批量、定时与环境检测页）。
 
+没有 Git 的项目（D153）：`projects_previewGitInit`（read）与 `projects_initGit`（write）开放给助手。`projects_create` 与 `projects_initGit` 在出确认卡之前先检查目录（`prechecks`，与附件的检查同一处）：不在任何仓库里的目录让 `projects_create` 直接返回 `PROJECT_PATH_NO_GIT`，hint 让助手改用 `projects_initGit`；仓库的子目录、已添加的仓库、已是仓库的目录同样立即报错，不出用户确认了也会失败的卡片。
+
+页面（`AssistantPage`，08）覆盖界面的全部页面：新建批量、新建与修改定时任务、新建 PPT、组合模板的列表 / 新建 / 编辑页，以及某次 AI 审查（`git_review`，带 `gitReviewId`，地址跳到工作台里显示它的视图）。用户在 Git 工作台上看着某次审查时（改动视图的审查、提交详情的审查页签、分支与范围的审查视图，包括从历史里选中的那次），审查面板把它报告给界面状态，所在页面就是这次审查，而不只是工作台。用户在这些页面上时 system 写明是哪一个（模板的名称与阶段数；审查的范围、项目、状态与问题数；定时任务的修改页同定时任务页）；以前这些页面被当成主页。新增路由时没有对应页面会编译失败（只有引导页、团队入口跳转、放映与打印、开发组件页除外）。
+
 需求计划（v1.3，34 §10）：操作全部开放（`initiatives.saveDraft` 除外：改写阶段与工作包在页面上做）；`initiatives_create` 与「开始任务」一样只能转交本对话里的附件（30 §2.2），别的附件直接 `ATTACHMENT_NOT_FOUND`、不出确认卡；`open_page` 可以打开 `initiatives` / `initiative`，用户在需求计划页时 system 写明它的编号、标题、状态、项目、已开启的阶段与完成的工作包数。协议提示词写明：大需求（需求文档、多个功能要分析拆包分阶段）建需求计划而不是一个任务，不带模板时由 AI 拆解；建好后打开需求计划页让用户审阅确认；助手发起的拆解（`initiatives_create` 不带模板、`initiatives_rebreakdown`、`initiatives_refine`、带 `refine` 的 `initiatives_openPhase`）结束后，草稿或失败原因作为下一条消息送回原对话（`prompts/assistant-breakdown.md`，表 `assistant_breakdown_followups`，同成员分析的回报 33 §6）：阶段与工作包、需求覆盖里没有对应工作包的点、确认才开始；用户在页面上又开始了一次的不再回报。
 
 opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若它缓存启动时的列表，切换界面模式后列表要到 opencode 重启才更新，但调用时的模式检查保证简单模式下不会执行专业操作。
@@ -70,7 +74,7 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 确认流程（与 `ask_user` 同一模式，不依赖长时间阻塞的工具调用；`assistant.confirmations.ts`，状态机 09 §10）：
 
 1. 工具返回 `{ status: 'needs_confirmation', confirmation_id, instruction }`（instruction 要求模型用一句话说明并结束本轮），后端写 `assistant_confirmations`（`pending`），消息流追加 `confirmation` 条目，推送 `assistant.confirmation`。
-2. 界面在对话中渲染确认卡片：操作标题、参数（对象显示名称、字段用中文标签，§6.1）、影响说明（write：可「确认并总是允许」；critical：每次确认），合并（`tasks.deliver`）另显示将合并的改动统计。
+2. 界面在对话中渲染确认卡片：操作标题、参数（对象显示名称、字段用中文标签，§6.1）、影响说明（write：可「确认并总是允许」；critical：每次确认），合并（`tasks.deliver`）另显示将合并的改动统计，初始化 Git（`projects.initGit`）另显示与添加项目对话框相同的三件事、将纳入的文件数与大小和大文件提醒（D153）。
 3. 用户确认 → 先转为 `confirmed`（再点一次 409，不会执行两次）→ 后端执行操作 → 结果 `{ ok: true, output }` 或 `{ ok: false, error }` 与模板 `assistant-confirmed.md` 生成的待发消息在同一事务保存（无返回值的成功操作用 `output: null`，兼容旧记录缺失 output）→ 回传同一会话；取消 → 在同一事务保存 `cancelled` 与 `assistant-cancelled.md` 消息。会话还在回复或发送请求尚未返回时消息先排队，本轮结束后发出；opencode 不可用或发送失败时保留队列，后端重启后也可随用户的下一条消息发出。只有收到发送成功响应才移除当次消息，不移除期间新入队的消息；恢复只投递结果，不重新执行操作。
 4. `alwaysAllow: true` 只接受 write 级（critical 400 `VALIDATION_FAILED`），同时把操作 id 加入设置 `assistant.alwaysAllow`。之后该操作直接执行；critical 即使被写进列表也照样确认。
 

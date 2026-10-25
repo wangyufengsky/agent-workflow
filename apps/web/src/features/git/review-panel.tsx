@@ -7,7 +7,7 @@ import {
   type GitReviewTargetInput,
 } from '@aw/shared';
 import { useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Elapsed } from '../../components/elapsed.tsx';
@@ -17,6 +17,7 @@ import { Markdown } from '../../components/markdown.tsx';
 import { STREAM_COPY } from '../../copy/attempts.ts';
 import { formatDateTime } from '../../copy/common.ts';
 import { GIT_COPY as C } from '../../copy/git.ts';
+import { useUiStore } from '../../state/ui.store.ts';
 import { AttemptView } from '../attempts/attempt-view.tsx';
 import styles from './git.module.css';
 import { useStartReview, useStopReview } from './git.queries.ts';
@@ -197,6 +198,14 @@ export function ReviewPanel({
   const [choices, setChoices] = useState<ReadonlyMap<string, boolean>>(new Map());
   const stop = useStopReview(projectId);
   const review = reviews.find((r) => r.id === pickedId) ?? reviews[0];
+  // The assistant is told which review the user is looking at (15 §2), not only which view.
+  const setShownGitReview = useUiStore((s) => s.setShownGitReview);
+  const shownId = review?.id;
+  useEffect(() => {
+    if (shownId === undefined) return;
+    setShownGitReview(shownId);
+    return () => setShownGitReview(null);
+  }, [shownId, setShownGitReview]);
   if (review === undefined)
     return <StartReview projectId={projectId} target={target} again={false} onStarted={setPickedId} />;
   const index = reviews.length - reviews.indexOf(review);

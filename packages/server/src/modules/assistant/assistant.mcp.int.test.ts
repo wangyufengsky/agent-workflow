@@ -1,4 +1,6 @@
-import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   AssistantToolName,
@@ -33,6 +35,7 @@ import { waitForEvent } from '../../../test/helpers/events.ts';
 import { createTestRepo } from '../../../test/helpers/git.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
 import { addProject, workflowId } from '../../../test/helpers/tasks.ts';
+import { runGit } from '../git/index.ts';
 
 let t: TestApp;
 let mcp: Client;
@@ -336,6 +339,24 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     expect(await entityRefs()).toEqual([
       { kind: 'schedule', id: (output as { id: string }).id, title: '每晚审查订单模块' },
     ]);
+  });
+
+  it('没有 Git 的目录（D153）：projects_create 报错并提示初始化；projects_initGit 确认后目录有第一个提交、项目已添加', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'aw-plain-'));
+    writeFileSync(join(dir, 'package.json'), '{}');
+    const refused = await call('projects_create', { repoPath: dir });
+    expect(refused).toMatchObject({ isError: true, body: { code: ErrorCode.ProjectPathNoGit } });
+    expect(String(refused.body.hint)).toContain('projects_initGit');
+
+    const preview = await call('projects_previewGitInit', { repoPath: dir });
+    expect(preview.body).toMatchObject({ files: 2, gitignore: expect.stringContaining('node_modules/') });
+    const { body } = await call('projects_initGit', { repoPath: dir, name: '静态站' });
+    expect(body).toMatchObject({ status: 'needs_confirmation' });
+    expect(existsSync(join(dir, '.git'))).toBe(false);
+
+    const res = await decide(String(body.confirmation_id), 'confirm');
+    expect(res.body).toMatchObject({ result: { ok: true, output: { name: '静态站', defaultBranch: 'main' } } });
+    expect((await runGit(['rev-list', '--count', 'HEAD'], { cwd: dir })).stdout.trim()).toBe('1');
   });
 
   it('直接执行（总是允许）的路径同样记下产出的对象；失败的调用不记', async () => {

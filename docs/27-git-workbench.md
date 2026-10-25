@@ -64,7 +64,7 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 | 删除分支 | `git branch -d`；确认后可 `-D` | 不是当前分支、不是项目默认分支、没有在任何 worktree 检出（`GIT_BRANCH_IN_USE`）；不属于进行中的任务；未合并 → `GIT_BRANCH_NOT_MERGED`，界面再确认一次后以 `force` 删除 | **critical** |
 | 合并 | `merge --no-ff` 或 `merge --squash` + 提交（§3.5） | 目标是本地分支、不属于进行中的任务；目标检出的工作区没有进行中的操作且干净（这两项在仓库锁内、合并前检查） | **critical** |
 | 合并冲突交给 AI | 开一个「合并分支」任务（§3.6） | 刚才的合并冲突 | write（之后的合并仍需点击） |
-| 创建 PR / MR | 已有的 `GitHostingProvider.createPullRequest`；该分支已有打开的 PR 时直接返回它 | 项目已绑定远端（`HOSTING_NOT_CONFIGURED`）；分支已推送 | **critical** |
+| 创建 PR / MR | 已有的 `GitHostingProvider.createPullRequest`；该分支已有打开的 PR 时直接返回它 | 项目有可用令牌，自己的或全局的（`HOSTING_NOT_CONFIGURED`，D155）；分支已推送 | **critical** |
 | AI 草拟提交信息 | 只读的短会话（§7.3） | opencode 就绪 | read |
 | AI 审查 | 只读会话（§4） | opencode 就绪；同一项目没有进行中的审查（`GIT_REVIEW_RUNNING`） | write |
 
@@ -80,7 +80,7 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 ### 3.3 推送
 
 - 推送当前分支或分支表里选中的本地分支到 `origin`，分支名不变；没有上游时 `--set-upstream`。
-- 认证：项目绑定了远端且 origin 是 HTTPS 时，与 PR 交付一样经环境变量注入令牌（D53）；否则用用户自己的凭据（SSH 密钥、系统凭据管理器），`GIT_TERMINAL_PROMPT=0`（不会卡在密码提示）。
+- 认证：项目有可用令牌（自己绑定的，或 origin 平台地址的全局令牌，D155）且 origin 是 HTTPS 时，与 PR 交付一样经环境变量注入令牌（D53）；否则用用户自己的凭据（SSH 密钥、系统凭据管理器），`GIT_TERMINAL_PROMPT=0`（不会卡在密码提示）。
 - `--porcelain` 的状态行（`!` + `[rejected]`）判定远端拒绝 → `GIT_PUSH_REJECTED`，提示「远端有你本地没有的提交：先拉取，再推送」；其他失败 `GIT_COMMAND_FAILED`（stderr 可展开）。
 - 确认对话框列出：分支 → `origin/<分支>`（新建 / 更新）、将推送的提交（`<upstream>..<branch>`，最多列 20 条）。
 
@@ -199,7 +199,7 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 
 ### 6.1 仓库概览 `/git`
 
-顶部一句说明（「查看项目的提交与分支，提交、推送与合并你自己的改动；让 AI 只读审查」）；每个项目一张卡：名称与路径、当前分支 chip、领先 / 落后、未提交改动数、最近提交（标题、作者、相对时间）、最近一次审查的问题数、远端绑定状态；「进入」。读取失败的项目卡显示原因（路径不存在 → 去项目页）。
+顶部一句说明（「查看项目的提交与分支，提交、推送与合并你自己的改动；让 AI 只读审查」）；每个项目一张卡：名称与路径、当前分支 chip、领先 / 落后、未提交改动数、最近提交（标题、作者、相对时间）、最近一次审查的问题数、远端状态（按项目详情的 `effectiveHosting`：项目令牌、全局令牌、有 origin 但没有令牌、没有可识别的平台，D155）；「进入」。读取失败的项目卡显示原因（路径不存在 → 去项目页）。
 
 ### 6.2 仓库工作台 `/git/:projectId`
 

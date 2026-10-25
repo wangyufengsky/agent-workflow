@@ -1,3 +1,5 @@
+import { HostingProvider } from '@aw/shared';
+
 export const SETTINGS_COPY = {
   title: '设置',
   about: '关于',
@@ -25,6 +27,22 @@ export const SETTINGS_COPY = {
   concurrencyHint: '多个任务同时进行时，最多并行的 AI 会话数量。',
   // 专业项（08 §4.3）
   pro: '专业设置',
+  // 全局 GitHub / GitLab 令牌（D155）
+  hostingAccounts: 'GitHub / GitLab 令牌',
+  hostingAccountsLede:
+    '项目没有单独绑定令牌时，按 origin 所在的平台使用这里的令牌推送分支、创建 PR、读取审查意见；项目页绑定的令牌优先。',
+  hostingAccountsNone: '还没有全局令牌。',
+  hostingAddress: (provider: HostingProvider, baseUrl: string | null) =>
+    baseUrl ?? (provider === HostingProvider.Github ? 'github.com' : 'gitlab.com'),
+  hostingAccountAs: (account: string) => `账号 ${account}`,
+  hostingAccountAdd: '添加令牌',
+  hostingAccountReplace: '更换令牌',
+  hostingAccountRemove: '删除',
+  hostingAccountRemoved: '已删除令牌',
+  hostingAccountSaved: '令牌已保存',
+  hostingAccountCancel: '取消',
+  hostingAccountTokenHint:
+    '需要读写仓库的权限（GitHub：repo；GitLab：api）。同一平台地址只存一个，再次保存会替换。令牌加密保存在本机，不会发给 AI。',
   defaultModel: '默认模型',
   defaultModelHint: '角色没有指定模型时使用。',
   opencodeDefault: '使用 opencode 的默认模型',
