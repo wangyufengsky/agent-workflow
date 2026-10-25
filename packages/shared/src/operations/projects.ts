@@ -50,7 +50,7 @@ export const previewGitInitOp = defineOperationContract({
   output: gitInitPreviewSchema,
   risk: OperationRisk.Read,
   http: { method: 'POST', path: '/projects/git-init/preview' },
-  expose: { palette: false, assistant: false },
+  expose: { palette: false, assistant: true },
   credentialFields: [],
   mode: UiMode.Simple,
 });
@@ -64,7 +64,7 @@ export const initGitOp = defineOperationContract({
   output: projectDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/projects/git-init', status: 201 },
-  expose: { palette: false, assistant: false },
+  expose: { palette: false, assistant: true },
   credentialFields: [],
   mode: UiMode.Simple,
   produces: { kind: EntityKind.Project, ref: (project) => ({ id: project.id, title: project.name }) },

@@ -11,6 +11,8 @@ import { Icon } from '../../components/icon.tsx';
 import { CONFIRMATION_COPY as C } from '../../copy/assistant.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { operationTitle } from '../../copy/operations.ts';
+import { GitInitSummary } from '../projects/git-init-summary.tsx';
+import { gitInitPreviewQuery } from '../projects/projects.queries.ts';
 import { taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { useCancelCall, useConfirmCall } from './assistant.queries.ts';
 import styles from './cards.module.css';
@@ -23,6 +25,13 @@ function DeliveryImpact({ taskId }: { taskId: string }) {
   // Binary files have no line counts.
   const sum = (key: 'additions' | 'deletions') => diff.files.reduce((n, f) => n + (f[key] ?? 0), 0);
   return <p className={styles.note}>{C.diffStat(diff.files.length, sum('additions'), sum('deletions'))}</p>;
+}
+
+/** Putting a directory under Git shows what the first commit would take, as the add-project form does (D153). */
+function GitInitImpact({ repoPath }: { repoPath: string }) {
+  const preview = useQuery(gitInitPreviewQuery(repoPath));
+  if (preview.isError) return <ErrorState error={preview.error} onRetry={() => void preview.refetch()} />;
+  return preview.data === undefined ? null : <GitInitSummary preview={preview.data} />;
 }
 
 function Outcome({ confirmation }: { confirmation: AssistantConfirmationDTO }) {
@@ -61,6 +70,7 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
   const title = operationTitle(confirmation.title);
   const busy = confirm.isPending || cancel.isPending;
   const taskId = confirmation.input.id;
+  const repoPath = confirmation.input.repoPath;
   return (
     <section
       className={styles.card}
@@ -83,6 +93,9 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
       <InputSummary operation={contractOf(confirmation.operationId)} input={confirmation.input} />
       {pending && confirmation.operationId === 'tasks.deliver' && typeof taskId === 'string' && (
         <DeliveryImpact taskId={taskId} />
+      )}
+      {pending && confirmation.operationId === 'projects.initGit' && typeof repoPath === 'string' && (
+        <GitInitImpact repoPath={repoPath} />
       )}
       {pending ? (
         <>

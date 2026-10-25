@@ -56,10 +56,11 @@ export type OperationToolDeps = {
    */
   deferred: ReadonlyMap<string, (conversationId: string, output: unknown) => unknown>;
   /**
-   * Checks of an operation's input that depend on the calling conversation (attachments it may pass on, 30 §2.2);
-   * they run before the call runs or waits for a confirmation, so the card never offers what would be refused.
+   * Checks of an operation's input that run before the call runs or waits for a confirmation, so the card never offers
+   * what would be refused: the attachments the calling conversation may pass on (30 §2.2), the directory a project is
+   * added from (D153).
    */
-  scoped: ReadonlyMap<string, (conversationId: string, input: Record<string, unknown>) => void>;
+  prechecks: ReadonlyMap<string, (conversationId: string, input: Record<string, unknown>) => void | Promise<void>>;
   /** Records a pending confirmation for a call the user has to approve. */
   requestConfirmation(
     conversationId: string,
@@ -84,7 +85,7 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
         input: assistantInputSchema(contract),
         mode: contract.mode,
         async handler(input, { conversation }) {
-          deps.scoped.get(contract.id)?.(conversation.id, input);
+          await deps.prechecks.get(contract.id)?.(conversation.id, input);
           const allowed =
             contract.risk === OperationRisk.Read ||
             (contract.risk === OperationRisk.Write && deps.settings.get('assistant.alwaysAllow').includes(contract.id));
@@ -114,6 +115,8 @@ const COMMON_HINTS: Partial<Record<ErrorCode, string>> = {
   [ErrorCode.BrowserLoginRequired]:
     'Ask the user to log in under Settings > Websites, then read the address again. Never ask for or enter credentials.',
   [ErrorCode.BrowserReadFailed]: 'Explain the page load failure to the user using details.reason.',
+  [ErrorCode.ProjectPathNoGit]:
+    'The directory is not under Git yet. Offer to put it under Git and add it with projects_initGit (same repoPath); the confirmation card shows the user what the first commit takes. projects_previewGitInit tells you that beforehand, for example to warn about large files.',
   [ErrorCode.ValidationFailed]: 'Fix the arguments listed in details.issues and call the tool again.',
   [ErrorCode.McpConversationUnresolved]:
     'This session is not an assistant conversation of agent-workflow; do not call these tools.',
