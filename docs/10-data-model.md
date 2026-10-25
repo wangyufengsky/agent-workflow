@@ -44,6 +44,19 @@
 | hosting_credential_id | TEXT NULL → credentials | ON DELETE SET NULL |
 | created_at / updated_at | INTEGER | |
 
+### hosting_accounts
+
+全局 GitHub / GitLab 令牌（D155，迁移 `0029_hosting_accounts`），项目没有自己的令牌时按 origin 的平台地址使用。每个平台地址（`provider` + `base_url`）至多一行，由服务保存时按地址查找后替换。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| provider | TEXT | `HostingProvider` |
+| base_url | TEXT NULL | 自建 GitLab 地址（无末尾斜杠）；github.com 与 gitlab.com 为空 |
+| account | TEXT | 令牌登录的用户名，保存时读取 |
+| credential_id | TEXT → credentials | 令牌；删除这一行后删除凭据 |
+| created_at / updated_at | INTEGER | |
+
 ### db_connections
 
 | 列 | 类型 | 说明 |

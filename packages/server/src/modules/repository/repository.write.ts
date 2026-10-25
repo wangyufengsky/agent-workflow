@@ -99,11 +99,12 @@ export function createRepositoryWrites({ projects, tasks, locks }: RepositoryWri
     }
   }
 
-  /** The project's token for pushing over HTTPS (D53); without a binding git uses the user's own credentials. */
+  /**
+   * The project's token, or the global one of its platform (D155), for pushing over HTTPS (D53); without either git
+   * uses the user's own credentials.
+   */
   async function remoteEnv(projectId: string): Promise<NodeJS.ProcessEnv> {
-    const project = projects.getRecord(projectId);
-    if (project.hosting === null) return originEnv(undefined);
-    return originEnv((await projects.hostingOf(projectId)).gitAuthorization());
+    return originEnv((await projects.findHosting(projectId))?.gitAuthorization());
   }
 
   return {

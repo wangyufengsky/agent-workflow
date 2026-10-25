@@ -45,7 +45,7 @@ import { createDecksModule, type DecksService } from './modules/decks/index.ts';
 import { createDeliveryModule } from './modules/delivery/index.ts';
 import { createRepoLocks, locateOpencodeShell } from './modules/git/index.ts';
 import { createGitReviewsModule } from './modules/git-reviews/index.ts';
-import { type HostingEndpoints, PUBLIC_HOSTING } from './modules/hosting/index.ts';
+import { createHostingModule, type HostingEndpoints, PUBLIC_HOSTING } from './modules/hosting/index.ts';
 import { createInboxModule, type InboxService } from './modules/inbox/index.ts';
 import { createInitiativesModule, type InitiativesService } from './modules/initiatives/index.ts';
 import { createInsightsModule } from './modules/insights/index.ts';
@@ -212,13 +212,21 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     drivers: DB_DRIVERS,
     queryTimeoutMs: deps.dbQueryTimeoutMs ?? DB_QUERY_TIMEOUT_MS,
   });
+  const hostingEndpoints = deps.hosting ?? PUBLIC_HOSTING;
+  const hostingAccounts = createHostingModule({
+    db: database.db,
+    clock,
+    credentials: credentials.service,
+    endpoints: hostingEndpoints,
+  });
   const projects = createProjectsModule({
     db: database.db,
     clock,
     locks,
     credentials: credentials.service,
     databases: databases.service,
-    hosting: deps.hosting ?? PUBLIC_HOSTING,
+    hosting: hostingEndpoints,
+    hostingAccounts: hostingAccounts.service,
   });
   // Built-in roles and workflows of this app version are written on every start (13).
   const roles = createRolesModule({ db: database.db, clock, log });
@@ -472,6 +480,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...settings.operations,
     ...system.operations,
     ...projects.operations,
+    ...hostingAccounts.operations,
     ...attachments.operations,
     ...previews.operations,
     ...browser.operations,
