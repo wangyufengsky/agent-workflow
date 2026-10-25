@@ -1,3 +1,6 @@
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import { appTool, createProject, createRepo, patchSettings, queueAssistantTurn, queueTurn } from './helpers.ts';
@@ -122,6 +125,50 @@ test('主页的建议在主页上提问；open_page 带用户离开时面板接�
   await expect(page.getByText('还没有总是允许的操作')).toBeVisible();
 });
 
+test('没有 Git 的目录：确认卡片列出初始化要做的事与将纳入的文件，确认后项目已添加（D153）', async ({
+  page,
+  request,
+}) => {
+  // Any project, so that the shell shows instead of the onboarding page.
+  await createProject(request, null);
+  const dir = await mkdtemp(join(tmpdir(), 'aw-e2e-plain-'));
+  await writeFile(join(dir, 'package.json'), '{}');
+  await queueAssistantTurn(request, [
+    appTool('projects_initGit', { repoPath: dir, name: '静态站' }),
+    { type: 'text', text: '这个目录还没有 Git，请在卡片上确认初始化。' },
+  ]);
+  await queueAssistantTurn(request, [{ type: 'text', text: '已初始化并添加。' }]);
+
+  // What the first commit takes is held back: until it shows, the card cannot be confirmed (D153).
+  let releasePreview = () => {};
+  const previewHeld = new Promise<void>((resolve) => {
+    releasePreview = resolve;
+  });
+  await page.route('**/projects/git-init/preview', async (route) => {
+    await previewHeld;
+    await route.continue();
+  });
+
+  await page.goto('/settings');
+  await expect(page.getByRole('main').getByRole('heading', { name: '设置' })).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+j');
+  const panel = page.getByRole('complementary', { name: '应用助手' });
+  await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  await panel.getByLabel('发给助手的消息').fill(`把 ${dir} 加成项目`);
+  await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
+
+  const card = panel.getByTestId('confirmation-card');
+  await expect(card).toContainText('初始化 Git 并添加项目');
+  await expect(card.getByRole('button', { name: '确认', exact: true })).toBeDisabled();
+  await expect(card.getByRole('button', { name: '确认并总是允许' })).toBeDisabled();
+  releasePreview();
+  await expect(card).toContainText('写入 .gitignore，忽略 node_modules/');
+  await expect(card).toContainText('把现有的 2 个文件');
+  await card.getByRole('button', { name: '确认', exact: true }).click();
+  await expect(card).toContainText('已执行');
+  await expect(panel.getByTestId('entity-card')).toContainText('静态站');
+});
+
 test('总是允许的调用直接执行并出现对象卡片；对象删除后卡片显示「已删除」', async ({ page, request }) => {
   await createProject(request, null);
   await patchSettings(request, { 'assistant.alwaysAllow': ['projects.create'] });
@@ -137,6 +184,8 @@ test('总是允许的调用直接执行并出现对象卡片；对象删除后�
   await expect(page.getByRole('main').getByRole('heading', { name: '设置' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
+  // Its own conversation: the cards of an earlier test's stay out of it.
+  await panel.getByRole('button', { name: '新对话', exact: true }).click();
   await panel.getByLabel('发给助手的消息').fill('把这个仓库加成项目');
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
   const card = panel.getByTestId('entity-card');

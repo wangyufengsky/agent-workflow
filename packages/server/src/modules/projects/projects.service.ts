@@ -211,10 +211,14 @@ export function createProjectsService({
     };
   }
 
-  async function add(repoPath: string, name = basename(repoPath)): Promise<ProjectDetailDTO> {
+  function assertNotAdded(repoPath: string): void {
     if (repo.findByRepoPath(repoPath) !== undefined) {
       throw new AppError(ErrorCode.ProjectAlreadyExists, 'Repository already added', { repoPath });
     }
+  }
+
+  async function add(repoPath: string, name = basename(repoPath)): Promise<ProjectDetailDTO> {
+    assertNotAdded(repoPath);
     const defaultBranch = await readDefaultBranch(repoPath);
     if (defaultBranch === undefined) {
       throw new AppError(ErrorCode.GitBaseBranchNotFound, 'HEAD is detached and origin has no default branch', {
@@ -246,6 +250,19 @@ export function createProjectsService({
 
     create: async (input: CreateProjectRequest): Promise<ProjectDetailDTO> =>
       add(await resolveRepoRoot(input.repoPath), input.name),
+
+    /**
+     * Refuses a directory `create` would refuse for where it is (no repository, not its root, already added), before
+     * the assistant asks the user to confirm adding it (D153).
+     */
+    async assertAddable(repoPath: string): Promise<void> {
+      assertNotAdded(await resolveRepoRoot(repoPath));
+    },
+
+    /** Likewise for `initGit`: only a directory in no repository. */
+    async assertInitable(repoPath: string): Promise<void> {
+      await resolvePlainDirectory(repoPath);
+    },
 
     async previewGitInit(repoPath: string): Promise<GitInitPreviewDTO> {
       const dir = await resolvePlainDirectory(repoPath);
