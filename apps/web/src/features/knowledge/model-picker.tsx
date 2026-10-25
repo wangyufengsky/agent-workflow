@@ -1,14 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
 import { KNOWLEDGE_COPY as C } from '../../copy/knowledge.ts';
 import { environmentQuery } from '../onboarding/environment.queries.ts';
+import { usableModels } from '../onboarding/usable-models.ts';
 import styles from './knowledge.module.css';
 
 /**
  * The model of the next question (D67 ④), a small select in the question box: opencode's models (the same list as
- * the role editor, M5-06), or its default (null).
+ * the role editor, M5-06) that work in `projectId`, where the session runs (D162), or its default (null).
  */
-export function ModelPicker({ value, onChange }: { value: string | null; onChange(model: string | null): void }) {
-  const models = useQuery(environmentQuery).data?.models.available ?? [];
+export function ModelPicker({
+  value,
+  projectId,
+  onChange,
+}: {
+  value: string | null;
+  projectId: string | null;
+  onChange(model: string | null): void;
+}) {
+  const models = usableModels(useQuery(environmentQuery).data?.models.available ?? [], projectId);
   const ids = models.map((m) => `${m.providerId}/${m.modelId}`);
   return (
     <select

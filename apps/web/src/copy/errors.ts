@@ -56,7 +56,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.AttemptNotFound]: '这次尝试不存在。',
   [ErrorCode.AttemptNoResult]: 'AI 停下来了，但没有给出结果。',
   [ErrorCode.AttemptTimeout]: 'AI 会话超过了时限。',
-  [ErrorCode.AttemptSessionError]: 'AI 会话出错了（模型服务可能暂时不可用）。',
+  [ErrorCode.AttemptSessionError]: 'AI 会话出错了，模型服务返回了错误。',
   [ErrorCode.OpencodeNotReady]: 'opencode 还没有就绪，请稍后再试。',
   [ErrorCode.OpencodeRequestFailed]: '与 opencode 通信失败。',
   [ErrorCode.PermissionRequestExpired]: '这条权限请求已失效，已从待处理列表移除。',

@@ -197,14 +197,6 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const startHostedRuntime = async () => {
     if (hosting) await runtime.startIfDown();
   };
-  const system = createSystemModule({
-    config,
-    env,
-    runtime,
-    opencode,
-    credentials: credentials.service,
-    startRuntime: startHostedRuntime,
-  });
   const databases = createDatabasesModule({
     db: database.db,
     clock,
@@ -228,6 +220,15 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     databases: databases.service,
     hosting: hostingEndpoints,
     hostingAccounts: hostingAccounts.service,
+  });
+  const system = createSystemModule({
+    config,
+    env,
+    runtime,
+    opencode,
+    credentials: credentials.service,
+    projects: projects.service,
+    startRuntime: startHostedRuntime,
   });
   // Built-in roles and workflows of this app version are written on every start (13).
   const roles = createRolesModule({ db: database.db, clock, log });

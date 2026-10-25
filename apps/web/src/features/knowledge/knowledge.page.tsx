@@ -114,7 +114,7 @@ export function KnowledgeWelcomePage() {
             blockedReason={hasSource(sources) ? undefined : C.needSource}
             researching={false}
             pending={ask.isPending}
-            tools={<ModelPicker value={model} onChange={setModel} />}
+            tools={<ModelPicker value={model} projectId={projectId ?? null} onChange={setModel} />}
             onSend={(question) => {
               if (projectId === undefined) return;
               ask.mutate(
@@ -262,7 +262,7 @@ function Conversation({ conversation }: { conversation: KnowledgeConversationDTO
           pending={followUp.isPending}
           onSend={ask}
           onStop={() => stop.mutate(conversation.id)}
-          tools={<ModelPicker value={model} onChange={setModel} />}
+          tools={<ModelPicker value={model} projectId={conversation.project.id} onChange={setModel} />}
         >
           <SourcesPicker sources={conversation.sources} databaseCount={conversation.project.databaseCount} />
         </Composer>

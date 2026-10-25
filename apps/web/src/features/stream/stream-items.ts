@@ -53,7 +53,8 @@ export type StreamItem =
   /** A `report_progress` line. */
   | { kind: 'progress'; key: string; text: string }
   /** `waiting`: the session stopped here for your answer (`awaiting_input` last, nothing came after). */
-  | { kind: 'notice'; key: string; event: TranscriptSystemEvent; waiting: boolean }
+  /** `detail`: what the event comes with, e.g. the model service's reason for a retry (D163). */
+  | { kind: 'notice'; key: string; event: TranscriptSystemEvent; detail?: string; waiting: boolean }
   | { kind: 'error'; key: string; error: ErrorInfo };
 
 const text = (value: unknown) => (typeof value === 'string' ? value : '');
@@ -233,7 +234,14 @@ export function streamItems(
         items.push({ kind: 'wait', key, permission: e.data.permission, patterns: e.data.patterns, waiting: false });
         break;
       case TranscriptEntryKind.System:
-        if (!QUIET_EVENTS.has(e.data.event)) items.push({ kind: 'notice', key, event: e.data.event, waiting: false });
+        if (QUIET_EVENTS.has(e.data.event)) break;
+        items.push({
+          kind: 'notice',
+          key,
+          event: e.data.event,
+          ...(e.data.detail === undefined ? {} : { detail: e.data.detail }),
+          waiting: false,
+        });
         break;
       case TranscriptEntryKind.Error:
         items.push({ kind: 'error', key, error: e.data });
