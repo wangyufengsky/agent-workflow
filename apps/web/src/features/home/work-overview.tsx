@@ -5,6 +5,7 @@ import { ROUTES } from '../../app/routes.ts';
 import { BATCHES_COPY } from '../../copy/batches.ts';
 import { INITIATIVES_COPY } from '../../copy/initiatives.ts';
 import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
+import { ModelSlotsLine } from '../attempts/model-slots.tsx';
 import { BatchCard } from '../batches/batch-card.tsx';
 import { batchesQuery } from '../batches/batches.queries.ts';
 import { inboxQuery } from '../inbox/inbox.queries.ts';
@@ -67,6 +68,7 @@ export function WorkOverview() {
   const { attention, batches, initiatives, sections } = useWork();
   return (
     <>
+      <ModelSlotsLine />
       {attention.length > 0 && (
         <section className="section">
           <div className="section-head">

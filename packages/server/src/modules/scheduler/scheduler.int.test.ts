@@ -12,8 +12,9 @@ beforeEach(async () => {
 afterEach(() => t.close());
 
 describe('调度器', () => {
-  it('3 个任务各有两个并行节点：全局与每任务的并发上限都生效，所有任务完成', async () => {
-    await t.call(updateSettingsOp, { 'scheduler.maxConcurrentAttempts': 2, 'scheduler.maxConcurrentNodesPerTask': 1 });
+  it('3 个任务各有两个并行节点：任务占模型额度的份额（留一个给交互）与每任务的上限都生效，所有任务完成', async () => {
+    // Three model slots: tasks may use two of them, one stays free for interactive work (D186).
+    await t.call(updateSettingsOp, { 'scheduler.maxConcurrentAttempts': 3, 'scheduler.maxConcurrentNodesPerTask': 1 });
     const { project } = await addProject(t, { checkCommand: null });
     for (let i = 1; i <= 3; i++) {
       t.fake.enqueue(

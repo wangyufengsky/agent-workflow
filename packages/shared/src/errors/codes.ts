@@ -74,6 +74,8 @@ export const ErrorCode = {
   AssistantConversationNotFound: 'ASSISTANT_CONVERSATION_NOT_FOUND',
   AssistantConfirmationNotFound: 'ASSISTANT_CONFIRMATION_NOT_FOUND',
   AssistantBusy: 'ASSISTANT_BUSY',
+  /** Optional model work (the companion's whisper) is skipped while every model slot is taken (D186). */
+  ModelSlotsFull: 'MODEL_SLOTS_FULL',
   AssistantContextChanged: 'ASSISTANT_CONTEXT_CHANGED',
   // 批量任务
   BatchNotFound: 'BATCH_NOT_FOUND',
@@ -229,6 +231,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.AssistantConversationNotFound]: 404,
   [ErrorCode.AssistantConfirmationNotFound]: 404,
   [ErrorCode.AssistantBusy]: 409,
+  [ErrorCode.ModelSlotsFull]: 409,
   [ErrorCode.AssistantContextChanged]: 409,
   [ErrorCode.BatchNotFound]: 404,
   [ErrorCode.ScheduleNotFound]: 404,

@@ -1,7 +1,8 @@
 import { NodeStatus, TaskStatus } from '@aw/shared';
 
 export type SchedulerSnapshot = {
-  maxConcurrentAttempts: number;
+  /** Task sessions that may be at work: the background share of the model slots (D186). */
+  backgroundLimit: number;
   maxConcurrentNodesPerTask: number;
   /** opencode can take new sessions. */
   runtimeReady: boolean;
@@ -26,6 +27,8 @@ export type SchedulerDecision = {
   finished: string[];
   /** Running tasks with a failed node and nothing else working (`fail`). */
   failed: string[];
+  /** Planning attempts and busy nodes once the decision is carried out: what tasks hold of the model slots. */
+  busy: number;
 };
 
 const FINISHED: readonly NodeStatus[] = [NodeStatus.Done, NodeStatus.Skipped];
@@ -40,12 +43,19 @@ const WORKING: readonly NodeStatus[] = [NodeStatus.Running, NodeStatus.Verifying
  * has a failed node nothing more of it is dispatched.
  */
 export function decide(snapshot: SchedulerSnapshot): SchedulerDecision {
-  const decision: SchedulerDecision = { depsMet: [], dispatch: [], startPlanning: [], finished: [], failed: [] };
+  const decision: SchedulerDecision = {
+    depsMet: [],
+    dispatch: [],
+    startPlanning: [],
+    finished: [],
+    failed: [],
+    busy: 0,
+  };
   let busy = snapshot.tasks.reduce(
     (sum, task) => sum + (task.planning ? 1 : 0) + task.nodes.filter((n) => BUSY.includes(n.status)).length,
     0,
   );
-  const hasRoom = () => snapshot.runtimeReady && busy < snapshot.maxConcurrentAttempts;
+  const hasRoom = () => snapshot.runtimeReady && busy < snapshot.backgroundLimit;
 
   for (const task of snapshot.tasks) {
     if (task.status === TaskStatus.Planning) {
@@ -84,5 +94,6 @@ export function decide(snapshot: SchedulerSnapshot): SchedulerDecision {
       busy += 1;
     }
   }
+  decision.busy = busy;
   return decision;
 }

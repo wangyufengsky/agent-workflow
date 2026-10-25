@@ -6,6 +6,7 @@ import {
   environmentSchema,
   healthSchema,
   mcpToolInfoSchema,
+  modelSlotsSchema,
   runtimeLogsSchema,
   runtimeSchema,
   storageSchema,
@@ -64,6 +65,19 @@ export const getRuntimeOp = defineOperationContract({
   expose: { palette: false, assistant: true },
   credentialFields: [],
   mode: UiMode.Pro,
+});
+
+export const getModelSlotsOp = defineOperationContract({
+  id: 'system.modelSlots',
+  title: 'op.system.modelSlots',
+  description: 'Sessions using the model now, the shared limit and the requests waiting for a slot',
+  input: z.object({}),
+  output: modelSlotsSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/system/model-slots' },
+  expose: { palette: false, assistant: true },
+  credentialFields: [],
+  mode: UiMode.Simple,
 });
 
 export const restartRuntimeOp = defineOperationContract({

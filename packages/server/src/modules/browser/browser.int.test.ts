@@ -302,6 +302,7 @@ createServer((req, res) => {
           nudges: 0,
           error: null,
           progress: null,
+          queuePosition: null,
           startedAt: 0,
           endedAt: 0,
         },

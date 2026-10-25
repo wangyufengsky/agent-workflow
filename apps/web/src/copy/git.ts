@@ -167,6 +167,7 @@ export const GIT_COPY = {
   redraft: '重新草拟',
   drafted: 'AI 草拟，可修改',
   drafting: 'AI 正在草拟…',
+  draftQueued: '模型会话已满，排队等待草拟…',
   authorIs: (name: string, email: string) => `作者：${name} <${email}>`,
   noIdentity: 'Git 还没有你的姓名与邮箱，提交前需要先设置。',
   commitN: (n: number) => `提交 ${n} 个文件`,

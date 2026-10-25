@@ -82,6 +82,18 @@ export function ProSettings({ settings, set }: { settings: Settings; set: (patch
         <p className="hint">{C.timeoutHint}</p>
       </div>
       <div className="field">
+        <label className="label" htmlFor="setting-commit-draft-timeout">
+          {C.commitDraftTimeout}
+        </label>
+        <NumberSetting
+          key={settings['git.commitDraftTimeoutSeconds']}
+          id="setting-commit-draft-timeout"
+          value={settings['git.commitDraftTimeoutSeconds']}
+          onCommit={(n) => set({ 'git.commitDraftTimeoutSeconds': n })}
+        />
+        <p className="hint">{C.commitDraftTimeoutHint}</p>
+      </div>
+      <div className="field">
         <span className="label">{C.defaultStrategy}</span>
         <Segmented
           label={C.defaultStrategy}

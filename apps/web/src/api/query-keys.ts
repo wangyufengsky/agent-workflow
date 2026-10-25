@@ -8,6 +8,7 @@ export const queryKeys = {
   gitInitPreview: (repoPath: string) => ['projects', 'git-init-preview', repoPath],
   paletteOperations: ['operations', 'palette'],
   runtime: ['system', 'runtime'],
+  modelSlots: ['system', 'model-slots'],
   health: ['system', 'health'],
   /** Every attempt key, details and their streams alike; `attempt` is the one two-part key under it. */
   attemptsAll: ['attempts'],

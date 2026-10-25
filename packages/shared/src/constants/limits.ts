@@ -170,8 +170,6 @@ export const GIT_REVIEW_FINDING_TITLE_MAX_CHARS = 120;
 export const GIT_REVIEW_FINDING_TEXT_MAX_CHARS = 2000;
 /** The diff a commit message draft is written from is cut to this size (27 §7.3). */
 export const COMMIT_DRAFT_DIFF_MAX_BYTES = 60_000;
-/** A draft that takes longer is stopped (27 §7.3): the request waits for it. */
-export const COMMIT_DRAFT_TIMEOUT_MS = 120_000;
 /** Page previews (29 §4): starting one, probing its ready path, the log tail kept when it fails, its key pages. */
 export const PREVIEW_START_TIMEOUT_MS = 120_000;
 /** The setup command (dependency install) of a worktree's first start; a cold install takes minutes. */

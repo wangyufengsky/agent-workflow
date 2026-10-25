@@ -39,7 +39,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TaskFailedPhase` | `preparing` · `planning` · `running` · `merging` |
 | `NodeStatus` | `pending` · `ready` · `running` · `waiting_input` · `verifying` · `awaiting_acceptance` · `done` · `failed` · `skipped` · `cancelled` |
 | `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2）· `deck_outline`（PPT 的大纲）· `deck_slides`（PPT 的若干页：制作或修改，23 §4；两者在同一个会话中，`continueSession` 可换 kind）· `git_review`（Git 工作台的 AI 审查，不属于任务，27 §4.3）· `commit_message`（AI 草拟提交信息，27 §7.3）· `team_analysis`（团队页的 AI 成员分析，不属于任务，33 §6.3）· `breakdown`（需求计划的 AI 拆解、重新拆解与细化，不属于任务，由 `initiative_runs` 指向，34 §8） |
-| `AttemptStatus` | `starting` · `running` · `succeeded` · `failed` · `aborted` · `interrupted` |
+| `AttemptStatus` | `queued`（等模型额度，D186）· `starting` · `running` · `succeeded` · `failed` · `aborted` · `interrupted`；未结束的三种为 `ACTIVE_ATTEMPT_STATUSES` |
 | `PlanStatus` | `draft` · `confirmed` · `superseded` |
 | `PlanSource` | `ai` · `template` · `user` |
 | `CheckpointKey` | `confirm_plan`（运行前确认计划）· `accept_each_node`（每个节点人工验收）· `ask_on_uncertainty`（不确定时停下来问） |
@@ -238,7 +238,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | --- | --- | --- | --- | --- |
 | `idle` | `draft` | `pending` · `skipped` · `cancelled` | — | — |
 | `run` | `preparing` · `planning` · `running` · `merging` | `ready` · `running` · `verifying` | `starting` · `running` | `preparing` · `running` · `merging` |
-| `wait` | `plan_review` · `paused` | `waiting_input` · `awaiting_acceptance` | — | `plan_review` · `paused` · `needs_attention` |
+| `wait` | `plan_review` · `paused` | `waiting_input` · `awaiting_acceptance` | `queued` | `plan_review` · `paused` · `needs_attention` |
 | `ok` | `review` | `done` | `succeeded` | `review` |
 | `done` | `completed` | — | — | `completed` |
 | `danger` | `failed` | `failed` | `failed` | `failed` |
@@ -361,7 +361,6 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `GIT_REVIEW_FINDINGS_MAX` | 50（一次审查的问题数，27 §4.4） |
 | `GIT_REVIEW_SUMMARY_MAX_CHARS` / `GIT_REVIEW_FINDING_TITLE_MAX_CHARS` / `GIT_REVIEW_FINDING_TEXT_MAX_CHARS` | 2000 / 120 / 2000 |
 | `COMMIT_DRAFT_DIFF_MAX_BYTES` | 60000（草拟提交信息时交给 AI 的 diff，27 §7.3） |
-| `COMMIT_DRAFT_TIMEOUT_MS` | 120000（草拟超时即中止，请求返回 `COMMIT_DRAFT_FAILED`） |
 | `DECK_BRIEF_MAX_CHARS` | 4000（PPT 的要求） |
 | `DECK_TITLE_MAX_CHARS` | 60（PPT 标题；创建时取要求的首行，大纲返回后用 AI 给的标题） |
 | `DECK_MATERIALS_MAX` | 10（一份 PPT 的资料数） |
@@ -393,10 +392,11 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ai.askOnUncertainty` | `false` | 简单 |
 | `ai.defaultModel` | `null`（使用 opencode 默认模型） | 专业 |
 | `ai.bashPolicy` | `auto`（助手不能修改，D65） | 专业 |
-| `scheduler.maxConcurrentAttempts` | `4` | 简单 |
+| `scheduler.maxConcurrentAttempts` | `4`（所有使用模型的会话共享的上限，D186：任务、助手、知识问答、PPT、Git 审查、提交信息、需求拆解、成员分析一起算；用满时交互的请求排队，任务最多用上限减一；设置页文案「同时使用模型的会话数」） | 简单 |
 | `scheduler.maxConcurrentNodesPerTask` | `2` | 专业 |
 | `node.maxAttempts` | `3` | 专业 |
-| `attempt.timeoutMinutes` | `60` | 专业；任务尝试与助手单轮时限。助手权限等待暂停计时，回复后继续剩余时长，超时停止且不自动重试 |
+| `attempt.timeoutMinutes` | `60` | 专业；任务尝试与助手单轮时限。等待用户（权限、提问）与等待模型服务（opencode 重试失败的模型请求，D163）的时间不算，之后继续剩余时长；助手超时停止且不自动重试 |
+| `git.commitDraftTimeoutSeconds` | `120`（Git 工作台「AI 草拟」提交信息的时限，超时即中止，请求返回 `COMMIT_DRAFT_FAILED`，27 §7.3；本地模型较慢时调大，D184） | 专业 |
 | `worktree.rootDir` | `null`（使用 `<数据目录>/worktrees`；助手不能修改，D65） | 专业 |
 | `delivery.defaultStrategy` | `squash`（可选 `squash` / `merge` / `rebase`；PR 有单独按钮） | 专业 |
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |
@@ -516,6 +516,7 @@ class AppError extends Error {
 | `ASSISTANT_CONVERSATION_NOT_FOUND` | 404 | |
 | `ASSISTANT_CONFIRMATION_NOT_FOUND` | 404 | |
 | `ASSISTANT_BUSY` | 409 | 助手正在回复时又发来消息（先等它结束或停止它） |
+| `MODEL_SLOTS_FULL` | 409 | 模型额度用满或有请求在排队时，可有可无的模型调用（桌宠碎碎念）这次跳过，不排队（D186） |
 | `ASSISTANT_CONTEXT_CHANGED` | 409 | 关联等待期间当前预览或对话已切换；该消息尚未发送，保留草稿供用户确认后重试 |
 | **批量任务（v1.1）** | | |
 | `BATCH_NOT_FOUND` | 404 | 批次不存在（所属项目已删除时随之删除） |

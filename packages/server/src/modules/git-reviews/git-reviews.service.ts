@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { BuiltinRoleKey, EMPTY_SECTION, PromptName, type Prompts, renderTemplate } from '@aw/builtin';
 import {
+  ACTIVE_ATTEMPT_STATUSES,
   AppError,
   type AttemptDTO,
   AttemptKind,
-  AttemptStatus,
   type DiffFile,
   ErrorCode,
   type GitReviewDTO,
@@ -38,8 +38,6 @@ export type GitReviewsServiceDeps = {
 
 /** Prefix of the opencode session titles of reviews (the titles show only in opencode). */
 const SESSION_TITLE_PREFIX = 'Review';
-
-const ACTIVE: readonly AttemptStatus[] = [AttemptStatus.Starting, AttemptStatus.Running];
 
 /** What the reviewer is told it looks at (27 §4.3). */
 const SCOPE: Record<GitReviewTarget, (label: string) => string> = {
@@ -92,7 +90,7 @@ export function createGitReviewsService(deps: GitReviewsServiceDeps) {
       data: { reviewId: review.id, projectId: review.projectId },
     });
 
-  const isRunning = (review: Review) => ACTIVE.includes(attempts.get(review.attemptId).status);
+  const isRunning = (review: Review) => ACTIVE_ATTEMPT_STATUSES.includes(attempts.get(review.attemptId).status);
 
   /**
    * Projects whose review is being started: between the check and the review's row, resolving the diff awaits git,

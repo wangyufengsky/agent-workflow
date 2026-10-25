@@ -1,4 +1,11 @@
-import { AttemptStatus, type DiffFile, DiffFileStatus, FindingSeverity, type GitReviewDTO } from '@aw/shared';
+import {
+  ACTIVE_ATTEMPT_STATUSES,
+  AttemptStatus,
+  type DiffFile,
+  DiffFileStatus,
+  FindingSeverity,
+  type GitReviewDTO,
+} from '@aw/shared';
 import { GIT_COPY as C } from '../../copy/git.ts';
 import styles from './git.module.css';
 
@@ -38,8 +45,7 @@ export function LineCounts({ file }: { file: Pick<DiffFile, 'additions' | 'delet
   );
 }
 
-export const isActiveReview = (review: Pick<GitReviewDTO, 'status'>) =>
-  review.status === AttemptStatus.Starting || review.status === AttemptStatus.Running;
+export const isActiveReview = (review: Pick<GitReviewDTO, 'status'>) => ACTIVE_ATTEMPT_STATUSES.includes(review.status);
 
 /** The badge a commit carries in the list after its latest review. */
 export function ReviewBadge({ review }: { review: GitReviewDTO }) {

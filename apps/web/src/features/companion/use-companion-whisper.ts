@@ -1,6 +1,6 @@
-import { stopWhisperOp, whisperOp } from '@aw/shared';
+import { ErrorCode, stopWhisperOp, whisperOp } from '@aw/shared';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { callOperation } from '../../api/client.ts';
+import { ApiError, callOperation } from '../../api/client.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 
 const BUBBLE_DURATION_MS = 12_000;
@@ -26,7 +26,9 @@ export function useCompanionWhisper(available: boolean) {
       const result = await callOperation(whisperOp, {});
       if (generation.current === id) setText(result.text);
     } catch (failure) {
-      if (generation.current === id) setError(failure);
+      // Every model slot is taken: this one is skipped quietly; the next tick tries again (D186).
+      const skipped = failure instanceof ApiError && failure.code === ErrorCode.ModelSlotsFull;
+      if (generation.current === id && !skipped) setError(failure);
     } finally {
       running.current = false;
       if (generation.current === id) setPending(false);
