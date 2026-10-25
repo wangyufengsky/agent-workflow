@@ -46,7 +46,7 @@
 
 ### hosting_accounts
 
-全局 GitHub / GitLab 令牌（D155，迁移 `0029_hosting_accounts`），项目没有自己的令牌时按 origin 的平台地址使用。每个平台地址（`provider` + `base_url`）至多一行，由服务保存时按地址查找后替换。
+全局 GitHub / GitLab 令牌（D155，迁移 `0029_hosting_accounts`），项目没有自己的令牌时按 origin 的平台地址使用。每个平台地址（`provider` + `base_url`）至多一行：唯一索引 `(provider, coalesce(base_url, ''))`；再次保存时先加密新令牌，再在同一步里替换这一行的凭据并删除旧凭据。
 
 | 列 | 类型 | 说明 |
 | --- | --- | --- |

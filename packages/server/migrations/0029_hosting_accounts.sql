@@ -8,3 +8,5 @@ CREATE TABLE `hosting_accounts` (
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`credential_id`) REFERENCES `credentials`(`id`) ON UPDATE no action ON DELETE no action
 );
+--> statement-breakpoint
+CREATE UNIQUE INDEX `hosting_accounts_address_unique` ON `hosting_accounts` (`provider`,coalesce(`base_url`, ''));

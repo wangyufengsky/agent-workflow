@@ -54,13 +54,14 @@ export function createHostingAccountsService({ db, clock, credentials, endpoints
     async set({ provider, baseUrl: rawBaseUrl, token }: SetHostingAccountRequest): Promise<HostingAccountDTO> {
       const baseUrl = normalizeBaseUrl(provider, rawBaseUrl);
       const account = await hostingAccountOf(provider, baseUrl, token, endpoints);
+      const credentialId = await credentials.create(CredentialKind.GitToken, token);
+      // Nothing below awaits: two saves of one address cannot both see it empty and insert twice.
       const now = clock.now();
       const existing = find(provider, baseUrl);
       if (existing !== undefined) {
-        await credentials.replace(existing.credentialId, token);
-        db.update(t).set({ account, updatedAt: now }).where(eq(t.id, existing.id)).run();
+        db.update(t).set({ account, credentialId, updatedAt: now }).where(eq(t.id, existing.id)).run();
+        credentials.remove(existing.credentialId);
       } else {
-        const credentialId = await credentials.create(CredentialKind.GitToken, token);
         db.insert(t)
           .values({ id: randomUUID(), provider, baseUrl, account, credentialId, createdAt: now, updatedAt: now })
           .run();

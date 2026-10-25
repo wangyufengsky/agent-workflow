@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "49377921-7f6c-46ef-bcb8-10d7f4ae7cfa",
+  "id": "845044c7-51f1-4da0-9bbb-b33c250ab2d5",
   "prevId": "f2f70540-6895-465a-83d7-1bee98528943",
   "tables": {
     "assistant_analysis_followups": {
@@ -1879,7 +1879,13 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "hosting_accounts_address_unique": {
+          "name": "hosting_accounts_address_unique",
+          "columns": ["provider", "coalesce(\"base_url\", '')"],
+          "isUnique": true
+        }
+      },
       "foreignKeys": {
         "hosting_accounts_credential_id_credentials_id_fk": {
           "name": "hosting_accounts_credential_id_credentials_id_fk",
@@ -4525,6 +4531,14 @@
     "columns": {}
   },
   "internal": {
-    "indexes": {}
+    "indexes": {
+      "hosting_accounts_address_unique": {
+        "columns": {
+          "coalesce(\"base_url\", '')": {
+            "isExpression": true
+          }
+        }
+      }
+    }
   }
 }
