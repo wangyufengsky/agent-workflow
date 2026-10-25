@@ -12,8 +12,8 @@ import {
   GIT_INIT_LARGE_FILE_BYTES,
   GIT_INIT_LARGE_FILES_SHOWN,
   type GitInitPreviewDTO,
-  HostingProvider,
   type HostingRef,
+  HostingSource,
   PROJECT_SLUG_MAX,
   type ProjectDetailDTO,
   type ProjectDTO,
@@ -39,7 +39,13 @@ import {
   runGit,
   stage,
 } from '../git/index.ts';
-import { createHostingProvider, type GitHostingProvider, type HostingEndpoints } from '../hosting/index.ts';
+import {
+  createHostingProvider,
+  type GitHostingProvider,
+  type HostingAccountsService,
+  type HostingEndpoints,
+  normalizeBaseUrl,
+} from '../hosting/index.ts';
 import { inferDirGitignore, inferRepoCheckCommand, inferRepoPreview, parseRemoteUrl } from './projects.inference.ts';
 import { createProjectsRepo } from './projects.repo.ts';
 
@@ -52,6 +58,8 @@ export type ProjectsServiceDeps = {
   databases: DatabasesService;
   /** Platform API addresses (FakeHosting in tests). */
   hosting: HostingEndpoints;
+  /** Global tokens used when the project has none of its own (D155). */
+  hostingAccounts: HostingAccountsService;
 };
 
 /** Fallback slug for names with no ASCII letters or digits (e.g. Chinese names). */
@@ -141,7 +149,15 @@ async function putUnderGit(dir: string): Promise<void> {
   }
 }
 
-export function createProjectsService({ db, clock, locks, credentials, databases, hosting }: ProjectsServiceDeps) {
+export function createProjectsService({
+  db,
+  clock,
+  locks,
+  credentials,
+  databases,
+  hosting,
+  hostingAccounts,
+}: ProjectsServiceDeps) {
   const repo = createProjectsRepo(db);
 
   function require(id: string): ProjectDTO {
@@ -150,11 +166,46 @@ export function createProjectsService({ db, clock, locks, credentials, databases
     return project;
   }
 
+  /**
+   * The repository and whose token signs in to it (D155): the project's binding with its token, else that binding's
+   * (or origin's) repository with the global token of its platform address.
+   */
+  async function resolveHosting(project: ProjectDTO): Promise<{ ref: HostingRef; source: HostingSource } | undefined> {
+    if (project.hosting?.hasToken === true) {
+      const { provider, baseUrl, repo: path } = project.hosting;
+      return { ref: { provider, baseUrl, repo: path }, source: HostingSource.Project };
+    }
+    let ref: HostingRef | null = project.hosting;
+    if (ref === null) {
+      const origin = await readOriginUrl(project.repoPath);
+      ref = origin === undefined ? null : parseRemoteUrl(origin);
+    }
+    if (ref === null || !hostingAccounts.has(ref.provider, ref.baseUrl)) return undefined;
+    const { provider, baseUrl, repo: path } = ref;
+    return { ref: { provider, baseUrl, repo: path }, source: HostingSource.Global };
+  }
+
+  /** The project's platform signed in with its own token or the global one (D155); undefined with neither. */
+  async function findHosting(id: string): Promise<GitHostingProvider | undefined> {
+    const resolved = await resolveHosting(require(id));
+    if (resolved === undefined) return undefined;
+    const { ref, source } = resolved;
+    const credentialId = repo.hostingCredentialId(id);
+    const token =
+      source === HostingSource.Project && credentialId !== null
+        ? await credentials.reveal(credentialId)
+        : await hostingAccounts.token(ref.provider, ref.baseUrl);
+    if (token === undefined) throw new Error(`The global ${ref.provider} token vanished`);
+    return createHostingProvider(ref, token, hosting);
+  }
+
   async function detail(project: ProjectDTO): Promise<ProjectDetailDTO> {
     const origin = await readOriginUrl(project.repoPath);
+    const effective = await resolveHosting(project);
     return {
       ...project,
       inferredHosting: origin === undefined ? null : parseRemoteUrl(origin),
+      effectiveHosting: effective === undefined ? null : { ...effective.ref, source: effective.source },
       dbConnectionIds: databases.linkedIds(project.id),
       allowedBash: repo.allowedBash(project.id),
     };
@@ -239,8 +290,7 @@ export function createProjectsService({ db, clock, locks, credentials, databases
       require(id);
       const ref: HostingRef = {
         provider,
-        // github.com has no self-hosted address here; GitLab's is kept without a trailing slash.
-        baseUrl: provider === HostingProvider.Github ? null : (baseUrl?.replace(/\/+$/, '') ?? null),
+        baseUrl: normalizeBaseUrl(provider, baseUrl),
         repo: path,
       };
       await createHostingProvider(ref, token, hosting).verify();
@@ -281,15 +331,15 @@ export function createProjectsService({ db, clock, locks, credentials, databases
       return detail(require(id));
     },
 
-    /** The project's platform, signed in with its token; HOSTING_NOT_CONFIGURED when there is none. */
+    findHosting,
+
+    /** The project's platform signed in (D155); HOSTING_NOT_CONFIGURED when it has no token, own or global. */
     async hostingOf(id: string): Promise<GitHostingProvider> {
-      const project = require(id);
-      const credentialId = repo.hostingCredentialId(id);
-      if (project.hosting === null || credentialId === null) {
-        throw new AppError(ErrorCode.HostingNotConfigured, 'The project is not bound to a hosting repository', { id });
+      const found = await findHosting(id);
+      if (found === undefined) {
+        throw new AppError(ErrorCode.HostingNotConfigured, 'The project has no hosting token', { id });
       }
-      const { provider, baseUrl, repo: path } = project.hosting;
-      return createHostingProvider({ provider, baseUrl, repo: path }, await credentials.reveal(credentialId), hosting);
+      return found;
     },
   };
 }

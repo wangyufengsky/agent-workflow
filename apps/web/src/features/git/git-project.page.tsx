@@ -30,6 +30,7 @@ import {
 } from './git.queries.ts';
 import { type GitDialog, GitDialogs } from './git-dialogs.tsx';
 import { GitMenu } from './git-menu.tsx';
+import { hostingState } from './hosting-state.ts';
 import { reviewSearch, reviewTarget } from './review-location.ts';
 import { ReviewPanel } from './review-panel.tsx';
 import { WorktreesTab } from './worktrees-tab.tsx';
@@ -191,6 +192,7 @@ function Rail({
   const branches = useQuery(gitBranchesQuery(project.id)).data ?? [];
   const local = branches.filter((b) => !b.remote);
   const remote = branches.filter((b) => b.remote);
+  const hosting = hostingState(project);
   const views = (['changes', 'commits', 'branches', 'files', 'worktrees'] as const).map((v) => ({
     v,
     icon: ({ changes: 'edit', commits: 'git', branches: 'branch', files: 'folder', worktrees: 'layers' } as const)[v],
@@ -282,10 +284,10 @@ function Rail({
         </>
       )}
       <div className={styles.railFoot}>
-        <Icon name={project.hosting === null ? 'info' : 'check'} size="sm" />
+        <Icon name={hosting.signedIn ? 'check' : 'info'} size="sm" />
         <div>
-          <b>{project.hosting === null ? C.hostingNone : C.hostingBound}</b>
-          {project.hosting === null ? C.hostingCardNone : C.hostingCard(project.hosting.repo)}
+          <b>{hosting.title}</b>
+          {hosting.detail}
         </div>
       </div>
     </aside>

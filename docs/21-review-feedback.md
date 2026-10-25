@@ -48,7 +48,7 @@
 `POST /tasks/:id/review-feedback` `{ commentIds: string[], note?: string }`（操作 `tasks.reviseFromReview`，write）。后端按顺序：
 
 1. 状态机检查 `completed --review_feedback--> running` 是否允许（只经状态机，09 §2）；最近一次成功的交付必须是 `pull_request`，否则 409 `PULL_REQUEST_NOT_OPEN`。
-2. 项目必须仍绑定远端（否则 400 `HOSTING_NOT_CONFIGURED`）；按分支找到打开的 PR（否则 409 `PULL_REQUEST_NOT_OPEN`）。
+2. 项目必须仍有可用令牌，自己的或全局的（D155；否则 400 `HOSTING_NOT_CONFIGURED`）；按分支找到打开的 PR（否则 409 `PULL_REQUEST_NOT_OPEN`）。
 3. **重新取回**意见，按 `commentIds` 挑出条目（前端传 id 而不是正文：AI 读到的一定是平台上的原文）；有 id 已不存在（被删除或已解决）→ 400 `VALIDATION_FAILED`（`issues[].path = ['commentIds']`），界面提示刷新后重选。
 4. **同步分支**（§4.1）并**重建 worktree**（§4.2）。
 5. 一个事务内：新计划版本（`source = user`、立即确认）+ 追加节点「按审查意见修改」+ 任务 `completed → running`（事件 `review_feedback`，`finishedAt` 清空）。之后由调度器照常派发。

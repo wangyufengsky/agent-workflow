@@ -11,6 +11,12 @@ describe('parseRemoteUrl', () => {
       'ssh://git@git.corp.cn:2222/team/app.git',
       { provider: 'gitlab', baseUrl: 'https://git.corp.cn', repo: 'team/app' },
     ],
+    // An HTTP(S) origin is the GitLab's web address: its scheme and port are kept (D155 matches global tokens on it).
+    [
+      'https://gitlab.example.com:8443/acme/shop.git',
+      { provider: 'gitlab', baseUrl: 'https://gitlab.example.com:8443', repo: 'acme/shop' },
+    ],
+    ['http://git.lan/team/app.git', { provider: 'gitlab', baseUrl: 'http://git.lan', repo: 'team/app' }],
   ])('%s', (url, expected) => {
     expect(parseRemoteUrl(url)).toEqual(expected);
   });
