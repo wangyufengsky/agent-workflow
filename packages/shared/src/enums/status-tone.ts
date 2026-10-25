@@ -1,3 +1,4 @@
+import { ExternalMcpStatus } from './assistant.ts';
 import { DeckStatus } from './deck.ts';
 import { InitiativeItemStatus, InitiativeStatus } from './initiative.ts';
 import { KnowledgeTurnStatus } from './knowledge.ts';
@@ -96,6 +97,13 @@ export const STATUS_TONE = {
     [InitiativeItemStatus.Waiting]: StatusTone.Idle,
     [InitiativeItemStatus.Ready]: StatusTone.Wait,
   },
+  externalMcp: {
+    [ExternalMcpStatus.Connected]: StatusTone.Ok,
+    [ExternalMcpStatus.Disabled]: StatusTone.Idle,
+    [ExternalMcpStatus.Failed]: StatusTone.Danger,
+    [ExternalMcpStatus.NeedsAuth]: StatusTone.Warn,
+    [ExternalMcpStatus.NeedsClientRegistration]: StatusTone.Warn,
+  },
 } as const satisfies {
   task: Record<TaskStatus, StatusTone>;
   node: Record<NodeStatus, StatusTone>;
@@ -107,4 +115,5 @@ export const STATUS_TONE = {
   schedule: Record<ScheduleStatus, StatusTone>;
   initiative: Record<InitiativeStatus, StatusTone>;
   initiativeItem: Record<InitiativeItemStatus, StatusTone>;
+  externalMcp: Record<ExternalMcpStatus, StatusTone>;
 };

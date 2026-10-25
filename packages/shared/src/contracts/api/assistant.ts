@@ -6,6 +6,7 @@ import {
   assistantPageSchema,
   assistantTurnEventSchema,
   assistantTurnStatusSchema,
+  externalMcpStatusSchema,
 } from '../../enums/assistant.ts';
 import { permissionDecisionSchema } from '../../enums/inbox.ts';
 import { operationRiskSchema } from '../../enums/system.ts';
@@ -155,6 +156,15 @@ export const confirmAssistantCallRequestSchema = z.object({
   /** Also add the operation to `assistant.alwaysAllow`; write risk only (D27). */
   alwaysAllow: z.boolean().optional(),
 });
+
+/** An MCP server of the user's own opencode configuration (calendar and the like) the assistant can use (28 §4). */
+export const externalMcpServerSchema = z.object({
+  name: z.string(),
+  status: externalMcpStatusSchema,
+  /** Why it failed, as opencode tells it; null unless failed. */
+  error: z.string().nullable(),
+});
+export type ExternalMcpServerDTO = z.infer<typeof externalMcpServerSchema>;
 
 /** A file the assistant wrote in `files/<conversationId>/`; `path` is relative to that directory. */
 export const assistantFileSchema = z.object({

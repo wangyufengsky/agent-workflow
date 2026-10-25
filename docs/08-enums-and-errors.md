@@ -125,6 +125,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `AssistantConfirmationStatus` | `pending` · `confirmed` · `cancelled` | 确认卡片（09 §10） |
 | `AssistantTurnStatus` | `running` · `completed` · `aborted` · `failed` · `interrupted` · `timed_out` | 助手单轮运行状态（09 §14），用量未知与状态独立 |
 | `AssistantTurnEvent` | `idle` · `abort` · `error` · `runtime_lost` · `backend_restart` · `timeout` | 助手轮次的结束原因，运行时丢失与后端重启分别保存 |
+| `ExternalMcpStatus` | `connected` · `disabled` · `failed` · `needs_auth` · `needs_client_registration` | opencode `mcp.status` 报告的用户自己的 MCP 服务器状态（28 §4）；设置「助手」分组显示，语气见 §3 |
 | `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` · `read_attachment` · `browser_read` · `show_chart` · `show_flowchart`（35） | 助手专用工具（15 §3）；其余工具由操作清单生成 |
 | `AssistantPage` | `desktop`（桌宠来源，不带任务参数） · `home` · `tasks` · `task` · `task_preview`（任务页的预览页签，v1.3 B3，29 §2.6） · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` · `ppt` · `ppt_deck`（23 §9） · `batches` · `batch` · `schedules` · `schedule` · `environment`（28 §4） · `initiatives` · `initiative`（34 §10） | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId` / `deckId` / `batchId` / `scheduleId` / `initiativeId`；PPT 工作台另可带选中的页 `slideId`） |
 | `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） · `schedule`（22 §10） · `deck`（23 §9） · `git_review`（27 §7.1） · `initiative`（34 §10） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
@@ -224,7 +225,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 
 ## 3. 状态 → 语气映射（`STATUS_TONE`）
 
-`STATUS_TONE.task` / `.node` / `.attempt` / `.knowledgeTurn` / `.deck` / `.runtime` / `.taskDisplay` / `.schedule`（类型保证每个值都有映射，单测再校验一次）。`schedule`（v1.2）：`active` → `ok`，`paused` → `wait`。`knowledgeTurn`：`researching` → `run`，`answered` → `ok`，`stopped` → `idle`，`failed` → `danger`。`deck`（v1.2）：`outlining` / `generating` → `run`，`outline_ready` → `wait`，`incomplete` → `warn`，`failed` → `danger`，`ready` → `ok`。`runtime`：`ready` → `ok`，`starting` → `run`，`stopped` → `wait`，`not_installed` / `version_mismatch` / `crashed` → `danger`。
+`STATUS_TONE.task` / `.node` / `.attempt` / `.knowledgeTurn` / `.deck` / `.runtime` / `.taskDisplay` / `.schedule`（类型保证每个值都有映射，单测再校验一次）。`schedule`（v1.2）：`active` → `ok`，`paused` → `wait`。`knowledgeTurn`：`researching` → `run`，`answered` → `ok`，`stopped` → `idle`，`failed` → `danger`。`deck`（v1.2）：`outlining` / `generating` → `run`，`outline_ready` → `wait`，`incomplete` → `warn`，`failed` → `danger`，`ready` → `ok`。`runtime`：`ready` → `ok`，`starting` → `run`，`stopped` → `wait`，`not_installed` / `version_mismatch` / `crashed` → `danger`。 `externalMcp`：`connected` → `ok`，`disabled` → `idle`，`failed` → `danger`，`needs_auth` / `needs_client_registration` → `warn`。
 
 | tone | TaskStatus | NodeStatus | AttemptStatus | TaskDisplayGroup |
 | --- | --- | --- | --- | --- |

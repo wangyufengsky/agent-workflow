@@ -3,6 +3,7 @@ export {
   type AssistantPrompt,
   type CreateSessionInput,
   createRuntimeClient,
+  type McpServerState,
   type ModelRef,
   type OpencodeClient,
   type PromptInput,

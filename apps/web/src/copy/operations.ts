@@ -145,6 +145,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.assistant.abort': '停止助手',
   'op.assistant.replyPermission': '回复助手的权限请求',
   'op.assistant.files': '助手生成的文件',
+  'op.assistant.externalMcp': '你自己的 MCP 工具',
   'op.assistant.confirmations': '助手的确认记录',
   'op.assistant.confirm': '确认助手的操作',
   'op.assistant.cancelConfirmation': '取消助手的操作',

@@ -6,6 +6,7 @@ import {
   assistantFileSchema,
   confirmAssistantCallRequestSchema,
   createConversationRequestSchema,
+  externalMcpServerSchema,
   replyAssistantPermissionRequestSchema,
   sendAssistantMessageRequestSchema,
   snapshotAssistantContextRequestSchema,
@@ -129,6 +130,17 @@ export const listAssistantFilesOp = defineOperationContract({
   output: z.object({ items: z.array(assistantFileSchema) }),
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/assistant/conversations/:id/files' },
+});
+
+export const listExternalMcpOp = defineOperationContract({
+  ...common,
+  id: 'assistant.externalMcp',
+  title: 'op.assistant.externalMcp',
+  description: "MCP servers of the user's own opencode configuration the assistant can use, and their status",
+  input: z.object({}),
+  output: z.object({ items: z.array(externalMcpServerSchema) }),
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/assistant/external-mcp' },
 });
 
 export const listConfirmationsOp = defineOperationContract({

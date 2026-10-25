@@ -73,7 +73,7 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 3. 用户确认 → 先转为 `confirmed`（再点一次 409，不会执行两次）→ 后端执行操作 → 结果 `{ ok: true, output }` 或 `{ ok: false, error }` 与模板 `assistant-confirmed.md` 生成的待发消息在同一事务保存（无返回值的成功操作用 `output: null`，兼容旧记录缺失 output）→ 回传同一会话；取消 → 在同一事务保存 `cancelled` 与 `assistant-cancelled.md` 消息。会话还在回复或发送请求尚未返回时消息先排队，本轮结束后发出；opencode 不可用或发送失败时保留队列，后端重启后也可随用户的下一条消息发出。只有收到发送成功响应才移除当次消息，不移除期间新入队的消息；恢复只投递结果，不重新执行操作。
 4. `alwaysAllow: true` 只接受 write 级（critical 400 `VALIDATION_FAILED`），同时把操作 id 加入设置 `assistant.alwaysAllow`。之后该操作直接执行；critical 即使被写进列表也照样确认。
 
-设置项 `assistant.alwaysAllow: string[]`（操作 id 列表），设置页「助手」分组可查看与撤销；助手自己不能修改它（D65）。后端代发的确认结果消息不记入消息流（卡片显示结果）。
+设置项 `assistant.alwaysAllow: string[]`（操作 id 列表），设置页「助手」分组可查看与撤销（同一分组还列出用户自己在 opencode 里配置的 MCP 服务器与连接状态，附添加方法，28 §4）；助手自己不能修改它（D65）。后端代发的确认结果消息不记入消息流（卡片显示结果）。
 
 ### 4.1 普通任务结果回到原对话
 

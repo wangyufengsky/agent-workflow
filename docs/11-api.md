@@ -336,6 +336,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | PUT | `/assistant/conversations/:id/preview` | `assistant.bindPreview`，界面专用、不对助手开放；`{ preview: { taskId, tabId } \| null }` → 204。只接受属于该任务的真实用户预览，不能绑定 AI 页签；`null` 解除关联，删除后的清理也幂等。仅保存在内存 |
 | POST | `/assistant/conversations/:id/permissions/:permissionId` | `{ reply: PermissionDecision }`：回复助手会话的权限请求（bash / webfetch 询问），不存在 404 `NOT_FOUND` |
 | GET | `/assistant/conversations/:id/transcript?afterSeq=` | 消息流分页（非清单路由，格式同 `/attempts/:id/transcript`；`done` 恒为 false：对话不会结束） |
+| GET | `/assistant/external-mcp` | `assistant.externalMcp`（read，仅界面）：`{ items: Array<{ name, status: ExternalMcpStatus, error: string \| null }> }`：opencode `mcp.status`（助手目录）报告的 MCP 服务器，去掉应用自己的 `agent-workflow` 与 `agent-workflow-app`，按名称排序；opencode 没就绪 503 `OPENCODE_NOT_READY`（28 §4） |
 | GET | `/assistant/conversations/:id/files` | `{ items: Array<{ path, absolutePath, size, modifiedAt }> }`：`files/<id>/` 下助手写的文件 |
 | GET | `/assistant/conversations/:id/confirmations` | `{ items: AssistantConfirmationDTO[] }`，按创建时间；`AssistantConfirmationDTO = { id, conversationId, operationId, title, risk, input, status, result: { ok: true, output } \| { ok: false, error } \| null, createdAt, resolvedAt }`；无返回值的成功操作及旧版缺失 output 的成功记录均返回 `output: null` |
 | POST | `/assistant/confirmations/:id/confirm` | `{ alwaysAllow? }`：执行操作并把结果作为下一条消息发回会话；`alwaysAllow` 只允许 write 级（critical 400 `VALIDATION_FAILED`），同时把操作加入 `assistant.alwaysAllow`；已处理 409 `STATE_TRANSITION_INVALID`；不存在 404 `ASSISTANT_CONFIRMATION_NOT_FOUND` |

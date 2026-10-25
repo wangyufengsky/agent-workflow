@@ -33,6 +33,17 @@ export const AssistantTurnEvent = {
 export type AssistantTurnEvent = (typeof AssistantTurnEvent)[keyof typeof AssistantTurnEvent];
 export const assistantTurnEventSchema = z.enum(AssistantTurnEvent);
 
+/** How opencode reports an MCP server the user configured (15 §2, 28 §4), as its `mcp.status` names it. */
+export const ExternalMcpStatus = {
+  Connected: 'connected',
+  Disabled: 'disabled',
+  Failed: 'failed',
+  NeedsAuth: 'needs_auth',
+  NeedsClientRegistration: 'needs_client_registration',
+} as const;
+export type ExternalMcpStatus = (typeof ExternalMcpStatus)[keyof typeof ExternalMcpStatus];
+export const externalMcpStatusSchema = z.enum(ExternalMcpStatus);
+
 /** Assistant-only MCP tools (15 §3); the other assistant tools come from the operation registry. */
 export const AssistantToolName = {
   GetCurrentTime: 'get_current_time',

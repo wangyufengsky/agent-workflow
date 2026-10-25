@@ -40,7 +40,8 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       return qc.invalidateQueries({ queryKey: queryKeys.settings });
     case ServerEventType.RuntimeUpdated:
       qc.setQueryData(queryKeys.runtime, event.data);
-      // Whether models are available depends on the runtime.
+      // Whether models are available, and which MCP servers are connected, depends on the runtime.
+      await qc.invalidateQueries({ queryKey: queryKeys.externalMcp });
       return qc.invalidateQueries({ queryKey: queryKeys.environment });
     case ServerEventType.AttemptUpdated:
       await updateAttempt(qc, event.data.attempt);

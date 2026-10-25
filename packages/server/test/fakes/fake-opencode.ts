@@ -3,7 +3,10 @@ import { dirname, join } from 'node:path';
 import {
   AppError,
   ErrorCode,
+  ExternalMcpStatus,
+  MCP_ASSISTANT_SERVER_NAME,
   MCP_ASSISTANT_TOOL_PREFIX,
+  MCP_SERVER_NAME,
   MCP_SESSION_ARG,
   MCP_TOOL_PREFIX,
   type ModelInfo,
@@ -15,6 +18,7 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   type CreateSessionInput,
   OpencodeEventType as E,
+  type McpServerState,
   type OpencodeClient,
   type OpencodeError,
   type OpencodeEvent,
@@ -135,6 +139,12 @@ export function createFakeOpencode() {
     { providerId: 'opencode', modelId: 'fake-model', name: 'Fake Model' },
     { providerId: 'opencode', modelId: 'fake-model-2', name: 'Fake Model 2' },
   ];
+
+  // The app's two servers are connected, as in opencode.
+  const mcpServers: Record<string, McpServerState> = {
+    [MCP_SERVER_NAME]: { status: ExternalMcpStatus.Connected },
+    [MCP_ASSISTANT_SERVER_NAME]: { status: ExternalMcpStatus.Connected },
+  };
 
   const nextId = (prefix: string) => `${prefix}_${++counter}`;
   const emit = (event: OpencodeEvent) => {
@@ -298,6 +308,8 @@ export function createFakeOpencode() {
     /** Session ids the backend aborted, in order. */
     aborts: string[];
     models: ModelInfo[];
+    /** What `mcpStatus` reports, by server name; a test adds the user's own servers. */
+    mcpServers: Record<string, McpServerState>;
     /** Where `callTool` reaches the backend's execution MCP and `callAppTool` its assistant MCP. */
     connectMcp(endpoints: Record<FakeMcpServer, McpEndpoint>): void;
     /**
@@ -469,6 +481,11 @@ export function createFakeOpencode() {
     },
     async listModels() {
       return { available: models };
+    },
+    mcpServers,
+    async mcpStatus() {
+      if (!connected) throw new AppError(ErrorCode.OpencodeNotReady, 'FakeOpencode is not connected');
+      return mcpServers;
     },
     subscribe(listener) {
       listeners.add(listener);

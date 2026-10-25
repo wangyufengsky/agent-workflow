@@ -5,6 +5,8 @@ import { SessionAgent } from '../enums/workflow.ts';
 
 export const APP_ID = 'agent-workflow';
 export const APP_SOURCE_URL = 'https://github.com/wangyufengsky/agent-workflow';
+/** How to add an MCP server to opencode, linked from the settings' list of the user's own (28 §4). */
+export const OPENCODE_MCP_DOCS_URL = 'https://opencode.ai/docs/mcp-servers/';
 export const APP_LICENSE = 'Apache-2.0';
 /** Exact opencode version this app hosts; any other version is `version_mismatch`. */
 export const OPENCODE_VERSION = '1.19.0';

@@ -19,7 +19,10 @@ import {
   AttachmentOwnerKind,
   type ChartSpec,
   ErrorCode,
+  type ExternalMcpServerDTO,
+  MCP_ASSISTANT_SERVER_NAME,
   MCP_ASSISTANT_TOOL_PREFIX,
+  MCP_SERVER_NAME,
   OPENCODE_ASSISTANT_AGENT,
   type OperationContract,
   type PermissionDecision,
@@ -592,6 +595,14 @@ export function createAssistantService(deps: AssistantServiceDeps) {
 
   return {
     get: (id: string): AssistantConversationDTO => toDto(get(id)),
+    /** The MCP servers the user added to opencode themself (28 §4); the app's own two are not theirs to manage. */
+    async externalMcp(): Promise<ExternalMcpServerDTO[]> {
+      const servers = await opencode.mcpStatus(directory);
+      return Object.entries(servers)
+        .filter(([name]) => name !== MCP_SERVER_NAME && name !== MCP_ASSISTANT_SERVER_NAME)
+        .map(([name, { status, error }]) => ({ name, status, error: error ?? null }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
     list: (): AssistantConversationDTO[] => {
       const conversations = repo.listConversations();
       const summaries = usage.summaries(conversations.map((c) => c.id));
