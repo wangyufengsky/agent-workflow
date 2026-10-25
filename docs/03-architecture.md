@@ -45,7 +45,7 @@
 
 1. main 先创建窗口（上次启动留下的主题底色，`<userData>/launch.json`）并显示打开动画页（28 §5，D113），同时启动 utilityProcess（后端），传入数据目录、令牌（令牌由 main 生成，窗口与后端共用）。
 2. 后端：打开 SQLite → 执行迁移 → 启动 HTTP → 环境检测（git 版本、opencode 路径与版本）。
-3. 版本精确等于 `OPENCODE_VERSION`（1.19.0）时启动 `opencode serve --hostname 127.0.0.1 --port 0`，环境变量 `OPENCODE_CONFIG_CONTENT` 注入配置；从 stdout 解析监听地址；订阅其事件流。
+3. 版本在 `OPENCODE_SUPPORTED_VERSIONS`（1.18.0 – 1.90.x，D156）之内时启动 `opencode serve --hostname 127.0.0.1 --port 0`，环境变量 `OPENCODE_CONFIG_CONTENT` 注入配置；从 stdout 解析监听地址；订阅其事件流。
 4. 恢复：把上次退出时仍为 `running/starting` 的尝试标为 `interrupted`（等待阻塞问题答案的除外，D46），对应节点回到 `ready`（不消耗预算）；仍在 `running`/`verifying` 而没有工作中尝试的节点回到 `ready`；仍在 `preparing` 的任务重新准备工作区。
 4a. API 开始监听后（`app.start(port)`）调度器开始工作：重新派发 `ready` 节点、为规划中的任务启动规划会话。
 5. 后端经 `process.parentPort` 通知 main 监听端口；动画播完（或被跳过、关闭、reduced-motion）后 main 在同一窗口加载 `http://127.0.0.1:<port>/`，令牌经 `additionalArguments` 传给 preload。后端在就绪前退出时，动画页显示「后台服务没能启动」与「退出」。

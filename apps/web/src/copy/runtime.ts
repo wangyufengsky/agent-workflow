@@ -16,7 +16,7 @@ export const RUNTIME_COPY = {
   opencode: 'opencode',
   status: '状态',
   version: '版本',
-  requiredVersion: '要求版本',
+  supportedVersions: '支持的版本',
   path: '可执行文件',
   url: '服务地址',
   startedAt: '启动时间',

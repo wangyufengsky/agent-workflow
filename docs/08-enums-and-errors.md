@@ -248,7 +248,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | 名称 | 值 | 说明 |
 | --- | --- | --- |
 | `APP_ID` | `agent-workflow` | 数据目录名、MCP server 名 |
-| `OPENCODE_VERSION` | `1.19.0` | 精确匹配，不匹配则 `version_mismatch` |
+| `OPENCODE_VERSION` | `1.19.0` | 构建与测试所用的版本（SDK、事件样本、引导页的安装命令） |
+| `OPENCODE_SUPPORTED_VERSIONS` | `{ min: [1, 18, 0], max: [1, 90] }` | 可托管的版本：1.18.0 起到 1.90 的所有补丁版本，其他为 `version_mismatch`（D156）；`isSupportedOpencodeVersion` 判断，`OPENCODE_SUPPORTED_RANGE` 为显示用的 `1.18.0 – 1.90.x` |
 | `OPENCODE_AGENT_NAME` | `{ planner: 'aw-planner', executor: 'aw-executor', reviewer: 'aw-reviewer', researcher: 'aw-researcher', slides_writer: 'aw-slides' }` | 按 `SessionAgent`；`aw-researcher` 为知识研究员（v1.1，18 §5.1），`aw-slides` 为 PPT 写作者（v1.2，23 §7.1），`code_reviewer: 'aw-code-reviewer'` 为 Git 工作台的审查员（v1.2，27 §4.3） |
 | `MCP_SERVER_NAME` | `agent-workflow` | 执行 MCP；opencode 中工具名为 `agent-workflow_<tool>` |
 | `MCP_ASSISTANT_SERVER_NAME` | `agent-workflow-app` | 助手 MCP（v1.1）；opencode 中工具名为 `agent-workflow-app_<tool>` |

@@ -18,7 +18,7 @@ v1.0 只验收了 macOS arm64（D13），代码按跨平台抽象编写。本文
 | | macOS | Windows | Linux |
 | --- | --- | --- | --- |
 | Git | Xcode 命令行工具或 Homebrew | **Git for Windows**（自带 Git Bash，见 §3.3） | 发行版的 `git` 包 |
-| opencode 1.19.0 | `npm install -g opencode-ai@1.19.0` 或官方安装脚本 | `npm install -g opencode-ai@1.19.0` | 同 macOS |
+| opencode 1.18.0 – 1.90.x（推荐 1.19.0，D156） | `npm install -g opencode-ai@1.19.0` 或官方安装脚本 | `npm install -g opencode-ai@1.19.0` | 同 macOS |
 | 凭据存储 | 钥匙串（总可用） | DPAPI（总可用） | Secret Service（GNOME Keyring 等，`libsecret`）或 KWallet；没有时不能保存令牌与密码（§3.6） |
 
 ## 2. 原则
