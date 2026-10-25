@@ -397,7 +397,7 @@ type SlideDTO = { id: string; seq: number; layout: SlideLayout; title: string; p
 - 操作清单注册后助手自动获得工具（15 §3）：`decks_create`、`decks_generate`、`decks_reviseSlides` 等为 write，**出现确认卡片**，用户可以「确认并总是允许」；`decks_delete` 为 critical，每次确认；列表、详情为 read，直接执行。
 - 典型对话：「把 T-12 的结果做成 5 页汇报」→ 助手调用 `decks_create`（`materials: [{ kind: task, taskId }]`、`slideCount: 5`）→ 确认卡片（显示要求、资料「T-12 · 退款单分页查询与导出」、页数）→ 确认后对话里出现 PPT 导航卡片（D66，`EntityKind.Deck`），状态随 `deck.updated` 实时变化（「正在写大纲」→「大纲待确认」）→「打开」进入工作台看大纲。
 - **不阻塞、不回发消息**：工具立即返回 PPT 的摘要；与知识问答不同（18 §4a），大纲或页面做好后**不**把结果作为下一条消息发回助手会话——PPT 要在工作台里看，卡片上的实时状态已经告诉用户进展。用户也可以继续让助手「确认大纲开始制作」「把第 3 页改短」。
-- 导出与放映不是操作，助手不能导出；它可以 `open_page` 打开工作台（`AssistantPage` 增加 `ppt`、`ppt_deck`），由用户点导出。
+- 导出与放映不是操作。助手用专用工具 `export_deck` 导出做好的 PPT：界面打开工作台，页头执行与「导出」按钮相同的流程，保存位置由用户选（15 §3、28 §4）；放映仍由用户点。它也可以 `open_page` 打开工作台（`AssistantPage` 增加 `ppt`、`ppt_deck`）。
 - 助手上下文（15 §2）：用户在工作台时，页面描述写明 PPT 标题、显示状态、选中的页（第几页、标题）。
 
 ## 10. 枚举、常量、错误码（08）

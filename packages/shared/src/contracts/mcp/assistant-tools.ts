@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { AssistantForm, AssistantPage } from '../../enums/assistant.ts';
+import { deckExportFormatSchema } from '../../enums/deck.ts';
 import { runtimeStatusSchema } from '../../enums/system.ts';
 import { uiModeSchema } from '../../enums/ui.ts';
 import { createDbConnectionOp, updateDbConnectionOp } from '../../operations/databases.ts';
@@ -77,6 +78,10 @@ export const listFilesOutputSchema = z.object({
 /** `reveal_file`: `path` relative to the conversation's files directory. */
 export const revealFileInputSchema = z.object({ path: z.string().min(1) });
 export const revealedOutputSchema = z.object({ revealed: z.literal(true) });
+
+/** `export_deck`: a finished PPT, saved where the user chooses. */
+export const exportDeckInputSchema = z.object({ deckId: z.string().min(1), format: deckExportFormatSchema });
+export const exportingOutputSchema = z.object({ exporting: z.literal(true) });
 
 /**
  * What a write or critical operation tool returns while its call waits for the user (15 §4); the panel shows the

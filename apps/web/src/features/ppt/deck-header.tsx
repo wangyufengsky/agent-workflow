@@ -1,7 +1,16 @@
-import { type DeckDTO, DeckStatus, isAttemptActive, THEME_IDS, themeIdSchema, UiMode } from '@aw/shared';
+import {
+  type DeckDTO,
+  DeckExportFormat,
+  DeckStatus,
+  isAttemptActive,
+  StatusTone,
+  THEME_IDS,
+  themeIdSchema,
+  UiMode,
+} from '@aw/shared';
 import { useMutation } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
@@ -10,6 +19,7 @@ import { Icon } from '../../components/icon.tsx';
 import { toast } from '../../components/toast.tsx';
 import { PPT_COPY as C } from '../../copy/ppt.ts';
 import { THEME_LABEL } from '../../copy/themes.ts';
+import { useUiStore } from '../../state/ui.store.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { canExportPdf, exportPdf, exportPptx, type Saved } from './export/save.ts';
 import styles from './ppt.module.css';
@@ -68,11 +78,24 @@ export function DeckHeader({ deck, details }: { deck: DeckDTO; details: boolean 
   const remove = useDeleteDeck();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const exporting = useMutation({
-    mutationFn: (kind: 'pdf' | 'pptx') => (kind === 'pdf' ? exportPdf(deck) : exportPptx(deck)),
+    mutationFn: (format: DeckExportFormat) => (format === DeckExportFormat.Pdf ? exportPdf(deck) : exportPptx(deck)),
     onSuccess: (saved: Saved) => {
       if (saved !== null && !('failed' in saved)) toast(C.exported);
     },
   });
+  // The assistant's `export_deck` runs here, as a click on the export button would (28 §4).
+  const pendingExport = useUiStore((s) => s.pendingExport);
+  const setPendingExport = useUiStore((s) => s.setPendingExport);
+  const { mutate: exportAs } = exporting;
+  useEffect(() => {
+    if (pendingExport === null || pendingExport.deckId !== deck.id) return;
+    setPendingExport(null);
+    if (pendingExport.format === DeckExportFormat.Pdf && !canExportPdf()) {
+      toast(C.exportPdfDesktopOnly, StatusTone.Danger);
+    } else {
+      exportAs(pendingExport.format);
+    }
+  }, [pendingExport, deck.id, setPendingExport, exportAs]);
   const busy = deck.runs.some((r) => isAttemptActive(r.attempt.status));
   const ready = deck.status === DeckStatus.Ready;
   const step = stepOf(deck);
@@ -137,8 +160,8 @@ export function DeckHeader({ deck, details }: { deck: DeckDTO; details: boolean 
           icon="download"
           disabled={!ready}
           title={ready ? C.exportPptxHint : C.exportNotReady}
-          pending={exporting.isPending && exporting.variables === 'pptx'}
-          onClick={() => exporting.mutate('pptx')}
+          pending={exporting.isPending && exporting.variables === DeckExportFormat.Pptx}
+          onClick={() => exporting.mutate(DeckExportFormat.Pptx)}
         >
           {C.exportPptx}
         </Button>
@@ -148,8 +171,8 @@ export function DeckHeader({ deck, details }: { deck: DeckDTO; details: boolean 
             icon="download"
             disabled={!ready}
             title={ready ? C.exportPdfHint : C.exportNotReady}
-            pending={exporting.isPending && exporting.variables === 'pdf'}
-            onClick={() => exporting.mutate('pdf')}
+            pending={exporting.isPending && exporting.variables === DeckExportFormat.Pdf}
+            onClick={() => exporting.mutate(DeckExportFormat.Pdf)}
           >
             {C.exportPdf}
           </Button>

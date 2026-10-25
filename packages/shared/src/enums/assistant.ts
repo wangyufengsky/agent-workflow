@@ -48,6 +48,8 @@ export const AssistantToolName = {
   ShowChart: 'show_chart',
   /** A flowchart in the conversation (35 §3.2). */
   ShowFlowchart: 'show_flowchart',
+  /** Export a finished PPT the way its「导出」buttons do (28 §4). */
+  ExportDeck: 'export_deck',
 } as const;
 export type AssistantToolName = (typeof AssistantToolName)[keyof typeof AssistantToolName];
 

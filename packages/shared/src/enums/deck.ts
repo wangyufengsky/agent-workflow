@@ -14,6 +14,14 @@ export const DeckStatus = {
 export type DeckStatus = (typeof DeckStatus)[keyof typeof DeckStatus];
 export const deckStatusSchema = z.enum(DeckStatus);
 
+/** The files a PPT is exported to (23 §6): PowerPoint anywhere, PDF in the desktop app only. */
+export const DeckExportFormat = {
+  Pptx: 'pptx',
+  Pdf: 'pdf',
+} as const;
+export type DeckExportFormat = (typeof DeckExportFormat)[keyof typeof DeckExportFormat];
+export const deckExportFormatSchema = z.enum(DeckExportFormat);
+
 /** What one AI work on a PPT does (23 §3 `deck_runs`): told by its attempt's kind. */
 export const DeckRunKind = {
   Outline: 'outline',

@@ -128,6 +128,7 @@ export const TOOL_COPY = {
     [AssistantToolName.ReadBrowser]: '读取我的预览',
     [AssistantToolName.ShowChart]: '画图',
     [AssistantToolName.ShowFlowchart]: '画流程图',
+    [AssistantToolName.ExportDeck]: '导出 PPT',
   } satisfies Record<AssistantToolName, string>,
   /** opencode's own tools (12 §2); the user's own MCP servers show as `external`. */
   native: NATIVE_TOOL,

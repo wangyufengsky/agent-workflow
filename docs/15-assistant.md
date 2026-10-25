@@ -50,6 +50,7 @@ opencode 1.19 的已有会话目录不能通过发送参数或 fork 改变。迁
 | `open_page` | read | `{ page: AssistantPage, params }`（各页面需要的参数为 `ASSISTANT_PAGE_PARAMS`）→ SSE `assistant.navigate`，界面在面板旁跳转；`task_preview` 是任务页的预览页签（`?view=preview`，v1.3 B3，29 §2.6），用户在那里时消息带的当前页面也是它，助手启动预览后用它把用户带过去 |
 | `open_form` | read | `{ form: AssistantForm, values }` → SSE `assistant.open_form`；`values` 按该表单所提交操作的助手输入（不含凭据字段）的 partial 校验，带凭据字段 `VALIDATION_FAILED` |
 | `show_chart` / `show_flowchart` | read | 在对话里画图（35，D138）：统计图（`bar` / `line` / `pie`，类别 + 系列）或流程图（节点与连线，允许回环）；输入为 strict 对象，跨字段规则与上限见 35 §3，不合规为 `VALIDATION_FAILED`（issues 带 `path` 与改法）；通过后写消息流 `chart` 条目（10 §3）并返回 `{ shown: true }`；界面在消息流中渲染为图（§6.1） |
+| `export_deck` | read | `{ deckId, format: pptx \| pdf }`：只接受做好的 PPT（否则 `DECK_NOT_READY`）→ SSE `assistant.export_deck`，界面在面板旁打开这份 PPT，页头执行与「导出」按钮相同的导出：保存位置由用户在系统对话框里选（浏览器开发模式为下载），所以不出确认卡片；`pdf` 只在桌面应用，浏览器里提示「导出 PDF 只在桌面应用中可用」。返回 `{ exporting: true }`，助手不知道文件存到了哪里（28 §4） |
 | `list_files` / `reveal_file` | read | 列出 / 在 Finder 中显示 `files/<id>/` 下的文件（路径相对该目录，越界或不存在 `VALIDATION_FAILED`；显示经 SSE `assistant.reveal_file` 由 preload 完成） |
 
 第一批开放给助手的操作（v1.1）：项目、任务（含开始、取消、结果、再改改、交付）、需要你处理（列表、回答、审批）、流程与角色（读；专业模式可写）、数据库（列表、测试、结构、只读查询：新增操作 `databases.query`，与 AI 的 `db_query` 同样的只读四道关，可用于任意连接）、Git（只读）、设置。知识问答（v1.1，18 §4a）的操作已注册并 `expose.assistant`：`knowledge_ask` / `knowledge_followUp` 为 read（不需确认），工具立即返回 `researching`，回答（带引用链接）与导航卡片在研究结束后作为下一条消息送达；`knowledge_delete` 为 critical，列表、详情、引用原文为 read。PPT 模块上线时注册其操作即自动可用。各模块的覆盖盘点见 28 §4（v1.2 起批量、定时、PPT、审查意见回流都已开放；`open_page` 补了批量、定时与环境检测页）。
