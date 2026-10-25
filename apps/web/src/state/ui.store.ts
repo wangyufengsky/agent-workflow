@@ -1,11 +1,12 @@
-import type { AssistantForm, AssistantPageRef } from '@aw/shared';
+import type { AssistantForm, AssistantPageRef, DeckExportFormat } from '@aw/shared';
 import { create } from 'zustand';
 
 /** What the assistant asked the renderer to do (15 §3): the shell carries it out once. */
 export type AssistantUiRequest =
   | { kind: 'navigate'; target: AssistantPageRef }
   | { kind: 'form'; form: AssistantForm; values: Record<string, unknown> }
-  | { kind: 'reveal'; absolutePath: string };
+  | { kind: 'reveal'; absolutePath: string }
+  | { kind: 'export'; deckId: string; format: DeckExportFormat };
 
 /** Pure UI state only (06 §4); server data stays in TanStack Query. */
 type UiState = {
@@ -33,18 +34,25 @@ type UiState = {
    */
   pendingForm: PendingForm | null;
   setPendingForm(form: PendingForm | null): void;
+  /** An `export_deck` request, until the PPT's page runs it as its export buttons do (28 §4). */
+  pendingExport: PendingExport | null;
+  setPendingExport(pendingExport: PendingExport | null): void;
   /** Conversation streams the user opened or closed (25 §4.5), by attempt id, kept until the app reloads. */
   streamOpen: Record<string, boolean>;
   setStreamOpen(attemptId: string, open: boolean): void;
   /** The user's open preview tab of each task (29 §8.1): a change request may attach its page (29 §2.3). */
   previewTabs: Record<string, string>;
   setPreviewTab(taskId: string, tabId: string | null): void;
+  /** The AI review the Git workbench shows (27 §4.5), whichever view and history entry: where the user is (15 §2). */
+  shownGitReview: string | null;
+  setShownGitReview(reviewId: string | null): void;
   /** The project the team page showed last (33 §5.1), until the app reloads. */
   teamProjectId: string | null;
   setTeamProject(projectId: string): void;
 };
 
 export type PendingForm = { seq: number; form: AssistantForm; values: Record<string, unknown> };
+export type PendingExport = { seq: number; deckId: string; format: DeckExportFormat };
 
 export const useUiStore = create<UiState>((set) => ({
   activePreview: null,
@@ -62,8 +70,12 @@ export const useUiStore = create<UiState>((set) => ({
     set((s) => ({ assistantRequest: { seq: (s.assistantRequest?.seq ?? 0) + 1, request } })),
   pendingForm: null,
   setPendingForm: (pendingForm) => set({ pendingForm }),
+  pendingExport: null,
+  setPendingExport: (pendingExport) => set({ pendingExport }),
   streamOpen: {},
   setStreamOpen: (attemptId, open) => set((s) => ({ streamOpen: { ...s.streamOpen, [attemptId]: open } })),
+  shownGitReview: null,
+  setShownGitReview: (shownGitReview) => set({ shownGitReview }),
   teamProjectId: null,
   setTeamProject: (teamProjectId) => set({ teamProjectId }),
   previewTabs: {},

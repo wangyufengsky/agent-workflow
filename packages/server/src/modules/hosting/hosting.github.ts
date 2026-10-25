@@ -87,10 +87,19 @@ const toMessage = (m: { author: string; body: string; createdAt: string }) => ({
   createdAt: Date.parse(m.createdAt),
 });
 
+const octokitOf = (token: string, apiUrl: string) =>
+  new Octokit({ auth: token, baseUrl: apiUrl, log: { debug() {}, info() {}, warn() {}, error() {} } });
+
+/** The login a token signs in as; HOSTING_AUTH_FAILED when GitHub rejects it (D155). */
+export async function githubAccount(token: string, apiUrl: string): Promise<string> {
+  const { data } = await octokitOf(token, apiUrl).rest.users.getAuthenticated().catch(translate);
+  return data.login;
+}
+
 /** GitHub through Octokit (D08); `repo` is `owner/name`. */
 export function createGithubProvider(repo: string, token: string, apiUrl: string): GitHostingProvider {
   const [owner = '', name = ''] = repo.split('/');
-  const octokit = new Octokit({ auth: token, baseUrl: apiUrl, log: { debug() {}, info() {}, warn() {}, error() {} } });
+  const octokit = octokitOf(token, apiUrl);
   return {
     async verify() {
       await octokit.rest.repos.get({ owner, repo: name }).catch(translate);

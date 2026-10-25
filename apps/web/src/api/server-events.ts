@@ -121,6 +121,10 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
         .requestFromAssistant({ kind: 'form', form: event.data.form, values: event.data.values });
     case ServerEventType.AssistantRevealFile:
       return useUiStore.getState().requestFromAssistant({ kind: 'reveal', absolutePath: event.data.absolutePath });
+    case ServerEventType.AssistantExportDeck:
+      return useUiStore
+        .getState()
+        .requestFromAssistant({ kind: 'export', deckId: event.data.deckId, format: event.data.format });
   }
 }
 

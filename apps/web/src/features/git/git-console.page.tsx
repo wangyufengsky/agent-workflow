@@ -7,10 +7,11 @@ import { Icon } from '../../components/icon.tsx';
 import { PathText } from '../../components/path-text.tsx';
 import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
 import { GIT_COPY as C } from '../../copy/git.ts';
-import { projectsQuery } from '../projects/projects.queries.ts';
+import { projectQuery, projectsQuery } from '../projects/projects.queries.ts';
 import styles from './git.module.css';
 import { gitLastCommitQuery, gitReviewQuery, gitReviewsQuery, gitStatusQuery } from './git.queries.ts';
 import { Avatar, ReviewBadge } from './git-parts.tsx';
+import { hostingState } from './hosting-state.ts';
 import { reviewSearch } from './review-location.ts';
 
 function ProjectCard({ project }: { project: ProjectDTO }) {
@@ -18,6 +19,8 @@ function ProjectCard({ project }: { project: ProjectDTO }) {
   const branch = status.data?.branch ?? null;
   const last = useQuery({ ...gitLastCommitQuery(project.id, branch ?? 'HEAD'), enabled: status.isSuccess });
   const review = useQuery(gitReviewsQuery(project.id)).data?.[0];
+  // The list has neither origin nor the global tokens; the detail says whose token signs in (D155).
+  const detail = useQuery(projectQuery(project.id)).data;
   const head = (
     <div className={styles.cardHead}>
       <span className="tile">
@@ -84,7 +87,7 @@ function ProjectCard({ project }: { project: ProjectDTO }) {
       )}
       <div className={styles.cardFoot}>
         {review !== undefined && <ReviewBadge review={review} />}
-        <span className="chip">{project.hosting === null ? C.hostingNone : project.hosting.provider}</span>
+        {detail !== undefined && <span className="chip">{hostingState(detail).chip}</span>}
         <span className={styles.spacer} />
         <Link className="btn secondary sm" to={ROUTES.gitProject} params={{ projectId: project.id }}>
           {C.enter}

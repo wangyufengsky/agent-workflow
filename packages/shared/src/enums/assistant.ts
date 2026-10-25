@@ -59,6 +59,8 @@ export const AssistantToolName = {
   ShowChart: 'show_chart',
   /** A flowchart in the conversation (35 §3.2). */
   ShowFlowchart: 'show_flowchart',
+  /** Export a finished PPT the way its「导出」buttons do (28 §4). */
+  ExportDeck: 'export_deck',
 } as const;
 export type AssistantToolName = (typeof AssistantToolName)[keyof typeof AssistantToolName];
 
@@ -77,6 +79,8 @@ export const AssistantPage = {
   Settings: 'settings',
   Git: 'git',
   GitProject: 'git_project',
+  /** One AI review of the Git workbench (27 §4); its address leads to where the console shows it. */
+  GitReview: 'git_review',
   Workflows: 'workflows',
   Workflow: 'workflow',
   Roles: 'roles',
@@ -92,16 +96,24 @@ export const AssistantPage = {
   TeamMember: 'team_member',
   /** PPT (23 §2): the list and one PPT's workspace. */
   Ppt: 'ppt',
+  PptNew: 'ppt_new',
   PptDeck: 'ppt_deck',
   /** Batches (20), scheduled tasks (22) and the environment checks (14 §3.1a), D111. */
   Batches: 'batches',
+  BatchNew: 'batch_new',
   Batch: 'batch',
   Schedules: 'schedules',
+  ScheduleNew: 'schedule_new',
   Schedule: 'schedule',
+  ScheduleEdit: 'schedule_edit',
   Environment: 'environment',
   /** Initiatives (34 §10): the list and one initiative. */
   Initiatives: 'initiatives',
   Initiative: 'initiative',
+  /** Composition templates of initiatives (34 §15.6, pro): the list, a new one, one in its editor. */
+  InitiativeTemplates: 'initiative_templates',
+  InitiativeTemplateNew: 'initiative_template_new',
+  InitiativeTemplate: 'initiative_template',
 } as const;
 export type AssistantPage = (typeof AssistantPage)[keyof typeof AssistantPage];
 export const assistantPageSchema = z.enum(AssistantPage);
@@ -118,6 +130,8 @@ export type AssistantPageParam =
   | 'batchId'
   | 'scheduleId'
   | 'initiativeId'
+  | 'templateKey'
+  | 'gitReviewId'
   /** A team member's main email (33 §5.1). */
   | 'teamMember';
 
@@ -135,6 +149,7 @@ export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.Settings]: [],
   [AssistantPage.Git]: [],
   [AssistantPage.GitProject]: ['projectId'],
+  [AssistantPage.GitReview]: ['gitReviewId'],
   [AssistantPage.Workflows]: [],
   [AssistantPage.Workflow]: ['workflowKey'],
   [AssistantPage.Roles]: [],
@@ -148,14 +163,21 @@ export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.Team]: ['projectId'],
   [AssistantPage.TeamMember]: ['projectId', 'teamMember'],
   [AssistantPage.Ppt]: [],
+  [AssistantPage.PptNew]: [],
   [AssistantPage.PptDeck]: ['deckId'],
   [AssistantPage.Batches]: [],
+  [AssistantPage.BatchNew]: [],
   [AssistantPage.Batch]: ['batchId'],
   [AssistantPage.Schedules]: [],
+  [AssistantPage.ScheduleNew]: [],
   [AssistantPage.Schedule]: ['scheduleId'],
+  [AssistantPage.ScheduleEdit]: ['scheduleId'],
   [AssistantPage.Environment]: [],
   [AssistantPage.Initiatives]: [],
   [AssistantPage.Initiative]: ['initiativeId'],
+  [AssistantPage.InitiativeTemplates]: [],
+  [AssistantPage.InitiativeTemplateNew]: [],
+  [AssistantPage.InitiativeTemplate]: ['templateKey'],
 } as const satisfies Record<AssistantPage, readonly AssistantPageParam[]>;
 
 /**

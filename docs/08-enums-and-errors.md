@@ -84,6 +84,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DeliveryStrategy` | `squash` · `merge` · `rebase` · `pull_request` · `report_only` |
 | `DeliveryStatus` | `running` · `succeeded` · `conflict` · `failed` |
 | `HostingProvider` | `github` · `gitlab` |
+| `HostingSource` | `project`（项目自己绑定的令牌）· `global`（设置里该平台地址的全局令牌）：`effectiveHosting` 的令牌来源（D155） |
 | `ChangeRequestReason` | `user`（让 AI 再改改）· `conflict`（交给 AI 解决冲突）· `review`（按 PR 审查意见修改，21）；`request-changes` 的 `reason` 只接受前两个，`review` 只经 `review-feedback` 发起 |
 | `ReviewCommentKind` | `thread`（未解决的审查讨论，通常在某个文件的某一行）· `general`（对话中的评论或审查总结）（21 §2.2） |
 | `GitOperation` | `merge` · `rebase` · `cherry_pick` · `revert`：主工作区里用户没做完的操作（27 §5） |
@@ -126,8 +127,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `AssistantTurnStatus` | `running` · `completed` · `aborted` · `failed` · `interrupted` · `timed_out` | 助手单轮运行状态（09 §14），用量未知与状态独立 |
 | `AssistantTurnEvent` | `idle` · `abort` · `error` · `runtime_lost` · `backend_restart` · `timeout` | 助手轮次的结束原因，运行时丢失与后端重启分别保存 |
 | `ExternalMcpStatus` | `connected` · `disabled` · `failed` · `needs_auth` · `needs_client_registration` | opencode `mcp.status` 报告的用户自己的 MCP 服务器状态（28 §4）；设置「助手」分组显示，语气见 §3 |
-| `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` · `read_attachment` · `browser_read` · `show_chart` · `show_flowchart`（35） | 助手专用工具（15 §3）；其余工具由操作清单生成 |
-| `AssistantPage` | `desktop`（桌宠来源，不带任务参数） · `home` · `tasks` · `task` · `task_preview`（任务页的预览页签，v1.3 B3，29 §2.6） · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` · `ppt` · `ppt_deck`（23 §9） · `batches` · `batch` · `schedules` · `schedule` · `environment`（28 §4） · `initiatives` · `initiative`（34 §10） | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId` / `deckId` / `batchId` / `scheduleId` / `initiativeId`；PPT 工作台另可带选中的页 `slideId`） |
+| `AssistantToolName` | `get_current_time` · `get_app_status` · `open_page` · `open_form` · `list_files` · `reveal_file` · `read_attachment` · `browser_read` · `show_chart` · `show_flowchart`（35） · `export_deck`（28 §4） | 助手专用工具（15 §3）；其余工具由操作清单生成 |
+| `AssistantPage` | `desktop`（桌宠来源，不带任务参数） · `home` · `tasks` · `task` · `task_preview`（任务页的预览页签，v1.3 B3，29 §2.6） · `node` · `inbox` · `projects` · `project` · `settings` · `git` · `git_project` · `git_review`（某次 AI 审查，27 §4；地址跳到工作台里显示它的视图） · `workflows` · `workflow` · `roles` · `databases` · `tools` · `runtime` · `knowledge` · `knowledge_conversation` · `knowledge_history` · `insights` · `ppt` · `ppt_new` · `ppt_deck`（23 §9） · `batches` · `batch_new` · `batch` · `schedules` · `schedule_new` · `schedule` · `schedule_edit` · `environment`（28 §4） · `initiatives` · `initiative`（34 §10） · `initiative_templates` · `initiative_template_new` · `initiative_template`（34 §15.6，专业） | 当前页面与 `open_page` 的目标；每个页面需要的参数为常量 `ASSISTANT_PAGE_PARAMS`（`taskId` / `nodeId` / `projectId` / `workflowKey` / `knowledgeConversationId` / `deckId` / `batchId` / `scheduleId` / `initiativeId` / `templateKey` / `gitReviewId` / `teamMember`；PPT 工作台另可带选中的页 `slideId`）。界面里除引导页、只做跳转的团队入口 `/team`、全屏的放映与打印页、开发用组件页之外，每个路由都对应一个页面（`assistant-page.ts` 编译期检查），否则用户会被当成在主页 |
 | `EntityKind` | `task` · `project` · `workflow` · `role` · `db_connection` · `knowledge_conversation` · `batch`（20 §8） · `schedule`（22 §10） · `deck`（23 §9） · `git_review`（27 §7.1） · `initiative`（34 §10） | 操作契约 `produces` 的对象类型（`enums/entity.ts`）；`entity_ref` 条目的 `kind`；`workflow` 的 id 为流程 key（D66） |
 | `InputRef` | `EntityKind` 的全部取值 · `inbox_item` · `node`（同一输入中 `id` 所指任务的步骤） · `attempt` | 操作契约 `refs`：输入字段指向的对象（`enums/entity.ts`）；助手确认卡片据此把 id 显示为对象名称，标签为对象类型（D84）；`workflow` 字段可以是流程 id 或 key |
 | `AssistantForm` | `tasks.create` · `projects.create` · `projects.setHosting` · `databases.create` · `databases.update` | `open_form` 能打开的表单，以其提交的操作命名（`ASSISTANT_FORM_OPERATION`）；预填值的 schema 为该操作的助手输入（不含凭据字段）的 partial |
@@ -188,6 +189,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | --- | --- | --- |
 | `DeckStatus` | `outlining` · `outline_ready` · `failed` · `generating` · `incomplete` · `ready` | PPT 的显示状态，由页面与最近一次 AI 工作的尝试状态推导（`deckStatusOf`，`shared/deck/status.ts`，23 §4.3），不存储 |
 | `DeckRunKind` | `outline` · `slides` | 一次 AI 工作做什么，由其尝试的 kind 推导（`deckRunKindOf`） |
+| `DeckExportFormat` | `pptx` · `pdf` | PPT 导出的文件（23 §6）；`pdf` 只在桌面应用；助手 `export_deck` 的 `format` |
 | `DeckMaterialKind` | `text` · `file` · `task` · `knowledge` · `web` | 创建时快照的资料（23 §2.3）；`web` 为按网站规则只读读取一次的网页（29 §2.8） |
 | `SlideLayout` | `cover` · `section` · `bullets` · `two_column` · `cards` · `steps` · `stats` · `table` · `code` · `quote` | 内置版式（23 §5.1，D93）；每种版式的字段与字数上限为 `slideContentSchema`（`shared/contracts/deck/slide.ts`） |
 
@@ -459,7 +461,7 @@ class AppError extends Error {
 | `GIT_BRANCH_NOT_MERGED` | 409 | 删除未合并的分支要 `force` |
 | `GIT_BRANCH_OWNED_BY_TASK` | 409 | 分支属于没结束的任务，只能在任务页交付；`details: { branch, task: { id, key } }`（27 §5） |
 | **托管平台** | | |
-| `HOSTING_NOT_CONFIGURED` | 400 | 选择 PR 交付但项目未绑定远端 |
+| `HOSTING_NOT_CONFIGURED` | 400 | 需要平台（PR、审查意见）但项目没有可用的令牌：自己没绑定，origin 的平台地址也没有全局令牌（D155） |
 | `HOSTING_AUTH_FAILED` | 401 | 令牌无效或权限不足 |
 | `HOSTING_API_ERROR` | 502 | `details: { status, body }` |
 | **流程 / 角色** | | |
@@ -524,6 +526,7 @@ class AppError extends Error {
 | `DECK_NOT_FOUND` | 404 | |
 | `DECK_SLIDE_NOT_FOUND` | 404 | 页面不存在或不属于这份 PPT |
 | `DECK_BUSY` | 409 | 有 AI 工作进行中时又修改页面、发起 AI 工作或删除 PPT（先等它完成或停止） |
+| `DECK_NOT_READY` | 409 | 助手 `export_deck` 的 PPT 还没有全部做好（状态不是 `ready`） |
 | **Inbox** | | |
 | `INBOX_ITEM_NOT_FOUND` | 404 | |
 | `INBOX_ITEM_CLOSED` | 409 | 条目已处理 |

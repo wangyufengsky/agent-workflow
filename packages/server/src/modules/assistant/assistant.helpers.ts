@@ -11,7 +11,9 @@ import {
   CHART_CATEGORIES,
   CHART_SERIES_MAX,
   ChartType,
+  DeckStatus,
   ErrorCode,
+  exportDeckInputSchema,
   FLOWCHART_EDGES_MAX,
   FLOWCHART_NODES_MAX,
   type GetAppStatusOutput,
@@ -33,6 +35,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { EventBus } from '../../core/event-bus.ts';
 import type { AttachmentsService } from '../attachments/index.ts';
 import type { BrowserService } from '../browser/index.ts';
+import type { DecksService } from '../decks/index.ts';
 import { localTime } from './assistant.context.ts';
 import type { AssistantService } from './assistant.service.ts';
 import type { AssistantTool } from './assistant.tools.ts';
@@ -45,6 +48,7 @@ export type HelperToolDeps = {
   appStatus(): Promise<GetAppStatusOutput>;
   attachments: AttachmentsService;
   browser: BrowserService;
+  decks: DecksService;
 };
 
 /** The fields `open_form` may prefill, per form, for the model to read in the description. */
@@ -189,6 +193,28 @@ export function helperTools(deps: HelperToolDeps): AssistantTool[] {
           data: { conversationId: conversation.id, absolutePath },
         });
         return { revealed: true };
+      },
+    },
+    {
+      name: AssistantToolName.ExportDeck,
+      description:
+        'Export a finished PPT (status ready) as PowerPoint (pptx) or, in the desktop app only, PDF. The app opens the PPT and asks the user where to save the file, as its export buttons do; you are not told where it went',
+      input: exportDeckInputSchema,
+      mode: UiMode.Simple,
+      handler(input, { conversation }) {
+        const { deckId, format } = exportDeckInputSchema.parse(input);
+        const deck = deps.decks.get(deckId);
+        if (deck.status !== DeckStatus.Ready) {
+          throw new AppError(ErrorCode.DeckNotReady, 'Only a PPT whose pages are all made can be exported', {
+            deckId,
+            status: deck.status,
+          });
+        }
+        events.publish({
+          type: ServerEventType.AssistantExportDeck,
+          data: { conversationId: conversation.id, deckId, format },
+        });
+        return { exporting: true };
       },
     },
   ];

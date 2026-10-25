@@ -1,4 +1,10 @@
-import { AssistantForm, HostingProvider, hostingProviderSchema, type ProjectDetailDTO } from '@aw/shared';
+import {
+  AssistantForm,
+  HostingProvider,
+  HostingSource,
+  hostingProviderSchema,
+  type ProjectDetailDTO,
+} from '@aw/shared';
 import { type FormEvent, useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -139,9 +145,11 @@ export function HostingPanel({ project }: { project: ProjectDetailDTO }) {
     return (
       <div className="col">
         <p className="hint">
-          {project.inferredHosting === null
-            ? C.remoteNone
-            : C.remoteInferred(C.providers[project.inferredHosting.provider], project.inferredHosting.repo)}
+          {project.effectiveHosting?.source === HostingSource.Global
+            ? C.remoteGlobal(C.providers[project.effectiveHosting.provider], project.effectiveHosting.repo)
+            : project.inferredHosting === null
+              ? C.remoteNone
+              : C.remoteInferred(C.providers[project.inferredHosting.provider], project.inferredHosting.repo)}
         </p>
         <BindForm
           key={prefill?.seq}

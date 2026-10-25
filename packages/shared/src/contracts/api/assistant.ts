@@ -79,6 +79,8 @@ export const assistantPageRefSchema = z
         batchId: z.string().min(1).optional(),
         scheduleId: z.string().min(1).optional(),
         initiativeId: z.string().min(1).optional(),
+        templateKey: z.string().min(1).optional(),
+        gitReviewId: z.string().min(1).optional(),
         /** On a team member's page: the member's main email. */
         teamMember: z.string().min(1).optional(),
       })

@@ -1,4 +1,4 @@
-import { ErrorCode, GitMergeStrategy, type GitStatusDTO, type ProjectDetailDTO } from '@aw/shared';
+import { ErrorCode, GitMergeStrategy, type GitStatusDTO, HostingSource, type ProjectDetailDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -262,7 +262,12 @@ function PushDialog({ project, branch, onClose }: DialogProps & { branch: string
       )}
       <p className={styles.fine}>
         <Icon name="lock" size="sm" />
-        {project.hosting === null ? C.pushNoteOwn : C.pushNoteToken(project.hosting.repo)} {C.pushNoForce}
+        {project.effectiveHosting === null
+          ? C.pushNoteOwn
+          : project.effectiveHosting.source === HostingSource.Project
+            ? C.pushNoteToken(project.effectiveHosting.repo)
+            : C.pushNoteGlobal(project.effectiveHosting.repo)}{' '}
+        {C.pushNoForce}
       </p>
       {push.isError && <ErrorState error={push.error} />}
     </Dialog>
@@ -388,7 +393,7 @@ function PullRequestDialog({ project, branch, onClose }: DialogProps & { branch:
             <Button
               variant="primary"
               pending={create.isPending}
-              disabled={project.hosting === null || title.trim() === ''}
+              disabled={project.effectiveHosting === null || title.trim() === ''}
               onClick={() => create.mutate({ branch, base, title: title.trim(), body })}
             >
               {C.prRun}
@@ -402,7 +407,7 @@ function PullRequestDialog({ project, branch, onClose }: DialogProps & { branch:
         </>
       }
     >
-      {project.hosting === null && <p className="hint">{C.prNeedsHosting}</p>}
+      {project.effectiveHosting === null && <p className="hint">{C.prNeedsHosting}</p>}
       {create.data !== undefined && (
         <div className="banner ok" role="status">
           <Icon name="check" />

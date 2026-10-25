@@ -20,6 +20,7 @@ export const queryKeys = {
   workflowVersions: (key: string) => ['workflows', 'versions', key],
   roles: ['roles'],
   dbConnections: ['db-connections'],
+  hostingAccounts: ['hosting-accounts'],
   dbSchema: (id: string) => ['db-connections', id, 'schema'],
   mcpTools: ['mcp', 'tools'],
   runtimeLogs: (tail: number) => ['system', 'runtime', 'logs', tail],

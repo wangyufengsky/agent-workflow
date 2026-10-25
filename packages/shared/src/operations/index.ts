@@ -88,6 +88,7 @@ import {
   pruneWorktreesOp,
 } from './git.ts';
 import { getGitReviewOp, listGitReviewsOp, startGitReviewOp, stopGitReviewOp } from './git-reviews.ts';
+import { listHostingAccountsOp, removeHostingAccountOp, setHostingAccountOp } from './hosting.ts';
 import { countInboxOp, dismissInboxOp, listInboxOp, resolveInboxOp } from './inbox.ts';
 import {
   confirmInitiativeItemMergedOp,
@@ -227,6 +228,7 @@ export * from './decks.ts';
 export * from './define.ts';
 export * from './git.ts';
 export * from './git-reviews.ts';
+export * from './hosting.ts';
 export * from './inbox.ts';
 export * from './initiatives.ts';
 export * from './insights.ts';
@@ -261,6 +263,9 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   deleteProjectOp,
   setProjectHostingOp,
   clearProjectHostingOp,
+  listHostingAccountsOp,
+  setHostingAccountOp,
+  removeHostingAccountOp,
   setProjectDbConnectionsOp,
   removeProjectAllowedBashOp,
   getPreviewOp,

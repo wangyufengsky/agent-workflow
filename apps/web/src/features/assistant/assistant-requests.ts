@@ -12,12 +12,13 @@ const text = (value: unknown) => (typeof value === 'string' ? value : undefined)
 
 /**
  * Carries out what the assistant asked the renderer to do (15 §3, §6): open a page or a prefilled form next to the
- * panel, or reveal a file in Finder. Each request runs once. Pages other than home show the conversation in the panel
+ * panel, export a PPT from its page, or reveal a file in Finder. Each request runs once. Pages other than home show the conversation in the panel
  * (D112); the home page shows it itself.
  */
 export function useAssistantRequests(): void {
   const request = useUiStore((s) => s.assistantRequest);
   const setPendingForm = useUiStore((s) => s.setPendingForm);
+  const setPendingExport = useUiStore((s) => s.setPendingExport);
   const openPage = useOpenAssistantPage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -36,6 +37,11 @@ export function useAssistantRequests(): void {
       case 'reveal':
         // Finder is reached through the Electron preload; a plain browser (development) has none.
         if (window.aw !== undefined) void window.aw.revealInFinder(r.absolutePath);
+        return;
+      case 'export':
+        // The PPT's page exports it, so that the user sees it happen and where the file went (28 §4).
+        setPendingExport({ seq: request.seq, deckId: r.deckId, format: r.format });
+        followAssistant(() => navigate({ to: ROUTES.pptDeck, params: { deckId: r.deckId } }));
         return;
       case 'form': {
         const { form, values } = r;
@@ -76,5 +82,5 @@ export function useAssistantRequests(): void {
         }
       }
     }
-  }, [request, openPage, navigate, queryClient, setPendingForm]);
+  }, [request, openPage, navigate, queryClient, setPendingForm, setPendingExport]);
 }

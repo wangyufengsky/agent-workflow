@@ -1,4 +1,6 @@
-import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   AssistantToolName,
@@ -8,8 +10,10 @@ import {
   cancelAssistantCallOp,
   confirmAssistantCallOp,
   createConversationOp,
+  createDeckOp,
   createProjectOp,
   ErrorCode,
+  generateDeckOp,
   getProjectOp,
   getSettingsOp,
   listConfirmationsOp,
@@ -17,6 +21,7 @@ import {
   OPENCODE_ASSISTANT_AGENT,
   RoleBaseAgent,
   ServerEventType,
+  SlideLayout,
   sendAssistantMessageOp,
   type TranscriptPage,
   updateSettingsOp,
@@ -30,6 +35,7 @@ import { waitForEvent } from '../../../test/helpers/events.ts';
 import { createTestRepo } from '../../../test/helpers/git.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
 import { addProject, workflowId } from '../../../test/helpers/tasks.ts';
+import { runGit } from '../git/index.ts';
 
 let t: TestApp;
 let mcp: Client;
@@ -335,6 +341,24 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     ]);
   });
 
+  it('没有 Git 的目录（D153）：projects_create 报错并提示初始化；projects_initGit 确认后目录有第一个提交、项目已添加', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'aw-plain-'));
+    writeFileSync(join(dir, 'package.json'), '{}');
+    const refused = await call('projects_create', { repoPath: dir });
+    expect(refused).toMatchObject({ isError: true, body: { code: ErrorCode.ProjectPathNoGit } });
+    expect(String(refused.body.hint)).toContain('projects_initGit');
+
+    const preview = await call('projects_previewGitInit', { repoPath: dir });
+    expect(preview.body).toMatchObject({ files: 2, gitignore: expect.stringContaining('node_modules/') });
+    const { body } = await call('projects_initGit', { repoPath: dir, name: '静态站' });
+    expect(body).toMatchObject({ status: 'needs_confirmation' });
+    expect(existsSync(join(dir, '.git'))).toBe(false);
+
+    const res = await decide(String(body.confirmation_id), 'confirm');
+    expect(res.body).toMatchObject({ result: { ok: true, output: { name: '静态站', defaultBranch: 'main' } } });
+    expect((await runGit(['rev-list', '--count', 'HEAD'], { cwd: dir })).stdout.trim()).toBe('1');
+  });
+
   it('直接执行（总是允许）的路径同样记下产出的对象；失败的调用不记', async () => {
     await t.call(updateSettingsOp, { 'assistant.alwaysAllow': ['projects.create'] });
     const repo = await createTestRepo();
@@ -512,6 +536,53 @@ describe('助手专用工具（A-05）', () => {
     });
     expect(isError).toBe(true);
     expect(body).toMatchObject({ code: ErrorCode.ValidationFailed });
+  });
+
+  it('export_deck：做好的 PPT 由界面导出（推送请求）；没做好的 DECK_NOT_READY、不存在的 DECK_NOT_FOUND', async () => {
+    const writer = { agent: 'aw-slides' };
+    const deckWork = async (start: () => Promise<unknown>) => {
+      const ended = waitForEvent(
+        t.app.events,
+        ServerEventType.AttemptUpdated,
+        (d) => d.attempt.kind.startsWith('deck_') && d.attempt.status === 'succeeded',
+      );
+      await start();
+      await ended;
+      await t.fake.settled();
+    };
+    t.fake.enqueue(
+      script().callTool('submit_outline', {
+        title: '周报',
+        understanding: { audience: '团队同事', duration: '约 5 分钟', assumptions: ['听众了解项目'] },
+        slides: [{ layout: SlideLayout.Cover, title: '周报', points: ['本周进展'] }],
+      }),
+      writer,
+    );
+    let deckId = '';
+    await deckWork(async () => {
+      deckId = (await t.call(createDeckOp, { brief: '周报', materials: [{ kind: 'text', content: '退款改好了' }] }))
+        .body.id;
+    });
+    expect(await call('export_deck', { deckId, format: 'pptx' })).toMatchObject({
+      isError: true,
+      body: { code: ErrorCode.DeckNotReady },
+    });
+
+    t.fake.enqueue(
+      script().callTool('submit_slide', {
+        page: 1,
+        content: { layout: SlideLayout.Cover, title: '周报', subtitle: '本周' },
+      }),
+      writer,
+    );
+    await deckWork(() => t.call(generateDeckOp, { id: deckId }));
+    const requested = waitForEvent(t.app.events, ServerEventType.AssistantExportDeck, () => true);
+    expect((await call('export_deck', { deckId, format: 'pptx' })).body).toEqual({ exporting: true });
+    expect(await requested).toEqual({ conversationId, deckId, format: 'pptx' });
+
+    expect(await call('export_deck', { deckId: 'gone', format: 'pdf' })).toMatchObject({
+      body: { code: ErrorCode.DeckNotFound },
+    });
   });
 
   it('list_files / reveal_file：只限本对话的文件目录', async () => {

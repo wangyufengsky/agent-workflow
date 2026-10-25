@@ -89,6 +89,7 @@ export const ErrorCode = {
   DeckNotFound: 'DECK_NOT_FOUND',
   DeckSlideNotFound: 'DECK_SLIDE_NOT_FOUND',
   DeckBusy: 'DECK_BUSY',
+  DeckNotReady: 'DECK_NOT_READY',
   // Inbox
   InboxItemNotFound: 'INBOX_ITEM_NOT_FOUND',
   InboxItemClosed: 'INBOX_ITEM_CLOSED',
@@ -233,6 +234,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.DeckNotFound]: 404,
   [ErrorCode.DeckSlideNotFound]: 404,
   [ErrorCode.DeckBusy]: 409,
+  [ErrorCode.DeckNotReady]: 409,
   [ErrorCode.InboxItemNotFound]: 404,
   [ErrorCode.InboxItemClosed]: 409,
   [ErrorCode.DeliveryConflict]: 409,

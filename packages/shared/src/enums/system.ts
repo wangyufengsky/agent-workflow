@@ -112,6 +112,7 @@ export const ServerEventType = {
   AssistantNavigate: 'assistant.navigate',
   AssistantOpenForm: 'assistant.open_form',
   AssistantRevealFile: 'assistant.reveal_file',
+  AssistantExportDeck: 'assistant.export_deck',
   /** A knowledge conversation changed: a new turn, a submitted answer, a turn that ended, a deletion (18 §4). */
   KnowledgeUpdated: 'knowledge.updated',
   /** A PPT changed: AI work started or ended, a page was submitted, edited, moved or deleted (23 §8). */
