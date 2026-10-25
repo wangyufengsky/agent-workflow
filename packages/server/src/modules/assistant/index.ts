@@ -21,6 +21,7 @@ import type { TasksService } from '../tasks/index.ts';
 import type { TeamService } from '../team/index.ts';
 import type { WorkflowsService } from '../workflows/index.ts';
 import { createAnalysisRelay } from './assistant.analyses.ts';
+import { createBreakdownRelay } from './assistant.breakdowns.ts';
 import { createConfirmations } from './assistant.confirmations.ts';
 import { createContextRenderer } from './assistant.context.ts';
 import { helperTools } from './assistant.helpers.ts';
@@ -61,9 +62,13 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
   const conversations = createAssistantService({ ...deps, context });
   const taskRelay = createTaskRelay({ ...deps, conversations });
   const analysisRelay = createAnalysisRelay({ ...deps, conversations });
-  // Work the assistant starts and later reports on: tasks (15 §6) and member analyses (33 §6).
-  const run = (conversationId: string, impl: OperationImpl, input: unknown) =>
-    analysisRelay.handles(impl) ? analysisRelay.run(conversationId, input) : taskRelay.run(conversationId, impl, input);
+  const breakdownRelay = createBreakdownRelay({ ...deps, conversations });
+  // Work the assistant starts and later reports on: tasks (15 §6), member analyses (33 §6), initiatives' AI runs (34 §10).
+  const run = (conversationId: string, impl: OperationImpl, input: unknown) => {
+    if (analysisRelay.handles(impl)) return analysisRelay.run(conversationId, input);
+    if (breakdownRelay.handles(impl)) return breakdownRelay.run(conversationId, impl, input);
+    return taskRelay.run(conversationId, impl, input);
+  };
   const confirmations = createConfirmations({
     run,
     ...deps,
@@ -102,7 +107,7 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     service: conversations,
     stopWhisper: whisper.stop,
     async start() {
-      await Promise.all([analysisRelay.start(), taskRelay.start()]);
+      await Promise.all([analysisRelay.start(), breakdownRelay.start(), taskRelay.start()]);
     },
     registry,
     operations: assistantOperations(

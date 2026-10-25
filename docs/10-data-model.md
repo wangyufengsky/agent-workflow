@@ -467,6 +467,18 @@ payload / response：
 
 见 [34-initiatives.md §9、§15.8](34-initiatives.md)，迁移 `0026_initiatives`。需求计划没有状态列，显示状态由下列事实与工作包的任务推导（34 §6）；`breakdown_rev`、`confirmed_rev`、`opened_phase` 只增不减。资料附件为 `attachment_refs`（`owner_kind = initiative`），删除需求计划或项目时释放（项目删除经 `tasks.onProjectDeleted`）。
 
+### assistant_breakdown_followups（34 §10）
+
+助手发起的需求计划 AI 拆解（第一次拆解、重新拆解、细化）：结束后把结果送回发起它的对话，同 `assistant_analysis_followups`（33 §6）。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| attempt_id | TEXT PK | 这次拆解的尝试（`initiative_runs.attempt_id`） |
+| initiative_id | TEXT → initiatives，CASCADE | 索引 |
+| conversation_id | TEXT → assistant_conversations，CASCADE | |
+| reported | INTEGER(bool) | 结果已排进对话，或用户在页面上开始了更新的一次（不再回报） |
+| created_at | INTEGER | |
+
 ### initiative_templates
 
 | 列 | 类型 | 说明 |

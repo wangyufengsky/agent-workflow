@@ -31,6 +31,7 @@ export const PromptName = {
   AssistantKnowledgeFailed: 'assistant-knowledge-failed',
   /** A member analysis the assistant started has ended (33 §6). */
   AssistantTeamAnalysis: 'assistant-team-analysis',
+  AssistantBreakdown: 'assistant-breakdown',
   /** The knowledge researcher's agent prompt, its first message and a follow-up question (18 §5). */
   ProtocolResearch: 'protocol-research',
   StartResearch: 'start-research',
@@ -94,6 +95,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.AssistantKnowledgeAnswered]: read(PromptName.AssistantKnowledgeAnswered),
     [PromptName.AssistantKnowledgeFailed]: read(PromptName.AssistantKnowledgeFailed),
     [PromptName.AssistantTeamAnalysis]: read(PromptName.AssistantTeamAnalysis),
+    [PromptName.AssistantBreakdown]: read(PromptName.AssistantBreakdown),
     [PromptName.ProtocolResearch]: read(PromptName.ProtocolResearch),
     [PromptName.StartResearch]: read(PromptName.StartResearch),
     [PromptName.ResearchFollowUp]: read(PromptName.ResearchFollowUp),
