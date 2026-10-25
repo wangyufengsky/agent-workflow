@@ -2,16 +2,23 @@ import { DatabaseSync } from 'node:sqlite';
 import {
   CredentialKind,
   changeMasterPasswordOp,
+  createDbConnectionOp,
+  DbTlsMode,
+  DbType,
   ErrorCode,
   getEnvironmentOp,
   MasterPasswordState,
   resetMasterPasswordOp,
+  setProjectDbConnectionsOp,
   setupMasterPasswordOp,
   unlockCredentialsOp,
 } from '@aw/shared';
 import { afterEach, describe, expect, it } from 'vitest';
+import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { testCipher } from '../../../test/helpers/cipher.ts';
+import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
+import { addProject, createTask, nodeReaches } from '../../../test/helpers/tasks.ts';
 
 // No cipher: the backend runs like the desktop app on a Linux without a secret service (D74, D167).
 let t: TestApp;
@@ -153,6 +160,43 @@ describe('主密码（D167）', () => {
     expect((await credentials.status()).masterPassword).toBe(MasterPasswordState.None);
     await expect(credentials.create(CredentialKind.GitToken, 'x')).rejects.toMatchObject({
       code: ErrorCode.CredentialUnavailable,
+    });
+  });
+
+  it('锁定时 AI 的数据库工具返回 CREDENTIAL_LOCKED，并提示请用户解锁', async () => {
+    t = await createTestApp();
+    await t.call(setupMasterPasswordOp, { password: 'correct horse' });
+    // Never reached: the password is needed before connecting.
+    const { body: connection } = await t.call(createDbConnectionOp, {
+      name: 'shop-db',
+      type: DbType.Mysql,
+      host: '127.0.0.1',
+      port: 3306,
+      database: 'shop',
+      username: 'app',
+      password: 'db-pass',
+      tlsMode: DbTlsMode.Off,
+    });
+    await restart();
+    const { project } = await addProject(t);
+    await t.call(setProjectDbConnectionsOp, { id: project.id, connectionIds: [connection.id] });
+    t.fake.enqueue(script().hang(), { title: '· 定位根因' });
+    const running = nodeReaches(t, 'locate', 'running');
+    await createTask(t, { projectId: project.id, workflow: 'bugfix' });
+    await running;
+    const [session] = t.fake.sessions;
+    if (session === undefined) throw new Error('No session');
+    const mcp = await connectMcp(t.mcpUrl, t.app.mcpToken);
+
+    const result = await callTool(mcp, 'db_query', {
+      connection: 'shop-db',
+      sql: 'SELECT 1',
+      __aw_session: session.id,
+    });
+    await mcp.close();
+    expect(result).toMatchObject({
+      isError: true,
+      body: { code: ErrorCode.CredentialLocked, hint: expect.stringContaining('ask_user') },
     });
   });
 });

@@ -309,7 +309,7 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 
 输入：`{ connection: string; table?: string }`（`connection` 为连接名称，须是任务项目关联的连接）
 输出：无 table 时 `{ tables: Array<{ name; comment?; rows?: number }> }`（`rows` 为服务器的估计值）；有 table 时 `{ columns: Array<{ name; type; nullable; key?; default?; comment? }>, indexes: Array<{ name; columns: string[]; unique: boolean }> }`（`type` 为完整列类型如 `varchar(64)`，索引按名称排序）
-错误：`DB_CONNECTION_NOT_FOUND`、`DB_CONNECTION_FAILED`、`VALIDATION_FAILED`（表不存在）。
+错误：`DB_CONNECTION_NOT_FOUND`、`DB_CONNECTION_FAILED`、`VALIDATION_FAILED`（表不存在）、`CREDENTIAL_LOCKED`（数据库密码由主密码保护、本次启动还没解锁，D178：hint 让能用 `ask_user` 的步骤请用户在应用顶部解锁后再调用，否则不用数据库继续并在结果里说明）。
 
 ### 6.11 `db_query`
 
@@ -323,7 +323,7 @@ M3 实现了除数据库工具以外的全部工具，数据库工具随 M5-07�
 
 值按 JSON 返回：日期为字符串，`BIGINT` / `DECIMAL` 为字符串（可能超出 JSON 数字精度；SQL Server 的 `DECIMAL` 例外为数字，24 §5），二进制为 `0x` 开头的十六进制（最多 64 字节）。
 输出：`{ columns: string[], rows: unknown[][], truncated: boolean, elapsedMs: number }`
-错误：`DB_QUERY_REJECTED`、`DB_QUERY_TIMEOUT`、`DB_QUERY_FAILED`（`details.driverMessage`）、`DB_CONNECTION_FAILED`、`DB_CONNECTION_NOT_FOUND`。
+错误：`DB_QUERY_REJECTED`、`DB_QUERY_TIMEOUT`、`DB_QUERY_FAILED`（`details.driverMessage`）、`DB_CONNECTION_FAILED`、`DB_CONNECTION_NOT_FOUND`、`CREDENTIAL_LOCKED`（同 §6.10）。
 
 ### 6.12 `submit_answer`（v1.1）
 

@@ -6,13 +6,12 @@ import {
   resetMasterPasswordOp,
   StatusTone,
   setupMasterPasswordOp,
-  unlockCredentialsOp,
 } from '@aw/shared';
 import { type FormEvent, useState } from 'react';
 import { callOperation } from '../../api/client.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
-import { ErrorState } from '../../components/error-state.tsx';
+import { ErrorState, UnlockForm } from '../../components/error-state.tsx';
 import { toast } from '../../components/toast.tsx';
 import { ONBOARDING_COPY } from '../../copy/onboarding.ts';
 import { CheckRow } from './check-row.tsx';
@@ -115,27 +114,6 @@ function ResetButton() {
   );
 }
 
-function UnlockForm() {
-  const [password, setPassword] = useState('');
-  const unlock = useCredentialMutation((p: string) => callOperation(unlockCredentialsOp, { password: p }));
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    unlock.mutate(password, { onSuccess: () => toast(C.unlockDone) });
-  };
-  return (
-    <form className="col" onSubmit={submit} aria-label={C.unlock}>
-      <PasswordField id="master-password-unlock" label={C.password} value={password} onChange={setPassword} />
-      {unlock.isError && <ErrorState error={unlock.error} />}
-      <div className="row">
-        <Button type="submit" size="sm" pending={unlock.isPending} disabled={password === ''}>
-          {C.unlock}
-        </Button>
-        <ResetButton />
-      </div>
-    </form>
-  );
-}
-
 function ChangeForm({ onDone }: { onDone: () => void }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -216,7 +194,9 @@ export function CredentialsCheck({ environment }: { environment: EnvironmentDTO 
       return (
         <CheckRow title={C.title} tone={StatusTone.Warn} badge={C.lockedBadge}>
           <span className="hint">{C.locked}</span>
-          <UnlockForm />
+          <UnlockForm>
+            <ResetButton />
+          </UnlockForm>
         </CheckRow>
       );
     case MasterPasswordState.None:

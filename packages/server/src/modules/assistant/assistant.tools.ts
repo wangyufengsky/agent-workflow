@@ -122,6 +122,8 @@ const COMMON_HINTS: Partial<Record<ErrorCode, string>> = {
     'This session is not an assistant conversation of agent-workflow; do not call these tools.',
   [ErrorCode.McpToolNotAllowed]:
     'This function needs pro mode. Tell the user; they can switch to pro mode in the settings.',
+  [ErrorCode.CredentialLocked]:
+    'Tokens and database passwords are protected by the master password, not entered since the app started. Tell the user to enter it in the bar at the top of the window, then try again.',
 };
 
 function toolResult(output: unknown): CallToolResult {

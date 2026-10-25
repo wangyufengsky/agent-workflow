@@ -15,6 +15,7 @@ import { useSettings } from '../../features/settings/settings.queries.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { NAV_ITEMS, navItemsFor } from '../navigation.ts';
 import { ROUTES } from '../routes.ts';
+import { CredentialsBanner } from './credentials-banner.tsx';
 import { InboxButton } from './inbox-button.tsx';
 import { NavLink } from './nav-link.tsx';
 import { RuntimeChip } from './runtime-chip.tsx';
@@ -137,6 +138,7 @@ export function AppShell() {
           />
           <ThemeSwitch />
         </header>
+        <CredentialsBanner />
         <main className="content">
           <PreviewBinding />
           <Outlet />

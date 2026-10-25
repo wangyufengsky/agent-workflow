@@ -16,6 +16,9 @@ import { defineMcpTool } from '../mcp.registry.ts';
 
 const ALL_KINDS = [AttemptKind.Plan, AttemptKind.Execute, AttemptKind.Review, AttemptKind.Research];
 const UNKNOWN_CONNECTION_HINT = 'Call db_list_connections and use one of the names it returns.';
+/** Unattended runs (schedules, batches) must not end quietly without the database (D178). */
+const LOCKED_HINT =
+  'The database password is protected by the master password, which the user has not entered since the app started. If you can call ask_user, ask the user to unlock it in the app (the bar at the top of the window) and call this tool again after the answer; otherwise continue without the database and say in your result that its password was locked.';
 
 export const dbListConnectionsTool = (tasks: TasksService, knowledge: KnowledgeService) =>
   defineMcpTool({
@@ -40,6 +43,7 @@ export const dbDescribeTool = (tasks: TasksService, knowledge: KnowledgeService)
       [ErrorCode.DbConnectionNotFound]: UNKNOWN_CONNECTION_HINT,
       [ErrorCode.ValidationFailed]: 'Call db_describe without table to list the tables, then pick one.',
       [ErrorCode.DbConnectionFailed]: 'The database cannot be reached; continue without it and say so in your result.',
+      [ErrorCode.CredentialLocked]: LOCKED_HINT,
     },
     handler: ({ connection, table }, { attempt }) =>
       attempt.kind === AttemptKind.Research
@@ -63,6 +67,7 @@ export const dbQueryTool = (tasks: TasksService, knowledge: KnowledgeService) =>
       [ErrorCode.DbQueryTimeout]: 'Narrow the query (WHERE, LIMIT, indexed columns) and try again.',
       [ErrorCode.DbQueryFailed]: 'Fix the SQL using details.driverMessage; db_describe shows the table structure.',
       [ErrorCode.DbConnectionFailed]: 'The database cannot be reached; continue without it and say so in your result.',
+      [ErrorCode.CredentialLocked]: LOCKED_HINT,
     },
     handler: (input, { attempt }) =>
       attempt.kind === AttemptKind.Research ? knowledge.dbQuery(attempt, input) : tasks.dbQuery(attempt, input),

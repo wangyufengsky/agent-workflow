@@ -5,6 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium, type ElectronApplication, _electron as electron, expect, type Page, test } from '@playwright/test';
+import { createRepo, MIN_WINDOW } from './helpers.ts';
 
 /** The desktop app's `electron` dependency resolves to the path of its executable. */
 const electronPath: string = createRequire(join(process.cwd(), 'apps/desktop/package.json'))('electron');
@@ -101,4 +102,95 @@ test.describe('Linux 凭据存储（D167）', () => {
       await second.app.close();
     }
   });
+});
+
+/** The backend as the renderer calls it, with the app's own token. */
+function send(page: Page, method: string, path: string, body: unknown): Promise<void> {
+  return page.evaluate(
+    async ({ method, path, body }) => {
+      const res = await fetch(`/api/v1${path}`, {
+        method,
+        headers: { Authorization: `Bearer ${window.aw?.apiToken ?? ''}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`${method} ${path} failed: ${res.status}`);
+    },
+    { method, path, body },
+  );
+}
+
+async function open(userDataDir: string): Promise<{ app: ElectronApplication; page: Page }> {
+  const app = await electron.launch({ args: ['apps/desktop', `--user-data-dir=${userDataDir}`] });
+  const page = await app.firstWindow();
+  // The opening animation is a data: page that a click skips (28 §5); then the app loads from the backend.
+  await page.mouse.click(10, 10);
+  await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 60_000 });
+  return { app, page };
+}
+
+/** A project, a master password and the given settings; the app started again, so the password is locked. */
+async function openLocked(prefix: string, settings: Record<string, unknown> = {}) {
+  const userDataDir = mkdtempSync(join(tmpdir(), prefix));
+  const first = await open(userDataDir);
+  try {
+    await send(first.page, 'POST', '/credentials/master-password', { password: 'correct horse' });
+    await send(first.page, 'POST', '/projects', { repoPath: createRepo() });
+    await send(first.page, 'PATCH', '/settings', settings);
+  } finally {
+    await first.app.close();
+  }
+  return open(userDataDir);
+}
+
+// Whatever the key store: a master password set earlier is locked again at every start (D167). Every page then says
+// so and unlocks in place (D178).
+test('主密码锁定时每个页面顶部提示，就地解锁', async () => {
+  const { app, page } = await openLocked('aw-e2e-locked-banner-');
+  try {
+    const banner = page.getByRole('region', { name: '凭据存储' });
+    await expect(banner).toContainText('本次启动还没有解锁');
+    await banner.getByLabel('主密码', { exact: true }).fill('wrong horse');
+    await banner.getByRole('button', { name: '解锁' }).click();
+    await expect(banner.getByRole('alert')).toBeVisible();
+    await banner.getByLabel('主密码', { exact: true }).fill('correct horse');
+    await banner.getByRole('button', { name: '解锁' }).click();
+    await expect(banner).toBeHidden();
+  } finally {
+    await app.close();
+  }
+});
+
+// The unlock under an error often sits in the form that failed (a database connection, a token): unlocking must not
+// submit that form again. Saving answers CREDENTIAL_LOCKED here on every platform, as on a Linux without a key store.
+test('表单里的错误就地解锁，不会再次提交表单', async () => {
+  const { app, page } = await openLocked('aw-e2e-locked-form-', { 'ui.mode': 'pro' });
+  try {
+    let saves = 0;
+    await page.route('**/api/v1/db-connections', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      saves += 1;
+      return route.fulfill({
+        status: 423,
+        json: { error: { code: 'CREDENTIAL_LOCKED', message: 'Master password not entered since start' } },
+      });
+    });
+    // The connection form with its error and the unlock is taller than the smallest window: the dialog scrolls (14 §2).
+    await app.evaluate(({ BrowserWindow }, { width, height }) => {
+      BrowserWindow.getAllWindows()[0]?.setSize(width, height);
+    }, MIN_WINDOW);
+    await page.goto(new URL('/databases', page.url()).href);
+    await page.getByRole('button', { name: '添加连接' }).first().click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('名称').fill('shop-db');
+    await dialog.getByLabel('主机').fill('127.0.0.1');
+    await dialog.getByLabel('数据库', { exact: true }).fill('shop');
+    await dialog.getByLabel('用户名').fill('app');
+    await dialog.getByRole('button', { name: '保存' }).click();
+    await dialog.getByLabel('主密码', { exact: true }).fill('correct horse');
+    await dialog.getByRole('button', { name: '解锁' }).click();
+    await expect(dialog).toContainText('已解锁，请再试一次');
+    expect(saves).toBe(1);
+  } finally {
+    await app.close();
+  }
 });
