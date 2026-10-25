@@ -49,6 +49,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+      # The browser module's tests drive a real Chromium (headless shell, docs/07 §4 createChromiumHost).
+      - run: pnpm exec playwright install --only-shell --with-deps chromium
       # The database tests run on both architectures. SQL Server and openGauss publish x64 images only: on arm64 they
       # are not pulled and their cases skip (test/helpers/db-containers.ts); x64 covers them (docs/24 §7).
       - name: test:int
@@ -127,11 +129,18 @@ jobs:
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: pnpm build
       - name: Electron launch smoke (virtual display)
+        id: smoke
         run: xvfb-run -a pnpm e2e:smoke
-      # Each runner packages its own architecture, the one the smoke above ran on.
+      - name: Upload smoke traces
+        if: ${{ !cancelled() && steps.smoke.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-results-${{ matrix.os }}
+          path: test-results/
+      # Each runner packages its own architecture, the one the smoke above ran on (electron-builder.yml names no arch).
       - name: Package (AppImage + deb)
         if: ${{ !cancelled() }}
-        run: pnpm dist --${{ runner.arch == 'ARM64' && 'arm64' || 'x64' }}
+        run: pnpm dist
       - name: Upload installers
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

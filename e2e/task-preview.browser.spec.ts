@@ -109,7 +109,7 @@ test('助手打开任务的预览页签（29 §2.6）', async ({ page, request }
   ]);
 
   await page.goto(`/tasks/${task.id}`);
-  await page.getByRole('button', { name: '打开助手（⌘J）' }).click();
+  await page.getByRole('button', { name: /^打开助手/ }).click();
   const panel = page.getByRole('complementary', { name: '应用助手' });
   // A conversation of its own: the backend is shared with the other specs.
   await panel.getByRole('button', { name: '新对话', exact: true }).click();

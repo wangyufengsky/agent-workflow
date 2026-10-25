@@ -133,7 +133,7 @@ Linux 上没有识别到密钥服务时，Chromium 退回 `basic_text`：用写�
 | --- | --- | --- |
 | macOS | dmg arm64 | 不变 |
 | Windows | NSIS x64，`oneClick: false`、可改安装目录、按用户安装 | 未签名：SmartScreen 提示「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」 |
-| Linux | AppImage 与 deb，各 x64、arm64（D160） | 未签名。应用不打包原生模块，两种架构在任一台机器上都能打；CI 在各自架构的运行器上用 `pnpm dist --x64` / `--arm64` 只打本机架构。deb 包名与可执行文件名 `agent-workflow`，维护者字段取 `linux.maintainer`；electron-builder 的默认 deb 依赖已含 `libsecret-1-0`（凭据存储，§3.6） |
+| Linux | AppImage 与 deb，各 x64、arm64（D160） | 未签名。配置里不写架构：`pnpm dist` 打本机架构，`pnpm dist --x64 --arm64` 两种都打（配置里写了架构会盖过命令行参数）。应用不打包原生模块，两种架构在任一台机器上都能打；CI 在各自架构的运行器上只打本机架构，与 Electron 冒烟同一架构。deb 包名与可执行文件名 `agent-workflow`，维护者字段取 `linux.maintainer`；electron-builder 的默认 deb 依赖已含 `libsecret-1-0`（凭据存储，§3.6） |
 
 - 图标：`build/icon.svg` 渲染出 `build/icon.png`（1024 px），Windows（转 ico）与 Linux 使用；macOS 仍用 `icon.icns`。
 - `pnpm dist` 构建当前平台的安装包（`electron-builder` 不带平台参数，按各平台的 `target` 配置），CI 在各自的 runner 上运行。

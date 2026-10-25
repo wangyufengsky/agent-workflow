@@ -64,7 +64,7 @@ pnpm dev
 | `pnpm test:oc` | 真实 opencode 的集成测试（只有 bridge 插件测试调用模型） |
 | `pnpm test:live` | 真实模型跑五个内置流程（手动，约一小时；报告写到 `live/reports/`） |
 | `pnpm perf` | 性能实测：20 节点画布帧率、5 MB 会话流首屏、10 个并发任务（结果写到 `perf-results/`） |
-| `pnpm dist` | 打包当前平台的安装包（macOS dmg arm64、Windows NSIS x64、Linux AppImage 与 deb，x64 与 arm64，用 `pnpm dist --x64` / `--arm64` 只打其一；未签名，输出到 `apps/desktop/release/`） |
+| `pnpm dist` | 打包当前平台的安装包（macOS dmg arm64、Windows NSIS x64、Linux AppImage 与 deb，默认本机架构，`pnpm dist --x64 --arm64` 两种都打；未签名，输出到 `apps/desktop/release/`） |
 
 ## 架构入口
 

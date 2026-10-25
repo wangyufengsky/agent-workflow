@@ -60,6 +60,7 @@ function Panel({ open, onClosed }: { open: boolean; onClosed: () => void }) {
         <IconButton
           icon="plus"
           label={C.newConversation}
+          disabled={create.isPending}
           onClick={() => create.mutate(undefined, { onSuccess: (c) => setActive(c.id) })}
         />
         {active !== undefined && (
@@ -81,7 +82,7 @@ function Panel({ open, onClosed }: { open: boolean; onClosed: () => void }) {
           <MessageList key={active.id} conversation={active} />
         )}
       </div>
-      <Composer conversation={active} inputRef={input} />
+      <Composer conversation={active} inputRef={input} disabled={create.isPending} />
       {active !== undefined && deleting && (
         <Dialog
           open

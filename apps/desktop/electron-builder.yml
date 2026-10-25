@@ -44,13 +44,12 @@ linux:
   executableName: agent-workflow
   category: Development
   maintainer: wangyufeng (https://github.com/wangyufengsky/agent-workflow)
-  # x64 and arm64 (D160). No native modules are packaged, so either architecture builds on either machine; CI builds
-  # each on its own runner (`pnpm dist --x64` / `--arm64`) so the Electron smoke runs on the same architecture.
+  # x64 and arm64 (D160). No arch here: `pnpm dist` builds the machine's own architecture (an arch listed here would
+  # win over the command line), `pnpm dist --x64 --arm64` builds both; no native modules are packaged, so either
+  # builds anywhere. CI packages each on its own runner, where the Electron smoke ran.
   target:
-    - target: AppImage
-      arch: [x64, arm64]
-    - target: deb
-      arch: [x64, arm64]
+    - AppImage
+    - deb
 appImage:
   artifactName: agent-workflow-${version}-${arch}.${ext}
 deb:

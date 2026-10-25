@@ -153,7 +153,19 @@ test('没有 Git 的目录：确认卡片列出初始化要做的事与将纳入
   await expect(page.getByRole('main').getByRole('heading', { name: '设置' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
+  // Until the new conversation exists the input is disabled: what is typed must not go to the one still shown.
+  let releaseCreate = () => {};
+  const createHeld = new Promise<void>((resolve) => {
+    releaseCreate = resolve;
+  });
+  await page.route('**/assistant/conversations', async (route) => {
+    if (route.request().method() === 'POST') await createHeld;
+    await route.continue();
+  });
   await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  await expect(panel.getByLabel('发给助手的消息')).toBeDisabled();
+  releaseCreate();
+  await expect(panel.getByTestId('assistant-user-message')).toHaveCount(0);
   await panel.getByLabel('发给助手的消息').fill(`把 ${dir} 加成项目`);
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
 

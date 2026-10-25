@@ -178,7 +178,7 @@ export function CompanionPage() {
                 <MessageList key={conversation.id} conversation={conversation} />
               )}
             </div>
-            <Composer conversation={conversation} inputRef={input} />
+            <Composer conversation={conversation} inputRef={input} disabled={create.isPending} />
           </section>
         )}
         {notice !== undefined && (
