@@ -1,4 +1,4 @@
-import type { AwBridge, BrowserShortcut } from '@aw/shared';
+import type { AwBridge, BrowserPrompt, BrowserShortcut } from '@aw/shared';
 import { contextBridge, ipcRenderer } from 'electron';
 import { companionBridge } from './companion.ts';
 
@@ -33,6 +33,14 @@ const bridge: AwBridge = {
     forward: (tabId) => ipcRenderer.send('aw:browser-forward', tabId),
     reload: (tabId) => ipcRenderer.send('aw:browser-reload', tabId),
     openDevTools: (tabId) => ipcRenderer.send('aw:browser-openDevTools', tabId),
+    onPrompt: (listener) => {
+      const receive = (_event: Electron.IpcRendererEvent, prompt: BrowserPrompt) => listener(prompt);
+      ipcRenderer.on('aw:browser-prompt', receive);
+      return () => {
+        ipcRenderer.removeListener('aw:browser-prompt', receive);
+      };
+    },
+    answerPrompt: (answer) => ipcRenderer.send('aw:browser-prompt-answer', answer),
   },
 };
 

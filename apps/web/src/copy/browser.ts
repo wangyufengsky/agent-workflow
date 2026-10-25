@@ -38,6 +38,11 @@ export const WEBSITES_COPY = {
   save: '保存规则',
   saved: '网站规则已保存',
   none: '没有规则：AI 不能打开任何网站。',
+  queryPaths: '允许提交的查询路径',
+  queryPathsPlaceholder: '允许提交的查询路径，如 /api/search, /rest/*/query',
+  queryPathsHint:
+    '只读网站上，AI 发往「允许提交的查询路径」的 POST 照常发出（用 POST 做查询的老系统需要），其他写请求仍被拦下。只填确定只是查询的路径：应用不检查请求内容。',
+  rulesInvalid: '地址只能写主机名（可以用 *）；查询路径要以 / 开头，用逗号分隔，不带 ? 和 #。',
   login: '网站登录',
   loginLede: '需要登录的网站，在这里自己登录一次，AI 会用这个登录状态浏览；应用从不保存或填写密码。',
   loginUrl: '网站地址',
@@ -48,6 +53,29 @@ export const WEBSITES_COPY = {
   loginsNone: '还没有登录过的网站。',
   logout: '退出登录',
   loggedOut: (host: string) => `已退出 ${host}`,
+  loginsHint: 'HTTP 认证（用户名和密码框）与客户端证书的登录不在这个列表里：只保留到退出应用，之后需要重新登录。',
+  integratedAuth: 'Windows 集成登录的服务器',
+  integratedAuthHint:
+    '用逗号分隔，如 *.corp.example.com, wiki.corp。这些服务器要求 Windows 集成登录（NTLM / Kerberos）时，应用直接用你登录系统的身份，AI 打开时也一样；不在这里的服务器会弹出用户名和密码框。',
+  integratedAuthInvalid: '只能写主机名，可以用 *，不能只写 *。',
+} as const;
+
+/** What a website asks of the user's own tab (29 §5.4): an HTTP login or a client certificate. */
+export const WEBSITE_PROMPT_COPY = {
+  loginTitle: (host: string) => `登录 ${host}`,
+  proxyTitle: (host: string) => `登录代理服务器 ${host}`,
+  loginLede: (realm: string) =>
+    `${realm === '' ? '这个网站' : `「${realm}」`}要求输入用户名和密码。密码只交给这个网站，应用不保存；退出应用前，AI 打开这个网站时沿用这次登录。`,
+  username: '用户名',
+  password: '密码',
+  login: '登录',
+  cancel: '取消',
+  certificateTitle: (host: string) => `为 ${host} 选择证书`,
+  certificateLede: '这个网站要求客户端证书。退出应用前，AI 打开这个网站时沿用你选的证书。',
+  certificateNone: '系统里没有可用的证书。',
+  issuer: (issuer: string) => `颁发者：${issuer}`,
+  expires: (date: string) => `有效期至 ${date}`,
+  useCertificate: '使用这个证书',
 } as const;
 
 /** The task page's preview tab (29 §8.1–§8.2). */

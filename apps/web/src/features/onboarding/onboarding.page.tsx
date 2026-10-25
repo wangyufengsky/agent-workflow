@@ -11,6 +11,7 @@ import { AddProjectForm } from '../projects/add-project-form.tsx';
 import { useUpdateSettings } from '../settings/settings.queries.ts';
 import { CheckRow } from './check-row.tsx';
 import { CopyCommand } from './copy-command.tsx';
+import { CredentialsCheck } from './credentials-check.tsx';
 import { environmentQuery, useRecheckEnvironment } from './environment.queries.ts';
 
 function GitCheck({ git, platform }: { git: EnvironmentDTO['git']; platform: Platform }) {
@@ -102,24 +103,6 @@ function ModelsCheck({ environment }: { environment: EnvironmentDTO }) {
     <CheckRow title={C.models.title} tone={StatusTone.Wait} badge={C.models.pendingBadge}>
       <span className="hint">{C.models.pending}</span>
       <CopyCommand command={C.models.fix} />
-    </CheckRow>
-  );
-}
-
-/** Secrets need an OS key store; without one only storing tokens and passwords fails, so this is a warning (D74). */
-function CredentialsCheck({ environment }: { environment: EnvironmentDTO }) {
-  if (environment.credentials.available) {
-    return (
-      <CheckRow title={C.credentials.title} tone={StatusTone.Ok} badge={C.ready}>
-        <span className="hint">{C.credentials.available}</span>
-      </CheckRow>
-    );
-  }
-  const fix = C.credentials.fix[environment.platform];
-  return (
-    <CheckRow title={C.credentials.title} tone={StatusTone.Warn} badge={C.credentials.unavailableBadge}>
-      <span className="hint">{C.credentials.unavailable}</span>
-      {fix !== null && <CopyCommand command={fix} />}
     </CheckRow>
   );
 }

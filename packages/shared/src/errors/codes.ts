@@ -111,6 +111,11 @@ export const ErrorCode = {
   DbQueryFailed: 'DB_QUERY_FAILED',
   // 凭据
   CredentialUnavailable: 'CREDENTIAL_UNAVAILABLE',
+  CredentialLocked: 'CREDENTIAL_LOCKED',
+  CredentialLost: 'CREDENTIAL_LOST',
+  MasterPasswordIncorrect: 'MASTER_PASSWORD_INCORRECT',
+  MasterPasswordExists: 'MASTER_PASSWORD_EXISTS',
+  MasterPasswordNotSet: 'MASTER_PASSWORD_NOT_SET',
   // 页面预览与浏览器（29）
   PreviewNotConfigured: 'PREVIEW_NOT_CONFIGURED',
   PreviewStartFailed: 'PREVIEW_START_FAILED',
@@ -252,6 +257,11 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.DbQueryTimeout]: 504,
   [ErrorCode.DbQueryFailed]: 400,
   [ErrorCode.CredentialUnavailable]: 500,
+  [ErrorCode.CredentialLocked]: 423,
+  [ErrorCode.CredentialLost]: 409,
+  [ErrorCode.MasterPasswordIncorrect]: 400,
+  [ErrorCode.MasterPasswordExists]: 409,
+  [ErrorCode.MasterPasswordNotSet]: 409,
   [ErrorCode.PreviewNotConfigured]: 409,
   [ErrorCode.PreviewStartFailed]: 502,
   [ErrorCode.PreviewLimitReached]: 409,

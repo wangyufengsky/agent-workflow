@@ -28,6 +28,11 @@ export const browserPortOpSchema = z.discriminatedUnion('kind', [
       .object({ width: z.number().int().min(1), height: z.number().int().min(1), mobile: z.boolean() })
       .nullable(),
     policy: browserPolicySchema,
+    /**
+     * Servers the tab's partition logs in to with the user's system login (NTLM / Negotiate, 29 §5.4). It holds for
+     * the whole partition, so each open sets it again; only the websites' partition has any.
+     */
+    integratedAuthServers: z.array(z.string()),
   }),
   /** The preview's origin changes when it restarts on another port. */
   z.object({ kind: z.literal('setPolicy'), tabId: tabIdSchema, policy: browserPolicySchema }),
@@ -80,6 +85,11 @@ export const browserPortEventSchema = z.discriminatedUnion('type', [
     source: z.string(),
     cleanupError: z.string().optional(),
   }),
+  /**
+   * A website (`host:port`) asked one of the AI's tabs for a client certificate: main gave none and stopped the load,
+   * since only the user chooses one in their own tab (29 §5.4). The backend reports that the website asks to log in.
+   */
+  z.object({ type: z.literal('browser.certificateRefused'), tabId: tabIdSchema, host: z.string() }),
   /** The tab's renderer is gone or the view was destroyed; the backend drops the tab. */
   z.object({ type: z.literal('browser.gone'), tabId: tabIdSchema, reason: z.string() }),
 ]);

@@ -10,6 +10,7 @@ import { useAssistantRequests } from '../../features/assistant/assistant-request
 import { useAssistantHandoff } from '../../features/assistant/handoff.ts';
 import { PreviewBinding } from '../../features/assistant/preview-binding.tsx';
 import { DEFAULT_START_WORKFLOW } from '../../features/home/workflow-icon.ts';
+import { WebsitePrompts } from '../../features/preview/website-prompt.tsx';
 import { useSettings } from '../../features/settings/settings.queries.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { NAV_ITEMS, navItemsFor } from '../navigation.ts';
@@ -144,6 +145,7 @@ export function AppShell() {
       {/* Floats over the page and plays its own open and close (D84), so it stays mounted. */}
       <AssistantPanel />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} items={paletteItems} />
+      <WebsitePrompts />
     </div>
   );
 }

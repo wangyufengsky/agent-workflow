@@ -319,7 +319,7 @@ export function taskOperations(tasks: TasksService) {
 ## 9. 安全边界
 
 - renderer：`contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`、CSP `default-src 'self'`；主窗口禁止导航到应用以外的地址、禁止 `window.open`。
-- 凭据（Git 令牌、数据库密码）：经 main 的 safeStorage 加密后存 SQLite，只在使用时解密；不写日志、不进 DTO、不进 MCP 返回值。
+- 凭据（Git 令牌、数据库密码）：经 main 的 safeStorage 加密后存 SQLite（Linux 没有密钥服务时改用主密码，由后端 credentials 模块加密，D167），只在使用时解密；不写日志、不进 DTO、不进 MCP 返回值。
 - opencode 会话：`directory` 为任务 worktree；`external_directory: deny`；edit 允许；bash 按角色基线（见 13-builtin-workflows）。
 - 执行 MCP：独立令牌；每次调用根据 sessionID 解析到唯一的活动尝试，工具按尝试类型授权。
 - Git：所有调用设置 `LC_ALL=C`（D37），参数数组传参。

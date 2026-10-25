@@ -28,14 +28,16 @@ export const updateSettingsOp = defineOperationContract({
   expose: { palette: false, assistant: true },
   credentialFields: [],
   // Stays with the user (D65): approving its own calls, the program the app starts, letting executors run any
-  // command, and where worktrees are written; whom the backend trusts and where its requests go (D164, D165). Once
-  // settings.update is always allowed, no card would show for these.
+  // command, where worktrees are written, which websites the AI opens and which servers get the user's system login;
+  // whom the backend trusts and where its requests go (D164, D165). Once settings.update is always allowed, no card
+  // would show for these.
   assistantOmit: [
     'assistant.alwaysAllow',
     'opencode.binaryPath',
     'ai.bashPolicy',
     'worktree.rootDir',
     'browser.sites',
+    'browser.integratedAuthServers',
     'network.extraCaCerts',
     'network.proxy',
     'network.noProxy',

@@ -115,6 +115,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DbType` | `mysql` · `postgresql` · `opengauss`（openGauss / GaussDB）· `sqlserver` · `goldendb`（MySQL 协议）（v1.2，24 §1） |
 | `DbTlsMode` | `off`（不加密）· `verify`（加密并校验证书链与主机名，信任列表同 D164）· `no_verify`（加密但不校验证书）（D166，24 §2） |
 | `CredentialKind` | `git_token` · `db_password` |
+| `CredentialSeal` | `system` · `master_password` · `discarded` | 凭据由什么加密（D167）：系统密钥服务、主密码；`discarded` 为主密码重置后已清除、需要重新填写 |
+| `MasterPasswordState` | `none` · `locked` · `unlocked` | 主密码（D167）：没设置、设置了但本次启动还没输入、已解锁 |
 | `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` · `confirmation` · `attachment` · `entity_ref` · `chart`（后四种仅助手对话，10 §3；`chart` 见 35 §4） |
 | `TranscriptSystemEvent` | `attempt_started` · `nudged` · `retrying` · `result_submitted` · `awaiting_input`（等待用户回答或授权）· `timed_out` · `aborted` · `runtime_lost` · `assistant_isolated`（旧助手会话切换到独立目录；`system` 会话流条目记录的事件，文案在前端） |
 | `McpToolName` | 执行 MCP 工具名（12 §6）；`ATTEMPT_SUBMIT_TOOL` 为每种尝试的提交工具 |
@@ -274,6 +276,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ASSISTANT_DIR` / `ASSISTANT_FILES_DIR` / `ASSISTANT_CONVERSATIONS_DIR` | `assistant` / `files` / `conversations` | 助手会话工作目录 `<数据目录>/assistant/files/<id>/`，对话文件相对该目录，消息流 `conversations/<id>.jsonl` |
 | `KNOWLEDGE_DOC_DIRS` / `KNOWLEDGE_DOC_EXTENSIONS` | `docs` `doc` / `.md` `.mdx` `.markdown` `.txt` `.rst` `.adoc` | 被引用的文件位于这些目录下或带这些扩展名时为文档，否则为代码（18 §6.1） |
 | `PROJECT_CHECK_PLACEHOLDER` | `$PROJECT_CHECK` | 验收命令中代表项目检查命令，物化节点时替换（13 §1） |
+| `MASTER_PASSWORD_SCRYPT` | `{ N: 2^17, r: 8, p: 1 }` | 新设主密码时的 scrypt 参数（约 128 MiB、半秒一次，D167）；每个主密码记下自己用的参数 |
 | `GIT_COMMIT_IDENTITY` | `agent-workflow <agent-workflow@localhost>` | 节点完成时后端提交的作者与提交者（09 §3）；为没有 Git 的目录初始化时，git 没有配置身份也用它（D153） |
 | `GIT_INIT_BRANCH` / `GIT_INIT_COMMIT_MESSAGE` | `main` / `Initial commit` | 为没有 Git 的目录初始化时的分支与第一个提交的说明（D153，11 §3） |
 
@@ -306,6 +309,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ACCEPTANCE_COMMAND_TIMEOUT_MS` | 600000 |
 | `ACCEPTANCE_OUTPUT_MAX_CHARS` | 20000（验收命令输出保留末尾这么多字符） |
 | `DB_QUERY_MAX_ROWS` | 200 |
+| `MASTER_PASSWORD_MIN_LENGTH` / `MASTER_PASSWORD_MAX_LENGTH` | 8 / 1,024（主密码的字符数，D167） |
 | `DB_QUERY_TIMEOUT_MS` | 15000 |
 | `DB_CONNECT_TIMEOUT_MS` | 10000（建立到项目数据库的连接） |
 | `TRANSCRIPT_PAGE_SIZE` | 200 |
@@ -408,8 +412,9 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `companion.notifications` | `true`（后台系统通知；应用内提醒独立显示） | 简单 |
 | `preview.maxRunning` | `3`（同时运行的页面预览，29 §4.4） | 专业 |
 | `preview.idleMinutes` | `10`（没有标签页、没有活动尝试多久后停止预览） | 专业 |
-| `browser.sites` | `[{ pattern: '*', access: 'read' }]`（网站规则，按顺序取第一条匹配，无匹配不允许；助手不能修改，D65 的同一思路，29 §5.4） | 简单 |
+| `browser.sites` | `[{ pattern: '*', access: 'read', queryPaths: [] }]`（网站规则，按顺序取第一条匹配，无匹配不允许；只读规则的 `queryPaths` 为放行 POST 的查询路径，缺省为空，D173；助手不能修改，D65 的同一思路，29 §5.4） | 简单 |
 | `browser.loginUrlPatterns` | `[]`（内置规则之外识别登录页的主机或路径片段） | 专业 |
+| `browser.integratedAuthServers` | `[]`（网站分区用系统身份做 Windows 集成登录的服务器，主机名通配，不能只写 `*`；助手不能修改，D171，29 §5.4） | 专业 |
 | `network.extraCaCerts` | `null`（PEM，一张或多张；后端与 opencode 在内置根证书与系统证书库之外再信任它们；边界检查 PEM 结构，后端保存前逐张解析；助手不能修改，D164） | 专业 |
 | `network.proxy` | `null`（`http(s)://主机:端口`，不含账号密码；`null` 时用环境变量 `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`；助手不能修改，D165） | 专业 |
 | `network.noProxy` | `[]`（`network.proxy` 生效时直连的主机，`.corp.example` 匹配子域名；本机地址总是直连；助手不能修改，D165） | 专业 |
@@ -560,7 +565,12 @@ class AppError extends Error {
 | `DB_QUERY_TIMEOUT` | 504 | |
 | `DB_QUERY_FAILED` | 400 | SQL 错误；`details.driverMessage` |
 | **凭据** | | |
-| `CREDENTIAL_UNAVAILABLE` | 500 | safeStorage 不可用或解密失败 |
+| `CREDENTIAL_UNAVAILABLE` | 500 | 没有可用的加密方式（safeStorage 不可用且没有设置主密码），或解密失败 |
+| `CREDENTIAL_LOCKED` | 423 | 凭据由主密码保护，本次启动还没解锁（D167）；保存新凭据时系统密钥服务不可用、主密码已锁定也是此码 |
+| `CREDENTIAL_LOST` | 409 | 凭据在主密码重置时已清除，需要重新填写 |
+| `MASTER_PASSWORD_INCORRECT` | 400 | 解锁或修改时主密码不对 |
+| `MASTER_PASSWORD_EXISTS` | 409 | 已经设置过主密码 |
+| `MASTER_PASSWORD_NOT_SET` | 409 | 解锁或修改时还没有设置主密码 |
 | `PREVIEW_NOT_CONFIGURED` | 409 | 项目没有页面预览配置（29 §4.1）；浏览器工具打开预览路径时同此码 |
 | `PREVIEW_START_FAILED` | 502 | 页面预览没能就绪（进程退出或超时）；`details: { logTail }` |
 | `PREVIEW_LIMIT_REACHED` | 409 | 同时运行的预览已达 `preview.maxRunning`，且都有标签页在用（29 §4.4）；`details: { maxRunning, taskIds }`，`taskIds` 为占用中的任务 |

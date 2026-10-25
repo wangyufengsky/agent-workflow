@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { siteRuleSchema } from '../browser/policy.ts';
+import { integratedAuthServerSchema, siteRuleSchema } from '../browser/policy.ts';
 import { SiteAccess } from '../enums/browser.ts';
 import { DeliveryStrategy, localMergeStrategySchema } from '../enums/git.ts';
 import { BashPolicy, bashPolicySchema } from '../enums/system.ts';
@@ -65,6 +65,8 @@ export const settingsSchema = z.strictObject({
   'browser.sites': z.array(siteRuleSchema),
   /** Host or path fragments that mark a login page, besides the built-in ones (29 §5.4). */
   'browser.loginUrlPatterns': z.array(z.string().min(1)),
+  /** Servers the websites' partition logs in to with the user's system login, NTLM / Negotiate (29 §5.4). */
+  'browser.integratedAuthServers': z.array(integratedAuthServerSchema),
   /** CAs trusted besides the built-in roots and the system store (D164); null: none. */
   'network.extraCaCerts': pemCertificatesSchema.nullable(),
   /** Replaces the proxy environment variables when set (D165); null: they apply. */
@@ -104,8 +106,9 @@ export const SETTING_DEFAULTS: Settings = {
   'companion.notifications': true,
   'preview.maxRunning': 3,
   'preview.idleMinutes': 10,
-  'browser.sites': [{ pattern: '*', access: SiteAccess.Read }],
+  'browser.sites': [{ pattern: '*', access: SiteAccess.Read, queryPaths: [] }],
   'browser.loginUrlPatterns': [],
+  'browser.integratedAuthServers': [],
   'network.extraCaCerts': null,
   'network.proxy': null,
   'network.noProxy': [],
@@ -140,6 +143,7 @@ export const SETTING_MODE: Record<SettingKey, UiMode> = {
   'preview.idleMinutes': UiMode.Pro,
   'browser.sites': UiMode.Simple,
   'browser.loginUrlPatterns': UiMode.Pro,
+  'browser.integratedAuthServers': UiMode.Pro,
   'network.extraCaCerts': UiMode.Pro,
   'network.proxy': UiMode.Pro,
   'network.noProxy': UiMode.Pro,

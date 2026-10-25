@@ -21,6 +21,10 @@
 | GET | `/system/health` | `{ status: 'ok', appVersion, node }`：后台存活、应用版本（`AW_APP_VERSION`，桌面包的版本号）与 Node.js 版本；「设置 → 关于」显示 |
 | GET | `/system/environment` | 环境检测结果 `EnvironmentDTO` |
 | POST | `/system/environment/recheck` | 重新检测（安装 opencode 后用） |
+| POST | `/credentials/master-password` | `credentials.setupMasterPassword`（write）：`{ password }`（凭据字段，8–1024 个字符）→ `CredentialStatusDTO`，设置后即为已解锁；已设置 409 `MASTER_PASSWORD_EXISTS`（D167） |
+| POST | `/credentials/master-password/unlock` | `credentials.unlock`（write）：`{ password }`（凭据字段）→ `CredentialStatusDTO`；主密码不对 400 `MASTER_PASSWORD_INCORRECT`，没设置 409 `MASTER_PASSWORD_NOT_SET` |
+| PUT | `/credentials/master-password` | `credentials.changeMasterPassword`（write）：`{ currentPassword, newPassword }`（凭据字段）→ `CredentialStatusDTO`；已存的凭据不变；错误码同解锁 |
+| DELETE | `/credentials/master-password` | `credentials.resetMasterPassword`（critical）：忘记主密码时重置，用它保存的凭据被清除（之后使用为 409 `CREDENTIAL_LOST`）→ `CredentialStatusDTO`。主密码的四个操作不暴露给助手与命令面板 |
 | GET | `/system/runtime` | `RuntimeDTO`：opencode 状态、路径、版本；`ready` 时含地址与启动时间 |
 | POST | `/system/runtime/restart` | `ready` 时重启，`stopped` / `crashed` 时启动（活动尝试 → `interrupted`）；返回启动结束后的 `RuntimeDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
 | GET | `/system/runtime/logs?tail=500` 🅿 | 最新一天 opencode 日志（`<数据目录>/logs/opencode-YYYYMMDD.log`）的末尾 `tail` 行（默认 `RUNTIME_LOG_TAIL_DEFAULT`，至多 `RUNTIME_LOG_TAIL_MAX`）：`{ file, lines }`；还没有日志时 `{ file: null, lines: [] }` |
@@ -47,8 +51,14 @@ type EnvironmentDTO = {
     }>;
     defaultModel?: string;
   };
-  credentials: { available: boolean };   // 能否保存令牌与密码（safeStorage；Linux 无密钥服务时为 false，D74），不计入 ready
+  credentials: CredentialStatusDTO;      // 能否保存令牌与密码（D74、D167），不计入 ready
   ready: boolean;              // git、opencode、模型三项都满足
+};
+
+type CredentialStatusDTO = {
+  available: boolean;          // 现在能保存：系统密钥服务可用，或主密码已解锁
+  system: boolean;             // 系统密钥服务可用（safeStorage；Linux 上要 Secret Service 或 KWallet）
+  masterPassword: 'none' | 'locked' | 'unlocked';   // MasterPasswordState（D167）
 };
 ```
 
@@ -554,7 +564,7 @@ type PrintSettled = { ok: true } | { ok: false; error: ErrorInfo };
 type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorInfo };   // path 为 null：用户取消了保存
 ```
 
-加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。浏览器标签页同样：后端经同一通道发 `browser.request`（`shared/contracts/browser-port.ts`：`open` / `setPolicy` / `close` / `cdp`），main 回 `browser.response`，并主动发 `browser.cdpEvent` / `browser.blocked` / `browser.unownedBlocked`（无法归属标签页的 Worker 拦截，后端记日志）/ `browser.gone`（29 §5.1）。
+加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。浏览器标签页同样：后端经同一通道发 `browser.request`（`shared/contracts/browser-port.ts`：`open` / `setPolicy` / `close` / `cdp`），main 回 `browser.response`，并主动发 `browser.cdpEvent` / `browser.blocked` / `browser.unownedBlocked`（无法归属标签页的 Worker 拦截，后端记日志）/ `browser.certificateRefused { host }`（网站 `host:port` 向 AI 的标签页要客户端证书，main 没有回答并停止加载，后端据此返回 `BROWSER_LOGIN_REQUIRED`，D172）/ `browser.gone`（29 §5.1）。`open` 带 `integratedAuthServers`（只有网站分区非空，D171）。网站向**用户的**标签页要 HTTP 认证或客户端证书时不经后端：main 经 IPC 直接请 renderer 询问用户（D170、D172，29 §5.4）。
 
 ## 14. 待实施 API：附件与需求清单
 

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   getEnvironmentOp,
   getRuntimeLogsOp,
+  MasterPasswordState,
   OPENCODE_VERSION,
   recheckEnvironmentOp,
   updateSettingsOp,
@@ -108,7 +109,11 @@ describe('凭据存储（D74）', () => {
     await fakeOpencode(bin, OPENCODE_VERSION);
     const env = await isolatedEnv(bin, home, { git: true });
     t = await createTestApp({ env, cipher: testCipher });
-    expect((await t.call(getEnvironmentOp, {})).body.credentials).toEqual({ available: true });
+    expect((await t.call(getEnvironmentOp, {})).body.credentials).toEqual({
+      available: true,
+      system: true,
+      masterPassword: MasterPasswordState.None,
+    });
 
     // No encryption backend (Linux without a secret service): the store is unavailable, the rest still ready.
     await t.close();

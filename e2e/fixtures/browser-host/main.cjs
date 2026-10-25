@@ -11,9 +11,22 @@ const PAGE = `<!doctype html><title>host</title>
 <button onclick="window.clicked = (window.clicked || 0) + 1">Go</button>
 <input id="a" aria-label="first"><input id="b" aria-label="second">`;
 
+// A wiki behind HTTP Basic authentication (29 §5.4): the page with the right credentials, else the challenge.
+const WIKI_AUTH = `Basic ${Buffer.from('reader:secret').toString('base64')}`;
+
 const requests = [];
 const server = createServer((req, res) => {
   requests.push(`${req.method} ${req.url}`);
+  if (req.url === '/wiki') {
+    if (req.headers.authorization === WIKI_AUTH) {
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end('<!doctype html><title>wiki</title><p>接口说明</p>');
+    } else {
+      res.writeHead(401, { 'content-type': 'text/html', 'www-authenticate': 'Basic realm="wiki"' });
+      res.end('<!doctype html><title>401</title>');
+    }
+    return;
+  }
   if (req.url === '/shared-worker.js') {
     res.writeHead(200, { 'content-type': 'text/javascript' });
     res.end(`onconnect = ({ ports: [port] }) => {
@@ -51,6 +64,17 @@ function start() {
     emit: record,
     // Recorded with the events, as `{ type: 'external', url }`.
     openExternal: (url) => record({ type: 'external', url }),
+    // The user's answers, as the spec sets them in `harness.answers`; each question is recorded with the events.
+    prompts: {
+      login: (prompt) => {
+        record({ type: 'prompt.login', ...prompt });
+        return Promise.resolve(globalThis.harness.answers.login);
+      },
+      certificate: (prompt) => {
+        record({ type: 'prompt.certificate', ...prompt });
+        return Promise.resolve(globalThis.harness.answers.certificate);
+      },
+    },
   });
 
   globalThis.harness = {
@@ -58,6 +82,7 @@ function start() {
     tabs,
     events,
     requests,
+    answers: { login: null, certificate: null },
     /** The next event (from now) that `matches`, as the backend would await it. */
     next(matches) {
       return new Promise((resolve) => {

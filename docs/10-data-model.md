@@ -24,8 +24,23 @@
 | --- | --- | --- |
 | id | TEXT PK | |
 | kind | TEXT | `CredentialKind` |
-| ciphertext | BLOB | safeStorage 加密结果 |
+| seal | TEXT | `CredentialSeal`，默认 `system`（D167，迁移 `0031_credential_master_password`）：由系统密钥服务还是主密码加密；主密码重置后为 `discarded` |
+| ciphertext | BLOB | `system`：safeStorage 加密结果；`master_password`：nonce ‖ AES-256-GCM 密文 ‖ tag（数据密钥加密）；`discarded`：空 |
 | created_at | INTEGER | |
+
+保存与替换时，系统密钥服务可用就用它，否则用已解锁的主密码；读取按这一行的 `seal`。
+
+### credential_vault
+
+主密码（D167），至多一行（`id` 为 1）。随机的 32 字节数据密钥加密凭据；它被主密码经 scrypt 派生的密钥包住存在这里，只在解锁后留在后端内存。修改主密码只重新包住数据密钥；重置时在同一事务里删除这一行，并把 `seal = master_password` 的凭据改为 `discarded`、清空密文（引用它们的项目、数据库连接、全局令牌保留，重新填写时替换）。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | INTEGER PK | 1 |
+| salt | BLOB | 16 字节 |
+| scrypt_n / scrypt_r / scrypt_p | INTEGER | 派生时用的参数（`MASTER_PASSWORD_SCRYPT`） |
+| wrapped_key | BLOB | nonce ‖ AES-256-GCM(数据密钥) ‖ tag；主密码不对时 tag 校验失败 |
+| created_at / updated_at | INTEGER | |
 
 ### projects
 

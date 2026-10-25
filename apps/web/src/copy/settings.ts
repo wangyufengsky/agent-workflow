@@ -25,6 +25,7 @@ export const SETTINGS_COPY = {
   previewMaxRunning: '同时运行的页面预览数',
   previewIdleMinutes: '页面预览空闲多久后停止（分钟）',
   loginUrlPatterns: '识别登录页的地址片段',
+  integratedAuthServers: 'Windows 集成登录的服务器',
   concurrencyHint: '多个任务同时进行时，最多并行的 AI 会话数量。',
   // 离线环境（D168）
   offline: '离线环境',

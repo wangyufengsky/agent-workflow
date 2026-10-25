@@ -218,6 +218,13 @@
       "when": 1792925314810,
       "tag": "0030_db_tls_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1792929349200,
+      "tag": "0031_credential_master_password",
+      "breakpoints": true
     }
   ]
 }

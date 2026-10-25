@@ -32,6 +32,12 @@ import {
   userTabLogsOp,
 } from './browser.ts';
 import {
+  changeMasterPasswordOp,
+  resetMasterPasswordOp,
+  setupMasterPasswordOp,
+  unlockCredentialsOp,
+} from './credentials.ts';
+import {
   createDbConnectionOp,
   dbSchemaOp,
   deleteDbConnectionOp,
@@ -224,6 +230,7 @@ export * from './attachments.ts';
 export * from './attempts.ts';
 export * from './batches.ts';
 export * from './browser.ts';
+export * from './credentials.ts';
 export * from './databases.ts';
 export * from './debug.ts';
 export * from './decks.ts';
@@ -252,6 +259,10 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getHealthOp,
   getEnvironmentOp,
   recheckEnvironmentOp,
+  setupMasterPasswordOp,
+  unlockCredentialsOp,
+  changeMasterPasswordOp,
+  resetMasterPasswordOp,
   getRuntimeOp,
   restartRuntimeOp,
   getRuntimeLogsOp,

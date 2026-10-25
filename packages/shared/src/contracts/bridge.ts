@@ -23,6 +23,51 @@ export type PrintSettled = z.infer<typeof printSettledSchema>;
 /** A PDF export: where it was saved (null when the user cancelled the dialog), or why the PPT could not be printed. */
 export type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorInfo };
 
+/**
+ * What a website asks of the user's own tab (29 §5.4): HTTP authentication (Basic, NTLM, Negotiate, a proxy's) or a
+ * client certificate. Main asks the renderer, which asks the user; the answer goes back to main only, never to the
+ * backend, and nothing keeps it but Chromium's memory of the partition.
+ */
+const promptIdSchema = z.number().int();
+export const browserPromptSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('login'),
+    id: promptIdSchema,
+    host: z.string(),
+    realm: z.string(),
+    scheme: z.string(),
+    isProxy: z.boolean(),
+  }),
+  z.object({
+    kind: z.literal('certificate'),
+    id: promptIdSchema,
+    host: z.string(),
+    certificates: z.array(
+      z.object({
+        fingerprint: z.string(),
+        subject: z.string(),
+        issuer: z.string(),
+        /** Seconds since the epoch, as Electron gives it. */
+        validExpiry: z.number(),
+      }),
+    ),
+  }),
+]);
+export type BrowserPrompt = z.infer<typeof browserPromptSchema>;
+type Unasked<P> = P extends unknown ? Omit<P, 'id' | 'kind'> : never;
+export type BrowserLoginPrompt = Unasked<Extract<BrowserPrompt, { kind: 'login' }>>;
+export type BrowserCertificatePrompt = Unasked<Extract<BrowserPrompt, { kind: 'certificate' }>>;
+
+export const browserCredentialsSchema = z.object({ username: z.string(), password: z.string() });
+export type BrowserCredentials = z.infer<typeof browserCredentialsSchema>;
+
+/** The user's answer: null cancels (the page gets the 401, or goes on without a certificate). */
+export const browserPromptAnswerSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('login'), id: promptIdSchema, credentials: browserCredentialsSchema.nullable() }),
+  z.object({ kind: z.literal('certificate'), id: promptIdSchema, fingerprint: z.string().nullable() }),
+]);
+export type BrowserPromptAnswer = z.infer<typeof browserPromptAnswerSchema>;
+
 /** Capabilities the Electron preload exposes to the renderer as `window.aw`. */
 export interface AwBridge {
   companion: CompanionBridge;
@@ -51,6 +96,9 @@ export interface AwBridge {
     forward(tabId: string): void;
     reload(tabId: string): void;
     openDevTools(tabId: string): void;
+    /** A website asks the user's tab for a login or a certificate (29 §5.4); answered with `answerPrompt`. */
+    onPrompt(listener: (prompt: BrowserPrompt) => void): () => void;
+    answerPrompt(answer: BrowserPromptAnswer): void;
   };
 }
 

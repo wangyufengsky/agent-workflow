@@ -214,6 +214,7 @@ export function createBrowserService({
       // The preview tab starts clean for each attempt; websites share the user's logins (29 §5.3).
       partition: kind === BrowserTabKind.Preview ? `aw-attempt-${owner.id}` : SITES_PARTITION,
       policy: policyFor(owner),
+      integratedAuthServers: kind === BrowserTabKind.Site ? integratedAuthServers() : [],
       site: kind === BrowserTabKind.Site,
     });
     session.tabs[kind] = tab;
@@ -221,15 +222,24 @@ export function createBrowserService({
     return tab;
   }
 
-  async function loginPage(tab: Tab, url: string): Promise<boolean> {
+  /** The websites' partition logs in to these with the user's system login (29 §5.4). */
+  const integratedAuthServers = () => settings.get('browser.integratedAuthServers');
+
+  /**
+   * Where a website tab now at `url` asks to log in (29 §5.4), or null: credentials only the user gives (HTTP
+   * authentication, a client certificate), or a page that looks like a login page.
+   */
+  async function loginAt(tab: Tab, url: string): Promise<string | null> {
+    const asked = tab.credentialsAsked();
+    if (asked !== null) return asked;
     const { hostname, pathname } = new URL(url);
     const where = `${hostname}${pathname}`.toLowerCase();
     if (
       [...LOGIN_HINTS, ...settings.get('browser.loginUrlPatterns')].some((hint) => where.includes(hint.toLowerCase()))
     ) {
-      return true;
+      return url;
     }
-    return (await tab.evaluate('document.querySelectorAll("input[type=password]").length')) === 1;
+    return (await tab.evaluate('document.querySelectorAll("input[type=password]").length')) === 1 ? url : null;
   }
 
   /** The folder of an owner's screenshots and frames (29 §5.7). */
@@ -301,6 +311,7 @@ export function createBrowserService({
       userFacing: false,
       viewport: VIEWPORT_SIZES.desktop,
       policy: { previewOrigins: [], sites: [] },
+      integratedAuthServers: integratedAuthServers(),
     });
     try {
       return await run((method, params) => host.request({ kind: 'cdp', tabId, method, params }));
@@ -447,6 +458,7 @@ export function createBrowserService({
           kind: BrowserTabKind.Preview,
           partition: `persist:aw-preview-${projectId}`,
           policy: policyFor({ taskId, projectId }),
+          integratedAuthServers: [],
           site: false,
           userFacing: true,
           signal,
@@ -558,6 +570,7 @@ export function createBrowserService({
           kind: BrowserTabKind.Site,
           partition: SITES_PARTITION,
           policy,
+          integratedAuthServers: integratedAuthServers(),
           site: true,
           signal: abort.signal,
         });
@@ -566,6 +579,11 @@ export function createBrowserService({
           .object({ errorText: z.string().optional() })
           .parse(await tab.cdp('Page.navigate', { url: normalized }));
         abort.signal.throwIfAborted();
+        // Without the client certificate the website asked for, the connection fails: that is a login to do.
+        const certificate = tab.credentialsAsked();
+        if (certificate !== null) {
+          throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: certificate });
+        }
         if (navigation.errorText !== undefined) {
           throw new AppError(ErrorCode.BrowserReadFailed, 'The website could not be loaded', {
             url: normalized,
@@ -576,10 +594,10 @@ export function createBrowserService({
         abort.signal.throwIfAborted();
         const page = await tab.snapshot();
         abort.signal.throwIfAborted();
-        const needsLogin = await loginPage(tab, page.url);
+        const login = await loginAt(tab, page.url);
         abort.signal.throwIfAborted();
-        if (needsLogin) {
-          throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: page.url });
+        if (login !== null) {
+          throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: login });
         }
         return { ...page, tab: BrowserTabKind.Site, settled, logs: tab.logs('open') };
       }
@@ -621,8 +639,9 @@ export function createBrowserService({
       await tab.cdp('Page.navigate', { url: normalized });
       const settled = await tab.result(await tab.settle());
       const output = { ...settled, frame: await frame(owner, tab, McpToolName.BrowserOpen, settled.url) };
-      if (access.tab === BrowserTabKind.Site && (await loginPage(tab, output.url))) {
-        throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: output.url });
+      const login = access.tab === BrowserTabKind.Site ? await loginAt(tab, output.url) : null;
+      if (login !== null) {
+        throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: login });
       }
       remember(owner, output, normalized);
       return output;
@@ -748,6 +767,7 @@ export function createBrowserService({
         kind: BrowserTabKind.Preview,
         partition: `aw-check-${nodeId}`,
         policy: policyFor(request),
+        integratedAuthServers: [],
         site: false,
       });
       previews.acquire(taskId);
@@ -792,6 +812,7 @@ export function createBrowserService({
         userFacing: true,
         viewport: null,
         policy: { previewOrigins: [], sites: settings.get('browser.sites') },
+        integratedAuthServers: integratedAuthServers(),
       });
       await host.request({ kind: 'cdp', tabId, method: 'Page.navigate', params: { url } });
       return { tabId };

@@ -10,7 +10,8 @@ import {
   browserShortcutSchema,
   urlAccess,
 } from '@aw/shared';
-import { type BrowserWindow, type Session, type UtilityProcess, WebContentsView } from 'electron';
+import { app, type BrowserWindow, type Session, type UtilityProcess, WebContentsView } from 'electron';
+import type { BrowserPrompts } from './browser-prompts.ts';
 
 type Tab = { tabId: string; view: WebContentsView; policy: BrowserPolicy; userFacing: boolean; onWindow: boolean };
 
@@ -20,6 +21,8 @@ export type BrowserTabsDeps = {
   emit: (event: BrowserPortEvent) => void;
   /** Where a user-facing tab sends addresses the policy denies (29 §5.4). */
   openExternal: (url: string) => void;
+  /** Asks the user what a website asks their own tab: a login or a client certificate (29 §5.4). */
+  prompts: Pick<BrowserPrompts, 'login' | 'certificate'>;
 };
 
 const WEB_SCHEMES = ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'];
@@ -29,7 +32,7 @@ const isWeb = (url: string) => /^https?:\/\//i.test(url);
  * Browser tabs in Electron main (29 §5.1): views, the CDP relay and request cancelling by the policy the backend
  * gives each tab. Mechanism only: what to open, when a page has settled and what a click hit are the backend's.
  */
-export function createBrowserTabs({ window, emit, openExternal }: BrowserTabsDeps) {
+export function createBrowserTabs({ window, emit, openExternal, prompts }: BrowserTabsDeps) {
   const tabs = new Map<string, Tab>();
   const byContents = new Map<number, Tab>();
   const configured = new Set<Session>();
@@ -71,6 +74,36 @@ export function createBrowserTabs({ window, emit, openExternal }: BrowserTabsDep
     ses.on('will-download', (event) => event.preventDefault());
   }
 
+  /**
+   * A website (`host:port`, not a URL) asks a tab for a client certificate (29 §5.4). Electron's default would take
+   * the first one of the store for any tab; the user chooses in their own tab (Chromium remembers the choice for the
+   * partition). The AI's tabs give none, and do not answer either: Chromium would remember "no certificate" for the
+   * whole partition, and the user could not choose one in their login tab until the app restarts. Stopping the load
+   * drops the request unanswered. On the app (not the tab's contents): only there can the callback give none.
+   */
+  app.on('select-client-certificate', (event, contents, host, certificates, callback) => {
+    const tab = contents === null ? undefined : byContents.get(contents.id);
+    // The app's own windows load the app itself, which asks for none.
+    if (tab === undefined) return;
+    event.preventDefault();
+    if (!tab.userFacing) {
+      emit({ type: 'browser.certificateRefused', tabId: tab.tabId, host });
+      tab.view.webContents.stop();
+      return;
+    }
+    void prompts
+      .certificate({
+        host,
+        certificates: certificates.map((c) => ({
+          fingerprint: c.fingerprint,
+          subject: c.subjectName,
+          issuer: c.issuerName,
+          validExpiry: c.validExpiry,
+        })),
+      })
+      .then((fingerprint) => callback(certificates.find((c) => c.fingerprint === fingerprint)));
+  });
+
   function forget(tab: Tab): void {
     tabs.delete(tab.tabId);
     byContents.delete(tab.view.webContents.id);
@@ -93,6 +126,7 @@ export function createBrowserTabs({ window, emit, openExternal }: BrowserTabsDep
     const contents = view.webContents;
     const tab: Tab = { tabId: op.tabId, view, policy: op.policy, userFacing: op.userFacing, onWindow: false };
     configure(contents.session);
+    contents.session.allowNTLMCredentialsForDomains(op.integratedAuthServers.join(','));
     tabs.set(op.tabId, tab);
     byContents.set(contents.id, tab);
 
@@ -118,6 +152,18 @@ export function createBrowserTabs({ window, emit, openExternal }: BrowserTabsDep
       if (urlAccess(url, tab.policy) !== null) return;
       event.preventDefault();
       if (tab.userFacing && isWeb(url)) openExternal(url);
+    });
+    // Credentials are the user's to give, in their own tab (29 §5.4): Chromium keeps what they gave for the
+    // partition, and the AI's tabs there reuse it. The AI's tabs never ask: Electron's default cancels the login (the
+    // page gets the 401), and no certificate is chosen for them (the app's `select-client-certificate` above).
+    contents.on('login', (event, _details, auth, callback) => {
+      if (!tab.userFacing) return;
+      event.preventDefault();
+      void prompts
+        .login({ host: auth.host, realm: auth.realm, scheme: auth.scheme, isProxy: auth.isProxy })
+        .then((credentials) =>
+          credentials === null ? callback() : callback(credentials.username, credentials.password),
+        );
     });
     contents.on('render-process-gone', (_event, details) => {
       forget(tab);

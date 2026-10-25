@@ -4,9 +4,9 @@ import { type BrowserPolicy, blockReason, urlAccess } from './policy.ts';
 const policy: BrowserPolicy = {
   previewOrigins: ['http://127.0.0.1:5173'],
   sites: [
-    { pattern: 'tickets.corp', access: 'interact' },
-    { pattern: '*.corp', access: 'read' },
-    { pattern: '10.12.*.*', access: 'read' },
+    { pattern: 'tickets.corp', access: 'interact', queryPaths: [] },
+    { pattern: '*.corp', access: 'read', queryPaths: [] },
+    { pattern: '10.12.*.*', access: 'read', queryPaths: [] },
   ],
 };
 
@@ -46,7 +46,10 @@ describe('urlAccess', () => {
 
   it('规则 * 放开所有网站', () => {
     expect(
-      urlAccess('https://example.com/', { previewOrigins: [], sites: [{ pattern: '*', access: 'read' }] }),
+      urlAccess('https://example.com/', {
+        previewOrigins: [],
+        sites: [{ pattern: '*', access: 'read', queryPaths: [] }],
+      }),
     ).toEqual({ tab: 'site', access: 'read' });
   });
 });
@@ -75,5 +78,21 @@ describe('blockReason', () => {
     expect(blockReason(post('https://wiki.corp/api'), policy, false)).toBeNull();
     expect(blockReason(post('https://tickets.corp/api'), policy, true)).toBeNull();
     expect(blockReason(post('http://127.0.0.1:5173/api'), policy, true)).toBeNull();
+  });
+
+  it('只读网站规则写明的查询路径：AI 的 POST 放行；别的路径、别的写方法与 WebSocket 仍拦下', () => {
+    const queries: BrowserPolicy = {
+      previewOrigins: [],
+      sites: [{ pattern: 'bugs.corp', access: 'read', queryPaths: ['/api/search', '/rest/*/query'] }],
+    };
+    const request = (method: string, url: string, isWebSocket = false) => ({ method, url, isWebSocket });
+    expect(blockReason(request('POST', 'https://bugs.corp/api/search?page=2'), queries, true)).toBeNull();
+    expect(blockReason(request('post', 'https://bugs.corp/rest/issue/query'), queries, true)).toBeNull();
+    // The whole path matches, case and all: neither a longer path nor another case is a query.
+    expect(blockReason(request('POST', 'https://bugs.corp/api/search/save'), queries, true)).toBe('read_only');
+    expect(blockReason(request('POST', 'https://bugs.corp/API/search'), queries, true)).toBe('read_only');
+    expect(blockReason(request('POST', 'https://bugs.corp/api/comments'), queries, true)).toBe('read_only');
+    expect(blockReason(request('PUT', 'https://bugs.corp/api/search'), queries, true)).toBe('read_only');
+    expect(blockReason(request('GET', 'wss://bugs.corp/api/search', true), queries, true)).toBe('read_only');
   });
 });

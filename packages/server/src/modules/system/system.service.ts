@@ -74,7 +74,7 @@ export function createSystemService({
       git,
       opencode: runtimeState,
       models,
-      credentials: { available: await credentials.isAvailable() },
+      credentials: await credentials.status(),
       ready: git.installed && !NOT_HOSTABLE.includes(runtimeState.status) && models.available.length > 0,
     };
   }

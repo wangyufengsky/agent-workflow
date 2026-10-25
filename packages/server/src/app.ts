@@ -491,6 +491,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const operations: OperationImpl[] = [
     ...settings.operations,
     ...system.operations,
+    ...credentials.operations,
     ...storage.operations,
     ...projects.operations,
     ...hostingAccounts.operations,
