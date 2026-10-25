@@ -220,3 +220,16 @@ export async function box(
   if (rect === null) throw new Error('The element is not drawn');
   return { left: rect.x, right: rect.x + rect.width, top: rect.y, bottom: rect.y + rect.height, width: rect.width };
 }
+
+/**
+ * Starts a new conversation in the assistant panel (or the companion's chat) and waits until it is the one shown:
+ * the input stays disabled while it is created, so what is typed cannot go to the previous conversation.
+ */
+export async function newConversation(page: Page, scope: Locator): Promise<void> {
+  const created = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && r.url().endsWith('/assistant/conversations'),
+  );
+  await scope.getByRole('button', { name: '新对话', exact: true }).click();
+  await created;
+  await expect(scope.getByLabel('发给助手的消息')).toBeEnabled();
+}

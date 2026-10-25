@@ -18,7 +18,7 @@
 
 应用数据在 `~/Library/Application Support/Agent Workflow/`。
 
-### Windows 10 / 11（x64）
+### Windows 10 / 11（x64，暂缓：没有在 CI 和真机上验证，D160）
 
 1. 需要 **Git for Windows**（`winget install --id Git.Git -e`）：AI 执行的命令与检查命令都在它自带的 Git Bash 中运行，只装 MinGit 不够。
 2. 运行 `agent-workflow-<版本>-setup-x64.exe`。SmartScreen 提示「Windows 已保护你的电脑」时点「更多信息 → 仍要运行」；可以选择安装目录，默认只为当前用户安装。
@@ -26,10 +26,10 @@
 
 应用数据在 `%APPDATA%\Agent Workflow\`。
 
-### Linux（Ubuntu 22.04+ x64，其他发行版尽力支持）
+### Linux（Ubuntu 22.04+，x64 与 arm64，其他发行版尽力支持）
 
-- **deb**（推荐 Ubuntu / Debian）：`sudo apt install ./agent-workflow_<版本>_amd64.deb`，之后在应用菜单中打开，或运行 `agent-workflow`。
-- **AppImage**（其他发行版）：`chmod +x agent-workflow-<版本>-x86_64.AppImage` 后运行。需要 FUSE 2（Ubuntu 24.04：`sudo apt install libfuse2t64`）。Ubuntu 24.04 默认限制非特权用户命名空间，AppImage 可能因 Chromium 沙箱无法启动；请改用 deb，或按发行版说明为该 AppImage 配置 AppArmor 规则。
+- **deb**（推荐 Ubuntu / Debian）：`sudo apt install ./agent-workflow_<版本>_amd64.deb`（arm64 机器用 `_arm64.deb`），之后在应用菜单中打开，或运行 `agent-workflow`。
+- **AppImage**（其他发行版）：`chmod +x agent-workflow-<版本>-<架构>.AppImage` 后运行。需要 FUSE 2（Ubuntu 24.04：`sudo apt install libfuse2t64`）。Ubuntu 24.04 默认限制非特权用户命名空间，AppImage 可能因 Chromium 沙箱无法启动；请改用 deb，或按发行版说明为该 AppImage 配置 AppArmor 规则。
 - 保存托管平台令牌与数据库密码需要系统密钥服务（GNOME Keyring 或 KWallet）；没有时引导页「凭据存储」一项会提示（`sudo apt install gnome-keyring` 后重启应用），其他功能不受影响。
 
 应用数据在 `~/.config/Agent Workflow/`。
@@ -64,7 +64,7 @@ pnpm dev
 | `pnpm test:oc` | 真实 opencode 的集成测试（只有 bridge 插件测试调用模型） |
 | `pnpm test:live` | 真实模型跑五个内置流程（手动，约一小时；报告写到 `live/reports/`） |
 | `pnpm perf` | 性能实测：20 节点画布帧率、5 MB 会话流首屏、10 个并发任务（结果写到 `perf-results/`） |
-| `pnpm dist` | 打包当前平台的安装包（macOS dmg arm64、Windows NSIS x64、Linux AppImage 与 deb x64；未签名，输出到 `apps/desktop/release/`） |
+| `pnpm dist` | 打包当前平台的安装包（macOS dmg arm64、Windows NSIS x64、Linux AppImage 与 deb，默认本机架构，`pnpm dist --x64 --arm64` 两种都打；未签名，输出到 `apps/desktop/release/`） |
 
 ## 架构入口
 

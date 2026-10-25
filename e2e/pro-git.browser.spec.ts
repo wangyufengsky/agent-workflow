@@ -11,6 +11,7 @@ import {
   GIT_HEAVY_SPECS_SLOW,
   git,
   MIN_WINDOW,
+  newConversation,
   patchSettings,
   pickWorkflow,
   queueAssistantTurn,
@@ -140,7 +141,7 @@ test('J24 Git 工作台：暂存 → AI 草拟并提交 → 新建分支再提�
   await queueAssistantTurn(request, [{ type: 'text', text: '这条问题要先修。' }]);
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
-  await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  await newConversation(page, panel);
   const sent = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/messages'));
   await panel.getByLabel('发给助手的消息').fill('这些问题要紧吗？');
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');

@@ -20,9 +20,12 @@ import { useAsk } from './use-ask.ts';
 export function Composer({
   conversation,
   inputRef,
+  disabled = false,
 }: {
   conversation: AssistantConversationDTO | undefined;
   inputRef: RefObject<HTMLTextAreaElement | null>;
+  /** While a new conversation is being created: what is typed now must not go to the one still shown. */
+  disabled?: boolean;
 }) {
   const [text, setText] = useState('');
   const files = useAttachmentDraft();
@@ -35,7 +38,7 @@ export function Composer({
 
   const submit = (e: FormEvent | KeyboardEvent) => {
     e.preventDefault();
-    if (empty || busy || files.blocked) return;
+    if (empty || busy || disabled || files.blocked) return;
     ask(
       text.trim(),
       conversation,
@@ -61,6 +64,7 @@ export function Composer({
           aria-label={C.inputLabel}
           placeholder={C.inputPlaceholder}
           value={text}
+          disabled={disabled}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           onPaste={pasteFilesInto(files)}
@@ -95,7 +99,7 @@ export function Composer({
               className={styles.send}
               aria-label={C.send}
               title={C.send}
-              disabled={empty || isPending || files.blocked}
+              disabled={empty || isPending || disabled || files.blocked}
             >
               {isPending ? <span className="spin" aria-hidden="true" /> : <Icon name="arrowUp" size="sm" />}
             </button>

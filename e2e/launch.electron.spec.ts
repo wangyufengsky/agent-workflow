@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createConnection, createServer, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,18 +11,44 @@ import { _electron as electron, expect, test } from '@playwright/test';
 test('构建后的应用启动后显示引导页并能正常退出', async () => {
   const userDataDir = mkdtempSync(join(tmpdir(), 'aw-e2e-launch-'));
   const app = await electron.launch({ args: ['apps/desktop', `--user-data-dir=${userDataDir}`] });
+  // What main and the backend printed, kept for a failure: it is intermittent on CI only (07 §1).
+  const output: string[] = [];
+  app.process().stdout?.on('data', (chunk) => output.push(String(chunk)));
+  app.process().stderr?.on('data', (chunk) => output.push(String(chunk)));
   const page = await app.firstWindow();
-  await expect(page.getByRole('heading', { name: 'Everything is a Workflow.' })).toBeVisible();
-  await page.mouse.click(10, 10);
+  try {
+    await expect(page.getByRole('heading', { name: 'Everything is a Workflow.' })).toBeVisible();
+    await page.mouse.click(10, 10);
 
-  await expect(page.getByRole('heading', { name: '欢迎使用 Agent Workflow' })).toBeVisible();
-  await expect(page.getByTestId('check-Git')).toContainText('已就绪');
-  await expect(page.getByTestId('check-opencode')).toBeVisible();
-  await expect(page.getByTestId('check-凭据存储')).toBeVisible();
-  // The next start shows its window in the theme the renderer applied, before the backend is up (28 §5.3).
-  const launchFile = join(userDataDir, 'launch.json');
-  await expect.poll(() => existsSync(launchFile)).toBe(true);
-  expect(JSON.parse(readFileSync(launchFile, 'utf8'))).toMatchObject({ intro: true });
+    await expect(page.getByRole('heading', { name: '欢迎使用 Agent Workflow' })).toBeVisible();
+    await expect(page.getByTestId('check-Git')).toContainText('已就绪');
+    await expect(page.getByTestId('check-opencode')).toBeVisible();
+    await expect(page.getByTestId('check-凭据存储')).toBeVisible();
+    // The next start shows its window in the theme the renderer applied, before the backend is up (28 §5.3).
+    const launchFile = join(userDataDir, 'launch.json');
+    await expect.poll(() => existsSync(launchFile)).toBe(true);
+    expect(JSON.parse(readFileSync(launchFile, 'utf8'))).toMatchObject({ intro: true });
+  } catch (err) {
+    // Written under the test's output directory, which CI uploads; each step bounded, a hung renderer included.
+    const info = test.info();
+    writeFileSync(info.outputPath('process-output.txt'), output.join(''));
+    const windows = await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().map((w) => ({
+        url: w.webContents.getURL(),
+        loading: w.webContents.isLoading(),
+        crashed: w.webContents.isCrashed(),
+        visible: w.isVisible(),
+      })),
+    );
+    writeFileSync(info.outputPath('windows.json'), JSON.stringify(windows, null, 2));
+    const logs = join(userDataDir, 'logs');
+    for (const file of existsSync(logs) ? readdirSync(logs) : []) copyFileSync(join(logs, file), info.outputPath(file));
+    // A screenshot that cannot be taken says the renderer is not painting: recorded, the original failure rethrown.
+    await page
+      .screenshot({ path: info.outputPath('page.png'), timeout: 5000 })
+      .catch((e: unknown) => writeFileSync(info.outputPath('screenshot-error.txt'), String(e)));
+    throw err;
+  }
 
   await app.close();
 });

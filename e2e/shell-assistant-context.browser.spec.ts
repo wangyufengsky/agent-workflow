@@ -1,7 +1,14 @@
 import { expect } from '@playwright/test';
 import { test } from './assistant-fixtures.ts';
 import { API_BASE, AUTH } from './env.ts';
-import { addFromMenu, createProject, patchSettings, pickWorkflow, queueAssistantTurn } from './helpers.ts';
+import {
+  addFromMenu,
+  createProject,
+  newConversation,
+  patchSettings,
+  pickWorkflow,
+  queueAssistantTurn,
+} from './helpers.ts';
 
 test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
@@ -27,7 +34,7 @@ test('任务详情快照可预览移除，与文件一起随侧栏消息发送',
   await expect(page.getByRole('heading', { name: '导出订单时保留前导零' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
-  await panel.getByRole('button', { name: '新对话', exact: true }).click();
+  await newConversation(page, panel);
   await expect(panel.getByRole('button', { name: '切换对话', exact: true })).toHaveText('新对话');
   await expect(panel.getByLabel('发给助手的消息')).toBeEnabled();
   const snapshotName = `${task.key}-任务上下文.txt`;

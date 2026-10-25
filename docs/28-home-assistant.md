@@ -169,7 +169,7 @@
 
 1. `app.whenReady` 后**立即**创建窗口（主题底色），以 `data:` URL 显示打开动画页（`splashHtml`，§7）。
 2. 同时启动后端（令牌改由 main 生成，窗口与后端共用）。
-3. 两件事都完成后在同一窗口 `loadURL(应用地址)`：后端就绪，**且**动画播完或被跳过（main 经 `executeJavaScript` 等动画页的 `window.splash.done`，再等 0.2s 的淡出 `leave()`）。
+3. 两件事都完成后在同一窗口 `loadURL(应用地址)`：后端就绪，**且**动画播完或被跳过（main 经 `executeJavaScript` 等动画页的 `window.splash.done`，再等 0.2s 的淡出 `leave()`）。两个时间点由动画页里的计时器决定，不等 CSS 动画的 `animationend`：窗口不出帧时（启动时被隐藏、显卡慢、CI 的虚拟显示）动画不推进、事件不来，曾让窗口一直停在动画页（`e2e/splash.browser.spec.ts` 把动画播放速度设为 0 复现）。
 
 因此动画与后端启动重叠：后端启动比 1.2s 慢时，动画不增加时间（把原来的空白等待变成了画面）；比 1.2s 快时，进入应用晚一些，一点即过。
 

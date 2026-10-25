@@ -104,17 +104,18 @@ test('J41 专业模式：「让 AI 拆解」时选可选流程，默认是改动
   await page.getByRole('textbox', { name: '需求', exact: true }).fill('给订单和支付补单元测试');
 
   await page.getByRole('button', { name: /可选流程/ }).click();
+  // Exact names: other specs on the shared backend add custom workflows such as 「我的修 Bug」.
   const allowed = page.getByRole('group', { name: '可选流程' });
-  await expect(allowed.getByLabel('新功能开发')).toBeChecked();
-  await expect(allowed.getByLabel('详细设计')).toBeChecked();
-  await expect(allowed.getByLabel('代码审查')).not.toBeChecked();
+  await expect(allowed.getByLabel('新功能开发', { exact: true })).toBeChecked();
+  await expect(allowed.getByLabel('详细设计', { exact: true })).toBeChecked();
+  await expect(allowed.getByLabel('代码审查', { exact: true })).not.toBeChecked();
   for (const name of ['新功能开发', '修 Bug', '补单元测试', '重构', '清理告警', '详细设计', '需求拆解']) {
-    await allowed.getByLabel(name).uncheck();
+    await allowed.getByLabel(name, { exact: true }).uncheck();
   }
   await expect(page.getByText('至少选一个流程')).toBeVisible();
   await expect(page.getByRole('button', { name: /^开始/ })).toBeDisabled();
-  await allowed.getByLabel('补单元测试').check();
-  await allowed.getByLabel('代码审查').check();
+  await allowed.getByLabel('补单元测试', { exact: true }).check();
+  await allowed.getByLabel('代码审查', { exact: true }).check();
   await page.getByRole('button', { name: /^开始/ }).click();
 
   await expect(page.getByTestId('initiative-page')).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
