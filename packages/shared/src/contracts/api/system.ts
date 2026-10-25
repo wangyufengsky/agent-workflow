@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { OPENCODE_VERSION } from '../../constants/app.ts';
-import { platformSchema, RuntimeStatus } from '../../enums/system.ts';
+import { platformSchema, RuntimeStatus, storageCleanTargetSchema, storageKindSchema } from '../../enums/system.ts';
 import { attemptKindSchema } from '../../enums/task.ts';
 import { McpToolName } from '../mcp/names.ts';
 
@@ -11,13 +10,12 @@ export const healthSchema = z.object({
 });
 export type Health = z.infer<typeof healthSchema>;
 
-const requiredVersion = z.literal(OPENCODE_VERSION);
-const located = { path: z.string(), version: z.string(), requiredVersion };
+const located = { path: z.string(), version: z.string() };
 
 /** `GET /system/runtime` (11 §2): the hosted opencode process. */
 export const runtimeSchema = z.discriminatedUnion('status', [
   // A binary may be found yet unusable (`--version` fails): then only its path is known.
-  z.object({ status: z.literal(RuntimeStatus.NotInstalled), path: z.string().optional(), requiredVersion }),
+  z.object({ status: z.literal(RuntimeStatus.NotInstalled), path: z.string().optional() }),
   z.object({
     status: z.enum([
       RuntimeStatus.VersionMismatch,
@@ -71,3 +69,29 @@ export const mcpToolInfoSchema = z.object({
   allowedKinds: z.array(attemptKindSchema),
 });
 export type McpToolInfo = z.infer<typeof mcpToolInfoSchema>;
+
+/** `GET /system/storage` (11 §2, 37 §2): the space the data directory and the task worktrees take. */
+export const storageSchema = z.object({
+  dataDir: z.string(),
+  worktreeRoot: z.string(),
+  /** Every kind once, in `StorageKind` order; bytes on disk without following symbolic links. */
+  items: z.array(z.object({ kind: storageKindSchema, bytes: z.number().int().nonnegative() })),
+  totalBytes: z.number().int().nonnegative(),
+  /** What each cleanup target would delete now. */
+  cleanable: z.array(
+    z.object({
+      target: storageCleanTargetSchema,
+      /** Log files, or tasks whose records go. */
+      count: z.number().int().nonnegative(),
+      bytes: z.number().int().nonnegative(),
+    }),
+  ),
+});
+export type StorageDTO = z.infer<typeof storageSchema>;
+
+export const cleanStorageRequestSchema = z.object({ target: storageCleanTargetSchema });
+export const cleanStorageResponseSchema = z.object({
+  freedBytes: z.number().int().nonnegative(),
+  storage: storageSchema,
+});
+export type CleanStorageResponse = z.infer<typeof cleanStorageResponseSchema>;

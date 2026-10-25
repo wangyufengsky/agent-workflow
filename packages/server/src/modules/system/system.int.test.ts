@@ -35,25 +35,25 @@ describe('环境检测', () => {
     await appWithPath({ git: true });
     const { body } = await t.call(getEnvironmentOp, {});
     expect(body.git).toEqual({ installed: true, version: expect.stringMatching(/^\d+\.\d+/) });
-    expect(body.opencode).toEqual({ status: 'not_installed', requiredVersion: OPENCODE_VERSION });
+    expect(body.opencode).toEqual({ status: 'not_installed' });
     expect(body.ready).toBe(false);
   });
 
-  it('opencode 版本不是 1.19.0 时为 version_mismatch 并报告版本与路径', async () => {
-    const path = await fakeOpencode(bin, '1.18.2');
+  it('opencode 版本不在支持范围内时为 version_mismatch 并报告版本与路径', async () => {
+    const path = await fakeOpencode(bin, '1.17.9');
     await appWithPath({ git: true });
     const { body } = await t.call(getEnvironmentOp, {});
-    expect(body.opencode).toEqual({ status: 'version_mismatch', path, version: '1.18.2', requiredVersion: '1.19.0' });
+    expect(body.opencode).toEqual({ status: 'version_mismatch', path, version: '1.17.9' });
     expect(body.ready).toBe(false);
   });
 
-  it('安装正确版本后重新检测变为 stopped 且环境就绪', async () => {
+  it('安装支持范围内的版本后重新检测变为 stopped 且环境就绪', async () => {
     await appWithPath({ git: true });
     expect((await t.call(getEnvironmentOp, {})).body.opencode.status).toBe('not_installed');
 
-    const installed = await fakeOpencode(bin, OPENCODE_VERSION);
+    const installed = await fakeOpencode(bin, '1.18.2');
     const { body } = await t.call(recheckEnvironmentOp, {});
-    expect(body.opencode).toMatchObject({ status: 'stopped', path: installed, version: OPENCODE_VERSION });
+    expect(body.opencode).toMatchObject({ status: 'stopped', path: installed, version: '1.18.2' });
     expect(body.ready).toBe(true);
   });
 

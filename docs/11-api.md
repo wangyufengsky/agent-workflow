@@ -24,14 +24,16 @@
 | GET | `/system/runtime` | `RuntimeDTO`：opencode 状态、路径、版本；`ready` 时含地址与启动时间 |
 | POST | `/system/runtime/restart` | `ready` 时重启，`stopped` / `crashed` 时启动（活动尝试 → `interrupted`）；返回启动结束后的 `RuntimeDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
 | GET | `/system/runtime/logs?tail=500` 🅿 | 最新一天 opencode 日志（`<数据目录>/logs/opencode-YYYYMMDD.log`）的末尾 `tail` 行（默认 `RUNTIME_LOG_TAIL_DEFAULT`，至多 `RUNTIME_LOG_TAIL_MAX`）：`{ file, lines }`；还没有日志时 `{ file: null, lines: [] }` |
+| GET | `/system/storage` 🅿 | 占用空间（37 §2）：`{ dataDir, worktreeRoot, items: [{ kind: StorageKind, bytes }], totalBytes, cleanable: [{ target: StorageCleanTarget, count, bytes }] }`；`items` 按 `StorageKind` 顺序每类一项 |
+| POST | `/system/storage/clean` 🅿 | `{ target: StorageCleanTarget }`（critical）：删除该目标的旧数据（37 §3），返回 `{ freedBytes, storage }` |
 | GET | `/settings` | 全部设置 `Record<SettingKey, value>` |
 | PATCH | `/settings` | 部分更新；按 key 的 schema 校验 |
 
 ```ts
 type RuntimeDTO =
-  | { status: 'not_installed'; path?: string; requiredVersion: '1.19.0' }      // path：找到但无法执行时
-  | { status: 'version_mismatch' | 'stopped' | 'starting' | 'crashed'; path: string; version: string; requiredVersion: '1.19.0' }
-  | { status: 'ready'; path: string; version: string; requiredVersion: '1.19.0'; url: string; startedAt: number };
+  | { status: 'not_installed'; path?: string }      // path：找到但无法执行时
+  | { status: 'version_mismatch' | 'stopped' | 'starting' | 'crashed'; path: string; version: string }   // 支持的范围见 08 §4 OPENCODE_SUPPORTED_VERSIONS（D156）
+  | { status: 'ready'; path: string; version: string; url: string; startedAt: number };
 
 type EnvironmentDTO = {
   platform: 'darwin' | 'win32' | 'linux';   // 后端的操作系统，引导页据此显示安装命令（D75）

@@ -137,3 +137,26 @@ export const ServerEventType = {
 } as const;
 export type ServerEventType = (typeof ServerEventType)[keyof typeof ServerEventType];
 export const serverEventTypeSchema = z.enum(ServerEventType);
+
+/** What the data directory's space goes to (37 §2). */
+export const StorageKind = {
+  Database: 'database',
+  Logs: 'logs',
+  Transcripts: 'transcripts',
+  Worktrees: 'worktrees',
+  Assistant: 'assistant',
+  Attachments: 'attachments',
+  Other: 'other',
+} as const;
+export type StorageKind = (typeof StorageKind)[keyof typeof StorageKind];
+export const storageKindSchema = z.enum(StorageKind);
+
+/** What `system.cleanStorage` can delete (37 §3). */
+export const StorageCleanTarget = {
+  /** Log files older than `STORAGE_KEEP_DAYS`, except the newest app and opencode log (in use). */
+  Logs: 'logs',
+  /** Session records and screenshots of tasks that ended more than `STORAGE_KEEP_DAYS` ago. */
+  Transcripts: 'transcripts',
+} as const;
+export type StorageCleanTarget = (typeof StorageCleanTarget)[keyof typeof StorageCleanTarget];
+export const storageCleanTargetSchema = z.enum(StorageCleanTarget);

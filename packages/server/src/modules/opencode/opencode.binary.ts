@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { OPENCODE_VERSION, RuntimeStatus } from '@aw/shared';
+import { isSupportedOpencodeVersion, RuntimeStatus } from '@aw/shared';
 import { execa } from 'execa';
 import { host } from '../../core/platform.ts';
 
@@ -20,7 +20,7 @@ function locate(env: NodeJS.ProcessEnv, configuredPath: string | null): string |
   ]);
 }
 
-/** Finds the opencode binary and checks it is exactly OPENCODE_VERSION; the runtime starts only from `stopped`. */
+/** Finds the opencode binary and checks its version is supported (D156); the runtime starts only from `stopped`. */
 export async function detectOpencode(
   env: NodeJS.ProcessEnv,
   configuredPath: string | null,
@@ -33,7 +33,7 @@ export async function detectOpencode(
   if (result.exitCode !== 0) return { status: RuntimeStatus.NotInstalled, path };
   const version = result.stdout.trim();
   return {
-    status: version === OPENCODE_VERSION ? RuntimeStatus.Stopped : RuntimeStatus.VersionMismatch,
+    status: isSupportedOpencodeVersion(version) ? RuntimeStatus.Stopped : RuntimeStatus.VersionMismatch,
     path,
     version,
   };

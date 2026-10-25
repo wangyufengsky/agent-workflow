@@ -17,7 +17,7 @@ test('构建后的应用启动后显示引导页并能正常退出', async () =>
 
   await expect(page.getByRole('heading', { name: '欢迎使用 Agent Workflow' })).toBeVisible();
   await expect(page.getByTestId('check-Git')).toContainText('已就绪');
-  await expect(page.getByTestId('check-opencode 1.19.0')).toBeVisible();
+  await expect(page.getByTestId('check-opencode')).toBeVisible();
   await expect(page.getByTestId('check-凭据存储')).toBeVisible();
   // The next start shows its window in the theme the renderer applied, before the backend is up (28 §5.3).
   const launchFile = join(userDataDir, 'launch.json');

@@ -1,4 +1,13 @@
-import { getHealthOp, getRuntimeLogsOp, getRuntimeOp, listMcpToolsOp, restartRuntimeOp } from '@aw/shared';
+import {
+  cleanStorageOp,
+  getHealthOp,
+  getRuntimeLogsOp,
+  getRuntimeOp,
+  getStorageOp,
+  listMcpToolsOp,
+  restartRuntimeOp,
+  type StorageCleanTarget,
+} from '@aw/shared';
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
@@ -33,3 +42,18 @@ export const mcpToolsQuery = queryOptions({
   queryFn: async () => (await callOperation(listMcpToolsOp, {})).items,
   staleTime: Number.POSITIVE_INFINITY,
 });
+
+/** Disk usage (37); measured when the panel opens and on demand, not kept fresh by events. */
+export const storageQuery = queryOptions({
+  queryKey: queryKeys.storage,
+  queryFn: () => callOperation(getStorageOp, {}),
+  staleTime: Number.POSITIVE_INFINITY,
+});
+
+export function useCleanStorage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (target: StorageCleanTarget) => callOperation(cleanStorageOp, { target }),
+    onSuccess: ({ storage }) => queryClient.setQueryData(queryKeys.storage, storage),
+  });
+}

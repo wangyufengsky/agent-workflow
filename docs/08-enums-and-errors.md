@@ -109,6 +109,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | 枚举 | 值 |
 | --- | --- |
 | `RuntimeStatus` | `not_installed` · `version_mismatch` · `stopped` · `starting` · `ready` · `crashed` |
+| `StorageKind` | `database` · `logs` · `transcripts` · `worktrees` · `assistant` · `attachments` · `other`（37 §2） |
+| `StorageCleanTarget` | `logs` · `transcripts`（37 §3） |
 | `Platform` | `darwin` · `win32` · `linux`（运行应用的操作系统，17 §1） |
 | `DbType` | `mysql` · `postgresql` · `opengauss`（openGauss / GaussDB）· `sqlserver` · `goldendb`（MySQL 协议）（v1.2，24 §1） |
 | `CredentialKind` | `git_token` · `db_password` |
@@ -246,7 +248,8 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | 名称 | 值 | 说明 |
 | --- | --- | --- |
 | `APP_ID` | `agent-workflow` | 数据目录名、MCP server 名 |
-| `OPENCODE_VERSION` | `1.19.0` | 精确匹配，不匹配则 `version_mismatch` |
+| `OPENCODE_VERSION` | `1.19.0` | 构建与测试所用的版本（SDK、事件样本、引导页的安装命令） |
+| `OPENCODE_SUPPORTED_VERSIONS` | `{ min: [1, 18, 0], max: [1, 90] }` | 可托管的版本：1.18.0 起到 1.90 的所有补丁版本，其他为 `version_mismatch`（D156）；`isSupportedOpencodeVersion` 判断，`OPENCODE_SUPPORTED_RANGE` 为显示用的 `1.18.0 – 1.90.x` |
 | `OPENCODE_AGENT_NAME` | `{ planner: 'aw-planner', executor: 'aw-executor', reviewer: 'aw-reviewer', researcher: 'aw-researcher', slides_writer: 'aw-slides' }` | 按 `SessionAgent`；`aw-researcher` 为知识研究员（v1.1，18 §5.1），`aw-slides` 为 PPT 写作者（v1.2，23 §7.1），`code_reviewer: 'aw-code-reviewer'` 为 Git 工作台的审查员（v1.2，27 §4.3） |
 | `MCP_SERVER_NAME` | `agent-workflow` | 执行 MCP；opencode 中工具名为 `agent-workflow_<tool>` |
 | `MCP_ASSISTANT_SERVER_NAME` | `agent-workflow-app` | 助手 MCP（v1.1）；opencode 中工具名为 `agent-workflow-app_<tool>` |
@@ -317,6 +320,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TEAM_ANALYSIS_SAMPLE` / `TEAM_REVIEW_MAX_LINES` | 5 / 2000（AI 成员分析抽样评审的提交数、单个提交的行数上限，33 §6.2） |
 | `TEAM_ANALYSIS_COMMITS_MAX` / `TEAM_ANALYSIS_MEMBERS_MAX` | 400 / 50（首条消息列出的提交数、一次排队的成员数） |
 | `RUNTIME_LOG_TAIL_DEFAULT` / `RUNTIME_LOG_TAIL_MAX` | 500 / 5000（运行环境日志页的行数） |
+| `STORAGE_KEEP_DAYS` | 7（存储清理保留的天数：日志与结束的任务的会话记录，37 §3） |
 | `LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX` | 50 / 100（任务与「需要你处理」列表每页条数，11 §1） |
 | `GIT_INIT_LARGE_FILE_BYTES` / `GIT_INIT_LARGE_TOTAL_BYTES` | 50 MiB / 500 MiB（初始化 Git 时单个文件、首次提交总量达到它就提醒先补忽略规则，D153） |
 | `GIT_INIT_LARGE_FILES_SHOWN` | 5（初始化确认里列出的大文件数） |

@@ -14,7 +14,7 @@ import Fastify, { type FastifyBaseLogger, type FastifyInstance, LogController } 
 import type { DestinationStream } from 'pino';
 import { type Clock, systemClock } from './core/clock.ts';
 import type { AppConfig } from './core/config.ts';
-import { openDatabase } from './core/db/database.ts';
+import { DATABASE_FILE, openDatabase } from './core/db/database.ts';
 import { createUnitOfWork } from './core/db/unit-of-work.ts';
 import { createEventBus, type EventBus } from './core/event-bus.ts';
 import { registerTokenAuth } from './core/http/auth.ts';
@@ -68,6 +68,7 @@ import { createRolesModule, type RolesService } from './modules/roles/index.ts';
 import { createScheduler } from './modules/scheduler/index.ts';
 import { createSchedulesModule, type SchedulesService } from './modules/schedules/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
+import { createStorageModule } from './modules/storage/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
 import { createTasksModule, type TasksService } from './modules/tasks/index.ts';
 import { createTeamModule } from './modules/team/index.ts';
@@ -134,7 +135,7 @@ export type App = {
 export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<App> {
   const clock = deps.clock ?? systemClock;
   const log = createLogger(config, clock, deps.logDestination);
-  const database = openDatabase(join(config.dataDir, 'app.db'), config.migrationsDir);
+  const database = openDatabase(join(config.dataDir, DATABASE_FILE), config.migrationsDir);
   const events = createEventBus();
   const unit = createUnitOfWork(database.db, events);
   const locks = createRepoLocks();
@@ -435,6 +436,12 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     await schedules.timer.settled();
   });
   const insights = createInsightsModule({ db: database.db, clock, timeZone, tasks: tasks.service });
+  const storage = createStorageModule({
+    dataDir: config.dataDir,
+    clock,
+    settings: settings.service,
+    tasks: tasks.service,
+  });
   const team = createTeamModule({
     db: database.db,
     unit,
@@ -479,6 +486,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const operations: OperationImpl[] = [
     ...settings.operations,
     ...system.operations,
+    ...storage.operations,
     ...projects.operations,
     ...hostingAccounts.operations,
     ...attachments.operations,

@@ -151,10 +151,12 @@ import {
 } from './schedules.ts';
 import { getSettingsOp, updateSettingsOp } from './settings.ts';
 import {
+  cleanStorageOp,
   getEnvironmentOp,
   getHealthOp,
   getRuntimeLogsOp,
   getRuntimeOp,
+  getStorageOp,
   listMcpToolsOp,
   recheckEnvironmentOp,
   restartRuntimeOp,
@@ -253,6 +255,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getRuntimeOp,
   restartRuntimeOp,
   getRuntimeLogsOp,
+  getStorageOp,
+  cleanStorageOp,
   listMcpToolsOp,
   listProjectsOp,
   createProjectOp,

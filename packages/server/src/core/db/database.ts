@@ -19,6 +19,9 @@ export type DbExecutor = Pick<Db, 'select' | 'insert' | 'update' | 'delete'>;
 
 export type Database = { db: Db; close(): void };
 
+/** The SQLite file in the data directory (03 §7); WAL adds `-wal` and `-shm` next to it. */
+export const DATABASE_FILE = 'app.db';
+
 /** Opens (creating if needed) the SQLite file with WAL and foreign keys, and applies pending migrations. */
 export function openDatabase(file: string, migrationsDir: string): Database {
   mkdirSync(dirname(file), { recursive: true });
