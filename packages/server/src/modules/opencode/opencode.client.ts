@@ -1,4 +1,11 @@
-import { AppError, ErrorCode, type ModelInfo, type PermissionDecision, type PermissionRule } from '@aw/shared';
+import {
+  AppError,
+  ErrorCode,
+  type ExternalMcpStatus,
+  type ModelInfo,
+  type PermissionDecision,
+  type PermissionRule,
+} from '@aw/shared';
 import { z } from 'zod';
 import type { Logger } from '../../core/logger.ts';
 import { type OpencodeError, type OpencodeEvent, OpencodeEventType, parseGlobalEvent } from './opencode.events.ts';
@@ -61,6 +68,8 @@ export type OpencodeClient = {
   replyPermission(input: { permissionId: string; directory: string; reply: PermissionDecision }): Promise<void>;
   /** Models of the providers the user has connected, and the configured default `provider/model`. */
   listModels(): Promise<{ available: ModelInfo[]; defaultModel?: string }>;
+  /** Every MCP server of the configuration `directory` sees, by name: the app's own and the user's (28 §4). */
+  mcpStatus(directory: string): Promise<Record<string, McpServerState>>;
   subscribe(listener: (event: OpencodeEvent) => void): () => void;
   /**
    * The backend shuts down (app quit): opencode goes with it. Its sessions are lost like in a crash (`runtime_lost`,
@@ -70,6 +79,9 @@ export type OpencodeClient = {
 };
 
 /** `provider/model` → parts; the model id itself may contain `/`. */
+/** opencode's report of one MCP server; `error` only when it failed or needs a client registration. */
+export type McpServerState = { status: ExternalMcpStatus; error?: string };
+
 export function parseModelRef(value: string): ModelRef {
   const slash = value.indexOf('/');
   if (slash <= 0 || slash === value.length - 1) {
@@ -243,6 +255,10 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         Object.values(p.models).map((m) => ({ providerId: p.id, modelId: m.id, name: m.name })),
       );
       return config.model === undefined ? { available } : { available, defaultModel: config.model };
+    },
+    async mcpStatus(directory) {
+      const { data } = await request('mcp.status', () => runtime.sdk().mcp.status({ directory }, THROW));
+      return data;
     },
     subscribe(listener) {
       listeners.add(listener);

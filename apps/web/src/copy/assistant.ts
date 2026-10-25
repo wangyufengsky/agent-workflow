@@ -3,6 +3,7 @@ import {
   AssistantToolName,
   AssistantTurnStatus,
   EntityKind,
+  ExternalMcpStatus,
   InputRef,
   OperationRisk,
   type Platform,
@@ -166,6 +167,19 @@ export const ASSISTANT_SETTINGS_COPY = {
   alwaysAllowHint: '助手调用这些操作时不再弹出确认卡片。合并、取消、删除等关键操作每次都需要确认，不会出现在这里。',
   none: '还没有总是允许的操作。在助手的确认卡片上选「确认并总是允许」即可加入。',
   revoke: '撤销',
+  externalMcp: '你自己的 MCP 工具',
+  externalMcpHint: '在 opencode 的配置里添加的 MCP 服务器（如日历、文档），助手可以直接使用。',
+  externalMcpNone: '还没有添加。',
+  externalMcpStatus: {
+    [ExternalMcpStatus.Connected]: '已连接',
+    [ExternalMcpStatus.Disabled]: '已停用',
+    [ExternalMcpStatus.Failed]: '连接失败',
+    [ExternalMcpStatus.NeedsAuth]: '需要登录授权',
+    [ExternalMcpStatus.NeedsClientRegistration]: '需要注册客户端',
+  } satisfies Record<ExternalMcpStatus, string>,
+  externalMcpHowTo:
+    '怎样添加：在 ~/.config/opencode/opencode.json 的 mcp 里加上服务器，然后在「运行环境」页重启 opencode。',
+  externalMcpDocs: 'opencode 的 MCP 说明',
 } as const;
 
 /** Navigation cards of the objects the assistant's calls produced (D66). */

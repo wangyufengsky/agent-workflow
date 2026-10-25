@@ -12,6 +12,7 @@ import {
   listAssistantFilesOp,
   listConfirmationsOp,
   listConversationsOp,
+  listExternalMcpOp,
   listInitiativeTemplatesOp,
   OPENCODE_ASSISTANT_AGENT,
   replyAssistantPermissionOp,
@@ -125,6 +126,18 @@ describe('助手对话（A-02、A-03）', () => {
     expect(t.fake.prompts[0]?.system).toContain(
       `the page of initiative I-1 "整理订单模块" (initiative id ${initiative.id}, status draft_ready, project "${project.name}"`,
     );
+  });
+
+  it('用户自己的 MCP（28 §4）：列出 opencode 报告的服务器与状态，不含应用自己的两个；opencode 没就绪时 OPENCODE_NOT_READY', async () => {
+    t.fake.mcpServers.github = { status: 'failed', error: 'spawn npx ENOENT' };
+    t.fake.mcpServers.calendar = { status: 'connected' };
+    expect((await t.call(listExternalMcpOp, {})).body.items).toEqual([
+      { name: 'calendar', status: 'connected', error: null },
+      { name: 'github', status: 'failed', error: 'spawn npx ENOENT' },
+    ]);
+
+    t.fake.crash();
+    expect((await t.call(listExternalMcpOp, {})).body).toMatchObject({ error: { code: ErrorCode.OpencodeNotReady } });
   });
 
   it('用户在组合模板的编辑页或某次 AI 审查时，system 写明是哪一个（34 §15.6、27 §4）', async () => {

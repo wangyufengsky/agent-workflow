@@ -9,6 +9,7 @@ import {
   listAssistantFilesOp,
   listConfirmationsOp,
   listConversationsOp,
+  listExternalMcpOp,
   replyAssistantPermissionOp,
   sendAssistantMessageOp,
   snapshotAssistantContextOp,
@@ -51,6 +52,7 @@ export function assistantOperations(
       conversations.replyPermission(id, permissionId, reply),
     ),
     implement(listAssistantFilesOp, ({ id }) => ({ items: conversations.files(id) })),
+    implement(listExternalMcpOp, async () => ({ items: await conversations.externalMcp() })),
     implement(listConfirmationsOp, ({ id }) => {
       conversations.get(id);
       return { items: confirmations.list(id) };

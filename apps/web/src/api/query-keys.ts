@@ -1,6 +1,7 @@
 /** TanStack Query keys: the only cache of server data in the renderer (06 §4). */
 export const queryKeys = {
   settings: ['settings'],
+  externalMcp: ['assistant', 'external-mcp'],
   environment: ['system', 'environment'],
   projects: ['projects'],
   project: (id: string) => ['projects', id],

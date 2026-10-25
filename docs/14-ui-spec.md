@@ -32,7 +32,7 @@
 | `/databases` | 数据库连接 | 专业 | `databases.html` |
 | `/tools` | MCP 工具 | 专业 | `tools.html`（只保留 MCP 工具清单） |
 | `/runtime` | 运行环境 | 专业 | `runtime.html` |
-| （浮层面板） | 应用助手（v1.1，`⌘J`；主页上由主页显示对话、没有面板（D112）；设置页「助手」分组管理「总是允许」） | 全部 | 新增，见 [15-assistant.md](15-assistant.md#6-界面) |
+| （浮层面板） | 应用助手（v1.1，`⌘J`；主页上由主页显示对话、没有面板（D112）；设置页「助手」分组管理「总是允许」、列出用户自己的 MCP 工具及其连接状态（28 §4）） | 全部 | 新增，见 [15-assistant.md](15-assistant.md#6-界面) |
 
 ```ts
 export const NAV_ITEMS: NavItem[] = [

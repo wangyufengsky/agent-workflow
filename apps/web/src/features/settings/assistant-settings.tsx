@@ -3,10 +3,11 @@ import { Button } from '../../components/button.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { ASSISTANT_SETTINGS_COPY as C } from '../../copy/assistant.ts';
 import { operationTitle } from '../../copy/operations.ts';
+import { ExternalMcp } from './external-mcp.tsx';
 
 const titleOfOperation = new Map(OPERATION_CONTRACTS.map((op) => [op.id, operationTitle(op.title)]));
 
-/** The「助手」group (15 §4): what the assistant may run without asking, and revoking it. */
+/** The「助手」group (15 §4): what the assistant may run without asking, and revoking it; the user's own MCP tools. */
 export function AssistantSettings({ settings, set }: { settings: Settings; set: (patch: Partial<Settings>) => void }) {
   const allowed = settings['assistant.alwaysAllow'];
   return (
@@ -34,6 +35,7 @@ export function AssistantSettings({ settings, set }: { settings: Settings; set: 
           </ul>
         )}
       </div>
+      <ExternalMcp />
     </Panel>
   );
 }

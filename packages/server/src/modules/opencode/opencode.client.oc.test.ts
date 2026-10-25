@@ -1,6 +1,7 @@
 import {
   BashPolicy,
   ErrorCode,
+  listExternalMcpOp,
   MCP_ASSISTANT_SERVER_NAME,
   MCP_SERVER_NAME,
   OPENCODE_AGENT_NAME,
@@ -57,6 +58,11 @@ describe('@opencode 客户端与配置注入', () => {
       [MCP_SERVER_NAME]: { status: 'connected' },
       [MCP_ASSISTANT_SERVER_NAME]: { status: 'connected' },
     });
+    // The settings list only the user's own servers (28 §4), whatever their global configuration has.
+    const { body: external } = await t.call(listExternalMcpOp, {});
+    const names = external.items.map((s) => s.name);
+    expect(names).not.toContain(MCP_SERVER_NAME);
+    expect(names).not.toContain(MCP_ASSISTANT_SERVER_NAME);
   });
 
   it('重复删除已经不存在的真实会话仍然成功，允许中断后重试清理', async () => {

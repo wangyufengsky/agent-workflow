@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ExternalMcpStatus } from './assistant.ts';
 import { InitiativeItemStatus, InitiativeStatus } from './initiative.ts';
 import { KnowledgeTurnStatus } from './knowledge.ts';
 import { ScheduleStatus } from './schedule.ts';
@@ -26,6 +27,7 @@ describe('STATUS_TONE', () => {
     ['schedule', Object.values(ScheduleStatus), STATUS_TONE.schedule],
     ['initiative', Object.values(InitiativeStatus), STATUS_TONE.initiative],
     ['initiativeItem', Object.values(InitiativeItemStatus), STATUS_TONE.initiativeItem],
+    ['externalMcp', Object.values(ExternalMcpStatus), STATUS_TONE.externalMcp],
   ] as const)('%s 的每个状态都映射到一个合法语气', (_name, statuses, map) => {
     const tones: Record<string, string> = map;
     expect(Object.keys(tones).sort()).toEqual([...statuses].sort());
