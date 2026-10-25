@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Prompts } from '@aw/builtin';
 import {
+  ACTIVE_ATTEMPT_STATUSES,
   AppError,
   ATTEMPT_STATUSES,
   type AttemptDTO,
@@ -19,6 +20,7 @@ import {
   type TranscriptPage,
   TranscriptSystemEvent,
 } from '@aw/shared';
+import type { ModelSlots } from '../model-slots/index.ts';
 import { parseModelRef, sessionPermissionRules } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
@@ -38,6 +40,7 @@ export type AttemptsServiceDeps = AttemptStateDeps & {
   settings: SettingsService;
   prompts: Prompts;
   projects: Pick<ProjectsService, 'allowedBash' | 'rememberBash'>;
+  slots: ModelSlots;
 };
 
 export type StartAttemptInput = {
@@ -70,14 +73,42 @@ export type StartAttemptInput = {
 /** What re-attaching to a persisted session needs after a restart: the session state lived in memory. */
 export type ResumeInput = { agent: SessionAgent; system: string | undefined };
 
-const ACTIVE: readonly AttemptStatus[] = [AttemptStatus.Starting, AttemptStatus.Running];
+type ContinueInput = { id?: string; prompt: string; model?: string | null; kind?: AttemptKind } & ResumeInput;
 
 /** Attempt lifecycle (09 §4) and the session protocol (12 §4); opencode-driven end conditions are in the reactions. */
 export function createAttemptsService(deps: AttemptsServiceDeps) {
-  const { clock, opencode, settings, transcripts, projects } = deps;
+  const { clock, opencode, settings, transcripts, projects, slots } = deps;
   const state = createAttemptState(deps);
   const { repo, mustFind, move, record, toDto } = state;
   const reactions = watchSessions(state, deps);
+
+  // Interactive sessions using the model (D186): attempts of no task that do not wait for the user or the model service.
+  slots.addCounter(
+    () =>
+      repo.listByStatus([AttemptStatus.Starting, AttemptStatus.Running]).filter((attempt) => {
+        if (attempt.taskId !== null) return false;
+        const session = state.sessionOf(attempt.id);
+        return session === undefined || (!session.parked && session.modelWaitLeftMs === null);
+      }).length,
+  );
+
+  /**
+   * Whether a new attempt starts now or waits for a model slot (D186). Task attempts are dispatched by the scheduler
+   * within its share, so only attempts of no task ask; once granted, `launch` runs in the background.
+   */
+  function waitsForSlot(id: string, taskId: string | null, launch: () => Promise<unknown>): boolean {
+    if (taskId !== null) return false;
+    return !slots.request({
+      id,
+      grant: () => {
+        state.signal('started', move(mustFind(id), AttemptEvent.SlotGranted));
+        state.inBackground(id, async () => {
+          await launch();
+        });
+      },
+      moved: () => state.publish(mustFind(id)),
+    });
+  }
 
   function requireReady(): void {
     if (!opencode.isConnected()) throw new AppError(ErrorCode.OpencodeNotReady, 'opencode is not ready');
@@ -120,6 +151,88 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     }
   }
 
+  /** Creates the session of a started (or just granted) attempt and sends the first message. */
+  async function launch(id: string, input: StartAttemptInput): Promise<AttemptDTO> {
+    record(mustFind(id), [systemEntry(TranscriptSystemEvent.AttemptStarted)]);
+    const agent = OPENCODE_AGENT_NAME[input.agent];
+    let sessionId: string;
+    try {
+      sessionId = await opencode.createSession({
+        directory: input.directory,
+        title: input.title,
+        agent,
+        permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
+          checkCommands: input.checkCommands,
+          web: input.web,
+          offline: settings.get('network.offline'),
+          allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
+        }),
+      });
+    } catch (err) {
+      const current = mustFind(id);
+      // The runtime went away while the session was being created (crash, restart, app quit): the attempt is
+      // interrupted already and the failed request was part of that.
+      if (current.status !== AttemptStatus.Starting) return toDto(current);
+      return toDto(move(current, AttemptEvent.StartFailed, errorOf(err)));
+    }
+    repo.setSession(id, sessionId);
+    const attempt = mustFind(id);
+    // The runtime may have gone away (or the task been cancelled) while the session was being created.
+    if (attempt.status !== AttemptStatus.Starting) return toDto(attempt);
+
+    const session = track(
+      attempt,
+      {
+        attemptId: id,
+        taskId: input.taskId,
+        sessionId,
+        directory: input.directory,
+        agent,
+        model: input.model === null ? undefined : parseModelRef(input.model),
+        system: input.system,
+      },
+      false,
+    );
+    // Running before the first prompt, so every event of the session finds the attempt active.
+    move(attempt, AttemptEvent.SessionStarted);
+    await sendOrFail(session, input.prompt);
+    return toDto(mustFind(id));
+  }
+
+  /** Follows the earlier attempt's session again for a started (or just granted) attempt and sends the next message. */
+  async function relaunch(
+    id: string,
+    previous: Attempt,
+    sessionId: string,
+    model: string | null,
+    input: ContinueInput,
+  ): Promise<AttemptDTO> {
+    record(mustFind(id), [systemEntry(TranscriptSystemEvent.AttemptStarted)]);
+    // The previous turn on this session may still be winding down (the abort after its submit); its last events
+    // must not reach the new attempt.
+    const winding = state.live.get(sessionId);
+    if (winding !== undefined) await winding.released;
+    const attempt = mustFind(id);
+    // Cancelled while waiting.
+    if (attempt.status !== AttemptStatus.Starting) return toDto(attempt);
+    const session = track(
+      attempt,
+      {
+        attemptId: id,
+        taskId: previous.taskId,
+        sessionId,
+        directory: previous.directory,
+        agent: OPENCODE_AGENT_NAME[input.agent],
+        model: model === null ? undefined : parseModelRef(model),
+        system: input.system,
+      },
+      false,
+    );
+    move(attempt, AttemptEvent.SessionStarted);
+    await sendOrFail(session, input.prompt);
+    return toDto(mustFind(id));
+  }
+
   return {
     get: (id: string): AttemptDTO => toDto(mustFind(id)),
     /** The project the attempt's session works in (none for debug attempts and PPTs without a project). */
@@ -134,9 +247,10 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     /** Execute and review attempts of a node, oldest first. */
     listByNode: (nodeId: string): AttemptSummaryDTO[] => repo.listByNode(nodeId).map(state.toSummary),
     /** Every active attempt, for task summaries. */
-    listActiveAll: (): AttemptSummaryDTO[] => repo.listByStatus(ACTIVE).map(state.toSummary),
-    /** Active (starting / running) attempts of a task. */
-    listActive: (taskId: string): AttemptSummaryDTO[] => repo.listByTask(taskId, ACTIVE).map(state.toSummary),
+    listActiveAll: (): AttemptSummaryDTO[] => repo.listByStatus(ACTIVE_ATTEMPT_STATUSES).map(state.toSummary),
+    /** Active (queued / starting / running) attempts of a task. */
+    listActive: (taskId: string): AttemptSummaryDTO[] =>
+      repo.listByTask(taskId, ACTIVE_ATTEMPT_STATUSES).map(state.toSummary),
     listByTask: (taskId: string): AttemptSummaryDTO[] => repo.listByTask(taskId, ATTEMPT_STATUSES).map(state.toSummary),
     latestPlanAttempt: (taskId: string): AttemptDTO | undefined => {
       const attempt = repo.findLatestPlan(taskId);
@@ -147,12 +261,13 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
 
     /**
      * Creates the session and sends the first message (12 §4.1); the attempt is then `running`. The attempt row is
-     * written before the first await, so a caller that does not wait still sees it as active.
+     * written before the first await, so a caller that does not wait still sees it as active. An attempt of no task
+     * that finds every model slot taken returns `queued` at once and starts once it gets one (D186).
      */
     async start(input: StartAttemptInput): Promise<AttemptDTO> {
       requireReady();
-      const model = input.model === null ? undefined : parseModelRef(input.model);
       const id = input.id ?? randomUUID();
+      const queued = waitsForSlot(id, input.taskId, () => launch(id, input));
       repo.insert({
         id,
         taskId: input.taskId,
@@ -161,7 +276,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         projectId: input.projectId,
         kind: input.kind,
         seq: repo.nextSeq(input),
-        status: AttemptStatus.Starting,
+        status: queued ? AttemptStatus.Queued : AttemptStatus.Starting,
         model: input.model,
         directory: input.directory,
         opencodeSessionId: null,
@@ -169,62 +284,15 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         startedAt: clock.now(),
       });
       state.publish(mustFind(id));
-      record(mustFind(id), [systemEntry(TranscriptSystemEvent.AttemptStarted)]);
-
-      const agent = OPENCODE_AGENT_NAME[input.agent];
-      let sessionId: string;
-      try {
-        sessionId = await opencode.createSession({
-          directory: input.directory,
-          title: input.title,
-          agent,
-          permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
-            checkCommands: input.checkCommands,
-            web: input.web,
-            offline: settings.get('network.offline'),
-            allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
-          }),
-        });
-      } catch (err) {
-        const current = mustFind(id);
-        // The runtime went away while the session was being created (crash, restart, app quit): the attempt is
-        // interrupted already and the failed request was part of that.
-        if (current.status !== AttemptStatus.Starting) return toDto(current);
-        return toDto(move(current, AttemptEvent.StartFailed, errorOf(err)));
-      }
-      repo.setSession(id, sessionId);
-      const attempt = mustFind(id);
-      // The runtime may have gone away (or the task been cancelled) while the session was being created.
-      if (attempt.status !== AttemptStatus.Starting) return toDto(attempt);
-
-      const session = track(
-        attempt,
-        {
-          attemptId: id,
-          taskId: input.taskId,
-          sessionId,
-          directory: input.directory,
-          agent,
-          model,
-          system: input.system,
-        },
-        false,
-      );
-      // Running before the first prompt, so every event of the session finds the attempt active.
-      move(attempt, AttemptEvent.SessionStarted);
-      await sendOrFail(session, input.prompt);
-      return toDto(mustFind(id));
+      return queued ? toDto(mustFind(id)) : launch(id, input);
     },
 
     /**
      * A new attempt on the session of an earlier one (re-planning, 12 §4.3; a knowledge follow-up, 18 §5.3; PPT work,
      * 23 §4.1): the model keeps what it read and receives `prompt` as the next message, with the previous attempt's
-     * model and kind unless `model` / `kind` give others. Synchronous up to sending, like `start`.
+     * model and kind unless `model` / `kind` give others. Synchronous up to sending, like `start`, and queued like it.
      */
-    async continueSession(
-      previousId: string,
-      input: { id?: string; prompt: string; model?: string | null; kind?: AttemptKind } & ResumeInput,
-    ): Promise<AttemptDTO> {
+    async continueSession(previousId: string, input: ContinueInput): Promise<AttemptDTO> {
       requireReady();
       const previous = mustFind(previousId);
       if (previous.opencodeSessionId === null) {
@@ -234,6 +302,8 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       // A PPT's outline and pages are different kinds of work on one session (23 §7.1).
       const kind = input.kind ?? previous.kind;
       const id = input.id ?? randomUUID();
+      const sessionId = previous.opencodeSessionId;
+      const queued = waitsForSlot(id, previous.taskId, () => relaunch(id, previous, sessionId, model, input));
       repo.insert({
         id,
         taskId: previous.taskId,
@@ -242,37 +312,15 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         projectId: previous.projectId,
         kind,
         seq: repo.nextSeq({ ...previous, kind }),
-        status: AttemptStatus.Starting,
+        status: queued ? AttemptStatus.Queued : AttemptStatus.Starting,
         model,
         directory: previous.directory,
         opencodeSessionId: previous.opencodeSessionId,
         nudges: 0,
         startedAt: clock.now(),
       });
-      record(mustFind(id), [systemEntry(TranscriptSystemEvent.AttemptStarted)]);
-      // The previous turn on this session may still be winding down (the abort after its submit); its last events
-      // must not reach the new attempt.
-      const winding = state.live.get(previous.opencodeSessionId);
-      if (winding !== undefined) await winding.released;
-      const attempt = mustFind(id);
-      // Cancelled while waiting.
-      if (attempt.status !== AttemptStatus.Starting) return toDto(attempt);
-      const session = track(
-        attempt,
-        {
-          attemptId: id,
-          taskId: previous.taskId,
-          sessionId: previous.opencodeSessionId,
-          directory: previous.directory,
-          agent: OPENCODE_AGENT_NAME[input.agent],
-          model: model === null ? undefined : parseModelRef(model),
-          system: input.system,
-        },
-        false,
-      );
-      move(attempt, AttemptEvent.SessionStarted);
-      await sendOrFail(session, input.prompt);
-      return toDto(mustFind(id));
+      state.publish(mustFind(id));
+      return queued ? toDto(mustFind(id)) : relaunch(id, previous, sessionId, model, input);
     },
 
     /** The latest attempt on an opencode session; MCP calls are attributed by it (12 §3). */

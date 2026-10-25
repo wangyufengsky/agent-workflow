@@ -65,6 +65,8 @@ export type AttemptKind = (typeof AttemptKind)[keyof typeof AttemptKind];
 export const attemptKindSchema = z.enum(AttemptKind);
 
 export const AttemptStatus = {
+  /** Waiting for a model slot (`scheduler.maxConcurrentAttempts`, D186); no session yet. */
+  Queued: 'queued',
   Starting: 'starting',
   Running: 'running',
   Succeeded: 'succeeded',
@@ -74,6 +76,12 @@ export const AttemptStatus = {
 } as const;
 export type AttemptStatus = (typeof AttemptStatus)[keyof typeof AttemptStatus];
 export const ATTEMPT_STATUSES = Object.values(AttemptStatus);
+/** Not ended: queued for a model slot, creating the session, or working. */
+export const ACTIVE_ATTEMPT_STATUSES: readonly AttemptStatus[] = [
+  AttemptStatus.Queued,
+  AttemptStatus.Starting,
+  AttemptStatus.Running,
+];
 export const attemptStatusSchema = z.enum(AttemptStatus);
 
 export const PlanStatus = {

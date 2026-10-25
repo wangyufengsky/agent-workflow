@@ -2,6 +2,7 @@ import { AttemptKind, type ServerEventType as EventType, ServerEventType, TaskSt
 import type { EventBus } from '../../core/event-bus.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttemptsService } from '../attempts/index.ts';
+import type { ModelSlots } from '../model-slots/index.ts';
 import type { NodesService } from '../nodes/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import type { TasksService } from '../tasks/index.ts';
@@ -12,6 +13,7 @@ export type SchedulerDeps = {
   nodes: NodesService;
   attempts: AttemptsService;
   settings: SettingsService;
+  slots: Pick<ModelSlots, 'backgroundLimit' | 'setBackgroundBusy'>;
   events: EventBus;
   log: Logger;
 };
@@ -23,12 +25,14 @@ const TRIGGERS: ReadonlySet<EventType> = new Set([
   ServerEventType.AttemptUpdated,
   ServerEventType.SettingsUpdated,
   ServerEventType.RuntimeUpdated,
+  // An interactive session ended, waits, or the queue emptied: tasks may take the slot (D186).
+  ServerEventType.ModelSlotsUpdated,
 ]);
 
 const SCHEDULED: readonly TaskStatus[] = [TaskStatus.Planning, TaskStatus.Running, TaskStatus.Paused];
 
 /** Event-driven scheduler: each relevant event schedules one run; runs never overlap and repeat while triggered. */
-export function createScheduler({ tasks, nodes, attempts, settings, events, log }: SchedulerDeps) {
+export function createScheduler({ tasks, nodes, attempts, settings, slots, events, log }: SchedulerDeps) {
   let queued = false;
   let running = false;
   let again = false;
@@ -43,7 +47,7 @@ export function createScheduler({ tasks, nodes, attempts, settings, events, log 
     );
     const byTask = Map.groupBy(nodes.listByTasks(scheduled.map((t) => t.id)), (n) => n.taskId);
     return {
-      maxConcurrentAttempts: settings.get('scheduler.maxConcurrentAttempts'),
+      backgroundLimit: slots.backgroundLimit(),
       maxConcurrentNodesPerTask: settings.get('scheduler.maxConcurrentNodesPerTask'),
       runtimeReady: attempts.isReady(),
       tasks: scheduled
@@ -54,6 +58,8 @@ export function createScheduler({ tasks, nodes, attempts, settings, events, log 
 
   async function runOnce(): Promise<void> {
     const decision = decide(snapshot());
+    // Before anything starts: interactive requests asking meanwhile see the slots the tasks are about to take.
+    slots.setBackgroundBusy(decision.busy);
     for (const nodeId of decision.depsMet) nodes.markReady(nodeId);
     for (const taskId of decision.failed) tasks.failRunning(taskId);
     for (const taskId of decision.finished) await tasks.finishRunning(taskId);

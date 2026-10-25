@@ -8,6 +8,7 @@ export const queryKeys = {
   gitInitPreview: (repoPath: string) => ['projects', 'git-init-preview', repoPath],
   paletteOperations: ['operations', 'palette'],
   runtime: ['system', 'runtime'],
+  modelSlots: ['system', 'model-slots'],
   health: ['system', 'health'],
   attempt: (id: string) => ['attempts', id],
   /** An attachment's original never changes (30 §3.1). */

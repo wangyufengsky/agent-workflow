@@ -12,6 +12,7 @@ export type KnowledgeTurnStatus = (typeof KnowledgeTurnStatus)[keyof typeof Know
 export const knowledgeTurnStatusSchema = z.enum(KnowledgeTurnStatus);
 
 const TURN_STATUS_OF_ATTEMPT = {
+  [AttemptStatus.Queued]: KnowledgeTurnStatus.Researching,
   [AttemptStatus.Starting]: KnowledgeTurnStatus.Researching,
   [AttemptStatus.Running]: KnowledgeTurnStatus.Researching,
   [AttemptStatus.Succeeded]: KnowledgeTurnStatus.Answered,

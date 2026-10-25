@@ -38,6 +38,9 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
   switch (event.type) {
     case ServerEventType.SettingsUpdated:
       return qc.invalidateQueries({ queryKey: queryKeys.settings });
+    case ServerEventType.ModelSlotsUpdated:
+      qc.setQueryData(queryKeys.modelSlots, event.data);
+      return;
     case ServerEventType.RuntimeUpdated:
       qc.setQueryData(queryKeys.runtime, event.data);
       // Whether models are available, and which MCP servers are connected, depends on the runtime.

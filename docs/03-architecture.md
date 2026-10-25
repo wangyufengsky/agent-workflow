@@ -314,7 +314,8 @@ export function taskOperations(tasks: TasksService) {
 - SQLite 单连接、单写者；多行状态变更放进同一事务。
 - 状态变更只通过 `fsm.transition()`，转换表在 `shared/fsm`；非法转换抛 `STATE_TRANSITION_INVALID`。
 - Git：同一仓库会改动 refs 或 worktree 列表的操作（worktree add/remove、branch 删除、merge、push）经**每仓库互斥锁**串行；worktree 内部的读写彼此独立。
-- 调度器：全局并发上限 `maxConcurrentAttempts`（计入 `running`/`verifying` 的节点与规划中的任务）、每任务上限 `maxConcurrentNodesPerTask`（另计入等待输入的节点）；事件驱动（任务、节点、尝试、设置、运行时变化）触发一次调度，同一时刻只有一次调度在运行，不轮询（D47）。纯决策函数为 `scheduler.decide.ts`。
+- 模型额度（D186，`modules/model-slots`）：`scheduler.maxConcurrentAttempts` 是所有使用模型的会话共享的上限。交互的会话（不属于任务的尝试：知识问答、PPT、Git 审查、提交信息、需求拆解、成员分析；助手单轮）向它要额度，用满时先来先得排队（尝试为 `queued`，助手一轮显示排队位置），拿到额度后才建会话、开始计时；任务的规划与节点由调度器在「后台份额」内派发：最多用上限减一（上限为 1 时可用这一个），交互已占的不给，有请求排队时不再派发新的。占用按需计数：等待用户、opencode 重试模型请求（D163）的会话不占；等完继续时不再排队，可能短暂超过上限。桌宠碎碎念不排队，用满时这次跳过（`MODEL_SLOTS_FULL`）。
+- 调度器：后台份额 `backgroundLimit`（计入 `running`/`verifying` 的节点与规划中的任务）、每任务上限 `maxConcurrentNodesPerTask`（另计入等待输入的节点）；事件驱动（任务、节点、尝试、设置、运行时、模型额度变化）触发一次调度，同一时刻只有一次调度在运行，不轮询（D47）；每次调度先把任务占用的数目告诉模型额度，再派发。纯决策函数为 `scheduler.decide.ts`。
 
 ## 9. 安全边界
 

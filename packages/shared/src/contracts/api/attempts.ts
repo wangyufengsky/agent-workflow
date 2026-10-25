@@ -20,6 +20,8 @@ export const attemptSummarySchema = z.object({
   error: errorInfoSchema.nullable(),
   /** Latest `report_progress` line while the attempt is active; kept in memory only (12 §6.8). */
   progress: z.string().nullable(),
+  /** 1 = next to get a model slot while `queued` (D186); null otherwise. */
+  queuePosition: z.number().int().positive().nullable(),
   startedAt: z.number(),
   endedAt: z.number().nullable(),
 });

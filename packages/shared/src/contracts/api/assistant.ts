@@ -52,6 +52,8 @@ export const assistantConversationSchema = z.object({
   id: z.string(),
   title: z.string(),
   busy: z.boolean(),
+  /** The turn waits for a model slot (D186): 1 = next; null when not queued. */
+  queuePosition: z.number().int().positive().nullable(),
   pendingPermissions: z.array(assistantPermissionRequestSchema),
   usage: assistantUsageSchema,
   createdAt: z.number(),

@@ -23,6 +23,8 @@ export function createAssistantUsage(deps: {
   clock: Clock;
   settings: SettingsService;
   onTimeout(id: string): void;
+  /** Whether a turn uses the model changed (started, ended, waits): the model slots recount (D186). */
+  onChange(): void;
 }) {
   const repo = createAssistantUsageRepo(deps.db);
   const active = new Map<string, Active>();
@@ -43,7 +45,8 @@ export function createAssistantUsage(deps: {
       state.cancel();
       state.remainingMs -= deps.clock.now() - state.armedAt;
       state.armedAt = null;
-    }
+    } else return;
+    deps.onChange();
   }
 
   function update(id: string, change: Partial<Pick<Active, 'held' | 'waitingForModel'>>) {
@@ -84,7 +87,10 @@ export function createAssistantUsage(deps: {
       state.cancel();
       finishTurn(state.turn, event);
       active.delete(id);
+      deps.onChange();
     },
+    /** Turns using the model now: running, not waiting for the user or the model service. */
+    usingModel: () => [...active.values()].filter((state) => state.armedAt !== null).length,
     pause: (id: string) => update(id, { held: true }),
     resume: (id: string) => update(id, { held: false }),
     /** opencode 等待重试失败的模型请求（`session.status` 为 `retry`）：这段时间算模型服务的。 */

@@ -14,6 +14,7 @@ import { Markdown } from '../../components/markdown.tsx';
 import { formatTime } from '../../copy/common.ts';
 import { GIT_COPY } from '../../copy/git.ts';
 import { TEAM_COPY as C, formatDecimal } from '../../copy/team.ts';
+import { AttemptQueueNotice } from '../attempts/model-slots.tsx';
 import git from '../git/git.module.css';
 import styles from './team.module.css';
 import { teamAnalysesQuery, useCancelAnalysis, useCreateAnalyses } from './team.queries.ts';
@@ -158,6 +159,9 @@ function Report({ analysis, onCancel }: { analysis: TeamAnalysisDTO; onCancel: (
           </Button>
         )}
       </div>
+      {analysis.status === TeamAnalysisStatus.Running && analysis.attemptId !== null && (
+        <AttemptQueueNotice attemptId={analysis.attemptId} />
+      )}
       {analysis.error !== null && <ErrorState error={analysis.error} />}
       {report !== null && (
         <>

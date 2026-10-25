@@ -11,6 +11,7 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { attemptQuery, attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
+import { QueueNotice } from '../attempts/model-slots.tsx';
 import { ActionBar, ActionGroup, StreamAttemptContext } from './action-bar.tsx';
 import { ClampedText } from './clamped-text.tsx';
 import { LatestButton } from './latest-button.tsx';
@@ -256,5 +257,10 @@ export function ConversationStream({ attemptId, ...props }: { attemptId: string 
   ) : (
     pages.hasNextPage && <p className="hint">{COMMON_COPY.loading}</p>
   );
-  return <Box attempt={attempt.data} entries={entries} more={more} {...props} />;
+  return (
+    <>
+      <QueueNotice position={attempt.data.queuePosition} />
+      <Box attempt={attempt.data} entries={entries} more={more} {...props} />
+    </>
+  );
 }

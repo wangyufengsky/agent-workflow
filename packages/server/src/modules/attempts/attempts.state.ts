@@ -20,6 +20,7 @@ import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { InboxService } from '../inbox/index.ts';
+import type { ModelSlots } from '../model-slots/index.ts';
 import type { ModelRef, OpencodeClient } from '../opencode/index.ts';
 import { recordTaskEvent } from '../timeline/index.ts';
 import { type Attempt, createAttemptsRepo } from './attempts.repo.ts';
@@ -60,9 +61,10 @@ export type LiveSession = {
 
 /**
  * What the owner of an attempt (a node, a plan, an acceptance review) needs to hear about: the attempt ended (in any
- * terminal state), or its session started or stopped waiting for the user.
+ * terminal state), a queued attempt got its model slot and its session is being created (`started`, D186), or its
+ * session started or stopped waiting for the user.
  */
-export type AttemptSignal = { type: 'ended' | 'awaiting_input' | 'input_answered'; attempt: Attempt };
+export type AttemptSignal = { type: 'started' | 'ended' | 'awaiting_input' | 'input_answered'; attempt: Attempt };
 
 export type AttemptStateDeps = {
   db: Db;
@@ -72,6 +74,7 @@ export type AttemptStateDeps = {
   opencode: OpencodeClient;
   inbox: InboxService;
   transcripts: TranscriptStore<{ id: string; taskId: string | null; kind: AttemptKind }>;
+  slots: Pick<ModelSlots, 'changed' | 'cancel' | 'position'>;
 };
 
 /** An expected failure (opencode request, not ready …) as the error recorded on the attempt; anything else is a bug. */
@@ -86,7 +89,7 @@ export const systemEntry = (event: TranscriptSystemEvent): NewTranscriptEntry =>
 });
 
 /** What the attempt service and its session reactions share: records, live sessions and the transition helper. */
-export function createAttemptState({ db, unit, clock, log, opencode, inbox, transcripts }: AttemptStateDeps) {
+export function createAttemptState({ db, unit, clock, log, opencode, inbox, transcripts, slots }: AttemptStateDeps) {
   const repo = createAttemptsRepo(db);
   /** By opencode session id. */
   const live = new Map<string, LiveSession>();
@@ -109,7 +112,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
     roleId: _r,
     ...a
   }: Attempt): AttemptSummaryDTO {
-    return { ...a, progress: progress.get(a.id) ?? null };
+    return { ...a, progress: progress.get(a.id) ?? null, queuePosition: slots.position(a.id) };
   }
 
   function publish(attempt: Attempt): void {
@@ -171,7 +174,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
     toSummary,
     toDto: (attempt: Attempt): AttemptDTO => {
       const { roleId: _roleId, ...rest } = attempt;
-      return { ...rest, progress: progress.get(attempt.id) ?? null };
+      return { ...rest, progress: progress.get(attempt.id) ?? null, queuePosition: slots.position(attempt.id) };
     },
     onSignal(listener: (signal: AttemptSignal) => void): void {
       listeners.add(listener);
@@ -209,6 +212,9 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
         if (ended) inbox.dismissOpen({ attemptId: attempt.id });
         return mustFind(attempt.id);
       });
+      // Stopped while waiting for a model slot: it leaves the line.
+      if (ended) slots.cancel(attempt.id);
+      slots.changed();
       if (ended) {
         progress.delete(attempt.id);
         const session = sessionOf(attempt.id);
@@ -226,6 +232,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
       if (session.parked) return;
       session.parked = true;
       session.cancelTimeout();
+      slots.changed();
       transcripts.append(attempt, [systemEntry(TranscriptSystemEvent.AwaitingInput)]);
       signal('awaiting_input', attempt);
     },

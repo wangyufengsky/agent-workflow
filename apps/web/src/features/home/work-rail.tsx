@@ -6,6 +6,7 @@ import { BATCHES_COPY } from '../../copy/batches.ts';
 import { HOME_COPY as C } from '../../copy/home.ts';
 import { INITIATIVES_COPY } from '../../copy/initiatives.ts';
 import { INBOX_COPY } from '../../copy/tasks.ts';
+import { ModelSlotsLine } from '../attempts/model-slots.tsx';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import styles from './home.module.css';
 import { useWork } from './work-overview.tsx';
@@ -34,6 +35,7 @@ export function WorkRail() {
         <span className="grow">{C.rail}</span>
         <IconButton icon="chevRight" label={C.railHide} onClick={() => setOpen(false)} />
       </div>
+      <ModelSlotsLine />
       {attention.length > 0 && (
         <section className={styles.railGroup}>
           <h3 className={styles.railTitle}>

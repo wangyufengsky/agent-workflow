@@ -9,7 +9,7 @@ import { browserFrameSchema, userTabStateSchema } from '../api/browser.ts';
 import { deliverySchema } from '../api/delivery.ts';
 import { inboxItemSchema } from '../api/inbox.ts';
 import { previewSchema } from '../api/previews.ts';
-import { runtimeSchema } from '../api/system.ts';
+import { modelSlotsSchema, runtimeSchema } from '../api/system.ts';
 import { nodeSummarySchema, planSummarySchema, taskSummarySchema } from '../api/tasks.ts';
 
 /** Domain events pushed over SSE (11 §11). Each milestone adds the events of the entities it introduces. */
@@ -19,6 +19,7 @@ export const serverEventSchema = z.discriminatedUnion('type', [
     data: z.object({ keys: z.array(settingsSchema.keyof()) }),
   }),
   z.object({ type: z.literal(ServerEventType.RuntimeUpdated), data: runtimeSchema }),
+  z.object({ type: z.literal(ServerEventType.ModelSlotsUpdated), data: modelSlotsSchema }),
   z.object({ type: z.literal(ServerEventType.TaskUpdated), data: taskSummarySchema }),
   z.object({
     type: z.literal(ServerEventType.NodeUpdated),

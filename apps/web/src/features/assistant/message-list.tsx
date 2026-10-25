@@ -242,11 +242,11 @@ const Message = memo(function Message({
 });
 
 /** The working indicator (15 §6): the assistant's mark turning and a line of light passing over the words. */
-function Thinking() {
+function Thinking({ queuePosition }: { queuePosition: number | null }) {
   return (
     <div className={`${styles.message} ${styles.thinking}`} role="status" data-testid="assistant-thinking">
       <Character mood="thinking" />
-      <span className="shimmer">{C.thinking}</span>
+      <span className="shimmer">{queuePosition === null ? C.thinking : ATTEMPT_COPY.queued(queuePosition)}</span>
     </div>
   );
 }
@@ -312,7 +312,7 @@ function Stream({
             fresh={i >= opened}
           />
         ))}
-        {thinking && <Thinking />}
+        {thinking && <Thinking queuePosition={conversation.queuePosition} />}
       </div>
       {!stick.following && <LatestButton unseen={stick.unseen} onClick={stick.toLatest} />}
     </>

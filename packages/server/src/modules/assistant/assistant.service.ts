@@ -16,6 +16,7 @@ import {
   AssistantTurnEvent,
   AssistantTurnStatus,
   type AssistantUsageDTO,
+  type AttachmentDTO,
   AttachmentOwnerKind,
   type ChartSpec,
   ErrorCode,
@@ -45,6 +46,7 @@ import {
   type NewTranscriptEntry,
   type SessionView,
 } from '../attempts/index.ts';
+import type { ModelSlots } from '../model-slots/index.ts';
 import {
   type AssistantPrompt,
   assistantPermissionRules,
@@ -72,6 +74,7 @@ export type AssistantServiceDeps = {
   settings: SettingsService;
   attachments: AttachmentsService;
   context: ContextRenderer;
+  slots: ModelSlots;
   dataDir: string;
   /** IANA zone the user's times are given in (15 §2). */
   timeZone: string;
@@ -98,6 +101,8 @@ type Live = {
   /** The user asked to stop: the abort's own error is not the conversation's. */
   aborting: boolean;
   stopping: boolean;
+  /** The next turn waits for a model slot (D186); it starts once granted. */
+  queued: boolean;
   turn: Turn | null;
   view: SessionView;
   permissions: Map<string, AssistantPermissionRequestDTO>;
@@ -122,7 +127,7 @@ const titleOf = (text: string) =>
  * Messages go out with the per-turn context; the session's events become the conversation's message stream.
  */
 export function createAssistantService(deps: AssistantServiceDeps) {
-  const { db, unit, events, clock, log, opencode, settings, attachments, context } = deps;
+  const { db, unit, events, clock, log, opencode, settings, attachments, context, slots } = deps;
   const repo = createAssistantRepo(db);
   // opencode 使用真实路径判断目录边界，macOS 的 /var 等别名也必须先规范化。
   const directory = join(realpathSync(deps.dataDir), ASSISTANT_DIR);
@@ -134,7 +139,9 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         log.error({ err, conversationId: id }, 'assistant timeout abort failed'),
       );
     },
+    onChange: slots.changed,
   });
+  slots.addCounter(usage.usingModel);
   /** opencode session id → conversation id, for the sessions this run has used. */
   const sessions = new Map<string, string>();
   const transcripts = createTranscriptStore<{ id: string }>({
@@ -155,6 +162,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         deleting: false,
         aborting: false,
         stopping: false,
+        queued: false,
         turn: null,
         view: createSessionView(),
         permissions: new Map(),
@@ -180,6 +188,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       id: c.id,
       title: c.title,
       busy: state.busy || state.sending || state.deleting || state.stopping,
+      queuePosition: slots.position(c.id),
       pendingPermissions: [...state.permissions.values()],
       usage: summary,
       createdAt: c.createdAt,
@@ -242,11 +251,43 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     return sessionId;
   }
 
-  /** 建会话之前占住发送入口；请求返回前的空闲事件只结束模型回合，不释放发送权。 */
+  /**
+   * 模型额度用满时本轮排队（D186）：先占住发送入口并显示排队，拿到额度后再开始，`onQueued` 让用户的消息先出现在对话里。
+   * 没有人再等这次请求，开始时的失败写进对话。
+   */
   async function runTurn(
     c: Conversation,
     source: 'user' | 'app',
     send: (model: string | null, turn: Turn) => Promise<void>,
+    onQueued: () => void = () => undefined,
+  ): Promise<void> {
+    const state = liveOf(c.id);
+    const now = slots.request({
+      id: c.id,
+      grant: () => {
+        state.queued = false;
+        beginTurn(c, source, send, true).catch((err: unknown) =>
+          log.warn({ err, conversationId: c.id }, 'queued assistant turn did not start'),
+        );
+      },
+      moved: () => publish(c.id),
+    });
+    if (now) {
+      await beginTurn(c, source, send, false);
+      return;
+    }
+    state.queued = true;
+    state.busy = true;
+    onQueued();
+    publish(c.id);
+  }
+
+  /** 建会话之前占住发送入口；请求返回前的空闲事件只结束模型回合，不释放发送权。 */
+  async function beginTurn(
+    c: Conversation,
+    source: 'user' | 'app',
+    send: (model: string | null, turn: Turn) => Promise<void>,
+    queued: boolean,
   ): Promise<void> {
     const state = liveOf(c.id);
     state.sending = true;
@@ -271,6 +312,9 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         state.busy = false;
         state.turn = null;
         usage.finish(c.id, AssistantTurnEvent.Error);
+        // Queued: nobody waits for the request; the failure belongs in the conversation.
+        if (queued && err instanceof AppError)
+          record(c, [{ kind: TranscriptEntryKind.Error, data: { code: err.code, message: err.message } }]);
       }
       throw err;
     } finally {
@@ -404,6 +448,8 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     for (const [id, state] of live) {
       state.permissions.clear();
       if (!state.busy) continue;
+      slots.cancel(id);
+      state.queued = false;
       state.busy = false;
       usage.finish(id, AssistantTurnEvent.RuntimeLost);
       state.turn = null;
@@ -553,6 +599,14 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     const state = liveOf(id);
     if (state.deleting) throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is being deleted`, { id });
     if ((!state.busy && !state.sending) || state.stopping) return;
+    if (state.queued) {
+      slots.cancel(id);
+      state.queued = false;
+      state.busy = false;
+      record(c, [{ kind: TranscriptEntryKind.System, data: { event: TranscriptSystemEvent.Aborted } }]);
+      publish(id);
+      return;
+    }
     const turn = state.turn;
     state.stopping = true;
     state.aborting = true;
@@ -642,6 +696,11 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       if (state.sending || state.deleting || state.stopping)
         throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is busy`, { id });
       const turn = state.turn;
+      if (state.queued) {
+        slots.cancel(id);
+        state.queued = false;
+        state.busy = false;
+      }
       state.deleting = true;
       usage.pause(id);
       try {
@@ -699,13 +758,10 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       const systemText = system(c, page, 'user');
       const titled = c.title === '' ? { ...c, title: titleOf(text) } : c;
       repo.updateConversation(id, { title: titled.title, updatedAt: clock.now() });
-      await runTurn(titled, 'user', async (model, turn) => {
-        const sessionId = await sessionOf(titled);
-        if (!usage.isRunning(id) || state.stopping || state.deleting)
-          throw new AppError(
-            ErrorCode.AssistantBusy,
-            'Assistant stopped before the message was sent; your draft is retained',
-          );
+      let shown: AttachmentDTO[] | undefined;
+      // The message joins the conversation once sent, or right away when the turn waits for a model slot (D186).
+      const show = (): AttachmentDTO[] => {
+        if (shown !== undefined) return shown;
         // The conversation keeps its files even when the model cannot be reached: they were sent (30 §2).
         attachments.bind({ kind: AttachmentOwnerKind.AssistantMessage, id }, attachmentIds);
         const sent = attachmentIds.map((attachmentId) => attachments.get(attachmentId));
@@ -715,22 +771,38 @@ export function createAssistantService(deps: AssistantServiceDeps) {
             data: sent.length === 0 ? { text } : { text, attachments: sent.map((a) => ({ id: a.id, name: a.name })) },
           },
         ]);
-        state.page = page;
-        const queued = repo.pendingMessages(id);
-        const section = attachments.promptSection(
-          sent,
-          `${MCP_ASSISTANT_TOOL_PREFIX}${AssistantToolName.ReadAttachment}`,
-        );
-        await prompt(
-          c,
-          sessionId,
-          systemText,
-          [...queued.map((m) => m.text), text, ...(section === '' ? [] : [section])].join('\n\n'),
-          model,
-          turn,
-        );
-        repo.acknowledgeMessages(queued.map((m) => m.id));
-      });
+        shown = sent;
+        return sent;
+      };
+      await runTurn(
+        titled,
+        'user',
+        async (model, turn) => {
+          const sessionId = await sessionOf(titled);
+          if (!usage.isRunning(id) || state.stopping || state.deleting)
+            throw new AppError(
+              ErrorCode.AssistantBusy,
+              'Assistant stopped before the message was sent; your draft is retained',
+            );
+          const sent = show();
+          state.page = page;
+          const queued = repo.pendingMessages(id);
+          const section = attachments.promptSection(
+            sent,
+            `${MCP_ASSISTANT_TOOL_PREFIX}${AssistantToolName.ReadAttachment}`,
+          );
+          await prompt(
+            c,
+            sessionId,
+            systemText,
+            [...queued.map((m) => m.text), text, ...(section === '' ? [] : [section])].join('\n\n'),
+            model,
+            turn,
+          );
+          repo.acknowledgeMessages(queued.map((m) => m.id));
+        },
+        show,
+      );
       return toDto(get(id));
     },
 

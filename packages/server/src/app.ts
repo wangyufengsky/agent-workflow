@@ -51,6 +51,7 @@ import { createInitiativesModule, type InitiativesService } from './modules/init
 import { createInsightsModule } from './modules/insights/index.ts';
 import { createKnowledgeModule, type KnowledgeService } from './modules/knowledge/index.ts';
 import { createMcpModule } from './modules/mcp/index.ts';
+import { createModelSlotsModule } from './modules/model-slots/index.ts';
 import { createNetworkModule, validateNetworkSettings } from './modules/network/index.ts';
 import { createNodesModule, type NodesService } from './modules/nodes/index.ts';
 import {
@@ -240,6 +241,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const workflows = createWorkflowsModule({ db: database.db, clock, log, roles: roles.service });
   workflows.service.syncBuiltin(loadBuiltinWorkflows(config.promptsDir));
   const inbox = createInboxModule({ db: database.db, unit, clock, log });
+  const modelSlots = createModelSlotsModule({ settings: settings.service, events, log });
+  server.addHook('preClose', async () => modelSlots.service.dispose());
   const attempts = createAttemptsModule({
     db: database.db,
     unit,
@@ -252,6 +255,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     projects: projects.service,
     prompts,
     dataDir: config.dataDir,
+    slots: modelSlots.service,
   });
   const worktrees = createWorktreesModule({
     db: database.db,
@@ -420,6 +424,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     nodes: nodes.service,
     attempts: attempts.service,
     settings: settings.service,
+    slots: modelSlots.service,
     events,
     log,
   });
@@ -491,6 +496,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const operations: OperationImpl[] = [
     ...settings.operations,
     ...system.operations,
+    ...modelSlots.operations,
     ...credentials.operations,
     ...storage.operations,
     ...projects.operations,
@@ -540,6 +546,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     gitReviews: gitReviews.service,
     team: team.service,
     attachments: attachments.service,
+    slots: modelSlots.service,
     dataDir: config.dataDir,
     timeZone,
     token: assistantMcpToken,

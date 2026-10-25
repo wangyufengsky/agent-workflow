@@ -3,10 +3,10 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
+  ACTIVE_ATTEMPT_STATUSES,
   AcceptanceCheckKind,
   AppError,
   ATTEMPT_STATUSES,
-  AttemptStatus,
   BROWSER_FRAME_QUALITY,
   BROWSER_FRAME_WIDTH,
   BROWSER_READ_TIMEOUT_MS,
@@ -96,9 +96,7 @@ const hostOfCookie = (domain: string) => domain.replace(/^\./, '');
 
 /** Host or path fragments of login pages, besides `browser.loginUrlPatterns` (29 §5.4). */
 const LOGIN_HINTS = ['login', 'signin', 'sign-in', 'sso', 'cas', 'oauth'];
-const ENDED = new Set<string>(
-  ATTEMPT_STATUSES.filter((s) => s !== AttemptStatus.Starting && s !== AttemptStatus.Running),
-);
+const ENDED = new Set<string>(ATTEMPT_STATUSES.filter((s) => !ACTIVE_ATTEMPT_STATUSES.includes(s)));
 
 const navigateSchema = z.object({ errorText: z.string().optional() });
 /** An address as a citation names a page: without its fragment. */

@@ -12,7 +12,7 @@ const task = (id: string, nodes: Task['nodes'], status: TaskStatus = TaskStatus.
   nodes: nodes.map((n) => ({ ...n, id: `${id}.${n.key}` })),
 });
 const snapshot = (tasks: Task[], extra: Partial<SchedulerSnapshot> = {}): SchedulerSnapshot => ({
-  maxConcurrentAttempts: 4,
+  backgroundLimit: 4,
   maxConcurrentNodesPerTask: 2,
   runtimeReady: true,
   tasks,
@@ -47,7 +47,7 @@ describe('调度决策', () => {
         task('old', [node('a', NodeStatus.Verifying), node('b', NodeStatus.Ready)]),
         task('new', [node('a', NodeStatus.Ready)]),
       ],
-      { maxConcurrentAttempts: 3 },
+      { backgroundLimit: 3 },
     );
     expect(dispatched(s)).toEqual(['old.b']);
   });
@@ -74,7 +74,7 @@ describe('调度决策', () => {
         TaskStatus.Paused,
       ),
     ]);
-    expect(decide(s)).toEqual({ depsMet: ['t.b'], dispatch: [], startPlanning: [], finished: [], failed: [] });
+    expect(decide(s)).toEqual({ depsMet: ['t.b'], dispatch: [], startPlanning: [], finished: [], failed: [], busy: 0 });
   });
 
   it('规划中且没有规划会话的任务在有空位时开始规划', () => {
@@ -83,8 +83,8 @@ describe('调度决策', () => {
       planning: active,
     });
     expect(
-      decide(snapshot([planning('a', false), planning('b', true), planning('c', false)], { maxConcurrentAttempts: 2 })),
-    ).toMatchObject({ startPlanning: ['a'] });
+      decide(snapshot([planning('a', false), planning('b', true), planning('c', false)], { backgroundLimit: 2 })),
+    ).toMatchObject({ startPlanning: ['a'], busy: 2 });
   });
 
   it('opencode 未就绪时不派发也不开始规划', () => {

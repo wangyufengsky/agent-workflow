@@ -8,6 +8,7 @@ import {
   OPENCODE_COMPANION_AGENT,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
+import type { ModelSlots } from '../model-slots/index.ts';
 import { OpencodeEventType as E, type OpencodeClient, parseModelRef } from '../opencode/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 
@@ -16,6 +17,7 @@ export function createWhisperService(deps: {
   opencode: OpencodeClient;
   settings: SettingsService;
   clock: Clock;
+  slots: Pick<ModelSlots, 'isFree'>;
   dataDir: string;
 }) {
   const { opencode, settings, clock } = deps;
@@ -26,6 +28,8 @@ export function createWhisperService(deps: {
   return {
     async generate(): Promise<{ text: string }> {
       if (running) throw new AppError(ErrorCode.AssistantBusy, 'Companion is already speaking');
+      // Not worth a place in line behind real work (D186); it is not counted while it runs either, being one line.
+      if (!deps.slots.isFree()) throw new AppError(ErrorCode.ModelSlotsFull, 'Every model slot is taken');
       running = true;
       const completed = Promise.withResolvers<void>();
       settled = completed.promise;

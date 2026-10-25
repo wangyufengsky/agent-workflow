@@ -21,12 +21,13 @@ export const SETTINGS_COPY = {
   uncertainty: 'AI 遇到不确定的地方时',
   assume: '做出合理假设并写明',
   ask: '停下来问我',
-  concurrency: '同时运行的 AI 会话数',
+  concurrency: '同时使用模型的会话数',
   previewMaxRunning: '同时运行的页面预览数',
   previewIdleMinutes: '页面预览空闲多久后停止（分钟）',
   loginUrlPatterns: '识别登录页的地址片段',
   integratedAuthServers: 'Windows 集成登录的服务器',
-  concurrencyHint: '多个任务同时进行时，最多并行的 AI 会话数量。',
+  concurrencyHint:
+    '任务、助手、知识问答、PPT、Git 审查等一起算；用满时新的请求排队，有人在等的先开始，任务最多用其中的数量减一。本地模型并发小时调小。',
   // 离线环境（D168）
   offline: '离线环境',
   offlineHint:

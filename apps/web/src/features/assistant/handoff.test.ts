@@ -6,6 +6,7 @@ const conversation = (busy: boolean): AssistantConversationDTO => ({
   id: 'c1',
   title: '',
   busy,
+  queuePosition: null,
   pendingPermissions: [],
   createdAt: 0,
   updatedAt: 0,

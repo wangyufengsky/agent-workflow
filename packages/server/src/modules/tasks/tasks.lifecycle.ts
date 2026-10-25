@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { PromptName, renderTemplate } from '@aw/builtin';
 import {
+  ACTIVE_ATTEMPT_STATUSES,
   AppError,
   AttachmentOwnerKind,
   type AttemptDTO,
@@ -505,7 +506,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       for (const attempt of attempts.listActive(taskId)) {
         // An attempt may end on its own while earlier ones are being aborted.
         const { status } = attempts.get(attempt.id);
-        if (status === AttemptStatus.Starting || status === AttemptStatus.Running) await attempts.abort(attempt.id);
+        if (ACTIVE_ATTEMPT_STATUSES.includes(status)) await attempts.abort(attempt.id);
       }
       const worktree = worktrees.findByTask(taskId);
       if (worktree?.status === WorktreeStatus.Ready) {

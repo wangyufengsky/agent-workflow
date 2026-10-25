@@ -1,5 +1,6 @@
 import { PromptName, type Prompts, renderTemplate } from '@aw/builtin';
 import {
+  ACTIVE_ATTEMPT_STATUSES,
   ATTEMPT_MAX_NUDGES,
   ATTEMPT_SUBMIT_TOOL,
   AttemptEvent,
@@ -10,6 +11,7 @@ import {
   TranscriptSystemEvent,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
+import type { ModelSlots } from '../model-slots/index.ts';
 import {
   describeOpencodeError,
   type OpencodeClient,
@@ -19,8 +21,6 @@ import {
 } from '../opencode/index.ts';
 import type { Attempt } from './attempts.repo.ts';
 import { type AttemptState, errorOf, type LiveSession, systemEntry } from './attempts.state.ts';
-
-const ACTIVE: readonly AttemptStatus[] = [AttemptStatus.Starting, AttemptStatus.Running];
 
 type ToolEvent = Extract<OpencodeEvent, { type: typeof OpencodeEventType.Tool }>;
 type PermissionEvent = Extract<OpencodeEvent, { type: typeof OpencodeEventType.PermissionAsked }>;
@@ -32,7 +32,10 @@ type PermissionEvent = Extract<OpencodeEvent, { type: typeof OpencodeEventType.P
  * request the attempt waits for the model service without its timeout running, so an unreachable service costs no
  * retry budget (D163). Also turns every session event into transcript entries and token usage.
  */
-export function watchSessions(state: AttemptState, deps: { opencode: OpencodeClient; prompts: Prompts; clock: Clock }) {
+export function watchSessions(
+  state: AttemptState,
+  deps: { opencode: OpencodeClient; prompts: Prompts; clock: Clock; slots: Pick<ModelSlots, 'changed'> },
+) {
   const { repo, live, mustFind, move, record } = state;
 
   async function send(attempt: Attempt, session: LiveSession, text: string): Promise<void> {
@@ -113,6 +116,7 @@ export function watchSessions(state: AttemptState, deps: { opencode: OpencodeCli
     if (session.parked || session.modelWaitLeftMs !== null) return;
     session.cancelTimeout();
     session.modelWaitLeftMs = session.timeoutAt - deps.clock.now();
+    deps.slots.changed();
   }
 
   /** The session sends a request again or makes progress: the timeout goes on with what was left. */
@@ -120,10 +124,11 @@ export function watchSessions(state: AttemptState, deps: { opencode: OpencodeCli
     if (session.modelWaitLeftMs === null) return;
     arm(session, session.modelWaitLeftMs);
     session.modelWaitLeftMs = null;
+    deps.slots.changed();
   }
 
   function interruptActive(): void {
-    for (const attempt of repo.listByStatus(ACTIVE)) {
+    for (const attempt of repo.listByStatus(ACTIVE_ATTEMPT_STATUSES)) {
       if (attempt.status === AttemptStatus.Running && state.waitsForAnswer(attempt.id)) continue;
       record(attempt, [systemEntry(TranscriptSystemEvent.RuntimeLost)]);
       move(attempt, AttemptEvent.RuntimeLost);
@@ -200,6 +205,7 @@ export function watchSessions(state: AttemptState, deps: { opencode: OpencodeCli
     if (!session.parked || state.waitsForUser(session.attemptId)) return;
     session.parked = false;
     arm(session, session.timeoutMs);
+    deps.slots.changed();
     const attempt = mustFind(session.attemptId);
     state.signal('input_answered', attempt);
     if (session.idle) state.inBackground(attempt.id, () => onIdle(attempt, session));
