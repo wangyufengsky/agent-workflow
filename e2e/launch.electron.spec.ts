@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createConnection, createServer, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -29,13 +29,24 @@ test('构建后的应用启动后显示引导页并能正常退出', async () =>
     await expect.poll(() => existsSync(launchFile)).toBe(true);
     expect(JSON.parse(readFileSync(launchFile, 'utf8'))).toMatchObject({ intro: true });
   } catch (err) {
-    await test.info().attach('process-output.txt', { body: output.join(''), contentType: 'text/plain' });
-    await test.info().attach('page.png', { body: await page.screenshot(), contentType: 'image/png' });
-    await test.info().attach('url.txt', { body: page.url(), contentType: 'text/plain' });
+    // Written under the test's output directory, which CI uploads; each step bounded, a hung renderer included.
+    const info = test.info();
+    writeFileSync(info.outputPath('process-output.txt'), output.join(''));
+    const windows = await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().map((w) => ({
+        url: w.webContents.getURL(),
+        loading: w.webContents.isLoading(),
+        crashed: w.webContents.isCrashed(),
+        visible: w.isVisible(),
+      })),
+    );
+    writeFileSync(info.outputPath('windows.json'), JSON.stringify(windows, null, 2));
     const logs = join(userDataDir, 'logs');
-    for (const file of existsSync(logs) ? readdirSync(logs) : []) {
-      await test.info().attach(file, { path: join(logs, file), contentType: 'text/plain' });
-    }
+    for (const file of existsSync(logs) ? readdirSync(logs) : []) copyFileSync(join(logs, file), info.outputPath(file));
+    // A screenshot that cannot be taken says the renderer is not painting: recorded, the original failure rethrown.
+    await page
+      .screenshot({ path: info.outputPath('page.png'), timeout: 5000 })
+      .catch((e: unknown) => writeFileSync(info.outputPath('screenshot-error.txt'), String(e)));
     throw err;
   }
 
