@@ -12,6 +12,7 @@ import {
   GIT_INIT_LARGE_FILE_BYTES,
   GIT_INIT_LARGE_FILES_SHOWN,
   type GitInitPreviewDTO,
+  HostingProvider,
   type HostingRef,
   HostingSource,
   PROJECT_SLUG_MAX,
@@ -166,6 +167,15 @@ export function createProjectsService({
     return project;
   }
 
+  /** origin's repository; an SSH origin's GitLab address is matched against the saved global ones (D169). */
+  function inferHosting(origin: string | undefined): HostingRef | null {
+    if (origin === undefined) return null;
+    const gitlabAddresses = hostingAccounts
+      .list()
+      .flatMap((a) => (a.provider === HostingProvider.Gitlab && a.baseUrl !== null ? [a.baseUrl] : []));
+    return parseRemoteUrl(origin, gitlabAddresses);
+  }
+
   /**
    * The repository and whose token signs in to it (D155): the project's binding with its token, else that binding's
    * (or origin's) repository with the global token of its platform address.
@@ -176,10 +186,7 @@ export function createProjectsService({
       return { ref: { provider, baseUrl, repo: path }, source: HostingSource.Project };
     }
     let ref: HostingRef | null = project.hosting;
-    if (ref === null) {
-      const origin = await readOriginUrl(project.repoPath);
-      ref = origin === undefined ? null : parseRemoteUrl(origin);
-    }
+    if (ref === null) ref = inferHosting(await readOriginUrl(project.repoPath));
     if (ref === null || !hostingAccounts.has(ref.provider, ref.baseUrl)) return undefined;
     const { provider, baseUrl, repo: path } = ref;
     return { ref: { provider, baseUrl, repo: path }, source: HostingSource.Global };
@@ -204,7 +211,7 @@ export function createProjectsService({
     const effective = await resolveHosting(project);
     return {
       ...project,
-      inferredHosting: origin === undefined ? null : parseRemoteUrl(origin),
+      inferredHosting: inferHosting(origin),
       effectiveHosting: effective === undefined ? null : { ...effective.ref, source: effective.source },
       dbConnectionIds: databases.linkedIds(project.id),
       allowedBash: repo.allowedBash(project.id),

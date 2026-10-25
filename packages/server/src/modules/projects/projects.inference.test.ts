@@ -18,11 +18,23 @@ describe('parseRemoteUrl', () => {
     ],
     ['http://git.lan/team/app.git', { provider: 'gitlab', baseUrl: 'http://git.lan', repo: 'team/app' }],
   ])('%s', (url, expected) => {
-    expect(parseRemoteUrl(url)).toEqual(expected);
+    expect(parseRemoteUrl(url, [])).toEqual(expected);
   });
 
   it.each(['/srv/git/app.git', '../other-repo', 'https://github.com/'])('无法识别的远端 %s 返回 null', (url) => {
-    expect(parseRemoteUrl(url)).toBeNull();
+    expect(parseRemoteUrl(url, [])).toBeNull();
+  });
+
+  // D169: an intranet GitLab's web address often differs from its SSH host in scheme and port.
+  it('SSH origin 的地址是同主机名唯一的已保存 GitLab 地址；多个时同没有一样为 https://<主机>', () => {
+    const saved = ['http://gitlab.corp:8080', 'https://other.corp'];
+    const baseUrl = (url: string, addresses: string[]) => parseRemoteUrl(url, addresses)?.baseUrl;
+    expect(baseUrl('git@gitlab.corp:team/app.git', saved)).toBe('http://gitlab.corp:8080');
+    expect(baseUrl('ssh://git@gitlab.corp:2222/team/app.git', saved)).toBe('http://gitlab.corp:8080');
+    expect(baseUrl('git@gitlab.corp:team/app.git', [...saved, 'https://gitlab.corp'])).toBe('https://gitlab.corp');
+    expect(baseUrl('git@gitlab.corp:team/app.git', [...saved, 'http://gitlab.corp:9090'])).toBe('https://gitlab.corp');
+    // An HTTP(S) origin already names its web address.
+    expect(baseUrl('https://gitlab.corp/team/app.git', saved)).toBe('https://gitlab.corp');
   });
 });
 
