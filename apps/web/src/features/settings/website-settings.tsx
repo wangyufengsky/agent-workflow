@@ -1,11 +1,14 @@
 import {
   clearSiteLoginOp,
   closeUserTabOp,
+  integratedAuthServerSchema,
   listSiteLoginsOp,
   openLoginTabOp,
   type Settings,
   SiteAccess,
   type SiteRule,
+  siteRuleSchema,
+  UiMode,
 } from '@aw/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
@@ -28,13 +31,30 @@ function move<T>(items: readonly T[], from: number, to: number): T[] {
   return next;
 }
 
+/** A rule as edited: its query paths as typed, comma-separated. */
+type DraftRule = Omit<SiteRule, 'queryPaths'> & { queryPaths: string };
+const splitList = (text: string) => text.split(/[\s,]+/).filter((s) => s !== '');
+
 /** The website rules in order (29 §5.4), edited here and saved together. */
 function SiteRules({ rules, set }: { rules: readonly SiteRule[]; set: (patch: Partial<Settings>) => void }) {
-  const [draft, setDraft] = useState<SiteRule[]>([...rules]);
-  const change = (index: number, rule: Partial<SiteRule>) =>
+  const [draft, setDraft] = useState<DraftRule[]>(rules.map((r) => ({ ...r, queryPaths: r.queryPaths.join(', ') })));
+  const [invalid, setInvalid] = useState(false);
+  const change = (index: number, rule: Partial<DraftRule>) =>
     setDraft(draft.map((r, i) => (i === index ? { ...r, ...rule } : r)));
   const save = () => {
-    set({ 'browser.sites': draft.map((r) => ({ ...r, pattern: r.pattern.trim() })).filter((r) => r.pattern !== '') });
+    const parsed = siteRuleSchema.array().safeParse(
+      draft
+        .map((r) => ({
+          pattern: r.pattern.trim(),
+          access: r.access,
+          // Only a read-only website has query paths to let through.
+          queryPaths: r.access === SiteAccess.Read ? splitList(r.queryPaths) : [],
+        }))
+        .filter((r) => r.pattern !== ''),
+    );
+    setInvalid(!parsed.success);
+    if (!parsed.success) return;
+    set({ 'browser.sites': parsed.data });
     toast(C.saved);
   };
   return (
@@ -74,12 +94,25 @@ function SiteRules({ rules, set }: { rules: readonly SiteRule[]; set: (patch: Pa
                 onClick={() => setDraft(move(draft, i, i + 1))}
               />
               <IconButton icon="trash" label={C.remove} onClick={() => setDraft(draft.filter((_, j) => j !== i))} />
+              {rule.access === SiteAccess.Read && (
+                <input
+                  className={`input mono ${styles.queryPaths}`}
+                  aria-label={C.queryPaths}
+                  placeholder={C.queryPathsPlaceholder}
+                  value={rule.queryPaths}
+                  onChange={(e) => change(i, { queryPaths: e.target.value })}
+                />
+              )}
             </li>
           ))}
         </ol>
       )}
+      <p className="hint">{invalid ? C.rulesInvalid : C.queryPathsHint}</p>
       <div className={styles.actions}>
-        <Button icon="plus" onClick={() => setDraft([...draft, { pattern: '', access: SiteAccess.Read }])}>
+        <Button
+          icon="plus"
+          onClick={() => setDraft([...draft, { pattern: '', access: SiteAccess.Read, queryPaths: '' }])}
+        >
           {C.add}
         </Button>
         <Button variant="primary" onClick={save}>
@@ -146,6 +179,7 @@ function SiteLogins() {
       {tabId !== null && <div ref={area} className={styles.loginArea} data-testid="login-area" />}
       <span className="label">{C.logins}</span>
       {logins.isError && <ErrorState error={logins.error} onRetry={() => void logins.refetch()} />}
+      <p className="hint">{C.loginsHint}</p>
       {logins.data?.hosts.length === 0 && <p className="hint">{C.loginsNone}</p>}
       {logins.data !== undefined && logins.data.hosts.length > 0 && (
         <ul className={styles.logins} aria-label={C.logins}>
@@ -168,6 +202,39 @@ function SiteLogins() {
   );
 }
 
+/**
+ * Pro mode: the servers the websites' partition logs in to with the user's system login (29 §5.4), a comma-separated
+ * list saved when the field is left.
+ */
+function IntegratedAuth({ servers, set }: { servers: readonly string[]; set: (patch: Partial<Settings>) => void }) {
+  const [text, setText] = useState(servers.join(', '));
+  const [invalid, setInvalid] = useState(false);
+  const commit = () => {
+    const next = splitList(text);
+    const parsed = integratedAuthServerSchema.array().safeParse(next);
+    setInvalid(!parsed.success);
+    if (parsed.success && next.join(',') !== servers.join(',')) set({ 'browser.integratedAuthServers': next });
+  };
+  return (
+    <div className="field">
+      <label className="label" htmlFor="setting-integrated-auth">
+        {C.integratedAuth}
+      </label>
+      <input
+        id="setting-integrated-auth"
+        className="input mono"
+        placeholder="*.corp.example.com"
+        value={text}
+        aria-invalid={invalid}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === 'Enter' && commit()}
+      />
+      <p className="hint">{invalid ? C.integratedAuthInvalid : C.integratedAuthHint}</p>
+    </div>
+  );
+}
+
 /** The「网站」group of the settings (29 §8.6), shown in simple mode too. */
 export function WebsiteSettings({ settings, set }: { settings: Settings; set: (patch: Partial<Settings>) => void }) {
   return (
@@ -176,6 +243,16 @@ export function WebsiteSettings({ settings, set }: { settings: Settings; set: (p
       <SiteRules key={JSON.stringify(settings['browser.sites'])} rules={settings['browser.sites']} set={set} />
       <div className="divider" />
       <SiteLogins />
+      {settings['ui.mode'] === UiMode.Pro && (
+        <>
+          <div className="divider" />
+          <IntegratedAuth
+            key={settings['browser.integratedAuthServers'].join(',')}
+            servers={settings['browser.integratedAuthServers']}
+            set={set}
+          />
+        </>
+      )}
     </Panel>
   );
 }

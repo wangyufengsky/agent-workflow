@@ -78,6 +78,8 @@ export type TabInput = {
   kind: BrowserTabKind;
   partition: string;
   policy: BrowserPolicy;
+  /** Servers the partition logs in to with the user's system login (29 §5.4): the websites' partition's only. */
+  integratedAuthServers: string[];
   /** Websites lose their realtime write channels (29 §5.4). */
   site: boolean;
   /** The user's own tab, placed on the window by the renderer (29 §8.1): sized by its place, files can be chosen. */
@@ -98,6 +100,7 @@ export async function openTab({
   kind,
   partition,
   policy,
+  integratedAuthServers,
   site,
   userFacing = false,
   signal,
@@ -110,7 +113,14 @@ export async function openTab({
   const blockedUrls = new Map<string, BrowserBlockReason>();
   const network = createNetworkTracker(clock, BROWSER_SETTLE_QUIET_MS);
   let logCursor = { console: 0, exceptions: 0, requests: 0 };
-  const since = { navigated: false, dialog: null as string | null, blockedWrites: [] as string[], loaded: true };
+  const since = {
+    navigated: false,
+    dialog: null as string | null,
+    blockedWrites: [] as string[],
+    loaded: true,
+    /** A website that asked for a client certificate, which this tab never gives (29 §5.4). */
+    certificateAsked: null as string | null,
+  };
   let mark = { console: 0, exceptions: 0, failed: 0 };
   /** Where this action's entries start, for the facts of one page (a page check, 29 §7.2). */
   let start = { console: 0, exceptions: 0, requests: 0 };
@@ -219,6 +229,7 @@ export async function openTab({
   const unsubscribe = host.onEvent((event) => {
     if (event.type === 'browser.unownedBlocked' || event.tabId !== tabId) return;
     if (event.type === 'browser.cdpEvent') onCdp(event.method, event.params);
+    else if (event.type === 'browser.certificateRefused') since.certificateAsked = event.url;
     else if (event.type === 'browser.blocked') {
       blockedUrls.set(event.url, event.reason);
       if (event.reason === BrowserBlockReason.ReadOnly) {
@@ -250,6 +261,7 @@ export async function openTab({
       userFacing,
       viewport: userFacing ? null : VIEWPORT_SIZES.desktop,
       policy,
+      integratedAuthServers,
     });
     opened = true;
     signal?.throwIfAborted();
@@ -298,12 +310,24 @@ export async function openTab({
       since.navigated = false;
       since.dialog = null;
       since.blockedWrites = [];
+      since.certificateAsked = null;
       mark = { console: consoleErrors(), exceptions: exceptions.length, failed: failedRequests().length };
       start = { console: consoleEntries.length, exceptions: exceptions.length, requests: requests.size };
     },
 
     /** The main frame's address (empty before the first navigation). */
     url: () => url,
+
+    /**
+     * The address that asked this tab for credentials only the user gives, in their own tab (29 §5.4): the current
+     * document answered 401 / 407 (HTTP authentication, a proxy's), or a website asked for a client certificate since
+     * the action began. Null when nothing asked.
+     */
+    credentialsAsked(): string | null {
+      if (since.certificateAsked !== null) return since.certificateAsked;
+      const document = [...requests.values()].findLast((r) => r.resourceType === 'Document' && r.url === url);
+      return document?.status === 401 || document?.status === 407 ? url : null;
+    },
 
     /** Console errors (uncaught exceptions included) and failed requests of the current document (29 §8.1). */
     pageCounts(): { consoleErrors: number; failedRequests: number } {

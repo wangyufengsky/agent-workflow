@@ -406,8 +406,9 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `companion.notifications` | `true`（后台系统通知；应用内提醒独立显示） | 简单 |
 | `preview.maxRunning` | `3`（同时运行的页面预览，29 §4.4） | 专业 |
 | `preview.idleMinutes` | `10`（没有标签页、没有活动尝试多久后停止预览） | 专业 |
-| `browser.sites` | `[{ pattern: '*', access: 'read' }]`（网站规则，按顺序取第一条匹配，无匹配不允许；助手不能修改，D65 的同一思路，29 §5.4） | 简单 |
+| `browser.sites` | `[{ pattern: '*', access: 'read', queryPaths: [] }]`（网站规则，按顺序取第一条匹配，无匹配不允许；只读规则的 `queryPaths` 为放行 POST 的查询路径，缺省为空，D173；助手不能修改，D65 的同一思路，29 §5.4） | 简单 |
 | `browser.loginUrlPatterns` | `[]`（内置规则之外识别登录页的主机或路径片段） | 专业 |
+| `browser.integratedAuthServers` | `[]`（网站分区用系统身份做 Windows 集成登录的服务器，主机名通配，不能只写 `*`；助手不能修改，D171，29 §5.4） | 专业 |
 
 「模式」列表示该设置在哪种界面模式下出现在设置页（常量 `SETTING_MODE`）。值的 schema 为 `settingsSchema`（strict：未知键拒绝），默认值为 `SETTING_DEFAULTS`。
 

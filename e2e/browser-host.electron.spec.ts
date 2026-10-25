@@ -16,6 +16,7 @@ type Harness = {
   tabs: { handle(op: unknown): Promise<unknown>; place(tabId: string, rect: unknown): void };
   events: Array<{ type: string; tabId?: string; method?: string; reason?: string; url?: string }>;
   requests: string[];
+  answers: { login: { username: string; password: string } | null; certificate: string | null };
   next(matches: (event: { type: string; tabId?: string; method?: string }) => boolean): Promise<unknown>;
 };
 declare global {
@@ -29,6 +30,7 @@ async function openTab(options: {
   userFacing: boolean;
   sites?: Array<{ pattern: string; access: 'read' | 'interact' }>;
   preview?: boolean;
+  path?: string;
 }): Promise<void> {
   await app.evaluate(async (_electron, o) => {
     const h = globalThis.harness as Harness;
@@ -38,13 +40,18 @@ async function openTab(options: {
       partition: o.partition,
       userFacing: o.userFacing,
       viewport: o.userFacing ? null : { width: 1280, height: 800, mobile: false },
-      policy: { previewOrigins: o.preview ? [h.origin] : [], sites: o.sites ?? [] },
+      // As main gets it from the port, parsed with the rules' defaults.
+      policy: {
+        previewOrigins: o.preview ? [h.origin] : [],
+        sites: (o.sites ?? []).map((rule) => ({ queryPaths: [], ...rule })),
+      },
+      integratedAuthServers: [],
     });
     if (o.userFacing) h.tabs.place(o.tabId, { x: 0, y: 0, width: 1000, height: 700 });
     const cdp = (method: string, params?: object) => h.tabs.handle({ kind: 'cdp', tabId: o.tabId, method, params });
     await cdp('Page.enable');
     const loaded = h.next((e) => e.tabId === o.tabId && e.method === 'Page.loadEventFired');
-    await cdp('Page.navigate', { url: `${h.origin}/` });
+    await cdp('Page.navigate', { url: `${h.origin}${o.path ?? '/'}` });
     await loaded;
   }, options);
 }
@@ -185,4 +192,35 @@ test('共享 Worker 的请求无法归属标签页时拒绝写入，并报告未
   expect(result.blocked).toEqual(
     expect.arrayContaining([expect.objectContaining({ url: expect.stringMatching(/\/api\/worker-write$/) })]),
   );
+});
+
+test('HTTP 认证：AI 标签页不弹出、得到 401；用户在自己的标签页里登录后，同一分区的 AI 标签页沿用登录', async () => {
+  const sites = [{ pattern: '127.0.0.1', access: 'read' as const }];
+  const partition = 'aw-sites-auth';
+  await openTab({ tabId: 'ai', partition, userFacing: false, sites });
+  expect(await evaluate('ai', `fetch('/wiki').then((r) => r.status)`)).toBe(401);
+
+  await app.evaluate(() => {
+    (globalThis.harness as Harness).answers.login = { username: 'reader', password: 'secret' };
+  });
+  await openTab({ tabId: 'user', partition, userFacing: true, sites, path: '/wiki' });
+  expect(await evaluate('user', 'document.title')).toBe('wiki');
+  expect(await evaluate('ai', `fetch('/wiki').then((r) => r.status)`)).toBe(200);
+
+  const prompts = await app.evaluate(() =>
+    (globalThis.harness as Harness).events.filter((e) => e.type.startsWith('prompt.')),
+  );
+  // Only the user's tab asked, once; the AI's tab neither asked nor got anything to answer.
+  expect(prompts).toEqual([
+    { type: 'prompt.login', host: '127.0.0.1', realm: 'wiki', scheme: 'basic', isProxy: false },
+  ]);
+});
+
+test('HTTP 认证：用户取消时页面得到 401，AI 标签页仍然没有登录', async () => {
+  const sites = [{ pattern: '127.0.0.1', access: 'read' as const }];
+  const partition = 'aw-sites-cancel';
+  await openTab({ tabId: 'user', partition, userFacing: true, sites, path: '/wiki' });
+  expect(await evaluate('user', 'document.title')).toBe('401');
+  await openTab({ tabId: 'ai', partition, userFacing: false, sites });
+  expect(await evaluate('ai', `fetch('/wiki').then((r) => r.status)`)).toBe(401);
 });

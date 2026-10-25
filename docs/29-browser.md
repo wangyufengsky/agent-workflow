@@ -1,6 +1,6 @@
 # 29 · 内置浏览器与页面预览
 
-> 状态：D120–D125 **用户已确认**（2026-10-23）。**B1 已实现**（05 的 B-01…B-08，分支 `feat/B-browser`）：预览服务、浏览器宿主与动作层、执行 MCP 浏览器工具、项目与设置界面；**B2 已实现**（05 的 B2-01…B2-08，分支 `feat/B2-browser`）：页面体检与内置流程、动作画面、用户的预览标签页与浮层、任务页预览页签、节点详情与结果卡、「附上当前页面」（只附文字）；验收见 05 的 B2 状态，**B3 已实现**（分支 `feat/B3-browser`，05 的 B3-01…B3-04）：助手的只读读网站、读用户的预览与预览启停已由 AP-03a/b 做完，B3 补上助手打开预览页签（§2.6）、知识问答的网页引用摘录与 PPT 网页资料（§2.8）；live `browser-reading.live.test.ts` 用默认免费模型通过（07 §6）。实现中与设计稿不同的地方已改在各节里（如 §5.2 的宿主接口、§5.7 的截图、§4.1 推断的位置）。
+> 状态：D120–D125 **用户已确认**（2026-10-23）。**B1 已实现**（05 的 B-01…B-08，分支 `feat/B-browser`）：预览服务、浏览器宿主与动作层、执行 MCP 浏览器工具、项目与设置界面；**B2 已实现**（05 的 B2-01…B2-08，分支 `feat/B2-browser`）：页面体检与内置流程、动作画面、用户的预览标签页与浮层、任务页预览页签、节点详情与结果卡、「附上当前页面」（只附文字）；验收见 05 的 B2 状态，**B3 已实现**（分支 `feat/B3-browser`，05 的 B3-01…B3-04）：助手的只读读网站、读用户的预览与预览启停已由 AP-03a/b 做完，B3 补上助手打开预览页签（§2.6）、知识问答的网页引用摘录与 PPT 网页资料（§2.8）；live `browser-reading.live.test.ts` 用默认免费模型通过（07 §6）。实现中与设计稿不同的地方已改在各节里（如 §5.2 的宿主接口、§5.7 的截图、§4.1 推断的位置）。**内网登录适配**（D170–D173，05 的 IN-10…IN-13，分支 `fix/browser-intranet-auth`）已实现，待用户检查：用户标签页里的 HTTP 认证与客户端证书、Windows 集成登录的服务器、只读网站的查询路径（§5.4、§8.6）。
 
 ## 1. 定位
 
@@ -230,10 +230,12 @@ type BrowserHost = {
 | --- | --- |
 | `pattern` | 主机名通配：`*`（全部）、`*.corp.example.com`、`wiki.corp`、`10.12.*.*` |
 | `access` | `read`（只读浏览）· `interact`（可操作） |
+| `queryPaths` | 只读规则可选：只做查询的 POST 路径，如 `/api/search`、`/rest/*/query`（D173，见下） |
 
 - 按顺序取第一条匹配的规则，没有匹配的为**不允许**。
 - 默认 `[{ pattern: '*', access: 'read' }]`：所有网站可浏览，都只读。用户可以收窄（例如只留内网域名），或给某些网站放开操作。
-- **只读**的实现：AI 会话的标签页对这类网站发出的非 `GET` / `HEAD` / `OPTIONS` 请求（表单提交、`fetch` / `xhr` 写请求）在 `session.webRequest.onBeforeRequest` 里取消。按请求的 `webContentsId` 只拦 AI 的标签页，用户自己登录时不受影响。动作结果写明「已拦下 POST /api/comments（这个网站只允许浏览）」。用 `POST` 做查询的单页应用会因此读不到数据，把它设为可操作即可。这一层由网络层保证，不依赖模型是否听话。
+- **只读**的实现：AI 会话的标签页对这类网站发出的非 `GET` / `HEAD` / `OPTIONS` 请求（表单提交、`fetch` / `xhr` 写请求）在 `session.webRequest.onBeforeRequest` 里取消。按请求的 `webContentsId` 只拦 AI 的标签页，用户自己登录时不受影响。动作结果写明「已拦下 POST /api/comments（这个网站只允许浏览）」。这一层由网络层保证，不依赖模型是否听话。
+- **只读网站的查询路径**（D173）：用 `POST` 做查询的老系统（搜索、筛选、报表）在只读下读不到数据。规则的 `queryPaths` 列出只做查询的路径（以 `/` 开头，`*` 匹配任意字符，整条路径匹配、区分大小写、不看查询串），AI 发往这些路径的 `POST` 照常发出；其他写方法（`PUT` / `PATCH` / `DELETE`）、其他路径与 WebSocket 仍拦下。判断在共享的 `blockReason` 里，两种宿主一致。只按方法与路径判断、不看请求体，所以只填确定只是查询的路径。查询被拦时动作结果的 `blockedWrites` 有这条 `POST`，执行提示词让 AI 用 `ask_user` 请用户放行这个路径（规划只记进 `assumptions`）。
 - **只读也覆盖非 HTTP 的写通道**：建立连接后的 WebSocket 消息 `onBeforeRequest` 看不到，所以只读网站的 `ws:` / `wss:` 连接（`resourceType = webSocket`）直接取消；AI 网站标签页在每个文档创建时（`Page.addScriptToEvaluateOnNewDocument`）去掉 `RTCPeerConnection` 与 `WebTransport`。AI 没有执行任意 JS 的工具（§6），能触发的写通道只剩表单、`fetch` / `xhr` / `sendBeacon`（都是非 GET 的 HTTP 请求）、WebSocket 与这两者，都已覆盖。靠 WebSocket 推送数据的页面（实时看板）在只读下没有数据，设为可操作即可。
 - **Worker 必须有可确认的归属**：Electron 请求层拒绝无法关联到标签页的 Worker 请求；开发 Chromium 在共享 Worker 执行前暂停并关闭它，因为 SharedWorker 可由同一登录分区的多个标签页共享，无法可靠选用单个页面的权限。拒绝事件 `browser.unownedBlocked` 由后端记录，不默认继承用户页面权限。依赖 SharedWorker 的网站可能缺少部分功能，用户登录页也遵守这条未归属限制。
 - **只读按 HTTP 方法判断**：有副作用的 `GET`（如 `/delete?id=1` 这种不规范的接口）拦不住。这类网站不要放进规则，或收窄规则只放文档类网站。
@@ -243,9 +245,12 @@ type BrowserHost = {
 **登录**：
 
 - 网站标签页用持久分区 `persist:aw-sites`。用户在设置的「网站登录」（§8.6）里打开网站，自己完成登录（包括单点登录），登录状态留在这个分区里，AI 的网站标签页复用它。
-- 应用从不读取、保存或填写密码。
-- 打开网站后，若最终地址的主机或路径像登录页（主机名或路径含 `login` / `signin` / `sso` / `cas` / `oauth`，或页面上只有一个密码框的表单），返回 `BROWSER_LOGIN_REQUIRED`，`details.url` 为登录页地址。
-- 规则可以在设置里补充：`browser.loginUrlPatterns`。
+- 应用从不保存或填写密码。下面的 HTTP 认证里，用户输入的密码只经 main 交给网站一次。
+- **HTTP 认证**（Basic、NTLM、Negotiate、代理认证，D170）：Electron 默认取消认证。**用户自己的标签页**（「网站登录」与「我的预览」）收到 `login` 事件时，main 经 IPC `aw:browser-prompt` 请界面弹出用户名和密码框（`features/preview/website-prompt.tsx`，挂在应用外壳上，打开时原生视图按 §8.1 移出窗口），用户的回答经 `aw:browser-prompt-answer` 回到 main，直接交给 Chromium：不经过后端、不写盘。Chromium 在本次运行内按分区记住它，同在 `persist:aw-sites` 的 AI 网站标签页之后自动带上。**AI 的标签页从不弹框**，取消后页面得到 401。这种登录只在内存里：退出应用后要重新登录，也不在「已登录的网站」（按 Cookie 列出）里。
+- **Windows 集成登录**（NTLM / Kerberos 协商，D171）：专业模式设置 `browser.integratedAuthServers` 列出的服务器（主机名通配，不能只写 `*`，默认空），网站分区用用户登录系统的身份自动登录（`session.allowNTLMCredentialsForDomains`，main 在每次打开网站分区的标签页时按 `open` 请求里的 `integratedAuthServers` 更新；其他分区一律为空）。用户与 AI 的网站标签页都一样，只读规则照常生效。不做 Kerberos 委派（`auth-negotiate-delegate-allowlist`）。开发用 Chromium 宿主忽略这一项（Chromium 只能整个浏览器设置，开发与测试没有域身份）。
+- **客户端证书**（D172）：网站要求客户端证书时，main 在应用的 `select-client-certificate` 事件里处理自己的标签页（应用自己的窗口不管）：用户的标签页弹出系统证书列表让用户选，选择由 Chromium 在本次运行内按分区记住；AI 的标签页不选证书（Electron 默认会替任何标签页选第一张），并发 `browser.certificateRefused`。
+- 打开网站后返回 `BROWSER_LOGIN_REQUIRED`（`details.url` 为要求登录的地址）的情形：主文档是 401 / 407（AI 的标签页不回答 HTTP 认证）；这次动作中网站要过客户端证书；最终地址的主机或路径像登录页（主机名或路径含 `login` / `signin` / `sso` / `cas` / `oauth`）；页面上只有一个密码框的表单。判断在后端 `loginAt`（`browser.service.ts`），`browser_open` 与 `browser.readUrl` 共用。
+- 登录页的地址规则可以在设置里补充：`browser.loginUrlPatterns`。
 
 **项目预览和网站都适用**：
 
@@ -483,10 +488,12 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 
 设置页新增一节，简单模式也显示：
 
-- **网站规则**：一个有序列表，每行包括地址通配、「只读浏览 / 可操作」、上移、下移和删除（不做拖动），改完「保存规则」一起保存；说明「没有匹配的网站不能打开」。默认一行 `*` · 只读浏览。
+- **网站规则**：一个有序列表，每行包括地址通配、「只读浏览 / 可操作」、上移、下移和删除（不做拖动），只读规则下面多一行「允许提交的查询路径」（逗号分隔，§5.4 的 `queryPaths`），改完「保存规则」一起保存，格式不对时不保存并提示；说明「没有匹配的网站不能打开」。默认一行 `*` · 只读浏览。
 - **网站登录**：输入地址后点「打开并登录」，页面区域显示一个真实标签页（`site` 会话，贴在窗口上），用户自己登录，完成后点「完成」关闭。下方列出已有登录状态的网站，可以「退出登录」（清除该主机在 `persist:aw-sites` 中的 Cookie 与存储）。
 - 登录标签页是盖在页面上的原生视图：与预览页签共用 `features/preview/use-placed-tab.ts`，任一 Radix 对话框（对话框、抽屉、⌘K）或 ⌘J 助手面板打开时离开窗口，关闭后回来（§8.1，B2-05）。
-- **AI 在任务中遇到需要登录**：`ask_user` 的提问里附上「去登录」链接，直接打开这里并预填地址。
+- **HTTP 认证与客户端证书**（D170、D172）：登录标签页里网站要求时弹出对话框（用户名和密码，或证书列表），见 §5.4；已登录列表下注明这两种登录只保留到退出应用。
+- **Windows 集成登录的服务器**（专业模式，D171）：一个输入框，逗号分隔的主机名通配，离开输入框时保存；只写 `*` 或格式不对时不保存并提示。
+- **AI 在任务中遇到需要登录**：`ask_user` 的提问里附上「去登录」链接，直接打开这里并预填地址。（未实现：目前执行提示词让 AI 在提问里写明去「设置 → 网站 → 网站登录」。）
 
 ### 8.7 浏览器开发模式
 
@@ -521,7 +528,7 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
 实现时按惯例写进各自的权威文档，这里只列清单。
 
 - **表（10）**：`projects.preview` TEXT(JSON) 可空（迁移 `00NN_project_preview`）。预览、浏览器会话只在内存里，不建表。
-- **设置**：`preview.maxRunning`（3）、`preview.idleMinutes`（10）、`browser.sites`（默认 `[{ pattern: '*', access: 'read' }]`）、`browser.loginUrlPatterns`（默认空，在内置规则之外补充）。
+- **设置**：`preview.maxRunning`（3）、`preview.idleMinutes`（10）、`browser.sites`（默认 `[{ pattern: '*', access: 'read', queryPaths: [] }]`；`queryPaths` 缺省为空，D173）、`browser.loginUrlPatterns`（默认空，在内置规则之外补充）、`browser.integratedAuthServers`（默认空，专业模式，助手不能修改，D171）。
 - **枚举（08）**：
   - `AcceptanceCheckKind` 加 `browser`；
   - `PreviewState`：`stopped` · `starting` · `running` · `failed`；
@@ -538,7 +545,8 @@ iframe "https://pay.example.com/…"（不在允许范围，不能读取）
   - **B2 再加**（契约在 B2-01 已定义，`shared/operations/browser.ts`，随 B2-04 / B2-05 的实现挂进操作清单）：`browser.openUserTab` `{ taskId }`（返回 `UserTabState`）、`browser.navigateUserTab`、`browser.setUserViewport`、`browser.userTabLogs`、`browser.listFrames`、`tasks.previewSessions`；非清单路由 `GET /attempts/:attemptId/browser/:file`（尝试的截图与画面）、`GET /tasks/:taskId/browser/*`（页面体检截图）；SSE `browser.frame`、`browser.tab_updated`；`tasks.requestChanges` 输入加可选 `page: { tabId }`（后端自己读取那个标签页的路径、视口与日志，不接受界面传来的页面信息）。
   - **B3 再加**：`browser.read`、`browser.readUrl`。
 - **MCP（12）**：§6 的 11 个工具（B1 已有，12 §6.17）；知识问答 `web` 引用的 `CitationDTO` 加 `excerpt`（18 §6，B3）。
-- **preload**：`aw.browser.place(tabId, rect | null)`、`aw.browser.back / forward / reload(tabId)`、`aw.browser.openDevTools(tabId)`。用户标签页的地址导航经后端 `browser.navigateUserTab`，统一检查来源。
+- **preload**：`aw.browser.place(tabId, rect | null)`、`aw.browser.back / forward / reload(tabId)`、`aw.browser.openDevTools(tabId)`；`aw.browser.onPrompt` / `answerPrompt`（网站向用户的标签页要 HTTP 认证或客户端证书，D170、D172，契约 `browserPromptSchema` / `browserPromptAnswerSchema` 在 `shared/contracts/bridge.ts`）。用户标签页的地址导航经后端 `browser.navigateUserTab`，统一检查来源。
+- **后端 ↔ main 协议**（`contracts/browser-port.ts`）：`open` 带 `integratedAuthServers`（D171）；事件 `browser.certificateRefused { tabId, url }`（D172）。
 
 ## 11. 实现结构
 
@@ -605,8 +613,8 @@ packages/builtin/prompts/         protocol-execute / protocol-review / protocol-
   - `confirm` 被自动确定；
   - `window.open` 在同一标签页打开；
   - 不在网站规则里的地址被拦下；
-  - 只读网站上表单提交与 `fetch` POST 被拦下、`GET` 照常，用户标签页的提交不受影响；
-  - 跳转到登录页时返回 `BROWSER_LOGIN_REQUIRED`；
+  - 只读网站上表单提交与 `fetch` POST 被拦下、`GET` 照常，用户标签页的提交不受影响；规则写明的查询路径上 POST 照常、同一网站别的写请求仍拦下（D173）；
+  - 跳转到登录页、主文档是 HTTP 认证的 401 时返回 `BROWSER_LOGIN_REQUIRED`（`browser_open` 与 `browser.readUrl`，D170）；
   - 导航后编号作废；
   - 体检能抓到未捕获异常和 404 脚本。
 - **集成（真实进程）**：
@@ -615,7 +623,7 @@ packages/builtin/prompts/         protocol-execute / protocol-review / protocol-
   - 停止后进程树里没有残留。
 - **验收集成**：一个页面会抛异常的 worktree 夹具，`browser` 检查不通过，`output` 里有异常信息。
 - **E2E**：四主题走查新增预览页签的各个状态、节点详情的体检结果、结果卡「页面」区。
-- **Electron E2E**：真实的 `WebContentsView` 放置与隐藏（⌘K 打开时隐藏）、不允许的地址交给系统浏览器（桩住 `openExternal`）。
+- **Electron E2E**：真实的 `WebContentsView` 放置与隐藏（⌘K 打开时隐藏）、不允许的地址交给系统浏览器（桩住 `openExternal`）；HTTP Basic 认证（`browser-host.electron.spec.ts`，桩住询问用户的 `prompts`）：AI 的标签页不询问、得到 401，用户在自己的标签页里登录后同一分区的 AI 标签页沿用，用户取消时仍是 401（D170）；`site-login.electron.spec.ts` 用真实后端与界面走一遍：登录前 `browser.readUrl` 是 `BROWSER_LOGIN_REQUIRED`，在「网站登录」的对话框里输入后读到页面，对话框打开时原生视图离开窗口。集成登录（D171）与客户端证书（D172）需要域环境或系统里的证书，没有自动化测试。
 - **live**：§13 B1 的完成标准那一例。
 
 ## 15. 与统一附件／需求清单的衔接（补充设计，未实现）

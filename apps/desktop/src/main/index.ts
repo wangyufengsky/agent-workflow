@@ -4,6 +4,7 @@ import { APP_LICENSE, APP_SOURCE_URL, browserRectSchema, type LaunchPreferences 
 import { splashBackground, splashHtml } from '@aw/web/splash';
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell, type WebPreferences } from 'electron';
 import { type Backend, startBackend } from './backend.ts';
+import { type BrowserPrompts, createBrowserPrompts } from './browser-prompts.ts';
 import { createCompanionHost } from './companion.ts';
 import { serveExports } from './export.ts';
 import { readLaunchPreferences, writeLaunchPreferences } from './launch.ts';
@@ -45,7 +46,7 @@ function createWindow(apiToken: string, launch: LaunchPreferences): Window {
 }
 
 /** The app itself, once the backend listens and the animation is done. */
-async function openApp({ win, webPreferences }: Window, b: Backend): Promise<void> {
+async function openApp({ win, webPreferences }: Window, b: Backend, prompts: BrowserPrompts): Promise<void> {
   const url = process.env.ELECTRON_RENDERER_URL ?? `http://127.0.0.1:${b.port}/`;
   serveExports(url, webPreferences);
   companion = createCompanionHost(win, url, webPreferences, () => app.quit());
@@ -55,7 +56,10 @@ async function openApp({ win, webPreferences }: Window, b: Backend): Promise<voi
   });
   // A reload starts the page over: nothing of it knows the user's tabs any more, so they close (29 §8.1).
   win.webContents.on('did-start-navigation', (details) => {
-    if (details.isMainFrame && !details.isSameDocument) b.browser.closeUserTabs();
+    if (details.isMainFrame && !details.isSameDocument) {
+      b.browser.closeUserTabs();
+      prompts.cancelAll();
+    }
   });
   await win.loadURL(url);
 }
@@ -90,6 +94,7 @@ app.whenReady().then(async () => {
   const launch = readLaunchPreferences(launchFile, nativeTheme.shouldUseDarkColors);
   const apiToken = randomBytes(32).toString('hex');
   const window = createWindow(apiToken, launch);
+  const prompts = createBrowserPrompts(() => window.win);
   // `window.splash` (28 §5): `done` once the animation ended or was skipped.
   const animated = window.win
     .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml(launch))}`)
@@ -99,6 +104,7 @@ app.whenReady().then(async () => {
       window: () => window.win,
       // Only web addresses reach the system browser (29 §5.4).
       openExternal: (url) => void shell.openExternal(url),
+      prompts,
     });
   } catch (e) {
     console.error('backend failed to start', e);
@@ -108,7 +114,7 @@ app.whenReady().then(async () => {
   }
   await animated;
   await window.win.webContents.executeJavaScript('window.splash.leave()');
-  await openApp(window, backend);
+  await openApp(window, backend, prompts);
 });
 
 async function finishQuit(running: Backend): Promise<void> {

@@ -466,6 +466,17 @@
 | --- | --- | --- |
 | ST-01 | 后端 storage 模块：`system.storage` 按 `StorageKind` 统计数据目录与工作区根目录、`system.cleanStorage` 清理旧日志（保留每类最新的一个）与结束超过 7 天的任务的 `runs/<taskId>/`；运行环境页「存储空间」面板与确认框 | 集成测试（真实文件系统）：分类统计与合计、旧日志清理保留每类最新的一个、只清理结束超过保留天数的任务且任务本身保留 |
 
+## 后续 · 内网部署适配（IN）
+
+> 状态：**用户要求**（2026-10-25，应用部署在企业内网）。本分支只含内置浏览器的 IN-10…IN-13（D170–D173），**已实现**，待用户检查；IN-01…IN-03 见 PR #112，其余编号留给企业 CA / 代理、SSH 远端、Linux 凭据、离线开关。合并时与 #112 的同名一节合并成一节。
+
+| 任务 | 内容 | 完成标准 |
+| --- | --- | --- |
+| IN-10 | 网站的 HTTP 认证（D170）：main 处理用户标签页的 `login` 事件，经 IPC `aw:browser-prompt` 请界面弹出用户名和密码框（`features/preview/website-prompt.tsx`），回答经 main 直接交给 Chromium，不经后端；AI 的标签页不询问；后端在主文档 401 / 407 时返回 `BROWSER_LOGIN_REQUIRED`（`loginAt`）。同一提交登记 02、11、14、29 §5.4 / §8.6 | Electron（`browser-host.electron.spec.ts`）：AI 标签页 401 且没有询问；用户在自己的标签页里登录后同一分区的 AI 标签页 200；取消仍是 401。Electron 全栈（`site-login.electron.spec.ts`）：设置页对话框里登录后 `browser.readUrl` 读到页面。集成（Chromium 宿主）：401 的网站 `browser_open` 与 `browser.readUrl` 都是 `BROWSER_LOGIN_REQUIRED` |
+| IN-11 | Windows 集成登录（D171）：专业模式设置 `browser.integratedAuthServers`（不能只写 `*`，助手不能改），`open` 请求带 `integratedAuthServers`，main 对网站分区 `allowNTLMCredentialsForDomains`；设置页「网站」一节的输入框。不做委派（用户已确认）。同一提交登记 02、08、14、29 | 单元与类型检查；没有域环境，Kerberos / NTLM 没有自动化或手工验证（PR 中写明） |
+| IN-12 | 客户端证书（D172）：main 在应用的 `select-client-certificate` 事件里处理本应用的标签页：用户的标签页弹出证书列表，AI 的标签页不给证书并发 `browser.certificateRefused`，后端据此返回 `BROWSER_LOGIN_REQUIRED`。同一提交登记 02、11、29 | 类型检查；没有系统证书，未验证（PR 中写明） |
+| IN-13 | 只读网站的查询路径（D173，用户已确认）：网站规则加 `queryPaths`，`blockReason` 放行 AI 发往这些路径的 POST；设置页只读规则下的输入框；执行与规划提示词说明查询被拦时怎么办。同一提交登记 02、08、14、29 | 单元（`policy.test.ts`）：查询路径的 POST 放行，别的路径、大小写不同、`PUT`、WebSocket 仍拦下；集成（Chromium 宿主）：查询照常发出、同一网站别的写请求被拦并写进 `blockedWrites` |
+
 ## v1.3 期间 · 精简助手输入区（Y）
 
 > 状态：**设计已确认**（2026-10-24，36 §8 都按推荐方案），Y-02…Y-05 已完成，待用户检查。设计见 [36-compact-composer.md](36-compact-composer.md)，决策 D143–D145。任务与完成标准见 36 §9.2：Y-01 设计；Y-02「+」菜单；Y-03 用量按钮；Y-04「直接开始」收起与框内展开；Y-05 J9 走查与文档同步。
