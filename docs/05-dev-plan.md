@@ -477,6 +477,8 @@
 | IN-11 | Windows 集成登录（D171）：专业模式设置 `browser.integratedAuthServers`（不能只写 `*`，助手不能改），`open` 请求带 `integratedAuthServers`，main 对网站分区 `allowNTLMCredentialsForDomains`；设置页「网站」一节的输入框。不做委派（用户已确认）。同一提交登记 02、08、14、29 | 单元与类型检查；没有域环境，Kerberos / NTLM 没有自动化或手工验证（PR 中写明） |
 | IN-12 | 客户端证书（D172）：main 在应用的 `select-client-certificate` 事件里处理本应用的标签页：用户的标签页弹出证书列表，AI 的标签页不回答（停止加载，免得 Chromium 记住「不用证书」）并发 `browser.certificateRefused`，后端据此返回 `BROWSER_LOGIN_REQUIRED`。同一提交登记 02、11、29 | 类型检查；没有系统证书，未验证（PR 中写明） |
 | IN-13 | 只读网站的查询路径（D173，用户已确认）：网站规则加 `queryPaths`，`blockReason` 放行 AI 发往这些路径的 POST；设置页只读规则下的输入框；执行与规划提示词说明查询被拦时怎么办。同一提交登记 02、08、14、29 | 单元（`policy.test.ts`）：查询路径的 POST 放行，别的路径、大小写不同、`PUT`、WebSocket 仍拦下；集成（Chromium 宿主）：查询照常发出、同一网站别的写请求被拦并写进 `blockedWrites` |
+| IN-21 | 离线环境不显示费用（D181）：attempts 服务的 `toDto` 在 `network.offline` 时把 `cost` 置为 `null`；离线环境的说明加上「只显示 tokens、不显示费用」。同一提交登记 02、08、11、12、14、18 | 集成（FakeOpencode，`usage` 步骤可带费用）：在线时 `attempts.get` 带上报告的费用，打开离线环境后同一尝试 `cost` 为 `null`、tokens 不变 |
+| IN-22 | opencode 后台安装 `@opencode-ai/plugin` 的实测（D182，用户决定暂不处理、默认已装好）：12 §8.2 记下安装目录、跳过条件、失败的重试与对建会话的阻塞；`opencode.offline.oc.test.ts` 把 npm 源指向本地服务 | 真实 opencode（`pnpm test:oc`，不调用模型）：在线对照会请求 npm 源；离线且配置目录已装好时没有任何外连 |
 
 ## 后续 · 存储空间与磁盘清理（ST）
 
