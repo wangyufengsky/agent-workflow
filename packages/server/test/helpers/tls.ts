@@ -18,8 +18,10 @@ export type TestCertificates = {
 /**
  * A certificate authority of its own (an enterprise CA no client trusts by default) and a server certificate it signed
  * for `hosts` (DNS names or IPv4 addresses), made with the openssl command line. The files are `ca.pem`, `server.pem`
- * and `server-key.pem` in `dir`; the key is readable by everyone, as a database server in a container runs as its own
- * user.
+ * and `server-key.pem` in `dir`; the directory and the key are readable by everyone, as a database server in a
+ * container runs as its own user. On Linux a bind mount keeps the host's owner and mode, and `mkdtemp` makes the
+ * directory 0700: MySQL then cannot read its certificates, logs a warning and starts without TLS. Docker Desktop on
+ * macOS shows a mount as owned by the container's user, which hid this.
  */
 export async function createTestCertificates(hosts: string[]): Promise<TestCertificates> {
   const dir = await mkdtemp(join(tmpdir(), 'aw-tls-'));
@@ -39,6 +41,7 @@ export async function createTestCertificates(hosts: string[]): Promise<TestCerti
     ...['x509', '-req', '-in', 'server.csr', '-CA', 'ca.pem', '-CAkey', 'ca-key.pem', '-CAcreateserial'],
     ...['-days', '2', '-extfile', 'server.ext', '-out', 'server.pem'],
   );
+  await chmod(dir, 0o755);
   await chmod(file('server-key.pem'), 0o644);
   const [caPem, certPem, keyPem] = await Promise.all([
     readFile(file('ca.pem'), 'utf8'),
