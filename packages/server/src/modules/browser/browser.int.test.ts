@@ -43,6 +43,8 @@ const PAGES: Record<string, string> = {
     <p id="out"></p>`),
   '/popup': page(`<button type="button" onclick="window.open('/orders')">Open</button>`),
   '/write': page(`<button type="button" onclick="fetch('/api/write', { method: 'POST' })">Save</button>`),
+  '/search': page(`<button type="button" onclick="fetch('/api/search', { method: 'POST', body: 'q=T-1' })
+      .then(() => fetch('/api/write', { method: 'POST' }))">Search</button>`),
   '/login': page('<form><input aria-label="user"> <input type="password" aria-label="password"></form>'),
   '/account': page('<form><input aria-label="user"> <input type="password" aria-label="password"></form>'),
   '/errors': page(`<script>console.error('boom')</script><script src="/missing.js"></script>
@@ -63,6 +65,12 @@ beforeAll(async () => {
     if (req.method !== 'GET') writes.push(`${req.method} ${req.url}`);
     // A website's login: the session cookie it sets.
     if (req.url === '/sign-in') res.setHeader('set-cookie', 'sid=s3cret; Path=/; HttpOnly');
+    // A wiki behind HTTP authentication: nothing in its address or page says login (29 §5.4).
+    if (req.url === '/wiki') {
+      res.writeHead(401, { 'content-type': 'text/html; charset=utf-8', 'www-authenticate': 'Basic realm="wiki"' });
+      res.end(page('<p>Unauthorized</p>'));
+      return;
+    }
     const body = req.url === '/sign-in' ? page('<p>已登录</p>') : PAGES[req.url ?? ''];
     res.writeHead(body === undefined ? 404 : 200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(body ?? 'not found');
@@ -120,6 +128,15 @@ describe('浏览器：打开与读取页面', () => {
     // No login word in the address: a form with one password field is a login page too.
     await expect(browser.open(owner, `${origin}/account`)).rejects.toMatchObject({
       code: ErrorCode.BrowserLoginRequired,
+    });
+    // HTTP authentication the AI's tab cannot answer: the document is a 401.
+    await expect(browser.open(owner, `${origin}/wiki`)).rejects.toMatchObject({
+      code: ErrorCode.BrowserLoginRequired,
+      details: { url: `${origin}/wiki` },
+    });
+    await expect(browser.readUrl(`${origin}/wiki`)).rejects.toMatchObject({
+      code: ErrorCode.BrowserLoginRequired,
+      details: { url: `${origin}/wiki` },
     });
   });
 
@@ -196,6 +213,18 @@ describe('浏览器：动作层', () => {
     expect(saved.blockedWrites).toEqual(['POST /api/write']);
     expect(writes).not.toContain('POST /api/write');
     expect(browser.logs(owner, 'open').requests).toMatchObject([{ method: 'POST', blocked: 'read_only' }]);
+  });
+
+  it('只读网站规则写明的查询路径：AI 用 POST 查询照常，同一网站别的写请求仍拦下', async () => {
+    const { browser, owner } = await browserFor('read');
+    await t.call(updateSettingsOp, {
+      'browser.sites': [{ pattern: '127.0.0.1', access: 'read', queryPaths: ['/api/search'] }],
+    });
+    const opened = await browser.open(owner, `${origin}/search`);
+    const searched = await browser.click(owner, refOf(opened.page, 'button "Search"'));
+    expect(searched.blockedWrites).toEqual(['POST /api/write']);
+    expect(writes).toContain('POST /api/search');
+    expect(writes).not.toContain('POST /api/write');
   });
 
   it('截图存到尝试的目录', async () => {

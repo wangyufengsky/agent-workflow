@@ -4,6 +4,7 @@ const { tmpdir } = require('node:os');
 const { join, resolve, delimiter } = require('node:path');
 const { app, BrowserWindow, ipcMain, utilityProcess } = require('electron');
 const { serveBrowserRequests } = require('../../../apps/desktop/src/main/browser.ts');
+const { createBrowserPrompts } = require('../../../apps/desktop/src/main/browser-prompts.ts');
 const { serveCredentialRequests } = require('../../../apps/desktop/src/main/credentials.ts');
 const { browserRectSchema } = require('@aw/shared');
 
@@ -31,7 +32,11 @@ globalThis.previewHarness = {
         PATH: `${resolve('e2e/fixtures/bin')}${delimiter}${process.env.PATH}`,
       },
     });
-    tabs = serveBrowserRequests(child, { window: () => win ?? null, openExternal: () => {} });
+    tabs = serveBrowserRequests(child, {
+      window: () => win ?? null,
+      openExternal: () => {},
+      prompts: createBrowserPrompts(() => win ?? null),
+    });
     serveCredentialRequests(child);
     const port = await new Promise((resolve, reject) => {
       child.once('exit', (code) => reject(new Error(`Preview backend exited: ${code}`)));

@@ -554,7 +554,7 @@ type PrintSettled = { ok: true } | { ok: false; error: ErrorInfo };
 type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorInfo };   // path 为 null：用户取消了保存
 ```
 
-加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。浏览器标签页同样：后端经同一通道发 `browser.request`（`shared/contracts/browser-port.ts`：`open` / `setPolicy` / `close` / `cdp`），main 回 `browser.response`，并主动发 `browser.cdpEvent` / `browser.blocked` / `browser.unownedBlocked`（无法归属标签页的 Worker 拦截，后端记日志）/ `browser.gone`（29 §5.1）。
+加解密不暴露给 renderer：后端经 utilityProcess 与 main 之间的 `MessagePort` 请求 main 的 safeStorage。浏览器标签页同样：后端经同一通道发 `browser.request`（`shared/contracts/browser-port.ts`：`open` / `setPolicy` / `close` / `cdp`），main 回 `browser.response`，并主动发 `browser.cdpEvent` / `browser.blocked` / `browser.unownedBlocked`（无法归属标签页的 Worker 拦截，后端记日志）/ `browser.certificateRefused { host }`（网站 `host:port` 向 AI 的标签页要客户端证书，main 没有回答并停止加载，后端据此返回 `BROWSER_LOGIN_REQUIRED`，D172）/ `browser.gone`（29 §5.1）。`open` 带 `integratedAuthServers`（只有网站分区非空，D171）。网站向**用户的**标签页要 HTTP 认证或客户端证书时不经后端：main 经 IPC 直接请 renderer 询问用户（D170、D172，29 §5.4）。
 
 ## 14. 待实施 API：附件与需求清单
 

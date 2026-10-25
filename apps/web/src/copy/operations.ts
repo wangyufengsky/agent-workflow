@@ -245,6 +245,7 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   'preview.maxRunning': SETTINGS_COPY.previewMaxRunning,
   'preview.idleMinutes': SETTINGS_COPY.previewIdleMinutes,
   'browser.loginUrlPatterns': SETTINGS_COPY.loginUrlPatterns,
+  'browser.integratedAuthServers': SETTINGS_COPY.integratedAuthServers,
   repoPath: '仓库目录',
   name: '名称',
   defaultBranch: '默认分支',

@@ -64,6 +64,8 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
     return tab;
   }
 
+  // `integratedAuthServers` is not applied: Chromium takes them for the whole browser, and development and tests have
+  // no domain login to give.
   async function open(op: Extract<BrowserPortOp, { kind: 'open' }>): Promise<null> {
     const context =
       contexts.get(op.partition) ??

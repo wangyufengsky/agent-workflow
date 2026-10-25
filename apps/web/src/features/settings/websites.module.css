@@ -23,6 +23,11 @@
   min-width: 0;
 }
 
+/* A read-only rule's query paths: a line of its own under the rule. */
+.rule > input.queryPaths {
+  flex-basis: 100%;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

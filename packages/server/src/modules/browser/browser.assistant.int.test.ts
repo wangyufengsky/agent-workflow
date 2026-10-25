@@ -195,6 +195,7 @@ describe('助手网页文字与任务预览', () => {
       userFacing: false,
       viewport: VIEWPORT_SIZES.desktop,
       policy: { previewOrigins: [], sites: [] },
+      integratedAuthServers: [],
     });
     const targets = async () =>
       z
