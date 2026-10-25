@@ -84,6 +84,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DeliveryStrategy` | `squash` · `merge` · `rebase` · `pull_request` · `report_only` |
 | `DeliveryStatus` | `running` · `succeeded` · `conflict` · `failed` |
 | `HostingProvider` | `github` · `gitlab` |
+| `HostingSource` | `project`（项目自己绑定的令牌）· `global`（设置里该平台地址的全局令牌）：`effectiveHosting` 的令牌来源（D155） |
 | `ChangeRequestReason` | `user`（让 AI 再改改）· `conflict`（交给 AI 解决冲突）· `review`（按 PR 审查意见修改，21）；`request-changes` 的 `reason` 只接受前两个，`review` 只经 `review-feedback` 发起 |
 | `ReviewCommentKind` | `thread`（未解决的审查讨论，通常在某个文件的某一行）· `general`（对话中的评论或审查总结）（21 §2.2） |
 | `GitOperation` | `merge` · `rebase` · `cherry_pick` · `revert`：主工作区里用户没做完的操作（27 §5） |
@@ -458,7 +459,7 @@ class AppError extends Error {
 | `GIT_BRANCH_NOT_MERGED` | 409 | 删除未合并的分支要 `force` |
 | `GIT_BRANCH_OWNED_BY_TASK` | 409 | 分支属于没结束的任务，只能在任务页交付；`details: { branch, task: { id, key } }`（27 §5） |
 | **托管平台** | | |
-| `HOSTING_NOT_CONFIGURED` | 400 | 选择 PR 交付但项目未绑定远端 |
+| `HOSTING_NOT_CONFIGURED` | 400 | 需要平台（PR、审查意见）但项目没有可用的令牌：自己没绑定，origin 的平台地址也没有全局令牌（D155） |
 | `HOSTING_AUTH_FAILED` | 401 | 令牌无效或权限不足 |
 | `HOSTING_API_ERROR` | 502 | `details: { status, body }` |
 | **流程 / 角色** | | |

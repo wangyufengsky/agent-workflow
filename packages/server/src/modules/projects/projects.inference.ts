@@ -5,17 +5,23 @@ import { z } from 'zod';
 
 const SCP_LIKE = /^[\w.-]+@([\w.-]+):(.+)$/;
 
-/** Hosting remote from an origin URL; github.com is GitHub, any other host is (possibly self-hosted) GitLab. */
+/**
+ * Hosting remote from an origin URL; github.com is GitHub, any other host is (possibly self-hosted) GitLab. A GitLab's
+ * address is an HTTP(S) origin's own scheme and port; over SSH only the host is known, so `https://<host>`.
+ */
 export function parseRemoteUrl(url: string): HostingRef | null {
   let host: string;
+  let web: string;
   let path: string;
   const scp = SCP_LIKE.exec(url);
   if (scp?.[1] !== undefined && scp[2] !== undefined) {
     host = scp[1];
+    web = `https://${host}`;
     path = scp[2];
   } else if (/^(https?|ssh):\/\//.test(url)) {
     const parsed = new URL(url);
     host = parsed.hostname;
+    web = parsed.protocol === 'ssh:' ? `https://${host}` : parsed.origin;
     path = parsed.pathname;
   } else {
     return null;
@@ -26,7 +32,7 @@ export function parseRemoteUrl(url: string): HostingRef | null {
     .replace(/\/+$/, '');
   if (!repo.includes('/')) return null;
   if (host === 'github.com') return { provider: HostingProvider.Github, baseUrl: null, repo };
-  return { provider: HostingProvider.Gitlab, baseUrl: host === 'gitlab.com' ? null : `https://${host}`, repo };
+  return { provider: HostingProvider.Gitlab, baseUrl: web === 'https://gitlab.com' ? null : web, repo };
 }
 
 const LOCKFILE_RUNNER: ReadonlyArray<[lockfile: string, run: string]> = [

@@ -153,7 +153,7 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
   const close = () => setOpen(undefined);
   const delivery = task.lastDelivery;
   const conflict = delivery?.status === DeliveryStatus.Conflict ? delivery : null;
-  const canPr = project.data?.hosting?.hasToken === true;
+  const canPr = project.data !== undefined && project.data.effectiveHosting !== null;
   const { pullRequest } = task;
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
 

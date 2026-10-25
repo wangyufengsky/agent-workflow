@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { hostingProviderSchema } from '../../enums/git.ts';
+import { hostingProviderSchema, hostingSourceSchema } from '../../enums/git.ts';
 import { projectPreviewSchema } from './previews.ts';
 
 export const hostingRefSchema = z.object({
@@ -31,6 +31,11 @@ export type ProjectDTO = z.infer<typeof projectSchema>;
 export const projectDetailSchema = projectSchema.extend({
   /** Parsed from `git remote get-url origin`, used to prefill the hosting form; null when not recognisable. */
   inferredHosting: hostingRefSchema.nullable(),
+  /**
+   * The repository PRs and token pushes go to, and whose token signs in (D155): the project's own binding with a
+   * token, else origin's repository with the global token of its platform; null when neither applies.
+   */
+  effectiveHosting: hostingRefSchema.extend({ source: hostingSourceSchema }).nullable(),
   /** Database connections the project's AI sessions may query (M5-07). */
   dbConnectionIds: z.array(z.string()),
   /** Bash patterns the user always allowed for the project's AI sessions, oldest first (D101). */
@@ -83,3 +88,27 @@ export const setHostingRequestSchema = z.object({
   token: z.string().trim().min(1),
 });
 export type SetHostingRequest = z.infer<typeof setHostingRequestSchema>;
+
+/** A global GitHub / GitLab token (D155), used by projects that have none of their own. */
+export const hostingAccountSchema = z.object({
+  id: z.string(),
+  provider: hostingProviderSchema,
+  /** Self-hosted GitLab address; null for github.com and gitlab.com. */
+  baseUrl: z.string().nullable(),
+  /** The user name the token signs in as, read when it was saved. */
+  account: z.string(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+export type HostingAccountDTO = z.infer<typeof hostingAccountSchema>;
+
+export const setHostingAccountRequestSchema = z.object({
+  provider: hostingProviderSchema,
+  /** Self-hosted GitLab address; omit for github.com and gitlab.com. */
+  baseUrl: z
+    .url({ protocol: /^https?$/ })
+    .nullable()
+    .optional(),
+  token: z.string().trim().min(1),
+});
+export type SetHostingAccountRequest = z.infer<typeof setHostingAccountRequestSchema>;
