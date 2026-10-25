@@ -49,6 +49,8 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
         flatten: true,
         filter: [{ type: 'shared_worker' }, { exclude: true }],
       });
+      // Target changes (a committed navigation) for `close` below, seen whatever state Playwright's page is in.
+      await session.send('Target.setDiscoverTargets', { discover: true });
       return instance;
     } catch (err) {
       await instance.close();
@@ -124,19 +126,21 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
     const failed = Promise.withResolvers<never>();
     // Chromium 156 的导航可替换正在关闭的旧 RFH，丢掉关闭状态（crbug.com/559040906）。
     // 新主 frame 提交是目标再次有效的证据；只响应这个事件关闭同一页，不做定时重试。
-    const onCommit = (frame: ReturnType<Page['mainFrame']>) => {
-      if (frame !== tab.page.mainFrame()) return;
+    // 提交从浏览器级会话的 Target.targetInfoChanged 得知：页面开始关闭后 Playwright 不一定再发 framenavigated
+    // （导航后立刻关闭时约 1/60 漏发，关闭就一直不结束）。
+    const onCommit = ({ targetInfo }: { targetInfo: { targetId: string } }) => {
+      if (targetInfo.targetId !== tab.targetId) return;
       targetControl.send('Target.closeTarget', { targetId: tab.targetId }).catch((err: unknown) => {
         if (!tab.page.isClosed()) failed.reject(err);
       });
     };
-    tab.page.on('framenavigated', onCommit);
+    targetControl.on('Target.targetInfoChanged', onCommit);
     try {
       await Promise.race([tab.page.close(), failed.promise]);
       tabs.delete(tabId);
       return null;
     } finally {
-      tab.page.off('framenavigated', onCommit);
+      targetControl.off('Target.targetInfoChanged', onCommit);
     }
   }
 
