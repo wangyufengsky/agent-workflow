@@ -128,9 +128,6 @@ async function open(userDataDir: string): Promise<{ app: ElectronApplication; pa
   return { app, page };
 }
 
-/** Unlocking derives the key with scrypt (128 MiB, D167): seconds on a busy runner. */
-const UNLOCK_TIMEOUT_MS = 20_000;
-
 /** A project, a master password and the given settings; the app started again, so the password is locked. */
 async function openLocked(prefix: string, settings: Record<string, unknown> = {}) {
   const userDataDir = mkdtempSync(join(tmpdir(), prefix));
@@ -148,18 +145,16 @@ async function openLocked(prefix: string, settings: Record<string, unknown> = {}
 // Whatever the key store: a master password set earlier is locked again at every start (D167). Every page then says
 // so and unlocks in place (D178).
 test('主密码锁定时每个页面顶部提示，就地解锁', async () => {
-  // The app starts twice.
-  test.slow();
   const { app, page } = await openLocked('aw-e2e-locked-banner-');
   try {
     const banner = page.getByRole('region', { name: '凭据存储' });
     await expect(banner).toContainText('本次启动还没有解锁');
     await banner.getByLabel('主密码', { exact: true }).fill('wrong horse');
     await banner.getByRole('button', { name: '解锁' }).click();
-    await expect(banner.getByRole('alert')).toBeVisible({ timeout: UNLOCK_TIMEOUT_MS });
+    await expect(banner.getByRole('alert')).toBeVisible();
     await banner.getByLabel('主密码', { exact: true }).fill('correct horse');
     await banner.getByRole('button', { name: '解锁' }).click();
-    await expect(banner).toBeHidden({ timeout: UNLOCK_TIMEOUT_MS });
+    await expect(banner).toBeHidden();
   } finally {
     await app.close();
   }
@@ -168,8 +163,6 @@ test('主密码锁定时每个页面顶部提示，就地解锁', async () => {
 // The unlock under an error often sits in the form that failed (a database connection, a token): unlocking must not
 // submit that form again. Saving answers CREDENTIAL_LOCKED here on every platform, as on a Linux without a key store.
 test('表单里的错误就地解锁，不会再次提交表单', async () => {
-  // The app starts twice.
-  test.slow();
   const { app, page } = await openLocked('aw-e2e-locked-form-', { 'ui.mode': 'pro' });
   try {
     let saves = 0;
@@ -195,7 +188,7 @@ test('表单里的错误就地解锁，不会再次提交表单', async () => {
     await dialog.getByRole('button', { name: '保存' }).click();
     await dialog.getByLabel('主密码', { exact: true }).fill('correct horse');
     await dialog.getByRole('button', { name: '解锁' }).click();
-    await expect(dialog).toContainText('已解锁，请再试一次', { timeout: UNLOCK_TIMEOUT_MS });
+    await expect(dialog).toContainText('已解锁，请再试一次');
     expect(saves).toBe(1);
   } finally {
     await app.close();
