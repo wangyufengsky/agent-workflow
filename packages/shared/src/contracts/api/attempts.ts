@@ -30,6 +30,7 @@ export const attemptSchema = attemptSummarySchema.extend({
   opencodeSessionId: z.string().nullable(),
   tokensInput: z.number().nullable(),
   tokensOutput: z.number().nullable(),
+  /** Dollars as opencode reports them; null before any usage and in the offline environment (D181). */
   cost: z.number().nullable(),
 });
 export type AttemptDTO = z.infer<typeof attemptSchema>;

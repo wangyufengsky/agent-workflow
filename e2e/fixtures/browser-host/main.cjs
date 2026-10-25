@@ -4,8 +4,14 @@
 // CommonJS without top-level await: Playwright's Electron loader requires the main script.
 const { createHash } = require('node:crypto');
 const { createServer } = require('node:http');
+const { createServer: createHttpsServer } = require('node:https');
 const { app, BrowserWindow } = require('electron');
 const { createBrowserTabs } = require('../../../apps/desktop/src/main/browser.ts');
+const { createTestCertificates } = require('../../../packages/server/test/helpers/tls.ts');
+const { createTestProxy } = require('../../../packages/server/test/helpers/proxy.ts');
+
+// An intranet website behind an enterprise CA (D176): at 127.0.0.1, and as a name only the test proxy resolves.
+const CORP_HOST = 'wiki.corp.test';
 
 const PAGE = `<!doctype html><title>host</title>
 <button onclick="window.clicked = (window.clicked || 0) + 1">Go</button>
@@ -48,9 +54,18 @@ server.on('upgrade', (req, socket) => {
   );
 });
 
-app.whenReady().then(() => server.listen(0, '127.0.0.1', start));
+app.whenReady().then(async () => {
+  const certificates = await createTestCertificates(['127.0.0.1', CORP_HOST]);
+  const intranet = createHttpsServer({ cert: certificates.certPem, key: certificates.keyPem }, (_req, res) => {
+    res.writeHead(200, { 'content-type': 'text/html' });
+    res.end('<!doctype html><title>intranet</title>');
+  });
+  await new Promise((resolve) => intranet.listen(0, '127.0.0.1', resolve));
+  const proxy = await createTestProxy();
+  server.listen(0, '127.0.0.1', () => start({ certificates, intranetPort: intranet.address().port, proxy }));
+});
 
-function start() {
+function start({ certificates, intranetPort, proxy }) {
   const origin = `http://127.0.0.1:${server.address().port}`;
 
   const events = [];
@@ -79,6 +94,12 @@ function start() {
 
   globalThis.harness = {
     origin,
+    intranet: {
+      origin: `https://127.0.0.1:${intranetPort}`,
+      corpOrigin: `https://${CORP_HOST}:${intranetPort}`,
+      caPem: certificates.caPem,
+    },
+    proxy: { url: proxy.url, connects: proxy.connects },
     tabs,
     events,
     requests,

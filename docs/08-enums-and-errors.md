@@ -401,7 +401,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `delivery.defaultStrategy` | `squash`（可选 `squash` / `merge` / `rebase`；PR 有单独按钮） | 专业 |
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |
 | `opencode.binaryPath` | `null`（从 PATH 与 `~/.opencode/bin` 查找；助手不能修改，D65） | 专业 |
-| `network.offline` | `false`（离线环境，D168：opencode 不访问公网、隐藏自带的 Zen / Go provider、知识问答不能网络搜索；opencode 下一次启动时生效） | 简单 |
+| `network.offline` | `false`（离线环境，D168：opencode 不访问公网、隐藏自带的 Zen / Go provider、知识问答不能网络搜索；opencode 下一次启动时生效。打开时各处不显示费用、只显示 tokens，立即生效，D181） | 简单 |
 | `assistant.alwaysAllow` | `[]`（操作 id 列表；只有 write 级生效，critical 即使在列表中也每次确认；助手自己不能修改，D65；v1.1） | 简单 |
 | `companion.appearance` | `orb`（`CompanionAppearance`：`orb` / `whale`，默认极光光球；32 §3） | 简单 |
 | `companion.enabled` | `false`（桌面显示助手） | 简单 |
@@ -415,9 +415,9 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `browser.sites` | `[{ pattern: '*', access: 'read', queryPaths: [] }]`（网站规则，按顺序取第一条匹配，无匹配不允许；只读规则的 `queryPaths` 为放行 POST 的查询路径，缺省为空，D173；助手不能修改，D65 的同一思路，29 §5.4） | 简单 |
 | `browser.loginUrlPatterns` | `[]`（内置规则之外识别登录页的主机或路径片段） | 专业 |
 | `browser.integratedAuthServers` | `[]`（网站分区用系统身份做 Windows 集成登录的服务器，主机名通配，不能只写 `*`；助手不能修改，D171，29 §5.4） | 专业 |
-| `network.extraCaCerts` | `null`（PEM，一张或多张；后端与 opencode 在内置根证书与系统证书库之外再信任它们；边界检查 PEM 结构，后端保存前逐张解析；助手不能修改，D164） | 专业 |
-| `network.proxy` | `null`（`http(s)://主机:端口`，不含账号密码；`null` 时用环境变量 `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`；助手不能修改，D165） | 专业 |
-| `network.noProxy` | `[]`（`network.proxy` 生效时直连的主机，`.corp.example` 匹配子域名；本机地址总是直连；助手不能修改，D165） | 专业 |
+| `network.extraCaCerts` | `null`（PEM，一张或多张；后端、opencode、git（D175）与内置浏览器（D176）在内置根证书与系统证书库之外再信任它们；边界检查 PEM 结构，后端保存前逐张解析；助手不能修改，D164） | 专业 |
+| `network.proxy` | `null`（`http(s)://主机:端口`，不含账号密码；`null` 时用环境变量 `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`，内置浏览器跟随系统代理；有值时后端、opencode、git 与内置浏览器都用它；助手不能修改，D165、D174–D176） | 专业 |
+| `network.noProxy` | `[]`（`network.proxy` 生效时直连的地址：`*`、主机名（含子域名，可写 `.` 或 `*.` 前缀）、IP、IPv4 / IPv6 网段、加 `:端口`；IP 与网段只匹配网址里直接写的 IP；由后端的转发代理统一判断，内置浏览器换算成 Chromium 的 bypass 规则；本机地址总是直连；助手不能修改，D165、D174） | 专业 |
 
 「模式」列表示该设置在哪种界面模式下出现在设置页（常量 `SETTING_MODE`）。值的 schema 为 `settingsSchema`（strict：未知键拒绝），默认值为 `SETTING_DEFAULTS`。
 

@@ -201,19 +201,21 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 
 **测试。** `shell-path.int.test.ts` 用一个假的登录 shell（启动时打印杂讯、加入 `/opt/fake-brew/bin` 并导出变量）验证：从 Finder 启动时后端的 PATH 按登录 shell 的顺序带上该目录、补上登录 shell 导出的变量、当前已有的变量不被覆盖、shell 自身的变量不带；从终端启动时 PATH 不变、变量以当前的为准；值含换行与 `=` 时原样带上；shell 失败或不结束时沿用原环境。假 shell 是 sh 脚本，这三例在 Windows 上跳过（该机制在 Windows 上不运行，「Windows 不问登录 shell」一例三平台都运行）。从打包应用里真正读到用户的 shell 配置只能手工验证：`pnpm dist` 打包、从 Finder 启动，跑一个 `mvn` 或 `pnpm` 检查命令。
 
-### 3.13 企业 CA 与代理（D164、D165）
+### 3.13 企业 CA 与代理（D164、D165、D174–D176）
 
 **问题。** 后端是 Electron utilityProcess 里的 Node：TLS 只信任 Node 自带的根证书，不读系统证书库；fetch 不读 `HTTPS_PROXY`。内置浏览器（Chromium）却读系统证书库、跟随系统代理（含 PAC），所以同一个企业 GitLab 浏览器能开、后端报证书错误，github.com 在「外部走代理」的内网里后端连不上。
 
 **处理（`modules/network`）。**
 
 - 信任：后端启动时与设置 `network.extraCaCerts` 变化时调用 `tls.setDefaultCACertificates`，列表为 `bundled`（Node 内置）+ `extra`（`NODE_EXTRA_CA_CERTS`，启动时由 Node 读入；Electron 44 的 utilityProcess 实测会读）+ `system`（系统证书库）+ 设置里的证书。fetch（Octokit、Gitbeaker）与 mysql2、pg、gaussdb-node、tedious 都不传自己的 `ca`，用的就是这份默认列表。系统证书库各平台来源：macOS 为钥匙串中受信任的证书，Linux 为 OpenSSL 默认目录（`/etc/ssl/certs` 等，`update-ca-certificates` 写入的位置），Windows 为系统证书存储（Windows 暂缓，未验证）。
-- 代理：`http.setGlobalProxyFromEnv` 以「生效的代理变量」替换 fetch 的全局 dispatcher 与 `http(s).globalAgent`，每次先还原上一次的设置。生效的变量：`network.proxy` 有值时为它与 `network.noProxy`，否则为环境变量（小写优先，与 curl、Node、bun 相同）；`NO_PROXY` 总是加上 `localhost,127.0.0.1,[::1]`（Node 只认带方括号的 IPv6 写法，实测）。数据库连接是 TCP，不经代理。
-- opencode（bun 1.3.14）：每次启动带 `NODE_USE_SYSTEM_CA=1`；设置里有证书时，把「后端从 `NODE_EXTRA_CA_CERTS` 读到的 + 设置里的」写到 `<数据目录>/network/extra-ca.pem`，`NODE_EXTRA_CA_CERTS` 指向它；代理变量大小写各一份（bun 原本就读这些变量与 `NO_PROXY`，实测）。改设置后要重启 opencode 才生效（运行环境页「重启」）。
-- 与内置浏览器的差异：浏览器跟随系统代理与 PAC；后端与 opencode 只认变量与设置，不解析 PAC。只在系统设置里配了代理的用户需要在设置「网络」里填一次。
-- 不处理：需要账号密码的代理不能写进设置（设置明文保存），继续用环境变量；NTLM / Kerberos 代理认证不支持；git 推送用用户自己的 git 配置（`http.sslCAInfo`、`http.proxy`）。
+- 代理：生效的变量为 `network.proxy` 有值时的它与 `network.noProxy`，否则为环境变量（小写优先，与 curl、Node、bun 相同）。有生效的代理时，后端在 `127.0.0.1` 的随机端口上开一个**转发代理**（`network.forward.ts`，D174），`http.setGlobalProxyFromEnv` 把 fetch 的全局 dispatcher 与 `http(s).globalAgent` 指向它（每次先还原上一次的设置），`NO_PROXY` 只剩 `localhost,127.0.0.1,[::1]`（Node 只认带方括号的 IPv6 写法，实测）。转发代理按生效的 `NO_PROXY` 决定每个请求直连还是经上游代理：一处匹配（`network.no-proxy.ts`），认网段、`*.域名` 与端口。只有拿到本次运行口令的进程能用它（代理 URL 的密码；用户名 `http` / `https` 说明请求的协议：Node 对 http 网址也用 CONNECT，隧道本身看不出该用哪个上游）。数据库连接是 TCP，不经代理。
+- 为什么要转发代理（实测，2026-10-25）：Node 24.19 / Electron 44 的 Node 24.22 与 bun 1.3.14 都不认 `10.0.0.0/8`、`10.*`、`127.0.0.*`，只认完整的主机名、IP、`主机:端口` 与单独的 `*`，并按字符串后缀匹配（`.0.0.1` 会匹配 `127.0.0.1`）；bun 不认 `*.corp.example`。git（Apple 2.50 / Homebrew 2.45，libcurl 8.7）认网段、不认 `*.corp.example` 与 IP 后缀；Ubuntu 22.04 的 curl 7.81 还不认网段（7.86 起）。
+- opencode（bun 1.3.14）：每次启动带 `NODE_USE_SYSTEM_CA=1`；设置里有证书时，把「后端从 `NODE_EXTRA_CA_CERTS` 读到的 + 设置里的」写到 `<数据目录>/network/extra-ca.pem`，`NODE_EXTRA_CA_CERTS` 指向它；有生效的代理时代理变量（大小写各一份）指向转发代理。CA 的改动要重启 opencode 才生效（运行环境页「重启」）；代理地址与 `noProxy` 的改动由转发代理立即应用，只有从没有代理到有代理（或反过来）要重启。
+- git（D175）：与远端通信的命令（Git 工作台的推送、拉取、取回，任务的 PR 推送与审查意见取回）经 `GIT_CONFIG_COUNT` 注入：设置里有证书时 `http.sslCAInfo=<数据目录>/network/git-ca.pem`（后端的整份信任列表：内置根证书 + `NODE_EXTRA_CA_CERTS` + 系统证书库 + 设置）；有生效的代理时 `http.proxy` 为转发代理（`https` 那个：git 只为 https 网址建隧道，http 网址以绝对地址转发，转发代理按 http 选上游）、`http.proxyAuthMethod=basic`（git 默认先不带凭据请求，收到 407 后重试，而转发代理拒绝后就关闭连接），`NO_PROXY` 只剩本机地址。证书包要完整，因为 git 用哪套 CA 因安装方式而异（实测）：macOS 上 Apple 与 Homebrew 的 git 都链接系统 libcurl（LibreSSL），`http.sslCAInfo` 叠加在钥匙串之上；Linux 发行版的 git 用 OpenSSL，`http.sslCAInfo` 替换默认证书包。注入会盖过用户 git 配置里不分网址的 `http.sslCAInfo` / `http.proxy`；按网址的 `http.<url>.*` 仍然优先。SSH 远端不受影响。
+- 内置浏览器（D176）：`network.proxy` 有值时用它（`session.setProxy`，bypass 由 `noProxy` 换算：名称加上 `*.` 子域名，网段与 IP 原样，Chromium 自己认网段），否则跟随系统代理与 PAC，环境变量的代理不作用于浏览器；设置里的 CA 经分区的 `setCertificateVerifyProc` 与 `certificate-error` 额外信任（检查见 29 §5.4）。
+- 不处理：需要账号密码的代理不能写进设置（设置明文保存），继续用环境变量（转发代理把 URL 里的账号密码交给上游）；NTLM / Kerberos 代理认证不支持；AI 在会话里自己运行的 git 不经此处（它继承 opencode 的代理变量，CA 用自己的配置）。
 
-**测试。** `network.int.test.ts`：FakeHosting 以测试 CA 签发的证书提供 HTTPS，加 CA 前报 `HOSTING_UNREACHABLE`、加上后成功；测试代理记录 CONNECT，自建 GitLab 用只有代理能解析的主机名，验证环境变量、设置覆盖与 `noProxy`；假 opencode 记录启动环境。`network.oc.test.ts`（`@opencode`）：真实 opencode 经设置里的 CA 连上 HTTPS 的模型服务。系统证书库只能手工验证：把测试 CA 加入钥匙串（Linux：`/usr/local/share/ca-certificates` + `update-ca-certificates`），不加设置，保存企业 GitLab 的令牌。
+**测试。** `network.no-proxy.test.ts`：各种 `NO_PROXY` 写法。`network.int.test.ts`：FakeHosting 以测试 CA 签发的证书提供 HTTPS，加 CA 前报 `HOSTING_UNREACHABLE`、加上后成功；测试代理记录 CONNECT，自建 GitLab 用只有代理能解析的主机名，验证环境变量、设置覆盖与 `noProxy`；`127.0.0.0/8` 时按 `[::ffff:127.0.0.1]` 访问的 GitLab 直连（本机地址列表不含这个写法，只有网段能让它直连）；假 opencode 记录启动环境，测试经它拿到的转发代理建隧道；真实 git 与 `git http-backend` 的 HTTPS 服务：加 CA 前推送因证书失败、加上后推送与取回成功，设置的代理下经代理到达只有代理能解析的远端；http 远端经代理转发，不走代理的网段里按 IP（`[::ffff:127.0.0.1]`）写的远端直连（转发的请求不能再用全局 agent，否则又回到转发代理）。Ubuntu 的 git 链接 GnuTLS，证书错误的措辞与 OpenSSL 不同（`server certificate verification failed`）。`network.oc.test.ts`（`@opencode`）：真实 opencode 经转发代理与上游代理连上只有代理能解析、企业 CA 签发证书的模型服务。浏览器：`browser-network.test.ts`（证书检查）与 `browser-host.electron.spec.ts`（真实 Chromium 的 CA 与代理）。系统证书库只能手工验证：把测试 CA 加入钥匙串（Linux：`/usr/local/share/ca-certificates` + `update-ca-certificates`），不加设置，保存企业 GitLab 的令牌。
 
 ## 4. 测试与 CI
 

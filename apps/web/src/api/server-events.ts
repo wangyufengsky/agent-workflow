@@ -14,7 +14,12 @@ import {
   updateConfirmation,
   updateConversation,
 } from '../features/assistant/assistant.queries.ts';
-import { appendTranscript, attemptTranscript, updateAttempt } from '../features/attempts/attempt.queries.ts';
+import {
+  appendTranscript,
+  attemptTranscript,
+  refreshAttempts,
+  updateAttempt,
+} from '../features/attempts/attempt.queries.ts';
 import { connectCompanionEvents } from '../features/companion/companion-events.ts';
 import { refreshGitReview } from '../features/git/git.queries.ts';
 import { updateInbox } from '../features/inbox/inbox.queries.ts';
@@ -37,6 +42,8 @@ const refreshInsights = (qc: QueryClient) => qc.invalidateQueries({ queryKey: qu
 async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
   switch (event.type) {
     case ServerEventType.SettingsUpdated:
+      // Attempts carry no cost in the offline environment (D181), so pages already showing them follow the switch.
+      if (event.data.keys.includes('network.offline')) await refreshAttempts(qc);
       return qc.invalidateQueries({ queryKey: queryKeys.settings });
     case ServerEventType.RuntimeUpdated:
       qc.setQueryData(queryKeys.runtime, event.data);

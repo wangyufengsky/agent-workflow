@@ -43,8 +43,8 @@ export type FakeStep =
   | { type: 'hang' }
   /** The model service fails: opencode reports a retry per message, then waits until `recoverModel()`. */
   | { type: 'retry'; messages: string[] }
-  /** The tokens the turn reports as used when it ends, instead of 100 input and 20 output. */
-  | { type: 'usage'; input: number; output: number }
+  /** The tokens (and cost) the turn reports as used when it ends, instead of 100 input, 20 output and no cost. */
+  | { type: 'usage'; input: number; output: number; cost: number }
   /** `idle: false`: opencode reports the error without a following idle event. */
   | { type: 'error'; name: string; message: string; idle: boolean };
 
@@ -76,8 +76,8 @@ export function script() {
       add({ type: 'callTool', server: 'exec', name: 'ask_user', args }),
     /** Asks for a permission and waits until the backend replies. */
     requestPermission: (permission: string, patterns: string[]) => add({ type: 'permission', permission, patterns }),
-    /** The tokens the turn reports when it ends (quality and usage, 19). */
-    usage: (input: number, output: number) => add({ type: 'usage', input, output }),
+    /** The tokens the turn reports when it ends (quality and usage, 19), and its cost in dollars. */
+    usage: (input: number, output: number, cost = 0) => add({ type: 'usage', input, output, cost }),
     /** Keeps working (never idle) until the session is aborted. */
     hang: () => add({ type: 'hang' }),
     /**
@@ -199,7 +199,7 @@ export function createFakeOpencode() {
       role: 'assistant',
       ...(parentMessageId === undefined ? {} : { parentMessageId }),
     });
-    let used = { input: 100, output: 20 };
+    let used = { input: 100, output: 20, cost: 0 };
     for (const step of steps) {
       if ((generation.get(sessionId) ?? 0) !== turnGeneration || closed)
         return { name: 'MessageAbortedError', data: { message: 'Aborted' } };
@@ -309,7 +309,7 @@ export function createFakeOpencode() {
       messageId,
       partId: nextId('step'),
       tokens: { input: used.input, output: used.output },
-      cost: 0,
+      cost: used.cost,
     });
     emit({ type: E.Idle, sessionId });
   }

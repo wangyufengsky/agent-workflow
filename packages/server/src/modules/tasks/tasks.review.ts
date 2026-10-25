@@ -109,6 +109,7 @@ export function createTaskReview(
         repoPath,
         branch: worktree.branch,
         authorization: hosting.gitAuthorization(),
+        network: await deps.gitNetwork(),
       });
       await worktrees.restore(worktree, repoPath);
       const comments = renderReviewComments(chosen);

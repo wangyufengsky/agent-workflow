@@ -30,7 +30,7 @@ import type { AttemptsService } from '../attempts/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DatabasesService } from '../databases/index.ts';
 import type { DeliveriesService } from '../delivery/index.ts';
-import type { RepoLocks } from '../git/index.ts';
+import type { GitNetwork, RepoLocks } from '../git/index.ts';
 import type { GitReviewsService } from '../git-reviews/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
@@ -47,6 +47,8 @@ import { createTasksRepo, type Task, type TaskChanges } from './tasks.repo.ts';
 import { createVerifySteps } from './tasks.verify.ts';
 
 export type TasksServiceDeps = {
+  /** The app's CA and proxy for pushing task branches (D175). */
+  gitNetwork: () => Promise<GitNetwork>;
   db: Db;
   unit: UnitOfWork;
   clock: Clock;

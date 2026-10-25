@@ -9,6 +9,15 @@ import { browserBlockReasonSchema } from '../enums/browser.ts';
  */
 const tabIdSchema = z.string().min(1);
 
+/** The network settings the built-in browser follows (D176, 29 §5.4): they hold for a tab's whole partition. */
+export const browserNetworkSchema = z.object({
+  /** From `network.proxy` and `network.noProxy` as Chromium's rules; null: the system's proxy (and PAC) applies. */
+  proxy: z.object({ rules: z.string().min(1), bypassRules: z.string() }).nullable(),
+  /** `network.extraCaCerts`, one PEM each: trusted besides the system store, never instead of its checks. */
+  certificates: z.array(z.string()),
+});
+export type BrowserNetwork = z.infer<typeof browserNetworkSchema>;
+
 export const browserPortOpSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('open'),
@@ -33,6 +42,8 @@ export const browserPortOpSchema = z.discriminatedUnion('kind', [
      * the whole partition, so each open sets it again; only the websites' partition has any.
      */
     integratedAuthServers: z.array(z.string()),
+    /** Set again by each open, like the servers above. */
+    network: browserNetworkSchema,
   }),
   /** The preview's origin changes when it restarts on another port. */
   z.object({ kind: z.literal('setPolicy'), tabId: tabIdSchema, policy: browserPolicySchema }),

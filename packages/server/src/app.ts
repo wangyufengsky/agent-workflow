@@ -155,7 +155,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const settings = createSettingsModule({ db: database.db, events, clock, validate: validateNetworkSettings });
   const credentials = createCredentialsModule({ db: database.db, clock, cipher: deps.cipher ?? unavailableCipher });
   const env = deps.env ?? process.env;
-  const network = createNetworkModule({ settings: settings.service, events, env, dataDir: config.dataDir });
+  const network = await createNetworkModule({ settings: settings.service, events, env, dataDir: config.dataDir, log });
+  server.addHook('onClose', async () => network.close());
   const prompts = loadPrompts(config.promptsDir);
   // Per-launch secrets of the two MCP endpoints, separate from the renderer token and from each other (D25).
   const mcpToken = randomBytes(32).toString('hex');
@@ -293,6 +294,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     log,
     events,
     settings: settings.service,
+    network: network.browserNetwork,
     projects: projects.service,
     previews: previews.service,
     dataDir: config.dataDir,
@@ -350,6 +352,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   const requirements = createRequirementsModule({ db: database.db, clock });
   const tasks = createTasksModule({
+    gitNetwork: network.gitEnv,
     db: database.db,
     unit,
     events,
@@ -466,6 +469,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     worktrees: worktrees.service,
     locks,
     log,
+    gitNetwork: network.gitEnv,
   });
   const debug = createDebugModule({ attempts: attempts.service, settings: settings.service, prompts });
   const mcp = createMcpModule({
