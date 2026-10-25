@@ -306,6 +306,8 @@ export function taskOperations(tasks: TasksService) {
 └─ assistant/                  助手工作目录（v1.1）：会话 directory；files/<对话 id>/ 生成的文件，conversations/<对话 id>.jsonl 消息流
 ```
 
+各部分的占用与手动清理（旧日志、旧任务的会话记录）见 [37](37-storage.md)。
+
 ## 8. 并发与一致性
 
 - SQLite 单连接、单写者；多行状态变更放进同一事务。

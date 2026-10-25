@@ -24,6 +24,7 @@ export const queryKeys = {
   dbSchema: (id: string) => ['db-connections', id, 'schema'],
   mcpTools: ['mcp', 'tools'],
   runtimeLogs: (tail: number) => ['system', 'runtime', 'logs', tail],
+  storage: ['system', 'storage'],
   /** Every task list (all filters) shares this prefix. */
   taskLists: ['tasks', 'list'],
   tasks: (filter: Record<string, string | undefined>) => ['tasks', 'list', filter],

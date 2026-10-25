@@ -15,6 +15,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.system.runtime': '查看 opencode 运行状态',
   'op.system.restartRuntime': '重启 opencode',
   'op.system.runtimeLogs': '查看 opencode 日志',
+  'op.system.storage': '查看占用空间',
+  'op.system.cleanStorage': '清理磁盘空间',
   'op.system.mcpTools': 'MCP 工具清单',
   'op.projects.list': '项目列表',
   'op.projects.create': '添加项目',

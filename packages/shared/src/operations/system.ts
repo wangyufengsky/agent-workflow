@@ -1,11 +1,14 @@
 import { z } from 'zod';
 import { RUNTIME_LOG_TAIL_DEFAULT, RUNTIME_LOG_TAIL_MAX } from '../constants/limits.ts';
 import {
+  cleanStorageRequestSchema,
+  cleanStorageResponseSchema,
   environmentSchema,
   healthSchema,
   mcpToolInfoSchema,
   runtimeLogsSchema,
   runtimeSchema,
+  storageSchema,
 } from '../contracts/api/system.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
@@ -97,6 +100,34 @@ export const listMcpToolsOp = defineOperationContract({
   output: z.object({ items: z.array(mcpToolInfoSchema) }),
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/mcp/tools' },
+  expose: { palette: false, assistant: true },
+  credentialFields: [],
+  mode: UiMode.Pro,
+});
+
+export const getStorageOp = defineOperationContract({
+  id: 'system.storage',
+  title: 'op.system.storage',
+  description:
+    'Disk space of the data directory (database, logs, session records, assistant, attachments) and task worktrees, and what cleanup would free',
+  input: z.object({}),
+  output: storageSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/system/storage' },
+  expose: { palette: false, assistant: true },
+  credentialFields: [],
+  mode: UiMode.Pro,
+});
+
+export const cleanStorageOp = defineOperationContract({
+  id: 'system.cleanStorage',
+  title: 'op.system.cleanStorage',
+  description:
+    'Delete old log files, or the session records and screenshots of tasks that ended long ago (their replay is gone afterwards); tasks, results and branches stay',
+  input: cleanStorageRequestSchema,
+  output: cleanStorageResponseSchema,
+  risk: OperationRisk.Critical,
+  http: { method: 'POST', path: '/system/storage/clean' },
   expose: { palette: false, assistant: true },
   credentialFields: [],
   mode: UiMode.Pro,

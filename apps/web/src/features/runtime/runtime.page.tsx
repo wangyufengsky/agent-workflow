@@ -15,6 +15,7 @@ import { environmentQuery } from '../onboarding/environment.queries.ts';
 import { DebugAttemptForm } from './debug-attempt-form.tsx';
 import styles from './runtime.module.css';
 import { runtimeLogsQuery, runtimeQuery, useRestartRuntime } from './runtime.queries.ts';
+import { StoragePanel } from './storage-panel.tsx';
 
 /** Line counts offered for the log tail. */
 const LOG_TAILS = [200, 500, 2000] as const;
@@ -132,7 +133,7 @@ function ModelsPanel() {
       {models.available.length > 0 ? (
         <div className="col">
           <span className="hint">{C.modelsCount(models.available.length)}</span>
-          <ul className={styles.models} data-testid="runtime-models">
+          <ul className={styles.rows} data-testid="runtime-models">
             {models.available.map((m) => {
               const id = `${m.providerId}/${m.modelId}`;
               return (
@@ -157,7 +158,7 @@ function ModelsPanel() {
   );
 }
 
-/** Runtime page (pro mode, 14 §1): the hosted opencode, its models and, in development builds, the debug entry. */
+/** Runtime page (pro mode, 14 §1): the hosted opencode, its models, logs, storage (37) and, in development builds, the debug entry. */
 export function RuntimePage() {
   const { attempt } = route.useSearch();
   const navigate = route.useNavigate();
@@ -173,6 +174,7 @@ export function RuntimePage() {
         <RuntimePanel />
         <ModelsPanel />
         <LogsPanel />
+        <StoragePanel />
         {import.meta.env.DEV && (
           <>
             <DebugAttemptForm onStarted={(id) => void navigate({ search: { attempt: id } })} />
