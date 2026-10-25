@@ -27,13 +27,6 @@ function DeliveryImpact({ taskId }: { taskId: string }) {
   return <p className={styles.note}>{C.diffStat(diff.files.length, sum('additions'), sum('deletions'))}</p>;
 }
 
-/** Putting a directory under Git shows what the first commit would take, as the add-project form does (D153). */
-function GitInitImpact({ repoPath }: { repoPath: string }) {
-  const preview = useQuery(gitInitPreviewQuery(repoPath));
-  if (preview.isError) return <ErrorState error={preview.error} onRetry={() => void preview.refetch()} />;
-  return preview.data === undefined ? null : <GitInitSummary preview={preview.data} />;
-}
-
 function Outcome({ confirmation }: { confirmation: AssistantConfirmationDTO }) {
   const { status, result } = confirmation;
   if (status === AssistantConfirmationStatus.Cancelled) return <p className={styles.outcome}>{C.status.cancelled}</p>;
@@ -71,6 +64,15 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
   const busy = confirm.isPending || cancel.isPending;
   const taskId = confirmation.input.id;
   const repoPath = confirmation.input.repoPath;
+  const gitInitPath =
+    confirmation.operationId === 'projects.initGit' && typeof repoPath === 'string' ? repoPath : undefined;
+  // Putting a directory under Git commits every file not ignored: as in the add-project form, it is confirmed only
+  // once what the first commit takes is shown (D153).
+  const gitInit = useQuery({
+    ...gitInitPreviewQuery(gitInitPath ?? ''),
+    enabled: pending && gitInitPath !== undefined,
+  });
+  const awaitsPreview = gitInitPath !== undefined && !gitInit.isSuccess;
   return (
     <section
       className={styles.card}
@@ -94,9 +96,13 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
       {pending && confirmation.operationId === 'tasks.deliver' && typeof taskId === 'string' && (
         <DeliveryImpact taskId={taskId} />
       )}
-      {pending && confirmation.operationId === 'projects.initGit' && typeof repoPath === 'string' && (
-        <GitInitImpact repoPath={repoPath} />
-      )}
+      {pending &&
+        gitInitPath !== undefined &&
+        (gitInit.isError ? (
+          <ErrorState error={gitInit.error} onRetry={() => void gitInit.refetch()} />
+        ) : (
+          gitInit.data !== undefined && <GitInitSummary preview={gitInit.data} />
+        ))}
       {pending ? (
         <>
           <p className={styles.note}>{C.impact[confirmation.risk]}</p>
@@ -105,7 +111,7 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
               variant="primary"
               size="sm"
               pending={confirm.isPending && confirm.variables?.alwaysAllow === false}
-              disabled={busy}
+              disabled={busy || awaitsPreview}
               onClick={() => confirm.mutate({ id: confirmation.id, alwaysAllow: false })}
             >
               {C.confirm}
@@ -114,7 +120,7 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
               <Button
                 size="sm"
                 pending={confirm.isPending && confirm.variables?.alwaysAllow === true}
-                disabled={busy}
+                disabled={busy || awaitsPreview}
                 onClick={() => confirm.mutate({ id: confirmation.id, alwaysAllow: true })}
               >
                 {C.confirmAlways}

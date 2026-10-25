@@ -139,6 +139,16 @@ test('没有 Git 的目录：确认卡片列出初始化要做的事与将纳入
   ]);
   await queueAssistantTurn(request, [{ type: 'text', text: '已初始化并添加。' }]);
 
+  // What the first commit takes is held back: until it shows, the card cannot be confirmed (D153).
+  let releasePreview = () => {};
+  const previewHeld = new Promise<void>((resolve) => {
+    releasePreview = resolve;
+  });
+  await page.route('**/projects/git-init/preview', async (route) => {
+    await previewHeld;
+    await route.continue();
+  });
+
   await page.goto('/settings');
   await expect(page.getByRole('main').getByRole('heading', { name: '设置' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+j');
@@ -149,6 +159,9 @@ test('没有 Git 的目录：确认卡片列出初始化要做的事与将纳入
 
   const card = panel.getByTestId('confirmation-card');
   await expect(card).toContainText('初始化 Git 并添加项目');
+  await expect(card.getByRole('button', { name: '确认', exact: true })).toBeDisabled();
+  await expect(card.getByRole('button', { name: '确认并总是允许' })).toBeDisabled();
+  releasePreview();
   await expect(card).toContainText('写入 .gitignore，忽略 node_modules/');
   await expect(card).toContainText('把现有的 2 个文件');
   await card.getByRole('button', { name: '确认', exact: true }).click();
