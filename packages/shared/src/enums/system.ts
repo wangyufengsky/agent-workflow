@@ -135,6 +135,8 @@ export const ServerEventType = {
   InboxUpdated: 'inbox.updated',
   DeliveryUpdated: 'delivery.updated',
   RuntimeUpdated: 'runtime.updated',
+  /** Model slot use changed: a session started, ended or waits, the queue moved, the limit changed (D186). */
+  ModelSlotsUpdated: 'model_slots.updated',
   SettingsUpdated: 'settings.updated',
   AssistantUpdated: 'assistant.updated',
   AssistantTranscript: 'assistant.transcript',

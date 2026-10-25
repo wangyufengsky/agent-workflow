@@ -35,6 +35,7 @@ export const STATUS_TONE = {
     [NodeStatus.Cancelled]: StatusTone.Idle,
   },
   attempt: {
+    [AttemptStatus.Queued]: StatusTone.Wait,
     [AttemptStatus.Starting]: StatusTone.Run,
     [AttemptStatus.Running]: StatusTone.Run,
     [AttemptStatus.Succeeded]: StatusTone.Ok,

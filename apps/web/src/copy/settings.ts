@@ -21,12 +21,13 @@ export const SETTINGS_COPY = {
   uncertainty: 'AI 遇到不确定的地方时',
   assume: '做出合理假设并写明',
   ask: '停下来问我',
-  concurrency: '同时运行的 AI 会话数',
+  concurrency: '同时使用模型的会话数',
   previewMaxRunning: '同时运行的页面预览数',
   previewIdleMinutes: '页面预览空闲多久后停止（分钟）',
   loginUrlPatterns: '识别登录页的地址片段',
   integratedAuthServers: 'Windows 集成登录的服务器',
-  concurrencyHint: '多个任务同时进行时，最多并行的 AI 会话数量。',
+  concurrencyHint:
+    '任务、助手、知识问答、PPT、Git 审查等一起算；用满时新的请求排队，有人在等的先开始，任务最多用其中的数量减一。本地模型并发小时调小。',
   // 离线环境（D168）
   offline: '离线环境',
   offlineHint:
@@ -72,7 +73,10 @@ export const SETTINGS_COPY = {
   nodesPerTask: '每个任务同时进行的步骤数',
   maxAttempts: '每个步骤最多尝试次数',
   timeoutMinutes: '任务尝试／助手单轮的时限（分钟）',
-  timeoutHint: '助手等待权限确认时暂停计时，回复后继续剩余时限；超时停止，不会自动重试。修改后从下一轮生效。',
+  timeoutHint:
+    '等待你确认权限、回答问题，以及模型服务不可用、opencode 重试期间都暂停计时，之后继续剩余时限；助手超时停止，不会自动重试。修改后从下一轮生效。',
+  commitDraftTimeout: 'AI 草拟提交信息的时限（秒）',
+  commitDraftTimeoutHint: 'Git 工作台「AI 草拟」等待 AI 写完的最长时间，超过就停止；本地模型较慢时调大。',
   worktreeRoot: '独立工作区目录',
   worktreeRootHint: '绝对路径；留空使用数据目录下的 worktrees。只影响之后新建的任务。',
   defaultStrategy: '「合并」按钮的合并方式',

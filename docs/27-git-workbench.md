@@ -264,7 +264,7 @@ M4-08 的 Git 管理台只做了只读浏览（分支、提交、文件、worktr
 
 ### 7.3 AI 草拟提交信息
 
-`AttemptKind.CommitMessage`，不属于任务、不计并发；只读会话（同审查的权限），首条消息含 `git diff --cached --stat` 与截断到 `COMMIT_DRAFT_DIFF_MAX_BYTES`（60 KB）的 diff（合并时为 `merge-base..来源` 的 diff 与提交标题列表），要求按仓库最近提交的风格写；MCP 工具 `submit_commit_message({ subject, body? })`。操作等待尝试结束后直接返回草稿（通常 10–20 秒，按钮显示进行中，可取消 = 中止尝试）；失败返回 `COMMIT_DRAFT_FAILED`（原因）。草稿只填进输入框，用户改完再点提交。
+`AttemptKind.CommitMessage`，不属于任务、不计并发；只读会话（同审查的权限），首条消息含 `git diff --cached --stat` 与截断到 `COMMIT_DRAFT_DIFF_MAX_BYTES`（60 KB）的 diff（合并时为 `merge-base..来源` 的 diff 与提交标题列表），要求按仓库最近提交的风格写；MCP 工具 `submit_commit_message({ subject, body? })`。操作等待尝试结束后直接返回草稿（通常 10–20 秒，按钮显示进行中，可取消 = 中止尝试；超过专业设置 `git.commitDraftTimeoutSeconds`，默认 120 秒，即中止，D184）；失败返回 `COMMIT_DRAFT_FAILED`（原因）。草稿只填进输入框，用户改完再点提交。
 
 ### 7.4 枚举与错误码（08 增补）
 

@@ -6,7 +6,6 @@ import {
   AttemptKind,
   AttemptStatus,
   COMMIT_DRAFT_DIFF_MAX_BYTES,
-  COMMIT_DRAFT_TIMEOUT_MS,
   ErrorCode,
   SessionAgent,
   type SubmitCommitMessageInput,
@@ -43,16 +42,18 @@ function truncate(text: string, max: number): string {
 
 /**
  * AI commit message drafts (27 §7.3, D110): a short read-only attempt the request waits for, stopped after
- * COMMIT_DRAFT_TIMEOUT_MS. The draft only fills the user's input; nothing is committed.
+ * the setting `git.commitDraftTimeoutSeconds`. The draft only fills the user's input; nothing is committed.
  */
 export function createCommitDrafts({ clock, log, attempts, projects, roles, settings, prompts }: CommitDraftsDeps) {
-  /** Drafts submitted by attempts still running, and the requests waiting for them. */
+  /** Drafts submitted by attempts still running, the requests waiting for them, and their time limits to start. */
   const submitted = new Map<string, CommitDraft>();
   const waiting = new Map<string, (attempt: AttemptDTO) => void>();
+  const starting = new Map<string, () => void>();
 
   attempts.onSignal(({ type, attempt }) => {
-    if (type !== 'ended' || attempt.kind !== AttemptKind.CommitMessage) return;
-    waiting.get(attempt.id)?.(attempts.get(attempt.id));
+    if (attempt.kind !== AttemptKind.CommitMessage) return;
+    if (type === 'started') starting.get(attempt.id)?.();
+    if (type === 'ended') waiting.get(attempt.id)?.(attempts.get(attempt.id));
   });
 
   /** What the draft describes: the staged changes, or what merging `from` into `to` brings. */
@@ -87,13 +88,17 @@ export function createCommitDrafts({ clock, log, attempts, projects, roles, sett
       const reviewer = roles.getByKey(BuiltinRoleKey.Reviewer);
       const attemptId = randomUUID();
       const ended = new Promise<AttemptDTO>((resolve) => waiting.set(attemptId, resolve));
-      // Not waited on forever: the request is someone at the commit box (27 §7.3).
-      const cancelTimer = clock.schedule(COMMIT_DRAFT_TIMEOUT_MS, () => {
-        // The timer has no caller to report to; the attempt may have ended in the meantime.
-        attempts.abort(attemptId).catch((err: unknown) => log.warn({ err, attemptId }, 'commit draft abort failed'));
-      });
+      // Not waited on forever: the request is someone at the commit box (27 §7.3). The limit runs once the attempt has
+      // a model slot (D186): waiting in line behind other sessions is not the draft taking long.
+      let cancelTimer: () => void = () => undefined;
+      const arm = () => {
+        cancelTimer = clock.schedule(settings.get('git.commitDraftTimeoutSeconds') * 1000, () => {
+          // The timer has no caller to report to; the attempt may have ended in the meantime.
+          attempts.abort(attemptId).catch((err: unknown) => log.warn({ err, attemptId }, 'commit draft abort failed'));
+        });
+      };
       try {
-        await attempts.start({
+        const started = attempts.start({
           id: attemptId,
           kind: AttemptKind.CommitMessage,
           agent: SessionAgent.CodeReviewer,
@@ -111,6 +116,10 @@ export function createCommitDrafts({ clock, log, attempts, projects, roles, sett
             diff: truncate(diff, COMMIT_DRAFT_DIFF_MAX_BYTES),
           }),
         });
+        // The attempt row exists once `start` returns: queued, or creating its session already.
+        if (attempts.get(attemptId).status === AttemptStatus.Queued) starting.set(attemptId, arm);
+        else arm();
+        await started;
         const attempt = await ended;
         const draft = submitted.get(attemptId);
         if (attempt.status !== AttemptStatus.Succeeded || draft === undefined) {
@@ -122,6 +131,7 @@ export function createCommitDrafts({ clock, log, attempts, projects, roles, sett
         return draft;
       } finally {
         cancelTimer();
+        starting.delete(attemptId);
         waiting.delete(attemptId);
         submitted.delete(attemptId);
       }

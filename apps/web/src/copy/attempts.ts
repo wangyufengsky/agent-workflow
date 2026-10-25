@@ -2,6 +2,7 @@ import { AttemptKind, AttemptStatus, McpToolName, TranscriptSystemEvent } from '
 import type { StreamAction, ToolAction } from '../features/stream/stream-items.ts';
 
 export const ATTEMPT_STATUS_LABEL: Record<AttemptStatus, string> = {
+  [AttemptStatus.Queued]: '排队中',
   [AttemptStatus.Starting]: '启动中',
   [AttemptStatus.Running]: '进行中',
   [AttemptStatus.Succeeded]: '已提交结果',
@@ -37,6 +38,11 @@ export const TRANSCRIPT_SYSTEM_LABEL: Record<TranscriptSystemEvent, string> = {
 
 export const ATTEMPT_COPY = {
   defaultModel: 'opencode 默认',
+  /** Waiting for a model slot (D186); 1 = next. */
+  queued: (position: number) =>
+    position === 1 ? '排队中：同时使用模型的会话已满，下一个就轮到' : `排队中：前面还有 ${position - 1} 个`,
+  modelSlots: (inUse: number, limit: number, queued: number) =>
+    `使用模型的会话 ${inUse} / ${limit}${queued > 0 ? ` · 排队 ${queued}` : ''}`,
   tokenUsage: (input: number, output: number) => `输入 ${input} · 输出 ${output} tokens`,
   abort: '中止',
   permission: (permission: string, patterns: string) => `请求权限：${permission} ${patterns}`,

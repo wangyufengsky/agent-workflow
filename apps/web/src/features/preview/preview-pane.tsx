@@ -1,4 +1,4 @@
-import { AcceptanceCheckKind, AttemptStatus, type BrowserFrame, type TaskDetailDTO } from '@aw/shared';
+import { ACTIVE_ATTEMPT_STATUSES, AcceptanceCheckKind, type BrowserFrame, type TaskDetailDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { PREVIEW_PANE_COPY as C } from '../../copy/browser.ts';
@@ -15,7 +15,6 @@ import {
 import styles from './preview-pane.module.css';
 
 type Session = { kind: 'mine' } | { kind: 'attempt'; attemptId: string } | { kind: 'check'; nodeId: string };
-const ACTIVE: readonly AttemptStatus[] = [AttemptStatus.Starting, AttemptStatus.Running];
 
 const frameLabel = (frame: BrowserFrame) =>
   `${C.tool[frame.tool] ?? frame.tool} ${frame.url === '' ? '' : new URL(frame.url).pathname}`;
@@ -115,7 +114,7 @@ export function PreviewPane({ task, active, pro }: { task: TaskDetailDTO; active
         <option value="mine">{C.mine}</option>
         {sessions.data?.attempts.map((a) => (
           <option key={a.attemptId} value={`a:${a.attemptId}`}>
-            {C.aiSession(titleOf(a.nodeId), ACTIVE.includes(a.status))}
+            {C.aiSession(titleOf(a.nodeId), ACTIVE_ATTEMPT_STATUSES.includes(a.status))}
           </option>
         ))}
         {sessions.data?.checks.map((c) => (

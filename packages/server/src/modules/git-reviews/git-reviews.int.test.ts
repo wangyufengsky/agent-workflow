@@ -1,19 +1,24 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
+  AttemptKind,
+  AttemptStatus,
   deleteProjectOp,
   ErrorCode,
   FindingProblemCode,
+  getAttemptOp,
   getGitReviewOp,
   gitDraftCommitMessageOp,
   gitStageOp,
   listGitReviewsOp,
   ServerEventType,
   startGitReviewOp,
+  updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
+import { createFakeClock } from '../../../test/helpers/clock.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { addProject } from '../../../test/helpers/tasks.ts';
 
@@ -166,5 +171,31 @@ describe('AI 草拟提交信息（27 §7.3）', () => {
     t.fake.enqueue(script().text('I would call it "update".'), REVIEWER);
     const failed = await t.call(gitDraftCommitMessageOp, { id: project.id });
     expect([failed.status, failed.raw.json().error.code]).toEqual([502, ErrorCode.CommitDraftFailed]);
+  });
+
+  it('草拟的时限取设置 git.commitDraftTimeoutSeconds，到时中止并 COMMIT_DRAFT_FAILED', async () => {
+    const clock = createFakeClock();
+    await t.close();
+    t = await createTestApp({ clock });
+    const { repo, project } = await addProject(t);
+    await t.call(updateSettingsOp, { 'git.commitDraftTimeoutSeconds': 300 });
+    await writeFile(join(repo.path, 'README.md'), '# changed\n');
+    await t.call(gitStageOp, { id: project.id, paths: ['README.md'] });
+    t.fake.enqueue(script().hang(), REVIEWER);
+    const running = waitForEvent(
+      t.app.events,
+      ServerEventType.AttemptUpdated,
+      (d) => d.attempt.kind === AttemptKind.CommitMessage && d.attempt.status === AttemptStatus.Running,
+    );
+    const drafting = t.call(gitDraftCommitMessageOp, { id: project.id });
+    const { attempt } = await running;
+
+    // A slow local model still writing past the old fixed 120 seconds.
+    clock.advance(299_999);
+    expect((await t.call(getAttemptOp, { id: attempt.id })).body.status).toBe(AttemptStatus.Running);
+    clock.advance(1);
+    const failed = await drafting;
+    expect([failed.status, failed.raw.json().error.code]).toEqual([502, ErrorCode.CommitDraftFailed]);
+    expect((await t.call(getAttemptOp, { id: attempt.id })).body.status).toBe(AttemptStatus.Aborted);
   });
 });

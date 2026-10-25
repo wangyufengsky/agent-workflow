@@ -16,6 +16,7 @@ import { IconButton } from '../../components/icon-button.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { GIT_COPY as C } from '../../copy/git.ts';
+import { useModelSlotsFull } from '../attempts/model-slots.tsx';
 import styles from './git.module.css';
 import {
   gitChangeFileQuery,
@@ -155,6 +156,7 @@ function CommitPanel({
   const [drafted, setDrafted] = useState(false);
   const commit = useCommit(projectId);
   const draft = useDraftCommitMessage(projectId);
+  const slotsFull = useModelSlotsFull();
   const branch = status.branch ?? C.detached;
   const message = body.trim() === '' ? subject.trim() : `${subject.trim()}\n\n${body.trim()}`;
   const run = (andPush: boolean) =>
@@ -189,7 +191,7 @@ function CommitPanel({
         onChange={(e) => setBody(e.target.value)}
       />
       <div className={styles.draftNote}>
-        {draft.isPending ? C.drafting : drafted ? C.drafted : ''}
+        {draft.isPending ? (slotsFull ? C.draftQueued : C.drafting) : drafted ? C.drafted : ''}
         <span className={styles.spacer} />
         <Button
           size="sm"

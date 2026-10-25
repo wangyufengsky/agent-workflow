@@ -45,6 +45,9 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       // Attempts carry no cost in the offline environment (D181), so pages already showing them follow the switch.
       if (event.data.keys.includes('network.offline')) await refreshAttempts(qc);
       return qc.invalidateQueries({ queryKey: queryKeys.settings });
+    case ServerEventType.ModelSlotsUpdated:
+      qc.setQueryData(queryKeys.modelSlots, event.data);
+      return;
     case ServerEventType.RuntimeUpdated:
       qc.setQueryData(queryKeys.runtime, event.data);
       // Whether models are available, and which MCP servers are connected, depends on the runtime.

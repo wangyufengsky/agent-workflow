@@ -178,6 +178,41 @@ describe('助手真实用量与单轮时限', () => {
     expect((await get(id)).usage.latest?.status).toBe(AssistantTurnStatus.Failed);
   });
 
+  it('模型服务不可用、opencode 重试期间不计入时限，恢复后按剩余时间继续（D163）', async () => {
+    await t.call(updateSettingsOp, { 'attempt.timeoutMinutes': 1 });
+    const id = await create();
+    const down = 'Cannot connect to API: Unable to connect. Is the computer able to access the url?';
+    const retrying = waitForEvent(t.app.events, ServerEventType.AssistantTranscript, (data) =>
+      data.entries.some((entry) => entry.kind === 'system' && entry.data.detail === down),
+    );
+    const prompt = t.fake.prompt.bind(t.fake);
+    vi.spyOn(t.fake, 'prompt').mockImplementationOnce(async (input) => {
+      clock.advance(20_000);
+      await prompt(input);
+    });
+    t.fake.enqueue(script().retry(down).text('回来了').hang());
+    await send(id);
+    await retrying;
+    clock.advance(60 * 60_000);
+    expect((await get(id)).busy).toBe(true);
+    expect(t.fake.aborts).toEqual([]);
+
+    const back = waitForEvent(t.app.events, ServerEventType.AssistantTranscript, (data) =>
+      data.entries.some((entry) => entry.kind === 'text'),
+    );
+    t.fake.recoverModel();
+    await back;
+    clock.advance(39_999);
+    expect((await get(id)).busy).toBe(true);
+    const stopped = waitForEvent(t.app.events, ServerEventType.AssistantUpdated, (c) => c.id === id && !c.busy);
+    clock.advance(1);
+    await stopped;
+    expect((await get(id)).usage.latest).toMatchObject({
+      status: AssistantTurnStatus.TimedOut,
+      endReason: AssistantTurnEvent.Timeout,
+    });
+  });
+
   it('运行时消失与后端重启分别记录；重启不把离线时段算作实际耗时', async () => {
     const id = await create();
     await hang(id);

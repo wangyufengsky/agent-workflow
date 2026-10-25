@@ -19,6 +19,14 @@ export type Health = z.infer<typeof healthSchema>;
 
 const located = { path: z.string(), version: z.string() };
 
+/** `GET /system/model-slots` (11 §2, D186): sessions using the model now, the shared limit, requests waiting. */
+export const modelSlotsSchema = z.object({
+  inUse: z.number().int().nonnegative(),
+  limit: z.number().int().positive(),
+  queued: z.number().int().nonnegative(),
+});
+export type ModelSlotsDTO = z.infer<typeof modelSlotsSchema>;
+
 /** `GET /system/runtime` (11 §2): the hosted opencode process. */
 export const runtimeSchema = z.discriminatedUnion('status', [
   // A binary may be found yet unusable (`--version` fails): then only its path is known.

@@ -15,7 +15,7 @@ import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { ASSISTANT_COPY as C } from '../../copy/assistant.ts';
-import { ATTEMPT_COPY, TRANSCRIPT_SYSTEM_LABEL } from '../../copy/attempts.ts';
+import { ATTEMPT_COPY, STREAM_COPY, TRANSCRIPT_SYSTEM_LABEL } from '../../copy/attempts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
@@ -193,8 +193,12 @@ function Body({ entry, ctx, fresh }: { entry: TranscriptEntry; ctx: Rendered; fr
       return <EntityCard entity={entry.data} />;
     case TranscriptEntryKind.Chart:
       return <ChartCard chart={entry.data.chart} fresh={fresh} />;
-    case TranscriptEntryKind.System:
-      return <p className={styles.system}>{TRANSCRIPT_SYSTEM_LABEL[entry.data.event]}</p>;
+    case TranscriptEntryKind.System: {
+      // Same notice as a task step's stream, e.g. why opencode is retrying the model request (D163).
+      const label = TRANSCRIPT_SYSTEM_LABEL[entry.data.event];
+      const { detail } = entry.data;
+      return <p className={styles.system}>{detail === undefined ? label : STREAM_COPY.noticeDetail(label, detail)}</p>;
+    }
     case TranscriptEntryKind.Error: {
       // The provider's own words, when it sent some (opencode's error data).
       const said = entry.data.details?.message;
@@ -238,11 +242,11 @@ const Message = memo(function Message({
 });
 
 /** The working indicator (15 §6): the assistant's mark turning and a line of light passing over the words. */
-function Thinking() {
+function Thinking({ queuePosition }: { queuePosition: number | null }) {
   return (
     <div className={`${styles.message} ${styles.thinking}`} role="status" data-testid="assistant-thinking">
       <Character mood="thinking" />
-      <span className="shimmer">{C.thinking}</span>
+      <span className="shimmer">{queuePosition === null ? C.thinking : ATTEMPT_COPY.queued(queuePosition)}</span>
     </div>
   );
 }
@@ -308,7 +312,7 @@ function Stream({
             fresh={i >= opened}
           />
         ))}
-        {thinking && <Thinking />}
+        {thinking && <Thinking queuePosition={conversation.queuePosition} />}
       </div>
       {!stick.following && <LatestButton unseen={stick.unseen} onClick={stick.toLatest} />}
     </>

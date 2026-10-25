@@ -26,6 +26,7 @@
 | PUT | `/credentials/master-password` | `credentials.changeMasterPassword`（write）：`{ currentPassword, newPassword }`（凭据字段）→ `CredentialStatusDTO`；已存的凭据不变；错误码同解锁 |
 | DELETE | `/credentials/master-password` | `credentials.resetMasterPassword`（critical）：忘记主密码时重置，用它保存的凭据被清除（之后使用为 409 `CREDENTIAL_LOST`）→ `CredentialStatusDTO`。主密码的四个操作不暴露给助手与命令面板 |
 | GET | `/system/runtime` | `RuntimeDTO`：opencode 状态、路径、版本；`ready` 时含地址与启动时间 |
+| GET | `/system/model-slots` | `ModelSlotsDTO = { inUse, limit, queued }`：正在使用模型的会话数、共享上限（`scheduler.maxConcurrentAttempts`）、排队等额度的请求数（D186） |
 | POST | `/system/runtime/restart` | `ready` 时重启，`stopped` / `crashed` 时启动（活动尝试 → `interrupted`）；返回启动结束后的 `RuntimeDTO`；其他状态 409 `STATE_TRANSITION_INVALID` |
 | GET | `/system/runtime/logs?tail=500` 🅿 | 最新一天 opencode 日志（`<数据目录>/logs/opencode-YYYYMMDD.log`）的末尾 `tail` 行（默认 `RUNTIME_LOG_TAIL_DEFAULT`，至多 `RUNTIME_LOG_TAIL_MAX`）：`{ file, lines }`；还没有日志时 `{ file: null, lines: [] }` |
 | GET | `/system/storage` 🅿 | 占用空间（37 §2）：`{ dataDir, worktreeRoot, items: [{ kind: StorageKind, bytes }], totalBytes, cleanable: [{ target: StorageCleanTarget, count, bytes }] }`；`items` 按 `StorageKind` 顺序每类一项 |
@@ -227,6 +228,7 @@ type AttemptSummaryDTO = {
   kind: AttemptKind; seq: number; status: AttemptStatus;
   model: string | null; nudges: number; error: ErrorInfo | null;
   progress: string | null;          // 最近一次 report_progress，仅活动期间，内存中
+  queuePosition: number | null;     // status 为 queued 时在模型额度队列中的位置，1 = 下一个（D186）
   startedAt: number; endedAt: number | null;
 };
 type AttemptDTO = AttemptSummaryDTO & {
@@ -265,7 +267,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | GET | `/projects/:id/git/changes/file?path&side` | 一个文件的 diff：`side = staged`（暂存区对 HEAD）或 `unstaged`（工作区对暂存区，未跟踪文件对空） |
 | POST | `/projects/:id/git/stage`、`/unstage` | `{ paths }`：整文件暂存（含删除）/ 取消暂存（暂存的改名连同原路径一起取消），write |
 | POST | `/projects/:id/git/commits` | `{ message }` → 201 新提交；以用户身份提交并运行钩子（钩子拒绝为 `GIT_COMMAND_FAILED`，stderr 为钩子输出）；`GIT_NOTHING_TO_COMMIT`、`GIT_IDENTITY_MISSING`、`GIT_OPERATION_IN_PROGRESS`，write |
-| POST | `/projects/:id/git/commit-message` | `{}` 或 `{ from, to }` → `{ subject, body }`：AI 草拟已暂存改动或压缩合并的提交信息，等它写完（最长 `COMMIT_DRAFT_TIMEOUT_MS`）；`GIT_NOTHING_TO_COMMIT`、`COMMIT_DRAFT_FAILED`、`OPENCODE_NOT_READY`；read，不给助手 |
+| POST | `/projects/:id/git/commit-message` | `{}` 或 `{ from, to }` → `{ subject, body }`：AI 草拟已暂存改动或压缩合并的提交信息，等它写完（最长为设置 `git.commitDraftTimeoutSeconds`）；`GIT_NOTHING_TO_COMMIT`、`COMMIT_DRAFT_FAILED`、`OPENCODE_NOT_READY`；read，不给助手 |
 | GET | `/projects/:id/git/push?branch` | 推送预览：远端分支、是否新建、将推送的提交（最多 `GIT_PUSH_COMMITS_SHOWN` 个）与总数 |
 | POST | `/projects/:id/git/push` | `{ branch }`：推送到 origin 的同名分支，不强推，没有上游时设为上游；绑定了远端时带项目令牌（D53），否则用用户自己的凭据；`GIT_PUSH_REJECTED`、`GIT_BRANCH_OWNED_BY_TASK`，critical |
 | POST | `/projects/:id/git/pull` | 获取当前分支的上游并快进；`GIT_NO_UPSTREAM`、`WORKTREE_DIRTY`、`BRANCH_DIVERGED`，write |
@@ -324,6 +326,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | `inbox.updated` | `{ item: InboxItemDTO, blockingCount }` | 徽标（同 `/inbox/count`，D119）与列表 |
 | `delivery.updated` | `{ taskId, delivery: DeliveryDTO }` | |
 | `runtime.updated` | `RuntimeDTO` | 运行环境指示 |
+| `model_slots.updated` | `ModelSlotsDTO` | 模型额度的占用、上限或排队变化（D186），主页工作概览显示「使用模型的会话 3 / 4 · 排队 2」 |
 | `settings.updated` | `{ keys: SettingKey[] }` | 重新拉设置（主题、模式即时生效） |
 | `assistant.updated` | `AssistantConversationDTO` | 对话列表与面板（忙碌、待回复的权限请求） |
 | `assistant.transcript` | `{ conversationId, entries: TranscriptEntry[] }` | 追加到面板的消息流；含 `confirmation`（确认卡片）、`attachment`（文件）、`entity_ref`（`{ kind, id, title }`，产出对象的导航卡片，D66）、`chart`（`{ chart: ChartSpec }`，助手画的图，35 §4）条目（10 §3） |
@@ -350,7 +353,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/assistant/conversations` | `{ items: AssistantConversationDTO[] }`，最近更新在前；`AssistantConversationDTO = { id, title, busy, pendingPermissions: Array<{ permissionId, permission, patterns }>, usage: AssistantUsageDTO, createdAt, updatedAt }`（`busy` 与权限请求只在内存中，重启后为空；`usage` 持久化） |
+| GET | `/assistant/conversations` | `{ items: AssistantConversationDTO[] }`，最近更新在前；`AssistantConversationDTO = { id, title, busy, queuePosition, pendingPermissions: Array<{ permissionId, permission, patterns }>, usage: AssistantUsageDTO, createdAt, updatedAt }`（`busy`、`queuePosition` 与权限请求只在内存中，重启后为空；`usage` 持久化；`queuePosition` 为这一轮在模型额度队列中的位置，1 = 下一个，没有排队为 `null`，D186） |
 | POST | `/assistant/conversations` | `{ title? }` → 201；opencode 会话在第一条消息时创建 |
 | POST | `/assistant/context-snapshots` | `assistant.snapshotContext`，`{ source: { kind: 'task', taskId, nodeId? } \| { kind: 'selection', text, page: AssistantPageRef } }` → 201 `AttachmentDTO`。用户显式附加文字，write，不暴露给助手或命令面板。任务／步骤信息由后端读取；不存在 404 `TASK_NOT_FOUND` / `NODE_NOT_FOUND`，步骤必须属于任务。选中文字 trim 后 1–12000 字符，超长／空白／多余字段 400 `VALIDATION_FAILED`；仅文字，NUL 等仍由附件边界拒绝。结果是固定的文本附件，使用现有查看、移除、绑定与清理接口 |
 | GET | `/assistant/conversations/:id` | 不存在 404 `ASSISTANT_CONVERSATION_NOT_FOUND` |
