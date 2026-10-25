@@ -75,23 +75,25 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
   }
 
   /**
-   * A website asks a tab for a client certificate (29 §5.4). Electron's default would take the first one of the
-   * store for any tab; the user chooses in their own tab (Chromium remembers the choice for the partition), the AI's
-   * tabs go on without one. On the app (not the tab's contents): only there can the callback give none.
+   * A website (`host:port`, not a URL) asks a tab for a client certificate (29 §5.4). Electron's default would take
+   * the first one of the store for any tab; the user chooses in their own tab (Chromium remembers the choice for the
+   * partition). The AI's tabs give none, and do not answer either: Chromium would remember "no certificate" for the
+   * whole partition, and the user could not choose one in their login tab until the app restarts. Stopping the load
+   * drops the request unanswered. On the app (not the tab's contents): only there can the callback give none.
    */
-  app.on('select-client-certificate', (event, contents, url, certificates, callback) => {
+  app.on('select-client-certificate', (event, contents, host, certificates, callback) => {
     const tab = contents === null ? undefined : byContents.get(contents.id);
     // The app's own windows load the app itself, which asks for none.
     if (tab === undefined) return;
     event.preventDefault();
     if (!tab.userFacing) {
-      emit({ type: 'browser.certificateRefused', tabId: tab.tabId, url });
-      callback();
+      emit({ type: 'browser.certificateRefused', tabId: tab.tabId, host });
+      tab.view.webContents.stop();
       return;
     }
     void prompts
       .certificate({
-        host: new URL(url).host,
+        host,
         certificates: certificates.map((c) => ({
           fingerprint: c.fingerprint,
           subject: c.subjectName,

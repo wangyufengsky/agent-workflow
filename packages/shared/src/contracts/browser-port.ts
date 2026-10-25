@@ -86,10 +86,10 @@ export const browserPortEventSchema = z.discriminatedUnion('type', [
     cleanupError: z.string().optional(),
   }),
   /**
-   * A website asked one of the AI's tabs for a client certificate: main gave none, since only the user chooses one in
-   * their own tab (29 §5.4). The backend reports that the website asks to log in.
+   * A website (`host:port`) asked one of the AI's tabs for a client certificate: main gave none and stopped the load,
+   * since only the user chooses one in their own tab (29 §5.4). The backend reports that the website asks to log in.
    */
-  z.object({ type: z.literal('browser.certificateRefused'), tabId: tabIdSchema, url: z.string() }),
+  z.object({ type: z.literal('browser.certificateRefused'), tabId: tabIdSchema, host: z.string() }),
   /** The tab's renderer is gone or the view was destroyed; the backend drops the tab. */
   z.object({ type: z.literal('browser.gone'), tabId: tabIdSchema, reason: z.string() }),
 ]);

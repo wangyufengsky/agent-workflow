@@ -248,7 +248,7 @@ type BrowserHost = {
 - 应用从不保存或填写密码。下面的 HTTP 认证里，用户输入的密码只经 main 交给网站一次。
 - **HTTP 认证**（Basic、NTLM、Negotiate、代理认证，D170）：Electron 默认取消认证。**用户自己的标签页**（「网站登录」与「我的预览」）收到 `login` 事件时，main 经 IPC `aw:browser-prompt` 请界面弹出用户名和密码框（`features/preview/website-prompt.tsx`，挂在应用外壳上，打开时原生视图按 §8.1 移出窗口），用户的回答经 `aw:browser-prompt-answer` 回到 main，直接交给 Chromium：不经过后端、不写盘。Chromium 在本次运行内按分区记住它，同在 `persist:aw-sites` 的 AI 网站标签页之后自动带上。**AI 的标签页从不弹框**，取消后页面得到 401。这种登录只在内存里：退出应用后要重新登录，也不在「已登录的网站」（按 Cookie 列出）里。
 - **Windows 集成登录**（NTLM / Kerberos 协商，D171）：专业模式设置 `browser.integratedAuthServers` 列出的服务器（主机名通配，不能只写 `*`，默认空），网站分区用用户登录系统的身份自动登录（`session.allowNTLMCredentialsForDomains`，main 在每次打开网站分区的标签页时按 `open` 请求里的 `integratedAuthServers` 更新；其他分区一律为空）。用户与 AI 的网站标签页都一样，只读规则照常生效。不做 Kerberos 委派（`auth-negotiate-delegate-allowlist`）。开发用 Chromium 宿主忽略这一项（Chromium 只能整个浏览器设置，开发与测试没有域身份）。
-- **客户端证书**（D172）：网站要求客户端证书时，main 在应用的 `select-client-certificate` 事件里处理自己的标签页（应用自己的窗口不管）：用户的标签页弹出系统证书列表让用户选，选择由 Chromium 在本次运行内按分区记住；AI 的标签页不选证书（Electron 默认会替任何标签页选第一张），并发 `browser.certificateRefused`。
+- **客户端证书**（D172）：网站要求客户端证书时，main 在应用的 `select-client-certificate` 事件里处理自己的标签页（应用自己的窗口不管；事件给的是 `host:port`，不是完整地址）：用户的标签页弹出系统证书列表让用户选，选择（包括「取消」）由 Chromium 在本次运行内按分区记住；AI 的标签页不选证书（Electron 默认会替任何标签页选第一张），也不回答「不用证书」（Chromium 会按分区记住，用户就选不了了），而是停止该标签页的加载，并发 `browser.certificateRefused { host }`，后端按 `https://<host>/` 返回 `BROWSER_LOGIN_REQUIRED`。
 - 打开网站后返回 `BROWSER_LOGIN_REQUIRED`（`details.url` 为要求登录的地址）的情形：主文档是 401 / 407（AI 的标签页不回答 HTTP 认证）；这次动作中网站要过客户端证书；最终地址的主机或路径像登录页（主机名或路径含 `login` / `signin` / `sso` / `cas` / `oauth`）；页面上只有一个密码框的表单。判断在后端 `loginAt`（`browser.service.ts`），`browser_open` 与 `browser.readUrl` 共用。
 - 登录页的地址规则可以在设置里补充：`browser.loginUrlPatterns`。
 

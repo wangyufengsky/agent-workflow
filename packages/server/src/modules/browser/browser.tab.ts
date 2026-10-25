@@ -229,7 +229,9 @@ export async function openTab({
   const unsubscribe = host.onEvent((event) => {
     if (event.type === 'browser.unownedBlocked' || event.tabId !== tabId) return;
     if (event.type === 'browser.cdpEvent') onCdp(event.method, event.params);
-    else if (event.type === 'browser.certificateRefused') since.certificateAsked = event.url;
+    // A certificate is asked for in the TLS handshake, of `host:port`: the website's address is its https origin.
+    else if (event.type === 'browser.certificateRefused')
+      since.certificateAsked = new URL(`https://${event.host}/`).href;
     else if (event.type === 'browser.blocked') {
       blockedUrls.set(event.url, event.reason);
       if (event.reason === BrowserBlockReason.ReadOnly) {
