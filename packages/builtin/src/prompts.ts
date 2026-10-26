@@ -58,6 +58,8 @@ export const PromptName = {
   Attachments: 'attachments',
   /** The instructions of the verify step (31 §2.2). */
   VerifyRequirements: 'verify-requirements',
+  /** The「在 Agent Workflow 中工作」section an AGENTS.md task adds (40 §5, D204). */
+  AgentsMdRules: 'agents-md-rules',
 } as const;
 export type PromptName = (typeof PromptName)[keyof typeof PromptName];
 
@@ -115,6 +117,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.RefineBreakdown]: read(PromptName.RefineBreakdown),
     [PromptName.Attachments]: read(PromptName.Attachments),
     [PromptName.VerifyRequirements]: read(PromptName.VerifyRequirements),
+    [PromptName.AgentsMdRules]: read(PromptName.AgentsMdRules),
   };
 }
 

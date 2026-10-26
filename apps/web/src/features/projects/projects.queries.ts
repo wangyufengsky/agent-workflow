@@ -3,6 +3,7 @@ import {
   clearProjectHostingOp,
   createProjectOp,
   deleteProjectOp,
+  getAgentsMdOp,
   getProjectOp,
   initGitOp,
   listProjectsOp,
@@ -10,7 +11,9 @@ import {
   previewGitInitOp,
   removeProjectAllowedBashOp,
   type SetHostingRequest,
+  type StartAgentsMdTaskRequest,
   setProjectHostingOp,
+  startAgentsMdTaskOp,
   type UpdateProjectRequest,
   updateProjectOp,
 } from '@aw/shared';
@@ -93,3 +96,18 @@ export const useSetHosting = () =>
 export const useClearHosting = () => useProjectMutation((id: string) => callOperation(clearProjectHostingOp, { id }));
 export const useRemoveAllowedBash = () =>
   useProjectMutation((input: { id: string; pattern: string }) => callOperation(removeProjectAllowedBashOp, input));
+
+/** The root AGENTS.md on the project's default branch and its task in progress (40 §6). */
+export const agentsMdQuery = (projectId: string) =>
+  queryOptions({
+    queryKey: queryKeys.agentsMd(projectId),
+    queryFn: () => callOperation(getAgentsMdOp, { id: projectId }),
+  });
+
+export function useStartAgentsMdTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: StartAgentsMdTaskRequest) => callOperation(startAgentsMdTaskOp, input),
+    onSuccess: (task) => queryClient.invalidateQueries({ queryKey: queryKeys.agentsMd(task.project.id) }),
+  });
+}

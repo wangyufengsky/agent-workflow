@@ -5,6 +5,7 @@ export * from './constants/limits.ts';
 export * from './constants/opencode.ts';
 export * from './constants/settings.ts';
 export * from './constants/team.ts';
+export * from './contracts/api/agents-md.ts';
 export * from './contracts/api/assistant.ts';
 export * from './contracts/api/attachments.ts';
 export * from './contracts/api/attempts.ts';

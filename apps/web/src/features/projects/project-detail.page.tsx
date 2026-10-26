@@ -13,10 +13,11 @@ import { PREVIEW_COPY } from '../../copy/browser.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DATABASES_COPY } from '../../copy/databases.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
-import { PROJECTS_COPY as C } from '../../copy/projects.ts';
+import { AGENTS_MD_COPY, PROJECTS_COPY as C } from '../../copy/projects.ts';
 import { ProjectDatabases } from '../databases/project-databases.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { HostingPanel } from './hosting-form.tsx';
+import { ProjectAgentsMd } from './project-agents-md.tsx';
 import { ProjectAllowedBash } from './project-allowed-bash.tsx';
 import { ProjectPreviewForm } from './project-preview.tsx';
 import { projectQuery, useDeleteProject, useUpdateProject } from './projects.queries.ts';
@@ -125,6 +126,11 @@ export function ProjectDetailPage() {
         {/* Keyed by the saved values so the form resets when the project changes underneath it. */}
         <ProjectForm key={`${p.id}:${p.updatedAt}`} project={p} />
       </Panel>
+      <section className="section">
+        <Panel title={AGENTS_MD_COPY.section}>
+          <ProjectAgentsMd projectId={p.id} />
+        </Panel>
+      </section>
       <section className="section">
         <Panel title={PREVIEW_COPY.section}>
           <ProjectPreviewForm key={`${p.id}:${p.updatedAt}`} project={p} />
