@@ -35,7 +35,8 @@ test('网站登录：HTTP 认证在应用的对话框里完成，之后网站会
   await request.post(`${api}/projects`, { headers, data: { repoPath: createRepo() } });
   await request.patch(`${api}/settings`, {
     headers,
-    data: { 'browser.sites': [{ pattern: '127.0.0.1', access: 'read' }] },
+    // Website logins are a pro-mode setting (38 C5).
+    data: { 'browser.sites': [{ pattern: '127.0.0.1', access: 'read' }], 'ui.mode': 'pro' },
   });
   const read = () => request.post(`${api}/browser/read-url`, { headers, data: { url: wikiUrl } });
   const before = await read();
