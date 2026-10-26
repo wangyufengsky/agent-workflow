@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import {
   addFromMenu,
@@ -58,7 +59,7 @@ test('开始任务时附上文件：不支持的先移除才能开始，任务�
   const deleted = page.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes('/attachments/'));
   await attached.getByRole('button', { name: '移除 extra.md' }).click();
   expect((await deleted).status()).toBe(204);
-  await expect(attached.getByRole('alert')).toContainText('目前只支持文本文件');
+  await expect(attached.getByRole('alert')).toContainText('这个文件读不出文字');
   const start = page.getByRole('button', { name: /^开始/ });
   await expect(start).toBeDisabled();
   await attached.getByRole('button', { name: '移除 dump.bin' }).click();
@@ -88,4 +89,43 @@ test('问助手时附上文件：消息下面显示附件，可以打开', async
   await expect(page.getByText('看到了，导出按钮放在右上角。')).toBeVisible();
   await page.getByRole('button', { name: '查看 spec.md' }).click();
   await expect(page.getByRole('dialog', { name: 'spec.md' })).toContainText('导出按钮放在右上角');
+});
+
+const office = (name: string, fixture: string) => ({
+  name,
+  mimeType: 'application/octet-stream',
+  buffer: readFileSync(new URL(`../packages/server/test/fixtures/office/${fixture}`, import.meta.url)),
+});
+
+test('附上 Word 与 Excel：卡片显示读到的摘要，旧格式说明怎么另存；预览显示 AI 读到的正文与表格', async ({ page }) => {
+  await page.goto('/');
+  const chooser = page.waitForEvent('filechooser');
+  await addFromMenu(page, '上传文件…');
+  await (await chooser).setFiles([
+    office('需求.docx', 'report.libreoffice.docx'),
+    office('销售.xlsx', 'sales.libreoffice.xlsx'),
+    office('旧表.xls', 'sales.xls'),
+  ]);
+  const attached = page.getByRole('list', { name: '附加的资料' });
+  await expect(attached.getByRole('listitem').filter({ hasText: '需求.docx' })).toContainText('Word · 245 字');
+  await expect(attached.getByRole('listitem').filter({ hasText: '销售.xlsx' })).toContainText(
+    'Excel · 3 个工作表 · 14 行',
+  );
+  await expect(attached.getByRole('listitem').filter({ hasText: '旧表.xls' }).getByRole('alert')).toContainText(
+    '另存为 .docx / .xlsx',
+  );
+
+  await attached.getByRole('button', { name: '查看 需求.docx' }).click();
+  const word = page.getByRole('dialog', { name: '需求.docx' });
+  await expect(word.getByRole('heading', { name: '订单导出需求' })).toBeVisible();
+  await expect(word.getByRole('cell', { name: 'order_id' })).toBeVisible();
+  await expect(word).toContainText('图片、图表、批注没有包含');
+  await word.getByRole('button', { name: '关闭' }).click();
+
+  await attached.getByRole('button', { name: '查看 销售.xlsx' }).click();
+  const excel = page.getByRole('dialog', { name: '销售.xlsx' });
+  await expect(excel.getByRole('tab')).toHaveText(['明细', '汇总', '隐藏（隐藏）']);
+  await expect(excel.getByRole('row', { name: /^4（隐藏）/ })).toBeVisible();
+  await excel.getByRole('tab', { name: '汇总' }).click();
+  await expect(excel.getByRole('row', { name: /^6 合计 2791.5/ })).toBeVisible();
 });

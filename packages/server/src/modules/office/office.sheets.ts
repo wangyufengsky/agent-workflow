@@ -1,15 +1,16 @@
 import {
   AppError,
   ATTACHMENT_READ_MAX_CHARS,
+  columnName,
   ErrorCode,
   type QuerySheetInput,
   type ReadSheetOutput,
   SheetAggregate,
+  type SheetPreviewDTO,
   SheetQueryOp,
 } from '@aw/shared';
 import {
   cellRef,
-  columnName,
   columnNumber,
   extentOf,
   type Workbook,
@@ -226,4 +227,22 @@ export function querySheet(workbook: Workbook, query: SheetQuery): SheetQueryRes
     });
   }
   return { sheet: sheet.name, columns, rows: rows.slice(0, query.limit), total_rows: rows.length };
+}
+
+/** A sheet's first `maxRows` rows with content, for the attachment preview (39 §8.1). */
+export function sheetPreview(workbook: Workbook, name: string, maxRows: number): SheetPreviewDTO {
+  const sheet = sheetOf(workbook, name);
+  const { left, columns } = extentOf(sheet);
+  return {
+    name: sheet.name,
+    range: sheet.range,
+    hidden: sheet.hidden,
+    left,
+    columns,
+    merges: sheet.merges,
+    rows: sheet.rows
+      .slice(0, maxRows)
+      .map(({ r, hidden, cells }) => ({ r, hidden, cells: cells.map(({ c, v }) => ({ c, v })) })),
+    totalRows: sheet.rows.length,
+  };
 }

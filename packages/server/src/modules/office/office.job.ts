@@ -17,5 +17,6 @@ export type OfficeFormat = typeof AttachmentFormat.Docx | typeof AttachmentForma
 export type OfficeJob =
   | { kind: 'parse'; format: OfficeFormat; source: string; outDir: string }
   | { kind: 'read_sheet'; workbook: string; request: SheetPageRequest }
-  | { kind: 'query_sheet'; workbook: string; query: SheetQuery };
+  | { kind: 'query_sheet'; workbook: string; query: SheetQuery }
+  | { kind: 'preview_sheet'; workbook: string; sheet: string; rows: number };
 export type OfficeReply = { ok: true; value: unknown } | { ok: false; error: ErrorInfo };

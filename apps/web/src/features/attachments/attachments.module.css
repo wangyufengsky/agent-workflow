@@ -114,13 +114,67 @@ button.card:hover,
 .preview {
   max-height: 50vh;
   overflow: auto;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
   padding: 10px 12px;
   border-radius: var(--r-sm);
   background: var(--fill-2);
   color: var(--ink-2);
   font-size: var(--fs-sm);
+}
+
+.plain {
+  white-space: pre-wrap;
+}
+
+/* An Excel sheet's first rows (39 §8.1): sticky column letters and row numbers, scrolling both ways. */
+.sheet {
+  max-height: 50vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+}
+
+.sheet table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.sheet th,
+.sheet td {
+  padding: 4px 8px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  /* One line per row, scrolling sideways; a long cell is cut and shows in full on hover. */
+  white-space: nowrap;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  vertical-align: top;
+  color: var(--ink-2);
+}
+
+.sheet th {
+  background: var(--fill-2);
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.sheet thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.sheet tbody th {
+  position: sticky;
+  left: 0;
+  white-space: nowrap;
+}
+
+.sheet tr[data-hidden] td {
+  color: var(--muted);
 }
 
 .crumbs {

@@ -582,6 +582,7 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 | （非清单）文字 | GET `/attachments/:id/content` | 仅 UI | 模型读到的文字：文本附件的原件、Word / Excel 读出的 `text.md`；`text/plain; charset=utf-8` 加 `nosniff` |
 | attachments.snapshotProjectFile | POST `/attachments/project-file` | write；仅 UI | `{ projectId, taskId?, path, lines? }` → `AttachmentDTO` |
 | attachments.get | GET `/attachments/:id` | read；UI | `AttachmentDTO`（不含绝对路径） |
+| attachments.previewSheet（OF-03） | GET `/attachments/:id/sheet?sheet=` | read；仅 UI | Excel 附件一个工作表的预览 `SheetPreviewDTO`：`name`、`range`、`hidden`、`left` 与 `columns`（列字母从哪列起、共几列）、`merges`、前 `OFFICE_PREVIEW_ROWS` 行（`{ r, hidden, cells: [{ c, v }] }`）、`totalRows`；工作表不存在或附件不是 Excel 为 `VALIDATION_FAILED`（39 §8.1） |
 | attachments.remove | DELETE `/attachments/:id` | write；仅 UI | 只能删除尚无引用的附件，已发送的返回 `VALIDATION_FAILED` |
 
 以上为 U-01 已实现的部分。两条非清单路由使用与 JSON API 相同的令牌校验，不在 URL query 放令牌；原件以纯文本返回，不作为同源 HTML 执行。

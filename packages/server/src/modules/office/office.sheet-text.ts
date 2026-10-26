@@ -1,18 +1,12 @@
 import {
+  columnName,
   type OfficeMeta,
   SHEET_GRID_MAX_COLUMNS,
   SHEET_OVERVIEW_HEAD_ROWS,
   SHEET_OVERVIEW_SHEETS,
   SHEET_OVERVIEW_TAIL_ROWS,
 } from '@aw/shared';
-import {
-  columnName,
-  extentOf,
-  type Workbook,
-  type WorkbookCell,
-  type WorkbookRow,
-  type WorkbookSheet,
-} from './office.workbook.ts';
+import { extentOf, type Workbook, type WorkbookCell, type WorkbookRow, type WorkbookSheet } from './office.workbook.ts';
 
 const cellText = (cell: WorkbookCell) =>
   (cell.v === null && cell.f !== undefined ? `=${cell.f}` : String(cell.v ?? ''))

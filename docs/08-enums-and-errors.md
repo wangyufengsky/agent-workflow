@@ -658,6 +658,7 @@ class AppError extends Error {
 | OFFICE_WORKER_TIMEOUT_MS / OFFICE_WORKER_HEAP_MB | 30,000 / 1,024（一次解析或表格查询的时限与 worker 堆上限） |
 | SHEET_OVERVIEW_HEAD_ROWS / SHEET_OVERVIEW_TAIL_ROWS / SHEET_OVERVIEW_SHEETS（OF-02 已实现，下同） | 10 / 2 / 20（提示词里 Excel 概览的每表前几行、末几行与列出详情的工作表数） |
 | SHEET_QUERY_MAX_ROWS | 500（`query_sheet` 的 `limit` 上限） |
+| OFFICE_PREVIEW_ROWS（OF-03 已实现） | 1,000（Excel 附件预览每个工作表显示的行数） |
 | ATTACHMENT_NAME_MAX_CHARS | 255（显示名） |
 | ATTACHMENT_PROMPT_MAX_CHARS / ATTACHMENT_READ_MAX_CHARS | 20,000（一次提示词里全部附件合计）/ 12,000（每次读取）（U-02 已实现） |
 | ATTACHMENT_ORPHAN_TTL_MS / ATTACHMENT_CLEANUP_INTERVAL_MS | 86,400,000（无引用附件的保留时间）/ 3,600,000（清理间隔） |

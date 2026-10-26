@@ -64,8 +64,8 @@ export async function fullHeight(page: Page, width: number, height: number): Pro
 
 /**
  * Runs in the page. Two kinds of overflow: an element reaching past the viewport outside any container that clips or
- * scrolls it, and a container that scrolls sideways. Code, diffs, terminal-like output and the canvas scroll on
- * purpose and are left out.
+ * scrolls it, and a container that scrolls sideways. Code, diffs, terminal-like output, the canvas and spreadsheet grids
+ * scroll on purpose and are left out.
  */
 function findOverflow(): string[] {
   const width = document.documentElement.clientWidth;
@@ -75,7 +75,9 @@ function findOverflow(): string[] {
     return `<${el.tagName.toLowerCase()}${id ? ` ${id}` : ''}> ${text}`;
   };
   const scrollsOnPurpose = (el: Element) =>
-    el.closest('pre, code, textarea, .react-flow, [data-testid="diff-view"], [data-testid="transcript"]') !== null;
+    el.closest(
+      'pre, code, textarea, .react-flow, [data-testid="diff-view"], [data-testid="transcript"], [data-testid="sheet-grid"]',
+    ) !== null;
   const found: string[] = [];
   if (document.documentElement.scrollWidth > width + 1)
     found.push(`document scrolls sideways (${document.documentElement.scrollWidth}px)`);

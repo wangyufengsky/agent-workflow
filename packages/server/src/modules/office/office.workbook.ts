@@ -15,13 +15,6 @@ export type WorkbookSheet = {
 /** `workbook.json` of an Excel attachment (39 §5): what previews and the sheet tools read. */
 export type Workbook = { sheets: WorkbookSheet[] };
 
-/** `1` → `A`, `27` → `AA`. */
-export function columnName(column: number): string {
-  let name = '';
-  for (let n = column; n > 0; n = Math.floor((n - 1) / 26)) name = String.fromCharCode(65 + ((n - 1) % 26)) + name;
-  return name;
-}
-
 /** `A` → `1`, `AA` → `27`. */
 export const columnNumber = (letters: string) =>
   [...letters].reduce((n, letter) => n * 26 + letter.charCodeAt(0) - 64, 0);

@@ -21,12 +21,14 @@ import {
   ErrorCode,
   McpToolName,
   OFFICE_ATTACHMENT_BYTES_MAX,
+  OFFICE_PREVIEW_ROWS,
   type OfficeMeta,
   type QuerySheetInput,
   type QuerySheetOutput,
   type ReadAttachmentOutput,
   type ReadSheetInput,
   type ReadSheetOutput,
+  type SheetPreviewDTO,
   type SnapshotProjectFileRequest,
   WorktreeStatus,
 } from '@aw/shared';
@@ -421,6 +423,9 @@ export function createAttachmentsService({
     /** A page of an Excel attachment's sheet; the caller has checked the attachment is visible to its reader. */
     readSheet: ({ attachment_id, ...request }: ReadSheetInput): Promise<ReadSheetOutput> =>
       office.readSheet(workbookOf(attachment_id), request).then((page) => ({ attachment_id, ...page })),
+    /** The preview of one sheet of an Excel attachment (39 §8.1). */
+    previewSheet: (id: string, sheet: string): Promise<SheetPreviewDTO> =>
+      office.previewSheet(workbookOf(id), sheet, OFFICE_PREVIEW_ROWS),
     /** A query over an Excel attachment's sheet; the caller has checked the attachment is visible to its reader. */
     querySheet: ({ attachment_id, ...query }: QuerySheetInput): Promise<QuerySheetOutput> =>
       office.querySheet(workbookOf(attachment_id), query).then((result) => ({ attachment_id, ...result })),

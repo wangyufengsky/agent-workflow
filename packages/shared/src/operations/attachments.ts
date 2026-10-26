@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { attachmentSchema, snapshotProjectFileSchema } from '../contracts/api/attachments.ts';
+import { attachmentSchema, sheetPreviewSchema, snapshotProjectFileSchema } from '../contracts/api/attachments.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -39,4 +39,15 @@ export const snapshotProjectFileOp = defineOperationContract({
   output: attachmentSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/attachments/project-file', status: 201 },
+});
+
+export const previewAttachmentSheetOp = defineOperationContract({
+  ...common,
+  id: 'attachments.previewSheet',
+  title: 'op.attachments.previewSheet',
+  description: "One sheet of an Excel attachment's preview: its first rows",
+  input: z.object({ id: z.string(), sheet: z.string().min(1) }),
+  output: sheetPreviewSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/attachments/:id/sheet' },
 });

@@ -223,6 +223,8 @@ export const SHEET_OVERVIEW_HEAD_ROWS = 10;
 export const SHEET_OVERVIEW_TAIL_ROWS = 2;
 export const SHEET_OVERVIEW_SHEETS = 20;
 export const SHEET_QUERY_MAX_ROWS = 500;
+/** The rows of one sheet an Excel attachment's preview shows (39 §8.1); the AI reads the rest with its tools. */
+export const OFFICE_PREVIEW_ROWS = 1000;
 /** A task's acceptance checklist (31): items per version, and the lengths of an item's texts and of a note. */
 export const REQUIREMENTS_MAX = 30;
 export const REQUIREMENT_TITLE_MAX_CHARS = 120;

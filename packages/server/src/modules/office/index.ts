@@ -6,6 +6,7 @@ import {
   OFFICE_WORKER_HEAP_MB,
   OFFICE_WORKER_TIMEOUT_MS,
   type OfficeMeta,
+  type SheetPreviewDTO,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { OfficeFormat, OfficeJob, OfficeReply } from './office.job.ts';
@@ -82,6 +83,9 @@ export function createOffice({
     /** A `query_sheet` result over the parsed workbook at `workbook` (39 §6.2). */
     querySheet: (workbook: string, query: SheetQuery) =>
       run<SheetQueryResult>({ kind: 'query_sheet', workbook, query }),
+    /** The first `rows` rows of a sheet, for the attachment preview (39 §8.1). */
+    previewSheet: (workbook: string, sheet: string, rows: number) =>
+      run<SheetPreviewDTO>({ kind: 'preview_sheet', workbook, sheet, rows }),
   };
 }
 export type Office = ReturnType<typeof createOffice>;

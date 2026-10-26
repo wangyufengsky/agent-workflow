@@ -1,8 +1,15 @@
-import { AppError, AttachmentFormat, AttachmentLimit, ErrorCode, OFFICE_CELLS_MAX, type OfficeMeta } from '@aw/shared';
+import {
+  AppError,
+  AttachmentFormat,
+  AttachmentLimit,
+  columnName,
+  ErrorCode,
+  OFFICE_CELLS_MAX,
+  type OfficeMeta,
+} from '@aw/shared';
 import ExcelJS from 'exceljs';
 import { workbookOverview, workbookText } from './office.sheet-text.ts';
 import {
-  columnName,
   extentOf,
   type Workbook,
   type WorkbookCell,

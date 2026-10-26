@@ -16,9 +16,18 @@ const C = ONBOARDING_COPY.credentials;
  * One way to show a failure (06 §8): the code's message, technical details folded away. Takes a failed request or
  * an `ErrorInfo` recorded on a task, delivery or attempt.
  */
-export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+export function ErrorState({
+  error,
+  message: own,
+  onRetry,
+}: {
+  error: unknown;
+  /** A message more precise than the code's, from the caller who knows the error's details. */
+  message?: string | undefined;
+  onRetry?: () => void;
+}) {
   const info = error instanceof ApiError ? error : errorInfoSchema.safeParse(error).data;
-  const message = info === undefined ? COMMON_COPY.backendUnreachable : ERROR_COPY[info.code];
+  const message = own ?? (info === undefined ? COMMON_COPY.backendUnreachable : ERROR_COPY[info.code]);
   const summary = error instanceof Error ? error.message : (info?.message ?? String(error));
   // The driver's own words (a database's error) are the cause the English message only names (08 DB_*).
   const driverMessage = info?.details?.driverMessage;

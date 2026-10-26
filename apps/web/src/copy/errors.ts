@@ -119,7 +119,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.AttachmentNotFound]: '这份资料不存在或已失效，请重新添加。',
   [ErrorCode.AttachmentInvalidType]:
     '目前只支持文本、Word（.docx）和 Excel（.xlsx）文件，图片和其他格式请改用文字描述。',
-  [ErrorCode.AttachmentTooLarge]: '资料太大或太多了：每次最多 10 个，单个不超过 5 MB。',
+  [ErrorCode.AttachmentTooLarge]: '资料太大或太多了：每次最多 10 个；文本不超过 5 MB，Word / Excel 不超过 20 MB。',
   [ErrorCode.AttachmentParseFailed]: '文件已损坏或无法读取，可以在 Word / Excel 中打开后另存一份再试。',
   [ErrorCode.AttachmentSourceInvalid]: '读不了这个文件：它不在项目目录里、不是普通文件或已不存在。',
   [ErrorCode.RequirementsUnacknowledged]:

@@ -16,7 +16,7 @@ import {
   stopWhisperOp,
   whisperOp,
 } from './assistant.ts';
-import { getAttachmentOp, removeAttachmentOp, snapshotProjectFileOp } from './attachments.ts';
+import { getAttachmentOp, previewAttachmentSheetOp, removeAttachmentOp, snapshotProjectFileOp } from './attachments.ts';
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
 import { createBatchOp, deliverBatchOp, getBatchOp, listBatchesOp } from './batches.ts';
 import {
@@ -309,6 +309,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getAttemptOp,
   abortAttemptOp,
   getAttachmentOp,
+  previewAttachmentSheetOp,
   removeAttachmentOp,
   snapshotProjectFileOp,
   getRequirementsOp,
