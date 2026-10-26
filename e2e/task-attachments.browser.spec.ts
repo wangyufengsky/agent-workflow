@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import {
   addFromMenu,
+  appTool,
   createProject,
   type E2EProject,
   passReview,
@@ -128,4 +129,41 @@ test('附上 Word 与 Excel：卡片显示读到的摘要，旧格式说明怎�
   await expect(excel.getByRole('row', { name: /^4（隐藏）/ })).toBeVisible();
   await excel.getByRole('tab', { name: '汇总' }).click();
   await expect(excel.getByRole('row', { name: /^6 合计 2791.5/ })).toBeVisible();
+});
+
+test('助手生成 Excel：消息里出现文件卡片，可以预览、下载', async ({ page, request }) => {
+  await queueAssistantTurn(request, [
+    appTool('create_xlsx', {
+      file: '区域汇总.xlsx',
+      sheets: [
+        {
+          name: '汇总',
+          columns: [{ header: '区域' }, { header: '金额', type: 'currency' }],
+          rows: [
+            ['华东', 1384],
+            ['华北', 707.5],
+          ],
+        },
+      ],
+    }),
+    { type: 'text', text: '汇总表做好了。' },
+  ]);
+
+  await page.goto('/');
+  await page.getByLabel('告诉助手，或开始任务').fill('把销售按区域汇总成表格');
+  await page.getByRole('button', { name: '发送', exact: true }).click();
+  await expect(page.getByText('汇总表做好了。')).toBeVisible();
+
+  const card = page.getByRole('region', { name: '助手生成的文件' });
+  await expect(card).toContainText('区域汇总.xlsx');
+  await expect(card).toContainText('Excel');
+  await card.getByRole('button', { name: '预览' }).click();
+  const preview = page.getByRole('dialog', { name: '区域汇总.xlsx' });
+  await expect(preview).toContainText('Excel · 1 个工作表 · 3 行');
+  await expect(preview.getByRole('row', { name: /^3 华北 707.5/ })).toBeVisible();
+  await preview.getByRole('button', { name: '关闭' }).click();
+
+  const download = page.waitForEvent('download');
+  await card.getByRole('button', { name: '另存为…' }).click();
+  expect((await download).suggestedFilename()).toBe('区域汇总.xlsx');
 });

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import {
   AppError,
   ASSISTANT_CONVERSATIONS_DIR,
@@ -854,6 +854,56 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     transcript(id: string, afterSeq: number): TranscriptPage {
       // A conversation never ends: readers keep following it.
       return transcripts.read(get(id), afterSeq, false);
+    },
+
+    /**
+     * A file of this conversation by its path relative to the files directory: paths come from the model and the
+     * user (06 §11), so anything outside it or not a file is `VALIDATION_FAILED`.
+     */
+    fileOf(id: string, path: string): string {
+      get(id);
+      const dir = filesDir(id);
+      const absolutePath = resolve(dir, path);
+      const inside = relative(dir, absolutePath);
+      if (
+        inside.startsWith('..') ||
+        isAbsolute(inside) ||
+        !existsSync(absolutePath) ||
+        !statSync(absolutePath).isFile()
+      ) {
+        throw new AppError(ErrorCode.ValidationFailed, `${path} is not a file of this conversation`, {
+          issues: [{ path: ['path'], message: 'not a file of this conversation; call list_files' }],
+        });
+      }
+      return absolutePath;
+    },
+
+    /**
+     * Where a new file asked for at `path` goes (39 §7.2): inside the files directory, its folders made; a taken name
+     * gets a number before the extension (「周报 (2).docx」), so nothing is overwritten.
+     */
+    newFile(id: string, path: string): { path: string; absolutePath: string } {
+      get(id);
+      const dir = filesDir(id);
+      const wanted = resolve(dir, path);
+      const inside = relative(dir, wanted);
+      if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) {
+        throw new AppError(ErrorCode.ValidationFailed, `${path} is outside this conversation's files directory`, {
+          issues: [{ path: ['file'], message: 'a path inside the files directory, such as report.docx' }],
+        });
+      }
+      mkdirSync(dirname(wanted), { recursive: true });
+      const extension = extname(wanted);
+      const stem = wanted.slice(0, wanted.length - extension.length);
+      let absolutePath = wanted;
+      for (let n = 2; existsSync(absolutePath); n++) absolutePath = `${stem} (${n})${extension}`;
+      return { path: relative(dir, absolutePath), absolutePath };
+    },
+
+    /** A file the assistant wrote with an app tool: a card in the message stream, like one its own tools wrote. */
+    recordFile(id: string, path: string): void {
+      live.get(id)?.attached.add(path);
+      record(get(id), [{ kind: TranscriptEntryKind.Attachment, data: { path } }]);
     },
 
     files(id: string): AssistantFileDTO[] {

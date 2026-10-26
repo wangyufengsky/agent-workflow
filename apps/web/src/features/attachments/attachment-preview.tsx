@@ -57,9 +57,7 @@ export function AttachmentPreview({ id, name, onClose }: { id: string; name: str
         />
       ) : content.data !== undefined ? (
         meta.data?.format === AttachmentFormat.Docx ? (
-          <div className={styles.preview}>
-            <Markdown source={content.data} />
-          </div>
+          <WordBody markdown={content.data} />
         ) : (
           <pre className={`mono ${styles.preview} ${styles.plain}`}>{content.data}</pre>
         )
@@ -74,7 +72,20 @@ function SheetPreview({ id, sheet }: { id: string; sheet: string }) {
   const query = useQuery(attachmentSheetQuery(id, sheet));
   if (query.error !== null) return <ErrorState error={query.error} />;
   if (query.data === undefined) return <p className="hint">{C.loading}</p>;
-  const data = query.data;
+  return <SheetView data={query.data} />;
+}
+
+/** A Word body as the AI reads it (39 §8). */
+export function WordBody({ markdown }: { markdown: string }) {
+  return (
+    <div className={styles.preview}>
+      <Markdown source={markdown} />
+    </div>
+  );
+}
+
+/** One sheet's first rows (39 §8.1): a grid, or cell by cell when it is too wide; says when rows are left out. */
+export function SheetView({ data }: { data: SheetPreviewDTO }) {
   if (data.range === null) return <p className="hint">{C.emptySheet}</p>;
   return (
     <div className="col">

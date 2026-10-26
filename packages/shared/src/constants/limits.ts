@@ -225,6 +225,9 @@ export const SHEET_OVERVIEW_SHEETS = 20;
 export const SHEET_QUERY_MAX_ROWS = 500;
 /** The rows of one sheet an Excel attachment's preview shows (39 §8.1); the AI reads the rest with its tools. */
 export const OFFICE_PREVIEW_ROWS = 1000;
+/** One `create_docx` / `create_xlsx` call (39 §10): blocks of a document, cells of a workbook (`rows_from` counted). */
+export const OFFICE_WRITE_BLOCKS_MAX = 2000;
+export const OFFICE_WRITE_CELLS_MAX = 200_000;
 /** A task's acceptance checklist (31): items per version, and the lengths of an item's texts and of a note. */
 export const REQUIREMENTS_MAX = 30;
 export const REQUIREMENT_TITLE_MAX_CHARS = 120;

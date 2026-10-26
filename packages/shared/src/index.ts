@@ -42,6 +42,7 @@ export * from './contracts/mcp/get-node-output.ts';
 export * from './contracts/mcp/get-task-context.ts';
 export * from './contracts/mcp/get-task-diff.ts';
 export * from './contracts/mcp/names.ts';
+export * from './contracts/mcp/office-write.ts';
 export * from './contracts/mcp/read-attachment.ts';
 export * from './contracts/mcp/report-progress.ts';
 export * from './contracts/mcp/sheets.ts';

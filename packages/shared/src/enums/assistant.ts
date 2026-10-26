@@ -58,6 +58,9 @@ export const AssistantToolName = {
   ReadSheet: 'read_sheet',
   /** Filtered, grouped or totalled rows of an Excel attachment (39 §6.2). */
   QuerySheet: 'query_sheet',
+  /** A new Word / Excel file in the conversation's files directory (39 §7.2). */
+  CreateDocx: 'create_docx',
+  CreateXlsx: 'create_xlsx',
   ReadBrowser: 'browser_read',
   /** A bar, line or pie chart in the conversation (35 §3.1). */
   ShowChart: 'show_chart',

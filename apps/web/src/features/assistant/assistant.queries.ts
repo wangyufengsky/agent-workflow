@@ -9,16 +9,18 @@ import {
   createConversationOp,
   deleteConversationOp,
   ErrorCode,
+  errorResponseSchema,
   listAssistantFilesOp,
   listConfirmationsOp,
   listConversationsOp,
   type PermissionDecision,
+  previewAssistantFileOp,
   replyAssistantPermissionOp,
   type SendAssistantMessageRequest,
   sendAssistantMessageOp,
 } from '@aw/shared';
 import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError, callOperation } from '../../api/client.ts';
+import { ApiError, apiToken, callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import type { TranscriptSource } from '../attempts/attempt.queries.ts';
@@ -48,6 +50,22 @@ export const assistantFilesQuery = (id: string) =>
     queryKey: queryKeys.assistantFiles(id),
     queryFn: async () => (await callOperation(listAssistantFilesOp, { id })).items,
   });
+
+export const assistantFilePreviewQuery = (id: string, path: string, sheet: string | undefined) =>
+  queryOptions({
+    queryKey: queryKeys.assistantFilePreview(id, path, sheet),
+    queryFn: () => callOperation(previewAssistantFileOp, { id, path, ...(sheet === undefined ? {} : { sheet }) }),
+  });
+
+/** A file the assistant wrote, as bytes to save (39 §8.2). */
+export async function fetchAssistantFile(id: string, path: string): Promise<Uint8Array> {
+  const res = await fetch(
+    `${API_PREFIX}/assistant/conversations/${encodeURIComponent(id)}/files/raw?path=${encodeURIComponent(path)}`,
+    { headers: { Authorization: `Bearer ${apiToken()}` } },
+  );
+  if (!res.ok) throw new ApiError(res.status, errorResponseSchema.parse(await res.json()).error);
+  return new Uint8Array(await res.arrayBuffer());
+}
 
 export const conversationTranscript = (id: string): TranscriptSource => ({
   key: queryKeys.assistantTranscript(id),

@@ -27,17 +27,13 @@ import { thinkingSeconds } from '../stream/stream-items.ts';
 import { ThinkingBlock } from '../stream/thinking-block.tsx';
 import { useStickToBottom } from '../stream/use-stick-to-bottom.ts';
 import styles from './assistant.module.css';
-import {
-  assistantFilesQuery,
-  confirmationsQuery,
-  conversationTranscript,
-  useReplyAssistantPermission,
-} from './assistant.queries.ts';
+import { confirmationsQuery, conversationTranscript, useReplyAssistantPermission } from './assistant.queries.ts';
 import { AssistantWelcome } from './assistant-welcome.tsx';
 import cards from './cards.module.css';
 import { ChartCard } from './chart-card.tsx';
 import { ConfirmationCard } from './confirmation-card.tsx';
 import { EntityCard } from './entity-card.tsx';
+import { FileCard } from './file-card.tsx';
 import { ReplyMarkdown } from './reply-markdown.tsx';
 import { type ToolResult, ToolRow } from './tool-row.tsx';
 
@@ -59,29 +55,6 @@ const CHART_TOOLS: ReadonlySet<string> = new Set(
 /** In simple mode a chart stands for the call that drew it; a failed call still shows (35 §5.4). */
 function drewChart(tool: string, result: ToolResult | undefined): boolean {
   return CHART_TOOLS.has(tool) && result?.data.status === 'completed';
-}
-
-function AttachmentCard({ conversationId, path }: { conversationId: string; path: string }) {
-  const file = useQuery(assistantFilesQuery(conversationId)).data?.find((f) => f.path === path);
-  const bridge = window.aw;
-  return (
-    <section className={`${cards.card} ${cards.linkCard}`} aria-label={C.attachment}>
-      <div className={cards.cardHead}>
-        <span className={cards.tile} aria-hidden="true">
-          <Icon name="copy" size="sm" />
-        </span>
-        <span className={cards.cardHeading}>
-          <span className={cards.eyebrow}>{C.attachment}</span>
-          <span className={`${cards.cardTitle} ellipsis`}>{path}</span>
-        </span>
-        {bridge !== undefined && file !== undefined && (
-          <Button size="sm" onClick={() => void bridge.revealInFinder(file.absolutePath)}>
-            {C.reveal}
-          </Button>
-        )}
-      </div>
-    </section>
-  );
 }
 
 function PermissionCard({
@@ -188,7 +161,7 @@ function Body({ entry, ctx, fresh }: { entry: TranscriptEntry; ctx: Rendered; fr
       return confirmation === undefined ? null : <ConfirmationCard confirmation={confirmation} />;
     }
     case TranscriptEntryKind.Attachment:
-      return <AttachmentCard conversationId={ctx.conversation.id} path={entry.data.path} />;
+      return <FileCard conversationId={ctx.conversation.id} path={entry.data.path} />;
     case TranscriptEntryKind.EntityRef:
       return <EntityCard entity={entry.data} />;
     case TranscriptEntryKind.Chart:

@@ -1,4 +1,4 @@
-import { AttachmentFormat, type OfficeMeta } from '@aw/shared';
+import { AttachmentFormat, type DocxMeta } from '@aw/shared';
 import mammoth from 'mammoth';
 import { htmlToMarkdown } from './office.markdown.ts';
 
@@ -6,7 +6,7 @@ import { htmlToMarkdown } from './office.markdown.ts';
  * A Word body as Markdown (39 §5.2). Pictures become numbered placeholders (the model reads text only); mammoth
  * leaves links to files outside the document unread (`externalFileAccess` is off by default since 1.11).
  */
-export async function readDocx(bytes: Buffer): Promise<{ text: string; meta: OfficeMeta }> {
+export async function readDocx(bytes: Buffer): Promise<{ text: string; meta: DocxMeta }> {
   const { value: html } = await mammoth.convertToHtml(
     { buffer: bytes },
     { convertImage: mammoth.images.imgElement(async () => ({ src: '' })) },

@@ -1,10 +1,10 @@
 import {
   columnName,
-  type OfficeMeta,
   SHEET_GRID_MAX_COLUMNS,
   SHEET_OVERVIEW_HEAD_ROWS,
   SHEET_OVERVIEW_SHEETS,
   SHEET_OVERVIEW_TAIL_ROWS,
+  type XlsxMeta,
 } from '@aw/shared';
 import { extentOf, type Workbook, type WorkbookCell, type WorkbookRow, type WorkbookSheet } from './office.workbook.ts';
 
@@ -70,7 +70,7 @@ export function workbookText(workbook: Workbook): string {
  * What the prompt shows of a workbook (39 §6.1): each sheet's first and last rows, the rest left to `read_sheet` and
  * `query_sheet`. Written as `overview.md` when the attachment is saved, so prompts read it without parsing cells.
  */
-export function workbookOverview(workbook: Workbook, meta: OfficeMeta): string {
+export function workbookOverview(workbook: Workbook, meta: XlsxMeta): string {
   const shown = workbook.sheets.slice(0, SHEET_OVERVIEW_SHEETS);
   const sections = shown.map((sheet) => {
     const { rows } = sheet;
@@ -87,16 +87,14 @@ export function workbookOverview(workbook: Workbook, meta: OfficeMeta): string {
   });
   const rest = workbook.sheets.slice(SHEET_OVERVIEW_SHEETS);
   if (rest.length > 0) sections.push(`其余 ${rest.length} 个工作表：${rest.map((s) => `「${s.name}」`).join('、')}`);
-  if (meta.format === 'xlsx') {
-    const notes: string[] = [];
-    if (meta.formulas > 0) notes.push(`有 ${meta.formulas} 个公式，显示的是文件里保存的结果`);
-    const unread = [
-      [meta.charts, '图表'],
-      [meta.images, '图片'],
-      [meta.pivotTables, '透视表'],
-    ].filter(([n]) => (n as number) > 0);
-    if (unread.length > 0) notes.push(`${unread.map(([n, what]) => `${n} 个${what}`).join('、')}没有读取`);
-    if (notes.length > 0) sections.push(`${notes.join('；')}。`);
-  }
+  const notes: string[] = [];
+  if (meta.formulas > 0) notes.push(`有 ${meta.formulas} 个公式，显示的是文件里保存的结果`);
+  const unread = [
+    [meta.charts, '图表'],
+    [meta.images, '图片'],
+    [meta.pivotTables, '透视表'],
+  ].filter(([n]) => (n as number) > 0);
+  if (unread.length > 0) notes.push(`${unread.map(([n, what]) => `${n} 个${what}`).join('、')}没有读取`);
+  if (notes.length > 0) sections.push(`${notes.join('；')}。`);
   return `${sections.join('\n\n')}\n`;
 }

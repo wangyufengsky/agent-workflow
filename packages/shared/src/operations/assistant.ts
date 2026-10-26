@@ -11,7 +11,7 @@ import {
   sendAssistantMessageRequestSchema,
   snapshotAssistantContextRequestSchema,
 } from '../contracts/api/assistant.ts';
-import { attachmentSchema } from '../contracts/api/attachments.ts';
+import { attachmentSchema, officeFilePreviewSchema } from '../contracts/api/attachments.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -130,6 +130,17 @@ export const listAssistantFilesOp = defineOperationContract({
   output: z.object({ items: z.array(assistantFileSchema) }),
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/assistant/conversations/:id/files' },
+});
+
+export const previewAssistantFileOp = defineOperationContract({
+  ...common,
+  id: 'assistant.previewFile',
+  title: 'op.assistant.previewFile',
+  description: "A Word or Excel file the assistant wrote, read for its card's preview",
+  input: z.object({ id: z.string(), path: z.string().min(1), sheet: z.string().min(1).optional() }),
+  output: officeFilePreviewSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/assistant/conversations/:id/files/preview' },
 });
 
 export const listExternalMcpOp = defineOperationContract({

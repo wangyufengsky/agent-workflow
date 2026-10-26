@@ -30,6 +30,8 @@ export const docxMetaSchema = z.object({
   images: z.number(),
 });
 
+export type DocxMeta = z.infer<typeof docxMetaSchema>;
+
 /** One sheet of an Excel attachment: its used range (null when empty) and size. */
 export const sheetMetaSchema = z.object({
   name: z.string(),
@@ -48,6 +50,8 @@ export const xlsxMetaSchema = z.object({
   images: z.number(),
   pivotTables: z.number(),
 });
+
+export type XlsxMeta = z.infer<typeof xlsxMetaSchema>;
 
 export const officeMetaSchema = z.discriminatedUnion('format', [docxMetaSchema, xlsxMetaSchema]);
 export type OfficeMeta = z.infer<typeof officeMetaSchema>;
@@ -113,3 +117,13 @@ export const sheetPreviewSchema = z.object({
   totalRows: z.number(),
 });
 export type SheetPreviewDTO = z.infer<typeof sheetPreviewSchema>;
+
+/**
+ * A Word or Excel file the assistant wrote, as its card's preview shows it (39 §8.2): read on demand, the same way an
+ * attachment is. An Excel file gives one sheet, the first unless one is asked for.
+ */
+export const officeFilePreviewSchema = z.discriminatedUnion('format', [
+  z.object({ format: z.literal(AttachmentFormat.Docx), meta: docxMetaSchema, markdown: z.string() }),
+  z.object({ format: z.literal(AttachmentFormat.Xlsx), meta: xlsxMetaSchema, sheet: sheetPreviewSchema }),
+]);
+export type OfficeFilePreviewDTO = z.infer<typeof officeFilePreviewSchema>;

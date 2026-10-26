@@ -1,6 +1,6 @@
 # 39 · Word 与 Excel 文件
 
-> 状态：**设计已确认**（2026-10-26，D193–D201 均按推荐方案，§17），实施中：OF-01（解析与附件接入）、OF-02（Excel 概览与表格工具）、OF-03（附件条与预览）已完成。
+> 状态：**设计已确认**（2026-10-26，D193–D201 均按推荐方案，§17），实施中：OF-01（解析与附件接入）、OF-02（Excel 概览与表格工具）、OF-03（附件条与预览）、OF-04（助手生成 Word / Excel 与文件卡片）已完成。
 >
 > OF-01 的实测：Electron 44 的 utilityProcess 能从 `app.asar` 里加载解析 worker（`office-worker.js`），其 Node 24.22（ICU 78.2）能按 GB18030 解码。样本只有 LibreOffice、macOS 文本编辑（textutil）保存的文件和 msoffcrypto-tool 加密的文件：用脚本驱动 Microsoft Word 另存失败，WPS 只能手动操作，二者的样本待补。macOS 文本编辑保存的 Word 没有标题样式，表格也变成了段落，只能按段落读出。实施任务见 [05 的 OF 系列](05-dev-plan.md#后续--word-与-excel-文件of)。枚举、常量、表、接口、工具在实施时登记到 08–12，本文先写在 §11–§12。
 
@@ -173,7 +173,7 @@ OF-02 只读附件（`attachment_id`）；助手读回自己在对话目录里�
 
 | 工具 | 输入 | 输出与行为 |
 | --- | --- | --- |
-| `create_docx` | `{ file, title?, blocks, style_from? }`；`blocks` 为 `heading { level 1–4, text }` / `paragraph { text }` / `list { ordered, items }` / `table { header, rows }` / `page_break`；文字中可用 `**粗体**`、`*斜体*`、`[链接](url)` | 写一个新的 `.docx`；`style_from` 为一个 Word `source` 时沿用它的样式表（标题、正文字体与字号） |
+| `create_docx` | `{ file, title?, blocks }`（`style_from` 随 OF-05 的 `revise_docx` 一起做）；`blocks` 为 `heading { level 1–4, text }` / `paragraph { text }` / `list { ordered, items }` / `table { header, rows }` / `page_break`；文字中可用 `**粗体**`、`*斜体*`、`[链接](url)` | 写一个新的 `.docx`；`style_from` 为一个 Word `source` 时沿用它的样式表（标题、正文字体与字号） |
 | `create_xlsx` | `{ file, sheets: [{ name, columns: [{ header, type?: text/number/date/percent/currency, width? }], rows?, rows_from?, freeze_header? = true }] }`；单元格为字符串、数字、布尔、`null`、`{ date }` 或 `{ formula }` | 写一个新的 `.xlsx`；`rows_from` 为一次 `query_sheet` 的参数，数据由后端直接从源表取出写入，大表不必经过模型的输出 |
 | `edit_xlsx` | `{ source, file, operations }`；操作为 `set_cells { sheet, start, values }`、`insert_rows`、`delete_rows`、`insert_columns`、`delete_columns`、`add_sheet`、`rename_sheet`、`delete_sheet` | 在原件的副本上修改后另存为 `file`；单元格样式、列宽、合并、公式、其他工作表保留 |
 | `revise_docx` | `{ source, file, blocks }` | 按 `blocks` 重写成新文件，沿用原件的样式表；见下方保真说明 |
@@ -210,10 +210,11 @@ OF-02 只读附件（`attachment_id`）；助手读回自己在对话目录里�
 
 ### 8.2 助手生成的文件
 
-现在的 `AttachmentCard`（`message-list.tsx`）只有路径和「在 Finder 中显示」。对 `.docx` / `.xlsx`：
+助手写的文件在消息流里是一张文件卡片（`features/assistant/file-card.tsx`，OF-04 已实现）：
 
-- 副标题为格式、大小与摘要；有 `warnings` 时多一行弱化提示（如「原表的 2 个图表未保留」）。
-- 按钮：「预览」（同 §8.1 的预览，后端即时解析对话目录里的文件）、「另存为…」（桌面版经现有 preload `saveFile`；浏览器开发模式 `<a download>`，E2E 由此断言）、「打开」（用系统默认应用，新增 preload `openPath`，main 只接受对话目录内的路径；浏览器开发模式没有）、「在 Finder 中显示」（不变）。
+- 标题行为「助手生成的文件 · Word / Excel · 大小」与路径；摘要（字数、工作表与行数）在预览的标题下，不为卡片逐个解析文件。OF-05 的 `warnings` 再加一行弱化提示。
+- 按钮：「预览」（只对 `.docx` / `.xlsx`：`assistant.previewFile`，后端在 worker 里按需读这个文件，与附件同样的检查与上限，Excel 按工作表取前 1,000 行，界面与 §8.1 共用组件）、「另存为…」（所有文件：`GET /assistant/conversations/:id/files/raw?path=` 取字节，桌面版经 preload `saveFile`，浏览器开发模式下载，E2E 由此断言）、「打开」（桌面版：preload `openPath`，main 只接受 `<数据目录>/assistant/files/` 下的文件，用系统默认应用打开）、「在 Finder 中显示」（不变）。
+- 写文件的路径一律经 `assistant.fileOf` / `newFile` 限定在对话目录内（越界 `VALIDATION_FAILED`）；同名时加「 (2)」等序号；worker 以 `wx` 写入，不覆盖任何已有文件。
 
 ### 8.3 简单 / 专业模式
 
