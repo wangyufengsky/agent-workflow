@@ -34,6 +34,7 @@ export type RequestEntry = {
 const frameNavigatedSchema = z.object({
   frame: z.object({ id: z.string(), url: z.string(), parentId: z.string().optional() }),
 });
+const frameStartedNavigatingSchema = z.object({ frameId: z.string(), navigationType: z.string() });
 const dialogSchema = z.object({ type: z.string(), message: z.string() });
 const exceptionSchema = z.object({
   exceptionDetails: z.object({
@@ -131,8 +132,11 @@ export async function openTab({
   let mainFrame: string | null = null;
   let url = '';
   let page = { console: 0, exceptions: 0, requests: 0 };
-  let onLoad = () => {};
-  let cancelLoad = () => {};
+  /** Main-frame navigations that replace the document: started, and committed (29 §5.5). */
+  const navigations = { started: 0, committed: 0 };
+  /** Told when the main frame commits or loads; `cancelWait` ends a wait on that early (the tab is disposed). */
+  let mainFrameEvent = () => {};
+  let cancelWait = () => {};
   /** Told when the page's address or its error counts change. */
   let changed = () => {};
 
@@ -152,12 +156,22 @@ export async function openTab({
         refs = new Map();
         since.navigated = true;
         since.loaded = false;
+        navigations.committed++;
         changed();
+        mainFrameEvent();
+        return;
+      }
+      case 'Page.frameStartedNavigating': {
+        const { frameId, navigationType } = frameStartedNavigatingSchema.parse(params);
+        if (frameId !== mainFrame || navigationType === 'sameDocument' || navigationType === 'historySameDocument') {
+          return;
+        }
+        navigations.started++;
         return;
       }
       case 'Page.loadEventFired':
         since.loaded = true;
-        onLoad();
+        mainFrameEvent();
         return;
       case 'Page.javascriptDialogOpening': {
         // 用户自己操作的页面由用户处理对话框，读取页面不能替用户点确认。
@@ -290,6 +304,24 @@ export async function openTab({
     removeAbortListener();
   }
 
+  /** Resolves true once `ready()` holds, checked as the main frame commits and loads; false at `deadline`. */
+  function mainFrameReaches(ready: () => boolean, deadline: number): Promise<boolean> {
+    if (ready()) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const finish = (reached: boolean) => {
+        cancel();
+        mainFrameEvent = () => {};
+        cancelWait = () => {};
+        resolve(reached);
+      };
+      const cancel = clock.schedule(Math.max(0, deadline - clock.now()), () => finish(false));
+      mainFrameEvent = () => {
+        if (ready()) finish(true);
+      };
+      cancelWait = () => finish(false);
+    });
+  }
+
   async function evaluate(expression: string): Promise<unknown> {
     const { result } = evaluateSchema.parse(
       await cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }),
@@ -371,26 +403,25 @@ export async function openTab({
     /** The page loaded (when it navigated), then network and DOM quiet; false when that took too long (29 §5.5). */
     async settle(): Promise<boolean> {
       const deadline = clock.now() + BROWSER_SETTLE_TIMEOUT_MS;
-      if (!since.loaded) {
-        const loaded = await new Promise<boolean>((resolve) => {
-          const finish = (loaded: boolean) => {
-            cancel();
-            onLoad = () => {};
-            cancelLoad = () => {};
-            resolve(loaded);
-          };
-          const cancel = clock.schedule(BROWSER_SETTLE_TIMEOUT_MS, () => finish(false));
-          onLoad = () => finish(true);
-          cancelLoad = () => finish(false);
-        });
-        if (!loaded) return false;
+      for (;;) {
+        if (!(await mainFrameReaches(() => since.loaded, deadline))) return false;
+        const before = { ...navigations };
+        const left = Math.max(0, deadline - clock.now());
+        try {
+          const [networkQuiet, domQuiet] = await Promise.all([
+            network.whenQuiet(left),
+            evaluate(DOM_QUIET(BROWSER_SETTLE_QUIET_MS, left)),
+          ]);
+          return networkQuiet && domQuiet === true;
+        } catch (err) {
+          // The DOM check runs in the document it reached. A navigation that starts after that (the action's, late,
+          // like Electron's `window.open` → `loadURL`, or the page's own) and commits fails the check with "Inspected
+          // target navigated or closed", just before the new document's Page.frameNavigated. That new document is
+          // what the action led to: wait for it to commit and load, then check it.
+          if (navigations.started === before.started) throw err;
+          if (!(await mainFrameReaches(() => navigations.committed > before.committed, deadline))) return false;
+        }
       }
-      const left = Math.max(0, deadline - clock.now());
-      const [networkQuiet, domQuiet] = await Promise.all([
-        network.whenQuiet(left),
-        evaluate(DOM_QUIET(BROWSER_SETTLE_QUIET_MS, left)),
-      ]);
-      return networkQuiet && domQuiet === true;
     },
 
     async snapshot(): Promise<{ url: string; title: string; page: string }> {
@@ -438,7 +469,7 @@ export async function openTab({
 
     /** Stops listening; the host's tab is already gone (closed by main, 29 §8.1). */
     dispose(): void {
-      cancelLoad();
+      cancelWait();
       network.close();
       unsubscribe();
     },

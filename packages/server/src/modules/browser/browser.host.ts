@@ -13,6 +13,7 @@ export type BrowserHost = {
 export const BROWSER_CDP_EVENTS = [
   'Page.loadEventFired',
   'Page.frameNavigated',
+  'Page.frameStartedNavigating',
   'Page.javascriptDialogOpening',
   'Runtime.exceptionThrown',
   'Runtime.consoleAPICalled',

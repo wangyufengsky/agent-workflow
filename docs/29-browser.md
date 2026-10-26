@@ -279,7 +279,7 @@ type BrowserHost = {
    - 输入（`browser_type`）：先按上面的方式点击目标让它获得焦点，再确认 `document.activeElement` 是目标或在目标内（富文本编辑器）；不是则返回 `BROWSER_ACTION_FAILED`，`details.reason = not_focusable`。`clear` 时全选（按平台的 ⌘A / Ctrl+A，`Input.dispatchKeyEvent`）再删除，然后 `Input.insertText`，`submit` 时再按回车。`Input.insertText` 写入的是当前焦点，所以不能省掉聚焦这一步；
    - 按键（`browser_press`）：`Input.dispatchKeyEvent`，作用于当前焦点；
    - 选择框：通过 `DOM.resolveNode` 设值并派发 `input`、`change` 事件。
-6. **等页面稳定**：动作后若发生导航，等 `Page.lifecycleEvent` 的 `load`；然后等允许来源的进行中请求清零、DOM 无变动，各持续 `BROWSER_SETTLE_QUIET_MS`（500）。最多等 `BROWSER_SETTLE_TIMEOUT_MS`（10000），超时不算失败，结果里标 `settled: false`。
+6. **等页面稳定**：动作后若发生导航，等 `Page.lifecycleEvent` 的 `load`；然后等允许来源的进行中请求清零、DOM 无变动，各持续 `BROWSER_SETTLE_QUIET_MS`（500）。最多等 `BROWSER_SETTLE_TIMEOUT_MS`（10000），超时不算失败，结果里标 `settled: false`。DOM 无变动在页面里检查，检查送到哪个文档就在哪个文档里等；检查开始后才开始、随后提交的主框架导航（动作引起但晚到的导航，如 Electron 的 `window.open` 改为 `loadURL`，或页面自己跳转）会让 CDP 以「Inspected target navigated or closed」结束这次检查，这时按导航处理：等新文档提交并 `load`，再在新文档里检查，共用同一个截止时间。检查期间没有主框架导航开始时，这个错误照常抛出。
 7. **弹窗**：`alert` 确定，`confirm` 确定，`prompt` 取消（`Page.handleJavaScriptDialog`），并在结果里写明「页面弹出确认框“确定删除？”，已点确定」。不处理的话页面会卡住。
 8. **返回动作后的页面摘要**（§6），省一次 `browser_snapshot`。
 
