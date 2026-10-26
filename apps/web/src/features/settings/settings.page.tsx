@@ -13,7 +13,10 @@ import { NumberSetting, Segmented } from './setting-inputs.tsx';
 import { useSettings, useUpdateSettings } from './settings.queries.ts';
 import { WebsiteSettings } from './website-settings.tsx';
 
-/** Settings (14 §3.7): the simple ones, and in pro mode the pro keys of `SETTING_MODE` (M5-08). */
+/**
+ * Settings (14 §3.7): the simple ones, and in pro mode the pro keys of `SETTING_MODE` (M5-08). Safety and performance
+ * knobs — concurrency, the assistant's「总是允许」, website rules and logins — are pro only (38 C5, D158).
+ */
 export function SettingsPage() {
   const settings = useSettings();
   const update = useUpdateSettings();
@@ -85,22 +88,24 @@ export function SettingsPage() {
               onChange={(v) => set({ 'ai.askOnUncertainty': v === 'ask' })}
             />
           </div>
-          <div className="field">
-            <label className="label" htmlFor="concurrency">
-              {C.concurrency}
-            </label>
-            <NumberSetting
-              key={settings['scheduler.maxConcurrentAttempts']}
-              id="concurrency"
-              value={settings['scheduler.maxConcurrentAttempts']}
-              onCommit={(n) => set({ 'scheduler.maxConcurrentAttempts': n })}
-            />
-            <p className="hint">{C.concurrencyHint}</p>
-          </div>
+          {isPro && (
+            <div className="field">
+              <label className="label" htmlFor="concurrency">
+                {C.concurrency}
+              </label>
+              <NumberSetting
+                key={settings['scheduler.maxConcurrentAttempts']}
+                id="concurrency"
+                value={settings['scheduler.maxConcurrentAttempts']}
+                onCommit={(n) => set({ 'scheduler.maxConcurrentAttempts': n })}
+              />
+              <p className="hint">{C.concurrencyHint}</p>
+            </div>
+          )}
         </Panel>
-        <AssistantSettings settings={settings} set={set} />
-        <CompanionSettings settings={settings} set={set} />
-        <WebsiteSettings settings={settings} set={set} />
+        {isPro && <AssistantSettings settings={settings} set={set} />}
+        <CompanionSettings settings={settings} set={set} isPro={isPro} />
+        {isPro && <WebsiteSettings settings={settings} set={set} />}
         <NetworkSettings settings={settings} set={set} isPro={isPro} />
         {isPro && <ProSettings settings={settings} set={set} />}
         {isPro && <HostingAccountsSettings />}

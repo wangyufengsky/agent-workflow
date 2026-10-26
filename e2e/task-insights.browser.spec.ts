@@ -81,6 +81,13 @@ test('J16 质量与用量：简单视图本周三个数，专业视图用量与�
   await expect(simple).toContainText(`完成了 ${after.quality.ended.completed} 个任务`);
   await expect(simple).toContainText(`用了 ${tokens(after.usage)} tokens`);
   await expect(simple).toContainText(`打扰了你 ${after.attention.interruptions} 次`);
+  // The simple sidebar has no「质量与用量」: the same figures lead the task list (38 C1).
+  await page.goto('/tasks');
+  await expect(page.getByTestId('week-summary')).toHaveText(
+    `本周 · 完成了 ${after.quality.ended.completed} 个任务 · 用了 ${tokens(after.usage)} tokens · 打扰了你 ${after.attention.interruptions} 次`,
+  );
+  await page.getByTestId('week-summary').getByRole('link', { name: '本周' }).click();
+  await expect(page.getByTestId('insights-simple')).toBeVisible();
 
   // Pro mode: usage and quality of the same week, then the tasks behind a failure reason.
   await page.getByRole('button', { name: '开启专业模式' }).click();

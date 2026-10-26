@@ -7,12 +7,25 @@ import { Character } from '../companion/character.tsx';
 import { CHARACTER_CLIPS, type CharacterMood } from '../companion/character-assets.ts';
 import styles from './companion-settings.module.css';
 
-export function CompanionSettings({ settings, set }: { settings: Settings; set: (patch: Partial<Settings>) => void }) {
+/** Simple mode shows whether it is on the desktop, how it looks and the notifications; the rest is pro (38 C5). */
+export function CompanionSettings({
+  settings,
+  set,
+  isPro,
+}: {
+  settings: Settings;
+  set: (patch: Partial<Settings>) => void;
+  isPro: boolean;
+}) {
   const [mood, setMood] = useState<CharacterMood>('idle');
   const switches = [
     { key: 'companion.enabled', label: C.desktop, hint: window.aw === undefined ? C.desktopOnly : C.desktopHint },
-    { key: 'companion.animations', label: C.animations },
-    { key: 'companion.whisper', label: C.whisper, hint: C.whisperHint },
+    ...(isPro
+      ? ([
+          { key: 'companion.animations', label: C.animations },
+          { key: 'companion.whisper', label: C.whisper, hint: C.whisperHint },
+        ] as const)
+      : []),
     { key: 'companion.notifications', label: C.notifications },
   ] as const;
   return (
@@ -74,33 +87,37 @@ export function CompanionSettings({ settings, set }: { settings: Settings; set: 
             />
           </div>
         ))}
-        <label className="field">
-          <span className="label">
-            {C.size} · {settings['companion.size']}
-          </span>
-          <input
-            type="range"
-            min={120}
-            max={300}
-            step={20}
-            value={settings['companion.size']}
-            onChange={(e) => set({ 'companion.size': Number(e.target.value) })}
-          />
-        </label>
-        <label className="field">
-          <span className="label">{C.whisperMinutes}</span>
-          <select
-            className="input"
-            value={settings['companion.whisperMinutes']}
-            onChange={(e) => set({ 'companion.whisperMinutes': Number(e.target.value) })}
-          >
-            {[1, 5, 15, 30, 60, 120].map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
+        {isPro && (
+          <>
+            <label className="field">
+              <span className="label">
+                {C.size} · {settings['companion.size']}
+              </span>
+              <input
+                type="range"
+                min={120}
+                max={300}
+                step={20}
+                value={settings['companion.size']}
+                onChange={(e) => set({ 'companion.size': Number(e.target.value) })}
+              />
+            </label>
+            <label className="field">
+              <span className="label">{C.whisperMinutes}</span>
+              <select
+                className="input"
+                value={settings['companion.whisperMinutes']}
+                onChange={(e) => set({ 'companion.whisperMinutes': Number(e.target.value) })}
+              >
+                {[1, 5, 15, 30, 60, 120].map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
       </div>
     </Panel>
   );

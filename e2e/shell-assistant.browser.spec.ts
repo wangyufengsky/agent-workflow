@@ -123,6 +123,8 @@ test('主页的建议在主页上提问；open_page 带用户离开时面板接�
   await expect(card).toContainText('已执行');
   await expect(panel).toContainText('改好了。');
 
+  // The assistant's「总是允许」list is a pro-mode setting (38 C5).
+  await patchSettings(request, { 'ui.mode': 'pro' });
   await page.getByRole('link', { name: '设置', exact: true }).click();
   const allowed = page.getByRole('list', { name: '总是允许的操作' });
   await expect(allowed).toContainText('修改项目');

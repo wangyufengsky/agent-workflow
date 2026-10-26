@@ -24,9 +24,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'tasks', route: ROUTES.tasks, label: NAV_COPY.tasks, icon: 'list', visibleIn: BOTH, badge: 'inboxOpen' },
   { id: 'projects', route: ROUTES.projects, label: NAV_COPY.projects, icon: 'folder', visibleIn: BOTH },
   { id: 'knowledge', route: ROUTES.knowledge, label: NAV_COPY.knowledge, icon: 'book', visibleIn: BOTH },
-  { id: 'ppt', route: ROUTES.ppt, label: NAV_COPY.ppt, icon: 'slides', visibleIn: BOTH },
-  { id: 'insights', route: ROUTES.insights, label: NAV_COPY.insights, icon: 'chart', visibleIn: BOTH },
-  { id: 'team', route: ROUTES.teamIndex, label: NAV_COPY.team, icon: 'team', visibleIn: BOTH },
+  // PPT, insights and team are pro-only in the sidebar, their routes stay open to both (38 C1, D158).
+  { id: 'ppt', route: ROUTES.ppt, label: NAV_COPY.ppt, icon: 'slides', visibleIn: PRO, group: 'pro' },
+  { id: 'insights', route: ROUTES.insights, label: NAV_COPY.insights, icon: 'chart', visibleIn: PRO, group: 'pro' },
+  { id: 'team', route: ROUTES.teamIndex, label: NAV_COPY.team, icon: 'team', visibleIn: PRO, group: 'pro' },
   { id: 'git', route: ROUTES.git, label: NAV_COPY.git, icon: 'git', visibleIn: PRO, group: 'pro' },
   { id: 'workflows', route: ROUTES.workflows, label: NAV_COPY.workflows, icon: 'flow', visibleIn: PRO, group: 'pro' },
   { id: 'roles', route: ROUTES.roles, label: NAV_COPY.roles, icon: 'users', visibleIn: PRO, group: 'pro' },

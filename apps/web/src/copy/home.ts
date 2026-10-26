@@ -14,6 +14,8 @@ export const HOME_COPY = {
   pickWorkflow: '选择流程开始任务',
   changeWorkflow: '换一个流程',
   customWorkflows: '自定义',
+  moreWorkflows: (n: number) => `更多流程 ${n}`,
+  moreWorkflowsLabel: '更多流程',
   more: '更多',
   tryAsking: '试试问',
   suggestions: ['列出我的项目', '哪些事需要我处理', '每周一早上 9 点给项目补单元测试', '把最近一次知识问答做成 PPT'],

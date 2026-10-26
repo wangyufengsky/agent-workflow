@@ -19,7 +19,6 @@ import { CredentialsBanner } from './credentials-banner.tsx';
 import { InboxButton } from './inbox-button.tsx';
 import { NavLink } from './nav-link.tsx';
 import { RuntimeChip } from './runtime-chip.tsx';
-import { ThemeSwitch } from './theme-switch.tsx';
 import { usePaletteItems } from './use-palette-items.ts';
 
 /** The assistant button and ⌘J: the panel, or on the home page its own input, which holds the conversation (D112). */
@@ -136,7 +135,6 @@ export function AppShell() {
             aria-pressed={assistantOpen}
             onClick={() => toggleAssistant(onHome)}
           />
-          <ThemeSwitch />
         </header>
         <CredentialsBanner />
         <main className="content">

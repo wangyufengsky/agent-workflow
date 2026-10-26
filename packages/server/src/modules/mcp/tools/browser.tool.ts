@@ -56,7 +56,7 @@ const HINTS: Partial<Record<ErrorCode, string>> = {
   [ErrorCode.BrowserSiteNotAllowed]:
     "The user's website rules do not allow this host. Continue without it; do not try other addresses to get around the rules.",
   [ErrorCode.BrowserLoginRequired]:
-    'The website wants a login. Ask the user (ask_user) to log in to it in the app (Settings, Websites), or continue without it. Never type a password.',
+    'The website wants a login. Ask the user (ask_user) to log in to it in the app (Settings, Websites; shown in pro mode), or continue without it. Never type a password.',
   [ErrorCode.BrowserRefStale]: 'The page changed. Call browser_snapshot and use the refs it returns.',
   [ErrorCode.BrowserActionFailed]:
     'details.reason says why: covered (details.coveredBy is on top: close or wait for it), not_visible, disabled, detached or not_focusable. Take a snapshot and pick another way.',

@@ -392,7 +392,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ai.askOnUncertainty` | `false` | 简单 |
 | `ai.defaultModel` | `null`（使用 opencode 默认模型） | 专业 |
 | `ai.bashPolicy` | `auto`（助手不能修改，D65） | 专业 |
-| `scheduler.maxConcurrentAttempts` | `4`（所有使用模型的会话共享的上限，D186：任务、助手、知识问答、PPT、Git 审查、提交信息、需求拆解、成员分析一起算；用满时交互的请求排队，任务最多用上限减一；设置页文案「同时使用模型的会话数」） | 简单 |
+| `scheduler.maxConcurrentAttempts` | `4`（所有使用模型的会话共享的上限，D186：任务、助手、知识问答、PPT、Git 审查、提交信息、需求拆解、成员分析一起算；用满时交互的请求排队，任务最多用上限减一；设置页文案「同时使用模型的会话数」） | 专业（38 C5） |
 | `scheduler.maxConcurrentNodesPerTask` | `2` | 专业 |
 | `node.maxAttempts` | `3` | 专业 |
 | `attempt.timeoutMinutes` | `60` | 专业；任务尝试与助手单轮时限。等待用户（权限、提问）与等待模型服务（opencode 重试失败的模型请求，D163）的时间不算，之后继续剩余时长；助手超时停止且不自动重试 |
@@ -402,17 +402,17 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |
 | `opencode.binaryPath` | `null`（从 PATH 与 `~/.opencode/bin` 查找；助手不能修改，D65） | 专业 |
 | `network.offline` | `false`（离线环境，D168：opencode 不访问公网、隐藏自带的 Zen / Go provider、知识问答不能网络搜索；opencode 下一次启动时生效。打开时各处不显示费用、只显示 tokens，立即生效，D181） | 简单 |
-| `assistant.alwaysAllow` | `[]`（操作 id 列表；只有 write 级生效，critical 即使在列表中也每次确认；助手自己不能修改，D65；v1.1） | 简单 |
+| `assistant.alwaysAllow` | `[]`（操作 id 列表；只有 write 级生效，critical 即使在列表中也每次确认；助手自己不能修改，D65；v1.1） | 专业（38 C5） |
 | `companion.appearance` | `orb`（`CompanionAppearance`：`orb` / `whale`，默认极光光球；32 §3） | 简单 |
 | `companion.enabled` | `false`（桌面显示助手） | 简单 |
-| `companion.animations` | `true`（系统减少动态效果仍优先） | 简单 |
-| `companion.size` | `180`（整数 120–300） | 简单 |
-| `companion.whisper` | `false`（自动碎碎念） | 简单 |
-| `companion.whisperMinutes` | `15`（整数 1–120 分钟） | 简单 |
+| `companion.animations` | `true`（系统减少动态效果仍优先） | 专业（38 C5） |
+| `companion.size` | `180`（整数 120–300） | 专业（38 C5） |
+| `companion.whisper` | `false`（自动碎碎念） | 专业（38 C5） |
+| `companion.whisperMinutes` | `15`（整数 1–120 分钟） | 专业（38 C5） |
 | `companion.notifications` | `true`（后台系统通知；应用内提醒独立显示） | 简单 |
 | `preview.maxRunning` | `3`（同时运行的页面预览，29 §4.4） | 专业 |
 | `preview.idleMinutes` | `10`（没有标签页、没有活动尝试多久后停止预览） | 专业 |
-| `browser.sites` | `[{ pattern: '*', access: 'read', queryPaths: [] }]`（网站规则，按顺序取第一条匹配，无匹配不允许；只读规则的 `queryPaths` 为放行 POST 的查询路径，缺省为空，D173；助手不能修改，D65 的同一思路，29 §5.4） | 简单 |
+| `browser.sites` | `[{ pattern: '*', access: 'read', queryPaths: [] }]`（网站规则，按顺序取第一条匹配，无匹配不允许；只读规则的 `queryPaths` 为放行 POST 的查询路径，缺省为空，D173；助手不能修改，D65 的同一思路，29 §5.4） | 专业（38 C5） |
 | `browser.loginUrlPatterns` | `[]`（内置规则之外识别登录页的主机或路径片段） | 专业 |
 | `browser.integratedAuthServers` | `[]`（网站分区用系统身份做 Windows 集成登录的服务器，主机名通配，不能只写 `*`；助手不能修改，D171，29 §5.4） | 专业 |
 | `network.extraCaCerts` | `null`（PEM，一张或多张；后端、opencode、git（D175）与内置浏览器（D176）在内置根证书与系统证书库之外再信任它们；边界检查 PEM 结构，后端保存前逐张解析；助手不能修改，D164） | 专业 |
