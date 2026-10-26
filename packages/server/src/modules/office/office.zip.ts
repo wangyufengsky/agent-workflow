@@ -1,5 +1,5 @@
-import { inflateRawSync } from 'node:zlib';
-import { AppError, AttachmentParseFailure, ErrorCode } from '@aw/shared';
+import { createInflateRaw, inflateRawSync } from 'node:zlib';
+import { AppError, AttachmentLimit, AttachmentParseFailure, ErrorCode } from '@aw/shared';
 
 /** One file in a zip, as its central directory describes it. */
 export type ZipEntry = { name: string; method: number; compressedSize: number; size: number; localOffset: number };
@@ -54,20 +54,58 @@ export function zipEntries(bytes: Buffer): ZipEntry[] {
   return entries;
 }
 
-/** One entry's content, inflated to at most the size the directory declared. */
-export function readZipEntry(bytes: Buffer, entry: ZipEntry): Buffer {
+/** An entry's stored bytes, as its local header places them. */
+function packedData(bytes: Buffer, entry: ZipEntry): Buffer {
   const at = entry.localOffset;
   if (at + 30 > bytes.length || bytes.readUInt32LE(at) !== LOCAL_FILE_HEADER) {
     throw corrupt(`Bad local header for ${entry.name}`);
   }
+  if (entry.method !== STORED && entry.method !== DEFLATED) throw corrupt(`Unsupported compression for ${entry.name}`);
   const start = at + 30 + bytes.readUInt16LE(at + 26) + bytes.readUInt16LE(at + 28);
-  const data = bytes.subarray(start, start + entry.compressedSize);
+  return bytes.subarray(start, start + entry.compressedSize);
+}
+
+/** One small entry's content; more than `maxBytes` once inflated is corrupt, whatever the directory declared. */
+export function readZipEntry(bytes: Buffer, entry: ZipEntry, maxBytes: number): Buffer {
+  const data = packedData(bytes, entry);
   if (entry.method === STORED) return data;
-  if (entry.method !== DEFLATED) throw corrupt(`Unsupported compression for ${entry.name}`);
   try {
-    // Capped, so a lying entry cannot inflate past the checked total.
-    return inflateRawSync(data, { maxOutputLength: Math.max(entry.size, 1) });
+    return inflateRawSync(data, { maxOutputLength: maxBytes });
   } catch (err) {
     throw corrupt(`Cannot inflate ${entry.name}: ${String(err)}`);
+  }
+}
+
+/**
+ * Inflates every entry, counting the bytes it really produces and keeping none of them, and stops once they pass
+ * `limit` (39 §5.1). The central directory's sizes are the file's own claim and a zip bomb lies about them, so the
+ * parsers only get a file that is known to unzip within the limit.
+ */
+export async function assertUnzipsWithin(bytes: Buffer, entries: readonly ZipEntry[], limit: number): Promise<void> {
+  let total = 0;
+  const count = (size: number) => {
+    total += size;
+    if (total > limit) {
+      throw new AppError(ErrorCode.AttachmentTooLarge, 'Unzipped size limit exceeded', {
+        reason: AttachmentLimit.Unzipped,
+        limit,
+      });
+    }
+  };
+  for (const entry of entries) {
+    const data = packedData(bytes, entry);
+    if (entry.method === STORED) {
+      count(data.length);
+      continue;
+    }
+    const inflate = createInflateRaw();
+    inflate.end(data);
+    try {
+      // Leaving the loop early (over the limit) destroys the stream.
+      for await (const chunk of inflate as AsyncIterable<Buffer>) count(chunk.length);
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      throw corrupt(`Cannot inflate ${entry.name}: ${String(err)}`);
+    }
   }
 }

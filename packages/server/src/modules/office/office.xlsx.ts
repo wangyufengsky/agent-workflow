@@ -1,4 +1,12 @@
-import { AppError, AttachmentFormat, AttachmentLimit, ErrorCode, OFFICE_CELLS_MAX, type OfficeMeta } from '@aw/shared';
+import {
+  AppError,
+  AttachmentFormat,
+  AttachmentLimit,
+  ErrorCode,
+  OFFICE_CELLS_MAX,
+  type OfficeMeta,
+  SHEET_GRID_MAX_COLUMNS,
+} from '@aw/shared';
 import ExcelJS from 'exceljs';
 import type { ZipEntry } from './office.zip.ts';
 
@@ -95,7 +103,8 @@ const cellText = (cell: WorkbookCell) =>
 
 /**
  * One section per sheet (39 §5.3): a Markdown table whose first column is the row number and whose header is the
- * column letters, so the model can name cells as `C17`.
+ * column letters, so the model can name cells as `C17`. A sheet wider than `SHEET_GRID_MAX_COLUMNS` lists each row's
+ * cells by address instead, so its text stays proportional to its cells.
  */
 function sheetText(sheet: WorkbookSheet, { left, rows, columns }: Extent): string {
   const notes = [sheet.range === null ? '空' : `${sheet.range}，${rows} 行 × ${columns} 列`];
@@ -104,12 +113,22 @@ function sheetText(sheet: WorkbookSheet, { left, rows, columns }: Extent): strin
   if (sheet.merges.length > 0) lines.push(`合并单元格：${sheet.merges.join('、')}`);
   if (sheet.hiddenColumns.length > 0) lines.push(`隐藏的列：${sheet.hiddenColumns.map(columnName).join('、')}`);
   if (sheet.range === null) return lines.join('\n');
+  const label = (row: WorkbookRow) => `${row.r}${row.hidden ? '（隐藏）' : ''}`;
+  if (columns > SHEET_GRID_MAX_COLUMNS) {
+    lines.push('', `列太多，逐个列出有内容的单元格：`);
+    for (const row of sheet.rows) {
+      lines.push(
+        `- ${label(row)}：${row.cells.map((cell) => `${columnName(cell.c)}${row.r} = ${cellText(cell)}`).join('；')}`,
+      );
+    }
+    return lines.join('\n');
+  }
   const letters = Array.from({ length: columns }, (_, i) => columnName(left + i));
   lines.push('', `| 行 | ${letters.join(' | ')} |`, `| --- | ${letters.map(() => '---').join(' | ')} |`);
   for (const row of sheet.rows) {
     const cells = Array<string>(columns).fill('');
     for (const cell of row.cells) cells[cell.c - left] = cellText(cell);
-    lines.push(`| ${row.r}${row.hidden ? '（隐藏）' : ''} | ${cells.join(' | ')} |`);
+    lines.push(`| ${label(row)} | ${cells.join(' | ')} |`);
   }
   return lines.join('\n');
 }

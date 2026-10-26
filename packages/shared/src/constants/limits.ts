@@ -210,6 +210,11 @@ export const OFFICE_UNZIPPED_BYTES_MAX = 200 * 1024 * 1024;
 export const OFFICE_CELLS_MAX = 500_000;
 export const OFFICE_WORKER_TIMEOUT_MS = 30_000;
 export const OFFICE_WORKER_HEAP_MB = 1024;
+/**
+ * A sheet spanning more columns than this is written cell by cell instead of as a grid (39 §5.3), so the text grows
+ * with its cells, not with rows × columns: one value in XFD1 must not pad every row to 16,384 columns.
+ */
+export const SHEET_GRID_MAX_COLUMNS = 50;
 /** A task's acceptance checklist (31): items per version, and the lengths of an item's texts and of a note. */
 export const REQUIREMENTS_MAX = 30;
 export const REQUIREMENT_TITLE_MAX_CHARS = 120;

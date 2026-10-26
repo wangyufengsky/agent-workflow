@@ -69,4 +69,16 @@ describe('Excel 读成工作簿与文字', () => {
   it('列字母', () => {
     expect([1, 26, 27, 52, 703].map(columnName)).toEqual(['A', 'Z', 'AA', 'AZ', 'AAA']);
   });
+
+  it('跨很多列的稀疏工作表逐个列出单元格，文字随单元格数增长而不是行数乘列数', async () => {
+    const bytes = await written((book) => {
+      const sheet = book.addWorksheet('稀疏');
+      for (let r = 1; r <= 1000; r++) sheet.getCell(`A${r}`).value = r;
+      sheet.getCell('XFD1').value = '备注';
+    });
+    const { text } = await readXlsx(bytes, zipEntries(bytes));
+    expect(text).toContain('## 工作表「稀疏」（A1:XFD1000，1000 行 × 16384 列）');
+    expect(text).toContain('- 1：A1 = 1；XFD1 = 备注\n- 2：A2 = 2\n');
+    expect(text.length).toBeLessThan(20_000);
+  });
 });

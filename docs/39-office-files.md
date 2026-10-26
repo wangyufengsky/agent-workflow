@@ -104,7 +104,7 @@ attachments/<id>/original + text.md + workbook.json        files/<conversationId
 解析一个 20 MiB 的 xlsx 要几秒、几百 MB 内存。后端是单线程的 Fastify，在主线程解析会卡住 SSE、MCP 和其他请求，所以用 Node 内置的 `worker_threads`：
 
 - 每次解析或生成起一个 worker，`resourceLimits.maxOldGenerationSizeMb` 限内存；超过时限 `terminate()`，返回 `ATTACHMENT_PARSE_FAILED`（`reason: timeout` 或 `out_of_memory`）。worker 用完即退，不常驻。
-- 解压前先读 zip 中央目录，累计未压缩大小超过上限即拒绝（防 zip 炸弹），不等解压完。
+- 防 zip 炸弹：中央目录里的大小是文件自己声明的，可以作假，所以 worker 在交给解析库之前先把每个部件实际解压一遍、只计数不保留，合计超过上限即拒绝（`ATTACHMENT_TOO_LARGE`，`reason: unzipped`）；识别格式时只解压很小的 `[Content_Types].xml`（超过 1 MiB 视为损坏）。
 - `office.worker.ts` 作为 electron-vite 后端构建的另一个入口；OF-01 的第一步是在打包后的 utilityProcess 中实测 worker 可用（`pnpm e2e:smoke` 上传一个 xlsx）。
 
 ### 5.2 Word → Markdown
@@ -119,7 +119,7 @@ attachments/<id>/original + text.md + workbook.json        files/<conversationId
 - 用 exceljs 读每个工作表的已用区域；单元格取**值**：数字原值、日期为 ISO 8601、布尔、错误值（`#DIV/0!`）、富文本取纯文字；公式另存公式文本与文件里缓存的结果。
 - 不重算公式（不带计算引擎）。有的程序生成的文件不存缓存结果，此时值为空，并在 `workbook.json` 里标记，`read_sheet` 返回 `formula_without_value` 提示。
 - 隐藏的工作表、行、列照常读出并标记；图表、图片、透视表、条件格式、数据验证不提取，只在 `meta` 里计数。
-- `text.md`：每个工作表一节 `## 工作表「销售明细」（A1:F1204，1,204 行 × 6 列）`，下接 Markdown 表格，**首列为行号、表头为列字母**，模型可以用 `C17`、`A2:F2` 这样的坐标指称和修改。
+- `text.md`：每个工作表一节 `## 工作表「销售明细」（A1:F1204，1,204 行 × 6 列）`，下接 Markdown 表格，**首列为行号、表头为列字母**，模型可以用 `C17`、`A2:F2` 这样的坐标指称和修改。 跨越超过 `SHEET_GRID_MAX_COLUMNS`（50）列的工作表改为逐行列出有内容的单元格（`- 1：A1 = 日期；XFD1 = 备注`），文字随单元格数增长，而不是行数乘列数（只在 XFD1 有一个值也会让每行补满 16,384 列）。
 
 ## 6. 交给模型的形式（D196）
 

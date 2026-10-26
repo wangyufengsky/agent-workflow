@@ -653,6 +653,7 @@ class AppError extends Error {
 | ATTACHMENT_BYTES_MAX | 5 MiB（文本附件） |
 | OFFICE_ATTACHMENT_BYTES_MAX / OFFICE_UNZIPPED_BYTES_MAX（OF-01 已实现，下同） | 20 MiB / 200 MiB（Word 与 Excel 附件，39 §10） |
 | OFFICE_CELLS_MAX | 500,000（Excel 的非空单元格） |
+| SHEET_GRID_MAX_COLUMNS | 50（超过这么多列的工作表逐个列出单元格，不画成表格，39 §5.3） |
 | OFFICE_WORKER_TIMEOUT_MS / OFFICE_WORKER_HEAP_MB | 30,000 / 1,024（一次解析的时限与 worker 堆上限） |
 | ATTACHMENT_NAME_MAX_CHARS | 255（显示名） |
 | ATTACHMENT_PROMPT_MAX_CHARS / ATTACHMENT_READ_MAX_CHARS | 20,000（一次提示词里全部附件合计）/ 12,000（每次读取）（U-02 已实现） |

@@ -16,6 +16,8 @@ import { makeZip, minimalXlsx } from '../../../test/helpers/zip.ts';
 import { createOffice, detectFormat, OFFICE_TEXT_FILE, type OfficeFormat, WORKBOOK_FILE } from './index.ts';
 import { columnName, type Workbook } from './office.xlsx.ts';
 
+const WORD_TYPES =
+  '<Types><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>';
 const workerFile = fileURLToPath(new URL('./office.worker.ts', import.meta.url));
 const fixture = (name: string) => fileURLToPath(new URL(`../../../test/fixtures/office/${name}`, import.meta.url));
 
@@ -51,17 +53,9 @@ describe('识别格式（看内容不看扩展名）', () => {
     }
   });
 
-  it('其他 zip 不是 Word / Excel；解压后超过上限的在解压前就被拒', async () => {
+  it('其他 zip 不是 Word / Excel', async () => {
     const archive = makeZip([{ name: 'notes.txt', content: 'hello' }]);
     expect(await errorOf(() => detectFormat(archive))).toMatchObject({ details: { reason: 'unsupported' } });
-    const bomb = makeZip([
-      { name: '[Content_Types].xml', content: '<Types/>' },
-      { name: 'xl/worksheets/sheet1.xml', content: 'x', declaredSize: OFFICE_UNZIPPED_BYTES_MAX },
-    ]);
-    expect(await errorOf(() => detectFormat(bomb))).toEqual({
-      code: ErrorCode.AttachmentTooLarge,
-      details: { reason: 'unzipped', limit: OFFICE_UNZIPPED_BYTES_MAX },
-    });
     expect(detectFormat(Buffer.from('a,b\n1,2\n'))).toBe(AttachmentFormat.Text);
   });
 });
@@ -97,13 +91,20 @@ describe('在 worker 线程里读出文字', () => {
     expect(workbook.sheets[1]?.rows.find((row) => row.r === 6)?.cells[1]).toEqual({ c: 2, v: 2791.5, f: 'SUM(B3:B5)' });
   });
 
+  it('实际解压后超过上限的被拒，即使中央目录把大小写小了', async () => {
+    const bomb = makeZip([
+      { name: '[Content_Types].xml', content: WORD_TYPES },
+      { name: 'word/document.xml', content: Buffer.alloc(OFFICE_UNZIPPED_BYTES_MAX + 1), declaredSize: 10 },
+    ]);
+    expect(await errorOf(() => parse(bomb))).toEqual({
+      code: ErrorCode.AttachmentTooLarge,
+      details: { reason: 'unzipped', limit: OFFICE_UNZIPPED_BYTES_MAX },
+    });
+  });
+
   it('损坏的文件为 ATTACHMENT_PARSE_FAILED', async () => {
     const broken = makeZip([
-      {
-        name: '[Content_Types].xml',
-        content:
-          '<Types><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
-      },
+      { name: '[Content_Types].xml', content: WORD_TYPES },
       { name: 'word/document.xml', content: '<w:document' },
     ]);
     expect(await errorOf(() => parse(broken))).toEqual({
