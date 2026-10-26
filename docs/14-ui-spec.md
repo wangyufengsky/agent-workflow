@@ -288,6 +288,11 @@ export type ThemeDefinition = {
 - 新增主题 = 新增一个 `themes/*.ts` + 在 `ThemeId` 枚举与 registry 中登记；类型系统保证令牌齐全。
 - PPT 的页面有自己的主题（与应用主题无关）：每套主题另有一组不透明的幻灯片调色板 `slides: SlidePalette`（`bg` `surface` `ink` `sub` `accent` `fill` `onFill` `line` `codeBg` `codeInk`），渲染时写成页面容器上的 `--slide-*` 变量，PowerPoint 导出也读它；单测校验其对比度（23 §5.2）。
 - 工作中的通用动效 `.shimmer`（文字流光，只改遮罩透明度）与 `.caret`（打字光标）在 `base.css`，助手面板与会话流共用（25 §4.6）。
+- 界面通用动效都在 `base.css`，只用 CSS，减少动态效果时由全局规则压到瞬间完成：
+  - 抽屉、对话框、命令面板与遮罩随 Radix 的 `data-state` 播放进出关键帧（抽屉滑入滑出、对话框与命令面板淡入并轻微上浮、遮罩淡入淡出）；Radix 只在打开时挂载它们，过渡无法播放，关闭时它等动画结束再卸载。
+  - 切换页面时页面内容淡入（`.content > *` 挂载时播放）；只改透明度，不改位置，页面第一帧量到的几何就是最终的（光球是否在视口内、画布适配节点）。
+  - 平台 `popover` 菜单默认只做透明度的淡入淡出（`:where([popover])`，不改位置，锚定的菜单第一帧就在原处；组件可用自己的类覆盖，如助手的向上弹出菜单）。
+  - 页签下划线在选中项上展开、离开的一项收起；按钮与图标按钮按下时缩到 0.97。
 - 助手面板的磨砂材质与助手标识也是主题令牌（`frost`、`frost-card`、`frost-edge`、`frost-filter`、`frost-shadow`、`frost-sheen`、`aura`，D84）；与主题无关的动效令牌 `--ease-spring`、`--t-drawer` 在 `base.css`。
 - 每套主题在单测中校验：正文/次要文字在 `bg`/`panel`/`sidebar` 及其上叠加的悬停、选中底色（`fill-1`–`fill-3`、`accent-fill`）、外框装饰渐变最浓处，以及助手磨砂面板（`frost` 叠在 `bg`/`surface`/`raised` 上，及其上的 `frost-card` 与悬停底色）上对比度 ≥ 4.5:1，状态文字在其 fill（叠在 `bg` / `panel` 上）上 ≥ 4.5:1，侧栏数量徽标（`stall`）在侧栏及其悬停、选中底色上 ≥ 4.5:1，主按钮与品牌按钮（含悬停）文字 ≥ 4.5:1（沿用设计稿已校验的约束）。渲染后的页面另由 E2E 走查（J9）用 axe 的 `color-contrast` 规则在全部主题下逐页检查（M6-01）。
 

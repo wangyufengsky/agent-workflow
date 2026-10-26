@@ -53,7 +53,7 @@ export function CommandPalette({ open, onOpenChange, items }: CommandPaletteProp
   return (
     <RadixDialog.Root open={open} onOpenChange={close}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="scrim open" />
+        <RadixDialog.Overlay className="scrim" />
         <RadixDialog.Content className={styles.panel} aria-describedby={undefined}>
           <RadixDialog.Title className="sr">{PALETTE_COPY.title}</RadixDialog.Title>
           <div className={styles.search}>

@@ -12,6 +12,23 @@
   background: var(--panel);
   box-shadow: var(--shadow-pop);
   overflow: hidden;
+  animation: panel-in var(--t-mid) var(--ease) both;
+}
+/* Radix keeps it mounted until this ends (base.css §10). */
+.panel[data-state="closed"] {
+  animation: panel-out var(--t-fast) var(--ease) both;
+}
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px) scale(0.98);
+  }
+}
+@keyframes panel-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -4px) scale(0.98);
+  }
 }
 .search {
   display: flex;
