@@ -278,7 +278,7 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 sudo apt install ./agent-workflow_1.4.0_amd64.deb
 ```
 
-arm64 机器换成 `_arm64.deb`。之后在应用菜单中打开，或运行 `agent-workflow`。
+arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `/usr/bin/agent-workflow` 指向它，菜单项在 `/usr/share/applications/agent-workflow.desktop`），用户数据在 `~/.config/Agent Workflow/`。之后在应用菜单中打开，或运行 `agent-workflow`；第一次启动时应用会在桌面放一个快捷方式（只放一次，删掉后不再出现）。卸载：`sudo apt remove agent-workflow`。
 
 **AppImage（其他发行版）**：
 
@@ -287,6 +287,7 @@ chmod +x agent-workflow-1.4.0-x86_64.AppImage
 ./agent-workflow-1.4.0-x86_64.AppImage
 ```
 
+- AppImage 不安装，放在哪里就从哪里运行（建议先移到固定位置，如 `~/Applications/`）；第一次启动时在桌面放一个指向它当前位置的快捷方式，之后移动文件需要删掉快捷方式重新放。
 - 需要 FUSE 2（Ubuntu 24.04：`sudo apt install libfuse2t64`）。
 - Ubuntu 24.04 默认限制非特权用户命名空间，AppImage 可能因 Chromium 沙箱无法启动；请改用 deb，或按发行版说明为该 AppImage 配置 AppArmor 规则。
 

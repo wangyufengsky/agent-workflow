@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { APP_LICENSE, APP_SOURCE_URL, browserRectSchema, type LaunchPreferences } from '@aw/shared';
@@ -6,6 +7,7 @@ import { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell, type 
 import { type Backend, startBackend } from './backend.ts';
 import { type BrowserPrompts, createBrowserPrompts } from './browser-prompts.ts';
 import { createCompanionHost } from './companion.ts';
+import { createDesktopShortcut, DEB_MENU_ENTRY } from './desktop-shortcut.ts';
 import { serveExports } from './export.ts';
 import { readLaunchPreferences, writeLaunchPreferences } from './launch.ts';
 import { passwordStoreSwitch } from './password-store.ts';
@@ -71,6 +73,26 @@ async function openApp({ win, webPreferences }: Window, b: Backend, prompts: Bro
   await win.loadURL(url);
 }
 
+/** The installed app on Linux puts itself on the desktop once (D191); a failure only loses the shortcut. */
+function placeDesktopShortcut(): void {
+  try {
+    const shortcut = createDesktopShortcut({
+      userData: app.getPath('userData'),
+      desktop: app.getPath('desktop'),
+      appImage: process.env.APPIMAGE,
+      appIcon: join(app.getAppPath(), 'build/icon.png'),
+      menuEntry: DEB_MENU_ENTRY,
+    });
+    if (shortcut === undefined) return;
+    // GNOME's desktop icons launch an entry only once trusted; elsewhere there is no `gio` or nothing to trust.
+    execFile('gio', ['set', shortcut, 'metadata::trusted', 'true'], (error) => {
+      if (error !== null) console.warn('desktop shortcut not marked trusted', error.message);
+    });
+  } catch (e) {
+    console.error('desktop shortcut failed', e);
+  }
+}
+
 ipcMain.handle('aw:select-directory', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
   return result.canceled ? null : (result.filePaths[0] ?? null);
@@ -110,6 +132,7 @@ app.whenReady().then(async () => {
     if (themedTitleBar) window.win.setTitleBarOverlay(titleBarOverlay(applied));
   });
   const prompts = createBrowserPrompts(() => window.win);
+  if (process.platform === 'linux' && app.isPackaged) placeDesktopShortcut();
   // `window.splash` (28 §5): `done` once the animation ended or was skipped.
   const animated = window.win
     .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml(launch))}`)

@@ -149,7 +149,9 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 | Windows | NSIS x64，`oneClick: false`、可改安装目录、按用户安装 | 未签名：SmartScreen 提示「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」 |
 | Linux | AppImage 与 deb，各 x64、arm64（D160） | 未签名。配置里不写架构：`pnpm dist` 打本机架构，`pnpm dist --x64 --arm64` 两种都打（配置里写了架构会盖过命令行参数）。应用不打包原生模块，两种架构在任一台机器上都能打；CI 在各自架构的运行器上只打本机架构，与 Electron 冒烟同一架构。deb 包名与可执行文件名 `agent-workflow`，维护者字段取 `linux.maintainer`；electron-builder 的默认 deb 依赖已含 `libsecret-1-0`（凭据存储，§3.6） |
 
-- 图标：`build/icon.svg` 渲染出 `build/icon.png`（1024 px），Windows（转 ico）与 Linux 使用；macOS 仍用 `icon.icns`。
+- 图标（D190）：`build/icon.svg` 是唯一来源，渲染出 `build/icon.png`（1024 px，Windows 转 ico、Linux 用）与 `build/icon.icns`（16–1024 px 的 iconset 经 `iconutil` 打包）；侧栏品牌图标 `logo` 是同一图形的线稿。
+- 安装位置：deb 装到 `/opt/Agent Workflow/`（electron-builder 的 `/opt/<productName>`），`update-alternatives` 建 `/usr/bin/agent-workflow`，菜单项 `/usr/share/applications/agent-workflow.desktop`，图标装进 hicolor；AppImage 不安装。用户数据都在 `~/.config/Agent Workflow/`。
+- 桌面快捷方式（D191，`desktop-shortcut.ts`）：打包后的应用在 Linux 第一次启动时往桌面（`app.getPath('desktop')`，读 `user-dirs.dirs`，中文系统为 `~/桌面`）放 `agent-workflow.desktop`：deb 复制它的菜单项；AppImage 写一个启动 `$APPIMAGE` 当前位置的条目，图标复制到用户数据目录。文件可执行，再用 `gio set … metadata::trusted true` 让 GNOME 桌面图标直接可启动（没有 `gio` 时只记日志，需在图标右键「允许启动」）。用户数据目录里的标记文件 `desktop-shortcut` 记下已放过，删掉的快捷方式不再出现；没有桌面目录或两种都不是（其他安装方式）时不放、下次再试。没在 Linux 真机验证。
 - `pnpm dist` 构建当前平台的安装包（`electron-builder` 不带平台参数，按各平台的 `target` 配置），CI 在各自的 runner 上运行。
 - Linux 的已知限制（README 说明，**需要用户在真机确认**）：
   - Ubuntu 24.04 默认用 AppArmor 限制非特权用户命名空间，Chromium 沙箱无法启动 AppImage（报 `The SUID sandbox helper binary was found, but is not configured correctly`）。deb 安装会带上 SUID 的 `chrome-sandbox`，不受影响；AppImage 需要按 README 放行或使用 deb。不以 `--no-sandbox` 作为默认。
