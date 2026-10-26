@@ -459,6 +459,7 @@ export const submitPlanTool = defineMcpTool({
 | --- | --- | --- |
 | `read_attachment`（U-02 已实现） | plan / execute / review / breakdown（需求计划的资料附件，34 §8.1）；助手 MCP 另有一份（`AssistantToolName.ReadAttachment`） | `{ attachment_id, cursor = 0 }` → `{ attachment_id, name, text, total_chars, next_cursor }`，每页最多 `ATTACHMENT_READ_MAX_CHARS`，读完时 `next_cursor` 为 null。执行 MCP 的范围是当前尝试所属任务的附件（需求与各次「再改改」），助手的是当前对话；范围外 `ATTACHMENT_NOT_FOUND` |
 | `read_sheet` / `query_sheet`（OF-02 已实现） | 同 `read_attachment`；助手 MCP 另有一份（`AssistantToolName.ReadSheet` / `QuerySheet`） | 只用于 Excel 附件（其他附件 `VALIDATION_FAILED`），范围与 `read_attachment` 相同。`read_sheet`：`{ attachment_id, sheet, range?, include_formulas? }` → 区域里有内容的行，按行分页、`next_range` 接着读；`query_sheet`：`{ attachment_id, sheet, header_row?, columns?, where?, group_by?, aggregates?, order_by?, limit? }` → `{ columns, rows, total_rows }`。都在解析 worker 里执行，契约见 39 §6.2 |
+| `read_office_file`（OF-06 已实现） | plan / execute / review / research / breakdown | `{ path, sheet?, range?, cursor? }` → `{ path, format, text, total_chars, next_cursor, next_range }`：读会话工作目录（尝试的 `directory`）里的 Word / Excel 文件，路径检查同项目文件快照（越界、链接指到外面、`.git` 内为 `ATTACHMENT_SOURCE_INVALID`），不是 Word / Excel 为 `VALIDATION_FAILED`；契约见 39 §7.3 |
 | `get_task_context` 扩展（Q-02 已实现） | 既有 | 增加 `requirements`：当前版本的项（id、标题、预期、是否必需、核验方式），没有清单时为空数组；逐项状态不在这里。附件不在这里：首条消息已带附件节（30 §3.2） |
 | `submit_result` 扩展（Q-02 已实现） | execute | 可选 `requirement_results: [{ item_id, conclusion: pass / fail / unverified, note }]`；只接受核验节点的提交，项须属于当前版本且为 AI 核验项，否则 `REQUIREMENT_RESULTS_INVALID`；漏掉的项保持未核验 |
 

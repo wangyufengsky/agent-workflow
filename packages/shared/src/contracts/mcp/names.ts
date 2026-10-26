@@ -8,6 +8,7 @@ export const McpToolName = {
   ReadAttachment: 'read_attachment',
   ReadSheet: 'read_sheet',
   QuerySheet: 'query_sheet',
+  ReadOfficeFile: 'read_office_file',
   SubmitPlan: 'submit_plan',
   SubmitResult: 'submit_result',
   SubmitReview: 'submit_review',

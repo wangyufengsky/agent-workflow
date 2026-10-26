@@ -6,7 +6,15 @@ import {
   SHEET_OVERVIEW_TAIL_ROWS,
   type XlsxMeta,
 } from '@aw/shared';
-import { extentOf, type Workbook, type WorkbookCell, type WorkbookRow, type WorkbookSheet } from './office.workbook.ts';
+import type { SheetPage } from './office.sheets.ts';
+import {
+  extentOf,
+  type Workbook,
+  type WorkbookCell,
+  type WorkbookRow,
+  type WorkbookSheet,
+  type WorkbookValue,
+} from './office.workbook.ts';
 
 const cellText = (cell: WorkbookCell) =>
   (cell.v === null && cell.f !== undefined ? `=${cell.f}` : String(cell.v ?? ''))
@@ -97,4 +105,20 @@ export function workbookOverview(workbook: Workbook, meta: XlsxMeta): string {
   if (unread.length > 0) notes.push(`${unread.map(([n, what]) => `${n} 个${what}`).join('、')}没有读取`);
   if (notes.length > 0) sections.push(`${notes.join('；')}。`);
   return `${sections.join('\n\n')}\n`;
+}
+
+const valueText = (value: WorkbookValue) =>
+  String(value ?? '')
+    .replaceAll('|', '\\|')
+    .replace(/\r?\n/g, '<br>');
+
+/** A `read_sheet` page as the Markdown table the model reads elsewhere: row numbers down, column letters across. */
+export function pageText(page: SheetPage): string {
+  const lines = [`## 工作表「${page.sheet}」（${page.range ?? '空'}）`];
+  if (page.rows.length === 0) return lines.join('\n');
+  lines.push('', `| 行 | ${page.columns.join(' | ')} |`, `| --- | ${page.columns.map(() => '---').join(' | ')} |`);
+  for (const row of page.rows) {
+    lines.push(`| ${row.row}${row.hidden ? '（隐藏）' : ''} | ${row.values.map(valueText).join(' | ')} |`);
+  }
+  return lines.join('\n');
 }

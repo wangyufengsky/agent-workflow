@@ -493,6 +493,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     team: team.service,
     initiatives: initiatives.service,
     attachments: attachments.service,
+    office,
     browser: browser.service,
     filesDirOf: attempts.filesDirOf,
     log,

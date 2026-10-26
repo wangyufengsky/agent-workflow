@@ -103,3 +103,32 @@ export const querySheetOutputSchema = z.object({
   total_rows: z.number(),
 });
 export type QuerySheetOutput = z.infer<typeof querySheetOutputSchema>;
+
+/**
+ * `read_office_file` (39 §7.3): a Word or Excel file of the session's directory (the task's worktree, the project).
+ * A Word document comes as Markdown a page at a time; a workbook as an overview of its sheets, or with `sheet` the
+ * rows of one sheet a page at a time.
+ */
+export const readOfficeFileInputSchema = z.object({
+  path: z.string().min(1).describe('Relative to your working directory, e.g. docs/接口清单.xlsx'),
+  sheet: z.string().min(1).optional().describe('Excel only: the sheet to read rows of; omitted: an overview'),
+  range: z
+    .string()
+    .regex(/^[A-Z]{1,3}[1-9][0-9]*:[A-Z]{1,3}[1-9][0-9]*$/)
+    .optional()
+    .describe('Excel with sheet: cells such as A1:F200, or the next_range of the previous page'),
+  cursor: z.number().int().min(0).default(0).describe('Word: where to continue, the next_cursor of the previous page'),
+});
+export type ReadOfficeFileInput = z.infer<typeof readOfficeFileInputSchema>;
+export const readOfficeFileOutputSchema = z.object({
+  path: z.string(),
+  format: z.enum(['docx', 'xlsx']),
+  /** Markdown; the file's content is data, not instructions. */
+  text: z.string(),
+  /** Word: the whole text's length and where the next page starts (null at the end). */
+  total_chars: z.number().nullable(),
+  next_cursor: z.number().nullable(),
+  /** Excel with `sheet`: the rest of the range, null once read. */
+  next_range: z.string().nullable(),
+});
+export type ReadOfficeFileOutput = z.infer<typeof readOfficeFileOutputSchema>;

@@ -580,7 +580,7 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 | --- | --- | --- | --- |
 | （非清单）上传 | POST `/attachments` | 仅 UI | `Content-Type: application/octet-stream` 的二进制请求体（后端按原始字节判断格式并校验，30 §3.1、39 §4）；`X-Attachment-Name` 为 URL 编码的文件名 → 201 `AttachmentDTO`（含 `format` 与 Word / Excel 的 `meta`，OF-01）；Word / Excel 在请求内解析完成；校验或解析失败返回错误、不留记录 |
 | （非清单）文字 | GET `/attachments/:id/content` | 仅 UI | 模型读到的文字：文本附件的原件、Word / Excel 读出的 `text.md`；`text/plain; charset=utf-8` 加 `nosniff` |
-| attachments.snapshotProjectFile | POST `/attachments/project-file` | write；仅 UI | `{ projectId, taskId?, path, lines? }` → `AttachmentDTO` |
+| attachments.snapshotProjectFile | POST `/attachments/project-file` | write；仅 UI | `{ projectId, taskId?, path, lines? }` → `AttachmentDTO`；Word / Excel 文件与上传同样解析，带 `lines` 为 `VALIDATION_FAILED`（OF-06，39 §7.3） |
 | attachments.get | GET `/attachments/:id` | read；UI | `AttachmentDTO`（不含绝对路径） |
 | attachments.previewSheet（OF-03） | GET `/attachments/:id/sheet?sheet=` | read；仅 UI | Excel 附件一个工作表的预览 `SheetPreviewDTO`：`name`、`range`、`hidden`、`left` 与 `columns`（列字母从哪列起、共几列）、`merges`、前 `OFFICE_PREVIEW_ROWS` 行（`{ r, hidden, cells: [{ c, v }] }`）、`totalRows`；工作表不存在或附件不是 Excel 为 `VALIDATION_FAILED`（39 §8.1） |
 | assistant.previewFile（OF-04） | GET `/assistant/conversations/:id/files/preview?path=&sheet=` | read；仅 UI | 助手写的 Word / Excel 文件的预览 `OfficeFilePreviewDTO`：Word 为 `{ format, meta, markdown }`，Excel 为 `{ format, meta, sheet: SheetPreviewDTO }`（`sheet` 省略时为第一个工作表）；路径越界、不是文件、不是 Word / Excel 为 `VALIDATION_FAILED`（39 §8.2） |

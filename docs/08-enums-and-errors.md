@@ -642,7 +642,7 @@ class AppError extends Error {
 | OfficeLoss（OF-05 已实现） | charts · images · pivot_tables · headers_footers · comments · formula_references（从源文件写出的新文件没有保留的内容，39 §7.2） |
 | XlsxColumnType（OF-04 已实现） | text · number · date · percent · currency（`create_xlsx` 的列格式） |
 | InputRef 增量（U-03 已实现） | attachment（确认卡把附件 ID 显示为文件名） |
-| McpToolName 增量（U-02 已实现） | read_attachment；read_sheet · query_sheet（OF-02 已实现） |
+| McpToolName 增量（U-02 已实现） | read_attachment；read_sheet · query_sheet（OF-02 已实现）；read_office_file（OF-06 已实现） |
 | SheetQueryOp / SheetAggregate（OF-02 已实现） | eq · ne · gt · gte · lt · lte · contains · in · empty · not_empty / count · sum · avg · min · max（`query_sheet`，39 §6.2） |
 | NodeKind 增量（Q-02 已实现） | verify（核验验收清单的系统步骤） |
 | RequirementVerification（Q-01 已实现，下同） | command · ai_review · manual |

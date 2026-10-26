@@ -1,6 +1,6 @@
 # 39 · Word 与 Excel 文件
 
-> 状态：**设计已确认**（2026-10-26，D193–D201 均按推荐方案，§17），实施中：OF-01（解析与附件接入）、OF-02（Excel 概览与表格工具）、OF-03（附件条与预览）、OF-04（助手生成 Word / Excel 与文件卡片）、OF-05（修改 Excel、改写 Word 与丢失提示）已完成。
+> 状态：**设计已确认**（2026-10-26，D193–D201 均按推荐方案，§17），实施中：OF-01（解析与附件接入）、OF-02（Excel 概览与表格工具）、OF-03（附件条与预览）、OF-04（助手生成 Word / Excel 与文件卡片）、OF-05（修改 Excel、改写 Word 与丢失提示）、OF-06（仓库里的 Word / Excel）已完成。
 >
 > OF-01 的实测：Electron 44 的 utilityProcess 能从 `app.asar` 里加载解析 worker（`office-worker.js`），其 Node 24.22（ICU 78.2）能按 GB18030 解码。样本只有 LibreOffice、macOS 文本编辑（textutil）保存的文件和 msoffcrypto-tool 加密的文件：用脚本驱动 Microsoft Word 另存失败，WPS 只能手动操作，二者的样本待补。macOS 文本编辑保存的 Word 没有标题样式，表格也变成了段落，只能按段落读出。实施任务见 [05 的 OF 系列](05-dev-plan.md#后续--word-与-excel-文件of)。枚举、常量、表、接口、工具在实施时登记到 08–12，本文先写在 §11–§12。
 
@@ -188,7 +188,8 @@ OF-02 只读附件（`attachment_id`）；助手读回自己在对话目录里�
 
 ### 7.3 任务里（D199）
 
-- **首版只读**：规划、执行、评审、需求拆解能读任务附件（§6.2）；仓库里的 Office 文件用执行 MCP 新工具 `read_office_file { path, sheet?, range? }` 读，`path` 是会话目录（worktree 或项目仓库）内的相对路径，越界、符号链接指向根外按 `core/repo-files.ts` 拒绝；知识研究员同样可用。「项目文件…」快照也接受 `.docx` / `.xlsx`（同一解析）。
+- **首版只读**（OF-06 已实现）：规划、执行、评审、需求拆解能读任务附件（§6.2）；仓库里的 Office 文件用执行 MCP 新工具 `read_office_file { path, sheet?, range?, cursor? }` 读（规划、执行、评审、知识研究、需求拆解），`path` 是会话工作目录（尝试的 `directory`：任务的 worktree 或项目仓库）内的相对路径，越界、符号链接指向根外、`.git` 内按 `core/repo-files.ts` 拒绝（`ATTACHMENT_SOURCE_INVALID`，`reason: outside / missing`），不是 Word / Excel 为 `VALIDATION_FAILED`。返回 `{ path, format, text, total_chars, next_cursor, next_range }`：Word 为正文 Markdown 按 `cursor` 分页；Excel 不带 `sheet` 时为概览，带 `sheet` 时为该区域的行（同 `read_sheet` 的分页，渲染成行号列字母的表格），`next_range` 接着读。读取在 worker 里进行，检查与上限同附件。
+- 「项目文件…」快照也接受 `.docx` / `.xlsx`：与上传同样解析、保存派生文件，来源记项目与路径；不能选行范围（`VALIDATION_FAILED`）。
 - **首版不做**：任务在 worktree 里生成或修改 Office 文件。它会进节点提交，二进制 diff 在评审和 Git 工作台里无法审阅；需要表格产出时让执行者写 CSV。
 
 ## 8. 界面

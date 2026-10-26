@@ -12,6 +12,7 @@ import type { DecksService } from '../decks/index.ts';
 import type { CommitDrafts, GitReviewsService } from '../git-reviews/index.ts';
 import type { InitiativesService } from '../initiatives/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
+import type { Office } from '../office/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import type { TeamService } from '../team/index.ts';
 import { createToolRegistry, type McpToolDefinition } from './mcp.registry.ts';
@@ -22,6 +23,7 @@ import { dbDescribeTool, dbListConnectionsTool, dbQueryTool } from './tools/db-t
 import { getNodeOutputTool } from './tools/get-node-output.tool.ts';
 import { getTaskContextTool } from './tools/get-task-context.tool.ts';
 import { getTaskDiffTool } from './tools/get-task-diff.tool.ts';
+import { readOfficeFileTool } from './tools/office-file.tool.ts';
 import { reportProgressTool } from './tools/report-progress.tool.ts';
 import { submitAnswerTool } from './tools/submit-answer.tool.ts';
 import { submitBreakdownTool } from './tools/submit-breakdown.tool.ts';
@@ -49,6 +51,7 @@ export type McpModuleDeps = {
   team: TeamService;
   initiatives: InitiativesService;
   attachments: AttachmentsService;
+  office: Office;
   browser: BrowserService;
   /** Where an attempt's transcript and files live (29 §5.7). */
   filesDirOf: (attempt: { taskId: string | null; kind: AttemptKind }) => string;
@@ -68,6 +71,7 @@ export function createMcpModule({
   team,
   initiatives,
   attachments,
+  office,
   browser,
   filesDirOf,
   log,
@@ -77,6 +81,7 @@ export function createMcpModule({
     getNodeOutputTool(tasks),
     getTaskDiffTool(tasks),
     ...attachmentTools(tasks, initiatives, attachments),
+    readOfficeFileTool(office),
     submitPlanTool(tasks),
     submitResultTool(tasks, debug),
     submitReviewTool(acceptance),
