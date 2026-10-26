@@ -33,6 +33,13 @@ test('网站登录的标签页在 ⌘K 打开时离开窗口，关闭后回来',
         body: JSON.stringify({ repoPath: repo }),
       });
       if (!res.ok) throw new Error(`POST /projects failed: ${res.status}`);
+      // Website logins are a pro-mode setting (38 C5).
+      const mode = await fetch('/api/v1/settings', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${window.aw?.apiToken ?? ''}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 'ui.mode': 'pro' }),
+      });
+      if (!mode.ok) throw new Error(`PATCH /settings failed: ${mode.status}`);
     }, repoPath);
     await page.goto(new URL('/settings', page.url()).href);
 
