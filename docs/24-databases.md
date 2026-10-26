@@ -58,7 +58,7 @@
 | 表注释 | `TABLE_COMMENT` | `obj_description` | 扩展属性 `MS_Description` |
 | 行数估计 | `TABLE_ROWS` | `reltuples`（从未 ANALYZE 的表为 -1，不返回；视图不返回） | `sys.partitions` 的行数之和（堆或聚集索引；视图不返回） |
 | 列 | `information_schema.COLUMNS` | `pg_attribute` + `format_type` + `pg_get_expr`（默认值）+ `col_description` | `INFORMATION_SCHEMA.COLUMNS` + `MS_Description`；类型由 `DATA_TYPE` 与长度 / 精度拼成，如 `nvarchar(64)`、`varbinary(max)`、`decimal(10,2)` |
-| `key` | `PRI` / `UNI` / `MUL`（`COLUMN_KEY`） | 只有 `PRI`（主键的键列：`indkey` 的前 `indnkeyatts` 个，`INCLUDE` 列不算） | 只有 `PRI` |
+| `key` | `PRI` / `UNI` / `MUL`（`COLUMN_KEY`） | 只有 `PRI`（主键约束 `pg_constraint.conkey` 里的键列，`INCLUDE` 列不算；不用数组切片 `[0 : n]`，GaussDB 507 把它当语法错误） | 只有 `PRI` |
 | 索引 | `information_schema.STATISTICS` | `pg_index` + `pg_get_indexdef(oid, n)` 逐列，只列前 `indnkeyatts` 个键列、不含 `INCLUDE` 列（表达式索引显示表达式；openGauss 只有 ustore 表的 ubtree 索引支持 `INCLUDE`）；用选择列表里的 `generate_series` 展开，不用 `LATERAL`（openGauss 基于 PostgreSQL 9.2） | `sys.indexes` + `sys.index_columns`（不含 `INCLUDE` 列；堆没有名称，不列） |
 
 主键索引名各不相同：MySQL `PRIMARY`、PostgreSQL `<表>_pkey`、SQL Server 未命名时 `PK__<表>__<哈希>`。
@@ -169,7 +169,7 @@ MySQL 为必需（`pnpm verify`，与原来相同）。另外三个镜像没有�
 ## 8. 不做与已知限制
 
 - GoldenDB 没有在真实环境验证：DBProxy 若不支持 `SET SESSION MAX_EXECUTION_TIME` 或只读事务，查询会失败（`DB_QUERY_FAILED`，带驱动信息），届时为 GoldenDB 单独写一个 mysql2 驱动变体。
-- GaussDB（华为云的集中式与分布式版本）没有验证，只验证了 openGauss 7；两者的认证与系统表相同。
+- GaussDB（华为云的集中式与分布式版本）没有在测试里验证，只验证了 openGauss 7；两者的认证与系统表相同，但 SQL 语法有差别：2026-10-26 内网 GaussDB Kernel 507 实测数组切片 `[0 : n]` 报语法错误，openGauss 7 接受。
 - 只浏览默认 schema（D99）。
 - SQL Server：只支持 SQL Server 账号；`DECIMAL` 为数字（§5）；只读依赖拒绝表与回滚（§4.3）。
 - 不做写操作（D07 不变）。
