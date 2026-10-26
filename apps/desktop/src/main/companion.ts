@@ -29,6 +29,12 @@ import {
   type WebPreferences,
 } from 'electron';
 import { placeCompanion } from './companion-geometry.ts';
+import { companionMouse } from './companion-mouse.ts';
+
+const takeMouse = (window: BrowserWindow, interactive: boolean) => {
+  const { ignore, forward } = companionMouse(process.platform, interactive);
+  window.setIgnoreMouseEvents(ignore, { forward });
+};
 
 /** 一个宿主窗口管理角色窗口；关闭主界面时仍保持已认证的后端连接。 */
 export function createCompanionHost(
@@ -118,7 +124,7 @@ export function createCompanionHost(
     const window = pet;
     // 不把整个应用转换为 UIElementApplication；主窗口与 Dock 应保持可见。
     window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    window.setIgnoreMouseEvents(true, { forward: true });
+    takeMouse(window, false);
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', (event, target) => {
       if (target === new URL(COMPANION_PATH, baseUrl).href) return;
@@ -206,8 +212,7 @@ export function createCompanionHost(
   });
   ipcMain.on('aw:companion-interactive', (event, raw: unknown) => {
     if (event.sender !== pet?.webContents) return;
-    const interactive = companionInteractiveSchema.parse(raw);
-    pet.setIgnoreMouseEvents(!interactive, { forward: true });
+    takeMouse(pet, companionInteractiveSchema.parse(raw));
   });
   ipcMain.on('aw:companion-drag-start', (event, raw: unknown) => {
     if (event.sender !== pet?.webContents || anchor === undefined) return;
