@@ -19,7 +19,10 @@ const C = ONBOARDING_COPY.credentials;
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const info = error instanceof ApiError ? error : errorInfoSchema.safeParse(error).data;
   const message = info === undefined ? COMMON_COPY.backendUnreachable : ERROR_COPY[info.code];
-  const detail = error instanceof Error ? error.message : (info?.message ?? String(error));
+  const summary = error instanceof Error ? error.message : (info?.message ?? String(error));
+  // The driver's own words (a database's error) are the cause the English message only names (08 DB_*).
+  const driverMessage = info?.details?.driverMessage;
+  const detail = typeof driverMessage === 'string' ? `${summary}\n${driverMessage}` : summary;
   return (
     <div className="banner danger" role="alert">
       <Icon name="alert" />

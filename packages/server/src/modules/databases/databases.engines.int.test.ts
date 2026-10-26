@@ -270,7 +270,7 @@ for (const engine of ENGINES) {
       });
     });
 
-    // Regression: the key columns of an index are the first indnkeyatts of indkey; INCLUDE columns follow them.
+    // Regression: INCLUDE columns follow the key columns in indkey but are not part of the primary key.
     it.runIf(engine.includedColumnTable !== undefined)('主键的 INCLUDE 列不标为主键', async () => {
       await server.exec(engine.includedColumnTable ?? '');
       try {

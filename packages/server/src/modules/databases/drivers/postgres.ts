@@ -146,16 +146,15 @@ function createPostgresDriver({ Client, Cursor }: PostgresLibrary): DbDriver {
 
     columns: (target, table) =>
       withClient(target, async (client) => {
-        // A primary key's columns are the first indnkeyatts of indkey (INCLUDE columns follow). The slice is spaced:
-        // openGauss reads `:name` as a bind placeholder.
+        // conkey of the primary key constraint holds only its key columns, not INCLUDE ones. No array slice: GaussDB
+        // rejects `[0 : n]` as a syntax error.
         const rows = z.array(columnRowSchema).parse(
           await run(
             client,
             `SELECT c.relname AS "tableName", a.attname AS name, format_type(a.atttypid, a.atttypmod) AS type,
                 NOT a.attnotnull AS nullable,
-                EXISTS (SELECT 1 FROM pg_catalog.pg_index i
-                         WHERE i.indrelid = c.oid AND i.indisprimary
-                           AND a.attnum = ANY ((i.indkey::int2[])[0 : i.indnkeyatts - 1])) AS "isPrimary",
+                EXISTS (SELECT 1 FROM pg_catalog.pg_constraint k
+                         WHERE k.conrelid = c.oid AND k.contype = 'p' AND a.attnum = ANY (k.conkey)) AS "isPrimary",
                 pg_get_expr(d.adbin, d.adrelid) AS "defaultValue", col_description(c.oid, a.attnum) AS comment
                FROM pg_catalog.pg_attribute a
                JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
