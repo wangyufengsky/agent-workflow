@@ -8,7 +8,6 @@ import {
   type ErrorInfo,
   InboxKind,
   MCP_TOOL_PREFIX,
-  McpToolName,
   NodeStatus,
   resolveTaskDisplayGroup,
   ServerEventType,
@@ -186,10 +185,7 @@ export function createTaskState(deps: TasksServiceDeps) {
 
   /** The requirement as the task's AI sessions read it: followed by the attached files (30 §3.2). */
   function promptRequirement(task: Task): string {
-    const section = deps.attachments.promptSection(
-      attachmentsOf(task),
-      `${MCP_TOOL_PREFIX}${McpToolName.ReadAttachment}`,
-    );
+    const section = deps.attachments.promptSection(attachmentsOf(task), MCP_TOOL_PREFIX);
     return section === '' ? task.requirement : `${task.requirement}\n\n${section}`;
   }
 

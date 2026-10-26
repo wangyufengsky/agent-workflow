@@ -4,6 +4,7 @@ import { registerMcpEndpoint } from '../../core/http/mcp-endpoint.ts';
 import type { Logger } from '../../core/logger.ts';
 import { implement } from '../../core/operations/operations.ts';
 import type { AcceptanceService } from '../acceptance/index.ts';
+import type { AttachmentsService } from '../attachments/index.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DebugService } from '../debug/index.ts';
@@ -15,12 +16,12 @@ import type { TasksService } from '../tasks/index.ts';
 import type { TeamService } from '../team/index.ts';
 import { createToolRegistry, type McpToolDefinition } from './mcp.registry.ts';
 import { askUserTool } from './tools/ask-user.tool.ts';
+import { attachmentTools } from './tools/attachment.tool.ts';
 import { browserTools } from './tools/browser.tool.ts';
 import { dbDescribeTool, dbListConnectionsTool, dbQueryTool } from './tools/db-tools.tool.ts';
 import { getNodeOutputTool } from './tools/get-node-output.tool.ts';
 import { getTaskContextTool } from './tools/get-task-context.tool.ts';
 import { getTaskDiffTool } from './tools/get-task-diff.tool.ts';
-import { readAttachmentTool } from './tools/read-attachment.tool.ts';
 import { reportProgressTool } from './tools/report-progress.tool.ts';
 import { submitAnswerTool } from './tools/submit-answer.tool.ts';
 import { submitBreakdownTool } from './tools/submit-breakdown.tool.ts';
@@ -47,6 +48,7 @@ export type McpModuleDeps = {
   commitDrafts: CommitDrafts;
   team: TeamService;
   initiatives: InitiativesService;
+  attachments: AttachmentsService;
   browser: BrowserService;
   /** Where an attempt's transcript and files live (29 §5.7). */
   filesDirOf: (attempt: { taskId: string | null; kind: AttemptKind }) => string;
@@ -65,6 +67,7 @@ export function createMcpModule({
   commitDrafts,
   team,
   initiatives,
+  attachments,
   browser,
   filesDirOf,
   log,
@@ -73,7 +76,7 @@ export function createMcpModule({
     getTaskContextTool(tasks, debug),
     getNodeOutputTool(tasks),
     getTaskDiffTool(tasks),
-    readAttachmentTool(tasks, initiatives),
+    ...attachmentTools(tasks, initiatives, attachments),
     submitPlanTool(tasks),
     submitResultTool(tasks, debug),
     submitReviewTool(acceptance),

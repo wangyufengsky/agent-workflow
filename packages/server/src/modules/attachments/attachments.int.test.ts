@@ -122,6 +122,7 @@ describe('Word 与 Excel（39）', () => {
     expect(await contentOf(attachment.id)).toContain('## 工作表「汇总」');
     expect((await readdir(join(t.dataDir, ATTACHMENTS_DIR, attachment.id))).sort()).toEqual([
       'original',
+      'overview.md',
       'text.md',
       'workbook.json',
     ]);

@@ -19,9 +19,14 @@ import {
   AttachmentRejection,
   AttachmentSource,
   ErrorCode,
+  McpToolName,
   OFFICE_ATTACHMENT_BYTES_MAX,
   type OfficeMeta,
+  type QuerySheetInput,
+  type QuerySheetOutput,
   type ReadAttachmentOutput,
+  type ReadSheetInput,
+  type ReadSheetOutput,
   type SnapshotProjectFileRequest,
   WorktreeStatus,
 } from '@aw/shared';
@@ -30,7 +35,14 @@ import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { Logger } from '../../core/logger.ts';
 import { linesOf, locateRepoFile } from '../../core/repo-files.ts';
-import { detectFormat, OFFICE_TEXT_FILE, type Office, type OfficeFormat } from '../office/index.ts';
+import {
+  detectFormat,
+  OFFICE_TEXT_FILE,
+  type Office,
+  type OfficeFormat,
+  OVERVIEW_FILE,
+  WORKBOOK_FILE,
+} from '../office/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { WorktreesService } from '../worktrees/index.ts';
 import { createAttachmentsRepo, type Owner } from './attachments.repo.ts';
@@ -153,12 +165,31 @@ export function createAttachmentsService({
     return attachment;
   }
 
-  /** One attachment as the prompt shows it: whole, or its first `budget` characters and where to continue. */
+  /**
+   * One attachment as the prompt shows it: whole, or its first `budget` characters and where to continue. An Excel
+   * workbook shows its overview instead (39 §6.1), cut at a line when it must be; the sheet tools read the rest.
+   */
   function promptItem(attachment: AttachmentDTO, text: string, budget: number): string {
     const path = attachment.origin === null ? '' : ` path="${attr(attachment.origin.path)}"`;
     const head = `<attachment attachment_id="${attachment.id}" name="${attr(attachment.name)}" source="${attachment.source}"${path}`;
-    if (text.length <= budget) return `${head}>\n${text}\n</attachment>`;
-    return `${head} shown="first ${budget} of ${text.length} characters" cursor="${budget}">\n${text.slice(0, budget)}\n</attachment>`;
+    if (attachment.meta?.format === AttachmentFormat.Xlsx) {
+      const sheets = ` format="xlsx" sheets="${attachment.meta.sheets.length}"`;
+      const shown = text.length <= budget ? text : `${text.slice(0, text.lastIndexOf('\n', budget))}\n…`;
+      return `${head}${sheets}>\n${shown}\n</attachment>`;
+    }
+    const format = attachment.format === AttachmentFormat.Text ? '' : ` format="${attachment.format}"`;
+    if (text.length <= budget) return `${head}${format}>\n${text}\n</attachment>`;
+    return `${head}${format} shown="first ${budget} of ${text.length} characters" cursor="${budget}">\n${text.slice(0, budget)}\n</attachment>`;
+  }
+
+  /** The parsed cells of an Excel attachment, for the sheet tools (39 §6.2). */
+  function workbookOf(id: string): string {
+    const attachment = require(id);
+    if (attachment.format !== AttachmentFormat.Xlsx) {
+      const message = `${attachment.name} is not an Excel workbook; read it with read_attachment`;
+      throw new AppError(ErrorCode.ValidationFailed, message, { issues: [{ path: ['attachment_id'], message }] });
+    }
+    return join(dirOf(id), WORKBOOK_FILE);
   }
 
   /** The worktree of `taskId` when given, else the project's main working tree (30 §2.1). */
@@ -358,19 +389,41 @@ export function createAttachmentsService({
 
     /**
      * The prompt section for these attachments (30 §3.2), empty without any. All text goes in while the total fits
-     * `ATTACHMENT_PROMPT_MAX_CHARS`; otherwise each gets an equal share and the model reads the rest with `readTool`.
+     * `ATTACHMENT_PROMPT_MAX_CHARS`; otherwise each gets an equal share and the model reads the rest with the tools,
+     * named with `toolPrefix` (the execution or the assistant MCP's).
      */
-    promptSection(attachments: readonly AttachmentDTO[], readTool: string): string {
+    promptSection(attachments: readonly AttachmentDTO[], toolPrefix: string): string {
       if (attachments.length === 0) return '';
-      const withText = attachments.map((attachment) => ({ attachment, text: textOf(attachment) }));
+      const withText = attachments.map((attachment) => ({
+        attachment,
+        text:
+          attachment.format === AttachmentFormat.Xlsx
+            ? readFileSync(join(dirOf(attachment.id), OVERVIEW_FILE), 'utf8')
+            : textOf(attachment),
+      }));
       const total = withText.reduce((sum, { text }) => sum + text.length, 0);
       const budget =
         total <= ATTACHMENT_PROMPT_MAX_CHARS
           ? Number.POSITIVE_INFINITY
           : Math.floor(ATTACHMENT_PROMPT_MAX_CHARS / attachments.length);
       const items = withText.map(({ attachment, text }) => promptItem(attachment, text, budget)).join('\n\n');
-      return renderTemplate(prompts[PromptName.Attachments], { readTool, items });
+      const tool = (name: string) => `\`${toolPrefix}${name}\``;
+      const sheets = attachments.some((a) => a.format === AttachmentFormat.Xlsx)
+        ? `An Excel workbook (\`format="xlsx"\`) is shown as an overview: each sheet's range and size and its first and last rows, under column letters with row numbers on the left. Read more rows with ${tool(McpToolName.ReadSheet)}, and filter, group, total or sort the rows with ${tool(McpToolName.QuerySheet)} instead of reading them all; name cells like \`C17\`.\n\n`
+        : '';
+      return renderTemplate(prompts[PromptName.Attachments], {
+        readTool: `${toolPrefix}${McpToolName.ReadAttachment}`,
+        sheets,
+        items,
+      });
     },
+
+    /** A page of an Excel attachment's sheet; the caller has checked the attachment is visible to its reader. */
+    readSheet: ({ attachment_id, ...request }: ReadSheetInput): Promise<ReadSheetOutput> =>
+      office.readSheet(workbookOf(attachment_id), request).then((page) => ({ attachment_id, ...page })),
+    /** A query over an Excel attachment's sheet; the caller has checked the attachment is visible to its reader. */
+    querySheet: ({ attachment_id, ...query }: QuerySheetInput): Promise<QuerySheetOutput> =>
+      office.querySheet(workbookOf(attachment_id), query).then((result) => ({ attachment_id, ...result })),
 
     /** One page of an attachment's text; the caller has checked the attachment is visible to its reader. */
     read(id: string, cursor: number): ReadAttachmentOutput {

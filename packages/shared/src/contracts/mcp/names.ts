@@ -6,6 +6,8 @@ export const McpToolName = {
   GetNodeOutput: 'get_node_output',
   GetTaskDiff: 'get_task_diff',
   ReadAttachment: 'read_attachment',
+  ReadSheet: 'read_sheet',
+  QuerySheet: 'query_sheet',
   SubmitPlan: 'submit_plan',
   SubmitResult: 'submit_result',
   SubmitReview: 'submit_review',

@@ -1,38 +1,16 @@
-import {
-  AppError,
-  AttachmentFormat,
-  AttachmentLimit,
-  ErrorCode,
-  OFFICE_CELLS_MAX,
-  type OfficeMeta,
-  SHEET_GRID_MAX_COLUMNS,
-} from '@aw/shared';
+import { AppError, AttachmentFormat, AttachmentLimit, ErrorCode, OFFICE_CELLS_MAX, type OfficeMeta } from '@aw/shared';
 import ExcelJS from 'exceljs';
+import { workbookOverview, workbookText } from './office.sheet-text.ts';
+import {
+  columnName,
+  extentOf,
+  type Workbook,
+  type WorkbookCell,
+  type WorkbookRow,
+  type WorkbookSheet,
+  type WorkbookValue,
+} from './office.workbook.ts';
 import type { ZipEntry } from './office.zip.ts';
-
-/** A cell as the model reads it: dates are ISO 8601, errors their text (`#DIV/0!`), rich text plain. */
-export type WorkbookValue = string | number | boolean | null;
-/** `c` is the 1-based column; `f` the formula, whose value is what the file cached (null when it cached none). */
-export type WorkbookCell = { c: number; v: WorkbookValue; f?: string };
-export type WorkbookRow = { r: number; hidden: boolean; cells: WorkbookCell[] };
-export type WorkbookSheet = {
-  name: string;
-  hidden: boolean;
-  /** The cells with content, e.g. `A1:F1204`; null for an empty sheet. */
-  range: string | null;
-  merges: string[];
-  hiddenColumns: number[];
-  rows: WorkbookRow[];
-};
-/** `workbook.json` of an Excel attachment (39 §5): what previews and the sheet tools read. */
-export type Workbook = { sheets: WorkbookSheet[] };
-
-/** `1` → `A`, `27` → `AA`. */
-export function columnName(column: number): string {
-  let name = '';
-  for (let n = column; n > 0; n = Math.floor((n - 1) / 26)) name = String.fromCharCode(65 + ((n - 1) % 26)) + name;
-  return name;
-}
 
 function isoDate(date: Date): string {
   const iso = date.toISOString();
@@ -57,13 +35,7 @@ const tooManyCells = () =>
     limit: OFFICE_CELLS_MAX,
   });
 
-/** Where a sheet's cells are: its first column, and how many rows and columns the range spans. */
-type Extent = { left: number; rows: number; columns: number };
-
-function readSheet(
-  sheet: ExcelJS.Worksheet,
-  counted: { cells: number; formulas: number },
-): { sheet: WorkbookSheet; extent: Extent } {
+function readSheet(sheet: ExcelJS.Worksheet, counted: { cells: number; formulas: number }): WorkbookSheet {
   const rows: WorkbookRow[] = [];
   let [top, left, bottom, right] = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, 0, 0];
   sheet.eachRow({ includeEmpty: false }, (row, r) => {
@@ -82,85 +54,41 @@ function readSheet(
   });
   const hiddenColumns: number[] = [];
   for (let c = 1; c <= sheet.columnCount; c++) if (sheet.getColumn(c).hidden) hiddenColumns.push(c);
-  const empty = rows.length === 0;
   return {
-    sheet: {
-      name: sheet.name,
-      hidden: sheet.state !== 'visible',
-      range: empty ? null : `${columnName(left)}${top}:${columnName(right)}${bottom}`,
-      merges: sheet.model.merges,
-      hiddenColumns,
-      rows,
-    },
-    extent: empty ? { left: 1, rows: 0, columns: 0 } : { left, rows: bottom - top + 1, columns: right - left + 1 },
+    name: sheet.name,
+    hidden: sheet.state !== 'visible',
+    range: rows.length === 0 ? null : `${columnName(left)}${top}:${columnName(right)}${bottom}`,
+    merges: sheet.model.merges,
+    hiddenColumns,
+    rows,
   };
-}
-
-const cellText = (cell: WorkbookCell) =>
-  (cell.v === null && cell.f !== undefined ? `=${cell.f}` : String(cell.v ?? ''))
-    .replaceAll('|', '\\|')
-    .replace(/\r?\n/g, '<br>');
-
-/**
- * One section per sheet (39 §5.3): a Markdown table whose first column is the row number and whose header is the
- * column letters, so the model can name cells as `C17`. A sheet wider than `SHEET_GRID_MAX_COLUMNS` lists each row's
- * cells by address instead, so its text stays proportional to its cells.
- */
-function sheetText(sheet: WorkbookSheet, { left, rows, columns }: Extent): string {
-  const notes = [sheet.range === null ? '空' : `${sheet.range}，${rows} 行 × ${columns} 列`];
-  if (sheet.hidden) notes.push('隐藏的工作表');
-  const lines = [`## 工作表「${sheet.name}」（${notes.join('，')}）`];
-  if (sheet.merges.length > 0) lines.push(`合并单元格：${sheet.merges.join('、')}`);
-  if (sheet.hiddenColumns.length > 0) lines.push(`隐藏的列：${sheet.hiddenColumns.map(columnName).join('、')}`);
-  if (sheet.range === null) return lines.join('\n');
-  const label = (row: WorkbookRow) => `${row.r}${row.hidden ? '（隐藏）' : ''}`;
-  if (columns > SHEET_GRID_MAX_COLUMNS) {
-    lines.push('', `列太多，逐个列出有内容的单元格：`);
-    for (const row of sheet.rows) {
-      lines.push(
-        `- ${label(row)}：${row.cells.map((cell) => `${columnName(cell.c)}${row.r} = ${cellText(cell)}`).join('；')}`,
-      );
-    }
-    return lines.join('\n');
-  }
-  const letters = Array.from({ length: columns }, (_, i) => columnName(left + i));
-  lines.push('', `| 行 | ${letters.join(' | ')} |`, `| --- | ${letters.map(() => '---').join(' | ')} |`);
-  for (const row of sheet.rows) {
-    const cells = Array<string>(columns).fill('');
-    for (const cell of row.cells) cells[cell.c - left] = cellText(cell);
-    lines.push(`| ${label(row)} | ${cells.join(' | ')} |`);
-  }
-  return lines.join('\n');
 }
 
 const countOf = (entries: readonly ZipEntry[], pattern: RegExp) => entries.filter((e) => pattern.test(e.name)).length;
 
-/** An Excel workbook's cells and its text for the model (39 §5.3); formulas are not recalculated. */
+/**
+ * An Excel workbook's cells, its full text and the prompt's overview of it (39 §5.3, §6.1); formulas are not
+ * recalculated.
+ */
 export async function readXlsx(
   bytes: Buffer,
   entries: readonly ZipEntry[],
-): Promise<{ text: string; workbook: Workbook; meta: OfficeMeta }> {
+): Promise<{ text: string; overview: string; workbook: Workbook; meta: OfficeMeta }> {
   const book = new ExcelJS.Workbook();
   // exceljs declares its own Buffer type, which Node's Buffer satisfies at runtime.
   await book.xlsx.load(bytes as unknown as ExcelJS.Buffer);
   const counted = { cells: 0, formulas: 0 };
-  const read = book.worksheets.map((sheet) => readSheet(sheet, counted));
-  return {
-    text: `${read.map(({ sheet, extent }) => sheetText(sheet, extent)).join('\n\n')}\n`,
-    workbook: { sheets: read.map(({ sheet }) => sheet) },
-    meta: {
-      format: AttachmentFormat.Xlsx,
-      sheets: read.map(({ sheet, extent }) => ({
-        name: sheet.name,
-        range: sheet.range,
-        rows: extent.rows,
-        columns: extent.columns,
-        hidden: sheet.hidden,
-      })),
-      formulas: counted.formulas,
-      charts: countOf(entries, /^xl\/charts\/chart\d*\.xml$/),
-      images: countOf(entries, /^xl\/media\//),
-      pivotTables: countOf(entries, /^xl\/pivotTables\/[^/]+\.xml$/),
-    },
+  const workbook: Workbook = { sheets: book.worksheets.map((sheet) => readSheet(sheet, counted)) };
+  const meta: OfficeMeta = {
+    format: AttachmentFormat.Xlsx,
+    sheets: workbook.sheets.map((sheet) => {
+      const { rows, columns } = extentOf(sheet);
+      return { name: sheet.name, range: sheet.range, rows, columns, hidden: sheet.hidden };
+    }),
+    formulas: counted.formulas,
+    charts: countOf(entries, /^xl\/charts\/chart\d*\.xml$/),
+    images: countOf(entries, /^xl\/media\//),
+    pivotTables: countOf(entries, /^xl\/pivotTables\/[^/]+\.xml$/),
   };
+  return { text: workbookText(workbook), overview: workbookOverview(workbook, meta), workbook, meta };
 }

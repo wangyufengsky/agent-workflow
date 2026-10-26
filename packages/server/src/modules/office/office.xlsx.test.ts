@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
-import { columnName, readXlsx } from './office.xlsx.ts';
+import { columnName } from './office.workbook.ts';
+import { readXlsx } from './office.xlsx.ts';
 import { zipEntries } from './office.zip.ts';
 
 /** A workbook as a program (not Excel) writes it: formulas without cached results. */
@@ -80,5 +81,21 @@ describe('Excel 读成工作簿与文字', () => {
     expect(text).toContain('## 工作表「稀疏」（A1:XFD1000，1000 行 × 16384 列）');
     expect(text).toContain('- 1：A1 = 1；XFD1 = 备注\n- 2：A2 = 2\n');
     expect(text.length).toBeLessThan(20_000);
+  });
+
+  it('提示词里的概览：每个工作表只放前 10 行与最后 2 行，中间写省略了几行；说明公式与没读的图表', async () => {
+    const bytes = await written((book) => {
+      const sheet = book.addWorksheet('明细');
+      sheet.addRow(['序号', '金额']);
+      for (let i = 1; i <= 20; i++) sheet.addRow([i, { formula: `A${i + 1}*10`, result: i * 10 }]);
+    });
+    const { overview } = await readXlsx(bytes, [
+      ...zipEntries(bytes),
+      { name: 'xl/charts/chart1.xml', method: 8, compressedSize: 0, size: 0, localOffset: 0 },
+    ]);
+    expect(overview).toContain('## 工作表「明细」（A1:B21，21 行 × 2 列；下面是前 10 行与最后 2 行）');
+    expect(overview).toContain('| 10 | 9 | 90 |\n| … | 省略 9 行 | |\n| 20 | 19 | 190 |');
+    expect(overview).not.toContain('| 11 |');
+    expect(overview).toContain('有 20 个公式，显示的是文件里保存的结果；1 个图表没有读取。');
   });
 });

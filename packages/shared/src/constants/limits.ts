@@ -215,6 +215,14 @@ export const OFFICE_WORKER_HEAP_MB = 1024;
  * with its cells, not with rows × columns: one value in XFD1 must not pad every row to 16,384 columns.
  */
 export const SHEET_GRID_MAX_COLUMNS = 50;
+/**
+ * What the model gets of an Excel attachment (39 §6): the prompt's overview and `query_sheet` rows; a `read_sheet` page
+ * is up to `ATTACHMENT_READ_MAX_CHARS`.
+ */
+export const SHEET_OVERVIEW_HEAD_ROWS = 10;
+export const SHEET_OVERVIEW_TAIL_ROWS = 2;
+export const SHEET_OVERVIEW_SHEETS = 20;
+export const SHEET_QUERY_MAX_ROWS = 500;
 /** A task's acceptance checklist (31): items per version, and the lengths of an item's texts and of a note. */
 export const REQUIREMENTS_MAX = 30;
 export const REQUIREMENT_TITLE_MAX_CHARS = 120;

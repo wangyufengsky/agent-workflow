@@ -491,6 +491,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     commitDrafts: gitReviews.drafts,
     team: team.service,
     initiatives: initiatives.service,
+    attachments: attachments.service,
     browser: browser.service,
     filesDirOf: attempts.filesDirOf,
     log,
