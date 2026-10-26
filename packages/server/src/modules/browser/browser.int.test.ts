@@ -42,6 +42,16 @@ const PAGES: Record<string, string> = {
     page(`<button type="button" onclick="out.textContent = confirm('确定删除？') ? 'deleted' : 'kept'">Delete</button>
     <p id="out"></p>`),
   '/popup': page(`<button type="button" onclick="window.open('/orders')">Open</button>`),
+  // Leaves the moment the click's settle starts watching its DOM: the navigation starts after that check reached this
+  // document, on every run (a page navigating itself shortly after an action, made deterministic).
+  '/leave': page(`<button type="button" onclick="leaveWhenWatched()">Save</button><script>
+    function leaveWhenWatched() {
+      const observe = MutationObserver.prototype.observe;
+      MutationObserver.prototype.observe = function (...args) {
+        observe.apply(this, args);
+        location.href = '/orders';
+      };
+    }</script>`),
   '/write': page(`<button type="button" onclick="fetch('/api/write', { method: 'POST' })">Save</button>`),
   '/search': page(`<button type="button" onclick="fetch('/api/search', { method: 'POST', body: 'q=T-1' })
       .then(() => fetch('/api/write', { method: 'POST' }))">Search</button>`),
@@ -196,6 +206,13 @@ describe('浏览器：动作层', () => {
     const popup = await browser.open(owner, `${origin}/popup`);
     const opened = await browser.click(owner, refOf(popup.page, 'button "Open"'));
     expect(opened).toMatchObject({ navigated: true, url: `${origin}/orders` });
+  });
+
+  it('等页面稳定时动作引起的导航才提交：等新页面稳定，结果是新页面', async () => {
+    const { browser, owner } = await browserFor();
+    const opened = await browser.open(owner, `${origin}/leave`);
+    const saved = await browser.click(owner, refOf(opened.page, 'button "Save"'));
+    expect(saved).toMatchObject({ navigated: true, settled: true, url: `${origin}/orders`, title: '退款单' });
   });
 
   it('页面导航后旧编号作废：BROWSER_REF_STALE', async () => {
