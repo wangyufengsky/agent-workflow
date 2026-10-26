@@ -240,9 +240,11 @@ export function sheetPreview(workbook: Workbook, name: string, maxRows: number):
     left,
     columns,
     merges: sheet.merges,
-    rows: sheet.rows
-      .slice(0, maxRows)
-      .map(({ r, hidden, cells }) => ({ r, hidden, cells: cells.map(({ c, v }) => ({ c, v })) })),
+    rows: sheet.rows.slice(0, maxRows).map(({ r, hidden, cells }) => ({
+      r,
+      hidden,
+      cells: cells.map(({ c, v, f }) => (v === null && f !== undefined ? { c, v, f } : { c, v })),
+    })),
     totalRows: sheet.rows.length,
   };
 }

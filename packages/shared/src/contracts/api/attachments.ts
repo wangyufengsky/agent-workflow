@@ -99,7 +99,14 @@ export const sheetPreviewSchema = z.object({
     z.object({
       r: z.number(),
       hidden: z.boolean(),
-      cells: z.array(z.object({ c: z.number(), v: z.union([z.string(), z.number(), z.boolean(), z.null()]) })),
+      cells: z.array(
+        z.object({
+          c: z.number(),
+          v: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+          /** Only a formula whose result the file did not save: the preview shows it as `=…`, as the AI reads it. */
+          f: z.string().optional(),
+        }),
+      ),
     }),
   ),
   /** Rows with content in the whole sheet. */

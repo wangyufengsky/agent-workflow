@@ -1,6 +1,6 @@
 import { ATTACHMENT_READ_MAX_CHARS, ErrorCode, type QuerySheetInput } from '@aw/shared';
 import { describe, expect, it } from 'vitest';
-import { querySheet, readSheetPage, type SheetQuery } from './office.sheets.ts';
+import { querySheet, readSheetPage, type SheetQuery, sheetPreview } from './office.sheets.ts';
 import type { Workbook, WorkbookRow } from './office.workbook.ts';
 
 const row = (r: number, ...values: Array<string | number | null>): WorkbookRow => ({
@@ -213,5 +213,55 @@ describe('query_sheet', () => {
     ]);
     // Far below the worker's time limit; quadratic grouping took over 30 s for 30,000 rows.
     expect(performance.now() - started).toBeLessThan(5_000);
+  });
+});
+
+describe('预览', () => {
+  it('前几行原样给出；文件没存结果的公式带上公式，有结果的只给值', () => {
+    const workbook: Workbook = {
+      sheets: [
+        {
+          name: 'S',
+          hidden: false,
+          range: 'A1:B3',
+          merges: [],
+          hiddenColumns: [],
+          rows: [
+            row(1, '金额', '合计'),
+            {
+              r: 2,
+              hidden: false,
+              cells: [
+                { c: 1, v: 1 },
+                { c: 2, v: 3, f: 'A2+A3' },
+              ],
+            },
+            {
+              r: 3,
+              hidden: true,
+              cells: [
+                { c: 1, v: 2 },
+                { c: 2, v: null, f: 'A3*2' },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(sheetPreview(workbook, 'S', 2)).toMatchObject({ totalRows: 3, rows: [{ r: 1 }, { r: 2 }] });
+    expect(
+      sheetPreview(workbook, 'S', 3)
+        .rows.slice(1)
+        .map((r) => r.cells),
+    ).toEqual([
+      [
+        { c: 1, v: 1 },
+        { c: 2, v: 3 },
+      ],
+      [
+        { c: 1, v: 2 },
+        { c: 2, v: null, f: 'A3*2' },
+      ],
+    ]);
   });
 });

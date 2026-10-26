@@ -23,7 +23,9 @@ const describe = ({ origin, sizeBytes, meta }: AttachmentDTO) => {
   return [source, ...(meta === null ? [] : [C.summary(meta)]), C.size(sizeBytes)].join(' · ');
 };
 
-const cellText = (value: string | number | boolean | null) => (value === null ? '' : String(value));
+/** As the AI reads a cell (39 §5.3): a formula without a saved result shows as the formula. */
+const cellText = ({ v, f }: SheetPreviewDTO['rows'][number]['cells'][number]) =>
+  v === null ? (f === undefined ? '' : `=${f}`) : String(v);
 
 /** What was attached, exactly as the AI reads it (30 §3, 39 §8.1): text, a Word body, or an Excel workbook. */
 export function AttachmentPreview({ id, name, onClose }: { id: string; name: string; onClose: () => void }) {
@@ -101,7 +103,7 @@ function SheetGrid({ data }: { data: SheetPreviewDTO }) {
         <tbody>
           {data.rows.map((row) => {
             const values = Array<string>(data.columns).fill('');
-            for (const cell of row.cells) values[cell.c - data.left] = cellText(cell.v);
+            for (const cell of row.cells) values[cell.c - data.left] = cellText(cell);
             return (
               <tr key={row.r} data-hidden={row.hidden || undefined}>
                 <th scope="row">{row.hidden ? C.hiddenRow(row.r) : row.r}</th>
@@ -127,7 +129,7 @@ function SheetCells({ data }: { data: SheetPreviewDTO }) {
       {data.rows.map((row) => (
         <div key={row.r}>
           {row.hidden ? C.hiddenRow(row.r) : row.r}：
-          {row.cells.map((cell) => `${columnName(cell.c)}${row.r} = ${cellText(cell.v)}`).join('；')}
+          {row.cells.map((cell) => `${columnName(cell.c)}${row.r} = ${cellText(cell)}`).join('；')}
         </div>
       ))}
     </div>
