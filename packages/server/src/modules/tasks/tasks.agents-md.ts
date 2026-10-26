@@ -40,14 +40,11 @@ export function createTaskAgentsMd(deps: TasksServiceDeps, state: TaskState, lif
   const rulesFor = (checkCommand: string | null) =>
     renderTemplate(prompts[PromptName.AgentsMdRules], { check: agentsMdRulesCheck(checkCommand) }).trim();
 
-  /** The project's latest AGENTS.md task that has not ended; tasks may use any version of the workflow. */
+  /** The project's latest AGENTS.md task that has not ended; the joined key matches every version of the workflow. */
   function openTask(projectId: string) {
     const task = state.repo
       .list({ projectId })
-      .find(
-        (t) =>
-          !isTerminalState(taskMachine, t.status) && workflows.get(t.workflowId).key === SystemWorkflowKey.AgentsMd,
-      );
+      .find((t) => !isTerminalState(taskMachine, t.status) && t.workflowKey === SystemWorkflowKey.AgentsMd);
     return task === undefined ? null : state.summary(task);
   }
 
