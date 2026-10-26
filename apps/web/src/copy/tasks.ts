@@ -51,7 +51,6 @@ export const HOME_TASK_COPY = {
   viewAll: '查看全部',
   inProgress: '进行中',
   toMerge: '待合并',
-  recent: '最近完成',
   noneInProgress: '还没有任务。选一个流程写下需求，或者直接告诉助手，AI 会在独立工作区里完成它。',
   moreOptions: '更多选项',
   title: '标题',

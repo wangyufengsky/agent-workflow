@@ -356,6 +356,50 @@
     opacity: 0;
   }
 }
+/* 「更多流程」: a full-width list inside the panel, one line per workflow with what it does (38 C2) */
+.moreFlows {
+  flex-basis: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--s-1) var(--s-2);
+}
+.moreFlows[hidden] {
+  display: none;
+}
+.moreFlow {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--r-md);
+  background: transparent;
+  text-align: left;
+}
+.moreFlow:hover {
+  background: var(--fill-3);
+}
+.moreFlow[aria-pressed="true"] {
+  background: var(--accent-fill);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+  color: var(--accent-ink);
+}
+.moreFlowName {
+  white-space: nowrap;
+}
+.moreFlowHint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
 .flows:not([hidden]) .chip {
   animation: chip-in 0.2s var(--ease) both;
   animation-delay: calc(var(--i) * 15ms);
@@ -602,6 +646,30 @@
   overflow: hidden;
 }
 .railBar > span {
+  display: block;
+  height: 100%;
+  background: var(--run);
+}
+
+/* An initiative or batch on one line of「进行中」(38 C3) */
+.groupRow {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.groupTitle {
+  flex: 0 1 auto;
+  max-width: 45%;
+  font-weight: 500;
+}
+.groupBar {
+  flex: 0 0 96px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--fill-3);
+  overflow: hidden;
+}
+.groupBar > span {
   display: block;
   height: 100%;
   background: var(--run);

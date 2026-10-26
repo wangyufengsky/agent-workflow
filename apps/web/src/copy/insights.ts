@@ -23,6 +23,8 @@ export const INSIGHTS_COPY = {
   title: '质量与用量',
   lede: 'AI 帮你做了多少、做得怎样、用了多少。',
   simpleLede: '本周 AI 帮你做了多少、用了多少。',
+  /** Leads the simple task list's line of the three figures (38 C1). */
+  thisWeek: '本周',
   completed: (n: number) => `完成了 ${n} 个任务`,
   used: (tokens: string) => `用了 ${tokens} tokens`,
   interrupted: (n: number) => `打扰了你 ${n} 次`,

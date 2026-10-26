@@ -110,7 +110,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.PreviewStartFailed]: '页面预览没能启动，查看服务日志找原因，或修改预览设置。',
   [ErrorCode.PreviewLimitReached]: '同时运行的页面预览已达上限，先停掉一个再试。',
   [ErrorCode.BrowserSiteNotAllowed]: '这个网站不在允许的范围内，可以在设置的「网站」里添加规则。',
-  [ErrorCode.BrowserLoginRequired]: '这个网站需要登录，先在设置的「网站登录」里登录。',
+  [ErrorCode.BrowserLoginRequired]: '这个网站需要登录，先打开专业模式，在设置的「网站登录」里登录。',
   [ErrorCode.BrowserReadFailed]: '网页加载失败，请检查地址或网络连接。',
   [ErrorCode.BrowserNotOpen]: '请先在桌面版打开任务的「我的预览」。',
   [ErrorCode.BrowserRefStale]: '页面已经变了，需要重新读取页面。',

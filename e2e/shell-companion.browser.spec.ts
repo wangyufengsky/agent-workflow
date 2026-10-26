@@ -57,9 +57,12 @@ test('默认光球可预览工作与完成动画，切换鲸鱼会持久化并�
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await expect(preview.locator('canvas')).toHaveAttribute('data-active', 'true');
   await page.screenshot({ path: 'screenshots/companion/aurora-dark.png' });
+  // The animation switch is a pro-mode setting (38 C5).
+  await patchSettings(request, { 'ui.mode': 'pro' });
   await page.getByRole('switch', { name: '播放角色动画', exact: true }).click();
   await expect(preview.locator('canvas')).toHaveAttribute('data-active', 'false');
   await expect(preview.locator('img')).toBeVisible();
+  await patchSettings(request, { 'ui.mode': 'simple' });
 });
 
 test('极光失去 GPU 上下文后保留静态形象', async ({ page, request }) => {

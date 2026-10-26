@@ -5,7 +5,7 @@ import { useSettings, useUpdateSettings } from '../../features/settings/settings
 
 const PREFERENCES = themePreferenceSchema.options;
 
-/** Header quick switch; the same `ui.theme` setting as the settings page. */
+/** Quick switch for the component gallery; the same `ui.theme` setting as the settings page (the header has none, 38 C4). */
 export function ThemeSwitch() {
   const theme = useSettings()['ui.theme'];
   const update = useUpdateSettings();

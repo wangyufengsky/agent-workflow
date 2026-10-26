@@ -1,4 +1,4 @@
-import { TASK_DISPLAY_GROUPS, type TaskDisplayGroup, taskDisplayGroupSchema } from '@aw/shared';
+import { TASK_DISPLAY_GROUPS, type TaskDisplayGroup, taskDisplayGroupSchema, UiMode } from '@aw/shared';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
@@ -10,7 +10,9 @@ import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
 import { INITIATIVES_COPY } from '../../copy/initiatives.ts';
 import { SCHEDULES_COPY } from '../../copy/schedules.ts';
 import { TASKS_COPY as C, TASK_DISPLAY_LABEL } from '../../copy/tasks.ts';
+import { WeekSummaryLine } from '../insights/week-summary-line.tsx';
 import { projectsQuery } from '../projects/projects.queries.ts';
+import { useSettings } from '../settings/settings.queries.ts';
 import { TaskBadge } from './task-badge.tsx';
 import styles from './tasks.module.css';
 import { taskPagesQuery } from './tasks.queries.ts';
@@ -21,6 +23,7 @@ const route = getRouteApi(ROUTE_IDS.tasks);
 export function TasksPage() {
   const { projectId, displayGroup } = route.useSearch();
   const navigate = route.useNavigate();
+  const isSimple = useSettings()['ui.mode'] === UiMode.Simple;
   const projects = useQuery(projectsQuery);
   const pages = useInfiniteQuery(
     taskPagesQuery({
@@ -38,6 +41,7 @@ export function TasksPage() {
         <div className="grow">
           <h1 className="title">{C.title}</h1>
           <p className="lede">{C.lede}</p>
+          {isSimple && <WeekSummaryLine />}
         </div>
         <div className={styles.filters}>
           <Link to={ROUTES.initiatives} className="btn ghost">

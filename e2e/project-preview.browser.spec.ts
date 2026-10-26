@@ -39,9 +39,10 @@ test('J26 页面预览：保存设置、试运行成功与失败', async ({ page
 });
 
 test('J26 网站规则：添加、改权限、排序后保存；浏览器版不显示登录窗口', async ({ page, request }) => {
+  // Website rules and logins are pro-mode settings (38 C5).
   await patchSettings(request, {
     'ui.theme': 'codex',
-    'ui.mode': 'simple',
+    'ui.mode': 'pro',
     'browser.sites': [{ pattern: '*', access: 'read' }],
   });
   await page.goto('/settings');

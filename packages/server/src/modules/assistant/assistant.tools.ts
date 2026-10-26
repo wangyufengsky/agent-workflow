@@ -113,7 +113,7 @@ const COMMON_HINTS: Partial<Record<ErrorCode, string>> = {
     'Ask the user to open their task preview in the desktop app. Do not substitute an AI-owned tab or the most recent task.',
   [ErrorCode.BrowserSiteNotAllowed]: 'The website rules do not allow this address. Do not bypass the rules.',
   [ErrorCode.BrowserLoginRequired]:
-    'Ask the user to log in under Settings > Websites, then read the address again. Never ask for or enter credentials.',
+    'Ask the user to log in under Settings > Websites (shown in pro mode), then read the address again. Never ask for or enter credentials.',
   [ErrorCode.BrowserReadFailed]: 'Explain the page load failure to the user using details.reason.',
   [ErrorCode.ProjectPathNoGit]:
     'The directory is not under Git yet. Offer to put it under Git and add it with projects_initGit (same repoPath); the confirmation card shows the user what the first commit takes. projects_previewGitInit tells you that beforehand, for example to warn about large files.',
