@@ -32,7 +32,8 @@ const ICON_PATHS = {
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
   sparkle: 'M12 3l1.8 5.6L19.5 10l-5.7 1.6L12 17l-1.8-5.4L4.5 10l5.7-1.4z',
-  logo: 'M20 12a8 8 0 1 1-3-6.2M20 4v4h-4M12 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
+  // The app icon's rising flow (apps/desktop/build/icon.svg): three linked nodes.
+  logo: 'M5 19.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4zM12 15.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4zM19 8.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2zM6.9 15.9l3.2-1.8M13.6 11.4l3.6-3.6',
   layers: 'M12 3 2 8l10 5 10-5zM2 13l10 5 10-5',
   lock: 'M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3',
   pause: 'M8 5v14M16 5v14',

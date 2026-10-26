@@ -166,19 +166,21 @@ export function HomePage() {
     return <HomeConversation conversation={conversation} conversations={list} composer={composer} />;
   }
   return (
-    <div className="page">
-      <div className={styles.hero}>
-        <MarkNodes className={styles.mark} />
-        <Wordmark className={styles.wordmark} />
-        <p className={styles.tagline}>{C.tagline}</p>
-      </div>
-      <div className={styles.lead}>
-        {composer}
-        <Suggestions />
-        {conversations.isError && (
-          <ErrorState error={conversations.error} onRetry={() => void conversations.refetch()} />
-        )}
-        <RecentConversations conversations={list} />
+    <div className={`page ${styles.idle}`}>
+      <div className={styles.welcome}>
+        <div className={styles.hero}>
+          <MarkNodes className={styles.mark} />
+          <Wordmark className={styles.wordmark} />
+          <p className={styles.tagline}>{C.tagline}</p>
+        </div>
+        <div className={styles.lead}>
+          {composer}
+          <Suggestions />
+          {conversations.isError && (
+            <ErrorState error={conversations.error} onRetry={() => void conversations.refetch()} />
+          )}
+          <RecentConversations conversations={list} />
+        </div>
       </div>
       <WorkOverview />
     </div>

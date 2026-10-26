@@ -26,6 +26,8 @@ export function readLaunchPreferences(file: string, prefersDark: boolean): Launc
 }
 
 /** Keeps what the renderer applied for the next start; it comes over IPC, so it is checked here. */
-export function writeLaunchPreferences(file: string, preferences: unknown): void {
-  writeFileSync(file, JSON.stringify(launchPreferencesSchema.parse(preferences)));
+export function writeLaunchPreferences(file: string, preferences: unknown): LaunchPreferences {
+  const parsed = launchPreferencesSchema.parse(preferences);
+  writeFileSync(file, JSON.stringify(parsed));
+  return parsed;
 }

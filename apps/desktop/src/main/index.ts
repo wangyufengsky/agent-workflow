@@ -1,11 +1,13 @@
+import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { APP_LICENSE, APP_SOURCE_URL, browserRectSchema, type LaunchPreferences } from '@aw/shared';
-import { splashBackground, splashHtml } from '@aw/web/splash';
+import { splashBackground, splashHtml, titleBarOverlay } from '@aw/web/splash';
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell, type WebPreferences } from 'electron';
 import { type Backend, startBackend } from './backend.ts';
 import { type BrowserPrompts, createBrowserPrompts } from './browser-prompts.ts';
 import { createCompanionHost } from './companion.ts';
+import { createDesktopShortcut, DEB_MENU_ENTRY } from './desktop-shortcut.ts';
 import { serveExports } from './export.ts';
 import { readLaunchPreferences, writeLaunchPreferences } from './launch.ts';
 import { passwordStoreSwitch } from './password-store.ts';
@@ -14,6 +16,11 @@ import { passwordStoreSwitch } from './password-store.ts';
 const LAUNCH_FILE = 'launch.json';
 
 const isDev = process.env.ELECTRON_RENDERER_URL !== undefined;
+/**
+ * Windows and Linux hide the system title bar, which keeps its own colours whatever the theme, and draw the window
+ * buttons over the header in the theme's colours; the header moves the window (17 §3.14). macOS keeps its title bar.
+ */
+const themedTitleBar = process.platform !== 'darwin';
 let backend: Backend | undefined;
 let companion: ReturnType<typeof createCompanionHost> | undefined;
 
@@ -37,6 +44,7 @@ function createWindow(apiToken: string, launch: LaunchPreferences): Window {
     minWidth: 1024,
     minHeight: 700,
     backgroundColor: splashBackground(launch),
+    ...(themedTitleBar && { titleBarStyle: 'hidden', titleBarOverlay: titleBarOverlay(launch) }),
     webPreferences: {
       ...webPreferences,
       additionalArguments: [...webPreferences.additionalArguments, '--aw-main-window'],
@@ -63,6 +71,26 @@ async function openApp({ win, webPreferences }: Window, b: Backend, prompts: Bro
     }
   });
   await win.loadURL(url);
+}
+
+/** The installed app on Linux puts itself on the desktop once (D191); a failure only loses the shortcut. */
+function placeDesktopShortcut(): void {
+  try {
+    const shortcut = createDesktopShortcut({
+      userData: app.getPath('userData'),
+      desktop: app.getPath('desktop'),
+      appImage: process.env.APPIMAGE,
+      appIcon: join(app.getAppPath(), 'build/icon.png'),
+      menuEntry: DEB_MENU_ENTRY,
+    });
+    if (shortcut === undefined) return;
+    // GNOME's desktop icons launch an entry only once trusted; elsewhere there is no `gio` or nothing to trust.
+    execFile('gio', ['set', shortcut, 'metadata::trusted', 'true'], (error) => {
+      if (error !== null) console.warn('desktop shortcut not marked trusted', error.message);
+    });
+  } catch (e) {
+    console.error('desktop shortcut failed', e);
+  }
 }
 
 ipcMain.handle('aw:select-directory', async () => {
@@ -95,11 +123,16 @@ app.setAboutPanelOptions({
 
 app.whenReady().then(async () => {
   const launchFile = join(app.getPath('userData'), LAUNCH_FILE);
-  ipcMain.on('aw:launch-preferences', (_e, preferences: unknown) => writeLaunchPreferences(launchFile, preferences));
   const launch = readLaunchPreferences(launchFile, nativeTheme.shouldUseDarkColors);
   const apiToken = randomBytes(32).toString('hex');
   const window = createWindow(apiToken, launch);
+  // Sent whenever the renderer applies a theme: the window buttons change with it.
+  ipcMain.on('aw:launch-preferences', (_e, preferences: unknown) => {
+    const applied = writeLaunchPreferences(launchFile, preferences);
+    if (themedTitleBar) window.win.setTitleBarOverlay(titleBarOverlay(applied));
+  });
   const prompts = createBrowserPrompts(() => window.win);
+  if (process.platform === 'linux' && app.isPackaged) placeDesktopShortcut();
   // `window.splash` (28 §5): `done` once the animation ended or was skipped.
   const animated = window.win
     .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splashHtml(launch))}`)

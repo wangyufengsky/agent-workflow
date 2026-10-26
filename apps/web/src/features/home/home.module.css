@@ -1,5 +1,22 @@
 /* The assistant-first home page (28 §2, D111). */
 
+/*
+ * Idle (28 §2.1): the hero and the input fill the first screen with themselves in its middle, a little above it, so a
+ * tall window has no empty half under them; a long work overview below pushes them back to the top.
+ */
+.idle {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.welcome {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-bottom: 6vh;
+}
+
 /* ---- hero ---- */
 .hero {
   display: flex;
@@ -25,7 +42,7 @@
 .wordmark {
   margin: var(--s-1) 0 0;
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: clamp(34px, 1.4vw + 16px, 46px);
   font-weight: 400;
   letter-spacing: -1px;
   line-height: 1.1;
@@ -42,8 +59,9 @@
   font-size: var(--fs-md);
   color: var(--sub);
 }
+/* Wider on a large screen (28 §2.1), so the input does not look small in it. */
 .lead {
-  max-width: 820px;
+  max-width: clamp(820px, 46vw, 1000px);
   margin: 0 auto var(--s-8);
   display: flex;
   flex-direction: column;
@@ -80,8 +98,8 @@
 }
 .input {
   field-sizing: content;
-  min-height: 72px;
-  max-height: 240px;
+  min-height: clamp(72px, 9vh, 132px);
+  max-height: max(240px, 30vh);
   padding: 0;
   border: 0;
   background: transparent;
@@ -92,7 +110,8 @@
   resize: none;
 }
 .composerArea[data-docked] .input {
-  min-height: 24px;
+  /* One line, two on a tall window. */
+  min-height: clamp(24px, 5vh - 20px, 52px);
   font-size: var(--fs-md);
 }
 .input:focus-visible {
@@ -493,7 +512,7 @@
 }
 .conversationMain > * {
   width: 100%;
-  max-width: 768px;
+  max-width: clamp(768px, 46vw, 960px);
   margin-inline: auto;
 }
 .conversationHead {
@@ -504,7 +523,6 @@
 }
 /* Holds the shared stream, which scrolls itself and floats「回到最新」over its bottom (25 §4.1). */
 .stream {
-  view-transition-name: assistant-stream;
   position: relative;
   flex: 1;
   min-height: 0;

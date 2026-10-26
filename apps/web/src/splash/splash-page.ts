@@ -27,6 +27,7 @@ export function splashHtml({ theme, intro }: LaunchPreferences): string {
 <style>${STYLE}</style>
 </head>
 <body>
+<div class="title-bar"></div>
 <main class="mark">
 <svg class="nodes" width="${MARK.width * 2}" height="${MARK.height * 2}" viewBox="0 0 ${MARK.width} ${MARK.height}" aria-hidden="true">${lines}${nodes}<circle class="spark" r="2.4"/></svg>
 <h1 class="word"><span class="lead">${HOME_COPY.mark.lead}</span> <em class="emphasis">${HOME_COPY.mark.emphasis}</em></h1>
@@ -54,6 +55,8 @@ html,body{margin:0;height:100%}
 body{display:grid;place-items:center;overflow:hidden;background:var(--bg);color:var(--ink);cursor:default;user-select:none;
   font:400 14px/1.55 "DM Sans",-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif}
 body::before{content:"";position:fixed;inset:-20%;background:radial-gradient(closest-side,var(--accent-fill),transparent 70%)}
+/* Where the system title bar is hidden (17 §3.14) its strip moves the window; the rest still takes the skipping click. */
+.title-bar{position:fixed;top:0;left:0;right:0;height:env(titlebar-area-height,0px);-webkit-app-region:drag}
 .mark{position:relative;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
 .nodes{overflow:visible}
 .line{fill:none;stroke:var(--line-3);stroke-width:2;stroke-dasharray:60;stroke-dashoffset:0}
@@ -123,3 +126,16 @@ window.splash = {
 
 /** The window's colour until the page paints: the same theme's background. */
 export const splashBackground = ({ theme }: LaunchPreferences): string => THEMES[theme].tokens.bg;
+
+/** The height of the app's header (`--header-h`), where the title bar's window buttons sit (17 §3.14). */
+const TITLE_BAR_HEIGHT = 56;
+
+/**
+ * The window buttons Windows and Linux draw over the header's right end once the system title bar is hidden (17
+ * §3.14): on the theme's background, in its secondary text colour, so they change with the theme.
+ */
+export const titleBarOverlay = ({ theme }: LaunchPreferences) => ({
+  color: THEMES[theme].tokens.bg,
+  symbolColor: THEMES[theme].tokens.sub,
+  height: TITLE_BAR_HEIGHT,
+});
