@@ -4,6 +4,7 @@ import { TranscriptEntryKind, transcriptSystemEventSchema } from '../../enums/sy
 import { attemptKindSchema, attemptStatusSchema } from '../../enums/task.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
 import { chartSpecSchema } from '../chart.ts';
+import { officeLossSchema } from '../mcp/office-write.ts';
 
 /** `AttemptSummaryDTO` (11 §6): one AI session working for a node, a plan or a review. */
 export const attemptSummarySchema = z.object({
@@ -94,8 +95,15 @@ export const transcriptEntrySchema = z.discriminatedUnion('kind', [
     kind: z.literal(TranscriptEntryKind.Confirmation),
     data: z.object({ confirmationId: z.string() }),
   }),
-  /** `path` is relative to the conversation's files directory. */
-  z.object({ ...entry, kind: z.literal(TranscriptEntryKind.Attachment), data: z.object({ path: z.string() }) }),
+  /**
+   * `path` is relative to the conversation's files directory; `lost`, of a file written from a source, what it lacks
+   * of it (39 §7.2).
+   */
+  z.object({
+    ...entry,
+    kind: z.literal(TranscriptEntryKind.Attachment),
+    data: z.object({ path: z.string(), lost: z.array(officeLossSchema).optional() }),
+  }),
   z.object({ ...entry, kind: z.literal(TranscriptEntryKind.EntityRef), data: entityRefSchema }),
   z.object({ ...entry, kind: z.literal(TranscriptEntryKind.Chart), data: z.object({ chart: chartSpecSchema }) }),
 ]);

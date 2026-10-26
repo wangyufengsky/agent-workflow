@@ -161,7 +161,7 @@ function Body({ entry, ctx, fresh }: { entry: TranscriptEntry; ctx: Rendered; fr
       return confirmation === undefined ? null : <ConfirmationCard confirmation={confirmation} />;
     }
     case TranscriptEntryKind.Attachment:
-      return <FileCard conversationId={ctx.conversation.id} path={entry.data.path} />;
+      return <FileCard conversationId={ctx.conversation.id} path={entry.data.path} lost={entry.data.lost ?? []} />;
     case TranscriptEntryKind.EntityRef:
       return <EntityCard entity={entry.data} />;
     case TranscriptEntryKind.Chart:

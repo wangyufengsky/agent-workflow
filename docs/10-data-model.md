@@ -350,7 +350,7 @@ payload / response：
 | `system` | `{ event: TranscriptSystemEvent, detail? }`（尝试开始、已提醒、重试中、已提交、超时、已中止、运行时消失；文案在前端） |
 | `error` | `ErrorInfo`（`{ code, message, details? }`；尝试结束后的会话错误不记录，如提交后我们发出的中止） |
 | `confirmation` | `{ confirmationId }`（仅助手对话：一次等待用户确认的调用，卡片内容来自 `assistant_confirmations`） |
-| `attachment` | `{ path }`（仅助手对话：助手写入对话文件目录 `files/<id>/` 的文件，`path` 相对该目录） |
+| `attachment` | `{ path, lost? }`（仅助手对话：助手写入对话文件目录 `files/<id>/` 的文件，`path` 相对该目录；从源文件写出的 Word / Excel 文件另有 `lost: [{ kind: OfficeLoss, count }]`，即新文件没有保留的内容，39 §7.2） |
 | `entity_ref` | `{ kind: EntityKind, id, title }`（仅助手对话：助手调用的操作执行成功后产出的对象，界面渲染为导航卡片，D66） |
 | `chart` | `{ chart: ChartSpec }`（仅助手对话：`show_chart` / `show_flowchart` 校验通过后的图，`shared/contracts/chart.ts`；只做向后兼容的修改，35 §4、D139） |
 

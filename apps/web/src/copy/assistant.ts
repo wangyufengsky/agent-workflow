@@ -5,6 +5,8 @@ import {
   EntityKind,
   ExternalMcpStatus,
   InputRef,
+  type OfficeLoss,
+  type OfficeLossItem,
   OperationRisk,
   type Platform,
 } from '@aw/shared';
@@ -19,6 +21,15 @@ const REVEAL: Record<Platform, string> = {
 };
 
 /** The app assistant (15 §6). */
+const LOST: Record<OfficeLoss, (count: number) => string> = {
+  charts: (n) => `${n} 个图表`,
+  images: (n) => `${n} 张图片`,
+  pivot_tables: (n) => `${n} 个透视表`,
+  headers_footers: () => '页眉页脚',
+  comments: () => '批注',
+  formula_references: (n) => `公式引用（插入或删除行列后，${n} 个公式没有跟着调整，请检查）`,
+};
+
 export const ASSISTANT_COPY = {
   panel: '应用助手',
   open: `打开助手（${MOD_KEY}J）`,
@@ -50,6 +61,9 @@ export const ASSISTANT_COPY = {
     save: '另存为…',
     open: '打开',
     saved: (path: string) => `已保存到 ${path}`,
+    /** What a file written from a source lacks of it (39 §7.2). */
+    lost: (items: readonly OfficeLossItem[]) =>
+      `没有保留原文件的${items.map(({ kind, count }) => LOST[kind](count)).join('、')}`,
   },
   /** The input's「+」menu (36 §4). */
   addMenu: '添加资料与上下文',
@@ -138,6 +152,8 @@ export const TOOL_COPY = {
     [AssistantToolName.QuerySheet]: '查询表格',
     [AssistantToolName.CreateDocx]: '生成 Word 文件',
     [AssistantToolName.CreateXlsx]: '生成 Excel 文件',
+    [AssistantToolName.EditXlsx]: '修改 Excel 文件',
+    [AssistantToolName.ReviseDocx]: '改写 Word 文件',
     [AssistantToolName.ReadBrowser]: '读取我的预览',
     [AssistantToolName.ShowChart]: '画图',
     [AssistantToolName.ShowFlowchart]: '画流程图',

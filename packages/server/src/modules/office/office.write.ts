@@ -76,18 +76,34 @@ function table({ header, rows }: Extract<DocxBlock, { type: 'table' }>): Table {
   });
 }
 
+/**
+ * A document's own heading styles: Word names them 「heading 1」… whatever their ids (a Chinese Word's are 「1」…), so
+ * headings written with another document's styles use its ids.
+ */
+function headingStyleIds(styles: string): Map<number, string> {
+  const ids = new Map<number, string>();
+  for (const [, id, level] of styles.matchAll(
+    /<w:style\b[^>]*\bw:styleId="([^"]+)"[^>]*>(?:(?!<\/w:style>)[\s\S])*?<w:name w:val="heading ([1-9])"/gi,
+  )) {
+    ids.set(Number(level), id as string);
+  }
+  return ids;
+}
+
 /** Each ordered list counts from 1: its own instance of the numbering. */
-function blocks(items: readonly DocxBlock[]): Array<Paragraph | Table> {
+function blocks(items: readonly DocxBlock[], headings: ReadonlyMap<number, string>): Array<Paragraph | Table> {
   let lists = 0;
   return items.flatMap((block) => {
     switch (block.type) {
-      case 'heading':
+      case 'heading': {
+        const style = headings.get(block.level);
         return [
           new Paragraph({
-            heading: HEADINGS[block.level - 1] as (typeof HEADINGS)[number],
+            ...(style === undefined ? { heading: HEADINGS[block.level - 1] as (typeof HEADINGS)[number] } : { style }),
             children: runs(block.text),
           }),
         ];
+      }
       case 'paragraph':
         return [new Paragraph({ children: runs(block.text) })];
       case 'list': {
@@ -112,11 +128,19 @@ function blocks(items: readonly DocxBlock[]): Array<Paragraph | Table> {
   });
 }
 
-/** A new Word document (39 §7.2): the app lays out what the model wrote as blocks. */
-export async function writeDocx({ title, blocks: items }: CreateDocxInput): Promise<Buffer> {
+/**
+ * A new Word document (39 §7.2): the app lays out what the model wrote as blocks. With `styles` (another document's
+ * `word/styles.xml`) it uses those fonts, sizes and heading styles instead of the app's defaults.
+ */
+export async function writeDocx(
+  { title, blocks: items }: Pick<CreateDocxInput, 'title' | 'blocks'>,
+  styles?: string,
+): Promise<Buffer> {
   const document = new Document({
     ...(title === undefined ? {} : { title }),
-    styles: { default: { document: { run: { font: FONT, size: 22 } } } },
+    ...(styles === undefined
+      ? { styles: { default: { document: { run: { font: FONT, size: 22 } } } } }
+      : { externalStyles: styles }),
     numbering: {
       config: [
         {
@@ -132,7 +156,7 @@ export async function writeDocx({ title, blocks: items }: CreateDocxInput): Prom
         },
       ],
     },
-    sections: [{ children: blocks(items) }],
+    sections: [{ children: blocks(items, styles === undefined ? new Map() : headingStyleIds(styles)) }],
   });
   return Packer.toBuffer(document);
 }
@@ -145,7 +169,7 @@ const FORMATS: Record<XlsxColumnType, string | undefined> = {
   currency: '#,##0.00',
 };
 
-function cellValue(cell: XlsxCell | WorkbookValue): ExcelJS.CellValue {
+export function cellValue(cell: XlsxCell | WorkbookValue): ExcelJS.CellValue {
   if (cell === null || typeof cell !== 'object') return cell;
   if ('date' in cell) return new Date(`${cell.date}T00:00:00Z`);
   // Without the leading =, as exceljs writes it.

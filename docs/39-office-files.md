@@ -1,6 +1,6 @@
 # 39 · Word 与 Excel 文件
 
-> 状态：**设计已确认**（2026-10-26，D193–D201 均按推荐方案，§17），实施中：OF-01（解析与附件接入）、OF-02（Excel 概览与表格工具）、OF-03（附件条与预览）、OF-04（助手生成 Word / Excel 与文件卡片）已完成。
+> 状态：**设计已确认**（2026-10-26，D193–D201 均按推荐方案，§17），实施中：OF-01（解析与附件接入）、OF-02（Excel 概览与表格工具）、OF-03（附件条与预览）、OF-04（助手生成 Word / Excel 与文件卡片）、OF-05（修改 Excel、改写 Word 与丢失提示）已完成。
 >
 > OF-01 的实测：Electron 44 的 utilityProcess 能从 `app.asar` 里加载解析 worker（`office-worker.js`），其 Node 24.22（ICU 78.2）能按 GB18030 解码。样本只有 LibreOffice、macOS 文本编辑（textutil）保存的文件和 msoffcrypto-tool 加密的文件：用脚本驱动 Microsoft Word 另存失败，WPS 只能手动操作，二者的样本待补。macOS 文本编辑保存的 Word 没有标题样式，表格也变成了段落，只能按段落读出。实施任务见 [05 的 OF 系列](05-dev-plan.md#后续--word-与-excel-文件of)。枚举、常量、表、接口、工具在实施时登记到 08–12，本文先写在 §11–§12。
 
@@ -173,16 +173,17 @@ OF-02 只读附件（`attachment_id`）；助手读回自己在对话目录里�
 
 | 工具 | 输入 | 输出与行为 |
 | --- | --- | --- |
-| `create_docx` | `{ file, title?, blocks }`（`style_from` 随 OF-05 的 `revise_docx` 一起做）；`blocks` 为 `heading { level 1–4, text }` / `paragraph { text }` / `list { ordered, items }` / `table { header, rows }` / `page_break`；文字中可用 `**粗体**`、`*斜体*`、`[链接](url)` | 写一个新的 `.docx`；`style_from` 为一个 Word `source` 时沿用它的样式表（标题、正文字体与字号） |
+| `create_docx` | `{ file, title?, blocks, style_from? }`；`blocks` 为 `heading { level 1–4, text }` / `paragraph { text }` / `list { ordered, items }` / `table { header, rows }` / `page_break`；文字中可用 `**粗体**`、`*斜体*`、`[链接](url)` | 写一个新的 `.docx`；`style_from` 为一个 Word `source` 时沿用它的样式表（标题、正文字体与字号） |
 | `create_xlsx` | `{ file, sheets: [{ name, columns: [{ header, type?: text/number/date/percent/currency, width? }], rows?, rows_from?, freeze_header? = true }] }`；单元格为字符串、数字、布尔、`null`、`{ date }` 或 `{ formula }` | 写一个新的 `.xlsx`；`rows_from` 为一次 `query_sheet` 的参数，数据由后端直接从源表取出写入，大表不必经过模型的输出 |
-| `edit_xlsx` | `{ source, file, operations }`；操作为 `set_cells { sheet, start, values }`、`insert_rows`、`delete_rows`、`insert_columns`、`delete_columns`、`add_sheet`、`rename_sheet`、`delete_sheet` | 在原件的副本上修改后另存为 `file`；单元格样式、列宽、合并、公式、其他工作表保留 |
-| `revise_docx` | `{ source, file, blocks }` | 按 `blocks` 重写成新文件，沿用原件的样式表；见下方保真说明 |
+| `edit_xlsx` | `{ source, file, operations }`；操作（最多 `OFFICE_EDIT_OPERATIONS_MAX` 1,000 个，按顺序）为 `set_cells { sheet, start, values }`、`insert_rows { sheet, before, count }`、`delete_rows { sheet, from, count }`、`insert_columns { sheet, before, count }`、`delete_columns { sheet, from, count }`、`add_sheet { name }`、`rename_sheet { sheet, name }`、`delete_sheet { sheet }` | 在原件的副本上修改后另存为 `file`；单元格样式、列宽、合并、公式、隐藏的工作表与其他工作表保留；工作表不存在、重名、删掉最后一个工作表为 `VALIDATION_FAILED` |
+| `revise_docx` | `{ source, file, title?, blocks }` | 按 `blocks` 重写成新文件，沿用原件的 `word/styles.xml`；标题段落按原件里名为「heading N」的样式 ID 写（中文 Word 的 ID 是「1」「2」），见下方保真说明 |
 
 - `file` 是对话目录内的相对路径，扩展名必须与工具一致；越界或扩展名不对为 `VALIDATION_FAILED`。同名文件已存在时加序号（`周报 (2).docx`），返回实际路径，不覆盖。
 - 写入后与原生 `write` 一样在消息流追加 `attachment` 条目（15 §2）。风险为 `read`：只写本对话目录、不改用户的任何文件，与原生写文件一样不出确认卡。
 - 校验失败统一为 `VALIDATION_FAILED`，`details.issues` 指出字段与改法（与 PPT 的 `submit_slide` 相同，23 开头的实现说明）。
 - **原件永远不变**：附件是不可变的（30 §3.1），修改一律另存新文件。
-- **保真说明**：`edit_xlsx` 经 exceljs 往返，图表、图片、透视表、切片器可能丢失；`revise_docx` 只保留样式表，页眉页脚、页面设置、图片、批注不保留。工具按 `meta` 对比原件与新文件，把丢失的内容放进返回的 `warnings`，模型须告诉用户，卡片上也显示一行提示。Word 的原位修改（保留全部排版只改几段字）不在首版，见 D198 备选。
+- `source` 为 `{ attachment_id }`（本对话的附件，范围外 `ATTACHMENT_NOT_FOUND`）或 `{ file }`（本对话目录里写过的文件，按真实路径限定）；worker 读源时按附件同样的大小与解压上限检查，格式不是工具要的为 `VALIDATION_FAILED`。`create_docx` 的 `style_from` 也是一个 Word `source`。
+- **保真说明**（OF-05 已实现）：`edit_xlsx` 经 exceljs 往返，按部件对比原件与新文件，少了的图表、图片、透视表计入 `lost`；有插入或删除行列时 exceljs 不调整公式里的引用，`lost` 记下 `formula_references`（原件的公式数）。`revise_docx` 只保留样式表，原件的图片、页眉页脚、批注计入 `lost`（页面设置也不保留）。工具返回 `{ file, size, lost: [{ kind: OfficeLoss, count }] }`，提示模型告诉用户；消息流的 `attachment` 条目记下 `lost`，文件卡片显示一行「没有保留原文件的……」。Word 的原位修改（保留全部排版只改几段字）不在首版，见 D198 备选。
 - **公式安全**：只有显式的 `{ formula }` 写成公式，普通字符串即使以 `=` 开头也写成文本；拒绝引用其他工作簿和会联网的函数（`WEBSERVICE`、`FILTERXML`、`HYPERLINK` 等），因为附件里的文字可能诱导模型写出打开文件时把数据发出去的公式。
 
 ### 7.3 任务里（D199）
@@ -212,7 +213,7 @@ OF-02 只读附件（`attachment_id`）；助手读回自己在对话目录里�
 
 助手写的文件在消息流里是一张文件卡片（`features/assistant/file-card.tsx`，OF-04 已实现）：
 
-- 标题行为「助手生成的文件 · Word / Excel · 大小」与路径；摘要（字数、工作表与行数）在预览的标题下，不为卡片逐个解析文件。OF-05 的 `warnings` 再加一行弱化提示。
+- 标题行为「助手生成的文件 · Word / Excel · 大小」与路径；摘要（字数、工作表与行数）在预览的标题下，不为卡片逐个解析文件。从源文件写出的文件有 `lost` 时多一行弱化提示（OF-05）。
 - 按钮：「预览」（只对 `.docx` / `.xlsx`：`assistant.previewFile`，后端在 worker 里按需读这个文件，与附件同样的检查与上限，Excel 按工作表取前 1,000 行，界面与 §8.1 共用组件）、「另存为…」（所有文件：`GET /assistant/conversations/:id/files/raw?path=` 取字节，桌面版经 preload `saveFile`，浏览器开发模式下载，E2E 由此断言）、「打开」（桌面版：preload `openPath`，main 只接受 `<数据目录>/assistant/files/` 下的文件，用系统默认应用打开）、「在 Finder 中显示」（不变）。
 - 写文件的路径一律经 `assistant.fileOf` / `newFile` 限定在对话目录内（越界 `VALIDATION_FAILED`）；同名时加「 (2)」等序号；worker 以 `wx` 写入，不覆盖任何已有文件。
 

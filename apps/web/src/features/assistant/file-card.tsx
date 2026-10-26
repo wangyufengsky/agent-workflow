@@ -1,4 +1,4 @@
-import { AttachmentFormat, type XlsxMeta } from '@aw/shared';
+import { AttachmentFormat, type OfficeLossItem, type XlsxMeta } from '@aw/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { saveBytes } from '../../app/save-file.ts';
@@ -25,7 +25,16 @@ const fileName = (path: string) => path.split(/[\\/]/).at(-1) ?? path;
  * A file the assistant wrote (15 §2, 39 §8.2): saved where the user chooses, opened with the system's app (desktop),
  * shown in the file manager (desktop); a Word or Excel file also previews what is in it.
  */
-export function FileCard({ conversationId, path }: { conversationId: string; path: string }) {
+export function FileCard({
+  conversationId,
+  path,
+  lost,
+}: {
+  conversationId: string;
+  path: string;
+  /** What it lacks of the file it was written from (39 §7.2). */
+  lost: readonly OfficeLossItem[];
+}) {
   const file = useQuery(assistantFilesQuery(conversationId)).data?.find((f) => f.path === path);
   const [previewing, setPreviewing] = useState(false);
   const kind = officeKind(path);
@@ -56,6 +65,7 @@ export function FileCard({ conversationId, path }: { conversationId: string; pat
           <span className={`${cards.cardTitle} ellipsis`}>{path}</span>
         </span>
       </div>
+      {lost.length > 0 && <p className="hint">{C.file.lost(lost)}</p>}
       <div className="row wrap">
         {kind !== undefined && (
           <Button size="sm" onClick={() => setPreviewing(true)}>

@@ -638,7 +638,8 @@ class AppError extends Error {
 | AttachmentLimit（`ATTACHMENT_TOO_LARGE` 的 `details.reason`） | bytes · count · unzipped · cells |
 | AttachmentParseFailure（`ATTACHMENT_PARSE_FAILED` 的 `details.reason`） | corrupt · timeout · out_of_memory |
 | AttachmentOwnerKind | task_input（owner 为任务）· task_feedback（owner 为追加的修改节点）· assistant_message（owner 为助手对话）· initiative（owner 为需求计划：资料原件，每个工作包的任务再引用一次，34 §7） |
-| AssistantToolName 增量（U-02 已实现） | read_attachment；read_sheet · query_sheet（OF-02 已实现）；create_docx · create_xlsx（OF-04 已实现） |
+| AssistantToolName 增量（U-02 已实现） | read_attachment；read_sheet · query_sheet（OF-02 已实现）；create_docx · create_xlsx（OF-04 已实现）；edit_xlsx · revise_docx（OF-05 已实现） |
+| OfficeLoss（OF-05 已实现） | charts · images · pivot_tables · headers_footers · comments · formula_references（从源文件写出的新文件没有保留的内容，39 §7.2） |
 | XlsxColumnType（OF-04 已实现） | text · number · date · percent · currency（`create_xlsx` 的列格式） |
 | InputRef 增量（U-03 已实现） | attachment（确认卡把附件 ID 显示为文件名） |
 | McpToolName 增量（U-02 已实现） | read_attachment；read_sheet · query_sheet（OF-02 已实现） |
@@ -660,7 +661,8 @@ class AppError extends Error {
 | SHEET_OVERVIEW_HEAD_ROWS / SHEET_OVERVIEW_TAIL_ROWS / SHEET_OVERVIEW_SHEETS（OF-02 已实现，下同） | 10 / 2 / 20（提示词里 Excel 概览的每表前几行、末几行与列出详情的工作表数） |
 | SHEET_QUERY_MAX_ROWS | 500（`query_sheet` 的 `limit` 上限） |
 | OFFICE_PREVIEW_ROWS（OF-03 已实现） | 1,000（Excel 附件预览每个工作表显示的行数） |
-| OFFICE_WRITE_BLOCKS_MAX / OFFICE_WRITE_CELLS_MAX（OF-04 已实现） | 2,000 / 200,000（一次 `create_docx` 的块数、一次 `create_xlsx` 的单元格数，`rows_from` 取出的也算） |
+| OFFICE_WRITE_BLOCKS_MAX / OFFICE_WRITE_CELLS_MAX（OF-04 已实现） | 2,000 / 200,000（一次 `create_docx` / `revise_docx` 的块数，一次 `create_xlsx` / `edit_xlsx` 的单元格数，`rows_from` 取出的也算） |
+| OFFICE_EDIT_OPERATIONS_MAX（OF-05 已实现） | 1,000（一次 `edit_xlsx` 的操作数） |
 | ATTACHMENT_NAME_MAX_CHARS | 255（显示名） |
 | ATTACHMENT_PROMPT_MAX_CHARS / ATTACHMENT_READ_MAX_CHARS | 20,000（一次提示词里全部附件合计）/ 12,000（每次读取）（U-02 已实现） |
 | ATTACHMENT_ORPHAN_TTL_MS / ATTACHMENT_CLEANUP_INTERVAL_MS | 86,400,000（无引用附件的保留时间）/ 3,600,000（清理间隔） |

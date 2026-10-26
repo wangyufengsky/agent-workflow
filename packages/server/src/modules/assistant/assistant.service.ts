@@ -23,6 +23,7 @@ import {
   MCP_ASSISTANT_SERVER_NAME,
   MCP_ASSISTANT_TOOL_PREFIX,
   MCP_SERVER_NAME,
+  type OfficeLossItem,
   OPENCODE_ASSISTANT_AGENT,
   type OperationContract,
   type PermissionDecision,
@@ -907,9 +908,11 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     },
 
     /** A file the assistant wrote with an app tool: a card in the message stream, like one its own tools wrote. */
-    recordFile(id: string, path: string): void {
+    recordFile(id: string, path: string, lost: readonly OfficeLossItem[]): void {
       live.get(id)?.attached.add(path);
-      record(get(id), [{ kind: TranscriptEntryKind.Attachment, data: { path } }]);
+      record(get(id), [
+        { kind: TranscriptEntryKind.Attachment, data: lost.length === 0 ? { path } : { path, lost: [...lost] } },
+      ]);
     },
 
     files(id: string): AssistantFileDTO[] {

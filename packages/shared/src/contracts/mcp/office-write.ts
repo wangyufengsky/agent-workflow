@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { OFFICE_WRITE_BLOCKS_MAX, OFFICE_WRITE_CELLS_MAX } from '../../constants/limits.ts';
+import { OFFICE_EDIT_OPERATIONS_MAX, OFFICE_WRITE_BLOCKS_MAX, OFFICE_WRITE_CELLS_MAX } from '../../constants/limits.ts';
+import { OfficeLoss } from '../../enums/attachment.ts';
 import { querySheetInputSchema } from './sheets.ts';
 
 /**
@@ -36,11 +37,25 @@ export const docxBlockSchema = z.discriminatedUnion('type', [
 ]);
 export type DocxBlock = z.infer<typeof docxBlockSchema>;
 
+/** A file to start from (39 §7.2): one the user attached in this conversation, or one written in it. */
+export const officeSourceSchema = z
+  .union([
+    z.object({ attachment_id: z.string().min(1) }).strict(),
+    z.object({ file: z.string().min(1).describe('Relative to the files directory, as list_files gives it') }).strict(),
+  ])
+  .describe('An attachment of this conversation ({ attachment_id }) or a file written in it ({ file })');
+export type OfficeSource = z.infer<typeof officeSourceSchema>;
+
+const blocks = z.array(docxBlockSchema).min(1).max(OFFICE_WRITE_BLOCKS_MAX);
+
 /** `create_docx` (39 §7.2): a new Word document from blocks; the app lays it out. */
 export const createDocxInputSchema = z.object({
   file: fileOf('.docx'),
   title: z.string().max(200).optional().describe('The document title in its properties; headings go in blocks'),
-  blocks: z.array(docxBlockSchema).min(1).max(OFFICE_WRITE_BLOCKS_MAX),
+  blocks,
+  style_from: officeSourceSchema
+    .optional()
+    .describe('A Word document whose styles (heading and body fonts, sizes, colours) the new one uses'),
 });
 export type CreateDocxInput = z.infer<typeof createDocxInputSchema>;
 
@@ -134,6 +149,72 @@ export const createXlsxInputSchema = z
   });
 export type CreateXlsxInput = z.infer<typeof createXlsxInputSchema>;
 
-/** What the create tools return: the file as written (a taken name gets a number, 39 §7.2). */
-export const officeFileWrittenSchema = z.object({ file: z.string(), size: z.number() });
+const cellRef = z
+  .string()
+  .regex(/^[A-Z]{1,3}[1-9][0-9]*$/)
+  .describe('A cell such as B2');
+const columnLetters = z
+  .string()
+  .regex(/^[A-Z]{1,3}$/)
+  .describe('Column letters such as C');
+const count = z.number().int().min(1).max(100_000);
+
+/** One change `edit_xlsx` makes, in order (39 §7.2). Rows and columns are those of the sheet as it is at that step. */
+export const xlsxEditSchema = z.discriminatedUnion('op', [
+  z.object({
+    op: z.literal('set_cells'),
+    sheet: z.string().min(1),
+    start: cellRef.describe('The top left cell values[0][0] goes to'),
+    values: z.array(z.array(xlsxCellSchema)).min(1),
+  }),
+  z.object({ op: z.literal('insert_rows'), sheet: z.string().min(1), before: z.number().int().min(1), count }),
+  z.object({ op: z.literal('delete_rows'), sheet: z.string().min(1), from: z.number().int().min(1), count }),
+  z.object({ op: z.literal('insert_columns'), sheet: z.string().min(1), before: columnLetters, count }),
+  z.object({ op: z.literal('delete_columns'), sheet: z.string().min(1), from: columnLetters, count }),
+  z.object({ op: z.literal('add_sheet'), name: sheetName }),
+  z.object({ op: z.literal('rename_sheet'), sheet: z.string().min(1), name: sheetName }),
+  z.object({ op: z.literal('delete_sheet'), sheet: z.string().min(1) }),
+]);
+export type XlsxEdit = z.infer<typeof xlsxEditSchema>;
+
+/** `edit_xlsx` (39 §7.2): changes made on a copy of a workbook, saved as a new file; the source stays as it was. */
+export const editXlsxInputSchema = z
+  .object({
+    source: officeSourceSchema,
+    file: fileOf('.xlsx'),
+    operations: z.array(xlsxEditSchema).min(1).max(OFFICE_EDIT_OPERATIONS_MAX),
+  })
+  .superRefine(({ operations }, ctx) => {
+    const cells = operations.reduce(
+      (n, op) => n + (op.op === 'set_cells' ? op.values.reduce((m, row) => m + row.length, 0) : 0),
+      0,
+    );
+    if (cells > OFFICE_WRITE_CELLS_MAX) {
+      ctx.addIssue({ code: 'custom', path: ['operations'], message: `over ${OFFICE_WRITE_CELLS_MAX} cells` });
+    }
+  });
+export type EditXlsxInput = z.infer<typeof editXlsxInputSchema>;
+
+/**
+ * `revise_docx` (39 §7.2): a Word document rewritten from blocks as a new file, with the source's styles. Its
+ * pictures, headers and footers, comments and page setup are not carried over; the result lists what was lost.
+ */
+export const reviseDocxInputSchema = z.object({
+  source: officeSourceSchema,
+  file: fileOf('.docx'),
+  title: z.string().max(200).optional(),
+  blocks,
+});
+export type ReviseDocxInput = z.infer<typeof reviseDocxInputSchema>;
+
+/** What a new file lacks of its source (39 §7.2): tell the user; the file card shows it too. */
+export const officeLossSchema = z.object({ kind: z.enum(OfficeLoss), count: z.number() });
+export type OfficeLossItem = z.infer<typeof officeLossSchema>;
+
+/** What the write tools return: the file as written (a taken name gets a number) and what it lost (39 §7.2). */
+export const officeFileWrittenSchema = z.object({
+  file: z.string(),
+  size: z.number(),
+  lost: z.array(officeLossSchema),
+});
 export type OfficeFileWritten = z.infer<typeof officeFileWrittenSchema>;

@@ -4,15 +4,17 @@ import {
   AttachmentParseFailure,
   type CreateDocxInput,
   type CreateXlsxInput,
+  type EditXlsxInput,
   ErrorCode,
   OFFICE_WORKER_HEAP_MB,
   OFFICE_WORKER_TIMEOUT_MS,
   type OfficeFilePreviewDTO,
   type OfficeMeta,
+  type ReviseDocxInput,
   type SheetPreviewDTO,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
-import type { OfficeFormat, OfficeJob, OfficeReply } from './office.job.ts';
+import type { OfficeFormat, OfficeJob, OfficeReply, OfficeWritten } from './office.job.ts';
 import type { SheetPage, SheetPageRequest, SheetQuery, SheetQueryResult } from './office.sheets.ts';
 
 export { detectFormat } from './office.detect.ts';
@@ -92,11 +94,18 @@ export function createOffice({
     /** A Word or Excel file read on demand, for the assistant's file cards (39 §8.2). */
     previewFile: (file: string, sheet: string | undefined) =>
       run<OfficeFilePreviewDTO>({ kind: 'preview_file', file, sheet }),
-    /** Writes a new Word document at `out` (39 §7.2). */
-    createDocx: (input: CreateDocxInput, out: string) => run<{ size: number }>({ kind: 'create_docx', input, out }),
+    /** Writes a new Word document at `out`, with the styles of the Word document at `styleFrom` if given (39 §7.2). */
+    createDocx: (input: CreateDocxInput, out: string, styleFrom: string | undefined) =>
+      run<OfficeWritten>({ kind: 'create_docx', input, out, styleFrom }),
     /** Writes a new Excel workbook at `out`; `workbooks` are the `rows_from` attachments' cells (39 §7.2). */
     createXlsx: (input: CreateXlsxInput, out: string, workbooks: Record<string, string>) =>
-      run<{ size: number }>({ kind: 'create_xlsx', input, out, workbooks }),
+      run<OfficeWritten>({ kind: 'create_xlsx', input, out, workbooks }),
+    /** Rewrites the Word document at `source` as a new one at `out` (39 §7.2). */
+    reviseDocx: (input: ReviseDocxInput, source: string, out: string) =>
+      run<OfficeWritten>({ kind: 'revise_docx', input, source, out }),
+    /** Changes a copy of the workbook at `source`, saved at `out` (39 §7.2). */
+    editXlsx: (input: EditXlsxInput, source: string, out: string) =>
+      run<OfficeWritten>({ kind: 'edit_xlsx', input, source, out }),
   };
 }
 export type Office = ReturnType<typeof createOffice>;

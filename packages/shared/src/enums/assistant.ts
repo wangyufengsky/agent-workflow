@@ -61,6 +61,9 @@ export const AssistantToolName = {
   /** A new Word / Excel file in the conversation's files directory (39 §7.2). */
   CreateDocx: 'create_docx',
   CreateXlsx: 'create_xlsx',
+  /** A changed copy of a workbook, or a Word document rewritten with its source's styles (39 §7.2). */
+  EditXlsx: 'edit_xlsx',
+  ReviseDocx: 'revise_docx',
   ReadBrowser: 'browser_read',
   /** A bar, line or pie chart in the conversation (35 §3.1). */
   ShowChart: 'show_chart',

@@ -1,7 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { parentPort, workerData } from 'node:worker_threads';
-import { AppError } from '@aw/shared';
-import type { OfficeJob, OfficeReply } from './office.job.ts';
+import { AppError, AttachmentFormat, type OfficeLossItem } from '@aw/shared';
+import { documentStyles, editXlsx, readSource, reviseDocx } from './office.edit.ts';
+import type { OfficeJob, OfficeReply, OfficeWritten } from './office.job.ts';
 import { parseOffice, previewOffice } from './office.parse.ts';
 import { querySheet, readSheetPage, sheetPreview } from './office.sheets.ts';
 import type { Workbook } from './office.workbook.ts';
@@ -29,8 +30,13 @@ async function run(job: OfficeJob): Promise<unknown> {
       return sheetPreview(await workbookAt(job.workbook), job.sheet, job.rows);
     case 'preview_file':
       return previewOffice(job.file, job.sheet);
-    case 'create_docx':
-      return written(job.out, await writeDocx(job.input));
+    case 'create_docx': {
+      const styles =
+        job.styleFrom === undefined
+          ? undefined
+          : documentStyles(await readSource(job.styleFrom, AttachmentFormat.Docx));
+      return written(job.out, { bytes: await writeDocx(job.input, styles), lost: [] });
+    }
     case 'create_xlsx': {
       const { workbooks } = job;
       const bytes = await writeXlsx(job.input.sheets, async ({ rows_from }) =>
@@ -38,15 +44,25 @@ async function run(job: OfficeJob): Promise<unknown> {
           ? undefined
           : sourceRows(await workbookAt(workbooks[rows_from.attachment_id] as string), rows_from),
       );
-      return written(job.out, bytes);
+      return written(job.out, { bytes, lost: [] });
     }
+    case 'revise_docx':
+      return written(job.out, await reviseDocx(await readSource(job.source, AttachmentFormat.Docx), job.input));
+    case 'edit_xlsx':
+      return written(
+        job.out,
+        await editXlsx(await readSource(job.source, AttachmentFormat.Xlsx), job.input.operations),
+      );
   }
 }
 
 /** `wx`: the caller picked a name nobody has taken; a file appearing there meanwhile is not overwritten. */
-async function written(out: string, bytes: Buffer): Promise<{ size: number }> {
+async function written(
+  out: string,
+  { bytes, lost }: { bytes: Buffer; lost: OfficeLossItem[] },
+): Promise<OfficeWritten> {
   await writeFile(out, bytes, { flag: 'wx' });
-  return { size: bytes.length };
+  return { size: bytes.length, lost };
 }
 
 let reply: OfficeReply;

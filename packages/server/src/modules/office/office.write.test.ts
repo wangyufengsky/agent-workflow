@@ -9,7 +9,6 @@ import { zipEntries } from './office.zip.ts';
 describe('生成 Word', () => {
   it('标题、段落里的强调与链接、有序与无序列表、表格写进去后能原样读回', async () => {
     const bytes = await writeDocx({
-      file: '周报.docx',
       title: '周报',
       blocks: [
         { type: 'heading', level: 1, text: '本周进展' },
