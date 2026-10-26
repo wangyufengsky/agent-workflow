@@ -2,6 +2,7 @@ import { UiMode } from '@aw/shared';
 import { COMPANION_COPY } from './companion.ts';
 import { DELIVERY_COPY } from './delivery.ts';
 import { PPT_COPY } from './ppt.ts';
+import { AGENTS_MD_COPY } from './projects.ts';
 import { SETTINGS_COPY } from './settings.ts';
 import { THEME_LABEL } from './themes.ts';
 
@@ -25,6 +26,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.projects.initGit': '初始化 Git 并添加项目',
   'op.projects.get': '查看项目',
   'op.projects.update': '修改项目',
+  'op.projects.agentsMd': '查看项目的 AGENTS.md',
+  'op.projects.startAgentsMdTask': '让 AI 整理项目的 AGENTS.md',
   'op.previews.get': '查看页面预览',
   'op.browser.readUrl': '读取网页文字',
   'op.assistant.bindPreview': '关联当前预览',
@@ -316,6 +319,8 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   slideId: '页面',
   content: PPT_COPY.content,
   notes: PPT_COPY.notes,
+  guidance: AGENTS_MD_COPY.notes,
+  includeRules: AGENTS_MD_COPY.includeRules,
   layout: PPT_COPY.layout,
   points: '要点',
   afterSlideId: PPT_COPY.insertAfter,

@@ -18,6 +18,7 @@ import {
   type ResultNext,
   resolveTaskDisplayGroup,
   ServerEventType,
+  type StartAgentsMdTaskRequest,
   type SubmitResultInput,
   TASK_STATUSES,
   type TaskDetailDTO,
@@ -27,6 +28,7 @@ import {
 import type { EventBus } from '../../core/event-bus.ts';
 import { listTaskEvents } from '../timeline/index.ts';
 import { createTaskActions } from './tasks.actions.ts';
+import { createTaskAgentsMd } from './tasks.agents-md.ts';
 import { createTaskChanges } from './tasks.changes.ts';
 import { createTaskChecks } from './tasks.checks.ts';
 import { createTaskContext } from './tasks.context.ts';
@@ -55,6 +57,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   const delivery = createTaskDelivery(deps, state);
   const changes = createTaskChanges(deps, state, delivery.current);
   const review = createTaskReview(deps, state, changes);
+  const agentsMd = createTaskAgentsMd(deps, state, lifecycle);
 
   // A task's summary shows its open attention items, working steps and progress line; keep it current.
   deps.events.subscribe((event) => {
@@ -229,6 +232,11 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       });
       lifecycle.start(id);
       return detail(id);
+    },
+    /** The project page's AGENTS.md and the task that generates or supplements it (40). */
+    agentsMd: agentsMd.get,
+    async createAgentsMdTask(input: StartAgentsMdTaskRequest): Promise<TaskDetailDTO> {
+      return detail(await agentsMd.createTask(input));
     },
     onProjectDeleted: actions.onProjectDeleted,
     /** Creating several tasks in one transaction (batches, 20 §2): check once, insert drafts, start after commit. */

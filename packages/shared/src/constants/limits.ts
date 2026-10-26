@@ -19,6 +19,10 @@ export const REPORT_PROGRESS_MAX_CHARS = 200;
 export const RESULT_SUMMARY_MAX_CHARS = 4000;
 /** A task title taken from the requirement's first line is cut to this length. */
 export const TASK_TITLE_MAX_CHARS = 80;
+/** The user's notes for an AGENTS.md task (40 §6). */
+export const AGENTS_MD_NOTES_MAX_CHARS = 2000;
+/** The file an AGENTS.md task writes and the project page shows, at the repository root (40, D203). */
+export const AGENTS_MD_PATH = 'AGENTS.md';
 /** Output of an acceptance command kept on the node (its end, where failures are reported). */
 export const ACCEPTANCE_OUTPUT_MAX_CHARS = 20_000;
 /** `GET /system/runtime/logs`: lines returned by default and at most. */

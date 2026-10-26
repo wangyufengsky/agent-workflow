@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { agentsMdSchema, startAgentsMdTaskRequestSchema } from '../contracts/api/agents-md.ts';
 import { setProjectDbConnectionsRequestSchema } from '../contracts/api/databases.ts';
 import {
   createProjectRequestSchema,
@@ -8,6 +9,7 @@ import {
   setHostingRequestSchema,
   updateProjectRequestSchema,
 } from '../contracts/api/projects.ts';
+import { taskDetailSchema } from '../contracts/api/tasks.ts';
 import { EntityKind, InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
@@ -164,4 +166,34 @@ export const removeProjectAllowedBashOp = defineOperationContract({
   expose: { palette: false, assistant: true },
   credentialFields: [],
   mode: UiMode.Pro,
+});
+
+export const getAgentsMdOp = defineOperationContract({
+  id: 'projects.agentsMd',
+  title: 'op.projects.agentsMd',
+  description:
+    "The project's root AGENTS.md on its default branch, the Agent Workflow rules a task would add, and an AGENTS.md task in progress",
+  input: byId,
+  output: agentsMdSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/projects/:id/agents-md' },
+  expose: { palette: false, assistant: true },
+  credentialFields: [],
+  mode: UiMode.Simple,
+});
+
+export const startAgentsMdTaskOp = defineOperationContract({
+  id: 'projects.startAgentsMdTask',
+  refs: { id: InputRef.Project },
+  title: 'op.projects.startAgentsMdTask',
+  description:
+    "Start a task in which the AI writes the project's AGENTS.md (generates it, or supplements the existing one) in its own worktree; the user merges the result",
+  input: startAgentsMdTaskRequestSchema,
+  output: taskDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/projects/:id/agents-md/task', status: 201 },
+  expose: { palette: false, assistant: true },
+  credentialFields: [],
+  mode: UiMode.Simple,
+  produces: { kind: EntityKind.Task, ref: (task) => ({ id: task.id, title: `${task.key} · ${task.title}` }) },
 });

@@ -10,8 +10,16 @@ test('简单模式：侧栏 5 项、顶栏没有主题切换；「直接开始�
   await page.goto('/');
 
   const nav = page.getByRole('navigation', { name: 'Agent Workflow' });
-  // Besides the items: the「开始任务」button above them and the runtime chip below.
-  await expect(nav.getByRole('link')).toHaveText(['开始任务', '主页', '任务', '项目', '知识问答', '设置', /opencode/]);
+  // Besides the items: the「开始任务」button above them and the runtime chip below;「任务」may carry the inbox count.
+  await expect(nav.getByRole('link')).toHaveText([
+    '开始任务',
+    '主页',
+    /^任务\d*$/,
+    '项目',
+    '知识问答',
+    '设置',
+    /opencode/,
+  ]);
   await expect(page.getByRole('combobox', { name: '切换主题' })).toHaveCount(0);
 
   await page.getByRole('button', { name: '直接开始', exact: true }).click();

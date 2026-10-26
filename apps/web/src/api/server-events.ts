@@ -74,6 +74,8 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       return appendTranscript(qc, attemptTranscript(event.data.attemptId), event.data.entries);
     case ServerEventType.TaskUpdated:
       await updateTask(qc, event.data);
+      // The project page's AGENTS.md shows its task in progress, and the file once that task is merged (40 §7).
+      await qc.invalidateQueries({ queryKey: queryKeys.agentsMd(event.data.project.id) });
       // Quality is counted over the tasks that ended.
       return refreshInsights(qc);
     case ServerEventType.NodeUpdated:

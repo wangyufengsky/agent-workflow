@@ -131,6 +131,7 @@ import {
   clearProjectHostingOp,
   createProjectOp,
   deleteProjectOp,
+  getAgentsMdOp,
   getProjectOp,
   initGitOp,
   listProjectsOp,
@@ -138,6 +139,7 @@ import {
   removeProjectAllowedBashOp,
   setProjectDbConnectionsOp,
   setProjectHostingOp,
+  startAgentsMdTaskOp,
   updateProjectOp,
 } from './projects.ts';
 import {
@@ -286,6 +288,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   removeHostingAccountOp,
   setProjectDbConnectionsOp,
   removeProjectAllowedBashOp,
+  getAgentsMdOp,
+  startAgentsMdTaskOp,
   getPreviewOp,
   startPreviewOp,
   stopPreviewOp,

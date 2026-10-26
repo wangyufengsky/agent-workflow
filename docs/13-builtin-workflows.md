@@ -189,6 +189,7 @@ packages/builtin/
 | key | 名称 | 说明 |
 | --- | --- | --- |
 | `system.merge_branch` | 合并分支 | Git 工作台的合并冲突「交给 AI 解决」（27 §3.6）：固定流程，模板只有一个节点 `resolve_conflicts`「解决合并冲突」（developer，检查为项目检查命令）。任务的 `merge_source` 为来源、`base_branch` 为目标；worktree 从来源建出，准备阶段由后端 `git merge --no-ff --no-commit <目标>` 留下冲突标记，节点完成时后端的提交结束这次合并；之后照常检查、待合并，由用户合并回目标 |
+| `system.agents_md` | 整理 AGENTS.md | 项目详情页「AGENTS.md」的「让 AI 生成 / 补充」（40，D202）：固定流程，`survey`「梳理项目约定」（developer，不改文件、无检查）→ `write`「编写 AGENTS.md」（developer，只改根目录的 `AGENTS.md`；补充时保留原有内容，D205；检查为 AI 评审：命令与路径是否与仓库一致、是否保留原有内容、是否只改了 AGENTS.md、规则是否原意加入，不跑项目检查）。需求由 `agentsMdTaskText` 写成，含检查命令、用户的补充说明，勾选时含 `prompts/agents-md-rules.md` 渲染出的「在 Agent Workflow 中工作」一节（D204）；之后照常待合并 |
 
 ### 4b. 内置组合模板（v1.3，34 §15.3）
 

@@ -70,3 +70,24 @@ export const PROJECTS_COPY = {
   revoke: '撤销',
   revoked: '已撤销',
 } as const;
+
+/** The project page's AGENTS.md panel (40 §7). */
+export const AGENTS_MD_COPY = {
+  section: 'AGENTS.md',
+  onBranch: (branch: string) => `默认分支 ${branch} 上的版本`,
+  missing: (branch: string) => `默认分支 ${branch} 上还没有 AGENTS.md。`,
+  why: 'AI 在每个任务开始时读它。写清检查命令、目录结构和代码约定，任务能少走弯路。',
+  tooLarge: (kb: number) => `文件过大（${kb} KB），不在这里显示。`,
+  binary: '不是文本文件，不在这里显示。',
+  inProgress: '正在整理：',
+  notes: '补充说明（可选）',
+  notesPlaceholder: '例如：测试用 vitest，提交信息用英文，不要改 generated/ 目录。',
+  includeRules: '加入适合 Agent Workflow 的规则',
+  includeRulesHint: '在 AGENTS.md 里加一节「在 Agent Workflow 中工作」，只在 Agent Workflow 的任务里适用。',
+  previewRules: '预览这一节',
+  hideRules: '收起',
+  generate: '让 AI 生成',
+  supplement: '让 AI 补充',
+  started: '已开始整理 AGENTS.md',
+  hint: 'AI 在独立的分支里写，写完照常检查，由你看过改动后合并。',
+} as const;
