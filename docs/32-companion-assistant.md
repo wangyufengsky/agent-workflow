@@ -78,6 +78,8 @@
 
 `companion-position.json` 的 v2 格式为 `{ version: 2, x, y }`，记录角色锚点；旧 `{ x, y }` 按旧 460×680 窗口右下角色位置迁移。macOS 的跨桌面显示指定 `skipTransformProcessType: true`，避免创建桌宠时切换整个应用的进程类型。
 
+鼠标穿透（D192）：macOS 与 Windows 上窗口平时 `setIgnoreMouseEvents(true, { forward: true })`，指针移到 `[data-interactive]` 上时渲染端 `setInteractive(true)`。Electron 的 `forward` 只支持 macOS 与 Windows，Linux 上窗口一旦穿透就收不到指针移动，再也变不回可点击，所以 Linux 上桌宠窗口始终接收鼠标、不穿透：收起时窗口只是角色加四分之一边长的余量，展开时是角色与面板的包围矩形，这些透明部分挡住其下的点击。
+
 ## 5. 阶段计划与完成门槛
 
 | 阶段 | 任务 | 完成门槛 | 当前状态 |

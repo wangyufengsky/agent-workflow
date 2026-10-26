@@ -30,6 +30,13 @@ import {
 } from 'electron';
 import { placeCompanion } from './companion-geometry.ts';
 
+/**
+ * Electron forwards mouse moves to a window that ignores the mouse only on macOS and Windows (`forward`). On Linux a
+ * click-through companion never learns the pointer is back over it and stays unclickable, so there it always takes
+ * the mouse; its window is the character and a small margin unless a panel is open (32, D192).
+ */
+const clickThrough = process.platform !== 'linux';
+
 /** 一个宿主窗口管理角色窗口；关闭主界面时仍保持已认证的后端连接。 */
 export function createCompanionHost(
   main: BrowserWindow,
@@ -118,7 +125,7 @@ export function createCompanionHost(
     const window = pet;
     // 不把整个应用转换为 UIElementApplication；主窗口与 Dock 应保持可见。
     window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    window.setIgnoreMouseEvents(true, { forward: true });
+    if (clickThrough) window.setIgnoreMouseEvents(true, { forward: true });
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', (event, target) => {
       if (target === new URL(COMPANION_PATH, baseUrl).href) return;
@@ -205,7 +212,7 @@ export function createCompanionHost(
     fit();
   });
   ipcMain.on('aw:companion-interactive', (event, raw: unknown) => {
-    if (event.sender !== pet?.webContents) return;
+    if (event.sender !== pet?.webContents || !clickThrough) return;
     const interactive = companionInteractiveSchema.parse(raw);
     pet.setIgnoreMouseEvents(!interactive, { forward: true });
   });
