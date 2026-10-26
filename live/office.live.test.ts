@@ -68,6 +68,12 @@ async function salesWorkbook(): Promise<{ bytes: Buffer; totals: Record<string, 
   return { bytes: await writeXlsx(sheets, async () => undefined), totals };
 }
 
+/** The first number after each mention of `region`, before any other figure: 「华东 | 54,550」, 「华东金额最高（54550 元）」. */
+function amountsAfter(text: string, region: string): number[] {
+  const plain = text.replace(/(\d),(?=\d{3})/g, '$1');
+  return [...plain.matchAll(new RegExp(`${region}[^\\d\\n]{0,20}?(\\d+(?:\\.\\d+)?)`, 'g'))].map((m) => Number(m[1]));
+}
+
 describe('@live Word 与 Excel', () => {
   it('助手用表格工具按区域汇总 Excel 附件，并把结果写成 Word 报告', async () => {
     const { bytes, totals } = await salesWorkbook();
@@ -122,11 +128,7 @@ describe('@live Word 与 Excel', () => {
     expect(tools.some((tool) => /(query|read)_sheet$/.test(tool))).toBe(true);
     expect(tools).toContain(`${MCP_ASSISTANT_TOOL_PREFIX}create_docx`);
     expect(report).toBeDefined();
-    // The model may group digits (12,345) or not.
-    const plain = text.replaceAll(',', '').replaceAll('，', '');
-    for (const [region, total] of Object.entries(totals)) {
-      expect(plain).toContain(region);
-      expect(plain).toContain(String(total));
-    }
+    // Each region with its own total: the first amount after the region's name (digits grouped or not), somewhere.
+    for (const [region, total] of Object.entries(totals)) expect(amountsAfter(text, region)).toContain(total);
   });
 });
