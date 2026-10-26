@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import {
   AppError,
@@ -151,6 +151,11 @@ export function createAssistantService(deps: AssistantServiceDeps) {
   });
 
   const filesDir = (id: string) => join(directory, ASSISTANT_FILES_DIR, id);
+  /** A real path (links followed) that is the conversation's files directory or inside it; `directory` is real. */
+  const within = (id: string, real: string) => {
+    const inside = relative(filesDir(id), real);
+    return !inside.startsWith('..') && !isAbsolute(inside);
+  };
 
   function liveOf(id: string): Live {
     let state = live.get(id);
@@ -858,19 +863,12 @@ export function createAssistantService(deps: AssistantServiceDeps) {
 
     /**
      * A file of this conversation by its path relative to the files directory: paths come from the model and the
-     * user (06 §11), so anything outside it or not a file is `VALIDATION_FAILED`.
+     * user (06 §11), so anything outside it, through a symbolic link too, or not a file is `VALIDATION_FAILED`.
      */
     fileOf(id: string, path: string): string {
       get(id);
-      const dir = filesDir(id);
-      const absolutePath = resolve(dir, path);
-      const inside = relative(dir, absolutePath);
-      if (
-        inside.startsWith('..') ||
-        isAbsolute(inside) ||
-        !existsSync(absolutePath) ||
-        !statSync(absolutePath).isFile()
-      ) {
+      const absolutePath = resolve(filesDir(id), path);
+      if (!existsSync(absolutePath) || !within(id, realpathSync(absolutePath)) || !statSync(absolutePath).isFile()) {
         throw new AppError(ErrorCode.ValidationFailed, `${path} is not a file of this conversation`, {
           issues: [{ path: ['path'], message: 'not a file of this conversation; call list_files' }],
         });
@@ -880,23 +878,31 @@ export function createAssistantService(deps: AssistantServiceDeps) {
 
     /**
      * Where a new file asked for at `path` goes (39 §7.2): inside the files directory, its folders made; a taken name
-     * gets a number before the extension (「周报 (2).docx」), so nothing is overwritten.
+     * gets a number before the extension (「周报 (2).docx」), so nothing is overwritten. The folder it lands in must be
+     * inside the directory once symbolic links are followed: the worker writes through them.
      */
     newFile(id: string, path: string): { path: string; absolutePath: string } {
       get(id);
       const dir = filesDir(id);
       const wanted = resolve(dir, path);
-      const inside = relative(dir, wanted);
-      if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) {
-        throw new AppError(ErrorCode.ValidationFailed, `${path} is outside this conversation's files directory`, {
+      const outside = () =>
+        new AppError(ErrorCode.ValidationFailed, `${path} is outside this conversation's files directory`, {
           issues: [{ path: ['file'], message: 'a path inside the files directory, such as report.docx' }],
         });
-      }
+      const inside = relative(dir, wanted);
+      if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) throw outside();
+      // The nearest folder that exists decides where the missing ones are made.
+      let existing = dirname(wanted);
+      while (!existsSync(existing)) existing = dirname(existing);
+      if (!within(id, realpathSync(existing))) throw outside();
       mkdirSync(dirname(wanted), { recursive: true });
       const extension = extname(wanted);
       const stem = wanted.slice(0, wanted.length - extension.length);
       let absolutePath = wanted;
-      for (let n = 2; existsSync(absolutePath); n++) absolutePath = `${stem} (${n})${extension}`;
+      // lstat: a link that points nowhere still takes the name (the worker's `wx` would fail on it).
+      for (let n = 2; lstatSync(absolutePath, { throwIfNoEntry: false }) !== undefined; n++) {
+        absolutePath = `${stem} (${n})${extension}`;
+      }
       return { path: relative(dir, absolutePath), absolutePath };
     },
 

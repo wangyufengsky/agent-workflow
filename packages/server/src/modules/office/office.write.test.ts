@@ -1,4 +1,4 @@
-import { createXlsxInputSchema } from '@aw/shared';
+import { createXlsxInputSchema, OFFICE_WRITE_CELLS_MAX } from '@aw/shared';
 import { describe, expect, it } from 'vitest';
 import { readDocx } from './office.docx.ts';
 import type { Workbook } from './office.workbook.ts';
@@ -180,5 +180,37 @@ describe('create_xlsx 的输入', () => {
       'sheets.0.rows.0: has 2 cells for 1 columns',
     ]);
     expect(problems({ file: 'x.docx', sheets: [sheet({ rows: [] })] })).toEqual(['file: must end with .xlsx']);
+  });
+});
+
+describe('rows_from 的上限', () => {
+  it('匹配的行超过单元格上限时拒绝，不悄悄截掉', () => {
+    const rows = Array.from({ length: OFFICE_WRITE_CELLS_MAX + 1 }, (_, i) => ({
+      r: i + 2,
+      hidden: false,
+      cells: [{ c: 1, v: i }],
+    }));
+    const big: Workbook = {
+      sheets: [
+        {
+          name: 'S',
+          hidden: false,
+          range: `A1:A${rows.length + 1}`,
+          merges: [],
+          hiddenColumns: [],
+          rows: [{ r: 1, hidden: false, cells: [{ c: 1, v: '序号' }] }, ...rows],
+        },
+      ],
+    };
+    const query = {
+      attachment_id: 'a',
+      sheet: 'S',
+      header_row: 1,
+      where: [],
+      group_by: [],
+      aggregates: [],
+      order_by: [],
+    };
+    expect(() => sourceRows(big, query)).toThrow(/rows_from matches 200001 rows/);
   });
 });

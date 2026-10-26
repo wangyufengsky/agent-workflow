@@ -192,8 +192,12 @@ export async function writeXlsx(
   return Buffer.from(await book.xlsx.writeBuffer());
 }
 
-/** `rows_from` (39 §7.2): every row the query matches, as many as the cell limit lets through. */
+/** `rows_from` (39 §7.2): every row the query matches; more than the cell limit is refused, not cut short. */
 export function sourceRows(workbook: Workbook, query: NonNullable<XlsxSheet['rows_from']>): SheetSource {
-  const { columns, rows } = querySheet(workbook, { ...query, limit: OFFICE_WRITE_CELLS_MAX });
+  const { columns, rows, total_rows } = querySheet(workbook, { ...query, limit: OFFICE_WRITE_CELLS_MAX });
+  if (total_rows > rows.length) {
+    const message = `rows_from matches ${total_rows} rows, over ${OFFICE_WRITE_CELLS_MAX} cells; narrow it with where or group_by`;
+    throw new AppError(ErrorCode.ValidationFailed, message, { issues: [{ path: ['sheets', 'rows_from'], message }] });
+  }
   return { columns, rows };
 }

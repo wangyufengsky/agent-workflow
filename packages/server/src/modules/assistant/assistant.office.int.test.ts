@@ -1,4 +1,6 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   type AssistantPageRef,
   ATTACHMENT_NAME_HEADER,
@@ -136,5 +138,29 @@ describe('助手生成 Word 与 Excel（39 §7.2）', () => {
       url: `/assistant/conversations/${mine.id}/files/raw?path=${encodeURIComponent('../../app.db')}`,
     });
     expect([outside.statusCode, outside.json().error.code]).toEqual([400, ErrorCode.ValidationFailed]);
+  });
+
+  it('对话目录里指向外面的符号链接不能把文件写出去，也不能借它下载外面的文件', async () => {
+    const { body: c } = await t.call(createConversationOp, {});
+    const outside = join(tmpdir(), `aw-outside-${c.id}`);
+    await mkdir(outside, { recursive: true });
+    await writeFile(join(outside, 'secret.txt'), 'secret\n');
+    const dir = t.app.services.assistant.filesDir(c.id);
+    await mkdir(dir, { recursive: true });
+    await symlink(outside, join(dir, 'linked'));
+    const report = { file: 'linked/report.docx', blocks: [{ type: 'paragraph', text: '出去' }] };
+    t.fake.enqueue(script().callAppTool('create_docx', report).text('不行'), { agent: OPENCODE_ASSISTANT_AGENT });
+    await say(c.id, '写一份');
+
+    expect(toolResults('create_docx')[0]).toMatchObject({
+      isError: true,
+      result: { code: ErrorCode.ValidationFailed },
+    });
+    expect(await readdir(outside)).toEqual(['secret.txt']);
+    const raw = await t.request({
+      method: 'GET',
+      url: `/assistant/conversations/${c.id}/files/raw?path=${encodeURIComponent('linked/secret.txt')}`,
+    });
+    expect([raw.statusCode, raw.json().error.code]).toEqual([400, ErrorCode.ValidationFailed]);
   });
 });
