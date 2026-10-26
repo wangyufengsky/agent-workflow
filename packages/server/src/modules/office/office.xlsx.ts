@@ -73,6 +73,13 @@ function readSheet(sheet: ExcelJS.Worksheet, counted: { cells: number; formulas:
 
 const countOf = (entries: readonly ZipEntry[], pattern: RegExp) => entries.filter((e) => pattern.test(e.name)).length;
 
+/** A workbook's charts, pictures and pivot tables, counted by its parts: none of them is read (39 §5.3). */
+export const workbookParts = (entries: readonly ZipEntry[]) => ({
+  charts: countOf(entries, /^xl\/charts\/chart\d*\.xml$/),
+  images: countOf(entries, /^xl\/media\//),
+  pivotTables: countOf(entries, /^xl\/pivotTables\/[^/]+\.xml$/),
+});
+
 /**
  * An Excel workbook's cells, its full text and the prompt's overview of it (39 §5.3, §6.1); formulas are not
  * recalculated.
@@ -93,9 +100,7 @@ export async function readXlsx(
       return { name: sheet.name, range: sheet.range, rows, columns, hidden: sheet.hidden };
     }),
     formulas: counted.formulas,
-    charts: countOf(entries, /^xl\/charts\/chart\d*\.xml$/),
-    images: countOf(entries, /^xl\/media\//),
-    pivotTables: countOf(entries, /^xl\/pivotTables\/[^/]+\.xml$/),
+    ...workbookParts(entries),
   };
   return { text: workbookText(workbook), overview: workbookOverview(workbook, meta), workbook, meta };
 }

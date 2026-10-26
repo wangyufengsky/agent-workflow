@@ -55,6 +55,20 @@ export const AttachmentParseFailure = {
 } as const;
 export type AttachmentParseFailure = (typeof AttachmentParseFailure)[keyof typeof AttachmentParseFailure];
 
+/** What a Word or Excel file written from a source lacks of it (39 §7.2), reported to the model and on the file card. */
+export const OfficeLoss = {
+  /** exceljs does not keep charts. */
+  Charts: 'charts',
+  Images: 'images',
+  PivotTables: 'pivot_tables',
+  /** A revised Word document keeps only the source's styles. */
+  HeadersFooters: 'headers_footers',
+  Comments: 'comments',
+  /** Rows or columns were inserted or deleted: formulas pointing past them are not moved (count: the formulas). */
+  FormulaReferences: 'formula_references',
+} as const;
+export type OfficeLoss = (typeof OfficeLoss)[keyof typeof OfficeLoss];
+
 /** What an attachment reference belongs to (10 §6.1); the owner id is that object's id. */
 export const AttachmentOwnerKind = {
   /** The task's starting input; the owner is the task. */

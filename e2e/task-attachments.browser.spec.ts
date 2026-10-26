@@ -167,3 +167,43 @@ test('助手生成 Excel：消息里出现文件卡片，可以预览、下载',
   await card.getByRole('button', { name: '另存为…' }).click();
   expect((await download).suggestedFilename()).toBe('区域汇总.xlsx');
 });
+
+test('助手修改 Excel：另存为新文件，卡片说明没有保留的内容', async ({ page, request }) => {
+  await queueAssistantTurn(request, [
+    appTool('create_xlsx', {
+      file: '预算.xlsx',
+      sheets: [
+        {
+          name: '预算',
+          columns: [{ header: '项目' }, { header: '金额' }],
+          rows: [
+            ['服务器', 1200],
+            ['合计', { formula: 'SUM(B2:B2)' }],
+          ],
+        },
+      ],
+    }),
+    appTool('edit_xlsx', {
+      source: { file: '预算.xlsx' },
+      file: '预算（加一行）.xlsx',
+      operations: [
+        { op: 'insert_rows', sheet: '预算', before: 3, count: 1 },
+        { op: 'set_cells', sheet: '预算', start: 'A3', values: [['带宽', 300]] },
+      ],
+    }),
+    { type: 'text', text: '加好了。' },
+  ]);
+
+  await page.goto('/');
+  await page.getByLabel('告诉助手，或开始任务').fill('预算表里加一行带宽');
+  await page.getByRole('button', { name: '发送', exact: true }).click();
+  await expect(page.getByText('加好了。')).toBeVisible();
+
+  const cards = page.getByRole('region', { name: '助手生成的文件' });
+  await expect(cards).toHaveCount(2);
+  await expect(cards.nth(0)).not.toContainText('没有保留');
+  await expect(cards.nth(1)).toContainText('预算（加一行）.xlsx');
+  await expect(cards.nth(1)).toContainText(
+    '没有保留原文件的公式引用（插入或删除行列后，1 个公式没有跟着调整，请检查）',
+  );
+});

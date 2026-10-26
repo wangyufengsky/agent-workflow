@@ -228,6 +228,8 @@ export const OFFICE_PREVIEW_ROWS = 1000;
 /** One `create_docx` / `create_xlsx` call (39 §10): blocks of a document, cells of a workbook (`rows_from` counted). */
 export const OFFICE_WRITE_BLOCKS_MAX = 2000;
 export const OFFICE_WRITE_CELLS_MAX = 200_000;
+/** One `edit_xlsx` call's operations (39 §7.2). */
+export const OFFICE_EDIT_OPERATIONS_MAX = 1000;
 /** A task's acceptance checklist (31): items per version, and the lengths of an item's texts and of a note. */
 export const REQUIREMENTS_MAX = 30;
 export const REQUIREMENT_TITLE_MAX_CHARS = 120;

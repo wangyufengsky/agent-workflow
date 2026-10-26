@@ -423,6 +423,8 @@ export function createAttachmentsService({
     /** A page of an Excel attachment's sheet; the caller has checked the attachment is visible to its reader. */
     readSheet: ({ attachment_id, ...request }: ReadSheetInput): Promise<ReadSheetOutput> =>
       office.readSheet(workbookOf(attachment_id), request).then((page) => ({ attachment_id, ...page })),
+    /** Where an attachment's original is, for a Word or Excel file written from it (39 §7.2). */
+    originalPath: (id: string): string => join(dirOf(require(id).id), ORIGINAL),
     /** Where an Excel attachment's cells are, for work the office worker does on them (39 §7.2 `rows_from`). */
     workbookPath: workbookOf,
     /** The preview of one sheet of an Excel attachment (39 §8.1). */

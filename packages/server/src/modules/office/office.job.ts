@@ -1,4 +1,12 @@
-import type { AttachmentFormat, CreateDocxInput, CreateXlsxInput, ErrorInfo } from '@aw/shared';
+import type {
+  AttachmentFormat,
+  CreateDocxInput,
+  CreateXlsxInput,
+  EditXlsxInput,
+  ErrorInfo,
+  OfficeLossItem,
+  ReviseDocxInput,
+} from '@aw/shared';
 import type { SheetPageRequest, SheetQuery } from './office.sheets.ts';
 
 /** What the model reads of a Word or Excel attachment, next to its original (39 §5). */
@@ -21,8 +29,13 @@ export type OfficeJob =
   | { kind: 'preview_sheet'; workbook: string; sheet: string; rows: number }
   /** A file the assistant wrote, read on demand for its card (39 §8.2). */
   | { kind: 'preview_file'; file: string; sheet: string | undefined }
-  /** Write a new file at `out`, which must not exist yet (39 §7.2). */
-  | { kind: 'create_docx'; input: CreateDocxInput; out: string }
+  /** Write a new file at `out`, which must not exist yet (39 §7.2); `styleFrom` is a Word document to take styles from. */
+  | { kind: 'create_docx'; input: CreateDocxInput; out: string; styleFrom: string | undefined }
+  /** A new file from the file at `source` (39 §7.2); `source` is never written. */
+  | { kind: 'revise_docx'; input: ReviseDocxInput; source: string; out: string }
+  | { kind: 'edit_xlsx'; input: EditXlsxInput; source: string; out: string }
   /** `workbooks` maps the attachments that `rows_from` names to their `workbook.json`. */
   | { kind: 'create_xlsx'; input: CreateXlsxInput; out: string; workbooks: Record<string, string> };
+/** What a write job returns: the file's size and what it lacks of its source. */
+export type OfficeWritten = { size: number; lost: OfficeLossItem[] };
 export type OfficeReply = { ok: true; value: unknown } | { ok: false; error: ErrorInfo };

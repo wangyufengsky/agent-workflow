@@ -163,4 +163,62 @@ describe('助手生成 Word 与 Excel（39 §7.2）', () => {
     });
     expect([raw.statusCode, raw.json().error.code]).toEqual([400, ErrorCode.ValidationFailed]);
   });
+
+  it('修改与改写：源可以是本对话的附件或写过的文件，另存新文件、原件不变；丢失的内容随卡片记下；格式不对或别的对话的附件被拒', async () => {
+    const { body: mine } = await t.call(createConversationOp, {});
+    const { body: other } = await t.call(createConversationOp, {});
+    const sales = await uploaded(await salesXlsx(), '销售.xlsx');
+    const word = await uploaded(
+      await readFile(new URL('../../../test/fixtures/office/report.libreoffice.docx', import.meta.url)),
+      '需求.docx',
+    );
+    const edit = {
+      source: { attachment_id: sales.id },
+      file: '销售（加备注）.xlsx',
+      operations: [
+        { op: 'insert_rows', sheet: '汇总', before: 2, count: 1 },
+        { op: 'set_cells', sheet: '明细', start: 'G1', values: [['备注']] },
+      ],
+    };
+    const revise = {
+      source: { attachment_id: word.id },
+      file: '需求（修订）.docx',
+      blocks: [{ type: 'heading', level: 1, text: '订单导出需求（修订）' }],
+    };
+    t.fake.enqueue(
+      script()
+        .callAppTool('edit_xlsx', edit)
+        .callAppTool('revise_docx', revise)
+        .callAppTool('revise_docx', { ...revise, source: { file: '需求（修订）.docx' }, file: '再改一次.docx' })
+        .callAppTool('edit_xlsx', { ...edit, source: { attachment_id: word.id } })
+        .text('改好了'),
+      { agent: OPENCODE_ASSISTANT_AGENT },
+    );
+    await say(mine.id, '在销售表上加备注列，再修订需求文档', [sales.id, word.id]);
+    t.fake.enqueue(script().callAppTool('edit_xlsx', edit).text('不行'), { agent: OPENCODE_ASSISTANT_AGENT });
+    await say(other.id, '改那份销售表');
+
+    expect(toolResults('edit_xlsx').map((c) => c.result)).toMatchObject([
+      { file: '销售（加备注）.xlsx', lost: [{ kind: 'formula_references', count: 9 }] },
+      { code: ErrorCode.ValidationFailed },
+      { code: ErrorCode.AttachmentNotFound },
+    ]);
+    expect(toolResults('revise_docx').map((c) => c.result)).toMatchObject([
+      { file: '需求（修订）.docx', lost: [{ kind: 'images', count: 1 }] },
+      { file: '再改一次.docx', lost: [] },
+    ]);
+    const page: TranscriptPage = (
+      await t.request({ method: 'GET', url: `/assistant/conversations/${mine.id}/transcript` })
+    ).json();
+    expect(page.entries.filter((e) => e.kind === 'attachment').map((e) => e.data)).toEqual([
+      { path: '销售（加备注）.xlsx', lost: [{ kind: 'formula_references', count: 9 }] },
+      { path: '需求（修订）.docx', lost: [{ kind: 'images', count: 1 }] },
+      { path: '再改一次.docx' },
+    ]);
+    const edited = (await t.call(previewAssistantFileOp, { id: mine.id, path: '销售（加备注）.xlsx', sheet: '明细' }))
+      .body;
+    expect(edited.format === 'xlsx' && edited.sheet.rows[0]?.cells.at(-1)).toEqual({ c: 7, v: '备注' });
+    // The attachment itself is untouched.
+    expect((await readFile(t.app.services.attachments.originalPath(sales.id))).equals(await salesXlsx())).toBe(true);
+  });
 });
