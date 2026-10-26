@@ -61,6 +61,8 @@ export function useUpdateProject() {
     onSuccess: async (project) => {
       queryClient.setQueryData(queryKeys.project(project.id), project);
       await queryClient.invalidateQueries({ queryKey: queryKeys.projects, exact: true });
+      // The AGENTS.md panel shows the default branch's file and the rules with the check command (40 §7).
+      await queryClient.invalidateQueries({ queryKey: queryKeys.agentsMd(project.id) });
     },
   });
 }

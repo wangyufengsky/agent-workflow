@@ -27,6 +27,10 @@ test('J44 AGENTS.md：项目详情没有时预览规则、写补充说明后让 
   await expect(panel).toContainText('默认分支 main 上还没有 AGENTS.md。');
   await panel.getByRole('button', { name: '预览这一节' }).click();
   await expect(panel.getByTestId('agents-md-rules')).toContainText('提交结果前运行项目的测试');
+  // Saving the project above re-reads the panel: the rules take the new check command.
+  await page.getByLabel('检查命令').fill('npm test');
+  await page.getByRole('button', { name: '保存修改' }).click();
+  await expect(panel.getByTestId('agents-md-rules')).toContainText('提交结果前运行项目的检查命令 npm test');
   await panel.getByLabel('补充说明（可选）').fill('提交信息用英文');
   await panel.getByRole('button', { name: '让 AI 生成' }).click();
 
