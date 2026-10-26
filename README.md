@@ -55,7 +55,8 @@ Agent Workflow 把「让 AI 写代码」变成一条看得见、停得住、由�
 | **进度画布** | 任务页以画布展示 AI 规划出的步骤，节点依次亮起；右侧实时显示当前步骤的执行过程、AI 的思考与汇报。 |
 | **自动检查** | 每一步完成后自动验收：运行项目的检查命令（测试、lint 等）、AI 评审，前端项目还可以做页面体检。 |
 | **需求验收清单** | 可以给任务写几条验收要求，最后由只读的核验步骤逐项给出结论；结果卡逐项显示，交付前提醒未满足的项。 |
-| **附件** | 开始任务、问助手、「让 AI 再改改」时可以带上文本文件或项目里的文件快照，之后每一步看到的都是同一份内容。 |
+| **附件** | 开始任务、问助手、「让 AI 再改改」时可以带上文本文件、Word / Excel 或项目里的文件快照，之后每一步看到的都是同一份内容；Excel 大表由 AI 按需读取与汇总。 |
+| **项目的 AGENTS.md** | 项目详情里查看默认分支上的 AGENTS.md；「让 AI 生成 / 补充」会开一个任务，AI 梳理项目的命令、结构与约定后写好它，可选加入一节「在 Agent Workflow 中工作」的规则，你看过改动再合并。 |
 | **结果卡** | 改动摘要、改了哪些文件、diff、检查结果；按钮：「合并到 main」「创建 PR」「让 AI 再改改」「放弃」。 |
 | **合并与冲突** | 默认 squash 合并到目标分支；有冲突时可以交给 AI 解决后再合并。专业模式可选 merge / squash / rebase。 |
 | **GitHub / GitLab** | 推送分支并创建 PR / MR；同事在 PR 上留的审查意见可以取回来，勾选后「让 AI 按意见再改改」，再推送回同一个 PR。 |
@@ -78,9 +79,11 @@ Agent Workflow 把「让 AI 写代码」变成一条看得见、停得住、由�
 | **应用助手** | 主页的大输入框和任意页面的 `⌘J` 浮层。用自然语言让助手调用应用的各项功能（加项目、开任务、查状态、改设置、查数据库、看 Git……），还能画柱状图、饼图和流程图。写操作会弹出确认卡片，合并、取消、删除每次都要确认；密码与令牌只在表单里输入，不经过对话。 |
 | **知识问答** | 针对一个项目提问（「退款金额在哪里四舍五入？」），只读的知识研究员去查代码、文档和关联数据库，给出**带引用的回答**，点开引用编号就是原文。网络检索单独开关，默认关闭。 |
 | **PPT 制作** | 把任务结果、知识问答或你给的材料做成一份 PPT：AI 先出大纲，确认后逐页制作；可以放映、逐页让 AI 改、自己改文字，最后导出 PDF 或 PowerPoint。 |
-| **质量与用量** | 简单模式看本周三个数；专业模式看 tokens 用量、趋势、按项目 / 流程 / 模型拆分，以及完成率、首次通过率、平均重试、到待合并耗时等质量指标。 |
+| **质量与用量** | 简单模式在任务页顶部看本周三个数；专业模式看 tokens 用量、趋势、按项目 / 流程 / 模型拆分，以及完成率、首次通过率、平均重试、到待合并耗时等质量指标。 |
 | **团队** | 按项目看成员这段时间的提交、改动与质量信号，按时间纵向对比、成员之间横向对比，并可让 AI 给出成员的工作总结。不打分、不排名。 |
 | **桌面伙伴** | 可选的助手形象（光球或鲸鱼），能以透明小窗常驻桌面：点它就能对话，任务准备好、完成或失败时主动提醒。 |
+
+PPT、质量与用量、团队在专业模式的侧栏里；简单模式下从任务结果卡、知识问答和助手进入同样的页面。助手还能生成与修改 Word / Excel 文件，卡片上可以预览、另存为、用默认应用打开。
 
 ### 专业模式（设置中开启）
 
@@ -105,7 +108,7 @@ Agent Workflow 把「让 AI 写代码」变成一条看得见、停得住、由�
 
 ### 主页与助手
 
-主页只有一个输入框：直接打字是问助手；点「直接开始」选一个流程，就切换成「开始任务」，`⌘↵` 或点发送即建任务。下方是「需要你处理」、进行中的需求计划、批量任务和各状态的任务列表。
+主页只有一个输入框：直接打字是问助手；点「直接开始」选一个流程，就切换成「开始任务」，`⌘↵` 或点发送即建任务。下方是三段：「需要你处理」、进行中（需求计划与批量任务各占一行）、待合并。简单模式只放 5 个常用流程，其余在「更多流程」里。
 
 助手对话里的写操作会以确认卡片出现，可以「确认」「确认并总是允许」或「取消」；右侧「工作概览」随时显示待处理与进行中的工作。
 
@@ -220,15 +223,15 @@ Linux 上用 `Ctrl` 代替 `⌘`。
 
 ## 安装
 
-在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。当前版本 **v1.4.1**：
+在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。当前版本 **v1.4.2**：
 
 | 平台 | 文件 |
 | --- | --- |
-| macOS（Apple 芯片） | `agent-workflow-1.4.1-arm64.dmg` |
-| Linux x64（Ubuntu / Debian） | `agent-workflow_1.4.1_amd64.deb` |
-| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.4.1_arm64.deb` |
-| Linux x64（其他发行版） | `agent-workflow-1.4.1-x86_64.AppImage` |
-| Linux arm64（其他发行版） | `agent-workflow-1.4.1-arm64.AppImage` |
+| macOS（Apple 芯片） | `agent-workflow-1.4.2-arm64.dmg` |
+| Linux x64（Ubuntu / Debian） | `agent-workflow_1.4.2_amd64.deb` |
+| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.4.2_arm64.deb` |
+| Linux x64（其他发行版） | `agent-workflow-1.4.2-x86_64.AppImage` |
+| Linux arm64（其他发行版） | `agent-workflow-1.4.2-arm64.AppImage` |
 
 可以用同一页的 `SHA256SUMS.txt` 校验下载的文件：
 
@@ -275,7 +278,7 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 **deb（推荐 Ubuntu / Debian）**：
 
 ```bash
-sudo apt install ./agent-workflow_1.4.1_amd64.deb
+sudo apt install ./agent-workflow_1.4.2_amd64.deb
 ```
 
 arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `/usr/bin/agent-workflow` 指向它，菜单项在 `/usr/share/applications/agent-workflow.desktop`），用户数据在 `~/.config/Agent Workflow/`。之后在应用菜单中打开，或运行 `agent-workflow`；第一次启动时应用会在桌面放一个快捷方式（只放一次，删掉后不再出现）。卸载：`sudo apt remove agent-workflow`。
@@ -283,8 +286,8 @@ arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `
 **AppImage（其他发行版）**：
 
 ```bash
-chmod +x agent-workflow-1.4.1-x86_64.AppImage
-./agent-workflow-1.4.1-x86_64.AppImage
+chmod +x agent-workflow-1.4.2-x86_64.AppImage
+./agent-workflow-1.4.2-x86_64.AppImage
 ```
 
 - AppImage 不安装，放在哪里就从哪里运行（建议先移到固定位置，如 `~/Applications/`）；第一次启动时在桌面放一个指向它当前位置的快捷方式，之后移动文件需要删掉快捷方式重新放。
