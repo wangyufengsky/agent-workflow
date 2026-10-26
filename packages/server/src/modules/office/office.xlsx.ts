@@ -5,7 +5,7 @@ import {
   columnName,
   ErrorCode,
   OFFICE_CELLS_MAX,
-  type OfficeMeta,
+  type XlsxMeta,
 } from '@aw/shared';
 import ExcelJS from 'exceljs';
 import { workbookOverview, workbookText } from './office.sheet-text.ts';
@@ -80,13 +80,13 @@ const countOf = (entries: readonly ZipEntry[], pattern: RegExp) => entries.filte
 export async function readXlsx(
   bytes: Buffer,
   entries: readonly ZipEntry[],
-): Promise<{ text: string; overview: string; workbook: Workbook; meta: OfficeMeta }> {
+): Promise<{ text: string; overview: string; workbook: Workbook; meta: XlsxMeta }> {
   const book = new ExcelJS.Workbook();
   // exceljs declares its own Buffer type, which Node's Buffer satisfies at runtime.
   await book.xlsx.load(bytes as unknown as ExcelJS.Buffer);
   const counted = { cells: 0, formulas: 0 };
   const workbook: Workbook = { sheets: book.worksheets.map((sheet) => readSheet(sheet, counted)) };
-  const meta: OfficeMeta = {
+  const meta: XlsxMeta = {
     format: AttachmentFormat.Xlsx,
     sheets: workbook.sheets.map((sheet) => {
       const { rows, columns } = extentOf(sheet);

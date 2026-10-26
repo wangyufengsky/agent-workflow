@@ -76,6 +76,8 @@ export interface AwBridge {
   selectDirectory(): Promise<string | null>;
   openExternal(url: string): Promise<void>;
   revealInFinder(path: string): Promise<void>;
+  /** Opens a file the assistant wrote with the system's default app (39 §8.2); main refuses any other path. */
+  openPath(path: string): Promise<void>;
   /**
    * Prints a PPT's print view (`/ppt/:id/print`) to PDF in a hidden window and saves it where the user chooses
    * (23 §6.1).

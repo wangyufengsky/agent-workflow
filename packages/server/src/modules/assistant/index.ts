@@ -19,6 +19,7 @@ import type { DecksService } from '../decks/index.ts';
 import type { GitReviewsService } from '../git-reviews/index.ts';
 import type { InitiativesService } from '../initiatives/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
+import type { Office } from '../office/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SchedulesService } from '../schedules/index.ts';
 import type { TasksService } from '../tasks/index.ts';
@@ -30,6 +31,7 @@ import { createConfirmations } from './assistant.confirmations.ts';
 import { createContextRenderer } from './assistant.context.ts';
 import { helperTools } from './assistant.helpers.ts';
 import { createKnowledgeRelay, KNOWLEDGE_QUESTION_OPS } from './assistant.knowledge.ts';
+import { officeTools } from './assistant.office.ts';
 import { assistantOperations } from './assistant.operations.ts';
 import { registerAssistantRoutes } from './assistant.routes.ts';
 import { type AssistantServiceDeps, createAssistantService } from './assistant.service.ts';
@@ -55,6 +57,8 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context'> & {
   gitReviews: GitReviewsService;
   team: TeamService;
   browser: BrowserService;
+  /** Word and Excel files: writing them, and the previews of the files cards (39 §7.2, §8.2). */
+  office: Office;
   /** Every other operation of the app; the assistant's tools are generated from them (15 §3). */
   operations: readonly OperationImpl[];
   appStatus(): Promise<GetAppStatusOutput>;
@@ -108,6 +112,7 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
         ]),
       }),
       ...helperTools({ ...deps, conversations }),
+      ...officeTools({ ...deps, conversations }),
     ],
     { settings: deps.settings, log: deps.log, findBySession: conversations.findBySession },
   );
@@ -124,6 +129,7 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
       whisper,
       createAssistantSnapshots(deps),
       deps.browser,
+      deps.office,
     ),
     register(server: FastifyInstance) {
       registerAssistantRoutes(server, conversations);

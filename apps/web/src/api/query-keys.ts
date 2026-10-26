@@ -83,6 +83,13 @@ export const queryKeys = {
   assistantTranscriptLive: (id: string) => ['assistant', id, 'transcript-live'],
   assistantConfirmations: (id: string) => ['assistant', id, 'confirmations'],
   assistantFiles: (id: string) => ['assistant', id, 'files'],
+  assistantFilePreview: (id: string, path: string, sheet: string | undefined) => [
+    'assistant',
+    id,
+    'files',
+    path,
+    sheet ?? '',
+  ],
   /** Every knowledge query shares this prefix; `knowledge.updated` refreshes them all. */
   knowledge: ['knowledge'],
   knowledgeConversation: (id: string) => ['knowledge', 'conversation', id],

@@ -43,6 +43,14 @@ export const ASSISTANT_COPY = {
   toolStopped: '已中断',
   toolName: '工具',
   attachment: '助手生成的文件',
+  /** The card of a file the assistant wrote (39 §8.2). */
+  file: {
+    kind: { docx: 'Word', xlsx: 'Excel' },
+    preview: '预览',
+    save: '另存为…',
+    open: '打开',
+    saved: (path: string) => `已保存到 ${path}`,
+  },
   /** The input's「+」menu (36 §4). */
   addMenu: '添加资料与上下文',
   context: {
@@ -128,6 +136,8 @@ export const TOOL_COPY = {
     [AssistantToolName.ReadAttachment]: '读取附加的资料',
     [AssistantToolName.ReadSheet]: '读取表格',
     [AssistantToolName.QuerySheet]: '查询表格',
+    [AssistantToolName.CreateDocx]: '生成 Word 文件',
+    [AssistantToolName.CreateXlsx]: '生成 Excel 文件',
     [AssistantToolName.ReadBrowser]: '读取我的预览',
     [AssistantToolName.ShowChart]: '画图',
     [AssistantToolName.ShowFlowchart]: '画流程图',

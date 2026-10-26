@@ -10,6 +10,7 @@ import {
   listConfirmationsOp,
   listConversationsOp,
   listExternalMcpOp,
+  previewAssistantFileOp,
   replyAssistantPermissionOp,
   sendAssistantMessageOp,
   snapshotAssistantContextOp,
@@ -18,6 +19,7 @@ import {
 } from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
 import type { BrowserService } from '../browser/index.ts';
+import type { Office } from '../office/index.ts';
 import type { Confirmations } from './assistant.confirmations.ts';
 import type { AssistantService } from './assistant.service.ts';
 import type { AssistantSnapshots } from './assistant.snapshots.ts';
@@ -29,6 +31,7 @@ export function assistantOperations(
   whisper: WhisperService,
   snapshots: AssistantSnapshots,
   browser: BrowserService,
+  office: Office,
 ) {
   return [
     implement(snapshotAssistantContextOp, (input) => snapshots.create(input)),
@@ -52,6 +55,9 @@ export function assistantOperations(
       conversations.replyPermission(id, permissionId, reply),
     ),
     implement(listAssistantFilesOp, ({ id }) => ({ items: conversations.files(id) })),
+    implement(previewAssistantFileOp, ({ id, path, sheet }) =>
+      office.previewFile(conversations.fileOf(id, path), sheet),
+    ),
     implement(listExternalMcpOp, async () => ({ items: await conversations.externalMcp() })),
     implement(listConfirmationsOp, ({ id }) => {
       conversations.get(id);

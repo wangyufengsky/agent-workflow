@@ -2,9 +2,12 @@ import { Worker } from 'node:worker_threads';
 import {
   AppError,
   AttachmentParseFailure,
+  type CreateDocxInput,
+  type CreateXlsxInput,
   ErrorCode,
   OFFICE_WORKER_HEAP_MB,
   OFFICE_WORKER_TIMEOUT_MS,
+  type OfficeFilePreviewDTO,
   type OfficeMeta,
   type SheetPreviewDTO,
 } from '@aw/shared';
@@ -86,6 +89,14 @@ export function createOffice({
     /** The first `rows` rows of a sheet, for the attachment preview (39 §8.1). */
     previewSheet: (workbook: string, sheet: string, rows: number) =>
       run<SheetPreviewDTO>({ kind: 'preview_sheet', workbook, sheet, rows }),
+    /** A Word or Excel file read on demand, for the assistant's file cards (39 §8.2). */
+    previewFile: (file: string, sheet: string | undefined) =>
+      run<OfficeFilePreviewDTO>({ kind: 'preview_file', file, sheet }),
+    /** Writes a new Word document at `out` (39 §7.2). */
+    createDocx: (input: CreateDocxInput, out: string) => run<{ size: number }>({ kind: 'create_docx', input, out }),
+    /** Writes a new Excel workbook at `out`; `workbooks` are the `rows_from` attachments' cells (39 §7.2). */
+    createXlsx: (input: CreateXlsxInput, out: string, workbooks: Record<string, string>) =>
+      run<{ size: number }>({ kind: 'create_xlsx', input, out, workbooks }),
   };
 }
 export type Office = ReturnType<typeof createOffice>;

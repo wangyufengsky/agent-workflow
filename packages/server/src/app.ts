@@ -277,6 +277,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     worktrees: worktrees.service,
     dataDir: config.dataDir,
   });
+  const office = createOffice({ clock, workerFile: config.officeWorkerFile });
   const attachments = createAttachmentsModule({
     db: database.db,
     unit,
@@ -285,7 +286,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     projects: projects.service,
     worktrees: worktrees.service,
     prompts,
-    office: createOffice({ clock, workerFile: config.officeWorkerFile }),
+    office,
     dataDir: config.dataDir,
   });
   server.addHook('preClose', async () => {
@@ -553,6 +554,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     gitReviews: gitReviews.service,
     team: team.service,
     attachments: attachments.service,
+    office,
     slots: modelSlots.service,
     dataDir: config.dataDir,
     timeZone,

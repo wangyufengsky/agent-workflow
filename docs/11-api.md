@@ -583,6 +583,8 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 | attachments.snapshotProjectFile | POST `/attachments/project-file` | write；仅 UI | `{ projectId, taskId?, path, lines? }` → `AttachmentDTO` |
 | attachments.get | GET `/attachments/:id` | read；UI | `AttachmentDTO`（不含绝对路径） |
 | attachments.previewSheet（OF-03） | GET `/attachments/:id/sheet?sheet=` | read；仅 UI | Excel 附件一个工作表的预览 `SheetPreviewDTO`：`name`、`range`、`hidden`、`left` 与 `columns`（列字母从哪列起、共几列）、`merges`、前 `OFFICE_PREVIEW_ROWS` 行（`{ r, hidden, cells: [{ c, v }] }`）、`totalRows`；工作表不存在或附件不是 Excel 为 `VALIDATION_FAILED`（39 §8.1） |
+| assistant.previewFile（OF-04） | GET `/assistant/conversations/:id/files/preview?path=&sheet=` | read；仅 UI | 助手写的 Word / Excel 文件的预览 `OfficeFilePreviewDTO`：Word 为 `{ format, meta, markdown }`，Excel 为 `{ format, meta, sheet: SheetPreviewDTO }`（`sheet` 省略时为第一个工作表）；路径越界、不是文件、不是 Word / Excel 为 `VALIDATION_FAILED`（39 §8.2） |
+| （非清单）助手文件 | GET `/assistant/conversations/:id/files/raw?path=` | 仅 UI | 文件字节，`application/octet-stream`，`content-disposition: attachment`；路径同上校验（另存为，39 §8.2） |
 | attachments.remove | DELETE `/attachments/:id` | write；仅 UI | 只能删除尚无引用的附件，已发送的返回 `VALIDATION_FAILED` |
 
 以上为 U-01 已实现的部分。两条非清单路由使用与 JSON API 相同的令牌校验，不在 URL query 放令牌；原件以纯文本返回，不作为同源 HTML 执行。

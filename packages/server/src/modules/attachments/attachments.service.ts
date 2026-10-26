@@ -423,6 +423,8 @@ export function createAttachmentsService({
     /** A page of an Excel attachment's sheet; the caller has checked the attachment is visible to its reader. */
     readSheet: ({ attachment_id, ...request }: ReadSheetInput): Promise<ReadSheetOutput> =>
       office.readSheet(workbookOf(attachment_id), request).then((page) => ({ attachment_id, ...page })),
+    /** Where an Excel attachment's cells are, for work the office worker does on them (39 §7.2 `rows_from`). */
+    workbookPath: workbookOf,
     /** The preview of one sheet of an Excel attachment (39 §8.1). */
     previewSheet: (id: string, sheet: string): Promise<SheetPreviewDTO> =>
       office.previewSheet(workbookOf(id), sheet, OFFICE_PREVIEW_ROWS),

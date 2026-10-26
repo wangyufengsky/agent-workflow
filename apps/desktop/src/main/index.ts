@@ -1,7 +1,15 @@
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { join } from 'node:path';
-import { APP_LICENSE, APP_SOURCE_URL, browserRectSchema, type LaunchPreferences } from '@aw/shared';
+import { realpathSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import {
+  APP_LICENSE,
+  APP_SOURCE_URL,
+  ASSISTANT_DIR,
+  ASSISTANT_FILES_DIR,
+  browserRectSchema,
+  type LaunchPreferences,
+} from '@aw/shared';
 import { splashBackground, splashHtml, titleBarOverlay } from '@aw/web/splash';
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell, type WebPreferences } from 'electron';
 import { type Backend, startBackend } from './backend.ts';
@@ -102,6 +110,14 @@ ipcMain.handle('aw:open-external', async (_e, url: string) => {
   await shell.openExternal(url);
 });
 ipcMain.handle('aw:reveal-in-finder', (_e, path: string) => shell.showItemInFolder(path));
+// Opening runs whatever app the system picks, so only a file the assistant wrote (39 §8.2), whatever the renderer asks.
+ipcMain.handle('aw:open-path', async (_e, path: string) => {
+  const root = realpathSync(join(app.getPath('userData'), ASSISTANT_DIR, ASSISTANT_FILES_DIR));
+  const inside = relative(root, realpathSync(path));
+  if (inside === '' || inside.startsWith('..')) throw new Error('Only files the assistant wrote can be opened');
+  const failure = await shell.openPath(path);
+  if (failure !== '') throw new Error(failure);
+});
 // The user's browser tabs (29 §8.1): the renderer is a boundary, its arguments are parsed.
 ipcMain.on('aw:browser-place', (_e, tabId: unknown, rect: unknown) =>
   backend?.browser.place(String(tabId), browserRectSchema.nullable().parse(rect)),

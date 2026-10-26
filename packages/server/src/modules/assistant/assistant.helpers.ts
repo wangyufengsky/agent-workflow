@@ -1,11 +1,8 @@
-import { existsSync, statSync } from 'node:fs';
-import { isAbsolute, relative, resolve } from 'node:path';
 import {
   AppError,
   ASSISTANT_FORM_OPERATION,
   AssistantForm,
   AssistantToolName,
-  AttachmentOwnerKind,
   assistantFormSchema,
   assistantInputSchema,
   CHART_CATEGORIES,
@@ -71,14 +68,8 @@ const openFormToolInput = z.object({
 export function helperTools(deps: HelperToolDeps): AssistantTool[] {
   const { events, conversations } = deps;
   /** The attachment tools read only the files the user attached in this conversation (30 §5). */
-  const assertOwn = (conversationId: string, attachmentId: string) => {
-    const own = deps.attachments.listByOwner({ kind: AttachmentOwnerKind.AssistantMessage, id: conversationId });
-    if (!own.some((a) => a.id === attachmentId)) {
-      throw new AppError(ErrorCode.AttachmentNotFound, 'Not an attachment of this conversation', {
-        attachment_id: attachmentId,
-      });
-    }
-  };
+  const assertOwn = (conversationId: string, attachmentId: string) =>
+    conversations.assertOwnAttachments(conversationId, [attachmentId]);
   return [
     {
       name: AssistantToolName.ReadBrowser,
@@ -206,20 +197,7 @@ export function helperTools(deps: HelperToolDeps): AssistantTool[] {
       mode: UiMode.Simple,
       handler(input, { conversation }) {
         const { path } = revealFileInputSchema.parse(input);
-        const dir = conversations.filesDir(conversation.id);
-        const absolutePath = resolve(dir, path);
-        const inside = relative(dir, absolutePath);
-        // Paths come from the model (06 §11): only files of this conversation.
-        if (
-          inside.startsWith('..') ||
-          isAbsolute(inside) ||
-          !existsSync(absolutePath) ||
-          !statSync(absolutePath).isFile()
-        ) {
-          throw new AppError(ErrorCode.ValidationFailed, `${path} is not a file of this conversation`, {
-            issues: [{ path: ['path'], message: 'not a file of this conversation; call list_files' }],
-          });
-        }
+        const absolutePath = conversations.fileOf(conversation.id, path);
         events.publish({
           type: ServerEventType.AssistantRevealFile,
           data: { conversationId: conversation.id, absolutePath },
