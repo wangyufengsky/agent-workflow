@@ -39,6 +39,8 @@ export async function startBackend(
       AW_OPENCODE_PLUGIN_FILE: app.isPackaged
         ? join(process.resourcesPath, 'opencode-plugin', 'agent-workflow-bridge.js')
         : join(app.getAppPath(), '../../packages/opencode-plugin/dist/agent-workflow-bridge.js'),
+      // Built next to server.js, in development too.
+      AW_OFFICE_WORKER_FILE: join(import.meta.dirname, 'office-worker.js'),
       ...(isDev ? {} : { AW_WEB_DIR: join(import.meta.dirname, '../renderer') }),
     },
   });

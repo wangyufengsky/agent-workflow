@@ -1,0 +1,72 @@
+import ExcelJS from 'exceljs';
+import { describe, expect, it } from 'vitest';
+import { columnName, readXlsx } from './office.xlsx.ts';
+import { zipEntries } from './office.zip.ts';
+
+/** A workbook as a program (not Excel) writes it: formulas without cached results. */
+async function written(build: (book: ExcelJS.Workbook) => void): Promise<Buffer> {
+  const book = new ExcelJS.Workbook();
+  build(book);
+  return Buffer.from(await book.xlsx.writeBuffer());
+}
+
+describe('Excel 读成工作簿与文字', () => {
+  it('取单元格的值：日期为 ISO、富文本取文字、公式取缓存结果，没有缓存时文字里写公式', async () => {
+    const bytes = await written((book) => {
+      const sheet = book.addWorksheet('明细');
+      sheet.addRow(['日期', '说明', '金额', '合计']);
+      sheet.addRow([
+        new Date('2026-09-01T00:00:00Z'),
+        { richText: [{ text: '含税' }, { text: ' | 元' }] },
+        { formula: '1+1', result: 2 },
+        { formula: 'C2*2' },
+      ]);
+      sheet.addRow([new Date('2026-09-01T08:30:00Z'), '多行\n说明', null, null]);
+    });
+    const { workbook, text, meta } = await readXlsx(bytes, zipEntries(bytes));
+    expect(workbook.sheets[0]?.rows[1]?.cells).toEqual([
+      { c: 1, v: '2026-09-01' },
+      { c: 2, v: '含税 | 元' },
+      { c: 3, v: 2, f: '1+1' },
+      { c: 4, v: null, f: 'C2*2' },
+    ]);
+    expect(text).toContain('| 2 | 2026-09-01 | 含税 \\| 元 | 2 | =C2*2 |');
+    expect(text).toContain('| 3 | 2026-09-01T08:30:00 | 多行<br>说明 |  |  |');
+    expect(meta).toMatchObject({ format: 'xlsx', formulas: 2, sheets: [{ name: '明细', range: 'A1:D3', rows: 3 }] });
+  });
+
+  it('行号与列字母从数据所在的位置开始；合并区域只记一次，隐藏的行、列、工作表都标出', async () => {
+    const bytes = await written((book) => {
+      const sheet = book.addWorksheet('汇总');
+      sheet.getCell('C3').value = '区域汇总';
+      sheet.mergeCells('C3:D3');
+      sheet.getCell('C4').value = '华东';
+      sheet.getCell('D4').value = 1384;
+      sheet.getRow(4).hidden = true;
+      sheet.getColumn('D').hidden = true;
+      book.addWorksheet('空的');
+      book.addWorksheet('内部', { state: 'hidden' }).getCell('A1').value = 1;
+    });
+    const { workbook, text, meta } = await readXlsx(bytes, zipEntries(bytes));
+    expect(workbook.sheets[0]).toMatchObject({ range: 'C3:D4', merges: ['C3:D3'], hiddenColumns: [4] });
+    expect(text).toContain(
+      [
+        '## 工作表「汇总」（C3:D4，2 行 × 2 列）',
+        '合并单元格：C3:D3',
+        '隐藏的列：D',
+        '',
+        '| 行 | C | D |',
+        '| --- | --- | --- |',
+        '| 3 | 区域汇总 |  |',
+        '| 4（隐藏） | 华东 | 1384 |',
+      ].join('\n'),
+    );
+    expect(text).toContain('## 工作表「空的」（空）');
+    expect(text).toContain('## 工作表「内部」（A1:A1，1 行 × 1 列，隐藏的工作表）');
+    expect(meta).toMatchObject({ sheets: [{ hidden: false }, { range: null, rows: 0 }, { hidden: true }] });
+  });
+
+  it('列字母', () => {
+    expect([1, 26, 27, 52, 703].map(columnName)).toEqual(['A', 'Z', 'AA', 'AZ', 'AAA']);
+  });
+});

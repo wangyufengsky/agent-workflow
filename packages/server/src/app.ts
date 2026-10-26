@@ -54,6 +54,7 @@ import { createMcpModule } from './modules/mcp/index.ts';
 import { createModelSlotsModule } from './modules/model-slots/index.ts';
 import { createNetworkModule, validateNetworkSettings } from './modules/network/index.ts';
 import { createNodesModule, type NodesService } from './modules/nodes/index.ts';
+import { createOffice } from './modules/office/index.ts';
 import {
   createOpencodeRuntime,
   createRuntimeClient,
@@ -284,6 +285,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     projects: projects.service,
     worktrees: worktrees.service,
     prompts,
+    office: createOffice({ clock, workerFile: config.officeWorkerFile }),
     dataDir: config.dataDir,
   });
   server.addHook('preClose', async () => {

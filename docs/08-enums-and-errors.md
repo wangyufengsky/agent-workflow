@@ -633,6 +633,10 @@ class AppError extends Error {
 | 枚举／类型 | 值 |
 | --- | --- |
 | AttachmentSource | upload · project_file |
+| AttachmentFormat（OF-01 已实现，下同） | text · docx · xlsx（看内容判断，39 §4） |
+| AttachmentRejection（`ATTACHMENT_INVALID_TYPE` 的 `details.reason`） | not_text · legacy_office（.doc / .xls）· encrypted（有打开密码）· unsupported（其他 zip） |
+| AttachmentLimit（`ATTACHMENT_TOO_LARGE` 的 `details.reason`） | bytes · count · unzipped · cells |
+| AttachmentParseFailure（`ATTACHMENT_PARSE_FAILED` 的 `details.reason`） | corrupt · timeout · out_of_memory |
 | AttachmentOwnerKind | task_input（owner 为任务）· task_feedback（owner 为追加的修改节点）· assistant_message（owner 为助手对话）· initiative（owner 为需求计划：资料原件，每个工作包的任务再引用一次，34 §7） |
 | AssistantToolName 增量（U-02 已实现） | read_attachment |
 | InputRef 增量（U-03 已实现） | attachment（确认卡把附件 ID 显示为文件名） |
@@ -646,7 +650,10 @@ class AppError extends Error {
 | 常量 | 值 |
 | --- | --- |
 | ATTACHMENTS_PER_INPUT_MAX | 10 |
-| ATTACHMENT_BYTES_MAX | 5 MiB |
+| ATTACHMENT_BYTES_MAX | 5 MiB（文本附件） |
+| OFFICE_ATTACHMENT_BYTES_MAX / OFFICE_UNZIPPED_BYTES_MAX（OF-01 已实现，下同） | 20 MiB / 200 MiB（Word 与 Excel 附件，39 §10） |
+| OFFICE_CELLS_MAX | 500,000（Excel 的非空单元格） |
+| OFFICE_WORKER_TIMEOUT_MS / OFFICE_WORKER_HEAP_MB | 30,000 / 1,024（一次解析的时限与 worker 堆上限） |
 | ATTACHMENT_NAME_MAX_CHARS | 255（显示名） |
 | ATTACHMENT_PROMPT_MAX_CHARS / ATTACHMENT_READ_MAX_CHARS | 20,000（一次提示词里全部附件合计）/ 12,000（每次读取）（U-02 已实现） |
 | ATTACHMENT_ORPHAN_TTL_MS / ATTACHMENT_CLEANUP_INTERVAL_MS | 86,400,000（无引用附件的保留时间）/ 3,600,000（清理间隔） |
@@ -656,8 +663,9 @@ class AppError extends Error {
 | 错误码 | HTTP | 含义 |
 | --- | --- | --- |
 | ATTACHMENT_NOT_FOUND | 404 | 不存在或不在当前范围（其他任务／对话），不泄露内容 |
-| ATTACHMENT_INVALID_TYPE | 400 | 不是严格 UTF-8 或含 NUL 字节（首版只支持文本） |
-| ATTACHMENT_TOO_LARGE | 413 | 大小或单次输入个数超限，`details.limit` 为超过的那个上限值 |
+| ATTACHMENT_INVALID_TYPE | 400 | 不是文本（严格 UTF-8、不含 NUL；名字为 .csv / .tsv / .txt 时也接受 GB18030）也不是 Word / Excel；`details.reason` 见 `AttachmentRejection` |
+| ATTACHMENT_TOO_LARGE | 413 | 大小、单次输入个数、解压后大小或单元格数超限；`details.reason` 见 `AttachmentLimit`，`details.limit` 为超过的那个上限值 |
+| ATTACHMENT_PARSE_FAILED（OF-01 已实现） | 400 | Word / Excel 文件损坏，或解析超过时限、内存上限；`details.reason` 见 `AttachmentParseFailure` |
 | ATTACHMENT_SOURCE_INVALID | 400 | 项目文件越界（含 `.git` 内）、指向根外的符号链接、不存在或非普通文件（`details.reason`：`outside` · `missing`）、行号超出末尾（`details.lineCount`），或任务在该项目没有可用的工作区 |
 | REQUIREMENTS_NOT_EDITABLE（Q-01 已实现） | 409 | 任务状态不允许编辑清单（只有 `draft`、`plan_review`、`review` 可以），或不在 `review` 时请求重新核验／人工结论 |
 | REQUIREMENT_RESULTS_INVALID（Q-02 已实现） | —（只经执行 MCP 返回） | 非核验节点提交 `requirement_results`，或项不属于当前版本、不是 AI 核验项、重复 |

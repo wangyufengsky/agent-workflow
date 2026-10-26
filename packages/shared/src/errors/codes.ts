@@ -134,6 +134,7 @@ export const ErrorCode = {
   AttachmentInvalidType: 'ATTACHMENT_INVALID_TYPE',
   AttachmentTooLarge: 'ATTACHMENT_TOO_LARGE',
   AttachmentSourceInvalid: 'ATTACHMENT_SOURCE_INVALID',
+  AttachmentParseFailed: 'ATTACHMENT_PARSE_FAILED',
   // 需求验收清单（31）
   RequirementsNotEditable: 'REQUIREMENTS_NOT_EDITABLE',
   RequirementResultsInvalid: 'REQUIREMENT_RESULTS_INVALID',
@@ -279,6 +280,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.AttachmentInvalidType]: 400,
   [ErrorCode.AttachmentTooLarge]: 413,
   [ErrorCode.AttachmentSourceInvalid]: 400,
+  [ErrorCode.AttachmentParseFailed]: 400,
   [ErrorCode.RequirementsNotEditable]: 409,
   [ErrorCode.RequirementResultsInvalid]: null,
   [ErrorCode.RequirementsUnacknowledged]: 409,

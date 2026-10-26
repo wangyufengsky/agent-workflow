@@ -578,8 +578,8 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 
 | 操作 | 方法与路径 | 风险／曝光 | 输入 → 结果 |
 | --- | --- | --- | --- |
-| （非清单）上传 | POST `/attachments` | 仅 UI | `Content-Type: application/octet-stream` 的二进制请求体（后端按原始字节校验文本，30 §3.1）；`X-Attachment-Name` 为 URL 编码的文件名 → 201 `AttachmentDTO`；校验失败返回错误、不留记录 |
-| （非清单）原件 | GET `/attachments/:id/content` | 仅 UI | 原件字节，`text/plain; charset=utf-8` 加 `nosniff` |
+| （非清单）上传 | POST `/attachments` | 仅 UI | `Content-Type: application/octet-stream` 的二进制请求体（后端按原始字节判断格式并校验，30 §3.1、39 §4）；`X-Attachment-Name` 为 URL 编码的文件名 → 201 `AttachmentDTO`（含 `format` 与 Word / Excel 的 `meta`，OF-01）；Word / Excel 在请求内解析完成；校验或解析失败返回错误、不留记录 |
+| （非清单）文字 | GET `/attachments/:id/content` | 仅 UI | 模型读到的文字：文本附件的原件、Word / Excel 读出的 `text.md`；`text/plain; charset=utf-8` 加 `nosniff` |
 | attachments.snapshotProjectFile | POST `/attachments/project-file` | write；仅 UI | `{ projectId, taskId?, path, lines? }` → `AttachmentDTO` |
 | attachments.get | GET `/attachments/:id` | read；UI | `AttachmentDTO`（不含绝对路径） |
 | attachments.remove | DELETE `/attachments/:id` | write；仅 UI | 只能删除尚无引用的附件，已发送的返回 `VALIDATION_FAILED` |

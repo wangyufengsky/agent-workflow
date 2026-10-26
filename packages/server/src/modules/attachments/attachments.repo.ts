@@ -1,4 +1,4 @@
-import { type AttachmentDTO, type AttachmentOwnerKind, attachmentOriginSchema } from '@aw/shared';
+import { type AttachmentDTO, type AttachmentOwnerKind, attachmentOriginSchema, officeMetaSchema } from '@aw/shared';
 import { and, asc, eq, inArray, lt, notExists } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { attachmentRefsTable, attachmentsTable } from './attachments.table.ts';
@@ -7,9 +7,10 @@ type AttachmentRow = typeof attachmentsTable.$inferSelect;
 export type Owner = { kind: AttachmentOwnerKind; id: string };
 
 // JSON columns are parsed at the boundary (06 §9).
-const toAttachment = ({ origin, ...row }: AttachmentRow): AttachmentDTO => ({
+const toAttachment = ({ origin, meta, ...row }: AttachmentRow): AttachmentDTO => ({
   ...row,
   origin: origin === null ? null : attachmentOriginSchema.parse(JSON.parse(origin)),
+  meta: meta === null ? null : officeMetaSchema.parse(JSON.parse(meta)),
 });
 
 export function createAttachmentsRepo(db: DbExecutor) {
@@ -19,9 +20,13 @@ export function createAttachmentsRepo(db: DbExecutor) {
 
   return {
     insert(attachment: AttachmentDTO): void {
-      const { origin, ...row } = attachment;
+      const { origin, meta, ...row } = attachment;
       db.insert(a)
-        .values({ ...row, origin: origin === null ? null : JSON.stringify(origin) })
+        .values({
+          ...row,
+          origin: origin === null ? null : JSON.stringify(origin),
+          meta: meta === null ? null : JSON.stringify(meta),
+        })
         .run();
     },
     find(id: string): AttachmentDTO | undefined {

@@ -201,6 +201,15 @@ export const ATTACHMENT_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 /** What the model gets of attachments (30 §3.2): all of one input's text in the prompt, and one `read_attachment` page. */
 export const ATTACHMENT_PROMPT_MAX_CHARS = 20_000;
 export const ATTACHMENT_READ_MAX_CHARS = 12_000;
+/**
+ * Word and Excel attachments (39 §10): a file's size, its size unzipped, its non-empty cells, and how long and with how
+ * much heap one is parsed. Text attachments keep `ATTACHMENT_BYTES_MAX`.
+ */
+export const OFFICE_ATTACHMENT_BYTES_MAX = 20 * 1024 * 1024;
+export const OFFICE_UNZIPPED_BYTES_MAX = 200 * 1024 * 1024;
+export const OFFICE_CELLS_MAX = 500_000;
+export const OFFICE_WORKER_TIMEOUT_MS = 30_000;
+export const OFFICE_WORKER_HEAP_MB = 1024;
 /** A task's acceptance checklist (31): items per version, and the lengths of an item's texts and of a note. */
 export const REQUIREMENTS_MAX = 30;
 export const REQUIREMENT_TITLE_MAX_CHARS = 120;

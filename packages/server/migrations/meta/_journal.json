@@ -225,6 +225,13 @@
       "when": 1792929349200,
       "tag": "0031_credential_master_password",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1793003200579,
+      "tag": "0032_attachment_format",
+      "breakpoints": true
     }
   ]
 }

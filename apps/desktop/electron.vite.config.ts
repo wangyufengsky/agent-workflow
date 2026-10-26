@@ -27,6 +27,8 @@ export default defineConfig(({ mode }) => ({
         input: {
           index: resolve(import.meta.dirname, 'src/main/index.ts'),
           server: resolve(import.meta.dirname, '../../packages/server/src/main.ts'),
+          // Its own bundle: a worker thread loads it by path (39 §5.1).
+          'office-worker': resolve(import.meta.dirname, '../../packages/server/src/modules/office/office.worker.ts'),
         },
       },
     },

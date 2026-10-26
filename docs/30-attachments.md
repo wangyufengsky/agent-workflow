@@ -42,7 +42,7 @@
 
 `POST /attachments` 一次上传（二进制请求体，非清单路由，11 §14）。后端写临时文件，校验通过后原子改名到 `<userData>/attachments/<id>/original`，再插入记录；校验不过直接返回错误，不留记录。所以没有「上传中／处理中」状态：**记录存在就是可用的**。
 
-- 是不是文本看内容，不看扩展名或浏览器给的 MIME：严格 UTF-8 解码成功且不含 NUL 字节才接受，否则返回 `ATTACHMENT_INVALID_TYPE`（`details.reason: not_text`）。图片、PDF 等都在这里被拒，提示信息说明目前只支持文本。
+- 是不是文本看内容，不看扩展名或浏览器给的 MIME：严格 UTF-8 解码成功且不含 NUL 字节才接受，否则返回 `ATTACHMENT_INVALID_TYPE`（`details.reason: not_text`）。图片、PDF 等都在这里被拒，提示信息说明目前只支持文本。Word（.docx）与 Excel（.xlsx）按 [39 §4–§5](39-office-files.md) 识别并在上传时读出文字（OF-01 已实现）。
 - 二进制请求体而不是 JSON 字符串，是为了让后端拿到原始字节做严格校验（浏览器读文件时会把非法字节替换掉），以后支持图片时也不用换接口。
 - 存储路径只由附件 ID 派生，显示名只在数据库；同名文件是不同附件，不做内容去重。
 
