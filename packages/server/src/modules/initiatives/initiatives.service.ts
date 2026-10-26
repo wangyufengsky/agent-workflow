@@ -37,7 +37,6 @@ import {
   type ListInitiativesQuery,
   type LocalMergeStrategy,
   MCP_TOOL_PREFIX,
-  McpToolName,
   renderTemplateRequirement,
   ServerEventType,
   SessionAgent,
@@ -538,10 +537,7 @@ export function createInitiativesService({
         projectName: project.name,
         baseBranch: initiative.baseBranch,
         requirement: initiative.requirement,
-        attachments: attachments.promptSection(
-          attachments.listByOwner(owner(initiative.id)),
-          `${MCP_TOOL_PREFIX}${McpToolName.ReadAttachment}`,
-        ),
+        attachments: attachments.promptSection(attachments.listByOwner(owner(initiative.id)), MCP_TOOL_PREFIX),
         workflows: allowedWorkflowsOf(initiative),
       });
     const started =

@@ -171,7 +171,8 @@ export function querySheet(workbook: Workbook, query: SheetQuery): SheetQueryRes
   let rows: WorkbookValue[][];
   if (query.aggregates.length === 0) {
     if (query.group_by.length > 0) throw invalid('group_by', 'group_by needs at least one aggregate');
-    const picked = (query.columns ?? [...headerOf.values()]).map((name, i) => resolve(name, `columns.${i}`));
+    // All columns by position: two headers may read the same.
+    const picked = query.columns?.map((name, i) => resolve(name, `columns.${i}`)) ?? [...headerOf.keys()];
     columns = picked.map((c) => headerOf.get(c) ?? columnName(c));
     rows = data.map((cellAt) => picked.map(cellAt));
   } else {
@@ -185,7 +186,9 @@ export function querySheet(workbook: Workbook, query: SheetQuery): SheetQueryRes
     const groups = new Map<string, typeof data>();
     for (const cellAt of data) {
       const key = JSON.stringify(groupBy.map(cellAt));
-      groups.set(key, [...(groups.get(key) ?? []), cellAt]);
+      const members = groups.get(key);
+      if (members === undefined) groups.set(key, [cellAt]);
+      else members.push(cellAt);
     }
     if (groupBy.length === 0 && groups.size === 0) groups.set('[]', []);
     columns = [

@@ -185,4 +185,33 @@ describe('query_sheet', () => {
         .message,
     ).toBe('"金额" is not a returned column; they are 区域');
   });
+
+  it('不指定列时按位置返回所有列，表头重名的两列各是各的', () => {
+    const twins: Workbook = {
+      sheets: [
+        {
+          name: 'S',
+          hidden: false,
+          range: 'A1:B2',
+          merges: [],
+          hiddenColumns: [],
+          rows: [row(1, '金额', '金额'), row(2, 10, 20)],
+        },
+      ],
+    };
+    expect(querySheet(twins, query({ sheet: 'S' }))).toMatchObject({ columns: ['金额', '金额'], rows: [[10, 20]] });
+  });
+
+  it('十万行的汇总不随行数平方变慢', () => {
+    const rows = [row(1, '金额'), ...Array.from({ length: 100_000 }, (_, i) => row(i + 2, 1))];
+    const big: Workbook = {
+      sheets: [{ name: 'S', hidden: false, range: 'A1:A100001', merges: [], hiddenColumns: [], rows }],
+    };
+    const started = performance.now();
+    expect(querySheet(big, query({ sheet: 'S', aggregates: [{ fn: 'sum', column: '金额' }] })).rows).toEqual([
+      [100_000],
+    ]);
+    // Far below the worker's time limit; quadratic grouping took over 30 s for 30,000 rows.
+    expect(performance.now() - started).toBeLessThan(5_000);
+  });
 });
