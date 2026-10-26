@@ -128,7 +128,7 @@ attachments/<id>/original + text.md + workbook.json        files/<conversationId
 ### 6.1 提示词
 
 - **Word**：与文本附件相同（30 §3.2），`text.md` 进附件块，所有附件合计超过 20,000 字符时平分额度并给 `cursor`，模型用 `read_attachment` 读完。
-- **Excel**：不放整张表（按字符截断会切断行，且大表放不下），放**工作簿概览**：每个工作表的名字、区域、行列数、前 10 行与最后 2 行（含表头）、公式与图表数量；超过 20 个工作表时只列名字。概览后一句写明用 `read_sheet` 读更多行、用 `query_sheet` 做筛选与汇总。
+- **Excel**：不放整张表（按字符截断会切断行，且大表放不下），放**工作簿概览**：第一行列出全部工作表（名字、区域、是否隐藏），概览被截断时模型仍知道有哪些表可读；然后是每个工作表的名字、区域、行列数、前 10 行与最后 2 行（含表头）、公式与图表数量；超过 20 个工作表时只列名字。概览后一句写明用 `read_sheet` 读更多行、用 `query_sheet` 做筛选与汇总。
 
 ```xml
 <attachment attachment_id="att_9" name="销售明细.xlsx" source="upload" format="xlsx" sheets="2">

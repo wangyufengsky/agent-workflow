@@ -97,7 +97,7 @@ export async function readOfficeFile(
         : `${overview.slice(0, overview.lastIndexOf('\n', ATTACHMENT_READ_MAX_CHARS))}\n…`;
     return { path, format, text, total_chars: null, next_cursor: null, next_range: null };
   }
-  const page = readSheetPage(workbook, { sheet, range, include_formulas: false });
+  const page = readSheetPage(workbook, { sheet, range, include_formulas: true });
   return { path, format, text: pageText(page), total_chars: null, next_cursor: null, next_range: page.next_range };
 }
 

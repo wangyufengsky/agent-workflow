@@ -93,8 +93,12 @@ export function workbookOverview(workbook: Workbook, meta: XlsxMeta): string {
     const note = cut ? `下面是前 ${SHEET_OVERVIEW_HEAD_ROWS} 行与最后 ${SHEET_OVERVIEW_TAIL_ROWS} 行` : undefined;
     return [...heading(sheet, note), ...(sheet.range === null ? [] : table(sheet, picked))].join('\n');
   });
-  const rest = workbook.sheets.slice(SHEET_OVERVIEW_SHEETS);
-  if (rest.length > 0) sections.push(`其余 ${rest.length} 个工作表：${rest.map((s) => `「${s.name}」`).join('、')}`);
+  // First, so an overview cut short (a prompt's budget, a page) still names every sheet to read with the tools.
+  const inventory = workbook.sheets.map((s) => {
+    const notes = [s.range ?? '空', ...(s.hidden ? ['隐藏'] : [])];
+    return `「${s.name}」（${notes.join('，')}）`;
+  });
+  const head = [`共 ${workbook.sheets.length} 个工作表：${inventory.join('、')}`];
   const notes: string[] = [];
   if (meta.formulas > 0) notes.push(`有 ${meta.formulas} 个公式，显示的是文件里保存的结果`);
   const unread = [
@@ -103,8 +107,10 @@ export function workbookOverview(workbook: Workbook, meta: XlsxMeta): string {
     [meta.pivotTables, '透视表'],
   ].filter(([n]) => (n as number) > 0);
   if (unread.length > 0) notes.push(`${unread.map(([n, what]) => `${n} 个${what}`).join('、')}没有读取`);
-  if (notes.length > 0) sections.push(`${notes.join('；')}。`);
-  return `${sections.join('\n\n')}\n`;
+  if (notes.length > 0) head.push(`${notes.join('；')}。`);
+  const rest = workbook.sheets.length - shown.length;
+  if (rest > 0) sections.push(`其余 ${rest} 个工作表没有列出行，用工具按名字读取。`);
+  return `${[head.join('\n'), ...sections].join('\n\n')}\n`;
 }
 
 const valueText = (value: WorkbookValue) =>
@@ -114,11 +120,17 @@ const valueText = (value: WorkbookValue) =>
 
 /** A `read_sheet` page as the Markdown table the model reads elsewhere: row numbers down, column letters across. */
 export function pageText(page: SheetPage): string {
+  // A formula whose result the file did not save shows as the formula, as elsewhere (39 §5.3).
+  const cell = (row: SheetPage['rows'][number], i: number) => {
+    const value = row.values[i] ?? null;
+    const formula = row.formulas?.[page.columns[i] as string];
+    return value === null && formula !== undefined ? valueText(`=${formula}`) : valueText(value);
+  };
   const lines = [`## 工作表「${page.sheet}」（${page.range ?? '空'}）`];
   if (page.rows.length === 0) return lines.join('\n');
   lines.push('', `| 行 | ${page.columns.join(' | ')} |`, `| --- | ${page.columns.map(() => '---').join(' | ')} |`);
   for (const row of page.rows) {
-    lines.push(`| ${row.row}${row.hidden ? '（隐藏）' : ''} | ${row.values.map(valueText).join(' | ')} |`);
+    lines.push(`| ${row.row}${row.hidden ? '（隐藏）' : ''} | ${row.values.map((_, i) => cell(row, i)).join(' | ')} |`);
   }
   return lines.join('\n');
 }
