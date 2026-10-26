@@ -13,9 +13,14 @@ import {
   ATTACHMENTS_DIR,
   ATTACHMENTS_PER_INPUT_MAX,
   type AttachmentDTO,
+  AttachmentFormat,
+  AttachmentLimit,
   type AttachmentOwnerKind,
+  AttachmentRejection,
   AttachmentSource,
   ErrorCode,
+  OFFICE_ATTACHMENT_BYTES_MAX,
+  type OfficeMeta,
   type ReadAttachmentOutput,
   type SnapshotProjectFileRequest,
   WorktreeStatus,
@@ -25,6 +30,7 @@ import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { Logger } from '../../core/logger.ts';
 import { linesOf, locateRepoFile } from '../../core/repo-files.ts';
+import { detectFormat, OFFICE_TEXT_FILE, type Office, type OfficeFormat } from '../office/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { WorktreesService } from '../worktrees/index.ts';
 import { createAttachmentsRepo, type Owner } from './attachments.repo.ts';
@@ -37,27 +43,37 @@ export type AttachmentsServiceDeps = {
   projects: ProjectsService;
   worktrees: WorktreesService;
   prompts: Prompts;
+  office: Office;
   dataDir: string;
 };
 
 const ORIGINAL = 'original';
-const tooLarge = (limit: 'bytes' | 'count') =>
-  new AppError(ErrorCode.AttachmentTooLarge, `Attachment ${limit} limit exceeded`, {
-    limit: limit === 'bytes' ? ATTACHMENT_BYTES_MAX : ATTACHMENTS_PER_INPUT_MAX,
-  });
+const tooLarge = (reason: AttachmentLimit, limit: number) =>
+  new AppError(ErrorCode.AttachmentTooLarge, `Attachment ${reason} limit exceeded`, { reason, limit });
+/** Names whose text may come from Excel or Notepad on Chinese Windows, in GBK (D194). */
+const LEGACY_TEXT_NAME = /\.(csv|tsv|txt)$/i;
 
 /** File names go into attribute values of the prompt's `<attachment>` tags. */
 const attr = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 
-/** Only text is accepted for now (30 §3.1): strict UTF-8 without NUL bytes, whatever the name or MIME type says. */
-function asText(bytes: Uint8Array): string {
-  let text: string;
+const decode = (encoding: string, bytes: Uint8Array) => {
   try {
-    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return new TextDecoder(encoding, { fatal: true }).decode(bytes);
   } catch {
-    throw new AppError(ErrorCode.AttachmentInvalidType, 'Not UTF-8 text');
+    // Translation: a decoding failure is the caller's "not text".
+    return undefined;
   }
-  if (text.includes('\0')) throw new AppError(ErrorCode.AttachmentInvalidType, 'Not UTF-8 text');
+};
+
+/**
+ * Text is strict UTF-8 without NUL bytes, whatever the name or MIME type says (30 §3.1). A `.csv` / `.tsv` / `.txt`
+ * that is not UTF-8 is read as GB18030 instead (39 §4); it is stored as UTF-8.
+ */
+function asText(bytes: Uint8Array, name: string): string {
+  const text = decode('utf-8', bytes) ?? (LEGACY_TEXT_NAME.test(name) ? decode('gb18030', bytes) : undefined);
+  if (text === undefined || text.includes('\0')) {
+    throw new AppError(ErrorCode.AttachmentInvalidType, 'Not text', { reason: AttachmentRejection.NotText });
+  }
   return text;
 }
 
@@ -70,6 +86,7 @@ export function createAttachmentsService({
   projects,
   worktrees,
   prompts,
+  office,
   dataDir,
 }: AttachmentsServiceDeps) {
   const repo = createAttachmentsRepo(db);
@@ -94,11 +111,47 @@ export function createAttachmentsService({
     return attachment;
   }
 
+  /** The text the model reads: a text attachment's original, or what was read out of a Word or Excel file (39 §5). */
+  const textPath = (attachment: AttachmentDTO) =>
+    join(dirOf(attachment.id), attachment.format === AttachmentFormat.Text ? ORIGINAL : OFFICE_TEXT_FILE);
+
   /**
-   * Synchronous: prompts are rendered where a step is dispatched, which must not wait (an attachment is at most
-   * `ATTACHMENT_BYTES_MAX`).
+   * Synchronous: prompts are rendered where a step is dispatched, which must not wait (the text of an attachment is
+   * bounded by `ATTACHMENT_BYTES_MAX` or `OFFICE_CELLS_MAX`).
    */
-  const textOf = (id: string) => readFileSync(join(dirOf(id), ORIGINAL), 'utf8');
+  const textOf = (attachment: AttachmentDTO) => readFileSync(textPath(attachment), 'utf8');
+
+  /**
+   * A Word or Excel file (39 §5): the original and what the worker reads out of it are on disk before the row exists.
+   * A failed parse leaves nothing behind.
+   */
+  async function saveOffice(name: string, format: OfficeFormat, bytes: Buffer): Promise<AttachmentDTO> {
+    const id = randomUUID();
+    const dir = dirOf(id);
+    await mkdir(dir, { recursive: true });
+    const original = join(dir, ORIGINAL);
+    await writeFile(original, bytes);
+    let meta: OfficeMeta;
+    try {
+      meta = await office.parse(format, original, dir);
+    } catch (err) {
+      // Cleanup: the directory has no row, so nothing else will look for it.
+      await serialized(() => rm(dir, { recursive: true, force: true }));
+      throw err;
+    }
+    const attachment: AttachmentDTO = {
+      id,
+      source: AttachmentSource.Upload,
+      name,
+      sizeBytes: bytes.byteLength,
+      origin: null,
+      format,
+      meta,
+      createdAt: clock.now(),
+    };
+    repo.insert(attachment);
+    return attachment;
+  }
 
   /** One attachment as the prompt shows it: whole, or its first `budget` characters and where to continue. */
   function promptItem(attachment: AttachmentDTO, text: string, budget: number): string {
@@ -186,23 +239,28 @@ export function createAttachmentsService({
     cleanup,
 
     get: require,
-    /** The original's location, for the content route only (never in a DTO). */
-    contentPath(id: string): string {
-      require(id);
-      return join(dirOf(id), ORIGINAL);
-    },
+    /** Where the text the model reads is, for the content route only (never in a DTO). */
+    contentPath: (id: string): string => textPath(require(id)),
 
-    /** One upload (11 §14.1): the body is read up to the size limit and checked before anything is stored. */
+    /**
+     * One upload (11 §14.1): the body is read up to the larger, Word and Excel limit; what it is decides its own
+     * limit and how it is checked (39 §4), all before anything is stored.
+     */
     async upload(name: string, body: AsyncIterable<Uint8Array>, declaredBytes: number | undefined) {
-      if (declaredBytes !== undefined && declaredBytes > ATTACHMENT_BYTES_MAX) throw tooLarge('bytes');
+      if (declaredBytes !== undefined && declaredBytes > OFFICE_ATTACHMENT_BYTES_MAX) {
+        throw tooLarge(AttachmentLimit.Bytes, OFFICE_ATTACHMENT_BYTES_MAX);
+      }
       const chunks: Uint8Array[] = [];
       let size = 0;
       for await (const chunk of body) {
         size += chunk.byteLength;
-        if (size > ATTACHMENT_BYTES_MAX) throw tooLarge('bytes');
+        if (size > OFFICE_ATTACHMENT_BYTES_MAX) throw tooLarge(AttachmentLimit.Bytes, OFFICE_ATTACHMENT_BYTES_MAX);
         chunks.push(chunk);
       }
-      const content = asText(Buffer.concat(chunks));
+      const bytes = Buffer.concat(chunks);
+      const format = detectFormat(bytes);
+      if (format !== AttachmentFormat.Text) return saveOffice(name, format, bytes);
+      if (size > ATTACHMENT_BYTES_MAX) throw tooLarge(AttachmentLimit.Bytes, ATTACHMENT_BYTES_MAX);
       return save(
         {
           id: randomUUID(),
@@ -210,9 +268,11 @@ export function createAttachmentsService({
           name,
           sizeBytes: size,
           origin: null,
+          format,
+          meta: null,
           createdAt: clock.now(),
         },
-        content,
+        asText(bytes, name),
       );
     },
 
@@ -222,8 +282,11 @@ export function createAttachmentsService({
       if (typeof file === 'string') {
         throw new AppError(ErrorCode.AttachmentSourceInvalid, `${path} cannot be read`, { path, reason: file });
       }
-      if ((await stat(file.real)).size > ATTACHMENT_BYTES_MAX) throw tooLarge('bytes');
-      let content = asText(await readFile(file.real));
+      if ((await stat(file.real)).size > ATTACHMENT_BYTES_MAX) {
+        throw tooLarge(AttachmentLimit.Bytes, ATTACHMENT_BYTES_MAX);
+      }
+      // Word and Excel files of a project come with OF-06 (39 §7.3); until then a snapshot is text only.
+      let content = asText(await readFile(file.real), file.relativePath);
       if (lines !== undefined) {
         const all = linesOf(content);
         if (lines.to > all.length) {
@@ -243,6 +306,8 @@ export function createAttachmentsService({
           name,
           sizeBytes: Buffer.byteLength(content),
           origin: { projectId, taskId: taskId ?? null, path: file.relativePath, lines: lines ?? null, readAt: now },
+          format: AttachmentFormat.Text,
+          meta: null,
           createdAt: now,
         },
         content,
@@ -266,7 +331,9 @@ export function createAttachmentsService({
      * which ids its caller may use (e.g. only the conversation's own).
      */
     bind(owner: Owner, attachmentIds: readonly string[]): void {
-      if (attachmentIds.length > ATTACHMENTS_PER_INPUT_MAX) throw tooLarge('count');
+      if (attachmentIds.length > ATTACHMENTS_PER_INPUT_MAX) {
+        throw tooLarge(AttachmentLimit.Count, ATTACHMENTS_PER_INPUT_MAX);
+      }
       if (new Set(attachmentIds).size !== attachmentIds.length) {
         throw new AppError(ErrorCode.ValidationFailed, 'An attachment is listed twice', { attachmentIds });
       }
@@ -295,7 +362,7 @@ export function createAttachmentsService({
      */
     promptSection(attachments: readonly AttachmentDTO[], readTool: string): string {
       if (attachments.length === 0) return '';
-      const withText = attachments.map((attachment) => ({ attachment, text: textOf(attachment.id) }));
+      const withText = attachments.map((attachment) => ({ attachment, text: textOf(attachment) }));
       const total = withText.reduce((sum, { text }) => sum + text.length, 0);
       const budget =
         total <= ATTACHMENT_PROMPT_MAX_CHARS
@@ -308,7 +375,7 @@ export function createAttachmentsService({
     /** One page of an attachment's text; the caller has checked the attachment is visible to its reader. */
     read(id: string, cursor: number): ReadAttachmentOutput {
       const attachment = require(id);
-      const text = textOf(id);
+      const text = textOf(attachment);
       const end = cursor + ATTACHMENT_READ_MAX_CHARS;
       return {
         attachment_id: id,

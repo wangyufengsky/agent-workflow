@@ -56,6 +56,7 @@
 | `createTestCertificates(hosts, { extendedKeyUsage? })` | `test/helpers/tls.ts` | 用 openssl 命令行生成一个测试 CA 与它为 `hosts` 签发的服务器证书（企业 CA 的替身，D164；`extendedKeyUsage: 'clientAuth'` 造出不能用于服务器的证书），返回目录与 PEM |
 | `createGitHttpServer({ root, tls, host? })` | `test/helpers/git-http.ts` | 以 `git http-backend` 提供 `root` 下裸仓库的 HTTPS 智能协议（允许推送），证书由测试 CA 签发；git 推拉用应用的 CA 与代理的集成测试用它（D175） |
 | `createTestProxy()` | `test/helpers/proxy.ts` | 只做 HTTPS 隧道（CONNECT）的 HTTP 代理，记录每次的目标；任何主机名都连到本机，测试用只有经代理才能解析的主机名验证请求确实走了代理（D165） |
+| `makeZip(parts)` / `minimalXlsx(sheetData)` | `test/helpers/zip.ts` | 手工拼出的 zip 与最小的 Excel 工作簿：解压后大小作假的 zip 炸弹、不是 Office 的 zip、超过单元格上限的工作表（39 §14）；真实软件保存的样本在 `test/fixtures/office/`（见其中的 README） |
 | `createTestRepo()` | `test/helpers/git.ts` | 在临时目录建 Git 仓库，带初始提交，可选远端（本地 bare 仓库） |
 | `createChromiumHost()` | `src/modules/browser/host.chromium.ts` | 浏览器集成测试的宿主：真实 Chromium（playwright-core），`createTestApp({ browserHost })` 注入；页面快照的单元测试输入是从 Chromium 录下的无障碍树 `test/fixtures/browser/orders.ax.json`（对应 `orders.html`），不手编 |
 | `e2e/fixtures/browser-host/main.cjs` | — | Electron 中运行真实的 main `browser.ts`（Electron 自带的 Node 直接加载 TypeScript）加本地 HTTP / WebSocket 服务，代替后端发 `browser.request`；`browser-host.electron.spec.ts` 经 `app.evaluate` 驱动，不需要构建应用（29 §14，B-04） |

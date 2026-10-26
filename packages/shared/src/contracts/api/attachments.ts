@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ATTACHMENT_NAME_MAX_CHARS, ATTACHMENTS_PER_INPUT_MAX } from '../../constants/limits.ts';
-import { attachmentSourceSchema } from '../../enums/attachment.ts';
+import { AttachmentFormat, attachmentFormatSchema, attachmentSourceSchema } from '../../enums/attachment.ts';
 
 /** A 1-based, inclusive line range of a project file. */
 export const lineRangeSchema = z
@@ -19,7 +19,40 @@ export const attachmentOriginSchema = z.object({
 });
 export type AttachmentOrigin = z.infer<typeof attachmentOriginSchema>;
 
-/** An attachment's metadata (11 §14.1); never the server path. Its content is `GET /attachments/:id/content`. */
+/** What a Word attachment holds (39 §5), as read when it was uploaded. */
+export const docxMetaSchema = z.object({
+  format: z.literal(AttachmentFormat.Docx),
+  /** Characters of the body text the model reads. */
+  chars: z.number(),
+  headings: z.number(),
+  tables: z.number(),
+  /** Pictures in the body; the model sees a placeholder for each. */
+  images: z.number(),
+});
+
+/** One sheet of an Excel attachment: its used range (null when empty) and size. */
+export const sheetMetaSchema = z.object({
+  name: z.string(),
+  range: z.string().nullable(),
+  rows: z.number(),
+  columns: z.number(),
+  hidden: z.boolean(),
+});
+
+/** What an Excel attachment holds (39 §5); charts, pictures and pivot tables are counted but not read. */
+export const xlsxMetaSchema = z.object({
+  format: z.literal(AttachmentFormat.Xlsx),
+  sheets: z.array(sheetMetaSchema),
+  formulas: z.number(),
+  charts: z.number(),
+  images: z.number(),
+  pivotTables: z.number(),
+});
+
+export const officeMetaSchema = z.discriminatedUnion('format', [docxMetaSchema, xlsxMetaSchema]);
+export type OfficeMeta = z.infer<typeof officeMetaSchema>;
+
+/** An attachment's metadata (11 §14.1); never the server path. Its text is `GET /attachments/:id/content`. */
 export const attachmentSchema = z.object({
   id: z.string(),
   source: attachmentSourceSchema,
@@ -27,6 +60,9 @@ export const attachmentSchema = z.object({
   sizeBytes: z.number(),
   /** Project file snapshots only. */
   origin: attachmentOriginSchema.nullable(),
+  format: attachmentFormatSchema,
+  /** Word and Excel attachments only. */
+  meta: officeMetaSchema.nullable(),
   createdAt: z.number(),
 });
 export type AttachmentDTO = z.infer<typeof attachmentSchema>;

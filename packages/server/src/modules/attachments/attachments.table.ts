@@ -1,4 +1,4 @@
-import type { AttachmentOwnerKind, AttachmentSource } from '@aw/shared';
+import type { AttachmentFormat, AttachmentOwnerKind, AttachmentSource } from '@aw/shared';
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 /** 10 §6.1 attachments: an immutable original at `attachments/<id>/original`; a row exists only once it is valid. */
@@ -11,6 +11,10 @@ export const attachmentsTable = sqliteTable(
     sizeBytes: integer('size_bytes').notNull(),
     /** JSON `AttachmentOrigin`; project file snapshots only. */
     origin: text('origin'),
+    /** What the original is (39 §4); Word and Excel attachments keep the text read out of them next to it. */
+    format: text('format').$type<AttachmentFormat>().notNull().default('text'),
+    /** JSON `OfficeMeta`; Word and Excel attachments only. */
+    meta: text('meta'),
     createdAt: integer('created_at').notNull(),
   },
   (t) => [index('attachments_created_idx').on(t.createdAt)],

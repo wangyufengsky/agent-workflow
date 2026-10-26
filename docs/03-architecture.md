@@ -116,6 +116,8 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | 代码质量 | @biomejs/biome / dependency-cruiser / typescript | 2.5.15 / 18.6.0 / **6.0.3**（D29） |
 | 静态文件 | @fastify/static | 10.1.6 |
 | PPT 导出为 PowerPoint | pptxgenjs（MIT；依赖 jszip、image-size；渲染进程按需加载，不进首屏包，D94） | 4.0.1 |
+| 读 Word 附件 | mammoth（BSD-2-Clause；正文转 HTML 后由 `modules/office` 转成 Markdown；默认不读外部链接的本机文件，D200） | 1.13.0 |
+| 读写 Excel 附件 | exceljs（MIT；传递依赖有 jszip（MIT / GPL-3.0 双许可，按 MIT 使用）、unzipper、archiver 等，都是纯 JS；只在解析 worker 的包 `office-worker.js` 里，不进 `server.js`，D200） | 4.4.0 |
 
 **明确不引入**：Temporal / BullMQ（单机够用）、XState（见 D21）、tRPC（要可文档化 REST）、Tailwind（已有令牌与样式体系）、Monaco（v1 不在应用内编辑代码）、任何 ORM 之外的数据访问层封装。
 

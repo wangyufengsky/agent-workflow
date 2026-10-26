@@ -1,5 +1,6 @@
-import { readdir, symlink, utimes, writeFile } from 'node:fs/promises';
+import { readdir, readFile, symlink, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   ATTACHMENT_BYTES_MAX,
   ATTACHMENT_NAME_HEADER,
@@ -11,6 +12,7 @@ import {
   createProjectOp,
   ErrorCode,
   getAttachmentOp,
+  OFFICE_ATTACHMENT_BYTES_MAX,
   removeAttachmentOp,
   snapshotProjectFileOp,
 } from '@aw/shared';
@@ -18,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { createFakeClock } from '../../../test/helpers/clock.ts';
 import { createTestRepo } from '../../../test/helpers/git.ts';
+import { makeZip } from '../../../test/helpers/zip.ts';
 
 const HOUR = 60 * 60 * 1000;
 
@@ -36,13 +39,15 @@ const upload = (content: string | Buffer, name = 'notes.md') =>
     headers: { 'content-type': 'application/octet-stream', [ATTACHMENT_NAME_HEADER]: encodeURIComponent(name) },
     payload: content,
   });
-const uploaded = async (content: string, name?: string): Promise<AttachmentDTO> => {
+const uploaded = async (content: string | Buffer, name?: string): Promise<AttachmentDTO> => {
   const res = await upload(content, name);
   expect(res.statusCode).toBe(201);
   return res.json();
 };
 const contentOf = async (id: string) => (await t.request({ method: 'GET', url: `/attachments/${id}/content` })).body;
 const storedDirs = () => readdir(join(t.dataDir, ATTACHMENTS_DIR));
+const officeFixture = (name: string) =>
+  readFile(fileURLToPath(new URL(`../../../test/fixtures/office/${name}`, import.meta.url)));
 const service = () => t.app.services.attachments;
 const task = (id: string) => ({ kind: AttachmentOwnerKind.TaskInput, id });
 
@@ -70,11 +75,76 @@ describe('上传', () => {
     const invalid = [
       [Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe]), ErrorCode.AttachmentInvalidType],
       ['a\0b', ErrorCode.AttachmentInvalidType],
-      ['x'.repeat(ATTACHMENT_BYTES_MAX + 1), ErrorCode.AttachmentTooLarge],
     ] as const;
     for (const [content, code] of invalid) {
       expect((await upload(content)).json().error.code).toBe(code);
     }
+    // Text keeps its own limit; a Word or Excel file may be larger (39 §10).
+    const limits = [
+      ['x'.repeat(ATTACHMENT_BYTES_MAX + 1), ATTACHMENT_BYTES_MAX],
+      [Buffer.alloc(OFFICE_ATTACHMENT_BYTES_MAX + 1), OFFICE_ATTACHMENT_BYTES_MAX],
+    ] as const;
+    for (const [content, limit] of limits) {
+      expect((await upload(content)).json().error).toMatchObject({
+        code: ErrorCode.AttachmentTooLarge,
+        details: { reason: 'bytes', limit },
+      });
+    }
+    expect(await storedDirs()).toEqual([]);
+  });
+
+  it('GBK 编码的 CSV 按 GB18030 读出、存成 UTF-8；其他名字的非 UTF-8 文件仍被拒', async () => {
+    const gbk = Buffer.from([0xc7, 0xf8, 0xd3, 0xf2, 0x2c, 0xbd, 0xf0, 0xb6, 0xee, 0x0a]); // 「区域,金额」
+    const csv = await uploaded(gbk, '销售.csv');
+    expect(await contentOf(csv.id)).toBe('区域,金额\n');
+    expect((await upload(gbk, '销售.md')).json().error).toMatchObject({ details: { reason: 'not_text' } });
+  });
+});
+
+describe('Word 与 Excel（39）', () => {
+  it('Word 读成 Markdown：模型与内容接口读到的都是它，原件另存', async () => {
+    const attachment = await uploaded(await officeFixture('report.libreoffice.docx'), '需求.docx');
+    expect(attachment).toMatchObject({
+      name: '需求.docx',
+      format: 'docx',
+      meta: { format: 'docx', headings: 3, tables: 1, images: 1 },
+    });
+    const text = await contentOf(attachment.id);
+    expect(text).toContain('| order_id | string | 订单号 |');
+    expect(service().read(attachment.id, 0).text).toBe(text);
+    expect(service().promptSection([attachment], 'read_attachment')).toContain('# 订单导出需求');
+    expect((await readdir(join(t.dataDir, ATTACHMENTS_DIR, attachment.id))).sort()).toEqual(['original', 'text.md']);
+  });
+
+  it('Excel 另存每个单元格，供预览与表格工具读取', async () => {
+    const attachment = await uploaded(await officeFixture('sales.libreoffice.xlsx'), '销售.xlsx');
+    expect(attachment).toMatchObject({ format: 'xlsx', meta: { formulas: 9, sheets: [{ name: '明细' }, {}, {}] } });
+    expect(await contentOf(attachment.id)).toContain('## 工作表「汇总」');
+    expect((await readdir(join(t.dataDir, ATTACHMENTS_DIR, attachment.id))).sort()).toEqual([
+      'original',
+      'text.md',
+      'workbook.json',
+    ]);
+  });
+
+  it('旧格式、加密、损坏的文件被拒并说明原因，不留下记录和文件', async () => {
+    const broken = makeZip([
+      {
+        name: '[Content_Types].xml',
+        content:
+          '<Types><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+      },
+      { name: 'word/document.xml', content: '<w:document' },
+    ]);
+    const cases = [
+      [await officeFixture('report.doc'), ErrorCode.AttachmentInvalidType, 'legacy_office'],
+      [await officeFixture('report.encrypted.docx'), ErrorCode.AttachmentInvalidType, 'encrypted'],
+      [broken, ErrorCode.AttachmentParseFailed, 'corrupt'],
+    ] as const;
+    for (const [content, code, reason] of cases) {
+      expect((await upload(content, 'x.docx')).json().error).toMatchObject({ code, details: { reason } });
+    }
+    await service().settled();
     expect(await storedDirs()).toEqual([]);
   });
 });

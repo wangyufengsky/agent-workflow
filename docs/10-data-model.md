@@ -763,7 +763,7 @@ payload / response：
 
 | 表 | 关键字段／约束 |
 | --- | --- |
-| attachments | id、source、name（显示名）、size_bytes、origin JSON（项目文件快照才有：projectId、taskId、相对路径、行范围、读取时间）、created_at；索引 created_at。磁盘路径只由 id 派生：`attachments/<id>/original`（迁移 0017，U-01 已实现） |
+| attachments | id、source、name（显示名）、size_bytes、origin JSON（项目文件快照才有：projectId、taskId、相对路径、行范围、读取时间）、format（`AttachmentFormat`，默认 text）、meta JSON（Word / Excel 才有：`OfficeMeta`，字数与标题、表格、图片数，或各工作表的名字、区域、行列数与公式、图表、图片、透视表数）、created_at；索引 created_at。磁盘路径只由 id 派生：`attachments/<id>/original`（迁移 0017，U-01 已实现）；Word / Excel 另有模型读的 `text.md`，Excel 再有单元格 `workbook.json`（迁移 0032_attachment_format，OF-01 已实现，39 §5） |
 | attachment_refs | owner_kind、owner_id、attachment_id FK、ordinal、created_at；主键 (owner_kind, owner_id, attachment_id)，索引 attachment_id |
 
 - 所有者在自己的事务里创建／删除引用：删除任务时删除该任务（task_input）与其节点（task_feedback）的引用；删除助手对话时删除 assistant_message 引用。多态 owner 没有外键，由所有者模块负责。
