@@ -1,6 +1,6 @@
 # 39 · Word 与 Excel 文件
 
-> 状态：**设计已确认**（2026-10-26，D193–D201 均按推荐方案，§17），实施中：OF-01（解析与附件接入）、OF-02（Excel 概览与表格工具）、OF-03（附件条与预览）、OF-04（助手生成 Word / Excel 与文件卡片）、OF-05（修改 Excel、改写 Word 与丢失提示）、OF-06（仓库里的 Word / Excel）已完成。
+> 状态：**设计已确认**（2026-10-26，D193–D201 均按推荐方案，§17），实施中：OF-01（解析与附件接入）、OF-02（Excel 概览与表格工具）、OF-03（附件条与预览）、OF-04（助手生成 Word / Excel 与文件卡片）、OF-05（修改 Excel、改写 Word 与丢失提示）、OF-06（仓库里的 Word / Excel）、OF-07（live）已完成。
 >
 > OF-01 的实测：Electron 44 的 utilityProcess 能从 `app.asar` 里加载解析 worker（`office-worker.js`），其 Node 24.22（ICU 78.2）能按 GB18030 解码。样本只有 LibreOffice、macOS 文本编辑（textutil）保存的文件和 msoffcrypto-tool 加密的文件：用脚本驱动 Microsoft Word 另存失败，WPS 只能手动操作，二者的样本待补。macOS 文本编辑保存的 Word 没有标题样式，表格也变成了段落，只能按段落读出。实施任务见 [05 的 OF 系列](05-dev-plan.md#后续--word-与-excel-文件of)。枚举、常量、表、接口、工具在实施时登记到 08–12，本文先写在 §11–§12。
 
