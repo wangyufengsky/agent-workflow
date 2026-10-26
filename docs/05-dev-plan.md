@@ -498,3 +498,19 @@
 ## v1.3 期间 · 精简助手输入区（Y）
 
 > 状态：**设计已确认**（2026-10-24，36 §8 都按推荐方案），Y-02…Y-05 已完成，待用户检查。设计见 [36-compact-composer.md](36-compact-composer.md)，决策 D143–D145。任务与完成标准见 36 §9.2：Y-01 设计；Y-02「+」菜单；Y-03 用量按钮；Y-04「直接开始」收起与框内展开；Y-05 J9 走查与文档同步。
+
+## 后续设计 · Word 与 Excel 文件（OF，设计稿，未实施）
+
+> 状态：**用户要求**（2026-10-26：「新增处理 word、excel 的能力」），设计见 [39-office-files.md](39-office-files.md)；决策 D193–D201 待确认，确认前不开工。每项实施时同一提交把枚举、错误码、表、API、MCP 工具登记到 08–12，并在 03 §3 登记新依赖。
+
+| 任务 | 内容 | 完成标准 |
+| --- | --- | --- |
+| OF-01 | 后端 `office` 模块：格式识别（看内容）、worker 线程（时限、内存、zip 炸弹拦截）、Word → Markdown（mammoth）、Excel → 工作簿结构与文字（exceljs）；附件上传接入：`attachments.format` / `meta` 两列与迁移、派生文件 `text.md` / `workbook.json`、`ATTACHMENT_PARSE_FAILED` 与新的拒绝原因、CSV 的 GB18030 解码（39 §4、§5、§10） | 先在打包后的 utilityProcess 实测 worker 可用；集成（真实样本，Office / WPS / LibreOffice 各保存一份）：接受与拒绝各格式且拒绝时不留记录、加密与旧格式的原因、超时与内存上限（调小上限，不 sleep）、zip 炸弹在解压前被拒；单元：Markdown 转换与工作簿文字 |
+| OF-02 | 模型读取：提示词附件节按格式（Word 正文、Excel 概览）、`read_attachment` 读 `text.md`、`read_sheet` / `query_sheet`（执行与助手两套范围）（39 §6） | FakeOpencode 断言提示词里的 Excel 概览；每个工具一个成功路径、特有错误与允许的尝试类型；范围外的附件 ID 读不到；`query_sheet` 的筛选、分组、汇总单元测试 |
+| OF-03 | 界面：附件条接受 `.docx` / `.xlsx`、格式图标与摘要、失败原因文案、预览（Word 正文、Excel 页签与表格）（39 §8.1） | E2E：上传 docx 与 xlsx 后卡片摘要正确、预览可切换工作表、`.doc` 显示失败卡片；四主题走查含 Excel 预览 |
+| OF-04 | 生成：助手工具 `create_docx` / `create_xlsx`（含 `rows_from`、公式白名单）、写入对话目录并记消息流；文件卡片的预览、另存为、打开（preload `openPath`）（39 §7.2、§8.2） | 集成：生成后再解析内容一致、同名加序号、越界与扩展名不符被拒、联网函数被拒；E2E：FakeOpencode 调用 `create_xlsx` 后卡片可预览、可下载 |
+| OF-05 | 修改：`edit_xlsx`（在原件副本上按操作修改）、`revise_docx`（沿用原件样式重写）、丢失内容的 `warnings`（39 §7.2） | 集成：`edit_xlsx` 后样式、列宽、合并与其他工作表保留，有图表的原件返回丢失提示；`revise_docx` 的标题与正文样式来自原件；原件附件不变 |
+| OF-06 | 任务里的 Office 文件：执行 MCP `read_office_file`（规划、执行、评审、研究员）、「项目文件…」快照接受 Office（39 §7.3） | 集成：读 worktree 里的 xlsx 指定工作表与区域；越界、符号链接指向根外被拒；快照保存后原文件改变不影响附件 |
+| OF-07 | live：真实模型读 Excel 汇总并生成 Word 报告（`live/office.live.test.ts`） | 免费测试模型用 `query_sheet` 答出正确的各区域合计，`create_docx` 生成的文件再解析后含这些数字 |
+
+OF-01 完成后 OF-02 与 OF-03 可并行；OF-01 至 OF-03 完成即「上传 Word / Excel 让 AI 读懂」可用，OF-04 起是产出文件。
