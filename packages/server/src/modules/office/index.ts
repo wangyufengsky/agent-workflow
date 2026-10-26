@@ -10,6 +10,8 @@ import {
   OFFICE_WORKER_TIMEOUT_MS,
   type OfficeFilePreviewDTO,
   type OfficeMeta,
+  type ReadOfficeFileInput,
+  type ReadOfficeFileOutput,
   type ReviseDocxInput,
   type SheetPreviewDTO,
 } from '@aw/shared';
@@ -94,6 +96,9 @@ export function createOffice({
     /** A Word or Excel file read on demand, for the assistant's file cards (39 §8.2). */
     previewFile: (file: string, sheet: string | undefined) =>
       run<OfficeFilePreviewDTO>({ kind: 'preview_file', file, sheet }),
+    /** `read_office_file` over a file already located inside the session's directory (39 §7.3). */
+    readFile: (file: string, input: ReadOfficeFileInput) =>
+      run<ReadOfficeFileOutput>({ kind: 'read_office_file', file, input }),
     /** Writes a new Word document at `out`, with the styles of the Word document at `styleFrom` if given (39 §7.2). */
     createDocx: (input: CreateDocxInput, out: string, styleFrom: string | undefined) =>
       run<OfficeWritten>({ kind: 'create_docx', input, out, styleFrom }),

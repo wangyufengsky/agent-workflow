@@ -139,7 +139,12 @@ export function createAttachmentsService({
    * A Word or Excel file (39 §5): the original and what the worker reads out of it are on disk before the row exists.
    * A failed parse leaves nothing behind.
    */
-  async function saveOffice(name: string, format: OfficeFormat, bytes: Buffer): Promise<AttachmentDTO> {
+  async function saveOffice(
+    name: string,
+    format: OfficeFormat,
+    bytes: Buffer,
+    from: Pick<AttachmentDTO, 'source' | 'origin'> = { source: AttachmentSource.Upload, origin: null },
+  ): Promise<AttachmentDTO> {
     const id = randomUUID();
     const dir = dirOf(id);
     await mkdir(dir, { recursive: true });
@@ -155,10 +160,9 @@ export function createAttachmentsService({
     }
     const attachment: AttachmentDTO = {
       id,
-      source: AttachmentSource.Upload,
+      ...from,
       name,
       sizeBytes: bytes.byteLength,
-      origin: null,
       format,
       meta,
       createdAt: clock.now(),
@@ -315,11 +319,22 @@ export function createAttachmentsService({
       if (typeof file === 'string') {
         throw new AppError(ErrorCode.AttachmentSourceInvalid, `${path} cannot be read`, { path, reason: file });
       }
-      if ((await stat(file.real)).size > ATTACHMENT_BYTES_MAX) {
-        throw tooLarge(AttachmentLimit.Bytes, ATTACHMENT_BYTES_MAX);
+      if ((await stat(file.real)).size > OFFICE_ATTACHMENT_BYTES_MAX) {
+        throw tooLarge(AttachmentLimit.Bytes, OFFICE_ATTACHMENT_BYTES_MAX);
       }
-      // Word and Excel files of a project come with OF-06 (39 §7.3); until then a snapshot is text only.
-      let content = asText(await readFile(file.real), file.relativePath);
+      const bytes = await readFile(file.real);
+      const format = detectFormat(bytes);
+      // A project's Word and Excel files are read like uploads (39 §7.3); they have no lines to pick.
+      if (format !== AttachmentFormat.Text) {
+        if (lines !== undefined) {
+          const message = 'A Word or Excel file is attached whole, without a line range';
+          throw new AppError(ErrorCode.ValidationFailed, message, { issues: [{ path: ['lines'], message }] });
+        }
+        const origin = { projectId, taskId: taskId ?? null, path: file.relativePath, lines: null, readAt: clock.now() };
+        return saveOffice(basename(file.relativePath), format, bytes, { source: AttachmentSource.ProjectFile, origin });
+      }
+      if (bytes.length > ATTACHMENT_BYTES_MAX) throw tooLarge(AttachmentLimit.Bytes, ATTACHMENT_BYTES_MAX);
+      let content = asText(bytes, file.relativePath);
       if (lines !== undefined) {
         const all = linesOf(content);
         if (lines.to > all.length) {

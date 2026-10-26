@@ -219,6 +219,30 @@ describe('项目文件快照', () => {
   });
 });
 
+describe('项目里的 Word 与 Excel（39 §7.3）', () => {
+  it('快照按上传同样读出文字，记下来源；不能选行范围', async () => {
+    const { repo, project } = await addProject({});
+    await writeFile(join(repo.path, '销售.xlsx'), await officeFixture('sales.libreoffice.xlsx'));
+    await repo.git('add', '-A');
+    await repo.git('commit', '-q', '-m', 'sales');
+    const snapshot = (await t.call(snapshotProjectFileOp, { projectId: project.id, path: '销售.xlsx' })).body;
+    expect(snapshot).toMatchObject({
+      source: 'project_file',
+      name: '销售.xlsx',
+      format: 'xlsx',
+      meta: { sheets: [{ name: '明细' }, {}, {}] },
+      origin: { path: '销售.xlsx', lines: null },
+    });
+    expect(await contentOf(snapshot.id)).toContain('## 工作表「明细」');
+    const ranged = await t.call(snapshotProjectFileOp, {
+      projectId: project.id,
+      path: '销售.xlsx',
+      lines: { from: 1, to: 2 },
+    });
+    expect([ranged.status, ranged.raw.json().error.code]).toEqual([400, ErrorCode.ValidationFailed]);
+  });
+});
+
 describe('引用与清理', () => {
   it('被引用的附件一直保留；最后一个引用释放、超过保留时间后才删除', async () => {
     const attachment = await uploaded('shared\n');

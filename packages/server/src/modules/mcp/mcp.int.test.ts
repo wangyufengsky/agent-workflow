@@ -55,6 +55,7 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.ReadAttachment,
       McpToolName.ReadSheet,
       McpToolName.QuerySheet,
+      McpToolName.ReadOfficeFile,
       McpToolName.SubmitPlan,
       McpToolName.SubmitResult,
       McpToolName.SubmitReview,

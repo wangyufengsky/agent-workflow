@@ -98,4 +98,16 @@ describe('Excel 读成工作簿与文字', () => {
     expect(overview).not.toContain('| 11 |');
     expect(overview).toContain('有 20 个公式，显示的是文件里保存的结果；1 个图表没有读取。');
   });
+
+  it('概览开头列出全部工作表，即使后面被截断也能知道还有哪些表可读', async () => {
+    const bytes = await written((book) => {
+      book.addWorksheet('长文本').getCell('A1').value = 'x'.repeat(13_000);
+      book.addWorksheet('第二张').getCell('A1').value = 1;
+      book.addWorksheet('内部', { state: 'hidden' });
+    });
+    const { overview } = await readXlsx(bytes, zipEntries(bytes));
+    expect(overview.split('\n')[0]).toBe(
+      '共 3 个工作表：「长文本」（A1:A1）、「第二张」（A1:A1）、「内部」（空，隐藏）',
+    );
+  });
 });

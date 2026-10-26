@@ -68,6 +68,7 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.ReadAttachment]: '读取附加的资料',
   [McpToolName.ReadSheet]: '读取表格',
   [McpToolName.QuerySheet]: '查询表格',
+  [McpToolName.ReadOfficeFile]: '读取 Word / Excel 文件',
   [McpToolName.SubmitPlan]: '提交计划',
   [McpToolName.SubmitResult]: '提交结果',
   [McpToolName.SubmitReview]: '提交评审意见',

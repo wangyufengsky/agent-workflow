@@ -5,6 +5,7 @@ import type {
   EditXlsxInput,
   ErrorInfo,
   OfficeLossItem,
+  ReadOfficeFileInput,
   ReviseDocxInput,
 } from '@aw/shared';
 import type { SheetPageRequest, SheetQuery } from './office.sheets.ts';
@@ -29,6 +30,8 @@ export type OfficeJob =
   | { kind: 'preview_sheet'; workbook: string; sheet: string; rows: number }
   /** A file the assistant wrote, read on demand for its card (39 §8.2). */
   | { kind: 'preview_file'; file: string; sheet: string | undefined }
+  /** `read_office_file` (39 §7.3): `file` is the located real path. */
+  | { kind: 'read_office_file'; file: string; input: ReadOfficeFileInput }
   /** Write a new file at `out`, which must not exist yet (39 §7.2); `styleFrom` is a Word document to take styles from. */
   | { kind: 'create_docx'; input: CreateDocxInput; out: string; styleFrom: string | undefined }
   /** A new file from the file at `source` (39 §7.2); `source` is never written. */

@@ -9,7 +9,7 @@ export type TestRepo = { path: string; git(...args: string[]): Promise<string> }
 
 /** Real Git repository in a temp dir with one commit on `main` (07 §4). */
 export async function createTestRepo(
-  options: { files?: Record<string, string>; origin?: string } = {},
+  options: { files?: Record<string, string | Buffer>; origin?: string } = {},
 ): Promise<TestRepo> {
   const path = await realpath(await mkdtemp(join(tmpdir(), 'aw-repo-')));
   const git = async (...args: string[]) => (await runGit([...IDENTITY, ...args], { cwd: path })).stdout;

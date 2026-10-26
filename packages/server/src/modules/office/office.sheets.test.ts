@@ -1,5 +1,6 @@
 import { ATTACHMENT_READ_MAX_CHARS, ErrorCode, type QuerySheetInput } from '@aw/shared';
 import { describe, expect, it } from 'vitest';
+import { pageText } from './office.sheet-text.ts';
 import { querySheet, readSheetPage, type SheetQuery, sheetPreview } from './office.sheets.ts';
 import type { Workbook, WorkbookRow } from './office.workbook.ts';
 
@@ -263,5 +264,42 @@ describe('预览', () => {
         { c: 2, v: null, f: 'A3*2' },
       ],
     ]);
+  });
+});
+
+describe('分页的文字', () => {
+  it('文件没存结果的公式写成公式，其余写值', () => {
+    const workbook: Workbook = {
+      sheets: [
+        {
+          name: 'S',
+          hidden: false,
+          range: 'A1:B2',
+          merges: [],
+          hiddenColumns: [],
+          rows: [
+            {
+              r: 1,
+              hidden: false,
+              cells: [
+                { c: 1, v: 1 },
+                { c: 2, v: 2, f: 'A1*2' },
+              ],
+            },
+            {
+              r: 2,
+              hidden: false,
+              cells: [
+                { c: 1, v: 3 },
+                { c: 2, v: null, f: 'A2*2' },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(pageText(readSheetPage(workbook, { sheet: 'S', include_formulas: true }))).toBe(
+      '## 工作表「S」（A1:B2）\n\n| 行 | A | B |\n| --- | --- | --- |\n| 1 | 1 | 2 |\n| 2 | 3 | =A2*2 |',
+    );
   });
 });

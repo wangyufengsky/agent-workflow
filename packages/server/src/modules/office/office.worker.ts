@@ -3,7 +3,7 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { AppError, AttachmentFormat, type OfficeLossItem } from '@aw/shared';
 import { documentStyles, editXlsx, readSource, reviseDocx } from './office.edit.ts';
 import type { OfficeJob, OfficeReply, OfficeWritten } from './office.job.ts';
-import { parseOffice, previewOffice } from './office.parse.ts';
+import { parseOffice, previewOffice, readOfficeFile } from './office.parse.ts';
 import { querySheet, readSheetPage, sheetPreview } from './office.sheets.ts';
 import type { Workbook } from './office.workbook.ts';
 import { sourceRows, writeDocx, writeXlsx } from './office.write.ts';
@@ -30,6 +30,8 @@ async function run(job: OfficeJob): Promise<unknown> {
       return sheetPreview(await workbookAt(job.workbook), job.sheet, job.rows);
     case 'preview_file':
       return previewOffice(job.file, job.sheet);
+    case 'read_office_file':
+      return readOfficeFile(job.file, job.input);
     case 'create_docx': {
       const styles =
         job.styleFrom === undefined

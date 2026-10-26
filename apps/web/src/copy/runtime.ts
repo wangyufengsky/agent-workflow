@@ -58,6 +58,8 @@ export const TOOLS_COPY = {
     [McpToolName.ReadAttachment]: '分页读取用户附加的资料（提示词里只放了开头时）。',
     [McpToolName.ReadSheet]: '按行分页读取附加的 Excel 中某个工作表。',
     [McpToolName.QuerySheet]: '对附加的 Excel 中某个工作表做筛选、分组、汇总与排序。',
+    [McpToolName.ReadOfficeFile]:
+      '读取工作目录里的 Word / Excel 文件：Word 分页读正文，Excel 先看概览再按工作表分页读行。',
     [McpToolName.SubmitPlan]: '提交计划：步骤、角色、指令与依赖。计划不合规时返回问题，AI 修改后再提交。',
     [McpToolName.SubmitResult]: '步骤完成后提交结果；每次尝试只能提交一次，之后进入检查。',
     [McpToolName.SubmitReview]: '提交评审结论：通过，或列出问题及位置。',
