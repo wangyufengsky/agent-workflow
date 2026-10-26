@@ -220,15 +220,15 @@ Linux 上用 `Ctrl` 代替 `⌘`。
 
 ## 安装
 
-在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。当前版本 **v1.3.0**：
+在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。当前版本 **v1.4.0**：
 
 | 平台 | 文件 |
 | --- | --- |
-| macOS（Apple 芯片） | `agent-workflow-1.3.0-arm64.dmg` |
-| Linux x64（Ubuntu / Debian） | `agent-workflow_1.3.0_amd64.deb` |
-| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.3.0_arm64.deb` |
-| Linux x64（其他发行版） | `agent-workflow-1.3.0-x86_64.AppImage` |
-| Linux arm64（其他发行版） | `agent-workflow-1.3.0-arm64.AppImage` |
+| macOS（Apple 芯片） | `agent-workflow-1.4.0-arm64.dmg` |
+| Linux x64（Ubuntu / Debian） | `agent-workflow_1.4.0_amd64.deb` |
+| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.4.0_arm64.deb` |
+| Linux x64（其他发行版） | `agent-workflow-1.4.0-x86_64.AppImage` |
+| Linux arm64（其他发行版） | `agent-workflow-1.4.0-arm64.AppImage` |
 
 可以用同一页的 `SHA256SUMS.txt` 校验下载的文件：
 
@@ -275,7 +275,7 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 **deb（推荐 Ubuntu / Debian）**：
 
 ```bash
-sudo apt install ./agent-workflow_1.3.0_amd64.deb
+sudo apt install ./agent-workflow_1.4.0_amd64.deb
 ```
 
 arm64 机器换成 `_arm64.deb`。之后在应用菜单中打开，或运行 `agent-workflow`。
@@ -283,8 +283,8 @@ arm64 机器换成 `_arm64.deb`。之后在应用菜单中打开，或运行 `ag
 **AppImage（其他发行版）**：
 
 ```bash
-chmod +x agent-workflow-1.3.0-x86_64.AppImage
-./agent-workflow-1.3.0-x86_64.AppImage
+chmod +x agent-workflow-1.4.0-x86_64.AppImage
+./agent-workflow-1.4.0-x86_64.AppImage
 ```
 
 - 需要 FUSE 2（Ubuntu 24.04：`sudo apt install libfuse2t64`）。
