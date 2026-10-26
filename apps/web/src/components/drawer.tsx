@@ -23,10 +23,10 @@ export function Drawer({ open, onOpenChange, title, size, modal = true, children
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange} modal={modal}>
       <RadixDialog.Portal>
-        {modal && <RadixDialog.Overlay className="scrim open" />}
+        {modal && <RadixDialog.Overlay className="scrim" />}
         <RadixDialog.Content
           ref={content}
-          className={size === undefined ? 'drawer open' : `drawer open ${size}`}
+          className={size === undefined ? 'drawer' : `drawer ${size}`}
           aria-describedby={undefined}
           onOpenAutoFocus={(e) => {
             e.preventDefault();

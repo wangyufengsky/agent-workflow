@@ -486,8 +486,14 @@ svg.i.lg {
     background var(--t-fast),
     border-color var(--t-fast),
     color var(--t-fast),
-    opacity var(--t-fast);
+    opacity var(--t-fast),
+    transform var(--t-fast) var(--ease);
   user-select: none;
+}
+/* A small press under the pointer, so a click is felt before its result arrives. */
+.btn:active:not(:disabled, [aria-disabled="true"]),
+.icon-btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .btn.sm {
   height: 30px;
@@ -560,7 +566,8 @@ svg.i.lg {
   color: var(--sub);
   transition:
     background var(--t-fast),
-    color var(--t-fast);
+    color var(--t-fast),
+    transform var(--t-fast) var(--ease);
 }
 .icon-btn:hover {
   background: var(--fill-3);
@@ -861,7 +868,8 @@ input:is([type="checkbox"], [type="radio"]):disabled {
   color: var(--ink-strong);
   font-weight: 500;
 }
-.tab[aria-selected="true"]::after {
+/* The underline grows under the chosen tab while it shrinks away from the one left. */
+.tab::after {
   content: "";
   position: absolute;
   left: 12px;
@@ -870,6 +878,11 @@ input:is([type="checkbox"], [type="radio"]):disabled {
   height: 2px;
   border-radius: 2px;
   background: var(--ink-strong);
+  transform: scaleX(0);
+  transition: transform var(--t-mid) var(--ease);
+}
+.tab[aria-selected="true"]::after {
+  transform: none;
 }
 
 /* ---------- 6. 卡片 / 面板 / 列表 ---------- */
@@ -1185,19 +1198,20 @@ button.card:hover,
 }
 
 /* ---------- 10. 抽屉 / 对话框 / 浮层 ---------- */
+/*
+ * Radix mounts these only while open, so they play keyframes on its `data-state` instead of transitions: it keeps a
+ * closing one mounted until its animation ends, which gives the exit too.
+ */
 .scrim {
   position: fixed;
   inset: 0;
   z-index: 40;
   background: var(--scrim);
   backdrop-filter: blur(2px);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--t-mid);
+  animation: fade var(--t-mid) var(--ease) both;
 }
-.scrim.open {
-  opacity: 1;
-  pointer-events: auto;
+.scrim[data-state="closed"] {
+  animation: fade-out var(--t-mid) var(--ease) both;
 }
 .drawer {
   position: fixed;
@@ -1214,11 +1228,21 @@ button.card:hover,
   box-shadow:
     -1px 0 0 var(--line),
     -24px 0 60px var(--shade);
-  transform: translateX(102%);
-  transition: transform var(--t-slow) var(--ease);
+  --drawer-from: 102%;
+  animation: drawer-in var(--t-slow) var(--ease) both;
 }
-.drawer.open {
-  transform: none;
+.drawer[data-state="closed"] {
+  animation: drawer-out var(--t-mid) var(--ease) both;
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(var(--drawer-from));
+  }
+}
+@keyframes drawer-out {
+  to {
+    transform: translateX(var(--drawer-from));
+  }
 }
 /* Focused on open (components/drawer.tsx); the panel itself needs no ring. */
 .drawer:focus-visible {
@@ -1227,13 +1251,10 @@ button.card:hover,
 .drawer.left {
   left: 0;
   right: auto;
-  transform: translateX(-102%);
+  --drawer-from: -102%;
   box-shadow:
     1px 0 0 var(--line),
     24px 0 60px var(--shade);
-}
-.drawer.left.open {
-  transform: none;
 }
 .drawer.md {
   width: var(--drawer-md);
@@ -1282,20 +1303,26 @@ button.card:hover,
   /* Centred on the window: a form taller than a short window scrolls instead of losing its top and its buttons. */
   max-height: calc(100vh - 32px);
   overflow-y: auto;
-  transform: translate(-50%, -48%) scale(0.98);
-  opacity: 0;
-  pointer-events: none;
+  transform: translate(-50%, -50%);
   background: var(--panel);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-pop);
-  transition:
-    opacity var(--t-mid),
-    transform var(--t-mid) var(--ease);
+  animation: dialog-in var(--t-mid) var(--ease) both;
 }
-.dialog.open {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translate(-50%, -50%);
+.dialog[data-state="closed"] {
+  animation: dialog-out var(--t-fast) var(--ease) both;
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.98);
+  }
+}
+@keyframes dialog-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -49%) scale(0.98);
+  }
 }
 .dialog-body {
   padding: 22px 22px 8px;
@@ -1410,6 +1437,38 @@ button.card:hover,
   }
   to {
     opacity: 1;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+/*
+ * Each page fades in when the route changes (the route's element mounts). Only opacity: a page's geometry is what it
+ * measures from its first frame (whether the companion's canvas is in view, where a canvas fits its nodes).
+ */
+.content > * {
+  animation: fade var(--t-mid) var(--ease) backwards;
+}
+/*
+ * Popovers (the platform's `popover`) fade in and out; only opacity, so an anchored one is where it belongs from its
+ * first frame. `:where` keeps this the default: a component that moves its own popover (the assistant's menus rise
+ * from their button) overrides it with a plain class.
+ */
+:where([popover]) {
+  opacity: 0;
+  transition:
+    opacity var(--t-fast) var(--ease),
+    overlay var(--t-fast) allow-discrete,
+    display var(--t-fast) allow-discrete;
+}
+:where([popover]:popover-open) {
+  opacity: 1;
+}
+@starting-style {
+  :where([popover]:popover-open) {
+    opacity: 0;
   }
 }
 /*

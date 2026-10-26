@@ -34,12 +34,15 @@ export async function inspectPage(page: Page): Promise<PageReport> {
       '*, *::before, *::after { background-image: none !important; transition: none !important; animation: none !important; }',
   });
   const axe = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
+  // Overflow is measured before the style goes too: removing it restarts entrance keyframes (a drawer slides in again
+  // from past the window's edge, base.css §10).
+  const overflow = await page.evaluate(findOverflow);
   await noImages.evaluate((el) => el.remove());
   const describe = (results: typeof axe.violations) =>
     results.flatMap((r) => r.nodes.map((n) => `${n.target.join(' ')} — ${n.any[0]?.message ?? r.help}`));
   return {
     contrast: describe(axe.violations),
-    overflow: await page.evaluate(findOverflow),
+    overflow,
     contrastChecked: axe.passes.reduce((sum, r) => sum + r.nodes.length, 0),
     contrastUndecided: describe(axe.incomplete),
   };

@@ -15,9 +15,9 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="scrim open" />
+        <RadixDialog.Overlay className="scrim" />
         <RadixDialog.Content
-          className="dialog open"
+          className="dialog"
           aria-describedby={description === undefined ? undefined : 'dialog-desc'}
         >
           <div className="dialog-body">

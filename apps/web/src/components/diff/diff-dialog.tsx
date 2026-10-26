@@ -57,10 +57,10 @@ export function DiffDialog<T extends { files: DiffFile[] }>({
       }}
     >
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className={`scrim open ${styles.largeScrim}`} />
+        <RadixDialog.Overlay className={`scrim ${styles.largeScrim}`} />
         <RadixDialog.Content
           ref={content}
-          className={`dialog open ${styles.large}`}
+          className={`dialog ${styles.large}`}
           aria-describedby={undefined}
           onKeyDown={step}
           // The dialog itself takes focus so the keys work at once and the close button does not look selected.
