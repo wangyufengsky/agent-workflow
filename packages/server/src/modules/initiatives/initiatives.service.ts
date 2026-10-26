@@ -37,8 +37,6 @@ import {
   type ListInitiativesQuery,
   type LocalMergeStrategy,
   MCP_TOOL_PREFIX,
-  McpToolName,
-  type ReadAttachmentOutput,
   renderTemplateRequirement,
   ServerEventType,
   SessionAgent,
@@ -539,10 +537,7 @@ export function createInitiativesService({
         projectName: project.name,
         baseBranch: initiative.baseBranch,
         requirement: initiative.requirement,
-        attachments: attachments.promptSection(
-          attachments.listByOwner(owner(initiative.id)),
-          `${MCP_TOOL_PREFIX}${McpToolName.ReadAttachment}`,
-        ),
+        attachments: attachments.promptSection(attachments.listByOwner(owner(initiative.id)), MCP_TOOL_PREFIX),
         workflows: allowedWorkflowsOf(initiative),
       });
     const started =
@@ -954,13 +949,13 @@ export function createInitiativesService({
     },
 
     /** `read_attachment` for a breakdown session: the initiative's own source files only (30 §3.2). */
-    readAttachment(attempt: AttemptDTO, attachmentId: string, cursor: number): ReadAttachmentOutput {
+    /** A breakdown attempt reads only its initiative's source attachments (34 §8.1). */
+    assertAttachment(attempt: AttemptDTO, attachmentId: string): void {
       const run = repo.runOfAttempt(attempt.id);
       if (run === undefined) throw new Error(`Breakdown attempt ${attempt.id} has no initiative run`);
       if (!attachments.listByOwner(owner(run.initiativeId)).some((a) => a.id === attachmentId)) {
         throw new AppError(ErrorCode.AttachmentNotFound, `Attachment ${attachmentId} not found`, { id: attachmentId });
       }
-      return attachments.read(attachmentId, cursor);
     },
 
     /** Starts a work package by hand: after a failed start, or again after its task was cancelled (34 §5.4). */

@@ -1,6 +1,6 @@
 # 39 · Word 与 Excel 文件
 
-> 状态：**设计已确认**（2026-10-26，D193–D201 均按推荐方案，§17），实施中：OF-01（解析与附件接入）已完成。
+> 状态：**设计已确认**（2026-10-26，D193–D201 均按推荐方案，§17），实施中：OF-01（解析与附件接入）、OF-02（Excel 概览与表格工具）已完成。
 >
 > OF-01 的实测：Electron 44 的 utilityProcess 能从 `app.asar` 里加载解析 worker（`office-worker.js`），其 Node 24.22（ICU 78.2）能按 GB18030 解码。样本只有 LibreOffice、macOS 文本编辑（textutil）保存的文件和 msoffcrypto-tool 加密的文件：用脚本驱动 Microsoft Word 另存失败，WPS 只能手动操作，二者的样本待补。macOS 文本编辑保存的 Word 没有标题样式，表格也变成了段落，只能按段落读出。实施任务见 [05 的 OF 系列](05-dev-plan.md#后续--word-与-excel-文件of)。枚举、常量、表、接口、工具在实施时登记到 08–12，本文先写在 §11–§12。
 
@@ -148,10 +148,12 @@ attachments/<id>/original + text.md + workbook.json        files/<conversationId
 | 工具 | 输入 → 输出 | 说明 |
 | --- | --- | --- |
 | `read_attachment` | 不变 | Office 附件读的是 `text.md` |
-| `read_sheet` | `{ source, sheet, range?, include_formulas? = false }` → `{ sheet, range, header, rows, next_range }` | 按**行**分页，不切断行；每页最多 500 行且不超过 `ATTACHMENT_READ_MAX_CHARS`；`range` 省略时从已用区域开头读 |
-| `query_sheet` | `{ source, sheet, header_row? = 1, columns?, where?, group_by?, aggregates?, order_by?, limit? }` → `{ columns, rows, total_rows }` | 结构化查询，在 worker 里用 JS 执行：`where` 为 `[{ column, op: eq/ne/gt/gte/lt/lte/contains/in/empty, value }]`，`aggregates` 为 `count/sum/avg/min/max`；最多返回 500 行。列用表头文字或列字母指定 |
+| `read_sheet` | `{ attachment_id, sheet, range?, include_formulas? = false }` → `{ attachment_id, sheet, range, columns, rows: [{ row, hidden, values, formulas? }], next_range }` | 按**行**分页，不切断行；每页的 JSON 不超过 `ATTACHMENT_READ_MAX_CHARS`（至少一行）；`range` 省略时读整个已用区域，`values` 与 `columns` 的列字母对齐 |
+| `query_sheet` | `{ attachment_id, sheet, header_row? = 1, columns?, where?, group_by?, aggregates?, order_by?, limit? = 100 }` → `{ attachment_id, sheet, columns, rows, total_rows }` | 结构化查询，在 worker 里用 JS 执行：`where` 为 `[{ column, op: eq/ne/gt/gte/lt/lte/contains/in/empty/not_empty, value }]`（全部满足），`aggregates` 为 `count/sum/avg/min/max`（结果列名如 `sum(金额)`，`order_by` 用结果列名）；`limit` 最多 `SHEET_QUERY_MAX_ROWS`（500）。列用表头文字或列字母指定；sum / avg 只算数字（存成文字的数字也算），count 不带列时数行 |
 
-`source` 是 `{ attachment_id }`；助手的工具还可以是 `{ file }`（对话目录里的相对路径），用来读回自己刚生成或修改过的文件。
+OF-02 只读附件（`attachment_id`）；助手读回自己在对话目录里生成或修改的文件（`{ file }`）随 OF-04 加上。工具名不对的工作表、列、排序列与对 Word 附件调用都是 `VALIDATION_FAILED`，消息列出可用的名字。
+
+提示词里的概览在保存附件时由 worker 一并写成 `overview.md`（与 `text.md`、`workbook.json` 同目录），渲染提示词时同步读它、不解析单元格；所有附件超过 20,000 字符时 Excel 概览在行尾截断，不给 `cursor`（剩下的用表格工具读）。
 
 范围与 `read_attachment` 相同：执行 MCP 只能读当前尝试所属任务的附件（plan / execute / review / breakdown），助手只能读当前对话的附件和对话目录；范围外一律 `ATTACHMENT_NOT_FOUND`。
 
@@ -247,8 +249,7 @@ attachments/<id>/original + text.md + workbook.json        files/<conversationId
 | `OFFICE_WORKER_TIMEOUT_MS` | 30 秒 | `ATTACHMENT_PARSE_FAILED`，`reason: timeout` |
 | `OFFICE_WORKER_HEAP_MB` | 1,024 | `ATTACHMENT_PARSE_FAILED`，`reason: out_of_memory` |
 | `SHEET_OVERVIEW_HEAD_ROWS` / `_TAIL_ROWS` / `_SHEETS` | 10 / 2 / 20 | 概览只列这么多 |
-| `SHEET_READ_MAX_ROWS` | 500（且不超过 `ATTACHMENT_READ_MAX_CHARS`） | 给 `next_range` |
-| `SHEET_QUERY_MAX_ROWS` | 500 | 返回 `total_rows`，模型可加条件或分组 |
+| `SHEET_QUERY_MAX_ROWS` | 500（`limit` 的上限，默认 100） | 返回 `total_rows`，模型可加条件或分组 |
 | `OFFICE_PREVIEW_ROWS` | 1,000 | 预览说明只显示前 1,000 行 |
 | `OFFICE_WRITE_BLOCKS_MAX` / `OFFICE_WRITE_CELLS_MAX` | 2,000 / 200,000（`rows_from` 取出的行也算） | `VALIDATION_FAILED` |
 

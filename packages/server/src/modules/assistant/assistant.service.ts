@@ -12,7 +12,6 @@ import {
   type AssistantFileDTO,
   type AssistantPageRef,
   type AssistantPermissionRequestDTO,
-  AssistantToolName,
   AssistantTurnEvent,
   AssistantTurnStatus,
   type AssistantUsageDTO,
@@ -787,10 +786,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           const sent = show();
           state.page = page;
           const queued = repo.pendingMessages(id);
-          const section = attachments.promptSection(
-            sent,
-            `${MCP_ASSISTANT_TOOL_PREFIX}${AssistantToolName.ReadAttachment}`,
-          );
+          const section = attachments.promptSection(sent, MCP_ASSISTANT_TOOL_PREFIX);
           await prompt(
             c,
             sessionId,

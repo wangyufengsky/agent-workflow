@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import {
   type CreateInitiativeRequest,
   confirmInitiativeOp,
@@ -203,8 +204,10 @@ describe('AI 拆解与逐步细化（34 §8，D133、D136）', () => {
 
   it('没有交出拆解就是失败，可以带意见重新拆解；拆解进行中不能修改或删除', async () => {
     const { project } = await addProject(t, { checkCommand: null });
+    const notes = Buffer.from('导出字段：订单号、金额\n');
+    const source = await t.app.services.attachments.upload('导出.md', Readable.from([notes]), notes.length);
     // No script: the session ends its turn without submitting, is reminded once, and the run fails.
-    const created = await create({ projectId: project.id, requirement: '加一个导出功能' });
+    const created = await create({ projectId: project.id, requirement: '加一个导出功能', attachmentIds: [source.id] });
     // Without a choice, the work packages may use the built-in workflows that change the repository (34 §5.1).
     expect(created.allowedWorkflows).toEqual([
       'feature',
@@ -219,6 +222,9 @@ describe('AI 拆解与逐步细化（34 §8，D133、D136）', () => {
     const first = t.fake.prompts.find((p) => p.text.includes('## The requirement'))?.text ?? '';
     expect(first).toContain('`feature`');
     expect(first).not.toContain('`code_review`');
+    // The attachments section names the execution MCP's tools.
+    expect(first).toContain('导出字段：订单号、金额');
+    expect(first).toContain('read the rest with `agent-workflow_read_attachment`,');
     expect(await detail(created.id)).toMatchObject({
       status: 'breakdown_failed',
       latestRun: { mode: 'breakdown', status: 'failed' },

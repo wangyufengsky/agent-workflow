@@ -638,9 +638,10 @@ class AppError extends Error {
 | AttachmentLimit（`ATTACHMENT_TOO_LARGE` 的 `details.reason`） | bytes · count · unzipped · cells |
 | AttachmentParseFailure（`ATTACHMENT_PARSE_FAILED` 的 `details.reason`） | corrupt · timeout · out_of_memory |
 | AttachmentOwnerKind | task_input（owner 为任务）· task_feedback（owner 为追加的修改节点）· assistant_message（owner 为助手对话）· initiative（owner 为需求计划：资料原件，每个工作包的任务再引用一次，34 §7） |
-| AssistantToolName 增量（U-02 已实现） | read_attachment |
+| AssistantToolName 增量（U-02 已实现） | read_attachment；read_sheet · query_sheet（OF-02 已实现） |
 | InputRef 增量（U-03 已实现） | attachment（确认卡把附件 ID 显示为文件名） |
-| McpToolName 增量（U-02 已实现） | read_attachment |
+| McpToolName 增量（U-02 已实现） | read_attachment；read_sheet · query_sheet（OF-02 已实现） |
+| SheetQueryOp / SheetAggregate（OF-02 已实现） | eq · ne · gt · gte · lt · lte · contains · in · empty · not_empty / count · sum · avg · min · max（`query_sheet`，39 §6.2） |
 | NodeKind 增量（Q-02 已实现） | verify（核验验收清单的系统步骤） |
 | RequirementVerification（Q-01 已实现，下同） | command · ai_review · manual |
 | RequirementResultSource | command · ai · user |
@@ -654,7 +655,9 @@ class AppError extends Error {
 | OFFICE_ATTACHMENT_BYTES_MAX / OFFICE_UNZIPPED_BYTES_MAX（OF-01 已实现，下同） | 20 MiB / 200 MiB（Word 与 Excel 附件，39 §10） |
 | OFFICE_CELLS_MAX | 500,000（Excel 的非空单元格） |
 | SHEET_GRID_MAX_COLUMNS | 50（超过这么多列的工作表逐个列出单元格，不画成表格，39 §5.3） |
-| OFFICE_WORKER_TIMEOUT_MS / OFFICE_WORKER_HEAP_MB | 30,000 / 1,024（一次解析的时限与 worker 堆上限） |
+| OFFICE_WORKER_TIMEOUT_MS / OFFICE_WORKER_HEAP_MB | 30,000 / 1,024（一次解析或表格查询的时限与 worker 堆上限） |
+| SHEET_OVERVIEW_HEAD_ROWS / SHEET_OVERVIEW_TAIL_ROWS / SHEET_OVERVIEW_SHEETS（OF-02 已实现，下同） | 10 / 2 / 20（提示词里 Excel 概览的每表前几行、末几行与列出详情的工作表数） |
+| SHEET_QUERY_MAX_ROWS | 500（`query_sheet` 的 `limit` 上限） |
 | ATTACHMENT_NAME_MAX_CHARS | 255（显示名） |
 | ATTACHMENT_PROMPT_MAX_CHARS / ATTACHMENT_READ_MAX_CHARS | 20,000（一次提示词里全部附件合计）/ 12,000（每次读取）（U-02 已实现） |
 | ATTACHMENT_ORPHAN_TTL_MS / ATTACHMENT_CLEANUP_INTERVAL_MS | 86,400,000（无引用附件的保留时间）/ 3,600,000（清理间隔） |

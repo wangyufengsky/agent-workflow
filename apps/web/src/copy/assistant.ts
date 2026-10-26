@@ -126,6 +126,8 @@ export const TOOL_COPY = {
     [AssistantToolName.ListFiles]: '列出生成的文件',
     [AssistantToolName.RevealFile]: REVEAL[UI_PLATFORM],
     [AssistantToolName.ReadAttachment]: '读取附加的资料',
+    [AssistantToolName.ReadSheet]: '读取表格',
+    [AssistantToolName.QuerySheet]: '查询表格',
     [AssistantToolName.ReadBrowser]: '读取我的预览',
     [AssistantToolName.ShowChart]: '画图',
     [AssistantToolName.ShowFlowchart]: '画流程图',

@@ -66,6 +66,8 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.GetNodeOutput]: '读取前面步骤的产出',
   [McpToolName.GetTaskDiff]: '查看任务的改动',
   [McpToolName.ReadAttachment]: '读取附加的资料',
+  [McpToolName.ReadSheet]: '读取表格',
+  [McpToolName.QuerySheet]: '查询表格',
   [McpToolName.SubmitPlan]: '提交计划',
   [McpToolName.SubmitResult]: '提交结果',
   [McpToolName.SubmitReview]: '提交评审意见',

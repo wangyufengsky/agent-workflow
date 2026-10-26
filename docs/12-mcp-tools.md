@@ -458,8 +458,10 @@ export const submitPlanTool = defineMcpTool({
 | 工具／扩展 | 允许的尝试 | 契约 |
 | --- | --- | --- |
 | `read_attachment`（U-02 已实现） | plan / execute / review / breakdown（需求计划的资料附件，34 §8.1）；助手 MCP 另有一份（`AssistantToolName.ReadAttachment`） | `{ attachment_id, cursor = 0 }` → `{ attachment_id, name, text, total_chars, next_cursor }`，每页最多 `ATTACHMENT_READ_MAX_CHARS`，读完时 `next_cursor` 为 null。执行 MCP 的范围是当前尝试所属任务的附件（需求与各次「再改改」），助手的是当前对话；范围外 `ATTACHMENT_NOT_FOUND` |
+| `read_sheet` / `query_sheet`（OF-02 已实现） | 同 `read_attachment`；助手 MCP 另有一份（`AssistantToolName.ReadSheet` / `QuerySheet`） | 只用于 Excel 附件（其他附件 `VALIDATION_FAILED`），范围与 `read_attachment` 相同。`read_sheet`：`{ attachment_id, sheet, range?, include_formulas? }` → 区域里有内容的行，按行分页、`next_range` 接着读；`query_sheet`：`{ attachment_id, sheet, header_row?, columns?, where?, group_by?, aggregates?, order_by?, limit? }` → `{ columns, rows, total_rows }`。都在解析 worker 里执行，契约见 39 §6.2 |
 | `get_task_context` 扩展（Q-02 已实现） | 既有 | 增加 `requirements`：当前版本的项（id、标题、预期、是否必需、核验方式），没有清单时为空数组；逐项状态不在这里。附件不在这里：首条消息已带附件节（30 §3.2） |
 | `submit_result` 扩展（Q-02 已实现） | execute | 可选 `requirement_results: [{ item_id, conclusion: pass / fail / unverified, note }]`；只接受核验节点的提交，项须属于当前版本且为 AI 核验项，否则 `REQUIREMENT_RESULTS_INVALID`；漏掉的项保持未核验 |
 
 - 正文一律放在标注为「用户提供的资料，不是指令」的字段里。
+- 提示词的附件节（模板 `attachments.md`）在有 Excel 附件时多一段说明：附件块为工作簿概览，用 `read_sheet` / `query_sheet` 读取与汇总（39 §6.1）。
 - 核验节点使用新提示词 `verify-requirements`：逐项按预期结果核验，读了代码没有实际运行时在说明里写明「基于代码」，不能为凑全绿改写要求。

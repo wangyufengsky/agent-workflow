@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import {
   type AssistantPageRef,
   ATTACHMENT_NAME_HEADER,
@@ -34,7 +35,7 @@ beforeEach(async () => {
 });
 afterEach(() => t.close());
 
-async function uploaded(content: string, name: string): Promise<AttachmentDTO> {
+async function uploaded(content: string | Buffer, name: string): Promise<AttachmentDTO> {
   const res = await t.request({
     method: 'POST',
     url: '/attachments',
@@ -52,6 +53,14 @@ function promptTo(title: string): string {
   if (prompt === undefined) throw new Error(`No prompt to ${title}`);
   return prompt.text;
 }
+
+const salesXlsx = () => readFile(new URL('../../../test/fixtures/office/sales.libreoffice.xlsx', import.meta.url));
+const byRegion = {
+  sheet: '明细',
+  group_by: ['区域'],
+  aggregates: [{ fn: 'sum', column: '金额' }],
+  order_by: [{ column: 'sum(金额)', desc: true }],
+};
 
 const toolResult = (name: string, index = 0) => t.fake.toolCalls.filter((c) => c.name === name)[index];
 
@@ -129,6 +138,74 @@ describe('任务的附件（30 §3.2）', () => {
     });
   });
 
+  it('Excel 附件在提示词里是概览；read_sheet 与 query_sheet 只读本任务的 Excel 附件', async () => {
+    const { project } = await addProject(t);
+    const sales = await uploaded(await salesXlsx(), '销售.xlsx');
+    const notes = await uploaded('按区域汇总\n', 'notes.md');
+    const unrelated = await uploaded(await salesXlsx(), '别的.xlsx');
+    const { body: task } = await t.call(createTaskOp, {
+      projectId: project.id,
+      workflowId: await workflowId(t, 'bugfix'),
+      requirement: 'Total the sales by region',
+      start: false,
+      attachmentIds: [sales.id, notes.id],
+    });
+    const directory = `/${task.key}`;
+    t.fake.enqueue(
+      script()
+        .callTool('read_sheet', { attachment_id: sales.id, sheet: '汇总', range: 'A3:B4', include_formulas: true })
+        .callTool('query_sheet', { attachment_id: sales.id, ...byRegion })
+        .callTool('query_sheet', { attachment_id: unrelated.id, ...byRegion })
+        .callTool('read_sheet', { attachment_id: notes.id, sheet: '明细' })
+        .callTool('submit_result', { summary: 'Totalled' }),
+      { title: '· 定位根因', directory },
+    );
+    t.fake.enqueue(script().callTool('submit_result', { summary: 'Done' }), { title: '· 修复', directory });
+    t.fake.enqueue(script().callTool('submit_review', { verdict: 'pass', summary: 'Right' }), {
+      agent: 'aw-reviewer',
+      directory,
+    });
+    const review = reaches(task.id, 'review');
+    await t.call(startTaskOp, { id: task.id });
+    await review;
+    await t.fake.settled();
+
+    const prompt = promptTo('· 定位根因');
+    expect(prompt).toContain(
+      `<attachment attachment_id="${sales.id}" name="销售.xlsx" source="upload" format="xlsx" sheets="3">`,
+    );
+    expect(prompt).toContain('## 工作表「汇总」（A1:B7，7 行 × 2 列）');
+    expect(prompt).toContain('`agent-workflow_read_sheet`');
+    expect(prompt).toContain('`agent-workflow_query_sheet`');
+    expect(toolResult('read_sheet')).toMatchObject({
+      isError: false,
+      result: {
+        range: 'A3:B4',
+        rows: [
+          { row: 3, values: ['华东', 1384], formulas: { B: 'SUMIF(明细!B2:B6,A3,明细!F2:F6)' } },
+          { row: 4, values: ['华北', 707.5] },
+        ],
+        next_range: null,
+      },
+    });
+    expect(toolResult('query_sheet')).toMatchObject({
+      isError: false,
+      result: {
+        columns: ['区域', 'sum(金额)'],
+        rows: [
+          ['华东', 1384],
+          ['华北', 707.5],
+          ['华南', 700],
+        ],
+      },
+    });
+    expect(toolResult('query_sheet', 1)).toMatchObject({
+      isError: true,
+      result: { code: ErrorCode.AttachmentNotFound },
+    });
+    expect(toolResult('read_sheet', 1)).toMatchObject({ isError: true, result: { code: ErrorCode.ValidationFailed } });
+  });
+
   it('附件不存在时任务不创建', async () => {
     const { project } = await addProject(t);
     const res = await t.call(createTaskOp, {
@@ -182,6 +259,35 @@ describe('助手消息的附件（30 §5）', () => {
       isError: true,
       result: { code: ErrorCode.AttachmentNotFound },
     });
+
+    const sales = await uploaded(await salesXlsx(), '销售.xlsx');
+    t.fake.enqueue(
+      script()
+        .callAppTool('query_sheet', { attachment_id: sales.id, ...byRegion })
+        .text('华东最多'),
+      {
+        agent: OPENCODE_ASSISTANT_AGENT,
+      },
+    );
+    await say(mine.id, '哪个区域卖得最多', [sales.id]);
+    t.fake.enqueue(script().callAppTool('read_sheet', { attachment_id: sales.id, sheet: '明细' }).text('看不到'), {
+      agent: OPENCODE_ASSISTANT_AGENT,
+    });
+    await say(other.id, '读一下销售表');
+    expect(t.fake.prompts.find((p) => p.text.includes('哪个区域卖得最多'))?.text).toContain(
+      '`agent-workflow-app_query_sheet`',
+    );
+    expect(toolResult('query_sheet')).toMatchObject({
+      isError: false,
+      result: {
+        rows: [
+          ['华东', 1384],
+          ['华北', 707.5],
+          ['华南', 700],
+        ],
+      },
+    });
+    expect(toolResult('read_sheet')).toMatchObject({ isError: true, result: { code: ErrorCode.AttachmentNotFound } });
 
     await t.call(deleteConversationOp, { id: mine.id });
     clock.advance(ATTACHMENT_ORPHAN_TTL_MS + 1);

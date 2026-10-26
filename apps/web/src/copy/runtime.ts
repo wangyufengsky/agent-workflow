@@ -56,6 +56,8 @@ export const TOOLS_COPY = {
     [McpToolName.GetNodeOutput]: '读取本任务中某个已完成步骤的完整产出：摘要、改动文件、注意事项与检查结果。',
     [McpToolName.GetTaskDiff]: '查看任务工作区相对基线的改动：文件列表，或某个文件的 diff。',
     [McpToolName.ReadAttachment]: '分页读取用户附加的资料（提示词里只放了开头时）。',
+    [McpToolName.ReadSheet]: '按行分页读取附加的 Excel 中某个工作表。',
+    [McpToolName.QuerySheet]: '对附加的 Excel 中某个工作表做筛选、分组、汇总与排序。',
     [McpToolName.SubmitPlan]: '提交计划：步骤、角色、指令与依赖。计划不合规时返回问题，AI 修改后再提交。',
     [McpToolName.SubmitResult]: '步骤完成后提交结果；每次尝试只能提交一次，之后进入检查。',
     [McpToolName.SubmitReview]: '提交评审结论：通过，或列出问题及位置。',
