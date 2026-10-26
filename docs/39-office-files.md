@@ -183,7 +183,7 @@ OF-02 只读附件（`attachment_id`）；助手读回自己在对话目录里�
 - 校验失败统一为 `VALIDATION_FAILED`，`details.issues` 指出字段与改法（与 PPT 的 `submit_slide` 相同，23 开头的实现说明）。
 - **原件永远不变**：附件是不可变的（30 §3.1），修改一律另存新文件。
 - `source` 为 `{ attachment_id }`（本对话的附件，范围外 `ATTACHMENT_NOT_FOUND`）或 `{ file }`（本对话目录里写过的文件，按真实路径限定）；worker 读源时按附件同样的大小与解压上限检查，格式不是工具要的为 `VALIDATION_FAILED`。`create_docx` 的 `style_from` 也是一个 Word `source`。
-- **保真说明**（OF-05 已实现）：`edit_xlsx` 经 exceljs 往返，按部件对比原件与新文件，少了的图表、图片、透视表计入 `lost`；有插入或删除行列时 exceljs 不调整公式里的引用，`lost` 记下 `formula_references`（原件的公式数）。`revise_docx` 只保留样式表，原件的图片、页眉页脚、批注计入 `lost`（页面设置也不保留）。工具返回 `{ file, size, lost: [{ kind: OfficeLoss, count }] }`，提示模型告诉用户；消息流的 `attachment` 条目记下 `lost`，文件卡片显示一行「没有保留原文件的……」。Word 的原位修改（保留全部排版只改几段字）不在首版，见 D198 备选。
+- **保真说明**（OF-05 已实现）：`edit_xlsx` 经 exceljs 往返，按部件对比原件与新文件，少了的图表、图片、透视表计入 `lost`；有插入或删除行列时 exceljs 不调整公式里的引用，`lost` 记下 `formula_references`（原件的公式数）；删掉的工作表被别的公式引用时，同样记下这些公式数。exceljs 移动列时不移动合并区域（行会），由我们取下合并区域、移动列、再按新位置合并；重命名工作表时，引用它的公式改成新名字。`revise_docx` 只保留样式表，原件的图片、页眉页脚、批注计入 `lost`（页面设置也不保留）。工具返回 `{ file, size, lost: [{ kind: OfficeLoss, count }] }`，提示模型告诉用户；消息流的 `attachment` 条目记下 `lost`，文件卡片显示一行「没有保留原文件的……」。Word 的原位修改（保留全部排版只改几段字）不在首版，见 D198 备选。
 - **公式安全**：只有显式的 `{ formula }` 写成公式，普通字符串即使以 `=` 开头也写成文本；拒绝引用其他工作簿和会联网的函数（`WEBSERVICE`、`FILTERXML`、`HYPERLINK` 等），因为附件里的文字可能诱导模型写出打开文件时把数据发出去的公式。
 
 ### 7.3 任务里（D199）

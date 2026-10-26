@@ -53,6 +53,33 @@ describe('edit_xlsx', () => {
     expect((book.getWorksheet('说明') as ExcelJS.Worksheet).getCell('B1').value).toEqual({ formula: '1+1' });
   });
 
+  it('插入或删除列时合并区域跟着移动；重命名工作表时引用它的公式跟着改；删掉被引用的工作表时报告', async () => {
+    const source = await fixture('sales.libreoffice.xlsx');
+    const moved = await loaded(
+      (
+        await editXlsx(source, [
+          { op: 'insert_columns', sheet: '汇总', before: 'A', count: 1 },
+          { op: 'insert_columns', sheet: '汇总', before: 'C', count: 1 },
+        ])
+      ).bytes,
+    );
+    const totals = moved.getWorksheet('汇总') as ExcelJS.Worksheet;
+    // A1:B1 went to B1:C1, then grew around the column put in at C.
+    expect([totals.model.merges, totals.getCell('B1').value]).toEqual([['B1:D1'], '区域汇总']);
+    const shrunk = await loaded(
+      (await editXlsx(source, [{ op: 'delete_columns', sheet: '汇总', from: 'B', count: 1 }])).bytes,
+    );
+    expect((shrunk.getWorksheet('汇总') as ExcelJS.Worksheet).model.merges).toEqual([]);
+
+    const renamed = await editXlsx(source, [{ op: 'rename_sheet', sheet: '明细', name: '九月 明细' }]);
+    expect(renamed.lost).toEqual([]);
+    const formula = ((await loaded(renamed.bytes)).getWorksheet('汇总') as ExcelJS.Worksheet).getCell('B3').value;
+    expect(formula).toMatchObject({ formula: "SUMIF('九月 明细'!B2:B6,A3,'九月 明细'!F2:F6)" });
+
+    const deleted = await editXlsx(source, [{ op: 'delete_sheet', sheet: '明细' }]);
+    expect(deleted.lost).toEqual([{ kind: 'formula_references', count: 3 }]);
+  });
+
   it('原件里 exceljs 保留不了的图表与透视表报告为丢失', async () => {
     const source = repacked(await fixture('sales.libreoffice.xlsx'), {
       'xl/charts/chart1.xml': '<c:chartSpace/>',

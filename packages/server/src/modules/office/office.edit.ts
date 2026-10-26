@@ -85,8 +85,78 @@ function formulasIn(book: ExcelJS.Workbook): number {
   return formulas;
 }
 
-/** One change; rows and columns are those of the workbook as the earlier changes left it. */
-function apply(book: ExcelJS.Workbook, op: XlsxEdit, at: string): void {
+/** A sheet name as a formula writes it: plain when it is letters and digits, quoted otherwise. */
+const sheetRef = (name: string) => (/^[\p{L}_][\p{L}\p{N}_.]*$/u.test(name) ? name : `'${name.replaceAll("'", "''")}'`);
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** `明细!A1` and `'明细'!A1`, not `新明细!A1`; sheet names compare without case, as Excel's do. */
+const referencesTo = (name: string) =>
+  new RegExp(`(?<![\\p{L}\\p{N}_.'])(?:'${escapeRegExp(name.replaceAll("'", "''"))}'|${escapeRegExp(name)})!`, 'giu');
+
+/**
+ * Each formula a sheet writes itself (a shared formula's other cells follow its first): `edit` returns the new text,
+ * or undefined to leave it.
+ */
+function eachFormula(book: ExcelJS.Workbook, edit: (formula: string) => string | undefined): void {
+  for (const sheet of book.worksheets) {
+    sheet.eachRow({ includeEmpty: false }, (row) =>
+      row.eachCell({ includeEmpty: false }, (cell) => {
+        if (cell.type !== ExcelJS.ValueType.Formula) return;
+        const value = cell.value as ExcelJS.CellFormulaValue | ExcelJS.CellSharedFormulaValue;
+        if ('sharedFormula' in value || value.formula === undefined) return;
+        const changed = edit(value.formula);
+        if (changed !== undefined) cell.value = { ...value, formula: changed };
+      }),
+    );
+  }
+}
+
+type Merge = { top: number; left: number; bottom: number; right: number };
+
+/**
+ * A merged range after columns `at`… change: `deleted` taken out, then `inserted` put in. A range they fall inside
+ * grows or shrinks; one reduced to a single cell is no merge.
+ */
+function shiftColumns(m: Merge, at: number, deleted: number, inserted: number): Merge | undefined {
+  let { left, right } = m;
+  if (deleted > 0) {
+    const last = at + deleted - 1;
+    if (right >= at) right = right > last ? right - deleted : at - 1;
+    if (left >= at) left = left > last ? left - deleted : at;
+    if (right < left) return undefined;
+  }
+  if (inserted > 0) {
+    if (left >= at) left += inserted;
+    if (right >= at) right += inserted;
+  }
+  return left === right && m.top === m.bottom ? undefined : { ...m, left, right };
+}
+
+/**
+ * exceljs moves cells but not merged ranges when columns move (its rows keep theirs), and a range left in place
+ * hides the cells moved under it: the ranges are taken off, the columns moved, the moved ranges put back.
+ */
+function spliceColumns(sheet: ExcelJS.Worksheet, at: number, deleted: number, inserted: number): void {
+  const merges = sheet.model.merges.map((range): Merge => {
+    const [from, to] = range.split(':').map((ref) => {
+      const [, letters = '', digits = ''] = /^([A-Z]+)(\d+)$/.exec(ref) ?? [];
+      return { row: Number(digits), column: columnNumber(letters) };
+    }) as [{ row: number; column: number }, { row: number; column: number }];
+    return { top: from.row, left: from.column, bottom: to.row, right: to.column };
+  });
+  for (const range of sheet.model.merges) sheet.unMergeCells(range);
+  sheet.spliceColumns(at, deleted, ...Array.from({ length: inserted }, () => []));
+  for (const merge of merges) {
+    const moved = shiftColumns(merge, at, deleted, inserted);
+    if (moved !== undefined) sheet.mergeCells(moved.top, moved.left, moved.bottom, moved.right);
+  }
+}
+
+/**
+ * One change; rows and columns are those of the workbook as the earlier changes left it. Returns how many formulas
+ * it left pointing at something gone (a deleted sheet).
+ */
+function apply(book: ExcelJS.Workbook, op: XlsxEdit, at: string): number {
   const sheetOf = (name: string) => {
     const sheet = book.getWorksheet(name);
     if (sheet === undefined) {
@@ -111,35 +181,46 @@ function apply(book: ExcelJS.Workbook, op: XlsxEdit, at: string): void {
           sheet.getCell(top + i, left + j).value = cellValue(value);
         });
       });
-      return;
+      return 0;
     }
     case 'insert_rows':
       sheetOf(op.sheet).spliceRows(op.before, 0, ...empty(op.count));
-      return;
+      return 0;
     case 'delete_rows':
       sheetOf(op.sheet).spliceRows(op.from, op.count);
-      return;
+      return 0;
     case 'insert_columns':
-      sheetOf(op.sheet).spliceColumns(columnNumber(op.before), 0, ...empty(op.count));
-      return;
+      spliceColumns(sheetOf(op.sheet), columnNumber(op.before), 0, op.count);
+      return 0;
     case 'delete_columns':
-      sheetOf(op.sheet).spliceColumns(columnNumber(op.from), op.count);
-      return;
+      spliceColumns(sheetOf(op.sheet), columnNumber(op.from), op.count, 0);
+      return 0;
     case 'add_sheet':
       nameFree(op.name);
       book.addWorksheet(op.name);
-      return;
+      return 0;
     case 'rename_sheet': {
       const sheet = sheetOf(op.sheet);
       if (op.name.toLowerCase() !== op.sheet.toLowerCase()) nameFree(op.name);
+      // exceljs renames only the sheet: the formulas that name it follow here.
+      const old = referencesTo(sheet.name);
+      eachFormula(book, (formula) =>
+        formula.search(old) >= 0 ? formula.replace(old, `${sheetRef(op.name)}!`) : undefined,
+      );
       sheet.name = op.name;
-      return;
+      return 0;
     }
     case 'delete_sheet': {
       const sheet = sheetOf(op.sheet);
       if (book.worksheets.length === 1) throw invalid(`${at}.sheet`, 'A workbook keeps at least one sheet');
       book.removeWorksheet(sheet.id);
-      return;
+      const gone = referencesTo(sheet.name);
+      let broken = 0;
+      eachFormula(book, (formula) => {
+        if (formula.search(gone) >= 0) broken += 1;
+        return undefined;
+      });
+      return broken;
     }
   }
 }
@@ -148,13 +229,15 @@ const MOVES = new Set<XlsxEdit['op']>(['insert_rows', 'delete_rows', 'insert_col
 
 /**
  * `edit_xlsx` (39 §7.2): the changes made on a copy of the source, which keeps its cell styles, widths, merges and
- * other sheets. exceljs drops charts and pivot tables, and moves no formula when rows or columns move: all reported.
+ * other sheets; merged ranges move with columns and formulas follow a renamed sheet. exceljs drops charts and pivot
+ * tables and moves no formula when rows or columns move, and a deleted sheet's formulas break: all reported.
  */
 export async function editXlsx(source: Buffer, operations: readonly XlsxEdit[]) {
   const book = new ExcelJS.Workbook();
   await translated(AttachmentFormat.Xlsx, () => book.xlsx.load(source as unknown as ExcelJS.Buffer));
   const formulas = formulasIn(book);
-  for (const [i, op] of operations.entries()) apply(book, op, `operations.${i}`);
+  let broken = 0;
+  for (const [i, op] of operations.entries()) broken += apply(book, op, `operations.${i}`);
   const bytes = Buffer.from(await book.xlsx.writeBuffer());
   const [before, after] = [workbookParts(zipEntries(source)), workbookParts(zipEntries(bytes))];
   const moved = operations.some((op) => MOVES.has(op.op));
@@ -162,7 +245,8 @@ export async function editXlsx(source: Buffer, operations: readonly XlsxEdit[]) 
     [OfficeLoss.Charts, before.charts - after.charts],
     [OfficeLoss.Images, before.images - after.images],
     [OfficeLoss.PivotTables, before.pivotTables - after.pivotTables],
-    [OfficeLoss.FormulaReferences, moved ? formulas : 0],
+    // After moved rows or columns any formula may point at the wrong cells; otherwise only those naming a deleted sheet.
+    [OfficeLoss.FormulaReferences, moved ? formulas : broken],
   ]);
   return { bytes, lost };
 }
