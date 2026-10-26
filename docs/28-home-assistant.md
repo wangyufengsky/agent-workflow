@@ -46,7 +46,8 @@
 ```
 
 - 顶部是用户喜欢的设计稿标语（`home.html` 的 hero）：三个相连的节点、「Everything is a *Workflow.*」（Workflow. 为 accent 色衬线斜体）、副标「万事皆流程，执行由你掌控。」。它与打开动画（§5）的最后一帧是同一个图形，动画结束进入应用时视觉上是连续的。原 `HOME_COPY.title`「今天想让 AI 做什么？」改为输入框的占位文字。
-- **输入框**：与面板同一个输入组件，主页上更大（最少 3 行、最宽 760px）。
+- **输入框**：与面板同一个输入组件，主页上更大（最少 3 行）。输入区最宽 `clamp(820px, 46vw, 1000px)`，最小高度随窗口高度在 72–132px 之间（D187）。
+- **竖直位置**：标语、输入框、建议与最近对话一起放在第一屏中间偏上，工作概览在其下；工作概览很长时它们回到顶部（D187）。
 - **直接开始**：底栏的「直接开始 ▾」默认收起，点开在框内、底栏上方列出内置流程（专业模式另加自定义流程，排在「自定义」小标题后），点一个即收起并把输入框切到「开始任务」（§2.2，36 §5）。
 - **试试问**：四条建议，点即在新对话中发送；它们特意覆盖不同模块（项目、需要你处理、定时任务、PPT），让人知道助手能做什么（§4）。
 - **最近对话**：最近 3 个对话（标题 · 相对时间），点击进入「对话中」；「全部对话」打开对话列表。
@@ -59,7 +60,7 @@
 │      │ ● 整理本周失败的任务 ▾           ＋ 新对话  │ 需要你处理 2     │
 │      │                                         │  T-12 有个问题   │
 │      │           （消息流，与面板同一组件，         │  T-9 待合并      │
-│      │             居中，最宽 720px）             │ 进行中 3         │
+│      │             居中，最宽 768–960px）             │ 进行中 3         │
 │      │   你：帮我修一下登录页记不住密码的问题       │  T-14 执行中     │
 │      │   助手：好的，用「修 Bug」流程…             │  T-15 规划中     │
 │      │   ┌ 需要你确认 · 开始任务 ──────────┐      │ 批量 1           │
@@ -110,7 +111,7 @@
 | 助手带过去的：`open_page`、`open_form`、导航卡片的「打开」、知识问答引用的原文 | 打开，显示对话 X：用户正在对话中，是助手把他带到了别处 |
 | 用户自己点走的：侧栏、工作概览栏、页面里的链接 | 只有 X 正在回复或有等待确认的卡片时才打开；否则不打开，顶栏助手按钮随时打开同一个对话 |
 
-接力用浏览器自带的同文档视图过渡（`document.startViewTransition`，Chromium 内置，不是动画库）：消息流从页面中央移到右侧面板的位置，0.36s；`prefers-reduced-motion` 下直接切换。
+接力时面板用它自己的弹出动画打开（D189）。原先用浏览器的同文档视图过渡把消息流从页面中央移到面板（D112），实测每帧要把整个新页面重绘进过渡快照，内容多的页面（Git）与大屏上掉到约 15fps、持续约 0.5s，已去掉。
 
 **回到主页**：面板开着时回到主页（侧栏「主页」）→ 面板收起，对话移到主页（`/?conversation=<面板当前的对话>`，反向接力）；面板关着时主页为空闲。应用每次启动主页都是空闲状态，上次的对话在「最近对话」里。
 
@@ -212,7 +213,7 @@
 | --- | --- |
 | `web/src/features/home/` | `home.page.tsx`（空闲 / 对话中、建议、最近对话）、`home-composer.tsx`（两种模式的输入框与「直接开始」）、`use-start-task.ts`（原表单的 `tasks.create`）、`more-options.tsx`（专业模式的更多选项）、`work-overview.tsx`（空闲时下方的工作概览与 `useWork`）、`work-rail.tsx`（对话中的工作概览栏）；原 `start-task-form.tsx` 与助手条 `home-assistant-entry.tsx` 删除 |
 | `web/src/components/workflow-mark.tsx`、`web/src/brand/mark.ts` | 标语与三个节点，主页与动画页共用的几何 |
-| `web/src/features/assistant/` | `handoff.ts`：规则 `panelFollowsUser`、外壳里的 `useAssistantHandoff`（离开 / 回到主页）、`followAssistant`（助手带用户离开：打开面板，从主页离开时经视图过渡）；`use-ask.ts` 在主页上把对话放进地址而不是打开面板；面板在主页上不显示 |
+| `web/src/features/assistant/` | `handoff.ts`：规则 `panelFollowsUser`、外壳里的 `useAssistantHandoff`（离开 / 回到主页）、`followAssistant`（助手带用户离开：打开面板）；`use-ask.ts` 在主页上把对话放进地址而不是打开面板；面板在主页上不显示 |
 | `web/src/splash/splash-page.ts`（`@aw/web/splash`） | 动画页：纯函数 `splashHtml({ theme, intro })` 生成自包含的 HTML（主题令牌、标语、关键帧、跳过与 `window.splash`），`splashBackground` 给窗口底色 |
 | `desktop/src/main/` | `index.ts` 先开窗口（令牌由 main 生成）、以 `data:` URL 显示动画页、并行启动后端，经 `executeJavaScript` 等 `window.splash.done`、`leave()`，失败时 `fail()`；`launch.ts` 读写 `launch.json`；preload `setLaunchPreferences` |
 | `shared` | `AssistantPage` 加 `batches`、`batch`、`schedules`、`schedule`、`environment`（参数 `batchId`、`scheduleId`）；设置 `ui.introAnimation`；`launchPreferencesSchema`、`AwBridge.setLaunchPreferences` |
@@ -228,7 +229,7 @@
 | E2E 走查 J9 | 新增「开始任务」模式（`home-task`）与主页对话（`home-conversation`）；专业模式主页展开更多选项；助手欢迎页改在任务列表上打开面板 |
 | Electron J15 | 窗口先显示动画页（点击跳过），随后出现引导页，前端已写入 `launch.json` |
 
-不测：动画的时间与样子（不做像素或时间断言）、视图过渡本身（浏览器行为）。
+不测：动画的时间与样子（不做像素或时间断言）。
 
 ## 9. 实现任务
 
@@ -237,7 +238,7 @@
 | H-01 | 设计文档 28、决策 D111–D113 | 用户确认 |
 | H-02 | shared：`AssistantPage` 五个页面、`ui.introAnimation`、`AwBridge.setLaunchPreferences`；08、15 同步 | 类型检查通过 |
 | H-03 | 主页：标语、输入框两种模式、直接开始、建议、最近对话、工作概览、对话中视图 | J1 / J17 / J19 通过 |
-| H-04 | 面板与接力：主页时不显示、接力规则、视图过渡、反向接力 | 单测；J25 |
+| H-04 | 面板与接力：主页时不显示、接力规则、反向接力（视图过渡已去掉，D189） | 单测；J25 |
 | H-05 | 打开动画：动画页入口、main 启动顺序、`launch.json`、设置项、后端提前退出的提示 | 单测；J15；实测后端启动时间写入 §5.2 |
 | H-06 | 文档收尾（§7）、J9 走查 | `pnpm verify`、`pnpm e2e`、`pnpm test:oc` 通过 |
 | 后续 | `export_deck` 助手工具（§4，已完成）；设置中列出外部 MCP（§4，已完成） | 各自独立的 PR |

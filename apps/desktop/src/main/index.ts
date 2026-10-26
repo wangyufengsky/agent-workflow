@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { APP_LICENSE, APP_SOURCE_URL, browserRectSchema, type LaunchPreferences } from '@aw/shared';
-import { splashBackground, splashHtml } from '@aw/web/splash';
+import { splashBackground, splashHtml, titleBarOverlay } from '@aw/web/splash';
 import { app, BrowserWindow, dialog, ipcMain, nativeTheme, session, shell, type WebPreferences } from 'electron';
 import { type Backend, startBackend } from './backend.ts';
 import { type BrowserPrompts, createBrowserPrompts } from './browser-prompts.ts';
@@ -14,6 +14,11 @@ import { passwordStoreSwitch } from './password-store.ts';
 const LAUNCH_FILE = 'launch.json';
 
 const isDev = process.env.ELECTRON_RENDERER_URL !== undefined;
+/**
+ * Windows and Linux hide the system title bar, which keeps its own colours whatever the theme, and draw the window
+ * buttons over the header in the theme's colours; the header moves the window (17 §3.14). macOS keeps its title bar.
+ */
+const themedTitleBar = process.platform !== 'darwin';
 let backend: Backend | undefined;
 let companion: ReturnType<typeof createCompanionHost> | undefined;
 
@@ -37,6 +42,7 @@ function createWindow(apiToken: string, launch: LaunchPreferences): Window {
     minWidth: 1024,
     minHeight: 700,
     backgroundColor: splashBackground(launch),
+    ...(themedTitleBar && { titleBarStyle: 'hidden', titleBarOverlay: titleBarOverlay(launch) }),
     webPreferences: {
       ...webPreferences,
       additionalArguments: [...webPreferences.additionalArguments, '--aw-main-window'],
@@ -95,10 +101,14 @@ app.setAboutPanelOptions({
 
 app.whenReady().then(async () => {
   const launchFile = join(app.getPath('userData'), LAUNCH_FILE);
-  ipcMain.on('aw:launch-preferences', (_e, preferences: unknown) => writeLaunchPreferences(launchFile, preferences));
   const launch = readLaunchPreferences(launchFile, nativeTheme.shouldUseDarkColors);
   const apiToken = randomBytes(32).toString('hex');
   const window = createWindow(apiToken, launch);
+  // Sent whenever the renderer applies a theme: the window buttons change with it.
+  ipcMain.on('aw:launch-preferences', (_e, preferences: unknown) => {
+    const applied = writeLaunchPreferences(launchFile, preferences);
+    if (themedTitleBar) window.win.setTitleBarOverlay(titleBarOverlay(applied));
+  });
   const prompts = createBrowserPrompts(() => window.win);
   // `window.splash` (28 §5): `done` once the animation ended or was skipped.
   const animated = window.win

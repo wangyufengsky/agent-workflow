@@ -217,6 +217,16 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 
 **测试。** `network.no-proxy.test.ts`：各种 `NO_PROXY` 写法。`network.int.test.ts`：FakeHosting 以测试 CA 签发的证书提供 HTTPS，加 CA 前报 `HOSTING_UNREACHABLE`、加上后成功；测试代理记录 CONNECT，自建 GitLab 用只有代理能解析的主机名，验证环境变量、设置覆盖与 `noProxy`；`127.0.0.0/8` 时按 `[::ffff:127.0.0.1]` 访问的 GitLab 直连（本机地址列表不含这个写法，只有网段能让它直连）；假 opencode 记录启动环境，测试经它拿到的转发代理建隧道；真实 git 与 `git http-backend` 的 HTTPS 服务：加 CA 前推送因证书失败、加上后推送与取回成功，设置的代理下经代理到达只有代理能解析的远端；http 远端经代理转发，不走代理的网段里按 IP（`[::ffff:127.0.0.1]`）写的远端直连（转发的请求不能再用全局 agent，否则又回到转发代理）。Ubuntu 的 git 链接 GnuTLS，证书错误的措辞与 OpenSSL 不同（`server certificate verification failed`）。`network.oc.test.ts`（`@opencode`）：真实 opencode 经转发代理与上游代理连上只有代理能解析、企业 CA 签发证书的模型服务。浏览器：`browser-network.test.ts`（证书检查）与 `browser-host.electron.spec.ts`（真实 Chromium 的 CA 与代理）。系统证书库只能手工验证：把测试 CA 加入钥匙串（Linux：`/usr/local/share/ca-certificates` + `update-ca-certificates`），不加设置，保存企业 GitLab 的令牌。
 
+### 3.14 窗口标题栏（D188）
+
+系统标题栏（Linux 上还有 Electron 默认菜单「File Edit View Window」）用系统的颜色，不随应用主题变。Windows 与 Linux 上 main 建窗口时 `titleBarStyle: 'hidden'`，`titleBarOverlay` 由系统在顶栏右端画最小化 / 最大化 / 关闭三个按钮：底色为主题的 `bg`，符号为 `sub`，高 56px（`--header-h`）；颜色与打开动画一样取自 `@aw/web/splash`（`titleBarOverlay`）。界面每次应用主题都会发 `aw:launch-preferences`（28 §5.3），main 收到后除了写 `launch.json` 还调用 `setTitleBarOverlay`，按钮随主题即时变色。macOS 保留系统标题栏，不变。
+
+- 移动窗口：顶栏（`.header`）与侧栏品牌区是 `-webkit-app-region: drag`，其中的按钮、链接、输入框为 `no-drag`；打开动画整页可拖动（「退出」按钮除外）。
+- 让出按钮的位置：顶栏右侧内边距加上 `100vw - env(titlebar-area-x) - env(titlebar-area-width)`（只有隐藏了标题栏的窗口才有这组环境变量，其他平台与浏览器里为 0）；右侧抽屉从 `env(titlebar-area-height)` 开始，关闭按钮不被窗口按钮挡住。
+- 拖动区域会吃掉盖在它上面的元素的点击，所以遮罩、抽屉、对话框都是 `no-drag`。
+- 只用 CSS 环境变量与 main 的一处判断，界面代码不判断平台（D71）。菜单栏不再显示；默认菜单仍在，它的快捷键（缩放、开发者工具等）在 Linux 上是否照常可用尚未实测。
+- 验证：macOS 上浏览器 E2E 与 Electron 冒烟覆盖不变的部分；Linux 上的样子需要真机或 CI 打出的包手工查看（未在本机验证）。
+
 ## 4. 测试与 CI
 
 ### 4.1 GitHub Actions（`.github/workflows/ci.yml`）

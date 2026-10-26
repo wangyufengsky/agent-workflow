@@ -9,7 +9,8 @@
   top: calc(var(--header-h) + var(--s-2));
   right: var(--s-3);
   bottom: var(--s-3);
-  width: min(var(--drawer-md), calc(100vw - var(--nav-w) - var(--s-8)));
+  /* Wider on a large screen, so the stream and the input do not look small in it. */
+  width: min(clamp(var(--drawer-md), 30vw, 640px), calc(100vw - var(--nav-w) - var(--s-8)));
   display: flex;
   flex-direction: column;
   border-radius: var(--r-xl);
@@ -169,8 +170,6 @@
 
 /* ---- message stream ---- */
 .messages {
-  /* The home page's stream has the same name: leaving home moves the conversation here (D112). */
-  view-transition-name: assistant-stream;
   position: relative;
   flex: 1;
   min-height: 0;
@@ -393,8 +392,9 @@
 }
 .input {
   field-sizing: content;
-  min-height: 24px;
-  max-height: 200px;
+  /* One line, two on a tall window. */
+  min-height: clamp(24px, 5vh - 20px, 52px);
+  max-height: max(200px, 25vh);
   padding: 0;
   border: 0;
   background: transparent;

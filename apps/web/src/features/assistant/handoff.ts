@@ -19,21 +19,13 @@ export function panelFollowsUser(
   return conversation.busy || (confirmations ?? []).some((c) => c.status === AssistantConfirmationStatus.Pending);
 }
 
-const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
 /**
  * The assistant takes the user to another page (a card's「打开」, `open_page`, a link in its answer): the panel opens
- * on the same conversation (D112). Leaving the home page, the stream morphs from the page into the panel with the
- * browser's view transition; reduced motion switches at once.
+ * on the same conversation (D112), with its own entrance also when leaving the home page (D189).
  */
 export function followAssistant(go: () => Promise<unknown>): void {
-  const fromHome = window.location.pathname === ROUTES.home;
   useUiStore.setState({ assistantOpen: true });
-  if (!fromHome || reducedMotion()) {
-    void go();
-    return;
-  }
-  document.startViewTransition(go);
+  void go();
 }
 
 /**
