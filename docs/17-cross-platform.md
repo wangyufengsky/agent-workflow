@@ -223,7 +223,7 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 
 系统标题栏（Linux 上还有 Electron 默认菜单「File Edit View Window」）用系统的颜色，不随应用主题变。Windows 与 Linux 上 main 建窗口时 `titleBarStyle: 'hidden'`，`titleBarOverlay` 由系统在顶栏右端画最小化 / 最大化 / 关闭三个按钮：底色为主题的 `bg`，符号为 `sub`，高 56px（`--header-h`）；颜色与打开动画一样取自 `@aw/web/splash`（`titleBarOverlay`）。界面每次应用主题都会发 `aw:launch-preferences`（28 §5.3），main 收到后除了写 `launch.json` 还调用 `setTitleBarOverlay`，按钮随主题即时变色。macOS 保留系统标题栏，不变。
 
-- 移动窗口：顶栏（`.header`）与侧栏品牌区是 `-webkit-app-region: drag`，其中的按钮、链接、输入框为 `no-drag`；打开动画整页可拖动（「退出」按钮除外）。
+- 移动窗口：顶栏（`.header`）与侧栏品牌区是 `-webkit-app-region: drag`，其中的按钮、链接、输入框为 `no-drag`；打开动画顶部同样高度的一条可拖动（其余部分仍可点击跳过动画）。
 - 让出按钮的位置：顶栏右侧内边距加上 `100vw - env(titlebar-area-x) - env(titlebar-area-width)`（只有隐藏了标题栏的窗口才有这组环境变量，其他平台与浏览器里为 0）；右侧抽屉从 `env(titlebar-area-height)` 开始，关闭按钮不被窗口按钮挡住。
 - 拖动区域会吃掉盖在它上面的元素的点击，所以遮罩、抽屉、对话框都是 `no-drag`。
 - 只用 CSS 环境变量与 main 的一处判断，界面代码不判断平台（D71）。菜单栏不再显示；默认菜单仍在，它的快捷键（缩放、开发者工具等）在 Linux 上是否照常可用尚未实测。

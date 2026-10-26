@@ -27,6 +27,7 @@ export function splashHtml({ theme, intro }: LaunchPreferences): string {
 <style>${STYLE}</style>
 </head>
 <body>
+<div class="title-bar"></div>
 <main class="mark">
 <svg class="nodes" width="${MARK.width * 2}" height="${MARK.height * 2}" viewBox="0 0 ${MARK.width} ${MARK.height}" aria-hidden="true">${lines}${nodes}<circle class="spark" r="2.4"/></svg>
 <h1 class="word"><span class="lead">${HOME_COPY.mark.lead}</span> <em class="emphasis">${HOME_COPY.mark.emphasis}</em></h1>
@@ -52,9 +53,10 @@ const STYLE = `
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{display:grid;place-items:center;overflow:hidden;background:var(--bg);color:var(--ink);cursor:default;user-select:none;
-  -webkit-app-region:drag;
   font:400 14px/1.55 "DM Sans",-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif}
 body::before{content:"";position:fixed;inset:-20%;background:radial-gradient(closest-side,var(--accent-fill),transparent 70%)}
+/* Where the system title bar is hidden (17 §3.14) its strip moves the window; the rest still takes the skipping click. */
+.title-bar{position:fixed;top:0;left:0;right:0;height:env(titlebar-area-height,0px);-webkit-app-region:drag}
 .mark{position:relative;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
 .nodes{overflow:visible}
 .line{fill:none;stroke:var(--line-3);stroke-width:2;stroke-dasharray:60;stroke-dashoffset:0}
@@ -68,7 +70,7 @@ body::before{content:"";position:fixed;inset:-20%;background:radial-gradient(clo
 .tagline{margin:0;font-size:16px;color:var(--sub)}
 .failed{margin-top:12px;color:var(--danger)}
 .failed p{margin:0 0 4px}
-.failed button{-webkit-app-region:no-drag;margin-top:8px;height:32px;padding:0 16px;border:0;border-radius:999px;background:var(--primary-bg);color:var(--primary-ink);font:inherit}
+.failed button{margin-top:8px;height:32px;padding:0 16px;border:0;border-radius:999px;background:var(--primary-bg);color:var(--primary-ink);font:inherit}
 [data-intro="true"] .node{animation:pop .32s cubic-bezier(.32,1.28,.54,1) both}
 [data-intro="true"] .node:nth-of-type(2){animation-delay:.09s}
 [data-intro="true"] .node:nth-of-type(3){animation-delay:.18s}
