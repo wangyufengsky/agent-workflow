@@ -1,4 +1,13 @@
-import { closeSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, realpathSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  ftruncateSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { API_PREFIX, GIT_INIT_LARGE_FILE_BYTES, THEME_IDS, type ThemeId, UiMode } from '@aw/shared';
@@ -816,6 +825,26 @@ const SHOTS: Shot[] = [
       const list = page.getByRole('list', { name: '附加的资料' });
       await expect(list.getByRole('button', { name: /^查看 / })).toHaveCount(names.length);
       return list;
+    },
+  },
+  {
+    // An Excel attachment's preview (39 §8.1): sheet tabs, the grid under column letters, a hidden row.
+    name: 'home-attachment-excel',
+    mode: UiMode.Simple,
+    url: () => '/',
+    ready: heading('Everything is a Workflow.'),
+    open: async (page) => {
+      await page.locator('input[type="file"]').setInputFiles({
+        name: '九月销售明细.xlsx',
+        mimeType: 'application/octet-stream',
+        buffer: readFileSync(
+          new URL('../packages/server/test/fixtures/office/sales.libreoffice.xlsx', import.meta.url),
+        ),
+      });
+      await page.getByRole('button', { name: '查看 九月销售明细.xlsx' }).click();
+      const dialog = page.getByRole('dialog', { name: '九月销售明细.xlsx' });
+      await expect(dialog.getByRole('row', { name: /^6 / })).toBeVisible();
+      return dialog;
     },
   },
   {

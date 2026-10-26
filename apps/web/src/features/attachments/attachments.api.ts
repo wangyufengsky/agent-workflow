@@ -2,10 +2,12 @@ import {
   API_PREFIX,
   ATTACHMENT_NAME_HEADER,
   type AttachmentDTO,
+  AttachmentLimit,
   attachmentSchema,
   ErrorCode,
   errorResponseSchema,
   getAttachmentOp,
+  previewAttachmentSheetOp,
   removeAttachmentOp,
   type SnapshotProjectFileRequest,
   snapshotProjectFileOp,
@@ -13,6 +15,7 @@ import {
 import { queryOptions } from '@tanstack/react-query';
 import { ApiError, apiToken, callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
+import { ATTACHMENTS_COPY as C } from '../../copy/attachments.ts';
 
 async function failure(res: Response): Promise<ApiError> {
   return new ApiError(res.status, errorResponseSchema.parse(await res.json()).error);
@@ -39,7 +42,24 @@ export const snapshotProjectFile = (input: SnapshotProjectFileRequest) => callOp
 
 /** Picked files over the limit fail at once, as the backend would answer them. */
 export const tooLargeError = (limit: number) =>
-  new ApiError(413, { code: ErrorCode.AttachmentTooLarge, message: 'Attachment too large', details: { limit } });
+  new ApiError(413, {
+    code: ErrorCode.AttachmentTooLarge,
+    message: 'Attachment too large',
+    details: { reason: AttachmentLimit.Bytes, limit },
+  });
+
+/** The precise message for a refused upload, by the error's `details.reason` (39 §8.1). */
+export function failureMessage(error: unknown): string | undefined {
+  const reason = error instanceof ApiError ? error.details?.reason : undefined;
+  return typeof reason === 'string' ? C.failure[reason] : undefined;
+}
+
+export const attachmentSheetQuery = (id: string, sheet: string) =>
+  queryOptions({
+    queryKey: queryKeys.attachmentSheet(id, sheet),
+    queryFn: () => callOperation(previewAttachmentSheetOp, { id, sheet }),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
 
 export const attachmentQuery = (id: string) =>
   queryOptions({

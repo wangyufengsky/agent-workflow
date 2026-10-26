@@ -2,11 +2,18 @@ import {
   ATTACHMENT_BYTES_MAX,
   ATTACHMENTS_PER_INPUT_MAX,
   type AttachmentDTO,
+  OFFICE_ATTACHMENT_BYTES_MAX,
   type SnapshotProjectFileRequest,
 } from '@aw/shared';
 import { useRef, useState } from 'react';
 import { ATTACHMENTS_COPY as C } from '../../copy/attachments.ts';
 import { removeAttachment, snapshotProjectFile, tooLargeError, uploadAttachment } from './attachments.api.ts';
+
+/**
+ * Names the backend may read as Word or Excel (39 §4). Only for the size checked before uploading and the
+ * card's「正在读取…」: the backend decides by content.
+ */
+export const looksLikeOffice = (name: string) => /\.(docx|docm|xlsx|xlsm)$/i.test(name);
 
 /** One attachment of the input being written: uploading, ready to send, or failed with the backend's error. */
 export type DraftAttachment =
@@ -54,10 +61,11 @@ export function useAttachmentDraft() {
     const room = ATTACHMENTS_PER_INPUT_MAX - items.length;
     setNotice(images.length > 0 ? C.imageUnsupported : others.length > room ? C.tooMany : undefined);
     for (const file of others.slice(0, Math.max(room, 0))) {
-      if (file.size > ATTACHMENT_BYTES_MAX) {
+      const limit = looksLikeOffice(file.name) ? OFFICE_ATTACHMENT_BYTES_MAX : ATTACHMENT_BYTES_MAX;
+      if (file.size > limit) {
         setItems((list) => [
           ...list,
-          { key: crypto.randomUUID(), name: file.name, state: 'failed', error: tooLargeError(ATTACHMENT_BYTES_MAX) },
+          { key: crypto.randomUUID(), name: file.name, state: 'failed', error: tooLargeError(limit) },
         ]);
       } else {
         track(file.name, () => uploadAttachment(file));

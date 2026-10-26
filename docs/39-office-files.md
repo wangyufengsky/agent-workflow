@@ -1,6 +1,6 @@
 # 39 · Word 与 Excel 文件
 
-> 状态：**设计已确认**（2026-10-26，D193–D201 均按推荐方案，§17），实施中：OF-01（解析与附件接入）、OF-02（Excel 概览与表格工具）已完成。
+> 状态：**设计已确认**（2026-10-26，D193–D201 均按推荐方案，§17），实施中：OF-01（解析与附件接入）、OF-02（Excel 概览与表格工具）、OF-03（附件条与预览）已完成。
 >
 > OF-01 的实测：Electron 44 的 utilityProcess 能从 `app.asar` 里加载解析 worker（`office-worker.js`），其 Node 24.22（ICU 78.2）能按 GB18030 解码。样本只有 LibreOffice、macOS 文本编辑（textutil）保存的文件和 msoffcrypto-tool 加密的文件：用脚本驱动 Microsoft Word 另存失败，WPS 只能手动操作，二者的样本待补。macOS 文本编辑保存的 Word 没有标题样式，表格也变成了段落，只能按段落读出。实施任务见 [05 的 OF 系列](05-dev-plan.md#后续--word-与-excel-文件of)。枚举、常量、表、接口、工具在实施时登记到 08–12，本文先写在 §11–§12。
 
@@ -205,7 +205,8 @@ OF-02 只读附件（`attachment_id`）；助手读回自己在对话目录里�
 | 过大 / 单元格过多 | 文件太大（上限 20 MB / 50 万个单元格），可以删掉不需要的工作表或另存为 CSV |
 | 解析失败 | 文件已损坏或无法读取 |
 
-- 预览（复用 `attachment-preview.tsx` 的对话框）：Word 显示提取出的正文（react-markdown，已有依赖）；Excel 为工作表页签 + 表格（行号与列字母、首行固定、最多显示 1,000 行，超出时说明「完整内容 AI 可以通过工具读取」）。顶部一行说明「这是 AI 读到的内容；图片、图表、批注未包含」。
+- 预览（复用 `attachment-preview.tsx` 的对话框）：Word 显示提取出的正文（应用的 `Markdown` 组件）；Excel 为工作表页签 + 表格（行号与列字母、表头与行号固定、隐藏的行标出、最多显示 `OFFICE_PREVIEW_ROWS` 1,000 行，超出时说明「完整内容 AI 可以通过工具读取」；超过 `SHEET_GRID_MAX_COLUMNS` 列的工作表按单元格列出）。顶部一行说明「这是 AI 读到的内容；图片、图表、批注没有包含」。Excel 预览按工作表经 `attachments.previewSheet`（`GET /attachments/:id/sheet?sheet=`）取前 1,000 行，在 worker 里读 `workbook.json`。
+- 前端在上传前按名字预检大小：`.docx` / `.docm` / `.xlsx` / `.xlsm` 用 20 MiB，其余 5 MiB（最终仍由后端按内容判断）；卡片在上传 Office 文件时显示「正在读取…」，失败卡片按 `details.reason` 显示上表的原因（`ErrorState` 的 `message`）。
 
 ### 8.2 助手生成的文件
 
@@ -268,7 +269,7 @@ OF-02 只读附件（`attachment_id`）；助手读回自己在对话目录里�
 
 - **状态**：不新增状态机。解析在上传请求内同步完成（§5），生成在工具调用内同步完成；两者失败都直接返回错误，没有中间状态需要恢复。
 - **表**（10 §6.1）：迁移给 `attachments` 加 `format`（非空，默认 `text`）与 `meta`（JSON，可空）；`attachment_refs` 不变。
-- **API**（11 §14）：`AttachmentDTO` 加 `format`、`meta`；新增 `GET /attachments/:id/preview` → `{ format: 'docx', markdown } | { format: 'xlsx', sheets: [{ name, range, rows, truncated }] }`；助手对话文件新增 `GET /assistant/conversations/:id/files/preview?path=` 与 `…/files/raw?path=`（另存为与浏览器开发模式下载用）。
+- **API**（11 §14）：`AttachmentDTO` 加 `format`、`meta`；Word 的预览直接读 `GET /attachments/:id/content`（`text.md`），Excel 按工作表 `attachments.previewSheet`（`GET /attachments/:id/sheet?sheet=` → `SheetPreviewDTO`：区域、`left` 与列数、合并区域、前 `OFFICE_PREVIEW_ROWS` 行与 `totalRows`，OF-03 已实现）；助手对话文件新增 `GET /assistant/conversations/:id/files/preview?path=` 与 `…/files/raw?path=`（另存为与浏览器开发模式下载用）。
 - **preload**：新增 `openPath(path)`；main 校验路径在助手对话目录内。
 - **MCP**（12 §6、15 §3）：§6.2、§7.2、§7.3 的工具，输入输出 schema 放 `shared/contracts/mcp/`。
 

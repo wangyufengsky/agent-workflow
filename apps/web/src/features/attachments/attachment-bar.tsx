@@ -1,13 +1,15 @@
+import { AttachmentFormat } from '@aw/shared';
 import { type ClipboardEvent, type DragEvent, useRef, useState } from 'react';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
 import { ATTACHMENTS_COPY as C } from '../../copy/attachments.ts';
 import { AttachmentPreview } from './attachment-preview.tsx';
+import { failureMessage } from './attachments.api.ts';
 import styles from './attachments.module.css';
 import { FileName } from './file-name.tsx';
 import { ProjectFileDialog, type ProjectFileSource } from './project-file-dialog.tsx';
-import type { AttachmentDraft, DraftAttachment } from './use-attachment-draft.ts';
+import { type AttachmentDraft, type DraftAttachment, looksLikeOffice } from './use-attachment-draft.ts';
 
 /** Drop targets of an input with attachments: files dropped anywhere on it are attached (30 §2). */
 export function dropFilesInto(draft: AttachmentDraft) {
@@ -117,6 +119,13 @@ export function AttachmentBar({
   );
 }
 
+function metaOf(item: DraftAttachment): string {
+  if (item.state === 'uploading') return looksLikeOffice(item.name) ? C.reading : C.uploading;
+  if (item.state === 'failed') return '';
+  const { meta, sizeBytes } = item.attachment;
+  return meta === null ? C.size(sizeBytes) : C.summary(meta);
+}
+
 function DraftCard({
   item,
   onOpen,
@@ -132,7 +141,12 @@ function DraftCard({
         {item.state === 'uploading' ? (
           <span className="spin" aria-hidden="true" />
         ) : (
-          <Icon name={item.state === 'failed' ? 'alert' : 'file'} size="sm" />
+          <Icon
+            name={
+              item.state === 'failed' ? 'alert' : item.attachment.format === AttachmentFormat.Xlsx ? 'table' : 'file'
+            }
+            size="sm"
+          />
         )}
         {item.state === 'ready' ? (
           <button
@@ -146,12 +160,10 @@ function DraftCard({
         ) : (
           <FileName name={item.name} />
         )}
-        <span className={styles.meta}>
-          {item.state === 'uploading' ? C.uploading : item.state === 'ready' ? C.size(item.attachment.sizeBytes) : ''}
-        </span>
+        <span className={styles.meta}>{metaOf(item)}</span>
         <IconButton icon="x" label={C.remove(item.name)} className={styles.remove} onClick={onRemove} />
       </div>
-      {item.state === 'failed' && <ErrorState error={item.error} />}
+      {item.state === 'failed' && <ErrorState error={item.error} message={failureMessage(item.error)} />}
     </li>
   );
 }

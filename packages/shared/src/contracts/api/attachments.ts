@@ -83,3 +83,33 @@ export const snapshotProjectFileSchema = z.object({
   lines: lineRangeSchema.optional(),
 });
 export type SnapshotProjectFileRequest = z.infer<typeof snapshotProjectFileSchema>;
+
+/**
+ * One sheet of an Excel attachment as its preview shows it (39 §8.1): the first `OFFICE_PREVIEW_ROWS` rows with
+ * content, cells by 1-based column; `left` and `columns` place them under column letters.
+ */
+export const sheetPreviewSchema = z.object({
+  name: z.string(),
+  range: z.string().nullable(),
+  hidden: z.boolean(),
+  left: z.number(),
+  columns: z.number(),
+  merges: z.array(z.string()),
+  rows: z.array(
+    z.object({
+      r: z.number(),
+      hidden: z.boolean(),
+      cells: z.array(
+        z.object({
+          c: z.number(),
+          v: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+          /** Only a formula whose result the file did not save: the preview shows it as `=…`, as the AI reads it. */
+          f: z.string().optional(),
+        }),
+      ),
+    }),
+  ),
+  /** Rows with content in the whole sheet. */
+  totalRows: z.number(),
+});
+export type SheetPreviewDTO = z.infer<typeof sheetPreviewSchema>;

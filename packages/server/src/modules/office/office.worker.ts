@@ -3,7 +3,7 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { AppError } from '@aw/shared';
 import type { OfficeJob, OfficeReply } from './office.job.ts';
 import { parseOffice } from './office.parse.ts';
-import { querySheet, readSheetPage } from './office.sheets.ts';
+import { querySheet, readSheetPage, sheetPreview } from './office.sheets.ts';
 import type { Workbook } from './office.workbook.ts';
 
 /**
@@ -24,6 +24,8 @@ async function run(job: OfficeJob): Promise<unknown> {
       return readSheetPage(await workbookAt(job.workbook), job.request);
     case 'query_sheet':
       return querySheet(await workbookAt(job.workbook), job.query);
+    case 'preview_sheet':
+      return sheetPreview(await workbookAt(job.workbook), job.sheet, job.rows);
   }
 }
 

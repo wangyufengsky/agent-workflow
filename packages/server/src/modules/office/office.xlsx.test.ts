@@ -1,6 +1,6 @@
+import { columnName } from '@aw/shared';
 import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
-import { columnName } from './office.workbook.ts';
 import { readXlsx } from './office.xlsx.ts';
 import { zipEntries } from './office.zip.ts';
 

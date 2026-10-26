@@ -16,6 +16,7 @@ export const queryKeys = {
   /** An attachment's original never changes (30 §3.1). */
   attachment: (id: string) => ['attachments', id],
   attachmentContent: (id: string) => ['attachments', id, 'content'],
+  attachmentSheet: (id: string, sheet: string) => ['attachments', id, 'sheet', sheet],
   transcript: (id: string) => ['attempts', id, 'transcript'],
   transcriptLive: (id: string) => ['attempts', id, 'transcript-live'],
   workflows: ['workflows'],

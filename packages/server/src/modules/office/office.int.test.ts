@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   AttachmentFormat,
   AttachmentParseFailure,
+  columnName,
   ErrorCode,
   OFFICE_CELLS_MAX,
   OFFICE_UNZIPPED_BYTES_MAX,
@@ -14,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { createFakeClock } from '../../../test/helpers/clock.ts';
 import { makeZip, minimalXlsx } from '../../../test/helpers/zip.ts';
 import { createOffice, detectFormat, OFFICE_TEXT_FILE, type OfficeFormat, WORKBOOK_FILE } from './index.ts';
-import { columnName, type Workbook } from './office.workbook.ts';
+import type { Workbook } from './office.workbook.ts';
 
 const WORD_TYPES =
   '<Types><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>';

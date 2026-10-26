@@ -13,6 +13,7 @@ import {
   ErrorCode,
   getAttachmentOp,
   OFFICE_ATTACHMENT_BYTES_MAX,
+  previewAttachmentSheetOp,
   removeAttachmentOp,
   snapshotProjectFileOp,
 } from '@aw/shared';
@@ -126,6 +127,35 @@ describe('Word 与 Excel（39）', () => {
       'text.md',
       'workbook.json',
     ]);
+  });
+
+  it('Excel 预览按工作表读前几行；工作表名不对或不是 Excel 时说明', async () => {
+    const sales = await uploaded(await officeFixture('sales.libreoffice.xlsx'), '销售.xlsx');
+    const notes = await uploaded('# 说明\n', 'notes.md');
+    expect((await t.call(previewAttachmentSheetOp, { id: sales.id, sheet: '汇总' })).body).toMatchObject({
+      name: '汇总',
+      range: 'A1:B7',
+      left: 1,
+      columns: 2,
+      merges: ['A1:B1'],
+      totalRows: 7,
+      rows: [
+        { r: 1, cells: [{ c: 1, v: '区域汇总' }] },
+        {},
+        {},
+        {},
+        {},
+        { r: 6, cells: [{ v: '合计' }, { v: 2791.5 }] },
+        {},
+      ],
+    });
+    for (const [id, sheet] of [
+      [sales.id, '没有'],
+      [notes.id, '明细'],
+    ]) {
+      const res = await t.call(previewAttachmentSheetOp, { id: id as string, sheet: sheet as string });
+      expect([res.status, res.raw.json().error.code]).toEqual([400, ErrorCode.ValidationFailed]);
+    }
   });
 
   it('旧格式、加密、损坏的文件被拒并说明原因，不留下记录和文件', async () => {
