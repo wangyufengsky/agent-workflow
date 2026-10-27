@@ -5,6 +5,12 @@
 export const SkillName = {
   /** The assistant finds out why a task failed or is stuck and what to do next (41 §5.1). */
   TaskDiagnosis: 'aw-task-diagnosis',
+  /** The assistant writes the requirement of a task, batch, scheduled task or initiative (41 §5.1). */
+  TaskRequirement: 'aw-task-requirement',
+  /** The assistant sets up scheduled tasks and batches (41 §5.1). */
+  RecurringWork: 'aw-recurring-work',
+  /** The assistant writes and changes Word and Excel files (41 §5.1). */
+  OfficeDocs: 'aw-office-docs',
 } as const;
 export type SkillName = (typeof SkillName)[keyof typeof SkillName];
 

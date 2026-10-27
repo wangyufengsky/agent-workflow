@@ -9010,7 +9010,10 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "question": "deny",
         "skill": {
           "*": "deny",
+          "aw-office-docs": "allow",
+          "aw-recurring-work": "allow",
           "aw-task-diagnosis": "allow",
+          "aw-task-requirement": "allow",
         },
         "task": "deny",
         "webfetch": "ask",

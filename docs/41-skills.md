@@ -1,6 +1,6 @@
 # 41 · 内置 skill
 
-> 状态：**已确认，SK-01 已实现**（2026-10-27，用户要求：「我们需要哪些 skill，skill 如何写，以及如何注入」；同日补充：「AI 助手是否需要 skill？她的主观能动性最高」，助手因此作为 skill 的主要使用者单列，§5.1）。决策 D206–D212 同日按推荐方案确认（02），任务拆分见 05 的 SK。§3 的 opencode 行为在 opencode 1.19.0 上实测（2026-10-27），标注「读代码」的条目尚未实测，由 §9 的测试兜住。
+> 状态：**已确认，SK-01、SK-02 已实现**（2026-10-27，用户要求：「我们需要哪些 skill，skill 如何写，以及如何注入」；同日补充：「AI 助手是否需要 skill？她的主观能动性最高」，助手因此作为 skill 的主要使用者单列，§5.1）。决策 D206–D212 同日按推荐方案确认（02），任务拆分见 05 的 SK。§3 的 opencode 行为在 opencode 1.19.0 上实测（2026-10-27），标注「读代码」的条目尚未实测，由 §9 的测试兜住。
 
 ## 1. 为什么要有
 
@@ -228,8 +228,8 @@ Find the actual cause before you suggest anything, and quote the line that shows
 | 层 | 内容 |
 | --- | --- |
 | 单元 | `packages/builtin` 的 skill 检查：每个目录只有 `SKILL.md`；YAML 头可解析，`name` 与目录名相同且带 `aw-` 前缀，`description` 非空且不超过 400 字符；文件不超过 `SKILL_MAX_BYTES`；`SkillName` 与目录一一对应。`opencode.config.test.ts` 的快照：`skills.paths`、各 agent 的 `skill` 规则（`"*": "deny"` 在最前）、没有 skill 的 agent 为 `deny`、每个 agent 不超过 `AGENT_SKILLS_MAX`；启动环境里有 `OPENCODE_DISABLE_EXTERNAL_SKILLS` |
-| oc（真实 opencode，不调模型） | 按应用的配置启动托管的 opencode，在临时仓库的 `.agents/skills` 与 `.claude/skills` 下各放一个 skill：`GET /skill?directory=<临时仓库>` 包含全部 `aw-*`，不包含这两个（同一开关也跳过用户主目录下的，实测；改 `HOME` 会影响找 opencode，不在测试里做） |
-| live（免费模型） | 助手建任务：会话记录里在 `tasks_create` 之前有加载 `aw-task-requirement` 的 `skill` 调用，且助手 `skill` 工具的说明里没有 `aw-merge-conflicts`（agent 级过滤只能经模型观察）。助手诊断：一个检查命令必定失败的任务停下后问「为什么失败」，回答引用了检查输出。迁移对比：画图与预览各沿用 35、29 已有的 live 场景，迁移前后各跑一次，模型仍然画出图、仍然先启动预览再打开 |
+| oc（真实 opencode，不调模型） | 按应用的配置启动托管的 opencode，在临时仓库的 `.agents/skills` 与 `.claude/skills` 下各放一个 skill：`GET /skill?directory=<临时仓库>` 包含全部 `aw-*`，不包含这两个（同一开关也跳过用户主目录下的，实测；改 `HOME` 会影响找 opencode，不在测试里做）。agent 级过滤：本地的 OpenAI 兼容服务代替模型（同 `opencode.permissions.oc.test.ts`），记下每个 agent 一轮对话里 opencode 发给模型的请求：分配了 skill 的 agent 有 `skill` 工具，请求里出现的 skill 名正好是它的白名单；没有分配的没有 `skill` 工具；仓库里的与 opencode 自带的 `customize-opencode` 都不出现 |
+| live（免费模型） | 助手建任务（`live/skills.live.test.ts`）：会话记录里在 `tasks_create` 之前有加载 `aw-task-requirement` 的 `skill` 调用（agent 级过滤由上一行的 oc 测试覆盖，不再经模型观察）。助手诊断：一个检查命令必定失败的任务停下后问「为什么失败」，回答引用了检查输出。迁移对比：画图与预览各沿用 35、29 已有的 live 场景，迁移前后各跑一次，模型仍然画出图、仍然先启动预览再打开 |
 | 打包 | `skills` 与 `prompts` 走同一条 `extraResources`；`pnpm e2e:smoke` 跑的是未打包的应用，覆盖不到，改为实现时手动检查 `electron-builder --dir` 产物的 `Resources/skills` |
 
 ## 10. 之后可能做的

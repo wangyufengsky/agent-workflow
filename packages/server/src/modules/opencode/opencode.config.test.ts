@@ -71,7 +71,10 @@ describe('opencode 配置生成', () => {
     }
     expect(Object.fromEntries(rules)[OPENCODE_ASSISTANT_AGENT]).toEqual({
       '*': 'deny',
+      [SkillName.TaskRequirement]: 'allow',
       [SkillName.TaskDiagnosis]: 'allow',
+      [SkillName.RecurringWork]: 'allow',
+      [SkillName.OfficeDocs]: 'allow',
     });
   });
 
