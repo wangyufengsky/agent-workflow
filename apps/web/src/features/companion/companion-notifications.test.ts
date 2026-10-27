@@ -26,7 +26,10 @@ const question: InboxItemDTO = {
 describe('助手按真实业务状态提醒', () => {
   it('历史快照静默；进度和重放不重复；重新执行后可再次庆祝，多个任务保留顺序', () => {
     const notices: Omit<CompanionNotice, 'system'>[] = [];
-    const tracker = createCompanionNotifications((notice) => notices.push(notice));
+    const tracker = createCompanionNotifications(
+      (notice) => notices.push(notice),
+      () => {},
+    );
     tracker.snapshot([task(TaskStatus.Completed, 1), task(TaskStatus.Running, 1, 'two')], [question]);
     expect(notices).toEqual([]);
     tracker.task(task(TaskStatus.Review, 2, 'two'));
@@ -47,12 +50,37 @@ describe('助手按真实业务状态提醒', () => {
   });
   it('重连对齐漏掉的最终状态；新问题提醒一次；初始加载时的实时完成不会被快照吞掉', () => {
     const notices: Omit<CompanionNotice, 'system'>[] = [];
-    const tracker = createCompanionNotifications((notice) => notices.push(notice));
+    const tracker = createCompanionNotifications(
+      (notice) => notices.push(notice),
+      () => {},
+    );
     tracker.task(task(TaskStatus.Review, 2));
     tracker.snapshot([task(TaskStatus.Review, 2)], []);
     tracker.snapshot([task(TaskStatus.Completed, 3)], [question]);
     tracker.item(question);
     tracker.snapshot([task(TaskStatus.Completed, 3)], [question]);
     expect(notices.map((n) => n.mood)).toEqual(['success', 'success', 'waiting']);
+  });
+  it('通知说的事不再成立就撤回：待处理项已处理（包括断线期间处理的），任务进入下一个状态', () => {
+    const notices: string[] = [];
+    const withdrawn: string[] = [];
+    const tracker = createCompanionNotifications(
+      (notice) => notices.push(notice.id),
+      (id) => withdrawn.push(id),
+    );
+    const permission: InboxItemDTO = { ...question, id: 'permission' };
+    tracker.snapshot([task(TaskStatus.Running, 1)], []);
+    tracker.item(question);
+    tracker.item(permission);
+    tracker.item({ ...question, status: InboxStatus.Resolved });
+    tracker.item({ ...question, status: InboxStatus.Resolved });
+    tracker.snapshot([task(TaskStatus.Running, 1)], [{ ...permission, status: InboxStatus.Resolved }]);
+    expect(withdrawn).toEqual(['inbox:question', 'inbox:permission']);
+
+    tracker.task(task(TaskStatus.Review, 2));
+    tracker.task(task(TaskStatus.Review, 3));
+    tracker.task(task(TaskStatus.Completed, 4));
+    expect(withdrawn.slice(2)).toEqual([notices[2]]);
+    expect(notices).toHaveLength(4);
   });
 });

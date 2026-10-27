@@ -22,8 +22,10 @@ export function CompanionNoticeHost() {
           </div>
           <p>{notice.body}</p>
           <div className="row">
-            <Link to={notice.path}>{C.details}</Link>
-            <Button size="sm" onClick={dismissCompanionNotice}>
+            <Link to={notice.path} onClick={() => dismissCompanionNotice(notice.id)}>
+              {C.details}
+            </Link>
+            <Button size="sm" onClick={() => dismissCompanionNotice(notice.id)}>
               {notices.length > 1 ? `${C.next} (${notices.length - 1})` : C.dismiss}
             </Button>
           </div>

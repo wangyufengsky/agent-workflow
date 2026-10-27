@@ -111,7 +111,7 @@ test('桌宠页面复用助手聊天、碎碎念隔离，鲸鱼素材失败有�
   await patchSettings(request, { 'companion.appearance': 'orb' });
 });
 
-test('真实任务事件驱动光球庆祝，待检查与完成分别提醒，旧通知不覆盖新通知', async ({ page, request }) => {
+test('真实任务事件驱动光球庆祝，待检查与完成分别提醒，任务进入下一状态时撤回旧提醒', async ({ page, request }) => {
   const project = await createProject(request, null);
   await patchSettings(request, { 'companion.appearance': 'orb' });
   await page.goto('/companion');
@@ -137,8 +137,8 @@ test('真实任务事件驱动光球庆祝，待检查与完成分别提醒，�
     data: { strategy: 'squash' },
   });
   expect(delivered.ok()).toBe(true);
-  await page.getByRole('button', { name: /下一条提醒/ }).click();
   await expect(page.getByText('任务完成啦', { exact: true })).toBeVisible();
+  await expect(page.getByText('已经准备好，等你检查', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '知道了', exact: true }).click();
   // 全套旅程共享后端，其他任务仍可能运行；结束庆祝后回到实时工作状态。
   await expect(page.locator('[data-size="pet"]')).not.toHaveAttribute('data-mood', 'success');

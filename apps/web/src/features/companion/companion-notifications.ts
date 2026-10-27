@@ -28,21 +28,40 @@ const taskNotice = (task: Task): Omit<CompanionNotice, 'system'> | undefined => 
   };
 };
 
-/** 只保留通知判重所需的前态；业务状态仍由服务器和 Query 缓存拥有。 */
-export function createCompanionNotifications(emit: (notice: Omit<CompanionNotice, 'system'>) => void) {
+/**
+ * 只保留通知判重所需的前态；业务状态仍由服务器和 Query 缓存拥有。
+ * 通知说的事不再成立时（任务进入下一个状态、待处理项已处理）撤回它，各处的提醒随之消失（32 §3.5）。
+ */
+export function createCompanionNotifications(
+  emit: (notice: Omit<CompanionNotice, 'system'>) => void,
+  withdraw: (id: string) => void,
+) {
   const tasks = new Map<string, Task>();
+  /** 每个任务最近一条提醒的 id。 */
+  const taskNotices = new Map<string, string>();
   const inbox = new Set<string>();
+  /** 已提醒、仍待处理的待处理项。 */
+  const inboxNotices = new Set<string>();
   let initialized = false;
   const task = (next: Task, live = true) => {
     const before = tasks.get(next.id);
     if (before !== undefined && next.updatedAt < before.updatedAt) return;
-    if ((live || initialized) && before?.status !== next.status) {
-      const notice = taskNotice(next);
-      if (notice !== undefined) emit(notice);
+    if (before?.status !== next.status) {
+      const shown = taskNotices.get(next.id);
+      if (shown !== undefined) {
+        taskNotices.delete(next.id);
+        withdraw(shown);
+      }
+      const notice = live || initialized ? taskNotice(next) : undefined;
+      if (notice !== undefined) {
+        taskNotices.set(next.id, notice.id);
+        emit(notice);
+      }
     }
     tasks.set(next.id, next);
   };
   const item = (next: InboxItemDTO, live = true) => {
+    if (next.status !== InboxStatus.Open && inboxNotices.delete(next.id)) withdraw(`inbox:${next.id}`);
     const seen = inbox.has(next.id);
     inbox.add(next.id);
     // 任务失败、交付已由任务状态提醒，避免同一件事提醒两次。
@@ -55,6 +74,7 @@ export function createCompanionNotifications(emit: (notice: Omit<CompanionNotice
       (next.kind === InboxKind.Question && !next.payload.blocking)
     )
       return;
+    inboxNotices.add(next.id);
     emit({
       id: `inbox:${next.id}`,
       title: C.attention,
