@@ -134,6 +134,15 @@ v1.4.1 之后合并的 PR #129–#141。
 | 项目的 AGENTS.md（40，D202–D205，AM 系列 PR #141）：查看默认分支上的 AGENTS.md，让 AI 在独立任务里生成或补充，可选「在 Agent Workflow 中工作」规则 | 已合并，待用户检查 |
 | 发布：**v1.4.2**（2026-10-26）；安装包同 v1.4.1（macOS arm64 dmg，Linux x64 / arm64 deb 与 AppImage，未签名）；AI 生成 AGENTS.md 的质量、内网环境的实际使用待用户检查 | 已发布 |
 
+### 5.2i v1.4.3：内置 skill（已发布）
+
+v1.4.2 之后合并的 PR #143–#148。
+
+| 内容 | 状态 |
+| --- | --- |
+| 内置 skill（41，D206–D212，SK 系列 PR #143–#148）：opencode 原生 `skills.paths` 指向应用自带的 `skills/`，每个智能体按白名单只看到自己的 skill，`OPENCODE_DISABLE_EXTERNAL_SKILLS=1` 屏蔽本机与项目里的 skill；助手 7 个（建任务与需求计划、排查任务、定时任务、Word / Excel、画图、预览、只读查库），任务会话的查库、内网、合并冲突、页面检查；助手的几类通知只按通知内容回答、不调用工具 | 已合并 |
+| 发布：**v1.4.3**（2026-10-27）；安装包同 v1.4.2（macOS arm64 dmg，Linux x64 / arm64 deb 与 AppImage，未签名）；没有新的数据库迁移；排查任务、定时任务、Word / Excel、只读查库、内网几个 skill 没有专门的 live 测试，实际效果待用户检查 | 已发布 |
+
 ### 5.3 明确不做
 
 - 对外 MCP（供 Claude Desktop / Cursor 等外部工具调用）：应用助手已通过助手 MCP 使用全部操作，无外部需求；操作清单保留扩展能力。

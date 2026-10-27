@@ -85,6 +85,8 @@ Agent Workflow 把「让 AI 写代码」变成一条看得见、停得住、由�
 
 PPT、质量与用量、团队在专业模式的侧栏里；简单模式下从任务结果卡、知识问答和助手进入同样的页面。助手还能生成与修改 Word / Excel 文件，卡片上可以预览、另存为、用默认应用打开。
 
+应用内置一组 skill（AI 的操作经验，按需加载）：助手在建任务与需求计划、排查失败的任务、安排定时任务、处理 Word / Excel、画图、预览页面和查数据库时用；任务里的 AI 在查数据库、内网环境、解决合并冲突和检查页面时用。你自己或项目里装的 skill（如 `~/.claude/skills`、项目的 `.claude/skills`）在应用里不会加载。
+
 ### 专业模式（设置中开启）
 
 | 功能 | 说明 |
@@ -223,15 +225,15 @@ Linux 上用 `Ctrl` 代替 `⌘`。
 
 ## 安装
 
-在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。当前版本 **v1.4.2**：
+在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。当前版本 **v1.4.3**：
 
 | 平台 | 文件 |
 | --- | --- |
-| macOS（Apple 芯片） | `agent-workflow-1.4.2-arm64.dmg` |
-| Linux x64（Ubuntu / Debian） | `agent-workflow_1.4.2_amd64.deb` |
-| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.4.2_arm64.deb` |
-| Linux x64（其他发行版） | `agent-workflow-1.4.2-x86_64.AppImage` |
-| Linux arm64（其他发行版） | `agent-workflow-1.4.2-arm64.AppImage` |
+| macOS（Apple 芯片） | `agent-workflow-1.4.3-arm64.dmg` |
+| Linux x64（Ubuntu / Debian） | `agent-workflow_1.4.3_amd64.deb` |
+| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.4.3_arm64.deb` |
+| Linux x64（其他发行版） | `agent-workflow-1.4.3-x86_64.AppImage` |
+| Linux arm64（其他发行版） | `agent-workflow-1.4.3-arm64.AppImage` |
 
 可以用同一页的 `SHA256SUMS.txt` 校验下载的文件：
 
@@ -278,7 +280,7 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 **deb（推荐 Ubuntu / Debian）**：
 
 ```bash
-sudo apt install ./agent-workflow_1.4.2_amd64.deb
+sudo apt install ./agent-workflow_1.4.3_amd64.deb
 ```
 
 arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `/usr/bin/agent-workflow` 指向它，菜单项在 `/usr/share/applications/agent-workflow.desktop`），用户数据在 `~/.config/Agent Workflow/`。之后在应用菜单中打开，或运行 `agent-workflow`；第一次启动时应用会在桌面放一个快捷方式（只放一次，删掉后不再出现）。卸载：`sudo apt remove agent-workflow`。
@@ -286,8 +288,8 @@ arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `
 **AppImage（其他发行版）**：
 
 ```bash
-chmod +x agent-workflow-1.4.2-x86_64.AppImage
-./agent-workflow-1.4.2-x86_64.AppImage
+chmod +x agent-workflow-1.4.3-x86_64.AppImage
+./agent-workflow-1.4.3-x86_64.AppImage
 ```
 
 - AppImage 不安装，放在哪里就从哪里运行（建议先移到固定位置，如 `~/Applications/`）；第一次启动时在桌面放一个指向它当前位置的快捷方式，之后移动文件需要删掉快捷方式重新放。
