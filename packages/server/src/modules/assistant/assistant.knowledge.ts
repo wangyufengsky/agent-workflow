@@ -34,9 +34,9 @@ function describeCitation(citation: CitationDTO): string {
 }
 
 /**
- * Questions the assistant asks the knowledge researcher (18 §4a): the tool answers at once with `researching`, and
- * when the turn ends its answer (or why there is none) goes to the asking conversation as the next message, after a
- * navigation card to the knowledge conversation. Who waits for which turn is kept in memory: a restart interrupts the
+ * Questions the assistant asks the knowledge researcher (18 §4a): the tool answers at once with `researching` (the
+ * navigation card to the knowledge conversation is already in the assistant conversation), and when the turn ends its
+ * answer (or why there is none) goes to the asking conversation as the next message. Who waits for which turn is kept in memory: a restart interrupts the
  * research itself (03 §2.1), and the knowledge page still shows the outcome.
  */
 export function createKnowledgeRelay(deps: {
@@ -81,9 +81,7 @@ export function createKnowledgeRelay(deps: {
     const assistantId = waiting.get(turnId);
     if (assistantId === undefined) return;
     waiting.delete(turnId);
-    const conversation = knowledge.get(conversationId);
-    conversations.recordProduced(assistantId, askKnowledgeOp, conversation);
-    await conversations.deliver(assistantId, message(conversation, turnId));
+    await conversations.deliver(assistantId, message(knowledge.get(conversationId), turnId));
   }
 
   // Nobody awaits the relay: a failure is logged (the knowledge page still shows the outcome).

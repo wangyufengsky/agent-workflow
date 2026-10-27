@@ -3,6 +3,7 @@ import {
   EntityKind,
   ErrorCode,
   getKnowledgeOp,
+  KnowledgeTurnStatus,
   knowledgeLink,
   MCP_SESSION_ARG,
   OPENCODE_ASSISTANT_AGENT,
@@ -89,6 +90,15 @@ describe('应用助手调用知识问答（18 §4a）', () => {
     expect(await entityRefs()).toEqual([
       { kind: EntityKind.KnowledgeConversation, id: knowledgeId, title: 'Where is the refund rounded?' },
     ]);
+  });
+
+  it('提问一建好就在助手对话里放导航卡片，不等研究完成', async () => {
+    t.fake.enqueue(script().hang(), RESEARCHER);
+    const result = await callTool(mcp, 'knowledge_ask', { projectId, question: 'q', sources: SOURCES, ...session });
+
+    const { body: knowledge } = await t.call(getKnowledgeOp, { id: String(result.body.knowledge_conversation_id) });
+    expect(knowledge.turns[0]?.status).toBe(KnowledgeTurnStatus.Researching);
+    expect(await entityRefs()).toEqual([{ kind: EntityKind.KnowledgeConversation, id: knowledge.id, title: 'q' }]);
   });
 
   it('研究失败（停下没提交）时把错误码与原因发回助手会话', async () => {

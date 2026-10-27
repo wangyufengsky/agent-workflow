@@ -57,7 +57,7 @@ opencode 1.19 的已有会话目录不能通过发送参数或 fork 改变。迁
 | `edit_xlsx` / `revise_docx` | read | 从本对话的附件或写过的文件写出一个新文件（39 §7.2）：Excel 在副本上按操作修改，Word 按块重写并沿用原件的样式；原件不变；返回并在卡片上显示新文件没有保留的内容（`lost`） |
 | `list_files` / `reveal_file` | read | 列出 / 在 Finder 中显示 `files/<id>/` 下的文件（路径相对该目录，越界或不存在 `VALIDATION_FAILED`；显示经 SSE `assistant.reveal_file` 由 preload 完成） |
 
-第一批开放给助手的操作（v1.1）：项目、任务（含开始、取消、结果、再改改、交付）、需要你处理（列表、回答、审批）、流程与角色（读；专业模式可写）、数据库（列表、测试、结构、只读查询：新增操作 `databases.query`，与 AI 的 `db_query` 同样的只读四道关，可用于任意连接）、Git（只读）、设置。知识问答（v1.1，18 §4a）的操作已注册并 `expose.assistant`：`knowledge_ask` / `knowledge_followUp` 为 read（不需确认），工具立即返回 `researching`，回答（带引用链接）与导航卡片在研究结束后作为下一条消息送达；`knowledge_delete` 为 critical，列表、详情、引用原文为 read。PPT 模块上线时注册其操作即自动可用。各模块的覆盖盘点见 28 §4（v1.2 起批量、定时、PPT、审查意见回流都已开放；`open_page` 补了批量、定时与环境检测页）。
+第一批开放给助手的操作（v1.1）：项目、任务（含开始、取消、结果、再改改、交付）、需要你处理（列表、回答、审批）、流程与角色（读；专业模式可写）、数据库（列表、测试、结构、只读查询：新增操作 `databases.query`，与 AI 的 `db_query` 同样的只读四道关，可用于任意连接）、Git（只读）、设置。知识问答（v1.1，18 §4a）的操作已注册并 `expose.assistant`：`knowledge_ask` / `knowledge_followUp` 为 read（不需确认），工具立即返回 `researching`，导航卡片同时出现，回答（带引用链接）在研究结束后作为下一条消息送达；`knowledge_delete` 为 critical，列表、详情、引用原文为 read。PPT 模块上线时注册其操作即自动可用。各模块的覆盖盘点见 28 §4（v1.2 起批量、定时、PPT、审查意见回流都已开放；`open_page` 补了批量、定时与环境检测页）。
 
 没有 Git 的项目（D153）：`projects_previewGitInit`（read）与 `projects_initGit`（write）开放给助手。`projects_create` 与 `projects_initGit` 在出确认卡之前先检查目录（`prechecks`，与附件的检查同一处）：不在任何仓库里的目录让 `projects_create` 直接返回 `PROJECT_PATH_NO_GIT`，hint 让助手改用 `projects_initGit`；仓库的子目录、已添加的仓库、已是仓库的目录同样立即报错，不出用户确认了也会失败的卡片。
 
