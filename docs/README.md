@@ -42,7 +42,7 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [37-storage.md](37-storage.md) | 存储空间与磁盘清理（已实现，待检查，D157）：专业模式运行环境页按类别统计占用，手动清理旧日志与旧任务的会话记录 | 全员 |
 | [38-convergence.md](38-convergence.md) | 功能收敛（已确认并实现，D158）：简单模式导航回到 5 项、主页流程按钮与分段精简、设置页参数移到专业模式、防止再次膨胀的约束 | 全员 |
 | [40-agents-md.md](40-agents-md.md) | 项目的 AGENTS.md（已实现，待检查，D202–D205）：项目详情查看默认分支上的 AGENTS.md，让 AI 在独立任务里生成或补充，可选加入「在 Agent Workflow 中工作」规则 | 全员 |
-| [41-skills.md](41-skills.md) | 内置 skill（已确认，SK-01、SK-02 已实现，D206–D212）：用 opencode 原生 `skills.paths` 注入应用自带的 skill、按 agent 白名单、屏蔽用户个人与项目的 skill；助手为主要使用者（7 个，含画图与预览段的迁移），任务会话 3 个；写法规范与测试 | 全员 |
+| [41-skills.md](41-skills.md) | 内置 skill（已确认，SK-01–SK-03 已实现，D206–D212）：用 opencode 原生 `skills.paths` 注入应用自带的 skill、按 agent 白名单、屏蔽用户个人与项目的 skill；助手为主要使用者（7 个，含画图与预览段的迁移），任务会话 3 个；写法规范与测试 | 全员 |
 | [39-office-files.md](39-office-files.md) | Word 与 Excel 文件（已实现，待检查，D193–D201）：上传 .docx / .xlsx 时提取文字、Excel 概览与表格查询工具、助手生成与修改文件、预览与另存为、依赖与上限 | 全员 |
 
 ## 维护规则
