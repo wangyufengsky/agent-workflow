@@ -111,9 +111,14 @@ const ASSISTANT_PERMISSION = {
  * repository never reach an aw session. An agent without skills loses the `skill` tool altogether.
  */
 export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
-  [SessionAgent.Planner]: [SkillName.DbReadonly, SkillName.OfflineNetwork],
-  [SessionAgent.Executor]: [SkillName.DbReadonly, SkillName.OfflineNetwork, SkillName.MergeConflicts],
-  [SessionAgent.Reviewer]: [SkillName.DbReadonly],
+  [SessionAgent.Planner]: [SkillName.DbReadonly, SkillName.OfflineNetwork, SkillName.PageCheck],
+  [SessionAgent.Executor]: [
+    SkillName.DbReadonly,
+    SkillName.OfflineNetwork,
+    SkillName.MergeConflicts,
+    SkillName.PageCheck,
+  ],
+  [SessionAgent.Reviewer]: [SkillName.DbReadonly, SkillName.PageCheck],
   [SessionAgent.Researcher]: [SkillName.DbReadonly],
   [SessionAgent.SlidesWriter]: [],
   [SessionAgent.CodeReviewer]: [],

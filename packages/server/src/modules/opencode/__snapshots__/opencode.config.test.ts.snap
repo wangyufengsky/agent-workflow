@@ -9059,6 +9059,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
           "aw-db-readonly": "allow",
           "aw-merge-conflicts": "allow",
           "aw-offline-network": "allow",
+          "aw-page-check": "allow",
         },
         "webfetch": "ask",
       },
@@ -9076,6 +9077,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
           "*": "deny",
           "aw-db-readonly": "allow",
           "aw-offline-network": "allow",
+          "aw-page-check": "allow",
         },
         "webfetch": "deny",
       },
@@ -9110,6 +9112,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "skill": {
           "*": "deny",
           "aw-db-readonly": "allow",
+          "aw-page-check": "allow",
         },
         "webfetch": "deny",
       },
