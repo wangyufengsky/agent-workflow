@@ -186,10 +186,16 @@ export function CompanionPage() {
             <strong>{notice.title}</strong>
             <p>{notice.body}</p>
             <div className="row">
-              <Button size="sm" onClick={() => openMain(notice.path)}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  openMain(notice.path);
+                  dismissCompanionNotice(notice.id);
+                }}
+              >
                 {C.details}
               </Button>
-              <Button size="sm" onClick={dismissCompanionNotice}>
+              <Button size="sm" onClick={() => dismissCompanionNotice(notice.id)}>
                 {notices.length > 1 ? `${C.next} (${notices.length - 1})` : C.dismiss}
               </Button>
             </div>

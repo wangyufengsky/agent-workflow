@@ -27,7 +27,20 @@ export const useCompanionUi = create<{ notices: CompanionNotice[]; error: unknow
   notices: [],
   error: null,
 }));
-export const dismissCompanionNotice = () => useCompanionUi.setState((s) => ({ notices: s.notices.slice(1) }));
+/**
+ * 本窗口知道已处理的提醒（自己处理的、另一个窗口广播来的）。两个窗口各自收服务器事件，先后不定：
+ * 后收到事件的一方不能再把已处理的提醒显示出来或发系统通知。提醒 id 带任务状态与时间，不会复用。
+ */
+const dismissed = new Set<string>();
+const removeNotice = (id: string) => {
+  dismissed.add(id);
+  useCompanionUi.setState((s) => ({ notices: s.notices.filter((notice) => notice.id !== id) }));
+};
+/** 在一处处理即处处消失：本窗口、另一个窗口的气泡和系统通知（32 §3.5）。 */
+export const dismissCompanionNotice = (id: string) => {
+  removeNotice(id);
+  window.aw?.companion.dismiss(id);
+};
 export const useCompanionWorking = () =>
   useQuery({ queryKey: ACTIVITY_KEY, enabled: false, queryFn: async (): Promise<TaskSummaryDTO[]> => [] }).data?.some(
     (t) => WORKING.includes(t.status),
@@ -37,13 +50,20 @@ export const useCompanionWorking = () =>
 export function connectCompanionEvents(qc: QueryClient) {
   let disposed = false;
   let loading: Promise<void> | undefined;
-  const tracker = createCompanionNotifications((notice) => {
-    if (disposed) return;
-    const settings = qc.getQueryData(settingsQuery.queryKey);
-    const next = { ...notice, system: settings?.['companion.notifications'] === true };
-    useCompanionUi.setState((s) => ({ notices: [...s.notices, next] }));
-    if (window.location.pathname !== COMPANION_PATH) window.aw?.companion.notify(next);
-  });
+  const tracker = createCompanionNotifications(
+    (notice) => {
+      if (disposed) return;
+      const settings = qc.getQueryData(settingsQuery.queryKey);
+      const next = { ...notice, system: settings?.['companion.notifications'] === true };
+      useCompanionUi.setState((s) => ({ notices: [...s.notices, next] }));
+      if (window.location.pathname !== COMPANION_PATH) window.aw?.companion.notify(next);
+    },
+    (id) => {
+      if (!disposed) dismissCompanionNotice(id);
+    },
+    dismissed,
+  );
+  const offDismissed = window.aw?.companion.onDismissed(removeNotice);
   const snapshot = async () => {
     const tasks: TaskSummaryDTO[] = [];
     const inbox: InboxItemDTO[] = [];
@@ -103,6 +123,7 @@ export function connectCompanionEvents(qc: QueryClient) {
     },
     close() {
       disposed = true;
+      offDismissed?.();
     },
   };
 }

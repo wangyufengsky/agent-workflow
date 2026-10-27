@@ -26,6 +26,7 @@ export const companionNoticeSchema = z.object({
   system: z.boolean(),
 });
 export type CompanionNotice = z.infer<typeof companionNoticeSchema>;
+export const companionNoticeIdSchema = companionNoticeSchema.shape.id;
 export const companionLabelsSchema = z.object({ open: z.string(), hide: z.string(), quit: z.string() });
 export type CompanionLabels = z.infer<typeof companionLabelsSchema>;
 export interface CompanionBridge {
@@ -44,4 +45,7 @@ export interface CompanionBridge {
   getConversation(): Promise<string | null>;
   onConversation(listener: (id: string | null) => void): () => void;
   notify(notice: CompanionNotice): void;
+  /** 通知已处理：两个窗口都收起它，系统通知也撤下。 */
+  dismiss(id: string): void;
+  onDismissed(listener: (id: string) => void): () => void;
 }

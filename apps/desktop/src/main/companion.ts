@@ -10,6 +10,7 @@ import {
   companionConversationSchema,
   companionInteractiveSchema,
   companionLabelsSchema,
+  companionNoticeIdSchema,
   companionNoticeSchema,
   companionPanelSchema,
   companionPathSchema,
@@ -248,15 +249,35 @@ export function createCompanionHost(
       if (window !== undefined && !window.isDestroyed()) window.webContents.send('aw:companion-conversation', id);
     }
   });
+  /** 屏幕上的系统通知，按提醒 id：任何一处处理了就撤下（32 §3.5）。 */
+  const shown = new Map<string, Notification>();
+  const dismiss = (id: string) => {
+    shown.get(id)?.close();
+    shown.delete(id);
+    for (const window of [main, pet]) {
+      if (window !== undefined && !window.isDestroyed()) window.webContents.send('aw:companion-dismissed', id);
+    }
+  };
   ipcMain.on('aw:companion-notice', (event, raw: unknown) => {
     if (event.sender !== main.webContents) return;
     const notice = companionNoticeSchema.parse(raw);
     pathSchema.parse(notice.path);
     if (notice.system && !main.isFocused() && Notification.isSupported()) {
       const notification = new Notification({ title: notice.title, body: notice.body });
-      notification.on('click', () => void openMain(notice.path).catch(report));
+      notification.on('click', () => {
+        dismiss(notice.id);
+        void openMain(notice.path).catch(report);
+      });
+      notification.on('close', () => {
+        if (shown.get(notice.id) === notification) shown.delete(notice.id);
+      });
+      shown.set(notice.id, notification);
       notification.show();
     }
+  });
+  ipcMain.on('aw:companion-dismiss', (event, raw: unknown) => {
+    requireKnown(event);
+    dismiss(companionNoticeIdSchema.parse(raw));
   });
   main.on('close', (event) => {
     if (enabled && !quitting) {

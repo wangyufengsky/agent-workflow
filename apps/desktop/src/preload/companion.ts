@@ -31,6 +31,14 @@ export const companionBridge: CompanionBridge = {
     };
   },
   notify: (notice) => ipcRenderer.send('aw:companion-notice', notice),
+  dismiss: (id) => ipcRenderer.send('aw:companion-dismiss', id),
+  onDismissed: (listener) => {
+    const receive = (_event: Electron.IpcRendererEvent, id: string) => listener(id);
+    ipcRenderer.on('aw:companion-dismissed', receive);
+    return () => {
+      ipcRenderer.removeListener('aw:companion-dismissed', receive);
+    };
+  },
   onNavigate: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, path: string) => listener(path);
     ipcRenderer.on('aw:companion-navigate', receive);
