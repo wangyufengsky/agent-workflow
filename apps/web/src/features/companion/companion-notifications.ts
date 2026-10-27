@@ -35,6 +35,8 @@ const taskNotice = (task: Task): Omit<CompanionNotice, 'system'> | undefined => 
 export function createCompanionNotifications(
   emit: (notice: Omit<CompanionNotice, 'system'>) => void,
   withdraw: (id: string) => void,
+  /** 已在别处处理的提醒：晚到的事件或重连快照不再提醒。 */
+  dismissed: ReadonlySet<string>,
 ) {
   const tasks = new Map<string, Task>();
   /** 每个任务最近一条提醒的 id。 */
@@ -53,7 +55,7 @@ export function createCompanionNotifications(
         withdraw(shown);
       }
       const notice = live || initialized ? taskNotice(next) : undefined;
-      if (notice !== undefined) {
+      if (notice !== undefined && !dismissed.has(notice.id)) {
         taskNotices.set(next.id, notice.id);
         emit(notice);
       }
@@ -69,6 +71,7 @@ export function createCompanionNotifications(
       seen ||
       (!live && !initialized) ||
       next.status !== InboxStatus.Open ||
+      dismissed.has(`inbox:${next.id}`) ||
       next.kind === InboxKind.Failure ||
       next.kind === InboxKind.Delivery ||
       (next.kind === InboxKind.Question && !next.payload.blocking)

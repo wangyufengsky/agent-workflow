@@ -29,6 +29,7 @@ describe('助手按真实业务状态提醒', () => {
     const tracker = createCompanionNotifications(
       (notice) => notices.push(notice),
       () => {},
+      new Set(),
     );
     tracker.snapshot([task(TaskStatus.Completed, 1), task(TaskStatus.Running, 1, 'two')], [question]);
     expect(notices).toEqual([]);
@@ -53,6 +54,7 @@ describe('助手按真实业务状态提醒', () => {
     const tracker = createCompanionNotifications(
       (notice) => notices.push(notice),
       () => {},
+      new Set(),
     );
     tracker.task(task(TaskStatus.Review, 2));
     tracker.snapshot([task(TaskStatus.Review, 2)], []);
@@ -67,6 +69,7 @@ describe('助手按真实业务状态提醒', () => {
     const tracker = createCompanionNotifications(
       (notice) => notices.push(notice.id),
       (id) => withdrawn.push(id),
+      new Set(),
     );
     const permission: InboxItemDTO = { ...question, id: 'permission' };
     tracker.snapshot([task(TaskStatus.Running, 1)], []);
@@ -82,5 +85,21 @@ describe('助手按真实业务状态提醒', () => {
     tracker.task(task(TaskStatus.Completed, 4));
     expect(withdrawn.slice(2)).toEqual([notices[2]]);
     expect(notices).toHaveLength(4);
+  });
+  it('另一个窗口已处理的提醒，晚到的事件和重连快照都不再提醒', () => {
+    const notices: string[] = [];
+    const dismissed = new Set(['inbox:question', 'task:one:review:2']);
+    const tracker = createCompanionNotifications(
+      (notice) => notices.push(notice.id),
+      () => {},
+      dismissed,
+    );
+    tracker.snapshot([task(TaskStatus.Running, 1)], []);
+    tracker.item(question);
+    tracker.task(task(TaskStatus.Review, 2));
+    tracker.snapshot([task(TaskStatus.Review, 2)], [question]);
+    expect(notices).toEqual([]);
+    tracker.task(task(TaskStatus.Completed, 3));
+    expect(notices).toEqual(['task:one:completed:3']);
   });
 });
