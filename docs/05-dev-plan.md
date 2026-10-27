@@ -543,7 +543,7 @@ OF-01 完成后 OF-02 与 OF-03 可并行；OF-01 至 OF-03 完成即「上传 W
 | 任务 | 内容 | 完成标准 |
 | --- | --- | --- |
 | SK-01（已完成） | 机制：`skillsDir`（`AW_SKILLS_DIR`）与打包、`skills.paths`、`AGENT_SKILLS` 与各 agent 的 `skill` 权限、`OPENCODE_DISABLE_EXTERNAL_SKILLS`；先放 `aw-task-diagnosis`；更新 12 §2、15 §2 | 单元：`packages/builtin/src/skills.test.ts`（目录与 `SkillName` 对应、只有 `SKILL.md`、头部与上限）、`opencode.config.test.ts`（`skills.paths`、白名单、启动环境）；oc：`opencode.skills.oc.test.ts`（找到全部 `aw-*`，不含仓库里 `.agents` / `.claude` 下的 skill）；打包：`electron-builder --dir` 产物的 `Resources/skills` 含全部 skill（手动） |
-| SK-02 | 助手的新 skill：`aw-task-requirement`（并入需求计划段，`protocol-assistant.md` 点名）、`aw-recurring-work`、`aw-office-docs` | 单元；live：助手建任务前加载 `aw-task-requirement`，`skill` 工具说明里没有未分配的 skill |
+| SK-02（已完成） | 助手的新 skill：`aw-task-requirement`（并入需求计划段，`protocol-assistant.md` 点名）、`aw-recurring-work`、`aw-office-docs` | 单元；oc：`opencode.skills.oc.test.ts` 用本地的脚本模型检查每个 agent 发给模型的请求里正好是它的白名单；live：`live/skills.live.test.ts` 助手建任务前加载 `aw-task-requirement` |
 | SK-03 | 助手的迁移：`aw-assistant-charts`、`aw-assistant-preview`，提示词保留触发句与规则并点名；每项单独提交 | 迁移前后各跑一次 35、29 的 live 场景，行为不变 |
 | SK-04 | 任务会话的 skill：`aw-db-readonly`（同时给助手）、`aw-offline-network`、`aw-merge-conflicts` 与 `revise-conflict.md` 的点名 | 单元 |
 | SK-05 | 任务会话的浏览器检查迁移成 `aw-page-check`（41 §5.3） | 迁移前后各跑一次页面改动的 live 场景 |

@@ -110,7 +110,7 @@ const ASSISTANT_PERMISSION = {
  * The app's skills each agent sees (41 §7.3, D207): an allowlist, so the user's own skills and those of the project's
  * repository never reach an aw session. An agent without skills loses the `skill` tool altogether.
  */
-const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
+export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
   [SessionAgent.Planner]: [],
   [SessionAgent.Executor]: [],
   [SessionAgent.Reviewer]: [],
@@ -118,7 +118,12 @@ const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
   [SessionAgent.SlidesWriter]: [],
   [SessionAgent.CodeReviewer]: [],
 };
-const ASSISTANT_SKILLS: SkillName[] = [SkillName.TaskDiagnosis];
+export const ASSISTANT_SKILLS: SkillName[] = [
+  SkillName.TaskRequirement,
+  SkillName.TaskDiagnosis,
+  SkillName.RecurringWork,
+  SkillName.OfficeDocs,
+];
 
 /** The catch-all deny comes first: opencode applies the last rule that matches (12 §2). */
 const skillPermission = (skills: SkillName[]) =>
