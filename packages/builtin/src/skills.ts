@@ -15,6 +15,12 @@ export const SkillName = {
   AssistantCharts: 'aw-assistant-charts',
   /** The assistant starts and reads page previews and reads websites (41 §5.1, moved from its prompt). */
   AssistantPreview: 'aw-assistant-preview',
+  /** Read-only investigation of project databases, for task sessions, the researcher and the assistant (41 §5.2). */
+  DbReadonly: 'aw-db-readonly',
+  /** Working when downloads and installs fail on an intranet machine (41 §5.2). */
+  OfflineNetwork: 'aw-offline-network',
+  /** Resolving the merge conflicts a conflict step is given (41 §5.2). */
+  MergeConflicts: 'aw-merge-conflicts',
 } as const;
 export type SkillName = (typeof SkillName)[keyof typeof SkillName];
 
