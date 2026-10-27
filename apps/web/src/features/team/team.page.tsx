@@ -1,7 +1,7 @@
 import { TeamOtherKind, type TeamSummaryDTO, UiMode } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Navigate, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { BarChart } from '../../components/charts/bar-chart.tsx';
@@ -13,7 +13,7 @@ import { TEAM_COPY as C, formatBucket, formatCount, formatRate } from '../../cop
 import { useUiStore } from '../../state/ui.store.ts';
 import { projectQuery, projectsQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
-import { AnalyseAllButton } from './member-analysis.tsx';
+import { ANALYSIS_HASH, AnalyseAllButton, TeamAnalyses } from './member-analysis.tsx';
 import styles from './team.module.css';
 import { teamSummaryQuery } from './team.queries.ts';
 import {
@@ -67,6 +67,7 @@ export function TeamPage() {
   const summary = useQuery(teamSummaryQuery(query));
   const pro = useSettings()['ui.mode'] === UiMode.Pro;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const analyses = useRef<HTMLElement>(null);
   useEffect(() => setTeamProject(projectId), [setTeamProject, projectId]);
 
   const onSearch = (change: Partial<TeamSearch>) =>
@@ -93,6 +94,7 @@ export function TeamPage() {
           <AnalyseAllButton
             query={query}
             members={summary.data.members.filter((m) => m.metrics.commits > 0).map((m) => m.key)}
+            onStarted={() => analyses.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           />
         )}
         {pro && (
@@ -113,7 +115,11 @@ export function TeamPage() {
       {summary.data !== undefined && (
         <Overview
           summary={summary.data}
+          analysesRef={analyses}
           onOpen={(member) => void navigate({ to: ROUTES.teamMember, params: { projectId, member }, search })}
+          onReport={(member) =>
+            void navigate({ to: ROUTES.teamMember, params: { projectId, member }, search, hash: ANALYSIS_HASH })
+          }
         />
       )}
       {pro && <TeamSettingsDrawer projectId={projectId} open={settingsOpen} onOpenChange={setSettingsOpen} />}
@@ -121,7 +127,18 @@ export function TeamPage() {
   );
 }
 
-function Overview({ summary, onOpen }: { summary: TeamSummaryDTO; onOpen: (memberKey: string) => void }) {
+function Overview({
+  summary,
+  analysesRef,
+  onOpen,
+  onReport,
+}: {
+  summary: TeamSummaryDTO;
+  analysesRef: RefObject<HTMLElement | null>;
+  onOpen: (memberKey: string) => void;
+  /** To the member page's AI analysis. */
+  onReport: (memberKey: string) => void;
+}) {
   const [metric, setMetric] = useState<MetricKey>('commits');
   const { totals, previousTotals } = summary;
   if (summary.members.length === 0 && summary.others.length === 0) {
@@ -215,6 +232,8 @@ function Overview({ summary, onOpen }: { summary: TeamSummaryDTO; onOpen: (membe
           <p className={`hint ${styles.note}`}>{C.aiNote}</p>
         </div>
       </section>
+
+      <TeamAnalyses ref={analysesRef} members={summary.members} analyses={summary.analyses} onOpen={onReport} />
 
       <div className="grid-2">
         <section className="section card pad" aria-label={C.compareTitle}>

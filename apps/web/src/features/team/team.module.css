@@ -226,13 +226,15 @@
   border-radius: 3px;
 }
 
-/* 非成员与身份 */
-.others {
+/* 非成员、AI 分析与身份 */
+.others,
+.analyses {
   list-style: none;
   margin: var(--s-3) 0 0;
   padding: 0;
 }
-.others li {
+.others li,
+.analyses li {
   display: flex;
   align-items: center;
   gap: var(--s-4);
@@ -240,7 +242,8 @@
   border-bottom: 1px solid var(--line);
   font-size: var(--fs-sm);
 }
-.others li:last-child {
+.others li:last-child,
+.analyses li:last-child {
   border-bottom: none;
 }
 .identities {
