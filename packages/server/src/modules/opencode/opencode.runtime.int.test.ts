@@ -123,7 +123,11 @@ describe('opencode 运行时', () => {
 
     // Launches 1–2 online, 3–4 after the setting changed.
     const [before, , after] = await launchEnvs();
-    expect(Object.keys(before ?? {})).toEqual(['OPENCODE_CONFIG_CONTENT']);
+    // Online, only the configuration and the skill switch, which does not depend on the network (D207).
+    expect(Object.keys(before ?? {}).toSorted()).toEqual([
+      'OPENCODE_CONFIG_CONTENT',
+      'OPENCODE_DISABLE_EXTERNAL_SKILLS',
+    ]);
     expect(after).toMatchObject({
       OPENCODE_DISABLE_AUTOUPDATE: '1',
       OPENCODE_DISABLE_MODELS_FETCH: '1',

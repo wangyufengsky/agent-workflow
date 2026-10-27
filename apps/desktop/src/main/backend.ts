@@ -36,6 +36,9 @@ export async function startBackend(
       AW_PROMPTS_DIR: app.isPackaged
         ? join(process.resourcesPath, 'prompts')
         : join(app.getAppPath(), '../../packages/builtin/prompts'),
+      AW_SKILLS_DIR: app.isPackaged
+        ? join(process.resourcesPath, 'skills')
+        : join(app.getAppPath(), '../../packages/builtin/skills'),
       AW_OPENCODE_PLUGIN_FILE: app.isPackaged
         ? join(process.resourcesPath, 'opencode-plugin', 'agent-workflow-bridge.js')
         : join(app.getAppPath(), '../../packages/opencode-plugin/dist/agent-workflow-bridge.js'),
