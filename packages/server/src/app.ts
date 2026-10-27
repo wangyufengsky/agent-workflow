@@ -178,6 +178,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
         assistantMcpUrl: `${api}${MCP_ASSISTANT_PATH}`,
         assistantMcpToken,
         pluginFile: config.opencodePluginFile,
+        skillsDir: config.skillsDir,
         prompts,
         shell,
         offline,

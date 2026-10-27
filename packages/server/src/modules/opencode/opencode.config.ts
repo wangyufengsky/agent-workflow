@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { PromptName, type Prompts } from '@aw/builtin';
+import { PromptName, type Prompts, SkillName } from '@aw/builtin';
 import {
   BASH_PERMISSION_PRESETS,
   BashPolicy,
@@ -24,6 +24,8 @@ export type OpencodeConfigInput = {
   assistantMcpUrl: string;
   assistantMcpToken: string;
   pluginFile: string;
+  /** The app's own skills (41, D206). */
+  skillsDir: string;
   prompts: Prompts;
   /** Pinned shell (Git Bash on Windows, D72); otherwise opencode uses the user's own. */
   shell: string | undefined;
@@ -104,6 +106,26 @@ const ASSISTANT_PERMISSION = {
   [EXEC_TOOLS]: 'deny',
 } as const satisfies AgentPermission & { [EXEC_TOOLS]: 'deny' };
 
+/**
+ * The app's skills each agent sees (41 §7.3, D207): an allowlist, so the user's own skills and those of the project's
+ * repository never reach an aw session. An agent without skills loses the `skill` tool altogether.
+ */
+const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
+  [SessionAgent.Planner]: [],
+  [SessionAgent.Executor]: [],
+  [SessionAgent.Reviewer]: [],
+  [SessionAgent.Researcher]: [],
+  [SessionAgent.SlidesWriter]: [],
+  [SessionAgent.CodeReviewer]: [],
+};
+const ASSISTANT_SKILLS: SkillName[] = [SkillName.TaskDiagnosis];
+
+/** The catch-all deny comes first: opencode applies the last rule that matches (12 §2). */
+const skillPermission = (skills: SkillName[]) =>
+  skills.length === 0
+    ? ('deny' as const)
+    : { '*': 'deny' as const, ...Object.fromEntries(skills.map((skill) => [skill, 'allow' as const])) };
+
 const AGENT_PROMPT: Record<SessionAgent, PromptName> = {
   [SessionAgent.Planner]: PromptName.ProtocolPlan,
   [SessionAgent.Executor]: PromptName.ProtocolExecute,
@@ -134,6 +156,12 @@ const OFFLINE_ENV = {
   OPENCODE_DISABLE_AUTOUPDATE: '1',
 } as const;
 
+/**
+ * opencode skips `.claude/skills` and `.agents/skills`, the user's and the project's (D207): the allowlist already
+ * hides them, this spares scanning the home directory for every new worktree.
+ */
+const SKILL_ENV = { OPENCODE_DISABLE_EXTERNAL_SKILLS: '1' } as const;
+
 /** Injected as `OPENCODE_CONFIG_CONTENT` and merged by opencode with the user's own configuration (12 §2, S3). */
 export function buildOpencodeConfig(input: OpencodeConfigInput) {
   const agents = Object.values(SessionAgent).map((base) => [
@@ -142,7 +170,7 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
       mode: 'primary',
       description: `agent-workflow ${base}`,
       prompt: input.prompts[AGENT_PROMPT[base]],
-      permission: AGENT_PERMISSION[base],
+      permission: { ...AGENT_PERMISSION[base], skill: skillPermission(AGENT_SKILLS[base]) },
     },
   ]);
   const remote = (url: string, token: string) => ({
@@ -158,6 +186,7 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
       [MCP_ASSISTANT_SERVER_NAME]: remote(input.assistantMcpUrl, input.assistantMcpToken),
     },
     plugin: [pathToFileURL(input.pluginFile).href],
+    skills: { paths: [input.skillsDir] },
     agent: {
       ...Object.fromEntries(agents),
       [OPENCODE_COMPANION_AGENT]: {
@@ -170,7 +199,7 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
         mode: 'primary',
         description: 'agent-workflow assistant',
         prompt: input.prompts[PromptName.ProtocolAssistant],
-        permission: ASSISTANT_PERMISSION,
+        permission: { ...ASSISTANT_PERMISSION, skill: skillPermission(ASSISTANT_SKILLS) },
       },
     },
     ...(input.shell === undefined ? {} : { shell: input.shell }),
@@ -182,6 +211,7 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
 export function opencodeLaunchEnv(input: OpencodeConfigInput): Record<string, string> {
   return {
     OPENCODE_CONFIG_CONTENT: JSON.stringify(buildOpencodeConfig(input)),
+    ...SKILL_ENV,
     ...(input.offline ? OFFLINE_ENV : {}),
   };
 }

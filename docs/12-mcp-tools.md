@@ -29,6 +29,8 @@
     "agent-workflow-app": { "type": "remote", "url": "http://127.0.0.1:<apiPort>/mcp/assistant", "headers": { "Authorization": "Bearer <assistantMcpToken>" }, "oauth": false, "enabled": true }
   },
   "plugin": ["file://<appResources>/opencode-plugin/agent-workflow-bridge.js"],
+  // 应用自带的 skill（41，D206）；各 agent 的 permission 另有 "skill" 白名单（D207，见下）
+  "skills": { "paths": ["<appResources>/skills"] },
   "agent": {
     "aw-planner":  { "mode": "primary", "description": "agent-workflow planner",  "prompt": "<protocol-plan.md>",    "permission": { "edit": "deny",  "question": "deny", "webfetch": "deny", "external_directory": "deny", "agent-workflow-app_*": "deny" } },
     "aw-executor": { "mode": "primary", "description": "agent-workflow executor", "prompt": "<protocol-execute.md>", "permission": { "edit": "allow", "question": "deny", "webfetch": "ask",  "external_directory": "deny", "agent-workflow-app_*": "deny" } },
@@ -45,6 +47,7 @@
 ```
 
 - 生成函数 `buildOpencodeConfig`（`modules/opencode/opencode.config.ts`）；agent 的 `prompt` 为 `packages/builtin/prompts/protocol-*.md`，插件路径为构建出的 `agent-workflow-bridge.js`（打包后在 `Resources/opencode-plugin/`，源码运行时在 `packages/opencode-plugin/dist/`）。
+- skill（41）：`skills.paths` 指向应用自带的 skill 目录（`AppConfig.skillsDir`，打包后在 `Resources/skills/`，源码运行时在 `packages/builtin/skills/`）。每个 agent 的权限加 `skill` 白名单，由 `opencode.config.ts` 的 `AGENT_SKILLS` / `ASSISTANT_SKILLS` 生成：有 skill 时为 `{ "*": "deny", "<skill>": "allow", … }`（拒绝全部的规则在最前），没有时为 `"deny"`（opencode 去掉 `skill` 工具）；桌宠的 `"*": "deny"` 已包含它。启动 opencode 时始终设 `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`（D207），用户与项目的 `.claude/skills`、`.agents/skills` 不被扫描。
 - 每个 agent 的权限 deny 另一套 MCP 的工具（`agent-workflow-app_*` / `agent-workflow_*`）：opencode 去掉被整体 deny 的工具，执行任务的会话看不到几十个助手工具，助手也看不到执行工具；即使调用了，归属也会失败（12 §3、15 §2）。
 - agent 只放不随设置变化的权限；**bash 规则在 `session.create` 时以会话级 `permission` 规则集传入**（D35，`sessionPermissionRules`），格式 `[{ permission: 'bash', pattern, action }]`。opencode 取**最后一条**匹配的规则，所以兜底的 `*` 放在最前。
 - 原生 `question` 工具禁用，提问只走 MCP `ask_user`（D36）。
@@ -449,7 +452,7 @@ export const submitPlanTool = defineMcpTool({
 - `websearch` 工具只对 `opencode`、`opencode-go` provider 或打开 `OPENCODE_ENABLE_EXA` / `OPENCODE_ENABLE_PARALLEL`（含 `OPENCODE_EXPERIMENTAL`）时出现。
 - 不登录时 `opencode` provider 列出 11 个免费模型；`provider.<id>.whitelist: []` 去掉它的全部模型，provider 随之消失，用户的 `disabled_providers` 不受影响。经 `OPENCODE_CONFIG_CONTENT` 注入的 `disabled_providers` 则整体替换用户自己的（用户禁用的 provider 重新出现）。
 - `@opencode-ai/plugin` 的安装（D182，2026-10-25 读 1.19.0 源码并实测）：配置目录 = `$XDG_CONFIG_HOME/opencode`、从会话目录往上到 worktree 根的每个 `.opencode`、`~/.opencode`、`OPENCODE_CONFIG_DIR`，每个实例（目录）加载配置时对其中每个可写的目录调用一次。用的是二进制内置的 npm Arborist（不是 Bun），npm 配置照常读环境变量 `npm_config_*`、`~/.npmrc` 与目录里的 `.npmrc`（实测 `npm_config_registry` 与 `~/.npmrc` 的 `registry` 都生效）。目录里有 `node_modules`、且 package.json 的依赖名与 `@opencode-ai/plugin` 都在 package-lock.json 的 `packages[""]` 里时跳过（只比名字，不比版本），否则安装；失败什么也不留下，下次还装。配置里有插件时（应用总会注入桥接插件），opencode 加载插件前等这次安装结束，`session.create` 也就等着。实测新目录第一次 `session.create`：npm 源连接被拒 70 秒，DNS 失败 82–87 秒（第二个新目录照样再等），经代理时 `CONNECT registry.npmjs.org` 在 0、10、70 秒各一次后放弃（npm 重试两次，代理不回应时还要加上默认 5 分钟的 fetch-timeout）；目录里已装好 0.3 秒、没有请求。应用自己的桥接插件只用类型导入，运行时不需要这个包；需要它的是用户写在这些目录里的自定义工具与插件（如 `tool()`）。`opencode.offline.oc.test.ts` 把 `npm_config_registry` 指向本地服务：在线对照能看到安装请求，离线且已装好时没有任何外连。
-- `OPENCODE_DISABLE_DEFAULT_PLUGINS` 关掉的是二进制内置的插件（认证等），不联网；`OPENCODE_DISABLE_EXTERNAL_SKILLS` 只跳过扫描 `~/.claude`、`~/.agents`。两者都与离线无关。
+- `OPENCODE_DISABLE_DEFAULT_PLUGINS` 关掉的是二进制内置的插件（认证等），不联网；`OPENCODE_DISABLE_EXTERNAL_SKILLS` 跳过扫描用户与项目里的 `.claude/skills`、`.agents/skills`（2026-10-27 实测，项目里的也跳过）。两者都与离线无关；后者由 D207 始终设置（§2）。
 
 ## 9. 待实施工具增量（30 / 31）
 
