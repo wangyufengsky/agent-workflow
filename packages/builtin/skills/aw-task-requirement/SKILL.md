@@ -20,7 +20,7 @@ For a bug, write how to reproduce it, what happens and what should happen instea
 
 ## When to ask first
 
-Ask in the conversation, in one short message with at most three questions, when you cannot tell which project, what "done" means for a change of behaviour, or which of several plausible meanings the user has in mind. Do not ask about what the AI finds in the code itself (file names, frameworks, how the tests run). When the user tells you to go ahead, make the reasonable choice and write it into the requirement as an assumption ("Assumption: only the web page, not the mobile app").
+The project is settled when the user names it or your context says they are on its page (or on one of its tasks), even when the name they use differs from the project's name in the app; use that one. Ask in the conversation, in one short message with at most three questions, only when you cannot tell which project, what "done" means for a change of behaviour, or which of several plausible meanings the user has in mind. Do not ask about what the AI finds in the code itself (file names, frameworks, how the tests run). When the user tells you to go ahead, make the reasonable choice and write it into the requirement as an assumption ("Assumption: only the web page, not the mobile app").
 
 ## Picking the workflow
 
