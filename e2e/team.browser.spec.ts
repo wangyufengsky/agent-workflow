@@ -100,6 +100,16 @@ test('J35 团队：成员表默认按姓名、点列头排序，成员页纵向�
   // No findings in the sampled lines: none per thousand lines in the AI column.
   await expect(table.locator('tbody tr').filter({ hasText: 'Zhang San' }).locator('td').last()).toHaveText('0');
   await expect(table.locator('tbody tr')).toHaveCount(4);
+  // The team page lists where each member's analysis stands and leads to the report.
+  const analyses = page.getByTestId('team-analyses');
+  const zhang = analyses.getByRole('listitem').filter({ hasText: 'Zhang San' });
+  await expect(zhang).toContainText('已完成');
+  await expect(zhang).toContainText('阻断 0 · 严重 0 · 一般 0');
+  await expect(analyses.getByRole('listitem').filter({ hasText: 'Li Si' })).toContainText('未分析');
+  await zhang.getByRole('button', { name: '查看报告' }).click();
+  await expect(page).toHaveURL(/\/members\/zs(%40|@)corp\.com/);
+  await expect(page.getByTestId('analysis-report')).toBeInViewport();
+  await page.locator('.crumbs').getByRole('link', { name: '团队' }).click();
 
   // Pro mode adds how lines are counted.
   await patchSettings(request, { 'ui.mode': 'pro' });
@@ -113,6 +123,14 @@ test('J35 团队：成员表默认按姓名、点列头排序，成员页纵向�
     await page.goto(`/team/${project.id}?period=last_90_days`);
     await expect(page.getByTestId('team-members')).toBeVisible();
     await expect(page.getByTestId('team-compare')).toBeVisible();
+  }
+
+  // Analysing everyone shows each member's progress where the button's results appear.
+  await page.getByRole('button', { name: '为全部成员生成分析' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '开始分析' }).click();
+  await expect(analyses).toBeInViewport();
+  for (const row of await analyses.getByRole('listitem').all()) {
+    await expect(row).not.toContainText('未分析');
   }
   expect(errors).toEqual([]);
   await patchSettings(request, { 'ui.mode': 'simple' });
