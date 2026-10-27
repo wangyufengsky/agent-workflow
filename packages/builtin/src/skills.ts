@@ -11,6 +11,10 @@ export const SkillName = {
   RecurringWork: 'aw-recurring-work',
   /** The assistant writes and changes Word and Excel files (41 §5.1). */
   OfficeDocs: 'aw-office-docs',
+  /** The assistant draws charts and flowcharts (41 §5.1, moved from its prompt). */
+  AssistantCharts: 'aw-assistant-charts',
+  /** The assistant starts and reads page previews and reads websites (41 §5.1, moved from its prompt). */
+  AssistantPreview: 'aw-assistant-preview',
 } as const;
 export type SkillName = (typeof SkillName)[keyof typeof SkillName];
 
