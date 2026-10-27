@@ -9,6 +9,7 @@ import {
   updateSettingsOp,
 } from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { SkillName } from '../packages/builtin/src/skills.ts';
 import { createChromiumHost } from '../packages/server/src/modules/browser/host.chromium.ts';
 import { TEST_MODEL } from '../packages/server/test/helpers/model.ts';
 import { type LiveApp, outcome, startLiveApp, TASK_TIMEOUT_MS } from './live-app.ts';
@@ -34,21 +35,25 @@ afterAll(async () => {
   await host.close();
 });
 
-/** The browser tool calls in the task's transcripts, with whether each succeeded. */
-async function browserCalls(taskId: string): Promise<Array<{ tool: string; ok: boolean }>> {
+/** The browser tool calls in the task's transcripts, with whether each succeeded, and the skills loaded. */
+async function browserCalls(
+  taskId: string,
+): Promise<{ calls: Array<{ tool: string; ok: boolean }>; skills: unknown[] }> {
   const dir = join(live.t.dataDir, 'runs', taskId);
   const calls: Array<{ tool: string; ok: boolean }> = [];
+  const skills: unknown[] = [];
   for (const file of (await readdir(dir)).filter((f) => f.endsWith('.jsonl'))) {
     const entries: TranscriptEntry[] = (await readFile(join(dir, file), 'utf8'))
       .trim()
       .split('\n')
       .map((line) => JSON.parse(line));
     for (const e of entries) {
+      if (e.kind === 'tool_call' && e.data.tool === 'skill') skills.push(e.data.input.name);
       if (e.kind !== 'tool_result' || !/^agent-workflow_browser_/.test(e.data.tool)) continue;
       calls.push({ tool: e.data.tool.replace('agent-workflow_', ''), ok: e.data.status === 'completed' });
     }
   }
-  return calls;
+  return { calls, skills };
 }
 
 describe('@live 浏览器：改页面并在页面预览里验证', () => {
@@ -62,7 +67,9 @@ describe('@live 浏览器：改页面并在页面预览里验证', () => {
       const task = await live.runTask('feature', 'todo-web', REQUIREMENT);
       expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
 
-      const calls = await browserCalls(task.id);
+      const { calls, skills } = await browserCalls(task.id);
+      // The executor's prompt names the skill for checking pages (41 §5.3).
+      expect(skills).toContain(SkillName.PageCheck);
       expect(calls).toContainEqual({ tool: 'browser_open', ok: true });
       expect(calls).toContainEqual({ tool: 'browser_click', ok: true });
       const html = await readFile(join(task.git.worktreePath ?? '', 'public/index.html'), 'utf8');

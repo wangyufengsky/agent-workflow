@@ -1,6 +1,6 @@
 # 41 · 内置 skill
 
-> 状态：**已确认，SK-01–SK-04 已实现**（2026-10-27，用户要求：「我们需要哪些 skill，skill 如何写，以及如何注入」；同日补充：「AI 助手是否需要 skill？她的主观能动性最高」，助手因此作为 skill 的主要使用者单列，§5.1）。决策 D206–D212 同日按推荐方案确认（02），任务拆分见 05 的 SK。§3 的 opencode 行为在 opencode 1.19.0 上实测（2026-10-27），标注「读代码」的条目尚未实测，由 §9 的测试兜住。
+> 状态：**已确认，SK-01–SK-05 已实现**（2026-10-27，用户要求：「我们需要哪些 skill，skill 如何写，以及如何注入」；同日补充：「AI 助手是否需要 skill？她的主观能动性最高」，助手因此作为 skill 的主要使用者单列，§5.1）。决策 D206–D212 同日按推荐方案确认（02），任务拆分见 05 的 SK。§3 的 opencode 行为在 opencode 1.19.0 上实测（2026-10-27），标注「读代码」的条目尚未实测，由 §9 的测试兜住。
 
 ## 1. 为什么要有
 
@@ -196,6 +196,7 @@ Find the actual cause before you suggest anything, and quote the line that shows
 | `aw-db-readonly` | ✓ | ✓ | ✓ | ✓ | | | ✓ |
 | `aw-offline-network` | ✓ | ✓ | | | | | |
 | `aw-merge-conflicts` | | ✓ | | | | | |
+| `aw-page-check` | ✓ | ✓ | ✓ | | | | |
 
 桌宠的 agent 已经是 `'*': 'deny'`，不变。
 

@@ -21,6 +21,8 @@ export const SkillName = {
   OfflineNetwork: 'aw-offline-network',
   /** Resolving the merge conflicts a conflict step is given (41 §5.2). */
   MergeConflicts: 'aw-merge-conflicts',
+  /** Checking pages in the task's preview and reading linked websites, for task sessions (41 §5.3, moved from prompts). */
+  PageCheck: 'aw-page-check',
 } as const;
 export type SkillName = (typeof SkillName)[keyof typeof SkillName];
 
