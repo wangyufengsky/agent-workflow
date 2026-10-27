@@ -75,6 +75,7 @@ describe('opencode 配置生成', () => {
       [SkillName.TaskDiagnosis]: 'allow',
       [SkillName.RecurringWork]: 'allow',
       [SkillName.OfficeDocs]: 'allow',
+      [SkillName.AssistantCharts]: 'allow',
     });
   });
 
