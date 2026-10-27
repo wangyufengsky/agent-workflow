@@ -52,7 +52,7 @@ export type OperationToolDeps = {
   recordProduced(conversationId: string, contract: OperationContract, output: unknown): void;
   /**
    * Operations whose outcome arrives later as a message (a knowledge question, 18 §4a): what the tool returns
-   * instead of the output; their navigation card comes with that message.
+   * instead of the output. Their navigation card is recorded at once, so the user can follow the work meanwhile.
    */
   deferred: ReadonlyMap<string, (conversationId: string, output: unknown) => unknown>;
   /**
@@ -92,10 +92,9 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
           if (allowed) {
             // A failing operation answers with its error code, like any tool (12 §5).
             const output = await deps.run(conversation.id, impl, input);
-            const deferred = deps.deferred.get(contract.id);
-            if (deferred !== undefined) return deferred(conversation.id, output);
             deps.recordProduced(conversation.id, contract, output);
-            return output;
+            const deferred = deps.deferred.get(contract.id);
+            return deferred === undefined ? output : deferred(conversation.id, output);
           }
           const confirmation = deps.requestConfirmation(conversation.id, contract.id, input);
           return {

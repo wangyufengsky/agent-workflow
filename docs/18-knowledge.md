@@ -160,7 +160,8 @@ type KnowledgeConversationSummaryDTO = {
 用户要求助手能直接提问（D68）。`knowledge.ask` 与 `knowledge.followUp` 为 read：只读项目，不需要确认卡片；契约声明 `produces: knowledge_conversation`（D66）。研究可能要几分钟，助手的工具调用不阻塞，沿用确认流程「结果作为下一条消息」的模式（15 §4）：
 
 1. 助手调用 `knowledge_ask`（或 `knowledge_followUp`）。操作照常执行；工具不返回对话 DTO，而是立即返回 `{ status: 'researching', knowledge_conversation_id, instruction }`，`instruction` 让模型告诉用户正在查资料并结束本轮。助手模块记下「这一轮由哪个助手对话等待」（内存中；应用重启会中断研究本身，结果仍可在知识问答页看到）。
-2. 这一轮结束时（知识模块 `onTurnEnded`），后端先在助手对话中记录指向该知识对话的导航卡片（`entity_ref`），再把消息发回原助手会话（会话忙时等本轮结束，`deliver`）：
+   操作一返回，助手对话中就记录指向该知识对话的导航卡片（`entity_ref`，与其他 `produces` 操作相同），用户在研究进行中即可点进去看进度。
+2. 这一轮结束时（知识模块 `onTurnEnded`），后端把消息发回原助手会话（会话忙时等本轮结束，`deliver`）：
    - 回答（`assistant-knowledge-answered.md`）：问题、带 `[n]` 的回答、引用列表（`[n] 路径 第 a–b 行 — link: /knowledge/<id>?turn=<turnId>&cite=<n>`），以及对话页面链接 `/knowledge/<id>`（即 `open_page` 的 `knowledge_conversation` 页面）；要求模型把提到的引用写成 `[[n]](link)` 形式的 Markdown 链接，并在结尾附上对话页面链接。
    - 失败、停止（`assistant-knowledge-failed.md`）：状态、错误码与原因、对话页面链接。
 3. 助手面板中以 `/` 开头的链接在应用内导航（面板保持打开）：点引用即打开知识问答页并推入该处原文；导航卡片「打开」进入知识对话页。链接地址由 `knowledgeLink()`（`shared/knowledge/citations.ts`）生成，与前端路由一致。
