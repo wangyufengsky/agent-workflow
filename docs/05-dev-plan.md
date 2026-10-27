@@ -535,3 +535,15 @@ OF-01 完成后 OF-02 与 OF-03 可并行；OF-01 至 OF-03 完成即「上传 W
 | --- | --- | --- |
 | AM-01（已完成） | 系统流程 `system.agents_md`、规则原文 `agents-md-rules.md`、`agentsMdTaskText`；操作 `projects.agentsMd` / `projects.startAgentsMdTask`（tasks 模块实现） | 集成：`tasks.agents-md.int.test.ts`（默认分支上的文件、未提交的不算、规则里的检查命令、生成与补充的需求、两步到待合并、面板指向进行中的任务） |
 | AM-02（已完成） | 项目详情「AGENTS.md」面板：查看、预览规则、补充说明、让 AI 生成 / 补充、进行中的任务 | E2E：J44 |
+
+## 后续 · 内置 skill（SK）
+
+> 状态：**用户要求**（2026-10-27：「我们需要哪些 skill，skill 如何写，以及如何注入」），设计见 [41-skills.md](41-skills.md)，D206–D212 同日按推荐方案确认，待实施。
+
+| 任务 | 内容 | 完成标准 |
+| --- | --- | --- |
+| SK-01 | 机制：`skillsDir`（`AW_SKILLS_DIR`）与打包、`skills.paths`、`AGENT_SKILLS` 与各 agent 的 `skill` 权限、`OPENCODE_DISABLE_EXTERNAL_SKILLS`；先放 `aw-task-diagnosis`；更新 12 §2、15 §2 | 单元：skill 目录检查、`opencode.config.test.ts` 快照；oc：`GET /skill` 含全部 `aw-*`、不含临时 `HOME` 下的个人 skill；打包冒烟：`skillsDir` 存在 |
+| SK-02 | 助手的新 skill：`aw-task-requirement`（并入需求计划段，`protocol-assistant.md` 点名）、`aw-recurring-work`、`aw-office-docs` | 单元；live：助手建任务前加载 `aw-task-requirement`，`skill` 工具说明里没有未分配的 skill |
+| SK-03 | 助手的迁移：`aw-assistant-charts`、`aw-assistant-preview`，提示词保留触发句与规则并点名；每项单独提交 | 迁移前后各跑一次 35、29 的 live 场景，行为不变 |
+| SK-04 | 任务会话的 skill：`aw-db-readonly`（同时给助手）、`aw-offline-network`、`aw-merge-conflicts` 与 `revise-conflict.md` 的点名 | 单元 |
+| SK-05 | 任务会话的浏览器检查迁移成 `aw-page-check`（41 §5.3） | 迁移前后各跑一次页面改动的 live 场景 |
