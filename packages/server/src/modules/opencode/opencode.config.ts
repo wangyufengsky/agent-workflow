@@ -124,6 +124,7 @@ export const ASSISTANT_SKILLS: SkillName[] = [
   SkillName.RecurringWork,
   SkillName.OfficeDocs,
   SkillName.AssistantCharts,
+  SkillName.AssistantPreview,
 ];
 
 /** The catch-all deny comes first: opencode applies the last rule that matches (12 §2). */
