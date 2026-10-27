@@ -111,10 +111,10 @@ const ASSISTANT_PERMISSION = {
  * repository never reach an aw session. An agent without skills loses the `skill` tool altogether.
  */
 export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
-  [SessionAgent.Planner]: [],
-  [SessionAgent.Executor]: [],
-  [SessionAgent.Reviewer]: [],
-  [SessionAgent.Researcher]: [],
+  [SessionAgent.Planner]: [SkillName.DbReadonly, SkillName.OfflineNetwork],
+  [SessionAgent.Executor]: [SkillName.DbReadonly, SkillName.OfflineNetwork, SkillName.MergeConflicts],
+  [SessionAgent.Reviewer]: [SkillName.DbReadonly],
+  [SessionAgent.Researcher]: [SkillName.DbReadonly],
   [SessionAgent.SlidesWriter]: [],
   [SessionAgent.CodeReviewer]: [],
 };
@@ -125,6 +125,7 @@ export const ASSISTANT_SKILLS: SkillName[] = [
   SkillName.OfficeDocs,
   SkillName.AssistantCharts,
   SkillName.AssistantPreview,
+  SkillName.DbReadonly,
 ];
 
 /** The catch-all deny comes first: opencode applies the last rule that matches (12 §2). */
