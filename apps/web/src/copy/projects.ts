@@ -32,6 +32,10 @@ export const PROJECTS_COPY = {
   emptyTitle: '还没有项目',
   emptyBody: '添加一个本地 Git 仓库后就可以开始任务。',
   defaultBranch: '默认分支',
+  defaultBranchHint: '新任务从这个分支开始，完成后合并回这里。',
+  otherBranchCheckedOut: (current: string, base: string) =>
+    `仓库现在检出的是 ${current}，新任务却从 ${base} 开始。平时在 ${current} 上开发的话，改用它。`,
+  switchToBranch: (branch: string) => `改用 ${branch}`,
   checkCommand: '检查命令',
   checkCommandHint: '每个步骤完成后自动运行的检查，例如 pnpm test；留空表示不运行。',
   noCheckCommand: '未设置',

@@ -50,6 +50,21 @@ describe('添加项目', () => {
     expect((await t.call(listProjectsOp, {})).body.items.map((p) => p.id)).toEqual([res.body.id]);
   });
 
+  it('远端默认分支与仓库检出的分支不同时，项目详情同时给出两者（D216）', async () => {
+    const repo = await nodeRepo();
+    // origin's default is main (an empty branch in the user's case); the work happens on dev.
+    await repo.git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    await repo.git('symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main');
+    await repo.git('checkout', '-q', '-b', 'dev');
+    const { body } = await t.call(createProjectOp, { repoPath: repo.path });
+    expect({ defaultBranch: body.defaultBranch, currentBranch: body.currentBranch }).toEqual({
+      defaultBranch: 'main',
+      currentBranch: 'dev',
+    });
+    await repo.git('checkout', '-q', '--detach');
+    expect((await t.call(getProjectOp, { id: body.id })).body.currentBranch).toBeNull();
+  });
+
   it('未给名称时用目录名，同名 slug 自动加序号', async () => {
     const a = await t.call(createProjectOp, { repoPath: (await createTestRepo()).path, name: 'app' });
     const b = await t.call(createProjectOp, { repoPath: (await createTestRepo()).path, name: 'App' });

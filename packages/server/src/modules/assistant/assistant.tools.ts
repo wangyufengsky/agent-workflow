@@ -61,6 +61,11 @@ export type OperationToolDeps = {
    * added from (D153).
    */
   prechecks: ReadonlyMap<string, (conversationId: string, input: Record<string, unknown>) => void | Promise<void>>;
+  /**
+   * Fills in what an operation would otherwise default, so the confirmation card shows it and the call runs with what
+   * the user approved: the branch a task starts from (D215).
+   */
+  completions: ReadonlyMap<string, (input: Record<string, unknown>) => Record<string, unknown>>;
   /** Records a pending confirmation for a call the user has to approve. */
   requestConfirmation(
     conversationId: string,
@@ -84,7 +89,8 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
         description: `${contract.description}.${RISK_NOTE[contract.risk]}`,
         input: assistantInputSchema(contract),
         mode: contract.mode,
-        async handler(input, { conversation }) {
+        async handler(given, { conversation }) {
+          const input = deps.completions.get(contract.id)?.(given) ?? given;
           await deps.prechecks.get(contract.id)?.(conversation.id, input);
           const allowed =
             contract.risk === OperationRisk.Read ||

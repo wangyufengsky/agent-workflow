@@ -77,6 +77,7 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 
 确认流程（与 `ask_user` 同一模式，不依赖长时间阻塞的工具调用；`assistant.confirmations.ts`，状态机 09 §10）：
 
+0. 没写 `baseBranch` 的 `tasks.create`、`batches.create`、`initiatives.create` 先填上项目当前的默认分支（D215），卡片与确认后的调用都用它；定时任务不填（每次运行时取当时的默认分支）。
 1. 工具返回 `{ status: 'needs_confirmation', confirmation_id, instruction }`（instruction 要求模型用一句话说明并结束本轮），后端写 `assistant_confirmations`（`pending`），消息流追加 `confirmation` 条目，推送 `assistant.confirmation`。
 2. 界面在对话中渲染确认卡片：操作标题、参数（对象显示名称、字段用中文标签，§6.1）、影响说明（write：可「确认并总是允许」；critical：每次确认），合并（`tasks.deliver`）另显示将合并的改动统计，初始化 Git（`projects.initGit`）另显示与添加项目对话框相同的三件事、将纳入的文件数与大小和大文件提醒（D153）。
 3. 用户确认 → 先转为 `confirmed`（再点一次 409，不会执行两次）→ 后端执行操作 → 结果 `{ ok: true, output }` 或 `{ ok: false, error }` 与模板 `assistant-confirmed.md` 生成的待发消息在同一事务保存（无返回值的成功操作用 `output: null`，兼容旧记录缺失 output）→ 回传同一会话；取消 → 在同一事务保存 `cancelled` 与 `assistant-cancelled.md` 消息。会话还在回复或发送请求尚未返回时消息先排队，本轮结束后发出；opencode 不可用或发送失败时保留队列，后端重启后也可随用户的下一条消息发出。只有收到发送成功响应才移除当次消息，不移除期间新入队的消息；恢复只投递结果，不重新执行操作。

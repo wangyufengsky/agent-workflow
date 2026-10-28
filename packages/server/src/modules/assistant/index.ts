@@ -1,6 +1,7 @@
 import type { Prompts } from '@aw/builtin';
 import {
   attachmentIdsSchema,
+  createBatchOp,
   createInitiativeOp,
   createProjectOp,
   createTaskOp,
@@ -93,6 +94,15 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
         requestConfirmation: confirmations.request,
         recordProduced: conversations.recordProduced,
         deferred: new Map(KNOWLEDGE_QUESTION_OPS.map((id) => [id, relay.researching])),
+        completions: new Map(
+          [createTaskOp.id, createBatchOp.id, createInitiativeOp.id].map((id) => [
+            id,
+            (input: Record<string, unknown>) =>
+              input.baseBranch === undefined
+                ? { ...input, baseBranch: deps.projects.getRecord(z.string().parse(input.projectId)).defaultBranch }
+                : input,
+          ]),
+        ),
         prechecks: new Map([
           // Only files of this conversation are handed on (30 §2.2): to a task, or to an initiative (34 §10).
           ...[createTaskOp.id, createInitiativeOp.id].map(

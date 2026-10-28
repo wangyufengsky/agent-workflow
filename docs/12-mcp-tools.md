@@ -53,7 +53,7 @@
 - agent 只放不随设置变化的权限；**bash 规则在 `session.create` 时以会话级 `permission` 规则集传入**（D35，`sessionPermissionRules`），格式 `[{ permission: 'bash', pattern, action }]`。opencode 取**最后一条**匹配的规则，所以兜底的 `*` 放在最前。
 - 原生 `question` 工具禁用，提问只走 MCP `ask_user`（D36）。
 - **bash 规则集**（`shared/constants/opencode.ts`：planner 与 reviewer 用 `readonlyBashRules(checkCommands, allowedBash)`，executor 按 `ai.bashPolicy` 用 `BASH_PERMISSION_PRESETS`；`allowedBash` 是项目中「总是允许」记下的模式，D101）：
-  - Git 只读子命令：`git status* git log* git diff* git show* git blame* git grep* git ls-files* git rev-parse*`。
+  - Git 只读子命令：`git status* git log* git diff* git show* git blame* git grep* git ls-files* git rev-parse*`，以及读对象与引用的 `git ls-tree* git cat-file* git rev-list* git merge-base* git for-each-ref* git shortlog* git describe* git name-rev*`（D214；`show-ref` 已被 `git show*` 包含）。`git --git-dir=…`、`git -C <目录>` 与 `git branch` 不在其中：前两者让 git 读写会话目录之外的仓库，后者能建删分支。
   - 只读规则，按顺序（最后一条匹配的规则生效）：
     1. `*` ask。
     2. 版本查询 allow（D64）：单条命令 `<程序> --version` / `-version` / `-V`、`go version`；`-v` 只对 `node npm npx pnpm yarn bun mvn gradle docker`（别的程序里 `-v` 常是 verbose，如 `rake -v` 会运行默认任务）。程序名前还有别的词（`rm -rf src --version`、`PATH=. node --version`）或程序是路径（`./deploy.sh --version`）时 ask；`npx <包> --version` 也 ask（没有 TTY 时 npx 默认 `--yes`，会下载并运行任意包），只有 `npx --version` 本身放行。

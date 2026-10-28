@@ -26,6 +26,15 @@ const GIT_READONLY = [
   'git grep*',
   'git ls-files*',
   'git rev-parse*',
+  // Objects and refs, e.g. another branch's files from a worktree (D214). `git show*` already covers `show-ref`.
+  'git ls-tree*',
+  'git cat-file*',
+  'git rev-list*',
+  'git merge-base*',
+  'git for-each-ref*',
+  'git shortlog*',
+  'git describe*',
+  'git name-rev*',
 ];
 /**
  * Commands that only read the workspace or print; allowed without asking under every policy. Models exploring a

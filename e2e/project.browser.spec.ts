@@ -29,6 +29,20 @@ test('项目基本信息与远端仓库：保存、绑定、解除绑定后都�
   await expect(page.getByRole('status').getByText('已解除绑定')).toBeVisible();
 });
 
+test('仓库检出的分支与默认分支不同：项目页说明并可一键改用（D216）', async ({ page, request }) => {
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
+  const project = await createProject(request, null);
+  git(project.repoPath, 'checkout', '-q', '-b', 'dev');
+  await page.goto(`/projects/${project.id}`);
+
+  const basics = page.getByRole('region', { name: '项目' });
+  await expect(basics.getByTestId('other-branch')).toContainText('仓库现在检出的是 dev，新任务却从 main 开始');
+  await basics.getByRole('button', { name: '改用 dev' }).click();
+  await expect(page.getByRole('status').getByText('已保存', { exact: true })).toBeVisible();
+  await expect(basics.getByLabel('默认分支')).toHaveValue('dev');
+  await expect(basics.getByTestId('other-branch')).toHaveCount(0);
+});
+
 test('添加没有 Git 的目录：确认初始化 Git 后照常添加项目（D153）', async ({ page, request }) => {
   await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
   // Without any project every page leads to onboarding; this goes through the projects page's dialog.

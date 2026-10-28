@@ -200,6 +200,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "git ls-tree*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "sort",
       "permission": "bash",
     },
@@ -855,6 +895,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "git ls-tree* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "sort 2>&1",
       "permission": "bash",
     },
@@ -1321,6 +1401,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "git rev-parse* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-tree* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev* 2>/dev/null",
       "permission": "bash",
     },
     {
@@ -1987,6 +2107,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "git ls-tree*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "sort",
       "permission": "bash",
     },
@@ -2642,6 +2802,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "git ls-tree* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "sort 2>&1",
       "permission": "bash",
     },
@@ -3108,6 +3308,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "git rev-parse* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-tree* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev* 2>/dev/null",
       "permission": "bash",
     },
     {
@@ -3774,6 +4014,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "git ls-tree*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "sort",
       "permission": "bash",
     },
@@ -4429,6 +4709,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "allow",
+      "pattern": "git ls-tree* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "sort 2>&1",
       "permission": "bash",
     },
@@ -4895,6 +5215,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "allow",
       "pattern": "git rev-parse* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-tree* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev* 2>/dev/null",
       "permission": "bash",
     },
     {
@@ -5419,6 +5779,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
       "pattern": "git rev-parse*",
       "permission": "bash",
     },
+    {
+      "action": "allow",
+      "pattern": "git ls-tree*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev*",
+      "permission": "bash",
+    },
   ],
   "planner": [
     {
@@ -5614,6 +6014,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "allow",
       "pattern": "git rev-parse*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-tree*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev*",
       "permission": "bash",
     },
     {
@@ -6273,6 +6713,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "allow",
+      "pattern": "git ls-tree* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "sort 2>&1",
       "permission": "bash",
     },
@@ -6739,6 +7219,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "allow",
       "pattern": "git rev-parse* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-tree* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev* 2>/dev/null",
       "permission": "bash",
     },
     {
@@ -7405,6 +7925,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "allow",
+      "pattern": "git ls-tree*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev*",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "sort",
       "permission": "bash",
     },
@@ -8060,6 +8620,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "allow",
+      "pattern": "git ls-tree* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev* 2>&1",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
       "pattern": "sort 2>&1",
       "permission": "bash",
     },
@@ -8526,6 +9126,46 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "allow",
       "pattern": "git rev-parse* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git ls-tree* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git cat-file* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git rev-list* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git merge-base* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git for-each-ref* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git shortlog* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git describe* 2>/dev/null",
+      "permission": "bash",
+    },
+    {
+      "action": "allow",
+      "pattern": "git name-rev* 2>/dev/null",
       "permission": "bash",
     },
     {

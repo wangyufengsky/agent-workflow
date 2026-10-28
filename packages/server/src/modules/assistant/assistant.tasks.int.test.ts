@@ -12,6 +12,7 @@ import {
   deliverTaskOp,
   ErrorCode,
   getTaskOp,
+  listConfirmationsOp,
   listTasksOp,
   MCP_SESSION_ARG,
   OPENCODE_ASSISTANT_AGENT,
@@ -20,16 +21,19 @@ import {
   startTaskOp,
   type TaskDetailDTO,
   TaskStatus,
+  updateProjectOp,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
+import type { TestRepo } from '../../../test/helpers/git.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
 import { addProject, workflowId } from '../../../test/helpers/tasks.ts';
 
 let t: TestApp;
+let repo: TestRepo;
 let conversationId: string;
 let sessionId: string;
 let input: { projectId: string; workflowId: string; requirement: string; start: false };
@@ -37,7 +41,9 @@ const HOME = { page: 'home', params: {} } as const;
 
 beforeEach(async () => {
   t = await createTestApp();
-  const { project } = await addProject(t, { checkCommand: null });
+  const added = await addProject(t, { checkCommand: null });
+  const { project } = added;
+  repo = added.repo;
   input = { projectId: project.id, workflowId: await workflowId(t, 'bugfix'), requirement: '修复问候语', start: false };
   conversationId = (await t.call(createConversationOp, {})).body.id;
   await t.call(sendAssistantMessageOp, { id: conversationId, text: '帮我修复', context: HOME });
@@ -241,4 +247,20 @@ it('归属登记失败时创建整体回滚，不发布任务事件或开始工�
   expect((await t.call(listTasksOp, {})).body.items).toEqual([]);
   expect(published).toEqual([]);
   expect(t.fake.sessions.map((session) => session.agent)).toEqual([OPENCODE_ASSISTANT_AGENT]);
+});
+
+it('确认卡片写明任务基于哪个分支：助手没指定时填上项目的默认分支，确认后照它创建（D215）', async () => {
+  await repo.git('branch', 'dev');
+  await t.call(updateProjectOp, { id: input.projectId, defaultBranch: 'dev' });
+  const mcp = await connectMcp(t.assistantMcpUrl, t.app.assistantMcpToken);
+  try {
+    const result = await callTool(mcp, 'tasks_create', { ...input, [MCP_SESSION_ARG]: sessionId });
+    const [card] = (await t.call(listConfirmationsOp, { id: conversationId })).body.items;
+    expect(card?.input.baseBranch).toBe('dev');
+    const confirmed = await t.call(confirmAssistantCallOp, { id: String(result.body.confirmation_id) });
+    if (confirmed.body.result?.ok !== true) throw new Error('Task creation was not confirmed');
+    expect(createTaskOp.output.parse(confirmed.body.result.output).git.baseBranch).toBe('dev');
+  } finally {
+    await mcp.close();
+  }
 });
