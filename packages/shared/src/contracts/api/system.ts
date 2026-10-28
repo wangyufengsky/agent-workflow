@@ -88,7 +88,8 @@ export const environmentSchema = z.object({
   /** Decides the install commands onboarding shows (17 §3.7). */
   platform: platformSchema,
   git: z.discriminatedUnion('installed', [
-    z.object({ installed: z.literal(true), version: z.string() }),
+    /** `supported`: the version is `GIT_MIN_VERSION` or later (D225); an older git keeps the app from being ready. */
+    z.object({ installed: z.literal(true), version: z.string(), supported: z.boolean() }),
     z.object({ installed: z.literal(false) }),
   ]),
   opencode: runtimeSchema,

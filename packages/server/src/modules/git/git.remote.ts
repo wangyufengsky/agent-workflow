@@ -21,19 +21,17 @@ export function originEnv(network: GitNetwork, authorization?: string): NodeJS.P
   return {
     ...process.env,
     ...network.env,
-    ...(config.length === 0
-      ? {}
-      : {
-          GIT_CONFIG_COUNT: String(config.length),
-          ...Object.fromEntries(
-            config.flatMap(([key, value], i) => [
-              [`GIT_CONFIG_KEY_${i}`, key],
-              [`GIT_CONFIG_VALUE_${i}`, value],
-            ]),
-          ),
-        }),
+    ...(config.length === 0 ? {} : { GIT_CONFIG_PARAMETERS: configParameters(config) }),
     GIT_TERMINAL_PROMPT: '0',
   };
+}
+
+/**
+ * `-c` settings the way git hands them to its own child processes, which every git version reads (`GIT_CONFIG_COUNT`
+ * needs git 2.31, D225): `'key=value'` entries quoted as for a shell, separated by spaces.
+ */
+function configParameters(config: ReadonlyArray<readonly [string, string]>): string {
+  return config.map(([key, value]) => `'${`${key}=${value}`.replaceAll("'", "'\\''")}'`).join(' ');
 }
 
 /** `git push --porcelain`: one `<flag>\t<from>:<to>\t<summary>` line per ref; `!` means the remote rejected it. */

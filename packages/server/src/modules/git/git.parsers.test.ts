@@ -108,17 +108,19 @@ describe('git ls-tree -z --long', () => {
   });
 });
 
-describe('git worktree list --porcelain -z', () => {
-  it('主工作区、游离、锁定与目录已不存在的 worktree', () => {
+describe('git worktree list --porcelain（不带 -z，D225）', () => {
+  it('主工作区、游离、锁定与目录已不存在的 worktree；路径里的空格、引号与中文原样保留', () => {
     const output =
-      `worktree /r/repo\0HEAD ${SHA_MAIN}\0branch refs/heads/main\0\0` +
-      `worktree /r/det\0HEAD ${SHA_INIT}\0detached\0\0` +
-      `worktree /r/locked\0HEAD ${SHA_MAIN}\0branch refs/heads/other\0locked in use\0\0` +
-      `worktree /r/wt\0HEAD ${SHA_FEAT}\0branch refs/heads/aw/T-1-feat\0prunable gitdir file points to non-existent location\0\0`;
+      `worktree /r/repo\nHEAD ${SHA_MAIN}\nbranch refs/heads/main\n\n` +
+      `worktree /r/det\nHEAD ${SHA_INIT}\ndetached\n\n` +
+      `worktree /r/locked\nHEAD ${SHA_MAIN}\nbranch refs/heads/other\nlocked in use\n\n` +
+      `worktree /r/中文 "q"\nHEAD ${SHA_MAIN}\nbranch refs/heads/feat\n\n` +
+      `worktree /r/wt\nHEAD ${SHA_FEAT}\nbranch refs/heads/aw/T-1-feat\nprunable gitdir file points to non-existent location\n\n`;
     expect(parseWorktreeList(output)).toEqual([
       { path: '/r/repo', commit: SHA_MAIN, branch: 'main', locked: false, prunable: false },
       { path: '/r/det', commit: SHA_INIT, branch: null, locked: false, prunable: false },
       { path: '/r/locked', commit: SHA_MAIN, branch: 'other', locked: true, prunable: false },
+      { path: '/r/中文 "q"', commit: SHA_MAIN, branch: 'feat', locked: false, prunable: false },
       { path: '/r/wt', commit: SHA_FEAT, branch: 'aw/T-1-feat', locked: false, prunable: true },
     ]);
   });

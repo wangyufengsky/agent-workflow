@@ -491,6 +491,7 @@
 | IN-28（已完成） | Git 只读子命令加入 `ls-tree` `cat-file` `rev-list` `merge-base` `for-each-ref` `shortlog` `describe` `name-rev`（D214）。同一提交登记 02、12 §2 | 单元：只读预设、执行者 ask 与 auto 下这些命令放行，`git branch -D`、`checkout`、`--git-dir`、`-C` 不放行 |
 | IN-29（已完成） | 助手建任务、批量、需求计划时补上默认分支再确认（D215，`completions`）。同一提交登记 02、15 §4 | 集成：项目默认分支为 dev 时，助手不写分支的 `tasks_create` 卡片输入有 `baseBranch: dev`，确认后任务基于 dev |
 | IN-30（已完成） | 项目详情 `currentBranch` 与项目页的说明、「改用」按钮（D216）。同一提交登记 02、11 §3、14 | 集成：远端默认 main、检出 dev 时详情两者都有，游离时为 null；E2E：项目页说明并一键改用，保存后说明消失 |
+| IN-32（已完成） | 兼容 git 2.30（D225）：远端通信的配置改经 `GIT_CONFIG_PARAMETERS`，`worktree list` 去掉 `-z`；`GIT_MIN_VERSION` 2.30 与环境检查的 `git.supported`、引导页提示。同一提交登记 02、11 §2、17 | 单元：按行解析 `worktree list`（含空格、引号、中文路径）、版本判断；集成：令牌作为请求头随推送到达要求它的远端，没有令牌时被拒；环境检查带 `supported`。在 git 2.30.2 上的实测待做（本机没有该版本） |
 
 ## 后续 · 存储空间与磁盘清理（ST）
 

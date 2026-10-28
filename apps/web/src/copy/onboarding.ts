@@ -14,6 +14,8 @@ export const ONBOARDING_COPY = {
   git: {
     title: 'Git',
     installed: (version: string) => `已安装 ${version}`,
+    tooOld: (version: string, min: string) =>
+      `已安装 ${version}，版本过低：需要 ${min} 或以上（合并、推送与工作区列表会失败）。请升级 Git 后重新检查。`,
     missing: {
       darwin: '没有找到 Git。安装 Xcode 命令行工具即可获得：',
       win32: '没有找到 Git for Windows（本应用需要其中的 Git Bash）。在终端安装：',

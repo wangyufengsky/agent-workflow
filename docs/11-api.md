@@ -42,7 +42,7 @@ type RuntimeDTO =
 
 type EnvironmentDTO = {
   platform: 'darwin' | 'win32' | 'linux';   // 后端的操作系统，引导页据此显示安装命令（D75）
-  git: { installed: true; version: string } | { installed: false };   // Windows 上还要求 Git for Windows 的 Git Bash（D72）
+  git: { installed: true; version: string; supported: boolean } | { installed: false };   // supported：版本不低于 GIT_MIN_VERSION（2.30，D225），否则 ready 为 false   // Windows 上还要求 Git for Windows 的 Git Bash（D72）
   opencode: RuntimeDTO;
   models: {
     available: Array<{

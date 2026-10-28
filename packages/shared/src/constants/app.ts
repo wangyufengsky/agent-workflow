@@ -28,6 +28,25 @@ export function isSupportedOpencodeVersion(version: string): boolean {
   );
 }
 
+/**
+ * The oldest git the app works with (D225): `rev-parse --end-of-options` came with 2.30. Debian 11 ships 2.30.2;
+ * Ubuntu 20.04's 2.25 and older are not enough.
+ */
+export const GIT_MIN_VERSION = [2, 30, 0] as const;
+export const GIT_MIN_VERSION_TEXT = GIT_MIN_VERSION.slice(0, 2).join('.');
+
+/** Whether `git --version`'s number (`2.45.2`, `2.45.1.windows.1`, `2.39.5 (Apple Git-154)`) is `GIT_MIN_VERSION` or later. */
+export function isSupportedGitVersion(version: string): boolean {
+  const parts = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(version);
+  if (parts === null) return false;
+  return (
+    compareVersions(
+      parts.slice(1).map((p) => Number(p ?? 0)),
+      GIT_MIN_VERSION,
+    ) >= 0
+  );
+}
+
 function compareVersions(a: readonly number[], b: readonly number[]): number {
   for (let i = 0; i < Math.max(a.length, b.length); i++) {
     const diff = (a[i] ?? 0) - (b[i] ?? 0);
