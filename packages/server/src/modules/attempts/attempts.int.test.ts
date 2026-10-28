@@ -130,6 +130,28 @@ describe('尝试的结束条件（12 §4.2）', () => {
     expect((await failed).attempt.error).toMatchObject({ code: ErrorCode.AttemptTimeout });
   });
 
+  it('模型服务长时间没有返回数据时中止这次输出，提醒它分段写后在同一会话继续（D217）', async () => {
+    t.fake.enqueue(script().text('Now I will write the whole document').stall());
+    t.fake.enqueue(script().edit('hello.txt', 'hi\n').callTool('submit_result', submit));
+    const entries: Array<{ kind: string; data: unknown }> = [];
+    t.app.events.subscribe((event) => {
+      if (event.type === ServerEventType.AttemptTranscript) entries.push(...event.data.entries);
+    });
+    const succeeded = reaches('succeeded');
+    const started = await startAttempt();
+
+    expect((await succeeded).attempt).toMatchObject({ nudges: 0, error: null });
+    expect(t.fake.aborts[0]).toBe(started.opencodeSessionId);
+    expect(t.fake.prompts[1]).toMatchObject({
+      sessionId: started.opencodeSessionId,
+      text: expect.stringContaining('in parts'),
+    });
+    expect(entries).toContainEqual(expect.objectContaining({ kind: 'system', data: { event: 'model_stalled' } }));
+    // The abort was ours, not a failure of the session.
+    expect(entries.filter((e) => e.kind === 'error')).toEqual([]);
+    await t.fake.settled();
+  });
+
   it('超过 attempt.timeoutMinutes 时中止会话并失败 ATTEMPT_TIMEOUT', async () => {
     await t.call(updateSettingsOp, { 'attempt.timeoutMinutes': 5 });
     t.fake.enqueue(script().text('Working on it').hang());

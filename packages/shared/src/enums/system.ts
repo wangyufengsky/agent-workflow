@@ -98,6 +98,8 @@ export const TranscriptSystemEvent = {
   Nudged: 'nudged',
   /** opencode waits before retrying a failed model request; `detail` is its message. */
   Retrying: 'retrying',
+  /** The model service sent nothing for opencode's chunk timeout and the reply was cut off (D217). */
+  ModelStalled: 'model_stalled',
   ResultSubmitted: 'result_submitted',
   /** Waiting for the user: an open blocking question or a permission request (12 §4.2). */
   AwaitingInput: 'awaiting_input',
