@@ -24,6 +24,13 @@ import type { TaskLifecycle } from './tasks.lifecycle.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
+/** Worktree states of a finished task whose cancel or delivery is still winding it up. */
+const CLEANING_WORKTREE: readonly WorktreeStatus[] = [
+  WorktreeStatus.Creating,
+  WorktreeStatus.Ready,
+  WorktreeStatus.Removing,
+];
+
 /**
  * Decisions taken in「需要你处理」(11 §7): each kind acts through the module owning the action, which resolves the
  * item. Also node decisions and project deletion, which need the task around them.
@@ -172,13 +179,24 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
      */
     async deleteTask(taskId: string): Promise<void> {
       const task = finished(taskId);
+      // A task turns finished before its cancel or delivery has stopped its sessions and removed its worktree; those
+      // still read the rows deleting would take away.
+      const worktree = deps.worktrees.findByTask(taskId);
+      const cleaning =
+        attempts.listActive(taskId).length > 0 ||
+        (worktree !== undefined && CLEANING_WORKTREE.includes(worktree.status));
+      if (cleaning) {
+        throw new AppError(ErrorCode.TaskNotFinished, `Task ${task.key} is still being wound up`, {
+          status: task.status,
+          cleaning: true,
+        });
+      }
       for (const guard of deletionGuards) {
         const holder = guard(taskId);
         if (holder !== null) {
           throw new AppError(ErrorCode.TaskInUse, `Task ${task.key} belongs to a batch or an initiative`, holder);
         }
       }
-      const worktree = deps.worktrees.findByTask(taskId);
       if (worktree?.status === WorktreeStatus.Error) {
         await deps.worktrees.remove(worktree, {
           repoPath: projects.getRecord(task.projectId).repoPath,

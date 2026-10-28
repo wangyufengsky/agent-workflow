@@ -69,7 +69,7 @@ describe('任务归档（42，D218–D220）', () => {
 });
 
 describe('任务删除（42，D221–D223）', () => {
-  it('删除结束的任务：记录与会话记录都没了，分支留下，编号不再复用', async () => {
+  it('删除结束且收尾完的任务：记录与会话记录都没了，分支留下，编号不再复用', async () => {
     const { project, repo } = await addProject(t);
     const draft = await createTask(t, { projectId: project.id, workflow: 'bugfix', start: false });
     expect((await t.call(deleteTaskOp, { id: draft.id })).body).toMatchObject({
@@ -80,7 +80,12 @@ describe('任务删除（42，D221–D223）', () => {
     const running = nodeReaches(t, 'locate', 'running');
     const task = await createTask(t, { projectId: project.id, workflow: 'bugfix' });
     await running;
-    const cancelled = (await t.call(cancelTaskOp, { id: task.id, keepBranch: true })).body;
+    // Cancelled, but its session is still being stopped and its worktree removed: not yet.
+    const cancelling = t.app.services.tasks.cancel(task.id, true);
+    expect((await t.call(deleteTaskOp, { id: task.id })).body).toMatchObject({
+      error: { code: ErrorCode.TaskNotFinished, details: { status: 'cancelled', cleaning: true } },
+    });
+    const cancelled = await cancelling;
     const runs = join(t.dataDir, 'runs', task.id);
     expect(existsSync(runs)).toBe(true);
 

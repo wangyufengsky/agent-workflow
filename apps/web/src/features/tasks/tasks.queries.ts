@@ -220,19 +220,30 @@ export function useArchiveFinishedTasks() {
   });
 }
 
-export function useDeleteTask() {
+/**
+ * `onDeleted` runs here rather than in `mutate`'s callbacks: `task.deleted` may arrive first and show the open task
+ * page as gone, unmounting whatever called `mutate`, whose callbacks then never run.
+ */
+export function useDeleteTask(onDeleted: () => void) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => callOperation(deleteTaskOp, { id }),
-    onSuccess: (_, id) => removeTask(queryClient, id),
+    onSuccess: async () => {
+      onDeleted();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.taskLists });
+    },
   });
 }
 
-/** A deleted task (SSE `task.deleted`, or our own delete): its detail goes, lists and what counts tasks refetch. */
+/**
+ * SSE `task.deleted` (the assistant or another window deleted it): an open task page reads it again and shows that it
+ * is gone (TASK_NOT_FOUND); lists, which include batches, initiatives and schedules, refetch.
+ */
 export async function removeTask(qc: QueryClient, id: string): Promise<void> {
-  await qc.cancelQueries({ queryKey: queryKeys.task(id) });
-  qc.removeQueries({ queryKey: queryKeys.task(id) });
-  await qc.invalidateQueries({ queryKey: queryKeys.taskLists });
+  await Promise.all([
+    refetchAfterEvent(qc, queryKeys.task(id)),
+    qc.invalidateQueries({ queryKey: queryKeys.taskLists }),
+  ]);
 }
 export const useRetryTask = () =>
   useTaskMutation((input: { id: string; feedback?: string }) => callOperation(retryTaskOp, input));

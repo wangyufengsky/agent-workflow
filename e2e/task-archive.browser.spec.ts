@@ -19,7 +19,7 @@ async function cancelledTask(request: APIRequestContext, project: E2EProject, re
   return task;
 }
 
-test('J45 任务归档与删除（42）：任务页归档 → 列表「已归档」里找到 → 取消归档 → 删除后回到列表且看不到它', async ({
+test('J45 任务归档与删除（42）：任务页归档 → 列表「已归档」里找到 → 取消归档 → 删除后回到列表且看不到它；别处删除时打开的任务页显示已删除', async ({
   page,
   request,
 }) => {
@@ -50,4 +50,12 @@ test('J45 任务归档与删除（42）：任务页归档 → 列表「已归档
   await expect(page.getByText('还没有任务')).toBeVisible();
   await row('archived');
   await expect(page.getByText('没有已归档的任务')).toBeVisible();
+
+  // Deleted elsewhere (the assistant, another window) while its page is open: the page says it is gone.
+  const other = await cancelledTask(request, project, '在别处删除的任务');
+  await page.goto(`/tasks/${other.id}`);
+  await expect(page.getByRole('button', { name: '删除任务' })).toBeVisible();
+  const deleted = await request.delete(`${API_BASE}/tasks/${other.id}`, { headers: AUTH });
+  expect(deleted.status()).toBe(204);
+  await expect(page.getByText('这个任务不存在或已被删除。')).toBeVisible();
 });

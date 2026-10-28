@@ -490,7 +490,7 @@ class AppError extends Error {
 | `ROLE_ALREADY_EXISTS` | 409 | 新建 / 复制角色时 key 已存在 |
 | **任务 / 计划 / 节点** | | |
 | `TASK_NOT_FOUND` | 404 | |
-| `TASK_NOT_FINISHED` | 409 | 归档或删除需要已结束（已完成、已取消）的任务（42，D218、D221）；`details.status` |
+| `TASK_NOT_FINISHED` | 409 | 归档或删除需要已结束（已完成、已取消）的任务（42，D218、D221）；删除还要等取消或交付的收尾结束（会话已停、工作区已移除），否则 `details.cleaning` 为 true；`details.status` |
 | `TASK_IN_USE` | 409 | 属于批次或需求计划的任务只能归档、不能删除（D222）；`details` 为 `{ batchId }` 或 `{ initiativeId }` |
 | `PLAN_NOT_FOUND` | 404 | |
 | `PLAN_VERSION_CONFLICT` | 409 | 编辑基于的版本不是最新草稿 |

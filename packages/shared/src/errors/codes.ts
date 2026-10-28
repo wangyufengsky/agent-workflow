@@ -49,7 +49,7 @@ export const ErrorCode = {
   RoleAlreadyExists: 'ROLE_ALREADY_EXISTS',
   // 任务 / 计划 / 节点
   TaskNotFound: 'TASK_NOT_FOUND',
-  /** Archiving or deleting needs a finished task (42, D218, D221). */
+  /** Archiving or deleting needs a finished task, and deleting one whose cancel or delivery has wound up (42, D221). */
   TaskNotFinished: 'TASK_NOT_FINISHED',
   /** A task of a batch or an initiative cannot be deleted, only archived (D222). */
   TaskInUse: 'TASK_IN_USE',

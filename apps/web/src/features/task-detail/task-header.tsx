@@ -43,7 +43,11 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
   const cancel = useCancelTask();
   const archive = useArchiveTask();
   const unarchive = useUnarchiveTask();
-  const remove = useDeleteTask();
+  const remove = useDeleteTask(() => {
+    setDeleting(false);
+    toast(C.deleted);
+    void navigate({ to: ROUTES.tasks });
+  });
   const finished = isTerminalState(taskMachine, task.status);
   const pause = usePauseTask();
   const resume = useResumeTask();
@@ -155,19 +159,7 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
         onOpenChange={setDeleting}
         title={C.deleteTitle}
         footer={
-          <Button
-            variant="danger"
-            pending={remove.isPending}
-            onClick={() =>
-              remove.mutate(task.id, {
-                onSuccess: () => {
-                  setDeleting(false);
-                  toast(C.deleted);
-                  void navigate({ to: ROUTES.tasks });
-                },
-              })
-            }
-          >
+          <Button variant="danger" pending={remove.isPending} onClick={() => remove.mutate(task.id)}>
             {C.deleteConfirm}
           </Button>
         }

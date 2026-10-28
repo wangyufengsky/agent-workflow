@@ -159,7 +159,6 @@ export const archiveTaskOp = defineOperationContract({
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/archive' },
-  expose: { palette: true, assistant: true },
 });
 
 export const unarchiveTaskOp = defineOperationContract({
@@ -172,7 +171,6 @@ export const unarchiveTaskOp = defineOperationContract({
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/unarchive' },
-  expose: { palette: true, assistant: true },
 });
 
 export const archiveFinishedTasksOp = defineOperationContract({

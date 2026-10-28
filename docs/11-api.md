@@ -129,7 +129,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/tasks/:id/archive` | （`tasks.archive`，write，42）归档：任务未结束 409 `TASK_NOT_FINISHED`；已归档时原样返回 `TaskDetailDTO` |
 | POST | `/tasks/:id/unarchive` | （`tasks.unarchive`，write）取消归档；未归档时原样返回 |
 | POST | `/tasks/archive-finished` | （`tasks.archiveFinished`，write，D220）`{ projectId? }`：该项目（不传为全部项目）已结束且未归档的任务全部归档，返回 `{ archived }` 数量 |
-| DELETE | `/tasks/:id` | （`tasks.delete`，critical，D221）删除已结束的任务：未结束 409 `TASK_NOT_FINISHED`；属于批次或需求计划 409 `TASK_IN_USE`（`details` 为 `{ batchId }` 或 `{ initiativeId }`，D222）。删除记录、附件、`runs/<taskId>/` 与移除失败残留的工作区，分支、提交与 PR 保留；成功 204 并发 `task.deleted` |
+| DELETE | `/tasks/:id` | （`tasks.delete`，critical，D221）删除已结束的任务：未结束、或取消与交付还在收尾（有活动的尝试，工作区为 creating / ready / removing）409 `TASK_NOT_FINISHED`（收尾时 `details.cleaning: true`）；属于批次或需求计划 409 `TASK_IN_USE`（`details` 为 `{ batchId }` 或 `{ initiativeId }`，D222）。删除记录、附件、`runs/<taskId>/` 与移除失败残留的工作区，分支、提交与 PR 保留；成功 204 并发 `task.deleted` |
 | POST | `/tasks/:id/request-changes` | `{ reason: 'user' \| 'conflict', feedback?, page?: { tabId } }`（`page`：用户预览标签页的当前页面随意见交给 AI，后端自己读取路径、视口、控制台错误与失败请求，29 §2.3；v1.3 B2，助手不能设置）；`review → running`，追加「按反馈修改」或「解决合并冲突」节点（13 §4）。`user` 必须带 `feedback`；`conflict` 要求最近一次交付为 `conflict`；否则 400 `VALIDATION_FAILED` |
 | POST | `/tasks/:id/deliver` | `{ strategy, targetBranch?, pr?: { title, body } }`；见 §5.3 |
 | GET | `/tasks/:id/review-comments` | `ReviewCommentsDTO`：任务的 PR/MR 上的审查意见，实时取自平台；见 §5.4 |
