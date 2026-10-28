@@ -1,5 +1,7 @@
 import {
   acceptNodeOp,
+  archiveFinishedTasksOp,
+  archiveTaskOp,
   type CreateRoleRequest,
   type CreateTaskRequest,
   type CreateWorkflowRequest,
@@ -10,6 +12,7 @@ import {
   createWorkflowOp,
   type DeliverRequest,
   deleteRoleOp,
+  deleteTaskOp,
   deleteWorkflowOp,
   deliverTaskOp,
   getNodeOp,
@@ -46,6 +49,7 @@ import {
   taskDiffOp,
   type UpdateRoleRequest,
   type UpdateWorkflowRequest,
+  unarchiveTaskOp,
   updateCheckCommandOp,
   updateRoleOp,
   updateWorkflowOp,
@@ -105,7 +109,7 @@ export const rolesQuery = queryOptions({
   queryFn: async () => (await callOperation(listRolesOp, {})).items,
 });
 
-export type TaskFilter = { projectId?: string; displayGroup?: TaskDisplayGroup };
+export type TaskFilter = { projectId?: string; displayGroup?: TaskDisplayGroup; archived?: boolean };
 
 export const tasksQuery = (filter: TaskFilter = {}) =>
   queryOptions({
@@ -204,6 +208,43 @@ function useTaskMutation<I>(run: (input: I) => Promise<TaskDetailDTO>) {
 
 export const useCreateTask = () => useTaskMutation((input: CreateTaskRequest) => callOperation(createTaskOp, input));
 export const useCancelTask = () => useTaskMutation((id: string) => callOperation(cancelTaskOp, { id }));
+export const useArchiveTask = () => useTaskMutation((id: string) => callOperation(archiveTaskOp, { id }));
+export const useUnarchiveTask = () => useTaskMutation((id: string) => callOperation(unarchiveTaskOp, { id }));
+
+export function useArchiveFinishedTasks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (projectId: string | undefined) =>
+      callOperation(archiveFinishedTasksOp, projectId === undefined ? {} : { projectId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.taskLists }),
+  });
+}
+
+/**
+ * `onDeleted` runs here rather than in `mutate`'s callbacks: `task.deleted` may arrive first and show the open task
+ * page as gone, unmounting whatever called `mutate`, whose callbacks then never run.
+ */
+export function useDeleteTask(onDeleted: () => void) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => callOperation(deleteTaskOp, { id }),
+    onSuccess: async () => {
+      onDeleted();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.taskLists });
+    },
+  });
+}
+
+/**
+ * SSE `task.deleted` (the assistant or another window deleted it): an open task page reads it again and shows that it
+ * is gone (TASK_NOT_FOUND); lists, which include batches, initiatives and schedules, refetch.
+ */
+export async function removeTask(qc: QueryClient, id: string): Promise<void> {
+  await Promise.all([
+    refetchAfterEvent(qc, queryKeys.task(id)),
+    qc.invalidateQueries({ queryKey: queryKeys.taskLists }),
+  ]);
+}
 export const useRetryTask = () =>
   useTaskMutation((input: { id: string; feedback?: string }) => callOperation(retryTaskOp, input));
 export const useSkipCheck = () => useTaskMutation((id: string) => callOperation(skipCheckOp, { id }));

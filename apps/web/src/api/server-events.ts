@@ -28,7 +28,7 @@ import { refreshKnowledge } from '../features/knowledge/knowledge.queries.ts';
 import { refreshDecks } from '../features/ppt/ppt.queries.ts';
 import { appendFrame } from '../features/preview/preview.queries.ts';
 import { refreshSchedules } from '../features/schedules/schedules.queries.ts';
-import { updateNode, updateTask } from '../features/tasks/tasks.queries.ts';
+import { removeTask, updateNode, updateTask } from '../features/tasks/tasks.queries.ts';
 import { useUiStore } from '../state/ui.store.ts';
 import { apiToken } from './client.ts';
 import { queryKeys } from './query-keys.ts';
@@ -77,6 +77,10 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       // The project page's AGENTS.md shows its task in progress, and the file once that task is merged (40 §7).
       await qc.invalidateQueries({ queryKey: queryKeys.agentsMd(event.data.project.id) });
       // Quality is counted over the tasks that ended.
+      return refreshInsights(qc);
+    case ServerEventType.TaskDeleted:
+      // Lists include schedules, whose runs may name it; its usage left the counts.
+      await removeTask(qc, event.data.taskId);
       return refreshInsights(qc);
     case ServerEventType.NodeUpdated:
       return updateNode(qc, event.data.taskId, event.data.node);

@@ -165,7 +165,7 @@ type Acceptance = {
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
 | id | TEXT PK | |
-| seq | INTEGER UNIQUE | 自增编号 |
+| seq | INTEGER UNIQUE | 编号，取自 `app_counters.task_seq`，删除任务或项目后也不复用（D223） |
 | key | TEXT UNIQUE | `T-<seq>` |
 | project_id | TEXT → projects | ON DELETE RESTRICT |
 | workflow_id | TEXT → workflows | 具体版本 |
@@ -182,8 +182,20 @@ type Acceptance = {
 | current_plan_id | TEXT NULL | 当前生效（confirmed）版本（无外键：plans 引用 tasks，两张表不能互相引用，D43） |
 | result | TEXT(JSON) NULL | 结果卡数据 `TaskResultDTO`：`{ summary, filesChanged, insertions, deletions, files[], checks[], nodeSummaries[], assumptions[] }`（`checks[]` 每项 `{ nodeKey, nodeTitle, kind, passed, command, skipped }`，`command` 只有命令检查有，`skipped` 为用户跳过的检查，D116）（进入 `review` 时生成） |
 | created_at / updated_at / started_at / finished_at | INTEGER | |
+| archived_at | INTEGER NULL | 归档时间（42，D218，迁移 `0033_task_archive`）；只有已结束的任务能归档，归档不改 `updated_at`；从 PR 审查意见回流重新打开时清空 |
 
-索引：`(project_id, status)`、`(status, updated_at)`。
+索引：`(project_id, status)`、`(status, updated_at)`、`(archived_at)`。
+
+删除任务（42，D221）：任务行删除，`ON DELETE CASCADE` 带走节点、尝试、计划、需求、交付、工作区记录、「需要你处理」、时间线、批次条目与助手的任务跟进；定时任务运行记录与需求计划工作包的 `task_id` 置空。属于批次或需求计划的任务不能删除（D222）。
+
+### app_counters
+
+只发放一次的编号（D223，迁移 `0033_task_archive`）。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| name | TEXT PK | `task_seq`：任务编号；迁移时取现有 `max(tasks.seq)` |
+| value | INTEGER | 最后发出的编号；建任务时在同一条语句里加一并取回 |
 
 ### task_events
 

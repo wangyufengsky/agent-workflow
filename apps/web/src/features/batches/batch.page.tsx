@@ -134,7 +134,7 @@ export function BatchPage() {
                     </Link>
                   </td>
                   <td>
-                    <TaskBadge group={item.task.displayGroup} />
+                    <TaskBadge group={item.task.displayGroup} archived={item.task.archivedAt !== null} />
                     {item.task.status === TaskStatus.Review && note !== undefined && (
                       <span className={styles.note}>{note}</span>
                     )}

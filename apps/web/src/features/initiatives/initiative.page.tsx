@@ -187,7 +187,7 @@ function ItemRow({ initiative, item }: { initiative: InitiativeDetailDTO; item: 
             <Link to={ROUTES.task} params={{ taskId: item.task.id }}>
               <span className="mono">{item.task.key}</span> · {item.task.title}
             </Link>
-            <TaskBadge group={item.task.displayGroup} />
+            <TaskBadge group={item.task.displayGroup} archived={item.task.archivedAt !== null} />
           </div>
         )}
       </td>

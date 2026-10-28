@@ -17,6 +17,7 @@ const row = (id: string, over: Partial<InsightsTaskDTO> = {}): InsightsTaskDTO =
     updatedAt: 0,
     startedAt: 0,
     finishedAt: 0,
+    archivedAt: null,
   },
   usage: { attempts: 1, tokensInput: 1, tokensOutput: 1 },
   roles: ['developer'],

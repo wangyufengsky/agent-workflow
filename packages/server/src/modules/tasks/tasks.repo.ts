@@ -9,11 +9,13 @@ import {
   type TaskStatus,
   taskResultSchema,
 } from '@aw/shared';
-import { and, desc, eq, inArray, lt, notInArray, or, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, lt, notInArray, or, type SQL, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { projectsTable } from '../projects/index.ts';
 import { workflowsTable } from '../workflows/index.ts';
-import { tasksTable } from './tasks.table.ts';
+import { appCountersTable, tasksTable } from './tasks.table.ts';
+
+const TASK_SEQ_COUNTER = 'task_seq';
 
 type TaskRow = typeof tasksTable.$inferSelect;
 
@@ -29,7 +31,10 @@ export type Task = Omit<TaskRow, 'failure' | 'checkpoints' | 'result'> & {
 
 /** Columns a transition may change together with the status. */
 export type TaskChanges = Partial<
-  Pick<TaskRow, 'failedPhase' | 'baseCommit' | 'branch' | 'currentPlanId' | 'startedAt' | 'finishedAt'> & {
+  Pick<
+    TaskRow,
+    'failedPhase' | 'baseCommit' | 'branch' | 'currentPlanId' | 'startedAt' | 'finishedAt' | 'archivedAt'
+  > & {
     failure: ErrorInfo | null;
     result: TaskResultDTO;
   }
@@ -89,13 +94,15 @@ export function createTasksRepo(db: DbExecutor) {
       .where(where);
 
   return {
-    /** Numbers the task `T-<seq>` and inserts it. */
+    /** Numbers the task `T-<seq>` with a number never handed out before, deleted tasks' included (D223), and inserts it. */
     insert(task: NewTask, keyPrefix: string): void {
-      const row = db
-        .select({ max: sql<number | null>`max(${t.seq})` })
-        .from(t)
+      const c = appCountersTable;
+      const { value: seq } = db
+        .insert(c)
+        .values({ name: TASK_SEQ_COUNTER, value: 1 })
+        .onConflictDoUpdate({ target: c.name, set: { value: sql`${c.value} + 1` } })
+        .returning({ value: c.value })
         .get();
-      const seq = (row?.max ?? 0) + 1;
       db.insert(t)
         .values({ ...task, seq, key: `${keyPrefix}${seq}`, checkpoints: JSON.stringify(task.checkpoints) })
         .run();
@@ -135,6 +142,7 @@ export function createTasksRepo(db: DbExecutor) {
      */
     page(filter: {
       projectId: string | undefined;
+      archived: boolean;
       oneOf: readonly StatusMatch[] | undefined;
       attention: ReadonlySet<string>;
       after: { updatedAt: number; seq: number } | undefined;
@@ -150,6 +158,7 @@ export function createTasksRepo(db: DbExecutor) {
       return select(
         and(
           ...(filter.projectId === undefined ? [] : [eq(t.projectId, filter.projectId)]),
+          filter.archived ? isNotNull(t.archivedAt) : isNull(t.archivedAt),
           // No status can match: an empty page, not every task.
           ...(statusMatch === undefined ? [] : [statusMatch.length === 0 ? sql`0` : or(...statusMatch)]),
           ...(after === undefined
@@ -179,6 +188,31 @@ export function createTasksRepo(db: DbExecutor) {
           to,
         });
       }
+    },
+    /** Archives or brings back a task; its `updatedAt` stays, since nothing about the work changed (D218). */
+    setArchived(id: string, archivedAt: number | null): void {
+      db.update(t).set({ archivedAt }).where(eq(t.id, id)).run();
+    },
+    /** Finished tasks not archived yet, of one project or all (D220). */
+    unarchivedIn(projectId: string | undefined, statuses: readonly TaskStatus[]): string[] {
+      return db
+        .select({ id: t.id })
+        .from(t)
+        .where(
+          and(
+            ...(projectId === undefined ? [] : [eq(t.projectId, projectId)]),
+            inArray(t.status, statuses),
+            isNull(t.archivedAt),
+          ),
+        )
+        .all()
+        .map((r) => r.id);
+    },
+    archiveAll(ids: readonly string[], archivedAt: number): void {
+      if (ids.length > 0) db.update(t).set({ archivedAt }).where(inArray(t.id, ids)).run();
+    },
+    delete(id: string): void {
+      db.delete(t).where(eq(t.id, id)).run();
     },
     deleteByProject(projectId: string): void {
       db.delete(t).where(eq(t.projectId, projectId)).run();
