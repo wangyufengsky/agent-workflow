@@ -109,6 +109,10 @@ test('三个任务同时运行改同一文件：各自分支与工作区互不�
   page,
   request,
 }) => {
+  // Three at once need three background slots (D186): sessions other journeys left on the shared backend may hold
+  // some of the default four, and a task queued behind them starts only once another waits for its permission, too
+  // late for the inbox to show all three in time on a slow runner.
+  await patchSettings(request, { 'scheduler.maxConcurrentAttempts': 8 });
   const project = await createProject(request, null);
   writeFileSync(join(project.repoPath, 'greet.ts'), 'export const greet = () => "hi";\n');
   git(project.repoPath, 'add', '-A');
@@ -173,6 +177,7 @@ test('三个任务同时运行改同一文件：各自分支与工作区互不�
     });
     expect(git(project.repoPath, 'show', 'main:greet.ts')).toBe(`export const greet = () => "${expected}";`);
   }
+  await patchSettings(request, { 'scheduler.maxConcurrentAttempts': 4 });
   // The last merge's worktree is removed after the merge is reported.
   await expect
     .poll(() => git(project.repoPath, 'worktree', 'list', '--porcelain').match(/^worktree /gm))
