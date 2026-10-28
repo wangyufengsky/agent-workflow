@@ -26,6 +26,7 @@ live/reports/
 opencode-workflow-design-showcase/evidence/
 opencode-workflow-design-showcase/backup-*/
 apps/desktop/release/
+apps/desktop/build/ripgrep/
 screenshots/
 perf-results/
 test-results-*/

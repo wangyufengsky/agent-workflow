@@ -13,6 +13,8 @@ const envSchema = z.object({
   AW_PROMPTS_DIR: z.string().min(1).optional(),
   AW_OPENCODE_PLUGIN_FILE: z.string().min(1).optional(),
   AW_SKILLS_DIR: z.string().min(1).optional(),
+  /** The installer's ripgrep, packaged only (D213). */
+  AW_RIPGREP_DIR: z.string().min(1).optional(),
   /** And the bundled worker that parses Word and Excel files (39 §5.1). */
   AW_OFFICE_WORKER_FILE: z.string().min(1).optional(),
   AW_APP_VERSION: z.string().default('0.0.0-dev'),
@@ -32,6 +34,8 @@ export type AppConfig = {
   opencodePluginFile: string;
   /** The app's own skills, given to opencode as `skills.paths` (41, D206). */
   skillsDir: string;
+  /** The bundled ripgrep, added to opencode's PATH (D213); absent when running from source. */
+  ripgrepDir: string | undefined;
   /** The worker thread entry that parses Word and Excel attachments (39 §5.1). */
   officeWorkerFile: string;
   appVersion: string;
@@ -62,6 +66,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     opencodePluginFile:
       e.AW_OPENCODE_PLUGIN_FILE === undefined ? SOURCE_PLUGIN_FILE : path.resolve(e.AW_OPENCODE_PLUGIN_FILE),
     skillsDir: e.AW_SKILLS_DIR === undefined ? SOURCE_SKILLS_DIR : path.resolve(e.AW_SKILLS_DIR),
+    ripgrepDir: e.AW_RIPGREP_DIR === undefined ? undefined : path.resolve(e.AW_RIPGREP_DIR),
     officeWorkerFile:
       e.AW_OFFICE_WORKER_FILE === undefined ? SOURCE_OFFICE_WORKER_FILE : path.resolve(e.AW_OFFICE_WORKER_FILE),
     appVersion: e.AW_APP_VERSION,

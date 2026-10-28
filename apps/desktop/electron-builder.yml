@@ -18,6 +18,9 @@ extraResources:
     to: prompts
   - from: ../../packages/builtin/skills
     to: skills
+  # Fetched by scripts/fetch-ripgrep.mjs; added to opencode's PATH (D213).
+  - from: build/ripgrep/${os}-${arch}
+    to: ripgrep
 npmRebuild: false
 asar: true
 mac:

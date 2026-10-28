@@ -14,6 +14,16 @@ describe('平台规则', () => {
     expect(linux.homeDir(env)).toBe('/home/me');
   });
 
+  it('应用自带的程序目录排在用户 PATH 之后，Windows 上沿用原有的变量名（D213）', () => {
+    expect(linux.pathAppending({ PATH: '/usr/bin:/bin' }, '/opt/aw/ripgrep')).toEqual({
+      PATH: '/usr/bin:/bin:/opt/aw/ripgrep',
+    });
+    expect(linux.pathAppending({}, '/opt/aw/ripgrep')).toEqual({ PATH: '/opt/aw/ripgrep' });
+    expect(windows.pathAppending({ Path: 'C:\\Git\\cmd' }, 'C:\\aw\\ripgrep')).toEqual({
+      Path: 'C:\\Git\\cmd;C:\\aw\\ripgrep',
+    });
+  });
+
   it('git 输出的正斜杠路径在 Windows 上转为本机形式', () => {
     expect(windows.fromGitPath('C:/Users/me/repo')).toBe('C:\\Users\\me\\repo');
     expect(linux.fromGitPath('/home/me/repo')).toBe('/home/me/repo');
