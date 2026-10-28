@@ -103,12 +103,13 @@ const COMMAND_ESCAPES = [
   'find *-fprint*',
   'find *-fls*',
   'rg *--pre*',
-  'git *--output*',
+  // Git takes any unambiguous prefix of a long option (`--outp`, `--filt`): each pattern is the shortest one.
+  'git *--ou*',
   'git grep *-O*',
-  'git grep *--open-files-in-pager*',
+  'git grep *--op*',
   // Run the repository's smudge or textconv programs on the object (D214).
-  'git cat-file *--filters*',
-  'git cat-file *--textconv*',
+  'git cat-file *--fi*',
+  'git cat-file *--te*',
   // In-place editing (`-I` on macOS), a script from a file, or more scripts after the first.
   'sed *-i*',
   'sed *-I*',

@@ -83,6 +83,12 @@ const ESCAPES = [
   'git cat-file --filters HEAD:src/App.java',
   'git cat-file --textconv HEAD:docs/x.docx',
   'git cat-file --batch --filters',
+  // Git takes unambiguous prefixes of long options.
+  'git cat-file --filt HEAD:a.txt',
+  'git cat-file --text HEAD:a.txt',
+  'git log --outp=log.txt',
+  'git diff --ou=d.patch',
+  'git grep --open=vim TODO',
 ];
 const READS = [
   'ls -la',
