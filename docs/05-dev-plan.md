@@ -491,6 +491,7 @@
 | IN-28（已完成） | Git 只读子命令加入 `ls-tree` `cat-file` `rev-list` `merge-base` `for-each-ref` `shortlog` `describe` `name-rev`（D214）。同一提交登记 02、12 §2 | 单元：只读预设、执行者 ask 与 auto 下这些命令放行，`git branch -D`、`checkout`、`--git-dir`、`-C` 不放行 |
 | IN-29（已完成） | 助手建任务、批量、需求计划时补上默认分支再确认（D215，`completions`）。同一提交登记 02、15 §4 | 集成：项目默认分支为 dev 时，助手不写分支的 `tasks_create` 卡片输入有 `baseBranch: dev`，确认后任务基于 dev |
 | IN-30（已完成） | 项目详情 `currentBranch` 与项目页的说明、「改用」按钮（D216）。同一提交登记 02、11 §3、14 | 集成：远端默认 main、检出 dev 时详情两者都有，游离时为 null；E2E：项目页说明并一键改用，保存后说明消失 |
+| IN-31（已完成） | 模型服务一次回复中途长时间无数据（`SSE read timed out`）时中止这次输出、在同一会话提醒分段写后继续，超时照常计时；执行者与助手提示词要求长文件分段写（D217）。同一提交登记 02、08、12 §4.2 与 §8、13 | 集成（FakeOpencode `stall` 步骤）：中止后同一会话收到 `model-stalled.md` 并提交成功，会话流有 `model_stalled`、没有错误；`@opencode`：缩短 `chunkTimeout` 的本地服务卡住时报 `stalled`，中止后空闲，同一会话可以继续 |
 
 ## 后续 · 存储空间与磁盘清理（ST）
 

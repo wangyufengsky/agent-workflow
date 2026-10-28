@@ -18,6 +18,7 @@ export {
 } from './opencode.config.ts';
 export {
   describeOpencodeError,
+  MESSAGE_ABORTED_ERROR,
   type OpencodeError,
   type OpencodeEvent,
   OpencodeEventType,

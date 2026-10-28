@@ -143,6 +143,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       // A session re-attached after a restart waits idle for its answer.
       idle: parked,
       pendingAnswers: [],
+      stall: null,
       released,
       release,
     };

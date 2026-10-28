@@ -104,6 +104,8 @@ export function createSessionView() {
               },
             },
           ];
+        case E.Stalled:
+          return [{ kind: TranscriptEntryKind.System, data: { event: TranscriptSystemEvent.ModelStalled } }];
         case E.Error:
           return [
             {
