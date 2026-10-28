@@ -12,6 +12,8 @@ export const PromptName = {
   StartAnswer: 'start-answer',
   Replan: 'replan',
   Nudge: 'nudge',
+  /** The model service sent nothing for opencode's chunk timeout: the reply was cut off (D217). */
+  ModelStalled: 'model-stalled',
   Revise: 'revise',
   ReviseConflict: 'revise-conflict',
   /** Review comments of the task's pull request to address (21 §3.1). */
@@ -83,6 +85,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.StartAnswer]: read(PromptName.StartAnswer),
     [PromptName.Replan]: read(PromptName.Replan),
     [PromptName.Nudge]: read(PromptName.Nudge),
+    [PromptName.ModelStalled]: read(PromptName.ModelStalled),
     [PromptName.Revise]: read(PromptName.Revise),
     [PromptName.ReviseConflict]: read(PromptName.ReviseConflict),
     [PromptName.ReviseReview]: read(PromptName.ReviseReview),

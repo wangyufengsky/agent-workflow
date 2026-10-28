@@ -28,6 +28,7 @@ export const TRANSCRIPT_SYSTEM_LABEL: Record<TranscriptSystemEvent, string> = {
   [TranscriptSystemEvent.AttemptStarted]: '会话开始',
   [TranscriptSystemEvent.Nudged]: 'AI 停下但没有提交结果，已提醒它提交',
   [TranscriptSystemEvent.Retrying]: '模型请求失败，opencode 稍后重试',
+  [TranscriptSystemEvent.ModelStalled]: '模型几分钟没有返回任何内容，这次输出已中断（常见于一次写入很长的内容）',
   [TranscriptSystemEvent.ResultSubmitted]: 'AI 已提交结果',
   [TranscriptSystemEvent.AwaitingInput]: '等待你回答问题或授权',
   [TranscriptSystemEvent.TimedOut]: '超过时限，已中止会话',

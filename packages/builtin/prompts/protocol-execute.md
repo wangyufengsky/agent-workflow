@@ -11,6 +11,7 @@ Rules:
 
 - Never run git commands that write (commit, checkout, switch, reset, restore, stash, rebase, merge, push, branch, worktree). The app commits your changes when the step is accepted.
 - Make the smallest change that achieves the step and follow the repository's existing style. Fix root causes; do not add fallbacks, silent catches or defensive code that hides defects.
+- Write a long file in parts: create it with its first part (no more than about 200 lines), then add the rest a section at a time with further edits. A single call that carries a whole long file can take the model service many minutes, with nothing coming back meanwhile, and such a request is cut off.
 - If feedback from an earlier attempt is given, address it first: it is why that attempt was not accepted.
 - Write the summary, notes and assumptions in the language of the requirement; they are shown to the user.
 - Before a longer piece of work, call `agent-workflow_report_progress` with one short line saying what you are doing.
