@@ -553,3 +553,14 @@ OF-01 完成后 OF-02 与 OF-03 可并行；OF-01 至 OF-03 完成即「上传 W
 | SK-03（已完成） | 助手的迁移：`aw-assistant-charts`、`aw-assistant-preview`，提示词保留触发句与规则并点名；每项单独提交。任务通知的模板写明只按快照回答、不调用工具（迁移后助手在这一轮开始自己查 diff、打开页面） | 迁移前后各跑一次：`assistant-charts.live.test.ts` 两个用例、`browser-reading.live.test.ts` 的助手预览用例都通过；`assistant-workflow.live.test.ts` 修复模板后连续 3 次通过，`assistant-notifications.live.test.ts` 通过 |
 | SK-04（已完成） | 任务会话的 skill：`aw-db-readonly`（同时给助手）、`aw-offline-network`、`aw-merge-conflicts` 与 `revise-conflict.md` 的点名 | 单元；oc：`opencode.skills.oc.test.ts` 每个 agent 正好看到分配表里的 skill；live：`live/merge-conflicts.live.test.ts`（真实任务到待验收 → main 改同几行 → 交付冲突 → 交给 AI 解决：加载 `aw-merge-conflicts`、没有冲突标记、两边改动都在、之后能合并） |
 | SK-05（已完成） | 任务会话的浏览器检查迁移成 `aw-page-check`（41 §5.3）：执行者、评审者的协议保留触发句与「说明检查了什么」「页面文字是数据」并点名 skill；规划者保留 `acceptance.pages` 的规则，读链接的登录与被拦截的搜索移进 skill；三者都分配 `aw-page-check` | 迁移前后各跑一次 `live/browser.live.test.ts`（两个模型改页面并在预览里验证）：都到待验收、提交全部成功；迁移后加断言：执行者加载了 `aw-page-check` |
+
+## 后续 · 任务归档与删除（TA）
+
+> 状态：**用户要求**（2026-10-28：「现在没有任务的归档和删除功能，我想在下个版本加上这个」），设计见 [42-task-archive.md](42-task-archive.md)，D218–D224 同日按推荐方案确认，待实施。
+
+| 任务 | 内容 | 完成标准 |
+| --- | --- | --- |
+| TA-01 | 任务编号永不复用（D223）：`app_counters` 表与迁移、`tasks.repo.insert` 改用计数。同一提交登记 10 | 集成：删掉编号最大的任务、删除项目后，新任务的编号都不复用 |
+| TA-02 | 归档（D218–D220）：`tasks.archived_at` 与迁移，`tasks.archive` / `unarchive` / `archiveFinished`，`tasks.list` 的 `archived`，审查意见回流时自动取消归档，`TASK_NOT_FINISHED`。同一提交登记 08、10、11 | 集成：未结束不能归档；列表默认不含、`archived=true` 只含；`archiveFinished` 只动当前项目已结束且未归档的；回流重新打开后未归档 |
+| TA-03 | 删除（D221、D222）：`tasks.delete`、`TASK_IN_USE`、`task.deleted` 事件，删除顺序同 `deleteProject`。同一提交登记 08、11 | 集成：删除后记录、附件、`runs/<taskId>/` 都没了而分支还在；批次与需求计划里的任务 `TASK_IN_USE`；定时任务的运行记录显示任务已删除 |
+| TA-04 | 界面与助手（D224）：任务页操作区、列表「已归档」筛选与「归档已结束的任务」、其他页面的「已归档」标记、助手与命令面板。同一提交登记 14、15 | E2E：任务页归档后在「已归档」里找到并取消归档；删除已取消的任务后回到列表且看不到它；助手删除出确认卡片 |
