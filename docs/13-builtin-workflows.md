@@ -21,6 +21,7 @@ packages/builtin/
    ├─ replan.md                「按意见重新规划」时发回规划会话的反馈消息
    ├─ rule-ask.md / rule-assume.md  ask_on_uncertainty 开 / 关时首条消息中的提问规则
    ├─ nudge.md                 提醒提交结果
+   ├─ model-stalled.md         模型服务长时间无数据、输出被中断后，要它分段继续（D217）
    ├─ revise.md                「让 AI 再改改」节点指令模板
    ├─ revise-conflict.md       「交给 AI 解决冲突」节点指令模板
    ├─ roles/*.md

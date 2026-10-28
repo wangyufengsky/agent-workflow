@@ -125,6 +125,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `session.idle` 且有已回答但未送达的答案 | 发送答案（会话忙时回答的问题，在下一次空闲时送达） |
 | `session.idle` 且未提交、无问题 | 发送提醒（`nudge.md`，按尝试类型填入对应的提交工具名），`nudges+1`；已提醒 `ATTEMPT_MAX_NUDGES` 次仍空闲 → `failed / ATTEMPT_NO_RESULT` |
 | `session.status` 为 `retry`（模型服务连不上、5xx、限流，opencode 自己一直重试） | 尝试继续等待，超时暂停并记下剩余时间；会话再次发出请求（`busy`）或有进展时按剩余时间继续计时（D163）。会话流记「模型请求失败，opencode 稍后重试」与原因，同一原因连续重试只记一次 |
+| `session.status` 为 `retry` 且原因为 `SSE read timed out`（模型服务一次回复中途超过 opencode 的 `chunkTimeout` 没有数据，适配层报为 `stalled`） | 会话流记 `model_stalled`；中止这次输出，中止返回且会话空闲后在同一会话发送 `model-stalled.md` 要它分段继续（续写的 `busy` 之前，被中止那一轮的 `MessageAbortedError` 与迟到的空闲都不算），不计提醒次数；超时照常计时（D217） |
 | `session.error` | `failed / ATTEMPT_SESSION_ERROR`（`message` 为「错误类名: 模型服务的原话」，`details.error` 为 opencode 的错误对象，D163） |
 | 超时 | 从 `running` 起 `attempt.timeoutMinutes`（等待用户与等待模型服务的时间不算）：中止会话，`failed / ATTEMPT_TIMEOUT` |
 | 用户中止 | `aborted`，中止会话 |
@@ -425,6 +426,7 @@ export const submitPlanTool = defineMcpTool({
 | 规则合并（v1.1） | 发给模型的工具列表按 `merge(agent.permission, session.permission)` 计算被整体 deny 的工具（二进制中 `de.disabled(Object.keys(tools), de.merge(e.agent.permission, e.permission ?? []))`），所以会话级 allow 能重新打开 agent deny 的工具（知识研究员的网络开关，D69） |
 | 流式正文（M2） | `message.part.updated` 在文本/思考片段开始（`text` 为空）与结束（带 `time.end`）时各一次，其间是 `message.part.delta`（`field: 'text'`）；工具片段依次 `pending` → `running`（可多次，`metadata.output` 增长）→ `completed` / `error`；`step-finish` 片段带 tokens 与 cost；`server.connected`、`server.heartbeat` 不带 `directory`。样本见 `packages/server/test/fixtures/opencode-1.19.0-events.json` |
 | 重试（M2） | 模型请求失败时 `session.status` 为 `{ type: 'retry', attempt, message, next }`，会话一直等待到 `next`（如免费额度用尽），不发 `session.error`。2026-10-25 实测（D163，本地 OpenAI 兼容服务）：连接被拒（`Cannot connect to API: …`）、503、500 都是重试，间隔约 2 s、5 s、8 s、18 s 递增（观察的 20 s 内没有停止重试）；每次请求前 `session.status` 为 `busy`。不重试、直接 `session.error` 的：400 上下文超限为 `ContextOverflowError`（`data.message` 为服务返回的原话，opencode 随后自动尝试压缩一次，再报一次同样的错误后空闲），401 为 `APIError`（`statusCode: 401`、`isRetryable: false`） |
+| 回复中途无数据 | provider 的 `chunkTimeout`（只认 `provider.<id>.options.chunkTimeout`，默认 300000 毫秒；`headerTimeout` 同为首个响应头的时限。值是正整数或 `false`（关闭），写 `0` 或字符串时整份配置无效、opencode 启动失败，写在别处不报错也不生效，2026-10-28 实测）内收不到 SSE 数据就中止请求，`session.status` 为 `retry`、原因 `SSE read timed out`，重试从头生成。适配层报为 `stalled`（D217）；在重试等待中 `session.abort` 直接空闲不报错，请求已重发时先报 `MessageAbortedError` 再空闲，之后同一会话可继续（`opencode.stall.oc.test.ts`） |
 | 模型列表（D162） | `config.providers` 不带 `directory` 时只有全局配置的 provider，项目 `opencode.json` 里的只在带该目录时出现；`opencode` 免费 provider 不登录也在列表里；自定义模型没写 `limit` 时 `limit.context` 与 `limit.output` 为 0 |
 | 内部事件（M2） | `modules/opencode/opencode.events.ts` 只解析用到的事件（消息角色、文本与增量、工具、用量、发出请求（`busy`，D163）、重试、空闲、错误、权限），加上运行时消失的 `runtime_lost`；其他模块只经 `OpencodeClient.subscribe` 获取 |
 | 数据目录 | opencode 会话存于用户自己的 opencode 数据目录（与用户 TUI 共享，登录凭据也在那里），本应用不隔离；会话标题带任务编号便于辨认 |

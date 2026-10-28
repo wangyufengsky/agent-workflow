@@ -43,6 +43,8 @@ export type FakeStep =
   | { type: 'hang' }
   /** The model service fails: opencode reports a retry per message, then waits until `recoverModel()`. */
   | { type: 'retry'; messages: string[] }
+  /** The model service sends nothing for opencode's chunk timeout: opencode reports the stall and resends (D217). */
+  | { type: 'stall' }
   /** The tokens (and cost) the turn reports as used when it ends, instead of 100 input, 20 output and no cost. */
   | { type: 'usage'; input: number; output: number; cost: number }
   /** `idle: false`: opencode reports the error without a following idle event. */
@@ -85,6 +87,8 @@ export function script() {
      * each request, as 1.19.0 does) and goes on once the test calls `recoverModel()`.
      */
     retry: (...messages: string[]) => add({ type: 'retry', messages }),
+    /** The reply stalls; opencode would resend the request, so the turn waits until the session is aborted. */
+    stall: () => add({ type: 'stall' }),
     /** Fails the turn with a session error. */
     error: (name: string, message: string, { idle = true }: { idle?: boolean } = {}) =>
       add({ type: 'error', name, message, idle }),
@@ -192,6 +196,8 @@ export function createFakeOpencode() {
     const turnGeneration = generation.get(sessionId) ?? 0;
     const messageId = nextId('fake_msg');
     if (parentMessageId !== undefined) emit({ type: E.Message, sessionId, messageId: parentMessageId, role: 'user' });
+    // opencode 1.19.0 reports the session busy as each turn starts.
+    emit({ type: E.Busy, sessionId });
     emit({
       type: E.Message,
       sessionId,
@@ -287,6 +293,12 @@ export function createFakeOpencode() {
         case 'hang':
           await new Promise<void>((resolve) => hanging.set(sessionId, [...(hanging.get(sessionId) ?? []), resolve]));
           break;
+        case 'stall':
+          emit({ type: E.Stalled, sessionId });
+          await new Promise<void>((resolve) => hanging.set(sessionId, [...(hanging.get(sessionId) ?? []), resolve]));
+          // Only an abort ends it. Besides abort()'s own idle, opencode may report the stopped turn's end again late.
+          emit({ type: E.Idle, sessionId });
+          return { name: 'MessageAbortedError', data: { message: 'Aborted' } };
         case 'retry':
           for (const message of step.messages) {
             emit({ type: E.Busy, sessionId });
