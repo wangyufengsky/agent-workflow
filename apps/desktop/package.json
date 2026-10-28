@@ -20,7 +20,7 @@
     "vite": "8.3.4"
   },
   "productName": "Agent Workflow",
-  "version": "1.4.32",
+  "version": "1.4.33",
   "description": "Local AI development workflow desktop app",
   "author": "wangyufeng",
   "homepage": "https://github.com/wangyufengsky/agent-workflow"
