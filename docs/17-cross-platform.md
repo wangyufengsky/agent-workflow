@@ -374,6 +374,6 @@ macOS 不变：一个 job 2.9–3.6 分钟（改动后 3.1–3.5 分钟）。整
 | 其他命令的 `--end-of-options` | 2.24 | 同上 |
 | `GIT_CONFIG_COUNT` 传配置 | 2.31 | 改用 `GIT_CONFIG_PARAMETERS` |
 | `worktree list --porcelain -z` | 2.36 | 去掉 `-z`，按行解析；路径原样输出（2.45 实测连引号、换行都不转义），所以含换行的路径读不对 |
-| `worktree list --porcelain` 输出 `locked` / `prunable` | 2.31 | 2.30 上这两项总为 false，只影响 Git 工作台的标记 |
+| `worktree list --porcelain` 输出 `locked` / `prunable` | 2.31 | 可清理改为由应用判断（git 标了，或工作区目录已不存在）；锁定在 2.30 上总为 false，只少了 Git 工作台的「锁定」标记 |
 
-内网实测：Debian 11 的 git 2.30.2 上，合并到本地分支（`worktree list -z` 报未知选项）与创建 PR（推送没带上令牌）都失败（2026-10-28）。
+内网实测：Debian 11 的 git 2.30.2 上，合并到本地分支（`worktree list -z` 报未知选项）与创建 PR（推送没带上令牌）都失败（2026-10-28）。本机用源码编译的 git 2.30.2 实测：修复前交付、工作区总览的集成测试 9 个失败；修复后 git、交付、网络、仓库、工作区、任务、项目等 35 个集成测试文件里只剩 2 个用例失败，都是测试用 `GIT_CONFIG_GLOBAL`（2.32）模拟用户的全局配置，与产品无关（运行时另给一个空的 `HOME`，让测试不读开发者自己的 `~/.gitconfig`）。
