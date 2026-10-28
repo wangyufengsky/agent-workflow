@@ -196,6 +196,8 @@ export function createFakeOpencode() {
     const turnGeneration = generation.get(sessionId) ?? 0;
     const messageId = nextId('fake_msg');
     if (parentMessageId !== undefined) emit({ type: E.Message, sessionId, messageId: parentMessageId, role: 'user' });
+    // opencode 1.19.0 reports the session busy as each turn starts.
+    emit({ type: E.Busy, sessionId });
     emit({
       type: E.Message,
       sessionId,
@@ -294,7 +296,8 @@ export function createFakeOpencode() {
         case 'stall':
           emit({ type: E.Stalled, sessionId });
           await new Promise<void>((resolve) => hanging.set(sessionId, [...(hanging.get(sessionId) ?? []), resolve]));
-          // Only an abort ends it; abort() reports the turn's end.
+          // Only an abort ends it. Besides abort()'s own idle, opencode may report the stopped turn's end again late.
+          emit({ type: E.Idle, sessionId });
           return { name: 'MessageAbortedError', data: { message: 'Aborted' } };
         case 'retry':
           for (const message of step.messages) {

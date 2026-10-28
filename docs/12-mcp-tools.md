@@ -125,7 +125,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `session.idle` 且有已回答但未送达的答案 | 发送答案（会话忙时回答的问题，在下一次空闲时送达） |
 | `session.idle` 且未提交、无问题 | 发送提醒（`nudge.md`，按尝试类型填入对应的提交工具名），`nudges+1`；已提醒 `ATTEMPT_MAX_NUDGES` 次仍空闲 → `failed / ATTEMPT_NO_RESULT` |
 | `session.status` 为 `retry`（模型服务连不上、5xx、限流，opencode 自己一直重试） | 尝试继续等待，超时暂停并记下剩余时间；会话再次发出请求（`busy`）或有进展时按剩余时间继续计时（D163）。会话流记「模型请求失败，opencode 稍后重试」与原因，同一原因连续重试只记一次 |
-| `session.status` 为 `retry` 且原因为 `SSE read timed out`（模型服务一次回复中途超过 opencode 的 `chunkTimeout` 没有数据，适配层报为 `stalled`） | 会话流记 `model_stalled`；中止这次输出（随后的 `MessageAbortedError` 不算出错），空闲后在同一会话发送 `model-stalled.md` 要它分段继续，不计提醒次数；超时照常计时（D217） |
+| `session.status` 为 `retry` 且原因为 `SSE read timed out`（模型服务一次回复中途超过 opencode 的 `chunkTimeout` 没有数据，适配层报为 `stalled`） | 会话流记 `model_stalled`；中止这次输出，中止返回且会话空闲后在同一会话发送 `model-stalled.md` 要它分段继续（续写的 `busy` 之前，被中止那一轮的 `MessageAbortedError` 与迟到的空闲都不算），不计提醒次数；超时照常计时（D217） |
 | `session.error` | `failed / ATTEMPT_SESSION_ERROR`（`message` 为「错误类名: 模型服务的原话」，`details.error` 为 opencode 的错误对象，D163） |
 | 超时 | 从 `running` 起 `attempt.timeoutMinutes`（等待用户与等待模型服务的时间不算）：中止会话，`failed / ATTEMPT_TIMEOUT` |
 | 用户中止 | `aborted`，中止会话 |

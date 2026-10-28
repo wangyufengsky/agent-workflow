@@ -56,11 +56,14 @@ export function watchSessions(
       state.park(session, attempt);
       return;
     }
-    const messages = session.pendingAnswers.splice(0);
-    if (session.stalled) {
-      session.stalled = false;
-      messages.unshift(deps.prompts[PromptName.ModelStalled]);
+    const { stall } = session;
+    if (stall !== null) {
+      stall.idled = true;
+      await stall.stopped;
+      stall.continued = true;
     }
+    const messages = session.pendingAnswers.splice(0);
+    if (stall !== null) messages.unshift(deps.prompts[PromptName.ModelStalled]);
     if (messages.length > 0) {
       await send(attempt, session, messages.join('\n\n'));
       return;
@@ -113,6 +116,16 @@ export function watchSessions(
     state.park(session, attempt);
   }
 
+  /**
+   * Whether `event` belongs to the reply stopped after a stall (D217): its abort error, and idle events after the first
+   * until the continuation reports busy (opencode may report an aborted turn's end more than once, and late).
+   */
+  function endsStoppedReply(stall: NonNullable<LiveSession['stall']>, event: OpencodeEvent): boolean {
+    if (event.type === OpencodeEventType.Error) return event.error?.name === MESSAGE_ABORTED_ERROR;
+    if (event.type === OpencodeEventType.Idle) return stall.idled;
+    return false;
+  }
+
   /** Runs the attempt's timeout for `ms` from now. */
   function arm(session: LiveSession, ms: number): void {
     session.timeoutAt = deps.clock.now() + ms;
@@ -154,9 +167,7 @@ export function watchSessions(
     }
     const session = live.get(event.sessionId);
     if (session === undefined) return;
-    // Aborting the stalled reply (D217) is no failure of the session.
-    if (session.stalled && event.type === OpencodeEventType.Error && event.error?.name === MESSAGE_ABORTED_ERROR)
-      return;
+    if (session.stall !== null && endsStoppedReply(session.stall, event)) return;
     const attempt = mustFind(session.attemptId);
     const running = attempt.status === AttemptStatus.Running;
     // Errors after the attempt ended (e.g. the abort we sent after a submit) are not the attempt's.
@@ -165,6 +176,7 @@ export function watchSessions(
       if (event.type === OpencodeEventType.Retry) waitForModel(session);
       else modelAnswering(session);
     }
+    if (event.type === OpencodeEventType.Busy && session.stall?.continued === true) session.stall = null;
     switch (event.type) {
       case OpencodeEventType.StepFinished:
         repo.addUsage(attempt.id, { ...event.tokens, cost: event.cost });
@@ -181,12 +193,14 @@ export function watchSessions(
           ...(event.error === undefined ? {} : { details: { error: event.error } }),
         });
         return;
-      case OpencodeEventType.Stalled:
-        if (!running) return;
+      case OpencodeEventType.Stalled: {
+        if (!running || session.stall !== null) return;
         // opencode would send the whole request again and stall the same way: stop it and ask for shorter calls.
-        session.stalled = true;
-        state.inBackground(attempt.id, () => state.stopSession(session));
+        const stopped = state.stopSession(session);
+        session.stall = { stopped, idled: false, continued: false };
+        state.inBackground(attempt.id, () => stopped);
         return;
+      }
       case OpencodeEventType.Tool:
         onToolEvent(attempt, session, event);
         return;
