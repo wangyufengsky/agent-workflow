@@ -153,6 +153,7 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 - 安装位置：deb 装到 `/opt/Agent Workflow/`（electron-builder 的 `/opt/<productName>`），`update-alternatives` 建 `/usr/bin/agent-workflow`，菜单项 `/usr/share/applications/agent-workflow.desktop`，图标装进 hicolor；AppImage 不安装。用户数据都在 `~/.config/Agent Workflow/`。
 - 桌面快捷方式（D191，`desktop-shortcut.ts`）：打包后的应用在 Linux 第一次启动时往桌面（`app.getPath('desktop')`，读 `user-dirs.dirs`，中文系统为 `~/桌面`）放 `agent-workflow.desktop`：deb 复制它的菜单项；AppImage 写一个启动 `$APPIMAGE` 当前位置的条目，图标复制到用户数据目录。文件可执行，再用 `gio set … metadata::trusted true` 让 GNOME 桌面图标直接可启动（没有 `gio` 时只记日志，需在图标右键「允许启动」）。用户数据目录里的标记文件 `desktop-shortcut` 记下已放过，删掉的快捷方式不再出现；没有桌面目录或两种都不是（其他安装方式）时不放、下次再试。没在 Linux 真机验证。
 - `pnpm dist` 构建当前平台的安装包（`electron-builder` 不带平台参数，按各平台的 `target` 配置），CI 在各自的 runner 上运行。
+- 自带 ripgrep（D213）：`pnpm dist` 在打包前运行 `apps/desktop/scripts/fetch-ripgrep.mjs`，把本平台各架构的 ripgrep 15.1.0（macOS arm64、Linux x64 musl、Linux arm64）校验 SHA-256 后放到 `build/ripgrep/<os>-<arch>/`（不提交，已在 `.gitignore`），`extraResources` 按 `${os}-${arch}` 装进 `Resources/ripgrep/`，附 ripgrep 的许可证文件。打包需要能访问 GitHub；已有的目标不重复下载。Windows 暂缓（D160），没有对应条目。
 - Linux 的已知限制（README 说明，**需要用户在真机确认**）：
   - Ubuntu 24.04 默认用 AppArmor 限制非特权用户命名空间，Chromium 沙箱无法启动 AppImage（报 `The SUID sandbox helper binary was found, but is not configured correctly`）。deb 安装会带上 SUID 的 `chrome-sandbox`，不受影响；AppImage 需要按 README 放行或使用 deb。不以 `--no-sandbox` 作为默认。
   - AppImage 需要 FUSE 2（Ubuntu 22.04 默认有，24.04 需 `sudo apt install libfuse2t64`）。

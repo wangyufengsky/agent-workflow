@@ -34,6 +34,15 @@ export function platformRules(os: Platform) {
     /** `PATH` split into directories. */
     pathDirs: (env: NodeJS.ProcessEnv): string[] =>
       (envValue(env, 'PATH') ?? '').split(paths.delimiter).filter((dir) => dir !== ''),
+    /**
+     * `PATH` with `dir` after the user's directories, under the name the environment already uses (`Path` on
+     * Windows): what the user installed is found first.
+     */
+    pathAppending(env: NodeJS.ProcessEnv, dir: string): Record<string, string> {
+      const name = (isWindows && Object.keys(env).find((k) => k.toUpperCase() === 'PATH')) || 'PATH';
+      const current = envValue(env, 'PATH');
+      return { [name]: current === undefined || current === '' ? dir : `${current}${paths.delimiter}${dir}` };
+    },
     homeDir: (env: NodeJS.ProcessEnv): string | undefined => envValue(env, isWindows ? 'USERPROFILE' : 'HOME'),
     /** A file that can be run (on Windows any existing file: the extension decides, `X_OK` means nothing). */
     isExecutableFile,

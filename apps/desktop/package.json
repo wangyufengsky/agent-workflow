@@ -7,7 +7,7 @@
     "typecheck": "tsc --noEmit -p .",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "dist": "electron-vite build && electron-builder"
+    "dist": "electron-vite build && node scripts/fetch-ripgrep.mjs && electron-builder"
   },
   "devDependencies": {
     "@aw/server": "workspace:*",

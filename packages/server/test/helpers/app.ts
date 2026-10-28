@@ -44,6 +44,8 @@ export type TestAppOptions = Omit<AppDeps, 'logDestination' | 'opencode'> & {
   dataDir?: string;
   /** Reuse a FakeOpencode, whose sessions outlive a simulated backend restart like opencode's do. */
   fake?: FakeOpencode;
+  /** Extra `AW_*` variables for `loadConfig`, as the desktop shell passes them. */
+  configEnv?: Record<string, string>;
   /** Extra routes for tests of the HTTP layer itself; Fastify only accepts routes before it listens. */
   routes?: (server: FastifyInstance) => void;
 };
@@ -55,6 +57,7 @@ export type TestAppOptions = Omit<AppDeps, 'logDestination' | 'opencode'> & {
 export async function createTestApp({
   realOpencode = false,
   routes,
+  configEnv,
   dataDir: reusedDataDir,
   fake: reusedFake,
   ...deps
@@ -62,7 +65,13 @@ export async function createTestApp({
   const dataDir = reusedDataDir ?? (await mkdtemp(join(tmpdir(), 'aw-int-')));
   const logs: LogLine[] = [];
   const logDestination = { write: (line: string) => void logs.push(JSON.parse(line)) };
-  const config = loadConfig({ AW_API_TOKEN: TEST_TOKEN, AW_DATA_DIR: dataDir, AW_LOG_LEVEL: 'info', NODE_ENV: 'test' });
+  const config = loadConfig({
+    AW_API_TOKEN: TEST_TOKEN,
+    AW_DATA_DIR: dataDir,
+    AW_LOG_LEVEL: 'info',
+    NODE_ENV: 'test',
+    ...configEnv,
+  });
   const fake = reusedFake ?? createFakeOpencode();
   // A backend starting again has its own runtime (the previous one may have been shut down with it).
   fake.reconnect();

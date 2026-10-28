@@ -21,6 +21,7 @@ import { registerTokenAuth } from './core/http/auth.ts';
 import { registerErrorHandling } from './core/http/errors.ts';
 import { createLogger, type Logger } from './core/logger.ts';
 import { mountOperations, type OperationImpl } from './core/operations/operations.ts';
+import { host } from './core/platform.ts';
 import { registerSseHub } from './core/sse/sse-hub.ts';
 import { createAcceptanceModule } from './modules/acceptance/index.ts';
 import { type AssistantService, createAssistantModule } from './modules/assistant/index.ts';
@@ -183,7 +184,9 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
         shell,
         offline,
       });
-      return { env: launchEnv, offline };
+      // opencode's grep, glob and skill tools run rg, downloading it when missing: not on intranet machines (D213).
+      const ripgrep = config.ripgrepDir === undefined ? {} : host.pathAppending(env, config.ripgrepDir);
+      return { env: { ...launchEnv, ...ripgrep }, offline };
     },
     networkEnv: network.opencodeEnv,
     log,

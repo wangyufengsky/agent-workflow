@@ -48,6 +48,7 @@
 
 - 生成函数 `buildOpencodeConfig`（`modules/opencode/opencode.config.ts`）；agent 的 `prompt` 为 `packages/builtin/prompts/protocol-*.md`，插件路径为构建出的 `agent-workflow-bridge.js`（打包后在 `Resources/opencode-plugin/`，源码运行时在 `packages/opencode-plugin/dist/`）。
 - skill（41）：`skills.paths` 指向应用自带的 skill 目录（`AppConfig.skillsDir`，打包后在 `Resources/skills/`，源码运行时在 `packages/builtin/skills/`）。每个 agent 的权限加 `skill` 白名单，由 `opencode.config.ts` 的 `AGENT_SKILLS` / `ASSISTANT_SKILLS` 生成：有 skill 时为 `{ "*": "deny", "<skill>": "allow", … }`（拒绝全部的规则在最前），没有时为 `"deny"`（opencode 去掉 `skill` 工具）；桌宠的 `"*": "deny"` 已包含它。启动 opencode 时始终设 `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`（D207），用户与项目的 `.claude/skills`、`.agents/skills` 不被扫描。
+- ripgrep（D213）：opencode 的 `skill`、`grep`、`glob` 工具调用 rg，找不到时从 GitHub 下载。打包后的应用把自带的 `Resources/ripgrep/` 追加到 opencode 的 `PATH` 末尾（`AppConfig.ripgrepDir`，由 `AW_RIPGREP_DIR` 传入；Windows 上沿用原有的 `Path` 变量名，`platform.ts` 的 `pathAppending`），用户自己装的 rg 仍然优先。
 - 每个 agent 的权限 deny 另一套 MCP 的工具（`agent-workflow-app_*` / `agent-workflow_*`）：opencode 去掉被整体 deny 的工具，执行任务的会话看不到几十个助手工具，助手也看不到执行工具；即使调用了，归属也会失败（12 §3、15 §2）。
 - agent 只放不随设置变化的权限；**bash 规则在 `session.create` 时以会话级 `permission` 规则集传入**（D35，`sessionPermissionRules`），格式 `[{ permission: 'bash', pattern, action }]`。opencode 取**最后一条**匹配的规则，所以兜底的 `*` 放在最前。
 - 原生 `question` 工具禁用，提问只走 MCP `ask_user`（D36）。

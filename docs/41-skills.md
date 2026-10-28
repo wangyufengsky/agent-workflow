@@ -179,6 +179,7 @@ Find the actual cause before you suggest anything, and quote the line that shows
 
 - `"*": "deny"` 写在最前：opencode 取最后一条匹配的规则（与 bash 规则相同，12 §2）。
 - `opencodeLaunchEnv` 始终加 `OPENCODE_DISABLE_EXTERNAL_SKILLS: '1'`（D207），不只在离线时。
+- skill 工具加载时用 ripgrep 列出 skill 目录里的文件，没有 rg 就失败（「ripgrep execution failed」）。安装包自带 rg 并追加到 opencode 的 `PATH`（D213，12 §2），内网机器也能加载。
 - 经 `OPENCODE_CONFIG_CONTENT` 注入的 `skills.paths` 会替换用户自己配置里的同名数组（与 D168 记下的 `disabled_providers` 相同）。白名单下用户的 skill 本来就不可见，没有额外影响。
 
 ### 7.3 分配表
