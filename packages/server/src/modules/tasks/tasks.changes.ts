@@ -127,8 +127,8 @@ export function createTaskChanges(
       const appended = added.map((spec) => nodes.append(input, spec));
       // The task leaves review; reaching it again opens a new delivery item.
       inbox.dismissOpen({ taskId: task.id, kind: InboxKind.Delivery });
-      // A completed task is not finished any more (21 §7).
-      move(get(task.id), event, undefined, { currentPlanId: plan.id, finishedAt: null });
+      // A completed task is not finished any more (21 §7), nor archived (D219).
+      move(get(task.id), event, undefined, { currentPlanId: plan.id, finishedAt: null, archivedAt: null });
       return appended;
     });
   }

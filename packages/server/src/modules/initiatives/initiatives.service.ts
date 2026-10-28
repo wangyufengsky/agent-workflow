@@ -422,6 +422,11 @@ export function createInitiativesService({
     const id = repo.initiativeOfTask(event.data.id);
     if (id !== undefined) void reconcile(id);
   });
+  // A work package's task carries its delivery: it can be archived, not deleted (D222).
+  tasks.guardDeletion((taskId) => {
+    const initiativeId = repo.initiativeOfTask(taskId);
+    return initiativeId === undefined ? null : { initiativeId };
+  });
   // Initiatives are deleted with their project; their source attachments' references go with them (34 §9).
   tasks.onProjectDeleted((projectId) => {
     const ids = repo.idsOfProject(projectId);

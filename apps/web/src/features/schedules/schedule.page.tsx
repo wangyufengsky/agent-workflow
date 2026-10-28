@@ -41,7 +41,7 @@ function RunOutcome({ run }: { run: ScheduleRunDTO }) {
         <Link to={ROUTES.task} params={{ taskId: run.task.id }}>
           <span className="mono">{run.task.key}</span> · {run.task.title}
         </Link>
-        <TaskBadge group={run.task.displayGroup} />
+        <TaskBadge group={run.task.displayGroup} archived={run.task.archivedAt !== null} />
       </span>
     );
   }

@@ -49,6 +49,10 @@ export const ErrorCode = {
   RoleAlreadyExists: 'ROLE_ALREADY_EXISTS',
   // 任务 / 计划 / 节点
   TaskNotFound: 'TASK_NOT_FOUND',
+  /** Archiving or deleting needs a finished task (42, D218, D221). */
+  TaskNotFinished: 'TASK_NOT_FINISHED',
+  /** A task of a batch or an initiative cannot be deleted, only archived (D222). */
+  TaskInUse: 'TASK_IN_USE',
   PlanNotFound: 'PLAN_NOT_FOUND',
   PlanVersionConflict: 'PLAN_VERSION_CONFLICT',
   PlanInvalid: 'PLAN_INVALID',
@@ -210,6 +214,8 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.RoleInUse]: 409,
   [ErrorCode.RoleAlreadyExists]: 409,
   [ErrorCode.TaskNotFound]: 404,
+  [ErrorCode.TaskNotFinished]: 409,
+  [ErrorCode.TaskInUse]: 409,
   [ErrorCode.PlanNotFound]: 404,
   [ErrorCode.PlanVersionConflict]: 409,
   [ErrorCode.PlanInvalid]: 400,

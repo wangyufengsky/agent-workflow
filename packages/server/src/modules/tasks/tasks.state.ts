@@ -122,6 +122,7 @@ export function createTaskState(deps: TasksServiceDeps) {
       updatedAt: task.updatedAt,
       startedAt: task.startedAt,
       finishedAt: task.finishedAt,
+      archivedAt: task.archivedAt,
     }));
   }
 

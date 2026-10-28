@@ -149,6 +149,57 @@ export const cancelTaskOp = defineOperationContract({
   http: { method: 'POST', path: '/tasks/:id/cancel' },
 });
 
+export const archiveTaskOp = defineOperationContract({
+  ...common,
+  id: 'tasks.archive',
+  refs: { id: InputRef.Task },
+  title: 'op.tasks.archive',
+  description: 'Archive a finished (completed or cancelled) task: it leaves the task list; nothing else changes',
+  input: byId,
+  output: taskDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/archive' },
+  expose: { palette: true, assistant: true },
+});
+
+export const unarchiveTaskOp = defineOperationContract({
+  ...common,
+  id: 'tasks.unarchive',
+  refs: { id: InputRef.Task },
+  title: 'op.tasks.unarchive',
+  description: 'Bring an archived task back into the task list',
+  input: byId,
+  output: taskDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/unarchive' },
+  expose: { palette: true, assistant: true },
+});
+
+export const archiveFinishedTasksOp = defineOperationContract({
+  ...common,
+  id: 'tasks.archiveFinished',
+  refs: { projectId: InputRef.Project },
+  title: 'op.tasks.archiveFinished',
+  description: 'Archive every finished task that is not archived yet, of one project or of all projects',
+  input: z.object({ projectId: z.string().optional() }),
+  output: z.object({ archived: z.number() }),
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/archive-finished' },
+});
+
+export const deleteTaskOp = defineOperationContract({
+  ...common,
+  id: 'tasks.delete',
+  refs: { id: InputRef.Task },
+  title: 'op.tasks.delete',
+  description:
+    'Delete a finished task with its records, session transcripts and attachments (its usage leaves quality and usage); the branch, commits and pull request stay. Tasks of a batch or an initiative can only be archived',
+  input: byId,
+  output: z.void(),
+  risk: OperationRisk.Critical,
+  http: { method: 'DELETE', path: '/tasks/:id' },
+});
+
 export const pauseTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.pause',

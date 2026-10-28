@@ -48,6 +48,8 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.RoleInUse]: '这个角色正被流程使用，或已在任务中用过，不能删除。',
   [ErrorCode.RoleAlreadyExists]: '这个角色标识已经被使用，换一个再试。',
   [ErrorCode.TaskNotFound]: '这个任务不存在或已被删除。',
+  [ErrorCode.TaskNotFinished]: '任务还没有结束：先等它完成，或者取消它。',
+  [ErrorCode.TaskInUse]: '这个任务属于批量任务或需求计划，只能归档，不能删除。',
   [ErrorCode.PlanNotFound]: '这个计划不存在。',
   [ErrorCode.PlanVersionConflict]: '计划已经更新，请查看最新版本后再确认。',
   [ErrorCode.PlanInvalid]: '计划有问题，按列出的问题修改后再保存。',

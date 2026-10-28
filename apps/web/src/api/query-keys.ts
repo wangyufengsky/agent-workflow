@@ -32,9 +32,9 @@ export const queryKeys = {
   storage: ['system', 'storage'],
   /** Every task list (all filters) shares this prefix. */
   taskLists: ['tasks', 'list'],
-  tasks: (filter: Record<string, string | undefined>) => ['tasks', 'list', filter],
+  tasks: (filter: Record<string, string | boolean | undefined>) => ['tasks', 'list', filter],
   /** All pages of a filtered list (the tasks page); under the same prefix, so task events refresh it. */
-  taskPages: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'pages', filter],
+  taskPages: (filter: Record<string, string | boolean | undefined>) => ['tasks', 'list', 'pages', filter],
   /** Batches are under the task lists' prefix: their progress is their tasks', so task events refresh them (20 §4). */
   batches: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'batches', filter],
   batch: (id: string) => ['tasks', 'list', 'batch', id],

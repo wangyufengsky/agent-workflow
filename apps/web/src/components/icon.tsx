@@ -32,6 +32,8 @@ const ICON_PATHS = {
   terminal: 'M4 5h16v14H4zM8 10l3 2-3 2M13 15h3',
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+  // A lidded box: archiving a task (42).
+  archive: 'M3 4h18v4H3zM5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4',
   sparkle: 'M12 3l1.8 5.6L19.5 10l-5.7 1.6L12 17l-1.8-5.4L4.5 10l5.7-1.4z',
   // The app icon's rising flow (apps/desktop/build/icon.svg): three linked nodes.
   logo: 'M5 19.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4zM12 15.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4zM19 8.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2zM6.9 15.9l3.2-1.8M13.6 11.4l3.6-3.6',

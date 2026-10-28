@@ -67,10 +67,21 @@ export const TASKS_COPY = {
   lede: '所有任务按最近更新排列。',
   allProjects: '全部项目',
   allStates: '全部状态',
+  archivedFilter: '已归档',
+  archiveFinished: '归档已结束的任务',
+  archiveFinishedTitle: '归档已结束的任务？',
+  archiveFinishedBody: (project: string | null) =>
+    `${project === null ? '全部项目' : `项目「${project}」`}里已完成、已取消的任务都会从列表里收起，随时可以在「已归档」里取消归档。`,
+  archiveFinishedConfirm: '归档',
+  archivedCount: (n: number) => (n === 0 ? '没有需要归档的任务' : `已归档 ${n} 个任务`),
+  emptyArchived: '没有已归档的任务',
   columns: { title: '标题', project: '项目', workflow: '流程', status: '状态', updated: '更新时间' },
   empty: '还没有任务',
   emptyBody: '在主页描述需求即可开始第一个任务。',
 } as const;
+
+/** A small badge beside a task's state (D219). */
+export const TASK_ARCHIVED_LABEL = '已归档';
 
 export const TASK_COPY = {
   back: '← 任务',
@@ -108,6 +119,18 @@ export const TASK_COPY = {
   cancelBody: 'AI 会话会被中止，独立工作区和分支会被删除，已经完成的改动不会保留。',
   cancelConfirm: '取消任务',
   cancelled: '任务已取消',
+  // 归档与删除（42）
+  archive: '归档',
+  archived: '任务已归档',
+  unarchive: '取消归档',
+  unarchived: '已取消归档',
+  archivedOn: (date: string) => `已归档 · ${date}`,
+  delete: '删除任务',
+  deleteTitle: '删除这个任务？',
+  deleteBody:
+    '任务的步骤、会话记录、附件都会删除，「质量与用量」里也不再统计它，删除后无法恢复。任务的分支、提交和 PR 不受影响。',
+  deleteConfirm: '删除任务',
+  deleted: '任务已删除',
   // 准备中 / 规划中
   stagePreparing: '建立独立工作区',
   stagePlanning: 'AI 正在阅读代码并规划',

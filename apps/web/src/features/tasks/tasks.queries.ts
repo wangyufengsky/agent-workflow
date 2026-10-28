@@ -1,5 +1,7 @@
 import {
   acceptNodeOp,
+  archiveFinishedTasksOp,
+  archiveTaskOp,
   type CreateRoleRequest,
   type CreateTaskRequest,
   type CreateWorkflowRequest,
@@ -10,6 +12,7 @@ import {
   createWorkflowOp,
   type DeliverRequest,
   deleteRoleOp,
+  deleteTaskOp,
   deleteWorkflowOp,
   deliverTaskOp,
   getNodeOp,
@@ -46,6 +49,7 @@ import {
   taskDiffOp,
   type UpdateRoleRequest,
   type UpdateWorkflowRequest,
+  unarchiveTaskOp,
   updateCheckCommandOp,
   updateRoleOp,
   updateWorkflowOp,
@@ -105,7 +109,7 @@ export const rolesQuery = queryOptions({
   queryFn: async () => (await callOperation(listRolesOp, {})).items,
 });
 
-export type TaskFilter = { projectId?: string; displayGroup?: TaskDisplayGroup };
+export type TaskFilter = { projectId?: string; displayGroup?: TaskDisplayGroup; archived?: boolean };
 
 export const tasksQuery = (filter: TaskFilter = {}) =>
   queryOptions({
@@ -204,6 +208,32 @@ function useTaskMutation<I>(run: (input: I) => Promise<TaskDetailDTO>) {
 
 export const useCreateTask = () => useTaskMutation((input: CreateTaskRequest) => callOperation(createTaskOp, input));
 export const useCancelTask = () => useTaskMutation((id: string) => callOperation(cancelTaskOp, { id }));
+export const useArchiveTask = () => useTaskMutation((id: string) => callOperation(archiveTaskOp, { id }));
+export const useUnarchiveTask = () => useTaskMutation((id: string) => callOperation(unarchiveTaskOp, { id }));
+
+export function useArchiveFinishedTasks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (projectId: string | undefined) =>
+      callOperation(archiveFinishedTasksOp, projectId === undefined ? {} : { projectId }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.taskLists }),
+  });
+}
+
+export function useDeleteTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => callOperation(deleteTaskOp, { id }),
+    onSuccess: (_, id) => removeTask(queryClient, id),
+  });
+}
+
+/** A deleted task (SSE `task.deleted`, or our own delete): its detail goes, lists and what counts tasks refetch. */
+export async function removeTask(qc: QueryClient, id: string): Promise<void> {
+  await qc.cancelQueries({ queryKey: queryKeys.task(id) });
+  qc.removeQueries({ queryKey: queryKeys.task(id) });
+  await qc.invalidateQueries({ queryKey: queryKeys.taskLists });
+}
 export const useRetryTask = () =>
   useTaskMutation((input: { id: string; feedback?: string }) => callOperation(retryTaskOp, input));
 export const useSkipCheck = () => useTaskMutation((id: string) => callOperation(skipCheckOp, { id }));

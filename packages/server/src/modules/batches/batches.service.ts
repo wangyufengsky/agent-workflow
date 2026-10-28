@@ -49,6 +49,11 @@ const firstLine = (text: string) => text.trim().split('\n')[0]?.trim() ?? '';
  */
 export function createBatchesService({ db, unit, clock, log, settings, workflows, tasks }: BatchesServiceDeps) {
   const repo = createBatchesRepo(db);
+  // A batch's tasks are its progress: they can be archived, not deleted (D222).
+  tasks.guardDeletion((taskId) => {
+    const batchId = repo.batchOfTask(taskId);
+    return batchId === undefined ? null : { batchId };
+  });
 
   function get(id: string): Batch {
     const batch = repo.find(id);

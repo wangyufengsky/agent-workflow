@@ -40,9 +40,18 @@ export const tasksTable = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
     startedAt: integer('started_at'),
     finishedAt: integer('finished_at'),
+    /** Hidden from the task list; only finished tasks are archived (42, D218). */
+    archivedAt: integer('archived_at'),
   },
   (t) => [
     index('tasks_project_status_idx').on(t.projectId, t.status),
     index('tasks_status_updated_idx').on(t.status, t.updatedAt),
+    index('tasks_archived_idx').on(t.archivedAt),
   ],
 );
+
+/** 10 §app_counters: numbers handed out once and never again, e.g. `task_seq` for `T-<seq>` (D223). */
+export const appCountersTable = sqliteTable('app_counters', {
+  name: text('name').primaryKey(),
+  value: integer('value').notNull(),
+});

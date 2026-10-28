@@ -14,10 +14,14 @@ import {
   permissionResponseSchema,
   planResponseSchema,
   questionAnswerSchema,
+  ServerEventType,
+  TASK_STATUSES,
   taskMachine,
+  WorktreeStatus,
 } from '@aw/shared';
 import { parseInput } from '../../core/http/errors.ts';
 import type { TaskLifecycle } from './tasks.lifecycle.ts';
+import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
 /**
@@ -28,6 +32,18 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
   const { inbox, attempts, nodes, roles, prompts, projects, dataDir } = deps;
   /** Modules above tasks that keep rows of a project outside its foreign keys (initiatives' attachments, 34 §9). */
   const projectDeletion: Array<(projectId: string) => void> = [];
+  /** Modules above tasks whose records need the task to stay (batches, initiatives, D222): what holds it, or null. */
+  const deletionGuards: Array<(taskId: string) => Record<string, string> | null> = [];
+  const finishedStatuses = TASK_STATUSES.filter((s) => isTerminalState(taskMachine, s));
+
+  /** Archiving and deleting are for tasks whose work is over (D218, D221). */
+  function finished(taskId: string): Task {
+    const task = state.get(taskId);
+    if (!isTerminalState(taskMachine, task.status)) {
+      throw new AppError(ErrorCode.TaskNotFinished, `Task ${task.key} has not finished`, { status: task.status });
+    }
+    return task;
+  }
 
   function attemptOf(item: InboxItemDTO): string {
     if (item.attemptId === null) throw new Error(`${item.kind} item ${item.id} has no attempt`);
@@ -127,6 +143,60 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
         const usedByTasks = nodes.usesRole(role.id) || attempts.usesRole(role.id);
         return workflows.length > 0 || usedByTasks ? { workflows, usedByTasks } : null;
       });
+    },
+
+    archive(taskId: string): void {
+      if (finished(taskId).archivedAt !== null) return;
+      state.repo.setArchived(taskId, deps.clock.now());
+      state.publish(taskId);
+    },
+    unarchive(taskId: string): void {
+      if (state.get(taskId).archivedAt === null) return;
+      state.repo.setArchived(taskId, null);
+      state.publish(taskId);
+    },
+    /** Archives the finished tasks of a project, or of every project, that are not archived yet (D220). */
+    archiveFinished({ projectId }: { projectId?: string | undefined }): { archived: number } {
+      if (projectId !== undefined) projects.getRecord(projectId);
+      const ids = state.repo.unarchivedIn(projectId, finishedStatuses);
+      deps.unit.transact(() => {
+        state.repo.archiveAll(ids, deps.clock.now());
+        for (const id of ids) state.publish(id);
+      });
+      return { archived: ids.length };
+    },
+
+    /**
+     * Deletes a finished task with its records (foreign keys cascade), attachments and `runs/<taskId>/`, and a worktree
+     * left over from a failed removal; the branch, commits and pull request stay (D221).
+     */
+    async deleteTask(taskId: string): Promise<void> {
+      const task = finished(taskId);
+      for (const guard of deletionGuards) {
+        const holder = guard(taskId);
+        if (holder !== null) {
+          throw new AppError(ErrorCode.TaskInUse, `Task ${task.key} belongs to a batch or an initiative`, holder);
+        }
+      }
+      const worktree = deps.worktrees.findByTask(taskId);
+      if (worktree?.status === WorktreeStatus.Error) {
+        await deps.worktrees.remove(worktree, {
+          repoPath: projects.getRecord(task.projectId).repoPath,
+          deleteBranch: false,
+        });
+      }
+      const nodeIds = nodes.listByTask(taskId).map((n) => n.id);
+      deps.unit.transact(() => {
+        deps.attachments.release(AttachmentOwnerKind.TaskInput, [taskId]);
+        deps.attachments.release(AttachmentOwnerKind.TaskFeedback, nodeIds);
+        state.repo.delete(taskId);
+        deps.unit.publish({ type: ServerEventType.TaskDeleted, data: { taskId, projectId: task.projectId } });
+      });
+      await rm(join(dataDir, 'runs', taskId), { recursive: true, force: true });
+    },
+    /** A module whose records name tasks says which task it holds (D222); called before a task is deleted. */
+    guardDeletion(guard: (taskId: string) => Record<string, string> | null): void {
+      deletionGuards.push(guard);
     },
 
     /** Deleting a project deletes its finished tasks, its knowledge conversations and their records (10 §5). */
