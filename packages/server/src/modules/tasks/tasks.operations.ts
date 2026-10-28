@@ -1,11 +1,14 @@
 import {
   acceptNodeOp,
+  archiveFinishedTasksOp,
+  archiveTaskOp,
   cancelTaskOp,
   confirmPlanOp,
   createTaskOp,
   decideRequirementOp,
   deleteProjectOp,
   deleteRoleOp,
+  deleteTaskOp,
   deleteWorkflowOp,
   deliverTaskOp,
   getAgentsMdOp,
@@ -36,6 +39,7 @@ import {
   startTaskOp,
   taskDiffFileOp,
   taskDiffOp,
+  unarchiveTaskOp,
   updateCheckCommandOp,
 } from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
@@ -63,6 +67,10 @@ export function tasksOperations(tasks: TasksService) {
     ),
     implement(skipCheckOp, ({ id }) => tasks.skipCheck(id)),
     implement(cancelTaskOp, ({ id, keepBranch }) => tasks.cancel(id, keepBranch ?? false)),
+    implement(archiveTaskOp, ({ id }) => tasks.archive(id)),
+    implement(unarchiveTaskOp, ({ id }) => tasks.unarchive(id)),
+    implement(archiveFinishedTasksOp, (input) => tasks.archiveFinished(input)),
+    implement(deleteTaskOp, ({ id }) => tasks.delete(id)),
     implement(confirmPlanOp, ({ id, version }) => tasks.confirmPlan(id, version)),
     implement(replanOp, ({ id, feedback }) => tasks.replan(id, feedback)),
     implement(saveDraftPlanOp, ({ id, baseVersion, graph }) => tasks.saveDraftPlan(id, baseVersion, graph)),

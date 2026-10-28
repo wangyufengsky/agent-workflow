@@ -114,7 +114,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/tasks?projectId&status&displayGroup&limit&cursor` | `{ items: TaskSummaryDTO[], nextCursor }`，按 `updatedAt`（同时按编号）倒序分页（§1，`LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX`）；`displayGroup` 在查询中过滤（由 `resolveTaskDisplayGroup` 推出每个状态与是否有打开的提问 / 权限 / 验收条目的组合），每页都是满的；游标为上一页最后一个任务的 `<updatedAt>.<seq>`，格式不对 400 `VALIDATION_FAILED` |
+| GET | `/tasks?projectId&status&displayGroup&archived&limit&cursor` | `{ items: TaskSummaryDTO[], nextCursor }`，`archived`（默认 false）只列未归档的任务，true 只列已归档的（D219）；按 `updatedAt`（同时按编号）倒序分页（§1，`LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX`）；`displayGroup` 在查询中过滤（由 `resolveTaskDisplayGroup` 推出每个状态与是否有打开的提问 / 权限 / 验收条目的组合），每页都是满的；游标为上一页最后一个任务的 `<updatedAt>.<seq>`，格式不对 400 `VALIDATION_FAILED` |
 | POST | `/tasks` | 创建，见下 |
 | GET | `/tasks/:id` | `TaskDetailDTO` |
 | GET | `/tasks/:id/preview/sessions` | `{ attempts: [{ attemptId, nodeId, kind, status, frames }], checks: [{ nodeId, passed }] }`：任务预览页签可看的会话（v1.3 B2，29 §8.1）——留下过动作画面的尝试，与最近一次页面体检有截图的步骤 |
@@ -126,6 +126,10 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/tasks/:id/check-command` | `{ command, updateProject }`（D116）：只限在执行阶段因命令检查失败的任务（`CHECK_COMMAND_UNRUNNABLE`，或 `NODE_ATTEMPTS_EXHAUSTED` 且最近一次已提交的结果未通过命令检查），否则 409 `STATE_TRANSITION_INVALID`；任务未完成的步骤（`pending` / `ready` / `failed`）中与失败命令相同的命令检查换成 `command`，`updateProject` 时同时设为项目的检查命令；然后重试：已提交结果的失败步骤 `recheck`（预算重置），其余 `retry` |
 | POST | `/tasks/:id/skip-check` | （D116）只限因 `CHECK_COMMAND_UNRUNNABLE` 或 `BROWSER_CHECK_UNRUNNABLE` 失败的任务，否则 409 `STATE_TRANSITION_INVALID`；未完成步骤中这条命令检查（或所有页面体检）标 `skipped`，然后重试（失败步骤 `recheck`）；结果卡与 PR 说明写明未验证 |
 | POST | `/tasks/:id/cancel` | `{ keepBranch?: boolean }` |
+| POST | `/tasks/:id/archive` | （`tasks.archive`，write，42）归档：任务未结束 409 `TASK_NOT_FINISHED`；已归档时原样返回 `TaskDetailDTO` |
+| POST | `/tasks/:id/unarchive` | （`tasks.unarchive`，write）取消归档；未归档时原样返回 |
+| POST | `/tasks/archive-finished` | （`tasks.archiveFinished`，write，D220）`{ projectId? }`：该项目（不传为全部项目）已结束且未归档的任务全部归档，返回 `{ archived }` 数量 |
+| DELETE | `/tasks/:id` | （`tasks.delete`，critical，D221）删除已结束的任务：未结束、或取消与交付还在收尾（有活动的尝试，工作区为 creating / ready / removing）409 `TASK_NOT_FINISHED`（收尾时 `details.cleaning: true`）；属于批次或需求计划 409 `TASK_IN_USE`（`details` 为 `{ batchId }` 或 `{ initiativeId }`，D222）。删除记录、附件、`runs/<taskId>/` 与移除失败残留的工作区，分支、提交与 PR 保留；成功 204 并发 `task.deleted` |
 | POST | `/tasks/:id/request-changes` | `{ reason: 'user' \| 'conflict', feedback?, page?: { tabId } }`（`page`：用户预览标签页的当前页面随意见交给 AI，后端自己读取路径、视口、控制台错误与失败请求，29 §2.3；v1.3 B2，助手不能设置）；`review → running`，追加「按反馈修改」或「解决合并冲突」节点（13 §4）。`user` 必须带 `feedback`；`conflict` 要求最近一次交付为 `conflict`；否则 400 `VALIDATION_FAILED` |
 | POST | `/tasks/:id/deliver` | `{ strategy, targetBranch?, pr?: { title, body } }`；见 §5.3 |
 | GET | `/tasks/:id/review-comments` | `ReviewCommentsDTO`：任务的 PR/MR 上的审查意见，实时取自平台；见 §5.4 |
@@ -151,7 +155,7 @@ type CreateTaskRequest = {
 
 ### 5.2 TaskDetailDTO
 
-TaskSummaryDTO：`{ id, key, title, status, displayGroup, project: { id, name }, workflow: { id, key, name }, currentStep, progress, createdAt, updatedAt, startedAt, finishedAt }`（`currentStep` 为工作中的步骤标题，`progress` 为活动尝试最近一次 `report_progress`）。DTO 中可空字段用 `null` 表示（下式中的 `?`）。
+TaskSummaryDTO：`{ id, key, title, status, displayGroup, project: { id, name }, workflow: { id, key, name }, currentStep, progress, createdAt, updatedAt, startedAt, finishedAt, archivedAt }`（`archivedAt` 为归档时间，未归档为 null，D218；`currentStep` 为工作中的步骤标题，`progress` 为活动尝试最近一次 `report_progress`）。DTO 中可空字段用 `null` 表示（下式中的 `?`）。
 
 ```ts
 type TaskDetailDTO = {
@@ -321,6 +325,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | ServerEventType | data | 前端处理 |
 | --- | --- | --- |
 | `task.updated` | `TaskSummaryDTO` | 更新列表与详情缓存 |
+| `task.deleted` | `{ taskId, projectId }` | 任务被删除（42）：移除详情缓存，刷新任务列表（含挂在其前缀下的批次、需求计划、定时任务）与质量和用量 |
 | `node.updated` | `{ taskId, node: NodeSummaryDTO }` | 更新详情中的节点 |
 | `plan.updated` | `{ taskId, plan: PlanDTO }` | |
 | `attempt.updated` | `{ taskId, nodeId, attempt: AttemptSummaryDTO }`（调试尝试 `taskId`、`nodeId` 为 null） | 状态、提醒次数、当前进展变化时 |

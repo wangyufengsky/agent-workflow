@@ -52,6 +52,11 @@ export function createBatchesRepo(db: DbExecutor) {
     link(link: BatchLink): void {
       db.insert(batchTasksTable).values(link).run();
     },
+    /** The batch a task was made for, if any. */
+    batchOfTask(taskId: string): string | undefined {
+      const bt = batchTasksTable;
+      return db.select({ id: bt.batchId }).from(bt).where(eq(bt.taskId, taskId)).get()?.id;
+    },
     find(id: string): Batch | undefined {
       const row = select(eq(b.id, id)).get();
       return row === undefined ? undefined : toBatch(row);

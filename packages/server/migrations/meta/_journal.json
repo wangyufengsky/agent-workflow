@@ -232,6 +232,13 @@
       "when": 1793003200579,
       "tag": "0032_attachment_format",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1793170238249,
+      "tag": "0033_task_archive",
+      "breakpoints": true
     }
   ]
 }

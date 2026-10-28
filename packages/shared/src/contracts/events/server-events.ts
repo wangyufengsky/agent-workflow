@@ -22,6 +22,10 @@ export const serverEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal(ServerEventType.ModelSlotsUpdated), data: modelSlotsSchema }),
   z.object({ type: z.literal(ServerEventType.TaskUpdated), data: taskSummarySchema }),
   z.object({
+    type: z.literal(ServerEventType.TaskDeleted),
+    data: z.object({ taskId: z.string(), projectId: z.string() }),
+  }),
+  z.object({
     type: z.literal(ServerEventType.NodeUpdated),
     data: z.object({ taskId: z.string(), node: nodeSummarySchema }),
   }),

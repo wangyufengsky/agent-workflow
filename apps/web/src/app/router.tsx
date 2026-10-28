@@ -170,7 +170,12 @@ const homeRoute = createRoute({
 const tasksRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.tasks,
-  validateSearch: z.object({ projectId: z.string().optional(), displayGroup: taskDisplayGroupSchema.optional() }),
+  // `archived` lists only archived tasks (D219), in place of a display group.
+  validateSearch: z.object({
+    projectId: z.string().optional(),
+    displayGroup: taskDisplayGroupSchema.optional(),
+    archived: z.boolean().optional(),
+  }),
   component: TasksPage,
 });
 const taskRoute = createRoute({

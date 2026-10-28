@@ -3,6 +3,7 @@ import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  archiveTaskOp,
   createProjectOp,
   deliverTaskOp,
   ErrorCode,
@@ -111,12 +112,19 @@ describe('PR 审查意见回流（21）', () => {
       (d) => d.id === task.id && d.status === 'review',
     );
     const chosen = comments.items.filter((c) => c.selectedByDefault).map((c) => c.id);
+    // Reopening an archived task brings it back to the list (D219).
+    expect((await t.call(archiveTaskOp, { id: task.id })).body).toMatchObject({ archivedAt: expect.any(Number) });
     const { body: running } = await t.call(reviseFromReviewOp, {
       id: task.id,
       commentIds: chosen,
       note: 'Keep the export name.',
     });
-    expect(running).toMatchObject({ status: 'running', finishedAt: null, git: { worktreePath: worktree } });
+    expect(running).toMatchObject({
+      status: 'running',
+      finishedAt: null,
+      archivedAt: null,
+      git: { worktreePath: worktree },
+    });
     expect(running.nodes.map((n) => [n.key, n.kind]).at(-1)).toEqual(['review_fix_1', 'revise']);
     await review;
     await t.fake.settled();

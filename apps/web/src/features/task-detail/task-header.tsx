@@ -1,5 +1,5 @@
 import { isTerminalState, NodeStatus, type TaskDetailDTO, TaskStatus, taskMachine } from '@aw/shared';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
@@ -8,10 +8,19 @@ import { Elapsed } from '../../components/elapsed.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { toast } from '../../components/toast.tsx';
+import { formatDateTime } from '../../copy/common.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { TaskBadge } from '../tasks/task-badge.tsx';
-import { useCancelTask, usePauseTask, useResumeTask, useStartTask } from '../tasks/tasks.queries.ts';
+import {
+  useArchiveTask,
+  useCancelTask,
+  useDeleteTask,
+  usePauseTask,
+  useResumeTask,
+  useStartTask,
+  useUnarchiveTask,
+} from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
 
 /** The task is working on its own: the header says how far it got and for how long (D118). */
@@ -29,7 +38,17 @@ type Props = {
 
 export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
   const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const navigate = useNavigate();
   const cancel = useCancelTask();
+  const archive = useArchiveTask();
+  const unarchive = useUnarchiveTask();
+  const remove = useDeleteTask(() => {
+    setDeleting(false);
+    toast(C.deleted);
+    void navigate({ to: ROUTES.tasks });
+  });
+  const finished = isTerminalState(taskMachine, task.status);
   const pause = usePauseTask();
   const resume = useResumeTask();
   const start = useStartTask();
@@ -41,7 +60,7 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
       </Link>
       <div className={styles.titleRow}>
         <h1 className="title grow">{task.title}</h1>
-        <TaskBadge group={task.displayGroup} />
+        <TaskBadge group={task.displayGroup} archived={task.archivedAt !== null} />
         {details !== undefined && (
           <Button variant="ghost" size="sm" icon="layers" onClick={() => onDetailsChange(!details)}>
             {details ? C.hideDetails : C.showDetails}
@@ -67,13 +86,41 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
             {C.resume}
           </Button>
         )}
-        {!isTerminalState(taskMachine, task.status) && (
+        {!finished && (
           <Button variant="ghost" icon="x" onClick={() => setConfirming(true)}>
             {C.cancel}
           </Button>
         )}
+        {finished && task.archivedAt === null && (
+          <Button
+            variant="ghost"
+            icon="archive"
+            pending={archive.isPending}
+            onClick={() => archive.mutate(task.id, { onSuccess: () => toast(C.archived) })}
+          >
+            {C.archive}
+          </Button>
+        )}
+        {task.archivedAt !== null && (
+          <Button
+            variant="ghost"
+            icon="undo"
+            pending={unarchive.isPending}
+            onClick={() => unarchive.mutate(task.id, { onSuccess: () => toast(C.unarchived) })}
+          >
+            {C.unarchive}
+          </Button>
+        )}
+        {finished && (
+          <Button variant="ghost" icon="trash" onClick={() => setDeleting(true)}>
+            {C.delete}
+          </Button>
+        )}
       </div>
-      <span className="hint">{C.meta(task.key, task.project.name, task.workflow.name)}</span>
+      <span className="hint">
+        {C.meta(task.key, task.project.name, task.workflow.name)}
+        {task.archivedAt !== null && ` · ${C.archivedOn(formatDateTime(task.archivedAt))}`}
+      </span>
       {/* In the header, which stays as the task moves on: the main area below changes its layout by state. */}
       {task.attachments.length > 0 && <SentAttachments attachments={task.attachments} />}
       {WORKING.includes(task.status) && <Progress task={task} doing={doing} />}
@@ -81,6 +128,8 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
       {start.isError && <ErrorState error={start.error} />}
       {pause.isError && <ErrorState error={pause.error} />}
       {resume.isError && <ErrorState error={resume.error} />}
+      {archive.isError && <ErrorState error={archive.error} />}
+      {unarchive.isError && <ErrorState error={unarchive.error} />}
       <Dialog
         open={confirming}
         onOpenChange={setConfirming}
@@ -104,6 +153,19 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
       >
         <p>{C.cancelBody}</p>
         {cancel.isError && <ErrorState error={cancel.error} />}
+      </Dialog>
+      <Dialog
+        open={deleting}
+        onOpenChange={setDeleting}
+        title={C.deleteTitle}
+        footer={
+          <Button variant="danger" pending={remove.isPending} onClick={() => remove.mutate(task.id)}>
+            {C.deleteConfirm}
+          </Button>
+        }
+      >
+        <p>{C.deleteBody}</p>
+        {remove.isError && <ErrorState error={remove.error} />}
       </Dialog>
     </header>
   );

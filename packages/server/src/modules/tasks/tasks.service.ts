@@ -119,7 +119,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   return {
     detail,
     /** A page of task summaries (11 §5); the display group is decided in SQL so that pages stay full. */
-    list({ projectId, status, displayGroup, limit, cursor }: ListTasksQuery): {
+    list({ projectId, status, displayGroup, archived, limit, cursor }: ListTasksQuery): {
       items: TaskSummaryDTO[];
       nextCursor: string | null;
     } {
@@ -138,6 +138,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       const [updatedAt, seq] = cursor === undefined ? [] : cursor.split('.').map(Number);
       const rows = state.repo.page({
         projectId,
+        archived,
         oneOf,
         attention,
         after: updatedAt === undefined || seq === undefined ? undefined : { updatedAt, seq },
@@ -358,6 +359,17 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
 
     ...diffs,
     resolveInbox: actions.resolveInbox,
+    archive(id: string): TaskDetailDTO {
+      actions.archive(id);
+      return detail(id);
+    },
+    unarchive(id: string): TaskDetailDTO {
+      actions.unarchive(id);
+      return detail(id);
+    },
+    archiveFinished: actions.archiveFinished,
+    delete: actions.deleteTask,
+    guardDeletion: actions.guardDeletion,
     deleteProject: actions.deleteProject,
     deleteWorkflow: actions.deleteWorkflow,
     deleteRole: actions.deleteRole,

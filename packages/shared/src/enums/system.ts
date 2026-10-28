@@ -130,6 +130,8 @@ export const operationRiskSchema = z.enum(OperationRisk);
 /** SSE event types (11 §11). */
 export const ServerEventType = {
   TaskUpdated: 'task.updated',
+  /** A task was deleted (42 §5). */
+  TaskDeleted: 'task.deleted',
   NodeUpdated: 'node.updated',
   PlanUpdated: 'plan.updated',
   AttemptUpdated: 'attempt.updated',

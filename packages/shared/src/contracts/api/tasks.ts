@@ -215,6 +215,8 @@ export const taskSummarySchema = z.object({
   updatedAt: z.number(),
   startedAt: z.number().nullable(),
   finishedAt: z.number().nullable(),
+  /** When the task was archived (42, D218); null when it is not. */
+  archivedAt: z.number().nullable(),
 });
 export type TaskSummaryDTO = z.infer<typeof taskSummarySchema>;
 
@@ -263,6 +265,8 @@ export const listTasksQuerySchema = z.object({
   projectId: z.string().optional(),
   status: taskStatusSchema.optional(),
   displayGroup: taskDisplayGroupSchema.optional(),
+  /** false (default): tasks that are not archived; true: only archived ones (D219). */
+  archived: z.union([z.boolean(), z.stringbool()]).default(false),
   limit: z.coerce.number().int().min(1).max(LIST_PAGE_MAX).default(LIST_PAGE_DEFAULT),
   cursor: taskCursorSchema.optional(),
 });

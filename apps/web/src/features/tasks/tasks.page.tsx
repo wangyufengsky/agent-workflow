@@ -1,10 +1,13 @@
 import { TASK_DISPLAY_GROUPS, type TaskDisplayGroup, taskDisplayGroupSchema, UiMode } from '@aw/shared';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link } from '@tanstack/react-router';
+import { useState } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
+import { Dialog } from '../../components/dialog.tsx';
 import { EmptyState } from '../../components/empty-state.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { toast } from '../../components/toast.tsx';
 import { BATCHES_COPY } from '../../copy/batches.ts';
 import { COMMON_COPY, formatDateTime } from '../../copy/common.ts';
 import { INITIATIVES_COPY } from '../../copy/initiatives.ts';
@@ -15,13 +18,18 @@ import { projectsQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { TaskBadge } from './task-badge.tsx';
 import styles from './tasks.module.css';
-import { taskPagesQuery } from './tasks.queries.ts';
+import { taskPagesQuery, useArchiveFinishedTasks } from './tasks.queries.ts';
+
+/** The state filter's value for archived tasks (D219); every other value is a display group. */
+const ARCHIVED = 'archived';
 
 const route = getRouteApi(ROUTE_IDS.tasks);
 
-/** Task list (14 §3.7): filter by project and display state. */
+/** Task list (14 §3.7): filter by project and display state, or list the archived tasks (42 §6). */
 export function TasksPage() {
-  const { projectId, displayGroup } = route.useSearch();
+  const { projectId, displayGroup, archived } = route.useSearch();
+  const [archiving, setArchiving] = useState(false);
+  const archiveFinished = useArchiveFinishedTasks();
   const navigate = route.useNavigate();
   const isSimple = useSettings()['ui.mode'] === UiMode.Simple;
   const projects = useQuery(projectsQuery);
@@ -29,11 +37,16 @@ export function TasksPage() {
     taskPagesQuery({
       ...(projectId === undefined ? {} : { projectId }),
       ...(displayGroup === undefined ? {} : { displayGroup }),
+      ...(archived === true ? { archived } : {}),
     }),
   );
   const rows = pages.data?.pages.flatMap((page) => page.items);
-  const setFilter = (next: { projectId?: string | undefined; displayGroup?: TaskDisplayGroup | undefined }) =>
-    void navigate({ search: (prev) => ({ ...prev, ...next }) });
+  const setFilter = (next: {
+    projectId?: string | undefined;
+    displayGroup?: TaskDisplayGroup | undefined;
+    archived?: boolean | undefined;
+  }) => void navigate({ search: (prev) => ({ ...prev, ...next }) });
+  const projectName = projects.data?.find((p) => p.id === projectId)?.name ?? null;
 
   return (
     <div className="page">
@@ -69,12 +82,16 @@ export function TasksPage() {
           <select
             className="select"
             aria-label={C.allStates}
-            value={displayGroup ?? ''}
-            onChange={(e) =>
-              setFilter({
-                displayGroup: e.target.value === '' ? undefined : taskDisplayGroupSchema.parse(e.target.value),
-              })
-            }
+            value={archived === true ? ARCHIVED : (displayGroup ?? '')}
+            onChange={(e) => {
+              const { value } = e.target;
+              if (value === ARCHIVED) setFilter({ archived: true, displayGroup: undefined });
+              else
+                setFilter({
+                  archived: undefined,
+                  displayGroup: value === '' ? undefined : taskDisplayGroupSchema.parse(value),
+                });
+            }}
           >
             <option value="">{C.allStates}</option>
             {TASK_DISPLAY_GROUPS.map((g) => (
@@ -82,12 +99,21 @@ export function TasksPage() {
                 {TASK_DISPLAY_LABEL[g]}
               </option>
             ))}
+            <option value={ARCHIVED}>{C.archivedFilter}</option>
           </select>
+          <Button variant="ghost" icon="archive" onClick={() => setArchiving(true)}>
+            {C.archiveFinished}
+          </Button>
         </div>
       </div>
       {pages.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
       {pages.isError && <ErrorState error={pages.error} onRetry={() => void pages.refetch()} />}
-      {rows?.length === 0 && <EmptyState icon="list" title={C.empty} body={C.emptyBody} />}
+      {rows?.length === 0 &&
+        (archived === true ? (
+          <EmptyState icon="list" title={C.emptyArchived} />
+        ) : (
+          <EmptyState icon="list" title={C.empty} body={C.emptyBody} />
+        ))}
       {rows !== undefined && rows.length > 0 && (
         <table className={styles.table}>
           <thead>
@@ -118,6 +144,30 @@ export function TasksPage() {
           </tbody>
         </table>
       )}
+      <Dialog
+        open={archiving}
+        onOpenChange={setArchiving}
+        title={C.archiveFinishedTitle}
+        footer={
+          <Button
+            variant="primary"
+            pending={archiveFinished.isPending}
+            onClick={() =>
+              archiveFinished.mutate(projectId, {
+                onSuccess: ({ archived: count }) => {
+                  setArchiving(false);
+                  toast(C.archivedCount(count));
+                },
+              })
+            }
+          >
+            {C.archiveFinishedConfirm}
+          </Button>
+        }
+      >
+        <p>{C.archiveFinishedBody(projectName)}</p>
+        {archiveFinished.isError && <ErrorState error={archiveFinished.error} />}
+      </Dialog>
       {pages.hasNextPage && (
         <div className="row">
           <Button pending={pages.isFetchingNextPage} onClick={() => void pages.fetchNextPage()}>

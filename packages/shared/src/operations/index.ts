@@ -173,9 +173,12 @@ import {
 } from './system.ts';
 import {
   acceptNodeOp,
+  archiveFinishedTasksOp,
+  archiveTaskOp,
   cancelTaskOp,
   confirmPlanOp,
   createTaskOp,
+  deleteTaskOp,
   deliverTaskOp,
   getNodeOp,
   getPlanOp,
@@ -201,6 +204,7 @@ import {
   startTaskOp,
   taskDiffFileOp,
   taskDiffOp,
+  unarchiveTaskOp,
   updateCheckCommandOp,
 } from './tasks.ts';
 import {
@@ -343,6 +347,10 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   updateCheckCommandOp,
   skipCheckOp,
   cancelTaskOp,
+  archiveTaskOp,
+  unarchiveTaskOp,
+  archiveFinishedTasksOp,
+  deleteTaskOp,
   pauseTaskOp,
   resumeTaskOp,
   listPlansOp,
