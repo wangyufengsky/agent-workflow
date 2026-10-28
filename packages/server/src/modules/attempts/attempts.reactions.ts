@@ -14,6 +14,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { ModelSlots } from '../model-slots/index.ts';
 import {
   describeOpencodeError,
+  MESSAGE_ABORTED_ERROR,
   type OpencodeClient,
   type OpencodeEvent,
   OpencodeEventType,
@@ -30,7 +31,9 @@ type PermissionEvent = Extract<OpencodeEvent, { type: typeof OpencodeEventType.P
  * (wait for the user), idle with answers to deliver, idle without a result (nudge, then ATTEMPT_NO_RESULT), session
  * errors, timeouts and a lost runtime. Permission requests become inbox items. While opencode retries a failed model
  * request the attempt waits for the model service without its timeout running, so an unreachable service costs no
- * retry budget (D163). Also turns every session event into transcript entries and token usage.
+ * retry budget (D163). A reply the model service stalled on is stopped instead, with the attempt's timeout running,
+ * and the session is asked to continue in shorter tool calls (D217). Also turns every session event into transcript
+ * entries and token usage.
  */
 export function watchSessions(
   state: AttemptState,
@@ -53,8 +56,13 @@ export function watchSessions(
       state.park(session, attempt);
       return;
     }
-    if (session.pendingAnswers.length > 0) {
-      await send(attempt, session, session.pendingAnswers.splice(0).join('\n\n'));
+    const messages = session.pendingAnswers.splice(0);
+    if (session.stalled) {
+      session.stalled = false;
+      messages.unshift(deps.prompts[PromptName.ModelStalled]);
+    }
+    if (messages.length > 0) {
+      await send(attempt, session, messages.join('\n\n'));
       return;
     }
     if (attempt.nudges >= ATTEMPT_MAX_NUDGES) {
@@ -146,6 +154,9 @@ export function watchSessions(
     }
     const session = live.get(event.sessionId);
     if (session === undefined) return;
+    // Aborting the stalled reply (D217) is no failure of the session.
+    if (session.stalled && event.type === OpencodeEventType.Error && event.error?.name === MESSAGE_ABORTED_ERROR)
+      return;
     const attempt = mustFind(session.attemptId);
     const running = attempt.status === AttemptStatus.Running;
     // Errors after the attempt ended (e.g. the abort we sent after a submit) are not the attempt's.
@@ -169,6 +180,12 @@ export function watchSessions(
           message: describeOpencodeError(event.error),
           ...(event.error === undefined ? {} : { details: { error: event.error } }),
         });
+        return;
+      case OpencodeEventType.Stalled:
+        if (!running) return;
+        // opencode would send the whole request again and stall the same way: stop it and ask for shorter calls.
+        session.stalled = true;
+        state.inBackground(attempt.id, () => state.stopSession(session));
         return;
       case OpencodeEventType.Tool:
         onToolEvent(attempt, session, event);

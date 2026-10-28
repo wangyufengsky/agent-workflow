@@ -118,7 +118,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `CredentialSeal` | `system` · `master_password` · `discarded` | 凭据由什么加密（D167）：系统密钥服务、主密码；`discarded` 为主密码重置后已清除、需要重新填写 |
 | `MasterPasswordState` | `none` · `locked` · `unlocked` | 主密码（D167）：没设置、设置了但本次启动还没输入、已解锁 |
 | `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` · `confirmation` · `attachment` · `entity_ref` · `chart`（后四种仅助手对话，10 §3；`chart` 见 35 §4） |
-| `TranscriptSystemEvent` | `attempt_started` · `nudged` · `retrying` · `result_submitted` · `awaiting_input`（等待用户回答或授权）· `timed_out` · `aborted` · `runtime_lost` · `assistant_isolated`（旧助手会话切换到独立目录；`system` 会话流条目记录的事件，文案在前端） |
+| `TranscriptSystemEvent` | `attempt_started` · `nudged` · `retrying` · `model_stalled`（模型服务长时间不返回数据，这次输出中断，D217）· `result_submitted` · `awaiting_input`（等待用户回答或授权）· `timed_out` · `aborted` · `runtime_lost` · `assistant_isolated`（旧助手会话切换到独立目录；`system` 会话流条目记录的事件，文案在前端） |
 | `McpToolName` | 执行 MCP 工具名（12 §6）；`ATTEMPT_SUBMIT_TOOL` 为每种尝试的提交工具 |
 | `BashPolicy` | `auto`（默认放行，禁止 Git 写操作）· `ask`（只读命令放行，其余询问） |
 | `OperationRisk` | `read` · `write` · `critical`（操作清单风险等级，决定助手确认行为，见 15 §4） |

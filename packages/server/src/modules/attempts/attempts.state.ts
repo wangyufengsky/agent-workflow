@@ -54,6 +54,8 @@ export type LiveSession = {
   idle: boolean;
   /** Answers to send at the next opportunity (the session was busy, or other questions are still open). */
   pendingAnswers: string[];
+  /** The model service stalled and the reply was stopped: its next idle sends the model-stalled prompt (D217). */
+  stalled: boolean;
   /** Resolves once we stop following the session (its last turn went idle, or the runtime was lost). */
   released: Promise<void>;
   release: () => void;

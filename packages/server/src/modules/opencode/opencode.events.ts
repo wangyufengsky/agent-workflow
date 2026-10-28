@@ -16,6 +16,12 @@ export const OpencodeEventType = {
    * the rate. opencode 1.19.0 retries such requests until they succeed, without a session error (12 §8).
    */
   Retry: 'retry',
+  /**
+   * The model service sent nothing for opencode's `chunkTimeout` (5 minutes by default) in the middle of a reply, and
+   * opencode is about to send the whole request again. Seen when the service holds back a long tool call until it is
+   * complete (D217); waiting does not help, since the next try takes as long.
+   */
+  Stalled: 'stalled',
   /** opencode sends a model request (again, after a retry wait). */
   Busy: 'busy',
   Idle: 'idle',
@@ -48,6 +54,12 @@ export function describeOpencodeError(error: OpencodeError | undefined): string 
 }
 
 const E = OpencodeEventType;
+
+/** opencode 1.19.0's retry message when its `chunkTimeout` passes without data from the model service. */
+const SSE_READ_TIMED_OUT = 'SSE read timed out';
+
+/** The session error opencode reports when a reply still generating is aborted. */
+export const MESSAGE_ABORTED_ERROR = 'MessageAbortedError';
 export type OpencodeEvent =
   | {
       type: typeof E.Message;
@@ -87,6 +99,7 @@ export type OpencodeEvent =
       cost: number;
     }
   | { type: typeof E.Retry; sessionId: string; message: string | undefined }
+  | { type: typeof E.Stalled; sessionId: string }
   | { type: typeof E.Busy; sessionId: string }
   | { type: typeof E.Idle; sessionId: string }
   /** `error` is opencode's error object (`{ name, data }`), absent when opencode gives none. */
@@ -260,6 +273,7 @@ export function parseGlobalEvent(raw: unknown): OpencodeEvent | undefined {
       const { sessionID, status } = event.properties;
       if (status.type === 'busy') return { type: E.Busy, sessionId: sessionID };
       if (status.type !== 'retry') return undefined;
+      if (status.message === SSE_READ_TIMED_OUT) return { type: E.Stalled, sessionId: sessionID };
       return { type: E.Retry, sessionId: sessionID, message: status.message };
     }
     case 'session.idle':
