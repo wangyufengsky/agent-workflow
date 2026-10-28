@@ -106,6 +106,9 @@ const COMMAND_ESCAPES = [
   'git *--output*',
   'git grep *-O*',
   'git grep *--open-files-in-pager*',
+  // Run the repository's smudge or textconv programs on the object (D214).
+  'git cat-file *--filters*',
+  'git cat-file *--textconv*',
   // In-place editing (`-I` on macOS), a script from a file, or more scripts after the first.
   'sed *-i*',
   'sed *-I*',

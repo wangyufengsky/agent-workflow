@@ -570,6 +570,16 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "ask",
+      "pattern": "git cat-file *--filters*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--textconv*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
       "pattern": "sed *-i*",
       "permission": "bash",
     },
@@ -1771,6 +1781,16 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--filters*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--textconv*",
       "permission": "bash",
     },
     {
@@ -2477,6 +2497,16 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "ask",
+      "pattern": "git cat-file *--filters*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--textconv*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
       "pattern": "sed *-i*",
       "permission": "bash",
     },
@@ -3678,6 +3708,16 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--filters*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--textconv*",
       "permission": "bash",
     },
     {
@@ -4384,6 +4424,16 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     },
     {
       "action": "ask",
+      "pattern": "git cat-file *--filters*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--textconv*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
       "pattern": "sed *-i*",
       "permission": "bash",
     },
@@ -5585,6 +5635,16 @@ exports[`opencode 配置生成 > ai.bashPolicy = ask 时各 agent 的会话 bash
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--filters*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--textconv*",
       "permission": "bash",
     },
     {
@@ -6388,6 +6448,16 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "ask",
+      "pattern": "git cat-file *--filters*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--textconv*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
       "pattern": "sed *-i*",
       "permission": "bash",
     },
@@ -7589,6 +7659,16 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--filters*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--textconv*",
       "permission": "bash",
     },
     {
@@ -8295,6 +8375,16 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     },
     {
       "action": "ask",
+      "pattern": "git cat-file *--filters*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--textconv*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
       "pattern": "sed *-i*",
       "permission": "bash",
     },
@@ -9496,6 +9586,16 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
     {
       "action": "ask",
       "pattern": "git grep *--open-files-in-pager*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--filters*",
+      "permission": "bash",
+    },
+    {
+      "action": "ask",
+      "pattern": "git cat-file *--textconv*",
       "permission": "bash",
     },
     {

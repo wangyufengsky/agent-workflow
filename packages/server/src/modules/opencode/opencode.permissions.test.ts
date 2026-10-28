@@ -80,6 +80,9 @@ const ESCAPES = [
   'git diff --output=d.patch',
   'git grep -Ovim TODO',
   'git grep --open-files-in-pager=vim TODO',
+  'git cat-file --filters HEAD:src/App.java',
+  'git cat-file --textconv HEAD:docs/x.docx',
+  'git cat-file --batch --filters',
 ];
 const READS = [
   'ls -la',
