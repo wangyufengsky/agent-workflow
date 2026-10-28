@@ -1,4 +1,12 @@
-import { AppError, type EnvironmentDTO, ErrorCode, type Health, type ModelInfo, RuntimeStatus } from '@aw/shared';
+import {
+  AppError,
+  type EnvironmentDTO,
+  ErrorCode,
+  type Health,
+  isSupportedGitVersion,
+  type ModelInfo,
+  RuntimeStatus,
+} from '@aw/shared';
 import type { AppConfig } from '../../core/config.ts';
 import { host } from '../../core/platform.ts';
 import type { CredentialsService } from '../credentials/index.ts';
@@ -24,7 +32,7 @@ async function detectGit(env: NodeJS.ProcessEnv): Promise<EnvironmentDTO['git']>
     const version = await readGitVersion(env);
     // On Windows commands run in the bash that comes with Git for Windows: a git without it is not enough (D72).
     await locateShell(env);
-    return { installed: true, version };
+    return { installed: true, version, supported: isSupportedGitVersion(version) };
   } catch (err) {
     // Recovery with a defined meaning: a missing git is a check result shown on onboarding, not a failure.
     if (err instanceof AppError && err.code === ErrorCode.GitNotInstalled) return { installed: false };
@@ -75,7 +83,8 @@ export function createSystemService({
       opencode: runtimeState,
       models,
       credentials: await credentials.status(),
-      ready: git.installed && !NOT_HOSTABLE.includes(runtimeState.status) && models.available.length > 0,
+      ready:
+        git.installed && git.supported && !NOT_HOSTABLE.includes(runtimeState.status) && models.available.length > 0,
     };
   }
 

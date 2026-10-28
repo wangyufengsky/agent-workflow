@@ -36,7 +36,7 @@ describe('环境检测', () => {
   it('PATH 与 ~/.opencode/bin 中都没有 opencode 时为 not_installed', async () => {
     await appWithPath({ git: true });
     const { body } = await t.call(getEnvironmentOp, {});
-    expect(body.git).toEqual({ installed: true, version: expect.stringMatching(/^\d+\.\d+/) });
+    expect(body.git).toEqual({ installed: true, version: expect.stringMatching(/^\d+\.\d+/), supported: true });
     expect(body.opencode).toEqual({ status: 'not_installed' });
     expect(body.ready).toBe(false);
   });

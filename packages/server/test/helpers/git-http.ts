@@ -7,14 +7,20 @@ import type { AddressInfo } from 'node:net';
 /**
  * Git's smart HTTP protocol for the bare repositories under `root` (`git http-backend` as a CGI): over HTTPS with
  * `tls`, a certificate an enterprise CA signed (D175), else plain HTTP; addressed as `host` (default 127.0.0.1).
- * Pushing is allowed: the backend takes the request as an authenticated user's.
+ * Pushing is allowed: the backend takes the request as an authenticated user's. With `authorization`, a request
+ * without exactly that `Authorization` header is answered 401, as a platform does without a token.
  */
 export async function createGitHttpServer(options: {
   root: string;
   tls?: { certPem: string; keyPem: string };
   host?: string;
+  authorization?: string;
 }) {
   const handle = (req: IncomingMessage, res: ServerResponse) => {
+    if (options.authorization !== undefined && req.headers.authorization !== options.authorization) {
+      res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="git"' }).end();
+      return;
+    }
     const url = new URL(req.url ?? '/', 'http://git');
     const backend = spawn('git', ['http-backend'], {
       env: {

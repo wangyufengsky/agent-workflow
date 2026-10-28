@@ -1,4 +1,4 @@
-import { type EnvironmentDTO, type Platform, RuntimeStatus, StatusTone } from '@aw/shared';
+import { type EnvironmentDTO, GIT_MIN_VERSION_TEXT, type Platform, RuntimeStatus, StatusTone } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
@@ -15,6 +15,13 @@ import { CredentialsCheck } from './credentials-check.tsx';
 import { environmentQuery, useRecheckEnvironment } from './environment.queries.ts';
 
 function GitCheck({ git, platform }: { git: EnvironmentDTO['git']; platform: Platform }) {
+  if (git.installed && !git.supported) {
+    return (
+      <CheckRow title={C.git.title} tone={StatusTone.Danger} badge={C.notReady}>
+        <span className="hint">{C.git.tooOld(git.version, GIT_MIN_VERSION_TEXT)}</span>
+      </CheckRow>
+    );
+  }
   if (git.installed) {
     return (
       <CheckRow title={C.git.title} tone={StatusTone.Ok} badge={C.ready}>
