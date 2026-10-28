@@ -53,7 +53,7 @@
 - agent 只放不随设置变化的权限；**bash 规则在 `session.create` 时以会话级 `permission` 规则集传入**（D35，`sessionPermissionRules`），格式 `[{ permission: 'bash', pattern, action }]`。opencode 取**最后一条**匹配的规则，所以兜底的 `*` 放在最前。
 - 原生 `question` 工具禁用，提问只走 MCP `ask_user`（D36）。
 - **bash 规则集**（`shared/constants/opencode.ts`：planner 与 reviewer 用 `readonlyBashRules(checkCommands, allowedBash)`，executor 按 `ai.bashPolicy` 用 `BASH_PERMISSION_PRESETS`；`allowedBash` 是项目中「总是允许」记下的模式，D101）：
-  - Git 只读子命令：`git status* git log* git diff* git show* git blame* git grep* git ls-files* git rev-parse*`。
+  - Git 只读子命令：`git status* git log* git diff* git show* git blame* git grep* git ls-files* git rev-parse*`，以及读对象与引用的 `git ls-tree* git cat-file* git rev-list* git merge-base* git for-each-ref* git shortlog* git describe* git name-rev*`（D214；`show-ref` 已被 `git show*` 包含）。`git --git-dir=…`、`git -C <目录>` 与 `git branch` 不在其中：前两者让 git 读写会话目录之外的仓库，后者能建删分支。
   - 只读规则，按顺序（最后一条匹配的规则生效）：
     1. `*` ask。
     2. 版本查询 allow（D64）：单条命令 `<程序> --version` / `-version` / `-V`、`go version`；`-v` 只对 `node npm npx pnpm yarn bun mvn gradle docker`（别的程序里 `-v` 常是 verbose，如 `rake -v` 会运行默认任务）。程序名前还有别的词（`rm -rf src --version`、`PATH=. node --version`）或程序是路径（`./deploy.sh --version`）时 ask；`npx <包> --version` 也 ask（没有 TTY 时 npx 默认 `--yes`，会下载并运行任意包），只有 `npx --version` 本身放行。
@@ -65,7 +65,7 @@
        - go：`go test`，可带任意参数，但 `-exec` / `-toolexec`（用别的程序代替测试二进制或编译器）在第 7 步之后仍 ask。
        - pytest / python / python3：`pytest`、`python -m pytest`、`python3 -m pytest`，可带任意参数。
     4a. 项目中总是允许的模式 allow（D101，`project_bash_rules`，如 `./scripts/mvn.sh -q *`）：排在逃逸写法之前，所以带重定向等写法仍询问。
-    5. 逃逸写法 ask（D63、D100）：任何重定向（`*>*`，也包括 `2>&1`、`2>/dev/null`）、`find` 的 `-exec` / `-execdir` / `-ok` / `-okdir` / `-delete` / `-fprint*` / `-fls`、`rg --pre`、`git … --output`、`git grep -O` / `--open-files-in-pager`；`sed` 的 `-i` / `-I`（原地修改）、`-f`（脚本来自文件）、`-e`（后续脚本），以及脚本中的 `w` / `W`（写文件）/ `e`（执行）——通配符解析不了脚本，所以这三个字母出现在无引号脚本结尾的 `p` 之前、或出现在引号内时都询问（地址正则含这些字母时会多问）；`sort -o` / `--output` / `--compress-program`；`uniq` 的第二个参数；`javap -J`（JVM 选项可加载 agent）；`file -C` / `--compile`；`tree -o` / `-R`。
+    5. 逃逸写法 ask（D63、D100）：任何重定向（`*>*`，也包括 `2>&1`、`2>/dev/null`）、`find` 的 `-exec` / `-execdir` / `-ok` / `-okdir` / `-delete` / `-fprint*` / `-fls`、`rg --pre`、`git … --output`、`git grep -O` / `--open-files-in-pager`、`git cat-file --filters` / `--textconv`（运行仓库配置的 smudge / textconv 程序，D214）；git 接受长选项的任何无歧义前缀（`--outp`、`--filt`），所以规则写最短的那个：`git *--ou*`、`git grep *--op*`、`git cat-file *--fi*` / `*--te*`；`sed` 的 `-i` / `-I`（原地修改）、`-f`（脚本来自文件）、`-e`（后续脚本），以及脚本中的 `w` / `W`（写文件）/ `e`（执行）——通配符解析不了脚本，所以这三个字母出现在无引号脚本结尾的 `p` 之前、或出现在引号内时都询问（地址正则含这些字母时会多问）；`sort -o` / `--output` / `--compress-program`；`uniq` 的第二个参数；`javap -J`（JVM 选项可加载 agent）；`file -C` / `--compile`；`tree -o` / `-R`。
     6. 第 2、3、4、4a 步的命令后接结尾单独的 ` 2>&1` 或 ` 2>/dev/null` 再 allow（`java -version` 把版本打到 stderr，模型常写 `mvn test 2>&1 | tail`、`ls ~/.m2 2>/dev/null`；两者都不写文件，D100），随后 `*>*>*` ask：再有第二个重定向（`mvn test > f 2>&1`）仍询问。
     7. 项目检查命令本身 allow（`<checkCommand>*`，带参数或重定向也放行；Maven / Gradle 的检查命令除外，见第 4 步；评审会话还包括被评审节点验收中的命令检查，即 `$PROJECT_CHECK` 展开后的命令）：运行检查是只读角色了解代码状态的常规手段，询问会频繁打扰用户（D51）。规划与评审会话、以及只读角色执行的步骤（如代码审查流程中评审者的步骤）都带检查命令。
     8. 第 5 步的命令逃逸（重定向除外）再 ask 一遍，使第 6 步的结尾重定向带不进它们（`find . -delete 2>/dev/null`）；然后是测试工具自己的逃逸参数 ask（D64）：`go test *-exec*`、`go test *-toolexec*`，排在检查命令之后，所以检查命令 `go test ./...` 也带不进 `-exec`。

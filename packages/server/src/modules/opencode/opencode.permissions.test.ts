@@ -80,6 +80,15 @@ const ESCAPES = [
   'git diff --output=d.patch',
   'git grep -Ovim TODO',
   'git grep --open-files-in-pager=vim TODO',
+  'git cat-file --filters HEAD:src/App.java',
+  'git cat-file --textconv HEAD:docs/x.docx',
+  'git cat-file --batch --filters',
+  // Git takes unambiguous prefixes of long options.
+  'git cat-file --filt HEAD:a.txt',
+  'git cat-file --text HEAD:a.txt',
+  'git log --outp=log.txt',
+  'git diff --ou=d.patch',
+  'git grep --open=vim TODO',
 ];
 const READS = [
   'ls -la',
@@ -215,6 +224,42 @@ describe.each(READONLY_PRESETS)('只读 bash 规则（%s）', (_name, rules) => 
 
   it.each(NOT_VERSION_QUERIES)('不是单条版本查询的命令询问：%s', (command) => {
     expect(decide(rules, command)).toBe('ask');
+  });
+});
+
+/**
+ * Git commands that only read objects and refs (D214): a session looking at another branch's files in its worktree
+ * (a task on 1.4.32 found its base empty and every `git ls-tree` was refused). Changing branches and pointing git at
+ * another repository stay the backend's job.
+ */
+const GIT_READS_D214 = [
+  'git ls-tree -r --name-only dev',
+  'git cat-file -p dev:src/App.java',
+  'git rev-list --count main..dev',
+  'git merge-base main dev',
+  'git show-ref --heads',
+  "git for-each-ref --format='%(refname:short)' refs/heads",
+  'git shortlog -sn',
+  'git describe --tags',
+  'git name-rev HEAD',
+];
+const GIT_NOT_READS_D214 = [
+  'git branch -D dev',
+  'git checkout dev',
+  'git --git-dir=/home/me/repo/.git log',
+  'git -C /home/me/repo ls-tree -r dev',
+];
+
+describe.each([
+  ...READONLY_PRESETS,
+  ['执行者 auto 策略', sessionPermissionRules(RoleBaseAgent.Executor, BashPolicy.Auto)] as const,
+])('只读的 git 命令（D214，%s）', (_name, rules) => {
+  it.each(GIT_READS_D214)('放行：%s', (command) => {
+    expect(decide(rules, command)).toBe('allow');
+  });
+
+  it.each(GIT_NOT_READS_D214)('改分支或指向别的仓库的不放行：%s', (command) => {
+    expect(decide(rules, command)).not.toBe('allow');
   });
 });
 

@@ -40,6 +40,11 @@ export const projectDetailSchema = projectSchema.extend({
   dbConnectionIds: z.array(z.string()),
   /** Bash patterns the user always allowed for the project's AI sessions, oldest first (D101). */
   allowedBash: z.array(z.string()),
+  /**
+   * The branch checked out in the repository itself, read live; null when HEAD is detached. Shown next to the default
+   * branch when they differ: tasks start from the default branch (D216).
+   */
+  currentBranch: z.string().nullable(),
 });
 export type ProjectDetailDTO = z.infer<typeof projectDetailSchema>;
 

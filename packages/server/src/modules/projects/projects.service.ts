@@ -33,6 +33,7 @@ import {
   initRepository,
   listUnignoredFiles,
   type RepoLocks,
+  readCheckedOutBranch,
   readConfiguredIdentity,
   readDefaultBranch,
   readOriginUrl,
@@ -207,14 +208,18 @@ export function createProjectsService({
   }
 
   async function detail(project: ProjectDTO): Promise<ProjectDetailDTO> {
-    const origin = await readOriginUrl(project.repoPath);
-    const effective = await resolveHosting(project);
+    const [origin, effective, currentBranch] = await Promise.all([
+      readOriginUrl(project.repoPath),
+      resolveHosting(project),
+      readCheckedOutBranch(project.repoPath),
+    ]);
     return {
       ...project,
       inferredHosting: inferHosting(origin),
       effectiveHosting: effective === undefined ? null : { ...effective.ref, source: effective.source },
       dbConnectionIds: databases.linkedIds(project.id),
       allowedBash: repo.allowedBash(project.id),
+      currentBranch: currentBranch ?? null,
     };
   }
 

@@ -26,6 +26,11 @@ export async function readDefaultBranch(repo: string): Promise<string | undefine
     okExitCodes: [0, 1, 128],
   });
   if (remoteHead.exitCode === 0) return remoteHead.stdout.trim().replace(/^origin\//, '');
+  return readCheckedOutBranch(repo);
+}
+
+/** The branch checked out in `repo`, also before its first commit; undefined when HEAD is detached. */
+export async function readCheckedOutBranch(repo: string): Promise<string | undefined> {
   const head = await runGit(['symbolic-ref', '--quiet', '--short', 'HEAD'], { cwd: repo, okExitCodes: [0, 1] });
   return head.exitCode === 0 ? head.stdout.trim() : undefined;
 }

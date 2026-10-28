@@ -1,4 +1,4 @@
-import { type ProjectDetailDTO, UiMode } from '@aw/shared';
+import { type ProjectDetailDTO, UiMode, type UpdateProjectRequest } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, useState } from 'react';
@@ -30,23 +30,25 @@ function ProjectForm({ project }: { project: ProjectDetailDTO }) {
   const [checkCommand, setCheckCommand] = useState(project.checkCommand ?? '');
   const update = useUpdateProject();
 
+  // Saving remounts this form (keyed by the project's update time): per-call callbacks of a mutation whose
+  // component unmounted never run, so the toast follows the promise. A failure shows through the mutation's state.
+  const save = (changes: Omit<UpdateProjectRequest, 'id'>) =>
+    update.mutateAsync({ id: project.id, ...changes }).then(
+      () => toast(C.saved),
+      () => undefined,
+    );
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const command = checkCommand.trim();
-    // Saving remounts this form (keyed by the project's update time): per-call callbacks of a mutation whose
-    // component unmounted never run, so the toast follows the promise. A failure shows through the mutation's state.
-    update
-      .mutateAsync({
-        id: project.id,
-        name: name.trim(),
-        defaultBranch: defaultBranch.trim(),
-        checkCommand: command === '' ? null : command,
-      })
-      .then(
-        () => toast(C.saved),
-        () => undefined,
-      );
+    void save({
+      name: name.trim(),
+      defaultBranch: defaultBranch.trim(),
+      checkCommand: command === '' ? null : command,
+    });
   };
+  // Tasks start from the default branch, which is origin's when there is one: not where the user works (D216).
+  const current = project.currentBranch;
+  const elsewhere = current !== null && current !== project.defaultBranch;
 
   return (
     <form onSubmit={submit}>
@@ -64,8 +66,20 @@ function ProjectForm({ project }: { project: ProjectDetailDTO }) {
           id="project-branch"
           className="input mono"
           value={defaultBranch}
+          aria-describedby="project-branch-hint"
           onChange={(e) => setDefaultBranch(e.target.value)}
         />
+        <p id="project-branch-hint" className="hint">
+          {C.defaultBranchHint}
+        </p>
+        {elsewhere && (
+          <div className="row" data-testid="other-branch">
+            <p className="hint grow">{C.otherBranchCheckedOut(current, project.defaultBranch)}</p>
+            <Button size="sm" pending={update.isPending} onClick={() => void save({ defaultBranch: current })}>
+              {C.switchToBranch(current)}
+            </Button>
+          </div>
+        )}
       </div>
       <div className="field">
         <label className="label" htmlFor="project-check">

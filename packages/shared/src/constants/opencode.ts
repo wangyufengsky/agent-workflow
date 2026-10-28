@@ -26,6 +26,15 @@ const GIT_READONLY = [
   'git grep*',
   'git ls-files*',
   'git rev-parse*',
+  // Objects and refs, e.g. another branch's files from a worktree (D214). `git show*` already covers `show-ref`.
+  'git ls-tree*',
+  'git cat-file*',
+  'git rev-list*',
+  'git merge-base*',
+  'git for-each-ref*',
+  'git shortlog*',
+  'git describe*',
+  'git name-rev*',
 ];
 /**
  * Commands that only read the workspace or print; allowed without asking under every policy. Models exploring a
@@ -94,9 +103,13 @@ const COMMAND_ESCAPES = [
   'find *-fprint*',
   'find *-fls*',
   'rg *--pre*',
-  'git *--output*',
+  // Git takes any unambiguous prefix of a long option (`--outp`, `--filt`): each pattern is the shortest one.
+  'git *--ou*',
   'git grep *-O*',
-  'git grep *--open-files-in-pager*',
+  'git grep *--op*',
+  // Run the repository's smudge or textconv programs on the object (D214).
+  'git cat-file *--fi*',
+  'git cat-file *--te*',
   // In-place editing (`-I` on macOS), a script from a file, or more scripts after the first.
   'sed *-i*',
   'sed *-I*',

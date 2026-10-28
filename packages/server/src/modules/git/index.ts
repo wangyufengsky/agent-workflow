@@ -15,6 +15,7 @@ export { createRepoLocks, type RepoLocks } from './git.lock.ts';
 export { beforeArgs, type LogFilter, readCommit, readLog, readRevisions } from './git.log.ts';
 export {
   branchExists,
+  readCheckedOutBranch,
   readDefaultBranch,
   readGitVersion,
   readHead,

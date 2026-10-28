@@ -211,6 +211,9 @@
 | D211 | （同上）skill 用英文写，静态文件、不做模板替换；名字用 `aw-` 前缀并与目录名相同 | 与协议提示词的约定一致；opencode 直接读文件；前缀避免与用户的 skill 重名 | 2026-10-27 |
 | D212 | （同上）每个 agent 分配的 skill 不超过 `AGENT_SKILLS_MAX` 8 个，超过时先合并相近的 skill | 模型靠描述选择 skill，列表越长越容易选错或漏选，每条描述也常驻上下文 | 2026-10-27 |
 | D213 | 安装包自带 ripgrep 15.1.0（与 opencode 1.19 下载的同一版本：macOS arm64、Linux x64 musl、Linux arm64），打包时由 `apps/desktop/scripts/fetch-ripgrep.mjs` 按发布页的 SHA-256 校验后放进 `Resources/ripgrep/`；启动 opencode 时把这个目录追加到 `PATH` 末尾（`AppConfig.ripgrepDir`，源码运行时不设） | opencode 的 skill、grep、glob 工具都调用 rg：先找 `PATH`，再找自己缓存目录的 `bin/rg`，都没有就从 GitHub 下载；内网机器下载不了，工具一律报「ripgrep execution failed」（2026-10-28 用户内网实测：助手加载 skill 总是失败）。追加在末尾，用户自己装的 rg 优先；不往 opencode 的缓存目录里放文件 | 2026-10-28 |
+| D214 | Git 只读子命令（12 §2）加入读对象与引用的 `ls-tree` `cat-file` `rev-list` `merge-base` `for-each-ref` `shortlog` `describe` `name-rev`；`--git-dir` / `-C` 与 `git branch` 仍不放行 | 2026-10-28 用户内网实测：任务从空的 main 开始，执行者想看 dev 上的代码，`git ls-tree -r dev` 每次都被拒（`git *` deny 之后没有再放行它），只有 `git show` 能用。这些子命令只读对象库与引用，与已放行的 `git show` / `git log` 同类；`--git-dir` 指向用户的原仓库，放行就绕过了 worktree 的边界 | 2026-10-28 |
+| D215 | 助手调用 `tasks.create`、`batches.create`、`initiatives.create` 没写 `baseBranch` 时，后端在确认前填上项目当前的默认分支（`completions`，15 §4）：确认卡片总有「基于分支」，确认后的调用用卡片上的分支。定时任务不填：它省略表示每次运行时取当时的默认分支（22 §9） | 同一次内网测试：助手建的任务从远端默认的 main（空分支）开始，卡片上看不出来，用户以为会从本地的 dev 开始。填进输入而不是只在界面上显示：用户确认的就是实际运行的，之后改默认分支也不影响这次确认 | 2026-10-28 |
+| D216 | 项目详情返回仓库检出的分支 `currentBranch`（每次读取，游离为 null，11 §3）；与默认分支不同时，项目页的默认分支下说明「仓库现在检出的是 dev，新任务却从 main 开始」，附「改用 dev」直接保存。添加项目仍按远端默认分支（没有远端时用检出的分支），添加后进入的就是这个页面 | 同上：默认分支取 `origin/HEAD`，用户实际在 dev 上开发，任务都从空的 main 开始。不在添加时自动改用检出的分支：在功能分支上添加项目时那样更常出错；只说明并给一键改用，已经添加的项目也能看到 | 2026-10-28 |
 
 2026-10-25 用户要求「进行功能收敛」：按 01 §2「默认简单」与 D15（简单模式 5 个导航项）整理出方案 [38](38-convergence.md)，登记为 D158，**待用户确认**；确认前不改代码。2026-10-26 用户确认（「落地 D158 收敛」），C1–C6 按推荐方案实现，见 38 §4（05 的 CV 系列）。
 
@@ -243,3 +246,5 @@
 2026-10-27 用户看到 MCP TypeScript SDK 2.4 支持 skill，问能否在运行时为 aw 注入适合的 skill。实测 opencode 1.19.0 的 skill 扫描、缓存与环境变量后出设计 [41](41-skills.md)，并按用户追问（「AI 助手是否需要 skill？她的主观能动性最高」）以助手为主要使用者；同日用户确认 D206–D212 均按推荐方案，任务拆分见 05 的 SK。
 
 2026-10-28 用户在内网发现助手加载 skill 经常失败（工具报「ripgrep execution failed」，改读 SKILL.md 又被外部目录权限拒绝）。查 opencode 1.19.0 得出 rg 的查找与下载顺序，内网机器既没有 rg 也下载不了；登记为 D213 并实现（05 的 IN-27）。外部目录拒绝是助手权限的本意（15 §2），skill 工具能用后不再需要直接读文件。
+
+2026-10-28 同一次内网测试：任务从空的 main 开始（远端默认分支），执行者想看 dev 上的代码时 git 命令一直失败。查明默认分支取 `origin/HEAD`、助手确认卡片不显示基于分支、只读 git 子命令不含 `ls-tree`，登记为 D214–D216 并实现（05 的 IN-28…IN-30）。

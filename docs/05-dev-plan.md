@@ -488,6 +488,9 @@
 | IN-25 | 助手单轮在 opencode 重试模型请求期间暂停时限、恢复后按剩余时间继续，与权限等待的暂停叠加；助手会话的系统提示显示原因（D185）。同一提交登记 02、08 §4.3、15 §6.2 | 集成（FakeOpencode `retry` 步骤与假时钟）：重试 60 分钟仍在运行、没有中止，恢复后剩余时间到点超时 |
 | IN-26 | 所有模型会话共享并发上限（D186）：新模块 `model-slots`（按需计数交互占用、先来先得队列、后台份额），尝试新增 `queued` / `slot_granted`（不属于任务的尝试用满时排队，拿到额度后才建会话），助手一轮排队（消息先进对话、`queuePosition`），调度器用后台份额并上报任务占用，提交信息草拟的时限从拿到额度起算，碎碎念用满时 `MODEL_SLOTS_FULL`；`GET /system/model-slots` 与 `model_slots.updated`；界面：会话流、PPT 进度、成员分析的排队位置，助手「排队中」，提交信息「排队等待草拟」，工作概览的占用行，设置文案。同一提交登记 02、03 §8、08、09、11、14、15 | 单元：额度的先来先得、位置前移、离开队列、后台份额（留一个、交互占用、有排队为 0、上限为 1）；集成（FakeOpencode、假时钟）：助手排在 Git 审查之后显示位置、排队 2 小时不算时限、轮到后从头计时；提交信息草拟为 `queued`、排队 10 分钟后仍返回草稿；用满时碎碎念 409；调度器在上限 3 时任务最多同时 2 个 |
 | IN-27（已完成） | 安装包自带 ripgrep（D213）：打包前 `fetch-ripgrep.mjs` 下载并校验，`extraResources` 装进 `Resources/ripgrep/`，桌面主进程传 `AW_RIPGREP_DIR`，启动 opencode 时追加到 `PATH` 末尾。同一提交登记 02、12 §2、17 §3.8、41 §7.2 | 单元：`pathAppending`（追加在末尾、空 PATH、Windows 的 `Path`）；`@opencode`：没有 rg、缓存为空、GitHub 不通时助手加载 skill 成功（修复前报「ripgrep execution failed」） |
+| IN-28（已完成） | Git 只读子命令加入 `ls-tree` `cat-file` `rev-list` `merge-base` `for-each-ref` `shortlog` `describe` `name-rev`（D214）。同一提交登记 02、12 §2 | 单元：只读预设、执行者 ask 与 auto 下这些命令放行，`git branch -D`、`checkout`、`--git-dir`、`-C` 不放行 |
+| IN-29（已完成） | 助手建任务、批量、需求计划时补上默认分支再确认（D215，`completions`）。同一提交登记 02、15 §4 | 集成：项目默认分支为 dev 时，助手不写分支的 `tasks_create` 卡片输入有 `baseBranch: dev`，确认后任务基于 dev |
+| IN-30（已完成） | 项目详情 `currentBranch` 与项目页的说明、「改用」按钮（D216）。同一提交登记 02、11 §3、14 | 集成：远端默认 main、检出 dev 时详情两者都有，游离时为 null；E2E：项目页说明并一键改用，保存后说明消失 |
 
 ## 后续 · 存储空间与磁盘清理（ST）
 
