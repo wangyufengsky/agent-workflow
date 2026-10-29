@@ -417,7 +417,7 @@ export const submitPlanTool = defineMcpTool({
 
 | 项 | 结论 |
 | --- | --- |
-| SDK | 使用 `@opencode-ai/sdk/v2` 的 `createOpencodeClient({ baseUrl })`；方法参数为扁平对象（如 `session.promptAsync({ sessionID, directory, agent, model: { providerID, modelID }, system, parts })`） |
+| SDK | 使用 `@opencode-ai/sdk/v2` 的 `createOpencodeClient({ baseUrl, fetch })`，`fetch` 是不设传输超时的全局 fetch（undici `Agent({ headersTimeout: 0, bodyTimeout: 0 })`，D226：`session.prompt` 整轮结束才发响应头，Node 默认 300 秒即失败；SDK 的 `req.timeout = false` 只有 Bun 认）；方法参数为扁平对象（如 `session.promptAsync({ sessionID, directory, agent, model: { providerID, modelID }, system, parts })`） |
 | 启动 | `opencode serve --hostname 127.0.0.1 --port 0 --print-logs --log-level WARN`，从 stdout/stderr 解析 `http://127.0.0.1:<port>` |
 | 配置合并 | `OPENCODE_CONFIG_CONTENT` 与用户全局配置合并；`config.get({ directory })` 可见注入的 mcp / agent / plugin；`mcp.status` 为 `connected` |
 | 会话 | `session.create({ directory, title, agent, permission })`；同一服务两个目录并发互不干扰 |
