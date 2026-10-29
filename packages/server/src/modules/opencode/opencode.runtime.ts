@@ -17,6 +17,7 @@ import {
 } from '@aw/shared';
 import { createOpencodeClient, type OpencodeClient as Sdk } from '@opencode-ai/sdk/v2';
 import { execa } from 'execa';
+import { Agent } from 'undici';
 import type { Clock } from '../../core/clock.ts';
 import type { EventBus } from '../../core/event-bus.ts';
 import { dateStamp, type Logger } from '../../core/logger.ts';
@@ -65,6 +66,15 @@ type Process = {
 };
 
 const LISTENING = /listening on (http:\/\/127\.0\.0\.1:\d+)/;
+
+/**
+ * Requests to opencode without a transport timeout (D226): `session.prompt` sends its response headers only when the
+ * whole turn has ended, so Node's fetch (undici's 5-minute `headersTimeout`) failed every assistant turn longer than
+ * that; the SDK's own `timeout = false` only works under Bun. Turns and attempts are bounded by our own timers.
+ * Cast: the undici package and @types/node declare `Dispatcher` separately, and TypeScript takes neither for the other.
+ */
+const UNLIMITED = new Agent({ headersTimeout: 0, bodyTimeout: 0 }) as unknown as NonNullable<RequestInit['dispatcher']>;
+const fetchUnlimited: typeof fetch = (input, init) => fetch(input, { ...init, dispatcher: UNLIMITED });
 
 /**
  * Hosts one `opencode serve` (D09) and drives the runtime state machine (09 §9).
@@ -206,7 +216,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     void launched.exited.then((exit) => onExit(launched, exit));
     try {
       const url = await address;
-      const client = createOpencodeClient({ baseUrl: url, throwOnError: true });
+      const client = createOpencodeClient({ baseUrl: url, throwOnError: true, fetch: fetchUnlimited });
       await client.config.get();
       transition(runtimeMachine, RuntimeStatus.Starting, RuntimeEvent.Listening);
       sdk = client;

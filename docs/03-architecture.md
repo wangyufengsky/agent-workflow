@@ -98,6 +98,7 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | HTTP | fastify（请求校验由操作清单挂载层直接用 zod 解析，见 D39） | 5.12.7 |
 | MCP | @modelcontextprotocol/sdk | 1.32.1 |
 | opencode 客户端 | @opencode-ai/sdk | **1.19.0（与 CLI 一致）** |
+| 连接 opencode 的请求不设传输超时（D226） | undici（MIT；只用它的 `Agent` 作为 SDK 所用全局 fetch 的 `dispatcher`，`headersTimeout` / `bodyTimeout` 为 0；Node 内置的 undici 不对外导出 `Agent`，与 Electron 内置的同为 7.x） | 7.30.1 |
 | opencode 插件类型 | @opencode-ai/plugin（仅类型，开发依赖） | 1.19.0 |
 | SQLite | `node:sqlite`（内置，D30） | — |
 | ORM / 迁移 | drizzle-orm（经 `core/db/node-sqlite-client.ts` 适配器复用 better-sqlite3 同步会话）+ drizzle-kit | 0.45.4 / 0.31.11 |

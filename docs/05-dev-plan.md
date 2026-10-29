@@ -493,6 +493,8 @@
 | IN-30（已完成） | 项目详情 `currentBranch` 与项目页的说明、「改用」按钮（D216）。同一提交登记 02、11 §3、14 | 集成：远端默认 main、检出 dev 时详情两者都有，游离时为 null；E2E：项目页说明并一键改用，保存后说明消失 |
 | IN-31（已完成） | 模型服务一次回复中途长时间无数据（`SSE read timed out`）时中止这次输出、在同一会话提醒分段写后继续，超时照常计时；执行者与助手提示词要求长文件分段写（D217）。同一提交登记 02、08、12 §4.2 与 §8、13 | 集成（FakeOpencode `stall` 步骤）：中止后同一会话收到 `model-stalled.md` 并提交成功，会话流有 `model_stalled`、没有错误；`@opencode`：缩短 `chunkTimeout` 的本地服务卡住时报 `stalled`，中止后空闲，同一会话可以继续 |
 | IN-32（已完成） | 兼容 git 2.30（D225）：远端通信的配置改经 `GIT_CONFIG_PARAMETERS`，`worktree list` 去掉 `-z`；`GIT_MIN_VERSION` 2.30 与环境检查的 `git.supported`、引导页提示。同一提交登记 02、11 §2、17 | 单元：按行解析 `worktree list`（含空格、引号、中文路径）、版本判断；集成：令牌作为请求头随推送到达要求它的远端，没有令牌时被拒；环境检查带 `supported`，目录已不存在的工作区算作可清理；用源码编译的 git 2.30.2 跑 git 相关的集成测试：修复前 9 个失败，修复后只剩 2 个依赖 `GIT_CONFIG_GLOBAL`（2.32）的测试用例 |
+| IN-33（已完成） | 连接本机 opencode 的请求不设传输超时（D226）：SDK 客户端的 `fetch` 用全局 fetch 加 undici `Agent({ headersTimeout: 0, bodyTimeout: 0 })`。同一提交登记 02、03 §3、12 §8、15 §6.2 | 手动实测（5 分钟级，不进自动测试）：本地服务 310 秒才回响应头，SDK 原样的 fetch 在 301 秒报 `UND_ERR_HEADERS_TIMEOUT`，修复后 310 秒正常返回；`@opencode`：客户端、助手生命周期与卡住续写的测试照常通过 |
+| IN-34（已完成） | 专业设置 `git.commitIdentity`（D227）：`backendCommitter(identity)` 取代常量，节点提交与交付的合并、squash、变基传入设置；团队页把带发起人 trailer 的提交也算作本应用的任务提交；设置页「任务的提交人」两项输入。同一提交登记 02、08 §4.3、09 §3 与 §7、14、33 | 集成：设置提交人后任务提交与 squash 提交的作者、提交者都是它，团队页仍归到发起人「经 AI 任务」；E2E：只填一项时标出且不保存，两项都填后保存，清空恢复默认 |
 
 ## 后续 · 存储空间与磁盘清理（ST）
 

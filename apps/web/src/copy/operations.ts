@@ -255,6 +255,7 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   'node.maxAttempts': SETTINGS_COPY.maxAttempts,
   'attempt.timeoutMinutes': SETTINGS_COPY.timeoutMinutes,
   'git.commitDraftTimeoutSeconds': SETTINGS_COPY.commitDraftTimeout,
+  'git.commitIdentity': SETTINGS_COPY.commitIdentity,
   'delivery.defaultStrategy': SETTINGS_COPY.defaultStrategy,
   'delivery.deleteBranchAfterMerge': SETTINGS_COPY.deleteBranch,
   'network.offline': SETTINGS_COPY.offline,

@@ -16,7 +16,7 @@ import {
   taskMachine,
   transition,
 } from '@aw/shared';
-import { BACKEND_COMMITTER, gitFailure, type RepoLocks, runGit, unmergedFiles } from '../git/index.ts';
+import { backendCommitter, gitFailure, type RepoLocks, runGit, unmergedFiles } from '../git/index.ts';
 import type { Node } from '../nodes/index.ts';
 import { acceptanceProject } from '../nodes/index.ts';
 import type { Task } from './tasks.repo.ts';
@@ -30,7 +30,7 @@ import { leafKeys } from './tasks.verify.ts';
 export function mergeIntoWorktree(locks: RepoLocks, repoPath: string, dir: string, target: string): Promise<string[]> {
   return locks.run(repoPath, async () => {
     // git needs an identity even for a merge it does not commit yet; the backend's, as for every merge (D52).
-    const args = [...BACKEND_COMMITTER, 'merge', '--no-ff', '--no-commit', '--end-of-options', target];
+    const args = [...backendCommitter(), 'merge', '--no-ff', '--no-commit', '--end-of-options', target];
     const result = await runGit(args, { cwd: dir, okExitCodes: [0, 1] });
     const files = await unmergedFiles(dir);
     if (result.exitCode === 1 && files.length === 0) throw gitFailure(args, result);

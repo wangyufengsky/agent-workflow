@@ -1,11 +1,73 @@
-import { BashPolicy, LOCAL_MERGE_STRATEGIES, type Settings } from '@aw/shared';
+import {
+  BashPolicy,
+  type CommitIdentity,
+  commitIdentitySchema,
+  LOCAL_MERGE_STRATEGIES,
+  type Settings,
+} from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
+import { type KeyboardEvent, useState } from 'react';
 import { Panel } from '../../components/panel.tsx';
 import { DELIVERY_COPY } from '../../copy/delivery.ts';
 import { SETTINGS_COPY as C } from '../../copy/settings.ts';
 import { environmentQuery } from '../onboarding/environment.queries.ts';
 import { usableModels } from '../onboarding/usable-models.ts';
 import { NumberSetting, Segmented, TextSetting } from './setting-inputs.tsx';
+
+/**
+ * Name and email of task commits (D227), saved when focus leaves both inputs or on Enter: both filled in, or both empty
+ * for agent-workflow's identity. Anything in between stays in the inputs, marked, until it is one or the other.
+ */
+function CommitIdentitySetting({
+  value,
+  onCommit,
+}: {
+  value: CommitIdentity | null;
+  onCommit: (identity: CommitIdentity | null) => void;
+}) {
+  const [name, setName] = useState(value?.name ?? '');
+  const [email, setEmail] = useState(value?.email ?? '');
+  const [invalid, setInvalid] = useState(false);
+  const commit = () => {
+    const empty = name.trim() === '' && email.trim() === '';
+    const parsed = commitIdentitySchema.safeParse({ name, email });
+    setInvalid(!empty && !parsed.success);
+    const next = empty ? null : parsed.data;
+    if (next === undefined || (next?.name === value?.name && next?.email === value?.email)) return;
+    onCommit(next);
+  };
+  const enter = (e: KeyboardEvent) => e.key === 'Enter' && commit();
+  return (
+    <fieldset
+      className="field"
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) commit();
+      }}
+    >
+      <legend className="label">{C.commitIdentity}</legend>
+      <div className="row">
+        <input
+          className={`input grow${invalid ? ' invalid' : ''}`}
+          aria-label={C.commitIdentityName}
+          placeholder={C.commitIdentityName}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={enter}
+        />
+        <input
+          className={`input grow${invalid ? ' invalid' : ''}`}
+          aria-label={C.commitIdentityEmail}
+          placeholder={C.commitIdentityEmail}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={enter}
+        />
+      </div>
+      {invalid && <p className="error-text">{C.commitIdentityInvalid}</p>}
+      <p className="hint">{C.commitIdentityHint}</p>
+    </fieldset>
+  );
+}
 
 /** Pro-mode settings (08 §4.3 `SETTING_MODE` = pro, M5-08). Inputs are keyed by the saved value to reset with it. */
 export function ProSettings({ settings, set }: { settings: Settings; set: (patch: Partial<Settings>) => void }) {
@@ -93,6 +155,11 @@ export function ProSettings({ settings, set }: { settings: Settings; set: (patch
         />
         <p className="hint">{C.commitDraftTimeoutHint}</p>
       </div>
+      <CommitIdentitySetting
+        key={JSON.stringify(settings['git.commitIdentity'])}
+        value={settings['git.commitIdentity']}
+        onCommit={(v) => set({ 'git.commitIdentity': v })}
+      />
       <div className="field">
         <span className="label">{C.defaultStrategy}</span>
         <Segmented

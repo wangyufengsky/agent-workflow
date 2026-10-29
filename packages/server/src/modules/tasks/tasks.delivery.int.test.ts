@@ -60,6 +60,22 @@ describe('交付：本地合并（09 §7）', () => {
     expect(await trailers(other.git.branch ?? '')).toBe('agent-workflow|');
   });
 
+  it('设置了提交人时任务提交与 squash 提交都用它，团队页仍算发起人经 AI 任务的提交（D227）', async () => {
+    const { repo, project } = await addProject(t, { files: GREET });
+    await repo.git('config', 'user.name', 'Zhang San');
+    await repo.git('config', 'user.email', 'zs@corp.com');
+    await t.call(updateSettingsOp, { 'git.commitIdentity': { name: 'Corp Bot', email: 'bot@corp.com' } });
+    const task = await taskInReview(t, project.id, FIXED);
+    const identities = (ref: string) => repo.git('log', '-1', '--format=%an <%ae>|%cn <%ce>', ref);
+    expect(await identities(task.git.branch ?? '')).toBe('Corp Bot <bot@corp.com>|Corp Bot <bot@corp.com>');
+
+    await t.call(deliverTaskOp, { id: task.id, strategy: 'squash' });
+    expect(await identities('main')).toBe('Corp Bot <bot@corp.com>|Corp Bot <bot@corp.com>');
+    const { body } = await t.call(teamSummaryOp, { id: project.id, period: TeamPeriod.Last30Days });
+    expect(body.members.find((m) => m.key === 'zs@corp.com')?.metrics).toMatchObject({ commits: 1, taskCommits: 1 });
+    expect(body.members.map((m) => m.key)).not.toContain('bot@corp.com');
+  });
+
   it('squash：主工作区在目标分支上，合并为一个提交；任务完成，worktree 与分支已清理，交付条目已处理', async () => {
     const { repo, task } = await inReview();
     const before = (await repo.git('rev-parse', 'main')).trim();

@@ -202,6 +202,9 @@ importers:
       tedious:
         specifier: 20.3.8
         version: 20.3.8
+      undici:
+        specifier: 7.30.1
+        version: 7.30.1
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -9699,8 +9702,7 @@ snapshots:
 
   undici@6.29.1: {}
 
-  undici@7.30.1:
-    optional: true
+  undici@7.30.1: {}
 
   unicorn-magic@0.3.0: {}
 

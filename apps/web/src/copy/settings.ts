@@ -77,6 +77,12 @@ export const SETTINGS_COPY = {
     '等待你确认权限、回答问题，以及模型服务不可用、opencode 重试期间都暂停计时，之后继续剩余时限；助手超时停止，不会自动重试。修改后从下一轮生效。',
   commitDraftTimeout: 'AI 草拟提交信息的时限（秒）',
   commitDraftTimeoutHint: 'Git 工作台「AI 草拟」等待 AI 写完的最长时间，超过就停止；本地模型较慢时调大。',
+  commitIdentity: '任务的提交人',
+  commitIdentityName: '名字',
+  commitIdentityEmail: '邮箱',
+  commitIdentityHint:
+    '任务的提交与交付时的合并、squash、变基提交用这个名字和邮箱；留空使用 agent-workflow <agent-workflow@localhost>。托管平台要求提交人是平台用户时填你的名字和邮箱。只影响之后的提交。',
+  commitIdentityInvalid: '名字和邮箱要么都填（邮箱形如 name@corp.com），要么都留空。',
   worktreeRoot: '独立工作区目录',
   worktreeRootHint: '绝对路径；留空使用数据目录下的 worktrees。只影响之后新建的任务。',
   defaultStrategy: '「合并」按钮的合并方式',
