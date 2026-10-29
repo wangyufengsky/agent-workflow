@@ -25,8 +25,11 @@ test('任务的提交人：名字与邮箱都填了才保存，只填一项时�
   await email.press('Enter');
   await expect(group.getByText('要么都留空')).toBeHidden();
   await expect.poll(() => savedIdentity(request)).toEqual({ name: 'Zhang San', email: 'zs@corp' });
-  await group.screenshot({ path: 'screenshots/settings/commit-identity.png' });
 
+  // Saving re-keys the inputs once the response is in; a fresh page has nothing pending and shows what was saved.
+  await page.reload();
+  await expect(name).toHaveValue('Zhang San');
+  await expect(email).toHaveValue('zs@corp');
   await name.fill('');
   await email.fill('');
   await email.press('Enter');
