@@ -172,7 +172,7 @@ stateDiagram-v2
 
 **`verifying`** 依次执行检查：`command` 在 worktree 中运行（超时 `ACCEPTANCE_COMMAND_TIMEOUT_MS`）；`ai_review` 创建 `review` 类尝试，`submit_review` 返回 `pass/fail`。任一失败即 `checks_failed`。
 
-**提交代码**：节点到达 `done` 之前，后端在 worktree 执行 `git add -A && git commit -m "<taskKey> <nodeTitle>"`（无改动则跳过，`commit_sha` 为空），提交 sha 记录在节点上；先提交再转换，下游节点不会在提交之前开始。提交者为 `GIT_COMMIT_IDENTITY`，带 `--no-verify` 且关闭签名（D48）。并行节点共享任务工作区，先完成的节点的提交会包含此刻工作区中的全部改动。模型不需要自己提交。
+**提交代码**：节点到达 `done` 之前，后端在 worktree 执行 `git add -A && git commit -m "<taskKey> <nodeTitle>"`（无改动则跳过，`commit_sha` 为空），提交 sha 记录在节点上；先提交再转换，下游节点不会在提交之前开始。提交者为 `GIT_COMMIT_IDENTITY`（设置了 `git.commitIdentity` 时为设置的身份，D227），带 `--no-verify` 且关闭签名（D48）。并行节点共享任务工作区，先完成的节点的提交会包含此刻工作区中的全部改动。模型不需要自己提交。
 
 **AI 评审未完成**：评审会话没有提交结论就结束（未提交、出错、超时、被中止）按 `checks_failed` 处理；运行时消失则 `interrupted`（D49）。
 
@@ -272,7 +272,7 @@ stateDiagram-v2
 
 1. 检查（任一不满足即返回错误，不建 delivery、不改状态）：目标分支存在（`DELIVERY_TARGET_NOT_FOUND`）；任务 worktree 没有未提交改动（`WORKTREE_DIRTY`）；目标分支检出所在的工作区（通常是用户的主工作区）干净，否则 `DELIVERY_TARGET_DIRTY`（不碰用户改动）。合并本身在仓库锁内进行，锁内、合并前再查一次这个工作区是否干净：检查与合并之间有人暂存了文件时同样 `DELIVERY_TARGET_DIRTY`（交付记为失败，任务回到待合并），压缩合并的提交因此不会带上用户暂存的文件。应用外的 git 进程不受这把锁约束。
 2. 建 delivery（`running`），任务 `deliver → merging`。
-3. 在仓库锁内、在**主仓库**中合并：目标分支检出在哪个工作区就在哪里合并（用户主工作区在目标分支上时其文件随之更新）；没有检出时在临时 worktree 中合并后删除。提交者为 `GIT_COMMIT_IDENTITY`、`--no-verify`、关闭签名（同 D48）。
+3. 在仓库锁内、在**主仓库**中合并：目标分支检出在哪个工作区就在哪里合并（用户主工作区在目标分支上时其文件随之更新）；没有检出时在临时 worktree 中合并后删除。提交者为 `GIT_COMMIT_IDENTITY`（或 `git.commitIdentity`，D227）、`--no-verify`、关闭签名（同 D48）。
    - `squash`：`git merge --squash` → 提交「<任务标题> (<任务编号>)」；目标分支已含全部改动时不提交。冲突时 `git reset --merge`（squash 没有 MERGE_HEAD，`merge --abort` 不可用）。
    - `merge`：`git merge --no-ff -m …`；冲突时 `git merge --abort`。
    - `rebase`：在任务 worktree 中 `git rebase <target>`（任务分支已包含目标分支时跳过，例如解决冲突时已合入），再在目标处 `git merge --ff-only`；冲突时 `git rebase --abort`。

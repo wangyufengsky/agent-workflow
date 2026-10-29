@@ -1,4 +1,4 @@
-import { AppError, ErrorCode, GIT_COMMIT_IDENTITY } from '@aw/shared';
+import { AppError, type CommitIdentity, ErrorCode, GIT_COMMIT_IDENTITY } from '@aw/shared';
 import { execa } from 'execa';
 import { host } from '../../core/platform.ts';
 
@@ -54,14 +54,10 @@ export function gitFailure(args: readonly string[], result: GitResult): AppError
 }
 
 /**
- * Commits made by the backend (node commits, merges, rebases) use agent-workflow's identity, without the user's
- * signing setup (D48); prepend to the git arguments.
+ * Commits made by the backend (node commits, merges, rebases) use agent-workflow's identity, or the one set in
+ * `git.commitIdentity` (D227), without the user's signing setup (D48); prepend to the git arguments.
  */
-export const BACKEND_COMMITTER = [
-  '-c',
-  `user.name=${GIT_COMMIT_IDENTITY.name}`,
-  '-c',
-  `user.email=${GIT_COMMIT_IDENTITY.email}`,
-  '-c',
-  'commit.gpgsign=false',
-] as const;
+export function backendCommitter(identity: CommitIdentity | null = null): readonly string[] {
+  const { name, email } = identity ?? GIT_COMMIT_IDENTITY;
+  return ['-c', `user.name=${name}`, '-c', `user.email=${email}`, '-c', 'commit.gpgsign=false'];
+}

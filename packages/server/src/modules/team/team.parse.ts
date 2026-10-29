@@ -73,15 +73,17 @@ export function parseTeamLog(output: string): CommitFacts[] {
         .replace(/^\0?\n?/, '');
       const found = trailers(trailerText);
       const email = authorEmail.toLowerCase();
+      const starter = requestedBy(found);
       return {
         sha,
         authorEmail: email,
         authorName,
         authoredAt: Number(authoredAt) * 1000,
         subject,
-        aiTask: email === GIT_COMMIT_IDENTITY.email,
+        // Only this app writes the starter trailer: with `git.commitIdentity` set its commits have another author (D227).
+        aiTask: email === GIT_COMMIT_IDENTITY.email || starter !== null,
         aiCoauthor: isAiCoauthor(found),
-        requestedBy: requestedBy(found),
+        requestedBy: starter,
         revertsSha: REVERTS.exec(body)?.[1] ?? null,
         files: [...parseNumstat(numstat)].map(([path, c]) => ({ path, added: c.additions, deleted: c.deletions })),
       };

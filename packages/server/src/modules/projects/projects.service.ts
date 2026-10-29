@@ -28,7 +28,7 @@ import type { Db } from '../../core/db/database.ts';
 import type { CredentialsService } from '../credentials/index.ts';
 import type { DatabasesService } from '../databases/index.ts';
 import {
-  BACKEND_COMMITTER,
+  backendCommitter,
   branchExists,
   initRepository,
   listUnignoredFiles,
@@ -141,7 +141,7 @@ async function putUnderGit(dir: string): Promise<void> {
   try {
     if (gitignore !== null) await writeFile(join(dir, '.gitignore'), gitignore);
     await stage(dir, ['.']);
-    const committer = (await readConfiguredIdentity(dir)) === null ? BACKEND_COMMITTER : [];
+    const committer = (await readConfiguredIdentity(dir)) === null ? backendCommitter() : [];
     // A directory whose files are all ignored still needs the base commit tasks branch from.
     await runGit([...committer, 'commit', '--quiet', '--allow-empty', '-m', GIT_INIT_COMMIT_MESSAGE], { cwd: dir });
   } catch (e) {

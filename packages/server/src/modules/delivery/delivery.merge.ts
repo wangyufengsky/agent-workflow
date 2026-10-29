@@ -1,9 +1,16 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AppError, DeliveryStrategy, ErrorCode, GitMergeStrategy, type LocalMergeStrategy } from '@aw/shared';
 import {
-  BACKEND_COMMITTER,
+  AppError,
+  type CommitIdentity,
+  DeliveryStrategy,
+  ErrorCode,
+  GitMergeStrategy,
+  type LocalMergeStrategy,
+} from '@aw/shared';
+import {
+  backendCommitter,
   branchExists,
   type GitResult,
   gitFailure,
@@ -24,6 +31,8 @@ export type LocalMergeInput = {
   strategy: LocalMergeStrategy;
   /** Subject of the squash or merge commit. */
   message: string;
+  /** Setting `git.commitIdentity` (D227). */
+  identity: CommitIdentity | null;
 };
 
 export type MergeOutcome = { merged: true; commitSha: string } | { merged: false; conflictFiles: string[] };
@@ -33,7 +42,10 @@ export type MergeOutcome = { merged: true; commitSha: string } | { merged: false
  * Git workbench (27 §2: their identity, hooks and signing).
  */
 type Committer = { identity: readonly string[]; hooks: boolean };
-const BACKEND: Committer = { identity: BACKEND_COMMITTER, hooks: false };
+const backend = (identity: CommitIdentity | null): Committer => ({
+  identity: backendCommitter(identity),
+  hooks: false,
+});
 const USER: Committer = { identity: [], hooks: true };
 
 /** Where the target branch is checked out (normally the user's main worktree), if anywhere. */
@@ -138,12 +150,25 @@ async function mergeIn(dir: string, input: LocalMergeInput): Promise<MergeOutcom
   switch (input.strategy) {
     case DeliveryStrategy.Squash:
     case DeliveryStrategy.Merge:
-      return mergeOrSquash(dir, input.branch, input.strategy === DeliveryStrategy.Squash, input.message, BACKEND);
+      return mergeOrSquash(
+        dir,
+        input.branch,
+        input.strategy === DeliveryStrategy.Squash,
+        input.message,
+        backend(input.identity),
+      );
     case DeliveryStrategy.Rebase: {
       // A branch that already contains the target (a resolved conflict merged it in) is fast-forwarded as it is:
       // rebasing it would replay the resolved conflict.
       if (!(await isAncestor(dir, input.targetBranch, input.branch))) {
-        const args = [...BACKEND_COMMITTER, 'rebase', '--quiet', '--no-verify', '--end-of-options', input.targetBranch];
+        const args = [
+          ...backendCommitter(input.identity),
+          'rebase',
+          '--quiet',
+          '--no-verify',
+          '--end-of-options',
+          input.targetBranch,
+        ];
         const result = await runGit(args, { cwd: input.worktreePath, ...accept });
         if (result.exitCode === 1) return conflictOrFailure(input.worktreePath, args, result, ['rebase', '--abort']);
       }

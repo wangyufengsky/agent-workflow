@@ -27,6 +27,7 @@ describe('本地合并在仓库锁内复查目标分支所在的工作区（09 �
       targetBranch: 'main',
       strategy: DeliveryStrategy.Squash,
       message: 'T-1 feature',
+      identity: null,
     });
 
     await expect(merge).rejects.toMatchObject({

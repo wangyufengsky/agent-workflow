@@ -277,7 +277,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `KNOWLEDGE_DOC_DIRS` / `KNOWLEDGE_DOC_EXTENSIONS` | `docs` `doc` / `.md` `.mdx` `.markdown` `.txt` `.rst` `.adoc` | 被引用的文件位于这些目录下或带这些扩展名时为文档，否则为代码（18 §6.1） |
 | `PROJECT_CHECK_PLACEHOLDER` | `$PROJECT_CHECK` | 验收命令中代表项目检查命令，物化节点时替换（13 §1） |
 | `MASTER_PASSWORD_SCRYPT` | `{ N: 2^17, r: 8, p: 1 }` | 新设主密码时的 scrypt 参数（约 128 MiB、半秒一次，D167）；每个主密码记下自己用的参数 |
-| `GIT_COMMIT_IDENTITY` | `agent-workflow <agent-workflow@localhost>` | 节点完成时后端提交的作者与提交者（09 §3）；为没有 Git 的目录初始化时，git 没有配置身份也用它（D153） |
+| `GIT_COMMIT_IDENTITY` | `agent-workflow <agent-workflow@localhost>` | 节点完成时后端提交的作者与提交者（09 §3），设置 `git.commitIdentity` 时改用设置（D227）；为没有 Git 的目录初始化时，git 没有配置身份也用它（D153） |
 | `GIT_INIT_BRANCH` / `GIT_INIT_COMMIT_MESSAGE` | `main` / `Initial commit` | 为没有 Git 的目录初始化时的分支与第一个提交的说明（D153，11 §3） |
 
 `constants/opencode.ts`：
@@ -397,6 +397,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `node.maxAttempts` | `3` | 专业 |
 | `attempt.timeoutMinutes` | `60` | 专业；任务尝试与助手单轮时限。等待用户（权限、提问）与等待模型服务（opencode 重试失败的模型请求，D163）的时间不算，之后继续剩余时长；助手超时停止且不自动重试 |
 | `git.commitDraftTimeoutSeconds` | `120`（Git 工作台「AI 草拟」提交信息的时限，超时即中止，请求返回 `COMMIT_DRAFT_FAILED`，27 §7.3；本地模型较慢时调大，D184） | 专业 |
+| `git.commitIdentity` | `null`（任务的节点提交与交付时的合并、squash、变基所用的作者与提交者 `{ name, email }`；`null` 用 `GIT_COMMIT_IDENTITY`。名字非空，两项都不能含换行与尖括号，邮箱形如 `name@host`；设置页「任务的提交人」，D227） | 专业 |
 | `worktree.rootDir` | `null`（使用 `<数据目录>/worktrees`；助手不能修改，D65） | 专业 |
 | `delivery.defaultStrategy` | `squash`（可选 `squash` / `merge` / `rebase`；PR 有单独按钮） | 专业 |
 | `delivery.deleteBranchAfterMerge` | `true` | 专业 |

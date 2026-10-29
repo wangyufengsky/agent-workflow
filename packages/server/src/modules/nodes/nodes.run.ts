@@ -22,7 +22,7 @@ import {
 } from '@aw/shared';
 import type { CommandCheckResult } from '../acceptance/index.ts';
 import type { Attempt } from '../attempts/index.ts';
-import { BACKEND_COMMITTER, hasMergeHead, readConfiguredIdentity, runGit } from '../git/index.ts';
+import { backendCommitter, hasMergeHead, readConfiguredIdentity, runGit } from '../git/index.ts';
 import type { createNodesRepo, Node, NodeChanges } from './nodes.repo.ts';
 import { feedbackFromAttempt, feedbackFromChecks, feedbackFromRejection, nextAfterFailure } from './nodes.rules.ts';
 import type { NodeRunContext, NodesServiceDeps } from './nodes.types.ts';
@@ -77,7 +77,8 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
       // The node's acceptance checks are the gate; the user's hooks may be slow or interactive.
       // The user who runs the task is named in a trailer, so that the team page can count it as theirs (D130).
       const message = withRequestedBy(`${ctx.taskKey} ${node.title}`, await readConfiguredIdentity(ctx.repoPath));
-      await runGit([...BACKEND_COMMITTER, 'commit', '--quiet', '--no-verify', '-m', message], { cwd });
+      const committer = backendCommitter(settings.get('git.commitIdentity'));
+      await runGit([...committer, 'commit', '--quiet', '--no-verify', '-m', message], { cwd });
       return (await runGit(['rev-parse', 'HEAD'], { cwd })).stdout.trim();
     });
   }

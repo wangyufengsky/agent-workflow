@@ -101,6 +101,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
         targetBranch: delivery.targetBranch,
         strategy,
         message: withRequestedBy(`${task.title} (${task.key})`, await readConfiguredIdentity(repoPath)),
+        identity: settings.get('git.commitIdentity'),
       });
     } catch (err) {
       recordFailure(task.id, delivery, err);

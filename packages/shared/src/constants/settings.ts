@@ -25,6 +25,20 @@ const proxyUrlSchema = z
   .url({ protocol: /^https?$/ })
   .regex(/^https?:\/\/[^\s/?#@\\]+\/?$/i, 'A proxy URL in the settings is http(s)://host[:port] only');
 
+/** A git identity (D227): git rejects line breaks and angle brackets in `user.name` / `user.email`. */
+export const commitIdentitySchema = z.strictObject({
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .regex(/^[^<>\r\n]+$/),
+  email: z
+    .string()
+    .trim()
+    .regex(/^[^\s<>]+@[^\s<>]+$/),
+});
+export type CommitIdentity = z.infer<typeof commitIdentitySchema>;
+
 /** User settings (08 §4.3): key → value schema. Unknown keys are rejected. */
 export const settingsSchema = z.strictObject({
   'ui.mode': uiModeSchema,
@@ -41,6 +55,8 @@ export const settingsSchema = z.strictObject({
   'attempt.timeoutMinutes': z.number().int().min(1),
   /** An AI commit message draft is stopped after this long (27 §7.3); the request waits for it. */
   'git.commitDraftTimeoutSeconds': z.number().int().min(1),
+  /** Who task commits are made as (D227); null: `GIT_COMMIT_IDENTITY`. */
+  'git.commitIdentity': commitIdentitySchema.nullable(),
   /** Absolute directory; null means `<data dir>/worktrees`. */
   'worktree.rootDir': z.string().min(1).nullable(),
   /** Strategy of the result card's primary「合并」button; pull requests have their own button. */
@@ -94,6 +110,7 @@ export const SETTING_DEFAULTS: Settings = {
   'node.maxAttempts': 3,
   'attempt.timeoutMinutes': 60,
   'git.commitDraftTimeoutSeconds': 120,
+  'git.commitIdentity': null,
   'worktree.rootDir': null,
   'delivery.defaultStrategy': DeliveryStrategy.Squash,
   'delivery.deleteBranchAfterMerge': true,
@@ -130,6 +147,7 @@ export const SETTING_MODE: Record<SettingKey, UiMode> = {
   'node.maxAttempts': UiMode.Pro,
   'attempt.timeoutMinutes': UiMode.Pro,
   'git.commitDraftTimeoutSeconds': UiMode.Pro,
+  'git.commitIdentity': UiMode.Pro,
   'worktree.rootDir': UiMode.Pro,
   'delivery.defaultStrategy': UiMode.Pro,
   'delivery.deleteBranchAfterMerge': UiMode.Pro,

@@ -32,7 +32,7 @@
 
 - 每个作者邮箱（小写）是一个**身份**。系统自动把每个身份当作一个成员。
 - 组长可以：**合并身份**（同一个人的公司邮箱和个人邮箱）、**改显示名**、**设为非成员**（机器人、CI 账号，如 `dependabot[bot]`）。设置按项目保存（`team_identities`，§8.2）。
-- 本应用 AI 任务的提交作者是 `agent-workflow <agent-workflow@localhost>`（D52）。这些提交默认归入「AI 任务」，不算任何成员；任务提交带 §2.5 的发起人 trailer 时，归到发起人名下的「经 AI 任务」一栏。
+- 本应用 AI 任务的提交作者是 `agent-workflow <agent-workflow@localhost>`（D52），用户在设置里改了提交人（`git.commitIdentity`，D227）时是设置的身份。作者是 `agent-workflow@localhost` 或带 §2.5 发起人 trailer 的提交都算本应用的任务提交：默认归入「AI 任务」，不算任何成员；带发起人 trailer 时，归到发起人名下的「经 AI 任务」一栏。
 - 非成员（含「AI 任务」）在成员表下方单独列出，默认折叠，不进入团队合计与中位数。
 
 ### 2.4 排除规则（口径设置）
@@ -51,7 +51,7 @@
 | 标记 | 来源 |
 | --- | --- |
 | 作者是 `agent-workflow@localhost` | 本应用的任务提交、任务交付的合并提交 |
-| trailer `Agent-Workflow-Requested-By: 名字 <邮箱>` | **新增**（D130，用户已确认）：本应用的任务提交写上发起人（任务开始时项目仓库的 `git config user.name / user.email`）。只对加入后的提交有效，旧提交仍只归入「AI 任务」 |
+| trailer `Agent-Workflow-Requested-By: 名字 <邮箱>` | **新增**（D130，用户已确认）：本应用的任务提交写上发起人（任务开始时项目仓库的 `git config user.name / user.email`）。只对加入后的提交有效，旧提交仍只归入「AI 任务」；只有本应用写它，所以设置了提交人（D227）、作者不是 `agent-workflow@localhost` 的提交也凭它认出 |
 | trailer `Co-Authored-By:` 的名字或邮箱含已知 AI 工具 | Claude、Copilot、Cursor、Codex、Gemini、Devin、aider 等（列表 `TEAM_AI_COAUTHOR_PATTERNS`），由其他工具写入 |
 
 成员页的「AI 参与」= 该成员名下带上述任一标记的提交占比；「经 AI 任务」= 带本应用发起人 trailer、归到他名下的提交数。
@@ -302,7 +302,7 @@
 
 ### 8.4 任务提交的发起人 trailer（D130）
 
-`nodes.run.ts` 的节点提交与 `tasks.delivery.ts` 交付的 squash / 合并提交，在提交信息末尾加 `Agent-Workflow-Requested-By: 名字 <邮箱>`（`withRequestedBy`）。名字与邮箱在提交时从项目仓库的配置读（`git config user.name` / `user.email`，不用 git 按主机名猜的身份）；任一项读不到或为空时不加。作者与提交者仍是 `GIT_COMMIT_IDENTITY`（D52 不变）。
+`nodes.run.ts` 的节点提交与 `tasks.delivery.ts` 交付的 squash / 合并提交，在提交信息末尾加 `Agent-Workflow-Requested-By: 名字 <邮箱>`（`withRequestedBy`）。名字与邮箱在提交时从项目仓库的配置读（`git config user.name` / `user.email`，不用 git 按主机名猜的身份）；任一项读不到或为空时不加。作者与提交者是 `GIT_COMMIT_IDENTITY`，或设置 `git.commitIdentity`（D227）。
 
 ## 9. 实现结构
 
