@@ -191,7 +191,9 @@
 | X-09 | 打包：electron-builder 增加 win nsis x64、linux AppImage + deb x64、`icon.png`、维护者与可执行文件名；`pnpm dist` 构建当前平台 | CI 在 windows 与 ubuntu 上打出安装包并上传 artifact |
 | X-10 | CI：GitHub Actions 三平台矩阵（verify 各步骤、浏览器 E2E、Electron 启动冒烟，Linux 用 xvfb）；数据库集成测试只在 ubuntu 运行并写明原因 | 三平台全绿 |
 | X-11 | 文档收尾：03 §7 数据目录、11 环境接口、07 CI 与 Electron 冒烟、14 引导页、README 各平台安装、本节状态 | 文档与代码一致 |
-| X-12（D228） | 恢复 Windows x64：ripgrep 的 Windows zip 校验与 rg.exe、Windows CI 矩阵、NSIS 安装后冒烟、v1.4.37-beta.1 未签名测试版 | 自动化测试与 CI 通过后以 prerelease 发布；真机模型任务验收范围单独注明 |
+| X-12（D228，PR #168） | 恢复 Windows x64：ripgrep 的 Windows zip 校验与 rg.exe、Windows CI 矩阵、NSIS 安装后冒烟、v1.4.37-beta.1 未签名测试版 | 自动化测试与 CI 通过后以 prerelease 发布；真机模型任务验收范围单独注明 |
+
+X-12 已完成（2026-10-30）：Windows x64 未签名测试版 v1.4.37-beta.1，跨平台 CI 31/31 通过；发布与验证记录见 [04 §5.2p](04-project-plan.md)。
 
 ## v1.1 · 质量与用量
 

@@ -243,18 +243,18 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 | `check (os)` | `pnpm check`、`pnpm test` |
 | `test:int (os, i/2)` | `pnpm test:int --shard=i/2`（vitest 按文件分片） |
 | `e2e (os, i/2)` | `pnpm build`、拉取 `postgres:17.6`（J21 要用，没有镜像时跳过）后 `pnpm e2e --grep-invert @walkthrough --shard=i/2`（除 J9 外的浏览器 E2E，Playwright 按文件分片） |
-| `e2e J9 (os, i/4)` | `pnpm build` 后 `pnpm e2e --grep @walkthrough --shard=i/4`：J9 每套主题一个用例，一片一套主题 |
+| `e2e J9 (os, i/4)` | `pnpm build` 后 `pnpm e2e --grep @walkthrough --shard=i/4`：J9 每套主题一个用例，五套主题均分到四片 |
 | `package (os)` | `pnpm build`、Electron 启动冒烟（Linux 含 J42 的主密码一例）、Linux 带 Secret Service 的凭据存储（`dbus-run-session` 里解锁 gnome-keyring 后以 `AW_E2E_SECRET_SERVICE=1` 再跑 `credentials.electron.spec.ts`，D167）、`pnpm dist`、上传安装包 |
 
-macOS 仍是一个 job，按上面的顺序串行跑完：它约 3 分钟，比拆分后的 Windows 还快，而 macOS runner 按 10 倍计费，拆开只增加费用。
+macOS 仍是一个 job，按上面的顺序串行跑完；拆分与分片沿用 D81 的安排，早期耗时记录见下文。
 
 **何时运行与当前的验收（D82，用户确认）**：
 
 - **当前的验收以本机 macOS 的全量验证为准**：主会话验收每个 PR 时在本机运行 `pnpm verify`、`pnpm e2e`、`pnpm test:oc`、`pnpm e2e:electron`，通过后合并。
 - **三平台 CI 不自动运行**：工作流只有 `workflow_dispatch` 触发，PR、推送到 main 与 tag 都不触发。发布正式版本前，或某个改动需要在 Windows / Linux 上确认时，手动运行（GitHub 的 Actions → CI → Run workflow，或 `gh workflow run ci.yml --ref <分支>`）。手动运行时三个平台都跑，上面的拆分与分片照样生效。
-- **跨平台代码照常写**：平台差异仍只在 `core/platform.ts` 等三处处理（D71），平台相关的单元测试（如 `platform.test.ts`）不依赖运行平台，在 macOS 上也会运行。Windows / Linux 的真机验证与三平台 CI 推迟到正式版本之前（§5）。
+- **跨平台代码照常写**：平台差异仍只在 `core/platform.ts` 等三处处理（D71），平台相关的单元测试（如 `platform.test.ts`）不依赖运行平台，在 macOS 上也会运行。Windows x64 测试版在发布前完成本节 CI（D228）；Windows / Linux 的真机验证仍按 §5 记录。
 
-分片的取值是 `i/N`，N 与矩阵列表写在一起；Playwright 与 vitest 的分片都是把全部用例按顺序切成 N 份，各片的并集就是全部用例，新增的 spec 或测试文件自动进入某一片。J9 原来是一个循环四套主题的用例（Windows 上 4.5 分钟，无法分片），现拆成每套主题一个用例（`walkthrough.browser.spec.ts`，标签 `@walkthrough`）：该 describe 设为 `parallel` 只为让分片能把它们分开；本机一个 worker 时四个用例依次运行、共用 `beforeAll` 的一次种子数据，与原来相同。
+分片的取值是 `i/N`，N 与矩阵列表写在一起；Playwright 与 vitest 的分片都是把全部用例按顺序切成 N 份，各片的并集就是全部用例，新增的 spec 或测试文件自动进入某一片。J9 原来是一个循环四套主题的用例（Windows 上 4.5 分钟，无法分片），现拆成每套主题一个用例（`walkthrough.browser.spec.ts`，标签 `@walkthrough`）：该 describe 设为 `parallel` 只为让分片能把它们分开；本机一个 worker 时全部主题的用例依次运行、共用 `beforeAll` 的一次种子数据，与原来相同。
 
 **结果与重跑。** job 内后面的步骤在前面失败后照常运行，一轮能看到该 job 的全部问题；任何一步失败，该 job 失败，整个 run 也就失败。只重跑失败部分用 GitHub 自带的「Re-run failed jobs」（或 `gh run rerun <run-id> --failed`），不另做机制。失败时 E2E 的 trace（`retain-on-failure`）连同 `test-results/` 作为 artifact 上传（`e2e-results-*`、`walkthrough-results-*`），后端日志在 CI 中输出到 job 日志。
 
