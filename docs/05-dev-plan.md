@@ -191,6 +191,8 @@
 | X-09 | 打包：electron-builder 增加 win nsis x64、linux AppImage + deb x64、`icon.png`、维护者与可执行文件名；`pnpm dist` 构建当前平台 | CI 在 windows 与 ubuntu 上打出安装包并上传 artifact |
 | X-10 | CI：GitHub Actions 三平台矩阵（verify 各步骤、浏览器 E2E、Electron 启动冒烟，Linux 用 xvfb）；数据库集成测试只在 ubuntu 运行并写明原因 | 三平台全绿 |
 | X-11 | 文档收尾：03 §7 数据目录、11 环境接口、07 CI 与 Electron 冒烟、14 引导页、README 各平台安装、本节状态 | 文档与代码一致 |
+| X-12（D228） | 恢复 Windows x64：ripgrep 的 Windows zip 校验与 rg.exe、Windows CI 矩阵、NSIS 安装后冒烟、v1.4.37-beta.1 未签名测试版 | 自动化测试与 CI 通过后以 prerelease 发布；真机模型任务验收范围单独注明 |
+
 ## v1.1 · 质量与用量
 
 > 状态：**已完成**（2026-10-21，PR #17）。设计见 [19-insights.md](19-insights.md)；决策 D79（只统计 tokens，不统计成本）与 D80（自写柱状图）用户已确认。验收：本机 macOS `pnpm verify`、`pnpm e2e`（含 J16 与走查 J9）、`pnpm test:oc` 通过；性能实测见 19 §5。与计划的差异：用户确认后去掉了成本（原设计按 opencode 报告的美元成本统计，并把未报价格的用量标为「未计价」）；趋势图为 HTML/CSS 柱状图；两种模式默认都看本周。顺带修复的根因缺陷：FakeOpencode 的 `abort()` 同步生效，提交结果那一步的用量永远报不上来（opencode 在工具结果之后紧接着发 step-finish，早于我们的中止请求）；跳过午夜的夏令时时区（哈瓦那）一天的起点算到了前一天（PR #17 评审）。恢复工作台、快照评审、历史归档不做见 D77。

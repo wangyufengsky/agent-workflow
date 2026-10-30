@@ -7,7 +7,7 @@ v1.0 只验收了 macOS arm64（D13），代码按跨平台抽象编写。本文
 | 平台 | 架构 | 级别 | 安装包 |
 | --- | --- | --- | --- |
 | macOS 14+ | arm64 | 支持（v1.0 已验收） | dmg（未签名） |
-| Windows 10 / 11 | x64 | **暂缓**（D160）：代码与打包配置保留，不进 CI、不做真机验证 | NSIS 安装程序 `.exe`（未签名，可选安装目录） |
+| Windows 10 / 11 | x64 | **测试版**（D228）：恢复 CI 与安装后冒烟；Windows 10/11 真机模型任务待验证 | NSIS 安装程序 `.exe`（未签名，可选安装目录） |
 | Ubuntu 22.04 / 24.04 | x64、arm64（D160） | 支持 | `.deb` 与 `.AppImage` |
 | 其他 Linux 发行版（Debian、Fedora、Arch 等） | x64、arm64 | 尽力支持：用 AppImage，不单独测试 | `.AppImage` |
 
@@ -87,7 +87,7 @@ Electron `app.getPath('userData')`，目录名为产品名：
 | --- | --- | --- |
 | `opencode serve` | 自成进程组（`detached`），停止时向进程组发 `SIGTERM` | 没有信号，`TerminateProcess` 只结束 opencode 本身，bash 子进程与语言服务会留下。用 `taskkill /pid <pid> /T /F` 结束进程树 |
 | 检查命令（`acceptance.runCommand`） | `/bin/sh -c`，自成进程组；超时 / 中止时向进程组发 `SIGTERM` | Git Bash `-c`（与 opencode 同一个 shell，D73）；超时 / 中止时 `taskkill /T /F` |
-| 页面预览的开发服务器（v1.3，`previews.process.ts`，29 §4） | 与检查命令同一个 POSIX shell、`killDescendants`；停止、空闲、worktree 删除前与应用退出时结束整棵进程树（macOS 上实测没有残留，29 §12 V5） | 同检查命令（Git Bash，`taskkill /T`）；**未在 Windows 上验证**（CI 停跑）。worktree 删除前先结束它，否则 Windows 上文件被占用（`worktrees.onBeforeRemove`） |
+| 页面预览的开发服务器（v1.3，`previews.process.ts`，29 §4） | 与检查命令同一个 POSIX shell、`killDescendants`；停止、空闲、worktree 删除前与应用退出时结束整棵进程树（macOS 上实测没有残留，29 §12 V5） | 同检查命令（Git Bash，`taskkill /T`）；由 Windows CI 的集成测试覆盖进程停止，真机预览待验证。worktree 删除前先结束它，否则 Windows 上文件被占用（`worktrees.onBeforeRemove`） |
 | git | 正常退出，不需要终止 | 同左 |
 
 两者都用 execa 的 `killDescendants` 启动（POSIX 上自成进程组，Windows 上停止时运行 `taskkill /T`），`child.kill()` 即结束整棵进程树。只结束 shell 本身时，它启动的命令（`a && b` 中的 `b`、后台的测试进程）继续运行并占着输出管道，execa 的结果要等它们结束才返回。
@@ -153,7 +153,7 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 - 安装位置：deb 装到 `/opt/Agent Workflow/`（electron-builder 的 `/opt/<productName>`），`update-alternatives` 建 `/usr/bin/agent-workflow`，菜单项 `/usr/share/applications/agent-workflow.desktop`，图标装进 hicolor；AppImage 不安装。用户数据都在 `~/.config/Agent Workflow/`。
 - 桌面快捷方式（D191，`desktop-shortcut.ts`）：打包后的应用在 Linux 第一次启动时往桌面（`app.getPath('desktop')`，读 `user-dirs.dirs`，中文系统为 `~/桌面`）放 `agent-workflow.desktop`：deb 复制它的菜单项；AppImage 写一个启动 `$APPIMAGE` 当前位置的条目，图标复制到用户数据目录。文件可执行，再用 `gio set … metadata::trusted true` 让 GNOME 桌面图标直接可启动（没有 `gio` 时只记日志，需在图标右键「允许启动」）。用户数据目录里的标记文件 `desktop-shortcut` 记下已放过，删掉的快捷方式不再出现；没有桌面目录或两种都不是（其他安装方式）时不放、下次再试。没在 Linux 真机验证。
 - `pnpm dist` 构建当前平台的安装包（`electron-builder` 不带平台参数，按各平台的 `target` 配置），CI 在各自的 runner 上运行。
-- 自带 ripgrep（D213）：`pnpm dist` 在打包前运行 `apps/desktop/scripts/fetch-ripgrep.mjs`，把本平台各架构的 ripgrep 15.1.0（macOS arm64、Linux x64 musl、Linux arm64）校验 SHA-256 后放到 `build/ripgrep/<os>-<arch>/`（不提交，已在 `.gitignore`），`extraResources` 按 `${os}-${arch}` 装进 `Resources/ripgrep/`，附 ripgrep 的许可证文件。打包需要能访问 GitHub；已有的目标不重复下载。Windows 暂缓（D160），没有对应条目。
+- 自带 ripgrep（D213）：`pnpm dist` 在打包前运行 `apps/desktop/scripts/fetch-ripgrep.mjs`，把本平台各架构的 ripgrep 15.1.0（macOS arm64、Linux x64 musl、Linux arm64、Windows x64 MSVC）校验 SHA-256 后放到 `build/ripgrep/<os>-<arch>/`（不提交，已在 `.gitignore`），`extraResources` 按 `${os}-${arch}` 装进 `Resources/ripgrep/`，附 ripgrep 的许可证文件。打包需要能访问 GitHub；已有的目标不重复下载。Windows 用上游 zip 与 `rg.exe`，系统 `tar`（bsdtar）解压，放到 `build/ripgrep/win-x64/`（D228）。
 - Linux 的已知限制（README 说明，**需要用户在真机确认**）：
   - Ubuntu 24.04 默认用 AppArmor 限制非特权用户命名空间，Chromium 沙箱无法启动 AppImage（报 `The SUID sandbox helper binary was found, but is not configured correctly`）。deb 安装会带上 SUID 的 `chrome-sandbox`，不受影响；AppImage 需要按 README 放行或使用 deb。不以 `--no-sandbox` 作为默认。
   - AppImage 需要 FUSE 2（Ubuntu 22.04 默认有，24.04 需 `sudo apt install libfuse2t64`）。
@@ -210,7 +210,7 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 
 **处理（`modules/network`）。**
 
-- 信任：后端启动时与设置 `network.extraCaCerts` 变化时调用 `tls.setDefaultCACertificates`，列表为 `bundled`（Node 内置）+ `extra`（`NODE_EXTRA_CA_CERTS`，启动时由 Node 读入；Electron 44 的 utilityProcess 实测会读）+ `system`（系统证书库）+ 设置里的证书。fetch（Octokit、Gitbeaker）与 mysql2、pg、gaussdb-node、tedious 都不传自己的 `ca`，用的就是这份默认列表。系统证书库各平台来源：macOS 为钥匙串中受信任的证书，Linux 为 OpenSSL 默认目录（`/etc/ssl/certs` 等，`update-ca-certificates` 写入的位置），Windows 为系统证书存储（Windows 暂缓，未验证）。
+- 信任：后端启动时与设置 `network.extraCaCerts` 变化时调用 `tls.setDefaultCACertificates`，列表为 `bundled`（Node 内置）+ `extra`（`NODE_EXTRA_CA_CERTS`，启动时由 Node 读入；Electron 44 的 utilityProcess 实测会读）+ `system`（系统证书库）+ 设置里的证书。fetch（Octokit、Gitbeaker）与 mysql2、pg、gaussdb-node、tedious 都不传自己的 `ca`，用的就是这份默认列表。系统证书库各平台来源：macOS 为钥匙串中受信任的证书，Linux 为 OpenSSL 默认目录（`/etc/ssl/certs` 等，`update-ca-certificates` 写入的位置），Windows 为系统证书存储（企业证书环境待真机验证）。
 - 代理：生效的变量为 `network.proxy` 有值时的它与 `network.noProxy`，否则为环境变量（小写优先，与 curl、Node、bun 相同）。有生效的代理时，后端在 `127.0.0.1` 的随机端口上开一个**转发代理**（`network.forward.ts`，D174），`http.setGlobalProxyFromEnv` 把 fetch 的全局 dispatcher 与 `http(s).globalAgent` 指向它（每次先还原上一次的设置），`NO_PROXY` 只剩 `localhost,127.0.0.1,[::1]`（Node 只认带方括号的 IPv6 写法，实测）。转发代理按生效的 `NO_PROXY` 决定每个请求直连还是经上游代理：一处匹配（`network.no-proxy.ts`），认网段、`*.域名` 与端口。只有拿到本次运行口令的进程能用它（代理 URL 的密码；用户名 `http` / `https` 说明请求的协议：Node 对 http 网址也用 CONNECT，隧道本身看不出该用哪个上游）。数据库连接是 TCP，不经代理。
 - 为什么要转发代理（实测，2026-10-25）：Node 24.19 / Electron 44 的 Node 24.22 与 bun 1.3.14 都不认 `10.0.0.0/8`、`10.*`、`127.0.0.*`，只认完整的主机名、IP、`主机:端口` 与单独的 `*`，并按字符串后缀匹配（`.0.0.1` 会匹配 `127.0.0.1`）；bun 不认 `*.corp.example`。git（Apple 2.50 / Homebrew 2.45，libcurl 8.7）认网段、不认 `*.corp.example` 与 IP 后缀；Ubuntu 22.04 的 curl 7.81 还不认网段（7.86 起）。
 - opencode（bun 1.3.14）：每次启动带 `NODE_USE_SYSTEM_CA=1`；设置里有证书时，把「后端从 `NODE_EXTRA_CA_CERTS` 读到的 + 设置里的」写到 `<数据目录>/network/extra-ca.pem`，`NODE_EXTRA_CA_CERTS` 指向它；有生效的代理时代理变量（大小写各一份）指向转发代理。CA 的改动要重启 opencode 才生效（运行环境页「重启」）；代理地址与 `noProxy` 的改动由转发代理立即应用，只有从没有代理到有代理（或反过来）要重启。
@@ -234,9 +234,9 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 
 ### 4.1 GitHub Actions（`.github/workflows/ci.yml`）
 
-工作流只在手动触发时运行（见下文「何时运行与当前的验收」）。平台为 Linux x64（`ubuntu-24.04`）、Linux arm64（`ubuntu-24.04-arm`）与 macOS；Windows 暂缓，不在矩阵里（D160）。各平台运行同一组检查与测试：`pnpm verify` 的各步骤（`check`、`test`、`test:int`、`build`）、浏览器 E2E `pnpm e2e`（FakeOpencode）、Electron 启动冒烟 `pnpm e2e:smoke`（J15：打包前的构建产物启动、后端握手、显示引导页、四项检测有结果；Linux 下用 `xvfb-run`）；两个 Linux 运行器另外各打本机架构的包，并把安装包（`release/*.AppImage`、`*.deb`）作为 artifact 上传。依赖安装（Node 24、pnpm 10.28、按锁文件哈希缓存的 pnpm store）由 `.github/actions/setup` 统一完成。
+工作流只在手动触发时运行（见下文「何时运行与当前的验收」）。平台为 Linux x64（`ubuntu-24.04`）、Linux arm64（`ubuntu-24.04-arm`）、macOS 与 Windows x64（`windows-2022`，D228）。各平台运行同一组检查与测试：`pnpm verify` 的各步骤（`check`、`test`、`test:int`、`build`）、浏览器 E2E `pnpm e2e`（FakeOpencode）、Electron 启动冒烟 `pnpm e2e:smoke`（J15：打包前的构建产物启动、后端握手、显示引导页、四项检测有结果；Linux 下用 `xvfb-run`）；两个 Linux 运行器另外各打本机架构的包，并把安装包（`release/*.AppImage`、`*.deb`）作为 artifact 上传。Windows 另打 NSIS x64，检查安装程序未签名、静默安装到含空格与中文的目录、执行安装副本的 `rg.exe --version`，然后用 `AW_E2E_EXECUTABLE_PATH` 指向安装后的 exe 重跑启动/退出冒烟；安装包上传 artifact。这些步骤不依赖真实模型。依赖安装（Node 24、pnpm 10.28、按锁文件哈希缓存的 pnpm store）由 `.github/actions/setup` 统一完成。
 
-**两个 Linux 运行器拆成并行的 job（D81；原为 ubuntu 与 windows，D160 起 windows 换成 arm64）。** 拆分时仓库是私有的，runner 只有 2 个 vCPU：vitest 默认的 worker 数是 CPU 数减 1，集成测试逐个文件串行；浏览器 E2E 共用一个后端，本来就是一个 worker。因此在这两个平台上把测试分到同时运行的多台机器上：
+**Linux x64/arm64 与 Windows x64 拆成并行的 job（D81、D228）。** 拆分时仓库是私有的，runner 只有 2 个 vCPU：vitest 默认的 worker 数是 CPU 数减 1，集成测试逐个文件串行；浏览器 E2E 共用一个后端，本来就是一个 worker。因此在这些运行器上把测试分到同时运行的多台机器上：
 
 | job | 内容 |
 | --- | --- |
@@ -244,7 +244,7 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 | `test:int (os, i/2)` | `pnpm test:int --shard=i/2`（vitest 按文件分片） |
 | `e2e (os, i/2)` | `pnpm build`、拉取 `postgres:17.6`（J21 要用，没有镜像时跳过）后 `pnpm e2e --grep-invert @walkthrough --shard=i/2`（除 J9 外的浏览器 E2E，Playwright 按文件分片） |
 | `e2e J9 (os, i/4)` | `pnpm build` 后 `pnpm e2e --grep @walkthrough --shard=i/4`：J9 每套主题一个用例，一片一套主题 |
-| `package (os)` | `pnpm build`、Electron 启动冒烟（含 J42 的主密码一例）、带 Secret Service 的凭据存储（`dbus-run-session` 里解锁 gnome-keyring 后以 `AW_E2E_SECRET_SERVICE=1` 再跑 `credentials.electron.spec.ts`，D167）、`pnpm dist`、上传安装包 |
+| `package (os)` | `pnpm build`、Electron 启动冒烟（Linux 含 J42 的主密码一例）、Linux 带 Secret Service 的凭据存储（`dbus-run-session` 里解锁 gnome-keyring 后以 `AW_E2E_SECRET_SERVICE=1` 再跑 `credentials.electron.spec.ts`，D167）、`pnpm dist`、上传安装包 |
 
 macOS 仍是一个 job，按上面的顺序串行跑完：它约 3 分钟，比拆分后的 Windows 还快，而 macOS runner 按 10 倍计费，拆开只增加费用。
 
@@ -344,7 +344,7 @@ macOS 不变：一个 job 2.9–3.6 分钟（改动后 3.1–3.5 分钟）。整
 | 三平台 `pnpm verify`（Windows / macOS 除数据库集成测试）、浏览器 E2E、Electron 启动冒烟 | CI 全绿 | CI |
 | Windows NSIS 与 Linux AppImage / deb 能打出来 | CI artifact | CI |
 | 本机 macOS：`pnpm verify`、`pnpm e2e`、`pnpm test:oc` | 本机运行 | 开发者 |
-| **Windows 真机**（暂缓，D160）：安装 NSIS 包（SmartScreen 放行）→ 引导页三项检测（Git for Windows、opencode 1.19.0、模型）→ 添加项目 → 跑通一个「修 Bug」任务 → 合并；任务中模型执行 bash 命令时只读规则生效（规划阶段不弹权限请求）；取消运行中的任务后 worktree 能被清理 | 手动 | **需要用户完成** |
+| **Windows 真机**（测试版后继续，D228）：安装 NSIS 包（SmartScreen 放行）→ 引导页三项检测（Git for Windows、opencode 1.19.0、模型）→ 添加项目 → 跑通一个「修 Bug」任务 → 合并；任务中模型执行 bash 命令时只读规则生效（规划阶段不弹权限请求）；取消运行中的任务后 worktree 能被清理 | 手动 | **需要用户完成** |
 | **Linux 真机（Ubuntu 22.04 / 24.04 桌面，x64 与 arm64 各一台）**：安装 deb 与运行 AppImage（24.04 的 AppArmor 限制）→ 引导页三项检测与「凭据存储」→ 绑定托管平台令牌（GNOME Keyring 存在时成功；无密钥服务时显示 `CREDENTIAL_UNAVAILABLE`）→ 跑通一个任务 | 手动 | **需要用户完成** |
 | 真实 opencode 在 Windows / Linux 上的 `test:oc`、`test:live`、J10 | 在对应机器上运行 | **需要用户完成**（可选） |
 

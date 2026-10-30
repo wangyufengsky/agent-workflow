@@ -8,9 +8,17 @@ import { _electron as electron, expect, test } from '@playwright/test';
 // checks answered, and quits cleanly (main waits for the backend to stop opencode and exit). No opencode or model
 // is needed; the full journey with them is J10. The window comes first with the opening animation, which a click
 // skips (28 §5, D113).
+async function launch(userDataDir: string) {
+  const executablePath = process.env.AW_E2E_EXECUTABLE_PATH;
+  return await electron.launch({
+    ...(executablePath === undefined ? {} : { executablePath }),
+    args: [...(executablePath === undefined ? ['apps/desktop'] : []), `--user-data-dir=${userDataDir}`],
+  });
+}
+
 test('构建后的应用启动后显示引导页并能正常退出', async () => {
   const userDataDir = mkdtempSync(join(tmpdir(), 'aw-e2e-launch-'));
-  const app = await electron.launch({ args: ['apps/desktop', `--user-data-dir=${userDataDir}`] });
+  const app = await launch(userDataDir);
   // What main and the backend printed, kept for a failure: it is intermittent on CI only (07 §1).
   const output: string[] = [];
   app.process().stdout?.on('data', (chunk) => output.push(String(chunk)));
@@ -55,7 +63,7 @@ test('构建后的应用启动后显示引导页并能正常退出', async () =>
 
 test('退出时释放应用预连接，后端与桌面进程都能正常结束', async () => {
   const userDataDir = mkdtempSync(join(tmpdir(), 'aw-e2e-preconnect-'));
-  const app = await electron.launch({ args: ['apps/desktop', `--user-data-dir=${userDataDir}`] });
+  const app = await launch(userDataDir);
   const child = app.process();
   const sockets = new Set<Socket>();
   const connected = Promise.withResolvers<void>();

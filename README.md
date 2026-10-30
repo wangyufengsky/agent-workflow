@@ -225,7 +225,7 @@ Linux 上用 `Ctrl` 代替 `⌘`。
 
 ## 安装
 
-在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。当前版本 **v1.4.36**：
+在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。当前稳定版 **v1.4.36**：
 
 | 平台 | 文件 |
 | --- | --- |
@@ -308,7 +308,11 @@ sudo apt install gnome-keyring
 
 ### Windows
 
-代码与打包配置保留，但还没有在 CI 和真机上验证，**暂不提供安装包**。想自己尝试的话，可以按[从源码运行](#从源码运行与参与开发)在 Windows 上执行 `pnpm dist`；注意需要完整的 Git for Windows（AI 执行的命令在它自带的 Git Bash 中运行）。平台差异见 [docs/17](docs/17-cross-platform.md)。
+Windows x64 未签名测试版 **v1.4.37-beta.1** 的安装包为 `agent-workflow-1.4.37-beta.1-setup-x64.exe`，在[测试版发布页](https://github.com/wangyufengsky/agent-workflow/releases/tag/v1.4.37-beta.1)下载，并可用同页的 `SHA256SUMS.txt` 核对文件。测试版不替换上面的稳定版。
+
+支持 Windows 10 / 11 x64，按当前用户安装，可选择安装目录。未签名的安装程序可能触发 SmartScreen：确认来源与校验值后点「更多信息 → 仍要运行」。需要完整的 **Git for Windows**（含 Git Bash）、opencode 与可用模型；安装包自带 ripgrep。
+
+CI 覆盖 Windows 构建、自动化测试与安装后的启动/退出；真实 Windows 10/11 桌面上的完整模型任务、企业网络与系统凭据实际使用仍待验证，所以先作为测试版提供。平台差异与验证范围见 [docs/17](docs/17-cross-platform.md)。
 
 ## 常见问题
 
