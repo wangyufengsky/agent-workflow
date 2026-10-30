@@ -25,6 +25,9 @@ export default defineConfig({
           globalSetup: [TEMP_ROOT],
           include: [`${SOURCES}/*.int.test.ts`],
           exclude: IGNORE,
+          // Node 24 在 Office 源码 worker 退出时可能重复释放 WASM 包装器，导致整个测试进程崩溃。
+          // https://github.com/nodejs/node/issues/66366；Node 24 纳入 #66376 的 V8 修复后移除。
+          execArgv: process.versions.node.startsWith('24.') ? ['--no-wasm-code-gc'] : [],
           // Real git and processes: a git-heavy test takes 1–2 s here, several times that on a busy CI runner and on
           // Windows, where process creation is slow (17 §4.1).
           testTimeout: 30_000,

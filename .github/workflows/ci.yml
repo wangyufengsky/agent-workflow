@@ -4,7 +4,7 @@
 # Day-to-day acceptance is the full local run on macOS. Tests that need the real opencode and a model (test:oc,
 # test:live, J10) are not run here: they stay on the developer's machine.
 #
-# Every platform runs the same tests as `pnpm verify`, `pnpm e2e` and `pnpm e2e:smoke`. On the two Linux runners the
+# Every platform runs the same tests as `pnpm verify`, `pnpm e2e` and `pnpm e2e:smoke`. On Linux and Windows the
 # suites are split into jobs that run at once (int and browser E2E in shards). macOS stays one job: it finishes in
 # about 3 minutes.
 #
@@ -105,7 +105,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2022]
-        # One theme per shard.
+        # 五套主题分成四片；Playwright 按用例均分。
         shard: [1, 2, 3, 4]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30

@@ -10,6 +10,8 @@
 
 ## 2. 测试分层
 
+Node 24 的集成测试进程暂用 `--no-wasm-code-gc`：Office 源码 worker 退出时触发过 V8 的 WASM 包装器回收崩溃（[nodejs/node#66366](https://github.com/nodejs/node/issues/66366)）。参数只在 Vitest 的 int 项目传入，不改变安装包；Node 24 纳入 [#66376](https://github.com/nodejs/node/pull/66376) 的修复后移除。测试仍执行全部用例，不加重试。
+
 | 层 | 工具 | 对象 | 依赖 | 位置 | 命令 |
 | --- | --- | --- | --- | --- | --- |
 | 单元 | Vitest | 纯逻辑：状态机表、计划校验、调度决策函数、git 输出解析器、配置生成、检查点解析、错误映射、主题对比度 | 无 IO | 被测文件旁 `*.test.ts` | `pnpm test` |
