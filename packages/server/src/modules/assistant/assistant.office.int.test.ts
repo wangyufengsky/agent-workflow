@@ -89,8 +89,8 @@ describe('助手生成 Word 与 Excel（39 §7.2）', () => {
 
     const docx = toolResults('create_docx');
     expect(docx.map((c) => c.result)).toMatchObject([
-      { file: 'out/周报.docx' },
-      { file: 'out/周报 (2).docx' },
+      { file: join('out', '周报.docx') },
+      { file: join('out', '周报 (2).docx') },
       { code: ErrorCode.ValidationFailed },
     ]);
     const xlsx = toolResults('create_xlsx');
@@ -98,13 +98,13 @@ describe('助手生成 Word 与 Excel（39 §7.2）', () => {
     expect(xlsx[1]).toMatchObject({ isError: true, result: { code: ErrorCode.AttachmentNotFound } });
 
     const files = (await t.call(listAssistantFilesOp, { id: mine.id })).body.items.map((f) => f.path);
-    expect(files).toEqual(['out/周报 (2).docx', 'out/周报.docx', '按区域.xlsx']);
+    expect(files).toEqual([join('out', '周报 (2).docx'), join('out', '周报.docx'), '按区域.xlsx']);
     const page: TranscriptPage = (
       await t.request({ method: 'GET', url: `/assistant/conversations/${mine.id}/transcript` })
     ).json();
     expect(page.entries.filter((e) => e.kind === 'attachment').map((e) => e.data)).toEqual([
-      { path: 'out/周报.docx' },
-      { path: 'out/周报 (2).docx' },
+      { path: join('out', '周报.docx') },
+      { path: join('out', '周报 (2).docx') },
       { path: '按区域.xlsx' },
     ]);
 

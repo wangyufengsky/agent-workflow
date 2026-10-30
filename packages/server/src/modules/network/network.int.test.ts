@@ -24,6 +24,7 @@ import { createTestRepo } from '../../../test/helpers/git.ts';
 import { createGitHttpServer } from '../../../test/helpers/git-http.ts';
 import { createTestProxy, type TestProxy } from '../../../test/helpers/proxy.ts';
 import { createTestCertificates, type TestCertificates } from '../../../test/helpers/tls.ts';
+import { host } from '../../core/platform.ts';
 import { runGit } from '../git/index.ts';
 
 const TOKEN = 'glpat-valid';
@@ -184,8 +185,12 @@ else { writeFileSync(${JSON.stringify(launchEnv)}, JSON.stringify(process.env));
     const launched: NodeJS.ProcessEnv = JSON.parse(await readFile(launchEnv, 'utf8'));
     expect(launched).toMatchObject({ NODE_USE_SYSTEM_CA: '1', NO_PROXY: 'localhost,127.0.0.1,[::1]' });
     expect(await readFile(launched.NODE_EXTRA_CA_CERTS ?? '', 'utf8')).toContain(certificates.caPem.trim());
-    const forward = launched.HTTPS_PROXY ?? '';
-    expect([launched.https_proxy, launched.HTTP_PROXY]).toEqual([forward, launched.http_proxy]);
+    const forward = host.envValue(launched, 'HTTPS_PROXY') ?? '';
+    // Windows 子进程的环境变量名不分大小写，序列化后只保留一个大小写版本。
+    expect([host.envValue(launched, 'https_proxy'), host.envValue(launched, 'HTTP_PROXY')]).toEqual([
+      forward,
+      host.envValue(launched, 'http_proxy'),
+    ]);
     const port = new URL(corp.endpoints.gitlabUrl).port;
     // Through the upstream proxy, which alone resolves the name; an address in the network goes direct.
     expect(await tunnel(forward, `${CORP_HOST}:${port}`)).toBe(200);
@@ -235,7 +240,8 @@ describe('git 推拉用应用的 CA 与代理（D175）', () => {
     expect(untrusted.raw.json().error.details.stderr).toMatch(/certificate/);
 
     await t.call(updateSettingsOp, { 'network.extraCaCerts': certificates.caPem });
-    expect((await t.call(gitPushOp, { id: project.id, branch: 'main' })).status).toBe(204);
+    const pushed = await t.call(gitPushOp, { id: project.id, branch: 'main' });
+    expect(pushed.status, pushed.raw.body).toBe(204);
     expect((await runGit(['rev-parse', 'main'], { cwd: project.bare })).stdout).toBe(
       (await project.repo.git('rev-parse', 'main')).trim(),
     );
@@ -250,7 +256,8 @@ describe('git 推拉用应用的 CA 与代理（D175）', () => {
     await t.call(updateSettingsOp, { 'network.extraCaCerts': certificates.caPem, 'network.proxy': fromSettings.url });
     const project = await projectWithOrigin(t, server.url, root, 'origin.git');
 
-    expect((await t.call(gitPushOp, { id: project.id, branch: 'main' })).status).toBe(204);
+    const pushed = await t.call(gitPushOp, { id: project.id, branch: 'main' });
+    expect(pushed.status, pushed.raw.body).toBe(204);
     expect((await t.call(gitFetchOp, { id: project.id })).status).toBe(204);
     const target = new URL(server.url('origin.git')).host;
     expect(fromSettings.connects).toEqual([target, target]);
