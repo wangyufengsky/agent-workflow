@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { type BrowserNetwork, ServerEventType, type SettingKey, type SettingsPatch } from '@aw/shared';
 import type { EventBus } from '../../core/event-bus.ts';
 import type { Logger } from '../../core/logger.ts';
+import { host } from '../../core/platform.ts';
 import type { GitNetwork } from '../git/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { createForwardProxy } from './network.forward.ts';
@@ -111,7 +112,7 @@ export async function createNetworkModule({ settings, events, env, dataDir, log 
       const proxied = isProxied(currentProxy());
       return {
         config: [
-          ...(pem === null ? [] : [['http.sslCAInfo', gitCertificatesFile] as const]),
+          ...(pem === null ? [] : [...host.gitCustomCaConfig, ['http.sslCAInfo', gitCertificatesFile] as const]),
           ...(proxied
             ? [['http.proxy', forward.url('https')] as const, ['http.proxyAuthMethod', 'basic'] as const]
             : []),

@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const VERSION = '15.1.0';
-/** electron-builder's `${os}-${arch}` → the release asset and its SHA-256. Windows is on hold (D160). */
+/** electron-builder's `${os}-${arch}` → the release asset and its SHA-256. */
 const TARGETS = {
   'mac-arm64': {
     asset: 'aarch64-apple-darwin',
@@ -23,11 +23,17 @@ const TARGETS = {
     asset: 'aarch64-unknown-linux-gnu',
     sha256: '2b661c6ef508e902f388e9098d9c4c5aca72c87b55922d94abdba830b4dc885e',
   },
+  'win-x64': {
+    asset: 'x86_64-pc-windows-msvc',
+    sha256: '124510b94b6baa3380d051fdf4650eaa80a302c876d611e9dba0b2e18d87493a',
+  },
 };
 /** Shipped next to rg: ripgrep is dual-licensed MIT / Unlicense. */
 const LICENSE_FILES = ['COPYING', 'LICENSE-MIT', 'UNLICENSE'];
-const OS = { darwin: 'mac', linux: 'linux' }[process.platform];
+const OS = { darwin: 'mac', linux: 'linux', win32: 'win' }[process.platform];
 if (OS === undefined) throw new Error(`no bundled ripgrep for ${process.platform}`);
+const executable = OS === 'win' ? 'rg.exe' : 'rg';
+const extension = OS === 'win' ? 'zip' : 'tar.gz';
 
 const exists = (file) =>
   stat(file).then(
@@ -38,9 +44,9 @@ const exists = (file) =>
 for (const [target, { asset, sha256 }] of Object.entries(TARGETS)) {
   if (!target.startsWith(`${OS}-`)) continue;
   const dir = join(import.meta.dirname, '..', 'build', 'ripgrep', target);
-  if (await exists(join(dir, 'rg'))) continue;
+  if (await exists(join(dir, executable))) continue;
   const name = `ripgrep-${VERSION}-${asset}`;
-  const url = `https://github.com/BurntSushi/ripgrep/releases/download/${VERSION}/${name}.tar.gz`;
+  const url = `https://github.com/BurntSushi/ripgrep/releases/download/${VERSION}/${name}.${extension}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
   const archive = Buffer.from(await res.arrayBuffer());
@@ -48,12 +54,14 @@ for (const [target, { asset, sha256 }] of Object.entries(TARGETS)) {
   if (actual !== sha256) throw new Error(`${url}: SHA-256 ${actual}, expected ${sha256}`);
   const scratch = await mkdtemp(join(tmpdir(), 'aw-ripgrep-'));
   try {
-    await writeFile(join(scratch, 'rg.tar.gz'), archive);
-    execFileSync('tar', ['-xzf', join(scratch, 'rg.tar.gz'), '-C', scratch]);
+    const archivePath = join(scratch, `rg.${extension}`);
+    await writeFile(archivePath, archive);
+    // Windows 10/11 的系统 tar（bsdtar）支持 zip；POSIX tar 自动识别 gzip。
+    execFileSync('tar', ['-xf', archivePath, '-C', scratch]);
     await mkdir(dir, { recursive: true });
     // rg last: its presence marks a complete target.
-    for (const file of [...LICENSE_FILES, 'rg']) await copyFile(join(scratch, name, file), join(dir, file));
-    await chmod(join(dir, 'rg'), 0o755);
+    for (const file of [...LICENSE_FILES, executable]) await copyFile(join(scratch, name, file), join(dir, file));
+    if (OS !== 'win') await chmod(join(dir, executable), 0o755);
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }

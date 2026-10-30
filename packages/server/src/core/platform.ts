@@ -56,6 +56,8 @@ export function platformRules(os: Platform) {
     fromGitPath: (gitPath: string): string => (isWindows ? paths.normalize(gitPath) : gitPath),
     /** Prepended to every git command: worktrees under the data directory easily exceed 260 characters. */
     gitPlatformArgs: isWindows ? (['-c', 'core.longpaths=true'] as const) : ([] as const),
+    // Schannel 对 CA 文件有 1 MiB 上限；应用的完整信任包需用 Git for Windows 自带的 OpenSSL 读取。
+    gitCustomCaConfig: isWindows ? ([['http.sslBackend', 'openssl']] as const) : ([] as const),
 
     /**
      * Whether commands run in Git for Windows' bash, which is then also opencode's shell (D72, D73); elsewhere

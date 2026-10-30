@@ -1,4 +1,13 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  accessSync,
+  constants,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -22,7 +31,8 @@ describe('Linux 桌面快捷方式（D191）', () => {
     const shortcut = createDesktopShortcut(p);
     expect(shortcut).toBe(join(p.desktop, SHORTCUT_FILE));
     expect(readFileSync(join(p.desktop, SHORTCUT_FILE), 'utf8')).toBe(readFileSync(p.menuEntry, 'utf8'));
-    expect(statSync(join(p.desktop, SHORTCUT_FILE)).mode & 0o111).not.toBe(0);
+    // Windows 不提供 POSIX 执行位；由文件系统检查可执行性，Linux 上仍会拒绝没有执行权限的文件。
+    expect(() => accessSync(join(p.desktop, SHORTCUT_FILE), constants.X_OK)).not.toThrow();
   });
 
   it('AppImage：启动当前位置的文件，图标复制到用户数据目录', () => {

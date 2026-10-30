@@ -203,6 +203,20 @@ v1.4.35 之后合并的 PR #165（用户 2026-10-29 内网反馈：助手的一�
 | 专业设置「任务的提交人」`git.commitIdentity`：任务提交与交付的合并、squash、变基用它；团队页按发起人 trailer 认出这些提交（D227，05 IN-34，PR #165） | 已合并，待用户检查 |
 | 发布：**v1.4.36**（2026-10-29）；没有新的数据库迁移；新的运行时依赖 `undici` | 已发布 |
 
+### 5.2p v1.4.37-beta.1：Windows x64 未签名测试版（已发布）
+
+2026-10-30，用户要求恢复 Windows 打包与 CI，测试通过后发布测试版（D228，05 X-12）。稳定版仍为 v1.4.36。
+
+| 内容 | 状态 |
+| --- | --- |
+| Windows 安装包自带 ripgrep 15.1.0 x64，校验上游 SHA-256，附许可证 | 已验证，PR #168 |
+| Windows CI：检查、单元、非数据库集成、浏览器 E2E、Electron 冒烟、NSIS 打包与安装后启动/退出 | 31 项 CI job 全部通过，PR #168 |
+| GitHub prerelease：Windows x64 未签名 exe 与 SHA256SUMS.txt | [已发布](https://github.com/wangyufengsky/agent-workflow/releases/tag/v1.4.37-beta.1)，稳定版仍为 v1.4.36 |
+| Windows 10/11 真机完整模型任务、企业网络与凭据使用 | 未验证，测试版说明保留此限制 |
+
+验证记录：[CI #41013936818](https://github.com/wangyufengsky/agent-workflow/actions/runs/41013936818) 在构建源 `408265530bd82a96a26f1d867b4827ee6570aecb` 上 31/31 通过，覆盖 Windows x64、Linux x64 / arm64、macOS。Windows 为 959 项单元、489 项集成通过（4 项 POSIX shell 用例按原有规则跳过），安装到中文与空格路径后 `rg.exe` 和应用启动/退出通过；安装包直接取自该 run。恢复 CI 时同时修复 Windows 自定义 CA 的 Schannel 大文件限制、三处平台假设错误的测试断言，并为 Node 24 集成测试记录上游 WASM 回收缺陷的临时参数与移除条件（07 §2）。本地 macOS 的 check / build、959 项单元、493 项非数据库集成、89 项浏览器 E2E、19 项 opencode 集成、21 项完整 Electron 测试通过（含真实模型旅程；平台/数据库专属用例按原有条件跳过）。
+
+
 ### 5.3 明确不做
 
 - 对外 MCP（供 Claude Desktop / Cursor 等外部工具调用）：应用助手已通过助手 MCP 使用全部操作，无外部需求；操作清单保留扩展能力。

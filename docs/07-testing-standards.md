@@ -10,6 +10,8 @@
 
 ## 2. 测试分层
 
+Node 24 的集成测试进程暂用 `--no-wasm-code-gc`：Office 源码 worker 退出时触发过 V8 的 WASM 包装器回收崩溃（[nodejs/node#66366](https://github.com/nodejs/node/issues/66366)）。参数只在 Vitest 的 int 项目传入，不改变安装包；Node 24 纳入 [#66376](https://github.com/nodejs/node/pull/66376) 的修复后移除。测试仍执行全部用例，不加重试。
+
 | 层 | 工具 | 对象 | 依赖 | 位置 | 命令 |
 | --- | --- | --- | --- | --- | --- |
 | 单元 | Vitest | 纯逻辑：状态机表、计划校验、调度决策函数、git 输出解析器、配置生成、检查点解析、错误映射、主题对比度 | 无 IO | 被测文件旁 `*.test.ts` | `pnpm test` |
@@ -150,8 +152,8 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 不设全局覆盖率百分比。
 - 以下模块要求分支覆盖率 ≥ 90%：`shared/fsm`、`shared/workflow`（计划校验）、`scheduler`、`mcp.registry`。
 - 本地 `pnpm verify`：check + test + test:int + build，另加 e2e（浏览器）必须全绿；`test:oc` 在装有 opencode 的机器上随 `pnpm verify:full` 执行。
-- 当前的验收以本机 macOS 的全量验证为准：`pnpm verify`、`pnpm e2e`、`pnpm test:oc`、`pnpm e2e:electron`（D82，用户确认）。跨平台代码照常按 `core/platform.ts` 写，平台相关的单元测试在 macOS 上也会运行；Windows / Linux 的真机与 CI 验证推迟到正式版本之前。
-- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：只在手动触发时运行（`workflow_dispatch`：发布前或需要时，17 §4.1），PR、推送到 main 与 tag 都不触发。一次运行在 macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J15，Linux 用 xvfb），Ubuntu 与 Windows 另打安装包。Ubuntu 与 Windows 上这些步骤拆成并行的 job，集成测试与浏览器 E2E 分片运行，J9 每套主题一片；macOS 一个 job（D81，耗时与计费分钟见 17 §4.3）。失败的 job 用 GitHub 的「Re-run failed jobs」单独重跑。数据库集成测试（`databases.int.test.ts`、`databases.engines.int.test.ts`）只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
+- 当前的验收以本机 macOS 的全量验证为准：`pnpm verify`、`pnpm e2e`、`pnpm test:oc`、`pnpm e2e:electron`（D82，用户确认）。跨平台代码照常按 `core/platform.ts` 写，平台相关的单元测试在 macOS 上也会运行；Windows x64 测试版在发布前完成跨平台 CI（D228），真机模型流程另行验收。
+- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：只在手动触发时运行（`workflow_dispatch`：发布前或需要时，17 §4.1），PR、推送到 main 与 tag 都不触发。一次运行在 macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J15，Linux 用 xvfb；D228 恢复 Windows x64，另静默安装 NSIS 并对安装副本运行启动/退出冒烟），Ubuntu 与 Windows 另打安装包。Ubuntu 与 Windows 上这些步骤拆成并行的 job，集成测试与浏览器 E2E 分片运行，J9 的五套主题分四片；macOS 一个 job（D81，耗时与计费分钟见 17 §4.3）。失败的 job 用 GitHub 的「Re-run failed jobs」单独重跑。数据库集成测试（`databases.int.test.ts`、`databases.engines.int.test.ts`）只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
 - 测试失败时禁止 `.skip` 合并；确需暂时跳过须附任务编号与原因，并在一周内处理。
 
 ## 9. 待实施设计的验证计划（30 / 31）
