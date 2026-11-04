@@ -2,9 +2,13 @@
 
 # Agent Workflow
 
+**简体中文** · [English](README.en.md)
+
 **Everything is a *Workflow.*　万事皆流程，执行由你掌控。**
 
-一个本地桌面应用：选项目、选流程、写一句需求，AI 在独立的 Git 分支里把活干完，你看结果、点合并。
+本地 AI 编程工作流桌面应用：基于 opencode 编排开发、测试与代码审查，每个任务隔离在独立 Git 分支与 worktree 中，由你检查结果、确认合并。
+
+[下载安装](https://github.com/wangyufengsky/agent-workflow/releases/latest) · [快速上手](#使用指南) · [查看截图](#界面导览) · [参与开发](#从源码运行与参与开发)
 
 [![Release](https://img.shields.io/github/v/release/wangyufengsky/agent-workflow?label=%E4%B8%8B%E8%BD%BD)](https://github.com/wangyufengsky/agent-workflow/releases/latest)
 ![Platform](https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-macOS%20arm64%20%7C%20Linux%20x64%20%2F%20arm64-informational)
@@ -13,6 +17,8 @@
 </div>
 
 ![主页：一个输入框，问助手或直接开始任务](docs/assets/readme/home.png)
+
+*以下沿用仓库已有的中文界面截图，展示操作流程，不代表新的真实模型验收结果。*
 
 ---
 
@@ -43,7 +49,7 @@ Agent Workflow 把「让 AI 写代码」变成一条看得见、停得住、由�
 - **合并永远由你来点**。没有自动合并，这是全自动执行唯一的安全底线。
 - **只在必须时打扰你**：AI 的提问、命令权限请求、失败重试，全部汇总到「需要你处理」。
 - **默认简单，专业可选**。简单模式只显示结果和必要的打扰；打开「专业模式」后可以编辑计划、编排流程、管理角色、使用 Git 工作台等。
-- **完全在本地运行**。代码不离开你的电脑（模型调用除外），AI 由应用托管的 [opencode](https://opencode.ai) 驱动，用你自己登录的模型。
+- **本地优先**。应用与任务数据保存在本机，AI 由应用托管的 [opencode](https://opencode.ai) 驱动，用你自己登录的模型。模型调用会把所需上下文发送给配置的提供方；启用托管平台或网络功能时也会连接相应服务。
 
 ## 功能一览
 
@@ -133,6 +139,8 @@ AI 遇到拿不准的事会提问，给出选项也可以自由回答；回答�
 做完后显示验收清单的逐项结论、每一步的摘要、改动文件与检查结果。确认没问题就「合并到 main」或「创建 PR」；不满意就「让 AI 再改改」，写一句要改什么。
 
 ![结果卡：验收清单、摘要、改动文件与交付按钮](docs/assets/readme/task-review.png)
+
+*图中的验收项仍未核验，交付警告保持可见；这张图展示的是检查与交付入口，不是「全部验收通过」的示例。*
 
 ### 编辑计划（专业模式）
 
