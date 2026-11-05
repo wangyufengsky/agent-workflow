@@ -1,0 +1,139 @@
+name: PR
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: PR check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm check
+      - run: pnpm test
+        if: ${{ !cancelled() }}
+
+  integration:
+    name: PR integration (${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm exec playwright install --only-shell chromium --with-deps
+      - name: 数据库镜像与集成测试
+        run: |
+          docker pull mysql:8.4
+          docker pull postgres:17.6
+          docker pull opengauss/opengauss-server:7.0.0-RC3.B025
+          docker pull mcr.microsoft.com/mssql/server:2022-latest
+          pnpm test:int --shard=${{ matrix.shard }}/2
+
+  browser:
+    name: PR browser (${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm exec playwright install --only-shell chromium --with-deps
+      - run: pnpm build
+      - run: docker pull postgres:17.6
+      - run: pnpm e2e --grep-invert @walkthrough --shard=${{ matrix.shard }}/2
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: pr-browser-${{ matrix.shard }}
+          path: test-results/
+
+  walkthrough:
+    name: PR walkthrough (${{ matrix.shard }}/4)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - run: pnpm exec playwright install --only-shell chromium --with-deps
+      - run: pnpm build
+      - run: pnpm e2e --grep @walkthrough --shard=${{ matrix.shard }}/4
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: pr-walkthrough-${{ matrix.shard }}
+          path: test-results/
+
+  smoke:
+    name: PR desktop smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      # Ubuntu 24.04 限制非特权用户命名空间；沿用跨平台 CI 的 Electron 沙箱设置。
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: pnpm build
+      - run: xvfb-run -a pnpm e2e:smoke
+      - name: Linux 系统密钥服务
+        if: ${{ !cancelled() }}
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends gnome-keyring dbus
+          xvfb-run -a dbus-run-session -- sh -c 'printf aw-ci | gnome-keyring-daemon --unlock --components=secrets >/dev/null && AW_E2E_SECRET_SERVICE=1 pnpm exec playwright test credentials.electron --project electron'
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: pr-desktop-smoke
+          path: test-results/
+
+  required:
+    name: PR checks
+    if: ${{ always() }}
+    needs: [check, integration, browser, walkthrough, smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # main 只绑定这个固定名称；失败、取消或跳过任一必需任务都不能放行。
+      - name: 检查全部结果
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          node <<'NODE'
+          const jobs = JSON.parse(process.env.NEEDS_JSON);
+          for (const [name, job] of Object.entries(jobs)) {
+            if (job.result !== 'success') throw new Error(`${name}: ${job.result}`);
+          }
+          NODE

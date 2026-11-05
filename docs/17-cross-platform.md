@@ -232,9 +232,24 @@ Electron 44 默认把 `basic_text` 报告为不可用（`isEncryptionAvailable()
 
 ## 4. 测试与 CI
 
-### 4.1 GitHub Actions（`.github/workflows/ci.yml`）
+### 4.1 GitHub Actions
 
-工作流只在手动触发时运行（见下文「何时运行与当前的验收」）。平台为 Linux x64（`ubuntu-24.04`）、Linux arm64（`ubuntu-24.04-arm`）、macOS 与 Windows x64（`windows-2022`，D228）。各平台运行同一组检查与测试：`pnpm verify` 的各步骤（`check`、`test`、`test:int`、`build`）、浏览器 E2E `pnpm e2e`（FakeOpencode）、Electron 启动冒烟 `pnpm e2e:smoke`（J15：打包前的构建产物启动、后端握手、显示引导页、四项检测有结果；Linux 下用 `xvfb-run`）；两个 Linux 运行器另外各打本机架构的包，并把安装包（`release/*.AppImage`、`*.deb`）作为 artifact 上传。Windows 另打 NSIS x64，检查安装程序未签名、静默安装到含空格与中文的目录、执行安装副本的 `rg.exe --version`，然后用 `AW_E2E_EXECUTABLE_PATH` 指向安装后的 exe 重跑启动/退出冒烟；安装包上传 artifact。这些步骤不依赖真实模型。依赖安装（Node 24、pnpm 10.28、按锁文件哈希缓存的 pnpm store）由 `.github/actions/setup` 统一完成。
+**PR 自动检查（X-13，2026-11-05 用户要求）**：`.github/workflows/pr.yml` 在指向 main 的 PR 和推送到 main 时运行，不设路径过滤，避免必需检查永久等待。只用 Linux x64（`ubuntu-24.04`），复用 `.github/actions/setup` 和现有测试命令；不生成安装包，不调用真实 opencode / 模型。同一 PR 有新提交时取消旧运行。
+
+| 检查 | 内容 |
+| --- | --- |
+| `PR check` | 类型、lint、依赖边界、CSS、状态机文档一致性、全部单元测试 |
+| `PR integration (i/2)` | 两片全部集成测试；拉取 MySQL、PostgreSQL、openGauss、SQL Server，安装 Chromium headless shell |
+| `PR browser (i/2)` | 构建、PostgreSQL、除主题走查外的全部浏览器 E2E，两片 |
+| `PR walkthrough (i/4)` | 构建、全部主题走查，四片 |
+| `PR desktop smoke` | 构建、Electron 启动与退出、主密码凭据存储、Linux Secret Service |
+| `PR checks` | 固定名称的汇总检查；依赖上述全部任务，任一失败、取消或跳过都失败 |
+
+main 的必需检查使用 GitHub Actions 的 `PR checks`，要求分支保持最新、讨论已解决，管理员也遵守，禁止强推和删除。不把其他仓库的检查名或手动全平台任务绑定为必需检查。保护配置是 GitHub 仓库设置，先在 PR 上验证所有任务通过、合并工作流，再启用。审批门槛独立于 CI，与 qq-agents main 的生效规则一致，不要求额外 PR 审批。
+
+自动运行有 10 个测试任务和 1 个汇总任务；原全平台手动 CI 有 31 个任务。自动检查保留 Linux 上完整的非模型验证，跨平台兼容与安装包仍由下述手动 CI 验证。
+
+**全平台 CI（`.github/workflows/ci.yml`）**只在手动触发时运行（见下文「何时运行与当前的验收」）。平台为 Linux x64（`ubuntu-24.04`）、Linux arm64（`ubuntu-24.04-arm`）、macOS 与 Windows x64（`windows-2022`，D228）。各平台运行同一组检查与测试：`pnpm verify` 的各步骤（`check`、`test`、`test:int`、`build`）、浏览器 E2E `pnpm e2e`（FakeOpencode）、Electron 启动冒烟 `pnpm e2e:smoke`（J15：打包前的构建产物启动、后端握手、显示引导页、四项检测有结果；Linux 下用 `xvfb-run`）；两个 Linux 运行器另外各打本机架构的包，并把安装包（`release/*.AppImage`、`*.deb`）作为 artifact 上传。Windows 另打 NSIS x64，检查安装程序未签名、静默安装到含空格与中文的目录、执行安装副本的 `rg.exe --version`，然后用 `AW_E2E_EXECUTABLE_PATH` 指向安装后的 exe 重跑启动/退出冒烟；安装包上传 artifact。这些步骤不依赖真实模型。依赖安装（Node 24、pnpm 10.28、按锁文件哈希缓存的 pnpm store）由 `.github/actions/setup` 统一完成。
 
 **Linux x64/arm64 与 Windows x64 拆成并行的 job（D81、D228）。** 拆分时仓库是私有的，runner 只有 2 个 vCPU：vitest 默认的 worker 数是 CPU 数减 1，集成测试逐个文件串行；浏览器 E2E 共用一个后端，本来就是一个 worker。因此在这些运行器上把测试分到同时运行的多台机器上：
 
@@ -251,7 +266,7 @@ macOS 仍是一个 job，按上面的顺序串行跑完；拆分与分片沿用 
 **何时运行与当前的验收（D82，用户确认）**：
 
 - **当前的验收以本机 macOS 的全量验证为准**：主会话验收每个 PR 时在本机运行 `pnpm verify`、`pnpm e2e`、`pnpm test:oc`、`pnpm e2e:electron`，通过后合并。
-- **三平台 CI 不自动运行**：工作流只有 `workflow_dispatch` 触发，PR、推送到 main 与 tag 都不触发。发布正式版本前，或某个改动需要在 Windows / Linux 上确认时，手动运行（GitHub 的 Actions → CI → Run workflow，或 `gh workflow run ci.yml --ref <分支>`）。手动运行时三个平台都跑，上面的拆分与分片照样生效。
+- **全平台 CI 仍手动运行，PR 自动检查独立执行**：`ci.yml` 只有 `workflow_dispatch` 触发，PR、推送到 main 与 tag 都不触发。发布正式版本前，或某个改动需要在 Windows / Linux 上确认时，手动运行（GitHub 的 Actions → CI → Run workflow，或 `gh workflow run ci.yml --ref <分支>`）。手动运行时三个平台都跑，上面的拆分与分片照样生效。
 - **跨平台代码照常写**：平台差异仍只在 `core/platform.ts` 等三处处理（D71），平台相关的单元测试（如 `platform.test.ts`）不依赖运行平台，在 macOS 上也会运行。Windows x64 测试版在发布前完成本节 CI（D228）；Windows / Linux 的真机验证仍按 §5 记录。
 
 分片的取值是 `i/N`，N 与矩阵列表写在一起；Playwright 与 vitest 的分片都是把全部用例按顺序切成 N 份，各片的并集就是全部用例，新增的 spec 或测试文件自动进入某一片。J9 原来是一个循环四套主题的用例（Windows 上 4.5 分钟，无法分片），现拆成每套主题一个用例（`walkthrough.browser.spec.ts`，标签 `@walkthrough`）：该 describe 设为 `parallel` 只为让分片能把它们分开；本机一个 worker 时全部主题的用例依次运行、共用 `beforeAll` 的一次种子数据，与原来相同。
@@ -322,7 +337,7 @@ macOS 不变：一个 job 2.9–3.6 分钟（改动后 3.1–3.5 分钟）。整
 | macOS（×10） | 3–4 / 30–40 | 4 / 40 |
 | **合计** | **32–37 / 79–95** | **56–57 / 123–125** |
 
-拆分使 Ubuntu 与 Windows 的实际分钟增加（每个 job 各有约 1 分钟准备，且各自向上取整）。改动前每个 PR 的每次推送与每次合并都自动跑一轮（PR #10 一个 PR 跑了 18 轮），用尽了账户的 Actions 额度；现在只在手动运行时消耗（D82）。
+拆分使 Ubuntu 与 Windows 的实际分钟增加（每个 job 各有约 1 分钟准备，且各自向上取整）。改动前每个 PR 的每次推送与每次合并都自动跑一轮（PR #10 一个 PR 跑了 18 轮），用尽了账户的 Actions 额度；D82 将全平台 CI 改为手动运行。X-13 恢复独立的 Linux x64 PR 自动检查，不自动运行其余平台或生成安装包；自动检查不改变本节历史耗时记录。
 
 **看过但没有采用的手段**：
 
