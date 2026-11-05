@@ -153,7 +153,8 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 以下模块要求分支覆盖率 ≥ 90%：`shared/fsm`、`shared/workflow`（计划校验）、`scheduler`、`mcp.registry`。
 - 本地 `pnpm verify`：check + test + test:int + build，另加 e2e（浏览器）必须全绿；`test:oc` 在装有 opencode 的机器上随 `pnpm verify:full` 执行。
 - 当前的验收以本机 macOS 的全量验证为准：`pnpm verify`、`pnpm e2e`、`pnpm test:oc`、`pnpm e2e:electron`（D82，用户确认）。跨平台代码照常按 `core/platform.ts` 写，平台相关的单元测试在 macOS 上也会运行；Windows x64 测试版在发布前完成跨平台 CI（D228），真机模型流程另行验收。
-- GitHub Actions（`.github/workflows/ci.yml`，v1.1）：只在手动触发时运行（`workflow_dispatch`：发布前或需要时，17 §4.1），PR、推送到 main 与 tag 都不触发。一次运行在 macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J15，Linux 用 xvfb；D228 恢复 Windows x64，另静默安装 NSIS 并对安装副本运行启动/退出冒烟），Ubuntu 与 Windows 另打安装包。Ubuntu 与 Windows 上这些步骤拆成并行的 job，集成测试与浏览器 E2E 分片运行，J9 的五套主题分四片；macOS 一个 job（D81，耗时与计费分钟见 17 §4.3）。失败的 job 用 GitHub 的「Re-run failed jobs」单独重跑。数据库集成测试（`databases.int.test.ts`、`databases.engines.int.test.ts`）只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
+- PR 自动检查（`.github/workflows/pr.yml`，X-13）：PR 的目标为 main 或推送到 main 时，Linux x64 运行 check、单元测试、全部集成测试（含四种数据库）、构建、全部浏览器 E2E（含主题走查）、Electron 冒烟和 Linux 系统密钥服务测试。固定检查 `PR checks` 仅在全部任务成功时通过；失败、取消、跳过都不能放行。自动检查不打安装包，不调用真实模型。详见 17 §4.1。
+- 全平台 GitHub Actions（`.github/workflows/ci.yml`，v1.1）：只在手动触发时运行（`workflow_dispatch`：发布前或需要时，17 §4.1），PR、推送到 main 与 tag 都不触发。一次运行在 macOS / Ubuntu / Windows 三平台跑 verify 各步骤、浏览器 E2E、Electron 启动冒烟（J15，Linux 用 xvfb；D228 恢复 Windows x64，另静默安装 NSIS 并对安装副本运行启动/退出冒烟），Ubuntu 与 Windows 另打安装包。Ubuntu 与 Windows 上这些步骤拆成并行的 job，集成测试与浏览器 E2E 分片运行，J9 的五套主题分四片；macOS 一个 job（D81，耗时与计费分钟见 17 §4.3）。失败的 job 用 GitHub 的「Re-run failed jobs」单独重跑。数据库集成测试（`databases.int.test.ts`、`databases.engines.int.test.ts`）只在 Ubuntu 上运行（Windows runner 不能运行 Linux 容器、macOS runner 没有 Docker），由工作流显式排除；`test:oc`、`test:live`、J10 不进 CI（17 §4）。
 - 测试失败时禁止 `.skip` 合并；确需暂时跳过须附任务编号与原因，并在一周内处理。
 
 ## 9. 待实施设计的验证计划（30 / 31）
