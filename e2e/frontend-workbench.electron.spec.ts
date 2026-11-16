@@ -241,6 +241,8 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
       await allow(continueEditing);
     }
     await expect.poll(async () => (await detail()).displayGroup).toBe('frontend_review');
+    await expect(page.getByText('待查看页面', { exact: true })).toBeVisible();
+    await expect(workbench.getByRole('button', { name: '完成并验收' })).toBeEnabled();
     // A SPA updates its URL in the current document before the user picks an element.
     await app.evaluate(async ({ BrowserWindow }, path) => {
       const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((item) => 'webContents' in item);
@@ -328,6 +330,8 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
           return [current.status, current.frontend?.rounds.length];
         })
         .toEqual(['review', number]);
+      await expect(page.getByText('待查看页面', { exact: true })).toBeVisible();
+      await expect(workbench.getByRole('button', { name: '完成并验收' })).toBeEnabled();
       const current = await detail();
       const last = current.frontend?.rounds.at(-1);
       if (last?.before == null) throw new Error('The round has no screenshot');

@@ -10,6 +10,7 @@ import {
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
+import { refreshTaskAfterMutation } from '../tasks/tasks.queries.ts';
 
 export const requirementsQuery = (taskId: string) =>
   queryOptions({
@@ -49,9 +50,10 @@ export const useReverifyRequirements = () => {
       expectedCommitSha?: string;
       items?: RequirementItemInput[];
     }) => callOperation(reverifyRequirementsOp, input),
-    onSuccess: (task) => {
-      qc.setQueryData(queryKeys.task(task.id), task);
-      void qc.invalidateQueries({ queryKey: queryKeys.taskRequirements(task.id) });
-    },
+    onSuccess: (task) =>
+      Promise.all([
+        refreshTaskAfterMutation(qc, task),
+        qc.invalidateQueries({ queryKey: queryKeys.taskRequirements(task.id) }),
+      ]),
   });
 };

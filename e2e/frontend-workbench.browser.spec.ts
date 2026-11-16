@@ -1,4 +1,4 @@
-import { taskDetailSchema } from '@aw/shared';
+import { InboxKind, PermissionDecision, TaskStatus, taskDetailSchema } from '@aw/shared';
 import { expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import { createProject, queueTurn, startTask, submitResult, TASK_RUN_TIMEOUT_MS } from './helpers.ts';
@@ -21,7 +21,10 @@ test('前端开发从开始任务直接进入预览，在同一个任务提交�
     { type: 'edit', file: 'preview.mjs', content: server },
     submitResult('首版就绪'),
   ]);
-  await queueTurn(request, project, { title: '界面修改 1' }, [submitResult('修改完成')]);
+  await queueTurn(request, project, { title: '界面修改 1' }, [
+    { type: 'permission', permission: 'bash', patterns: ['node verify-page.mjs'] },
+    submitResult('修改完成'),
+  ]);
   await startTask(page, project, /^前端开发$/, '在预览中开发订单页');
   const workbench = page.getByTestId('frontend-workbench');
   await expect(workbench).toBeVisible();
@@ -29,10 +32,42 @@ test('前端开发从开始任务直接进入预览，在同一个任务提交�
   await expect(workbench.getByRole('button', { name: '完成并验收' })).toBeEnabled();
   await workbench.getByRole('button', { name: '标注修改' }).click();
   await workbench.getByRole('textbox', { name: '补充这轮的整体要求' }).fill('页面标题改为订单明细');
-  await workbench.getByRole('button', { name: '交给 AI 修改' }).click();
-  await expect(workbench.getByRole('button', { name: '界面修改 1' })).toBeVisible({ timeout: 2 * TASK_RUN_TIMEOUT_MS });
-  await expect(page.getByText('待查看页面', { exact: true })).toBeVisible({ timeout: 2 * TASK_RUN_TIMEOUT_MS });
   const taskPath = new URL(page.url()).pathname;
+  const held = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  await page.route(`**/api/v1${taskPath}/request-changes`, async (route) => {
+    // Hold the response until the completion event has already reached the open task page.
+    const response = await route.fetch();
+    expect(taskDetailSchema.parse(await response.json()).status).toBe(TaskStatus.Running);
+    held.resolve();
+    await release.promise;
+    await route.fulfill({ response });
+  });
+  try {
+    await workbench.getByRole('button', { name: '交给 AI 修改' }).click();
+    await held.promise;
+    const pendingPermission = async () => {
+      const response = await request.get(`${API_BASE}${taskPath}`, { headers: AUTH });
+      return taskDetailSchema.parse(await response.json()).openInbox.find((item) => item.kind === InboxKind.Permission);
+    };
+    await expect.poll(pendingPermission).toBeDefined();
+    const permission = await pendingPermission();
+    if (permission === undefined) throw new Error('The revision is not waiting for permission');
+    await expect(
+      await request.post(`${API_BASE}/inbox/${permission.id}/resolve`, {
+        headers: AUTH,
+        data: { response: { decision: PermissionDecision.Once } },
+      }),
+    ).toBeOK();
+    await expect(page.getByText('待查看页面', { exact: true })).toBeVisible({ timeout: 2 * TASK_RUN_TIMEOUT_MS });
+  } finally {
+    release.resolve();
+  }
+  // The mutation success handler closes notes and opens the task history.
+  await expect(workbench.getByRole('button', { name: '界面修改 1' })).toBeVisible();
+  await expect(page.getByText('待查看页面', { exact: true })).toBeVisible();
+  await expect(workbench.getByRole('button', { name: '完成并验收' })).toBeEnabled();
+  expect(new URL(page.url()).pathname).toBe(taskPath);
   const response = await request.get(`${API_BASE}${taskPath}`, { headers: AUTH });
   await expect(response).toBeOK();
   const task = taskDetailSchema.parse(await response.json());
