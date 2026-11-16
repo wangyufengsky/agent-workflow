@@ -1,5 +1,6 @@
 import {
   EDITABLE_NODE_STATUSES,
+  NodeKind,
   type TaskDetailDTO,
   TaskStatus,
   UiMode,
@@ -19,7 +20,9 @@ import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { PreviewPane } from '../preview/preview-pane.tsx';
 import { projectQuery } from '../projects/projects.queries.ts';
+import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
+import { failedNodeKeyOf } from '../tasks/failure-text.ts';
 import { taskQuery } from '../tasks/tasks.queries.ts';
 import { FailurePanel } from './failure-panel.tsx';
 import { NodeDrawer, type NodeTab } from './node-drawer.tsx';
@@ -164,9 +167,17 @@ function TaskMain({ task, selection, pro }: MainProps) {
   }
 }
 
+function hasVisibleChecklist(task: TaskDetailDTO): boolean {
+  if (task.status === TaskStatus.Review) return true;
+  if (task.status === TaskStatus.Merging || ENDED_TASK.includes(task.status)) return task.result !== null;
+  if (task.status !== TaskStatus.Failed || task.failure === null) return false;
+  const failedKey = failedNodeKeyOf(task.failure);
+  return task.nodes.some((node) => node.key === failedKey && node.kind === NodeKind.Verify);
+}
+
 export function TaskPage() {
   const { taskId } = route.useParams();
-  const { node, details } = route.useSearch();
+  const { node, details, requirement } = route.useSearch();
   const navigate = route.useNavigate();
   const task = useQuery(taskQuery(taskId));
   // The pro view: pro mode, or「显示详细信息」on this task in simple mode (D19).
@@ -189,6 +200,7 @@ export function TaskPage() {
         details={isPro ? undefined : details === true}
         onDetailsChange={(on) => void navigate({ search: (prev) => ({ ...prev, details: on }), replace: true })}
       />
+      {requirement !== undefined && !hasVisibleChecklist(task.data) && <RequirementsSection task={task.data} />}
       {project.data?.preview !== null &&
       project.data !== undefined &&
       task.data.git.worktreeStatus === WorktreeStatus.Ready &&

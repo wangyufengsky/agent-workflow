@@ -1,4 +1,6 @@
+import { taskRequirementsSchema } from '@aw/shared';
 import { expect, test } from '@playwright/test';
+import { API_BASE, AUTH } from './env.ts';
 import {
   createProject,
   passReview,
@@ -98,6 +100,19 @@ test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → �
   await expect(page.getByTestId('task-page').getByText('已完成', { exact: true }).first()).toBeVisible({
     timeout: TASK_RUN_TIMEOUT_MS,
   });
+
+  const taskPath = new URL(page.url()).pathname;
+  const saved = await request.get(`${API_BASE}${taskPath}/requirements`, { headers: AUTH });
+  await expect(saved).toBeOK();
+  const requirements = taskRequirementsSchema.parse(await saved.json());
+  const previous = requirements.history.find((revision) => revision.seq === 1);
+  const orderSearch = requirements.items.find((item) => item.title === '按订单号搜索');
+  if (previous === undefined || orderSearch === undefined) throw new Error('没有保留原验收项和版本');
+  const search = new URLSearchParams({ requirement: orderSearch.id, requirementRevision: previous.id });
+  await page.goto(`${taskPath}?${search}`);
+  const historicalItem = checklist.locator('strong').filter({ hasText: '按订单号搜索' });
+  await expect(historicalItem).toBeFocused();
+  await expect(historicalItem.locator('..')).toContainText('预期：只显示匹配订单 · 必需');
 });
 
 test('「直接开始」默认收起：展开后 Esc 收起并还焦点，开始任务模式下从标签换流程（36 §5）', async ({

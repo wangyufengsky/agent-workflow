@@ -11,10 +11,10 @@ import {
   WorktreeStatus,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { getRouteApi, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ApiError, callOperation } from '../../api/client.ts';
-import { ROUTES } from '../../app/routes.ts';
+import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { DiffDialog } from '../../components/diff/diff-dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -35,6 +35,8 @@ import { Check } from './node-drawer.tsx';
 import { RemoteDeliveryStatus } from './remote-delivery-status.tsx';
 import { ReviewComments } from './review-comments.tsx';
 import styles from './task-page.module.css';
+
+const taskRoute = getRouteApi(ROUTE_IDS.task);
 
 /** How the task was delivered, once it is merging or done. */
 function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
@@ -83,6 +85,8 @@ function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
 export function ResultCard({ task }: { task: TaskDetailDTO }) {
   // The large diff opens on the file clicked, or the first one (D114).
   const [viewing, setViewing] = useState<{ path: string | undefined } | null>(null);
+  const { delivery } = taskRoute.useSearch();
+  const navigate = taskRoute.useNavigate();
   const { result } = task;
   if (result === null) return <p className="hint">{C.resultPending}</p>;
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
@@ -208,8 +212,13 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
       </div>
       {browsable && (
         <DiffDialog
-          open={viewing !== null}
-          onOpenChange={(open) => !open && setViewing(null)}
+          open={delivery === true || viewing !== null}
+          onOpenChange={(open) => {
+            if (open) return;
+            setViewing(null);
+            if (delivery === true)
+              void navigate({ search: (previous) => ({ ...previous, delivery: undefined }), replace: true });
+          }}
           title={D.changesTitle}
           query={taskDiffQuery(task.id)}
           fileQuery={taskDiffFileQuery(task.id)}
