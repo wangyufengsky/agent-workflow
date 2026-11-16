@@ -26,7 +26,7 @@ const RECENT_SHOWN = 3;
 
 const route = getRouteApi(ROUTE_IDS.home);
 
-function Suggestions() {
+function Suggestions({ projectId }: { projectId: string | null }) {
   const { ask, isPending, error } = useAsk();
   return (
     <>
@@ -38,7 +38,7 @@ function Suggestions() {
             type="button"
             className={styles.suggestion}
             disabled={isPending}
-            onClick={() => ask(text, undefined)}
+            onClick={() => ask(text, undefined, undefined, [], projectId)}
           >
             {text}
           </button>
@@ -181,7 +181,7 @@ export function HomePage() {
         </div>
         <div className={styles.lead}>
           {composer}
-          <Suggestions />
+          <Suggestions projectId={search.assistantProjectId ?? null} />
           {conversations.isError && (
             <ErrorState error={conversations.error} onRetry={() => void conversations.refetch()} />
           )}

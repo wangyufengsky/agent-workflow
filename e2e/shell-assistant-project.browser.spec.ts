@@ -42,3 +42,27 @@ test('项目会话从主页到侧栏保持归属，新草稿可切换项目', as
   const list = await (await request.get(`${API_BASE}/assistant/conversations`, { headers: AUTH })).json();
   expect(list.items.find((c: { title: string }) => c.title === '查看这个项目').projectId).toBe(a.id);
 });
+
+test('欢迎建议使用已选的草稿项目', async ({ page, request }) => {
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
+  const a = await createProject(request, null);
+  const b = await createProject(request, null);
+  await queueAssistantTurn(request, [{ type: 'text', text: '主页建议已处理。' }]);
+  await page.goto(`/?assistantProjectId=${a.id}`);
+  await expect(page.getByLabel('会话项目')).toHaveValue(a.id);
+  await page.getByRole('button', { name: '列出我的项目', exact: true }).click();
+  await expect(page.getByTestId('home-messages')).toContainText('主页建议已处理。');
+  await expect(page.getByLabel('会话项目')).toHaveValue(a.id);
+  await page.goto('/settings');
+  await page.getByRole('button', { name: /打开助手/ }).click();
+  const panel = page.getByRole('complementary', { name: '应用助手' });
+  await panel.getByRole('button', { name: '新对话' }).click();
+  await panel.getByLabel('会话项目').selectOption(b.id);
+  await queueAssistantTurn(request, [{ type: 'text', text: '侧栏建议已处理。' }]);
+  await panel.getByRole('button', { name: '列出我的项目', exact: true }).click();
+  await expect(panel).toContainText('侧栏建议已处理。');
+  await expect(panel.getByLabel('会话项目')).toHaveValue(b.id);
+  const list = await (await request.get(`${API_BASE}/assistant/conversations`, { headers: AUTH })).json();
+  const matching = list.items.filter((c: { title: string }) => c.title === '列出我的项目');
+  expect(matching.map((c: { projectId: string | null }) => c.projectId)).toEqual(expect.arrayContaining([a.id, b.id]));
+});

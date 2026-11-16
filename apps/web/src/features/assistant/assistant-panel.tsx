@@ -91,7 +91,7 @@ function Panel({ open, onClosed }: { open: boolean; onClosed: () => void }) {
           {active === undefined ? (
             conversations.isSuccess && (
               <div className={styles.feed}>
-                <AssistantWelcome conversation={undefined} />
+                <AssistantWelcome conversation={undefined} projectId={drafting ? draft.projectId : null} />
               </div>
             )
           ) : (

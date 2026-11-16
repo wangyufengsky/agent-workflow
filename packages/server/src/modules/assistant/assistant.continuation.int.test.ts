@@ -152,6 +152,24 @@ it('连续续接保留上次交接和尚未发送的超限草稿', async () => {
   expect(listed?.continuation?.sourceAvailable).toBe(false);
 });
 
+it('续接对话已有新消息时，再次续接仍携带上次较长的近期上下文', async () => {
+  const source = (await t.call(createConversationOp, {})).body;
+  await say(source.id, '当前工作涉及 payment-service');
+  await say(source.id, `改动背景：${'x'.repeat(480)}。就按原接口做，继续核对 T-231。`);
+  async function continueFrom(id: string) {
+    return (await t.call(createAssistantContinuationOp, { id, requestId: crypto.randomUUID(), attachmentIds: [] }))
+      .body;
+  }
+  const child = await continueFrom(source.id);
+  await say(child.id, '继续');
+  const grandchild = await continueFrom(child.id);
+  await say(grandchild.id, '再接着做');
+  const prompt = t.fake.prompts.at(-1)?.text;
+  expect(prompt).toContain('payment-service');
+  expect(prompt).toContain('就按原接口做，继续核对 T-231');
+  expect(prompt).toContain('User: "继续"');
+});
+
 it('忙碌的来源不能创建快照，待确认权限不会复制到新会话', async () => {
   const source = (await t.call(createConversationOp, {})).body;
   t.fake.enqueue(script().requestPermission('bash', ['echo work']).hang());

@@ -24,6 +24,16 @@ function excerpt(role: string, text: string): string {
   return `${role}: ${JSON.stringify(text)}`;
 }
 
+/** 续接过的近期原话移入旧资料。长句保留首尾，主题说明与句末结论都可进入下一次交接。 */
+function carryPreviousLine(line: string): string {
+  const split = line.indexOf(': ');
+  const role = line.slice(0, split);
+  const text: string = JSON.parse(line.slice(split + 2));
+  if (text.length <= MAX_FACT_CHARS) return line;
+  const half = Math.floor(MAX_FACT_CHARS / 2);
+  return excerpt(role, `${text.slice(0, half)}…${text.slice(-half)}`);
+}
+
 function takeWholeLines(lines: Iterable<string>, budget: number): string {
   const kept: string[] = [];
   for (const line of lines) {
@@ -59,7 +69,8 @@ export function continuationContext(
   const carried = priorTop.split(FACTS_TITLE)[1]?.split('\n') ?? [];
   const carriedRecent = priorRecent
     .split('\n')
-    .filter((line) => line.length <= MAX_FACT_CHARS && FACT_MARKER.test(line));
+    .filter((line) => line !== '')
+    .map(carryPreviousLine);
   const olderUserMessages = earlierMessages.filter(({ role, text }) => role === 'User' && text.trim() !== '');
   // 取分布在旧对话各段的用户原话，给未使用「决定」等关键词的表述留位置。
   const stride = Math.max(1, Math.floor(olderUserMessages.length / EARLIER_USER_SAMPLES));
@@ -67,10 +78,10 @@ export function continuationContext(
     .filter((_, index) => index % stride === 0)
     .slice(0, EARLIER_USER_SAMPLES)
     .map(({ role, text }) => excerpt(role, text.trim().slice(0, MAX_FACT_CHARS)));
-  const facts = takeWholeLines(
-    new Set([...carried, ...references, ...samples, ...earlier, ...carriedRecent]),
-    Math.floor(budget / 2) - FACTS_TITLE.length,
-  );
+  const factsBudget = Math.floor(budget / 2) - FACTS_TITLE.length;
+  const previous = takeWholeLines(new Set([...carriedRecent, ...carried]), Math.floor(factsBudget / 2));
+  const current = takeWholeLines(new Set([...references, ...earlier, ...samples]), factsBudget - previous.length - 1);
+  const facts = [previous, current].filter((text) => text !== '').join('\n');
   const prefix = `${HISTORY_INTRO}${facts === '' ? '' : FACTS_TITLE + facts}${CONTINUATION_RECENT_HEADING}`;
   let remaining = ASSISTANT_CONTINUATION_MAX_CHARS - prefix.length;
   const recent: string[] = [];
