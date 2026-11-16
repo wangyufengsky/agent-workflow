@@ -27,15 +27,17 @@ const KIND_ICON: Record<DeckMaterialKind, IconName> = {
   [DeckMaterialKind.Text]: 'file',
   [DeckMaterialKind.File]: 'file',
   [DeckMaterialKind.Task]: 'list',
+  [DeckMaterialKind.Artifact]: 'file',
   [DeckMaterialKind.Knowledge]: 'book',
   [DeckMaterialKind.Web]: 'external',
 };
 
 /** The material's name: a task or conversation is looked up for its title. */
 function MaterialTitle({ material }: { material: DeckMaterialInput }) {
+  const fromTask = material.kind === DeckMaterialKind.Task || material.kind === DeckMaterialKind.Artifact;
   const task = useQuery({
-    ...taskQuery(material.kind === DeckMaterialKind.Task ? material.taskId : ''),
-    enabled: material.kind === DeckMaterialKind.Task,
+    ...taskQuery(fromTask ? material.taskId : ''),
+    enabled: fromTask,
   });
   const conversation = useQuery({
     ...knowledgeConversationQuery(material.kind === DeckMaterialKind.Knowledge ? material.conversationId : ''),
@@ -48,6 +50,13 @@ function MaterialTitle({ material }: { material: DeckMaterialInput }) {
       return <>{material.title}</>;
     case DeckMaterialKind.Task:
       return <>{task.data === undefined ? '…' : `${task.data.key} · ${task.data.title}`}</>;
+    case DeckMaterialKind.Artifact: {
+      const version = task.data?.artifact?.versions.find(({ id }) => id === material.artifactVersionId);
+      if (task.isPending) return <>…</>;
+      return (
+        <>{version === undefined ? C.artifactMissing : `${task.data?.key} · ${version.name} · v${version.number}`}</>
+      );
+    }
     case DeckMaterialKind.Knowledge:
       return <>{conversation.data?.title ?? '…'}</>;
     case DeckMaterialKind.Web:

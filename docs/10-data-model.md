@@ -679,6 +679,7 @@ payload / response：
 | seq | INTEGER | |
 | kind | TEXT | `DeckMaterialKind` |
 | ref_id | TEXT NULL | 来源任务 / 知识对话 id，网页资料为读到的最终地址（不设外键，快照不随其删除） |
+| artifact_version_id | TEXT NULL | 产物资料的来源版本，用于回查，不设外键 |
 | title | TEXT | |
 | content | TEXT | 创建时的快照（Markdown） |
 

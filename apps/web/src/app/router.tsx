@@ -203,6 +203,7 @@ const taskRoute = createRoute({
     requirement: z.uuid().optional(),
     requirementRevision: z.uuid().optional(),
     delivery: z.boolean().optional(),
+    artifactVersion: z.uuid().optional(),
     // The preview tab (29 §8.1); the progress tab without it.
     view: z.literal('preview').optional(),
   }),
@@ -332,6 +333,7 @@ const pptNewRoute = createRoute({
   validateSearch: z.object({
     projectId: z.string().optional(),
     taskId: z.string().optional(),
+    artifactVersionId: z.uuid().optional(),
     knowledgeConversationId: z.string().optional(),
   }),
   component: PptNewPage,

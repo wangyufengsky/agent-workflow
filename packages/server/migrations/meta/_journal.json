@@ -281,6 +281,13 @@
       "when": 1794807761297,
       "tag": "0039_spotty_gressill",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "6",
+      "when": 1794839084190,
+      "tag": "0040_deck_artifact_source",
+      "breakpoints": true
     }
   ]
 }

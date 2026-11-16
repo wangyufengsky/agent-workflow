@@ -1,4 +1,4 @@
-import { ARTIFACT_WORKFLOW_KEY, artifactTaskSchema, TaskStatus, taskDetailSchema } from '@aw/shared';
+import { ARTIFACT_WORKFLOW_KEY, artifactTaskSchema, deckSchema, TaskStatus, taskDetailSchema } from '@aw/shared';
 import { expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import { createProject, type FakeStep, queueTurn, submitResult, TASK_RUN_TIMEOUT_MS } from './helpers.ts';
@@ -182,5 +182,38 @@ for (const item of cases) {
     if (item.format === 'Excel' || item.format === 'Word') expect(bytes.subarray(0, 2).toString()).toBe('PK');
     else expect(bytes.toString()).toContain(item.revised);
     expect(new URL(page.url()).pathname).toBe(taskPath);
+
+    if (item.format === 'Word' || item.format === 'Excel') {
+      const earlier = artifact.versions[0];
+      if (earlier === undefined) throw new Error('Expected the first artifact version');
+      await queueTurn(request, project, { agent: 'aw-slides' }, [
+        {
+          type: 'callTool',
+          name: 'submit_outline',
+          args: {
+            title: '基于首版的汇报',
+            understanding: { audience: '运营团队', duration: '5 分钟', assumptions: [] },
+            slides: [{ layout: 'cover', title: '运营复盘', points: [] }],
+          },
+        },
+      ]);
+      await workbench.getByRole('combobox', { name: '产物版本' }).selectOption(earlier.id);
+      await workbench.getByRole('link', { name: '做成 PPT' }).click();
+      const source = `${reviewed.key} · ${earlier.name} · v1`;
+      await expect(page.getByRole('list', { name: '资料' })).toContainText(source);
+      await page.getByRole('textbox', { name: '这份 PPT 讲什么' }).fill('根据首版制作汇报');
+      await page.getByRole('button', { name: /^生成大纲/ }).click();
+      await expect(page).toHaveURL(/\/ppt\/[0-9a-f-]+$/);
+      const deckPath = new URL(page.url()).pathname.replace('/ppt/', '/decks/');
+      const deck = deckSchema.parse(await (await request.get(`${API_BASE}${deckPath}`, { headers: AUTH })).json());
+      expect(deck.materials).toMatchObject([
+        { kind: 'artifact', title: source, refId: reviewed.id, artifactVersionId: earlier.id },
+      ]);
+      await page.getByRole('region', { name: '来源产物' }).getByRole('link', { name: source }).click();
+      await expect(page).toHaveURL(new RegExp(`${taskPath}\\?artifactVersion=${earlier.id}`));
+      await expect(workbench.getByRole('combobox', { name: '产物版本' })).toHaveValue(earlier.id);
+      await expect(workbench.getByText(item.original, { exact: true })).toBeVisible();
+      await expect(workbench.getByText(item.revised, { exact: true })).toHaveCount(0);
+    }
   });
 }

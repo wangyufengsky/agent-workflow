@@ -194,6 +194,7 @@ export function createDecksService(deps: DecksServiceDeps) {
         kind: m.kind,
         title: m.title,
         refId: m.refId,
+        artifactVersionId: m.artifactVersionId,
         chars: m.content.length,
       })),
       understanding: deck.understanding,
@@ -363,6 +364,7 @@ export function createDecksService(deps: DecksServiceDeps) {
     async create(request: CreateDeckRequest): Promise<DeckDTO> {
       const snapshots = await snapshotMaterials(request.materials, {
         task: tasks.detail,
+        artifact: tasks.artifacts.textAt,
         knowledge: knowledge.get,
         web: browser.readUrl,
       });
@@ -400,6 +402,7 @@ export function createDecksService(deps: DecksServiceDeps) {
             seq: i + 1,
             kind: s.kind,
             refId: s.refId,
+            artifactVersionId: s.artifactVersionId ?? null,
             title: s.title,
             content: s.content,
           })),

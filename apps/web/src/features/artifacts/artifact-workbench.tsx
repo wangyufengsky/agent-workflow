@@ -10,14 +10,17 @@ import {
   TaskStatus,
 } from '@aw/shared';
 import { useMutation } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
 import { getBlob } from '../../api/client.ts';
+import { ROUTES } from '../../app/routes.ts';
 import { saveBytes } from '../../app/save-file.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
 import { ASSISTANT_COPY } from '../../copy/assistant.ts';
 import { formatDateTime } from '../../copy/common.ts';
+import { PPT_COPY } from '../../copy/ppt.ts';
 import { FrontendActivity } from '../preview/frontend-activity.tsx';
 import layout from '../preview/frontend-workbench.module.css';
 import { RequirementsSection } from '../requirements/requirements-section.tsx';
@@ -41,24 +44,28 @@ const PANELS = {
 export function ArtifactWorkbench({
   task,
   artifact,
+  selectedVersion,
+  onSelectVersion,
   record,
   nodeDetails,
   onOpenNode,
 }: {
   task: TaskDetailDTO;
   artifact: NonNullable<TaskDetailDTO['artifact']>;
+  selectedVersion: string | undefined;
+  onSelectVersion: (id: string | undefined) => void;
   record: ReactNode;
   nodeDetails?: NodeDetails | undefined;
   onOpenNode: (id: string) => void;
 }) {
   const [panel, setPanel] = useState<Panel>('activity');
-  const [selectedVersion, setSelectedVersion] = useState<string>();
   const [draft, setDraft] = useState<{ versionId: string; notes: DraftNote[] }>();
   const [selection, setSelection] = useState<ArtifactSelection>();
   const [note, setNote] = useState('');
   const [compare, setCompare] = useState(false);
   const latest = artifact.versions.at(-1);
-  const version = artifact.versions.find(({ id }) => id === selectedVersion) ?? latest;
+  const version = selectedVersion === undefined ? latest : artifact.versions.find(({ id }) => id === selectedVersion);
+  const missingVersion = selectedVersion !== undefined && version === undefined;
   const previous = version === undefined ? undefined : artifact.versions[artifact.versions.indexOf(version) - 1];
   const notes = draft !== undefined && draft.versionId === version?.id ? draft.notes : [];
   const review = task.status === TaskStatus.Review;
@@ -101,7 +108,7 @@ export function ArtifactWorkbench({
         onSuccess: () => {
           setPanel('activity');
           setDraft(undefined);
-          setSelectedVersion(undefined);
+          onSelectVersion(undefined);
           setCompare(false);
         },
       },
@@ -109,7 +116,7 @@ export function ArtifactWorkbench({
   }
 
   function choose(id: string) {
-    setSelectedVersion(id === latest?.id ? undefined : id);
+    onSelectVersion(id === latest?.id ? undefined : id);
     setSelection(undefined);
     setNote('');
     setCompare(false);
@@ -175,6 +182,11 @@ export function ArtifactWorkbench({
             保存原件
           </Button>
         )}
+        {version !== undefined && (
+          <Link to={ROUTES.pptNew} search={{ taskId: task.id, artifactVersionId: version.id }} className="btn ghost sm">
+            {PPT_COPY.makeDeck}
+          </Link>
+        )}
         {review && (
           <Button
             size="sm"
@@ -215,6 +227,15 @@ export function ArtifactWorkbench({
                   onPick={canNote && panel === 'notes' && !compare ? pick : undefined}
                 />
               </section>
+            </div>
+          ) : missingVersion ? (
+            <div className="col">
+              <p className="hint">{PPT_COPY.artifactMissing}</p>
+              {latest !== undefined && (
+                <Button size="sm" onClick={() => choose(latest.id)}>
+                  打开最新版本
+                </Button>
+              )}
             </div>
           ) : building ? (
             <FrontendActivity

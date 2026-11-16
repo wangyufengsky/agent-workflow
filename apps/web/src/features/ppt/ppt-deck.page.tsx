@@ -1,8 +1,8 @@
-import { AttemptStatus, DeckRunKind, UiMode } from '@aw/shared';
+import { AttemptStatus, DeckMaterialKind, DeckRunKind, UiMode } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { getRouteApi } from '@tanstack/react-router';
+import { getRouteApi, Link } from '@tanstack/react-router';
 import { useState } from 'react';
-import { ROUTE_IDS } from '../../app/routes.ts';
+import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { PPT_COPY as C } from '../../copy/ppt.ts';
@@ -38,6 +38,7 @@ export function PptDeckPage() {
     );
   }
   const d = deck.data;
+  const artifactSources = d.materials.filter((material) => material.kind === DeckMaterialKind.Artifact);
   const pro = settings['ui.mode'] === UiMode.Pro || details === true;
   // A new outline from the AI replaces the draft being edited.
   const outlineVersion = d.runs
@@ -47,6 +48,25 @@ export function PptDeckPage() {
   return (
     <div className={`page ${styles.workspace}`}>
       <DeckHeader deck={d} details={details === true} />
+      {artifactSources.length > 0 && (
+        <section className="row wrap" aria-label={C.artifactSources}>
+          <span className="hint">{C.artifactSources}</span>
+          {artifactSources.map(({ id, refId, artifactVersionId, title }) =>
+            refId === null || artifactVersionId === null ? (
+              <span key={id}>{title}</span>
+            ) : (
+              <Link
+                key={id}
+                to={ROUTES.task}
+                params={{ taskId: refId }}
+                search={{ artifactVersion: artifactVersionId }}
+              >
+                {title}
+              </Link>
+            ),
+          )}
+        </section>
+      )}
       <RunBanner deck={d} />
       <div className="row">
         <span className="hint">{C.model}</span>

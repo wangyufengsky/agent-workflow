@@ -10,6 +10,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
 import { type FormEvent, type KeyboardEvent, useState } from 'react';
+import { ApiError } from '../../api/client.ts';
 import { MOD_KEY } from '../../app/platform.ts';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
@@ -33,10 +34,21 @@ const THEME_THUMB_WIDTH = 168;
 /** Material given in the address (「做成 PPT」on a result card or a knowledge conversation, 23 §2.5). */
 function prefilled(search: {
   taskId?: string | undefined;
+  artifactVersionId?: string | undefined;
   knowledgeConversationId?: string | undefined;
 }): DeckMaterialInput[] {
   return [
-    ...(search.taskId === undefined ? [] : [{ kind: DeckMaterialKind.Task, taskId: search.taskId } as const]),
+    ...(search.taskId === undefined
+      ? []
+      : search.artifactVersionId === undefined
+        ? [{ kind: DeckMaterialKind.Task, taskId: search.taskId } as const]
+        : [
+            {
+              kind: DeckMaterialKind.Artifact,
+              taskId: search.taskId,
+              artifactVersionId: search.artifactVersionId,
+            } as const,
+          ]),
     ...(search.knowledgeConversationId === undefined
       ? []
       : [{ kind: DeckMaterialKind.Knowledge, conversationId: search.knowledgeConversationId } as const]),
@@ -80,7 +92,8 @@ export function PptNewPage() {
   const fromMaterial = prefillTask.data?.project.id ?? prefillConversation.data?.project.id;
   const projectId = chosenProject === undefined ? (fromMaterial ?? null) : chosenProject;
   const projectLocked = materials.some(
-    (m) => m.kind === DeckMaterialKind.Task || m.kind === DeckMaterialKind.Knowledge,
+    (m) =>
+      m.kind === DeckMaterialKind.Task || m.kind === DeckMaterialKind.Artifact || m.kind === DeckMaterialKind.Knowledge,
   );
 
   const chars = typedChars(materials);
@@ -106,6 +119,7 @@ export function PptNewPage() {
       { onSuccess: (deck) => void navigate({ to: ROUTES.pptDeck, params: { deckId: deck.id } }) },
     );
   };
+  const materialChars = create.error instanceof ApiError ? create.error.details?.materialChars : undefined;
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit();
   };
@@ -193,7 +207,12 @@ export function PptNewPage() {
             ))}
           </div>
         </div>
-        {create.isError && <ErrorState error={create.error} />}
+        {create.isError && (
+          <ErrorState
+            error={create.error}
+            message={typeof materialChars === 'number' ? C.tooMuch(materialChars, DECK_MATERIALS_MAX_CHARS) : undefined}
+          />
+        )}
         <div className="row">
           <span className="hint">{C.model}</span>
           <ModelPicker value={model} projectId={projectId} onChange={setModel} />

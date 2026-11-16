@@ -1,0 +1,1 @@
+ALTER TABLE `deck_materials` ADD `artifact_version_id` text;

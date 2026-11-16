@@ -561,6 +561,8 @@ N2a 实现组合模板，N2b 加入 AI 拆解（`templateKey` 省略时）、重
 | POST | `/decks/:id/stop` | `decks.stop` | write | 中止进行中的 AI 工作；已结束 409 |
 | DELETE | `/decks/:id` | `decks.delete` | critical | 204；AI 工作中 409 `DECK_BUSY` |
 
+资料支持 `{ kind: "artifact", taskId, artifactVersionId }`，创建时读取该版正文或表格数据。PPT 详情的资料项返回来源任务 `refId` 和 `artifactVersionId`。
+
 导出不是 HTTP 操作：PowerPoint 在渲染进程生成，PDF 由 Electron main 打印 `/ppt/:id/print`（§13）。
 
 ## 13. preload 能力（非 HTTP）

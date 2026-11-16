@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  ARTIFACT_WORKFLOW_KEY,
   createDeckOp,
   type DeckDTO,
   DeckRunKind,
@@ -10,14 +11,17 @@ import {
   ErrorCode,
   generateDeckOp,
   getDeckOp,
+  getTaskOp,
   listDecksOp,
   readonlyBashRules,
   restoreSlideOp,
   reviseOutlineOp,
   reviseSlidesOp,
+  reviseTaskArtifactOp,
   ServerEventType,
   SlideLayout,
   stopDeckOp,
+  TaskStatus,
   updateDeckOp,
   updateOutlineOp,
   updateSlideOp,
@@ -27,7 +31,7 @@ import type { z } from 'zod';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
-import { addProject, taskInReview } from '../../../test/helpers/tasks.ts';
+import { addProject, createTask, taskInReview, taskReaches } from '../../../test/helpers/tasks.ts';
 
 const WRITER = { agent: 'aw-slides' };
 const UNDERSTANDING = { audience: '团队同事', duration: '约 10 分钟', assumptions: ['听众了解项目背景'] };
@@ -106,6 +110,84 @@ async function made(): Promise<DeckDTO> {
 }
 
 const toolResults = (name: string) => t.fake.toolCalls.filter((c) => c.name === name);
+
+describe('指定版本作为 PPT 资料', () => {
+  const drafts = [
+    {
+      format: 'Word',
+      tool: 'write_task_docx',
+      file: '复盘.docx',
+      contents: (text: string) => ({ blocks: [{ type: 'paragraph', text }] }),
+      original: '本期共处理 717 个订单。',
+      revised: '本期共处理 818 个订单。',
+    },
+    {
+      format: 'Excel',
+      tool: 'write_task_xlsx',
+      file: '复盘.xlsx',
+      contents: (text: string) => ({
+        sheets: [
+          { name: '汇总', columns: [{ header: '总额', type: 'number' }], rows: [[5001]] },
+          { name: '各渠道', columns: [{ header: '渠道' }], rows: [[text]] },
+        ],
+      }),
+      original: '旧版客户渠道',
+      revised: '新版客户渠道',
+    },
+  ];
+
+  it.each(drafts)('$format 读指定旧版本，并保留任务和版本的来源', async (fixture) => {
+    const { project } = await addProject(t);
+    const publish = (text: string) =>
+      script()
+        .callTool(fixture.tool, { file: fixture.file, ...fixture.contents(text) })
+        .callTool('submit_result', {
+          summary: '已发布文件',
+        });
+    t.fake.enqueue(publish(fixture.original), { title: '生成首版产物' });
+    const first = taskReaches(t, TaskStatus.Review);
+    const task = await createTask(t, { projectId: project.id, workflow: ARTIFACT_WORKFLOW_KEY });
+    await first;
+    const version = (await t.call(getTaskOp, { id: task.id })).body.artifact?.versions.at(-1);
+    if (version === undefined) throw new Error('Missing first artifact version');
+
+    t.fake.enqueue(publish(fixture.revised), { title: '产物修改 1' });
+    const second = taskReaches(t, TaskStatus.Review);
+    await t.call(reviseTaskArtifactOp, {
+      id: task.id,
+      versionId: version.id,
+      notes: [{ anchor: { kind: 'whole' }, quote: '', note: '更新统计内容' }],
+    });
+    await second;
+
+    t.fake.enqueue(script().callTool('submit_outline', OUTLINE), WRITER);
+    const written = workEnds();
+    const created = await t.call(createDeckOp, {
+      brief: '把旧版做成汇报',
+      materials: [{ kind: 'artifact', taskId: task.id, artifactVersionId: version.id }],
+    });
+    expect(created.status).toBe(201);
+    await written;
+    const deck = await get(created.body.id);
+    expect(deck.materials).toMatchObject([
+      {
+        kind: 'artifact',
+        title: `${task.key} · ${fixture.file} · v1`,
+        refId: task.id,
+        artifactVersionId: version.id,
+      },
+    ]);
+    const writer = t.fake.sessions.find((session) => session.agent === 'aw-slides');
+    const prompt = t.fake.prompts.find(({ sessionId }) => sessionId === writer?.id)?.text;
+    expect(prompt).toContain(fixture.original);
+    expect(prompt).not.toContain(fixture.revised);
+    expect(prompt).toContain(`${fixture.file} · v1`);
+    if (fixture.format === 'Excel') {
+      expect(prompt).toContain('5001');
+      expect(prompt).toContain('工作表「各渠道」');
+    }
+  });
+});
 
 describe('PPT', () => {
   it('从任务结果出大纲：只读会话、资料快照、页数校验；确认后逐页制作直到完成', async () => {

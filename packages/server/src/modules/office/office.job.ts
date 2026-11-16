@@ -32,6 +32,7 @@ export type OfficeJob =
   | { kind: 'preview_file'; file: string; sheet: string | undefined }
   /** `read_office_file` (39 §7.3): `file` is the located real path. */
   | { kind: 'read_office_file'; file: string; input: ReadOfficeFileInput }
+  | { kind: 'office_file_text'; file: string; limit: number }
   /** Write a new file at `out`, which must not exist yet (39 §7.2); `styleFrom` is a Word document to take styles from. */
   | { kind: 'create_docx'; input: CreateDocxInput; out: string; styleFrom: string | undefined }
   /** A new file from the file at `source` (39 §7.2); `source` is never written. */

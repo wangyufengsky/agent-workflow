@@ -179,7 +179,7 @@ function hasVisibleChecklist(task: TaskDetailDTO): boolean {
 
 export function TaskPage() {
   const { taskId } = route.useParams();
-  const { node, details, requirement } = route.useSearch();
+  const { node, details, requirement, artifactVersion } = route.useSearch();
   const navigate = route.useNavigate();
   const task = useQuery(taskQuery(taskId));
   // The pro view: pro mode, or「显示详细信息」on this task in simple mode (D19).
@@ -224,6 +224,10 @@ export function TaskPage() {
           key={task.data.id}
           task={task.data}
           artifact={artifact}
+          selectedVersion={artifactVersion}
+          onSelectVersion={(id) =>
+            void navigate({ search: (prev) => ({ ...prev, artifactVersion: id }), replace: true })
+          }
           nodeDetails={nodeDetails}
           onOpenNode={selection.open}
           record={

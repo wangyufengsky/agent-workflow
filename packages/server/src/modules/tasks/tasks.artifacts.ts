@@ -186,6 +186,14 @@ export function createTaskArtifacts(deps: TasksServiceDeps, state: TaskState) {
       const version = versionOf(taskId, id);
       return original(taskId, version);
     },
+    async textAt(taskId: string, id: string, limit: number) {
+      const version = versionOf(taskId, id);
+      const format = formatOf(version);
+      const path = original(taskId, version);
+      if (format === 'docx' || format === 'xlsx') return { version, ...(await deps.office.fileText(path, limit)) };
+      const value = await readFile(path, 'utf8');
+      return { version, text: value.slice(0, limit), chars: value.length };
+    },
     async preview(taskId: string, id: string, sheet: string | undefined) {
       const version = versionOf(taskId, id);
       const format = formatOf(version);
