@@ -57,7 +57,7 @@ export const initiativeItemSpecSchema = z.object({
   acceptance: z
     .array(
       requirementItemInputSchema.extend({
-        /** Explicit identifier within the work package, used by coverage links. */
+        /** 覆盖行引用的包内验收项标识。 */
         sourceKey: z.string().regex(NODE_KEY_PATTERN).optional(),
       }),
     )
@@ -188,7 +188,7 @@ export const initiativeDetailSchema = initiativeSummarySchema.extend({
 });
 export type InitiativeDetailDTO = z.infer<typeof initiativeDetailSchema>;
 
-/** A proposal as it appeared in a coverage version; legacy snapshots have no checklist or task fact. */
+/** 拆解提交时的工作包快照。旧快照可能只有包身份。 */
 export const initiativeCoverageItemSnapshotSchema = z.object({
   id: z.string(),
   key: z.string(),
@@ -198,7 +198,7 @@ export const initiativeCoverageItemSnapshotSchema = z.object({
 });
 export type InitiativeCoverageItemSnapshot = z.infer<typeof initiativeCoverageItemSnapshotSchema>;
 
-/** Batched task lineage and checklist evidence for the coverage view. */
+/** 覆盖页批量读取的任务历史、清单证据与交付。 */
 export const initiativeCoverageTraceSchema = z.object({
   versions: z.array(
     z.object({

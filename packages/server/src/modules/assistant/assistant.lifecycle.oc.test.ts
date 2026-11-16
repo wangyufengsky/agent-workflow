@@ -314,7 +314,7 @@ it('@opencode 刚派发即停止不会漏过启动，随后短问完成；无效
   await t.call(deleteConversationOp, { id: c.id });
 });
 
-it('@opencode 助手可加载包含重新核验操作的任务诊断技能', async () => {
+it('@opencode 助手可加载重验、需求追溯和项目约定技能', async () => {
   const { body: conversation } = await t.call(createConversationOp, {});
   const result = await say(conversation.id, { name: 'skill', arguments: { name: 'aw-task-diagnosis' } });
   expect(result).toMatchObject({ data: { status: 'completed' } });
@@ -322,4 +322,9 @@ it('@opencode 助手可加载包含重新核验操作的任务诊断技能', asy
   expect(content).toContain('tasks_reverifyRequirements');
   expect(content).toContain('tasks_updateCheckCommand');
   expect(content).toContain('existing confirmation card');
+  expect(content).toContain('整理为项目约定');
+
+  const requirement = await say(conversation.id, { name: 'skill', arguments: { name: 'aw-task-requirement' } });
+  expect(requirement).toMatchObject({ data: { status: 'completed' } });
+  expect(JSON.stringify(requirement?.data)).toContain('Older plans may have only a package-level link');
 });

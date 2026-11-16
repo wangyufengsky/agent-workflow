@@ -18,8 +18,8 @@ export function listTaskEvents(db: DbExecutor, taskId: string, afterId: number) 
 }
 
 /** 清单核验的是交付前的任务提交。目标分支上的合并提交有独立的记录。 */
-export function deliveredRequirements(db: DbExecutor, deliveryIds: readonly string[]) {
-  return createTimelineRepo(db).deliveredRequirements(deliveryIds);
+export function deliveredRequirements(db: DbExecutor, deliveryByTask: ReadonlyMap<string, string>) {
+  return createTimelineRepo(db).deliveredRequirements(deliveryByTask);
 }
 
 /** Events happen in id order: the newest matching event's id orders it against others (0 when none). */

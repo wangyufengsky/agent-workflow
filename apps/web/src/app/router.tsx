@@ -193,8 +193,8 @@ const tasksRoute = createRoute({
 const taskRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.task,
-  // `?node=<id>` selects a step on the canvas; `open` shows its details drawer (14 §3.4) on its `tab`; `details` shows
-  // the pro view in simple mode (D19); `requirement` locates a checklist item, and `delivery` opens delivered changes.
+  // `node` 选中流程步骤，`open` 打开步骤详情的 `tab`，`details` 开启该任务的详细视图。
+  // `requirement` 定位验收项；`requirementRevision` 指向历史清单；`delivery` 打开交付改动。
   validateSearch: z.object({
     node: z.string().optional(),
     open: z.boolean().optional(),

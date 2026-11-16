@@ -71,7 +71,7 @@ opencode 1.19 的已有会话目录不能通过发送参数或 fork 改变。迁
 
 页面（`AssistantPage`，08）覆盖界面的全部页面：新建批量、新建与修改定时任务、新建 PPT、组合模板的列表 / 新建 / 编辑页，以及某次 AI 审查（`git_review`，带 `gitReviewId`，地址跳到工作台里显示它的视图）。用户在 Git 工作台上看着某次审查时（改动视图的审查、提交详情的审查页签、分支与范围的审查视图，包括从历史里选中的那次），审查面板把它报告给界面状态，所在页面就是这次审查，而不只是工作台。用户在这些页面上时 system 写明是哪一个（模板的名称与阶段数；审查的范围、项目、状态与问题数；定时任务的修改页同定时任务页）；以前这些页面被当成主页。新增路由时没有对应页面会编译失败（只有引导页、团队入口跳转、放映与打印、开发组件页除外）。
 
-需求计划（v1.3，34 §10）：操作全部开放（`initiatives.saveDraft` 除外：改写阶段与工作包在页面上做）；`initiatives_create` 与「开始任务」一样只能转交本对话里的附件（30 §2.2），别的附件直接 `ATTACHMENT_NOT_FOUND`、不出确认卡；`open_page` 可以打开 `initiatives` / `initiative`，用户在需求计划页时 system 写明它的编号、标题、状态、项目、已开启的阶段与完成的工作包数。协议提示词写明：大需求（需求文档、多个功能要分析拆包分阶段）建需求计划而不是一个任务，不带模板时由 AI 拆解；建好后打开需求计划页让用户审阅确认；助手发起的拆解（`initiatives_create` 不带模板、`initiatives_rebreakdown`、`initiatives_refine`、带 `refine` 的 `initiatives_openPhase`）结束后，草稿或失败原因作为下一条消息送回原对话（`prompts/assistant-breakdown.md`，表 `assistant_breakdown_followups`，同成员分析的回报 33 §6）：阶段与工作包、需求覆盖里没有对应工作包的点、确认才开始；用户在页面上又开始了一次的不再回报。
+需求计划（v1.3，34 §10）：常用操作开放。改写阶段与工作包和展开逐项证据在需求计划页完成；`initiatives_create` 与「开始任务」一样只能转交本对话里的附件（30 §2.2），别的附件直接 `ATTACHMENT_NOT_FOUND`、不出确认卡；`open_page` 可以打开 `initiatives` / `initiative`，用户在需求计划页时 system 写明它的编号、标题、状态、项目、已开启的阶段与完成的工作包数。协议提示词写明：大需求（需求文档、多个功能要分析拆包分阶段）建需求计划而不是一个任务，不带模板时由 AI 拆解；建好后打开需求计划页让用户审阅确认；助手发起的拆解（`initiatives_create` 不带模板、`initiatives_rebreakdown`、`initiatives_refine`、带 `refine` 的 `initiatives_openPhase`）结束后，草稿或失败原因作为下一条消息送回原对话（`prompts/assistant-breakdown.md`，表 `assistant_breakdown_followups`，同成员分析的回报 33 §6）：阶段与工作包、需求覆盖里没有对应工作包的点、确认才开始；用户在页面上又开始了一次的不再回报。
 
 opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若它缓存启动时的列表，切换界面模式后列表要到 opencode 重启才更新，但调用时的模式检查保证简单模式下不会执行专业操作。
 
@@ -86,6 +86,8 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 确认流程（与 `ask_user` 同一模式，不依赖长时间阻塞的工具调用；`assistant.confirmations.ts`，状态机 09 §10）：
 
 修改检查命令或清单来重验已有成果时，`aw-task-diagnosis` 先读取失败证据。确认卡显示检查命令及是否同时更新项目默认值，或列出清单的逐项变更、原版本与核验所依据的提交。清单修改仅作用于该任务，保存和启动核验在同一事务进行（UX-01）。
+
+`aw-task-requirement` 在追溯需求时沿用已记录的工作包与验收项引用，将核验结论和交付状态分别说明。用 `open_page` 打开需求计划查看旧任务、证据和提交。整理项目约定时，`aw-task-diagnosis` 指向失败或审查记录，建议写清适用条件，由用户在界面选择同项目证据并审核。项目设置和 AGENTS.md 整理任务沿用已有提交与合并路径（UX-11、UX-12）。
 
 0. 没写 `baseBranch` 的 `tasks.create`、`batches.create`、`initiatives.create` 先填上项目当前的默认分支（D215），卡片与确认后的调用都用它；定时任务不填（每次运行时取当时的默认分支）。
 1. 工具返回 `{ status: 'needs_confirmation', confirmation_id, instruction }`（instruction 要求模型用一句话说明并结束本轮），后端写 `assistant_confirmations`（`pending`），消息流追加 `confirmation` 条目，推送 `assistant.confirmation`。

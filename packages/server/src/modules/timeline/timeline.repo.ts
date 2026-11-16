@@ -51,7 +51,7 @@ export function createTimelineRepo(db: DbExecutor) {
         .get();
       return row?.id ?? 0;
     },
-    deliveredRequirements(deliveryIds: readonly string[]) {
+    deliveredRequirements(deliveries: ReadonlyMap<string, string>) {
       const rows = db
         .select({ id: taskEventsTable.entityId, payload: taskEventsTable.payload })
         .from(taskEventsTable)
@@ -59,7 +59,8 @@ export function createTimelineRepo(db: DbExecutor) {
           and(
             eq(taskEventsTable.entity, TaskEventEntity.Delivery),
             eq(taskEventsTable.type, 'note'),
-            inArray(taskEventsTable.entityId, deliveryIds),
+            inArray(taskEventsTable.taskId, [...deliveries.keys()]),
+            inArray(taskEventsTable.entityId, [...deliveries.values()]),
           ),
         )
         .all();

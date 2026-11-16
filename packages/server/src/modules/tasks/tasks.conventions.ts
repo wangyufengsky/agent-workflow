@@ -16,7 +16,7 @@ import type { createTaskReview } from './tasks.review.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
 const EVIDENCE_TEXT_LIMIT = 8000;
-/** Show exactly the bounded, redacted text that will be sent to the task. */
+/** 预览文本与传给任务的快照一致。 */
 function snapshotText(text: string): string {
   const redacted = text
     .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [已隐藏]')
@@ -37,7 +37,7 @@ function failureFacts(payload: Record<string, unknown> | null): string {
   return '原事件未保存失败详情，请打开来源查看；不要推测原因。';
 }
 
-/** Snapshot only records verified under the selected project before the user confirms a task. */
+/** 发起任务前，先按项目核对并封存用户选中的资料。 */
 export function createConventionEvidence(
   deps: TasksServiceDeps,
   state: TaskState,

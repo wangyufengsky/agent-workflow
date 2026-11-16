@@ -35,7 +35,7 @@ export function createTaskRequirements(deps: TasksServiceDeps, state: TaskState)
       const delivery = deliveries.latest(task.id);
       const snapshot =
         delivery?.status === DeliveryStatus.Succeeded
-          ? deliveredRequirements(db, [delivery.id]).get(delivery.id)
+          ? deliveredRequirements(db, new Map([[task.id, delivery.id]])).get(delivery.id)
           : undefined;
       return requirements.view(task.id, snapshot?.commitSha ?? null);
     }
@@ -47,12 +47,12 @@ export function createTaskRequirements(deps: TasksServiceDeps, state: TaskState)
       const summaries = state.summaries(state.repo.list({ ids: taskIds }));
       const lastDeliveries = deliveries.latestOf(taskIds);
       const trees = new Map(worktrees.listByTasks(taskIds).map((tree) => [tree.taskId, tree]));
-      const snapshots = deliveredRequirements(
-        db,
-        [...lastDeliveries.values()]
-          .filter((delivery) => delivery.status === DeliveryStatus.Succeeded)
-          .map((d) => d.id),
+      const successfulDeliveries = new Map(
+        [...lastDeliveries].flatMap(([taskId, delivery]) =>
+          delivery.status === DeliveryStatus.Succeeded ? [[taskId, delivery.id] as const] : [],
+        ),
       );
+      const snapshots = deliveredRequirements(db, successfulDeliveries);
       const commits = new Map(
         await Promise.all(
           summaries.map(async (task): Promise<[string, string | null]> => {

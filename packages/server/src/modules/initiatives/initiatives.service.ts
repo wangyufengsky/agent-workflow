@@ -955,8 +955,7 @@ export function createInitiativesService({
         });
       }
       if (problems.length > 0) throw invalid(problems);
-      // Resolve model-supplied keys once, while the submitted draft is validated. Stored links use the immutable
-      // checklist item id, so removing an item and later reusing its key cannot silently reconnect old coverage.
+      // 模型给出的 key 可以复用。持久化验收项 UUID 后，重用 key 也能区分新旧验收项。
       const coverage = input.coverage.map((line) => ({
         ...line,
         ...(line.links === undefined

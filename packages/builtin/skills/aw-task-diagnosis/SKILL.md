@@ -1,6 +1,6 @@
 ---
 name: aw-task-diagnosis
-description: Use when the user asks why a task failed, is stuck, is waiting or takes long, or what to do next with it. Walks through the task, its timeline, the failing step's checks and the AI runtime, names the cause with the line that shows it, and picks the matching next action.
+description: Use when the user asks why a task failed, is stuck, is waiting or takes long, what to do next, or how to turn failures and review comments into a project convention. Walks through the task, its timeline, the failing step's checks and the AI runtime, names the cause with the line that shows it, and picks the matching next action.
 ---
 
 # Diagnosing a task
@@ -27,6 +27,10 @@ Name one cause. If two fit, say which the evidence supports better.
 - **The requirement was unclear or the plan went the wrong way** (review issues about missing parts, assumptions that contradict what the user wanted). While the plan waits for confirmation, send the user's feedback on it with `agent-workflow-app_tasks_replan`; after that, offer a new task with a clearer requirement.
 - **The AI runtime or the model** (opencode not ready, a login that expired, a quota or rate limit, an unknown model, timeouts). The user fixes the login or the model in the settings; restarting opencode (`agent-workflow-app_system_restartRuntime`) interrupts every running AI session. Then the task can continue with `agent-workflow-app_tasks_retry`.
 - **The same failure in every attempt.** Retrying unchanged will fail again. Suggest a note that says what to do differently, a different check, or splitting the work into a smaller task.
+
+## Project conventions
+
+When the user wants to carry a lesson forward, name the source task, the specific failure or review comment, the proposed rule and when it applies. Keep one-off requirements on their task. Use `agent-workflow-app_open_page` to open Quality & Usage for a failure (the failure drill-down is in pro mode) or the source task for a PR review. Direct the user to “整理为项目约定” in the failure drill-down or the PR review. The user selects which records from that project to include and reviews the proposal. Check or preview settings are edited on the project page. Team rules go through the existing AGENTS.md task and its user-reviewed merge.
 
 ## Do not
 

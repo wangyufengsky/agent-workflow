@@ -102,10 +102,9 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
         : skippedCount > 0
           ? C.checksSkipped(skippedCount, skipped)
           : C.checksPassed;
+  const delivered = task.status === TaskStatus.Completed && task.lastDelivery?.status === DeliveryStatus.Succeeded;
   // Delivered changes use their recorded commit range after the worktree is removed.
-  const browsable =
-    task.git.worktreeStatus === WorktreeStatus.Ready ||
-    (task.status === TaskStatus.Completed && task.lastDelivery?.status === DeliveryStatus.Succeeded && !report);
+  const browsable = task.git.worktreeStatus === WorktreeStatus.Ready || (delivered && !report);
   return (
     <Panel solid>
       <div className={styles.result} data-testid="result-card">
@@ -212,7 +211,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
       </div>
       {browsable && (
         <DiffDialog
-          open={delivery === true || viewing !== null}
+          open={(delivered && delivery === true) || viewing !== null}
           onOpenChange={(open) => {
             if (open) return;
             setViewing(null);

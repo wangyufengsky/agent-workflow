@@ -1,6 +1,6 @@
 ---
 name: aw-task-requirement
-description: Use when you are about to create a task, a batch, a scheduled task or an initiative (tasks_create, batches_create, schedules_create, initiatives_create). How to turn what the user said into a requirement the AI can act on, which workflow to pick, and when a large requirement becomes an initiative instead of one task.
+description: Use when you are about to create a task, a batch, a scheduled task or an initiative (tasks_create, batches_create, schedules_create, initiatives_create). How to turn what the user said into a requirement the AI can act on, which workflow to pick, and when a large requirement becomes an initiative, and how to trace its acceptance and delivery.
 ---
 
 # Writing the requirement
@@ -42,6 +42,7 @@ Create an initiative (`agent-workflow-app_initiatives_create`) instead of one ta
 - Pass the files the user attached in this conversation in `attachmentIds`.
 - The AI breakdown, and a new breakdown or refinement you start, takes a few minutes. Its draft or its failure arrives as your next message and you summarise it then, so tell the user that instead of asking whether to wait.
 - To look at an initiative later, read it with `agent-workflow-app_initiatives_get`. The user changes phases and work packages on the page, or asks the AI to break it down again (`agent-workflow-app_initiatives_rebreakdown` with their feedback). Opening the next phase, dropping a work package and the like go through the other `agent-workflow-app_initiatives_*` tools when the user asks.
+- To trace an original requirement, use its recorded work packages and explicit checklist links. Use `agent-workflow-app_requirements_get` for a known task's current checklist. Read the verification verdict and the merge status separately. Older plans may have only a package-level link. Open the initiative with `agent-workflow-app_open_page` and ask the user to expand the coverage row for earlier tasks, evidence and a delivery link.
 
 ## Example
 

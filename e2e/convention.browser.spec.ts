@@ -5,6 +5,7 @@ import { expect, test } from '@playwright/test';
 import { API_BASE, AUTH, E2E_HOSTING } from './env.ts';
 import {
   createProject,
+  GIT_HEAVY_SPECS_SLOW,
   git,
   passReview,
   patchSettings,
@@ -14,7 +15,10 @@ import {
   TASK_RUN_TIMEOUT_MS,
 } from './helpers.ts';
 
-test('UX-12 选择失败和审查意见，预览并通过任务合并约定', async ({ page, request }) => {
+test.slow(GIT_HEAVY_SPECS_SLOW, '同一旅程运行任务、两次重试、推送和合并');
+test.afterEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
+
+test('UX-12 选择失败和审查意见，预览并通过任务合并约定', async ({ page, request }, testInfo) => {
   await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'pro', 'node.maxAttempts': 3 });
   const project = await createProject(request, 'git status --porcelain | grep -q .');
   const origin = mkdtempSync(join(tmpdir(), 'aw-convention-origin-'));
@@ -133,9 +137,12 @@ test('UX-12 选择失败和审查意见，预览并通过任务合并约定', as
   await evidencePage.close();
   await dialog.getByLabel('建议的项目约定').fill('问候语修改要覆盖空名称测试。');
   await dialog.getByLabel('适用条件').fill('修改问候语时');
-  await page.screenshot({ path: '/private/tmp/ux12-light.png' });
-  await patchSettings(request, { 'ui.theme': 'dracula' });
-  await page.screenshot({ path: '/private/tmp/ux12-dark.png' });
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await dialog.getByRole('heading', { name: '选中的来源快照' }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('project-conventions-light.png') });
+  await patchSettings(request, { 'ui.theme': 'default' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'default');
+  await page.screenshot({ path: testInfo.outputPath('project-conventions-dark.png') });
   await queueTurn(request, project, { title: '梳理项目约定' }, [submitResult('已有检查')]);
   await queueTurn(request, project, { title: '编写 AGENTS.md' }, [
     { type: 'edit', file: 'AGENTS.md', content: '# 项目约定\n\n问候语修改要覆盖空名称测试。\n' },

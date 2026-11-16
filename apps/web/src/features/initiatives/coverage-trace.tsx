@@ -18,7 +18,7 @@ import { TaskBadge } from '../tasks/task-badge.tsx';
 import styles from './initiatives.module.css';
 import { initiativeCoverageQuery } from './initiatives.queries.ts';
 
-/** The exact links supplied by the breakdown; legacy lines remain at work-package granularity. */
+/** 使用拆解时的显式关联。旧记录按工作包展示。 */
 export function CoverageTrace({
   initiative,
   line,
@@ -32,7 +32,7 @@ export function CoverageTrace({
   if (query.isPending) return <p className="hint">{C.coverageLoading}</p>;
   if (query.isError) return <ErrorState error={query.error} />;
   return (
-    <div className="col">
+    <div className={`col ${styles.coverageTrace}`}>
       {line.items.map((key) => {
         const previous = snapshot?.find((entry) => entry.key === key);
         const item = initiative.items.find(
@@ -41,7 +41,7 @@ export function CoverageTrace({
         const links = line.links?.filter((entry) => entry.item === key).flatMap((entry) => entry.acceptance) ?? [];
         if (item === undefined)
           return (
-            <section key={key} className="col">
+            <section key={key} className={`col ${styles.coveragePackage}`}>
               <strong>
                 {C.coverageRemoved}: {previous?.title ?? key}
               </strong>
@@ -77,7 +77,9 @@ export function CoverageTrace({
                 <Link to={ROUTES.task} params={{ taskId: task.id }}>
                   {task.id === item.task?.id ? C.coverageCurrent : C.coveragePrevious} · {task.key} · {task.title}
                 </Link>
-                <TaskBadge group={task.displayGroup} archived={task.archivedAt !== null} />
+                <div className="row">
+                  <TaskBadge group={task.displayGroup} archived={task.archivedAt !== null} />
+                </div>
                 {links.map((key) => {
                   const acceptance = item.acceptance.find((entry) => entry.id === key);
                   const trace = requirements.find((entry) => entry.item.id === key);
@@ -178,7 +180,7 @@ export function CoverageTrace({
   );
 }
 
-/** Show only explicit links from the snapshot; legacy snapshots cannot supply missing criteria. */
+/** 历史覆盖使用拆解快照里的验收项和工作包身份。 */
 function SnapshotCriteria({ snapshot, links }: { snapshot: InitiativeCoverageItemSnapshot; links: readonly string[] }) {
   if (links.length === 0) return <span className="hint">{C.coveragePackageOnly}</span>;
   if (snapshot.acceptance === undefined) return <span className="hint">{C.coverageSnapshotUnavailable}</span>;
@@ -200,7 +202,7 @@ function SnapshotCriteria({ snapshot, links }: { snapshot: InitiativeCoverageIte
   );
 }
 
-/** Earlier submitted breakdowns keep their own package identities, even if a key is reused later. */
+/** 每个覆盖版本保留原工作包身份，以区分后续复用同一 key 的包。 */
 export function CoverageHistory({ initiative }: { initiative: InitiativeDetailDTO }) {
   const query = useQuery(initiativeCoverageQuery(initiative.id));
   if (!query.isSuccess || query.data.versions.length < 2) return null;

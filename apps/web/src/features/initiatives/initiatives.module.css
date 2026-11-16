@@ -157,6 +157,17 @@
   color: var(--ink-2);
 }
 
+.coverageTrace a {
+  text-decoration: underline;
+  text-underline-offset: 0.17em;
+}
+
+.coveragePackage {
+  padding-left: 12px;
+  margin-bottom: 8px;
+  border-inline-start: 1px solid var(--line);
+}
+
 .coverageOutput {
   max-height: 200px;
   overflow: auto;

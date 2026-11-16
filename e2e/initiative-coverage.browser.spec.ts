@@ -13,7 +13,8 @@ import {
   TASK_RUN_TIMEOUT_MS,
 } from './helpers.ts';
 
-test.slow(GIT_HEAVY_SPECS_SLOW, 'two staged task runs and deliveries');
+test.slow(GIT_HEAVY_SPECS_SLOW, '两阶段任务执行及交付');
+test.afterEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' }));
 
 const point = '退款金额在订单和支付两端保持一致';
 const unplanned = '历史退款数据迁移';
@@ -93,12 +94,12 @@ test('UX-11 从两阶段的共同需求直达验收输出和最终交付改动',
   await page.getByRole('button', { name: '确认并开始第 1 阶段' }).click({ timeout: TASK_RUN_TIMEOUT_MS });
 
   let demand = await coverageRow(page);
-  await expect(demand.getByText('尚未开始任务', { exact: true })).toBeVisible();
   await page.getByTestId('initiative-understanding').locator('summary').getByText(unplanned, { exact: true }).click();
   await expect(page.getByTestId('initiative-understanding').getByText('未安排工作包')).toBeVisible();
 
   const orderAcceptance = demand.getByRole('link', { name: '订单按分取整', exact: true });
   await expect(orderAcceptance).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  await expect(demand.getByText('尚未开始任务', { exact: true })).toBeVisible();
   await orderAcceptance.click();
   await expect(page).toHaveURL(/\/tasks\/[^?]+\?requirement=/);
   await expect(page.getByTestId('requirements').getByText('order-rounding-proof', { exact: true })).toBeVisible({
@@ -160,5 +161,4 @@ test('UX-11 从两阶段的共同需求直达验收输出和最终交付改动',
   await page
     .getByTestId('initiative-understanding')
     .screenshot({ path: testInfo.outputPath('requirement-coverage-dark.png') });
-  await patchSettings(request, { 'ui.theme': 'codex' });
 });

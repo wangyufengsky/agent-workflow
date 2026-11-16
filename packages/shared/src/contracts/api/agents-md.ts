@@ -25,7 +25,7 @@ export const startAgentsMdTaskRequestSchema = z.object({
 });
 export type StartAgentsMdTaskRequest = z.infer<typeof startAgentsMdTaskRequestSchema>;
 
-/** The exact source records selected by the user for a project convention proposal. */
+/** 用户选中的项目约定来源。 */
 export const conventionEvidenceRequestSchema = z
   .object({
     id: z.string(),

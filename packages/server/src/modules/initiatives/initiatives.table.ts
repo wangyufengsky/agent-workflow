@@ -92,7 +92,7 @@ export const initiativeItemsTable = sqliteTable(
   ],
 );
 
-/** Every task started for a work package, including the tasks it replaced. */
+/** 工作包每次启动的任务，包括已被替换的任务。 */
 export const initiativeItemTasksTable = sqliteTable(
   'initiative_item_tasks',
   {
@@ -110,7 +110,7 @@ export const initiativeItemTasksTable = sqliteTable(
   ],
 );
 
-/** Immutable coverage and package identity snapshots from completed breakdowns. */
+/** 每次有效拆解的覆盖表与工作包身份快照。 */
 export const initiativeCoverageVersionsTable = sqliteTable(
   'initiative_coverage_versions',
   {
