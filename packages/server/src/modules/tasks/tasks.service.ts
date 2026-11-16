@@ -9,6 +9,8 @@ import {
   DeliveryStatus,
   ErrorCode,
   type ErrorInfo,
+  frontendRoundSchema,
+  isFrontendWorkflow,
   type ListTasksQuery,
   type NodeDetailDTO,
   type PlanDTO,
@@ -37,6 +39,7 @@ import { createConventionEvidence } from './tasks.conventions.ts';
 import { createTaskDelegation } from './tasks.delegation.ts';
 import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
+import { frontendVerified } from './tasks.frontend.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
 import type { StatusMatch } from './tasks.repo.ts';
 import { createTaskRequirements } from './tasks.requirements.ts';
@@ -79,11 +82,20 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     if (taskId !== null) state.publish(taskId);
   });
 
+  const isFrontend = (id: string): boolean => isFrontendWorkflow(workflows.get(state.get(id).workflowId));
+
   function detail(id: string): TaskDetailDTO {
     const task = state.get(id);
     const workflow = workflows.get(task.workflowId);
     const worktree = worktrees.findByTask(id);
     const plan = task.status === TaskStatus.PlanReview ? plans.draft(id) : plans.confirmed(id);
+    const summaries = nodes.summaries(id);
+    const frontend = isFrontendWorkflow(workflow)
+      ? {
+          verified: frontendVerified(summaries),
+          rounds: listTaskEvents(db, id, 0, 'frontend_round').map(({ payload }) => frontendRoundSchema.parse(payload)),
+        }
+      : undefined;
     return {
       ...state.summary(task),
       requirement: task.requirement,
@@ -107,7 +119,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       },
       plan: plan ?? null,
       draftPlan: task.status === TaskStatus.Paused ? (plans.draft(id) ?? null) : null,
-      nodes: nodes.summaries(id),
+      nodes: summaries,
+      ...(frontend === undefined ? {} : { frontend }),
       activeAttempts: attempts.listActive(id),
       openInbox: inbox.listOpen({ taskId: id }),
       result:
@@ -124,6 +137,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   }
 
   async function deliver(id: string, request: Omit<DeliverRequest, 'id'>): Promise<TaskDetailDTO> {
+    if (isFrontend(id) && !frontendVerified(nodes.listByTask(id)))
+      throw new AppError(ErrorCode.StateTransitionInvalid, 'Finish frontend verification before delivery');
     const checklist = await requirements.deliveryCheck(id, request.acknowledgedRequirementsRevisionId);
     await delivery.deliver(id, request, checklist);
     return detail(id);
@@ -131,6 +146,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
 
   return {
     detail,
+    isFrontend,
+    frontendVerified: (id: string) => frontendVerified(nodes.listByTask(id)),
     /** A page of task summaries (11 §5); the display group is decided in SQL so that pages stay full. */
     list({ projectId, status, displayGroup, archived, limit, cursor }: ListTasksQuery): {
       items: TaskSummaryDTO[];
@@ -141,12 +158,16 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       const oneOf =
         status === undefined && displayGroup === undefined
           ? undefined
-          : statuses.flatMap((s): StatusMatch[] => {
-              const without = displayGroup === undefined || resolveTaskDisplayGroup(s, false) === displayGroup;
-              const withAttention = displayGroup === undefined || resolveTaskDisplayGroup(s, true) === displayGroup;
-              if (without && withAttention) return [{ status: s, attention: 'any' }];
-              if (without) return [{ status: s, attention: 'without' }];
-              return withAttention ? [{ status: s, attention: 'with' }] : [];
+          : statuses.flatMap((status) => {
+              if (displayGroup === undefined) return [{ status, attention: 'any' } satisfies StatusMatch];
+              const variants = status === TaskStatus.Review ? [false, true] : [undefined];
+              return variants.flatMap((frontendIteration): StatusMatch[] => {
+                const without = resolveTaskDisplayGroup(status, false, frontendIteration) === displayGroup;
+                const withAttention = resolveTaskDisplayGroup(status, true, frontendIteration) === displayGroup;
+                if (!without && !withAttention) return [];
+                const attention = without && withAttention ? 'any' : without ? 'without' : 'with';
+                return [{ status, attention, ...(frontendIteration === undefined ? {} : { frontendIteration }) }];
+              });
             });
       const [updatedAt, seq] = cursor === undefined ? [] : cursor.split('.').map(Number);
       const rows = state.repo.page({
@@ -327,6 +348,10 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       page?: RequestChangesRequest['page'],
     ): Promise<TaskDetailDTO> {
       await changes.requestChanges(id, reason, feedback, attachmentIds, page);
+      return detail(id);
+    },
+    async finishFrontend(id: string, path?: string): Promise<TaskDetailDTO> {
+      await changes.finishFrontend(id, path);
       return detail(id);
     },
     reviewComments: review.reviewComments,

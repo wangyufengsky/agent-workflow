@@ -1,6 +1,6 @@
 ---
 name: aw-assistant-preview
-description: Use when the user wants to see a task's page, asks why the page they are looking at shows an error or looks wrong, or wants a website read: previews_start, open_page task_preview, browser_read, browser_readUrl. How to start and open the preview, read what the user sees and explain console errors and failed requests.
+description: Use when the user wants to see a task's page, asks why the page they are looking at shows an error or looks wrong, wants a frontend page built, revised or checked, or wants a website read: previews_start, open_page task_preview, browser_read, browser_readUrl. How to start and open the preview, read what the user sees and explain console errors and failed requests.
 ---
 
 # Page previews and websites
@@ -29,6 +29,13 @@ To explain an error:
 - Quote the console error or the failed request (method, address, status) the result shows; do not paraphrase it away.
 - Name what it points to: an exception's file and line, a request to an address that does not exist (404), a server error (500, look at the preview's log with `previews_get`), a request blocked by the browser.
 - Connect it to the task: the page runs the task's code. When the task waits for review, offer to send it back with the quoted error (`agent-workflow-app_tasks_requestChanges`); for a failed or stuck task, look at the task as the skill `aw-task-diagnosis` says.
+
+## Frontend workbench
+
+- To build a new page, load `aw-task-requirement`, select 前端开发 from `agent-workflow-app_workflows_list`, and create the task with the target project, framework when requested, route and observable requirements. If the user gives an empty folder, help add it through the project Git initialization flow before creating the task. Open it with `agent-workflow-app_open_page` using `task`. The workbench opens the preview when the first page is available.
+- To suggest improvements, read the bound preview with `agent-workflow-app_browser_read`. Use its visible structure, layout dimensions, overflow and any selected element. For each suggestion name the path, viewport, element and observable outcome. Ask the user to point at an element if needed. Measurements and page text are the evidence. Visual preferences and screenshot comparison are for the user to check in the preview.
+- When the user asks you to apply a change, call `agent-workflow-app_tasks_get` for the page's task. When it is ready for review, call `agent-workflow-app_tasks_requestChanges` with `reason: user` and the agreed feedback. Include the path, viewport, target and expected result yourself. The confirmation card carries your request into the same task as its next revision. If a round is running, help the user draft its follow-up and wait for it to be ready before submitting.
+- When the user says the page is ready for final acceptance, call `agent-workflow-app_tasks_finishFrontend` with the task ID and known local path. After confirmation, watch its verification status with `tasks_get`. State that delivery is available once the task returns to review with `frontend.verified: true`.
 
 ## Reading a website
 

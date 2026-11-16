@@ -7,6 +7,7 @@ import {
 } from '../../enums/git.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
 import { attachmentIdsSchema } from './attachments.ts';
+import { FRONTEND_ANNOTATION_LIMIT, frontendAnnotationRequestSchema } from './frontend.ts';
 import { hostingRefSchema } from './projects.ts';
 
 export const remoteDeliveryStatusSchema = z.object({
@@ -67,7 +68,12 @@ export const requestChangesSchema = z.object({
    * The user's preview tab whose current page goes with the feedback (29 §2.3): the backend reads its path,
    * viewport, console errors and failed requests itself.
    */
-  page: z.object({ tabId: z.string() }).optional(),
+  page: z
+    .object({
+      tabId: z.string(),
+      annotations: z.array(frontendAnnotationRequestSchema).max(FRONTEND_ANNOTATION_LIMIT).optional(),
+    })
+    .optional(),
   /** Files attached to the feedback (30); the steps from this change on see them. */
   attachmentIds: attachmentIdsSchema.optional(),
 });

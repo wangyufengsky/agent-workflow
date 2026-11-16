@@ -18,7 +18,12 @@ export const TASK_DISPLAY_GROUP = {
 } as const satisfies Record<TaskStatus, TaskDisplayGroup>;
 
 /** An open question / permission / acceptance item overrides the status of any non-terminal task. */
-export function resolveTaskDisplayGroup(status: TaskStatus, hasOpenAttentionItem: boolean): TaskDisplayGroup {
+export function resolveTaskDisplayGroup(
+  status: TaskStatus,
+  hasOpenAttentionItem: boolean,
+  frontendIteration = false,
+): TaskDisplayGroup {
   if (hasOpenAttentionItem && !isTerminalState(taskMachine, status)) return TaskDisplayGroup.NeedsAttention;
+  if (status === TaskStatus.Review && frontendIteration) return TaskDisplayGroup.FrontendReview;
   return TASK_DISPLAY_GROUP[status];
 }

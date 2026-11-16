@@ -72,11 +72,17 @@ export function createTimelineRepo(db: DbExecutor) {
         }),
       );
     },
-    list(taskId: string, afterId: number): TaskEventDTO[] {
+    list(taskId: string, afterId: number, type?: string): TaskEventDTO[] {
       return db
         .select()
         .from(taskEventsTable)
-        .where(and(eq(taskEventsTable.taskId, taskId), gt(taskEventsTable.id, afterId)))
+        .where(
+          and(
+            eq(taskEventsTable.taskId, taskId),
+            gt(taskEventsTable.id, afterId),
+            type === undefined ? undefined : eq(taskEventsTable.type, type),
+          ),
+        )
         .orderBy(asc(taskEventsTable.id))
         .all()
         .map(({ taskId: _taskId, payload, ...row }) => ({

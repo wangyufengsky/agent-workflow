@@ -14,6 +14,7 @@ export * from './contracts/api/browser.ts';
 export * from './contracts/api/databases.ts';
 export * from './contracts/api/decks.ts';
 export * from './contracts/api/delivery.ts';
+export * from './contracts/api/frontend.ts';
 export * from './contracts/api/git.ts';
 export * from './contracts/api/inbox.ts';
 export * from './contracts/api/initiatives.ts';

@@ -263,3 +263,13 @@
   list-style: none;
   min-width: 0;
 }
+
+.frontendProgress .layout {
+  grid-template-columns: minmax(0, 1fr);
+  height: auto;
+  min-height: 0;
+}
+
+.frontendProgress .layout > :first-child {
+  min-height: 235px;
+}

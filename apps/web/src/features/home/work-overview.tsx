@@ -26,7 +26,13 @@ const ATTENTION_SHOWN = 3;
 const SECTIONS: { title: string; groups: TaskDisplayGroup[] }[] = [
   {
     title: C.inProgress,
-    groups: [TaskDisplayGroup.Preparing, TaskDisplayGroup.Running, TaskDisplayGroup.Paused, TaskDisplayGroup.Merging],
+    groups: [
+      TaskDisplayGroup.Preparing,
+      TaskDisplayGroup.Running,
+      TaskDisplayGroup.FrontendReview,
+      TaskDisplayGroup.Paused,
+      TaskDisplayGroup.Merging,
+    ],
   },
   { title: C.toMerge, groups: [TaskDisplayGroup.Review] },
 ];

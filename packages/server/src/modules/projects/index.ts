@@ -1,6 +1,7 @@
 import { projectsOperations } from './projects.operations.ts';
 import { createProjectsService, type ProjectsServiceDeps } from './projects.service.ts';
 
+export { frontendCheckCommands, inferRepoPreview } from './projects.inference.ts';
 export type { ProjectsService } from './projects.service.ts';
 export { projectsTable } from './projects.table.ts';
 

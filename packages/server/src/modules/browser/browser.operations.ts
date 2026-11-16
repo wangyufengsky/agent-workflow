@@ -6,6 +6,7 @@ import {
   navigateUserTabOp,
   openLoginTabOp,
   openUserTabOp,
+  pickFrontendElementOp,
   readWebsiteOp,
   setUserViewportOp,
   userTabLogsOp,
@@ -20,6 +21,9 @@ export function browserOperations(browser: BrowserService) {
     implement(listSiteLoginsOp, () => browser.siteLogins()),
     implement(clearSiteLoginOp, ({ host }) => browser.clearSiteLogin(host)),
     implement(openUserTabOp, ({ taskId }) => browser.openUserTab(taskId)),
+    implement(pickFrontendElementOp, async ({ tabId, requestId, cancel }) => ({
+      element: await browser.pickFrontendElement(tabId, requestId, cancel ?? false),
+    })),
     implement(navigateUserTabOp, ({ tabId, path }) => browser.navigateUserTab(tabId, path)),
     implement(setUserViewportOp, ({ tabId, preset }) => browser.setUserViewport(tabId, preset)),
     implement(userTabLogsOp, ({ tabId }) => browser.userTabLogs(tabId)),

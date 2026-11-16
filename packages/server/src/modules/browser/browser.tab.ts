@@ -387,6 +387,8 @@ export async function openTab({
       };
     },
 
+    documentVersion: () => navigations.committed,
+
     onChange(listener: () => void): void {
       changed = listener;
     },

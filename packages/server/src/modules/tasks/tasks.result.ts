@@ -5,6 +5,7 @@ import {
   ErrorCode,
   InboxKind,
   InboxStatus,
+  isFrontendWorkflow,
   NodeStatus,
   TaskEvent,
   TaskFailedPhase,
@@ -15,6 +16,7 @@ import {
 import { diffCommits, runGit } from '../git/index.ts';
 import type { Node } from '../nodes/index.ts';
 import { taskDiffBase } from './tasks.diff.ts';
+import { frontendVerified } from './tasks.frontend.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
 /** Leaf nodes: no other node depends on them; their summaries describe the outcome of a report workflow. */
@@ -36,23 +38,24 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
     if (worktree === undefined) throw new AppError(ErrorCode.NotFound, `Task ${task.key} has no worktree`);
     const head = (await runGit(['rev-parse', 'HEAD'], { cwd: worktree.path })).stdout.trim();
     const files = await diffCommits(worktree.path, await taskDiffBase(worktree.path, task.baseBranch), head);
-    const done = nodes
-      .listByTask(taskId)
-      .flatMap((node) =>
-        node.status === NodeStatus.Done && node.result !== null ? [{ node, result: node.result }] : [],
-      );
+    const steps = nodes.listByTask(taskId);
+    const done = steps.flatMap((node) =>
+      node.status === NodeStatus.Done && node.result !== null ? [{ node, result: node.result }] : [],
+    );
     const nodeSummaries = done.map(({ node, result }) => ({
       key: node.key,
       title: node.title,
       summary: result.summary,
     }));
-    const report = workflows.get(task.workflowId).deliverable === WorkflowDeliverable.Report;
+    const workflow = workflows.get(task.workflowId);
+    const report = workflow.deliverable === WorkflowDeliverable.Report;
     const leaves = new Set(leavesOf(done.map((d) => d.node)).map((n) => n.key));
     const summarized = report ? nodeSummaries.filter((s) => leaves.has(s.key)) : nodeSummaries;
     const assumed = inbox
       .list({ taskId, kind: InboxKind.Question }, InboxStatus.Resolved)
       .flatMap((item) => (item.response !== null && 'assumed' in item.response ? [item.response.value] : []));
     return {
+      ...(isFrontendWorkflow(workflow) ? { frontendVerified: frontendVerified(steps) } : {}),
       summary:
         summarized.length === 1
           ? summarized.map((s) => s.summary).join('')
@@ -93,6 +96,7 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
       if (task.status !== TaskStatus.Running) return;
       unit.transact(() => {
         move(task, TaskEvent.AllNodesFinished, undefined, { result });
+        if (result.frontendVerified === false) return;
         inbox.create({
           kind: InboxKind.Delivery,
           taskId,

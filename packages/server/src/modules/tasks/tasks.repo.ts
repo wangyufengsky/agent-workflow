@@ -76,7 +76,11 @@ function serialize(changes: TaskChanges) {
 }
 
 /** A task status, and whether the task must (`with`) or must not (`without`) have open attention items. */
-export type StatusMatch = { status: TaskStatus; attention: 'with' | 'without' | 'any' };
+export type StatusMatch = {
+  status: TaskStatus;
+  attention: 'with' | 'without' | 'any';
+  frontendIteration?: boolean;
+};
 
 export function createTasksRepo(db: DbExecutor) {
   const t = tasksTable;
@@ -149,10 +153,22 @@ export function createTasksRepo(db: DbExecutor) {
       limit: number;
     }): Task[] {
       const ids = [...filter.attention];
-      const statusMatch = filter.oneOf?.flatMap(({ status, attention }) => {
-        if (attention === 'any') return [eq(t.status, status)];
-        if (attention === 'with') return ids.length === 0 ? [] : [and(eq(t.status, status), inArray(t.id, ids))];
-        return [ids.length === 0 ? eq(t.status, status) : and(eq(t.status, status), notInArray(t.id, ids))];
+      const statusMatch = filter.oneOf?.flatMap(({ status, attention, frontendIteration }) => {
+        if (attention === 'with' && ids.length === 0) return [];
+        const reviewed = sql`json_extract(${t.result}, '$.frontendVerified')`;
+        const iteration =
+          frontendIteration === undefined
+            ? undefined
+            : frontendIteration
+              ? sql`${reviewed} IS 0`
+              : sql`${reviewed} IS NOT 0`;
+        const required =
+          attention === 'with'
+            ? inArray(t.id, ids)
+            : attention === 'without' && ids.length > 0
+              ? notInArray(t.id, ids)
+              : undefined;
+        return [and(eq(t.status, status), required, iteration)];
       });
       const { after } = filter;
       return select(

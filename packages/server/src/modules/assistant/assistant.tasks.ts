@@ -52,6 +52,9 @@ export function createTaskRelay(deps: {
                   eventType: task.eventType,
                   occurredAt: task.occurredAt,
                   status: task.status,
+                  ...(deps.tasks.isFrontend(task.taskId)
+                    ? { frontend: { verified: deps.tasks.frontendVerified(task.taskId) } }
+                    : {}),
                   failedPhase: task.failedPhase,
                   failure: task.failure,
                   result:

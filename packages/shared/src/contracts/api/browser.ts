@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { viewportPresetSchema } from '../../enums/browser.ts';
 import { attemptKindSchema, attemptStatusSchema } from '../../enums/task.ts';
 import { browserLogsOutputSchema, browserPageSchema } from '../mcp/browser.ts';
+import { frontendElementSchema, frontendPageLayoutSchema } from './frontend.ts';
 
 /** 助手只读网页：沿用网站登录状态，但不开放页面操作。 */
 export const readWebsiteRequestSchema = z.object({
@@ -25,6 +26,8 @@ export const readPreviewSchema = browserPageSchema.extend({
   settled: z.boolean(),
   taskId: z.string(),
   viewport: viewportPresetSchema,
+  layout: frontendPageLayoutSchema.optional(),
+  selectedElement: frontendElementSchema.optional(),
   logs: browserLogsOutputSchema,
 });
 
@@ -63,6 +66,7 @@ export const userTabStateSchema = z.object({
   url: z.string(),
   viewport: viewportPresetSchema,
   /** Of the current page: console errors (uncaught exceptions included) and requests that failed or answered ≥ 400. */
+  picking: z.boolean().optional(),
   consoleErrors: z.number().int(),
   failedRequests: z.number().int(),
 });

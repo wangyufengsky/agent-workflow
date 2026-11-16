@@ -14,6 +14,7 @@ import {
   FailureAction,
   InboxKind,
   InboxStatus,
+  isFrontendWorkflow,
   lockedChanges,
   NodeStatus,
   PLAN_PROBLEM_HINT,
@@ -83,11 +84,14 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
     work().catch((err: unknown) => log.error({ err, taskId }, 'task background work failed'));
   };
 
+  const withInitialVerification = (task: Task, workflow: WorkflowDTO, graph: PlanGraph) =>
+    isFrontendWorkflow(workflow) ? graph : state.verify.withVerifyStep(task.id, graph);
+
   const materializeInput = (task: Task, plan: PlanDTO, workflow: WorkflowDTO) => ({
     taskId: task.id,
     planId: plan.id,
     // The checklist may have changed since the plan was drafted (31 §2.1).
-    graph: state.verify.withVerifyStep(task.id, plan.graph),
+    graph: withInitialVerification(task, workflow, plan.graph),
     ...acceptanceProject(projects.getRecord(task.projectId)),
     defaultAcceptance: workflow.definition.defaultAcceptance,
     acceptEachNode: task.checkpoints.accept_each_node,
@@ -159,7 +163,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       const plan = plans.createDraft({
         taskId: task.id,
         source: PlanSource.Template,
-        graph: state.verify.withVerifyStep(task.id, template),
+        graph: withInitialVerification(task, workflow, template),
         summary: null,
         assumptions: [],
         feedback: null,

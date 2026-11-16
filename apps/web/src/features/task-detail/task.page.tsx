@@ -18,6 +18,7 @@ import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { FrontendRoundHistory, FrontendWorkbench } from '../preview/frontend-workbench.tsx';
 import { PreviewPane } from '../preview/preview-pane.tsx';
 import { projectQuery } from '../projects/projects.queries.ts';
 import { RequirementsSection } from '../requirements/requirements-section.tsx';
@@ -192,6 +193,9 @@ export function TaskPage() {
   const project = useQuery({ ...projectQuery(task.data?.project.id ?? ''), enabled: task.data !== undefined });
   if (task.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (task.isError) return <ErrorState error={task.error} onRetry={() => void task.refetch()} />;
+  const frontend = task.data.frontend;
+  const workbench =
+    frontend !== undefined && !ENDED_TASK.includes(task.data.status) && task.data.status !== TaskStatus.Merging;
   return (
     <div className="page wide" data-testid="task-page">
       <TaskHeader
@@ -201,10 +205,27 @@ export function TaskPage() {
         onDetailsChange={(on) => void navigate({ search: (prev) => ({ ...prev, details: on }), replace: true })}
       />
       {requirement !== undefined && !hasVisibleChecklist(task.data) && <RequirementsSection task={task.data} />}
-      {project.data?.preview !== null &&
-      project.data !== undefined &&
-      task.data.git.worktreeStatus === WorktreeStatus.Ready &&
-      !ENDED_TASK.includes(task.data.status) ? (
+      {workbench ? (
+        <FrontendWorkbench
+          key={task.data.id}
+          task={task.data}
+          pro={pro}
+          hasConfiguredPreview={project.data?.preview != null}
+          onOpenNode={selection.open}
+          progress={
+            <div className={styles.frontendProgress}>
+              {task.data.status === TaskStatus.Review && !frontend.verified ? (
+                <StepsView task={task.data} selection={selection} pro={pro} />
+              ) : (
+                <TaskMain task={task.data} selection={selection} pro={pro} />
+              )}
+            </div>
+          }
+        />
+      ) : project.data?.preview !== null &&
+        project.data !== undefined &&
+        task.data.git.worktreeStatus === WorktreeStatus.Ready &&
+        !ENDED_TASK.includes(task.data.status) ? (
         <RadixTabs.Root
           value={view ?? 'progress'}
           onValueChange={(next) =>
@@ -233,6 +254,7 @@ export function TaskPage() {
       ) : (
         <TaskMain task={task.data} selection={selection} pro={pro} />
       )}
+      {!workbench && frontend !== undefined && <FrontendRoundHistory task={task.data} onOpen={selection.open} />}
       <NodeDrawer
         taskId={taskId}
         nodeId={open === true ? node : undefined}

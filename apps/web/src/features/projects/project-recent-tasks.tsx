@@ -13,6 +13,7 @@ const PRIORITY_GROUPS: TaskDisplayGroup[] = [
   TaskDisplayGroup.Failed,
   TaskDisplayGroup.NeedsAttention,
   TaskDisplayGroup.PlanReview,
+  TaskDisplayGroup.FrontendReview,
   TaskDisplayGroup.Review,
 ];
 const RECENT_LIMIT = 5;

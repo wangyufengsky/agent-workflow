@@ -17,6 +17,7 @@ let tabs;
 let quitting = false;
 globalThis.previewHarness = {
   token,
+  dataDir,
   ready: app.whenReady().then(async () => {
     child = utilityProcess.fork(resolve('packages/server/src/main.ts'), [], {
       stdio: 'inherit',

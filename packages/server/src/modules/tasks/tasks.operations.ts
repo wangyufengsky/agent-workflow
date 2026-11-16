@@ -11,6 +11,7 @@ import {
   deleteTaskOp,
   deleteWorkflowOp,
   deliverTaskOp,
+  finishFrontendTaskOp,
   getAgentsMdOp,
   getNodeOp,
   getRequirementHistoryOp,
@@ -93,6 +94,7 @@ export function tasksOperations(tasks: TasksService) {
     implement(requestChangesOp, ({ id, reason, feedback, attachmentIds, page }) =>
       tasks.requestChanges(id, reason, feedback, attachmentIds, page),
     ),
+    implement(finishFrontendTaskOp, ({ id, path }) => tasks.finishFrontend(id, path)),
     implement(refreshDeliveryStatusOp, ({ id }) => tasks.refreshDeliveryStatus(id)),
     implement(reviewCommentsOp, ({ id }) => tasks.reviewComments(id)),
     implement(reviseFromReviewOp, ({ id, commentIds, note }) => tasks.reviseFromReview(id, commentIds, note)),

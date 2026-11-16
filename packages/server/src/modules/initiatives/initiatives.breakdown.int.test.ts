@@ -348,6 +348,7 @@ describe('AI 拆解与逐步细化（34 §8，D133、D136）', () => {
     // Without a choice, the work packages may use the built-in workflows that change the repository (34 §5.1).
     expect(created.allowedWorkflows).toEqual([
       'feature',
+      'frontend',
       'bugfix',
       'unit_tests',
       'refactor',

@@ -71,6 +71,7 @@ export const STATUS_TONE = {
     [TaskDisplayGroup.Running]: StatusTone.Run,
     [TaskDisplayGroup.Paused]: StatusTone.Wait,
     [TaskDisplayGroup.NeedsAttention]: StatusTone.Wait,
+    [TaskDisplayGroup.FrontendReview]: StatusTone.Wait,
     [TaskDisplayGroup.Review]: StatusTone.Ok,
     [TaskDisplayGroup.Merging]: StatusTone.Run,
     [TaskDisplayGroup.Completed]: StatusTone.Done,

@@ -36,6 +36,7 @@ import type { KnowledgeService } from '../knowledge/index.ts';
 import type { NodeRunContext, NodesService } from '../nodes/index.ts';
 import type { OpencodeClient } from '../opencode/index.ts';
 import type { PlansService } from '../plans/index.ts';
+import type { PreviewsService } from '../previews/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { RequirementsService } from '../requirements/index.ts';
 import type { RolesService } from '../roles/index.ts';
@@ -65,6 +66,7 @@ export type TasksServiceDeps = {
   opencode: OpencodeClient;
   attachments: AttachmentsService;
   browser: BrowserService;
+  previews: PreviewsService;
   requirements: RequirementsService;
   inbox: InboxService;
   deliveries: DeliveriesService;
@@ -115,7 +117,11 @@ export function createTaskState(deps: TasksServiceDeps) {
       key: task.key,
       title: task.title,
       status: task.status,
-      displayGroup: resolveTaskDisplayGroup(task.status, attention.has(task.id)),
+      displayGroup: resolveTaskDisplayGroup(
+        task.status,
+        attention.has(task.id),
+        task.result?.frontendVerified === false,
+      ),
       project: { id: task.projectId, name: task.projectName },
       workflow: { id: task.workflowId, key: task.workflowKey, name: task.workflowName },
       currentStep: working.get(task.id)?.join('、') ?? null,
