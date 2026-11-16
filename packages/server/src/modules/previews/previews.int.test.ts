@@ -99,6 +99,10 @@ describe('页面预览', () => {
     const response = await t.call(startPreviewOp, { taskId: task.id });
     expect(response.status).toBe(200);
     expect(await answers(response.body.url)).toBe(join(worktree.path, folder));
+
+    const stopped = await t.call(stopPreviewOp, { taskId: task.id });
+    expect(stopped.body).toMatchObject({ state: 'stopped', url: null });
+    await refuses(response.body.url);
   });
 
   it('安装命令只在这个 worktree 第一次启动前运行', async () => {

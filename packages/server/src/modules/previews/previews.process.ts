@@ -11,6 +11,7 @@ import {
 } from '@aw/shared';
 import { execa } from 'execa';
 import type { Clock } from '../../core/clock.ts';
+import { host } from '../../core/platform.ts';
 
 /** A preview's output: appended to its log file (when it has one) and kept as a tail for the user. */
 export type PreviewLog = { append(text: string): void; tail(): string; close(): void };
@@ -67,7 +68,9 @@ function startFailed(message: string, log: PreviewLog): AppError {
 /** Runs a shell command line in the worktree, its output going to the log; null exit code when it was ended. */
 function run(command: string, input: LaunchInput, env: NodeJS.ProcessEnv) {
   input.log.append(`$ ${command}\n`);
-  const child = execa(command, {
+  // Keep Git Bash alive after launching the command. Windows can only terminate descendants while their root exists.
+  const shellCommand = host.shellFromGit ? `${command}\nexit $?` : command;
+  const child = execa(shellCommand, {
     cwd: input.directory,
     // The same POSIX shell as check commands on every platform (D73).
     shell: input.shell,
