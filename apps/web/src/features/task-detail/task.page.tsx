@@ -26,7 +26,7 @@ import { useSettings } from '../settings/settings.queries.ts';
 import { failedNodeKeyOf } from '../tasks/failure-text.ts';
 import { taskQuery } from '../tasks/tasks.queries.ts';
 import { FailurePanel } from './failure-panel.tsx';
-import { NodeDrawer, type NodeTab } from './node-drawer.tsx';
+import { NodeDetailPane, NodeDrawer, type NodeTab } from './node-drawer.tsx';
 import { PausedBanner } from './paused-banner.tsx';
 import { PlanReview } from './plan-review.tsx';
 import { PlanningProgress } from './planning-progress.tsx';
@@ -190,6 +190,8 @@ export function TaskPage() {
     open: (id, tab) => void navigate({ search: (prev) => ({ ...prev, node: id, open: true, tab }) }),
   };
   const { open, tab, view } = route.useSearch();
+  const nodeId = open === true ? node : undefined;
+  const closeNode = () => void navigate({ search: (prev) => ({ ...prev, open: false }), replace: true });
   const project = useQuery({ ...projectQuery(task.data?.project.id ?? ''), enabled: task.data !== undefined });
   if (task.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (task.isError) return <ErrorState error={task.error} onRetry={() => void task.refetch()} />;
@@ -212,6 +214,15 @@ export function TaskPage() {
           pro={pro}
           hasConfiguredPreview={project.data?.preview != null}
           onOpenNode={selection.open}
+          nodeDetails={
+            nodeId === undefined
+              ? undefined
+              : {
+                  title: task.data.nodes.find((item) => item.id === nodeId)?.title ?? C.viewNode,
+                  content: <NodeDetailPane taskId={taskId} nodeId={nodeId} tab={tab} pro={pro} />,
+                  onClose: closeNode,
+                }
+          }
           progress={
             <div className={styles.frontendProgress}>
               {task.data.status === TaskStatus.Review && !frontend.verified ? (
@@ -255,13 +266,7 @@ export function TaskPage() {
         <TaskMain task={task.data} selection={selection} pro={pro} />
       )}
       {!workbench && frontend !== undefined && <FrontendRoundHistory task={task.data} onOpen={selection.open} />}
-      <NodeDrawer
-        taskId={taskId}
-        nodeId={open === true ? node : undefined}
-        tab={tab}
-        pro={pro}
-        onClose={() => void navigate({ search: (prev) => ({ ...prev, open: false }), replace: true })}
-      />
+      {!workbench && <NodeDrawer taskId={taskId} nodeId={nodeId} tab={tab} pro={pro} onClose={closeNode} />}
     </div>
   );
 }

@@ -6,7 +6,7 @@ import {
   NodeStatus,
   type StatusTone,
 } from '@aw/shared';
-import { useQuery } from '@tanstack/react-query';
+import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
@@ -291,6 +291,37 @@ export function NodeTabs({ node, tab }: { node: NodeDetailDTO; tab?: NodeTab | u
   );
 }
 
+type NodeDetailsProps = { taskId: string; nodeId: string; tab?: NodeTab | undefined; pro: boolean };
+
+function NodeDetails({
+  taskId,
+  node,
+  tab,
+  pro,
+}: Omit<NodeDetailsProps, 'nodeId'> & { node: UseQueryResult<NodeDetailDTO> }) {
+  if (node.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
+  if (node.isError) return <ErrorState error={node.error} onRetry={() => void node.refetch()} />;
+  return (
+    <div className="col">
+      <span className="row">
+        <NodeBadge status={node.data.status} />
+        <span className="hint grow">{node.data.roleName}</span>
+        {pro && (
+          <Link to={ROUTES.node} params={{ taskId, nodeId: node.data.id }} search={{}} className="btn secondary sm">
+            {TASK_COPY.viewNodePage}
+          </Link>
+        )}
+      </span>
+      <NodeTabs node={node.data} tab={tab} />
+    </div>
+  );
+}
+
+export function NodeDetailPane({ taskId, nodeId, tab, pro }: NodeDetailsProps) {
+  const node = useQuery(nodeQuery(taskId, nodeId));
+  return <NodeDetails taskId={taskId} node={node} tab={tab} pro={pro} />;
+}
+
 /**
  * Step details in a drawer beside the canvas (14 §3.4): output, changes, process; clicking another step on the canvas
  * shows that one. The pro view links to the full page (M5-04).
@@ -301,13 +332,7 @@ export function NodeDrawer({
   tab,
   pro,
   onClose,
-}: {
-  taskId: string;
-  nodeId: string | undefined;
-  tab?: NodeTab | undefined;
-  pro: boolean;
-  onClose: () => void;
-}) {
+}: Omit<NodeDetailsProps, 'nodeId'> & { nodeId: string | undefined; onClose: () => void }) {
   const node = useQuery({ ...nodeQuery(taskId, nodeId ?? ''), enabled: nodeId !== undefined });
   return (
     <Drawer
@@ -317,22 +342,7 @@ export function NodeDrawer({
       size="lg"
       modal={false}
     >
-      {node.isPending && nodeId !== undefined && <p className="hint">{COMMON_COPY.loading}</p>}
-      {node.isError && <ErrorState error={node.error} onRetry={() => void node.refetch()} />}
-      {node.data !== undefined && (
-        <div className="col">
-          <span className="row">
-            <NodeBadge status={node.data.status} />
-            <span className="hint grow">{node.data.roleName}</span>
-            {pro && (
-              <Link to={ROUTES.node} params={{ taskId, nodeId: node.data.id }} search={{}} className="btn secondary sm">
-                {TASK_COPY.viewNodePage}
-              </Link>
-            )}
-          </span>
-          <NodeTabs node={node.data} tab={tab} />
-        </div>
-      )}
+      {nodeId !== undefined && <NodeDetails taskId={taskId} node={node} tab={tab} pro={pro} />}
     </Drawer>
   );
 }

@@ -347,6 +347,13 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
     await round(1, '导出', '导出订单');
     await round(2, '导出订单', '下载订单');
     await expect(workbench.getByRole('button', { name: '手机', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await workbench.getByRole('button', { name: '界面修改 2' }).click();
+    await expect(page.getByRole('tab', { name: '过程' })).toBeVisible();
+    await expect.poll(nativeText, { timeout: 3_000 }).toBe('下载订单');
+    const stepDetails = workbench.getByRole('complementary', { name: '界面修改 2' });
+    await expect(stepDetails.getByRole('tab', { name: '过程' })).toBeVisible();
+    await expect(workbench.getByLabel('页面路径')).toHaveValue(route);
+    await stepDetails.getByRole('button', { name: '关闭', exact: true }).click();
     await expect(workbench.getByRole('button', { name: '界面修改 2' })).toBeVisible();
     const nativeImage = await app.evaluate(async ({ BrowserWindow }) => {
       const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((item) => 'webContents' in item);

@@ -25,6 +25,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
 import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
+import { COMMON_COPY } from '../../copy/common.ts';
 import { FRONTEND_COPY as C } from '../../copy/frontend.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { useFinishFrontendTask, useRequestChanges } from '../tasks/tasks.queries.ts';
@@ -84,12 +85,14 @@ export function FrontendWorkbench({
   hasConfiguredPreview,
   progress,
   onOpenNode,
+  nodeDetails,
 }: {
   task: TaskDetailDTO;
   pro: boolean;
   hasConfiguredPreview: boolean;
   progress: ReactNode;
   onOpenNode: (id: string) => void;
+  nodeDetails?: { title: string; content: ReactNode; onClose: () => void } | undefined;
 }) {
   const [pickedPanel, setPanel] = useState<Panel>();
   const activityId = useId();
@@ -118,7 +121,8 @@ export function FrontendWorkbench({
   const live = previewState === PreviewState.Running;
   const failed = previewState === PreviewState.Failed;
   const activityInMain = !live && !failed && !firstResult;
-  const panel = pickedPanel === undefined ? (activityInMain ? null : 'activity') : pickedPanel;
+  const defaultPanel = pickedPanel === undefined ? (activityInMain ? null : 'activity') : pickedPanel;
+  const panel = nodeDetails === undefined ? defaultPanel : 'node';
   const checking =
     working && task.nodes.findLast((node) => node.kind !== NodeKind.Verify)?.key.startsWith(FRONTEND_VERIFY_PREFIX);
   const canPick = tabId !== undefined && notes.length < FRONTEND_ANNOTATION_LIMIT;
@@ -187,6 +191,7 @@ export function FrontendWorkbench({
   }
 
   function toggle(next: Exclude<Panel, null>) {
+    nodeDetails?.onClose();
     if (panel === next) {
       cancelPick();
       setPanel(null);
@@ -282,7 +287,10 @@ export function FrontendWorkbench({
               finish.mutate(
                 { id: task.id, ...(path === undefined ? {} : { path }) },
                 {
-                  onSuccess: () => setPanel('progress'),
+                  onSuccess: () => {
+                    nodeDetails?.onClose();
+                    setPanel('progress');
+                  },
                 },
               );
             }}
@@ -329,6 +337,16 @@ export function FrontendWorkbench({
             <ErrorState error={preview.error} onRetry={() => void preview.refetch()} />
           )}
         </section>
+        {nodeDetails !== undefined && (
+          // This is placed beside the native preview so both surfaces stay visible.
+          <aside className={styles.inspector} aria-label={nodeDetails.title}>
+            <div className={styles.inspectorHead}>
+              <h2>{nodeDetails.title}</h2>
+              <IconButton icon="x" label={COMMON_COPY.close} onClick={nodeDetails.onClose} />
+            </div>
+            {nodeDetails.content}
+          </aside>
+        )}
         {(panel === 'notes' || panel === 'progress') && (
           <aside className={styles.inspector} aria-label={panel === 'notes' ? C.notes : C.progress}>
             {panel === 'notes' ? (
