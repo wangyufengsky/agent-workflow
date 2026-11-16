@@ -233,15 +233,16 @@ Linux 上用 `Ctrl` 代替 `⌘`。
 
 ## 安装
 
-在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。当前稳定版 **v1.4.36**：
+在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。**v1.5.0** 的安装包如下。
 
 | 平台 | 文件 |
 | --- | --- |
-| macOS（Apple 芯片） | `agent-workflow-1.4.36-arm64.dmg` |
-| Linux x64（Ubuntu / Debian） | `agent-workflow_1.4.36_amd64.deb` |
-| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.4.36_arm64.deb` |
-| Linux x64（其他发行版） | `agent-workflow-1.4.36-x86_64.AppImage` |
-| Linux arm64（其他发行版） | `agent-workflow-1.4.36-arm64.AppImage` |
+| macOS（Apple 芯片） | `agent-workflow-1.5.0-arm64.dmg` |
+| Linux x64（Ubuntu / Debian） | `agent-workflow_1.5.0_amd64.deb` |
+| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.5.0_arm64.deb` |
+| Linux x64（其他发行版） | `agent-workflow-1.5.0-x86_64.AppImage` |
+| Linux arm64（其他发行版） | `agent-workflow-1.5.0-arm64.AppImage` |
+| Windows 10 / 11 x64 | `agent-workflow-1.5.0-setup-x64.exe` |
 
 可以用同一页的 `SHA256SUMS.txt` 校验下载的文件：
 
@@ -288,7 +289,7 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 **deb（推荐 Ubuntu / Debian）**：
 
 ```bash
-sudo apt install ./agent-workflow_1.4.36_amd64.deb
+sudo apt install ./agent-workflow_1.5.0_amd64.deb
 ```
 
 arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `/usr/bin/agent-workflow` 指向它，菜单项在 `/usr/share/applications/agent-workflow.desktop`），用户数据在 `~/.config/Agent Workflow/`。之后在应用菜单中打开，或运行 `agent-workflow`；第一次启动时应用会在桌面放一个快捷方式（只放一次，删掉后不再出现）。卸载：`sudo apt remove agent-workflow`。
@@ -296,8 +297,8 @@ arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `
 **AppImage（其他发行版）**：
 
 ```bash
-chmod +x agent-workflow-1.4.36-x86_64.AppImage
-./agent-workflow-1.4.36-x86_64.AppImage
+chmod +x agent-workflow-1.5.0-x86_64.AppImage
+./agent-workflow-1.5.0-x86_64.AppImage
 ```
 
 - AppImage 不安装，放在哪里就从哪里运行（建议先移到固定位置，如 `~/Applications/`）；第一次启动时在桌面放一个指向它当前位置的快捷方式，之后移动文件需要删掉快捷方式重新放。
@@ -316,11 +317,11 @@ sudo apt install gnome-keyring
 
 ### Windows
 
-Windows x64 未签名测试版 **v1.4.37-beta.1** 的安装包为 `agent-workflow-1.4.37-beta.1-setup-x64.exe`，在[测试版发布页](https://github.com/wangyufengsky/agent-workflow/releases/tag/v1.4.37-beta.1)下载，并可用同页的 `SHA256SUMS.txt` 核对文件。测试版不替换上面的稳定版。
+Windows x64 未签名安装包与 macOS、Linux 安装包在同一个发布页提供，可以用 `SHA256SUMS.txt` 核对文件。
 
 支持 Windows 10 / 11 x64，按当前用户安装，可选择安装目录。未签名的安装程序可能触发 SmartScreen：确认来源与校验值后点「更多信息 → 仍要运行」。需要完整的 **Git for Windows**（含 Git Bash）、opencode 与可用模型；安装包自带 ripgrep。
 
-CI 覆盖 Windows 构建、自动化测试与安装后的启动/退出；真实 Windows 10/11 桌面上的完整模型任务、企业网络与系统凭据实际使用仍待验证，所以先作为测试版提供。平台差异与验证范围见 [docs/17](docs/17-cross-platform.md)。
+CI 覆盖 Windows 构建、自动化测试与安装后的启动/退出；真实 Windows 10/11 桌面上的完整模型任务、企业网络与系统凭据实际使用仍待验证。平台差异与验证范围见 [docs/17](docs/17-cross-platform.md)。
 
 ## 常见问题
 

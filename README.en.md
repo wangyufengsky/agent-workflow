@@ -74,7 +74,7 @@ Use [GitHub Releases](https://github.com/wangyufengsky/agent-workflow/releases/l
 | --- | --- |
 | macOS, Apple silicon | Stable `.dmg` |
 | Linux x64 / arm64 | Stable `.deb` and `.AppImage` |
-| Windows 10 / 11 x64 | [Unsigned preview v1.4.37-beta.1](https://github.com/wangyufengsky/agent-workflow/releases/tag/v1.4.37-beta.1), not the stable release |
+| Windows 10 / 11 x64 | Unsigned x64 NSIS installer |
 
 Packages are unsigned. Check the release source and checksum before installation. Windows CI covers builds, automated tests, and installed-app startup / shutdown; full real-model workflows and enterprise-network / credential behavior on physical Windows desktops remain to be validated. See [platform support and validation](docs/17-cross-platform.md).
 

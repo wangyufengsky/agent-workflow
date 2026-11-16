@@ -28,7 +28,7 @@ afterEach(() => t.close());
 const promptsDir = loadConfig({ AW_API_TOKEN: 'x'.repeat(32), AW_DATA_DIR: '/tmp' }).promptsDir;
 
 describe('内置流程与角色', () => {
-  it('首次启动写入 4 个角色与 11 个流程，按内置顺序列出', async () => {
+  it('首次启动写入 4 个角色与 13 个流程，按内置顺序列出', async () => {
     const roles = (await t.call(listRolesOp, {})).body.items;
     expect(roles.map((r) => [r.key, r.kind, r.baseAgent])).toEqual([
       ['planner', 'builtin', 'planner'],
@@ -38,6 +38,7 @@ describe('内置流程与角色', () => {
     ]);
     const workflows = (await t.call(listWorkflowsOp, {})).body.items;
     expect(workflows.map((w) => [w.key, w.version, w.planning, w.deliverable])).toEqual([
+      ['artifact', 1, 'fixed', 'report'],
       ['feature', 1, 'ai', 'code_changes'],
       ['frontend', 1, 'fixed', 'code_changes'],
       ['bugfix', 1, 'fixed', 'code_changes'],
@@ -51,7 +52,8 @@ describe('内置流程与角色', () => {
       ['detailed_design', 1, 'fixed', 'code_changes'],
       ['breakdown', 1, 'fixed', 'code_changes'],
     ]);
-    const feature = (await t.call(getWorkflowOp, { id: workflows[0]?.id ?? '' })).body;
+    const feature = (await t.call(getWorkflowOp, { id: workflows.find(({ key }) => key === 'feature')?.id ?? '' }))
+      .body;
     expect(feature.definition.plannerGuidance).toContain('final_verify');
   });
 
@@ -74,7 +76,7 @@ describe('内置流程与角色', () => {
     expect(after).toMatchObject({ version: 2, description: '新的说明' });
     // Tasks keep referring to the version they started with.
     expect(workflows.get(before?.id ?? '')).toMatchObject({ version: 1, description: before?.description });
-    expect(workflows.list()).toHaveLength(12);
+    expect(workflows.list()).toHaveLength(13);
   });
 
   it('系统流程的 key 不占用户的命名空间：用户的 merge_branch 流程在同步内置流程后仍是最新版本并列出', async () => {
