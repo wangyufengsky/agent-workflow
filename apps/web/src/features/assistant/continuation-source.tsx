@@ -204,11 +204,15 @@ export function ContinuationSource({ conversation }: { conversation: AssistantCo
   const choose = useContinueConversation()?.select;
   const conversations = useQuery(conversationsQuery).data;
   const { continuation } = conversation;
+  const hasCarriedAttachments = continuation !== null && continuation.attachmentIds.length > 0;
   const attachments = useQuery({
     ...assistantAttachmentsQuery(conversation.id),
-    enabled: continuation !== null && continuation.consumedAt === null,
+    enabled: hasCarriedAttachments,
   });
   if (continuation === null) return null;
+  const carriedAttachments = attachments.data?.filter((attachment) =>
+    continuation.attachmentIds.includes(attachment.id),
+  );
   const source = conversations?.find((item) => item.id === continuation.sourceConversationId);
   const description = continuation.sourceAvailable
     ? C.source(source === undefined ? continuation.sourceConversationId : titleOf(source), continuation.createdAt)
@@ -226,13 +230,13 @@ export function ContinuationSource({ conversation }: { conversation: AssistantCo
           {C.history}
         </Button>
       )}
-      {continuation.consumedAt === null && attachments.isError && (
+      {hasCarriedAttachments && attachments.isError && (
         <ErrorState error={attachments.error} onRetry={() => void attachments.refetch()} />
       )}
-      {continuation.consumedAt === null && attachments.data !== undefined && attachments.data.length > 0 && (
+      {carriedAttachments !== undefined && carriedAttachments.length > 0 && (
         <div className={styles.carried}>
           <span className="hint">{C.carriedAttachments}</span>
-          <SentAttachments attachments={attachments.data} />
+          <SentAttachments attachments={carriedAttachments} />
         </div>
       )}
       {open && continuation.sourceAvailable && (

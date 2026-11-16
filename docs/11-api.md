@@ -361,7 +361,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/assistant/conversations` | `{ items: AssistantConversationDTO[] }`，最近更新在前；`AssistantConversationDTO` 包含 `{ id, title, projectId, continuation, busy, queuePosition, pendingPermissions, usage, createdAt, updatedAt }`。`projectId: string \| null`，`continuation` 对普通会话为 `null`，续接时为 `{ sourceConversationId, sourceAvailable, cutoffSeq, createdAt, handoffKind, draftText, consumedAt }`。`busy`、队列位置和权限只在内存中，`usage` 持久化；队列位置 1 为下一个，未排队为 `null`（D186） |
+| GET | `/assistant/conversations` | `{ items: AssistantConversationDTO[] }`，最近更新在前；`AssistantConversationDTO` 包含 `{ id, title, projectId, continuation, busy, queuePosition, pendingPermissions, usage, createdAt, updatedAt }`。`projectId: string \| null`，`continuation` 对普通会话为 `null`，续接时为 `{ sourceConversationId, sourceAvailable, cutoffSeq, createdAt, handoffKind, attachmentIds, draftText, consumedAt }`。`busy`、队列位置和权限只在内存中，`usage` 持久化；队列位置 1 为下一个，未排队为 `null`（D186） |
 | POST | `/assistant/conversations` | `{ title?, projectId? }` → 201；`projectId` 可空，未知项目返回 404 `PROJECT_NOT_FOUND`。opencode 会话在第一条消息时创建 |
 | POST | `/assistant/conversations/:id/continuations` | `assistant.continue`，`{ requestId, attachmentIds }` → 201 新对话。同 UUID 与来源返回同一结果；来源忙碌返回 409 `ASSISTANT_BUSY`。附件须属于来源会话，仅勾选项绑定到新会话 |
 | GET | `/assistant/conversations/:id/continuation/history?afterSeq=` | `assistant.continuationHistory`，读取来源消息流截至创建时的序号，返回 `TranscriptPage`。来源已删除返回 404 `ASSISTANT_CONVERSATION_NOT_FOUND` |

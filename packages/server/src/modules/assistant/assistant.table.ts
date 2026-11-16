@@ -37,6 +37,7 @@ export const assistantContinuationsTable = sqliteTable(
     cutoffSeq: integer('cutoff_seq').notNull(),
     handoffText: text('handoff_text').notNull(),
     handoffKind: text('handoff_kind').$type<'summary' | 'recent'>().notNull(),
+    attachmentIds: text('attachment_ids').notNull().default('[]'),
     draftText: text('draft_text'),
     createdAt: integer('created_at').notNull(),
     consumedAt: integer('consumed_at'),

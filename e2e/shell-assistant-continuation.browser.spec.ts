@@ -57,6 +57,7 @@ test('超限后续接项目对话、选择附件、回看来源并编辑后发�
   await page.reload();
   await expect(page.getByTestId('home-messages')).toContainText('已检查迁移。');
   await expect(input).toHaveValue('');
+  await expect(source.getByRole('button', { name: '查看 检查说明.txt' })).toBeVisible();
 
   await page.goto('/settings');
   await expect(page.getByRole('main').getByRole('heading', { name: '设置' })).toBeVisible();

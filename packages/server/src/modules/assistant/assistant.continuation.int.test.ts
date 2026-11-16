@@ -92,6 +92,7 @@ it('选中附件在重启后仍归属新对话，未选中的附件不可读', a
   }
   const chosen = await upload('chosen.txt', '保留的资料');
   const omitted = await upload('omitted.txt', '不带的资料');
+  const retryOnly = await upload('retry-only.txt', '失败后取消的新附件');
   const idle = waitForEvent(t.app.events, ServerEventType.AssistantUpdated, (c) => c.id === source.id && !c.busy);
   await t.call(sendAssistantMessageOp, {
     id: source.id,
@@ -107,6 +108,7 @@ it('选中附件在重启后仍归属新对话，未选中的附件不可读', a
       attachmentIds: [chosen.id],
     })
   ).body;
+  expect(child.continuation?.attachmentIds).toEqual([chosen.id]);
   expect((await t.call(listAssistantAttachmentsOp, { id: child.id })).body.items.map((a) => a.id)).toEqual([chosen.id]);
   const dataDir = t.dataDir;
   const fake = t.fake;
@@ -114,12 +116,21 @@ it('选中附件在重启后仍归属新对话，未选中的附件不可读', a
   t = await createTestApp({ dataDir, fake });
   await t.call(deleteConversationOp, { id: source.id });
   t.fake.failNextPrompt();
-  await t.call(sendAssistantMessageOp, { id: child.id, text: '第一次尝试', context: { page: 'home', params: {} } });
-  expect((await t.call(listAssistantAttachmentsOp, { id: child.id })).body.items.map((a) => a.id)).toEqual([chosen.id]);
+  await t.call(sendAssistantMessageOp, {
+    id: child.id,
+    text: '第一次尝试',
+    context: { page: 'home', params: {} },
+    attachmentIds: [retryOnly.id],
+  });
+  expect((await t.call(getConversationOp, { id: child.id })).body.continuation?.attachmentIds).toEqual([chosen.id]);
   await say(child.id, '继续');
   expect(t.fake.prompts.at(-1)?.text).toContain('保留的资料');
   expect(t.fake.prompts.at(-1)?.text).not.toContain('不带的资料');
-  expect((await t.call(listAssistantAttachmentsOp, { id: child.id })).body.items.map((a) => a.id)).toEqual([chosen.id]);
+  expect(t.fake.prompts.at(-1)?.text).not.toContain('失败后取消的新附件');
+  expect((await t.call(listAssistantAttachmentsOp, { id: child.id })).body.items.map((a) => a.id)).toEqual([
+    chosen.id,
+    retryOnly.id,
+  ]);
 });
 
 it('连续续接保留上次交接和尚未发送的超限草稿', async () => {

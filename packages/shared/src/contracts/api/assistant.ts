@@ -59,6 +59,7 @@ export const assistantConversationSchema = z.object({
       cutoffSeq: z.number(),
       createdAt: z.number(),
       handoffKind: z.enum(['summary', 'recent']),
+      attachmentIds: attachmentIdsSchema,
       draftText: z.string().nullable(),
       consumedAt: z.number().nullable(),
     })

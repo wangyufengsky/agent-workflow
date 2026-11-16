@@ -211,6 +211,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
               cutoffSeq: continuation.cutoffSeq,
               createdAt: continuation.createdAt,
               handoffKind: continuation.handoffKind,
+              attachmentIds: continuation.attachmentIds,
               draftText: continuation.draftText,
               consumedAt: continuation.consumedAt,
             },
@@ -802,6 +803,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           cutoffSeq: afterSeq,
           handoffText: handoff.text,
           handoffKind: handoff.kind,
+          attachmentIds,
           draftText,
           createdAt: now,
           consumedAt: null,
@@ -928,7 +930,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           const continuation = repo.findContinuation(id);
           const inherited =
             continuation !== undefined && continuation.consumedAt === null
-              ? attachments.listByOwner({ kind: AttachmentOwnerKind.AssistantMessage, id })
+              ? continuation.attachmentIds.map((attachmentId) => attachments.get(attachmentId))
               : [];
           const selected = [...new Map([...inherited, ...sent].map((a) => [a.id, a])).values()];
           const section = attachments.promptSection(selected, MCP_ASSISTANT_TOOL_PREFIX);

@@ -389,7 +389,7 @@ payload / response：
 
 ### assistant_continuations
 
-迁移 `0035_assistant_conversations`。删除子对话时随它级联清理，删除来源时仍保留交接内容。
+迁移 `0035_assistant_conversations`、`0036_continuation_attachments`。删除子对话时随它级联清理，删除来源时仍保留交接内容。
 
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
@@ -399,6 +399,7 @@ payload / response：
 | cutoff_seq | INTEGER | 原消息流最后纳入的序号 |
 | handoff_text | TEXT | 有长度上限的历史交接文字 |
 | handoff_kind | TEXT | `summary` 为抽取要点与近期原文，`recent` 为仅有近期原文 |
+| attachment_ids | TEXT(JSON) | 用户创建续接时选定的附件 ID，独立于消息发送后建立的附件引用 |
 | draft_text | TEXT NULL | 明确上下文超限时恢复原用户输入，模型接受子对话首轮后清除 |
 | created_at / consumed_at | INTEGER / INTEGER NULL | 创建与首轮交接接受时间 |
 

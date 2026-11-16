@@ -1,0 +1,1 @@
+ALTER TABLE `assistant_continuations` ADD `attachment_ids` text DEFAULT '[]' NOT NULL;
