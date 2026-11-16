@@ -6,6 +6,7 @@ import {
   type InitiativePhase,
   InitiativeTemplateKind,
   type InitiativeUnderstanding,
+  initiativeCoverageItemSnapshotSchema,
   initiativeCoverageSchema,
   initiativeItemSpecSchema,
   initiativePhaseSchema,
@@ -226,15 +227,17 @@ export function createInitiativesRepo(db: DbExecutor) {
         .map((row) => ({
           revision: row.revision,
           coverage: json(z.array(initiativeCoverageSchema), row.coverage),
-          items: json(z.array(z.object({ id: z.string(), key: z.string(), title: z.string() })), row.items),
+          items: json(z.array(initiativeCoverageItemSnapshotSchema), row.items),
         }));
     },
     recordCoverage(initiativeId: string, revision: number, coverage: InitiativeCoverage[], now: number): void {
       const items = db
-        .select({ id: it.id, key: it.key, title: it.title })
+        .select()
         .from(it)
         .where(eq(it.initiativeId, initiativeId))
-        .all();
+        .all()
+        .map(toItem)
+        .map(({ id, key, title, acceptance, taskId }) => ({ id, key, title, acceptance, taskId }));
       db.insert(initiativeCoverageVersionsTable)
         .values({
           initiativeId,

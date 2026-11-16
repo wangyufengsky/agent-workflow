@@ -75,6 +75,9 @@ export const INITIATIVES_COPY = {
   coverageRemoteRefreshFailed: '刷新失败，显示上次结果',
   coverageLoading: '正在读取任务与证据…',
   coverageHistory: '查看之前的覆盖版本',
+  coverageSnapshotCriteria: '当时关联的验收项',
+  coverageSnapshotPending: '当时尚未开始任务，未核验',
+  coverageSnapshotUnavailable: '该版本未保存验收项详情',
   coverageVersion: (revision: number) => `拆解版本 ${revision}`,
 
   coverageRemoved: '对应的工作包已删除',

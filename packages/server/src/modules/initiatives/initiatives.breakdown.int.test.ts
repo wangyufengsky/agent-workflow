@@ -302,6 +302,43 @@ describe('AI 拆解与逐步细化（34 §8，D133、D136）', () => {
     expect(trace.items[1]?.tasks).toEqual([]);
   });
 
+  it('重新拆解移除未启动的包后，旧版本保留原验收要求且同 key 的新包不会继承身份', async () => {
+    const { project } = await addProject(t, { checkCommand: null });
+    const make = (key: string, title: string) => {
+      const item = { ...unitTests(key, 1, 'a/'), acceptance: [{ key: 'check', title, expected: '原预期' }] };
+      return {
+        ...breakdown([item], ['第一阶段']),
+        coverage: [{ point: '原始需求', items: [key], links: [{ item: key, acceptance: ['check'] }] }],
+      };
+    };
+    t.fake.enqueue(script().callTool('submit_breakdown', make('a', '原验收项')), SESSION);
+    const created = await create({ projectId: project.id, requirement: '原始需求' });
+    await settled();
+    const original = await detail(created.id);
+    const originalId = original.items[0]?.id;
+    const criterionId = original.items[0]?.acceptance[0]?.id;
+    t.fake.enqueue(script().callTool('submit_breakdown', make('b', '替代验收项')), SESSION);
+    await t.call(rebreakdownInitiativeOp, { id: created.id });
+    await settled();
+    t.fake.enqueue(script().callTool('submit_breakdown', make('a', '新验收项')), SESSION);
+    await t.call(rebreakdownInitiativeOp, { id: created.id });
+    await settled();
+    const current = await detail(created.id);
+    expect(current.items[0]?.id).not.toBe(originalId);
+    const trace = (await t.call(initiativeCoverageTraceOp, { id: created.id })).body;
+    const old = trace.versions.find((version) => version.revision === 1);
+    expect(old?.items).toMatchObject([
+      {
+        id: originalId,
+        key: 'a',
+        taskId: null,
+        acceptance: [{ id: criterionId, title: '原验收项', expected: '原预期' }],
+      },
+    ]);
+    expect(old?.coverage[0]?.links?.[0]?.acceptance).toEqual([criterionId]);
+    expect(current.items[0]?.acceptance[0]?.title).toBe('新验收项');
+  });
+
   it('没有交出拆解就是失败，可以带意见重新拆解；拆解进行中不能修改或删除', async () => {
     const { project } = await addProject(t, { checkCommand: null });
     const notes = Buffer.from('导出字段：订单号、金额\n');

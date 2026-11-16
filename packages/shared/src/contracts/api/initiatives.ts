@@ -188,13 +188,23 @@ export const initiativeDetailSchema = initiativeSummarySchema.extend({
 });
 export type InitiativeDetailDTO = z.infer<typeof initiativeDetailSchema>;
 
+/** A proposal as it appeared in a coverage version; legacy snapshots have no checklist or task fact. */
+export const initiativeCoverageItemSnapshotSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  title: z.string(),
+  acceptance: initiativeItemSpecSchema.shape.acceptance.unwrap().optional(),
+  taskId: z.string().nullable().optional(),
+});
+export type InitiativeCoverageItemSnapshot = z.infer<typeof initiativeCoverageItemSnapshotSchema>;
+
 /** Batched task lineage and checklist evidence for the coverage view. */
 export const initiativeCoverageTraceSchema = z.object({
   versions: z.array(
     z.object({
       revision: z.number(),
       coverage: z.array(initiativeCoverageSchema),
-      items: z.array(z.object({ id: z.string(), key: z.string(), title: z.string() })),
+      items: z.array(initiativeCoverageItemSnapshotSchema),
     }),
   ),
   items: z.array(

@@ -2,6 +2,7 @@ import {
   DeliveryStatus,
   DeliveryStrategy,
   type InitiativeCoverage,
+  type InitiativeCoverageItemSnapshot,
   type InitiativeDetailDTO,
   InitiativeItemStatus,
   RequirementDisplayStatus,
@@ -25,7 +26,7 @@ export function CoverageTrace({
 }: {
   initiative: InitiativeDetailDTO;
   line: InitiativeCoverage;
-  snapshot?: ReadonlyArray<{ id: string; key: string; title: string }>;
+  snapshot?: readonly InitiativeCoverageItemSnapshot[];
 }) {
   const query = useQuery(initiativeCoverageQuery(initiative.id));
   if (query.isPending) return <p className="hint">{C.coverageLoading}</p>;
@@ -37,14 +38,17 @@ export function CoverageTrace({
         const item = initiative.items.find(
           (entry) => entry.key === key && (snapshot === undefined || entry.id === previous?.id),
         );
+        const links = line.links?.filter((entry) => entry.item === key).flatMap((entry) => entry.acceptance) ?? [];
         if (item === undefined)
           return (
-            <p key={key}>
-              {C.coverageRemoved}: {previous?.title ?? key}
-            </p>
+            <section key={key} className="col">
+              <strong>
+                {C.coverageRemoved}: {previous?.title ?? key}
+              </strong>
+              {previous !== undefined && <SnapshotCriteria snapshot={previous} links={links} />}
+            </section>
           );
         const history = query.data.items.find((entry) => entry.key === key)?.tasks ?? [];
-        const links = line.links?.filter((entry) => entry.item === key).flatMap((entry) => entry.acceptance) ?? [];
         return (
           <section key={key} className="col">
             <strong>
@@ -54,6 +58,7 @@ export function CoverageTrace({
                 : INITIATIVE_ITEM_STATUS_LABEL[item.status]}
             </strong>
             {item.dropReason !== null && <span>{item.dropReason}</span>}
+            {previous !== undefined && <SnapshotCriteria snapshot={previous} links={links} />}
             {links.length === 0 && <span className="hint">{C.coveragePackageOnly}</span>}
             {history.length === 0 && <span className="hint">{C.coverageNoTask}</span>}
             {history.length === 0 &&
@@ -86,11 +91,16 @@ export function CoverageTrace({
                     );
                   return (
                     <div className="col" key={key}>
-                      <a
-                        href={`/tasks/${encodeURIComponent(task.id)}?requirement=${encodeURIComponent(trace.item.id)}${trace.isCurrent ? '' : `&requirementRevision=${encodeURIComponent(trace.revisionId)}`}`}
+                      <Link
+                        to={ROUTES.task}
+                        params={{ taskId: task.id }}
+                        search={{
+                          requirement: trace.item.id,
+                          ...(trace.isCurrent ? {} : { requirementRevision: trace.revisionId }),
+                        }}
                       >
                         {trace.item.title}
-                      </a>
+                      </Link>
                       <span>{trace.isCurrent ? R.statusLabel[trace.status] : C.coverageRemovedVersion}</span>
                       {commitSha === null && trace.latest !== null && (
                         <span className="hint">{C.coverageCommitUnknown}</span>
@@ -143,9 +153,9 @@ export function CoverageTrace({
                             : C.coverageRemoteOpen}
                   </span>
                 ) : delivery.commitSha !== null && delivery.diffBase !== null && delivery.diffHead !== null ? (
-                  <a href={`/tasks/${encodeURIComponent(task.id)}?delivery=true`}>
+                  <Link to={ROUTES.task} params={{ taskId: task.id }} search={{ delivery: true }}>
                     {C.coverageLocalCommit(delivery.commitSha)}
-                  </a>
+                  </Link>
                 ) : delivery.commitSha !== null ? (
                   <Link
                     to={ROUTES.gitProject}
@@ -162,6 +172,28 @@ export function CoverageTrace({
               </div>
             ))}
           </section>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Show only explicit links from the snapshot; legacy snapshots cannot supply missing criteria. */
+function SnapshotCriteria({ snapshot, links }: { snapshot: InitiativeCoverageItemSnapshot; links: readonly string[] }) {
+  if (links.length === 0) return <span className="hint">{C.coveragePackageOnly}</span>;
+  if (snapshot.acceptance === undefined) return <span className="hint">{C.coverageSnapshotUnavailable}</span>;
+  return (
+    <div className="col">
+      <span className="hint">{C.coverageSnapshotCriteria}</span>
+      {links.map((id) => {
+        const criterion = snapshot.acceptance?.find((entry) => entry.id === id);
+        if (criterion === undefined) return <span key={id}>{C.coverageSnapshotUnavailable}</span>;
+        return (
+          <div key={id} className="col">
+            <span>{criterion.title}</span>
+            <span className="hint">{R.expectedIs(criterion.expected)}</span>
+            {snapshot.taskId === null && <span className="hint">{C.coverageSnapshotPending}</span>}
+          </div>
         );
       })}
     </div>
