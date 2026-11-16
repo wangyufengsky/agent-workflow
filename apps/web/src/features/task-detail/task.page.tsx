@@ -1,9 +1,16 @@
-import { EDITABLE_NODE_STATUSES, type TaskDetailDTO, TaskStatus, UiMode, WorktreeStatus } from '@aw/shared';
+import {
+  EDITABLE_NODE_STATUSES,
+  type TaskDetailDTO,
+  TaskStatus,
+  UiMode,
+  WorkflowPlanning,
+  WorktreeStatus,
+} from '@aw/shared';
 import * as RadixTabs from '@radix-ui/react-tabs';
 import { useQuery } from '@tanstack/react-query';
-import { getRouteApi } from '@tanstack/react-router';
+import { getRouteApi, Link } from '@tanstack/react-router';
 import { useState } from 'react';
-import { ROUTE_IDS } from '../../app/routes.ts';
+import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { ProgressCanvas } from '../../canvas/progress-canvas.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
@@ -135,6 +142,17 @@ function TaskMain({ task, selection, pro }: MainProps) {
       return (
         <div className="col">
           {task.result !== null ? <ResultCard task={task} /> : null}
+          {task.status === TaskStatus.Completed &&
+            task.plan !== null &&
+            task.workflow.planning === WorkflowPlanning.Ai && (
+              <Link
+                className="btn secondary"
+                to={ROUTES.workflowNew}
+                search={{ task: task.id, version: task.plan.version }}
+              >
+                {C.savePlanTemplate}
+              </Link>
+            )}
           {task.nodes.length > 0 && (
             <details className={styles.canvasFold} open={task.result === null}>
               <summary className="hint">{C.canvasToggle}</summary>

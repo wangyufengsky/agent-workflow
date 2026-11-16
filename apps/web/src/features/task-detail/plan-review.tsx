@@ -1,6 +1,8 @@
 import { type PlanGraph, type RoleDTO, type TaskDetailDTO, transitiveDependencies, WorkflowPlanning } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { type FormEvent, useState } from 'react';
+import { ROUTES } from '../../app/routes.ts';
 import { ProgressCanvas } from '../../canvas/progress-canvas.tsx';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -85,6 +87,11 @@ export function PlanReview({ task, pro }: { task: TaskDetailDTO; pro: boolean })
             >
               {C.confirmPlan}
             </Button>
+            {task.workflow.planning === WorkflowPlanning.Ai && (
+              <Link className="btn secondary" to={ROUTES.workflowNew} search={{ task: task.id, version: plan.version }}>
+                {C.savePlanTemplate}
+              </Link>
+            )}
             {pro && (
               <Button icon="edit" onClick={() => setEditing(true)}>
                 {C.editPlan}

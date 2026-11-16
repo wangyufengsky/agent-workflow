@@ -196,6 +196,8 @@ export const ASSISTANT_PAGE_PARAMS = {
  */
 export const AssistantForm = {
   StartTask: 'tasks.create',
+  WorkflowFromPlan: 'workflows.fromPlan',
+  TemplateFromInitiative: 'initiativeTemplates.fromInitiative',
   AddProject: 'projects.create',
   ProjectHosting: 'projects.setHosting',
   AddDbConnection: 'databases.create',

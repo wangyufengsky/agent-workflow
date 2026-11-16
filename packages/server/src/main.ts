@@ -47,7 +47,10 @@ async function selectFakeHosting() {
       import('../test/fakes/fake-hosting.ts'),
       import('../test/fakes/fake-hosting.routes.ts'),
     ]);
-    return { fake: await createFakeHosting({ token, repos: [repo] }), registerFakeHostingRoutes };
+    return {
+      fake: await createFakeHosting({ token, repos: [repo], canonicalWebUrls: true }),
+      registerFakeHostingRoutes,
+    };
   }
   return undefined;
 }

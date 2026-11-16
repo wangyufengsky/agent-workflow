@@ -117,3 +117,24 @@ export const setHostingAccountRequestSchema = z.object({
   token: z.string().trim().min(1),
 });
 export type SetHostingAccountRequest = z.infer<typeof setHostingAccountRequestSchema>;
+
+export const projectRuntimePartSchema = z.object({
+  status: z.enum(['pending', 'passed', 'failed', 'not_configured', 'stopped', 'skipped']),
+  output: z.string(),
+  reason: z.enum(['cannot_start', 'timeout', 'nonzero_exit', 'execution_error']).optional(),
+});
+export const projectRuntimeCheckSchema = z.object({
+  projectId: z.string(),
+  branch: z.string(),
+  configVersion: z.number(),
+  checkCommand: z.string().nullable(),
+  preview: projectPreviewSchema.nullable(),
+  startedAt: z.number(),
+  finishedAt: z.number().nullable(),
+  status: z.enum(['running', 'completed', 'stopped', 'interrupted']),
+  infrastructureError: z.object({ phase: z.enum(['execution', 'cleanup']), message: z.string() }).optional(),
+  repository: projectRuntimePartSchema,
+  command: projectRuntimePartSchema,
+  previewResult: projectRuntimePartSchema,
+});
+export type ProjectRuntimeCheck = z.infer<typeof projectRuntimeCheckSchema>;

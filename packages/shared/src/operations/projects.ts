@@ -5,6 +5,7 @@ import {
   createProjectRequestSchema,
   gitInitPreviewSchema,
   projectDetailSchema,
+  projectRuntimeCheckSchema,
   projectSchema,
   setHostingRequestSchema,
   updateProjectRequestSchema,
@@ -196,4 +197,47 @@ export const startAgentsMdTaskOp = defineOperationContract({
   credentialFields: [],
   mode: UiMode.Simple,
   produces: { kind: EntityKind.Task, ref: (task) => ({ id: task.id, title: `${task.key} · ${task.title}` }) },
+});
+
+export const getProjectRuntimeCheckOp = defineOperationContract({
+  id: 'projects.runtimeCheck',
+  title: 'op.projects.runtimeCheck',
+  description: 'Read the latest project runtime check',
+  input: byId,
+  output: projectRuntimeCheckSchema.nullable(),
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/projects/:id/runtime-check' },
+  expose: { palette: false, assistant: false },
+  credentialFields: [],
+  mode: UiMode.Simple,
+});
+export const startProjectRuntimeCheckOp = defineOperationContract({
+  id: 'projects.startRuntimeCheck',
+  title: 'op.projects.startRuntimeCheck',
+  description: 'Run selected configured project commands in a temporary worktree',
+  input: z.object({
+    id: z.string(),
+    branch: z.string().trim().min(1),
+    configVersion: z.number(),
+    runCommand: z.boolean(),
+    runPreview: z.boolean(),
+  }),
+  output: projectRuntimeCheckSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/projects/:id/runtime-check' },
+  expose: { palette: false, assistant: false },
+  credentialFields: [],
+  mode: UiMode.Simple,
+});
+export const stopProjectRuntimeCheckOp = defineOperationContract({
+  id: 'projects.stopRuntimeCheck',
+  title: 'op.projects.stopRuntimeCheck',
+  description: 'Stop a running project runtime check',
+  input: byId,
+  output: projectRuntimeCheckSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/projects/:id/runtime-check/stop' },
+  expose: { palette: false, assistant: false },
+  credentialFields: [],
+  mode: UiMode.Simple,
 });

@@ -16,6 +16,7 @@ import {
   deleteWorkflowOp,
   deliverTaskOp,
   getNodeOp,
+  getPlanOp,
   getTaskOp,
   getWorkflowOp,
   listRolesOp,
@@ -30,6 +31,7 @@ import {
   pauseTaskOp,
   type RequestChangesRequest,
   type ReviseFromReviewRequest,
+  refreshDeliveryStatusOp,
   rejectNodeOp,
   replanOp,
   requestChangesOp,
@@ -69,6 +71,9 @@ export const workflowsQuery = queryOptions({
   queryKey: queryKeys.workflows,
   queryFn: async () => (await callOperation(listWorkflowsOp, {})).items,
 });
+
+export const planVersionQuery = (id: string, version: number) =>
+  queryOptions({ queryKey: ['plan', id, version], queryFn: () => callOperation(getPlanOp, { id, version }) });
 
 export const workflowQuery = (id: string) =>
   queryOptions({ queryKey: queryKeys.workflow(id), queryFn: () => callOperation(getWorkflowOp, { id }) });
@@ -267,6 +272,8 @@ export const useConfirmPlan = () =>
 export const useDeliver = () => useTaskMutation((input: DeliverRequest) => callOperation(deliverTaskOp, input));
 export const useRequestChanges = () =>
   useTaskMutation((input: RequestChangesRequest) => callOperation(requestChangesOp, input));
+export const useRefreshDeliveryStatus = () =>
+  useTaskMutation((input: { id: string }) => callOperation(refreshDeliveryStatusOp, input));
 export const useReviseFromReview = () =>
   useTaskMutation((input: ReviseFromReviewRequest) => callOperation(reviseFromReviewOp, input));
 

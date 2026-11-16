@@ -437,6 +437,18 @@ export const requestChangesOp = defineOperationContract({
   assistantOmit: ['page', 'attachmentIds'],
 });
 
+export const refreshDeliveryStatusOp = defineOperationContract({
+  ...common,
+  expose: { palette: false, assistant: false },
+  id: 'tasks.refreshDeliveryStatus',
+  title: 'op.tasks.refreshDeliveryStatus',
+  description: 'Refresh the saved status of the task pull request',
+  input: byId,
+  output: taskDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/delivery-status' },
+});
+
 export const reviewCommentsOp = defineOperationContract({
   ...common,
   id: 'tasks.reviewComments',

@@ -1,18 +1,22 @@
 import {
+  DEFINITION_KEY_PATTERN,
   type PlanGraph,
   planProblemCodeSchema,
   type RoleDTO,
   validateWorkflowDefinition,
+  validateWorkflowOp,
   type WorkflowDefinition,
   type WorkflowDTO,
   WorkflowKind,
   WorkflowPlanning,
   type WorkflowProblem,
+  type WorkflowShape,
   workflowProblemCodeSchema,
 } from '@aw/shared';
-import { useQuery } from '@tanstack/react-query';
-import { getRouteApi, Link } from '@tanstack/react-router';
-import type { ReactNode } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
+import { type ReactNode, useState } from 'react';
+import { callOperation } from '../../api/client.ts';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { AcceptanceEditor } from '../../canvas/acceptance-editor.tsx';
 import { EditTools } from '../../canvas/edit-tools.tsx';
@@ -38,12 +42,16 @@ import {
 } from '../../copy/workflows.ts';
 import { stepsOfPlan } from '../task-detail/steps.ts';
 import {
+  planVersionQuery,
   rolesQuery,
+  taskQuery,
+  useCreateWorkflow,
   useUpdateWorkflow,
   workflowQuery,
   workflowsQuery,
   workflowVersionsQuery,
 } from '../tasks/tasks.queries.ts';
+import { workflowDefinitionFromPlan } from './from-plan.ts';
 import { InsertSteps } from './insert-steps.tsx';
 import { RequiredStepsEditor } from './required-steps-editor.tsx';
 import styles from './workflows.module.css';
@@ -85,7 +93,9 @@ function Settings({
   draft,
   onChange,
   readonly,
+  isNew,
 }: {
+  isNew: boolean;
   workflow: WorkflowDTO;
   roles: readonly RoleDTO[];
   draft: Draft;
@@ -115,6 +125,18 @@ function Settings({
       </div>
       <fieldset className={`field ${styles.roles}`}>
         <legend className="label">{C.roles}</legend>
+        {definition.allowedRoles
+          .filter((key) => !roles.some((role) => role.key === key))
+          .map((key) => (
+            <label key={key} className="check">
+              <input
+                type="checkbox"
+                checked
+                onChange={() => patch({ allowedRoles: definition.allowedRoles.filter((role) => role !== key) })}
+              />
+              <span>{C.missingRole(key)}</span>
+            </label>
+          ))}
         {roles.map((role) => (
           <label key={role.key} className="check">
             <input
@@ -206,7 +228,7 @@ function Settings({
           </div>
         </>
       )}
-      <Versions workflowKey={workflow.key} />
+      {!isNew && <Versions workflowKey={workflow.key} />}
     </fieldset>
   );
 }
@@ -215,7 +237,21 @@ function Settings({
  * Editing one workflow (M5-05, 13 §5), canvas first (26 §6.3, D107): the toolbar, the steps on the canvas and a side
  * panel with the selected step and 流程设置. A built-in workflow is shown read-only. Saving adds a version.
  */
-function WorkflowEditor({ workflow, roles }: { workflow: WorkflowDTO; roles: readonly RoleDTO[] }) {
+function WorkflowEditor({
+  workflow,
+  roles,
+  source,
+}: {
+  workflow: WorkflowDTO;
+  roles: readonly RoleDTO[];
+  source?: { task: string; version: number };
+}) {
+  const isNew = source !== undefined;
+  const [key, setKey] = useState('');
+  const [serverProblems, setServerProblems] = useState<WorkflowProblem[]>([]);
+  const validate = useMutation({ mutationFn: (shape: WorkflowShape) => callOperation(validateWorkflowOp, shape) });
+  const create = useCreateWorkflow();
+  const navigate = useNavigate();
   const readonly = workflow.kind === WorkflowKind.Builtin;
   const update = useUpdateWorkflow();
   const history = useHistory<Draft>({
@@ -225,7 +261,10 @@ function WorkflowEditor({ workflow, roles }: { workflow: WorkflowDTO; roles: rea
   });
   const draft = history.value;
   const { definition } = draft;
-  const change = (patch: Partial<Draft>, mergeKey?: string) => history.change({ ...draft, ...patch }, mergeKey);
+  const change = (patch: Partial<Draft>, mergeKey?: string) => {
+    setServerProblems([]);
+    history.change({ ...draft, ...patch }, mergeKey);
+  };
   const fixed = workflow.planning === WorkflowPlanning.Fixed;
   const template = definition.template ?? { nodes: [] };
   const templateRules = { allowedRoles: definition.allowedRoles, requiredSteps: [] };
@@ -238,16 +277,49 @@ function WorkflowEditor({ workflow, roles }: { workflow: WorkflowDTO; roles: rea
     (s) => s.title.trim() === '' || s.instructions.trim() === '',
   );
   const problems: EditorProblem[] = [
+    ...(isNew && !DEFINITION_KEY_PATTERN.test(key) ? [{ key: undefined, message: C.keyRequired }] : []),
     ...(draft.name.trim() === '' ? [{ key: undefined, message: C.nameRequired }] : []),
     ...definitionProblems.map((p) => ({ key: p.nodeKey, message: problemLabel(p) })),
+    ...serverProblems.map((p) => ({ key: p.nodeKey, message: problemLabel(p) })),
     ...templateProblems,
     ...(incomplete ? [{ key: undefined, message: C.requiredIncomplete }] : []),
   ];
-  const save = () =>
+  const save = () => {
+    if (isNew) {
+      validate.mutate(
+        { planning: workflow.planning, definition },
+        {
+          onSuccess: ({ problems: found }) => {
+            if (found.length > 0) {
+              setServerProblems(found);
+              return;
+            }
+            create.mutate(
+              {
+                key,
+                name: draft.name.trim(),
+                description: draft.description,
+                planning: workflow.planning,
+                deliverable: workflow.deliverable,
+                definition,
+              },
+              {
+                onSuccess: (saved) => {
+                  toast(C.saved(saved.version));
+                  void navigate({ to: ROUTES.workflow, params: { key: saved.key } });
+                },
+              },
+            );
+          },
+        },
+      );
+      return;
+    }
     update.mutate(
       { id: workflow.id, name: draft.name.trim(), description: draft.description, definition },
       { onSuccess: (saved) => toast(C.saved(saved.version)) },
     );
+  };
 
   const toolbar = (tools: ReactNode) => (
     <>
@@ -267,6 +339,15 @@ function WorkflowEditor({ workflow, roles }: { workflow: WorkflowDTO; roles: rea
           ? C.builtinBadge
           : `${WORKFLOW_PLANNING_LABEL[workflow.planning]} · ${WORKFLOWS_COPY.version(workflow.version)}`}
       </span>
+      {isNew && (
+        <input
+          className="input mono"
+          aria-label={C.newKey}
+          placeholder={WORKFLOWS_COPY.keyHint}
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+        />
+      )}
       <span className="grow" />
       {readonly ? (
         <span className="hint">{C.readonly}</span>
@@ -279,8 +360,8 @@ function WorkflowEditor({ workflow, roles }: { workflow: WorkflowDTO; roles: rea
             variant="primary"
             size="sm"
             icon="check"
-            pending={update.isPending}
-            disabled={problems.length > 0 || history.changes === 0}
+            pending={update.isPending || create.isPending || validate.isPending}
+            disabled={problems.length > 0 || (!isNew && history.changes === 0)}
             onClick={save}
           >
             {C.save}
@@ -303,7 +384,9 @@ function WorkflowEditor({ workflow, roles }: { workflow: WorkflowDTO; roles: rea
       {update.isError && <ErrorState error={update.error} />}
     </div>
   );
-  const settings = <Settings workflow={workflow} roles={roles} draft={draft} onChange={change} readonly={readonly} />;
+  const settings = (
+    <Settings workflow={workflow} roles={roles} draft={draft} onChange={change} readonly={readonly} isNew={isNew} />
+  );
 
   if (!fixed) {
     return (
@@ -364,7 +447,15 @@ function WorkflowEditor({ workflow, roles }: { workflow: WorkflowDTO; roles: rea
           </>,
         )
       }
-      actions={update.isError ? <ErrorState error={update.error} /> : undefined}
+      actions={
+        validate.isError ? (
+          <ErrorState error={validate.error} />
+        ) : create.isError ? (
+          <ErrorState error={create.error} />
+        ) : update.isError ? (
+          <ErrorState error={update.error} />
+        ) : undefined
+      }
       settings={settings}
     />
   );
@@ -389,6 +480,36 @@ export function WorkflowEditorPage() {
         // A saved version is a new row: the editor starts again from it.
         <WorkflowEditor key={workflow.data.id} workflow={workflow.data} roles={roles.data} />
       )}
+    </div>
+  );
+}
+
+/** A fixed workflow draft based on the exact stored plan, before any workflow is created. */
+export function NewWorkflowFromPlanPage() {
+  const { task: taskId, version } = getRouteApi(ROUTE_IDS.workflowNew).useSearch();
+  const task = useQuery(taskQuery(taskId));
+  const plan = useQuery(planVersionQuery(taskId, version));
+  const roles = useQuery(rolesQuery);
+  const original = useQuery({ ...workflowQuery(task.data?.workflow.id ?? ''), enabled: task.data !== undefined });
+  const error = task.error ?? plan.error ?? roles.error ?? original.error;
+  if (error !== null) return <ErrorState error={error} />;
+  if (task.data === undefined || plan.data === undefined || roles.data === undefined || original.data === undefined)
+    return <p className="hint">{COMMON_COPY.loading}</p>;
+  const definition = workflowDefinitionFromPlan(plan.data.graph, original.data.definition);
+  const workflow: WorkflowDTO = {
+    ...original.data,
+    id: '',
+    key: '',
+    name: task.data.title,
+    kind: WorkflowKind.Custom,
+    planning: WorkflowPlanning.Fixed,
+    definition,
+  };
+  return (
+    <div className="page wide">
+      <p>{C.fromPlan(task.data.key, version)}</p>
+      <p className="hint">{C.fromPlanHint}</p>
+      <WorkflowEditor workflow={workflow} roles={roles.data} source={{ task: task.data.key, version }} />
     </div>
   );
 }

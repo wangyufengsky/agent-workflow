@@ -99,6 +99,7 @@ export const KNOWLEDGE_QUESTION_MAX_CHARS = 4000;
 /** A conversation's title taken from its first question is cut to this length. */
 export const KNOWLEDGE_TITLE_MAX_CHARS = 80;
 export const KNOWLEDGE_ANSWER_MAX_CHARS = 20_000;
+export const KNOWLEDGE_TASK_EXCERPT_MAX_CHARS = 8_000;
 export const KNOWLEDGE_MAX_CITATIONS = 20;
 /** Lines one file citation may span. */
 export const KNOWLEDGE_CITATION_MAX_LINES = 200;

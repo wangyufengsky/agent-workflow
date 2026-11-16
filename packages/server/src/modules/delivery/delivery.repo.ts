@@ -6,6 +6,10 @@ import {
   ErrorCode,
   type ErrorInfo,
   errorInfoSchema,
+  type HostingRef,
+  hostingRefSchema,
+  type RemoteDeliveryStatus,
+  remoteDeliveryStatusSchema,
 } from '@aw/shared';
 import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -22,6 +26,7 @@ export type DeliveryChanges = {
   prUrl?: string;
   diffBase?: string;
   diffHead?: string;
+  remoteRef?: HostingRef;
   conflictFiles?: string[];
   error?: ErrorInfo;
   finishedAt: number;
@@ -33,6 +38,9 @@ const filesSchema = z.array(z.string());
 function toDelivery(row: DeliveryRow): Delivery {
   return {
     ...row,
+    remoteRef: row.remoteRef === null ? null : hostingRefSchema.parse(JSON.parse(row.remoteRef)),
+    remoteStatus: row.remoteStatus === null ? null : remoteDeliveryStatusSchema.parse(JSON.parse(row.remoteStatus)),
+    remoteError: row.remoteError === null ? null : errorInfoSchema.parse(JSON.parse(row.remoteError)),
     conflictFiles: row.conflictFiles === null ? null : filesSchema.parse(JSON.parse(row.conflictFiles)),
     error: row.error === null ? null : errorInfoSchema.parse(JSON.parse(row.error)),
   };
@@ -71,14 +79,24 @@ export function createDeliveriesRepo(db: DbExecutor) {
     listByStatus(status: DeliveryStatus): Delivery[] {
       return db.select().from(t).where(eq(t.status, status)).all().map(toDelivery);
     },
+    updateRemote(id: string, snapshot: RemoteDeliveryStatus | undefined, error: ErrorInfo | null): void {
+      db.update(t)
+        .set({
+          ...(snapshot === undefined ? {} : { remoteStatus: JSON.stringify(snapshot) }),
+          remoteError: error === null ? null : JSON.stringify(error),
+        })
+        .where(eq(t.id, id))
+        .run();
+    },
     /** The only status write (09 §1): guarded by the expected current status. */
     updateStatus(id: string, from: DeliveryStatus, to: DeliveryStatus, changes: DeliveryChanges): void {
-      const { conflictFiles, error, ...rest } = changes;
+      const { conflictFiles, error, remoteRef, ...rest } = changes;
       const result = db
         .update(t)
         .set({
           status: to,
           ...rest,
+          ...(remoteRef === undefined ? {} : { remoteRef: JSON.stringify(remoteRef) }),
           ...(conflictFiles === undefined ? {} : { conflictFiles: JSON.stringify(conflictFiles) }),
           ...(error === undefined ? {} : { error: JSON.stringify(error) }),
         })

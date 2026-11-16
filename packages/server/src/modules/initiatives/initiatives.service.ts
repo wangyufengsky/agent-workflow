@@ -68,6 +68,7 @@ import {
   retryStep,
   startMessage,
 } from './initiatives.breakdown.ts';
+import { checkMergeReadiness } from './initiatives.merge-readiness.ts';
 import {
   createInitiativesRepo,
   type Initiative,
@@ -984,6 +985,19 @@ export function createInitiativesService({
         throw err;
       }
       return detail(id);
+    },
+
+    async mergeReadiness(
+      id: string,
+      key: string,
+    ): Promise<{ state: 'unknown' | 'remote_pending' | 'remote_closed' | 'local_pending' | 'ready' }> {
+      const initiative = get(id);
+      const item = itemOf(initiative, key);
+      return checkMergeReadiness(
+        projects.getRecord(initiative.projectId).repoPath,
+        initiative.baseBranch,
+        item.dto.lastDelivery,
+      );
     },
 
     /** 「已合入」for a work package delivered as a pull request (D134 ③). */

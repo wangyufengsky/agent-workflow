@@ -193,6 +193,19 @@ export const startInitiativeItemOp = defineOperationContract({
   http: { method: 'POST', path: '/initiatives/:id/items/:key/start' },
 });
 
+export const initiativeMergeReadinessOp = defineOperationContract({
+  ...common,
+  ...byId,
+  expose: { palette: false, assistant: false },
+  id: 'initiatives.mergeReadiness',
+  title: 'op.initiatives.mergeReadiness',
+  description: 'Check whether a recorded remote merge is present on the local base branch',
+  input: confirmInitiativeItemMergedRequestSchema,
+  output: z.object({ state: z.enum(['unknown', 'remote_pending', 'remote_closed', 'local_pending', 'ready']) }),
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/initiatives/:id/items/:key/merge-readiness' },
+});
+
 export const confirmInitiativeItemMergedOp = defineOperationContract({
   ...common,
   ...byId,

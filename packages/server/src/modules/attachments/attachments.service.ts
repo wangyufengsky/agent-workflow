@@ -19,6 +19,7 @@ import {
   AttachmentRejection,
   AttachmentSource,
   ErrorCode,
+  type KnowledgeAttachmentOrigin,
   McpToolName,
   OFFICE_ATTACHMENT_BYTES_MAX,
   OFFICE_PREVIEW_ROWS,
@@ -176,7 +177,8 @@ export function createAttachmentsService({
    * workbook shows its overview instead (39 §6.1), cut at a line when it must be; the sheet tools read the rest.
    */
   function promptItem(attachment: AttachmentDTO, text: string, budget: number): string {
-    const path = attachment.origin === null ? '' : ` path="${attr(attachment.origin.path)}"`;
+    const path =
+      attachment.origin !== null && 'path' in attachment.origin ? ` path="${attr(attachment.origin.path)}"` : '';
     const head = `<attachment attachment_id="${attachment.id}" name="${attr(attachment.name)}" source="${attachment.source}"${path}`;
     if (attachment.meta?.format === AttachmentFormat.Xlsx) {
       const sheets = ` format="xlsx" sheets="${attachment.meta.sheets.length}"`;
@@ -313,6 +315,24 @@ export function createAttachmentsService({
       );
     },
 
+    saveKnowledgeAnswer(name: string, origin: KnowledgeAttachmentOrigin, text: string): Promise<AttachmentDTO> {
+      const bytes = Buffer.from(text, 'utf8');
+      if (bytes.length > ATTACHMENT_BYTES_MAX) throw tooLarge(AttachmentLimit.Bytes, ATTACHMENT_BYTES_MAX);
+      return save(
+        {
+          id: randomUUID(),
+          source: AttachmentSource.KnowledgeAnswer,
+          name,
+          sizeBytes: bytes.length,
+          origin,
+          format: AttachmentFormat.Text,
+          meta: null,
+          createdAt: origin.readAt,
+        },
+        asText(bytes, name),
+      );
+    },
+
     /** A snapshot of a project file (30 §2.1): later changes to the file do not change it. */
     async snapshotProjectFile({ projectId, taskId, path, lines }: SnapshotProjectFileRequest): Promise<AttachmentDTO> {
       const file = await locateRepoFile(rootOf(projectId, taskId), path);
@@ -378,17 +398,24 @@ export function createAttachmentsService({
      * Gives `owner` the attachments in this order; called inside the owner's transaction (30 §5). The owner decides
      * which ids its caller may use (e.g. only the conversation's own).
      */
-    bind(owner: Owner, attachmentIds: readonly string[]): void {
+    bind(owner: Owner, attachmentIds: readonly string[], projectId?: string): void {
       if (attachmentIds.length > ATTACHMENTS_PER_INPUT_MAX) {
         throw tooLarge(AttachmentLimit.Count, ATTACHMENTS_PER_INPUT_MAX);
       }
       if (new Set(attachmentIds).size !== attachmentIds.length) {
         throw new AppError(ErrorCode.ValidationFailed, 'An attachment is listed twice', { attachmentIds });
       }
-      const found = new Set(repo.findMany(attachmentIds).map((a) => a.id));
+      const attachments = repo.findMany(attachmentIds);
+      const found = new Set(attachments.map((a) => a.id));
       const missing = attachmentIds.filter((id) => !found.has(id));
       if (missing.length > 0) {
         throw new AppError(ErrorCode.AttachmentNotFound, 'Attachments not found', { ids: missing });
+      }
+      if (
+        projectId !== undefined &&
+        attachments.some(({ origin }) => origin !== null && 'kind' in origin && origin.projectId !== projectId)
+      ) {
+        throw new AppError(ErrorCode.AttachmentSourceInvalid, 'Knowledge answer belongs to a different project');
       }
       repo.insertRefs(owner, attachmentIds, clock.now());
     },

@@ -48,6 +48,36 @@ const REVIEW_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
   }
 }`;
 
+const STATUS_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      state headRefOid baseRefName mergeCommit { oid } reviewDecision
+      commits(last: 1) { nodes { commit { oid statusCheckRollup { state } } } }
+    }
+  }
+}`;
+const statusSchema = z.object({
+  repository: z.object({
+    pullRequest: z.object({
+      state: z.enum(['OPEN', 'CLOSED', 'MERGED']),
+      headRefOid: z.string(),
+      baseRefName: z.string(),
+      mergeCommit: z.object({ oid: z.string() }).nullable(),
+      reviewDecision: z.string().nullable(),
+      commits: z.object({
+        nodes: z.array(
+          z.object({
+            commit: z.object({
+              oid: z.string(),
+              statusCheckRollup: z.object({ state: z.string() }).nullable(),
+            }),
+          }),
+        ),
+      }),
+    }),
+  }),
+});
+
 // A deleted account answers `author: null`; GitHub shows it as「ghost」.
 const authorSchema = z
   .object({ login: z.string() })
@@ -119,6 +149,19 @@ export function createGithubProvider(repo: string, token: string, apiUrl: string
         .catch(translate);
       const [pull] = data;
       return pull === undefined ? undefined : { number: pull.number, url: pull.html_url };
+    },
+    async getPullRequestStatus(number) {
+      const raw = await octokit.graphql(STATUS_QUERY, { owner, name, number }).catch(translate);
+      const pr = statusSchema.parse(raw).repository.pullRequest;
+      const commit = pr.commits.nodes[0]?.commit;
+      return {
+        state: pr.state === 'MERGED' ? 'merged' : pr.state === 'CLOSED' ? 'closed' : 'open',
+        head: pr.headRefOid,
+        targetBranch: pr.baseRefName,
+        mergeCommit: pr.state === 'MERGED' ? (pr.mergeCommit?.oid ?? null) : null,
+        ci: commit?.oid === pr.headRefOid ? (commit.statusCheckRollup?.state ?? null) : null,
+        review: pr.reviewDecision,
+      };
     },
     async listReviewComments({ number }) {
       const data = await octokit.graphql(REVIEW_QUERY, { owner, name, number }).catch(translate);

@@ -13,7 +13,7 @@ import { PREVIEW_COPY } from '../../copy/browser.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DATABASES_COPY } from '../../copy/databases.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
-import { AGENTS_MD_COPY, PROJECTS_COPY as C } from '../../copy/projects.ts';
+import { AGENTS_MD_COPY, PROJECTS_COPY as C, PROJECT_RUNTIME_COPY } from '../../copy/projects.ts';
 import { ProjectDatabases } from '../databases/project-databases.tsx';
 import { DEFAULT_START_WORKFLOW } from '../home/workflow-icon.ts';
 import { useSettings } from '../settings/settings.queries.ts';
@@ -22,6 +22,7 @@ import { ProjectAgentsMd } from './project-agents-md.tsx';
 import { ProjectAllowedBash } from './project-allowed-bash.tsx';
 import { ProjectPreviewForm } from './project-preview.tsx';
 import { ProjectRecentTasks } from './project-recent-tasks.tsx';
+import { ProjectRuntimeCheckPanel } from './project-runtime-check.tsx';
 import { projectQuery, useDeleteProject, useUpdateProject } from './projects.queries.ts';
 
 const route = getRouteApi(ROUTE_IDS.project);
@@ -150,6 +151,11 @@ export function ProjectDetailPage() {
           <Icon name="slides" size="sm" />
           {PPT_COPY.makeDeck}
         </Link>
+      </section>
+      <section className="section">
+        <Panel title={PROJECT_RUNTIME_COPY.title}>
+          <ProjectRuntimeCheckPanel key={`${p.id}:${p.updatedAt}`} project={p} />
+        </Panel>
       </section>
       <Panel title={C.title}>
         {/* Keyed by the saved values so the form resets when the project changes underneath it. */}

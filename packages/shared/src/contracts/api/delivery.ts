@@ -7,6 +7,18 @@ import {
 } from '../../enums/git.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
 import { attachmentIdsSchema } from './attachments.ts';
+import { hostingRefSchema } from './projects.ts';
+
+export const remoteDeliveryStatusSchema = z.object({
+  state: z.enum(['open', 'closed', 'merged', 'locked']),
+  head: z.string(),
+  targetBranch: z.string(),
+  mergeCommit: z.string().nullable(),
+  ci: z.string().nullable(),
+  review: z.string().nullable(),
+  checkedAt: z.number(),
+});
+export type RemoteDeliveryStatus = z.infer<typeof remoteDeliveryStatusSchema>;
 
 /** One merge or pull request of a task (10 §deliveries). */
 export const deliverySchema = z.object({
@@ -19,6 +31,9 @@ export const deliverySchema = z.object({
   prUrl: z.string().nullable(),
   diffBase: z.string().nullable(),
   diffHead: z.string().nullable(),
+  remoteRef: hostingRefSchema.nullable(),
+  remoteStatus: remoteDeliveryStatusSchema.nullable(),
+  remoteError: errorInfoSchema.nullable(),
   /** Files that conflicted; the merge was aborted. */
   conflictFiles: z.array(z.string()).nullable(),
   error: errorInfoSchema.nullable(),

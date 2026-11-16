@@ -19,7 +19,9 @@ const describe = ({ origin, sizeBytes, meta }: AttachmentDTO) => {
   const source =
     origin === null
       ? C.fromUpload
-      : C.fromProject(origin.lines === null ? origin.path : `${origin.path}:${origin.lines.from}-${origin.lines.to}`);
+      : 'kind' in origin
+        ? C.fromKnowledge
+        : C.fromProject(origin.lines === null ? origin.path : `${origin.path}:${origin.lines.from}-${origin.lines.to}`);
   return [source, ...(meta === null ? [] : [C.summary(meta)]), C.size(sizeBytes)].join(' · ');
 };
 

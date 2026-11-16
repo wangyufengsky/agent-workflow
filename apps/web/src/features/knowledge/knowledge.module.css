@@ -508,3 +508,21 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+.materialPreview pre {
+  max-height: 20vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.materialChoices {
+  display: grid;
+  gap: var(--s-2);
+  max-height: 24vh;
+  overflow: auto;
+}
+
+.materialChoices span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

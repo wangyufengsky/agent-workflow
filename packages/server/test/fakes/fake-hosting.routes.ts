@@ -18,6 +18,16 @@ const commentSchema = messageSchema.extend({ head: z.string() });
  * cannot do from the browser otherwise. Never registered in production builds.
  */
 export function registerFakeHostingRoutes(server: FastifyInstance, fake: FakeHosting): void {
+  server.post(`${API_PREFIX}/dev/fake-hosting/status`, async (req, reply) => {
+    const input = parseInput(
+      z.object({ head: z.string(), sha: z.string(), ci: z.string(), review: z.string() }),
+      req.body,
+    );
+    const pr = fake.pullRequests.findLast((p) => p.head === input.head);
+    if (pr === undefined) throw new Error('PR missing');
+    pr.status = { state: 'open', sha: input.sha, mergeCommit: null, ci: input.ci, review: input.review };
+    return reply.code(204).send();
+  });
   server.post(`${API_PREFIX}/dev/fake-hosting/review-threads`, async (req, reply) => {
     const { head, ...thread } = parseInput(threadSchema, req.body);
     fake.addReviewThread(head, thread);

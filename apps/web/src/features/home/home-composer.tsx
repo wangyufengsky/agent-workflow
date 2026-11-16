@@ -1,5 +1,6 @@
 import {
   type AssistantConversationDTO,
+  type AttachmentDTO,
   InitiativeTemplateKind,
   type ProjectDTO,
   WorkflowKind,
@@ -16,8 +17,10 @@ import { Icon } from '../../components/icon.tsx';
 import { ASSISTANT_COPY } from '../../copy/assistant.ts';
 import { ATTACHMENTS_COPY } from '../../copy/attachments.ts';
 import { BATCHES_COPY } from '../../copy/batches.ts';
+import { COMMON_COPY } from '../../copy/common.ts';
 import { HOME_COPY as C } from '../../copy/home.ts';
 import { INITIATIVES_COPY } from '../../copy/initiatives.ts';
+import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
 import { SCHEDULES_COPY } from '../../copy/schedules.ts';
 import { HOME_TASK_COPY } from '../../copy/tasks.ts';
 import { useUiStore } from '../../state/ui.store.ts';
@@ -28,6 +31,7 @@ import { ConversationProjectSelect } from '../assistant/conversation-project-sel
 import { UsageButton } from '../assistant/usage-line.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
 import { AttachmentList, dropFilesInto, pasteFilesInto, useAttachmentPickers } from '../attachments/attachment-bar.tsx';
+import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
 import { AllowedWorkflowsField } from '../initiatives/allowed-workflows-field.tsx';
 import { initiativeTemplatesQuery } from '../initiatives/initiatives.queries.ts';
@@ -57,6 +61,7 @@ export function HomeComposer({
   onAssistantProjectChange,
   initialWorkflowKey,
   initialRequirement,
+  knowledgeDraft,
   docked,
 }: {
   conversation: AssistantConversationDTO | undefined;
@@ -67,6 +72,9 @@ export function HomeComposer({
   onAssistantProjectChange: (id: string | null) => void;
   initialWorkflowKey: string | undefined;
   initialRequirement: string | undefined;
+  knowledgeDraft?:
+    | { attachment: AttachmentDTO | undefined; loading: boolean; error: unknown; retry(): void; dismiss(): void }
+    | undefined;
   /** Under a conversation rather than in the hero: a smaller box. */
   docked: boolean;
 }) {
@@ -85,7 +93,8 @@ export function HomeComposer({
   const abort = useAbortAssistant();
   const input = useRef<HTMLTextAreaElement>(null);
   const focusSeq = useUiStore((s) => s.homeInputFocus);
-  const files = useAttachmentDraft();
+  const material = knowledgeDraft?.attachment;
+  const files = useAttachmentDraft(knowledgeDraft === undefined ? 0 : 1);
   const context = useContextAttachments(files);
   const [flowsOpen, setFlowsOpen] = useState(false);
   const flowsId = useId();
@@ -95,8 +104,8 @@ export function HomeComposer({
     projectId,
     workflowId: workflows.data?.find((w) => w.key === workflowKey)?.id,
     requirement: text,
-    attachmentIds: files.ids,
-    attachmentsBlocked: files.blocked,
+    attachmentIds: material === undefined ? files.ids : [material.id, ...files.ids],
+    attachmentsBlocked: files.blocked || (knowledgeDraft !== undefined && material === undefined),
     requirements: checklist,
     onStarted: () => {
       files.clear();
@@ -174,7 +183,7 @@ export function HomeComposer({
   const send = () => {
     if (workflow !== undefined) task.start();
     else if (initiativeMode) initiative.start();
-    else if (!empty && !busy && !ask.isPending && !files.blocked) {
+    else if (knowledgeDraft === undefined && !empty && !busy && !ask.isPending && !files.blocked) {
       ask.ask(
         text.trim(),
         conversation,
@@ -224,18 +233,20 @@ export function HomeComposer({
                     <Icon name="chevDown" size="sm" />
                   </span>
                 </button>
-                <button
-                  type="button"
-                  className={styles.modeClear}
-                  aria-label={C.askInstead}
-                  onClick={() => {
-                    setWorkflowKey(undefined);
-                    setTemplateKey(undefined);
-                    setBreakdown(false);
-                  }}
-                >
-                  <Icon name="x" size="sm" />
-                </button>
+                {knowledgeDraft === undefined && (
+                  <button
+                    type="button"
+                    className={styles.modeClear}
+                    aria-label={C.askInstead}
+                    onClick={() => {
+                      setWorkflowKey(undefined);
+                      setTemplateKey(undefined);
+                      setBreakdown(false);
+                    }}
+                  >
+                    <Icon name="x" size="sm" />
+                  </button>
+                )}
               </span>
               {/* The task's project, always shown: the base branch and the batch / schedule links depend on it. */}
               <label className={styles.projectPick}>
@@ -244,6 +255,7 @@ export function HomeComposer({
                   className={styles.pillSelect}
                   aria-label={HOME_TASK_COPY.project}
                   value={projectId}
+                  disabled={knowledgeDraft !== undefined}
                   onChange={(e) => changeProject(e.target.value)}
                 >
                   {projects.map((p) => (
@@ -281,6 +293,25 @@ export function HomeComposer({
           onKeyDown={onKeyDown}
           onPaste={pasteFilesInto(files)}
         />
+        {knowledgeDraft !== undefined && (
+          <div className="col">
+            <div className="row wrap">
+              <span className="label grow">{KNOWLEDGE_COPY.taskMaterial}</span>
+              <Button size="sm" variant="ghost" onClick={knowledgeDraft.dismiss}>
+                {KNOWLEDGE_COPY.removeMaterial}
+              </Button>
+            </div>
+            {material !== undefined && <SentAttachments attachments={[material]} />}
+            {material !== undefined && project === undefined && (
+              <p className="hint">{KNOWLEDGE_COPY.materialProjectGone}</p>
+            )}
+            {knowledgeDraft.loading && <p className="hint">{COMMON_COPY.loading}</p>}
+            {!knowledgeDraft.loading && material === undefined && (
+              <p className="hint">{KNOWLEDGE_COPY.invalidMaterial}</p>
+            )}
+            {knowledgeDraft.error != null && <ErrorState error={knowledgeDraft.error} onRetry={knowledgeDraft.retry} />}
+          </div>
+        )}
         <AttachmentList draft={files} />
         {workflow !== undefined && <ChecklistField drafts={checklist} onChange={setChecklist} />}
         {breakdown && task.pro && (
@@ -298,7 +329,12 @@ export function HomeComposer({
             id={flowsId}
             open={flowsOpen}
             workflows={shown}
-            templates={templates.data?.filter((t) => task.pro || t.kind === InitiativeTemplateKind.Builtin) ?? []}
+            allowInitiatives={knowledgeDraft === undefined}
+            templates={
+              knowledgeDraft === undefined
+                ? (templates.data?.filter((t) => task.pro || t.kind === InitiativeTemplateKind.Builtin) ?? [])
+                : []
+            }
             picked={workflowKey}
             pickedTemplate={templateKey}
             pickedBreakdown={breakdown}
@@ -385,7 +421,7 @@ export function HomeComposer({
                 <span>{HOME_TASK_COPY.confirmPlan}</span>
               </label>
               {/* Fixed workflows can run on several targets at once (20 §2) and on a schedule (22 §7). */}
-              {workflow.planning === WorkflowPlanning.Fixed && (
+              {workflow.planning === WorkflowPlanning.Fixed && knowledgeDraft === undefined && (
                 <>
                   <Link
                     to={ROUTES.batchNew}
@@ -475,7 +511,7 @@ export function HomeComposer({
                 className={styles.send}
                 aria-label={C.send}
                 title={C.send}
-                disabled={empty || ask.isPending || files.blocked}
+                disabled={empty || ask.isPending || files.blocked || knowledgeDraft !== undefined}
               >
                 {ask.isPending ? <span className="spin" aria-hidden="true" /> : <Icon name="arrowUp" size="sm" />}
               </button>

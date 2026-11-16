@@ -3,6 +3,7 @@ import { PromptName, type Prompts, renderTemplate } from '@aw/builtin';
 import {
   AppError,
   type AskKnowledgeRequest,
+  AttachmentSource,
   type AttemptDTO,
   AttemptKind,
   type AttemptSummaryDTO,
@@ -19,6 +20,7 @@ import {
   type KnowledgeConversationDTO,
   type KnowledgeConversationSummaryDTO,
   type KnowledgeSources,
+  type KnowledgeTaskMaterialRequest,
   type KnowledgeTurnDTO,
   KnowledgeTurnStatus,
   knowledgeTurnStatusOf,
@@ -30,6 +32,7 @@ import {
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
+import type { AttachmentsService } from '../attachments/index.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DatabasesService } from '../databases/index.ts';
@@ -38,12 +41,14 @@ import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { readCitedFile, validateCitations } from './knowledge.citations.ts';
 import { type Conversation, createKnowledgeRepo, type Turn } from './knowledge.repo.ts';
+import { knowledgeTaskMaterialText, selectedAnswer } from './knowledge.task-material.ts';
 
 export type KnowledgeServiceDeps = {
   db: Db;
   unit: UnitOfWork;
   clock: Clock;
   attempts: AttemptsService;
+  attachments: Pick<AttachmentsService, 'saveKnowledgeAnswer'>;
   projects: ProjectsService;
   databases: DatabasesService;
   inbox: InboxService;
@@ -393,6 +398,50 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
       const attemptIds = repo.listTurnsOf(ids).map((t) => t.attemptId);
       for (const id of ids) repo.deleteConversation(id);
       attempts.delete(attemptIds);
+    },
+
+    snapshotTaskMaterial({ id, turnId, from, to, citations }: KnowledgeTaskMaterialRequest) {
+      const conversation = mustFind(id);
+      const turn = repo.findTurn(turnId);
+      if (turn === undefined || turn.conversationId !== id || turn.answer === null || turn.answeredAt === null) {
+        throw new AppError(ErrorCode.NotFound, 'Verified knowledge answer not found', { id, turnId });
+      }
+      const selected = new Set(citations);
+      const excerpt = selectedAnswer(turn.answer, from, to, selected);
+      if (to > turn.answer.length || excerpt === '') {
+        throw new AppError(ErrorCode.ValidationFailed, 'Select a non-empty part of the saved answer');
+      }
+      const sources = [...selected]
+        .sort((a, b) => a - b)
+        .map((index) => {
+          const citation = turn.citations[index - 1];
+          if (citation === undefined)
+            throw new AppError(ErrorCode.KnowledgeCitationNotFound, 'Citation is not in the saved answer', {
+              turnId,
+              index,
+            });
+          return { index, citation };
+        });
+      const { answeredAt } = turn;
+      return deps.attachments.saveKnowledgeAnswer(
+        `知识问答-${turn.seq}.txt`,
+        {
+          kind: AttachmentSource.KnowledgeAnswer,
+          projectId: conversation.projectId,
+          conversationId: id,
+          turnId,
+          answeredAt,
+          readAt: clock.now(),
+        },
+        knowledgeTaskMaterialText({
+          conversationId: id,
+          turnId,
+          question: turn.question,
+          answeredAt,
+          excerpt,
+          citations: sources,
+        }),
+      );
     },
 
     /** The original behind one citation (`knowledge.citation`, 18 §6.3). */

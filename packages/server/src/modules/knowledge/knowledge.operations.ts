@@ -5,6 +5,7 @@ import {
   getKnowledgeOp,
   knowledgeCitationOp,
   listKnowledgeOp,
+  snapshotKnowledgeTaskMaterialOp,
   stopKnowledgeOp,
 } from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
@@ -19,5 +20,6 @@ export function knowledgeOperations(knowledge: KnowledgeService) {
     implement(stopKnowledgeOp, ({ id }) => knowledge.stop(id)),
     implement(deleteKnowledgeOp, ({ id }) => knowledge.delete(id)),
     implement(knowledgeCitationOp, ({ turnId, index }) => knowledge.citation(turnId, index)),
+    implement(snapshotKnowledgeTaskMaterialOp, (input) => knowledge.snapshotTaskMaterial(input)),
   ];
 }

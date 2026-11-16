@@ -54,7 +54,7 @@ import { TeamMemberPage } from '../features/team/member.page.tsx';
 import { TeamIndexPage, TeamPage } from '../features/team/team.page.tsx';
 import { teamSearchSchema } from '../features/team/team-search.ts';
 import { ToolsPage } from '../features/tools/tools.page.tsx';
-import { WorkflowEditorPage } from '../features/workflows/workflow-editor.page.tsx';
+import { NewWorkflowFromPlanPage, WorkflowEditorPage } from '../features/workflows/workflow-editor.page.tsx';
 import { WorkflowsPage } from '../features/workflows/workflows.page.tsx';
 import { useAppliedTheme } from '../theme/use-applied-theme.ts';
 import { ROUTES } from './routes.ts';
@@ -135,6 +135,16 @@ const initiativeTemplateNewRoute = createRoute({
     </ProOnly>
   ),
 });
+const workflowNewRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: ROUTES.workflowNew,
+  validateSearch: z.object({ task: z.string(), version: z.coerce.number().int().min(1) }),
+  component: () => (
+    <ProOnly>
+      <NewWorkflowFromPlanPage />
+    </ProOnly>
+  ),
+});
 const projectsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.projects,
@@ -165,6 +175,7 @@ const homeRoute = createRoute({
     projectId: z.string().optional(),
     workflow: z.string().optional(),
     requirement: z.string().optional(),
+    knowledgeMaterial: z.string().optional(),
   }),
   component: HomePage,
 });
@@ -381,6 +392,7 @@ const routeTree = rootRoute.addChildren([
     gitReviewRoute,
     gitProjectRoute,
     proOnlyPage(ROUTES.workflows, WorkflowsPage),
+    workflowNewRoute,
     proOnlyPage(ROUTES.workflow, WorkflowEditorPage),
     proOnlyPage(ROUTES.initiativeTemplates, InitiativeTemplatesPage),
     initiativeTemplateNewRoute,

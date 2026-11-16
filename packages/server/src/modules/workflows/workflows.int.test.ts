@@ -94,6 +94,29 @@ describe('内置流程与角色', () => {
     expect(roles.getByKey('tester')).toMatchObject({ prompt: 'p2', baseAgent: 'reviewer' });
   });
 
+  it('固定模板使用不存在的角色时给出问题并拒绝保存', async () => {
+    const source = await builtin('bugfix');
+    const definition = {
+      ...source.definition,
+      allowedRoles: ['missing_role'],
+      template: {
+        nodes: [{ key: 'work', title: '工作', roleKey: 'missing_role', instructions: '完成工作', dependsOn: [] }],
+      },
+    };
+    const validation = await t.call(validateWorkflowOp, { planning: 'fixed', definition });
+    expect(validation.body.problems).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'ROLE_NOT_FOUND', details: { role: 'missing_role' } })]),
+    );
+    const saved = await t.call(createWorkflowOp, {
+      key: 'missing_role_test',
+      name: '缺失角色',
+      planning: 'fixed',
+      deliverable: 'code_changes',
+      definition,
+    });
+    expect(saved.body).toMatchObject({ error: { code: ErrorCode.WorkflowDefinitionInvalid } });
+  });
+
   it('内置流程全部通过流程定义校验', () => {
     const { workflows } = t.app.services;
     for (const summary of workflows.list()) {

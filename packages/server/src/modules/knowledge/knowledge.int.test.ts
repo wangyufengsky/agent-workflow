@@ -6,6 +6,7 @@ import {
   answerDraft,
   askKnowledgeOp,
   CitationProblemCode,
+  createTaskOp,
   deleteKnowledgeOp,
   deleteProjectOp,
   ErrorCode,
@@ -19,6 +20,7 @@ import {
   listKnowledgeOp,
   readonlyBashRules,
   ServerEventType,
+  snapshotKnowledgeTaskMaterialOp,
   stopKnowledgeOp,
   type TranscriptPage,
   updateSettingsOp,
@@ -27,7 +29,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
-import { addProject } from '../../../test/helpers/tasks.ts';
+import { addProject, workflowId } from '../../../test/helpers/tasks.ts';
 
 const RESEARCHER = { agent: 'aw-researcher' };
 const CODE_AND_DOCS: KnowledgeSources = { code: true, docs: true, database: false, web: false };
@@ -93,6 +95,50 @@ const fileCitation = (path: string, start: number, end: number) => ({
 });
 
 describe('知识问答', () => {
+  it('从校验后的回答保存所选资料，来源删除后仍可绑定，拒绝跨项目绑定', async () => {
+    const { project: p } = await project();
+    const { project: other } = await addProject(t);
+    const answer = '采用以分为单位的退款计算 [1]。额外说明 [2]。';
+    t.fake.enqueue(
+      script().callTool('submit_answer', {
+        answer,
+        citations: [fileCitation('src/refund.ts', 2, 3), fileCitation('docs/refunds.md', 3, 3)],
+      }),
+      RESEARCHER,
+    );
+    const source = await ask(p.id, '如何改退款计算？');
+    const turn = source.turns[0];
+    if (turn === undefined) throw new Error('Missing saved answer');
+    const input = { id: source.id, turnId: turn.id, from: 0, to: answer.indexOf('额外说明'), citations: [1] };
+    const invalid = await t.call(snapshotKnowledgeTaskMaterialOp, { ...input, citations: [3] });
+    expect(invalid.status).toBe(404);
+    const saved = await t.call(snapshotKnowledgeTaskMaterialOp, input);
+    expect(saved.status).toBe(201);
+    expect(saved.body.origin).toMatchObject({
+      kind: 'knowledge_answer',
+      projectId: p.id,
+      conversationId: source.id,
+      turnId: turn.id,
+    });
+    await t.call(deleteKnowledgeOp, { id: source.id });
+    expect((await t.call(snapshotKnowledgeTaskMaterialOp, input)).status).toBe(404);
+    const draft = {
+      workflowId: await workflowId(t, 'feature'),
+      requirement: '按分计算退款差额',
+      attachmentIds: [saved.body.id],
+      start: false,
+    };
+    expect((await t.call(createTaskOp, { ...draft, projectId: other.id })).status).toBe(400);
+    const task = await t.call(createTaskOp, { ...draft, projectId: p.id });
+    expect(task.status).toBe(201);
+    expect(task.body.attachments.map((a) => a.id)).toEqual([saved.body.id]);
+    const snapshot = await t.request({ method: 'GET', url: `/attachments/${saved.body.id}/content` });
+    expect(snapshot.body).toContain('采用以分为单位的退款计算');
+    expect(snapshot.body).toContain('src/refund.ts:2-3');
+    expect(snapshot.body).not.toContain('额外说明');
+    expect(snapshot.body).not.toContain('docs/refunds.md');
+  });
+
   it('研究员在项目仓库中只读研究，提交的回答带校验过的引用', async () => {
     const { project: p, repo } = await project();
     t.fake.enqueue(

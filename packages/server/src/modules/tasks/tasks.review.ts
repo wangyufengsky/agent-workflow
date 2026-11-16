@@ -2,7 +2,9 @@ import { EMPTY_SECTION, PromptName, renderTemplate } from '@aw/builtin';
 import {
   AppError,
   ChangeRequestReason,
+  type DeliveryDTO,
   ErrorCode,
+  HostingProvider,
   type ReviewCommentDTO,
   ReviewCommentKind,
   type ReviewCommentsDTO,
@@ -37,7 +39,7 @@ export function createTaskReview(
   state: TaskState,
   changes: Pick<TaskChangeRequests, 'appendRevision'>,
 ) {
-  const { projects, deliveries, worktrees, locks, prompts } = deps;
+  const { projects, deliveries, worktrees, locks, prompts, clock } = deps;
   const { get } = state;
 
   /** The task's latest pull request delivery (`TaskDetailDTO.pullRequest`). */
@@ -82,8 +84,56 @@ export function createTaskReview(
     return { ...pr, items };
   }
 
+  const refreshing = new Map<string, Promise<DeliveryDTO>>();
+
+  async function refresh(taskId: string): Promise<DeliveryDTO> {
+    const task = get(taskId);
+    const delivery = deliveries.latestPullRequest(taskId);
+    if (delivery === undefined || delivery.prUrl === null) {
+      throw new AppError(ErrorCode.PullRequestNotOpen, 'The task has no pull request', { taskId });
+    }
+    try {
+      const hosting = await projects.hostingOf(task.projectId);
+      const currentRef = hosting.ref;
+      const ref = delivery.remoteRef ?? currentRef;
+      if (ref.provider !== currentRef.provider || ref.baseUrl !== currentRef.baseUrl || ref.repo !== currentRef.repo) {
+        throw new AppError(
+          ErrorCode.HostingNotConfigured,
+          'The recorded repository does not match the configured credentials',
+        );
+      }
+      const url = new URL(delivery.prUrl);
+      const expected =
+        ref.provider === HostingProvider.Github ? 'https://github.com' : (ref.baseUrl ?? 'https://gitlab.com');
+      const base = new URL(expected);
+      const prefix = `${base.pathname.replace(/\/$/, '')}/${ref.repo}/${ref.provider === HostingProvider.Github ? 'pull' : '-/merge_requests'}/`;
+      const number = url.pathname.startsWith(prefix) ? url.pathname.slice(prefix.length) : '';
+      if (url.origin !== base.origin || !/^[1-9]\d*$/.test(number) || url.search !== '' || url.hash !== '') {
+        throw new AppError(ErrorCode.ValidationFailed, 'The pull request URL does not match the configured repository');
+      }
+      const status = await hosting.getPullRequestStatus(Number(number));
+      return deliveries.updateRemote(delivery.id, { ...status, checkedAt: clock.now() }, null);
+    } catch (err) {
+      const error = err instanceof AppError ? err.toInfo() : { code: ErrorCode.InternalError, message: String(err) };
+      return deliveries.updateRemote(delivery.id, undefined, error);
+    }
+  }
+
   return {
     pullRequestOf,
+    async refreshDeliveryStatus(taskId: string): Promise<DeliveryDTO> {
+      const delivery = deliveries.latestPullRequest(taskId);
+      if (delivery === undefined) return refresh(taskId);
+      const pending = refreshing.get(delivery.id);
+      if (pending !== undefined) return pending;
+      const request = refresh(taskId);
+      refreshing.set(delivery.id, request);
+      try {
+        return await request;
+      } finally {
+        refreshing.delete(delivery.id);
+      }
+    },
 
     async reviewComments(taskId: string): Promise<ReviewCommentsDTO> {
       const { open, items } = await readComments(get(taskId));

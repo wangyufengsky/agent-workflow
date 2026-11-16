@@ -5,6 +5,7 @@ import {
   InitiativeItemStatus,
   InitiativeRunMode,
   InitiativeStatus,
+  initiativeMergeReadinessOp,
   isBatchDeliverable,
   STATUS_TONE,
   StatusTone,
@@ -13,6 +14,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
+import { callOperation } from '../../api/client.ts';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
@@ -118,12 +120,28 @@ function ItemActions({ initiative, item }: { initiative: InitiativeDetailDTO; it
   const drop = useDropInitiativeItem();
   const [reason, setReason] = useState('');
   const ref = { id: initiative.id, key: item.key };
+  const readiness = useQuery({
+    queryKey: ['initiative-merge-readiness', initiative.id, item.key, item.lastDelivery?.remoteStatus?.checkedAt],
+    queryFn: () => callOperation(initiativeMergeReadinessOp, ref),
+    enabled: item.status === InitiativeItemStatus.PrOpen,
+  });
   return (
     <div className={styles.actions}>
       {item.status === InitiativeItemStatus.Ready && initiative.status !== InitiativeStatus.DraftReady && (
         <Button size="sm" variant="primary" pending={start.isPending} onClick={() => start.mutate(ref)}>
           {C.start}
         </Button>
+      )}
+      {item.status === InitiativeItemStatus.PrOpen && readiness.isError && (
+        <ErrorState error={readiness.error} onRetry={() => void readiness.refetch()} />
+      )}
+      {item.status === InitiativeItemStatus.PrOpen && (
+        <Button size="sm" pending={readiness.isFetching} onClick={() => void readiness.refetch()}>
+          {C.recheckMergeReadiness}
+        </Button>
+      )}
+      {item.status === InitiativeItemStatus.PrOpen && readiness.data !== undefined && (
+        <p className="hint">{C.mergeReadiness[readiness.data.state]}</p>
       )}
       {item.status === InitiativeItemStatus.PrOpen && (
         <Confirmed

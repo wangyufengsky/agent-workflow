@@ -6,6 +6,7 @@ export const AttachmentSource = {
   Upload: 'upload',
   /** A snapshot of a file in a project or task worktree (30 §2.1). */
   ProjectFile: 'project_file',
+  KnowledgeAnswer: 'knowledge_answer',
 } as const;
 export type AttachmentSource = (typeof AttachmentSource)[keyof typeof AttachmentSource];
 export const attachmentSourceSchema = z.enum(AttachmentSource);

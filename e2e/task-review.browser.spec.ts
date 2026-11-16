@@ -58,6 +58,15 @@ test('J18 PR 审查意见 → 取回并勾选 → AI 按意见修改 → 推送�
   const taskId = page.url().split('/tasks/')[1] ?? '';
   const task = await (await request.get(`${API_BASE}/tasks/${taskId}`, { headers: AUTH })).json();
   const head: string = task.git.branch;
+  await devPost(request, 'status', { head, sha: task.lastDelivery.diffHead, ci: 'PENDING', review: 'REVIEW_REQUIRED' });
+  const remote = result.getByTestId('remote-delivery-status');
+  await remote.getByRole('button', { name: '刷新交付状态' }).click();
+  await expect(remote).toContainText('远端状态：待合入');
+  await expect(remote).toContainText('CI：等待中');
+  await expect(remote).toContainText('审查：等待审查');
+  await expect(remote).toContainText('最近成功查询');
+  await page.reload();
+  await expect(page.getByTestId('remote-delivery-status')).toContainText('CI：等待中');
   await devPost(request, 'review-threads', {
     head,
     path: 'greet.ts',

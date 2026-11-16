@@ -17,6 +17,9 @@ export const deliveriesTable = sqliteTable(
     prUrl: text('pr_url'),
     diffBase: text('diff_base'),
     diffHead: text('diff_head'),
+    remoteRef: text('remote_ref'),
+    remoteStatus: text('remote_status'),
+    remoteError: text('remote_error'),
     /** JSON file paths. */
     conflictFiles: text('conflict_files'),
     /** JSON `ErrorInfo`. */
