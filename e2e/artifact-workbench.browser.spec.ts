@@ -153,6 +153,7 @@ for (const item of cases) {
     });
     expect(stale.status()).toBe(409);
     const revision = reviewed.plan?.graph.nodes.find(({ title }) => title === '产物修改 1');
+    expect(revision?.instructions).toContain('aw-artifact-revision');
     expect(revision?.instructions).toContain('按新数据更新这里，保留其他内容。');
     expect(artifact.rounds).toMatchObject([
       { versionId: artifact.versions[0]?.id, notes: [{ note: '按新数据更新这里，保留其他内容。' }] },

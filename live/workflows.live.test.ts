@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -6,6 +7,7 @@ import {
   attemptMachine,
   createWorkflowOp,
   getGitReviewOp,
+  getNodeOp,
   isTerminalState,
   ServerEventType,
   startGitReviewOp,
@@ -19,11 +21,10 @@ import { SkillName } from '../packages/builtin/src/skills.ts';
 import { waitForEvent } from '../packages/server/test/helpers/events.ts';
 import { type LiveApp, outcome, startLiveApp, TASK_TIMEOUT_MS } from './live-app.ts';
 
-function loadedReviewSkill(live: LiveApp, attemptId: string) {
+function loadedSkill(live: LiveApp, attemptId: string, skill: SkillName) {
   const { entries } = live.t.app.services.attempts.transcript(attemptId, 0);
   const call = entries.find(
-    (entry) =>
-      entry.kind === 'tool_call' && entry.data.tool === 'skill' && entry.data.input.name === SkillName.CodeReview,
+    (entry) => entry.kind === 'tool_call' && entry.data.tool === 'skill' && entry.data.input.name === skill,
   );
   return (
     call?.kind === 'tool_call' &&
@@ -131,6 +132,108 @@ describe('@live 内置流程全集', () => {
   );
 
   it(
+    '后端 Skill：迁移旧数据，兼容已有调用方，并向测试步骤交接',
+    async () => {
+      const { t } = live;
+      const check = 'node --test test/entries.test.mjs';
+      const workflow = await t.call(createWorkflowOp, {
+        key: 'backend_skill_step',
+        name: '后端 Skill 验收',
+        planning: WorkflowPlanning.Fixed,
+        deliverable: WorkflowDeliverable.CodeChanges,
+        definition: {
+          allowedRoles: [BuiltinRoleKey.Developer, BuiltinRoleKey.Tester],
+          template: {
+            nodes: [
+              {
+                key: 'migrate',
+                title: '实现兼容迁移',
+                roleKey: BuiltinRoleKey.Developer,
+                instructions: `在 src/entries.mjs 实现后端接口：添加可重复运行的 migrate(db)，给旧 entries 表补 active INTEGER NOT NULL DEFAULT 1，添加 listActive(db) 返回按 id 排序的启用名称，保留 listEntries 的原行为。只改这个文件。运行 ${check}，并在 handoff 交接接口和验证证据。`,
+                dependsOn: [],
+              },
+              {
+                key: 'verify_caller',
+                title: '验证已有调用方',
+                roleKey: BuiltinRoleKey.Tester,
+                instructions: `读取上游 handoff，运行 ${check} 验证旧数据、重复迁移和原调用方。保持代码现状，在 summary 记录结果。`,
+                dependsOn: ['migrate'],
+              },
+            ],
+          },
+          checkpoints: { confirm_plan: false, accept_each_node: false },
+          defaultAcceptance: { checks: [], manual: false },
+        },
+      });
+      expect(workflow.status).toBe(201);
+      const task = await live.runTask(workflow.body.key, 'ts-stats', '为条目补充启用状态，兼容旧数据与调用方。', {
+        history: {
+          initAt: '2026-10-01T10:00:00',
+          commits: [
+            {
+              date: '2026-10-02T10:00:00',
+              message: 'add legacy entries API and migration acceptance',
+              files: {
+                'src/entries.mjs': `export function listEntries(db) {
+  return db.prepare('SELECT name FROM entries ORDER BY id').all().map(({ name }) => name);
+}
+`,
+                'test/entries.test.mjs': `import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import { test } from 'node:test';
+import { listEntries, listActive, migrate } from '../src/entries.mjs';
+
+test('upgrade old rows, repeat migration, and keep old callers', () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec("CREATE TABLE entries (id INTEGER PRIMARY KEY, name TEXT NOT NULL); INSERT INTO entries VALUES (1,'old');");
+    assert.deepEqual(listEntries(db), ['old']);
+    migrate(db);
+    migrate(db);
+    db.exec("INSERT INTO entries VALUES (2,'disabled',0);");
+    assert.deepEqual(listActive(db), ['old']);
+    assert.deepEqual(listEntries(db), ['old','disabled']);
+  } finally {
+    db.close();
+  }
+});
+`,
+              },
+            },
+          ],
+        },
+      });
+      expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
+      execFileSync(process.execPath, ['--test', 'test/entries.test.mjs'], { cwd: task.git.worktreePath ?? '' });
+      const migration = task.nodes.find(({ key }) => key === 'migrate');
+      const caller = task.nodes.find(({ key }) => key === 'verify_caller');
+      if (migration === undefined || caller === undefined) throw new Error('Backend skill workflow steps missing');
+      const { body: node } = await t.call(getNodeOp, { id: task.id, nodeId: migration.id });
+      expect(node.result?.handoff?.facts.some(({ evidence }) => evidence.length > 0)).toBe(true);
+      const attempts = t.app.services.attempts.listByTask(task.id);
+      expect(
+        attempts.some(
+          ({ id, nodeId }) => nodeId === migration.id && loadedSkill(live, id, SkillName.BackendDevelopment),
+        ),
+      ).toBe(true);
+      const callerAttempt = attempts.find(({ nodeId }) => nodeId === caller.id);
+      if (callerAttempt === undefined) throw new Error('Caller verification attempt missing');
+      const { entries } = t.app.services.attempts.transcript(callerAttempt.id, 0);
+      expect(entries).toContainEqual(
+        expect.objectContaining({
+          kind: 'tool_result',
+          data: expect.objectContaining({
+            tool: 'agent-workflow_get_task_context',
+            status: 'completed',
+            output: expect.stringContaining('"handoff"'),
+          }),
+        }),
+      );
+    },
+    TASK_TIMEOUT_MS,
+  );
+
+  it(
     '代码步骤验收：加载 Skill 并用 submit_review 给出结果',
     async () => {
       const { t } = live;
@@ -171,7 +274,9 @@ describe('@live 内置流程全集', () => {
         expect.arrayContaining([expect.objectContaining({ kind: 'ai_review', passed: true })]),
       );
       const attempts = t.app.services.attempts.listByTask(task.id);
-      expect(attempts.some(({ id, kind }) => kind === AttemptKind.Review && loadedReviewSkill(live, id))).toBe(true);
+      expect(
+        attempts.some(({ id, kind }) => kind === AttemptKind.Review && loadedSkill(live, id, SkillName.CodeReview)),
+      ).toBe(true);
     },
     TASK_TIMEOUT_MS,
   );
@@ -189,7 +294,7 @@ describe('@live 内置流程全集', () => {
       expect(task.result?.filesChanged).toBe(0);
       expect(task.result?.summary).toContain('percentile');
       const attempts = live.t.app.services.attempts.listByTask(task.id);
-      expect(attempts.some(({ id }) => loadedReviewSkill(live, id))).toBe(true);
+      expect(attempts.some(({ id }) => loadedSkill(live, id, SkillName.CodeReview))).toBe(true);
     },
     TASK_TIMEOUT_MS,
   );
@@ -214,7 +319,7 @@ describe('@live 内置流程全集', () => {
       await ended;
       const { body: review } = await t.call(getGitReviewOp, { reviewId: started.body.id });
       expect(review.status).toBe('succeeded');
-      expect(loadedReviewSkill(live, review.attemptId)).toBe(true);
+      expect(loadedSkill(live, review.attemptId, SkillName.CodeReview)).toBe(true);
       expect(review.findings).toEqual(
         expect.arrayContaining([expect.objectContaining({ path: 'src/percentile.ts', line: 4 })]),
       );

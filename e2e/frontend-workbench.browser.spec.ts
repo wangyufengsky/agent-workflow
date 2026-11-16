@@ -72,6 +72,11 @@ test('前端开发从开始任务直接进入预览，在同一个任务提交�
   await expect(response).toBeOK();
   const task = taskDetailSchema.parse(await response.json());
   expect(task.frontend?.rounds).toMatchObject([{ feedback: '页面标题改为订单明细', annotations: [] }]);
+  for (const title of ['开发首版页面', '界面修改 1']) {
+    expect(task.plan?.graph.nodes.find((node) => node.title === title)?.instructions).toContain(
+      'aw-frontend-development',
+    );
+  }
   const needsReview = await request.get(`${API_BASE}/tasks?displayGroup=frontend_review&projectId=${project.id}`, {
     headers: AUTH,
   });

@@ -27,6 +27,10 @@ export const SkillName = {
   PageCheck: 'aw-page-check',
   /** Evidence and findings for task reviews and Git workbench code reviews (41 §13). */
   CodeReview: 'aw-code-review',
+  ArtifactRevision: 'aw-artifact-revision',
+  TaskDelivery: 'aw-task-delivery',
+  BackendDevelopment: 'aw-backend-development',
+  FrontendDevelopment: 'aw-frontend-development',
 } as const;
 export type SkillName = (typeof SkillName)[keyof typeof SkillName];
 
@@ -48,6 +52,9 @@ export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
     SkillName.OfflineNetwork,
     SkillName.MergeConflicts,
     SkillName.PageCheck,
+    SkillName.ArtifactRevision,
+    SkillName.BackendDevelopment,
+    SkillName.FrontendDevelopment,
   ],
   [SessionAgent.Reviewer]: [SkillName.DbReadonly, SkillName.PageCheck, SkillName.CodeReview],
   [SessionAgent.Researcher]: [SkillName.DbReadonly],
@@ -63,6 +70,7 @@ export const ASSISTANT_SKILLS: SkillName[] = [
   SkillName.AssistantCharts,
   SkillName.AssistantPreview,
   SkillName.DbReadonly,
+  SkillName.TaskDelivery,
 ];
 
 /** 内置 Skill 约定用单行描述，值可包含冒号。 */

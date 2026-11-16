@@ -1,0 +1,16 @@
+---
+name: aw-task-delivery
+description: Use when the user asks whether to accept or deliver a task, requests frontend final checks, asks to merge or open a PR/MR, or asks whether delivery has finished. Inspect task state and checklist evidence before choosing an action.
+---
+
+# Task acceptance and delivery
+
+1. Resolve the task by the user's reference or current page, then call `agent-workflow-app_tasks_get`. Look at `status`, `displayGroup`, the result and checks, any open inbox items, `frontend.verified`, the latest artifact version, `pullRequest` and the delivery record. For readiness or delivery decisions, call `agent-workflow-app_requirements_get` for the current checklist and result commit. Name missing, skipped, stale or failed evidence separately from passed checks. For a runtime or execution failure use `aw-task-diagnosis`.
+2. Choose the action for the current state.
+   - **Draft:** tell the user to start the draft on its task page before there can be an acceptance result.
+   - **Active or waiting on a person:** name the current step or the question, plan or check that needs the user. Open the task with `agent-workflow-app_open_page`, page `task`, when useful.
+   - **Frontend in review without final verification:** open the task for page review or use `aw-assistant-preview` for a requested revision. When the user asks for final verification, call `agent-workflow-app_tasks_finishFrontend` with the task ID and a local path when known. After confirmation, read the task again when reporting the outcome. Delivery becomes available after review with `frontend.verified: true`.
+   - **Checklist needs a new run:** after a request to recheck the existing result, call `agent-workflow-app_tasks_reverifyRequirements`. When the user also requests new conditions, follow the revision and commit procedure in `aw-task-diagnosis`. Direct manual verdicts and acknowledgement of unmet required items to the task page. Use the app's current evidence for any readiness claim.
+   - **Report or document ready for acceptance:** name the report or the latest artifact file and version. For a requested revision, use the task's revision path. When the user requests completion, use `agent-workflow-app_tasks_deliver` with `strategy: "report_only"`, subject to the checklist and the app's confirmation.
+   - **Code ready for delivery:** use `agent-workflow-app_tasks_deliver` with the requested strategy. Local delivery uses `squash`, `merge` or `rebase`; remote delivery uses `pull_request`. Confirm the target branch and strategy in plain language, using the task's base branch when no target is given and the `delivery.defaultStrategy` value from `agent-workflow-app_settings_get` when the local strategy is delegated to you. This operation changes Git state. Use the existing confirmation flow for writes.
+3. When asked for delivery status, report the evidence as recorded. A local delivery records its target branch and resulting commit. A PR/MR link records creation or update. State remote review, CI, or merge from `lastDelivery.remoteStatus` and its `checkedAt`; use the task page's refresh when it needs updating. Remote merge and local branch inclusion are separate facts. State local inclusion only when a local delivery record or local Git evidence confirms it.

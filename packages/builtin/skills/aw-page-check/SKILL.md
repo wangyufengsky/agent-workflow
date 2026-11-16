@@ -9,7 +9,11 @@ description: Use when your step or review changes or concerns what a web page sh
 
 `agent-workflow_browser_open` with a path starting with `/` (such as `/orders`) starts the task's page preview, the project's dev server running the code in this worktree, and returns the page as text with element refs (`e12`). Planning sessions cannot open the preview, because the code has not changed yet; they can open websites.
 
-When the project has no preview or it does not come up (`PREVIEW_NOT_CONFIGURED`, `PREVIEW_START_FAILED`, `PREVIEW_LIMIT_REACHED`), check with tests instead and say so in your notes.
+The frontend workflow can infer a supported start script from its worktree when the project has no explicit configuration. It checks the root first, then a single immediate frontend package. Use the task-relative URL so the user sees the same preview, including while the first step is running.
+
+- `PREVIEW_NOT_CONFIGURED`: for a new frontend page, check the worktree's package, start script and page entry. Once they are ready, open the task-relative route. For an existing project whose launch remains ambiguous, report the configuration needed on the project page.
+- `PREVIEW_START_FAILED`: read the launch error or log tail first. Correct a missing dependency, script or build failure in scope, then reopen the route.
+- `PREVIEW_LIMIT_REACHED`: report that preview capacity is occupied. If the preview is still unavailable after diagnosis, run the relevant project checks and state that the browser verification is pending.
 
 ## Checking a change
 
@@ -19,7 +23,7 @@ When the project has no preview or it does not come up (`PREVIEW_NOT_CONFIGURED`
 4. Then `agent-workflow_browser_logs` (`since: "open"` for everything since the page opened): console errors, exceptions and failed requests with method, address and status. An error your change caused is a defect: fix it and check again. Errors that were there before your change belong in your notes, not in your fix.
 5. For layout (something hidden, overlapping, off-screen, unclickable), `agent-workflow_browser_inspect` the element: its box, whether it is in the viewport, what covers it, its computed styles. Check the mobile size with `agent-workflow_browser_viewport` (`mobile`, or `tablet`) when the page is used on phones or the change affects layout, then go back to `desktop`.
 6. `agent-workflow_browser_screenshot` only when the look itself matters and you can see images; the page text is the main evidence.
-7. Refs change when the page changes: after `BROWSER_REF_STALE`, take a new `agent-workflow_browser_snapshot` and use the new ref. `BROWSER_ACTION_FAILED` says why in `details.reason`: `not_visible` (scroll or open what hides it), `covered` (close what `coveredBy` names, such as a dialog), `disabled` (fill what the form still needs), `detached` or `not_focusable` (take a new snapshot). Do not repeat the same action blindly.
+7. Recover an action by its error. For `BROWSER_REF_STALE` take a new `agent-workflow_browser_snapshot` and find the target by its role or visible text. For `BROWSER_ACTION_FAILED`, use `details.reason`: inspect `coveredBy` for `covered` and dismiss the overlay or fix unintended overlap, reveal a `not_visible` target, fill prerequisites for `disabled`, and take a fresh snapshot for `detached` or `not_focusable`. Try the action again only after the target or page state has changed. If it still fails, leave the interaction unverified and report the error and evidence.
 8. In your notes, say which pages and screen sizes you checked, what you did on them, and what you saw, including errors you found and fixed.
 
 When reviewing, do the steps the requirement describes on the page as well as reading the diff. You may use the page, but you still never edit files; an error the change introduced on the page is an issue to report.

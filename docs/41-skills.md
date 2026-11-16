@@ -199,6 +199,10 @@ opencode 的权限规则和「我的 Skill」目录共同读取 `packages/builti
 | `aw-merge-conflicts` | | ✓ | | | | | |
 | `aw-page-check` | ✓ | ✓ | ✓ | | | | |
 | `aw-code-review` | | | ✓ | | | ✓ | |
+| `aw-artifact-revision` | | ✓ | | | | | |
+| `aw-task-delivery` | | | | | | | ✓ |
+| `aw-backend-development` | | ✓ | | | | | |
+| `aw-frontend-development` | | ✓ | | | | | |
 
 桌宠的 agent 已经是 `'*': 'deny'`，不变。
 
@@ -210,6 +214,9 @@ opencode 的权限规则和「我的 Skill」目录共同读取 `packages/builti
   - 预览与浏览器一段缩成触发句与规则，并点名 `aw-assistant-preview`。
 - `revise-conflict.md`：先加载 `aw-merge-conflicts`。
 - `start-review.md`、`protocol-review.md` 和 `start-git-review.md` 按 §13 的对应审查场景点名加载 `aw-code-review`。
+- 助手协议在回答验收、重新核验或交付问题前点名 `aw-task-delivery`。涉及预览和修改时使用 `aw-assistant-preview`。
+- 执行协议按实际步骤匹配 `aw-backend-development` 和 `aw-frontend-development`。前端首版和多轮修改的步骤指令也点名前端 Skill。
+- 文档与表格任务每次从批注生成修改步骤时，步骤指令点名 `aw-artifact-revision`。
 
 其余 skill（`aw-task-diagnosis`、`aw-recurring-work`、`aw-office-docs`、`aw-db-readonly`、`aw-offline-network`）靠描述触发，不点名。
 
@@ -277,3 +284,13 @@ opencode 的权限规则和「我的 Skill」目录共同读取 `packages/builti
 | Git 工作台审查 | 审查首条消息包含 Skill 触发指令、应用指定的读取范围和 `submit_findings`。问题包含文件、行号、严重程度、触发条件、影响、证据和修复建议。旧侧行号按 Git 审查接口标记，越界位置沿用现有校验。允许空问题列表 |
 | 复用评审配置的其他操作 | 提交信息草拟、团队成员分析及需求拆解的启动指令各自指向原操作。纯文档、产物或人工检查按对应验收要求进行 |
 | 角色与管理页 | 只分配给任务评审和 Git 工作台的评审配置。「我的 Skill」能查到正文、触发范围，并分别筛选任务评审员和 Git 工作台代码审查 |
+
+## 14. 预览、产物修订、接口交接与交付
+
+| 清单 | 触发与动作 | 核验 |
+| --- | --- | --- |
+| SK-06 更新预览指引 | `aw-assistant-preview` 和 `aw-page-check` 说明预览配置的优先顺序。前端任务可从工作区根目录或唯一的直属前端包推断。根据启动错误和元素操作错误恢复，在同一个任务预览中重新确认目标 | Electron 验证首版执行中启动预览、热更新和多轮迭代。浏览器工具回归验证元素遮挡和编号失效 |
+| SK-07 文档与表格产物修订 | 执行者收到产物版本及批注后，按段落、行或表格坐标读当前文件，定点修改，再用任务产物工具发布并检查 `lost` | Word、Excel、Markdown、TXT 各走一轮批注、版本对比与验收。四种修改步骤都包含 Skill 入口 |
+| SK-08 任务验收与交付 | 助手读取任务状态、验收清单和已有交付。前端最终核验、报告完成、本地合并及 PR/MR 对应各自的工具与确认卡。人工结论和必需项的豁免由任务页管理 | 检查仅询问能否交付时只查询，交付前单独核对必需项。回归本地合并、PR/MR 状态及验收清单阻挡 |
+| SK-10 后端开发与接口交接 | 执行者实现后端接口、服务、迁移和后台任务时使用。测试工程师设计相关用例时也可加载。下游复核已有检查时可直接使用结构化 `handoff` 与现有命令 | 用真实 SQLite 旧数据、重复迁移和既有调用方检验接口。开发和测试节点读取各自的上下文 |
+| SK-11 前端开发与迭代 | 开发步骤尽早打开首屏并继续实现。后续根据路径、视口和元素批注复查。通用流程中的前端步骤可复用同一做法，沿用项目已有预览配置和验收方式 | 核对前端首版、修改步骤和通用执行协议的触发入口。复用桌面前端工作台用例验证早期预览、热更新、两轮修改和最终验收 |

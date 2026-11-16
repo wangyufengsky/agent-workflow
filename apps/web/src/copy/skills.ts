@@ -132,4 +132,24 @@ export const BUILTIN_SKILL_COPY: Readonly<Record<string, { title: string; descri
     description: '核对审查范围、改动证据和问题位置。',
     trigger: '验收涉及代码变更的步骤、独立代码审查任务，或在 Git 工作台发起 AI 审查时。',
   },
+  'aw-artifact-revision': {
+    title: '文档与表格产物修订',
+    description: '按版本和批注定位，修改并复查任务产物。',
+    trigger: '按段落、行或单元格批注修订 Word、Excel、Markdown 或 TXT 产物时。',
+  },
+  'aw-task-delivery': {
+    title: '任务验收与交付',
+    description: '根据任务状态、验收证据和交付记录选择下一步。',
+    trigger: '用户询问验收、重新核验、本地合并、PR/MR 或交付结果时。',
+  },
+  'aw-backend-development': {
+    title: '后端开发与接口交接',
+    description: '核对接口、兼容性和失败路径，并向下游节点交接验证证据。',
+    trigger: '执行步骤实现后端接口、服务、数据迁移或后台任务，或需要为它们设计测试时。',
+  },
+  'aw-frontend-development': {
+    title: '前端开发与迭代',
+    description: '尽早启动任务预览，按页面标注迭代并验证交互。',
+    trigger: '执行步骤搭建页面、实现网页交互或根据前端工作台标注修改时。',
+  },
 };

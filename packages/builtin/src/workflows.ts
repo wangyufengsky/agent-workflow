@@ -10,6 +10,7 @@ import {
   WorkflowPlanning,
 } from '@aw/shared';
 import { BuiltinRoleKey } from './roles.ts';
+import { SkillName } from './skills.ts';
 
 /** Built-in workflow (13 §3); an AI-planned workflow's planner guidance is `prompts/workflows/<key>.md`. */
 export type BuiltinWorkflow = {
@@ -128,11 +129,9 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
             title: '开发首版页面',
             roleKey: BuiltinRoleKey.Developer,
             instructions: [
-              '尽快交付一个可运行的首版，供用户在预览中试用。按需求实现页面、关键交互与窄视口布局。',
-              '已有前端项目沿用其路由、组件、样式和包管理器。记录入口路径。',
-              '空项目按用户指定技术栈创建；未指定时用 Vue 和 Vite，空项目默认用 pnpm。提供 dev 和 build 脚本及依赖锁文件，将 node_modules 和构建产物加入 .gitignore。',
-              '先搭出可运行的首屏骨架。启动脚本、依赖清单、锁文件和入口齐备后，立即用 agent-workflow_browser_open 打开首屏（新建项目用 /，已有项目用预览入口）。该工具会启动工作台共用的预览；成功打开后继续补齐数据、样式和交互。',
-              '提交前在同一预览里复查首屏与主要交互，在 summary 中记录访问路径和已做的检查。提交后等用户在同一个任务中提出下一轮。',
+              `读取任务上下文后，用 skill 工具加载 ${SkillName.FrontendDevelopment}。`,
+              '先做出可操作的首屏，在步骤仍执行时用 agent-workflow_browser_open 打开任务预览，再完善页面。',
+              '提交前核验主要交互与窄视口布局，记录入口路径和检查结果，供用户在同一任务查看。',
             ].join('\n'),
             dependsOn: [],
             acceptance: unchecked,

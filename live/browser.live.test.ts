@@ -68,7 +68,8 @@ describe('@live 浏览器：改页面并在页面预览里验证', () => {
       expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
 
       const { calls, skills } = await browserCalls(task.id);
-      // The executor's prompt names the skill for checking pages (41 §5.3).
+      // Frontend implementation and browser checks use separate skills within a general feature task.
+      expect(skills).toContain(SkillName.FrontendDevelopment);
       expect(skills).toContain(SkillName.PageCheck);
       expect(calls).toContainEqual({ tool: 'browser_open', ok: true });
       expect(calls).toContainEqual({ tool: 'browser_click', ok: true });

@@ -30,6 +30,11 @@ test('新建和导入 Skill，绑定到流程，在助手里选用并保存提�
   await expect(details.getByText('评审员', { exact: true })).toBeVisible();
   await details.getByRole('tab', { name: 'SKILL.md' }).click();
   await expect(details.locator('pre')).toContainText('name: aw-code-review');
+  await audience.selectOption({ label: '应用助手' });
+  await expect(library.getByRole('button', { name: /任务验收与交付/ })).toBeVisible();
+  await expect(library.getByRole('button', { name: /后端开发与接口交接/ })).toHaveCount(0);
+  await audience.selectOption({ label: '测试工程师' });
+  await expect(library.getByRole('button', { name: /后端开发与接口交接/ })).toBeVisible();
   await audience.selectOption('');
 
   await library.getByRole('button', { name: /页面检查/ }).click();
