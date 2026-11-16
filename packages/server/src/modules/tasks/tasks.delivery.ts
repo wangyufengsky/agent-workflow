@@ -59,7 +59,11 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
   }
 
   /** The task is done: its delivery item is resolved by it (11 §7). */
-  function recordSuccess(taskId: string, delivery: DeliveryDTO, result: { commitSha?: string; prUrl?: string }) {
+  function recordSuccess(
+    taskId: string,
+    delivery: DeliveryDTO,
+    result: { commitSha?: string; prUrl?: string; diffBase?: string; diffHead?: string },
+  ) {
     unit.transact(() => {
       const task = get(taskId);
       const event = task.status === TaskStatus.Review ? TaskEvent.Deliver : TaskEvent.DeliverySucceeded;
@@ -109,7 +113,11 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
       throw err;
     }
     if (outcome.merged) {
-      recordSuccess(task.id, delivery, { commitSha: outcome.commitSha });
+      recordSuccess(task.id, delivery, {
+        commitSha: outcome.commitSha,
+        ...(outcome.diffBase === undefined ? {} : { diffBase: outcome.diffBase }),
+        diffHead: outcome.commitSha,
+      });
       await cleanUp(task, worktree, strategy);
       return;
     }
@@ -133,11 +141,13 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
     pr: { title: string; body: string },
   ): Promise<void> {
     let url: string;
+    let diff: { diffBase: string; diffHead: string };
     try {
       const { repoPath } = projects.getRecord(task.projectId);
-      await pushBranch(locks, {
+      diff = await pushBranch(locks, {
         repoPath,
         branch: worktree.branch,
+        targetBranch: delivery.targetBranch,
         authorization: hosting.gitAuthorization(),
         network: await deps.gitNetwork(),
       });
@@ -156,7 +166,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
       if (err instanceof AppError) return;
       throw err;
     }
-    recordSuccess(task.id, delivery, { prUrl: url });
+    recordSuccess(task.id, delivery, { prUrl: url, ...diff });
     await cleanUp(task, worktree, delivery.strategy);
   }
 

@@ -13,6 +13,8 @@ import {
   reviseFromReviewOp,
   ServerEventType,
   setProjectHostingOp,
+  taskDiffFileOp,
+  taskDiffOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createFakeHosting, type FakeHosting } from '../../../test/fakes/fake-hosting.ts';
@@ -67,6 +69,18 @@ async function reviewerCommits(origin: string, branch: string, file: string, con
 }
 
 describe('PR 审查意见回流（21）', () => {
+  it('PR 推送后和目标分支继续前进后，历史 diff 保留推送时的范围', async () => {
+    const { repo, task, branch } = await deliveredAsPullRequest({ provider: 'github', repo: 'acme/shop' });
+    const base = (await repo.git('rev-parse', 'main')).trim();
+    const head = (await repo.git('rev-parse', branch)).trim();
+    expect(task.lastDelivery).toMatchObject({ diffBase: base, diffHead: head });
+    await writeFile(join(repo.path, 'later.txt'), 'later\n');
+    await repo.git('add', '-A');
+    await repo.git('commit', '-qm', 'later');
+    const diff = await t.call(taskDiffOp, { id: task.id });
+    expect(diff.body).toMatchObject({ base, files: [{ path: 'greet.ts' }] });
+  });
+
   it('取回意见 → 勾选 → AI 在重建的工作区按意见修改（含审查者提交的建议）→ 推送到同一个 PR', async () => {
     const { origin, task, branch, worktree } = await deliveredAsPullRequest({ provider: 'github', repo: 'acme/shop' });
     expect(task).toMatchObject({ status: 'completed', git: { worktreeStatus: 'removed' } });
@@ -139,6 +153,8 @@ describe('PR 审查意见回流（21）', () => {
 
     const { body: inReview } = await t.call(getTaskOp, { id: task.id });
     expect(inReview.pullRequest?.url).toBe('https://github.example/acme/shop/pull/1');
+    const revisionDiff = await t.call(taskDiffFileOp, { id: task.id, path: 'greet.ts' });
+    expect('diff' in revisionDiff.body && revisionDiff.body.diff).toContain('+export const greet = (name: string)');
     const { body: pushed } = await t.call(deliverTaskOp, { id: task.id, strategy: 'pull_request' });
     expect(pushed).toMatchObject({
       status: 'completed',

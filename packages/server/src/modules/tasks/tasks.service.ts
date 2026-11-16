@@ -15,6 +15,7 @@ import {
   type PlanGraph,
   type PreviewSessions,
   type RequestChangesRequest,
+  type RequirementItemInput,
   type ResultNext,
   resolveTaskDisplayGroup,
   ServerEventType,
@@ -55,7 +56,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   const checks = createTaskChecks(deps, state, lifecycle);
   const diffs = createTaskDiffs(deps, state);
   const delivery = createTaskDelivery(deps, state);
-  const changes = createTaskChanges(deps, state, delivery.current);
+  const changes = createTaskChanges(deps, state, delivery.current, lifecycle);
   const review = createTaskReview(deps, state, changes);
   const agentsMd = createTaskAgentsMd(deps, state, lifecycle);
 
@@ -103,7 +104,13 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       nodes: nodes.summaries(id),
       activeAttempts: attempts.listActive(id),
       openInbox: inbox.listOpen({ taskId: id }),
-      result: task.result,
+      result:
+        task.result === null
+          ? null
+          : {
+              ...task.result,
+              checks: task.result.checks.map(({ evidence: _evidence, ...check }) => check),
+            },
       lastDelivery: delivery.lastDelivery(id),
       pullRequest: review.pullRequestOf(id),
       attachments: state.attachmentsOf(task),
@@ -251,8 +258,13 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       lifecycle.retry(id, { feedback });
       return detail(id);
     },
-    async updateCheckCommand(id: string, command: string, updateProject: boolean): Promise<TaskDetailDTO> {
-      await checks.updateCheckCommand(id, command, updateProject);
+    async updateCheckCommand(
+      id: string,
+      command: string,
+      updateProject: boolean,
+      expectedCommand?: string,
+    ): Promise<TaskDetailDTO> {
+      await checks.updateCheckCommand(id, command, updateProject, expectedCommand);
       return detail(id);
     },
     skipCheck(id: string): TaskDetailDTO {
@@ -287,8 +299,13 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       return { outcome, error: lastDelivery.error };
     },
     deliver,
-    reverifyRequirements(id: string): TaskDetailDTO {
-      changes.reverifyRequirements(id);
+    async reverifyRequirements(
+      id: string,
+      revisionId?: string,
+      expectedCommitSha?: string,
+      items?: readonly RequirementItemInput[],
+    ): Promise<TaskDetailDTO> {
+      await changes.reverifyRequirements(id, revisionId, expectedCommitSha, items);
       return detail(id);
     },
     async requestChanges(
@@ -357,6 +374,11 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       return nodes.submitResult(attempt, input, state.runContext(state.get(attempt.taskId)));
     },
 
+    checkEvidence(id: string, evidenceId: string) {
+      const check = state.get(id).result?.checks.find((item) => item.evidenceId === evidenceId);
+      if (check?.evidence === undefined) throw new AppError(ErrorCode.NotFound, '检查证据不可用或结果已更新');
+      return check.evidence;
+    },
     ...diffs,
     resolveInbox: actions.resolveInbox,
     archive(id: string): TaskDetailDTO {

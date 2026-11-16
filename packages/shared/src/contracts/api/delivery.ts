@@ -17,6 +17,8 @@ export const deliverySchema = z.object({
   /** Tip of the target branch after a local merge. */
   commitSha: z.string().nullable(),
   prUrl: z.string().nullable(),
+  diffBase: z.string().nullable(),
+  diffHead: z.string().nullable(),
   /** Files that conflicted; the merge was aborted. */
   conflictFiles: z.array(z.string()).nullable(),
   error: errorInfoSchema.nullable(),

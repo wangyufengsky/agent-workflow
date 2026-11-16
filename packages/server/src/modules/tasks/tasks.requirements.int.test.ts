@@ -106,6 +106,7 @@ describe('需求验收清单（31，Q-01）', () => {
       revision: null,
       items: [],
       history: [],
+      commitSha: null,
     });
   });
 });

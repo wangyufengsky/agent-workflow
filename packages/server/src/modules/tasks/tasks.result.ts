@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   AcceptanceCheckKind,
   AppError,
@@ -64,6 +65,10 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
         (node.checkResults ?? []).map((c) => ({
           nodeKey: node.key,
           nodeTitle: node.title,
+          nodeId: node.id,
+          commitSha: node.commitSha,
+          evidence: c,
+          evidenceId: randomUUID(),
           kind: c.kind,
           passed: c.passed,
           command: c.kind === AcceptanceCheckKind.Command ? c.command : null,

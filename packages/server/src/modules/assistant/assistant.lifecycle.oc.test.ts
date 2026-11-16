@@ -35,7 +35,10 @@ const requestSchema = z.object({
     }),
   ),
 });
-const callSchema = z.object({ name: z.enum(['read', 'write', 'bash']), arguments: z.record(z.string(), z.unknown()) });
+const callSchema = z.object({
+  name: z.enum(['read', 'write', 'bash', 'skill']),
+  arguments: z.record(z.string(), z.unknown()),
+});
 
 async function bodyOf(req: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -279,4 +282,14 @@ it('@opencode 刚派发即停止不会漏过启动，随后短问完成；无效
     ]);
   }
   await t.call(deleteConversationOp, { id: c.id });
+});
+
+it('@opencode 助手可加载包含重新核验操作的任务诊断技能', async () => {
+  const { body: conversation } = await t.call(createConversationOp, {});
+  const result = await say(conversation.id, { name: 'skill', arguments: { name: 'aw-task-diagnosis' } });
+  expect(result).toMatchObject({ data: { status: 'completed' } });
+  const content = JSON.stringify(result?.data);
+  expect(content).toContain('tasks_reverifyRequirements');
+  expect(content).toContain('tasks_updateCheckCommand');
+  expect(content).toContain('existing confirmation card');
 });

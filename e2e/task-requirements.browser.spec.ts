@@ -56,11 +56,13 @@ test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → �
   await expect(merge).toBeDisabled();
   await notice.getByLabel('我知道这些项未满足，仍然交付').check();
   await expect(merge).toBeEnabled();
-  // The acceptance is for that version: once the checklist is saved again, it has to be accepted again.
+  // Editing the checklist schedules verification of the existing result.
+  await queueTurn(request, project, { title: '核验验收清单' }, [submitResult('再次核验完成')]);
   await checklist.getByRole('button', { name: '编辑清单' }).click();
   const edit = page.getByRole('dialog', { name: '编辑验收清单' });
   await edit.getByLabel('预期结果 1').fill('只显示匹配订单，忽略大小写');
-  await edit.getByRole('button', { name: '保存' }).click();
+  await edit.getByRole('button', { name: '保存并重新核验' }).click();
+  await expect(page.getByTestId('result-card')).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
   await expect(edit).toBeHidden();
   await expect(notice.getByLabel('我知道这些项未满足，仍然交付')).not.toBeChecked();
   await expect(merge).toBeDisabled();

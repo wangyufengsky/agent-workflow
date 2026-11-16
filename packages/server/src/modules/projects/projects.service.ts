@@ -293,6 +293,11 @@ export function createProjectsService({
       });
     },
 
+    setCheckCommand(id: string, command: string): void {
+      require(id);
+      repo.update(id, { checkCommand: command, updatedAt: clock.now() });
+    },
+
     async update({ id, ...changes }: UpdateProjectRequest): Promise<ProjectDetailDTO> {
       const project = require(id);
       if (changes.defaultBranch !== undefined) {

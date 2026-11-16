@@ -5,6 +5,8 @@ import {
   type InboxItemDTO,
   type InboxItemOf,
   InboxKind,
+  NodeKind,
+  NodeStatus,
   PermissionDecision,
   projectBashPatterns,
 } from '@aw/shared';
@@ -13,6 +15,7 @@ import { Link } from '@tanstack/react-router';
 import { type FormEvent, useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
+import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { ATTEMPT_KIND_LABEL } from '../../copy/attempts.ts';
@@ -20,6 +23,7 @@ import { ERROR_COPY } from '../../copy/errors.ts';
 import { SCHEDULES_COPY } from '../../copy/schedules.ts';
 import { INBOX_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
 import { attemptQuery } from '../attempts/attempt.queries.ts';
+import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { schedulesQuery } from '../schedules/schedules.queries.ts';
 import { CheckFailureActions } from '../tasks/check-failure-actions.tsx';
 import { checkUnrunnable, failureText } from '../tasks/failure-text.ts';
@@ -163,10 +167,33 @@ function FailureCard({ item, resolve, pending }: CardProps<typeof InboxKind.Fail
           {checkUnrunnable(error) ? TASK_COPY.recheck : C.retry}
         </Button>
         {item.taskId !== null && <CheckFailureActions taskId={item.taskId} error={error} size="sm" />}
+        {item.taskId !== null && <FailedChecklistAction taskId={item.taskId} />}
         <Button variant="danger" size="sm" disabled={pending} onClick={() => resolve({ action: FailureAction.Cancel })}>
           {C.cancelTask}
         </Button>
       </div>
+    </>
+  );
+}
+
+function FailedChecklistAction({ taskId }: { taskId: string }) {
+  const task = useQuery(taskQuery(taskId)).data;
+  const [open, setOpen] = useState(false);
+  if (
+    task === undefined ||
+    !task.nodes.some((node) => node.kind === NodeKind.Verify && node.status === NodeStatus.Failed)
+  )
+    return null;
+  return (
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        {TASK_COPY.editRequirementsAndReverify}
+      </Button>
+      {open && (
+        <Dialog open onOpenChange={setOpen} title={TASK_COPY.editRequirementsAndReverify}>
+          <RequirementsSection task={task} />
+        </Dialog>
+      )}
     </>
   );
 }

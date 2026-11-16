@@ -239,6 +239,13 @@
       "when": 1793170238249,
       "tag": "0033_task_archive",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1794793259445,
+      "tag": "0034_delivery_diff_range",
+      "breakpoints": true
     }
   ]
 }

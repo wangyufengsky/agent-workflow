@@ -44,6 +44,7 @@ agent-workflow 是一个本地桌面应用：选项目、选流程、写一句�
 | [40-agents-md.md](40-agents-md.md) | 项目的 AGENTS.md（已实现，待检查，D202–D205）：项目详情查看默认分支上的 AGENTS.md，让 AI 在独立任务里生成或补充，可选加入「在 Agent Workflow 中工作」规则 | 全员 |
 | [41-skills.md](41-skills.md) | 内置 skill（已确认，SK-01–SK-05 全部实现，D206–D212）：用 opencode 原生 `skills.paths` 注入应用自带的 skill、按 agent 白名单、屏蔽用户个人与项目的 skill；助手为主要使用者（7 个，含画图与预览段的迁移），任务会话 3 个；写法规范与测试 | 全员 |
 | [39-office-files.md](39-office-files.md) | Word 与 Excel 文件（已实现，待检查，D193–D201）：上传 .docx / .xlsx 时提取文字、Excel 概览与表格查询工具、助手生成与修改文件、预览与另存为、依赖与上限 | 全员 |
+| [43-workflow-experience.md](43-workflow-experience.md) | 项目对话、任务验收与交付改进（共 12 项，第一批已实现），含会话续接、重验、流程图前置、计划存为模板、PR 状态与跨功能关联 | 全员 |
 
 ## 维护规则
 

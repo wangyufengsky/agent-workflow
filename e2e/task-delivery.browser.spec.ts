@@ -68,6 +68,36 @@ test('J5 合并到 main（squash）→ 主分支有提交、worktree 已清理�
     .poll(() => git(project.repoPath, 'worktree', 'list', '--porcelain').match(/^worktree /gm))
     .toHaveLength(1);
   await expect.poll(() => git(project.repoPath, 'branch', '--list', 'aw/*')).toBe('');
+  // Delivery's recorded commits keep the same diff even after the worktree is gone and main moves.
+  writeFileSync(join(project.repoPath, 'later.txt'), 'later\n');
+  git(project.repoPath, 'add', '-A');
+  git(project.repoPath, 'commit', '-qm', 'later');
+  await result.getByRole('button', { name: '查看改动' }).click();
+  const historical = page.getByRole('dialog', { name: '改动' });
+  await expect(historical.getByTestId('diff-view')).toContainText('export const greet = () => "你好";');
+  await expect(historical).not.toContainText('later.txt');
+});
+
+test('无法运行的命令跳过后，从结果卡读取当次检查证据', async ({ page, request }) => {
+  const project = await createProject(request, 'aw-command-that-does-not-exist');
+  await queueTurn(request, project, { title: '定位根因' }, [submitResult('找到了原因')]);
+  await queueTurn(request, project, { title: '修复' }, [
+    { type: 'edit', file: 'greet.ts', content: 'export const greet = () => "你好";\n' },
+    submitResult('已修复'),
+  ]);
+  await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
+  await startTask(page, project, /修 Bug/, '检查不可运行的命令');
+  const failure = page.getByTestId('failure-panel');
+  await expect(failure.getByRole('button', { name: '跳过这项检查…' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  await failure.getByRole('button', { name: '跳过这项检查…' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '跳过并继续' }).click();
+  const result = page.getByTestId('result-card');
+  await expect(result).toContainText('已跳过', { timeout: TASK_RUN_TIMEOUT_MS });
+  const evidence = result.getByTestId('check-evidence-row').first();
+  await evidence.getByRole('button', { name: '查看证据' }).click();
+  await evidence.getByText('aw-command-that-does-not-exist').click();
+  await expect(evidence).toContainText('已跳过');
+  await expect(evidence.locator('pre')).toBeVisible();
 });
 
 test('J6 两个任务改同一文件 → 第二个合并冲突 → 交给 AI 解决 → 合并成功', async ({ page, request }) => {

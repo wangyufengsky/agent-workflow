@@ -123,7 +123,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/tasks/:id/pause` 🅿 | `running → paused`：不再派发新步骤，进行中的步骤继续 |
 | POST | `/tasks/:id/resume` 🅿 | `paused → running`；未确认的调整草稿被取代 |
 | POST | `/tasks/:id/retry` | `{ feedback? }`：`failed → <failedPhase>`；`feedback`（D118）作为重试的失败步骤下一次尝试的说明（同 `nodes/:nodeId/retry`），其他阶段的失败忽略它；检查命令无法运行而失败的步骤 `recheck`（用已提交的结果重新检查，不重跑 AI，D116），其余失败步骤 `retry` |
-| POST | `/tasks/:id/check-command` | `{ command, updateProject }`（D116）：只限在执行阶段因命令检查失败的任务（`CHECK_COMMAND_UNRUNNABLE`，或 `NODE_ATTEMPTS_EXHAUSTED` 且最近一次已提交的结果未通过命令检查），否则 409 `STATE_TRANSITION_INVALID`；任务未完成的步骤（`pending` / `ready` / `failed`）中与失败命令相同的命令检查换成 `command`，`updateProject` 时同时设为项目的检查命令；然后重试：已提交结果的失败步骤 `recheck`（预算重置），其余 `retry` |
+| POST | `/tasks/:id/check-command` | `{ command, updateProject, expectedCommand? }`（D116、UX-01）：提交原检查命令时校验它仍是失败原因；工作区须可用。：只限在执行阶段因命令检查失败的任务（`CHECK_COMMAND_UNRUNNABLE`，或 `NODE_ATTEMPTS_EXHAUSTED` 且最近一次已提交的结果未通过命令检查），否则 409 `STATE_TRANSITION_INVALID`；任务未完成的步骤（`pending` / `ready` / `failed`）中与失败命令相同的命令检查换成 `command`，`updateProject` 时同时设为项目的检查命令；然后重试：已提交结果的失败步骤 `recheck`（预算重置），其余 `retry` |
 | POST | `/tasks/:id/skip-check` | （D116）只限因 `CHECK_COMMAND_UNRUNNABLE` 或 `BROWSER_CHECK_UNRUNNABLE` 失败的任务，否则 409 `STATE_TRANSITION_INVALID`；未完成步骤中这条命令检查（或所有页面体检）标 `skipped`，然后重试（失败步骤 `recheck`）；结果卡与 PR 说明写明未验证 |
 | POST | `/tasks/:id/cancel` | `{ keepBranch?: boolean }` |
 | POST | `/tasks/:id/archive` | （`tasks.archive`，write，42）归档：任务未结束 409 `TASK_NOT_FINISHED`；已归档时原样返回 `TaskDetailDTO` |
@@ -134,7 +134,8 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/tasks/:id/deliver` | `{ strategy, targetBranch?, pr?: { title, body } }`；见 §5.3 |
 | GET | `/tasks/:id/review-comments` | `ReviewCommentsDTO`：任务的 PR/MR 上的审查意见，实时取自平台；见 §5.4 |
 | POST | `/tasks/:id/review-feedback` | `{ commentIds: string[], note? }`；`completed → running`，按勾选的审查意见追加「按审查意见修改」节点；见 §5.4 |
-| GET | `/tasks/:id/diff` | `DiffDTO { base, files }`：worktree（含未提交改动）相对任务分支与目标分支的 merge-base（起初即基线提交；解决冲突合入目标分支后为目标分支的提交）的文件列表与增删统计；worktree 已删除 → 404 `NOT_FOUND` |
+| GET | `/tasks/:id/check-evidence/:evidenceId` | `tasks.checkEvidence`（read）：按结果中该检查的 `evidenceId` 延迟读取当次检查的 `CheckResult`；标识不属于当前任务结果或证据不可用时返回 404 `NOT_FOUND`（UX-03） |
+| GET | `/tasks/:id/diff` | `DiffDTO { base, files }`：worktree（含未提交改动）相对任务分支与目标分支的 merge-base（起初即基线提交；解决冲突合入目标分支后为目标分支的提交）的文件列表与增删统计。已交付且 worktree 不再可用时对比该次交付的 `diffBase` 与 `diffHead`；范围或提交不可用时返回 404 `NOT_FOUND`（UX-03） |
 | GET | `/tasks/:id/diff/file?path=` | 单文件 unified diff `FileDiffDTO`（超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }`） |
 
 ### 5.1 创建
@@ -602,10 +603,10 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 
 | 操作 | 方法与路径 | 风险／曝光 | 输入 → 结果 |
 | --- | --- | --- | --- |
-| requirements.get（Q-01 已实现） | GET `/tasks/:id/requirements` | read；UI / 助手 | `{ revision, items, history }`：当前版本、逐项 `status` 与决定它的最新结论 `latest`、旧版本摘要（新的在前）；没有清单时都为空。状态按任务工作区当前提交计算，工作区已删除时只比较版本 |
+| requirements.get（Q-01 已实现） | GET `/tasks/:id/requirements` | read；UI / 助手 | `{ revision, items, history, commitSha }`：当前版本、逐项 `status` 与决定它的最新结论 `latest`（含可空的 `nodeId`）、旧版本摘要（新的在前）及任务工作区当前提交；没有清单时都为空。状态按任务工作区当前提交计算，工作区已删除时只比较版本 |
 | requirements.replace（Q-01 已实现） | PUT `/tasks/:id/requirements` | write；UI / 助手确认 | `{ items }` → 新版本，返回同 `get`；带 `id` 的项保留（必须是当前版本的项，否则 `VALIDATION_FAILED`），不带的是新项；只在 `draft`、`plan_review`、`review`，否则 `REQUIREMENTS_NOT_EDITABLE`。确认卡列出每项与命令，突出删除和改为可选的项（Q-03） |
 | requirements.decide（Q-03 已实现） | POST `/tasks/:id/requirements/:itemId/decisions` | write；仅 UI（不向助手和命令面板曝光） | `{ conclusion: pass / fail / waive, note }`；waive 必须有 note（否则 `VALIDATION_FAILED`）；只在 `review`，否则 `REQUIREMENTS_NOT_EDITABLE`；结论记为 user，绑定当前提交；返回同 `get` |
-| tasks.reverifyRequirements（Q-03 已实现） | POST `/tasks/:id/requirements/reverify` | write；UI / 助手确认 | 只在 `review`（否则 `REQUIREMENTS_NOT_EDITABLE`），没有清单时 `VALIDATION_FAILED`；追加 `verify_requirements_<n>`，任务回到 `running`；返回任务详情 |
+| tasks.reverifyRequirements（Q-03、UX-01） | POST `/tasks/:id/requirements/reverify` | write；UI / 助手确认 | `{ revisionId?, expectedCommitSha?, items? }`。提交 `items` 时同时带编辑所依据的版本和提交；校验后保存新清单并启动核验。待合并时追加核验步骤，核验步骤导致失败且已有执行结果时恢复该步骤。旧请求可按当前清单重新核验。返回任务详情 |
 
 - `createTask` 增加可选 `requirements: items`（每项 `title`、`expected`，`required` 默认 true，`verification` 默认 AI 核验），与任务同一事务创建第一个版本（Q-01 已实现）。
 - 交付（本地合并、创建／更新 PR、报告完成）增加可选 `acknowledgedRequirementsRevisionId`：界面对话框或助手确认卡列出未满足项时所依据的清单版本。有未满足的必需项时，缺少它或与当前版本不同都返回 `REQUIREMENTS_UNACKNOWLEDGED`，用户需要看着新版本重新确认；交付记录保存清单摘要。（Q-03 已实现：`tasks.deliver` 先算清单，批量交付也经过它；助手的 `tasks_deliver` 不带这个字段（`assistantOmit`），有未满足项时只能由用户在任务页交付；摘要记在交付的时间线事件里，见 10 §6.2）

@@ -74,10 +74,11 @@ export function createRequirementsService({ db, clock }: RequirementsServiceDeps
     /** The current version with each item's state against `commitSha` (null when the task's commit is unknown). */
     view(taskId: string, commitSha: string | null): TaskRequirementsDTO {
       const [current, ...older] = repo.listRevisions(taskId);
-      if (current === undefined) return { revision: null, items: [], history: [] };
+      if (current === undefined) return { commitSha, revision: null, items: [], history: [] };
       const results = repo.listResults(taskId);
       const baseline = { revisionId: current.id, commitSha };
       return {
+        commitSha,
         revision: { id: current.id, seq: current.seq, createdAt: current.createdAt },
         items: current.items.map((item) => ({
           ...item,

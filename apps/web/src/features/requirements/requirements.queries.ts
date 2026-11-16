@@ -39,7 +39,15 @@ export const useDecideRequirement = (taskId: string) =>
 export const useReverifyRequirements = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (taskId: string) => callOperation(reverifyRequirementsOp, { id: taskId }),
-    onSuccess: (task) => qc.setQueryData(queryKeys.task(task.id), task),
+    mutationFn: (input: {
+      id: string;
+      revisionId?: string;
+      expectedCommitSha?: string;
+      items?: RequirementItemInput[];
+    }) => callOperation(reverifyRequirementsOp, input),
+    onSuccess: (task) => {
+      qc.setQueryData(queryKeys.task(task.id), task);
+      void qc.invalidateQueries({ queryKey: queryKeys.taskRequirements(task.id) });
+    },
   });
 };

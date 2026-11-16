@@ -334,6 +334,7 @@ payload / response：
 | status | TEXT | `DeliveryStatus` |
 | commit_sha | TEXT NULL | 本地合并产生的提交 |
 | pr_url | TEXT NULL | |
+| diff_base / diff_head | TEXT NULL | UX-03。记录本次交付的固定对比范围。本地合并是目标分支交付前后的提交，PR / MR 是对比基线与本次推送提交。旧交付可为空 |
 | conflict_files | TEXT(JSON) NULL | |
 | error | TEXT(JSON) NULL | |
 | created_at / finished_at | INTEGER | |

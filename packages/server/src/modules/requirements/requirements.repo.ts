@@ -46,6 +46,7 @@ export function createRequirementsRepo(db: DbExecutor) {
             note: r.note,
             output: r.output,
             commitSha: r.commitSha,
+            nodeId: r.nodeId,
             createdAt: r.createdAt,
           })
           .from(r)

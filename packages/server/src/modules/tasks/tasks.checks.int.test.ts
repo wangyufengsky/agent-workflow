@@ -79,6 +79,14 @@ describe('检查命令因环境无法运行（D116）', () => {
 
   it('修改检查命令：改写这个任务已冻结的检查并可同时设为项目的检查命令，用已交的结果重新检查', async () => {
     const task = await failsOnCheck('aw-no-such-tool -q test');
+    const stale = await t.call(updateCheckCommandOp, {
+      id: task.id,
+      command: 'false',
+      updateProject: true,
+      expectedCommand: 'outdated',
+    });
+    expect(stale.status).toBe(409);
+    expect((await t.call(getProjectOp, { id: task.project.id })).body.checkCommand).toBe('aw-no-such-tool -q test');
     t.fake.enqueue(passReview(), { agent: 'aw-reviewer' });
     const review = taskReaches(t, 'review');
     const updated = await t.call(updateCheckCommandOp, {
@@ -93,6 +101,14 @@ describe('检查命令因环境无法运行（D116）', () => {
     const { body: node } = await t.call(getNodeOp, { id: task.id, nodeId: fixNode(task).id });
     expect(node.acceptance.checks[0]).toEqual({ kind: 'command', command: 'test -f fix.txt' });
     expect((await t.call(getProjectOp, { id: task.project.id })).body.checkCommand).toBe('test -f fix.txt');
+
+    const duplicate = await t.call(updateCheckCommandOp, {
+      id: task.id,
+      command: 'false',
+      updateProject: true,
+    });
+    expect(duplicate).toMatchObject({ status: 409, body: { error: { code: ErrorCode.StateTransitionInvalid } } });
+    expect((await t.call(getProjectOp, { id: task.project.id })).body.checkCommand).toBe('test -f fix.txt');
   });
 
   it('跳过这项检查：结果卡标为已跳过，其余检查（AI 评审）照常', async () => {
@@ -103,7 +119,7 @@ describe('检查命令因环境无法运行（D116）', () => {
     await review;
 
     const { body: done } = await t.call(getTaskOp, { id: task.id });
-    expect(done.result?.checks.filter((c) => c.nodeKey === 'fix')).toEqual([
+    expect(done.result?.checks.filter((c) => c.nodeKey === 'fix')).toMatchObject([
       {
         nodeKey: 'fix',
         nodeTitle: '修复',

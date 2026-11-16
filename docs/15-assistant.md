@@ -77,6 +77,8 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 
 确认流程（与 `ask_user` 同一模式，不依赖长时间阻塞的工具调用；`assistant.confirmations.ts`，状态机 09 §10）：
 
+修改检查命令或清单来重验已有成果时，`aw-task-diagnosis` 先读取失败证据。确认卡显示检查命令及是否同时更新项目默认值，或列出清单的逐项变更、原版本与核验所依据的提交。清单修改仅作用于该任务，保存和启动核验在同一事务进行（UX-01）。
+
 0. 没写 `baseBranch` 的 `tasks.create`、`batches.create`、`initiatives.create` 先填上项目当前的默认分支（D215），卡片与确认后的调用都用它；定时任务不填（每次运行时取当时的默认分支）。
 1. 工具返回 `{ status: 'needs_confirmation', confirmation_id, instruction }`（instruction 要求模型用一句话说明并结束本轮），后端写 `assistant_confirmations`（`pending`），消息流追加 `confirmation` 条目，推送 `assistant.confirmation`。
 2. 界面在对话中渲染确认卡片：操作标题、参数（对象显示名称、字段用中文标签，§6.1）、影响说明（write：可「确认并总是允许」；critical：每次确认），合并（`tasks.deliver`）另显示将合并的改动统计，初始化 Git（`projects.initGit`）另显示与添加项目对话框相同的三件事、将纳入的文件数与大小和大文件提醒（D153）。

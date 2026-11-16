@@ -70,6 +70,14 @@ test('J29 页面体检不通过 → 下一次尝试修好后通过；步骤详�
   await expect(pages.getByRole('link', { name: '打开预览' })).toBeVisible();
   await decoded(pages.getByRole('img', { name: '放大 /（桌面）' }));
 
+  // The result card reads the exact captured check only when requested.
+  const evidence = result.getByTestId('check-evidence-row').filter({ hasText: '修复' });
+  await evidence.getByRole('button', { name: '查看证据' }).click();
+  await evidence.getByText('页面体检').click();
+  await evidence.getByRole('button', { name: '放大 /（手机）' }).click();
+  await decoded(page.getByRole('dialog', { name: '/ · 手机' }).getByRole('img'));
+  await page.keyboard.press('Escape');
+
   const { pathname } = new URL(page.url());
   const task = await (await request.get(`${API_BASE}${pathname}`, { headers: AUTH })).json();
   const fix = task.nodes.find((n: { key: string }) => n.key === 'fix');

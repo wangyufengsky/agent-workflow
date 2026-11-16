@@ -54,6 +54,7 @@ export const requirementResultSchema = z.object({
   /** A command's output, cut to its end; null for AI and user conclusions. */
   output: z.string().nullable(),
   commitSha: z.string(),
+  nodeId: z.string().nullable().optional(),
   createdAt: z.number(),
 });
 export type RequirementResultDTO = z.infer<typeof requirementResultSchema>;
@@ -62,6 +63,7 @@ export const requirementRevisionSummarySchema = z.object({ id: z.string(), seq: 
 
 /** `GET /tasks/:id/requirements` (11 §14.2): the current version with each item's state; empty without a checklist. */
 export const taskRequirementsSchema = z.object({
+  commitSha: z.string().nullable(),
   revision: requirementRevisionSummarySchema.nullable(),
   items: z.array(
     requirementItemSchema.extend({

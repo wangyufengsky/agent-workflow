@@ -1,13 +1,17 @@
 import {
+  AcceptanceCheckKind,
   DeliveryStatus,
   DeliveryStrategy,
   type TaskDetailDTO,
   TaskStatus,
+  taskCheckEvidenceOp,
   WorkflowDeliverable,
   WorktreeStatus,
 } from '@aw/shared';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
+import { callOperation } from '../../api/client.ts';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { DiffDialog } from '../../components/diff/diff-dialog.tsx';
@@ -23,6 +27,7 @@ import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { skippedChecks } from '../tasks/skipped-checks.ts';
 import { taskDiffFileQuery, taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { DeliveryActions } from './delivery-actions.tsx';
+import { Check } from './node-drawer.tsx';
 import { ReviewComments } from './review-comments.tsx';
 import styles from './task-page.module.css';
 
@@ -63,7 +68,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
   const { result } = task;
   if (result === null) return <p className="hint">{C.resultPending}</p>;
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
-  const failedChecks = result.checks.filter((c) => !c.passed).length;
+  const failedChecks = result.checks.filter((c) => !c.passed && !c.skipped).length;
   const skipped = skippedChecks(result);
   // One skipped check per step that had the command; the commands are listed once each.
   const skippedCount = result.checks.filter((c) => c.skipped).length;
@@ -75,8 +80,10 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
         : skippedCount > 0
           ? C.checksSkipped(skippedCount, skipped)
           : C.checksPassed;
-  // The diff is read from the worktree, which goes away once the task is delivered or cancelled.
-  const browsable = task.git.worktreeStatus === WorktreeStatus.Ready;
+  // Delivered changes use their recorded commit range after the worktree is removed.
+  const browsable =
+    task.git.worktreeStatus === WorktreeStatus.Ready ||
+    (task.status === TaskStatus.Completed && task.lastDelivery?.status === DeliveryStatus.Succeeded && !report);
   return (
     <Panel solid>
       <div className={styles.result} data-testid="result-card">
@@ -92,9 +99,6 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
             {PPT_COPY.makeDeck}
           </Link>
         </div>
-        <ResultPages task={task} />
-        <DeliveryOutcome task={task} />
-        <RequirementsSection task={task} />
         <section className={styles.block}>
           <h3 className="sec-t">{report ? C.report : C.summary}</h3>
           {report ? (
@@ -110,6 +114,31 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
             </ol>
           )}
         </section>
+        {result.checks.some(
+          (check) => !check.passed || check.skipped || check.kind === AcceptanceCheckKind.Browser,
+        ) && (
+          <section className={styles.block}>
+            <h3 className="sec-t">{C.checkEvidenceHeading}</h3>
+            {result.checks
+              .filter((check) => !check.passed || check.skipped || check.kind === AcceptanceCheckKind.Browser)
+              .map((check, index) => (
+                <div key={check.evidenceId ?? `${check.nodeKey}-${index}`} data-testid="check-evidence-row">
+                  <p>
+                    {check.nodeTitle}
+                    {check.commitSha ? C.checkEvidenceCommit(check.commitSha) : ''}
+                  </p>
+                  {check.evidenceId === undefined ? (
+                    <p className="hint">{C.checkEvidenceOld}</p>
+                  ) : (
+                    <Evidence taskId={task.id} evidenceId={check.evidenceId} />
+                  )}
+                </div>
+              ))}
+          </section>
+        )}
+        <ResultPages task={task} />
+        <DeliveryOutcome task={task} />
+        <RequirementsSection task={task} />
         {result.assumptions.length > 0 && (
           <section className={styles.block}>
             <h3 className="sec-t">{C.assumptions}</h3>
@@ -167,5 +196,24 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
         />
       )}
     </Panel>
+  );
+}
+
+function Evidence({ taskId, evidenceId }: { taskId: string; evidenceId: string }) {
+  const [open, setOpen] = useState(false);
+  const query = useQuery({
+    queryKey: ['task-check-evidence', taskId, evidenceId],
+    queryFn: () => callOperation(taskCheckEvidenceOp, { id: taskId, evidenceId }),
+    enabled: open,
+  });
+  return (
+    <div>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(!open)}>
+        {open ? C.checkEvidenceClose : C.checkEvidenceView}
+      </Button>
+      {open && query.isPending && <p className="hint">{C.checkEvidenceLoading}</p>}
+      {open && query.isError && <p className="hint">{C.checkEvidenceUnavailable}</p>}
+      {open && query.data !== undefined && <Check taskId={taskId} check={query.data} />}
+    </div>
   );
 }

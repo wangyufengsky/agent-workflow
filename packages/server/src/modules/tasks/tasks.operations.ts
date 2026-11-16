@@ -37,6 +37,7 @@ import {
   skipNodeOp,
   startAgentsMdTaskOp,
   startTaskOp,
+  taskCheckEvidenceOp,
   taskDiffFileOp,
   taskDiffOp,
   unarchiveTaskOp,
@@ -58,12 +59,14 @@ export function tasksOperations(tasks: TasksService) {
     implement(decideRequirementOp, ({ id, itemId, conclusion, note }) =>
       tasks.decideRequirement(id, itemId, { conclusion, note }),
     ),
-    implement(reverifyRequirementsOp, ({ id }) => tasks.reverifyRequirements(id)),
+    implement(reverifyRequirementsOp, ({ id, revisionId, expectedCommitSha, items }) =>
+      tasks.reverifyRequirements(id, revisionId, expectedCommitSha, items),
+    ),
     implement(getTaskTimelineOp, ({ id, afterId }) => ({ items: tasks.timeline(id, afterId) })),
     implement(startTaskOp, ({ id }) => tasks.start(id)),
     implement(retryTaskOp, ({ id, feedback }) => tasks.retry(id, feedback)),
-    implement(updateCheckCommandOp, ({ id, command, updateProject }) =>
-      tasks.updateCheckCommand(id, command, updateProject),
+    implement(updateCheckCommandOp, ({ id, command, updateProject, expectedCommand }) =>
+      tasks.updateCheckCommand(id, command, updateProject, expectedCommand),
     ),
     implement(skipCheckOp, ({ id }) => tasks.skipCheck(id)),
     implement(cancelTaskOp, ({ id, keepBranch }) => tasks.cancel(id, keepBranch ?? false)),
@@ -87,6 +90,7 @@ export function tasksOperations(tasks: TasksService) {
     ),
     implement(reviewCommentsOp, ({ id }) => tasks.reviewComments(id)),
     implement(reviseFromReviewOp, ({ id, commentIds, note }) => tasks.reviseFromReview(id, commentIds, note)),
+    implement(taskCheckEvidenceOp, ({ id, evidenceId }) => tasks.checkEvidence(id, evidenceId)),
     implement(taskDiffOp, ({ id }) => tasks.diff(id)),
     implement(taskDiffFileOp, ({ id, path }) => tasks.diffFile(id, path)),
     implement(nodeDiffOp, ({ id, nodeId }) => tasks.nodeDiff(id, nodeId)),

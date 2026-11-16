@@ -20,6 +20,8 @@ export type Delivery = DeliveryDTO & { taskId: string };
 export type DeliveryChanges = {
   commitSha?: string;
   prUrl?: string;
+  diffBase?: string;
+  diffHead?: string;
   conflictFiles?: string[];
   error?: ErrorInfo;
   finishedAt: number;

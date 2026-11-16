@@ -120,6 +120,8 @@ Node 24 的集成测试进程暂用 `--no-wasm-code-gc`：Office 源码 worker �
 | J43 | 简单模式的收敛（38，CV-01…CV-04，`simple-mode.browser.spec.ts`）：侧栏只有主页、任务、项目、知识问答、设置，顶栏没有主题切换；「直接开始」五个常用流程，「更多流程」展开六个、选「安全审查」切到「开始任务 · 安全审查」；专业模式侧栏有 PPT、质量与用量、团队。J16 另断言简单模式任务页的本周一行 | 浏览器 |
 | J44 | 项目的 AGENTS.md（40，AM-02，`project-agents-md.browser.spec.ts`）：项目详情没有 AGENTS.md → 预览规则 → 写补充说明 →「让 AI 生成」→ 任务页 → FakeOpencode 两步与评审完成 → 合并到 main → 面板显示默认分支上的新内容、按钮变为「让 AI 补充」 | 浏览器 |
 
+UX-01…UX-03 回归：`task.browser.spec.ts` 验证流程图前置、键盘折叠、跳转及两种模式与窗口尺寸下的长流程；`task-requirements.browser.spec.ts` 验证保存并重验；`task-delivery.browser.spec.ts` 和 `task-page-check.browser.spec.ts` 验证交付后 diff、读取当次命令输出和放大核验截图。真实 OpenCode 的任务诊断 skill 加载用本地脚本模型验证。
+
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 
 审查过程回归（`review-progress.browser.spec.ts`，J24 / J22）：四类 Git 审查入口均能查看进展、思考、正文与工具输入输出，刷新后保留，完成后收起；重新审查选中新过程、历史互不串流，停止后仍可展开。任务 AI 评审在当前步骤与简单过程页可见。真实 opencode 权限回归用本地脚本模型并行触发两条 `find`，验证「总是允许」发出两条完成事件及重复答复的明确失效错误；集成覆盖 SSE / HTTP 竞争、重复投递、无关条目保留和助手同步。

@@ -12,9 +12,11 @@ import {
   createConversationOp,
   createDeckOp,
   createProjectOp,
+  createTaskOp,
   ErrorCode,
   generateDeckOp,
   getProjectOp,
+  getRequirementsOp,
   getSettingsOp,
   listConfirmationsOp,
   MCP_SESSION_ARG,
@@ -34,7 +36,7 @@ import { createFakeClock } from '../../../test/helpers/clock.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { createTestRepo } from '../../../test/helpers/git.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
-import { addProject, workflowId } from '../../../test/helpers/tasks.ts';
+import { addProject, taskReaches, workflowId } from '../../../test/helpers/tasks.ts';
 import { runGit } from '../git/index.ts';
 
 let t: TestApp;
@@ -122,6 +124,41 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
       expect(settings).not.toContain(omitted);
     }
     expect(JSON.stringify(tools)).not.toContain(MCP_SESSION_ARG);
+  });
+
+  it('修改条件并重新核验的助手确认卡显示原版本、提交和新条件', async () => {
+    const { project } = await addProject(t, { checkCommand: null });
+    t.fake.enqueue(script().callTool('submit_result', { summary: 'Found the issue' }), { title: '定位根因' });
+    t.fake.enqueue(script().edit('fix.txt', 'fixed\n').callTool('submit_result', { summary: 'Fixed' }), {
+      title: '· 修复',
+    });
+    t.fake.enqueue(script().callTool('submit_review', { verdict: 'pass', summary: 'OK' }), { agent: 'aw-reviewer' });
+    t.fake.enqueue(script().callTool('submit_result', { summary: 'Verified' }), { title: '· 核验验收清单' });
+    const review = taskReaches(t, 'review');
+    const { body: task } = await t.call(createTaskOp, {
+      projectId: project.id,
+      workflowId: await workflowId(t, 'bugfix'),
+      requirement: 'Add fix.txt',
+      requirements: [{ title: '原条件', expected: '检查失败', verification: { kind: 'command', command: 'false' } }],
+    });
+    await review;
+    const { body: checklist } = await t.call(getRequirementsOp, { id: task.id });
+    const { revision, commitSha } = checklist;
+    if (revision === null || commitSha === null) throw new Error('Expected a verified checklist');
+    const input = {
+      id: task.id,
+      revisionId: revision.id,
+      expectedCommitSha: commitSha,
+      items: [{ title: '新条件', expected: '文件存在', verification: { kind: 'command', command: 'test -f fix.txt' } }],
+    };
+    expect(await call('tasks_reverifyRequirements', input)).toMatchObject({
+      isError: false,
+      body: { status: 'needs_confirmation' },
+    });
+    expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toMatchObject([
+      { operationId: 'tasks.reverifyRequirements', status: 'pending', input },
+    ]);
+    expect((await t.call(getRequirementsOp, { id: task.id })).body.revision?.id).toBe(revision.id);
   });
 
   it('read：直接执行并返回结果', async () => {

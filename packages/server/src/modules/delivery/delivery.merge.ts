@@ -35,7 +35,9 @@ export type LocalMergeInput = {
   identity: CommitIdentity | null;
 };
 
-export type MergeOutcome = { merged: true; commitSha: string } | { merged: false; conflictFiles: string[] };
+export type MergeOutcome =
+  | { merged: true; commitSha: string; diffBase?: string }
+  | { merged: false; conflictFiles: string[] };
 
 /**
  * Who a merge commits as: the backend for a task's delivery (D52: its identity, no hooks or signing), the user in the
@@ -218,7 +220,11 @@ export function mergeLocally(locks: RepoLocks, input: LocalMergeInput): Promise<
     input.repoPath,
     input.targetBranch,
     (holder) => assertTargetClean(holder, input.targetBranch),
-    (dir) => mergeIn(dir, input),
+    async (dir) => {
+      const diffBase = await head(dir);
+      const outcome = await mergeIn(dir, input);
+      return outcome.merged ? { ...outcome, diffBase } : outcome;
+    },
   );
 }
 

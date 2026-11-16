@@ -10,7 +10,6 @@ import { Markdown } from '../../components/markdown.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
-import { projectQuery } from '../projects/projects.queries.ts';
 import { failedCommandOf, pageUnrunnableDetails, unrunnableDetails } from './failure-text.ts';
 import { taskQuery, useSkipCheck, useUpdateCheckCommand } from './tasks.queries.ts';
 
@@ -66,40 +65,25 @@ function EditPreviewLink({ taskId, size }: { taskId: string; size: 'sm' | undefi
   );
 }
 
-/** Opened only when asked for, so the task and its project are read then. */
+/** Show the failed condition before asking the user to change it. */
 function EditCheckDialog({ taskId, command, onClose }: { taskId: string; command: string; onClose: () => void }) {
-  const task = useQuery(taskQuery(taskId)).data;
-  const project = useQuery({ ...projectQuery(task?.project.id ?? ''), enabled: task !== undefined }).data;
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()} title={C.editCheckTitle} description={C.editCheckBody}>
-      {project === undefined ? null : (
-        <EditCheckForm taskId={taskId} command={command} projectCommand={project.checkCommand} onClose={onClose} />
-      )}
+      <EditCheckForm taskId={taskId} command={command} onClose={onClose} />
     </Dialog>
   );
 }
 
 /**
- * Prefilled with the project's check command when it differs from the failed one (the user already changed the
- * project), otherwise with the failed command; becoming the project's by default when the failed one was (D116).
+ * The failed command is shown as the original condition; changing the project default is an explicit choice.
  */
-function EditCheckForm({
-  taskId,
-  command,
-  projectCommand,
-  onClose,
-}: {
-  taskId: string;
-  command: string;
-  projectCommand: string | null;
-  onClose: () => void;
-}) {
-  const [value, setValue] = useState(projectCommand ?? command);
-  const [updateProject, setUpdateProject] = useState(projectCommand === command);
+function EditCheckForm({ taskId, command, onClose }: { taskId: string; command: string; onClose: () => void }) {
+  const [value, setValue] = useState(command);
+  const [updateProject, setUpdateProject] = useState(false);
   const update = useUpdateCheckCommand();
   const save = () =>
     update.mutate(
-      { id: taskId, command: value.trim(), updateProject },
+      { id: taskId, command: value.trim(), updateProject, expectedCommand: command },
       {
         onSuccess: () => {
           toast(C.rechecked);
