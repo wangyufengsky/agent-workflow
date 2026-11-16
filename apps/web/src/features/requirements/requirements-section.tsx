@@ -9,9 +9,9 @@ import {
   TaskStatus,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { getRouteApi, Link } from '@tanstack/react-router';
 import { useState } from 'react';
-import { ROUTES } from '../../app/routes.ts';
+import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -24,6 +24,9 @@ import styles from './requirements.module.css';
 import { requirementsQuery, useDecideRequirement, useReverifyRequirements } from './requirements.queries.ts';
 import { RequirementsHistory } from './requirements-history.tsx';
 
+const taskRoute = getRouteApi(ROUTE_IDS.task);
+const focusItem = (element: HTMLElement | null) => element?.focus();
+
 type Item = TaskRequirementsDTO['items'][number];
 type Decision =
   | typeof RequirementConclusion.Pass
@@ -35,6 +38,7 @@ type Decision =
  * state, who concluded it and why. In review the user decides items, sends one back, verifies again or edits.
  */
 export function RequirementsSection({ task }: { task: TaskDetailDTO }) {
+  const target = taskRoute.useSearch({ shouldThrow: false });
   const query = useQuery(requirementsQuery(task.id));
   const reverify = useReverifyRequirements();
   const [editing, setEditing] = useState(false);
@@ -89,64 +93,76 @@ export function RequirementsSection({ task }: { task: TaskDetailDTO }) {
       </div>
       {reverify.isError && <ErrorState error={reverify.error} />}
       <ul className={styles.items}>
-        {ordered.map((item) => (
-          <li key={item.id}>
-            <details className={styles.item} open={unmet.includes(item)} data-unmet={unmet.includes(item) || undefined}>
-              <summary>
-                <span className={styles.status} data-status={item.status}>
-                  {C.statusLabel[item.status]}
-                </span>
-                <span className={styles.itemTitle}>{item.title}</span>
-                {!item.required && <span className="hint">{C.optional}</span>}
-                <span className="hint">{C.verificationLabel[item.verification.kind]}</span>
-              </summary>
-              <div className={styles.itemBody}>
-                <span className="hint">{C.expectedIs(item.expected)}</span>
-                {item.latest !== null && (
-                  <>
-                    <span className="hint">
-                      {C.sourceLabel[item.latest.source]} · {new Date(item.latest.createdAt).toLocaleString()}
-                    </span>
-                    <span className="hint">{C.resultVersion(item.latest.revisionId, item.latest.commitSha)}</span>
-                    {item.latest.nodeId != null && (
-                      <Link to={ROUTES.node} params={{ taskId: task.id, nodeId: item.latest.nodeId }} search={{}}>
-                        {C.viewVerificationNode}
-                      </Link>
-                    )}
-                    {item.status === RequirementDisplayStatus.Stale && <span className="hint">{C.staleHint}</span>}
-                    {item.latest.note !== '' && <Markdown source={item.latest.note} />}
-                    {item.latest.output !== null && item.latest.output !== '' && (
-                      <>
-                        <span className="hint">{C.output}</span>
-                        <pre className={`mono ${styles.output}`}>{item.latest.output}</pre>
-                      </>
-                    )}
-                  </>
-                )}
-                {review && (
-                  <div className={styles.actions}>
-                    <Button size="sm" onClick={() => setDeciding({ item, conclusion: RequirementConclusion.Pass })}>
-                      {C.pass}
-                    </Button>
-                    <Button size="sm" onClick={() => setDeciding({ item, conclusion: RequirementConclusion.Fail })}>
-                      {C.fail}
-                    </Button>
-                    <Button size="sm" onClick={() => setDeciding({ item, conclusion: RequirementConclusion.Waive })}>
-                      {C.waive}
-                    </Button>
-                    {isUnmet(item.status) && (
-                      <Button size="sm" variant="ghost" onClick={() => setRevising(item)}>
-                        {C.reviseItem}
+        {ordered.map((item) => {
+          const linked = target?.requirement === item.id && target.requirementRevision === undefined;
+          return (
+            <li key={item.id}>
+              <details
+                className={styles.item}
+                open={linked || unmet.includes(item)}
+                data-unmet={unmet.includes(item) || undefined}
+              >
+                <summary ref={linked ? focusItem : undefined}>
+                  <span className={styles.status} data-status={item.status}>
+                    {C.statusLabel[item.status]}
+                  </span>
+                  <span className={styles.itemTitle}>{item.title}</span>
+                  {!item.required && <span className="hint">{C.optional}</span>}
+                  <span className="hint">{C.verificationLabel[item.verification.kind]}</span>
+                </summary>
+                <div className={styles.itemBody}>
+                  <span className="hint">{C.expectedIs(item.expected)}</span>
+                  {item.latest !== null && (
+                    <>
+                      <span className="hint">
+                        {C.sourceLabel[item.latest.source]} · {new Date(item.latest.createdAt).toLocaleString()}
+                      </span>
+                      <span className="hint">{C.resultVersion(item.latest.revisionId, item.latest.commitSha)}</span>
+                      {item.latest.nodeId != null && (
+                        <Link to={ROUTES.node} params={{ taskId: task.id, nodeId: item.latest.nodeId }} search={{}}>
+                          {C.viewVerificationNode}
+                        </Link>
+                      )}
+                      {item.status === RequirementDisplayStatus.Stale && <span className="hint">{C.staleHint}</span>}
+                      {item.latest.note !== '' && <Markdown source={item.latest.note} />}
+                      {item.latest.output !== null && item.latest.output !== '' && (
+                        <>
+                          <span className="hint">{C.output}</span>
+                          <pre className={`mono ${styles.output}`}>{item.latest.output}</pre>
+                        </>
+                      )}
+                    </>
+                  )}
+                  {review && (
+                    <div className={styles.actions}>
+                      <Button size="sm" onClick={() => setDeciding({ item, conclusion: RequirementConclusion.Pass })}>
+                        {C.pass}
                       </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </details>
-          </li>
-        ))}
+                      <Button size="sm" onClick={() => setDeciding({ item, conclusion: RequirementConclusion.Fail })}>
+                        {C.fail}
+                      </Button>
+                      <Button size="sm" onClick={() => setDeciding({ item, conclusion: RequirementConclusion.Waive })}>
+                        {C.waive}
+                      </Button>
+                      {isUnmet(item.status) && (
+                        <Button size="sm" variant="ghost" onClick={() => setRevising(item)}>
+                          {C.reviseItem}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </details>
+            </li>
+          );
+        })}
       </ul>
-      <RequirementsHistory taskId={task.id} revisions={[revision, ...query.data.history]} />
+      <RequirementsHistory
+        taskId={task.id}
+        revisions={[revision, ...query.data.history]}
+        itemId={target?.requirement}
+        revisionId={target?.requirementRevision}
+      />
       {deciding !== undefined && <DecideDialog taskId={task.id} {...deciding} onClose={() => setDeciding(undefined)} />}
       {editing && (
         <EditDialog

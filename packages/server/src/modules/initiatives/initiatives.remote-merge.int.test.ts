@@ -7,6 +7,7 @@ import {
   createProjectOp,
   deliverTaskOp,
   getInitiativeOp,
+  initiativeCoverageTraceOp,
   initiativeMergeReadinessOp,
   refreshDeliveryStatusOp,
   saveInitiativeDraftOp,
@@ -61,6 +62,10 @@ it('远端 squash 已合入、本地更新后仍须用户确认才能解锁下�
     const taskId = confirmed.body.items[0]?.task?.id;
     if (taskId === undefined) throw new Error('task missing');
     const delivered = await t.call(deliverTaskOp, { id: taskId, strategy: 'pull_request' });
+    await t.call(refreshDeliveryStatusOp, { id: taskId });
+    const openTrace = (await t.call(initiativeCoverageTraceOp, { id: initiative.id })).body.items[0]?.tasks[0];
+    expect(openTrace?.delivery).toMatchObject({ strategy: 'pull_request', remoteStatus: { state: 'open' } });
+    expect((await t.call(getInitiativeOp, { id: initiative.id })).body.items[0]?.status).toBe('pr_open');
     const head = delivered.body.lastDelivery?.diffHead;
     const branch = delivered.body.git.branch;
     if (head === null || head === undefined || branch === null) throw new Error('delivery evidence missing');

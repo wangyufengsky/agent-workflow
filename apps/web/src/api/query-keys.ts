@@ -42,6 +42,7 @@ export const queryKeys = {
   initiativeLists: ['tasks', 'list', 'initiatives'],
   initiatives: (filter: Record<string, string | undefined>) => ['tasks', 'list', 'initiatives', filter],
   initiative: (id: string) => ['tasks', 'list', 'initiative', id],
+  initiativeCoverage: (id: string) => ['tasks', 'list', 'initiative', id, 'coverage'],
   initiativeTemplates: ['initiative-templates'],
   /** Schedules too: the state of the task a schedule started is part of it (22 §9). */
   scheduleLists: ['tasks', 'list', 'schedules'],

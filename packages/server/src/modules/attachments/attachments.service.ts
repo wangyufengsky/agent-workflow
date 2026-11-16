@@ -18,6 +18,7 @@ import {
   type AttachmentOwnerKind,
   AttachmentRejection,
   AttachmentSource,
+  type ConventionEvidenceOrigin,
   ErrorCode,
   type KnowledgeAttachmentOrigin,
   McpToolName,
@@ -315,6 +316,24 @@ export function createAttachmentsService({
       );
     },
 
+    saveConventionEvidence(origin: ConventionEvidenceOrigin, text: string): Promise<AttachmentDTO> {
+      const bytes = Buffer.from(text, 'utf8');
+      if (bytes.length > ATTACHMENT_BYTES_MAX) throw tooLarge(AttachmentLimit.Bytes, ATTACHMENT_BYTES_MAX);
+      return save(
+        {
+          id: randomUUID(),
+          source: AttachmentSource.ConventionEvidence,
+          name: '项目约定来源.txt',
+          sizeBytes: bytes.length,
+          origin,
+          format: AttachmentFormat.Text,
+          meta: null,
+          createdAt: origin.readAt,
+        },
+        asText(bytes, '项目约定来源.txt'),
+      );
+    },
+
     saveKnowledgeAnswer(name: string, origin: KnowledgeAttachmentOrigin, text: string): Promise<AttachmentDTO> {
       const bytes = Buffer.from(text, 'utf8');
       if (bytes.length > ATTACHMENT_BYTES_MAX) throw tooLarge(AttachmentLimit.Bytes, ATTACHMENT_BYTES_MAX);
@@ -410,6 +429,17 @@ export function createAttachmentsService({
       const missing = attachmentIds.filter((id) => !found.has(id));
       if (missing.length > 0) {
         throw new AppError(ErrorCode.AttachmentNotFound, 'Attachments not found', { ids: missing });
+      }
+      if (
+        attachments.some(
+          ({ origin }) =>
+            origin !== null &&
+            'kind' in origin &&
+            origin.kind === AttachmentSource.ConventionEvidence &&
+            origin.projectId !== projectId,
+        )
+      ) {
+        throw new AppError(ErrorCode.AttachmentSourceInvalid, 'Convention evidence belongs to a different project');
       }
       if (
         projectId !== null &&

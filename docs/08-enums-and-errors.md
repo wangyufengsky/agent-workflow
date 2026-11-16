@@ -524,7 +524,7 @@ class AppError extends Error {
 | **批量任务（v1.1）** | | |
 | `BATCH_NOT_FOUND` | 404 | 批次不存在（所属项目已删除时随之删除） |
 | `INITIATIVE_NOT_FOUND` | 404 | 需求计划不存在（所属项目已删除时随之删除） |
-| `INITIATIVE_BREAKDOWN_INVALID` | 400 | 阶段与工作包不合规则；`details.problems[]` 的子码 `InitiativeProblemCode`：`DUPLICATE_KEY` · `UNKNOWN_DEPENDENCY` · `CYCLE` · `DEPENDENCY_PHASE`（依赖更晚的阶段）· `EMPTY_PHASE` · `PHASE_OUT_OF_RANGE` · `UNKNOWN_WORKFLOW`（流程不存在或是系统流程）· `TEMPLATE_REQUIREMENT_MISSING`（模板没有一个工作包含 `{{requirement}}`）· `WORKFLOW_NOT_ALLOWED`（流程不在需求计划的可选范围）· `UNKNOWN_COVERAGE_ITEM`（覆盖表引用了不存在的工作包）· `ITEM_NOT_EDITABLE`（改动或删除了已开始、已完成或已放弃的工作包），各带 `itemKey`（`validateInitiativeDraft`，34 §8.3） |
+| `INITIATIVE_BREAKDOWN_INVALID` | 400 | 阶段与工作包不合规则；`details.problems[]` 的子码 `InitiativeProblemCode`：`DUPLICATE_KEY` · `UNKNOWN_DEPENDENCY` · `CYCLE` · `DEPENDENCY_PHASE`（依赖更晚的阶段）· `EMPTY_PHASE` · `PHASE_OUT_OF_RANGE` · `UNKNOWN_WORKFLOW`（流程不存在或是系统流程）· `TEMPLATE_REQUIREMENT_MISSING`（模板没有一个工作包含 `{{requirement}}`）· `WORKFLOW_NOT_ALLOWED`（流程不在需求计划的可选范围）· `UNKNOWN_COVERAGE_ITEM`（覆盖表引用了不存在的工作包）· `INVALID_COVERAGE_LINK`（验收项 key 重复或覆盖关系引用了不存在的验收项）· `ITEM_NOT_EDITABLE`（改动或删除了已开始、已完成或已放弃的工作包），各带 `itemKey`（`validateInitiativeDraft`，34 §8.3） |
 | `INITIATIVE_NOT_EDITABLE` | 409 | 需求计划当前的状态不允许这个操作（没有可确认的草稿、草稿未确认时开启阶段、删去已开启的阶段）；`details.status` |
 | `INITIATIVE_PHASE_NOT_READY` | 409 | 不是下一个阶段，或之前阶段还有未完成的工作包；`details.openedPhase`、`details.items` |
 | `INITIATIVE_ITEM_NOT_READY` | 409 | 工作包当前的状态不允许这个操作（开始、标记已合入、放弃），或开始时被另一次开始抢先；`details.status` |
@@ -635,7 +635,7 @@ class AppError extends Error {
 
 | 枚举／类型 | 值 |
 | --- | --- |
-| AttachmentSource | upload · project_file · knowledge_answer |
+| AttachmentSource | upload · project_file · knowledge_answer · convention_evidence |
 | AttachmentFormat（OF-01 已实现，下同） | text · docx · xlsx（看内容判断，39 §4） |
 | AttachmentRejection（`ATTACHMENT_INVALID_TYPE` 的 `details.reason`） | not_text · legacy_office（.doc / .xls）· encrypted（有打开密码）· unsupported（其他 zip） |
 | AttachmentLimit（`ATTACHMENT_TOO_LARGE` 的 `details.reason`） | bytes · count · unzipped · cells |

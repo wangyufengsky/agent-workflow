@@ -1,4 +1,4 @@
-import { isTerminalState, NodeStatus, type TaskDetailDTO, TaskStatus, taskMachine } from '@aw/shared';
+import { AttachmentSource, isTerminalState, NodeStatus, type TaskDetailDTO, TaskStatus, taskMachine } from '@aw/shared';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
@@ -127,7 +127,8 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
       {task.attachments.map(
         ({ id, origin }) =>
           origin !== null &&
-          'kind' in origin && (
+          'kind' in origin &&
+          origin.kind === AttachmentSource.KnowledgeAnswer && (
             <Link
               key={id}
               to={ROUTES.knowledgeConversation}

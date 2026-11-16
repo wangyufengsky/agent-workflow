@@ -21,5 +21,32 @@ export const startAgentsMdTaskRequestSchema = z.object({
   /** The user's own wishes for the file, added to the task's requirement. */
   guidance: z.string().trim().min(1).max(AGENTS_MD_NOTES_MAX_CHARS).optional(),
   includeRules: z.boolean(),
+  evidenceAttachmentId: z.string().optional(),
 });
 export type StartAgentsMdTaskRequest = z.infer<typeof startAgentsMdTaskRequestSchema>;
+
+/** 用户选中的项目约定来源。 */
+export const conventionEvidenceRequestSchema = z
+  .object({
+    id: z.string(),
+    failures: z.array(z.object({ taskId: z.string(), eventId: z.number().int().positive() })).max(30),
+    reviews: z.array(z.object({ taskId: z.string(), commentId: z.string() })).max(30),
+  })
+  .refine((v) => v.failures.length + v.reviews.length > 0);
+export type ConventionEvidenceRequest = z.infer<typeof conventionEvidenceRequestSchema>;
+export const conventionEvidenceSchema = z.object({
+  attachmentId: z.string(),
+  text: z.string(),
+  suggestions: z.array(
+    z.object({
+      text: z.string(),
+      applicability: z.string(),
+      taskId: z.string(),
+      eventId: z.number().nullable(),
+      commentId: z.string().nullable(),
+      nodeId: z.string().nullable(),
+      attemptId: z.string().nullable(),
+      sourceUrl: z.string().nullable(),
+    }),
+  ),
+});

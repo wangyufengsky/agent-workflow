@@ -15,6 +15,7 @@ export const InitiativeProblemCode = {
   WorkflowNotAllowed: 'WORKFLOW_NOT_ALLOWED',
   /** The coverage table names a work package that does not exist. */
   UnknownCoverageItem: 'UNKNOWN_COVERAGE_ITEM',
+  InvalidCoverageLink: 'INVALID_COVERAGE_LINK',
   /** A composition template where no work package's requirement contains `{{requirement}}`. */
   TemplateRequirementMissing: 'TEMPLATE_REQUIREMENT_MISSING',
   /** An edit changed or removed a work package that already started, finished or was dropped. */

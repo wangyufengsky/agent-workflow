@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { agentsMdSchema, startAgentsMdTaskRequestSchema } from '../contracts/api/agents-md.ts';
+import {
+  agentsMdSchema,
+  conventionEvidenceRequestSchema,
+  conventionEvidenceSchema,
+  startAgentsMdTaskRequestSchema,
+} from '../contracts/api/agents-md.ts';
 import { setProjectDbConnectionsRequestSchema } from '../contracts/api/databases.ts';
 import {
   createProjectRequestSchema,
@@ -190,6 +195,7 @@ export const startAgentsMdTaskOp = defineOperationContract({
   description:
     "Start a task in which the AI writes the project's AGENTS.md (generates it, or supplements the existing one) in its own worktree; the user merges the result",
   input: startAgentsMdTaskRequestSchema,
+  assistantOmit: ['evidenceAttachmentId'],
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/projects/:id/agents-md/task', status: 201 },
@@ -237,6 +243,19 @@ export const stopProjectRuntimeCheckOp = defineOperationContract({
   output: projectRuntimeCheckSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/projects/:id/runtime-check/stop' },
+  expose: { palette: false, assistant: false },
+  credentialFields: [],
+  mode: UiMode.Simple,
+});
+
+export const previewConventionEvidenceOp = defineOperationContract({
+  id: 'projects.previewConventionEvidence',
+  title: 'op.projects.previewConventionEvidence',
+  description: 'Snapshot selected project failures and review comments for a convention proposal',
+  input: conventionEvidenceRequestSchema,
+  output: conventionEvidenceSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/projects/:id/convention-evidence' },
   expose: { palette: false, assistant: false },
   credentialFields: [],
   mode: UiMode.Simple,

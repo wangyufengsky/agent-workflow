@@ -33,6 +33,7 @@ import { createTaskAgentsMd } from './tasks.agents-md.ts';
 import { createTaskChanges } from './tasks.changes.ts';
 import { createTaskChecks } from './tasks.checks.ts';
 import { createTaskContext } from './tasks.context.ts';
+import { createConventionEvidence } from './tasks.conventions.ts';
 import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
@@ -61,6 +62,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   );
   const review = createTaskReview(deps, state, changes);
   const agentsMd = createTaskAgentsMd(deps, state, lifecycle);
+  const previewConventionEvidence = createConventionEvidence(deps, state, review);
 
   // A task's summary shows its open attention items, working steps and progress line; keep it current.
   deps.events.subscribe((event) => {
@@ -247,6 +249,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       lifecycle.start(id);
       return detail(id);
     },
+    previewConventionEvidence,
     /** The project page's AGENTS.md and the task that generates or supplements it (40). */
     agentsMd: agentsMd.get,
     async createAgentsMdTask(input: StartAgentsMdTaskRequest): Promise<TaskDetailDTO> {

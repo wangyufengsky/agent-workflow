@@ -16,6 +16,7 @@ import {
   formatTokens,
   groupName,
 } from '../../copy/insights.ts';
+import { ConventionDialog } from '../conventions/convention-dialog.tsx';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import { drillFilter, failureKey } from './drill.ts';
 import styles from './insights.module.css';
@@ -87,6 +88,7 @@ export function InsightsTaskTable({
                     <Link to={ROUTES.task} params={{ taskId: row.task.id }} search={{}}>
                       <span className="mono hint">{row.task.key}</span> {row.task.title}
                     </Link>
+                    {drill === InsightsDrill.Failure && <ConventionDialog task={row.task} />}
                   </td>
                   <td>{row.task.project.name}</td>
                   <td>

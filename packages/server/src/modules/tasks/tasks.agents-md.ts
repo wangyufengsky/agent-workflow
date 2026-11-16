@@ -3,6 +3,7 @@ import {
   AGENTS_MD_PATH,
   type AgentsMdDTO,
   AppError,
+  AttachmentSource,
   ErrorCode,
   type GitFileDTO,
   GitTreeEntryType,
@@ -60,9 +61,26 @@ export function createTaskAgentsMd(deps: TasksServiceDeps, state: TaskState, lif
     },
 
     /** Generates when the default branch has no AGENTS.md, else supplements it (40 §4). */
-    async createTask({ id: projectId, guidance, includeRules }: StartAgentsMdTaskRequest): Promise<string> {
+    async createTask({
+      id: projectId,
+      guidance,
+      includeRules,
+      evidenceAttachmentId,
+    }: StartAgentsMdTaskRequest): Promise<string> {
       const project = await defaultBranchOf(projectId);
       const file = await readAgentsMd(project.repoPath, project.defaultBranch);
+      if (evidenceAttachmentId !== undefined) {
+        const attachment = deps.attachments.get(evidenceAttachmentId);
+        if (
+          attachment.source !== AttachmentSource.ConventionEvidence ||
+          attachment.origin === null ||
+          !('kind' in attachment.origin) ||
+          attachment.origin.kind !== AttachmentSource.ConventionEvidence ||
+          attachment.origin.projectId !== projectId
+        ) {
+          throw new AppError(ErrorCode.AttachmentSourceInvalid, 'Convention evidence belongs to another project');
+        }
+      }
       const workflow = workflows.system(SystemWorkflowKey.AgentsMd);
       const id = lifecycle.insertDraft({
         projectId,
@@ -74,6 +92,7 @@ export function createTaskAgentsMd(deps: TasksServiceDeps, state: TaskState, lif
           rules: includeRules ? rulesFor(project.checkCommand) : undefined,
         }),
         baseBranch: project.defaultBranch,
+        ...(evidenceAttachmentId === undefined ? {} : { attachmentIds: [evidenceAttachmentId] }),
       });
       lifecycle.start(id);
       return id;

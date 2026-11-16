@@ -180,6 +180,7 @@ export function createInitiativesService({
       ...item,
       workflow,
       dto: {
+        id: item.id,
         key: item.key,
         title: item.title,
         phase: item.phase,
@@ -351,7 +352,7 @@ export function createInitiativesService({
         requirement: item.requirement,
         baseBranch,
         attachmentIds: [background.id, ...sources],
-        ...(item.acceptance.length === 0 ? {} : { requirements: item.acceptance }),
+        ...(item.acceptance.length === 0 ? {} : { requirements: item.acceptance, initialRequirementIds: true }),
         ...(initiative.confirmItemPlans ? { checkpoints: { confirm_plan: true } } : {}),
       });
       if (!repo.claimItem(item.id, item.taskId, initiative.breakdownRev, created, clock.now())) {
@@ -361,6 +362,7 @@ export function createInitiativesService({
           status: item.dto.status,
         });
       }
+      repo.recordItemTask(item.id, created, clock.now());
       return created;
     });
     log.info({ initiativeId: initiative.id, item: item.key, taskId }, 'initiative work package started');
@@ -906,6 +908,26 @@ export function createInitiativesService({
       return detail(id);
     },
 
+    async coverageTrace(id: string) {
+      get(id);
+      const items = repo.items(id);
+      const lineage = repo.itemTasks(id);
+      const details = await tasks.coverageTasks(lineage.map((entry) => entry.taskId));
+      const byId = new Map(details.map((entry) => [entry.task.id, entry]));
+      return {
+        versions: repo.coverageVersions(id),
+        items: items.map((item) => ({
+          key: item.key,
+          tasks: lineage
+            .filter((entry) => entry.itemId === item.id)
+            .flatMap((entry) => {
+              const detail = byId.get(entry.taskId);
+              return detail === undefined ? [] : [detail];
+            }),
+        })),
+      };
+    },
+
     /** `submit_breakdown` (34 §8.2): checked like a user edit (34 §8.3), then the draft waits for the user. */
     submitBreakdown(attempt: AttemptDTO, input: SubmitBreakdownInput): void {
       const run = repo.runOfAttempt(attempt.id);
@@ -933,13 +955,34 @@ export function createInitiativesService({
         });
       }
       if (problems.length > 0) throw invalid(problems);
+      // 模型给出的 key 可以复用。持久化验收项 UUID 后，重用 key 也能区分新旧验收项。
+      const coverage = input.coverage.map((line) => ({
+        ...line,
+        ...(line.links === undefined
+          ? {}
+          : {
+              links: line.links.map((link) => {
+                const item = draft.items.find((entry) => entry.key === link.item);
+                if (item === undefined) throw new Error(`Validated work package ${link.item} disappeared`);
+                return {
+                  item: link.item,
+                  acceptance: link.acceptance.map((key) => {
+                    const acceptance = item.acceptance.find((entry) => entry.sourceKey === key);
+                    if (acceptance?.id === undefined) throw new Error(`Validated acceptance ${key} disappeared`);
+                    return acceptance.id;
+                  }),
+                };
+              }),
+            }),
+      }));
       const now = clock.now();
       unit.transact(() => {
         writeDraft(initiative.id, current, draft, now);
+        repo.recordCoverage(initiative.id, initiative.breakdownRev + 1, coverage, now);
         repo.update(initiative.id, {
           summary: input.summary,
           understanding: input.understanding,
-          coverage: input.coverage,
+          coverage,
           breakdownRev: initiative.breakdownRev + 1,
           // The title the user saw while it was being broken down is the requirement's first line.
           ...(initiative.breakdownRev === 0 ? { title: input.title } : {}),

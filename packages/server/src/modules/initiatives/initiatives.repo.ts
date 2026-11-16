@@ -6,18 +6,20 @@ import {
   type InitiativePhase,
   InitiativeTemplateKind,
   type InitiativeUnderstanding,
+  initiativeCoverageItemSnapshotSchema,
   initiativeCoverageSchema,
   initiativeItemSpecSchema,
   initiativePhaseSchema,
   initiativeUnderstandingSchema,
-  requirementItemInputSchema,
 } from '@aw/shared';
 import { and, asc, desc, eq, inArray, isNull, lt, type SQL, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { projectsTable } from '../projects/index.ts';
 import {
+  initiativeCoverageVersionsTable,
   initiativeItemsTable,
+  initiativeItemTasksTable,
   initiativeRunsTable,
   initiativesTable,
   initiativeTemplatesTable,
@@ -48,7 +50,7 @@ const nullableJson = <T>(schema: z.ZodType<T>, value: string | null): T | null =
   value === null ? null : json(schema, value);
 const phasesSchema = z.array(initiativePhaseSchema);
 const keysSchema = z.array(z.string());
-const acceptanceSchema = z.array(requirementItemInputSchema);
+const acceptanceSchema = initiativeItemSpecSchema.shape.acceptance;
 
 /** The JSON columns of an initiative, serialized. */
 function columnsOf(fields: { [K in keyof InitiativeJson]?: InitiativeJson[K] | undefined }) {
@@ -207,7 +209,56 @@ export function createInitiativesRepo(db: DbExecutor) {
     },
     /** Which initiative a task belongs to, if any. */
     initiativeOfTask(taskId: string): string | undefined {
-      return db.select({ id: it.initiativeId }).from(it).where(eq(it.taskId, taskId)).get()?.id;
+      return db
+        .select({ id: it.initiativeId })
+        .from(initiativeItemTasksTable)
+        .innerJoin(it, eq(it.id, initiativeItemTasksTable.itemId))
+        .where(eq(initiativeItemTasksTable.taskId, taskId))
+        .get()?.id;
+    },
+
+    coverageVersions(initiativeId: string) {
+      return db
+        .select()
+        .from(initiativeCoverageVersionsTable)
+        .where(eq(initiativeCoverageVersionsTable.initiativeId, initiativeId))
+        .orderBy(desc(initiativeCoverageVersionsTable.revision))
+        .all()
+        .map((row) => ({
+          revision: row.revision,
+          coverage: json(z.array(initiativeCoverageSchema), row.coverage),
+          items: json(z.array(initiativeCoverageItemSnapshotSchema), row.items),
+        }));
+    },
+    recordCoverage(initiativeId: string, revision: number, coverage: InitiativeCoverage[], now: number): void {
+      const items = db
+        .select()
+        .from(it)
+        .where(eq(it.initiativeId, initiativeId))
+        .all()
+        .map(toItem)
+        .map(({ id, key, title, acceptance, taskId }) => ({ id, key, title, acceptance, taskId }));
+      db.insert(initiativeCoverageVersionsTable)
+        .values({
+          initiativeId,
+          revision,
+          coverage: JSON.stringify(coverage),
+          items: JSON.stringify(items),
+          createdAt: now,
+        })
+        .run();
+    },
+    itemTasks(initiativeId: string): Array<{ itemId: string; taskId: string }> {
+      return db
+        .select({ itemId: initiativeItemTasksTable.itemId, taskId: initiativeItemTasksTable.taskId })
+        .from(initiativeItemTasksTable)
+        .innerJoin(it, eq(it.id, initiativeItemTasksTable.itemId))
+        .where(eq(it.initiativeId, initiativeId))
+        .orderBy(asc(initiativeItemTasksTable.createdAt), asc(sql`initiative_item_tasks.rowid`))
+        .all();
+    },
+    recordItemTask(itemId: string, taskId: string, now: number): void {
+      db.insert(initiativeItemTasksTable).values({ itemId, taskId, createdAt: now }).run();
     },
 
     items(initiativeId: string): InitiativeItem[] {

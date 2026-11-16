@@ -9,6 +9,7 @@ import {
   deliverInitiativePhaseResponseSchema,
   dropInitiativeItemRequestSchema,
   getInitiativeRequestSchema,
+  initiativeCoverageTraceSchema,
   initiativeDetailSchema,
   initiativeSummarySchema,
   initiativeTemplateSchema,
@@ -114,6 +115,19 @@ export const getInitiativeOp = defineOperationContract({
   output: initiativeDetailSchema,
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/initiatives/:id' },
+});
+
+export const initiativeCoverageTraceOp = defineOperationContract({
+  ...common,
+  ...byId,
+  expose: { palette: false, assistant: false },
+  id: 'initiatives.coverageTrace',
+  title: 'op.initiatives.coverageTrace',
+  description: 'Work package task history, checklist evidence and deliveries for requirement coverage',
+  input: getInitiativeRequestSchema,
+  output: initiativeCoverageTraceSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/initiatives/:id/coverage-trace' },
 });
 
 export const saveInitiativeDraftOp = defineOperationContract({

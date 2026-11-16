@@ -266,7 +266,13 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
     },
 
     /** Inserts a draft task whose project, workflow and base branch `checkCreate` accepted; returns its id. */
-    insertDraft(input: Omit<CreateTaskRequest, 'start'> & { baseBranch: string; mergeSource?: string }): string {
+    insertDraft(
+      input: Omit<CreateTaskRequest, 'start'> & {
+        baseBranch: string;
+        mergeSource?: string;
+        initialRequirementIds?: boolean;
+      },
+    ): string {
       const workflow = workflows.get(input.workflowId);
       // Request > workflow definition > setting (11 §5.1); fixed for the task's lifetime.
       const checkpoints = {
@@ -296,7 +302,8 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
         if (input.attachmentIds !== undefined) {
           deps.attachments.bind({ kind: AttachmentOwnerKind.TaskInput, id }, input.attachmentIds, input.projectId);
         }
-        if (input.requirements !== undefined) deps.requirements.save(id, input.requirements);
+        if (input.requirements !== undefined)
+          deps.requirements.save(id, input.requirements, input.initialRequirementIds === true);
       });
       log.info({ taskId: id, workflow: workflow.key }, 'task created');
       state.publish(id);

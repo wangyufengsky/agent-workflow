@@ -18,6 +18,7 @@ import { INITIATIVES_COPY as C } from '../../copy/initiatives.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { ConversationStream } from '../stream/conversation-stream.tsx';
 import { coverageLines } from './coverage.ts';
+import { CoverageHistory, CoverageTrace } from './coverage-trace.tsx';
 import styles from './initiatives.module.css';
 import { useRebreakdownInitiative, useRefineInitiative } from './initiatives.queries.ts';
 
@@ -218,22 +219,17 @@ export function Understanding({ initiative }: { initiative: InitiativeDetailDTO 
       {table !== null && (
         <details>
           <summary className="hint">{C.coverageSummary(table.covered, table.lines.length)}</summary>
-          <table className={styles.table}>
-            <tbody>
-              {table.lines.map((line) => (
-                <tr key={line.point}>
-                  <td>{line.point}</td>
-                  <td className={line.state === 'removed' ? styles.error : undefined}>
-                    {line.state === 'skipped'
-                      ? C.coverageNone
-                      : line.state === 'removed'
-                        ? C.coverageRemoved
-                        : line.titles.join('、')}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {coverage?.map((line) => (
+            <details key={line.point}>
+              <summary>{line.point}</summary>
+              {line.items.length === 0 ? (
+                <p>{C.coverageNone}</p>
+              ) : (
+                <CoverageTrace initiative={initiative} line={line} />
+              )}
+            </details>
+          ))}
+          <CoverageHistory initiative={initiative} />
         </details>
       )}
     </section>

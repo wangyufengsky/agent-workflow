@@ -591,6 +591,12 @@ payload / response：
 | drop_reason | TEXT NULL | |
 | created_at / updated_at | INTEGER | |
 
+### initiative_item_tasks 与 initiative_coverage_versions
+
+迁移 `0039`：`initiative_item_tasks(item_id, task_id, created_at)` 保存工作包每次启动的任务，`task_id` 唯一；替换当前任务时历史不删除。迁移将已有当前任务补入，无法恢复此前已经被覆盖的任务。`initiative_coverage_versions(initiative_id, revision, coverage, items, created_at)` 保存每次拆解的覆盖表及工作包 id、key、标题、验收项和当时任务关联快照，按需求计划与版本唯一。迁移保存已有的最新覆盖表和包身份；旧快照中没有保存的验收项详情及更早被覆盖的版本无法恢复。两表随所属工作包或需求计划删除。
+
+覆盖表的显式验收链接在提交拆解时从包内 key 转为清单项 UUID；没有显式链接的旧数据只保留工作包级关系，不按文字或顺序推断。
+
 ### initiative_runs
 
 一次 AI 拆解、重新拆解或细化（迁移 `0027_initiative_runs`）；状态不单独存，由尝试推导（同 `deck_runs`）。同一需求计划的各次 run 沿用同一个 opencode 会话。
@@ -802,7 +808,7 @@ payload / response：
 | attachments | id、source、name（显示名）、size_bytes、origin JSON（快照来源见下文）、format（`AttachmentFormat`，默认 text）、meta JSON（Word / Excel 的 `OfficeMeta`）、created_at。索引为 created_at。原文件按 id 存在 `attachments/<id>/original`（迁移 0017）。Word / Excel 另有模型读取的 `text.md`，Excel 还有单元格 `workbook.json`（迁移 0032，39 §5）。 |
 | attachment_refs | owner_kind、owner_id、attachment_id FK、ordinal、created_at；主键 (owner_kind, owner_id, attachment_id)，索引 attachment_id |
 
-项目文件的 `origin` 保存 `projectId`、`taskId`、相对路径、行范围和读取时间。知识问答的 `origin` 保存 `kind = knowledge_answer`、`projectId`、`conversationId`、`turnId`、`answeredAt` 和 `readAt`，旧附件仍按原格式解析。快照保存回答时选中的原文和引用，任务从附件归属读取，删除问答不会删除已绑定的快照。
+项目文件的 `origin` 保存 `projectId`、`taskId`、相对路径、行范围和读取时间。知识问答的 `origin` 保存 `kind = knowledge_answer`、`projectId`、`conversationId`、`turnId`、`answeredAt` 和 `readAt`，旧附件仍按原格式解析。快照保存回答时选中的原文和引用，任务从附件归属读取，删除问答不会删除已绑定的快照。项目约定证据快照的 `origin` 保存 `kind = convention_evidence`、`projectId` 与 `readAt`；来源文本作为只读附件保存，任务绑定时检查项目归属。节点新产生的检查失败、无法运行、执行失败及拒绝事件在 payload 中保存检查类型与通过状态，不记录命令或输出；历史事件未保存的详情不能重建。
 
 - 所有者在自己的事务里创建／删除引用：删除任务时删除该任务（task_input）与其节点（task_feedback）的引用；删除助手对话时删除 assistant_message 引用。多态 owner 没有外键，由所有者模块负责。
 - 助手会话 JSONL 的用户消息增加可选 `attachments: [{ id, name }]`，只作展示。

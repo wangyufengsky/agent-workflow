@@ -166,7 +166,7 @@ export function ProjectDetailPage() {
           <ProjectAgentsMd projectId={p.id} />
         </Panel>
       </section>
-      <section className="section">
+      <section className="section" id="project-preview">
         <Panel title={PREVIEW_COPY.section}>
           <ProjectPreviewForm key={`${p.id}:${p.updatedAt}`} project={p} />
         </Panel>
