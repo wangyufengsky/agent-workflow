@@ -80,6 +80,18 @@ test('UX-12 选择失败和审查意见，预览并通过任务合并约定', as
   );
   await dialog.getByRole('button', { name: '预览来源与建议' }).click();
   const temporary = await (await response).json();
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const failedDelete = `**/attachments/${temporary.attachmentId}`;
+  await page.route(failedDelete, (route) =>
+    route.fulfill({ status: 500, json: { error: { code: 'INTERNAL_ERROR', message: 'delete failed' } } }),
+  );
+  await dialog.getByRole('button', { name: '取消并清除' }).click();
+  await expect(dialog).toContainText('选中的来源快照');
+  await expect(dialog.getByRole('checkbox', { name: /检查未通过/ }).first()).toBeChecked();
+  await expect(dialog.getByRole('button', { name: '取消并清除' })).toBeEnabled();
+  expect(errors).toEqual([]);
+  await page.unroute(failedDelete);
   await dialog.getByRole('button', { name: '取消并清除' }).click();
   expect((await request.get(`${API_BASE}/attachments/${temporary.attachmentId}`, { headers: AUTH })).status()).toBe(
     404,
@@ -104,16 +116,19 @@ test('UX-12 选择失败和审查意见，预览并通过任务合并约定', as
   await dialog.getByRole('button', { name: '预览来源与建议' }).click();
   await expect(dialog).toContainText('问候语修改需要覆盖空名称测试');
   await expect(dialog.getByRole('link', { name: /问候语修复/ })).toHaveCount(3);
-  await expect(dialog.getByRole('link', { name: '查看失败步骤' }).first()).toHaveAttribute(
+  await expect(dialog.getByRole('link', { name: '查看对应尝试' }).first()).toHaveAttribute(
     'href',
-    new RegExp(`/tasks/${taskId}/nodes/`),
+    new RegExp(`/tasks/${taskId}/nodes/.*[?]attempt=`),
   );
+  const firstAttempt = await dialog.getByRole('link', { name: '查看对应尝试' }).nth(0).getAttribute('href');
+  const secondAttempt = await dialog.getByRole('link', { name: '查看对应尝试' }).nth(1).getAttribute('href');
+  expect(firstAttempt).not.toBe(secondAttempt);
   await expect(dialog.getByRole('link', { name: '查看原审查意见' })).toBeVisible();
-  const evidenceHref = await dialog.getByRole('link', { name: '查看失败步骤' }).first().getAttribute('href');
+  const evidenceHref = await dialog.getByRole('link', { name: '查看对应尝试' }).first().getAttribute('href');
   if (evidenceHref === null) throw new Error('Missing failure evidence link');
   const evidencePage = await page.context().newPage();
   await evidencePage.goto(evidenceHref);
-  await expect(evidencePage).toHaveURL(new RegExp(`/tasks/${taskId}/nodes/`));
+  await expect(evidencePage).toHaveURL(new RegExp(`/tasks/${taskId}/nodes/.*[?]attempt=`));
   await expect(evidencePage.getByText('修复', { exact: true }).first()).toBeVisible();
   await evidencePage.close();
   await dialog.getByLabel('建议的项目约定').fill('问候语修改要覆盖空名称测试。');
@@ -127,7 +142,24 @@ test('UX-12 选择失败和审查意见，预览并通过任务合并约定', as
     submitResult('完成'),
   ]);
   await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
+  let releaseStart: (() => void) | undefined;
+  const holdStart = new Promise<void>((resolve) => {
+    releaseStart = resolve;
+  });
+  let startEntered: (() => void) | undefined;
+  const entered = new Promise<void>((resolve) => {
+    startEntered = resolve;
+  });
+  await page.route(`**/projects/${project.id}/agents-md/task`, async (route) => {
+    startEntered?.();
+    await holdStart;
+    await route.continue();
+  });
   await dialog.getByRole('button', { name: '确认并发起 AGENTS.md 任务' }).click();
+  await entered;
+  await expect(dialog.getByRole('button', { name: '继续选择' })).toBeDisabled();
+  await expect(dialog.getByRole('checkbox', { name: /检查未通过/ }).first()).toBeDisabled();
+  releaseStart?.();
   await expect(page).toHaveURL(/\/tasks\//);
   const conventionResult = page.getByTestId('result-card');
   await conventionResult.getByRole('button', { name: '合并到 main' }).click({ timeout: TASK_RUN_TIMEOUT_MS });

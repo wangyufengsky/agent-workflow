@@ -102,14 +102,21 @@ export function ConventionDialog({ task, reviewIds = [] }: { task: TaskSummaryDT
   const sources = selection?.sources ?? [];
   const cleanup = useMutation({ mutationFn: (id: string) => callOperation(removeAttachmentOp, { id }) });
   const discardPreview = async () => {
-    if (preview.data !== undefined) await cleanup.mutateAsync(preview.data.attachmentId);
+    if (preview.data !== undefined) {
+      try {
+        await cleanup.mutateAsync(preview.data.attachmentId);
+      } catch {
+        return false;
+      }
+    }
     preview.reset();
+    return true;
   };
   const update = async (source: Source, checked: boolean) => {
     if (foreign) return;
     const key = (s: Source) => (s.kind === 'failure' ? `${s.taskId}:f:${s.eventId}` : `${s.taskId}:r:${s.commentId}`);
     const rest = sources.filter((s) => key(s) !== key(source));
-    await discardPreview();
+    if (!(await discardPreview())) return;
     saveSelection({ projectId: task.project.id, sources: checked ? [...rest, source] : rest });
     setVersion(version + 1);
   };
@@ -151,8 +158,7 @@ export function ConventionDialog({ task, reviewIds = [] }: { task: TaskSummaryDT
           if (next) setOpen(true);
           else if (!preview.isPending && !cleanup.isPending && !start.isPending)
             void (async () => {
-              await discardPreview();
-              setOpen(false);
+              if (await discardPreview()) setOpen(false);
             })();
         }}
         title={C.title}
@@ -178,7 +184,7 @@ export function ConventionDialog({ task, reviewIds = [] }: { task: TaskSummaryDT
                   <input
                     type="checkbox"
                     checked={has(source)}
-                    disabled={preview.isPending || cleanup.isPending}
+                    disabled={preview.isPending || cleanup.isPending || start.isPending}
                     onChange={(ev) => void update(source, ev.target.checked)}
                   />
                   <span>{source.label}</span>
@@ -198,7 +204,7 @@ export function ConventionDialog({ task, reviewIds = [] }: { task: TaskSummaryDT
                   <input
                     type="checkbox"
                     checked={has(source)}
-                    disabled={preview.isPending || cleanup.isPending}
+                    disabled={preview.isPending || cleanup.isPending || start.isPending}
                     onChange={(ev) => void update(source, ev.target.checked)}
                   />
                   <span>{source.label}</span>
@@ -214,7 +220,7 @@ export function ConventionDialog({ task, reviewIds = [] }: { task: TaskSummaryDT
                 </Link>
                 <Button
                   size="sm"
-                  disabled={preview.isPending || cleanup.isPending}
+                  disabled={preview.isPending || cleanup.isPending || start.isPending}
                   onClick={() => void update(s, false)}
                 >
                   {C.remove}
@@ -228,6 +234,7 @@ export function ConventionDialog({ task, reviewIds = [] }: { task: TaskSummaryDT
               </label>
               <textarea
                 id="convention-rule"
+                disabled={start.isPending}
                 maxLength={1000}
                 className="textarea"
                 value={rule}
@@ -241,6 +248,7 @@ export function ConventionDialog({ task, reviewIds = [] }: { task: TaskSummaryDT
               </label>
               <input
                 id="convention-scope"
+                disabled={start.isPending}
                 maxLength={500}
                 className="input"
                 value={scope}
@@ -249,12 +257,11 @@ export function ConventionDialog({ task, reviewIds = [] }: { task: TaskSummaryDT
               />
             </div>
             <Button
-              disabled={sources.length === 0 || cleanup.isPending}
+              disabled={sources.length === 0 || cleanup.isPending || start.isPending}
               pending={preview.isPending}
               onClick={() =>
                 void (async () => {
-                  await discardPreview();
-                  preview.mutate();
+                  if (await discardPreview()) preview.mutate();
                 })()
               }
             >
@@ -273,16 +280,20 @@ export function ConventionDialog({ task, reviewIds = [] }: { task: TaskSummaryDT
                       <Link
                         to={ROUTES.node}
                         params={{ taskId: suggestion.taskId, nodeId: suggestion.nodeId }}
-                        search={{}}
+                        search={suggestion.attemptId === null ? {} : { attempt: suggestion.attemptId }}
                       >
-                        {C.viewStep}
+                        {suggestion.attemptId === null ? C.viewStep : C.viewAttempt}
                       </Link>
+                    )}
+                    {suggestion.eventId !== null && suggestion.attemptId === null && (
+                      <p className="hint">{C.sourceLimit}</p>
                     )}
                     {suggestion.sourceUrl !== null && (
                       <ExternalLink href={suggestion.sourceUrl}>{C.viewComment}</ExternalLink>
                     )}
                     <Button
                       size="sm"
+                      disabled={start.isPending}
                       onClick={() => {
                         setRule(suggestion.text);
                         setScope(suggestion.applicability);
@@ -323,11 +334,10 @@ export function ConventionDialog({ task, reviewIds = [] }: { task: TaskSummaryDT
         {cleanup.isError && <ErrorState error={cleanup.error} />}
         <div className="row">
           <Button
-            disabled={preview.isPending || cleanup.isPending}
+            disabled={preview.isPending || cleanup.isPending || start.isPending}
             onClick={() =>
               void (async () => {
-                await discardPreview();
-                setOpen(false);
+                if (await discardPreview()) setOpen(false);
               })()
             }
           >
@@ -337,7 +347,7 @@ export function ConventionDialog({ task, reviewIds = [] }: { task: TaskSummaryDT
             disabled={preview.isPending || cleanup.isPending || start.isPending}
             onClick={() =>
               void (async () => {
-                await discardPreview();
+                if (!(await discardPreview())) return;
                 saveSelection(undefined);
                 setOpen(false);
               })()
@@ -349,7 +359,7 @@ export function ConventionDialog({ task, reviewIds = [] }: { task: TaskSummaryDT
             disabled={preview.isPending || cleanup.isPending || start.isPending}
             onClick={() =>
               void (async () => {
-                await discardPreview();
+                if (!(await discardPreview())) return;
                 saveSelection(undefined);
                 setOpen(false);
               })()

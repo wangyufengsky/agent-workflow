@@ -22,6 +22,8 @@ export const CONVENTION_COPY = {
   previewSettings: '打开项目预览设置',
   useSuggestion: '采用这条建议',
   viewStep: '查看失败步骤',
+  viewAttempt: '查看对应尝试',
+  sourceLimit: '未能确定当次尝试；步骤页可能显示最新结果，所选记录以快照为准。',
   viewComment: '查看原审查意见',
   oneOff: '这是一次性问题，结束整理',
   failureNames: {

@@ -45,6 +45,7 @@ export const conventionEvidenceSchema = z.object({
       eventId: z.number().nullable(),
       commentId: z.string().nullable(),
       nodeId: z.string().nullable(),
+      attemptId: z.string().nullable(),
       sourceUrl: z.string().nullable(),
     }),
   ),

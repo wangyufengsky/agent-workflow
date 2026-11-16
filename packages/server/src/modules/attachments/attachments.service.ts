@@ -431,6 +431,17 @@ export function createAttachmentsService({
         throw new AppError(ErrorCode.AttachmentNotFound, 'Attachments not found', { ids: missing });
       }
       if (
+        attachments.some(
+          ({ origin }) =>
+            origin !== null &&
+            'kind' in origin &&
+            origin.kind === AttachmentSource.ConventionEvidence &&
+            origin.projectId !== projectId,
+        )
+      ) {
+        throw new AppError(ErrorCode.AttachmentSourceInvalid, 'Convention evidence belongs to a different project');
+      }
+      if (
         projectId !== null &&
         attachments.some(({ origin }) => origin !== null && 'kind' in origin && origin.projectId !== projectId)
       ) {

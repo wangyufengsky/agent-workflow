@@ -1,6 +1,7 @@
 import {
   AppError,
   AttachmentSource,
+  AttemptKind,
   AttemptStatus,
   type ConventionEvidenceRequest,
   ErrorCode,
@@ -62,10 +63,12 @@ export function createConventionEvidence(
       eventId: number | null;
       commentId: string | null;
       nodeId: string | null;
+      attemptId: string | null;
       sourceUrl: string | null;
     }[] = [];
     const failures = input.failures.map(({ taskId, eventId }) => {
-      const event = listTaskEvents(db, taskId, 0).find((e) => e.id === eventId);
+      const timeline = listTaskEvents(db, taskId, 0);
+      const event = timeline.find((e) => e.id === eventId);
       const isFailure =
         event !== undefined &&
         ((event.entity === TaskEventEntity.Task && event.type === TaskEvent.Fail) ||
@@ -76,6 +79,41 @@ export function createConventionEvidence(
           (event.entity === TaskEventEntity.Attempt && event.toStatus === AttemptStatus.Failed));
       if (!isFailure || event === undefined) throw new AppError(ErrorCode.ValidationFailed, 'Failure event not found');
       const task = state.get(taskId);
+      const attempts = deps.attempts.listByTask(taskId);
+      const direct =
+        event.entity === TaskEventEntity.Attempt ? attempts.find((a) => a.id === event.entityId) : undefined;
+      const cycleStart =
+        event.entity === TaskEventEntity.Node &&
+        [NodeEvent.ChecksFailed, NodeEvent.CheckUnrunnable, NodeEvent.AttemptFailed].some((type) => type === event.type)
+          ? timeline
+              .filter(
+                (e) =>
+                  e.id < event.id &&
+                  e.entity === TaskEventEntity.Node &&
+                  e.entityId === event.entityId &&
+                  (e.type === NodeEvent.Dispatch || e.type === NodeEvent.Recheck),
+              )
+              .at(-1)?.id
+          : undefined;
+      const matchingEvent =
+        cycleStart === undefined
+          ? undefined
+          : timeline
+              .filter(
+                (e) =>
+                  e.id > cycleStart &&
+                  e.id < event.id &&
+                  e.entity === TaskEventEntity.Attempt &&
+                  (event.type === NodeEvent.AttemptFailed
+                    ? e.toStatus === AttemptStatus.Failed
+                    : e.toStatus === AttemptStatus.Succeeded) &&
+                  attempts.some(
+                    (a) => a.id === e.entityId && a.nodeId === event.entityId && a.kind === AttemptKind.Execute,
+                  ),
+              )
+              .at(-1);
+      const linked =
+        direct ?? (matchingEvent === undefined ? undefined : attempts.find((a) => a.id === matchingEvent.entityId));
       const suggestion =
         event.type === NodeEvent.ChecksFailed || event.type === NodeEvent.CheckUnrunnable
           ? '提交前运行适用的项目检查，并处理检查未通过或无法启动的问题。'
@@ -88,7 +126,8 @@ export function createConventionEvidence(
         taskId,
         eventId,
         commentId: null,
-        nodeId: event.entity === TaskEventEntity.Node ? event.entityId : null,
+        nodeId: event.entity === TaskEventEntity.Node ? event.entityId : (linked?.nodeId ?? null),
+        attemptId: linked?.id ?? null,
         sourceUrl: null,
       });
       return `任务 ${task.key} · ${task.title} (${taskId})\n事件 ${event.id} · ${event.type} · ${new Date(event.createdAt).toISOString()}\n${failureFacts(event.payload)}`;
@@ -109,6 +148,7 @@ export function createConventionEvidence(
           eventId: null,
           commentId,
           nodeId: null,
+          attemptId: null,
           sourceUrl: comment.url,
         });
       return `任务 ${task.key} · ${task.title} (${taskId})\n评论 ${comment.id} · ${comment.url}\n${snapshotText(comment.messages.map((m) => `${m.author}: ${m.body}`).join('\n'))}`;

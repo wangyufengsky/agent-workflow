@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   archiveTaskOp,
   createProjectOp,
+  createTaskOp,
   deliverTaskOp,
   ErrorCode,
   getTaskOp,
@@ -28,7 +29,7 @@ import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { testCipher } from '../../../test/helpers/cipher.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { createTestRepo } from '../../../test/helpers/git.ts';
-import { addProject, createTask, taskInReview, taskReaches } from '../../../test/helpers/tasks.ts';
+import { addProject, createTask, taskInReview, taskReaches, workflowId } from '../../../test/helpers/tasks.ts';
 import { runGit } from '../git/index.ts';
 
 const TOKEN = 'ghp_valid';
@@ -82,6 +83,7 @@ describe('PR 审查意见回流（21）', () => {
     if (comment === undefined) throw new Error('Missing comment');
     await t.call(updateSettingsOp, { 'node.maxAttempts': 1 });
     const failures = [];
+    const attemptIds: string[] = [];
     for (const label of ['第一条失败', '第二条失败']) {
       t.fake.enqueue(script().error('APIError', label), { title: '· 定位根因' });
       const failed = taskReaches(t, 'failed');
@@ -90,6 +92,9 @@ describe('PR 审查意见回流（21）', () => {
       const timeline = (await t.call(getTaskTimelineOp, { id: source.id })).body.items;
       const event = timeline.find((e) => e.type === NodeEvent.AttemptFailed);
       if (event === undefined) throw new Error('Missing failure event');
+      const failedAttempt = timeline.find((e) => e.entity === 'attempt' && e.toStatus === 'failed');
+      if (failedAttempt === undefined) throw new Error('Missing failed attempt');
+      attemptIds.push(failedAttempt.entityId);
       failures.push({ taskId: source.id, eventId: event.id });
     }
     const request = { id: task.project.id, failures, reviews: [{ taskId: task.id, commentId: comment.id }] };
@@ -100,6 +105,7 @@ describe('PR 审查意见回流（21）', () => {
     expect(preview.text).not.toContain('secretvalue');
     expect(preview.suggestions.map((s) => s.text).join()).not.toContain('secretvalue');
     expect(preview.suggestions).toHaveLength(3);
+    expect(preview.suggestions.slice(0, 2).map((s) => s.attemptId)).toEqual(attemptIds);
     const { project: other } = await addProject(t);
     expect((await t.call(previewConventionEvidenceOp, { ...request, id: other.id })).status).toBe(400);
     expect(
@@ -119,6 +125,24 @@ describe('PR 审查意见回流（21）', () => {
         })
       ).status,
     ).toBe(400);
+    const workflow = await workflowId(t, 'bugfix');
+    const bypass = await t.call(createTaskOp, {
+      projectId: other.id,
+      workflowId: workflow,
+      requirement: '跨项目资料',
+      start: false,
+      attachmentIds: [preview.attachmentId],
+    });
+    expect(bypass.status).toBe(400);
+    expect(bypass.body).toMatchObject({ error: { code: ErrorCode.AttachmentSourceInvalid } });
+    const sameProject = await t.call(createTaskOp, {
+      projectId: task.project.id,
+      workflowId: workflow,
+      requirement: '本项目资料',
+      start: false,
+      attachmentIds: [preview.attachmentId],
+    });
+    expect(sameProject.status).toBe(201);
     hosting.addComment(branch, { author: 'reviewer', body: '后续新评论' });
     const { body: created } = await t.call(startAgentsMdTaskOp, {
       id: task.project.id,
