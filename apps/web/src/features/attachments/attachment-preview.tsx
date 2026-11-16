@@ -6,6 +6,7 @@ import {
   type SheetPreviewDTO,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -87,18 +88,25 @@ export function WordBody({ markdown }: { markdown: string }) {
 }
 
 /** One sheet's first rows (39 §8.1): a grid, or cell by cell when it is too wide; says when rows are left out. */
-export function SheetView({ data }: { data: SheetPreviewDTO }) {
+type CellRenderer = (row: number, column: number, value: string) => ReactNode;
+type SheetProps = { data: SheetPreviewDTO; renderCell?: CellRenderer | undefined };
+
+export function SheetView({ data, renderCell }: SheetProps) {
   if (data.range === null) return <p className="hint">{C.emptySheet}</p>;
   return (
     <div className="col">
       {data.rows.length < data.totalRows && <p className="hint">{C.previewRows(data.totalRows)}</p>}
-      {data.columns > SHEET_GRID_MAX_COLUMNS ? <SheetCells data={data} /> : <SheetGrid data={data} />}
+      {data.columns > SHEET_GRID_MAX_COLUMNS ? (
+        <SheetCells data={data} renderCell={renderCell} />
+      ) : (
+        <SheetGrid data={data} renderCell={renderCell} />
+      )}
     </div>
   );
 }
 
 /** Row numbers down the side and column letters across the top, as the AI names cells (39 §5.3). */
-function SheetGrid({ data }: { data: SheetPreviewDTO }) {
+function SheetGrid({ data, renderCell }: SheetProps) {
   const letters = Array.from({ length: data.columns }, (_, i) => columnName(data.left + i));
   return (
     <div className={styles.sheet} data-testid="sheet-grid">
@@ -122,7 +130,7 @@ function SheetGrid({ data }: { data: SheetPreviewDTO }) {
                 <th scope="row">{row.hidden ? C.hiddenRow(row.r) : row.r}</th>
                 {values.map((value, i) => (
                   <td key={letters[i]} title={value === '' ? undefined : value}>
-                    {value}
+                    {renderCell === undefined ? value : renderCell(row.r, data.left + i, value)}
                   </td>
                 ))}
               </tr>
@@ -135,14 +143,21 @@ function SheetGrid({ data }: { data: SheetPreviewDTO }) {
 }
 
 /** A sheet too wide for a grid, cell by cell as the AI reads it (39 §5.3). */
-function SheetCells({ data }: { data: SheetPreviewDTO }) {
+function SheetCells({ data, renderCell }: SheetProps) {
   return (
     <div className={`${styles.preview} mono`}>
       <p className="hint">{C.wideSheet}</p>
       {data.rows.map((row) => (
         <div key={row.r}>
           {row.hidden ? C.hiddenRow(row.r) : row.r}：
-          {row.cells.map((cell) => `${columnName(cell.c)}${row.r} = ${cellText(cell)}`).join('；')}
+          {renderCell === undefined
+            ? row.cells.map((cell) => `${columnName(cell.c)}${row.r} = ${cellText(cell)}`).join('；')
+            : row.cells.map((cell) => (
+                <span key={cell.c} className="row">
+                  {`${columnName(cell.c)}${row.r}`}
+                  {renderCell(row.r, cell.c, cellText(cell))}
+                </span>
+              ))}
         </div>
       ))}
     </div>

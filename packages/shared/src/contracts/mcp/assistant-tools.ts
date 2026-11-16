@@ -7,6 +7,7 @@ import { createDbConnectionOp, updateDbConnectionOp } from '../../operations/dat
 import { assistantInputSchema, type OperationContract } from '../../operations/define.ts';
 import { getInitiativeOp } from '../../operations/initiatives.ts';
 import { createProjectOp, setProjectHostingOp } from '../../operations/projects.ts';
+import { createSkillOp } from '../../operations/skills.ts';
 import { createTaskOp, getPlanOp } from '../../operations/tasks.ts';
 import { assistantPageRefSchema } from '../api/assistant.ts';
 
@@ -50,6 +51,7 @@ export const openedOutputSchema = z.object({ opened: z.literal(true) });
 
 /** The operation each form submits; its credential fields are typed by the user, never prefilled (D28). */
 export const ASSISTANT_FORM_OPERATION = {
+  [AssistantForm.CreateSkill]: createSkillOp,
   [AssistantForm.StartTask]: createTaskOp,
   [AssistantForm.WorkflowFromPlan]: getPlanOp,
   [AssistantForm.TemplateFromInitiative]: getInitiativeOp,
@@ -65,6 +67,7 @@ const formInput = <F extends AssistantForm>(form: F) =>
 /** `open_form`: any non-secret field may be prefilled; a credential field is rejected as unknown. */
 export const openFormInputSchema = z.discriminatedUnion('form', [
   formInput(AssistantForm.StartTask),
+  z.object({ form: z.literal(AssistantForm.CreateSkill), values: createSkillOp.input.strict() }),
   z.object({ form: z.literal(AssistantForm.WorkflowFromPlan), values: getPlanOp.input }),
   z.object({ form: z.literal(AssistantForm.TemplateFromInitiative), values: getInitiativeOp.input }),
   formInput(AssistantForm.AddProject),

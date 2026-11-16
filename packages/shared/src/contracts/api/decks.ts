@@ -62,8 +62,10 @@ export const deckMaterialSchema = z.object({
   id: z.string(),
   kind: deckMaterialKindSchema,
   title: z.string(),
-  /** The task or knowledge conversation it was taken from. */
+  /** 来源任务、知识对话，或网页地址。 */
   refId: z.string().nullable(),
+  /** 产物资料固定到这一版，任务之后再修改也不会改变。 */
+  artifactVersionId: z.uuid().nullable(),
   chars: z.number(),
 });
 export type DeckMaterialDTO = z.infer<typeof deckMaterialSchema>;
@@ -120,6 +122,7 @@ export const deckMaterialInputSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal(DeckMaterialKind.Text), content: materialText }),
   z.object({ kind: z.literal(DeckMaterialKind.File), title: z.string().trim().min(1).max(200), content: materialText }),
   z.object({ kind: z.literal(DeckMaterialKind.Task), taskId: z.string() }),
+  z.object({ kind: z.literal(DeckMaterialKind.Artifact), taskId: z.string(), artifactVersionId: z.uuid() }),
   z.object({ kind: z.literal(DeckMaterialKind.Knowledge), conversationId: z.string() }),
   z.object({ kind: z.literal(DeckMaterialKind.Web), url: readWebsiteRequestSchema.shape.url }),
 ]);

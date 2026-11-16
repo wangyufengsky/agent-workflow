@@ -17,6 +17,7 @@ import {
   PermissionDecision,
   type PermissionPayload,
   type SessionAgent,
+  type SkillSnapshot,
   TaskEventEntity,
   type TranscriptPage,
   TranscriptSystemEvent,
@@ -25,6 +26,7 @@ import type { ModelSlots } from '../model-slots/index.ts';
 import { parseModelRef, sessionPermissionRules } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
+import { withUserSkills } from '../skills/index.ts';
 import { recordTaskEvent } from '../timeline/index.ts';
 import { watchSessions } from './attempts.reactions.ts';
 import type { Attempt } from './attempts.repo.ts';
@@ -39,6 +41,7 @@ import {
 } from './attempts.state.ts';
 
 export type AttemptsServiceDeps = AttemptStateDeps & {
+  taskSkills(taskId: string): SkillSnapshot[];
   settings: SettingsService;
   prompts: Prompts;
   projects: Pick<ProjectsService, 'allowedBash' | 'rememberBash'>;
@@ -134,8 +137,15 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
   ): LiveSession {
     const timeoutMs = settings.get('attempt.timeoutMinutes') * 60_000;
     const { promise: released, resolve: release } = Promise.withResolvers<void>();
+    const skills =
+      attempt.taskId === null
+        ? []
+        : deps
+            .taskSkills(attempt.taskId)
+            .filter(({ roleIds }) => roleIds == null || (attempt.roleId !== null && roleIds.includes(attempt.roleId)));
     const tracked: LiveSession = {
       ...session,
+      system: skills.length === 0 ? session.system : withUserSkills(session.system ?? '', skills),
       view: createSessionView(),
       timeoutMs,
       timeoutAt: clock.now() + timeoutMs,

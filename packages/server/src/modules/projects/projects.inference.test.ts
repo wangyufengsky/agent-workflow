@@ -89,7 +89,7 @@ describe('inferPreview', () => {
   it('安装命令按锁文件选，其余字段为默认值', () => {
     expect(inferPreview(files('pnpm-lock.yaml'), vite)).toEqual({
       command: 'pnpm run dev --port $PORT --strictPort',
-      setupCommand: 'pnpm install --frozen-lockfile',
+      setupCommand: 'CI=true pnpm install --frozen-lockfile',
       readyPath: '/',
       pages: ['/'],
       extraOrigins: [],

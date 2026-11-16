@@ -30,12 +30,14 @@ import { nodeAcceptanceSchema, planGraphSchema } from '../../workflow/plan-graph
 import { diffFileSchema } from '../mcp/get-task-diff.ts';
 import { submitResultInputSchema } from '../mcp/submit-result.ts';
 import { reviewIssueSchema } from '../mcp/submit-review.ts';
+import { artifactTaskSchema } from './artifacts.ts';
 import { attachmentIdsSchema, attachmentSchema } from './attachments.ts';
 import { attemptSummarySchema } from './attempts.ts';
 import { deliverySchema, taskPullRequestSchema } from './delivery.ts';
 import { frontendRoundSchema } from './frontend.ts';
 import { inboxItemSchema } from './inbox.ts';
 import { requirementItemsInputSchema } from './requirements.ts';
+import { skillRefSchema } from './skills.ts';
 
 /** Resolved once when the task is created (11 §5.1) and never changed afterwards. */
 export const checkpointsSchema = z.object({
@@ -233,6 +235,7 @@ export type TaskSummaryDTO = z.infer<typeof taskSummarySchema>;
 
 /** `TaskDetailDTO` (11 §5.2). */
 export const taskDetailSchema = taskSummarySchema.extend({
+  skills: z.array(skillRefSchema).optional(),
   requirement: z.string(),
   failedPhase: taskFailedPhaseSchema.nullable(),
   failure: errorInfoSchema.nullable(),
@@ -258,6 +261,7 @@ export const taskDetailSchema = taskSummarySchema.extend({
   draftPlan: planSchema.nullable(),
   nodes: z.array(nodeSummarySchema),
   activeAttempts: z.array(attemptSummarySchema),
+  artifact: artifactTaskSchema.optional(),
   frontend: z.object({ verified: z.boolean(), rounds: z.array(frontendRoundSchema) }).optional(),
   openInbox: z.array(inboxItemSchema),
   result: taskResultSchema.nullable(),

@@ -30,7 +30,7 @@ import { useUiStore } from '../../state/ui.store.ts';
 import { Segmented } from '../settings/setting-inputs.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { taskQuery } from '../tasks/tasks.queries.ts';
-import { userTabLogsQuery } from './preview.queries.ts';
+import { userTabLogsQuery, useStartPreview } from './preview.queries.ts';
 import styles from './preview-pane.module.css';
 import { usePlacedTab } from './use-placed-tab.ts';
 
@@ -185,13 +185,11 @@ export function MyPreview({
   preview,
   active,
   pro,
-  autoStart = false,
 }: {
   task: TaskDetailDTO;
   preview: Preview;
   active: boolean;
   pro: boolean;
-  autoStart?: boolean;
 }) {
   const qc = useQueryClient();
   const desktop = window.aw !== undefined;
@@ -200,17 +198,7 @@ export function MyPreview({
   const [logOpen, setLogOpen] = useState(false);
   // Never fetched: its opening and `browser.tab_updated` write it.
   const tab = useQuery<UserTabState>({ queryKey: queryKeys.userTab(tabId ?? ''), queryFn: skipToken });
-  const start = useMutation({
-    mutationFn: () => callOperation(startPreviewOp, { taskId: task.id }),
-    onSuccess: (next) => qc.setQueryData(queryKeys.preview(task.id), next),
-  });
-  const autoStarted = useRef(false);
-  const { mutate: startTab } = start;
-  useEffect(() => {
-    if (!autoStart || !active || autoStarted.current) return;
-    autoStarted.current = true;
-    if (preview.state === PreviewState.Stopped) startTab();
-  }, [autoStart, active, preview.state, startTab]);
+  const start = useStartPreview(task.id);
   const open = useMutation({
     mutationFn: () => callOperation(openUserTabOp, { taskId: task.id }),
     onSuccess: (state) => {
@@ -243,7 +231,7 @@ export function MyPreview({
     };
   }, [tabId, task.id, setPreviewTab]);
   const shown = active && running && desktop ? tabId : null;
-  usePlacedTab(shown, area);
+  usePlacedTab(shown, area, true);
   // What the user is looking at is what the assistant may read (`browser_read`, 15); nothing on another tab.
   useEffect(() => {
     if (shown === null) return;

@@ -20,7 +20,13 @@ async function startBugfix(page: Page, project: E2EProject, requirement: string,
   await page.goto(`/?projectId=${project.id}`);
   await pickWorkflow(page, /修 Bug/);
   await page.getByLabel('需求').fill(requirement);
-  if (confirmPlan) await page.getByLabel('运行前让我确认计划').check();
+  if (confirmPlan) {
+    const more = page.getByRole('button', { name: '更多选项' });
+    await more.click();
+    await page.getByRole('switch', { name: '运行前让我确认计划' }).check();
+    await more.click();
+    await expect(page.getByRole('switch', { name: '运行前让我确认计划' })).toBeHidden();
+  }
   await page.getByRole('button', { name: /^开始/ }).click();
   // Starting creates the task's worktree first (up to 9 s on the Windows runner).
   await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/, { timeout: TASK_RUN_TIMEOUT_MS });

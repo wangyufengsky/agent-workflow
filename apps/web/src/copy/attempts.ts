@@ -73,6 +73,11 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.ReadAttachment]: '读取附加的资料',
   [McpToolName.ReadSheet]: '读取表格',
   [McpToolName.QuerySheet]: '查询表格',
+  [McpToolName.ReadTaskArtifact]: '读取任务产物',
+  [McpToolName.WriteTaskText]: '发布文本产物',
+  [McpToolName.WriteTaskDocx]: '发布 Word 产物',
+  [McpToolName.WriteTaskXlsx]: '发布 Excel 产物',
+  [McpToolName.EditTaskXlsx]: '修改 Excel 产物',
   [McpToolName.ReadOfficeFile]: '读取 Word / Excel 文件',
   [McpToolName.SubmitPlan]: '提交计划',
   [McpToolName.SubmitResult]: '提交结果',
@@ -161,6 +166,7 @@ export function actionGroupSummary(actions: readonly StreamAction[]): string {
 }
 
 export const STREAM_COPY = {
+  lastActivity: (time: string) => `最近活动 ${time}`,
   processTitle: '执行过程',
   reviewTitle: '评审过程',
   researchTitle: '研究过程',

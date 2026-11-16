@@ -39,6 +39,12 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.HostingApiError]: '远端平台返回了错误，请稍后再试。',
   [ErrorCode.HostingUnreachable]:
     '连不上远端平台。若平台用的是企业 CA 或自签名证书，在设置的「网络」里加上 CA 证书；若要经代理访问，检查代理设置。',
+  [ErrorCode.SkillInvalid]:
+    '请检查 SKILL.md。需要有效的 YAML 头、英文小写短名、用途说明和非空正文。名称可含数字和连字符，aw- 为内置保留前缀。',
+  [ErrorCode.SkillNameTaken]: '已有同名 Skill，请换一个名称。',
+  [ErrorCode.SkillAssistantDisabled]: '这条 Skill 已关闭助手选用，请重新选择。',
+  [ErrorCode.SkillBindingLimit]: '该项目流程已达到绑定数量上限，请先移除一条 Skill。',
+  [ErrorCode.SkillNotFound]: '这个 Skill 已不存在，请重新选择。',
   [ErrorCode.WorkflowNotFound]: '这个流程不存在。',
   [ErrorCode.WorkflowReadonly]: '内置流程不能修改，可以复制后再改。',
   [ErrorCode.WorkflowDefinitionInvalid]: '流程定义有问题，按编辑器右侧列出的问题修改后再保存。',

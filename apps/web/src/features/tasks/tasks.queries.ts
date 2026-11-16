@@ -1,4 +1,5 @@
 import {
+  type ArtifactRevision,
   acceptNodeOp,
   archiveFinishedTasksOp,
   archiveTaskOp,
@@ -41,6 +42,7 @@ import {
   retryTaskOp,
   reviewCommentsOp,
   reviseFromReviewOp,
+  reviseTaskArtifactOp,
   saveDraftPlanOp,
   skipCheckOp,
   skipNodeOp,
@@ -103,12 +105,32 @@ export const useCreateWorkflow = () =>
   useDefinitionMutation((input: CreateWorkflowRequest) => callOperation(createWorkflowOp, input));
 export const useUpdateWorkflow = () =>
   useDefinitionMutation((input: UpdateWorkflowRequest) => callOperation(updateWorkflowOp, input));
-export const useDeleteWorkflow = () => useDefinitionMutation((key: string) => callOperation(deleteWorkflowOp, { key }));
+export function useDeleteWorkflow() {
+  const cache = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) => callOperation(deleteWorkflowOp, { key }),
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: queryKeys.workflows });
+      void cache.invalidateQueries({ queryKey: queryKeys.skillBindings });
+      void cache.invalidateQueries({ queryKey: queryKeys.skillCatalog });
+    },
+  });
+}
 export const useCreateRole = () =>
   useDefinitionMutation((input: CreateRoleRequest) => callOperation(createRoleOp, input));
 export const useUpdateRole = () =>
   useDefinitionMutation((input: UpdateRoleRequest) => callOperation(updateRoleOp, input));
-export const useDeleteRole = () => useDefinitionMutation((id: string) => callOperation(deleteRoleOp, { id }));
+export function useDeleteRole() {
+  const cache = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => callOperation(deleteRoleOp, { id }),
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: queryKeys.roles });
+      void cache.invalidateQueries({ queryKey: queryKeys.skillBindings });
+      void cache.invalidateQueries({ queryKey: queryKeys.skillCatalog });
+    },
+  });
+}
 
 export const rolesQuery = queryOptions({
   queryKey: queryKeys.roles,
@@ -169,10 +191,9 @@ export const nodeDiffFileQuery =
   });
 
 /**
- * Refetches a detail after an event about it. A first read still in flight may have been answered before the event
- * (a refetch would join it and keep its older answer), so it is cancelled and read again.
+ * 刷新详情时取消已发出的读取。首次读取仍在进行时，直接刷新会复用它，拿到变化发生前的旧快照。
  */
-async function refetchAfterEvent(qc: QueryClient, queryKey: readonly unknown[]): Promise<void> {
+async function refreshDetail(qc: QueryClient, queryKey: readonly unknown[]): Promise<void> {
   await qc.cancelQueries({ queryKey, exact: true });
   await qc.invalidateQueries({ queryKey, exact: true });
 }
@@ -198,17 +219,25 @@ export async function updateNode(qc: QueryClient, taskId: string, node: NodeSumm
   qc.setQueryData<TaskDetailDTO>(queryKeys.task(taskId), (old) =>
     old === undefined ? old : { ...old, nodes: old.nodes.map((n) => (n.id === node.id ? node : n)) },
   );
-  await refetchAfterEvent(qc, queryKeys.node(taskId, node.id));
+  await refreshDetail(qc, queryKeys.node(taskId, node.id));
+}
+
+/** 操作返回的快照可能比已收到的执行事件早。已有详情重新读取，只给尚未加载的任务填入初始数据。 */
+export async function refreshTaskAfterMutation(qc: QueryClient, task: TaskDetailDTO): Promise<void> {
+  const key = queryKeys.task(task.id);
+  const detail = qc.getQueryState(key);
+  if (detail === undefined) qc.setQueryData(key, task);
+  await Promise.all([
+    detail === undefined ? undefined : refreshDetail(qc, key),
+    qc.invalidateQueries({ queryKey: queryKeys.taskLists }),
+  ]);
 }
 
 function useTaskMutation<I>(run: (input: I) => Promise<TaskDetailDTO>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: run,
-    onSuccess: async (task) => {
-      queryClient.setQueryData(queryKeys.task(task.id), task);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.taskLists });
-    },
+    onSuccess: (task) => refreshTaskAfterMutation(queryClient, task),
   });
 }
 
@@ -246,10 +275,7 @@ export function useDeleteTask(onDeleted: () => void) {
  * is gone (TASK_NOT_FOUND); lists, which include batches, initiatives and schedules, refetch.
  */
 export async function removeTask(qc: QueryClient, id: string): Promise<void> {
-  await Promise.all([
-    refetchAfterEvent(qc, queryKeys.task(id)),
-    qc.invalidateQueries({ queryKey: queryKeys.taskLists }),
-  ]);
+  await Promise.all([refreshDetail(qc, queryKeys.task(id)), qc.invalidateQueries({ queryKey: queryKeys.taskLists })]);
 }
 export const useRetryTask = () =>
   useTaskMutation((input: { id: string; feedback?: string }) => callOperation(retryTaskOp, input));
@@ -262,8 +288,7 @@ export function useUpdateCheckCommand() {
     mutationFn: (input: { id: string; command: string; updateProject: boolean; expectedCommand?: string }) =>
       callOperation(updateCheckCommandOp, input),
     onSuccess: async (task, input) => {
-      queryClient.setQueryData(queryKeys.task(task.id), task);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.taskLists });
+      await refreshTaskAfterMutation(queryClient, task);
       if (input.updateProject) await queryClient.invalidateQueries({ queryKey: queryKeys.project(task.project.id) });
     },
   });
@@ -273,6 +298,8 @@ export const useConfirmPlan = () =>
 export const useDeliver = () => useTaskMutation((input: DeliverRequest) => callOperation(deliverTaskOp, input));
 export const useFinishFrontendTask = () =>
   useTaskMutation((input: { id: string; path?: string }) => callOperation(finishFrontendTaskOp, input));
+export const useReviseTaskArtifact = () =>
+  useTaskMutation((input: ArtifactRevision) => callOperation(reviseTaskArtifactOp, input));
 export const useRequestChanges = () =>
   useTaskMutation((input: RequestChangesRequest) => callOperation(requestChangesOp, input));
 export const useRefreshDeliveryStatus = () =>

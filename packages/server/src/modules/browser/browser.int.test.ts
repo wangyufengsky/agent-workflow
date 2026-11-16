@@ -36,6 +36,9 @@ const PAGES: Record<string, string> = {
     <script>setTimeout(() => overlay.remove(), 400)</script>`),
   '/covered': page(`<button type="button">Go</button>
     <div id="overlay" class="modal-backdrop" style="position: fixed; inset: 0"></div>`),
+  '/below-fold': page(`<div style="height: 1600px">Spacer</div>
+    <button type="button" onclick="document.title = 'clicked'">Go</button>
+    <div style="height: 800px"></div>`),
   '/form': page(`<input aria-label="first" id="a" value="old"> <input aria-label="second" id="b">
     <button type="button" onclick="out.textContent = a.value + '|' + b.value">Show</button><p id="out"></p>`),
   '/confirm':
@@ -185,6 +188,19 @@ describe('浏览器：动作层', () => {
       code: ErrorCode.BrowserActionFailed,
       details: { reason: 'covered', coveredBy: 'div#overlay.modal-backdrop' },
     });
+  });
+
+  it('定位并点开首屏下方的按钮，检查和截图也能读取该元素', async () => {
+    const { browser, owner } = await browserFor();
+    const opened = await browser.open(owner, `${origin}/below-fold`);
+    const ref = refOf(opened.page, 'button "Go"');
+    expect(await browser.inspect(owner, ref)).toMatchObject({ inViewport: false, coveredBy: null });
+    expect((await browser.screenshot(owner, { ref, fullPage: false })).data).not.toBe('');
+    const clicked = await browser.click(owner, ref);
+    expect(clicked.title).toBe('clicked');
+    const clickedRef = refOf(clicked.page, 'button "Go"');
+    expect(await browser.inspect(owner, clickedRef)).toMatchObject({ inViewport: true, coveredBy: null });
+    expect((await browser.screenshot(owner, { ref: clickedRef, fullPage: false })).data).not.toBe('');
   });
 
   it('输入先聚焦目标：清空后输入第一个框、再输入第二个框，不会输到前一个框', async () => {

@@ -7,8 +7,22 @@ const objectSchema = z.object({ object: z.object({ objectId: z.string() }) });
 const callSchema = z.object({ result: z.object({ value: z.unknown().optional() }) });
 const quadsSchema = z.object({ quads: z.array(z.array(z.number())) });
 const hitSchema = z.object({ backendNodeId: z.number() });
+const layoutMetricsSchema = z.object({
+  cssLayoutViewport: z.object({ pageX: z.number(), pageY: z.number() }),
+  cssVisualViewport: z.object({
+    offsetX: z.number(),
+    offsetY: z.number(),
+    clientWidth: z.number(),
+    clientHeight: z.number(),
+  }),
+});
 
 type Point = { x: number; y: number };
+type Box = Point & { width: number; height: number };
+
+async function layoutMetrics(tab: Tab) {
+  return layoutMetricsSchema.parse(await tab.cdp('Page.getLayoutMetrics'));
+}
 
 function failed(reason: BrowserActionFailure, ref: string, details: Record<string, unknown> = {}): AppError {
   return new AppError(ErrorCode.BrowserActionFailed, `Cannot act on ${ref}: ${reason}`, { reason, ref, ...details });
@@ -57,29 +71,34 @@ export function createActions(clock: Clock) {
     return callSchema.parse(response).result.value;
   }
 
-  /** The centre of the element's first box in the viewport, or null when it has none (display: none, zero size). */
+  /** The centre of the first content quad intersected with the visible viewport. */
   async function centre(tab: Tab, node: number): Promise<Point | null> {
-    try {
-      const { quads } = quadsSchema.parse(await tab.cdp('DOM.getContentQuads', { backendNodeId: node }));
-      const q = quads[0];
-      if (q === undefined || q.length < 8) return null;
-      const xs = [q[0], q[2], q[4], q[6]].map(Number);
-      const ys = [q[1], q[3], q[5], q[7]].map(Number);
-      const width = Math.max(...xs) - Math.min(...xs);
-      const height = Math.max(...ys) - Math.min(...ys);
-      if (width < 1 || height < 1) return null;
-      return { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2 };
-    } catch {
-      // "Could not compute content quads": the element is not rendered.
-      return null;
-    }
+    const raw = await tab.cdp('DOM.getContentQuads', { backendNodeId: node }).catch(() => null);
+    if (raw === null) return null;
+    const { quads } = quadsSchema.parse(raw);
+    const q = quads[0];
+    if (q === undefined || q.length < 8) return null;
+    const xs = [q[0], q[2], q[4], q[6]].map(Number);
+    const ys = [q[1], q[3], q[5], q[7]].map(Number);
+    const { cssVisualViewport: v } = await layoutMetrics(tab);
+    const left = Math.max(Math.min(...xs), v.offsetX);
+    const right = Math.min(Math.max(...xs), v.offsetX + v.clientWidth);
+    const top = Math.max(Math.min(...ys), v.offsetY);
+    const bottom = Math.min(Math.max(...ys), v.offsetY + v.clientHeight);
+    if (right - left < 1 || bottom - top < 1) return null;
+    return { x: (left + right) / 2, y: (top + bottom) / 2 };
   }
 
-  /** How the element covering a point describes itself: `div.modal-backdrop`. */
+  /** Hit testing takes document coordinates. The mouse event still takes viewport coordinates. */
   async function describeAt(tab: Tab, point: Point): Promise<{ objectId: string; label: string } | null> {
-    const hit = hitSchema.safeParse(
-      await tab.cdp('DOM.getNodeForLocation', { x: Math.round(point.x), y: Math.round(point.y) }),
-    );
+    const { cssLayoutViewport: v } = await layoutMetrics(tab);
+    const result = await tab
+      .cdp('DOM.getNodeForLocation', { x: Math.round(point.x + v.pageX), y: Math.round(point.y + v.pageY) })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.message.endsWith('No node found at given location')) return null;
+        throw err;
+      });
+    const hit = hitSchema.safeParse(result);
     if (!hit.success) return null;
     const { object } = objectSchema.parse(await tab.cdp('DOM.resolveNode', { backendNodeId: hit.data.backendNodeId }));
     const label = await call(
@@ -130,10 +149,11 @@ export function createActions(clock: Clock) {
             { objectId: hit.objectId },
           ])) === true;
         if (reaches) return after;
-        reason = BrowserActionFailure.Covered;
+        reason = hit === null ? BrowserActionFailure.NotVisible : BrowserActionFailure.Covered;
         coveredBy = hit?.label ?? null;
-      } else if (after !== null) {
-        reason = BrowserActionFailure.Covered;
+      } else if (after === null) {
+        reason = BrowserActionFailure.NotVisible;
+        coveredBy = null;
       }
       if (clock.now() >= deadline) {
         throw failed(reason, ref, reason === BrowserActionFailure.Covered ? { coveredBy } : {});
@@ -252,6 +272,24 @@ export function createActions(clock: Clock) {
           ),
         );
       return { ...facts, coveredBy: reaches || hit === null ? null : hit.label };
+    },
+
+    /** Element clips are measured in document coordinates, even when the target is outside the viewport. */
+    async screenshotClip(tab: Tab, ref: string): Promise<Box & { scale: number }> {
+      const { node } = await resolve(tab, ref);
+      const raw = await tab.cdp('DOM.getBoxModel', { backendNodeId: node }).catch(() => null);
+      const result = z.object({ model: z.object({ border: z.array(z.number()).length(8) }) }).safeParse(raw);
+      if (!result.success) throw failed(BrowserActionFailure.NotVisible, ref);
+      const q = result.data.model.border;
+      const xs = [q[0], q[2], q[4], q[6]].map(Number);
+      const ys = [q[1], q[3], q[5], q[7]].map(Number);
+      const left = Math.min(...xs);
+      const top = Math.min(...ys);
+      const width = Math.max(...xs) - left;
+      const height = Math.max(...ys) - top;
+      if (width < 1 || height < 1) throw failed(BrowserActionFailure.NotVisible, ref);
+      const { cssLayoutViewport: v } = await layoutMetrics(tab);
+      return { x: left + v.pageX, y: top + v.pageY, width, height, scale: 1 };
     },
 
     /** Waits until `text` appears in (or `gone` leaves) the page, watching DOM changes; false after `timeoutMs`. */

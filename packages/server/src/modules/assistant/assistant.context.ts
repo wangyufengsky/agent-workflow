@@ -56,6 +56,7 @@ const STATIC_PAGES: Partial<Record<AssistantPage, string>> = {
   [AssistantPage.Tasks]: 'the task list',
   [AssistantPage.Inbox]: 'the list of items that need the user',
   [AssistantPage.Projects]: 'the project list',
+  [AssistantPage.Skills]: 'the My Skills library',
   [AssistantPage.Settings]: 'the settings page',
   [AssistantPage.Git]: 'the Git console',
   [AssistantPage.Workflows]: 'the workflow list',
@@ -136,7 +137,16 @@ export function createContextRenderer(deps: ContextDeps) {
       case AssistantPage.Task:
       case AssistantPage.Node: {
         const task = tasks.detail(param(ref, 'taskId'));
-        return describeTask(task, ref.params.nodeId, page === AssistantPage.Task ? 'the page' : 'the step page');
+        const base = describeTask(task, ref.params.nodeId, page === AssistantPage.Task ? 'the page' : 'the step page');
+        if (page !== AssistantPage.Task || task.artifact === undefined) return base;
+        const versionId = ref.params.artifactVersionId;
+        const version =
+          versionId === undefined
+            ? task.artifact.versions.at(-1)
+            : task.artifact.versions.find(({ id }) => id === versionId);
+        return version === undefined
+          ? base
+          : `${base}; viewing artifact v${version.number} (${version.name}, artifactVersionId ${version.id})`;
       }
       case AssistantPage.TaskPreview:
         // What the user looks at there is the page `browser_read` reads (29 §9).

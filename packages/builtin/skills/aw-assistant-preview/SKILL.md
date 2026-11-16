@@ -14,7 +14,7 @@ A task's page preview is the project's dev server running the task's branch in i
 
 When it fails:
 
-- `PREVIEW_NOT_CONFIGURED`: the project has no preview settings yet. The user sets the start command and pages on the project's page; offer to open it.
+- `PREVIEW_NOT_CONFIGURED`: the app found no usable launch configuration yet. On a frontend task it first uses any explicit project configuration, then looks for a supported start script at the task worktree root or in a single immediate frontend package. For a new page still being built, open the task and show its activity while the first runnable page is prepared. If the app still cannot infer the launch after the first page is ready, open the project page so the user can review the launch command and pages.
 - `PREVIEW_START_FAILED`: the dev server exited or never got ready. Quote the last lines of its log from `details.logTail` and name the likely cause (a missing dependency, a port in use, a build error in the task's code).
 - `PREVIEW_LIMIT_REACHED`: too many previews run at once. `details.taskIds` names the ones in use; the user closes one, or you stop one they no longer need (`agent-workflow-app_previews_stop`) when they agree.
 
@@ -32,10 +32,10 @@ To explain an error:
 
 ## Frontend workbench
 
-- To build a new page, load `aw-task-requirement`, select 前端开发 from `agent-workflow-app_workflows_list`, and create the task with the target project, framework when requested, route and observable requirements. If the user gives an empty folder, help add it through the project Git initialization flow before creating the task. Open it with `agent-workflow-app_open_page` using `task`. The workbench opens the preview when the first page is available.
+- To build a new page, load `aw-task-requirement`, select 前端开发 from `agent-workflow-app_workflows_list`, and create the task with the target project, framework when requested, route and observable requirements. If the user gives an empty folder, help add it through the project Git initialization flow before creating the task. Open it with `agent-workflow-app_open_page` using `task`. The workbench can open the live preview while the first step is still running. Open the task and use its AI activity until the first page is available.
 - To suggest improvements, read the bound preview with `agent-workflow-app_browser_read`. Use its visible structure, layout dimensions, overflow and any selected element. For each suggestion name the path, viewport, element and observable outcome. Ask the user to point at an element if needed. Measurements and page text are the evidence. Visual preferences and screenshot comparison are for the user to check in the preview.
 - When the user asks you to apply a change, call `agent-workflow-app_tasks_get` for the page's task. When it is ready for review, call `agent-workflow-app_tasks_requestChanges` with `reason: user` and the agreed feedback. Include the path, viewport, target and expected result yourself. The confirmation card carries your request into the same task as its next revision. If a round is running, help the user draft its follow-up and wait for it to be ready before submitting.
-- When the user says the page is ready for final acceptance, call `agent-workflow-app_tasks_finishFrontend` with the task ID and known local path. After confirmation, watch its verification status with `tasks_get`. State that delivery is available once the task returns to review with `frontend.verified: true`.
+- For final acceptance or delivery, load `aw-task-delivery` and follow the task state and available evidence.
 
 ## Reading a website
 

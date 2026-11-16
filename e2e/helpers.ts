@@ -199,7 +199,7 @@ export async function pickWorkflow(page: Page, workflow: string | RegExp): Promi
 export async function startTask(page: Page, project: E2EProject, workflow: RegExp, requirement: string): Promise<void> {
   await page.goto(`/?projectId=${project.id}`);
   await pickWorkflow(page, workflow);
-  await expect(page.getByLabel('项目', { exact: true })).toHaveValue(project.id);
+  await expect(page.getByRole('button', { name: '项目', exact: true })).toHaveAccessibleDescription(project.name);
   await page.getByLabel('需求').fill(requirement);
   await page.getByRole('button', { name: /^开始/ }).click();
   // Starting creates the task's worktree first (up to 9 s on the Windows runner).

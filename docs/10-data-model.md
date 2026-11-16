@@ -166,6 +166,8 @@ type Acceptance = {
 
 ### tasks
 
+`skills` 为创建任务时保存的有序 JSON 快照，每项包含 `id`、`name`、`version`、`body` 和可选的 `roleIds`。未指定角色或角色值为 null 时应用于任务的全部角色。旧任务默认空数组。任务使用快照中的版本及角色范围。
+
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
 | id | TEXT PK | |
@@ -679,6 +681,7 @@ payload / response：
 | seq | INTEGER | |
 | kind | TEXT | `DeckMaterialKind` |
 | ref_id | TEXT NULL | 来源任务 / 知识对话 id，网页资料为读到的最终地址（不设外键，快照不随其删除） |
+| artifact_version_id | TEXT NULL | 产物资料的来源版本，用于回查，不设外键 |
 | title | TEXT | |
 | content | TEXT | 创建时的快照（Markdown） |
 
@@ -827,3 +830,9 @@ payload / response：
 items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`expected`、`required`、`verification`（`{ kind: 'command', command }` / `{ kind: 'ai_review' }` / `{ kind: 'manual' }`）。核验节点的命令检查在节点 acceptance 中带 `requirementItemId`（Q-02 已实现）：核验节点按顺序运行全部检查，第 i 个检查结果对应第 i 个检查，节点完成时 `tasks` 据此写入命令项的结论（通过 → pass，失败 → fail，跳过或无法运行 → unverified），AI 项的结论来自它的 `submit_result.requirement_results`；提交号是核验节点完成时工作区的 HEAD。
 
 删除任务时级联删除清单版本与结论。
+
+### user_skills 与 project_skill_bindings
+
+- `user_skills` 按 UUID 保存 `name`（唯一）、`description`、`source`（完整 SKILL.md）与 `version`（从 1 开始，内容有变化时递增）与 `assistant_enabled`（允许助手手动选用，默认开启）。
+- `project_skill_bindings` 主键为 `(project_id, workflow_key, skill_id)`，按 `position` 保存选用顺序。`role_ids` 保存精确角色 ID 的 JSON 数组，null 适用于该流程全部角色。迁移 0042 为旧选用和绑定保留原范围。外键随项目或 Skill 删除级联清理。流程下线或角色删除时，同一事务清理所涉及的绑定。若最后一个显式绑定角色被删除，则解除该条绑定。
+- 助手 JSONL 的 `user_message` 可选 `skills` 字段保存当轮选用的 `id`、`name`、`version`。

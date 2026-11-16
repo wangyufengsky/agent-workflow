@@ -172,6 +172,16 @@ import {
 } from './schedules.ts';
 import { getSettingsOp, updateSettingsOp } from './settings.ts';
 import {
+  createSkillOp,
+  deleteSkillOp,
+  getSkillCatalogOp,
+  listProjectSkillBindingsOp,
+  listSkillsOp,
+  setProjectSkillBindingOp,
+  setSkillScopeOp,
+  updateSkillOp,
+} from './skills.ts';
+import {
   cleanStorageOp,
   getEnvironmentOp,
   getHealthOp,
@@ -195,6 +205,7 @@ import {
   finishFrontendTaskOp,
   getNodeOp,
   getPlanOp,
+  getTaskArtifactOp,
   getTaskOp,
   getTaskTimelineOp,
   listPlansOp,
@@ -212,6 +223,7 @@ import {
   retryTaskOp,
   reviewCommentsOp,
   reviseFromReviewOp,
+  reviseTaskArtifactOp,
   saveDraftPlanOp,
   skipCheckOp,
   skipNodeOp,
@@ -277,6 +289,14 @@ export * from './workflows.ts';
 
 /** Every operation contract; the server mounts exactly these and the copy table covers all their titles. */
 export const OPERATION_CONTRACTS: readonly OperationContract[] = [
+  createSkillOp,
+  deleteSkillOp,
+  getSkillCatalogOp,
+  setSkillScopeOp,
+  listProjectSkillBindingsOp,
+  listSkillsOp,
+  setProjectSkillBindingOp,
+  updateSkillOp,
   getSettingsOp,
   updateSettingsOp,
   getHealthOp,
@@ -360,6 +380,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   deleteRoleOp,
   listTasksOp,
   createTaskOp,
+  getTaskArtifactOp,
+  reviseTaskArtifactOp,
   getTaskOp,
   getTaskTimelineOp,
   listPreviewSessionsOp,
@@ -516,3 +538,5 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   stopDeckOp,
   deleteDeckOp,
 ];
+
+export * from './skills.ts';

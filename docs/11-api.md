@@ -184,6 +184,8 @@ type TaskDetailDTO = {
 };
 ```
 
+文档与表格任务详情的 `artifact` 提供可预览版本及标注历史。预览用 `GET /tasks/:id/artifacts/:versionId?sheet=`，原件用同路径的 `/raw`，下轮修改用 `POST /tasks/:id/revise-artifact`（`versionId` 和 `notes`），见 [39 §8.4](39-office-files.md#84-文档与表格任务工作台)。
+
 ### 5.3 交付
 
 - `strategy ∈ { squash, merge, rebase }`：本地合并到 `targetBranch`（默认 `baseBranch`），见 09 §7。合并前的检查失败直接返回错误、不改状态：`DELIVERY_TARGET_NOT_FOUND`、`WORKTREE_DIRTY`、`DELIVERY_TARGET_DIRTY`（目标分支检出在有未提交改动的工作区）。成功 → 任务 `completed`。冲突 → 任务回 `review`，`lastDelivery.status = conflict`，`conflictFiles` 列出文件；前端提供「交给 AI 解决」（= `request-changes` with `reason: 'conflict'`）。其他 git 失败 → 任务回 `review`，`lastDelivery.status = failed`，`error` 为原因。以上都返回操作后的 `TaskDetailDTO`。
@@ -559,6 +561,8 @@ N2a 实现组合模板，N2b 加入 AI 拆解（`templateKey` 省略时）、重
 | POST | `/decks/:id/stop` | `decks.stop` | write | 中止进行中的 AI 工作；已结束 409 |
 | DELETE | `/decks/:id` | `decks.delete` | critical | 204；AI 工作中 409 `DECK_BUSY` |
 
+资料支持 `{ kind: "artifact", taskId, artifactVersionId }`，创建时读取该版正文或表格数据。PPT 详情的资料项返回来源任务 `refId` 和 `artifactVersionId`。
+
 导出不是 HTTP 操作：PowerPoint 在渲染进程生成，PDF 由 Electron main 打印 `/ppt/:id/print`（§13）。
 
 ## 13. preload 能力（非 HTTP）
@@ -623,3 +627,18 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 - `createTask` 增加可选 `requirements: items`（每项 `title`、`expected`，`required` 默认 true，`verification` 默认 AI 核验），与任务同一事务创建第一个版本（Q-01 已实现）。
 - 交付（本地合并、创建／更新 PR、报告完成）增加可选 `acknowledgedRequirementsRevisionId`：界面对话框或助手确认卡列出未满足项时所依据的清单版本。有未满足的必需项时，缺少它或与当前版本不同都返回 `REQUIREMENTS_UNACKNOWLEDGED`，用户需要看着新版本重新确认；交付记录保存清单摘要。（Q-03 已实现：`tasks.deliver` 先算清单，批量交付也经过它；助手的 `tasks_deliver` 不带这个字段（`assistantOmit`），有未满足项时只能由用户在任务页交付；摘要记在交付的时间线事件里，见 10 §6.2）
 - SSE：`requirements.updated { taskId }`，界面重新获取。
+
+## 用户 Skill
+
+| 操作 | HTTP | 输入和结果 |
+| --- | --- | --- |
+| `skills.list` | GET `/skills` | 返回 `{items}`，每项有 `id`、`name`、`description`、`source`、`version` 和 `assistantEnabled` |
+| `skills.catalog` | GET `/skills/catalog` | 返回 `{builtin, scopes}`，含内置 Skill 正文及系统可用对象、自定义 Skill 的使用范围 |
+| `skills.setScope` | PUT `/skills/:id/scope` | 用 `{assistantEnabled, bindings}` 一次保存。每条绑定为 `{projectId, workflowKey, roleIds}`，角色为 null 时应用于全部角色。返回保存的范围 |
+| `skills.create` | POST `/skills` | 输入完整 `{source}`，返回新 Skill |
+| `skills.update` | PUT `/skills/:id` | 输入完整 `{source}`，返回保存后的 Skill |
+| `skills.delete` | DELETE `/skills/:id` | 删除 Skill 并解除绑定，返回 204 |
+| `skills.listProjectBindings` | GET `/projects/:projectId/skill-bindings` | 返回 `{items}`，每项有 `projectId`、`workflowKey`、`skillIds` |
+| `skills.setProjectBinding` | PUT `/projects/:projectId/skill-bindings/:workflowKey` | 用有序 `{skillIds}` 替换绑定，传空数组解除 |
+
+助手发送消息可传允许选用的 `skillIds`。任务详情的可选 `skills` 返回创建时绑定的 Skill 名称、版本和角色范围。助手的任务页面上下文可携带 `params.artifactVersionId`，仅在该版本属于当前任务时描述它。

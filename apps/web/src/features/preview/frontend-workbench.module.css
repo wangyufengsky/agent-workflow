@@ -1,4 +1,5 @@
 .workbench {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--s-2);
@@ -33,18 +34,65 @@
   min-width: 0;
 }
 
-.waiting {
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: var(--s-2);
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--fill-2);
+.previewState {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  color: var(--sub);
+  font-size: var(--fs-sm);
 }
 
-.waiting p,
+.previewState::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.previewState[data-live="true"]::before {
+  background: var(--ok);
+}
+
+.activityMain {
+  flex: 1;
+  min-width: 0;
+  padding: var(--s-5);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.activityFlow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.buildHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.buildHeader h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+
+.buildIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--s-10);
+  height: var(--s-10);
+  color: var(--accent-ink);
+  background: var(--accent-fill);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-sm);
+}
+
 .history p {
   margin: 0;
 }
@@ -59,6 +107,10 @@
   padding-inline-start: var(--s-3);
   overflow: auto;
   border-inline-start: 1px solid var(--line);
+}
+
+.inspector[hidden] {
+  display: none;
 }
 
 .inspectorHead {
@@ -111,7 +163,7 @@
   border: 1px solid var(--line);
 }
 
-@media (max-width: 730px) {
+@container (max-width: 640px) {
   .body {
     flex-direction: column;
   }

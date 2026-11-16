@@ -54,8 +54,9 @@ export const createDeckOp = defineOperationContract({
   refs: { projectId: InputRef.Project },
   title: 'op.decks.create',
   description:
-    'Create a PPT from a brief and material (pasted text, a task result, a knowledge conversation; a project whose ' +
-    'code the AI may read). The AI writes an outline first; the user confirms it before the pages are made.',
+    'Create a PPT from a brief and material such as pasted text, a task result, a specific document or spreadsheet ' +
+    'version (artifact with taskId and artifactVersionId), or a knowledge conversation. ' +
+    'The user confirms the outline before pages are made.',
   input: createDeckRequestSchema,
   output: deckSchema,
   risk: OperationRisk.Write,

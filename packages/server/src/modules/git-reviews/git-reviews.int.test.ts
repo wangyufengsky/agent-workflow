@@ -96,6 +96,8 @@ describe('AI 审查（27 §4）', () => {
     const prompt = t.fake.prompts.find((p) => p.text.includes('Branch feature'))?.text ?? '';
     expect(prompt).toContain(`git diff ${started.from} ${started.to}`);
     expect(prompt).toContain('金额');
+    expect(prompt).toContain('Load the skill `aw-code-review`');
+    expect(prompt).toContain('agent-workflow_submit_findings');
     expect(t.fake.sessions.at(-1)).toMatchObject({ agent: 'aw-code-reviewer', directory: project.repoPath });
 
     const { body: review } = await t.call(getGitReviewOp, { reviewId: started.id });
@@ -167,6 +169,8 @@ describe('AI 草拟提交信息（27 §7.3）', () => {
     const { body } = await t.call(gitDraftCommitMessageOp, { id: project.id });
     expect(body).toEqual({ subject: 'docs: retitle the readme', body: 'Shorter.' });
     expect(t.fake.prompts.at(-1)?.text).toContain('+# changed');
+    expect(t.fake.prompts.at(-1)?.text).toContain('agent-workflow_submit_commit_message');
+    expect(t.fake.prompts.at(-1)?.text).not.toContain('aw-code-review');
 
     t.fake.enqueue(script().text('I would call it "update".'), REVIEWER);
     const failed = await t.call(gitDraftCommitMessageOp, { id: project.id });

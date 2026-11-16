@@ -17,6 +17,7 @@ import { AGENTS_MD_COPY, PROJECTS_COPY as C, PROJECT_RUNTIME_COPY } from '../../
 import { ProjectDatabases } from '../databases/project-databases.tsx';
 import { DEFAULT_START_WORKFLOW } from '../home/workflow-icon.ts';
 import { useSettings } from '../settings/settings.queries.ts';
+import { ProjectSkillBindings } from '../skills/project-skill-bindings.tsx';
 import { HostingPanel } from './hosting-form.tsx';
 import { ProjectAgentsMd } from './project-agents-md.tsx';
 import { ProjectAllowedBash } from './project-allowed-bash.tsx';
@@ -165,6 +166,9 @@ export function ProjectDetailPage() {
         <Panel title={AGENTS_MD_COPY.section}>
           <ProjectAgentsMd projectId={p.id} />
         </Panel>
+      </section>
+      <section className="section">
+        <ProjectSkillBindings projectId={p.id} />
       </section>
       <section className="section" id="project-preview">
         <Panel title={PREVIEW_COPY.section}>

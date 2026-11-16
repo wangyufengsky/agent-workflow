@@ -1,6 +1,5 @@
 /*
- * The assistant panel (15 §6, D84): a frosted sheet floating over the page, so pages keep their width. The glass is
- * theme tokens (frost*, aura); motion is base.css's --ease-spring / --t-drawer and honours prefers-reduced-motion.
+ * 助手面板（15 §6）。一般浮于页面上方，打开原生预览时右侧预留一列。
  */
 .panel {
   position: fixed;
@@ -28,6 +27,16 @@
 }
 .panel[data-state="closed"] {
   animation: panel-out 0.24s var(--ease) both;
+}
+
+.panel[data-docked] {
+  width: var(--preview-assistant-w);
+  animation: fade-in var(--t-fast) var(--ease) both;
+}
+
+.panel[data-docked][data-state="closed"] {
+  /* 关闭时预览立即恢复宽度，避免原生视图盖住退出动画。 */
+  visibility: hidden;
 }
 @keyframes panel-in {
   from {

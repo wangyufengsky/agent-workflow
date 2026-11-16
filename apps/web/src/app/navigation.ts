@@ -1,6 +1,7 @@
 import { UiMode } from '@aw/shared';
 import type { IconName } from '../components/icon.tsx';
 import { NAV_COPY } from '../copy/nav.ts';
+import { SKILLS_COPY } from '../copy/skills.ts';
 import { ROUTES, type RoutePath } from './routes.ts';
 
 export type NavItem = {
@@ -8,7 +9,7 @@ export type NavItem = {
   route: RoutePath;
   label: string;
   icon: IconName;
-  /** Interface modes in which the item appears (D15: simple shows 5 items, pro adds the rest). */
+  /** Interface modes in which the item appears （简单模式展示常用页面，专业模式补充更多工具）. */
   visibleIn: readonly UiMode[];
   group?: 'pro';
   position?: 'bottom';
@@ -24,6 +25,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'tasks', route: ROUTES.tasks, label: NAV_COPY.tasks, icon: 'list', visibleIn: BOTH, badge: 'inboxOpen' },
   { id: 'projects', route: ROUTES.projects, label: NAV_COPY.projects, icon: 'folder', visibleIn: BOTH },
   { id: 'knowledge', route: ROUTES.knowledge, label: NAV_COPY.knowledge, icon: 'book', visibleIn: BOTH },
+  { id: 'skills', route: ROUTES.skills, label: SKILLS_COPY.title, icon: 'sparkle', visibleIn: BOTH },
   // PPT, insights and team are pro-only in the sidebar, their routes stay open to both (38 C1, D158).
   { id: 'ppt', route: ROUTES.ppt, label: NAV_COPY.ppt, icon: 'slides', visibleIn: PRO, group: 'pro' },
   { id: 'insights', route: ROUTES.insights, label: NAV_COPY.insights, icon: 'chart', visibleIn: PRO, group: 'pro' },

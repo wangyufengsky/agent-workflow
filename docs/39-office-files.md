@@ -190,7 +190,7 @@ OF-02 只读附件（`attachment_id`）；助手读回自己在对话目录里�
 
 - **首版只读**（OF-06 已实现）：规划、执行、评审、需求拆解能读任务附件（§6.2）；仓库里的 Office 文件用执行 MCP 新工具 `read_office_file { path, sheet?, range?, cursor? }` 读（规划、执行、评审、知识研究、需求拆解），`path` 是会话工作目录（尝试的 `directory`：任务的 worktree 或项目仓库）内的相对路径，越界、符号链接指向根外、`.git` 内按 `core/repo-files.ts` 拒绝（`ATTACHMENT_SOURCE_INVALID`，`reason: outside / missing`），不是 Word / Excel 为 `VALIDATION_FAILED`。返回 `{ path, format, text, total_chars, next_cursor, next_range }`：Word 为正文 Markdown 按 `cursor` 分页；Excel 不带 `sheet` 时为概览，带 `sheet` 时为该区域的行（同 `read_sheet` 的分页，渲染成行号列字母的表格），`next_range` 接着读。读取在 worker 里进行，检查与上限同附件。
 - 「项目文件…」快照也接受 `.docx` / `.xlsx`：与上传同样解析、保存派生文件，来源记项目与路径；不能选行范围（`VALIDATION_FAILED`）。
-- **首版不做**：任务在 worktree 里生成或修改 Office 文件。它会进节点提交，二进制 diff 在评审和 Git 工作台里无法审阅；需要表格产出时让执行者写 CSV。
+- 「文档与表格」任务将生成或修改后的产物发布到任务数据目录，支持在任务页预览及比较版本。
 
 ## 8. 界面
 
@@ -221,6 +221,15 @@ OF-02 只读附件（`attachment_id`）；助手读回自己在对话目录里�
 ### 8.3 简单 / 专业模式
 
 两种模式都能上传 Office 文件、使用这些工具；不加导航、页面、主页分段和设置项（38 C6 要求进简单模式的功能写明理由：这是现有附件与助手能力的格式扩展，不新增入口）。文案在 `web/src/copy/attachments.ts`、`assistant.ts`。
+
+
+### 8.4 文档与表格任务工作台
+
+在「直接开始 → 更多流程」选择「文档与表格」，指定项目、产物格式及所需资料。一个任务维护一份主要文件，支持 `.docx`、`.xlsx`、`.md`、`.txt`。首版生成前在主区显示执行过程，首个可预览版本发布后自动显示产物，AI 活动移到右侧。后续修改期间仍可阅读已提交的版本。
+
+「标注修改」支持选择 Word 和 Markdown 的正文块、Markdown 源码和 TXT 的行，以及 Excel 工作表里的单元格。按住 Shift 选第二个位置可以框选文本行或单元格区域。每条意见保存所见版本、坐标与原文摘录；提交意见前服务端确认它仍对应最新版本。版本记录可查看意见、执行过程与上一版对照。Word 在应用里展示提取出的内容，原件可另存为。Office 写入时若丢失部分源文件特性，版本上会显示报告。
+
+执行者通过 `write_task_docx`、`write_task_xlsx` 或 `write_task_text` 发布文件，`edit_task_xlsx` 可定点编辑当前工作簿，`read_task_artifact` 读当前产物。本轮提交结果前必须至少发布一个版本。版本写到 `runs/<taskId>/artifacts/<versionId>/`，元数据和意见记录在任务时间线中。验收沿用 `report_only`，页面继续保留各版原件及下载入口。预览用 `GET /tasks/:id/artifacts/:versionId`，下载用同路径下的 `/raw`，提交用 `POST /tasks/:id/revise-artifact`。
 
 ## 9. 依赖（D200）
 
@@ -297,7 +306,7 @@ OF-02 只读附件（`attachment_id`）；助手读回自己在对话目录里�
 - 理解图片与图表内容（模型只支持文本）；OCR。
 - 公式重算；Word 原位修改与修订模式；应用内的 Word / Excel 编辑器；在线协同。
 - `.pptx` 读取与 PDF（30 的 U2 另议）；`.doc` / `.xls`（视 D194）。
-- 任务在 worktree 里生成 Office 文件（视 D199）；批量与定时任务带附件（30 §5 不变）。
+- 批量与定时任务带附件（30 §5 不变）。
 - PPT 资料、知识问答附件接入 Office 文件：复用 `office.parse` 改动不大，等本期上线后另议。
 - 浏览器里向网站上传或下载文件（29 §5.4 不变）。
 

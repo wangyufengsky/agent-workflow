@@ -15,11 +15,12 @@ import {
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
+import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { RolesService } from '../roles/index.ts';
 import { createWorkflowsRepo } from './workflows.repo.ts';
 
-export type WorkflowsServiceDeps = { db: Db; clock: Clock; log: Logger; roles: RolesService };
+export type WorkflowsServiceDeps = { db: Db; unit: UnitOfWork; clock: Clock; log: Logger; roles: RolesService };
 
 type VersionContent = Pick<WorkflowDTO, 'name' | 'description' | 'planning' | 'deliverable' | 'definition'>;
 
@@ -41,7 +42,7 @@ function rolesOf({ definition }: WorkflowDTO): Set<string> {
   ]);
 }
 
-export function createWorkflowsService({ db, clock, log, roles }: WorkflowsServiceDeps) {
+export function createWorkflowsService({ db, unit, clock, log, roles }: WorkflowsServiceDeps) {
   const repo = createWorkflowsRepo(db);
 
   function get(id: string): WorkflowDTO {
@@ -186,10 +187,9 @@ export function createWorkflowsService({ db, clock, log, roles }: WorkflowsServi
       assertCustom(latestByKey(key));
       const ids = repo.listVersions(key).map((v) => v.id);
       const kept = keep(ids);
-      db.transaction((tx) => {
-        const txRepo = createWorkflowsRepo(tx);
-        txRepo.unlist(key);
-        txRepo.delete(ids.filter((id) => !kept.has(id)));
+      unit.transact(() => {
+        repo.unlist(key);
+        repo.delete(ids.filter((id) => !kept.has(id)));
       });
       log.info({ workflow: key, kept: kept.size }, 'workflow deleted');
     },

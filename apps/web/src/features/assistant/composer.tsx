@@ -8,6 +8,7 @@ import { ATTACHMENTS_COPY } from '../../copy/attachments.ts';
 import { AttachmentList, dropFilesInto, pasteFilesInto, useAttachmentPickers } from '../attachments/attachment-bar.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
 import { projectsQuery } from '../projects/projects.queries.ts';
+import { AssistantSkillPicker } from '../skills/assistant-skill-picker.tsx';
 import { AddMenu } from './add-menu.tsx';
 import styles from './assistant.module.css';
 import { useAbortAssistant } from './assistant.queries.ts';
@@ -36,6 +37,7 @@ export function Composer({
 }) {
   const continuation = conversation?.continuation;
   const [text, setText] = useState(continuation?.consumedAt === null ? (continuation.draftText ?? '') : '');
+  const [skillIds, setSkillIds] = useState<string[]>([]);
   const projects = useQuery(projectsQuery).data ?? [];
   const files = useAttachmentDraft();
   const boundId = conversation === undefined ? projectId : conversation.projectId;
@@ -58,9 +60,11 @@ export function Composer({
       () => {
         setText('');
         files.clear();
+        setSkillIds([]);
       },
       files.ids,
       projectId,
+      skillIds,
     );
   };
   const onKeyDown = (e: KeyboardEvent) => {
@@ -70,12 +74,8 @@ export function Composer({
   return (
     <form className={styles.composer} onSubmit={submit} {...dropFilesInto(files)}>
       {error !== null && <ErrorState error={error} />}
-      <ConversationProjectSelect
-        value={conversation === undefined ? projectId : conversation.projectId}
-        projects={projects}
-        onChange={onProjectChange}
-      />
       <div className={styles.inputBox}>
+        <ConversationProjectSelect value={boundId} projects={projects} onChange={onProjectChange} />
         <textarea
           ref={inputRef}
           className={styles.input}
@@ -106,6 +106,7 @@ export function Composer({
             ]}
             onOpen={context.capture}
           />
+          <AssistantSkillPicker selected={skillIds} onChange={setSkillIds} />
           <span className="grow" />
           {conversation !== undefined && <UsageButton usage={conversation.usage} />}
           <span className={styles.inputHint}>{C.sendHint}</span>

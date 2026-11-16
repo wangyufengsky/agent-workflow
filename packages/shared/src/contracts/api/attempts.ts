@@ -5,6 +5,7 @@ import { attemptKindSchema, attemptStatusSchema } from '../../enums/task.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
 import { chartSpecSchema } from '../chart.ts';
 import { officeLossSchema } from '../mcp/office-write.ts';
+import { skillRefSchema } from './skills.ts';
 
 /** `AttemptSummaryDTO` (11 §6): one AI session working for a node, a plan or a review. */
 export const attemptSummarySchema = z.object({
@@ -59,6 +60,7 @@ export const transcriptEntrySchema = z.discriminatedUnion('kind', [
     data: z.object({
       text: z.string(),
       attachments: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
+      skills: z.array(skillRefSchema).optional(),
     }),
   }),
   z.object({ ...part, kind: z.literal(TranscriptEntryKind.Text), data: piece }),

@@ -5,8 +5,10 @@ import { join } from 'node:path';
 import {
   FRONTEND_WORKFLOW_KEY,
   initGitOp,
+  NodeStatus,
   type OperationContract,
   type TaskDetailDTO,
+  TaskStatus,
   taskCheckEvidenceOp,
   taskDetailSchema,
   toOperationRequest,
@@ -16,6 +18,7 @@ import type { z } from 'zod';
 import { type FakeStep, passReview, submitResult } from './helpers.ts';
 
 const nativeVue = process.env.AW_E2E_FRONTEND_VUE === '1';
+const appFolder = nativeVue ? 'web/' : '';
 const packageName = 'aw-frontend-fixture';
 const route = '/?status=archived#/orders';
 const html = (label: string) => `<!doctype html><html lang="zh"><meta charset="utf-8">
@@ -33,10 +36,15 @@ button{padding:8px 18px;background:#133467;color:white;border:0;border-radius:6p
 <label>搜索订单 <input></label><button id="export">${label}</button><p>订单 A1001　待发货</p><p>订单 A1002　已签收</p>`
 }
 </main>${nativeVue ? '<script type="module" src="/main.js"></script>' : ''}</body></html>`;
-const script = (label: string) => `import { createApp, h } from 'vue';
+const script = `import { createApp, h, ref } from 'vue';
+import { caption } from './caption.js';
+const label = ref(caption);
+if (import.meta.hot) {
+  import.meta.hot.accept('./caption.js', (mod) => { label.value = mod.caption; });
+}
 createApp({ render: () => [
   h('h1', '订单工作台'), h('label', ['搜索订单 ', h('input')]),
-  h('button', { id:'export' }, ${JSON.stringify(label)}),
+  h('button', { id:'export' }, label.value),
   h('p', '订单 A1001　待发货'), h('p', '订单 A1002　已签收')
 ]}).mount('#app');`;
 const server = `import { createServer } from 'node:http';
@@ -48,10 +56,15 @@ createServer((_req, res) => {
 
 const editPage = (label: string): FakeStep =>
   nativeVue
-    ? { type: 'edit', file: 'main.js', content: script(label) }
+    ? {
+        type: 'edit',
+        file: `${appFolder}caption.js`,
+        content: `export const caption = ${JSON.stringify(label)};
+`,
+      }
     : { type: 'edit', file: 'index.html', content: html(label) };
 
-test('前端任务从空目录启动真实预览，手机视口点选两轮后再完成验收', async ({ request }, testInfo) => {
+test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮修改与验收', async ({ request }, testInfo) => {
   test.setTimeout(nativeVue ? 180_000 : 90_000);
   const app = await electron.launch({ args: ['e2e/fixtures/user-preview/main.cjs'] });
   try {
@@ -102,14 +115,26 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
           return readFileSync(join(dir, 'pnpm-lock.yaml'), 'utf8');
         })()
       : null;
+    const permissionStep = (command: string): FakeStep => ({
+      type: 'permission',
+      permission: 'bash',
+      patterns: [command],
+    });
+    const build = 'node verify-first-scaffold.cjs';
+    const continueEditing = 'node verify-first-live-preview.cjs';
+    const finishFirstPage = 'node verify-hot-update.cjs';
     await queue({ title: '开发首版页面' }, [
+      { type: 'think', text: '先搭可运行的订单页骨架，再补齐操作。' },
+      { type: 'tool', tool: 'read', input: { filePath: 'package.json' }, output: '准备创建项目。' },
+      permissionStep(build),
       { type: 'edit', file: '.gitignore', content: 'node_modules/\ndist/\n.DS_Store\n' },
-      { type: 'edit', file: 'package.json', content: JSON.stringify(manifest) },
+      { type: 'edit', file: `${appFolder}package.json`, content: JSON.stringify(manifest) },
       ...(vueLock !== null
         ? [
-            { type: 'edit' as const, file: 'pnpm-lock.yaml', content: vueLock },
-            { type: 'edit' as const, file: 'index.html', content: html('导出') },
-            editPage('导出'),
+            { type: 'edit' as const, file: `${appFolder}pnpm-lock.yaml`, content: vueLock },
+            { type: 'edit' as const, file: `${appFolder}index.html`, content: html('导出') },
+            { type: 'edit' as const, file: `${appFolder}main.js`, content: script },
+            editPage('订单操作准备中'),
           ]
         : [
             { type: 'edit' as const, file: 'server.mjs', content: server },
@@ -126,6 +151,9 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
             },
             editPage('导出'),
           ]),
+      { type: 'callTool', server: 'exec', name: 'browser_open', args: { url: '/' } },
+      permissionStep(continueEditing),
+      ...(nativeVue ? [editPage('导出'), permissionStep(finishFirstPage)] : []),
       submitResult('订单页面已可预览'),
     ]);
     const started = await request.post(`${api}/tasks`, {
@@ -143,6 +171,18 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
     const page = await app.firstWindow();
     await page.goto(`${base}/tasks/${task.id}`);
     const workbench = page.getByTestId('frontend-workbench');
+    const permission = (command: string) => workbench.getByTestId('inbox-permission').filter({ hasText: command });
+    const allow = (command: string) => permission(command).getByRole('button', { name: '允许一次' }).click();
+    const activity = workbench.getByRole('region', { name: 'AI 活动' });
+    await expect(permission(build)).toBeVisible();
+    await expect(activity.getByRole('heading', { name: '正在构建首屏' })).toBeVisible();
+    await expect(activity.getByText('package.json', { exact: true })).toBeVisible();
+    await expect(activity.getByTestId('stream-thinking')).toContainText('先搭可运行的订单页骨架');
+    await expect(workbench.getByTestId('preview-area')).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('frontend-first-build.png'), animations: 'disabled' });
+    const initialAttempt = (await detail()).activeAttempts[0]?.id;
+    expect(initialAttempt).toBeDefined();
+    await allow(build);
     const previewState = async () => (await request.get(`${api}/tasks/${task.id}/preview`, { headers })).json();
     try {
       await expect.poll(async () => (await previewState()).state, { timeout: 45_000 }).toBe('running');
@@ -156,7 +196,53 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
         const contents = (view as Electron.WebContentsView | undefined)?.webContents;
         return contents?.executeJavaScript("document.querySelector('#export')?.textContent");
       });
-    await expect.poll(nativeText).toBe('导出');
+    await expect.poll(nativeText).toBe(nativeVue ? '订单操作准备中' : '导出');
+    await expect(activity.getByRole('heading', { name: 'AI 活动' })).toBeVisible();
+    await expect(activity.getByRole('heading', { name: '正在构建首屏' })).toHaveCount(0);
+    await expect(permission(continueEditing)).toBeVisible();
+    const previewBounds = await workbench.getByTestId('preview-area').boundingBox();
+    const activityBounds = await activity.boundingBox();
+    expect(activityBounds?.x).toBeGreaterThan(previewBounds?.x ?? Number.POSITIVE_INFINITY);
+    await page.screenshot({ path: testInfo.outputPath('frontend-first-live.png'), animations: 'disabled' });
+    const duringFirstPage = await detail();
+    expect(duringFirstPage.status).toBe(TaskStatus.Running);
+    expect(duringFirstPage.nodes[0]?.status).not.toBe(NodeStatus.Done);
+    expect(duringFirstPage.activeAttempts[0]?.id).toBe(initialAttempt);
+    const activityButton = workbench.getByRole('button', { name: 'AI 活动', exact: true });
+    await activity.getByRole('button', { name: '收起 AI 活动' }).click();
+    await expect(activity).toBeHidden();
+    await expect(activityButton).toBeFocused();
+    await expect(workbench.getByTestId('preview-area')).toBeVisible();
+    await activityButton.click();
+    await expect(permission(continueEditing)).toBeVisible();
+    if (nativeVue) {
+      // The HMR update must keep document-local state, so a full page reload cannot pass.
+      const nativeInput = (value?: string) =>
+        app.evaluate(async ({ BrowserWindow }, next) => {
+          const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((item) => 'webContents' in item);
+          const contents = (view as Electron.WebContentsView | undefined)?.webContents;
+          return contents?.executeJavaScript(
+            next === undefined
+              ? "document.querySelector('input')?.value"
+              : `document.querySelector('input').value = ${JSON.stringify(next)}`,
+          );
+        }, value);
+      await nativeInput('查看待发货');
+      await allow(continueEditing);
+      await expect(permission(finishFirstPage)).toBeVisible();
+      await expect.poll(nativeText).toBe('导出');
+      expect(await nativeInput()).toBe('查看待发货');
+      const afterHotUpdate = await detail();
+      expect(afterHotUpdate.status).toBe(TaskStatus.Running);
+      expect(afterHotUpdate.nodes[0]?.status).not.toBe(NodeStatus.Done);
+      expect(afterHotUpdate.activeAttempts[0]?.id).toBe(initialAttempt);
+      await allow(finishFirstPage);
+    } else {
+      await allow(continueEditing);
+    }
+    await expect.poll(async () => (await detail()).displayGroup).toBe('frontend_review');
+    await expect(page.getByText('待查看页面', { exact: true })).toBeVisible();
+    await expect(workbench.getByRole('button', { name: '完成并验收' })).toBeEnabled();
     // A SPA updates its URL in the current document before the user picks an element.
     await app.evaluate(async ({ BrowserWindow }, path) => {
       const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((item) => 'webContents' in item);
@@ -244,6 +330,8 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
           return [current.status, current.frontend?.rounds.length];
         })
         .toEqual(['review', number]);
+      await expect(page.getByText('待查看页面', { exact: true })).toBeVisible();
+      await expect(workbench.getByRole('button', { name: '完成并验收' })).toBeEnabled();
       const current = await detail();
       const last = current.frontend?.rounds.at(-1);
       if (last?.before == null) throw new Error('The round has no screenshot');
@@ -263,6 +351,13 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
     await round(1, '导出', '导出订单');
     await round(2, '导出订单', '下载订单');
     await expect(workbench.getByRole('button', { name: '手机', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await workbench.getByRole('button', { name: '界面修改 2' }).click();
+    await expect(page.getByRole('tab', { name: '过程' })).toBeVisible();
+    await expect.poll(nativeText, { timeout: 3_000 }).toBe('下载订单');
+    const stepDetails = workbench.getByRole('complementary', { name: '界面修改 2' });
+    await expect(stepDetails.getByRole('tab', { name: '过程' })).toBeVisible();
+    await expect(workbench.getByLabel('页面路径')).toHaveValue(route);
+    await stepDetails.getByRole('button', { name: '关闭', exact: true }).click();
     await expect(workbench.getByRole('button', { name: '界面修改 2' })).toBeVisible();
     const nativeImage = await app.evaluate(async ({ BrowserWindow }) => {
       const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((item) => 'webContents' in item);
@@ -293,7 +388,7 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
         expect.objectContaining({
           kind: 'command',
           passed: true,
-          command: nativeVue ? 'pnpm run build' : 'npm run build',
+          command: nativeVue ? "cd './web' && pnpm run build" : 'npm run build',
         }),
         expect.objectContaining({ kind: 'browser', passed: true }),
         expect.objectContaining({ kind: 'ai_review', passed: true }),
@@ -320,6 +415,37 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
     });
     expect(response.ok()).toBe(false);
     expect((await detail()).frontend?.verified).toBe(true);
+
+    await workbench.getByTestId('preview-area').scrollIntoViewIfNeeded();
+    const shownPage = await nativeText();
+    expect(shownPage).toBeDefined();
+    await page.getByRole('button', { name: /打开助手/ }).click();
+    const assistant = page.getByRole('complementary', { name: '应用助手' });
+    const deliver = workbench.getByRole('button', { name: '合并与交付', exact: true });
+    await expect(assistant).toBeVisible();
+    // Electron 原生视图仍在窗口里，且没有挡住助手的输入区。
+    await expect.soft.poll(nativeText, { timeout: 2_000 }).toBe(shownPage);
+    const side = await assistant.boundingBox();
+    if (side === null) throw new Error('Assistant has no bounds');
+    const nativeRight = () =>
+      app.evaluate(({ BrowserWindow }) => {
+        const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((item) => 'webContents' in item);
+        const bounds = view?.getBounds();
+        return bounds === undefined ? Infinity : bounds.x + bounds.width;
+      });
+    await expect.soft.poll(nativeRight, { timeout: 2_000 }).toBeLessThanOrEqual(side.x);
+    await expect(assistant.getByRole('textbox', { name: '发给助手的消息' })).toBeVisible();
+    await expect(deliver).toBeVisible();
+    await assistant.getByRole('button', { name: '收起助手' }).click();
+    await expect(assistant).toBeHidden();
+    await expect.poll(nativeText).toBe(shownPage);
+
+    await deliver.click();
+    const dialog = page.getByRole('dialog');
+    await expect.poll(nativeRight).toBe(Infinity);
+    await dialog.getByRole('button', { name: '合并到 main', exact: true }).click();
+    await expect.poll(async () => (await detail()).status).toBe(TaskStatus.Completed);
+    await expect(page.getByTestId('delivery-outcome')).toContainText('已合并到 main');
   } finally {
     await app.close();
   }

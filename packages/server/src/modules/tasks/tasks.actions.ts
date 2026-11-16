@@ -140,15 +140,21 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
 
     /** A custom workflow goes; the versions tasks use stay for them, unlisted (11 §4). */
     deleteWorkflow(key: string): void {
-      deps.workflows.remove(key, (ids) => state.repo.workflowsInUse(ids));
+      deps.unit.transact(() => {
+        deps.workflows.remove(key, (ids) => state.repo.workflowsInUse(ids));
+        deps.skills.releaseWorkflow(key);
+      });
     },
 
     /** A custom role goes unless a listed workflow names it or a task step or session used it (ROLE_IN_USE). */
     deleteRole(id: string): void {
-      roles.delete(id, (role) => {
-        const workflows = deps.workflows.usingRole(role.key);
-        const usedByTasks = nodes.usesRole(role.id) || attempts.usesRole(role.id);
-        return workflows.length > 0 || usedByTasks ? { workflows, usedByTasks } : null;
+      deps.unit.transact(() => {
+        roles.delete(id, (role) => {
+          const workflows = deps.workflows.usingRole(role.key);
+          const usedByTasks = nodes.usesRole(role.id) || attempts.usesRole(role.id);
+          return workflows.length > 0 || usedByTasks ? { workflows, usedByTasks } : null;
+        });
+        deps.skills.releaseRole(id);
       });
     },
 

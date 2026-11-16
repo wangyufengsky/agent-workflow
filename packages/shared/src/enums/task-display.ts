@@ -22,8 +22,10 @@ export function resolveTaskDisplayGroup(
   status: TaskStatus,
   hasOpenAttentionItem: boolean,
   frontendIteration = false,
+  artifactIteration = false,
 ): TaskDisplayGroup {
   if (hasOpenAttentionItem && !isTerminalState(taskMachine, status)) return TaskDisplayGroup.NeedsAttention;
+  if (status === TaskStatus.Review && artifactIteration) return TaskDisplayGroup.ArtifactReview;
   if (status === TaskStatus.Review && frontendIteration) return TaskDisplayGroup.FrontendReview;
   return TASK_DISPLAY_GROUP[status];
 }

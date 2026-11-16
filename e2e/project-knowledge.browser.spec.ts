@@ -322,7 +322,7 @@ test('J31 读取和引用内网网页，选取网页与代码资料创建任务'
     );
     await draft.getByRole('button', { name: '进入任务表单' }).click();
     const material = await (await snapshotted).json();
-    await expect(page.getByLabel('项目', { exact: true })).toHaveValue(project.id);
+    await expect(page.getByRole('button', { name: '项目', exact: true })).toHaveAccessibleDescription(project.name);
     await expect(page.getByLabel('需求', { exact: true })).toHaveValue('实现按分取整的退款');
     await page.getByRole('button', { name: /换一个流程/ }).click();
     await page.getByRole('button', { name: '新功能开发', exact: true }).click();

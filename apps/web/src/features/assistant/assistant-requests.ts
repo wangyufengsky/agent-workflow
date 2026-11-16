@@ -79,6 +79,10 @@ export function useAssistantRequests(): void {
             }
             return;
           }
+          case AssistantForm.CreateSkill:
+            setPendingForm({ seq: request.seq, form, values });
+            followAssistant(() => navigate({ to: ROUTES.skills }));
+            return;
           case AssistantForm.AddProject:
             setPendingForm({ seq: request.seq, form, values });
             followAssistant(() => navigate({ to: ROUTES.projects, search: { add: true } }));

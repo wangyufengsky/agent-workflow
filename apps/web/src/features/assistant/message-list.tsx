@@ -23,6 +23,7 @@ import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { useTranscript } from '../attempts/attempt.queries.ts';
 import { Character } from '../companion/character.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
+import { UsedSkills } from '../skills/used-skills.tsx';
 import { LatestButton } from '../stream/latest-button.tsx';
 import { thinkingSeconds } from '../stream/stream-items.ts';
 import { ThinkingBlock } from '../stream/thinking-block.tsx';
@@ -125,6 +126,7 @@ function Body({ entry, ctx, fresh }: { entry: TranscriptEntry; ctx: Rendered; fr
             {entry.data.text}
           </div>
           {entry.data.attachments !== undefined && <SentAttachments attachments={entry.data.attachments} />}
+          {entry.data.skills !== undefined && <UsedSkills skills={entry.data.skills} />}
         </div>
       );
     case TranscriptEntryKind.Text:

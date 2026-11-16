@@ -7,7 +7,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { ATTEMPT_STATUS_LABEL, STREAM_COPY as C, TRANSCRIPT_SYSTEM_LABEL } from '../../copy/attempts.ts';
-import { COMMON_COPY } from '../../copy/common.ts';
+import { COMMON_COPY, formatTime } from '../../copy/common.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { attemptQuery, attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
@@ -239,13 +239,14 @@ type StreamProps = {
   testId?: string;
   /** Folds as soon as the attempt ends, even while watched (the knowledge research card once answered, 18 §2.1). */
   foldOnEnd?: boolean;
+  showLastActivity?: boolean;
 };
 
 /**
  * An attempt's conversation stream in a box of fixed height (25 §3–§5): it scrolls inside, follows the newest content
  * until the user scrolls up, and folds to its header once the attempt has ended.
  */
-export function ConversationStream({ attemptId, ...props }: { attemptId: string } & StreamProps) {
+export function ConversationStream({ attemptId, showLastActivity, ...props }: { attemptId: string } & StreamProps) {
   const attempt = useQuery(attemptQuery(attemptId));
   const { pages, entries } = useTranscript(attemptTranscript(attemptId));
   if (attempt.isError) return <ErrorState error={attempt.error} onRetry={() => void attempt.refetch()} />;
@@ -257,10 +258,17 @@ export function ConversationStream({ attemptId, ...props }: { attemptId: string 
   ) : (
     pages.hasNextPage && <p className="hint">{COMMON_COPY.loading}</p>
   );
+  const lastActivity = showLastActivity ? entries.reduce((latest, entry) => Math.max(latest, entry.ts), 0) : 0;
   return (
     <>
       <QueueNotice position={attempt.data.queuePosition} />
-      <Box attempt={attempt.data} entries={entries} more={more} {...props} />
+      <Box
+        attempt={attempt.data}
+        entries={entries}
+        more={more}
+        {...props}
+        meta={lastActivity > 0 ? C.lastActivity(formatTime(lastActivity)) : props.meta}
+      />
     </>
   );
 }

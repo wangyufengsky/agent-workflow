@@ -10,6 +10,7 @@ import {
   type RequirementItemInput,
   requestChangesOp,
   reverifyRequirementsOp,
+  reviseTaskArtifactOp,
   ServerEventType,
   startTaskOp,
   type TaskRequirementsDTO,
@@ -165,6 +166,85 @@ describe('核验验收清单步骤（31 §2.2，Q-02）', () => {
       ['按订单号搜索', 'stale', 'ai'],
       ['单元测试通过', 'failed', 'command'],
     ]);
+  });
+
+  it('文档修改后以同一个 Git 提交重新核验，旧版的结论过期', async () => {
+    const { project } = await addProject(t);
+    const { body: task } = await t.call(createTaskOp, {
+      projectId: project.id,
+      workflowId: await workflowId(t, 'artifact'),
+      requirement: '写一份月度报告',
+      start: false,
+      requirements: [
+        { title: '说明统计范围', expected: '正文注明数据统计范围' },
+        { title: '复核数据', expected: '人工确认总计', verification: { kind: 'manual' } },
+      ],
+    });
+    const [scope, totals] = (await t.call(getRequirementsOp, { id: task.id })).body.items;
+    if (scope === undefined || totals === undefined) throw new Error('Expected a checklist');
+    const directory = `/${task.key}`;
+    const write = (text: string) =>
+      script()
+        .callTool('write_task_text', { file: 'report.md', text })
+        .callTool('submit_result', { summary: 'Published' });
+
+    t.fake.enqueue(write('# 月报\n范围：全部客户'), { title: '· 生成首版产物', directory });
+    t.fake.enqueue(
+      script()
+        .callTool('read_task_artifact', { cursor: 0 })
+        .callTool('submit_result', {
+          summary: 'Checked',
+          requirement_results: [{ item_id: scope.id, conclusion: 'pass', note: '范围已注明' }],
+        }),
+      { title: '· 核验验收清单', directory },
+    );
+    let review = reaches(task.id, 'review');
+    await t.call(startTaskOp, { id: task.id });
+    await review;
+    const first = (
+      await t.call(decideRequirementOp, { id: task.id, itemId: totals.id, conclusion: 'pass', note: '首版已查' })
+    ).body;
+    expect(first.items.map((item) => item.status)).toEqual(['passed', 'passed']);
+    const version = (await t.call(getTaskOp, { id: task.id })).body.artifact?.versions.at(-1);
+    if (version === undefined) throw new Error('Expected the first artifact');
+
+    t.fake.enqueue(write('# 月报\n本月总计：120'), { title: '· 产物修改 1', directory });
+    t.fake.enqueue(
+      script()
+        .callTool('read_task_artifact', { cursor: 0 })
+        .callTool('submit_result', {
+          summary: 'Checked the revised document',
+          requirement_results: [{ item_id: scope.id, conclusion: 'fail', note: '新版缺少统计范围' }],
+        }),
+      { title: '· 核验验收清单', directory },
+    );
+    review = reaches(task.id, 'review');
+    const revision = await t.call(reviseTaskArtifactOp, {
+      id: task.id,
+      versionId: version.id,
+      notes: [{ anchor: { kind: 'whole' }, quote: '', note: '更新月报' }],
+    });
+    expect(revision.status).toBe(200);
+    await review;
+    await t.fake.settled();
+
+    const { body: detail } = await t.call(getTaskOp, { id: task.id });
+    expect(detail.nodes.slice(-2).map(({ key, dependsOn }) => [key, dependsOn])).toEqual([
+      ['artifact_revision_1', ['verify_requirements']],
+      ['verify_requirements_1', ['artifact_revision_1']],
+    ]);
+    expect(
+      t.fake.toolCalls.filter(({ name }) => name === 'read_task_artifact').map(({ result }) => result),
+    ).toMatchObject([{ text: '# 月报\n范围：全部客户' }, { text: '# 月报\n本月总计：120' }]);
+    const { body: rechecked } = await t.call(getRequirementsOp, { id: task.id });
+    expect(rechecked.commitSha).toBe(first.commitSha);
+    expect(rechecked.items.map((item) => item.status)).toEqual(['failed', 'stale']);
+    const delivery = await t.call(deliverTaskOp, {
+      id: task.id,
+      strategy: 'report_only',
+      acknowledgedRequirementsRevisionId: first.revision?.id,
+    });
+    expect([delivery.status, delivery.raw.json().error.code]).toEqual([409, ErrorCode.RequirementsUnacknowledged]);
   });
 
   it('规划流程同样在最后加上核验步骤；没有清单的任务没有它', async () => {

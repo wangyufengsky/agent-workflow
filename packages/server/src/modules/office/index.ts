@@ -96,6 +96,9 @@ export function createOffice({
     /** A Word or Excel file read on demand, for the assistant's file cards (39 §8.2). */
     previewFile: (file: string, sheet: string | undefined) =>
       run<OfficeFilePreviewDTO>({ kind: 'preview_file', file, sheet }),
+    /** 读取 Office 正文，返回指定长度的文字和实际总字数。 */
+    fileText: (file: string, limit: number) =>
+      run<{ text: string; chars: number }>({ kind: 'office_file_text', file, limit }),
     /** `read_office_file` over a file already located inside the session's directory (39 §7.3). */
     readFile: (file: string, input: ReadOfficeFileInput) =>
       run<ReadOfficeFileOutput>({ kind: 'read_office_file', file, input }),

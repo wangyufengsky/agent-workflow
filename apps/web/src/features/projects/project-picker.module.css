@@ -1,0 +1,148 @@
+.picker {
+  align-self: flex-start;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: var(--ctl-h);
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 var(--s-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--fill-2);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  text-align: left;
+  transition:
+    background var(--t-fast),
+    border-color var(--t-fast);
+}
+
+.trigger:where(:hover, :has(+ :popover-open)):not(:disabled) {
+  background: var(--fill-3);
+  border-color: var(--accent-line);
+}
+
+.trigger:disabled {
+  cursor: default;
+  color: var(--muted);
+}
+
+.trigger > :global(.i),
+.chevron {
+  flex: none;
+  color: var(--muted);
+}
+
+.label {
+  flex: none;
+  color: var(--sub);
+}
+
+.chevron {
+  display: flex;
+  transition: transform var(--t-fast) var(--ease);
+}
+
+.trigger:has(+ :popover-open) .chevron {
+  transform: rotate(180deg);
+}
+
+.menu {
+  position: fixed;
+  position-anchor: auto;
+  inset: auto;
+  top: anchor(bottom);
+  left: anchor(left);
+  position-try-fallbacks:
+    flip-block,
+    flip-inline,
+    flip-block flip-inline;
+  width: clamp(220px, anchor-size(width), 320px);
+  max-width: calc(100vw - var(--s-6));
+  max-height: min(320px, 55dvh);
+  margin: var(--s-1) 0;
+  padding: var(--s-1);
+  overflow-y: auto;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  background: var(--raised);
+  color: var(--ink);
+  box-shadow: var(--shadow-pop);
+}
+
+.menu:popover-open {
+  animation: reveal var(--t-fast) var(--ease);
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.menuHeading {
+  padding: var(--s-1) var(--s-2);
+  color: var(--sub);
+  font-size: var(--fs-xs);
+}
+
+.option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  min-height: var(--ctl-h);
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  text-align: left;
+  font-size: var(--fs-sm);
+}
+
+.option:is(:hover, :focus-visible) {
+  background: var(--fill-3);
+  color: var(--ink);
+}
+
+.option[aria-checked="true"] {
+  background: var(--accent-fill);
+  color: var(--accent-ink);
+}
+
+.option:focus-visible {
+  outline-offset: -2px;
+}
+
+.optionText {
+  overflow-wrap: anywhere;
+}
+
+.optionHint {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--sub);
+}
+
+.option + .projectGroup {
+  margin-top: var(--s-1);
+  padding-top: var(--s-1);
+  border-top: 1px solid var(--hairline);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu:popover-open {
+    animation: none;
+  }
+}

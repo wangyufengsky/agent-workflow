@@ -86,6 +86,7 @@ export const AssistantPage = {
   Inbox: 'inbox',
   Projects: 'projects',
   Project: 'project',
+  Skills: 'skills',
   Settings: 'settings',
   Git: 'git',
   GitProject: 'git_project',
@@ -156,6 +157,7 @@ export const ASSISTANT_PAGE_PARAMS = {
   [AssistantPage.Inbox]: [],
   [AssistantPage.Projects]: [],
   [AssistantPage.Project]: ['projectId'],
+  [AssistantPage.Skills]: [],
   [AssistantPage.Settings]: [],
   [AssistantPage.Git]: [],
   [AssistantPage.GitProject]: ['projectId'],
@@ -196,6 +198,7 @@ export const ASSISTANT_PAGE_PARAMS = {
  */
 export const AssistantForm = {
   StartTask: 'tasks.create',
+  CreateSkill: 'skills.create',
   WorkflowFromPlan: 'workflows.fromPlan',
   TemplateFromInitiative: 'initiativeTemplates.fromInitiative',
   AddProject: 'projects.create',

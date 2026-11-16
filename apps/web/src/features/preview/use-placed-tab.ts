@@ -12,12 +12,11 @@ function subscribeToDialogs(onChange: () => void): () => void {
 const dialogOpen = () => document.querySelector(OPEN_DIALOG) !== null;
 
 /**
- * Whether something floats over the page: a dialog, a drawer, the ⌘K palette or the ⌘J assistant panel. A placed
- * tab is a native view drawn above the whole page, so it must leave the window meanwhile (29 §8.1).
+ * 盖在原生视图上的界面打开时需要暂时让出窗口。任务预览打开时，助手的并排布局会预留独立区域。
  */
-function useOverlayOpen(): boolean {
+function useOverlayOpen(dockAssistant: boolean): boolean {
   const dialog = useSyncExternalStore(subscribeToDialogs, dialogOpen);
-  const panels = useUiStore((s) => s.assistantOpen || s.paletteOpen);
+  const panels = useUiStore((s) => s.paletteOpen || (!dockAssistant && s.assistantOpen));
   return dialog || panels;
 }
 
@@ -57,8 +56,12 @@ function visibleRect(element: HTMLElement) {
  * changes, scrolling and the window's size, and it leaves the window while an overlay is open, the area scrolled out
  * of sight or is gone.
  */
-export function usePlacedTab(tabId: string | null, area: RefObject<HTMLDivElement | null>): void {
-  const covered = useOverlayOpen();
+export function usePlacedTab(
+  tabId: string | null,
+  area: RefObject<HTMLDivElement | null>,
+  dockAssistant = false,
+): void {
+  const covered = useOverlayOpen(dockAssistant);
   useEffect(() => {
     const bridge = window.aw;
     const element = area.current;

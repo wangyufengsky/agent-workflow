@@ -2,6 +2,7 @@ import { mergeTaskText, SystemWorkflowKey } from '@aw/builtin';
 import {
   AcceptanceCheckKind,
   AppError,
+  type ArtifactRevision,
   type AttemptDTO,
   BatchDeliveryOutcome,
   type CreateTaskRequest,
@@ -10,6 +11,7 @@ import {
   ErrorCode,
   type ErrorInfo,
   frontendRoundSchema,
+  isArtifactWorkflow,
   isFrontendWorkflow,
   type ListTasksQuery,
   type NodeDetailDTO,
@@ -32,6 +34,7 @@ import type { EventBus } from '../../core/event-bus.ts';
 import { listTaskEvents } from '../timeline/index.ts';
 import { createTaskActions } from './tasks.actions.ts';
 import { createTaskAgentsMd } from './tasks.agents-md.ts';
+import { createTaskArtifacts } from './tasks.artifacts.ts';
 import { createTaskChanges } from './tasks.changes.ts';
 import { createTaskChecks } from './tasks.checks.ts';
 import { createTaskContext } from './tasks.context.ts';
@@ -41,7 +44,7 @@ import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
 import { frontendVerified } from './tasks.frontend.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
-import type { StatusMatch } from './tasks.repo.ts';
+import { readTaskSkills, type StatusMatch } from './tasks.repo.ts';
 import { createTaskRequirements } from './tasks.requirements.ts';
 import { createTaskResults } from './tasks.result.ts';
 import { createTaskReview } from './tasks.review.ts';
@@ -62,7 +65,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   const checks = createTaskChecks(deps, state, lifecycle);
   const diffs = createTaskDiffs(deps, state);
   const delivery = createTaskDelivery(deps, state);
-  const changes = createTaskChanges(deps, state, delivery.current, (taskId) =>
+  const artifacts = createTaskArtifacts(deps, state);
+  const changes = createTaskChanges(deps, state, artifacts, delivery.current, (taskId) =>
     lifecycle.retry(taskId, { recheck: () => false }),
   );
   const review = createTaskReview(deps, state, changes);
@@ -96,9 +100,12 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
           rounds: listTaskEvents(db, id, 0, 'frontend_round').map(({ payload }) => frontendRoundSchema.parse(payload)),
         }
       : undefined;
+    const skills = readTaskSkills(db, id);
     return {
       ...state.summary(task),
+      ...(isArtifactWorkflow(workflow) ? { artifact: artifacts.details(id) } : {}),
       requirement: task.requirement,
+      ...(skills.length === 0 ? {} : { skills: skills.map(({ id, name, version }) => ({ id, name, version })) }),
       failedPhase: task.failedPhase,
       failure: task.failure,
       workflow: {
@@ -147,6 +154,15 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   return {
     detail,
     isFrontend,
+    latestArtifactOf(id: string) {
+      const task = state.get(id);
+      return isArtifactWorkflow(workflows.get(task.workflowId)) ? artifacts.visibleVersions(id).at(-1) : undefined;
+    },
+    artifacts,
+    reviseArtifact(input: ArtifactRevision): TaskDetailDTO {
+      changes.reviseArtifact(input);
+      return detail(input.id);
+    },
     frontendVerified: (id: string) => frontendVerified(nodes.listByTask(id)),
     /** A page of task summaries (11 §5); the display group is decided in SQL so that pages stay full. */
     list({ projectId, status, displayGroup, archived, limit, cursor }: ListTasksQuery): {
@@ -160,13 +176,29 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
           ? undefined
           : statuses.flatMap((status) => {
               if (displayGroup === undefined) return [{ status, attention: 'any' } satisfies StatusMatch];
-              const variants = status === TaskStatus.Review ? [false, true] : [undefined];
-              return variants.flatMap((frontendIteration): StatusMatch[] => {
-                const without = resolveTaskDisplayGroup(status, false, frontendIteration) === displayGroup;
-                const withAttention = resolveTaskDisplayGroup(status, true, frontendIteration) === displayGroup;
+              const variants =
+                status === TaskStatus.Review
+                  ? ([
+                      [false, false],
+                      [true, false],
+                      [false, true],
+                    ] as const)
+                  : ([[undefined, undefined]] as const);
+              return variants.flatMap(([frontendIteration, artifactIteration]): StatusMatch[] => {
+                const without =
+                  resolveTaskDisplayGroup(status, false, frontendIteration, artifactIteration) === displayGroup;
+                const withAttention =
+                  resolveTaskDisplayGroup(status, true, frontendIteration, artifactIteration) === displayGroup;
                 if (!without && !withAttention) return [];
                 const attention = without && withAttention ? 'any' : without ? 'without' : 'with';
-                return [{ status, attention, ...(frontendIteration === undefined ? {} : { frontendIteration }) }];
+                return [
+                  {
+                    status,
+                    attention,
+                    ...(frontendIteration === undefined ? {} : { frontendIteration }),
+                    ...(artifactIteration === undefined ? {} : { artifactIteration }),
+                  },
+                ];
               });
             });
       const [updatedAt, seq] = cursor === undefined ? [] : cursor.split('.').map(Number);
@@ -406,6 +438,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     /** `submit_result` of a task's execute attempt (12 §6.5). */
     async submitResult(attempt: AttemptDTO, input: SubmitResultInput): Promise<ResultNext> {
       if (attempt.taskId === null || attempt.nodeId === null) throw new Error(`Attempt ${attempt.id} is no step's`);
+      if (isArtifactWorkflow(workflows.get(state.get(attempt.taskId).workflowId))) artifacts.assertPublished(attempt);
       state.verify.checkResults(attempt.taskId, nodes.get(attempt.nodeId), input.requirement_results);
       return nodes.submitResult(attempt, input, state.runContext(state.get(attempt.taskId)));
     },

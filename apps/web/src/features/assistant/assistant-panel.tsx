@@ -18,7 +18,7 @@ import { ConversationMenu } from './conversation-menu.tsx';
 import { MessageList } from './message-list.tsx';
 
 /** The panel's content: conversations, the message stream and the input; Esc closes it. */
-function Panel({ open, onClosed }: { open: boolean; onClosed: () => void }) {
+function Panel({ open, docked, onClosed }: { open: boolean; docked: boolean; onClosed: () => void }) {
   const setOpen = useUiStore((s) => s.setAssistantOpen);
   const activeId = useUiStore((s) => s.activeConversationId);
   const setActive = useUiStore((s) => s.setActiveConversation);
@@ -52,6 +52,7 @@ function Panel({ open, onClosed }: { open: boolean; onClosed: () => void }) {
         className={styles.panel}
         data-state={open ? 'open' : 'closed'}
         data-busy={busy || undefined}
+        data-docked={docked || undefined}
         inert={!open}
         aria-label={C.panel}
         onKeyDown={(e) => {
@@ -144,14 +145,12 @@ function Panel({ open, onClosed }: { open: boolean; onClosed: () => void }) {
 }
 
 /**
- * The global assistant panel (15 §6, D84): a frosted sheet floating over the page rather than a column beside it, so
- * pages keep their width. It stays mounted while it plays its closing animation, then unmounts. The home page shows
- * the conversation itself, so there the panel is closed (D112).
+ * 任务的原生预览打开时给助手留出一列，其他页面用浮动面板。关闭动画结束后卸载，主页在正文显示对话。
  */
-export function AssistantPanel() {
+export function AssistantPanel({ docked }: { docked: boolean }) {
   const onHome = useRouterState({ select: (s) => s.location.pathname === ROUTES.home });
   const open = useUiStore((s) => s.assistantOpen) && !onHome;
   const [mounted, setMounted] = useState(open);
   if (open && !mounted) setMounted(true);
-  return mounted ? <Panel open={open} onClosed={() => setMounted(false)} /> : null;
+  return mounted ? <Panel open={open} docked={docked} onClosed={() => setMounted(false)} /> : null;
 }

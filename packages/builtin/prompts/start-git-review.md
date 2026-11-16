@@ -16,4 +16,4 @@ Read the diff with:
 
 {{focus}}
 
-Review the change and finish with `agent-workflow_submit_findings`. Findings may only name the files listed above.
+Load the skill `aw-code-review` with the `skill` tool, then review the change and finish with `agent-workflow_submit_findings`. Findings may only name the files listed above.

@@ -1,3 +1,5 @@
+import { SessionAgent } from '@aw/shared';
+
 /**
  * Skills in `packages/builtin/skills/<name>/SKILL.md` (41), by name. opencode reads them from the directory the
  * backend puts into `skills.paths` (D206); which agent sees which one is decided in the opencode configuration (D207).
@@ -23,6 +25,12 @@ export const SkillName = {
   MergeConflicts: 'aw-merge-conflicts',
   /** Checking pages in the task's preview and reading linked websites, for task sessions (41 §5.3, moved from prompts). */
   PageCheck: 'aw-page-check',
+  /** Evidence and findings for task reviews and Git workbench code reviews (41 §13). */
+  CodeReview: 'aw-code-review',
+  ArtifactRevision: 'aw-artifact-revision',
+  TaskDelivery: 'aw-task-delivery',
+  BackendDevelopment: 'aw-backend-development',
+  FrontendDevelopment: 'aw-frontend-development',
 } as const;
 export type SkillName = (typeof SkillName)[keyof typeof SkillName];
 
@@ -33,3 +41,46 @@ export const SKILL_MAX_BYTES = 8 * 1024;
 export const SKILL_DESCRIPTION_MAX = 400;
 /** Skills one agent may be given (D212). */
 export const AGENT_SKILLS_MAX = 8;
+
+/**
+ * 内置 Skill 的分配表，同时用于原生 Skill 白名单和管理页。
+ */
+export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
+  [SessionAgent.Planner]: [SkillName.DbReadonly, SkillName.OfflineNetwork, SkillName.PageCheck],
+  [SessionAgent.Executor]: [
+    SkillName.DbReadonly,
+    SkillName.OfflineNetwork,
+    SkillName.MergeConflicts,
+    SkillName.PageCheck,
+    SkillName.ArtifactRevision,
+    SkillName.BackendDevelopment,
+    SkillName.FrontendDevelopment,
+  ],
+  [SessionAgent.Reviewer]: [SkillName.DbReadonly, SkillName.PageCheck, SkillName.CodeReview],
+  [SessionAgent.Researcher]: [SkillName.DbReadonly],
+  [SessionAgent.SlidesWriter]: [],
+  [SessionAgent.CodeReviewer]: [SkillName.CodeReview],
+  [SessionAgent.Delegate]: [],
+};
+export const ASSISTANT_SKILLS: SkillName[] = [
+  SkillName.TaskRequirement,
+  SkillName.TaskDiagnosis,
+  SkillName.RecurringWork,
+  SkillName.OfficeDocs,
+  SkillName.AssistantCharts,
+  SkillName.AssistantPreview,
+  SkillName.DbReadonly,
+  SkillName.TaskDelivery,
+];
+
+/** 内置 Skill 约定用单行描述，值可包含冒号。 */
+export function builtinSkillHeader(text: string): Record<string, string> {
+  const block = /^---\n([\s\S]*?)\n---\n/.exec(text)?.[1];
+  if (block === undefined) throw new Error('SKILL.md has no YAML header');
+  return Object.fromEntries(
+    block.split('\n').map((line) => {
+      const colon = line.indexOf(': ');
+      return [line.slice(0, colon), line.slice(colon + 2)];
+    }),
+  );
+}

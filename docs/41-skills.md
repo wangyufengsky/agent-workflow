@@ -18,7 +18,7 @@ skill 是按需加载的知识包：会话里只列出名字和一句描述，�
 | --- | --- |
 | 应用自带一组 skill（`packages/builtin/skills/`），随安装包发布，opencode 启动时通过配置注入 | 走 MCP 的 Skills 扩展（SEP-2640，见 D206） |
 | 每个 agent 只看到分配给它的 skill；用户个人的 skill、项目仓库里的 skill 在 aw 会话中不出现 | 项目仓库里的 skill（`.agents/skills`、`.claude/skills`、`.opencode/skills`）与用户给助手加的 skill：需要时另行设计，见 §10 |
-| 助手的 7 个 skill（§5.1），其中 2 个由现有提示词段落迁移而来；任务会话的 3 个 skill（§5.2） | 用户在应用里新建或编辑 skill |
+| 助手的 7 个 skill（§5.1），其中 2 个由现有提示词段落迁移而来；任务会话的 3 个 skill（§5.2） | 用户在应用里新建或编辑 Skill 见 §12 |
 | 协议提示词在明确的触发点点名 skill | 把必须遵守的规则移进 skill（D208） |
 | | `skills.urls`（远程 skill 列表）、skill 带附带文件（D209） |
 
@@ -184,7 +184,7 @@ Find the actual cause before you suggest anything, and quote the line that shows
 
 ### 7.3 分配表
 
-一处定义：`opencode.config.ts` 里与 `AGENT_PERMISSION` 并列的 `AGENT_SKILLS: Record<SessionAgent, SkillName[]>`，另加助手的一份。权限的 `skill` 规则由它生成。
+opencode 的权限规则和「我的 Skill」目录共同读取 `packages/builtin/src/skills.ts` 中的 `AGENT_SKILLS` 和 `ASSISTANT_SKILLS`。
 
 | skill | 规划者 | 执行者 | 评审者 | 研究员 | PPT | 代码评审 | 助手 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -198,6 +198,11 @@ Find the actual cause before you suggest anything, and quote the line that shows
 | `aw-offline-network` | ✓ | ✓ | | | | | |
 | `aw-merge-conflicts` | | ✓ | | | | | |
 | `aw-page-check` | ✓ | ✓ | ✓ | | | | |
+| `aw-code-review` | | | ✓ | | | ✓ | |
+| `aw-artifact-revision` | | ✓ | | | | | |
+| `aw-task-delivery` | | | | | | | ✓ |
+| `aw-backend-development` | | ✓ | | | | | |
+| `aw-frontend-development` | | ✓ | | | | | |
 
 桌宠的 agent 已经是 `'*': 'deny'`，不变。
 
@@ -208,6 +213,10 @@ Find the actual cause before you suggest anything, and quote the line that shows
   - 画图一段缩成触发句与规则，并点名 `aw-assistant-charts`。
   - 预览与浏览器一段缩成触发句与规则，并点名 `aw-assistant-preview`。
 - `revise-conflict.md`：先加载 `aw-merge-conflicts`。
+- `start-review.md`、`protocol-review.md` 和 `start-git-review.md` 按 §13 的对应审查场景点名加载 `aw-code-review`。
+- 助手协议在回答验收、重新核验或交付问题前点名 `aw-task-delivery`。涉及预览和修改时使用 `aw-assistant-preview`。
+- 执行协议按实际步骤匹配 `aw-backend-development` 和 `aw-frontend-development`。前端首版和多轮修改的步骤指令也点名前端 Skill。
+- 文档与表格任务每次从批注生成修改步骤时，步骤指令点名 `aw-artifact-revision`。
 
 其余 skill（`aw-task-diagnosis`、`aw-recurring-work`、`aw-office-docs`、`aw-db-readonly`、`aw-offline-network`）靠描述触发，不点名。
 
@@ -218,7 +227,7 @@ Find the actual cause before you suggest anything, and quote the line that shows
 - 开发时改了 `SKILL.md`，新建的任务或助手对话（新的目录）就能读到新内容；已经在跑的会话继续用缓存。
 - 不涉及表结构、状态机、REST API 与 MCP 工具（10、09、11、12 §3 以后不变）。12 §2 的配置示例补上 `skills` 与各 agent 的 `skill` 权限，D168 的说明补一句指向 D207；15 §2 补一句助手的 skill 与 41 的链接。
 
-## 8. 安全
+## 8. 内置 Skill 的安全
 
 - skill 正文是应用自带的静态文件，与协议提示词同等可信；不读取项目或用户提供的 skill（D207），仓库里的 `SKILL.md` 不会被当作指令加载。
 - 白名单在 agent 级配置里，会话无法自行放开；`skill` 工具加载时 opencode 还会按会话权限再检查一次。
@@ -236,7 +245,6 @@ Find the actual cause before you suggest anything, and quote the line that shows
 
 ## 10. 之后可能做的
 
-- **用户给助手加的 skill**：应用数据目录下一个「我的 skill」目录，只加进助手的 `skills.paths` 与白名单（名字不能用 `aw-` 前缀），设置页的「助手」分组列出并说明怎样添加。适合报告模板、团队的固定说法这类个人知识。比放开 `~/.agents` 安全：只有用户特意放进来的才生效，也只给助手。白名单要按名字放行，需要在 opencode 启动时读出目录里的名字，新加的 skill 重启 opencode 后生效。
 - **项目的 skill**：项目设置里加「使用仓库里的 skill」开关，打开后为这个项目放行 `.opencode/skills` 下的 skill。难点是 opencode 1.19 的权限只按 skill 名过滤，分不清项目的与用户个人的，需要换成按项目配置目录注入的方式，届时另行设计。
 - **MCP 的 Skills 扩展**：opencode 实现 SEP-2640 的客户端后，再评估是否改为由执行 MCP 按任务动态提供（D206）。
 
@@ -249,3 +257,40 @@ Find the actual cause before you suggest anything, and quote the line that shows
 | SK-03 | 助手的迁移：`aw-assistant-charts`、`aw-assistant-preview`，每项单独提交 | 每项迁移前后各跑一次对应的 live 场景 |
 | SK-04 | 任务会话的 skill：`aw-db-readonly`（同时放行给助手）、`aw-offline-network`、`aw-merge-conflicts` 与 `revise-conflict.md` 的点名 | 单元 |
 | SK-05 | 任务会话的浏览器检查迁移成 `aw-page-check`（§5.3） | 迁移前后各跑一次页面改动的 live 场景 |
+
+## 12. 我的 Skill
+
+- 侧栏「我的 Skill」在简单和专业模式均可打开。列表支持按来源、使用对象筛选和按名称、说明搜索。详情可查看使用范围与 `SKILL.md`。内置 Skill 只读，使用对象来自运行时配置。自定义 Skill 支持新建、编辑、导入或删除单个 UTF-8 `SKILL.md`。YAML 头至少提供唯一的英文短名 `name` 和用途 `description`，正文使用 Markdown。保留 `aw-` 前缀给内置 Skill。导入范围是选中的 Markdown 文件。
+- 自定义 Skill 的「允许助手手动选用」控制其是否可用于助手对话。开启后，主页和侧栏助手通过「选择 Skill」为本条消息选择做法，发送后清空选择。对话记录显示名称和版本。
+- 在 Skill 详情的「编辑使用范围」中可保存多条项目和流程绑定，每条绑定可选全部角色或指定角色。角色按 ID 精确匹配，复用同一执行配置的角色可分别绑定。项目详情仍可快速调整对应流程的 Skill 列表。旧绑定继续应用于流程全部角色。流程发布新版本后绑定依然适用。任务创建时保存正文及角色范围快照，规划、执行、审核和续接会话按各自角色使用对应快照。后续保存的版本或范围应用于新任务。
+- 对话菜单和有操作结果的任务提供「提炼为 Skill」。助手查看已有结果和校验，生成可编辑草稿。用户也可直接描述想创建的 Skill。草稿经 `open_form` 进入同一编辑器，保存后才进入库。
+- 应用把显式选择或绑定的正文附到对应会话的 system prompt。任务协议与原有工具授权继续控制操作，应用自带的原生 Skill 白名单继续按角色分配。
+
+## 13. 代码审查
+
+### 13.1 触发条件
+
+- **任务步骤验收**。验收的首条消息要求评审员先读任务上下文。当前验收范围涉及代码变更时，下一步加载 `aw-code-review`，结合任务要求、改动和检查证据再给出结论。
+- **独立审查任务**。「代码审查」「版本比对审查」「安全审查」的评审员按步骤指定的目录、提交范围或安全关注点加载。同角色自定义步骤在目标为代码审查时同样适用。
+- **Git 工作台**。用户对工作区、分支或指定提交发起 AI 审查后，由审查首条消息点名加载。该会话按应用给出的基准、目标和文件读取命令审查。草拟提交信息、团队成员分析和需求拆解沿用各自的首条消息和提交工具。
+- 代码审查的方法由 Skill 提供。任务步骤验收用 `submit_review`，独立报告用 `submit_result`，Git 工作台用 `submit_findings`。可运行的检查由原会话权限决定，纯静态审查须如实说明证据来源。应用助手不分配此 Skill。
+
+### 13.2 验收标准
+
+| 用例 | 通过条件 |
+| --- | --- |
+| 有代码变更的步骤验收 | 读取任务上下文后收到明确的 Skill 触发指令。核对当前步骤和验收证据，继续使用 `submit_review`。失败结论包含至少一条 blocker 或 major |
+| 独立代码审查报告 | 按指定范围审查，继续使用 `submit_result`，仓库内容保持原样。版本对比能区分既有问题与该范围内引入的问题 |
+| Git 工作台审查 | 审查首条消息包含 Skill 触发指令、应用指定的读取范围和 `submit_findings`。问题包含文件、行号、严重程度、触发条件、影响、证据和修复建议。旧侧行号按 Git 审查接口标记，越界位置沿用现有校验。允许空问题列表 |
+| 复用评审配置的其他操作 | 提交信息草拟、团队成员分析及需求拆解的启动指令各自指向原操作。纯文档、产物或人工检查按对应验收要求进行 |
+| 角色与管理页 | 只分配给任务评审和 Git 工作台的评审配置。「我的 Skill」能查到正文、触发范围，并分别筛选任务评审员和 Git 工作台代码审查 |
+
+## 14. 预览、产物修订、接口交接与交付
+
+| 清单 | 触发与动作 | 核验 |
+| --- | --- | --- |
+| SK-06 更新预览指引 | `aw-assistant-preview` 和 `aw-page-check` 说明预览配置的优先顺序。前端任务可从工作区根目录或唯一的直属前端包推断。根据启动错误和元素操作错误恢复，在同一个任务预览中重新确认目标 | Electron 验证首版执行中启动预览、热更新和多轮迭代。浏览器工具回归验证元素遮挡和编号失效 |
+| SK-07 文档与表格产物修订 | 执行者收到产物版本及批注后，按段落、行或表格坐标读当前文件，定点修改，再用任务产物工具发布并检查 `lost` | Word、Excel、Markdown、TXT 各走一轮批注、版本对比与验收。四种修改步骤都包含 Skill 入口 |
+| SK-08 任务验收与交付 | 助手读取任务状态、验收清单和已有交付。前端最终核验、报告完成、本地合并及 PR/MR 对应各自的工具与确认卡。人工结论和必需项的豁免由任务页管理 | 检查仅询问能否交付时只查询，交付前单独核对必需项。回归本地合并、PR/MR 状态及验收清单阻挡 |
+| SK-10 后端开发与接口交接 | 执行者实现后端接口、服务、迁移和后台任务时使用。测试工程师设计相关用例时也可加载。下游复核已有检查时可直接使用结构化 `handoff` 与现有命令 | 用真实 SQLite 旧数据、重复迁移和既有调用方检验接口。开发和测试节点读取各自的上下文 |
+| SK-11 前端开发与迭代 | 开发步骤尽早打开首屏并继续实现。后续根据路径、视口和元素批注复查。通用流程中的前端步骤可复用同一做法，沿用项目已有预览配置和验收方式 | 核对前端首版、修改步骤和通用执行协议的触发入口。复用桌面前端工作台用例验证早期预览、热更新、两轮修改和最终验收 |

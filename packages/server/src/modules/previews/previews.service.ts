@@ -17,7 +17,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { EventBus } from '../../core/event-bus.ts';
 import type { Logger } from '../../core/logger.ts';
 import { locateShell } from '../git/index.ts';
-import { inferRepoPreview, type ProjectsService } from '../projects/index.ts';
+import { inferTaskFrontendPreview, type ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import type { WorktreesService } from '../worktrees/index.ts';
 import {
@@ -53,6 +53,8 @@ type Entry = {
   idleSince: number;
   cancelIdle: () => void;
 };
+
+type PreviewLaunch = { directory: string; preview: ProjectPreview };
 
 const ACTIVE: readonly PreviewState[] = [PreviewState.Starting, PreviewState.Running];
 
@@ -143,7 +145,11 @@ export function createPreviewsService({
     }
   }
 
-  async function launch(entry: Entry, directory: string, config: ProjectPreview): Promise<Preview> {
+  async function launch(
+    entry: Entry,
+    worktreePath: string,
+    { directory, preview: config }: PreviewLaunch,
+  ): Promise<Preview> {
     const taskRuns = join(dataDir, 'runs', entry.taskId);
     mkdirSync(taskRuns, { recursive: true });
     entry.log?.close();
@@ -159,9 +165,9 @@ export function createPreviewsService({
         log: previewLog,
         signal: entry.abort.signal,
       };
-      if (config.setupCommand !== null && !setUp.has(directory)) {
+      if (config.setupCommand !== null && !setUp.has(worktreePath)) {
         await setUpPreview(config.setupCommand, input);
-        setUp.add(directory);
+        setUp.add(worktreePath);
       }
       const running = await launchPreview(input);
       if (entry.state !== PreviewState.Starting) {
@@ -212,17 +218,24 @@ export function createPreviewsService({
     setUp.delete(worktree.path);
   });
 
+  async function resolveConfiguration(
+    taskId: string,
+    worktree: { projectId: string; path: string },
+  ): Promise<PreviewLaunch> {
+    const configured = projects.getRecord(worktree.projectId).preview;
+    if (configured !== null) return { preview: configured, directory: worktree.path };
+    const inferred = isFrontend(taskId) ? await inferTaskFrontendPreview(worktree.path) : null;
+    if (inferred !== null) return inferred;
+    throw new AppError(ErrorCode.PreviewNotConfigured, 'The project has no page preview', {
+      projectId: worktree.projectId,
+    });
+  }
+
   async function configuration(taskId: string): Promise<ProjectPreview> {
     const worktree = worktrees.findByTask(taskId);
     if (worktree?.status !== WorktreeStatus.Ready)
       throw new AppError(ErrorCode.StateTransitionInvalid, 'The task has no worktree to preview', { taskId });
-    const configured = projects.getRecord(worktree.projectId).preview;
-    const preview = configured ?? (isFrontend(taskId) ? await inferRepoPreview(worktree.path) : null);
-    if (preview === null)
-      throw new AppError(ErrorCode.PreviewNotConfigured, 'The project has no page preview', {
-        projectId: worktree.projectId,
-      });
-    return preview;
+    return (await resolveConfiguration(taskId, worktree)).preview;
   }
 
   return {
@@ -259,7 +272,7 @@ export function createPreviewsService({
           taskId,
         });
       }
-      const preview = await configuration(taskId);
+      const preview = await resolveConfiguration(taskId, worktree);
       await makeRoom(taskId, queue);
       existing = entries.get(taskId);
       if (existing?.state === PreviewState.Running) return toPreview(taskId, existing);

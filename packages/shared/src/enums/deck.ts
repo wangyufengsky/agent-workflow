@@ -35,6 +35,7 @@ export const DeckMaterialKind = {
   Text: 'text',
   File: 'file',
   Task: 'task',
+  Artifact: 'artifact',
   Knowledge: 'knowledge',
   /** A web page read once through the website rules (29 §2.8); its text is kept, never re-read. */
   Web: 'web',

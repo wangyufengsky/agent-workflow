@@ -78,6 +78,7 @@ describe('opencode 配置生成', () => {
       [SkillName.AssistantCharts]: 'allow',
       [SkillName.AssistantPreview]: 'allow',
       [SkillName.DbReadonly]: 'allow',
+      [SkillName.TaskDelivery]: 'allow',
     });
   });
 

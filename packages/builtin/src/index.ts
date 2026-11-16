@@ -14,7 +14,16 @@ export {
   renderTemplate,
 } from './prompts.ts';
 export { BUILTIN_ROLES, type BuiltinRole, BuiltinRoleKey } from './roles.ts';
-export { AGENT_SKILLS_MAX, SKILL_DESCRIPTION_MAX, SKILL_FILE, SKILL_MAX_BYTES, SkillName } from './skills.ts';
+export {
+  AGENT_SKILLS,
+  AGENT_SKILLS_MAX,
+  ASSISTANT_SKILLS,
+  builtinSkillHeader,
+  SKILL_DESCRIPTION_MAX,
+  SKILL_FILE,
+  SKILL_MAX_BYTES,
+  SkillName,
+} from './skills.ts';
 export { SYSTEM_NODES, type SystemNode, VERIFY_NODE } from './system-nodes.ts';
 export {
   agentsMdRulesCheck,

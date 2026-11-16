@@ -5,9 +5,10 @@ import {
   listBrowserFramesOp,
   listPreviewSessionsOp,
   PreviewState,
+  startPreviewOp,
   userTabLogsOp,
 } from '@aw/shared';
-import { type QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
+import { type QueryClient, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { callOperation, getBlob } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 
@@ -18,6 +19,14 @@ export const previewQuery = (taskId: string) =>
     queryFn: () => callOperation(getPreviewOp, { taskId }),
     refetchInterval: (query) => (query.state.data?.state === PreviewState.Starting ? 1000 : false),
   });
+
+export function useStartPreview(taskId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => callOperation(startPreviewOp, { taskId }),
+    onSuccess: (next) => queryClient.setQueryData(queryKeys.preview(taskId), next),
+  });
+}
 
 export const previewSessionsQuery = (taskId: string) =>
   queryOptions({

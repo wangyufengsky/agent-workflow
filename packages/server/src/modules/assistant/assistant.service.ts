@@ -59,6 +59,7 @@ import {
   ToolCallStatus,
 } from '../opencode/index.ts';
 import type { SettingsService } from '../settings/index.ts';
+import { type SkillsService, withUserSkills } from '../skills/index.ts';
 import { type ContextRenderer, localTime } from './assistant.context.ts';
 import { continuationBudget, fitContinuation } from './assistant.continuation-budget.ts';
 import { continuationContext } from './assistant.continuation-context.ts';
@@ -67,6 +68,7 @@ import { type Conversation, createAssistantRepo } from './assistant.repo.ts';
 import { createAssistantUsage } from './assistant.usage.ts';
 
 export type AssistantServiceDeps = {
+  skills: SkillsService;
   db: Db;
   unit: UnitOfWork;
   events: EventBus;
@@ -888,6 +890,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       text,
       context: page,
       attachmentIds = [],
+      skillIds = [],
     }: SendAssistantMessageRequest): Promise<AssistantConversationDTO> {
       const c = get(id);
       const state = liveOf(id);
@@ -895,7 +898,8 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is busy`, { id });
       if (!opencode.isConnected()) throw new AppError(ErrorCode.OpencodeNotReady, 'opencode is not ready');
       // Rendered first: a page about a deleted entity fails before anything is recorded.
-      const systemText = system(c, page, 'user');
+      const skills = deps.skills.selected(skillIds);
+      const systemText = withUserSkills(system(c, page, 'user'), skills);
       const titled = c.title === '' ? { ...c, title: titleOf(text) } : c;
       repo.updateConversation(id, { title: titled.title, updatedAt: clock.now() });
       let shown: AttachmentDTO[] | undefined;
@@ -908,7 +912,13 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         record(c, [
           {
             kind: TranscriptEntryKind.UserMessage,
-            data: sent.length === 0 ? { text } : { text, attachments: sent.map((a) => ({ id: a.id, name: a.name })) },
+            data: {
+              text,
+              ...(sent.length === 0 ? {} : { attachments: sent.map((a) => ({ id: a.id, name: a.name })) }),
+              ...(skills.length === 0
+                ? {}
+                : { skills: skills.map(({ id, name, version }) => ({ id, name, version })) }),
+            },
           },
         ]);
         shown = sent;

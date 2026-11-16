@@ -195,7 +195,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `DeckStatus` | `outlining` · `outline_ready` · `failed` · `generating` · `incomplete` · `ready` | PPT 的显示状态，由页面与最近一次 AI 工作的尝试状态推导（`deckStatusOf`，`shared/deck/status.ts`，23 §4.3），不存储 |
 | `DeckRunKind` | `outline` · `slides` | 一次 AI 工作做什么，由其尝试的 kind 推导（`deckRunKindOf`） |
 | `DeckExportFormat` | `pptx` · `pdf` | PPT 导出的文件（23 §6）；`pdf` 只在桌面应用；助手 `export_deck` 的 `format` |
-| `DeckMaterialKind` | `text` · `file` · `task` · `knowledge` · `web` | 创建时快照的资料（23 §2.3）；`web` 为按网站规则只读读取一次的网页（29 §2.8） |
+| `DeckMaterialKind` | `text` · `file` · `task` · `artifact` · `knowledge` · `web` | 创建时快照的资料（23 §2.3）；`web` 为按网站规则只读读取一次的网页（29 §2.8） |
 | `SlideLayout` | `cover` · `section` · `bullets` · `two_column` · `cards` · `steps` · `stats` · `table` · `code` · `quote` | 内置版式（23 §5.1，D93）；每种版式的字段与字数上限为 `slideContentSchema`（`shared/contracts/deck/slide.ts`） |
 
 `ServerEventType` 另有 `deck.updated`（11 §11）。
@@ -482,6 +482,11 @@ class AppError extends Error {
 | `HOSTING_UNREACHABLE` | 502 | 请求没有得到平台的回答：连不上、域名解析失败、证书不受信任（D164）或代理不通（D165）；`details: { code, message }`（Node 的错误码，如 `UNABLE_TO_VERIFY_LEAF_SIGNATURE`、`ENOTFOUND`） |
 | **流程 / 角色** | | |
 | `WORKFLOW_NOT_FOUND` | 404 | |
+| `SKILL_INVALID` | 400 | SKILL.md 的 YAML 头、名称、用途说明或正文无效 |
+| `SKILL_NAME_TAKEN` | 409 | 已有同名的用户 Skill |
+| `SKILL_NOT_FOUND` | 404 | 所选用户 Skill 不存在 |
+| `SKILL_ASSISTANT_DISABLED` | 409 | 选中的 Skill 已关闭助手手动选用 |
+| `SKILL_BINDING_LIMIT` | 409 | 同一项目流程已绑定五个 Skill |
 | `WORKFLOW_READONLY` | 409 | 修改内置流程 |
 | `WORKFLOW_DEFINITION_INVALID` | 400 | `details.problems[]`，子码见 5.4 |
 | `WORKFLOW_ALREADY_EXISTS` | 409 | 新建 / 复制流程时 key 已被列出的流程使用 |
@@ -646,6 +651,7 @@ class AppError extends Error {
 | XlsxColumnType（OF-04 已实现） | text · number · date · percent · currency（`create_xlsx` 的列格式） |
 | InputRef 增量（U-03 已实现） | attachment（确认卡把附件 ID 显示为文件名） |
 | McpToolName 增量（U-02 已实现） | read_attachment；read_sheet · query_sheet（OF-02 已实现）；read_office_file（OF-06 已实现） |
+| TaskDisplayGroup 增量 | artifact_review（待查看产物，见 39 §8.4） |
 | SheetQueryOp / SheetAggregate（OF-02 已实现） | eq · ne · gt · gte · lt · lte · contains · in · empty · not_empty / count · sum · avg · min · max（`query_sheet`，39 §6.2） |
 | NodeKind 增量（Q-02 已实现） | verify（核验验收清单的系统步骤） |
 | RequirementVerification（Q-01 已实现，下同） | command · ai_review · manual |

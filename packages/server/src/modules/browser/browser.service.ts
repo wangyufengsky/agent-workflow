@@ -707,16 +707,12 @@ export function createBrowserService({
     async screenshot(owner: BrowserOwner, input: { ref?: string; fullPage: boolean }) {
       const tab = current(owner);
       const session = sessionOf(owner);
-      let clip: { x: number; y: number; width: number; height: number; scale: number } | undefined;
-      if (input.ref !== undefined) {
-        const { box } = await actions.inspect(tab, input.ref);
-        if (box !== null) clip = { ...box, scale: 1 };
-      }
+      const clip = input.ref === undefined ? undefined : await actions.screenshotClip(tab, input.ref);
       const { data } = z.object({ data: z.string() }).parse(
         await tab.cdp('Page.captureScreenshot', {
           format: 'jpeg',
           quality: 70,
-          captureBeyondViewport: input.fullPage,
+          captureBeyondViewport: input.fullPage || clip !== undefined,
           ...(clip === undefined ? {} : { clip }),
         }),
       );

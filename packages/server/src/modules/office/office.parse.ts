@@ -66,6 +66,15 @@ export async function previewOffice(file: string, sheet: string | undefined): Pr
   return { format, meta, sheet: sheetPreview(workbook, name, OFFICE_PREVIEW_ROWS) };
 }
 
+/** 读取正文或各工作表的完整文字，限制返回主线程的长度。 */
+export async function officeFileText(file: string, limit: number) {
+  const { bytes, format, entries } = await officeBytes(file);
+  const { text } = await translated<{ text: string }>(format, () =>
+    format === AttachmentFormat.Docx ? readDocx(bytes) : readXlsx(bytes, entries),
+  );
+  return { text: text.slice(0, limit), chars: text.length };
+}
+
 /**
  * `read_office_file` (39 §7.3): a Word document's Markdown a page at a time; a workbook's overview, or one sheet's
  * rows a page at a time.

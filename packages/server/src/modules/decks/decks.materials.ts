@@ -1,7 +1,9 @@
 import {
   AppError,
+  type ArtifactVersion,
   type CitationDTO,
   CitationType,
+  DECK_MATERIALS_MAX_CHARS,
   type DeckMaterialInput,
   DeckMaterialKind,
   ErrorCode,
@@ -18,6 +20,7 @@ const firstLine = (text: string) => (text.trim().split('\n')[0] ?? '').slice(0, 
 export type MaterialSnapshot = {
   kind: DeckMaterialKind;
   refId: string | null;
+  artifactVersionId?: string;
   title: string;
   /** The project the material belongs to, if any: a PPT has at most one. */
   projectId: string | null;
@@ -26,6 +29,11 @@ export type MaterialSnapshot = {
 
 export type MaterialSources = {
   task(id: string): TaskDetailDTO;
+  artifact(
+    taskId: string,
+    versionId: string,
+    limit: number,
+  ): Promise<{ version: ArtifactVersion; text: string; chars: number }>;
   knowledge(id: string): KnowledgeConversationDTO;
   /** Reads the page with the website session, read only (`browser.readUrl`). */
   web(url: string): Promise<WebPage>;
@@ -128,6 +136,31 @@ async function snapshotOf(input: DeckMaterialInput, sources: MaterialSources): P
         title: `${task.key} · ${task.title}`,
         projectId: task.project.id,
         content: taskSnapshot(task),
+      };
+    }
+    case DeckMaterialKind.Artifact: {
+      const task = sources.task(input.taskId);
+      const { version, text, chars } = await sources.artifact(
+        task.id,
+        input.artifactVersionId,
+        DECK_MATERIALS_MAX_CHARS,
+      );
+      const title = `${task.key} · ${version.name} · v${version.number}`;
+      const heading = `# ${title}\n\n`;
+      if (heading.length + chars > DECK_MATERIALS_MAX_CHARS) {
+        const message = `${title} 超过 PPT 资料上限（${DECK_MATERIALS_MAX_CHARS} 字符）`;
+        throw new AppError(ErrorCode.ValidationFailed, message, {
+          issues: [{ path: ['materials'], message }],
+          materialChars: heading.length + chars,
+        });
+      }
+      return {
+        kind: input.kind,
+        refId: task.id,
+        artifactVersionId: version.id,
+        title,
+        projectId: task.project.id,
+        content: heading + text,
       };
     }
     case DeckMaterialKind.Knowledge: {

@@ -38,6 +38,8 @@ export const deckMaterialsTable = sqliteTable(
     kind: text('kind').notNull(),
     /** The task or knowledge conversation it was taken from; no foreign key, the snapshot outlives it. */
     refId: text('ref_id'),
+    /** 产物版本同样只用于回查，来源任务删除后保留快照。 */
+    artifactVersionId: text('artifact_version_id'),
     title: text('title').notNull(),
     content: text('content').notNull(),
   },

@@ -9755,6 +9755,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
           "aw-db-readonly": "allow",
           "aw-office-docs": "allow",
           "aw-recurring-work": "allow",
+          "aw-task-delivery": "allow",
           "aw-task-diagnosis": "allow",
           "aw-task-requirement": "allow",
         },
@@ -9771,7 +9772,10 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "edit": "deny",
         "external_directory": "deny",
         "question": "deny",
-        "skill": "deny",
+        "skill": {
+          "*": "deny",
+          "aw-code-review": "allow",
+        },
         "task": "deny",
         "webfetch": "deny",
         "websearch": "deny",
@@ -9796,7 +9800,10 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "question": "deny",
         "skill": {
           "*": "deny",
+          "aw-artifact-revision": "allow",
+          "aw-backend-development": "allow",
           "aw-db-readonly": "allow",
+          "aw-frontend-development": "allow",
           "aw-merge-conflicts": "allow",
           "aw-offline-network": "allow",
           "aw-page-check": "allow",
@@ -9869,6 +9876,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "question": "deny",
         "skill": {
           "*": "deny",
+          "aw-code-review": "allow",
           "aw-db-readonly": "allow",
           "aw-page-check": "allow",
         },

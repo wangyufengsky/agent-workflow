@@ -72,6 +72,35 @@ describe('页面预览', () => {
     expect((await t.call(getPreviewOp, { taskId: task.id })).body.state).toBe('stopped');
   });
 
+  it('前端任务从唯一的子目录启动页面，保留项目级预览配置为空', async () => {
+    t = await createTestApp();
+    const folder = "web's ui";
+    const { project } = await addProject(t, {
+      files: {
+        [`${folder}/package.json`]: JSON.stringify({ name: 'preview-fixture', scripts: { dev: 'node server.mjs' } }),
+        [`${folder}/package-lock.json`]: JSON.stringify({
+          name: 'preview-fixture',
+          lockfileVersion: 3,
+          packages: { '': { name: 'preview-fixture' } },
+        }),
+        [`${folder}/server.mjs`]: SERVER,
+      },
+    });
+    expect(project.preview).toBeNull();
+    const reviewing = taskReaches(t, 'plan_review');
+    const task = await createTask(t, {
+      projectId: project.id,
+      workflow: 'frontend',
+      checkpoints: { confirm_plan: true },
+    });
+    await reviewing;
+    const worktree = t.app.services.worktrees.findByTask(task.id);
+    if (worktree === undefined) throw new Error('No worktree');
+    const response = await t.call(startPreviewOp, { taskId: task.id });
+    expect(response.status).toBe(200);
+    expect(await answers(response.body.url)).toBe(join(worktree.path, folder));
+  });
+
   it('安装命令只在这个 worktree 第一次启动前运行', async () => {
     t = await createTestApp();
     const { task, worktree } = await taskWithWorktree();

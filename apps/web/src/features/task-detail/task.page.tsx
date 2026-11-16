@@ -18,6 +18,7 @@ import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { ArtifactWorkbench } from '../artifacts/artifact-workbench.tsx';
 import { FrontendRoundHistory, FrontendWorkbench } from '../preview/frontend-workbench.tsx';
 import { PreviewPane } from '../preview/preview-pane.tsx';
 import { projectQuery } from '../projects/projects.queries.ts';
@@ -25,8 +26,9 @@ import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { failedNodeKeyOf } from '../tasks/failure-text.ts';
 import { taskQuery } from '../tasks/tasks.queries.ts';
+import { DeliveryDialogButton } from './delivery-actions.tsx';
 import { FailurePanel } from './failure-panel.tsx';
-import { NodeDrawer, type NodeTab } from './node-drawer.tsx';
+import { NodeDetailPane, NodeDrawer, type NodeTab } from './node-drawer.tsx';
 import { PausedBanner } from './paused-banner.tsx';
 import { PlanReview } from './plan-review.tsx';
 import { PlanningProgress } from './planning-progress.tsx';
@@ -107,7 +109,7 @@ function StepsMain(props: MainProps) {
 }
 
 /** The main area follows the task's state (14 §3.3). */
-function TaskMain({ task, selection, pro }: MainProps) {
+function TaskMain({ task, selection, pro, deliveryInToolbar = false }: MainProps & { deliveryInToolbar?: boolean }) {
   const props = { task, selection, pro };
   switch (task.status) {
     case TaskStatus.Draft:
@@ -136,7 +138,7 @@ function TaskMain({ task, selection, pro }: MainProps) {
           )}
           <a href="#task-acceptance-result">{C.viewAcceptanceResult}</a>
           <div id="task-acceptance-result" tabIndex={-1}>
-            <ResultCard task={task} />
+            <ResultCard task={task} showDelivery={!deliveryInToolbar} />
           </div>
         </div>
       );
@@ -178,7 +180,7 @@ function hasVisibleChecklist(task: TaskDetailDTO): boolean {
 
 export function TaskPage() {
   const { taskId } = route.useParams();
-  const { node, details, requirement } = route.useSearch();
+  const { node, details, requirement, artifactVersion } = route.useSearch();
   const navigate = route.useNavigate();
   const task = useQuery(taskQuery(taskId));
   // The pro view: pro mode, or「显示详细信息」on this task in simple mode (D19).
@@ -190,10 +192,23 @@ export function TaskPage() {
     open: (id, tab) => void navigate({ search: (prev) => ({ ...prev, node: id, open: true, tab }) }),
   };
   const { open, tab, view } = route.useSearch();
+  const nodeId = open === true ? node : undefined;
+  const closeNode = () => void navigate({ search: (prev) => ({ ...prev, open: false }), replace: true });
   const project = useQuery({ ...projectQuery(task.data?.project.id ?? ''), enabled: task.data !== undefined });
   if (task.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (task.isError) return <ErrorState error={task.error} onRetry={() => void task.refetch()} />;
   const frontend = task.data.frontend;
+  const artifact = task.data.artifact;
+  const artifactOpen =
+    artifact !== undefined && task.data.status !== TaskStatus.Draft && task.data.status !== TaskStatus.PlanReview;
+  const nodeDetails =
+    nodeId === undefined
+      ? undefined
+      : {
+          title: task.data.nodes.find((item) => item.id === nodeId)?.title ?? C.viewNode,
+          content: <NodeDetailPane taskId={taskId} nodeId={nodeId} tab={tab} pro={pro} />,
+          onClose: closeNode,
+        };
   const workbench =
     frontend !== undefined && !ENDED_TASK.includes(task.data.status) && task.data.status !== TaskStatus.Merging;
   return (
@@ -205,19 +220,44 @@ export function TaskPage() {
         onDetailsChange={(on) => void navigate({ search: (prev) => ({ ...prev, details: on }), replace: true })}
       />
       {requirement !== undefined && !hasVisibleChecklist(task.data) && <RequirementsSection task={task.data} />}
-      {workbench ? (
+      {artifactOpen ? (
+        <ArtifactWorkbench
+          key={task.data.id}
+          task={task.data}
+          artifact={artifact}
+          selectedVersion={artifactVersion}
+          onSelectVersion={(id) =>
+            void navigate({ search: (prev) => ({ ...prev, artifactVersion: id }), replace: true })
+          }
+          nodeDetails={nodeDetails}
+          onOpenNode={selection.open}
+          record={
+            <div className={styles.frontendProgress}>
+              {task.data.status === TaskStatus.Review || task.data.status === TaskStatus.Completed ? (
+                <StepsView task={task.data} selection={selection} pro={pro} />
+              ) : (
+                <TaskMain task={task.data} selection={selection} pro={pro} />
+              )}
+            </div>
+          }
+        />
+      ) : workbench ? (
         <FrontendWorkbench
           key={task.data.id}
           task={task.data}
           pro={pro}
           hasConfiguredPreview={project.data?.preview != null}
           onOpenNode={selection.open}
+          nodeDetails={nodeDetails}
+          delivery={
+            task.data.status === TaskStatus.Review && frontend.verified && <DeliveryDialogButton task={task.data} />
+          }
           progress={
             <div className={styles.frontendProgress}>
               {task.data.status === TaskStatus.Review && !frontend.verified ? (
                 <StepsView task={task.data} selection={selection} pro={pro} />
               ) : (
-                <TaskMain task={task.data} selection={selection} pro={pro} />
+                <TaskMain task={task.data} selection={selection} pro={pro} deliveryInToolbar />
               )}
             </div>
           }
@@ -255,13 +295,9 @@ export function TaskPage() {
         <TaskMain task={task.data} selection={selection} pro={pro} />
       )}
       {!workbench && frontend !== undefined && <FrontendRoundHistory task={task.data} onOpen={selection.open} />}
-      <NodeDrawer
-        taskId={taskId}
-        nodeId={open === true ? node : undefined}
-        tab={tab}
-        pro={pro}
-        onClose={() => void navigate({ search: (prev) => ({ ...prev, open: false }), replace: true })}
-      />
+      {!workbench && !artifactOpen && (
+        <NodeDrawer taskId={taskId} nodeId={nodeId} tab={tab} pro={pro} onClose={closeNode} />
+      )}
     </div>
   );
 }

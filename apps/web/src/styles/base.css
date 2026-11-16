@@ -207,9 +207,13 @@ svg.i.lg {
 /* ---------- 3. 应用外壳 ---------- */
 .app {
   display: grid;
+  --preview-assistant-w: clamp(280px, 30vw, 440px);
   grid-template-columns: var(--nav-w) minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
+}
+.app[data-assistant-docked] {
+  grid-template-columns: var(--nav-w) minmax(0, 1fr) calc(var(--preview-assistant-w) + var(--s-5));
 }
 .nav {
   display: flex;
