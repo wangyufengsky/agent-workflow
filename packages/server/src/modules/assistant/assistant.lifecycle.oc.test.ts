@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import {
   AssistantTurnStatus,
   abortAssistantOp,
+  createAssistantContinuationOp,
   createConversationOp,
   deleteConversationOp,
   OPENCODE_ASSISTANT_AGENT,
@@ -20,12 +21,15 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
+import { addProject } from '../../../test/helpers/tasks.ts';
 import { assistantPermissionRules } from '../opencode/index.ts';
 
 const MODEL = 'aw-assistant-scripted/model';
 const TOOL_PREFIX = 'TOOL_INPUT: ';
 const advertisedTools = new Set<string>();
 const rejectedPermissions: string[] = [];
+const continuationRequests: Array<z.infer<typeof requestSchema>['messages']> = [];
+const CONTINUATION_TEST = 'VERIFY_CONTINUATION_HANDOFF';
 const requestSchema = z.object({
   tools: z.array(z.object({ function: z.object({ name: z.string() }) })).default([]),
   messages: z.array(
@@ -55,6 +59,7 @@ function scriptedModel(): Server {
       const last = messages.at(-1);
       const text =
         typeof last?.content === 'string' ? last.content : (last?.content ?? []).map((p) => p.text ?? '').join('');
+      if (text.includes(CONTINUATION_TEST)) continuationRequests.push(messages);
       if (text.includes('WAIT_FOR_ABORT')) {
         res.setHeader('content-type', 'text/event-stream');
         res.flushHeaders();
@@ -117,6 +122,31 @@ afterAll(async () => {
   await t.close();
   model.closeAllConnections();
   await new Promise<void>((resolve, reject) => model.close((error) => (error ? reject(error) : resolve())));
+});
+
+it('@opencode 续接在新模型会话发送绑定项目和旧决定，下一轮不重复添加交接', async () => {
+  const { project } = await addProject(t);
+  const source = (await t.call(createConversationOp, { projectId: project.id })).body;
+  async function send(id: string, text: string) {
+    const idle = waitForEvent(t.app.events, ServerEventType.AssistantUpdated, (c) => c.id === id && !c.busy, 60_000);
+    expect((await t.call(sendAssistantMessageOp, { id, text, context: { page: 'home', params: {} } })).status).toBe(
+      200,
+    );
+    await idle;
+  }
+  await send(source.id, '就按方案 B 做，后续检查任务 T-931');
+  for (const text of ['处理认证', '处理集成', '处理文档']) await send(source.id, text);
+  const child = (
+    await t.call(createAssistantContinuationOp, { id: source.id, requestId: randomUUID(), attachmentIds: [] })
+  ).body;
+  await send(child.id, `${CONTINUATION_TEST} 一`);
+  await send(child.id, `${CONTINUATION_TEST} 二`);
+
+  const latest = continuationRequests.at(-2);
+  expect(latest?.filter((message) => message.role === 'user')).toHaveLength(1);
+  expect(JSON.stringify(latest)).toContain(project.id);
+  expect(JSON.stringify(latest?.at(-1))).toContain('就按方案 B 做，后续检查任务 T-931');
+  expect(JSON.stringify(continuationRequests.at(-1)?.at(-1))).not.toContain('T-931');
 });
 
 async function say(id: string, instruction: z.infer<typeof callSchema>) {

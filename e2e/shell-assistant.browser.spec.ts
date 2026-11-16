@@ -64,8 +64,7 @@ test('J11 对助手说开始任务 → 确认卡片 → 任务运行', async ({ 
   await expect(panel).toBeVisible();
   expect((await page.locator('main').boundingBox())?.width).toBe(pageWidth);
   // 唯一用户消息属于本例新建聊天，不依赖共享后端没有其他历史。
-  await newConversation(page, panel);
-  await expect(panel.getByRole('button', { name: '切换对话', exact: true })).toHaveText('新对话');
+  await newConversation(panel);
   await expect(panel.getByTestId('assistant-user-message')).toHaveCount(0);
   await panel.getByLabel('发给助手的消息').fill('帮我修一下：助手开的任务：退款金额少算了运费');
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
@@ -163,7 +162,7 @@ test('没有 Git 的目录：确认卡片列出初始化要做的事与将纳入
   await expect(page.getByRole('main').getByRole('heading', { name: '设置' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
-  // Until the new conversation exists the input is disabled: what is typed must not go to the one still shown.
+  // The draft stays visible while its first send waits for creation; another send must not fall through to another chat.
   let releaseCreate = () => {};
   const createHeld = new Promise<void>((resolve) => {
     releaseCreate = resolve;
@@ -172,13 +171,14 @@ test('没有 Git 的目录：确认卡片列出初始化要做的事与将纳入
     if (route.request().method() === 'POST') await createHeld;
     await route.continue();
   });
-  await panel.getByRole('button', { name: '新对话', exact: true }).click();
-  await expect(panel.getByLabel('发给助手的消息')).toBeDisabled();
-  releaseCreate();
-  await expect(panel.getByLabel('发给助手的消息')).toBeEnabled();
+  await newConversation(panel);
   await expect(panel.getByTestId('assistant-user-message')).toHaveCount(0);
-  await panel.getByLabel('发给助手的消息').fill(`把 ${dir} 加成项目`);
-  await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
+  const input = panel.getByLabel('发给助手的消息');
+  await input.fill(`把 ${dir} 加成项目`);
+  await input.press('ControlOrMeta+Enter');
+  await expect(panel.getByRole('button', { name: '发送', exact: true })).toBeDisabled();
+  await expect(input).toHaveValue(`把 ${dir} 加成项目`);
+  releaseCreate();
 
   const card = panel.getByTestId('confirmation-card');
   await expect(card).toContainText('初始化 Git 并添加项目');
@@ -208,7 +208,7 @@ test('总是允许的调用直接执行并出现对象卡片；对象删除后�
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
   // Its own conversation: the cards of an earlier test's stay out of it.
-  await newConversation(page, panel);
+  await newConversation(panel);
   await panel.getByLabel('发给助手的消息').fill('把这个仓库加成项目');
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
   const card = panel.getByTestId('entity-card');

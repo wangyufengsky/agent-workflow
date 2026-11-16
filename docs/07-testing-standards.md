@@ -122,6 +122,8 @@ Node 24 的集成测试进程暂用 `--no-wasm-code-gc`：Office 源码 worker �
 
 UX-01…UX-03 回归：`task.browser.spec.ts` 验证流程图前置、键盘折叠、跳转及两种模式与窗口尺寸下的长流程；`task-requirements.browser.spec.ts` 验证保存并重验；`task-delivery.browser.spec.ts` 和 `task-page-check.browser.spec.ts` 验证交付后 diff、读取当次命令输出和放大核验截图。真实 OpenCode 的任务诊断 skill 加载用本地脚本模型验证。
 
+UX-04、UX-05、UX-08 回归：`shell-assistant-project.browser.spec.ts` 验证项目预选、主页到侧栏保留归属和返回原会话；`shell-assistant-continuation.browser.spec.ts` 验证明确溢出后续接、选择附件、重载后编辑输入、来源回看和侧栏主动续接；`project-overview.browser.spec.ts` 验证按项目筛选、近期状态更新、旧待处理任务优先显示，以及窄屏和专业模式入口。助手的 SQLite / FakeOpencode 集成验证历史截止、连续续接、来源删除、重启、原权限和确认卡隔离。
+
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 
 审查过程回归（`review-progress.browser.spec.ts`，J24 / J22）：四类 Git 审查入口均能查看进展、思考、正文与工具输入输出，刷新后保留，完成后收起；重新审查选中新过程、历史互不串流，停止后仍可展开。任务 AI 评审在当前步骤与简单过程页可见。真实 opencode 权限回归用本地脚本模型并行触发两条 `find`，验证「总是允许」发出两条完成事件及重复答复的明确失效错误；集成覆盖 SSE / HTTP 竞争、重复投递、无关条目保留和助手同步。

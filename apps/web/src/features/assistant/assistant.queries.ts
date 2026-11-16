@@ -108,8 +108,8 @@ export async function updateConfirmation(qc: QueryClient, confirmation: Assistan
 export function useCreateConversation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (title: string | undefined) =>
-      callOperation(createConversationOp, title === undefined ? {} : { title }),
+    mutationFn: (input: { title?: string; projectId?: string | null } | undefined) =>
+      callOperation(createConversationOp, input ?? {}),
     onSuccess: (c) => updateConversation(queryClient, c),
   });
 }

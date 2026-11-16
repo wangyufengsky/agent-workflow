@@ -7,6 +7,7 @@ import {
   createConversationOp,
   createInitiativeOp,
   deleteConversationOp,
+  deleteProjectOp,
   ErrorCode,
   getConversationOp,
   listAssistantFilesOp,
@@ -57,6 +58,23 @@ async function say(id: string, text: string, context: AssistantPageRef = HOME) {
 }
 
 describe('助手对话（A-02、A-03）', () => {
+  it('会话项目独立于当前页面，删除后保留归属，通用对话保持无项目', async () => {
+    const a = (await addProject(t)).project;
+    const b = (await addProject(t)).project;
+    const c = (await t.call(createConversationOp, { projectId: a.id })).body;
+    const general = (await t.call(createConversationOp, {})).body;
+    expect(c.projectId).toBe(a.id);
+    expect(general.projectId).toBeNull();
+    expect((await t.call(createConversationOp, { projectId: 'missing' })).status).toBe(404);
+    await say(c.id, '在这个项目建任务', { page: 'project', params: { projectId: b.id } });
+    expect(t.fake.prompts[0]?.system).toContain(`Session project: Project "${a.name}" (project id ${a.id}`);
+    expect(t.fake.prompts[0]?.system).toContain(`the page of project "${b.name}" (project id ${b.id}`);
+    expect((await t.call(deleteProjectOp, { id: a.id })).status).toBe(204);
+    expect((await t.call(getConversationOp, { id: c.id })).body.projectId).toBe(a.id);
+    await say(c.id, '继续', HOME);
+    expect(t.fake.prompts[1]?.system).toContain(`Deleted project (project id ${a.id})`);
+  });
+
   it('新建 → 列表 → 发送 → 消息流：对话以第一条消息的首行为标题', async () => {
     const c = await newConversation();
     t.fake.enqueue(script().text('明天是 10 月 11 日。'), { agent: OPENCODE_ASSISTANT_AGENT });

@@ -6,7 +6,13 @@ import styles from './assistant.module.css';
 import { useAsk } from './use-ask.ts';
 
 /** A conversation with nothing in it yet: a greeting and a few things to ask, each sent with one click. */
-export function AssistantWelcome({ conversation }: { conversation: AssistantConversationDTO | undefined }) {
+export function AssistantWelcome({
+  conversation,
+  projectId = null,
+}: {
+  conversation: AssistantConversationDTO | undefined;
+  projectId?: string | null;
+}) {
   const { ask, isPending, error } = useAsk();
   return (
     <div className={styles.welcome}>
@@ -20,7 +26,7 @@ export function AssistantWelcome({ conversation }: { conversation: AssistantConv
             type="button"
             className={styles.suggestion}
             disabled={isPending}
-            onClick={() => ask(text, conversation)}
+            onClick={() => ask(text, conversation, undefined, [], projectId)}
           >
             {text}
           </button>

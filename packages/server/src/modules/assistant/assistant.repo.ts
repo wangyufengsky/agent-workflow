@@ -8,7 +8,12 @@ import {
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
-import { assistantConfirmationsTable, assistantConversationsTable, assistantOutboxTable } from './assistant.table.ts';
+import {
+  assistantConfirmationsTable,
+  assistantContinuationsTable,
+  assistantConversationsTable,
+  assistantOutboxTable,
+} from './assistant.table.ts';
 
 export type Conversation = typeof assistantConversationsTable.$inferSelect;
 
@@ -16,6 +21,14 @@ export type Confirmation = Omit<typeof assistantConfirmationsTable.$inferSelect,
   input: Record<string, unknown>;
   result: AssistantConfirmationResult | null;
 };
+
+type Continuation = Omit<typeof assistantContinuationsTable.$inferSelect, 'attachmentIds'> & {
+  attachmentIds: string[];
+};
+const continuationAttachmentIdsSchema = z.array(z.string());
+function toContinuation(row: typeof assistantContinuationsTable.$inferSelect): Continuation {
+  return { ...row, attachmentIds: continuationAttachmentIdsSchema.parse(JSON.parse(row.attachmentIds)) };
+}
 
 const inputSchema = z.record(z.string(), z.unknown());
 
@@ -33,6 +46,38 @@ export function createAssistantRepo(db: DbExecutor) {
   const confirmations = assistantConfirmationsTable;
   const outbox = assistantOutboxTable;
   return {
+    listContinuations() {
+      return db.select().from(assistantContinuationsTable).all().map(toContinuation);
+    },
+    findContinuation(id: string) {
+      const row = db
+        .select()
+        .from(assistantContinuationsTable)
+        .where(eq(assistantContinuationsTable.conversationId, id))
+        .get();
+      return row === undefined ? undefined : toContinuation(row);
+    },
+    findContinuationByRequest(requestId: string) {
+      const row = db
+        .select()
+        .from(assistantContinuationsTable)
+        .where(eq(assistantContinuationsTable.requestId, requestId))
+        .get();
+      return row === undefined ? undefined : toContinuation(row);
+    },
+    insertContinuation(
+      row: Omit<typeof assistantContinuationsTable.$inferInsert, 'attachmentIds'> & { attachmentIds: string[] },
+    ): void {
+      db.insert(assistantContinuationsTable)
+        .values({ ...row, attachmentIds: JSON.stringify(row.attachmentIds) })
+        .run();
+    },
+    consumeContinuation(id: string, now: number): void {
+      db.update(assistantContinuationsTable)
+        .set({ consumedAt: now, draftText: null })
+        .where(eq(assistantContinuationsTable.conversationId, id))
+        .run();
+    },
     enqueueMessage(conversationId: string, text: string, createdAt: number): void {
       db.insert(outbox).values({ conversationId, text, createdAt }).run();
     },

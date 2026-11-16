@@ -15,6 +15,7 @@ import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { ASSISTANT_COPY as C } from '../../copy/assistant.ts';
+import { ASSISTANT_CONTINUATION_COPY } from '../../copy/assistant-continuation.ts';
 import { ATTEMPT_COPY, STREAM_COPY, TRANSCRIPT_SYSTEM_LABEL } from '../../copy/attempts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
@@ -32,6 +33,8 @@ import { AssistantWelcome } from './assistant-welcome.tsx';
 import cards from './cards.module.css';
 import { ChartCard } from './chart-card.tsx';
 import { ConfirmationCard } from './confirmation-card.tsx';
+import { ContinuationSource } from './continuation-source.tsx';
+import { useContinueConversation } from './conversation-continuation.tsx';
 import { EntityCard } from './entity-card.tsx';
 import { FileCard } from './file-card.tsx';
 import { ReplyMarkdown } from './reply-markdown.tsx';
@@ -102,6 +105,7 @@ type Rendered = {
   confirmations: ReadonlyMap<string, AssistantConfirmationDTO>;
   results: ReadonlyMap<string, ToolResult>;
   pro: boolean;
+  onContinue: (() => void) | null;
   /** Where the latest turn starts: the last user message's `seq`. */
   turnStart: number;
   /** The text or thinking the assistant is writing right now (a typing caret, the thinking's last lines). */
@@ -175,11 +179,14 @@ function Body({ entry, ctx, fresh }: { entry: TranscriptEntry; ctx: Rendered; fr
     case TranscriptEntryKind.Error: {
       // The provider's own words, when it sent some (opencode's error data).
       const said = entry.data.details?.message;
+      const overflow = entry.data.details?.opencodeErrorName === 'ContextOverflowError';
       return (
         <div className={styles.error} role="status">
           <Icon name="alert" size="sm" />
           <span className="grow">
-            <span className={styles.errorTitle}>{ERROR_COPY[entry.data.code]}</span>
+            <span className={styles.errorTitle}>
+              {overflow ? ASSISTANT_CONTINUATION_COPY.overflow : ERROR_COPY[entry.data.code]}
+            </span>
             {typeof said === 'string' && <span className={styles.errorMessage}>{said}</span>}
             {ctx.pro && (
               <span className={`${styles.errorMessage} mono`}>
@@ -187,6 +194,11 @@ function Body({ entry, ctx, fresh }: { entry: TranscriptEntry; ctx: Rendered; fr
               </span>
             )}
           </span>
+          {overflow && entry.seq > ctx.turnStart && ctx.onContinue !== null && (
+            <Button size="sm" variant="ghost" onClick={ctx.onContinue}>
+              {ASSISTANT_CONTINUATION_COPY.action}
+            </Button>
+          )}
         </div>
       );
     }
@@ -233,6 +245,7 @@ function Stream({
 }) {
   const confirmations = useQuery(confirmationsQuery(conversation.id)).data;
   const pro = useSettings()['ui.mode'] === UiMode.Pro;
+  const onContinue = useContinueConversation()?.start ?? null;
   // What was there when the conversation opened is staggered; what arrives later fades in at once.
   const [opened] = useState(entries.length);
   const last = entries.at(-1);
@@ -251,11 +264,12 @@ function Stream({
       confirmations: new Map((confirmations ?? []).map((c) => [c.id, c])),
       results,
       pro,
+      onContinue,
       turnStart,
       writingKey,
       seconds,
     }),
-    [conversation, confirmations, results, pro, turnStart, writingKey, seconds],
+    [conversation, confirmations, results, pro, onContinue, turnStart, writingKey, seconds],
   );
   // Writing text or thinking shows itself and a running call its own shimmer; otherwise the panel shows it is thinking.
   const runningCall = last?.kind === TranscriptEntryKind.ToolCall && !results.has(last.data.callId);
@@ -305,5 +319,10 @@ export function MessageList({ conversation }: { conversation: AssistantConversat
         )}
       </div>
     );
-  return <Stream conversation={conversation} entries={entries} />;
+  return (
+    <>
+      <ContinuationSource conversation={conversation} />
+      <Stream conversation={conversation} entries={entries} />
+    </>
+  );
 }

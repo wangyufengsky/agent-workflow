@@ -361,8 +361,11 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/assistant/conversations` | `{ items: AssistantConversationDTO[] }`，最近更新在前；`AssistantConversationDTO = { id, title, busy, queuePosition, pendingPermissions: Array<{ permissionId, permission, patterns }>, usage: AssistantUsageDTO, createdAt, updatedAt }`（`busy`、`queuePosition` 与权限请求只在内存中，重启后为空；`usage` 持久化；`queuePosition` 为这一轮在模型额度队列中的位置，1 = 下一个，没有排队为 `null`，D186） |
-| POST | `/assistant/conversations` | `{ title? }` → 201；opencode 会话在第一条消息时创建 |
+| GET | `/assistant/conversations` | `{ items: AssistantConversationDTO[] }`，最近更新在前；`AssistantConversationDTO` 包含 `{ id, title, projectId, continuation, busy, queuePosition, pendingPermissions, usage, createdAt, updatedAt }`。`projectId: string \| null`，`continuation` 对普通会话为 `null`，续接时为 `{ sourceConversationId, sourceAvailable, cutoffSeq, createdAt, handoffKind, attachmentIds, draftText, consumedAt }`。`busy`、队列位置和权限只在内存中，`usage` 持久化；队列位置 1 为下一个，未排队为 `null`（D186） |
+| POST | `/assistant/conversations` | `{ title?, projectId? }` → 201；`projectId` 可空，未知项目返回 404 `PROJECT_NOT_FOUND`。opencode 会话在第一条消息时创建 |
+| POST | `/assistant/conversations/:id/continuations` | `assistant.continue`，`{ requestId, attachmentIds }` → 201 新对话。同 UUID 与来源返回同一结果；来源忙碌返回 409 `ASSISTANT_BUSY`。附件须属于来源会话，仅勾选项绑定到新会话 |
+| GET | `/assistant/conversations/:id/continuation/history?afterSeq=` | `assistant.continuationHistory`，读取来源消息流截至创建时的序号，返回 `TranscriptPage`。来源已删除返回 404 `ASSISTANT_CONVERSATION_NOT_FOUND` |
+| GET | `/assistant/conversations/:id/attachments` | `assistant.attachments`，返回 `{ items: AttachmentDTO[] }`，仅列该对话有权读取的用户附件 |
 | POST | `/assistant/context-snapshots` | `assistant.snapshotContext`，`{ source: { kind: 'task', taskId, nodeId? } \| { kind: 'selection', text, page: AssistantPageRef } }` → 201 `AttachmentDTO`。用户显式附加文字，write，不暴露给助手或命令面板。任务／步骤信息由后端读取；不存在 404 `TASK_NOT_FOUND` / `NODE_NOT_FOUND`，步骤必须属于任务。选中文字 trim 后 1–12000 字符，超长／空白／多余字段 400 `VALIDATION_FAILED`；仅文字，NUL 等仍由附件边界拒绝。结果是固定的文本附件，使用现有查看、移除、绑定与清理接口 |
 | GET | `/assistant/conversations/:id` | 不存在 404 `ASSISTANT_CONVERSATION_NOT_FOUND` |
 | DELETE | `/assistant/conversations/:id` | 204；先中止运行并删除底层会话，失败保留本地对话以便重试；成功后清理确认、待发消息、任务跟进记录、消息流 JSONL 与 `files/<id>/`。正在异步建会话/发送或另一删除中返回 409 `ASSISTANT_BUSY`，防止孤儿会话和删除期间回传 |

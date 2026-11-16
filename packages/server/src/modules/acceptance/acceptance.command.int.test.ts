@@ -82,6 +82,6 @@ describe('检查命令', () => {
     const running = service().runCommand(dir, LONG_RUNNING, controller.signal);
     await created('started');
     controller.abort();
-    expect(await running).toMatchObject({ passed: false, timedOut: false });
+    expect(await running).toMatchObject({ passed: false, exitCode: null, timedOut: false });
   });
 });

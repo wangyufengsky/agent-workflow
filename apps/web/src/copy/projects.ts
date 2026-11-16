@@ -3,6 +3,11 @@ import { formatBytes } from './common.ts';
 
 export const PROJECTS_COPY = {
   title: '项目',
+  startTask: '开始任务',
+  askProject: '问这个项目',
+  recentTasks: '近期任务',
+  viewProjectTasks: '查看本项目全部任务',
+  noRecentTasks: '这个项目还没有任务。',
   lede: '添加到这里的本地 Git 仓库可以用来开始任务。',
   add: '添加项目',
   addTitle: '添加项目',

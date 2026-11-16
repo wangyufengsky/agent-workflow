@@ -92,6 +92,8 @@ export const ASSISTANT_CONTEXT_MAX_CHARS = 12_000;
 /** 旧会话隔离升级时回放的最近记录和文字上限。 */
 export const ASSISTANT_RECOVERY_ENTRIES = 200;
 export const ASSISTANT_RECOVERY_MAX_CHARS = 12_000;
+/** 续接首轮携带的历史预算。实际发送时还受模型容量和当前输入限制。 */
+export const ASSISTANT_CONTINUATION_MAX_CHARS = 8_000;
 /** Knowledge Q&A (18 §7). */
 export const KNOWLEDGE_QUESTION_MAX_CHARS = 4000;
 /** A conversation's title taken from its first question is cut to this length. */

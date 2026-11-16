@@ -1,5 +1,6 @@
 import type { AssistantConversationDTO } from '@aw/shared';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
+import { useRef } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { useCreateConversation, useSendMessage } from './assistant.queries.ts';
@@ -17,6 +18,7 @@ export function useAsk() {
   const navigate = useNavigate();
   const create = useCreateConversation();
   const send = useSendMessage();
+  const draftTarget = useRef<AssistantConversationDTO | undefined>(undefined);
 
   const sendTo = (
     target: AssistantConversationDTO,
@@ -34,6 +36,7 @@ export function useAsk() {
       // Only once the message is accepted: the input that sent it keeps the text and shows why it was not.
       send.mutate(message, {
         onSuccess: () => {
+          draftTarget.current = undefined;
           onSent?.();
           useUiStore.setState({ activeConversationId: target.id });
           void navigate({ to: ROUTES.home, search: (s) => ({ projectId: s.projectId, conversation: target.id }) });
@@ -41,8 +44,13 @@ export function useAsk() {
       });
       return;
     }
-    useUiStore.setState({ assistantOpen: !onDesktop, activeConversationId: target.id });
-    send.mutate(message, { ...(onSent === undefined ? {} : { onSuccess: onSent }) });
+    send.mutate(message, {
+      onSuccess: () => {
+        draftTarget.current = undefined;
+        useUiStore.setState({ assistantOpen: !onDesktop, activeConversationId: target.id });
+        onSent?.();
+      },
+    });
   };
   /** `attachmentIds`: files sent with the message (30 §2). */
   const ask = (
@@ -50,10 +58,20 @@ export function useAsk() {
     conversation: AssistantConversationDTO | undefined,
     onSent?: () => void,
     attachmentIds: readonly string[] = [],
+    projectId: string | null = null,
   ) => {
-    if (conversation === undefined)
-      create.mutate(undefined, { onSuccess: (c) => sendTo(c, text, attachmentIds, onSent) });
-    else sendTo(conversation, text, attachmentIds, onSent);
+    if (conversation !== undefined) sendTo(conversation, text, attachmentIds, onSent);
+    else if (draftTarget.current?.projectId === projectId) sendTo(draftTarget.current, text, attachmentIds, onSent);
+    else
+      create.mutate(
+        { projectId },
+        {
+          onSuccess: (c) => {
+            draftTarget.current = c;
+            sendTo(c, text, attachmentIds, onSent);
+          },
+        },
+      );
   };
   return {
     ask,

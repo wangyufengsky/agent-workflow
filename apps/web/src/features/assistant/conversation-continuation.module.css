@@ -1,0 +1,54 @@
+.source {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-2);
+  margin: var(--s-2) var(--s-5) 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--bg-sunken);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sourceText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.carried {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-2);
+}
+.choices {
+  display: grid;
+  gap: var(--s-2);
+  max-height: 32vh;
+  overflow: auto;
+}
+.choice {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  overflow-wrap: anywhere;
+}
+.history {
+  display: grid;
+  gap: var(--s-3);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  min-width: 0;
+}
+.historyMessage {
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow-wrap: anywhere;
+}
+.userText {
+  white-space: pre-wrap;
+}

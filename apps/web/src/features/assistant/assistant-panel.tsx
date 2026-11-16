@@ -10,9 +10,10 @@ import { ASSISTANT_COPY as C } from '../../copy/assistant.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { Character } from '../companion/character.tsx';
 import styles from './assistant.module.css';
-import { conversationsQuery, useCreateConversation, useDeleteConversation } from './assistant.queries.ts';
+import { conversationsQuery, useDeleteConversation } from './assistant.queries.ts';
 import { AssistantWelcome } from './assistant-welcome.tsx';
 import { Composer } from './composer.tsx';
+import { ConversationContinuation } from './conversation-continuation.tsx';
 import { ConversationMenu } from './conversation-menu.tsx';
 import { MessageList } from './message-list.tsx';
 
@@ -22,94 +23,116 @@ function Panel({ open, onClosed }: { open: boolean; onClosed: () => void }) {
   const activeId = useUiStore((s) => s.activeConversationId);
   const setActive = useUiStore((s) => s.setActiveConversation);
   const conversations = useQuery(conversationsQuery);
-  const create = useCreateConversation();
   const remove = useDeleteConversation();
   const [deleting, setDeleting] = useState(false);
+  const [draft, setDraft] = useState<{ activeId: string | null; projectId: string | null } | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const list = conversations.data ?? [];
-  const active = list.find((c) => c.id === activeId) ?? list[0];
+  const menuActive = list.find((c) => c.id === activeId) ?? list[0];
+  const drafting = draft !== null && draft.activeId === activeId;
+  const active = drafting ? undefined : menuActive;
   const busy = active?.busy === true;
+  useEffect(() => {
+    setDraft((current) => (current?.activeId === activeId ? current : null));
+  }, [activeId]);
 
   useEffect(() => {
     if (open) input.current?.focus();
   }, [open]);
 
   return (
-    <aside
-      className={styles.panel}
-      data-state={open ? 'open' : 'closed'}
-      data-busy={busy || undefined}
-      inert={!open}
-      aria-label={C.panel}
-      onKeyDown={(e) => {
-        // Esc in the open conversation list closes only the list.
-        if (e.key === 'Escape' && e.currentTarget.querySelector(':popover-open') === null) setOpen(false);
-      }}
-      onAnimationEnd={(e) => {
-        if (!open && e.target === e.currentTarget) onClosed();
-      }}
-    >
-      <header className={styles.head}>
-        <Character mood={busy ? 'thinking' : undefined} />
-        {active === undefined ? (
-          <span className={styles.headTitle}>{C.panel}</span>
-        ) : (
-          <ConversationMenu conversations={list} active={active} onSelect={setActive} />
-        )}
-        <span className="grow" />
-        <IconButton
-          icon="plus"
-          label={C.newConversation}
-          disabled={create.isPending}
-          onClick={() => create.mutate(undefined, { onSuccess: (c) => setActive(c.id) })}
-        />
-        {active !== undefined && (
-          <IconButton icon="trash" label={C.deleteConversation} onClick={() => setDeleting(true)} />
-        )}
-        <IconButton icon="x" label={C.close} onClick={() => setOpen(false)} />
-      </header>
-      <div className={styles.messages} data-testid="assistant-messages">
-        {conversations.isError && (
-          <ErrorState error={conversations.error} onRetry={() => void conversations.refetch()} />
-        )}
-        {active === undefined ? (
-          conversations.isSuccess && (
-            <div className={styles.feed}>
-              <AssistantWelcome conversation={undefined} />
-            </div>
+    <ConversationContinuation conversation={active} onContinued={setActive}>
+      <aside
+        className={styles.panel}
+        data-state={open ? 'open' : 'closed'}
+        data-busy={busy || undefined}
+        inert={!open}
+        aria-label={C.panel}
+        onKeyDown={(e) => {
+          // Portals and the switcher handle Esc without closing the panel underneath them.
+          if (
+            e.key === 'Escape' &&
+            e.target instanceof Node &&
+            e.currentTarget.contains(e.target) &&
+            e.currentTarget.querySelector(':popover-open') === null
           )
-        ) : (
-          <MessageList key={active.id} conversation={active} />
+            setOpen(false);
+        }}
+        onAnimationEnd={(e) => {
+          if (!open && e.target === e.currentTarget) onClosed();
+        }}
+      >
+        <header className={styles.head}>
+          <Character mood={busy ? 'thinking' : undefined} />
+          {menuActive === undefined ? (
+            <span className={styles.headTitle}>{drafting ? C.newConversation : C.panel}</span>
+          ) : (
+            <ConversationMenu
+              conversations={list}
+              active={menuActive}
+              draft={drafting}
+              onSelect={(id) => {
+                setDraft(null);
+                setActive(id);
+              }}
+            />
+          )}
+          <span className="grow" />
+          <IconButton icon="plus" label={C.newConversation} onClick={() => setDraft({ activeId, projectId: null })} />
+          {active !== undefined && (
+            <IconButton icon="trash" label={C.deleteConversation} onClick={() => setDeleting(true)} />
+          )}
+          <IconButton icon="x" label={C.close} onClick={() => setOpen(false)} />
+        </header>
+        <div className={styles.messages} data-testid="assistant-messages">
+          {conversations.isError && (
+            <ErrorState error={conversations.error} onRetry={() => void conversations.refetch()} />
+          )}
+          {active === undefined ? (
+            conversations.isSuccess && (
+              <div className={styles.feed}>
+                <AssistantWelcome conversation={undefined} projectId={drafting ? draft.projectId : null} />
+              </div>
+            )
+          ) : (
+            <MessageList key={active.id} conversation={active} />
+          )}
+        </div>
+        <Composer
+          key={active?.id ?? 'draft'}
+          conversation={active}
+          inputRef={input}
+          projectId={drafting ? draft.projectId : null}
+          onProjectChange={(projectId) => setDraft({ activeId, projectId })}
+        />
+        {active !== undefined && deleting && (
+          <Dialog
+            open
+            onOpenChange={setDeleting}
+            title={C.deleteConversation}
+            footer={
+              <Button
+                variant="danger"
+                pending={remove.isPending}
+                onClick={() =>
+                  remove.mutate(active.id, {
+                    onSuccess: () => {
+                      setDeleting(false);
+                      setActive(null);
+                    },
+                  })
+                }
+              >
+                {C.deleteConversation}
+              </Button>
+            }
+          >
+            <p>{C.deleteConfirm}</p>
+            {remove.isError && <ErrorState error={remove.error} />}
+          </Dialog>
         )}
-      </div>
-      <Composer conversation={active} inputRef={input} disabled={create.isPending} />
-      {active !== undefined && deleting && (
-        <Dialog
-          open
-          onOpenChange={setDeleting}
-          title={C.deleteConversation}
-          footer={
-            <Button
-              variant="danger"
-              pending={remove.isPending}
-              onClick={() =>
-                remove.mutate(active.id, {
-                  onSuccess: () => {
-                    setDeleting(false);
-                    setActive(null);
-                  },
-                })
-              }
-            >
-              {C.deleteConversation}
-            </Button>
-          }
-        >
-          <p>{C.deleteConfirm}</p>
-          {remove.isError && <ErrorState error={remove.error} />}
-        </Dialog>
-      )}
-    </aside>
+      </aside>
+    </ConversationContinuation>
   );
 }
 

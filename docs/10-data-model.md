@@ -379,12 +379,29 @@ payload / response：
 | --- | --- | --- |
 | id | TEXT PK | |
 | title | TEXT | 默认取第一条消息的首行（`ASSISTANT_TITLE_MAX_CHARS`） |
+| project_id | TEXT NULL | 迁移 0035；创建时验证，空值为通用对话。项目删除后保留原 ID 以区分通用会话 |
 | opencode_session_id | TEXT NULL | 第一条消息时创建；MCP 调用归属的依据；已隔离会话运行于真实路径 `assistant/files/<id>/` |
 | isolated | INTEGER boolean DEFAULT 0 | 迁移 0020：旧记录为 false，新建为 true；首次发送前把旧原生会话迁移到独立目录 |
 | retired_session_id | TEXT NULL | 迁移 0020：等待清理的旧原生会话；持久化后才删除，失败保留供跨重启重试，禁止回到旧目录运行 |
 | created_at / updated_at | INTEGER | `updated_at` 随每条消息更新，列表按它倒序 |
 
 索引：`(opencode_session_id)`、`(updated_at)`。
+
+### assistant_continuations
+
+迁移 `0035_assistant_conversations`、`0036_continuation_attachments`。删除子对话时随它级联清理，删除来源时仍保留交接内容。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| conversation_id | TEXT PK → assistant_conversations，CASCADE | 新会话 |
+| source_conversation_id | TEXT | 来源会话，删除来源后保留原 ID |
+| request_id | TEXT UNIQUE | 界面为同一次操作生成的 UUID |
+| cutoff_seq | INTEGER | 原消息流最后纳入的序号 |
+| handoff_text | TEXT | 有长度上限的历史交接文字 |
+| handoff_kind | TEXT | `summary` 为抽取要点与近期原文，`recent` 为仅有近期原文 |
+| attachment_ids | TEXT(JSON) | 用户创建续接时选定的附件 ID，独立于消息发送后建立的附件引用 |
+| draft_text | TEXT NULL | 明确上下文超限时恢复原用户输入，模型接受子对话首轮后清除 |
+| created_at / consumed_at | INTEGER / INTEGER NULL | 创建与首轮交接接受时间 |
 
 ### assistant_confirmations
 

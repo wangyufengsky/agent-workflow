@@ -246,6 +246,20 @@
       "when": 1794793259445,
       "tag": "0034_delivery_diff_range",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1794798388807,
+      "tag": "0035_assistant_conversations",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1794800404628,
+      "tag": "0036_continuation_attachments",
+      "breakpoints": true
     }
   ]
 }

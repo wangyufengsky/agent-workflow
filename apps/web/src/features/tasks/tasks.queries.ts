@@ -109,7 +109,7 @@ export const rolesQuery = queryOptions({
   queryFn: async () => (await callOperation(listRolesOp, {})).items,
 });
 
-export type TaskFilter = { projectId?: string; displayGroup?: TaskDisplayGroup; archived?: boolean };
+export type TaskFilter = { projectId?: string; displayGroup?: TaskDisplayGroup; archived?: boolean; limit?: number };
 
 export const tasksQuery = (filter: TaskFilter = {}) =>
   queryOptions({

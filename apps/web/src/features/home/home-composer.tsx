@@ -24,6 +24,7 @@ import { useUiStore } from '../../state/ui.store.ts';
 import { AddMenu, type AddMenuItem } from '../assistant/add-menu.tsx';
 import { useAbortAssistant } from '../assistant/assistant.queries.ts';
 import { useContextAttachments } from '../assistant/context-attachments.tsx';
+import { ConversationProjectSelect } from '../assistant/conversation-project-select.tsx';
 import { UsageButton } from '../assistant/usage-line.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
 import { AttachmentList, dropFilesInto, pasteFilesInto, useAttachmentPickers } from '../attachments/attachment-bar.tsx';
@@ -52,6 +53,8 @@ export function HomeComposer({
   projects,
   projectId,
   onProjectChange,
+  assistantProjectId,
+  onAssistantProjectChange,
   initialWorkflowKey,
   initialRequirement,
   docked,
@@ -60,6 +63,8 @@ export function HomeComposer({
   projects: readonly ProjectDTO[];
   projectId: string;
   onProjectChange: (id: string) => void;
+  assistantProjectId: string | null;
+  onAssistantProjectChange: (id: string | null) => void;
   initialWorkflowKey: string | undefined;
   initialRequirement: string | undefined;
   /** Under a conversation rather than in the hero: a smaller box. */
@@ -67,7 +72,10 @@ export function HomeComposer({
 }) {
   const workflows = useQuery(workflowsQuery);
   const templates = useQuery(initiativeTemplatesQuery);
-  const [text, setText] = useState(initialRequirement ?? '');
+  const continuation = conversation?.continuation;
+  const [text, setText] = useState(
+    initialRequirement ?? (continuation?.consumedAt === null ? continuation.draftText : null) ?? '',
+  );
   const [workflowKey, setWorkflowKey] = useState(initialWorkflowKey);
   const [templateKey, setTemplateKey] = useState<string>();
   // 「让 AI 拆解」: an initiative the AI breaks down, instead of one made from a template (34 §5.1).
@@ -107,9 +115,14 @@ export function HomeComposer({
     onStarted: () => files.clear(),
   });
   const project = projects.find((p) => p.id === projectId);
+  const selectedAssistantId = conversation === undefined ? assistantProjectId : conversation.projectId;
+  const attachmentProject =
+    workflowKey !== undefined || templateKey !== undefined || breakdown
+      ? project
+      : projects.find((p) => p.id === selectedAssistantId);
   const pickers = useAttachmentPickers(
     files,
-    project === undefined ? undefined : { projectId: project.id, refName: 'HEAD' },
+    attachmentProject === undefined ? undefined : { projectId: attachmentProject.id, refName: 'HEAD' },
   );
   // A base branch belongs to the project it was picked in.
   const changeProject = (id: string) => {
@@ -161,7 +174,7 @@ export function HomeComposer({
   const send = () => {
     if (workflow !== undefined) task.start();
     else if (initiativeMode) initiative.start();
-    else if (!empty && !busy && !files.blocked) {
+    else if (!empty && !busy && !ask.isPending && !files.blocked) {
       ask.ask(
         text.trim(),
         conversation,
@@ -170,6 +183,7 @@ export function HomeComposer({
           files.clear();
         },
         files.ids,
+        assistantProjectId,
       );
     }
   };
@@ -242,6 +256,13 @@ export function HomeComposer({
             </div>
             <span className={styles.modeDescription}>{mode.description}</span>
           </div>
+        )}
+        {mode === undefined && (
+          <ConversationProjectSelect
+            value={conversation === undefined ? assistantProjectId : conversation.projectId}
+            projects={projects}
+            onChange={onAssistantProjectChange}
+          />
         )}
         <textarea
           ref={input}

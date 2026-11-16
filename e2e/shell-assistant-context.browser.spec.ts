@@ -34,8 +34,7 @@ test('任务详情快照可预览移除，与文件一起随侧栏消息发送',
   await expect(page.getByRole('heading', { name: '导出订单时保留前导零' })).toBeVisible();
   await page.keyboard.press('ControlOrMeta+j');
   const panel = page.getByRole('complementary', { name: '应用助手' });
-  await newConversation(page, panel);
-  await expect(panel.getByRole('button', { name: '切换对话', exact: true })).toHaveText('新对话');
+  await newConversation(panel);
   await expect(panel.getByLabel('发给助手的消息')).toBeEnabled();
   const snapshotName = `${task.key}-任务上下文.txt`;
   await addFromMenu(panel, '附上任务详情');

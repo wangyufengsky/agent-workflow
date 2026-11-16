@@ -139,7 +139,8 @@ export function createAcceptanceService({
       const result = await child;
       cancelTimeout();
       signal.removeEventListener('abort', stop);
-      const exitCode = timedOut ? null : (result.exitCode ?? null);
+      // Git Bash 可以在子进程被中止后返回 0，取消的检查没有有效退出码。
+      const exitCode = timedOut || signal.aborted ? null : (result.exitCode ?? null);
       const output = result.all ?? '';
       const unrunnable = unrunnableOf(command, exitCode, output);
       log.info({ directory, command, exitCode, timedOut, unrunnable }, 'acceptance command finished');

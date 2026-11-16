@@ -1,5 +1,5 @@
 import type { AssistantConfirmationStatus, AssistantTurnEvent, AssistantTurnStatus } from '@aw/shared';
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { initiativesTable } from '../initiatives/initiatives.table.ts';
 import { tasksTable } from '../tasks/tasks.table.ts';
 import { teamAnalysesTable } from '../team/team.table.ts';
@@ -10,6 +10,8 @@ export const assistantConversationsTable = sqliteTable(
   {
     id: text('id').primaryKey(),
     title: text('title').notNull(),
+    /** Kept even if the project is deleted, so it cannot become a general chat silently. */
+    projectId: text('project_id'),
     opencodeSessionId: text('opencode_session_id'),
     /** 旧会话目录不可由 opencode 请求参数改变，首次恢复时迁到独立会话。 */
     isolated: integer('isolated', { mode: 'boolean' }).notNull().default(false),
@@ -21,6 +23,26 @@ export const assistantConversationsTable = sqliteTable(
     index('assistant_conversations_session_idx').on(t.opencodeSessionId),
     index('assistant_conversations_updated_idx').on(t.updatedAt),
   ],
+);
+
+/** 续接快照不依赖来源存活；交接只在首次用户消息被接受后消费。 */
+export const assistantContinuationsTable = sqliteTable(
+  'assistant_continuations',
+  {
+    conversationId: text('conversation_id')
+      .primaryKey()
+      .references(() => assistantConversationsTable.id, { onDelete: 'cascade' }),
+    sourceConversationId: text('source_conversation_id').notNull(),
+    requestId: text('request_id').notNull(),
+    cutoffSeq: integer('cutoff_seq').notNull(),
+    handoffText: text('handoff_text').notNull(),
+    handoffKind: text('handoff_kind').$type<'summary' | 'recent'>().notNull(),
+    attachmentIds: text('attachment_ids').notNull().default('[]'),
+    draftText: text('draft_text'),
+    createdAt: integer('created_at').notNull(),
+    consumedAt: integer('consumed_at'),
+  },
+  (t) => [uniqueIndex('assistant_continuations_request_idx').on(t.requestId)],
 );
 
 /** 10 §4 assistant_confirmations: a write or critical call waiting for the user (15 §4). */
