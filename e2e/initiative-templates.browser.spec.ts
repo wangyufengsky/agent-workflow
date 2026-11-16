@@ -8,7 +8,7 @@ import { createProject, patchSettings } from './helpers.ts';
 test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'pro' }));
 test.afterAll(({ request }) => patchSettings(request, { 'ui.mode': 'simple' }));
 
-test('J40 专业模式：需求计划「存为模板」（先改出 {{requirement}}）→ 复制内置模板 → 删除 → 主页「自定义」里有它', async ({
+test('J40 专业模式：需求计划「存为组合模板」（先改出 {{requirement}}）→ 复制内置模板 → 删除 → 主页「自定义」里有它', async ({
   page,
   request,
 }) => {
@@ -55,7 +55,7 @@ test('J40 专业模式：需求计划「存为模板」（先改出 {{requiremen
   });
 
   await page.goto(`/initiatives/${initiative.id}`);
-  await page.getByRole('link', { name: '存为模板' }).click();
+  await page.getByRole('link', { name: '存为组合模板', exact: true }).click();
   const editor = page.getByTestId('template-editor');
   await expect(page.getByText(`来自需求计划 ${initiative.key}`)).toBeVisible();
   // The requirements hold the initiative's own text: no {{requirement}} yet.

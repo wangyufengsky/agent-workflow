@@ -124,7 +124,7 @@ const proOnlyPage = <P extends string>(path: P, Component: () => React.ReactNode
       <Component />
     </ProOnly>
   ));
-// 存为模板 opens it with the initiative (`?initiative=`), 复制 with the template copied (`?copy=`).
+// 存为组合模板 opens it with the initiative (`?initiative=`), 复制 with the template copied (`?copy=`).
 const initiativeTemplateNewRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: ROUTES.initiativeTemplateNew,

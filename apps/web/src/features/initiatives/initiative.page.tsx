@@ -343,7 +343,7 @@ export function InitiativePage() {
         </div>
         {!editing && canRefine && <RefineButton initiative={i} />}
         {!editing && editable && <Button onClick={() => setEditing(true)}>{C.edit}</Button>}
-        {/* 存为模板 (34 §15.6): custom templates are a pro-mode page. */}
+        {/* 存为组合模板 (34 §15.6): custom templates are a pro-mode page. */}
         {pro && !busy && (
           <Link to={ROUTES.initiativeTemplateNew} search={{ initiative: i.id }} className="btn ghost">
             {INITIATIVE_TEMPLATES_COPY.saveAs}
