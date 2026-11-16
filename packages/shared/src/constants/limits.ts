@@ -256,3 +256,7 @@ export const REQUIREMENT_NOTE_MAX_CHARS = 4000;
 /** Master password (D167): a short one is cheap to guess offline from a copied app.db, scrypt or not. */
 export const MASTER_PASSWORD_MIN_LENGTH = 8;
 export const MASTER_PASSWORD_MAX_LENGTH = 1024;
+
+/** 用户 Skill 的正文会随会话上下文发送。 */
+export const USER_SKILL_MAX_CHARS = 12_000;
+export const SKILL_SELECTION_MAX = 5;

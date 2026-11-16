@@ -196,6 +196,7 @@ export const ASSISTANT_PAGE_PARAMS = {
  */
 export const AssistantForm = {
   StartTask: 'tasks.create',
+  CreateSkill: 'skills.create',
   WorkflowFromPlan: 'workflows.fromPlan',
   TemplateFromInitiative: 'initiativeTemplates.fromInitiative',
   AddProject: 'projects.create',

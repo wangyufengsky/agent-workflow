@@ -61,7 +61,8 @@ export const getTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.get',
   title: 'op.tasks.get',
-  description: 'A task with its plan, steps, active AI sessions, open items and result',
+  description:
+    'A task with its plan, steps, active AI sessions, open items, result and document or spreadsheet versions',
   input: byId,
   output: taskDetailSchema,
   risk: OperationRisk.Read,

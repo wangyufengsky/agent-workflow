@@ -223,3 +223,9 @@ server/src/modules/assistant/
 按 [30](30-attachments.md) / [31](31-requirements-checklist.md) 接入。U-02 已实现：发送消息可带 `attachmentIds`，附件内容放进这条消息、消息流记下附件名；`read_attachment` 只能读当前对话的附件；删除对话释放引用。用户消息的附件与现有「助手生成的文件」是不同记录。创建任务时可以带上对话里的附件（U-03）：只接受本对话的附件，确认卡列出文件名。
 
 助手可以帮用户拆验收要求，经确认卡创建带清单的任务或替换清单（write 确认），也可以请求重新核验；逐项人工结论不向助手曝光。交付确认卡列出未满足的必需项。
+
+## 用户 Skill 草稿与产物做成 PPT
+
+用户可在本轮消息选用已保存的 Skill，系统提示携带发出当时的 Skill 正文，聊天记录显示名称和版本。创建 Skill 或从任务、对话中提炼做法时，助手通过现有 `open_form` 打开 `skills.create` 表单，值为完整 `source`。用户在「我的 Skill」检查、编辑并保存。
+
+从任务产物制作 PPT 时，助手通过 `tasks_get` 核对具体版本，并调用 `decks_create` 传入 `kind: artifact`、`taskId`、`artifactVersionId`。任务页会提供它正在显示的版本。用户确认创建后，PPT 按该版本读取正文或表格数据，并保留来源入口。

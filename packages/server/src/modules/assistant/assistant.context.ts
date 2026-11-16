@@ -136,7 +136,16 @@ export function createContextRenderer(deps: ContextDeps) {
       case AssistantPage.Task:
       case AssistantPage.Node: {
         const task = tasks.detail(param(ref, 'taskId'));
-        return describeTask(task, ref.params.nodeId, page === AssistantPage.Task ? 'the page' : 'the step page');
+        const base = describeTask(task, ref.params.nodeId, page === AssistantPage.Task ? 'the page' : 'the step page');
+        if (page !== AssistantPage.Task || task.artifact === undefined) return base;
+        const versionId = ref.params.artifactVersionId;
+        const version =
+          versionId === undefined
+            ? task.artifact.versions.at(-1)
+            : task.artifact.versions.find(({ id }) => id === versionId);
+        return version === undefined
+          ? base
+          : `${base}; viewing artifact v${version.number} (${version.name}, artifactVersionId ${version.id})`;
       }
       case AssistantPage.TaskPreview:
         // What the user looks at there is the page `browser_read` reads (29 §9).

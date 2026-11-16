@@ -172,6 +172,14 @@ import {
 } from './schedules.ts';
 import { getSettingsOp, updateSettingsOp } from './settings.ts';
 import {
+  createSkillOp,
+  deleteSkillOp,
+  listProjectSkillBindingsOp,
+  listSkillsOp,
+  setProjectSkillBindingOp,
+  updateSkillOp,
+} from './skills.ts';
+import {
   cleanStorageOp,
   getEnvironmentOp,
   getHealthOp,
@@ -279,6 +287,12 @@ export * from './workflows.ts';
 
 /** Every operation contract; the server mounts exactly these and the copy table covers all their titles. */
 export const OPERATION_CONTRACTS: readonly OperationContract[] = [
+  createSkillOp,
+  deleteSkillOp,
+  listProjectSkillBindingsOp,
+  listSkillsOp,
+  setProjectSkillBindingOp,
+  updateSkillOp,
   getSettingsOp,
   updateSettingsOp,
   getHealthOp,
@@ -520,3 +534,5 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   stopDeckOp,
   deleteDeckOp,
 ];
+
+export * from './skills.ts';

@@ -40,6 +40,7 @@ describe('操作清单的标注（M5-10）', () => {
         'projects.delete',
         'roles.delete',
         'schedules.delete',
+        'skills.delete',
         'system.cleanStorage',
         'tasks.cancel',
         'tasks.delete',

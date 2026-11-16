@@ -627,3 +627,16 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 - `createTask` 增加可选 `requirements: items`（每项 `title`、`expected`，`required` 默认 true，`verification` 默认 AI 核验），与任务同一事务创建第一个版本（Q-01 已实现）。
 - 交付（本地合并、创建／更新 PR、报告完成）增加可选 `acknowledgedRequirementsRevisionId`：界面对话框或助手确认卡列出未满足项时所依据的清单版本。有未满足的必需项时，缺少它或与当前版本不同都返回 `REQUIREMENTS_UNACKNOWLEDGED`，用户需要看着新版本重新确认；交付记录保存清单摘要。（Q-03 已实现：`tasks.deliver` 先算清单，批量交付也经过它；助手的 `tasks_deliver` 不带这个字段（`assistantOmit`），有未满足项时只能由用户在任务页交付；摘要记在交付的时间线事件里，见 10 §6.2）
 - SSE：`requirements.updated { taskId }`，界面重新获取。
+
+## 用户 Skill
+
+| 操作 | HTTP | 输入和结果 |
+| --- | --- | --- |
+| `skills.list` | GET `/skills` | 返回 `{items}`，每项有 `id`、`name`、`description`、`source`、`version` |
+| `skills.create` | POST `/skills` | 输入完整 `{source}`，返回新 Skill |
+| `skills.update` | PUT `/skills/:id` | 输入完整 `{source}`，返回保存后的 Skill |
+| `skills.delete` | DELETE `/skills/:id` | 删除 Skill 并解除绑定，返回 204 |
+| `skills.listProjectBindings` | GET `/projects/:projectId/skill-bindings` | 返回 `{items}`，每项有 `projectId`、`workflowKey`、`skillIds` |
+| `skills.setProjectBinding` | PUT `/projects/:projectId/skill-bindings/:workflowKey` | 用有序 `{skillIds}` 替换绑定，传空数组解除 |
+
+助手发送消息可传 `skillIds`。任务详情的可选 `skills` 返回创建时应用的 Skill 名称和版本。助手的任务页面上下文可携带 `params.artifactVersionId`，仅在该版本属于当前任务时描述它。

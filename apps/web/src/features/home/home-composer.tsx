@@ -39,6 +39,8 @@ import { templateChain, useStartInitiative } from '../initiatives/use-start-init
 import { ProjectPicker } from '../projects/project-picker.tsx';
 import type { DraftRequirement } from '../requirements/checklist-editor.tsx';
 import { ChecklistField } from '../requirements/checklist-field.tsx';
+import { AssistantSkillPicker } from '../skills/assistant-skill-picker.tsx';
+import { WorkflowSkillSummary } from '../skills/workflow-skill-summary.tsx';
 import { workflowsQuery } from '../tasks/tasks.queries.ts';
 import styles from './home.module.css';
 import { MoreOptionsFields } from './more-options.tsx';
@@ -91,6 +93,7 @@ export function HomeComposer({
   const [breakdown, setBreakdown] = useState(false);
   const [allowedWorkflows, setAllowedWorkflows] = useState<string[] | undefined>(undefined);
   const ask = useAsk();
+  const [skillIds, setSkillIds] = useState<string[]>([]);
   const abort = useAbortAssistant();
   const input = useRef<HTMLTextAreaElement>(null);
   const focusSeq = useUiStore((s) => s.homeInputFocus);
@@ -193,9 +196,11 @@ export function HomeComposer({
         () => {
           setText('');
           files.clear();
+          setSkillIds([]);
         },
         files.ids,
         assistantProjectId,
+        skillIds,
       );
     }
   };
@@ -260,6 +265,9 @@ export function HomeComposer({
               />
             </div>
             <span className={styles.modeDescription}>{mode.description}</span>
+            {project !== undefined && workflow !== undefined && (
+              <WorkflowSkillSummary projectId={project.id} workflowKey={workflow.key} />
+            )}
           </div>
         )}
         {mode === undefined && (
@@ -384,6 +392,7 @@ export function HomeComposer({
         )}
         <div className={styles.boxFoot}>
           <AddMenu items={addItems} onOpen={context.capture} />
+          {mode === undefined && <AssistantSkillPicker selected={skillIds} onChange={setSkillIds} />}
           {initiativeMode ? (
             <>
               <label className="check">

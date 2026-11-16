@@ -12,6 +12,7 @@ import { permissionDecisionSchema } from '../../enums/inbox.ts';
 import { operationRiskSchema } from '../../enums/system.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
 import { attachmentIdsSchema } from './attachments.ts';
+import { skillIdsSchema } from './skills.ts';
 
 /** A permission request of the assistant's session, answered in the panel (15 §6). Kept in memory, like opencode's. */
 export const assistantPermissionRequestSchema = z.object({
@@ -85,6 +86,7 @@ export const assistantPageRefSchema = z
       .strictObject({
         taskId: z.string().min(1).optional(),
         nodeId: z.string().min(1).optional(),
+        artifactVersionId: z.uuid().optional(),
         projectId: z.string().min(1).optional(),
         workflowKey: z.string().min(1).optional(),
         knowledgeConversationId: z.string().min(1).optional(),
@@ -132,6 +134,7 @@ export const createConversationRequestSchema = z.object({
 });
 
 export const sendAssistantMessageRequestSchema = z.object({
+  skillIds: skillIdsSchema.optional(),
   id: z.string(),
   text: z.string().trim().min(1).max(ASSISTANT_MESSAGE_MAX_CHARS),
   context: assistantPageRefSchema,

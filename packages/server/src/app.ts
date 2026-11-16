@@ -74,9 +74,10 @@ import { createRolesModule, type RolesService } from './modules/roles/index.ts';
 import { createScheduler } from './modules/scheduler/index.ts';
 import { createSchedulesModule, type SchedulesService } from './modules/schedules/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
+import { createSkillsModule } from './modules/skills/index.ts';
 import { createStorageModule } from './modules/storage/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
-import { createTasksModule, type TasksService } from './modules/tasks/index.ts';
+import { createTasksModule, readTaskSkills, type TasksService } from './modules/tasks/index.ts';
 import { createTeamModule } from './modules/team/index.ts';
 import { createWorkflowsModule, type WorkflowsService } from './modules/workflows/index.ts';
 import { createWorktreesModule, type WorktreesService } from './modules/worktrees/index.ts';
@@ -246,12 +247,19 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   // Built-in roles and workflows of this app version are written on every start (13).
   const roles = createRolesModule({ db: database.db, clock, log });
   roles.service.syncBuiltin(loadBuiltinRoles(config.promptsDir));
-  const workflows = createWorkflowsModule({ db: database.db, clock, log, roles: roles.service });
+  const workflows = createWorkflowsModule({ db: database.db, unit, clock, log, roles: roles.service });
   workflows.service.syncBuiltin(loadBuiltinWorkflows(config.promptsDir));
+  const skills = createSkillsModule({
+    db: database.db,
+    unit,
+    projects: projects.service,
+    workflows: workflows.service,
+  });
   const inbox = createInboxModule({ db: database.db, unit, clock, log });
   const modelSlots = createModelSlotsModule({ settings: settings.service, events, log });
   server.addHook('preClose', async () => modelSlots.service.dispose());
   const attempts = createAttemptsModule({
+    taskSkills: (id) => readTaskSkills(database.db, id),
     db: database.db,
     unit,
     events,
@@ -379,6 +387,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   const requirements = createRequirementsModule({ db: database.db, clock });
   const tasks = createTasksModule({
+    skills: skills.service,
     office,
     opencode,
     previews: previews.service,
@@ -542,6 +551,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...databases.operations,
     ...roles.operations,
     ...workflows.operations,
+    ...skills.operations,
     ...tasks.operations,
     ...batches.operations,
     ...initiatives.operations,
@@ -561,6 +571,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   ];
   const activeTaskStatuses = TASK_STATUSES.filter((s) => !isTerminalState(taskMachine, s));
   const assistant = createAssistantModule({
+    skills: skills.service,
     browser: browser.service,
     db: database.db,
     unit,

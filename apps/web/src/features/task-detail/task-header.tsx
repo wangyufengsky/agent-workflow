@@ -10,8 +10,11 @@ import { Markdown } from '../../components/markdown.tsx';
 import { toast } from '../../components/toast.tsx';
 import { formatDateTime } from '../../copy/common.ts';
 import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
+import { SKILLS_COPY } from '../../copy/skills.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { useAsk } from '../assistant/use-ask.ts';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
+import { UsedSkills } from '../skills/used-skills.tsx';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import {
   useArchiveTask,
@@ -41,6 +44,7 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
+  const summarize = useAsk();
   const cancel = useCancelTask();
   const archive = useArchiveTask();
   const unarchive = useUnarchiveTask();
@@ -122,6 +126,23 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
         {C.meta(task.key, task.project.name, task.workflow.name)}
         {task.archivedAt !== null && ` · ${C.archivedOn(formatDateTime(task.archivedAt))}`}
       </span>
+      {task.skills !== undefined && <UsedSkills skills={task.skills} />}
+      {(task.result !== null || task.nodes.some((node) => node.status === NodeStatus.Done)) && (
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="sparkle"
+            pending={summarize.isPending}
+            onClick={() =>
+              summarize.ask(SKILLS_COPY.summarizeTask(task.key), undefined, undefined, [], task.project.id)
+            }
+          >
+            {SKILLS_COPY.summarize}
+          </Button>
+        </div>
+      )}
+      {summarize.error !== null && <ErrorState error={summarize.error} />}
       {/* In the header, which stays as the task moves on: the main area below changes its layout by state. */}
       {task.attachments.length > 0 && <SentAttachments attachments={task.attachments} />}
       {task.attachments.map(

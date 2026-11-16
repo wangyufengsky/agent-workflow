@@ -2,6 +2,8 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   ARTIFACT_WORKFLOW_KEY,
+  AssistantPage,
+  createConversationOp,
   createDeckOp,
   type DeckDTO,
   DeckRunKind,
@@ -20,6 +22,7 @@ import {
   reviseTaskArtifactOp,
   ServerEventType,
   SlideLayout,
+  sendAssistantMessageOp,
   stopDeckOp,
   TaskStatus,
   updateDeckOp,
@@ -159,6 +162,25 @@ describe('指定版本作为 PPT 资料', () => {
       notes: [{ anchor: { kind: 'whole' }, quote: '', note: '更新统计内容' }],
     });
     await second;
+
+    if (fixture.format === 'Word') {
+      const { body: conversation } = await t.call(createConversationOp, { projectId: project.id });
+      const ready = waitForEvent(
+        t.app.events,
+        ServerEventType.AssistantUpdated,
+        (c) => c.id === conversation.id && !c.busy,
+      );
+      const sent = await t.call(sendAssistantMessageOp, {
+        id: conversation.id,
+        text: '把我现在看的这版做成 PPT',
+        context: { page: AssistantPage.Task, params: { taskId: task.id, artifactVersionId: version.id } },
+      });
+      expect(sent.status).toBe(200);
+      await ready;
+      expect(t.fake.prompts.at(-1)?.system).toContain(
+        `viewing artifact v1 (${fixture.file}, artifactVersionId ${version.id})`,
+      );
+    }
 
     t.fake.enqueue(script().callTool('submit_outline', OUTLINE), WRITER);
     const written = workEnds();

@@ -140,7 +140,10 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
 
     /** A custom workflow goes; the versions tasks use stay for them, unlisted (11 §4). */
     deleteWorkflow(key: string): void {
-      deps.workflows.remove(key, (ids) => state.repo.workflowsInUse(ids));
+      deps.unit.transact(() => {
+        deps.workflows.remove(key, (ids) => state.repo.workflowsInUse(ids));
+        deps.skills.releaseWorkflow(key);
+      });
     },
 
     /** A custom role goes unless a listed workflow names it or a task step or session used it (ROLE_IN_USE). */

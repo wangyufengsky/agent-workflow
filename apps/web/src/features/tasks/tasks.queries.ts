@@ -105,7 +105,16 @@ export const useCreateWorkflow = () =>
   useDefinitionMutation((input: CreateWorkflowRequest) => callOperation(createWorkflowOp, input));
 export const useUpdateWorkflow = () =>
   useDefinitionMutation((input: UpdateWorkflowRequest) => callOperation(updateWorkflowOp, input));
-export const useDeleteWorkflow = () => useDefinitionMutation((key: string) => callOperation(deleteWorkflowOp, { key }));
+export function useDeleteWorkflow() {
+  const cache = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) => callOperation(deleteWorkflowOp, { key }),
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: queryKeys.workflows });
+      void cache.invalidateQueries({ queryKey: queryKeys.skillBindings });
+    },
+  });
+}
 export const useCreateRole = () =>
   useDefinitionMutation((input: CreateRoleRequest) => callOperation(createRoleOp, input));
 export const useUpdateRole = () =>

@@ -24,6 +24,7 @@ import { operationTitle } from '../../copy/operations.ts';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { transcriptEntries } from '../attempts/attempt.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
+import { UsedSkills } from '../skills/used-skills.tsx';
 import { thinkingSeconds } from '../stream/stream-items.ts';
 import { ThinkingBlock } from '../stream/thinking-block.tsx';
 import { confirmationsQuery, conversationsQuery } from './assistant.queries.ts';
@@ -70,6 +71,7 @@ function HistoryMessage({
           <strong>{C.user}</strong>
           <div className={styles.userText}>{entry.data.text}</div>
           {entry.data.attachments !== undefined && <SentAttachments attachments={entry.data.attachments} />}
+          {entry.data.skills !== undefined && <UsedSkills skills={entry.data.skills} />}
         </li>
       );
     case TranscriptEntryKind.Text:

@@ -43,6 +43,7 @@ import type { ProjectsService } from '../projects/index.ts';
 import type { RequirementsService } from '../requirements/index.ts';
 import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
+import type { SkillsService } from '../skills/index.ts';
 import { recordTaskEvent } from '../timeline/index.ts';
 import type { WorkflowsService } from '../workflows/index.ts';
 import type { WorktreesService } from '../worktrees/index.ts';
@@ -57,6 +58,7 @@ export type TasksServiceDeps = {
   clock: Clock;
   log: Logger;
   settings: SettingsService;
+  skills: SkillsService;
   prompts: Prompts;
   projects: ProjectsService;
   workflows: WorkflowsService;

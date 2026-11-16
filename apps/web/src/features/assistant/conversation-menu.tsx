@@ -1,11 +1,14 @@
 import type { AssistantConversationDTO } from '@aw/shared';
 import { useId, useRef } from 'react';
+import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { ASSISTANT_COPY as C } from '../../copy/assistant.ts';
 import { ASSISTANT_CONTINUATION_COPY } from '../../copy/assistant-continuation.ts';
+import { SKILLS_COPY } from '../../copy/skills.ts';
 import { Character } from '../companion/character.tsx';
 import styles from './assistant.module.css';
 import { useContinueConversation } from './conversation-continuation.tsx';
+import { useAsk } from './use-ask.ts';
 
 export const titleOf = (c: AssistantConversationDTO) => (c.title === '' ? C.untitled : c.title);
 
@@ -26,6 +29,7 @@ export function ConversationMenu({
 }) {
   const id = useId();
   const menu = useRef<HTMLDivElement>(null);
+  const summarize = useAsk();
   const onContinue = useContinueConversation()?.start ?? null;
   return (
     <>
@@ -63,6 +67,21 @@ export function ConversationMenu({
             {!draft && c.id === active.id && <Icon name="check" size="sm" />}
           </button>
         ))}
+        {!draft && !active.busy && active.title !== '' && (
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.menuItem}
+            disabled={summarize.isPending}
+            onClick={() => {
+              menu.current?.hidePopover();
+              summarize.ask(SKILLS_COPY.summarizeConversation, active);
+            }}
+          >
+            <Icon name="sparkle" size="sm" />
+            {SKILLS_COPY.summarize}
+          </button>
+        )}
         {onContinue !== null && (
           <button
             type="button"
@@ -78,6 +97,7 @@ export function ConversationMenu({
           </button>
         )}
       </div>
+      {summarize.error !== null && <ErrorState error={summarize.error} />}
     </>
   );
 }

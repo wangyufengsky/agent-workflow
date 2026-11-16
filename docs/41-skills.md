@@ -18,7 +18,7 @@ skill 是按需加载的知识包：会话里只列出名字和一句描述，�
 | --- | --- |
 | 应用自带一组 skill（`packages/builtin/skills/`），随安装包发布，opencode 启动时通过配置注入 | 走 MCP 的 Skills 扩展（SEP-2640，见 D206） |
 | 每个 agent 只看到分配给它的 skill；用户个人的 skill、项目仓库里的 skill 在 aw 会话中不出现 | 项目仓库里的 skill（`.agents/skills`、`.claude/skills`、`.opencode/skills`）与用户给助手加的 skill：需要时另行设计，见 §10 |
-| 助手的 7 个 skill（§5.1），其中 2 个由现有提示词段落迁移而来；任务会话的 3 个 skill（§5.2） | 用户在应用里新建或编辑 skill |
+| 助手的 7 个 skill（§5.1），其中 2 个由现有提示词段落迁移而来；任务会话的 3 个 skill（§5.2） | 用户在应用里新建或编辑 Skill 见 §12 |
 | 协议提示词在明确的触发点点名 skill | 把必须遵守的规则移进 skill（D208） |
 | | `skills.urls`（远程 skill 列表）、skill 带附带文件（D209） |
 
@@ -218,7 +218,7 @@ Find the actual cause before you suggest anything, and quote the line that shows
 - 开发时改了 `SKILL.md`，新建的任务或助手对话（新的目录）就能读到新内容；已经在跑的会话继续用缓存。
 - 不涉及表结构、状态机、REST API 与 MCP 工具（10、09、11、12 §3 以后不变）。12 §2 的配置示例补上 `skills` 与各 agent 的 `skill` 权限，D168 的说明补一句指向 D207；15 §2 补一句助手的 skill 与 41 的链接。
 
-## 8. 安全
+## 8. 内置 Skill 的安全
 
 - skill 正文是应用自带的静态文件，与协议提示词同等可信；不读取项目或用户提供的 skill（D207），仓库里的 `SKILL.md` 不会被当作指令加载。
 - 白名单在 agent 级配置里，会话无法自行放开；`skill` 工具加载时 opencode 还会按会话权限再检查一次。
@@ -236,7 +236,6 @@ Find the actual cause before you suggest anything, and quote the line that shows
 
 ## 10. 之后可能做的
 
-- **用户给助手加的 skill**：应用数据目录下一个「我的 skill」目录，只加进助手的 `skills.paths` 与白名单（名字不能用 `aw-` 前缀），设置页的「助手」分组列出并说明怎样添加。适合报告模板、团队的固定说法这类个人知识。比放开 `~/.agents` 安全：只有用户特意放进来的才生效，也只给助手。白名单要按名字放行，需要在 opencode 启动时读出目录里的名字，新加的 skill 重启 opencode 后生效。
 - **项目的 skill**：项目设置里加「使用仓库里的 skill」开关，打开后为这个项目放行 `.opencode/skills` 下的 skill。难点是 opencode 1.19 的权限只按 skill 名过滤，分不清项目的与用户个人的，需要换成按项目配置目录注入的方式，届时另行设计。
 - **MCP 的 Skills 扩展**：opencode 实现 SEP-2640 的客户端后，再评估是否改为由执行 MCP 按任务动态提供（D206）。
 
@@ -249,3 +248,11 @@ Find the actual cause before you suggest anything, and quote the line that shows
 | SK-03 | 助手的迁移：`aw-assistant-charts`、`aw-assistant-preview`，每项单独提交 | 每项迁移前后各跑一次对应的 live 场景 |
 | SK-04 | 任务会话的 skill：`aw-db-readonly`（同时放行给助手）、`aw-offline-network`、`aw-merge-conflicts` 与 `revise-conflict.md` 的点名 | 单元 |
 | SK-05 | 任务会话的浏览器检查迁移成 `aw-page-check`（§5.3） | 迁移前后各跑一次页面改动的 live 场景 |
+
+## 12. 我的 Skill
+
+- 「设置 → 我的 Skill」支持编辑、导入或删除单个 UTF-8 `SKILL.md`。YAML 头至少提供唯一的英文短名 `name` 和用途 `description`，正文使用 Markdown。保留 `aw-` 前缀给内置 Skill。导入范围是选中的 Markdown 文件。
+- 主页和侧栏助手通过「选择 Skill」为本条消息选择做法，发送后清空选择。对话记录显示名称和版本。
+- 「项目 → 流程使用的 Skill」按项目和流程键保存绑定，流程发布新版本后绑定也适用。发起任务时显示将使用的名称和版本。任务创建时保存正文快照，规划、执行、审核及后续继续会话都沿用该记录。编辑 Skill 只让之后创建的任务使用新版本。
+- 对话菜单和有操作结果的任务提供「提炼为 Skill」。助手查看已有结果和校验，生成可编辑草稿。用户也可直接描述想创建的 Skill。草稿经 `open_form` 进入同一编辑器，保存后才进入库。
+- 应用把显式选择或绑定的正文附到对应会话的 system prompt。任务协议与原有工具授权继续控制操作，应用自带的原生 Skill 白名单继续按角色分配。

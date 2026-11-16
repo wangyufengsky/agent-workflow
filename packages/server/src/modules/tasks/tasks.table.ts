@@ -21,6 +21,8 @@ export const tasksTable = sqliteTable(
       .references(() => workflowsTable.id),
     title: text('title').notNull(),
     requirement: text('requirement').notNull(),
+    /** 创建任务时固定的用户 Skill（JSON）。 */
+    skills: text('skills').notNull().default('[]'),
     status: text('status').$type<TaskStatus>().notNull(),
     failedPhase: text('failed_phase').$type<TaskFailedPhase>(),
     /** JSON `ErrorInfo`. */

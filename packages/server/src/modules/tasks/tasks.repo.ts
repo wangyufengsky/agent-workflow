@@ -6,11 +6,26 @@ import {
   ErrorCode,
   type ErrorInfo,
   errorInfoSchema,
+  type SkillSnapshot,
+  skillSnapshotsSchema,
   type TaskResultDTO,
   type TaskStatus,
   taskResultSchema,
 } from '@aw/shared';
-import { and, desc, eq, inArray, isNotNull, isNull, lt, notInArray, or, type SQL, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  notInArray,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { projectsTable } from '../projects/index.ts';
 import { workflowsTable } from '../workflows/index.ts';
@@ -18,7 +33,8 @@ import { appCountersTable, tasksTable } from './tasks.table.ts';
 
 const TASK_SEQ_COUNTER = 'task_seq';
 
-type TaskRow = typeof tasksTable.$inferSelect;
+const { skills: skillColumn, ...taskColumns } = getTableColumns(tasksTable);
+type TaskRow = Omit<typeof tasksTable.$inferSelect, 'skills'>;
 
 /** A task with its JSON columns parsed and the names of its project and workflow. */
 export type Task = Omit<TaskRow, 'failure' | 'checkpoints' | 'result'> & {
@@ -53,7 +69,7 @@ export type NewTask = Pick<
   | 'mergeSource'
   | 'createdAt'
   | 'updatedAt'
-> & { checkpoints: Checkpoints };
+> & { checkpoints: Checkpoints; skills: SkillSnapshot[] };
 
 // JSON columns: parsed at the boundary (06 §9).
 function toTask(row: { tasks: TaskRow; projectName: string; workflowKey: string; workflowName: string }): Task {
@@ -84,12 +100,19 @@ export type StatusMatch = {
   artifactIteration?: boolean;
 };
 
+/** 正文只在启动会话和读取任务详情时需要，任务列表不加载它。 */
+export function readTaskSkills(db: DbExecutor, id: string): SkillSnapshot[] {
+  const row = db.select({ skills: skillColumn }).from(tasksTable).where(eq(tasksTable.id, id)).get();
+  if (row === undefined) throw new AppError(ErrorCode.TaskNotFound, `Task ${id} not found`, { id });
+  return skillSnapshotsSchema.parse(JSON.parse(row.skills));
+}
+
 export function createTasksRepo(db: DbExecutor) {
   const t = tasksTable;
   const select = (where: SQL | undefined) =>
     db
       .select({
-        tasks: t,
+        tasks: taskColumns,
         projectName: projectsTable.name,
         workflowKey: workflowsTable.key,
         workflowName: workflowsTable.name,
@@ -110,7 +133,13 @@ export function createTasksRepo(db: DbExecutor) {
         .returning({ value: c.value })
         .get();
       db.insert(t)
-        .values({ ...task, seq, key: `${keyPrefix}${seq}`, checkpoints: JSON.stringify(task.checkpoints) })
+        .values({
+          ...task,
+          seq,
+          key: `${keyPrefix}${seq}`,
+          checkpoints: JSON.stringify(task.checkpoints),
+          skills: JSON.stringify(task.skills),
+        })
         .run();
     },
     find(id: string): Task | undefined {

@@ -8,7 +8,7 @@ import { tasksOperations } from './tasks.operations.ts';
 import { createTasksService } from './tasks.service.ts';
 import type { TasksServiceDeps } from './tasks.state.ts';
 
-export type { Task } from './tasks.repo.ts';
+export { readTaskSkills, type Task } from './tasks.repo.ts';
 export type { TasksService } from './tasks.service.ts';
 export { tasksTable } from './tasks.table.ts';
 

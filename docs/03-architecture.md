@@ -95,6 +95,7 @@ opencode 全局事件 `permission.asked`（含 `id`、`sessionID`、`permission`
 | 表单 | react-hook-form + @hookform/resolvers | 引入时锁定（M1 表单字段少，用受控组件） |
 | diff / 代码高亮 | shiki（JavaScript 正则引擎、CSS 变量主题，按扩展名懒加载语法）；unified / split 视图与文件树为自写组件 `components/diff/`（D54） | 4.5.0 |
 | 契约 | zod | 4.6.7 |
+| 导入用户 Skill 的 YAML 头 | yaml | 2.9.1 |
 | HTTP | fastify（请求校验由操作清单挂载层直接用 zod 解析，见 D39） | 5.12.7 |
 | MCP | @modelcontextprotocol/sdk | 1.32.1 |
 | opencode 客户端 | @opencode-ai/sdk | **1.19.0（与 CLI 一致）** |
@@ -215,6 +216,7 @@ modules/tasks/
 - 需求计划（v1.3，34）：`initiatives` 在 `tasks`、`workflows`、`attachments`、`settings` 之上，`assistant` 之下；`tasks` 不知道需求计划（工作包表引用任务表）。经事件总线的 `task.updated` 得知工作包任务的变化；删除项目时经 `tasks.onProjectDeleted` 释放资料附件的引用。
 - 定时任务（v1.2，22 §11）：`schedules` 在 `tasks`、`workflows`、`inbox` 之上，`assistant` 之下；`tasks` 不知道定时任务（运行表引用任务表）。检查循环（`schedules.timer.ts`）用注入时钟，`app.start` 时与调度器一起启动，收到 `schedule.updated` 时重排；时区换算在 `core/time-zone.ts`，质量与用量共用。
 - 任务域的服务分层（D45）：`inbox`、`plans`、`timeline`、`worktrees` → `attempts` → `acceptance` → `nodes` → `tasks` → `scheduler`；`mcp` 在最上层。`assistant`（v1.1）与 `mcp` 同在最上层：它从 `app.ts` 拿到其余所有模块的操作实现来生成工具，并用 `attempts` 的会话流存储与会话视图、`tasks` / `projects` / `workflows` 查页面上的名称。尝试经 `attempts.onSignal` 通知其所有者（节点、规划、评审），不反向依赖；需要完整任务上下文的入口（`inbox.resolve`、`projects.delete`、节点通过/驳回/重试、删除流程与角色）由 `tasks` 实现。`databases` 在 `projects` 之下（项目详情列出关联的连接），任务上下文与数据库 MCP 工具经 `tasks` 使用它；`workflows` 依赖 `roles`（校验流程定义）。
+- 我的 Skill（41 §12）由 `skills` 读取项目和流程，任务服务创建任务时保存 Skill 快照。尝试模块由 `app.ts` 注入快照读取函数，助手可读取用户在当前消息选择的 Skill。
 - 跨服务的写入用 `core/db/unit-of-work` 的 `transact`（嵌套加入外层事务，事件在提交后发出，D44）。
 - `core` 不依赖 `modules`；`shared` 不依赖任何 app/package；`web` 只依赖 `shared`。
 - 模块间不循环。需要反向通知时用 `core/event-bus` 发领域事件。

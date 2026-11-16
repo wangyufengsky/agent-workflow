@@ -24,12 +24,14 @@ export function useAsk() {
     target: AssistantConversationDTO,
     text: string,
     attachmentIds: readonly string[],
+    skillIds: readonly string[],
     onSent?: () => void,
   ) => {
     const message = {
       id: target.id,
       text,
       context: page,
+      ...(skillIds.length === 0 ? {} : { skillIds: [...skillIds] }),
       ...(attachmentIds.length === 0 ? {} : { attachmentIds: [...attachmentIds] }),
     };
     if (onHome) {
@@ -59,16 +61,18 @@ export function useAsk() {
     onSent?: () => void,
     attachmentIds: readonly string[] = [],
     projectId: string | null = null,
+    skillIds: readonly string[] = [],
   ) => {
-    if (conversation !== undefined) sendTo(conversation, text, attachmentIds, onSent);
-    else if (draftTarget.current?.projectId === projectId) sendTo(draftTarget.current, text, attachmentIds, onSent);
+    if (conversation !== undefined) sendTo(conversation, text, attachmentIds, skillIds, onSent);
+    else if (draftTarget.current?.projectId === projectId)
+      sendTo(draftTarget.current, text, attachmentIds, skillIds, onSent);
     else
       create.mutate(
         { projectId },
         {
           onSuccess: (c) => {
             draftTarget.current = c;
-            sendTo(c, text, attachmentIds, onSent);
+            sendTo(c, text, attachmentIds, skillIds, onSent);
           },
         },
       );

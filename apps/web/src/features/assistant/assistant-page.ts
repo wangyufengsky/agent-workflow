@@ -103,6 +103,7 @@ export function useAssistantPage(): AssistantPageRef {
       const ids = {
         taskId: text(params.taskId),
         nodeId: text(params.nodeId) ?? text(search.node),
+        artifactVersionId: page === AssistantPage.Task ? text(search.artifactVersion) : undefined,
         projectId: text(params.projectId),
         workflowKey: page === AssistantPage.Workflow ? key : undefined,
         templateKey: page === AssistantPage.InitiativeTemplate ? key : undefined,
@@ -141,7 +142,7 @@ export function useOpenAssistantPage() {
           return navigate({
             to: ROUTES.task,
             params: { taskId: param(ref, 'taskId') },
-            search: ref.params.nodeId === undefined ? {} : { node: ref.params.nodeId },
+            search: { node: ref.params.nodeId, artifactVersion: ref.params.artifactVersionId },
           });
         case AssistantPage.TaskPreview:
           return navigate({ to: ROUTES.task, params: { taskId: param(ref, 'taskId') }, search: { view: 'preview' } });

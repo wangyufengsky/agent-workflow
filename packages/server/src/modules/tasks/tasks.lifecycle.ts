@@ -294,6 +294,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
             workflowId: workflow.id,
             title: input.title ?? firstLine(input.requirement).slice(0, TASK_TITLE_MAX_CHARS),
             requirement: input.requirement,
+            skills: deps.skills.forWorkflow(input.projectId, workflow.key),
             status: TaskStatus.Draft,
             baseBranch: input.baseBranch,
             mergeSource: input.mergeSource ?? null,

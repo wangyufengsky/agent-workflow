@@ -44,7 +44,7 @@ import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
 import { frontendVerified } from './tasks.frontend.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
-import type { StatusMatch } from './tasks.repo.ts';
+import { readTaskSkills, type StatusMatch } from './tasks.repo.ts';
 import { createTaskRequirements } from './tasks.requirements.ts';
 import { createTaskResults } from './tasks.result.ts';
 import { createTaskReview } from './tasks.review.ts';
@@ -100,10 +100,12 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
           rounds: listTaskEvents(db, id, 0, 'frontend_round').map(({ payload }) => frontendRoundSchema.parse(payload)),
         }
       : undefined;
+    const skills = readTaskSkills(db, id);
     return {
       ...state.summary(task),
       ...(isArtifactWorkflow(workflow) ? { artifact: artifacts.details(id) } : {}),
       requirement: task.requirement,
+      ...(skills.length === 0 ? {} : { skills: skills.map(({ id, name, version }) => ({ id, name, version })) }),
       failedPhase: task.failedPhase,
       failure: task.failure,
       workflow: {
