@@ -29,7 +29,7 @@ test('将待确认的 AI 计划保存为固定流程', async ({ page, request })
     },
   ]);
   await page.goto(`/?projectId=${project.id}`);
-  await pickWorkflow(page, /新功能开发/);
+  await pickWorkflow(page, '新功能开发');
   await page.getByLabel('需求').fill('实现功能');
   await page.getByLabel('运行前让我确认计划').check();
   await page.getByRole('button', { name: /^开始/ }).click();
