@@ -10,12 +10,13 @@ export const FRONTEND_VERIFY_PREFIX = 'frontend_verify_';
 export const FRONTEND_ANNOTATION_LIMIT = 6;
 export const FRONTEND_NOTE_LIMIT = 300;
 export const FRONTEND_FEEDBACK_LIMIT = 1800;
+const FRONTEND_ROUTE_LIMIT = 2000;
 
 const dimension = z.object({ width: z.number(), height: z.number() });
 export const frontendPageLayoutSchema = dimension.extend({ scrollWidth: z.number() });
 export const frontendElementSchema = z.object({
   id: z.uuid(),
-  path: z.string().max(500),
+  path: z.string().max(FRONTEND_ROUTE_LIMIT),
   viewport: viewportPresetSchema,
   layout: frontendPageLayoutSchema,
   tag: z.string().max(40),
@@ -41,5 +42,5 @@ export type FrontendRound = z.infer<typeof frontendRoundSchema>;
 
 export const localPreviewPathSchema = z
   .string()
-  .max(500)
+  .max(FRONTEND_ROUTE_LIMIT)
   .regex(/^\/(?![/\\])[^\r\n]*$/);

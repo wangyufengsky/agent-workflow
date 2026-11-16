@@ -9,6 +9,7 @@ import {
   NodeKind,
   NodeStatus,
   pickFrontendElementOp,
+  previewPathFromUrl,
   type TaskDetailDTO,
   TaskStatus,
   type UserTabState,
@@ -233,7 +234,8 @@ export function FrontendWorkbench({
             disabled={!review || hasDraft || revision.isPending}
             pending={finish.isPending}
             onClick={() => {
-              const path = tab !== undefined && URL.canParse(tab.url) ? new URL(tab.url).pathname : undefined;
+              const path =
+                tab !== undefined && URL.canParse(tab.url) ? previewPathFromUrl(new URL(tab.url)) : undefined;
               finish.mutate(
                 { id: task.id, ...(path === undefined ? {} : { path }) },
                 {

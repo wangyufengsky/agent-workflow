@@ -32,8 +32,14 @@ export type RequestEntry = {
 
 /** CDP event params the tab reads; they come from the browser, so they are parsed (06 §1). */
 const frameNavigatedSchema = z.object({
-  frame: z.object({ id: z.string(), url: z.string(), parentId: z.string().optional() }),
+  frame: z.object({
+    id: z.string(),
+    url: z.string(),
+    urlFragment: z.string().optional(),
+    parentId: z.string().optional(),
+  }),
 });
+const sameDocumentSchema = z.object({ frameId: z.string(), url: z.string() });
 const frameStartedNavigatingSchema = z.object({ frameId: z.string(), navigationType: z.string() });
 const dialogSchema = z.object({ type: z.string(), message: z.string() });
 const exceptionSchema = z.object({
@@ -131,6 +137,7 @@ export async function openTab({
   /** The main frame and its address, and where its current document's entries start (the user's counts, 29 §8.1). */
   let mainFrame: string | null = null;
   let url = '';
+  let documentUrl = '';
   let page = { console: 0, exceptions: 0, requests: 0 };
   /** Main-frame navigations that replace the document: started, and committed (29 §5.5). */
   const navigations = { started: 0, committed: 0 };
@@ -151,7 +158,8 @@ export async function openTab({
         const { frame } = frameNavigatedSchema.parse(params);
         if (frame.parentId !== undefined) return;
         mainFrame = frame.id;
-        url = frame.url;
+        documentUrl = frame.url;
+        url = documentUrl + (frame.urlFragment ?? '');
         // Refs name nodes of the page that was left (29 §5.5).
         refs = new Map();
         since.navigated = true;
@@ -159,6 +167,15 @@ export async function openTab({
         navigations.committed++;
         changed();
         mainFrameEvent();
+        return;
+      }
+      case 'Page.navigatedWithinDocument': {
+        const route = sameDocumentSchema.parse(params);
+        if (route.frameId !== mainFrame || route.url === url) return;
+        url = route.url;
+        refs = new Map();
+        since.navigated = true;
+        changed();
         return;
       }
       case 'Page.frameStartedNavigating': {
@@ -363,7 +380,7 @@ export async function openTab({
      */
     credentialsAsked(): string | null {
       if (since.certificateAsked !== null) return since.certificateAsked;
-      const document = [...requests.values()].findLast((r) => r.resourceType === 'Document' && r.url === url);
+      const document = [...requests.values()].findLast((r) => r.resourceType === 'Document' && r.url === documentUrl);
       return document?.status === 401 || document?.status === 407 ? url : null;
     },
 

@@ -58,6 +58,19 @@ export const navigateUserTabRequestSchema = z.object({
 });
 export const setUserViewportRequestSchema = z.object({ tabId: z.string(), preset: viewportPresetSchema });
 
+/** The local route, including client-side routing and filter state. */
+export function previewPathFromUrl({
+  pathname,
+  search,
+  hash,
+}: {
+  pathname: string;
+  search: string;
+  hash: string;
+}): string {
+  return `${pathname}${search}${hash}`;
+}
+
 /** The user's preview tab as the bottom bar shows it (29 §8.1); SSE `browser.tab_updated` when it changes. */
 export const userTabStateSchema = z.object({
   tabId: z.string(),
@@ -65,8 +78,8 @@ export const userTabStateSchema = z.object({
   /** The page's address; empty until the first page loads. */
   url: z.string(),
   viewport: viewportPresetSchema,
-  /** Of the current page: console errors (uncaught exceptions included) and requests that failed or answered ≥ 400. */
   picking: z.boolean().optional(),
+  /** Of the current page: console errors (uncaught exceptions included) and requests that failed or answered ≥ 400. */
   consoleErrors: z.number().int(),
   failedRequests: z.number().int(),
 });

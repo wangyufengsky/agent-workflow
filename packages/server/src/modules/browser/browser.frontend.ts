@@ -9,6 +9,8 @@ import {
   type FrontendRound,
   frontendElementSchema,
   frontendPageLayoutSchema,
+  localPreviewPathSchema,
+  previewPathFromUrl,
 } from '@aw/shared';
 import { z } from 'zod';
 import type { BrowserHost } from './browser.host.ts';
@@ -52,7 +54,15 @@ const readElement = `function () {
   };
 }`;
 
-const pagePath = (tab: Tab): string => new URL(tab.url()).pathname.slice(0, 500);
+const pagePath = (tab: Tab): string => previewPathFromUrl(new URL(tab.url()));
+function checkedPagePath(tab: Tab): string {
+  const route = localPreviewPathSchema.safeParse(pagePath(tab));
+  if (!route.success)
+    throw new AppError(ErrorCode.ValidationFailed, 'The preview route is too long or invalid', {
+      issues: route.error.issues,
+    });
+  return route.data;
+}
 type PendingPick = { id: string; done: PromiseWithResolvers<number | null>; abort: () => void; armed: boolean };
 
 export function createFrontendPreview(host: BrowserHost, dataDir: string) {
@@ -110,7 +120,7 @@ export function createFrontendPreview(host: BrowserHost, dataDir: string) {
       signal.throwIfAborted();
       const element = {
         id: randomUUID(),
-        path: pagePath(tab),
+        path: checkedPagePath(tab),
         viewport: tab.viewport.preset,
         ...facts,
       };
@@ -160,7 +170,7 @@ export function createFrontendPreview(host: BrowserHost, dataDir: string) {
       )?.element,
     layout: async (tab: Tab) => frontendPageLayoutSchema.parse(await tab.evaluate(readLayout)),
     async capture(taskId: string, tab: Tab, signal: AbortSignal): Promise<NonNullable<FrontendRound['before']>> {
-      const path = pagePath(tab);
+      const path = checkedPagePath(tab);
       const viewport = tab.viewport.preset;
       const { cssVisualViewport: v } = z
         .object({

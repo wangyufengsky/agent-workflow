@@ -7,6 +7,7 @@ import {
   initGitOp,
   type OperationContract,
   type TaskDetailDTO,
+  taskCheckEvidenceOp,
   taskDetailSchema,
   toOperationRequest,
 } from '@aw/shared';
@@ -16,6 +17,7 @@ import { type FakeStep, passReview, submitResult } from './helpers.ts';
 
 const nativeVue = process.env.AW_E2E_FRONTEND_VUE === '1';
 const packageName = 'aw-frontend-fixture';
+const route = '/?status=archived#/orders';
 const html = (label: string) => `<!doctype html><html lang="zh"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>订单工作台</title>
 <style>
@@ -155,6 +157,14 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
         return contents?.executeJavaScript("document.querySelector('#export')?.textContent");
       });
     await expect.poll(nativeText).toBe('导出');
+    // A SPA updates its URL in the current document before the user picks an element.
+    await app.evaluate(async ({ BrowserWindow }, path) => {
+      const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((item) => 'webContents' in item);
+      const contents = (view as Electron.WebContentsView | undefined)?.webContents;
+      if (contents === undefined) throw new Error('Preview is not placed');
+      await contents.executeJavaScript(`history.pushState({}, '', ${JSON.stringify(path)})`);
+    }, route);
+    await expect(workbench.getByLabel('页面路径')).toHaveValue(route);
     const pending = await detail();
     expect(pending.frontend?.verified).toBe(false);
     expect(pending.displayGroup).toBe('frontend_review');
@@ -237,7 +247,10 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
       const current = await detail();
       const last = current.frontend?.rounds.at(-1);
       if (last?.before == null) throw new Error('The round has no screenshot');
-      expect(last.annotations[0]).toMatchObject({ element: { label, locator: '#export', viewport: 'mobile' } });
+      expect(last.annotations[0]).toMatchObject({
+        element: { label, locator: '#export', viewport: 'mobile', path: route },
+      });
+      expect(last.before).toMatchObject({ path: route, viewport: 'mobile' });
       expect(
         (await request.get(`${api}/tasks/${task.id}/browser/${last.before.file}`, { headers })).headers()[
           'content-type'
@@ -245,6 +258,7 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
       ).toContain('image/jpeg');
       await workbench.getByRole('button', { name: '刷新', exact: true }).click();
       await expect.poll(nativeText).toBe(rename);
+      await expect(workbench.getByLabel('页面路径')).toHaveValue(route);
     }
     await round(1, '导出', '导出订单');
     await round(2, '导出订单', '下载订单');
@@ -285,6 +299,16 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
         expect.objectContaining({ kind: 'ai_review', passed: true }),
       ]),
     );
+    const evidenceId = accepted.result?.checks.find((check) => check.kind === 'browser')?.evidenceId;
+    if (evidenceId === undefined) throw new Error('Accepted task has no page check evidence');
+    const browserCheck = await call(taskCheckEvidenceOp, { id: task.id, evidenceId });
+    expect(browserCheck).toMatchObject({
+      kind: 'browser',
+      pages: expect.arrayContaining([
+        expect.objectContaining({ path: route, viewport: 'desktop' }),
+        expect.objectContaining({ path: route, viewport: 'mobile' }),
+      ]),
+    });
     expect(accepted.displayGroup).toBe('review');
     expect(accepted.openInbox.some((item) => item.kind === 'delivery')).toBe(true);
     await expect(workbench.getByText('已完成验收')).toBeVisible();

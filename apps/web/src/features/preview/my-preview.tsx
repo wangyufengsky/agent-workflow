@@ -5,6 +5,7 @@ import {
   openUserTabOp,
   type Preview,
   PreviewState,
+  previewPathFromUrl,
   setUserViewportOp,
   startPreviewOp,
   stopPreviewOp,
@@ -40,7 +41,7 @@ const limitOf = (error: unknown) =>
     ? limitSchema.parse(error.details)
     : undefined;
 
-const pathOf = (url: string) => (url === '' ? '/' : `${new URL(url).pathname}${new URL(url).search}`);
+const pathOf = (url: string) => (url === '' ? '/' : previewPathFromUrl(new URL(url)));
 
 /** One of the running previews in the way, and a way to stop it. */
 function RunningPreview({ taskId, onStopped }: { taskId: string; onStopped: () => void }) {
