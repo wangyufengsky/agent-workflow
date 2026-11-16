@@ -1,5 +1,6 @@
 import {
   AppError,
+  DeliveryStatus,
   ErrorCode,
   isUnmet,
   type RequirementItemInput,
@@ -10,6 +11,7 @@ import {
   WorktreeStatus,
 } from '@aw/shared';
 import { runGit } from '../git/index.ts';
+import { deliveredRequirements } from '../timeline/index.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
@@ -18,7 +20,7 @@ const EDITABLE: readonly TaskStatus[] = [TaskStatus.Draft, TaskStatus.PlanReview
 
 /** A task's acceptance checklist (31): when it may change, and its items' states against the task's current commit. */
 export function createTaskRequirements(deps: TasksServiceDeps, state: TaskState) {
-  const { unit, worktrees, requirements } = deps;
+  const { db, deliveries, unit, worktrees, requirements } = deps;
 
   /** The task branch's commit in its worktree; unknown once the worktree is gone. */
   async function currentCommit(task: Task): Promise<string | null> {
@@ -29,28 +31,50 @@ export function createTaskRequirements(deps: TasksServiceDeps, state: TaskState)
 
   async function view(taskId: string): Promise<TaskRequirementsDTO> {
     const task = state.get(taskId);
+    if (task.status === TaskStatus.Completed) {
+      const delivery = deliveries.latest(task.id);
+      const snapshot =
+        delivery?.status === DeliveryStatus.Succeeded
+          ? deliveredRequirements(db, [delivery.id]).get(delivery.id)
+          : undefined;
+      return requirements.view(task.id, snapshot?.commitSha ?? null);
+    }
     return requirements.view(task.id, await currentCommit(task));
   }
 
   return {
     async coverageTasks(taskIds: readonly string[]) {
       const summaries = state.summaries(state.repo.list({ ids: taskIds }));
-      const deliveries = deps.deliveries.latestOf(taskIds);
-      const trees = deps.worktrees.listByTasks(taskIds);
+      const lastDeliveries = deliveries.latestOf(taskIds);
+      const trees = new Map(worktrees.listByTasks(taskIds).map((tree) => [tree.taskId, tree]));
+      const snapshots = deliveredRequirements(
+        db,
+        [...lastDeliveries.values()]
+          .filter((delivery) => delivery.status === DeliveryStatus.Succeeded)
+          .map((d) => d.id),
+      );
       const commits = new Map(
         await Promise.all(
-          taskIds.map(async (id): Promise<[string, string | null]> => {
-            const tree = trees.find((entry) => entry.taskId === id && entry.status === WorktreeStatus.Ready);
-            if (tree !== undefined)
-              return [id, (await runGit(['rev-parse', 'HEAD'], { cwd: tree.path })).stdout.trim()];
-            return [id, deliveries.get(id)?.diffHead ?? null];
+          summaries.map(async (task): Promise<[string, string | null]> => {
+            if (task.status === TaskStatus.Completed) {
+              // Squash、merge 和 rebase 都可能改写 SHA。保留交付时实际核验的来源提交。
+              const delivery = lastDeliveries.get(task.id);
+              return [task.id, delivery === undefined ? null : (snapshots.get(delivery.id)?.commitSha ?? null)];
+            }
+            const tree = trees.get(task.id);
+            return [
+              task.id,
+              task.status === TaskStatus.Cancelled || tree?.status !== WorktreeStatus.Ready
+                ? null
+                : (await runGit(['rev-parse', 'HEAD'], { cwd: tree.path })).stdout.trim(),
+            ];
           }),
         ),
       );
       const traces = requirements.tracesOf(commits);
       return summaries.map((task) => ({
         task,
-        delivery: deliveries.get(task.id) ?? null,
+        delivery: lastDeliveries.get(task.id) ?? null,
         commitSha: commits.get(task.id) ?? null,
         requirements: traces.get(task.id) ?? [],
       }));

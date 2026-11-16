@@ -1,4 +1,4 @@
-import type { InitiativeDetailDTO, TaskDetailDTO } from '@aw/shared';
+import { type InitiativeDetailDTO, type TaskDetailDTO, taskRequirementsSchema } from '@aw/shared';
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import {
@@ -94,7 +94,7 @@ test('UX-11 从两阶段的共同需求直达验收输出和最终交付改动',
 
   let demand = await coverageRow(page);
   await expect(demand.getByText('尚未开始任务', { exact: true })).toBeVisible();
-  await page.getByTestId('initiative-understanding').getByText(unplanned, { exact: true }).click();
+  await page.getByTestId('initiative-understanding').locator('summary').getByText(unplanned, { exact: true }).click();
   await expect(page.getByTestId('initiative-understanding').getByText('未安排工作包')).toBeVisible();
 
   const orderAcceptance = demand.getByRole('link', { name: '订单按分取整', exact: true });
@@ -119,10 +119,19 @@ test('UX-11 从两阶段的共同需求直达验收输出和最终交付改动',
   await expect(firstTaskResponse).toBeOK();
   const firstTask: TaskDetailDTO = await firstTaskResponse.json();
   const firstCommit = git(project.repoPath, 'rev-parse', 'main');
+  const checklistResponse = await request.get(`${API_BASE}${taskPath}/requirements`, { headers: AUTH });
+  await expect(checklistResponse).toBeOK();
+  const checklist = taskRequirementsSchema.parse(await checklistResponse.json());
+  const evaluatedCommit = checklist.items[0]?.latest?.commitSha;
+  expect(evaluatedCommit).toMatch(/^[a-f0-9]{40}$/);
+  expect(evaluatedCommit).not.toBe(firstCommit);
+  expect(checklist.commitSha).toBe(evaluatedCommit);
   expect(firstTask.lastDelivery?.commitSha).toBe(firstCommit);
 
   await page.goto(planPath);
   demand = await coverageRow(page);
+  await expect(demand).not.toContainText('已过期');
+  await expect(demand.getByText('order-rounding-proof', { exact: true })).toBeVisible();
   await demand.getByRole('link', { name: `本地交付提交 ${firstCommit.slice(0, 12)}`, exact: true }).click();
   await expect(page).toHaveURL(/delivery=true$/);
   const diff = page.getByRole('dialog', { name: '改动', exact: true });
@@ -134,7 +143,9 @@ test('UX-11 从两阶段的共同需求直达验收输出和最终交付改动',
 
   await page.goto(planPath);
   await page.getByRole('button', { name: '进入第 2 阶段', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: '进入第 2 阶段', exact: true }).click();
+  const nextPhase = page.getByRole('dialog', { name: '进入第 2 阶段？' });
+  await nextPhase.getByRole('checkbox', { name: /先让 AI 按合入后的代码细化/ }).uncheck();
+  await nextPhase.getByRole('button', { name: '进入第 2 阶段', exact: true }).click();
   demand = await coverageRow(page);
   await expect(demand.getByText('payment-rounding-proof', { exact: true })).toBeVisible({
     timeout: TASK_RUN_TIMEOUT_MS,

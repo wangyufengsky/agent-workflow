@@ -1,5 +1,5 @@
-import type { TaskEventDTO, TaskEventEntity } from '@aw/shared';
-import { and, asc, desc, eq, gt } from 'drizzle-orm';
+import { requirementsDeliverySummarySchema, type TaskEventDTO, TaskEventEntity } from '@aw/shared';
+import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { taskEventsTable } from './timeline.table.ts';
@@ -16,6 +16,7 @@ export type NewTaskEvent = {
 };
 
 const payloadSchema = z.record(z.string(), z.unknown());
+const deliveryPayload = z.object({ requirements: requirementsDeliverySummarySchema.optional() });
 
 export function createTimelineRepo(db: DbExecutor) {
   return {
@@ -49,6 +50,26 @@ export function createTimelineRepo(db: DbExecutor) {
         .orderBy(desc(taskEventsTable.id))
         .get();
       return row?.id ?? 0;
+    },
+    deliveredRequirements(deliveryIds: readonly string[]) {
+      const rows = db
+        .select({ id: taskEventsTable.entityId, payload: taskEventsTable.payload })
+        .from(taskEventsTable)
+        .where(
+          and(
+            eq(taskEventsTable.entity, TaskEventEntity.Delivery),
+            eq(taskEventsTable.type, 'note'),
+            inArray(taskEventsTable.entityId, deliveryIds),
+          ),
+        )
+        .all();
+      return new Map(
+        rows.flatMap(({ id, payload }) => {
+          if (payload === null) return [];
+          const { requirements } = deliveryPayload.parse(JSON.parse(payload));
+          return requirements === undefined ? [] : [[id, requirements] as const];
+        }),
+      );
     },
     list(taskId: string, afterId: number): TaskEventDTO[] {
       return db

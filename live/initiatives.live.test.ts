@@ -72,6 +72,13 @@ describe('@live 需求计划的 AI 拆解', () => {
         draft.items.every((i) => ['feature', 'bugfix', 'unit_tests', 'detailed_design'].includes(i.workflow)),
       ).toBe(true);
       expect(draft.coverage?.length ?? 0).toBeGreaterThanOrEqual(7);
+      const links = (draft.coverage ?? []).flatMap((point) => point.links ?? []);
+      expect(links.length).toBeGreaterThan(0);
+      for (const link of links) {
+        const acceptanceIds = draft.items.find((item) => item.key === link.item)?.acceptance.map((item) => item.id);
+        expect(link.acceptance.length).toBeGreaterThan(0);
+        expect(acceptanceIds).toEqual(expect.arrayContaining(link.acceptance));
+      }
       const commands = draft.items.flatMap((i) =>
         i.acceptance.flatMap((a) => (a.verification.kind === 'command' ? [a.verification.command] : [])),
       );
