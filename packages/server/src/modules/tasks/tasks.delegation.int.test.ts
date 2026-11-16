@@ -3,6 +3,7 @@ import {
   AttemptKind,
   AttemptStatus,
   cancelTaskOp,
+  DELEGATION_READ_MAX_CHARS,
   DELEGATION_TIMEOUT_MS,
   ErrorCode,
   getAttemptOp,
@@ -37,11 +38,23 @@ function finishTask() {
 
 it('两个委派读取同一个固定 Git 快照，返回证据，父节点继续并可追踪子尝试', async () => {
   await t.call(updateSettingsOp, { 'scheduler.maxConcurrentAttempts': 4 });
-  const { project } = await addProject(t, { checkCommand: null, files: { 'src/a.txt': 'committed needle\nsecond\n' } });
+  const prefix = 'a'.repeat(DELEGATION_READ_MAX_CHARS - 1);
+  const longLine = `${prefix}🚀tail`;
+  const { project } = await addProject(t, {
+    checkCommand: null,
+    files: { 'src/a.txt': 'committed needle\nsecond\n', 'src/long.txt': longLine },
+  });
   const inspect = () =>
     script()
       .callTool('inspect_delegation', { action: 'search', query: 'needle', path: 'src' })
       .callTool('inspect_delegation', { action: 'read', path: 'src/a.txt' })
+      .callTool('inspect_delegation', { action: 'read', path: 'src/long.txt' })
+      .callTool('inspect_delegation', {
+        action: 'read',
+        path: 'src/long.txt',
+        startLine: 1,
+        startOffset: prefix.length,
+      })
       .callTool('inspect_delegation', { action: 'read', path: '../outside' })
       .callTool('get_task_context')
       .callTool('delegate_readonly', { questions: ['nested'] })
@@ -74,7 +87,10 @@ it('两个委派读取同一个固定 Git 快照，返回证据，父节点继�
       question,
       status: 'succeeded',
       attemptId: expect.any(String),
-      sources: [{ path: 'src/a.txt', startLine: 1, endLine: 3 }],
+      sources: [
+        { path: 'src/a.txt', startLine: 1, endLine: 3 },
+        { path: 'src/long.txt', startLine: 1, endLine: 1 },
+      ],
     })),
   });
   expect(parentCalls[1]?.result).toMatchObject({ code: ErrorCode.ValidationFailed });
@@ -84,6 +100,8 @@ it('两个委派读取同一个固定 Git 快照，返回证据，父节点继�
     expect(reads.map((call) => call.result)).toEqual([
       expect.objectContaining({ paths: ['src/a.txt'] }),
       expect.objectContaining({ text: 'committed needle\nsecond\n' }),
+      expect.objectContaining({ text: prefix, truncated: true, nextLine: 1, nextOffset: prefix.length }),
+      expect.objectContaining({ text: '🚀tail' }),
       expect.objectContaining({ code: ErrorCode.ValidationFailed }),
     ]);
     for (const operation of ['get_task_context', 'delegate_readonly']) {

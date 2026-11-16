@@ -405,9 +405,9 @@ type HandoffOutput = {
 
 `delegate_readonly` 输入 `{ questions: string[] }`，从真实工作流的执行或评审步骤发起。每次父尝试最多启动两个委派。应用使用父尝试的模型，每个委派使用已有并发上限内的空闲模型槽位；没有空位的问项立即返回 `model_slots_busy`。返回固定提交及按原顺序排列的逐项结果，包含对应尝试、短报告及实际读取到的文件行号，或失败原因。
 
-`inspect_delegation` 输入 `{ action: 'list' | 'read' | 'search', path?, query?, startLine? }`。目录和读路径指向同一任务仓库的固定提交，搜索使用字面值，文件按行读取并限制每次返回长度。`submit_delegation` 用 `{ summary }` 把报告提交给父步骤。
+`inspect_delegation` 输入 `{ action: 'list' | 'read' | 'search', path?, query?, startLine?, startOffset? }`。目录和读路径指向同一任务仓库的固定提交，搜索使用字面值。读取达到长度上限时，使用返回的 `nextLine` 与 `nextOffset` 继续读取，行内偏移按 UTF-16 码元计。`submit_delegation` 用 `{ summary }` 把报告提交给父步骤。
 
-委派会话在临时空目录启动，工具权限仅放行两项委派工具，Git 对象由应用读取。父步骤结束或委派超时会中止活跃子尝试。子尝试沿用已有状态机和会话流，父步骤负责代码修改、核验和提交结果。
+委派会话在独立临时目录启动，沿用父会话的模型，按需继承该模型的项目提供商配置。工具权限仅放行两项委派工具，Git 对象由应用读取。父步骤结束或委派超时会中止活跃子尝试。子尝试沿用已有状态机和会话流，父步骤负责代码修改、核验和提交结果。
 
 ## 7. 实现结构
 

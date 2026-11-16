@@ -3,6 +3,7 @@ import {
   DELEGATION_MAX_CHILDREN,
   DELEGATION_QUESTION_MAX_CHARS,
   DELEGATION_SUMMARY_MAX_CHARS,
+  DIFF_FILE_MAX_BYTES,
 } from '../../constants/limits.ts';
 
 const hasControl = (value: string) => [...value].some((character) => character.charCodeAt(0) < 32);
@@ -35,7 +36,19 @@ export const inspectDelegationInputSchema = z
       .max(150)
       .refine((value) => !hasControl(value))
       .optional(),
-    startLine: z.number().int().min(1).max(1_000_000).default(1),
+    startLine: z
+      .number()
+      .int()
+      .min(1)
+      .max(DIFF_FILE_MAX_BYTES + 1)
+      .default(1),
+    startOffset: z
+      .number()
+      .int()
+      .min(0)
+      .max(DIFF_FILE_MAX_BYTES)
+      .default(0)
+      .describe('Character offset within startLine, from nextOffset in the previous response'),
   })
   .superRefine(({ action, path, query }, ctx) => {
     if (action === 'read' && path === '') ctx.addIssue({ code: 'custom', path: ['path'], message: 'Choose a file' });
@@ -49,6 +62,7 @@ export const inspectDelegationOutputSchema = z.object({
   text: z.string().optional(),
   startLine: z.number().optional(),
   nextLine: z.number().optional(),
+  nextOffset: z.number().optional(),
   unavailable: z.enum(['binary', 'too_large']).optional(),
   truncated: z.boolean().optional(),
 });

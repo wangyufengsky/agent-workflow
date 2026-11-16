@@ -25,7 +25,7 @@ import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
 type Outcome = DelegateReadonlyOutput['results'][number];
 type Sources = Extract<Outcome, { status: 'succeeded' }>['sources'];
-type Snapshot = { repo: string; commit: string; sessionDirectory: string };
+type Snapshot = { repo: string; commit: string; sessionDirectory: string; model: string | null };
 type Child = Snapshot & {
   ended: PromiseWithResolvers<Pick<AttemptDTO, 'status' | 'error'>>;
   sources: Sources;
@@ -45,7 +45,7 @@ const limitedPaths = (commit: string, paths: string[]): InspectDelegationOutput 
 
 async function inspect(child: Child, input: InspectDelegationInput): Promise<InspectDelegationOutput> {
   const { commit, repo } = child;
-  const { path, startLine } = input;
+  const { path, startLine, startOffset } = input;
   if (input.action === 'list') {
     const entries = await readTree(repo, commit, path);
     return limitedPaths(
@@ -69,12 +69,20 @@ async function inspect(child: Child, input: InspectDelegationInput): Promise<Ins
   const file = await readFile(repo, commit, path);
   if (!('content' in file)) return { commit, unavailable: 'binary' in file ? 'binary' : 'too_large' };
   const lines = file.content.split('\n');
-  const remaining = lines.slice(startLine - 1).join('\n');
+  const [first = '', ...after] = lines.slice(startLine - 1);
+  if (startOffset > first.length)
+    throw new AppError(ErrorCode.ValidationFailed, 'startOffset is outside the line', {
+      issues: [{ path: ['startOffset'], message: 'Use the nextOffset from the preceding read' }],
+    });
+  const remaining = [first.slice(startOffset), ...after].join('\n');
   const clipped = remaining.slice(0, DELEGATION_READ_MAX_CHARS);
   const truncated = clipped.length < remaining.length;
-  const boundary = truncated ? clipped.lastIndexOf('\n') : -1;
-  const text = boundary > 0 ? clipped.slice(0, boundary) : clipped;
-  const endLine = startLine + (text === '' ? 0 : text.split('\n').length - 1);
+  const boundary = truncated ? clipped.lastIndexOf('\n') + 1 : 0;
+  const lastCode = clipped.charCodeAt(clipped.length - 1);
+  // 优先在完整行后分页。单行超长时保留行内游标，且分页不拆成对的 UTF-16 字符。
+  const end = boundary || (truncated && lastCode >= 0xd800 && lastCode <= 0xdbff ? clipped.length - 1 : clipped.length);
+  const text = clipped.slice(0, end);
+  const endLine = startLine + text.split('\n').length - 1;
   if (
     text !== '' &&
     child.sources.length < DELEGATION_SOURCES_MAX &&
@@ -86,13 +94,14 @@ async function inspect(child: Child, input: InspectDelegationInput): Promise<Ins
     commit,
     text,
     startLine,
-    ...(truncated ? { truncated: true } : {}),
-    ...(endLine < lines.length ? { nextLine: endLine + 1 } : {}),
+    ...(truncated
+      ? { truncated: true, nextLine: endLine, nextOffset: endLine === startLine ? startOffset + text.length : 0 }
+      : {}),
   };
 }
 
 /** 节点发起的只读委派使用正常尝试生命周期，且每次只读父节点选定的 Git 快照。 */
-export function createTaskDelegation({ attempts, clock, projects }: TasksServiceDeps, state: TaskState) {
+export function createTaskDelegation({ attempts, clock, opencode, projects }: TasksServiceDeps, state: TaskState) {
   const parents = new Map<string, Parent>();
   const children = new Map<string, Child>();
 
@@ -142,7 +151,7 @@ export function createTaskDelegation({ attempts, clock, projects }: TasksService
         agent: SessionAgent.Delegate,
         directory: snapshot.sessionDirectory,
         title: `${task.key} · read-only delegation`,
-        model: parentAttempt.model,
+        model: snapshot.model,
         delegation: { parentAttemptId: parentAttempt.id, commit: snapshot.commit },
         prompt: `Committed snapshot: ${snapshot.commit}\n\nQuestion from the parent step:\n${question}`,
       });
@@ -187,11 +196,19 @@ export function createTaskDelegation({ attempts, clock, projects }: TasksService
         // 会话从空目录启动，项目仓库的本地指令与工具配置不会由运行时加载。
         const sessionDirectory = await mkdtemp(join(tmpdir(), 'aw-delegate-'));
         try {
+          const model = await opencode.prepareDelegationModel({
+            sourceDirectory: directory,
+            sourceSessionId: attempt.opencodeSessionId,
+            targetDirectory: sessionDirectory,
+            model: attempt.model,
+          });
           if (!parents.has(attempt.id))
             throw new AppError(ErrorCode.McpAttemptUnresolved, 'Parent attempt ended before delegation');
           const repo = projects.getRecord(task.projectId).repoPath;
           const settled = await Promise.allSettled(
-            questions.map((question) => run(attempt, task, parent, { repo, commit, sessionDirectory }, question)),
+            questions.map((question) =>
+              run(attempt, task, parent, { repo, commit, sessionDirectory, model }, question),
+            ),
           );
           return {
             commit,

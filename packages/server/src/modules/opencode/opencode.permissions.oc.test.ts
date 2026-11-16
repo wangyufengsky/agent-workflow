@@ -31,15 +31,18 @@ import { OpencodeEventType, ToolCallStatus } from './opencode.events.ts';
  * a prompt `RUN: <command>` with a bash call of that command, and the call's result with a short text.
  */
 const PROVIDER = 'aw-scripted';
+const PROJECT_PROVIDER = 'aw-project-scripted';
 const MODEL = 'scripted';
 const RUN = 'RUN: ';
 const PROJECT_PATTERNS = ['./scripts/check.sh -q *'];
 const PROBE_PARENT = 'VERIFY_MANAGED_DELEGATION';
 const PROBE_CHILD = 'FIND_COMMITTED_PROBE';
 const PROBE_EVIDENCE = 'sample-repository-marker';
+const PROJECT_INSTRUCTION = 'project-instruction-marker';
 const advertisedParent = new Set<string>();
 const advertisedChild = new Set<string>();
 const childReads: string[] = [];
+const childPrompts: string[] = [];
 
 const ALLOWED = [
   './scripts/check.sh -q 2>&1 | tail -5',
@@ -89,6 +92,7 @@ function scriptedModel(): Server {
       let calls: Array<{ name: string; args: Record<string, unknown> }> = [];
       if (hasProbe(PROBE_CHILD)) {
         for (const name of names) advertisedChild.add(name);
+        childPrompts.push(...messages.map(textOf));
         if (last?.role === 'tool') {
           childReads.push(textOf(last));
           calls = [operation(McpToolName.SubmitDelegation, { summary: 'src.ts:1 contains the sample marker' })];
@@ -146,6 +150,15 @@ function scriptedModel(): Server {
   });
 }
 
+function providerFor(model: Server) {
+  return {
+    npm: '@ai-sdk/openai-compatible',
+    name: 'Scripted',
+    options: { baseURL: `http://127.0.0.1:${(model.address() as AddressInfo).port}/v1`, apiKey: 'unused' },
+    models: { [MODEL]: { name: 'Scripted', tool_call: true } },
+  };
+}
+
 let model: Server;
 let t: TestApp;
 let repo: TestRepo;
@@ -158,12 +171,7 @@ beforeAll(async () => {
     configFile,
     JSON.stringify({
       provider: {
-        [PROVIDER]: {
-          npm: '@ai-sdk/openai-compatible',
-          name: 'Scripted',
-          options: { baseURL: `http://127.0.0.1:${(model.address() as AddressInfo).port}/v1`, apiKey: 'unused' },
-          models: { [MODEL]: { name: 'Scripted', tool_call: true } },
-        },
+        [PROVIDER]: providerFor(model),
       },
     }),
   );
@@ -272,9 +280,24 @@ describe('@opencode 只读会话的 bash 规则与项目中总是允许的模式
   });
 });
 
-it('@opencode 委派通过工作流工具读取固定提交，并隔离原生工具', async () => {
-  await t.call(updateSettingsOp, { 'ai.defaultModel': `${PROVIDER}/${MODEL}`, 'scheduler.maxConcurrentAttempts': 3 });
-  const { project } = await addProject(t, { files: { 'src.ts': PROBE_EVIDENCE }, checkCommand: null });
+it('@opencode 委派沿用项目模型、读取固定提交，并隔离原生工具与项目指令', async () => {
+  await t.call(updateSettingsOp, { 'ai.defaultModel': null, 'scheduler.maxConcurrentAttempts': 3 });
+  const projectModel = `${PROJECT_PROVIDER}/${MODEL}`;
+  const { project } = await addProject(t, {
+    checkCommand: null,
+    files: {
+      'src.ts': PROBE_EVIDENCE,
+      'project-rules.md': PROJECT_INSTRUCTION,
+      'opencode.json': JSON.stringify({
+        model: projectModel,
+        provider: { [PROJECT_PROVIDER]: providerFor(model) },
+        instructions: ['project-rules.md'],
+      }),
+    },
+  });
+  expect(
+    (await t.app.services.opencode.listModels()).available.some((item) => item.providerId === PROJECT_PROVIDER),
+  ).toBe(false);
   const complete = nodeReaches(t, 'locate', NodeStatus.AwaitingAcceptance, 45_000);
   const task = await createTask(t, {
     projectId: project.id,
@@ -287,7 +310,7 @@ it('@opencode 委派通过工作流工具读取固定提交，并隔离原生工
     const detail = (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
     expect(detail.result?.notes).toContain('src.ts:1 contains the sample marker');
     expect(detail.attempts.filter((attempt) => attempt.kind === AttemptKind.Delegation)).toMatchObject([
-      { status: AttemptStatus.Succeeded },
+      { status: AttemptStatus.Succeeded, model: projectModel },
     ]);
     expect(advertisedParent).toContain(`${MCP_TOOL_PREFIX}${McpToolName.DelegateReadonly}`);
     expect(advertisedParent).not.toContain('task');
@@ -304,6 +327,7 @@ it('@opencode 委派通过工作流工具读取固定提交，并隔离原生工
     ])
       expect(advertisedChild).not.toContain(name);
     expect(childReads.some((result) => result.includes(PROBE_EVIDENCE))).toBe(true);
+    expect(childPrompts.join(' ')).not.toContain(PROJECT_INSTRUCTION);
   } finally {
     await t.call(cancelTaskOp, { id: task.id });
   }

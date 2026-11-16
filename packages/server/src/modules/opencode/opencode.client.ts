@@ -1,3 +1,6 @@
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { AppError, ErrorCode, type ExternalMcpStatus, type PermissionDecision, type PermissionRule } from '@aw/shared';
 import { z } from 'zod';
 import type { Logger } from '../../core/logger.ts';
@@ -65,6 +68,13 @@ export type OpencodeClient = {
    * global configuration only.
    */
   listModels(directory?: string): Promise<{ available: OpencodeModel[]; defaultModel?: string }>;
+  /** 在独立目录恢复父会话实际使用的模型，复制的配置仅包含模型提供商。 */
+  prepareDelegationModel(input: {
+    sourceDirectory: string;
+    sourceSessionId: string | null;
+    targetDirectory: string;
+    model: string | null;
+  }): Promise<string | null>;
   /** Every MCP server of the configuration `directory` sees, by name: the app's own and the user's (28 §4). */
   mcpStatus(directory: string): Promise<Record<string, McpServerState>>;
   subscribe(listener: (event: OpencodeEvent) => void): () => void;
@@ -261,6 +271,40 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         })),
       );
       return config.model === undefined ? { available } : { available, defaultModel: config.model };
+    },
+    async prepareDelegationModel({ sourceDirectory, sourceSessionId, targetDirectory, model }) {
+      const sdk = runtime.sdk();
+      const { data: source } = await request('config.get', () => sdk.config.get({ directory: sourceDirectory }, THROW));
+      let resolvedModel = model;
+      if (resolvedModel === null && sourceSessionId !== null) {
+        const { data } = await request('session.messages', () =>
+          sdk.session.messages({ sessionID: sourceSessionId, directory: sourceDirectory, limit: 1 }, THROW),
+        );
+        const message = data.at(-1)?.info;
+        if (message?.role === 'assistant') resolvedModel = `${message.providerID}/${message.modelID}`;
+        if (message?.role === 'user') resolvedModel = `${message.model.providerID}/${message.model.modelID}`;
+      }
+      resolvedModel ??= source.model ?? null;
+      if (resolvedModel === null) return null;
+      const { providerId } = parseModelRef(resolvedModel);
+      const { data: global } = await request('config.get', () => sdk.config.get({}, THROW));
+      const provider = source.provider?.[providerId];
+      const localProvider = provider !== undefined && !isDeepStrictEqual(provider, global.provider?.[providerId]);
+      const enabledProvidersChanged = !isDeepStrictEqual(source.enabled_providers, global.enabled_providers);
+      const disabledProvidersChanged = !isDeepStrictEqual(source.disabled_providers, global.disabled_providers);
+      if (localProvider || enabledProvidersChanged || disabledProvidersChanged) {
+        // 使用运行时已解析的单个提供商。项目的指令、插件、MCP 和其他配置均不复制。
+        await writeFile(
+          join(targetDirectory, 'opencode.json'),
+          JSON.stringify({
+            ...(localProvider ? { provider: { [providerId]: provider } } : {}),
+            ...(enabledProvidersChanged ? { enabled_providers: source.enabled_providers ?? [] } : {}),
+            ...(disabledProvidersChanged ? { disabled_providers: source.disabled_providers ?? [] } : {}),
+          }),
+          { mode: 0o600, flag: 'wx' },
+        );
+      }
+      return resolvedModel;
     },
     async mcpStatus(directory) {
       const { data } = await request('mcp.status', () => runtime.sdk().mcp.status({ directory }, THROW));

@@ -24,7 +24,7 @@ export const delegationTools = (tasks: TasksService) => [
   defineMcpTool({
     name: McpToolName.InspectDelegation,
     description:
-      'Inspect the committed snapshot: list a directory by path, search for a literal query, or read a file from startLine.',
+      'Inspect the committed snapshot: list a directory by path, search for a literal query, or read a file from startLine and startOffset. Set both from nextLine and nextOffset to continue.',
     allowedKinds: [AttemptKind.Delegation],
     input: inspectDelegationInputSchema,
     output: inspectDelegationOutputSchema,

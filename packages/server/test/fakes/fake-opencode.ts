@@ -525,6 +525,9 @@ export function createFakeOpencode() {
     async listModels(directory) {
       return { available: [...models, ...(directory === undefined ? [] : (projectModels.get(directory) ?? []))] };
     },
+    async prepareDelegationModel({ model }) {
+      return model;
+    },
     mcpServers,
     async mcpStatus() {
       if (!connected) throw new AppError(ErrorCode.OpencodeNotReady, 'FakeOpencode is not connected');
