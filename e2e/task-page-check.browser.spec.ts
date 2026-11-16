@@ -125,3 +125,21 @@ test('J29 预览从没启动过：页面体检无法运行，不重做 AI；跳�
     timeout: 30_000,
   });
 });
+
+test('修改失败检查命令时显示失败步骤与原条件', async ({ page, request }) => {
+  const project = await createProject(request, 'aw-command-does-not-exist');
+  await queueTurn(request, project, { title: '定位根因' }, [submitResult('找到了原因')]);
+  await queueTurn(request, project, { title: '修复' }, [
+    { type: 'edit', file: 'fix.txt', content: 'fixed\n' },
+    submitResult('修好了'),
+  ]);
+  await startTask(page, project, /^修 Bug$/, '修复检查');
+  const failure = page.getByTestId('failure-panel');
+  await expect(failure).toContainText('aw-command-does-not-exist', { timeout: 30_000 });
+  await failure.getByRole('button', { name: '修改检查命令…' }).click();
+  const dialog = page.getByRole('dialog', { name: '修改检查命令' });
+  await expect(dialog.getByTestId('failure-context')).toContainText('修复');
+  await expect(dialog.getByTestId('failure-context')).toContainText('aw-command-does-not-exist');
+  await expect(dialog.getByLabel('检查命令', { exact: true })).toHaveValue('aw-command-does-not-exist');
+  await expect(dialog.getByLabel('同时设为项目的检查命令')).not.toBeChecked();
+});

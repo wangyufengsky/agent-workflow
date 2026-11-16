@@ -56,7 +56,9 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   const checks = createTaskChecks(deps, state, lifecycle);
   const diffs = createTaskDiffs(deps, state);
   const delivery = createTaskDelivery(deps, state);
-  const changes = createTaskChanges(deps, state, delivery.current, lifecycle);
+  const changes = createTaskChanges(deps, state, delivery.current, (taskId) =>
+    lifecycle.retry(taskId, { recheck: () => false }),
+  );
   const review = createTaskReview(deps, state, changes);
   const agentsMd = createTaskAgentsMd(deps, state, lifecycle);
 

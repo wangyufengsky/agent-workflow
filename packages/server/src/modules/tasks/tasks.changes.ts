@@ -25,7 +25,6 @@ import { backendCommitter, gitFailure, type RepoLocks, runGit, unmergedFiles } f
 import type { Node } from '../nodes/index.ts';
 import { acceptanceProject } from '../nodes/index.ts';
 import { recordTaskEvent } from '../timeline/index.ts';
-import type { TaskLifecycle } from './tasks.lifecycle.ts';
 import type { Task } from './tasks.repo.ts';
 import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 import { leafKeys } from './tasks.verify.ts';
@@ -53,7 +52,7 @@ export function createTaskChanges(
   deps: TasksServiceDeps,
   state: TaskState,
   currentDelivery: (taskId: string) => DeliveryDTO | null,
-  lifecycle: TaskLifecycle,
+  retryVerification: (taskId: string) => void,
 ) {
   const { unit, prompts, projects, workflows, plans, nodes, inbox, locks, browser } = deps;
   const { get, move } = state;
@@ -231,7 +230,7 @@ export function createTaskChanges(
           });
           if (failedVerify !== undefined) {
             nodes.setVerification(failedVerify.id, step.instructions, nodeAcceptanceSchema.parse(step.acceptance));
-            lifecycle.retry(task.id, { recheck: () => false });
+            retryVerification(task.id);
           } else {
             appendSteps(task, [step], null, TaskEvent.ChangesRequested);
           }

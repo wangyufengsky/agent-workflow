@@ -69,6 +69,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.attachments.previewSheet': '预览表格',
   'op.assistant.previewFile': '预览助手生成的文件',
   'op.attachments.snapshotProjectFile': '添加项目文件',
+  'op.requirements.history': '查看验收清单历史',
   'op.requirements.get': '查看验收清单',
   'op.requirements.replace': '修改验收清单',
   'op.requirements.decide': '人工确认验收项',

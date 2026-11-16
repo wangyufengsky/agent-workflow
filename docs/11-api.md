@@ -123,7 +123,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/tasks/:id/pause` 🅿 | `running → paused`：不再派发新步骤，进行中的步骤继续 |
 | POST | `/tasks/:id/resume` 🅿 | `paused → running`；未确认的调整草稿被取代 |
 | POST | `/tasks/:id/retry` | `{ feedback? }`：`failed → <failedPhase>`；`feedback`（D118）作为重试的失败步骤下一次尝试的说明（同 `nodes/:nodeId/retry`），其他阶段的失败忽略它；检查命令无法运行而失败的步骤 `recheck`（用已提交的结果重新检查，不重跑 AI，D116），其余失败步骤 `retry` |
-| POST | `/tasks/:id/check-command` | `{ command, updateProject, expectedCommand? }`（D116、UX-01）：提交原检查命令时校验它仍是失败原因；工作区须可用。：只限在执行阶段因命令检查失败的任务（`CHECK_COMMAND_UNRUNNABLE`，或 `NODE_ATTEMPTS_EXHAUSTED` 且最近一次已提交的结果未通过命令检查），否则 409 `STATE_TRANSITION_INVALID`；任务未完成的步骤（`pending` / `ready` / `failed`）中与失败命令相同的命令检查换成 `command`，`updateProject` 时同时设为项目的检查命令；然后重试：已提交结果的失败步骤 `recheck`（预算重置），其余 `retry` |
+| POST | `/tasks/:id/check-command` | `{ command, updateProject, expectedCommand? }`（D116、UX-01）：提交原检查命令时校验它仍是失败原因；工作区须可用。只限在执行阶段因命令检查失败的任务（`CHECK_COMMAND_UNRUNNABLE`，或 `NODE_ATTEMPTS_EXHAUSTED` 且最近一次已提交的结果未通过命令检查），否则 409 `STATE_TRANSITION_INVALID`；任务未完成的步骤（`pending` / `ready` / `failed`）中与失败命令相同的命令检查换成 `command`，`updateProject` 时同时设为项目的检查命令；然后重试：已提交结果的失败步骤 `recheck`（预算重置），其余 `retry` |
 | POST | `/tasks/:id/skip-check` | （D116）只限因 `CHECK_COMMAND_UNRUNNABLE` 或 `BROWSER_CHECK_UNRUNNABLE` 失败的任务，否则 409 `STATE_TRANSITION_INVALID`；未完成步骤中这条命令检查（或所有页面体检）标 `skipped`，然后重试（失败步骤 `recheck`）；结果卡与 PR 说明写明未验证 |
 | POST | `/tasks/:id/cancel` | `{ keepBranch?: boolean }` |
 | POST | `/tasks/:id/archive` | （`tasks.archive`，write，42）归档：任务未结束 409 `TASK_NOT_FINISHED`；已归档时原样返回 `TaskDetailDTO` |
@@ -604,6 +604,7 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 | 操作 | 方法与路径 | 风险／曝光 | 输入 → 结果 |
 | --- | --- | --- | --- |
 | requirements.get（Q-01 已实现） | GET `/tasks/:id/requirements` | read；UI / 助手 | `{ revision, items, history, commitSha }`：当前版本、逐项 `status` 与决定它的最新结论 `latest`（含可空的 `nodeId`）、旧版本摘要（新的在前）及任务工作区当前提交；没有清单时都为空。状态按任务工作区当前提交计算，工作区已删除时只比较版本 |
+| requirements.history（UX-01） | GET `/tasks/:id/requirements/history/:revisionId` | read；UI / 助手 | 按需读取任务的指定清单版本，返回当时的验收条件和该版本记录的结论及输出。版本不存在或属于其他任务时返回 404 |
 | requirements.replace（Q-01 已实现） | PUT `/tasks/:id/requirements` | write；UI / 助手确认 | `{ items }` → 新版本，返回同 `get`；带 `id` 的项保留（必须是当前版本的项，否则 `VALIDATION_FAILED`），不带的是新项；只在 `draft`、`plan_review`、`review`，否则 `REQUIREMENTS_NOT_EDITABLE`。确认卡列出每项与命令，突出删除和改为可选的项（Q-03） |
 | requirements.decide（Q-03 已实现） | POST `/tasks/:id/requirements/:itemId/decisions` | write；仅 UI（不向助手和命令面板曝光） | `{ conclusion: pass / fail / waive, note }`；waive 必须有 note（否则 `VALIDATION_FAILED`）；只在 `review`，否则 `REQUIREMENTS_NOT_EDITABLE`；结论记为 user，绑定当前提交；返回同 `get` |
 | tasks.reverifyRequirements（Q-03、UX-01） | POST `/tasks/:id/requirements/reverify` | write；UI / 助手确认 | `{ revisionId?, expectedCommitSha?, items? }`。提交 `items` 时同时带编辑所依据的版本和提交；校验后保存新清单并启动核验。待合并时追加核验步骤，核验步骤导致失败且已有执行结果时恢复该步骤。旧请求可按当前清单重新核验。返回任务详情 |

@@ -1,6 +1,7 @@
 import type { DiffFile, FileDiffDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { ApiError } from '../../api/client.ts';
 import { DIFF_COPY as C } from '../../copy/diff.ts';
 import { ErrorState } from '../error-state.tsx';
 import styles from './diff.module.css';
@@ -26,7 +27,18 @@ export function FileDiff({
 }) {
   const diff = useQuery(query(path));
   if (diff.isPending) return <p className="hint">{C.loading}</p>;
-  if (diff.isError) return <ErrorState error={diff.error} onRetry={() => void diff.refetch()} />;
+  if (diff.isError)
+    return (
+      <ErrorState
+        error={diff.error}
+        message={
+          diff.error instanceof ApiError && diff.error.details?.reason === 'delivery_range_unavailable'
+            ? C.deliveryRangeUnavailable
+            : undefined
+        }
+        onRetry={() => void diff.refetch()}
+      />
+    );
   return <DiffView file={diff.data} mode={mode} marks={marks} focus={focus} />;
 }
 

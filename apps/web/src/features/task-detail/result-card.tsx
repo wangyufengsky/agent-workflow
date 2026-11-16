@@ -5,6 +5,7 @@ import {
   type TaskDetailDTO,
   TaskStatus,
   taskCheckEvidenceOp,
+  UiMode,
   WorkflowDeliverable,
   WorktreeStatus,
 } from '@aw/shared';
@@ -24,6 +25,7 @@ import { PPT_COPY } from '../../copy/ppt.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { ResultPages } from '../preview/result-pages.tsx';
 import { RequirementsSection } from '../requirements/requirements-section.tsx';
+import { useSettings } from '../settings/settings.queries.ts';
 import { skippedChecks } from '../tasks/skipped-checks.ts';
 import { taskDiffFileQuery, taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { DeliveryActions } from './delivery-actions.tsx';
@@ -34,6 +36,7 @@ import styles from './task-page.module.css';
 /** How the task was delivered, once it is merging or done. */
 function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
   const delivery = task.lastDelivery;
+  const pro = useSettings()['ui.mode'] === UiMode.Pro;
   if (task.status === TaskStatus.Merging) {
     return (
       <p className="row hint">
@@ -56,7 +59,19 @@ function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
   return (
     <p className="row" data-testid="delivery-outcome">
       <Icon name="check" />
-      {delivery.commitSha === null ? D.reportDone : D.merged(delivery.targetBranch, delivery.commitSha)}
+      {delivery.commitSha === null ? (
+        D.reportDone
+      ) : pro && delivery.diffBase === null ? (
+        <Link
+          to={ROUTES.gitProject}
+          params={{ projectId: task.project.id }}
+          search={{ view: 'commits', ref: delivery.targetBranch, sha: delivery.commitSha }}
+        >
+          {D.merged(delivery.targetBranch, delivery.commitSha)}
+        </Link>
+      ) : (
+        D.merged(delivery.targetBranch, delivery.commitSha)
+      )}
     </p>
   );
 }

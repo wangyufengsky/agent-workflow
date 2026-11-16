@@ -18,9 +18,11 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { REQUIREMENTS_COPY as C } from '../../copy/requirements.ts';
 import { ReviseDialog } from '../task-detail/delivery-actions.tsx';
+import { FailureContext } from '../tasks/failure-context.tsx';
 import { ChecklistEditor, draftsOf, isComplete, toInputs } from './checklist-editor.tsx';
 import styles from './requirements.module.css';
 import { requirementsQuery, useDecideRequirement, useReverifyRequirements } from './requirements.queries.ts';
+import { RequirementsHistory } from './requirements-history.tsx';
 
 type Item = TaskRequirementsDTO['items'][number];
 type Decision =
@@ -146,10 +148,11 @@ export function RequirementsSection({ task }: { task: TaskDetailDTO }) {
           </li>
         ))}
       </ul>
+      <RequirementsHistory taskId={task.id} revisions={[revision, ...query.data.history]} />
       {deciding !== undefined && <DecideDialog taskId={task.id} {...deciding} onClose={() => setDeciding(undefined)} />}
       {editing && (
         <EditDialog
-          taskId={task.id}
+          task={task}
           revisionId={revision.id}
           commitSha={query.data.commitSha}
           items={items}
@@ -216,13 +219,13 @@ function DecideDialog({
 
 /** Editing the checklist in review saves a new version; its earlier conclusions become stale (31 §2.1). */
 function EditDialog({
-  taskId,
+  task,
   revisionId,
   commitSha,
   items,
   onClose,
 }: {
-  taskId: string;
+  task: TaskDetailDTO;
   revisionId: string;
   commitSha: string | null;
   items: readonly Item[];
@@ -244,7 +247,7 @@ function EditDialog({
           onClick={() =>
             replace.mutate(
               {
-                id: taskId,
+                id: task.id,
                 revisionId,
                 ...(commitSha === null ? {} : { expectedCommitSha: commitSha }),
                 items: toInputs(drafts),
@@ -257,6 +260,9 @@ function EditDialog({
         </Button>
       }
     >
+      {task.failure !== null && task.failedPhase !== null && (
+        <FailureContext taskId={task.id} phase={task.failedPhase} error={task.failure} />
+      )}
       <ChecklistEditor drafts={drafts} onChange={setDrafts} />
       {replace.isError && <ErrorState error={replace.error} />}
     </Dialog>

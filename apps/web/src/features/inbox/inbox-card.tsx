@@ -26,6 +26,7 @@ import { attemptQuery } from '../attempts/attempt.queries.ts';
 import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { schedulesQuery } from '../schedules/schedules.queries.ts';
 import { CheckFailureActions } from '../tasks/check-failure-actions.tsx';
+import { FailureContext } from '../tasks/failure-context.tsx';
 import { checkUnrunnable, failureText } from '../tasks/failure-text.ts';
 import { taskQuery, tasksQuery } from '../tasks/tasks.queries.ts';
 import { type InboxResponse, useDismissInbox, useResolveInbox } from './inbox.queries.ts';
@@ -191,6 +192,9 @@ function FailedChecklistAction({ taskId }: { taskId: string }) {
       </Button>
       {open && (
         <Dialog open onOpenChange={setOpen} title={TASK_COPY.editRequirementsAndReverify}>
+          {task.failure !== null && task.failedPhase !== null && (
+            <FailureContext taskId={task.id} phase={task.failedPhase} error={task.failure} />
+          )}
           <RequirementsSection task={task} />
         </Dialog>
       )}

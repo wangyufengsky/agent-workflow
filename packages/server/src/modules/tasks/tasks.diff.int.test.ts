@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
@@ -82,7 +82,7 @@ describe('任务与步骤的 diff', () => {
     expect((await t.call(taskCheckEvidenceOp, { id: task.id, evidenceId: 'missing' })).status).toBe(404);
   });
   it('旧交付缺少范围时返回明确的不可用原因', async () => {
-    const { project } = await addProject(t, { files: { 'greet.ts': 'old\n' } });
+    const { repo, project } = await addProject(t, { files: { 'greet.ts': 'old\n' } });
     const task = await taskInReview(t, project.id, { 'greet.ts': 'new\n' });
     await t.call(deliverTaskOp, { id: task.id, strategy: 'squash' });
     const db = new DatabaseSync(join(t.dataDir, 'app.db'));
@@ -90,12 +90,22 @@ describe('任务与步骤的 diff', () => {
     db.close();
     const diff = await t.call(taskDiffOp, { id: task.id });
     expect(diff.status).toBe(404);
-    expect(diff.raw.json().error.message).toContain('交付时的 Git 对比范围不可用');
+    expect(diff.raw.json().error).toMatchObject({
+      message: 'Delivery diff range is unavailable',
+      details: { reason: 'delivery_range_unavailable' },
+    });
     const missing = new DatabaseSync(join(t.dataDir, 'app.db'));
     missing
       .prepare('UPDATE deliveries SET diff_base = ?, diff_head = ? WHERE task_id = ?')
       .run('a'.repeat(40), 'b'.repeat(40), task.id);
     missing.close();
     expect((await t.call(taskDiffOp, { id: task.id })).status).toBe(404);
+    await rename(join(repo.path, '.git'), join(repo.path, '.git-away'));
+    try {
+      const failed = await t.call(taskDiffOp, { id: task.id });
+      expect(failed.raw.json().error.code).toBe(ErrorCode.GitCommandFailed);
+    } finally {
+      await rename(join(repo.path, '.git-away'), join(repo.path, '.git'));
+    }
   });
 });

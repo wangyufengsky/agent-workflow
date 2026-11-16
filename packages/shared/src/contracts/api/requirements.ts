@@ -61,6 +61,12 @@ export type RequirementResultDTO = z.infer<typeof requirementResultSchema>;
 
 export const requirementRevisionSummarySchema = z.object({ id: z.string(), seq: z.number(), createdAt: z.number() });
 
+/** A historical version and all conclusions recorded for its items. */
+export const requirementHistorySchema = z.object({
+  revision: requirementRevisionSummarySchema,
+  items: z.array(requirementItemSchema.extend({ results: z.array(requirementResultSchema) })),
+});
+
 /** `GET /tasks/:id/requirements` (11 §14.2): the current version with each item's state; empty without a checklist. */
 export const taskRequirementsSchema = z.object({
   commitSha: z.string().nullable(),

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   decideRequirementSchema,
   replaceRequirementsSchema,
+  requirementHistorySchema,
   requirementItemsInputSchema,
   taskRequirementsSchema,
 } from '../contracts/api/requirements.ts';
@@ -24,6 +25,18 @@ export const getRequirementsOp = defineOperationContract({
   output: taskRequirementsSchema,
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/tasks/:id/requirements' },
+});
+
+export const getRequirementHistoryOp = defineOperationContract({
+  ...common,
+  id: 'requirements.history',
+  refs: { id: InputRef.Task },
+  title: 'op.requirements.history',
+  description: 'Read a checklist version and its recorded conclusions',
+  input: z.object({ id: z.string(), revisionId: z.string() }),
+  output: requirementHistorySchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/requirements/history/:revisionId' },
 });
 
 export const replaceRequirementsOp = defineOperationContract({

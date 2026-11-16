@@ -13,6 +13,7 @@ import {
   deliverTaskOp,
   getAgentsMdOp,
   getNodeOp,
+  getRequirementHistoryOp,
   getRequirementsOp,
   getTaskOp,
   getTaskTimelineOp,
@@ -55,6 +56,7 @@ export function tasksOperations(tasks: TasksService) {
     implement(startAgentsMdTaskOp, (input) => tasks.createAgentsMdTask(input)),
     implement(getTaskOp, ({ id }) => tasks.detail(id)),
     implement(getRequirementsOp, ({ id }) => tasks.requirements(id)),
+    implement(getRequirementHistoryOp, ({ id, revisionId }) => tasks.requirementHistory(id, revisionId)),
     implement(replaceRequirementsOp, ({ id, items }) => tasks.replaceRequirements(id, items)),
     implement(decideRequirementOp, ({ id, itemId, conclusion, note }) =>
       tasks.decideRequirement(id, itemId, { conclusion, note }),

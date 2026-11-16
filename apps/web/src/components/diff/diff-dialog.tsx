@@ -2,6 +2,7 @@ import type { DiffFile } from '@aw/shared';
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { type UseQueryOptions, useQuery } from '@tanstack/react-query';
 import { type KeyboardEvent, useRef, useState } from 'react';
+import { ApiError } from '../../api/client.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DIFF_COPY as C } from '../../copy/diff.ts';
 import { ErrorState } from '../error-state.tsx';
@@ -78,7 +79,17 @@ export function DiffDialog<T extends { files: DiffFile[] }>({
           </div>
           <div className={styles.dialogBody}>
             {diff.isPending && <p className="hint">{C.loading}</p>}
-            {diff.isError && <ErrorState error={diff.error} onRetry={() => void diff.refetch()} />}
+            {diff.isError && (
+              <ErrorState
+                error={diff.error}
+                message={
+                  diff.error instanceof ApiError && diff.error.details?.reason === 'delivery_range_unavailable'
+                    ? C.deliveryRangeUnavailable
+                    : undefined
+                }
+                onRetry={() => void diff.refetch()}
+              />
+            )}
             {diff.data !== undefined && (
               <DiffBrowser
                 files={diff.data.files}

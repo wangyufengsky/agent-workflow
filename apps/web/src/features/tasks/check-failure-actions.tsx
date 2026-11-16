@@ -1,4 +1,4 @@
-import type { ErrorInfo } from '@aw/shared';
+import { type ErrorInfo, TaskFailedPhase } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -10,6 +10,7 @@ import { Markdown } from '../../components/markdown.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { FailureContext } from './failure-context.tsx';
 import { failedCommandOf, pageUnrunnableDetails, unrunnableDetails } from './failure-text.ts';
 import { taskQuery, useSkipCheck, useUpdateCheckCommand } from './tasks.queries.ts';
 
@@ -44,7 +45,7 @@ export function CheckFailureActions({ taskId, error, size }: { taskId: string; e
           {C.skipCheck}
         </Button>
       )}
-      {open === 'edit' && <EditCheckDialog taskId={taskId} command={command} onClose={close} />}
+      {open === 'edit' && <EditCheckDialog taskId={taskId} command={command} error={error} onClose={close} />}
       {open === 'skip' && <SkipCheckDialog taskId={taskId} body={C.skipCheckBody(command)} onClose={close} />}
     </>
   );
@@ -66,9 +67,20 @@ function EditPreviewLink({ taskId, size }: { taskId: string; size: 'sm' | undefi
 }
 
 /** Show the failed condition before asking the user to change it. */
-function EditCheckDialog({ taskId, command, onClose }: { taskId: string; command: string; onClose: () => void }) {
+function EditCheckDialog({
+  taskId,
+  command,
+  error,
+  onClose,
+}: {
+  taskId: string;
+  command: string;
+  error: ErrorInfo;
+  onClose: () => void;
+}) {
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()} title={C.editCheckTitle} description={C.editCheckBody}>
+      <FailureContext taskId={taskId} phase={TaskFailedPhase.Running} error={error} />
       <EditCheckForm taskId={taskId} command={command} onClose={onClose} />
     </Dialog>
   );

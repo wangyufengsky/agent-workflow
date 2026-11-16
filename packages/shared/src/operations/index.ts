@@ -144,6 +144,7 @@ import {
 } from './projects.ts';
 import {
   decideRequirementOp,
+  getRequirementHistoryOp,
   getRequirementsOp,
   replaceRequirementsOp,
   reverifyRequirementsOp,
@@ -323,6 +324,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   removeAttachmentOp,
   snapshotProjectFileOp,
   getRequirementsOp,
+  getRequirementHistoryOp,
   replaceRequirementsOp,
   decideRequirementOp,
   reverifyRequirementsOp,

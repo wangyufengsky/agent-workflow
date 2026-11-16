@@ -13,6 +13,7 @@ import {
   diffCommitsFile,
   diffWorktree,
   diffWorktreeFile,
+  gitFailure,
   limitDiff,
   mergeBase,
   runGit,
@@ -58,18 +59,21 @@ export function createTaskDiffs(deps: TasksServiceDeps, state: TaskState) {
     const repo = projects.getRecord(task.projectId).repoPath;
     const base = delivery.diffBase;
     const head = delivery.diffHead;
-    // Older deliveries did not persist the pre-delivery tip; inferring it from the
-    // resulting commit is unsafe for rebases and no-op merges.
-    try {
-      if (base === null || head === null) throw new Error('delivery range was not recorded');
-      await runGit(['cat-file', '-e', `${base}^{commit}`], { cwd: repo });
-      await runGit(['cat-file', '-e', `${head}^{commit}`], { cwd: repo });
-      return { repo, base, head };
-    } catch {
-      throw new AppError(ErrorCode.NotFound, '交付时的 Git 对比范围不可用，提交可能已被清理或旧记录未保存范围', {
+    // Older deliveries did not persist the pre-delivery tip; a no-op merge can return an existing commit.
+    const unavailable = () =>
+      new AppError(ErrorCode.NotFound, 'Delivery diff range is unavailable', {
         taskId: task.id,
+        reason: 'delivery_range_unavailable',
       });
-    }
+    if (base === null || head === null) throw unavailable();
+    const objects = [`${base}^{commit}`, `${head}^{commit}`];
+    const args = ['cat-file', '--batch-check=%(objecttype)'];
+    const result = await runGit(args, { cwd: repo, input: `${objects.join('\n')}\n` });
+    const types = result.stdout.split(/\r?\n/);
+    if (result.stderr !== '' || types.length !== objects.length) throw gitFailure(args, result);
+    if (objects.some((object, index) => types[index] === `${object} missing`)) throw unavailable();
+    if (types.some((type) => type !== 'commit')) throw gitFailure(args, result);
+    return { repo, base, head };
   }
 
   return {
