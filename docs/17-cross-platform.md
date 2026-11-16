@@ -261,7 +261,13 @@ main 的必需检查使用 GitHub Actions 的 `PR checks`，要求分支保持�
 | `e2e J9 (os, i/4)` | `pnpm build` 后 `pnpm e2e --grep @walkthrough --shard=i/4`：J9 每套主题一个用例，五套主题均分到四片 |
 | `package (os)` | `pnpm build`、Electron 启动冒烟（Linux 含 J42 的主密码一例）、Linux 带 Secret Service 的凭据存储（`dbus-run-session` 里解锁 gnome-keyring 后以 `AW_E2E_SECRET_SERVICE=1` 再跑 `credentials.electron.spec.ts`，D167）、`pnpm dist`、上传安装包 |
 
-macOS 仍是一个 job，按上面的顺序串行跑完；拆分与分片沿用 D81 的安排，早期耗时记录见下文。
+macOS 有三个并行 job，各自保留 30 分钟上限。集成测试维持上面的数据库排除规则，两组浏览器测试按 `@walkthrough` 标签互补覆盖全部用例。
+
+| 作业 | 步骤 |
+| --- | --- |
+| `verify (macos-latest)` | `pnpm check`、`pnpm test`、`pnpm test:int`（排除数据库集成） |
+| `browser and smoke (macos-latest)` | `pnpm build`、`pnpm e2e --grep-invert @walkthrough`、`pnpm e2e:smoke` |
+| `e2e J9 (macos-latest)` | `pnpm build`、`pnpm e2e --grep @walkthrough`，覆盖所有主题 |
 
 **何时运行与当前的验收（D82，用户确认）**：
 
