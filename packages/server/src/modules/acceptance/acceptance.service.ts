@@ -116,10 +116,23 @@ export function createAcceptanceService({
      * (`unrunnable`, D116).
      */
     async runCommand(directory: string, command: string, signal: AbortSignal): Promise<CommandCheckResult> {
+      const shell = await locateShell(env);
+      // A stop during shell discovery must not launch a process tree that is still being created when killed.
+      if (signal.aborted)
+        return {
+          kind: AcceptanceCheckKind.Command,
+          command,
+          passed: false,
+          output: '',
+          exitCode: null,
+          timedOut: false,
+          unrunnable: null,
+          skipped: false,
+        };
       const child = execa(command, {
         cwd: directory,
         // A check command is a POSIX shell command line on every platform (`pnpm test`, `mvn -q test && …`, D73).
-        shell: await locateShell(env),
+        shell,
         env,
         extendEnv: false,
         all: true,
@@ -134,8 +147,7 @@ export function createAcceptanceService({
         timedOut = true;
         stop();
       });
-      if (signal.aborted) stop();
-      else signal.addEventListener('abort', stop, { once: true });
+      signal.addEventListener('abort', stop, { once: true });
       const result = await child;
       cancelTimeout();
       signal.removeEventListener('abort', stop);
