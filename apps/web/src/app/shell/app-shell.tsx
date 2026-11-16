@@ -84,12 +84,13 @@ export function AppShell() {
   const title = useCurrentTitle();
   const onHome = useRouterState({ select: (s) => s.location.pathname === ROUTES.home });
   const assistantOpen = useUiStore((s) => s.assistantOpen) && !onHome;
+  const dockAssistant = useUiStore((s) => s.activePreview !== null);
   useShortcuts();
   useAssistantRequests();
   useAssistantHandoff();
 
   return (
-    <div className="app">
+    <div className="app" data-assistant-docked={(assistantOpen && dockAssistant) || undefined}>
       <nav className="nav" aria-label={NAV_COPY.brand}>
         <div className="brand">
           <span className="brand-mark">
@@ -142,8 +143,7 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
-      {/* Floats over the page and plays its own open and close (D84), so it stays mounted. */}
-      <AssistantPanel />
+      <AssistantPanel docked={dockAssistant} />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} items={paletteItems} />
       <WebsitePrompts />
     </div>

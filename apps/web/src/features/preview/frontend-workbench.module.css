@@ -1,4 +1,5 @@
 .workbench {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--s-2);
@@ -162,7 +163,7 @@
   border: 1px solid var(--line);
 }
 
-@media (max-width: 730px) {
+@container (max-width: 640px) {
   .body {
     flex-direction: column;
   }

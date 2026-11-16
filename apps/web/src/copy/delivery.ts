@@ -1,6 +1,7 @@
 import { DeliveryStrategy } from '@aw/shared';
 
 export const DELIVERY_COPY = {
+  actionsTitle: '合并与交付',
   merge: (branch: string) => `合并到 ${branch}`,
   mergeOptions: '合并选项…',
   mergeOptionsTitle: '合并选项',

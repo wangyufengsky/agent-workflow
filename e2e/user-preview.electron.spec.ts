@@ -12,7 +12,7 @@ test.afterEach(async () => {
   await app.close();
 });
 
-test('我的预览：真实原生视图、只放可见部分、原生页里 ⌘J 回到界面、助手浮层隐藏并仍可读、返回恢复、离开页签解除关联', async ({
+test('我的预览：真实原生视图、只放可见部分、原生页里 ⌘J 回到界面、助手与预览并排且仍可读、离开页签解除关联', async ({
   request,
 }) => {
   app = await electron.launch({ args: ['e2e/fixtures/user-preview/main.cjs'] });
@@ -125,7 +125,7 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
     });
   });
   await expect(page.getByRole('complementary', { name: '应用助手' })).toBeVisible();
-  await expect.poll(nativeCount).toBe(0);
+  await expect.poll(nativeCount).toBe(1);
   await request.post(`${api}/dev/fake-opencode/scripts`, {
     headers,
     data: {

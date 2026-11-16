@@ -82,7 +82,7 @@ function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
 }
 
 /** Result card (14 §3.5): what was done, the changes, and the delivery decisions while in review. */
-export function ResultCard({ task }: { task: TaskDetailDTO }) {
+export function ResultCard({ task, showDelivery = true }: { task: TaskDetailDTO; showDelivery?: boolean }) {
   // The large diff opens on the file clicked, or the first one (D114).
   const [viewing, setViewing] = useState<{ path: string | undefined } | null>(null);
   const { delivery } = taskRoute.useSearch();
@@ -207,7 +207,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
           </section>
         )}
         {task.status === TaskStatus.Completed && task.pullRequest !== null && <ReviewComments task={task} />}
-        {task.status === TaskStatus.Review && <DeliveryActions task={task} />}
+        {showDelivery && task.status === TaskStatus.Review && <DeliveryActions task={task} />}
       </div>
       {browsable && (
         <DiffDialog

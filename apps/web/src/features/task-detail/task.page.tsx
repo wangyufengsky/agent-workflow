@@ -26,6 +26,7 @@ import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { failedNodeKeyOf } from '../tasks/failure-text.ts';
 import { taskQuery } from '../tasks/tasks.queries.ts';
+import { DeliveryDialogButton } from './delivery-actions.tsx';
 import { FailurePanel } from './failure-panel.tsx';
 import { NodeDetailPane, NodeDrawer, type NodeTab } from './node-drawer.tsx';
 import { PausedBanner } from './paused-banner.tsx';
@@ -108,7 +109,7 @@ function StepsMain(props: MainProps) {
 }
 
 /** The main area follows the task's state (14 §3.3). */
-function TaskMain({ task, selection, pro }: MainProps) {
+function TaskMain({ task, selection, pro, deliveryInToolbar = false }: MainProps & { deliveryInToolbar?: boolean }) {
   const props = { task, selection, pro };
   switch (task.status) {
     case TaskStatus.Draft:
@@ -137,7 +138,7 @@ function TaskMain({ task, selection, pro }: MainProps) {
           )}
           <a href="#task-acceptance-result">{C.viewAcceptanceResult}</a>
           <div id="task-acceptance-result" tabIndex={-1}>
-            <ResultCard task={task} />
+            <ResultCard task={task} showDelivery={!deliveryInToolbar} />
           </div>
         </div>
       );
@@ -248,12 +249,15 @@ export function TaskPage() {
           hasConfiguredPreview={project.data?.preview != null}
           onOpenNode={selection.open}
           nodeDetails={nodeDetails}
+          delivery={
+            task.data.status === TaskStatus.Review && frontend.verified && <DeliveryDialogButton task={task.data} />
+          }
           progress={
             <div className={styles.frontendProgress}>
               {task.data.status === TaskStatus.Review && !frontend.verified ? (
                 <StepsView task={task.data} selection={selection} pro={pro} />
               ) : (
-                <TaskMain task={task.data} selection={selection} pro={pro} />
+                <TaskMain task={task.data} selection={selection} pro={pro} deliveryInToolbar />
               )}
             </div>
           }

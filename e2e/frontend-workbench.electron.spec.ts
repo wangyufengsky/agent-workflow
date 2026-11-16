@@ -415,6 +415,37 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
     });
     expect(response.ok()).toBe(false);
     expect((await detail()).frontend?.verified).toBe(true);
+
+    await workbench.getByTestId('preview-area').scrollIntoViewIfNeeded();
+    const shownPage = await nativeText();
+    expect(shownPage).toBeDefined();
+    await page.getByRole('button', { name: /打开助手/ }).click();
+    const assistant = page.getByRole('complementary', { name: '应用助手' });
+    const deliver = workbench.getByRole('button', { name: '合并与交付', exact: true });
+    await expect(assistant).toBeVisible();
+    // Electron 原生视图仍在窗口里，且没有挡住助手的输入区。
+    await expect.soft.poll(nativeText, { timeout: 2_000 }).toBe(shownPage);
+    const side = await assistant.boundingBox();
+    if (side === null) throw new Error('Assistant has no bounds');
+    const nativeRight = () =>
+      app.evaluate(({ BrowserWindow }) => {
+        const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((item) => 'webContents' in item);
+        const bounds = view?.getBounds();
+        return bounds === undefined ? Infinity : bounds.x + bounds.width;
+      });
+    await expect.soft.poll(nativeRight, { timeout: 2_000 }).toBeLessThanOrEqual(side.x);
+    await expect(assistant.getByRole('textbox', { name: '发给助手的消息' })).toBeVisible();
+    await expect(deliver).toBeVisible();
+    await assistant.getByRole('button', { name: '收起助手' }).click();
+    await expect(assistant).toBeHidden();
+    await expect.poll(nativeText).toBe(shownPage);
+
+    await deliver.click();
+    const dialog = page.getByRole('dialog');
+    await expect.poll(nativeRight).toBe(Infinity);
+    await dialog.getByRole('button', { name: '合并到 main', exact: true }).click();
+    await expect.poll(async () => (await detail()).status).toBe(TaskStatus.Completed);
+    await expect(page.getByTestId('delivery-outcome')).toContainText('已合并到 main');
   } finally {
     await app.close();
   }

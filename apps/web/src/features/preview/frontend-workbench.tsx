@@ -84,6 +84,7 @@ export function FrontendWorkbench({
   pro,
   hasConfiguredPreview,
   progress,
+  delivery,
   onOpenNode,
   nodeDetails,
 }: {
@@ -91,6 +92,7 @@ export function FrontendWorkbench({
   pro: boolean;
   hasConfiguredPreview: boolean;
   progress: ReactNode;
+  delivery: ReactNode;
   onOpenNode: (id: string) => void;
   nodeDetails?: { title: string; content: ReactNode; onClose: () => void } | undefined;
 }) {
@@ -274,6 +276,7 @@ export function FrontendWorkbench({
         >
           {C.progress}
         </Button>
+        {delivery}
         {!verified && (
           <Button
             variant="primary"

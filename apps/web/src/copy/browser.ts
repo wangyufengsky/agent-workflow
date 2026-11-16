@@ -133,7 +133,7 @@ export const PREVIEW_PANE_COPY = {
   notPassed: '未通过',
   errors: (n: number) => `${n} 个错误`,
   noShots: '这次体检没有截图。',
-  assistantHint: '可以打开助手询问当前页面。助手只读取文字和错误信息，打开助手时会暂时隐藏预览。',
+  assistantHint: '可以边看预览边询问助手。助手可读取当前页面的文字和错误信息。',
 } as const;
 
 /** A page check's result (29 §7.4, §8.3): each page at each viewport. */

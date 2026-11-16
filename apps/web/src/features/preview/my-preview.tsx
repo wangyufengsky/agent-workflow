@@ -231,7 +231,7 @@ export function MyPreview({
     };
   }, [tabId, task.id, setPreviewTab]);
   const shown = active && running && desktop ? tabId : null;
-  usePlacedTab(shown, area);
+  usePlacedTab(shown, area, true);
   // What the user is looking at is what the assistant may read (`browser_read`, 15); nothing on another tab.
   useEffect(() => {
     if (shown === null) return;

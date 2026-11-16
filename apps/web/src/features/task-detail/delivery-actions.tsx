@@ -138,6 +138,22 @@ const reportFollowUp = (workflowKey: string) =>
     ? { workflow: 'feature', label: C.developFromReport, requirement: C.developRequirement }
     : { workflow: 'bugfix', label: C.fixFromReport, requirement: C.fixRequirement };
 
+export function DeliveryDialogButton({ task }: { task: TaskDetailDTO }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="primary" size="sm" icon="git" onClick={() => setOpen(true)}>
+        {C.actionsTitle}
+      </Button>
+      {open && (
+        <Dialog open onOpenChange={setOpen} title={C.actionsTitle}>
+          <DeliveryActions task={task} />
+        </Dialog>
+      )}
+    </>
+  );
+}
+
 /** What the user can do with a task waiting for review (14 §3.5): merge, open a PR, ask for changes, discard. */
 export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
   const settings = useSettings();
