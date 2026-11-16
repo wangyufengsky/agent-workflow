@@ -591,6 +591,12 @@ payload / response：
 | drop_reason | TEXT NULL | |
 | created_at / updated_at | INTEGER | |
 
+### initiative_item_tasks 与 initiative_coverage_versions
+
+迁移 `0039`：`initiative_item_tasks(item_id, task_id, created_at)` 保存工作包每次启动的任务，`task_id` 唯一；替换当前任务时历史不删除。迁移将已有当前任务补入，无法恢复此前已经被覆盖的任务。`initiative_coverage_versions(initiative_id, revision, coverage, items, created_at)` 保存每次拆解的覆盖表及工作包 id、key、标题快照，按需求计划与版本唯一。迁移保存已有的最新覆盖表；更早被覆盖的版本无法恢复。两表随所属工作包或需求计划删除。
+
+覆盖表的显式验收链接在提交拆解时从包内 key 转为清单项 UUID；没有显式链接的旧数据只保留工作包级关系，不按文字或顺序推断。
+
 ### initiative_runs
 
 一次 AI 拆解、重新拆解或细化（迁移 `0027_initiative_runs`）；状态不单独存，由尝试推导（同 `deck_runs`）。同一需求计划的各次 run 沿用同一个 opencode 会话。

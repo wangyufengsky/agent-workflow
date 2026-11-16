@@ -156,3 +156,16 @@
   background: var(--fill-3);
   color: var(--ink-2);
 }
+
+.coverageOutput {
+  max-height: 200px;
+  overflow: auto;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  background: var(--fill-2);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

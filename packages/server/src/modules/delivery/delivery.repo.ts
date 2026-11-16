@@ -11,7 +11,7 @@ import {
   type RemoteDeliveryStatus,
   remoteDeliveryStatusSchema,
 } from '@aw/shared';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { deliveriesTable } from './delivery.table.ts';
@@ -59,6 +59,23 @@ export function createDeliveriesRepo(db: DbExecutor) {
     latest(taskId: string): Delivery | undefined {
       const row = db.select().from(t).where(eq(t.taskId, taskId)).orderBy(desc(t.createdAt), desc(t.id)).get();
       return row === undefined ? undefined : toDelivery(row);
+    },
+    latestOf(taskIds: readonly string[]): Delivery[] {
+      if (taskIds.length === 0) return [];
+      const rows = db
+        .select()
+        .from(t)
+        .where(inArray(t.taskId, [...taskIds]))
+        .orderBy(desc(t.createdAt), desc(t.id))
+        .all();
+      const seen = new Set<string>();
+      return rows
+        .filter((row) => {
+          if (seen.has(row.taskId)) return false;
+          seen.add(row.taskId);
+          return true;
+        })
+        .map(toDelivery);
     },
     /** The task's latest pull request that was opened or pushed to (21 §5). */
     latestPullRequest(taskId: string): Delivery | undefined {

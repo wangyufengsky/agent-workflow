@@ -14,6 +14,7 @@ import styles from './requirements.module.css';
 export type DraftRequirement = {
   key: string;
   id?: string;
+  sourceKey?: string;
   title: string;
   expected: string;
   required: boolean;
@@ -45,12 +46,16 @@ export const draftsOf = (items: readonly RequirementItem[]): DraftRequirement[] 
  * A checklist kept as inputs while it is written (a work package's acceptance, 34 §5.2): `prefix` keys the items that
  * have no id yet, so that their rows stay put between edits.
  */
-export const draftsOfInputs = (items: readonly RequirementItemInput[], prefix: string): DraftRequirement[] =>
+export const draftsOfInputs = (
+  items: ReadonlyArray<RequirementItemInput & { sourceKey?: string | undefined }>,
+  prefix: string,
+): DraftRequirement[] =>
   items.map((item, i) => {
     const verification = item.verification ?? { kind: RequirementVerification.AiReview };
     return {
       key: item.id ?? `${prefix}:${i}`,
       ...(item.id === undefined ? {} : { id: item.id }),
+      ...(item.sourceKey === undefined ? {} : { sourceKey: item.sourceKey }),
       title: item.title,
       expected: item.expected,
       required: item.required ?? true,
@@ -63,6 +68,7 @@ export const draftsOfInputs = (items: readonly RequirementItemInput[], prefix: s
 export const inputsOf = (drafts: readonly DraftRequirement[]) =>
   drafts.map((d) => ({
     ...(d.id === undefined ? {} : { id: d.id }),
+    ...(d.sourceKey === undefined ? {} : { sourceKey: d.sourceKey }),
     title: d.title,
     expected: d.expected,
     required: d.required,
@@ -85,6 +91,7 @@ export const isComplete = (drafts: readonly DraftRequirement[]): boolean =>
 export const toInputs = (drafts: readonly DraftRequirement[]): NonNullable<CreateTaskRequest['requirements']> =>
   drafts.map((d) => ({
     ...(d.id === undefined ? {} : { id: d.id }),
+    ...(d.sourceKey === undefined ? {} : { sourceKey: d.sourceKey }),
     title: d.title.trim(),
     expected: d.expected.trim(),
     required: d.required,

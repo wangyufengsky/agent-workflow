@@ -1,5 +1,5 @@
 import { type RequirementItem, type RequirementResultDTO, requirementItemSchema } from '@aw/shared';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { requirementResultsTable, requirementRevisionsTable } from './requirements.table.ts';
@@ -26,6 +26,38 @@ export function createRequirementsRepo(db: DbExecutor) {
     /** Newest first. */
     listRevisions(taskId: string): Revision[] {
       return db.select().from(v).where(eq(v.taskId, taskId)).orderBy(desc(v.seq)).all().map(toRevision);
+    },
+    listRevisionsOf(taskIds: readonly string[]): Revision[] {
+      return taskIds.length === 0
+        ? []
+        : db
+            .select()
+            .from(v)
+            .where(inArray(v.taskId, [...taskIds]))
+            .orderBy(desc(v.seq))
+            .all()
+            .map(toRevision);
+    },
+    listResultsOf(taskIds: readonly string[]): Array<RequirementResultDTO & { taskId: string }> {
+      if (taskIds.length === 0) return [];
+      return db
+        .select({
+          taskId: r.taskId,
+          id: r.id,
+          itemId: r.itemId,
+          revisionId: r.revisionId,
+          source: r.source,
+          conclusion: r.conclusion,
+          note: r.note,
+          output: r.output,
+          commitSha: r.commitSha,
+          nodeId: r.nodeId,
+          createdAt: r.createdAt,
+        })
+        .from(r)
+        .where(inArray(r.taskId, [...taskIds]))
+        .orderBy(asc(sql`rowid`))
+        .all();
     },
     findRevision(taskId: string, revisionId: string): Revision | undefined {
       const row = db

@@ -70,6 +70,9 @@ export function createDeliveriesService({ db, unit, clock, log }: DeliveriesServ
       const delivery = repo.latest(taskId);
       return delivery === undefined ? undefined : toDto(delivery);
     },
+    latestOf(taskIds: readonly string[]): Map<string, DeliveryDTO> {
+      return new Map(repo.latestOf(taskIds).map((delivery) => [delivery.taskId, toDto(delivery)]));
+    },
     latestPullRequest(taskId: string): DeliveryDTO | undefined {
       const delivery = repo.latestPullRequest(taskId);
       return delivery === undefined ? undefined : toDto(delivery);

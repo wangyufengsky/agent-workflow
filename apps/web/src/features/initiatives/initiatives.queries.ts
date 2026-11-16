@@ -11,6 +11,7 @@ import {
   getInitiativeOp,
   type InitiativeDetailDTO,
   type InitiativeDraft,
+  initiativeCoverageTraceOp,
   LIST_PAGE_MAX,
   listInitiativesOp,
   listInitiativeTemplatesOp,
@@ -63,6 +64,12 @@ export const initiativesQuery = (filter: { projectId?: string } = {}) =>
 
 export const initiativeQuery = (id: string) =>
   queryOptions({ queryKey: queryKeys.initiative(id), queryFn: () => callOperation(getInitiativeOp, { id }) });
+
+export const initiativeCoverageQuery = (id: string) =>
+  queryOptions({
+    queryKey: queryKeys.initiativeCoverage(id),
+    queryFn: () => callOperation(initiativeCoverageTraceOp, { id }),
+  });
 
 /** `initiative.updated` (34 §10): the initiative and the lists it is in are read again. */
 export const refreshInitiatives = (qc: QueryClient, id: string) =>

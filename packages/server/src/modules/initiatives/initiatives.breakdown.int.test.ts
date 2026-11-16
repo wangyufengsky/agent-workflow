@@ -1,17 +1,22 @@
 import { Readable } from 'node:stream';
 import {
   type CreateInitiativeRequest,
+  cancelTaskOp,
   confirmInitiativeOp,
   createInitiativeOp,
+  decideRequirementOp,
   deleteInitiativeOp,
   deliverTaskOp,
   ErrorCode,
   getInitiativeOp,
+  getRequirementsOp,
   getTaskOp,
   type InitiativeDetailDTO,
+  initiativeCoverageTraceOp,
   openInitiativePhaseOp,
   rebreakdownInitiativeOp,
   refineInitiativeOp,
+  replaceRequirementsOp,
   saveInitiativeDraftOp,
   startInitiativeItemOp,
   submitBreakdownInputSchema,
@@ -185,6 +190,9 @@ describe('AI 拆解与逐步细化（34 §8，D133、D136）', () => {
     await settled();
 
     const refined = await detail(created.id);
+    expect((await t.call(initiativeCoverageTraceOp, { id: created.id })).body.versions.map((v) => v.revision)).toEqual([
+      2, 1,
+    ]);
     expect(refined).toMatchObject({ status: 'draft_ready', openedPhase: 1 });
     expect(rejectedProblems(refined.latestRun?.attemptId ?? '')).toEqual([['ITEM_NOT_EDITABLE']]);
     const refinePrompt = t.fake.prompts.find((p) => p.text.includes('## Now: refine'))?.text ?? '';
@@ -200,6 +208,98 @@ describe('AI 拆解与逐步细化（34 §8，D133、D136）', () => {
     ]);
     const bTask = (await t.call(getTaskOp, { id: opened.items[1]?.task?.id ?? '' })).body;
     expect(bTask.requirement).toBe('为 b/ 补单元测试，复用 a 的测试写法');
+  });
+
+  it('按显式引用追溯多个工作包与重试任务，保留旧清单结论并区分旧数据', async () => {
+    const { project } = await addProject(t, { checkCommand: null });
+    const one = {
+      ...unitTests('a', 1, 'a/'),
+      acceptance: [{ key: 'test_a', title: 'a 的核验', expected: '通过', command: 'true' }],
+    };
+    const two = {
+      ...unitTests('b', 2, 'b/', ['a']),
+      acceptance: [{ key: 'test_b', title: 'b 的核验', expected: '通过' }],
+    };
+    const data = {
+      ...breakdown([one, two]),
+      coverage: [
+        {
+          point: '共同需求',
+          items: ['a', 'b'],
+          links: [
+            { item: 'a', acceptance: ['test_a'] },
+            { item: 'b', acceptance: ['test_b'] },
+          ],
+        },
+        { point: '旧关联', items: ['a'] },
+        { point: '不实现', items: [] },
+      ],
+    };
+    t.fake.enqueue(
+      script()
+        .callTool('submit_breakdown', {
+          ...data,
+          coverage: [{ point: '错误关联', items: ['a'], links: [{ item: 'a', acceptance: ['missing'] }] }],
+        })
+        .callTool('submit_breakdown', data),
+      SESSION,
+    );
+    const created = await create({ projectId: project.id, requirement: '共同需求' });
+    await settled();
+    const draft = await detail(created.id);
+    const firstAcceptance = draft.items[0]?.acceptance[0];
+    expect(firstAcceptance).toMatchObject({ sourceKey: 'test_a' });
+    expect(firstAcceptance?.id).toBeTruthy();
+    expect(draft.coverage?.[0]?.links?.[0]?.acceptance).toEqual([firstAcceptance?.id]);
+    expect(rejectedProblems(draft.latestRun?.attemptId ?? '')).toEqual([['INVALID_COVERAGE_LINK']]);
+    expect((await t.call(initiativeCoverageTraceOp, { id: created.id })).body.items).toMatchObject([
+      { key: 'a', tasks: [] },
+      { key: 'b', tasks: [] },
+    ]);
+
+    queueUnitTests('T-1', 'a/');
+    t.fake.enqueue(script().callTool('submit_result', { summary: 'Checked' }), { title: 'T-1 · 核验验收清单' });
+    const running = taskReaches(t, 'review');
+    const opened = (await t.call(confirmInitiativeOp, { id: created.id })).body;
+    const firstId = opened.items[0]?.task?.id ?? '';
+    await running;
+    const initial = (await t.call(getRequirementsOp, { id: firstId })).body;
+    expect(initial.items[0]?.id).toBe(firstAcceptance?.id);
+    expect(initial.commitSha).not.toBeNull();
+    await t.call(decideRequirementOp, {
+      id: firstId,
+      itemId: firstAcceptance?.id ?? '',
+      conclusion: 'pass',
+      note: '人工确认',
+    });
+    await t.call(replaceRequirementsOp, {
+      id: firstId,
+      items: [{ id: firstAcceptance?.id, title: 'a 的核验', expected: '新要求' }],
+    });
+    const stale = (await t.call(initiativeCoverageTraceOp, { id: created.id })).body.items[0]?.tasks[0]
+      ?.requirements[0];
+    expect(stale).toMatchObject({ isCurrent: true, status: 'stale', latest: { note: '人工确认' } });
+    await t.call(replaceRequirementsOp, { id: firstId, items: [{ title: '替换项', expected: '已更改' }] });
+    const removed = (await t.call(initiativeCoverageTraceOp, { id: created.id })).body.items[0]?.tasks[0]?.requirements;
+    expect(removed).toContainEqual(
+      expect.objectContaining({
+        item: expect.objectContaining({ id: firstAcceptance?.id }),
+        isCurrent: false,
+        revisionId: stale?.revisionId,
+        latest: expect.objectContaining({ note: '人工确认' }),
+      }),
+    );
+
+    await t.call(cancelTaskOp, { id: firstId });
+    await t.app.services.initiatives.settled();
+    t.fake.enqueue(script().hang(), { title: 'T-2 · 分析测试缺口' });
+    const restarted = (await t.call(startInitiativeItemOp, { id: created.id, key: 'a' })).body;
+    const secondId = restarted.items[0]?.task?.id ?? '';
+    expect(secondId).not.toBe(firstId);
+    const trace = (await t.call(initiativeCoverageTraceOp, { id: created.id })).body;
+    expect(trace.items[0]?.tasks.map((entry) => entry.task.id)).toEqual([firstId, secondId]);
+    expect(trace.items[0]?.tasks[1]?.requirements[0]?.item.id).toBe(firstAcceptance?.id);
+    expect(trace.items[1]?.tasks).toEqual([]);
   });
 
   it('没有交出拆解就是失败，可以带意见重新拆解；拆解进行中不能修改或删除', async () => {

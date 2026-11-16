@@ -52,11 +52,11 @@ export function createRequirementsService({ db, clock }: RequirementsServiceDeps
      * Saves `inputs` as the task's next version, inside the caller's transaction. An input with an `id` keeps that
      * item of the current version (its conclusions stay its own, if stale); one without gets a new id.
      */
-    save(taskId: string, inputs: readonly RequirementItemInput[]): void {
+    save(taskId: string, inputs: readonly RequirementItemInput[], initialIds = false): void {
       const [current] = repo.listRevisions(taskId);
       const known = new Set(current?.items.map((item) => item.id) ?? []);
       const items: RequirementItem[] = requirementItemsInputSchema.parse(inputs).map(({ id, ...item }, index) => {
-        if (id !== undefined && !known.has(id)) {
+        if (id !== undefined && !known.has(id) && !(initialIds && current === undefined)) {
           throw new AppError(ErrorCode.ValidationFailed, `No item ${id} in the current checklist`, {
             issues: [{ path: ['items', index, 'id'], message: 'not an item of the current checklist' }],
           });
@@ -83,6 +83,31 @@ export function createRequirementsService({ db, clock }: RequirementsServiceDeps
           results: results.filter((result) => result.itemId === item.id),
         })),
       };
+    },
+
+    /** Most recent version containing each item, including items removed from the current checklist. */
+    tracesOf(commits: ReadonlyMap<string, string | null>) {
+      const ids = [...commits.keys()];
+      const revisions = repo.listRevisionsOf(ids);
+      const results = repo.listResultsOf(ids);
+      return new Map(
+        ids.map((taskId) => {
+          const versions = revisions.filter((r) => r.taskId === taskId);
+          const current = versions[0];
+          const seen = new Set<string>();
+          const items = versions.flatMap((revision) =>
+            revision.items.flatMap((item) => {
+              if (seen.has(item.id)) return [];
+              seen.add(item.id);
+              const isCurrent = revision.id === current?.id;
+              const relevant = results.filter((r) => r.taskId === taskId && r.itemId === item.id);
+              const baseline = { revisionId: revision.id, commitSha: commits.get(taskId) ?? null };
+              return [{ item, revisionId: revision.id, isCurrent, ...displayStatus(relevant, baseline) }];
+            }),
+          );
+          return [taskId, items];
+        }),
+      );
     },
 
     /** The current version with each item's state against `commitSha` (null when the task's commit is unknown). */

@@ -92,6 +92,39 @@ export const initiativeItemsTable = sqliteTable(
   ],
 );
 
+/** Every task started for a work package, including the tasks it replaced. */
+export const initiativeItemTasksTable = sqliteTable(
+  'initiative_item_tasks',
+  {
+    itemId: text('item_id')
+      .notNull()
+      .references(() => initiativeItemsTable.id, { onDelete: 'cascade' }),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasksTable.id, { onDelete: 'cascade' }),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('initiative_item_tasks_task_idx').on(t.taskId),
+    index('initiative_item_tasks_item_idx').on(t.itemId),
+  ],
+);
+
+/** Immutable coverage and package identity snapshots from completed breakdowns. */
+export const initiativeCoverageVersionsTable = sqliteTable(
+  'initiative_coverage_versions',
+  {
+    initiativeId: text('initiative_id')
+      .notNull()
+      .references(() => initiativesTable.id, { onDelete: 'cascade' }),
+    revision: integer('revision').notNull(),
+    coverage: text('coverage').notNull(),
+    items: text('items').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [uniqueIndex('initiative_coverage_versions_idx').on(t.initiativeId, t.revision)],
+);
+
 /** 10 §initiative_runs (34 §9): one AI breakdown or refinement; its state is its attempt's (as `deck_runs`). */
 export const initiativeRunsTable = sqliteTable(
   'initiative_runs',

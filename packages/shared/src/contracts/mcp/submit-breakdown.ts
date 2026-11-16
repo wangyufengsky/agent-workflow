@@ -31,6 +31,10 @@ export const initiativeCoverageSchema = z.object({
   items: z
     .array(z.string())
     .describe('Keys of the work packages that do it; empty when left out (say why in out_of_scope)'),
+  links: z
+    .array(z.object({ item: z.string(), acceptance: z.array(z.string()).min(1) }))
+    .optional()
+    .describe('Explicit work package and acceptance keys for this point; omit when no item-level link is known'),
 });
 export type InitiativeCoverage = z.output<typeof initiativeCoverageSchema>;
 
@@ -66,6 +70,11 @@ export const submitBreakdownInputSchema = z.object({
         acceptance: z
           .array(
             z.object({
+              key: z
+                .string()
+                .regex(NODE_KEY_PATTERN)
+                .optional()
+                .describe('Stable acceptance key within this work package, referenced from coverage links'),
               title: text(REQUIREMENT_TITLE_MAX_CHARS),
               expected: text(REQUIREMENT_EXPECTED_MAX_CHARS),
               command: z

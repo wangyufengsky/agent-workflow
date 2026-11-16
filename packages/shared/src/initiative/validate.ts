@@ -17,7 +17,11 @@ export type InitiativeDraftRules = {
   /** The initiative's allowed workflows (AI breakdown); undefined: any existing one. */
   allowedWorkflows?: readonly string[];
   /** The AI's coverage table, whose work package keys must exist (34 §8.3). */
-  coverage?: ReadonlyArray<{ point: string; items: readonly string[] }>;
+  coverage?: ReadonlyArray<{
+    point: string;
+    items: readonly string[];
+    links?: ReadonlyArray<{ item: string; acceptance: readonly string[] }> | undefined;
+  }>;
   /** A composition template: some work package must take the user's requirement (34 §15.2). */
   template?: boolean;
 };
@@ -96,7 +100,34 @@ export function validateInitiativeDraft(draft: InitiativeDraft, rules: Initiativ
     });
   }
 
+  for (const item of draft.items) {
+    const keys = item.acceptance.flatMap((entry) => (entry.sourceKey === undefined ? [] : [entry.sourceKey]));
+    if (new Set(keys).size !== keys.length) {
+      problems.push({
+        code: InitiativeProblemCode.InvalidCoverageLink,
+        itemKey: item.key,
+        message: `Acceptance keys in ${item.key} must be unique`,
+      });
+    }
+  }
+
   for (const line of rules.coverage ?? []) {
+    for (const link of line.links ?? []) {
+      const item = byKey.get(link.item);
+      if (
+        !line.items.includes(link.item) ||
+        item === undefined ||
+        link.acceptance.some(
+          (key) => !item.acceptance.some((entry) => entry.sourceKey === key && entry.id !== undefined),
+        )
+      ) {
+        problems.push({
+          code: InitiativeProblemCode.InvalidCoverageLink,
+          itemKey: link.item,
+          message: `The coverage of "${line.point}" names an unknown acceptance item`,
+        });
+      }
+    }
     for (const key of line.items) {
       if (!byKey.has(key)) {
         problems.push({

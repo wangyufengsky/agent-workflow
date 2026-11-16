@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { PromptName, type Prompts, renderTemplate } from '@aw/builtin';
 import {
   INITIATIVE_ITEMS_MAX,
@@ -32,6 +33,7 @@ export function draftOf(
       acceptance:
         kept.get(item.key) ??
         item.acceptance.map((a) => ({
+          ...(a.key === undefined ? {} : { id: randomUUID(), sourceKey: a.key }),
           title: a.title,
           expected: a.expected,
           required: true,

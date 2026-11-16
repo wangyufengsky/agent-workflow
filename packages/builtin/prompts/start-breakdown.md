@@ -28,3 +28,5 @@ Break the requirement into work packages and phases. Each work package becomes o
 - `coverage` lists every point of the requirement with the work packages that do it; a point you leave out has no work packages and its reason in `understanding.out_of_scope`.
 - Stay with the code as it is; do not invent modules. Write titles, the summary, requirements and acceptance items in the language of the requirement.
 - You do not ask the user anything: write what you assumed in `understanding.assumptions`.
+
+- Give each acceptance item a unique stable `key` within its work package. In each coverage line, use `links` to explicitly name the work package and its acceptance keys that verify that point. Never guess links; omit them when the association is unclear.

@@ -33,6 +33,28 @@ export function createTaskRequirements(deps: TasksServiceDeps, state: TaskState)
   }
 
   return {
+    async coverageTasks(taskIds: readonly string[]) {
+      const summaries = state.summaries(state.repo.list({ ids: taskIds }));
+      const deliveries = deps.deliveries.latestOf(taskIds);
+      const trees = deps.worktrees.listByTasks(taskIds);
+      const commits = new Map(
+        await Promise.all(
+          taskIds.map(async (id): Promise<[string, string | null]> => {
+            const tree = trees.find((entry) => entry.taskId === id && entry.status === WorktreeStatus.Ready);
+            if (tree !== undefined)
+              return [id, (await runGit(['rev-parse', 'HEAD'], { cwd: tree.path })).stdout.trim()];
+            return [id, deliveries.get(id)?.diffHead ?? null];
+          }),
+        ),
+      );
+      const traces = requirements.tracesOf(commits);
+      return summaries.map((task) => ({
+        task,
+        delivery: deliveries.get(task.id) ?? null,
+        commitSha: commits.get(task.id) ?? null,
+        requirements: traces.get(task.id) ?? [],
+      }));
+    },
     requirements: view,
     requirementHistory: (taskId: string, revisionId: string) => requirements.history(state.get(taskId).id, revisionId),
 

@@ -22,6 +22,7 @@ import {
   initiativeStatusSchema,
   initiativeTemplateKindSchema,
 } from '../../enums/initiative.ts';
+import { requirementDisplayStatusSchema } from '../../enums/requirement.ts';
 import { attemptStatusSchema } from '../../enums/task.ts';
 import { workflowDeliverableSchema } from '../../enums/workflow.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
@@ -29,7 +30,7 @@ import { NODE_KEY_PATTERN } from '../../workflow/plan-graph.ts';
 import { initiativeCoverageSchema, initiativeUnderstandingSchema } from '../mcp/submit-breakdown.ts';
 import { attachmentSchema } from './attachments.ts';
 import { deliverySchema } from './delivery.ts';
-import { requirementItemInputSchema } from './requirements.ts';
+import { requirementItemInputSchema, requirementItemSchema, requirementResultSchema } from './requirements.ts';
 import { taskSummarySchema } from './tasks.ts';
 import { DEFINITION_KEY_PATTERN } from './workflows.ts';
 
@@ -53,7 +54,15 @@ export const initiativeItemSpecSchema = z.object({
   requirement: z.string().trim().min(1).max(INITIATIVE_ITEM_REQUIREMENT_MAX_CHARS),
   dependsOn: z.array(z.string()).default([]),
   /** The task's acceptance checklist (31); none when empty. */
-  acceptance: z.array(requirementItemInputSchema).max(REQUIREMENTS_MAX).default([]),
+  acceptance: z
+    .array(
+      requirementItemInputSchema.extend({
+        /** Explicit identifier within the work package, used by coverage links. */
+        sourceKey: z.string().regex(NODE_KEY_PATTERN).optional(),
+      }),
+    )
+    .max(REQUIREMENTS_MAX)
+    .default([]),
 });
 export type InitiativeItemSpec = z.output<typeof initiativeItemSpecSchema>;
 
@@ -130,6 +139,7 @@ export const initiativeSummarySchema = z.object({
 export type InitiativeSummaryDTO = z.infer<typeof initiativeSummarySchema>;
 
 export const initiativeItemSchema = initiativeItemSpecSchema.extend({
+  id: z.string(),
   status: initiativeItemStatusSchema,
   /** The workflow's latest version; name and deliverable are null when the workflow no longer exists. */
   workflowName: z.string().nullable(),
@@ -177,6 +187,39 @@ export const initiativeDetailSchema = initiativeSummarySchema.extend({
   attachments: z.array(attachmentSchema),
 });
 export type InitiativeDetailDTO = z.infer<typeof initiativeDetailSchema>;
+
+/** Batched task lineage and checklist evidence for the coverage view. */
+export const initiativeCoverageTraceSchema = z.object({
+  versions: z.array(
+    z.object({
+      revision: z.number(),
+      coverage: z.array(initiativeCoverageSchema),
+      items: z.array(z.object({ id: z.string(), key: z.string(), title: z.string() })),
+    }),
+  ),
+  items: z.array(
+    z.object({
+      key: z.string(),
+      tasks: z.array(
+        z.object({
+          task: taskSummarySchema,
+          delivery: deliverySchema.nullable(),
+          commitSha: z.string().nullable(),
+          requirements: z.array(
+            z.object({
+              item: requirementItemSchema,
+              revisionId: z.string(),
+              isCurrent: z.boolean(),
+              status: requirementDisplayStatusSchema,
+              latest: requirementResultSchema.nullable(),
+            }),
+          ),
+        }),
+      ),
+    }),
+  ),
+});
+export type InitiativeCoverageTraceDTO = z.infer<typeof initiativeCoverageTraceSchema>;
 
 const idSchema = z.object({ id: z.string() });
 const itemRefSchema = z.object({ id: z.string(), key: z.string() });

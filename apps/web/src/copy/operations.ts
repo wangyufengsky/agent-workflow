@@ -188,6 +188,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.initiatives.list': '需求计划列表',
   'op.initiatives.create': '新建需求计划',
   'op.initiatives.get': '查看需求计划',
+  'op.initiatives.coverageTrace': '查看需求覆盖追溯',
   'op.initiatives.saveDraft': '修改需求计划的阶段与工作包',
   'op.initiatives.confirm': '确认需求计划',
   'op.initiatives.openPhase': '进入下一阶段',
