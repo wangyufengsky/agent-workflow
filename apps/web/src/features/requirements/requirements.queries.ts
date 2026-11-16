@@ -22,7 +22,11 @@ function useChecklistMutation<I>(taskId: string, run: (input: I) => Promise<Task
   const qc = useQueryClient();
   return useMutation({
     mutationFn: run,
-    onSuccess: (view) => qc.setQueryData(queryKeys.taskRequirements(taskId), view),
+    onSuccess: async (view) => {
+      const key = queryKeys.taskRequirements(taskId);
+      qc.setQueryData(key, view);
+      await qc.invalidateQueries({ queryKey: [...key, 'history'] });
+    },
   });
 }
 

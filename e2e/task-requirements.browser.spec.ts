@@ -74,6 +74,10 @@ test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → �
   await expect(history.getByText('false', { exact: true })).toBeVisible();
   await expect(history.getByText('未通过 · 命令', { exact: false })).toBeVisible();
 
+  const currentHistory = checklist.locator('details', { has: checklist.getByText(/^版本 2 ·/) }).last();
+  await currentHistory.getByText(/^版本 2 ·/).click();
+  await expect(currentHistory.getByText('预期：只显示匹配订单，忽略大小写', { exact: false })).toBeVisible();
+
   // The user passes the AI item and accepts the failing command as not done, with a reason.
   await checklist
     .locator('details', { hasText: '按订单号搜索' })
@@ -81,6 +85,7 @@ test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → �
     .click();
   await page.getByRole('dialog').getByLabel('说明').fill('亲自搜了一单');
   await page.getByRole('dialog').getByRole('button', { name: '通过', exact: true }).click();
+  await expect(currentHistory.getByText('亲自搜了一单')).toBeVisible();
   await checklist.locator('details', { hasText: '单元测试通过' }).getByRole('button', { name: '接受未完成' }).click();
   const waive = page.getByRole('dialog');
   await expect(waive.getByRole('button', { name: '接受未完成' })).toBeDisabled();
