@@ -42,6 +42,8 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.SkillInvalid]:
     '请检查 SKILL.md。需要有效的 YAML 头、英文小写短名、用途说明和非空正文。名称可含数字和连字符，aw- 为内置保留前缀。',
   [ErrorCode.SkillNameTaken]: '已有同名 Skill，请换一个名称。',
+  [ErrorCode.SkillAssistantDisabled]: '这条 Skill 已关闭助手选用，请重新选择。',
+  [ErrorCode.SkillBindingLimit]: '该项目流程已达到绑定数量上限，请先移除一条 Skill。',
   [ErrorCode.SkillNotFound]: '这个 Skill 已不存在，请重新选择。',
   [ErrorCode.WorkflowNotFound]: '这个流程不存在。',
   [ErrorCode.WorkflowReadonly]: '内置流程不能修改，可以复制后再改。',

@@ -166,7 +166,7 @@ type Acceptance = {
 
 ### tasks
 
-`skills` 为创建任务时保存的有序 JSON 快照，每项包含 `id`、`name`、`version`、`body`。旧任务默认空数组。任务使用快照与库中的版本独立。
+`skills` 为创建任务时保存的有序 JSON 快照，每项包含 `id`、`name`、`version`、`body` 和可选的 `roleIds`。未指定角色或角色值为 null 时应用于任务的全部角色。旧任务默认空数组。任务使用快照中的版本及角色范围。
 
 | 列 | 类型 | 说明 |
 | --- | --- | --- |
@@ -833,6 +833,6 @@ items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`ex
 
 ### user_skills 与 project_skill_bindings
 
-- `user_skills` 按 UUID 保存 `name`（唯一）、`description`、`source`（完整 SKILL.md）与 `version`（从 1 开始，内容有变化时递增）。
-- `project_skill_bindings` 主键为 `(project_id, workflow_key, skill_id)`，按 `position` 保存选用顺序。外键随项目或 Skill 删除级联清理。流程下线时，同一事务清理该流程键的绑定。
+- `user_skills` 按 UUID 保存 `name`（唯一）、`description`、`source`（完整 SKILL.md）与 `version`（从 1 开始，内容有变化时递增）与 `assistant_enabled`（允许助手手动选用，默认开启）。
+- `project_skill_bindings` 主键为 `(project_id, workflow_key, skill_id)`，按 `position` 保存选用顺序。`role_ids` 保存精确角色 ID 的 JSON 数组，null 适用于该流程全部角色。迁移 0042 为旧选用和绑定保留原范围。外键随项目或 Skill 删除级联清理。流程下线或角色删除时，同一事务清理所涉及的绑定。若最后一个显式绑定角色被删除，则解除该条绑定。
 - 助手 JSONL 的 `user_message` 可选 `skills` 字段保存当轮选用的 `id`、`name`、`version`。

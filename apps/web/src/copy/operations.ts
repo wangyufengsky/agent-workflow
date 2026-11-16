@@ -234,6 +234,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.team.analyses.get': '查看成员分析',
   'op.team.analyses.cancel': '取消成员分析',
   'op.skills.list': '查看我的 Skill',
+  'op.skills.catalog': '查看 Skill 目录与使用范围',
+  'op.skills.setScope': '设置 Skill 使用范围',
   'op.skills.create': '保存 Skill',
   'op.skills.update': '编辑 Skill',
   'op.skills.delete': '删除 Skill',

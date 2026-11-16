@@ -174,9 +174,11 @@ import { getSettingsOp, updateSettingsOp } from './settings.ts';
 import {
   createSkillOp,
   deleteSkillOp,
+  getSkillCatalogOp,
   listProjectSkillBindingsOp,
   listSkillsOp,
   setProjectSkillBindingOp,
+  setSkillScopeOp,
   updateSkillOp,
 } from './skills.ts';
 import {
@@ -289,6 +291,8 @@ export * from './workflows.ts';
 export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   createSkillOp,
   deleteSkillOp,
+  getSkillCatalogOp,
+  setSkillScopeOp,
   listProjectSkillBindingsOp,
   listSkillsOp,
   setProjectSkillBindingOp,

@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { PromptName, type Prompts, SkillName } from '@aw/builtin';
+import { AGENT_SKILLS, ASSISTANT_SKILLS, PromptName, type Prompts, type SkillName } from '@aw/builtin';
 import {
   BASH_PERMISSION_PRESETS,
   BashPolicy,
@@ -123,33 +123,7 @@ const ASSISTANT_PERMISSION = {
   [EXEC_TOOLS]: 'deny',
 } as const satisfies AgentPermission & { [EXEC_TOOLS]: 'deny' };
 
-/**
- * The app's skills each agent sees (41 §7.3, D207): an allowlist, so the user's own skills and those of the project's
- * repository never reach an aw session. An agent without skills loses the `skill` tool altogether.
- */
-export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
-  [SessionAgent.Planner]: [SkillName.DbReadonly, SkillName.OfflineNetwork, SkillName.PageCheck],
-  [SessionAgent.Executor]: [
-    SkillName.DbReadonly,
-    SkillName.OfflineNetwork,
-    SkillName.MergeConflicts,
-    SkillName.PageCheck,
-  ],
-  [SessionAgent.Reviewer]: [SkillName.DbReadonly, SkillName.PageCheck],
-  [SessionAgent.Researcher]: [SkillName.DbReadonly],
-  [SessionAgent.SlidesWriter]: [],
-  [SessionAgent.CodeReviewer]: [],
-  [SessionAgent.Delegate]: [],
-};
-export const ASSISTANT_SKILLS: SkillName[] = [
-  SkillName.TaskRequirement,
-  SkillName.TaskDiagnosis,
-  SkillName.RecurringWork,
-  SkillName.OfficeDocs,
-  SkillName.AssistantCharts,
-  SkillName.AssistantPreview,
-  SkillName.DbReadonly,
-];
+export { AGENT_SKILLS, ASSISTANT_SKILLS };
 
 /** The catch-all deny comes first: opencode applies the last rule that matches (12 §2). */
 const skillPermission = (skills: SkillName[]) =>

@@ -81,7 +81,7 @@ export function useAssistantRequests(): void {
           }
           case AssistantForm.CreateSkill:
             setPendingForm({ seq: request.seq, form, values });
-            followAssistant(() => navigate({ to: ROUTES.settings, hash: 'my-skills' }));
+            followAssistant(() => navigate({ to: ROUTES.skills }));
             return;
           case AssistantForm.AddProject:
             setPendingForm({ seq: request.seq, form, values });

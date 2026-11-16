@@ -8,12 +8,29 @@ test('新建和导入 Skill，绑定到流程，在助手里选用并保存提�
   await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
   const project = await createProject(request, null);
   await page.goto('/settings');
+  await expect(page.getByRole('heading', { name: '我的 Skill', exact: true })).toHaveCount(0);
+  await page.getByRole('navigation').getByRole('link', { name: '我的 Skill', exact: true }).click();
+  await expect(page).toHaveURL(/\/skills$/);
   const library = page.locator('#my-skills');
+  await library.getByRole('button', { name: /内置 10/ }).click();
+  await library.getByRole('searchbox', { name: '搜索 Skill' }).fill('aw-page-check');
+  const details = library.getByRole('complementary', { name: 'Skill 详情' });
+  await expect(details.getByText('开发工程师', { exact: true })).toBeVisible();
+  await expect(details.getByText('测试工程师', { exact: true })).toBeVisible();
+  await expect(details.getByText('评审员', { exact: true })).toBeVisible();
+  await details.getByRole('tab', { name: 'SKILL.md' }).click();
+  await expect(details.locator('pre')).toContainText('name: aw-page-check');
+  await expect(details.getByRole('button', { name: '编辑正文' })).toHaveCount(0);
+
+  await library.getByRole('searchbox', { name: '搜索 Skill' }).fill('');
+  await library.getByRole('button', { name: /页面检查/ }).click();
+  await expect(details.getByRole('heading', { name: '页面检查', exact: true })).toBeInViewport();
+  await expect(library.getByRole('button', { name: '新建 Skill' })).toBeInViewport();
   await library.getByRole('button', { name: '新建 Skill' }).click();
   const editor = page.getByRole('dialog');
   await editor.getByLabel('SKILL.md', { exact: true }).fill(source('weekly-report-e2e', '先展示已核验的数字。'));
   await editor.getByRole('button', { name: '保存 Skill' }).click();
-  await expect(library.getByText('weekly-report-e2e', { exact: false })).toBeVisible();
+  await expect(library.getByRole('button', { name: /weekly-report-e2e/ })).toBeVisible();
 
   const file = page.waitForEvent('filechooser');
   await library.getByRole('button', { name: '导入 SKILL.md' }).click();
@@ -24,22 +41,29 @@ test('新建和导入 Skill，绑定到流程，在助手里选用并保存提�
   });
   await expect(editor.getByLabel('SKILL.md', { exact: true })).toHaveValue(/sheet-review-e2e/);
   await editor.getByRole('button', { name: '保存 Skill' }).click();
-  await expect(library.getByText('sheet-review-e2e', { exact: false })).toBeVisible();
+  await expect(library.getByRole('button', { name: /sheet-review-e2e/ })).toBeVisible();
 
-  await page.goto(`/projects/${project.id}`);
-  await page.getByLabel('流程', { exact: true }).selectOption('feature');
-  await page.getByRole('checkbox', { name: /weekly-report-e2e/ }).check();
-  await page.getByRole('button', { name: '保存绑定' }).click();
-  await expect(page.getByText('已保存', { exact: true })).toBeVisible();
-  await page.reload();
-  await page.getByLabel('流程', { exact: true }).selectOption('feature');
-  await expect(page.getByRole('checkbox', { name: /weekly-report-e2e/ })).toBeChecked();
+  await library.getByRole('button', { name: /weekly-report-e2e/ }).click();
+  await details.getByRole('button', { name: '编辑使用范围' }).click();
+  await editor.getByRole('checkbox', { name: '允许助手在对话中手动选用' }).uncheck();
+  await editor.getByRole('button', { name: '添加项目流程' }).click();
+  await editor.getByRole('combobox', { name: '项目', exact: true }).selectOption(project.id);
+  await editor.getByRole('combobox', { name: '流程', exact: true }).selectOption('feature');
+  await editor.getByRole('combobox', { name: '流程中的使用角色' }).selectOption('specific');
+  await editor.getByRole('checkbox', { name: '评审员', exact: true }).check();
+  await editor.getByRole('button', { name: '保存 Skill' }).click();
+  await expect(details.getByText('未在助手中启用。')).toBeVisible();
+  await expect(details.getByText('评审员', { exact: true })).toBeVisible();
+  await library.getByRole('combobox', { name: '按使用对象筛选' }).selectOption({ label: '评审员' });
+  await expect(library.getByRole('button', { name: /weekly-report-e2e/ })).toBeVisible();
+  await expect(library.getByRole('button', { name: /sheet-review-e2e/ })).toHaveCount(0);
   await page.goto(`/?projectId=${project.id}&workflow=feature`);
   await expect(page.getByText('weekly-report-e2e · v1', { exact: true })).toBeVisible();
 
   await queueAssistantTurn(request, [{ type: 'text', text: '已按约定整理。' }]);
   await page.goto('/');
   await page.getByRole('button', { name: '选择 Skill' }).click();
+  await expect(editor.getByRole('checkbox', { name: /weekly-report-e2e/ })).toHaveCount(0);
   await editor.getByRole('checkbox', { name: /sheet-review-e2e/ }).check();
   await editor.getByRole('button', { name: '完成' }).click();
   const input = page.getByLabel('告诉助手，或开始任务');
@@ -57,5 +81,6 @@ test('新建和导入 Skill，绑定到流程，在助手里选用并保存提�
   await expect(editor.getByRole('heading', { name: '助手拟好的 Skill' })).toBeVisible();
   await editor.getByLabel('SKILL.md', { exact: true }).fill(source('draft-report-e2e', '检查表头后逐列核对数据类型。'));
   await editor.getByRole('button', { name: '保存 Skill' }).click();
-  await expect(library.getByText('draft-report-e2e', { exact: false })).toBeVisible();
+  await expect(page).toHaveURL(/\/skills$/);
+  await expect(library.getByRole('button', { name: /draft-report-e2e/ })).toBeVisible();
 });

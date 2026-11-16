@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { createProject, patchSettings } from './helpers.ts';
 
-// What simple mode shows (38, D158): five sidebar items, six workflow chips under「直接开始」with the others under
+// What simple mode shows (38, D158): six sidebar items, six workflow chips under「直接开始」with the others under
 //「更多流程」, no theme switch in the header.
 
-test('简单模式：侧栏 5 项、顶栏没有主题切换；「直接开始」6 个流程，其余在「更多流程」里', async ({ page, request }) => {
+test('简单模式：侧栏 6 项、顶栏没有主题切换；「直接开始」6 个流程，其余在「更多流程」里', async ({ page, request }) => {
   await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
   await createProject(request, null);
   await page.goto('/');
@@ -17,6 +17,7 @@ test('简单模式：侧栏 5 项、顶栏没有主题切换；「直接开始�
     /^任务\d*$/,
     '项目',
     '知识问答',
+    '我的 Skill',
     '设置',
     /opencode/,
   ]);
@@ -30,14 +31,14 @@ test('简单模式：侧栏 5 项、顶栏没有主题切换；「直接开始�
   const more = page.getByRole('list', { name: '更多流程' });
   await expect(more).toBeHidden();
   await panel.getByRole('button', { name: /^更多流程/ }).click();
-  await expect(more.getByRole('button')).toHaveCount(6);
+  await expect(more.getByRole('button')).toHaveCount(7);
   await more.getByRole('button', { name: /安全审查/ }).click();
   await expect(page.getByText('开始任务 · 安全审查')).toBeVisible();
 
   // Pro mode lists the moved pages in its own group.
   await patchSettings(request, { 'ui.mode': 'pro' });
   await page.reload();
-  for (const name of ['PPT', '质量与用量', '团队']) {
+  for (const name of ['我的 Skill', 'PPT', '质量与用量', '团队']) {
     await expect(nav.getByRole('link', { name, exact: true })).toBeVisible();
   }
   await patchSettings(request, { 'ui.mode': 'simple' });

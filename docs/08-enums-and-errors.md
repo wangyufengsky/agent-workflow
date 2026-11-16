@@ -485,6 +485,8 @@ class AppError extends Error {
 | `SKILL_INVALID` | 400 | SKILL.md 的 YAML 头、名称、用途说明或正文无效 |
 | `SKILL_NAME_TAKEN` | 409 | 已有同名的用户 Skill |
 | `SKILL_NOT_FOUND` | 404 | 所选用户 Skill 不存在 |
+| `SKILL_ASSISTANT_DISABLED` | 409 | 选中的 Skill 已关闭助手手动选用 |
+| `SKILL_BINDING_LIMIT` | 409 | 同一项目流程已绑定五个 Skill |
 | `WORKFLOW_READONLY` | 409 | 修改内置流程 |
 | `WORKFLOW_DEFINITION_INVALID` | 400 | `details.problems[]`，子码见 5.4 |
 | `WORKFLOW_ALREADY_EXISTS` | 409 | 新建 / 复制流程时 key 已被列出的流程使用 |

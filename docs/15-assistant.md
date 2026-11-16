@@ -226,6 +226,6 @@ server/src/modules/assistant/
 
 ## 用户 Skill 草稿与产物做成 PPT
 
-用户可在本轮消息选用已保存的 Skill，系统提示携带发出当时的 Skill 正文，聊天记录显示名称和版本。创建 Skill 或从任务、对话中提炼做法时，助手通过现有 `open_form` 打开 `skills.create` 表单，值为完整 `source`。用户在「我的 Skill」检查、编辑并保存。
+用户可在本轮消息选用开启了「允许助手手动选用」的自定义 Skill，系统提示携带发出当时的 Skill 正文，聊天记录显示名称和版本。创建 Skill 或从任务、对话中提炼做法时，助手通过现有 `open_form` 打开 `skills.create` 表单，值为完整 `source`。用户在侧栏的「我的 Skill」独立页检查、编辑并保存。
 
 从任务产物制作 PPT 时，助手通过 `tasks_get` 核对具体版本，并调用 `decks_create` 传入 `kind: artifact`、`taskId`、`artifactVersionId`。任务页会提供它正在显示的版本。用户确认创建后，PPT 按该版本读取正文或表格数据，并保留来源入口。

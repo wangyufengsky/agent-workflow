@@ -632,11 +632,13 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 
 | 操作 | HTTP | 输入和结果 |
 | --- | --- | --- |
-| `skills.list` | GET `/skills` | 返回 `{items}`，每项有 `id`、`name`、`description`、`source`、`version` |
+| `skills.list` | GET `/skills` | 返回 `{items}`，每项有 `id`、`name`、`description`、`source`、`version` 和 `assistantEnabled` |
+| `skills.catalog` | GET `/skills/catalog` | 返回 `{builtin, scopes}`，含内置 Skill 正文及系统可用对象、自定义 Skill 的使用范围 |
+| `skills.setScope` | PUT `/skills/:id/scope` | 用 `{assistantEnabled, bindings}` 一次保存。每条绑定为 `{projectId, workflowKey, roleIds}`，角色为 null 时应用于全部角色。返回保存的范围 |
 | `skills.create` | POST `/skills` | 输入完整 `{source}`，返回新 Skill |
 | `skills.update` | PUT `/skills/:id` | 输入完整 `{source}`，返回保存后的 Skill |
 | `skills.delete` | DELETE `/skills/:id` | 删除 Skill 并解除绑定，返回 204 |
 | `skills.listProjectBindings` | GET `/projects/:projectId/skill-bindings` | 返回 `{items}`，每项有 `projectId`、`workflowKey`、`skillIds` |
 | `skills.setProjectBinding` | PUT `/projects/:projectId/skill-bindings/:workflowKey` | 用有序 `{skillIds}` 替换绑定，传空数组解除 |
 
-助手发送消息可传 `skillIds`。任务详情的可选 `skills` 返回创建时应用的 Skill 名称和版本。助手的任务页面上下文可携带 `params.artifactVersionId`，仅在该版本属于当前任务时描述它。
+助手发送消息可传允许选用的 `skillIds`。任务详情的可选 `skills` 返回创建时绑定的 Skill 名称、版本和角色范围。助手的任务页面上下文可携带 `params.artifactVersionId`，仅在该版本属于当前任务时描述它。

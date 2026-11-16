@@ -12,6 +12,7 @@ import { skillsQuery } from './skills.queries.ts';
 export function AssistantSkillPicker({ selected, onChange }: { selected: string[]; onChange(ids: string[]): void }) {
   const [open, setOpen] = useState(false);
   const library = useQuery({ ...skillsQuery, enabled: open });
+  const options = library.data?.filter((skill) => skill.assistantEnabled);
   return (
     <>
       <Button
@@ -40,10 +41,10 @@ export function AssistantSkillPicker({ selected, onChange }: { selected: string[
       >
         {library.isPending && <span className="spin" />}
         {library.isError && <ErrorState error={library.error} onRetry={() => void library.refetch()} />}
-        {library.data?.length === 0 && <p className="hint">{C.empty}</p>}
-        {library.data !== undefined && <SkillOptions items={library.data} selected={selected} onChange={onChange} />}
+        {options?.length === 0 && <p className="hint">{C.noAssistantSkills}</p>}
+        {options !== undefined && <SkillOptions items={options} selected={selected} onChange={onChange} />}
         <p>
-          <Link to={ROUTES.settings} hash="my-skills" onClick={() => setOpen(false)} className="link">
+          <Link to={ROUTES.skills} onClick={() => setOpen(false)} className="link">
             {C.title}
           </Link>
         </p>

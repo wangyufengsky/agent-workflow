@@ -4,7 +4,7 @@
 
 ## 1. 路由与页面
 
-**简单模式的硬约束（38 C6，D158）**：侧栏导航不超过 5 项（主页、任务、项目、知识问答、设置；PPT、质量与用量、团队只在专业模式的导航里，路由两种模式都能打开）、主页「直接开始」的流程按钮不超过 5 个（其余在「更多流程」里）、主页工作概览最多三段（需要你处理、进行中、待合并）。新功能默认只进专业模式；要进简单模式的导航、主页或设置，在设计文档里写明理由并单独确认。走查（J9）截图时核对。
+**简单模式的硬约束（38 C6，D158）**：侧栏导航包含主页、任务、项目、知识问答、我的 Skill、设置。用户已确认在两种模式中加入「我的 Skill」，作为查看角色与工作流绑定的独立入口。PPT、质量与用量、团队只在专业模式的导航里，路由两种模式都能打开。主页「直接开始」的流程按钮不超过 5 个（其余在「更多流程」里）、主页工作概览最多三段（需要你处理、进行中、待合并）。新功能默认只进专业模式；要进简单模式的导航、主页或设置，在设计文档里写明理由并单独确认。走查（J9）截图时核对。
 
 路由常量在 `web/src/app/routes.ts`（侧栏内页面挂在无路径布局路由 `_shell` 下，`getRouteApi` 用 `ROUTE_IDS`）；导航配置在 `web/src/app/navigation.ts`。没有任何项目时，侧栏内的页面都重定向到 `/onboarding`。开发构建另有 `/dev/components` 组件走查页（E2E 在全部主题下截图，生产构建不含）。
 
@@ -22,6 +22,7 @@
 | `/inbox` | 需要你处理 | 全部 | `inbox.html` |
 | `/projects`、`/projects/:projectId` | 项目 | 全部 | `projects.html` |
 | `/knowledge`、`/knowledge/:conversationId`、`/knowledge/history` | 知识问答（v1.1）：首屏（`?projectId=`）、对话（`?turn=&cite=` 打开某一轮的某处引用原文，`?details=true` 简单模式下的专业视图）、对话记录（`?q=&projectId=`） | 全部 | `knowledge.html`、`knowledge-history.html`，见 [18-knowledge.md §2](18-knowledge.md#2-页面与交互) |
+| `/skills` | 我的 Skill（搜索、按来源和使用对象筛选、查看使用范围与正文、编辑自定义 Skill 与绑定） | 全部 | [41-skills.md §12](41-skills.md#12-我的-skill) |
 | `/ppt`、`/ppt/new`、`/ppt/:deckId` | PPT（v1.2）：列表（搜索、项目筛选）、新建（`?projectId=&taskId=&knowledgeConversationId=` 预选资料，「做成 PPT」入口用它）、工作台（`?slide=` 选中的页，`?details=true` 简单模式下的专业视图） | 全部 | `ppt-works.html`、`ppt.html`、`ppt-studio.html`，见 [23-ppt.md §2](23-ppt.md#2-页面与交互) |
 | `/ppt/:deckId/play`、`/ppt/:deckId/print` | 放映（全屏翻页，`?slide=`）与打印视图（导出 PDF 时由隐藏窗口打印），都在外壳之外 | 全部 | 新增 |
 | `/insights` | 质量与用量（v1.1）：简单模式为本周三个数，专业模式为用量、趋势、拆分、质量与钻取（`?period=&from=&to=&drill=&key=`） | 全部（两种视图） | `insights.html`，见 [19-insights.md §3](19-insights.md#3-页面与交互) |

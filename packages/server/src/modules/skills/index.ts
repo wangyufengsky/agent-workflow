@@ -1,9 +1,11 @@
 import {
   createSkillOp,
   deleteSkillOp,
+  getSkillCatalogOp,
   listProjectSkillBindingsOp,
   listSkillsOp,
   setProjectSkillBindingOp,
+  setSkillScopeOp,
   updateSkillOp,
 } from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
@@ -18,6 +20,8 @@ export function createSkillsModule(deps: Parameters<typeof createSkillsService>[
     service,
     operations: [
       implement(listSkillsOp, () => ({ items: service.list() })),
+      implement(getSkillCatalogOp, () => service.catalog()),
+      implement(setSkillScopeOp, (input) => service.setScope(input)),
       implement(createSkillOp, ({ source }) => service.create(source)),
       implement(updateSkillOp, ({ id, source }) => service.update(id, source)),
       implement(deleteSkillOp, ({ id }) => service.remove(id)),

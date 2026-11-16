@@ -26,6 +26,7 @@ export const queryKeys = {
   roles: ['roles'],
   skills: ['skills'],
   skillLibrary: ['skills', 'library'],
+  skillCatalog: ['skills', 'catalog'],
   skillBindings: ['skills', 'project'],
   projectSkillBindings: (id: string) => ['skills', 'project', id],
   dbConnections: ['db-connections'],

@@ -10,7 +10,7 @@ import { Panel } from '../../components/panel.tsx';
 import { SKILLS_COPY as C } from '../../copy/skills.ts';
 import { workflowsQuery } from '../tasks/tasks.queries.ts';
 import { SkillOptions } from './skill-options.tsx';
-import { projectSkillBindingsQuery, skillsQuery } from './skills.queries.ts';
+import { projectSkillBindingsQuery, skillCatalogQuery, skillsQuery } from './skills.queries.ts';
 
 function BindingEditor({ binding, items }: { binding: ProjectSkillBinding; items: UserSkillDTO[] }) {
   const [selected, setSelected] = useState(binding.skillIds);
@@ -18,6 +18,7 @@ function BindingEditor({ binding, items }: { binding: ProjectSkillBinding; items
   const save = useMutation({
     mutationFn: () => callOperation(setProjectSkillBindingOp, { ...binding, skillIds: selected }),
     onSuccess: ({ skillIds }) => {
+      void query.invalidateQueries({ queryKey: skillCatalogQuery.queryKey });
       query.setQueryData(projectSkillBindingsQuery(binding.projectId).queryKey, (previous) => [
         ...(previous ?? []).filter(({ workflowKey }) => workflowKey !== binding.workflowKey),
         { ...binding, skillIds },
@@ -61,7 +62,7 @@ export function ProjectSkillBindings({ projectId }: { projectId: string }) {
       {library.data?.length === 0 ? (
         <p className="hint">
           {C.empty}{' '}
-          <Link to={ROUTES.settings} hash="my-skills" className="link">
+          <Link to={ROUTES.skills} className="link">
             {C.title}
           </Link>
         </p>

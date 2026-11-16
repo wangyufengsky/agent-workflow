@@ -112,6 +112,7 @@ export function useDeleteWorkflow() {
     onSuccess: () => {
       void cache.invalidateQueries({ queryKey: queryKeys.workflows });
       void cache.invalidateQueries({ queryKey: queryKeys.skillBindings });
+      void cache.invalidateQueries({ queryKey: queryKeys.skillCatalog });
     },
   });
 }
@@ -119,7 +120,17 @@ export const useCreateRole = () =>
   useDefinitionMutation((input: CreateRoleRequest) => callOperation(createRoleOp, input));
 export const useUpdateRole = () =>
   useDefinitionMutation((input: UpdateRoleRequest) => callOperation(updateRoleOp, input));
-export const useDeleteRole = () => useDefinitionMutation((id: string) => callOperation(deleteRoleOp, { id }));
+export function useDeleteRole() {
+  const cache = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => callOperation(deleteRoleOp, { id }),
+    onSuccess: () => {
+      void cache.invalidateQueries({ queryKey: queryKeys.roles });
+      void cache.invalidateQueries({ queryKey: queryKeys.skillBindings });
+      void cache.invalidateQueries({ queryKey: queryKeys.skillCatalog });
+    },
+  });
+}
 
 export const rolesQuery = queryOptions({
   queryKey: queryKeys.roles,

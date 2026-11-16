@@ -47,6 +47,7 @@ import { SchedulePage } from '../features/schedules/schedule.page.tsx';
 import { SchedulesPage } from '../features/schedules/schedules.page.tsx';
 import { SettingsPage } from '../features/settings/settings.page.tsx';
 import { settingsQuery, useSettings } from '../features/settings/settings.queries.ts';
+import { SkillLibraryPage } from '../features/skills/skill-library.tsx';
 import { NodeTab } from '../features/task-detail/node-drawer.tsx';
 import { TaskPage } from '../features/task-detail/task.page.tsx';
 import { TasksPage } from '../features/tasks/tasks.page.tsx';
@@ -391,6 +392,7 @@ const routeTree = rootRoute.addChildren([
     page(ROUTES.ppt, PptListPage),
     pptNewRoute,
     pptDeckRoute,
+    page(ROUTES.skills, SkillLibraryPage),
     page(ROUTES.settings, SettingsPage),
     page(ROUTES.environment, EnvironmentPage),
     gitRoute,

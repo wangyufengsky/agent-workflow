@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { projectSkillBindingSchema, saveSkillSchema, userSkillSchema } from '../contracts/api/skills.ts';
+import {
+  projectSkillBindingSchema,
+  saveSkillSchema,
+  skillCatalogSchema,
+  userSkillSchema,
+  userSkillScopeSchema,
+} from '../contracts/api/skills.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -71,4 +77,26 @@ export const setProjectSkillBindingOp = defineOperationContract({
   output: projectSkillBindingSchema,
   risk: OperationRisk.Write,
   http: { method: 'PUT', path: '/projects/:projectId/skill-bindings/:workflowKey' },
+});
+
+export const getSkillCatalogOp = defineOperationContract({
+  ...common,
+  id: 'skills.catalog',
+  title: 'op.skills.catalog',
+  description: 'Read the built-in skill catalog and user skill usage scopes',
+  input: z.object({}),
+  output: skillCatalogSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/skills/catalog' },
+});
+
+export const setSkillScopeOp = defineOperationContract({
+  ...common,
+  id: 'skills.setScope',
+  title: 'op.skills.setScope',
+  description: 'Set assistant selection and project workflow role bindings for a user skill',
+  input: userSkillScopeSchema,
+  output: userSkillScopeSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'PUT', path: '/skills/:id/scope' },
 });

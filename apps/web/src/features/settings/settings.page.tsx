@@ -3,7 +3,6 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { SETTINGS_COPY as C } from '../../copy/settings.ts';
 import { THEME_LABEL } from '../../copy/themes.ts';
-import { SkillLibrary } from '../skills/skill-library.tsx';
 import { AboutPanel } from './about-panel.tsx';
 import { AssistantSettings } from './assistant-settings.tsx';
 import { CompanionSettings } from './companion-settings.tsx';
@@ -104,7 +103,6 @@ export function SettingsPage() {
             </div>
           )}
         </Panel>
-        <SkillLibrary />
         {isPro && <AssistantSettings settings={settings} set={set} />}
         <CompanionSettings settings={settings} set={set} isPro={isPro} />
         {isPro && <WebsiteSettings settings={settings} set={set} />}

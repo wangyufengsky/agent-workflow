@@ -16,6 +16,7 @@ const PAGE_ROUTE = {
   [AssistantPage.Inbox]: ROUTES.inbox,
   [AssistantPage.Projects]: ROUTES.projects,
   [AssistantPage.Project]: ROUTES.project,
+  [AssistantPage.Skills]: ROUTES.skills,
   [AssistantPage.Settings]: ROUTES.settings,
   [AssistantPage.Git]: ROUTES.git,
   [AssistantPage.GitProject]: ROUTES.gitProject,

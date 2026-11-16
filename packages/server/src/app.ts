@@ -254,6 +254,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     unit,
     projects: projects.service,
     workflows: workflows.service,
+    roles: roles.service,
+    skillsDir: config.skillsDir,
   });
   const inbox = createInboxModule({ db: database.db, unit, clock, log });
   const modelSlots = createModelSlotsModule({ settings: settings.service, events, log });

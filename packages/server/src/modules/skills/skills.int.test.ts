@@ -10,16 +10,21 @@ import {
   deleteSkillOp,
   deleteWorkflowOp,
   ErrorCode,
+  getSkillCatalogOp,
   getTaskOp,
   listProjectSkillBindingsOp,
+  listRolesOp,
   listSkillsOp,
   ServerEventType,
   sendAssistantMessageOp,
   setProjectSkillBindingOp,
+  setSkillScopeOp,
   startTaskOp,
   TaskStatus,
   updateSkillOp,
   updateWorkflowOp,
+  WorkflowDeliverable,
+  WorkflowPlanning,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
@@ -45,7 +50,14 @@ describe('我的 Skill', () => {
     expect(created.status).toBe(201);
     const { id } = created.body;
     expect((await app.call(listSkillsOp, {})).body.items).toEqual([
-      { id, name: 'monthly-review', description: '用于编写运营复盘。 仅在确认数据之后使用。', version: 1, source },
+      {
+        id,
+        name: 'monthly-review',
+        description: '用于编写运营复盘。 仅在确认数据之后使用。',
+        version: 1,
+        source,
+        assistantEnabled: true,
+      },
     ]);
     expect((await app.call(createSkillOp, { source })).body).toMatchObject({
       error: { code: ErrorCode.SkillNameTaken },
@@ -121,6 +133,103 @@ describe('我的 Skill', () => {
     expect((await app.call(createWorkflowOp, input)).status).toBe(201);
     const next = await createTask(app, { projectId: project.id, workflow: input.key, start: false });
     expect(next.skills).toBeUndefined();
+  });
+
+  it('目录返回内置正文和运行时使用对象', async () => {
+    const response = await app.call(getSkillCatalogOp, {});
+    expect(response.status).toBe(200);
+    const { builtin, scopes } = response.body;
+    expect(builtin).toHaveLength(10);
+    expect(builtin.find(({ name }) => name === 'aw-page-check')).toMatchObject({
+      source: expect.stringContaining('name: aw-page-check'),
+      assistantEnabled: false,
+      agents: ['planner', 'executor', 'reviewer'],
+    });
+    expect(builtin.find(({ name }) => name === 'aw-db-readonly')).toMatchObject({
+      assistantEnabled: true,
+      agents: ['planner', 'executor', 'reviewer', 'researcher'],
+    });
+    expect(scopes).toEqual([]);
+  });
+
+  it('同为执行角色时仍按角色 ID 隔离，并在任务创建时冻结绑定', async () => {
+    const { project } = await addProject(app);
+    const { body: listed } = await app.call(listRolesOp, {});
+    const developer = listed.items.find(({ key }) => key === 'developer');
+    const tester = listed.items.find(({ key }) => key === 'tester');
+    if (developer === undefined || tester === undefined) throw new Error('Missing roles');
+
+    const workflow = await app.call(createWorkflowOp, {
+      key: 'role_skill_test',
+      name: '限定角色的流程',
+      planning: WorkflowPlanning.Fixed,
+      deliverable: WorkflowDeliverable.Report,
+      definition: {
+        allowedRoles: [developer.key, tester.key],
+        template: {
+          nodes: [
+            { key: 'implement', title: '实现步骤', roleKey: developer.key, instructions: '按计划处理', dependsOn: [] },
+            { key: 'test', title: '测试步骤', roleKey: tester.key, instructions: '进行复核', dependsOn: ['implement'] },
+          ],
+        },
+        checkpoints: { confirm_plan: false, accept_each_node: false },
+        defaultAcceptance: { checks: [], manual: false },
+      },
+    });
+    expect(workflow.status).toBe(201);
+    const { body: skill } = await app.call(createSkillOp, {
+      source: skillMarkdown('role-procedure', '仅指定角色执行口径确认。'),
+    });
+    const scope = {
+      id: skill.id,
+      assistantEnabled: false,
+      bindings: [{ projectId: project.id, workflowKey: workflow.body.key, roleIds: [developer.id] }],
+    };
+    expect((await app.call(setSkillScopeOp, scope)).body).toEqual(scope);
+    expect((await app.call(getSkillCatalogOp, {})).body.scopes).toEqual([scope]);
+    const projectBinding = { projectId: project.id, workflowKey: workflow.body.key, skillIds: [skill.id] };
+    await app.call(setProjectSkillBindingOp, projectBinding);
+    expect((await app.call(getSkillCatalogOp, {})).body.scopes).toEqual([scope]);
+
+    const task = await createTask(app, { projectId: project.id, workflow: workflow.body.key, start: false });
+    const otherRole = {
+      ...scope,
+      bindings: [{ projectId: project.id, workflowKey: workflow.body.key, roleIds: [tester.id] }],
+    };
+    expect((await app.call(setSkillScopeOp, otherRole)).body).toEqual(otherRole);
+    const review = taskReaches(app, TaskStatus.Review);
+    app.fake.enqueue(script().callTool('submit_result', { summary: '已实现' }), { title: '实现步骤' });
+    app.fake.enqueue(script().callTool('submit_result', { summary: '已复核' }), { title: '测试步骤' });
+    expect((await app.call(startTaskOp, { id: task.id })).status).toBe(200);
+    await review;
+    const getPrompt = (title: string) => {
+      const session = app.fake.sessions.find((item) => item.title.endsWith(title));
+      return app.fake.prompts.find((item) => item.sessionId === session?.id)?.system;
+    };
+    expect(getPrompt('实现步骤')).toContain('仅指定角色执行口径确认。');
+    expect(getPrompt('测试步骤')).toBeDefined();
+    expect(getPrompt('测试步骤')).not.toContain('仅指定角色执行口径确认。');
+
+    const { body: conversation } = await app.call(createConversationOp, {});
+    expect(
+      (
+        await app.call(sendAssistantMessageOp, {
+          id: conversation.id,
+          context: { page: AssistantPage.Skills, params: {} },
+          text: '使用这条 Skill',
+          skillIds: [skill.id],
+        })
+      ).body,
+    ).toMatchObject({ error: { code: ErrorCode.SkillAssistantDisabled } });
+    expect(
+      (
+        await app.call(setSkillScopeOp, {
+          ...scope,
+          bindings: [{ projectId: project.id, workflowKey: workflow.body.key, roleIds: [randomUUID()] }],
+        })
+      ).body,
+    ).toMatchObject({ error: { code: ErrorCode.RoleNotFound } });
+    expect((await app.call(getSkillCatalogOp, {})).body.scopes).toEqual([otherRole]);
   });
 
   it('助手只为所选消息加载 Skill，提炼出的草稿留给用户保存', async () => {

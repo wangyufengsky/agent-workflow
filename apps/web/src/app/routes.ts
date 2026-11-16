@@ -42,6 +42,7 @@ export const ROUTES = {
   pptDeck: '/ppt/$deckId',
   pptPlay: '/ppt/$deckId/play',
   pptPrint: '/ppt/$deckId/print',
+  skills: '/skills',
   settings: '/settings',
   git: '/git',
   gitProject: '/git/$projectId',

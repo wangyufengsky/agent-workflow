@@ -137,7 +137,12 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
   ): LiveSession {
     const timeoutMs = settings.get('attempt.timeoutMinutes') * 60_000;
     const { promise: released, resolve: release } = Promise.withResolvers<void>();
-    const skills = attempt.taskId === null ? [] : deps.taskSkills(attempt.taskId);
+    const skills =
+      attempt.taskId === null
+        ? []
+        : deps
+            .taskSkills(attempt.taskId)
+            .filter(({ roleIds }) => roleIds == null || (attempt.roleId !== null && roleIds.includes(attempt.roleId)));
     const tracked: LiveSession = {
       ...session,
       system: skills.length === 0 ? session.system : withUserSkills(session.system ?? '', skills),

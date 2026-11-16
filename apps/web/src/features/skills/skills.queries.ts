@@ -1,4 +1,4 @@
-import { listProjectSkillBindingsOp, listSkillsOp } from '@aw/shared';
+import { getSkillCatalogOp, listProjectSkillBindingsOp, listSkillsOp } from '@aw/shared';
 import { queryOptions } from '@tanstack/react-query';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
@@ -13,3 +13,8 @@ export const projectSkillBindingsQuery = (projectId: string) =>
     queryKey: queryKeys.projectSkillBindings(projectId),
     queryFn: async () => (await callOperation(listProjectSkillBindingsOp, { projectId })).items,
   });
+
+export const skillCatalogQuery = queryOptions({
+  queryKey: queryKeys.skillCatalog,
+  queryFn: () => callOperation(getSkillCatalogOp, {}),
+});
