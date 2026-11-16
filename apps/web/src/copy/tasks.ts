@@ -13,6 +13,7 @@ export const TASK_DISPLAY_LABEL: Record<TaskDisplayGroup, string> = {
   [TaskDisplayGroup.Running]: '执行中',
   [TaskDisplayGroup.Paused]: '已暂停',
   [TaskDisplayGroup.NeedsAttention]: '需要你处理',
+  [TaskDisplayGroup.FrontendReview]: '待查看页面',
   [TaskDisplayGroup.Review]: '待合并',
   [TaskDisplayGroup.Merging]: '合并中',
   [TaskDisplayGroup.Completed]: '已完成',

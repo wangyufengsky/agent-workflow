@@ -134,6 +134,7 @@ export const TaskDisplayGroup = {
   Running: 'running',
   Paused: 'paused',
   NeedsAttention: 'needs_attention',
+  FrontendReview: 'frontend_review',
   Review: 'review',
   Merging: 'merging',
   Completed: 'completed',

@@ -33,6 +33,7 @@ import { reviewIssueSchema } from '../mcp/submit-review.ts';
 import { attachmentIdsSchema, attachmentSchema } from './attachments.ts';
 import { attemptSummarySchema } from './attempts.ts';
 import { deliverySchema, taskPullRequestSchema } from './delivery.ts';
+import { frontendRoundSchema } from './frontend.ts';
 import { inboxItemSchema } from './inbox.ts';
 import { requirementItemsInputSchema } from './requirements.ts';
 
@@ -178,6 +179,8 @@ export type SaveDraftPlanRequest = z.infer<typeof saveDraftPlanRequestSchema>;
 
 /** Result card data, written when the task reaches review (M3-10). */
 export const taskResultSchema = z.object({
+  /** The current frontend result is an iteration until the final verification step passes. */
+  frontendVerified: z.boolean().optional(),
   /** Composed from the node summaries; for report workflows, the report itself. */
   summary: z.string(),
   filesChanged: z.number(),
@@ -255,6 +258,7 @@ export const taskDetailSchema = taskSummarySchema.extend({
   draftPlan: planSchema.nullable(),
   nodes: z.array(nodeSummarySchema),
   activeAttempts: z.array(attemptSummarySchema),
+  frontend: z.object({ verified: z.boolean(), rounds: z.array(frontendRoundSchema) }).optional(),
   openInbox: z.array(inboxItemSchema),
   result: taskResultSchema.nullable(),
   /** The latest merge or pull request (M4). */

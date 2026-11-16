@@ -39,6 +39,7 @@ describe('内置流程与角色', () => {
     const workflows = (await t.call(listWorkflowsOp, {})).body.items;
     expect(workflows.map((w) => [w.key, w.version, w.planning, w.deliverable])).toEqual([
       ['feature', 1, 'ai', 'code_changes'],
+      ['frontend', 1, 'fixed', 'code_changes'],
       ['bugfix', 1, 'fixed', 'code_changes'],
       ['unit_tests', 1, 'fixed', 'code_changes'],
       ['code_review', 1, 'fixed', 'report'],
@@ -73,7 +74,7 @@ describe('内置流程与角色', () => {
     expect(after).toMatchObject({ version: 2, description: '新的说明' });
     // Tasks keep referring to the version they started with.
     expect(workflows.get(before?.id ?? '')).toMatchObject({ version: 1, description: before?.description });
-    expect(workflows.list()).toHaveLength(11);
+    expect(workflows.list()).toHaveLength(12);
   });
 
   it('系统流程的 key 不占用户的命名空间：用户的 merge_branch 流程在同步内置流程后仍是最新版本并列出', async () => {

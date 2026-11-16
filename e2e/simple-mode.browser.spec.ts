@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { createProject, patchSettings } from './helpers.ts';
 
-// What simple mode shows (38, D158): five sidebar items, five workflow chips under「直接开始」with the others under
+// What simple mode shows (38, D158): five sidebar items, six workflow chips under「直接开始」with the others under
 //「更多流程」, no theme switch in the header.
 
-test('简单模式：侧栏 5 项、顶栏没有主题切换；「直接开始」5 个流程，其余在「更多流程」里', async ({ page, request }) => {
+test('简单模式：侧栏 5 项、顶栏没有主题切换；「直接开始」6 个流程，其余在「更多流程」里', async ({ page, request }) => {
   await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
   await createProject(request, null);
   await page.goto('/');
@@ -24,7 +24,7 @@ test('简单模式：侧栏 5 项、顶栏没有主题切换；「直接开始�
 
   await page.getByRole('button', { name: '直接开始', exact: true }).click();
   const panel = page.getByRole('group', { name: '选择流程开始任务' });
-  for (const name of ['新功能开发', '修 Bug', '补单元测试', '代码审查', '重构']) {
+  for (const name of ['新功能开发', '前端开发', '修 Bug', '补单元测试', '代码审查', '重构']) {
     await expect(panel.getByRole('button', { name, exact: true })).toBeVisible();
   }
   const more = page.getByRole('list', { name: '更多流程' });

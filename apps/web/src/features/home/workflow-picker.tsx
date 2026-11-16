@@ -12,7 +12,7 @@ import { PRIMARY_WORKFLOWS, workflowIcon } from './workflow-icon.ts';
  * focus to the picked workflow or the first one — the panel comes before the foot, so Tab would skip it — and Esc
  * folds it back, focus returning to the button that opened it (`opener`). Composition templates follow the built-in
  * workflows under「组合」(34 §15.4); custom ones join the custom workflows under「自定义」(pro mode, 34 §15.6).
- * Only the five common built-in workflows show as chips; the others unfold under「更多流程」, each with what it does
+ * The common built-in workflows show as chips; the others unfold under「更多流程」, each with what it does
  * (38 C2, D158), already unfolded when one of them is picked.
  */
 export function WorkflowPicker({

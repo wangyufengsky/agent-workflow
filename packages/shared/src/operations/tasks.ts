@@ -6,6 +6,7 @@ import {
   reviewCommentsSchema,
   reviseFromReviewSchema,
 } from '../contracts/api/delivery.ts';
+import { localPreviewPathSchema } from '../contracts/api/frontend.ts';
 import { diffSchema, fileDiffSchema } from '../contracts/api/git.ts';
 import {
   checkResultSchema,
@@ -435,6 +436,19 @@ export const requestChangesOp = defineOperationContract({
   http: { method: 'POST', path: '/tasks/:id/request-changes' },
   // A preview tab is the user's own: the assistant has none to attach. Nor can it attach files yet (30 §2.2).
   assistantOmit: ['page', 'attachmentIds'],
+});
+
+export const finishFrontendTaskOp = defineOperationContract({
+  ...common,
+  id: 'tasks.finishFrontend',
+  refs: { id: InputRef.Task },
+  title: 'op.tasks.finishFrontend',
+  description:
+    'Start final verification for a frontend task after the user says the page is ready. Runs build and configured checks, preview pages and AI review. Delivery is a separate action',
+  input: z.object({ id: z.string(), path: localPreviewPathSchema.optional() }),
+  output: taskDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/finish-frontend' },
 });
 
 export const refreshDeliveryStatusOp = defineOperationContract({

@@ -17,7 +17,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { EventBus } from '../../core/event-bus.ts';
 import type { Logger } from '../../core/logger.ts';
 import { locateShell } from '../git/index.ts';
-import type { ProjectsService } from '../projects/index.ts';
+import { inferRepoPreview, type ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import type { WorktreesService } from '../worktrees/index.ts';
 import {
@@ -35,6 +35,7 @@ export type PreviewsServiceDeps = {
   env: NodeJS.ProcessEnv;
   settings: SettingsService;
   projects: ProjectsService;
+  isFrontend?: (taskId: string) => boolean;
   worktrees: WorktreesService;
   dataDir: string;
 };
@@ -62,6 +63,7 @@ export function createPreviewsService({
   env,
   settings,
   projects,
+  isFrontend = () => false,
   worktrees,
   dataDir,
 }: PreviewsServiceDeps) {
@@ -210,7 +212,22 @@ export function createPreviewsService({
     setUp.delete(worktree.path);
   });
 
+  async function configuration(taskId: string): Promise<ProjectPreview> {
+    const worktree = worktrees.findByTask(taskId);
+    if (worktree?.status !== WorktreeStatus.Ready)
+      throw new AppError(ErrorCode.StateTransitionInvalid, 'The task has no worktree to preview', { taskId });
+    const configured = projects.getRecord(worktree.projectId).preview;
+    const preview = configured ?? (isFrontend(taskId) ? await inferRepoPreview(worktree.path) : null);
+    if (preview === null)
+      throw new AppError(ErrorCode.PreviewNotConfigured, 'The project has no page preview', {
+        projectId: worktree.projectId,
+      });
+    return preview;
+  }
+
   return {
+    configuration,
+    isFrontend,
     projectOf(taskId: string): string {
       const worktree = worktrees.findByTask(taskId);
       if (worktree === undefined || worktree.status !== WorktreeStatus.Ready) {
@@ -232,7 +249,7 @@ export function createPreviewsService({
      * for room under the limit instead of failing (a page check, 29 §4.4).
      */
     async start(taskId: string, { queue }: { queue?: AbortSignal } = {}): Promise<Preview> {
-      const existing = entries.get(taskId);
+      let existing = entries.get(taskId);
       if (existing?.state === PreviewState.Running) return toPreview(taskId, existing);
       if (existing?.starting !== null && existing?.starting !== undefined) return existing.starting;
       const worktree = worktrees.findByTask(taskId);
@@ -242,13 +259,11 @@ export function createPreviewsService({
           taskId,
         });
       }
-      const { preview } = projects.getRecord(worktree.projectId);
-      if (preview === null) {
-        throw new AppError(ErrorCode.PreviewNotConfigured, 'The project has no page preview', {
-          projectId: worktree.projectId,
-        });
-      }
+      const preview = await configuration(taskId);
       await makeRoom(taskId, queue);
+      existing = entries.get(taskId);
+      if (existing?.state === PreviewState.Running) return toPreview(taskId, existing);
+      if (existing?.starting !== null && existing?.starting !== undefined) return existing.starting;
       const entry: Entry = existing ?? {
         taskId,
         state: PreviewState.Stopped,

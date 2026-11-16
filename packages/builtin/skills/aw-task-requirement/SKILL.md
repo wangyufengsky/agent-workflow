@@ -26,7 +26,8 @@ For “this project”, use the bound session project first, even when the curre
 
 Call `agent-workflow-app_workflows_list` and compare the existing custom workflows as well as built-ins by name and description; do not guess keys. When asked to save a task plan as a template, read the task and its exact plan version, then call `agent-workflow-app_open_form` with form `workflows.fromPlan` and values `id` (task ID) and `version` (plan version). For a multi-phase initiative, call `agent-workflow-app_open_form` with form `initiativeTemplates.fromInitiative` and values `id` (initiative ID) to open its composite template editor. As a guide:
 
-- New behaviour: the AI-planned feature workflow. Restructuring without changing behaviour: refactor.
+- Building or iterating on a page in live preview: choose the Frontend Development workflow (前端开发). For an empty repository include the requested framework and first route. Open the task after creation so the user can see its workbench.
+- General new behaviour: the AI-planned feature workflow. Restructuring without changing behaviour: refactor.
 - A defect: bug fix (it reproduces the bug with a failing test first, then fixes the root cause).
 - Missing tests: unit tests. Lint and compiler warnings, dead code: cleanup.
 - Read-only reports that change no code: code review, security review, version review (changes since a date or commit). Their requirement says what to look at and what the report should answer.

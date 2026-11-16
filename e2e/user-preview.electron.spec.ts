@@ -5,7 +5,7 @@ import { type ElectronApplication, _electron as electron, expect, test } from '@
 import { createRepo, git } from './helpers.ts';
 
 declare global {
-  var previewHarness: { token: string; ready: Promise<string> };
+  var previewHarness: { token: string; dataDir: string; ready: Promise<string> };
 }
 let app: ElectronApplication;
 test.afterEach(async () => {

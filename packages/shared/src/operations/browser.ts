@@ -12,6 +12,7 @@ import {
   userTabSchema,
   userTabStateSchema,
 } from '../contracts/api/browser.ts';
+import { frontendElementSchema } from '../contracts/api/frontend.ts';
 import { InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
@@ -132,4 +133,15 @@ export const listBrowserFramesOp = defineOperationContract({
   refs: { attemptId: InputRef.Attempt },
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/attempts/:attemptId/browser-frames' },
+});
+
+export const pickFrontendElementOp = defineOperationContract({
+  ...common,
+  id: 'browser.pickFrontendElement',
+  title: 'op.browser.pickFrontendElement',
+  description: 'Select a DOM element by clicking on the user preview',
+  input: z.object({ tabId: z.string(), requestId: z.uuid(), cancel: z.boolean().optional() }),
+  output: z.object({ element: frontendElementSchema.nullable() }),
+  risk: OperationRisk.Read,
+  http: { method: 'POST', path: '/browser/tabs/:tabId/pick-element' },
 });

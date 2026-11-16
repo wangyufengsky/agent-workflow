@@ -23,6 +23,7 @@ import {
   PAGE_CHECK_SHOT_MAX_HEIGHT,
   PageCheckUnrunnable,
   PreviewState,
+  type RequestChangesRequest,
   ServerEventType,
   SiteAccess,
   TaskStatus,
@@ -41,6 +42,7 @@ import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { createActions } from './browser.actions.ts';
 import { type PageCheckPage, type PageCheckResult, pageCheckOutput, pageCheckVerdict } from './browser.check.ts';
+import { createFrontendPreview } from './browser.frontend.ts';
 import type { BrowserHost } from './browser.host.ts';
 import { openTab, type Tab } from './browser.tab.ts';
 
@@ -155,6 +157,7 @@ export function createBrowserService({
   attemptFilesDir,
 }: BrowserServiceDeps) {
   const sessions = new Map<string, Session>();
+  const frontend = createFrontendPreview(host, dataDir);
   /** The user's own preview tabs (29 §8.1), by tab id. */
   const userTabs = new Map<string, { tab: Tab; taskId: string; projectId: string }>();
   /** The preview tab the UI bound to each assistant conversation (15, 29 §8.1): only what the user is looking at. */
@@ -417,6 +420,12 @@ export function createBrowserService({
     return preview.url;
   }
 
+  function requireFrontendPage(taskId: string, tab: Tab): void {
+    const origin = runningPreviewUrl(taskId);
+    if (!URL.canParse(tab.url()) || new URL(tab.url()).origin !== origin)
+      throw new AppError(ErrorCode.BrowserNotOpen, 'Open a local page in the frontend task preview');
+  }
+
   /** Conversations bound to the tab lose it. */
   function unbindPreview(tabId: string): void {
     for (const [conversationId, bound] of boundPreviews) if (bound === tabId) boundPreviews.delete(conversationId);
@@ -427,6 +436,7 @@ export function createBrowserService({
     const entry = userTabs.get(tabId);
     if (entry === undefined) return;
     userTabs.delete(tabId);
+    frontend.forget(tabId);
     unbindPreview(tabId);
     previews.release(entry.taskId);
   }
@@ -490,7 +500,14 @@ export function createBrowserService({
 
   function userTabState(tabId: string): UserTabState {
     const { tab, taskId } = userTabOf(tabId);
-    return { tabId, taskId, url: tab.url(), viewport: tab.viewport.preset, ...tab.pageCounts() };
+    return {
+      tabId,
+      taskId,
+      url: tab.url(),
+      viewport: tab.viewport.preset,
+      ...tab.pageCounts(),
+      ...(frontend.isArmed(tabId) ? { picking: true } : {}),
+    };
   }
 
   async function closeUserTab(tabId: string): Promise<void> {
@@ -901,6 +918,8 @@ export function createBrowserService({
         const settled = await tab.settle();
         signal.throwIfAborted();
         const snapshot = await tab.snapshot();
+        const layout = previews.isFrontend(taskId) ? await frontend.layout(tab) : undefined;
+        const selectedElement = layout === undefined ? undefined : frontend.latestElement(tabId, tab);
         signal.throwIfAborted();
         if (boundPreviews.get(conversationId) !== tabId || !userTabs.has(tabId)) {
           throw new AppError(ErrorCode.BrowserNotOpen, 'The selected preview changed while reading');
@@ -912,6 +931,8 @@ export function createBrowserService({
           tab: BrowserTabKind.Preview,
           viewport: tab.viewport.preset,
           settled,
+          ...(layout === undefined ? {} : { layout }),
+          ...(selectedElement === undefined ? {} : { selectedElement }),
           logs: tab.logs('open'),
         };
       });
@@ -930,6 +951,41 @@ export function createBrowserService({
     },
 
     closeUserTab,
+
+    async pickFrontendElement(tabId: string, requestId: string, cancel: boolean) {
+      if (cancel) {
+        frontend.cancel(tabId, requestId);
+        return null;
+      }
+      const { tab, taskId } = userTabOf(tabId);
+      if (!previews.isFrontend(taskId))
+        throw new AppError(ErrorCode.StateTransitionInvalid, 'This tab is not a frontend task preview');
+      requireFrontendPage(taskId, tab);
+      return withinDeadline((signal) =>
+        frontend.pick(tabId, tab, requestId, signal, () => {
+          if (userTabs.has(tabId))
+            events.publish({ type: ServerEventType.BrowserTabUpdated, data: userTabState(tabId) });
+        }),
+      );
+    },
+
+    async captureFrontendRound(taskId: string, page: NonNullable<RequestChangesRequest['page']>) {
+      const { tab, taskId: owner } = userTabOf(page.tabId);
+      if (owner !== taskId) throw new AppError(ErrorCode.ValidationFailed, 'The preview belongs to another task');
+      requireFrontendPage(taskId, tab);
+      const annotations = (page.annotations ?? []).map(({ elementId, note }) => {
+        const element = frontend.getElement(page.tabId, elementId);
+        if (element === undefined)
+          throw new AppError(ErrorCode.ValidationFailed, 'Select the annotated element again', {
+            issues: [
+              { path: ['page', 'annotations'], message: 'The selected element is no longer in this preview session' },
+            ],
+          });
+        return { element, note };
+      });
+      const before = await withinDeadline((signal) => frontend.capture(taskId, tab, signal));
+      return { annotations, before };
+    },
 
     /**
      * What the user's preview tab shows, written into their change request (29 §2.3): its path and viewport, the

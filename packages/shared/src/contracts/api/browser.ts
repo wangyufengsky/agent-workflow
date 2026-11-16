@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { viewportPresetSchema } from '../../enums/browser.ts';
 import { attemptKindSchema, attemptStatusSchema } from '../../enums/task.ts';
 import { browserLogsOutputSchema, browserPageSchema } from '../mcp/browser.ts';
+import { frontendElementSchema, frontendPageLayoutSchema } from './frontend.ts';
 
 /** 助手只读网页：沿用网站登录状态，但不开放页面操作。 */
 export const readWebsiteRequestSchema = z.object({
@@ -25,6 +26,8 @@ export const readPreviewSchema = browserPageSchema.extend({
   settled: z.boolean(),
   taskId: z.string(),
   viewport: viewportPresetSchema,
+  layout: frontendPageLayoutSchema.optional(),
+  selectedElement: frontendElementSchema.optional(),
   logs: browserLogsOutputSchema,
 });
 
@@ -55,6 +58,19 @@ export const navigateUserTabRequestSchema = z.object({
 });
 export const setUserViewportRequestSchema = z.object({ tabId: z.string(), preset: viewportPresetSchema });
 
+/** The local route, including client-side routing and filter state. */
+export function previewPathFromUrl({
+  pathname,
+  search,
+  hash,
+}: {
+  pathname: string;
+  search: string;
+  hash: string;
+}): string {
+  return `${pathname}${search}${hash}`;
+}
+
 /** The user's preview tab as the bottom bar shows it (29 §8.1); SSE `browser.tab_updated` when it changes. */
 export const userTabStateSchema = z.object({
   tabId: z.string(),
@@ -62,6 +78,7 @@ export const userTabStateSchema = z.object({
   /** The page's address; empty until the first page loads. */
   url: z.string(),
   viewport: viewportPresetSchema,
+  picking: z.boolean().optional(),
   /** Of the current page: console errors (uncaught exceptions included) and requests that failed or answered ≥ 400. */
   consoleErrors: z.number().int(),
   failedRequests: z.number().int(),

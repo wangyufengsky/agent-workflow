@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   deleteProjectOp,
@@ -78,7 +78,10 @@ it('persists separate real command and preview failures and can rerun after sett
 it('stops a real long running command and cleans its temporary worktree', async () => {
   const { repo, project } = await addProject(t);
   const configured = (
-    await t.call(updateProjectOp, { id: project.id, checkCommand: 'node -e "setInterval(() => {}, 1000)"' })
+    await t.call(updateProjectOp, {
+      id: project.id,
+      checkCommand: `node -e "require('node:fs').writeFileSync('started', ''); setInterval(() => {}, 1000)"`,
+    })
   ).body;
   await t.call(startProjectRuntimeCheckOp, {
     id: project.id,
@@ -88,8 +91,11 @@ it('stops a real long running command and cleans its temporary worktree', async 
     runPreview: false,
   });
   await vi.waitFor(
-    async () =>
-      expect((await t.call(getProjectRuntimeCheckOp, { id: project.id })).body?.repository.status).toBe('passed'),
+    async () => {
+      const root = join(t.dataDir, 'runtime-checks');
+      const runs = await readdir(root);
+      expect(runs.some((run) => existsSync(join(root, run, 'worktree', 'started')))).toBe(true);
+    },
     { timeout: 10000 },
   );
   expect((await t.call(stopProjectRuntimeCheckOp, { id: project.id })).status).toBe(200);

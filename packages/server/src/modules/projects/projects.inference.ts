@@ -159,3 +159,11 @@ export async function inferRepoPreview(repoRoot: string): Promise<ProjectPreview
   const { files, packageJson } = await readRoot(repoRoot);
   return inferPreview(files, packageJson);
 }
+
+/** The checkout's own build and test scripts, including for a newly scaffolded frontend. */
+export async function frontendCheckCommands(repoRoot: string): Promise<string[]> {
+  const { files, packageJson } = await readRoot(repoRoot);
+  const scripts = packageJsonSchema.safeParse(packageJson).data?.scripts ?? {};
+  const manager = PACKAGE_MANAGERS.find(({ lockfile }) => files.has(lockfile)) ?? NO_LOCKFILE;
+  return ['build', 'test'].filter((name) => scripts[name] !== undefined).map((name) => `${manager.run} ${name}`);
+}

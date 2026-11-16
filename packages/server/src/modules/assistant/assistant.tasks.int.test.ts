@@ -11,11 +11,14 @@ import {
   deleteConversationOp,
   deliverTaskOp,
   ErrorCode,
+  FRONTEND_WORKFLOW_KEY,
+  finishFrontendTaskOp,
   getTaskOp,
   listConfirmationsOp,
   listTasksOp,
   MCP_SESSION_ARG,
   OPENCODE_ASSISTANT_AGENT,
+  requestChangesOp,
   ServerEventType,
   sendAssistantMessageOp,
   startTaskOp,
@@ -260,6 +263,77 @@ it('确认卡片写明任务基于哪个分支：助手没指定时填上项目�
     const confirmed = await t.call(confirmAssistantCallOp, { id: String(result.body.confirmation_id) });
     if (confirmed.body.result?.ok !== true) throw new Error('Task creation was not confirmed');
     expect(createTaskOp.output.parse(confirmed.body.result.output).git.baseBranch).toBe('dev');
+  } finally {
+    await mcp.close();
+  }
+});
+
+it('助手确认创建前端任务、继续修改同一分支并发起最终验收', async () => {
+  input.workflowId = await workflowId(t, FRONTEND_WORKFLOW_KEY);
+  const task = await assistantTask(false);
+  await t.call(updateProjectOp, {
+    id: input.projectId,
+    preview: {
+      command: 'node server.mjs',
+      readyPath: '/',
+      setupCommand: null,
+      pages: ['/'],
+      extraOrigins: [],
+    },
+  });
+  t.fake.enqueue(script().edit('index.html', '<h1>订单</h1>').callTool('submit_result', { summary: '首版就绪' }), {
+    title: '· 开发首版页面',
+  });
+
+  const reviewed = () =>
+    waitForEvent(
+      t.app.events,
+      ServerEventType.TaskUpdated,
+      (item) => item.id === task.id && item.status === TaskStatus.Review,
+    );
+  const first = reviewed();
+  expect((await t.call(startTaskOp, { id: task.id })).status).toBe(200);
+  await first;
+  await t.fake.settled();
+  expect((await t.call(getTaskOp, { id: task.id })).body.frontend).toEqual({ verified: false, rounds: [] });
+  const mcp = await connectMcp(t.assistantMcpUrl, t.app.assistantMcpToken);
+  try {
+    const feedback = '手机视口的订单按钮移到搜索框下方，左边缘对齐';
+    const revision = await callTool(mcp, 'tasks_requestChanges', {
+      id: task.id,
+      reason: 'user',
+      feedback,
+      [MCP_SESSION_ARG]: sessionId,
+    });
+    expect(revision.body.status).toBe('needs_confirmation');
+    t.fake.enqueue(
+      script()
+        .edit('index.html', '<h1>订单</h1><button>下载</button>')
+        .callTool('submit_result', { summary: '首轮修改完成' }),
+      { title: '· 界面修改 1' },
+    );
+    const second = reviewed();
+    const confirmed = await t.call(confirmAssistantCallOp, { id: String(revision.body.confirmation_id) });
+    if (confirmed.body.result?.ok !== true) throw new Error('Frontend revision was not confirmed');
+    const running = requestChangesOp.output.parse(confirmed.body.result.output);
+    expect(running.frontend?.rounds).toMatchObject([{ feedback, annotations: [], before: null }]);
+    await second;
+    await t.fake.settled();
+    expect((await t.call(getTaskOp, { id: task.id })).body.git.branch).toBe(running.git.branch);
+
+    const requested = await callTool(mcp, 'tasks_finishFrontend', {
+      id: task.id,
+      path: '/orders',
+      [MCP_SESSION_ARG]: sessionId,
+    });
+    expect(requested.body.status).toBe('needs_confirmation');
+    t.fake.enqueue(script().hang(), { title: '· 前端交付验收' });
+    const final = await t.call(confirmAssistantCallOp, { id: String(requested.body.confirmation_id) });
+    if (final.body.result?.ok !== true) throw new Error('Frontend verification was not confirmed');
+    expect(finishFrontendTaskOp.output.parse(final.body.result.output).plan?.graph.nodes.at(-1)).toMatchObject({
+      key: 'frontend_verify_1',
+      acceptance: { checks: expect.arrayContaining([{ kind: 'browser', pages: ['/orders', '/'] }]) },
+    });
   } finally {
     await mcp.close();
   }

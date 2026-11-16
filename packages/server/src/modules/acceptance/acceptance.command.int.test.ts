@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ACCEPTANCE_COMMAND_TIMEOUT_MS } from '@aw/shared';
 import { pino } from 'pino';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFakeClock, type FakeClock } from '../../../test/helpers/clock.ts';
 import { type AcceptanceServiceDeps, createAcceptanceService } from './acceptance.service.ts';
 
@@ -75,6 +75,16 @@ describe('检查命令', () => {
     await created('started');
     clock.advance(ACCEPTANCE_COMMAND_TIMEOUT_MS);
     expect(await running).toMatchObject({ passed: false, exitCode: null, timedOut: true });
+  });
+
+  it('定位 shell 时中止，不会启动检查命令', async () => {
+    const schedule = vi.spyOn(clock, 'schedule');
+    const controller = new AbortController();
+    const running = service().runCommand(dir, LONG_RUNNING, controller.signal);
+    controller.abort();
+    expect(await running).toMatchObject({ passed: false, exitCode: null, timedOut: false, output: '' });
+    expect(schedule).not.toHaveBeenCalled();
+    expect(existsSync(join(dir, 'started'))).toBe(false);
   });
 
   it('中止时结束命令及其子进程', async () => {

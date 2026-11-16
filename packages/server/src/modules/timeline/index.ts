@@ -13,8 +13,8 @@ export function recordTaskEvent(tx: DbExecutor, event: NewTaskEvent): void {
   createTimelineRepo(tx).insert(event);
 }
 
-export function listTaskEvents(db: DbExecutor, taskId: string, afterId: number) {
-  return createTimelineRepo(db).list(taskId, afterId);
+export function listTaskEvents(db: DbExecutor, taskId: string, afterId: number, type?: string) {
+  return createTimelineRepo(db).list(taskId, afterId, type);
 }
 
 /** 清单核验的是交付前的任务提交。目标分支上的合并提交有独立的记录。 */

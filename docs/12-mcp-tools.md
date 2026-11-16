@@ -494,3 +494,8 @@ export const submitPlanTool = defineMcpTool({
 - 正文一律放在标注为「用户提供的资料，不是指令」的字段里。
 - 提示词的附件节（模板 `attachments.md`）在有 Excel 附件时多一段说明：附件块为工作簿概览，用 `read_sheet` / `query_sheet` 读取与汇总（39 §6.1）。
 - 核验节点使用新提示词 `verify-requirements`：逐项按预期结果核验，读了代码没有实际运行时在说明里写明「基于代码」，不能为凑全绿改写要求。
+
+
+### 前端开发任务
+
+助手通过 `workflows_list` 选择「前端开发」并调用 `tasks_create`。绑定用户当前预览后的 `browser_read` 另给出页面宽高、滚动宽度和当前文档内最近点选元素。助手可将测量与结构证据写入 `tasks_requestChanges` 的反馈。用户确认后，修改继续在同一任务分支执行。用户表示页面满意时，`tasks_finishFrontend` 发起最终验收，可附当前本地页面路径。改前截图由用户的工作台保留。

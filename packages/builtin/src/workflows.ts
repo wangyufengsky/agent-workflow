@@ -1,6 +1,7 @@
 import {
   type Acceptance,
   AcceptanceCheckKind,
+  FRONTEND_WORKFLOW_KEY,
   PROJECT_CHECK_PLACEHOLDER,
   RequiredStepPosition,
   type WorkflowDefinition,
@@ -21,6 +22,7 @@ export type BuiltinWorkflow = {
 
 export const BuiltinWorkflowKey = {
   Feature: 'feature',
+  Frontend: FRONTEND_WORKFLOW_KEY,
   Bugfix: 'bugfix',
   UnitTests: 'unit_tests',
   CodeReview: 'code_review',
@@ -79,6 +81,35 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
       ],
       checkpoints: noCheckpoints,
       defaultAcceptance: checked,
+    },
+  },
+  {
+    key: BuiltinWorkflowKey.Frontend,
+    name: '前端开发',
+    description: '先打开可操作的页面，再在预览里标注并多轮修改',
+    planning: WorkflowPlanning.Fixed,
+    deliverable: WorkflowDeliverable.CodeChanges,
+    definition: {
+      allowedRoles: [BuiltinRoleKey.Developer],
+      template: {
+        nodes: [
+          {
+            key: 'build_page',
+            title: '开发首版页面',
+            roleKey: BuiltinRoleKey.Developer,
+            instructions: [
+              '尽快交付一个可运行的首版，供用户在预览中试用。按需求实现页面、关键交互与窄视口布局。',
+              '已有前端项目沿用其路由、组件、样式和包管理器。记录入口路径。',
+              '空项目按用户指定技术栈创建；未指定时用 Vue 和 Vite，空项目默认用 pnpm。提供 dev 和 build 脚本及依赖锁文件，将 node_modules 和构建产物加入 .gitignore。',
+              '用已有浏览器工具检查首屏与主要交互，在 summary 中记录访问路径和已做的检查。提交后等用户在同一个任务中提出下一轮。',
+            ].join('\n'),
+            dependsOn: [],
+            acceptance: unchecked,
+          },
+        ],
+      },
+      checkpoints: noCheckpoints,
+      defaultAcceptance: unchecked,
     },
   },
   {

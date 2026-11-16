@@ -1,0 +1,129 @@
+.workbench {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.toolbar,
+.status,
+.inspectorHead {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.toolbar {
+  flex-wrap: wrap;
+}
+
+.status {
+  flex: 1;
+  min-width: max-content;
+}
+
+.body {
+  display: flex;
+  gap: var(--s-3);
+  min-height: max(480px, calc(100dvh - 245px));
+}
+
+.preview {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.waiting {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--fill-2);
+}
+
+.waiting p,
+.history p {
+  margin: 0;
+}
+
+.inspector {
+  display: flex;
+  flex: 0 0 min(35%, 390px);
+  flex-direction: column;
+  gap: var(--s-3);
+  min-width: 220px;
+  max-height: max(480px, calc(100dvh - 245px));
+  padding-inline-start: var(--s-3);
+  overflow: auto;
+  border-inline-start: 1px solid var(--line);
+}
+
+.inspectorHead {
+  justify-content: space-between;
+}
+
+.inspectorHead h2,
+.history h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-block-end: var(--s-3);
+  border-block-end: 1px solid var(--line);
+}
+
+.note small {
+  color: var(--sub);
+}
+
+.inspector textarea {
+  resize: vertical;
+}
+
+.history ol {
+  display: grid;
+  gap: var(--s-3);
+  margin: var(--s-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history li {
+  display: grid;
+  gap: var(--s-2);
+  justify-items: start;
+  padding-block-end: var(--s-2);
+  border-block-end: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.history img {
+  display: block;
+  max-width: 100%;
+  margin-block-start: var(--s-2);
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 730px) {
+  .body {
+    flex-direction: column;
+  }
+
+  .preview {
+    min-height: 440px;
+  }
+
+  .inspector {
+    flex-basis: auto;
+    max-height: none;
+    padding-inline-start: 0;
+    border-inline-start: 0;
+  }
+}

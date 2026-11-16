@@ -1,8 +1,10 @@
+import { FRONTEND_WORKFLOW_KEY } from '@aw/shared';
 import type { IconName } from '../../components/icon.tsx';
 
 /** Icons of the built-in workflows on the start cards; custom workflows use the generic one. */
 const WORKFLOW_ICON: Readonly<Record<string, IconName>> = {
   feature: 'sparkle',
+  [FRONTEND_WORKFLOW_KEY]: 'terminal',
   bugfix: 'alert',
   unit_tests: 'check',
   code_review: 'search',
@@ -21,4 +23,11 @@ export const workflowIcon = (key: string): IconName => WORKFLOW_ICON[key] ?? 'fl
 export const DEFAULT_START_WORKFLOW = 'feature';
 
 /** The built-in workflows shown as chips under「直接开始」; the rest are under「更多流程」(38 C2, D158). */
-export const PRIMARY_WORKFLOWS: readonly string[] = ['feature', 'bugfix', 'unit_tests', 'code_review', 'refactor'];
+export const PRIMARY_WORKFLOWS: readonly string[] = [
+  'feature',
+  FRONTEND_WORKFLOW_KEY,
+  'bugfix',
+  'unit_tests',
+  'code_review',
+  'refactor',
+];

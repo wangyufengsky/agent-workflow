@@ -274,6 +274,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     dataDir: config.dataDir,
   });
   const previews = createPreviewsModule({
+    isFrontend: (taskId): boolean => tasks.service.isFrontend(taskId),
     clock,
     log,
     events,
@@ -379,6 +380,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const requirements = createRequirementsModule({ db: database.db, clock });
   const tasks = createTasksModule({
     opencode,
+    previews: previews.service,
     gitNetwork: network.gitEnv,
     db: database.db,
     unit,
