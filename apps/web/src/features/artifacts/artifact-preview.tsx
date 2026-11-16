@@ -15,6 +15,7 @@ import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
 import { Markdown } from '../../components/markdown.tsx';
+import { ARTIFACT_COPY } from '../../copy/artifacts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { SheetView } from '../attachments/attachment-preview.tsx';
 import styles from './artifact-workbench.module.css';
@@ -44,7 +45,7 @@ function Content({ source, onPick }: { source: string; onPick?: OnPick | undefin
     return (
       <IconButton
         icon="edit"
-        label={`标注第 ${from}${to === from ? '' : `–${to}`} 行`}
+        label={ARTIFACT_COPY.markLines(from, to)}
         onClick={() => onPick(blockAnchor(lines, from, to))}
         className={styles.mark}
       />
@@ -119,7 +120,7 @@ function Lines({ source, onPick }: { source: string; onPick?: OnPick | undefined
               {onPick ? (
                 <button
                   type="button"
-                  aria-label={`标注第 ${number} 行`}
+                  aria-label={ARTIFACT_COPY.markLines(number)}
                   onClick={(event) => pick(number, event.shiftKey)}
                 >
                   {line || '\u00a0'}
@@ -134,13 +135,11 @@ function Lines({ source, onPick }: { source: string; onPick?: OnPick | undefined
       {lines.length > PAGE_LINES && (
         <div className="row wrap">
           <Button size="sm" disabled={start === 0} onClick={() => setStart(start - PAGE_LINES)}>
-            上一页
+            {ARTIFACT_COPY.previousPage}
           </Button>
-          <span className="hint">
-            {start + 1}–{last} / {lines.length} 行
-          </span>
+          <span className="hint">{ARTIFACT_COPY.pageLines(start + 1, last, lines.length)}</span>
           <Button size="sm" disabled={last === lines.length} onClick={() => setStart(start + PAGE_LINES)}>
-            下一页
+            {ARTIFACT_COPY.nextPage}
           </Button>
         </div>
       )}
@@ -221,7 +220,7 @@ export function ArtifactPreview({
   if (data.format === AttachmentFormat.Xlsx) {
     return (
       <div className="col">
-        <fieldset className={`row wrap ${styles.sheets}`} aria-label="工作表">
+        <fieldset className={`row wrap ${styles.sheets}`} aria-label={ARTIFACT_COPY.sheets}>
           {data.meta.sheets.map(({ name, hidden }) => (
             <Button
               key={name}
@@ -231,7 +230,7 @@ export function ArtifactPreview({
               onClick={() => setSheet(name)}
             >
               {name}
-              {hidden && '（隐藏）'}
+              {hidden && ARTIFACT_COPY.hidden}
             </Button>
           ))}
         </fieldset>
@@ -245,14 +244,14 @@ export function ArtifactPreview({
       {data.format === 'md' && (
         <div className="row">
           <Button size="sm" aria-pressed={!plain} onClick={() => setPlain(false)}>
-            正文
+            {ARTIFACT_COPY.body}
           </Button>
           <Button size="sm" aria-pressed={plain} onClick={() => setPlain(true)}>
-            源码
+            {ARTIFACT_COPY.source}
           </Button>
         </div>
       )}
-      {data.truncated && <p className="hint">当前展示文件开头。保存原件可查看完整内容。</p>}
+      {data.truncated && <p className="hint">{ARTIFACT_COPY.truncated}</p>}
       {data.format === 'txt' || plain ? (
         <Lines source={data.text} onPick={onPick} />
       ) : (

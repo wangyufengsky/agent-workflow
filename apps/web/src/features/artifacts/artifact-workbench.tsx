@@ -4,7 +4,6 @@ import {
   ARTIFACT_NOTES_MAX,
   type ArtifactNote,
   type ArtifactVersion,
-  artifactAnchorLabel,
   DeliveryStrategy,
   type TaskDetailDTO,
   TaskStatus,
@@ -18,6 +17,7 @@ import { saveBytes } from '../../app/save-file.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
+import { ARTIFACT_COPY, artifactAnchorLabel } from '../../copy/artifacts.ts';
 import { ASSISTANT_COPY } from '../../copy/assistant.ts';
 import { formatDateTime } from '../../copy/common.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
@@ -33,13 +33,6 @@ type DraftNote = ArtifactNote & { id: string };
 
 type Panel = 'activity' | 'notes' | 'history' | 'record' | null;
 type NodeDetails = { title: string; content: ReactNode; onClose: () => void };
-
-const PANELS = {
-  activity: 'AI 活动',
-  notes: '标注修改',
-  history: '版本记录',
-  record: '任务记录',
-} as const;
 
 export function ArtifactWorkbench({
   task,
@@ -124,21 +117,21 @@ export function ArtifactWorkbench({
 
   const sidebar = nodeDetails !== undefined || (!building && panel !== null);
   return (
-    <section className={layout.workbench} data-testid="artifact-workbench" aria-label="产物工作台">
+    <section className={layout.workbench} data-testid="artifact-workbench" aria-label={ARTIFACT_COPY.workbench}>
       <header className={layout.toolbar}>
         <div className={styles.file}>
-          <strong>{version?.name ?? '任务产物'}</strong>
+          <strong>{version?.name ?? ARTIFACT_COPY.file}</strong>
           {version !== undefined && (
             <select
               className="input"
-              aria-label="产物版本"
+              aria-label={ARTIFACT_COPY.version}
               value={version.id}
               onChange={(event) => choose(event.currentTarget.value)}
             >
               {[...artifact.versions].reverse().map((file) => (
                 <option key={file.id} value={file.id}>
                   v{file.number}
-                  {file.id === latest?.id ? ' · 最新' : ''}
+                  {file.id === latest?.id ? ARTIFACT_COPY.latest : ''}
                 </option>
               ))}
             </select>
@@ -152,7 +145,7 @@ export function ArtifactWorkbench({
             aria-expanded={panel === 'activity'}
             onClick={() => show('activity')}
           >
-            {PANELS.activity}
+            {ARTIFACT_COPY.panels.activity}
           </Button>
         )}
         <Button
@@ -162,7 +155,7 @@ export function ArtifactWorkbench({
           disabled={!canNote}
           onClick={() => show('notes')}
         >
-          {PANELS.notes}
+          {ARTIFACT_COPY.panels.notes}
         </Button>
         <Button
           size="sm"
@@ -172,14 +165,14 @@ export function ArtifactWorkbench({
           disabled={version === undefined}
           onClick={() => show('history')}
         >
-          {PANELS.history}
+          {ARTIFACT_COPY.panels.history}
         </Button>
         <Button size="sm" icon="list" variant="ghost" aria-expanded={panel === 'record'} onClick={() => show('record')}>
-          {PANELS.record}
+          {ARTIFACT_COPY.panels.record}
         </Button>
         {version !== undefined && (
           <Button size="sm" variant="ghost" pending={save.isPending} onClick={() => save.mutate(version)}>
-            保存原件
+            {ARTIFACT_COPY.save}
           </Button>
         )}
         {version !== undefined && (
@@ -200,7 +193,7 @@ export function ArtifactWorkbench({
               delivery.mutate({ id: task.id, strategy: DeliveryStrategy.ReportOnly, ...acknowledgement.ack })
             }
           >
-            验收产物
+            {ARTIFACT_COPY.accept}
           </Button>
         )}
       </header>
@@ -212,13 +205,13 @@ export function ArtifactWorkbench({
           {version !== undefined ? (
             <div className={compare && previous !== undefined ? styles.comparison : 'col'}>
               {compare && previous !== undefined && (
-                <section aria-label={`改前 v${previous.number}`} className="col">
-                  <h3>改前 · v{previous.number}</h3>
+                <section aria-label={ARTIFACT_COPY.beforeLabel(previous.number)} className="col">
+                  <h3>{ARTIFACT_COPY.before(previous.number)}</h3>
                   <ArtifactPreview key={previous.id} taskId={task.id} version={previous} />
                 </section>
               )}
-              <section aria-label={`产物预览 v${version.number}`} className="col">
-                {compare && previous !== undefined && <h3>改后 · v{version.number}</h3>}
+              <section aria-label={ARTIFACT_COPY.previewLabel(version.number)} className="col">
+                {compare && previous !== undefined && <h3>{ARTIFACT_COPY.after(version.number)}</h3>}
                 {version.lost.length > 0 && <p className="hint">{ASSISTANT_COPY.file.lost(version.lost)}</p>}
                 <ArtifactPreview
                   key={version.id}
@@ -233,7 +226,7 @@ export function ArtifactWorkbench({
               <p className="hint">{PPT_COPY.artifactMissing}</p>
               {latest !== undefined && (
                 <Button size="sm" onClick={() => choose(latest.id)}>
-                  打开最新版本
+                  {ARTIFACT_COPY.openLatest}
                 </Button>
               )}
             </div>
@@ -242,21 +235,28 @@ export function ArtifactWorkbench({
               task={task}
               inMain
               starting={false}
-              buildingTitle="正在生成首版产物"
-              buildingHint="首个文件发布后会自动打开预览。"
+              buildingTitle={ARTIFACT_COPY.building}
+              buildingHint={ARTIFACT_COPY.buildingHint}
             />
           ) : (
             <div className="col">
-              <p className="hint">还没有可查看的文件。</p>
+              <p className="hint">{ARTIFACT_COPY.empty}</p>
               {record}
             </div>
           )}
         </div>
         {sidebar && (
-          <aside className={layout.inspector} aria-label={nodeDetails?.title ?? (panel === null ? '' : PANELS[panel])}>
+          <aside
+            className={layout.inspector}
+            aria-label={nodeDetails?.title ?? (panel === null ? '' : ARTIFACT_COPY.panels[panel])}
+          >
             <div className={layout.inspectorHead}>
-              <h2>{nodeDetails?.title ?? (panel === null ? '' : PANELS[panel])}</h2>
-              <IconButton icon="x" label="收起侧栏" onClick={nodeDetails?.onClose ?? (() => setPanel(null))} />
+              <h2>{nodeDetails?.title ?? (panel === null ? '' : ARTIFACT_COPY.panels[panel])}</h2>
+              <IconButton
+                icon="x"
+                label={ARTIFACT_COPY.closeSidebar}
+                onClick={nodeDetails?.onClose ?? (() => setPanel(null))}
+              />
             </div>
             {nodeDetails !== undefined ? (
               nodeDetails.content
@@ -268,7 +268,7 @@ export function ArtifactWorkbench({
               <>
                 {previous !== undefined && (
                   <Button size="sm" aria-pressed={compare} onClick={() => setCompare(!compare)}>
-                    {compare ? '关闭对照' : '对照上一版'}
+                    {compare ? ARTIFACT_COPY.closeCompare : ARTIFACT_COPY.compare}
                   </Button>
                 )}
                 <ol className={styles.history}>
@@ -289,7 +289,7 @@ export function ArtifactWorkbench({
                           )),
                         )}
                       <Button size="sm" variant="ghost" onClick={() => onOpenNode(file.nodeId)}>
-                        查看执行过程
+                        {ARTIFACT_COPY.viewActivity}
                       </Button>
                     </li>
                   ))}
@@ -297,15 +297,13 @@ export function ArtifactWorkbench({
               </>
             ) : panel === 'notes' && version !== undefined ? (
               <>
-                <p className="hint">
-                  {canNote ? '在预览中选中内容。按住 Shift 可选择多行或单元格区域。' : '在最新版本待查看时可提交意见。'}
-                </p>
+                <p className="hint">{canNote ? ARTIFACT_COPY.pickHint : ARTIFACT_COPY.reviewHint}</p>
                 {selection !== undefined && canNote && (
                   <div className={layout.note}>
                     <strong>{artifactAnchorLabel(selection.anchor)}</strong>
                     {selection.quote && <blockquote className={styles.quote}>{selection.quote}</blockquote>}
                     <label className="field">
-                      怎么修改
+                      {ARTIFACT_COPY.note}
                       <textarea
                         className="input"
                         rows={3}
@@ -320,7 +318,7 @@ export function ArtifactWorkbench({
                         disabled={note.trim() === '' || notes.length >= ARTIFACT_NOTES_MAX}
                         onClick={() => add(version.id)}
                       >
-                        加入本轮
+                        {ARTIFACT_COPY.add}
                       </Button>
                       <Button
                         size="sm"
@@ -330,7 +328,7 @@ export function ArtifactWorkbench({
                           setNote('');
                         }}
                       >
-                        取消标注
+                        {ARTIFACT_COPY.cancel}
                       </Button>
                     </div>
                   </div>
@@ -341,7 +339,7 @@ export function ArtifactWorkbench({
                       <strong>{artifactAnchorLabel(item.anchor)}</strong>
                       <IconButton
                         icon="x"
-                        label={`移除第 ${i + 1} 条意见`}
+                        label={ARTIFACT_COPY.removeNote(i + 1)}
                         onClick={() => setDraft({ versionId: version.id, notes: notes.filter((_, j) => j !== i) })}
                       />
                     </div>
@@ -354,7 +352,7 @@ export function ArtifactWorkbench({
                   disabled={!canNote}
                   onClick={() => pick({ anchor: { kind: 'whole' }, quote: '' })}
                 >
-                  整份文件意见
+                  {ARTIFACT_COPY.wholeFile}
                 </Button>
                 {revision.isError && <ErrorState error={revision.error} />}
                 <Button
@@ -364,7 +362,7 @@ export function ArtifactWorkbench({
                   disabled={!canNote || notes.length === 0 || note.trim() !== ''}
                   onClick={() => send(version.id)}
                 >
-                  交给 AI 修改
+                  {ARTIFACT_COPY.submit}
                 </Button>
               </>
             ) : null}

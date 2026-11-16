@@ -333,7 +333,11 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
       const node = get(attempt.nodeId);
       const { checks, manual } = node.acceptance;
       const target =
-        checks.length > 0 ? NodeStatus.Verifying : manual ? NodeStatus.AwaitingAcceptance : NodeStatus.Done;
+        node.kind === NodeKind.Verify || checks.length > 0
+          ? NodeStatus.Verifying
+          : manual
+            ? NodeStatus.AwaitingAcceptance
+            : NodeStatus.Done;
       transition(nodeMachine, node.status, NodeEvent.ResultSubmitted, target);
       // Commit before the node counts as done, so a dependent node never starts before the commit.
       const sha = target === NodeStatus.Done ? await commit(node, ctx) : null;

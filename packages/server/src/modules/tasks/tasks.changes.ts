@@ -259,7 +259,12 @@ export function createTaskChanges(
       kind: NodeKind.Revise,
     };
     unit.transact(() => {
-      const [node] = appendSteps(task, [step], notes.map(({ note }) => note).join('\n'), TaskEvent.ChangesRequested);
+      // Artifact versions live outside Git. Keep the same criteria but expire results and acknowledgements for the old file.
+      const current = deps.requirements.current(id);
+      if (current !== undefined) deps.requirements.save(id, current.items);
+      const check = state.verify.stepAfter(id, nextKey(id, `${VERIFY_NODE.keyPrefix}_`), [step.key]);
+      const added = check === undefined ? [step] : [step, check];
+      const [node] = appendSteps(task, added, notes.map(({ note }) => note).join('\n'), TaskEvent.ChangesRequested);
       if (node === undefined) throw new Error('Artifact revision did not append a step');
       recordTaskEvent(deps.db, {
         taskId: id,

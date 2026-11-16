@@ -80,12 +80,4 @@ export const artifactPreviewSchema = z.union([
 ]);
 export type ArtifactPreview = z.infer<typeof artifactPreviewSchema>;
 
-export function artifactAnchorLabel(anchor: ArtifactAnchor): string {
-  if (anchor.kind === 'cells') return `${anchor.sheet}!${anchor.range}`;
-  if (anchor.kind === 'whole') return '整份文件';
-  const { from, to } = anchor.lines;
-  const range = from === to ? `第 ${from} 行` : `第 ${from}–${to} 行`;
-  return anchor.kind === 'paragraph' && anchor.heading !== '' ? `${anchor.heading} · ${range}` : range;
-}
-
 export const textLines = (text: string) => text.replace(/\r\n/g, '\n').split('\n');
