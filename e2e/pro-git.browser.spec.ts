@@ -246,15 +246,19 @@ test('主页开始任务：总能看到并选择项目，基于分支只列所�
   git(a.repoPath, 'branch', 'feature/only-in-a');
   await page.goto(`/?projectId=${a.id}`);
   await pickWorkflow(page, '修 Bug');
-  const project = page.getByLabel('项目', { exact: true });
-  await expect(project).toHaveValue(a.id);
+  const project = page.getByRole('button', { name: '项目', exact: true });
+  await expect(project).toHaveAccessibleDescription(a.name);
 
   await page.getByText('更多选项').click();
   const branch = page.getByLabel('基于分支');
   await expect(branch.locator('option').first()).toHaveText(/^项目默认分支（.+）$/);
   await branch.selectOption('feature/only-in-a');
 
-  await project.selectOption(b.id);
+  await project.click();
+  await page
+    .getByRole('menu', { name: '项目', exact: true })
+    .getByRole('menuitemradio', { name: b.name, exact: true })
+    .click();
   await expect(branch).toHaveValue('');
   await expect(branch.locator('option', { hasText: 'feature/only-in-a' })).toHaveCount(0);
 

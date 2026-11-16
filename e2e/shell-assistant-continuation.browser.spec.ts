@@ -12,7 +12,7 @@ test('超限后续接项目对话、选择附件、回看来源并编辑后发�
   await queueAssistantTurn(request, [{ type: 'error', name: 'ContextOverflowError', message: 'context too long' }]);
   await page.goto(`/?assistantProjectId=${project.id}`);
   const input = page.getByLabel('告诉助手，或开始任务');
-  await expect(page.getByLabel('会话项目')).toHaveValue(project.id);
+  await expect(page.getByRole('button', { name: '会话项目' })).toHaveAccessibleDescription(project.name);
   await input.fill('确认使用 SQLite');
   await input.press('ControlOrMeta+Enter');
   await expect(page.getByTestId('home-messages')).toContainText('已确认使用 SQLite。');
@@ -35,7 +35,7 @@ test('超限后续接项目对话、选择附件、回看来源并编辑后发�
   const source = page.getByTestId('continuation-source');
   await expect(source).toContainText('续接自「确认使用 SQLite」');
   await expect(source).toContainText('从来源对话带上的附件');
-  await expect(page.getByLabel('会话项目')).toHaveValue(project.id);
+  await expect(page.getByRole('button', { name: '会话项目' })).toHaveAccessibleDescription(project.name);
   await expect(input).toHaveValue('请检查这项迁移');
   await source.getByRole('button', { name: '查看续接前的消息' }).click();
   const history = page.getByRole('dialog', { name: '查看续接前的消息' });
@@ -69,7 +69,7 @@ test('超限后续接项目对话、选择附件、回看来源并编辑后发�
   await dialog.getByRole('button', { name: '续接对话' }).click();
   await expect(panel.getByTestId('continuation-source')).toContainText('续接自');
   await expect(panel.getByTestId('assistant-user-message')).toHaveCount(0);
-  await expect(panel.getByLabel('会话项目')).toHaveValue(project.id);
+  await expect(panel.getByRole('button', { name: '会话项目' })).toHaveAccessibleDescription(project.name);
   await patchSettings(request, { 'ui.theme': 'default' });
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'default');
   await panel.getByRole('button', { name: '查看续接前的消息' }).click();

@@ -3,6 +3,8 @@ import { formatBytes } from './common.ts';
 
 export const PROJECTS_COPY = {
   title: '项目',
+  chooseProject: '选择项目',
+  myProjects: '我的项目',
   startTask: '开始任务',
   askProject: '问这个项目',
   recentTasks: '近期任务',

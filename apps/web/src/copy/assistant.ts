@@ -39,6 +39,7 @@ export const ASSISTANT_COPY = {
   newConversation: '新对话',
   sessionProject: '会话项目',
   generalConversation: '通用对话',
+  unboundConversation: '不关联项目',
   deletedProject: '项目已删除',
   conversations: '对话',
   switchConversation: '切换对话',

@@ -31,11 +31,11 @@ test('项目概览：快捷入口、项目任务和状态更新', async ({ page,
   await page.getByRole('main').getByRole('link', { name: '开始任务', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`projectId=${project.id}`));
   await expect(page).toHaveURL(/workflow=feature/);
-  await expect(page.getByRole('combobox', { name: '项目', exact: true })).toHaveValue(project.id);
+  await expect(page.getByRole('button', { name: '项目', exact: true })).toHaveAccessibleDescription(project.name);
   await page.goto(`/projects/${project.id}`);
   await page.getByRole('link', { name: '问这个项目' }).click();
   await expect(page).toHaveURL(new RegExp(`assistantProjectId=${project.id}`));
-  await expect(page.getByRole('combobox', { name: '会话项目' })).toHaveValue(project.id);
+  await expect(page.getByRole('button', { name: '会话项目' })).toHaveAccessibleDescription(project.name);
   await patchSettings(request, { 'ui.mode': 'pro' });
   await page.goto(`/projects/${project.id}`);
   await expect(page.getByRole('main').getByRole('link', { name: '开始任务', exact: true })).toBeVisible();

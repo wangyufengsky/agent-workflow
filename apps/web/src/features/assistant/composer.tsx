@@ -70,12 +70,8 @@ export function Composer({
   return (
     <form className={styles.composer} onSubmit={submit} {...dropFilesInto(files)}>
       {error !== null && <ErrorState error={error} />}
-      <ConversationProjectSelect
-        value={conversation === undefined ? projectId : conversation.projectId}
-        projects={projects}
-        onChange={onProjectChange}
-      />
       <div className={styles.inputBox}>
+        <ConversationProjectSelect value={boundId} projects={projects} onChange={onProjectChange} />
         <textarea
           ref={inputRef}
           className={styles.input}

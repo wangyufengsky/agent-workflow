@@ -1,11 +1,13 @@
 import { type ProjectDTO, TASK_TITLE_MAX_CHARS } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
+import { useId } from 'react';
+import { Icon } from '../../components/icon.tsx';
 import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
 import { gitBranchesQuery } from '../git/git.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
-import styles from './home.module.css';
+import styles from './more-options.module.css';
 
-/** Pro mode's「更多选项」(M5-09): title, base branch, every checkpoint; null fields use the defaults. */
+/** null 字段沿用默认设置。 */
 export type MoreOptions = {
   title: string;
   baseBranch: string | null;
@@ -14,73 +16,104 @@ export type MoreOptions = {
 };
 export const NO_OPTIONS: MoreOptions = { title: '', baseBranch: null, acceptEachNode: null, askOnUncertainty: null };
 
+function ConfirmationSwitch({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className={styles.switchRow}>
+      <span>{label}</span>
+      <input
+        type="checkbox"
+        role="switch"
+        aria-checked={checked}
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+    </label>
+  );
+}
+
 export function MoreOptionsFields({
+  id,
   project,
   value,
   onChange,
+  confirmPlan,
+  onConfirmPlanChange,
 }: {
-  /** The branches listed are this project's; the default is its default branch. */
+  id: string;
   project: ProjectDTO;
   value: MoreOptions;
   onChange: (value: MoreOptions) => void;
+  confirmPlan: boolean;
+  onConfirmPlanChange: (checked: boolean) => void;
 }) {
+  const fieldId = useId();
   const branches = useQuery(gitBranchesQuery(project.id));
   const askDefault = useSettings()['ai.askOnUncertainty'];
   const local = branches.data?.filter((b) => !b.remote) ?? [];
+
   return (
-    <details className={styles.more}>
-      <summary className="hint">{C.moreOptions}</summary>
-      <div className="grid-2">
-        <div>
-          <div className="field">
-            <label className="label" htmlFor="start-title">
-              {C.title}
-            </label>
+    <section id={id} aria-label={C.moreOptions} className={styles.panel}>
+      <div className={styles.layout}>
+        <section className={styles.identity} aria-labelledby={`${fieldId}-info`}>
+          <h3 id={`${fieldId}-info`} className={styles.heading}>
+            <Icon name="file" size="sm" />
+            {C.taskInfo}
+          </h3>
+          <label className={styles.field}>
+            <span>{C.title}</span>
             <input
-              id="start-title"
               className="input"
               maxLength={TASK_TITLE_MAX_CHARS}
               placeholder={C.titlePlaceholder}
               value={value.title}
-              onChange={(e) => onChange({ ...value, title: e.target.value })}
+              onChange={(event) => onChange({ ...value, title: event.target.value })}
             />
-          </div>
-        </div>
-        <div className="field">
-          <label className="label" htmlFor="start-branch">
-            {C.baseBranch}
           </label>
-          <select
-            id="start-branch"
-            className="select"
-            value={value.baseBranch ?? ''}
-            onChange={(e) => onChange({ ...value, baseBranch: e.target.value === '' ? null : e.target.value })}
-          >
-            <option value="">{C.defaultBranch(project.defaultBranch)}</option>
-            {local.map((b) => (
-              <option key={b.name} value={b.name}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </div>
+          <label className={styles.field}>
+            <span>{C.baseBranch}</span>
+            <span className={styles.branch}>
+              <Icon name="branch" size="sm" />
+              <select
+                className="select"
+                value={value.baseBranch ?? ''}
+                onChange={(event) => onChange({ ...value, baseBranch: event.target.value || null })}
+              >
+                <option value="">{C.defaultBranch(project.defaultBranch)}</option>
+                {local.map((branch) => (
+                  <option key={branch.name} value={branch.name}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </label>
+        </section>
+        <section className={styles.confirmation} aria-labelledby={`${fieldId}-confirmation`}>
+          <h3 id={`${fieldId}-confirmation`} className={styles.heading}>
+            <Icon name="shield" size="sm" />
+            {C.executionConfirmation}
+          </h3>
+          <ConfirmationSwitch label={C.confirmPlan} checked={confirmPlan} onChange={onConfirmPlanChange} />
+          <ConfirmationSwitch
+            label={C.acceptEachNode}
+            checked={value.acceptEachNode ?? false}
+            onChange={(acceptEachNode) => onChange({ ...value, acceptEachNode })}
+          />
+          <ConfirmationSwitch
+            label={C.askOnUncertainty}
+            checked={value.askOnUncertainty ?? askDefault}
+            onChange={(askOnUncertainty) => onChange({ ...value, askOnUncertainty })}
+          />
+        </section>
       </div>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={value.acceptEachNode ?? false}
-          onChange={(e) => onChange({ ...value, acceptEachNode: e.target.checked })}
-        />
-        <span>{C.acceptEachNode}</span>
-      </label>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={value.askOnUncertainty ?? askDefault}
-          onChange={(e) => onChange({ ...value, askOnUncertainty: e.target.checked })}
-        />
-        <span>{C.askOnUncertainty}</span>
-      </label>
-    </details>
+    </section>
   );
 }

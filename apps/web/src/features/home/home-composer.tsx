@@ -36,6 +36,7 @@ import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
 import { AllowedWorkflowsField } from '../initiatives/allowed-workflows-field.tsx';
 import { initiativeTemplatesQuery } from '../initiatives/initiatives.queries.ts';
 import { templateChain, useStartInitiative } from '../initiatives/use-start-initiative.ts';
+import { ProjectPicker } from '../projects/project-picker.tsx';
 import type { DraftRequirement } from '../requirements/checklist-editor.tsx';
 import { ChecklistField } from '../requirements/checklist-field.tsx';
 import { workflowsQuery } from '../tasks/tasks.queries.ts';
@@ -100,6 +101,8 @@ export function HomeComposer({
   const flowsId = useId();
   const flowsOpener = useRef<HTMLButtonElement>(null);
   const [checklist, setChecklist] = useState<DraftRequirement[]>([]);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreId = useId();
   const task = useStartTask({
     projectId,
     workflowId: workflows.data?.find((w) => w.key === workflowKey)?.id,
@@ -249,22 +252,12 @@ export function HomeComposer({
                 )}
               </span>
               {/* The task's project, always shown: the base branch and the batch / schedule links depend on it. */}
-              <label className={styles.projectPick}>
-                <span aria-hidden="true">{HOME_TASK_COPY.project}</span>
-                <select
-                  className={styles.pillSelect}
-                  aria-label={HOME_TASK_COPY.project}
-                  value={projectId}
-                  disabled={knowledgeDraft !== undefined}
-                  onChange={(e) => changeProject(e.target.value)}
-                >
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <ProjectPicker
+                projects={projects}
+                value={projectId}
+                disabled={knowledgeDraft !== undefined}
+                onChange={changeProject}
+              />
             </div>
             <span className={styles.modeDescription}>{mode.description}</span>
           </div>
@@ -313,7 +306,26 @@ export function HomeComposer({
           </div>
         )}
         <AttachmentList draft={files} />
-        {workflow !== undefined && <ChecklistField drafts={checklist} onChange={setChecklist} />}
+        {workflow !== undefined && (
+          <div className={styles.taskTools}>
+            <ChecklistField drafts={checklist} onChange={setChecklist} />
+            {task.pro && project !== undefined && (
+              <button
+                type="button"
+                className={styles.optionsToggle}
+                aria-expanded={moreOpen}
+                aria-controls={moreOpen ? moreId : undefined}
+                onClick={() => setMoreOpen((open) => !open)}
+              >
+                <Icon name="sliders" size="sm" />
+                {HOME_TASK_COPY.moreOptions}
+                <span className={styles.flowsChevron}>
+                  <Icon name="chevDown" size="sm" />
+                </span>
+              </button>
+            )}
+          </div>
+        )}
         {breakdown && task.pro && (
           <AllowedWorkflowsField
             workflows={workflows.data ?? []}
@@ -321,8 +333,15 @@ export function HomeComposer({
             onChange={setAllowedWorkflows}
           />
         )}
-        {workflow !== undefined && task.pro && project !== undefined && (
-          <MoreOptionsFields project={project} value={task.options} onChange={task.setOptions} />
+        {workflow !== undefined && task.pro && project !== undefined && moreOpen && (
+          <MoreOptionsFields
+            id={moreId}
+            project={project}
+            value={task.options}
+            onChange={task.setOptions}
+            confirmPlan={task.confirmPlan}
+            onConfirmPlanChange={task.setConfirmPlan}
+          />
         )}
         {shown !== undefined && (
           <WorkflowPicker
@@ -412,14 +431,16 @@ export function HomeComposer({
             </>
           ) : (
             <>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={task.confirmPlan}
-                  onChange={(e) => task.setConfirmPlan(e.target.checked)}
-                />
-                <span>{HOME_TASK_COPY.confirmPlan}</span>
-              </label>
+              {!task.pro && (
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={task.confirmPlan}
+                    onChange={(e) => task.setConfirmPlan(e.target.checked)}
+                  />
+                  <span>{HOME_TASK_COPY.confirmPlan}</span>
+                </label>
+              )}
               {/* Fixed workflows can run on several targets at once (20 §2) and on a schedule (22 §7). */}
               {workflow.planning === WorkflowPlanning.Fixed && knowledgeDraft === undefined && (
                 <>
