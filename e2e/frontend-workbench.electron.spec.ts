@@ -5,8 +5,10 @@ import { join } from 'node:path';
 import {
   FRONTEND_WORKFLOW_KEY,
   initGitOp,
+  NodeStatus,
   type OperationContract,
   type TaskDetailDTO,
+  TaskStatus,
   taskCheckEvidenceOp,
   taskDetailSchema,
   toOperationRequest,
@@ -33,10 +35,15 @@ button{padding:8px 18px;background:#133467;color:white;border:0;border-radius:6p
 <label>搜索订单 <input></label><button id="export">${label}</button><p>订单 A1001　待发货</p><p>订单 A1002　已签收</p>`
 }
 </main>${nativeVue ? '<script type="module" src="/main.js"></script>' : ''}</body></html>`;
-const script = (label: string) => `import { createApp, h } from 'vue';
+const script = `import { createApp, h, ref } from 'vue';
+import { caption } from './caption.js';
+const label = ref(caption);
+if (import.meta.hot) {
+  import.meta.hot.accept('./caption.js', (mod) => { label.value = mod.caption; });
+}
 createApp({ render: () => [
   h('h1', '订单工作台'), h('label', ['搜索订单 ', h('input')]),
-  h('button', { id:'export' }, ${JSON.stringify(label)}),
+  h('button', { id:'export' }, label.value),
   h('p', '订单 A1001　待发货'), h('p', '订单 A1002　已签收')
 ]}).mount('#app');`;
 const server = `import { createServer } from 'node:http';
@@ -48,10 +55,15 @@ createServer((_req, res) => {
 
 const editPage = (label: string): FakeStep =>
   nativeVue
-    ? { type: 'edit', file: 'main.js', content: script(label) }
+    ? {
+        type: 'edit',
+        file: 'caption.js',
+        content: `export const caption = ${JSON.stringify(label)};
+`,
+      }
     : { type: 'edit', file: 'index.html', content: html(label) };
 
-test('前端任务从空目录启动真实预览，手机视口点选两轮后再完成验收', async ({ request }, testInfo) => {
+test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮修改与验收', async ({ request }, testInfo) => {
   test.setTimeout(nativeVue ? 180_000 : 90_000);
   const app = await electron.launch({ args: ['e2e/fixtures/user-preview/main.cjs'] });
   try {
@@ -102,14 +114,26 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
           return readFileSync(join(dir, 'pnpm-lock.yaml'), 'utf8');
         })()
       : null;
+    const permissionStep = (command: string): FakeStep => ({
+      type: 'permission',
+      permission: 'bash',
+      patterns: [command],
+    });
+    const build = 'node verify-first-scaffold.cjs';
+    const continueEditing = 'node verify-first-live-preview.cjs';
+    const finishFirstPage = 'node verify-hot-update.cjs';
     await queue({ title: '开发首版页面' }, [
+      { type: 'think', text: '先搭可运行的订单页骨架，再补齐操作。' },
+      { type: 'tool', tool: 'read', input: { filePath: 'package.json' }, output: '准备创建项目。' },
+      permissionStep(build),
       { type: 'edit', file: '.gitignore', content: 'node_modules/\ndist/\n.DS_Store\n' },
       { type: 'edit', file: 'package.json', content: JSON.stringify(manifest) },
       ...(vueLock !== null
         ? [
             { type: 'edit' as const, file: 'pnpm-lock.yaml', content: vueLock },
             { type: 'edit' as const, file: 'index.html', content: html('导出') },
-            editPage('导出'),
+            { type: 'edit' as const, file: 'main.js', content: script },
+            editPage('订单操作准备中'),
           ]
         : [
             { type: 'edit' as const, file: 'server.mjs', content: server },
@@ -126,6 +150,9 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
             },
             editPage('导出'),
           ]),
+      { type: 'callTool', server: 'exec', name: 'browser_open', args: { url: '/' } },
+      permissionStep(continueEditing),
+      ...(nativeVue ? [editPage('导出'), permissionStep(finishFirstPage)] : []),
       submitResult('订单页面已可预览'),
     ]);
     const started = await request.post(`${api}/tasks`, {
@@ -143,6 +170,18 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
     const page = await app.firstWindow();
     await page.goto(`${base}/tasks/${task.id}`);
     const workbench = page.getByTestId('frontend-workbench');
+    const permission = (command: string) => workbench.getByTestId('inbox-permission').filter({ hasText: command });
+    const allow = (command: string) => permission(command).getByRole('button', { name: '允许一次' }).click();
+    const activity = workbench.getByRole('region', { name: 'AI 活动' });
+    await expect(permission(build)).toBeVisible();
+    await expect(activity.getByRole('heading', { name: '正在构建首屏' })).toBeVisible();
+    await expect(activity.getByText('package.json', { exact: true })).toBeVisible();
+    await expect(activity.getByTestId('stream-thinking')).toContainText('先搭可运行的订单页骨架');
+    await expect(workbench.getByTestId('preview-area')).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('frontend-first-build.png'), animations: 'disabled' });
+    const initialAttempt = (await detail()).activeAttempts[0]?.id;
+    expect(initialAttempt).toBeDefined();
+    await allow(build);
     const previewState = async () => (await request.get(`${api}/tasks/${task.id}/preview`, { headers })).json();
     try {
       await expect.poll(async () => (await previewState()).state, { timeout: 45_000 }).toBe('running');
@@ -156,7 +195,51 @@ test('前端任务从空目录启动真实预览，手机视口点选两轮后�
         const contents = (view as Electron.WebContentsView | undefined)?.webContents;
         return contents?.executeJavaScript("document.querySelector('#export')?.textContent");
       });
-    await expect.poll(nativeText).toBe('导出');
+    await expect.poll(nativeText).toBe(nativeVue ? '订单操作准备中' : '导出');
+    await expect(activity.getByRole('heading', { name: 'AI 活动' })).toBeVisible();
+    await expect(activity.getByRole('heading', { name: '正在构建首屏' })).toHaveCount(0);
+    await expect(permission(continueEditing)).toBeVisible();
+    const previewBounds = await workbench.getByTestId('preview-area').boundingBox();
+    const activityBounds = await activity.boundingBox();
+    expect(activityBounds?.x).toBeGreaterThan(previewBounds?.x ?? Number.POSITIVE_INFINITY);
+    await page.screenshot({ path: testInfo.outputPath('frontend-first-live.png'), animations: 'disabled' });
+    const duringFirstPage = await detail();
+    expect(duringFirstPage.status).toBe(TaskStatus.Running);
+    expect(duringFirstPage.nodes[0]?.status).not.toBe(NodeStatus.Done);
+    expect(duringFirstPage.activeAttempts[0]?.id).toBe(initialAttempt);
+    const activityButton = workbench.getByRole('button', { name: 'AI 活动', exact: true });
+    await activity.getByRole('button', { name: '收起 AI 活动' }).click();
+    await expect(activity).toBeHidden();
+    await expect(activityButton).toBeFocused();
+    await expect(workbench.getByTestId('preview-area')).toBeVisible();
+    await activityButton.click();
+    await expect(permission(continueEditing)).toBeVisible();
+    if (nativeVue) {
+      // The HMR update must keep document-local state, so a full page reload cannot pass.
+      const nativeInput = (value?: string) =>
+        app.evaluate(async ({ BrowserWindow }, next) => {
+          const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((item) => 'webContents' in item);
+          const contents = (view as Electron.WebContentsView | undefined)?.webContents;
+          return contents?.executeJavaScript(
+            next === undefined
+              ? "document.querySelector('input')?.value"
+              : `document.querySelector('input').value = ${JSON.stringify(next)}`,
+          );
+        }, value);
+      await nativeInput('查看待发货');
+      await allow(continueEditing);
+      await expect(permission(finishFirstPage)).toBeVisible();
+      await expect.poll(nativeText).toBe('导出');
+      expect(await nativeInput()).toBe('查看待发货');
+      const afterHotUpdate = await detail();
+      expect(afterHotUpdate.status).toBe(TaskStatus.Running);
+      expect(afterHotUpdate.nodes[0]?.status).not.toBe(NodeStatus.Done);
+      expect(afterHotUpdate.activeAttempts[0]?.id).toBe(initialAttempt);
+      await allow(finishFirstPage);
+    } else {
+      await allow(continueEditing);
+    }
+    await expect.poll(async () => (await detail()).displayGroup).toBe('frontend_review');
     // A SPA updates its URL in the current document before the user picks an element.
     await app.evaluate(async ({ BrowserWindow }, path) => {
       const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((item) => 'webContents' in item);

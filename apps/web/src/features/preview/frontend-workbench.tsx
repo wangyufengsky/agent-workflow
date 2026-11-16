@@ -8,6 +8,7 @@ import {
   type FrontendRound,
   NodeKind,
   NodeStatus,
+  PreviewState,
   pickFrontendElementOp,
   previewPathFromUrl,
   type TaskDetailDTO,
@@ -16,21 +17,23 @@ import {
   WorktreeStatus,
 } from '@aw/shared';
 import { skipToken, useQuery } from '@tanstack/react-query';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { Icon } from '../../components/icon.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
 import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
 import { FRONTEND_COPY as C } from '../../copy/frontend.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { useFinishFrontendTask, useRequestChanges } from '../tasks/tasks.queries.ts';
+import { FrontendActivity } from './frontend-activity.tsx';
 import styles from './frontend-workbench.module.css';
 import { MyPreview } from './my-preview.tsx';
-import { previewQuery, taskFileUrl, useImage } from './preview.queries.ts';
+import { previewQuery, taskFileUrl, useImage, useStartPreview } from './preview.queries.ts';
 
-type Panel = 'notes' | 'progress' | null;
+type Panel = 'activity' | 'notes' | 'progress' | null;
 type Draft = { element: FrontendElement; note: string };
 
 function BeforeImage({ taskId, before }: { taskId: string; before: NonNullable<FrontendRound['before']> }) {
@@ -88,7 +91,9 @@ export function FrontendWorkbench({
   progress: ReactNode;
   onOpenNode: (id: string) => void;
 }) {
-  const [panel, setPanel] = useState<Panel>(null);
+  const [pickedPanel, setPanel] = useState<Panel>();
+  const activityId = useId();
+  const openActivity = useRef<HTMLButtonElement>(null);
   const [feedback, setFeedback] = useState('');
   const [notes, setNotes] = useState<Draft[]>([]);
   const [picking, setPicking] = useState(false);
@@ -101,10 +106,19 @@ export function FrontendWorkbench({
   const revision = useRequestChanges();
   const finish = useFinishFrontendTask();
   const preview = useQuery(previewQuery(task.id));
+  const start = useStartPreview(task.id);
+  const { mutate: startPreview } = start;
+  const attemptedStart = useRef(false);
+  const previewState = preview.data?.state;
   const firstResult = task.nodes.some((node) => node.status === NodeStatus.Done);
-  const ready = task.git.worktreeStatus === WorktreeStatus.Ready && (hasConfiguredPreview || firstResult);
+  const worktreeReady = task.git.worktreeStatus === WorktreeStatus.Ready;
   const review = task.status === TaskStatus.Review;
   const working = task.status === TaskStatus.Running;
+  const autoStart = worktreeReady && (firstResult || (hasConfiguredPreview && working));
+  const live = previewState === PreviewState.Running;
+  const failed = previewState === PreviewState.Failed;
+  const activityInMain = !live && !failed && !firstResult;
+  const panel = pickedPanel === undefined ? (activityInMain ? null : 'activity') : pickedPanel;
   const checking =
     working && task.nodes.findLast((node) => node.kind !== NodeKind.Verify)?.key.startsWith(FRONTEND_VERIFY_PREFIX);
   const canPick = tabId !== undefined && notes.length < FRONTEND_ANNOTATION_LIMIT;
@@ -114,11 +128,27 @@ export function FrontendWorkbench({
       ? C.verified
       : checking
         ? C.checking
-        : working && ready
-          ? C.editing
-          : ready
-            ? C.ready
-            : C.waiting;
+        : live
+          ? C.livePreview
+          : failed
+            ? C.failedPreview
+            : previewState === PreviewState.Starting
+              ? C.startingPreview
+              : activityInMain
+                ? C.waiting
+                : PREVIEW_PANE_COPY.state[PreviewState.Stopped];
+
+  useEffect(() => {
+    if (attemptedStart.current || previewState === undefined) return;
+    if (previewState !== PreviewState.Stopped) {
+      attemptedStart.current = true;
+      return;
+    }
+    if (autoStart) {
+      attemptedStart.current = true;
+      startPreview();
+    }
+  }, [autoStart, previewState, startPreview]);
 
   useEffect(
     () => () => {
@@ -198,7 +228,7 @@ export function FrontendWorkbench({
       <header className={styles.toolbar}>
         <div className={styles.status}>
           <strong>{C.preview}</strong>
-          <span className="hint" aria-live="polite">
+          <span className={styles.previewState} data-live={live} aria-live="polite">
             {status}
           </span>
         </div>
@@ -207,12 +237,25 @@ export function FrontendWorkbench({
             {C.assistant}
           </Button>
         )}
+        {!activityInMain && (
+          <button
+            type="button"
+            ref={openActivity}
+            className={`btn sm ${panel === 'activity' ? 'secondary' : 'ghost'}`}
+            aria-controls={activityId}
+            aria-expanded={panel === 'activity'}
+            onClick={() => toggle('activity')}
+          >
+            <Icon name="gauge" size="sm" />
+            {C.activity}
+          </button>
+        )}
         <Button
           variant={panel === 'notes' ? 'primary' : 'secondary'}
           size="sm"
           icon="edit"
           aria-expanded={panel === 'notes'}
-          disabled={!ready}
+          disabled={activityInMain}
           onClick={() => toggle('notes')}
         >
           {C.mark}
@@ -249,21 +292,44 @@ export function FrontendWorkbench({
         )}
       </header>
       {finish.isError && <ErrorState error={finish.error} />}
+      {start.isError && previewState === PreviewState.Stopped && (
+        <ErrorState error={start.error} onRetry={() => startPreview()} />
+      )}
       <div className={styles.body}>
-        <div className={styles.preview}>
-          {ready && preview.data !== undefined ? (
-            <MyPreview task={task} preview={preview.data} active pro={pro} autoStart={firstResult} />
-          ) : preview.isError ? (
-            <ErrorState error={preview.error} onRetry={() => void preview.refetch()} />
-          ) : (
-            <div className={styles.waiting}>
-              <strong>{C.waiting}</strong>
-              <p className="hint">{C.waitingHint}</p>
-              {task.currentStep !== null && <p>{task.currentStep}</p>}
+        {!activityInMain && (
+          <div className={styles.preview}>
+            {preview.data !== undefined && worktreeReady ? (
+              <MyPreview task={task} preview={preview.data} active pro={pro} />
+            ) : preview.isError ? (
+              <ErrorState error={preview.error} onRetry={() => void preview.refetch()} />
+            ) : null}
+          </div>
+        )}
+        <section
+          id={activityId}
+          aria-label={C.activity}
+          className={activityInMain ? styles.activityMain : styles.inspector}
+          hidden={!activityInMain && panel !== 'activity'}
+        >
+          {!activityInMain && (
+            <div className={styles.inspectorHead}>
+              <h2>{C.activity}</h2>
+              <IconButton
+                icon="x"
+                label={C.closeActivity}
+                onClick={() => {
+                  toggle('activity');
+                  openActivity.current?.focus();
+                }}
+              />
             </div>
           )}
-        </div>
-        {panel !== null && (
+          <FrontendActivity task={task} inMain={activityInMain} starting={previewState === PreviewState.Starting} />
+          {activityInMain && preview.isError && (
+            <ErrorState error={preview.error} onRetry={() => void preview.refetch()} />
+          )}
+        </section>
+        {(panel === 'notes' || panel === 'progress') && (
           <aside className={styles.inspector} aria-label={panel === 'notes' ? C.notes : C.progress}>
             {panel === 'notes' ? (
               <>

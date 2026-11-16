@@ -161,6 +161,7 @@ export function actionGroupSummary(actions: readonly StreamAction[]): string {
 }
 
 export const STREAM_COPY = {
+  lastActivity: (time: string) => `最近活动 ${time}`,
   processTitle: '执行过程',
   reviewTitle: '评审过程',
   researchTitle: '研究过程',
