@@ -87,7 +87,7 @@ Electron `app.getPath('userData')`，目录名为产品名：
 | --- | --- | --- |
 | `opencode serve` | 自成进程组（`detached`），停止时向进程组发 `SIGTERM` | 没有信号，`TerminateProcess` 只结束 opencode 本身，bash 子进程与语言服务会留下。用 `taskkill /pid <pid> /T /F` 结束进程树 |
 | 检查命令（`acceptance.runCommand`） | `/bin/sh -c`，自成进程组；超时 / 中止时向进程组发 `SIGTERM` | Git Bash `-c`（与 opencode 同一个 shell，D73）；超时 / 中止时 `taskkill /T /F` |
-| 页面预览的开发服务器（v1.3，`previews.process.ts`，29 §4） | 与检查命令同一个 POSIX shell、`killDescendants`；停止、空闲、worktree 删除前与应用退出时结束整棵进程树（macOS 上实测没有残留，29 §12 V5） | 同检查命令（Git Bash，`taskkill /T`）；由 Windows CI 的集成测试覆盖进程停止，真机预览待验证。worktree 删除前先结束它，否则 Windows 上文件被占用（`worktrees.onBeforeRemove`） |
+| 页面预览的开发服务器（v1.3，`previews.process.ts`，29 §4） | 与检查命令同一个 POSIX shell、`killDescendants`；停止、空闲、worktree 删除前与应用退出时结束整棵进程树（macOS 上实测没有残留，29 §12 V5） | 简单的 npm、pnpm、Yarn 和 Bun 命令使用 Windows 原生启动器，包含 shell 语法的命令使用 Git Bash。停止时用 `taskkill /T` 结束进程树；Windows CI 覆盖停止预览和清理工作区。worktree 删除前先结束它，否则 Windows 上文件被占用（`worktrees.onBeforeRemove`） |
 | git | 正常退出，不需要终止 | 同左 |
 
 两者都用 execa 的 `killDescendants` 启动（POSIX 上自成进程组，Windows 上停止时运行 `taskkill /T`），`child.kill()` 即结束整棵进程树。只结束 shell 本身时，它启动的命令（`a && b` 中的 `b`、后台的测试进程）继续运行并占着输出管道，execa 的结果要等它们结束才返回。

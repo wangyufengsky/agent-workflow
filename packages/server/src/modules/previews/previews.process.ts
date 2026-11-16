@@ -11,6 +11,7 @@ import {
 } from '@aw/shared';
 import { execa } from 'execa';
 import type { Clock } from '../../core/clock.ts';
+import { host } from '../../core/platform.ts';
 
 /** A preview's output: appended to its log file (when it has one) and kept as a tail for the user. */
 export type PreviewLog = { append(text: string): void; tail(): string; close(): void };
@@ -67,10 +68,14 @@ function startFailed(message: string, log: PreviewLog): AppError {
 /** Runs a shell command line in the worktree, its output going to the log; null exit code when it was ended. */
 function run(command: string, input: LaunchInput, env: NodeJS.ProcessEnv) {
   input.log.append(`$ ${command}\n`);
-  const child = execa(command, {
+  // Package-manager shell shims can replace a Windows process in the middle of the tree.
+  // For simple package commands, use the native launcher. Shell syntax still goes through Git Bash.
+  const direct = host.shellFromGit ? /^(npm|pnpm|yarn|bun)((?: [A-Za-z0-9_.-]+)+)$/.exec(command) : null;
+  const manager = direct?.[1];
+  const args = direct?.[2]?.trim().split(' ') ?? [];
+  const executable = manager === undefined ? undefined : host.findExecutable(manager, host.pathDirs(env));
+  const options = {
     cwd: input.directory,
-    // The same POSIX shell as check commands on every platform (D73).
-    shell: input.shell,
     env,
     extendEnv: false,
     all: true,
@@ -78,7 +83,9 @@ function run(command: string, input: LaunchInput, env: NodeJS.ProcessEnv) {
     stdin: 'ignore',
     // A shell ended alone leaves the dev server running, holding its port and the worktree's files (D73).
     killDescendants: true,
-  });
+  } as const;
+  const child =
+    executable === undefined ? execa(command, { ...options, shell: input.shell }) : execa(executable, args, options);
   child.all.on('data', (chunk: Buffer) => input.log.append(chunk.toString()));
   return child;
 }
