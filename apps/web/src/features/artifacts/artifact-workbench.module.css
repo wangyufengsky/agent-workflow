@@ -1,0 +1,113 @@
+.file {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  overflow-wrap: anywhere;
+}
+
+.file select {
+  width: auto;
+}
+
+.stage {
+  flex: 1;
+  min-width: 0;
+  padding: var(--s-3);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.paper {
+  max-width: 780px;
+  min-height: 360px;
+  margin-inline: auto;
+  padding: clamp(16px, 4vw, 44px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.mark {
+  display: inline-flex;
+  margin-inline-start: var(--s-2);
+  vertical-align: middle;
+}
+
+.source ol,
+.history {
+  display: grid;
+  gap: var(--s-2);
+  padding: 0;
+  list-style: none;
+}
+
+.source li {
+  display: flex;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.source li > span {
+  flex: 0 0 4ch;
+  text-align: right;
+  color: var(--sub);
+}
+
+.source li :is(code, button) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.source button,
+.cell {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: var(--s-1);
+  border-radius: var(--r-xs);
+}
+
+.source button:hover,
+.cell:hover,
+.cell[aria-pressed="true"] {
+  background: var(--accent-fill);
+}
+
+.comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-3);
+}
+
+.history li {
+  display: grid;
+  gap: var(--s-2);
+  margin-block-end: var(--s-2);
+}
+
+.history blockquote,
+.quote {
+  margin: 0;
+  padding-inline-start: var(--s-2);
+  border-inline-start: 2px solid var(--line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--sub);
+}
+
+@media (max-width: 730px) {
+  .comparison {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sheets {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}

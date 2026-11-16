@@ -1,6 +1,7 @@
 import type { Prompts } from '@aw/builtin';
 import {
   AppError,
+  ARTIFACT_WORKFLOW_KEY,
   ATTENTION_INBOX_KINDS,
   type AttachmentDTO,
   AttachmentOwnerKind,
@@ -34,6 +35,7 @@ import type { GitReviewsService } from '../git-reviews/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { NodeRunContext, NodesService } from '../nodes/index.ts';
+import type { Office } from '../office/index.ts';
 import type { OpencodeClient } from '../opencode/index.ts';
 import type { PlansService } from '../plans/index.ts';
 import type { PreviewsService } from '../previews/index.ts';
@@ -64,6 +66,7 @@ export type TasksServiceDeps = {
   nodes: NodesService;
   attempts: AttemptsService;
   opencode: OpencodeClient;
+  office: Office;
   attachments: AttachmentsService;
   browser: BrowserService;
   previews: PreviewsService;
@@ -121,6 +124,7 @@ export function createTaskState(deps: TasksServiceDeps) {
         task.status,
         attention.has(task.id),
         task.result?.frontendVerified === false,
+        task.workflowKey === ARTIFACT_WORKFLOW_KEY,
       ),
       project: { id: task.projectId, name: task.projectName },
       workflow: { id: task.workflowId, key: task.workflowKey, name: task.workflowName },

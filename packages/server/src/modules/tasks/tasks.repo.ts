@@ -1,5 +1,6 @@
 import {
   AppError,
+  ARTIFACT_WORKFLOW_KEY,
   type Checkpoints,
   checkpointsSchema,
   ErrorCode,
@@ -80,6 +81,7 @@ export type StatusMatch = {
   status: TaskStatus;
   attention: 'with' | 'without' | 'any';
   frontendIteration?: boolean;
+  artifactIteration?: boolean;
 };
 
 export function createTasksRepo(db: DbExecutor) {
@@ -153,7 +155,7 @@ export function createTasksRepo(db: DbExecutor) {
       limit: number;
     }): Task[] {
       const ids = [...filter.attention];
-      const statusMatch = filter.oneOf?.flatMap(({ status, attention, frontendIteration }) => {
+      const statusMatch = filter.oneOf?.flatMap(({ status, attention, frontendIteration, artifactIteration }) => {
         if (attention === 'with' && ids.length === 0) return [];
         const reviewed = sql`json_extract(${t.result}, '$.frontendVerified')`;
         const iteration =
@@ -168,7 +170,11 @@ export function createTasksRepo(db: DbExecutor) {
             : attention === 'without' && ids.length > 0
               ? notInArray(t.id, ids)
               : undefined;
-        return [and(eq(t.status, status), required, iteration)];
+        const artifact =
+          artifactIteration === undefined
+            ? undefined
+            : sql`(${workflowsTable.key} = ${ARTIFACT_WORKFLOW_KEY}) = ${artifactIteration ? 1 : 0}`;
+        return [and(eq(t.status, status), required, iteration, artifact)];
       });
       const { after } = filter;
       return select(

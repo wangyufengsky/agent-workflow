@@ -1,4 +1,5 @@
 import {
+  type ArtifactRevision,
   acceptNodeOp,
   archiveFinishedTasksOp,
   archiveTaskOp,
@@ -41,6 +42,7 @@ import {
   retryTaskOp,
   reviewCommentsOp,
   reviseFromReviewOp,
+  reviseTaskArtifactOp,
   saveDraftPlanOp,
   skipCheckOp,
   skipNodeOp,
@@ -276,6 +278,8 @@ export const useConfirmPlan = () =>
 export const useDeliver = () => useTaskMutation((input: DeliverRequest) => callOperation(deliverTaskOp, input));
 export const useFinishFrontendTask = () =>
   useTaskMutation((input: { id: string; path?: string }) => callOperation(finishFrontendTaskOp, input));
+export const useReviseTaskArtifact = () =>
+  useTaskMutation((input: ArtifactRevision) => callOperation(reviseTaskArtifactOp, input));
 export const useRequestChanges = () =>
   useTaskMutation((input: RequestChangesRequest) => callOperation(requestChangesOp, input));
 export const useRefreshDeliveryStatus = () =>

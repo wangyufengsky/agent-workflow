@@ -1,6 +1,7 @@
 import {
   type Acceptance,
   AcceptanceCheckKind,
+  ARTIFACT_WORKFLOW_KEY,
   FRONTEND_WORKFLOW_KEY,
   PROJECT_CHECK_PLACEHOLDER,
   RequiredStepPosition,
@@ -23,6 +24,7 @@ export type BuiltinWorkflow = {
 export const BuiltinWorkflowKey = {
   Feature: 'feature',
   Frontend: FRONTEND_WORKFLOW_KEY,
+  Artifact: ARTIFACT_WORKFLOW_KEY,
   Bugfix: 'bugfix',
   UnitTests: 'unit_tests',
   CodeReview: 'code_review',
@@ -64,6 +66,34 @@ const reportOnly = (key: string, title: string, instructions: string) => ({
 });
 
 export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
+  {
+    key: BuiltinWorkflowKey.Artifact,
+    name: '文档与表格',
+    description: '生成 Word、Excel、Markdown 或纯文本，在任务里标注并多轮修改',
+    planning: WorkflowPlanning.Fixed,
+    deliverable: WorkflowDeliverable.Report,
+    definition: {
+      allowedRoles: [BuiltinRoleKey.Developer],
+      template: {
+        nodes: [
+          {
+            key: 'write_artifact',
+            title: '生成首版产物',
+            roleKey: BuiltinRoleKey.Developer,
+            instructions: [
+              '根据需求与资料生成一份主要产物。按用户指定格式交付；未指定时，表格用 Excel，正文用 Word。',
+              '直接使用 agent-workflow_write_task_docx、agent-workflow_write_task_xlsx 或 agent-workflow_write_task_text 发布首个可审阅版本。文本工具接受 .md 或 .txt。',
+              '用 agent-workflow_read_task_artifact 确认正文、数据及格式符合要求。发布后用 submit_result 总结产物和剩余问题。等待用户在同一任务提出标注。项目工作区仅作资料来源。',
+            ].join('\n'),
+            dependsOn: [],
+            acceptance: unchecked,
+          },
+        ],
+      },
+      checkpoints: noCheckpoints,
+      defaultAcceptance: unchecked,
+    },
+  },
   {
     key: BuiltinWorkflowKey.Feature,
     name: '新功能开发',

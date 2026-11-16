@@ -39,6 +39,7 @@ export function createTaskRelay(deps: {
       const recipients = new Set<string>();
       for (const task of repo.pending(taskId)) {
         if ([TaskStatus.Review, TaskStatus.Failed, TaskStatus.Completed].some((status) => status === task.status)) {
+          const artifact = deps.tasks.latestArtifactOf(task.taskId);
           conversations.queueMessage(
             task.conversationId,
             renderTemplate(deps.prompts[PromptName.AssistantTaskUpdated], {
@@ -55,6 +56,7 @@ export function createTaskRelay(deps: {
                   ...(deps.tasks.isFrontend(task.taskId)
                     ? { frontend: { verified: deps.tasks.frontendVerified(task.taskId) } }
                     : {}),
+                  ...(artifact === undefined ? {} : { artifact: { name: artifact.name, version: artifact.number } }),
                   failedPhase: task.failedPhase,
                   failure: task.failure,
                   result:

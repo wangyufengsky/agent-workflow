@@ -379,6 +379,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   const requirements = createRequirementsModule({ db: database.db, clock });
   const tasks = createTasksModule({
+    office,
     opencode,
     previews: previews.service,
     gitNetwork: network.gitEnv,
@@ -523,6 +524,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   mcp.register(server);
   attempts.registerRoutes(server);
+  tasks.registerRoutes(server);
   browser.registerRoutes(server);
   attachments.registerRoutes(server);
   const operations: OperationImpl[] = [

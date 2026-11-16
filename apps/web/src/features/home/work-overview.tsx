@@ -30,6 +30,7 @@ const SECTIONS: { title: string; groups: TaskDisplayGroup[] }[] = [
       TaskDisplayGroup.Preparing,
       TaskDisplayGroup.Running,
       TaskDisplayGroup.FrontendReview,
+      TaskDisplayGroup.ArtifactReview,
       TaskDisplayGroup.Paused,
       TaskDisplayGroup.Merging,
     ],

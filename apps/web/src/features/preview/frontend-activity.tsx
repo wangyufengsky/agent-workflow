@@ -13,10 +13,14 @@ export function FrontendActivity({
   task,
   inMain,
   starting,
+  buildingTitle = C.building,
+  buildingHint = C.waitingHint,
 }: {
   task: TaskDetailDTO;
   inMain: boolean;
   starting: boolean;
+  buildingTitle?: string;
+  buildingHint?: string;
 }) {
   const active = task.activeAttempts.reduce<(typeof task.activeAttempts)[number] | undefined>(
     (latest, attempt) => (latest === undefined || attempt.startedAt >= latest.startedAt ? attempt : latest),
@@ -39,8 +43,8 @@ export function FrontendActivity({
             <Icon name="terminal" size="lg" />
           </span>
           <div>
-            <h2>{starting ? C.startingPreview : C.building}</h2>
-            <p className="hint">{C.waitingHint}</p>
+            <h2>{starting ? C.startingPreview : buildingTitle}</h2>
+            <p className="hint">{buildingHint}</p>
           </div>
         </div>
       )}

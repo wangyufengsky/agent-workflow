@@ -184,6 +184,8 @@ type TaskDetailDTO = {
 };
 ```
 
+文档与表格任务详情的 `artifact` 提供可预览版本及标注历史。预览用 `GET /tasks/:id/artifacts/:versionId?sheet=`，原件用同路径的 `/raw`，下轮修改用 `POST /tasks/:id/revise-artifact`（`versionId` 和 `notes`），见 [39 §8.4](39-office-files.md#84-文档与表格任务工作台)。
+
 ### 5.3 交付
 
 - `strategy ∈ { squash, merge, rebase }`：本地合并到 `targetBranch`（默认 `baseBranch`），见 09 §7。合并前的检查失败直接返回错误、不改状态：`DELIVERY_TARGET_NOT_FOUND`、`WORKTREE_DIRTY`、`DELIVERY_TARGET_DIRTY`（目标分支检出在有未提交改动的工作区）。成功 → 任务 `completed`。冲突 → 任务回 `review`，`lastDelivery.status = conflict`，`conflictFiles` 列出文件；前端提供「交给 AI 解决」（= `request-changes` with `reason: 'conflict'`）。其他 git 失败 → 任务回 `review`，`lastDelivery.status = failed`，`error` 为原因。以上都返回操作后的 `TaskDetailDTO`。

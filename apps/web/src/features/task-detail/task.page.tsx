@@ -18,6 +18,7 @@ import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { ArtifactWorkbench } from '../artifacts/artifact-workbench.tsx';
 import { FrontendRoundHistory, FrontendWorkbench } from '../preview/frontend-workbench.tsx';
 import { PreviewPane } from '../preview/preview-pane.tsx';
 import { projectQuery } from '../projects/projects.queries.ts';
@@ -196,6 +197,17 @@ export function TaskPage() {
   if (task.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (task.isError) return <ErrorState error={task.error} onRetry={() => void task.refetch()} />;
   const frontend = task.data.frontend;
+  const artifact = task.data.artifact;
+  const artifactOpen =
+    artifact !== undefined && task.data.status !== TaskStatus.Draft && task.data.status !== TaskStatus.PlanReview;
+  const nodeDetails =
+    nodeId === undefined
+      ? undefined
+      : {
+          title: task.data.nodes.find((item) => item.id === nodeId)?.title ?? C.viewNode,
+          content: <NodeDetailPane taskId={taskId} nodeId={nodeId} tab={tab} pro={pro} />,
+          onClose: closeNode,
+        };
   const workbench =
     frontend !== undefined && !ENDED_TASK.includes(task.data.status) && task.data.status !== TaskStatus.Merging;
   return (
@@ -207,22 +219,31 @@ export function TaskPage() {
         onDetailsChange={(on) => void navigate({ search: (prev) => ({ ...prev, details: on }), replace: true })}
       />
       {requirement !== undefined && !hasVisibleChecklist(task.data) && <RequirementsSection task={task.data} />}
-      {workbench ? (
+      {artifactOpen ? (
+        <ArtifactWorkbench
+          key={task.data.id}
+          task={task.data}
+          artifact={artifact}
+          nodeDetails={nodeDetails}
+          onOpenNode={selection.open}
+          record={
+            <div className={styles.frontendProgress}>
+              {task.data.status === TaskStatus.Review || task.data.status === TaskStatus.Completed ? (
+                <StepsView task={task.data} selection={selection} pro={pro} />
+              ) : (
+                <TaskMain task={task.data} selection={selection} pro={pro} />
+              )}
+            </div>
+          }
+        />
+      ) : workbench ? (
         <FrontendWorkbench
           key={task.data.id}
           task={task.data}
           pro={pro}
           hasConfiguredPreview={project.data?.preview != null}
           onOpenNode={selection.open}
-          nodeDetails={
-            nodeId === undefined
-              ? undefined
-              : {
-                  title: task.data.nodes.find((item) => item.id === nodeId)?.title ?? C.viewNode,
-                  content: <NodeDetailPane taskId={taskId} nodeId={nodeId} tab={tab} pro={pro} />,
-                  onClose: closeNode,
-                }
-          }
+          nodeDetails={nodeDetails}
           progress={
             <div className={styles.frontendProgress}>
               {task.data.status === TaskStatus.Review && !frontend.verified ? (
@@ -266,7 +287,9 @@ export function TaskPage() {
         <TaskMain task={task.data} selection={selection} pro={pro} />
       )}
       {!workbench && frontend !== undefined && <FrontendRoundHistory task={task.data} onOpen={selection.open} />}
-      {!workbench && <NodeDrawer taskId={taskId} nodeId={nodeId} tab={tab} pro={pro} onClose={closeNode} />}
+      {!workbench && !artifactOpen && (
+        <NodeDrawer taskId={taskId} nodeId={nodeId} tab={tab} pro={pro} onClose={closeNode} />
+      )}
     </div>
   );
 }

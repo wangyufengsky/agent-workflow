@@ -14,6 +14,7 @@ const PRIORITY_GROUPS: TaskDisplayGroup[] = [
   TaskDisplayGroup.NeedsAttention,
   TaskDisplayGroup.PlanReview,
   TaskDisplayGroup.FrontendReview,
+  TaskDisplayGroup.ArtifactReview,
   TaskDisplayGroup.Review,
 ];
 const RECENT_LIMIT = 5;

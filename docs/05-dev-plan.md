@@ -527,6 +527,8 @@ X-12 已完成（2026-10-30）：Windows x64 未签名测试版 v1.4.37-beta.1�
 | OF-06（已完成） | 任务里的 Office 文件：执行 MCP `read_office_file`（规划、执行、评审、研究员）、「项目文件…」快照接受 Office（39 §7.3） | 集成：读 worktree 里的 xlsx 指定工作表与区域；越界、符号链接指向根外被拒；快照保存后原文件改变不影响附件 |
 | OF-07（已完成） | live：真实模型读 Excel 汇总并生成 Word 报告（`live/office.live.test.ts`；2026-10-26 `opencode-go/deepseek-v4.1-flash` 通过：300 行的工作簿，模型调用 `query_sheet` 再 `create_docx`，报告里三个区域的合计与表中一致） | 免费测试模型用 `query_sheet` 答出正确的各区域合计，`create_docx` 生成的文件再解析后含这些数字 |
 
+产物工作台（2026-11-16）见 [39 §8.4](39-office-files.md#84-文档与表格任务工作台)。验收覆盖四种格式的首版预览、定位标注、同任务修改、版本对照和原件下载。
+
 OF-01 完成后 OF-02 与 OF-03 可并行；OF-01 至 OF-03 完成即「上传 Word / Excel 让 AI 读懂」可用，OF-04 起是产出文件。
 
 ## 后续 · 功能收敛（CV）

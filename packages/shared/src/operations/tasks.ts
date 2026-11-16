@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { artifactPreviewSchema, artifactRevisionSchema } from '../contracts/api/artifacts.ts';
 import { previewSessionsSchema } from '../contracts/api/browser.ts';
 import {
   deliverRequestSchema,
@@ -436,6 +437,30 @@ export const requestChangesOp = defineOperationContract({
   http: { method: 'POST', path: '/tasks/:id/request-changes' },
   // A preview tab is the user's own: the assistant has none to attach. Nor can it attach files yet (30 §2.2).
   assistantOmit: ['page', 'attachmentIds'],
+});
+
+export const getTaskArtifactOp = defineOperationContract({
+  ...common,
+  expose: { palette: false, assistant: false },
+  id: 'tasks.getArtifact',
+  title: 'op.tasks.getArtifact',
+  description: 'Preview an immutable file version from a document task.',
+  input: z.object({ id: z.string(), versionId: z.uuid(), sheet: z.string().optional() }),
+  output: artifactPreviewSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/artifacts/:versionId' },
+});
+
+export const reviseTaskArtifactOp = defineOperationContract({
+  ...common,
+  id: 'tasks.reviseArtifact',
+  refs: { id: InputRef.Task },
+  title: 'op.tasks.reviseArtifact',
+  description: 'Send anchored notes on the latest file version to the same document task for another revision.',
+  input: artifactRevisionSchema,
+  output: taskDetailSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/revise-artifact' },
 });
 
 export const finishFrontendTaskOp = defineOperationContract({

@@ -36,6 +36,7 @@ import { submitPlanTool } from './tools/submit-plan.tool.ts';
 import { submitResultTool } from './tools/submit-result.tool.ts';
 import { submitReviewTool } from './tools/submit-review.tool.ts';
 import { submitSlideTool } from './tools/submit-slide.tool.ts';
+import { taskArtifactTools } from './tools/task-artifact.tool.ts';
 
 export type { McpToolDefinition } from './mcp.registry.ts';
 
@@ -84,6 +85,7 @@ export function createMcpModule({
     ...delegationTools(tasks),
     ...attachmentTools(tasks, initiatives, attachments),
     readOfficeFileTool(office),
+    ...taskArtifactTools(tasks, office, attachments),
     submitPlanTool(tasks),
     submitResultTool(tasks, debug),
     submitReviewTool(acceptance),
