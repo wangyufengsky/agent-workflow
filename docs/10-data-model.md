@@ -250,7 +250,7 @@ type Acceptance = {
 | status | TEXT | `NodeStatus` |
 | attempt_count | INTEGER | 消耗的预算 |
 | retry_feedback | TEXT NULL | 下次尝试附带 |
-| result | TEXT(JSON) NULL | 最近一次 `submit_result` 内容 |
+| result | TEXT(JSON) NULL | 最近一次 `submit_result`，可附交接与服务端记录的尝试 ID 和提交 |
 | check_results | TEXT(JSON) NULL | 当前这份结果的检查结果；交了新结果或重新检查（D116）进入 `verifying` 时置空，检查全部跑完后写入，所以检查中为 NULL（上次没通过的原因在 `retry_feedback`）。`CheckResult[]`：命令检查 `{ kind: command, command, passed, output, exitCode, timedOut, unrunnable, skipped }`（输出保留末尾 `ACCEPTANCE_OUTPUT_MAX_CHARS`；`unrunnable: { program, reason } | null` 为应用环境无法运行，`skipped` 为用户跳过、未运行且不挡住步骤（`passed` 为 true），D116；之前写入的行没有这两项，读出为 `null` / `false`）；AI 评审 `{ kind: ai_review, focus, passed, output, attemptId, issues[] }`；页面体检 `{ kind: browser, passed, pages: [{ path, viewport, httpStatus, errors, warnings, screenshot }], output, unrunnable: { reason, logTail } \| null, skipped }`（v1.3，29 §7.4） |
 | commit_sha | TEXT NULL | |
 | position | INTEGER | 画布与列表排序 |
@@ -280,6 +280,8 @@ type Acceptance = {
 | started_at / ended_at | INTEGER | |
 
 索引：`(node_id)`、`(task_id, kind)`、`(status)`、`(opencode_session_id)`、`(started_at)`（质量与用量按时间区间统计，19 §5）。
+
+只读委派沿用 `attempts`，归属父步骤的任务及节点。对应 `task_events` 记父尝试 ID 和固定的 Git 提交，模型用量与会话流随子尝试保存。
 
 
 ### inbox_items

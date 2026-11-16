@@ -7,6 +7,7 @@ import {
   MCP_ASSISTANT_TOOL_PREFIX,
   MCP_SERVER_NAME,
   MCP_TOOL_PREFIX,
+  McpToolName,
   OPENCODE_AGENT_NAME,
   OPENCODE_ASSISTANT_AGENT,
   OPENCODE_COMPANION_AGENT,
@@ -46,6 +47,17 @@ type AgentPermission = {
 const EXEC_TOOLS = `${MCP_TOOL_PREFIX}*`;
 const ASSISTANT_TOOLS = `${MCP_ASSISTANT_TOOL_PREFIX}*`;
 
+const DELEGATE_PERMISSION = {
+  '*': 'deny',
+  edit: 'deny',
+  question: 'deny',
+  webfetch: 'deny',
+  external_directory: 'deny',
+  [`${MCP_TOOL_PREFIX}${McpToolName.InspectDelegation}`]: 'allow',
+  [`${MCP_TOOL_PREFIX}${McpToolName.SubmitDelegation}`]: 'allow',
+  [ASSISTANT_TOOLS]: 'deny',
+} as const;
+
 /** Agents that only read and answer through their submit tool: no web unless the session allows it, no subagents. */
 const READ_ONLY_WRITER = {
   edit: 'deny',
@@ -66,6 +78,7 @@ const READ_ONLY_WRITER = {
 const AGENT_PERMISSION: Record<SessionAgent, AgentPermission & { [ASSISTANT_TOOLS]: 'deny' }> = {
   [SessionAgent.Planner]: {
     edit: 'deny',
+    task: 'deny',
     question: 'deny',
     webfetch: 'deny',
     external_directory: 'deny',
@@ -73,6 +86,7 @@ const AGENT_PERMISSION: Record<SessionAgent, AgentPermission & { [ASSISTANT_TOOL
   },
   [SessionAgent.Executor]: {
     edit: 'allow',
+    task: 'deny',
     question: 'deny',
     webfetch: 'ask',
     external_directory: 'deny',
@@ -80,6 +94,7 @@ const AGENT_PERMISSION: Record<SessionAgent, AgentPermission & { [ASSISTANT_TOOL
   },
   [SessionAgent.Reviewer]: {
     edit: 'deny',
+    task: 'deny',
     question: 'deny',
     webfetch: 'deny',
     external_directory: 'deny',
@@ -90,6 +105,8 @@ const AGENT_PERMISSION: Record<SessionAgent, AgentPermission & { [ASSISTANT_TOOL
   [SessionAgent.SlidesWriter]: READ_ONLY_WRITER,
   // The Git workbench's reviewer reads the user's repository and never uses the web (27 §4.3).
   [SessionAgent.CodeReviewer]: READ_ONLY_WRITER,
+  // 只读委派通过 MCP 读取固定 Git 提交，避免原生工具读到工作区外的文件。
+  [SessionAgent.Delegate]: DELEGATE_PERMISSION,
 };
 
 /**
@@ -122,6 +139,7 @@ export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
   [SessionAgent.Researcher]: [SkillName.DbReadonly],
   [SessionAgent.SlidesWriter]: [],
   [SessionAgent.CodeReviewer]: [],
+  [SessionAgent.Delegate]: [],
 };
 export const ASSISTANT_SKILLS: SkillName[] = [
   SkillName.TaskRequirement,
@@ -146,6 +164,7 @@ const AGENT_PROMPT: Record<SessionAgent, PromptName> = {
   [SessionAgent.Researcher]: PromptName.ProtocolResearch,
   [SessionAgent.SlidesWriter]: PromptName.ProtocolSlides,
   [SessionAgent.CodeReviewer]: PromptName.ProtocolCodeReview,
+  [SessionAgent.Delegate]: PromptName.ProtocolDelegate,
 };
 
 /**
@@ -263,6 +282,8 @@ export function sessionPermissionRules(
     allowedBash?: readonly string[] | undefined;
   } = {},
 ): PermissionRule[] {
+  if (base === SessionAgent.Delegate)
+    return Object.entries(DELEGATE_PERMISSION).map(([permission, action]) => ({ permission, action, pattern: '*' }));
   if (base === SessionAgent.Executor) {
     return bashPolicy === BashPolicy.Auto
       ? [...BASH_PERMISSION_PRESETS[bashPolicy]]

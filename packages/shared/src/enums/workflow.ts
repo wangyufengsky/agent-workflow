@@ -41,6 +41,7 @@ export const SessionAgent = {
   SlidesWriter: 'slides_writer',
   /** Reviews diffs and drafts commit messages in the Git workbench, read-only (27 §4.3). */
   CodeReviewer: 'code_reviewer',
+  Delegate: 'delegate',
 } as const;
 export type SessionAgent = (typeof SessionAgent)[keyof typeof SessionAgent];
 

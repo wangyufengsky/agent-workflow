@@ -18,7 +18,7 @@ import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { StatusBadge } from '../../components/status-badge.tsx';
 import { Tabs } from '../../components/tabs.tsx';
-import { STREAM_COPY } from '../../copy/attempts.ts';
+import { ATTEMPT_KIND_LABEL, STREAM_COPY } from '../../copy/attempts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DIFF_COPY } from '../../copy/diff.ts';
 import { NODE_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
@@ -123,6 +123,41 @@ export function Output({ node }: { node: NodeDetailDTO }) {
           </ul>
         </>
       )}
+      {result?.handoff !== undefined && (
+        <details open>
+          <summary>{C.handoff}</summary>
+          {result.handoff.facts.length > 0 && (
+            <>
+              <h4>{C.handoffFacts}</h4>
+              <ul>
+                {result.handoff.facts.map(({ text, evidence }) => (
+                  <li key={`${text}:${evidence}`}>
+                    {text} <span className="hint">{evidence}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {(
+            [
+              [C.handoffDecisions, result.handoff.decisions],
+              [C.handoffQuestions, result.handoff.openQuestions],
+            ] as const
+          ).map(
+            ([heading, lines]) =>
+              lines.length > 0 && (
+                <div key={heading}>
+                  <h4>{heading}</h4>
+                  <ul>
+                    {lines.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
+              ),
+          )}
+        </details>
+      )}
       {result?.notes !== undefined && (
         <>
           <h3 className="sec-t">{C.notes}</h3>
@@ -207,14 +242,22 @@ export function Process({ node }: { node: NodeDetailDTO }) {
   if (attempt === undefined) return <p className="hint">{C.noAttempt}</p>;
   const attempts = node.attempts
     .slice(node.attempts.indexOf(attempt))
-    .filter((a) => a.kind === AttemptKind.Execute || a.kind === AttemptKind.Review);
+    .filter(
+      (a) => a.kind === AttemptKind.Execute || a.kind === AttemptKind.Review || a.kind === AttemptKind.Delegation,
+    );
   return (
     <div className="col">
       {attempts.map((a) => (
         <ConversationStream
           key={a.id}
           attemptId={a.id}
-          title={a.kind === AttemptKind.Review ? STREAM_COPY.reviewTitle : STREAM_COPY.processTitle}
+          title={
+            a.kind === AttemptKind.Delegation
+              ? ATTEMPT_KIND_LABEL[AttemptKind.Delegation]
+              : a.kind === AttemptKind.Review
+                ? STREAM_COPY.reviewTitle
+                : STREAM_COPY.processTitle
+          }
           pro={false}
           size="drawer"
           foldOnEnd

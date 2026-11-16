@@ -5,6 +5,9 @@ export const McpToolName = {
   GetTaskContext: 'get_task_context',
   GetNodeOutput: 'get_node_output',
   GetTaskDiff: 'get_task_diff',
+  DelegateReadonly: 'delegate_readonly',
+  InspectDelegation: 'inspect_delegation',
+  SubmitDelegation: 'submit_delegation',
   ReadAttachment: 'read_attachment',
   ReadSheet: 'read_sheet',
   QuerySheet: 'query_sheet',
@@ -51,4 +54,5 @@ export const ATTEMPT_SUBMIT_TOOL = {
   [AttemptKind.CommitMessage]: McpToolName.SubmitCommitMessage,
   [AttemptKind.TeamAnalysis]: McpToolName.SubmitMemberAnalysis,
   [AttemptKind.Breakdown]: McpToolName.SubmitBreakdown,
+  [AttemptKind.Delegation]: McpToolName.SubmitDelegation,
 } as const satisfies Record<AttemptKind, McpToolName>;

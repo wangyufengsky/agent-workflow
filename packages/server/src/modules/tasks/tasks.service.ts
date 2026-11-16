@@ -34,6 +34,7 @@ import { createTaskChanges } from './tasks.changes.ts';
 import { createTaskChecks } from './tasks.checks.ts';
 import { createTaskContext } from './tasks.context.ts';
 import { createConventionEvidence } from './tasks.conventions.ts';
+import { createTaskDelegation } from './tasks.delegation.ts';
 import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
@@ -47,6 +48,7 @@ import { createTaskState, type TasksServiceDeps } from './tasks.state.ts';
 export function createTasksService(deps: TasksServiceDeps & { events: EventBus }) {
   const { db, plans, nodes, attempts, inbox, worktrees, workflows } = deps;
   const state = createTaskState(deps);
+  const delegation = createTaskDelegation(deps, state);
   // A finished verify step's conclusions are written with it (31 §2.2).
   nodes.onVerified((node, commitSha) => state.verify.record(node, commitSha));
   const lifecycle = createTaskLifecycle(deps, state);
@@ -404,6 +406,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     deleteProject: actions.deleteProject,
     deleteWorkflow: actions.deleteWorkflow,
     deleteRole: actions.deleteRole,
+    ...delegation,
     ...context,
     ...requirements,
     submitPlan: lifecycle.submitPlan,

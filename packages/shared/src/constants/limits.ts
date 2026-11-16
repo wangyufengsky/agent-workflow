@@ -17,6 +17,16 @@ export const DIFF_FILE_MAX_BYTES = 1_048_576;
 export const REPORT_PROGRESS_MAX_CHARS = 200;
 /** `submit_result` summary (12 §6.5). */
 export const RESULT_SUMMARY_MAX_CHARS = 4000;
+export const NODE_HANDOFF_ITEMS_MAX = 3;
+export const NODE_HANDOFF_ITEM_MAX_CHARS = 300;
+export const UPSTREAM_HANDOFF_MAX_CHARS = 5000;
+export const DELEGATION_MAX_CHILDREN = 2;
+export const DELEGATION_QUESTION_MAX_CHARS = 600;
+export const DELEGATION_SUMMARY_MAX_CHARS = 2000;
+export const DELEGATION_TIMEOUT_MS = 45_000;
+export const DELEGATION_READ_MAX_CHARS = 6000;
+export const DELEGATION_PATHS_MAX = 80;
+export const DELEGATION_SOURCES_MAX = 12;
 /** A task title taken from the requirement's first line is cut to this length. */
 export const TASK_TITLE_MAX_CHARS = 80;
 /** The user's notes for an AGENTS.md task (40 §6). */

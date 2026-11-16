@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { acceptanceCheckKindSchema } from '../../enums/task.ts';
+import { nodeHandoffOutputSchema } from './node-handoff.ts';
 
 /** `get_node_output` (12 §6.2). */
 export const getNodeOutputInputSchema = z.object({
@@ -12,6 +13,7 @@ export const getNodeOutputOutputSchema = z.object({
   changes: z.array(z.object({ path: z.string(), description: z.string() })),
   notes: z.string().optional(),
   assumptions: z.array(z.string()),
+  handoff: nodeHandoffOutputSchema.optional(),
   checkResults: z.array(z.object({ kind: acceptanceCheckKindSchema, passed: z.boolean(), output: z.string() })),
 });
 export type NodeOutput = z.infer<typeof getNodeOutputOutputSchema>;

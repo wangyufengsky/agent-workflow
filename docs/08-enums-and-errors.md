@@ -38,7 +38,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `TaskStatus` | `draft` · `preparing` · `planning` · `plan_review` · `running` · `paused` · `review` · `merging` · `completed` · `failed` · `cancelled` |
 | `TaskFailedPhase` | `preparing` · `planning` · `running` · `merging` |
 | `NodeStatus` | `pending` · `ready` · `running` · `waiting_input` · `verifying` · `awaiting_acceptance` · `done` · `failed` · `skipped` · `cancelled` |
-| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2）· `deck_outline`（PPT 的大纲）· `deck_slides`（PPT 的若干页：制作或修改，23 §4；两者在同一个会话中，`continueSession` 可换 kind）· `git_review`（Git 工作台的 AI 审查，不属于任务，27 §4.3）· `commit_message`（AI 草拟提交信息，27 §7.3）· `team_analysis`（团队页的 AI 成员分析，不属于任务，33 §6.3）· `breakdown`（需求计划的 AI 拆解、重新拆解与细化，不属于任务，由 `initiative_runs` 指向，34 §8） |
+| `AttemptKind` | `plan`（规划会话）· `execute`（节点执行会话）· `review`（AI 评审验收会话）· `research`（知识问答的一轮，不属于任务，18 §5.2）· `deck_outline`（PPT 的大纲）· `deck_slides`（PPT 的若干页：制作或修改，23 §4；两者在同一个会话中，`continueSession` 可换 kind）· `git_review`（Git 工作台的 AI 审查，不属于任务，27 §4.3）· `commit_message`（AI 草拟提交信息，27 §7.3）· `team_analysis`（团队页的 AI 成员分析，不属于任务，33 §6.3）· `breakdown`（需求计划的 AI 拆解、重新拆解与细化，不属于任务，由 `initiative_runs` 指向，34 §8）· `delegation`（步骤的只读委派，12 §6.18） |
 | `AttemptStatus` | `queued`（等模型额度，D186）· `starting` · `running` · `succeeded` · `failed` · `aborted` · `interrupted`；未结束的三种为 `ACTIVE_ATTEMPT_STATUSES` |
 | `PlanStatus` | `draft` · `confirmed` · `superseded` |
 | `PlanSource` | `ai` · `template` · `user` |

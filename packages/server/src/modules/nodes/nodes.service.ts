@@ -43,6 +43,17 @@ function toSummary(node: Node): NodeSummaryDTO {
   };
 }
 
+/** 使用已验收的节点结果和它的实际尝试。 */
+function handoffOf(node: Node): NodeOutput['handoff'] {
+  const { result } = node;
+  if (node.status !== NodeStatus.Done || result?.handoff === undefined || result.handoffAttemptId === undefined) return;
+  return {
+    content: result.handoff,
+    attemptId: result.handoffAttemptId,
+    commitSha: node.commitSha ?? result.handoffCommitSha ?? null,
+  };
+}
+
 /** Nodes of the confirmed plan (10 §nodes) and their state machine (09 §3); execution is in `nodes.run.ts`. */
 export function createNodesService(deps: NodesServiceDeps) {
   const { db, unit, clock, log, inbox, roles } = deps;
@@ -153,6 +164,8 @@ export function createNodesService(deps: NodesServiceDeps) {
       };
     },
 
+    handoff: handoffOf,
+
     /** `get_node_output` (12 §6.2): the full result of a finished node. */
     output(taskId: string, key: string): NodeOutput {
       const node = repo.findByKey(taskId, key);
@@ -160,6 +173,7 @@ export function createNodesService(deps: NodesServiceDeps) {
         throw new AppError(ErrorCode.McpNodeNotFound, `No finished step ${key}`, { node_key: key });
       }
       const { result } = node;
+      const handoff = handoffOf(node);
       return {
         key: node.key,
         title: node.title,
@@ -167,6 +181,7 @@ export function createNodesService(deps: NodesServiceDeps) {
         changes: result.changes ?? [],
         ...(result.notes === undefined ? {} : { notes: result.notes }),
         assumptions: result.assumptions ?? [],
+        ...(handoff === undefined ? {} : { handoff }),
         checkResults: (node.checkResults ?? []).map(({ kind, passed, output }) => ({ kind, passed, output })),
       };
     },
