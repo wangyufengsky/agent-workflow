@@ -1,11 +1,14 @@
 import { expect } from '@playwright/test';
 import { test } from './assistant-fixtures.ts';
-import { createProject, patchSettings, queueAssistantTurn } from './helpers.ts';
+import { appTool, createProject, patchSettings, queueAssistantTurn } from './helpers.ts';
 
 test('超限后续接项目对话、选择附件、回看来源并编辑后发送', async ({ page, request }, testInfo) => {
-  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple' });
+  await patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple', 'assistant.alwaysAllow': [] });
   const project = await createProject(request, null);
-  await queueAssistantTurn(request, [{ type: 'text', text: '已确认使用 SQLite。' }]);
+  await queueAssistantTurn(request, [
+    appTool('projects_update', { id: project.id, checkCommand: 'pnpm test' }),
+    { type: 'text', text: '已确认使用 SQLite。' },
+  ]);
   await queueAssistantTurn(request, [{ type: 'error', name: 'ContextOverflowError', message: 'context too long' }]);
   await page.goto(`/?assistantProjectId=${project.id}`);
   const input = page.getByLabel('告诉助手，或开始任务');
@@ -38,6 +41,10 @@ test('超限后续接项目对话、选择附件、回看来源并编辑后发�
   const history = page.getByRole('dialog', { name: '查看续接前的消息' });
   await expect(history).toContainText('已确认使用 SQLite。');
   await expect(history).toContainText('请检查这项迁移');
+  const oldConfirmation = history.getByTestId('historical-confirmation');
+  await expect(oldConfirmation).toContainText('等待确认');
+  await expect(oldConfirmation).toContainText('pnpm test');
+  await expect(history.getByRole('button', { name: '确认', exact: true })).toHaveCount(0);
   await history.getByRole('button', { name: '关闭' }).click();
 
   await page.reload();
@@ -45,6 +52,9 @@ test('超限后续接项目对话、选择附件、回看来源并编辑后发�
   await queueAssistantTurn(request, [{ type: 'text', text: '已检查迁移。' }]);
   await input.fill('只检查新增字段');
   await input.press('ControlOrMeta+Enter');
+  await expect(page.getByTestId('home-messages')).toContainText('已检查迁移。');
+  await expect(input).toHaveValue('');
+  await page.reload();
   await expect(page.getByTestId('home-messages')).toContainText('已检查迁移。');
   await expect(input).toHaveValue('');
 

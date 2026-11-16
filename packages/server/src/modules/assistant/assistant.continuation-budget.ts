@@ -3,6 +3,7 @@ import type { OpencodeClient } from '../opencode/index.ts';
 import { CONTINUATION_RECENT_HEADING } from './assistant.continuation-context.ts';
 
 const REPLY_RESERVE_TOKENS = 4096;
+const UNKNOWN_CONTEXT_LIMIT = 16_384;
 
 /** Metadata can be unavailable for a provider; use the fixed conservative limit in that case. */
 export async function continuationBudget(
@@ -11,22 +12,15 @@ export async function continuationBudget(
   system: string,
   userText: string,
 ): Promise<number> {
-  try {
-    const models = await opencode.listModels();
-    const key = model ?? models.defaultModel;
-    const selected = models.available.find((m) => `${m.providerId}/${m.modelId}` === key);
-    if (selected?.contextLimit == null) return ASSISTANT_CONTINUATION_MAX_CHARS;
-    // A character per token is conservative for mixed Chinese and English; reserve a full reply first.
-    return Math.max(
-      0,
-      Math.min(
-        ASSISTANT_CONTINUATION_MAX_CHARS,
-        selected.contextLimit - REPLY_RESERVE_TOKENS - system.length - userText.length,
-      ),
-    );
-  } catch {
-    return ASSISTANT_CONTINUATION_MAX_CHARS;
-  }
+  const models = await opencode.listModels();
+  const key = model ?? models.defaultModel;
+  const selected = models.available.find((m) => `${m.providerId}/${m.modelId}` === key);
+  const limit = selected?.contextLimit ?? UNKNOWN_CONTEXT_LIMIT;
+  // 按字符估算混合语言输入，为系统上下文、当前输入及回复保留空间。
+  return Math.max(
+    0,
+    Math.min(ASSISTANT_CONTINUATION_MAX_CHARS, limit - REPLY_RESERVE_TOKENS - system.length - userText.length),
+  );
 }
 
 /** Keep whole quoted lines, prioritising recent history and preserving the historical-data warning. */

@@ -34,7 +34,8 @@ export function Composer({
   projectId: string | null;
   onProjectChange: (id: string | null) => void;
 }) {
-  const [text, setText] = useState(conversation?.continuation?.draftText ?? '');
+  const continuation = conversation?.continuation;
+  const [text, setText] = useState(continuation?.consumedAt === null ? (continuation.draftText ?? '') : '');
   const projects = useQuery(projectsQuery).data ?? [];
   const files = useAttachmentDraft();
   const boundId = conversation === undefined ? projectId : conversation.projectId;

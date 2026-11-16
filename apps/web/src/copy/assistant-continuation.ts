@@ -15,6 +15,11 @@ export const ASSISTANT_CONTINUATION_COPY = {
   recentOnly: '交接内容只带了近期消息。',
   overflow: '这次对话已超出模型的上下文容量。',
   recoveredDraft: '已带入上次未能处理的消息，可编辑后发送。',
+  historicalConfirmation: '历史确认',
+  currentSourceStatus: (status: string) => `来源对话中的当前状态：${status}（仅供查看）`,
+  confirmationUnavailable: (id: string) => `历史确认 ${id} 不可用`,
+  resultNotLoaded: '当前已加载的历史中没有结果',
+  historicalPermission: '历史权限请求（仅供查看）',
   user: '你',
   assistant: '助手',
 } as const;

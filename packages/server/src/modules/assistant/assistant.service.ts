@@ -932,23 +932,24 @@ export function createAssistantService(deps: AssistantServiceDeps) {
               : [];
           const selected = [...new Map([...inherited, ...sent].map((a) => [a.id, a])).values()];
           const section = attachments.promptSection(selected, MCP_ASSISTANT_TOOL_PREFIX);
+          const updates = queued.map((m) => m.text);
           const handoff =
-            continuation !== undefined && continuation.consumedAt === null
+            continuation !== undefined && continuation.consumedAt === null && continuation.handoffText !== ''
               ? fitContinuation(
                   continuation.handoffText,
-                  await continuationBudget(opencode, model, systemText, text + section),
+                  await continuationBudget(opencode, model, systemText, [...updates, text, section].join('\n\n')),
                 )
               : '';
+          if (!usage.isRunning(id) || state.stopping || state.deleting)
+            throw new AppError(
+              ErrorCode.AssistantBusy,
+              'Assistant stopped before the message was sent; your draft is retained',
+            );
           await prompt(
             c,
             sessionId,
             systemText,
-            [
-              ...queued.map((m) => m.text),
-              ...(handoff === '' ? [] : [handoff]),
-              text,
-              ...(section === '' ? [] : [section]),
-            ].join('\n\n'),
+            [...updates, ...(handoff === '' ? [] : [handoff]), text, ...(section === '' ? [] : [section])].join('\n\n'),
             model,
             turn,
           );

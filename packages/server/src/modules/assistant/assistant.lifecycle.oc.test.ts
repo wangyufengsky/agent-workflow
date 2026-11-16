@@ -134,7 +134,7 @@ it('@opencode 续接在新模型会话发送绑定项目和旧决定，下一轮
     );
     await idle;
   }
-  await send(source.id, '已决定保留归并策略，后续检查任务 T-931');
+  await send(source.id, '就按方案 B 做，后续检查任务 T-931');
   for (const text of ['处理认证', '处理集成', '处理文档']) await send(source.id, text);
   const child = (
     await t.call(createAssistantContinuationOp, { id: source.id, requestId: randomUUID(), attachmentIds: [] })
@@ -145,7 +145,7 @@ it('@opencode 续接在新模型会话发送绑定项目和旧决定，下一轮
   const latest = continuationRequests.at(-2);
   expect(latest?.filter((message) => message.role === 'user')).toHaveLength(1);
   expect(JSON.stringify(latest)).toContain(project.id);
-  expect(JSON.stringify(latest?.at(-1))).toContain('已决定保留归并策略，后续检查任务 T-931');
+  expect(JSON.stringify(latest?.at(-1))).toContain('就按方案 B 做，后续检查任务 T-931');
   expect(JSON.stringify(continuationRequests.at(-1)?.at(-1))).not.toContain('T-931');
 });
 

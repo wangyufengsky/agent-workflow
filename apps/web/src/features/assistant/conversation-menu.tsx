@@ -49,6 +49,15 @@ export function ConversationMenu({
               menu.current?.hidePopover();
             }}
           >
+            {c.continuation !== null && (
+              <span
+                role="img"
+                aria-label={ASSISTANT_CONTINUATION_COPY.action}
+                title={ASSISTANT_CONTINUATION_COPY.action}
+              >
+                <Icon name="split" size="sm" />
+              </span>
+            )}
             <span className="ellipsis grow">{titleOf(c)}</span>
             {c.busy && <Character size="xs" mood="thinking" />}
             {!draft && c.id === active.id && <Icon name="check" size="sm" />}

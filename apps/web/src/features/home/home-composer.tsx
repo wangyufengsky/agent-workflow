@@ -72,7 +72,10 @@ export function HomeComposer({
 }) {
   const workflows = useQuery(workflowsQuery);
   const templates = useQuery(initiativeTemplatesQuery);
-  const [text, setText] = useState(initialRequirement ?? conversation?.continuation?.draftText ?? '');
+  const continuation = conversation?.continuation;
+  const [text, setText] = useState(
+    initialRequirement ?? (continuation?.consumedAt === null ? continuation.draftText : null) ?? '',
+  );
   const [workflowKey, setWorkflowKey] = useState(initialWorkflowKey);
   const [templateKey, setTemplateKey] = useState<string>();
   // 「让 AI 拆解」: an initiative the AI breaks down, instead of one made from a template (34 §5.1).

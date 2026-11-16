@@ -1,8 +1,11 @@
 import {
+  type AssistantConfirmationDTO,
   type AssistantConversationDTO,
   getAssistantContinuationHistoryOp,
+  OPERATION_CONTRACTS,
   type TranscriptEntry,
   TranscriptEntryKind,
+  UiMode,
 } from '@aw/shared';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
@@ -12,18 +15,54 @@ import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
+import { CONFIRMATION_COPY } from '../../copy/assistant.ts';
 import { ASSISTANT_CONTINUATION_COPY as C } from '../../copy/assistant-continuation.ts';
+import { ATTEMPT_COPY, STREAM_COPY, TRANSCRIPT_SYSTEM_LABEL } from '../../copy/attempts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
+import { operationTitle } from '../../copy/operations.ts';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { transcriptEntries } from '../attempts/attempt.queries.ts';
-import { conversationsQuery } from './assistant.queries.ts';
+import { useSettings } from '../settings/settings.queries.ts';
+import { thinkingSeconds } from '../stream/stream-items.ts';
+import { ThinkingBlock } from '../stream/thinking-block.tsx';
+import { confirmationsQuery, conversationsQuery } from './assistant.queries.ts';
+import { ChartCard } from './chart-card.tsx';
 import styles from './conversation-continuation.module.css';
 import { assistantAttachmentsQuery, useContinueConversation } from './conversation-continuation.tsx';
 import { titleOf } from './conversation-menu.tsx';
+import { InputSummary } from './input-summary.tsx';
 import { ReplyMarkdown } from './reply-markdown.tsx';
+import { describeTool } from './tool-label.ts';
+import { type ToolResult, ToolRow } from './tool-row.tsx';
 
-function HistoryMessage({ entry }: { entry: TranscriptEntry }) {
+function HistoryConfirmation({ confirmation, id }: { confirmation: AssistantConfirmationDTO | undefined; id: string }) {
+  if (confirmation === undefined) return <p className="hint">{C.confirmationUnavailable(id)}</p>;
+  const operation = OPERATION_CONTRACTS.find((item) => item.id === confirmation.operationId);
+  return (
+    <section aria-label={C.historicalConfirmation} data-testid="historical-confirmation">
+      <strong>
+        {C.historicalConfirmation}：{operationTitle(confirmation.title)}
+      </strong>
+      <p>{C.currentSourceStatus(CONFIRMATION_COPY.status[confirmation.status])}</p>
+      {operation !== undefined && <InputSummary operation={operation} input={confirmation.input} />}
+    </section>
+  );
+}
+
+function HistoryMessage({
+  entry,
+  results,
+  confirmations,
+  pro,
+  seconds,
+}: {
+  entry: TranscriptEntry;
+  results: ReadonlyMap<string, ToolResult>;
+  confirmations: ReadonlyMap<string, AssistantConfirmationDTO>;
+  pro: boolean;
+  seconds: ReadonlyMap<string, number>;
+}) {
   switch (entry.kind) {
     case TranscriptEntryKind.UserMessage:
       return (
@@ -41,6 +80,57 @@ function HistoryMessage({ entry }: { entry: TranscriptEntry }) {
           <ReplyMarkdown source={entry.data.text} />
         </li>
       );
+    case TranscriptEntryKind.Reasoning:
+      return (
+        <li>
+          <ThinkingBlock text={entry.data.text} seconds={seconds.get(entry.partId)} writing={false} />
+        </li>
+      );
+    case TranscriptEntryKind.ToolCall: {
+      const result = results.get(entry.data.callId);
+      if (result === undefined)
+        return (
+          <li className="hint">
+            {describeTool(entry.data.tool, entry.data.input).title} · {C.resultNotLoaded}
+          </li>
+        );
+      return (
+        <li>
+          <ToolRow call={entry} result={result} busy={false} pro={pro} />
+        </li>
+      );
+    }
+    case TranscriptEntryKind.ToolResult:
+      return null;
+    case TranscriptEntryKind.Permission:
+      return (
+        <li className="hint">
+          {C.historicalPermission} · {ATTEMPT_COPY.permission(entry.data.permission, entry.data.patterns.join(' '))}
+        </li>
+      );
+    case TranscriptEntryKind.Confirmation:
+      return (
+        <li>
+          <HistoryConfirmation
+            id={entry.data.confirmationId}
+            confirmation={confirmations.get(entry.data.confirmationId)}
+          />
+        </li>
+      );
+    case TranscriptEntryKind.Chart:
+      return (
+        <li>
+          <ChartCard chart={entry.data.chart} fresh={false} />
+        </li>
+      );
+    case TranscriptEntryKind.System: {
+      const label = TRANSCRIPT_SYSTEM_LABEL[entry.data.event];
+      return (
+        <li className="hint">
+          {entry.data.detail === undefined ? label : STREAM_COPY.noticeDetail(label, entry.data.detail)}
+        </li>
+      );
+    }
     case TranscriptEntryKind.Error:
       return <li className="hint">{ERROR_COPY[entry.data.code]}</li>;
     case TranscriptEntryKind.EntityRef:
@@ -52,7 +142,9 @@ function HistoryMessage({ entry }: { entry: TranscriptEntry }) {
   }
 }
 
-function SourceHistory({ id }: { id: string }) {
+function SourceHistory({ id, sourceId }: { id: string; sourceId: string }) {
+  const confirmations = useQuery(confirmationsQuery(sourceId));
+  const pro = useSettings()['ui.mode'] === UiMode.Pro;
   const history = useInfiniteQuery({
     queryKey: queryKeys.assistantContinuationHistory(id),
     queryFn: ({ pageParam }) => callOperation(getAssistantContinuationHistoryOp, { id, afterSeq: pageParam }),
@@ -60,8 +152,23 @@ function SourceHistory({ id }: { id: string }) {
     getNextPageParam: (page) => (page.hasMore ? page.lastSeq : undefined),
   });
   const entries = useMemo(() => transcriptEntries(history.data?.pages ?? [], []), [history.data]);
+  const results = useMemo(
+    () =>
+      new Map(
+        entries.flatMap((entry) =>
+          entry.kind === TranscriptEntryKind.ToolResult ? [[entry.data.callId, entry] as const] : [],
+        ),
+      ),
+    [entries],
+  );
+  const confirmationMap = useMemo(
+    () => new Map((confirmations.data ?? []).map((item) => [item.id, item])),
+    [confirmations.data],
+  );
+  const seconds = useMemo(() => thinkingSeconds(entries), [entries]);
   return (
     <>
+      {confirmations.isError && <ErrorState error={confirmations.error} onRetry={() => void confirmations.refetch()} />}
       {history.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
       {history.isError && (
         <ErrorState
@@ -72,7 +179,14 @@ function SourceHistory({ id }: { id: string }) {
       {history.isSuccess && entries.length === 0 && <p className="hint">{C.empty}</p>}
       <ol className={styles.history}>
         {entries.map((entry) => (
-          <HistoryMessage entry={entry} key={'partId' in entry ? entry.partId : entry.seq} />
+          <HistoryMessage
+            entry={entry}
+            results={results}
+            confirmations={confirmationMap}
+            pro={pro}
+            seconds={seconds}
+            key={'partId' in entry ? entry.partId : entry.seq}
+          />
         ))}
       </ol>
       {history.hasNextPage && (
@@ -138,7 +252,7 @@ export function ContinuationSource({ conversation }: { conversation: AssistantCo
             </>
           }
         >
-          <SourceHistory id={conversation.id} />
+          <SourceHistory id={conversation.id} sourceId={continuation.sourceConversationId} />
         </Dialog>
       )}
     </section>
