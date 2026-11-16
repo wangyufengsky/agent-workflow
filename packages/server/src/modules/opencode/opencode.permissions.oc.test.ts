@@ -3,10 +3,25 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BashPolicy, ErrorCode, OPENCODE_AGENT_NAME, type PermissionAction, RoleBaseAgent } from '@aw/shared';
+import {
+  AttemptKind,
+  AttemptStatus,
+  BashPolicy,
+  cancelTaskOp,
+  ErrorCode,
+  getNodeOp,
+  MCP_TOOL_PREFIX,
+  McpToolName,
+  NodeStatus,
+  OPENCODE_AGENT_NAME,
+  type PermissionAction,
+  RoleBaseAgent,
+  updateSettingsOp,
+} from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { createTestRepo, type TestRepo } from '../../../test/helpers/git.ts';
+import { addProject, createTask, nodeReaches } from '../../../test/helpers/tasks.ts';
 import { sessionPermissionRules } from './opencode.config.ts';
 import { OpencodeEventType, ToolCallStatus } from './opencode.events.ts';
 
@@ -16,9 +31,18 @@ import { OpencodeEventType, ToolCallStatus } from './opencode.events.ts';
  * a prompt `RUN: <command>` with a bash call of that command, and the call's result with a short text.
  */
 const PROVIDER = 'aw-scripted';
+const PROJECT_PROVIDER = 'aw-project-scripted';
 const MODEL = 'scripted';
 const RUN = 'RUN: ';
 const PROJECT_PATTERNS = ['./scripts/check.sh -q *'];
+const PROBE_PARENT = 'VERIFY_MANAGED_DELEGATION';
+const PROBE_CHILD = 'FIND_COMMITTED_PROBE';
+const PROBE_EVIDENCE = 'sample-repository-marker';
+const PROJECT_INSTRUCTION = 'project-instruction-marker';
+const advertisedParent = new Set<string>();
+const advertisedChild = new Set<string>();
+const childReads: string[] = [];
+const childPrompts: string[] = [];
 
 const ALLOWED = [
   './scripts/check.sh -q 2>&1 | tail -5',
@@ -42,7 +66,11 @@ function textOf(message: ChatMessage): string {
   return (message.content ?? []).map((p) => p.text ?? '').join('');
 }
 
-async function bodyOf(req: IncomingMessage): Promise<{ messages: ChatMessage[]; stream?: boolean }> {
+async function bodyOf(req: IncomingMessage): Promise<{
+  messages: ChatMessage[];
+  stream?: boolean;
+  tools?: Array<{ function: { name: string } }>;
+}> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
@@ -51,23 +79,48 @@ async function bodyOf(req: IncomingMessage): Promise<{ messages: ChatMessage[]; 
 /** Answers the latest `RUN:` prompt with a bash call, a tool result (or anything else) with text. */
 function scriptedModel(): Server {
   return createServer((req, res) => {
-    void bodyOf(req).then(({ messages, stream }) => {
+    void bodyOf(req).then(({ messages, stream, tools }) => {
       const last = messages.at(-1);
       const prompt = last?.role === 'user' ? textOf(last) : '';
       const command = prompt.includes(RUN) ? prompt.slice(prompt.indexOf(RUN) + RUN.length).trim() : undefined;
+      const hasProbe = (marker: string) => messages.some((m) => m.role === 'user' && textOf(m).includes(marker));
+      const names = (tools ?? []).map((tool) => tool.function.name);
+      const operation = (name: McpToolName, args: Record<string, unknown>) => ({
+        name: `${MCP_TOOL_PREFIX}${name}`,
+        args,
+      });
+      let calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+      if (hasProbe(PROBE_CHILD)) {
+        for (const name of names) advertisedChild.add(name);
+        childPrompts.push(...messages.map(textOf));
+        if (last?.role === 'tool') {
+          childReads.push(textOf(last));
+          calls = [operation(McpToolName.SubmitDelegation, { summary: 'src.ts:1 contains the sample marker' })];
+        } else calls = [operation(McpToolName.InspectDelegation, { action: 'read', path: 'src.ts' })];
+      } else if (hasProbe(PROBE_PARENT)) {
+        for (const name of names) advertisedParent.add(name);
+        calls =
+          last?.role === 'tool'
+            ? [operation(McpToolName.SubmitResult, { summary: 'Received the managed delegation', notes: textOf(last) })]
+            : [operation(McpToolName.DelegateReadonly, { questions: [PROBE_CHILD] })];
+      } else if (command !== undefined) {
+        calls = command
+          .split('\n')
+          .map((command) => ({ name: 'bash', args: { command, description: 'Run the command' } }));
+      }
       const delta =
-        command === undefined
+        calls.length === 0
           ? { role: 'assistant', content: 'done' }
           : {
               role: 'assistant',
-              tool_calls: command.split('\n').map((command, index) => ({
+              tool_calls: calls.map(({ name, args }, index) => ({
                 index,
                 id: `call_${Math.random().toString(36).slice(2)}`,
                 type: 'function',
-                function: { name: 'bash', arguments: JSON.stringify({ command, description: 'Run the command' }) },
+                function: { name, arguments: JSON.stringify(args) },
               })),
             };
-      const finish = command === undefined ? 'stop' : 'tool_calls';
+      const finish = calls.length === 0 ? 'stop' : 'tool_calls';
       const usage = { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 };
       const base = { id: 'chatcmpl-scripted', created: 0, model: MODEL };
       if (stream !== true) {
@@ -97,6 +150,15 @@ function scriptedModel(): Server {
   });
 }
 
+function providerFor(model: Server) {
+  return {
+    npm: '@ai-sdk/openai-compatible',
+    name: 'Scripted',
+    options: { baseURL: `http://127.0.0.1:${(model.address() as AddressInfo).port}/v1`, apiKey: 'unused' },
+    models: { [MODEL]: { name: 'Scripted', tool_call: true } },
+  };
+}
+
 let model: Server;
 let t: TestApp;
 let repo: TestRepo;
@@ -109,12 +171,7 @@ beforeAll(async () => {
     configFile,
     JSON.stringify({
       provider: {
-        [PROVIDER]: {
-          npm: '@ai-sdk/openai-compatible',
-          name: 'Scripted',
-          options: { baseURL: `http://127.0.0.1:${(model.address() as AddressInfo).port}/v1`, apiKey: 'unused' },
-          models: { [MODEL]: { name: 'Scripted', tool_call: true } },
-        },
+        [PROVIDER]: providerFor(model),
       },
     }),
   );
@@ -222,3 +279,56 @@ describe('@opencode 只读会话的 bash 规则与项目中总是允许的模式
     });
   });
 });
+
+it('@opencode 委派沿用项目模型、读取固定提交，并隔离原生工具与项目指令', async () => {
+  await t.call(updateSettingsOp, { 'ai.defaultModel': null, 'scheduler.maxConcurrentAttempts': 3 });
+  const projectModel = `${PROJECT_PROVIDER}/${MODEL}`;
+  const { project } = await addProject(t, {
+    checkCommand: null,
+    files: {
+      'src.ts': PROBE_EVIDENCE,
+      'project-rules.md': PROJECT_INSTRUCTION,
+      'opencode.json': JSON.stringify({
+        model: projectModel,
+        provider: { [PROJECT_PROVIDER]: providerFor(model) },
+        instructions: ['project-rules.md'],
+      }),
+    },
+  });
+  expect(
+    (await t.app.services.opencode.listModels()).available.some((item) => item.providerId === PROJECT_PROVIDER),
+  ).toBe(false);
+  const complete = nodeReaches(t, 'locate', NodeStatus.AwaitingAcceptance, 45_000);
+  const task = await createTask(t, {
+    projectId: project.id,
+    workflow: 'bugfix',
+    requirement: PROBE_PARENT,
+    checkpoints: { accept_each_node: true },
+  });
+  try {
+    const { node } = await complete;
+    const detail = (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
+    expect(detail.result?.notes).toContain('src.ts:1 contains the sample marker');
+    expect(detail.attempts.filter((attempt) => attempt.kind === AttemptKind.Delegation)).toMatchObject([
+      { status: AttemptStatus.Succeeded, model: projectModel },
+    ]);
+    expect(advertisedParent).toContain(`${MCP_TOOL_PREFIX}${McpToolName.DelegateReadonly}`);
+    expect(advertisedParent).not.toContain('task');
+    expect(advertisedChild).toContain(`${MCP_TOOL_PREFIX}${McpToolName.InspectDelegation}`);
+    expect(advertisedChild).toContain(`${MCP_TOOL_PREFIX}${McpToolName.SubmitDelegation}`);
+    for (const name of [
+      'bash',
+      'read',
+      'edit',
+      'write',
+      'task',
+      'webfetch',
+      `${MCP_TOOL_PREFIX}${McpToolName.DelegateReadonly}`,
+    ])
+      expect(advertisedChild).not.toContain(name);
+    expect(childReads.some((result) => result.includes(PROBE_EVIDENCE))).toBe(true);
+    expect(childPrompts.join(' ')).not.toContain(PROJECT_INSTRUCTION);
+  } finally {
+    await t.call(cancelTaskOp, { id: task.id });
+  }
+}, 60_000);

@@ -24,6 +24,7 @@ import { getNodeOutputTool } from './tools/get-node-output.tool.ts';
 import { getTaskContextTool } from './tools/get-task-context.tool.ts';
 import { getTaskDiffTool } from './tools/get-task-diff.tool.ts';
 import { readOfficeFileTool } from './tools/office-file.tool.ts';
+import { delegationTools } from './tools/readonly-delegation.tool.ts';
 import { reportProgressTool } from './tools/report-progress.tool.ts';
 import { submitAnswerTool } from './tools/submit-answer.tool.ts';
 import { submitBreakdownTool } from './tools/submit-breakdown.tool.ts';
@@ -80,6 +81,7 @@ export function createMcpModule({
     getTaskContextTool(tasks, debug),
     getNodeOutputTool(tasks),
     getTaskDiffTool(tasks),
+    ...delegationTools(tasks),
     ...attachmentTools(tasks, initiatives, attachments),
     readOfficeFileTool(office),
     submitPlanTool(tasks),

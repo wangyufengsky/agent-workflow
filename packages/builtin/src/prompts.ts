@@ -47,6 +47,7 @@ export const PromptName = {
   DeckSlidesRevise: 'deck-slides-revise',
   /** The Git workbench's reviewer: its agent prompt, a review's and a commit message draft's first message (27 §4). */
   ProtocolCodeReview: 'protocol-code-review',
+  ProtocolDelegate: 'protocol-delegate',
   StartGitReview: 'start-git-review',
   StartCommitMessage: 'start-commit-message',
   /** The same reviewer summarising one member's work for the team page (33 §6.3). */
@@ -111,6 +112,7 @@ export function loadPrompts(dir: string): Prompts {
     [PromptName.DeckSlides]: read(PromptName.DeckSlides),
     [PromptName.DeckSlidesRevise]: read(PromptName.DeckSlidesRevise),
     [PromptName.ProtocolCodeReview]: read(PromptName.ProtocolCodeReview),
+    [PromptName.ProtocolDelegate]: read(PromptName.ProtocolDelegate),
     [PromptName.StartGitReview]: read(PromptName.StartGitReview),
     [PromptName.StartCommitMessage]: read(PromptName.StartCommitMessage),
     [PromptName.StartTeamAnalysis]: read(PromptName.StartTeamAnalysis),

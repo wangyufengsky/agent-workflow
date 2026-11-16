@@ -1,4 +1,4 @@
-import { ErrorCode } from '@aw/shared';
+import { ErrorCode, getNodeOp, getTaskOp } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
@@ -29,6 +29,11 @@ describe('任务上下文类 MCP 工具（12 §6.1–6.3）', () => {
           summary: 'Wrote a',
           changes: [{ path: 'a.txt', description: 'new file' }],
           notes: 'b must read a.txt',
+          handoff: {
+            facts: [{ text: 'Sample input is checked in', evidence: 'a.txt:1' }],
+            decisions: ['Use UTF-8'],
+            openQuestions: ['Check whether blank lines are valid'],
+          },
           assumptions: ['UTF-8'],
         }),
       { title: '· a' },
@@ -75,6 +80,21 @@ describe('任务上下文类 MCP 工具（12 §6.1–6.3）', () => {
       upstream: [],
     });
     expect(planContext).not.toHaveProperty('plan');
+    const finished = (await t.call(getTaskOp, { id: task.id })).body;
+    const upstreamNode = finished.nodes.find((entry) => entry.key === 'a');
+    if (upstreamNode === undefined) throw new Error('Missing upstream node');
+    const upstream = (await t.call(getNodeOp, { id: task.id, nodeId: upstreamNode.id })).body;
+    const handoff = {
+      content: {
+        facts: [{ text: 'Sample input is checked in', evidence: 'a.txt:1' }],
+        decisions: ['Use UTF-8'],
+        openQuestions: ['Check whether blank lines are valid'],
+      },
+      attemptId: upstream.attempts[0]?.id,
+      commitSha: upstream.commitSha,
+    };
+    expect(handoff.attemptId).toBeDefined();
+    expect(handoff.commitSha).not.toBeNull();
     expect(executeContext).toMatchObject({
       attempt: { kind: 'execute' },
       node: { key: 'b', dependsOn: ['a'], acceptance: { checks: [], manual: false } },
@@ -86,9 +106,13 @@ describe('任务上下文类 MCP 工具（12 §6.1–6.3）', () => {
           { key: 'final_verify', status: 'pending' },
         ],
       },
-      upstream: [{ key: 'a', summary: 'Wrote a', changedFiles: ['a.txt'] }],
+      upstream: [{ key: 'a', summary: 'Wrote a', changedFiles: ['a.txt'], handoff }],
     });
-    expect(reviewContext).toMatchObject({ attempt: { kind: 'review' }, node: { key: 'final_verify' } });
+    expect(reviewContext).toMatchObject({
+      attempt: { kind: 'review' },
+      node: { key: 'final_verify' },
+      upstream: [{ key: 'b', summary: 'Wrote b' }],
+    });
     expect(results('ask_user')[0]?.result).toMatchObject({ code: ErrorCode.McpToolNotAllowed });
 
     const [output, missing] = results('get_node_output').map((c) => c.result);
@@ -99,6 +123,7 @@ describe('任务上下文类 MCP 工具（12 §6.1–6.3）', () => {
       changes: [{ path: 'a.txt', description: 'new file' }],
       notes: 'b must read a.txt',
       assumptions: ['UTF-8'],
+      handoff,
       checkResults: [],
     });
     expect(missing).toMatchObject({ code: ErrorCode.McpNodeNotFound, hint: expect.stringContaining('finished step') });

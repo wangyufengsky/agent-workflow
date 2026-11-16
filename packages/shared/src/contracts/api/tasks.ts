@@ -64,7 +64,10 @@ export const createTaskRequestSchema = z.object({
 export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
 
 /** A node's latest `submit_result` input as stored (10 §nodes `result`). */
-export const nodeResultSchema = submitResultInputSchema;
+export const nodeResultSchema = submitResultInputSchema.extend({
+  handoffAttemptId: z.string().optional(),
+  handoffCommitSha: z.string().optional(),
+});
 export type NodeResult = z.infer<typeof nodeResultSchema>;
 
 /** One acceptance check of a node's latest verification (10 §nodes `check_results`). */

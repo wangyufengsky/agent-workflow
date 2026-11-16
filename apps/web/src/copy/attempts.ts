@@ -21,6 +21,7 @@ export const ATTEMPT_KIND_LABEL: Record<AttemptKind, string> = {
   [AttemptKind.GitReview]: 'Git 审查',
   [AttemptKind.TeamAnalysis]: '成员分析',
   [AttemptKind.Breakdown]: '需求拆解',
+  [AttemptKind.Delegation]: '只读委派',
   [AttemptKind.CommitMessage]: '草拟提交信息',
 };
 
@@ -66,6 +67,9 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.GetTaskContext]: '读取任务背景',
   [McpToolName.GetNodeOutput]: '读取前面步骤的产出',
   [McpToolName.GetTaskDiff]: '查看任务的改动',
+  [McpToolName.DelegateReadonly]: '发起只读委派',
+  [McpToolName.InspectDelegation]: '读取委派代码快照',
+  [McpToolName.SubmitDelegation]: '提交只读委派结果',
   [McpToolName.ReadAttachment]: '读取附加的资料',
   [McpToolName.ReadSheet]: '读取表格',
   [McpToolName.QuerySheet]: '查询表格',

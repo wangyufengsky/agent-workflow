@@ -4,6 +4,7 @@ import { dbTypeSchema } from '../../enums/system.ts';
 import { attemptKindSchema, nodeStatusSchema } from '../../enums/task.ts';
 import { workflowDeliverableSchema } from '../../enums/workflow.ts';
 import { nodeAcceptanceSchema, planNodeSpecSchema } from '../../workflow/plan-graph.ts';
+import { nodeHandoffOutputSchema } from './node-handoff.ts';
 
 export const getTaskContextInputSchema = z.object({});
 
@@ -52,7 +53,14 @@ export const getTaskContextOutputSchema = z.object({
     })
     .optional(),
   upstream: z.array(
-    z.object({ key: z.string(), title: z.string(), summary: z.string(), changedFiles: z.array(z.string()) }),
+    z.object({
+      key: z.string(),
+      title: z.string(),
+      summary: z.string(),
+      changedFiles: z.array(z.string()),
+      handoff: nodeHandoffOutputSchema.optional(),
+      handoffAvailable: z.literal(true).optional().describe('Fetch this handoff with get_node_output if relevant'),
+    }),
   ),
   answeredQuestions: z.array(z.object({ question: z.string(), answer: z.string() })),
   userFeedback: z.array(z.string()),

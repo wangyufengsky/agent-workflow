@@ -15,6 +15,7 @@ import {
   PLAN_MAX_NODES,
   type TaskContext,
   type TaskDiffOutput,
+  UPSTREAM_HANDOFF_MAX_CHARS,
   WorkflowPlanning,
   WorktreeStatus,
 } from '@aw/shared';
@@ -94,6 +95,7 @@ export function createTaskContext(deps: TasksServiceDeps, state: TaskState) {
       const node = attempt.nodeId === null ? undefined : all.find((n) => n.id === attempt.nodeId);
       const plan = plans.confirmed(task.id);
       const isPlanning = attempt.kind === AttemptKind.Plan && workflow.planning === WorkflowPlanning.Ai;
+      let remainingHandoffChars = UPSTREAM_HANDOFF_MAX_CHARS;
       return {
         task: {
           key: task.key,
@@ -144,21 +146,21 @@ export function createTaskContext(deps: TasksServiceDeps, state: TaskState) {
                 dependsOn: node.dependsOn,
               },
             }),
-        upstream:
-          node === undefined
-            ? []
-            : all.flatMap((n) =>
-                node.dependsOn.includes(n.key) && n.result !== null
-                  ? [
-                      {
-                        key: n.key,
-                        title: n.title,
-                        summary: n.result.summary,
-                        changedFiles: (n.result.changes ?? []).map((c) => c.path),
-                      },
-                    ]
-                  : [],
-              ),
+        upstream: all.flatMap((upstream): TaskContext['upstream'] => {
+          if (node === undefined || !node.dependsOn.includes(upstream.key) || upstream.result === null) return [];
+          const summary = {
+            key: upstream.key,
+            title: upstream.title,
+            summary: upstream.result.summary,
+            changedFiles: (upstream.result.changes ?? []).map((change) => change.path),
+          };
+          const handoff = nodes.handoff(upstream);
+          if (handoff === undefined) return [summary];
+          const size = JSON.stringify(handoff).length;
+          if (size > remainingHandoffChars) return [{ ...summary, handoffAvailable: true }];
+          remainingHandoffChars -= size;
+          return [{ ...summary, handoff }];
+        }),
         answeredQuestions: answeredQuestions(task.id),
         userFeedback: userFeedback(task.id, attempt.nodeId),
         ...(isPlanning

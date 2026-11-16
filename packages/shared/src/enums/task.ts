@@ -60,6 +60,8 @@ export const AttemptKind = {
   TeamAnalysis: 'team_analysis',
   /** Breaks a requirement into work packages and phases, or refines the ones not started (34 §8); no task. */
   Breakdown: 'breakdown',
+  /** 节点启动的只读委派，归属同一任务和节点。 */
+  Delegation: 'delegation',
 } as const;
 export type AttemptKind = (typeof AttemptKind)[keyof typeof AttemptKind];
 export const attemptKindSchema = z.enum(AttemptKind);

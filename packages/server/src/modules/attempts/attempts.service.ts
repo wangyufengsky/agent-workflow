@@ -6,7 +6,7 @@ import {
   ATTEMPT_STATUSES,
   type AttemptDTO,
   AttemptEvent,
-  type AttemptKind,
+  AttemptKind,
   AttemptStatus,
   type AttemptSummaryDTO,
   attemptMachine,
@@ -17,6 +17,7 @@ import {
   PermissionDecision,
   type PermissionPayload,
   type SessionAgent,
+  TaskEventEntity,
   type TranscriptPage,
   TranscriptSystemEvent,
 } from '@aw/shared';
@@ -24,6 +25,7 @@ import type { ModelSlots } from '../model-slots/index.ts';
 import { parseModelRef, sessionPermissionRules } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
+import { recordTaskEvent } from '../timeline/index.ts';
 import { watchSessions } from './attempts.reactions.ts';
 import type { Attempt } from './attempts.repo.ts';
 import { createSessionView } from './attempts.session-view.ts';
@@ -68,6 +70,7 @@ export type StartAttemptInput = {
   checkCommands?: readonly string[];
   /** The researcher may use the web (18 §5.1). */
   web?: boolean;
+  delegation?: { parentAttemptId: string; commit: string };
 };
 
 /** What re-attaching to a persisted session needs after a restart: the session state lived in memory. */
@@ -77,16 +80,16 @@ type ContinueInput = { id?: string; prompt: string; model?: string | null; kind?
 
 /** Attempt lifecycle (09 §4) and the session protocol (12 §4); opencode-driven end conditions are in the reactions. */
 export function createAttemptsService(deps: AttemptsServiceDeps) {
-  const { clock, opencode, settings, transcripts, projects, slots } = deps;
+  const { clock, opencode, settings, transcripts, projects, slots, unit, db } = deps;
   const state = createAttemptState(deps);
   const { repo, mustFind, move, record } = state;
   const reactions = watchSessions(state, deps);
 
-  // Interactive sessions using the model (D186): attempts of no task that do not wait for the user or the model service.
+  // 委派占用与交互会话共用的额外槽位，父节点继续占用原有调度槽位。
   slots.addCounter(
     () =>
       repo.listByStatus([AttemptStatus.Starting, AttemptStatus.Running]).filter((attempt) => {
-        if (attempt.taskId !== null) return false;
+        if (attempt.taskId !== null && attempt.kind !== AttemptKind.Delegation) return false;
         const session = state.sessionOf(attempt.id);
         return session === undefined || (!session.parked && session.modelWaitLeftMs === null);
       }).length,
@@ -252,9 +255,10 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       new Map(repo.findMany(ids).map((a) => [a.id, state.toSummary(a)])),
     isReady: (): boolean => opencode.isConnected(),
     requireReady,
+    canStartDelegation: slots.isFree,
     onSignal: state.onSignal,
 
-    /** Execute and review attempts of a node, oldest first. */
+    /** A node’s execution, review and delegation attempts, oldest first. */
     listByNode: (nodeId: string): AttemptSummaryDTO[] => repo.listByNode(nodeId).map(state.toSummary),
     /** Every active attempt, for task summaries. */
     listActiveAll: (): AttemptSummaryDTO[] => repo.listByStatus(ACTIVE_ATTEMPT_STATUSES).map(state.toSummary),
@@ -278,22 +282,35 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       requireReady();
       const id = input.id ?? randomUUID();
       const queued = waitsForSlot(id, input.taskId, () => launch(id, input));
-      repo.insert({
-        id,
-        taskId: input.taskId,
-        nodeId: input.nodeId,
-        roleId: input.roleId,
-        projectId: input.projectId,
-        kind: input.kind,
-        seq: repo.nextSeq(input),
-        status: queued ? AttemptStatus.Queued : AttemptStatus.Starting,
-        model: input.model,
-        directory: input.directory,
-        opencodeSessionId: null,
-        nudges: 0,
-        startedAt: clock.now(),
+      unit.transact(() => {
+        repo.insert({
+          id,
+          taskId: input.taskId,
+          nodeId: input.nodeId,
+          roleId: input.roleId,
+          projectId: input.projectId,
+          kind: input.kind,
+          seq: repo.nextSeq(input),
+          status: queued ? AttemptStatus.Queued : AttemptStatus.Starting,
+          model: input.model,
+          directory: input.directory,
+          opencodeSessionId: null,
+          nudges: 0,
+          startedAt: clock.now(),
+        });
+        if (input.delegation !== undefined && input.taskId !== null) {
+          recordTaskEvent(db, {
+            taskId: input.taskId,
+            entity: TaskEventEntity.Attempt,
+            entityId: id,
+            type: 'note',
+            payload: input.delegation,
+            createdAt: clock.now(),
+          });
+        }
       });
       state.publish(mustFind(id));
+      if (input.kind === AttemptKind.Delegation) slots.changed();
       return queued ? toDto(mustFind(id)) : launch(id, input);
     },
 

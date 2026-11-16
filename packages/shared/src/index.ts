@@ -45,6 +45,7 @@ export * from './contracts/mcp/get-task-diff.ts';
 export * from './contracts/mcp/names.ts';
 export * from './contracts/mcp/office-write.ts';
 export * from './contracts/mcp/read-attachment.ts';
+export * from './contracts/mcp/readonly-delegation.ts';
 export * from './contracts/mcp/report-progress.ts';
 export * from './contracts/mcp/sheets.ts';
 export * from './contracts/mcp/submit-answer.ts';

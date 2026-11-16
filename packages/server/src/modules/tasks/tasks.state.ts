@@ -34,6 +34,7 @@ import type { GitReviewsService } from '../git-reviews/index.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { NodeRunContext, NodesService } from '../nodes/index.ts';
+import type { OpencodeClient } from '../opencode/index.ts';
 import type { PlansService } from '../plans/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { RequirementsService } from '../requirements/index.ts';
@@ -61,6 +62,7 @@ export type TasksServiceDeps = {
   plans: PlansService;
   nodes: NodesService;
   attempts: AttemptsService;
+  opencode: OpencodeClient;
   attachments: AttachmentsService;
   browser: BrowserService;
   requirements: RequirementsService;

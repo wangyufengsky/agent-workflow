@@ -337,12 +337,21 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
       transition(nodeMachine, node.status, NodeEvent.ResultSubmitted, target);
       // Commit before the node counts as done, so a dependent node never starts before the commit.
       const sha = target === NodeStatus.Done ? await commit(node, ctx) : null;
+      // 只读步骤没有自己的提交，也要记录交接依据的任务分支版本。
+      const result =
+        input.handoff === undefined
+          ? input
+          : {
+              ...input,
+              handoffAttemptId: attempt.id,
+              handoffCommitSha: sha ?? (await runGit(['rev-parse', 'HEAD'], { cwd: ctx.directory })).stdout,
+            };
       unit.transact(() => {
         attempts.markSubmitted(attempt.id);
         const current = get(node.id);
         // The previous result's checks say nothing about this one; why it failed stays in retryFeedback.
         move(current, NodeEvent.ResultSubmitted, target, {
-          result: input,
+          result,
           checkResults: null,
           ...(target === NodeStatus.Done ? doneChanges(sha) : {}),
         });

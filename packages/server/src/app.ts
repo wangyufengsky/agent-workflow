@@ -378,6 +378,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   const requirements = createRequirementsModule({ db: database.db, clock });
   const tasks = createTasksModule({
+    opencode,
     gitNetwork: network.gitEnv,
     db: database.db,
     unit,
