@@ -31,12 +31,12 @@ function ProjectForm({ project }: { project: ProjectDetailDTO }) {
   const [name, setName] = useState(project.name);
   const [defaultBranch, setDefaultBranch] = useState(project.defaultBranch);
   const [checkCommand, setCheckCommand] = useState(project.checkCommand ?? '');
-  const update = useUpdateProject();
+  const update = useUpdateProject(project.id);
 
   // Saving remounts this form (keyed by the project's update time): per-call callbacks of a mutation whose
   // component unmounted never run, so the toast follows the promise. A failure shows through the mutation's state.
   const save = (changes: Omit<UpdateProjectRequest, 'id'>) =>
-    update.mutateAsync({ id: project.id, ...changes }).then(
+    update.mutateAsync(changes).then(
       () => toast(C.saved),
       () => undefined,
     );

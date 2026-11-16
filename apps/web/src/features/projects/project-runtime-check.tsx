@@ -11,6 +11,7 @@ import { callOperation } from '../../api/client.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { PROJECT_RUNTIME_COPY as C } from '../../copy/projects.ts';
+import { useProjectConfigSaving } from './projects.queries.ts';
 
 const status = {
   pending: C.pending,
@@ -47,6 +48,7 @@ export function ProjectRuntimeCheckPanel({ project }: { project: ProjectDetailDT
   const [branch, setBranch] = useState(project.defaultBranch);
   const [runCommand, setRunCommand] = useState(project.checkCommand !== null);
   const [runPreview, setRunPreview] = useState(project.preview !== null);
+  const savingConfig = useProjectConfigSaving(project.id);
   const client = useQueryClient();
   const key = ['project-runtime-check', project.id];
   const query = useQuery({
@@ -115,7 +117,12 @@ export function ProjectRuntimeCheckPanel({ project }: { project: ProjectDetailDT
           {C.stop}
         </Button>
       ) : (
-        <Button variant="primary" disabled={!branch.trim()} pending={start.isPending} onClick={() => start.mutate()}>
+        <Button
+          variant="primary"
+          disabled={!branch.trim() || savingConfig}
+          pending={start.isPending}
+          onClick={() => start.mutate()}
+        >
           {C.run}
         </Button>
       )}
