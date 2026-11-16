@@ -31,7 +31,17 @@ export const knowledgeAttachmentOriginSchema = z.object({
   readAt: z.number(),
 });
 export type KnowledgeAttachmentOrigin = z.infer<typeof knowledgeAttachmentOriginSchema>;
-export const attachmentOriginSchema = z.union([projectFileOriginSchema, knowledgeAttachmentOriginSchema]);
+export const conventionEvidenceOriginSchema = z.object({
+  kind: z.literal(AttachmentSource.ConventionEvidence),
+  projectId: z.string(),
+  readAt: z.number(),
+});
+export type ConventionEvidenceOrigin = z.infer<typeof conventionEvidenceOriginSchema>;
+export const attachmentOriginSchema = z.union([
+  projectFileOriginSchema,
+  knowledgeAttachmentOriginSchema,
+  conventionEvidenceOriginSchema,
+]);
 export type AttachmentOrigin = z.infer<typeof attachmentOriginSchema>;
 
 /** What a Word attachment holds (39 §5), as read when it was uploaded. */

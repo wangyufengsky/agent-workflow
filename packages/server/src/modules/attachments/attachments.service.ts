@@ -18,6 +18,7 @@ import {
   type AttachmentOwnerKind,
   AttachmentRejection,
   AttachmentSource,
+  type ConventionEvidenceOrigin,
   ErrorCode,
   type KnowledgeAttachmentOrigin,
   McpToolName,
@@ -312,6 +313,24 @@ export function createAttachmentsService({
           createdAt: clock.now(),
         },
         asText(bytes, name),
+      );
+    },
+
+    saveConventionEvidence(origin: ConventionEvidenceOrigin, text: string): Promise<AttachmentDTO> {
+      const bytes = Buffer.from(text, 'utf8');
+      if (bytes.length > ATTACHMENT_BYTES_MAX) throw tooLarge(AttachmentLimit.Bytes, ATTACHMENT_BYTES_MAX);
+      return save(
+        {
+          id: randomUUID(),
+          source: AttachmentSource.ConventionEvidence,
+          name: '项目约定来源.txt',
+          sizeBytes: bytes.length,
+          origin,
+          format: AttachmentFormat.Text,
+          meta: null,
+          createdAt: origin.readAt,
+        },
+        asText(bytes, '项目约定来源.txt'),
       );
     },
 

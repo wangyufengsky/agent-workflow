@@ -8,13 +8,18 @@ import {
   deliverTaskOp,
   ErrorCode,
   getTaskOp,
+  getTaskTimelineOp,
+  NodeEvent,
+  previewConventionEvidenceOp,
   ReviewCommentKind,
   reviewCommentsOp,
   reviseFromReviewOp,
   ServerEventType,
   setProjectHostingOp,
+  startAgentsMdTaskOp,
   taskDiffFileOp,
   taskDiffOp,
+  updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createFakeHosting, type FakeHosting } from '../../../test/fakes/fake-hosting.ts';
@@ -23,7 +28,7 @@ import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { testCipher } from '../../../test/helpers/cipher.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { createTestRepo } from '../../../test/helpers/git.ts';
-import { taskInReview } from '../../../test/helpers/tasks.ts';
+import { addProject, createTask, taskInReview, taskReaches } from '../../../test/helpers/tasks.ts';
 import { runGit } from '../git/index.ts';
 
 const TOKEN = 'ghp_valid';
@@ -69,6 +74,64 @@ async function reviewerCommits(origin: string, branch: string, file: string, con
 }
 
 describe('PR 审查意见回流（21）', () => {
+  it('项目约定只接受同项目的失败和审查意见，并将预览内容作为不可变任务资料', async () => {
+    const { task, branch } = await deliveredAsPullRequest({ provider: 'github', repo: 'acme/shop' });
+    hosting.addComment(branch, { author: 'reviewer', body: '数据库变更需要迁移测试 token=secretvalue' });
+    const comments = (await t.call(reviewCommentsOp, { id: task.id })).body.items;
+    const comment = comments[0];
+    if (comment === undefined) throw new Error('Missing comment');
+    await t.call(updateSettingsOp, { 'node.maxAttempts': 1 });
+    const failures = [];
+    for (const label of ['第一条失败', '第二条失败']) {
+      t.fake.enqueue(script().error('APIError', label), { title: '· 定位根因' });
+      const failed = taskReaches(t, 'failed');
+      const source = await createTask(t, { projectId: task.project.id, workflow: 'bugfix', requirement: label });
+      await failed;
+      const timeline = (await t.call(getTaskTimelineOp, { id: source.id })).body.items;
+      const event = timeline.find((e) => e.type === NodeEvent.AttemptFailed);
+      if (event === undefined) throw new Error('Missing failure event');
+      failures.push({ taskId: source.id, eventId: event.id });
+    }
+    const request = { id: task.project.id, failures, reviews: [{ taskId: task.id, commentId: comment.id }] };
+    const { body: preview } = await t.call(previewConventionEvidenceOp, request);
+    expect(preview.text).toContain('第一条失败');
+    expect(preview.text).toContain('第二条失败');
+    expect(preview.text).toContain('数据库变更需要迁移测试');
+    expect(preview.text).not.toContain('secretvalue');
+    expect(preview.suggestions.map((s) => s.text).join()).not.toContain('secretvalue');
+    expect(preview.suggestions).toHaveLength(3);
+    const { project: other } = await addProject(t);
+    expect((await t.call(previewConventionEvidenceOp, { ...request, id: other.id })).status).toBe(400);
+    expect(
+      (
+        await t.call(startAgentsMdTaskOp, {
+          id: other.id,
+          includeRules: false,
+          evidenceAttachmentId: preview.attachmentId,
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await t.call(previewConventionEvidenceOp, {
+          ...request,
+          failures: [{ taskId: task.id, eventId: failures[0]?.eventId ?? 0 }],
+        })
+      ).status,
+    ).toBe(400);
+    hosting.addComment(branch, { author: 'reviewer', body: '后续新评论' });
+    const { body: created } = await t.call(startAgentsMdTaskOp, {
+      id: task.project.id,
+      includeRules: false,
+      evidenceAttachmentId: preview.attachmentId,
+      guidance: '迁移必须有测试',
+    });
+    expect(created.attachments.map((a) => a.id)).toContain(preview.attachmentId);
+    const content = await t.request({ method: 'GET', url: `/attachments/${preview.attachmentId}/content` });
+    expect(content.body).toContain('数据库变更需要迁移测试');
+    expect(content.body).not.toContain('后续新评论');
+  });
+
   it('PR 推送后和目标分支继续前进后，历史 diff 保留推送时的范围', async () => {
     const { repo, task, branch } = await deliveredAsPullRequest({ provider: 'github', repo: 'acme/shop' });
     const base = (await repo.git('rev-parse', 'main')).trim();

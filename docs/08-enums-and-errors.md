@@ -635,7 +635,7 @@ class AppError extends Error {
 
 | 枚举／类型 | 值 |
 | --- | --- |
-| AttachmentSource | upload · project_file · knowledge_answer |
+| AttachmentSource | upload · project_file · knowledge_answer · convention_evidence |
 | AttachmentFormat（OF-01 已实现，下同） | text · docx · xlsx（看内容判断，39 §4） |
 | AttachmentRejection（`ATTACHMENT_INVALID_TYPE` 的 `details.reason`） | not_text · legacy_office（.doc / .xls）· encrypted（有打开密码）· unsupported（其他 zip） |
 | AttachmentLimit（`ATTACHMENT_TOO_LARGE` 的 `details.reason`） | bytes · count · unzipped · cells |

@@ -71,6 +71,12 @@ export function createNodesService(deps: NodesServiceDeps) {
         type: event,
         fromStatus: node.status,
         toStatus: target,
+        ...(event === NodeEvent.ChecksFailed ||
+        event === NodeEvent.CheckUnrunnable ||
+        event === NodeEvent.AttemptFailed ||
+        event === NodeEvent.Reject
+          ? { payload: { checks: (changes.checkResults ?? []).map(({ kind, passed }) => ({ kind, passed })) } }
+          : {}),
         createdAt: now,
       });
       if (isTerminalState(nodeMachine, target)) inbox.dismissOpen({ nodeId: node.id });

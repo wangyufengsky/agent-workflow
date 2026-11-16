@@ -7,6 +7,7 @@ import { ExternalLink } from '../../components/external-link.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { toast } from '../../components/toast.tsx';
 import { DELIVERY_COPY as C } from '../../copy/delivery.ts';
+import { ConventionDialog } from '../conventions/convention-dialog.tsx';
 import { reviewCommentsQuery, useReviseFromReview } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
 
@@ -113,6 +114,7 @@ export function ReviewComments({ task }: { task: TaskDetailDTO }) {
             >
               {C.reviewRevise}
             </Button>
+            <ConventionDialog task={task} reviewIds={selected} />
             <span className="hint">{C.reviewSelected(selected.length)}</span>
           </div>
           {revise.isError && <ErrorState error={revise.error} />}

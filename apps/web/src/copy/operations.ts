@@ -30,6 +30,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.projects.stopRuntimeCheck': '停止项目环境检查',
   'op.projects.update': '修改项目',
   'op.projects.agentsMd': '查看项目的 AGENTS.md',
+  'op.projects.previewConventionEvidence': '整理项目约定来源',
   'op.projects.startAgentsMdTask': '让 AI 整理项目的 AGENTS.md',
   'op.previews.get': '查看页面预览',
   'op.browser.readUrl': '读取网页文字',
