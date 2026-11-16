@@ -77,7 +77,7 @@ export function inferCheckCommand(rootFiles: ReadonlySet<string>, packageJson: u
  * script name to it, while npm needs `--` (and swallows the flag's name without it); pnpm would pass a `--` on.
  */
 const PACKAGE_MANAGERS: ReadonlyArray<{ lockfile: string; run: string; flags: string; setup: string }> = [
-  { lockfile: 'pnpm-lock.yaml', run: 'pnpm run', flags: '', setup: 'pnpm install --frozen-lockfile' },
+  { lockfile: 'pnpm-lock.yaml', run: 'pnpm run', flags: '', setup: 'CI=true pnpm install --frozen-lockfile' },
   { lockfile: 'yarn.lock', run: 'yarn run', flags: '', setup: 'yarn install --frozen-lockfile' },
   { lockfile: 'bun.lock', run: 'bun run', flags: '', setup: 'bun install --frozen-lockfile' },
   { lockfile: 'bun.lockb', run: 'bun run', flags: '', setup: 'bun install --frozen-lockfile' },

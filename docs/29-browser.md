@@ -134,7 +134,7 @@
 
 | 仓库特征 | `command` | `setupCommand` |
 | --- | --- | --- |
-| `package.json` 的 `dev` 脚本含 `vite` | pnpm：`pnpm run dev --port $PORT --strictPort`；npm：`npm run dev -- --port $PORT --strictPort`；yarn / bun：`yarn run dev` / `bun run dev` 加同样的参数（未实测） | 按锁文件：`pnpm install --frozen-lockfile` / `npm ci` / `yarn install --frozen-lockfile` |
+| `package.json` 的 `dev` 脚本含 `vite` | pnpm：`pnpm run dev --port $PORT --strictPort`；npm：`npm run dev -- --port $PORT --strictPort`；yarn / bun：`yarn run dev` / `bun run dev` 加同样的参数（未实测） | 按锁文件：`CI=true pnpm install --frozen-lockfile` / `npm ci` / `yarn install --frozen-lockfile` |
 | 其他有 `dev` 或 `start` 脚本的（含 Next、Create React App） | `<pm> run dev`（只靠 `PORT` 环境变量，Next 与 CRA 都读它） | 同上 |
 | 其他（Java、Go…） | 不推断 | — |
 
