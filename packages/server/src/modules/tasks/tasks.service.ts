@@ -378,7 +378,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
 
     checkEvidence(id: string, evidenceId: string) {
       const check = state.get(id).result?.checks.find((item) => item.evidenceId === evidenceId);
-      if (check?.evidence === undefined) throw new AppError(ErrorCode.NotFound, '检查证据不可用或结果已更新');
+      if (check?.evidence === undefined) throw new AppError(ErrorCode.NotFound, 'Check evidence is unavailable');
       return check.evidence;
     },
     ...diffs,
