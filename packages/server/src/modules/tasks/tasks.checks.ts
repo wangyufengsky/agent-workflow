@@ -7,6 +7,7 @@ import {
   TaskFailedPhase,
   TaskStatus,
 } from '@aw/shared';
+import { runGit } from '../git/index.ts';
 import type { Node } from '../nodes/index.ts';
 import type { TaskLifecycle } from './tasks.lifecycle.ts';
 import type { Task } from './tasks.repo.ts';
@@ -53,16 +54,31 @@ export function createTaskChecks(deps: TasksServiceDeps, state: TaskState, lifec
 
   return {
     /** The new command replaces the failed one; steps that submitted a result are checked again with it. */
-    async updateCheckCommand(taskId: string, command: string, updateProject: boolean): Promise<void> {
-      const { task, found } = failedOn(taskId, nodes.failedCommand, 'a check command');
-      if (updateProject) await projects.update({ id: task.projectId, checkCommand: command });
-      unit.transact(() => {
-        rewrite(
-          taskId,
-          (c) => c.kind === AcceptanceCheckKind.Command && c.command === found.command,
-          () => ({ kind: AcceptanceCheckKind.Command, command }),
-        );
-        lifecycle.retry(taskId, { recheck: (node) => nodes.failedCommand(node) !== null });
+    async updateCheckCommand(
+      taskId: string,
+      command: string,
+      updateProject: boolean,
+      expectedCommand?: string,
+    ): Promise<void> {
+      const ctx = state.runContext(state.get(taskId));
+      await deps.locks.run(ctx.repoPath, async () => {
+        await runGit(['rev-parse', '--verify', 'HEAD'], { cwd: ctx.directory });
+        unit.transact(() => {
+          const { task, found } = failedOn(taskId, nodes.failedCommand, 'a check command');
+          if (
+            state.runContext(task).directory !== ctx.directory ||
+            (expectedCommand !== undefined && found.command !== expectedCommand)
+          ) {
+            throw new AppError(ErrorCode.StateTransitionInvalid, 'The failed check or worktree changed', { taskId });
+          }
+          if (updateProject) projects.setCheckCommand(task.projectId, command);
+          rewrite(
+            taskId,
+            (c) => c.kind === AcceptanceCheckKind.Command && c.command === found.command,
+            () => ({ kind: AcceptanceCheckKind.Command, command }),
+          );
+          lifecycle.retry(taskId, { recheck: (node) => nodes.failedCommand(node) !== null });
+        });
       });
     },
 

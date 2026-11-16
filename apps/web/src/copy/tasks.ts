@@ -200,6 +200,7 @@ export const TASK_COPY = {
   editPreview: '修改页面预览设置',
   skipPageCheckBody: '跳过后，这个任务之后的步骤都不再做页面体检，结果标为「未验证」。合并前请自己打开页面确认。',
   editCheck: '修改检查命令…',
+  editRequirementsAndReverify: '修改条件并重新核验',
   editCheckTitle: '修改检查命令',
   editCheckBody: '这个任务里还没完成的步骤都改用新命令，然后用 AI 已经交的结果重新检查。',
   editCheckField: '检查命令',
@@ -212,6 +213,13 @@ export const TASK_COPY = {
   skipCheckConfirm: '跳过并继续',
   checkSkipped: '已跳过这项检查',
   // 结果卡
+  checkEvidenceHeading: '检查与证据',
+  checkEvidenceOld: '旧结果未保存此检查的证据，请查看步骤或重新核验。',
+  checkEvidenceView: '查看证据',
+  checkEvidenceClose: '收起证据',
+  checkEvidenceLoading: '正在读取证据…',
+  checkEvidenceUnavailable: '证据不可用或结果已更新，请重新打开任务。',
+  checkEvidenceCommit: (sha: string) => ` · 提交 ${sha.slice(0, 12)}`,
   resultHeadline: (steps: number, files: number, add: number, del: number) =>
     `已完成 ${steps} 个步骤 · 改动 ${files} 个文件 +${add} −${del}`,
   checksPassed: '检查全部通过',
@@ -224,6 +232,7 @@ export const TASK_COPY = {
   report: '审查报告',
   resultPending: '正在汇总结果…',
   canvasToggle: '查看步骤',
+  viewAcceptanceResult: '查看验收结果',
   // 侧栏
   sideAttention: '需要你处理',
   sideNode: '步骤',

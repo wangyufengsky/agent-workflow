@@ -15,6 +15,8 @@ export const deliveriesTable = sqliteTable(
     status: text('status').$type<DeliveryStatus>().notNull(),
     commitSha: text('commit_sha'),
     prUrl: text('pr_url'),
+    diffBase: text('diff_base'),
+    diffHead: text('diff_head'),
     /** JSON file paths. */
     conflictFiles: text('conflict_files'),
     /** JSON `ErrorInfo`. */

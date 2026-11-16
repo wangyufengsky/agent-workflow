@@ -8,6 +8,7 @@ import {
 } from '../contracts/api/delivery.ts';
 import { diffSchema, fileDiffSchema } from '../contracts/api/git.ts';
 import {
+  checkResultSchema,
   createTaskRequestSchema,
   listTasksQuerySchema,
   nodeDetailSchema,
@@ -118,7 +119,12 @@ export const updateCheckCommandOp = defineOperationContract({
   title: 'op.tasks.updateCheckCommand',
   description:
     "Replace the check command a failed task's step failed on in the task's unfinished steps (and the project's check command when updateProject), then check the submitted result again",
-  input: z.object({ id: z.string(), command: z.string().trim().min(1), updateProject: z.boolean() }),
+  input: z.object({
+    id: z.string(),
+    command: z.string().trim().min(1),
+    updateProject: z.boolean(),
+    expectedCommand: z.string().optional(),
+  }),
   output: taskDetailSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/check-command' },
@@ -344,6 +350,17 @@ export const skipNodeOp = defineOperationContract({
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/nodes/:nodeId/skip' },
   mode: UiMode.Pro,
+});
+
+export const taskCheckEvidenceOp = defineOperationContract({
+  ...common,
+  id: 'tasks.checkEvidence',
+  title: 'op.tasks.checkEvidence',
+  description: 'Read the recorded evidence for one check in the current task result',
+  input: z.object({ id: z.string(), evidenceId: z.string() }),
+  output: checkResultSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/check-evidence/:evidenceId' },
 });
 
 export const taskDiffOp = defineOperationContract({

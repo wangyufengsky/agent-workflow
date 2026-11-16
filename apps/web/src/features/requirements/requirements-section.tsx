@@ -1,5 +1,7 @@
 import {
   isUnmet,
+  NodeKind,
+  NodeStatus,
   RequirementConclusion,
   RequirementDisplayStatus,
   type TaskDetailDTO,
@@ -7,21 +9,20 @@ import {
   TaskStatus,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
+import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { REQUIREMENTS_COPY as C } from '../../copy/requirements.ts';
 import { ReviseDialog } from '../task-detail/delivery-actions.tsx';
+import { FailureContext } from '../tasks/failure-context.tsx';
 import { ChecklistEditor, draftsOf, isComplete, toInputs } from './checklist-editor.tsx';
 import styles from './requirements.module.css';
-import {
-  requirementsQuery,
-  useDecideRequirement,
-  useReplaceRequirements,
-  useReverifyRequirements,
-} from './requirements.queries.ts';
+import { requirementsQuery, useDecideRequirement, useReverifyRequirements } from './requirements.queries.ts';
+import { RequirementsHistory } from './requirements-history.tsx';
 
 type Item = TaskRequirementsDTO['items'][number];
 type Decision =
@@ -40,6 +41,9 @@ export function RequirementsSection({ task }: { task: TaskDetailDTO }) {
   const [deciding, setDeciding] = useState<{ item: Item; conclusion: Decision }>();
   const [revising, setRevising] = useState<Item>();
   const review = task.status === TaskStatus.Review;
+  const failedVerify =
+    task.status === TaskStatus.Failed &&
+    task.nodes.some((node) => node.kind === NodeKind.Verify && node.status === NodeStatus.Failed);
   if (query.isPending) return null;
   if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
   const { revision, items } = query.data;
@@ -61,12 +65,23 @@ export function RequirementsSection({ task }: { task: TaskDetailDTO }) {
         <h3 className="sec-t grow">
           {C.section} · {C.summary(required.length, required.length - unmet.length, unmet.length)}
         </h3>
-        {review && (
+        {(review || failedVerify) && (
           <>
             <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
               {C.edit}
             </Button>
-            <Button size="sm" icon="refresh" pending={reverify.isPending} onClick={() => reverify.mutate(task.id)}>
+            <Button
+              size="sm"
+              icon="refresh"
+              pending={reverify.isPending}
+              onClick={() =>
+                reverify.mutate({
+                  id: task.id,
+                  revisionId: revision.id,
+                  ...(query.data.commitSha === null ? {} : { expectedCommitSha: query.data.commitSha }),
+                })
+              }
+            >
               {C.reverify}
             </Button>
           </>
@@ -92,6 +107,12 @@ export function RequirementsSection({ task }: { task: TaskDetailDTO }) {
                     <span className="hint">
                       {C.sourceLabel[item.latest.source]} · {new Date(item.latest.createdAt).toLocaleString()}
                     </span>
+                    <span className="hint">{C.resultVersion(item.latest.revisionId, item.latest.commitSha)}</span>
+                    {item.latest.nodeId != null && (
+                      <Link to={ROUTES.node} params={{ taskId: task.id, nodeId: item.latest.nodeId }} search={{}}>
+                        {C.viewVerificationNode}
+                      </Link>
+                    )}
                     {item.status === RequirementDisplayStatus.Stale && <span className="hint">{C.staleHint}</span>}
                     {item.latest.note !== '' && <Markdown source={item.latest.note} />}
                     {item.latest.output !== null && item.latest.output !== '' && (
@@ -125,8 +146,17 @@ export function RequirementsSection({ task }: { task: TaskDetailDTO }) {
           </li>
         ))}
       </ul>
+      <RequirementsHistory taskId={task.id} revisions={[revision, ...query.data.history]} />
       {deciding !== undefined && <DecideDialog taskId={task.id} {...deciding} onClose={() => setDeciding(undefined)} />}
-      {editing && <EditDialog taskId={task.id} items={items} onClose={() => setEditing(false)} />}
+      {editing && (
+        <EditDialog
+          task={task}
+          revisionId={revision.id}
+          commitSha={query.data.commitSha}
+          items={items}
+          onClose={() => setEditing(false)}
+        />
+      )}
       {revising !== undefined && (
         <ReviseDialog
           task={task}
@@ -186,9 +216,21 @@ function DecideDialog({
 }
 
 /** Editing the checklist in review saves a new version; its earlier conclusions become stale (31 §2.1). */
-function EditDialog({ taskId, items, onClose }: { taskId: string; items: readonly Item[]; onClose: () => void }) {
+function EditDialog({
+  task,
+  revisionId,
+  commitSha,
+  items,
+  onClose,
+}: {
+  task: TaskDetailDTO;
+  revisionId: string;
+  commitSha: string | null;
+  items: readonly Item[];
+  onClose: () => void;
+}) {
   const [drafts, setDrafts] = useState(() => draftsOf(items));
-  const replace = useReplaceRequirements(taskId);
+  const replace = useReverifyRequirements();
   return (
     <Dialog
       open
@@ -200,12 +242,25 @@ function EditDialog({ taskId, items, onClose }: { taskId: string; items: readonl
           variant="primary"
           pending={replace.isPending}
           disabled={drafts.length === 0 || !isComplete(drafts)}
-          onClick={() => replace.mutate(toInputs(drafts), { onSuccess: onClose })}
+          onClick={() =>
+            replace.mutate(
+              {
+                id: task.id,
+                revisionId,
+                ...(commitSha === null ? {} : { expectedCommitSha: commitSha }),
+                items: toInputs(drafts),
+              },
+              { onSuccess: onClose },
+            )
+          }
         >
           {C.save}
         </Button>
       }
     >
+      {task.failure !== null && task.failedPhase !== null && (
+        <FailureContext taskId={task.id} phase={task.failedPhase} error={task.failure} />
+      )}
       <ChecklistEditor drafts={drafts} onChange={setDrafts} />
       {replace.isError && <ErrorState error={replace.error} />}
     </Dialog>

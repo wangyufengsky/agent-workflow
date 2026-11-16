@@ -218,6 +218,10 @@ export function createNodesService(deps: NodesServiceDeps) {
       for (const node of touched) publish(node);
     },
 
+    setVerification(nodeId: string, instructions: string, acceptance: NodeAcceptance): void {
+      repo.setVerification(nodeId, instructions, acceptance, clock.now());
+    },
+
     /** The task's checks changed by the user (D116): a step's acceptance, which no transition touches. */
     setAcceptance(nodeId: string, acceptance: NodeAcceptance): void {
       repo.setAcceptance(nodeId, acceptance, clock.now());

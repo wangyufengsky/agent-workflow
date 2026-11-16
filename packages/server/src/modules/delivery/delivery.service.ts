@@ -107,7 +107,8 @@ export function createDeliveriesService({ db, unit, clock, log }: DeliveriesServ
         return toDto(delivery);
       });
     },
-    succeed: (id: string, result: { commitSha?: string; prUrl?: string }) => move(id, DeliveryEvent.Succeeded, result),
+    succeed: (id: string, result: { commitSha?: string; prUrl?: string; diffBase?: string; diffHead?: string }) =>
+      move(id, DeliveryEvent.Succeeded, result),
     conflict: (id: string, files: string[], error: ErrorInfo) =>
       move(id, DeliveryEvent.Conflicted, { conflictFiles: files, error }),
     fail: (id: string, error: ErrorInfo) => move(id, DeliveryEvent.Failed, { error }),

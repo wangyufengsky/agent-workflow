@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import {
+  box,
   createProject,
   passReview,
   patchSettings,
@@ -46,8 +47,44 @@ test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开�
   await expect(result).toContainText('greet.ts');
   await expect(page.getByTestId('task-page').getByText('待合并', { exact: true }).first()).toBeVisible();
 
+  // Review opens the canvas ahead of the result, including on direct access and reload.
+  const fold = page.locator('details').filter({ has: page.getByText('查看步骤', { exact: true }) });
+  await expect(fold).toHaveAttribute('open', '');
+  expect((await box(fold)).top).toBeLessThan((await box(result)).top);
+  await page.getByText('查看步骤', { exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(fold).not.toHaveAttribute('open', '');
+  await page.keyboard.press('Enter');
+  await expect(fold).toHaveAttribute('open', '');
+  await page.getByRole('link', { name: '查看验收结果' }).click();
+  await expect(result).toBeInViewport();
+  const taskUrl = page.url().split('#')[0] ?? '';
+  await page.goto(taskUrl);
+  await expect(fold).toHaveAttribute('open', '');
+  await page.reload();
+  await expect(fold).toHaveAttribute('open', '');
+
+  for (const mode of ['simple', 'pro'] as const) {
+    await patchSettings(request, { 'ui.mode': mode });
+    for (const viewport of [
+      { width: 1024, height: 700 },
+      { width: 1280, height: 800 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.reload();
+      await expect(fold).toHaveAttribute('open', '');
+      expect((await box(fold)).top).toBeLessThan((await box(result)).top);
+      await page.getByRole('link', { name: '查看验收结果' }).click();
+      const merge = result.getByRole('button', { name: '合并到 main' });
+      await merge.scrollIntoViewIfNeeded();
+      await expect(merge).toBeInViewport();
+      expect((await box(merge)).right).toBeLessThanOrEqual(viewport.width);
+    }
+  }
+  await patchSettings(request, { 'ui.mode': 'simple' });
+  await page.goto(taskUrl);
+
   // The step's summary in the side panel is Markdown, not its source (14 §2.2).
-  await page.getByText('查看步骤', { exact: true }).click();
   await page.getByTestId('step-impl').click();
   const side = page.getByTestId('task-side');
   await expect(side.getByRole('heading', { name: '实现思路' })).toBeVisible();
@@ -69,6 +106,61 @@ test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开�
   await expect(files.getByRole('button', { pressed: true })).toContainText('greet.test.ts');
   await page.keyboard.press('Escape');
   await expect(large).toBeHidden();
+});
+
+test('UX-02 长流程在待合并时可查看并交付', async ({ page, request }) => {
+  test.slow();
+  const project = await createProject(request, null);
+  const steps = Array.from({ length: 8 }, (_, index) => ({
+    key: `step_${index}`,
+    title: `开发步骤 ${index + 1}`,
+    role: 'developer',
+    instructions: `Complete step ${index + 1}`,
+    ...(index > 0 ? { depends_on: [`step_${index - 1}`] } : {}),
+  }));
+  await queueTurn(request, project, { agent: 'aw-planner' }, [
+    {
+      type: 'callTool',
+      name: 'submit_plan',
+      args: {
+        summary: '依次完成八个开发步骤并整体验证。',
+        nodes: [
+          ...steps,
+          { key: 'final_verify', title: '整体验证', role: 'tester', instructions: 'Verify', depends_on: ['step_7'] },
+        ],
+      },
+    },
+  ]);
+  for (const [index, step] of steps.entries()) {
+    await queueTurn(request, project, { title: step.title }, [
+      ...(index === 0 ? [{ type: 'edit' as const, file: 'long-flow.txt', content: 'done\n' }] : []),
+      submitResult(`${step.title}完成`),
+    ]);
+  }
+  await queueTurn(request, project, { title: '整体验证' }, [submitResult('检查通过')]);
+  await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
+  await startTask(page, project, /新功能开发/, '按顺序完成八个开发步骤');
+  const result = page.getByTestId('result-card');
+  await expect(result).toBeVisible({ timeout: 60_000 });
+  const fold = page.locator('details').filter({ has: page.getByText('查看步骤', { exact: true }) });
+  for (const mode of ['simple', 'pro'] as const) {
+    await patchSettings(request, { 'ui.mode': mode });
+    for (const viewport of [
+      { width: 1024, height: 700 },
+      { width: 1280, height: 800 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.reload();
+      await expect(fold).toHaveAttribute('open', '');
+      await page.getByTestId('progress-canvas').getByTestId('step-step_7').click();
+      await expect(page.getByTestId('task-side')).toContainText('开发步骤 8');
+      await page.getByRole('link', { name: '查看验收结果' }).click();
+      const merge = result.getByRole('button', { name: '合并到 main' });
+      await merge.scrollIntoViewIfNeeded();
+      await expect(merge).toBeInViewport();
+      expect((await box(merge)).right).toBeLessThanOrEqual(viewport.width);
+    }
+  }
 });
 
 test('J2 AI 阻塞提问 → 在需要你处理中作答 → 节点继续 → 完成', async ({ page, request }) => {

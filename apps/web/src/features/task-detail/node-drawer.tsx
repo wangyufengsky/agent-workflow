@@ -54,7 +54,7 @@ function checkKey(check: CheckResult): string {
   }
 }
 
-function Check({ taskId, check }: { taskId: string; check: CheckResult }) {
+export function Check({ taskId, check }: { taskId: string; check: CheckResult }) {
   const label =
     check.kind === AcceptanceCheckKind.Command
       ? C.commandCheck(check.command)

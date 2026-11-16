@@ -253,7 +253,7 @@ export const useSkipCheck = () => useTaskMutation((id: string) => callOperation(
 export function useUpdateCheckCommand() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { id: string; command: string; updateProject: boolean }) =>
+    mutationFn: (input: { id: string; command: string; updateProject: boolean; expectedCommand?: string }) =>
       callOperation(updateCheckCommandOp, input),
     onSuccess: async (task, input) => {
       queryClient.setQueryData(queryKeys.task(task.id), task);

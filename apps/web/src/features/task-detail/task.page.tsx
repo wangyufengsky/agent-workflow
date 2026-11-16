@@ -115,12 +115,26 @@ function TaskMain({ task, selection, pro }: MainProps) {
     case TaskStatus.Failed:
       return <StepsMain {...props} />;
     case TaskStatus.Review:
+      return (
+        <div className="col">
+          {task.nodes.length > 0 && (
+            <details className={styles.canvasFold} open>
+              <summary className="hint">{C.canvasToggle}</summary>
+              <StepsView {...props} />
+            </details>
+          )}
+          <a href="#task-acceptance-result">{C.viewAcceptanceResult}</a>
+          <div id="task-acceptance-result" tabIndex={-1}>
+            <ResultCard task={task} />
+          </div>
+        </div>
+      );
     case TaskStatus.Merging:
     case TaskStatus.Completed:
     case TaskStatus.Cancelled:
       return (
         <div className="col">
-          {task.result !== null || task.status === TaskStatus.Review ? <ResultCard task={task} /> : null}
+          {task.result !== null ? <ResultCard task={task} /> : null}
           {task.nodes.length > 0 && (
             <details className={styles.canvasFold} open={task.result === null}>
               <summary className="hint">{C.canvasToggle}</summary>

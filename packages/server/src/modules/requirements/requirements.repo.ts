@@ -1,5 +1,5 @@
 import { type RequirementItem, type RequirementResultDTO, requirementItemSchema } from '@aw/shared';
-import { asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { requirementResultsTable, requirementRevisionsTable } from './requirements.table.ts';
@@ -27,6 +27,14 @@ export function createRequirementsRepo(db: DbExecutor) {
     listRevisions(taskId: string): Revision[] {
       return db.select().from(v).where(eq(v.taskId, taskId)).orderBy(desc(v.seq)).all().map(toRevision);
     },
+    findRevision(taskId: string, revisionId: string): Revision | undefined {
+      const row = db
+        .select()
+        .from(v)
+        .where(and(eq(v.taskId, taskId), eq(v.id, revisionId)))
+        .get();
+      return row === undefined ? undefined : toRevision(row);
+    },
     insertResults(results: ReadonlyArray<typeof r.$inferInsert>): void {
       if (results.length > 0)
         db.insert(r)
@@ -34,7 +42,7 @@ export function createRequirementsRepo(db: DbExecutor) {
           .run();
     },
     /** In the order they were given. */
-    listResults(taskId: string): RequirementResultDTO[] {
+    listResults(taskId: string, revisionId?: string): RequirementResultDTO[] {
       return (
         db
           .select({
@@ -46,10 +54,13 @@ export function createRequirementsRepo(db: DbExecutor) {
             note: r.note,
             output: r.output,
             commitSha: r.commitSha,
+            nodeId: r.nodeId,
             createdAt: r.createdAt,
           })
           .from(r)
-          .where(eq(r.taskId, taskId))
+          .where(
+            revisionId === undefined ? eq(r.taskId, taskId) : and(eq(r.taskId, taskId), eq(r.revisionId, revisionId)),
+          )
           // Insertion order: two conclusions can share a millisecond.
           .orderBy(asc(sql`rowid`))
           .all()

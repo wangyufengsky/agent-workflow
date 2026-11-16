@@ -4,9 +4,8 @@
 # Day-to-day acceptance is the full local run on macOS. Tests that need the real opencode and a model (test:oc,
 # test:live, J10) are not run here: they stay on the developer's machine.
 #
-# Every platform runs the same tests as `pnpm verify`, `pnpm e2e` and `pnpm e2e:smoke`. On Linux and Windows the
-# suites are split into jobs that run at once (int and browser E2E in shards). macOS stays one job: it finishes in
-# about 3 minutes.
+# Every platform runs the same tests as `pnpm verify`, `pnpm e2e` and `pnpm e2e:smoke`. Linux and Windows shard
+# integration and browser E2E. macOS runs verification, browser E2E with Electron smoke, and J9 in parallel.
 #
 # Inside a job, later steps run after a failed one, so a round shows every problem of that job; a failed step fails
 # its job and with it the run. A failed job is rerun on its own with "Re-run failed jobs".
@@ -217,13 +216,19 @@ jobs:
       - name: test:int (without the database tests, see the int job)
         if: ${{ !cancelled() }}
         run: pnpm test:int $(git ls-files '*.int.test.ts' | grep -v '/databases\..*int.test.ts$')
-      - name: pnpm build
-        if: ${{ !cancelled() }}
-        run: pnpm build
-      - name: pnpm e2e
+
+  macos-browser-and-smoke:
+    name: browser and smoke (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm exec playwright install --only-shell chromium
+      - run: pnpm build
+      - name: pnpm e2e (all but J9)
         id: e2e
-        if: ${{ !cancelled() }}
-        run: pnpm e2e
+        run: pnpm e2e --grep-invert @walkthrough
       # Before the Electron smoke: Playwright empties test-results/ at the start of every run.
       - name: Upload E2E traces
         if: ${{ !cancelled() && steps.e2e.outcome == 'failure' }}
@@ -232,5 +237,31 @@ jobs:
           name: e2e-results-macOS
           path: test-results/
       - name: Electron launch smoke
+        id: smoke
         if: ${{ !cancelled() }}
         run: pnpm e2e:smoke
+      - name: Upload smoke traces
+        if: ${{ !cancelled() && steps.smoke.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-results-macOS
+          path: test-results/
+
+  macos-walkthrough:
+    name: e2e J9 (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: pnpm exec playwright install --only-shell chromium
+      - run: pnpm build
+      - name: pnpm e2e (J9)
+        id: e2e
+        run: pnpm e2e --grep @walkthrough
+      - name: Upload E2E traces
+        if: ${{ !cancelled() && steps.e2e.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: walkthrough-results-macOS
+          path: test-results/

@@ -34,6 +34,7 @@ export function createTaskRequirements(deps: TasksServiceDeps, state: TaskState)
 
   return {
     requirements: view,
+    requirementHistory: (taskId: string, revisionId: string) => requirements.history(state.get(taskId).id, revisionId),
 
     /** Saves the whole checklist as a new version (31 §2.1); its earlier conclusions become stale. */
     async replaceRequirements(taskId: string, items: readonly RequirementItemInput[]): Promise<TaskRequirementsDTO> {

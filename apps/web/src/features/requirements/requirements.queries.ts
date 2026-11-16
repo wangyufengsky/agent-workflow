@@ -22,7 +22,11 @@ function useChecklistMutation<I>(taskId: string, run: (input: I) => Promise<Task
   const qc = useQueryClient();
   return useMutation({
     mutationFn: run,
-    onSuccess: (view) => qc.setQueryData(queryKeys.taskRequirements(taskId), view),
+    onSuccess: async (view) => {
+      const key = queryKeys.taskRequirements(taskId);
+      qc.setQueryData(key, view);
+      await qc.invalidateQueries({ queryKey: [...key, 'history'] });
+    },
   });
 }
 
@@ -39,7 +43,15 @@ export const useDecideRequirement = (taskId: string) =>
 export const useReverifyRequirements = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (taskId: string) => callOperation(reverifyRequirementsOp, { id: taskId }),
-    onSuccess: (task) => qc.setQueryData(queryKeys.task(task.id), task),
+    mutationFn: (input: {
+      id: string;
+      revisionId?: string;
+      expectedCommitSha?: string;
+      items?: RequirementItemInput[];
+    }) => callOperation(reverifyRequirementsOp, input),
+    onSuccess: (task) => {
+      qc.setQueryData(queryKeys.task(task.id), task);
+      void qc.invalidateQueries({ queryKey: queryKeys.taskRequirements(task.id) });
+    },
   });
 };

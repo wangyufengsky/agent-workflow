@@ -185,6 +185,15 @@ export const CONFIRMATION_COPY = {
     [OperationRisk.Write]: '会修改应用中的数据。可以选「总是允许」，以后同类操作不再询问（可在设置中撤销）。',
     [OperationRisk.Critical]: '影响较大或不可撤销，每次都需要你确认，不能设为总是允许。',
   } satisfies Record<OperationRisk, string>,
+  requirementsLoading: '正在读取原验收条件…',
+  requirementsStale: '验收清单已变化或原版本不可用，无法比较；提交时会被拒绝，请重新读取后再操作。',
+  requirementsScope: '仅修改本任务的验收清单，并重新核验已有成果。',
+  requirementsUnchanged: '验收条件没有变化。',
+  requirementsBefore: '原条件：',
+  requirementsAfter: '新条件：',
+  requirementExpected: (value: string) => `预期：${value}`,
+  checkTaskOnly: '仅修改本任务中未完成步骤的检查命令，并重新检查已有成果。',
+  checkWithProject: '同时修改项目默认检查命令，并重新检查本任务的已有成果。',
   diffStat: (files: number, additions: number, deletions: number) =>
     `将合并的改动：${files} 个文件，+${additions} −${deletions}`,
 } as const;

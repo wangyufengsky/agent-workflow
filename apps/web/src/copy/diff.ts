@@ -11,6 +11,7 @@ export const DIFF_COPY = {
   empty: '这个文件没有内容改动（可能只改了权限或被重命名）。',
   tooLarge: (kb: number) => `文件改动过大（${kb} KB），不在这里显示。`,
   loading: '正在载入改动…',
+  deliveryRangeUnavailable: '交付时的 Git 对比范围不可用，提交可能已被清理或旧记录未保存范围。',
   status: {
     [DiffFileStatus.Added]: '新增',
     [DiffFileStatus.Modified]: '修改',

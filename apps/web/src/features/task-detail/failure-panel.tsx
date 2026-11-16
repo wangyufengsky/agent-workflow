@@ -1,4 +1,4 @@
-import { ErrorCode, NodeStatus, type TaskDetailDTO, TaskFailedPhase } from '@aw/shared';
+import { ErrorCode, NodeKind, NodeStatus, type TaskDetailDTO, TaskFailedPhase } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Button } from '../../components/button.tsx';
@@ -10,6 +10,7 @@ import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { PageCheckResultView } from '../preview/page-check-result.tsx';
+import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { CheckFailureActions } from '../tasks/check-failure-actions.tsx';
 import { checkUnrunnable, failedNodeKeyOf, failureText, pageUnrunnableDetails } from '../tasks/failure-text.ts';
 import { nodeQuery, useRetryTask } from '../tasks/tasks.queries.ts';
@@ -77,6 +78,7 @@ export function FailurePanel({
             </Button>
           )}
         </div>
+        {step?.kind === NodeKind.Verify && <RequirementsSection task={task} />}
         {retry.isError && <ErrorState error={retry.error} />}
         <details>
           <summary className="hint">{COMMON_COPY.errorDetails}</summary>

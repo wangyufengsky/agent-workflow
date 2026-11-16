@@ -10,6 +10,8 @@ export type GitOptions = {
   env?: NodeJS.ProcessEnv;
   /** Keep stdout exactly as written (file contents and diffs end with their own newline). */
   verbatim?: boolean;
+  /** Input records for commands such as `cat-file --batch-check`. */
+  input?: string;
 };
 
 export type GitResult = { stdout: string; stderr: string; exitCode: number };
@@ -31,6 +33,7 @@ export async function runGit(args: readonly string[], options: GitOptions): Prom
     extendEnv: false,
     reject: false,
     stripFinalNewline: options.verbatim !== true,
+    ...(options.input === undefined ? {} : { input: options.input }),
   });
   // No exit code means git was killed by a signal; report it as a failure like any unexpected exit.
   const exitCode = result.exitCode ?? -1;

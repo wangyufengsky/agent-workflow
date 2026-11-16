@@ -185,6 +185,11 @@ export const taskResultSchema = z.object({
     z.object({
       nodeKey: z.string(),
       nodeTitle: z.string(),
+      /** Snapshot of the check at the time this result was computed; absent in older results. */
+      evidence: checkResultSchema.optional(),
+      evidenceId: z.string().optional(),
+      nodeId: z.string().optional(),
+      commitSha: z.string().nullable().optional(),
       kind: acceptanceCheckKindSchema,
       passed: z.boolean(),
       /** A command check's command (results written before D116 have none). */

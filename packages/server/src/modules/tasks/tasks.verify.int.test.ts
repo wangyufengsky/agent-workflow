@@ -1,3 +1,4 @@
+import { rm } from 'node:fs/promises';
 import {
   createTaskOp,
   decideRequirementOp,
@@ -12,6 +13,7 @@ import {
   ServerEventType,
   startTaskOp,
   type TaskRequirementsDTO,
+  updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
@@ -258,6 +260,109 @@ describe('人工结论、重新核验与交付提醒（31 §2.3、§4，Q-03）'
     await running;
     const late = await t.call(decideRequirementOp, { id: task.id, itemId: search?.id ?? '', conclusion: 'pass' });
     expect([late.status, late.raw.json().error.code]).toEqual([409, ErrorCode.RequirementsNotEditable]);
+  });
+
+  it('核验步骤失败后用修改的清单恢复，不重新执行开发步骤', async () => {
+    await t.call(updateSettingsOp, { 'node.maxAttempts': 1 });
+    const { project } = await addProject(t);
+    const { body: task } = await t.call(createTaskOp, {
+      projectId: project.id,
+      workflowId: await workflowId(t, 'bugfix'),
+      requirement: '修复',
+      start: false,
+      requirements: CHECKLIST.slice(2, 3),
+    });
+    const directory = `/${task.key}`;
+    t.fake.enqueue(script().callTool('submit_result', { summary: 'Found' }), { title: '· 定位根因', directory });
+    t.fake.enqueue(script().edit('search.ts', 'fixed\n').callTool('submit_result', { summary: 'Fixed' }), {
+      title: '· 修复',
+      directory,
+    });
+    t.fake.enqueue(script().callTool('submit_review', { verdict: 'pass', summary: 'Right' }), {
+      agent: 'aw-reviewer',
+      directory,
+    });
+    t.fake.enqueue(script().error('APIError', 'Bad Gateway'), { title: '· 核验验收清单', directory });
+    const failed = reaches(task.id, 'failed');
+    await t.call(startTaskOp, { id: task.id });
+    await failed;
+    const before = (await t.call(getTaskOp, { id: task.id })).body;
+    const view = (await t.call(getRequirementsOp, { id: task.id })).body;
+    t.fake.enqueue(script().callTool('submit_result', { summary: 'Checked' }), { title: '· 核验验收清单', directory });
+    const review = reaches(task.id, 'review');
+    const response = await t.call(reverifyRequirementsOp, {
+      id: task.id,
+      revisionId: view.revision?.id ?? '',
+      expectedCommitSha: view.commitSha ?? '',
+      items: [{ title: '新条件', expected: '成功', verification: { kind: 'command', command: 'true' } }],
+    });
+    expect(response.status).toBe(200);
+    await review;
+    const after = (await t.call(getTaskOp, { id: task.id })).body;
+    expect(after.nodes.find((node) => node.key === 'fix')?.attemptCount).toBe(
+      before.nodes.find((node) => node.key === 'fix')?.attemptCount,
+    );
+    expect((await t.call(getRequirementsOp, { id: task.id })).body.commitSha).toBe(view.commitSha);
+    expect((await t.call(getRequirementsOp, { id: task.id })).body.items[0]?.title).toBe('新条件');
+  });
+
+  it('工作区不存在时拒绝重验，任务仍待合并', async () => {
+    const { task, view } = await inReviewWith(CHECKLIST.slice(2, 3));
+    const detail = (await t.call(getTaskOp, { id: task.id })).body;
+    if (detail.git.worktreePath === null) throw new Error('No worktree');
+    await rm(detail.git.worktreePath, { recursive: true, force: true });
+    const response = await t.call(reverifyRequirementsOp, {
+      id: task.id,
+      revisionId: view.revision?.id ?? '',
+      expectedCommitSha: view.commitSha ?? '',
+      items: [{ title: '不应保存', expected: '成功' }],
+    });
+    expect(response.status).not.toBe(200);
+    expect((await t.call(getTaskOp, { id: task.id })).body.status).toBe('review');
+  });
+
+  it('修改清单并重新核验是同一个操作，旧版本并发提交被拒绝', async () => {
+    const { task, view } = await inReviewWith(CHECKLIST.slice(2, 3));
+    const revisionId = view.revision?.id ?? '';
+    const wrongHead = await t.call(reverifyRequirementsOp, {
+      id: task.id,
+      revisionId,
+      expectedCommitSha: 'outdated',
+      items: [{ title: '不应保存', expected: '成功' }],
+    });
+    expect(wrongHead.status).toBe(409);
+    expect((await t.call(getRequirementsOp, { id: task.id })).body.revision?.id).toBe(revisionId);
+    t.fake.enqueue(script().callTool('submit_result', { summary: 'Checked again' }), {
+      title: '· 核验验收清单',
+      directory: `/${task.key}`,
+    });
+    const review = reaches(task.id, 'review');
+    const changed = await t.call(reverifyRequirementsOp, {
+      id: task.id,
+      revisionId,
+      expectedCommitSha: view.commitSha ?? '',
+      items: [{ title: '更新后的要求', expected: '退出码 0', verification: { kind: 'command', command: 'true' } }],
+    });
+    expect(changed.body.status).toBe('running');
+    await review;
+    const { body: current } = await t.call(getRequirementsOp, { id: task.id });
+    expect(current.revision?.id).not.toBe(revisionId);
+    expect(current.items[0]?.title).toBe('更新后的要求');
+    expect(current.history.map((r) => r.id)).toContain(revisionId);
+    const timeline = (await t.call(getTaskTimelineOp, { id: task.id })).body.items;
+    expect(timeline.find((event) => event.type === 'requirements_reverified')?.payload).toMatchObject({
+      previousRevisionId: revisionId,
+      revisionId: current.revision?.id,
+      commitSha: view.commitSha,
+    });
+    const stale = await t.call(reverifyRequirementsOp, {
+      id: task.id,
+      revisionId,
+      expectedCommitSha: view.commitSha ?? '',
+      items: [{ title: '旧页面覆盖', expected: '退出码 0', verification: { kind: 'command', command: 'true' } }],
+    });
+    expect(stale.status).toBe(409);
+    expect((await t.call(getRequirementsOp, { id: task.id })).body.items[0]?.title).toBe('更新后的要求');
   });
 
   it('重新核验追加一个核验步骤，按当前清单再跑一遍', async () => {

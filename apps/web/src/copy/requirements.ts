@@ -1,4 +1,9 @@
-import { RequirementDisplayStatus, RequirementResultSource, RequirementVerification } from '@aw/shared';
+import {
+  RequirementConclusion,
+  RequirementDisplayStatus,
+  RequirementResultSource,
+  RequirementVerification,
+} from '@aw/shared';
 
 /** The acceptance checklist (31): writing it, its states on the result card, and the delivery reminder. */
 export const REQUIREMENTS_COPY = {
@@ -39,7 +44,20 @@ export const REQUIREMENTS_COPY = {
   } satisfies Record<RequirementResultSource, string>,
   staleHint: '代码或清单改过了，这条结论说的是之前的版本。',
   expectedIs: (expected: string) => `预期：${expected}`,
+  resultVersion: (revisionId: string, sha: string) => `清单版本 ${revisionId} · 提交 ${sha.slice(0, 12)}`,
+  viewVerificationNode: '查看核验步骤当前详情',
   output: '命令输出',
+  history: '查看清单与核验历史',
+  historyVersion: (seq: number, date: string) => `版本 ${seq} · ${date}`,
+  historyLoading: '正在读取历史记录…',
+  historyNoResult: '尚无结论',
+  historyCommit: (sha: string) => `提交 ${sha.slice(0, 12)}`,
+  conclusionLabel: {
+    [RequirementConclusion.Pass]: '通过',
+    [RequirementConclusion.Fail]: '未通过',
+    [RequirementConclusion.Unverified]: '未核验',
+    [RequirementConclusion.Waive]: '接受未完成',
+  },
   pass: '通过',
   fail: '不通过',
   waive: '接受未完成',
@@ -47,14 +65,14 @@ export const REQUIREMENTS_COPY = {
   note: '说明',
   notePlaceholder: '写下你看到的情况',
   waiveReason: '原因（必填）',
-  save: '保存',
+  save: '保存并重新核验',
   reviseItem: '针对这一项再改改',
   reviseItemText: (title: string, expected: string, note: string) =>
     `验收项「${title}」没有满足。\n预期：${expected}${note === '' ? '' : `\n核验说明：${note}`}\n请修改。`,
   reverify: '重新核验',
   edit: '编辑清单',
   editTitle: '编辑验收清单',
-  editHint: '保存后之前的结论都会过期，可以再点「重新核验」。',
+  editHint: '保存新版本后重新核验已有成果，之前的结论会过期。',
   unmetTitle: (n: number) => `有 ${n} 项必需的验收要求未满足`,
   unmetAck: '我知道这些项未满足，仍然交付',
 } as const;

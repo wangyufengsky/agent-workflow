@@ -1,6 +1,8 @@
 import {
   createTaskOp,
+  decideRequirementOp,
   ErrorCode,
+  getRequirementHistoryOp,
   getRequirementsOp,
   type RequirementItemInput,
   replaceRequirementsOp,
@@ -81,6 +83,32 @@ describe('需求验收清单（31，Q-01）', () => {
     expect([unknown.status, unknown.raw.json().error.code]).toEqual([400, ErrorCode.ValidationFailed]);
   });
 
+  it('按任务读取历史版本和全部结论，拒绝跨任务版本', async () => {
+    const { project } = await addProject(t);
+    const task = await taskInReview(t, project.id, { 'a.txt': 'a\n' });
+    const first = (
+      await t.call(replaceRequirementsOp, { id: task.id, items: [{ title: '旧要求', expected: '旧预期' }] })
+    ).body;
+    const revisionId = first.revision?.id ?? '';
+    const itemId = first.items[0]?.id ?? '';
+    await t.call(decideRequirementOp, { id: task.id, itemId, conclusion: 'fail', note: '旧结论' });
+    await t.call(decideRequirementOp, { id: task.id, itemId, conclusion: 'pass', note: '复核结论' });
+    await t.call(replaceRequirementsOp, { id: task.id, items: [{ title: '新要求', expected: '新预期' }] });
+    const history = await t.call(getRequirementHistoryOp, { id: task.id, revisionId });
+    expect(history.body.items).toMatchObject([
+      {
+        title: '旧要求',
+        expected: '旧预期',
+        results: [
+          { conclusion: 'fail', note: '旧结论' },
+          { conclusion: 'pass', note: '复核结论' },
+        ],
+      },
+    ]);
+    const other = await draftWith();
+    expect((await t.call(getRequirementHistoryOp, { id: other.task.id, revisionId })).status).toBe(404);
+  });
+
   it('待合并时可以修改，执行中不能', async () => {
     const { project } = await addProject(t);
     const inReview = await taskInReview(t, project.id, { 'a.txt': 'a\n' });
@@ -106,6 +134,7 @@ describe('需求验收清单（31，Q-01）', () => {
       revision: null,
       items: [],
       history: [],
+      commitSha: null,
     });
   });
 });

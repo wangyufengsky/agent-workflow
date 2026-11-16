@@ -71,13 +71,28 @@ export function createRequirementsService({ db, clock }: RequirementsServiceDeps
       repo.insertRevision({ id: randomUUID(), taskId, seq: (current?.seq ?? 0) + 1, items, createdAt: clock.now() });
     },
 
+    history(taskId: string, revisionId: string) {
+      const revision = repo.findRevision(taskId, revisionId);
+      if (revision === undefined)
+        throw new AppError(ErrorCode.NotFound, 'Checklist revision not found', { revisionId });
+      const results = repo.listResults(taskId, revisionId);
+      return {
+        revision: { id: revision.id, seq: revision.seq, createdAt: revision.createdAt },
+        items: revision.items.map((item) => ({
+          ...item,
+          results: results.filter((result) => result.itemId === item.id),
+        })),
+      };
+    },
+
     /** The current version with each item's state against `commitSha` (null when the task's commit is unknown). */
     view(taskId: string, commitSha: string | null): TaskRequirementsDTO {
       const [current, ...older] = repo.listRevisions(taskId);
-      if (current === undefined) return { revision: null, items: [], history: [] };
+      if (current === undefined) return { commitSha, revision: null, items: [], history: [] };
       const results = repo.listResults(taskId);
       const baseline = { revisionId: current.id, commitSha };
       return {
+        commitSha,
         revision: { id: current.id, seq: current.seq, createdAt: current.createdAt },
         items: current.items.map((item) => ({
           ...item,

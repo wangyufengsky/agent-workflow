@@ -144,6 +144,7 @@ import {
 } from './projects.ts';
 import {
   decideRequirementOp,
+  getRequirementHistoryOp,
   getRequirementsOp,
   replaceRequirementsOp,
   reverifyRequirementsOp,
@@ -202,6 +203,7 @@ import {
   skipCheckOp,
   skipNodeOp,
   startTaskOp,
+  taskCheckEvidenceOp,
   taskDiffFileOp,
   taskDiffOp,
   unarchiveTaskOp,
@@ -322,6 +324,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   removeAttachmentOp,
   snapshotProjectFileOp,
   getRequirementsOp,
+  getRequirementHistoryOp,
   replaceRequirementsOp,
   decideRequirementOp,
   reverifyRequirementsOp,
@@ -363,6 +366,7 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   rejectNodeOp,
   retryNodeOp,
   skipNodeOp,
+  taskCheckEvidenceOp,
   taskDiffOp,
   taskDiffFileOp,
   nodeDiffOp,

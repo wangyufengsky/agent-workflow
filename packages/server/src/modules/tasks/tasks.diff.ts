@@ -1,9 +1,19 @@
-import { AppError, type DiffDTO, ErrorCode, type FileDiffDTO, WorktreeStatus } from '@aw/shared';
+import {
+  AppError,
+  DeliveryStatus,
+  DeliveryStrategy,
+  type DiffDTO,
+  ErrorCode,
+  type FileDiffDTO,
+  TaskStatus,
+  WorktreeStatus,
+} from '@aw/shared';
 import {
   diffCommits,
   diffCommitsFile,
   diffWorktree,
   diffWorktreeFile,
+  gitFailure,
   limitDiff,
   mergeBase,
   runGit,
@@ -22,7 +32,7 @@ export function taskDiffBase(worktreePath: string, targetBranch: string): Promis
 
 /** Diffs of a task's worktree (11 §5) and of its nodes' commits (11 §6). */
 export function createTaskDiffs(deps: TasksServiceDeps, state: TaskState) {
-  const { worktrees, nodes, projects } = deps;
+  const { worktrees, nodes, projects, deliveries } = deps;
 
   function readyWorktree(task: Task): Worktree {
     const worktree = worktrees.findByTask(task.id);
@@ -41,9 +51,36 @@ export function createTaskDiffs(deps: TasksServiceDeps, state: TaskState) {
     return { repo, commit: node.commitSha, parent };
   }
 
+  /** A completed delivery is pinned to the commits recorded during that delivery. */
+  async function deliveryRange(task: Task): Promise<{ repo: string; base: string; head: string } | null> {
+    if (task.status !== TaskStatus.Completed) return null;
+    const delivery = deliveries.latest(task.id);
+    if (delivery?.status !== DeliveryStatus.Succeeded || delivery.strategy === DeliveryStrategy.ReportOnly) return null;
+    const repo = projects.getRecord(task.projectId).repoPath;
+    const base = delivery.diffBase;
+    const head = delivery.diffHead;
+    // Older deliveries did not persist the pre-delivery tip; a no-op merge can return an existing commit.
+    const unavailable = () =>
+      new AppError(ErrorCode.NotFound, 'Delivery diff range is unavailable', {
+        taskId: task.id,
+        reason: 'delivery_range_unavailable',
+      });
+    if (base === null || head === null) throw unavailable();
+    const objects = [`${base}^{commit}`, `${head}^{commit}`];
+    const args = ['cat-file', '--batch-check=%(objecttype)'];
+    const result = await runGit(args, { cwd: repo, input: `${objects.join('\n')}\n` });
+    const types = result.stdout.split(/\r?\n/);
+    if (result.stderr !== '' || types.length !== objects.length) throw gitFailure(args, result);
+    if (objects.some((object, index) => types[index] === `${object} missing`)) throw unavailable();
+    if (types.some((type) => type !== 'commit')) throw gitFailure(args, result);
+    return { repo, base, head };
+  }
+
   return {
     async diff(taskId: string): Promise<DiffDTO> {
       const task = state.get(taskId);
+      const range = await deliveryRange(task);
+      if (range !== null) return { base: range.base, files: await diffCommits(range.repo, range.base, range.head) };
       const worktree = readyWorktree(task);
       const base = await taskDiffBase(worktree.path, task.baseBranch);
       return { base, files: await diffWorktree(worktree.path, base) };
@@ -51,6 +88,8 @@ export function createTaskDiffs(deps: TasksServiceDeps, state: TaskState) {
 
     async diffFile(taskId: string, path: string): Promise<FileDiffDTO> {
       const task = state.get(taskId);
+      const range = await deliveryRange(task);
+      if (range !== null) return limitDiff(path, await diffCommitsFile(range.repo, range.base, range.head, path));
       const worktree = readyWorktree(task);
       const base = await taskDiffBase(worktree.path, task.baseBranch);
       return limitDiff(path, await diffWorktreeFile(worktree.path, base, path));

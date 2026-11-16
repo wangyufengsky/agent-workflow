@@ -974,7 +974,6 @@ const SHOTS: Shot[] = [
     url: (s) => `/tasks/${s.review.id}?node=${node(s.review, 'locate')}`,
     ready: testId('result-card'),
     open: async (page) => {
-      await page.getByText('查看步骤', { exact: true }).click();
       return page.getByTestId('task-side').getByRole('heading', { name: '复现与根因定位' });
     },
   },

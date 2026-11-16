@@ -56,14 +56,27 @@ test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → �
   await expect(merge).toBeDisabled();
   await notice.getByLabel('我知道这些项未满足，仍然交付').check();
   await expect(merge).toBeEnabled();
-  // The acceptance is for that version: once the checklist is saved again, it has to be accepted again.
+  // Editing the checklist schedules verification of the existing result.
+  await queueTurn(request, project, { title: '核验验收清单' }, [submitResult('再次核验完成')]);
   await checklist.getByRole('button', { name: '编辑清单' }).click();
   const edit = page.getByRole('dialog', { name: '编辑验收清单' });
   await edit.getByLabel('预期结果 1').fill('只显示匹配订单，忽略大小写');
-  await edit.getByRole('button', { name: '保存' }).click();
+  await edit.getByRole('button', { name: '保存并重新核验' }).click();
+  await expect(page.getByTestId('result-card')).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
   await expect(edit).toBeHidden();
   await expect(notice.getByLabel('我知道这些项未满足，仍然交付')).not.toBeChecked();
   await expect(merge).toBeDisabled();
+
+  await checklist.getByText('查看清单与核验历史').click();
+  const history = checklist.locator('details', { has: page.getByText(/^版本 1 ·/) }).last();
+  await history.getByText(/^版本 1 ·/).click();
+  await expect(history.getByText('预期：只显示匹配订单', { exact: false })).toBeVisible();
+  await expect(history.getByText('false', { exact: true })).toBeVisible();
+  await expect(history.getByText('未通过 · 命令', { exact: false })).toBeVisible();
+
+  const currentHistory = checklist.locator('details', { has: page.getByText(/^版本 2 ·/) }).last();
+  await currentHistory.getByText(/^版本 2 ·/).click();
+  await expect(currentHistory.getByText('预期：只显示匹配订单，忽略大小写', { exact: false })).toBeVisible();
 
   // The user passes the AI item and accepts the failing command as not done, with a reason.
   await checklist
@@ -72,6 +85,7 @@ test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → �
     .click();
   await page.getByRole('dialog').getByLabel('说明').fill('亲自搜了一单');
   await page.getByRole('dialog').getByRole('button', { name: '通过', exact: true }).click();
+  await expect(currentHistory.getByText('亲自搜了一单')).toBeVisible();
   await checklist.locator('details', { hasText: '单元测试通过' }).getByRole('button', { name: '接受未完成' }).click();
   const waive = page.getByRole('dialog');
   await expect(waive.getByRole('button', { name: '接受未完成' })).toBeDisabled();

@@ -17,6 +17,7 @@ import { taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { useCancelCall, useConfirmCall } from './assistant.queries.ts';
 import styles from './cards.module.css';
 import { InputSummary } from './input-summary.tsx';
+import { RequirementsImpact } from './requirements-impact.tsx';
 
 /** Merging shows what would be merged (15 §4). */
 function DeliveryImpact({ taskId }: { taskId: string }) {
@@ -93,6 +94,14 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
         </span>
       </header>
       <InputSummary operation={contractOf(confirmation.operationId)} input={confirmation.input} />
+      {pending && confirmation.operationId === 'tasks.reverifyRequirements' && (
+        <RequirementsImpact input={confirmation.input} />
+      )}
+      {pending && confirmation.operationId === 'tasks.updateCheckCommand' && (
+        <p className={styles.note}>
+          {confirmation.input.updateProject === true ? C.checkWithProject : C.checkTaskOnly}
+        </p>
+      )}
       {pending && confirmation.operationId === 'tasks.deliver' && typeof taskId === 'string' && (
         <DeliveryImpact taskId={taskId} />
       )}
