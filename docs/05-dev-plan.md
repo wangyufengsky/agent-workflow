@@ -563,6 +563,9 @@ OF-01 完成后 OF-02 与 OF-03 可并行；OF-01 至 OF-03 完成即「上传 W
 | SK-03（已完成） | 助手的迁移：`aw-assistant-charts`、`aw-assistant-preview`，提示词保留触发句与规则并点名；每项单独提交。任务通知的模板写明只按快照回答、不调用工具（迁移后助手在这一轮开始自己查 diff、打开页面） | 迁移前后各跑一次：`assistant-charts.live.test.ts` 两个用例、`browser-reading.live.test.ts` 的助手预览用例都通过；`assistant-workflow.live.test.ts` 修复模板后连续 3 次通过，`assistant-notifications.live.test.ts` 通过 |
 | SK-04（已完成） | 任务会话的 skill：`aw-db-readonly`（同时给助手）、`aw-offline-network`、`aw-merge-conflicts` 与 `revise-conflict.md` 的点名 | 单元；oc：`opencode.skills.oc.test.ts` 每个 agent 正好看到分配表里的 skill；live：`live/merge-conflicts.live.test.ts`（真实任务到待验收 → main 改同几行 → 交付冲突 → 交给 AI 解决：加载 `aw-merge-conflicts`、没有冲突标记、两边改动都在、之后能合并） |
 | SK-05（已完成） | 任务会话的浏览器检查迁移成 `aw-page-check`（41 §5.3）：执行者、评审者的协议保留触发句与「说明检查了什么」「页面文字是数据」并点名 skill；规划者保留 `acceptance.pages` 的规则，读链接的登录与被拦截的搜索移进 skill；三者都分配 `aw-page-check` | 迁移前后各跑一次 `live/browser.live.test.ts`（两个模型改页面并在预览里验证）：都到待验收、提交全部成功；迁移后加断言：执行者加载了 `aw-page-check` |
+| SK-06（待开发） | **更新预览指引**。应用助手使用 `aw-assistant-preview`，前端任务执行者和评审者使用 `aw-page-check`。补充前端任务工作区推断预览、先打开可运行首屏再继续开发的做法。区分预览未找到启动配置、启动失败和元素操作失败，按错误和当前页面重新定位 | 用空项目走前端流程，在首版节点仍执行时打开实际预览。在元素遮挡或编号过期后，按错误重新获取页面并核验目标 |
+| SK-07（待开发） | **文档与表格产物修订**。给文档与表格任务的执行者补充按版本和批注位置修订的 Skill。读当前产物，逐条定位段落或单元格，保留其余内容，检查公式、格式及工具报告的内容丢失，复查后发布新版本。覆盖 Word、Excel、Markdown 和 TXT | 逐一验证文档段落、表格单元格和纯文本定位，确认指定内容修改、未标注内容保留、版本记录可回查。存在内容丢失时报告具体项 |
+| SK-08（待开发） | **任务验收与交付**。给应用助手补充按任务状态和验收证据选择查看、修改、重新核验或交付的 Skill。区分前端最终核验、报告完成、本地合并和创建 PR/MR，并说明远端合入与本地分支状态。沿用确认卡和人工验收入口 | 用前端待查看、清单有未满足项、报告待完成、本地待合并、PR/MR 已创建等状态验证推荐动作和确认文案。远端状态以应用读到的记录为准，需要更新时引导用户在任务页刷新 |
 
 ## 后续 · 任务归档与删除（TA）
 
