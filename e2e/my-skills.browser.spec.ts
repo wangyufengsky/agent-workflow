@@ -12,7 +12,7 @@ test('新建和导入 Skill，绑定到流程，在助手里选用并保存提�
   await page.getByRole('navigation').getByRole('link', { name: '我的 Skill', exact: true }).click();
   await expect(page).toHaveURL(/\/skills$/);
   const library = page.locator('#my-skills');
-  await library.getByRole('button', { name: /内置 10/ }).click();
+  await library.getByRole('button', { name: /^内置 \d+$/ }).click();
   await library.getByRole('searchbox', { name: '搜索 Skill' }).fill('aw-page-check');
   const details = library.getByRole('complementary', { name: 'Skill 详情' });
   await expect(details.getByText('开发工程师', { exact: true })).toBeVisible();
@@ -22,7 +22,16 @@ test('新建和导入 Skill，绑定到流程，在助手里选用并保存提�
   await expect(details.locator('pre')).toContainText('name: aw-page-check');
   await expect(details.getByRole('button', { name: '编辑正文' })).toHaveCount(0);
 
+  const audience = library.getByRole('combobox', { name: '按使用对象筛选' });
   await library.getByRole('searchbox', { name: '搜索 Skill' }).fill('');
+  await audience.selectOption({ label: 'Git 工作台代码审查' });
+  await expect(details.getByRole('heading', { name: '代码审查', exact: true })).toBeVisible();
+  await expect(details.getByText('Git 工作台代码审查', { exact: true })).toBeVisible();
+  await expect(details.getByText('评审员', { exact: true })).toBeVisible();
+  await details.getByRole('tab', { name: 'SKILL.md' }).click();
+  await expect(details.locator('pre')).toContainText('name: aw-code-review');
+  await audience.selectOption('');
+
   await library.getByRole('button', { name: /页面检查/ }).click();
   await expect(details.getByRole('heading', { name: '页面检查', exact: true })).toBeInViewport();
   await expect(library.getByRole('button', { name: '新建 Skill' })).toBeInViewport();

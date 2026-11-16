@@ -25,6 +25,8 @@ export const SkillName = {
   MergeConflicts: 'aw-merge-conflicts',
   /** Checking pages in the task's preview and reading linked websites, for task sessions (41 §5.3, moved from prompts). */
   PageCheck: 'aw-page-check',
+  /** Evidence and findings for task reviews and Git workbench code reviews (41 §13). */
+  CodeReview: 'aw-code-review',
 } as const;
 export type SkillName = (typeof SkillName)[keyof typeof SkillName];
 
@@ -47,10 +49,10 @@ export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
     SkillName.MergeConflicts,
     SkillName.PageCheck,
   ],
-  [SessionAgent.Reviewer]: [SkillName.DbReadonly, SkillName.PageCheck],
+  [SessionAgent.Reviewer]: [SkillName.DbReadonly, SkillName.PageCheck, SkillName.CodeReview],
   [SessionAgent.Researcher]: [SkillName.DbReadonly],
   [SessionAgent.SlidesWriter]: [],
-  [SessionAgent.CodeReviewer]: [],
+  [SessionAgent.CodeReviewer]: [SkillName.CodeReview],
   [SessionAgent.Delegate]: [],
 };
 export const ASSISTANT_SKILLS: SkillName[] = [

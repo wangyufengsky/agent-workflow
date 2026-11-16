@@ -1,13 +1,39 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { TaskStatus } from '@aw/shared';
+import {
+  AcceptanceCheckKind,
+  AttemptKind,
+  attemptMachine,
+  createWorkflowOp,
+  getGitReviewOp,
+  isTerminalState,
+  ServerEventType,
+  startGitReviewOp,
+  TaskStatus,
+  WorkflowDeliverable,
+  WorkflowPlanning,
+} from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { BuiltinRoleKey } from '../packages/builtin/src/roles.ts';
+import { SkillName } from '../packages/builtin/src/skills.ts';
+import { waitForEvent } from '../packages/server/test/helpers/events.ts';
 import { type LiveApp, outcome, startLiveApp, TASK_TIMEOUT_MS } from './live-app.ts';
 
-/**
- * M6-05 live suite (07 §6): with smoke.live.test.ts every built-in workflow runs once; the Java fixture runs its
- * check with Maven. Run by hand: `pnpm test:live`.
- */
+function loadedReviewSkill(live: LiveApp, attemptId: string) {
+  const { entries } = live.t.app.services.attempts.transcript(attemptId, 0);
+  const call = entries.find(
+    (entry) =>
+      entry.kind === 'tool_call' && entry.data.tool === 'skill' && entry.data.input.name === SkillName.CodeReview,
+  );
+  return (
+    call?.kind === 'tool_call' &&
+    entries.some(
+      (entry) =>
+        entry.kind === 'tool_result' && entry.data.callId === call.data.callId && entry.data.status === 'completed',
+    )
+  );
+}
+
 /** ts-stats as of 2026-09-25, plus `percentile` added on 2026-10-05 with an off-by-one index and an unused helper. */
 const STATS_HISTORY = {
   initAt: '2026-09-25T10:00:00',
@@ -39,6 +65,10 @@ beforeAll(async () => {
 }, 120_000);
 afterAll(() => live.close());
 
+/**
+ * M6-05 live suite (07 §6): with smoke.live.test.ts every built-in workflow runs once; the Java fixture runs its
+ * check with Maven. Run by hand: `pnpm test:live`.
+ */
 describe('@live 内置流程全集', () => {
   it(
     'bugfix（Java / Maven）：lowStock 漏掉了等于阈值的商品',
@@ -101,6 +131,52 @@ describe('@live 内置流程全集', () => {
   );
 
   it(
+    '代码步骤验收：加载 Skill 并用 submit_review 给出结果',
+    async () => {
+      const { t } = live;
+      const workflow = await t.call(createWorkflowOp, {
+        key: 'review_skill_step',
+        name: '代码审查 Skill 验收',
+        planning: WorkflowPlanning.Fixed,
+        deliverable: WorkflowDeliverable.CodeChanges,
+        definition: {
+          allowedRoles: [BuiltinRoleKey.Developer],
+          template: {
+            nodes: [
+              {
+                key: 'fix_median',
+                title: '改用数值排序',
+                roleKey: BuiltinRoleKey.Developer,
+                instructions: '仅将 src/stats.ts 中 median 的 sort() 改为 sort((a, b) => a - b)，避免字符串排序。',
+                dependsOn: [],
+              },
+            ],
+          },
+          checkpoints: { confirm_plan: false, accept_each_node: false },
+          defaultAcceptance: {
+            checks: [
+              {
+                kind: AcceptanceCheckKind.AiReview,
+                focus: '验证 median 的比较器按数值升序排序，包括输入 [10, 9, 1]。',
+              },
+            ],
+            manual: false,
+          },
+        },
+      });
+      expect(workflow.status).toBe(201);
+      const task = await live.runTask(workflow.body.key, 'ts-stats', '让 median([10, 9, 1]) 返回 9。');
+      expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
+      expect(task.result?.checks).toEqual(
+        expect.arrayContaining([expect.objectContaining({ kind: 'ai_review', passed: true })]),
+      );
+      const attempts = t.app.services.attempts.listByTask(task.id);
+      expect(attempts.some(({ id, kind }) => kind === AttemptKind.Review && loadedReviewSkill(live, id))).toBe(true);
+    },
+    TASK_TIMEOUT_MS,
+  );
+
+  it(
     'version_review：审查 10 月 1 日以来新增的 percentile（median 的排序问题在那之前就有）',
     async () => {
       const task = await live.runTask(
@@ -112,6 +188,36 @@ describe('@live 内置流程全集', () => {
       expect(outcome(task)).toEqual({ status: TaskStatus.Review, failure: null });
       expect(task.result?.filesChanged).toBe(0);
       expect(task.result?.summary).toContain('percentile');
+      const attempts = live.t.app.services.attempts.listByTask(task.id);
+      expect(attempts.some(({ id }) => loadedReviewSkill(live, id))).toBe(true);
+    },
+    TASK_TIMEOUT_MS,
+  );
+
+  it(
+    'Git 工作台代码审查：加载 Skill 并提交该提交引入的越界问题',
+    async () => {
+      const { t } = live;
+      const projectId = await live.addProject('ts-stats', STATS_HISTORY);
+      const ended = waitForEvent(
+        t.app.events,
+        ServerEventType.AttemptUpdated,
+        ({ attempt }) => attempt.kind === AttemptKind.GitReview && isTerminalState(attemptMachine, attempt.status),
+        TASK_TIMEOUT_MS,
+      );
+      const started = await t.call(startGitReviewOp, {
+        id: projectId,
+        target: { kind: 'commit', sha: 'HEAD' },
+        focus: '确认新增 percentile 函数的数组索引是否正确，给出能触发越界的输入。',
+      });
+      expect(started.status).toBe(201);
+      await ended;
+      const { body: review } = await t.call(getGitReviewOp, { reviewId: started.body.id });
+      expect(review.status).toBe('succeeded');
+      expect(loadedReviewSkill(live, review.attemptId)).toBe(true);
+      expect(review.findings).toEqual(
+        expect.arrayContaining([expect.objectContaining({ path: 'src/percentile.ts', line: 4 })]),
+      );
     },
     TASK_TIMEOUT_MS,
   );

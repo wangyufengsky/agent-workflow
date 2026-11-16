@@ -140,6 +140,10 @@ describe('节点状态机（09 §3）', () => {
     await failed;
     await t.fake.settled();
 
+    const reviewPrompt = t.fake.prompts.find(({ text }) => text.includes('## Step under review'))?.text;
+    expect(reviewPrompt).toContain('For code-change acceptance, your next action');
+    expect(reviewPrompt).toContain('{"name":"aw-code-review"}');
+    expect(reviewPrompt).toContain('agent-workflow_submit_review');
     expect(t.fake.toolCalls.filter((c) => c.name === 'submit_review').map((c) => c.isError)).toEqual([true, false]);
     expect(t.fake.toolCalls.find((c) => c.name === 'submit_review')?.result).toMatchObject({
       code: ErrorCode.ValidationFailed,

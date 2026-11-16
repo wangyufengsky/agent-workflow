@@ -139,7 +139,7 @@ describe('我的 Skill', () => {
     const response = await app.call(getSkillCatalogOp, {});
     expect(response.status).toBe(200);
     const { builtin, scopes } = response.body;
-    expect(builtin).toHaveLength(10);
+    expect(builtin).toHaveLength(11);
     expect(builtin.find(({ name }) => name === 'aw-page-check')).toMatchObject({
       source: expect.stringContaining('name: aw-page-check'),
       assistantEnabled: false,
@@ -148,6 +148,11 @@ describe('我的 Skill', () => {
     expect(builtin.find(({ name }) => name === 'aw-db-readonly')).toMatchObject({
       assistantEnabled: true,
       agents: ['planner', 'executor', 'reviewer', 'researcher'],
+    });
+    expect(builtin.find(({ name }) => name === 'aw-code-review')).toMatchObject({
+      source: expect.stringContaining('name: aw-code-review'),
+      assistantEnabled: false,
+      agents: ['reviewer', 'code_reviewer'],
     });
     expect(scopes).toEqual([]);
   });

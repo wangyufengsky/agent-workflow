@@ -9771,7 +9771,10 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "edit": "deny",
         "external_directory": "deny",
         "question": "deny",
-        "skill": "deny",
+        "skill": {
+          "*": "deny",
+          "aw-code-review": "allow",
+        },
         "task": "deny",
         "webfetch": "deny",
         "websearch": "deny",
@@ -9869,6 +9872,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "question": "deny",
         "skill": {
           "*": "deny",
+          "aw-code-review": "allow",
           "aw-db-readonly": "allow",
           "aw-page-check": "allow",
         },

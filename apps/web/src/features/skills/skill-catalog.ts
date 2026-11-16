@@ -5,6 +5,7 @@ import { BUILTIN_SKILL_COPY, SKILLS_COPY as C } from '../../copy/skills.ts';
 export const SkillAudience = {
   Assistant: 'assistant',
   Researcher: 'researcher',
+  GitReviewer: SessionAgent.CodeReviewer,
   Unconfigured: 'unconfigured',
 } as const;
 export type Audience = { id: string; name: string };
@@ -23,7 +24,8 @@ export type CatalogEntry = Entry &
 
 const assistant: Audience = { id: SkillAudience.Assistant, name: C.assistant };
 const researcher: Audience = { id: SkillAudience.Researcher, name: C.researcher };
-export const audienceOptions = (roles: RoleDTO[]): Audience[] => [assistant, ...roles, researcher];
+const gitReviewer: Audience = { id: SkillAudience.GitReviewer, name: C.gitReviewer };
+export const audienceOptions = (roles: RoleDTO[]): Audience[] => [assistant, ...roles, researcher, gitReviewer];
 
 export function catalogEntries(
   userSkills: UserSkillDTO[],
@@ -62,6 +64,7 @@ export function catalogEntries(
           ...(skill.assistantEnabled ? [assistant] : []),
           ...roles.filter((role) => skill.agents.includes(role.baseAgent)),
           ...(skill.agents.includes(SessionAgent.Researcher) ? [researcher] : []),
+          ...(skill.agents.includes(SessionAgent.CodeReviewer) ? [gitReviewer] : []),
         ],
       };
     }),

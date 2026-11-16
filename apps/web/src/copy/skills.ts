@@ -16,6 +16,7 @@ export const SKILLS_COPY = {
   scope: '使用范围',
   assistant: '应用助手',
   researcher: '知识问答研究员',
+  gitReviewer: 'Git 工作台代码审查',
   assistantOn: '在对话中手动选用，仅用于当次消息。',
   assistantOff: '未在助手中启用。',
   noAssistantSkills: '暂无允许助手选用的 Skill。',
@@ -125,5 +126,10 @@ export const BUILTIN_SKILL_COPY: Readonly<Record<string, { title: string; descri
     title: '页面检查',
     description: '检查页面行为、不同尺寸下的表现和运行错误。',
     trigger: '任务需求、步骤或评审涉及网页时。',
+  },
+  'aw-code-review': {
+    title: '代码审查',
+    description: '核对审查范围、改动证据和问题位置。',
+    trigger: '验收涉及代码变更的步骤、独立代码审查任务，或在 Git 工作台发起 AI 审查时。',
   },
 };

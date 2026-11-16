@@ -184,7 +184,7 @@ Find the actual cause before you suggest anything, and quote the line that shows
 
 ### 7.3 分配表
 
-一处定义：`opencode.config.ts` 里与 `AGENT_PERMISSION` 并列的 `AGENT_SKILLS: Record<SessionAgent, SkillName[]>`，另加助手的一份。权限的 `skill` 规则由它生成。
+opencode 的权限规则和「我的 Skill」目录共同读取 `packages/builtin/src/skills.ts` 中的 `AGENT_SKILLS` 和 `ASSISTANT_SKILLS`。
 
 | skill | 规划者 | 执行者 | 评审者 | 研究员 | PPT | 代码评审 | 助手 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -198,6 +198,7 @@ Find the actual cause before you suggest anything, and quote the line that shows
 | `aw-offline-network` | ✓ | ✓ | | | | | |
 | `aw-merge-conflicts` | | ✓ | | | | | |
 | `aw-page-check` | ✓ | ✓ | ✓ | | | | |
+| `aw-code-review` | | | ✓ | | | ✓ | |
 
 桌宠的 agent 已经是 `'*': 'deny'`，不变。
 
@@ -208,6 +209,7 @@ Find the actual cause before you suggest anything, and quote the line that shows
   - 画图一段缩成触发句与规则，并点名 `aw-assistant-charts`。
   - 预览与浏览器一段缩成触发句与规则，并点名 `aw-assistant-preview`。
 - `revise-conflict.md`：先加载 `aw-merge-conflicts`。
+- `start-review.md`、`protocol-review.md` 和 `start-git-review.md` 按 §13 的对应审查场景点名加载 `aw-code-review`。
 
 其余 skill（`aw-task-diagnosis`、`aw-recurring-work`、`aw-office-docs`、`aw-db-readonly`、`aw-offline-network`）靠描述触发，不点名。
 
@@ -256,3 +258,22 @@ Find the actual cause before you suggest anything, and quote the line that shows
 - 在 Skill 详情的「编辑使用范围」中可保存多条项目和流程绑定，每条绑定可选全部角色或指定角色。角色按 ID 精确匹配，复用同一执行配置的角色可分别绑定。项目详情仍可快速调整对应流程的 Skill 列表。旧绑定继续应用于流程全部角色。流程发布新版本后绑定依然适用。任务创建时保存正文及角色范围快照，规划、执行、审核和续接会话按各自角色使用对应快照。后续保存的版本或范围应用于新任务。
 - 对话菜单和有操作结果的任务提供「提炼为 Skill」。助手查看已有结果和校验，生成可编辑草稿。用户也可直接描述想创建的 Skill。草稿经 `open_form` 进入同一编辑器，保存后才进入库。
 - 应用把显式选择或绑定的正文附到对应会话的 system prompt。任务协议与原有工具授权继续控制操作，应用自带的原生 Skill 白名单继续按角色分配。
+
+## 13. 代码审查
+
+### 13.1 触发条件
+
+- **任务步骤验收**。验收的首条消息要求评审员先读任务上下文。当前验收范围涉及代码变更时，下一步加载 `aw-code-review`，结合任务要求、改动和检查证据再给出结论。
+- **独立审查任务**。「代码审查」「版本比对审查」「安全审查」的评审员按步骤指定的目录、提交范围或安全关注点加载。同角色自定义步骤在目标为代码审查时同样适用。
+- **Git 工作台**。用户对工作区、分支或指定提交发起 AI 审查后，由审查首条消息点名加载。该会话按应用给出的基准、目标和文件读取命令审查。草拟提交信息、团队成员分析和需求拆解沿用各自的首条消息和提交工具。
+- 代码审查的方法由 Skill 提供。任务步骤验收用 `submit_review`，独立报告用 `submit_result`，Git 工作台用 `submit_findings`。可运行的检查由原会话权限决定，纯静态审查须如实说明证据来源。应用助手不分配此 Skill。
+
+### 13.2 验收标准
+
+| 用例 | 通过条件 |
+| --- | --- |
+| 有代码变更的步骤验收 | 读取任务上下文后收到明确的 Skill 触发指令。核对当前步骤和验收证据，继续使用 `submit_review`。失败结论包含至少一条 blocker 或 major |
+| 独立代码审查报告 | 按指定范围审查，继续使用 `submit_result`，仓库内容保持原样。版本对比能区分既有问题与该范围内引入的问题 |
+| Git 工作台审查 | 审查首条消息包含 Skill 触发指令、应用指定的读取范围和 `submit_findings`。问题包含文件、行号、严重程度、触发条件、影响、证据和修复建议。旧侧行号按 Git 审查接口标记，越界位置沿用现有校验。允许空问题列表 |
+| 复用评审配置的其他操作 | 提交信息草拟、团队成员分析及需求拆解的启动指令各自指向原操作。纯文档、产物或人工检查按对应验收要求进行 |
+| 角色与管理页 | 只分配给任务评审和 Git 工作台的评审配置。「我的 Skill」能查到正文、触发范围，并分别筛选任务评审员和 Git 工作台代码审查 |
