@@ -18,6 +18,7 @@ import type { z } from 'zod';
 import { type FakeStep, passReview, submitResult } from './helpers.ts';
 
 const nativeVue = process.env.AW_E2E_FRONTEND_VUE === '1';
+const appFolder = nativeVue ? 'web/' : '';
 const packageName = 'aw-frontend-fixture';
 const route = '/?status=archived#/orders';
 const html = (label: string) => `<!doctype html><html lang="zh"><meta charset="utf-8">
@@ -57,7 +58,7 @@ const editPage = (label: string): FakeStep =>
   nativeVue
     ? {
         type: 'edit',
-        file: 'caption.js',
+        file: `${appFolder}caption.js`,
         content: `export const caption = ${JSON.stringify(label)};
 `,
       }
@@ -127,12 +128,12 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
       { type: 'tool', tool: 'read', input: { filePath: 'package.json' }, output: '准备创建项目。' },
       permissionStep(build),
       { type: 'edit', file: '.gitignore', content: 'node_modules/\ndist/\n.DS_Store\n' },
-      { type: 'edit', file: 'package.json', content: JSON.stringify(manifest) },
+      { type: 'edit', file: `${appFolder}package.json`, content: JSON.stringify(manifest) },
       ...(vueLock !== null
         ? [
-            { type: 'edit' as const, file: 'pnpm-lock.yaml', content: vueLock },
-            { type: 'edit' as const, file: 'index.html', content: html('导出') },
-            { type: 'edit' as const, file: 'main.js', content: script },
+            { type: 'edit' as const, file: `${appFolder}pnpm-lock.yaml`, content: vueLock },
+            { type: 'edit' as const, file: `${appFolder}index.html`, content: html('导出') },
+            { type: 'edit' as const, file: `${appFolder}main.js`, content: script },
             editPage('订单操作准备中'),
           ]
         : [
@@ -376,7 +377,7 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
         expect.objectContaining({
           kind: 'command',
           passed: true,
-          command: nativeVue ? 'pnpm run build' : 'npm run build',
+          command: nativeVue ? "cd './web' && pnpm run build" : 'npm run build',
         }),
         expect.objectContaining({ kind: 'browser', passed: true }),
         expect.objectContaining({ kind: 'ai_review', passed: true }),

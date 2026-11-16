@@ -160,10 +160,38 @@ export async function inferRepoPreview(repoRoot: string): Promise<ProjectPreview
   return inferPreview(files, packageJson);
 }
 
-/** The checkout's own build and test scripts, including for a newly scaffolded frontend. */
+/** 项目根有启动脚本时沿用根目录，否则只采用唯一的直属前端包。 */
+async function frontendPackage(repoRoot: string) {
+  const root = { ...(await readRoot(repoRoot)), folder: null };
+  if (inferPreview(root.files, root.packageJson) !== null) return root;
+
+  let candidate: { files: Set<string>; packageJson: unknown; folder: string } | undefined;
+  for (const entry of await readdir(repoRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+    const directory = join(repoRoot, entry.name);
+    const packageJson = await readJson(join(directory, 'package.json'));
+    if (packageJson === undefined) continue;
+    const files = new Set(await readdir(directory));
+    if (inferPreview(files, packageJson) === null) continue;
+    if (candidate !== undefined) return root;
+    candidate = { files, packageJson, folder: entry.name };
+  }
+  return candidate ?? root;
+}
+
+export async function inferTaskFrontendPreview(repoRoot: string) {
+  const { files, packageJson, folder } = await frontendPackage(repoRoot);
+  const preview = inferPreview(files, packageJson);
+  return preview === null ? null : { preview, directory: folder === null ? repoRoot : join(repoRoot, folder) };
+}
+
+/** 在预览所在的包运行构建和测试。没有可推断的预览时，仍检查仓库根脚本。 */
 export async function frontendCheckCommands(repoRoot: string): Promise<string[]> {
-  const { files, packageJson } = await readRoot(repoRoot);
+  const { files, packageJson, folder } = await frontendPackage(repoRoot);
   const scripts = packageJsonSchema.safeParse(packageJson).data?.scripts ?? {};
   const manager = PACKAGE_MANAGERS.find(({ lockfile }) => files.has(lockfile)) ?? NO_LOCKFILE;
-  return ['build', 'test'].filter((name) => scripts[name] !== undefined).map((name) => `${manager.run} ${name}`);
+  const enter = folder === null ? '' : `cd './${folder.replaceAll("'", "'\\''")}' && `;
+  return ['build', 'test']
+    .filter((name) => scripts[name] !== undefined)
+    .map((name) => `${enter}${manager.run} ${name}`);
 }
