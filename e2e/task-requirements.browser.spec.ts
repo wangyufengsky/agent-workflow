@@ -68,13 +68,13 @@ test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → �
   await expect(merge).toBeDisabled();
 
   await checklist.getByText('查看清单与核验历史').click();
-  const history = checklist.locator('details', { has: checklist.getByText(/^版本 1 ·/) }).last();
+  const history = checklist.locator('details', { has: page.getByText(/^版本 1 ·/) }).last();
   await history.getByText(/^版本 1 ·/).click();
   await expect(history.getByText('预期：只显示匹配订单', { exact: false })).toBeVisible();
   await expect(history.getByText('false', { exact: true })).toBeVisible();
   await expect(history.getByText('未通过 · 命令', { exact: false })).toBeVisible();
 
-  const currentHistory = checklist.locator('details', { has: checklist.getByText(/^版本 2 ·/) }).last();
+  const currentHistory = checklist.locator('details', { has: page.getByText(/^版本 2 ·/) }).last();
   await currentHistory.getByText(/^版本 2 ·/).click();
   await expect(currentHistory.getByText('预期：只显示匹配订单，忽略大小写', { exact: false })).toBeVisible();
 
