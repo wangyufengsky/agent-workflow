@@ -60,8 +60,8 @@ export function createTranscriptStore<S extends { id: string }>({
      * started, with its lines merged into one piece (D104) and the seq and time of its last line; later pages (and SSE)
      * continue the part, which readers merge by `partId`.
      */
-    read(subject: S, afterSeq: number, isEnded: boolean): TranscriptPage {
-      const all = lines(fileOf(subject));
+    read(subject: S, afterSeq: number, isEnded: boolean, cutoff?: number): TranscriptPage {
+      const all = lines(fileOf(subject)).slice(0, cutoff);
       const page = all
         .slice(afterSeq, afterSeq + TRANSCRIPT_PAGE_SIZE)
         .map((line) => transcriptEntrySchema.parse(JSON.parse(line)));

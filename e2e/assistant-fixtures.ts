@@ -10,7 +10,7 @@ export const test = base.extend<{ ownedAssistantConversations: undefined }>({
       const capture = (response: Response) => {
         if (
           response.request().method() !== 'POST' ||
-          !new URL(response.url()).pathname.endsWith('/assistant/conversations') ||
+          !/\/assistant\/conversations(?:\/[^/]+\/continuations)?$/.test(new URL(response.url()).pathname) ||
           !response.ok()
         )
           return;

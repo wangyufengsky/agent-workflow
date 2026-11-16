@@ -217,11 +217,24 @@ export function createContextRenderer(deps: ContextDeps) {
     }
   }
 
+  function describeSessionProject(id: string | null): string {
+    if (id === null) return 'General conversation (no bound project).';
+    try {
+      const project = projects.getRecord(id);
+      return `Project "${project.name}" (project id ${project.id}, repository ${project.repoPath}).`;
+    } catch (err) {
+      if (err instanceof AppError && err.code === ErrorCode.ProjectNotFound)
+        return `Deleted project (project id ${id}); do not substitute the current page project.`;
+      throw err;
+    }
+  }
+
   return {
     render(input: {
       time: GetCurrentTimeOutput;
       uiMode: UiMode;
       page: AssistantPageRef | undefined;
+      projectId: string | null;
       filesDir: string;
       source: 'user' | 'app';
     }) {
@@ -237,6 +250,7 @@ export function createContextRenderer(deps: ContextDeps) {
             ? 'Pro-mode functions are not available; the user can switch to pro mode in the settings.'
             : 'All functions are available.',
         page: describeContextPage(input.page, input.source),
+        sessionProject: describeSessionProject(input.projectId),
         filesDir: input.filesDir,
       });
     },

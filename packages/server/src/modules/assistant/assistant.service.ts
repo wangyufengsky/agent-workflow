@@ -60,6 +60,8 @@ import {
 } from '../opencode/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { type ContextRenderer, localTime } from './assistant.context.ts';
+import { continuationBudget, fitContinuation } from './assistant.continuation-budget.ts';
+import { continuationContext } from './assistant.continuation-context.ts';
 import { recoveryContext } from './assistant.recovery-context.ts';
 import { type Conversation, createAssistantRepo } from './assistant.repo.ts';
 import { createAssistantUsage } from './assistant.usage.ts';
@@ -74,6 +76,7 @@ export type AssistantServiceDeps = {
   settings: SettingsService;
   attachments: AttachmentsService;
   context: ContextRenderer;
+  projects: import('../projects/index.ts').ProjectsService;
   slots: ModelSlots;
   dataDir: string;
   /** IANA zone the user's times are given in (15 §2). */
@@ -82,6 +85,7 @@ export type AssistantServiceDeps = {
 
 type TurnOutcome = { error: OpencodeError | undefined } | { requestError: unknown };
 type Turn = {
+  source: 'user' | 'app';
   confirmedStop: typeof AssistantTurnEvent.Abort | typeof AssistantTurnEvent.Timeout | null;
   abortPending: Promise<void> | null;
   request: AssistantPrompt | null;
@@ -187,11 +191,32 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     return conversation;
   }
 
-  function toDto(c: Conversation, summary: AssistantUsageDTO = usage.get(c.id)): AssistantConversationDTO {
+  function toDto(
+    c: Conversation,
+    summary: AssistantUsageDTO = usage.get(c.id),
+    continuationInfo?: { continuation: ReturnType<typeof repo.findContinuation>; sourceAvailable: boolean },
+  ): AssistantConversationDTO {
     const state = liveOf(c.id);
+    const continuation = continuationInfo === undefined ? repo.findContinuation(c.id) : continuationInfo.continuation;
     return {
+      continuation:
+        continuation === undefined
+          ? null
+          : {
+              sourceConversationId: continuation.sourceConversationId,
+              sourceAvailable:
+                continuationInfo === undefined
+                  ? repo.findConversation(continuation.sourceConversationId) !== undefined
+                  : continuationInfo.sourceAvailable,
+              cutoffSeq: continuation.cutoffSeq,
+              createdAt: continuation.createdAt,
+              handoffKind: continuation.handoffKind,
+              draftText: continuation.draftText,
+              consumedAt: continuation.consumedAt,
+            },
       id: c.id,
       title: c.title,
+      projectId: c.projectId,
       busy: state.busy || state.sending || state.deleting || state.stopping,
       queuePosition: slots.position(c.id),
       pendingPermissions: [...state.permissions.values()],
@@ -216,6 +241,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       time: localTime(clock.now(), deps.timeZone),
       uiMode: settings.get('ui.mode'),
       page,
+      projectId: c.projectId,
       source,
       filesDir: `. (absolute: ${filesDir(c.id)})`,
     });
@@ -300,6 +326,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     const messageId = createMessageId(clock.now());
     const started = usage.start(c.id, source, messageId);
     const turn: Turn = {
+      source,
       confirmedStop: null,
       abortPending: null,
       request: null,
@@ -390,7 +417,10 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         state.view.toEntries({
           type: OpencodeEventType.Error,
           sessionId: c.opencodeSessionId ?? '',
-          error: outcome.error,
+          error:
+            outcome.error.name === 'ContextOverflowError'
+              ? { ...outcome.error, data: { ...outcome.error.data, assistantTurnSource: turn.source } }
+              : outcome.error,
         }),
       );
     }
@@ -667,10 +697,16 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     list: (): AssistantConversationDTO[] => {
       const conversations = repo.listConversations();
       const summaries = usage.summaries(conversations.map((c) => c.id));
+      const ids = new Set(conversations.map((c) => c.id));
+      const continuations = new Map(repo.listContinuations().map((c) => [c.conversationId, c]));
       return conversations.map((c) => {
         const summary = summaries.get(c.id);
         if (summary === undefined) throw new Error('Missing assistant usage summary');
-        return toDto(c, summary);
+        const continuation = continuations.get(c.id);
+        return toDto(c, summary, {
+          continuation,
+          sourceAvailable: continuation !== undefined && ids.has(continuation.sourceConversationId),
+        });
       });
     },
     dispose: usage.dispose,
@@ -678,12 +714,14 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     findBySession: (sessionId: string): Conversation | undefined => repo.findBySession(sessionId),
     filesDir,
 
-    create(title: string | undefined): AssistantConversationDTO {
+    create(title: string | undefined, projectId?: string | null): AssistantConversationDTO {
+      if (projectId != null) deps.projects.getRecord(projectId);
       const now = clock.now();
       const id = randomUUID();
       repo.insertConversation({
         id,
         title: title ?? '',
+        projectId: projectId ?? null,
         opencodeSessionId: null,
         isolated: true,
         retiredSessionId: null,
@@ -692,6 +730,98 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       });
       log.info({ conversationId: id }, 'assistant conversation created');
       return publish(id);
+    },
+
+    continueConversation({
+      id,
+      requestId,
+      attachmentIds,
+    }: {
+      id: string;
+      requestId: string;
+      attachmentIds: string[];
+    }): AssistantConversationDTO {
+      const existing = repo.findContinuationByRequest(requestId);
+      if (existing !== undefined) {
+        if (existing.sourceConversationId !== id)
+          throw new AppError(ErrorCode.ValidationFailed, 'Request belongs to another source');
+        return toDto(get(existing.conversationId));
+      }
+      const source = get(id);
+      const state = liveOf(id);
+      if (state.busy || state.sending || state.deleting || state.stopping)
+        throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is busy`, { id });
+      const previous = repo.findContinuation(id);
+      const own = new Set(attachments.listByOwner({ kind: AttachmentOwnerKind.AssistantMessage, id }).map((a) => a.id));
+      if (attachmentIds.some((attachmentId) => !own.has(attachmentId)))
+        throw new AppError(ErrorCode.AttachmentNotFound, 'Not attachments of this conversation');
+      const entries: import('@aw/shared').TranscriptEntry[] = [];
+      let afterSeq = 0;
+      let page: TranscriptPage;
+      do {
+        page = transcripts.read(source, afterSeq, true);
+        entries.push(...page.entries);
+        afterSeq = page.lastSeq;
+      } while (page.hasMore);
+      const handoff = continuationContext(entries, previous?.handoffText);
+      const lastUserIndex = entries.findLastIndex((entry) => entry.kind === TranscriptEntryKind.UserMessage);
+      const lastUser = entries[lastUserIndex];
+      const overflow =
+        lastUserIndex >= 0 &&
+        entries
+          .slice(lastUserIndex + 1)
+          .some(
+            (entry) =>
+              entry.kind === TranscriptEntryKind.Error &&
+              entry.data.details?.opencodeErrorName === 'ContextOverflowError' &&
+              entry.data.details.assistantTurnSource !== 'app',
+          );
+      const draftText =
+        overflow && lastUser?.kind === TranscriptEntryKind.UserMessage
+          ? lastUser.data.text
+          : lastUserIndex < 0
+            ? (previous?.draftText ?? null)
+            : null;
+      const now = clock.now();
+      const childId = randomUUID();
+      unit.transact(() => {
+        repo.insertConversation({
+          id: childId,
+          title: source.title,
+          projectId: source.projectId,
+          opencodeSessionId: null,
+          isolated: true,
+          retiredSessionId: null,
+          createdAt: now,
+          updatedAt: now,
+        });
+        repo.insertContinuation({
+          conversationId: childId,
+          sourceConversationId: id,
+          requestId,
+          cutoffSeq: afterSeq,
+          handoffText: handoff.text,
+          handoffKind: handoff.kind,
+          draftText,
+          createdAt: now,
+          consumedAt: null,
+        });
+        attachments.bind({ kind: AttachmentOwnerKind.AssistantMessage, id: childId }, attachmentIds);
+      });
+      return publish(childId);
+    },
+
+    continuationHistory(id: string, afterSeq: number): TranscriptPage {
+      get(id);
+      const continuation = repo.findContinuation(id);
+      if (continuation === undefined) throw new AppError(ErrorCode.NotFound, 'Conversation has no source');
+      const source = get(continuation.sourceConversationId);
+      return transcripts.read(source, Math.min(afterSeq, continuation.cutoffSeq), true, continuation.cutoffSeq);
+    },
+
+    listAttachments(id: string): AttachmentDTO[] {
+      get(id);
+      return attachments.listByOwner({ kind: AttachmentOwnerKind.AssistantMessage, id });
     },
 
     /** 先清理运行时资源；外部删除失败则保留本地记录，用户可在恢复后重试。 */
@@ -730,6 +860,9 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           attachments.release(AttachmentOwnerKind.AssistantMessage, [id]);
           repo.deleteConversation(id);
         });
+        for (const continuation of repo.listContinuations()) {
+          if (continuation.sourceConversationId === id) publish(continuation.conversationId);
+        }
         if (c.opencodeSessionId !== null) sessions.delete(c.opencodeSessionId);
         live.delete(id);
         transcripts.forget(c);
@@ -792,16 +925,35 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           const sent = show();
           state.page = page;
           const queued = repo.pendingMessages(id);
-          const section = attachments.promptSection(sent, MCP_ASSISTANT_TOOL_PREFIX);
+          const continuation = repo.findContinuation(id);
+          const inherited =
+            continuation !== undefined && continuation.consumedAt === null
+              ? attachments.listByOwner({ kind: AttachmentOwnerKind.AssistantMessage, id })
+              : [];
+          const selected = [...new Map([...inherited, ...sent].map((a) => [a.id, a])).values()];
+          const section = attachments.promptSection(selected, MCP_ASSISTANT_TOOL_PREFIX);
+          const handoff =
+            continuation !== undefined && continuation.consumedAt === null
+              ? fitContinuation(
+                  continuation.handoffText,
+                  await continuationBudget(opencode, model, systemText, text + section),
+                )
+              : '';
           await prompt(
             c,
             sessionId,
             systemText,
-            [...queued.map((m) => m.text), text, ...(section === '' ? [] : [section])].join('\n\n'),
+            [
+              ...queued.map((m) => m.text),
+              ...(handoff === '' ? [] : [handoff]),
+              text,
+              ...(section === '' ? [] : [section]),
+            ].join('\n\n'),
             model,
             turn,
           );
           repo.acknowledgeMessages(queued.map((m) => m.id));
+          if (continuation !== undefined && continuation.consumedAt === null) repo.consumeContinuation(id, clock.now());
         },
         show,
       );

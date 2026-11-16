@@ -11,7 +11,8 @@ import {
   sendAssistantMessageRequestSchema,
   snapshotAssistantContextRequestSchema,
 } from '../contracts/api/assistant.ts';
-import { attachmentSchema, officeFilePreviewSchema } from '../contracts/api/attachments.ts';
+import { attachmentIdsSchema, attachmentSchema, officeFilePreviewSchema } from '../contracts/api/attachments.ts';
+import { transcriptPageSchema, transcriptQuerySchema } from '../contracts/api/attempts.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -51,6 +52,39 @@ export const createConversationOp = defineOperationContract({
   output: assistantConversationSchema,
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/assistant/conversations', status: 201 },
+});
+
+export const createAssistantContinuationOp = defineOperationContract({
+  ...common,
+  id: 'assistant.continue',
+  title: 'op.assistant.continue',
+  description: 'Continue a conversation with a bounded historical handoff',
+  input: byId.extend({ requestId: z.string().uuid(), attachmentIds: attachmentIdsSchema }),
+  output: assistantConversationSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/assistant/conversations/:id/continuations', status: 201 },
+});
+
+export const getAssistantContinuationHistoryOp = defineOperationContract({
+  ...common,
+  id: 'assistant.continuationHistory',
+  title: 'op.assistant.continuationHistory',
+  description: 'Read the source transcript up to the continuation cutoff',
+  input: byId.extend(transcriptQuerySchema.shape),
+  output: transcriptPageSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/assistant/conversations/:id/continuation/history' },
+});
+
+export const listAssistantAttachmentsOp = defineOperationContract({
+  ...common,
+  id: 'assistant.attachments',
+  title: 'op.assistant.attachments',
+  description: 'List attachments owned by a conversation',
+  input: byId,
+  output: z.object({ items: z.array(attachmentSchema) }),
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/assistant/conversations/:id/attachments' },
 });
 
 export const getConversationOp = defineOperationContract({

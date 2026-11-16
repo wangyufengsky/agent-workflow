@@ -2,8 +2,10 @@ import type { AssistantConversationDTO } from '@aw/shared';
 import { useId, useRef } from 'react';
 import { Icon } from '../../components/icon.tsx';
 import { ASSISTANT_COPY as C } from '../../copy/assistant.ts';
+import { ASSISTANT_CONTINUATION_COPY } from '../../copy/assistant-continuation.ts';
 import { Character } from '../companion/character.tsx';
 import styles from './assistant.module.css';
+import { useContinueConversation } from './conversation-continuation.tsx';
 
 export const titleOf = (c: AssistantConversationDTO) => (c.title === '' ? C.untitled : c.title);
 
@@ -15,17 +17,20 @@ export function ConversationMenu({
   conversations,
   active,
   onSelect,
+  draft = false,
 }: {
   conversations: readonly AssistantConversationDTO[];
   active: AssistantConversationDTO;
   onSelect: (id: string) => void;
+  draft?: boolean;
 }) {
   const id = useId();
   const menu = useRef<HTMLDivElement>(null);
+  const onContinue = useContinueConversation()?.start ?? null;
   return (
     <>
       <button type="button" className={styles.switcher} popoverTarget={id} aria-label={C.switchConversation}>
-        <span className="ellipsis">{titleOf(active)}</span>
+        <span className="ellipsis">{draft ? C.newConversation : titleOf(active)}</span>
         <span className={styles.switcherChevron} aria-hidden="true">
           <Icon name="chevRight" size="sm" />
         </span>
@@ -37,7 +42,7 @@ export function ConversationMenu({
             type="button"
             role="menuitemradio"
             data-testid={`conversation-${c.id}`}
-            aria-checked={c.id === active.id}
+            aria-checked={!draft && c.id === active.id}
             className={styles.menuItem}
             onClick={() => {
               onSelect(c.id);
@@ -46,9 +51,23 @@ export function ConversationMenu({
           >
             <span className="ellipsis grow">{titleOf(c)}</span>
             {c.busy && <Character size="xs" mood="thinking" />}
-            {c.id === active.id && <Icon name="check" size="sm" />}
+            {!draft && c.id === active.id && <Icon name="check" size="sm" />}
           </button>
         ))}
+        {onContinue !== null && (
+          <button
+            type="button"
+            role="menuitem"
+            className={styles.menuItem}
+            onClick={() => {
+              menu.current?.hidePopover();
+              onContinue();
+            }}
+          >
+            <Icon name="split" size="sm" />
+            {ASSISTANT_CONTINUATION_COPY.action}
+          </button>
+        )}
       </div>
     </>
   );

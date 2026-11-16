@@ -113,7 +113,14 @@ export function createSessionView() {
               data: {
                 code: ErrorCode.AttemptSessionError,
                 message: describeOpencodeError(event.error),
-                ...(event.error === undefined ? {} : { details: event.error.data }),
+                ...(event.error === undefined
+                  ? {}
+                  : {
+                      details:
+                        event.error.name === 'ContextOverflowError'
+                          ? { ...event.error.data, opencodeErrorName: event.error.name }
+                          : event.error.data,
+                    }),
               },
             },
           ];

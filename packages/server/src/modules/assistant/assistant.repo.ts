@@ -8,7 +8,12 @@ import {
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbExecutor } from '../../core/db/database.ts';
-import { assistantConfirmationsTable, assistantConversationsTable, assistantOutboxTable } from './assistant.table.ts';
+import {
+  assistantConfirmationsTable,
+  assistantContinuationsTable,
+  assistantConversationsTable,
+  assistantOutboxTable,
+} from './assistant.table.ts';
 
 export type Conversation = typeof assistantConversationsTable.$inferSelect;
 
@@ -33,6 +38,32 @@ export function createAssistantRepo(db: DbExecutor) {
   const confirmations = assistantConfirmationsTable;
   const outbox = assistantOutboxTable;
   return {
+    listContinuations() {
+      return db.select().from(assistantContinuationsTable).all();
+    },
+    findContinuation(id: string) {
+      return db
+        .select()
+        .from(assistantContinuationsTable)
+        .where(eq(assistantContinuationsTable.conversationId, id))
+        .get();
+    },
+    findContinuationByRequest(requestId: string) {
+      return db
+        .select()
+        .from(assistantContinuationsTable)
+        .where(eq(assistantContinuationsTable.requestId, requestId))
+        .get();
+    },
+    insertContinuation(row: typeof assistantContinuationsTable.$inferInsert): void {
+      db.insert(assistantContinuationsTable).values(row).run();
+    },
+    consumeContinuation(id: string, now: number): void {
+      db.update(assistantContinuationsTable)
+        .set({ consumedAt: now, draftText: null })
+        .where(eq(assistantContinuationsTable.conversationId, id))
+        .run();
+    },
     enqueueMessage(conversationId: string, text: string, createdAt: number): void {
       db.insert(outbox).values({ conversationId, text, createdAt }).run();
     },

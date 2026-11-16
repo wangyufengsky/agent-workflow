@@ -10,6 +10,7 @@ import { formatDateTime } from '../../copy/common.ts';
 import { HOME_COPY as C } from '../../copy/home.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { conversationsQuery } from '../assistant/assistant.queries.ts';
+import { ConversationContinuation } from '../assistant/conversation-continuation.tsx';
 import { ConversationMenu, titleOf } from '../assistant/conversation-menu.tsx';
 import { MessageList } from '../assistant/message-list.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
@@ -107,31 +108,29 @@ function HomeConversation({
   useEffect(() => {
     useUiStore.setState({ activeConversationId: conversation.id });
   }, [conversation.id]);
+  const select = (id: string) =>
+    void navigate({ to: ROUTES.home, search: (s) => ({ projectId: s.projectId, conversation: id }) });
   return (
-    <div className={styles.conversation}>
-      <div className={styles.conversationMain}>
-        <header className={styles.conversationHead}>
-          <Character mood={conversation.busy ? 'thinking' : undefined} />
-          <ConversationMenu
-            conversations={conversations}
-            active={conversation}
-            onSelect={(id) =>
-              void navigate({ to: ROUTES.home, search: (s) => ({ projectId: s.projectId, conversation: id }) })
-            }
-          />
-          <span className="grow" />
-          <Link to={ROUTES.home} search={(s) => ({ projectId: s.projectId })} className="btn sm">
-            <Icon name="plus" size="sm" />
-            {C.newConversation}
-          </Link>
-        </header>
-        <div className={styles.stream} data-testid="home-messages">
-          <MessageList key={conversation.id} conversation={conversation} />
+    <ConversationContinuation conversation={conversation} onContinued={select}>
+      <div className={styles.conversation}>
+        <div className={styles.conversationMain}>
+          <header className={styles.conversationHead}>
+            <Character mood={conversation.busy ? 'thinking' : undefined} />
+            <ConversationMenu conversations={conversations} active={conversation} onSelect={select} />
+            <span className="grow" />
+            <Link to={ROUTES.home} search={(s) => ({ projectId: s.projectId })} className="btn sm">
+              <Icon name="plus" size="sm" />
+              {C.newConversation}
+            </Link>
+          </header>
+          <div className={styles.stream} data-testid="home-messages">
+            <MessageList key={conversation.id} conversation={conversation} />
+          </div>
+          {composer}
         </div>
-        {composer}
+        <WorkRail />
       </div>
-      <WorkRail />
-    </div>
+    </ConversationContinuation>
   );
 }
 
@@ -155,6 +154,13 @@ export function HomePage() {
       conversation={conversation}
       projects={projects}
       projectId={projectId ?? ''}
+      assistantProjectId={search.assistantProjectId ?? null}
+      onAssistantProjectChange={(id) =>
+        void navigate({
+          search: (s) => ({ ...s, conversation: undefined, assistantProjectId: id ?? undefined }),
+          replace: true,
+        })
+      }
       onProjectChange={(id) => void navigate({ search: (s) => ({ ...s, projectId: id }), replace: true })}
       initialWorkflowKey={search.workflow}
       initialRequirement={search.requirement}

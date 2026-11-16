@@ -15,11 +15,13 @@ import { DATABASES_COPY } from '../../copy/databases.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
 import { AGENTS_MD_COPY, PROJECTS_COPY as C } from '../../copy/projects.ts';
 import { ProjectDatabases } from '../databases/project-databases.tsx';
+import { DEFAULT_START_WORKFLOW } from '../home/workflow-icon.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { HostingPanel } from './hosting-form.tsx';
 import { ProjectAgentsMd } from './project-agents-md.tsx';
 import { ProjectAllowedBash } from './project-allowed-bash.tsx';
 import { ProjectPreviewForm } from './project-preview.tsx';
+import { ProjectRecentTasks } from './project-recent-tasks.tsx';
 import { projectQuery, useDeleteProject, useUpdateProject } from './projects.queries.ts';
 
 const route = getRouteApi(ROUTE_IDS.project);
@@ -131,11 +133,24 @@ export function ProjectDetailPage() {
           <h1 className="title">{p.name}</h1>
           <p className="lede mono">{p.repoPath}</p>
         </div>
+        <div className="row">
+          <Link to={ROUTES.home} search={{ projectId: p.id, workflow: DEFAULT_START_WORKFLOW }} className="btn primary">
+            {C.startTask}
+          </Link>
+          <Link to={ROUTES.home} search={{ assistantProjectId: p.id }} className="btn secondary">
+            {C.askProject}
+          </Link>
+        </div>
+      </div>
+      <section className="section">
+        <ProjectRecentTasks projectId={p.id} />
+      </section>
+      <section className="section">
         <Link to={ROUTES.pptNew} search={{ projectId: p.id }} className="btn sm">
           <Icon name="slides" size="sm" />
           {PPT_COPY.makeDeck}
         </Link>
-      </div>
+      </section>
       <Panel title={C.title}>
         {/* Keyed by the saved values so the form resets when the project changes underneath it. */}
         <ProjectForm key={`${p.id}:${p.updatedAt}`} project={p} />

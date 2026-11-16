@@ -161,6 +161,7 @@ const homeRoute = createRoute({
   // (28 §2.1).
   validateSearch: z.object({
     conversation: z.string().optional(),
+    assistantProjectId: z.string().optional(),
     projectId: z.string().optional(),
     workflow: z.string().optional(),
     requirement: z.string().optional(),

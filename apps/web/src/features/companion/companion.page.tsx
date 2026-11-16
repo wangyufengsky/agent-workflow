@@ -178,7 +178,15 @@ export function CompanionPage() {
                 <MessageList key={conversation.id} conversation={conversation} />
               )}
             </div>
-            <Composer conversation={conversation} inputRef={input} disabled={create.isPending} />
+            <Composer
+              conversation={conversation}
+              inputRef={input}
+              disabled={create.isPending}
+              projectId={null}
+              onProjectChange={(projectId) =>
+                create.mutate({ projectId }, { onSuccess: (c) => useUiStore.getState().setActiveConversation(c.id) })
+              }
+            />
           </section>
         )}
         {notice !== undefined && (

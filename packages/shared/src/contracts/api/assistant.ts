@@ -51,6 +51,18 @@ export type AssistantUsageDTO = z.infer<typeof assistantUsageSchema>;
 export const assistantConversationSchema = z.object({
   id: z.string(),
   title: z.string(),
+  projectId: z.string().nullable(),
+  continuation: z
+    .object({
+      sourceConversationId: z.string(),
+      sourceAvailable: z.boolean(),
+      cutoffSeq: z.number(),
+      createdAt: z.number(),
+      handoffKind: z.enum(['summary', 'recent']),
+      draftText: z.string().nullable(),
+      consumedAt: z.number().nullable(),
+    })
+    .nullable(),
   busy: z.boolean(),
   /** The turn waits for a model slot (D186): 1 = next; null when not queued. */
   queuePosition: z.number().int().positive().nullable(),
@@ -113,7 +125,10 @@ const assistantContextSourceSchema = z.discriminatedUnion('kind', [
 export const snapshotAssistantContextRequestSchema = z.strictObject({ source: assistantContextSourceSchema });
 export type SnapshotAssistantContextRequest = z.infer<typeof snapshotAssistantContextRequestSchema>;
 
-export const createConversationRequestSchema = z.object({ title: z.string().trim().min(1).optional() });
+export const createConversationRequestSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  projectId: z.string().min(1).nullable().optional(),
+});
 
 export const sendAssistantMessageRequestSchema = z.object({
   id: z.string(),

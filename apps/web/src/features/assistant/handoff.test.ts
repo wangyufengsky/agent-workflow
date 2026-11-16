@@ -5,6 +5,8 @@ import { panelFollowsUser } from './handoff.ts';
 const conversation = (busy: boolean): AssistantConversationDTO => ({
   id: 'c1',
   title: '',
+  projectId: null,
+  continuation: null,
   busy,
   queuePosition: null,
   pendingPermissions: [],

@@ -222,14 +222,10 @@ export async function box(
 }
 
 /**
- * Starts a new conversation in the assistant panel (or the companion's chat) and waits until it is the one shown:
- * the input stays disabled while it is created, so what is typed cannot go to the previous conversation.
+ * Opens a new assistant draft. The conversation is created once its first message is sent.
  */
-export async function newConversation(page: Page, scope: Locator): Promise<void> {
-  const created = page.waitForResponse(
-    (r) => r.request().method() === 'POST' && r.url().endsWith('/assistant/conversations'),
-  );
+export async function newConversation(scope: Locator): Promise<void> {
   await scope.getByRole('button', { name: '新对话', exact: true }).click();
-  await created;
+  await expect(scope.getByRole('heading', { name: '有什么可以帮你？' })).toBeVisible();
   await expect(scope.getByLabel('发给助手的消息')).toBeEnabled();
 }
