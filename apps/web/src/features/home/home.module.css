@@ -133,6 +133,10 @@
   border-top: 1px solid var(--hairline);
   font-size: var(--fs-sm);
 }
+.dockedProject {
+  min-width: 0;
+  max-width: min(240px, 40%);
+}
 .boxFoot .check {
   align-items: center;
   color: var(--ink-2);

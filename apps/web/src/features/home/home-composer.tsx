@@ -215,6 +215,14 @@ export function HomeComposer({
     }
   };
 
+  const conversationProject = mode === undefined && (
+    <ConversationProjectSelect
+      value={conversation === undefined ? assistantProjectId : conversation.projectId}
+      projects={projects}
+      onChange={onAssistantProjectChange}
+    />
+  );
+
   return (
     <div className={styles.composerArea} data-docked={docked || undefined}>
       <form
@@ -270,13 +278,7 @@ export function HomeComposer({
             )}
           </div>
         )}
-        {mode === undefined && (
-          <ConversationProjectSelect
-            value={conversation === undefined ? assistantProjectId : conversation.projectId}
-            projects={projects}
-            onChange={onAssistantProjectChange}
-          />
-        )}
+        {!docked && conversationProject}
         <textarea
           ref={input}
           className={styles.input}
@@ -392,6 +394,7 @@ export function HomeComposer({
         )}
         <div className={styles.boxFoot}>
           <AddMenu items={addItems} onOpen={context.capture} />
+          {docked && conversationProject && <div className={styles.dockedProject}>{conversationProject}</div>}
           {mode === undefined && <AssistantSkillPicker selected={skillIds} onChange={setSkillIds} />}
           {initiativeMode ? (
             <>
