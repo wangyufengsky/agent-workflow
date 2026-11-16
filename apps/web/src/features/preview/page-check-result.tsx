@@ -13,7 +13,7 @@ export function PageShot({ taskId, page }: { taskId: string; page: Page & { scre
   const [open, setOpen] = useState(false);
   const src = useImage(taskFileUrl(taskId, page.screenshot));
   const viewport = PREVIEW_PANE_COPY.viewports[page.viewport];
-  if (src === null) return <span className="hint">截图不可用或已被清理</span>;
+  if (src === null) return <span className="hint">{C.shotUnavailable}</span>;
   return (
     <>
       <button type="button" className={styles.thumb} onClick={() => setOpen(true)}>

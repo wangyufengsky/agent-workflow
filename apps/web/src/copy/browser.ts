@@ -162,6 +162,7 @@ export const PAGE_CHECK_COPY = {
   skipped: '这项检查被跳过了，页面没有验证。',
   enlarge: (path: string, viewport: string) => `放大 ${path}（${viewport}）`,
   shot: (path: string, viewport: string) => `${path} · ${viewport}`,
+  shotUnavailable: '截图不可用或已被清理',
   noPages: '没有检查页面。',
   section: '页面',
   morePages: (n: number) => `其余 ${n} 页`,

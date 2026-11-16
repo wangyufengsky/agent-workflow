@@ -107,12 +107,10 @@ export function RequirementsSection({ task }: { task: TaskDetailDTO }) {
                     <span className="hint">
                       {C.sourceLabel[item.latest.source]} · {new Date(item.latest.createdAt).toLocaleString()}
                     </span>
-                    <span className="hint">
-                      {`清单版本 ${item.latest.revisionId} · 提交 ${item.latest.commitSha.slice(0, 12)}`}
-                    </span>
+                    <span className="hint">{C.resultVersion(item.latest.revisionId, item.latest.commitSha)}</span>
                     {item.latest.nodeId != null && (
                       <Link to={ROUTES.node} params={{ taskId: task.id, nodeId: item.latest.nodeId }} search={{}}>
-                        查看核验步骤当前详情
+                        {C.viewVerificationNode}
                       </Link>
                     )}
                     {item.status === RequirementDisplayStatus.Stale && <span className="hint">{C.staleHint}</span>}

@@ -44,6 +44,8 @@ export const REQUIREMENTS_COPY = {
   } satisfies Record<RequirementResultSource, string>,
   staleHint: '代码或清单改过了，这条结论说的是之前的版本。',
   expectedIs: (expected: string) => `预期：${expected}`,
+  resultVersion: (revisionId: string, sha: string) => `清单版本 ${revisionId} · 提交 ${sha.slice(0, 12)}`,
+  viewVerificationNode: '查看核验步骤当前详情',
   output: '命令输出',
   history: '查看清单与核验历史',
   historyVersion: (seq: number, date: string) => `版本 ${seq} · ${date}`,

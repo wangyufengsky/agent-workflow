@@ -94,7 +94,24 @@ test('无法运行的命令跳过后，从结果卡读取当次检查证据', as
   const result = page.getByTestId('result-card');
   await expect(result).toContainText('已跳过', { timeout: TASK_RUN_TIMEOUT_MS });
   const evidence = result.getByTestId('check-evidence-row').first();
+  const evidenceRoute = '**/tasks/*/check-evidence/*';
+  await page.route(evidenceRoute, (route) =>
+    route.fulfill({ status: 404, json: { error: { code: 'NOT_FOUND', message: 'Evidence missing' } } }),
+  );
   await evidence.getByRole('button', { name: '查看证据' }).click();
+  await expect(evidence.getByText('证据不可用或结果已更新，请重新打开任务。')).toBeVisible();
+  await expect(evidence.getByRole('button', { name: '重试' })).toHaveCount(0);
+  await evidence.getByRole('button', { name: '收起证据' }).click();
+  await page.unroute(evidenceRoute);
+
+  await page.route(evidenceRoute, (route) =>
+    route.fulfill({ status: 500, json: { error: { code: 'INTERNAL_ERROR', message: 'Temporary failure' } } }),
+  );
+  await evidence.getByRole('button', { name: '查看证据' }).click();
+  const retry = evidence.getByRole('alert').getByRole('button', { name: '重试' });
+  await expect(retry).toBeVisible();
+  await page.unroute(evidenceRoute);
+  await retry.click();
   await evidence.getByText('aw-command-that-does-not-exist').click();
   await expect(evidence).toContainText('已跳过');
   await expect(evidence.locator('pre')).toBeVisible();

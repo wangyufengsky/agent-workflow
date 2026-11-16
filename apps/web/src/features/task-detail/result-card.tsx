@@ -2,6 +2,7 @@ import {
   AcceptanceCheckKind,
   DeliveryStatus,
   DeliveryStrategy,
+  ErrorCode,
   type TaskDetailDTO,
   TaskStatus,
   taskCheckEvidenceOp,
@@ -12,10 +13,11 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
-import { callOperation } from '../../api/client.ts';
+import { ApiError, callOperation } from '../../api/client.ts';
 import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { DiffDialog } from '../../components/diff/diff-dialog.tsx';
+import { ErrorState } from '../../components/error-state.tsx';
 import { ExternalLink } from '../../components/external-link.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { Markdown } from '../../components/markdown.tsx';
@@ -227,8 +229,14 @@ function Evidence({ taskId, evidenceId }: { taskId: string; evidenceId: string }
         {open ? C.checkEvidenceClose : C.checkEvidenceView}
       </Button>
       {open && query.isPending && <p className="hint">{C.checkEvidenceLoading}</p>}
-      {open && query.isError && <p className="hint">{C.checkEvidenceUnavailable}</p>}
-      {open && query.data !== undefined && <Check taskId={taskId} check={query.data} />}
+      {open &&
+        query.isError &&
+        (query.error instanceof ApiError && query.error.code === ErrorCode.NotFound ? (
+          <p className="hint">{C.checkEvidenceUnavailable}</p>
+        ) : (
+          <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+        ))}
+      {open && query.isSuccess && <Check taskId={taskId} check={query.data} />}
     </div>
   );
 }
