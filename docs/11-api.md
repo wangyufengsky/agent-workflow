@@ -139,7 +139,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/tasks/:id/review-feedback` | `{ commentIds: string[], note? }`；`completed → running`，按勾选的审查意见追加「按审查意见修改」节点；见 §5.4 |
 | GET | `/tasks/:id/check-evidence/:evidenceId` | `tasks.checkEvidence`（read）：按结果中该检查的 `evidenceId` 延迟读取当次检查的 `CheckResult`；标识不属于当前任务结果或证据不可用时返回 404 `NOT_FOUND`（UX-03） |
 | POST | `/tasks/:id/delivery-status` | 刷新当前 PR / MR 状态并保存最近成功结果；失败保存错误，保留旧快照。仅查询配置仓库下的已记录 URL。 |
-| GET | `/initiatives/:id/items/:key/merge-readiness` | 对照平台合入提交与需求计划本地基础分支，返回远端、等待本地或可确认状态；不自动确认。 |
+| GET | `/initiatives/:id/items/:key/merge-readiness` | 对照平台合入提交与需求计划本地基础分支，返回远端、等待本地、证据不足或可确认状态；旧交付缺少 head 时不推测；GitLab 缺合入提交时仅在原交付 head 确实是本地基础分支祖先时确认；不自动确认。用户可在页面重新检查本地分支，Git 错误显示后可重试。 |
 | GET | `/tasks/:id/diff` | `DiffDTO { base, files }`：worktree（含未提交改动）相对任务分支与目标分支的 merge-base（起初即基线提交；解决冲突合入目标分支后为目标分支的提交）的文件列表与增删统计。已交付且 worktree 不再可用时对比该次交付的 `diffBase` 与 `diffHead`；范围或提交不可用时返回 404 `NOT_FOUND`（UX-03） |
 | GET | `/tasks/:id/diff/file?path=` | 单文件 unified diff `FileDiffDTO`（超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }`） |
 

@@ -683,7 +683,7 @@ export function createInitiativesService({
         createdAt: now,
         updatedAt: now,
       });
-      if (input.attachmentIds !== undefined) attachments.bind(owner(id), input.attachmentIds);
+      if (input.attachmentIds !== undefined) attachments.bind(owner(id), input.attachmentIds, input.projectId);
     });
     log.info({ initiativeId: id }, 'initiative created for breakdown');
     await startRun(get(id), InitiativeRunMode.Breakdown, '', { instruction: null, openPhase: null });
@@ -794,7 +794,7 @@ export function createInitiativesService({
             updatedAt: now,
           });
         });
-        if (input.attachmentIds !== undefined) attachments.bind(owner(id), input.attachmentIds);
+        if (input.attachmentIds !== undefined) attachments.bind(owner(id), input.attachmentIds, input.projectId);
       });
       log.info({ initiativeId: id, template: template.key, review: input.review }, 'initiative created');
       publish(id);
@@ -990,7 +990,16 @@ export function createInitiativesService({
     async mergeReadiness(
       id: string,
       key: string,
-    ): Promise<{ state: 'unknown' | 'remote_pending' | 'remote_closed' | 'local_pending' | 'ready' }> {
+    ): Promise<{
+      state:
+        | 'unknown'
+        | 'refresh_failed'
+        | 'remote_pending'
+        | 'remote_closed'
+        | 'unverified'
+        | 'local_pending'
+        | 'ready';
+    }> {
       const initiative = get(id);
       const item = itemOf(initiative, key);
       return checkMergeReadiness(

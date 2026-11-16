@@ -96,7 +96,7 @@ export function createTaskChanges(
     unit.transact(() => {
       const [node] = appendSteps(task, added, revision.feedback, event);
       if (node === undefined) throw new Error('No step was appended');
-      deps.attachments.bind({ kind: AttachmentOwnerKind.TaskFeedback, id: node.id }, attachmentIds);
+      deps.attachments.bind({ kind: AttachmentOwnerKind.TaskFeedback, id: node.id }, attachmentIds, task.projectId);
     });
   }
 

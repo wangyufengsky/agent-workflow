@@ -6,6 +6,7 @@ import {
   answerDraft,
   askKnowledgeOp,
   CitationProblemCode,
+  createInitiativeOp,
   createTaskOp,
   deleteKnowledgeOp,
   deleteProjectOp,
@@ -129,6 +130,13 @@ describe('知识问答', () => {
       start: false,
     };
     expect((await t.call(createTaskOp, { ...draft, projectId: other.id })).status).toBe(400);
+    const breakdown = await t.call(createInitiativeOp, {
+      projectId: other.id,
+      requirement: draft.requirement,
+      attachmentIds: draft.attachmentIds,
+    });
+    expect(breakdown.status).toBe(400);
+    expect(breakdown.body).toMatchObject({ error: { code: ErrorCode.AttachmentSourceInvalid } });
     const task = await t.call(createTaskOp, { ...draft, projectId: p.id });
     expect(task.status).toBe(201);
     expect(task.body.attachments.map((a) => a.id)).toEqual([saved.body.id]);

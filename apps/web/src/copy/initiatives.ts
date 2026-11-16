@@ -93,6 +93,8 @@ export const INITIATIVES_COPY = {
   recheckMergeReadiness: '重新检查本地分支',
   mergeReadiness: {
     unknown: '请先在任务页刷新交付状态。',
+    refresh_failed: '远端状态刷新失败，请到任务页查看原因并重试。',
+    unverified: '远端已合入，但现有证据无法确认本地包含本次交付；请在平台和本地核对后手动确认。',
     remote_pending: '远端待合入。',
     remote_closed: '远端请求已关闭。',
     local_pending: '远端已合入，等待本地基础分支包含可验证的合入提交。',

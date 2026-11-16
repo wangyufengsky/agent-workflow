@@ -140,7 +140,7 @@ function ItemActions({ initiative, item }: { initiative: InitiativeDetailDTO; it
           {C.recheckMergeReadiness}
         </Button>
       )}
-      {item.status === InitiativeItemStatus.PrOpen && readiness.data !== undefined && (
+      {item.status === InitiativeItemStatus.PrOpen && !readiness.isError && readiness.data !== undefined && (
         <p className="hint">{C.mergeReadiness[readiness.data.state]}</p>
       )}
       {item.status === InitiativeItemStatus.PrOpen && (

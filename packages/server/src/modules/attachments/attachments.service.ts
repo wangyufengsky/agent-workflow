@@ -398,7 +398,7 @@ export function createAttachmentsService({
      * Gives `owner` the attachments in this order; called inside the owner's transaction (30 §5). The owner decides
      * which ids its caller may use (e.g. only the conversation's own).
      */
-    bind(owner: Owner, attachmentIds: readonly string[], projectId?: string): void {
+    bind(owner: Owner, attachmentIds: readonly string[], projectId: string | null): void {
       if (attachmentIds.length > ATTACHMENTS_PER_INPUT_MAX) {
         throw tooLarge(AttachmentLimit.Count, ATTACHMENTS_PER_INPUT_MAX);
       }
@@ -412,7 +412,7 @@ export function createAttachmentsService({
         throw new AppError(ErrorCode.AttachmentNotFound, 'Attachments not found', { ids: missing });
       }
       if (
-        projectId !== undefined &&
+        projectId !== null &&
         attachments.some(({ origin }) => origin !== null && 'kind' in origin && origin.projectId !== projectId)
       ) {
         throw new AppError(ErrorCode.AttachmentSourceInvalid, 'Knowledge answer belongs to a different project');

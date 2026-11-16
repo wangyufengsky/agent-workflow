@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 import { AppError, ErrorCode, type ProjectRuntimeCheck, projectRuntimeCheckSchema } from '@aw/shared';
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
 import type { Logger } from '../../core/logger.ts';
@@ -22,6 +23,17 @@ type Deps = {
   dataDir: string;
   log: Logger;
 };
+const journalSchema = z.object({ repoPath: z.string().min(1).refine(isAbsolute) });
+const isMissing = (error: unknown): boolean => error instanceof Error && 'code' in error && error.code === 'ENOENT';
+async function resolvedPath(path: string): Promise<string> {
+  try {
+    return await realpath(path);
+  } catch (error) {
+    if (isMissing(error)) return resolve(path);
+    throw error;
+  }
+}
+
 type Start = { id: string; branch: string; configVersion: number; runCommand: boolean; runPreview: boolean };
 
 export function createProjectRuntimeService({ db, clock, env, locks, projects, acceptance, dataDir, log }: Deps) {
@@ -59,16 +71,24 @@ export function createProjectRuntimeService({ db, clock, env, locks, projects, a
         projectId: project.id,
         branch: input.branch,
         configVersion: project.updatedAt,
-        checkCommand: input.runCommand ? project.checkCommand : null,
-        preview: input.runPreview ? project.preview : null,
+        checkCommand: project.checkCommand,
+        preview: project.preview,
         startedAt: clock.now(),
         finishedAt: null,
         status: 'running',
         repository: pending(),
         command:
-          input.runCommand && project.checkCommand !== null ? pending() : { status: 'not_configured', output: '' },
+          project.checkCommand === null
+            ? { status: 'not_configured', output: '' }
+            : input.runCommand
+              ? pending()
+              : { status: 'skipped', output: '' },
         previewResult:
-          input.runPreview && project.preview !== null ? pending() : { status: 'not_configured', output: '' },
+          project.preview === null
+            ? { status: 'not_configured', output: '' }
+            : input.runPreview
+              ? pending()
+              : { status: 'skipped', output: '' },
       };
       save(check);
       const abort = new AbortController();
@@ -81,8 +101,8 @@ export function createProjectRuntimeService({ db, clock, env, locks, projects, a
             repoPath: project.repoPath,
             workspaceRoot,
             branch: input.branch,
-            checkCommand: check.checkCommand,
-            preview: check.preview,
+            checkCommand: input.runCommand ? check.checkCommand : null,
+            preview: input.runPreview ? check.preview : null,
             signal: abort.signal,
             env,
             clock,
@@ -91,16 +111,20 @@ export function createProjectRuntimeService({ db, clock, env, locks, projects, a
             onProgress(parts) {
               Object.assign(check, {
                 repository: parts.repository,
-                command: parts.command,
-                previewResult: parts.preview,
+                command:
+                  !input.runCommand && check.checkCommand !== null ? { status: 'skipped', output: '' } : parts.command,
+                previewResult:
+                  !input.runPreview && check.preview !== null ? { status: 'skipped', output: '' } : parts.preview,
               });
               save(check);
             },
           });
           Object.assign(check, {
             repository: result.repository,
-            command: result.command,
-            previewResult: result.preview,
+            command:
+              !input.runCommand && check.checkCommand !== null ? { status: 'skipped', output: '' } : result.command,
+            previewResult:
+              !input.runPreview && check.preview !== null ? { status: 'skipped', output: '' } : result.preview,
           });
           check.status = abort.signal.aborted ? 'stopped' : 'completed';
         } catch (error) {
@@ -146,29 +170,48 @@ export function createProjectRuntimeService({ db, clock, env, locks, projects, a
       for (const name of await readdir(base)) {
         if (!/^[a-f0-9-]{36}$/.test(name)) continue;
         const root = join(base, name);
+        let stage = 'read_journal';
         try {
-          const journal: unknown = JSON.parse(await readFile(join(root, 'journal.json'), 'utf8'));
-          if (
-            typeof journal !== 'object' ||
-            journal === null ||
-            !('repoPath' in journal) ||
-            typeof journal.repoPath !== 'string'
-          )
+          let contents: string;
+          try {
+            contents = await readFile(join(root, 'journal.json'), 'utf8');
+          } catch (error) {
+            if (!isMissing(error)) throw error;
+            // An interrupted mkdir before the journal was written leaves only an empty managed directory.
+            const entries = await readdir(root).catch((cause: unknown) => {
+              if (isMissing(cause)) return [];
+              throw cause;
+            });
+            if (entries.length !== 0) throw error;
+            await rm(root, { recursive: true, force: true });
             continue;
-          const repoPath = journal.repoPath;
+          }
+          stage = 'validate_journal';
+          const { repoPath } = journalSchema.parse(JSON.parse(contents));
+          stage = 'remove_worktree';
           await locks.run(repoPath, async () => {
             const directory = join(root, 'worktree');
             const worktrees = await listWorktrees(repoPath);
-            const actual = await realpath(directory).catch(() => resolve(directory));
-            const paths = await Promise.all(
-              worktrees.map((worktree) => realpath(worktree.path).catch(() => resolve(worktree.path))),
-            );
+            const actual = await resolvedPath(directory);
+            const paths = await Promise.all(worktrees.map((worktree) => resolvedPath(worktree.path)));
             if (paths.includes(actual))
               await runGit(['worktree', 'remove', '--force', '--', directory], { cwd: repoPath, env });
           });
+          stage = 'remove_journal';
           await rm(root, { recursive: true, force: true });
-        } catch {
-          /* Keep the journal for another startup if the repository is unavailable. */
+        } catch (error) {
+          // Keep the recovery record without logging the journal or Git output.
+          const code =
+            error instanceof AppError
+              ? error.code
+              : error instanceof Error && 'code' in error && typeof error.code === 'string'
+                ? error.code
+                : error instanceof SyntaxError
+                  ? 'INVALID_JSON'
+                  : error instanceof z.ZodError
+                    ? 'INVALID_JOURNAL'
+                    : 'UNKNOWN';
+          log.warn({ workspaceId: name, stage, code }, 'project runtime workspace recovery failed');
         }
       }
       for (const row of db.select().from(projectRuntimeChecksTable).all()) {

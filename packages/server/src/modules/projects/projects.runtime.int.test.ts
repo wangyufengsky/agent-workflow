@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -223,4 +224,79 @@ it('reports cleanup failure after a stopped check and retries the retained journ
   await t.close();
   t = await createTestApp({ dataDir });
   expect((await repo.git('worktree', 'list', '--porcelain')).match(/^worktree /gm)).toHaveLength(1);
+});
+
+it('retains reviewed configuration and marks unchecked commands as skipped', async () => {
+  const { project } = await addProject(t);
+  const preview = {
+    command: 'node -e "process.exit(1)"',
+    setupCommand: null,
+    readyPath: '/',
+    pages: ['/'],
+    extraOrigins: [],
+  };
+  const configured = (
+    await t.call(updateProjectOp, { id: project.id, checkCommand: 'node -e "process.exit(1)"', preview })
+  ).body;
+  const started = await t.call(startProjectRuntimeCheckOp, {
+    id: project.id,
+    branch: 'main',
+    configVersion: configured.updatedAt,
+    runCommand: false,
+    runPreview: false,
+  });
+  expect(started.body).toMatchObject({
+    checkCommand: configured.checkCommand,
+    preview,
+    command: { status: 'skipped' },
+    previewResult: { status: 'skipped' },
+  });
+  await vi.waitFor(
+    async () => {
+      const result = (await t.call(getProjectRuntimeCheckOp, { id: project.id })).body;
+      expect(result).toMatchObject({
+        status: 'completed',
+        checkCommand: configured.checkCommand,
+        preview,
+        repository: { status: 'passed' },
+        command: { status: 'skipped' },
+        previewResult: { status: 'skipped' },
+      });
+    },
+    { timeout: 10000 },
+  );
+});
+
+it('logs and retains invalid or inaccessible journals while removing only blank managed directories', async () => {
+  const dataDir = t.dataDir;
+  await t.close();
+  const base = join(dataDir, 'runtime-checks');
+  const malformed = '11111111-1111-1111-1111-111111111111';
+  const invalid = '22222222-2222-2222-2222-222222222222';
+  const unavailable = '33333333-3333-3333-3333-333333333333';
+  const missingJournal = '44444444-4444-4444-4444-444444444444';
+  const empty = '55555555-5555-5555-5555-555555555555';
+  for (const id of [malformed, invalid, unavailable, missingJournal, empty])
+    await mkdir(join(base, id), { recursive: true });
+  await writeFile(join(base, malformed, 'journal.json'), '{private-secret');
+  await writeFile(join(base, invalid, 'journal.json'), JSON.stringify({ repoPath: 42 }));
+  await writeFile(
+    join(base, unavailable, 'journal.json'),
+    JSON.stringify({ repoPath: join(base, 'missing-repository') }),
+  );
+  await writeFile(join(base, missingJournal, 'unknown-file'), 'keep');
+  t = await createTestApp({ dataDir });
+  const warnings = t.logs.filter((line) => line.msg === 'project runtime workspace recovery failed');
+  expect(warnings).toHaveLength(4);
+  expect(warnings).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ workspaceId: malformed, stage: 'validate_journal', code: 'INVALID_JSON' }),
+      expect.objectContaining({ workspaceId: invalid, stage: 'validate_journal', code: 'INVALID_JOURNAL' }),
+      expect.objectContaining({ workspaceId: unavailable, stage: 'remove_worktree' }),
+      expect.objectContaining({ workspaceId: missingJournal, stage: 'read_journal', code: 'ENOENT' }),
+    ]),
+  );
+  expect(JSON.stringify(warnings)).not.toContain('private-secret');
+  for (const id of [malformed, invalid, unavailable, missingJournal]) expect(existsSync(join(base, id))).toBe(true);
+  expect(existsSync(join(base, empty))).toBe(false);
 });
