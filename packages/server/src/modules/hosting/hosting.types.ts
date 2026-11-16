@@ -12,6 +12,16 @@ export type PlatformReviewComment = Omit<ReviewCommentDTO, 'selectedByDefault'>;
 /** Comments of each kind read from a pull request (21 §2.2); more are not shown. */
 export const REVIEW_COMMENTS_MAX = 100;
 
+/** 平台按当前 head 返回的状态；mergeCommit 只在平台确认合并后可信。 */
+export type PullRequestStatus = {
+  state: 'open' | 'closed' | 'merged' | 'locked';
+  head: string;
+  targetBranch: string;
+  mergeCommit: string | null;
+  ci: string | null;
+  review: string | null;
+};
+
 /** A hosting platform (03 §4.2 extension point) for one repository, authenticated with the project's token. */
 export type GitHostingProvider = {
   /** Whether the token can read the repository; HOSTING_AUTH_FAILED otherwise. */
@@ -20,6 +30,8 @@ export type GitHostingProvider = {
   createPullRequest(input: PullRequestInput): Promise<{ url: string }>;
   /** The open pull request from `branch` of the repository itself, if there is one. */
   findOpenPullRequest(branch: string): Promise<OpenPullRequest | undefined>;
+  /** 当前 head 的平台状态。 */
+  getPullRequestStatus(number: number): Promise<PullRequestStatus>;
   /** Unresolved review threads and general comments of a pull request (21 §2.2), oldest first. */
   listReviewComments(pullRequest: OpenPullRequest): Promise<PlatformReviewComment[]>;
   /** `Authorization` header value with which git pushes over HTTPS using the token. */

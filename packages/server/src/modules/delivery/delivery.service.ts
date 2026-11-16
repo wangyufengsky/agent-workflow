@@ -6,6 +6,8 @@ import {
   type DeliveryStrategy,
   deliveryMachine,
   type ErrorInfo,
+  type HostingRef,
+  type RemoteDeliveryStatus,
   type RequirementsDeliverySummary,
   ServerEventType,
   DeliveryStatus as Status,
@@ -72,6 +74,12 @@ export function createDeliveriesService({ db, unit, clock, log }: DeliveriesServ
       const delivery = repo.latestPullRequest(taskId);
       return delivery === undefined ? undefined : toDto(delivery);
     },
+    updateRemote(id: string, snapshot: RemoteDeliveryStatus | undefined, error: ErrorInfo | null): DeliveryDTO {
+      repo.updateRemote(id, snapshot, error);
+      const delivery = mustFind(id);
+      publish(delivery);
+      return toDto(delivery);
+    },
     /** Deliveries cut short by the previous run, for recovery. */
     listRunning: (): Array<DeliveryDTO & { taskId: string }> => repo.listByStatus(Status.Running),
 
@@ -107,8 +115,10 @@ export function createDeliveriesService({ db, unit, clock, log }: DeliveriesServ
         return toDto(delivery);
       });
     },
-    succeed: (id: string, result: { commitSha?: string; prUrl?: string; diffBase?: string; diffHead?: string }) =>
-      move(id, DeliveryEvent.Succeeded, result),
+    succeed: (
+      id: string,
+      result: { commitSha?: string; prUrl?: string; diffBase?: string; diffHead?: string; remoteRef?: HostingRef },
+    ) => move(id, DeliveryEvent.Succeeded, result),
     conflict: (id: string, files: string[], error: ErrorInfo) =>
       move(id, DeliveryEvent.Conflicted, { conflictFiles: files, error }),
     fail: (id: string, error: ErrorInfo) => move(id, DeliveryEvent.Failed, { error }),

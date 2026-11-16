@@ -66,6 +66,8 @@ import {
 import { createPlansModule } from './modules/plans/index.ts';
 import { createPreviewsModule, type PreviewsService } from './modules/previews/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
+import { projectRuntimeOperations } from './modules/projects/projects.runtime-operations.ts';
+import { createProjectRuntimeService } from './modules/projects/projects.runtime-service.ts';
 import { createRepositoryModule } from './modules/repository/index.ts';
 import { createRequirementsModule } from './modules/requirements/index.ts';
 import { createRolesModule, type RolesService } from './modules/roles/index.ts';
@@ -325,6 +327,18 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     clock,
     env,
   });
+  const projectRuntime = createProjectRuntimeService({
+    db: database.db,
+    log,
+    clock,
+    env,
+    locks,
+    projects: projects.service,
+    acceptance: acceptance.service,
+    dataDir: config.dataDir,
+  });
+  server.addHook('onReady', () => projectRuntime.recover());
+  server.addHook('preClose', () => projectRuntime.stopAll());
   const nodes = createNodesModule({
     db: database.db,
     unit,
@@ -343,6 +357,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     unit,
     clock,
     attempts: attempts.service,
+    attachments: attachments.service,
     projects: projects.service,
     databases: databases.service,
     inbox: inbox.service,
@@ -389,6 +404,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     locks,
     dataDir: config.dataDir,
   });
+  tasks.service.onProjectDeleted((id) => projectRuntime.abortProject(id));
   const batches = createBatchesModule({
     db: database.db,
     unit,
@@ -513,6 +529,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...credentials.operations,
     ...storage.operations,
     ...projects.operations,
+    ...projectRuntimeOperations(projectRuntime),
     ...hostingAccounts.operations,
     ...attachments.operations,
     ...previews.operations,

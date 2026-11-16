@@ -57,7 +57,7 @@ opencode 1.19 的已有会话目录不能通过发送参数或 fork 改变。迁
 | `get_app_status` | read | `{ runtime, uiMode, projects, activeTasks, blockingInbox }`（`blockingInbox` 同徽标，不含待合并，D119） |
 | `browser_read` | read | 严格空参数；只读当前对话由界面绑定的「我的预览」文字、地址、视口和错误日志；无关联或预览失效为 `BROWSER_NOT_OPEN`，不能用任务或 tab 参数猜测当前页。整体最多 30 秒，超时为 `BROWSER_READ_FAILED`，保留用户页与关联（29 §9） |
 | `open_page` | read | `{ page: AssistantPage, params }`（各页面需要的参数为 `ASSISTANT_PAGE_PARAMS`）→ SSE `assistant.navigate`，界面在面板旁跳转；`task_preview` 是任务页的预览页签（`?view=preview`，v1.3 B3，29 §2.6），用户在那里时消息带的当前页面也是它，助手启动预览后用它把用户带过去 |
-| `open_form` | read | `{ form: AssistantForm, values }` → SSE `assistant.open_form`；`values` 按该表单所提交操作的助手输入（不含凭据字段）的 partial 校验，带凭据字段 `VALIDATION_FAILED` |
+| `open_form` | read | `{ form: AssistantForm, values }` → SSE `assistant.open_form`；`values` 按该表单所提交操作的助手输入（不含凭据字段）的 partial 校验，带凭据字段 `VALIDATION_FAILED`；`workflows.fromPlan` 要求任务 ID 与计划版本，`initiativeTemplates.fromInitiative` 要求需求计划 ID |
 | `show_chart` / `show_flowchart` | read | 在对话里画图（35，D138）：统计图（`bar` / `line` / `pie`，类别 + 系列）或流程图（节点与连线，允许回环）；输入为 strict 对象，跨字段规则与上限见 35 §3，不合规为 `VALIDATION_FAILED`（issues 带 `path` 与改法）；通过后写消息流 `chart` 条目（10 §3）并返回 `{ shown: true }`；界面在消息流中渲染为图（§6.1） |
 | `export_deck` | read | `{ deckId, format: pptx \| pdf }`：只接受做好的 PPT（否则 `DECK_NOT_READY`）→ SSE `assistant.export_deck`，界面在面板旁打开这份 PPT，页头执行与「导出」按钮相同的导出：保存位置由用户在系统对话框里选（浏览器开发模式为下载），所以不出确认卡片；`pdf` 只在桌面应用，浏览器里提示「导出 PDF 只在桌面应用中可用」。返回 `{ exporting: true }`，助手不知道文件存到了哪里（28 §4） |
 | `read_attachment` / `read_sheet` / `query_sheet` | read | 读当前对话里用户附加的资料：文字分页；Excel 的行分页与筛选、分组、汇总（39 §6.2）；别的对话的附件 `ATTACHMENT_NOT_FOUND` |
@@ -108,7 +108,7 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 ## 5. 凭据不经过对话
 
 - 涉及凭据的操作（添加数据库连接、绑定远端令牌）在操作定义中标记 `credentialFields`；这些字段**不出现在助手工具 schema 中**，凭据必填的操作没有工具。
-- 助手只能调用 `open_form` 打开预填好非敏感字段的表单，由用户在表单中输入凭据并提交。表单（`AssistantForm`，以其提交的操作命名）：`tasks.create`（主页开始任务，经地址预填项目、流程、需求）、`projects.create`（添加项目，预填路径）、`projects.setHosting`（项目详情的远端绑定）、`databases.create` / `databases.update`（数据库连接对话框）；后四者的预填值放在界面状态 `pendingForm` 中，表单提交或关闭时清除。
+- 助手只能调用 `open_form` 打开预填好非敏感字段的表单，由用户在表单中输入凭据并提交。表单（`AssistantForm`，以其提交的操作命名）：`tasks.create`（主页开始任务，经地址预填项目、流程、需求）、`workflows.fromPlan`（按任务 ID 与计划版本打开预填的固定流程编辑器）、`initiativeTemplates.fromInitiative`（按需求计划 ID 打开组合模板编辑器）、`projects.create`（添加项目，预填路径）、`projects.setHosting`（项目详情的远端绑定）、`databases.create` / `databases.update`（数据库连接对话框）；后四者的预填值放在界面状态 `pendingForm` 中，表单提交或关闭时清除。
 - 助手工具的返回值同样经过 DTO，不含凭据。
 
 ## 6. 界面

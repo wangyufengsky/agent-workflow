@@ -32,6 +32,7 @@ import { skippedChecks } from '../tasks/skipped-checks.ts';
 import { taskDiffFileQuery, taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { DeliveryActions } from './delivery-actions.tsx';
 import { Check } from './node-drawer.tsx';
+import { RemoteDeliveryStatus } from './remote-delivery-status.tsx';
 import { ReviewComments } from './review-comments.tsx';
 import styles from './task-page.module.css';
 
@@ -155,6 +156,9 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
         )}
         <ResultPages task={task} />
         <DeliveryOutcome task={task} />
+        {task.status === TaskStatus.Completed && task.lastDelivery?.strategy === DeliveryStrategy.PullRequest && (
+          <RemoteDeliveryStatus task={task} />
+        )}
         <RequirementsSection task={task} />
         {result.assumptions.length > 0 && (
           <section className={styles.block}>

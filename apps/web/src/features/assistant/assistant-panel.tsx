@@ -26,8 +26,14 @@ function Panel({ open, onClosed }: { open: boolean; onClosed: () => void }) {
   const remove = useDeleteConversation();
   const [deleting, setDeleting] = useState(false);
   const [draft, setDraft] = useState<{ activeId: string | null; projectId: string | null } | null>(null);
+  const [initialized, setInitialized] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const list = conversations.data ?? [];
+  // 缓存可能先出现新会话，再送出首条消息。空列表的输入框要保持草稿，直到发送成功并选中新会话。
+  if (!initialized && conversations.isSuccess) {
+    setInitialized(true);
+    if (list.length === 0 && activeId === null) setDraft({ activeId, projectId: null });
+  }
   const menuActive = list.find((c) => c.id === activeId) ?? list[0];
   const drafting = draft !== null && draft.activeId === activeId;
   const active = drafting ? undefined : menuActive;
@@ -102,6 +108,7 @@ function Panel({ open, onClosed }: { open: boolean; onClosed: () => void }) {
           key={active?.id ?? 'draft'}
           conversation={active}
           inputRef={input}
+          disabled={conversations.isPending}
           projectId={drafting ? draft.projectId : null}
           onProjectChange={(projectId) => setDraft({ activeId, projectId })}
         />

@@ -77,6 +77,9 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/projects/git-init` | `projects.initGit`（write，D153；助手可用，确认卡显示首次提交将纳入的内容，15 §4）：`{ repoPath, name? }` → 201 `ProjectDetailDTO`；目录要求同上。`git init -b main`，没有 `.gitignore` 时写入按根目录文件推断的规则（`package.json` / `node_modules` → `node_modules/`；`pom.xml` → `target/`；Gradle → `build/` `.gradle/`；Python → `__pycache__/` `.venv/`；总有 `.DS_Store`），`git add --all` 后以 `GIT_INIT_COMMIT_MESSAGE` 提交（git 配置了 `user.name` 与 `user.email` 时用它，否则 `GIT_COMMIT_IDENTITY`；文件全被忽略时为空提交，任务仍有起点），再同 `POST /projects` 添加。整个过程持有该目录的仓库锁（D37），同一目录的并发请求在锁内重新检查，后到的报 400 `VALIDATION_FAILED`、不会删掉先到的仓库。任一步失败时删除刚建的 `.git` 与写入的 `.gitignore`、目录恢复原样，再报原错误（如提交钩子拒绝 500 `GIT_COMMAND_FAILED`） |
 | GET | `/projects/:id` | `ProjectDetailDTO`：`ProjectDTO`（含远端绑定摘要 `hosting: { provider, baseUrl, repo, hasToken } \| null`）+ `inferredHosting` + 实际生效的远端 `effectiveHosting: { provider, baseUrl, repo, source: HostingSource } \| null`（项目绑定且有令牌 → `project`；否则绑定或推断的仓库所在平台地址有全局令牌 → `global`；都没有为 null，D155）+ 关联的数据库连接 `dbConnectionIds`（M5-07）+ 总是允许的 bash 模式 `allowedBash: string[]`（按记下的时间，D101）+ 仓库检出的分支 `currentBranch: string \| null`（每次读取，游离为 null；与默认分支不同时项目页说明，D216） |
 | PATCH | `/projects/:id` | `{ name?, defaultBranch?, checkCommand?: string \| null, preview?: ProjectPreview \| null }`；分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND`；`preview` 为页面预览设置（29 §4.1：`command`、`setupCommand`、`readyPath`、`pages`、`extraOrigins`），`extraOrigins` 每项须为来源（`http(s)://主机[:端口]`），否则 400 |
+| GET | `/projects/:id/runtime-check` | 最近一次项目运行检查及配置快照；没有记录时为 null |
+| POST | `/projects/:id/runtime-check` | `{ branch, configVersion, runCommand, runPreview }`：核对配置版本后在临时 worktree 异步检查；结果区分仓库、检查命令和预览；命令失败原因区分无法启动、超时、非零退出与执行错误，清理等基础设施错误单独返回诊断 |
+| POST | `/projects/:id/runtime-check/stop` | 中止正在运行的检查，清理进程及临时 worktree |
 | DELETE | `/projects/:id` | 有非终态任务时 409 `PROJECT_HAS_ACTIVE_TASKS` |
 | GET | `/projects/:id/agents-md` | `projects.agentsMd`（read，助手可用，40 §6）→ `AgentsMdDTO { branch, file: GitFileDTO \| null, rules, task: TaskSummaryDTO \| null }`：默认分支名；该分支上已提交的根目录 `AGENTS.md`（没有为 null，过大或二进制同 Git 工作台，D203）；按项目检查命令渲染的「在 Agent Workflow 中工作」一节（D204）；本项目最近一个未结束的 `system.agents_md` 任务。默认分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND` |
 | POST | `/projects/:id/agents-md/task` | `projects.startAgentsMdTask`（write，助手可用，确认卡片）：`{ guidance?: string（补充说明，≤ AGENTS_MD_NOTES_MAX_CHARS）, includeRules: boolean }` → 201 `TaskDetailDTO`：开出系统流程 `system.agents_md` 的任务（13 §4a），默认分支上没有 `AGENTS.md` 时「生成 AGENTS.md」、有时「补充 AGENTS.md」（D202、D205）；需求按 40 §4 由后端写成；默认分支不存在 → 400 `GIT_BASE_BRANCH_NOT_FOUND` |
@@ -135,6 +138,8 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | GET | `/tasks/:id/review-comments` | `ReviewCommentsDTO`：任务的 PR/MR 上的审查意见，实时取自平台；见 §5.4 |
 | POST | `/tasks/:id/review-feedback` | `{ commentIds: string[], note? }`；`completed → running`，按勾选的审查意见追加「按审查意见修改」节点；见 §5.4 |
 | GET | `/tasks/:id/check-evidence/:evidenceId` | `tasks.checkEvidence`（read）：按结果中该检查的 `evidenceId` 延迟读取当次检查的 `CheckResult`；标识不属于当前任务结果或证据不可用时返回 404 `NOT_FOUND`（UX-03） |
+| POST | `/tasks/:id/delivery-status` | 刷新当前 PR / MR 状态并保存最近成功结果；失败保存错误，保留旧快照。仅查询配置仓库下的已记录 URL。 |
+| GET | `/initiatives/:id/items/:key/merge-readiness` | 对照平台合入提交与需求计划本地基础分支，返回远端、等待本地、证据不足或可确认状态；旧交付缺少 head 时不推测；GitLab 缺合入提交时仅在原交付 head 确实是本地基础分支祖先时确认；不自动确认。用户可在页面重新检查本地分支，Git 错误显示后可重试。 |
 | GET | `/tasks/:id/diff` | `DiffDTO { base, files }`：worktree（含未提交改动）相对任务分支与目标分支的 merge-base（起初即基线提交；解决冲突合入目标分支后为目标分支的提交）的文件列表与增删统计。已交付且 worktree 不再可用时对比该次交付的 `diffBase` 与 `diffHead`；范围或提交不可用时返回 404 `NOT_FOUND`（UX-03） |
 | GET | `/tasks/:id/diff/file?path=` | 单文件 unified diff `FileDiffDTO`（超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }`） |
 
@@ -393,7 +398,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 
 ## 13a. 知识问答（v1.1）
 
-见 [18-knowledge.md §4](18-knowledge.md#4-api操作清单)。全部 `mode = simple`、`expose.assistant = true`、不进命令面板（D68）。
+见 [18-knowledge.md §4](18-knowledge.md#4-api操作清单)。全部 `mode = simple` 且不进命令面板。资料快照由界面调用，其他操作开放给助手（D68）。
 
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -404,6 +409,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/knowledge/conversations/:id/stop` | `knowledge.stop` | write | 中止研究中的一轮；已结束 409 `STATE_TRANSITION_INVALID` |
 | DELETE | `/knowledge/conversations/:id` | `knowledge.delete` | critical | 204；研究中 409 |
 | GET | `/knowledge/turns/:turnId/citations/:index` | `knowledge.citation` | read | `CitationSourceDTO`（18 §6.3）；404 `KNOWLEDGE_CITATION_NOT_FOUND` / `KNOWLEDGE_SOURCE_UNAVAILABLE` |
+| POST | `/knowledge/conversations/:id/task-material` | `knowledge.snapshotTaskMaterial` | write | `{ turnId, from, to, citations }`。原文按 UTF-16 半开区间定位，长度不超过 8000 字符。引用按原编号从 1 开始。读取指定已校验回答，返回 201 `AttachmentDTO`。来源或引用不存在返回 404，有效回答之外的范围返回 400。创建任务时以现有 `attachmentIds` 绑定，同一资料仅可在来源项目绑定。 |
 
 ## 13b. 质量与用量（v1.1）
 

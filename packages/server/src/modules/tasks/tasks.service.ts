@@ -171,6 +171,10 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
         }),
       );
     },
+    async refreshDeliveryStatus(id: string) {
+      await review.refreshDeliveryStatus(id);
+      return detail(id);
+    },
     /** The task's current round's latest delivery (`TaskDetailDTO.lastDelivery`). */
     lastDelivery: (id: string) => delivery.current(id),
     /** Tasks in the given states, for the scheduler. */

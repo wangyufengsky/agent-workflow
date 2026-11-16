@@ -19,6 +19,7 @@ export function WorkflowPicker({
   id,
   open,
   workflows,
+  allowInitiatives,
   templates,
   picked,
   pickedTemplate,
@@ -32,6 +33,7 @@ export function WorkflowPicker({
   id: string;
   open: boolean;
   workflows: readonly WorkflowSummaryDTO[];
+  allowInitiatives: boolean;
   templates: readonly InitiativeTemplateDTO[];
   picked: string | undefined;
   pickedTemplate: string | undefined;
@@ -130,18 +132,20 @@ export function WorkflowPicker({
           </li>
         ))}
       </ul>
-      <span className={styles.flowsCap}>{INITIATIVES_COPY.templates}</span>
-      <button
-        type="button"
-        className={styles.chip}
-        style={{ '--i': builtin.length + 1 } as CSSProperties}
-        aria-pressed={pickedBreakdown}
-        title={INITIATIVES_COPY.aiBreakdownDescription}
-        onClick={onPickBreakdown}
-      >
-        <Icon name="sparkle" size="sm" />
-        {INITIATIVES_COPY.aiBreakdown}
-      </button>
+      {allowInitiatives && <span className={styles.flowsCap}>{INITIATIVES_COPY.templates}</span>}
+      {allowInitiatives && (
+        <button
+          type="button"
+          className={styles.chip}
+          style={{ '--i': builtin.length + 1 } as CSSProperties}
+          aria-pressed={pickedBreakdown}
+          title={INITIATIVES_COPY.aiBreakdownDescription}
+          onClick={onPickBreakdown}
+        >
+          <Icon name="sparkle" size="sm" />
+          {INITIATIVES_COPY.aiBreakdown}
+        </button>
+      )}
       {builtinTemplates.map((t, i) => templateChip(t, builtin.length + 2 + i))}
       {custom.length + customTemplates.length > 0 && (
         <>

@@ -64,6 +64,21 @@ export function useAssistantRequests(): void {
               });
             })();
             return;
+          case AssistantForm.WorkflowFromPlan: {
+            const task = text(values.id);
+            const version = values.version;
+            if (task !== undefined && typeof version === 'number') {
+              followAssistant(() => navigate({ to: ROUTES.workflowNew, search: { task, version } }));
+            }
+            return;
+          }
+          case AssistantForm.TemplateFromInitiative: {
+            const initiative = text(values.id);
+            if (initiative !== undefined) {
+              followAssistant(() => navigate({ to: ROUTES.initiativeTemplateNew, search: { initiative } }));
+            }
+            return;
+          }
           case AssistantForm.AddProject:
             setPendingForm({ seq: request.seq, form, values });
             followAssistant(() => navigate({ to: ROUTES.projects, search: { add: true } }));

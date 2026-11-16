@@ -9,11 +9,11 @@ import {
   WorktreeStatus,
 } from '@aw/shared';
 import {
+  commitsExist,
   diffCommits,
   diffCommitsFile,
   diffWorktree,
   diffWorktreeFile,
-  gitFailure,
   limitDiff,
   mergeBase,
   runGit,
@@ -66,13 +66,7 @@ export function createTaskDiffs(deps: TasksServiceDeps, state: TaskState) {
         reason: 'delivery_range_unavailable',
       });
     if (base === null || head === null) throw unavailable();
-    const objects = [`${base}^{commit}`, `${head}^{commit}`];
-    const args = ['cat-file', '--batch-check=%(objecttype)'];
-    const result = await runGit(args, { cwd: repo, input: `${objects.join('\n')}\n` });
-    const types = result.stdout.split(/\r?\n/);
-    if (result.stderr !== '' || types.length !== objects.length) throw gitFailure(args, result);
-    if (objects.some((object, index) => types[index] === `${object} missing`)) throw unavailable();
-    if (types.some((type) => type !== 'commit')) throw gitFailure(args, result);
+    if (!(await commitsExist(repo, [base, head]))) throw unavailable();
     return { repo, base, head };
   }
 

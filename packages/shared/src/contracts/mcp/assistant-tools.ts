@@ -5,8 +5,9 @@ import { runtimeStatusSchema } from '../../enums/system.ts';
 import { uiModeSchema } from '../../enums/ui.ts';
 import { createDbConnectionOp, updateDbConnectionOp } from '../../operations/databases.ts';
 import { assistantInputSchema, type OperationContract } from '../../operations/define.ts';
+import { getInitiativeOp } from '../../operations/initiatives.ts';
 import { createProjectOp, setProjectHostingOp } from '../../operations/projects.ts';
-import { createTaskOp } from '../../operations/tasks.ts';
+import { createTaskOp, getPlanOp } from '../../operations/tasks.ts';
 import { assistantPageRefSchema } from '../api/assistant.ts';
 
 /** `get_current_time` (15 §3): the user's local time, so the model can answer「明天几号」without guessing. */
@@ -50,6 +51,8 @@ export const openedOutputSchema = z.object({ opened: z.literal(true) });
 /** The operation each form submits; its credential fields are typed by the user, never prefilled (D28). */
 export const ASSISTANT_FORM_OPERATION = {
   [AssistantForm.StartTask]: createTaskOp,
+  [AssistantForm.WorkflowFromPlan]: getPlanOp,
+  [AssistantForm.TemplateFromInitiative]: getInitiativeOp,
   [AssistantForm.AddProject]: createProjectOp,
   [AssistantForm.ProjectHosting]: setProjectHostingOp,
   [AssistantForm.AddDbConnection]: createDbConnectionOp,
@@ -62,6 +65,8 @@ const formInput = <F extends AssistantForm>(form: F) =>
 /** `open_form`: any non-secret field may be prefilled; a credential field is rejected as unknown. */
 export const openFormInputSchema = z.discriminatedUnion('form', [
   formInput(AssistantForm.StartTask),
+  z.object({ form: z.literal(AssistantForm.WorkflowFromPlan), values: getPlanOp.input }),
+  z.object({ form: z.literal(AssistantForm.TemplateFromInitiative), values: getInitiativeOp.input }),
   formInput(AssistantForm.AddProject),
   formInput(AssistantForm.ProjectHosting),
   formInput(AssistantForm.AddDbConnection),

@@ -50,6 +50,11 @@ export const WORKFLOWS_COPY = {
 
 export const WORKFLOW_EDITOR_COPY = {
   back: '← 流程',
+  fromPlan: (task: string, version: number) => `来源任务 ${task} · 计划第 ${version} 版`,
+  fromPlanHint: '请检查需求文字、绝对路径、分支和项目特有命令，再保存为可复用流程。',
+  keyRequired: '请输入有效的流程标识',
+  newKey: '流程标识',
+  missingRole: (key: string) => `${key}（角色不存在）`,
   readonly: '内置流程只读。复制后可以修改。',
   basics: '基本信息',
   checkpoints: '默认检查点',

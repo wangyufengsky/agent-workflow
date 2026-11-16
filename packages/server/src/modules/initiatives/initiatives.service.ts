@@ -68,6 +68,7 @@ import {
   retryStep,
   startMessage,
 } from './initiatives.breakdown.ts';
+import { checkMergeReadiness } from './initiatives.merge-readiness.ts';
 import {
   createInitiativesRepo,
   type Initiative,
@@ -682,7 +683,7 @@ export function createInitiativesService({
         createdAt: now,
         updatedAt: now,
       });
-      if (input.attachmentIds !== undefined) attachments.bind(owner(id), input.attachmentIds);
+      if (input.attachmentIds !== undefined) attachments.bind(owner(id), input.attachmentIds, input.projectId);
     });
     log.info({ initiativeId: id }, 'initiative created for breakdown');
     await startRun(get(id), InitiativeRunMode.Breakdown, '', { instruction: null, openPhase: null });
@@ -793,7 +794,7 @@ export function createInitiativesService({
             updatedAt: now,
           });
         });
-        if (input.attachmentIds !== undefined) attachments.bind(owner(id), input.attachmentIds);
+        if (input.attachmentIds !== undefined) attachments.bind(owner(id), input.attachmentIds, input.projectId);
       });
       log.info({ initiativeId: id, template: template.key, review: input.review }, 'initiative created');
       publish(id);
@@ -984,6 +985,28 @@ export function createInitiativesService({
         throw err;
       }
       return detail(id);
+    },
+
+    async mergeReadiness(
+      id: string,
+      key: string,
+    ): Promise<{
+      state:
+        | 'unknown'
+        | 'refresh_failed'
+        | 'remote_pending'
+        | 'remote_closed'
+        | 'unverified'
+        | 'local_pending'
+        | 'ready';
+    }> {
+      const initiative = get(id);
+      const item = itemOf(initiative, key);
+      return checkMergeReadiness(
+        projects.getRecord(initiative.projectId).repoPath,
+        initiative.baseBranch,
+        item.dto.lastDelivery,
+      );
     },
 
     /** 「已合入」for a work package delivered as a pull request (D134 ③). */

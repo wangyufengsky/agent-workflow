@@ -32,7 +32,7 @@ export function ProjectPreviewForm({ project }: { project: ProjectDetailDTO }) {
   const [setupCommand, setSetupCommand] = useState(saved?.setupCommand ?? '');
   const [readyPath, setReadyPath] = useState(saved?.readyPath ?? '/');
   const [extraOrigins, setExtraOrigins] = useState((saved?.extraOrigins ?? []).join('\n'));
-  const update = useUpdateProject();
+  const update = useUpdateProject(project.id);
   const trial = useMutation({ mutationFn: () => callOperation(trialPreviewOp, { projectId: project.id }) });
 
   const submit = (e: FormEvent) => {
@@ -50,7 +50,7 @@ export function ProjectPreviewForm({ project }: { project: ProjectDetailDTO }) {
           };
     // Saving remounts this form (it is keyed by the project's update time), so the toast follows the promise:
     // per-call callbacks of an unmounted mutation do not run. A failure shows through the mutation's state.
-    update.mutateAsync({ id: project.id, preview }).then(
+    update.mutateAsync({ preview }).then(
       () => toast(C.saved),
       () => undefined,
     );

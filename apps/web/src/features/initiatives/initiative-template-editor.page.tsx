@@ -173,7 +173,7 @@ const BLANK: InitiativeDraft = {
 };
 
 /**
- * `/initiative-templates/new`: blank, a copy of a template (`?copy=`), or「存为模板」from an initiative
+ * `/initiative-templates/new`: blank, a copy of a template (`?copy=`), or「存为组合模板」from an initiative
  * (`?initiative=`), whose requirements the user turns back into `{{requirement}}`.
  */
 export function NewInitiativeTemplatePage() {

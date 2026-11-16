@@ -56,6 +56,18 @@ export function gitFailure(args: readonly string[], result: GitResult): AppError
   });
 }
 
+/** 查询提交对象是否存在；Git 进程失败或非提交对象不能当成缺失。 */
+export async function commitsExist(cwd: string, commits: readonly string[]): Promise<boolean> {
+  const objects = commits.map((commit) => `${commit}^{commit}`);
+  const args = ['cat-file', '--batch-check=%(objecttype)'];
+  const result = await runGit(args, { cwd, input: `${objects.join('\n')}\n` });
+  const types = result.stdout.split(/\r?\n/);
+  if (result.stderr !== '' || types.length !== objects.length) throw gitFailure(args, result);
+  if (objects.some((object, index) => types[index] === `${object} missing`)) return false;
+  if (types.some((type) => type !== 'commit')) throw gitFailure(args, result);
+  return true;
+}
+
 /**
  * Commits made by the backend (node commits, merges, rebases) use agent-workflow's identity, or the one set in
  * `git.commitIdentity` (D227), without the user's signing setup (D48); prepend to the git arguments.

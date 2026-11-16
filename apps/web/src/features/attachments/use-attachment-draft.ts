@@ -25,10 +25,11 @@ export type DraftAttachment =
  * The attachments of one input (30 §2): uploaded as soon as they are picked, sent with the text, then cleared. Like
  * the text they live in the component only; one never sent is removed by the backend's cleanup (30 §4).
  */
-export function useAttachmentDraft() {
+export function useAttachmentDraft(reservedSlots = 0) {
   const [items, setItems] = useState<DraftAttachment[]>([]);
   const [notice, setNotice] = useState<string>();
   const pending = useRef(new Set<string>());
+  const availableSlots = ATTACHMENTS_PER_INPUT_MAX - reservedSlots;
 
   const settle = (key: string, next: DraftAttachment) =>
     setItems((list) => list.map((item) => (item.key === key ? next : item)));
@@ -58,7 +59,7 @@ export function useAttachmentDraft() {
   function addFiles(files: readonly File[]): void {
     const images = files.filter((f) => f.type.startsWith('image/'));
     const others = files.filter((f) => !f.type.startsWith('image/'));
-    const room = ATTACHMENTS_PER_INPUT_MAX - items.length;
+    const room = availableSlots - items.length;
     setNotice(images.length > 0 ? C.imageUnsupported : others.length > room ? C.tooMany : undefined);
     for (const file of others.slice(0, Math.max(room, 0))) {
       const limit = looksLikeOffice(file.name) ? OFFICE_ATTACHMENT_BYTES_MAX : ATTACHMENT_BYTES_MAX;
@@ -74,7 +75,7 @@ export function useAttachmentDraft() {
   }
 
   function addProjectFile(input: SnapshotProjectFileRequest): void {
-    if (items.length >= ATTACHMENTS_PER_INPUT_MAX) {
+    if (items.length >= availableSlots) {
       setNotice(C.tooMany);
       return;
     }
@@ -90,7 +91,7 @@ export function useAttachmentDraft() {
     addProjectFile,
     /** 应用生成的文字快照复用上传中、失败、预览和清理行为；不会绕过每条消息的数量上限。 */
     addSnapshot(name: string, work: () => Promise<AttachmentDTO>, onReady: (attachment: AttachmentDTO) => void): void {
-      if (items.length >= ATTACHMENTS_PER_INPUT_MAX) {
+      if (items.length >= availableSlots) {
         setNotice(C.tooMany);
         return;
       }

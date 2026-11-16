@@ -10,6 +10,8 @@ import {
   patchSettings,
   queueAssistantTurn,
   queueResearchTurn,
+  queueTurn,
+  TASK_RUN_TIMEOUT_MS,
 } from './helpers.ts';
 
 // J12 (K-09): a question about a project, its research, an answer with citations, the cited source, a follow-up and
@@ -256,7 +258,7 @@ test('J14 回答流式出现：引用先待核对、提交通过后可点击；�
   await expect(row).not.toContainText('fake-model-2');
 });
 
-test('J31 研究员用浏览器读内网网页并引用：打开引用看到读到的正文摘录（29 §2.8）', async ({ page, request }) => {
+test('J31 读取和引用内网网页，选取网页与代码资料创建任务', async ({ page, request }, testInfo) => {
   const site = createServer((_req, res) => {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     res.end('<title>退款规范</title><h1>退款规范</h1><p>退款金额四舍五入到分，手续费先扣。</p>');
@@ -267,16 +269,23 @@ test('J31 研究员用浏览器读内网网页并引用：打开引用看到读�
   const url = `http://127.0.0.1:${address.port}/refunds`;
   try {
     const project = await createProject(request, null);
+    writeFileSync(join(project.repoPath, 'refund.ts'), REFUND);
+    writeFileSync(join(project.repoPath, 'extra.txt'), '不随任务带入的细节\n');
+    const knowledgeText = '规范要求四舍五入到分 [1]，实现位于退款函数 [2]。附加信息 [3]。';
     await queueResearchTurn(request, project, [
       { type: 'callTool', name: 'browser_open', args: { url } },
-      answer('内网的退款规范写明四舍五入到分 [1]。', [{ type: 'web', url, title: '退款规范' }]),
+      answer(knowledgeText, [
+        { type: 'web', url, title: '退款规范' },
+        file('refund.ts', 2, 3),
+        file('extra.txt', 1, 1),
+      ]),
     ]);
     const asked = await request.post(`${API_BASE}/knowledge/conversations`, {
       headers: AUTH,
       data: {
         projectId: project.id,
         question: '退款怎么取整？',
-        sources: { code: true, docs: false, database: false, web: true },
+        sources: { code: true, docs: true, database: false, web: true },
       },
     });
     const conversation = await asked.json();
@@ -287,6 +296,82 @@ test('J31 研究员用浏览器读内网网页并引用：打开引用看到读�
     const panel = page.getByRole('complementary', { name: '引用原文' });
     await expect(panel.getByRole('link', { name: '在浏览器中打开' })).toBeVisible();
     await expect(panel.getByTestId('page-excerpt')).toContainText('退款金额四舍五入到分，手续费先扣。');
+    await page.keyboard.press('Escape');
+
+    const fromAnswer = turn.getByRole('button', { name: '据此开始任务' });
+    const draft = page.getByRole('dialog', { name: '据此开始任务' });
+    await fromAnswer.click();
+    await draft.getByRole('button', { name: '取消' }).click();
+    await expect(draft).toBeHidden();
+    const before = await (await request.get(`${API_BASE}/tasks?projectId=${project.id}`, { headers: AUTH })).json();
+    expect(before.items).toHaveLength(0);
+
+    await fromAnswer.click();
+    const raw = draft.getByRole('textbox', { name: '回答原文' });
+    await raw.evaluate((element, to) => {
+      if (!(element instanceof HTMLTextAreaElement)) throw new Error('Expected answer textarea');
+      element.setSelectionRange(0, to);
+    }, knowledgeText.indexOf('附加信息'));
+    await draft.getByRole('button', { name: '带入所选文字' }).click();
+    await draft.getByRole('checkbox', { name: /引用 3/ }).uncheck();
+    await draft.getByRole('textbox', { name: '需求', exact: true }).fill('实现按分取整的退款');
+    await draft.getByRole('combobox', { name: '流程', exact: true }).selectOption('bugfix');
+    await page.screenshot({ path: testInfo.outputPath('knowledge-material-light.png') });
+    const snapshotted = page.waitForResponse(
+      (response) => response.request().method() === 'POST' && response.url().endsWith('/task-material'),
+    );
+    await draft.getByRole('button', { name: '进入任务表单' }).click();
+    const material = await (await snapshotted).json();
+    await expect(page.getByLabel('项目', { exact: true })).toHaveValue(project.id);
+    await expect(page.getByLabel('需求', { exact: true })).toHaveValue('实现按分取整的退款');
+    await page.getByRole('button', { name: /换一个流程/ }).click();
+    await page.getByRole('button', { name: '新功能开发', exact: true }).click();
+    await expect(page.getByRole('button', { name: `查看 ${material.name}` })).toBeVisible();
+    await queueTurn(request, project, { agent: 'aw-planner' }, [
+      {
+        type: 'callTool',
+        name: 'submit_plan',
+        args: {
+          summary: '依据快照修改退款计算',
+          nodes: [
+            { key: 'refund', title: '修改退款取整', role: 'developer', instructions: '按分取整' },
+            {
+              key: 'final_verify',
+              title: '整体验证',
+              role: 'developer',
+              instructions: '核对退款结果',
+              depends_on: ['refund'],
+            },
+          ],
+        },
+      },
+    ]);
+    await page.getByLabel('运行前让我确认计划').check();
+    await page.getByLabel('需求', { exact: true }).press('ControlOrMeta+Enter');
+    await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+$/);
+    await expect(page.getByRole('button', { name: '确认并开始' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+    const taskUrl = page.url();
+    await page.getByRole('button', { name: `查看 ${material.name}` }).click();
+    const snapshot = page.getByRole('dialog', { name: material.name });
+    await expect(snapshot).toContainText('退款金额四舍五入到分，手续费先扣');
+    await expect(snapshot).toContainText('refund.ts:2-3');
+    await expect(snapshot).not.toContainText('extra.txt');
+    await expect(snapshot).not.toContainText('附加信息');
+    await patchSettings(request, { 'ui.theme': 'default' });
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'default');
+    await page.screenshot({ path: testInfo.outputPath('knowledge-material-dark.png') });
+    await snapshot.getByRole('button', { name: '关闭' }).click();
+    await page.getByRole('link', { name: '查看来源问答' }).click();
+    await expect(page).toHaveURL(new RegExp(`/knowledge/${conversation.id}\\?turn=${material.origin.turnId}$`));
+    await expect(turn).toContainText('规范要求四舍五入到分');
+
+    const removed = await request.delete(`${API_BASE}/knowledge/conversations/${conversation.id}`, { headers: AUTH });
+    expect(removed.ok()).toBe(true);
+    await page.goto(taskUrl);
+    await page.getByRole('button', { name: `查看 ${material.name}` }).click();
+    await expect(snapshot).toContainText('refund.ts:2-3');
+    const taskId = new URL(taskUrl).pathname.split('/').at(-1);
+    await request.post(`${API_BASE}/tasks/${taskId}/cancel`, { headers: AUTH, data: {} });
   } finally {
     site.close();
   }

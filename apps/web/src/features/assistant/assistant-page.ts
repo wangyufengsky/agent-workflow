@@ -56,6 +56,7 @@ const PAGE_ROUTE = {
  * gallery. Every other route must be a page above, or the user would be taken to be at home.
  */
 type Unreported =
+  | typeof ROUTES.workflowNew
   | typeof ROUTES.onboarding
   | typeof ROUTES.teamIndex
   | typeof ROUTES.pptPlay

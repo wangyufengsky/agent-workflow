@@ -7,7 +7,7 @@ import {
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
@@ -22,6 +22,7 @@ import { Answer, DraftAnswer } from './answer.tsx';
 import { Composer } from './composer.tsx';
 import styles from './knowledge.module.css';
 import { knowledgeConversationQuery, useAskKnowledge, useFollowUp, useStopKnowledge } from './knowledge.queries.ts';
+import { KnowledgeTaskAction } from './knowledge-task-action.tsx';
 import { ModelPicker } from './model-picker.tsx';
 import { ResearchCard } from './research-card.tsx';
 import { SourcePanel } from './source-panel.tsx';
@@ -157,6 +158,8 @@ function TurnDetails({ attemptId }: { attemptId: string }) {
 
 function Turn({
   turn,
+  conversationId,
+  projectId,
   repoPath,
   pro,
   isLatest,
@@ -165,6 +168,8 @@ function Turn({
   onAskAgain,
 }: {
   turn: KnowledgeTurnDTO;
+  conversationId: string;
+  projectId: string;
   repoPath: string;
   pro: boolean;
   isLatest: boolean;
@@ -177,7 +182,12 @@ function Turn({
   // Until the checked answer replaces it, the text being written is shown as a draft (18 §5.5).
   const draft = turn.answer === null ? answerDraft(entries) : undefined;
   return (
-    <article className={styles.turn} aria-label={turn.question} data-testid="knowledge-turn">
+    <article
+      id={`knowledge-answer-${turn.id}`}
+      className={styles.turn}
+      aria-label={turn.question}
+      data-testid="knowledge-turn"
+    >
       <p className={styles.question}>{turn.question}</p>
       <div className={styles.researcherRow}>
         <span className={styles.avatarSm} aria-hidden="true">
@@ -189,7 +199,10 @@ function Turn({
       <ResearchCard turn={turn} entries={entries} repoPath={repoPath} pro={pro} />
       {draft !== undefined && <DraftAnswer draft={draft} stopped={ended} />}
       {turn.answer !== null && (
-        <Answer answer={turn.answer} citations={turn.citations} active={activeCitation} onCite={onCite} />
+        <>
+          <Answer answer={turn.answer} citations={turn.citations} active={activeCitation} onCite={onCite} />
+          <KnowledgeTaskAction id={conversationId} projectId={projectId} turn={turn} answer={turn.answer} />
+        </>
       )}
       {ended && (
         <div className={styles.ended}>
@@ -221,6 +234,10 @@ function Conversation({ conversation }: { conversation: KnowledgeConversationDTO
   const cited = conversation.turns.find((t) => t.id === openTurn);
   // A follow-up keeps the model of the question before it unless the user picks another one (D67 ④).
   const [model, setModel] = useState(latest?.model ?? null);
+  useEffect(() => {
+    if (openTurn !== undefined && cite === undefined)
+      document.getElementById(`knowledge-answer-${openTurn}`)?.scrollIntoView({ block: 'start' });
+  }, [openTurn, cite]);
 
   const openCitation = (turnId: string, index: number, from?: HTMLElement) => {
     if (from !== undefined) trigger.current = from;
@@ -243,6 +260,8 @@ function Conversation({ conversation }: { conversation: KnowledgeConversationDTO
               <Turn
                 key={turn.id}
                 turn={turn}
+                conversationId={conversation.id}
+                projectId={conversation.project.id}
                 repoPath={conversation.project.repoPath}
                 pro={pro}
                 isLatest={turn === latest}

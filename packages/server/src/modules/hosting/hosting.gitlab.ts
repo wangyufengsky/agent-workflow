@@ -1,4 +1,4 @@
-import { ReviewCommentKind } from '@aw/shared';
+import { AppError, ErrorCode, ReviewCommentKind } from '@aw/shared';
 import { GitbeakerRequestError, Gitlab } from '@gitbeaker/rest';
 import { z } from 'zod';
 import {
@@ -37,6 +37,16 @@ const discussionsSchema = z.array(
   }),
 );
 
+const statusSchema = z.object({
+  state: z.enum(['opened', 'closed', 'merged', 'locked']),
+  sha: z.string(),
+  target_branch: z.string(),
+  merge_commit_sha: z.string().nullable(),
+  squash_commit_sha: z.string().nullable(),
+  head_pipeline: z.object({ sha: z.string(), status: z.string() }).nullable().optional(),
+});
+const approvalSchema = z.object({ approved: z.boolean(), approvals_left: z.number().optional() });
+
 /** The user name a token signs in as; HOSTING_AUTH_FAILED when GitLab rejects it (D155). */
 export async function gitlabAccount(token: string, host: string): Promise<string> {
   const user = await new Gitlab({ host, token }).Users.showCurrentUser().catch(translate);
@@ -60,6 +70,27 @@ export function createGitlabProvider(repo: string, token: string, host: string):
       );
       const [request] = requests;
       return request === undefined ? undefined : { number: request.iid, url: request.web_url };
+    },
+    async getPullRequestStatus(number) {
+      const raw = await api.MergeRequests.show(repo, number).catch(translate);
+      const pr = statusSchema.parse(raw);
+      const approvals = approvalSchema.parse(
+        await api.MergeRequestApprovals.showConfiguration(repo, {
+          mergerequestIId: number,
+        }).catch(translate),
+      );
+      const after = statusSchema.parse(await api.MergeRequests.show(repo, number).catch(translate));
+      if (after.sha !== pr.sha || after.state !== pr.state) {
+        throw new AppError(ErrorCode.HostingApiError, 'The merge request changed while its status was read');
+      }
+      return {
+        state: pr.state === 'opened' ? 'open' : pr.state,
+        head: pr.sha,
+        targetBranch: pr.target_branch,
+        mergeCommit: pr.state === 'merged' ? (pr.merge_commit_sha ?? pr.squash_commit_sha) : null,
+        ci: pr.head_pipeline?.sha === pr.sha ? pr.head_pipeline.status : null,
+        review: approvals.approved ? 'approved' : 'awaiting',
+      };
     },
     async listReviewComments({ number, url }) {
       const raw = await api.MergeRequestDiscussions.all(repo, number, {

@@ -14,6 +14,13 @@ export type FakePullRequest = {
   title: string;
   body: string;
   open: boolean;
+  status: {
+    state: 'open' | 'closed' | 'merged';
+    sha: string;
+    mergeCommit: string | null;
+    ci: string | null;
+    review: string | null;
+  };
   /** Review threads (GitHub) / resolvable discussions (GitLab). */
   threads: FakeReviewThread[];
   /** Conversation comments (GitHub) / plain notes (GitLab). */
@@ -39,9 +46,11 @@ export async function createFakeHosting(options: {
   repos: string[];
   tls?: { certPem: string; keyPem: string };
   host?: string;
+  canonicalWebUrls?: boolean;
 }) {
   const pullRequests: FakePullRequest[] = [];
   /** Answers the next pull request with this error instead (e.g. 422: one already exists). */
+  let statusGate: { entered: () => void; wait: Promise<void> } | undefined;
   let failNext: { status: number; message: string } | undefined;
 
   const readJson = async (req: IncomingMessage): Promise<Record<string, unknown>> => {
@@ -55,7 +64,7 @@ export async function createFakeHosting(options: {
   };
   const webUrl = (pr: FakePullRequest) =>
     pr.provider === 'github'
-      ? `https://github.example/${pr.repo}/pull/${pr.number}`
+      ? `${options.canonicalWebUrls === true ? 'https://github.com' : 'https://github.example'}/${pr.repo}/pull/${pr.number}`
       : `https://gitlab.example/${pr.repo}/-/merge_requests/${pr.number}`;
   const find = (provider: FakePullRequest['provider'], repo: string, number: number) =>
     pullRequests.find((p) => p.provider === provider && p.repo === repo && p.number === number);
@@ -82,6 +91,7 @@ export async function createFakeHosting(options: {
       title: String(body.title),
       body: String(github ? body.body : body.description),
       open: true,
+      status: { state: 'open', sha: 'a'.repeat(40), mergeCommit: null, ci: null, review: null },
       threads: [],
       comments: [],
     };
@@ -157,9 +167,10 @@ export async function createFakeHosting(options: {
       const url = new URL(req.url ?? '/', 'http://fake');
       const graphql = url.pathname === '/github/graphql';
       const github = /^\/github\/repos\/([^/]+\/[^/]+)(\/pulls)?$/.exec(url.pathname);
-      const gitlab = /^\/gitlab\/api\/v4\/projects\/([^/]+)(\/merge_requests(?:\/(\d+)\/discussions)?)?$/.exec(
-        url.pathname,
-      );
+      const gitlab =
+        /^\/gitlab\/api\/v4\/projects\/([^/]+)(\/merge_requests(?:\/(\d+)(?:\/(discussions|approvals))?)?)?$/.exec(
+          url.pathname,
+        );
       // The signed-in user of a token (D155).
       const user = url.pathname === '/github/user' || url.pathname === '/gitlab/api/v4/user';
       const match = github ?? gitlab;
@@ -175,9 +186,44 @@ export async function createFakeHosting(options: {
       if (user) return send(res, 200, provider === 'github' ? { login: FAKE_USER } : { username: FAKE_USER });
 
       if (graphql) {
-        const { variables } = (await readJson(req)) as { variables: { owner: string; name: string; number: number } };
+        const { variables, query } = (await readJson(req)) as {
+          query: string;
+          variables: { owner: string; name: string; number: number };
+        };
         const pr = find('github', `${variables.owner}/${variables.name}`, variables.number);
         if (pr === undefined) return send(res, 200, { data: null, errors: [{ type: 'NOT_FOUND', message: 'No PR' }] });
+        if (query.includes('statusCheckRollup')) {
+          const status = { ...pr.status };
+          const gate = statusGate;
+          if (gate !== undefined) {
+            statusGate = undefined;
+            gate.entered();
+            await gate.wait;
+          }
+          return send(res, 200, {
+            data: {
+              repository: {
+                pullRequest: {
+                  state: status.state.toUpperCase(),
+                  headRefOid: status.sha,
+                  baseRefName: pr.base,
+                  mergeCommit: status.mergeCommit === null ? null : { oid: status.mergeCommit },
+                  reviewDecision: status.review,
+                  commits: {
+                    nodes: [
+                      {
+                        commit: {
+                          oid: status.sha,
+                          statusCheckRollup: status.ci === null ? null : { state: status.ci },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          });
+        }
         return send(res, 200, githubReview(pr));
       }
       const repo = decodeURIComponent(match?.[1] ?? '');
@@ -187,7 +233,17 @@ export async function createFakeHosting(options: {
 
       if (gitlab?.[3] !== undefined) {
         const pr = find('gitlab', repo, Number(gitlab[3]));
-        return pr === undefined ? send(res, 404, { message: '404 Not found' }) : send(res, 200, gitlabDiscussions(pr));
+        if (pr === undefined) return send(res, 404, { message: '404 Not found' });
+        if (gitlab[4] === 'discussions') return send(res, 200, gitlabDiscussions(pr));
+        if (gitlab[4] === 'approvals') return send(res, 200, { approved: pr.status.review === 'approved' });
+        return send(res, 200, {
+          state: pr.status.state === 'open' ? 'opened' : pr.status.state,
+          sha: pr.status.sha,
+          target_branch: pr.base,
+          merge_commit_sha: pr.status.mergeCommit,
+          squash_commit_sha: null,
+          head_pipeline: pr.status.ci === null ? null : { sha: pr.status.sha, status: pr.status.ci },
+        });
       }
       // The open pull requests from a branch: GitHub `head=owner:branch&state=open`, GitLab `source_branch=…`.
       const head =
@@ -222,6 +278,18 @@ export async function createFakeHosting(options: {
     /** Pass as `createTestApp({ hosting })`; a self-hosted GitLab binding uses `gitlabUrl` as its base URL. */
     endpoints: { githubApiUrl: `${base}/github`, gitlabUrl: `${base}/gitlab` } satisfies HostingEndpoints,
     pullRequests,
+    pauseNextStatus() {
+      let entered = () => {};
+      let release = () => {};
+      const started = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      const wait = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      statusGate = { entered, wait };
+      return { started, release };
+    },
     failNextPullRequest(status: number, message: string): void {
       failNext = { status, message };
     },

@@ -124,6 +124,8 @@ UX-01…UX-03 回归：`task.browser.spec.ts` 验证流程图前置、键盘折�
 
 UX-04、UX-05、UX-08 回归：`shell-assistant-project.browser.spec.ts` 验证项目预选、主页到侧栏保留归属和返回原会话；`shell-assistant-continuation.browser.spec.ts` 验证明确溢出后续接、选择附件、重载后编辑输入、来源回看和侧栏主动续接；`project-overview.browser.spec.ts` 验证按项目筛选、近期状态更新、旧待处理任务优先显示，以及窄屏和专业模式入口。助手的 SQLite / FakeOpencode 集成验证历史截止、连续续接、来源删除、重启、原权限和确认卡隔离。
 
+第三批回归覆盖 `workflow-from-plan.browser.spec.ts` 的指定版本与模板复用、项目运行检查的真实 Git 与进程清理、`task-review.browser.spec.ts` 的 PR 状态及审查回流，以及 `project-knowledge.browser.spec.ts` 的网页与代码资料绑定、换流程和返回原回答。GitHub、GitLab 状态使用仿真平台，需求计划本地合入判断使用真实 Git。
+
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 
 审查过程回归（`review-progress.browser.spec.ts`，J24 / J22）：四类 Git 审查入口均能查看进展、思考、正文与工具输入输出，刷新后保留，完成后收起；重新审查选中新过程、历史互不串流，停止后仍可展开。任务 AI 评审在当前步骤与简单过程页可见。真实 opencode 权限回归用本地脚本模型并行触发两条 `find`，验证「总是允许」发出两条完成事件及重复答复的明确失效错误；集成覆盖 SSE / HTTP 竞争、重复投递、无关条目保留和助手同步。

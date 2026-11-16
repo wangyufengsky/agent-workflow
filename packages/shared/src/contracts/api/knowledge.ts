@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { KNOWLEDGE_QUESTION_MAX_CHARS, LIST_PAGE_DEFAULT, LIST_PAGE_MAX } from '../../constants/limits.ts';
+import {
+  KNOWLEDGE_ANSWER_MAX_CHARS,
+  KNOWLEDGE_MAX_CITATIONS,
+  KNOWLEDGE_QUESTION_MAX_CHARS,
+  KNOWLEDGE_TASK_EXCERPT_MAX_CHARS,
+  LIST_PAGE_DEFAULT,
+  LIST_PAGE_MAX,
+} from '../../constants/limits.ts';
 import { CitationType, knowledgeTurnStatusSchema } from '../../enums/knowledge.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
 import { dbQueryOutputSchema } from '../mcp/db-tools.ts';
@@ -150,3 +157,17 @@ export const citationSourceSchema = z.discriminatedUnion('type', [
   }),
 ]);
 export type CitationSourceDTO = z.infer<typeof citationSourceSchema>;
+
+export const knowledgeTaskMaterialRequestSchema = z
+  .strictObject({
+    id: z.string(),
+    turnId: z.string(),
+    from: z.number().int().nonnegative().max(KNOWLEDGE_ANSWER_MAX_CHARS),
+    to: z.number().int().positive().max(KNOWLEDGE_ANSWER_MAX_CHARS),
+    citations: z.array(z.number().int().min(1).max(KNOWLEDGE_MAX_CITATIONS)).max(KNOWLEDGE_MAX_CITATIONS),
+  })
+  .refine(({ from, to }) => to > from && to - from <= KNOWLEDGE_TASK_EXCERPT_MAX_CHARS, {
+    path: ['to'],
+    message: 'Select a non-empty excerpt within the character limit',
+  });
+export type KnowledgeTaskMaterialRequest = z.infer<typeof knowledgeTaskMaterialRequestSchema>;

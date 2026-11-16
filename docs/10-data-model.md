@@ -59,6 +59,10 @@
 | hosting_credential_id | TEXT NULL → credentials | ON DELETE SET NULL |
 | created_at / updated_at | INTEGER | |
 
+### project_runtime_checks
+
+每个项目至多保存一条最近运行检查：`project_id` 为指向 projects 的主键（删除项目时级联删除），`result` 为按契约校验的 JSON，记录配置快照、时间、分支与分项结果。临时工作区清理日志独立保存在数据目录；项目删除不会删除仍需收尾的日志。
+
 ### hosting_accounts
 
 全局 GitHub / GitLab 令牌（D155，迁移 `0029_hosting_accounts`），项目没有自己的令牌时按 origin 的平台地址使用。每个平台地址（`provider` + `base_url`）至多一行：唯一索引 `(provider, coalesce(base_url, ''))`；再次保存时先加密新令牌，再在同一步里替换这一行的凭据并删除旧凭据。
@@ -334,6 +338,8 @@ payload / response：
 | status | TEXT | `DeliveryStatus` |
 | commit_sha | TEXT NULL | 本地合并产生的提交 |
 | pr_url | TEXT NULL | |
+| remote_ref | TEXT NULL | UX-09。PR / MR 交付时的平台、地址及仓库身份；旧记录可为空。 |
+| remote_status / remote_error | TEXT NULL | UX-09。最近一次成功的远端状态快照及最近一次查询错误，失败时保留快照与其查询时间。 |
 | diff_base / diff_head | TEXT NULL | UX-03。记录本次交付的固定对比范围。本地合并是目标分支交付前后的提交，PR / MR 是对比基线与本次推送提交。旧交付可为空 |
 | conflict_files | TEXT(JSON) NULL | |
 | error | TEXT(JSON) NULL | |
@@ -793,8 +799,10 @@ payload / response：
 
 | 表 | 关键字段／约束 |
 | --- | --- |
-| attachments | id、source、name（显示名）、size_bytes、origin JSON（项目文件快照才有：projectId、taskId、相对路径、行范围、读取时间）、format（`AttachmentFormat`，默认 text）、meta JSON（Word / Excel 才有：`OfficeMeta`，字数与标题、表格、图片数，或各工作表的名字、区域、行列数与公式、图表、图片、透视表数）、created_at；索引 created_at。磁盘路径只由 id 派生：`attachments/<id>/original`（迁移 0017，U-01 已实现）；Word / Excel 另有模型读的 `text.md`，Excel 再有单元格 `workbook.json`（迁移 0032_attachment_format，OF-01 已实现，39 §5） |
+| attachments | id、source、name（显示名）、size_bytes、origin JSON（快照来源见下文）、format（`AttachmentFormat`，默认 text）、meta JSON（Word / Excel 的 `OfficeMeta`）、created_at。索引为 created_at。原文件按 id 存在 `attachments/<id>/original`（迁移 0017）。Word / Excel 另有模型读取的 `text.md`，Excel 还有单元格 `workbook.json`（迁移 0032，39 §5）。 |
 | attachment_refs | owner_kind、owner_id、attachment_id FK、ordinal、created_at；主键 (owner_kind, owner_id, attachment_id)，索引 attachment_id |
+
+项目文件的 `origin` 保存 `projectId`、`taskId`、相对路径、行范围和读取时间。知识问答的 `origin` 保存 `kind = knowledge_answer`、`projectId`、`conversationId`、`turnId`、`answeredAt` 和 `readAt`，旧附件仍按原格式解析。快照保存回答时选中的原文和引用，任务从附件归属读取，删除问答不会删除已绑定的快照。
 
 - 所有者在自己的事务里创建／删除引用：删除任务时删除该任务（task_input）与其节点（task_feedback）的引用；删除助手对话时删除 assistant_message 引用。多态 owner 没有外键，由所有者模块负责。
 - 助手会话 JSONL 的用户消息增加可选 `attachments: [{ id, name }]`，只作展示。

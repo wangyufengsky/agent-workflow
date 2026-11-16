@@ -246,8 +246,8 @@ describe('项目里的 Word 与 Excel（39 §7.3）', () => {
 describe('引用与清理', () => {
   it('被引用的附件一直保留；最后一个引用释放、超过保留时间后才删除', async () => {
     const attachment = await uploaded('shared\n');
-    service().bind(task('t1'), [attachment.id]);
-    service().bind({ kind: AttachmentOwnerKind.AssistantMessage, id: 'c1' }, [attachment.id]);
+    service().bind(task('t1'), [attachment.id], 'project');
+    service().bind({ kind: AttachmentOwnerKind.AssistantMessage, id: 'c1' }, [attachment.id], null);
     expect((await t.call(removeAttachmentOp, { id: attachment.id })).status).toBe(400);
 
     clock.advance(ATTACHMENT_ORPHAN_TTL_MS + HOUR);
@@ -269,7 +269,7 @@ describe('引用与清理', () => {
 
     expect((await t.call(getAttachmentOp, { id: old.id })).status).toBe(404);
     expect(await storedDirs()).toEqual([recent.id]);
-    expect(() => service().bind(task('t1'), [old.id, recent.id])).toThrow(
+    expect(() => service().bind(task('t1'), [old.id, recent.id], 'project')).toThrow(
       expect.objectContaining({ code: ErrorCode.AttachmentNotFound }),
     );
     expect(service().listByOwner(task('t1'))).toEqual([]);
@@ -297,7 +297,7 @@ describe('引用与清理', () => {
 
   it('按顺序绑定；一次最多 ATTACHMENTS_PER_INPUT_MAX 个', async () => {
     const [a, b] = [await uploaded('a\n', 'a.md'), await uploaded('b\n', 'b.md')];
-    service().bind(task('t1'), [b.id, a.id]);
+    service().bind(task('t1'), [b.id, a.id], 'project');
     expect(
       service()
         .listByOwner(task('t1'))
@@ -305,7 +305,7 @@ describe('引用与清理', () => {
     ).toEqual(['b.md', 'a.md']);
 
     const many = Array.from({ length: ATTACHMENTS_PER_INPUT_MAX + 1 }, () => a.id);
-    expect(() => service().bind(task('t2'), many)).toThrow(
+    expect(() => service().bind(task('t2'), many, 'project')).toThrow(
       expect.objectContaining({ code: ErrorCode.AttachmentTooLarge }),
     );
   });

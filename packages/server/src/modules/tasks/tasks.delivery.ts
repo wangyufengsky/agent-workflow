@@ -5,6 +5,7 @@ import {
   DeliveryStrategy,
   ErrorCode,
   type ErrorInfo,
+  type HostingRef,
   InboxKind,
   isLocalMerge,
   type RequirementsDeliverySummary,
@@ -62,7 +63,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
   function recordSuccess(
     taskId: string,
     delivery: DeliveryDTO,
-    result: { commitSha?: string; prUrl?: string; diffBase?: string; diffHead?: string },
+    result: { commitSha?: string; prUrl?: string; diffBase?: string; diffHead?: string; remoteRef?: HostingRef },
   ) {
     unit.transact(() => {
       const task = get(taskId);
@@ -137,7 +138,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
     task: Task,
     delivery: DeliveryDTO,
     worktree: Worktree,
-    hosting: GitHostingProvider,
+    hosting: GitHostingProvider & { ref: HostingRef },
     pr: { title: string; body: string },
   ): Promise<void> {
     let url: string;
@@ -166,7 +167,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
       if (err instanceof AppError) return;
       throw err;
     }
-    recordSuccess(task.id, delivery, { prUrl: url, ...diff });
+    recordSuccess(task.id, delivery, { prUrl: url, remoteRef: hosting.ref, ...diff });
     await cleanUp(task, worktree, delivery.strategy);
   }
 

@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { ATTACHMENT_NAME_MAX_CHARS, ATTACHMENTS_PER_INPUT_MAX } from '../../constants/limits.ts';
-import { AttachmentFormat, attachmentFormatSchema, attachmentSourceSchema } from '../../enums/attachment.ts';
+import {
+  AttachmentFormat,
+  AttachmentSource,
+  attachmentFormatSchema,
+  attachmentSourceSchema,
+} from '../../enums/attachment.ts';
 
 /** A 1-based, inclusive line range of a project file. */
 export const lineRangeSchema = z
@@ -9,7 +14,7 @@ export const lineRangeSchema = z
 export type LineRange = z.infer<typeof lineRangeSchema>;
 
 /** Where a project file snapshot was read (30 §2.1); paths are relative to the project or worktree root. */
-export const attachmentOriginSchema = z.object({
+const projectFileOriginSchema = z.object({
   projectId: z.string(),
   /** The task whose worktree was read; null for the project's main working tree. */
   taskId: z.string().nullable(),
@@ -17,6 +22,16 @@ export const attachmentOriginSchema = z.object({
   lines: lineRangeSchema.nullable(),
   readAt: z.number(),
 });
+export const knowledgeAttachmentOriginSchema = z.object({
+  kind: z.literal(AttachmentSource.KnowledgeAnswer),
+  projectId: z.string(),
+  conversationId: z.string(),
+  turnId: z.string(),
+  answeredAt: z.number(),
+  readAt: z.number(),
+});
+export type KnowledgeAttachmentOrigin = z.infer<typeof knowledgeAttachmentOriginSchema>;
+export const attachmentOriginSchema = z.union([projectFileOriginSchema, knowledgeAttachmentOriginSchema]);
 export type AttachmentOrigin = z.infer<typeof attachmentOriginSchema>;
 
 /** What a Word attachment holds (39 §5), as read when it was uploaded. */
@@ -62,7 +77,7 @@ export const attachmentSchema = z.object({
   source: attachmentSourceSchema,
   name: z.string(),
   sizeBytes: z.number(),
-  /** Project file snapshots only. */
+  /** Snapshots of project files or verified knowledge answers. */
   origin: attachmentOriginSchema.nullable(),
   format: attachmentFormatSchema,
   /** Word and Excel attachments only. */

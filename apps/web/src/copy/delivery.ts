@@ -46,6 +46,15 @@ export const DELIVERY_COPY = {
   resolveMyselfBody: '在任务的工作区里合入目标分支、解决冲突并提交，然后回到这里再次点击合并：',
   resolveMyselfGit: '在 Git 工作台中查看',
   failedTitle: '上次合并没有成功',
+  remoteRefresh: '刷新交付状态',
+  remoteState: (state: string) =>
+    `远端状态：${({ open: '待合入', closed: '已关闭', merged: '已合入', locked: '处理中' } as Record<string, string>)[state] ?? state}`,
+  remoteCi: (state: string | null) =>
+    `CI：${state === null ? '平台未提供' : (({ PENDING: '等待中', pending: '等待中', RUNNING: '运行中', running: '运行中', SUCCESS: '通过', success: '通过', FAILURE: '失败', failed: '失败', ERROR: '失败', CANCELED: '已取消', canceled: '已取消' } as Record<string, string>)[state] ?? state)}`,
+  remoteReview: (state: string | null) =>
+    `审查：${state === null ? '平台未提供' : (({ REVIEW_REQUIRED: '等待审查', CHANGES_REQUESTED: '要求修改', APPROVED: '已批准', approved: '已批准', awaiting: '等待审查' } as Record<string, string>)[state] ?? state)}`,
+  remoteChecked: (at: number) => `最近成功查询：${new Date(at).toLocaleString()}`,
+  remoteStale: '刷新失败，以下是上次成功查询的结果。',
   reviewTitle: '审查意见',
   reviewFetch: '取回审查意见',
   reviewRefetch: '重新取回',

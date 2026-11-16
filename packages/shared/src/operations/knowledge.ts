@@ -1,10 +1,12 @@
 import { z } from 'zod';
+import { attachmentSchema } from '../contracts/api/attachments.ts';
 import {
   askKnowledgeRequestSchema,
   citationSourceSchema,
   followUpKnowledgeRequestSchema,
   knowledgeConversationSchema,
   knowledgeConversationSummarySchema,
+  knowledgeTaskMaterialRequestSchema,
   listKnowledgeQuerySchema,
 } from '../contracts/api/knowledge.ts';
 import { EntityKind, InputRef } from '../enums/entity.ts';
@@ -96,4 +98,16 @@ export const knowledgeCitationOp = defineOperationContract({
   output: citationSourceSchema,
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/knowledge/turns/:turnId/citations/:index' },
+});
+
+export const snapshotKnowledgeTaskMaterialOp = defineOperationContract({
+  ...common,
+  expose: { palette: false, assistant: false },
+  id: 'knowledge.snapshotTaskMaterial',
+  title: 'op.knowledge.snapshotTaskMaterial',
+  description: 'Save the selected verified answer excerpt and citations as a task attachment',
+  input: knowledgeTaskMaterialRequestSchema,
+  output: attachmentSchema,
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/knowledge/conversations/:id/task-material', status: 201 },
 });

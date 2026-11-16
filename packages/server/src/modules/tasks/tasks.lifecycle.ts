@@ -294,7 +294,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
           TASK_KEY_PREFIX,
         );
         if (input.attachmentIds !== undefined) {
-          deps.attachments.bind({ kind: AttachmentOwnerKind.TaskInput, id }, input.attachmentIds);
+          deps.attachments.bind({ kind: AttachmentOwnerKind.TaskInput, id }, input.attachmentIds, input.projectId);
         }
         if (input.requirements !== undefined) deps.requirements.save(id, input.requirements);
       });

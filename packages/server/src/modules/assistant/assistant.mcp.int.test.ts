@@ -575,6 +575,32 @@ describe('助手专用工具（A-05）', () => {
     expect(body).toMatchObject({ code: ErrorCode.ValidationFailed });
   });
 
+  it('open_form：按来源打开流程或组合模板，缺少来源时拒绝', async () => {
+    const planOpened = waitForEvent(t.app.events, ServerEventType.AssistantOpenForm);
+    await call(AssistantToolName.OpenForm, { form: 'workflows.fromPlan', values: { id: 'task-id', version: 2 } });
+    expect(await planOpened).toEqual({
+      conversationId,
+      form: 'workflows.fromPlan',
+      values: { id: 'task-id', version: 2 },
+    });
+    const initiativeOpened = waitForEvent(t.app.events, ServerEventType.AssistantOpenForm);
+    await call(AssistantToolName.OpenForm, {
+      form: 'initiativeTemplates.fromInitiative',
+      values: { id: 'initiative-id' },
+    });
+    expect(await initiativeOpened).toEqual({
+      conversationId,
+      form: 'initiativeTemplates.fromInitiative',
+      values: { id: 'initiative-id' },
+    });
+    const { isError, body } = await call(AssistantToolName.OpenForm, {
+      form: 'workflows.fromPlan',
+      values: { id: 'task-id' },
+    });
+    expect(isError).toBe(true);
+    expect(body).toMatchObject({ code: ErrorCode.ValidationFailed });
+  });
+
   it('export_deck：做好的 PPT 由界面导出（推送请求）；没做好的 DECK_NOT_READY、不存在的 DECK_NOT_FOUND', async () => {
     const writer = { agent: 'aw-slides' };
     const deckWork = async (start: () => Promise<unknown>) => {

@@ -808,7 +808,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           createdAt: now,
           consumedAt: null,
         });
-        attachments.bind({ kind: AttachmentOwnerKind.AssistantMessage, id: childId }, attachmentIds);
+        attachments.bind({ kind: AttachmentOwnerKind.AssistantMessage, id: childId }, attachmentIds, source.projectId);
       });
       return publish(childId);
     },
@@ -903,7 +903,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       const show = (): AttachmentDTO[] => {
         if (shown !== undefined) return shown;
         // The conversation keeps its files even when the model cannot be reached: they were sent (30 §2).
-        attachments.bind({ kind: AttachmentOwnerKind.AssistantMessage, id }, attachmentIds);
+        attachments.bind({ kind: AttachmentOwnerKind.AssistantMessage, id }, attachmentIds, c.projectId);
         const sent = attachmentIds.map((attachmentId) => attachments.get(attachmentId));
         record(c, [
           {

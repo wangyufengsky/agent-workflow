@@ -62,6 +62,7 @@ export const ATTACHMENTS_COPY = {
   size: formatBytes,
   fromProject: (path: string) => `项目文件 ${path}`,
   fromUpload: '上传的文件',
+  fromKnowledge: '知识问答快照',
   loading: '正在读取…',
   close: '关闭',
   projectFileTitle: '添加项目文件',

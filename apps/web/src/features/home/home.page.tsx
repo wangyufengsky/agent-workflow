@@ -14,6 +14,7 @@ import { ConversationContinuation } from '../assistant/conversation-continuation
 import { ConversationMenu, titleOf } from '../assistant/conversation-menu.tsx';
 import { MessageList } from '../assistant/message-list.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
+import { attachmentQuery } from '../attachments/attachments.api.ts';
 import { Character } from '../companion/character.tsx';
 import { projectsQuery } from '../projects/projects.queries.ts';
 import styles from './home.module.css';
@@ -143,7 +144,18 @@ export function HomePage() {
   const conversations = useQuery(conversationsQuery);
   const search = route.useSearch();
   const navigate = route.useNavigate();
-  const projectId = projects.some((p) => p.id === search.projectId) ? search.projectId : projects[0]?.id;
+  const material = useQuery({
+    ...attachmentQuery(search.knowledgeMaterial ?? ''),
+    enabled: search.knowledgeMaterial !== undefined,
+  });
+  const origin = material.data?.origin;
+  const knowledgeOrigin = origin != null && 'kind' in origin ? origin : undefined;
+  const projectId =
+    search.knowledgeMaterial === undefined
+      ? projects.some((p) => p.id === search.projectId)
+        ? search.projectId
+        : projects[0]?.id
+      : projects.find((project) => project.id === knowledgeOrigin?.projectId)?.id;
   const list = conversations.data ?? [];
   const conversation = list.find((c) => c.id === search.conversation);
 
@@ -164,6 +176,17 @@ export function HomePage() {
       onProjectChange={(id) => void navigate({ search: (s) => ({ ...s, projectId: id }), replace: true })}
       initialWorkflowKey={search.workflow}
       initialRequirement={search.requirement}
+      knowledgeDraft={
+        search.knowledgeMaterial === undefined
+          ? undefined
+          : {
+              attachment: knowledgeOrigin === undefined ? undefined : material.data,
+              loading: material.isPending,
+              error: material.error,
+              retry: () => void material.refetch(),
+              dismiss: () => void navigate({ search: (s) => ({ ...s, knowledgeMaterial: undefined }), replace: true }),
+            }
+      }
       docked={conversation !== undefined}
     />
   );

@@ -138,6 +138,7 @@ export const TASK_COPY = {
   planningNow: '当前进展',
   lastAction: '最近的操作',
   // 待确认计划
+  savePlanTemplate: '存为流程模板',
   planTitle: 'AI 的计划',
   planVersion: (v: number) => `第 ${v} 版`,
   assumptions: '假设',

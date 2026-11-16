@@ -34,3 +34,12 @@ export const projectBashRulesTable = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.projectId, t.pattern] })],
 );
+
+/** Last runtime check, including its immutable configuration snapshot. */
+export const projectRuntimeChecksTable = sqliteTable('project_runtime_checks', {
+  projectId: text('project_id')
+    .primaryKey()
+    .notNull()
+    .references(() => projectsTable.id, { onDelete: 'cascade' }),
+  result: text('result').notNull(),
+});

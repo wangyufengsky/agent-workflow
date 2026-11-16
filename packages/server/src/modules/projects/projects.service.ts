@@ -194,7 +194,7 @@ export function createProjectsService({
   }
 
   /** The project's platform signed in with its own token or the global one (D155); undefined with neither. */
-  async function findHosting(id: string): Promise<GitHostingProvider | undefined> {
+  async function findHosting(id: string): Promise<(GitHostingProvider & { ref: HostingRef }) | undefined> {
     const resolved = await resolveHosting(require(id));
     if (resolved === undefined) return undefined;
     const { ref, source } = resolved;
@@ -204,7 +204,7 @@ export function createProjectsService({
         ? await credentials.reveal(credentialId)
         : await hostingAccounts.token(ref.provider, ref.baseUrl);
     if (token === undefined) throw new Error(`The global ${ref.provider} token vanished`);
-    return createHostingProvider(ref, token, hosting);
+    return { ...createHostingProvider(ref, token, hosting), ref };
   }
 
   async function detail(project: ProjectDTO): Promise<ProjectDetailDTO> {
@@ -294,8 +294,8 @@ export function createProjectsService({
     },
 
     setCheckCommand(id: string, command: string): void {
-      require(id);
-      repo.update(id, { checkCommand: command, updatedAt: clock.now() });
+      const project = require(id);
+      repo.update(id, { checkCommand: command, updatedAt: Math.max(clock.now(), project.updatedAt + 1) });
     },
 
     async update({ id, ...changes }: UpdateProjectRequest): Promise<ProjectDetailDTO> {
@@ -307,7 +307,7 @@ export function createProjectsService({
           });
         }
       }
-      repo.update(id, { ...changes, updatedAt: clock.now() });
+      repo.update(id, { ...changes, updatedAt: Math.max(clock.now(), require(id).updatedAt + 1) });
       return detail(require(id));
     },
 
@@ -331,7 +331,7 @@ export function createProjectsService({
       const existing = repo.hostingCredentialId(id);
       const credentialId = existing ?? (await credentials.create(CredentialKind.GitToken, token));
       if (existing !== null) await credentials.replace(existing, token);
-      repo.setHosting(id, { ...ref, credentialId }, clock.now());
+      repo.setHosting(id, { ...ref, credentialId }, Math.max(clock.now(), require(id).updatedAt + 1));
       return detail(require(id));
     },
 
@@ -360,7 +360,7 @@ export function createProjectsService({
     async clearHosting(id: string): Promise<ProjectDetailDTO> {
       require(id);
       const credentialId = repo.hostingCredentialId(id);
-      repo.setHosting(id, null, clock.now());
+      repo.setHosting(id, null, Math.max(clock.now(), require(id).updatedAt + 1));
       if (credentialId !== null) credentials.remove(credentialId);
       return detail(require(id));
     },
@@ -368,7 +368,7 @@ export function createProjectsService({
     findHosting,
 
     /** The project's platform signed in (D155); HOSTING_NOT_CONFIGURED when it has no token, own or global. */
-    async hostingOf(id: string): Promise<GitHostingProvider> {
+    async hostingOf(id: string): Promise<GitHostingProvider & { ref: HostingRef }> {
       const found = await findHosting(id);
       if (found === undefined) {
         throw new AppError(ErrorCode.HostingNotConfigured, 'The project has no hosting token', { id });

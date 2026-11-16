@@ -17,7 +17,7 @@ import {
   type UpdateProjectRequest,
   updateProjectOp,
 } from '@aw/shared';
-import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 
@@ -54,10 +54,17 @@ function useAddProject(add: (input: CreateProjectRequest) => Promise<ProjectDeta
 export const useCreateProject = () => useAddProject((input) => callOperation(createProjectOp, input));
 export const useInitGit = () => useAddProject((input) => callOperation(initGitOp, input));
 
-export function useUpdateProject() {
+const projectUpdateKey = (id: string) => ['project-update', id];
+
+export function useProjectConfigSaving(id: string) {
+  return useIsMutating({ mutationKey: projectUpdateKey(id) }) > 0;
+}
+
+export function useUpdateProject(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: UpdateProjectRequest) => callOperation(updateProjectOp, input),
+    mutationKey: projectUpdateKey(id),
+    mutationFn: (input: Omit<UpdateProjectRequest, 'id'>) => callOperation(updateProjectOp, { id, ...input }),
     onSuccess: async (project) => {
       queryClient.setQueryData(queryKeys.project(project.id), project);
       await queryClient.invalidateQueries({ queryKey: queryKeys.projects, exact: true });

@@ -22,6 +22,7 @@ import {
   nodeDiffFileOp,
   nodeDiffOp,
   pauseTaskOp,
+  refreshDeliveryStatusOp,
   rejectNodeOp,
   replaceRequirementsOp,
   replanOp,
@@ -90,6 +91,7 @@ export function tasksOperations(tasks: TasksService) {
     implement(requestChangesOp, ({ id, reason, feedback, attachmentIds, page }) =>
       tasks.requestChanges(id, reason, feedback, attachmentIds, page),
     ),
+    implement(refreshDeliveryStatusOp, ({ id }) => tasks.refreshDeliveryStatus(id)),
     implement(reviewCommentsOp, ({ id }) => tasks.reviewComments(id)),
     implement(reviseFromReviewOp, ({ id, commentIds, note }) => tasks.reviseFromReview(id, commentIds, note)),
     implement(taskCheckEvidenceOp, ({ id, evidenceId }) => tasks.checkEvidence(id, evidenceId)),
