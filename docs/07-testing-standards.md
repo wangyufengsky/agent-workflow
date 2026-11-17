@@ -117,7 +117,7 @@ Node 24 的集成测试进程暂用 `--no-wasm-code-gc`：Office 源码 worker �
 | J36 | 助手画图（35，V-04，`shell-assistant-charts.browser.spec.ts`）：主页问助手 → 一次被拒的画图（饼图两个系列）后画出饼图与流程图 → 饼图图例聚焦后读数为「已完成 · 7个 · 70%」、读屏表格含数值与占比，流程图的读屏列表含判断节点与带条件的回边 → 简单模式只有失败的那次「画图」动作条 → 刷新后两张图仍在 → 专业模式三次画图调用都有动作条；J9 另截面板与主页里的五种图（`assistant-charts`、`home-charts`） | 浏览器 |
 | J37 | 需求计划（34 §15，N-07 / N-11，`task-initiative.browser.spec.ts`）：主页「直接开始」面板的「组合」→「设计后开发」，框切到「开始 · 设计后开发」并显示阶段链 → 写需求开始 → 需求计划页两个阶段，第 2 阶段「前面完成后自动开始」→ 方案报告完成后「合并本阶段待合并的（1）」→ 方案设计「已完成」，第 2 阶段自动开启、开发任务 T-2 出现 | 浏览器 |
 | J38 | 需求计划的 AI 拆解（34 §5.1–§5.2、§8，N-07，`task-initiative-breakdown.browser.spec.ts`）：主页「直接开始」→「组合」的「让 AI 拆解」，框切到「开始 · AI 拆解需求计划」→ 写需求开始 → FakeOpencode 交出拆解：标题换成 AI 给的，说明、需求覆盖（含不做的一点）与两个阶段 →「按意见重新拆解」写意见 → 新草稿的工作包标题更新 →「确认并开始第 1 阶段」→ 第 1 个工作包开出任务，第 2 个阶段未开始 | 浏览器 |
-| J43 | 简单模式的收敛（38，CV-01…CV-04，`simple-mode.browser.spec.ts`）：侧栏只有主页、任务、项目、知识问答、设置，顶栏没有主题切换；「直接开始」五个常用流程，「更多流程」展开六个、选「安全审查」切到「开始任务 · 安全审查」；专业模式侧栏有 PPT、质量与用量、团队。J16 另断言简单模式任务页的本周一行 | 浏览器 |
+| J43 | 简单模式的收敛（38，CV-01…CV-04，`simple-mode.browser.spec.ts`）：侧栏显示主页、任务、项目、知识问答、助手记忆、我的 Skill、设置，顶栏没有主题切换；「直接开始」五个常用流程，「更多流程」展开六个、选「安全审查」切到「开始任务 · 安全审查」；专业模式侧栏有 PPT、质量与用量、团队。J16 另断言简单模式任务页的本周一行 | 浏览器 |
 | J44 | 项目的 AGENTS.md（40，AM-02，`project-agents-md.browser.spec.ts`）：项目详情没有 AGENTS.md → 预览规则 → 写补充说明 →「让 AI 生成」→ 任务页 → FakeOpencode 两步与评审完成 → 合并到 main → 面板显示默认分支上的新内容、按钮变为「让 AI 补充」 | 浏览器 |
 
 UX-01…UX-03 回归：`task.browser.spec.ts` 验证流程图前置、键盘折叠、跳转及两种模式与窗口尺寸下的长流程；`task-requirements.browser.spec.ts` 验证保存并重验；`task-delivery.browser.spec.ts` 和 `task-page-check.browser.spec.ts` 验证交付后 diff、读取当次命令输出和放大核验截图。真实 OpenCode 的任务诊断 skill 加载用本地脚本模型验证。
@@ -125,7 +125,7 @@ UX-01…UX-03 回归：`task.browser.spec.ts` 验证流程图前置、键盘折�
 UX-04、UX-05、UX-08 回归：`shell-assistant-project.browser.spec.ts` 验证项目预选、主页到侧栏保留归属和返回原会话；`shell-assistant-continuation.browser.spec.ts` 验证明确溢出后续接、选择附件、重载后编辑输入、来源回看和侧栏主动续接；`project-overview.browser.spec.ts` 验证按项目筛选、近期状态更新、旧待处理任务优先显示，以及窄屏和专业模式入口。助手的 SQLite / FakeOpencode 集成验证历史截止、连续续接、来源删除、重启、原权限和确认卡隔离。
 
 第三批回归覆盖 `workflow-from-plan.browser.spec.ts` 的指定版本与模板复用、项目运行检查的真实 Git 与进程清理、`task-review.browser.spec.ts` 的 PR 状态及审查回流，以及 `project-knowledge.browser.spec.ts` 的网页与代码资料绑定、换流程和返回原回答。GitHub、GitLab 状态使用仿真平台，需求计划本地合入判断使用真实 Git。
-| J46 | 助手记忆（`shell-assistant-memory.browser.spec.ts`）：项目页开对话 → 助手提议 → 用户确认 → 设置查看来源、修改并删除。真实模型用例 `live/assistant-memory.live.test.ts` 比较保存前后及跨项目隔离。 | 浏览器 |
+| J46 | 助手记忆（`shell-assistant-memory.browser.spec.ts`）：项目页开对话 → 助手提议 → 用户确认 → 左侧「助手记忆」按项目及关键词筛选 → 回到来源对话 → 新增、修改并删除。真实模型用例 `live/assistant-memory.live.test.ts` 比较保存前后及跨项目隔离。 | 浏览器 |
 
 E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访问名称时）定位，不用 CSS 类名。
 
