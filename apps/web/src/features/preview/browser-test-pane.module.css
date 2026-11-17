@@ -85,7 +85,21 @@
   font-size: 12px;
 }
 
+.zoom {
+  width: auto;
+  padding: var(--s-1) var(--s-2);
+  font-size: inherit;
+}
+
+.panHint {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .statusBar > :last-child {
+  white-space: nowrap;
   margin-left: auto;
 }
 

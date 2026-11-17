@@ -114,7 +114,9 @@ test('AI 测试的同一原生页签只观看，按需截图，结束后只保�
       return;
     }
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end('<button onclick="fetch(\'/api/clicked?trace=private\')">执行</button><p id="gate">等待操作</p>');
+    res.end(
+      '<style>button{position:absolute;top:70px;left:170px;width:92px;height:36px;background:red}</style><button onclick="fetch(\'/api/clicked?trace=private\')">执行</button><p id="gate">等待操作</p>',
+    );
   });
   await new Promise<void>((resolve) => target.listen(0, '127.0.0.1', resolve));
   try {
@@ -194,6 +196,56 @@ test('AI 测试的同一原生页签只观看，按需截图，结束后只保�
       });
       expect(watched).toMatchObject({ width: 1280, text: expect.stringContaining('等待操作') });
       expect(watched?.bounds).toEqual(watched?.shieldBounds);
+      const redLeft = () =>
+        app.evaluate(async ({ BrowserWindow }) => {
+          const view = BrowserWindow.getAllWindows()[0]?.contentView.children[0];
+          if (view === undefined || !('webContents' in view)) throw new Error('No native test view');
+          const shot = await view.webContents.capturePage();
+          const { width } = shot.getSize();
+          const pixels = shot.toBitmap();
+          let left = width;
+          for (let i = 0; i < pixels.length; i += 4) {
+            if (pixels[i + 2] > 235 && pixels[i + 1] < 20 && pixels[i] < 20) left = Math.min(left, (i / 4) % width);
+          }
+          return left === width ? null : left;
+        });
+      const zoom = page.getByRole('combobox', { name: '画面缩放' });
+      const original = await redLeft();
+      expect(original).not.toBeNull();
+      await zoom.selectOption('fit');
+      await expect.poll(redLeft).not.toBe(original);
+      await page.getByRole('button', { name: '复位画面' }).click();
+      await expect(zoom).toHaveValue('1');
+      await expect.poll(redLeft).toBe(original);
+      await zoom.selectOption('1.5');
+      await expect.poll(redLeft).not.toBe(original);
+      const zoomed = await redLeft();
+      expect(zoomed).not.toBeNull();
+      await app.evaluate(async ({ BrowserWindow }) => {
+        const win = BrowserWindow.getAllWindows()[0];
+        const shield = win?.contentView.children[1];
+        if (shield === undefined || !('webContents' in shield)) throw new Error('No native watch shield');
+        win?.focus();
+        const contents = shield.webContents;
+        contents.focus();
+        const send = (type: 'mouseDown' | 'mouseMove' | 'mouseUp', x: number) =>
+          new Promise<void>((resolve) => {
+            contents.once('before-mouse-event', () => resolve());
+            contents.sendInputEvent({
+              type,
+              x,
+              y: 100,
+              clickCount: 1,
+              ...(type === 'mouseMove' ? { modifiers: ['leftButtonDown'] } : { button: 'left' }),
+            });
+          });
+        await send('mouseDown', 325);
+        await send('mouseMove', 250);
+        await send('mouseUp', 250);
+      });
+      await expect.poll(redLeft).toBeLessThan(zoomed ?? 0);
+      await expect(page.getByText('1280 × 800', { exact: true })).toBeVisible();
+
       await page.getByRole('button', { name: '保存截图' }).click();
       await expect(page.getByText('测试截图', { exact: true })).toBeVisible();
       expect(clicks).toBe(0);
@@ -237,6 +289,7 @@ test('AI 测试的同一原生页签只观看，按需截图，结束后只保�
       await expect.poll(getBounds).toBeDefined();
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1280, 900));
       await expect.poll(getBounds).toEqual(watched?.bounds);
+      await expect(zoom).toHaveValue('1.5');
       await release('开放自动操作');
       await expect(page.getByText('测试页签已关闭，可查看下方记录。')).toBeVisible();
       await expect(page.getByText('操作与请求', { exact: true })).toBeVisible();

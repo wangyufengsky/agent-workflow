@@ -6,7 +6,7 @@ const { app, BrowserWindow, ipcMain, utilityProcess } = require('electron');
 const { serveBrowserRequests } = require('../../../apps/desktop/src/main/browser.ts');
 const { createBrowserPrompts } = require('../../../apps/desktop/src/main/browser-prompts.ts');
 const { serveCredentialRequests } = require('../../../apps/desktop/src/main/credentials.ts');
-const { browserRectSchema } = require('@aw/shared');
+const { browserRectSchema, browserWatchZoomSchema } = require('@aw/shared');
 
 const dataDir = mkdtempSync(join(tmpdir(), 'aw-preview-electron-'));
 app.setPath('userData', dataDir);
@@ -59,6 +59,9 @@ globalThis.previewHarness = {
     });
     ipcMain.on('aw:browser-place', (_event, tabId, rect) =>
       tabs.place(tabId, browserRectSchema.nullable().parse(rect)),
+    );
+    ipcMain.on('aw:browser-watch-zoom', (_event, tabId, zoom) =>
+      tabs.setWatchZoom(tabId, browserWatchZoomSchema.parse(zoom)),
     );
     for (const action of ['back', 'forward', 'reload', 'openDevTools']) {
       ipcMain.on(`aw:browser-${action}`, (_event, tabId) => tabs[action](tabId));

@@ -5,14 +5,16 @@ import {
   type BrowserPortOp,
   type BrowserPortResponse,
   type BrowserRect,
+  type BrowserWatchZoom,
   blockReason,
   browserPortRequestSchema,
   browserShortcutSchema,
   urlAccess,
 } from '@aw/shared';
-import { app, type BrowserWindow, type Session, type UtilityProcess, WebContentsView } from 'electron';
+import { app, type BrowserWindow, type Session, screen, type UtilityProcess, WebContentsView } from 'electron';
 import { createPartitionNetwork } from './browser-network.ts';
 import type { BrowserPrompts } from './browser-prompts.ts';
+import { createBrowserWatch, isWatchMetrics } from './browser-watch.ts';
 
 type Tab = {
   tabId: string;
@@ -23,6 +25,7 @@ type Tab = {
   userFacing: boolean;
   caseSession: boolean;
   onWindow: boolean;
+  watch?: ReturnType<typeof createBrowserWatch>;
 };
 
 export type BrowserTabsDeps = {
@@ -49,6 +52,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
   const network = createPartitionNetwork();
   let watchShield: WebContentsView | undefined;
   let shieldedTab: Tab | undefined;
+  let drag: { x: number; y: number } | undefined;
 
   /** 观看时透明视图接收窗口输入，CDP 操作仍直接发给下方测试页签。 */
   function unshield(tab: Tab): void {
@@ -56,6 +60,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
     const win = window();
     if (win !== null && !win.isDestroyed()) win.contentView.removeChildView(watchShield);
     shieldedTab = undefined;
+    drag = undefined;
   }
 
   function shield(tab: Tab): void {
@@ -64,8 +69,42 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
     if (watchShield === undefined) {
       watchShield = new WebContentsView({ webPreferences: { sandbox: true, backgroundThrottling: false } });
       watchShield.setBackgroundColor('#00000000');
+      // 未加载页面的透明视图挡住鼠标，但没有接收拖动事件的渲染器。
+      void watchShield.webContents
+        .loadURL('about:blank')
+        .catch((err: unknown) => console.error('Browser watch input surface failed to load', err));
+      watchShield.webContents.on('before-mouse-event', (event, input) => {
+        const watch = shieldedTab?.watch;
+        if (watch === undefined) return;
+        const { x, y } = input;
+        if (input.type === 'mouseDown' && input.button === 'left') {
+          drag = { x, y };
+          watchShield?.webContents.focus();
+        } else if (input.type === 'mouseMove' && drag !== undefined) {
+          watch.pan(x - drag.x, y - drag.y);
+          drag = { x, y };
+        } else if (input.type === 'mouseUp' || input.type === 'mouseLeave') {
+          drag = undefined;
+        }
+        event.preventDefault();
+      });
       watchShield.webContents.on('before-input-event', (event, input) => {
-        if (input.type !== 'keyDown' || (!input.meta && !input.control)) return;
+        if (input.type !== 'keyDown') return;
+        if (!input.meta && !input.control) {
+          const watch = shieldedTab?.watch;
+          const deltas: Record<string, readonly [number, number]> = {
+            ArrowLeft: [48, 0],
+            ArrowRight: [-48, 0],
+            ArrowUp: [0, 48],
+            ArrowDown: [0, -48],
+          };
+          const delta = deltas[input.key];
+          if (watch !== undefined && delta !== undefined) {
+            event.preventDefault();
+            watch.pan(...delta);
+          }
+          return;
+        }
         const shortcut = browserShortcutSchema.safeParse(input.key.toLowerCase());
         if (!shortcut.success) return;
         event.preventDefault();
@@ -171,6 +210,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
     const win = window();
     if (tab.onWindow && win !== null && !win.isDestroyed()) win.contentView.removeChildView(tab.view);
     tab.onWindow = false;
+    tab.watch?.refresh();
   }
 
   function requestPolicy(tab: Tab): BrowserPolicy {
@@ -223,6 +263,13 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
       caseSession: op.caseSession === true,
       onWindow: false,
     };
+    if (tab.caseSession && op.viewport !== null) {
+      tab.watch = createBrowserWatch(contents, { ...op.viewport, deviceScaleFactor: 1 }, () => {
+        const win = window();
+        if (win === null || !tab.onWindow || hasUserControl(tab)) return null;
+        return { bounds: tab.view.getBounds(), displayScale: screen.getDisplayMatching(win.getBounds()).scaleFactor };
+      });
+    }
     configure(contents.session);
     contents.session.allowNTLMCredentialsForDomains(op.integratedAuthServers.join(','));
     await network.apply(contents.session, op.network);
@@ -310,10 +357,13 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
           const wasManual = tab.caseSession && hasUserControl(tab);
           tab.policy = op.policy;
           if (tab.caseSession) {
-            if (hasUserControl(tab)) unshield(tab);
-            else {
+            if (hasUserControl(tab)) {
+              await tab.watch?.sync();
+              unshield(tab);
+            } else {
               if (wasManual) window()?.webContents.focus();
               shield(tab);
+              tab.watch?.refresh();
             }
           }
           return null;
@@ -323,8 +373,16 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
           if (tab !== undefined) await close(tab);
           return null;
         }
-        case 'cdp':
-          return tabOf(op.tabId).view.webContents.debugger.sendCommand(op.method, op.params, op.sessionId);
+        case 'cdp': {
+          const tab = tabOf(op.tabId);
+          const run = () => tab.view.webContents.debugger.sendCommand(op.method, op.params, op.sessionId);
+          if (tab.watch !== undefined && op.sessionId === undefined) {
+            if (op.method === 'Emulation.setDeviceMetricsOverride' && isWatchMetrics(op.params))
+              return tab.watch.changeMetrics(op.params);
+            if (op.method === 'Page.captureScreenshot') return tab.watch.capture(run);
+          }
+          return run();
+        }
       }
     },
 
@@ -346,6 +404,11 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
       tab.onWindow = true;
       tab.view.setBounds(rect);
       shield(tab);
+      tab.watch?.refresh();
+    },
+    setWatchZoom(tabId: string, zoom: BrowserWatchZoom): void {
+      const tab = tabs.get(tabId);
+      if (tab?.onWindow && !hasUserControl(tab)) tab.watch?.setZoom(zoom);
     },
     back: (tabId: string) => userTab(tabId).view.webContents.navigationHistory.goBack(),
     forward: (tabId: string) => userTab(tabId).view.webContents.navigationHistory.goForward(),

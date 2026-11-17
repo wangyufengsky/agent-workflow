@@ -368,7 +368,10 @@ export const BROWSER_TEST_COPY = {
   noRequests: '此操作没有发出请求。',
   requestCount: (count: number) => `${count} 个请求`,
   noMatchingActions: '没有符合条件的操作。',
-  watchOnly: '仅观看 · AI 正在操作',
+  zoom: '画面缩放',
+  zoomFit: '适应窗口',
+  resetView: '复位画面',
+  panHint: '拖动画面平移',
   recordTool: {
     browser_open: '打开页面',
     browser_click: '点击',

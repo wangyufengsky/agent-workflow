@@ -1,7 +1,10 @@
 import {
   ACTIVE_ATTEMPT_STATUSES,
   AcceptanceCheckKind,
+  BROWSER_WATCH_ZOOMS,
   type BrowserFrame,
+  type BrowserWatchZoom,
+  browserWatchZoomSchema,
   captureBrowserTestOp,
   type TaskDetailDTO,
   TaskStatus,
@@ -110,6 +113,7 @@ function subscribeToWindowWidth(onChange: () => void): () => void {
 export function BrowserTestPane({ task, active }: { task: TaskDetailDTO; active: boolean }) {
   const { data, error } = useQuery(previewSessionsQuery(task.id));
   const [selected, setSelected] = useState('');
+  const [watchZoom, setWatchZoom] = useState<{ tabId: string; zoom: BrowserWatchZoom }>();
   const [focused, setFocused] = useState(false);
   const [narrowHistory, setNarrowHistory] = useState(false);
   const narrow = useSyncExternalStore(subscribeToWindowWidth, () => narrowWindow().matches);
@@ -118,6 +122,11 @@ export function BrowserTestPane({ task, active }: { task: TaskDetailDTO; active:
   const attempt = attempts.find((item) => item.attemptId === selected) ?? attempts.at(-1);
   const live = data?.testTab?.attemptId === attempt?.attemptId ? data?.testTab : undefined;
   const handoff = live !== undefined ? task.browserCaseHandoff : undefined;
+  const zoom = watchZoom?.tabId === live?.tabId ? (watchZoom?.zoom ?? 1) : 1;
+  const changeZoom = (tabId: string, next: BrowserWatchZoom) => {
+    window.aw?.browser.setWatchZoom(tabId, next);
+    setWatchZoom({ tabId, zoom: next });
+  };
   const showRecords = narrow ? narrowHistory && handoff === undefined : !focused;
   const showPreview = !narrow || !showRecords;
   const report = task.result?.browserCaseReport;
@@ -188,7 +197,31 @@ export function BrowserTestPane({ task, active }: { task: TaskDetailDTO; active:
           )}
           {viewport !== undefined && (
             <div className={testStyles.statusBar}>
-              {handoff === undefined && <span>{BROWSER_TEST_COPY.watchOnly}</span>}
+              {live !== undefined && handoff === undefined && window.aw !== undefined && (
+                <>
+                  <select
+                    className={`input ${testStyles.zoom}`}
+                    aria-label={BROWSER_TEST_COPY.zoom}
+                    value={String(zoom)}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      const next = browserWatchZoomSchema.safeParse(value === 'fit' ? value : Number(value));
+                      if (next.success) changeZoom(live.tabId, next.data);
+                    }}
+                  >
+                    <option value="fit">{BROWSER_TEST_COPY.zoomFit}</option>
+                    {BROWSER_WATCH_ZOOMS.map((scale) => (
+                      <option key={scale} value={scale}>
+                        {scale * 100}%
+                      </option>
+                    ))}
+                  </select>
+                  <Button size="sm" onClick={() => changeZoom(live.tabId, 1)}>
+                    {BROWSER_TEST_COPY.resetView}
+                  </Button>
+                  <span className={testStyles.panHint}>{BROWSER_TEST_COPY.panHint}</span>
+                </>
+              )}
               <span className="mono">
                 {viewport.width} × {viewport.height}
               </span>
