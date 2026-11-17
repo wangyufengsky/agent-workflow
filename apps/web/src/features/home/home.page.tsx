@@ -1,4 +1,10 @@
-import { type AssistantConversationDTO, TaskStatus, WorktreeStatus } from '@aw/shared';
+import {
+  type AssistantConversationDTO,
+  AssistantForm,
+  browserTestScopeSchema,
+  TaskStatus,
+  WorktreeStatus,
+} from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -9,7 +15,7 @@ import { MarkNodes, Wordmark } from '../../components/workflow-mark.tsx';
 import { ASSISTANT_BROWSER_COPY } from '../../copy/assistant.ts';
 import { formatDateTime } from '../../copy/common.ts';
 import { HOME_COPY as C } from '../../copy/home.ts';
-import { useUiStore } from '../../state/ui.store.ts';
+import { usePendingForm, useUiStore } from '../../state/ui.store.ts';
 import { conversationsQuery } from '../assistant/assistant.queries.ts';
 import { ConversationContinuation } from '../assistant/conversation-continuation.tsx';
 import { ConversationMenu, titleOf } from '../assistant/conversation-menu.tsx';
@@ -193,6 +199,11 @@ export function HomePage() {
   const projects = useQuery(projectsQuery).data ?? [];
   const conversations = useQuery(conversationsQuery);
   const search = route.useSearch();
+  const pendingForm = usePendingForm(AssistantForm.StartTask);
+  const browserTest =
+    pendingForm !== undefined && pendingForm.seq === search.formSeq
+      ? browserTestScopeSchema.parse(pendingForm.values.browserTest)
+      : undefined;
   const navigate = route.useNavigate();
   const material = useQuery({
     ...attachmentQuery(search.knowledgeMaterial ?? ''),
@@ -212,7 +223,7 @@ export function HomePage() {
   const composer = (
     <HomeComposer
       // A new prefill in the address (the assistant's open_form, the report card) starts the input over.
-      key={`${search.conversation}|${search.workflow}|${search.requirement}`}
+      key={`${search.conversation}|${search.workflow}|${search.requirement}|${search.formSeq}`}
       conversation={conversation}
       projects={projects}
       projectId={projectId ?? ''}
@@ -226,6 +237,7 @@ export function HomePage() {
       onProjectChange={(id) => void navigate({ search: (s) => ({ ...s, projectId: id }), replace: true })}
       initialWorkflowKey={search.workflow}
       initialRequirement={search.requirement}
+      initialBrowserTest={browserTest}
       knowledgeDraft={
         search.knowledgeMaterial === undefined
           ? undefined

@@ -2,6 +2,7 @@ import {
   type AssistantConversationDTO,
   type AttachmentDTO,
   BROWSER_TEST_WORKFLOW_KEY,
+  type BrowserTestScope,
   browserTestScopeSchema,
   InitiativeTemplateKind,
   type ProjectDTO,
@@ -35,7 +36,7 @@ import { useAsk } from '../assistant/use-ask.ts';
 import { AttachmentList, dropFilesInto, pasteFilesInto, useAttachmentPickers } from '../attachments/attachment-bar.tsx';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
-import { parseBrowserWriteLines } from '../browser-cases/browser-case-scope.tsx';
+import { browserWriteLines, parseBrowserWriteLines } from '../browser-cases/browser-case-scope.tsx';
 import { AllowedWorkflowsField } from '../initiatives/allowed-workflows-field.tsx';
 import { initiativeTemplatesQuery } from '../initiatives/initiatives.queries.ts';
 import { templateChain, useStartInitiative } from '../initiatives/use-start-initiative.ts';
@@ -67,6 +68,7 @@ export function HomeComposer({
   onAssistantProjectChange,
   initialWorkflowKey,
   initialRequirement,
+  initialBrowserTest,
   knowledgeDraft,
   docked,
 }: {
@@ -78,6 +80,7 @@ export function HomeComposer({
   onAssistantProjectChange: (id: string | null) => void;
   initialWorkflowKey: string | undefined;
   initialRequirement: string | undefined;
+  initialBrowserTest: BrowserTestScope | undefined;
   knowledgeDraft?:
     | { attachment: AttachmentDTO | undefined; loading: boolean; error: unknown; retry(): void; dismiss(): void }
     | undefined;
@@ -110,8 +113,10 @@ export function HomeComposer({
   const [moreOpen, setMoreOpen] = useState(false);
   const moreId = useId();
   const browserTesting = workflowKey === BROWSER_TEST_WORKFLOW_KEY;
-  const [testTarget, setTestTarget] = useState('');
-  const [testWrites, setTestWrites] = useState('');
+  const [testTarget, setTestTarget] = useState(initialBrowserTest?.target ?? '');
+  const [testWrites, setTestWrites] = useState(
+    initialBrowserTest === undefined ? '' : browserWriteLines(initialBrowserTest),
+  );
   const [testApproved, setTestApproved] = useState(false);
   const testScope = browserTestScopeSchema.safeParse({
     target: testTarget,
@@ -156,6 +161,7 @@ export function HomeComposer({
   // A base branch belongs to the project it was picked in.
   const changeProject = (id: string) => {
     task.setOptions({ ...task.options, baseBranch: null });
+    setTestApproved(false);
     onProjectChange(id);
   };
   const shown = workflows.data?.filter((w) => task.pro || w.kind === WorkflowKind.Builtin);
@@ -424,6 +430,7 @@ export function HomeComposer({
             opener={flowsOpener}
             onPick={(key) => {
               setWorkflowKey(key);
+              setTestApproved(false);
               setTemplateKey(undefined);
               setBreakdown(false);
               setFlowsOpen(false);

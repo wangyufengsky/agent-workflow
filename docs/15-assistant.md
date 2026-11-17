@@ -117,7 +117,7 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 ## 5. 凭据不经过对话
 
 - 涉及凭据的操作（添加数据库连接、绑定远端令牌）在操作定义中标记 `credentialFields`；这些字段**不出现在助手工具 schema 中**，凭据必填的操作没有工具。
-- 助手只能调用 `open_form` 打开预填好非敏感字段的表单，由用户在表单中输入凭据并提交。表单（`AssistantForm`，以其提交的操作命名）：`tasks.create`（主页开始任务，经地址预填项目、流程、需求）、`workflows.fromPlan`（按任务 ID 与计划版本打开预填的固定流程编辑器）、`initiativeTemplates.fromInitiative`（按需求计划 ID 打开组合模板编辑器）、`projects.create`（添加项目，预填路径）、`projects.setHosting`（项目详情的远端绑定）、`databases.create` / `databases.update`（数据库连接对话框）；后四者的预填值放在界面状态 `pendingForm` 中，表单提交或关闭时清除。
+- 助手只能调用 `open_form` 打开预填好非敏感字段的表单，由用户在表单中输入凭据并提交。表单（`AssistantForm`，以其提交的操作命名）：`tasks.create`（主页开始任务，经地址预填项目、流程、需求，测试地址和写入规则经界面状态预填，由用户确认授权）、`workflows.fromPlan`（按任务 ID 与计划版本打开预填的固定流程编辑器）、`initiativeTemplates.fromInitiative`（按需求计划 ID 打开组合模板编辑器）、`projects.create`（添加项目，预填路径）、`projects.setHosting`（项目详情的远端绑定）、`databases.create` / `databases.update`（数据库连接对话框）；后四者的预填值放在界面状态 `pendingForm` 中，表单提交或关闭时清除。
 - 助手工具的返回值同样经过 DTO，不含凭据。
 
 ## 6. 界面
