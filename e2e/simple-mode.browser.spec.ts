@@ -32,7 +32,22 @@ test('简单模式：侧栏 7 项、顶栏没有主题切换；「直接开始�
   const more = page.getByRole('list', { name: '更多流程' });
   await expect(more).toBeHidden();
   await panel.getByRole('button', { name: /^更多流程/ }).click();
-  await expect(more.getByRole('button')).toHaveCount(7);
+  await expect(more.getByRole('button')).toHaveCount(8);
+  await expect(more.getByRole('button', { name: /浏览器测试/ })).toBeVisible();
+  await more.getByRole('button', { name: /浏览器测试/ }).click();
+  const submitBrowserTest = page.locator('form').locator('button[type="submit"]');
+  await page.getByRole('textbox', { name: '需求' }).fill('验证订单表单');
+  await expect(submitBrowserTest).toBeDisabled();
+  const scopeApproval = page.getByRole('checkbox', { name: /我确认这是测试环境/ });
+  await page.getByLabel('测试地址').fill('/orders');
+  await page.getByLabel('允许写入的接口').fill('POST /api/orders');
+  await expect(scopeApproval).toBeEnabled();
+  await scopeApproval.check();
+  await expect(submitBrowserTest).toBeEnabled();
+  await page.getByLabel('允许写入的接口').fill('DELETE /api/orders');
+  await expect(scopeApproval).not.toBeChecked();
+  await expect(submitBrowserTest).toBeDisabled();
+  await page.getByRole('button', { name: /^换一个流程/ }).click();
   await more.getByRole('button', { name: /安全审查/ }).click();
   await expect(page.getByText('开始任务 · 安全审查')).toBeVisible();
 

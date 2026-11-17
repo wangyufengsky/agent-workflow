@@ -1,4 +1,6 @@
 import {
+  AssistantBrowserActivityKind,
+  AssistantBrowserActivityOutcome,
   AssistantConfirmationStatus,
   AssistantToolName,
   AssistantTurnStatus,
@@ -151,6 +153,7 @@ export const TOOL_COPY = {
     [AssistantToolName.OpenForm]: '打开表单',
     [AssistantToolName.ListFiles]: '列出生成的文件',
     [AssistantToolName.RevealFile]: REVEAL[UI_PLATFORM],
+    [AssistantToolName.AnalyzeImage]: '请图像处理员读图',
     [AssistantToolName.ReadAttachment]: '读取附加的资料',
     [AssistantToolName.ReadSheet]: '读取表格',
     [AssistantToolName.QuerySheet]: '查询表格',
@@ -288,4 +291,36 @@ export const MEMORY_COPY = {
   noMatches: '没有找到匹配的记忆。',
   approval: '确认后保存，适用范围内的后续对话可以使用这条记忆。',
   local: '存储在本机',
+} as const;
+
+export const ASSISTANT_BROWSER_COPY = {
+  preview: '任务预览',
+  closePreview: '关闭预览',
+  previewUnavailable: '任务工作区就绪后可打开预览。',
+  enable: '让助手操作',
+  stop: '停止操作',
+  active: '助手正在控制',
+  manual: '你正在控制',
+  take: '接管页签',
+  giveBack: '交回助手',
+  history: '操作记录',
+  empty: '这段对话还没有网页操作记录。',
+  enableHelp: '允许助手连续筛选和查看当前页签。提交、发送和删除仍逐次确认。启用时会重新加载当前页。',
+  takeHelp: '暂停助手看页和操作。交回后仍使用当前页签和原授权。',
+  kinds: {
+    [AssistantBrowserActivityKind.Click]: '点击',
+    [AssistantBrowserActivityKind.Type]: '填写字段',
+    [AssistantBrowserActivityKind.Select]: '选择选项',
+    [AssistantBrowserActivityKind.Press]: '按键',
+    [AssistantBrowserActivityKind.Take]: '你接管了页签',
+    [AssistantBrowserActivityKind.Return]: '你把页签交回助手',
+  },
+  outcomes: {
+    [AssistantBrowserActivityOutcome.Done]: '已执行',
+    [AssistantBrowserActivityOutcome.Confirmation]: '已发起确认',
+    [AssistantBrowserActivityOutcome.Blocked]: '请求被拦截',
+    [AssistantBrowserActivityOutcome.Failed]: '执行失败',
+  },
+  confirmation: '只授权执行本次操作。接管页签、切换对话或更改表单后，需要重新发起。',
+  noWrite: '本次不授权 HTTP 写请求',
 } as const;

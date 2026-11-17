@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -11,13 +11,19 @@ import {
   BROWSER_FRAME_WIDTH,
   BROWSER_READ_TIMEOUT_MS,
   type BrowserActionOutput,
+  type BrowserCaseAssertion,
+  type BrowserCaseChallenge,
   type BrowserFrame,
   type BrowserKey,
   type BrowserNetwork,
   type BrowserPage,
   type BrowserPolicy,
   BrowserTabKind,
+  type BrowserTestAction,
+  type BrowserTestScope,
+  type BrowserTestTab,
   browserFrameSchema,
+  browserTestActionSchema,
   ErrorCode,
   McpToolName,
   PAGE_CHECK_SHOT_MAX_HEIGHT,
@@ -41,16 +47,21 @@ import type { PreviewsService } from '../previews/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { createActions } from './browser.actions.ts';
+import { evaluateCaseAssertion, resolveCaseRef } from './browser.case-dom.ts';
+import { createCaseHandoffs, detectCaseChallenge } from './browser.case-handoff.ts';
 import { type PageCheckPage, type PageCheckResult, pageCheckOutput, pageCheckVerdict } from './browser.check.ts';
+import { type BrowserActivity, createBrowserControl } from './browser.control.ts';
 import { createFrontendPreview } from './browser.frontend.ts';
 import type { BrowserHost } from './browser.host.ts';
-import { openTab, type Tab } from './browser.tab.ts';
+import { openTab, type RequestEntry, type Tab } from './browser.tab.ts';
+import { browserTestPath, browserTestRequests } from './browser.test-evidence.ts';
 
 export type BrowserServiceDeps = {
   host: BrowserHost;
   clock: Clock;
   log: Logger;
   events: EventBus;
+  activity: BrowserActivity;
   settings: SettingsService;
   /** The network settings every tab's partition follows (D176). */
   network: () => BrowserNetwork;
@@ -71,14 +82,32 @@ export type PageCheckRequest = {
 };
 
 /** Who uses the browser (an attempt, 29 §5.3) and where its screenshots go (beside its transcript, 29 §5.7). */
-export type BrowserOwner = { id: string; taskId: string | null; projectId: string | null; filesDir: string };
+export type BrowserOwner = {
+  id: string;
+  taskId: string | null;
+  projectId: string | null;
+  filesDir: string;
+  browserTest?: BrowserTestScope | null;
+  /** 保存的用例在自己的步骤循环中处理接管。 */
+  savedCase?: boolean;
+  waitForUser?: (wait: () => Promise<void>) => Promise<void>;
+};
+
+function usesProjectPreview(owner: BrowserOwner): boolean {
+  return owner.browserTest == null || owner.browserTest.target.startsWith('/');
+}
 
 type Session = {
   owner: BrowserOwner;
   tabs: Partial<Record<BrowserTabKind, Tab>>;
+  opening: Partial<Record<BrowserTabKind, Promise<Tab>>>;
   current: Tab | null;
   shots: number;
   frames: number;
+  testActions: number;
+  acceptedChallenge: string | null;
+  testActionActive: boolean;
+  testActionTarget?: string;
   /** What each page the owner read said, by address without its fragment (29 §2.8). */
   pages: Map<string, string>;
 };
@@ -103,7 +132,7 @@ const hostOfCookie = (domain: string) => domain.replace(/^\./, '');
 const LOGIN_HINTS = ['login', 'signin', 'sign-in', 'sso', 'cas', 'oauth'];
 const ENDED = new Set<string>(ATTEMPT_STATUSES.filter((s) => !ACTIVE_ATTEMPT_STATUSES.includes(s)));
 
-const navigateSchema = z.object({ errorText: z.string().optional() });
+const navigateSchema = z.object({ errorText: z.string().optional(), loaderId: z.string().optional() });
 /** An address as a citation names a page: without its fragment. */
 function pageKey(url: string): string {
   const parsed = new URL(url);
@@ -119,6 +148,7 @@ const visualViewportSchema = z.object({
   }),
 });
 /** An attempt's frames, one JSON line each, beside their images (29 §5.7). */
+const TEST_ACTIONS_INDEX = 'test-actions.jsonl';
 const FRAMES_INDEX = 'frames.jsonl';
 /** The only files read back from an attempt's folder: screenshots (`3.jpg`) and frames (`f3.jpg`). */
 export const ATTEMPT_FILE = /^f?\d+\.jpg$/;
@@ -149,6 +179,7 @@ export function createBrowserService({
   clock,
   log,
   events,
+  activity,
   settings,
   network,
   projects,
@@ -167,11 +198,20 @@ export function createBrowserService({
   /** Opens of a task's preview tab in progress: a second open joins the first. */
   const openingUserTabs = new Map<string, Promise<UserTabState>>();
   const actions = createActions(clock);
+  const control = createBrowserControl(actions, log, activity);
+  const handoffs = createCaseHandoffs();
   const unsubscribeHost = host.onEvent((event) => {
     // The page that placed a user's preview tab started over and main closed it (29 §8.1): let go of its preview.
     if (event.type === 'browser.gone') {
       const entry = userTabs.get(event.tabId);
-      if (entry === undefined) return;
+      if (entry === undefined) {
+        for (const session of sessions.values()) {
+          if (session.current?.tabId !== event.tabId) continue;
+          close(session.owner.id).catch((err: unknown) => log.error({ err }, 'lost case tab cleanup failed'));
+          break;
+        }
+        return;
+      }
       forgetUserTab(event.tabId);
       entry.tab.dispose();
       return;
@@ -181,8 +221,17 @@ export function createBrowserService({
     log.warn({ source: event.source, cleanupError: event.cleanupError }, 'browser unowned worker blocked');
   });
 
-  function policyFor(owner: Pick<BrowserOwner, 'taskId' | 'projectId'>): BrowserPolicy {
+  function policyFor(owner: Pick<BrowserOwner, 'taskId' | 'projectId' | 'browserTest'>): BrowserPolicy {
     const preview = owner.taskId === null ? null : previews.get(owner.taskId);
+    if (owner.browserTest != null) {
+      const target = owner.browserTest.target;
+      const origin = target.startsWith('/') ? preview?.url : new URL(target).origin;
+      return {
+        previewOrigins: origin == null ? [] : [origin],
+        sites: [],
+        automation: { origin: origin ?? '', writes: owner.browserTest.writes },
+      };
+    }
     const extra = owner.projectId === null ? [] : (projects.getRecord(owner.projectId).preview?.extraOrigins ?? []);
     return {
       previewOrigins: preview?.url === null || preview?.url === undefined ? [] : [preview.url, ...extra],
@@ -193,7 +242,18 @@ export function createBrowserService({
   function sessionOf(owner: BrowserOwner): Session {
     const existing = sessions.get(owner.id);
     if (existing !== undefined) return existing;
-    const session: Session = { owner, tabs: {}, current: null, shots: 0, frames: 0, pages: new Map() };
+    const session: Session = {
+      owner,
+      tabs: {},
+      opening: {},
+      current: null,
+      shots: 0,
+      frames: 0,
+      testActions: 0,
+      acceptedChallenge: null,
+      testActionActive: false,
+      pages: new Map(),
+    };
     sessions.set(owner.id, session);
     return session;
   }
@@ -203,29 +263,51 @@ export function createBrowserService({
     if (tab === null || tab === undefined) {
       throw new AppError(ErrorCode.ValidationFailed, 'No page is open: call browser_open first');
     }
+    if (owner.waitForUser !== undefined && handoffs.controls(tab.tabId))
+      throw new AppError(
+        ErrorCode.BrowserLoginRequired,
+        'The current test tab is waiting for the user to finish verification',
+      );
     return tab;
   }
 
-  async function tabFor(session: Session, kind: BrowserTabKind): Promise<Tab> {
+  async function tabFor(session: Session, kind: BrowserTabKind, signal?: AbortSignal): Promise<Tab> {
     const existing = session.tabs[kind];
     if (existing !== undefined) return existing;
+    const opening = session.opening[kind];
+    if (opening !== undefined) return opening;
     const { owner } = session;
-    const tab = await openTab({
+    const pending = openTab({
       host,
       clock,
       log,
       tabId: `${owner.id}:${kind}`,
+      ...(signal === undefined ? {} : { signal }),
+      ...(owner.browserTest == null ? {} : { caseSession: true }),
       kind,
-      // The preview tab starts clean for each attempt; websites share the user's logins (29 §5.3).
-      partition: kind === BrowserTabKind.Preview ? `aw-attempt-${owner.id}` : SITES_PARTITION,
+      // 浏览器测试与预览按尝试隔离，普通网站才共享用户登录分区。
+      partition:
+        owner.browserTest != null || kind === BrowserTabKind.Preview ? `aw-attempt-${owner.id}` : SITES_PARTITION,
       policy: policyFor(owner),
-      integratedAuthServers: kind === BrowserTabKind.Site ? integratedAuthServers() : [],
+      integratedAuthServers: kind === BrowserTabKind.Site && owner.browserTest == null ? integratedAuthServers() : [],
       network: network(),
       site: kind === BrowserTabKind.Site,
+    }).then(async (tab) => {
+      if (sessions.get(owner.id) !== session) {
+        await tab.close();
+        throw new AppError(ErrorCode.BrowserNotOpen, 'The browser attempt ended');
+      }
+      session.tabs[kind] = tab;
+      if (kind === BrowserTabKind.Preview && owner.taskId !== null && usesProjectPreview(owner))
+        previews.acquire(owner.taskId);
+      return tab;
     });
-    session.tabs[kind] = tab;
-    if (kind === BrowserTabKind.Preview && owner.taskId !== null) previews.acquire(owner.taskId);
-    return tab;
+    session.opening[kind] = pending;
+    try {
+      return await pending;
+    } finally {
+      delete session.opening[kind];
+    }
   }
 
   /** The websites' partition logs in to these with the user's system login (29 §5.4). */
@@ -235,12 +317,13 @@ export function createBrowserService({
    * Where a website tab now at `url` asks to log in (29 §5.4), or null: credentials only the user gives (HTTP
    * authentication, a client certificate), or a page that looks like a login page.
    */
-  async function loginAt(tab: Tab, url: string): Promise<string | null> {
+  async function loginAt(tab: Tab, url: string, checkUrl = true): Promise<string | null> {
     const asked = tab.credentialsAsked();
     if (asked !== null) return asked;
     const { hostname, pathname } = new URL(url);
     const where = `${hostname}${pathname}`.toLowerCase();
     if (
+      checkUrl &&
       [...LOGIN_HINTS, ...settings.get('browser.loginUrlPatterns')].some((hint) => where.includes(hint.toLowerCase()))
     ) {
       return url;
@@ -281,7 +364,117 @@ export function createBrowserService({
     return item.file;
   }
 
-  /** Runs an action on the current tab and reports what it did to the page (29 §6), leaving a frame. */
+  function notifyTest(owner: BrowserOwner): void {
+    if (owner.browserTest != null && owner.taskId !== null)
+      events.publish({ type: ServerEventType.BrowserTestUpdated, data: { taskId: owner.taskId, attemptId: owner.id } });
+  }
+
+  function testTab(taskId: string): BrowserTestTab | undefined {
+    const session = [...sessions.values()].find((s) => s.owner.taskId === taskId && s.owner.browserTest != null);
+    const tab = session?.current;
+    if (session === undefined || tab == null) return undefined;
+    return {
+      tabId: tab.tabId,
+      attemptId: session.owner.id,
+      path: browserTestPath(tab.url()),
+      viewport: tab.viewport.preset,
+    };
+  }
+
+  async function waitForTestUser(owner: BrowserOwner, tab: Tab, beforeHandoff?: RequestEntry[]): Promise<boolean> {
+    if (owner.waitForUser === undefined || owner.taskId === null) return false;
+    const session = sessions.get(owner.id);
+    if (session === undefined) throw new AppError(ErrorCode.BrowserNotOpen, 'The browser attempt ended');
+    if (handoffs.controls(tab.tabId))
+      throw new AppError(
+        ErrorCode.BrowserLoginRequired,
+        'The current test tab is waiting for the user to finish verification',
+      );
+    const challenge = await detectCaseChallenge(tab);
+    if (challenge === null) {
+      session.acceptedChallenge = null;
+      return false;
+    }
+    if (!challenge.persistent && challenge.key === session.acceptedChallenge) return false;
+    const taskId = owner.taskId;
+    beforeHandoff?.push(...tab.facts().requests);
+    await owner.waitForUser(() => handoffs.wait(taskId, tab, () => policyFor(owner), null, challenge.reason));
+    const remaining = await detectCaseChallenge(tab);
+    session.acceptedChallenge = remaining?.persistent === false ? remaining.key : null;
+    tab.begin();
+    return true;
+  }
+
+  async function recordTestAction(
+    owner: BrowserOwner,
+    tab: Tab,
+    tool: ActingTool,
+    outcome: { passed: boolean; errorCode: ErrorCode | null },
+    requests: RequestEntry[],
+  ): Promise<void> {
+    const session = sessions.get(owner.id);
+    if (session === undefined || owner.savedCase === true) return;
+    const item: BrowserTestAction = {
+      seq: ++session.testActions,
+      tool,
+      path: browserTestPath(tab.url()),
+      ...(session.testActionTarget === undefined ? {} : { target: session.testActionTarget }),
+      ...outcome,
+      requests: browserTestRequests(requests),
+    };
+    const dir = ownerDir(owner);
+    mkdirSync(dir, { recursive: true });
+    await appendFile(join(dir, TEST_ACTIONS_INDEX), `${JSON.stringify(item)}\n`);
+    notifyTest(owner);
+  }
+
+  async function observeAction<T extends { url: string }>(
+    owner: BrowserOwner,
+    tab: Tab,
+    tool: ActingTool,
+    run: (beforeHandoff: RequestEntry[]) => Promise<T>,
+    met: (output: T) => boolean = () => true,
+  ): Promise<T & { frame?: string }> {
+    if (owner.browserTest == null) {
+      const output = await run([]);
+      return { ...output, frame: await frame(owner, tab, tool, output.url) };
+    }
+    if (handoffs.controls(tab.tabId))
+      throw new AppError(
+        ErrorCode.BrowserLoginRequired,
+        'The current test tab is waiting for the user to finish verification',
+      );
+    const session = sessions.get(owner.id);
+    if (session === undefined) throw new AppError(ErrorCode.BrowserNotOpen, 'The browser attempt ended');
+    if (session.testActionActive)
+      throw new AppError(ErrorCode.StateTransitionInvalid, 'Wait for the preceding browser action to finish');
+    session.testActionActive = true;
+    delete session.testActionTarget;
+    const beforeHandoff: RequestEntry[] = [];
+    try {
+      let output: T;
+      try {
+        output = await run(beforeHandoff);
+      } catch (err) {
+        await recordTestAction(
+          owner,
+          tab,
+          tool,
+          { passed: false, errorCode: err instanceof AppError ? err.code : ErrorCode.BrowserActionFailed },
+          [...beforeHandoff, ...tab.facts().requests],
+        );
+        throw err;
+      }
+      await recordTestAction(owner, tab, tool, { passed: met(output), errorCode: null }, [
+        ...beforeHandoff,
+        ...tab.facts().requests,
+      ]);
+      return output;
+    } finally {
+      session.testActionActive = false;
+    }
+  }
+
   /**
    * Keeps what a page read by the owner said, under its address and the ones that led to it: a knowledge answer's
    * `web` citation of it stores this text (29 §2.8). The snapshot's header line describes the tab, not the page.
@@ -292,17 +485,44 @@ export function createBrowserService({
     for (const url of [page.url, ...also]) if (URL.canParse(url)) pages.set(pageKey(url), text);
   }
 
+  function testControlGuard(owner: BrowserOwner, tab: Tab, ref: string | null, forTyping = false) {
+    if (owner.browserTest == null) return undefined;
+    return async () => {
+      const { sensitive, textField, label } = await actions.describeControl(tab, ref);
+      if (sensitive || tab.credentialsAsked() !== null)
+        throw new AppError(ErrorCode.BrowserLoginRequired, 'The user handles credentials and file inputs');
+      if (forTyping && !textField) throw new AppError(ErrorCode.BrowserActionFailed, 'Choose an editable text field');
+      const session = sessions.get(owner.id);
+      if (ref !== null && session?.testActionActive === true) session.testActionTarget = label;
+    };
+  }
+
   async function act(
     owner: BrowserOwner,
     tool: ActingTool,
     run: (tab: Tab) => Promise<void>,
   ): Promise<BrowserActionOutput> {
     const tab = current(owner);
-    tab.begin();
-    await run(tab);
-    const output = await tab.result(await tab.settle());
-    remember(owner, output);
-    return { ...output, frame: await frame(owner, tab, tool, output.url) };
+    return observeAction(
+      owner,
+      tab,
+      tool,
+      async (beforeHandoff) => {
+        tab.begin();
+        if (await waitForTestUser(owner, tab, beforeHandoff))
+          throw new AppError(
+            ErrorCode.BrowserRefStale,
+            'The user finished verification. Read the current page and continue this step.',
+          );
+        await run(tab);
+        const settled = await tab.settle();
+        const handedOff = await waitForTestUser(owner, tab, beforeHandoff);
+        const output = await tab.result(settled || handedOff);
+        remember(owner, output);
+        return output;
+      },
+      (output) => output.settled && output.blockedWrites.length === 0,
+    );
   }
 
   /** A short-lived offscreen tab of the websites' partition, for its cookies and storage. */
@@ -338,8 +558,13 @@ export function createBrowserService({
     const session = sessions.get(ownerId);
     if (session === undefined) return;
     sessions.delete(ownerId);
-    for (const tab of Object.values(session.tabs)) await tab.close();
-    if (session.tabs.preview !== undefined && session.owner.taskId !== null) previews.release(session.owner.taskId);
+    notifyTest(session.owner);
+    for (const tab of Object.values(session.tabs)) {
+      handoffs.lost(tab.tabId);
+      await tab.close();
+    }
+    if (session.tabs.preview !== undefined && session.owner.taskId !== null && usesProjectPreview(session.owner))
+      previews.release(session.owner.taskId);
   }
 
   /**
@@ -428,7 +653,11 @@ export function createBrowserService({
 
   /** Conversations bound to the tab lose it. */
   function unbindPreview(tabId: string): void {
-    for (const [conversationId, bound] of boundPreviews) if (bound === tabId) boundPreviews.delete(conversationId);
+    for (const [conversationId, bound] of boundPreviews) {
+      if (bound !== tabId) continue;
+      void control.revoke(conversationId);
+      boundPreviews.delete(conversationId);
+    }
   }
 
   /** The tab is no longer the user's: unbound, and its preview free to idle. */
@@ -449,11 +678,16 @@ export function createBrowserService({
     const origin = runningPreviewUrl(taskId);
     const url = new URL(path, origin);
     if (url.origin !== origin) throw new AppError(ErrorCode.ValidationFailed, 'Preview navigation needs a local path');
-    const { errorText } = navigateSchema.parse(await tab.cdp('Page.navigate', { url: url.href }));
+    const previous = tab.documentVersion();
+    const { errorText, loaderId } = navigateSchema.parse(await tab.cdp('Page.navigate', { url: url.href }));
     signal.throwIfAborted();
     if (errorText !== undefined) {
       throw new AppError(ErrorCode.BrowserReadFailed, 'The preview page could not be loaded', { reason: errorText });
     }
+    // Page.navigate 确认启动，实际提交后当前页签才具备授权所需的来源。
+    if (loaderId !== undefined && !(await tab.waitForDocument(previous)))
+      throw new AppError(ErrorCode.BrowserReadFailed, 'The preview document did not commit');
+    signal.throwIfAborted();
   }
 
   /** A new preview tab of the task, timed from the preview being ready; a tab that does not open in time goes. */
@@ -545,6 +779,7 @@ export function createBrowserService({
         ...[...userTabs.values()].filter((u) => u.taskId === event.data.taskId).map((u) => ({ tab: u.tab, owner: u })),
       ];
       for (const { tab, owner } of tabs) {
+        if (control.hasPolicy(tab.tabId) || handoffs.controls(tab.tabId)) continue;
         tab.setPolicy(policyFor(owner)).catch((err: unknown) => log.error({ err }, 'browser policy update failed'));
       }
     }
@@ -636,8 +871,17 @@ export function createBrowserService({
      * `browser_open` (29 §6): a path starting with / opens in the task's preview (started first when needed), a full
      * address in the preview tab or the website tab by the policy.
      */
-    async open(owner: BrowserOwner, url: string): Promise<BrowserActionOutput> {
+    async open(owner: BrowserOwner, url: string, signal?: AbortSignal): Promise<BrowserActionOutput> {
+      if (owner.browserTest != null && !sessions.has(owner.id) && url !== owner.browserTest.target) {
+        throw new AppError(ErrorCode.BrowserSiteNotAllowed, 'Open the user-authorized test target first');
+      }
       let target = url;
+      if (url.startsWith('/') && !/^(?!.*\\)\/(?!\/)/.test(url)) {
+        throw new AppError(ErrorCode.BrowserSiteNotAllowed, 'Use a path within the preview');
+      }
+      if (url.startsWith('/') && !usesProjectPreview(owner)) {
+        throw new AppError(ErrorCode.BrowserSiteNotAllowed, 'Use an absolute address on the approved test site');
+      }
       if (url.startsWith('/')) {
         if (owner.taskId === null) {
           throw new AppError(ErrorCode.ValidationFailed, 'Only tasks have a page preview: give a full address', {
@@ -647,6 +891,7 @@ export function createBrowserService({
         const preview = await previews.start(owner.taskId);
         target = `${preview.url}${url}`;
       }
+      signal?.throwIfAborted();
       const session = sessionOf(owner);
       // Normalized here, as the policy expects (shared has no URL parser).
       const normalized = URL.canParse(target) ? new URL(target).href : target;
@@ -656,34 +901,128 @@ export function createBrowserService({
           host: URL.canParse(target) ? new URL(target).host : target,
         });
       }
-      const tab = await tabFor(session, access.tab);
+      const tab = await tabFor(session, access.tab, signal);
+      signal?.throwIfAborted();
+      const opened = session.current === null;
       session.current = tab;
-      tab.begin();
-      await tab.cdp('Page.navigate', { url: normalized });
-      const settled = await tab.result(await tab.settle());
-      const output = { ...settled, frame: await frame(owner, tab, McpToolName.BrowserOpen, settled.url) };
-      const login = access.tab === BrowserTabKind.Site ? await loginAt(tab, output.url) : null;
-      if (login !== null) {
-        throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: login });
+      if (opened) notifyTest(owner);
+      const output = await observeAction(
+        owner,
+        tab,
+        McpToolName.BrowserOpen,
+        async (beforeHandoff) => {
+          tab.begin();
+          await tab.cdp('Page.navigate', { url: normalized });
+          const settled = await tab.settle();
+          const handedOff = await waitForTestUser(owner, tab, beforeHandoff);
+          const result = await tab.result(settled || handedOff);
+          const login =
+            owner.browserTest != null &&
+            owner.waitForUser === undefined &&
+            owner.savedCase !== true &&
+            URL.canParse(result.url) &&
+            urlAccess(result.url, policyFor(owner)) !== null
+              ? await loginAt(tab, result.url, access.tab === BrowserTabKind.Site)
+              : null;
+          if (login !== null) {
+            throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: login });
+          }
+          return result;
+        },
+        (result) => result.settled && result.blockedWrites.length === 0,
+      );
+      if (
+        owner.browserTest == null &&
+        access.tab === BrowserTabKind.Site &&
+        URL.canParse(output.url) &&
+        urlAccess(output.url, policyFor(owner)) !== null
+      ) {
+        const login = await loginAt(tab, output.url, true);
+        if (login !== null)
+          throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: login });
       }
       remember(owner, output, normalized);
+      if (owner.savedCase === true) notifyTest(owner);
       return output;
+    },
+
+    caseHandoffs: {
+      get: handoffs.get,
+      take: handoffs.take,
+      resume: handoffs.resume,
+      async wait(owner: BrowserOwner, step: number, reason: BrowserCaseChallenge, signal: AbortSignal) {
+        if (owner.taskId === null) throw new Error('Browser case has no task');
+        await handoffs.wait(owner.taskId, current(owner), () => policyFor(owner), step, reason, signal);
+      },
+    },
+
+    caseChallenge(owner: BrowserOwner) {
+      const tab = sessions.get(owner.id)?.current;
+      return tab == null ? Promise.resolve(null) : detectCaseChallenge(tab);
+    },
+
+    beginCaseStep(owner: BrowserOwner): void {
+      sessions.get(owner.id)?.current?.begin();
+    },
+
+    caseRequests(owner: BrowserOwner) {
+      return sessions.get(owner.id)?.current?.facts().requests ?? [];
+    },
+
+    resolveCaseRef: (owner: BrowserOwner, selector: string) => resolveCaseRef(current(owner), selector),
+    evaluateCaseAssertion: (owner: BrowserOwner, expect: BrowserCaseAssertion) =>
+      evaluateCaseAssertion(current(owner), expect),
+
+    testTab,
+
+    testActions(attemptId: string): BrowserTestAction[] {
+      const index = join(ownerDir({ id: attemptId, filesDir: attemptFilesDir(attemptId) }), TEST_ACTIONS_INDEX);
+      if (!existsSync(index)) return [];
+      return readFileSync(index, 'utf8')
+        .split('\n')
+        .filter((line) => line !== '')
+        .map((line) => browserTestActionSchema.parse(JSON.parse(line)));
+    },
+
+    async captureTest(taskId: string, attemptId: string): Promise<{ file: string }> {
+      const session = sessions.get(attemptId);
+      if (
+        session === undefined ||
+        session.owner.taskId !== taskId ||
+        session.owner.browserTest == null ||
+        session.current === null ||
+        handoffs.controls(session.current.tabId)
+      )
+        throw new AppError(ErrorCode.BrowserNotOpen, 'The test tab is not available for capture');
+      if (await detectCaseChallenge(session.current))
+        throw new AppError(ErrorCode.BrowserLoginRequired, 'Finish verification before saving a screenshot');
+      const { file } = await this.screenshot(session.owner, { fullPage: false });
+      return { file };
     },
 
     async snapshot(owner: BrowserOwner): Promise<BrowserPage> {
       const tab = current(owner);
+      await waitForTestUser(owner, tab);
       const page = await tab.snapshot();
       remember(owner, page);
       return { ...page, tab: tab.kind };
     },
 
-    click: (owner: BrowserOwner, ref: string) => act(owner, McpToolName.BrowserClick, (tab) => actions.click(tab, ref)),
+    click: (owner: BrowserOwner, ref: string) =>
+      act(owner, McpToolName.BrowserClick, (tab) => actions.click(tab, ref, testControlGuard(owner, tab, ref))),
     type: (owner: BrowserOwner, ref: string, input: { text: string; clear: boolean; submit: boolean }) =>
-      act(owner, McpToolName.BrowserType, (tab) => actions.type(tab, ref, input)),
+      act(owner, McpToolName.BrowserType, (tab) =>
+        actions.type(tab, ref, input, testControlGuard(owner, tab, ref, true)),
+      ),
     select: (owner: BrowserOwner, ref: string, values: readonly string[]) =>
-      act(owner, McpToolName.BrowserSelect, (tab) => actions.select(tab, ref, values)),
+      act(owner, McpToolName.BrowserSelect, (tab) =>
+        actions.select(tab, ref, values, testControlGuard(owner, tab, ref)),
+      ),
     press: (owner: BrowserOwner, key: BrowserKey) =>
-      act(owner, McpToolName.BrowserPress, (tab) => actions.press(tab, key)),
+      act(owner, McpToolName.BrowserPress, async (tab) => {
+        await testControlGuard(owner, tab, null)?.();
+        await actions.press(tab, key);
+      }),
 
     viewport: (owner: BrowserOwner, preset: ViewportPreset) =>
       act(owner, McpToolName.BrowserViewport, async (tab) => {
@@ -694,10 +1033,21 @@ export function createBrowserService({
 
     async waitFor(owner: BrowserOwner, input: { text: string; gone: boolean; timeoutMs: number }) {
       const tab = current(owner);
-      const met = await actions.waitFor(tab, input);
-      const page = await tab.snapshot();
-      remember(owner, page);
-      return { ...page, tab: tab.kind, met, frame: await frame(owner, tab, McpToolName.BrowserWaitFor, page.url) };
+      return observeAction(
+        owner,
+        tab,
+        McpToolName.BrowserWaitFor,
+        async (beforeHandoff) => {
+          if (owner.browserTest != null) tab.begin();
+          await waitForTestUser(owner, tab, beforeHandoff);
+          const met = await actions.waitFor(tab, input);
+          await waitForTestUser(owner, tab, beforeHandoff);
+          const page = await tab.snapshot();
+          remember(owner, page);
+          return { ...page, tab: tab.kind, met };
+        },
+        (output) => output.met,
+      );
     },
 
     inspect: (owner: BrowserOwner, ref: string) => actions.inspect(current(owner), ref),
@@ -720,6 +1070,7 @@ export function createBrowserService({
       mkdirSync(dir, { recursive: true });
       const file = `${++session.shots}.jpg`;
       await writeFile(join(dir, file), Buffer.from(data, 'base64'));
+      notifyTest(owner);
       return { file, data };
     },
 
@@ -742,6 +1093,15 @@ export function createBrowserService({
         .split('\n')
         .filter((line) => line !== '')
         .map((line) => browserFrameSchema.parse(JSON.parse(line)));
+    },
+
+    screenshots(attemptId: string): string[] {
+      const dir = ownerDir({ id: attemptId, filesDir: attemptFilesDir(attemptId) });
+      return existsSync(dir)
+        ? readdirSync(dir)
+            .filter((file) => /^\d+\.jpg$/.test(file))
+            .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
+        : [];
     },
 
     /** The path of an attempt's screenshot or frame (29 §5.7); only names the backend gives (ATTEMPT_FILE). */
@@ -853,7 +1213,7 @@ export function createBrowserService({
         const [tabId, { tab, projectId }] = existing;
         const preview = await previews.start(taskId);
         return withinDeadline(async (signal) => {
-          await tab.setPolicy(policyFor({ taskId, projectId }));
+          if (!control.hasPolicy(tabId)) await tab.setPolicy(policyFor({ taskId, projectId }));
           signal.throwIfAborted();
           if (tab.url() === '' || new URL(tab.url()).origin !== preview.url) {
             await navigatePreview(tab, taskId, projects.getRecord(projectId).preview?.pages[0] ?? '/', signal);
@@ -885,6 +1245,7 @@ export function createBrowserService({
      */
     bindPreview(conversationId: string, selection: { taskId: string; tabId: string } | null): void {
       if (selection === null) {
+        void control.revoke(conversationId);
         boundPreviews.delete(conversationId);
         return;
       }
@@ -894,8 +1255,37 @@ export function createBrowserService({
         throw new AppError(ErrorCode.BrowserNotOpen, 'The preview belongs to another task');
       }
       runningPreviewUrl(entry.taskId);
+      if (boundPreviews.get(conversationId) !== selection.tabId) void control.revoke(conversationId);
       boundPreviews.set(conversationId, selection.tabId);
     },
+
+    async setAssistantControl(conversationId: string, projectId: string | null, tabId: string, enabled: boolean) {
+      if (!enabled) {
+        await control.revoke(conversationId);
+        return { enabled: false };
+      }
+      if (boundPreviews.get(conversationId) !== tabId)
+        throw new AppError(ErrorCode.BrowserNotOpen, 'This conversation is not bound to the selected preview');
+      const entry = userTabOf(tabId);
+      if (projectId !== null && entry.projectId !== projectId)
+        throw new AppError(ErrorCode.BrowserNotOpen, 'The preview belongs to a different project');
+      await control.enable(conversationId, {
+        tab: entry.tab,
+        origin: runningPreviewUrl(entry.taskId),
+        restore: () => policyFor(entry),
+      });
+      return { enabled: true };
+    },
+
+    assistantControlInfo: control.info,
+    async handoffAssistantControl(conversationId: string, tabId: string, manual: boolean) {
+      if (boundPreviews.get(conversationId) !== tabId)
+        throw new AppError(ErrorCode.BrowserNotOpen, 'This conversation is not bound to the selected preview');
+      await control.handoff(conversationId, tabId, manual);
+    },
+
+    prepareAssistantAction: control.prepare,
+    confirmAssistantAction: control.confirm,
 
     /**
      * `browser_read`: the bound preview's address, viewport, text and errors, within BROWSER_READ_TIMEOUT_MS. A page
@@ -909,6 +1299,8 @@ export function createBrowserService({
       const entry = userTabs.get(tabId);
       if (entry === undefined) throw new AppError(ErrorCode.BrowserNotOpen, 'No user preview tab is open');
       const { tab, taskId } = entry;
+      control.assertReadable(tabId);
+      const version = tab.ownershipVersion();
       runningPreviewUrl(taskId);
       return withinDeadline(async (signal) => {
         const settled = await tab.settle();
@@ -917,7 +1309,8 @@ export function createBrowserService({
         const layout = previews.isFrontend(taskId) ? await frontend.layout(tab) : undefined;
         const selectedElement = layout === undefined ? undefined : frontend.latestElement(tabId, tab);
         signal.throwIfAborted();
-        if (boundPreviews.get(conversationId) !== tabId || !userTabs.has(tabId)) {
+        control.assertReadable(tabId);
+        if (boundPreviews.get(conversationId) !== tabId || !userTabs.has(tabId) || tab.ownershipVersion() !== version) {
           throw new AppError(ErrorCode.BrowserNotOpen, 'The selected preview changed while reading');
         }
         runningPreviewUrl(taskId);

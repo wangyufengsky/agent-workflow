@@ -70,6 +70,7 @@ export const TOOLS_COPY = {
       '读取工作目录里的 Word / Excel 文件：Word 分页读正文，Excel 先看概览再按工作表分页读行。',
     [McpToolName.SubmitPlan]: '提交计划：步骤、角色、指令与依赖。计划不合规时返回问题，AI 修改后再提交。',
     [McpToolName.SubmitResult]: '步骤完成后提交结果；每次尝试只能提交一次，之后进入检查。',
+    [McpToolName.BrowserSubmitReport]: '提交浏览器测试的结论、逐项结果和截图证据。',
     [McpToolName.SubmitReview]: '提交评审结论：通过，或列出问题及位置。',
     [McpToolName.AskUser]: '向你提问。阻塞的问题会让步骤停下来等你回答；不阻塞时 AI 按默认假设继续。',
     [McpToolName.ReportProgress]: '上报一句当前进展，显示在任务页上。',
@@ -100,6 +101,7 @@ export const TOOLS_COPY = {
     [McpToolName.BrowserInspect]: '浏览器：查看元素的位置、尺寸、是否被遮住与部分样式。',
     [McpToolName.BrowserLogs]: '浏览器：查看控制台错误、未捕获的异常与失败的请求。',
     [McpToolName.BrowserViewport]: '浏览器：切换桌面、平板或手机尺寸。',
+    [McpToolName.AnalyzeImage]: '请图像处理员读取当前任务的图片资料或浏览器截图。',
     [McpToolName.BrowserScreenshot]: '浏览器：截图并保存给你看；模型支持图片时也能看到截图。',
   } satisfies Record<McpToolName, string>,
 } as const;

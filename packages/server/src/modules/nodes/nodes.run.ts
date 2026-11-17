@@ -5,11 +5,14 @@ import {
   type AttemptDTO,
   AttemptKind,
   AttemptStatus,
+  browserTestSubmitTool,
   CHECK_KIND_ORDER,
   type CheckResult,
   type CheckUnrunnableReason,
   ErrorCode,
   InboxKind,
+  MCP_TOOL_PREFIX,
+  McpToolName,
   NodeEvent,
   NodeKind,
   type NodeResult,
@@ -51,7 +54,10 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
 
   /** Another attempt while budget remains, otherwise failed (09 §3). */
   function fail(node: Node, event: NodeEvent, feedback: string, changes: NodeChanges = {}): Node {
-    const to = nextAfterFailure(node.attemptCount, settings.get('node.maxAttempts'));
+    const to =
+      deps.isBrowserTestTask?.(node.taskId) === true
+        ? NodeStatus.Failed
+        : nextAfterFailure(node.attemptCount, settings.get('node.maxAttempts'));
     return move(node, event, to, {
       ...changes,
       retryFeedback: feedback,
@@ -242,8 +248,12 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     if (attempt.status === AttemptStatus.Succeeded) return;
     // Cancelled with its task, or already moved on.
     if (node.status !== NodeStatus.Running && node.status !== NodeStatus.WaitingInput) return;
-    if (attempt.status === AttemptStatus.Interrupted) interrupt(node);
-    else fail(node, NodeEvent.AttemptFailed, feedbackFromAttempt(attempt.status, attempt.error));
+    const browserTest = deps.isBrowserTestTask?.(node.taskId) === true;
+    if (attempt.status === AttemptStatus.Interrupted && !browserTest) interrupt(node);
+    else {
+      const submitTool = browserTest ? browserTestSubmitTool(node.kind) : McpToolName.SubmitResult;
+      fail(node, NodeEvent.AttemptFailed, feedbackFromAttempt(attempt.status, attempt.error, submitTool));
+    }
   }
 
   attempts.onSignal(({ type, attempt }) => {
@@ -276,6 +286,44 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     work().catch((err: unknown) => log.error({ err, nodeId }, 'node background work failed'));
   };
 
+  /** `submit_result` (12 §6.5): records the result and moves the node to acceptance. */
+  async function submitResult(attempt: AttemptDTO, input: NodeResult, ctx: NodeRunContext): Promise<ResultNext> {
+    if (attempt.nodeId === null) throw new Error(`Execute attempt ${attempt.id} has no node`);
+    const node = get(attempt.nodeId);
+    const { checks, manual } = node.acceptance;
+    const target =
+      node.kind === NodeKind.Verify || checks.length > 0
+        ? NodeStatus.Verifying
+        : manual
+          ? NodeStatus.AwaitingAcceptance
+          : NodeStatus.Done;
+    transition(nodeMachine, node.status, NodeEvent.ResultSubmitted, target);
+    // Commit before the node counts as done, so a dependent node never starts before the commit.
+    const sha = target === NodeStatus.Done && ctx.browserCase === undefined ? await commit(node, ctx) : null;
+    // 只读步骤没有自己的提交，也要记录交接依据的任务分支版本。
+    const result =
+      input.handoff === undefined
+        ? input
+        : {
+            ...input,
+            handoffAttemptId: attempt.id,
+            handoffCommitSha: sha ?? (await runGit(['rev-parse', 'HEAD'], { cwd: ctx.directory })).stdout,
+          };
+    unit.transact(() => {
+      attempts.markSubmitted(attempt.id);
+      const current = get(node.id);
+      // The previous result's checks say nothing about this one; why it failed stays in retryFeedback.
+      move(current, NodeEvent.ResultSubmitted, target, {
+        result,
+        checkResults: null,
+        ...(target === NodeStatus.Done ? doneChanges(sha) : {}),
+      });
+      if (target === NodeStatus.AwaitingAcceptance) requestAcceptance(current);
+    });
+    if (target === NodeStatus.Verifying) inBackground(node.id, () => verify(node.id, ctx));
+    return target;
+  }
+
   return {
     /** `listener` runs in the transaction that finishes a verify step, with the commit the step verified. */
     onVerified(listener: (node: Node, commitSha: string) => void): void {
@@ -291,12 +339,41 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         startedAt: clock.now(),
         finishedAt: null,
       });
+      if (ctx.browserCase !== undefined) {
+        const test = ctx.browserCase;
+        inBackground(nodeId, () =>
+          attempts.runLocal(
+            {
+              taskId: ctx.taskId,
+              projectId: ctx.projectId,
+              nodeId,
+              roleId: role.id,
+              directory: ctx.directory,
+            },
+            async (attempt, signal) => {
+              const report = await deps.runBrowserCase(attempt, test, signal);
+              signal.throwIfAborted();
+              await submitResult(attempt, { summary: test.name, browserCaseReport: report }, ctx);
+            },
+          ),
+        );
+        return;
+      }
+      const submitTool = ctx.browserTest === true ? browserTestSubmitTool(node.kind) : McpToolName.SubmitResult;
       const prompt = renderTemplate(prompts[PromptName.StartExecute], {
         taskKey: ctx.taskKey,
         taskTitle: ctx.taskTitle,
         requirement: ctx.requirement,
         nodeTitle: node.title,
-        instructions: node.instructions,
+        // 已确认的旧测试计划仍可能引用通用提交工具。
+        instructions:
+          submitTool === McpToolName.BrowserSubmitReport
+            ? node.instructions.replaceAll(
+                `${MCP_TOOL_PREFIX}${McpToolName.SubmitResult}`,
+                `${MCP_TOOL_PREFIX}${submitTool}`,
+              )
+            : node.instructions,
+        submitTool,
         retryFeedback: node.retryFeedback ?? EMPTY_SECTION,
         uncertaintyRule: prompts[ctx.askOnUncertainty ? PromptName.RuleAsk : PromptName.RuleAssume],
       });
@@ -312,6 +389,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         model: role.model ?? settings.get('ai.defaultModel'),
         system: role.prompt,
         prompt,
+        ...(ctx.browserTest === true ? { browserTestSubmit: submitTool } : {}),
         // A step of a read-only role (the code review's reviewer) may run the project check like a review (D51).
         checkCommands: ctx.checkCommand === null ? [] : [ctx.checkCommand],
       });
@@ -327,43 +405,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
       });
     },
 
-    /** `submit_result` (12 §6.5): records the result and moves the node to acceptance. */
-    async submitResult(attempt: AttemptDTO, input: NodeResult, ctx: NodeRunContext): Promise<ResultNext> {
-      if (attempt.nodeId === null) throw new Error(`Execute attempt ${attempt.id} has no node`);
-      const node = get(attempt.nodeId);
-      const { checks, manual } = node.acceptance;
-      const target =
-        node.kind === NodeKind.Verify || checks.length > 0
-          ? NodeStatus.Verifying
-          : manual
-            ? NodeStatus.AwaitingAcceptance
-            : NodeStatus.Done;
-      transition(nodeMachine, node.status, NodeEvent.ResultSubmitted, target);
-      // Commit before the node counts as done, so a dependent node never starts before the commit.
-      const sha = target === NodeStatus.Done ? await commit(node, ctx) : null;
-      // 只读步骤没有自己的提交，也要记录交接依据的任务分支版本。
-      const result =
-        input.handoff === undefined
-          ? input
-          : {
-              ...input,
-              handoffAttemptId: attempt.id,
-              handoffCommitSha: sha ?? (await runGit(['rev-parse', 'HEAD'], { cwd: ctx.directory })).stdout,
-            };
-      unit.transact(() => {
-        attempts.markSubmitted(attempt.id);
-        const current = get(node.id);
-        // The previous result's checks say nothing about this one; why it failed stays in retryFeedback.
-        move(current, NodeEvent.ResultSubmitted, target, {
-          result,
-          checkResults: null,
-          ...(target === NodeStatus.Done ? doneChanges(sha) : {}),
-        });
-        if (target === NodeStatus.AwaitingAcceptance) requestAcceptance(current);
-      });
-      if (target === NodeStatus.Verifying) inBackground(node.id, () => verify(node.id, ctx));
-      return target;
-    },
+    submitResult,
 
     /** Manual acceptance passed (09 §3). */
     async accept(nodeId: string, ctx: NodeRunContext): Promise<Node> {
@@ -436,7 +478,11 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         const working = attempts
           .listByNode(node.id)
           .some((a) => a.kind === AttemptKind.Execute && a.status === AttemptStatus.Running);
-        if (node.status === NodeStatus.Verifying || !working) interrupt(node);
+        if (node.status === NodeStatus.Verifying || !working) {
+          if (node.status !== NodeStatus.Verifying && deps.isBrowserTestTask?.(node.taskId) === true)
+            fail(node, NodeEvent.AttemptFailed, feedbackFromAttempt(AttemptStatus.Interrupted, null));
+          else interrupt(node);
+        }
       }
     },
   };

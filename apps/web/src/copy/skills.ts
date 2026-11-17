@@ -127,6 +127,11 @@ export const BUILTIN_SKILL_COPY: Readonly<Record<string, { title: string; descri
     description: '检查页面行为、不同尺寸下的表现和运行错误。',
     trigger: '任务需求、步骤或评审涉及网页时。',
   },
+  'aw-image-analysis': {
+    title: '图片与截图识别',
+    description: '请图像处理员读取图片里的文字、位置与布局，引用原图并说明看不清的部分。',
+    trigger: '附件或浏览器截图含有需要核对的视觉信息时。',
+  },
   'aw-code-review': {
     title: '代码审查',
     description: '核对审查范围、改动证据和问题位置。',

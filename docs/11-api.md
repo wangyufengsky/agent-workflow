@@ -47,6 +47,7 @@ type EnvironmentDTO = {
   models: {
     available: Array<{
       providerId: string; modelId: string; name: string;
+      supportsImage: boolean;       // 模型声明支持图片输入
       contextLimit: number | null;   // 上下文长度；provider 没写 limit.context 时为 null（D162）
       projectIds: string[];          // 只在这些项目自己的 opencode 配置里；全局配置里的为空（D162）
     }>;
@@ -121,7 +122,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | GET | `/tasks?projectId&status&displayGroup&archived&limit&cursor` | `{ items: TaskSummaryDTO[], nextCursor }`，`archived`（默认 false）只列未归档的任务，true 只列已归档的（D219）；按 `updatedAt`（同时按编号）倒序分页（§1，`LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX`）；`displayGroup` 在查询中过滤（由 `resolveTaskDisplayGroup` 推出每个状态与是否有打开的提问 / 权限 / 验收条目的组合），每页都是满的；游标为上一页最后一个任务的 `<updatedAt>.<seq>`，格式不对 400 `VALIDATION_FAILED` |
 | POST | `/tasks` | 创建，见下 |
 | GET | `/tasks/:id` | `TaskDetailDTO` |
-| GET | `/tasks/:id/preview/sessions` | `{ attempts: [{ attemptId, nodeId, kind, status, frames }], checks: [{ nodeId, passed }] }`：任务预览页签可看的会话（v1.3 B2，29 §8.1）——留下过动作画面的尝试，与最近一次页面体检有截图的步骤 |
+| GET | `/tasks/:id/preview/sessions` | `{ attempts: [{ attemptId, nodeId, kind, status, frames }], checks: [{ nodeId, passed }] }`：任务预览页签可看的会话（v1.3 B2，29 §8.1）。浏览器测试额外返回运行中的 `testTab`，各尝试列出操作记录数量与按需截图 |
 | GET | `/tasks/:id/timeline?afterId` | `{ items: TaskEventDTO[] }`：`id > afterId` 的 `task_events`，按 id 升序 |
 | POST | `/tasks/:id/start` | `draft → preparing` |
 | POST | `/tasks/:id/pause` 🅿 | `running → paused`：不再派发新步骤，进行中的步骤继续 |
@@ -158,7 +159,23 @@ type CreateTaskRequest = {
 };
 ```
 
+浏览器测试流程（`browser_test`）须携带 `browserTest: { target, writes: [{ method, path }] }`。`target` 是项目预览路径或不带凭据的 HTTP(S) 地址。写入方法为 POST、PUT、PATCH 或 DELETE，按完整路径匹配。任务详情返回同一份创建时冻结的授权。浏览器会话列表的 `attempts[].screenshots` 列出实际保存的截图文件。
+
 检查点解析：请求值 > 流程 `definition.checkpoints` > 设置 `ai.askOnUncertainty`（仅 ask_on_uncertainty）。解析结果写入 `tasks.checkpoints`，之后不再变。
+
+### 浏览器测试用例
+
+| 方法 | 路径 | 输入和结果 |
+| --- | --- | --- |
+| GET | `/projects/:projectId/browser-cases` | 项目用例列表 `{ items }` |
+| POST | `/projects/:projectId/browser-cases` | `{ definition }`，创建用例并返回版本 1 |
+| PUT | `/projects/:projectId/browser-cases/:caseId` | `{ revision, definition }`，只更新该版本并递增；过期版本返回 409 |
+| POST | `/projects/:projectId/browser-cases/:caseId/run` | `{ revision, approved: true }`，冻结已确认的版本并创建任务；过期版本返回 409 |
+| POST | `/tasks/:id/browser-case/rerun` | `{ approved: true }`，用原任务保存的用例版本和基础分支创建新任务 |
+| POST | `/tasks/:id/browser-case/handoff/take` | `{ handoffId }`，接管当前暂停的测试页签，204 |
+| POST | `/tasks/:id/browser-case/handoff/resume` | `{ handoffId }`，交还测试页签并继续，204。表单仍需登录或验证时 409 |
+
+定义包含 `name`、`scope` 和 `steps`。任务详情在等待接管时带 `browserCaseHandoff: { id, tabId, step, reason, active }`，`browserCase` 返回本次用例快照，`result.browserCaseReport` 返回每一步实际值、结果、截图文件与 HTTP 请求证据。
 
 ### 5.2 TaskDetailDTO
 
@@ -381,6 +398,9 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey?, knowledgeConversationId?, deckId?, slideId?, batchId?, scheduleId? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在创建会话、发送请求、删除或等待模型回复时 409 `ASSISTANT_BUSY` |
 | POST | `/assistant/conversations/:id/abort` | 停止本轮回复 |
 | PUT | `/assistant/conversations/:id/preview` | `assistant.bindPreview`，界面专用、不对助手开放；`{ preview: { taskId, tabId } \| null }` → 204。只接受属于该任务的真实用户预览，不能绑定 AI 页签；`null` 解除关联，删除后的清理也幂等。仅保存在内存 |
+| PUT | `/assistant/conversations/:id/browser-control` | `assistant.controlBrowser`，界面专用。 `{ tabId, enabled }` → `{ enabled }`；启用仅接受当前对话关联的项目预览。网页动作通过助手现有确认接口批准一次。 |
+| GET | `/assistant/conversations/:id/browser-control?tabId=` | `assistant.getBrowserControl`，返回当前操作方 `mode`（`off`、`assistant`、`manual`）及本地对话记录 `activity` |
+| PUT | `/assistant/conversations/:id/browser-control/handoff` | `assistant.handoffBrowser`，`{ tabId, manual }`，204。接管暂停助手读页和操作并使旧确认失效，交回恢复当前授权 |
 | POST | `/assistant/conversations/:id/permissions/:permissionId` | `{ reply: PermissionDecision }`：回复助手会话的权限请求（bash / webfetch 询问），不存在 404 `NOT_FOUND` |
 | GET | `/assistant/conversations/:id/transcript?afterSeq=` | 消息流分页（非清单路由，格式同 `/attempts/:id/transcript`；`done` 恒为 false：对话不会结束） |
 | GET | `/assistant/external-mcp` | `assistant.externalMcp`（read，仅界面）：`{ items: Array<{ name, status: ExternalMcpStatus, error: string \| null }> }`：opencode `mcp.status`（助手目录）报告的 MCP 服务器，去掉应用自己的 `agent-workflow` 与 `agent-workflow-app`，按名称排序；opencode 没就绪 503 `OPENCODE_NOT_READY`（28 §4） |
@@ -527,6 +547,8 @@ N2a 实现组合模板，N2b 加入 AI 拆解（`templateKey` 省略时）、重
 | GET | `/browser/tabs/:tabId/logs` | `browser.userTabLogs` | read | `{ errors: [{ message, source }], requests: [{ method, url, status, error }] }`：用户预览标签页当前页面的控制台错误（含未捕获异常）与失败请求，底栏抽屉的明细（v1.3 B2） |
 | POST | `/browser/tabs/:tabId/viewport` | `browser.setUserViewport` | read | `{ preset }`：桌面铺满放置区域，平板 / 手机在区域里模拟该尺寸（`Emulation.setDeviceMetricsOverride`）|
 | GET | `/attempts/:attemptId/browser-frames` | `browser.listFrames` | read | `{ items: BrowserFrame[] }`：一次尝试的动作画面，按 `seq` 排列（读尝试目录里的 `frames.jsonl`，尝试结束、应用重启后照样可读；没有画面为空列表；v1.3 B2，29 §8.2） |
+| GET | `/attempts/:attemptId/browser-test-actions` | `browser.listTestActions` | read | AI 浏览器测试的操作结果和相关请求，按执行顺序返回 |
+| POST | `/tasks/:taskId/browser-test-screenshot` | `browser.captureTest` | read | 指定 `attemptId`，保存正在运行且无需身份验证的测试页截图，返回文件名 |
 
 ### 13f″. 助手网页文字读取（29 §9）
 
@@ -609,15 +631,15 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 | 操作 | 方法与路径 | 风险／曝光 | 输入 → 结果 |
 | --- | --- | --- | --- |
 | （非清单）上传 | POST `/attachments` | 仅 UI | `Content-Type: application/octet-stream` 的二进制请求体（后端按原始字节判断格式并校验，30 §3.1、39 §4）；`X-Attachment-Name` 为 URL 编码的文件名 → 201 `AttachmentDTO`（含 `format` 与 Word / Excel 的 `meta`，OF-01）；Word / Excel 在请求内解析完成；校验或解析失败返回错误、不留记录 |
-| （非清单）文字 | GET `/attachments/:id/content` | 仅 UI | 模型读到的文字：文本附件的原件、Word / Excel 读出的 `text.md`；`text/plain; charset=utf-8` 加 `nosniff` |
-| attachments.snapshotProjectFile | POST `/attachments/project-file` | write；仅 UI | `{ projectId, taskId?, path, lines? }` → `AttachmentDTO`；Word / Excel 文件与上传同样解析，带 `lines` 为 `VALIDATION_FAILED`（OF-06，39 §7.3） |
+| （非清单）附件预览 | GET `/attachments/:id/content` | 仅 UI | 文本原件或 Word / Excel 的 `text.md`（`text/plain; charset=utf-8`）；PNG / JPEG 返回原始字节（`image/png` / `image/jpeg`）。都设置 `nosniff` |
+| attachments.snapshotProjectFile | POST `/attachments/project-file` | write；仅 UI | `{ projectId, taskId?, path, lines? }` → `AttachmentDTO`；Word / Excel 文件与上传同样解析；Word / Excel、PNG / JPEG 均按整份文件附加，带 `lines` 为 `VALIDATION_FAILED`（OF-06，39 §7.3） |
 | attachments.get | GET `/attachments/:id` | read；UI | `AttachmentDTO`（不含绝对路径） |
 | attachments.previewSheet（OF-03） | GET `/attachments/:id/sheet?sheet=` | read；仅 UI | Excel 附件一个工作表的预览 `SheetPreviewDTO`：`name`、`range`、`hidden`、`left` 与 `columns`（列字母从哪列起、共几列）、`merges`、前 `OFFICE_PREVIEW_ROWS` 行（`{ r, hidden, cells: [{ c, v }] }`）、`totalRows`；工作表不存在或附件不是 Excel 为 `VALIDATION_FAILED`（39 §8.1） |
 | assistant.previewFile（OF-04） | GET `/assistant/conversations/:id/files/preview?path=&sheet=` | read；仅 UI | 助手写的 Word / Excel 文件的预览 `OfficeFilePreviewDTO`：Word 为 `{ format, meta, markdown }`，Excel 为 `{ format, meta, sheet: SheetPreviewDTO }`（`sheet` 省略时为第一个工作表）；路径越界、不是文件、不是 Word / Excel 为 `VALIDATION_FAILED`（39 §8.2） |
 | （非清单）助手文件 | GET `/assistant/conversations/:id/files/raw?path=` | 仅 UI | 文件字节，`application/octet-stream`，`content-disposition: attachment`；路径同上校验（另存为，39 §8.2） |
 | attachments.remove | DELETE `/attachments/:id` | write；仅 UI | 只能删除尚无引用的附件，已发送的返回 `VALIDATION_FAILED` |
 
-以上为 U-01 已实现的部分。两条非清单路由使用与 JSON API 相同的令牌校验，不在 URL query 放令牌；原件以纯文本返回，不作为同源 HTML 执行。
+两条附件非清单路由使用与 JSON API 相同的令牌校验，令牌在请求头里。文本以纯文本返回，图像仅以 PNG / JPEG 返回。
 
 `TaskDetailDTO` 增加 `attachments`（需求的附件，再加每次「再改改」的附件，按顺序；U-03）。`createTask`、`requestChanges`、助手发送消息增加可选 `attachmentIds`（最多 `ATTACHMENTS_PER_INPUT_MAX`，U-02 已实现），后端在业务写入时绑定：任务与需求同一事务，「再改改」挂在追加的修改节点上，助手消息挂在对话上（同一附件在后续消息再次发送不重复引用）；有不存在的 ID 时返回 `ATTACHMENT_NOT_FOUND`，任务不创建。助手调用 `tasks.create` 时可以带 `attachmentIds`，但只能是当前对话里用户发过的附件：助手层在执行或请求确认前检查（`OperationToolDeps.scoped`），别的 ID 直接返回 `ATTACHMENT_NOT_FOUND`、不出确认卡；确认卡把它们显示为文件名（`InputRef.Attachment`）。`requestChanges` 的 `attachmentIds` 仍列在 `assistantOmit` 里，助手不能代为附加。
 

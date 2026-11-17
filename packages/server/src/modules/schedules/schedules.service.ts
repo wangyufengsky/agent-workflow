@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   AppError,
+  BROWSER_TEST_WORKFLOW_KEY,
   type CreateScheduleRequest,
   ErrorCode,
   InboxKind,
@@ -79,6 +80,11 @@ export function createSchedulesService({
   /** The latest version of a fixed workflow; AI-planned ones cannot run unattended (22 §1, D92). */
   function fixedWorkflow(key: string): WorkflowDTO {
     const workflow = workflows.latest(key);
+    if (workflow.key === BROWSER_TEST_WORKFLOW_KEY)
+      throw new AppError(
+        ErrorCode.ValidationFailed,
+        'Start browser tests from the task form to authorize their target',
+      );
     if (workflow.planning !== WorkflowPlanning.Fixed) {
       throw new AppError(ErrorCode.ValidationFailed, 'Only fixed workflows can run on a schedule', {
         issues: [{ path: ['workflowKey'], message: `workflow ${key} is planned by AI` }],

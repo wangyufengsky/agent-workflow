@@ -3,13 +3,14 @@ import {
   type BrowserFrame,
   getPreviewOp,
   listBrowserFramesOp,
+  listBrowserTestActionsOp,
   listPreviewSessionsOp,
   PreviewState,
   startPreviewOp,
   userTabLogsOp,
 } from '@aw/shared';
 import { type QueryClient, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { callOperation, getBlob } from '../../api/client.ts';
+import { callOperation, getImageDataUrl } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 
 /** The task's preview; its log tail grows only while it starts, so that is when it is read again (29 §8.1). */
@@ -40,6 +41,12 @@ export const framesQuery = (attemptId: string) =>
     queryFn: async () => (await callOperation(listBrowserFramesOp, { attemptId })).items,
   });
 
+export const testActionsQuery = (attemptId: string) =>
+  queryOptions({
+    queryKey: queryKeys.browserTestActions(attemptId),
+    queryFn: async () => (await callOperation(listBrowserTestActionsOp, { attemptId })).items,
+  });
+
 export const userTabLogsQuery = (tabId: string) =>
   queryOptions({ queryKey: queryKeys.userTabLogs(tabId), queryFn: () => callOperation(userTabLogsOp, { tabId }) });
 
@@ -58,15 +65,6 @@ export const attemptFileUrl = (attemptId: string, file: string) =>
 export const taskFileUrl = (taskId: string, file: string) =>
   `${API_PREFIX}/tasks/${encodeURIComponent(taskId)}/browser/${file}`;
 
-/** A blob as a `data:` URL, which the browser frees with the string (an object URL would need revoking). */
-const dataUrlOf = (blob: Blob) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-
 /**
  * An image of the API for `<img src>`, which cannot send the token. Images never change once written, so each is read
  * once and kept while shown.
@@ -74,7 +72,7 @@ const dataUrlOf = (blob: Blob) =>
 export function useImage(url: string): string | null {
   const image = useQuery({
     queryKey: ['images', url],
-    queryFn: async () => dataUrlOf(await getBlob(url)),
+    queryFn: () => getImageDataUrl(url),
     staleTime: Number.POSITIVE_INFINITY,
   });
   return image.data ?? null;

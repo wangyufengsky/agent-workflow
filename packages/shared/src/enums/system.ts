@@ -143,6 +143,7 @@ export const ServerEventType = {
   ModelSlotsUpdated: 'model_slots.updated',
   SettingsUpdated: 'settings.updated',
   AssistantUpdated: 'assistant.updated',
+  AssistantBrowserUpdated: 'assistant.browser_updated',
   AssistantTranscript: 'assistant.transcript',
   AssistantConfirmation: 'assistant.confirmation',
   /** The assistant asks the renderer to open a page, a prefilled form, or reveal a file (15 §3). */
@@ -170,6 +171,7 @@ export const ServerEventType = {
   BrowserFrame: 'browser.frame',
   /** The user's preview tab changed page, viewport or error counts (29 §8.1). */
   BrowserTabUpdated: 'browser.tab_updated',
+  BrowserTestUpdated: 'browser.test_updated',
   Resync: 'resync',
 } as const;
 export type ServerEventType = (typeof ServerEventType)[keyof typeof ServerEventType];

@@ -24,7 +24,7 @@ import { mountOperations, type OperationImpl } from './core/operations/operation
 import { host } from './core/platform.ts';
 import { registerSseHub } from './core/sse/sse-hub.ts';
 import { createAcceptanceModule } from './modules/acceptance/index.ts';
-import { type AssistantService, createAssistantModule } from './modules/assistant/index.ts';
+import { type AssistantService, createAssistantModule, createBrowserActivity } from './modules/assistant/index.ts';
 import { type AttachmentsService, createAttachmentsModule } from './modules/attachments/index.ts';
 import { type AttemptsService, createAttemptsModule } from './modules/attempts/index.ts';
 import { createBatchesModule } from './modules/batches/index.ts';
@@ -32,6 +32,7 @@ import {
   type BrowserHost,
   type BrowserService,
   createBrowserModule,
+  runBrowserCase,
   unavailableBrowserHost,
 } from './modules/browser/index.ts';
 import {
@@ -47,6 +48,7 @@ import { createDeliveryModule } from './modules/delivery/index.ts';
 import { createRepoLocks, locateOpencodeShell } from './modules/git/index.ts';
 import { createGitReviewsModule } from './modules/git-reviews/index.ts';
 import { createHostingModule, type HostingEndpoints, PUBLIC_HOSTING } from './modules/hosting/index.ts';
+import { createImageAnalysis } from './modules/image-analysis/index.ts';
 import { createInboxModule, type InboxService } from './modules/inbox/index.ts';
 import { createInitiativesModule, type InitiativesService } from './modules/initiatives/index.ts';
 import { createInsightsModule } from './modules/insights/index.ts';
@@ -259,6 +261,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   const inbox = createInboxModule({ db: database.db, unit, clock, log });
   const modelSlots = createModelSlotsModule({ settings: settings.service, events, log });
+  const imageAnalysis = createImageAnalysis({ clock, settings: settings.service, slots: modelSlots.service, opencode });
   server.addHook('preClose', async () => modelSlots.service.dispose());
   const attempts = createAttemptsModule({
     taskSkills: (id) => readTaskSkills(database.db, id),
@@ -313,6 +316,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   // Dev servers end with the backend: nothing else stops them once it is gone.
   server.addHook('preClose', () => previews.service.stopAll());
   const browser = createBrowserModule({
+    activity: createBrowserActivity(database.db, clock, events),
     host: deps.browserHost ?? unavailableBrowserHost,
     clock,
     log,
@@ -351,6 +355,22 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('onReady', () => projectRuntime.recover());
   server.addHook('preClose', () => projectRuntime.stopAll());
   const nodes = createNodesModule({
+    runBrowserCase: (attempt, test, signal) => {
+      const owner = {
+        id: attempt.id,
+        taskId: attempt.taskId,
+        projectId: attempts.service.projectOf(attempt.id),
+        filesDir: attempts.filesDirOf(attempt),
+        browserTest: test.scope,
+        savedCase: true,
+      };
+      return runBrowserCase(browser.service, owner, test, signal, (step, reason) =>
+        attempts.service.waitForLocalInput(attempt.id, () =>
+          browser.service.caseHandoffs.wait(owner, step, reason, signal),
+        ),
+      );
+    },
+    isBrowserTestTask: (id): boolean => tasks.service.browserTest(id) !== null,
     db: database.db,
     unit,
     clock,
@@ -531,6 +551,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     office,
     browser: browser.service,
     filesDirOf: attempts.filesDirOf,
+    imageAnalysis,
     log,
   });
   mcp.register(server);
@@ -598,6 +619,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     slots: modelSlots.service,
     dataDir: config.dataDir,
     timeZone,
+    imageAnalysis,
     token: assistantMcpToken,
     operations,
     appStatus: async () => ({

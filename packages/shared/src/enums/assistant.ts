@@ -54,6 +54,7 @@ export const AssistantToolName = {
   RevealFile: 'reveal_file',
   /** More of a file the user attached in this conversation (30 §3.2). */
   ReadAttachment: 'read_attachment',
+  AnalyzeImage: 'analyze_image',
   /** Rows of an Excel attachment (39 §6.2). */
   ReadSheet: 'read_sheet',
   /** Filtered, grouped or totalled rows of an Excel attachment (39 §6.2). */

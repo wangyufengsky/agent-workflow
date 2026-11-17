@@ -123,9 +123,17 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       return;
     case ServerEventType.BrowserFrame:
       return appendFrame(qc, event.data);
+    case ServerEventType.BrowserTestUpdated:
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.previewSessions(event.data.taskId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.browserTestActions(event.data.attemptId) }),
+      ]);
+      return;
     case ServerEventType.BrowserTabUpdated:
       qc.setQueryData(queryKeys.userTab(event.data.tabId), event.data);
       return qc.invalidateQueries({ queryKey: queryKeys.userTabLogs(event.data.tabId) });
+    case ServerEventType.AssistantBrowserUpdated:
+      return qc.invalidateQueries({ queryKey: queryKeys.assistantBrowserControl(event.data.conversationId) });
     case ServerEventType.AssistantConfirmation:
       return updateConfirmation(qc, event.data);
     // Requests of the assistant to the renderer, carried out by the shell (15 §6).

@@ -5,16 +5,28 @@ import {
   type BrowserPortOp,
   type BrowserPortResponse,
   type BrowserRect,
+  type BrowserWatchZoom,
   blockReason,
   browserPortRequestSchema,
   browserShortcutSchema,
   urlAccess,
 } from '@aw/shared';
-import { app, type BrowserWindow, type Session, type UtilityProcess, WebContentsView } from 'electron';
+import { app, type BrowserWindow, type Session, screen, type UtilityProcess, WebContentsView } from 'electron';
 import { createPartitionNetwork } from './browser-network.ts';
 import type { BrowserPrompts } from './browser-prompts.ts';
+import { createBrowserWatch, isWatchMetrics } from './browser-watch.ts';
 
-type Tab = { tabId: string; view: WebContentsView; policy: BrowserPolicy; userFacing: boolean; onWindow: boolean };
+type Tab = {
+  tabId: string;
+  view: WebContentsView;
+  contentsId: number;
+  partition: Session;
+  policy: BrowserPolicy;
+  userFacing: boolean;
+  caseSession: boolean;
+  onWindow: boolean;
+  watch?: ReturnType<typeof createBrowserWatch>;
+};
 
 export type BrowserTabsDeps = {
   /** The window user-facing tabs are placed on. */
@@ -38,6 +50,74 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
   const byContents = new Map<number, Tab>();
   const configured = new Set<Session>();
   const network = createPartitionNetwork();
+  let watchShield: WebContentsView | undefined;
+  let shieldedTab: Tab | undefined;
+  let drag: { x: number; y: number } | undefined;
+
+  /** 观看时透明视图接收窗口输入，CDP 操作仍直接发给下方测试页签。 */
+  function unshield(tab: Tab): void {
+    if (shieldedTab !== tab || watchShield === undefined) return;
+    const win = window();
+    if (win !== null && !win.isDestroyed()) win.contentView.removeChildView(watchShield);
+    shieldedTab = undefined;
+    drag = undefined;
+  }
+
+  function shield(tab: Tab): void {
+    const win = window();
+    if (win === null || !tab.onWindow || !tab.caseSession || hasUserControl(tab)) return;
+    if (watchShield === undefined) {
+      watchShield = new WebContentsView({ webPreferences: { sandbox: true, backgroundThrottling: false } });
+      watchShield.setBackgroundColor('#00000000');
+      // 未加载页面的透明视图挡住鼠标，但没有接收拖动事件的渲染器。
+      void watchShield.webContents
+        .loadURL('about:blank')
+        .catch((err: unknown) => console.error('Browser watch input surface failed to load', err));
+      watchShield.webContents.on('before-mouse-event', (event, input) => {
+        const watch = shieldedTab?.watch;
+        if (watch === undefined) return;
+        const { x, y } = input;
+        if (input.type === 'mouseDown' && input.button === 'left') {
+          drag = { x, y };
+          watchShield?.webContents.focus();
+        } else if (input.type === 'mouseMove' && drag !== undefined) {
+          watch.pan(x - drag.x, y - drag.y);
+          drag = { x, y };
+        } else if (input.type === 'mouseUp' || input.type === 'mouseLeave') {
+          drag = undefined;
+        }
+        event.preventDefault();
+      });
+      watchShield.webContents.on('before-input-event', (event, input) => {
+        if (input.type !== 'keyDown') return;
+        if (!input.meta && !input.control) {
+          const watch = shieldedTab?.watch;
+          const deltas: Record<string, readonly [number, number]> = {
+            ArrowLeft: [48, 0],
+            ArrowRight: [-48, 0],
+            ArrowUp: [0, 48],
+            ArrowDown: [0, -48],
+          };
+          const delta = deltas[input.key];
+          if (watch !== undefined && delta !== undefined) {
+            event.preventDefault();
+            watch.pan(...delta);
+          }
+          return;
+        }
+        const shortcut = browserShortcutSchema.safeParse(input.key.toLowerCase());
+        if (!shortcut.success) return;
+        event.preventDefault();
+        const current = window();
+        current?.webContents.focus();
+        current?.webContents.send('aw:browser-shortcut', shortcut.data);
+      });
+    }
+    if (shieldedTab !== undefined && shieldedTab !== tab) unshield(shieldedTab);
+    if (shieldedTab !== tab) win.contentView.addChildView(watchShield);
+    watchShield.setBounds(tab.view.getBounds());
+    shieldedTab = tab;
+  }
 
   function tabOf(tabId: string): Tab {
     const tab = tabs.get(tabId);
@@ -57,7 +137,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
           ? BrowserBlockReason.NotAllowed
           : blockReason(
               { url: details.url, method: details.method, isWebSocket: details.resourceType === 'webSocket' },
-              tab.policy,
+              requestPolicy(tab),
               !tab.userFacing,
             );
       if (tab === undefined) {
@@ -65,7 +145,12 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
       }
       if (reason !== null && tab !== undefined) {
         emit({ type: 'browser.blocked', tabId: tab.tabId, url: details.url, method: details.method, reason });
-        if (tab.userFacing && details.resourceType === 'mainFrame' && reason === BrowserBlockReason.NotAllowed) {
+        if (
+          tab.userFacing &&
+          tab.policy.automation === undefined &&
+          details.resourceType === 'mainFrame' &&
+          reason === BrowserBlockReason.NotAllowed
+        ) {
           openExternal(details.url);
         }
       }
@@ -88,7 +173,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
     // The app's own windows load the app itself, which asks for none.
     if (tab === undefined) return;
     event.preventDefault();
-    if (!tab.userFacing) {
+    if (!hasUserControl(tab)) {
       emit({ type: 'browser.certificateRefused', tabId: tab.tabId, host });
       tab.view.webContents.stop();
       return;
@@ -116,10 +201,44 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
 
   function forget(tab: Tab): void {
     tabs.delete(tab.tabId);
-    byContents.delete(tab.view.webContents.id);
+    byContents.delete(tab.contentsId);
+    hide(tab);
+  }
+
+  function hide(tab: Tab): void {
+    unshield(tab);
     const win = window();
-    // On quit the window is already gone, and its views with it.
     if (tab.onWindow && win !== null && !win.isDestroyed()) win.contentView.removeChildView(tab.view);
+    tab.onWindow = false;
+    tab.watch?.refresh();
+  }
+
+  function requestPolicy(tab: Tab): BrowserPolicy {
+    const scope = tab.policy.automation;
+    // 手动写入权限随原生视图可见，离开测试页签时仍按用例规则检查请求。
+    return !tab.onWindow && scope?.manual === true
+      ? { ...tab.policy, automation: { ...scope, manual: false } }
+      : tab.policy;
+  }
+
+  function hasUserControl(tab: Tab): boolean {
+    return tab.userFacing || (tab.caseSession && tab.policy.automation?.manual === true);
+  }
+
+  async function close(tab: Tab): Promise<void> {
+    const contents = tab.view.webContents;
+    const partition = tab.partition;
+    forget(tab);
+    if (!contents.isDestroyed()) contents.close();
+    if (tab.caseSession) {
+      await partition.closeAllConnections();
+      await Promise.all([partition.clearStorageData(), partition.clearCache(), partition.clearAuthCache()]);
+      configured.delete(partition);
+    }
+  }
+
+  function closeAfterLoss(tab: Tab): void {
+    void close(tab).catch((err: unknown) => console.error('Browser session cleanup failed', err));
   }
 
   async function open(op: Extract<BrowserPortOp, { kind: 'open' }>): Promise<null> {
@@ -129,12 +248,28 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
         sandbox: true,
         contextIsolation: true,
         nodeIntegration: false,
-        offscreen: !op.userFacing,
+        offscreen: !op.userFacing && op.caseSession !== true,
         backgroundThrottling: false,
       },
     });
     const contents = view.webContents;
-    const tab: Tab = { tabId: op.tabId, view, policy: op.policy, userFacing: op.userFacing, onWindow: false };
+    const tab: Tab = {
+      tabId: op.tabId,
+      view,
+      contentsId: contents.id,
+      partition: contents.session,
+      policy: op.policy,
+      userFacing: op.userFacing,
+      caseSession: op.caseSession === true,
+      onWindow: false,
+    };
+    if (tab.caseSession && op.viewport !== null) {
+      tab.watch = createBrowserWatch(contents, { ...op.viewport, deviceScaleFactor: 1 }, () => {
+        const win = window();
+        if (win === null || !tab.onWindow || hasUserControl(tab)) return null;
+        return { bounds: tab.view.getBounds(), displayScale: screen.getDisplayMatching(win.getBounds()).scaleFactor };
+      });
+    }
     configure(contents.session);
     contents.session.allowNTLMCredentialsForDomains(op.integratedAuthServers.join(','));
     await network.apply(contents.session, op.network);
@@ -142,7 +277,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
     byContents.set(contents.id, tab);
 
     contents.on('before-input-event', (event, input) => {
-      if (!tab.userFacing || input.type !== 'keyDown' || (!input.meta && !input.control)) return;
+      if (!hasUserControl(tab) || input.type !== 'keyDown' || (!input.meta && !input.control)) return;
       const shortcut = browserShortcutSchema.safeParse(input.key.toLowerCase());
       if (!shortcut.success) return;
       event.preventDefault();
@@ -156,19 +291,19 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
     // `window.open` of an allowed address stays in this tab: one tab per session (29 §5.3).
     contents.setWindowOpenHandler(({ url }) => {
       if (urlAccess(url, tab.policy) !== null) void contents.loadURL(url);
-      else if (tab.userFacing && isWeb(url)) openExternal(url);
+      else if (tab.userFacing && tab.policy.automation === undefined && isWeb(url)) openExternal(url);
       return { action: 'deny' };
     });
     contents.on('will-navigate', (event, url) => {
       if (urlAccess(url, tab.policy) !== null) return;
       event.preventDefault();
-      if (tab.userFacing && isWeb(url)) openExternal(url);
+      if (tab.userFacing && tab.policy.automation === undefined && isWeb(url)) openExternal(url);
     });
     // Credentials are the user's to give, in their own tab (29 §5.4): Chromium keeps what they gave for the
     // partition, and the AI's tabs there reuse it. The AI's tabs never ask: Electron's default cancels the login (the
     // page gets the 401), and no certificate is chosen for them (the app's `select-client-certificate` above).
     contents.on('login', (event, _details, auth, callback) => {
-      if (!tab.userFacing) return;
+      if (!hasUserControl(tab)) return;
       event.preventDefault();
       void prompts
         .login({ host: auth.host, realm: auth.realm, scheme: auth.scheme, isProxy: auth.isProxy })
@@ -177,7 +312,8 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
         );
     });
     contents.on('render-process-gone', (_event, details) => {
-      forget(tab);
+      if (!tabs.has(tab.tabId)) return;
+      closeAfterLoss(tab);
       emit({ type: 'browser.gone', tabId: tab.tabId, reason: details.reason });
     });
 
@@ -189,8 +325,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
     });
     contents.debugger.on('detach', (_event, reason) => {
       if (!tabs.has(tab.tabId)) return;
-      forget(tab);
-      contents.close();
+      closeAfterLoss(tab);
       emit({ type: 'browser.gone', tabId: tab.tabId, reason: `debugger detached: ${reason}` });
     });
     if (op.viewport !== null) {
@@ -207,7 +342,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
 
   function userTab(tabId: string): Tab {
     const tab = tabOf(tabId);
-    if (!tab.userFacing) throw new Error(`Browser tab ${tabId} is not the user's`);
+    if (!hasUserControl(tab)) throw new Error(`Browser tab ${tabId} is not the user's`);
     return tab;
   }
 
@@ -217,17 +352,37 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
       switch (op.kind) {
         case 'open':
           return open(op);
-        case 'setPolicy':
-          tabOf(op.tabId).policy = op.policy;
-          return null;
-        case 'close': {
+        case 'setPolicy': {
           const tab = tabOf(op.tabId);
-          forget(tab);
-          tab.view.webContents.close();
+          const wasManual = tab.caseSession && hasUserControl(tab);
+          tab.policy = op.policy;
+          if (tab.caseSession) {
+            if (hasUserControl(tab)) {
+              await tab.watch?.sync();
+              unshield(tab);
+            } else {
+              if (wasManual) window()?.webContents.focus();
+              shield(tab);
+              tab.watch?.refresh();
+            }
+          }
           return null;
         }
-        case 'cdp':
-          return tabOf(op.tabId).view.webContents.debugger.sendCommand(op.method, op.params, op.sessionId);
+        case 'close': {
+          const tab = tabs.get(op.tabId);
+          if (tab !== undefined) await close(tab);
+          return null;
+        }
+        case 'cdp': {
+          const tab = tabOf(op.tabId);
+          const run = () => tab.view.webContents.debugger.sendCommand(op.method, op.params, op.sessionId);
+          if (tab.watch !== undefined && op.sessionId === undefined) {
+            if (op.method === 'Emulation.setDeviceMetricsOverride' && isWatchMetrics(op.params))
+              return tab.watch.changeMetrics(op.params);
+            if (op.method === 'Page.captureScreenshot') return tab.watch.capture(run);
+          }
+          return run();
+        }
       }
     },
 
@@ -237,23 +392,43 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
      * already took it off.
      */
     place(tabId: string, rect: BrowserRect | null): void {
-      if (rect === null && !tabs.has(tabId)) return;
-      const tab = userTab(tabId);
+      const tab = tabs.get(tabId);
+      if (tab === undefined || (rect !== null && !tab.caseSession && !hasUserControl(tab))) return;
       const win = window();
       if (win === null) return;
       if (rect === null) {
-        if (tab.onWindow) win.contentView.removeChildView(tab.view);
-        tab.onWindow = false;
+        hide(tab);
         return;
       }
       if (!tab.onWindow) win.contentView.addChildView(tab.view);
       tab.onWindow = true;
       tab.view.setBounds(rect);
+      shield(tab);
+      tab.watch?.refresh();
+    },
+    setWatchZoom(tabId: string, zoom: BrowserWatchZoom): void {
+      const tab = tabs.get(tabId);
+      if (tab?.onWindow && !hasUserControl(tab)) tab.watch?.setZoom(zoom);
     },
     back: (tabId: string) => userTab(tabId).view.webContents.navigationHistory.goBack(),
     forward: (tabId: string) => userTab(tabId).view.webContents.navigationHistory.goForward(),
-    reload: (tabId: string) => userTab(tabId).view.webContents.reload(),
-    openDevTools: (tabId: string) => userTab(tabId).view.webContents.openDevTools({ mode: 'detach' }),
+    reload(tabId: string): void {
+      const tab = userTab(tabId);
+      const contents = tab.view.webContents;
+      if (!tab.caseSession) {
+        contents.reload();
+        return;
+      }
+      // 验证页可能来自 POST，不让重新加载重发该请求。
+      const url = contents.getURL();
+      if (urlAccess(url, tab.policy) !== null) {
+        void contents.loadURL(url).catch((err: unknown) => console.error('Browser case page reload failed', err));
+      }
+    },
+    openDevTools: (tabId: string) => {
+      const tab = userTab(tabId);
+      if (!tab.caseSession) tab.view.webContents.openDevTools({ mode: 'detach' });
+    },
 
     /**
      * The page that placed the user's tabs started over (a reload): nothing of it knows their ids any more, so they
@@ -261,6 +436,10 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
      */
     closeUserTabs(): void {
       for (const tab of [...tabs.values()]) {
+        if (tab.caseSession) {
+          hide(tab);
+          continue;
+        }
         if (!tab.userFacing) continue;
         forget(tab);
         tab.view.webContents.close();
@@ -274,9 +453,11 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
      */
     closeAll(): void {
       for (const tab of [...tabs.values()]) {
-        forget(tab);
-        if (!tab.view.webContents.isDestroyed()) tab.view.webContents.close();
+        if (tab.caseSession || !tab.view.webContents.isDestroyed()) closeAfterLoss(tab);
+        else forget(tab);
       }
+      if (watchShield !== undefined && !watchShield.webContents.isDestroyed()) watchShield.webContents.close();
+      watchShield = undefined;
     },
   };
 }

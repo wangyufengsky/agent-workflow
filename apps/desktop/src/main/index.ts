@@ -8,6 +8,7 @@ import {
   ASSISTANT_DIR,
   ASSISTANT_FILES_DIR,
   browserRectSchema,
+  browserWatchZoomSchema,
   type LaunchPreferences,
 } from '@aw/shared';
 import { splashBackground, splashHtml, titleBarOverlay } from '@aw/web/splash';
@@ -121,6 +122,9 @@ ipcMain.handle('aw:open-path', async (_e, path: string) => {
 // The user's browser tabs (29 §8.1): the renderer is a boundary, its arguments are parsed.
 ipcMain.on('aw:browser-place', (_e, tabId: unknown, rect: unknown) =>
   backend?.browser.place(String(tabId), browserRectSchema.nullable().parse(rect)),
+);
+ipcMain.on('aw:browser-watch-zoom', (_e, tabId: unknown, zoom: unknown) =>
+  backend?.browser.setWatchZoom(String(tabId), browserWatchZoomSchema.parse(zoom)),
 );
 for (const action of ['back', 'forward', 'reload', 'openDevTools'] as const) {
   ipcMain.on(`aw:browser-${action}`, (_e, tabId: unknown) => backend?.browser[action](String(tabId)));

@@ -31,12 +31,12 @@ export const ATTACHMENTS_COPY = {
       : `Excel · ${meta.sheets.length} 个工作表 · ${meta.sheets.reduce((n, s) => n + s.rows, 0).toLocaleString('zh-CN')} 行`,
   /** Why an upload was refused, by the error's `details.reason` (39 §8.1). */
   failure: {
-    [AttachmentRejection.NotText]: '目前支持文本、Word（.docx）和 Excel（.xlsx）文件，这个文件读不出文字。',
+    [AttachmentRejection.NotText]: '支持文本、PNG、JPEG、Word（.docx）和 Excel（.xlsx）。',
     [AttachmentRejection.LegacyOffice]:
       '不支持旧版 .doc / .xls，请在 Word、Excel 或 WPS 中另存为 .docx / .xlsx 后再上传。',
     [AttachmentRejection.Encrypted]: '文件有密码保护，请去掉打开密码后再上传。',
-    [AttachmentRejection.Unsupported]: '暂不支持这种文件，目前支持文本、Word（.docx）和 Excel（.xlsx）。',
-    [AttachmentLimit.Bytes]: `文件太大：文本不超过 ${formatBytes(ATTACHMENT_BYTES_MAX)}，Word / Excel 不超过 ${formatBytes(OFFICE_ATTACHMENT_BYTES_MAX)}。`,
+    [AttachmentRejection.Unsupported]: '暂不支持这种文件。可上传文本、PNG、JPEG、Word（.docx）或 Excel（.xlsx）。',
+    [AttachmentLimit.Bytes]: `文件太大。文本和图片不超过 ${formatBytes(ATTACHMENT_BYTES_MAX)}，Word / Excel 不超过 ${formatBytes(OFFICE_ATTACHMENT_BYTES_MAX)}。`,
     [AttachmentLimit.Count]: `每次最多附加 ${ATTACHMENTS_PER_INPUT_MAX} 个资料。`,
     [AttachmentLimit.Unzipped]: '文件解压后太大，可以删掉不需要的工作表或图片，或另存为 CSV。',
     [AttachmentLimit.Cells]: `表格超过 ${OFFICE_CELLS_MAX.toLocaleString('zh-CN')} 个有内容的单元格，可以删掉不需要的工作表，或另存为 CSV。`,
@@ -55,7 +55,6 @@ export const ATTACHMENTS_COPY = {
   previewRows: (total: number) =>
     `只显示前 ${OFFICE_PREVIEW_ROWS.toLocaleString('zh-CN')} 行（共 ${total.toLocaleString('zh-CN')} 行），完整内容 AI 可以通过工具读取。`,
   wideSheet: '列太多，按单元格列出：',
-  imageUnsupported: '暂不支持图片，请用文字描述截图里的内容。',
   tooMany: `每次最多附加 ${ATTACHMENTS_PER_INPUT_MAX} 个资料。`,
   notReady: '有资料还在上传或上传失败，处理好再发送。',
   removeFailed: '资料已从输入里移除，但后台没删掉；它会在 24 小时后自动清理。',

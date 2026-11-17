@@ -60,6 +60,7 @@ export const modelInfoSchema = z.object({
    * provider without `limit.context`): opencode then never compacts the conversation (D162).
    */
   contextLimit: z.number().int().positive().nullable(),
+  supportsImage: z.boolean().default(false),
   /** Projects whose own opencode configuration provides the model; empty when the global configuration does (D162). */
   projectIds: z.array(z.string()),
 });

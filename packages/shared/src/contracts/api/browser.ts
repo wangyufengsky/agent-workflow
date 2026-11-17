@@ -1,7 +1,18 @@
 import { z } from 'zod';
+import { browserWriteRuleSchema } from '../../browser/policy.ts';
 import { viewportPresetSchema } from '../../enums/browser.ts';
 import { attemptKindSchema, attemptStatusSchema } from '../../enums/task.ts';
-import { browserLogsOutputSchema, browserPageSchema } from '../mcp/browser.ts';
+import { errorInfoSchema } from '../../errors/codes.ts';
+import {
+  browserActionOutputSchema,
+  browserClickInputSchema,
+  browserLogsOutputSchema,
+  browserPageSchema,
+  browserPressInputSchema,
+  browserSelectInputSchema,
+  browserTypeInputSchema,
+} from '../mcp/browser.ts';
+import { browserCaseRequestSchema } from './browser-cases.ts';
 import { frontendElementSchema, frontendPageLayoutSchema } from './frontend.ts';
 
 /** 助手只读网页：沿用网站登录状态，但不开放页面操作。 */
@@ -30,6 +41,65 @@ export const readPreviewSchema = browserPageSchema.extend({
   selectedElement: frontendElementSchema.optional(),
   logs: browserLogsOutputSchema,
 });
+
+export const assistantBrowserActionSchema = z.object({
+  action: z.discriminatedUnion('kind', [
+    browserClickInputSchema.extend({ kind: z.literal('click') }),
+    browserTypeInputSchema.omit({ submit: true }).extend({ kind: z.literal('type'), text: z.string().max(4000) }),
+    browserSelectInputSchema.extend({ kind: z.literal('select') }),
+    browserPressInputSchema.extend({ kind: z.literal('press') }),
+  ]),
+  write: browserWriteRuleSchema.optional().describe('Exact same-origin HTTP write needed for this action, if known'),
+});
+export type AssistantBrowserAction = z.infer<typeof assistantBrowserActionSchema>;
+
+export const assistantBrowserConfirmationSchema = z.object({
+  requestId: z.string(),
+  page: z.string(),
+  target: z.string(),
+  fields: z.array(z.string()),
+  write: browserWriteRuleSchema.optional(),
+});
+export const AssistantBrowserMode = { Off: 'off', Assistant: 'assistant', Manual: 'manual' } as const;
+export type AssistantBrowserMode = (typeof AssistantBrowserMode)[keyof typeof AssistantBrowserMode];
+
+export const AssistantBrowserActivityKind = {
+  Click: 'click',
+  Type: 'type',
+  Select: 'select',
+  Press: 'press',
+  Take: 'take',
+  Return: 'return',
+} as const;
+export type AssistantBrowserActivityKind =
+  (typeof AssistantBrowserActivityKind)[keyof typeof AssistantBrowserActivityKind];
+
+export const AssistantBrowserActivityOutcome = {
+  Done: 'done',
+  Confirmation: 'confirmation',
+  Blocked: 'blocked',
+  Failed: 'failed',
+} as const;
+export type AssistantBrowserActivityOutcome =
+  (typeof AssistantBrowserActivityOutcome)[keyof typeof AssistantBrowserActivityOutcome];
+
+export const assistantBrowserActivitySchema = z.object({
+  id: z.number().int(),
+  kind: z.enum(AssistantBrowserActivityKind),
+  outcome: z.enum(AssistantBrowserActivityOutcome),
+  page: z.string(),
+  target: z.string().nullable(),
+  blockedRequests: z.array(z.string()),
+  at: z.number(),
+});
+export type AssistantBrowserActivity = z.infer<typeof assistantBrowserActivitySchema>;
+
+export const assistantBrowserControlSchema = z.object({
+  mode: z.enum(AssistantBrowserMode),
+  activity: z.array(assistantBrowserActivitySchema),
+});
+
+export const assistantBrowserResultSchema = browserActionOutputSchema.omit({ frame: true });
 
 /** Hosts with cookies in the websites' login partition. */
 export const siteLoginsSchema = z.object({ hosts: z.array(z.string()) });
@@ -89,7 +159,27 @@ export type UserTabState = z.infer<typeof userTabStateSchema>;
  * `GET /tasks/:id/preview/sessions` (29 §8.1): what the preview tab can show besides the user's own preview, the AI
  * sessions that used the browser (with their frames) and the steps whose page check left screenshots.
  */
+export const browserTestActionSchema = z.object({
+  seq: z.number().int().positive(),
+  tool: z.string(),
+  path: z.string(),
+  target: z.string().optional(),
+  passed: z.boolean(),
+  errorCode: errorInfoSchema.shape.code.nullable(),
+  requests: z.array(browserCaseRequestSchema),
+});
+export type BrowserTestAction = z.infer<typeof browserTestActionSchema>;
+
+export const browserTestTabSchema = z.object({
+  tabId: z.string(),
+  attemptId: z.string(),
+  path: z.string(),
+  viewport: viewportPresetSchema,
+});
+export type BrowserTestTab = z.infer<typeof browserTestTabSchema>;
+
 export const previewSessionsSchema = z.object({
+  testTab: browserTestTabSchema.optional(),
   attempts: z.array(
     z.object({
       attemptId: z.string(),
@@ -97,6 +187,8 @@ export const previewSessionsSchema = z.object({
       kind: attemptKindSchema,
       status: attemptStatusSchema,
       frames: z.number().int(),
+      actions: z.number().int().optional(),
+      screenshots: z.array(z.string()).default([]),
     }),
   ),
   checks: z.array(z.object({ nodeId: z.string(), passed: z.boolean() })),

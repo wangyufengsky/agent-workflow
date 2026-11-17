@@ -2,7 +2,7 @@
 
 > 状态：**v1.1 已实现**（任务 A-01…A-11，见 [05](05-dev-plan.md#v11--应用助手约-2-周v10-发布后)）。v1.0 交付了它的地基：操作清单（[03 §5](03-architecture.md#5-操作清单operation-registry)）与 ⌘K 命令面板。实现中按保守方案收紧的取舍见 D65（①② 用户已确认，③ 待确认）。
 
-2026-10-24 增补：助手可用 `browser_readUrl` 读取明确网址的文字结构与错误日志，沿用网站登录和规则，并强制只读（无法归属标签页的 Worker 被拒绝并记录）；整体读取最长 30 秒，截止显式失败并关闭临时页；可用 `previews_get/start/stop` 管理任务预览，启动/停止继续经过写操作确认。桌面版用户显式打开「我的预览」后，`browser_read` 可读取当前对话关联的用户页；关联等待期间切换预览或对话会取消本次发送并保留草稿。未开放助手页面点击/输入或截图/PDF，见 [29 §9](29-browser.md#9-应用助手)。
+2026-10-24 增补：助手可用 `browser_readUrl` 读取明确网址的文字结构与错误日志，沿用网站登录和规则，并强制只读（无法归属标签页的 Worker 被拒绝并记录）；整体读取最长 30 秒，截止显式失败并关闭临时页；可用 `previews_get/start/stop` 管理任务预览，启动/停止继续经过写操作确认。桌面版用户显式打开「我的预览」后，`browser_read` 可读取当前对话关联的用户页；关联等待期间切换预览或对话会取消本次发送并保留草稿。助手可通过 PNG / JPEG 附件请图像处理员读图，详见 [30 §7](30-attachments.md#7-图像处理员)。主页对话可打开任务预览，任务页侧栏复用同一对话与浏览器操作工具。用户先在当前预览点「让助手操作」，涉及提交的操作再通过确认卡授权。见 [29 §9](29-browser.md#9-应用助手)。
 
 ## 1. 定位
 
@@ -117,7 +117,7 @@ opencode 是否在每次会话中重新读取 MCP 工具列表未经验证；若
 ## 5. 凭据不经过对话
 
 - 涉及凭据的操作（添加数据库连接、绑定远端令牌）在操作定义中标记 `credentialFields`；这些字段**不出现在助手工具 schema 中**，凭据必填的操作没有工具。
-- 助手只能调用 `open_form` 打开预填好非敏感字段的表单，由用户在表单中输入凭据并提交。表单（`AssistantForm`，以其提交的操作命名）：`tasks.create`（主页开始任务，经地址预填项目、流程、需求）、`workflows.fromPlan`（按任务 ID 与计划版本打开预填的固定流程编辑器）、`initiativeTemplates.fromInitiative`（按需求计划 ID 打开组合模板编辑器）、`projects.create`（添加项目，预填路径）、`projects.setHosting`（项目详情的远端绑定）、`databases.create` / `databases.update`（数据库连接对话框）；后四者的预填值放在界面状态 `pendingForm` 中，表单提交或关闭时清除。
+- 助手只能调用 `open_form` 打开预填好非敏感字段的表单，由用户在表单中输入凭据并提交。表单（`AssistantForm`，以其提交的操作命名）：`tasks.create`（主页开始任务，经地址预填项目、流程、需求，测试地址和写入规则经界面状态预填，由用户确认授权）、`workflows.fromPlan`（按任务 ID 与计划版本打开预填的固定流程编辑器）、`initiativeTemplates.fromInitiative`（按需求计划 ID 打开组合模板编辑器）、`projects.create`（添加项目，预填路径）、`projects.setHosting`（项目详情的远端绑定）、`databases.create` / `databases.update`（数据库连接对话框）；后四者的预填值放在界面状态 `pendingForm` 中，表单提交或关闭时清除。
 - 助手工具的返回值同样经过 DTO，不含凭据。
 
 ## 6. 界面

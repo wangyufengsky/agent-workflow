@@ -1,6 +1,7 @@
 import {
   AppError,
   ARTIFACT_WORKFLOW_KEY,
+  browserCaseSchema,
   type Checkpoints,
   checkpointsSchema,
   ErrorCode,
@@ -64,6 +65,8 @@ export type NewTask = Pick<
   | 'workflowId'
   | 'title'
   | 'requirement'
+  | 'browserTest'
+  | 'browserCase'
   | 'status'
   | 'baseBranch'
   | 'mergeSource'
@@ -77,6 +80,7 @@ function toTask(row: { tasks: TaskRow; projectName: string; workflowKey: string;
   return {
     ...t,
     ...names,
+    browserCase: t.browserCase === null ? null : browserCaseSchema.parse(t.browserCase),
     failure: t.failure === null ? null : errorInfoSchema.parse(JSON.parse(t.failure)),
     checkpoints: checkpointsSchema.parse(JSON.parse(t.checkpoints)),
     result: t.result === null ? null : taskResultSchema.parse(JSON.parse(t.result)),

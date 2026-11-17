@@ -164,6 +164,10 @@ type Acceptance = {
 };
 ```
 
+### browser_cases
+
+项目内保存的浏览器用例。列为 `id`（主键）、`project_id`（项目删除时级联）、`revision`（从 1 递增）及 `definition`（JSON，含名称、授权范围与有序步骤）。索引 `browser_cases_project_idx` 用于项目列表。每次执行冻结的定义写到 `tasks.browser_case`，步骤证据保存在节点与任务结果的 `browserCaseReport` 字段。迁移 0045。
+
 ### tasks
 
 `skills` 为创建任务时保存的有序 JSON 快照，每项包含 `id`、`name`、`version`、`body` 和可选的 `roleIds`。未指定角色或角色值为 null 时应用于任务的全部角色。旧任务默认空数组。任务使用快照中的版本及角色范围。
@@ -177,6 +181,8 @@ type Acceptance = {
 | workflow_id | TEXT → workflows | 具体版本 |
 | title | TEXT | 未填时由需求首行截取 |
 | requirement | TEXT | |
+| browser_test | TEXT nullable | 浏览器测试任务创建时确认的目标与 HTTP 写请求规则，JSON。迁移 0044，历史任务为 null |
+| browser_case | TEXT nullable | 本次运行使用的固定用例定义和版本，JSON。迁移 0045，临时测试为 null |
 | status | TEXT | `TaskStatus` |
 | failed_phase | TEXT NULL | `TaskFailedPhase` |
 | failure | TEXT(JSON) NULL | `{ code, message, details? }` |
@@ -382,6 +388,10 @@ payload / response：
 ## 4. 助手（v1.1）
 
 见 [15-assistant.md](15-assistant.md)，迁移 `0008`。
+
+### assistant_browser_activity
+
+助手网页操作记录。包含自增 `id`、`conversation_id`（对话删除时级联）、`record`（JSON）和时间 `at`。应用按对话保留最近 100 条，记录页面路径、动作、控件名称、结果和被拦截的请求地址。迁移 0046。
 
 ### assistant_conversations
 
@@ -824,7 +834,7 @@ payload / response：
 
 | 表 | 关键字段／约束 |
 | --- | --- |
-| attachments | id、source、name（显示名）、size_bytes、origin JSON（快照来源见下文）、format（`AttachmentFormat`，默认 text）、meta JSON（Word / Excel 的 `OfficeMeta`）、created_at。索引为 created_at。原文件按 id 存在 `attachments/<id>/original`（迁移 0017）。Word / Excel 另有模型读取的 `text.md`，Excel 还有单元格 `workbook.json`（迁移 0032，39 §5）。 |
+| attachments | id、source、name（显示名）、size_bytes、origin JSON（快照来源见下文）、format（`AttachmentFormat`，默认 text）、meta JSON（Word / Excel 的 `OfficeMeta`）、created_at。索引为 created_at。原文件按 id 存在 `attachments/<id>/original`（迁移 0017）。PNG / JPEG 只增加 `format` 的值，原图保留在同一路径，`meta` 为 null。Word / Excel 另有模型读取的 `text.md`，Excel 还有单元格 `workbook.json`（迁移 0032，39 §5）。 |
 | attachment_refs | owner_kind、owner_id、attachment_id FK、ordinal、created_at；主键 (owner_kind, owner_id, attachment_id)，索引 attachment_id |
 
 项目文件的 `origin` 保存 `projectId`、`taskId`、相对路径、行范围和读取时间。知识问答的 `origin` 保存 `kind = knowledge_answer`、`projectId`、`conversationId`、`turnId`、`answeredAt` 和 `readAt`，旧附件仍按原格式解析。快照保存回答时选中的原文和引用，任务从附件归属读取，删除问答不会删除已绑定的快照。项目约定证据快照的 `origin` 保存 `kind = convention_evidence`、`projectId` 与 `readAt`；来源文本作为只读附件保存，任务绑定时检查项目归属。节点新产生的检查失败、无法运行、执行失败及拒绝事件在 payload 中保存检查类型与通过状态，不记录命令或输出；历史事件未保存的详情不能重建。

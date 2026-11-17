@@ -4,6 +4,7 @@ import {
   ACTIVE_ATTEMPT_STATUSES,
   AppError,
   ATTEMPT_STATUSES,
+  ATTEMPT_SUBMIT_TOOL,
   type AttemptDTO,
   AttemptEvent,
   AttemptKind,
@@ -11,8 +12,10 @@ import {
   type AttemptSummaryDTO,
   attemptMachine,
   BASH_PERMISSION,
+  type BrowserTestSubmitTool,
   ErrorCode,
   isTerminalState,
+  type McpToolName,
   OPENCODE_AGENT_NAME,
   PermissionDecision,
   type PermissionPayload,
@@ -73,6 +76,7 @@ export type StartAttemptInput = {
   checkCommands?: readonly string[];
   /** The researcher may use the web (18 §5.1). */
   web?: boolean;
+  browserTestSubmit?: BrowserTestSubmitTool;
   delegation?: { parentAttemptId: string; commit: string };
 };
 
@@ -86,7 +90,24 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
   const { clock, opencode, settings, transcripts, projects, slots, unit, db } = deps;
   const state = createAttemptState(deps);
   const { repo, mustFind, move, record } = state;
-  const reactions = watchSessions(state, deps);
+  const local = new Map<
+    string,
+    {
+      controller: AbortController;
+      cancelTimeout: () => void;
+      timeoutAt: number;
+      arm: (ms: number) => () => void;
+    }
+  >();
+  const reactions = watchSessions(state, deps, (id) => local.has(id));
+  state.onSignal(({ type, attempt }) => {
+    if (type !== 'ended') return;
+    const run = local.get(attempt.id);
+    if (run === undefined) return;
+    local.delete(attempt.id);
+    run.cancelTimeout();
+    run.controller.abort();
+  });
 
   // 委派占用与交互会话共用的额外槽位，父节点继续占用原有调度槽位。
   slots.addCounter(
@@ -134,6 +155,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     attempt: Attempt,
     session: Pick<LiveSession, 'attemptId' | 'taskId' | 'sessionId' | 'directory' | 'agent' | 'model' | 'system'>,
     parked: boolean,
+    submitTool: McpToolName | null = ATTEMPT_SUBMIT_TOOL[attempt.kind],
   ): LiveSession {
     const timeoutMs = settings.get('attempt.timeoutMinutes') * 60_000;
     const { promise: released, resolve: release } = Promise.withResolvers<void>();
@@ -152,7 +174,9 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       cancelTimeout: parked ? () => undefined : clock.schedule(timeoutMs, () => reactions.timeOut(attempt.id)),
       modelWaitLeftMs: null,
       stopAfterSubmit: false,
+      submitTool,
       parked,
+      browserWaiting: false,
       // A session re-attached after a restart waits idle for its answer.
       idle: parked,
       pendingAnswers: [],
@@ -187,6 +211,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
           checkCommands: input.checkCommands,
           web: input.web,
+          browserTestSubmit: input.browserTestSubmit,
           offline: settings.get('network.offline'),
           allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
         }),
@@ -215,6 +240,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         system: input.system,
       },
       false,
+      input.browserTestSubmit ?? ATTEMPT_SUBMIT_TOOL[input.kind],
     );
     // Running before the first prompt, so every event of the session finds the attempt active.
     move(attempt, AttemptEvent.SessionStarted);
@@ -324,6 +350,82 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       return queued ? toDto(mustFind(id)) : launch(id, input);
     },
 
+    /** 本地浏览器用例复用尝试的状态、取消、超时和证据目录。 */
+    async runLocal(
+      input: Pick<StartAttemptInput, 'taskId' | 'projectId' | 'nodeId' | 'roleId' | 'directory'>,
+      work: (attempt: AttemptDTO, signal: AbortSignal) => Promise<void>,
+    ): Promise<void> {
+      const id = randomUUID();
+      const kind = AttemptKind.Execute;
+      repo.insert({
+        ...input,
+        id,
+        kind,
+        seq: repo.nextSeq({ ...input, kind }),
+        status: AttemptStatus.Starting,
+        model: null,
+        opencodeSessionId: null,
+        nudges: 0,
+        startedAt: clock.now(),
+      });
+      const controller = new AbortController();
+      const timeoutMs = settings.get('attempt.timeoutMinutes') * 60_000;
+      const arm = (ms: number) =>
+        clock.schedule(ms, () =>
+          move(mustFind(id), AttemptEvent.Timeout, {
+            code: ErrorCode.AttemptTimeout,
+            message: 'Browser case timed out',
+          }),
+        );
+      local.set(id, { controller, arm, cancelTimeout: arm(timeoutMs), timeoutAt: clock.now() + timeoutMs });
+      const attempt = move(mustFind(id), AttemptEvent.SessionStarted);
+      record(attempt, [systemEntry(TranscriptSystemEvent.AttemptStarted)]);
+      try {
+        await work(toDto(attempt), controller.signal);
+      } catch (err) {
+        const current = repo.find(id);
+        if (current?.status === AttemptStatus.Running) move(current, AttemptEvent.SessionError, errorOf(err));
+      }
+    },
+
+    async waitForBrowserInput(id: string, wait: () => Promise<void>): Promise<void> {
+      const session = state.sessionOf(id);
+      const attempt = mustFind(id);
+      if (session === undefined || attempt.status !== AttemptStatus.Running)
+        throw new AppError(ErrorCode.McpAttemptUnresolved, 'The browser test attempt ended');
+      const pending = wait();
+      session.browserWaiting = true;
+      state.park(session, attempt);
+      try {
+        await pending;
+        if (session.idle)
+          session.pendingAnswers.push(
+            'The user finished verification in the same test tab. Read the current page and continue the test from that step.',
+          );
+      } finally {
+        session.browserWaiting = false;
+        if (mustFind(id).status === AttemptStatus.Running) reactions.resume(session);
+      }
+    },
+
+    async waitForLocalInput(id: string, wait: () => Promise<void>): Promise<void> {
+      const run = local.get(id);
+      if (run === undefined) throw new AppError(ErrorCode.AttemptNotFound, 'The local attempt ended');
+      const remaining = Math.max(0, run.timeoutAt - clock.now());
+      run.cancelTimeout();
+      const pending = wait();
+      state.signal('awaiting_input', mustFind(id));
+      try {
+        await pending;
+      } finally {
+        if (!run.controller.signal.aborted) {
+          run.timeoutAt = clock.now() + remaining;
+          run.cancelTimeout = run.arm(remaining);
+          state.signal('input_answered', mustFind(id));
+        }
+      }
+    },
+
     /**
      * A new attempt on the session of an earlier one (re-planning, 12 §4.3; a knowledge follow-up, 18 §5.3; PPT work,
      * 23 §4.1): the model keeps what it read and receives `prompt` as the next message, with the previous attempt's
@@ -411,6 +513,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
             system: resume.system,
           },
           true,
+          null,
         );
       session.pendingAnswers.push(text);
       reactions.resume(session);

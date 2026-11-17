@@ -55,13 +55,11 @@ export function useAttachmentDraft(reservedSlots = 0) {
     );
   }
 
-  /** Files picked, dropped or pasted. Images are not accepted yet (30 §1): said once, not uploaded. */
+  /** 选择、拖放和粘贴使用同一条上传链路。 */
   function addFiles(files: readonly File[]): void {
-    const images = files.filter((f) => f.type.startsWith('image/'));
-    const others = files.filter((f) => !f.type.startsWith('image/'));
     const room = availableSlots - items.length;
-    setNotice(images.length > 0 ? C.imageUnsupported : others.length > room ? C.tooMany : undefined);
-    for (const file of others.slice(0, Math.max(room, 0))) {
+    setNotice(files.length > room ? C.tooMany : undefined);
+    for (const file of files.slice(0, Math.max(room, 0))) {
       const limit = looksLikeOffice(file.name) ? OFFICE_ATTACHMENT_BYTES_MAX : ATTACHMENT_BYTES_MAX;
       if (file.size > limit) {
         setItems((list) => [

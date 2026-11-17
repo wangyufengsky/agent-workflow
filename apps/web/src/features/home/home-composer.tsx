@@ -1,6 +1,9 @@
 import {
   type AssistantConversationDTO,
   type AttachmentDTO,
+  BROWSER_TEST_WORKFLOW_KEY,
+  type BrowserTestScope,
+  browserTestScopeSchema,
   InitiativeTemplateKind,
   type ProjectDTO,
   WorkflowKind,
@@ -22,7 +25,7 @@ import { HOME_COPY as C } from '../../copy/home.ts';
 import { INITIATIVES_COPY } from '../../copy/initiatives.ts';
 import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
 import { SCHEDULES_COPY } from '../../copy/schedules.ts';
-import { HOME_TASK_COPY } from '../../copy/tasks.ts';
+import { BROWSER_TEST_COPY, HOME_TASK_COPY } from '../../copy/tasks.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { AddMenu, type AddMenuItem } from '../assistant/add-menu.tsx';
 import { useAbortAssistant } from '../assistant/assistant.queries.ts';
@@ -33,6 +36,7 @@ import { useAsk } from '../assistant/use-ask.ts';
 import { AttachmentList, dropFilesInto, pasteFilesInto, useAttachmentPickers } from '../attachments/attachment-bar.tsx';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
+import { browserWriteLines, parseBrowserWriteLines } from '../browser-cases/browser-case-scope.tsx';
 import { AllowedWorkflowsField } from '../initiatives/allowed-workflows-field.tsx';
 import { initiativeTemplatesQuery } from '../initiatives/initiatives.queries.ts';
 import { templateChain, useStartInitiative } from '../initiatives/use-start-initiative.ts';
@@ -64,6 +68,7 @@ export function HomeComposer({
   onAssistantProjectChange,
   initialWorkflowKey,
   initialRequirement,
+  initialBrowserTest,
   knowledgeDraft,
   docked,
 }: {
@@ -75,6 +80,7 @@ export function HomeComposer({
   onAssistantProjectChange: (id: string | null) => void;
   initialWorkflowKey: string | undefined;
   initialRequirement: string | undefined;
+  initialBrowserTest: BrowserTestScope | undefined;
   knowledgeDraft?:
     | { attachment: AttachmentDTO | undefined; loading: boolean; error: unknown; retry(): void; dismiss(): void }
     | undefined;
@@ -106,6 +112,16 @@ export function HomeComposer({
   const [checklist, setChecklist] = useState<DraftRequirement[]>([]);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreId = useId();
+  const browserTesting = workflowKey === BROWSER_TEST_WORKFLOW_KEY;
+  const [testTarget, setTestTarget] = useState(initialBrowserTest?.target ?? '');
+  const [testWrites, setTestWrites] = useState(
+    initialBrowserTest === undefined ? '' : browserWriteLines(initialBrowserTest),
+  );
+  const [testApproved, setTestApproved] = useState(false);
+  const testScope = browserTestScopeSchema.safeParse({
+    target: testTarget,
+    writes: parseBrowserWriteLines(testWrites),
+  });
   const task = useStartTask({
     projectId,
     workflowId: workflows.data?.find((w) => w.key === workflowKey)?.id,
@@ -113,9 +129,12 @@ export function HomeComposer({
     attachmentIds: material === undefined ? files.ids : [material.id, ...files.ids],
     attachmentsBlocked: files.blocked || (knowledgeDraft !== undefined && material === undefined),
     requirements: checklist,
+    browserTest: browserTesting && testApproved && testScope.success ? testScope.data : undefined,
+    browserTestBlocked: browserTesting && (!testApproved || !testScope.success),
     onStarted: () => {
       files.clear();
       setChecklist([]);
+      setTestApproved(false);
     },
   });
   const initiative = useStartInitiative({
@@ -142,6 +161,7 @@ export function HomeComposer({
   // A base branch belongs to the project it was picked in.
   const changeProject = (id: string) => {
     task.setOptions({ ...task.options, baseBranch: null });
+    setTestApproved(false);
     onProjectChange(id);
   };
   const shown = workflows.data?.filter((w) => task.pro || w.kind === WorkflowKind.Builtin);
@@ -316,6 +336,46 @@ export function HomeComposer({
           </div>
         )}
         <AttachmentList draft={files} />
+        {browserTesting && (
+          <fieldset className="col">
+            <legend>{workflow?.name}</legend>
+            <label className="col">
+              {BROWSER_TEST_COPY.target}
+              <input
+                className="input"
+                value={testTarget}
+                placeholder={BROWSER_TEST_COPY.targetPlaceholder}
+                onChange={(event) => {
+                  setTestTarget(event.target.value);
+                  setTestApproved(false);
+                }}
+              />
+            </label>
+            <label className="col">
+              {BROWSER_TEST_COPY.writes}
+              <textarea
+                className="input mono"
+                rows={2}
+                value={testWrites}
+                placeholder={BROWSER_TEST_COPY.writesPlaceholder}
+                onChange={(event) => {
+                  setTestWrites(event.target.value);
+                  setTestApproved(false);
+                }}
+              />
+              <span className="hint">{BROWSER_TEST_COPY.writesHint}</span>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={testApproved}
+                disabled={!testScope.success}
+                onChange={(event) => setTestApproved(event.target.checked)}
+              />
+              {BROWSER_TEST_COPY.approved}
+            </label>
+          </fieldset>
+        )}
         {workflow !== undefined && (
           <div className={styles.taskTools}>
             <ChecklistField drafts={checklist} onChange={setChecklist} />
@@ -370,6 +430,7 @@ export function HomeComposer({
             opener={flowsOpener}
             onPick={(key) => {
               setWorkflowKey(key);
+              setTestApproved(false);
               setTemplateKey(undefined);
               setBreakdown(false);
               setFlowsOpen(false);
@@ -454,7 +515,7 @@ export function HomeComposer({
                 </label>
               )}
               {/* Fixed workflows can run on several targets at once (20 §2) and on a schedule (22 §7). */}
-              {workflow.planning === WorkflowPlanning.Fixed && knowledgeDraft === undefined && (
+              {!browserTesting && workflow.planning === WorkflowPlanning.Fixed && knowledgeDraft === undefined && (
                 <>
                   <Link
                     to={ROUTES.batchNew}

@@ -79,6 +79,7 @@ describe('opencode 配置生成', () => {
       [SkillName.OfficeDocs]: 'allow',
       [SkillName.AssistantCharts]: 'allow',
       [SkillName.AssistantPreview]: 'allow',
+      [SkillName.ImageAnalysis]: 'allow',
       [SkillName.AssistantMemory]: 'allow',
       [SkillName.DbReadonly]: 'allow',
       [SkillName.TaskDelivery]: 'allow',

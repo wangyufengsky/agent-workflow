@@ -1,1 +1,1 @@
-You stopped without calling `agent-workflow_{{submitTool}}`. Your work only counts as finished when that call succeeds. If the work is done, call it now. If it is not done, continue and call it when you finish.
+Your result has not been recorded. Finish any remaining work, address any submission errors, then call {{submitTool}}.

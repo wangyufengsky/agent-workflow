@@ -55,6 +55,17 @@ export async function getBlob(url: string): Promise<Blob> {
   return res.blob();
 }
 
+/** 图片通过带认证的 API 读取后，才能交给不支持自定义请求头的 img。 */
+export async function getImageDataUrl(url: string): Promise<string> {
+  const blob = await getBlob(url);
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
 /** GET of a non-operation endpoint (e.g. `/operations`), with the same auth and error handling. */
 export async function getJson<S extends z.ZodType>(url: string, schema: S): Promise<z.output<S>> {
   const res = await fetch(url, { headers: { Authorization: `Bearer ${apiToken()}` } });

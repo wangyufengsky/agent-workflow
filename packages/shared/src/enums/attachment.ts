@@ -20,8 +20,14 @@ export const AttachmentFormat = {
   Docx: 'docx',
   /** Excel (`.xlsx`, `.xlsm`): the model reads its sheets as tables. */
   Xlsx: 'xlsx',
+  Png: 'png',
+  Jpeg: 'jpeg',
 } as const;
 export type AttachmentFormat = (typeof AttachmentFormat)[keyof typeof AttachmentFormat];
+export const imageMimeByFormat: Partial<Record<AttachmentFormat, 'image/png' | 'image/jpeg'>> = {
+  [AttachmentFormat.Png]: 'image/png',
+  [AttachmentFormat.Jpeg]: 'image/jpeg',
+};
 export const attachmentFormatSchema = z.enum(AttachmentFormat);
 
 /** Why an upload is not an attachment (`ATTACHMENT_INVALID_TYPE` `details.reason`, 08). */

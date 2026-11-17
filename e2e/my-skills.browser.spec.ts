@@ -25,6 +25,7 @@ test('新建和导入 Skill，绑定到流程，在助手里选用并保存提�
   const audience = library.getByRole('combobox', { name: '按使用对象筛选' });
   await library.getByRole('searchbox', { name: '搜索 Skill' }).fill('');
   await audience.selectOption({ label: 'Git 工作台代码审查' });
+  await library.getByRole('button', { name: /^代码审查/ }).click();
   await expect(details.getByRole('heading', { name: '代码审查', exact: true })).toBeVisible();
   await expect(details.getByText('Git 工作台代码审查', { exact: true })).toBeVisible();
   await expect(details.getByText('评审员', { exact: true })).toBeVisible();
@@ -35,6 +36,10 @@ test('新建和导入 Skill，绑定到流程，在助手里选用并保存提�
   await expect(library.getByRole('button', { name: /后端开发与接口交接/ })).toHaveCount(0);
   await audience.selectOption({ label: '测试工程师' });
   await expect(library.getByRole('button', { name: /后端开发与接口交接/ })).toBeVisible();
+  await library.getByRole('button', { name: /图片与截图识别/ }).click();
+  await expect(details.getByRole('heading', { name: '图片与截图识别', exact: true })).toBeVisible();
+  await expect(details.getByText('应用助手', { exact: true })).toBeVisible();
+  await expect(details.getByText('测试工程师', { exact: true })).toBeVisible();
   await audience.selectOption('');
 
   await library.getByRole('button', { name: /页面检查/ }).click();

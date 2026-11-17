@@ -4,10 +4,12 @@ import {
   ATTEMPT_MAX_NUDGES,
   ATTEMPT_SUBMIT_TOOL,
   AttemptEvent,
+  AttemptKind,
   AttemptStatus,
   ErrorCode,
   InboxKind,
   MCP_TOOL_PREFIX,
+  McpToolName,
   TranscriptSystemEvent,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
@@ -38,6 +40,7 @@ type PermissionEvent = Extract<OpencodeEvent, { type: typeof OpencodeEventType.P
 export function watchSessions(
   state: AttemptState,
   deps: { opencode: OpencodeClient; prompts: Prompts; clock: Clock; slots: Pick<ModelSlots, 'changed'> },
+  isLocal: (id: string) => boolean,
 ) {
   const { repo, live, mustFind, move, record } = state;
 
@@ -83,13 +86,20 @@ export function watchSessions(
     await send(
       attempt,
       session,
-      renderTemplate(deps.prompts[PromptName.Nudge], { submitTool: ATTEMPT_SUBMIT_TOOL[attempt.kind] }),
+      renderTemplate(deps.prompts[PromptName.Nudge], {
+        submitTool:
+          session.submitTool === null
+            ? 'the submission tool named in your instructions'
+            : `\`${MCP_TOOL_PREFIX}${session.submitTool}\``,
+      }),
     );
   }
 
   /** Stops the session once the accepted submit call has returned, so its result still reaches the transcript. */
   function onToolEvent(attempt: Attempt, session: LiveSession, event: ToolEvent): void {
-    const isSubmit = event.tool === `${MCP_TOOL_PREFIX}${ATTEMPT_SUBMIT_TOOL[attempt.kind]}`;
+    const isSubmit =
+      event.tool === `${MCP_TOOL_PREFIX}${ATTEMPT_SUBMIT_TOOL[attempt.kind]}` ||
+      (attempt.kind === AttemptKind.Execute && event.tool === `${MCP_TOOL_PREFIX}${McpToolName.BrowserSubmitReport}`);
     const finished = event.status === ToolCallStatus.Completed || event.status === ToolCallStatus.Error;
     if (!session.stopAfterSubmit || !isSubmit || !finished) return;
     session.stopAfterSubmit = false;
@@ -148,8 +158,9 @@ export function watchSessions(
     deps.slots.changed();
   }
 
-  function interruptActive(): void {
+  function interruptActive(runtimeLost = false): void {
     for (const attempt of repo.listByStatus(ACTIVE_ATTEMPT_STATUSES)) {
+      if (runtimeLost && isLocal(attempt.id)) continue;
       if (attempt.status === AttemptStatus.Running && state.waitsForAnswer(attempt.id)) continue;
       record(attempt, [systemEntry(TranscriptSystemEvent.RuntimeLost)]);
       move(attempt, AttemptEvent.RuntimeLost);
@@ -162,7 +173,7 @@ export function watchSessions(
 
   function onEvent(event: OpencodeEvent): void {
     if (event.type === OpencodeEventType.RuntimeLost) {
-      interruptActive();
+      interruptActive(true);
       return;
     }
     const session = live.get(event.sessionId);

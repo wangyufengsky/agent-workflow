@@ -1,7 +1,14 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { AppError, ErrorCode, type ExternalMcpStatus, type PermissionDecision, type PermissionRule } from '@aw/shared';
+import {
+  AppError,
+  ErrorCode,
+  type ExternalMcpStatus,
+  OPENCODE_IMAGE_AGENT,
+  type PermissionDecision,
+  type PermissionRule,
+} from '@aw/shared';
 import { z } from 'zod';
 import type { Logger } from '../../core/logger.ts';
 import { type OpencodeError, type OpencodeEvent, OpencodeEventType, parseGlobalEvent } from './opencode.events.ts';
@@ -9,6 +16,7 @@ import type { OpencodeRuntime } from './opencode.runtime.ts';
 
 /** Error responses are thrown (and translated by `request`) instead of returned. */
 const THROW = { throwOnError: true } as const;
+const requestOptions = (signal?: AbortSignal) => (signal === undefined ? THROW : { ...THROW, signal });
 
 const responseCauseSchema = z.object({ status: z.number() });
 const permissionNotFoundCauseSchema = z.object({
@@ -31,8 +39,23 @@ export type AssistantPrompt = {
 };
 
 export type ModelRef = { providerId: string; modelId: string };
+type SessionRequest = { sessionId: string; directory: string; signal?: AbortSignal };
 
-export type CreateSessionInput = { directory: string; title: string; agent: string; permission: PermissionRule[] };
+type ImagePromptInput = {
+  sessionId: string;
+  directory: string;
+  model: ModelRef;
+  question: string;
+  image: { mime: string; data: Buffer };
+  signal: AbortSignal;
+};
+export type CreateSessionInput = {
+  directory: string;
+  title: string;
+  agent: string;
+  permission: PermissionRule[];
+  signal?: AbortSignal;
+};
 export type PromptInput = {
   sessionId: string;
   directory: string;
@@ -58,16 +81,17 @@ export type OpencodeClient = {
   prompt(input: PromptInput): Promise<void>;
   /** 助手按请求关联完成；接受与结束分开，消息不必等模型整轮结束才清空草稿。 */
   promptAssistant(input: PromptInput & { messageId: string }): AssistantPrompt;
-  abort(input: { sessionId: string; directory: string }): Promise<void>;
+  promptImage(input: ImagePromptInput): Promise<string>;
+  abort(input: SessionRequest): Promise<void>;
   /** Already missing sessions count as deleted, so interrupted cleanup can be retried. */
-  deleteSession(input: { sessionId: string; directory: string }): Promise<void>;
+  deleteSession(input: SessionRequest): Promise<void>;
   replyPermission(input: { permissionId: string; directory: string; reply: PermissionDecision }): Promise<void>;
   /**
    * Models of the providers the user has connected, and the configured default `provider/model`, as opencode sees
    * them from `directory`: a project's own opencode configuration adds its providers there (D162). Without one, the
    * global configuration only.
    */
-  listModels(directory?: string): Promise<{ available: OpencodeModel[]; defaultModel?: string }>;
+  listModels(directory?: string, signal?: AbortSignal): Promise<{ available: OpencodeModel[]; defaultModel?: string }>;
   /** 在独立目录恢复父会话实际使用的模型，复制的配置仅包含模型提供商。 */
   prepareDelegationModel(input: {
     sourceDirectory: string;
@@ -86,7 +110,13 @@ export type OpencodeClient = {
 };
 
 /** A model opencode offers; `contextLimit` is null when its provider declares none (opencode reports 0). */
-export type OpencodeModel = { providerId: string; modelId: string; name: string; contextLimit: number | null };
+export type OpencodeModel = {
+  providerId: string;
+  modelId: string;
+  name: string;
+  contextLimit: number | null;
+  supportsImage?: boolean;
+};
 
 /** `provider/model` → parts; the model id itself may contain `/`. */
 /** opencode's report of one MCP server; `error` only when it failed or needs a client registration. */
@@ -149,9 +179,13 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
   return {
     isConnected: runtime.isReady,
     shutdown: runtime.shutdown,
-    async createSession({ directory, title, agent, permission }) {
+    async createSession({ directory, title, agent, permission, signal }) {
+      if (agent === OPENCODE_IMAGE_AGENT) {
+        // 独立会话绑定原图，覆盖用户全局配置中的自动分享。
+        await writeFile(join(directory, 'opencode.json'), JSON.stringify({ share: 'disabled', autoshare: false }));
+      }
       const { data } = await request('session.create', () =>
-        runtime.sdk().session.create({ directory, title, agent, permission }, THROW),
+        runtime.sdk().session.create({ directory, title, agent, permission }, requestOptions(signal)),
       );
       return data.id;
     },
@@ -226,13 +260,39 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         },
       };
     },
-    async abort({ sessionId, directory }) {
-      await request('session.abort', () => runtime.sdk().session.abort({ sessionID: sessionId, directory }, THROW));
+    async promptImage({ sessionId, directory, model, question, image, signal }) {
+      const { data } = await request('session.prompt', () =>
+        runtime.sdk().session.prompt(
+          {
+            sessionID: sessionId,
+            directory,
+            agent: OPENCODE_IMAGE_AGENT,
+            model: { providerID: model.providerId, modelID: model.modelId },
+            parts: [
+              { type: 'text', text: question },
+              { type: 'file', mime: image.mime, url: `data:${image.mime};base64,${image.data.toString('base64')}` },
+            ],
+          },
+          { ...THROW, signal },
+        ),
+      );
+      if ('error' in data.info && data.info.error !== undefined) {
+        throw new AppError(ErrorCode.ImageAnalysisFailed, 'The image model returned an error');
+      }
+      return data.parts
+        .flatMap((part) => (part.type === 'text' ? [part.text] : []))
+        .join('\n')
+        .trim();
     },
-    async deleteSession({ sessionId, directory }) {
+    async abort({ sessionId, directory, signal }) {
+      await request('session.abort', () =>
+        runtime.sdk().session.abort({ sessionID: sessionId, directory }, requestOptions(signal)),
+      );
+    },
+    async deleteSession({ sessionId, directory, signal }) {
       await request('session.delete', async () => {
         try {
-          await runtime.sdk().session.delete({ sessionID: sessionId, directory }, THROW);
+          await runtime.sdk().session.delete({ sessionID: sessionId, directory }, requestOptions(signal));
         } catch (err) {
           // 原生删除成功后，本地清理可能中断；只将 SDK 明确返回的会话不存在视为已完成。
           if (err instanceof Error && sessionNotFoundCauseSchema.safeParse(err.cause).success) return;
@@ -255,12 +315,13 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         }
       });
     },
-    async listModels(directory) {
+    async listModels(directory, signal) {
       const sdk = runtime.sdk();
       const at = directory === undefined ? {} : { directory };
+      const options = requestOptions(signal);
       const [{ data: providers }, { data: config }] = await Promise.all([
-        request('config.providers', () => sdk.config.providers(at, THROW)),
-        request('config.get', () => sdk.config.get(at, THROW)),
+        request('config.providers', () => sdk.config.providers(at, options)),
+        request('config.get', () => sdk.config.get(at, options)),
       ]);
       const available = providers.providers.flatMap((p) =>
         Object.values(p.models).map((m) => ({
@@ -268,6 +329,7 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
           modelId: m.id,
           name: m.name,
           contextLimit: m.limit.context > 0 ? m.limit.context : null,
+          supportsImage: m.capabilities.input.image,
         })),
       );
       return config.model === undefined ? { available } : { available, defaultModel: config.model };

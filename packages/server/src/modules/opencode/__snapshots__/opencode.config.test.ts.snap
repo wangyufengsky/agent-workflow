@@ -9754,6 +9754,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
           "aw-assistant-memory": "allow",
           "aw-assistant-preview": "allow",
           "aw-db-readonly": "allow",
+          "aw-image-analysis": "allow",
           "aw-office-docs": "allow",
           "aw-recurring-work": "allow",
           "aw-task-delivery": "allow",
@@ -9770,12 +9771,14 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "mode": "primary",
       "permission": {
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "edit": "deny",
         "external_directory": "deny",
         "question": "deny",
         "skill": {
           "*": "deny",
           "aw-code-review": "allow",
+          "aw-image-analysis": "allow",
         },
         "task": "deny",
         "webfetch": "deny",
@@ -9796,6 +9799,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "mode": "primary",
       "permission": {
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "edit": "allow",
         "external_directory": "deny",
         "question": "deny",
@@ -9805,6 +9809,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
           "aw-backend-development": "allow",
           "aw-db-readonly": "allow",
           "aw-frontend-development": "allow",
+          "aw-image-analysis": "allow",
           "aw-merge-conflicts": "allow",
           "aw-offline-network": "allow",
           "aw-page-check": "allow",
@@ -9814,17 +9819,27 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       },
       "prompt": "<protocol-execute.md>",
     },
+    "aw-image-reader": {
+      "description": "image reader",
+      "mode": "primary",
+      "permission": {
+        "*": "deny",
+      },
+      "prompt": "<protocol-image-reader.md>",
+    },
     "aw-planner": {
       "description": "agent-workflow planner",
       "mode": "primary",
       "permission": {
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "edit": "deny",
         "external_directory": "deny",
         "question": "deny",
         "skill": {
           "*": "deny",
           "aw-db-readonly": "allow",
+          "aw-image-analysis": "allow",
           "aw-offline-network": "allow",
           "aw-page-check": "allow",
         },
@@ -9839,6 +9854,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "permission": {
         "*": "deny",
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "agent-workflow_inspect_delegation": "allow",
         "agent-workflow_submit_delegation": "allow",
         "edit": "deny",
@@ -9854,6 +9870,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "mode": "primary",
       "permission": {
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "edit": "deny",
         "external_directory": "deny",
         "question": "deny",
@@ -9872,6 +9889,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "mode": "primary",
       "permission": {
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "edit": "deny",
         "external_directory": "deny",
         "question": "deny",
@@ -9879,6 +9897,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
           "*": "deny",
           "aw-code-review": "allow",
           "aw-db-readonly": "allow",
+          "aw-image-analysis": "allow",
           "aw-page-check": "allow",
         },
         "task": "deny",
@@ -9891,6 +9910,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "mode": "primary",
       "permission": {
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "edit": "deny",
         "external_directory": "deny",
         "question": "deny",

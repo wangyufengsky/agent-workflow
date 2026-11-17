@@ -57,6 +57,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.TaskNotFinished]: '任务还没有结束，或者还在收尾（停止会话、清理工作区）：稍后再试，或者先取消它。',
   [ErrorCode.TaskInUse]: '这个任务属于批量任务或需求计划，只能归档，不能删除。',
   [ErrorCode.PlanNotFound]: '这个计划不存在。',
+  [ErrorCode.BrowserCaseChanged]: '用例已被修改，请刷新后重新确认。',
   [ErrorCode.PlanVersionConflict]: '计划已经更新，请查看最新版本后再确认。',
   [ErrorCode.PlanInvalid]: '计划有问题，按列出的问题修改后再保存。',
   [ErrorCode.NodeNotFound]: '这个步骤不存在。',
@@ -127,8 +128,11 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.BrowserCheckUnrunnable]: '有一个步骤的页面体检在应用环境里无法运行：页面预览没能启动。',
   [ErrorCode.AttachmentNotFound]: '这份资料不存在或已失效，请重新添加。',
   [ErrorCode.AttachmentInvalidType]:
-    '目前只支持文本、Word（.docx）和 Excel（.xlsx）文件，图片和其他格式请改用文字描述。',
-  [ErrorCode.AttachmentTooLarge]: '资料太大或太多了：每次最多 10 个；文本不超过 5 MB，Word / Excel 不超过 20 MB。',
+    '这个操作无法读取所选附件的格式。支持上传文本、PNG、JPEG、Word（.docx）和 Excel（.xlsx）。',
+  [ErrorCode.ImageAnalysisUnavailable]: '图像处理员不可用，请在专业设置中选择支持图片输入的模型。',
+  [ErrorCode.ImageAnalysisFailed]: '图像处理员未能读图。可以查看原图，或稍后再试。',
+  [ErrorCode.AttachmentTooLarge]:
+    '资料太大或太多了：每次最多 10 个；文本和图片不超过 5 MB，Word / Excel 不超过 20 MB。',
   [ErrorCode.AttachmentParseFailed]: '文件已损坏或无法读取，可以在 Word / Excel 中打开后另存一份再试。',
   [ErrorCode.AttachmentSourceInvalid]: '读不了这个文件：它不在项目目录里、不是普通文件或已不存在。',
   [ErrorCode.RequirementsUnacknowledged]:

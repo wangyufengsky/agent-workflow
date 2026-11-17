@@ -124,8 +124,8 @@ describe('@opencode 客户端与配置注入', () => {
 
     expect((await opencode.listModels()).available.filter((m) => m.providerId === 'aw-lan')).toEqual([]);
     expect((await opencode.listModels(repo.path)).available.filter((m) => m.providerId === 'aw-lan')).toEqual([
-      { providerId: 'aw-lan', modelId: 'bare', name: 'Bare', contextLimit: null },
-      { providerId: 'aw-lan', modelId: 'sized', name: 'Sized', contextLimit: 32_768 },
+      { providerId: 'aw-lan', modelId: 'bare', name: 'Bare', contextLimit: null, supportsImage: false },
+      { providerId: 'aw-lan', modelId: 'sized', name: 'Sized', contextLimit: 32_768, supportsImage: false },
     ]);
   });
 });

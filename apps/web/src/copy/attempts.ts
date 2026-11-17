@@ -81,6 +81,7 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.ReadOfficeFile]: '读取 Word / Excel 文件',
   [McpToolName.SubmitPlan]: '提交计划',
   [McpToolName.SubmitResult]: '提交结果',
+  [McpToolName.BrowserSubmitReport]: '提交浏览器测试报告',
   [McpToolName.SubmitReview]: '提交评审意见',
   [McpToolName.AskUser]: '向你提问',
   [McpToolName.ReportProgress]: '进展',
@@ -104,6 +105,7 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.BrowserInspect]: '查看元素',
   [McpToolName.BrowserLogs]: '查看控制台',
   [McpToolName.BrowserViewport]: '切换尺寸',
+  [McpToolName.AnalyzeImage]: '图像处理员',
   [McpToolName.BrowserScreenshot]: '截图',
 };
 

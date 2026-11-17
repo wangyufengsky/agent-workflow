@@ -1,13 +1,17 @@
 import {
   abortAssistantOp,
+  actAssistantBrowserOp,
   bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
+  controlAssistantBrowserOp,
   createAssistantContinuationOp,
   createConversationOp,
   deleteConversationOp,
+  getAssistantBrowserControlOp,
   getAssistantContinuationHistoryOp,
   getConversationOp,
+  handoffAssistantBrowserOp,
   listAssistantAttachmentsOp,
   listAssistantFilesOp,
   listConfirmationsOp,
@@ -30,9 +34,11 @@ import { getAttachmentOp, previewAttachmentSheetOp, removeAttachmentOp, snapshot
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
 import { createBatchOp, deliverBatchOp, getBatchOp, listBatchesOp } from './batches.ts';
 import {
+  captureBrowserTestOp,
   clearSiteLoginOp,
   closeUserTabOp,
   listBrowserFramesOp,
+  listBrowserTestActionsOp,
   listSiteLoginsOp,
   navigateUserTabOp,
   openLoginTabOp,
@@ -42,6 +48,15 @@ import {
   setUserViewportOp,
   userTabLogsOp,
 } from './browser.ts';
+import {
+  createBrowserCaseOp,
+  listBrowserCasesOp,
+  rerunBrowserCaseOp,
+  resumeBrowserCaseOp,
+  runBrowserCaseOp,
+  takeBrowserCaseHandoffOp,
+  updateBrowserCaseOp,
+} from './browser-cases.ts';
 import {
   changeMasterPasswordOp,
   resetMasterPasswordOp,
@@ -272,6 +287,7 @@ export * from './attachments.ts';
 export * from './attempts.ts';
 export * from './batches.ts';
 export * from './browser.ts';
+export * from './browser-cases.ts';
 export * from './credentials.ts';
 export * from './databases.ts';
 export * from './debug.ts';
@@ -296,6 +312,13 @@ export * from './workflows.ts';
 
 /** Every operation contract; the server mounts exactly these and the copy table covers all their titles. */
 export const OPERATION_CONTRACTS: readonly OperationContract[] = [
+  listBrowserCasesOp,
+  createBrowserCaseOp,
+  updateBrowserCaseOp,
+  runBrowserCaseOp,
+  rerunBrowserCaseOp,
+  resumeBrowserCaseOp,
+  takeBrowserCaseHandoffOp,
   createSkillOp,
   deleteSkillOp,
   getSkillCatalogOp,
@@ -350,6 +373,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   clearSiteLoginOp,
   readWebsiteOp,
   listBrowserFramesOp,
+  listBrowserTestActionsOp,
+  captureBrowserTestOp,
   openUserTabOp,
   pickFrontendElementOp,
   navigateUserTabOp,
@@ -491,7 +516,11 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   pruneWorktreesOp,
   listConversationsOp,
   snapshotAssistantContextOp,
+  actAssistantBrowserOp,
   bindAssistantPreviewOp,
+  controlAssistantBrowserOp,
+  getAssistantBrowserControlOp,
+  handoffAssistantBrowserOp,
   createConversationOp,
   createAssistantContinuationOp,
   getAssistantContinuationHistoryOp,

@@ -391,6 +391,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `ui.introAnimation` | `true`（打开动画，下次启动生效；main 经 `launch.json` 读它，28 §5.3） | 简单 |
 | `ai.askOnUncertainty` | `false` | 简单 |
 | `ai.defaultModel` | `null`（使用 opencode 默认模型） | 专业 |
+| `ai.imageModel` | `null`（识图关闭）；显式选择全局配置中支持图片输入的 `provider/model` | 专业 |
 | `ai.bashPolicy` | `auto`（助手不能修改，D65） | 专业 |
 | `scheduler.maxConcurrentAttempts` | `4`（所有使用模型的会话共享的上限，D186：任务、助手、知识问答、PPT、Git 审查、提交信息、需求拆解、成员分析一起算；用满时交互的请求排队，任务最多用上限减一；设置页文案「同时使用模型的会话数」） | 专业（38 C5） |
 | `scheduler.maxConcurrentNodesPerTask` | `2` | 专业 |
@@ -500,6 +501,7 @@ class AppError extends Error {
 | `TASK_IN_USE` | 409 | 属于批次或需求计划的任务只能归档、不能删除（D222）；`details` 为 `{ batchId }` 或 `{ initiativeId }` |
 | `PLAN_NOT_FOUND` | 404 | |
 | `PLAN_VERSION_CONFLICT` | 409 | 编辑基于的版本不是最新草稿 |
+| `BROWSER_CASE_CHANGED` | 409 | 编辑或启动基于的用例版本已变更 |
 | `PLAN_INVALID` | 400 | 计划图校验失败；`details.problems[]`，每项 `{ code, nodeKey?, message }`，子码见 5.3 |
 | `NODE_NOT_FOUND` | 404 | |
 | `NODE_NOT_EDITABLE` | 409 | 调整计划时修改了已开始的节点 |
@@ -642,16 +644,17 @@ class AppError extends Error {
 | 枚举／类型 | 值 |
 | --- | --- |
 | AttachmentSource | upload · project_file · knowledge_answer · convention_evidence |
-| AttachmentFormat（OF-01 已实现，下同） | text · docx · xlsx（看内容判断，39 §4） |
+| AttachmentFormat（OF-01 已实现，下同） | text · docx · xlsx · png · jpeg（按内容判断，30 §3.1、39 §4） |
 | AttachmentRejection（`ATTACHMENT_INVALID_TYPE` 的 `details.reason`） | not_text · legacy_office（.doc / .xls）· encrypted（有打开密码）· unsupported（其他 zip） |
+| 识图工具错误 | `IMAGE_ANALYSIS_UNAVAILABLE`（未配置、模型不可用或缺少图片输入）；`IMAGE_ANALYSIS_FAILED`（文件或模型调用失败、中止、超时、空回复） |
 | AttachmentLimit（`ATTACHMENT_TOO_LARGE` 的 `details.reason`） | bytes · count · unzipped · cells |
 | AttachmentParseFailure（`ATTACHMENT_PARSE_FAILED` 的 `details.reason`） | corrupt · timeout · out_of_memory |
 | AttachmentOwnerKind | task_input（owner 为任务）· task_feedback（owner 为追加的修改节点）· assistant_message（owner 为助手对话）· initiative（owner 为需求计划：资料原件，每个工作包的任务再引用一次，34 §7） |
-| AssistantToolName 增量（U-02 已实现） | read_attachment；read_sheet · query_sheet（OF-02 已实现）；create_docx · create_xlsx（OF-04 已实现）；edit_xlsx · revise_docx（OF-05 已实现） |
+| AssistantToolName 增量（U-02、U-04） | read_attachment · analyze_image；read_sheet · query_sheet（OF-02 已实现）；create_docx · create_xlsx（OF-04 已实现）；edit_xlsx · revise_docx（OF-05 已实现） |
 | OfficeLoss（OF-05 已实现） | charts · images · pivot_tables · headers_footers · comments · formula_references（从源文件写出的新文件没有保留的内容，39 §7.2） |
 | XlsxColumnType（OF-04 已实现） | text · number · date · percent · currency（`create_xlsx` 的列格式） |
 | InputRef 增量（U-03 已实现） | attachment（确认卡把附件 ID 显示为文件名） |
-| McpToolName 增量（U-02 已实现） | read_attachment；read_sheet · query_sheet（OF-02 已实现）；read_office_file（OF-06 已实现） |
+| McpToolName 增量（U-02、U-04） | read_attachment · analyze_image；read_sheet · query_sheet（OF-02 已实现）；read_office_file（OF-06 已实现） |
 | TaskDisplayGroup 增量 | artifact_review（待查看产物，见 39 §8.4） |
 | SheetQueryOp / SheetAggregate（OF-02 已实现） | eq · ne · gt · gte · lt · lte · contains · in · empty · not_empty / count · sum · avg · min · max（`query_sheet`，39 §6.2） |
 | NodeKind 增量（Q-02 已实现） | verify（核验验收清单的系统步骤） |

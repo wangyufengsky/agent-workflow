@@ -94,6 +94,7 @@ export interface AwBridge {
     onShortcut(listener: (key: BrowserShortcut) => void): () => void;
     /** Puts the tab over this area of the window (CSS pixels), or takes it off the window with null. */
     place(tabId: string, rect: BrowserRect | null): void;
+    setWatchZoom(tabId: string, zoom: BrowserWatchZoom): void;
     back(tabId: string): void;
     forward(tabId: string): void;
     reload(tabId: string): void;
@@ -112,6 +113,10 @@ export const browserRectSchema = z.object({
   height: z.number().int().min(0),
 });
 export type BrowserRect = z.infer<typeof browserRectSchema>;
+
+export const BROWSER_WATCH_ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+export const browserWatchZoomSchema = z.literal(BROWSER_WATCH_ZOOMS).or(z.literal('fit'));
+export type BrowserWatchZoom = z.infer<typeof browserWatchZoomSchema>;
 
 /** Path of a PPT's print view, the page the hidden window prints (23 §6.1). */
 export const pptPrintPath = (deckId: string) => `/ppt/${encodeURIComponent(deckId)}/print`;

@@ -6,6 +6,7 @@ import {
   type AttemptDTO,
   AttemptKind,
   ErrorCode,
+  McpToolName,
   ResultNext,
   RoleBaseAgent,
   type SubmitResultInput,
@@ -73,6 +74,7 @@ export function createDebugService({ attempts, settings, prompts }: DebugService
         nodeTitle: run.title,
         instructions: run.requirement,
         retryFeedback: EMPTY_SECTION,
+        submitTool: McpToolName.SubmitResult,
         uncertaintyRule: prompts[settings.get('ai.askOnUncertainty') ? PromptName.RuleAsk : PromptName.RuleAssume],
       });
       const attempt = await attempts.start({

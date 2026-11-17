@@ -4,6 +4,7 @@ import {
   archiveTaskOp,
   cancelTaskOp,
   confirmPlanOp,
+  createBrowserCaseOp,
   createTaskOp,
   decideRequirementOp,
   deleteProjectOp,
@@ -19,6 +20,7 @@ import {
   getTaskArtifactOp,
   getTaskOp,
   getTaskTimelineOp,
+  listBrowserCasesOp,
   listPreviewSessionsOp,
   listTasksOp,
   nodeDiffFileOp,
@@ -30,6 +32,7 @@ import {
   replaceRequirementsOp,
   replanOp,
   requestChangesOp,
+  rerunBrowserCaseOp,
   resolveInboxOp,
   resumeTaskOp,
   retryNodeOp,
@@ -38,6 +41,7 @@ import {
   reviewCommentsOp,
   reviseFromReviewOp,
   reviseTaskArtifactOp,
+  runBrowserCaseOp,
   saveDraftPlanOp,
   skipCheckOp,
   skipNodeOp,
@@ -47,6 +51,7 @@ import {
   taskDiffFileOp,
   taskDiffOp,
   unarchiveTaskOp,
+  updateBrowserCaseOp,
   updateCheckCommandOp,
 } from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
@@ -56,6 +61,13 @@ export function tasksOperations(tasks: TasksService) {
   return [
     implement(listTasksOp, (query) => tasks.list(query)),
     implement(listPreviewSessionsOp, ({ id }) => tasks.previewSessions(id)),
+    implement(listBrowserCasesOp, ({ projectId }) => ({ items: tasks.browserCases.list(projectId) })),
+    implement(createBrowserCaseOp, ({ projectId, definition }) => tasks.browserCases.create(projectId, definition)),
+    implement(updateBrowserCaseOp, ({ projectId, caseId, revision, definition }) =>
+      tasks.browserCases.update(projectId, caseId, revision, definition),
+    ),
+    implement(runBrowserCaseOp, ({ projectId, caseId, revision }) => tasks.runBrowserCase(projectId, caseId, revision)),
+    implement(rerunBrowserCaseOp, ({ id }) => tasks.rerunBrowserCase(id)),
     implement(createTaskOp, (input) => tasks.create(input)),
     implement(getAgentsMdOp, ({ id }) => tasks.agentsMd(id)),
     implement(startAgentsMdTaskOp, (input) => tasks.createAgentsMdTask(input)),

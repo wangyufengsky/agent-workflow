@@ -1,4 +1,5 @@
 import { AttemptKind } from '../../enums/task.ts';
+import { NodeKind } from '../../enums/workflow.ts';
 
 /** Execution MCP tools (12 §6); opencode shows them as `agent-workflow_<name>`. */
 export const McpToolName = {
@@ -9,6 +10,7 @@ export const McpToolName = {
   InspectDelegation: 'inspect_delegation',
   SubmitDelegation: 'submit_delegation',
   ReadAttachment: 'read_attachment',
+  AnalyzeImage: 'analyze_image',
   ReadSheet: 'read_sheet',
   QuerySheet: 'query_sheet',
   ReadOfficeFile: 'read_office_file',
@@ -43,8 +45,24 @@ export const McpToolName = {
   BrowserLogs: 'browser_logs',
   BrowserViewport: 'browser_viewport',
   BrowserScreenshot: 'browser_screenshot',
+  BrowserSubmitReport: 'browser_submit_report',
 } as const;
 export type McpToolName = (typeof McpToolName)[keyof typeof McpToolName];
+
+export const BROWSER_TEST_TOOLS = Object.values(McpToolName).filter(
+  (name) =>
+    (name.startsWith('browser_') && name !== McpToolName.BrowserSubmitReport) ||
+    name === McpToolName.AnalyzeImage ||
+    name === McpToolName.GetTaskContext ||
+    name === McpToolName.AskUser ||
+    name === McpToolName.ReportProgress,
+);
+
+export type BrowserTestSubmitTool = typeof McpToolName.BrowserSubmitReport | typeof McpToolName.SubmitResult;
+
+export function browserTestSubmitTool(kind: NodeKind): BrowserTestSubmitTool {
+  return kind === NodeKind.Verify ? McpToolName.SubmitResult : McpToolName.BrowserSubmitReport;
+}
 
 /** The tool whose successful call finishes each kind of attempt (09 §4 `submitted`). */
 export const ATTEMPT_SUBMIT_TOOL = {
@@ -61,3 +79,7 @@ export const ATTEMPT_SUBMIT_TOOL = {
   [AttemptKind.Breakdown]: McpToolName.SubmitBreakdown,
   [AttemptKind.Delegation]: McpToolName.SubmitDelegation,
 } as const satisfies Record<AttemptKind, McpToolName>;
+
+export function isAttemptSubmitTool(name: McpToolName): boolean {
+  return name === McpToolName.BrowserSubmitReport || Object.values(ATTEMPT_SUBMIT_TOOL).some((tool) => tool === name);
+}

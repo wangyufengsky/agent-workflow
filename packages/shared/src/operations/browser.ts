@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   browserFrameSchema,
+  browserTestActionSchema,
   navigateUserTabRequestSchema,
   openLoginTabRequestSchema,
   openUserTabRequestSchema,
@@ -133,6 +134,30 @@ export const listBrowserFramesOp = defineOperationContract({
   refs: { attemptId: InputRef.Attempt },
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/attempts/:attemptId/browser-frames' },
+});
+
+export const listBrowserTestActionsOp = defineOperationContract({
+  ...common,
+  id: 'browser.listTestActions',
+  title: 'op.browser.listTestActions',
+  description: 'Get the actions and related requests of one browser test attempt',
+  input: z.object({ attemptId: z.string() }),
+  output: z.object({ items: z.array(browserTestActionSchema) }),
+  refs: { attemptId: InputRef.Attempt },
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/attempts/:attemptId/browser-test-actions' },
+});
+
+export const captureBrowserTestOp = defineOperationContract({
+  ...common,
+  id: 'browser.captureTest',
+  title: 'op.browser.captureTest',
+  description: 'Save an on-demand screenshot of the running browser test',
+  input: z.object({ taskId: z.string(), attemptId: z.string() }),
+  output: z.object({ file: z.string() }),
+  refs: { taskId: InputRef.Task, attemptId: InputRef.Attempt },
+  risk: OperationRisk.Read,
+  http: { method: 'POST', path: '/tasks/:taskId/browser-test-screenshot' },
 });
 
 export const pickFrontendElementOp = defineOperationContract({
