@@ -161,7 +161,10 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
   function releaseSession(session: LiveSession): void {
     if (live.get(session.sessionId) === session) {
       live.delete(session.sessionId);
-      if (hasPendingEndCommand(session)) signal('end_command_finished', mustFind(session.attemptId));
+      if (hasPendingEndCommand(session)) {
+        inbox.dismissOpen({ attemptId: session.attemptId, kind: InboxKind.Permission });
+        signal('end_command_finished', mustFind(session.attemptId));
+      }
     }
     session.firstPrompt?.controller.abort();
     session.release();

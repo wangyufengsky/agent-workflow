@@ -10,12 +10,16 @@ import {
   cancelTaskOp,
   ErrorCode,
   getNodeOp,
+  InboxKind,
+  listInboxOp,
   MCP_TOOL_PREFIX,
   McpToolName,
   NodeStatus,
   OPENCODE_AGENT_NAME,
   type PermissionAction,
+  PermissionDecision,
   RoleBaseAgent,
+  resolveInboxOp,
   ServerEventType,
   TranscriptSystemEvent,
   updateSettingsOp,
@@ -24,7 +28,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { createTestRepo, type TestRepo } from '../../../test/helpers/git.ts';
-import { addProject, createTask, nodeReaches } from '../../../test/helpers/tasks.ts';
+import { addProject, createTask, inboxOpens, nodeReaches, taskReaches } from '../../../test/helpers/tasks.ts';
 import { sessionPermissionRules } from './opencode.config.ts';
 import { OpencodeEventType, ToolCallStatus } from './opencode.events.ts';
 
@@ -430,6 +434,48 @@ it('@opencode 开始命令不可用时提示，原开发会话照常交付结果
       }),
     );
   } finally {
+    await t.call(cancelTaskOp, { id: task.id });
+  }
+}, 45_000);
+
+it('@opencode 结束命令需要权限时可以授权，保留已提交结果', async () => {
+  await t.call(updateSettingsOp, {
+    'ai.defaultModel': `${PROVIDER}/${MODEL}`,
+    'ai.bashPolicy': BashPolicy.Ask,
+    'ai.sessionStartCommand': null,
+    'ai.sessionEndCommand': '/end-with-permission',
+  });
+  const { project } = await addProject(t, {
+    checkCommand: null,
+    files: {
+      'opencode.json': JSON.stringify({
+        command: { 'end-with-permission': { template: `${RUN}find . -name nothing-here -delete` } },
+      }),
+    },
+  });
+  const submitted = nodeReaches(t, 'build_page', NodeStatus.Done);
+  const requested = inboxOpens(t, InboxKind.Permission);
+  const task = await createTask(t, { projectId: project.id, workflow: 'frontend', requirement: PROBE_SESSION_COMMAND });
+  const { node } = await submitted;
+  const { body: detail } = await t.call(getNodeOp, { id: task.id, nodeId: node.id });
+  const [summary] = detail.attempts;
+  if (summary === undefined) throw new Error('No submitted attempt');
+  const attempt = t.app.services.attempts.get(summary.id);
+  try {
+    const { item } = await requested;
+    expect(item).toMatchObject({ taskId: task.id, payload: { permission: 'bash' } });
+    if (item.attemptId === null) throw new Error('Permission is missing its attempt');
+    expect(t.app.services.attempts.get(item.attemptId).status).toBe(AttemptStatus.Succeeded);
+    const review = taskReaches(t, 'review', 25_000);
+    const reply = await t.call(resolveInboxOp, { id: item.id, response: { decision: PermissionDecision.Once } });
+    expect(reply.body.status).toBe('resolved');
+    await review;
+    expect(t.app.services.attempts.get(item.attemptId).status).toBe(AttemptStatus.Succeeded);
+    expect((await t.call(listInboxOp, { taskId: task.id, blocking: true, status: 'open' })).body.items).toEqual([]);
+  } finally {
+    if (attempt.opencodeSessionId !== null) {
+      await t.app.services.opencode.abort({ sessionId: attempt.opencodeSessionId, directory: attempt.directory });
+    }
     await t.call(cancelTaskOp, { id: task.id });
   }
 }, 45_000);

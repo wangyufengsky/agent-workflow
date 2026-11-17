@@ -26,6 +26,7 @@ import {
   taskReaches,
 } from '../../../test/helpers/tasks.ts';
 import { runGit } from '../git/index.ts';
+import { OpencodeEventType } from '../opencode/index.ts';
 
 let t: TestApp;
 beforeEach(async () => {
@@ -130,6 +131,20 @@ it('前一节点的结束命令收尾后才发送下一节点的开始命令', a
     expect((await isolated.call(getNodeOp, { id: task.id, nodeId: node.id })).body.status).toBe(NodeStatus.Ready);
     const prefix = command.mock.calls.map(([call]) => call.text);
     expect(prefix).toEqual(['/report start', '/report complete']);
+    const endRequest = command.mock.calls[1]?.[0];
+    if (endRequest === undefined) throw new Error('No end command in progress');
+    isolated.fake.replay([
+      {
+        type: OpencodeEventType.PermissionAsked,
+        sessionId: endRequest.sessionId,
+        directory: endRequest.directory,
+        permissionId: 'end-permission',
+        permission: 'webfetch',
+        patterns: ['http://127.0.0.1/report'],
+      },
+    ]);
+    const permissionQuery = { taskId: task.id, blocking: true, status: 'open' } as const;
+    expect((await isolated.call(listInboxOp, permissionQuery)).body.items).toHaveLength(1);
 
     const warning = waitForEvent(isolated.app.events, ServerEventType.AttemptTranscript, ({ entries }) =>
       entries.some(
@@ -151,6 +166,7 @@ it('前一节点的结束命令收尾后才发送下一节点的开始命令', a
       error: null,
     });
     expect((await isolated.call(getTaskOp, { id: task.id })).body.status).toBe('review');
+    expect((await isolated.call(listInboxOp, permissionQuery)).body.items).toEqual([]);
   } finally {
     await isolated.close();
   }

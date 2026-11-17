@@ -136,7 +136,7 @@ export function watchSessions(
   }
 
   /** A permission request waits in「需要你处理」until the user decides (03 §2.5). */
-  function onPermission(attempt: Attempt, session: LiveSession, event: PermissionEvent): void {
+  function onPermission(attempt: Attempt, event: PermissionEvent): void {
     state.inbox.create({
       kind: InboxKind.Permission,
       taskId: attempt.taskId,
@@ -151,7 +151,6 @@ export function watchSessions(
         patterns: event.patterns,
       },
     });
-    state.park(session, attempt);
   }
 
   /**
@@ -251,7 +250,8 @@ export function watchSessions(
         onToolEvent(attempt, session, event);
         return;
       case OpencodeEventType.PermissionAsked:
-        if (running) onPermission(attempt, session, event);
+        if (running || session.finishingCommand) onPermission(attempt, event);
+        if (running) state.park(session, attempt);
         return;
       case OpencodeEventType.PermissionReplied:
         state.inbox.completePermission(attempt.id, event.permissionId, event.reply);
