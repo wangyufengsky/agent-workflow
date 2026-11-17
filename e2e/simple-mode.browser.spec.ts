@@ -35,7 +35,7 @@ test('简单模式：侧栏 7 项、顶栏没有主题切换；「直接开始�
   await expect(more.getByRole('button')).toHaveCount(8);
   await expect(more.getByRole('button', { name: /浏览器测试/ })).toBeVisible();
   await more.getByRole('button', { name: /浏览器测试/ }).click();
-  const submitBrowserTest = page.locator('form').locator('button[type="submit"]');
+  const submitBrowserTest = page.getByRole('main').getByRole('button', { name: /^开始(?:\s|$)/ });
   await page.getByRole('textbox', { name: '需求' }).fill('验证订单表单');
   await expect(submitBrowserTest).toBeDisabled();
   const scopeApproval = page.getByRole('checkbox', { name: /我确认这是测试环境/ });
