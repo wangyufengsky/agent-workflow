@@ -1,27 +1,14 @@
 import { type BrowserCaseHandoff, resumeBrowserCaseOp, takeBrowserCaseHandoffOp } from '@aw/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRef } from 'react';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { BROWSER_CASE_COPY as C } from '../../copy/browser-cases.ts';
-import { usePlacedTab } from '../preview/use-placed-tab.ts';
-import styles from './browser-case-handoff.module.css';
 
-export function BrowserCaseHandoffPane({
-  taskId,
-  handoff,
-  visible,
-}: {
-  taskId: string;
-  handoff: BrowserCaseHandoff;
-  visible: boolean;
-}) {
-  const area = useRef<HTMLDivElement>(null);
+export function BrowserCaseHandoffPane({ taskId, handoff }: { taskId: string; handoff: BrowserCaseHandoff }) {
   const qc = useQueryClient();
   const bridge = window.aw;
-  usePlacedTab(visible && handoff.active ? handoff.tabId : null, area, true);
   const change = useMutation({
     mutationFn: (resume: boolean) =>
       callOperation(resume ? resumeBrowserCaseOp : takeBrowserCaseHandoffOp, { id: taskId, handoffId: handoff.id }),
@@ -30,7 +17,8 @@ export function BrowserCaseHandoffPane({
   return (
     <section className="col" aria-label={C.handoff.heading}>
       <strong>
-        {C.handoff.reason[handoff.reason]} · {handoff.step === 0 ? C.opening : C.step(handoff.step)}
+        {C.handoff.reason[handoff.reason]}
+        {handoff.step === null ? '' : ` · ${handoff.step === 0 ? C.opening : C.step(handoff.step)}`}
       </strong>
       {bridge === undefined ? (
         <p className="hint">{C.handoff.desktop}</p>
@@ -48,7 +36,6 @@ export function BrowserCaseHandoffPane({
             )}
           </div>
           {change.isError && <ErrorState error={change.error} />}
-          {handoff.active && <div ref={area} className={styles.surface} data-testid="case-handoff-surface" />}
         </>
       )}
     </section>

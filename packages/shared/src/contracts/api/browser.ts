@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { browserWriteRuleSchema } from '../../browser/policy.ts';
 import { viewportPresetSchema } from '../../enums/browser.ts';
 import { attemptKindSchema, attemptStatusSchema } from '../../enums/task.ts';
+import { errorInfoSchema } from '../../errors/codes.ts';
 import {
   browserActionOutputSchema,
   browserClickInputSchema,
@@ -11,6 +12,7 @@ import {
   browserSelectInputSchema,
   browserTypeInputSchema,
 } from '../mcp/browser.ts';
+import { browserCaseRequestSchema } from './browser-cases.ts';
 import { frontendElementSchema, frontendPageLayoutSchema } from './frontend.ts';
 
 /** 助手只读网页：沿用网站登录状态，但不开放页面操作。 */
@@ -157,7 +159,26 @@ export type UserTabState = z.infer<typeof userTabStateSchema>;
  * `GET /tasks/:id/preview/sessions` (29 §8.1): what the preview tab can show besides the user's own preview, the AI
  * sessions that used the browser (with their frames) and the steps whose page check left screenshots.
  */
+export const browserTestActionSchema = z.object({
+  seq: z.number().int().positive(),
+  tool: z.string(),
+  path: z.string(),
+  passed: z.boolean(),
+  errorCode: errorInfoSchema.shape.code.nullable(),
+  requests: z.array(browserCaseRequestSchema),
+});
+export type BrowserTestAction = z.infer<typeof browserTestActionSchema>;
+
+export const browserTestTabSchema = z.object({
+  tabId: z.string(),
+  attemptId: z.string(),
+  path: z.string(),
+  viewport: viewportPresetSchema,
+});
+export type BrowserTestTab = z.infer<typeof browserTestTabSchema>;
+
 export const previewSessionsSchema = z.object({
+  testTab: browserTestTabSchema.optional(),
   attempts: z.array(
     z.object({
       attemptId: z.string(),
@@ -165,6 +186,7 @@ export const previewSessionsSchema = z.object({
       kind: attemptKindSchema,
       status: attemptStatusSchema,
       frames: z.number().int(),
+      actions: z.number().int().optional(),
       screenshots: z.array(z.string()).default([]),
     }),
   ),

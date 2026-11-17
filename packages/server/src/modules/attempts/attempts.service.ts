@@ -176,6 +176,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       stopAfterSubmit: false,
       submitTool,
       parked,
+      browserWaiting: false,
       // A session re-attached after a restart waits idle for its answer.
       idle: parked,
       pendingAnswers: [],
@@ -384,6 +385,26 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       } catch (err) {
         const current = repo.find(id);
         if (current?.status === AttemptStatus.Running) move(current, AttemptEvent.SessionError, errorOf(err));
+      }
+    },
+
+    async waitForBrowserInput(id: string, wait: () => Promise<void>): Promise<void> {
+      const session = state.sessionOf(id);
+      const attempt = mustFind(id);
+      if (session === undefined || attempt.status !== AttemptStatus.Running)
+        throw new AppError(ErrorCode.McpAttemptUnresolved, 'The browser test attempt ended');
+      const pending = wait();
+      session.browserWaiting = true;
+      state.park(session, attempt);
+      try {
+        await pending;
+        if (session.idle)
+          session.pendingAnswers.push(
+            'The user finished verification in the same test tab. Read the current page and continue the test from that step.',
+          );
+      } finally {
+        session.browserWaiting = false;
+        if (mustFind(id).status === AttemptStatus.Running) reactions.resume(session);
       }
     },
 

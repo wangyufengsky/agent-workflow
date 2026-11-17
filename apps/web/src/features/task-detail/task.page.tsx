@@ -359,11 +359,7 @@ export function TaskPage() {
             {task.data.browserTest === undefined ? (
               <PreviewPane task={task.data} active={view === 'preview'} pro={pro} />
             ) : (
-              <BrowserTestPane
-                taskId={task.data.id}
-                handoff={task.data.browserCaseHandoff}
-                active={view === 'preview'}
-              />
+              <BrowserTestPane task={task.data} active={view === 'preview'} />
             )}
           </RadixTabs.Content>
         </RadixTabs.Root>

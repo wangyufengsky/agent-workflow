@@ -171,6 +171,7 @@ export const ServerEventType = {
   BrowserFrame: 'browser.frame',
   /** The user's preview tab changed page, viewport or error counts (29 §8.1). */
   BrowserTabUpdated: 'browser.tab_updated',
+  BrowserTestUpdated: 'browser.test_updated',
   Resync: 'resync',
 } as const;
 export type ServerEventType = (typeof ServerEventType)[keyof typeof ServerEventType];

@@ -304,7 +304,9 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     /** What the preview tab can show besides the user's own preview (29 §8.1). */
     previewSessions(id: string): PreviewSessions {
       const task = state.get(id);
+      const testTab = task.browserTest === null ? undefined : deps.browser.testTab(id);
       return {
+        ...(testTab === undefined ? {} : { testTab }),
         attempts: deps.attempts
           .listByTask(id)
           .map((a) => ({
@@ -313,9 +315,13 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
             kind: a.kind,
             status: a.status,
             frames: deps.browser.frames(a.id).length,
+            ...(task.browserTest === null ? {} : { actions: deps.browser.testActions(a.id).length }),
             screenshots: task.browserTest === null ? [] : deps.browser.screenshots(a.id),
           }))
-          .filter((a) => a.frames > 0 || a.screenshots.length > 0),
+          .filter(
+            (a) =>
+              a.frames > 0 || a.screenshots.length > 0 || (a.actions ?? 0) > 0 || a.attemptId === testTab?.attemptId,
+          ),
         checks: deps.nodes
           .listByTask(id)
           .flatMap((node) =>
@@ -507,6 +513,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     /** `submit_result` of a task's execute attempt (12 §6.5). */
     async submitResult(attempt: AttemptDTO, input: SubmitResultInput): Promise<ResultNext> {
       if (attempt.taskId === null || attempt.nodeId === null) throw new Error(`Attempt ${attempt.id} is no step's`);
+      if (deps.browser.caseHandoffs.get(attempt.taskId) !== undefined)
+        throw new AppError(ErrorCode.BrowserLoginRequired, 'Wait for the user to finish verification in the test tab');
       const task = state.get(attempt.taskId);
       const workflow = workflows.get(task.workflowId);
       const node = nodes.get(attempt.nodeId);

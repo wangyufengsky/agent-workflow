@@ -52,6 +52,7 @@ export type LiveSession = {
   submitTool: McpToolName | null;
   /** Waiting for the user (blocking question or permission); the timeout does not run meanwhile. */
   parked: boolean;
+  browserWaiting: boolean;
   /** The last turn ended and no message was sent since. */
   idle: boolean;
   /** Answers to send at the next opportunity (the session was busy, or other questions are still open). */
@@ -153,11 +154,14 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
 
   /** An open blocking question or a pending permission request of the attempt: the session waits for the user. */
   function waitsForUser(attemptId: string): boolean {
-    return inbox
-      .listOpen({ attemptId })
-      .some(
-        (item) => item.kind === InboxKind.Permission || (item.kind === InboxKind.Question && item.payload.blocking),
-      );
+    return (
+      sessionOf(attemptId)?.browserWaiting === true ||
+      inbox
+        .listOpen({ attemptId })
+        .some(
+          (item) => item.kind === InboxKind.Permission || (item.kind === InboxKind.Question && item.payload.blocking),
+        )
+    );
   }
 
   /** Only an open blocking question survives a lost runtime: the session is persisted, a permission request is not. */

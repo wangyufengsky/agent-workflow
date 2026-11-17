@@ -70,7 +70,6 @@ export const BROWSER_CASE_COPY = {
   pendingRequest: '无响应状态',
   evidence: '失败截图',
   saveEvidence: '下载截图',
-  noEvidence: '本步骤没有可用截图。',
   outcome: {
     [BrowserCaseOutcome.Passed]: '通过',
     [BrowserCaseOutcome.Failed]: '失败',

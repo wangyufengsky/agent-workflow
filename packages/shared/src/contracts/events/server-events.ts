@@ -73,6 +73,10 @@ export const serverEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal(ServerEventType.PreviewUpdated), data: previewSchema }),
   z.object({ type: z.literal(ServerEventType.BrowserFrame), data: browserFrameSchema }),
+  z.object({
+    type: z.literal(ServerEventType.BrowserTestUpdated),
+    data: z.object({ taskId: z.string(), attemptId: z.string() }),
+  }),
   z.object({ type: z.literal(ServerEventType.BrowserTabUpdated), data: userTabStateSchema }),
   z.object({
     type: z.literal(ServerEventType.AssistantTranscript),

@@ -9,6 +9,7 @@ import {
   type BrowserCaseInput,
   type BrowserPortEvent,
   cancelTaskOp,
+  captureBrowserTestOp,
   clearSiteLoginOp,
   closeUserTabOp,
   createBrowserCaseOp,
@@ -17,6 +18,7 @@ import {
   getNodeOp,
   getTaskOp,
   listBrowserCasesOp,
+  listBrowserTestActionsOp,
   listPreviewSessionsOp,
   listSiteLoginsOp,
   navigateUserTabOp,
@@ -280,7 +282,86 @@ describe('浏览器测试流程', () => {
     );
   });
 
-  it('保存、编辑并复跑固定用例；断言失败时保存同一步骤的截图和请求', async () => {
+  it('AI 测试在同一页签等待登录和验证码，继续后保存操作请求', async () => {
+    await browserFor();
+    const { project } = await addProject(t);
+    const scope = {
+      target: `${origin}/case-handoff`,
+      writes: [{ method: 'POST' as const, path: '/case-gate' }],
+    };
+    const { body: task } = await t.call(createTaskOp, {
+      projectId: project.id,
+      workflowId: await workflowId(t, BROWSER_TEST_WORKFLOW_KEY),
+      requirement: '验证登录后的发布操作',
+      browserTest: scope,
+      start: false,
+    });
+    t.fake.enqueue(
+      script()
+        .callTool('browser_open', { url: scope.target })
+        .callTool('browser_click', { ref: 'e1' })
+        .callTool('browser_submit_report', { summary: '验证通过' }),
+      { title: '· 执行浏览器测试' },
+    );
+    const loginWait = nodeReaches(t, 'browser_test', 'waiting_input');
+    await t.call(startTaskOp, { id: task.id });
+    await loginWait;
+    const readHandoff = async () => (await t.call(getTaskOp, { id: task.id })).body.browserCaseHandoff;
+    const login = await readHandoff();
+    expect(login).toMatchObject({ reason: 'login', step: null, active: false });
+    if (login === undefined) throw new Error('Expected login handoff');
+    expect((await t.call(listPreviewSessionsOp, { id: task.id })).body.testTab?.tabId).toBe(login.tabId);
+    async function finish(handoff: NonNullable<typeof login>, selector: string, expected: string) {
+      const input = { id: task.id, handoffId: handoff.id };
+      expect((await t.call(takeBrowserCaseHandoffOp, input)).status).toBe(204);
+      await host.request({
+        kind: 'cdp',
+        tabId: handoff.tabId,
+        method: 'Runtime.evaluate',
+        params: {
+          expression: `document.querySelector(${JSON.stringify(selector)}).value = 'fixture'; document.forms[0].requestSubmit()`,
+        },
+      });
+      await expect
+        .poll(() =>
+          host.request({
+            kind: 'cdp',
+            tabId: handoff.tabId,
+            method: 'Runtime.evaluate',
+            params: {
+              expression: `document.body.innerText.includes(${JSON.stringify(expected)})`,
+              returnByValue: true,
+            },
+          }),
+        )
+        .toMatchObject({ result: { value: true } });
+      expect((await t.call(resumeBrowserCaseOp, input)).status).toBe(204);
+    }
+    const verificationWait = nodeReaches(t, 'browser_test', 'waiting_input');
+    await finish(login, 'input[type=password]', '发布');
+    await verificationWait;
+    const verification = await readHandoff();
+    expect(verification).toMatchObject({ reason: 'verification', tabId: login.tabId, active: false });
+    if (verification === undefined) throw new Error('Expected verification handoff');
+    const reviewed = taskReaches(t, 'review');
+    await finish(verification, 'input[autocomplete=one-time-code]', '已发布');
+    await reviewed;
+    await t.fake.settled();
+    expect(t.fake.toolCalls.every((call) => !call.isError)).toBe(true);
+    const sessions = (await t.call(listPreviewSessionsOp, { id: task.id })).body;
+    expect(sessions.testTab).toBeUndefined();
+    expect(sessions.attempts).toMatchObject([{ actions: 2, frames: 0, screenshots: [] }]);
+    const [attempt] = sessions.attempts;
+    if (attempt === undefined) throw new Error('Expected action history');
+    const history = (await t.call(listBrowserTestActionsOp, { attemptId: attempt.attemptId })).body.items;
+    expect(JSON.stringify(history.flatMap((entry) => entry.requests))).not.toMatch(/case-session|case-verify/);
+    expect(history[1]?.requests).toContainEqual(
+      expect.objectContaining({ method: 'POST', url: `${origin}/case-gate` }),
+    );
+    expect(writes).toEqual(['POST /case-session', 'POST /case-gate', 'POST /case-verify']);
+  });
+
+  it('保存、编辑并复跑固定用例；断言失败时保留相关请求', async () => {
     await browserFor();
     const { project } = await addProject(t);
     const projectId = project.id;
@@ -325,7 +406,7 @@ describe('浏览器测试流程', () => {
           step: 2,
           outcome: 'failed',
           actual: 'saved',
-          screenshot: '1.jpg',
+          screenshot: null,
           requests: [{ method: 'POST', status: 201, url: `${origin}/api/case-save` }],
         },
       ],
@@ -333,8 +414,7 @@ describe('浏览器测试流程', () => {
     expect(writes).toEqual(['POST /api/case-save?trace=private']);
     expect(t.fake.sessions).toHaveLength(0);
     if (report === undefined) throw new Error('Expected test report');
-    const file = await readFile(t.app.services.browser.attemptFile(report.attemptId, '1.jpg'));
-    expect(file.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]));
+    expect((await t.call(listPreviewSessionsOp, { id: first.id })).body.attempts).toEqual([]);
 
     const updated = await t.call(updateBrowserCaseOp, {
       projectId,
@@ -388,7 +468,7 @@ describe('浏览器测试流程', () => {
         {
           step: 1,
           outcome: 'blocked',
-          screenshot: '1.jpg',
+          screenshot: null,
           requests: expect.arrayContaining([
             { method: 'POST', url: `${origin}/api/case-save`, blocked: 'read_only', status: null, failed: true },
           ]),
@@ -471,7 +551,19 @@ describe('浏览器测试流程', () => {
       expect.stringMatching(/address any submission errors.*agent-workflow_browser_submit_report/s),
     ]);
     expect(t.fake.aborts).toContain(submit?.sessionId);
-    expect((await t.call(listPreviewSessionsOp, { id })).body.attempts).toMatchObject([{ screenshots: ['1.jpg'] }]);
+    const sessions = (await t.call(listPreviewSessionsOp, { id })).body;
+    expect(sessions.testTab).toBeUndefined();
+    expect(sessions.attempts).toMatchObject([{ frames: 0, actions: 2, screenshots: ['1.jpg'] }]);
+    const [attempt] = sessions.attempts;
+    if (attempt === undefined) throw new Error('Expected browser test history');
+    expect((await t.call(listBrowserTestActionsOp, { attemptId: attempt.attemptId })).body.items).toMatchObject([
+      { tool: 'browser_open', passed: true },
+      {
+        tool: 'browser_click',
+        requests: expect.arrayContaining([expect.objectContaining({ method: 'POST', url: `${origin}/api/write` })]),
+      },
+    ]);
+    expect((await t.call(captureBrowserTestOp, { taskId: id, attemptId: attempt.attemptId })).status).toBe(409);
   });
 });
 

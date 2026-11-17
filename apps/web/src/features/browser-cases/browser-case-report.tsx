@@ -1,15 +1,10 @@
-import {
-  type BrowserCase,
-  BrowserCaseOutcome,
-  type BrowserCaseStepResult,
-  type BrowserCaseReport as Report,
-} from '@aw/shared';
+import type { BrowserCase, BrowserCaseStepResult, BrowserCaseReport as Report } from '@aw/shared';
 import { BROWSER_CASE_COPY as C } from '../../copy/browser-cases.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { attemptFileUrl, useImage } from '../preview/preview.queries.ts';
 import styles from './browser-case-report.module.css';
 
-function StepScreenshot({ attemptId, file }: { attemptId: string; file: string }) {
+export function StepScreenshot({ attemptId, file }: { attemptId: string; file: string }) {
   const src = useImage(attemptFileUrl(attemptId, file));
   return src === null ? null : (
     <figure className={styles.evidence}>
@@ -23,7 +18,7 @@ function StepScreenshot({ attemptId, file }: { attemptId: string; file: string }
   );
 }
 
-function StepRequests({ requests }: { requests: BrowserCaseStepResult['requests'] }) {
+export function StepRequests({ requests }: { requests: BrowserCaseStepResult['requests'] }) {
   return (
     <details>
       <summary>
@@ -82,13 +77,7 @@ export function BrowserCaseReport({ test, report }: { test: BrowserCase; report:
                 </p>
               )}
               {result?.errorCode != null && <p className="hint">{ERROR_COPY[result.errorCode]}</p>}
-              {result !== undefined &&
-                result.outcome !== BrowserCaseOutcome.Passed &&
-                (result.screenshot === null ? (
-                  <p className="hint">{C.noEvidence}</p>
-                ) : (
-                  <StepScreenshot attemptId={report.attemptId} file={result.screenshot} />
-                ))}
+              {result?.screenshot != null && <StepScreenshot attemptId={report.attemptId} file={result.screenshot} />}
               {result !== undefined && <StepRequests requests={result.requests} />}
             </li>
           );

@@ -34,9 +34,11 @@ import { getAttachmentOp, previewAttachmentSheetOp, removeAttachmentOp, snapshot
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
 import { createBatchOp, deliverBatchOp, getBatchOp, listBatchesOp } from './batches.ts';
 import {
+  captureBrowserTestOp,
   clearSiteLoginOp,
   closeUserTabOp,
   listBrowserFramesOp,
+  listBrowserTestActionsOp,
   listSiteLoginsOp,
   navigateUserTabOp,
   openLoginTabOp,
@@ -371,6 +373,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   clearSiteLoginOp,
   readWebsiteOp,
   listBrowserFramesOp,
+  listBrowserTestActionsOp,
+  captureBrowserTestOp,
   openUserTabOp,
   pickFrontendElementOp,
   navigateUserTabOp,

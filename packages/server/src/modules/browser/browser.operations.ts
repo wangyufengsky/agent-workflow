@@ -1,7 +1,9 @@
 import {
+  captureBrowserTestOp,
   clearSiteLoginOp,
   closeUserTabOp,
   listBrowserFramesOp,
+  listBrowserTestActionsOp,
   listSiteLoginsOp,
   navigateUserTabOp,
   openLoginTabOp,
@@ -32,6 +34,8 @@ export function browserOperations(browser: BrowserService) {
     implement(setUserViewportOp, ({ tabId, preset }) => browser.setUserViewport(tabId, preset)),
     implement(userTabLogsOp, ({ tabId }) => browser.userTabLogs(tabId)),
     implement(listBrowserFramesOp, ({ attemptId }) => ({ items: browser.frames(attemptId) })),
+    implement(listBrowserTestActionsOp, ({ attemptId }) => ({ items: browser.testActions(attemptId) })),
+    implement(captureBrowserTestOp, ({ taskId, attemptId }) => browser.captureTest(taskId, attemptId)),
     implement(readWebsiteOp, ({ url }) => browser.readUrl(url)),
   ];
 }

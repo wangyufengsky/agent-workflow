@@ -3,6 +3,7 @@ import {
   type BrowserFrame,
   getPreviewOp,
   listBrowserFramesOp,
+  listBrowserTestActionsOp,
   listPreviewSessionsOp,
   PreviewState,
   startPreviewOp,
@@ -38,6 +39,12 @@ export const framesQuery = (attemptId: string) =>
   queryOptions({
     queryKey: queryKeys.browserFrames(attemptId),
     queryFn: async () => (await callOperation(listBrowserFramesOp, { attemptId })).items,
+  });
+
+export const testActionsQuery = (attemptId: string) =>
+  queryOptions({
+    queryKey: queryKeys.browserTestActions(attemptId),
+    queryFn: async () => (await callOperation(listBrowserTestActionsOp, { attemptId })).items,
   });
 
 export const userTabLogsQuery = (tabId: string) =>

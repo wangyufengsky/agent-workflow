@@ -60,6 +60,7 @@ export const queryKeys = {
   /** Under the task detail: a step's new page check result is a new session (29 §8.1). */
   previewSessions: (taskId: string) => ['tasks', 'detail', taskId, 'preview', 'sessions'],
   browserFrames: (attemptId: string) => ['attempts', attemptId, 'browser-frames'],
+  browserTestActions: (attemptId: string) => ['attempts', attemptId, 'browser-test-actions'],
   /** The user's preview tab: set from its opening and `browser.tab_updated`, never fetched. */
   userTab: (tabId: string) => ['browser', 'tabs', tabId],
   userTabLogs: (tabId: string) => ['browser', 'tabs', tabId, 'logs'],

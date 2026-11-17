@@ -63,7 +63,7 @@ export const BrowserCaseOutcome = {
 } as const;
 export type BrowserCaseOutcome = (typeof BrowserCaseOutcome)[keyof typeof BrowserCaseOutcome];
 
-const browserCaseRequestSchema = z.object({
+export const browserCaseRequestSchema = z.object({
   method: z.string(),
   url: z.string(),
   status: z.number().int().nullable(),
@@ -98,7 +98,7 @@ export type BrowserCaseChallenge = (typeof BrowserCaseChallenge)[keyof typeof Br
 export const browserCaseHandoffSchema = z.object({
   id: z.string(),
   tabId: z.string(),
-  step: z.number().int().nonnegative(),
+  step: z.number().int().nonnegative().nullable(),
   reason: z.enum(BrowserCaseChallenge),
   active: z.boolean(),
 });

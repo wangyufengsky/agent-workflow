@@ -77,20 +77,22 @@ export function createCaseHandoffs() {
       taskId: string,
       tab: Tab,
       policy: () => BrowserPolicy,
-      step: number,
+      step: number | null,
       reason: BrowserCaseChallenge,
-      signal: AbortSignal,
+      signal?: AbortSignal,
     ): Promise<void> {
-      signal.throwIfAborted();
+      signal?.throwIfAborted();
+      if (waiting.has(taskId))
+        throw new AppError(ErrorCode.BrowserLoginRequired, 'The test tab is already waiting for verification');
       const { promise, resolve, reject } = Promise.withResolvers<void>();
       const dto = { id: randomUUID(), reason, step, tabId: tab.tabId, active: false };
-      const onAbort = () => reject(signal.reason);
+      const onAbort = () => reject(signal?.reason);
       waiting.set(taskId, { dto, tab, policy, finish: resolve, fail: reject, busy: false });
-      signal.addEventListener('abort', onAbort, { once: true });
+      signal?.addEventListener('abort', onAbort, { once: true });
       try {
         await promise;
       } finally {
-        signal.removeEventListener('abort', onAbort);
+        signal?.removeEventListener('abort', onAbort);
         waiting.delete(taskId);
       }
     },
@@ -100,6 +102,7 @@ export function createCaseHandoffs() {
       handoff.busy = true;
       try {
         await handoff.tab.setPolicy(manualPolicy(handoff.policy()));
+        handoff.tab.changeOwnership();
         handoff.dto.active = true;
       } finally {
         handoff.busy = false;
@@ -119,6 +122,7 @@ export function createCaseHandoffs() {
         if (urlAccess(handoff.tab.url(), policy) === null)
           throw new AppError(ErrorCode.BrowserSiteNotAllowed, 'Return to the test site before resuming');
         await handoff.tab.setPolicy(policy);
+        handoff.tab.changeOwnership();
         handoff.finish();
       } finally {
         handoff.busy = false;

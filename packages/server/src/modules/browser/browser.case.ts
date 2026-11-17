@@ -10,22 +10,9 @@ import {
 } from '@aw/shared';
 import type { BrowserOwner, BrowserService } from './browser.service.ts';
 import type { RequestEntry } from './browser.tab.ts';
+import { browserTestRequests } from './browser.test-evidence.ts';
 
-const REQUEST_LIMIT = 40;
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
-
-function requestEvidence(requests: RequestEntry[]): BrowserCaseStepResult['requests'] {
-  return requests.slice(-REQUEST_LIMIT).map(({ url, method, status, error, blocked }) => {
-    const address = new URL(url);
-    return {
-      url: address.origin === 'null' ? address.protocol : address.origin + address.pathname,
-      method,
-      status,
-      blocked,
-      failed: error !== null,
-    };
-  });
-}
 
 async function performAction(browser: BrowserService, owner: BrowserOwner, step: BrowserCaseStep, signal: AbortSignal) {
   const { action } = step;
@@ -121,15 +108,13 @@ export async function runBrowserCase(
         requests.some((r) => r.resourceType === 'Document' && (r.error !== null || (r.status ?? 0) >= 400))
       )
         outcome = BrowserCaseOutcome.Failed;
-      const screenshot = outcome === BrowserCaseOutcome.Passed ? null : await browser.caseFailureScreenshot(owner);
-      signal.throwIfAborted();
       steps.push({
         step,
         outcome,
         actual,
         errorCode,
-        screenshot,
-        requests: requestEvidence(requests),
+        screenshot: null,
+        requests: browserTestRequests(requests),
       });
       if (outcome !== BrowserCaseOutcome.Passed) break;
     }

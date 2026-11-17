@@ -349,5 +349,13 @@ export const BROWSER_TEST_COPY = {
   noWrites: '拦截写请求',
   screenshots: '测试截图',
   browser: '测试浏览器',
+  watching: '正在观看 · 由测试操作',
+  desktopOnly: '在桌面应用中观看实时测试页面。',
+  waitingPage: '等待测试打开网页。',
+  finishedPage: '测试页签已关闭，可查看下方记录。',
+  actions: '操作与请求',
+  actionPassed: '已执行',
+  actionFailed: '未完成',
+  capture: '保存截图',
   attempt: (number: number) => `第 ${number} 次测试`,
 } as const;

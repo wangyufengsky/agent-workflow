@@ -360,7 +360,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
         projectId: attempts.service.projectOf(attempt.id),
         filesDir: attempts.filesDirOf(attempt),
         browserTest: test.scope,
-        caseSession: true,
+        savedCase: true,
       };
       return runBrowserCase(browser.service, owner, test, signal, (step, reason) =>
         attempts.service.waitForLocalInput(attempt.id, () =>

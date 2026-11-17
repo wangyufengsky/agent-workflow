@@ -59,10 +59,12 @@ test('原生测试页签完成登录后继续，结束时清理测试分区的 C
       await expect(page.getByText('等待登录 · 打开测试页面')).toBeVisible();
       const { browserCaseHandoff } = await (await request.get(`${api}/tasks/${id}`, { headers })).json();
       const partition = `aw-attempt-${String(browserCaseHandoff.tabId).split(':')[0]}`;
-      await page.getByRole('button', { name: '接管测试页签' }).click();
-      await expect(page.getByTestId('case-handoff-surface')).toBeVisible();
+      await expect(page.getByTestId('browser-test-surface')).toBeVisible();
       const count = () =>
         app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.contentView.children.length);
+      await expect.poll(count).toBe(2);
+      await page.getByRole('button', { name: '接管测试页签' }).click();
+      await expect(page.getByTestId('case-handoff-surface')).toBeVisible();
       await expect.poll(count).toBe(1);
       await page.getByRole('tab', { name: '进度', exact: true }).click();
       await expect.poll(count).toBe(0);
@@ -90,8 +92,112 @@ test('原生测试页签完成登录后继续，结束时清理测试分区的 C
       await page.getByRole('button', { name: '验证完成，继续测试' }).click();
       await expect.poll(count).toBe(0);
       await page.getByRole('tab', { name: '进度', exact: true }).click();
-      await expect(page.getByText('步骤 1 · 检查登录结果 · 通过')).toBeVisible();
+      await expect(page.getByTestId('result-card').getByText('步骤 1 · 检查登录结果 · 通过')).toBeVisible();
       await expect.poll(cookieNames).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  } finally {
+    target.closeAllConnections();
+    await new Promise<void>((resolve, reject) =>
+      target.close((error) => (error === undefined ? resolve() : reject(error))),
+    );
+  }
+});
+
+test('AI 测试的同一原生页签只观看，按需截图，结束后只保留记录', async ({ request }) => {
+  let clicks = 0;
+  const target = createServer((req, res) => {
+    if (req.url?.startsWith('/api/clicked')) {
+      clicks += 1;
+      res.writeHead(204).end();
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end('<button onclick="fetch(\'/api/clicked?trace=private\')">执行</button><p id="gate">等待操作</p>');
+  });
+  await new Promise<void>((resolve) => target.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = target.address();
+    if (address === null || typeof address === 'string') throw new Error('Expected a local HTTP port');
+    const url = `http://127.0.0.1:${address.port}/`;
+    const app = await electron.launch({ args: ['e2e/fixtures/user-preview/main.cjs'] });
+    try {
+      const base = await app.evaluate(() => globalThis.previewHarness.ready);
+      const token = await app.evaluate(() => globalThis.previewHarness.token);
+      const headers = { Authorization: `Bearer ${token}` };
+      const api = `${base}/api/v1`;
+      const page = await app.firstWindow();
+      const project = await request.post(`${api}/projects`, { headers, data: { repoPath: createRepo() } });
+      expect(project.status()).toBe(201);
+      const { id: projectId } = await project.json();
+      const { items: workflows } = await (await request.get(`${api}/workflows`, { headers })).json();
+      const workflowId = workflows.find((workflow: { key: string }) => workflow.key === 'browser_test').id;
+      const queued = await request.post(`${api}/dev/fake-opencode/scripts`, {
+        headers,
+        data: {
+          match: { title: '· 执行浏览器测试' },
+          steps: [
+            { type: 'callTool', name: 'browser_open', args: { url } },
+            { type: 'callTool', name: 'browser_wait_for', args: { text: '开放自动操作', timeoutMs: 10000 } },
+            { type: 'callTool', name: 'browser_click', args: { ref: 'e1' } },
+            { type: 'callTool', name: 'browser_submit_report', args: { summary: '浏览器测试通过' } },
+          ],
+        },
+      });
+      expect(queued.ok()).toBe(true);
+      const created = await request.post(`${api}/tasks`, {
+        headers,
+        data: {
+          projectId,
+          workflowId,
+          requirement: '检查实时测试页面',
+          browserTest: { target: url, writes: [] },
+          start: false,
+        },
+      });
+      expect(created.status()).toBe(201);
+      const { id } = await created.json();
+      await page.goto(`${base}/tasks/${id}?view=preview`);
+      const started = await request.post(`${api}/tasks/${id}/start`, { headers, data: {} });
+      expect(started.ok()).toBe(true);
+      await expect(page.getByTestId('browser-test-surface')).toBeVisible();
+      await expect(page.getByText('正在观看 · 由测试操作')).toBeVisible();
+      const watched = await app.evaluate(async ({ BrowserWindow }) => {
+        const children = BrowserWindow.getAllWindows()[0]?.contentView.children ?? [];
+        const [view, shield] = children;
+        if (view === undefined || !('webContents' in view) || shield === undefined || !('webContents' in shield))
+          return null;
+        const contents = view.webContents;
+        const page = await contents.debugger.sendCommand('Runtime.evaluate', {
+          expression: `(() => { const r = document.querySelector('button').getBoundingClientRect();
+            return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2), width: innerWidth, text: document.body.innerText }; })()`,
+          returnByValue: true,
+        });
+        const { x, y, width, text } = page.result.value;
+        shield.webContents.focus();
+        shield.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+        shield.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
+        return { width, text, bounds: view.getBounds(), shieldBounds: shield.getBounds() };
+      });
+      expect(watched).toMatchObject({ width: 1280, text: expect.stringContaining('等待操作') });
+      expect(watched?.bounds).toEqual(watched?.shieldBounds);
+      await page.getByRole('button', { name: '保存截图' }).click();
+      await expect(page.getByText('测试截图', { exact: true })).toBeVisible();
+      expect(clicks).toBe(0);
+      await app.evaluate(async ({ BrowserWindow }) => {
+        const view = BrowserWindow.getAllWindows()[0]?.contentView.children[0];
+        if (view === undefined || !('webContents' in view)) throw new Error('No native test view');
+        await view.webContents.debugger.sendCommand('Runtime.evaluate', {
+          expression: "document.getElementById('gate').textContent = '开放自动操作'",
+        });
+      });
+      await expect(page.getByText('测试页签已关闭，可查看下方记录。')).toBeVisible();
+      await expect(page.getByText('操作与请求', { exact: true })).toBeVisible();
+      expect(clicks).toBe(1);
+      const sessions = await (await request.get(`${api}/tasks/${id}/preview/sessions`, { headers })).json();
+      expect(sessions.testTab).toBeUndefined();
+      expect(sessions.attempts).toMatchObject([{ frames: 0, actions: 3, screenshots: ['1.jpg'] }]);
     } finally {
       await app.close();
     }

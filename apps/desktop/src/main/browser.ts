@@ -47,6 +47,38 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
   const byContents = new Map<number, Tab>();
   const configured = new Set<Session>();
   const network = createPartitionNetwork();
+  let watchShield: WebContentsView | undefined;
+  let shieldedTab: Tab | undefined;
+
+  /** 观看时透明视图接收窗口输入，CDP 操作仍直接发给下方测试页签。 */
+  function unshield(tab: Tab): void {
+    if (shieldedTab !== tab || watchShield === undefined) return;
+    const win = window();
+    if (win !== null && !win.isDestroyed()) win.contentView.removeChildView(watchShield);
+    shieldedTab = undefined;
+  }
+
+  function shield(tab: Tab): void {
+    const win = window();
+    if (win === null || !tab.onWindow || !tab.caseSession || hasUserControl(tab)) return;
+    if (watchShield === undefined) {
+      watchShield = new WebContentsView({ webPreferences: { sandbox: true, backgroundThrottling: false } });
+      watchShield.setBackgroundColor('#00000000');
+      watchShield.webContents.on('before-input-event', (event, input) => {
+        if (input.type !== 'keyDown' || (!input.meta && !input.control)) return;
+        const shortcut = browserShortcutSchema.safeParse(input.key.toLowerCase());
+        if (!shortcut.success) return;
+        event.preventDefault();
+        const current = window();
+        current?.webContents.focus();
+        current?.webContents.send('aw:browser-shortcut', shortcut.data);
+      });
+    }
+    if (shieldedTab !== undefined && shieldedTab !== tab) unshield(shieldedTab);
+    if (shieldedTab !== tab) win.contentView.addChildView(watchShield);
+    watchShield.setBounds(tab.view.getBounds());
+    shieldedTab = tab;
+  }
 
   function tabOf(tabId: string): Tab {
     const tab = tabs.get(tabId);
@@ -135,6 +167,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
   }
 
   function hide(tab: Tab): void {
+    unshield(tab);
     const win = window();
     if (tab.onWindow && win !== null && !win.isDestroyed()) win.contentView.removeChildView(tab.view);
     tab.onWindow = false;
@@ -274,8 +307,15 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
           return open(op);
         case 'setPolicy': {
           const tab = tabOf(op.tabId);
+          const wasManual = tab.caseSession && hasUserControl(tab);
           tab.policy = op.policy;
-          if (tab.caseSession && !hasUserControl(tab)) hide(tab);
+          if (tab.caseSession) {
+            if (hasUserControl(tab)) unshield(tab);
+            else {
+              if (wasManual) window()?.webContents.focus();
+              shield(tab);
+            }
+          }
           return null;
         }
         case 'close': {
@@ -295,7 +335,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
      */
     place(tabId: string, rect: BrowserRect | null): void {
       const tab = tabs.get(tabId);
-      if (tab === undefined || (rect !== null && !hasUserControl(tab))) return;
+      if (tab === undefined || (rect !== null && !tab.caseSession && !hasUserControl(tab))) return;
       const win = window();
       if (win === null) return;
       if (rect === null) {
@@ -305,6 +345,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
       if (!tab.onWindow) win.contentView.addChildView(tab.view);
       tab.onWindow = true;
       tab.view.setBounds(rect);
+      shield(tab);
     },
     back: (tabId: string) => userTab(tabId).view.webContents.navigationHistory.goBack(),
     forward: (tabId: string) => userTab(tabId).view.webContents.navigationHistory.goForward(),
@@ -352,6 +393,8 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
         if (tab.caseSession || !tab.view.webContents.isDestroyed()) closeAfterLoss(tab);
         else forget(tab);
       }
+      if (watchShield !== undefined && !watchShield.webContents.isDestroyed()) watchShield.webContents.close();
+      watchShield = undefined;
     },
   };
 }

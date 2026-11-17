@@ -121,7 +121,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | GET | `/tasks?projectId&status&displayGroup&archived&limit&cursor` | `{ items: TaskSummaryDTO[], nextCursor }`，`archived`（默认 false）只列未归档的任务，true 只列已归档的（D219）；按 `updatedAt`（同时按编号）倒序分页（§1，`LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX`）；`displayGroup` 在查询中过滤（由 `resolveTaskDisplayGroup` 推出每个状态与是否有打开的提问 / 权限 / 验收条目的组合），每页都是满的；游标为上一页最后一个任务的 `<updatedAt>.<seq>`，格式不对 400 `VALIDATION_FAILED` |
 | POST | `/tasks` | 创建，见下 |
 | GET | `/tasks/:id` | `TaskDetailDTO` |
-| GET | `/tasks/:id/preview/sessions` | `{ attempts: [{ attemptId, nodeId, kind, status, frames }], checks: [{ nodeId, passed }] }`：任务预览页签可看的会话（v1.3 B2，29 §8.1）——留下过动作画面的尝试，与最近一次页面体检有截图的步骤 |
+| GET | `/tasks/:id/preview/sessions` | `{ attempts: [{ attemptId, nodeId, kind, status, frames }], checks: [{ nodeId, passed }] }`：任务预览页签可看的会话（v1.3 B2，29 §8.1）。浏览器测试额外返回运行中的 `testTab`，各尝试列出操作记录数量与按需截图 |
 | GET | `/tasks/:id/timeline?afterId` | `{ items: TaskEventDTO[] }`：`id > afterId` 的 `task_events`，按 id 升序 |
 | POST | `/tasks/:id/start` | `draft → preparing` |
 | POST | `/tasks/:id/pause` 🅿 | `running → paused`：不再派发新步骤，进行中的步骤继续 |
@@ -546,6 +546,8 @@ N2a 实现组合模板，N2b 加入 AI 拆解（`templateKey` 省略时）、重
 | GET | `/browser/tabs/:tabId/logs` | `browser.userTabLogs` | read | `{ errors: [{ message, source }], requests: [{ method, url, status, error }] }`：用户预览标签页当前页面的控制台错误（含未捕获异常）与失败请求，底栏抽屉的明细（v1.3 B2） |
 | POST | `/browser/tabs/:tabId/viewport` | `browser.setUserViewport` | read | `{ preset }`：桌面铺满放置区域，平板 / 手机在区域里模拟该尺寸（`Emulation.setDeviceMetricsOverride`）|
 | GET | `/attempts/:attemptId/browser-frames` | `browser.listFrames` | read | `{ items: BrowserFrame[] }`：一次尝试的动作画面，按 `seq` 排列（读尝试目录里的 `frames.jsonl`，尝试结束、应用重启后照样可读；没有画面为空列表；v1.3 B2，29 §8.2） |
+| GET | `/attempts/:attemptId/browser-test-actions` | `browser.listTestActions` | read | AI 浏览器测试的操作结果和相关请求，按执行顺序返回 |
+| POST | `/tasks/:taskId/browser-test-screenshot` | `browser.captureTest` | read | 指定 `attemptId`，保存正在运行且无需身份验证的测试页截图，返回文件名 |
 
 ### 13f″. 助手网页文字读取（29 §9）
 

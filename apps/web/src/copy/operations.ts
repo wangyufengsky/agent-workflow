@@ -54,6 +54,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.browser.listSiteLogins': '已登录的网站',
   'op.browser.clearSiteLogin': '退出网站登录',
   'op.browser.listFrames': 'AI 浏览器动作的画面',
+  'op.browser.listTestActions': '查看浏览器测试步骤和请求',
+  'op.browser.captureTest': '保存测试页截图',
   'op.browser.openUserTab': '打开任务的页面预览',
   'op.browser.navigateUserTab': '在预览里打开页面',
   'op.browser.setUserViewport': '切换预览的尺寸',
