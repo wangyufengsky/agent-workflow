@@ -204,15 +204,8 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
 
   /** 开始命令单独计时，失败后保留原会话并继续开发。 */
   async function runStartCommand(session: LiveSession, text: string, cancelled: AbortSignal): Promise<void> {
-    const deadline = new AbortController();
-    const cancel = clock.schedule(session.timeoutMs, () =>
-      deadline.abort(new Error('Session start command timed out')),
-    );
     try {
-      await state.runCommand(session, text, {
-        messageId: createMessageId(clock.now()),
-        signal: AbortSignal.any([cancelled, deadline.signal]),
-      });
+      await state.runCommand(session, text, { messageId: createMessageId(clock.now()), signal: cancelled });
     } catch (err) {
       if (cancelled.aborted) return;
       if (!(err instanceof AppError)) throw err;
@@ -224,8 +217,6 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         state.inbox.dismissOpen({ attemptId: attempt.id });
         reactions.resume(session);
       }
-    } finally {
-      cancel();
     }
   }
 

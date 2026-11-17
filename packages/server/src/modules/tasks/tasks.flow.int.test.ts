@@ -8,6 +8,7 @@ import {
   listInboxOp,
   readonlyBashRules,
   ServerEventType,
+  TranscriptSystemEvent,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -41,6 +42,18 @@ describe('只读角色执行的步骤', () => {
   });
 });
 
+function hangSessionCommand(app: TestApp) {
+  const started = Promise.withResolvers<AbortSignal>();
+  vi.spyOn(app.fake, 'runCommand').mockImplementationOnce(({ signal }) => {
+    if (signal === undefined) throw new Error('Expected a command timeout signal');
+    started.resolve(signal);
+    return new Promise<void>((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new AppError(ErrorCode.OpencodeRequestFailed)), { once: true });
+    });
+  });
+  return started.promise;
+}
+
 it('开始命令等待模型超过 30 秒，耗尽配置时限后开发步骤获得单独的完整时限', async () => {
   const clock = createFakeClock();
   const isolated = await createTestApp({ clock });
@@ -51,19 +64,13 @@ it('开始命令等待模型超过 30 秒，耗尽配置时限后开发步骤获
       'node.maxAttempts': 1,
     });
     const { project } = await addProject(isolated, { checkCommand: null });
-    const commandStarted = Promise.withResolvers<void>();
-    vi.spyOn(isolated.fake, 'runCommand').mockImplementation(({ signal }) => {
-      commandStarted.resolve();
-      return new Promise<void>((_resolve, reject) => {
-        signal?.addEventListener('abort', () => reject(new AppError(ErrorCode.OpencodeRequestFailed)), { once: true });
-      });
-    });
+    const commandStarted = hangSessionCommand(isolated);
     isolated.fake.enqueue(script().hang());
     const sent = waitForEvent(isolated.app.events, ServerEventType.AttemptTranscript, ({ entries }) =>
       entries.some((entry) => entry.kind === 'user_message' && entry.data.text.includes('Make a queue probe')),
     );
     await createTask(isolated, { projectId: project.id, workflow: 'frontend', requirement: 'Make a queue probe' });
-    await commandStarted.promise;
+    await commandStarted;
     clock.advance(31_000);
     expect(isolated.fake.prompts).toHaveLength(0);
 
@@ -79,6 +86,44 @@ it('开始命令等待模型超过 30 秒，耗尽配置时限后开发步骤获
     );
     clock.advance(1_000);
     expect((await failed).attempt.error?.code).toBe(ErrorCode.AttemptTimeout);
+  } finally {
+    await isolated.close();
+  }
+});
+
+it('原会话等待结束命令时后续步骤照常完成，超时后任务仍待交付', async () => {
+  const clock = createFakeClock();
+  const isolated = await createTestApp({ clock });
+  try {
+    await isolated.call(updateSettingsOp, { 'ai.sessionEndCommand': '/report complete', 'attempt.timeoutMinutes': 2 });
+    const { project } = await addProject(isolated, { checkCommand: null });
+    const commandStarted = hangSessionCommand(isolated);
+    isolated.fake.enqueue(script().callTool('submit_result', { summary: 'Found the cause' }), { title: '定位根因' });
+    isolated.fake.enqueue(script().callTool('submit_result', { summary: 'Fixed the bug' }), { title: '· 修复' });
+    isolated.fake.enqueue(script().callTool('submit_review', { verdict: 'pass', summary: 'Verified the fix' }), {
+      agent: 'aw-reviewer',
+    });
+    const review = taskReaches(isolated, 'review');
+    const task = await createTask(isolated, { projectId: project.id, workflow: 'bugfix' });
+    const signal = await commandStarted;
+    await review;
+    clock.advance(119_000);
+    expect(signal.aborted).toBe(false);
+
+    const warning = waitForEvent(isolated.app.events, ServerEventType.AttemptTranscript, ({ entries }) =>
+      entries.some(
+        (entry) => entry.kind === 'system' && entry.data.event === TranscriptSystemEvent.SessionEndCommandFailed,
+      ),
+    );
+    clock.advance(1_000);
+    expect(signal.aborted).toBe(true);
+    const { attemptId } = await warning;
+    await isolated.app.services.attempts.waitForEndCommands(task.id);
+    expect((await isolated.call(getAttemptOp, { id: attemptId })).body).toMatchObject({
+      status: 'succeeded',
+      error: null,
+    });
+    expect((await isolated.call(getTaskOp, { id: task.id })).body.status).toBe('review');
   } finally {
     await isolated.close();
   }

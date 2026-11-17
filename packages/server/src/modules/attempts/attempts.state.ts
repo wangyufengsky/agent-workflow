@@ -28,8 +28,6 @@ import { type Attempt, createAttemptsRepo } from './attempts.repo.ts';
 import type { SessionView } from './attempts.session-view.ts';
 import type { NewTranscriptEntry, TranscriptStore } from './attempts.transcript.ts';
 
-const SESSION_END_COMMAND_TIMEOUT_MS = 30_000;
-
 /** In-memory state of a session we created, kept until it goes quiet so trailing events still reach the transcript. */
 export type LiveSession = {
   attemptId: string;
@@ -275,24 +273,24 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
     async runCommand(
       session: LiveSession,
       text: string,
-      {
-        messageId,
-        signal = AbortSignal.timeout(SESSION_END_COMMAND_TIMEOUT_MS),
-      }: {
-        messageId?: string;
-        signal?: AbortSignal;
-      } = {},
+      { messageId, signal }: { messageId?: string; signal?: AbortSignal } = {},
     ): Promise<void> {
       transcripts.append(mustFind(session.attemptId), [{ kind: TranscriptEntryKind.UserMessage, data: { text } }]);
-      await opencode.runCommand({
-        sessionId: session.sessionId,
-        directory: session.directory,
-        agent: session.agent,
-        ...(session.model === undefined ? {} : { model: session.model }),
-        text,
-        ...(messageId === undefined ? {} : { messageId }),
-        signal,
-      });
+      const deadline = new AbortController();
+      const cancel = clock.schedule(session.timeoutMs, () => deadline.abort(new Error('Session command timed out')));
+      try {
+        await opencode.runCommand({
+          sessionId: session.sessionId,
+          directory: session.directory,
+          agent: session.agent,
+          ...(session.model === undefined ? {} : { model: session.model }),
+          text,
+          ...(messageId === undefined ? {} : { messageId }),
+          signal: signal === undefined ? deadline.signal : AbortSignal.any([signal, deadline.signal]),
+        });
+      } finally {
+        cancel();
+      }
     },
 
     stopSession: (session: LiveSession, signal?: AbortSignal) =>
