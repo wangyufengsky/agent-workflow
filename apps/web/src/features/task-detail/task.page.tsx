@@ -22,6 +22,7 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { BROWSER_TEST_COPY, TASK_COPY as C } from '../../copy/tasks.ts';
 import { ArtifactWorkbench } from '../artifacts/artifact-workbench.tsx';
+import { TaskBrowserCase } from '../browser-cases/task-browser-case.tsx';
 import { FrontendRoundHistory, FrontendWorkbench } from '../preview/frontend-workbench.tsx';
 import { BrowserTestPane, PreviewPane } from '../preview/preview-pane.tsx';
 import { projectQuery } from '../projects/projects.queries.ts';
@@ -245,6 +246,9 @@ export function TaskPage() {
       />
       {task.data.browserTest !== undefined && (
         <div className="col">
+          <div className="row">
+            <TaskBrowserCase key={task.data.id} task={task.data} />
+          </div>
           <p className="hint">
             {BROWSER_TEST_COPY.target} · {task.data.browserTest.target}
           </p>

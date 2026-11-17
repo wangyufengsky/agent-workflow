@@ -5,6 +5,8 @@ import {
   type ArtifactRevision,
   type AttemptDTO,
   BatchDeliveryOutcome,
+  BROWSER_TEST_WORKFLOW_KEY,
+  type BrowserCase,
   type CreateTaskRequest,
   type DeliverRequest,
   DeliveryStatus,
@@ -34,6 +36,7 @@ import {
 } from '@aw/shared';
 import type { EventBus } from '../../core/event-bus.ts';
 import { listTaskEvents } from '../timeline/index.ts';
+import { createBrowserCases } from './browser-cases.service.ts';
 import { createTaskActions } from './tasks.actions.ts';
 import { createTaskAgentsMd } from './tasks.agents-md.ts';
 import { createTaskArtifacts } from './tasks.artifacts.ts';
@@ -58,6 +61,7 @@ import { createTaskState, type TasksServiceDeps } from './tasks.state.ts';
 export function createTasksService(deps: TasksServiceDeps & { events: EventBus }) {
   const { db, plans, nodes, attempts, inbox, worktrees, workflows } = deps;
   const state = createTaskState(deps);
+  const browserCases = createBrowserCases(deps.db, deps.projects);
   const delegation = createTaskDelegation(deps, state);
   // A finished verify step's conclusions are written with it (31 §2.2).
   nodes.onVerified((node, commitSha) => state.verify.record(node, commitSha));
@@ -123,6 +127,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
         ? { codeReview: { report: reviewResult?.reviewReport ?? null, summary: reviewResult?.summary ?? null } }
         : {}),
       requirement: task.requirement,
+      ...(task.browserCase === null ? {} : { browserCase: task.browserCase }),
       ...(task.browserTest === null ? {} : { browserTest: task.browserTest }),
       ...(skills.length === 0 ? {} : { skills: skills.map(({ id, name, version }) => ({ id, name, version })) }),
       failedPhase: task.failedPhase,
@@ -162,6 +167,22 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     };
   }
 
+  async function startBrowserCase(projectId: string, browserCase: BrowserCase, baseBranch?: string) {
+    const workflow = workflows.latest(BROWSER_TEST_WORKFLOW_KEY);
+    const input = {
+      projectId,
+      workflowId: workflow.id,
+      requirement: browserCase.name,
+      title: browserCase.name,
+      browserTest: browserCase.scope,
+      ...(baseBranch === undefined ? {} : { baseBranch }),
+    };
+    const branch = await lifecycle.checkCreate(input);
+    const id = lifecycle.insertDraft({ ...input, baseBranch: branch, browserCase });
+    lifecycle.start(id);
+    return detail(id);
+  }
+
   async function deliver(id: string, request: Omit<DeliverRequest, 'id'>): Promise<TaskDetailDTO> {
     if (isFrontend(id) && !frontendVerified(nodes.listByTask(id)))
       throw new AppError(ErrorCode.StateTransitionInvalid, 'Finish frontend verification before delivery');
@@ -178,6 +199,15 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       return detail(id);
     },
     isFrontend,
+    browserCases,
+    runBrowserCase: (projectId: string, caseId: string, revision: number) =>
+      startBrowserCase(projectId, browserCases.revision(projectId, caseId, revision)),
+    rerunBrowserCase(id: string) {
+      const task = state.get(id);
+      if (task.browserCase === null)
+        throw new AppError(ErrorCode.ValidationFailed, 'There is no saved case snapshot in this task');
+      return startBrowserCase(task.projectId, task.browserCase, task.baseBranch);
+    },
     latestArtifactOf(id: string) {
       const task = state.get(id);
       const workflow = workflows.get(task.workflowId);

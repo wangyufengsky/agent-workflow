@@ -4,7 +4,7 @@ import { dbTypeSchema } from '../../enums/system.ts';
 import { attemptKindSchema, nodeStatusSchema } from '../../enums/task.ts';
 import { workflowDeliverableSchema } from '../../enums/workflow.ts';
 import { nodeAcceptanceSchema, planNodeSpecSchema } from '../../workflow/plan-graph.ts';
-import { browserTestScopeSchema } from '../api/tasks.ts';
+import { browserTestScopeSchema } from '../api/browser-cases.ts';
 import { nodeHandoffOutputSchema } from './node-handoff.ts';
 
 export const getTaskContextInputSchema = z.object({});

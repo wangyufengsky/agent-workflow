@@ -11,6 +11,7 @@ import {
   BROWSER_FRAME_WIDTH,
   BROWSER_READ_TIMEOUT_MS,
   type BrowserActionOutput,
+  type BrowserCaseAssertion,
   type BrowserFrame,
   type BrowserKey,
   type BrowserNetwork,
@@ -42,6 +43,7 @@ import type { PreviewsService } from '../previews/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { createActions } from './browser.actions.ts';
+import { evaluateCaseAssertion, resolveCaseRef } from './browser.case-dom.ts';
 import { type PageCheckPage, type PageCheckResult, pageCheckOutput, pageCheckVerdict } from './browser.check.ts';
 import { createBrowserControl } from './browser.control.ts';
 import { createFrontendPreview } from './browser.frontend.ts';
@@ -228,7 +230,7 @@ export function createBrowserService({
     return tab;
   }
 
-  async function tabFor(session: Session, kind: BrowserTabKind): Promise<Tab> {
+  async function tabFor(session: Session, kind: BrowserTabKind, signal?: AbortSignal): Promise<Tab> {
     const existing = session.tabs[kind];
     if (existing !== undefined) return existing;
     const { owner } = session;
@@ -237,6 +239,7 @@ export function createBrowserService({
       clock,
       log,
       tabId: `${owner.id}:${kind}`,
+      ...(signal === undefined ? {} : { signal }),
       kind,
       // The preview tab starts clean for each attempt; websites share the user's logins (29 §5.3).
       partition: kind === BrowserTabKind.Preview ? `aw-attempt-${owner.id}` : SITES_PARTITION,
@@ -258,12 +261,13 @@ export function createBrowserService({
    * Where a website tab now at `url` asks to log in (29 §5.4), or null: credentials only the user gives (HTTP
    * authentication, a client certificate), or a page that looks like a login page.
    */
-  async function loginAt(tab: Tab, url: string): Promise<string | null> {
+  async function loginAt(tab: Tab, url: string, checkUrl = true): Promise<string | null> {
     const asked = tab.credentialsAsked();
     if (asked !== null) return asked;
     const { hostname, pathname } = new URL(url);
     const where = `${hostname}${pathname}`.toLowerCase();
     if (
+      checkUrl &&
       [...LOGIN_HINTS, ...settings.get('browser.loginUrlPatterns')].some((hint) => where.includes(hint.toLowerCase()))
     ) {
       return url;
@@ -315,12 +319,13 @@ export function createBrowserService({
     for (const url of [page.url, ...also]) if (URL.canParse(url)) pages.set(pageKey(url), text);
   }
 
-  function testControlGuard(owner: BrowserOwner, tab: Tab, ref: string | null) {
+  function testControlGuard(owner: BrowserOwner, tab: Tab, ref: string | null, forTyping = false) {
     if (owner.browserTest == null) return undefined;
     return async () => {
-      const { sensitive } = await actions.describeControl(tab, ref);
+      const { sensitive, textField } = await actions.describeControl(tab, ref);
       if (sensitive || tab.credentialsAsked() !== null)
         throw new AppError(ErrorCode.BrowserLoginRequired, 'The user handles credentials and file inputs');
+      if (forTyping && !textField) throw new AppError(ErrorCode.BrowserActionFailed, 'Choose an editable text field');
     };
   }
 
@@ -674,7 +679,7 @@ export function createBrowserService({
      * `browser_open` (29 §6): a path starting with / opens in the task's preview (started first when needed), a full
      * address in the preview tab or the website tab by the policy.
      */
-    async open(owner: BrowserOwner, url: string): Promise<BrowserActionOutput> {
+    async open(owner: BrowserOwner, url: string, signal?: AbortSignal): Promise<BrowserActionOutput> {
       if (owner.browserTest != null && !sessions.has(owner.id) && url !== owner.browserTest.target) {
         throw new AppError(ErrorCode.BrowserSiteNotAllowed, 'Open the user-authorized test target first');
       }
@@ -694,6 +699,7 @@ export function createBrowserService({
         const preview = await previews.start(owner.taskId);
         target = `${preview.url}${url}`;
       }
+      signal?.throwIfAborted();
       const session = sessionOf(owner);
       // Normalized here, as the policy expects (shared has no URL parser).
       const normalized = URL.canParse(target) ? new URL(target).href : target;
@@ -703,7 +709,8 @@ export function createBrowserService({
           host: URL.canParse(target) ? new URL(target).host : target,
         });
       }
-      const tab = await tabFor(session, access.tab);
+      const tab = await tabFor(session, access.tab, signal);
+      signal?.throwIfAborted();
       session.current = tab;
       tab.begin();
       await tab.cdp('Page.navigate', { url: normalized });
@@ -713,13 +720,35 @@ export function createBrowserService({
         (access.tab === BrowserTabKind.Site || owner.browserTest != null) &&
         URL.canParse(output.url) &&
         urlAccess(output.url, policyFor(owner)) !== null
-          ? await loginAt(tab, output.url)
+          ? await loginAt(tab, output.url, access.tab === BrowserTabKind.Site)
           : null;
       if (login !== null) {
         throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: login });
       }
       remember(owner, output, normalized);
       return output;
+    },
+
+    beginCaseStep(owner: BrowserOwner): void {
+      sessions.get(owner.id)?.current?.begin();
+    },
+
+    caseRequests(owner: BrowserOwner) {
+      return sessions.get(owner.id)?.current?.facts().requests ?? [];
+    },
+
+    resolveCaseRef: (owner: BrowserOwner, selector: string) => resolveCaseRef(current(owner), selector),
+    evaluateCaseAssertion: (owner: BrowserOwner, expect: BrowserCaseAssertion) =>
+      evaluateCaseAssertion(current(owner), expect),
+
+    async caseFailureScreenshot(owner: BrowserOwner): Promise<string | null> {
+      if (sessions.get(owner.id)?.current == null) return null;
+      try {
+        return (await this.screenshot(owner, { fullPage: false })).file;
+      } catch (err) {
+        log.warn({ err, attemptId: owner.id }, 'browser case screenshot unavailable');
+        return null;
+      }
     },
 
     async snapshot(owner: BrowserOwner): Promise<BrowserPage> {
@@ -732,7 +761,9 @@ export function createBrowserService({
     click: (owner: BrowserOwner, ref: string) =>
       act(owner, McpToolName.BrowserClick, (tab) => actions.click(tab, ref, testControlGuard(owner, tab, ref))),
     type: (owner: BrowserOwner, ref: string, input: { text: string; clear: boolean; submit: boolean }) =>
-      act(owner, McpToolName.BrowserType, (tab) => actions.type(tab, ref, input, testControlGuard(owner, tab, ref))),
+      act(owner, McpToolName.BrowserType, (tab) =>
+        actions.type(tab, ref, input, testControlGuard(owner, tab, ref, true)),
+      ),
     select: (owner: BrowserOwner, ref: string, values: readonly string[]) =>
       act(owner, McpToolName.BrowserSelect, (tab) =>
         actions.select(tab, ref, values, testControlGuard(owner, tab, ref)),

@@ -279,6 +279,44 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     work().catch((err: unknown) => log.error({ err, nodeId }, 'node background work failed'));
   };
 
+  /** `submit_result` (12 §6.5): records the result and moves the node to acceptance. */
+  async function submitResult(attempt: AttemptDTO, input: NodeResult, ctx: NodeRunContext): Promise<ResultNext> {
+    if (attempt.nodeId === null) throw new Error(`Execute attempt ${attempt.id} has no node`);
+    const node = get(attempt.nodeId);
+    const { checks, manual } = node.acceptance;
+    const target =
+      node.kind === NodeKind.Verify || checks.length > 0
+        ? NodeStatus.Verifying
+        : manual
+          ? NodeStatus.AwaitingAcceptance
+          : NodeStatus.Done;
+    transition(nodeMachine, node.status, NodeEvent.ResultSubmitted, target);
+    // Commit before the node counts as done, so a dependent node never starts before the commit.
+    const sha = target === NodeStatus.Done && ctx.browserCase === undefined ? await commit(node, ctx) : null;
+    // 只读步骤没有自己的提交，也要记录交接依据的任务分支版本。
+    const result =
+      input.handoff === undefined
+        ? input
+        : {
+            ...input,
+            handoffAttemptId: attempt.id,
+            handoffCommitSha: sha ?? (await runGit(['rev-parse', 'HEAD'], { cwd: ctx.directory })).stdout,
+          };
+    unit.transact(() => {
+      attempts.markSubmitted(attempt.id);
+      const current = get(node.id);
+      // The previous result's checks say nothing about this one; why it failed stays in retryFeedback.
+      move(current, NodeEvent.ResultSubmitted, target, {
+        result,
+        checkResults: null,
+        ...(target === NodeStatus.Done ? doneChanges(sha) : {}),
+      });
+      if (target === NodeStatus.AwaitingAcceptance) requestAcceptance(current);
+    });
+    if (target === NodeStatus.Verifying) inBackground(node.id, () => verify(node.id, ctx));
+    return target;
+  }
+
   return {
     /** `listener` runs in the transaction that finishes a verify step, with the commit the step verified. */
     onVerified(listener: (node: Node, commitSha: string) => void): void {
@@ -294,6 +332,26 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         startedAt: clock.now(),
         finishedAt: null,
       });
+      if (ctx.browserCase !== undefined) {
+        const test = ctx.browserCase;
+        inBackground(nodeId, () =>
+          attempts.runLocal(
+            {
+              taskId: ctx.taskId,
+              projectId: ctx.projectId,
+              nodeId,
+              roleId: role.id,
+              directory: ctx.directory,
+            },
+            async (attempt, signal) => {
+              const report = await deps.runBrowserCase(attempt, test, signal);
+              signal.throwIfAborted();
+              await submitResult(attempt, { summary: test.name, browserCaseReport: report }, ctx);
+            },
+          ),
+        );
+        return;
+      }
       const prompt = renderTemplate(prompts[PromptName.StartExecute], {
         taskKey: ctx.taskKey,
         taskTitle: ctx.taskTitle,
@@ -331,43 +389,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
       });
     },
 
-    /** `submit_result` (12 §6.5): records the result and moves the node to acceptance. */
-    async submitResult(attempt: AttemptDTO, input: NodeResult, ctx: NodeRunContext): Promise<ResultNext> {
-      if (attempt.nodeId === null) throw new Error(`Execute attempt ${attempt.id} has no node`);
-      const node = get(attempt.nodeId);
-      const { checks, manual } = node.acceptance;
-      const target =
-        node.kind === NodeKind.Verify || checks.length > 0
-          ? NodeStatus.Verifying
-          : manual
-            ? NodeStatus.AwaitingAcceptance
-            : NodeStatus.Done;
-      transition(nodeMachine, node.status, NodeEvent.ResultSubmitted, target);
-      // Commit before the node counts as done, so a dependent node never starts before the commit.
-      const sha = target === NodeStatus.Done ? await commit(node, ctx) : null;
-      // 只读步骤没有自己的提交，也要记录交接依据的任务分支版本。
-      const result =
-        input.handoff === undefined
-          ? input
-          : {
-              ...input,
-              handoffAttemptId: attempt.id,
-              handoffCommitSha: sha ?? (await runGit(['rev-parse', 'HEAD'], { cwd: ctx.directory })).stdout,
-            };
-      unit.transact(() => {
-        attempts.markSubmitted(attempt.id);
-        const current = get(node.id);
-        // The previous result's checks say nothing about this one; why it failed stays in retryFeedback.
-        move(current, NodeEvent.ResultSubmitted, target, {
-          result,
-          checkResults: null,
-          ...(target === NodeStatus.Done ? doneChanges(sha) : {}),
-        });
-        if (target === NodeStatus.AwaitingAcceptance) requestAcceptance(current);
-      });
-      if (target === NodeStatus.Verifying) inBackground(node.id, () => verify(node.id, ctx));
-      return target;
-    },
+    submitResult,
 
     /** Manual acceptance passed (09 §3). */
     async accept(nodeId: string, ctx: NodeRunContext): Promise<Node> {

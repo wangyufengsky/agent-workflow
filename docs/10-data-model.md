@@ -164,6 +164,10 @@ type Acceptance = {
 };
 ```
 
+### browser_cases
+
+项目内保存的浏览器用例。列为 `id`（主键）、`project_id`（项目删除时级联）、`revision`（从 1 递增）及 `definition`（JSON，含名称、授权范围与有序步骤）。索引 `browser_cases_project_idx` 用于项目列表。每次执行冻结的定义写到 `tasks.browser_case`，步骤证据保存在节点与任务结果的 `browserCaseReport` 字段。迁移 0045。
+
 ### tasks
 
 `skills` 为创建任务时保存的有序 JSON 快照，每项包含 `id`、`name`、`version`、`body` 和可选的 `roleIds`。未指定角色或角色值为 null 时应用于任务的全部角色。旧任务默认空数组。任务使用快照中的版本及角色范围。
@@ -178,6 +182,7 @@ type Acceptance = {
 | title | TEXT | 未填时由需求首行截取 |
 | requirement | TEXT | |
 | browser_test | TEXT nullable | 浏览器测试任务创建时确认的目标与 HTTP 写请求规则，JSON。迁移 0044，历史任务为 null |
+| browser_case | TEXT nullable | 本次运行使用的固定用例定义和版本，JSON。迁移 0045，临时测试为 null |
 | status | TEXT | `TaskStatus` |
 | failed_phase | TEXT NULL | `TaskFailedPhase` |
 | failure | TEXT(JSON) NULL | `{ code, message, details? }` |

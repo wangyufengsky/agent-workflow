@@ -1,5 +1,5 @@
 import type { Prompts } from '@aw/builtin';
-import type { Acceptance, PlanGraph } from '@aw/shared';
+import type { Acceptance, AttemptDTO, BrowserCase, BrowserCaseReport, PlanGraph } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
@@ -23,6 +23,7 @@ export type NodesServiceDeps = {
   settings: SettingsService;
   prompts: Prompts;
   locks: RepoLocks;
+  runBrowserCase: (attempt: AttemptDTO, test: BrowserCase, signal: AbortSignal) => Promise<BrowserCaseReport>;
   isBrowserTestTask?: (taskId: string) => boolean;
 };
 
@@ -33,6 +34,7 @@ export type NodeRunContext = {
   taskKey: string;
   taskTitle: string;
   browserTest?: boolean;
+  browserCase?: BrowserCase;
   requirement: string;
   /** The task worktree. */
   directory: string;

@@ -35,6 +35,7 @@ import { useAsk } from '../assistant/use-ask.ts';
 import { AttachmentList, dropFilesInto, pasteFilesInto, useAttachmentPickers } from '../attachments/attachment-bar.tsx';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
+import { parseBrowserWriteLines } from '../browser-cases/browser-case-scope.tsx';
 import { AllowedWorkflowsField } from '../initiatives/allowed-workflows-field.tsx';
 import { initiativeTemplatesQuery } from '../initiatives/initiatives.queries.ts';
 import { templateChain, useStartInitiative } from '../initiatives/use-start-initiative.ts';
@@ -114,14 +115,7 @@ export function HomeComposer({
   const [testApproved, setTestApproved] = useState(false);
   const testScope = browserTestScopeSchema.safeParse({
     target: testTarget,
-    writes: testWrites
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [method, path, ...rest] = line.split(/\s+/);
-        return { method: method?.toUpperCase(), path: rest.length === 0 ? path : undefined };
-      }),
+    writes: parseBrowserWriteLines(testWrites),
   });
   const task = useStartTask({
     projectId,

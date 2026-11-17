@@ -32,6 +32,7 @@ import {
   type BrowserHost,
   type BrowserService,
   createBrowserModule,
+  runBrowserCase,
   unavailableBrowserHost,
 } from './modules/browser/index.ts';
 import {
@@ -351,6 +352,19 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('onReady', () => projectRuntime.recover());
   server.addHook('preClose', () => projectRuntime.stopAll());
   const nodes = createNodesModule({
+    runBrowserCase: (attempt, test, signal) =>
+      runBrowserCase(
+        browser.service,
+        {
+          id: attempt.id,
+          taskId: attempt.taskId,
+          projectId: attempts.service.projectOf(attempt.id),
+          filesDir: attempts.filesDirOf(attempt),
+          browserTest: test.scope,
+        },
+        test,
+        signal,
+      ),
     isBrowserTestTask: (id): boolean => tasks.service.browserTest(id) !== null,
     db: database.db,
     unit,

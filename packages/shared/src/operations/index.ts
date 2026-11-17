@@ -45,6 +45,13 @@ import {
   userTabLogsOp,
 } from './browser.ts';
 import {
+  createBrowserCaseOp,
+  listBrowserCasesOp,
+  rerunBrowserCaseOp,
+  runBrowserCaseOp,
+  updateBrowserCaseOp,
+} from './browser-cases.ts';
+import {
   changeMasterPasswordOp,
   resetMasterPasswordOp,
   setupMasterPasswordOp,
@@ -274,6 +281,7 @@ export * from './attachments.ts';
 export * from './attempts.ts';
 export * from './batches.ts';
 export * from './browser.ts';
+export * from './browser-cases.ts';
 export * from './credentials.ts';
 export * from './databases.ts';
 export * from './debug.ts';
@@ -298,6 +306,11 @@ export * from './workflows.ts';
 
 /** Every operation contract; the server mounts exactly these and the copy table covers all their titles. */
 export const OPERATION_CONTRACTS: readonly OperationContract[] = [
+  listBrowserCasesOp,
+  createBrowserCaseOp,
+  updateBrowserCaseOp,
+  runBrowserCaseOp,
+  rerunBrowserCaseOp,
   createSkillOp,
   deleteSkillOp,
   getSkillCatalogOp,

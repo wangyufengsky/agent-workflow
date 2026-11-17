@@ -8,6 +8,7 @@ import {
   AttemptKind,
   AttemptStatus,
   BROWSER_TEST_WORKFLOW_KEY,
+  type BrowserCase,
   type CreateTaskRequest,
   EDITABLE_NODE_STATUSES,
   ErrorCode,
@@ -274,6 +275,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
     insertDraft(
       input: Omit<CreateTaskRequest, 'start'> & {
         baseBranch: string;
+        browserCase?: BrowserCase;
         mergeSource?: string;
         initialRequirementIds?: boolean;
       },
@@ -303,6 +305,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
             title: input.title ?? firstLine(input.requirement).slice(0, TASK_TITLE_MAX_CHARS),
             requirement: input.requirement,
             browserTest: input.browserTest ?? null,
+            browserCase: input.browserCase ?? null,
             skills: deps.skills.forWorkflow(input.projectId, workflow.key),
             status: TaskStatus.Draft,
             baseBranch: input.baseBranch,

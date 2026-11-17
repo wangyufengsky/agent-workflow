@@ -12,6 +12,7 @@ export type SchedulerSnapshot = {
     status: TaskStatus;
     /** A planning attempt is starting or running. */
     planning: boolean;
+    local?: boolean;
     nodes: ReadonlyArray<{ id: string; key: string; status: NodeStatus; dependsOn: readonly string[] }>;
   }>;
 };
@@ -88,7 +89,12 @@ export function decide(snapshot: SchedulerSnapshot): SchedulerDecision {
     let taskBusy = nodes.filter((n) => WORKING.includes(n.status)).length;
     for (const node of nodes) {
       if (node.status !== NodeStatus.Ready) continue;
-      if (!hasRoom() || taskBusy >= snapshot.maxConcurrentNodesPerTask) break;
+      if (
+        (!snapshot.runtimeReady && task.local !== true) ||
+        busy >= snapshot.backgroundLimit ||
+        taskBusy >= snapshot.maxConcurrentNodesPerTask
+      )
+        break;
       decision.dispatch.push({ taskId: task.id, nodeId: node.id });
       taskBusy += 1;
       busy += 1;

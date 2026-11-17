@@ -1,5 +1,6 @@
 import {
   AcceptanceCheckKind,
+  BrowserCaseOutcome,
   DeliveryStatus,
   DeliveryStrategy,
   ErrorCode,
@@ -22,9 +23,11 @@ import { ExternalLink } from '../../components/external-link.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { Panel } from '../../components/panel.tsx';
+import { BROWSER_CASE_COPY } from '../../copy/browser-cases.ts';
 import { DELIVERY_COPY as D } from '../../copy/delivery.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
 import { BROWSER_TEST_COPY, TASK_COPY as C } from '../../copy/tasks.ts';
+import { BrowserCaseReport } from '../browser-cases/browser-case-report.tsx';
 import { attemptFileUrl, previewSessionsQuery, useImage } from '../preview/preview.queries.ts';
 import { ResultPages } from '../preview/result-pages.tsx';
 import { RequirementsSection } from '../requirements/requirements-section.tsx';
@@ -118,6 +121,7 @@ export function ResultCard({ task, showDelivery = true }: { task: TaskDetailDTO;
   const { result } = task;
   if (result === null) return <p className="hint">{C.resultPending}</p>;
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
+  const caseReport = result.browserCaseReport;
   const failedChecks = result.checks.filter((c) => !c.passed && !c.skipped).length;
   const skipped = skippedChecks(result);
   // One skipped check per step that had the command; the commands are listed once each.
@@ -138,9 +142,23 @@ export function ResultCard({ task, showDelivery = true }: { task: TaskDetailDTO;
       <div className={styles.result} data-testid="result-card">
         <div className="row">
           <p className={`${styles.headline} grow`}>
-            <Icon name="check" />
-            {C.resultHeadline(result.nodeSummaries.length, result.filesChanged, result.insertions, result.deletions)} ·{' '}
-            <Markdown inline source={checks} />
+            {caseReport === undefined ? (
+              <>
+                <Icon name="check" />
+                {C.resultHeadline(
+                  result.nodeSummaries.length,
+                  result.filesChanged,
+                  result.insertions,
+                  result.deletions,
+                )}{' '}
+                · <Markdown inline source={checks} />
+              </>
+            ) : (
+              <>
+                <Icon name={caseReport.outcome === BrowserCaseOutcome.Passed ? 'check' : 'alert'} />
+                {BROWSER_CASE_COPY.outcome[caseReport.outcome]}
+              </>
+            )}
           </p>
           {/* 23 §2.5: the result as a PPT for the team. */}
           <Link to={ROUTES.pptNew} search={{ taskId: task.id }} className="btn ghost sm">
@@ -148,22 +166,28 @@ export function ResultCard({ task, showDelivery = true }: { task: TaskDetailDTO;
             {PPT_COPY.makeDeck}
           </Link>
         </div>
-        <section className={styles.block}>
-          <h3 className="sec-t">{report ? C.report : C.summary}</h3>
-          {report ? (
-            <Markdown source={result.summary} />
-          ) : (
-            <ol className={styles.stepSummaries}>
-              {result.nodeSummaries.map((n) => (
-                <li key={n.key}>
-                  <span className={styles.stepTitle}>{n.title}</span>
-                  <Markdown source={n.summary} />
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
-        {task.browserTest !== undefined && <BrowserTestEvidence taskId={task.id} />}
+        {caseReport === undefined && (
+          <section className={styles.block}>
+            <h3 className="sec-t">{report ? C.report : C.summary}</h3>
+            {report ? (
+              <Markdown source={result.summary} />
+            ) : (
+              <ol className={styles.stepSummaries}>
+                {result.nodeSummaries.map((n) => (
+                  <li key={n.key}>
+                    <span className={styles.stepTitle}>{n.title}</span>
+                    <Markdown source={n.summary} />
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        )}
+        {task.browserCase !== undefined && caseReport !== undefined ? (
+          <BrowserCaseReport test={task.browserCase} report={caseReport} />
+        ) : (
+          task.browserTest !== undefined && <BrowserTestEvidence taskId={task.id} />
+        )}
         {result.checks.some(
           (check) => !check.passed || check.skipped || check.kind === AcceptanceCheckKind.Browser,
         ) && (

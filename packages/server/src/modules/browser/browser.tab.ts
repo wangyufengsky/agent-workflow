@@ -353,6 +353,11 @@ export async function openTab({
     viewport,
     cdp,
     evaluate,
+    registerCaseRef(node: number): string {
+      const ref = 'case-target';
+      refs.set(ref, node);
+      return ref;
+    },
     refOf(ref: string): number {
       const node = refs.get(ref);
       if (node === undefined) {

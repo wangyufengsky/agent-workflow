@@ -38,6 +38,7 @@ type PermissionEvent = Extract<OpencodeEvent, { type: typeof OpencodeEventType.P
 export function watchSessions(
   state: AttemptState,
   deps: { opencode: OpencodeClient; prompts: Prompts; clock: Clock; slots: Pick<ModelSlots, 'changed'> },
+  isLocal: (id: string) => boolean,
 ) {
   const { repo, live, mustFind, move, record } = state;
 
@@ -148,8 +149,9 @@ export function watchSessions(
     deps.slots.changed();
   }
 
-  function interruptActive(): void {
+  function interruptActive(runtimeLost = false): void {
     for (const attempt of repo.listByStatus(ACTIVE_ATTEMPT_STATUSES)) {
+      if (runtimeLost && isLocal(attempt.id)) continue;
       if (attempt.status === AttemptStatus.Running && state.waitsForAnswer(attempt.id)) continue;
       record(attempt, [systemEntry(TranscriptSystemEvent.RuntimeLost)]);
       move(attempt, AttemptEvent.RuntimeLost);
@@ -162,7 +164,7 @@ export function watchSessions(
 
   function onEvent(event: OpencodeEvent): void {
     if (event.type === OpencodeEventType.RuntimeLost) {
-      interruptActive();
+      interruptActive(true);
       return;
     }
     const session = live.get(event.sessionId);

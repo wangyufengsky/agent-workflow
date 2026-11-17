@@ -162,6 +162,18 @@ type CreateTaskRequest = {
 
 检查点解析：请求值 > 流程 `definition.checkpoints` > 设置 `ai.askOnUncertainty`（仅 ask_on_uncertainty）。解析结果写入 `tasks.checkpoints`，之后不再变。
 
+### 浏览器测试用例
+
+| 方法 | 路径 | 输入和结果 |
+| --- | --- | --- |
+| GET | `/projects/:projectId/browser-cases` | 项目用例列表 `{ items }` |
+| POST | `/projects/:projectId/browser-cases` | `{ definition }`，创建用例并返回版本 1 |
+| PUT | `/projects/:projectId/browser-cases/:caseId` | `{ revision, definition }`，只更新该版本并递增；过期版本返回 409 |
+| POST | `/projects/:projectId/browser-cases/:caseId/run` | `{ revision, approved: true }`，冻结已确认的版本并创建任务；过期版本返回 409 |
+| POST | `/tasks/:id/browser-case/rerun` | `{ approved: true }`，用原任务保存的用例版本和基础分支创建新任务 |
+
+定义包含 `name`、`scope` 和 `steps`。任务详情的 `browserCase` 返回本次用例快照，`result.browserCaseReport` 返回每一步实际值、结果、截图文件与 HTTP 请求证据。
+
 ### 5.2 TaskDetailDTO
 
 TaskSummaryDTO：`{ id, key, title, status, displayGroup, project: { id, name }, workflow: { id, key, name }, currentStep, progress, createdAt, updatedAt, startedAt, finishedAt, archivedAt }`（`archivedAt` 为归档时间，未归档为 null，D218；`currentStep` 为工作中的步骤标题，`progress` 为活动尝试最近一次 `report_progress`）。DTO 中可空字段用 `null` 表示（下式中的 `?`）。

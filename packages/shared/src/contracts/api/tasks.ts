@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { browserWriteRuleSchema } from '../../browser/policy.ts';
 import {
   LIST_PAGE_DEFAULT,
   LIST_PAGE_MAX,
@@ -34,6 +33,7 @@ import { reviewIssueSchema } from '../mcp/submit-review.ts';
 import { artifactTaskSchema } from './artifacts.ts';
 import { attachmentIdsSchema, attachmentSchema } from './attachments.ts';
 import { attemptSummarySchema } from './attempts.ts';
+import { browserCaseReportSchema, browserCaseSchema, browserTestScopeSchema } from './browser-cases.ts';
 import { deliverySchema, taskPullRequestSchema } from './delivery.ts';
 import { frontendRoundSchema } from './frontend.ts';
 import { inboxItemSchema } from './inbox.ts';
@@ -48,22 +48,6 @@ export const checkpointsSchema = z.object({
   ask_on_uncertainty: z.boolean(),
 });
 export type Checkpoints = z.infer<typeof checkpointsSchema>;
-
-export const BROWSER_TEST_WORKFLOW_KEY = 'browser_test';
-
-export const browserTestScopeSchema = z.object({
-  target: z
-    .string()
-    .trim()
-    .min(1)
-    .max(2048)
-    .refine(
-      (target) => /^\/(?!\/)[^\s\\]*$/.test(target) || /^https?:\/\/[^/\s@?#\\]+(?:[/?#][^\s\\]*)?$/i.test(target),
-      'Use a preview path or an HTTP(S) address without credentials',
-    ),
-  writes: z.array(browserWriteRuleSchema).max(20),
-});
-export type BrowserTestScope = z.infer<typeof browserTestScopeSchema>;
 
 export const createTaskRequestSchema = z.object({
   projectId: z.string(),
@@ -87,6 +71,7 @@ export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
 
 /** A node's latest `submit_result` input as stored (10 §nodes `result`). */
 export const nodeResultSchema = submitResultInputSchema.extend({
+  browserCaseReport: browserCaseReportSchema.optional(),
   reviewReport: taskCodeReviewReportSchema.optional(),
   handoffAttemptId: z.string().optional(),
   handoffCommitSha: z.string().optional(),
@@ -201,6 +186,7 @@ export type SaveDraftPlanRequest = z.infer<typeof saveDraftPlanRequestSchema>;
 
 /** Result card data, written when the task reaches review (M3-10). */
 export const taskResultSchema = z.object({
+  browserCaseReport: browserCaseReportSchema.optional(),
   /** The current frontend result is an iteration until the final verification step passes. */
   frontendVerified: z.boolean().optional(),
   /** Composed from the node summaries; for report workflows, the report itself. */
@@ -255,6 +241,7 @@ export type TaskSummaryDTO = z.infer<typeof taskSummarySchema>;
 
 /** `TaskDetailDTO` (11 §5.2). */
 export const taskDetailSchema = taskSummarySchema.extend({
+  browserCase: browserCaseSchema.optional(),
   browserTest: browserTestScopeSchema.optional(),
   skills: z.array(skillRefSchema).optional(),
   requirement: z.string(),

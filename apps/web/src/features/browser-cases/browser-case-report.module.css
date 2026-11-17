@@ -1,0 +1,27 @@
+.steps,
+.requests {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.step {
+  border-top: 1px solid var(--line);
+  padding-block: var(--s-3);
+  overflow-wrap: anywhere;
+}
+.step p {
+  margin-block: var(--s-1);
+  white-space: pre-wrap;
+}
+.requests {
+  padding-top: var(--s-2);
+}
+.evidence {
+  margin: var(--s-2) 0;
+}
+.evidence img {
+  display: block;
+  max-width: min(100%, 560px);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}

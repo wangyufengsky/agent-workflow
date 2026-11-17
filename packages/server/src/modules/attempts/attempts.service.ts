@@ -87,7 +87,16 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
   const { clock, opencode, settings, transcripts, projects, slots, unit, db } = deps;
   const state = createAttemptState(deps);
   const { repo, mustFind, move, record } = state;
-  const reactions = watchSessions(state, deps);
+  const local = new Map<string, { controller: AbortController; cancelTimeout: () => void }>();
+  const reactions = watchSessions(state, deps, (id) => local.has(id));
+  state.onSignal(({ type, attempt }) => {
+    if (type !== 'ended') return;
+    const run = local.get(attempt.id);
+    if (run === undefined) return;
+    local.delete(attempt.id);
+    run.cancelTimeout();
+    run.controller.abort();
+  });
 
   // 委派占用与交互会话共用的额外槽位，父节点继续占用原有调度槽位。
   slots.addCounter(
@@ -324,6 +333,39 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       state.publish(mustFind(id));
       if (input.kind === AttemptKind.Delegation) slots.changed();
       return queued ? toDto(mustFind(id)) : launch(id, input);
+    },
+
+    /** 本地浏览器用例复用尝试的状态、取消、超时和证据目录。 */
+    async runLocal(
+      input: Pick<StartAttemptInput, 'taskId' | 'projectId' | 'nodeId' | 'roleId' | 'directory'>,
+      work: (attempt: AttemptDTO, signal: AbortSignal) => Promise<void>,
+    ): Promise<void> {
+      const id = randomUUID();
+      const kind = AttemptKind.Execute;
+      repo.insert({
+        ...input,
+        id,
+        kind,
+        seq: repo.nextSeq({ ...input, kind }),
+        status: AttemptStatus.Starting,
+        model: null,
+        opencodeSessionId: null,
+        nudges: 0,
+        startedAt: clock.now(),
+      });
+      const controller = new AbortController();
+      const cancelTimeout = clock.schedule(settings.get('attempt.timeoutMinutes') * 60_000, () =>
+        move(mustFind(id), AttemptEvent.Timeout, { code: ErrorCode.AttemptTimeout, message: 'Browser case timed out' }),
+      );
+      local.set(id, { controller, cancelTimeout });
+      const attempt = move(mustFind(id), AttemptEvent.SessionStarted);
+      record(attempt, [systemEntry(TranscriptSystemEvent.AttemptStarted)]);
+      try {
+        await work(toDto(attempt), controller.signal);
+      } catch (err) {
+        const current = repo.find(id);
+        if (current?.status === AttemptStatus.Running) move(current, AttemptEvent.SessionError, errorOf(err));
+      }
     },
 
     /**

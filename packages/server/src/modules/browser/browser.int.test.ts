@@ -6,21 +6,27 @@ import { join } from 'node:path';
 import {
   AttemptStatus,
   BROWSER_TEST_WORKFLOW_KEY,
+  type BrowserCaseInput,
   type BrowserPortEvent,
   clearSiteLoginOp,
   closeUserTabOp,
+  createBrowserCaseOp,
   createTaskOp,
   ErrorCode,
   getTaskOp,
+  listBrowserCasesOp,
   listPreviewSessionsOp,
   listSiteLoginsOp,
   navigateUserTabOp,
   openLoginTabOp,
   openUserTabOp,
+  rerunBrowserCaseOp,
+  runBrowserCaseOp,
   ServerEventType,
   type SiteAccess,
   setUserViewportOp,
   startTaskOp,
+  updateBrowserCaseOp,
   updateProjectOp,
   updateSettingsOp,
 } from '@aw/shared';
@@ -37,6 +43,13 @@ const ORDERS = readFileSync(new URL('../../../test/fixtures/browser/orders.html'
 const page = (body: string) => `<!doctype html><html><head><title>t</title></head><body>${body}</body></html>`;
 const PAGES: Record<string, string> = {
   '/orders': ORDERS,
+  '/case-test': page(`<input id="name"><button id="save" onclick="saveEntry()">保存</button><p id="status">draft</p>
+    <script>
+    async function saveEntry() {
+      const reply = await fetch('/api/case-save?trace=private', { method: 'POST', body: document.querySelector('#name').value });
+      if (reply.ok) document.querySelector('#status').textContent = 'saved';
+    }
+    </script>`),
   '/cover': page(`<button type="button" onclick="document.title = 'clicked'">Go</button>
     <div id="overlay" style="position: fixed; inset: 0; background: #0003"></div>
     <script>setTimeout(() => overlay.remove(), 400)</script>`),
@@ -95,6 +108,10 @@ beforeAll(async () => {
       res.end(page('<p>Unauthorized</p>'));
       return;
     }
+    if (req.url === '/api/case-save?trace=private') {
+      res.writeHead(201).end();
+      return;
+    }
     const body = req.url === '/sign-in' ? page('<p>已登录</p>') : PAGES[req.url ?? ''];
     res.writeHead(body === undefined ? 404 : 200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(body ?? 'not found');
@@ -132,6 +149,132 @@ function refOf(snapshot: string, element: string): string {
 }
 
 describe('浏览器测试流程', () => {
+  it('保存、编辑并复跑固定用例；断言失败时保存同一步骤的截图和请求', async () => {
+    await browserFor();
+    const { project } = await addProject(t);
+    const projectId = project.id;
+    const definition: BrowserCaseInput = {
+      name: '保存订单',
+      scope: { target: `${origin}/case-test`, writes: [{ method: 'POST', path: '/api/case-save' }] },
+      steps: [
+        {
+          title: '填写订单',
+          action: { kind: 'fill', selector: '#name', value: 'test order' },
+          expect: { kind: 'value', selector: '#name', value: 'test order' },
+        },
+        {
+          title: '提交订单',
+          action: { kind: 'click', selector: '#save' },
+          expect: { kind: 'text', selector: '#status', value: 'published' },
+        },
+        {
+          title: '再次点击',
+          action: { kind: 'click', selector: '#save' },
+          expect: { kind: 'path', value: '/case-test' },
+        },
+      ],
+    };
+    const created = await t.call(createBrowserCaseOp, { projectId, definition });
+    expect(created.status).toBe(201);
+    const { caseId, revision } = created.body;
+    const run = { projectId, caseId, revision, approved: true } as const;
+    t.fake.crash();
+    const reviewed = taskReaches(t, 'review');
+    const started = await t.call(runBrowserCaseOp, run);
+    expect(started.status).toBe(201);
+    await reviewed;
+    const first = (await t.call(getTaskOp, { id: started.body.id })).body;
+    const report = first.result?.browserCaseReport;
+    expect(report).toMatchObject({
+      outcome: 'failed',
+      steps: [
+        { step: 0, outcome: 'passed' },
+        { step: 1, outcome: 'passed', actual: 'test order' },
+        {
+          step: 2,
+          outcome: 'failed',
+          actual: 'saved',
+          screenshot: '1.jpg',
+          requests: [{ method: 'POST', status: 201, url: `${origin}/api/case-save` }],
+        },
+      ],
+    });
+    expect(writes).toEqual(['POST /api/case-save?trace=private']);
+    expect(t.fake.sessions).toHaveLength(0);
+    if (report === undefined) throw new Error('Expected test report');
+    const file = await readFile(t.app.services.browser.attemptFile(report.attemptId, '1.jpg'));
+    expect(file.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]));
+
+    const updated = await t.call(updateBrowserCaseOp, {
+      projectId,
+      caseId,
+      revision,
+      definition: {
+        ...definition,
+        steps: [
+          {
+            title: '查看初始状态',
+            action: { kind: 'check' },
+            expect: { kind: 'text', selector: '#status', value: 'draft' },
+          },
+        ],
+      },
+    });
+    expect(updated.body.revision).toBe(2);
+    expect((await t.call(listBrowserCasesOp, { projectId })).body.items).toEqual([updated.body]);
+    expect((await t.call(runBrowserCaseOp, run)).status).toBe(409);
+    expect((await t.call(updateBrowserCaseOp, { projectId, caseId, revision, definition })).status).toBe(409);
+    const nextReview = taskReaches(t, 'review');
+    const next = await t.call(runBrowserCaseOp, { ...run, revision: 2 });
+    await nextReview;
+    expect((await t.call(getTaskOp, { id: next.body.id })).body.result?.browserCaseReport?.outcome).toBe('passed');
+
+    const blockedCase = await t.call(updateBrowserCaseOp, {
+      projectId,
+      caseId,
+      revision: 2,
+      definition: {
+        ...definition,
+        scope: { ...definition.scope, writes: [] },
+        steps: [
+          {
+            title: '提交超出授权的请求',
+            action: { kind: 'click', selector: '#save' },
+            expect: { kind: 'visible', selector: '#status' },
+          },
+        ],
+      },
+    });
+    expect(blockedCase.status).toBe(200);
+    const blockedReview = taskReaches(t, 'review');
+    const blocked = await t.call(runBrowserCaseOp, { ...run, revision: 3 });
+    expect(blocked.status).toBe(201);
+    await blockedReview;
+    expect((await t.call(getTaskOp, { id: blocked.body.id })).body.result?.browserCaseReport).toMatchObject({
+      outcome: 'blocked',
+      steps: [
+        { step: 0, outcome: 'passed' },
+        {
+          step: 1,
+          outcome: 'blocked',
+          screenshot: '1.jpg',
+          requests: expect.arrayContaining([
+            { method: 'POST', url: `${origin}/api/case-save`, blocked: 'read_only', status: null, failed: true },
+          ]),
+        },
+      ],
+    });
+    expect(writes).toEqual(['POST /api/case-save?trace=private']);
+
+    const replayReview = taskReaches(t, 'review');
+    const replay = await t.call(rerunBrowserCaseOp, { id: first.id, approved: true });
+    expect(replay.body.id).not.toBe(first.id);
+    expect(replay.body.browserCase).toEqual(first.browserCase);
+    await replayReview;
+    expect((await t.call(getTaskOp, { id: replay.body.id })).body.result?.browserCaseReport?.outcome).toBe('failed');
+    expect(writes).toEqual(['POST /api/case-save?trace=private', 'POST /api/case-save?trace=private']);
+  });
+
   it('保存显式授权，执行允许的写入并拦截其他方法和路径，报告可取回截图', async () => {
     await browserFor();
     const { project } = await addProject(t, { checkCommand: null });
