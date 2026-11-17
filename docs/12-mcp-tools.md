@@ -275,6 +275,8 @@ type HandoffOutput = {
 输出：`{ accepted: true, next: 'verifying' | 'awaiting_acceptance' | 'done' }`
 错误：`MCP_RESULT_ALREADY_SUBMITTED`、`VALIDATION_FAILED`。
 
+内置「代码审查」步骤可附带 `code_review: { scope, findings }`。`scope` 可以是 `{ kind: 'diff', from, to }` 或 `{ kind: 'files', commit, directory }`，提交均填写完整 Git SHA，整仓审查的目录用空串。发现沿用 Git 工作台的严重程度、分类、路径和行号协议。服务器验证每条发现归属审查范围及指定的文件版本，返回的任务报告含可跳转的位置。早期确认的流程仍可提交原有文字总结。
+
 ### 6.6 `submit_review`
 
 输入：

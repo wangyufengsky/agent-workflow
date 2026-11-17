@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
+import { basename, extname, join } from 'node:path';
 import {
   AppError,
   ARTIFACT_PREVIEW_CHARS,
@@ -46,7 +46,10 @@ export function createTaskArtifacts(deps: TasksServiceDeps, state: TaskState) {
   function visibleVersions(id: string): ArtifactVersion[] {
     const versions = allVersions(id);
     const attempts = deps.attempts.summaries(versions.map((version) => version.attemptId));
-    const ready = versions.filter((version) => attempts.get(version.attemptId)?.status === AttemptStatus.Succeeded);
+    const ready = versions.filter(
+      (version) =>
+        version.repository !== undefined || attempts.get(version.attemptId)?.status === AttemptStatus.Succeeded,
+    );
     if (ready.length > 0) return ready;
     return versions.filter((version) => {
       const status = attempts.get(version.attemptId)?.status;
@@ -150,6 +153,45 @@ export function createTaskArtifacts(deps: TasksServiceDeps, state: TaskState) {
       throw new AppError(ErrorCode.McpAttemptUnresolved, 'The artifact step is no longer running');
   }
 
+  async function saveRepositoryVersion(
+    taskId: string,
+    nodeId: string,
+    attemptId: string,
+    repository: NonNullable<ArtifactVersion['repository']>,
+    content: string,
+  ): Promise<void> {
+    const createdAt =
+      (repository.integratedDeliveryId === undefined ? deps.nodes.get(nodeId).finishedAt : null) ?? deps.clock.now();
+    const version: ArtifactVersion = {
+      id: randomUUID(),
+      number: (allVersions(taskId).at(-1)?.number ?? 0) + 1,
+      name: basename(repository.path),
+      size: Buffer.byteLength(content),
+      nodeId,
+      attemptId,
+      createdAt,
+      lost: [],
+      repository,
+    };
+    const file = original(taskId, version);
+    const dir = join(deps.dataDir, 'runs', taskId, 'artifacts', version.id);
+    await mkdir(dir, { recursive: true });
+    try {
+      await writeFile(file, content, { flag: 'wx' });
+      recordTaskEvent(deps.db, {
+        taskId,
+        entity: TaskEventEntity.Node,
+        entityId: nodeId,
+        type: VERSION_EVENT,
+        payload: version,
+        createdAt,
+      });
+    } catch (error) {
+      await rm(dir, { force: true, recursive: true });
+      throw error;
+    }
+  }
+
   const formatOf = (version: ArtifactVersion) => extname(version.name).slice(1).toLowerCase();
 
   return {
@@ -162,6 +204,7 @@ export function createTaskArtifacts(deps: TasksServiceDeps, state: TaskState) {
         return [];
       }),
     visibleVersions,
+    saveRepositoryVersion,
     details(id: string) {
       return {
         versions: visibleVersions(id),

@@ -56,6 +56,7 @@ export const deliverRequestSchema = z.object({
    * exist, and only for that version.
    */
   acknowledgedRequirementsRevisionId: z.string().optional(),
+  artifactVersionId: z.uuid().optional(),
 });
 export type DeliverRequest = z.infer<typeof deliverRequestSchema>;
 

@@ -432,7 +432,8 @@ function Workbench({ project, status }: { project: ProjectDetailDTO; status: Git
             refName={refName}
             path={search.path ?? ''}
             isFile={search.file === true}
-            onOpen={(path, file) => go({ path, file })}
+            line={search.line}
+            onOpen={(path, file) => go({ path, file, line: undefined })}
           />
         </div>
       );

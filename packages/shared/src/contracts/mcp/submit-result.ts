@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { REQUIREMENT_NOTE_MAX_CHARS, RESULT_SUMMARY_MAX_CHARS } from '../../constants/limits.ts';
 import { RequirementConclusion } from '../../enums/requirement.ts';
+import { taskCodeReviewInputSchema } from '../api/task-code-review.ts';
 import { nodeHandoffSchema } from './node-handoff.ts';
 
 /** `submit_result` (12 §6.5). */
@@ -12,6 +13,11 @@ export const submitResultInputSchema = z.object({
     .describe('Files you changed and why'),
   assumptions: z.array(z.string().min(1)).optional().describe('Assumptions you made instead of asking the user'),
   notes: z.string().optional().describe('Anything later steps or the user should know'),
+  code_review: taskCodeReviewInputSchema
+    .optional()
+    .describe(
+      'Only for the built-in Code Review task. Give the exact full Git commit IDs you reviewed and structured findings. Use an empty findings array when no issues were found.',
+    ),
   handoff: nodeHandoffSchema.optional().describe('Short, evidenced handoff for steps that depend on this result'),
   self_check: z
     .object({ tests_run: z.boolean(), tests_passed: z.boolean().optional(), details: z.string().optional() })

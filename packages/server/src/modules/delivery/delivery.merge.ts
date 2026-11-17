@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   AppError,
+  type ArtifactVersion,
   type CommitIdentity,
   DeliveryStrategy,
   ErrorCode,
@@ -12,10 +13,12 @@ import {
 import {
   backendCommitter,
   branchExists,
+  fileChangedBetween,
   type GitResult,
   gitFailure,
   isAncestor,
   listWorktrees,
+  mergeBase,
   type RepoLocks,
   readStatus,
   runGit,
@@ -33,6 +36,7 @@ export type LocalMergeInput = {
   message: string;
   /** Setting `git.commitIdentity` (D227). */
   identity: CommitIdentity | null;
+  reviewedDocument?: ArtifactVersion['repository'];
 };
 
 export type MergeOutcome =
@@ -213,6 +217,18 @@ function inTargetWorktree(
   });
 }
 
+export async function assertReviewedDocument(
+  repo: string,
+  ref: string,
+  document: NonNullable<ArtifactVersion['repository']>,
+): Promise<void> {
+  if (await fileChangedBetween(repo, document.commit, ref, document.path)) {
+    throw new AppError(ErrorCode.StateTransitionInvalid, 'The task document changed since review', {
+      path: document.path,
+    });
+  }
+}
+
 /** Merges the task branch into the target in the main repository (09 §7). */
 export function mergeLocally(locks: RepoLocks, input: LocalMergeInput): Promise<MergeOutcome> {
   return inTargetWorktree(
@@ -222,6 +238,18 @@ export function mergeLocally(locks: RepoLocks, input: LocalMergeInput): Promise<
     (holder) => assertTargetClean(holder, input.targetBranch),
     async (dir) => {
       const diffBase = await head(dir);
+      const document = input.reviewedDocument;
+      if (document !== undefined) {
+        const branch = `refs/heads/${input.branch}`;
+        await assertReviewedDocument(input.repoPath, branch, document);
+        const common = await mergeBase(input.repoPath, diffBase, branch);
+        // Even a clean textual merge would add unreviewed edits from the target. Integrate them on the task first.
+        if (
+          (await fileChangedBetween(input.repoPath, common, diffBase, document.path)) &&
+          (await fileChangedBetween(input.repoPath, document.commit, diffBase, document.path))
+        )
+          return { merged: false, conflictFiles: [document.path] };
+      }
       const outcome = await mergeIn(dir, input);
       return outcome.merged ? { ...outcome, diffBase } : outcome;
     },

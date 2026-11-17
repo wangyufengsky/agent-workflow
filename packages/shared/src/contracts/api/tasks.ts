@@ -38,6 +38,7 @@ import { frontendRoundSchema } from './frontend.ts';
 import { inboxItemSchema } from './inbox.ts';
 import { requirementItemsInputSchema } from './requirements.ts';
 import { skillRefSchema } from './skills.ts';
+import { taskCodeReviewReportSchema } from './task-code-review.ts';
 
 /** Resolved once when the task is created (11 §5.1) and never changed afterwards. */
 export const checkpointsSchema = z.object({
@@ -68,6 +69,7 @@ export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
 
 /** A node's latest `submit_result` input as stored (10 §nodes `result`). */
 export const nodeResultSchema = submitResultInputSchema.extend({
+  reviewReport: taskCodeReviewReportSchema.optional(),
   handoffAttemptId: z.string().optional(),
   handoffCommitSha: z.string().optional(),
 });
@@ -262,6 +264,7 @@ export const taskDetailSchema = taskSummarySchema.extend({
   nodes: z.array(nodeSummarySchema),
   activeAttempts: z.array(attemptSummarySchema),
   artifact: artifactTaskSchema.optional(),
+  codeReview: z.object({ report: taskCodeReviewReportSchema.nullable(), summary: z.string().nullable() }).optional(),
   frontend: z.object({ verified: z.boolean(), rounds: z.array(frontendRoundSchema) }).optional(),
   openInbox: z.array(inboxItemSchema),
   result: taskResultSchema.nullable(),

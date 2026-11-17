@@ -27,6 +27,7 @@ export * from './contracts/api/requirements.ts';
 export * from './contracts/api/schedules.ts';
 export * from './contracts/api/skills.ts';
 export * from './contracts/api/system.ts';
+export * from './contracts/api/task-code-review.ts';
 export * from './contracts/api/tasks.ts';
 export * from './contracts/api/team.ts';
 export * from './contracts/api/workflows.ts';

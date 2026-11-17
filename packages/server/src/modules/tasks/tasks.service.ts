@@ -13,8 +13,11 @@ import {
   frontendRoundSchema,
   isArtifactWorkflow,
   isFrontendWorkflow,
+  isRepositoryDocumentWorkflow,
+  isTaskCodeReview,
   type ListTasksQuery,
   type NodeDetailDTO,
+  NodeStatus,
   type PlanDTO,
   type PlanGraph,
   type PreviewSessions,
@@ -25,6 +28,7 @@ import {
   ServerEventType,
   type StartAgentsMdTaskRequest,
   type SubmitResultInput,
+  TASK_CODE_REVIEW_NODE_KEY,
   TASK_STATUSES,
   type TaskDetailDTO,
   TaskStatus,
@@ -37,11 +41,13 @@ import { createTaskAgentsMd } from './tasks.agents-md.ts';
 import { createTaskArtifacts } from './tasks.artifacts.ts';
 import { createTaskChanges } from './tasks.changes.ts';
 import { createTaskChecks } from './tasks.checks.ts';
+import { resolveTaskCodeReview } from './tasks.code-review.ts';
 import { createTaskContext } from './tasks.context.ts';
 import { createConventionEvidence } from './tasks.conventions.ts';
 import { createTaskDelegation } from './tasks.delegation.ts';
 import { createTaskDelivery } from './tasks.delivery.ts';
 import { createTaskDiffs } from './tasks.diff.ts';
+import { createTaskDocuments } from './tasks.documents.ts';
 import { frontendVerified } from './tasks.frontend.ts';
 import { createTaskLifecycle } from './tasks.lifecycle.ts';
 import { readTaskSkills, type StatusMatch } from './tasks.repo.ts';
@@ -66,6 +72,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   const diffs = createTaskDiffs(deps, state);
   const delivery = createTaskDelivery(deps, state);
   const artifacts = createTaskArtifacts(deps, state);
+  const documents = createTaskDocuments(deps, state, artifacts);
   const changes = createTaskChanges(deps, state, artifacts, delivery.current, (taskId) =>
     lifecycle.retry(taskId, { recheck: () => false }),
   );
@@ -101,9 +108,23 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
         }
       : undefined;
     const skills = readTaskSkills(db, id);
+    const repositoryDocument = isRepositoryDocumentWorkflow(workflow);
+    const showArtifact =
+      isArtifactWorkflow(workflow) ||
+      (repositoryDocument &&
+        (artifacts.visibleVersions(id).length > 0 ||
+          task.status === TaskStatus.Preparing ||
+          task.status === TaskStatus.Running));
+    const reviewResult = isTaskCodeReview(workflow)
+      ? nodes.listByTask(id).find(({ key, status }) => key === TASK_CODE_REVIEW_NODE_KEY && status === NodeStatus.Done)
+          ?.result
+      : undefined;
     return {
       ...state.summary(task),
-      ...(isArtifactWorkflow(workflow) ? { artifact: artifacts.details(id) } : {}),
+      ...(showArtifact ? { artifact: artifacts.details(id) } : {}),
+      ...(isTaskCodeReview(workflow)
+        ? { codeReview: { report: reviewResult?.reviewReport ?? null, summary: reviewResult?.summary ?? null } }
+        : {}),
       requirement: task.requirement,
       ...(skills.length === 0 ? {} : { skills: skills.map(({ id, name, version }) => ({ id, name, version })) }),
       failedPhase: task.failedPhase,
@@ -147,19 +168,29 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     if (isFrontend(id) && !frontendVerified(nodes.listByTask(id)))
       throw new AppError(ErrorCode.StateTransitionInvalid, 'Finish frontend verification before delivery');
     const checklist = await requirements.deliveryCheck(id, request.acknowledgedRequirementsRevisionId);
-    await delivery.deliver(id, request, checklist);
+    const reviewedDocument = await documents.forDelivery(id, request.artifactVersionId);
+    await delivery.deliver(id, request, checklist, reviewedDocument);
     return detail(id);
   }
 
   return {
     detail,
+    async workbenchDetail(id: string): Promise<TaskDetailDTO> {
+      await documents.prepare(id);
+      return detail(id);
+    },
     isFrontend,
     latestArtifactOf(id: string) {
       const task = state.get(id);
-      return isArtifactWorkflow(workflows.get(task.workflowId)) ? artifacts.visibleVersions(id).at(-1) : undefined;
+      const workflow = workflows.get(task.workflowId);
+      return isArtifactWorkflow(workflow) || isRepositoryDocumentWorkflow(workflow)
+        ? artifacts.visibleVersions(id).at(-1)
+        : undefined;
     },
     artifacts,
-    reviseArtifact(input: ArtifactRevision): TaskDetailDTO {
+    async reviseArtifact(input: ArtifactRevision): Promise<TaskDetailDTO> {
+      await documents.prepare(input.id);
+      await documents.assertEditableVersion(input);
       changes.reviseArtifact(input);
       return detail(input.id);
     },
@@ -438,9 +469,18 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     /** `submit_result` of a task's execute attempt (12 §6.5). */
     async submitResult(attempt: AttemptDTO, input: SubmitResultInput): Promise<ResultNext> {
       if (attempt.taskId === null || attempt.nodeId === null) throw new Error(`Attempt ${attempt.id} is no step's`);
-      if (isArtifactWorkflow(workflows.get(state.get(attempt.taskId).workflowId))) artifacts.assertPublished(attempt);
-      state.verify.checkResults(attempt.taskId, nodes.get(attempt.nodeId), input.requirement_results);
-      return nodes.submitResult(attempt, input, state.runContext(state.get(attempt.taskId)));
+      const task = state.get(attempt.taskId);
+      const workflow = workflows.get(task.workflowId);
+      const node = nodes.get(attempt.nodeId);
+      if (isArtifactWorkflow(workflow)) artifacts.assertPublished(attempt);
+      state.verify.checkResults(attempt.taskId, node, input.requirement_results);
+      const { code_review, ...result } = input;
+      // Older confirmed plans still submit a plain-text summary.
+      if (code_review === undefined) return nodes.submitResult(attempt, result, state.runContext(task));
+      if (!isTaskCodeReview(workflow) || node.key !== TASK_CODE_REVIEW_NODE_KEY)
+        throw new AppError(ErrorCode.McpToolNotAllowed, 'Structured findings are for the code review step');
+      const report = await resolveTaskCodeReview(deps.projects.getRecord(task.projectId).repoPath, code_review);
+      return nodes.submitResult(attempt, { ...result, reviewReport: report }, state.runContext(task));
     },
 
     checkEvidence(id: string, evidenceId: string) {

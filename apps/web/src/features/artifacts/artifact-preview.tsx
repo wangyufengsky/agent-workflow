@@ -65,12 +65,21 @@ function Content({ source, onPick }: { source: string; onPick?: OnPick | undefin
         {marker(node?.position?.start.line, node?.position?.end.line)}
       </li>
     ),
-    table: ({ children, node }) => (
-      <div>
+    table: ({ children }) => (
+      <div className={styles.markdownTable}>
         <table>{children}</table>
-        {marker(node?.position?.start.line, node?.position?.end.line)}
       </div>
     ),
+    tr: ({ children, node }) => {
+      const position = node?.position;
+      const control = marker(position?.start.line, position?.end.line);
+      return (
+        <tr>
+          {children}
+          {control === null ? null : <td className={styles.tableMark}>{control}</td>}
+        </tr>
+      );
+    },
   };
   for (const tag of ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const) {
     const Heading = tag;
@@ -243,10 +252,15 @@ export function ArtifactPreview({
     <div className="col">
       {data.format === 'md' && (
         <div className="row">
-          <Button size="sm" aria-pressed={!plain} onClick={() => setPlain(false)}>
+          <Button
+            size="sm"
+            variant={plain ? 'ghost' : 'secondary'}
+            aria-pressed={!plain}
+            onClick={() => setPlain(false)}
+          >
             {ARTIFACT_COPY.body}
           </Button>
-          <Button size="sm" aria-pressed={plain} onClick={() => setPlain(true)}>
+          <Button size="sm" variant={plain ? 'secondary' : 'ghost'} aria-pressed={plain} onClick={() => setPlain(true)}>
             {ARTIFACT_COPY.source}
           </Button>
         </div>

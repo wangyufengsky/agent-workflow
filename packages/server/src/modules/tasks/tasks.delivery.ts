@@ -1,5 +1,6 @@
 import {
   AppError,
+  type ArtifactVersion,
   type DeliverRequest,
   type DeliveryDTO,
   DeliveryStrategy,
@@ -94,7 +95,13 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
     });
   }
 
-  async function mergeTask(task: Task, delivery: DeliveryDTO, worktree: Worktree, repoPath: string): Promise<void> {
+  async function mergeTask(
+    task: Task,
+    delivery: DeliveryDTO,
+    worktree: Worktree,
+    repoPath: string,
+    reviewedDocument: ArtifactVersion['repository'],
+  ): Promise<void> {
     const strategy = delivery.strategy;
     if (!isLocalMerge(strategy)) throw new Error(`Strategy ${strategy} is not a local merge`);
     let outcome: MergeOutcome;
@@ -107,6 +114,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
         strategy,
         message: withRequestedBy(`${task.title} (${task.key})`, await readConfiguredIdentity(repoPath)),
         identity: settings.get('git.commitIdentity'),
+        reviewedDocument,
       });
     } catch (err) {
       recordFailure(task.id, delivery, err);
@@ -140,6 +148,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
     worktree: Worktree,
     hosting: GitHostingProvider & { ref: HostingRef },
     pr: { title: string; body: string },
+    reviewedDocument: ArtifactVersion['repository'],
   ): Promise<void> {
     let url: string;
     let diff: { diffBase: string; diffHead: string };
@@ -151,6 +160,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
         targetBranch: delivery.targetBranch,
         authorization: hosting.gitAuthorization(),
         network: await deps.gitNetwork(),
+        reviewedDocument,
       });
       // After a revision from review comments the push updates the pull request already open (21 §5).
       const open = await hosting.findOpenPullRequest(worktree.branch);
@@ -177,6 +187,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
       taskId: string,
       request: Omit<DeliverRequest, 'id'>,
       requirements: RequirementsDeliverySummary | null,
+      reviewedDocument?: ArtifactVersion['repository'],
     ): Promise<void> {
       const task = get(taskId);
       transition(taskMachine, task.status, TaskEvent.Deliver, TaskStatus.Merging);
@@ -232,10 +243,10 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
         move(task, TaskEvent.Deliver, TaskStatus.Merging);
         return started;
       });
-      if (hosting === undefined) await mergeTask(task, delivery, worktree, repoPath);
+      if (hosting === undefined) await mergeTask(task, delivery, worktree, repoPath, reviewedDocument);
       else {
         const pr = request.pr ?? { title: task.title, body: task.result?.summary ?? '' };
-        await openPullRequest(task, delivery, worktree, hosting, pr);
+        await openPullRequest(task, delivery, worktree, hosting, pr, reviewedDocument);
       }
     },
 

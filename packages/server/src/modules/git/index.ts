@@ -7,6 +7,7 @@ export {
   diffUnstaged,
   diffWorktree,
   diffWorktreeFile,
+  fileChangedBetween,
   limitDiff,
   parseNumstat,
 } from './git.diff.ts';

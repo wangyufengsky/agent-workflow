@@ -90,7 +90,7 @@ packages/builtin/
 | --- | --- |
 | planning | `fixed` |
 | deliverable | `report` |
-| template | `review`「代码审查」reviewer：按需求描述的范围（分支、提交区间、目录）审查，产出问题清单（severity / 位置 / 说明 / 建议） |
+| template | `review`「代码审查」reviewer：按需求描述的范围（分支、提交区间、目录）审查，使用 `submit_result.code_review` 提交固定在所审查提交上的问题清单（严重程度、位置、说明与建议） |
 | acceptance | 无 |
 | 交付 | 结果卡显示审查报告，按钮只有「完成」（`report_only`）与「据此修复」（以报告为需求新建一个 `bugfix` 或 `feature` 任务，预填需求） |
 
@@ -168,6 +168,8 @@ packages/builtin/
 | checkpoints | 全部 `false` |
 
 拆解文档合并后，用户按阶段照文档手动开任务：需求填工作包的需求切片，附件选这份文档（项目文件，30 §2.1），验收要求填进验收清单（31）。之后的需求计划（34 N2；N2a 的决策已确认，N2b 待确认）把这一步自动化。
+
+详细设计、需求拆解和代码审查的产物工作台见 [39 §8.5](39-office-files.md#85-仓库文档与代码审查)。
 
 四个只读流程（代码审查、版本比对审查、安全审查、方案设计）共用 `reportOnly(key, title, instructions)`：只有一个 reviewer 步骤，没有检查。新流程都是固定流程，因此也能用于批量任务与定时任务（D85、D92），例如每周一次的安全审查或「审查上周新增的代码」。
 

@@ -184,7 +184,7 @@ type TaskDetailDTO = {
 };
 ```
 
-文档与表格任务详情的 `artifact` 提供可预览版本及标注历史。预览用 `GET /tasks/:id/artifacts/:versionId?sheet=`，原件用同路径的 `/raw`，下轮修改用 `POST /tasks/:id/revise-artifact`（`versionId` 和 `notes`），见 [39 §8.4](39-office-files.md#84-文档与表格任务工作台)。
+文档与表格、详细设计、需求拆解的任务详情通过 `artifact` 提供可预览版本及标注历史。仓库文档版本还记录 `repository.path` 和 `repository.commit`。代码审查通过 `codeReview` 提供总结和结构化报告，每条发现带验证后的文件路径与提交；历史文字报告的 `report` 为 null。预览用 `GET /tasks/:id/artifacts/:versionId?sheet=`，原件用同路径的 `/raw`，下轮修改用 `POST /tasks/:id/revise-artifact`（`versionId` 和 `notes`），见 [39 §8.4](39-office-files.md#84-文档与表格任务工作台)。
 
 ### 5.3 交付
 
@@ -192,6 +192,7 @@ type TaskDetailDTO = {
 - `pull_request`：项目没有可用令牌（自己的或全局的，D155）→ 400 `HOSTING_NOT_CONFIGURED`（不改状态）。在仓库锁内把任务分支推送到 `origin`（HTTPS 远端经环境变量 `http.extraHeader` 带上令牌，不出现在命令参数中；SSH 远端用用户自己的密钥）→ 创建 PR/MR（`targetBranch` 为目标，标题与说明默认为任务标题与结果摘要，可用 `pr` 指定）→ 任务 `completed`，`prUrl` 记录在 delivery；worktree 删除，分支保留。推送或平台失败 → `lastDelivery.status = failed`，任务回 `review`。推送后先按分支查找打开的 PR/MR：已有（按审查意见修改后再次交付）就沿用它、不改标题与说明，`prUrl` 为同一个地址（21 §5）。
 - `report_only`：仅 `deliverable = report` 的任务可用，直接 `completed`。
 - `deliverable = report` 的任务使用其他策略 → 400 `VALIDATION_FAILED`。
+- 仓库文档工作台提交当前 `artifactVersionId`。版本变化时返回 `STATE_TRANSITION_INVALID`；交付在仓库锁内核对任务分支文件。目标分支改过同一文件且内容会变时进入现有冲突处理流程，解决后再查看文档的新版本。
 
 ### 5.4 PR 审查意见（v1.2，21）
 

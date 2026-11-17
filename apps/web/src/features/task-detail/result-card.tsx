@@ -39,7 +39,7 @@ import styles from './task-page.module.css';
 const taskRoute = getRouteApi(ROUTE_IDS.task);
 
 /** How the task was delivered, once it is merging or done. */
-function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
+export function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
   const delivery = task.lastDelivery;
   const pro = useSettings()['ui.mode'] === UiMode.Pro;
   if (task.status === TaskStatus.Merging) {
