@@ -3,9 +3,6 @@ import type { DebugService } from '../../debug/index.ts';
 import type { TasksService } from '../../tasks/index.ts';
 import { defineMcpTool } from '../mcp.registry.ts';
 
-const SUBMISSION_RETRY =
-  'After correcting the reported problem, try once more. If that retry fails, give your result and the error code and message in your final reply and stop submitting.';
-
 export const submitResultTool = (tasks: TasksService, debug: DebugService) =>
   defineMcpTool({
     name: McpToolName.SubmitResult,
@@ -15,9 +12,11 @@ export const submitResultTool = (tasks: TasksService, debug: DebugService) =>
     input: submitResultInputSchema,
     output: submitResultOutputSchema,
     hints: {
-      [ErrorCode.ValidationFailed]: `Fix the fields named in details.issues. ${SUBMISSION_RETRY}`,
-      [ErrorCode.RequirementResultsInvalid]: `In 核验验收清单, give one conclusion per ai_review item in get_task_context.requirements. Other steps must omit requirement_results. ${SUBMISSION_RETRY}`,
-      [ErrorCode.McpToolNotAllowed]: `Use the submission tool named in your step instructions. Only the Code Review step can send code_review. ${SUBMISSION_RETRY}`,
+      [ErrorCode.ValidationFailed]: 'Fix the fields named in details.issues and resubmit the corrected result.',
+      [ErrorCode.RequirementResultsInvalid]:
+        'In 核验验收清单, give one conclusion per ai_review item in get_task_context.requirements. Other steps must omit requirement_results.',
+      [ErrorCode.McpToolNotAllowed]:
+        'Use the submission tool named in your step instructions. Only the Code Review step can send code_review.',
     },
     handler: async (input, { attempt }) =>
       attempt.taskId === null
@@ -34,7 +33,8 @@ export const submitBrowserReportTool = (tasks: TasksService) =>
     input: submitResultInputSchema.pick({ summary: true, notes: true }).strict(),
     output: submitResultOutputSchema,
     hints: {
-      [ErrorCode.ValidationFailed]: `Fix the fields named in details.issues. Send summary and optional notes, preserving screenshot filenames. ${SUBMISSION_RETRY}`,
+      [ErrorCode.ValidationFailed]:
+        'Fix the fields named in details.issues. Send summary and optional notes, preserving screenshot filenames.',
     },
     handler: async (input, { attempt }) => ({
       accepted: true as const,

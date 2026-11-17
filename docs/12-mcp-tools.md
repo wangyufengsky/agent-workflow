@@ -165,7 +165,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `submit_delegation` | delegation | 把只读报告交回父步骤 |
 | `submit_plan` | plan | 提交计划 |
 | `submit_result` | execute | 提交节点结果 |
-| `browser_submit_report` | 浏览器测试的 execute | 提交逐项测试结果及证据，参数为 `summary` 和可选的 `notes`。参数校验失败时，提示模型修正后再试一次。修正后仍提交失败时，在执行记录中留下报告和失败原因。 |
+| `browser_submit_report` | 浏览器测试的 execute | 提交逐项测试结果及证据，参数为 `summary` 和可选的 `notes`。 |
 | `submit_review` | review | 提交评审结论 |
 | `ask_user` | plan · execute | 向用户提问 |
 | `report_progress` | plan · execute · review · research · deck_outline · deck_slides · git_review · commit_message · team_analysis · breakdown | 上报一句当前进展 |

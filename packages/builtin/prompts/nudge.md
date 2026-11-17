@@ -1,1 +1,1 @@
-Your result has not been recorded. If your submission retry already failed, or you cannot correct the error, end with your result draft, evidence filenames and the submission error code and message. Otherwise finish the work or correct the reported problem, then call {{submitTool}}.
+Your result has not been recorded. Finish any remaining work, address any submission errors, then call {{submitTool}}.

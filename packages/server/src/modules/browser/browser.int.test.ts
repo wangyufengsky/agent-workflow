@@ -431,7 +431,8 @@ describe('浏览器测试流程', () => {
         .callTool('browser_open', { url: browserTest.target })
         .callTool('browser_click', { ref: 'e1' })
         .callTool('browser_screenshot', {})
-        .callTool('browser_submit_report', { summary: '已执行测试用例，见 1.jpg', requirement_results: [] }),
+        .callTool('browser_submit_report', { summary: '已执行测试用例，见 1.jpg', requirement_results: [] })
+        .callTool('browser_submit_report', { summary: '' }),
       { title: '· 执行浏览器测试' },
     );
     t.fake.enqueue(
@@ -447,7 +448,7 @@ describe('浏览器测试流程', () => {
     const [testStep] = task.nodes;
     if (testStep === undefined) throw new Error('missing browser test step');
     expect((await t.call(getNodeOp, { id, nodeId: testStep.id })).body.result?.notes).toBe('截图 1.jpg');
-    const [rejected, submit] = t.fake.toolCalls.filter((call) => call.name === 'browser_submit_report');
+    const [rejected, stillInvalid, submit] = t.fake.toolCalls.filter((call) => call.name === 'browser_submit_report');
     expect(rejected).toMatchObject({
       isError: true,
       result: {
@@ -455,12 +456,19 @@ describe('浏览器测试流程', () => {
         hint: expect.stringContaining('preserving screenshot filenames'),
       },
     });
+    expect(stillInvalid).toMatchObject({
+      isError: true,
+      result: {
+        code: ErrorCode.ValidationFailed,
+        details: { issues: [expect.objectContaining({ path: ['summary'] })] },
+      },
+    });
     expect(submit).toMatchObject({ isError: false, result: { accepted: true, next: 'done' } });
     expect(
       t.fake.prompts.filter((prompt) => prompt.sessionId === submit?.sessionId).map((prompt) => prompt.text),
     ).toEqual([
-      expect.stringMatching(/agent-workflow_browser_submit_report.*that retry fails/s),
-      expect.stringMatching(/submission retry already failed.*agent-workflow_browser_submit_report/s),
+      expect.stringContaining('agent-workflow_browser_submit_report'),
+      expect.stringMatching(/address any submission errors.*agent-workflow_browser_submit_report/s),
     ]);
     expect(t.fake.aborts).toContain(submit?.sessionId);
     expect((await t.call(listPreviewSessionsOp, { id })).body.attempts).toMatchObject([{ screenshots: ['1.jpg'] }]);
