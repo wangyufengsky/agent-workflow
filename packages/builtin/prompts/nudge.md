@@ -1,1 +1,1 @@
-You stopped without calling {{submitTool}}. Your work only counts as finished when that call succeeds. If the work is done, call it now. If it is not done, continue and call it when you finish.
+Your result has not been recorded. If your submission retry already failed, or you cannot correct the error, end with your result draft, evidence filenames and the submission error code and message. Otherwise finish the work or correct the reported problem, then call {{submitTool}}.

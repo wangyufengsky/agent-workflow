@@ -120,7 +120,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 
 | 情况 | 处理 |
 | --- | --- |
-| 调用 `submit_plan` / `submit_result` / `submit_review` 成功 | 尝试 `succeeded`；后端随后中止会话的后续生成（若仍在生成） |
+| 调用 `submit_plan` / `submit_result` / `submit_review` / `browser_submit_report` 成功 | 尝试 `succeeded`；后端随后中止会话的后续生成（若仍在生成） |
 | `session.idle` 且有未回答的阻塞问题（或待处理的权限请求） | 尝试保持 `running` 但停止计时，节点 `waiting_input`；全部回答后 `prompt_async` 发送答案（`start-answer.md`，多个答案合成一条），节点回到 `running`，重新计时（D46） |
 | `session.idle` 且有已回答但未送达的答案 | 发送答案（会话忙时回答的问题，在下一次空闲时送达） |
 | `session.idle` 且未提交、无问题 | 发送提醒（`nudge.md`，按尝试类型填入对应的提交工具名），`nudges+1`；已提醒 `ATTEMPT_MAX_NUDGES` 次仍空闲 → `failed / ATTEMPT_NO_RESULT` |
@@ -165,7 +165,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `submit_delegation` | delegation | 把只读报告交回父步骤 |
 | `submit_plan` | plan | 提交计划 |
 | `submit_result` | execute | 提交节点结果 |
-| `browser_submit_report` | 浏览器测试的 execute | 提交逐项测试结果及证据，参数为 `summary` 和可选的 `notes` |
+| `browser_submit_report` | 浏览器测试的 execute | 提交逐项测试结果及证据，参数为 `summary` 和可选的 `notes`。参数校验失败时，提示模型修正后再试一次。修正后仍提交失败时，在执行记录中留下报告和失败原因。 |
 | `submit_review` | review | 提交评审结论 |
 | `ask_user` | plan · execute | 向用户提问 |
 | `report_progress` | plan · execute · review · research · deck_outline · deck_slides · git_review · commit_message · team_analysis · breakdown | 上报一句当前进展 |
