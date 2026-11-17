@@ -24,7 +24,8 @@ import { Markdown } from '../../components/markdown.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { DELIVERY_COPY as D } from '../../copy/delivery.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
-import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { BROWSER_TEST_COPY, TASK_COPY as C } from '../../copy/tasks.ts';
+import { attemptFileUrl, previewSessionsQuery, useImage } from '../preview/preview.queries.ts';
 import { ResultPages } from '../preview/result-pages.tsx';
 import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
@@ -78,6 +79,33 @@ export function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
         D.merged(delivery.targetBranch, delivery.commitSha)
       )}
     </p>
+  );
+}
+
+function TestScreenshot({ attemptId, file }: { attemptId: string; file: string }) {
+  const src = useImage(attemptFileUrl(attemptId, file));
+  return src === null ? null : (
+    <a className="btn sm" href={src} download={file}>
+      {file}
+    </a>
+  );
+}
+
+function BrowserTestEvidence({ taskId }: { taskId: string }) {
+  const sessions = useQuery(previewSessionsQuery(taskId));
+  const attempts = sessions.data?.attempts.filter((attempt) => attempt.screenshots.length > 0) ?? [];
+  if (attempts.length === 0) return null;
+  return (
+    <section className={styles.block}>
+      <h3 className="sec-t">{BROWSER_TEST_COPY.screenshots}</h3>
+      {attempts.map((attempt) => (
+        <div className="row" key={attempt.attemptId}>
+          {attempt.screenshots.map((file) => (
+            <TestScreenshot key={file} file={file} attemptId={attempt.attemptId} />
+          ))}
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -135,6 +163,7 @@ export function ResultCard({ task, showDelivery = true }: { task: TaskDetailDTO;
             </ol>
           )}
         </section>
+        {task.browserTest !== undefined && <BrowserTestEvidence taskId={task.id} />}
         {result.checks.some(
           (check) => !check.passed || check.skipped || check.kind === AcceptanceCheckKind.Browser,
         ) && (

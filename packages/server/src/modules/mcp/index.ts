@@ -101,9 +101,9 @@ export function createMcpModule({
     submitCommitMessageTool(commitDrafts),
     submitMemberAnalysisTool(team),
     submitBreakdownTool(initiatives),
-    ...browserTools({ browser, attempts, knowledge, filesDirOf }),
+    ...browserTools({ browser, attempts, knowledge, filesDirOf, tasks }),
   ];
-  const registry = createToolRegistry(tools, attempts, log);
+  const registry = createToolRegistry(tools, attempts, log, (id) => tasks.browserTest(id) !== null);
   return {
     registry,
     operations: [implement(listMcpToolsOp, () => ({ items: registry.info() }))],

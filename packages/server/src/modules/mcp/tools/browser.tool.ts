@@ -26,10 +26,12 @@ import {
 import type { AttemptsService } from '../../attempts/index.ts';
 import type { BrowserOwner, BrowserService } from '../../browser/index.ts';
 import type { KnowledgeService } from '../../knowledge/index.ts';
+import type { TasksService } from '../../tasks/index.ts';
 import { defineMcpTool, MCP_IMAGES, type McpToolDefinition } from '../mcp.registry.ts';
 
 export type BrowserToolDeps = {
   browser: BrowserService;
+  tasks: TasksService;
   attempts: AttemptsService;
   knowledge: KnowledgeService;
   filesDirOf: (attempt: AttemptDTO) => string;
@@ -72,6 +74,7 @@ function ownerOf(deps: BrowserToolDeps, attempt: AttemptDTO): BrowserOwner {
     taskId: attempt.taskId,
     projectId: deps.attempts.projectOf(attempt.id),
     filesDir: deps.filesDirOf(attempt),
+    browserTest: attempt.taskId === null ? null : deps.tasks.browserTest(attempt.taskId),
   };
 }
 

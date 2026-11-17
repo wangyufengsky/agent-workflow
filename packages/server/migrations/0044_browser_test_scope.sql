@@ -1,0 +1,1 @@
+ALTER TABLE `tasks` ADD `browser_test` text;

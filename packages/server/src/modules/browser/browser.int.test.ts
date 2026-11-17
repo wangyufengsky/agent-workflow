@@ -5,10 +5,14 @@ import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import {
   AttemptStatus,
+  BROWSER_TEST_WORKFLOW_KEY,
   type BrowserPortEvent,
   clearSiteLoginOp,
   closeUserTabOp,
+  createTaskOp,
   ErrorCode,
+  getTaskOp,
+  listPreviewSessionsOp,
   listSiteLoginsOp,
   navigateUserTabOp,
   openLoginTabOp,
@@ -16,13 +20,15 @@ import {
   ServerEventType,
   type SiteAccess,
   setUserViewportOp,
+  startTaskOp,
   updateProjectOp,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
-import { addProject, createTask, taskReaches } from '../../../test/helpers/tasks.ts';
+import { addProject, createTask, taskReaches, workflowId } from '../../../test/helpers/tasks.ts';
 import type { BrowserHost } from './browser.host.ts';
 import type { BrowserOwner } from './browser.service.ts';
 import { createChromiumHost } from './host.chromium.ts';
@@ -55,6 +61,11 @@ const PAGES: Record<string, string> = {
         location.href = '/orders';
       };
     }</script>`),
+  '/scoped': page(`<button type="button" onclick="Promise.allSettled([
+    fetch('/api/write', { method: 'POST' }),
+    fetch('/api/other', { method: 'POST' }),
+    fetch('/api/write', { method: 'DELETE' })
+  ]).then(() => document.title = 'checked')">Check</button>`),
   '/write': page(`<button type="button" onclick="fetch('/api/write', { method: 'POST' })">Save</button>`),
   '/search': page(`<button type="button" onclick="fetch('/api/search', { method: 'POST', body: 'q=T-1' })
       .then(() => fetch('/api/write', { method: 'POST' }))">Search</button>`),
@@ -102,6 +113,7 @@ afterEach(async () => t.close());
 
 /** An app whose website rules allow the test server; the owner stands for a knowledge question's attempt. */
 async function browserFor(access: SiteAccess = 'interact') {
+  writes.length = 0;
   t = await createTestApp({ browserHost: host });
   await t.call(updateSettingsOp, { 'browser.sites': [{ pattern: '127.0.0.1', access }] });
   const owner: BrowserOwner = {
@@ -118,6 +130,44 @@ function refOf(snapshot: string, element: string): string {
   if (match?.[1] === undefined) throw new Error(`No ${element} in:\n${snapshot}`);
   return match[1];
 }
+
+describe('浏览器测试流程', () => {
+  it('保存显式授权，执行允许的写入并拦截其他方法和路径，报告可取回截图', async () => {
+    await browserFor();
+    const { project } = await addProject(t, { checkCommand: null });
+    const input = {
+      projectId: project.id,
+      workflowId: await workflowId(t, BROWSER_TEST_WORKFLOW_KEY),
+      requirement: '检查写入授权',
+      start: false,
+    };
+    expect((await t.call(createTaskOp, input)).status).toBe(400);
+    const browserTest = {
+      target: `${origin}/scoped`,
+      writes: [{ method: 'POST' as const, path: '/api/write' }],
+    };
+    const created = await t.call(createTaskOp, { ...input, browserTest });
+    expect(created.status).toBe(201);
+    const { id } = created.body;
+    expect((await t.call(getTaskOp, { id })).body.browserTest).toEqual(browserTest);
+    const report = taskReaches(t, 'review');
+    t.fake.enqueue(
+      script()
+        .callTool('get_task_context', {})
+        .callTool('browser_open', { url: browserTest.target })
+        .callTool('browser_click', { ref: 'e1' })
+        .callTool('browser_screenshot', {})
+        .callTool('submit_result', { summary: '已执行测试用例，见 1.jpg' }),
+      { title: '· 执行浏览器测试' },
+    );
+    await t.call(startTaskOp, { id });
+    await report;
+    await t.fake.settled();
+    expect(writes).toEqual(['POST /api/write']);
+    expect((await t.call(getTaskOp, { id })).body.result?.summary).toContain('1.jpg');
+    expect((await t.call(listPreviewSessionsOp, { id })).body.attempts).toMatchObject([{ screenshots: ['1.jpg'] }]);
+  });
+});
 
 describe('浏览器：打开与读取页面', () => {
   it('打开网站返回带编号的页面结构与页头', async () => {

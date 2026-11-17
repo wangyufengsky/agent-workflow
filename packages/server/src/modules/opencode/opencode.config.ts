@@ -3,6 +3,7 @@ import { AGENT_SKILLS, ASSISTANT_SKILLS, PromptName, type Prompts, type SkillNam
 import {
   BASH_PERMISSION_PRESETS,
   BashPolicy,
+  BROWSER_TEST_TOOLS,
   MCP_ASSISTANT_SERVER_NAME,
   MCP_ASSISTANT_TOOL_PREFIX,
   MCP_SERVER_NAME,
@@ -247,15 +248,27 @@ export function sessionPermissionRules(
   {
     checkCommands = [],
     web = false,
+    browserTest = false,
     offline = false,
     allowedBash = [],
   }: {
     checkCommands?: readonly string[] | undefined;
     web?: boolean | undefined;
+    browserTest?: boolean | undefined;
     offline?: boolean | undefined;
     allowedBash?: readonly string[] | undefined;
   } = {},
 ): PermissionRule[] {
+  if (browserTest) {
+    return [
+      { permission: '*', action: 'deny', pattern: '*' },
+      ...BROWSER_TEST_TOOLS.map((tool) => ({
+        permission: `${MCP_TOOL_PREFIX}${tool}`,
+        action: 'allow' as const,
+        pattern: '*',
+      })),
+    ];
+  }
   if (base === SessionAgent.Delegate)
     return Object.entries(DELEGATE_PERMISSION).map(([permission, action]) => ({ permission, action, pattern: '*' }));
   if (base === SessionAgent.Executor) {

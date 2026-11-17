@@ -13,6 +13,7 @@ import {
 } from '../contracts/api/assistant.ts';
 import { attachmentIdsSchema, attachmentSchema, officeFilePreviewSchema } from '../contracts/api/attachments.ts';
 import { transcriptPageSchema, transcriptQuerySchema } from '../contracts/api/attempts.ts';
+import { assistantBrowserConfirmationSchema, assistantBrowserResultSchema } from '../contracts/api/browser.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -130,6 +131,28 @@ export const bindAssistantPreviewOp = defineOperationContract({
   output: z.void(),
   risk: OperationRisk.Write,
   http: { method: 'PUT', path: '/assistant/conversations/:id/preview' },
+});
+
+export const controlAssistantBrowserOp = defineOperationContract({
+  ...common,
+  id: 'assistant.controlBrowser',
+  title: 'op.assistant.controlBrowser',
+  description: 'Allow or stop browser control for a specific preview tab and conversation',
+  input: byId.extend({ tabId: z.string(), enabled: z.boolean() }),
+  output: z.object({ enabled: z.boolean() }),
+  risk: OperationRisk.Write,
+  http: { method: 'PUT', path: '/assistant/conversations/:id/browser-control' },
+});
+
+export const actAssistantBrowserOp = defineOperationContract({
+  ...common,
+  id: 'assistant.actBrowser',
+  title: 'op.assistant.actBrowser',
+  description: 'Perform a single confirmed action on the selected preview',
+  input: assistantBrowserConfirmationSchema,
+  output: assistantBrowserResultSchema,
+  risk: OperationRisk.Critical,
+  http: { method: 'POST', path: '/assistant/browser-actions' },
 });
 
 export const abortAssistantOp = defineOperationContract({

@@ -73,6 +73,7 @@ export type StartAttemptInput = {
   checkCommands?: readonly string[];
   /** The researcher may use the web (18 §5.1). */
   web?: boolean;
+  browserTest?: boolean;
   delegation?: { parentAttemptId: string; commit: string };
 };
 
@@ -187,6 +188,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
           checkCommands: input.checkCommands,
           web: input.web,
+          browserTest: input.browserTest,
           offline: settings.get('network.offline'),
           allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
         }),

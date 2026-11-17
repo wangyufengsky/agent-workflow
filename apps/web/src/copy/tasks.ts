@@ -337,3 +337,17 @@ export const INBOX_COPY = {
   viewAll: '查看全部',
   done: '已处理',
 } as const;
+
+export const BROWSER_TEST_COPY = {
+  target: '测试地址',
+  targetPlaceholder: '/orders 或 https://test.example.com/orders',
+  writes: '允许写入的接口',
+  writesPlaceholder: 'POST /api/orders',
+  writesHint: '每行一个 HTTP 方法和完整路径。留空时拦截写请求。',
+  approved: '我确认这是测试环境，并授权本任务访问该站点及发送上面列出的写请求。',
+  invalidScope: '填写有效的测试地址、允许写入的接口并确认授权',
+  noWrites: '拦截写请求',
+  screenshots: '测试截图',
+  browser: '测试浏览器',
+  attempt: (number: number) => `第 ${number} 次测试`,
+} as const;

@@ -4,6 +4,7 @@ import {
   type AttemptDTO,
   type AttemptKind,
   AttemptStatus,
+  BROWSER_TEST_TOOLS,
   ErrorCode,
   type ErrorInfo,
   MCP_SESSION_ARG,
@@ -69,6 +70,7 @@ export function createToolRegistry(
   tools: readonly McpToolDefinition[],
   attempts: AttemptLookup,
   log: Logger,
+  isBrowserTest: (id: string) => boolean,
 ): ToolRegistry {
   function resolveAttempt(tool: McpToolDefinition, sessionId: unknown): AttemptDTO {
     const attempt = typeof sessionId === 'string' ? attempts.findLatestBySession(sessionId) : undefined;
@@ -85,6 +87,9 @@ export function createToolRegistry(
       throw new AppError(ErrorCode.McpAttemptUnresolved, `Attempt ${attempt.id} is ${attempt.status}`, {
         attemptId: attempt.id,
       });
+    }
+    if (attempt.taskId !== null && !BROWSER_TEST_TOOLS.includes(tool.name) && isBrowserTest(attempt.taskId)) {
+      throw new AppError(ErrorCode.McpToolNotAllowed, 'This browser test can only use its test tools');
     }
     if (!tool.allowedKinds.includes(attempt.kind)) {
       throw new AppError(ErrorCode.McpToolNotAllowed, `${tool.name} is not allowed in ${attempt.kind} attempts`, {

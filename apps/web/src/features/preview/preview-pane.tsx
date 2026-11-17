@@ -2,6 +2,7 @@ import { ACTIVE_ATTEMPT_STATUSES, AcceptanceCheckKind, type BrowserFrame, type T
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { PREVIEW_PANE_COPY as C } from '../../copy/browser.ts';
+import { BROWSER_TEST_COPY } from '../../copy/tasks.ts';
 import { nodeQuery } from '../tasks/tasks.queries.ts';
 import { MyPreview } from './my-preview.tsx';
 import {
@@ -78,6 +79,39 @@ function CheckShots({ taskId, nodeId }: { taskId: string; nodeId: string }) {
           </figcaption>
         </figure>
       ))}
+    </div>
+  );
+}
+
+/** 浏览器测试使用尝试自己的页签，项目没有预览时也能查看过程。 */
+export function BrowserTestPane({ taskId }: { taskId: string }) {
+  const { data } = useQuery(previewSessionsQuery(taskId));
+  const [selected, setSelected] = useState('');
+  const attempts = data?.attempts ?? [];
+  const attempt = attempts.find((item) => item.attemptId === selected) ?? attempts.at(-1);
+  return (
+    <div className={styles.pane}>
+      {attempt === undefined ? (
+        <p className="hint">{C.noFrames}</p>
+      ) : (
+        <>
+          {attempts.length > 1 && (
+            <select
+              className={`input ${styles.session}`}
+              aria-label={C.session}
+              value={attempt.attemptId}
+              onChange={(event) => setSelected(event.target.value)}
+            >
+              {attempts.map((item, index) => (
+                <option key={item.attemptId} value={item.attemptId}>
+                  {BROWSER_TEST_COPY.attempt(index + 1)}
+                </option>
+              ))}
+            </select>
+          )}
+          <FramesViewer key={attempt.attemptId} attemptId={attempt.attemptId} />
+        </>
+      )}
     </div>
   );
 }

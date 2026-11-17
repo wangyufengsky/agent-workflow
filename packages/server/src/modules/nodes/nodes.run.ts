@@ -51,7 +51,10 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
 
   /** Another attempt while budget remains, otherwise failed (09 §3). */
   function fail(node: Node, event: NodeEvent, feedback: string, changes: NodeChanges = {}): Node {
-    const to = nextAfterFailure(node.attemptCount, settings.get('node.maxAttempts'));
+    const to =
+      deps.isBrowserTestTask?.(node.taskId) === true
+        ? NodeStatus.Failed
+        : nextAfterFailure(node.attemptCount, settings.get('node.maxAttempts'));
     return move(node, event, to, {
       ...changes,
       retryFeedback: feedback,
@@ -242,7 +245,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     if (attempt.status === AttemptStatus.Succeeded) return;
     // Cancelled with its task, or already moved on.
     if (node.status !== NodeStatus.Running && node.status !== NodeStatus.WaitingInput) return;
-    if (attempt.status === AttemptStatus.Interrupted) interrupt(node);
+    if (attempt.status === AttemptStatus.Interrupted && deps.isBrowserTestTask?.(node.taskId) !== true) interrupt(node);
     else fail(node, NodeEvent.AttemptFailed, feedbackFromAttempt(attempt.status, attempt.error));
   }
 
@@ -312,6 +315,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         model: role.model ?? settings.get('ai.defaultModel'),
         system: role.prompt,
         prompt,
+        ...(ctx.browserTest === true ? { browserTest: true } : {}),
         // A step of a read-only role (the code review's reviewer) may run the project check like a review (D51).
         checkCommands: ctx.checkCommand === null ? [] : [ctx.checkCommand],
       });
@@ -436,7 +440,11 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         const working = attempts
           .listByNode(node.id)
           .some((a) => a.kind === AttemptKind.Execute && a.status === AttemptStatus.Running);
-        if (node.status === NodeStatus.Verifying || !working) interrupt(node);
+        if (node.status === NodeStatus.Verifying || !working) {
+          if (node.status !== NodeStatus.Verifying && deps.isBrowserTestTask?.(node.taskId) === true)
+            fail(node, NodeEvent.AttemptFailed, feedbackFromAttempt(AttemptStatus.Interrupted, null));
+          else interrupt(node);
+        }
       }
     },
   };

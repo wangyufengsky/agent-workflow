@@ -1,4 +1,4 @@
-import type { TaskFailedPhase, TaskStatus } from '@aw/shared';
+import type { BrowserTestScope, TaskFailedPhase, TaskStatus } from '@aw/shared';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { projectsTable } from '../projects/projects.table.ts';
 import { workflowsTable } from '../workflows/workflows.table.ts';
@@ -21,6 +21,7 @@ export const tasksTable = sqliteTable(
       .references(() => workflowsTable.id),
     title: text('title').notNull(),
     requirement: text('requirement').notNull(),
+    browserTest: text('browser_test', { mode: 'json' }).$type<BrowserTestScope>(),
     /** 创建任务时固定的用户 Skill（JSON）。 */
     skills: text('skills').notNull().default('[]'),
     status: text('status').$type<TaskStatus>().notNull(),

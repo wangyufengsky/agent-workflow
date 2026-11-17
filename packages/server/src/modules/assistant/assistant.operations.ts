@@ -1,11 +1,15 @@
 import {
+  AppError,
   abortAssistantOp,
+  actAssistantBrowserOp,
   bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
+  controlAssistantBrowserOp,
   createAssistantContinuationOp,
   createConversationOp,
   deleteConversationOp,
+  ErrorCode,
   getAssistantContinuationHistoryOp,
   getConversationOp,
   listAssistantAttachmentsOp,
@@ -27,6 +31,10 @@ import type { Confirmations } from './assistant.confirmations.ts';
 import type { AssistantService } from './assistant.service.ts';
 import type { AssistantSnapshots } from './assistant.snapshots.ts';
 import type { WhisperService } from './assistant.whisper.ts';
+
+export const confirmedBrowserOperation = implement(actAssistantBrowserOp, () => {
+  throw new AppError(ErrorCode.ValidationFailed, 'Use the conversation confirmation');
+});
 
 export function assistantOperations(
   conversations: AssistantService,
@@ -55,6 +63,11 @@ export function assistantOperations(
       if (preview !== null) conversations.get(id);
       browser.bindPreview(id, preview);
     }),
+    implement(controlAssistantBrowserOp, ({ id, tabId, enabled }) => {
+      const conversation = conversations.get(id);
+      return browser.setAssistantControl(id, conversation.projectId, tabId, enabled);
+    }),
+    confirmedBrowserOperation,
     implement(sendAssistantMessageOp, (input) => conversations.send(input)),
     implement(abortAssistantOp, ({ id }) => conversations.abort(id)),
     implement(replyAssistantPermissionOp, ({ id, permissionId, reply }) =>

@@ -176,15 +176,71 @@ export function createActions(clock: Clock) {
   }
 
   return {
-    async click(tab: Tab, ref: string): Promise<void> {
+    async describeControl(tab: Tab, ref: string | null) {
+      const describe = `function () {
+        const el = this;
+        const form = el.form ?? el.closest('form');
+        const sensitive = (field) => field.matches(
+          'input[type=password], input[type=file], [autocomplete*=password], [autocomplete=one-time-code], [autocomplete=webauthn]'
+        );
+        const fields = Array.from(form?.elements ?? []).filter((field) =>
+          ['INPUT', 'SELECT', 'TEXTAREA'].includes(field.tagName) && !field.disabled);
+        const labelOf = (field) =>
+          (field.getAttribute('aria-label') ?? field.labels?.[0]?.textContent ?? field.getAttribute('placeholder') ??
+          field.getAttribute('name') ?? field.textContent?.trim() ?? '').trim().slice(0, 100) || field.tagName;
+        return {
+          label: labelOf(el),
+          textField: el.isContentEditable || el.matches('textarea, input:is([type=text], [type=search], [type=email], [type=tel], [type=url], [type=number], [type=date], [type=time], :not([type]))'),
+          link: el instanceof HTMLAnchorElement && !el.hasAttribute('download') ? el.href : null,
+          formAction: el.hasAttribute('formaction') ? el.formAction : form?.action ?? null,
+          formMethod: el.hasAttribute('formmethod') ? el.formMethod : form?.method ?? null,
+          submit: (el.tagName === 'BUTTON' || el.tagName === 'INPUT') && el.type === 'submit',
+          sensitive: !el.isConnected || sensitive(el) || fields.some(sensitive),
+          state: JSON.stringify([el.tagName, el.id, el.name, el.type, el.value, el.checked,
+            ...fields.map((field) => [field.name, field.value, field.checked])]),
+          fields: fields.filter((field) =>
+            !sensitive(field) && field.type !== 'hidden' &&
+            (!['checkbox', 'radio'].includes(field.type) || field.checked)
+          ).slice(0, 16).map((field) => labelOf(field) + ' · ' + String(field.value).slice(0, 200)),
+        };
+      }`;
+      const data =
+        ref === null
+          ? await tab.evaluate(`(${describe}).call(document.activeElement ?? document.body)`)
+          : await call(tab, (await resolve(tab, ref)).objectId, describe);
+      return z
+        .object({
+          label: z.string(),
+          textField: z.boolean(),
+          link: z.string().nullable(),
+          formAction: z.string().nullable(),
+          formMethod: z.string().nullable(),
+          submit: z.boolean(),
+          sensitive: z.boolean(),
+          state: z.string(),
+          fields: z.array(z.string()),
+        })
+        .parse(data);
+    },
+
+    async click(tab: Tab, ref: string, beforeInput?: () => Promise<void>): Promise<void> {
       const { node, objectId } = await resolve(tab, ref);
-      await clickAt(tab, await hittable(tab, ref, node, objectId));
+      const point = await hittable(tab, ref, node, objectId);
+      await beforeInput?.();
+      await clickAt(tab, point);
     },
 
     /** Focuses the field by clicking it, so `Input.insertText` reaches it and not the previous field (29 §5.5). */
-    async type(tab: Tab, ref: string, input: { text: string; clear: boolean; submit: boolean }): Promise<void> {
+    async type(
+      tab: Tab,
+      ref: string,
+      input: { text: string; clear: boolean; submit: boolean },
+      beforeInput?: () => Promise<void>,
+    ): Promise<void> {
       const { node, objectId } = await resolve(tab, ref);
-      await clickAt(tab, await hittable(tab, ref, node, objectId));
+      const point = await hittable(tab, ref, node, objectId);
+      await beforeInput?.();
+      await clickAt(tab, point);
       const focused = await call(
         tab,
         objectId,
@@ -206,8 +262,9 @@ export function createActions(clock: Clock) {
       if (input.submit) await press(tab, 'Enter');
     },
 
-    async select(tab: Tab, ref: string, values: readonly string[]): Promise<void> {
+    async select(tab: Tab, ref: string, values: readonly string[], beforeInput?: () => Promise<void>): Promise<void> {
       const { objectId } = await resolve(tab, ref);
+      await beforeInput?.();
       const missing = z
         .array(z.string())
         .nullable()

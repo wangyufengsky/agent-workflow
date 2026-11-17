@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { browserWriteRuleSchema } from '../../browser/policy.ts';
 import {
   LIST_PAGE_DEFAULT,
   LIST_PAGE_MAX,
@@ -48,10 +49,27 @@ export const checkpointsSchema = z.object({
 });
 export type Checkpoints = z.infer<typeof checkpointsSchema>;
 
+export const BROWSER_TEST_WORKFLOW_KEY = 'browser_test';
+
+export const browserTestScopeSchema = z.object({
+  target: z
+    .string()
+    .trim()
+    .min(1)
+    .max(2048)
+    .refine(
+      (target) => /^\/(?!\/)[^\s\\]*$/.test(target) || /^https?:\/\/[^/\s@?#\\]+(?:[/?#][^\s\\]*)?$/i.test(target),
+      'Use a preview path or an HTTP(S) address without credentials',
+    ),
+  writes: z.array(browserWriteRuleSchema).max(20),
+});
+export type BrowserTestScope = z.infer<typeof browserTestScopeSchema>;
+
 export const createTaskRequestSchema = z.object({
   projectId: z.string(),
   /** A specific workflow version. */
   workflowId: z.string(),
+  browserTest: browserTestScopeSchema.optional(),
   requirement: z.string().trim().min(1).max(REQUIREMENT_MAX_CHARS),
   /** Defaults to the requirement's first line. */
   title: z.string().trim().min(1).max(TASK_TITLE_MAX_CHARS).optional(),
@@ -237,6 +255,7 @@ export type TaskSummaryDTO = z.infer<typeof taskSummarySchema>;
 
 /** `TaskDetailDTO` (11 §5.2). */
 export const taskDetailSchema = taskSummarySchema.extend({
+  browserTest: browserTestScopeSchema.optional(),
   skills: z.array(skillRefSchema).optional(),
   requirement: z.string(),
   failedPhase: taskFailedPhaseSchema.nullable(),

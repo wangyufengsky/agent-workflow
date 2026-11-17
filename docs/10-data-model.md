@@ -177,6 +177,7 @@ type Acceptance = {
 | workflow_id | TEXT → workflows | 具体版本 |
 | title | TEXT | 未填时由需求首行截取 |
 | requirement | TEXT | |
+| browser_test | TEXT nullable | 浏览器测试任务创建时确认的目标与 HTTP 写请求规则，JSON。迁移 0044，历史任务为 null |
 | status | TEXT | `TaskStatus` |
 | failed_phase | TEXT NULL | `TaskFailedPhase` |
 | failure | TEXT(JSON) NULL | `{ code, message, details? }` |

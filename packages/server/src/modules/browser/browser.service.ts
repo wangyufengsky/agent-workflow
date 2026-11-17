@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -17,6 +17,7 @@ import {
   type BrowserPage,
   type BrowserPolicy,
   BrowserTabKind,
+  type BrowserTestScope,
   browserFrameSchema,
   ErrorCode,
   McpToolName,
@@ -42,6 +43,7 @@ import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { createActions } from './browser.actions.ts';
 import { type PageCheckPage, type PageCheckResult, pageCheckOutput, pageCheckVerdict } from './browser.check.ts';
+import { createBrowserControl } from './browser.control.ts';
 import { createFrontendPreview } from './browser.frontend.ts';
 import type { BrowserHost } from './browser.host.ts';
 import { openTab, type Tab } from './browser.tab.ts';
@@ -71,7 +73,17 @@ export type PageCheckRequest = {
 };
 
 /** Who uses the browser (an attempt, 29 §5.3) and where its screenshots go (beside its transcript, 29 §5.7). */
-export type BrowserOwner = { id: string; taskId: string | null; projectId: string | null; filesDir: string };
+export type BrowserOwner = {
+  id: string;
+  taskId: string | null;
+  projectId: string | null;
+  filesDir: string;
+  browserTest?: BrowserTestScope | null;
+};
+
+function usesProjectPreview(owner: BrowserOwner): boolean {
+  return owner.browserTest == null || owner.browserTest.target.startsWith('/');
+}
 
 type Session = {
   owner: BrowserOwner;
@@ -167,6 +179,7 @@ export function createBrowserService({
   /** Opens of a task's preview tab in progress: a second open joins the first. */
   const openingUserTabs = new Map<string, Promise<UserTabState>>();
   const actions = createActions(clock);
+  const control = createBrowserControl(actions, log);
   const unsubscribeHost = host.onEvent((event) => {
     // The page that placed a user's preview tab started over and main closed it (29 §8.1): let go of its preview.
     if (event.type === 'browser.gone') {
@@ -181,8 +194,17 @@ export function createBrowserService({
     log.warn({ source: event.source, cleanupError: event.cleanupError }, 'browser unowned worker blocked');
   });
 
-  function policyFor(owner: Pick<BrowserOwner, 'taskId' | 'projectId'>): BrowserPolicy {
+  function policyFor(owner: Pick<BrowserOwner, 'taskId' | 'projectId' | 'browserTest'>): BrowserPolicy {
     const preview = owner.taskId === null ? null : previews.get(owner.taskId);
+    if (owner.browserTest != null) {
+      const target = owner.browserTest.target;
+      const origin = target.startsWith('/') ? preview?.url : new URL(target).origin;
+      return {
+        previewOrigins: origin == null ? [] : [origin],
+        sites: [],
+        automation: { origin: origin ?? '', writes: owner.browserTest.writes },
+      };
+    }
     const extra = owner.projectId === null ? [] : (projects.getRecord(owner.projectId).preview?.extraOrigins ?? []);
     return {
       previewOrigins: preview?.url === null || preview?.url === undefined ? [] : [preview.url, ...extra],
@@ -224,7 +246,8 @@ export function createBrowserService({
       site: kind === BrowserTabKind.Site,
     });
     session.tabs[kind] = tab;
-    if (kind === BrowserTabKind.Preview && owner.taskId !== null) previews.acquire(owner.taskId);
+    if (kind === BrowserTabKind.Preview && owner.taskId !== null && usesProjectPreview(owner))
+      previews.acquire(owner.taskId);
     return tab;
   }
 
@@ -292,6 +315,15 @@ export function createBrowserService({
     for (const url of [page.url, ...also]) if (URL.canParse(url)) pages.set(pageKey(url), text);
   }
 
+  function testControlGuard(owner: BrowserOwner, tab: Tab, ref: string | null) {
+    if (owner.browserTest == null) return undefined;
+    return async () => {
+      const { sensitive } = await actions.describeControl(tab, ref);
+      if (sensitive || tab.credentialsAsked() !== null)
+        throw new AppError(ErrorCode.BrowserLoginRequired, 'The user handles credentials and file inputs');
+    };
+  }
+
   async function act(
     owner: BrowserOwner,
     tool: ActingTool,
@@ -339,7 +371,8 @@ export function createBrowserService({
     if (session === undefined) return;
     sessions.delete(ownerId);
     for (const tab of Object.values(session.tabs)) await tab.close();
-    if (session.tabs.preview !== undefined && session.owner.taskId !== null) previews.release(session.owner.taskId);
+    if (session.tabs.preview !== undefined && session.owner.taskId !== null && usesProjectPreview(session.owner))
+      previews.release(session.owner.taskId);
   }
 
   /**
@@ -428,7 +461,11 @@ export function createBrowserService({
 
   /** Conversations bound to the tab lose it. */
   function unbindPreview(tabId: string): void {
-    for (const [conversationId, bound] of boundPreviews) if (bound === tabId) boundPreviews.delete(conversationId);
+    for (const [conversationId, bound] of boundPreviews) {
+      if (bound !== tabId) continue;
+      void control.revoke(conversationId);
+      boundPreviews.delete(conversationId);
+    }
   }
 
   /** The tab is no longer the user's: unbound, and its preview free to idle. */
@@ -545,6 +582,7 @@ export function createBrowserService({
         ...[...userTabs.values()].filter((u) => u.taskId === event.data.taskId).map((u) => ({ tab: u.tab, owner: u })),
       ];
       for (const { tab, owner } of tabs) {
+        if (control.hasPolicy(tab.tabId)) continue;
         tab.setPolicy(policyFor(owner)).catch((err: unknown) => log.error({ err }, 'browser policy update failed'));
       }
     }
@@ -637,7 +675,16 @@ export function createBrowserService({
      * address in the preview tab or the website tab by the policy.
      */
     async open(owner: BrowserOwner, url: string): Promise<BrowserActionOutput> {
+      if (owner.browserTest != null && !sessions.has(owner.id) && url !== owner.browserTest.target) {
+        throw new AppError(ErrorCode.BrowserSiteNotAllowed, 'Open the user-authorized test target first');
+      }
       let target = url;
+      if (url.startsWith('/') && !/^(?!.*\\)\/(?!\/)/.test(url)) {
+        throw new AppError(ErrorCode.BrowserSiteNotAllowed, 'Use a path within the preview');
+      }
+      if (url.startsWith('/') && !usesProjectPreview(owner)) {
+        throw new AppError(ErrorCode.BrowserSiteNotAllowed, 'Use an absolute address on the approved test site');
+      }
       if (url.startsWith('/')) {
         if (owner.taskId === null) {
           throw new AppError(ErrorCode.ValidationFailed, 'Only tasks have a page preview: give a full address', {
@@ -662,7 +709,12 @@ export function createBrowserService({
       await tab.cdp('Page.navigate', { url: normalized });
       const settled = await tab.result(await tab.settle());
       const output = { ...settled, frame: await frame(owner, tab, McpToolName.BrowserOpen, settled.url) };
-      const login = access.tab === BrowserTabKind.Site ? await loginAt(tab, output.url) : null;
+      const login =
+        (access.tab === BrowserTabKind.Site || owner.browserTest != null) &&
+        URL.canParse(output.url) &&
+        urlAccess(output.url, policyFor(owner)) !== null
+          ? await loginAt(tab, output.url)
+          : null;
       if (login !== null) {
         throw new AppError(ErrorCode.BrowserLoginRequired, 'The website asks to log in', { url: login });
       }
@@ -677,13 +729,19 @@ export function createBrowserService({
       return { ...page, tab: tab.kind };
     },
 
-    click: (owner: BrowserOwner, ref: string) => act(owner, McpToolName.BrowserClick, (tab) => actions.click(tab, ref)),
+    click: (owner: BrowserOwner, ref: string) =>
+      act(owner, McpToolName.BrowserClick, (tab) => actions.click(tab, ref, testControlGuard(owner, tab, ref))),
     type: (owner: BrowserOwner, ref: string, input: { text: string; clear: boolean; submit: boolean }) =>
-      act(owner, McpToolName.BrowserType, (tab) => actions.type(tab, ref, input)),
+      act(owner, McpToolName.BrowserType, (tab) => actions.type(tab, ref, input, testControlGuard(owner, tab, ref))),
     select: (owner: BrowserOwner, ref: string, values: readonly string[]) =>
-      act(owner, McpToolName.BrowserSelect, (tab) => actions.select(tab, ref, values)),
+      act(owner, McpToolName.BrowserSelect, (tab) =>
+        actions.select(tab, ref, values, testControlGuard(owner, tab, ref)),
+      ),
     press: (owner: BrowserOwner, key: BrowserKey) =>
-      act(owner, McpToolName.BrowserPress, (tab) => actions.press(tab, key)),
+      act(owner, McpToolName.BrowserPress, async (tab) => {
+        await testControlGuard(owner, tab, null)?.();
+        await actions.press(tab, key);
+      }),
 
     viewport: (owner: BrowserOwner, preset: ViewportPreset) =>
       act(owner, McpToolName.BrowserViewport, async (tab) => {
@@ -742,6 +800,15 @@ export function createBrowserService({
         .split('\n')
         .filter((line) => line !== '')
         .map((line) => browserFrameSchema.parse(JSON.parse(line)));
+    },
+
+    screenshots(attemptId: string): string[] {
+      const dir = ownerDir({ id: attemptId, filesDir: attemptFilesDir(attemptId) });
+      return existsSync(dir)
+        ? readdirSync(dir)
+            .filter((file) => /^\d+\.jpg$/.test(file))
+            .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
+        : [];
     },
 
     /** The path of an attempt's screenshot or frame (29 §5.7); only names the backend gives (ATTEMPT_FILE). */
@@ -853,7 +920,7 @@ export function createBrowserService({
         const [tabId, { tab, projectId }] = existing;
         const preview = await previews.start(taskId);
         return withinDeadline(async (signal) => {
-          await tab.setPolicy(policyFor({ taskId, projectId }));
+          if (!control.hasPolicy(tabId)) await tab.setPolicy(policyFor({ taskId, projectId }));
           signal.throwIfAborted();
           if (tab.url() === '' || new URL(tab.url()).origin !== preview.url) {
             await navigatePreview(tab, taskId, projects.getRecord(projectId).preview?.pages[0] ?? '/', signal);
@@ -885,6 +952,7 @@ export function createBrowserService({
      */
     bindPreview(conversationId: string, selection: { taskId: string; tabId: string } | null): void {
       if (selection === null) {
+        void control.revoke(conversationId);
         boundPreviews.delete(conversationId);
         return;
       }
@@ -894,8 +962,30 @@ export function createBrowserService({
         throw new AppError(ErrorCode.BrowserNotOpen, 'The preview belongs to another task');
       }
       runningPreviewUrl(entry.taskId);
+      if (boundPreviews.get(conversationId) !== selection.tabId) void control.revoke(conversationId);
       boundPreviews.set(conversationId, selection.tabId);
     },
+
+    async setAssistantControl(conversationId: string, projectId: string | null, tabId: string, enabled: boolean) {
+      if (!enabled) {
+        await control.revoke(conversationId);
+        return { enabled: false };
+      }
+      if (boundPreviews.get(conversationId) !== tabId)
+        throw new AppError(ErrorCode.BrowserNotOpen, 'This conversation is not bound to the selected preview');
+      const entry = userTabOf(tabId);
+      if (projectId !== null && entry.projectId !== projectId)
+        throw new AppError(ErrorCode.BrowserNotOpen, 'The preview belongs to a different project');
+      await control.enable(conversationId, {
+        tab: entry.tab,
+        origin: runningPreviewUrl(entry.taskId),
+        restore: () => policyFor(entry),
+      });
+      return { enabled: true };
+    },
+
+    prepareAssistantAction: control.prepare,
+    confirmAssistantAction: control.confirm,
 
     /**
      * `browser_read`: the bound preview's address, viewport, text and errors, within BROWSER_READ_TIMEOUT_MS. A page

@@ -6,6 +6,7 @@ import {
   type BatchDetailDTO,
   type BatchItemDTO,
   type BatchSummaryDTO,
+  BROWSER_TEST_WORKFLOW_KEY,
   batchCounts,
   type CreateBatchRequest,
   type DeliverBatchResponse,
@@ -144,6 +145,11 @@ export function createBatchesService({ db, unit, clock, log, settings, workflows
      */
     async create(input: CreateBatchRequest): Promise<BatchDetailDTO> {
       const workflow = workflows.get(input.workflowId);
+      if (workflow.key === BROWSER_TEST_WORKFLOW_KEY)
+        throw new AppError(
+          ErrorCode.ValidationFailed,
+          'Start browser tests from the task form to authorize their target',
+        );
       if (workflow.planning !== WorkflowPlanning.Fixed) {
         throw new AppError(ErrorCode.ValidationFailed, 'Only fixed workflows can run as a batch', {
           issues: [{ path: ['workflowId'], message: `workflow ${workflow.key} is planned by AI` }],

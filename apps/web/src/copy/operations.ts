@@ -34,6 +34,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.projects.startAgentsMdTask': '让 AI 整理项目的 AGENTS.md',
   'op.previews.get': '查看页面预览',
   'op.browser.readUrl': '读取网页文字',
+  'op.assistant.actBrowser': '执行网页操作',
+  'op.assistant.controlBrowser': '设置助手网页控制',
   'op.assistant.bindPreview': '关联当前预览',
   'op.previews.start': '启动页面预览',
   'op.previews.stop': '停止页面预览',
@@ -267,6 +269,11 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
  * their label from what they name (`INPUT_REF_LABEL`). A unit test keeps every field of a confirmed operation covered.
  */
 export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
+  requestId: '操作编号',
+  page: '当前页面',
+  browserTest: '浏览器测试授权',
+  fields: '表单字段',
+  write: '允许发送的请求',
   path: '页面路径',
   'companion.appearance': COMPANION_COPY.appearance,
   'companion.enabled': COMPANION_COPY.desktop,

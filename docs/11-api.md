@@ -158,6 +158,8 @@ type CreateTaskRequest = {
 };
 ```
 
+浏览器测试流程（`browser_test`）须携带 `browserTest: { target, writes: [{ method, path }] }`。`target` 是项目预览路径或不带凭据的 HTTP(S) 地址。写入方法为 POST、PUT、PATCH 或 DELETE，按完整路径匹配。任务详情返回同一份创建时冻结的授权。浏览器会话列表的 `attempts[].screenshots` 列出实际保存的截图文件。
+
 检查点解析：请求值 > 流程 `definition.checkpoints` > 设置 `ai.askOnUncertainty`（仅 ask_on_uncertainty）。解析结果写入 `tasks.checkpoints`，之后不再变。
 
 ### 5.2 TaskDetailDTO
@@ -381,6 +383,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey?, knowledgeConversationId?, deckId?, slideId?, batchId?, scheduleId? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在创建会话、发送请求、删除或等待模型回复时 409 `ASSISTANT_BUSY` |
 | POST | `/assistant/conversations/:id/abort` | 停止本轮回复 |
 | PUT | `/assistant/conversations/:id/preview` | `assistant.bindPreview`，界面专用、不对助手开放；`{ preview: { taskId, tabId } \| null }` → 204。只接受属于该任务的真实用户预览，不能绑定 AI 页签；`null` 解除关联，删除后的清理也幂等。仅保存在内存 |
+| PUT | `/assistant/conversations/:id/browser-control` | `assistant.controlBrowser`，界面专用。 `{ tabId, enabled }` → `{ enabled }`；启用仅接受当前对话关联的项目预览。网页动作通过助手现有确认接口批准一次。 |
 | POST | `/assistant/conversations/:id/permissions/:permissionId` | `{ reply: PermissionDecision }`：回复助手会话的权限请求（bash / webfetch 询问），不存在 404 `NOT_FOUND` |
 | GET | `/assistant/conversations/:id/transcript?afterSeq=` | 消息流分页（非清单路由，格式同 `/attempts/:id/transcript`；`done` 恒为 false：对话不会结束） |
 | GET | `/assistant/external-mcp` | `assistant.externalMcp`（read，仅界面）：`{ items: Array<{ name, status: ExternalMcpStatus, error: string \| null }> }`：opencode `mcp.status`（助手目录）报告的 MCP 服务器，去掉应用自己的 `agent-workflow` 与 `agent-workflow-app`，按名称排序；opencode 没就绪 503 `OPENCODE_NOT_READY`（28 §4） |

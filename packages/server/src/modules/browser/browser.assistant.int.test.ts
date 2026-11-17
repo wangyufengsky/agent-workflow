@@ -1,15 +1,19 @@
 import { createServer, type Server } from 'node:http';
 import {
+  bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
+  controlAssistantBrowserOp,
   createConversationOp,
   ErrorCode,
   getPreviewOp,
   listConfirmationsOp,
   MCP_SESSION_ARG,
   openLoginTabOp,
+  openUserTabOp,
   readWebsiteOp,
   sendAssistantMessageOp,
+  startPreviewOp,
   updateProjectOp,
   updateSettingsOp,
   VIEWPORT_SIZES,
@@ -227,6 +231,88 @@ describe('助手网页文字与任务预览', () => {
       body: { code: ErrorCode.BrowserLoginRequired, hint: expect.any(String) },
     });
     await host.request({ kind: 'close', tabId: 'observer' });
+  });
+
+  it('同一页签可以填表，提交需要确认，表单变化或取消授权使旧操作失效', async () => {
+    const { project } = await addProject(t, {
+      files: {
+        'server.mjs': `import { createServer } from 'node:http';
+          createServer((req, res) => {
+            if (req.method === 'POST') {
+              res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+              res.end('<h1>已提交</h1>');
+              return;
+            }
+            res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+            res.end('<form method="post" action="/save"><input name="title" aria-label="名称"><button>保存</button></form>');
+          }).listen(Number(process.env.PORT), '127.0.0.1');`,
+      },
+    });
+    await t.call(updateProjectOp, {
+      id: project.id,
+      preview: { command: 'node server.mjs', setupCommand: null, readyPath: '/', pages: ['/'], extraOrigins: [] },
+    });
+    const reviewing = taskReaches(t, 'plan_review');
+    const task = await createTask(t, {
+      projectId: project.id,
+      workflow: 'bugfix',
+      checkpoints: { confirm_plan: true },
+    });
+    await reviewing;
+    await t.call(startPreviewOp, { taskId: task.id });
+    const { tabId } = (await t.call(openUserTabOp, { taskId: task.id })).body;
+    const binding = { id: conversationId, preview: { taskId: task.id, tabId } };
+    await t.call(bindAssistantPreviewOp, binding);
+    const initial = await call('browser_read');
+    const refOf = (body: unknown, label: string) => {
+      const snapshot = z.object({ page: z.string() }).parse(body).page;
+      const ref = new RegExp(`"${label}"[^\n]*\\[ref=(e\\d+)\\]`).exec(snapshot)?.[1];
+      if (ref === undefined) throw new Error(`Missing ${label} in ${snapshot}`);
+      return ref;
+    };
+    const type = { kind: 'type', ref: refOf(initial.body, '名称'), text: '回归订单' };
+    expect(await call('assistant_actBrowser', { action: type })).toMatchObject({ isError: true });
+    const grant = await t.call(controlAssistantBrowserOp, { id: conversationId, tabId, enabled: true });
+    expect(grant.body).toEqual({ enabled: true });
+    const snapshot = await call('browser_read');
+    const typed = await call('assistant_actBrowser', { action: { ...type, ref: refOf(snapshot.body, '名称') } });
+    expect(typed).toMatchObject({ isError: false });
+    const action = { kind: 'click', ref: refOf(typed.body, '保存') };
+    const requested = await call('assistant_actBrowser', { action });
+    expect(requested.body).toMatchObject({ status: 'needs_confirmation' });
+    const confirm = (body: Record<string, unknown>) =>
+      t.call(confirmAssistantCallOp, { id: String(body.confirmation_id), alwaysAllow: false });
+    expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items.at(-1)?.input).toMatchObject({
+      target: '保存',
+      fields: ['名称 · 回归订单'],
+      write: { method: 'POST', path: '/save' },
+    });
+    expect((await call('browser_read')).body.page).not.toContain('已提交');
+    await host.request({
+      kind: 'cdp',
+      tabId,
+      method: 'Runtime.evaluate',
+      params: {
+        expression: 'document.querySelector("input").value = "changed"',
+      },
+    });
+    expect((await confirm(requested.body)).body.result).toMatchObject({
+      ok: false,
+      error: { code: ErrorCode.BrowserRefStale },
+    });
+    const second = await call('assistant_actBrowser', { action });
+    await t.call(bindAssistantPreviewOp, { id: conversationId, preview: null });
+    expect((await confirm(second.body)).body.result).toMatchObject({ ok: false });
+    await t.call(bindAssistantPreviewOp, binding);
+    await expect
+      .poll(async () => (await t.call(controlAssistantBrowserOp, { id: conversationId, tabId, enabled: true })).status)
+      .toBe(200);
+    const last = await call('browser_read');
+    const third = await call('assistant_actBrowser', { action: { ...action, ref: refOf(last.body, '保存') } });
+    expect((await confirm(third.body)).body.result).toMatchObject({
+      ok: true,
+      output: { page: expect.stringContaining('已提交'), blockedWrites: [] },
+    });
   });
 
   it('启动和停止预览都经确认，取消不执行；总是允许后直接执行并返回真实预览状态', async () => {

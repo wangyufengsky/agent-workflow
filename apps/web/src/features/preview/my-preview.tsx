@@ -27,6 +27,7 @@ import { ExternalLink } from '../../components/external-link.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
 import { PREVIEW_PANE_COPY as C } from '../../copy/browser.ts';
 import { useUiStore } from '../../state/ui.store.ts';
+import { PreviewControl } from '../assistant/preview-binding.tsx';
 import { Segmented } from '../settings/setting-inputs.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { taskQuery } from '../tasks/tasks.queries.ts';
@@ -270,6 +271,7 @@ export function MyPreview({
             <IconButton icon="refresh" label={C.reload} onClick={() => bridge.browser.reload(tabId)} />
           </>
         )}
+        {shown !== null && <PreviewControl taskId={task.id} tabId={shown} />}
         <span className={styles.origin}>{C.origin(task.key)}</span>
         <input
           // A new page shows its own path; what is typed is kept until then.

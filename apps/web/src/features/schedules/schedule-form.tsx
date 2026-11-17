@@ -1,4 +1,11 @@
-import { type ProjectDTO, type ScheduleDetailDTO, UiMode, WorkflowKind, WorkflowPlanning } from '@aw/shared';
+import {
+  BROWSER_TEST_WORKFLOW_KEY,
+  type ProjectDTO,
+  type ScheduleDetailDTO,
+  UiMode,
+  WorkflowKind,
+  WorkflowPlanning,
+} from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { Button } from '../../components/button.tsx';
@@ -78,6 +85,7 @@ export function ScheduleForm({
   const workflows = useQuery(workflowsQuery);
   const fixed = workflows.data?.filter(
     (w) =>
+      w.key !== BROWSER_TEST_WORKFLOW_KEY &&
       w.planning === WorkflowPlanning.Fixed &&
       (pro || w.kind === WorkflowKind.Builtin || w.key === initial?.workflow.key),
   );

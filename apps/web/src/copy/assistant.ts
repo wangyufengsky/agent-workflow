@@ -267,3 +267,15 @@ export const MEMORY_COPY = {
   approval: '确认后保存，适用范围内的后续对话可以使用这条记忆。',
   description: '记忆保存在此设备。助手使用的条目会发送给当前模型。',
 } as const;
+
+export const ASSISTANT_BROWSER_COPY = {
+  preview: '任务预览',
+  closePreview: '关闭预览',
+  previewUnavailable: '任务工作区就绪后可打开预览。',
+  enable: '让助手操作',
+  stop: '停止操作',
+  active: '助手可操作当前预览',
+  enableHelp: '启用时会重新加载当前页。停止操作后可恢复手动提交。',
+  confirmation: '只授权执行本次操作。切换页签、对话或更改表单后，需要重新发起。',
+  noWrite: '本次不授权 HTTP 写请求',
+} as const;

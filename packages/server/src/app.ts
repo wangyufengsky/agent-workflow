@@ -351,6 +351,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('onReady', () => projectRuntime.recover());
   server.addHook('preClose', () => projectRuntime.stopAll());
   const nodes = createNodesModule({
+    isBrowserTestTask: (id): boolean => tasks.service.browserTest(id) !== null,
     db: database.db,
     unit,
     clock,

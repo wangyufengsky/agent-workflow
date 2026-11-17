@@ -23,6 +23,7 @@ export type NodesServiceDeps = {
   settings: SettingsService;
   prompts: Prompts;
   locks: RepoLocks;
+  isBrowserTestTask?: (taskId: string) => boolean;
 };
 
 /** What running a node needs to know about its task; the tasks module provides it. */
@@ -31,6 +32,7 @@ export type NodeRunContext = {
   projectId: string;
   taskKey: string;
   taskTitle: string;
+  browserTest?: boolean;
   requirement: string;
   /** The task worktree. */
   directory: string;

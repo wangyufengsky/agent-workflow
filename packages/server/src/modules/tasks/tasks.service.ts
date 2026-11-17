@@ -123,6 +123,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
         ? { codeReview: { report: reviewResult?.reviewReport ?? null, summary: reviewResult?.summary ?? null } }
         : {}),
       requirement: task.requirement,
+      ...(task.browserTest === null ? {} : { browserTest: task.browserTest }),
       ...(skills.length === 0 ? {} : { skills: skills.map(({ id, name, version }) => ({ id, name, version })) }),
       failedPhase: task.failedPhase,
       failure: task.failure,
@@ -268,7 +269,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     listByProject: (projectId: string) => state.repo.list({ projectId }),
     /** What the preview tab can show besides the user's own preview (29 §8.1). */
     previewSessions(id: string): PreviewSessions {
-      state.get(id);
+      const task = state.get(id);
       return {
         attempts: deps.attempts
           .listByTask(id)
@@ -278,8 +279,9 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
             kind: a.kind,
             status: a.status,
             frames: deps.browser.frames(a.id).length,
+            screenshots: task.browserTest === null ? [] : deps.browser.screenshots(a.id),
           }))
-          .filter((a) => a.frames > 0),
+          .filter((a) => a.frames > 0 || a.screenshots.length > 0),
         checks: deps.nodes
           .listByTask(id)
           .flatMap((node) =>
@@ -341,6 +343,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     onProjectDeleted: actions.onProjectDeleted,
     /** Creating several tasks in one transaction (batches, 20 §2): check once, insert drafts, start after commit. */
     checkCreate: lifecycle.checkCreate,
+    browserTest: (id: string) => state.get(id).browserTest,
     insertDraft: lifecycle.insertDraft,
     start(id: string): TaskDetailDTO {
       lifecycle.start(id);

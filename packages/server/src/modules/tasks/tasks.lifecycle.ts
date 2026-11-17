@@ -7,6 +7,7 @@ import {
   type AttemptDTO,
   AttemptKind,
   AttemptStatus,
+  BROWSER_TEST_WORKFLOW_KEY,
   type CreateTaskRequest,
   EDITABLE_NODE_STATUSES,
   ErrorCode,
@@ -278,6 +279,13 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       },
     ): string {
       const workflow = workflows.get(input.workflowId);
+      if ((workflow.key === BROWSER_TEST_WORKFLOW_KEY) !== (input.browserTest !== undefined)) {
+        throw new AppError(ErrorCode.ValidationFailed, 'The browser test needs an explicit target and write scope');
+      }
+      const target = input.browserTest?.target;
+      if (target !== undefined && !target.startsWith('/') && !URL.canParse(target)) {
+        throw new AppError(ErrorCode.ValidationFailed, 'Invalid browser test target');
+      }
       // Request > workflow definition > setting (11 §5.1); fixed for the task's lifetime.
       const checkpoints = {
         confirm_plan: input.checkpoints?.confirm_plan ?? workflow.definition.checkpoints.confirm_plan,
@@ -294,6 +302,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
             workflowId: workflow.id,
             title: input.title ?? firstLine(input.requirement).slice(0, TASK_TITLE_MAX_CHARS),
             requirement: input.requirement,
+            browserTest: input.browserTest ?? null,
             skills: deps.skills.forWorkflow(input.projectId, workflow.key),
             status: TaskStatus.Draft,
             baseBranch: input.baseBranch,

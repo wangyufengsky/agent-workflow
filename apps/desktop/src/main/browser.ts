@@ -65,7 +65,12 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
       }
       if (reason !== null && tab !== undefined) {
         emit({ type: 'browser.blocked', tabId: tab.tabId, url: details.url, method: details.method, reason });
-        if (tab.userFacing && details.resourceType === 'mainFrame' && reason === BrowserBlockReason.NotAllowed) {
+        if (
+          tab.userFacing &&
+          tab.policy.automation === undefined &&
+          details.resourceType === 'mainFrame' &&
+          reason === BrowserBlockReason.NotAllowed
+        ) {
           openExternal(details.url);
         }
       }
@@ -156,13 +161,13 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
     // `window.open` of an allowed address stays in this tab: one tab per session (29 §5.3).
     contents.setWindowOpenHandler(({ url }) => {
       if (urlAccess(url, tab.policy) !== null) void contents.loadURL(url);
-      else if (tab.userFacing && isWeb(url)) openExternal(url);
+      else if (tab.userFacing && tab.policy.automation === undefined && isWeb(url)) openExternal(url);
       return { action: 'deny' };
     });
     contents.on('will-navigate', (event, url) => {
       if (urlAccess(url, tab.policy) !== null) return;
       event.preventDefault();
-      if (tab.userFacing && isWeb(url)) openExternal(url);
+      if (tab.userFacing && tab.policy.automation === undefined && isWeb(url)) openExternal(url);
     });
     // Credentials are the user's to give, in their own tab (29 §5.4): Chromium keeps what they gave for the
     // partition, and the AI's tabs there reuse it. The AI's tabs never ask: Electron's default cancels the login (the

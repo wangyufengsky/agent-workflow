@@ -594,6 +594,15 @@
   padding: var(--s-2) var(--s-1) 0;
 }
 
+.preview {
+  display: flex;
+  width: min(42vw, 780px);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--s-3);
+  border-left: 1px solid var(--line);
+}
+
 /* ---- the work rail beside it ---- */
 .rail {
   width: 280px;

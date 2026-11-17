@@ -39,9 +39,24 @@ export const integratedAuthServerSchema = z
   .describe('Host name pattern of servers given the system login; * matches any characters');
 
 /** What a tab may open: its task's preview origins and the website rules in order. */
+export const browserWriteRuleSchema = z.object({
+  method: z.enum(['POST', 'PUT', 'PATCH', 'DELETE']),
+  path: z
+    .string()
+    .max(1024)
+    .regex(/^\/(?!\/)[^?#*\s\\]*$/),
+});
+export type BrowserWriteRule = z.infer<typeof browserWriteRuleSchema>;
+
 export const browserPolicySchema = z.object({
   previewOrigins: z.array(z.string()),
   sites: z.array(siteRuleSchema),
+  automation: z
+    .object({
+      origin: z.string(),
+      writes: z.array(browserWriteRuleSchema),
+    })
+    .optional(),
 });
 export type BrowserPolicy = z.infer<typeof browserPolicySchema>;
 
@@ -109,6 +124,16 @@ export function blockReason(
   const found = ruleOf(request.url, policy);
   if (found === undefined) return BrowserBlockReason.NotAllowed;
   const { address, rule } = found;
+  const automation = policy.automation;
+  if (automation !== undefined) {
+    if (request.isWebSocket) return BrowserBlockReason.ReadOnly;
+    const method = request.method.toUpperCase();
+    if (READ_METHODS.has(method)) return null;
+    return address.origin === automation.origin &&
+      automation.writes.some((write) => write.method === method && write.path === address.path)
+      ? null
+      : BrowserBlockReason.ReadOnly;
+  }
   if (!readOnlyEnforced || rule === null || rule.access !== SiteAccess.Read) return null;
   if (request.isWebSocket) return BrowserBlockReason.ReadOnly;
   const method = request.method.toUpperCase();

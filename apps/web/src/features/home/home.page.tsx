@@ -1,11 +1,12 @@
-import type { AssistantConversationDTO } from '@aw/shared';
+import { type AssistantConversationDTO, TaskStatus, WorktreeStatus } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { MarkNodes, Wordmark } from '../../components/workflow-mark.tsx';
+import { ASSISTANT_BROWSER_COPY } from '../../copy/assistant.ts';
 import { formatDateTime } from '../../copy/common.ts';
 import { HOME_COPY as C } from '../../copy/home.ts';
 import { useUiStore } from '../../state/ui.store.ts';
@@ -16,7 +17,10 @@ import { MessageList } from '../assistant/message-list.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
 import { attachmentQuery } from '../attachments/attachments.api.ts';
 import { Character } from '../companion/character.tsx';
+import { MyPreview } from '../preview/my-preview.tsx';
+import { previewQuery } from '../preview/preview.queries.ts';
 import { projectsQuery } from '../projects/projects.queries.ts';
+import { taskQuery, tasksQuery } from '../tasks/tasks.queries.ts';
 import styles from './home.module.css';
 import { HomeComposer } from './home-composer.tsx';
 import { WorkOverview } from './work-overview.tsx';
@@ -94,6 +98,17 @@ function RecentConversations({ conversations }: { conversations: readonly Assist
   );
 }
 
+function HomePreview({ taskId }: { taskId: string }) {
+  const task = useQuery(taskQuery(taskId));
+  const ready = task.data?.git.worktreeStatus === WorktreeStatus.Ready;
+  const preview = useQuery({ ...previewQuery(taskId), enabled: ready });
+  if (task.isError || preview.isError) return <ErrorState error={task.error ?? preview.error} />;
+  if (task.data !== undefined && !ready) return <p className="hint">{ASSISTANT_BROWSER_COPY.previewUnavailable}</p>;
+  return task.data === undefined || preview.data === undefined ? null : (
+    <MyPreview task={task.data} preview={preview.data} pro={false} active />
+  );
+}
+
 /** A conversation on the home page (28 §2.1): the same message stream as the panel, the input under it, work beside. */
 function HomeConversation({
   conversation,
@@ -105,6 +120,18 @@ function HomeConversation({
   composer: React.ReactNode;
 }) {
   const navigate = useNavigate();
+  const desktop = window.aw !== undefined;
+  const [previewTaskId, setPreviewTaskId] = useState('');
+  const projects = useQuery(projectsQuery).data;
+  const tasks = useQuery({ ...tasksQuery(), enabled: desktop }).data;
+  const previewTasks =
+    tasks?.filter(
+      (task) =>
+        task.status !== TaskStatus.Completed &&
+        task.status !== TaskStatus.Cancelled &&
+        (conversation.projectId === null || task.project.id === conversation.projectId) &&
+        projects?.some((project) => project.id === task.project.id && project.preview != null),
+    ) ?? [];
   // The panel shows the same conversation once the user leaves the page (D112).
   useEffect(() => {
     useUiStore.setState({ activeConversationId: conversation.id });
@@ -119,6 +146,23 @@ function HomeConversation({
             <Character mood={conversation.busy ? 'thinking' : undefined} />
             <ConversationMenu conversations={conversations} active={conversation} onSelect={select} />
             <span className="grow" />
+            {desktop && previewTasks.length > 0 && (
+              <select
+                className="input"
+                aria-label={ASSISTANT_BROWSER_COPY.preview}
+                value={previewTaskId}
+                onChange={(event) => setPreviewTaskId(event.target.value)}
+              >
+                <option value="">
+                  {previewTaskId === '' ? ASSISTANT_BROWSER_COPY.preview : ASSISTANT_BROWSER_COPY.closePreview}
+                </option>
+                {previewTasks.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {task.key} · {task.title}
+                  </option>
+                ))}
+              </select>
+            )}
             <Link to={ROUTES.home} search={(s) => ({ projectId: s.projectId })} className="btn sm">
               <Icon name="plus" size="sm" />
               {C.newConversation}
@@ -129,7 +173,13 @@ function HomeConversation({
           </div>
           {composer}
         </div>
-        <WorkRail />
+        {previewTaskId === '' ? (
+          <WorkRail />
+        ) : (
+          <aside className={styles.preview} aria-label={ASSISTANT_BROWSER_COPY.preview}>
+            <HomePreview key={previewTaskId} taskId={previewTaskId} />
+          </aside>
+        )}
       </div>
     </ConversationContinuation>
   );
@@ -192,7 +242,9 @@ export function HomePage() {
   );
 
   if (conversation !== undefined) {
-    return <HomeConversation conversation={conversation} conversations={list} composer={composer} />;
+    return (
+      <HomeConversation key={conversation.id} conversation={conversation} conversations={list} composer={composer} />
+    );
   }
   return (
     <div className={`page ${styles.idle}`}>

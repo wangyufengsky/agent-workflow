@@ -1,7 +1,16 @@
 import { z } from 'zod';
+import { browserWriteRuleSchema } from '../../browser/policy.ts';
 import { viewportPresetSchema } from '../../enums/browser.ts';
 import { attemptKindSchema, attemptStatusSchema } from '../../enums/task.ts';
-import { browserLogsOutputSchema, browserPageSchema } from '../mcp/browser.ts';
+import {
+  browserActionOutputSchema,
+  browserClickInputSchema,
+  browserLogsOutputSchema,
+  browserPageSchema,
+  browserPressInputSchema,
+  browserSelectInputSchema,
+  browserTypeInputSchema,
+} from '../mcp/browser.ts';
 import { frontendElementSchema, frontendPageLayoutSchema } from './frontend.ts';
 
 /** 助手只读网页：沿用网站登录状态，但不开放页面操作。 */
@@ -30,6 +39,26 @@ export const readPreviewSchema = browserPageSchema.extend({
   selectedElement: frontendElementSchema.optional(),
   logs: browserLogsOutputSchema,
 });
+
+export const assistantBrowserActionSchema = z.object({
+  action: z.discriminatedUnion('kind', [
+    browserClickInputSchema.extend({ kind: z.literal('click') }),
+    browserTypeInputSchema.omit({ submit: true }).extend({ kind: z.literal('type'), text: z.string().max(4000) }),
+    browserSelectInputSchema.extend({ kind: z.literal('select') }),
+    browserPressInputSchema.extend({ kind: z.literal('press') }),
+  ]),
+  write: browserWriteRuleSchema.optional().describe('Exact same-origin HTTP write needed for this action, if known'),
+});
+export type AssistantBrowserAction = z.infer<typeof assistantBrowserActionSchema>;
+
+export const assistantBrowserConfirmationSchema = z.object({
+  requestId: z.string(),
+  page: z.string(),
+  target: z.string(),
+  fields: z.array(z.string()),
+  write: browserWriteRuleSchema.optional(),
+});
+export const assistantBrowserResultSchema = browserActionOutputSchema.omit({ frame: true });
 
 /** Hosts with cookies in the websites' login partition. */
 export const siteLoginsSchema = z.object({ hosts: z.array(z.string()) });
@@ -97,6 +126,7 @@ export const previewSessionsSchema = z.object({
       kind: attemptKindSchema,
       status: attemptStatusSchema,
       frames: z.number().int(),
+      screenshots: z.array(z.string()).default([]),
     }),
   ),
   checks: z.array(z.object({ nodeId: z.string(), passed: z.boolean() })),

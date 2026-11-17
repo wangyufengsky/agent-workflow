@@ -1,4 +1,4 @@
-import { ARTIFACT_WORKFLOW_KEY, FRONTEND_WORKFLOW_KEY } from '@aw/shared';
+import { ARTIFACT_WORKFLOW_KEY, BROWSER_TEST_WORKFLOW_KEY, FRONTEND_WORKFLOW_KEY } from '@aw/shared';
 import type { IconName } from '../../components/icon.tsx';
 
 /** Icons of the built-in workflows on the start cards; custom workflows use the generic one. */
@@ -6,6 +6,7 @@ const WORKFLOW_ICON: Readonly<Record<string, IconName>> = {
   feature: 'sparkle',
   [FRONTEND_WORKFLOW_KEY]: 'terminal',
   [ARTIFACT_WORKFLOW_KEY]: 'file',
+  [BROWSER_TEST_WORKFLOW_KEY]: 'check',
   bugfix: 'alert',
   unit_tests: 'check',
   code_review: 'search',

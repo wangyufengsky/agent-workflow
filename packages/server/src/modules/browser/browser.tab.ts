@@ -66,7 +66,7 @@ const loadingFinishedSchema = z.object({ requestId: z.string() });
 const evaluateSchema = z.object({ result: z.object({ value: z.unknown().optional() }) });
 
 /** Removed from websites' pages for the AI: write channels the request filter cannot see (29 §5.4). */
-const NO_REALTIME =
+export const NO_REALTIME =
   'delete window.RTCPeerConnection; delete window.webkitRTCPeerConnection; delete window.WebTransport;';
 
 /** Resolves when the page has had no DOM change for `quiet` ms, false after `timeout` ms (page-side timers). */
@@ -282,7 +282,8 @@ export async function openTab({
     // File choosers would open a dialog nobody answers (29 §5.4); the user answers their own.
     if (!userFacing) await cdp('Page.setInterceptFileChooserDialog', { enabled: true });
     signal?.throwIfAborted();
-    if (site) await cdp('Page.addScriptToEvaluateOnNewDocument', { source: NO_REALTIME });
+    if (site || policy.automation !== undefined)
+      await cdp('Page.addScriptToEvaluateOnNewDocument', { source: NO_REALTIME });
     signal?.throwIfAborted();
   }
 
@@ -405,6 +406,8 @@ export async function openTab({
     },
 
     documentVersion: () => navigations.committed,
+    waitForDocument: (previous: number) =>
+      mainFrameReaches(() => navigations.committed > previous, clock.now() + BROWSER_SETTLE_TIMEOUT_MS),
 
     onChange(listener: () => void): void {
       changed = listener;

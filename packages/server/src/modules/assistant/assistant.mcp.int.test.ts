@@ -103,7 +103,9 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     );
     expect(simple).toEqual(expect.arrayContaining(Object.values(AssistantToolName)));
     expect(simple).not.toEqual(expect.arrayContaining(['git_status']));
-    for (const name of simple) expect(name).not.toMatch(/^assistant_|^debug_/);
+    expect(simple).toContain('assistant_actBrowser');
+    for (const name of simple.filter((tool) => tool !== 'assistant_actBrowser'))
+      expect(name).not.toMatch(/^assistant_|^debug_/);
     expect(simple).not.toContain('databases_create');
     expect(simple).not.toContain('projects_setHosting');
 

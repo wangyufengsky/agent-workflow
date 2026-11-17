@@ -64,6 +64,7 @@ export type NewTask = Pick<
   | 'workflowId'
   | 'title'
   | 'requirement'
+  | 'browserTest'
   | 'status'
   | 'baseBranch'
   | 'mergeSource'
