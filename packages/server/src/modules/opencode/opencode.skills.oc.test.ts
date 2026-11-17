@@ -4,7 +4,14 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SkillName } from '@aw/builtin';
-import { BashPolicy, OPENCODE_AGENT_NAME, OPENCODE_ASSISTANT_AGENT, SessionAgent } from '@aw/shared';
+import {
+  BashPolicy,
+  MCP_TOOL_PREFIX,
+  McpToolName,
+  OPENCODE_AGENT_NAME,
+  OPENCODE_ASSISTANT_AGENT,
+  SessionAgent,
+} from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { createTestRepo, type TestRepo } from '../../../test/helpers/git.ts';
@@ -153,5 +160,16 @@ describe('@opencode 内置 skill（41）', () => {
         seen: [...skills].toSorted(),
       });
     }
+  });
+  it('浏览器测试会话可以读取识图 Skill 并调用识图工具', async () => {
+    const { body } = await turnOf(
+      OPENCODE_AGENT_NAME[SessionAgent.Executor],
+      sessionPermissionRules(SessionAgent.Executor, BashPolicy.Auto, {
+        browserTestSubmit: McpToolName.BrowserSubmitReport,
+      }),
+    );
+    expect(body.tools?.map((tool) => tool.function.name)).toEqual(
+      expect.arrayContaining(['skill', `${MCP_TOOL_PREFIX}${McpToolName.AnalyzeImage}`]),
+    );
   });
 });
