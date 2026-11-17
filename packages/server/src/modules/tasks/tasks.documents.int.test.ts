@@ -88,8 +88,23 @@ it('目标分支更新同一文档后先重新审阅，已合并任务仍可读�
   expect((await t.call(getTaskArtifactOp, { id: task.id, versionId: manual.id })).body).toMatchObject({
     text: '# 订单\n\n权限：管理员和负责人\n\n超时：30 秒\n',
   });
-  const delivered = await t.call(deliverTaskOp, { id: task.id, strategy: 'squash', artifactVersionId: manual.id });
+  const correction = '# 订单\n\n权限：管理员和负责人\n\n超时：45 秒\n';
+  await writeFile(join(worktree.path, path), correction);
+  await repo.git('-C', worktree.path, 'commit', '-am', 'correct the integrated document');
+  const corrected = (await t.call(getTaskOp, { id: task.id })).body.artifact?.versions[3];
+  if (corrected === undefined) throw new Error('Expected a preview of the subsequent correction');
+  expect((await t.call(getTaskArtifactOp, { id: task.id, versionId: corrected.id })).body).toMatchObject({
+    text: correction,
+  });
+  const staleIntegration = await t.call(deliverTaskOp, {
+    id: task.id,
+    strategy: 'squash',
+    artifactVersionId: manual.id,
+  });
+  expect(staleIntegration.status).toBe(409);
+  const delivered = await t.call(deliverTaskOp, { id: task.id, strategy: 'squash', artifactVersionId: corrected.id });
   expect(delivered.body.status).toBe(TaskStatus.Completed);
+  expect(await repo.git('show', `main:${path}`)).toBe(correction.trimEnd());
   const oldest = await t.call(getTaskArtifactOp, { id: task.id, versionId: before.id });
   expect(oldest.body).toMatchObject({ text: initial });
 });

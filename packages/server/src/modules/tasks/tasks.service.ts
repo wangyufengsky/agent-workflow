@@ -17,7 +17,6 @@ import {
   isTaskCodeReview,
   type ListTasksQuery,
   type NodeDetailDTO,
-  NodeStatus,
   type PlanDTO,
   type PlanGraph,
   type PreviewSessions,
@@ -28,7 +27,6 @@ import {
   ServerEventType,
   type StartAgentsMdTaskRequest,
   type SubmitResultInput,
-  TASK_CODE_REVIEW_NODE_KEY,
   TASK_STATUSES,
   type TaskDetailDTO,
   TaskStatus,
@@ -41,7 +39,7 @@ import { createTaskAgentsMd } from './tasks.agents-md.ts';
 import { createTaskArtifacts } from './tasks.artifacts.ts';
 import { createTaskChanges } from './tasks.changes.ts';
 import { createTaskChecks } from './tasks.checks.ts';
-import { resolveTaskCodeReview } from './tasks.code-review.ts';
+import { isCodeReviewStep, latestFinishedCodeReview, resolveTaskCodeReview } from './tasks.code-review.ts';
 import { createTaskContext } from './tasks.context.ts';
 import { createConventionEvidence } from './tasks.conventions.ts';
 import { createTaskDelegation } from './tasks.delegation.ts';
@@ -116,8 +114,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
           task.status === TaskStatus.Preparing ||
           task.status === TaskStatus.Running));
     const reviewResult = isTaskCodeReview(workflow)
-      ? nodes.listByTask(id).find(({ key, status }) => key === TASK_CODE_REVIEW_NODE_KEY && status === NodeStatus.Done)
-          ?.result
+      ? latestFinishedCodeReview(nodes.listByTask(id))?.result
       : undefined;
     return {
       ...state.summary(task),
@@ -477,7 +474,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       const { code_review, ...result } = input;
       // Older confirmed plans still submit a plain-text summary.
       if (code_review === undefined) return nodes.submitResult(attempt, result, state.runContext(task));
-      if (!isTaskCodeReview(workflow) || node.key !== TASK_CODE_REVIEW_NODE_KEY)
+      if (!isTaskCodeReview(workflow) || !isCodeReviewStep(node))
         throw new AppError(ErrorCode.McpToolNotAllowed, 'Structured findings are for the code review step');
       const report = await resolveTaskCodeReview(deps.projects.getRecord(task.projectId).repoPath, code_review);
       return nodes.submitResult(attempt, { ...result, reviewReport: report }, state.runContext(task));

@@ -41,14 +41,15 @@ export function createTaskDocuments(
       latest === undefined ||
       previous === undefined ||
       worktree?.status !== WorktreeStatus.Ready ||
-      delivery?.status !== DeliveryStatus.Conflict ||
-      previous.integratedDeliveryId === delivery.id
+      delivery?.status !== DeliveryStatus.Conflict
     )
       return;
 
     const commit = (await runGit(['rev-parse', 'HEAD'], { cwd: worktree.path })).stdout;
-    const target = `refs/heads/${delivery.targetBranch}`;
-    if (commit === previous.commit || !(await isAncestor(repoPath, target, commit))) return;
+    // The first capture needs evidence that the target was integrated. Subsequent edits build on that capture.
+    const base =
+      previous.integratedDeliveryId === delivery.id ? previous.commit : `refs/heads/${delivery.targetBranch}`;
+    if (commit === previous.commit || !(await isAncestor(repoPath, base, commit))) return;
     if (!(await fileChangedBetween(repoPath, previous.commit, commit, previous.path))) return;
     const object = await runGit(['cat-file', '-t', '--end-of-options', `${commit}:${previous.path}`], {
       cwd: repoPath,

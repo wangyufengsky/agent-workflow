@@ -171,6 +171,24 @@ test('代码审查在主区按严重程度筛选，定位到审查时的文件�
   await expect(page.getByTestId('git-file').locator('mark[data-line="1"]')).toContainText('updateAllowed = true');
   await page.goBack();
   await expect(review.getByRole('heading', { name: '问题清单' })).toBeVisible();
+  await queueTurn(request, project, { title: '· 按反馈修改' }, [
+    {
+      type: 'callTool',
+      name: 'submit_result',
+      args: {
+        summary: '已复核并撤回旧问题。',
+        code_review: { scope: { kind: 'files', commit, directory: '' }, findings: [] },
+      },
+    },
+  ]);
+  const revise = await request.post(`${API_BASE}${new URL(page.url()).pathname}/request-changes`, {
+    headers: AUTH,
+    data: { reason: 'user', feedback: '请复核已有问题。' },
+  });
+  await expect(revise).toBeOK();
+  await expect(review.getByText('已复核并撤回旧问题。')).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS * 2 });
+  await expect(review.getByText('没有发现需要处理的问题')).toBeVisible();
+  await expect(review.getByRole('heading', { name: '更新接口未检查权限' })).toHaveCount(0);
   await review.getByRole('button', { name: '完成审查' }).click();
   await expect(review.getByRole('button', { name: '完成审查' })).toHaveCount(0);
   await expect(review.getByRole('heading', { name: '问题清单' })).toBeVisible();

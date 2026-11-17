@@ -2,11 +2,21 @@ import {
   AppError,
   DiffSide,
   ErrorCode,
+  NodeKind,
+  NodeStatus,
+  TASK_CODE_REVIEW_NODE_KEY,
   type TaskCodeReviewInput,
   type TaskCodeReviewReport,
   textLines,
 } from '@aw/shared';
 import { commitsExist, diffCommits, readFile, runGit } from '../git/index.ts';
+import type { Node } from '../nodes/index.ts';
+
+export const isCodeReviewStep = (node: Pick<Node, 'key' | 'kind'>) =>
+  node.key === TASK_CODE_REVIEW_NODE_KEY || node.kind === NodeKind.Revise;
+
+export const latestFinishedCodeReview = (nodes: readonly Node[]) =>
+  nodes.findLast((node) => isCodeReviewStep(node) && node.status === NodeStatus.Done && node.result !== null);
 
 const safePath = (path: string) =>
   !path.includes('\\') &&

@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ErrorCode, getTaskOp, startTaskOp, TaskStatus } from '@aw/shared';
+import { ErrorCode, getTaskOp, requestChangesOp, startTaskOp, TaskStatus } from '@aw/shared';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
@@ -49,5 +49,29 @@ it('拒绝越出审查范围的定位，并将删除行固定到当时的旧提�
   ]);
   expect((await t.call(getTaskOp, { id: task.id })).body.codeReview).toMatchObject({
     report: { scope: { kind: 'diff', from, to }, findings: [{ ...finding, location: { commit: from, path } }] },
+  });
+
+  t.fake.enqueue(
+    script()
+      .callTool('submit_result', {
+        summary: '重新核对后撤回误报。',
+        code_review: { scope: { kind: 'diff', from, to }, findings: [] },
+      })
+      .callTool('submit_result', { summary: '旧版兼容总结' }),
+    { title: '· 按反馈修改', directory: `/${task.key}` },
+  );
+  const revised = taskReaches(t, TaskStatus.Review);
+  const response = await t.call(requestChangesOp, {
+    id: task.id,
+    reason: 'user',
+    feedback: '重新核对权限规则和上下文。',
+  });
+  expect(response.status).toBe(200);
+  await revised;
+  const revisedSession = t.fake.sessions.find(({ title }) => title.includes('· 按反馈修改'));
+  expect(revisedSession?.agent).toBe('aw-reviewer');
+  expect((await t.call(getTaskOp, { id: task.id })).body.codeReview).toEqual({
+    summary: '重新核对后撤回误报。',
+    report: { scope: { kind: 'diff', from, to }, findings: [] },
   });
 });
