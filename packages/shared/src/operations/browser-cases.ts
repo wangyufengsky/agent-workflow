@@ -68,3 +68,27 @@ export const rerunBrowserCaseOp = defineOperationContract({
   risk: OperationRisk.Write,
   http: { method: 'POST', path: '/tasks/:id/browser-case/rerun', status: 201 },
 });
+
+const handoff = z.object({ id: z.string(), handoffId: z.string() });
+
+export const takeBrowserCaseHandoffOp = defineOperationContract({
+  ...common,
+  id: 'browserCases.takeHandoff',
+  title: 'op.browserCases.takeHandoff',
+  description: 'Allow the user to authenticate in the paused browser test tab',
+  input: handoff,
+  output: z.void(),
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/browser-case/handoff/take', status: 204 },
+});
+
+export const resumeBrowserCaseOp = defineOperationContract({
+  ...common,
+  id: 'browserCases.resume',
+  title: 'op.browserCases.resume',
+  description: 'Return the paused tab to its browser test',
+  input: handoff,
+  output: z.void(),
+  risk: OperationRisk.Write,
+  http: { method: 'POST', path: '/tasks/:id/browser-case/handoff/resume', status: 204 },
+});

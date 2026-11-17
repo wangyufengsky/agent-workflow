@@ -171,8 +171,10 @@ type CreateTaskRequest = {
 | PUT | `/projects/:projectId/browser-cases/:caseId` | `{ revision, definition }`，只更新该版本并递增；过期版本返回 409 |
 | POST | `/projects/:projectId/browser-cases/:caseId/run` | `{ revision, approved: true }`，冻结已确认的版本并创建任务；过期版本返回 409 |
 | POST | `/tasks/:id/browser-case/rerun` | `{ approved: true }`，用原任务保存的用例版本和基础分支创建新任务 |
+| POST | `/tasks/:id/browser-case/handoff/take` | `{ handoffId }`，接管当前暂停的测试页签，204 |
+| POST | `/tasks/:id/browser-case/handoff/resume` | `{ handoffId }`，交还测试页签并继续，204。表单仍需登录或验证时 409 |
 
-定义包含 `name`、`scope` 和 `steps`。任务详情的 `browserCase` 返回本次用例快照，`result.browserCaseReport` 返回每一步实际值、结果、截图文件与 HTTP 请求证据。
+定义包含 `name`、`scope` 和 `steps`。任务详情在等待接管时带 `browserCaseHandoff: { id, tabId, step, reason, active }`，`browserCase` 返回本次用例快照，`result.browserCaseReport` 返回每一步实际值、结果、截图文件与 HTTP 请求证据。
 
 ### 5.2 TaskDetailDTO
 

@@ -352,19 +352,21 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('onReady', () => projectRuntime.recover());
   server.addHook('preClose', () => projectRuntime.stopAll());
   const nodes = createNodesModule({
-    runBrowserCase: (attempt, test, signal) =>
-      runBrowserCase(
-        browser.service,
-        {
-          id: attempt.id,
-          taskId: attempt.taskId,
-          projectId: attempts.service.projectOf(attempt.id),
-          filesDir: attempts.filesDirOf(attempt),
-          browserTest: test.scope,
-        },
-        test,
-        signal,
-      ),
+    runBrowserCase: (attempt, test, signal) => {
+      const owner = {
+        id: attempt.id,
+        taskId: attempt.taskId,
+        projectId: attempts.service.projectOf(attempt.id),
+        filesDir: attempts.filesDirOf(attempt),
+        browserTest: test.scope,
+        caseSession: true,
+      };
+      return runBrowserCase(browser.service, owner, test, signal, (step, reason) =>
+        attempts.service.waitForLocalInput(attempt.id, () =>
+          browser.service.caseHandoffs.wait(owner, step, reason, signal),
+        ),
+      );
+    },
     isBrowserTestTask: (id): boolean => tasks.service.browserTest(id) !== null,
     db: database.db,
     unit,

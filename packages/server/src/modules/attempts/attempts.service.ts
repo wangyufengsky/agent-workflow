@@ -87,7 +87,15 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
   const { clock, opencode, settings, transcripts, projects, slots, unit, db } = deps;
   const state = createAttemptState(deps);
   const { repo, mustFind, move, record } = state;
-  const local = new Map<string, { controller: AbortController; cancelTimeout: () => void }>();
+  const local = new Map<
+    string,
+    {
+      controller: AbortController;
+      cancelTimeout: () => void;
+      timeoutAt: number;
+      arm: (ms: number) => () => void;
+    }
+  >();
   const reactions = watchSessions(state, deps, (id) => local.has(id));
   state.onSignal(({ type, attempt }) => {
     if (type !== 'ended') return;
@@ -354,10 +362,15 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         startedAt: clock.now(),
       });
       const controller = new AbortController();
-      const cancelTimeout = clock.schedule(settings.get('attempt.timeoutMinutes') * 60_000, () =>
-        move(mustFind(id), AttemptEvent.Timeout, { code: ErrorCode.AttemptTimeout, message: 'Browser case timed out' }),
-      );
-      local.set(id, { controller, cancelTimeout });
+      const timeoutMs = settings.get('attempt.timeoutMinutes') * 60_000;
+      const arm = (ms: number) =>
+        clock.schedule(ms, () =>
+          move(mustFind(id), AttemptEvent.Timeout, {
+            code: ErrorCode.AttemptTimeout,
+            message: 'Browser case timed out',
+          }),
+        );
+      local.set(id, { controller, arm, cancelTimeout: arm(timeoutMs), timeoutAt: clock.now() + timeoutMs });
       const attempt = move(mustFind(id), AttemptEvent.SessionStarted);
       record(attempt, [systemEntry(TranscriptSystemEvent.AttemptStarted)]);
       try {
@@ -365,6 +378,24 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       } catch (err) {
         const current = repo.find(id);
         if (current?.status === AttemptStatus.Running) move(current, AttemptEvent.SessionError, errorOf(err));
+      }
+    },
+
+    async waitForLocalInput(id: string, wait: () => Promise<void>): Promise<void> {
+      const run = local.get(id);
+      if (run === undefined) throw new AppError(ErrorCode.AttemptNotFound, 'The local attempt ended');
+      const remaining = Math.max(0, run.timeoutAt - clock.now());
+      run.cancelTimeout();
+      const pending = wait();
+      state.signal('awaiting_input', mustFind(id));
+      try {
+        await pending;
+      } finally {
+        if (!run.controller.signal.aborted) {
+          run.timeoutAt = clock.now() + remaining;
+          run.cancelTimeout = run.arm(remaining);
+          state.signal('input_answered', mustFind(id));
+        }
       }
     },
 

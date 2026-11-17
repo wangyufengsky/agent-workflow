@@ -103,6 +103,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     const worktree = worktrees.findByTask(id);
     const plan = task.status === TaskStatus.PlanReview ? plans.draft(id) : plans.confirmed(id);
     const summaries = nodes.summaries(id);
+    const browserCaseHandoff = deps.browser.caseHandoffs.get(id);
     const frontend = isFrontendWorkflow(workflow)
       ? {
           verified: frontendVerified(summaries),
@@ -128,6 +129,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
         : {}),
       requirement: task.requirement,
       ...(task.browserCase === null ? {} : { browserCase: task.browserCase }),
+      ...(browserCaseHandoff === undefined ? {} : { browserCaseHandoff }),
       ...(task.browserTest === null ? {} : { browserTest: task.browserTest }),
       ...(skills.length === 0 ? {} : { skills: skills.map(({ id, name, version }) => ({ id, name, version })) }),
       failedPhase: task.failedPhase,

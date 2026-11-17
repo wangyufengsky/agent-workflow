@@ -48,7 +48,9 @@ import {
   createBrowserCaseOp,
   listBrowserCasesOp,
   rerunBrowserCaseOp,
+  resumeBrowserCaseOp,
   runBrowserCaseOp,
+  takeBrowserCaseHandoffOp,
   updateBrowserCaseOp,
 } from './browser-cases.ts';
 import {
@@ -311,6 +313,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   updateBrowserCaseOp,
   runBrowserCaseOp,
   rerunBrowserCaseOp,
+  resumeBrowserCaseOp,
+  takeBrowserCaseHandoffOp,
   createSkillOp,
   deleteSkillOp,
   getSkillCatalogOp,

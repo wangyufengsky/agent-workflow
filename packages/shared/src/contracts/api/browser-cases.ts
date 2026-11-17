@@ -91,3 +91,15 @@ export const browserCaseReportSchema = z.object({
   steps: z.array(browserCaseStepResultSchema),
 });
 export type BrowserCaseReport = z.infer<typeof browserCaseReportSchema>;
+
+export const BrowserCaseChallenge = { Login: 'login', Verification: 'verification' } as const;
+export type BrowserCaseChallenge = (typeof BrowserCaseChallenge)[keyof typeof BrowserCaseChallenge];
+
+export const browserCaseHandoffSchema = z.object({
+  id: z.string(),
+  tabId: z.string(),
+  step: z.number().int().nonnegative(),
+  reason: z.enum(BrowserCaseChallenge),
+  active: z.boolean(),
+});
+export type BrowserCaseHandoff = z.infer<typeof browserCaseHandoffSchema>;

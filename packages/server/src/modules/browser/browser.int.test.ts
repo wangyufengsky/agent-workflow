@@ -8,6 +8,7 @@ import {
   BROWSER_TEST_WORKFLOW_KEY,
   type BrowserCaseInput,
   type BrowserPortEvent,
+  cancelTaskOp,
   clearSiteLoginOp,
   closeUserTabOp,
   createBrowserCaseOp,
@@ -21,11 +22,13 @@ import {
   openLoginTabOp,
   openUserTabOp,
   rerunBrowserCaseOp,
+  resumeBrowserCaseOp,
   runBrowserCaseOp,
   ServerEventType,
   type SiteAccess,
   setUserViewportOp,
   startTaskOp,
+  takeBrowserCaseHandoffOp,
   updateBrowserCaseOp,
   updateProjectOp,
   updateSettingsOp,
@@ -34,7 +37,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
-import { addProject, createTask, taskReaches, workflowId } from '../../../test/helpers/tasks.ts';
+import { addProject, createTask, nodeReaches, taskReaches, workflowId } from '../../../test/helpers/tasks.ts';
 import type { BrowserHost } from './browser.host.ts';
 import type { BrowserOwner } from './browser.service.ts';
 import { createChromiumHost } from './host.chromium.ts';
@@ -112,6 +115,34 @@ beforeAll(async () => {
       res.writeHead(201).end();
       return;
     }
+    if (req.url === '/case-handoff') {
+      res.setHeader('content-type', 'text/html; charset=utf-8');
+      res.end(
+        req.headers.cookie?.includes('caseSession=ok') === true
+          ? page('<form action="/case-gate" method="post"><button id="publish">发布</button></form>')
+          : page(
+              '<form action="/case-session" method="post"><input type="password" name="pw"><button>登录</button></form>',
+            ),
+      );
+      return;
+    }
+    if (req.url === '/case-session' && req.method === 'POST') {
+      res.writeHead(303, { location: '/case-handoff', 'set-cookie': 'caseSession=ok; HttpOnly; Path=/' }).end();
+      return;
+    }
+    if (req.url === '/case-gate' && req.method === 'POST') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.end(
+        page(
+          '<form action="/case-verify" method="post"><input autocomplete="one-time-code" name="otp"><button>验证</button></form>',
+        ),
+      );
+      return;
+    }
+    if (req.url === '/case-verify' && req.method === 'POST') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page('<p id="status">已发布</p>'));
+      return;
+    }
     const body = req.url === '/sign-in' ? page('<p>已登录</p>') : PAGES[req.url ?? ''];
     res.writeHead(body === undefined ? 404 : 200, { 'content-type': 'text/html; charset=utf-8' });
     res.end(body ?? 'not found');
@@ -149,6 +180,105 @@ function refOf(snapshot: string, element: string): string {
 }
 
 describe('浏览器测试流程', () => {
+  it('在同一页签接管登录和验证码，从失败前的动作继续并在结束后释放登录状态', async () => {
+    await browserFor();
+    const { project } = await addProject(t);
+    const projectId = project.id;
+    const created = await t.call(createBrowserCaseOp, {
+      projectId,
+      definition: {
+        name: '带登录的发布',
+        scope: { target: `${origin}/case-handoff`, writes: [{ method: 'POST', path: '/case-gate' }] },
+        steps: [
+          {
+            title: '发布',
+            action: { kind: 'click', selector: '#publish' },
+            expect: { kind: 'text', selector: '#status', value: '已发布' },
+          },
+        ],
+      },
+    });
+    const run = { projectId, caseId: created.body.caseId, revision: 1, approved: true } as const;
+    const waiting = () => nodeReaches(t, BROWSER_TEST_WORKFLOW_KEY, 'waiting_input');
+    const loginWait = waiting();
+    const started = await t.call(runBrowserCaseOp, run);
+    const { id } = started.body;
+    await loginWait;
+    const handoff = async () => {
+      const state = (await t.call(getTaskOp, { id })).body.browserCaseHandoff;
+      if (state === undefined) throw new Error('Expected a browser handoff');
+      return state;
+    };
+    const login = await handoff();
+    expect(login).toMatchObject({ step: 0, reason: 'login', active: false });
+    expect(writes).toEqual([]);
+    const access = { id, handoffId: login.id };
+    expect((await t.call(resumeBrowserCaseOp, access)).status).toBe(409);
+    expect((await t.call(takeBrowserCaseHandoffOp, access)).status).toBe(204);
+    expect((await t.call(resumeBrowserCaseOp, access)).status).toBe(409);
+    const enter = async (tabId: string, path: string, selector: string, value: string) => {
+      await host.request({
+        kind: 'cdp',
+        tabId,
+        method: 'Runtime.evaluate',
+        params: {
+          expression: `document.querySelector(${JSON.stringify(selector)}).value = ${JSON.stringify(value)}; document.forms[0].requestSubmit()`,
+        },
+      });
+      await expect
+        .poll(async () => {
+          const result = await host.request({
+            kind: 'cdp',
+            tabId,
+            method: 'Runtime.evaluate',
+            params: {
+              expression: `location.pathname === ${JSON.stringify(path)} && document.querySelector(${JSON.stringify(selector)}) === null`,
+              returnByValue: true,
+            },
+          });
+          return result;
+        })
+        .toMatchObject({ result: { value: true } });
+    };
+    const verificationWait = waiting();
+    await enter(login.tabId, '/case-handoff', 'input[type=password]', 'placeholder');
+    expect((await t.call(resumeBrowserCaseOp, access)).status).toBe(204);
+    await verificationWait;
+    const verification = await handoff();
+    expect(verification).toMatchObject({ step: 1, reason: 'verification', tabId: login.tabId });
+    const verifyAccess = { id, handoffId: verification.id };
+    expect((await t.call(takeBrowserCaseHandoffOp, verifyAccess)).status).toBe(204);
+    await enter(login.tabId, '/case-verify', 'input[autocomplete=one-time-code]', '000000');
+    const reviewed = taskReaches(t, 'review');
+    expect((await t.call(resumeBrowserCaseOp, verifyAccess)).status).toBe(204);
+    await reviewed;
+    const finished = (await t.call(getTaskOp, { id })).body;
+    expect(finished.browserCaseHandoff).toBeUndefined();
+    expect(finished.result?.browserCaseReport).toMatchObject({ outcome: 'passed' });
+    expect(JSON.stringify(finished.result?.browserCaseReport)).not.toMatch(
+      /case-session|case-verify|000000|placeholder/,
+    );
+    expect(writes).toEqual(['POST /case-session', 'POST /case-gate', 'POST /case-verify']);
+    await expect(host.request({ kind: 'cdp', tabId: login.tabId, method: 'Runtime.evaluate' })).rejects.toThrow(
+      'No browser tab',
+    );
+
+    const freshLoginWait = waiting();
+    const fresh = await t.call(runBrowserCaseOp, run);
+    await freshLoginWait;
+    const freshState = (await t.call(getTaskOp, { id: fresh.body.id })).body.browserCaseHandoff;
+    expect(freshState).toMatchObject({ step: 0, reason: 'login', active: false });
+    if (freshState === undefined) throw new Error('Expected a fresh login');
+    expect(freshState.tabId).not.toBe(login.tabId);
+    expect((await t.call(takeBrowserCaseHandoffOp, { id: fresh.body.id, handoffId: freshState.id })).status).toBe(204);
+    await enter(freshState.tabId, '/case-handoff', 'input[type=password]', 'placeholder');
+    await t.call(cancelTaskOp, { id: fresh.body.id });
+    expect((await t.call(getTaskOp, { id: fresh.body.id })).body.browserCaseHandoff).toBeUndefined();
+    await expect(host.request({ kind: 'cdp', tabId: freshState.tabId, method: 'Runtime.evaluate' })).rejects.toThrow(
+      'No browser tab',
+    );
+  });
+
   it('保存、编辑并复跑固定用例；断言失败时保存同一步骤的截图和请求', async () => {
     await browserFor();
     const { project } = await addProject(t);

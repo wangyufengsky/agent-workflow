@@ -1,8 +1,15 @@
-import { ACTIVE_ATTEMPT_STATUSES, AcceptanceCheckKind, type BrowserFrame, type TaskDetailDTO } from '@aw/shared';
+import {
+  ACTIVE_ATTEMPT_STATUSES,
+  AcceptanceCheckKind,
+  type BrowserCaseHandoff,
+  type BrowserFrame,
+  type TaskDetailDTO,
+} from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { PREVIEW_PANE_COPY as C } from '../../copy/browser.ts';
 import { BROWSER_TEST_COPY } from '../../copy/tasks.ts';
+import { BrowserCaseHandoffPane } from '../browser-cases/browser-case-handoff.tsx';
 import { nodeQuery } from '../tasks/tasks.queries.ts';
 import { MyPreview } from './my-preview.tsx';
 import {
@@ -84,7 +91,21 @@ function CheckShots({ taskId, nodeId }: { taskId: string; nodeId: string }) {
 }
 
 /** 浏览器测试使用尝试自己的页签，项目没有预览时也能查看过程。 */
-export function BrowserTestPane({ taskId }: { taskId: string }) {
+export function BrowserTestPane({
+  taskId,
+  handoff,
+  active,
+}: {
+  taskId: string;
+  handoff: BrowserCaseHandoff | undefined;
+  active: boolean;
+}) {
+  if (handoff !== undefined)
+    return <BrowserCaseHandoffPane key={handoff.id} taskId={taskId} handoff={handoff} visible={active} />;
+  return <BrowserTestFrames taskId={taskId} />;
+}
+
+function BrowserTestFrames({ taskId }: { taskId: string }) {
   const { data } = useQuery(previewSessionsQuery(taskId));
   const [selected, setSelected] = useState('');
   const attempts = data?.attempts ?? [];

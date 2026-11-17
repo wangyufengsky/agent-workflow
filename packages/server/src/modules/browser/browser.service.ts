@@ -12,6 +12,7 @@ import {
   BROWSER_READ_TIMEOUT_MS,
   type BrowserActionOutput,
   type BrowserCaseAssertion,
+  type BrowserCaseChallenge,
   type BrowserFrame,
   type BrowserKey,
   type BrowserNetwork,
@@ -44,6 +45,7 @@ import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { createActions } from './browser.actions.ts';
 import { evaluateCaseAssertion, resolveCaseRef } from './browser.case-dom.ts';
+import { createCaseHandoffs, detectCaseChallenge } from './browser.case-handoff.ts';
 import { type PageCheckPage, type PageCheckResult, pageCheckOutput, pageCheckVerdict } from './browser.check.ts';
 import { createBrowserControl } from './browser.control.ts';
 import { createFrontendPreview } from './browser.frontend.ts';
@@ -81,6 +83,7 @@ export type BrowserOwner = {
   projectId: string | null;
   filesDir: string;
   browserTest?: BrowserTestScope | null;
+  caseSession?: boolean;
 };
 
 function usesProjectPreview(owner: BrowserOwner): boolean {
@@ -182,11 +185,19 @@ export function createBrowserService({
   const openingUserTabs = new Map<string, Promise<UserTabState>>();
   const actions = createActions(clock);
   const control = createBrowserControl(actions, log);
+  const handoffs = createCaseHandoffs();
   const unsubscribeHost = host.onEvent((event) => {
     // The page that placed a user's preview tab started over and main closed it (29 §8.1): let go of its preview.
     if (event.type === 'browser.gone') {
       const entry = userTabs.get(event.tabId);
-      if (entry === undefined) return;
+      if (entry === undefined) {
+        for (const session of sessions.values()) {
+          if (session.current?.tabId !== event.tabId) continue;
+          close(session.owner.id).catch((err: unknown) => log.error({ err }, 'lost case tab cleanup failed'));
+          break;
+        }
+        return;
+      }
       forgetUserTab(event.tabId);
       entry.tab.dispose();
       return;
@@ -240,6 +251,7 @@ export function createBrowserService({
       log,
       tabId: `${owner.id}:${kind}`,
       ...(signal === undefined ? {} : { signal }),
+      ...(owner.caseSession === true ? { caseSession: true } : {}),
       kind,
       // The preview tab starts clean for each attempt; websites share the user's logins (29 §5.3).
       partition: kind === BrowserTabKind.Preview ? `aw-attempt-${owner.id}` : SITES_PARTITION,
@@ -375,7 +387,10 @@ export function createBrowserService({
     const session = sessions.get(ownerId);
     if (session === undefined) return;
     sessions.delete(ownerId);
-    for (const tab of Object.values(session.tabs)) await tab.close();
+    for (const tab of Object.values(session.tabs)) {
+      handoffs.lost(tab.tabId);
+      await tab.close();
+    }
     if (session.tabs.preview !== undefined && session.owner.taskId !== null && usesProjectPreview(session.owner))
       previews.release(session.owner.taskId);
   }
@@ -587,7 +602,7 @@ export function createBrowserService({
         ...[...userTabs.values()].filter((u) => u.taskId === event.data.taskId).map((u) => ({ tab: u.tab, owner: u })),
       ];
       for (const { tab, owner } of tabs) {
-        if (control.hasPolicy(tab.tabId)) continue;
+        if (control.hasPolicy(tab.tabId) || handoffs.controls(tab.tabId)) continue;
         tab.setPolicy(policyFor(owner)).catch((err: unknown) => log.error({ err }, 'browser policy update failed'));
       }
     }
@@ -717,7 +732,7 @@ export function createBrowserService({
       const settled = await tab.result(await tab.settle());
       const output = { ...settled, frame: await frame(owner, tab, McpToolName.BrowserOpen, settled.url) };
       const login =
-        (access.tab === BrowserTabKind.Site || owner.browserTest != null) &&
+        (access.tab === BrowserTabKind.Site || (owner.browserTest != null && owner.caseSession !== true)) &&
         URL.canParse(output.url) &&
         urlAccess(output.url, policyFor(owner)) !== null
           ? await loginAt(tab, output.url, access.tab === BrowserTabKind.Site)
@@ -727,6 +742,21 @@ export function createBrowserService({
       }
       remember(owner, output, normalized);
       return output;
+    },
+
+    caseHandoffs: {
+      get: handoffs.get,
+      take: handoffs.take,
+      resume: handoffs.resume,
+      async wait(owner: BrowserOwner, step: number, reason: BrowserCaseChallenge, signal: AbortSignal) {
+        if (owner.taskId === null) throw new Error('Browser case has no task');
+        await handoffs.wait(owner.taskId, current(owner), () => policyFor(owner), step, reason, signal);
+      },
+    },
+
+    caseChallenge(owner: BrowserOwner) {
+      const tab = sessions.get(owner.id)?.current;
+      return tab == null ? Promise.resolve(null) : detectCaseChallenge(tab);
     },
 
     beginCaseStep(owner: BrowserOwner): void {

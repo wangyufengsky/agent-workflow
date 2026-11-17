@@ -1,4 +1,4 @@
-import { type BrowserCaseAssertion, BrowserCaseOutcome } from '@aw/shared';
+import { type BrowserCaseAssertion, BrowserCaseChallenge, BrowserCaseOutcome } from '@aw/shared';
 
 const actions = {
   check: '只检查',
@@ -16,6 +16,20 @@ const assertions = {
 
 export const BROWSER_CASE_COPY = {
   title: '浏览器测试用例',
+  handoff: {
+    heading: '测试暂停，等待你操作',
+    open: '打开测试页签',
+    reason: {
+      [BrowserCaseChallenge.Login]: '等待登录',
+      [BrowserCaseChallenge.Verification]: '等待完成验证',
+    },
+    take: '接管测试页签',
+    resume: '验证完成，继续测试',
+    reload: '重新加载测试页',
+    desktop: '请在桌面应用中打开这个任务，在测试页签完成登录或验证码。',
+    takeHint: '接管后可在当前测试页签提交登录或验证码，手动操作限定在测试站点。',
+    activeHint: '请在下方完成登录或验证码，再点继续。测试会从暂停的位置继续。',
+  },
   newCase: '新建用例',
   saveFromTask: '保存为用例',
   edit: '编辑用例',

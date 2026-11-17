@@ -8,7 +8,9 @@ import {
   openUserTabOp,
   pickFrontendElementOp,
   readWebsiteOp,
+  resumeBrowserCaseOp,
   setUserViewportOp,
+  takeBrowserCaseHandoffOp,
   userTabLogsOp,
 } from '@aw/shared';
 import { implement } from '../../core/operations/operations.ts';
@@ -16,6 +18,8 @@ import type { BrowserService } from './browser.service.ts';
 
 export function browserOperations(browser: BrowserService) {
   return [
+    implement(takeBrowserCaseHandoffOp, ({ id, handoffId }) => browser.caseHandoffs.take(id, handoffId)),
+    implement(resumeBrowserCaseOp, ({ id, handoffId }) => browser.caseHandoffs.resume(id, handoffId)),
     implement(openLoginTabOp, ({ url }) => browser.openLoginTab(url)),
     implement(closeUserTabOp, ({ tabId }) => browser.closeUserTab(tabId)),
     implement(listSiteLoginsOp, () => browser.siteLogins()),

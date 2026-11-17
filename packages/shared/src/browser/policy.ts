@@ -55,6 +55,7 @@ export const browserPolicySchema = z.object({
     .object({
       origin: z.string(),
       writes: z.array(browserWriteRuleSchema),
+      manual: z.boolean().optional(),
     })
     .optional(),
 });
@@ -130,7 +131,8 @@ export function blockReason(
     const method = request.method.toUpperCase();
     if (READ_METHODS.has(method)) return null;
     return address.origin === automation.origin &&
-      automation.writes.some((write) => write.method === method && write.path === address.path)
+      (automation.manual === true ||
+        automation.writes.some((write) => write.method === method && write.path === address.path))
       ? null
       : BrowserBlockReason.ReadOnly;
   }

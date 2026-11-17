@@ -33,7 +33,12 @@ import { reviewIssueSchema } from '../mcp/submit-review.ts';
 import { artifactTaskSchema } from './artifacts.ts';
 import { attachmentIdsSchema, attachmentSchema } from './attachments.ts';
 import { attemptSummarySchema } from './attempts.ts';
-import { browserCaseReportSchema, browserCaseSchema, browserTestScopeSchema } from './browser-cases.ts';
+import {
+  browserCaseHandoffSchema,
+  browserCaseReportSchema,
+  browserCaseSchema,
+  browserTestScopeSchema,
+} from './browser-cases.ts';
 import { deliverySchema, taskPullRequestSchema } from './delivery.ts';
 import { frontendRoundSchema } from './frontend.ts';
 import { inboxItemSchema } from './inbox.ts';
@@ -242,6 +247,7 @@ export type TaskSummaryDTO = z.infer<typeof taskSummarySchema>;
 /** `TaskDetailDTO` (11 §5.2). */
 export const taskDetailSchema = taskSummarySchema.extend({
   browserCase: browserCaseSchema.optional(),
+  browserCaseHandoff: browserCaseHandoffSchema.optional(),
   browserTest: browserTestScopeSchema.optional(),
   skills: z.array(skillRefSchema).optional(),
   requirement: z.string(),

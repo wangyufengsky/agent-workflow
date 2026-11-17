@@ -38,6 +38,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.browserCases.create': '保存浏览器测试用例',
   'op.browserCases.update': '编辑浏览器测试用例',
   'op.browserCases.run': '运行浏览器测试用例',
+  'op.browserCases.takeHandoff': '接管测试页签',
+  'op.browserCases.resume': '继续浏览器测试',
   'op.browserCases.rerun': '复跑浏览器测试用例',
   'op.assistant.actBrowser': '执行网页操作',
   'op.assistant.controlBrowser': '设置助手网页控制',

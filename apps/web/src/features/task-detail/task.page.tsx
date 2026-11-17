@@ -15,9 +15,11 @@ import { getRouteApi, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { ProgressCanvas } from '../../canvas/progress-canvas.tsx';
+import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { ARTIFACT_COPY } from '../../copy/artifacts.ts';
 import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
+import { BROWSER_CASE_COPY } from '../../copy/browser-cases.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { BROWSER_TEST_COPY, TASK_COPY as C } from '../../copy/tasks.ts';
@@ -244,6 +246,14 @@ export function TaskPage() {
         details={isPro ? undefined : details === true}
         onDetailsChange={(on) => void navigate({ search: (prev) => ({ ...prev, details: on }), replace: true })}
       />
+      {task.data.browserCaseHandoff !== undefined && view !== 'preview' && (
+        <div className="row">
+          <strong>{BROWSER_CASE_COPY.handoff.heading}</strong>
+          <Button size="sm" onClick={() => void navigate({ search: (prev) => ({ ...prev, view: 'preview' }) })}>
+            {BROWSER_CASE_COPY.handoff.open}
+          </Button>
+        </div>
+      )}
       {task.data.browserTest !== undefined && (
         <div className="col">
           <div className="row">
@@ -349,7 +359,11 @@ export function TaskPage() {
             {task.data.browserTest === undefined ? (
               <PreviewPane task={task.data} active={view === 'preview'} pro={pro} />
             ) : (
-              <BrowserTestPane taskId={task.data.id} />
+              <BrowserTestPane
+                taskId={task.data.id}
+                handoff={task.data.browserCaseHandoff}
+                active={view === 'preview'}
+              />
             )}
           </RadixTabs.Content>
         </RadixTabs.Root>

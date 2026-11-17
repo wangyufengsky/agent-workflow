@@ -93,6 +93,7 @@ export type TabInput = {
   site: boolean;
   /** The user's own tab, placed on the window by the renderer (29 §8.1): sized by its place, files can be chosen. */
   userFacing?: boolean;
+  caseSession?: boolean;
   /** 短期读取的整体截止也覆盖初始化；迟到的宿主资源必须立即释放。 */
   signal?: AbortSignal;
 };
@@ -113,9 +114,11 @@ export async function openTab({
   network: partitionNetwork,
   site,
   userFacing = false,
+  caseSession = false,
   signal,
 }: TabInput) {
   const viewport: { preset: ViewportPreset } = { preset: 'desktop' };
+  let manual = false;
   let refs = new Map<string, number>();
   const consoleEntries: ConsoleEntry[] = [];
   const exceptions: ExceptionEntry[] = [];
@@ -192,7 +195,7 @@ export async function openTab({
         return;
       case 'Page.javascriptDialogOpening': {
         // 用户自己操作的页面由用户处理对话框，读取页面不能替用户点确认。
-        if (userFacing) return;
+        if (userFacing || manual) return;
         const { type, message } = dialogSchema.parse(params);
         // An unanswered dialog freezes the page: alert and confirm are accepted, prompt dismissed (29 §5.5).
         const accept = type !== 'prompt';
@@ -296,6 +299,7 @@ export async function openTab({
       tabId,
       partition,
       userFacing,
+      ...(caseSession ? { caseSession } : {}),
       viewport: userFacing ? null : VIEWPORT_SIZES.desktop,
       policy,
       integratedAuthServers,
@@ -492,7 +496,10 @@ export async function openTab({
       };
     },
 
-    setPolicy: (next: BrowserPolicy) => host.request({ kind: 'setPolicy', tabId, policy: next }),
+    async setPolicy(next: BrowserPolicy) {
+      await host.request({ kind: 'setPolicy', tabId, policy: next });
+      manual = next.automation?.manual === true;
+    },
 
     /** Stops listening; the host's tab is already gone (closed by main, 29 §8.1). */
     dispose(): void {
