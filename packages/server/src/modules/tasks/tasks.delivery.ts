@@ -79,6 +79,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
   async function cleanUp(task: Task, worktree: Worktree, strategy: DeliveryStrategy): Promise<void> {
     const deleteBranch = strategy !== DeliveryStrategy.PullRequest && settings.get('delivery.deleteBranchAfterMerge');
     try {
+      await deps.attempts.waitForEndCommands(task.id);
       await worktrees.remove(worktree, { repoPath: projects.getRecord(task.projectId).repoPath, deleteBranch });
     } catch (err) {
       // The task is delivered either way; the failure stays on the worktree (status error) for the Git console.

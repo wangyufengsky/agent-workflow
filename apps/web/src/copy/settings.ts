@@ -21,6 +21,12 @@ export const SETTINGS_COPY = {
   uncertainty: 'AI 遇到不确定的地方时',
   assume: '做出合理假设并写明',
   ask: '停下来问我',
+  sessionStartCommand: '会话开始命令',
+  sessionEndCommand: '会话结束命令',
+  sessionStartCommandExample: '/report start',
+  sessionEndCommandExample: '/report complete',
+  sessionCommandsHint:
+    '可填写 OpenCode 斜杠命令。开发步骤在同一会话内先运行开始命令，成功提交结果后运行结束命令。同一任务等结束命令收尾再开始下一步。两条命令分别使用「尝试时限」，失败时在过程里提示。留空则跳过。',
   concurrency: '同时使用模型的会话数',
   previewMaxRunning: '同时运行的页面预览数',
   previewIdleMinutes: '页面预览空闲多久后停止（分钟）',

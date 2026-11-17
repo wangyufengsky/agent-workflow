@@ -19,6 +19,7 @@ import {
   OPENCODE_AGENT_NAME,
   PermissionDecision,
   type PermissionPayload,
+  RoleBaseAgent,
   type SessionAgent,
   type SkillSnapshot,
   TaskEventEntity,
@@ -26,7 +27,7 @@ import {
   TranscriptSystemEvent,
 } from '@aw/shared';
 import type { ModelSlots } from '../model-slots/index.ts';
-import { parseModelRef, sessionPermissionRules } from '../opencode/index.ts';
+import { createMessageId, parseModelRef, sessionPermissionRules } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { withUserSkills } from '../skills/index.ts';
@@ -39,9 +40,12 @@ import {
   type AttemptStateDeps,
   createAttemptState,
   errorOf,
+  hasPendingEndCommand,
   type LiveSession,
   systemEntry,
 } from './attempts.state.ts';
+
+const SESSION_COMMAND_CLEANUP_TIMEOUT_MS = 5_000;
 
 export type AttemptsServiceDeps = AttemptStateDeps & {
   taskSkills(taskId: string): SkillSnapshot[];
@@ -87,7 +91,7 @@ type ContinueInput = { id?: string; prompt: string; model?: string | null; kind?
 
 /** Attempt lifecycle (09 §4) and the session protocol (12 §4); opencode-driven end conditions are in the reactions. */
 export function createAttemptsService(deps: AttemptsServiceDeps) {
-  const { clock, opencode, settings, transcripts, projects, slots, unit, db } = deps;
+  const { clock, opencode, settings, transcripts, projects, slots, unit, db, log } = deps;
   const state = createAttemptState(deps);
   const { repo, mustFind, move, record } = state;
   const local = new Map<
@@ -150,6 +154,14 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     if (!opencode.isConnected()) throw new AppError(ErrorCode.OpencodeNotReady, 'opencode is not ready');
   }
 
+  function usesSessionCommands(attempt: Attempt, agent: string): boolean {
+    return (
+      attempt.taskId !== null &&
+      attempt.kind === AttemptKind.Execute &&
+      agent === OPENCODE_AGENT_NAME[RoleBaseAgent.Executor]
+    );
+  }
+
   /** Registers the session as ours, with the attempt timeout running. */
   function track(
     attempt: Attempt,
@@ -174,6 +186,9 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       cancelTimeout: parked ? () => undefined : clock.schedule(timeoutMs, () => reactions.timeOut(attempt.id)),
       modelWaitLeftMs: null,
       stopAfterSubmit: false,
+      firstPrompt: null,
+      endCommand: usesSessionCommands(attempt, session.agent) ? settings.get('ai.sessionEndCommand') : null,
+      finishingCommand: false,
       submitTool,
       parked,
       browserWaiting: false,
@@ -188,13 +203,61 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     return tracked;
   }
 
-  /** Sends a message; a failure to deliver it fails the attempt like a session error. */
-  async function sendOrFail(session: LiveSession, text: string): Promise<void> {
+  /** 开始命令单独计时，失败后保留原会话并继续开发。 */
+  async function runStartCommand(session: LiveSession, text: string, cancelled: AbortSignal): Promise<void> {
     try {
-      await state.send(session, text);
+      await state.runCommand(session, text, { messageId: createMessageId(clock.now()), signal: cancelled });
+    } catch (err) {
+      if (cancelled.aborted) return;
+      if (!(err instanceof AppError)) throw err;
+      const attempt = mustFind(session.attemptId);
+      log.warn({ err, attemptId: attempt.id }, 'session start command failed');
+      record(attempt, [systemEntry(TranscriptSystemEvent.SessionStartCommandFailed)]);
+      if (err.details?.responseReceived !== true) await stopUnfinishedStartCommand(session, cancelled);
+      if (!cancelled.aborted) {
+        state.inbox.dismissOpen({ attemptId: attempt.id });
+        reactions.resume(session);
+      }
+    }
+  }
+
+  /** 请求超时或连接断开后，OpenCode 可能仍在执行命令。 */
+  async function stopUnfinishedStartCommand(session: LiveSession, cancelled: AbortSignal): Promise<void> {
+    try {
+      await state.stopSession(
+        session,
+        AbortSignal.any([cancelled, AbortSignal.timeout(SESSION_COMMAND_CLEANUP_TIMEOUT_MS)]),
+      );
+    } catch (err) {
+      if (!(err instanceof AppError)) throw err;
+      log.warn({ err, attemptId: session.attemptId }, 'session start command cleanup failed');
+    }
+  }
+
+  /** 任务提示发送失败仍按原流程结束尝试。 */
+  async function sendOrFail(session: LiveSession, text: string, startCommand: string | null = null): Promise<void> {
+    try {
+      let messageId: string | undefined;
+      if (startCommand !== null) {
+        const firstPrompt: NonNullable<LiveSession['firstPrompt']> = {
+          messageId: null,
+          controller: new AbortController(),
+        };
+        session.firstPrompt = firstPrompt;
+        session.cancelTimeout();
+        await runStartCommand(session, startCommand, firstPrompt.controller.signal);
+        if (firstPrompt.controller.signal.aborted) return;
+        // OpenCode 按原生消息 id 的顺序选取最新提示词，任务消息必须排在开始命令之后。
+        messageId = createMessageId(clock.now());
+        firstPrompt.messageId = messageId;
+        reactions.arm(session, session.timeoutMs);
+      }
+      await state.send(session, text, messageId);
     } catch (err) {
       const current = mustFind(session.attemptId);
-      if (current.status === AttemptStatus.Running) move(current, AttemptEvent.SessionError, errorOf(err));
+      if (current.status !== AttemptStatus.Running) return;
+      move(current, AttemptEvent.SessionError, errorOf(err));
+      if (startCommand !== null) await state.stopSession(session);
     }
   }
 
@@ -244,7 +307,8 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     );
     // Running before the first prompt, so every event of the session finds the attempt active.
     move(attempt, AttemptEvent.SessionStarted);
-    await sendOrFail(session, input.prompt);
+    const startCommand = usesSessionCommands(attempt, agent) ? settings.get('ai.sessionStartCommand') : null;
+    await sendOrFail(session, input.prompt, startCommand);
     return toDto(mustFind(id));
   }
 
@@ -474,6 +538,24 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       const session = state.sessionOf(id);
       if (session !== undefined) session.stopAfterSubmit = true;
       return toDto(updated);
+    },
+
+    /** 仍由结束命令占用原会话的任务，调度器要等收尾后再发下一个开始命令。 */
+    tasksClosingSessions(): ReadonlySet<string> {
+      const ids = new Set<string>();
+      for (const session of state.live.values()) {
+        if (session.taskId !== null && hasPendingEndCommand(session)) ids.add(session.taskId);
+      }
+      return ids;
+    },
+
+    /** 完成命令需要使用原任务目录，清理工作树前等待当前收尾。 */
+    async waitForEndCommands(taskId: string): Promise<void> {
+      await Promise.all(
+        [...state.live.values()]
+          .filter((session) => session.taskId === taskId && hasPendingEndCommand(session))
+          .map((session) => session.released),
+      );
     },
 
     /** User abort (11 §6) or task cancellation. */

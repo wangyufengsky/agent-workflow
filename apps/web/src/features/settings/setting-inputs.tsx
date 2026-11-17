@@ -51,10 +51,12 @@ export function TextSetting({
   id,
   value,
   onCommit,
+  placeholder,
 }: {
   id: string;
   value: string | null;
   onCommit: (text: string | null) => void;
+  placeholder?: string;
 }) {
   const [text, setText] = useState(value ?? '');
   const commit = () => {
@@ -65,6 +67,7 @@ export function TextSetting({
     <input
       id={id}
       className="input mono"
+      placeholder={placeholder}
       value={text}
       onChange={(e) => setText(e.target.value)}
       onBlur={commit}

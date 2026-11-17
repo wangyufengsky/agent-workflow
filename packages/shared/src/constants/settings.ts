@@ -39,6 +39,12 @@ export const commitIdentitySchema = z.strictObject({
 });
 export type CommitIdentity = z.infer<typeof commitIdentitySchema>;
 
+const sessionCommandSchema = z
+  .string()
+  .trim()
+  .regex(/^\/[^\s]+(?:[ \t]+[^\r\n]*)?$/)
+  .nullable();
+
 /** User settings (08 §4.3): key → value schema. Unknown keys are rejected. */
 export const settingsSchema = z.strictObject({
   'ui.mode': uiModeSchema,
@@ -50,6 +56,8 @@ export const settingsSchema = z.strictObject({
   'ai.defaultModel': z.string().min(1).nullable(),
   'ai.imageModel': z.string().min(1).nullable(),
   'ai.bashPolicy': bashPolicySchema,
+  'ai.sessionStartCommand': sessionCommandSchema,
+  'ai.sessionEndCommand': sessionCommandSchema,
   'scheduler.maxConcurrentAttempts': z.number().int().min(1),
   'scheduler.maxConcurrentNodesPerTask': z.number().int().min(1),
   'node.maxAttempts': z.number().int().min(1),
@@ -107,6 +115,8 @@ export const SETTING_DEFAULTS: Settings = {
   'ai.defaultModel': null,
   'ai.imageModel': null,
   'ai.bashPolicy': BashPolicy.Auto,
+  'ai.sessionStartCommand': null,
+  'ai.sessionEndCommand': null,
   'scheduler.maxConcurrentAttempts': 4,
   'scheduler.maxConcurrentNodesPerTask': 2,
   'node.maxAttempts': 3,
@@ -145,6 +155,8 @@ export const SETTING_MODE: Record<SettingKey, UiMode> = {
   'ai.defaultModel': UiMode.Pro,
   'ai.imageModel': UiMode.Pro,
   'ai.bashPolicy': UiMode.Pro,
+  'ai.sessionStartCommand': UiMode.Pro,
+  'ai.sessionEndCommand': UiMode.Pro,
   'scheduler.maxConcurrentAttempts': UiMode.Pro,
   'scheduler.maxConcurrentNodesPerTask': UiMode.Pro,
   'node.maxAttempts': UiMode.Pro,

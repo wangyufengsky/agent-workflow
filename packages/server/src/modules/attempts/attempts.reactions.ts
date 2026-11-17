@@ -1,6 +1,7 @@
 import { PromptName, type Prompts, renderTemplate } from '@aw/builtin';
 import {
   ACTIVE_ATTEMPT_STATUSES,
+  AppError,
   ATTEMPT_MAX_NUDGES,
   ATTEMPT_SUBMIT_TOOL,
   AttemptEvent,
@@ -13,6 +14,7 @@ import {
   TranscriptSystemEvent,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
+import type { Logger } from '../../core/logger.ts';
 import type { ModelSlots } from '../model-slots/index.ts';
 import {
   describeOpencodeError,
@@ -39,7 +41,7 @@ type PermissionEvent = Extract<OpencodeEvent, { type: typeof OpencodeEventType.P
  */
 export function watchSessions(
   state: AttemptState,
-  deps: { opencode: OpencodeClient; prompts: Prompts; clock: Clock; slots: Pick<ModelSlots, 'changed'> },
+  deps: { opencode: OpencodeClient; prompts: Prompts; clock: Clock; slots: Pick<ModelSlots, 'changed'>; log: Logger },
   isLocal: (id: string) => boolean,
 ) {
   const { repo, live, mustFind, move, record } = state;
@@ -95,20 +97,46 @@ export function watchSessions(
     );
   }
 
+  /** 提交工具已经返回，停止本轮生成后在原会话执行结束命令。 */
+  async function runEndCommand(attempt: Attempt, session: LiveSession, command: string): Promise<void> {
+    try {
+      await state.stopSession(session);
+      if (live.get(session.sessionId) === session) await state.runCommand(session, command);
+    } catch (err) {
+      if (!(err instanceof AppError)) throw err;
+      deps.log.warn({ err, attemptId: attempt.id }, 'session end command failed');
+      if (live.get(session.sessionId) === session) {
+        record(attempt, [systemEntry(TranscriptSystemEvent.SessionEndCommandFailed)]);
+        await state.stopSession(session);
+      }
+    } finally {
+      state.releaseSession(session);
+    }
+  }
+
+  function finishSubmitted(attempt: Attempt, session: LiveSession): void {
+    session.stopAfterSubmit = false;
+    record(attempt, [systemEntry(TranscriptSystemEvent.ResultSubmitted)]);
+    const command = session.endCommand;
+    if (command === null) {
+      state.inBackground(attempt.id, () => state.stopSession(session));
+    } else {
+      session.finishingCommand = true;
+      state.inBackground(attempt.id, () => runEndCommand(attempt, session, command));
+    }
+  }
+
   /** Stops the session once the accepted submit call has returned, so its result still reaches the transcript. */
   function onToolEvent(attempt: Attempt, session: LiveSession, event: ToolEvent): void {
     const isSubmit =
       event.tool === `${MCP_TOOL_PREFIX}${ATTEMPT_SUBMIT_TOOL[attempt.kind]}` ||
       (attempt.kind === AttemptKind.Execute && event.tool === `${MCP_TOOL_PREFIX}${McpToolName.BrowserSubmitReport}`);
     const finished = event.status === ToolCallStatus.Completed || event.status === ToolCallStatus.Error;
-    if (!session.stopAfterSubmit || !isSubmit || !finished) return;
-    session.stopAfterSubmit = false;
-    record(attempt, [systemEntry(TranscriptSystemEvent.ResultSubmitted)]);
-    state.inBackground(attempt.id, () => state.stopSession(session));
+    if (session.stopAfterSubmit && isSubmit && finished) finishSubmitted(attempt, session);
   }
 
   /** A permission request waits in「需要你处理」until the user decides (03 §2.5). */
-  function onPermission(attempt: Attempt, session: LiveSession, event: PermissionEvent): void {
+  function onPermission(attempt: Attempt, event: PermissionEvent): void {
     state.inbox.create({
       kind: InboxKind.Permission,
       taskId: attempt.taskId,
@@ -123,7 +151,6 @@ export function watchSessions(
         patterns: event.patterns,
       },
     });
-    state.park(session, attempt);
   }
 
   /**
@@ -181,9 +208,10 @@ export function watchSessions(
     if (session.stall !== null && endsStoppedReply(session.stall, event)) return;
     const attempt = mustFind(session.attemptId);
     const running = attempt.status === AttemptStatus.Running;
-    // Errors after the attempt ended (e.g. the abort we sent after a submit) are not the attempt's.
-    if (running || event.type !== OpencodeEventType.Error) record(attempt, session.view.toEntries(event));
-    if (running) {
+    // 命令请求单独处理失败。开始命令的迟到事件按顺序先于首条任务消息，结束命令发生在提交之后。
+    if (event.type === OpencodeEventType.Error && (!running || session.firstPrompt !== null)) return;
+    record(attempt, session.view.toEntries(event));
+    if (running && session.firstPrompt === null) {
       if (event.type === OpencodeEventType.Retry) waitForModel(session);
       else modelAnswering(session);
     }
@@ -192,12 +220,18 @@ export function watchSessions(
       case OpencodeEventType.StepFinished:
         repo.addUsage(attempt.id, { ...event.tokens, cost: event.cost });
         return;
+      case OpencodeEventType.Message:
+        if (event.messageId === session.firstPrompt?.messageId) session.firstPrompt = null;
+        return;
       case OpencodeEventType.Idle:
-        if (running) state.inBackground(attempt.id, () => onIdle(attempt, session));
-        else state.releaseSession(session);
+        if (session.finishingCommand) return;
+        if (running) {
+          if (session.firstPrompt === null) state.inBackground(attempt.id, () => onIdle(attempt, session));
+        } else if (session.stopAfterSubmit && session.endCommand !== null) {
+          finishSubmitted(attempt, session);
+        } else state.releaseSession(session);
         return;
       case OpencodeEventType.Error:
-        if (!running) return;
         move(attempt, AttemptEvent.SessionError, {
           code: ErrorCode.AttemptSessionError,
           message: describeOpencodeError(event.error),
@@ -205,7 +239,7 @@ export function watchSessions(
         });
         return;
       case OpencodeEventType.Stalled: {
-        if (!running || session.stall !== null) return;
+        if (!running || session.firstPrompt !== null || session.stall !== null) return;
         // opencode would send the whole request again and stall the same way: stop it and ask for shorter calls.
         const stopped = state.stopSession(session);
         session.stall = { stopped, idled: false, continued: false };
@@ -216,7 +250,8 @@ export function watchSessions(
         onToolEvent(attempt, session, event);
         return;
       case OpencodeEventType.PermissionAsked:
-        if (running) onPermission(attempt, session, event);
+        if (running || session.finishingCommand) onPermission(attempt, event);
+        if (running) state.park(session, attempt);
         return;
       case OpencodeEventType.PermissionReplied:
         state.inbox.completePermission(attempt.id, event.permissionId, event.reply);
@@ -246,11 +281,11 @@ export function watchSessions(
   function resume(session: LiveSession): void {
     if (!session.parked || state.waitsForUser(session.attemptId)) return;
     session.parked = false;
-    arm(session, session.timeoutMs);
+    if (session.firstPrompt?.messageId !== null) arm(session, session.timeoutMs);
     deps.slots.changed();
     const attempt = mustFind(session.attemptId);
     state.signal('input_answered', attempt);
     if (session.idle) state.inBackground(attempt.id, () => onIdle(attempt, session));
   }
-  return { timeOut, interruptActive, resume };
+  return { arm, timeOut, interruptActive, resume };
 }

@@ -49,6 +49,10 @@ export type LiveSession = {
   modelWaitLeftMs: number | null;
   /** Set once the result was submitted: further generation is stopped when the submit call completes (12 §4.2). */
   stopAfterSubmit: boolean;
+  /** 收到首条任务消息的原生事件前，空闲和错误事件属于开始命令。 */
+  firstPrompt: { messageId: string | null; controller: AbortController } | null;
+  endCommand: string | null;
+  finishingCommand: boolean;
   submitTool: McpToolName | null;
   /** Waiting for the user (blocking question or permission); the timeout does not run meanwhile. */
   parked: boolean;
@@ -68,12 +72,19 @@ export type LiveSession = {
   release: () => void;
 };
 
+export function hasPendingEndCommand(session: LiveSession): boolean {
+  return session.endCommand !== null && (session.stopAfterSubmit || session.finishingCommand);
+}
+
 /**
  * What the owner of an attempt (a node, a plan, an acceptance review) needs to hear about: the attempt ended (in any
  * terminal state), a queued attempt got its model slot and its session is being created (`started`, D186), or its
  * session started or stopped waiting for the user.
  */
-export type AttemptSignal = { type: 'started' | 'ended' | 'awaiting_input' | 'input_answered'; attempt: Attempt };
+export type AttemptSignal = {
+  type: 'started' | 'ended' | 'awaiting_input' | 'input_answered' | 'end_command_finished';
+  attempt: Attempt;
+};
 
 export type AttemptStateDeps = {
   db: Db;
@@ -148,7 +159,14 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
 
   /** Stops following a session: later events of it are ignored until a new attempt tracks it. */
   function releaseSession(session: LiveSession): void {
-    if (live.get(session.sessionId) === session) live.delete(session.sessionId);
+    if (live.get(session.sessionId) === session) {
+      live.delete(session.sessionId);
+      if (hasPendingEndCommand(session)) {
+        inbox.dismissOpen({ attemptId: session.attemptId, kind: InboxKind.Permission });
+        signal('end_command_finished', mustFind(session.attemptId));
+      }
+    }
+    session.firstPrompt?.controller.abort();
     session.release();
   }
 
@@ -231,6 +249,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
         progress.delete(attempt.id);
         const session = sessionOf(attempt.id);
         session?.cancelTimeout();
+        session?.firstPrompt?.controller.abort();
         if (session !== undefined) session.parked = false;
       }
       log.info({ attemptId: attempt.id, from: attempt.status, to, event }, 'attempt transition');
@@ -250,10 +269,11 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
     },
 
     /** Sends a message to the session and records it as ours. */
-    async send(session: LiveSession, text: string): Promise<void> {
+    async send(session: LiveSession, text: string, messageId?: string): Promise<void> {
       session.idle = false;
       transcripts.append(mustFind(session.attemptId), [{ kind: TranscriptEntryKind.UserMessage, data: { text } }]);
       await opencode.prompt({
+        ...(messageId === undefined ? {} : { messageId }),
         sessionId: session.sessionId,
         directory: session.directory,
         agent: session.agent,
@@ -263,8 +283,35 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
       });
     },
 
-    stopSession: (session: LiveSession) =>
-      opencode.abort({ sessionId: session.sessionId, directory: session.directory }),
+    async runCommand(
+      session: LiveSession,
+      text: string,
+      { messageId, signal }: { messageId?: string; signal?: AbortSignal } = {},
+    ): Promise<void> {
+      transcripts.append(mustFind(session.attemptId), [{ kind: TranscriptEntryKind.UserMessage, data: { text } }]);
+      const deadline = new AbortController();
+      const cancel = clock.schedule(session.timeoutMs, () => deadline.abort(new Error('Session command timed out')));
+      try {
+        await opencode.runCommand({
+          sessionId: session.sessionId,
+          directory: session.directory,
+          agent: session.agent,
+          ...(session.model === undefined ? {} : { model: session.model }),
+          text,
+          ...(messageId === undefined ? {} : { messageId }),
+          signal: signal === undefined ? deadline.signal : AbortSignal.any([signal, deadline.signal]),
+        });
+      } finally {
+        cancel();
+      }
+    },
+
+    stopSession: (session: LiveSession, signal?: AbortSignal) =>
+      opencode.abort({
+        sessionId: session.sessionId,
+        directory: session.directory,
+        ...(signal === undefined ? {} : { signal }),
+      }),
 
     /** Background reactions to events have no caller; an unexpected failure is logged with the attempt. */
     inBackground(attemptId: string, work: () => Promise<void>): void {

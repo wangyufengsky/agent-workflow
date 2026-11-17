@@ -485,6 +485,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     nodes: nodes.service,
     attempts: attempts.service,
     settings: settings.service,
+    roles: roles.service,
     slots: modelSlots.service,
     events,
     log,

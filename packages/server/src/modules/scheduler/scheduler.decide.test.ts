@@ -52,6 +52,18 @@ describe('调度决策', () => {
     expect(dispatched(s)).toEqual(['old.b']);
   });
 
+  it('每个任务一次只派发一个配置了会话命令的步骤', () => {
+    const s = snapshot([
+      task('old', [
+        { ...node('a', NodeStatus.Ready), sessionCommands: true },
+        { ...node('b', NodeStatus.Ready), sessionCommands: true },
+        node('c', NodeStatus.Ready),
+      ]),
+      task('new', [{ ...node('a', NodeStatus.Ready), sessionCommands: true }]),
+    ]);
+    expect(dispatched(s)).toEqual(['old.a', 'old.c', 'new.a']);
+  });
+
   it('有失败节点后不再派发；仍有节点在工作时不判定失败，全部停下后判定失败', () => {
     const working = snapshot([
       task('t', [node('a', NodeStatus.Failed), node('b', NodeStatus.Running), node('c', NodeStatus.Ready)]),

@@ -10,18 +10,25 @@ import {
   cancelTaskOp,
   ErrorCode,
   getNodeOp,
+  InboxKind,
+  listInboxOp,
   MCP_TOOL_PREFIX,
   McpToolName,
   NodeStatus,
   OPENCODE_AGENT_NAME,
   type PermissionAction,
+  PermissionDecision,
   RoleBaseAgent,
+  resolveInboxOp,
+  ServerEventType,
+  TranscriptSystemEvent,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
+import { waitForEvent } from '../../../test/helpers/events.ts';
 import { createTestRepo, type TestRepo } from '../../../test/helpers/git.ts';
-import { addProject, createTask, nodeReaches } from '../../../test/helpers/tasks.ts';
+import { addProject, createTask, inboxOpens, nodeReaches, taskReaches } from '../../../test/helpers/tasks.ts';
 import { sessionPermissionRules } from './opencode.config.ts';
 import { OpencodeEventType, ToolCallStatus } from './opencode.events.ts';
 
@@ -36,6 +43,8 @@ const MODEL = 'scripted';
 const RUN = 'RUN: ';
 const PROJECT_PATTERNS = ['./scripts/check.sh -q *'];
 const PROBE_PARENT = 'VERIFY_MANAGED_DELEGATION';
+const PROBE_SESSION_COMMAND = 'VERIFY_SESSION_COMMAND_BOUNDARIES';
+const transportTrace: Array<{ command: string; args: string; sessionId: string } | 'task'> = [];
 const PROBE_CHILD = 'FIND_COMMITTED_PROBE';
 const PROBE_EVIDENCE = 'sample-repository-marker';
 const PROJECT_INSTRUCTION = 'project-instruction-marker';
@@ -77,8 +86,18 @@ async function bodyOf(req: IncomingMessage): Promise<{
 }
 
 /** Answers the latest `RUN:` prompt with a bash call, a tool result (or anything else) with text. */
+async function recordCommand(req: IncomingMessage) {
+  const data: Buffer[] = [];
+  for await (const chunk of req) data.push(chunk as Buffer);
+  transportTrace.push(JSON.parse(Buffer.concat(data).toString('utf8')));
+}
+
 function scriptedModel(): Server {
   return createServer((req, res) => {
+    if (req.url === '/session-command-probe') {
+      void recordCommand(req).then(() => res.end());
+      return;
+    }
     void bodyOf(req).then(({ messages, stream, tools }) => {
       const last = messages.at(-1);
       const prompt = last?.role === 'user' ? textOf(last) : '';
@@ -103,6 +122,9 @@ function scriptedModel(): Server {
           last?.role === 'tool'
             ? [operation(McpToolName.SubmitResult, { summary: 'Received the managed delegation', notes: textOf(last) })]
             : [operation(McpToolName.DelegateReadonly, { questions: [PROBE_CHILD] })];
+      } else if (prompt.includes(PROBE_SESSION_COMMAND)) {
+        transportTrace.push('task');
+        calls = [operation(McpToolName.SubmitResult, { summary: 'Task received after the start command' })];
       } else if (command !== undefined) {
         calls = command
           .split('\n')
@@ -332,3 +354,128 @@ it('@opencode 委派沿用项目模型、读取固定提交，并隔离原生工
     await t.call(cancelTaskOp, { id: task.id });
   }
 }, 60_000);
+
+it('@opencode 在同一开发会话执行首尾斜杠命令，插件可用该会话 id 上报', async () => {
+  await t.call(updateSettingsOp, {
+    'ai.defaultModel': `${PROVIDER}/${MODEL}`,
+    'ai.sessionStartCommand': '/session-probe start',
+    'ai.sessionEndCommand': '/session-probe complete',
+  });
+  const endpoint = `http://127.0.0.1:${(model.address() as AddressInfo).port}/session-command-probe`;
+  const { project } = await addProject(t, {
+    checkCommand: null,
+    files: {
+      'opencode.json': JSON.stringify({
+        command: { 'session-probe': { template: 'Report the boundary: $ARGUMENTS' } },
+      }),
+      '.opencode/plugins/session-command-probe.js': `
+        export default async () => ({
+          'command.execute.before': async ({ command, arguments: args, sessionID: sessionId }) => {
+            await fetch(${JSON.stringify(endpoint)}, {
+              method: 'POST', body: JSON.stringify({ command, args, sessionId }),
+            });
+          },
+        });
+      `,
+    },
+  });
+  const completed = nodeReaches(t, 'build_page', NodeStatus.Done, 45_000);
+  const task = await createTask(t, { projectId: project.id, workflow: 'frontend', requirement: PROBE_SESSION_COMMAND });
+  try {
+    const { node } = await completed;
+    await t.app.services.attempts.waitForEndCommands(task.id);
+    const detail = (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
+    const [summary] = detail.attempts;
+    if (summary === undefined) throw new Error('No development attempt');
+    const attempt = t.app.services.attempts.get(summary.id);
+    expect(detail.result?.summary).toBe('Task received after the start command');
+    expect(transportTrace).toEqual([
+      { command: 'session-probe', args: 'start', sessionId: attempt.opencodeSessionId },
+      'task',
+      { command: 'session-probe', args: 'complete', sessionId: attempt.opencodeSessionId },
+    ]);
+    const messages = t.app.services.attempts.transcript(attempt.id, 0).entries;
+    expect(messages.filter((entry) => entry.kind === 'user_message').map((entry) => entry.data.text)).toEqual([
+      '/session-probe start',
+      expect.stringContaining(PROBE_SESSION_COMMAND),
+      '/session-probe complete',
+    ]);
+  } finally {
+    await t.call(cancelTaskOp, { id: task.id });
+  }
+}, 60_000);
+
+it('@opencode 开始命令不可用时提示，原开发会话照常交付结果', async () => {
+  await t.call(updateSettingsOp, {
+    'ai.defaultModel': `${PROVIDER}/${MODEL}`,
+    'ai.sessionStartCommand': '/aw-unregistered-start-command',
+    'ai.sessionEndCommand': null,
+    'node.maxAttempts': 1,
+  });
+  const { project } = await addProject(t, { checkCommand: null });
+  const terminal = waitForEvent(
+    t.app.events,
+    ServerEventType.NodeUpdated,
+    ({ node }) => node.key === 'build_page' && (node.status === NodeStatus.Done || node.status === NodeStatus.Failed),
+  );
+  const task = await createTask(t, { projectId: project.id, workflow: 'frontend', requirement: PROBE_SESSION_COMMAND });
+  try {
+    const { node } = await terminal;
+    expect(node.status).toBe(NodeStatus.Done);
+    const { body: detail } = await t.call(getNodeOp, { id: task.id, nodeId: node.id });
+    expect(detail.attempts).toHaveLength(1);
+    const [attempt] = detail.attempts;
+    if (attempt === undefined) throw new Error('No development attempt');
+    const entries = t.app.services.attempts.transcript(attempt.id, 0).entries;
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        kind: 'system',
+        data: { event: TranscriptSystemEvent.SessionStartCommandFailed },
+      }),
+    );
+  } finally {
+    await t.call(cancelTaskOp, { id: task.id });
+  }
+}, 45_000);
+
+it('@opencode 结束命令需要权限时可以授权，保留已提交结果', async () => {
+  await t.call(updateSettingsOp, {
+    'ai.defaultModel': `${PROVIDER}/${MODEL}`,
+    'ai.bashPolicy': BashPolicy.Ask,
+    'ai.sessionStartCommand': null,
+    'ai.sessionEndCommand': '/end-with-permission',
+  });
+  const { project } = await addProject(t, {
+    checkCommand: null,
+    files: {
+      'opencode.json': JSON.stringify({
+        command: { 'end-with-permission': { template: `${RUN}find . -name nothing-here -delete` } },
+      }),
+    },
+  });
+  const submitted = nodeReaches(t, 'build_page', NodeStatus.Done);
+  const requested = inboxOpens(t, InboxKind.Permission);
+  const task = await createTask(t, { projectId: project.id, workflow: 'frontend', requirement: PROBE_SESSION_COMMAND });
+  const { node } = await submitted;
+  const { body: detail } = await t.call(getNodeOp, { id: task.id, nodeId: node.id });
+  const [summary] = detail.attempts;
+  if (summary === undefined) throw new Error('No submitted attempt');
+  const attempt = t.app.services.attempts.get(summary.id);
+  try {
+    const { item } = await requested;
+    expect(item).toMatchObject({ taskId: task.id, payload: { permission: 'bash' } });
+    if (item.attemptId === null) throw new Error('Permission is missing its attempt');
+    expect(t.app.services.attempts.get(item.attemptId).status).toBe(AttemptStatus.Succeeded);
+    const review = taskReaches(t, 'review', 25_000);
+    const reply = await t.call(resolveInboxOp, { id: item.id, response: { decision: PermissionDecision.Once } });
+    expect(reply.body.status).toBe('resolved');
+    await review;
+    expect(t.app.services.attempts.get(item.attemptId).status).toBe(AttemptStatus.Succeeded);
+    expect((await t.call(listInboxOp, { taskId: task.id, blocking: true, status: 'open' })).body.items).toEqual([]);
+  } finally {
+    if (attempt.opencodeSessionId !== null) {
+      await t.app.services.opencode.abort({ sessionId: attempt.opencodeSessionId, directory: attempt.directory });
+    }
+    await t.call(cancelTaskOp, { id: task.id });
+  }
+}, 45_000);

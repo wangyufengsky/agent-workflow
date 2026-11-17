@@ -536,6 +536,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       if (worktree?.status === WorktreeStatus.Ready) {
         const { repoPath } = projects.getRecord(task.projectId);
         try {
+          await attempts.waitForEndCommands(taskId);
           await worktrees.remove(worktree, { repoPath, deleteBranch: !keepBranch });
         } catch (err) {
           // The task is cancelled either way; the failure stays on the worktree (status error) for the Git console.

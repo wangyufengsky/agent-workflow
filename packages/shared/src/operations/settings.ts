@@ -35,6 +35,8 @@ export const updateSettingsOp = defineOperationContract({
     'assistant.alwaysAllow',
     'opencode.binaryPath',
     'ai.bashPolicy',
+    'ai.sessionStartCommand',
+    'ai.sessionEndCommand',
     'worktree.rootDir',
     'browser.sites',
     'browser.integratedAuthServers',

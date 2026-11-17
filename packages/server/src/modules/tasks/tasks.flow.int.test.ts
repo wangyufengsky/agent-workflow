@@ -1,9 +1,32 @@
-import { getNodeOp, getTaskOp, getTaskTimelineOp, listInboxOp, readonlyBashRules } from '@aw/shared';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  AppError,
+  ErrorCode,
+  getAttemptOp,
+  getNodeOp,
+  getTaskOp,
+  getTaskTimelineOp,
+  listInboxOp,
+  NodeStatus,
+  readonlyBashRules,
+  ServerEventType,
+  TranscriptSystemEvent,
+  updateSettingsOp,
+} from '@aw/shared';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
-import { addProject, createTask, finalVerify, planArgs, taskReaches } from '../../../test/helpers/tasks.ts';
+import { createFakeClock } from '../../../test/helpers/clock.ts';
+import { waitForEvent } from '../../../test/helpers/events.ts';
+import {
+  addProject,
+  createTask,
+  finalVerify,
+  nodeReaches,
+  planArgs,
+  taskReaches,
+} from '../../../test/helpers/tasks.ts';
 import { runGit } from '../git/index.ts';
+import { OpencodeEventType } from '../opencode/index.ts';
 
 let t: TestApp;
 beforeEach(async () => {
@@ -28,8 +51,130 @@ describe('只读角色执行的步骤', () => {
   });
 });
 
+function hangSessionCommand(app: TestApp, text: string) {
+  const started = Promise.withResolvers<AbortSignal>();
+  let waiting = false;
+  const command = vi.spyOn(app.fake, 'runCommand').mockImplementation(async (input) => {
+    if (waiting || input.text !== text) return;
+    waiting = true;
+    const { signal } = input;
+    if (signal === undefined) throw new Error('Expected a command timeout signal');
+    started.resolve(signal);
+    await new Promise<void>((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new AppError(ErrorCode.OpencodeRequestFailed)), { once: true });
+    });
+  });
+  return { started: started.promise, command };
+}
+
+it('开始命令等待模型超过 30 秒，耗尽配置时限后开发步骤获得单独的完整时限', async () => {
+  const clock = createFakeClock();
+  const isolated = await createTestApp({ clock });
+  try {
+    await isolated.call(updateSettingsOp, {
+      'ai.sessionStartCommand': '/report start',
+      'attempt.timeoutMinutes': 2,
+      'node.maxAttempts': 1,
+    });
+    const { project } = await addProject(isolated, { checkCommand: null });
+    const { started: commandStarted } = hangSessionCommand(isolated, '/report start');
+    isolated.fake.enqueue(script().hang());
+    const sent = waitForEvent(isolated.app.events, ServerEventType.AttemptTranscript, ({ entries }) =>
+      entries.some((entry) => entry.kind === 'user_message' && entry.data.text.includes('Make a queue probe')),
+    );
+    await createTask(isolated, { projectId: project.id, workflow: 'frontend', requirement: 'Make a queue probe' });
+    await commandStarted;
+    clock.advance(31_000);
+    expect(isolated.fake.prompts).toHaveLength(0);
+
+    clock.advance(89_000);
+    const { attemptId } = await sent;
+    clock.advance(119_000);
+    expect((await isolated.call(getAttemptOp, { id: attemptId })).body.status).toBe('running');
+
+    const failed = waitForEvent(
+      isolated.app.events,
+      ServerEventType.AttemptUpdated,
+      ({ attempt }) => attempt.id === attemptId && attempt.status === 'failed',
+    );
+    clock.advance(1_000);
+    expect((await failed).attempt.error?.code).toBe(ErrorCode.AttemptTimeout);
+  } finally {
+    await isolated.close();
+  }
+});
+
+it('前一节点的结束命令收尾后才发送下一节点的开始命令', async () => {
+  const clock = createFakeClock();
+  const isolated = await createTestApp({ clock });
+  try {
+    await isolated.call(updateSettingsOp, {
+      'ai.sessionStartCommand': '/report start',
+      'ai.sessionEndCommand': '/report complete',
+      'attempt.timeoutMinutes': 2,
+    });
+    const { project } = await addProject(isolated, { checkCommand: null });
+    const { started: commandStarted, command } = hangSessionCommand(isolated, '/report complete');
+    isolated.fake.enqueue(script().callTool('submit_result', { summary: 'Found the cause' }), { title: '定位根因' });
+    isolated.fake.enqueue(script().callTool('submit_result', { summary: 'Fixed the bug' }), { title: '· 修复' });
+    isolated.fake.enqueue(script().callTool('submit_review', { verdict: 'pass', summary: 'Verified the fix' }), {
+      agent: 'aw-reviewer',
+    });
+    const ready = nodeReaches(isolated, 'fix', NodeStatus.Ready);
+    const review = taskReaches(isolated, 'review');
+    const task = await createTask(isolated, { projectId: project.id, workflow: 'bugfix' });
+    const signal = await commandStarted;
+    const { node } = await ready;
+    clock.advance(119_000);
+    await isolated.fake.settled();
+    expect(signal.aborted).toBe(false);
+    expect((await isolated.call(getNodeOp, { id: task.id, nodeId: node.id })).body.status).toBe(NodeStatus.Ready);
+    const prefix = command.mock.calls.map(([call]) => call.text);
+    expect(prefix).toEqual(['/report start', '/report complete']);
+    const endRequest = command.mock.calls[1]?.[0];
+    if (endRequest === undefined) throw new Error('No end command in progress');
+    isolated.fake.replay([
+      {
+        type: OpencodeEventType.PermissionAsked,
+        sessionId: endRequest.sessionId,
+        directory: endRequest.directory,
+        permissionId: 'end-permission',
+        permission: 'webfetch',
+        patterns: ['http://127.0.0.1/report'],
+      },
+    ]);
+    const permissionQuery = { taskId: task.id, blocking: true, status: 'open' } as const;
+    expect((await isolated.call(listInboxOp, permissionQuery)).body.items).toHaveLength(1);
+
+    const warning = waitForEvent(isolated.app.events, ServerEventType.AttemptTranscript, ({ entries }) =>
+      entries.some(
+        (entry) => entry.kind === 'system' && entry.data.event === TranscriptSystemEvent.SessionEndCommandFailed,
+      ),
+    );
+    clock.advance(1_000);
+    expect(signal.aborted).toBe(true);
+    const { attemptId } = await warning;
+    await review;
+    expect(command.mock.calls.map(([call]) => call.text)).toEqual([
+      '/report start',
+      '/report complete',
+      '/report start',
+      '/report complete',
+    ]);
+    expect((await isolated.call(getAttemptOp, { id: attemptId })).body).toMatchObject({
+      status: 'succeeded',
+      error: null,
+    });
+    expect((await isolated.call(getTaskOp, { id: task.id })).body.status).toBe('review');
+    expect((await isolated.call(listInboxOp, permissionQuery)).body.items).toEqual([]);
+  } finally {
+    await isolated.close();
+  }
+});
+
 describe('任务主链路（新功能开发，简单模式）', () => {
   it('规划 → 并行执行两个步骤 → 整体验证（命令 + AI 评审）→ 待合并，结果卡含改动、检查与摘要', async () => {
+    const command = vi.spyOn(t.fake, 'runCommand');
     const { project } = await addProject(t, { checkCommand: 'test -f greet.ts' });
     t.fake.enqueue(
       script()
@@ -61,6 +206,8 @@ describe('任务主链路（新功能开发，简单模式）', () => {
     expect(created).toMatchObject({ key: 'T-1', title: 'Add a greeting module', status: 'preparing' });
     await review;
     await t.fake.settled();
+    expect(command).not.toHaveBeenCalled();
+    expect(t.fake.prompts.every((prompt) => prompt.text.trim() !== '')).toBe(true);
 
     const { body: task } = await t.call(getTaskOp, { id: created.id });
     expect(task).toMatchObject({ status: 'review', displayGroup: 'review', git: { worktreeStatus: 'ready' } });
