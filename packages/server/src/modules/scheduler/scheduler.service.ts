@@ -1,9 +1,10 @@
-import { AttemptKind, type ServerEventType as EventType, ServerEventType, TaskStatus } from '@aw/shared';
+import { AttemptKind, type ServerEventType as EventType, RoleBaseAgent, ServerEventType, TaskStatus } from '@aw/shared';
 import type { EventBus } from '../../core/event-bus.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { ModelSlots } from '../model-slots/index.ts';
 import type { NodesService } from '../nodes/index.ts';
+import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import { decide, type SchedulerSnapshot } from './scheduler.decide.ts';
@@ -13,6 +14,7 @@ export type SchedulerDeps = {
   nodes: NodesService;
   attempts: AttemptsService;
   settings: SettingsService;
+  roles: Pick<RolesService, 'list'>;
   slots: Pick<ModelSlots, 'backgroundLimit' | 'setBackgroundBusy'>;
   events: EventBus;
   log: Logger;
@@ -32,7 +34,7 @@ const TRIGGERS: ReadonlySet<EventType> = new Set([
 const SCHEDULED: readonly TaskStatus[] = [TaskStatus.Planning, TaskStatus.Running, TaskStatus.Paused];
 
 /** Event-driven scheduler: each relevant event schedules one run; runs never overlap and repeat while triggered. */
-export function createScheduler({ tasks, nodes, attempts, settings, slots, events, log }: SchedulerDeps) {
+export function createScheduler({ tasks, nodes, attempts, settings, roles, slots, events, log }: SchedulerDeps) {
   let queued = false;
   let running = false;
   let again = false;
@@ -46,9 +48,17 @@ export function createScheduler({ tasks, nodes, attempts, settings, slots, event
         .map((a) => a.taskId),
     );
     const byTask = Map.groupBy(nodes.listByTasks(scheduled.map((t) => t.id)), (n) => n.taskId);
+    const closing = attempts.tasksClosingSessions();
+    const configuration = settings.getAll();
+    const executorRoles = new Set<string>();
+    if (configuration['ai.sessionStartCommand'] !== null || configuration['ai.sessionEndCommand'] !== null) {
+      for (const role of roles.list()) {
+        if (role.baseAgent === RoleBaseAgent.Executor) executorRoles.add(role.id);
+      }
+    }
     return {
       backgroundLimit: slots.backgroundLimit(),
-      maxConcurrentNodesPerTask: settings.get('scheduler.maxConcurrentNodesPerTask'),
+      maxConcurrentNodesPerTask: configuration['scheduler.maxConcurrentNodesPerTask'],
       runtimeReady: attempts.isReady(),
       tasks: scheduled
         .sort((a, b) => a.createdAt - b.createdAt)
@@ -56,8 +66,12 @@ export function createScheduler({ tasks, nodes, attempts, settings, slots, event
           id: t.id,
           status: t.status,
           planning: planning.has(t.id),
-          nodes: byTask.get(t.id) ?? [],
           local: t.browserCase !== null,
+          closingSession: closing.has(t.id),
+          nodes: (byTask.get(t.id) ?? []).map((node) => ({
+            ...node,
+            sessionCommands: t.browserCase === null && executorRoles.has(node.roleId),
+          })),
         })),
     };
   }
@@ -103,6 +117,9 @@ export function createScheduler({ tasks, nodes, attempts, settings, slots, event
     trigger,
     /** Starts reacting to events; called once recovery has settled the state left by the previous run. */
     start(): void {
+      attempts.onSignal(({ type }) => {
+        if (type === 'end_command_finished') trigger();
+      });
       events.subscribe((event) => {
         if (TRIGGERS.has(event.type)) trigger();
       });

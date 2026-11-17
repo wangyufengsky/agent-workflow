@@ -72,12 +72,19 @@ export type LiveSession = {
   release: () => void;
 };
 
+export function hasPendingEndCommand(session: LiveSession): boolean {
+  return session.endCommand !== null && (session.stopAfterSubmit || session.finishingCommand);
+}
+
 /**
  * What the owner of an attempt (a node, a plan, an acceptance review) needs to hear about: the attempt ended (in any
  * terminal state), a queued attempt got its model slot and its session is being created (`started`, D186), or its
  * session started or stopped waiting for the user.
  */
-export type AttemptSignal = { type: 'started' | 'ended' | 'awaiting_input' | 'input_answered'; attempt: Attempt };
+export type AttemptSignal = {
+  type: 'started' | 'ended' | 'awaiting_input' | 'input_answered' | 'end_command_finished';
+  attempt: Attempt;
+};
 
 export type AttemptStateDeps = {
   db: Db;
@@ -152,7 +159,10 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
 
   /** Stops following a session: later events of it are ignored until a new attempt tracks it. */
   function releaseSession(session: LiveSession): void {
-    if (live.get(session.sessionId) === session) live.delete(session.sessionId);
+    if (live.get(session.sessionId) === session) {
+      live.delete(session.sessionId);
+      if (hasPendingEndCommand(session)) signal('end_command_finished', mustFind(session.attemptId));
+    }
     session.firstPrompt?.controller.abort();
     session.release();
   }

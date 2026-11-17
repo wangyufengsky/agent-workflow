@@ -40,6 +40,7 @@ import {
   type AttemptStateDeps,
   createAttemptState,
   errorOf,
+  hasPendingEndCommand,
   type LiveSession,
   systemEntry,
 } from './attempts.state.ts';
@@ -539,15 +540,20 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       return toDto(updated);
     },
 
+    /** 仍由结束命令占用原会话的任务，调度器要等收尾后再发下一个开始命令。 */
+    tasksClosingSessions(): ReadonlySet<string> {
+      const ids = new Set<string>();
+      for (const session of state.live.values()) {
+        if (session.taskId !== null && hasPendingEndCommand(session)) ids.add(session.taskId);
+      }
+      return ids;
+    },
+
     /** 完成命令需要使用原任务目录，清理工作树前等待当前收尾。 */
     async waitForEndCommands(taskId: string): Promise<void> {
       await Promise.all(
         [...state.live.values()]
-          .filter(
-            (session) =>
-              session.taskId === taskId &&
-              (session.finishingCommand || (session.stopAfterSubmit && session.endCommand !== null)),
-          )
+          .filter((session) => session.taskId === taskId && hasPendingEndCommand(session))
           .map((session) => session.released),
       );
     },

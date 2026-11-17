@@ -13,7 +13,14 @@ export type SchedulerSnapshot = {
     /** A planning attempt is starting or running. */
     planning: boolean;
     local?: boolean;
-    nodes: ReadonlyArray<{ id: string; key: string; status: NodeStatus; dependsOn: readonly string[] }>;
+    closingSession?: boolean;
+    nodes: ReadonlyArray<{
+      id: string;
+      key: string;
+      status: NodeStatus;
+      dependsOn: readonly string[];
+      sessionCommands?: boolean;
+    }>;
   }>;
 };
 
@@ -53,7 +60,11 @@ export function decide(snapshot: SchedulerSnapshot): SchedulerDecision {
     busy: 0,
   };
   let busy = snapshot.tasks.reduce(
-    (sum, task) => sum + (task.planning ? 1 : 0) + task.nodes.filter((n) => BUSY.includes(n.status)).length,
+    (sum, task) =>
+      sum +
+      Number(task.planning) +
+      Number(task.closingSession === true) +
+      task.nodes.filter((n) => BUSY.includes(n.status)).length,
     0,
   );
   const hasRoom = () => snapshot.runtimeReady && busy < snapshot.backgroundLimit;
@@ -76,7 +87,7 @@ export function decide(snapshot: SchedulerSnapshot): SchedulerDecision {
       decision.depsMet.push(node.id);
       return { ...node, status: NodeStatus.Ready };
     });
-    if (task.status !== TaskStatus.Running) continue;
+    if (task.status !== TaskStatus.Running || task.closingSession) continue;
 
     if (nodes.every((n) => FINISHED.includes(n.status))) {
       decision.finished.push(task.id);
@@ -86,7 +97,9 @@ export function decide(snapshot: SchedulerSnapshot): SchedulerDecision {
       if (!nodes.some((n) => WORKING.includes(n.status))) decision.failed.push(task.id);
       continue;
     }
-    let taskBusy = nodes.filter((n) => WORKING.includes(n.status)).length;
+    const working = nodes.filter((n) => WORKING.includes(n.status));
+    let taskBusy = working.length;
+    let hasCommandSession = working.some((n) => n.sessionCommands);
     for (const node of nodes) {
       if (node.status !== NodeStatus.Ready) continue;
       if (
@@ -95,7 +108,9 @@ export function decide(snapshot: SchedulerSnapshot): SchedulerDecision {
         taskBusy >= snapshot.maxConcurrentNodesPerTask
       )
         break;
+      if (node.sessionCommands && hasCommandSession) continue;
       decision.dispatch.push({ taskId: task.id, nodeId: node.id });
+      if (node.sessionCommands) hasCommandSession = true;
       taskBusy += 1;
       busy += 1;
     }
