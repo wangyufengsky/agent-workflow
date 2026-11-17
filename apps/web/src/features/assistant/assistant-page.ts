@@ -17,6 +17,7 @@ const PAGE_ROUTE = {
   [AssistantPage.Projects]: ROUTES.projects,
   [AssistantPage.Project]: ROUTES.project,
   [AssistantPage.Skills]: ROUTES.skills,
+  [AssistantPage.Memory]: ROUTES.assistantMemory,
   [AssistantPage.Settings]: ROUTES.settings,
   [AssistantPage.Git]: ROUTES.git,
   [AssistantPage.GitProject]: ROUTES.gitProject,

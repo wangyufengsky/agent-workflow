@@ -57,6 +57,7 @@ const STATIC_PAGES: Partial<Record<AssistantPage, string>> = {
   [AssistantPage.Inbox]: 'the list of items that need the user',
   [AssistantPage.Projects]: 'the project list',
   [AssistantPage.Skills]: 'the My Skills library',
+  [AssistantPage.Memory]: 'the Assistant Memory page',
   [AssistantPage.Settings]: 'the settings page',
   [AssistantPage.Git]: 'the Git console',
   [AssistantPage.Workflows]: 'the workflow list',

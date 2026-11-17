@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { useServerEvents } from '../api/server-events.ts';
 import { ErrorState } from '../components/error-state.tsx';
 import { ToastHost } from '../components/toast.tsx';
+import { MemoryPage } from '../features/assistant/memory-page.tsx';
 import { BatchPage } from '../features/batches/batch.page.tsx';
 import { BatchesPage } from '../features/batches/batches.page.tsx';
 import { NewBatchPage } from '../features/batches/new-batch.page.tsx';
@@ -393,6 +394,7 @@ const routeTree = rootRoute.addChildren([
     page(ROUTES.ppt, PptListPage),
     pptNewRoute,
     pptDeckRoute,
+    page(ROUTES.assistantMemory, MemoryPage),
     page(ROUTES.skills, SkillLibraryPage),
     page(ROUTES.settings, SettingsPage),
     page(ROUTES.environment, EnvironmentPage),
