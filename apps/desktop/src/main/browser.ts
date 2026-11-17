@@ -143,7 +143,7 @@ export function createBrowserTabs({ window, emit, openExternal, prompts }: Brows
   function requestPolicy(tab: Tab): BrowserPolicy {
     const scope = tab.policy.automation;
     // 手动写入权限随原生视图可见，离开测试页签时仍按用例规则检查请求。
-    return tab.caseSession && !tab.onWindow && scope?.manual === true
+    return !tab.onWindow && scope?.manual === true
       ? { ...tab.policy, automation: { ...scope, manual: false } }
       : tab.policy;
   }

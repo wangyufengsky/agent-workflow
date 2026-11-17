@@ -40,7 +40,7 @@ To explain an error:
 ## Operating the selected preview
 
 1. Ask the user to select their preview and enable「让助手操作」. Call `agent-workflow-app_browser_read` for the current refs.
-2. Call `agent-workflow-app_assistant_actBrowser` with the requested action. Use type or select for fields, click for a link or button, and press for a key. Supply the exact HTTP method and path when the requested write is known. The user handles login, passwords, verification codes and file picking.
+2. Call `agent-workflow-app_assistant_actBrowser` with the requested action. Use type or select for fields, click for a link or button, and press for a key. The active grant covers repeated filtering and viewing on that tab. The app confirms submissions, sends, deletions and ambiguous controls individually. If the user takes over, wait for them to return the tab, then read it again for fresh refs. Supply the exact HTTP method and path when the requested write is known. The user handles login, passwords, verification codes and file picking.
 3. On `needs_confirmation`, tell the user which action is waiting and end the turn. On a cancelled, expired or blocked action, report what happened and wait for a new instruction. On success, verify the expected change in the returned snapshot.
 
 ## Reading a website

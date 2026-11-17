@@ -143,6 +143,7 @@ export const ServerEventType = {
   ModelSlotsUpdated: 'model_slots.updated',
   SettingsUpdated: 'settings.updated',
   AssistantUpdated: 'assistant.updated',
+  AssistantBrowserUpdated: 'assistant.browser_updated',
   AssistantTranscript: 'assistant.transcript',
   AssistantConfirmation: 'assistant.confirmation',
   /** The assistant asks the renderer to open a page, a prefilled form, or reveal a file (15 §3). */

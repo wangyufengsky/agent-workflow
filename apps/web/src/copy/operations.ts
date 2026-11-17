@@ -42,6 +42,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.browserCases.resume': '继续浏览器测试',
   'op.browserCases.rerun': '复跑浏览器测试用例',
   'op.assistant.actBrowser': '执行网页操作',
+  'op.assistant.getBrowserControl': '查看助手网页操作记录',
+  'op.assistant.handoffBrowser': '切换网页操作方',
   'op.assistant.controlBrowser': '设置助手网页控制',
   'op.assistant.bindPreview': '关联当前预览',
   'op.previews.start': '启动页面预览',

@@ -190,11 +190,16 @@ export function createActions(clock: Clock) {
           field.getAttribute('name') ?? field.textContent?.trim() ?? '').trim().slice(0, 100) || field.tagName;
         return {
           label: labelOf(el),
+          control: el.matches('button, input[type=button], input[type=submit], [role=button]'),
+          disclosure: el.matches('details > summary, [role=tab]'),
+          download: el.hasAttribute('download') || ['file', 'reset'].includes(el.type),
+          signals: [el.id, el.name, el.getAttribute('title'), el.getAttribute('data-action'),
+            el.getAttribute('aria-label'), el.textContent?.trim().slice(0, 120)].filter((item) => typeof item === 'string'),
           textField: el.isContentEditable || el.matches('textarea, input:is([type=text], [type=search], [type=email], [type=tel], [type=url], [type=number], [type=date], [type=time], :not([type]))'),
           link: el instanceof HTMLAnchorElement && !el.hasAttribute('download') ? el.href : null,
           formAction: el.hasAttribute('formaction') ? el.formAction : form?.action ?? null,
           formMethod: el.hasAttribute('formmethod') ? el.formMethod : form?.method ?? null,
-          submit: (el.tagName === 'BUTTON' || el.tagName === 'INPUT') && el.type === 'submit',
+          submit: form !== null && (el.tagName === 'BUTTON' || el.tagName === 'INPUT') && el.type === 'submit',
           sensitive: !el.isConnected || sensitive(el) || fields.some(sensitive),
           state: JSON.stringify([el.tagName, el.id, el.name, el.type, el.value, el.checked,
             ...fields.map((field) => [field.name, field.value, field.checked])]),
@@ -211,6 +216,10 @@ export function createActions(clock: Clock) {
       return z
         .object({
           label: z.string(),
+          control: z.boolean(),
+          disclosure: z.boolean(),
+          download: z.boolean(),
+          signals: z.array(z.string()),
           textField: z.boolean(),
           link: z.string().nullable(),
           formAction: z.string().nullable(),

@@ -91,6 +91,7 @@ export const queryKeys = {
   assistantTranscriptLive: (id: string) => ['assistant', id, 'transcript-live'],
   assistantContinuationHistory: (id: string) => ['assistant', id, 'continuation-history'],
   assistantAttachments: (id: string) => ['assistant', id, 'attachments'],
+  assistantBrowserControl: (id: string) => ['assistant', id, 'browser-control'],
   assistantConfirmations: (id: string) => ['assistant', id, 'confirmations'],
   assistantFiles: (id: string) => ['assistant', id, 'files'],
   assistantFilePreview: (id: string, path: string, sheet: string | undefined) => [

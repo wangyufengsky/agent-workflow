@@ -323,6 +323,13 @@
       "when": 1794889477193,
       "tag": "0045_browser_cases",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "6",
+      "when": 1794894841180,
+      "tag": "0046_assistant_browser_activity",
+      "breakpoints": true
     }
   ]
 }

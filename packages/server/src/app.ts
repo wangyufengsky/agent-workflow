@@ -24,7 +24,7 @@ import { mountOperations, type OperationImpl } from './core/operations/operation
 import { host } from './core/platform.ts';
 import { registerSseHub } from './core/sse/sse-hub.ts';
 import { createAcceptanceModule } from './modules/acceptance/index.ts';
-import { type AssistantService, createAssistantModule } from './modules/assistant/index.ts';
+import { type AssistantService, createAssistantModule, createBrowserActivity } from './modules/assistant/index.ts';
 import { type AttachmentsService, createAttachmentsModule } from './modules/attachments/index.ts';
 import { type AttemptsService, createAttemptsModule } from './modules/attempts/index.ts';
 import { createBatchesModule } from './modules/batches/index.ts';
@@ -314,6 +314,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   // Dev servers end with the backend: nothing else stops them once it is gone.
   server.addHook('preClose', () => previews.service.stopAll());
   const browser = createBrowserModule({
+    activity: createBrowserActivity(database.db, clock, events),
     host: deps.browserHost ?? unavailableBrowserHost,
     clock,
     log,

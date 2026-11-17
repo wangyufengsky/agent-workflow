@@ -47,7 +47,7 @@ import { createActions } from './browser.actions.ts';
 import { evaluateCaseAssertion, resolveCaseRef } from './browser.case-dom.ts';
 import { createCaseHandoffs, detectCaseChallenge } from './browser.case-handoff.ts';
 import { type PageCheckPage, type PageCheckResult, pageCheckOutput, pageCheckVerdict } from './browser.check.ts';
-import { createBrowserControl } from './browser.control.ts';
+import { type BrowserActivity, createBrowserControl } from './browser.control.ts';
 import { createFrontendPreview } from './browser.frontend.ts';
 import type { BrowserHost } from './browser.host.ts';
 import { openTab, type Tab } from './browser.tab.ts';
@@ -57,6 +57,7 @@ export type BrowserServiceDeps = {
   clock: Clock;
   log: Logger;
   events: EventBus;
+  activity: BrowserActivity;
   settings: SettingsService;
   /** The network settings every tab's partition follows (D176). */
   network: () => BrowserNetwork;
@@ -120,7 +121,7 @@ const hostOfCookie = (domain: string) => domain.replace(/^\./, '');
 const LOGIN_HINTS = ['login', 'signin', 'sign-in', 'sso', 'cas', 'oauth'];
 const ENDED = new Set<string>(ATTEMPT_STATUSES.filter((s) => !ACTIVE_ATTEMPT_STATUSES.includes(s)));
 
-const navigateSchema = z.object({ errorText: z.string().optional() });
+const navigateSchema = z.object({ errorText: z.string().optional(), loaderId: z.string().optional() });
 /** An address as a citation names a page: without its fragment. */
 function pageKey(url: string): string {
   const parsed = new URL(url);
@@ -166,6 +167,7 @@ export function createBrowserService({
   clock,
   log,
   events,
+  activity,
   settings,
   network,
   projects,
@@ -184,7 +186,7 @@ export function createBrowserService({
   /** Opens of a task's preview tab in progress: a second open joins the first. */
   const openingUserTabs = new Map<string, Promise<UserTabState>>();
   const actions = createActions(clock);
-  const control = createBrowserControl(actions, log);
+  const control = createBrowserControl(actions, log, activity);
   const handoffs = createCaseHandoffs();
   const unsubscribeHost = host.onEvent((event) => {
     // The page that placed a user's preview tab started over and main closed it (29 §8.1): let go of its preview.
@@ -506,11 +508,16 @@ export function createBrowserService({
     const origin = runningPreviewUrl(taskId);
     const url = new URL(path, origin);
     if (url.origin !== origin) throw new AppError(ErrorCode.ValidationFailed, 'Preview navigation needs a local path');
-    const { errorText } = navigateSchema.parse(await tab.cdp('Page.navigate', { url: url.href }));
+    const previous = tab.documentVersion();
+    const { errorText, loaderId } = navigateSchema.parse(await tab.cdp('Page.navigate', { url: url.href }));
     signal.throwIfAborted();
     if (errorText !== undefined) {
       throw new AppError(ErrorCode.BrowserReadFailed, 'The preview page could not be loaded', { reason: errorText });
     }
+    // Page.navigate 确认启动，实际提交后当前页签才具备授权所需的来源。
+    if (loaderId !== undefined && !(await tab.waitForDocument(previous)))
+      throw new AppError(ErrorCode.BrowserReadFailed, 'The preview document did not commit');
+    signal.throwIfAborted();
   }
 
   /** A new preview tab of the task, timed from the preview being ready; a tab that does not open in time goes. */
@@ -1045,6 +1052,13 @@ export function createBrowserService({
       return { enabled: true };
     },
 
+    assistantControlInfo: control.info,
+    async handoffAssistantControl(conversationId: string, tabId: string, manual: boolean) {
+      if (boundPreviews.get(conversationId) !== tabId)
+        throw new AppError(ErrorCode.BrowserNotOpen, 'This conversation is not bound to the selected preview');
+      await control.handoff(conversationId, tabId, manual);
+    },
+
     prepareAssistantAction: control.prepare,
     confirmAssistantAction: control.confirm,
 
@@ -1060,6 +1074,8 @@ export function createBrowserService({
       const entry = userTabs.get(tabId);
       if (entry === undefined) throw new AppError(ErrorCode.BrowserNotOpen, 'No user preview tab is open');
       const { tab, taskId } = entry;
+      control.assertReadable(tabId);
+      const version = tab.ownershipVersion();
       runningPreviewUrl(taskId);
       return withinDeadline(async (signal) => {
         const settled = await tab.settle();
@@ -1068,7 +1084,8 @@ export function createBrowserService({
         const layout = previews.isFrontend(taskId) ? await frontend.layout(tab) : undefined;
         const selectedElement = layout === undefined ? undefined : frontend.latestElement(tabId, tab);
         signal.throwIfAborted();
-        if (boundPreviews.get(conversationId) !== tabId || !userTabs.has(tabId)) {
+        control.assertReadable(tabId);
+        if (boundPreviews.get(conversationId) !== tabId || !userTabs.has(tabId) || tab.ownershipVersion() !== version) {
           throw new AppError(ErrorCode.BrowserNotOpen, 'The selected preview changed while reading');
         }
         runningPreviewUrl(taskId);

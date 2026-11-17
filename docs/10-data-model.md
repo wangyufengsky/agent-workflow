@@ -389,6 +389,10 @@ payload / response：
 
 见 [15-assistant.md](15-assistant.md)，迁移 `0008`。
 
+### assistant_browser_activity
+
+助手网页操作记录。包含自增 `id`、`conversation_id`（对话删除时级联）、`record`（JSON）和时间 `at`。应用按对话保留最近 100 条，记录页面路径、动作、控件名称、结果和被拦截的请求地址。迁移 0046。
+
 ### assistant_conversations
 
 | 列 | 类型 | 说明 |

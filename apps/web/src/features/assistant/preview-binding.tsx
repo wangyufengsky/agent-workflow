@@ -1,12 +1,19 @@
-import { controlAssistantBrowserOp } from '@aw/shared';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import {
+  AssistantBrowserMode,
+  controlAssistantBrowserOp,
+  getAssistantBrowserControlOp,
+  handoffAssistantBrowserOp,
+} from '@aw/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { callOperation } from '../../api/client.ts';
+import { queryKeys } from '../../api/query-keys.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { ASSISTANT_BROWSER_COPY as C } from '../../copy/assistant.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { conversationsQuery, PREVIEW_BINDING_SCOPE, useBindPreview } from './assistant.queries.ts';
+import { BrowserActivityDrawer } from './browser-activity-drawer.tsx';
 
 function useSelectedConversation() {
   const conversations = useQuery(conversationsQuery);
@@ -35,27 +42,61 @@ export function PreviewControl({ taskId, tabId }: { taskId: string; tabId: strin
 }
 
 function BrowserControlButton({ id, taskId, tabId }: { id: string; taskId: string; tabId: string }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const queryKey = [...queryKeys.assistantBrowserControl(id), tabId];
+  const info = useQuery({ queryKey, queryFn: () => callOperation(getAssistantBrowserControlOp, { id, tabId }) });
+  const mode = info.data?.mode ?? AssistantBrowserMode.Off;
   const control = useMutation({
     scope: PREVIEW_BINDING_SCOPE,
-    mutationFn: async (enabled: boolean) => {
+    mutationFn: async (action: 'enable' | 'stop' | 'take' | 'return') => {
       const selected = useUiStore.getState().activePreview;
-      if (enabled && (selected?.tabId !== tabId || selected.taskId !== taskId)) return { enabled: false };
-      return callOperation(controlAssistantBrowserOp, { id, tabId, enabled });
+      if (selected?.tabId !== tabId || selected.taskId !== taskId) return;
+      if (action === 'enable' || action === 'stop') {
+        await callOperation(controlAssistantBrowserOp, { id, tabId, enabled: action === 'enable' });
+      } else {
+        await callOperation(handoffAssistantBrowserOp, { id, tabId, manual: action === 'take' });
+      }
     },
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
   });
-  const enabled = control.data?.enabled === true || (control.isPending && control.variables === false);
+  const disabled = info.isPending || control.isPending;
   return (
     <>
-      <Button
-        size="sm"
-        type="button"
-        pending={control.isPending}
-        aria-pressed={enabled}
-        title={enabled ? C.active : C.enableHelp}
-        onClick={() => control.mutate(!enabled)}
-      >
-        {enabled ? C.stop : C.enable}
+      {mode === AssistantBrowserMode.Off ? (
+        <Button
+          size="sm"
+          type="button"
+          disabled={disabled}
+          title={C.enableHelp}
+          onClick={() => control.mutate('enable')}
+        >
+          {C.enable}
+        </Button>
+      ) : (
+        <>
+          <span className="hint" aria-live="polite">
+            {mode === AssistantBrowserMode.Assistant ? C.active : C.manual}
+          </span>
+          <Button
+            size="sm"
+            type="button"
+            disabled={disabled}
+            title={C.takeHelp}
+            onClick={() => control.mutate(mode === AssistantBrowserMode.Assistant ? 'take' : 'return')}
+          >
+            {mode === AssistantBrowserMode.Assistant ? C.take : C.giveBack}
+          </Button>
+          <Button size="sm" type="button" variant="ghost" disabled={disabled} onClick={() => control.mutate('stop')}>
+            {C.stop}
+          </Button>
+        </>
+      )}
+      <Button size="sm" type="button" variant="ghost" onClick={() => setOpen(true)}>
+        {C.history}
       </Button>
+      <BrowserActivityDrawer open={open} onOpenChange={setOpen} activity={info.data?.activity ?? []} />
+      {info.isError && <ErrorState error={info.error} onRetry={() => void info.refetch()} />}
       {control.isError && <ErrorState error={control.error} />}
     </>
   );

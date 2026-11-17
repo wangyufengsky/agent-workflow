@@ -145,6 +145,15 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
   expect(JSON.stringify(transcript)).toContain('只有用户预览的内容');
   await page.getByRole('button', { name: '让助手操作' }).click();
   await expect(page.getByRole('button', { name: '停止操作' })).toBeEnabled();
+  await page.getByRole('button', { name: '接管页签' }).click();
+  await expect(page.getByText('你正在控制', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '交回助手' }).click();
+  await expect(page.getByText('助手正在控制', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '操作记录' }).click();
+  const history = page.getByRole('dialog', { name: '操作记录' });
+  await expect(history.getByText('你接管了页签')).toBeVisible();
+  await expect(history.getByText('你把页签交回助手')).toBeVisible();
+  await history.getByRole('button', { name: '关闭', exact: true }).click();
   await page.getByRole('button', { name: '停止操作' }).click();
   await expect(page.getByRole('button', { name: '让助手操作' })).toBeEnabled();
   await page.getByRole('complementary', { name: '应用助手' }).getByRole('button', { name: '收起助手' }).click();
@@ -216,6 +225,10 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
   await expect(page.getByTestId('preview-area')).toBeVisible();
   await page.getByRole('button', { name: '让助手操作' }).click();
   await expect(page.getByRole('button', { name: '停止操作' })).toBeEnabled();
+  await page.getByRole('button', { name: '接管页签' }).click();
+  await expect(page.getByRole('button', { name: '交回助手' })).toBeVisible();
+  await page.getByRole('button', { name: '交回助手' }).click();
+  await expect(page.getByText('助手正在控制', { exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: '任务预览' }).selectOption('');
   await expect(page.getByTestId('preview-area')).toHaveCount(0);
 });

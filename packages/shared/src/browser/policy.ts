@@ -56,6 +56,7 @@ export const browserPolicySchema = z.object({
       origin: z.string(),
       writes: z.array(browserWriteRuleSchema),
       manual: z.boolean().optional(),
+      restrictMutationReads: z.boolean().optional(),
     })
     .optional(),
 });
@@ -113,6 +114,28 @@ export function urlAccess(raw: string, policy: BrowserPolicy): UrlAccess | null 
 /** Only these leave a read-only website untouched (29 §5.4); a WebSocket can write once open, so it never does. */
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+export function looksLikeBrowserMutation(text: string): boolean {
+  const tokens = text.replace(/([a-z])([A-Z])/g, '$1 $2');
+  return (
+    /提交|保存|发送|删除|清空|移除|移至废纸篓|发布|确认订单|下单|支付|付款|批量更新|退出登录|注销|永久移除|重置|批准|归档|转账|撤销订单|取消订单|作废/.test(
+      tokens,
+    ) ||
+    /\b(?:save|submit|send|delete|clear|remove|destroy|publish|approve|archive|checkout|pay|purchase|reset|logout|signout|transfer|confirm|revoke|cancel)(?:s|d|ed|ing)?\b/i.test(
+      tokens,
+    )
+  );
+}
+
+function mutationRead(url: string): boolean {
+  let target = url.replace(/^[^:]+:\/\/[^/?#]+/, '');
+  try {
+    target = decodeURIComponent(target);
+  } catch {
+    // 非法编码的地址仍按收到的路径判断。
+  }
+  return looksLikeBrowserMutation(target);
+}
+
 /**
  * Why Electron main cancels a request from a tab, or null to let it through. `readOnlyEnforced` is set for the AI's
  * tabs: the user's own tabs write as the user does.
@@ -129,7 +152,11 @@ export function blockReason(
   if (automation !== undefined) {
     if (request.isWebSocket) return BrowserBlockReason.ReadOnly;
     const method = request.method.toUpperCase();
-    if (READ_METHODS.has(method)) return null;
+    if (READ_METHODS.has(method)) {
+      return automation.restrictMutationReads === true && mutationRead(request.url)
+        ? BrowserBlockReason.ReadOnly
+        : null;
+    }
     return address.origin === automation.origin &&
       (automation.manual === true ||
         automation.writes.some((write) => write.method === method && write.path === address.path))

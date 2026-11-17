@@ -58,6 +58,45 @@ export const assistantBrowserConfirmationSchema = z.object({
   fields: z.array(z.string()),
   write: browserWriteRuleSchema.optional(),
 });
+export const AssistantBrowserMode = { Off: 'off', Assistant: 'assistant', Manual: 'manual' } as const;
+export type AssistantBrowserMode = (typeof AssistantBrowserMode)[keyof typeof AssistantBrowserMode];
+
+export const AssistantBrowserActivityKind = {
+  Click: 'click',
+  Type: 'type',
+  Select: 'select',
+  Press: 'press',
+  Take: 'take',
+  Return: 'return',
+} as const;
+export type AssistantBrowserActivityKind =
+  (typeof AssistantBrowserActivityKind)[keyof typeof AssistantBrowserActivityKind];
+
+export const AssistantBrowserActivityOutcome = {
+  Done: 'done',
+  Confirmation: 'confirmation',
+  Blocked: 'blocked',
+  Failed: 'failed',
+} as const;
+export type AssistantBrowserActivityOutcome =
+  (typeof AssistantBrowserActivityOutcome)[keyof typeof AssistantBrowserActivityOutcome];
+
+export const assistantBrowserActivitySchema = z.object({
+  id: z.number().int(),
+  kind: z.enum(AssistantBrowserActivityKind),
+  outcome: z.enum(AssistantBrowserActivityOutcome),
+  page: z.string(),
+  target: z.string().nullable(),
+  blockedRequests: z.array(z.string()),
+  at: z.number(),
+});
+export type AssistantBrowserActivity = z.infer<typeof assistantBrowserActivitySchema>;
+
+export const assistantBrowserControlSchema = z.object({
+  mode: z.enum(AssistantBrowserMode),
+  activity: z.array(assistantBrowserActivitySchema),
+});
+
 export const assistantBrowserResultSchema = browserActionOutputSchema.omit({ frame: true });
 
 /** Hosts with cookies in the websites' login partition. */

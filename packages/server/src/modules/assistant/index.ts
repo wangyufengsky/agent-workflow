@@ -161,8 +161,9 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
         name: assistantToolName(actAssistantBrowserOp.id),
         description:
           'Act on the user-selected preview after the user enables control. First call browser_read for refs. ' +
-          'Same-origin links, typing and selecting can run with writes blocked. Clicks on controls, keystrokes and ' +
-          'actions that need an exact same-origin HTTP write require confirmation. Use write only when the method and ' +
+          'Filtering, viewing, same-origin links, typing and selecting may run under one grant with writes blocked. ' +
+          'Submitting, sending, deleting, unrecognized buttons, keystrokes and explicit writes require individual confirmation. ' +
+          'If the user has taken control, let them finish. Use write only when the method and ' +
           'path are known. Never retry a blocked request on your own. The user handles credentials and verification codes.',
         input: assistantBrowserActionSchema,
         mode: UiMode.Simple,
@@ -214,3 +215,5 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     },
   };
 }
+
+export { createBrowserActivity } from './assistant.browser-activity.ts';

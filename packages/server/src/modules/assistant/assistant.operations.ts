@@ -10,8 +10,10 @@ import {
   createConversationOp,
   deleteConversationOp,
   ErrorCode,
+  getAssistantBrowserControlOp,
   getAssistantContinuationHistoryOp,
   getConversationOp,
+  handoffAssistantBrowserOp,
   listAssistantAttachmentsOp,
   listAssistantFilesOp,
   listConfirmationsOp,
@@ -55,8 +57,8 @@ export function assistantOperations(
     implement(listAssistantAttachmentsOp, ({ id }) => ({ items: conversations.listAttachments(id) })),
     implement(getConversationOp, ({ id }) => conversations.get(id)),
     implement(deleteConversationOp, async ({ id }) => {
-      await conversations.delete(id);
       browser.bindPreview(id, null);
+      await conversations.delete(id);
     }),
     implement(bindAssistantPreviewOp, ({ id, preview }) => {
       // 取消关联是幂等清理；删除对话后的界面卸载仍会发送它。
@@ -66,6 +68,14 @@ export function assistantOperations(
     implement(controlAssistantBrowserOp, ({ id, tabId, enabled }) => {
       const conversation = conversations.get(id);
       return browser.setAssistantControl(id, conversation.projectId, tabId, enabled);
+    }),
+    implement(getAssistantBrowserControlOp, ({ id, tabId }) => {
+      conversations.get(id);
+      return browser.assistantControlInfo(id, tabId);
+    }),
+    implement(handoffAssistantBrowserOp, ({ id, tabId, manual }) => {
+      conversations.get(id);
+      return browser.handoffAssistantControl(id, tabId, manual);
     }),
     confirmedBrowserOperation,
     implement(sendAssistantMessageOp, (input) => conversations.send(input)),

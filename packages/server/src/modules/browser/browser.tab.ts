@@ -119,6 +119,7 @@ export async function openTab({
 }: TabInput) {
   const viewport: { preset: ViewportPreset } = { preset: 'desktop' };
   let manual = false;
+  let ownership = 0;
   let refs = new Map<string, number>();
   const consoleEntries: ConsoleEntry[] = [];
   const exceptions: ExceptionEntry[] = [];
@@ -130,6 +131,7 @@ export async function openTab({
     navigated: false,
     dialog: null as string | null,
     blockedWrites: [] as string[],
+    blockedRequests: [] as Array<{ url: string; method: string }>,
     loaded: true,
     /** A website that asked for a client certificate, which this tab never gives (29 §5.4). */
     certificateAsked: null as string | null,
@@ -271,6 +273,7 @@ export async function openTab({
       since.certificateAsked = new URL(`https://${event.host}/`).href;
     else if (event.type === 'browser.blocked') {
       blockedUrls.set(event.url, event.reason);
+      if (since.blockedRequests.length < 50) since.blockedRequests.push({ url: event.url, method: event.method });
       if (event.reason === BrowserBlockReason.ReadOnly) {
         since.blockedWrites.push(`${event.method} ${new URL(event.url).pathname}`);
       }
@@ -357,6 +360,11 @@ export async function openTab({
     viewport,
     cdp,
     evaluate,
+    ownershipVersion: () => ownership,
+    changeOwnership(): void {
+      ownership += 1;
+      refs.clear();
+    },
     registerCaseRef(node: number): string {
       const ref = 'case-target';
       refs.set(ref, node);
@@ -375,10 +383,13 @@ export async function openTab({
       since.navigated = false;
       since.dialog = null;
       since.blockedWrites = [];
+      since.blockedRequests = [];
       since.certificateAsked = null;
       mark = { console: consoleErrors(), exceptions: exceptions.length, failed: failedRequests().length };
       start = { console: consoleEntries.length, exceptions: exceptions.length, requests: requests.size };
     },
+
+    blockedDuringAction: () => [...since.blockedRequests],
 
     /** The main frame's address (empty before the first navigation). */
     url: () => url,

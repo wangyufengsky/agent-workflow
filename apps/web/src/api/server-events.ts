@@ -126,6 +126,8 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
     case ServerEventType.BrowserTabUpdated:
       qc.setQueryData(queryKeys.userTab(event.data.tabId), event.data);
       return qc.invalidateQueries({ queryKey: queryKeys.userTabLogs(event.data.tabId) });
+    case ServerEventType.AssistantBrowserUpdated:
+      return qc.invalidateQueries({ queryKey: queryKeys.assistantBrowserControl(event.data.conversationId) });
     case ServerEventType.AssistantConfirmation:
       return updateConfirmation(qc, event.data);
     // Requests of the assistant to the renderer, carried out by the shell (15 §6).

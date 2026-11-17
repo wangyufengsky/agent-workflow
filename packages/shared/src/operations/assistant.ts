@@ -13,7 +13,11 @@ import {
 } from '../contracts/api/assistant.ts';
 import { attachmentIdsSchema, attachmentSchema, officeFilePreviewSchema } from '../contracts/api/attachments.ts';
 import { transcriptPageSchema, transcriptQuerySchema } from '../contracts/api/attempts.ts';
-import { assistantBrowserConfirmationSchema, assistantBrowserResultSchema } from '../contracts/api/browser.ts';
+import {
+  assistantBrowserConfirmationSchema,
+  assistantBrowserControlSchema,
+  assistantBrowserResultSchema,
+} from '../contracts/api/browser.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -142,6 +146,28 @@ export const controlAssistantBrowserOp = defineOperationContract({
   output: z.object({ enabled: z.boolean() }),
   risk: OperationRisk.Write,
   http: { method: 'PUT', path: '/assistant/conversations/:id/browser-control' },
+});
+
+export const getAssistantBrowserControlOp = defineOperationContract({
+  ...common,
+  id: 'assistant.getBrowserControl',
+  title: 'op.assistant.getBrowserControl',
+  description: 'Read preview ownership and the conversation’s browser activity',
+  input: byId.extend({ tabId: z.string() }),
+  output: assistantBrowserControlSchema,
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/assistant/conversations/:id/browser-control' },
+});
+
+export const handoffAssistantBrowserOp = defineOperationContract({
+  ...common,
+  id: 'assistant.handoffBrowser',
+  title: 'op.assistant.handoffBrowser',
+  description: 'Take over the granted preview or return it to the assistant',
+  input: byId.extend({ tabId: z.string(), manual: z.boolean() }),
+  output: z.void(),
+  risk: OperationRisk.Write,
+  http: { method: 'PUT', path: '/assistant/conversations/:id/browser-control/handoff', status: 204 },
 });
 
 export const actAssistantBrowserOp = defineOperationContract({
