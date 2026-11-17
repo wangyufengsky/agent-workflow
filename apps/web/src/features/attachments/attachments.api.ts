@@ -13,7 +13,7 @@ import {
   snapshotProjectFileOp,
 } from '@aw/shared';
 import { queryOptions } from '@tanstack/react-query';
-import { ApiError, apiToken, callOperation } from '../../api/client.ts';
+import { ApiError, apiToken, callOperation, getImageDataUrl } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import { ATTACHMENTS_COPY as C } from '../../copy/attachments.ts';
 
@@ -68,11 +68,13 @@ export const attachmentQuery = (id: string) =>
     staleTime: Number.POSITIVE_INFINITY,
   });
 
-export const attachmentContentQuery = (id: string) =>
+export const attachmentContentQuery = (id: string, image: boolean) =>
   queryOptions({
     queryKey: queryKeys.attachmentContent(id),
     queryFn: async () => {
-      const res = await fetch(`${API_PREFIX}/attachments/${id}/content`, {
+      const url = `${API_PREFIX}/attachments/${encodeURIComponent(id)}/content`;
+      if (image) return getImageDataUrl(url);
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${apiToken()}` },
       });
       if (!res.ok) throw await failure(res);

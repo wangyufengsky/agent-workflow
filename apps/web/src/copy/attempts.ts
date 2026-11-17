@@ -105,6 +105,7 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.BrowserInspect]: '查看元素',
   [McpToolName.BrowserLogs]: '查看控制台',
   [McpToolName.BrowserViewport]: '切换尺寸',
+  [McpToolName.AnalyzeImage]: '图像处理员',
   [McpToolName.BrowserScreenshot]: '截图',
 };
 

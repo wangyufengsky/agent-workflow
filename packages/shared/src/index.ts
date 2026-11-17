@@ -41,6 +41,7 @@ export * from './contracts/companion.ts';
 export * from './contracts/credential-port.ts';
 export * from './contracts/deck/slide.ts';
 export * from './contracts/events/server-events.ts';
+export * from './contracts/mcp/analyze-image.ts';
 export * from './contracts/mcp/ask-user.ts';
 export * from './contracts/mcp/assistant-tools.ts';
 export * from './contracts/mcp/browser.ts';

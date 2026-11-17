@@ -111,7 +111,7 @@ Node 24 的集成测试进程暂用 `--no-wasm-code-gc`：Office 源码 worker �
 | J30 | 任务页预览（v1.3，29 §8.1，`preview.electron.spec.ts`）：构建后的应用（全新用户目录，经 API 加项目、配置预览、建一个停在确认计划的修 Bug 任务）→ 预览页签「启动预览」→ 窗口多一个视图且是预览的真实页面 → 地址栏换到报错的页面，底栏「控制台错误 1」→ 切到「进度」视图离开窗口、切回来回到窗口 → 重新加载页面时标签页关闭（视图与 webContents 都回到之前的数目）→ 标签页开着时应用正常退出。不需要 opencode 与模型 | Electron |
 | J31 | 知识问答的网页摘录（v1.3，29 §2.8，`project-knowledge.browser.spec.ts`）：打开网络开关提问 → 研究员用 `browser_open` 读本地网页并引用它 → 打开引用，「引用原文」面板显示「在浏览器中打开」与读到的正文摘录 | 浏览器 |
 | J32 | PPT 网页资料（v1.3，29 §2.8，`ppt.browser.spec.ts`）：从项目「做成 PPT」→ 资料「网页」输入本地网页地址、回车添加，列表显示地址与「网页」→ 生成大纲 → 大纲出现，PPT 的资料是 `web`、`ref_id` 为地址、标题为网页标题 | 浏览器 |
-| J33 | 附件（30，U-03，`task-attachments.browser.spec.ts`）：开始任务时选文件 → 图片给出提示、不是文本的卡片报错且「开始」不可用 → 移除后开始 → 任务页标题下的附件打开看到原文；问助手时附上文件 → 消息下面的附件可打开 | 浏览器 |
+| J33 | 附件（30，U-03，`task-attachments.browser.spec.ts`）：开始任务时选文件 → PNG 可附加、不支持的格式报错且「开始」不可用 → 移除后开始 → 任务页标题下的附件打开看到文字或原图；问助手时附上文件 → 消息下面的附件可打开 | 浏览器 |
 | J34 | 验收清单（31，Q-03，`task-requirements.browser.spec.ts`）：开始任务时填两项（AI 核验、命令 `false`）→ 核验步骤后结果卡显示两项未满足 → 交付提醒挡住合并、勾选确认后可用 → 人工「通过」一项、「接受未完成」一项（原因必填）→ 全部满足、提醒消失 → 合并完成 | 浏览器 |
 | J35 | 团队（33，T-03 / T-06，`team.browser.spec.ts`）：三个人（其中一人两个邮箱）的仓库 → 成员表默认按姓名、点「提交」列头按数值排序 → 成员页测试伴随率与提交列表 → 在另一个邮箱的成员页「合并到…」后合并为一位成员 → FakeOpencode 的成员分析：确认框写明会发送代码、报告显示总结与引用的提交、成员表的 AI 抽样评审列 → 专业模式「统计口径」抽屉 → 全部主题无报错；走查 J9 含团队与成员页 | 浏览器 |
 | J36 | 助手画图（35，V-04，`shell-assistant-charts.browser.spec.ts`）：主页问助手 → 一次被拒的画图（饼图两个系列）后画出饼图与流程图 → 饼图图例聚焦后读数为「已完成 · 7个 · 70%」、读屏表格含数值与占比，流程图的读屏列表含判断节点与带条件的回边 → 简单模式只有失败的那次「画图」动作条 → 刷新后两张图仍在 → 专业模式三次画图调用都有动作条；J9 另截面板与主页里的五种图（`assistant-charts`、`home-charts`） | 浏览器 |
@@ -142,6 +142,7 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 团队 `live/team.live.test.ts`（T-04、T-06）：`ts-stats` 上一位成员的两个提交，真实模型生成成员分析，断言分析完成、报告引用的都是这位成员的提交并通过校验；助手在团队页被问「近 30 天谁提交最多？谁表现最好？」，断言调用了 `team_summary`、回复含成员名，回复写到 `live/reports/team-assistant-<时间>.json` 供人看是否打分排名；再让助手分析一位成员、确认卡片后真实模型分析，结束后断言助手转述了报告并附成员页链接（`team-assistant-analysis-<时间>.json`）。
 - 应用助手 `live/assistant.live.test.ts`（A-09）：让助手查明天的日期并列出项目，断言调用了 `get_current_time` 与 `projects_list`、回复含明天的日期与项目名，报告写到 `live/reports/assistant-<时间>.json`。
 - 助手画图 `live/assistant-charts.live.test.ts`（V-06，35 §10）：三位成员（3 / 2 / 1 个提交）的仓库，让助手统计最近 30 天每个成员的提交数并画柱状图，断言调用了 `team_summary` 与 `show_chart`、柱状图里各成员的数值与提交历史一致；再让它把内置「修 Bug」流程画成流程图，断言调用了 `show_flowchart` 且至少 3 个节点、2 条连线。报告写到 `live/reports/assistant-charts-<时间>.json`。
+- 识图（U-04，`live/image-analysis.live.test.ts`）：把随机错误码写进 Chromium 生成的 PNG，用纯文本模型提问，断言通过图像处理员返回同一错误码。默认使用 `opencode-go/glm-5.3` 发起，由 `opencode-go/deepseek-v4.1-flash` 读图；可用 `AW_LIVE_TEXT_MODEL`、`AW_LIVE_IMAGE_MODEL` 指定其他模型。
 - 不作为通过/失败的硬门槛（模型有随机性），但内置提示词改动的 PR 必须附 live 报告对比。
 
 ## 7. 编写规则

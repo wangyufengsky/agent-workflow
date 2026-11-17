@@ -213,6 +213,11 @@ export const PAGE_CHECK_SHOT_MAX_HEIGHT = 8000;
 /** Attachments (30): one input's count, one file's size, a display name, and how long an unsent one is kept. */
 export const ATTACHMENTS_PER_INPUT_MAX = 10;
 export const ATTACHMENT_BYTES_MAX = 5 * 1024 * 1024;
+/** 图像处理员的工具调用时限及提示词、结果长度（30 §7）。 */
+export const IMAGE_ANALYSIS_TIMEOUT_MS = 60_000;
+export const IMAGE_ANALYSIS_CLEANUP_TIMEOUT_MS = 5_000;
+export const IMAGE_ANALYSIS_QUESTION_MAX_CHARS = 1_000;
+export const IMAGE_ANALYSIS_MAX_CHARS = 6_000;
 export const ATTACHMENT_NAME_MAX_CHARS = 255;
 export const ATTACHMENT_ORPHAN_TTL_MS = 24 * 60 * 60 * 1000;
 export const ATTACHMENT_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;

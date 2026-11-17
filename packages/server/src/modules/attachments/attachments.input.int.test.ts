@@ -10,16 +10,22 @@ import {
   deleteConversationOp,
   ErrorCode,
   getAttachmentOp,
+  getModelSlotsOp,
+  IMAGE_ANALYSIS_CLEANUP_TIMEOUT_MS,
+  IMAGE_ANALYSIS_TIMEOUT_MS,
   listTasksOp,
   OPENCODE_ASSISTANT_AGENT,
+  OPENCODE_IMAGE_AGENT,
   requestChangesOp,
   ServerEventType,
   sendAssistantMessageOp,
   startTaskOp,
   type TranscriptPage,
+  updateSettingsOp,
 } from '@aw/shared';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
+import { WHITE_PNG_BASE64 } from '../../../test/fixtures/white-png.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { createFakeClock } from '../../../test/helpers/clock.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
@@ -231,6 +237,112 @@ describe('助手消息的附件（30 §5）', () => {
     await idle;
     return res;
   }
+
+  it('助手从当前对话委派 PNG 给单独配置的模型，其他对话不能读图', async () => {
+    const model = { providerId: 'local', modelId: 'vision' };
+    t.fake.models.push({ ...model, name: 'Vision', contextLimit: null, supportsImage: true });
+    const png = Buffer.from(WHITE_PNG_BASE64, 'base64');
+    const image = await uploaded(png, '错误截图.png');
+    expect(image.format).toBe('png');
+    const content = await t.request({ method: 'GET', url: `/attachments/${image.id}/content` });
+    expect(content.headers['content-type']).toBe('image/png');
+    expect(content.rawPayload).toEqual(png);
+
+    const { body: mine } = await t.call(createConversationOp, {});
+    const { body: other } = await t.call(createConversationOp, {});
+    const input = { source: { attachment_id: image.id }, question: '图里是什么颜色？' };
+    const delegate = () =>
+      t.fake.enqueue(script().callAppTool('analyze_image', input), { agent: OPENCODE_ASSISTANT_AGENT });
+    const readImage = vi.spyOn(t.fake, 'promptImage').mockResolvedValue('白色');
+    delegate();
+    await say(mine.id, '请读图', [image.id]);
+    expect(toolResult('analyze_image', 0)).toMatchObject({
+      isError: true,
+      result: { code: ErrorCode.ImageAnalysisUnavailable },
+    });
+
+    expect((await t.call(updateSettingsOp, { 'ai.imageModel': 'local/vision' })).status).toBe(200);
+    delegate();
+    await say(other.id, '请读图');
+    expect(toolResult('analyze_image', 1)).toMatchObject({
+      isError: true,
+      result: { code: ErrorCode.AttachmentNotFound },
+    });
+    delegate();
+    await say(mine.id, '再读一下这张图');
+    expect(toolResult('analyze_image', 2)).toMatchObject({
+      isError: false,
+      result: { source: { attachment_id: image.id, name: '错误截图.png' }, analysis: '白色' },
+    });
+    expect(readImage).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        model,
+        question: input.question,
+        image: { mime: 'image/png', data: png },
+      }),
+    );
+    expect(t.fake.sessions.some((s) => s.agent === OPENCODE_IMAGE_AGENT)).toBe(false);
+    const prompt = t.fake.prompts.find((p) => p.text.includes('aw-image-analysis'))?.text;
+    expect(prompt).toContain(`attachment_id="${image.id}"`);
+    expect(prompt).not.toContain(png.toString('base64'));
+  });
+
+  it.each([
+    { scenario: '正常清理', stalled: null },
+    { scenario: '中止请求无响应', stalled: 'abort' },
+    { scenario: '删除请求无响应', stalled: 'deleteSession' },
+  ] as const)('图像处理员超时后归还并发名额（$scenario）', async ({ stalled }) => {
+    t.fake.models.push({
+      providerId: 'local',
+      modelId: 'vision',
+      name: 'Vision',
+      contextLimit: null,
+      supportsImage: true,
+    });
+    await t.call(updateSettingsOp, { 'ai.imageModel': 'local/vision' });
+    const image = await uploaded(Buffer.from(WHITE_PNG_BASE64, 'base64'), 'screen.png');
+    const { body: conversation } = await t.call(createConversationOp, {});
+    const started = Promise.withResolvers<string>();
+    vi.spyOn(t.fake, 'promptImage').mockImplementation(({ sessionId, signal }) => {
+      started.resolve(sessionId);
+      return new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+    });
+    const cleaning = Promise.withResolvers<void>();
+    if (stalled !== null) {
+      vi.spyOn(t.fake, stalled).mockImplementation(({ signal }) => {
+        cleaning.resolve();
+        return new Promise((_, reject) =>
+          signal?.addEventListener('abort', () => reject(signal.reason), { once: true }),
+        );
+      });
+    }
+    t.fake.enqueue(
+      script().callAppTool('analyze_image', {
+        source: { attachment_id: image.id },
+        question: 'What is visible?',
+      }),
+      { agent: OPENCODE_ASSISTANT_AGENT },
+    );
+
+    const result = say(conversation.id, '请读图', [image.id]);
+    const reader = await started.promise;
+    expect((await t.call(getModelSlotsOp, {})).body.inUse).toBe(2);
+    clock.advance(IMAGE_ANALYSIS_TIMEOUT_MS);
+    if (stalled !== null) {
+      await cleaning.promise;
+      clock.advance(IMAGE_ANALYSIS_CLEANUP_TIMEOUT_MS);
+    }
+    await result;
+    expect(toolResult('analyze_image')).toMatchObject({
+      isError: true,
+      result: { code: ErrorCode.ImageAnalysisFailed, message: 'Image analysis timed out' },
+    });
+    if (stalled === null) {
+      expect(t.fake.aborts).toContain(reader);
+      expect(t.fake.sessions.some((s) => s.id === reader)).toBe(false);
+    }
+    expect((await t.call(getModelSlotsOp, {})).body.inUse).toBe(0);
+  });
 
   it('消息带上附件内容并记在消息流里；助手只能读本对话的附件；删除对话后附件随清理删除', async () => {
     const { body: mine } = await t.call(createConversationOp, {});

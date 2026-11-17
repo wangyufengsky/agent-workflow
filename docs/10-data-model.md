@@ -834,7 +834,7 @@ payload / response：
 
 | 表 | 关键字段／约束 |
 | --- | --- |
-| attachments | id、source、name（显示名）、size_bytes、origin JSON（快照来源见下文）、format（`AttachmentFormat`，默认 text）、meta JSON（Word / Excel 的 `OfficeMeta`）、created_at。索引为 created_at。原文件按 id 存在 `attachments/<id>/original`（迁移 0017）。Word / Excel 另有模型读取的 `text.md`，Excel 还有单元格 `workbook.json`（迁移 0032，39 §5）。 |
+| attachments | id、source、name（显示名）、size_bytes、origin JSON（快照来源见下文）、format（`AttachmentFormat`，默认 text）、meta JSON（Word / Excel 的 `OfficeMeta`）、created_at。索引为 created_at。原文件按 id 存在 `attachments/<id>/original`（迁移 0017）。PNG / JPEG 只增加 `format` 的值，原图保留在同一路径，`meta` 为 null。Word / Excel 另有模型读取的 `text.md`，Excel 还有单元格 `workbook.json`（迁移 0032，39 §5）。 |
 | attachment_refs | owner_kind、owner_id、attachment_id FK、ordinal、created_at；主键 (owner_kind, owner_id, attachment_id)，索引 attachment_id |
 
 项目文件的 `origin` 保存 `projectId`、`taskId`、相对路径、行范围和读取时间。知识问答的 `origin` 保存 `kind = knowledge_answer`、`projectId`、`conversationId`、`turnId`、`answeredAt` 和 `readAt`，旧附件仍按原格式解析。快照保存回答时选中的原文和引用，任务从附件归属读取，删除问答不会删除已绑定的快照。项目约定证据快照的 `origin` 保存 `kind = convention_evidence`、`projectId` 与 `readAt`；来源文本作为只读附件保存，任务绑定时检查项目归属。节点新产生的检查失败、无法运行、执行失败及拒绝事件在 payload 中保存检查类型与通过状态，不记录命令或输出；历史事件未保存的详情不能重建。

@@ -183,7 +183,7 @@ export function browserTools(deps: BrowserToolDeps): McpToolDefinition[] {
       ...common,
       name: McpToolName.BrowserScreenshot,
       description:
-        'Screenshot of the page (or one element by ref), saved for the user. The image comes with the result; if you cannot see images, use browser_snapshot and browser_inspect instead.',
+        'Screenshot of the page (or one element by ref), saved for the user. The image comes with the result; when you need visual evidence but cannot inspect the image, give the returned filename to analyze_image.',
       input: browserScreenshotInputSchema,
       output: browserScreenshotOutputSchema,
       handler: async ({ ref, fullPage }, { attempt }) => {

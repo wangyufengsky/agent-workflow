@@ -10,12 +10,14 @@ import type { BrowserService } from '../browser/index.ts';
 import type { DebugService } from '../debug/index.ts';
 import type { DecksService } from '../decks/index.ts';
 import type { CommitDrafts, GitReviewsService } from '../git-reviews/index.ts';
+import type { ImageAnalysis } from '../image-analysis/index.ts';
 import type { InitiativesService } from '../initiatives/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { Office } from '../office/index.ts';
 import type { TasksService } from '../tasks/index.ts';
 import type { TeamService } from '../team/index.ts';
 import { createToolRegistry, type McpToolDefinition } from './mcp.registry.ts';
+import { imageAnalysisTool } from './tools/analyze-image.tool.ts';
 import { askUserTool } from './tools/ask-user.tool.ts';
 import { attachmentTools } from './tools/attachment.tool.ts';
 import { browserTools } from './tools/browser.tool.ts';
@@ -53,6 +55,7 @@ export type McpModuleDeps = {
   team: TeamService;
   initiatives: InitiativesService;
   attachments: AttachmentsService;
+  imageAnalysis: ImageAnalysis;
   office: Office;
   browser: BrowserService;
   /** Where an attempt's transcript and files live (29 §5.7). */
@@ -73,6 +76,7 @@ export function createMcpModule({
   team,
   initiatives,
   attachments,
+  imageAnalysis,
   office,
   browser,
   filesDirOf,
@@ -84,6 +88,7 @@ export function createMcpModule({
     getTaskDiffTool(tasks),
     ...delegationTools(tasks),
     ...attachmentTools(tasks, initiatives, attachments),
+    imageAnalysisTool({ imageAnalysis, attachments, attempts, browser, tasks, initiatives }),
     readOfficeFileTool(office),
     ...taskArtifactTools(tasks, office, attachments),
     submitPlanTool(tasks),

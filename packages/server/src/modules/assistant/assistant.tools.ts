@@ -21,7 +21,7 @@ import type { SettingsService } from '../settings/index.ts';
 import type { Conversation } from './assistant.repo.ts';
 import type { TaskRelay } from './assistant.tasks.ts';
 
-export type AssistantToolContext = { conversation: Conversation };
+export type AssistantToolContext = { conversation: Conversation; signal?: AbortSignal | undefined };
 
 /** One tool of the assistant MCP (15 §3): generated from an operation, or one of the assistant's own. */
 export type AssistantTool = {
@@ -179,7 +179,7 @@ export function createAssistantToolRegistry(
         }),
       ),
 
-    async call(name, args) {
+    async call(name, args, signal) {
       const tool = tools.find((t) => t.name === name);
       if (tool === undefined) {
         return errorResult({ code: ErrorCode.NotFound, message: `Unknown tool ${name}` }, undefined);
@@ -194,7 +194,7 @@ export function createAssistantToolRegistry(
         if (!parsed.success) {
           throw new AppError(ErrorCode.ValidationFailed, 'Tool arguments are invalid', { issues: parsed.error.issues });
         }
-        const output = await tool.handler(parsed.data, { conversation });
+        const output = await tool.handler(parsed.data, { conversation, signal });
         log.info({ tool: name, conversationId: conversation.id }, 'assistant tool called');
         return toolResult(output);
       } catch (err) {

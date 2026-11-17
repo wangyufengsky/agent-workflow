@@ -14,7 +14,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 /** What an MCP endpoint serves: `tools/list` and `tools/call`. */
 export type McpTools = {
   list(): Tool[];
-  call(name: string, args: Record<string, unknown>): Promise<CallToolResult>;
+  call(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<CallToolResult>;
 };
 
 function hasToken(req: FastifyRequest, token: string): boolean {
@@ -38,13 +38,17 @@ export function registerMcpEndpoint(
     if (!hasToken(req, token)) throw new AppError(ErrorCode.Unauthorized, 'Missing or invalid MCP token');
     const mcp = new Server({ name, version: '1' }, { capabilities: { tools: {} } });
     mcp.setRequestHandler(ListToolsRequestSchema, () => ({ tools: tools.list() }));
-    mcp.setRequestHandler(CallToolRequestSchema, (request) =>
-      tools.call(request.params.name, request.params.arguments ?? {}),
+    const connection = new AbortController();
+    mcp.setRequestHandler(CallToolRequestSchema, (request, { signal }) =>
+      tools.call(request.params.name, request.params.arguments ?? {}, AbortSignal.any([signal, connection.signal])),
     );
     // No session id generator: stateless mode.
     const transport = new StreamableHTTPServerTransport({});
     reply.hijack();
-    reply.raw.on('close', () => void mcp.close());
+    reply.raw.on('close', () => {
+      connection.abort();
+      void mcp.close();
+    });
     // The SDK's own transport type does not satisfy its Transport interface under exactOptionalPropertyTypes.
     await mcp.connect(transport as Transport);
     await transport.handleRequest(req.raw, reply.raw, req.body);

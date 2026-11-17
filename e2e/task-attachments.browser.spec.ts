@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
+import { WHITE_PNG_BASE64 } from '../packages/server/test/fixtures/white-png.ts';
 import {
   addFromMenu,
   appTool,
@@ -25,6 +26,12 @@ test.beforeAll(async ({ request }) => {
   project = await createProject(request, null);
 });
 
+const PNG = {
+  name: 'screen.png',
+  mimeType: 'image/png',
+  buffer: Buffer.from(WHITE_PNG_BASE64, 'base64'),
+};
+
 const text = (name: string, content: string, mimeType = 'text/markdown') => ({
   name,
   mimeType,
@@ -45,11 +52,8 @@ test('开始任务时附上文件：不支持的先移除才能开始，任务�
   const picker = page.locator('input[type="file"]');
   const attached = page.getByRole('list', { name: '附加的资料' });
 
-  await picker.setInputFiles([text('screen.png', 'png', 'image/png')]);
-  await expect(page.getByRole('status').filter({ hasText: '暂不支持图片' })).toBeVisible();
-  await expect(attached).toBeHidden();
-
   await picker.setInputFiles([
+    PNG,
     text('notes.md', '订单号是 12 位数字\n'),
     text('extra.md', '不需要了\n'),
     text('dump.bin', '\u0000\u0001'),
@@ -60,7 +64,7 @@ test('开始任务时附上文件：不支持的先移除才能开始，任务�
   const deleted = page.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes('/attachments/'));
   await attached.getByRole('button', { name: '移除 extra.md' }).click();
   expect((await deleted).status()).toBe(204);
-  await expect(attached.getByRole('alert')).toContainText('这个文件读不出文字');
+  await expect(attached.getByRole('alert')).toContainText('支持文本、PNG、JPEG');
   const start = page.getByRole('button', { name: /^开始/ });
   await expect(start).toBeDisabled();
   await attached.getByRole('button', { name: '移除 dump.bin' }).click();
@@ -72,6 +76,11 @@ test('开始任务时附上文件：不支持的先移除才能开始，任务�
   const preview = page.getByRole('dialog', { name: 'notes.md' });
   await expect(preview).toContainText('订单号是 12 位数字');
   await expect(preview).toContainText('上传的文件');
+  await preview.getByRole('button', { name: '关闭' }).click();
+  await page.getByTestId('task-page').getByRole('button', { name: '查看 screen.png' }).click();
+  const image = page.getByRole('dialog', { name: 'screen.png' }).getByRole('img', { name: 'screen.png' });
+  await expect(image).toBeVisible();
+  await expect.poll(() => image.evaluate((node) => node instanceof HTMLImageElement && node.naturalWidth)).toBe(1);
 });
 
 test('问助手时附上文件：消息下面显示附件，可以打开', async ({ page, request }) => {
@@ -90,6 +99,30 @@ test('问助手时附上文件：消息下面显示附件，可以打开', async
   await expect(page.getByText('看到了，导出按钮放在右上角。')).toBeVisible();
   await page.getByRole('button', { name: '查看 spec.md' }).click();
   await expect(page.getByRole('dialog', { name: 'spec.md' })).toContainText('导出按钮放在右上角');
+});
+
+test('专业设置仅列出支持图片输入的模型，选择后重新打开仍然生效', async ({ page, request }, testInfo) => {
+  await patchSettings(request, { 'ui.mode': 'pro', 'ai.imageModel': null });
+  try {
+    await page.goto('/settings');
+    const model = page.getByRole('combobox', { name: '图像处理员模型' });
+    await expect(model.locator('option')).toHaveText(['未启用', 'Fake Model 2（opencode/fake-model-2）']);
+    const saved = page.waitForResponse((res) => res.request().method() === 'PATCH' && res.url().endsWith('/settings'));
+    await model.selectOption('opencode/fake-model-2');
+    expect((await saved).status()).toBe(200);
+    for (const [theme, state] of [
+      ['codex', 'light'],
+      ['default', 'dark'],
+    ] as const) {
+      await patchSettings(request, { 'ui.theme': theme });
+      await page.reload();
+      await expect(model).toHaveValue('opencode/fake-model-2');
+      await model.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: testInfo.outputPath(`image-reader-settings-${state}.png`) });
+    }
+  } finally {
+    await patchSettings(request, { 'ai.imageModel': null });
+  }
 });
 
 const office = (name: string, fixture: string) => ({

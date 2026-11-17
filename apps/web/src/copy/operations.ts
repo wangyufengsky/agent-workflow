@@ -298,6 +298,7 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   'ui.introAnimation': SETTINGS_COPY.intro,
   'ai.askOnUncertainty': SETTINGS_COPY.uncertainty,
   'ai.defaultModel': SETTINGS_COPY.defaultModel,
+  'ai.imageModel': SETTINGS_COPY.imageModel,
   'scheduler.maxConcurrentAttempts': SETTINGS_COPY.concurrency,
   'scheduler.maxConcurrentNodesPerTask': SETTINGS_COPY.nodesPerTask,
   'node.maxAttempts': SETTINGS_COPY.maxAttempts,

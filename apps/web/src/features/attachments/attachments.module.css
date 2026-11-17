@@ -217,3 +217,10 @@ button.card:hover,
   background: var(--accent-fill);
   color: var(--accent-ink);
 }
+
+.image {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}

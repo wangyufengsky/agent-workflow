@@ -9754,6 +9754,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
           "aw-assistant-memory": "allow",
           "aw-assistant-preview": "allow",
           "aw-db-readonly": "allow",
+          "aw-image-analysis": "allow",
           "aw-office-docs": "allow",
           "aw-recurring-work": "allow",
           "aw-task-delivery": "allow",
@@ -9777,6 +9778,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "skill": {
           "*": "deny",
           "aw-code-review": "allow",
+          "aw-image-analysis": "allow",
         },
         "task": "deny",
         "webfetch": "deny",
@@ -9807,6 +9809,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
           "aw-backend-development": "allow",
           "aw-db-readonly": "allow",
           "aw-frontend-development": "allow",
+          "aw-image-analysis": "allow",
           "aw-merge-conflicts": "allow",
           "aw-offline-network": "allow",
           "aw-page-check": "allow",
@@ -9815,6 +9818,14 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "webfetch": "ask",
       },
       "prompt": "<protocol-execute.md>",
+    },
+    "aw-image-reader": {
+      "description": "image reader",
+      "mode": "primary",
+      "permission": {
+        "*": "deny",
+      },
+      "prompt": "<protocol-image-reader.md>",
     },
     "aw-planner": {
       "description": "agent-workflow planner",
@@ -9828,6 +9839,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         "skill": {
           "*": "deny",
           "aw-db-readonly": "allow",
+          "aw-image-analysis": "allow",
           "aw-offline-network": "allow",
           "aw-page-check": "allow",
         },
@@ -9885,6 +9897,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
           "*": "deny",
           "aw-code-review": "allow",
           "aw-db-readonly": "allow",
+          "aw-image-analysis": "allow",
           "aw-page-check": "allow",
         },
         "task": "deny",

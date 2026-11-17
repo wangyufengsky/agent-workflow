@@ -2,6 +2,7 @@ import {
   type AttachmentDTO,
   AttachmentFormat,
   columnName,
+  imageMimeByFormat,
   SHEET_GRID_MAX_COLUMNS,
   type SheetPreviewDTO,
 } from '@aw/shared';
@@ -34,9 +35,10 @@ const cellText = ({ v, f }: SheetPreviewDTO['rows'][number]['cells'][number]) =>
 export function AttachmentPreview({ id, name, onClose }: { id: string; name: string; onClose: () => void }) {
   const meta = useQuery(attachmentQuery(id));
   const workbook = meta.data?.meta?.format === AttachmentFormat.Xlsx ? meta.data.meta : undefined;
+  const image = meta.data !== undefined && imageMimeByFormat[meta.data.format] !== undefined;
   // An Excel preview reads its sheets one by one instead of the whole text.
   const content = useQuery({
-    ...attachmentContentQuery(id),
+    ...attachmentContentQuery(id, image),
     enabled: meta.data !== undefined && workbook === undefined,
   });
   const error = meta.error ?? content.error;
@@ -49,7 +51,7 @@ export function AttachmentPreview({ id, name, onClose }: { id: string; name: str
       footer={<Button onClick={onClose}>{C.close}</Button>}
     >
       {error !== null && <ErrorState error={error} />}
-      {meta.data !== undefined && meta.data.format !== AttachmentFormat.Text && <p className="hint">{C.officeNote}</p>}
+      {meta.data !== undefined && meta.data.meta !== null && <p className="hint">{C.officeNote}</p>}
       {workbook !== undefined ? (
         <Tabs
           items={workbook.sheets.map((sheet) => ({
@@ -59,7 +61,9 @@ export function AttachmentPreview({ id, name, onClose }: { id: string; name: str
           }))}
         />
       ) : content.data !== undefined ? (
-        meta.data?.format === AttachmentFormat.Docx ? (
+        image ? (
+          <img className={styles.image} src={content.data} alt={name} />
+        ) : meta.data?.format === AttachmentFormat.Docx ? (
           <WordBody markdown={content.data} />
         ) : (
           <pre className={`mono ${styles.preview} ${styles.plain}`}>{content.data}</pre>

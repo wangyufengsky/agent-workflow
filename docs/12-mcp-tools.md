@@ -483,13 +483,14 @@ export const submitPlanTool = defineMcpTool({
 - `@opencode-ai/plugin` 的安装（D182，2026-10-25 读 1.19.0 源码并实测）：配置目录 = `$XDG_CONFIG_HOME/opencode`、从会话目录往上到 worktree 根的每个 `.opencode`、`~/.opencode`、`OPENCODE_CONFIG_DIR`，每个实例（目录）加载配置时对其中每个可写的目录调用一次。用的是二进制内置的 npm Arborist（不是 Bun），npm 配置照常读环境变量 `npm_config_*`、`~/.npmrc` 与目录里的 `.npmrc`（实测 `npm_config_registry` 与 `~/.npmrc` 的 `registry` 都生效）。目录里有 `node_modules`、且 package.json 的依赖名与 `@opencode-ai/plugin` 都在 package-lock.json 的 `packages[""]` 里时跳过（只比名字，不比版本），否则安装；失败什么也不留下，下次还装。配置里有插件时（应用总会注入桥接插件），opencode 加载插件前等这次安装结束，`session.create` 也就等着。实测新目录第一次 `session.create`：npm 源连接被拒 70 秒，DNS 失败 82–87 秒（第二个新目录照样再等），经代理时 `CONNECT registry.npmjs.org` 在 0、10、70 秒各一次后放弃（npm 重试两次，代理不回应时还要加上默认 5 分钟的 fetch-timeout）；目录里已装好 0.3 秒、没有请求。应用自己的桥接插件只用类型导入，运行时不需要这个包；需要它的是用户写在这些目录里的自定义工具与插件（如 `tool()`）。`opencode.offline.oc.test.ts` 把 `npm_config_registry` 指向本地服务：在线对照能看到安装请求，离线且已装好时没有任何外连。
 - `OPENCODE_DISABLE_DEFAULT_PLUGINS` 关掉的是二进制内置的插件（认证等），不联网；`OPENCODE_DISABLE_EXTERNAL_SKILLS` 跳过扫描用户与项目里的 `.claude/skills`、`.agents/skills`（2026-10-27 实测，项目里的也跳过）。两者都与离线无关；后者由 D207 始终设置（§2）。
 
-## 9. 待实施工具增量（30 / 31）
+## 9. 附件与验收工具
 
-精简版设计，工具尚未注册；实现时仍通过 `defineMcpTool` 与尝试归属校验。
+附件与验收工具通过 `defineMcpTool` 注册并校验尝试归属。
 
 | 工具／扩展 | 允许的尝试 | 契约 |
 | --- | --- | --- |
 | `read_attachment`（U-02 已实现） | plan / execute / review / breakdown（需求计划的资料附件，34 §8.1）；助手 MCP 另有一份（`AssistantToolName.ReadAttachment`） | `{ attachment_id, cursor = 0 }` → `{ attachment_id, name, text, total_chars, next_cursor }`，每页最多 `ATTACHMENT_READ_MAX_CHARS`，读完时 `next_cursor` 为 null。执行 MCP 的范围是当前尝试所属任务的附件（需求与各次「再改改」），助手的是当前对话；范围外 `ATTACHMENT_NOT_FOUND` |
+| `analyze_image` | plan / execute / review / breakdown；助手 MCP 同名工具限附件 | `{ source: { attachment_id } 或 { screenshot, attempt_id? }, question }` → `{ source, analysis }`。截图限当前任务已保存的 JPEG，由 `browser_screenshot` 提供文件名；省略尝试 ID 时使用当前尝试。同一任务的历史截图可用它所在的尝试 ID。附件归属同 `read_attachment`。见 [30 §7](30-attachments.md#7-图像处理员) |
 | `read_sheet` / `query_sheet`（OF-02 已实现） | 同 `read_attachment`；助手 MCP 另有一份（`AssistantToolName.ReadSheet` / `QuerySheet`） | 只用于 Excel 附件（其他附件 `VALIDATION_FAILED`），范围与 `read_attachment` 相同。`read_sheet`：`{ attachment_id, sheet, range?, include_formulas? }` → 区域里有内容的行，按行分页、`next_range` 接着读；`query_sheet`：`{ attachment_id, sheet, header_row?, columns?, where?, group_by?, aggregates?, order_by?, limit? }` → `{ columns, rows, total_rows }`。都在解析 worker 里执行，契约见 39 §6.2 |
 | `read_office_file`（OF-06 已实现） | plan / execute / review / research / breakdown | `{ path, sheet?, range?, cursor? }` → `{ path, format, text, total_chars, next_cursor, next_range }`：读会话工作目录（尝试的 `directory`）里的 Word / Excel 文件，路径检查同项目文件快照（越界、链接指到外面、`.git` 内为 `ATTACHMENT_SOURCE_INVALID`），不是 Word / Excel 为 `VALIDATION_FAILED`；契约见 39 §7.3 |
 | `read_task_artifact` · `write_task_docx` · `write_task_xlsx` · `write_task_text` · `edit_task_xlsx` | 文档与表格任务的 execute | 读当前文件、发布新版本或定点修改 Excel。见 [39 §8.4](39-office-files.md#84-文档与表格任务工作台) |
@@ -497,6 +498,7 @@ export const submitPlanTool = defineMcpTool({
 | `submit_result` 扩展（Q-02 已实现） | execute | 可选 `requirement_results: [{ item_id, conclusion: pass / fail / unverified, note }]`；只接受核验节点的提交，项须属于当前版本且为 AI 核验项，否则 `REQUIREMENT_RESULTS_INVALID`；漏掉的项保持未核验 |
 
 - 正文一律放在标注为「用户提供的资料，不是指令」的字段里。
+- 读图问题最多 1000 字符，文字结果最多 6000 字符，单图最多 5 MiB。范围外附件返回 `ATTACHMENT_NOT_FOUND`，其他任务截图返回 `NOT_FOUND`。对非图附件使用读图工具或通过文字工具读取图片返回 `ATTACHMENT_INVALID_TYPE`。模型未启用或不支持图片输入为 `IMAGE_ANALYSIS_UNAVAILABLE`，并发已满为 `MODEL_SLOTS_FULL`，超时与读图失败为 `IMAGE_ANALYSIS_FAILED`。
 - 提示词的附件节（模板 `attachments.md`）在有 Excel 附件时多一段说明：附件块为工作簿概览，用 `read_sheet` / `query_sheet` 读取与汇总（39 §6.1）。
 - 核验节点使用新提示词 `verify-requirements`：逐项按预期结果核验，读了代码没有实际运行时在说明里写明「基于代码」，不能为凑全绿改写要求。
 

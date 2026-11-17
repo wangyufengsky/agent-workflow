@@ -48,11 +48,8 @@ export function registerAttachmentRoutes(server: FastifyInstance, attachments: A
 
     scope.get(`${API_PREFIX}/attachments/:id/content`, async (req, reply) => {
       const { id } = parseInput(z.object({ id: z.string() }), req.params);
-      // Plain text that the browser must not reinterpret as HTML or script.
-      return reply
-        .type('text/plain; charset=utf-8')
-        .header('x-content-type-options', 'nosniff')
-        .send(createReadStream(attachments.contentPath(id)));
+      const { mime, path } = attachments.content(id);
+      return reply.type(mime).header('x-content-type-options', 'nosniff').send(createReadStream(path));
     });
   });
 }

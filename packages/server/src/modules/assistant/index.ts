@@ -27,6 +27,7 @@ import type { BatchesService } from '../batches/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DecksService } from '../decks/index.ts';
 import type { GitReviewsService } from '../git-reviews/index.ts';
+import type { ImageAnalysis } from '../image-analysis/index.ts';
 import type { InitiativesService } from '../initiatives/index.ts';
 import type { KnowledgeService } from '../knowledge/index.ts';
 import type { Office } from '../office/index.ts';
@@ -69,6 +70,7 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context' | 'memory
   gitReviews: GitReviewsService;
   team: TeamService;
   browser: BrowserService;
+  imageAnalysis: ImageAnalysis;
   /** Word and Excel files: writing them, and the previews of the files cards (39 §7.2, §8.2). */
   office: Office;
   /** Every other operation of the app; the assistant's tools are generated from them (15 §3). */

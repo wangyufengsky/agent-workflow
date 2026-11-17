@@ -58,6 +58,7 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.ReadAttachment,
       McpToolName.ReadSheet,
       McpToolName.QuerySheet,
+      McpToolName.AnalyzeImage,
       McpToolName.ReadOfficeFile,
       McpToolName.ReadTaskArtifact,
       McpToolName.WriteTaskText,

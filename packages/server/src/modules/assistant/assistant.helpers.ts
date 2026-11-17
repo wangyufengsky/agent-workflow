@@ -3,6 +3,8 @@ import {
   ASSISTANT_FORM_OPERATION,
   AssistantForm,
   AssistantToolName,
+  analyzeAttachmentImageInputSchema,
+  analyzeImageDescription,
   assistantFormSchema,
   assistantInputSchema,
   CHART_CATEGORIES,
@@ -35,6 +37,7 @@ import type { EventBus } from '../../core/event-bus.ts';
 import type { AttachmentsService } from '../attachments/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DecksService } from '../decks/index.ts';
+import type { ImageAnalysis } from '../image-analysis/index.ts';
 import { localTime } from './assistant.context.ts';
 import type { AssistantService } from './assistant.service.ts';
 import type { AssistantTool } from './assistant.tools.ts';
@@ -46,6 +49,7 @@ export type HelperToolDeps = {
   conversations: AssistantService;
   appStatus(): Promise<GetAppStatusOutput>;
   attachments: AttachmentsService;
+  imageAnalysis: ImageAnalysis;
   browser: BrowserService;
   decks: DecksService;
 };
@@ -93,6 +97,18 @@ export function helperTools(deps: HelperToolDeps): AssistantTool[] {
       input: getAppStatusInputSchema,
       mode: UiMode.Simple,
       handler: () => deps.appStatus(),
+    },
+    {
+      name: AssistantToolName.AnalyzeImage,
+      description: analyzeImageDescription,
+      input: analyzeAttachmentImageInputSchema,
+      mode: UiMode.Simple,
+      handler(input, { conversation, signal }) {
+        const { source, question } = analyzeAttachmentImageInputSchema.parse(input);
+        assertOwn(conversation.id, source.attachment_id);
+        const { name, mime, path } = deps.attachments.image(source.attachment_id);
+        return deps.imageAnalysis.analyze({ path, mime, reference: { ...source, name } }, question, signal);
+      },
     },
     {
       name: AssistantToolName.ReadAttachment,

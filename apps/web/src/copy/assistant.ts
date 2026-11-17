@@ -153,6 +153,7 @@ export const TOOL_COPY = {
     [AssistantToolName.OpenForm]: '打开表单',
     [AssistantToolName.ListFiles]: '列出生成的文件',
     [AssistantToolName.RevealFile]: REVEAL[UI_PLATFORM],
+    [AssistantToolName.AnalyzeImage]: '请图像处理员读图',
     [AssistantToolName.ReadAttachment]: '读取附加的资料',
     [AssistantToolName.ReadSheet]: '读取表格',
     [AssistantToolName.QuerySheet]: '查询表格',
