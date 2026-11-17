@@ -11,6 +11,7 @@ import {
   ErrorCode,
   getAttachmentOp,
   getModelSlotsOp,
+  IMAGE_ANALYSIS_CLEANUP_TIMEOUT_MS,
   IMAGE_ANALYSIS_TIMEOUT_MS,
   listTasksOp,
   OPENCODE_ASSISTANT_AGENT,
@@ -286,7 +287,11 @@ describe('助手消息的附件（30 §5）', () => {
     expect(prompt).not.toContain(png.toString('base64'));
   });
 
-  it('图像处理员超时会中止临时会话并归还并发名额', async () => {
+  it.each([
+    { scenario: '正常清理', stalled: null },
+    { scenario: '中止请求无响应', stalled: 'abort' },
+    { scenario: '删除请求无响应', stalled: 'deleteSession' },
+  ] as const)('图像处理员超时后归还并发名额（$scenario）', async ({ stalled }) => {
     t.fake.models.push({
       providerId: 'local',
       modelId: 'vision',
@@ -302,6 +307,15 @@ describe('助手消息的附件（30 §5）', () => {
       started.resolve(sessionId);
       return new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
     });
+    const cleaning = Promise.withResolvers<void>();
+    if (stalled !== null) {
+      vi.spyOn(t.fake, stalled).mockImplementation(({ signal }) => {
+        cleaning.resolve();
+        return new Promise((_, reject) =>
+          signal?.addEventListener('abort', () => reject(signal.reason), { once: true }),
+        );
+      });
+    }
     t.fake.enqueue(
       script().callAppTool('analyze_image', {
         source: { attachment_id: image.id },
@@ -314,13 +328,19 @@ describe('助手消息的附件（30 §5）', () => {
     const reader = await started.promise;
     expect((await t.call(getModelSlotsOp, {})).body.inUse).toBe(2);
     clock.advance(IMAGE_ANALYSIS_TIMEOUT_MS);
+    if (stalled !== null) {
+      await cleaning.promise;
+      clock.advance(IMAGE_ANALYSIS_CLEANUP_TIMEOUT_MS);
+    }
     await result;
     expect(toolResult('analyze_image')).toMatchObject({
       isError: true,
       result: { code: ErrorCode.ImageAnalysisFailed, message: 'Image analysis timed out' },
     });
-    expect(t.fake.aborts).toContain(reader);
-    expect(t.fake.sessions.some((s) => s.id === reader)).toBe(false);
+    if (stalled === null) {
+      expect(t.fake.aborts).toContain(reader);
+      expect(t.fake.sessions.some((s) => s.id === reader)).toBe(false);
+    }
     expect((await t.call(getModelSlotsOp, {})).body.inUse).toBe(0);
   });
 

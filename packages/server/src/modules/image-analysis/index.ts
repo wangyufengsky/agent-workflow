@@ -6,6 +6,7 @@ import {
   AppError,
   ATTACHMENT_BYTES_MAX,
   ErrorCode,
+  IMAGE_ANALYSIS_CLEANUP_TIMEOUT_MS,
   IMAGE_ANALYSIS_MAX_CHARS,
   IMAGE_ANALYSIS_TIMEOUT_MS,
   OPENCODE_IMAGE_AGENT,
@@ -77,6 +78,7 @@ export function createImageAnalysis({
         await file.close();
       }
       const analysis = await run(question, source.mime, data, model, signal);
+      signal.throwIfAborted();
       if (analysis === '') throw new AppError(ErrorCode.ImageAnalysisFailed, 'The image reader returned no analysis');
       return { source: source.reference, analysis: analysis.slice(0, IMAGE_ANALYSIS_MAX_CHARS) };
     } catch (err) {
@@ -115,17 +117,27 @@ export function createImageAnalysis({
       try {
         return await opencode.promptImage({ sessionId, directory, model, question, image: { mime, data }, signal });
       } finally {
-        // 停止请求也应中止 OpenCode 的生成，再删除含原图的临时会话。
-        if (opencode.isConnected()) {
-          try {
-            if (signal.aborted) await opencode.abort({ sessionId, directory });
-          } finally {
-            await opencode.deleteSession({ sessionId, directory });
-          }
-        }
+        await closeSession(sessionId, directory, signal.aborted);
       }
     } finally {
       await rm(directory, { recursive: true, force: true });
+    }
+  }
+
+  async function closeSession(sessionId: string, directory: string, interrupted: boolean): Promise<void> {
+    if (!opencode.isConnected()) return;
+    // 清理使用单独的时限。运行时不响应时，读图依然要归还并发名额。
+    const deadline = new AbortController();
+    const cancel = clock.schedule(IMAGE_ANALYSIS_CLEANUP_TIMEOUT_MS, () => deadline.abort());
+    const session = { sessionId, directory, signal: deadline.signal };
+    try {
+      try {
+        if (interrupted) await opencode.abort(session);
+      } finally {
+        await opencode.deleteSession(session);
+      }
+    } finally {
+      cancel();
     }
   }
 

@@ -16,6 +16,7 @@ import type { OpencodeRuntime } from './opencode.runtime.ts';
 
 /** Error responses are thrown (and translated by `request`) instead of returned. */
 const THROW = { throwOnError: true } as const;
+const requestOptions = (signal?: AbortSignal) => (signal === undefined ? THROW : { ...THROW, signal });
 
 const responseCauseSchema = z.object({ status: z.number() });
 const permissionNotFoundCauseSchema = z.object({
@@ -38,6 +39,7 @@ export type AssistantPrompt = {
 };
 
 export type ModelRef = { providerId: string; modelId: string };
+type SessionRequest = { sessionId: string; directory: string; signal?: AbortSignal };
 
 type ImagePromptInput = {
   sessionId: string;
@@ -80,9 +82,9 @@ export type OpencodeClient = {
   /** 助手按请求关联完成；接受与结束分开，消息不必等模型整轮结束才清空草稿。 */
   promptAssistant(input: PromptInput & { messageId: string }): AssistantPrompt;
   promptImage(input: ImagePromptInput): Promise<string>;
-  abort(input: { sessionId: string; directory: string }): Promise<void>;
+  abort(input: SessionRequest): Promise<void>;
   /** Already missing sessions count as deleted, so interrupted cleanup can be retried. */
-  deleteSession(input: { sessionId: string; directory: string }): Promise<void>;
+  deleteSession(input: SessionRequest): Promise<void>;
   replyPermission(input: { permissionId: string; directory: string; reply: PermissionDecision }): Promise<void>;
   /**
    * Models of the providers the user has connected, and the configured default `provider/model`, as opencode sees
@@ -183,9 +185,7 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         await writeFile(join(directory, 'opencode.json'), JSON.stringify({ share: 'disabled', autoshare: false }));
       }
       const { data } = await request('session.create', () =>
-        runtime
-          .sdk()
-          .session.create({ directory, title, agent, permission }, signal === undefined ? THROW : { ...THROW, signal }),
+        runtime.sdk().session.create({ directory, title, agent, permission }, requestOptions(signal)),
       );
       return data.id;
     },
@@ -284,13 +284,15 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         .join('\n')
         .trim();
     },
-    async abort({ sessionId, directory }) {
-      await request('session.abort', () => runtime.sdk().session.abort({ sessionID: sessionId, directory }, THROW));
+    async abort({ sessionId, directory, signal }) {
+      await request('session.abort', () =>
+        runtime.sdk().session.abort({ sessionID: sessionId, directory }, requestOptions(signal)),
+      );
     },
-    async deleteSession({ sessionId, directory }) {
+    async deleteSession({ sessionId, directory, signal }) {
       await request('session.delete', async () => {
         try {
-          await runtime.sdk().session.delete({ sessionID: sessionId, directory }, THROW);
+          await runtime.sdk().session.delete({ sessionID: sessionId, directory }, requestOptions(signal));
         } catch (err) {
           // 原生删除成功后，本地清理可能中断；只将 SDK 明确返回的会话不存在视为已完成。
           if (err instanceof Error && sessionNotFoundCauseSchema.safeParse(err.cause).success) return;
@@ -316,7 +318,7 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
     async listModels(directory, signal) {
       const sdk = runtime.sdk();
       const at = directory === undefined ? {} : { directory };
-      const options = signal === undefined ? THROW : { ...THROW, signal };
+      const options = requestOptions(signal);
       const [{ data: providers }, { data: config }] = await Promise.all([
         request('config.providers', () => sdk.config.providers(at, options)),
         request('config.get', () => sdk.config.get(at, options)),
