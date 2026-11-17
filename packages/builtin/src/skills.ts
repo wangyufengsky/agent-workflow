@@ -17,6 +17,7 @@ export const SkillName = {
   AssistantCharts: 'aw-assistant-charts',
   /** The assistant starts and reads page previews and reads websites (41 §5.1, moved from its prompt). */
   AssistantPreview: 'aw-assistant-preview',
+  AssistantMemory: 'aw-assistant-memory',
   /** Read-only investigation of project databases, for task sessions, the researcher and the assistant (41 §5.2). */
   DbReadonly: 'aw-db-readonly',
   /** Working when downloads and installs fail on an intranet machine (41 §5.2). */
@@ -41,6 +42,7 @@ export const SKILL_MAX_BYTES = 8 * 1024;
 export const SKILL_DESCRIPTION_MAX = 400;
 /** Skills one agent may be given (D212). */
 export const AGENT_SKILLS_MAX = 8;
+export const ASSISTANT_SKILLS_MAX = 9;
 
 /**
  * 内置 Skill 的分配表，同时用于原生 Skill 白名单和管理页。
@@ -69,6 +71,7 @@ export const ASSISTANT_SKILLS: SkillName[] = [
   SkillName.OfficeDocs,
   SkillName.AssistantCharts,
   SkillName.AssistantPreview,
+  SkillName.AssistantMemory,
   SkillName.DbReadonly,
   SkillName.TaskDelivery,
 ];

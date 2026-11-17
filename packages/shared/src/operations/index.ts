@@ -20,6 +20,12 @@ import {
   stopWhisperOp,
   whisperOp,
 } from './assistant.ts';
+import {
+  createAssistantMemoryOp,
+  deleteAssistantMemoryOp,
+  listAssistantMemoriesOp,
+  updateAssistantMemoryOp,
+} from './assistant-memory.ts';
 import { getAttachmentOp, previewAttachmentSheetOp, removeAttachmentOp, snapshotProjectFileOp } from './attachments.ts';
 import { abortAttemptOp, getAttemptOp } from './attempts.ts';
 import { createBatchOp, deliverBatchOp, getBatchOp, listBatchesOp } from './batches.ts';
@@ -261,6 +267,7 @@ import {
 } from './workflows.ts';
 
 export * from './assistant.ts';
+export * from './assistant-memory.ts';
 export * from './attachments.ts';
 export * from './attempts.ts';
 export * from './batches.ts';
@@ -502,6 +509,10 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   listConfirmationsOp,
   confirmAssistantCallOp,
   cancelAssistantCallOp,
+  listAssistantMemoriesOp,
+  createAssistantMemoryOp,
+  updateAssistantMemoryOp,
+  deleteAssistantMemoryOp,
   listKnowledgeOp,
   getKnowledgeOp,
   askKnowledgeOp,

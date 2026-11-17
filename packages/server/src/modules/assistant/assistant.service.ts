@@ -63,6 +63,7 @@ import { type SkillsService, withUserSkills } from '../skills/index.ts';
 import { type ContextRenderer, localTime } from './assistant.context.ts';
 import { continuationBudget, fitContinuation } from './assistant.continuation-budget.ts';
 import { continuationContext } from './assistant.continuation-context.ts';
+import type { AssistantMemory } from './assistant.memory.ts';
 import { recoveryContext } from './assistant.recovery-context.ts';
 import { type Conversation, createAssistantRepo } from './assistant.repo.ts';
 import { createAssistantUsage } from './assistant.usage.ts';
@@ -78,6 +79,7 @@ export type AssistantServiceDeps = {
   settings: SettingsService;
   attachments: AttachmentsService;
   context: ContextRenderer;
+  memory: AssistantMemory;
   projects: import('../projects/index.ts').ProjectsService;
   slots: ModelSlots;
   dataDir: string;
@@ -944,12 +946,14 @@ export function createAssistantService(deps: AssistantServiceDeps) {
               : [];
           const selected = [...new Map([...inherited, ...sent].map((a) => [a.id, a])).values()];
           const section = attachments.promptSection(selected, MCP_ASSISTANT_TOOL_PREFIX);
+          const memory = deps.memory.context(c.projectId, text);
+          const turnSystem = memory === '' ? systemText : `${systemText}\n\n${memory}`;
           const updates = queued.map((m) => m.text);
           const handoff =
             continuation !== undefined && continuation.consumedAt === null && continuation.handoffText !== ''
               ? fitContinuation(
                   continuation.handoffText,
-                  await continuationBudget(opencode, model, systemText, [...updates, text, section].join('\n\n')),
+                  await continuationBudget(opencode, model, turnSystem, [...updates, text, section].join('\n\n')),
                 )
               : '';
           if (!usage.isRunning(id) || state.stopping || state.deleting)
@@ -960,7 +964,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           await prompt(
             c,
             sessionId,
-            systemText,
+            turnSystem,
             [...updates, ...(handoff === '' ? [] : [handoff]), text, ...(section === '' ? [] : [section])].join('\n\n'),
             model,
             turn,

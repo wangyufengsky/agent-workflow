@@ -99,6 +99,7 @@ export const FLOWCHART_NODE_ID_MAX_CHARS = 32;
 export const FLOWCHART_EDGE_LABEL_MAX_CHARS = 16;
 /** 一次显式附加的文字或任务上下文；超过时由用户缩短，任务快照注明截断。 */
 export const ASSISTANT_CONTEXT_MAX_CHARS = 12_000;
+export const ASSISTANT_MEMORY_MAX_CHARS = 800;
 /** 旧会话隔离升级时回放的最近记录和文字上限。 */
 export const ASSISTANT_RECOVERY_ENTRIES = 200;
 export const ASSISTANT_RECOVERY_MAX_CHARS = 12_000;

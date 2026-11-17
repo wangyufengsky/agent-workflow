@@ -413,6 +413,20 @@ payload / response：
 | draft_text | TEXT NULL | 明确上下文超限时恢复原用户输入，模型接受子对话首轮后清除 |
 | created_at / consumed_at | INTEGER / INTEGER NULL | 创建与首轮交接接受时间 |
 
+### assistant_memories
+
+迁移 `0043_assistant_memory`。
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| id | TEXT PK | |
+| project_id | TEXT NULL → projects，CASCADE | 空值表示个人记忆；删除项目时级联删除项目记忆。 |
+| content | TEXT | 经用户保存的记忆正文。 |
+| source_conversation_id | TEXT NULL → assistant_conversations，SET NULL | 助手提议的来源对话；用户直接新增时为空。删除来源对话时保留记忆。 |
+| updated_at | INTEGER | 新增、修改时更新；用于排序。 |
+
+索引：`(project_id, updated_at)`。
+
 ### assistant_confirmations
 
 | 列 | 类型 | 说明 |

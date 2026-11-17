@@ -1,10 +1,14 @@
 import type { Prompts } from '@aw/builtin';
 import {
+  AppError,
   attachmentIdsSchema,
+  createAssistantMemoryOp,
   createBatchOp,
   createInitiativeOp,
   createProjectOp,
+  createScheduleOp,
   createTaskOp,
+  ErrorCode,
   type GetAppStatusOutput,
   initGitOp,
   MCP_ASSISTANT_PATH,
@@ -32,6 +36,8 @@ import { createConfirmations } from './assistant.confirmations.ts';
 import { createContextRenderer } from './assistant.context.ts';
 import { helperTools } from './assistant.helpers.ts';
 import { createKnowledgeRelay, KNOWLEDGE_QUESTION_OPS } from './assistant.knowledge.ts';
+import { createAssistantMemory } from './assistant.memory.ts';
+import { assistantMemoryOperations, proposeMemoryTool, saveConfirmedMemory } from './assistant.memory-operations.ts';
 import { officeTools } from './assistant.office.ts';
 import { assistantOperations } from './assistant.operations.ts';
 import { registerAssistantRoutes } from './assistant.routes.ts';
@@ -43,7 +49,7 @@ import { createWhisperService } from './assistant.whisper.ts';
 
 export type { AssistantService } from './assistant.service.ts';
 
-export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context'> & {
+export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context' | 'memory'> & {
   /** Bearer token of `/mcp/assistant`, separate from the execution MCP's (D25). */
   token: string;
   prompts: Prompts;
@@ -69,12 +75,15 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context'> & {
 export function createAssistantModule(deps: AssistantModuleDeps) {
   const whisper = createWhisperService(deps);
   const context = createContextRenderer(deps);
-  const conversations = createAssistantService({ ...deps, context });
+  const memory = createAssistantMemory(deps);
+  const memoryOperations = assistantMemoryOperations(memory);
+  const conversations = createAssistantService({ ...deps, context, memory });
   const taskRelay = createTaskRelay({ ...deps, conversations });
   const analysisRelay = createAnalysisRelay({ ...deps, conversations });
   const breakdownRelay = createBreakdownRelay({ ...deps, conversations });
   // Work the assistant starts and later reports on: tasks (15 §6), member analyses (33 §6), initiatives' AI runs (34 §10).
-  const run = (conversationId: string, impl: OperationImpl, input: unknown) => {
+  const run = async (conversationId: string, impl: OperationImpl, input: unknown) => {
+    if (impl.contract.id === createAssistantMemoryOp.id) return saveConfirmedMemory(memory, conversationId, input);
     if (analysisRelay.handles(impl)) return analysisRelay.run(conversationId, input);
     if (breakdownRelay.handles(impl)) return breakdownRelay.run(conversationId, impl, input);
     return taskRelay.run(conversationId, impl, input);
@@ -83,9 +92,10 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     run,
     ...deps,
     conversations,
-    operations: new Map(deps.operations.map((impl) => [impl.contract.id, impl])),
+    operations: new Map([...deps.operations, ...memoryOperations].map((impl) => [impl.contract.id, impl])),
   });
   const relay = createKnowledgeRelay({ ...deps, conversations });
+  const projectStarts = [createTaskOp.id, createBatchOp.id, createInitiativeOp.id, createScheduleOp.id];
   const registry = createAssistantToolRegistry(
     [
       ...operationTools(deps.operations, {
@@ -104,16 +114,27 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
           ]),
         ),
         prechecks: new Map([
-          // Only files of this conversation are handed on (30 §2.2): to a task, or to an initiative (34 §10).
-          ...[createTaskOp.id, createInitiativeOp.id].map(
+          ...projectStarts.map(
             (id) =>
               [
                 id,
-                (conversationId: string, input: Record<string, unknown>) =>
-                  conversations.assertOwnAttachments(
-                    conversationId,
-                    attachmentIdsSchema.optional().parse(input.attachmentIds) ?? [],
-                  ),
+                (conversationId: string, input: Record<string, unknown>) => {
+                  const { projectId } = conversations.get(conversationId);
+                  if (projectId !== null && projectId !== input.projectId)
+                    throw new AppError(ErrorCode.ValidationFailed, 'Start a conversation for the target project', {
+                      issues: [
+                        {
+                          path: ['projectId'],
+                          message: 'Use the bound project, or start a new conversation for the target project',
+                        },
+                      ],
+                    });
+                  if (id === createTaskOp.id || id === createInitiativeOp.id)
+                    conversations.assertOwnAttachments(
+                      conversationId,
+                      attachmentIdsSchema.optional().parse(input.attachmentIds) ?? [],
+                    );
+                },
               ] as const,
           ),
           // A directory the user would add only to have it refused is answered at once, with its code's hint (D153).
@@ -121,6 +142,7 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
           [initGitOp.id, (_, input) => deps.projects.assertInitable(z.string().parse(input.repoPath))],
         ]),
       }),
+      proposeMemoryTool(confirmations, deps.projects),
       ...helperTools({ ...deps, conversations }),
       ...officeTools({ ...deps, conversations }),
     ],
@@ -133,14 +155,17 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
       await Promise.all([analysisRelay.start(), breakdownRelay.start(), taskRelay.start()]);
     },
     registry,
-    operations: assistantOperations(
-      conversations,
-      confirmations,
-      whisper,
-      createAssistantSnapshots(deps),
-      deps.browser,
-      deps.office,
-    ),
+    operations: [
+      ...memoryOperations,
+      ...assistantOperations(
+        conversations,
+        confirmations,
+        whisper,
+        createAssistantSnapshots(deps),
+        deps.browser,
+        deps.office,
+      ),
+    ],
     register(server: FastifyInstance) {
       registerAssistantRoutes(server, conversations);
       registerMcpEndpoint(server, {
