@@ -107,6 +107,7 @@ type Session = {
   testActions: number;
   acceptedChallenge: string | null;
   testActionActive: boolean;
+  testActionTarget?: string;
   /** What each page the owner read said, by address without its fragment (29 §2.8). */
   pages: Map<string, string>;
 };
@@ -417,6 +418,7 @@ export function createBrowserService({
       seq: ++session.testActions,
       tool,
       path: browserTestPath(tab.url()),
+      ...(session.testActionTarget === undefined ? {} : { target: session.testActionTarget }),
       ...outcome,
       requests: browserTestRequests(requests),
     };
@@ -447,6 +449,7 @@ export function createBrowserService({
     if (session.testActionActive)
       throw new AppError(ErrorCode.StateTransitionInvalid, 'Wait for the preceding browser action to finish');
     session.testActionActive = true;
+    delete session.testActionTarget;
     const beforeHandoff: RequestEntry[] = [];
     try {
       let output: T;
@@ -485,10 +488,12 @@ export function createBrowserService({
   function testControlGuard(owner: BrowserOwner, tab: Tab, ref: string | null, forTyping = false) {
     if (owner.browserTest == null) return undefined;
     return async () => {
-      const { sensitive, textField } = await actions.describeControl(tab, ref);
+      const { sensitive, textField, label } = await actions.describeControl(tab, ref);
       if (sensitive || tab.credentialsAsked() !== null)
         throw new AppError(ErrorCode.BrowserLoginRequired, 'The user handles credentials and file inputs');
       if (forTyping && !textField) throw new AppError(ErrorCode.BrowserActionFailed, 'Choose an editable text field');
+      const session = sessions.get(owner.id);
+      if (ref !== null && session?.testActionActive === true) session.testActionTarget = label;
     };
   }
 

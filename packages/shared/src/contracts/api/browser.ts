@@ -163,6 +163,7 @@ export const browserTestActionSchema = z.object({
   seq: z.number().int().positive(),
   tool: z.string(),
   path: z.string(),
+  target: z.string().optional(),
   passed: z.boolean(),
   errorCode: errorInfoSchema.shape.code.nullable(),
   requests: z.array(browserCaseRequestSchema),

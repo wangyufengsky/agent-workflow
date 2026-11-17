@@ -18,9 +18,15 @@ export function StepScreenshot({ attemptId, file }: { attemptId: string; file: s
   );
 }
 
-export function StepRequests({ requests }: { requests: BrowserCaseStepResult['requests'] }) {
+export function StepRequests({
+  requests,
+  expanded,
+}: {
+  requests: BrowserCaseStepResult['requests'];
+  expanded?: boolean;
+}) {
   return (
-    <details>
+    <details open={expanded}>
       <summary>
         {C.requests} · {requests.length}
       </summary>

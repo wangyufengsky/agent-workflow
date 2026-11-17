@@ -139,6 +139,18 @@ test('AI 测试的同一原生页签只观看，按需截图，结束后只保�
           match: { title: '· 执行浏览器测试' },
           steps: [
             { type: 'callTool', name: 'browser_open', args: { url } },
+            { type: 'callTool', name: 'browser_wait_for', args: { text: '开始追加记录', timeoutMs: 10000 } },
+            ...Array.from({ length: 16 }, () => ({
+              type: 'callTool',
+              name: 'browser_wait_for',
+              args: { text: '执行' },
+            })),
+            { type: 'callTool', name: 'browser_wait_for', args: { text: '继续追加记录', timeoutMs: 10000 } },
+            ...Array.from({ length: 16 }, () => ({
+              type: 'callTool',
+              name: 'browser_wait_for',
+              args: { text: '执行' },
+            })),
             { type: 'callTool', name: 'browser_wait_for', args: { text: '开放自动操作', timeoutMs: 10000 } },
             { type: 'callTool', name: 'browser_click', args: { ref: 'e1' } },
             { type: 'callTool', name: 'browser_submit_report', args: { summary: '浏览器测试通过' } },
@@ -185,19 +197,55 @@ test('AI 测试的同一原生页签只观看，按需截图，结束后只保�
       await page.getByRole('button', { name: '保存截图' }).click();
       await expect(page.getByText('测试截图', { exact: true })).toBeVisible();
       expect(clicks).toBe(0);
-      await app.evaluate(async ({ BrowserWindow }) => {
-        const view = BrowserWindow.getAllWindows()[0]?.contentView.children[0];
-        if (view === undefined || !('webContents' in view)) throw new Error('No native test view');
-        await view.webContents.debugger.sendCommand('Runtime.evaluate', {
-          expression: "document.getElementById('gate').textContent = '开放自动操作'",
-        });
+      const release = (text: string) =>
+        app.evaluate(async ({ BrowserWindow }, value) => {
+          const view = BrowserWindow.getAllWindows()[0]?.contentView.children[0];
+          if (view === undefined || !('webContents' in view)) throw new Error('No native test view');
+          await view.webContents.debugger.sendCommand('Runtime.evaluate', {
+            expression: `document.getElementById('gate').textContent = ${JSON.stringify(value)}`,
+          });
+        }, text);
+      const getBounds = () =>
+        app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.contentView.children[0]?.getBounds());
+      const list = page.getByTestId('browser-test-action-list');
+      await release('开始追加记录');
+      await expect(list.getByRole('button')).toHaveCount(18);
+      await list.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
       });
+      await expect(page.getByText('正在查看历史')).toBeVisible();
+      await release('继续追加记录');
+      await expect(list.getByRole('button')).toHaveCount(35);
+      await expect(page.getByText('17 条新记录')).toBeVisible();
+      await expect.poll(getBounds).toEqual(watched?.bounds);
+      await page.getByRole('button', { name: '回到最新' }).click();
+      await expect(page.getByText('跟随最新')).toBeVisible();
+      await page.getByRole('button', { name: '有请求 1' }).click();
+      await expect(list.getByRole('button')).toHaveCount(1);
+      await expect(page.getByText(`GET ${url}`, { exact: false })).toBeVisible();
+      await page.getByRole('button', { name: '专注观看' }).click();
+      await expect(page.getByRole('complementary', { name: '操作与请求' })).toBeHidden();
+      await page.getByRole('button', { name: '操作记录', exact: true }).click();
+      await expect.poll(getBounds).toEqual(watched?.bounds);
+      await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(960, 900));
+      await expect(page.getByRole('complementary', { name: '操作与请求' })).toBeHidden();
+      await page.getByRole('button', { name: '操作记录', exact: true }).click();
+      await expect(page.getByTestId('browser-test-surface')).toBeHidden();
+      await expect.poll(getBounds).toBeUndefined();
+      await page.getByRole('button', { name: '返回浏览器' }).click();
+      await expect(page.getByTestId('browser-test-surface')).toBeVisible();
+      await expect.poll(getBounds).toBeDefined();
+      await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1280, 900));
+      await expect.poll(getBounds).toEqual(watched?.bounds);
+      await release('开放自动操作');
       await expect(page.getByText('测试页签已关闭，可查看下方记录。')).toBeVisible();
       await expect(page.getByText('操作与请求', { exact: true })).toBeVisible();
       expect(clicks).toBe(1);
       const sessions = await (await request.get(`${api}/tasks/${id}/preview/sessions`, { headers })).json();
       expect(sessions.testTab).toBeUndefined();
-      expect(sessions.attempts).toMatchObject([{ frames: 0, actions: 3, screenshots: ['1.jpg'] }]);
+      expect(sessions.attempts).toMatchObject([{ frames: 0, actions: 37, screenshots: ['1.jpg'] }]);
+      await page.getByRole('button', { name: '全部 37' }).click();
+      await expect(page.getByText('点击 · 执行', { exact: true })).toBeVisible();
     } finally {
       await app.close();
     }

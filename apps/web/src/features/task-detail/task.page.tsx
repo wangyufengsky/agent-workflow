@@ -238,8 +238,9 @@ export function TaskPage() {
       )}
     </div>
   );
+  const watchingTest = task.data.browserTest !== undefined && view === 'preview';
   return (
-    <div className="page wide" data-testid="task-page">
+    <div className={`page wide ${watchingTest ? styles.testViewing : ''}`} data-testid="task-page">
       <TaskHeader
         task={task.data}
         pro={pro}
@@ -254,7 +255,7 @@ export function TaskPage() {
           </Button>
         </div>
       )}
-      {task.data.browserTest !== undefined && (
+      {task.data.browserTest !== undefined && !watchingTest && (
         <div className="col">
           <div className="row">
             <TaskBrowserCase key={task.data.id} task={task.data} />
@@ -335,6 +336,7 @@ export function TaskPage() {
           task.data.git.worktreeStatus === WorktreeStatus.Ready &&
           !ENDED_TASK.includes(task.data.status)) ? (
         <RadixTabs.Root
+          className={watchingTest ? styles.testTabs : undefined}
           value={view ?? 'progress'}
           onValueChange={(next) =>
             void navigate({
@@ -355,7 +357,12 @@ export function TaskPage() {
             <TaskMain task={task.data} selection={selection} pro={pro} />
           </RadixTabs.Content>
           {/* Kept mounted on the progress tab: the user's preview tab stays open, only off the window. */}
-          <RadixTabs.Content value="preview" className="tab-panel" forceMount hidden={view !== 'preview'}>
+          <RadixTabs.Content
+            value="preview"
+            className={`tab-panel ${watchingTest ? styles.testPanel : ''}`}
+            forceMount
+            hidden={view !== 'preview'}
+          >
             {task.data.browserTest === undefined ? (
               <PreviewPane task={task.data} active={view === 'preview'} pro={pro} />
             ) : (

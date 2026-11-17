@@ -1,7 +1,0 @@
-.surface {
-  width: 100%;
-  height: clamp(340px, 62vh, 760px);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--fill-2);
-}

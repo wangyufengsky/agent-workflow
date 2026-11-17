@@ -8,17 +8,17 @@ import {
   VIEWPORT_SIZES,
 } from '@aw/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useRef, useState, useSyncExternalStore } from 'react';
 import { callOperation } from '../../api/client.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { PREVIEW_PANE_COPY as C } from '../../copy/browser.ts';
-import { ERROR_COPY } from '../../copy/errors.ts';
 import { BROWSER_TEST_COPY } from '../../copy/tasks.ts';
-import caseStyles from '../browser-cases/browser-case-handoff.module.css';
 import { BrowserCaseHandoffPane } from '../browser-cases/browser-case-handoff.tsx';
-import { BrowserCaseReport, StepRequests, StepScreenshot } from '../browser-cases/browser-case-report.tsx';
+import { BrowserCaseReport, StepScreenshot } from '../browser-cases/browser-case-report.tsx';
 import { nodeQuery } from '../tasks/tasks.queries.ts';
+import { BrowserTestHistory } from './browser-test-history.tsx';
+import testStyles from './browser-test-pane.module.css';
 import { MyPreview } from './my-preview.tsx';
 import {
   attemptFileUrl,
@@ -26,7 +26,6 @@ import {
   previewQuery,
   previewSessionsQuery,
   taskFileUrl,
-  testActionsQuery,
   useImage,
 } from './preview.queries.ts';
 import styles from './preview-pane.module.css';
@@ -100,108 +99,146 @@ function CheckShots({ taskId, nodeId }: { taskId: string; nodeId: string }) {
   );
 }
 
-function TestActionHistory({ attemptId }: { attemptId: string }) {
-  const actions = useQuery(testActionsQuery(attemptId));
-  if (actions.isError) return <ErrorState error={actions.error} />;
-  if (!actions.data?.length) return null;
-  return (
-    <section className="col">
-      <strong>{BROWSER_TEST_COPY.actions}</strong>
-      <ol>
-        {actions.data.map((action) => (
-          <li key={action.seq}>
-            <p>
-              {C.tool[action.tool] ?? action.tool} {action.path} ·{' '}
-              {action.passed ? BROWSER_TEST_COPY.actionPassed : BROWSER_TEST_COPY.actionFailed}
-            </p>
-            {action.errorCode !== null && <p className="hint">{ERROR_COPY[action.errorCode]}</p>}
-            <StepRequests requests={action.requests} />
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
+const narrowWindow = () => window.matchMedia('(max-width: 1040px)');
+function subscribeToWindowWidth(onChange: () => void): () => void {
+  const media = narrowWindow();
+  media.addEventListener('change', onChange);
+  return () => media.removeEventListener('change', onChange);
 }
 
-/** 自动执行和手动接管使用同一个测试页签，结束后仅显示记录。 */
+/** 实时网页占用剩余空间，记录只在自己的面板滚动。 */
 export function BrowserTestPane({ task, active }: { task: TaskDetailDTO; active: boolean }) {
   const { data, error } = useQuery(previewSessionsQuery(task.id));
   const [selected, setSelected] = useState('');
+  const [focused, setFocused] = useState(false);
+  const [narrowHistory, setNarrowHistory] = useState(false);
+  const narrow = useSyncExternalStore(subscribeToWindowWidth, () => narrowWindow().matches);
   const area = useRef<HTMLDivElement>(null);
   const attempts = data?.attempts ?? [];
   const attempt = attempts.find((item) => item.attemptId === selected) ?? attempts.at(-1);
   const live = data?.testTab?.attemptId === attempt?.attemptId ? data?.testTab : undefined;
   const handoff = live !== undefined ? task.browserCaseHandoff : undefined;
-  usePlacedTab(active ? (live?.tabId ?? null) : null, area);
+  const showRecords = narrow ? narrowHistory && handoff === undefined : !focused;
+  const showPreview = !narrow || !showRecords;
+  const report = task.result?.browserCaseReport;
+  const running = task.status === TaskStatus.Running || task.status === TaskStatus.Paused;
+  const origin = task.browserTest?.target.startsWith('/') === false ? new URL(task.browserTest.target).origin : '';
+  const viewport = live === undefined ? undefined : VIEWPORT_SIZES[live.viewport];
+  usePlacedTab(active && showPreview ? (live?.tabId ?? null) : null, area);
   const capture = useMutation({
     mutationFn: (attemptId: string) => callOperation(captureBrowserTestOp, { taskId: task.id, attemptId }),
   });
-  const report = task.result?.browserCaseReport;
-  const running = task.status === TaskStatus.Running || task.status === TaskStatus.Paused;
   return (
-    <div className={styles.pane}>
-      {error !== null && <ErrorState error={error} />}
-      {attempts.length > 1 && (
-        <select
-          className={`input ${styles.session}`}
-          aria-label={C.session}
-          value={attempt?.attemptId ?? ''}
-          onChange={(event) => setSelected(event.target.value)}
-        >
-          {attempts.map((item, index) => (
-            <option key={item.attemptId} value={item.attemptId}>
-              {BROWSER_TEST_COPY.attempt(index + 1)}
-            </option>
-          ))}
-        </select>
-      )}
-      {live === undefined ? (
-        <p className="hint">{running ? BROWSER_TEST_COPY.waitingPage : BROWSER_TEST_COPY.finishedPage}</p>
-      ) : (
-        <>
-          {handoff === undefined ? (
-            <div className="row">
-              <strong>{BROWSER_TEST_COPY.watching}</strong>
-              <span className="mono">
-                {live.path} · {VIEWPORT_SIZES[live.viewport].width} × {VIEWPORT_SIZES[live.viewport].height}
-              </span>
-              {window.aw !== undefined && (
-                <Button size="sm" pending={capture.isPending} onClick={() => capture.mutate(live.attemptId)}>
-                  {BROWSER_TEST_COPY.capture}
-                </Button>
-              )}
-            </div>
-          ) : (
-            <BrowserCaseHandoffPane taskId={task.id} handoff={handoff} />
-          )}
+    <div className={testStyles.workspace} data-split={showPreview && showRecords} data-testid="browser-test-workspace">
+      {showPreview && (
+        <section className={testStyles.preview} aria-label={BROWSER_TEST_COPY.browser}>
+          <div className={testStyles.toolbar}>
+            {live !== undefined && handoff === undefined && (
+              <strong className={testStyles.watching}>{BROWSER_TEST_COPY.watching}</strong>
+            )}
+            <span className={`mono ${testStyles.address}`} title={origin + (live?.path ?? '')}>
+              {origin}
+              {live?.path}
+            </span>
+            {live !== undefined && handoff === undefined && window.aw !== undefined && (
+              <Button size="sm" pending={capture.isPending} onClick={() => capture.mutate(live.attemptId)}>
+                {BROWSER_TEST_COPY.capture}
+              </Button>
+            )}
+            {narrow && handoff === undefined && (
+              <Button size="sm" icon="list" onClick={() => setNarrowHistory(true)}>
+                {BROWSER_TEST_COPY.records}
+              </Button>
+            )}
+            {!narrow && (
+              <Button size="sm" icon={focused ? 'list' : 'expand'} onClick={() => setFocused(!focused)}>
+                {focused ? BROWSER_TEST_COPY.records : BROWSER_TEST_COPY.focus}
+              </Button>
+            )}
+          </div>
+          {error !== null && <ErrorState error={error} />}
           {capture.isError && <ErrorState error={capture.error} />}
-          {window.aw === undefined ? (
-            <p className="hint">{BROWSER_TEST_COPY.desktopOnly}</p>
-          ) : (
+          {handoff !== undefined && (
+            <div className={testStyles.handoff}>
+              <BrowserCaseHandoffPane taskId={task.id} handoff={handoff} />
+            </div>
+          )}
+          {live !== undefined && window.aw !== undefined ? (
             <div
               ref={area}
-              className={caseStyles.surface}
+              className={testStyles.surface}
               data-testid={handoff?.active === true ? 'case-handoff-surface' : 'browser-test-surface'}
             />
+          ) : (
+            <div className={testStyles.previewBody}>
+              <p className="hint">
+                {live !== undefined
+                  ? BROWSER_TEST_COPY.desktopOnly
+                  : running
+                    ? BROWSER_TEST_COPY.waitingPage
+                    : BROWSER_TEST_COPY.finishedPage}
+              </p>
+              {attempt !== undefined && attempt.frames > 0 && live === undefined && (
+                <FramesViewer key={attempt.attemptId} attemptId={attempt.attemptId} />
+              )}
+              {task.browserCase !== undefined && report !== undefined && (
+                <BrowserCaseReport test={task.browserCase} report={report} />
+              )}
+            </div>
           )}
-        </>
+          {viewport !== undefined && (
+            <div className={testStyles.statusBar}>
+              {handoff === undefined && <span>{BROWSER_TEST_COPY.watchOnly}</span>}
+              <span className="mono">
+                {viewport.width} × {viewport.height}
+              </span>
+            </div>
+          )}
+        </section>
       )}
-      {attempt !== undefined && <TestActionHistory key={attempt.attemptId} attemptId={attempt.attemptId} />}
-      {attempt !== undefined && attempt.frames > 0 && live === undefined && (
-        <FramesViewer key={attempt.attemptId} attemptId={attempt.attemptId} />
-      )}
-      {task.browserCase !== undefined &&
-        report !== undefined &&
-        (attempt === undefined || attempt.attemptId === report.attemptId) && (
-          <BrowserCaseReport test={task.browserCase} report={report} />
-        )}
-      {attempt !== undefined && attempt.screenshots.length > 0 && (
-        <details>
-          <summary>{BROWSER_TEST_COPY.screenshots}</summary>
-          {attempt.screenshots.map((file) => (
-            <StepScreenshot key={file} attemptId={attempt.attemptId} file={file} />
-          ))}
-        </details>
+      {showRecords && (
+        <aside className={testStyles.records} aria-label={BROWSER_TEST_COPY.actions}>
+          <header className={testStyles.recordsHead}>
+            <h2>{BROWSER_TEST_COPY.actions}</h2>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={narrow ? 'chevLeft' : 'x'}
+              aria-label={narrow ? BROWSER_TEST_COPY.backToBrowser : BROWSER_TEST_COPY.hideRecords}
+              title={narrow ? BROWSER_TEST_COPY.backToBrowser : BROWSER_TEST_COPY.hideRecords}
+              onClick={() => (narrow ? setNarrowHistory(false) : setFocused(true))}
+            />
+          </header>
+          {attempts.length > 1 && (
+            <select
+              className={`input ${testStyles.attempt}`}
+              aria-label={C.session}
+              value={attempt?.attemptId ?? ''}
+              onChange={(event) => setSelected(event.target.value)}
+            >
+              {attempts.map((item, index) => (
+                <option key={item.attemptId} value={item.attemptId}>
+                  {BROWSER_TEST_COPY.attempt(index + 1)}
+                </option>
+              ))}
+            </select>
+          )}
+          {attempt !== undefined ? (
+            <BrowserTestHistory key={attempt.attemptId} attemptId={attempt.attemptId} />
+          ) : (
+            <div className={testStyles.empty}>
+              <p className="hint">{BROWSER_TEST_COPY.noActions}</p>
+            </div>
+          )}
+          {attempt !== undefined && attempt.screenshots.length > 0 && (
+            <details className={testStyles.screenshots}>
+              <summary>{BROWSER_TEST_COPY.screenshots}</summary>
+              {attempt.screenshots.map((file) => (
+                <StepScreenshot key={file} attemptId={attempt.attemptId} file={file} />
+              ))}
+            </details>
+          )}
+        </aside>
       )}
     </div>
   );
