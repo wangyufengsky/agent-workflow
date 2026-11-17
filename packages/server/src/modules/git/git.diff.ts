@@ -157,3 +157,12 @@ export function limitDiff(path: string, diff: string): FileDiffDTO {
   const size = Buffer.byteLength(diff);
   return size > DIFF_FILE_MAX_BYTES ? { path, tooLarge: true, size } : { path, diff };
 }
+
+/** Compare the exact repository path without interpreting pathspec characters in the name. */
+export async function fileChangedBetween(repo: string, from: string, to: string, path: string): Promise<boolean> {
+  const { exitCode } = await runGit(['diff', '--quiet', '--end-of-options', from, to, '--', `:(literal)${path}`], {
+    cwd: repo,
+    okExitCodes: [0, 1],
+  });
+  return exitCode === 1;
+}

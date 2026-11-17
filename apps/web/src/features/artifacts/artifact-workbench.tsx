@@ -42,6 +42,7 @@ export function ArtifactWorkbench({
   record,
   nodeDetails,
   onOpenNode,
+  renderDelivery,
 }: {
   task: TaskDetailDTO;
   artifact: NonNullable<TaskDetailDTO['artifact']>;
@@ -50,6 +51,7 @@ export function ArtifactWorkbench({
   record: ReactNode;
   nodeDetails?: NodeDetails | undefined;
   onOpenNode: (id: string) => void;
+  renderDelivery?: (version: ArtifactVersion, disabled: boolean) => ReactNode;
 }) {
   const [panel, setPanel] = useState<Panel>('activity');
   const [draft, setDraft] = useState<{ versionId: string; notes: DraftNote[] }>();
@@ -115,12 +117,20 @@ export function ArtifactWorkbench({
     setCompare(false);
   }
 
+  const pendingNotes = notes.length > 0 || note.trim() !== '' || revision.isPending;
   const sidebar = nodeDetails !== undefined || (!building && panel !== null);
   return (
     <section className={layout.workbench} data-testid="artifact-workbench" aria-label={ARTIFACT_COPY.workbench}>
       <header className={layout.toolbar}>
         <div className={styles.file}>
-          <strong>{version?.name ?? ARTIFACT_COPY.file}</strong>
+          <div className={styles.documentTitle}>
+            <strong>{version?.name ?? ARTIFACT_COPY.file}</strong>
+            {version?.repository !== undefined && (
+              <span className="mono hint" title={version.repository.commit}>
+                {version.repository.path}
+              </span>
+            )}
+          </div>
           {version !== undefined && (
             <select
               className="input"
@@ -180,26 +190,27 @@ export function ArtifactWorkbench({
             {PPT_COPY.makeDeck}
           </Link>
         )}
-        {review && (
-          <Button
-            size="sm"
-            variant="primary"
-            icon="check"
-            pending={delivery.isPending}
-            disabled={
-              !canNote || acknowledgement.blocked || notes.length > 0 || note.trim() !== '' || revision.isPending
-            }
-            onClick={() =>
-              delivery.mutate({ id: task.id, strategy: DeliveryStrategy.ReportOnly, ...acknowledgement.ack })
-            }
-          >
-            {ARTIFACT_COPY.accept}
-          </Button>
-        )}
+        {review && renderDelivery !== undefined && version !== undefined
+          ? renderDelivery(version, !canNote || pendingNotes)
+          : review &&
+            renderDelivery === undefined && (
+              <Button
+                size="sm"
+                variant="primary"
+                icon="check"
+                pending={delivery.isPending}
+                disabled={!canNote || acknowledgement.blocked || pendingNotes}
+                onClick={() =>
+                  delivery.mutate({ id: task.id, strategy: DeliveryStrategy.ReportOnly, ...acknowledgement.ack })
+                }
+              >
+                {ARTIFACT_COPY.accept}
+              </Button>
+            )}
       </header>
       {save.isError && <ErrorState error={save.error} />}
       {delivery.isError && <ErrorState error={delivery.error} />}
-      {review && <UnmetNotice acknowledgement={acknowledgement} />}
+      {review && renderDelivery === undefined && <UnmetNotice acknowledgement={acknowledgement} />}
       <div className={layout.body}>
         <div className={styles.stage}>
           {version !== undefined ? (

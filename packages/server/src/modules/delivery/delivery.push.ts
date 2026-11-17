@@ -1,4 +1,4 @@
-import { AppError, ErrorCode } from '@aw/shared';
+import { AppError, type ArtifactVersion, ErrorCode } from '@aw/shared';
 import {
   branchExists,
   type GitNetwork,
@@ -8,18 +8,20 @@ import {
   type RepoLocks,
   runGit,
 } from '../git/index.ts';
+import { assertReviewedDocument } from './delivery.merge.ts';
 
 export type OriginBranchInput = { repoPath: string; branch: string; authorization: string; network: GitNetwork };
 
 /** Pushes the task branch to `origin` for a pull request (09 §7), under the repository lock; never forced. */
 export async function pushBranch(
   locks: RepoLocks,
-  input: OriginBranchInput & { targetBranch: string },
+  input: OriginBranchInput & { targetBranch: string; reviewedDocument?: ArtifactVersion['repository'] },
 ): Promise<{ diffBase: string; diffHead: string }> {
   const ref = `refs/heads/${input.branch}`;
   return locks.run(input.repoPath, async () => {
     const cwd = input.repoPath;
     const diffHead = (await runGit(['rev-parse', '--verify', `${ref}^{commit}`], { cwd })).stdout.trim();
+    if (input.reviewedDocument !== undefined) await assertReviewedDocument(cwd, diffHead, input.reviewedDocument);
     const diffBase = await mergeBase(cwd, `refs/heads/${input.targetBranch}`, diffHead);
     await runGit(['push', '--quiet', 'origin', `${diffHead}:${ref}`], {
       cwd,

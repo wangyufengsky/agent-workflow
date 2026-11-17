@@ -8,9 +8,11 @@ import { Elapsed } from '../../components/elapsed.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { toast } from '../../components/toast.tsx';
+import { ARTIFACT_COPY } from '../../copy/artifacts.ts';
 import { formatDateTime } from '../../copy/common.ts';
 import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
 import { SKILLS_COPY } from '../../copy/skills.ts';
+import { TASK_CODE_REVIEW_COPY } from '../../copy/task-code-review.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { useAsk } from '../assistant/use-ask.ts';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
@@ -58,6 +60,12 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
   const resume = useResumeTask();
   const start = useStartTask();
   const doing = task.progress ?? task.currentStep;
+  const reviewLabel =
+    task.codeReview !== undefined
+      ? TASK_CODE_REVIEW_COPY.awaitingReport
+      : task.artifact?.versions.at(-1)?.repository === undefined
+        ? undefined
+        : ARTIFACT_COPY.awaitingDocument;
   return (
     <header className={styles.header}>
       <Link to={ROUTES.tasks} className="crumbs">
@@ -65,7 +73,11 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
       </Link>
       <div className={styles.titleRow}>
         <h1 className="title grow">{task.title}</h1>
-        <TaskBadge group={task.displayGroup} archived={task.archivedAt !== null} />
+        <TaskBadge
+          group={task.displayGroup}
+          archived={task.archivedAt !== null}
+          label={task.status === TaskStatus.Review ? reviewLabel : undefined}
+        />
         {details !== undefined && (
           <Button variant="ghost" size="sm" icon="layers" onClick={() => onDetailsChange(!details)}>
             {details ? C.hideDetails : C.showDetails}

@@ -2,9 +2,13 @@ import {
   type Acceptance,
   AcceptanceCheckKind,
   ARTIFACT_WORKFLOW_KEY,
+  CODE_REVIEW_WORKFLOW_KEY,
   FRONTEND_WORKFLOW_KEY,
   PROJECT_CHECK_PLACEHOLDER,
+  REPOSITORY_DOCUMENT_NODE_KEY,
+  REPOSITORY_DOCUMENT_WORKFLOW,
   RequiredStepPosition,
+  TASK_CODE_REVIEW_NODE_KEY,
   type WorkflowDefinition,
   WorkflowDeliverable,
   WorkflowPlanning,
@@ -28,14 +32,14 @@ export const BuiltinWorkflowKey = {
   Artifact: ARTIFACT_WORKFLOW_KEY,
   Bugfix: 'bugfix',
   UnitTests: 'unit_tests',
-  CodeReview: 'code_review',
+  CodeReview: CODE_REVIEW_WORKFLOW_KEY,
   Refactor: 'refactor',
   VersionReview: 'version_review',
   SecurityReview: 'security_review',
   Cleanup: 'cleanup',
   DesignProposal: 'design_proposal',
-  DetailedDesign: 'detailed_design',
-  Breakdown: 'breakdown',
+  DetailedDesign: REPOSITORY_DOCUMENT_WORKFLOW.DetailedDesign,
+  Breakdown: REPOSITORY_DOCUMENT_WORKFLOW.Breakdown,
 } as const;
 
 const projectCheck = { kind: AcceptanceCheckKind.Command, command: PROJECT_CHECK_PLACEHOLDER } as const;
@@ -223,9 +227,13 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
     planning: WorkflowPlanning.Fixed,
     deliverable: WorkflowDeliverable.Report,
     definition: reportOnly(
-      'review',
+      TASK_CODE_REVIEW_NODE_KEY,
       '代码审查',
-      '按需求描述的范围（分支、提交区间或目录）审查代码，在 summary 中产出问题清单：每条写明严重程度（blocker / major / minor）、位置、说明与修改建议。只报真实问题，不提风格偏好。',
+      [
+        '按需求描述的范围审查代码。先解析并记录实际读取的完整 Git 提交 SHA，基于这些提交读取文件和差异。',
+        '调用 agent-workflow_submit_result，summary 写审查结论，code_review 给出 scope 和 findings。审查分支或提交区间用 diff，填写比较的 from 和 to；目录或全仓库审查用 files，填写 commit 及仓库相对 directory（全仓库传空串）。',
+        '每条问题给出严重程度、类别、仓库相对路径、行号或范围、影响及建议。差异中的删除行用 old 侧，其余用 new 侧。只报告能在审查版本中验证的问题；没有发现时提交空数组。',
+      ].join('\n'),
     ),
   },
   {
@@ -373,13 +381,13 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
             acceptance: unchecked,
           },
           {
-            key: 'write',
+            key: REPOSITORY_DOCUMENT_NODE_KEY,
             title: '编写详细设计',
             roleKey: BuiltinRoleKey.Developer,
             instructions: [
-              '按需求与上一步的梳理写一份详细设计文档，放在仓库现有的设计文档目录并沿用其格式（没有时放在 docs/design/，Markdown，文件名用主题），内容包括：',
+              '按需求与上一步的梳理写一份详细设计文档，以 Markdown 提交，沿用仓库现有的设计文档目录和章节约定（没有时放在 docs/design/，文件名用主题），内容包括：',
               '背景与目标；范围与不做的事；总体方案；模块划分与职责；接口定义（签名或请求与响应、错误）；数据结构与表结构的变更；关键流程；异常与边界情况；兼容与迁移；测试方案；实施步骤。',
-              '写到开发者能直接照着实现的程度，与代码现状一致，不编造不存在的模块；用需求的语言书写。只写文档，不改代码。',
+              '写到开发者能直接照着实现的程度，与代码现状一致，不编造不存在的模块；用需求的语言书写。只写文档，不改代码。提交结果时在 changes 中填写这份文档的仓库相对路径。',
             ].join('\n'),
             dependsOn: ['survey'],
             acceptance: {
@@ -415,17 +423,17 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
             acceptance: unchecked,
           },
           {
-            key: 'write',
+            key: REPOSITORY_DOCUMENT_NODE_KEY,
             title: '编写拆解文档',
             roleKey: BuiltinRoleKey.Developer,
             instructions: [
-              '先用 agent-workflow_get_node_output 读取上一步（survey）的完整产出，需求要点清单与梳理在其中的 notes 里。然后按需求与这份梳理，把需求拆成可以分阶段实施的工作包，写成一份拆解文档，放在仓库现有的设计文档目录并沿用其格式（没有时放在 docs/plans/，Markdown，文件名用需求主题），内容依次为：',
+              '先用 agent-workflow_get_node_output 读取上一步（survey）的完整产出，需求要点清单与梳理在其中的 notes 里。然后按需求与这份梳理，把需求拆成可以分阶段实施的工作包，写成一份拆解文档，以 Markdown 提交，沿用仓库现有的设计文档目录和章节约定（没有时放在 docs/plans/，文件名用需求主题），内容依次为：',
               '1. 概述：目标、范围、不做的内容、假设、风险。',
               '2. 阶段：按先后列出，每个阶段写目标与完成标志；后一阶段建立在前一阶段的工作包合并之后的代码上。阶段是人工把关点，每个阶段结束都要人合并一次：最多 6 个阶段，互不需要对方结果的工作包放在同一阶段，不要一个阶段只放一个工作包，只在后面的工作确实要建立在前面合并后的代码上时才分阶段。',
               '3. 工作包：每个一节，写明编号与标题、所属阶段、建议流程（新功能开发、修 Bug、重构、补单元测试、详细设计等）、依赖的工作包、需求切片（可以直接作为一个任务的需求的完整文字：写清要做什么、改哪些模块与接口、怎么验证，不写「见上文」；不规定每个函数名与测试文件名，后面阶段的工作包在前面合并后会按真实代码再细化）、对应原需求的哪几点、验收要求（每条写要求、预期结果与核验方式：AI 核验、项目的测试命令或人工确认；命令只用项目已有的测试命令，不写 node -e 这类内联脚本）。',
               '4. 需求覆盖表：原需求的每一点由哪个工作包负责；不做的点写明原因。',
               '粒度：一个工作包是一个任务能完成并验证的改动，实施时不超过 8 个步骤；太小的合并，太大的再拆，确实拆不开的写明原因。依赖不能成环，只能依赖同一阶段或更早阶段的工作包；互不需要对方结果的工作包不要互相依赖，以便并行。不要单独列「全量回归」或「验收」工作包：每个开发任务自带整体验证，验收要求由各工作包的验收清单核验。',
-              '拆解要与代码现状一致，不编造不存在的模块；用需求的语言书写。只写这一份文档，不改代码。',
+              '拆解要与代码现状一致，不编造不存在的模块；用需求的语言书写。只写这一份文档，不改代码。提交结果时在 changes 中填写这份文档的仓库相对路径。',
             ].join('\n'),
             dependsOn: ['survey'],
             acceptance: {

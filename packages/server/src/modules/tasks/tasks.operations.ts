@@ -60,7 +60,7 @@ export function tasksOperations(tasks: TasksService) {
     implement(getAgentsMdOp, ({ id }) => tasks.agentsMd(id)),
     implement(startAgentsMdTaskOp, (input) => tasks.createAgentsMdTask(input)),
     implement(previewConventionEvidenceOp, (input) => tasks.previewConventionEvidence(input)),
-    implement(getTaskOp, ({ id }) => tasks.detail(id)),
+    implement(getTaskOp, ({ id }) => tasks.workbenchDetail(id)),
     implement(getTaskArtifactOp, ({ id, versionId, sheet }) => tasks.artifacts.preview(id, versionId, sheet)),
     implement(reviseTaskArtifactOp, (input) => tasks.reviseArtifact(input)),
     implement(getRequirementsOp, ({ id }) => tasks.requirements(id)),

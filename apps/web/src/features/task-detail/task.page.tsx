@@ -1,9 +1,11 @@
 import {
+  DeliveryStatus,
   EDITABLE_NODE_STATUSES,
   NodeKind,
   type TaskDetailDTO,
   TaskStatus,
   UiMode,
+  WorkflowDeliverable,
   WorkflowPlanning,
   WorktreeStatus,
 } from '@aw/shared';
@@ -14,6 +16,7 @@ import { useState } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { ProgressCanvas } from '../../canvas/progress-canvas.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { ARTIFACT_COPY } from '../../copy/artifacts.ts';
 import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
@@ -32,8 +35,11 @@ import { NodeDetailPane, NodeDrawer, type NodeTab } from './node-drawer.tsx';
 import { PausedBanner } from './paused-banner.tsx';
 import { PlanReview } from './plan-review.tsx';
 import { PlanningProgress } from './planning-progress.tsx';
-import { ResultCard } from './result-card.tsx';
+import { RemoteDeliveryStatus } from './remote-delivery-status.tsx';
+import { DeliveryOutcome, ResultCard } from './result-card.tsx';
+import { ReviewComments } from './review-comments.tsx';
 import { stepsOfNodes } from './steps.ts';
+import { TaskCodeReviewWorkbench } from './task-code-review.tsx';
 import { TaskHeader } from './task-header.tsx';
 import styles from './task-page.module.css';
 import { TaskPlanEditor } from './task-plan-editor.tsx';
@@ -182,7 +188,12 @@ export function TaskPage() {
   const { taskId } = route.useParams();
   const { node, details, requirement, artifactVersion } = route.useSearch();
   const navigate = route.useNavigate();
-  const task = useQuery(taskQuery(taskId));
+  const task = useQuery({
+    ...taskQuery(taskId),
+    refetchOnWindowFocus: (query) =>
+      query.state.data?.lastDelivery?.status === DeliveryStatus.Conflict &&
+      query.state.data.artifact?.versions.at(-1)?.repository !== undefined,
+  });
   // The pro view: pro mode, or「显示详细信息」on this task in simple mode (D19).
   const isPro = useSettings()['ui.mode'] === UiMode.Pro;
   const pro = isPro || details === true;
@@ -199,6 +210,10 @@ export function TaskPage() {
   if (task.isError) return <ErrorState error={task.error} onRetry={() => void task.refetch()} />;
   const frontend = task.data.frontend;
   const artifact = task.data.artifact;
+  const repositoryDocument = artifact?.versions.at(-1)?.repository !== undefined;
+  const codeReview = task.data.codeReview;
+  const reviewOpen =
+    codeReview !== undefined && task.data.status !== TaskStatus.Draft && task.data.status !== TaskStatus.PlanReview;
   const artifactOpen =
     artifact !== undefined && task.data.status !== TaskStatus.Draft && task.data.status !== TaskStatus.PlanReview;
   const nodeDetails =
@@ -211,6 +226,15 @@ export function TaskPage() {
         };
   const workbench =
     frontend !== undefined && !ENDED_TASK.includes(task.data.status) && task.data.status !== TaskStatus.Merging;
+  const record = (
+    <div className={styles.frontendProgress}>
+      {task.data.status === TaskStatus.Review || task.data.status === TaskStatus.Completed ? (
+        <StepsView task={task.data} selection={selection} pro={pro} />
+      ) : (
+        <TaskMain task={task.data} selection={selection} pro={pro} />
+      )}
+    </div>
+  );
   return (
     <div className="page wide" data-testid="task-page">
       <TaskHeader
@@ -220,6 +244,10 @@ export function TaskPage() {
         onDetailsChange={(on) => void navigate({ search: (prev) => ({ ...prev, details: on }), replace: true })}
       />
       {requirement !== undefined && !hasVisibleChecklist(task.data) && <RequirementsSection task={task.data} />}
+      {repositoryDocument && <DeliveryOutcome task={task.data} />}
+      {repositoryDocument && task.data.status === TaskStatus.Completed && task.data.pullRequest !== null && (
+        <RemoteDeliveryStatus task={task.data} />
+      )}
       {artifactOpen ? (
         <ArtifactWorkbench
           key={task.data.id}
@@ -231,15 +259,29 @@ export function TaskPage() {
           }
           nodeDetails={nodeDetails}
           onOpenNode={selection.open}
-          record={
-            <div className={styles.frontendProgress}>
-              {task.data.status === TaskStatus.Review || task.data.status === TaskStatus.Completed ? (
-                <StepsView task={task.data} selection={selection} pro={pro} />
-              ) : (
-                <TaskMain task={task.data} selection={selection} pro={pro} />
-              )}
-            </div>
-          }
+          record={record}
+          {...(task.data.workflow.deliverable === WorkflowDeliverable.CodeChanges
+            ? {
+                renderDelivery: (version, disabled) => (
+                  <DeliveryDialogButton
+                    key={version.id}
+                    task={task.data}
+                    label={ARTIFACT_COPY.deliver}
+                    artifactVersionId={version.id}
+                    disabled={disabled}
+                  />
+                ),
+              }
+            : {})}
+        />
+      ) : reviewOpen ? (
+        <TaskCodeReviewWorkbench
+          key={taskId}
+          task={task.data}
+          review={codeReview}
+          pro={isPro}
+          record={record}
+          nodeDetails={nodeDetails}
         />
       ) : workbench ? (
         <FrontendWorkbench
@@ -294,8 +336,11 @@ export function TaskPage() {
       ) : (
         <TaskMain task={task.data} selection={selection} pro={pro} />
       )}
+      {repositoryDocument && task.data.status === TaskStatus.Completed && task.data.pullRequest !== null && (
+        <ReviewComments task={task.data} />
+      )}
       {!workbench && frontend !== undefined && <FrontendRoundHistory task={task.data} onOpen={selection.open} />}
-      {!workbench && !artifactOpen && (
+      {!workbench && !artifactOpen && !reviewOpen && (
         <NodeDrawer taskId={taskId} nodeId={nodeId} tab={tab} pro={pro} onClose={closeNode} />
       )}
     </div>

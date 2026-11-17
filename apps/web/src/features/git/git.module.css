@@ -1388,3 +1388,9 @@ button.treeEntry:hover {
 .breakable {
   word-break: break-all;
 }
+
+.fileLine {
+  color: inherit;
+  background: var(--accent-fill);
+  outline: 1px solid var(--accent-line);
+}

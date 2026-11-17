@@ -7,6 +7,17 @@ export const ARTIFACT_WORKFLOW_KEY = 'artifact';
 export const isArtifactWorkflow = (workflow: { key: string; kind: WorkflowKind }): boolean =>
   workflow.kind === WorkflowKind.Builtin && workflow.key === ARTIFACT_WORKFLOW_KEY;
 
+export const REPOSITORY_DOCUMENT_WORKFLOW = {
+  DetailedDesign: 'detailed_design',
+  Breakdown: 'breakdown',
+} as const;
+export const REPOSITORY_DOCUMENT_NODE_KEY = 'write';
+
+export const isRepositoryDocumentWorkflow = (workflow: { key: string; kind: WorkflowKind }): boolean =>
+  workflow.kind === WorkflowKind.Builtin &&
+  (workflow.key === REPOSITORY_DOCUMENT_WORKFLOW.DetailedDesign ||
+    workflow.key === REPOSITORY_DOCUMENT_WORKFLOW.Breakdown);
+
 export const ARTIFACT_PREVIEW_CHARS = 200_000;
 export const ARTIFACT_NOTE_LIMIT = 1000;
 export const ARTIFACT_NOTES_MAX = 12;
@@ -29,6 +40,9 @@ export const artifactVersionSchema = z.object({
   nodeId: z.string(),
   createdAt: z.number(),
   lost: z.array(officeLossSchema),
+  repository: z
+    .object({ path: z.string(), commit: z.string(), integratedDeliveryId: z.string().optional() })
+    .optional(),
 });
 export type ArtifactVersion = z.infer<typeof artifactVersionSchema>;
 

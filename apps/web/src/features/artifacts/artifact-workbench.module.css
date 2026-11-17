@@ -7,11 +7,18 @@
   overflow-wrap: anywhere;
 }
 
+.documentTitle {
+  display: grid;
+  gap: var(--s-1);
+  min-width: 0;
+}
+
 .file select {
   width: auto;
 }
 
 .stage {
+  container: document-stage / inline-size;
   flex: 1;
   min-width: 0;
   padding: var(--s-3);
@@ -21,6 +28,7 @@
 }
 
 .paper {
+  width: 100%;
   max-width: 780px;
   min-height: 360px;
   margin-inline: auto;
@@ -99,7 +107,7 @@
   color: var(--sub);
 }
 
-@media (max-width: 730px) {
+@container document-stage (max-width: 520px) {
   .comparison {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -110,4 +118,14 @@
   margin: 0;
   padding: 0;
   border: 0;
+}
+
+.markdownTable {
+  max-width: 100%;
+  overflow: auto;
+}
+
+.markdownTable .tableMark {
+  width: 1%;
+  white-space: nowrap;
 }

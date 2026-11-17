@@ -12,11 +12,11 @@ import {
   InboxKind,
   NodeEvent,
   NodeKind,
+  type NodeResult,
   NodeStatus,
   nodeMachine,
   type PageCheckUnrunnable,
   type ResultNext,
-  type SubmitResultInput,
   transition,
   withRequestedBy,
 } from '@aw/shared';
@@ -328,7 +328,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     },
 
     /** `submit_result` (12 §6.5): records the result and moves the node to acceptance. */
-    async submitResult(attempt: AttemptDTO, input: SubmitResultInput, ctx: NodeRunContext): Promise<ResultNext> {
+    async submitResult(attempt: AttemptDTO, input: NodeResult, ctx: NodeRunContext): Promise<ResultNext> {
       if (attempt.nodeId === null) throw new Error(`Execute attempt ${attempt.id} has no node`);
       const node = get(attempt.nodeId);
       const { checks, manual } = node.acceptance;

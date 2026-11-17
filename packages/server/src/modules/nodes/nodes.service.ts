@@ -180,6 +180,7 @@ export function createNodesService(deps: NodesServiceDeps) {
         summary: result.summary,
         changes: result.changes ?? [],
         ...(result.notes === undefined ? {} : { notes: result.notes }),
+        ...(result.reviewReport === undefined ? {} : { reviewReport: result.reviewReport }),
         assumptions: result.assumptions ?? [],
         ...(handoff === undefined ? {} : { handoff }),
         checkResults: (node.checkResults ?? []).map(({ kind, passed, output }) => ({ kind, passed, output })),

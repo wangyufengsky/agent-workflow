@@ -138,16 +138,26 @@ const reportFollowUp = (workflowKey: string) =>
     ? { workflow: 'feature', label: C.developFromReport, requirement: C.developRequirement }
     : { workflow: 'bugfix', label: C.fixFromReport, requirement: C.fixRequirement };
 
-export function DeliveryDialogButton({ task }: { task: TaskDetailDTO }) {
+export function DeliveryDialogButton({
+  task,
+  label = C.actionsTitle,
+  disabled,
+  artifactVersionId,
+}: {
+  task: TaskDetailDTO;
+  label?: string;
+  disabled?: boolean;
+  artifactVersionId?: string | undefined;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="primary" size="sm" icon="git" onClick={() => setOpen(true)}>
-        {C.actionsTitle}
+      <Button variant="primary" size="sm" icon="git" disabled={disabled ?? false} onClick={() => setOpen(true)}>
+        {label}
       </Button>
       {open && (
-        <Dialog open onOpenChange={setOpen} title={C.actionsTitle}>
-          <DeliveryActions task={task} />
+        <Dialog open onOpenChange={setOpen} title={label}>
+          <DeliveryActions task={task} artifactVersionId={artifactVersionId} />
         </Dialog>
       )}
     </>
@@ -155,7 +165,13 @@ export function DeliveryDialogButton({ task }: { task: TaskDetailDTO }) {
 }
 
 /** What the user can do with a task waiting for review (14 §3.5): merge, open a PR, ask for changes, discard. */
-export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
+export function DeliveryActions({
+  task,
+  artifactVersionId,
+}: {
+  task: TaskDetailDTO;
+  artifactVersionId?: string | undefined;
+}) {
   const settings = useSettings();
   const pro = settings['ui.mode'] === UiMode.Pro;
   const project = useQuery(projectQuery(task.project.id));
@@ -163,12 +179,17 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
   const changes = useRequestChanges();
   const cancel = useCancelTask();
   const acknowledgement = useDeliveryAcknowledgement(task.id);
-  const { ack, blocked } = acknowledgement;
+  const { blocked } = acknowledgement;
+  const ack = { ...acknowledgement.ack, ...(artifactVersionId === undefined ? {} : { artifactVersionId }) };
   const navigate = useNavigate();
   const [open, setOpen] = useState<Open>(undefined);
   const close = () => setOpen(undefined);
   const delivery = task.lastDelivery;
-  const conflict = delivery?.status === DeliveryStatus.Conflict ? delivery : null;
+  const reviewedVersion = task.artifact?.versions.find(({ id }) => id === artifactVersionId);
+  const conflict =
+    delivery?.status === DeliveryStatus.Conflict && reviewedVersion?.repository?.integratedDeliveryId !== delivery.id
+      ? delivery
+      : null;
   const canPr = project.data !== undefined && project.data.effectiveHosting !== null;
   const { pullRequest } = task;
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
@@ -289,7 +310,7 @@ export function DeliveryActions({ task }: { task: TaskDetailDTO }) {
             </Button>
           </span>
         )}
-        <Button onClick={() => setOpen('revise')}>{C.revise}</Button>
+        {artifactVersionId === undefined && <Button onClick={() => setOpen('revise')}>{C.revise}</Button>}
         <Button variant="ghost" onClick={() => setOpen('discard')}>
           {C.discard}
         </Button>

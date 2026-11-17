@@ -22,6 +22,8 @@ export const ARTIFACT_COPY = {
   latest: ' · 最新',
   save: '保存原件',
   accept: '验收产物',
+  deliver: '验收并交付',
+  awaitingDocument: '待查看文档',
   beforeLabel: (version: number) => `改前 v${version}`,
   before: (version: number) => `改前 · v${version}`,
   previewLabel: (version: number) => `产物预览 v${version}`,
