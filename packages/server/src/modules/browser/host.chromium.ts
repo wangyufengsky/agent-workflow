@@ -2,7 +2,14 @@ import { type BrowserPolicy, type BrowserPortEvent, type BrowserPortOp, blockRea
 import { type Browser, type BrowserContext, type CDPSession, chromium, type Page } from 'playwright-core';
 import { BROWSER_CDP_EVENTS, type BrowserHost } from './browser.host.ts';
 
-type Tab = { page: Page; session: CDPSession; targetId: string; policy: BrowserPolicy; userFacing: boolean };
+type Tab = {
+  page: Page;
+  session: CDPSession;
+  targetId: string;
+  policy: BrowserPolicy;
+  userFacing: boolean;
+  casePartition?: string;
+};
 
 /**
  * Development and tests only (plain Node has no Electron): tabs in a Chromium of playwright-core, cancelling requests
@@ -74,7 +81,14 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
     const page = await context.newPage();
     const session = await context.newCDPSession(page);
     const { targetInfo } = await session.send('Target.getTargetInfo');
-    const tab: Tab = { page, session, targetId: targetInfo.targetId, policy: op.policy, userFacing: op.userFacing };
+    const tab: Tab = {
+      page,
+      session,
+      targetId: targetInfo.targetId,
+      policy: op.policy,
+      userFacing: op.userFacing,
+      ...(op.caseSession === true ? { casePartition: op.partition } : {}),
+    };
     tabs.set(op.tabId, tab);
     const blocked = (url: string, method: string, isWebSocket: boolean) => {
       const reason = blockReason({ url, method, isWebSocket }, tab.policy, !tab.userFacing);
@@ -119,6 +133,12 @@ export function createChromiumHost(): BrowserHost & { close(): Promise<void> } {
 
   async function close(tabId: string): Promise<null> {
     const tab = tabs.get(tabId);
+    if (tab?.casePartition !== undefined) {
+      tabs.delete(tabId);
+      contexts.delete(tab.casePartition);
+      await tab.page.context().close();
+      return null;
+    }
     if (tab === undefined || tab.page.isClosed()) {
       tabs.delete(tabId);
       return null;

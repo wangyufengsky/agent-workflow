@@ -54,7 +54,10 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
     const assumed = inbox
       .list({ taskId, kind: InboxKind.Question }, InboxStatus.Resolved)
       .flatMap((item) => (item.response !== null && 'assumed' in item.response ? [item.response.value] : []));
+    const browserCaseReport = done.find(({ result }) => result.browserCaseReport !== undefined)?.result
+      .browserCaseReport;
     return {
+      ...(browserCaseReport === undefined ? {} : { browserCaseReport }),
       ...(isFrontendWorkflow(workflow) ? { frontendVerified: frontendVerified(steps) } : {}),
       summary:
         summarized.length === 1

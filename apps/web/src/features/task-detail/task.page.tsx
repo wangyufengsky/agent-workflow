@@ -15,15 +15,18 @@ import { getRouteApi, Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { ProgressCanvas } from '../../canvas/progress-canvas.tsx';
+import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { ARTIFACT_COPY } from '../../copy/artifacts.ts';
 import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
+import { BROWSER_CASE_COPY } from '../../copy/browser-cases.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
-import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { BROWSER_TEST_COPY, TASK_COPY as C } from '../../copy/tasks.ts';
 import { ArtifactWorkbench } from '../artifacts/artifact-workbench.tsx';
+import { TaskBrowserCase } from '../browser-cases/task-browser-case.tsx';
 import { FrontendRoundHistory, FrontendWorkbench } from '../preview/frontend-workbench.tsx';
-import { PreviewPane } from '../preview/preview-pane.tsx';
+import { BrowserTestPane, PreviewPane } from '../preview/preview-pane.tsx';
 import { projectQuery } from '../projects/projects.queries.ts';
 import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
@@ -235,14 +238,38 @@ export function TaskPage() {
       )}
     </div>
   );
+  const watchingTest = task.data.browserTest !== undefined && view === 'preview';
   return (
-    <div className="page wide" data-testid="task-page">
+    <div className={`page wide ${watchingTest ? styles.testViewing : ''}`} data-testid="task-page">
       <TaskHeader
         task={task.data}
         pro={pro}
         details={isPro ? undefined : details === true}
         onDetailsChange={(on) => void navigate({ search: (prev) => ({ ...prev, details: on }), replace: true })}
       />
+      {task.data.browserCaseHandoff !== undefined && view !== 'preview' && (
+        <div className="row">
+          <strong>{BROWSER_CASE_COPY.handoff.heading}</strong>
+          <Button size="sm" onClick={() => void navigate({ search: (prev) => ({ ...prev, view: 'preview' }) })}>
+            {BROWSER_CASE_COPY.handoff.open}
+          </Button>
+        </div>
+      )}
+      {task.data.browserTest !== undefined && !watchingTest && (
+        <div className="col">
+          <div className="row">
+            <TaskBrowserCase key={task.data.id} task={task.data} />
+          </div>
+          <p className="hint">
+            {BROWSER_TEST_COPY.target} · {task.data.browserTest.target}
+          </p>
+          <p className="hint">
+            {BROWSER_TEST_COPY.writes} ·{' '}
+            {task.data.browserTest.writes.map(({ method, path }) => `${method} ${path}`).join('、') ||
+              BROWSER_TEST_COPY.noWrites}
+          </p>
+        </div>
+      )}
       {requirement !== undefined && !hasVisibleChecklist(task.data) && <RequirementsSection task={task.data} />}
       {repositoryDocument && <DeliveryOutcome task={task.data} />}
       {repositoryDocument && task.data.status === TaskStatus.Completed && task.data.pullRequest !== null && (
@@ -304,11 +331,12 @@ export function TaskPage() {
             </div>
           }
         />
-      ) : project.data?.preview !== null &&
-        project.data !== undefined &&
-        task.data.git.worktreeStatus === WorktreeStatus.Ready &&
-        !ENDED_TASK.includes(task.data.status) ? (
+      ) : task.data.browserTest !== undefined ||
+        (project.data?.preview != null &&
+          task.data.git.worktreeStatus === WorktreeStatus.Ready &&
+          !ENDED_TASK.includes(task.data.status)) ? (
         <RadixTabs.Root
+          className={watchingTest ? styles.testTabs : undefined}
           value={view ?? 'progress'}
           onValueChange={(next) =>
             void navigate({
@@ -322,15 +350,24 @@ export function TaskPage() {
               {PREVIEW_PANE_COPY.tabProgress}
             </RadixTabs.Trigger>
             <RadixTabs.Trigger value="preview" className="tab">
-              {PREVIEW_PANE_COPY.tabPreview}
+              {task.data.browserTest === undefined ? PREVIEW_PANE_COPY.tabPreview : BROWSER_TEST_COPY.browser}
             </RadixTabs.Trigger>
           </RadixTabs.List>
           <RadixTabs.Content value="progress" className="tab-panel">
             <TaskMain task={task.data} selection={selection} pro={pro} />
           </RadixTabs.Content>
           {/* Kept mounted on the progress tab: the user's preview tab stays open, only off the window. */}
-          <RadixTabs.Content value="preview" className="tab-panel" forceMount hidden={view !== 'preview'}>
-            <PreviewPane task={task.data} active={view === 'preview'} pro={pro} />
+          <RadixTabs.Content
+            value="preview"
+            className={`tab-panel ${watchingTest ? styles.testPanel : ''}`}
+            forceMount
+            hidden={view !== 'preview'}
+          >
+            {task.data.browserTest === undefined ? (
+              <PreviewPane task={task.data} active={view === 'preview'} pro={pro} />
+            ) : (
+              <BrowserTestPane task={task.data} active={view === 'preview'} />
+            )}
           </RadixTabs.Content>
         </RadixTabs.Root>
       ) : (

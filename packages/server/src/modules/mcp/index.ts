@@ -33,7 +33,7 @@ import { submitFindingsTool } from './tools/submit-findings.tool.ts';
 import { submitMemberAnalysisTool } from './tools/submit-member-analysis.tool.ts';
 import { submitOutlineTool } from './tools/submit-outline.tool.ts';
 import { submitPlanTool } from './tools/submit-plan.tool.ts';
-import { submitResultTool } from './tools/submit-result.tool.ts';
+import { submitBrowserReportTool, submitResultTool } from './tools/submit-result.tool.ts';
 import { submitReviewTool } from './tools/submit-review.tool.ts';
 import { submitSlideTool } from './tools/submit-slide.tool.ts';
 import { taskArtifactTools } from './tools/task-artifact.tool.ts';
@@ -88,6 +88,7 @@ export function createMcpModule({
     ...taskArtifactTools(tasks, office, attachments),
     submitPlanTool(tasks),
     submitResultTool(tasks, debug),
+    submitBrowserReportTool(tasks),
     submitReviewTool(acceptance),
     askUserTool(tasks),
     reportProgressTool(attempts),
@@ -101,9 +102,9 @@ export function createMcpModule({
     submitCommitMessageTool(commitDrafts),
     submitMemberAnalysisTool(team),
     submitBreakdownTool(initiatives),
-    ...browserTools({ browser, attempts, knowledge, filesDirOf }),
+    ...browserTools({ browser, attempts, knowledge, filesDirOf, tasks }),
   ];
-  const registry = createToolRegistry(tools, attempts, log);
+  const registry = createToolRegistry(tools, attempts, log, tasks.browserTestSubmit);
   return {
     registry,
     operations: [implement(listMcpToolsOp, () => ({ items: registry.info() }))],

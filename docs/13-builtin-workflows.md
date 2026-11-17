@@ -74,6 +74,10 @@ packages/builtin/
 | acceptance | `locate`：无检查；`fix`：`[command $PROJECT_CHECK, browser, ai_review(focus: 是否修复根因而非绕过症状，是否引入兜底逻辑)]` |
 | checkpoints | 全部 `false` |
 
+### `browser_test` · 浏览器测试
+
+「浏览器测试」固定为一个报告步骤。用户通过任务表单提供测试地址、步骤和预期结果，并确认允许写入的 HTTP 方法与路径。执行使用任务的内置浏览器与隔离页签，按用例汇总结果和截图。见 [29 §9](29-browser.md#9-应用助手)。
+
 ### 3.3 `unit_tests` · 补单元测试
 
 | 项 | 值 |

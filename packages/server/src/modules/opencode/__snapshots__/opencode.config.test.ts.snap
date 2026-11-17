@@ -9770,6 +9770,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "mode": "primary",
       "permission": {
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "edit": "deny",
         "external_directory": "deny",
         "question": "deny",
@@ -9796,6 +9797,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "mode": "primary",
       "permission": {
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "edit": "allow",
         "external_directory": "deny",
         "question": "deny",
@@ -9819,6 +9821,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "mode": "primary",
       "permission": {
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "edit": "deny",
         "external_directory": "deny",
         "question": "deny",
@@ -9839,6 +9842,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "permission": {
         "*": "deny",
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "agent-workflow_inspect_delegation": "allow",
         "agent-workflow_submit_delegation": "allow",
         "edit": "deny",
@@ -9854,6 +9858,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "mode": "primary",
       "permission": {
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "edit": "deny",
         "external_directory": "deny",
         "question": "deny",
@@ -9872,6 +9877,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "mode": "primary",
       "permission": {
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "edit": "deny",
         "external_directory": "deny",
         "question": "deny",
@@ -9891,6 +9897,7 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       "mode": "primary",
       "permission": {
         "agent-workflow-app_*": "deny",
+        "agent-workflow_browser_submit_report": "deny",
         "edit": "deny",
         "external_directory": "deny",
         "question": "deny",

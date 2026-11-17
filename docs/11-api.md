@@ -121,7 +121,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | GET | `/tasks?projectId&status&displayGroup&archived&limit&cursor` | `{ items: TaskSummaryDTO[], nextCursor }`，`archived`（默认 false）只列未归档的任务，true 只列已归档的（D219）；按 `updatedAt`（同时按编号）倒序分页（§1，`LIST_PAGE_DEFAULT` / `LIST_PAGE_MAX`）；`displayGroup` 在查询中过滤（由 `resolveTaskDisplayGroup` 推出每个状态与是否有打开的提问 / 权限 / 验收条目的组合），每页都是满的；游标为上一页最后一个任务的 `<updatedAt>.<seq>`，格式不对 400 `VALIDATION_FAILED` |
 | POST | `/tasks` | 创建，见下 |
 | GET | `/tasks/:id` | `TaskDetailDTO` |
-| GET | `/tasks/:id/preview/sessions` | `{ attempts: [{ attemptId, nodeId, kind, status, frames }], checks: [{ nodeId, passed }] }`：任务预览页签可看的会话（v1.3 B2，29 §8.1）——留下过动作画面的尝试，与最近一次页面体检有截图的步骤 |
+| GET | `/tasks/:id/preview/sessions` | `{ attempts: [{ attemptId, nodeId, kind, status, frames }], checks: [{ nodeId, passed }] }`：任务预览页签可看的会话（v1.3 B2，29 §8.1）。浏览器测试额外返回运行中的 `testTab`，各尝试列出操作记录数量与按需截图 |
 | GET | `/tasks/:id/timeline?afterId` | `{ items: TaskEventDTO[] }`：`id > afterId` 的 `task_events`，按 id 升序 |
 | POST | `/tasks/:id/start` | `draft → preparing` |
 | POST | `/tasks/:id/pause` 🅿 | `running → paused`：不再派发新步骤，进行中的步骤继续 |
@@ -158,7 +158,23 @@ type CreateTaskRequest = {
 };
 ```
 
+浏览器测试流程（`browser_test`）须携带 `browserTest: { target, writes: [{ method, path }] }`。`target` 是项目预览路径或不带凭据的 HTTP(S) 地址。写入方法为 POST、PUT、PATCH 或 DELETE，按完整路径匹配。任务详情返回同一份创建时冻结的授权。浏览器会话列表的 `attempts[].screenshots` 列出实际保存的截图文件。
+
 检查点解析：请求值 > 流程 `definition.checkpoints` > 设置 `ai.askOnUncertainty`（仅 ask_on_uncertainty）。解析结果写入 `tasks.checkpoints`，之后不再变。
+
+### 浏览器测试用例
+
+| 方法 | 路径 | 输入和结果 |
+| --- | --- | --- |
+| GET | `/projects/:projectId/browser-cases` | 项目用例列表 `{ items }` |
+| POST | `/projects/:projectId/browser-cases` | `{ definition }`，创建用例并返回版本 1 |
+| PUT | `/projects/:projectId/browser-cases/:caseId` | `{ revision, definition }`，只更新该版本并递增；过期版本返回 409 |
+| POST | `/projects/:projectId/browser-cases/:caseId/run` | `{ revision, approved: true }`，冻结已确认的版本并创建任务；过期版本返回 409 |
+| POST | `/tasks/:id/browser-case/rerun` | `{ approved: true }`，用原任务保存的用例版本和基础分支创建新任务 |
+| POST | `/tasks/:id/browser-case/handoff/take` | `{ handoffId }`，接管当前暂停的测试页签，204 |
+| POST | `/tasks/:id/browser-case/handoff/resume` | `{ handoffId }`，交还测试页签并继续，204。表单仍需登录或验证时 409 |
+
+定义包含 `name`、`scope` 和 `steps`。任务详情在等待接管时带 `browserCaseHandoff: { id, tabId, step, reason, active }`，`browserCase` 返回本次用例快照，`result.browserCaseReport` 返回每一步实际值、结果、截图文件与 HTTP 请求证据。
 
 ### 5.2 TaskDetailDTO
 
@@ -381,6 +397,9 @@ type AttemptDTO = AttemptSummaryDTO & {
 | POST | `/assistant/conversations/:id/messages` | `{ text, context: AssistantPageRef }` → 对话；`AssistantPageRef = { page: AssistantPage, params: { taskId?, nodeId?, projectId?, workflowKey?, knowledgeConversationId?, deckId?, slideId?, batchId?, scheduleId? } }`（每个页面需要的参数见 `ASSISTANT_PAGE_PARAMS`），后端据此在本轮 `system` 中写明当前页面与选中对象的名称；正在创建会话、发送请求、删除或等待模型回复时 409 `ASSISTANT_BUSY` |
 | POST | `/assistant/conversations/:id/abort` | 停止本轮回复 |
 | PUT | `/assistant/conversations/:id/preview` | `assistant.bindPreview`，界面专用、不对助手开放；`{ preview: { taskId, tabId } \| null }` → 204。只接受属于该任务的真实用户预览，不能绑定 AI 页签；`null` 解除关联，删除后的清理也幂等。仅保存在内存 |
+| PUT | `/assistant/conversations/:id/browser-control` | `assistant.controlBrowser`，界面专用。 `{ tabId, enabled }` → `{ enabled }`；启用仅接受当前对话关联的项目预览。网页动作通过助手现有确认接口批准一次。 |
+| GET | `/assistant/conversations/:id/browser-control?tabId=` | `assistant.getBrowserControl`，返回当前操作方 `mode`（`off`、`assistant`、`manual`）及本地对话记录 `activity` |
+| PUT | `/assistant/conversations/:id/browser-control/handoff` | `assistant.handoffBrowser`，`{ tabId, manual }`，204。接管暂停助手读页和操作并使旧确认失效，交回恢复当前授权 |
 | POST | `/assistant/conversations/:id/permissions/:permissionId` | `{ reply: PermissionDecision }`：回复助手会话的权限请求（bash / webfetch 询问），不存在 404 `NOT_FOUND` |
 | GET | `/assistant/conversations/:id/transcript?afterSeq=` | 消息流分页（非清单路由，格式同 `/attempts/:id/transcript`；`done` 恒为 false：对话不会结束） |
 | GET | `/assistant/external-mcp` | `assistant.externalMcp`（read，仅界面）：`{ items: Array<{ name, status: ExternalMcpStatus, error: string \| null }> }`：opencode `mcp.status`（助手目录）报告的 MCP 服务器，去掉应用自己的 `agent-workflow` 与 `agent-workflow-app`，按名称排序；opencode 没就绪 503 `OPENCODE_NOT_READY`（28 §4） |
@@ -527,6 +546,8 @@ N2a 实现组合模板，N2b 加入 AI 拆解（`templateKey` 省略时）、重
 | GET | `/browser/tabs/:tabId/logs` | `browser.userTabLogs` | read | `{ errors: [{ message, source }], requests: [{ method, url, status, error }] }`：用户预览标签页当前页面的控制台错误（含未捕获异常）与失败请求，底栏抽屉的明细（v1.3 B2） |
 | POST | `/browser/tabs/:tabId/viewport` | `browser.setUserViewport` | read | `{ preset }`：桌面铺满放置区域，平板 / 手机在区域里模拟该尺寸（`Emulation.setDeviceMetricsOverride`）|
 | GET | `/attempts/:attemptId/browser-frames` | `browser.listFrames` | read | `{ items: BrowserFrame[] }`：一次尝试的动作画面，按 `seq` 排列（读尝试目录里的 `frames.jsonl`，尝试结束、应用重启后照样可读；没有画面为空列表；v1.3 B2，29 §8.2） |
+| GET | `/attempts/:attemptId/browser-test-actions` | `browser.listTestActions` | read | AI 浏览器测试的操作结果和相关请求，按执行顺序返回 |
+| POST | `/tasks/:taskId/browser-test-screenshot` | `browser.captureTest` | read | 指定 `attemptId`，保存正在运行且无需身份验证的测试页截图，返回文件名 |
 
 ### 13f″. 助手网页文字读取（29 §9）
 

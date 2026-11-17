@@ -1,13 +1,19 @@
 import {
+  AppError,
   abortAssistantOp,
+  actAssistantBrowserOp,
   bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
+  controlAssistantBrowserOp,
   createAssistantContinuationOp,
   createConversationOp,
   deleteConversationOp,
+  ErrorCode,
+  getAssistantBrowserControlOp,
   getAssistantContinuationHistoryOp,
   getConversationOp,
+  handoffAssistantBrowserOp,
   listAssistantAttachmentsOp,
   listAssistantFilesOp,
   listConfirmationsOp,
@@ -28,6 +34,10 @@ import type { AssistantService } from './assistant.service.ts';
 import type { AssistantSnapshots } from './assistant.snapshots.ts';
 import type { WhisperService } from './assistant.whisper.ts';
 
+export const confirmedBrowserOperation = implement(actAssistantBrowserOp, () => {
+  throw new AppError(ErrorCode.ValidationFailed, 'Use the conversation confirmation');
+});
+
 export function assistantOperations(
   conversations: AssistantService,
   confirmations: Confirmations,
@@ -47,14 +57,27 @@ export function assistantOperations(
     implement(listAssistantAttachmentsOp, ({ id }) => ({ items: conversations.listAttachments(id) })),
     implement(getConversationOp, ({ id }) => conversations.get(id)),
     implement(deleteConversationOp, async ({ id }) => {
-      await conversations.delete(id);
       browser.bindPreview(id, null);
+      await conversations.delete(id);
     }),
     implement(bindAssistantPreviewOp, ({ id, preview }) => {
       // 取消关联是幂等清理；删除对话后的界面卸载仍会发送它。
       if (preview !== null) conversations.get(id);
       browser.bindPreview(id, preview);
     }),
+    implement(controlAssistantBrowserOp, ({ id, tabId, enabled }) => {
+      const conversation = conversations.get(id);
+      return browser.setAssistantControl(id, conversation.projectId, tabId, enabled);
+    }),
+    implement(getAssistantBrowserControlOp, ({ id, tabId }) => {
+      conversations.get(id);
+      return browser.assistantControlInfo(id, tabId);
+    }),
+    implement(handoffAssistantBrowserOp, ({ id, tabId, manual }) => {
+      conversations.get(id);
+      return browser.handoffAssistantControl(id, tabId, manual);
+    }),
+    confirmedBrowserOperation,
     implement(sendAssistantMessageOp, (input) => conversations.send(input)),
     implement(abortAssistantOp, ({ id }) => conversations.abort(id)),
     implement(replyAssistantPermissionOp, ({ id, permissionId, reply }) =>

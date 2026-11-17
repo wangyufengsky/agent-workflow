@@ -30,6 +30,7 @@ const bridge: AwBridge = {
       };
     },
     place: (tabId, rect) => ipcRenderer.send('aw:browser-place', tabId, rect),
+    setWatchZoom: (tabId, zoom) => ipcRenderer.send('aw:browser-watch-zoom', tabId, zoom),
     back: (tabId) => ipcRenderer.send('aw:browser-back', tabId),
     forward: (tabId) => ipcRenderer.send('aw:browser-forward', tabId),
     reload: (tabId) => ipcRenderer.send('aw:browser-reload', tabId),

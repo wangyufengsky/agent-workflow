@@ -1,4 +1,6 @@
 import {
+  AssistantBrowserActivityKind,
+  AssistantBrowserActivityOutcome,
   AssistantConfirmationStatus,
   AssistantToolName,
   AssistantTurnStatus,
@@ -266,4 +268,36 @@ export const MEMORY_COPY = {
   empty: '没有记忆。可以在这里添加，或对助手说「记住……」。',
   approval: '确认后保存，适用范围内的后续对话可以使用这条记忆。',
   description: '记忆保存在此设备。助手使用的条目会发送给当前模型。',
+} as const;
+
+export const ASSISTANT_BROWSER_COPY = {
+  preview: '任务预览',
+  closePreview: '关闭预览',
+  previewUnavailable: '任务工作区就绪后可打开预览。',
+  enable: '让助手操作',
+  stop: '停止操作',
+  active: '助手正在控制',
+  manual: '你正在控制',
+  take: '接管页签',
+  giveBack: '交回助手',
+  history: '操作记录',
+  empty: '这段对话还没有网页操作记录。',
+  enableHelp: '允许助手连续筛选和查看当前页签。提交、发送和删除仍逐次确认。启用时会重新加载当前页。',
+  takeHelp: '暂停助手看页和操作。交回后仍使用当前页签和原授权。',
+  kinds: {
+    [AssistantBrowserActivityKind.Click]: '点击',
+    [AssistantBrowserActivityKind.Type]: '填写字段',
+    [AssistantBrowserActivityKind.Select]: '选择选项',
+    [AssistantBrowserActivityKind.Press]: '按键',
+    [AssistantBrowserActivityKind.Take]: '你接管了页签',
+    [AssistantBrowserActivityKind.Return]: '你把页签交回助手',
+  },
+  outcomes: {
+    [AssistantBrowserActivityOutcome.Done]: '已执行',
+    [AssistantBrowserActivityOutcome.Confirmation]: '已发起确认',
+    [AssistantBrowserActivityOutcome.Blocked]: '请求被拦截',
+    [AssistantBrowserActivityOutcome.Failed]: '执行失败',
+  },
+  confirmation: '只授权执行本次操作。接管页签、切换对话或更改表单后，需要重新发起。',
+  noWrite: '本次不授权 HTTP 写请求',
 } as const;

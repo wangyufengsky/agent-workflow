@@ -14,6 +14,7 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { DATABASES_COPY } from '../../copy/databases.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
 import { AGENTS_MD_COPY, PROJECTS_COPY as C, PROJECT_RUNTIME_COPY } from '../../copy/projects.ts';
+import { ProjectBrowserCases } from '../browser-cases/project-browser-cases.tsx';
 import { ProjectDatabases } from '../databases/project-databases.tsx';
 import { DEFAULT_START_WORKFLOW } from '../home/workflow-icon.ts';
 import { useSettings } from '../settings/settings.queries.ts';
@@ -146,6 +147,9 @@ export function ProjectDetailPage() {
       </div>
       <section className="section">
         <ProjectRecentTasks projectId={p.id} />
+      </section>
+      <section className="section">
+        <ProjectBrowserCases key={p.id} projectId={p.id} />
       </section>
       <section className="section">
         <Link to={ROUTES.pptNew} search={{ projectId: p.id }} className="btn sm">

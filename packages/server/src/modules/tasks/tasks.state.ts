@@ -217,6 +217,8 @@ export function createTaskState(deps: TasksServiceDeps) {
       projectId: task.projectId,
       taskKey: task.key,
       taskTitle: task.title,
+      browserTest: task.browserTest !== null,
+      ...(task.browserCase === null ? {} : { browserCase: task.browserCase }),
       requirement: promptRequirement(task),
       directory: worktree.path,
       repoPath: project.repoPath,

@@ -1,11 +1,11 @@
 ---
 name: aw-assistant-preview
-description: Use when the user wants to see a task's page, asks why the page they are looking at shows an error or looks wrong, wants a frontend page built, revised or checked, or wants a website read: previews_start, open_page task_preview, browser_read, browser_readUrl. How to start and open the preview, read what the user sees and explain console errors and failed requests.
+description: Use when the user wants to open, read or operate a task preview, diagnose a page error, build or revise a frontend page, or read a website. Covers previews_start, open_page task_preview, browser_read, assistant_actBrowser and browser_readUrl.
 ---
 
 # Page previews and websites
 
-A task's page preview is the project's dev server running the task's branch in its worktree. The user looks at it in a preview tab of the app. You can start it, open the tab, read the page the user has open and read websites; you cannot click or type on pages.
+A task's page preview is the project's dev server running the task's branch in its worktree. The user looks at it in a preview tab of the app. You can start it, open the tab, and read or operate the page with the user’s permission. Website reading by URL runs in a separate read-only tab.
 
 ## Showing a task's page
 
@@ -37,8 +37,14 @@ To explain an error:
 - When the user asks you to apply a change, call `agent-workflow-app_tasks_get` for the page's task. When it is ready for review, call `agent-workflow-app_tasks_requestChanges` with `reason: user` and the agreed feedback. Include the path, viewport, target and expected result yourself. The confirmation card carries your request into the same task as its next revision. If a round is running, help the user draft its follow-up and wait for it to be ready before submitting.
 - For final acceptance or delivery, load `aw-task-delivery` and follow the task state and available evidence.
 
+## Operating the selected preview
+
+1. Ask the user to select their preview and enable「让助手操作」. Call `agent-workflow-app_browser_read` for the current refs.
+2. Call `agent-workflow-app_assistant_actBrowser` with the requested action. Use type or select for fields, click for a link or button, and press for a key. The active grant covers repeated filtering and viewing on that tab. The app confirms submissions, sends, deletions and ambiguous controls individually. If the user takes over, wait for them to return the tab, then read it again for fresh refs. Supply the exact HTTP method and path when the requested write is known. The user handles login, passwords, verification codes and file picking.
+3. On `needs_confirmation`, tell the user which action is waiting and end the turn. On a cancelled, expired or blocked action, report what happened and wait for a new instruction. On success, verify the expected change in the returned snapshot.
+
 ## Reading a website
 
 `agent-workflow-app_browser_readUrl` with a full address reads a page read-only: its text and its console log. A page that needs a login returns `BROWSER_LOGIN_REQUIRED`: the user logs in under Settings → Websites → Website login (pro mode), then you read again. Sites the user's website rules do not allow return `BROWSER_SITE_NOT_ALLOWED`. A whole read is cut off after 30 seconds (`BROWSER_READ_FAILED`).
 
-When the user needs something done on a page (clicking, filling a form), tell them the steps instead.
+For interactions on external websites, explain the steps or open the browser test task form so the user can authorize a test environment.

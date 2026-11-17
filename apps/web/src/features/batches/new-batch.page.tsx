@@ -1,6 +1,7 @@
 import {
   BATCH_TARGET_PLACEHOLDER,
   BATCH_TARGETS_MAX,
+  BROWSER_TEST_WORKFLOW_KEY,
   renderBatchRequirement,
   UiMode,
   WorkflowKind,
@@ -43,7 +44,10 @@ export function NewBatchPage() {
   const projects = useQuery(projectsQuery).data ?? [];
   const workflows = useQuery(workflowsQuery);
   const fixed = workflows.data?.filter(
-    (w) => w.planning === WorkflowPlanning.Fixed && (pro || w.kind === WorkflowKind.Builtin),
+    (w) =>
+      w.key !== BROWSER_TEST_WORKFLOW_KEY &&
+      w.planning === WorkflowPlanning.Fixed &&
+      (pro || w.kind === WorkflowKind.Builtin),
   );
   const [projectId, setProjectId] = useState(
     projects.some((p) => p.id === search.projectId) ? search.projectId : projects[0]?.id,

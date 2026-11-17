@@ -52,7 +52,13 @@ export function createScheduler({ tasks, nodes, attempts, settings, slots, event
       runtimeReady: attempts.isReady(),
       tasks: scheduled
         .sort((a, b) => a.createdAt - b.createdAt)
-        .map((t) => ({ id: t.id, status: t.status, planning: planning.has(t.id), nodes: byTask.get(t.id) ?? [] })),
+        .map((t) => ({
+          id: t.id,
+          status: t.status,
+          planning: planning.has(t.id),
+          nodes: byTask.get(t.id) ?? [],
+          local: t.browserCase !== null,
+        })),
     };
   }
 

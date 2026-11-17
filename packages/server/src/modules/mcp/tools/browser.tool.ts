@@ -26,10 +26,12 @@ import {
 import type { AttemptsService } from '../../attempts/index.ts';
 import type { BrowserOwner, BrowserService } from '../../browser/index.ts';
 import type { KnowledgeService } from '../../knowledge/index.ts';
+import type { TasksService } from '../../tasks/index.ts';
 import { defineMcpTool, MCP_IMAGES, type McpToolDefinition } from '../mcp.registry.ts';
 
 export type BrowserToolDeps = {
   browser: BrowserService;
+  tasks: TasksService;
   attempts: AttemptsService;
   knowledge: KnowledgeService;
   filesDirOf: (attempt: AttemptDTO) => string;
@@ -56,7 +58,7 @@ const HINTS: Partial<Record<ErrorCode, string>> = {
   [ErrorCode.BrowserSiteNotAllowed]:
     "The user's website rules do not allow this host. Continue without it; do not try other addresses to get around the rules.",
   [ErrorCode.BrowserLoginRequired]:
-    'The website wants a login. Ask the user (ask_user) to log in to it in the app (Settings, Websites; shown in pro mode), or continue without it. Never type a password.',
+    'For a browser test, let the user complete verification in the current Test Browser tab. For other sites, use the app website login. Never type a password.',
   [ErrorCode.BrowserRefStale]: 'The page changed. Call browser_snapshot and use the refs it returns.',
   [ErrorCode.BrowserActionFailed]:
     'details.reason says why: covered (details.coveredBy is on top: close or wait for it), not_visible, disabled, detached or not_focusable. Take a snapshot and pick another way.',
@@ -67,11 +69,14 @@ function ownerOf(deps: BrowserToolDeps, attempt: AttemptDTO): BrowserOwner {
   if (attempt.kind === AttemptKind.Research && !deps.knowledge.webAllowed(attempt)) {
     throw new AppError(ErrorCode.McpToolNotAllowed, 'The web is not a source of this question', { kind: attempt.kind });
   }
+  const browserTest = attempt.taskId === null ? null : deps.tasks.browserTest(attempt.taskId);
   return {
     id: attempt.id,
     taskId: attempt.taskId,
     projectId: deps.attempts.projectOf(attempt.id),
     filesDir: deps.filesDirOf(attempt),
+    browserTest,
+    ...(browserTest === null ? {} : { waitForUser: (wait) => deps.attempts.waitForBrowserInput(attempt.id, wait) }),
   };
 }
 

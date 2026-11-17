@@ -101,6 +101,7 @@ export function createTaskContext(deps: TasksServiceDeps, state: TaskState) {
           key: task.key,
           title: task.title,
           requirement: task.requirement,
+          ...(task.browserTest === null ? {} : { browserTest: task.browserTest }),
           workflow: workflow.name,
           deliverable: workflow.deliverable,
         },

@@ -5,6 +5,9 @@ import {
   type ArtifactRevision,
   type AttemptDTO,
   BatchDeliveryOutcome,
+  BROWSER_TEST_WORKFLOW_KEY,
+  type BrowserCase,
+  browserTestSubmitTool,
   type CreateTaskRequest,
   type DeliverRequest,
   DeliveryStatus,
@@ -16,6 +19,7 @@ import {
   isRepositoryDocumentWorkflow,
   isTaskCodeReview,
   type ListTasksQuery,
+  McpToolName,
   type NodeDetailDTO,
   type PlanDTO,
   type PlanGraph,
@@ -34,6 +38,7 @@ import {
 } from '@aw/shared';
 import type { EventBus } from '../../core/event-bus.ts';
 import { listTaskEvents } from '../timeline/index.ts';
+import { createBrowserCases } from './browser-cases.service.ts';
 import { createTaskActions } from './tasks.actions.ts';
 import { createTaskAgentsMd } from './tasks.agents-md.ts';
 import { createTaskArtifacts } from './tasks.artifacts.ts';
@@ -58,6 +63,7 @@ import { createTaskState, type TasksServiceDeps } from './tasks.state.ts';
 export function createTasksService(deps: TasksServiceDeps & { events: EventBus }) {
   const { db, plans, nodes, attempts, inbox, worktrees, workflows } = deps;
   const state = createTaskState(deps);
+  const browserCases = createBrowserCases(deps.db, deps.projects);
   const delegation = createTaskDelegation(deps, state);
   // A finished verify step's conclusions are written with it (31 §2.2).
   nodes.onVerified((node, commitSha) => state.verify.record(node, commitSha));
@@ -99,6 +105,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     const worktree = worktrees.findByTask(id);
     const plan = task.status === TaskStatus.PlanReview ? plans.draft(id) : plans.confirmed(id);
     const summaries = nodes.summaries(id);
+    const browserCaseHandoff = deps.browser.caseHandoffs.get(id);
     const frontend = isFrontendWorkflow(workflow)
       ? {
           verified: frontendVerified(summaries),
@@ -123,6 +130,9 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
         ? { codeReview: { report: reviewResult?.reviewReport ?? null, summary: reviewResult?.summary ?? null } }
         : {}),
       requirement: task.requirement,
+      ...(task.browserCase === null ? {} : { browserCase: task.browserCase }),
+      ...(browserCaseHandoff === undefined ? {} : { browserCaseHandoff }),
+      ...(task.browserTest === null ? {} : { browserTest: task.browserTest }),
       ...(skills.length === 0 ? {} : { skills: skills.map(({ id, name, version }) => ({ id, name, version })) }),
       failedPhase: task.failedPhase,
       failure: task.failure,
@@ -161,6 +171,22 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     };
   }
 
+  async function startBrowserCase(projectId: string, browserCase: BrowserCase, baseBranch?: string) {
+    const workflow = workflows.latest(BROWSER_TEST_WORKFLOW_KEY);
+    const input = {
+      projectId,
+      workflowId: workflow.id,
+      requirement: browserCase.name,
+      title: browserCase.name,
+      browserTest: browserCase.scope,
+      ...(baseBranch === undefined ? {} : { baseBranch }),
+    };
+    const branch = await lifecycle.checkCreate(input);
+    const id = lifecycle.insertDraft({ ...input, baseBranch: branch, browserCase });
+    lifecycle.start(id);
+    return detail(id);
+  }
+
   async function deliver(id: string, request: Omit<DeliverRequest, 'id'>): Promise<TaskDetailDTO> {
     if (isFrontend(id) && !frontendVerified(nodes.listByTask(id)))
       throw new AppError(ErrorCode.StateTransitionInvalid, 'Finish frontend verification before delivery');
@@ -177,6 +203,15 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       return detail(id);
     },
     isFrontend,
+    browserCases,
+    runBrowserCase: (projectId: string, caseId: string, revision: number) =>
+      startBrowserCase(projectId, browserCases.revision(projectId, caseId, revision)),
+    rerunBrowserCase(id: string) {
+      const task = state.get(id);
+      if (task.browserCase === null)
+        throw new AppError(ErrorCode.ValidationFailed, 'There is no saved case snapshot in this task');
+      return startBrowserCase(task.projectId, task.browserCase, task.baseBranch);
+    },
     latestArtifactOf(id: string) {
       const task = state.get(id);
       const workflow = workflows.get(task.workflowId);
@@ -268,8 +303,10 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     listByProject: (projectId: string) => state.repo.list({ projectId }),
     /** What the preview tab can show besides the user's own preview (29 §8.1). */
     previewSessions(id: string): PreviewSessions {
-      state.get(id);
+      const task = state.get(id);
+      const testTab = task.browserTest === null ? undefined : deps.browser.testTab(id);
       return {
+        ...(testTab === undefined ? {} : { testTab }),
         attempts: deps.attempts
           .listByTask(id)
           .map((a) => ({
@@ -278,8 +315,13 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
             kind: a.kind,
             status: a.status,
             frames: deps.browser.frames(a.id).length,
+            ...(task.browserTest === null ? {} : { actions: deps.browser.testActions(a.id).length }),
+            screenshots: task.browserTest === null ? [] : deps.browser.screenshots(a.id),
           }))
-          .filter((a) => a.frames > 0),
+          .filter(
+            (a) =>
+              a.frames > 0 || a.screenshots.length > 0 || (a.actions ?? 0) > 0 || a.attemptId === testTab?.attemptId,
+          ),
         checks: deps.nodes
           .listByTask(id)
           .flatMap((node) =>
@@ -341,6 +383,11 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     onProjectDeleted: actions.onProjectDeleted,
     /** Creating several tasks in one transaction (batches, 20 §2): check once, insert drafts, start after commit. */
     checkCreate: lifecycle.checkCreate,
+    browserTest: (id: string) => state.get(id).browserTest,
+    browserTestSubmit: (attempt: AttemptDTO) => {
+      if (attempt.taskId === null || state.get(attempt.taskId).browserTest === null) return undefined;
+      return attempt.nodeId === null ? McpToolName.SubmitResult : browserTestSubmitTool(nodes.get(attempt.nodeId).kind);
+    },
     insertDraft: lifecycle.insertDraft,
     start(id: string): TaskDetailDTO {
       lifecycle.start(id);
@@ -466,6 +513,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     /** `submit_result` of a task's execute attempt (12 §6.5). */
     async submitResult(attempt: AttemptDTO, input: SubmitResultInput): Promise<ResultNext> {
       if (attempt.taskId === null || attempt.nodeId === null) throw new Error(`Attempt ${attempt.id} is no step's`);
+      if (deps.browser.caseHandoffs.get(attempt.taskId) !== undefined)
+        throw new AppError(ErrorCode.BrowserLoginRequired, 'Wait for the user to finish verification in the test tab');
       const task = state.get(attempt.taskId);
       const workflow = workflows.get(task.workflowId);
       const node = nodes.get(attempt.nodeId);

@@ -16,3 +16,5 @@ export function createBrowserModule(deps: BrowserServiceDeps) {
     registerRoutes: (server: FastifyInstance) => registerBrowserRoutes(server, service, deps.dataDir),
   };
 }
+
+export { runBrowserCase } from './browser.case.ts';

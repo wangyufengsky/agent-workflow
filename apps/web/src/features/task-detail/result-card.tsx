@@ -1,5 +1,6 @@
 import {
   AcceptanceCheckKind,
+  BrowserCaseOutcome,
   DeliveryStatus,
   DeliveryStrategy,
   ErrorCode,
@@ -22,9 +23,12 @@ import { ExternalLink } from '../../components/external-link.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { Panel } from '../../components/panel.tsx';
+import { BROWSER_CASE_COPY } from '../../copy/browser-cases.ts';
 import { DELIVERY_COPY as D } from '../../copy/delivery.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
-import { TASK_COPY as C } from '../../copy/tasks.ts';
+import { BROWSER_TEST_COPY, TASK_COPY as C } from '../../copy/tasks.ts';
+import { BrowserCaseReport } from '../browser-cases/browser-case-report.tsx';
+import { attemptFileUrl, previewSessionsQuery, useImage } from '../preview/preview.queries.ts';
 import { ResultPages } from '../preview/result-pages.tsx';
 import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
@@ -81,6 +85,33 @@ export function DeliveryOutcome({ task }: { task: TaskDetailDTO }) {
   );
 }
 
+function TestScreenshot({ attemptId, file }: { attemptId: string; file: string }) {
+  const src = useImage(attemptFileUrl(attemptId, file));
+  return src === null ? null : (
+    <a className="btn sm" href={src} download={file}>
+      {file}
+    </a>
+  );
+}
+
+function BrowserTestEvidence({ taskId }: { taskId: string }) {
+  const sessions = useQuery(previewSessionsQuery(taskId));
+  const attempts = sessions.data?.attempts.filter((attempt) => attempt.screenshots.length > 0) ?? [];
+  if (attempts.length === 0) return null;
+  return (
+    <section className={styles.block}>
+      <h3 className="sec-t">{BROWSER_TEST_COPY.screenshots}</h3>
+      {attempts.map((attempt) => (
+        <div className="row" key={attempt.attemptId}>
+          {attempt.screenshots.map((file) => (
+            <TestScreenshot key={file} file={file} attemptId={attempt.attemptId} />
+          ))}
+        </div>
+      ))}
+    </section>
+  );
+}
+
 /** Result card (14 §3.5): what was done, the changes, and the delivery decisions while in review. */
 export function ResultCard({ task, showDelivery = true }: { task: TaskDetailDTO; showDelivery?: boolean }) {
   // The large diff opens on the file clicked, or the first one (D114).
@@ -90,6 +121,7 @@ export function ResultCard({ task, showDelivery = true }: { task: TaskDetailDTO;
   const { result } = task;
   if (result === null) return <p className="hint">{C.resultPending}</p>;
   const report = task.workflow.deliverable === WorkflowDeliverable.Report;
+  const caseReport = result.browserCaseReport;
   const failedChecks = result.checks.filter((c) => !c.passed && !c.skipped).length;
   const skipped = skippedChecks(result);
   // One skipped check per step that had the command; the commands are listed once each.
@@ -110,9 +142,23 @@ export function ResultCard({ task, showDelivery = true }: { task: TaskDetailDTO;
       <div className={styles.result} data-testid="result-card">
         <div className="row">
           <p className={`${styles.headline} grow`}>
-            <Icon name="check" />
-            {C.resultHeadline(result.nodeSummaries.length, result.filesChanged, result.insertions, result.deletions)} ·{' '}
-            <Markdown inline source={checks} />
+            {caseReport === undefined ? (
+              <>
+                <Icon name="check" />
+                {C.resultHeadline(
+                  result.nodeSummaries.length,
+                  result.filesChanged,
+                  result.insertions,
+                  result.deletions,
+                )}{' '}
+                · <Markdown inline source={checks} />
+              </>
+            ) : (
+              <>
+                <Icon name={caseReport.outcome === BrowserCaseOutcome.Passed ? 'check' : 'alert'} />
+                {BROWSER_CASE_COPY.outcome[caseReport.outcome]}
+              </>
+            )}
           </p>
           {/* 23 §2.5: the result as a PPT for the team. */}
           <Link to={ROUTES.pptNew} search={{ taskId: task.id }} className="btn ghost sm">
@@ -120,21 +166,28 @@ export function ResultCard({ task, showDelivery = true }: { task: TaskDetailDTO;
             {PPT_COPY.makeDeck}
           </Link>
         </div>
-        <section className={styles.block}>
-          <h3 className="sec-t">{report ? C.report : C.summary}</h3>
-          {report ? (
-            <Markdown source={result.summary} />
-          ) : (
-            <ol className={styles.stepSummaries}>
-              {result.nodeSummaries.map((n) => (
-                <li key={n.key}>
-                  <span className={styles.stepTitle}>{n.title}</span>
-                  <Markdown source={n.summary} />
-                </li>
-              ))}
-            </ol>
-          )}
-        </section>
+        {caseReport === undefined && (
+          <section className={styles.block}>
+            <h3 className="sec-t">{report ? C.report : C.summary}</h3>
+            {report ? (
+              <Markdown source={result.summary} />
+            ) : (
+              <ol className={styles.stepSummaries}>
+                {result.nodeSummaries.map((n) => (
+                  <li key={n.key}>
+                    <span className={styles.stepTitle}>{n.title}</span>
+                    <Markdown source={n.summary} />
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        )}
+        {task.browserCase !== undefined && caseReport !== undefined ? (
+          <BrowserCaseReport test={task.browserCase} report={caseReport} />
+        ) : (
+          task.browserTest !== undefined && <BrowserTestEvidence taskId={task.id} />
+        )}
         {result.checks.some(
           (check) => !check.passed || check.skipped || check.kind === AcceptanceCheckKind.Browser,
         ) && (

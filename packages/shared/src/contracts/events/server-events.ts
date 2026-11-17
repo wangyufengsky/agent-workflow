@@ -50,6 +50,10 @@ export const serverEventSchema = z.discriminatedUnion('type', [
     data: z.object({ attemptId: z.string(), entries: z.array(transcriptEntrySchema) }),
   }),
   z.object({ type: z.literal(ServerEventType.AssistantUpdated), data: assistantConversationSchema }),
+  z.object({
+    type: z.literal(ServerEventType.AssistantBrowserUpdated),
+    data: z.object({ conversationId: z.string() }),
+  }),
   z.object({ type: z.literal(ServerEventType.KnowledgeUpdated), data: z.object({ conversationId: z.string() }) }),
   z.object({ type: z.literal(ServerEventType.DeckUpdated), data: z.object({ deckId: z.string() }) }),
   z.object({
@@ -69,6 +73,10 @@ export const serverEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal(ServerEventType.PreviewUpdated), data: previewSchema }),
   z.object({ type: z.literal(ServerEventType.BrowserFrame), data: browserFrameSchema }),
+  z.object({
+    type: z.literal(ServerEventType.BrowserTestUpdated),
+    data: z.object({ taskId: z.string(), attemptId: z.string() }),
+  }),
   z.object({ type: z.literal(ServerEventType.BrowserTabUpdated), data: userTabStateSchema }),
   z.object({
     type: z.literal(ServerEventType.AssistantTranscript),

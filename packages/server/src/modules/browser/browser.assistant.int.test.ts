@@ -1,15 +1,21 @@
 import { createServer, type Server } from 'node:http';
 import {
+  bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
+  controlAssistantBrowserOp,
   createConversationOp,
   ErrorCode,
+  getAssistantBrowserControlOp,
   getPreviewOp,
+  handoffAssistantBrowserOp,
   listConfirmationsOp,
   MCP_SESSION_ARG,
   openLoginTabOp,
+  openUserTabOp,
   readWebsiteOp,
   sendAssistantMessageOp,
+  startPreviewOp,
   updateProjectOp,
   updateSettingsOp,
   VIEWPORT_SIZES,
@@ -227,6 +233,210 @@ describe('助手网页文字与任务预览', () => {
       body: { code: ErrorCode.BrowserLoginRequired, hint: expect.any(String) },
     });
     await host.request({ kind: 'close', tabId: 'observer' });
+  });
+
+  it('同一页签可以填表，提交需要确认，表单变化或取消授权使旧操作失效', async () => {
+    const { project } = await addProject(t, {
+      files: {
+        'server.mjs': `import { createServer } from 'node:http';
+          createServer((req, res) => {
+            if (req.method === 'POST') {
+              res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+              res.end('<h1>已提交</h1>');
+              return;
+            }
+            res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+            res.end('<form method="post" action="/save"><input name="title" aria-label="名称"><button>保存</button></form>');
+          }).listen(Number(process.env.PORT), '127.0.0.1');`,
+      },
+    });
+    await t.call(updateProjectOp, {
+      id: project.id,
+      preview: { command: 'node server.mjs', setupCommand: null, readyPath: '/', pages: ['/'], extraOrigins: [] },
+    });
+    const reviewing = taskReaches(t, 'plan_review');
+    const task = await createTask(t, {
+      projectId: project.id,
+      workflow: 'bugfix',
+      checkpoints: { confirm_plan: true },
+    });
+    await reviewing;
+    await t.call(startPreviewOp, { taskId: task.id });
+    const { tabId } = (await t.call(openUserTabOp, { taskId: task.id })).body;
+    const binding = { id: conversationId, preview: { taskId: task.id, tabId } };
+    await t.call(bindAssistantPreviewOp, binding);
+    const initial = await call('browser_read');
+    const refOf = (body: unknown, label: string) => {
+      const snapshot = z.object({ page: z.string() }).parse(body).page;
+      const ref = new RegExp(`"${label}"[^\n]*\\[ref=(e\\d+)\\]`).exec(snapshot)?.[1];
+      if (ref === undefined) throw new Error(`Missing ${label} in ${snapshot}`);
+      return ref;
+    };
+    const type = { kind: 'type', ref: refOf(initial.body, '名称'), text: '回归订单' };
+    expect(await call('assistant_actBrowser', { action: type })).toMatchObject({ isError: true });
+    const grant = await t.call(controlAssistantBrowserOp, { id: conversationId, tabId, enabled: true });
+    expect(grant.body).toEqual({ enabled: true });
+    const snapshot = await call('browser_read');
+    const typed = await call('assistant_actBrowser', { action: { ...type, ref: refOf(snapshot.body, '名称') } });
+    expect(typed).toMatchObject({ isError: false });
+    const action = { kind: 'click', ref: refOf(typed.body, '保存') };
+    const requested = await call('assistant_actBrowser', { action });
+    expect(requested.body).toMatchObject({ status: 'needs_confirmation' });
+    const confirm = (body: Record<string, unknown>) =>
+      t.call(confirmAssistantCallOp, { id: String(body.confirmation_id), alwaysAllow: false });
+    expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items.at(-1)?.input).toMatchObject({
+      target: '保存',
+      fields: ['名称 · 回归订单'],
+      write: { method: 'POST', path: '/save' },
+    });
+    expect((await call('browser_read')).body.page).not.toContain('已提交');
+    await host.request({
+      kind: 'cdp',
+      tabId,
+      method: 'Runtime.evaluate',
+      params: {
+        expression: 'document.querySelector("input").value = "changed"',
+      },
+    });
+    expect((await confirm(requested.body)).body.result).toMatchObject({
+      ok: false,
+      error: { code: ErrorCode.BrowserRefStale },
+    });
+    const second = await call('assistant_actBrowser', { action });
+    await t.call(bindAssistantPreviewOp, { id: conversationId, preview: null });
+    expect((await confirm(second.body)).body.result).toMatchObject({ ok: false });
+    await t.call(bindAssistantPreviewOp, binding);
+    await expect
+      .poll(async () => (await t.call(controlAssistantBrowserOp, { id: conversationId, tabId, enabled: true })).status)
+      .toBe(200);
+    const last = await call('browser_read');
+    const third = await call('assistant_actBrowser', { action: { ...action, ref: refOf(last.body, '保存') } });
+    expect((await confirm(third.body)).body.result).toMatchObject({
+      ok: true,
+      output: { page: expect.stringContaining('已提交'), blockedWrites: [] },
+    });
+  });
+
+  it('一次授权执行筛选和查看，拦截伪装的写入，接管时作废确认并保留同一个页签', async () => {
+    const { project } = await addProject(t, {
+      files: {
+        'server.mjs': `import { createServer } from 'node:http';
+          createServer((req, res) => {
+            res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+            if (req.url.startsWith('/records/delete')) return res.end('<p>已删除</p>');
+            if (req.url === '/manual') return res.end('manual write');
+            if (req.url === '/send') return res.end('<p>已发送</p>');
+            res.end(\`
+              <input aria-label="订单号" id="order">
+              <button id="filter" onclick="result.textContent='筛选结果'">筛选</button>
+              <button id="details" onclick="result.textContent='订单详情'">查看详情</button>
+              <button id="lookup" onclick="fetch('/records/delete?entry=private').catch(() => {})">查询</button>
+              <a href="/records/delete?entry=private">删除</a>
+              <form action="/send" method="post"><button>发送</button></form>
+              <div id="result"></div>\`);
+          }).listen(Number(process.env.PORT), '127.0.0.1');`,
+      },
+    });
+    await t.call(updateProjectOp, {
+      id: project.id,
+      preview: { command: 'node server.mjs', setupCommand: null, readyPath: '/', pages: ['/'], extraOrigins: [] },
+    });
+    const preparing = taskReaches(t, 'plan_review');
+    const task = await createTask(t, {
+      projectId: project.id,
+      workflow: 'bugfix',
+      checkpoints: { confirm_plan: true },
+    });
+    await preparing;
+    await t.call(startPreviewOp, { taskId: task.id });
+    const { tabId } = (await t.call(openUserTabOp, { taskId: task.id })).body;
+    const id = conversationId;
+    await t.call(bindAssistantPreviewOp, { id, preview: { taskId: task.id, tabId } });
+    const scope = { id, tabId };
+    const control = await t.call(controlAssistantBrowserOp, { ...scope, enabled: true });
+    expect(control.body).toEqual({ enabled: true });
+    const info = async () => (await t.call(getAssistantBrowserControlOp, scope)).body;
+    const refOf = (page: unknown, label: string) => {
+      const snapshot = z.string().parse(page);
+      const ref = new RegExp(`"${label}"[^\n]*\\[ref=(e\\d+)\\]`).exec(snapshot)?.[1];
+      if (ref === undefined) throw new Error(`Missing ${label} in ${snapshot}`);
+      return ref;
+    };
+    const click = async (label: string) => {
+      const { body } = await call('browser_read');
+      return call('assistant_actBrowser', { action: { kind: 'click', ref: refOf(body.page, label) } });
+    };
+    const initial = await call('browser_read');
+    expect(
+      await call('assistant_actBrowser', {
+        action: { kind: 'type', ref: refOf(initial.body.page, '订单号'), text: 'private-order-number' },
+      }),
+    ).toMatchObject({ isError: false, body: { page: expect.stringContaining('private-order-number') } });
+    expect(await click('筛选')).toMatchObject({ isError: false, body: { page: expect.stringContaining('筛选结果') } });
+    expect(await click('查看详情')).toMatchObject({
+      isError: false,
+      body: { page: expect.stringContaining('订单详情') },
+    });
+    expect(await click('查询')).toMatchObject({ isError: false, body: { blockedWrites: ['GET /records/delete'] } });
+    expect((await t.call(listConfirmationsOp, { id })).body.items).toEqual([]);
+
+    const deletion = await click('删除');
+    expect(deletion.body).toMatchObject({ status: 'needs_confirmation' });
+    expect((await t.call(handoffAssistantBrowserOp, { ...scope, manual: true })).status).toBe(204);
+    expect((await info()).mode).toBe('manual');
+    expect(await call('browser_read')).toMatchObject({ isError: true });
+    const expired = await t.call(confirmAssistantCallOp, {
+      id: String(deletion.body.confirmation_id),
+      alwaysAllow: false,
+    });
+    expect(expired.body.result).toMatchObject({ ok: false });
+
+    const manual = await host.request({
+      kind: 'cdp',
+      tabId,
+      method: 'Runtime.evaluate',
+      params: {
+        expression: `(async () => {
+        document.querySelector('#order').value = 'manual-state';
+        return (await fetch('/manual', { method: 'POST' })).ok;
+      })()`,
+        returnByValue: true,
+        awaitPromise: true,
+      },
+    });
+    expect(manual).toMatchObject({ result: { value: true } });
+    expect((await t.call(handoffAssistantBrowserOp, { ...scope, manual: false })).status).toBe(204);
+    expect((await info()).mode).toBe('assistant');
+    expect((await call('browser_read')).body.page).toContain('manual-state');
+
+    const send = await click('发送');
+    expect(send.body).toMatchObject({ status: 'needs_confirmation' });
+    const approved = await t.call(confirmAssistantCallOp, {
+      id: String(send.body.confirmation_id),
+      alwaysAllow: false,
+    });
+    expect(approved.body.result).toMatchObject({ ok: true, output: { page: expect.stringContaining('已发送') } });
+    await t.call(bindAssistantPreviewOp, { id, preview: null });
+    const stored = await info();
+    expect(stored.mode).toBe('off');
+    expect(stored.activity).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'type', target: '订单号', outcome: 'done' }),
+        expect.objectContaining({ kind: 'click', target: '筛选', outcome: 'done' }),
+        expect.objectContaining({ kind: 'click', target: '查看详情', outcome: 'done' }),
+        expect.objectContaining({
+          kind: 'click',
+          target: '查询',
+          outcome: 'blocked',
+          blockedRequests: [expect.stringMatching(/GET http:\/\/127.0.0.1:\d+\/records\/delete$/)],
+        }),
+        expect.objectContaining({ kind: 'click', target: '删除', outcome: 'confirmation' }),
+        expect.objectContaining({ kind: 'take' }),
+        expect.objectContaining({ kind: 'return' }),
+        expect.objectContaining({ kind: 'click', target: '发送', outcome: 'done' }),
+      ]),
+    );
+    expect(JSON.stringify(stored.activity)).not.toMatch(/private|manual-state/);
   });
 
   it('启动和停止预览都经确认，取消不执行；总是允许后直接执行并返回真实预览状态', async () => {

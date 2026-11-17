@@ -3,6 +3,8 @@ import { AGENT_SKILLS, ASSISTANT_SKILLS, PromptName, type Prompts, type SkillNam
 import {
   BASH_PERMISSION_PRESETS,
   BashPolicy,
+  BROWSER_TEST_TOOLS,
+  type BrowserTestSubmitTool,
   MCP_ASSISTANT_SERVER_NAME,
   MCP_ASSISTANT_TOOL_PREFIX,
   MCP_SERVER_NAME,
@@ -176,7 +178,11 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
       mode: 'primary',
       description: `agent-workflow ${base}`,
       prompt: input.prompts[AGENT_PROMPT[base]],
-      permission: { ...AGENT_PERMISSION[base], skill: skillPermission(AGENT_SKILLS[base]) },
+      permission: {
+        ...AGENT_PERMISSION[base],
+        [`${MCP_TOOL_PREFIX}${McpToolName.BrowserSubmitReport}`]: 'deny',
+        skill: skillPermission(AGENT_SKILLS[base]),
+      },
     },
   ]);
   const remote = (url: string, token: string) => ({
@@ -247,15 +253,27 @@ export function sessionPermissionRules(
   {
     checkCommands = [],
     web = false,
+    browserTestSubmit,
     offline = false,
     allowedBash = [],
   }: {
     checkCommands?: readonly string[] | undefined;
     web?: boolean | undefined;
+    browserTestSubmit?: BrowserTestSubmitTool | undefined;
     offline?: boolean | undefined;
     allowedBash?: readonly string[] | undefined;
   } = {},
 ): PermissionRule[] {
+  if (browserTestSubmit !== undefined) {
+    return [
+      { permission: '*', action: 'deny', pattern: '*' },
+      ...[...BROWSER_TEST_TOOLS, browserTestSubmit].map((tool) => ({
+        permission: `${MCP_TOOL_PREFIX}${tool}`,
+        action: 'allow' as const,
+        pattern: '*',
+      })),
+    ];
+  }
   if (base === SessionAgent.Delegate)
     return Object.entries(DELEGATE_PERMISSION).map(([permission, action]) => ({ permission, action, pattern: '*' }));
   if (base === SessionAgent.Executor) {

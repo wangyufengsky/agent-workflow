@@ -1,6 +1,8 @@
 import {
   type AssistantConfirmationDTO,
   AssistantConfirmationStatus,
+  actAssistantBrowserOp,
+  assistantBrowserConfirmationSchema,
   assistantMemoryInputSchema,
   createAssistantMemoryOp,
   OPERATION_CONTRACTS,
@@ -10,7 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
-import { CONFIRMATION_COPY as C, MEMORY_COPY } from '../../copy/assistant.ts';
+import { ASSISTANT_BROWSER_COPY, CONFIRMATION_COPY as C, MEMORY_COPY } from '../../copy/assistant.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { operationTitle } from '../../copy/operations.ts';
 import { GitInitSummary } from '../projects/git-init-summary.tsx';
@@ -75,12 +77,26 @@ function MemoryProposal({ input }: { input: Record<string, unknown> }) {
   );
 }
 
+function BrowserActionProposal({ input }: { input: Record<string, unknown> }) {
+  const { page, target, fields, write } = assistantBrowserConfirmationSchema.parse(input);
+  return (
+    <div className={styles.note}>
+      <p>
+        {page} · {target}
+      </p>
+      {fields.length > 0 && <p>{fields.join('、')}</p>}
+      <p>{write === undefined ? ASSISTANT_BROWSER_COPY.noWrite : `${write.method} ${write.path}`}</p>
+    </div>
+  );
+}
+
 /** A write or critical call of the assistant waiting for the user (15 §4): what it does, to what, in words. */
 export function ConfirmationCard({ confirmation }: { confirmation: AssistantConfirmationDTO }) {
   const confirm = useConfirmCall();
   const cancel = useCancelCall();
   const pending = confirmation.status === AssistantConfirmationStatus.Pending;
   const critical = confirmation.risk === OperationRisk.Critical;
+  const isBrowser = confirmation.operationId === actAssistantBrowserOp.id;
   const isMemory = confirmation.operationId === createAssistantMemoryOp.id;
   const title = operationTitle(confirmation.title);
   const busy = confirm.isPending || cancel.isPending;
@@ -114,7 +130,9 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
           {C.status[confirmation.status]}
         </span>
       </header>
-      {isMemory ? (
+      {isBrowser ? (
+        <BrowserActionProposal input={confirmation.input} />
+      ) : isMemory ? (
         <MemoryProposal input={confirmation.input} />
       ) : (
         <InputSummary operation={contractOf(confirmation.operationId)} input={confirmation.input} />
@@ -139,7 +157,13 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
         ))}
       {pending ? (
         <>
-          <p className={styles.note}>{isMemory ? MEMORY_COPY.approval : C.impact[confirmation.risk]}</p>
+          <p className={styles.note}>
+            {isBrowser
+              ? ASSISTANT_BROWSER_COPY.confirmation
+              : isMemory
+                ? MEMORY_COPY.approval
+                : C.impact[confirmation.risk]}
+          </p>
           <div className={styles.actions}>
             <Button
               variant="primary"

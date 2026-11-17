@@ -177,6 +177,7 @@ const homeRoute = createRoute({
     workflow: z.string().optional(),
     requirement: z.string().optional(),
     knowledgeMaterial: z.string().optional(),
+    formSeq: z.number().int().positive().optional(),
   }),
   component: HomePage,
 });

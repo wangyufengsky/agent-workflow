@@ -21,6 +21,7 @@ describe('操作清单的标注（M5-10）', () => {
     const critical = OPERATION_CONTRACTS.filter((op) => op.risk === OperationRisk.Critical).map((op) => op.id);
     expect(critical.sort()).toEqual(
       [
+        'assistant.actBrowser',
         'assistant.confirm',
         'assistant.delete',
         'assistant.replyPermission',

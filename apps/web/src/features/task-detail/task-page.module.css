@@ -273,3 +273,43 @@
 .frontendProgress .layout > :first-child {
   min-height: 235px;
 }
+
+/* 测试浏览器视图占用任务页的剩余高度，滚动交由其记录栏。 */
+.testViewing {
+  display: flex;
+  flex-direction: column;
+  min-height: 470px;
+  height: 100%;
+  padding: 16px 20px 16px;
+}
+
+.testViewing > .header {
+  flex: none;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.testViewing .titleRow h1 {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.testViewing .doing {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.testTabs,
+.testPanel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.testPanel[hidden] {
+  display: none;
+}

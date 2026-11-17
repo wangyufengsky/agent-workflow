@@ -144,7 +144,7 @@ export function helperTools(deps: HelperToolDeps): AssistantTool[] {
     },
     {
       name: AssistantToolName.OpenForm,
-      description: `Open a form prefilled with the values you know; the user checks it, types any password or token and submits it. Never pass secrets. Forms and the fields you may prefill: ${FORM_FIELDS}`,
+      description: `Open a form prefilled with the values you know; the user checks it, types any password or token and submits it. Never pass secrets. For a browser test, prefill tasks.create values.browserTest as { target: string, writes: [{ method, path }] }, using writes: [] for a read-only test. The user authorizes the scope in the form. Forms and the fields you may prefill: ${FORM_FIELDS}`,
       input: openFormToolInput,
       mode: UiMode.Simple,
       handler(input, { conversation }) {

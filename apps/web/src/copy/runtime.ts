@@ -70,6 +70,7 @@ export const TOOLS_COPY = {
       '读取工作目录里的 Word / Excel 文件：Word 分页读正文，Excel 先看概览再按工作表分页读行。',
     [McpToolName.SubmitPlan]: '提交计划：步骤、角色、指令与依赖。计划不合规时返回问题，AI 修改后再提交。',
     [McpToolName.SubmitResult]: '步骤完成后提交结果；每次尝试只能提交一次，之后进入检查。',
+    [McpToolName.BrowserSubmitReport]: '提交浏览器测试的结论、逐项结果和截图证据。',
     [McpToolName.SubmitReview]: '提交评审结论：通过，或列出问题及位置。',
     [McpToolName.AskUser]: '向你提问。阻塞的问题会让步骤停下来等你回答；不阻塞时 AI 按默认假设继续。',
     [McpToolName.ReportProgress]: '上报一句当前进展，显示在任务页上。',

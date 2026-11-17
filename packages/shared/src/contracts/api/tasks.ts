@@ -33,6 +33,12 @@ import { reviewIssueSchema } from '../mcp/submit-review.ts';
 import { artifactTaskSchema } from './artifacts.ts';
 import { attachmentIdsSchema, attachmentSchema } from './attachments.ts';
 import { attemptSummarySchema } from './attempts.ts';
+import {
+  browserCaseHandoffSchema,
+  browserCaseReportSchema,
+  browserCaseSchema,
+  browserTestScopeSchema,
+} from './browser-cases.ts';
 import { deliverySchema, taskPullRequestSchema } from './delivery.ts';
 import { frontendRoundSchema } from './frontend.ts';
 import { inboxItemSchema } from './inbox.ts';
@@ -52,6 +58,7 @@ export const createTaskRequestSchema = z.object({
   projectId: z.string(),
   /** A specific workflow version. */
   workflowId: z.string(),
+  browserTest: browserTestScopeSchema.optional(),
   requirement: z.string().trim().min(1).max(REQUIREMENT_MAX_CHARS),
   /** Defaults to the requirement's first line. */
   title: z.string().trim().min(1).max(TASK_TITLE_MAX_CHARS).optional(),
@@ -69,6 +76,7 @@ export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
 
 /** A node's latest `submit_result` input as stored (10 §nodes `result`). */
 export const nodeResultSchema = submitResultInputSchema.extend({
+  browserCaseReport: browserCaseReportSchema.optional(),
   reviewReport: taskCodeReviewReportSchema.optional(),
   handoffAttemptId: z.string().optional(),
   handoffCommitSha: z.string().optional(),
@@ -183,6 +191,7 @@ export type SaveDraftPlanRequest = z.infer<typeof saveDraftPlanRequestSchema>;
 
 /** Result card data, written when the task reaches review (M3-10). */
 export const taskResultSchema = z.object({
+  browserCaseReport: browserCaseReportSchema.optional(),
   /** The current frontend result is an iteration until the final verification step passes. */
   frontendVerified: z.boolean().optional(),
   /** Composed from the node summaries; for report workflows, the report itself. */
@@ -237,6 +246,9 @@ export type TaskSummaryDTO = z.infer<typeof taskSummarySchema>;
 
 /** `TaskDetailDTO` (11 §5.2). */
 export const taskDetailSchema = taskSummarySchema.extend({
+  browserCase: browserCaseSchema.optional(),
+  browserCaseHandoff: browserCaseHandoffSchema.optional(),
+  browserTest: browserTestScopeSchema.optional(),
   skills: z.array(skillRefSchema).optional(),
   requirement: z.string(),
   failedPhase: taskFailedPhaseSchema.nullable(),

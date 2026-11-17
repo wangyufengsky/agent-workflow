@@ -500,6 +500,7 @@ class AppError extends Error {
 | `TASK_IN_USE` | 409 | 属于批次或需求计划的任务只能归档、不能删除（D222）；`details` 为 `{ batchId }` 或 `{ initiativeId }` |
 | `PLAN_NOT_FOUND` | 404 | |
 | `PLAN_VERSION_CONFLICT` | 409 | 编辑基于的版本不是最新草稿 |
+| `BROWSER_CASE_CHANGED` | 409 | 编辑或启动基于的用例版本已变更 |
 | `PLAN_INVALID` | 400 | 计划图校验失败；`details.problems[]`，每项 `{ code, nodeKey?, message }`，子码见 5.3 |
 | `NODE_NOT_FOUND` | 404 | |
 | `NODE_NOT_EDITABLE` | 409 | 调整计划时修改了已开始的节点 |

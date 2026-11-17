@@ -1,6 +1,10 @@
 import type { Prompts } from '@aw/builtin';
 import {
   AppError,
+  actAssistantBrowserOp,
+  assistantBrowserActionSchema,
+  assistantBrowserConfirmationSchema,
+  assistantToolName,
   attachmentIdsSchema,
   createAssistantMemoryOp,
   createBatchOp,
@@ -13,6 +17,7 @@ import {
   initGitOp,
   MCP_ASSISTANT_PATH,
   MCP_ASSISTANT_SERVER_NAME,
+  UiMode,
 } from '@aw/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -39,12 +44,12 @@ import { createKnowledgeRelay, KNOWLEDGE_QUESTION_OPS } from './assistant.knowle
 import { createAssistantMemory } from './assistant.memory.ts';
 import { assistantMemoryOperations, proposeMemoryTool, saveConfirmedMemory } from './assistant.memory-operations.ts';
 import { officeTools } from './assistant.office.ts';
-import { assistantOperations } from './assistant.operations.ts';
+import { assistantOperations, confirmedBrowserOperation } from './assistant.operations.ts';
 import { registerAssistantRoutes } from './assistant.routes.ts';
 import { type AssistantServiceDeps, createAssistantService } from './assistant.service.ts';
 import { createAssistantSnapshots } from './assistant.snapshots.ts';
 import { createTaskRelay } from './assistant.tasks.ts';
-import { createAssistantToolRegistry, operationTools } from './assistant.tools.ts';
+import { createAssistantToolRegistry, NEEDS_CONFIRMATION_INSTRUCTION, operationTools } from './assistant.tools.ts';
 import { createWhisperService } from './assistant.whisper.ts';
 
 export type { AssistantService } from './assistant.service.ts';
@@ -83,6 +88,11 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
   const breakdownRelay = createBreakdownRelay({ ...deps, conversations });
   // Work the assistant starts and later reports on: tasks (15 §6), member analyses (33 §6), initiatives' AI runs (34 §10).
   const run = async (conversationId: string, impl: OperationImpl, input: unknown) => {
+    if (impl.contract.id === actAssistantBrowserOp.id)
+      return deps.browser.confirmAssistantAction(
+        conversationId,
+        assistantBrowserConfirmationSchema.parse(input).requestId,
+      );
     if (impl.contract.id === createAssistantMemoryOp.id) return saveConfirmedMemory(memory, conversationId, input);
     if (analysisRelay.handles(impl)) return analysisRelay.run(conversationId, input);
     if (breakdownRelay.handles(impl)) return breakdownRelay.run(conversationId, impl, input);
@@ -92,7 +102,9 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     run,
     ...deps,
     conversations,
-    operations: new Map([...deps.operations, ...memoryOperations].map((impl) => [impl.contract.id, impl])),
+    operations: new Map(
+      [...deps.operations, ...memoryOperations, confirmedBrowserOperation].map((impl) => [impl.contract.id, impl]),
+    ),
   });
   const relay = createKnowledgeRelay({ ...deps, conversations });
   const projectStarts = [createTaskOp.id, createBatchOp.id, createInitiativeOp.id, createScheduleOp.id];
@@ -129,6 +141,8 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
                         },
                       ],
                     });
+                  if (id === createTaskOp.id && input.browserTest !== undefined)
+                    throw new AppError(ErrorCode.ValidationFailed, 'Set the browser test scope on the task form');
                   if (id === createTaskOp.id || id === createInitiativeOp.id)
                     conversations.assertOwnAttachments(
                       conversationId,
@@ -143,6 +157,30 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
         ]),
       }),
       proposeMemoryTool(confirmations, deps.projects),
+      {
+        name: assistantToolName(actAssistantBrowserOp.id),
+        description:
+          'Act on the user-selected preview after the user enables control. First call browser_read for refs. ' +
+          'Filtering, viewing, same-origin links, typing and selecting may run under one grant with writes blocked. ' +
+          'Submitting, sending, deleting, unrecognized buttons, keystrokes and explicit writes require individual confirmation. ' +
+          'If the user has taken control, let them finish. Use write only when the method and ' +
+          'path are known. Never retry a blocked request on your own. The user handles credentials and verification codes.',
+        input: assistantBrowserActionSchema,
+        mode: UiMode.Simple,
+        async handler(input, { conversation }) {
+          const result = await deps.browser.prepareAssistantAction(
+            conversation.id,
+            assistantBrowserActionSchema.parse(input),
+          );
+          if ('output' in result) return result.output;
+          const confirmation = confirmations.request(conversation.id, actAssistantBrowserOp.id, result.confirmation);
+          return {
+            status: 'needs_confirmation',
+            confirmation_id: confirmation.id,
+            instruction: NEEDS_CONFIRMATION_INSTRUCTION,
+          };
+        },
+      },
       ...helperTools({ ...deps, conversations }),
       ...officeTools({ ...deps, conversations }),
     ],
@@ -177,3 +215,5 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
     },
   };
 }
+
+export { createBrowserActivity } from './assistant.browser-activity.ts';

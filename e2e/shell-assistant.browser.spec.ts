@@ -93,6 +93,46 @@ test('J11 对助手说开始任务 → 确认卡片 → 任务运行', async ({ 
   await expect(panel).toBeVisible();
 });
 
+test('助手预填浏览器测试地址和写入范围，由用户确认', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const workflows: { items: { id: string; key: string }[] } = await (
+    await request.get(`${API_BASE}/workflows`, { headers: AUTH })
+  ).json();
+  const workflow = workflows.items.find((item) => item.key === 'browser_test');
+  if (workflow === undefined) throw new Error('no browser test workflow');
+  const target = 'http://127.0.0.1:5173/cards';
+  await queueAssistantTurn(request, [
+    appTool('open_form', {
+      form: 'tasks.create',
+      values: {
+        projectId: project.id,
+        workflowId: workflow.id,
+        requirement: '复测卡牌筛选',
+        browserTest: { target, writes: [{ method: 'POST', path: '/api/test-filter' }] },
+      },
+    }),
+    { type: 'text', text: '请核对测试范围。' },
+  ]);
+
+  await page.goto(`/?projectId=${project.id}`);
+  const input = page.getByRole('textbox', { name: '告诉助手，或开始任务' });
+  await input.fill('帮我准备复测');
+  await input.press('ControlOrMeta+Enter');
+  const address = page.getByRole('textbox', { name: '测试地址' });
+  const writes = page.getByRole('textbox', { name: /允许写入的接口/ });
+  const approval = page.getByRole('checkbox', { name: /我确认这是测试环境/ });
+  const start = page.getByRole('button', { name: /^开始 / });
+  await expect(address).toHaveValue(target);
+  await expect(writes).toHaveValue('POST /api/test-filter');
+  await expect(approval).not.toBeChecked();
+  await expect(start).toBeDisabled();
+  await approval.check();
+  await expect(start).toBeEnabled();
+  await address.fill('http://127.0.0.1:5173/other');
+  await expect(approval).not.toBeChecked();
+  await expect(start).toBeDisabled();
+});
+
 test('主页的建议在主页上提问；open_page 带用户离开时面板接着显示对话；卡片上「总是允许」后可在设置中撤销', async ({
   page,
   request,

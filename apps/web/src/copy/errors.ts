@@ -57,6 +57,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.TaskNotFinished]: '任务还没有结束，或者还在收尾（停止会话、清理工作区）：稍后再试，或者先取消它。',
   [ErrorCode.TaskInUse]: '这个任务属于批量任务或需求计划，只能归档，不能删除。',
   [ErrorCode.PlanNotFound]: '这个计划不存在。',
+  [ErrorCode.BrowserCaseChanged]: '用例已被修改，请刷新后重新确认。',
   [ErrorCode.PlanVersionConflict]: '计划已经更新，请查看最新版本后再确认。',
   [ErrorCode.PlanInvalid]: '计划有问题，按列出的问题修改后再保存。',
   [ErrorCode.NodeNotFound]: '这个步骤不存在。',

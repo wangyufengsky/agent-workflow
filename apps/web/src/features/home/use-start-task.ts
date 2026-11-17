@@ -1,10 +1,10 @@
-import { UiMode } from '@aw/shared';
+import { type BrowserTestScope, UiMode } from '@aw/shared';
 import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { ATTACHMENTS_COPY } from '../../copy/attachments.ts';
 import { REQUIREMENTS_COPY } from '../../copy/requirements.ts';
-import { HOME_TASK_COPY as C } from '../../copy/tasks.ts';
+import { BROWSER_TEST_COPY, HOME_TASK_COPY as C } from '../../copy/tasks.ts';
 import { type DraftRequirement, isComplete, toInputs } from '../requirements/checklist-editor.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { useCreateTask } from '../tasks/tasks.queries.ts';
@@ -21,6 +21,8 @@ export function useStartTask({
   attachmentIds,
   attachmentsBlocked,
   requirements,
+  browserTest,
+  browserTestBlocked,
   onStarted,
 }: {
   projectId: string;
@@ -32,6 +34,8 @@ export function useStartTask({
   attachmentsBlocked: boolean;
   /** The acceptance checklist being written (31 §2.1); empty for none. */
   requirements: readonly DraftRequirement[];
+  browserTest: BrowserTestScope | undefined;
+  browserTestBlocked: boolean;
   onStarted: () => void;
 }) {
   const pro = useSettings()['ui.mode'] === UiMode.Pro;
@@ -41,7 +45,12 @@ export function useStartTask({
   const navigate = useNavigate();
   const checklistReady = isComplete(requirements);
   const canStart =
-    workflowId !== undefined && projectId !== '' && requirement.trim() !== '' && !attachmentsBlocked && checklistReady;
+    workflowId !== undefined &&
+    projectId !== '' &&
+    requirement.trim() !== '' &&
+    !attachmentsBlocked &&
+    checklistReady &&
+    !browserTestBlocked;
   // Why「开始」is unavailable, said next to it (only the requirement can be missing once projects and workflows load).
   const blocked = canStart
     ? undefined
@@ -51,7 +60,9 @@ export function useStartTask({
         ? ATTACHMENTS_COPY.notReady
         : !checklistReady
           ? REQUIREMENTS_COPY.incomplete
-          : C.needsWorkflow;
+          : browserTestBlocked
+            ? BROWSER_TEST_COPY.invalidScope
+            : C.needsWorkflow;
 
   const start = (asDraft = false) => {
     if (!canStart) return;
@@ -66,6 +77,7 @@ export function useStartTask({
         projectId,
         workflowId,
         requirement: requirement.trim(),
+        ...(browserTest === undefined ? {} : { browserTest }),
         ...(Object.keys(checkpoints).length === 0 ? {} : { checkpoints }),
         ...(more.title.trim() === '' ? {} : { title: more.title.trim() }),
         ...(more.baseBranch === null ? {} : { baseBranch: more.baseBranch }),

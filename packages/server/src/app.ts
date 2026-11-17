@@ -24,7 +24,7 @@ import { mountOperations, type OperationImpl } from './core/operations/operation
 import { host } from './core/platform.ts';
 import { registerSseHub } from './core/sse/sse-hub.ts';
 import { createAcceptanceModule } from './modules/acceptance/index.ts';
-import { type AssistantService, createAssistantModule } from './modules/assistant/index.ts';
+import { type AssistantService, createAssistantModule, createBrowserActivity } from './modules/assistant/index.ts';
 import { type AttachmentsService, createAttachmentsModule } from './modules/attachments/index.ts';
 import { type AttemptsService, createAttemptsModule } from './modules/attempts/index.ts';
 import { createBatchesModule } from './modules/batches/index.ts';
@@ -32,6 +32,7 @@ import {
   type BrowserHost,
   type BrowserService,
   createBrowserModule,
+  runBrowserCase,
   unavailableBrowserHost,
 } from './modules/browser/index.ts';
 import {
@@ -313,6 +314,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   // Dev servers end with the backend: nothing else stops them once it is gone.
   server.addHook('preClose', () => previews.service.stopAll());
   const browser = createBrowserModule({
+    activity: createBrowserActivity(database.db, clock, events),
     host: deps.browserHost ?? unavailableBrowserHost,
     clock,
     log,
@@ -351,6 +353,22 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('onReady', () => projectRuntime.recover());
   server.addHook('preClose', () => projectRuntime.stopAll());
   const nodes = createNodesModule({
+    runBrowserCase: (attempt, test, signal) => {
+      const owner = {
+        id: attempt.id,
+        taskId: attempt.taskId,
+        projectId: attempts.service.projectOf(attempt.id),
+        filesDir: attempts.filesDirOf(attempt),
+        browserTest: test.scope,
+        savedCase: true,
+      };
+      return runBrowserCase(browser.service, owner, test, signal, (step, reason) =>
+        attempts.service.waitForLocalInput(attempt.id, () =>
+          browser.service.caseHandoffs.wait(owner, step, reason, signal),
+        ),
+      );
+    },
+    isBrowserTestTask: (id): boolean => tasks.service.browserTest(id) !== null,
     db: database.db,
     unit,
     clock,

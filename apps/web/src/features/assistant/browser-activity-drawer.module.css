@@ -1,0 +1,17 @@
+.list,
+.requests {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.entry {
+  padding-block: var(--s-3);
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.entry p {
+  margin-block: var(--s-1);
+}
+.requests {
+  color: var(--danger);
+}

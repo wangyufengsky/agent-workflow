@@ -5,6 +5,8 @@ import {
   type CheckResult,
   ErrorCode,
   type ErrorInfo,
+  MCP_TOOL_PREFIX,
+  McpToolName,
   type NodeAcceptance,
   NodeStatus,
   PAGE_CHECK_VIEWPORTS,
@@ -70,11 +72,15 @@ const FEEDBACK_OUTPUT_CHARS = 3000;
 
 // Feedback is part of the next attempt's prompt, so it is written for the model.
 
-export function feedbackFromAttempt(status: AttemptStatus, error: ErrorInfo | null): string {
+export function feedbackFromAttempt(
+  status: AttemptStatus,
+  error: ErrorInfo | null,
+  submitTool: McpToolName = McpToolName.SubmitResult,
+): string {
   if (status === AttemptStatus.Aborted) return 'The previous attempt was stopped by the user. Start the step again.';
   switch (error?.code) {
     case ErrorCode.AttemptNoResult:
-      return 'The previous attempt stopped without calling agent-workflow_submit_result. Finish the step and submit its result.';
+      return `The previous attempt stopped without calling ${MCP_TOOL_PREFIX}${submitTool}. Finish the step and submit its result.`;
     case ErrorCode.AttemptTimeout:
       return 'The previous attempt ran out of time. Focus on what the step asks and submit the result as soon as it is done.';
     case ErrorCode.AttemptSessionError:

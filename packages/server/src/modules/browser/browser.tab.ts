@@ -66,7 +66,7 @@ const loadingFinishedSchema = z.object({ requestId: z.string() });
 const evaluateSchema = z.object({ result: z.object({ value: z.unknown().optional() }) });
 
 /** Removed from websites' pages for the AI: write channels the request filter cannot see (29 §5.4). */
-const NO_REALTIME =
+export const NO_REALTIME =
   'delete window.RTCPeerConnection; delete window.webkitRTCPeerConnection; delete window.WebTransport;';
 
 /** Resolves when the page has had no DOM change for `quiet` ms, false after `timeout` ms (page-side timers). */
@@ -93,6 +93,7 @@ export type TabInput = {
   site: boolean;
   /** The user's own tab, placed on the window by the renderer (29 §8.1): sized by its place, files can be chosen. */
   userFacing?: boolean;
+  caseSession?: boolean;
   /** 短期读取的整体截止也覆盖初始化；迟到的宿主资源必须立即释放。 */
   signal?: AbortSignal;
 };
@@ -113,9 +114,12 @@ export async function openTab({
   network: partitionNetwork,
   site,
   userFacing = false,
+  caseSession = false,
   signal,
 }: TabInput) {
   const viewport: { preset: ViewportPreset } = { preset: 'desktop' };
+  let manual = false;
+  let ownership = 0;
   let refs = new Map<string, number>();
   const consoleEntries: ConsoleEntry[] = [];
   const exceptions: ExceptionEntry[] = [];
@@ -127,6 +131,7 @@ export async function openTab({
     navigated: false,
     dialog: null as string | null,
     blockedWrites: [] as string[],
+    blockedRequests: [] as Array<{ url: string; method: string }>,
     loaded: true,
     /** A website that asked for a client certificate, which this tab never gives (29 §5.4). */
     certificateAsked: null as string | null,
@@ -192,7 +197,7 @@ export async function openTab({
         return;
       case 'Page.javascriptDialogOpening': {
         // 用户自己操作的页面由用户处理对话框，读取页面不能替用户点确认。
-        if (userFacing) return;
+        if (userFacing || manual) return;
         const { type, message } = dialogSchema.parse(params);
         // An unanswered dialog freezes the page: alert and confirm are accepted, prompt dismissed (29 §5.5).
         const accept = type !== 'prompt';
@@ -268,6 +273,7 @@ export async function openTab({
       since.certificateAsked = new URL(`https://${event.host}/`).href;
     else if (event.type === 'browser.blocked') {
       blockedUrls.set(event.url, event.reason);
+      if (since.blockedRequests.length < 50) since.blockedRequests.push({ url: event.url, method: event.method });
       if (event.reason === BrowserBlockReason.ReadOnly) {
         since.blockedWrites.push(`${event.method} ${new URL(event.url).pathname}`);
       }
@@ -282,7 +288,8 @@ export async function openTab({
     // File choosers would open a dialog nobody answers (29 §5.4); the user answers their own.
     if (!userFacing) await cdp('Page.setInterceptFileChooserDialog', { enabled: true });
     signal?.throwIfAborted();
-    if (site) await cdp('Page.addScriptToEvaluateOnNewDocument', { source: NO_REALTIME });
+    if (site || policy.automation !== undefined)
+      await cdp('Page.addScriptToEvaluateOnNewDocument', { source: NO_REALTIME });
     signal?.throwIfAborted();
   }
 
@@ -295,6 +302,7 @@ export async function openTab({
       tabId,
       partition,
       userFacing,
+      ...(caseSession ? { caseSession } : {}),
       viewport: userFacing ? null : VIEWPORT_SIZES.desktop,
       policy,
       integratedAuthServers,
@@ -352,6 +360,16 @@ export async function openTab({
     viewport,
     cdp,
     evaluate,
+    ownershipVersion: () => ownership,
+    changeOwnership(): void {
+      ownership += 1;
+      refs.clear();
+    },
+    registerCaseRef(node: number): string {
+      const ref = 'case-target';
+      refs.set(ref, node);
+      return ref;
+    },
     refOf(ref: string): number {
       const node = refs.get(ref);
       if (node === undefined) {
@@ -365,10 +383,13 @@ export async function openTab({
       since.navigated = false;
       since.dialog = null;
       since.blockedWrites = [];
+      since.blockedRequests = [];
       since.certificateAsked = null;
       mark = { console: consoleErrors(), exceptions: exceptions.length, failed: failedRequests().length };
       start = { console: consoleEntries.length, exceptions: exceptions.length, requests: requests.size };
     },
+
+    blockedDuringAction: () => [...since.blockedRequests],
 
     /** The main frame's address (empty before the first navigation). */
     url: () => url,
@@ -405,6 +426,8 @@ export async function openTab({
     },
 
     documentVersion: () => navigations.committed,
+    waitForDocument: (previous: number) =>
+      mainFrameReaches(() => navigations.committed > previous, clock.now() + BROWSER_SETTLE_TIMEOUT_MS),
 
     onChange(listener: () => void): void {
       changed = listener;
@@ -484,7 +507,10 @@ export async function openTab({
       };
     },
 
-    setPolicy: (next: BrowserPolicy) => host.request({ kind: 'setPolicy', tabId, policy: next }),
+    async setPolicy(next: BrowserPolicy) {
+      await host.request({ kind: 'setPolicy', tabId, policy: next });
+      manual = next.automation?.manual === true;
+    },
 
     /** Stops listening; the host's tab is already gone (closed by main, 29 §8.1). */
     dispose(): void {
