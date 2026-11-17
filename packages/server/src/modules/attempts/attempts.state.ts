@@ -28,6 +28,8 @@ import { type Attempt, createAttemptsRepo } from './attempts.repo.ts';
 import type { SessionView } from './attempts.session-view.ts';
 import type { NewTranscriptEntry, TranscriptStore } from './attempts.transcript.ts';
 
+const SESSION_COMMAND_TIMEOUT_MS = 30_000;
+
 /** In-memory state of a session we created, kept until it goes quiet so trailing events still reach the transcript. */
 export type LiveSession = {
   attemptId: string;
@@ -49,6 +51,10 @@ export type LiveSession = {
   modelWaitLeftMs: number | null;
   /** Set once the result was submitted: further generation is stopped when the submit call completes (12 §4.2). */
   stopAfterSubmit: boolean;
+  /** 收到首条任务消息的原生事件前，空闲事件属于开始命令。 */
+  firstPrompt: { messageId: string | null; controller: AbortController } | null;
+  endCommand: string | null;
+  finishingCommand: boolean;
   submitTool: McpToolName | null;
   /** Waiting for the user (blocking question or permission); the timeout does not run meanwhile. */
   parked: boolean;
@@ -149,6 +155,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
   /** Stops following a session: later events of it are ignored until a new attempt tracks it. */
   function releaseSession(session: LiveSession): void {
     if (live.get(session.sessionId) === session) live.delete(session.sessionId);
+    session.firstPrompt?.controller.abort();
     session.release();
   }
 
@@ -231,6 +238,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
         progress.delete(attempt.id);
         const session = sessionOf(attempt.id);
         session?.cancelTimeout();
+        session?.firstPrompt?.controller.abort();
         if (session !== undefined) session.parked = false;
       }
       log.info({ attemptId: attempt.id, from: attempt.status, to, event }, 'attempt transition');
@@ -250,16 +258,32 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
     },
 
     /** Sends a message to the session and records it as ours. */
-    async send(session: LiveSession, text: string): Promise<void> {
+    async send(session: LiveSession, text: string, messageId?: string): Promise<void> {
       session.idle = false;
       transcripts.append(mustFind(session.attemptId), [{ kind: TranscriptEntryKind.UserMessage, data: { text } }]);
       await opencode.prompt({
+        ...(messageId === undefined ? {} : { messageId }),
         sessionId: session.sessionId,
         directory: session.directory,
         agent: session.agent,
         ...(session.model === undefined ? {} : { model: session.model }),
         ...(session.system === undefined ? {} : { system: session.system }),
         text,
+      });
+    },
+
+    async runCommand(session: LiveSession, text: string, messageId?: string): Promise<void> {
+      const deadline = AbortSignal.timeout(SESSION_COMMAND_TIMEOUT_MS);
+      const starting = session.firstPrompt?.controller.signal;
+      transcripts.append(mustFind(session.attemptId), [{ kind: TranscriptEntryKind.UserMessage, data: { text } }]);
+      await opencode.runCommand({
+        sessionId: session.sessionId,
+        directory: session.directory,
+        agent: session.agent,
+        ...(session.model === undefined ? {} : { model: session.model }),
+        text,
+        ...(messageId === undefined ? {} : { messageId }),
+        signal: starting === undefined ? deadline : AbortSignal.any([deadline, starting]),
       });
     },
 

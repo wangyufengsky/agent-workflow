@@ -19,6 +19,7 @@ import {
   OPENCODE_AGENT_NAME,
   PermissionDecision,
   type PermissionPayload,
+  RoleBaseAgent,
   type SessionAgent,
   type SkillSnapshot,
   TaskEventEntity,
@@ -26,7 +27,7 @@ import {
   TranscriptSystemEvent,
 } from '@aw/shared';
 import type { ModelSlots } from '../model-slots/index.ts';
-import { parseModelRef, sessionPermissionRules } from '../opencode/index.ts';
+import { createMessageId, parseModelRef, sessionPermissionRules } from '../opencode/index.ts';
 import type { ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { withUserSkills } from '../skills/index.ts';
@@ -150,6 +151,14 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     if (!opencode.isConnected()) throw new AppError(ErrorCode.OpencodeNotReady, 'opencode is not ready');
   }
 
+  function usesSessionCommands(attempt: Attempt, agent: string): boolean {
+    return (
+      attempt.taskId !== null &&
+      attempt.kind === AttemptKind.Execute &&
+      agent === OPENCODE_AGENT_NAME[RoleBaseAgent.Executor]
+    );
+  }
+
   /** Registers the session as ours, with the attempt timeout running. */
   function track(
     attempt: Attempt,
@@ -174,6 +183,9 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       cancelTimeout: parked ? () => undefined : clock.schedule(timeoutMs, () => reactions.timeOut(attempt.id)),
       modelWaitLeftMs: null,
       stopAfterSubmit: false,
+      firstPrompt: null,
+      endCommand: usesSessionCommands(attempt, session.agent) ? settings.get('ai.sessionEndCommand') : null,
+      finishingCommand: false,
       submitTool,
       parked,
       browserWaiting: false,
@@ -189,12 +201,27 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
   }
 
   /** Sends a message; a failure to deliver it fails the attempt like a session error. */
-  async function sendOrFail(session: LiveSession, text: string): Promise<void> {
+  async function sendOrFail(session: LiveSession, text: string, startCommand: string | null = null): Promise<void> {
     try {
-      await state.send(session, text);
+      if (startCommand === null) {
+        await state.send(session, text);
+        return;
+      }
+      const firstPrompt: NonNullable<LiveSession['firstPrompt']> = {
+        messageId: null,
+        controller: new AbortController(),
+      };
+      session.firstPrompt = firstPrompt;
+      await state.runCommand(session, startCommand, createMessageId(clock.now()));
+      if (firstPrompt.controller.signal.aborted) return;
+      // OpenCode 按原生消息 id 的顺序选取最新提示词，任务消息必须排在开始命令之后。
+      firstPrompt.messageId = createMessageId(clock.now());
+      await state.send(session, text, firstPrompt.messageId);
     } catch (err) {
       const current = mustFind(session.attemptId);
-      if (current.status === AttemptStatus.Running) move(current, AttemptEvent.SessionError, errorOf(err));
+      if (current.status !== AttemptStatus.Running) return;
+      move(current, AttemptEvent.SessionError, errorOf(err));
+      if (startCommand !== null) await state.stopSession(session);
     }
   }
 
@@ -244,7 +271,8 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     );
     // Running before the first prompt, so every event of the session finds the attempt active.
     move(attempt, AttemptEvent.SessionStarted);
-    await sendOrFail(session, input.prompt);
+    const startCommand = usesSessionCommands(attempt, agent) ? settings.get('ai.sessionStartCommand') : null;
+    await sendOrFail(session, input.prompt, startCommand);
     return toDto(mustFind(id));
   }
 
@@ -474,6 +502,19 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       const session = state.sessionOf(id);
       if (session !== undefined) session.stopAfterSubmit = true;
       return toDto(updated);
+    },
+
+    /** 完成命令需要使用原任务目录，清理工作树前等待当前收尾。 */
+    async waitForEndCommands(taskId: string): Promise<void> {
+      await Promise.all(
+        [...state.live.values()]
+          .filter(
+            (session) =>
+              session.taskId === taskId &&
+              (session.finishingCommand || (session.stopAfterSubmit && session.endCommand !== null)),
+          )
+          .map((session) => session.released),
+      );
     },
 
     /** User abort (11 §6) or task cancellation. */

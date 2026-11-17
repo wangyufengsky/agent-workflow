@@ -36,6 +36,8 @@ const MODEL = 'scripted';
 const RUN = 'RUN: ';
 const PROJECT_PATTERNS = ['./scripts/check.sh -q *'];
 const PROBE_PARENT = 'VERIFY_MANAGED_DELEGATION';
+const PROBE_SESSION_COMMAND = 'VERIFY_SESSION_COMMAND_BOUNDARIES';
+const transportTrace: Array<{ command: string; args: string; sessionId: string } | 'task'> = [];
 const PROBE_CHILD = 'FIND_COMMITTED_PROBE';
 const PROBE_EVIDENCE = 'sample-repository-marker';
 const PROJECT_INSTRUCTION = 'project-instruction-marker';
@@ -77,8 +79,18 @@ async function bodyOf(req: IncomingMessage): Promise<{
 }
 
 /** Answers the latest `RUN:` prompt with a bash call, a tool result (or anything else) with text. */
+async function recordCommand(req: IncomingMessage) {
+  const data: Buffer[] = [];
+  for await (const chunk of req) data.push(chunk as Buffer);
+  transportTrace.push(JSON.parse(Buffer.concat(data).toString('utf8')));
+}
+
 function scriptedModel(): Server {
   return createServer((req, res) => {
+    if (req.url === '/session-command-probe') {
+      void recordCommand(req).then(() => res.end());
+      return;
+    }
     void bodyOf(req).then(({ messages, stream, tools }) => {
       const last = messages.at(-1);
       const prompt = last?.role === 'user' ? textOf(last) : '';
@@ -103,6 +115,9 @@ function scriptedModel(): Server {
           last?.role === 'tool'
             ? [operation(McpToolName.SubmitResult, { summary: 'Received the managed delegation', notes: textOf(last) })]
             : [operation(McpToolName.DelegateReadonly, { questions: [PROBE_CHILD] })];
+      } else if (prompt.includes(PROBE_SESSION_COMMAND)) {
+        transportTrace.push('task');
+        calls = [operation(McpToolName.SubmitResult, { summary: 'Task received after the start command' })];
       } else if (command !== undefined) {
         calls = command
           .split('\n')
@@ -328,6 +343,56 @@ it('@opencode 委派沿用项目模型、读取固定提交，并隔离原生工
       expect(advertisedChild).not.toContain(name);
     expect(childReads.some((result) => result.includes(PROBE_EVIDENCE))).toBe(true);
     expect(childPrompts.join(' ')).not.toContain(PROJECT_INSTRUCTION);
+  } finally {
+    await t.call(cancelTaskOp, { id: task.id });
+  }
+}, 60_000);
+
+it('@opencode 在同一开发会话执行首尾斜杠命令，插件可用该会话 id 上报', async () => {
+  await t.call(updateSettingsOp, {
+    'ai.defaultModel': `${PROVIDER}/${MODEL}`,
+    'ai.sessionStartCommand': '/session-probe start',
+    'ai.sessionEndCommand': '/session-probe complete',
+  });
+  const endpoint = `http://127.0.0.1:${(model.address() as AddressInfo).port}/session-command-probe`;
+  const { project } = await addProject(t, {
+    checkCommand: null,
+    files: {
+      'opencode.json': JSON.stringify({
+        command: { 'session-probe': { template: 'Report the boundary: $ARGUMENTS' } },
+      }),
+      '.opencode/plugins/session-command-probe.js': `
+        export default async () => ({
+          'command.execute.before': async ({ command, arguments: args, sessionID: sessionId }) => {
+            await fetch(${JSON.stringify(endpoint)}, {
+              method: 'POST', body: JSON.stringify({ command, args, sessionId }),
+            });
+          },
+        });
+      `,
+    },
+  });
+  const completed = nodeReaches(t, 'build_page', NodeStatus.Done, 45_000);
+  const task = await createTask(t, { projectId: project.id, workflow: 'frontend', requirement: PROBE_SESSION_COMMAND });
+  try {
+    const { node } = await completed;
+    await t.app.services.attempts.waitForEndCommands(task.id);
+    const detail = (await t.call(getNodeOp, { id: task.id, nodeId: node.id })).body;
+    const [summary] = detail.attempts;
+    if (summary === undefined) throw new Error('No development attempt');
+    const attempt = t.app.services.attempts.get(summary.id);
+    expect(detail.result?.summary).toBe('Task received after the start command');
+    expect(transportTrace).toEqual([
+      { command: 'session-probe', args: 'start', sessionId: attempt.opencodeSessionId },
+      'task',
+      { command: 'session-probe', args: 'complete', sessionId: attempt.opencodeSessionId },
+    ]);
+    const messages = t.app.services.attempts.transcript(attempt.id, 0).entries;
+    expect(messages.filter((entry) => entry.kind === 'user_message').map((entry) => entry.data.text)).toEqual([
+      '/session-probe start',
+      expect.stringContaining(PROBE_SESSION_COMMAND),
+      '/session-probe complete',
+    ]);
   } finally {
     await t.call(cancelTaskOp, { id: task.id });
   }

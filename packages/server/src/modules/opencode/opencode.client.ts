@@ -11,7 +11,13 @@ import {
 } from '@aw/shared';
 import { z } from 'zod';
 import type { Logger } from '../../core/logger.ts';
-import { type OpencodeError, type OpencodeEvent, OpencodeEventType, parseGlobalEvent } from './opencode.events.ts';
+import {
+  describeOpencodeError,
+  type OpencodeError,
+  type OpencodeEvent,
+  OpencodeEventType,
+  parseGlobalEvent,
+} from './opencode.events.ts';
 import type { OpencodeRuntime } from './opencode.runtime.ts';
 
 /** Error responses are thrown (and translated by `request`) instead of returned. */
@@ -60,7 +66,7 @@ export type PromptInput = {
   sessionId: string;
   directory: string;
   agent: string;
-  /** 助手请求的显式 user message id；任务尝试不设置。 */
+  /** 用原生消息 id 关联本轮事件。 */
   messageId?: string;
   model?: ModelRef;
   /** Appended to the agent prompt for this message (role prompt, 12 §2). */
@@ -79,6 +85,7 @@ export type OpencodeClient = {
   createSession(input: CreateSessionInput): Promise<string>;
   /** Sends a message and returns at once (`prompt_async`); progress arrives as events. */
   prompt(input: PromptInput): Promise<void>;
+  runCommand(input: SessionRequest & Pick<PromptInput, 'agent' | 'model' | 'text' | 'messageId'>): Promise<void>;
   /** 助手按请求关联完成；接受与结束分开，消息不必等模型整轮结束才清空草稿。 */
   promptAssistant(input: PromptInput & { messageId: string }): AssistantPrompt;
   promptImage(input: ImagePromptInput): Promise<string>;
@@ -189,7 +196,7 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
       );
       return data.id;
     },
-    async prompt({ sessionId, directory, agent, model, system, text }) {
+    async prompt({ sessionId, directory, agent, model, system, text, messageId }) {
       await request('session.promptAsync', () =>
         runtime.sdk().session.promptAsync(
           {
@@ -199,10 +206,33 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
             ...(model === undefined ? {} : { model: { providerID: model.providerId, modelID: model.modelId } }),
             ...(system === undefined ? {} : { system }),
             parts: [{ type: 'text', text }],
+            ...(messageId === undefined ? {} : { messageID: messageId }),
           },
           THROW,
         ),
       );
+    },
+    async runCommand({ sessionId, directory, agent, model, text, messageId, signal }) {
+      const separator = text.search(/\s/);
+      const { data } = await request('session.command', () =>
+        runtime.sdk().session.command(
+          {
+            sessionID: sessionId,
+            directory,
+            agent,
+            ...(model === undefined ? {} : { model: `${model.providerId}/${model.modelId}` }),
+            command: text.slice(1, separator === -1 ? undefined : separator),
+            ...(messageId === undefined ? {} : { messageID: messageId }),
+            arguments: separator === -1 ? '' : text.slice(separator).trimStart(),
+          },
+          requestOptions(signal),
+        ),
+      );
+      if (data.info.error !== undefined) {
+        throw new AppError(ErrorCode.OpencodeRequestFailed, describeOpencodeError(data.info.error), {
+          operation: 'session.command',
+        });
+      }
     },
     promptAssistant({ sessionId, directory, agent, model, system, text, messageId }) {
       const accepted = Promise.withResolvers<void>();

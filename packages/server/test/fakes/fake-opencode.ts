@@ -467,6 +467,7 @@ export function createFakeOpencode() {
       turns.add(turn);
       void turn.finally(() => turns.delete(turn));
     },
+    async runCommand() {},
     promptAssistant(input) {
       const accepted = Promise.withResolvers<void>();
       const started = Promise.withResolvers<void>();

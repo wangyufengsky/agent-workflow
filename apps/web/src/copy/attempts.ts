@@ -31,6 +31,7 @@ export const TRANSCRIPT_SYSTEM_LABEL: Record<TranscriptSystemEvent, string> = {
   [TranscriptSystemEvent.Retrying]: '模型请求失败，opencode 稍后重试',
   [TranscriptSystemEvent.ModelStalled]: '模型几分钟没有返回任何内容，这次输出已中断（常见于一次写入很长的内容）',
   [TranscriptSystemEvent.ResultSubmitted]: 'AI 已提交结果',
+  [TranscriptSystemEvent.SessionEndCommandFailed]: '会话结束命令执行失败，请检查 OpenCode 的命令和插件配置',
   [TranscriptSystemEvent.AwaitingInput]: '等待你回答问题或授权',
   [TranscriptSystemEvent.TimedOut]: '超过时限，已中止会话',
   [TranscriptSystemEvent.Aborted]: '已中止会话',

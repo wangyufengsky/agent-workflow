@@ -9,7 +9,7 @@ import { CompanionSettings } from './companion-settings.tsx';
 import { HostingAccountsSettings } from './hosting-accounts.tsx';
 import { NetworkSettings } from './network-settings.tsx';
 import { ProSettings } from './pro-settings.tsx';
-import { NumberSetting, Segmented } from './setting-inputs.tsx';
+import { NumberSetting, Segmented, TextSetting } from './setting-inputs.tsx';
 import { useSettings, useUpdateSettings } from './settings.queries.ts';
 import { WebsiteSettings } from './website-settings.tsx';
 
@@ -101,6 +101,35 @@ export function SettingsPage() {
               />
               <p className="hint">{C.concurrencyHint}</p>
             </div>
+          )}
+          {isPro && (
+            <>
+              <div className="field">
+                <label className="label" htmlFor="session-start-command">
+                  {C.sessionStartCommand}
+                </label>
+                <TextSetting
+                  key={settings['ai.sessionStartCommand']}
+                  id="session-start-command"
+                  value={settings['ai.sessionStartCommand']}
+                  placeholder={C.sessionStartCommandExample}
+                  onCommit={(command) => set({ 'ai.sessionStartCommand': command })}
+                />
+              </div>
+              <div className="field">
+                <label className="label" htmlFor="session-end-command">
+                  {C.sessionEndCommand}
+                </label>
+                <TextSetting
+                  key={settings['ai.sessionEndCommand']}
+                  id="session-end-command"
+                  value={settings['ai.sessionEndCommand']}
+                  placeholder={C.sessionEndCommandExample}
+                  onCommit={(command) => set({ 'ai.sessionEndCommand': command })}
+                />
+                <p className="hint">{C.sessionCommandsHint}</p>
+              </div>
+            </>
           )}
         </Panel>
         {isPro && <AssistantSettings settings={settings} set={set} />}
