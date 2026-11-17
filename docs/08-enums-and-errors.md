@@ -521,6 +521,7 @@ class AppError extends Error {
 | `MCP_NODE_NOT_FOUND` | — | `get_node_output` 的 node_key 不存在或未完成 |
 | `MCP_CONVERSATION_UNRESOLVED` | — | 助手 MCP：调用的会话不属于任何助手对话（如执行任务的会话） |
 | **助手（v1.1）** | | |
+| `ASSISTANT_MEMORY_NOT_FOUND` | 404 | 记忆不存在或已删除。 |
 | `ASSISTANT_CONVERSATION_NOT_FOUND` | 404 | |
 | `ASSISTANT_CONFIRMATION_NOT_FOUND` | 404 | |
 | `ASSISTANT_BUSY` | 409 | 助手正在回复时又发来消息（先等它结束或停止它） |

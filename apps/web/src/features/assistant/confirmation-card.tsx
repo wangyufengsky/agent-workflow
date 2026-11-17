@@ -1,6 +1,8 @@
 import {
   type AssistantConfirmationDTO,
   AssistantConfirmationStatus,
+  assistantMemoryInputSchema,
+  createAssistantMemoryOp,
   OPERATION_CONTRACTS,
   OperationRisk,
 } from '@aw/shared';
@@ -8,11 +10,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
-import { CONFIRMATION_COPY as C } from '../../copy/assistant.ts';
+import { CONFIRMATION_COPY as C, MEMORY_COPY } from '../../copy/assistant.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { operationTitle } from '../../copy/operations.ts';
 import { GitInitSummary } from '../projects/git-init-summary.tsx';
-import { gitInitPreviewQuery } from '../projects/projects.queries.ts';
+import { gitInitPreviewQuery, projectsQuery } from '../projects/projects.queries.ts';
 import { taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { useCancelCall, useConfirmCall } from './assistant.queries.ts';
 import styles from './cards.module.css';
@@ -55,12 +57,31 @@ function contractOf(operationId: string) {
   return contract;
 }
 
+function MemoryProposal({ input }: { input: Record<string, unknown> }) {
+  const { projectId, content } = assistantMemoryInputSchema.parse(input);
+  const projects = useQuery(projectsQuery);
+  const project = projects.data?.find((item) => item.id === projectId);
+  return (
+    <dl className={styles.params}>
+      <div className={styles.param}>
+        <dt>{MEMORY_COPY.scope}</dt>
+        <dd>{projectId === null ? MEMORY_COPY.personal : `${MEMORY_COPY.project} · ${project?.name ?? projectId}`}</dd>
+      </div>
+      <div className={styles.param}>
+        <dt>{MEMORY_COPY.content}</dt>
+        <dd className={styles.memoryContent}>{content}</dd>
+      </div>
+    </dl>
+  );
+}
+
 /** A write or critical call of the assistant waiting for the user (15 §4): what it does, to what, in words. */
 export function ConfirmationCard({ confirmation }: { confirmation: AssistantConfirmationDTO }) {
   const confirm = useConfirmCall();
   const cancel = useCancelCall();
   const pending = confirmation.status === AssistantConfirmationStatus.Pending;
   const critical = confirmation.risk === OperationRisk.Critical;
+  const isMemory = confirmation.operationId === createAssistantMemoryOp.id;
   const title = operationTitle(confirmation.title);
   const busy = confirm.isPending || cancel.isPending;
   const taskId = confirmation.input.id;
@@ -93,7 +114,11 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
           {C.status[confirmation.status]}
         </span>
       </header>
-      <InputSummary operation={contractOf(confirmation.operationId)} input={confirmation.input} />
+      {isMemory ? (
+        <MemoryProposal input={confirmation.input} />
+      ) : (
+        <InputSummary operation={contractOf(confirmation.operationId)} input={confirmation.input} />
+      )}
       {pending && confirmation.operationId === 'tasks.reverifyRequirements' && (
         <RequirementsImpact input={confirmation.input} />
       )}
@@ -114,7 +139,7 @@ export function ConfirmationCard({ confirmation }: { confirmation: AssistantConf
         ))}
       {pending ? (
         <>
-          <p className={styles.note}>{C.impact[confirmation.risk]}</p>
+          <p className={styles.note}>{isMemory ? MEMORY_COPY.approval : C.impact[confirmation.risk]}</p>
           <div className={styles.actions}>
             <Button
               variant="primary"

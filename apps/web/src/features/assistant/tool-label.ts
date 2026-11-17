@@ -40,7 +40,11 @@ function subjectOf(input: Record<string, unknown>): string | undefined {
 /** How a tool call of the assistant reads in the panel: an operation's title, the app tool's verb, or opencode's. */
 export function describeTool(tool: string, input: Record<string, unknown>): ToolInfo {
   const operation = OPERATION_BY_TOOL.get(tool);
-  if (operation !== undefined) return { title: operationTitle(operation.title), operation };
+  if (operation !== undefined) {
+    const title = operationTitle(operation.title);
+    // 专用 MCP 工具的输入可以不同于同名的界面操作。
+    return operation.expose.assistant ? { title, operation } : { title };
+  }
   const appName = tool.startsWith(MCP_ASSISTANT_TOOL_PREFIX) ? tool.slice(MCP_ASSISTANT_TOOL_PREFIX.length) : tool;
   if (isAppTool(appName)) return { title: TOOL_COPY.app[appName] };
   const native = TOOL_COPY.native[tool];

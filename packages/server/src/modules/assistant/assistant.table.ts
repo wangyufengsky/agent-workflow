@@ -1,6 +1,7 @@
 import type { AssistantConfirmationStatus, AssistantTurnEvent, AssistantTurnStatus } from '@aw/shared';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { initiativesTable } from '../initiatives/initiatives.table.ts';
+import { projectsTable } from '../projects/projects.table.ts';
 import { tasksTable } from '../tasks/tasks.table.ts';
 import { teamAnalysesTable } from '../team/team.table.ts';
 
@@ -159,4 +160,18 @@ export const assistantTurnsTable = sqliteTable(
     index('assistant_turns_conversation_idx').on(t.conversationId, t.startedAt),
     index('assistant_turns_status_idx').on(t.status),
   ],
+);
+
+export const assistantMemoriesTable = sqliteTable(
+  'assistant_memories',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id').references(() => projectsTable.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    sourceConversationId: text('source_conversation_id').references(() => assistantConversationsTable.id, {
+      onDelete: 'set null',
+    }),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [index('assistant_memories_project_updated_idx').on(t.projectId, t.updatedAt)],
 );

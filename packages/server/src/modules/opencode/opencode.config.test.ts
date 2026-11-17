@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { AGENT_SKILLS_MAX, PromptName, SkillName } from '@aw/builtin';
+import { AGENT_SKILLS_MAX, ASSISTANT_SKILLS_MAX, PromptName, SkillName } from '@aw/builtin';
 import { BashPolicy, OPENCODE_ASSISTANT_AGENT, RoleBaseAgent, readonlyBashRules, SessionAgent } from '@aw/shared';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -62,12 +62,14 @@ describe('opencode 配置生成', () => {
       a.permission.skill === undefined ? [] : [[name, a.permission.skill] as const],
     );
     expect(rules).toHaveLength(Object.values(SessionAgent).length + 1);
-    for (const [, rule] of rules) {
+    for (const [name, rule] of rules) {
       if (rule === 'deny') continue;
       const [first, ...allowed] = Object.entries(rule);
       expect(first).toEqual(['*', 'deny']);
       expect(allowed.every(([, action]) => action === 'allow')).toBe(true);
-      expect(allowed.length).toBeLessThanOrEqual(AGENT_SKILLS_MAX);
+      expect(allowed.length).toBeLessThanOrEqual(
+        name === OPENCODE_ASSISTANT_AGENT ? ASSISTANT_SKILLS_MAX : AGENT_SKILLS_MAX,
+      );
     }
     expect(Object.fromEntries(rules)[OPENCODE_ASSISTANT_AGENT]).toEqual({
       '*': 'deny',
@@ -77,6 +79,7 @@ describe('opencode 配置生成', () => {
       [SkillName.OfficeDocs]: 'allow',
       [SkillName.AssistantCharts]: 'allow',
       [SkillName.AssistantPreview]: 'allow',
+      [SkillName.AssistantMemory]: 'allow',
       [SkillName.DbReadonly]: 'allow',
       [SkillName.TaskDelivery]: 'allow',
     });

@@ -250,3 +250,20 @@ export const INPUT_REF_LABEL = {
   [InputRef.Attempt]: 'AI 会话',
   [InputRef.Attachment]: '资料',
 } satisfies Record<InputRef, string>;
+
+export const MEMORY_COPY = {
+  title: '助手记忆',
+  add: '新增记忆',
+  edit: '修改记忆',
+  remove: '删除记忆',
+  removePrompt: '删除后，助手在后续对话中将停止重新引用这条记忆。已经写进旧对话的文字仍可回看。',
+  scope: '适用范围',
+  personal: '个人',
+  project: '项目',
+  all: '全部记忆',
+  content: '记忆内容',
+  source: '查看来源对话',
+  empty: '没有记忆。可以在这里添加，或对助手说「记住……」。',
+  approval: '确认后保存，适用范围内的后续对话可以使用这条记忆。',
+  description: '记忆保存在此设备。助手使用的条目会发送给当前模型。',
+} as const;

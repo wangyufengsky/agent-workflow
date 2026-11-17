@@ -212,8 +212,8 @@ export async function startAssistantEvaluation(name: string, browserHost?: Brows
       const snapshot = await completeEvidence(id, latestTurnId(evidenceDb, id), afterSeq);
       return checkpoint(label, id, afterSeq, begun, snapshot);
     },
-    async conversation(title: string) {
-      const result = await t.call(createConversationOp, { title });
+    async conversation(title: string, projectId?: string) {
+      const result = await t.call(createConversationOp, { title, projectId });
       expect(result.status).toBe(201);
       conversations.add(result.body.id);
       return result.body.id;

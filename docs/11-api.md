@@ -388,9 +388,15 @@ type AttemptDTO = AttemptSummaryDTO & {
 | GET | `/assistant/conversations/:id/confirmations` | `{ items: AssistantConfirmationDTO[] }`，按创建时间；`AssistantConfirmationDTO = { id, conversationId, operationId, title, risk, input, status, result: { ok: true, output } \| { ok: false, error } \| null, createdAt, resolvedAt }`；无返回值的成功操作及旧版缺失 output 的成功记录均返回 `output: null` |
 | POST | `/assistant/confirmations/:id/confirm` | `{ alwaysAllow? }`：执行操作并把结果作为下一条消息发回会话；`alwaysAllow` 只允许 write 级（critical 400 `VALIDATION_FAILED`），同时把操作加入 `assistant.alwaysAllow`；已处理 409 `STATE_TRANSITION_INVALID`；不存在 404 `ASSISTANT_CONFIRMATION_NOT_FOUND` |
 | POST | `/assistant/confirmations/:id/cancel` | 会话收到「用户取消了该操作」 |
+| GET | `/assistant/memories` | `memory.list`，read，返回 `{ items: AssistantMemoryDTO[] }`，按更新倒序。 |
+| POST | `/assistant/memories` | `memory.create`，critical，`{ projectId: string \| null, content }` → 201。用户可直接保存；助手另走提议和确认流程。 |
+| PATCH | `/assistant/memories/:id` | `memory.update`，write，`{ content }` → `AssistantMemoryDTO`。 |
+| DELETE | `/assistant/memories/:id` | `memory.delete`，critical，→ 204。 |
 
 | POST | `/assistant/whisper` | `assistant.whisper`，`{}` → `{ text }`（1–120 字符）；沿用默认模型，独立 `aw-companion` 会话，禁用全部工具，不保存到工作聊天；并发 409 `ASSISTANT_BUSY`，运行时不可用 `OPENCODE_NOT_READY`，空输出／模型错误／取消／超时 `OPENCODE_REQUEST_FAILED`。write，不暴露给助手或命令面板 |
 | POST | `/assistant/whisper/stop` | `assistant.stopWhisper`，`{}` → 204；取消在途生成并清理临时会话；无在途请求时仍成功 |
+
+`AssistantMemoryDTO` 包含 `id`、`projectId`、`content`、`sourceConversationId` 和 `updatedAt`，范围和来源的 ID 可为空。正文去除首尾空白后为 1–800 字符。修改、删除不存在的记录返回 404 `ASSISTANT_MEMORY_NOT_FOUND`。这四个操作仅供管理界面使用。
 
 确认结果与待发通知持久化在同一事务；会话忙、运行时不可用或发送失败时保留通知，重启后可随下一条用户消息投递，投递成功才移除，不重新执行业务操作。应用回传结果时，若用户上一条消息所在页面的对象已被删除，system 明确说明该页面已失效，仍正常发送结果；用户主动发送消息时仍严格校验所报页面对象。
 

@@ -80,6 +80,7 @@ export const ErrorCode = {
   McpNodeNotFound: 'MCP_NODE_NOT_FOUND',
   McpConversationUnresolved: 'MCP_CONVERSATION_UNRESOLVED',
   // 助手
+  AssistantMemoryNotFound: 'ASSISTANT_MEMORY_NOT_FOUND',
   AssistantConversationNotFound: 'ASSISTANT_CONVERSATION_NOT_FOUND',
   AssistantConfirmationNotFound: 'ASSISTANT_CONFIRMATION_NOT_FOUND',
   AssistantBusy: 'ASSISTANT_BUSY',
@@ -245,6 +246,7 @@ export const ERROR_HTTP_STATUS = {
   [ErrorCode.McpResultAlreadySubmitted]: null,
   [ErrorCode.McpNodeNotFound]: null,
   [ErrorCode.McpConversationUnresolved]: null,
+  [ErrorCode.AssistantMemoryNotFound]: 404,
   [ErrorCode.AssistantConversationNotFound]: 404,
   [ErrorCode.AssistantConfirmationNotFound]: 404,
   [ErrorCode.AssistantBusy]: 409,

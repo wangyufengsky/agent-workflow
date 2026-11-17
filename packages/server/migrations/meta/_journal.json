@@ -302,6 +302,13 @@
       "when": 1794844490976,
       "tag": "0042_skill_usage_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "6",
+      "when": 1794882926742,
+      "tag": "0043_assistant_memory",
+      "breakpoints": true
     }
   ]
 }

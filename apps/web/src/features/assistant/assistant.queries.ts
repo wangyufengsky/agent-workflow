@@ -6,6 +6,7 @@ import {
   bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
+  createAssistantMemoryOp,
   createConversationOp,
   deleteConversationOp,
   ErrorCode,
@@ -103,6 +104,8 @@ export async function updateConfirmation(qc: QueryClient, confirmation: Assistan
       : [...old.filter((c) => c.id !== confirmation.id), confirmation].sort((a, b) => a.createdAt - b.createdAt),
   );
   await qc.invalidateQueries({ queryKey: key, exact: true });
+  if (confirmation.operationId === createAssistantMemoryOp.id && confirmation.result?.ok)
+    await qc.invalidateQueries({ queryKey: queryKeys.assistantMemories });
 }
 
 export function useCreateConversation() {

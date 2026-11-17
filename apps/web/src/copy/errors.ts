@@ -75,6 +75,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.McpResultAlreadySubmitted]: 'AI 重复提交了结果。',
   [ErrorCode.McpNodeNotFound]: 'AI 要读取的步骤不存在或还没有完成。',
   [ErrorCode.McpConversationUnresolved]: '这次调用不属于任何助手对话。',
+  [ErrorCode.AssistantMemoryNotFound]: '这条记忆不存在，可能已被删除。',
   [ErrorCode.AssistantConversationNotFound]: '这个助手对话不存在，可能已被删除。',
   [ErrorCode.AssistantConfirmationNotFound]: '这条确认不存在，可能所在的对话已被删除。',
   [ErrorCode.AssistantBusy]: '助手还在处理上一条消息，请等它回复后再发，或先停止它。',

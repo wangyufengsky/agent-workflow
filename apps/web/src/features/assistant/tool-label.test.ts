@@ -21,6 +21,9 @@ describe('助手工具调用的显示', () => {
   });
 
   it('用户自己的 MCP 工具显示为外部工具', () => {
+    expect(describeTool(app('memory_create'), { scope: 'project', content: '交付用中文' })).toEqual({
+      title: '保存助手记忆',
+    });
     expect(describeTool('calendar_list_events', {}).title).toBe('使用外部工具');
   });
 });

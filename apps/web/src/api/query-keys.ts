@@ -85,6 +85,7 @@ export const queryKeys = {
   ],
   /** Highlighted tokens of a diff: derived in the renderer, cached like server data. */
   syntax: (path: string, digest: string) => ['syntax', path, digest],
+  assistantMemories: ['assistant-memories'],
   assistantConversations: ['assistant', 'conversations'],
   assistantTranscript: (id: string) => ['assistant', id, 'transcript'],
   assistantTranscriptLive: (id: string) => ['assistant', id, 'transcript-live'],
