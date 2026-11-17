@@ -16,7 +16,7 @@ import { type CallToolResult, type Tool, ToolSchema } from '@modelcontextprotoco
 import { z } from 'zod';
 import type { Logger } from '../../core/logger.ts';
 
-export type McpToolContext = { attempt: AttemptDTO };
+export type McpToolContext = { attempt: AttemptDTO; signal?: AbortSignal | undefined };
 
 /** Images a tool returns beside its output (a screenshot, 29 §5.7): MCP image content, kept out of the JSON. */
 export const MCP_IMAGES = Symbol('mcp images');
@@ -58,7 +58,7 @@ export type ToolRegistry = {
   list(): Tool[];
   /** What the MCP tools page shows (11 §10). */
   info(): McpToolInfo[];
-  call(name: string, args: Record<string, unknown>): Promise<CallToolResult>;
+  call(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<CallToolResult>;
 };
 
 export type AttemptLookup = { findLatestBySession(sessionId: string): AttemptDTO | undefined };
@@ -135,7 +135,7 @@ export function createToolRegistry(
         allowedKinds: [...t.allowedKinds],
       })),
 
-    async call(name, args) {
+    async call(name, args, signal) {
       const tool = tools.find((t) => t.name === name);
       if (tool === undefined) {
         return errorResult({ code: ErrorCode.NotFound, message: `Unknown tool ${name}` }, undefined);
@@ -147,7 +147,7 @@ export function createToolRegistry(
         if (!parsed.success) {
           throw new AppError(ErrorCode.ValidationFailed, 'Tool arguments are invalid', { issues: parsed.error.issues });
         }
-        const returned = await tool.handler(parsed.data, { attempt });
+        const returned = await tool.handler(parsed.data, { attempt, signal });
         const output = tool.output.parse(returned);
         log.info({ tool: name, attemptId: attempt.id }, 'mcp tool called');
         // opencode hands images to models with image input and tells the others they cannot see them (29 §12 V4).

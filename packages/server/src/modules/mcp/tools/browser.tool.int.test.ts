@@ -4,6 +4,7 @@ import {
   askKnowledgeOp,
   BROWSER_FRAME_WIDTH,
   type BrowserFrame,
+  createTaskOp,
   ErrorCode,
   getKnowledgeOp,
   knowledgeCitationOp,
@@ -16,14 +17,14 @@ import {
   updateSettingsOp,
 } from '@aw/shared';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { script } from '../../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../../test/helpers/app.ts';
 import { createChromiumHost } from '../../../../test/helpers/browser.ts';
 import { waitForEvent } from '../../../../test/helpers/events.ts';
 import { createTestRepo } from '../../../../test/helpers/git.ts';
 import { callTool, connectMcp } from '../../../../test/helpers/mcp.ts';
-import { addProject } from '../../../../test/helpers/tasks.ts';
+import { addProject, workflowId } from '../../../../test/helpers/tasks.ts';
 
 // The browser tools over the execution MCP (12 §6, 29 §6), as opencode calls them for an attempt's session; the tabs
 // run in a real Chromium.
@@ -69,13 +70,13 @@ afterEach(async () => {
 });
 
 /** An attempt of `kind` whose session keeps working; its tools are called with its session id. */
-async function sessionOf(kind: AttemptKind) {
+async function sessionOf(kind: AttemptKind, taskId: string | null = null) {
   t.fake.enqueue(script().hang());
   const repo = await createTestRepo();
   const attempt = await t.app.services.attempts.start({
     kind,
     agent: RoleBaseAgent.Executor,
-    taskId: null,
+    taskId,
     projectId: null,
     nodeId: null,
     roleId: null,
@@ -88,7 +89,7 @@ async function sessionOf(kind: AttemptKind) {
   if (session === null) throw new Error('attempt has no session');
   const call = (name: McpToolName, args: Record<string, unknown> = {}) =>
     callTool(mcp, name, { [MCP_SESSION_ARG]: session, ...args });
-  return Object.assign(call, { session });
+  return Object.assign(call, { session, attemptId: attempt.id });
 }
 
 /** The width in a JPEG's start-of-frame segment (baseline or progressive). */
@@ -109,6 +110,49 @@ const refIn = (page: unknown, element: string) => {
 };
 
 describe('浏览器工具', () => {
+  it('测试步骤可委派本任务保存的截图，其他任务的截图不会发给视觉模型', async () => {
+    const { project } = await addProject(t);
+    const createTask = async () =>
+      (
+        await t.call(createTaskOp, {
+          projectId: project.id,
+          workflowId: await workflowId(t, 'bugfix'),
+          requirement: 'Check the save button',
+          start: false,
+        })
+      ).body;
+    const task = await createTask();
+    const another = await createTask();
+    const first = await sessionOf(AttemptKind.Execute, task.id);
+    const second = await sessionOf(AttemptKind.Execute, another.id);
+    expect((await first(McpToolName.BrowserOpen, { url: origin })).isError).toBe(false);
+    const saved = await first(McpToolName.BrowserScreenshot);
+    expect(saved.body).toMatchObject({ file: '1.jpg' });
+    const model = { providerId: 'local', modelId: 'vision' };
+    t.fake.models.push({ ...model, name: 'Vision', contextLimit: null, supportsImage: true });
+    await t.call(updateSettingsOp, { 'ai.imageModel': 'local/vision' });
+    const readImage = vi.spyOn(t.fake, 'promptImage').mockResolvedValue('保存按钮在左侧');
+    const question = '保存按钮在哪里？';
+    expect(
+      await second(McpToolName.AnalyzeImage, {
+        source: { screenshot: '1.jpg', attempt_id: first.attemptId },
+        question,
+      }),
+    ).toMatchObject({ isError: true, body: { code: ErrorCode.NotFound } });
+    expect(await first(McpToolName.AnalyzeImage, { source: { screenshot: '1.jpg' }, question })).toMatchObject({
+      isError: false,
+      body: { source: { screenshot: '1.jpg', attempt_id: first.attemptId }, analysis: '保存按钮在左侧' },
+    });
+    const screenshot = await t.request({ method: 'GET', url: `/attempts/${first.attemptId}/browser/1.jpg` });
+    expect(readImage).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        model,
+        question,
+        image: { mime: 'image/jpeg', data: screenshot.rawPayload },
+      }),
+    );
+  });
+
   it('执行尝试用全部工具操作一个网站页面', async () => {
     const call = await sessionOf(AttemptKind.Execute);
     const opened = await call(McpToolName.BrowserOpen, { url: `${origin}/` });

@@ -26,6 +26,7 @@ export const SkillName = {
   MergeConflicts: 'aw-merge-conflicts',
   /** Checking pages in the task's preview and reading linked websites, for task sessions (41 §5.3, moved from prompts). */
   PageCheck: 'aw-page-check',
+  ImageAnalysis: 'aw-image-analysis',
   /** Evidence and findings for task reviews and Git workbench code reviews (41 §13). */
   CodeReview: 'aw-code-review',
   ArtifactRevision: 'aw-artifact-revision',
@@ -42,26 +43,32 @@ export const SKILL_MAX_BYTES = 8 * 1024;
 export const SKILL_DESCRIPTION_MAX = 400;
 /** Skills one agent may be given (D212). */
 export const AGENT_SKILLS_MAX = 8;
-export const ASSISTANT_SKILLS_MAX = 9;
+export const ASSISTANT_SKILLS_MAX = 10;
 
 /**
  * 内置 Skill 的分配表，同时用于原生 Skill 白名单和管理页。
  */
 export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
-  [SessionAgent.Planner]: [SkillName.DbReadonly, SkillName.OfflineNetwork, SkillName.PageCheck],
+  [SessionAgent.Planner]: [
+    SkillName.DbReadonly,
+    SkillName.OfflineNetwork,
+    SkillName.PageCheck,
+    SkillName.ImageAnalysis,
+  ],
   [SessionAgent.Executor]: [
     SkillName.DbReadonly,
     SkillName.OfflineNetwork,
     SkillName.MergeConflicts,
     SkillName.PageCheck,
+    SkillName.ImageAnalysis,
     SkillName.ArtifactRevision,
     SkillName.BackendDevelopment,
     SkillName.FrontendDevelopment,
   ],
-  [SessionAgent.Reviewer]: [SkillName.DbReadonly, SkillName.PageCheck, SkillName.CodeReview],
+  [SessionAgent.Reviewer]: [SkillName.DbReadonly, SkillName.PageCheck, SkillName.CodeReview, SkillName.ImageAnalysis],
   [SessionAgent.Researcher]: [SkillName.DbReadonly],
   [SessionAgent.SlidesWriter]: [],
-  [SessionAgent.CodeReviewer]: [SkillName.CodeReview],
+  [SessionAgent.CodeReviewer]: [SkillName.CodeReview, SkillName.ImageAnalysis],
   [SessionAgent.Delegate]: [],
 };
 export const ASSISTANT_SKILLS: SkillName[] = [
@@ -71,6 +78,7 @@ export const ASSISTANT_SKILLS: SkillName[] = [
   SkillName.OfficeDocs,
   SkillName.AssistantCharts,
   SkillName.AssistantPreview,
+  SkillName.ImageAnalysis,
   SkillName.AssistantMemory,
   SkillName.DbReadonly,
   SkillName.TaskDelivery,

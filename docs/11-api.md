@@ -47,6 +47,7 @@ type EnvironmentDTO = {
   models: {
     available: Array<{
       providerId: string; modelId: string; name: string;
+      supportsImage: boolean;       // 模型声明支持图片输入
       contextLimit: number | null;   // 上下文长度；provider 没写 limit.context 时为 null（D162）
       projectIds: string[];          // 只在这些项目自己的 opencode 配置里；全局配置里的为空（D162）
     }>;
@@ -630,15 +631,15 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 | 操作 | 方法与路径 | 风险／曝光 | 输入 → 结果 |
 | --- | --- | --- | --- |
 | （非清单）上传 | POST `/attachments` | 仅 UI | `Content-Type: application/octet-stream` 的二进制请求体（后端按原始字节判断格式并校验，30 §3.1、39 §4）；`X-Attachment-Name` 为 URL 编码的文件名 → 201 `AttachmentDTO`（含 `format` 与 Word / Excel 的 `meta`，OF-01）；Word / Excel 在请求内解析完成；校验或解析失败返回错误、不留记录 |
-| （非清单）文字 | GET `/attachments/:id/content` | 仅 UI | 模型读到的文字：文本附件的原件、Word / Excel 读出的 `text.md`；`text/plain; charset=utf-8` 加 `nosniff` |
-| attachments.snapshotProjectFile | POST `/attachments/project-file` | write；仅 UI | `{ projectId, taskId?, path, lines? }` → `AttachmentDTO`；Word / Excel 文件与上传同样解析，带 `lines` 为 `VALIDATION_FAILED`（OF-06，39 §7.3） |
+| （非清单）附件预览 | GET `/attachments/:id/content` | 仅 UI | 文本原件或 Word / Excel 的 `text.md`（`text/plain; charset=utf-8`）；PNG / JPEG 返回原始字节（`image/png` / `image/jpeg`）。都设置 `nosniff` |
+| attachments.snapshotProjectFile | POST `/attachments/project-file` | write；仅 UI | `{ projectId, taskId?, path, lines? }` → `AttachmentDTO`；Word / Excel 文件与上传同样解析；Word / Excel、PNG / JPEG 均按整份文件附加，带 `lines` 为 `VALIDATION_FAILED`（OF-06，39 §7.3） |
 | attachments.get | GET `/attachments/:id` | read；UI | `AttachmentDTO`（不含绝对路径） |
 | attachments.previewSheet（OF-03） | GET `/attachments/:id/sheet?sheet=` | read；仅 UI | Excel 附件一个工作表的预览 `SheetPreviewDTO`：`name`、`range`、`hidden`、`left` 与 `columns`（列字母从哪列起、共几列）、`merges`、前 `OFFICE_PREVIEW_ROWS` 行（`{ r, hidden, cells: [{ c, v }] }`）、`totalRows`；工作表不存在或附件不是 Excel 为 `VALIDATION_FAILED`（39 §8.1） |
 | assistant.previewFile（OF-04） | GET `/assistant/conversations/:id/files/preview?path=&sheet=` | read；仅 UI | 助手写的 Word / Excel 文件的预览 `OfficeFilePreviewDTO`：Word 为 `{ format, meta, markdown }`，Excel 为 `{ format, meta, sheet: SheetPreviewDTO }`（`sheet` 省略时为第一个工作表）；路径越界、不是文件、不是 Word / Excel 为 `VALIDATION_FAILED`（39 §8.2） |
 | （非清单）助手文件 | GET `/assistant/conversations/:id/files/raw?path=` | 仅 UI | 文件字节，`application/octet-stream`，`content-disposition: attachment`；路径同上校验（另存为，39 §8.2） |
 | attachments.remove | DELETE `/attachments/:id` | write；仅 UI | 只能删除尚无引用的附件，已发送的返回 `VALIDATION_FAILED` |
 
-以上为 U-01 已实现的部分。两条非清单路由使用与 JSON API 相同的令牌校验，不在 URL query 放令牌；原件以纯文本返回，不作为同源 HTML 执行。
+两条附件非清单路由使用与 JSON API 相同的令牌校验，令牌在请求头里。文本以纯文本返回，图像仅以 PNG / JPEG 返回。
 
 `TaskDetailDTO` 增加 `attachments`（需求的附件，再加每次「再改改」的附件，按顺序；U-03）。`createTask`、`requestChanges`、助手发送消息增加可选 `attachmentIds`（最多 `ATTACHMENTS_PER_INPUT_MAX`，U-02 已实现），后端在业务写入时绑定：任务与需求同一事务，「再改改」挂在追加的修改节点上，助手消息挂在对话上（同一附件在后续消息再次发送不重复引用）；有不存在的 ID 时返回 `ATTACHMENT_NOT_FOUND`，任务不创建。助手调用 `tasks.create` 时可以带 `attachmentIds`，但只能是当前对话里用户发过的附件：助手层在执行或请求确认前检查（`OperationToolDeps.scoped`），别的 ID 直接返回 `ATTACHMENT_NOT_FOUND`、不出确认卡；确认卡把它们显示为文件名（`InputRef.Attachment`）。`requestChanges` 的 `attachmentIds` 仍列在 `assistantOmit` 里，助手不能代为附加。
 

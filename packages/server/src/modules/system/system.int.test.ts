@@ -91,14 +91,27 @@ describe('可用的模型（D162）', () => {
     ]);
     const { body } = await t.call(getEnvironmentOp, {});
     expect(body.models.available).toEqual([
-      { providerId: 'lan', modelId: 'qwen-coder', name: 'Qwen Coder', contextLimit: null, projectIds: [project.id] },
+      {
+        providerId: 'lan',
+        modelId: 'qwen-coder',
+        name: 'Qwen Coder',
+        contextLimit: null,
+        supportsImage: false,
+        projectIds: [project.id],
+      },
     ]);
     expect(body.ready).toBe(true);
   });
 
   it('全局配置里的模型不注明项目，项目里同名的不重复列出', async () => {
     t = await createTestApp();
-    const global = { providerId: 'lan', modelId: 'qwen-coder', name: 'Qwen Coder', contextLimit: 32_768 };
+    const global = {
+      providerId: 'lan',
+      modelId: 'qwen-vision',
+      name: 'Qwen Vision',
+      contextLimit: 32_768,
+      supportsImage: true,
+    };
     t.fake.models.splice(0, Infinity, global);
     const { project } = await addProject(t);
     t.fake.projectModels.set(project.repoPath, [global]);

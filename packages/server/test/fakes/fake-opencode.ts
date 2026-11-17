@@ -150,7 +150,13 @@ export function createFakeOpencode() {
   const aborts: string[] = [];
   const models: OpencodeModel[] = [
     { providerId: 'opencode', modelId: 'fake-model', name: 'Fake Model', contextLimit: 128_000 },
-    { providerId: 'opencode', modelId: 'fake-model-2', name: 'Fake Model 2', contextLimit: 128_000 },
+    {
+      providerId: 'opencode',
+      modelId: 'fake-model-2',
+      name: 'Fake Model 2',
+      contextLimit: 128_000,
+      supportsImage: true,
+    },
   ];
   const projectModels = new Map<string, OpencodeModel[]>();
 
@@ -492,6 +498,9 @@ export function createFakeOpencode() {
         )
         .finally(unsubscribe);
       return { accepted: accepted.promise, started: started.promise, isRunning: async () => running, completed };
+    },
+    async promptImage() {
+      throw new Error('This test did not configure an image reader response');
     },
     async deleteSession({ sessionId }) {
       const index = sessions.findIndex((s) => s.id === sessionId);

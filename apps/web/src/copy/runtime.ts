@@ -101,6 +101,7 @@ export const TOOLS_COPY = {
     [McpToolName.BrowserInspect]: '浏览器：查看元素的位置、尺寸、是否被遮住与部分样式。',
     [McpToolName.BrowserLogs]: '浏览器：查看控制台错误、未捕获的异常与失败的请求。',
     [McpToolName.BrowserViewport]: '浏览器：切换桌面、平板或手机尺寸。',
+    [McpToolName.AnalyzeImage]: '请图像处理员读取当前任务的图片资料或浏览器截图。',
     [McpToolName.BrowserScreenshot]: '浏览器：截图并保存给你看；模型支持图片时也能看到截图。',
   } satisfies Record<McpToolName, string>,
 } as const;

@@ -20,6 +20,7 @@ import {
   AttachmentSource,
   type ConventionEvidenceOrigin,
   ErrorCode,
+  imageMimeByFormat,
   type KnowledgeAttachmentOrigin,
   McpToolName,
   OFFICE_ATTACHMENT_BYTES_MAX,
@@ -64,6 +65,14 @@ export type AttachmentsServiceDeps = {
 };
 
 const ORIGINAL = 'original';
+const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex');
+const JPEG_SIGNATURE = Buffer.from('ffd8ff', 'hex');
+
+function imageFormat(bytes: Buffer) {
+  if (bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) return AttachmentFormat.Png;
+  if (bytes.subarray(0, JPEG_SIGNATURE.length).equals(JPEG_SIGNATURE)) return AttachmentFormat.Jpeg;
+  return undefined;
+}
 const tooLarge = (reason: AttachmentLimit, limit: number) =>
   new AppError(ErrorCode.AttachmentTooLarge, `Attachment ${reason} limit exceeded`, { reason, limit });
 /** Names whose text may come from Excel or Notepad on Chinese Windows, in GBK (D194). */
@@ -117,7 +126,7 @@ export function createAttachmentsService({
   }
 
   /** The original is complete on disk before its row exists: a row always means a readable attachment (30 §3.1). */
-  async function save(attachment: AttachmentDTO, content: string): Promise<AttachmentDTO> {
+  async function save(attachment: AttachmentDTO, content: string | Buffer): Promise<AttachmentDTO> {
     const dir = dirOf(attachment.id);
     await mkdir(dir, { recursive: true });
     const partial = join(dir, `${ORIGINAL}.partial`);
@@ -127,15 +136,16 @@ export function createAttachmentsService({
     return attachment;
   }
 
-  /** The text the model reads: a text attachment's original, or what was read out of a Word or Excel file (39 §5). */
-  const textPath = (attachment: AttachmentDTO) =>
-    join(dirOf(attachment.id), attachment.format === AttachmentFormat.Text ? ORIGINAL : OFFICE_TEXT_FILE);
+  const originalPath = (id: string) => join(dirOf(id), ORIGINAL);
+  /** 图片原件通过与文本相同的受认证附件路由读取。 */
+  const contentPath = (attachment: AttachmentDTO) =>
+    attachment.meta === null ? originalPath(attachment.id) : join(dirOf(attachment.id), OFFICE_TEXT_FILE);
 
   /**
    * Synchronous: prompts are rendered where a step is dispatched, which must not wait (the text of an attachment is
    * bounded by `ATTACHMENT_BYTES_MAX` or `OFFICE_CELLS_MAX`).
    */
-  const textOf = (attachment: AttachmentDTO) => readFileSync(textPath(attachment), 'utf8');
+  const textOf = (attachment: AttachmentDTO) => readFileSync(contentPath(attachment), 'utf8');
 
   /**
    * A Word or Excel file (39 §5): the original and what the worker reads out of it are on disk before the row exists.
@@ -186,6 +196,7 @@ export function createAttachmentsService({
       const shown = text.length <= budget ? text : `${text.slice(0, text.lastIndexOf('\n', budget))}\n…`;
       return `${head}${sheets}>\n${shown}\n</attachment>`;
     }
+    if (imageMimeByFormat[attachment.format] !== undefined) return `${head} format="${attachment.format}" />`;
     const format = attachment.format === AttachmentFormat.Text ? '' : ` format="${attachment.format}"`;
     if (text.length <= budget) return `${head}${format}>\n${text}\n</attachment>`;
     return `${head}${format} shown="first ${budget} of ${text.length} characters" cursor="${budget}">\n${text.slice(0, budget)}\n</attachment>`;
@@ -279,8 +290,23 @@ export function createAttachmentsService({
     cleanup,
 
     get: require,
-    /** Where the text the model reads is, for the content route only (never in a DTO). */
-    contentPath: (id: string): string => textPath(require(id)),
+    /** 附件预览读取文字或图片原件，路径不进入 DTO。 */
+    content(id: string) {
+      const attachment = require(id);
+      return {
+        path: contentPath(attachment),
+        mime: imageMimeByFormat[attachment.format] ?? 'text/plain; charset=utf-8',
+      };
+    },
+    /** 调用者先用当前任务或对话校验附件所有权。 */
+    image(id: string) {
+      const attachment = require(id);
+      const mime = imageMimeByFormat[attachment.format];
+      if (mime === undefined) {
+        throw new AppError(ErrorCode.AttachmentInvalidType, 'The attachment is not a PNG or JPEG image', { id });
+      }
+      return { name: attachment.name, mime, path: originalPath(id) };
+    },
 
     /**
      * One upload (11 §14.1): the body is read up to the larger, Word and Excel limit; what it is decides its own
@@ -298,8 +324,11 @@ export function createAttachmentsService({
         chunks.push(chunk);
       }
       const bytes = Buffer.concat(chunks);
-      const format = detectFormat(bytes);
-      if (format !== AttachmentFormat.Text) return saveOffice(name, format, bytes);
+      const image = imageFormat(bytes);
+      if (image === undefined) {
+        const format = detectFormat(bytes);
+        if (format !== AttachmentFormat.Text) return saveOffice(name, format, bytes);
+      }
       if (size > ATTACHMENT_BYTES_MAX) throw tooLarge(AttachmentLimit.Bytes, ATTACHMENT_BYTES_MAX);
       return save(
         {
@@ -308,11 +337,11 @@ export function createAttachmentsService({
           name,
           sizeBytes: size,
           origin: null,
-          format,
+          format: image ?? AttachmentFormat.Text,
           meta: null,
           createdAt: clock.now(),
         },
-        asText(bytes, name),
+        image === undefined ? asText(bytes, name) : bytes,
       );
     },
 
@@ -362,6 +391,27 @@ export function createAttachmentsService({
         throw tooLarge(AttachmentLimit.Bytes, OFFICE_ATTACHMENT_BYTES_MAX);
       }
       const bytes = await readFile(file.real);
+      const image = imageFormat(bytes);
+      if (image !== undefined) {
+        if (bytes.length > ATTACHMENT_BYTES_MAX) throw tooLarge(AttachmentLimit.Bytes, ATTACHMENT_BYTES_MAX);
+        if (lines !== undefined) {
+          throw new AppError(ErrorCode.ValidationFailed, 'Attach an image whole, without a line range');
+        }
+        const now = clock.now();
+        return save(
+          {
+            id: randomUUID(),
+            source: AttachmentSource.ProjectFile,
+            name: basename(file.relativePath),
+            sizeBytes: bytes.length,
+            origin: { projectId, taskId: taskId ?? null, path: file.relativePath, lines: null, readAt: now },
+            format: image,
+            meta: null,
+            createdAt: now,
+          },
+          bytes,
+        );
+      }
       const format = detectFormat(bytes);
       // A project's Word and Excel files are read like uploads (39 §7.3); they have no lines to pick.
       if (format !== AttachmentFormat.Text) {
@@ -473,7 +523,9 @@ export function createAttachmentsService({
         text:
           attachment.format === AttachmentFormat.Xlsx
             ? readFileSync(join(dirOf(attachment.id), OVERVIEW_FILE), 'utf8')
-            : textOf(attachment),
+            : imageMimeByFormat[attachment.format] === undefined
+              ? textOf(attachment)
+              : '',
       }));
       const total = withText.reduce((sum, { text }) => sum + text.length, 0);
       const budget =
@@ -488,6 +540,9 @@ export function createAttachmentsService({
       return renderTemplate(prompts[PromptName.Attachments], {
         readTool: `${toolPrefix}${McpToolName.ReadAttachment}`,
         sheets,
+        images: attachments.some((a) => imageMimeByFormat[a.format] !== undefined)
+          ? `For PNG or JPEG attachments, load the aw-image-analysis skill and call ${tool(McpToolName.AnalyzeImage)} when you need evidence from the image.\n\n`
+          : '',
         items,
       });
     },
@@ -496,7 +551,7 @@ export function createAttachmentsService({
     readSheet: ({ attachment_id, ...request }: ReadSheetInput): Promise<ReadSheetOutput> =>
       office.readSheet(workbookOf(attachment_id), request).then((page) => ({ attachment_id, ...page })),
     /** Where an attachment's original is, for a Word or Excel file written from it (39 §7.2). */
-    originalPath: (id: string): string => join(dirOf(require(id).id), ORIGINAL),
+    originalPath: (id: string): string => originalPath(require(id).id),
     /** Where an Excel attachment's cells are, for work the office worker does on them (39 §7.2 `rows_from`). */
     workbookPath: workbookOf,
     /** The preview of one sheet of an Excel attachment (39 §8.1). */
@@ -509,6 +564,11 @@ export function createAttachmentsService({
     /** One page of an attachment's text; the caller has checked the attachment is visible to its reader. */
     read(id: string, cursor: number): ReadAttachmentOutput {
       const attachment = require(id);
+      if (imageMimeByFormat[attachment.format] !== undefined) {
+        throw new AppError(ErrorCode.AttachmentInvalidType, 'Use analyze_image to read a PNG or JPEG attachment', {
+          id,
+        });
+      }
       const text = textOf(attachment);
       const end = cursor + ATTACHMENT_READ_MAX_CHARS;
       return {

@@ -1,5 +1,5 @@
 import { pathToFileURL } from 'node:url';
-import { AGENT_SKILLS, ASSISTANT_SKILLS, PromptName, type Prompts, type SkillName } from '@aw/builtin';
+import { AGENT_SKILLS, ASSISTANT_SKILLS, PromptName, type Prompts, SkillName } from '@aw/builtin';
 import {
   BASH_PERMISSION_PRESETS,
   BashPolicy,
@@ -13,6 +13,7 @@ import {
   OPENCODE_AGENT_NAME,
   OPENCODE_ASSISTANT_AGENT,
   OPENCODE_COMPANION_AGENT,
+  OPENCODE_IMAGE_AGENT,
   type PermissionAction,
   type PermissionRule,
   readonlyBashRules,
@@ -201,6 +202,12 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
     skills: { paths: [input.skillsDir] },
     agent: {
       ...Object.fromEntries(agents),
+      [OPENCODE_IMAGE_AGENT]: {
+        mode: 'primary',
+        description: 'image reader',
+        prompt: input.prompts[PromptName.ProtocolImageReader],
+        permission: { '*': 'deny' },
+      },
       [OPENCODE_COMPANION_AGENT]: {
         mode: 'primary',
         description: 'companion small talk',
@@ -267,6 +274,7 @@ export function sessionPermissionRules(
   if (browserTestSubmit !== undefined) {
     return [
       { permission: '*', action: 'deny', pattern: '*' },
+      { permission: 'skill', action: 'allow', pattern: SkillName.ImageAnalysis },
       ...[...BROWSER_TEST_TOOLS, browserTestSubmit].map((tool) => ({
         permission: `${MCP_TOOL_PREFIX}${tool}`,
         action: 'allow' as const,

@@ -1,4 +1,5 @@
 import { AppError, AttachmentFormat, AttachmentRejection, ErrorCode } from '@aw/shared';
+import type { OfficeFormat } from './office.job.ts';
 import { readZipEntry, zipEntries } from './office.zip.ts';
 
 const ZIP = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
@@ -11,7 +12,7 @@ const CONTENT_TYPES = '[Content_Types].xml';
 const CONTENT_TYPES_MAX_BYTES = 1024 * 1024;
 
 /** The main part's content type tells a Word document from an Excel workbook, macros or not (39 §4). */
-const MAIN_PARTS: ReadonlyArray<readonly [string, AttachmentFormat]> = [
+const MAIN_PARTS: ReadonlyArray<readonly [string, OfficeFormat]> = [
   ['application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml', AttachmentFormat.Docx],
   ['application/vnd.ms-word.document.macroEnabled.main+xml', AttachmentFormat.Docx],
   ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml', AttachmentFormat.Xlsx],
@@ -26,7 +27,7 @@ const rejected = (reason: AttachmentRejection, message: string) =>
  * inflated here, the worker checks the rest unzips within its limit before parsing. Other Office-like files are
  * rejected with a reason. Everything else is `text` for the text check to decide.
  */
-export function detectFormat(bytes: Buffer): AttachmentFormat {
+export function detectFormat(bytes: Buffer): OfficeFormat | typeof AttachmentFormat.Text {
   if (bytes.subarray(0, OLE.length).equals(OLE)) {
     if (bytes.includes(ENCRYPTION_INFO)) throw rejected(AttachmentRejection.Encrypted, 'Password-protected file');
     throw rejected(AttachmentRejection.LegacyOffice, 'Word / Excel 97-2003 file');

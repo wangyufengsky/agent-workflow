@@ -10,6 +10,7 @@ export const McpToolName = {
   InspectDelegation: 'inspect_delegation',
   SubmitDelegation: 'submit_delegation',
   ReadAttachment: 'read_attachment',
+  AnalyzeImage: 'analyze_image',
   ReadSheet: 'read_sheet',
   QuerySheet: 'query_sheet',
   ReadOfficeFile: 'read_office_file',
@@ -51,6 +52,7 @@ export type McpToolName = (typeof McpToolName)[keyof typeof McpToolName];
 export const BROWSER_TEST_TOOLS = Object.values(McpToolName).filter(
   (name) =>
     (name.startsWith('browser_') && name !== McpToolName.BrowserSubmitReport) ||
+    name === McpToolName.AnalyzeImage ||
     name === McpToolName.GetTaskContext ||
     name === McpToolName.AskUser ||
     name === McpToolName.ReportProgress,

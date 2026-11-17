@@ -139,7 +139,12 @@ describe('我的 Skill', () => {
     const response = await app.call(getSkillCatalogOp, {});
     expect(response.status).toBe(200);
     const { builtin, scopes } = response.body;
-    expect(builtin).toHaveLength(16);
+    expect(builtin).toHaveLength(17);
+    expect(builtin.find(({ name }) => name === 'aw-image-analysis')).toMatchObject({
+      source: expect.stringContaining('agent-workflow_analyze_image'),
+      assistantEnabled: true,
+      agents: ['planner', 'executor', 'reviewer', 'code_reviewer'],
+    });
     expect(builtin.find(({ name }) => name === 'aw-page-check')).toMatchObject({
       source: expect.stringContaining('name: aw-page-check'),
       assistantEnabled: false,
