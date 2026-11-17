@@ -20,3 +20,17 @@ export const submitResultTool = (tasks: TasksService, debug: DebugService) =>
         ? debug.submitResult(attempt, input)
         : { accepted: true as const, next: await tasks.submitResult(attempt, input) },
   });
+
+export const submitBrowserReportTool = (tasks: TasksService) =>
+  defineMcpTool({
+    name: McpToolName.BrowserSubmitReport,
+    description:
+      'Submit your browser test report. Include each test, expected and actual results, pass/fail/blocked, and evidence such as screenshot filenames. Call once when the report is ready.',
+    allowedKinds: [AttemptKind.Execute],
+    input: submitResultInputSchema.pick({ summary: true, notes: true }).strict(),
+    output: submitResultOutputSchema,
+    handler: async (input, { attempt }) => ({
+      accepted: true as const,
+      next: await tasks.submitResult(attempt, input),
+    }),
+  });

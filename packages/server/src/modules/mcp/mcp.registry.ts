@@ -1,15 +1,16 @@
 import {
   AppError,
-  ATTEMPT_SUBMIT_TOOL,
   type AttemptDTO,
   type AttemptKind,
   AttemptStatus,
   BROWSER_TEST_TOOLS,
+  type BrowserTestSubmitTool,
   ErrorCode,
   type ErrorInfo,
+  isAttemptSubmitTool,
   MCP_SESSION_ARG,
   type McpToolInfo,
-  type McpToolName,
+  McpToolName,
 } from '@aw/shared';
 import { type CallToolResult, type Tool, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
@@ -70,15 +71,14 @@ export function createToolRegistry(
   tools: readonly McpToolDefinition[],
   attempts: AttemptLookup,
   log: Logger,
-  isBrowserTest: (id: string) => boolean,
+  browserTestSubmit: (attempt: AttemptDTO) => BrowserTestSubmitTool | undefined,
 ): ToolRegistry {
   function resolveAttempt(tool: McpToolDefinition, sessionId: unknown): AttemptDTO {
     const attempt = typeof sessionId === 'string' ? attempts.findLatestBySession(sessionId) : undefined;
     if (attempt === undefined) {
       throw new AppError(ErrorCode.McpAttemptUnresolved, 'No attempt for this session', { sessionId });
     }
-    const submitsResult = Object.values(ATTEMPT_SUBMIT_TOOL).some((name) => name === tool.name);
-    if (attempt.status === AttemptStatus.Succeeded && submitsResult) {
+    if (attempt.status === AttemptStatus.Succeeded && isAttemptSubmitTool(tool.name)) {
       throw new AppError(ErrorCode.McpResultAlreadySubmitted, 'The attempt already submitted its result', {
         attemptId: attempt.id,
       });
@@ -88,7 +88,17 @@ export function createToolRegistry(
         attemptId: attempt.id,
       });
     }
-    if (attempt.taskId !== null && !BROWSER_TEST_TOOLS.includes(tool.name) && isBrowserTest(attempt.taskId)) {
+    const testSubmit = browserTestSubmit(attempt);
+    if (tool.name === McpToolName.BrowserSubmitReport && testSubmit !== tool.name) {
+      throw new AppError(ErrorCode.McpToolNotAllowed, 'This tool is only for the browser test report step');
+    }
+    // A session from an earlier version may still have the previous submit_result permission.
+    if (
+      testSubmit !== undefined &&
+      tool.name !== testSubmit &&
+      tool.name !== McpToolName.SubmitResult &&
+      !BROWSER_TEST_TOOLS.includes(tool.name)
+    ) {
       throw new AppError(ErrorCode.McpToolNotAllowed, 'This browser test can only use its test tools');
     }
     if (!tool.allowedKinds.includes(attempt.kind)) {

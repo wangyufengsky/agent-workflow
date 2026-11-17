@@ -5,11 +5,14 @@ import {
   type AttemptDTO,
   AttemptKind,
   AttemptStatus,
+  browserTestSubmitTool,
   CHECK_KIND_ORDER,
   type CheckResult,
   type CheckUnrunnableReason,
   ErrorCode,
   InboxKind,
+  MCP_TOOL_PREFIX,
+  McpToolName,
   NodeEvent,
   NodeKind,
   type NodeResult,
@@ -245,8 +248,12 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
     if (attempt.status === AttemptStatus.Succeeded) return;
     // Cancelled with its task, or already moved on.
     if (node.status !== NodeStatus.Running && node.status !== NodeStatus.WaitingInput) return;
-    if (attempt.status === AttemptStatus.Interrupted && deps.isBrowserTestTask?.(node.taskId) !== true) interrupt(node);
-    else fail(node, NodeEvent.AttemptFailed, feedbackFromAttempt(attempt.status, attempt.error));
+    const browserTest = deps.isBrowserTestTask?.(node.taskId) === true;
+    if (attempt.status === AttemptStatus.Interrupted && !browserTest) interrupt(node);
+    else {
+      const submitTool = browserTest ? browserTestSubmitTool(node.kind) : McpToolName.SubmitResult;
+      fail(node, NodeEvent.AttemptFailed, feedbackFromAttempt(attempt.status, attempt.error, submitTool));
+    }
   }
 
   attempts.onSignal(({ type, attempt }) => {
@@ -352,12 +359,21 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         );
         return;
       }
+      const submitTool = ctx.browserTest === true ? browserTestSubmitTool(node.kind) : McpToolName.SubmitResult;
       const prompt = renderTemplate(prompts[PromptName.StartExecute], {
         taskKey: ctx.taskKey,
         taskTitle: ctx.taskTitle,
         requirement: ctx.requirement,
         nodeTitle: node.title,
-        instructions: node.instructions,
+        // 已确认的旧测试计划仍可能引用通用提交工具。
+        instructions:
+          submitTool === McpToolName.BrowserSubmitReport
+            ? node.instructions.replaceAll(
+                `${MCP_TOOL_PREFIX}${McpToolName.SubmitResult}`,
+                `${MCP_TOOL_PREFIX}${submitTool}`,
+              )
+            : node.instructions,
+        submitTool,
         retryFeedback: node.retryFeedback ?? EMPTY_SECTION,
         uncertaintyRule: prompts[ctx.askOnUncertainty ? PromptName.RuleAsk : PromptName.RuleAssume],
       });
@@ -373,7 +389,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         model: role.model ?? settings.get('ai.defaultModel'),
         system: role.prompt,
         prompt,
-        ...(ctx.browserTest === true ? { browserTest: true } : {}),
+        ...(ctx.browserTest === true ? { browserTestSubmit: submitTool } : {}),
         // A step of a read-only role (the code review's reviewer) may run the project check like a review (D51).
         checkCommands: ctx.checkCommand === null ? [] : [ctx.checkCommand],
       });

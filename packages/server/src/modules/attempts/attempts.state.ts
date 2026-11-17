@@ -9,6 +9,7 @@ import {
   type ErrorInfo,
   InboxKind,
   isTerminalState,
+  type McpToolName,
   ServerEventType,
   TaskEventEntity,
   TranscriptEntryKind,
@@ -48,6 +49,7 @@ export type LiveSession = {
   modelWaitLeftMs: number | null;
   /** Set once the result was submitted: further generation is stopped when the submit call completes (12 §4.2). */
   stopAfterSubmit: boolean;
+  submitTool: McpToolName | null;
   /** Waiting for the user (blocking question or permission); the timeout does not run meanwhile. */
   parked: boolean;
   /** The last turn ended and no message was sent since. */

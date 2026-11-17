@@ -66,6 +66,7 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.EditTaskXlsx,
       McpToolName.SubmitPlan,
       McpToolName.SubmitResult,
+      McpToolName.BrowserSubmitReport,
       McpToolName.SubmitReview,
       McpToolName.AskUser,
       McpToolName.ReportProgress,
@@ -93,6 +94,9 @@ describe('执行 MCP（/mcp/exec）', () => {
     ]);
     const submit = tools.find((tool) => tool.name === McpToolName.SubmitResult);
     expect(submit?.inputSchema).toMatchObject({ type: 'object', required: ['summary'] });
+    const browserReport = tools.find((tool) => tool.name === McpToolName.BrowserSubmitReport);
+    expect(browserReport?.inputSchema.required).toEqual(['summary']);
+    expect(Object.keys(browserReport?.inputSchema.properties ?? {})).toEqual(['summary', 'notes']);
     expect(JSON.stringify(tools)).not.toContain(MCP_SESSION_ARG);
   });
 
@@ -120,6 +124,16 @@ describe('执行 MCP（/mcp/exec）', () => {
     const session = await activeSession(AttemptKind.Plan);
     const { body } = await callTool(mcp, McpToolName.SubmitResult, { [MCP_SESSION_ARG]: session, summary: 'x' });
     expect(body).toMatchObject({ code: ErrorCode.McpToolNotAllowed, details: { kind: 'plan' } });
+  });
+
+  it('普通执行步骤不能用浏览器报告工具提交', async () => {
+    const session = await activeSession(AttemptKind.Execute);
+    const { body, isError } = await callTool(mcp, McpToolName.BrowserSubmitReport, {
+      [MCP_SESSION_ARG]: session,
+      summary: 'report',
+    });
+    expect(isError).toBe(true);
+    expect(body).toMatchObject({ code: ErrorCode.McpToolNotAllowed });
   });
 
   it('参数不合法时返回 VALIDATION_FAILED、zod issues 与 hint', async () => {

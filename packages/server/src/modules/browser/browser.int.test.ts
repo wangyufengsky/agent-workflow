@@ -14,6 +14,7 @@ import {
   createBrowserCaseOp,
   createTaskOp,
   ErrorCode,
+  getNodeOp,
   getTaskOp,
   listBrowserCasesOp,
   listPreviewSessionsOp,
@@ -429,15 +430,31 @@ describe('浏览器测试流程', () => {
         .callTool('get_task_context', {})
         .callTool('browser_open', { url: browserTest.target })
         .callTool('browser_click', { ref: 'e1' })
-        .callTool('browser_screenshot', {})
-        .callTool('submit_result', { summary: '已执行测试用例，见 1.jpg' }),
+        .callTool('browser_screenshot', {}),
+      { title: '· 执行浏览器测试' },
+    );
+    t.fake.enqueue(
+      script().callTool('browser_submit_report', { summary: '已执行测试用例，见 1.jpg', notes: '截图 1.jpg' }),
       { title: '· 执行浏览器测试' },
     );
     await t.call(startTaskOp, { id });
     await report;
     await t.fake.settled();
     expect(writes).toEqual(['POST /api/write']);
-    expect((await t.call(getTaskOp, { id })).body.result?.summary).toContain('1.jpg');
+    const task = (await t.call(getTaskOp, { id })).body;
+    expect(task.result?.summary).toContain('1.jpg');
+    const [testStep] = task.nodes;
+    if (testStep === undefined) throw new Error('missing browser test step');
+    expect((await t.call(getNodeOp, { id, nodeId: testStep.id })).body.result?.notes).toBe('截图 1.jpg');
+    const submit = t.fake.toolCalls.find((call) => call.name === 'browser_submit_report');
+    expect(submit).toMatchObject({ isError: false, result: { accepted: true, next: 'done' } });
+    expect(
+      t.fake.prompts.filter((prompt) => prompt.sessionId === submit?.sessionId).map((prompt) => prompt.text),
+    ).toEqual([
+      expect.stringContaining('agent-workflow_browser_submit_report'),
+      expect.stringContaining('agent-workflow_browser_submit_report'),
+    ]);
+    expect(t.fake.aborts).toContain(submit?.sessionId);
     expect((await t.call(listPreviewSessionsOp, { id })).body.attempts).toMatchObject([{ screenshots: ['1.jpg'] }]);
   });
 });

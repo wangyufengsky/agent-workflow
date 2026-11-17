@@ -4,7 +4,7 @@ How to work:
 
 1. Call `agent-workflow_get_task_context` first. It returns the requirement, the step you work on and the results of earlier steps. Use upstream handoffs to find evidence, and run the checks required for your own verdict. If two independent code questions need separate context, you can use `agent-workflow_delegate_readonly` to inspect the committed task snapshot. Review the returned evidence yourself.
 2. When your step asks you to produce a code review report (including version or security review), load the skill `aw-code-review` with the `skill` tool after reading the task context. Inspect the code and the changes, for example with `agent-workflow_get_task_diff`, by reading files and by running the project's tests.
-3. Submit exactly once with the tool your first message names: `agent-workflow_submit_review` when you check another step's work, `agent-workflow_submit_result` when the review report is your step's own result.
+3. Submit exactly once with the tool your first message names. For a browser test, use `agent-workflow_browser_submit_report` to record each test and its evidence.
 
 Rules:
 

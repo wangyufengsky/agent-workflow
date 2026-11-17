@@ -4,6 +4,7 @@ import {
   ACTIVE_ATTEMPT_STATUSES,
   AppError,
   ATTEMPT_STATUSES,
+  ATTEMPT_SUBMIT_TOOL,
   type AttemptDTO,
   AttemptEvent,
   AttemptKind,
@@ -11,8 +12,10 @@ import {
   type AttemptSummaryDTO,
   attemptMachine,
   BASH_PERMISSION,
+  type BrowserTestSubmitTool,
   ErrorCode,
   isTerminalState,
+  type McpToolName,
   OPENCODE_AGENT_NAME,
   PermissionDecision,
   type PermissionPayload,
@@ -73,7 +76,7 @@ export type StartAttemptInput = {
   checkCommands?: readonly string[];
   /** The researcher may use the web (18 §5.1). */
   web?: boolean;
-  browserTest?: boolean;
+  browserTestSubmit?: BrowserTestSubmitTool;
   delegation?: { parentAttemptId: string; commit: string };
 };
 
@@ -152,6 +155,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     attempt: Attempt,
     session: Pick<LiveSession, 'attemptId' | 'taskId' | 'sessionId' | 'directory' | 'agent' | 'model' | 'system'>,
     parked: boolean,
+    submitTool: McpToolName | null = ATTEMPT_SUBMIT_TOOL[attempt.kind],
   ): LiveSession {
     const timeoutMs = settings.get('attempt.timeoutMinutes') * 60_000;
     const { promise: released, resolve: release } = Promise.withResolvers<void>();
@@ -170,6 +174,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       cancelTimeout: parked ? () => undefined : clock.schedule(timeoutMs, () => reactions.timeOut(attempt.id)),
       modelWaitLeftMs: null,
       stopAfterSubmit: false,
+      submitTool,
       parked,
       // A session re-attached after a restart waits idle for its answer.
       idle: parked,
@@ -205,7 +210,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
           checkCommands: input.checkCommands,
           web: input.web,
-          browserTest: input.browserTest,
+          browserTestSubmit: input.browserTestSubmit,
           offline: settings.get('network.offline'),
           allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
         }),
@@ -234,6 +239,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         system: input.system,
       },
       false,
+      input.browserTestSubmit ?? ATTEMPT_SUBMIT_TOOL[input.kind],
     );
     // Running before the first prompt, so every event of the session finds the attempt active.
     move(attempt, AttemptEvent.SessionStarted);
@@ -486,6 +492,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
             system: resume.system,
           },
           true,
+          null,
         );
       session.pendingAnswers.push(text);
       reactions.resume(session);

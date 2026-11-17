@@ -41,6 +41,47 @@ const reaches = (taskId: string, status: string) =>
 const statuses = (view: TaskRequirementsDTO) => view.items.map((i) => [i.title, i.status, i.latest?.source ?? null]);
 
 describe('核验验收清单步骤（31 §2.2，Q-02）', () => {
+  it('浏览器测试步骤提交报告，验收清单步骤仍提交结构化结论', async () => {
+    const { project } = await addProject(t);
+    const { body: task } = await t.call(createTaskOp, {
+      projectId: project.id,
+      workflowId: await workflowId(t, 'browser_test'),
+      requirement: '复测订单筛选',
+      browserTest: { target: 'http://127.0.0.1:5173/', writes: [] },
+      start: false,
+      requirements: [{ title: '订单筛选', expected: '只显示已支付订单' }],
+    });
+    const [filter] = (await t.call(getRequirementsOp, { id: task.id })).body.items;
+    if (filter === undefined) throw new Error('missing checklist item');
+    t.fake.enqueue(script().callTool('browser_submit_report', { summary: '筛选正确' }), {
+      title: '· 执行浏览器测试',
+    });
+    t.fake.enqueue(
+      script()
+        .callTool('browser_submit_report', { summary: '尝试提交清单核验' })
+        .callTool('submit_result', {
+          summary: '检查通过',
+          requirement_results: [{ item_id: filter.id, conclusion: 'pass', note: '正常筛选' }],
+        }),
+      { title: '· 核验验收清单' },
+    );
+    const review = reaches(task.id, 'review');
+    await t.call(startTaskOp, { id: task.id });
+    await review;
+    await t.fake.settled();
+
+    expect(t.fake.toolCalls.map(({ isError, name }) => [name, isError])).toEqual([
+      ['browser_submit_report', false],
+      ['browser_submit_report', true],
+      ['submit_result', false],
+    ]);
+    expect(t.fake.prompts.map(({ text }) => text)).toEqual([
+      expect.stringContaining('agent-workflow_browser_submit_report'),
+      expect.stringContaining('agent-workflow_submit_result'),
+    ]);
+    expect((await t.call(getRequirementsOp, { id: task.id })).body.items[0]?.latest?.conclusion).toBe('pass');
+  });
+
   it('固定流程最后多一个核验步骤：AI 项按其结论，命令项逐条运行（失败不重试、不挡步骤），人工项待确认；只有核验步骤能交结论', async () => {
     const { project } = await addProject(t);
     const { body: task } = await t.call(createTaskOp, {

@@ -7,6 +7,7 @@ import {
   BatchDeliveryOutcome,
   BROWSER_TEST_WORKFLOW_KEY,
   type BrowserCase,
+  browserTestSubmitTool,
   type CreateTaskRequest,
   type DeliverRequest,
   DeliveryStatus,
@@ -18,6 +19,7 @@ import {
   isRepositoryDocumentWorkflow,
   isTaskCodeReview,
   type ListTasksQuery,
+  McpToolName,
   type NodeDetailDTO,
   type PlanDTO,
   type PlanGraph,
@@ -376,6 +378,10 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     /** Creating several tasks in one transaction (batches, 20 §2): check once, insert drafts, start after commit. */
     checkCreate: lifecycle.checkCreate,
     browserTest: (id: string) => state.get(id).browserTest,
+    browserTestSubmit: (attempt: AttemptDTO) => {
+      if (attempt.taskId === null || state.get(attempt.taskId).browserTest === null) return undefined;
+      return attempt.nodeId === null ? McpToolName.SubmitResult : browserTestSubmitTool(nodes.get(attempt.nodeId).kind);
+    },
     insertDraft: lifecycle.insertDraft,
     start(id: string): TaskDetailDTO {
       lifecycle.start(id);

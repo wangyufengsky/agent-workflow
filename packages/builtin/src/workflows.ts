@@ -198,7 +198,7 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
         '先读取任务上下文，以 task.browserTest.target 为入口。只用 agent-workflow_browser_* 工具执行网页操作。',
         '按需求依次执行步骤并核对预期。每个用例记录步骤、预期、实际、通过／失败／阻塞和证据。用 browser_screenshot 保存证据，用 browser_logs 检查请求和错误。',
         '授权外的请求被阻止时，把相关用例记为阻塞。不得换地址、用其他工具绕过或自动重试提交。遇到登录、验证码或密码步骤，交给用户。',
-        '用 agent-workflow_submit_result 提交报告，在 summary 先汇总结果，再用 Markdown 逐项列出详情和实际获得的截图文件名。',
+        '用 agent-workflow_browser_submit_report 提交报告，在 summary 先汇总结果，再用 Markdown 逐项列出详情和实际获得的截图文件名。',
       ].join('\n'),
     ),
   },

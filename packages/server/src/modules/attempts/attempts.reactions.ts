@@ -4,10 +4,12 @@ import {
   ATTEMPT_MAX_NUDGES,
   ATTEMPT_SUBMIT_TOOL,
   AttemptEvent,
+  AttemptKind,
   AttemptStatus,
   ErrorCode,
   InboxKind,
   MCP_TOOL_PREFIX,
+  McpToolName,
   TranscriptSystemEvent,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
@@ -84,13 +86,20 @@ export function watchSessions(
     await send(
       attempt,
       session,
-      renderTemplate(deps.prompts[PromptName.Nudge], { submitTool: ATTEMPT_SUBMIT_TOOL[attempt.kind] }),
+      renderTemplate(deps.prompts[PromptName.Nudge], {
+        submitTool:
+          session.submitTool === null
+            ? 'the submission tool named in your instructions'
+            : `\`${MCP_TOOL_PREFIX}${session.submitTool}\``,
+      }),
     );
   }
 
   /** Stops the session once the accepted submit call has returned, so its result still reaches the transcript. */
   function onToolEvent(attempt: Attempt, session: LiveSession, event: ToolEvent): void {
-    const isSubmit = event.tool === `${MCP_TOOL_PREFIX}${ATTEMPT_SUBMIT_TOOL[attempt.kind]}`;
+    const isSubmit =
+      event.tool === `${MCP_TOOL_PREFIX}${ATTEMPT_SUBMIT_TOOL[attempt.kind]}` ||
+      (attempt.kind === AttemptKind.Execute && event.tool === `${MCP_TOOL_PREFIX}${McpToolName.BrowserSubmitReport}`);
     const finished = event.status === ToolCallStatus.Completed || event.status === ToolCallStatus.Error;
     if (!session.stopAfterSubmit || !isSubmit || !finished) return;
     session.stopAfterSubmit = false;
