@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { expect, test } from '@playwright/test';
 import { createProject } from './helpers.ts';
 
-test('项目保存用例、确认后运行，并展开失败步骤的截图和请求', async ({ page, request }) => {
+test('项目保存用例、确认后运行，并查看失败断言和相关请求', async ({ page, request }) => {
   const target = createServer((req, res) => {
     if (req.url === '/api/save') {
       res.writeHead(201).end();
@@ -43,7 +43,7 @@ test('项目保存用例、确认后运行，并展开失败步骤的截图和�
     const report = page.getByRole('region', { name: '浏览器测试用例' });
     await expect(report.getByText('步骤 1 · 提交订单 · 失败')).toBeVisible({ timeout: 15_000 });
     await expect(report.getByText('实际 · 已保存')).toBeVisible();
-    await expect(report.getByRole('img', { name: '失败截图' })).toBeVisible();
+    await expect(report.getByRole('img', { name: '失败截图' })).toHaveCount(0);
     const failed = report.locator('li').filter({ hasText: '步骤 1 · 提交订单 · 失败' });
     await failed.locator('summary').click();
     await expect(report.getByText(/POST .*\/api\/save · 201/)).toBeVisible();
