@@ -108,10 +108,13 @@ export function createTaskChanges(
       acceptance: revisingReview ? { checks: [], manual: false } : system.acceptance,
       kind: NodeKind.Revise,
     };
-    // With a checklist, the change is verified again after it (31 §2.3).
-    const check = state.verify.stepAfter(task.id, nextKey(task.id, `${VERIFY_NODE.keyPrefix}_`), [spec.key]);
-    const added = check === undefined ? [spec] : [spec, check];
     unit.transact(() => {
+      // A revised read-only report can invalidate earlier conclusions while keeping the same Git commit.
+      const checklist = revisingReview ? deps.requirements.current(task.id) : undefined;
+      if (checklist !== undefined) deps.requirements.save(task.id, checklist.items);
+      // With a checklist, the change is verified again after it (31 §2.3).
+      const check = state.verify.stepAfter(task.id, nextKey(task.id, `${VERIFY_NODE.keyPrefix}_`), [spec.key]);
+      const added = check === undefined ? [spec] : [spec, check];
       const [node] = appendSteps(task, added, revision.feedback, event);
       if (node === undefined) throw new Error('No step was appended');
       deps.attachments.bind({ kind: AttachmentOwnerKind.TaskFeedback, id: node.id }, attachmentIds, task.projectId);

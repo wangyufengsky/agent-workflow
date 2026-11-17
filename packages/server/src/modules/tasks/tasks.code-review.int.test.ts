@@ -1,6 +1,15 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { ErrorCode, getTaskOp, requestChangesOp, startTaskOp, TaskStatus } from '@aw/shared';
+import {
+  decideRequirementOp,
+  ErrorCode,
+  getRequirementsOp,
+  getTaskOp,
+  replaceRequirementsOp,
+  requestChangesOp,
+  startTaskOp,
+  TaskStatus,
+} from '@aw/shared';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
@@ -51,6 +60,24 @@ it('拒绝越出审查范围的定位，并将删除行固定到当时的旧提�
     report: { scope: { kind: 'diff', from, to }, findings: [{ ...finding, location: { commit: from, path } }] },
   });
 
+  // A user conclusion about the first report does not verify the revised report at the same commit.
+  const checklist = await t.call(replaceRequirementsOp, {
+    id: task.id,
+    items: [{ title: '复核权限影响', expected: '逐条确认', verification: { kind: 'manual' } }],
+  });
+  const item = checklist.body.items[0];
+  if (item === undefined) throw new Error('Expected a checklist item');
+  const checked = await t.call(decideRequirementOp, {
+    id: task.id,
+    itemId: item.id,
+    conclusion: 'pass',
+    note: '已确认首版。',
+  });
+  expect(checked.body.items[0]?.status).toBe('passed');
+  t.fake.enqueue(script().callTool('submit_result', { summary: '请人工核对修订后的报告。' }), {
+    title: '· 核验验收清单',
+    directory: `/${task.key}`,
+  });
   t.fake.enqueue(
     script()
       .callTool('submit_result', {
@@ -74,4 +101,7 @@ it('拒绝越出审查范围的定位，并将删除行固定到当时的旧提�
     summary: '重新核对后撤回误报。',
     report: { scope: { kind: 'diff', from, to }, findings: [] },
   });
+  const requirements = (await t.call(getRequirementsOp, { id: task.id })).body;
+  expect(requirements.commitSha).toBe(checked.body.commitSha);
+  expect(requirements.items[0]?.status).toBe('stale');
 });
