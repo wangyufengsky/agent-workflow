@@ -28,7 +28,7 @@ import { type Attempt, createAttemptsRepo } from './attempts.repo.ts';
 import type { SessionView } from './attempts.session-view.ts';
 import type { NewTranscriptEntry, TranscriptStore } from './attempts.transcript.ts';
 
-const SESSION_COMMAND_TIMEOUT_MS = 30_000;
+const SESSION_END_COMMAND_TIMEOUT_MS = 30_000;
 
 /** In-memory state of a session we created, kept until it goes quiet so trailing events still reach the transcript. */
 export type LiveSession = {
@@ -51,7 +51,7 @@ export type LiveSession = {
   modelWaitLeftMs: number | null;
   /** Set once the result was submitted: further generation is stopped when the submit call completes (12 §4.2). */
   stopAfterSubmit: boolean;
-  /** 收到首条任务消息的原生事件前，空闲事件属于开始命令。 */
+  /** 收到首条任务消息的原生事件前，空闲和错误事件属于开始命令。 */
   firstPrompt: { messageId: string | null; controller: AbortController } | null;
   endCommand: string | null;
   finishingCommand: boolean;
@@ -272,9 +272,17 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
       });
     },
 
-    async runCommand(session: LiveSession, text: string, messageId?: string): Promise<void> {
-      const deadline = AbortSignal.timeout(SESSION_COMMAND_TIMEOUT_MS);
-      const starting = session.firstPrompt?.controller.signal;
+    async runCommand(
+      session: LiveSession,
+      text: string,
+      {
+        messageId,
+        signal = AbortSignal.timeout(SESSION_END_COMMAND_TIMEOUT_MS),
+      }: {
+        messageId?: string;
+        signal?: AbortSignal;
+      } = {},
+    ): Promise<void> {
       transcripts.append(mustFind(session.attemptId), [{ kind: TranscriptEntryKind.UserMessage, data: { text } }]);
       await opencode.runCommand({
         sessionId: session.sessionId,
@@ -283,12 +291,16 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
         ...(session.model === undefined ? {} : { model: session.model }),
         text,
         ...(messageId === undefined ? {} : { messageId }),
-        signal: starting === undefined ? deadline : AbortSignal.any([deadline, starting]),
+        signal,
       });
     },
 
-    stopSession: (session: LiveSession) =>
-      opencode.abort({ sessionId: session.sessionId, directory: session.directory }),
+    stopSession: (session: LiveSession, signal?: AbortSignal) =>
+      opencode.abort({
+        sessionId: session.sessionId,
+        directory: session.directory,
+        ...(signal === undefined ? {} : { signal }),
+      }),
 
     /** Background reactions to events have no caller; an unexpected failure is logged with the attempt. */
     inBackground(attemptId: string, work: () => Promise<void>): void {

@@ -16,10 +16,13 @@ import {
   OPENCODE_AGENT_NAME,
   type PermissionAction,
   RoleBaseAgent,
+  ServerEventType,
+  TranscriptSystemEvent,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
+import { waitForEvent } from '../../../test/helpers/events.ts';
 import { createTestRepo, type TestRepo } from '../../../test/helpers/git.ts';
 import { addProject, createTask, nodeReaches } from '../../../test/helpers/tasks.ts';
 import { sessionPermissionRules } from './opencode.config.ts';
@@ -397,3 +400,36 @@ it('@opencode 在同一开发会话执行首尾斜杠命令，插件可用该会
     await t.call(cancelTaskOp, { id: task.id });
   }
 }, 60_000);
+
+it('@opencode 开始命令不可用时提示，原开发会话照常交付结果', async () => {
+  await t.call(updateSettingsOp, {
+    'ai.defaultModel': `${PROVIDER}/${MODEL}`,
+    'ai.sessionStartCommand': '/aw-unregistered-start-command',
+    'ai.sessionEndCommand': null,
+    'node.maxAttempts': 1,
+  });
+  const { project } = await addProject(t, { checkCommand: null });
+  const terminal = waitForEvent(
+    t.app.events,
+    ServerEventType.NodeUpdated,
+    ({ node }) => node.key === 'build_page' && (node.status === NodeStatus.Done || node.status === NodeStatus.Failed),
+  );
+  const task = await createTask(t, { projectId: project.id, workflow: 'frontend', requirement: PROBE_SESSION_COMMAND });
+  try {
+    const { node } = await terminal;
+    expect(node.status).toBe(NodeStatus.Done);
+    const { body: detail } = await t.call(getNodeOp, { id: task.id, nodeId: node.id });
+    expect(detail.attempts).toHaveLength(1);
+    const [attempt] = detail.attempts;
+    if (attempt === undefined) throw new Error('No development attempt');
+    const entries = t.app.services.attempts.transcript(attempt.id, 0).entries;
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        kind: 'system',
+        data: { event: TranscriptSystemEvent.SessionStartCommandFailed },
+      }),
+    );
+  } finally {
+    await t.call(cancelTaskOp, { id: task.id });
+  }
+}, 45_000);

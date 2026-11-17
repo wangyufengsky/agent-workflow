@@ -231,6 +231,7 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
       if (data.info.error !== undefined) {
         throw new AppError(ErrorCode.OpencodeRequestFailed, describeOpencodeError(data.info.error), {
           operation: 'session.command',
+          responseReceived: true,
         });
       }
     },

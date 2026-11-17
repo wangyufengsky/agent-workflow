@@ -44,6 +44,8 @@ import {
   systemEntry,
 } from './attempts.state.ts';
 
+const SESSION_COMMAND_CLEANUP_TIMEOUT_MS = 5_000;
+
 export type AttemptsServiceDeps = AttemptStateDeps & {
   taskSkills(taskId: string): SkillSnapshot[];
   settings: SettingsService;
@@ -88,7 +90,7 @@ type ContinueInput = { id?: string; prompt: string; model?: string | null; kind?
 
 /** Attempt lifecycle (09 §4) and the session protocol (12 §4); opencode-driven end conditions are in the reactions. */
 export function createAttemptsService(deps: AttemptsServiceDeps) {
-  const { clock, opencode, settings, transcripts, projects, slots, unit, db } = deps;
+  const { clock, opencode, settings, transcripts, projects, slots, unit, db, log } = deps;
   const state = createAttemptState(deps);
   const { repo, mustFind, move, record } = state;
   const local = new Map<
@@ -200,23 +202,65 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     return tracked;
   }
 
-  /** Sends a message; a failure to deliver it fails the attempt like a session error. */
+  /** 开始命令单独计时，失败后保留原会话并继续开发。 */
+  async function runStartCommand(session: LiveSession, text: string, cancelled: AbortSignal): Promise<void> {
+    const deadline = new AbortController();
+    const cancel = clock.schedule(session.timeoutMs, () =>
+      deadline.abort(new Error('Session start command timed out')),
+    );
+    try {
+      await state.runCommand(session, text, {
+        messageId: createMessageId(clock.now()),
+        signal: AbortSignal.any([cancelled, deadline.signal]),
+      });
+    } catch (err) {
+      if (cancelled.aborted) return;
+      if (!(err instanceof AppError)) throw err;
+      const attempt = mustFind(session.attemptId);
+      log.warn({ err, attemptId: attempt.id }, 'session start command failed');
+      record(attempt, [systemEntry(TranscriptSystemEvent.SessionStartCommandFailed)]);
+      if (err.details?.responseReceived !== true) await stopUnfinishedStartCommand(session, cancelled);
+      if (!cancelled.aborted) {
+        state.inbox.dismissOpen({ attemptId: attempt.id });
+        reactions.resume(session);
+      }
+    } finally {
+      cancel();
+    }
+  }
+
+  /** 请求超时或连接断开后，OpenCode 可能仍在执行命令。 */
+  async function stopUnfinishedStartCommand(session: LiveSession, cancelled: AbortSignal): Promise<void> {
+    try {
+      await state.stopSession(
+        session,
+        AbortSignal.any([cancelled, AbortSignal.timeout(SESSION_COMMAND_CLEANUP_TIMEOUT_MS)]),
+      );
+    } catch (err) {
+      if (!(err instanceof AppError)) throw err;
+      log.warn({ err, attemptId: session.attemptId }, 'session start command cleanup failed');
+    }
+  }
+
+  /** 任务提示发送失败仍按原流程结束尝试。 */
   async function sendOrFail(session: LiveSession, text: string, startCommand: string | null = null): Promise<void> {
     try {
-      if (startCommand === null) {
-        await state.send(session, text);
-        return;
+      let messageId: string | undefined;
+      if (startCommand !== null) {
+        const firstPrompt: NonNullable<LiveSession['firstPrompt']> = {
+          messageId: null,
+          controller: new AbortController(),
+        };
+        session.firstPrompt = firstPrompt;
+        session.cancelTimeout();
+        await runStartCommand(session, startCommand, firstPrompt.controller.signal);
+        if (firstPrompt.controller.signal.aborted) return;
+        // OpenCode 按原生消息 id 的顺序选取最新提示词，任务消息必须排在开始命令之后。
+        messageId = createMessageId(clock.now());
+        firstPrompt.messageId = messageId;
+        reactions.arm(session, session.timeoutMs);
       }
-      const firstPrompt: NonNullable<LiveSession['firstPrompt']> = {
-        messageId: null,
-        controller: new AbortController(),
-      };
-      session.firstPrompt = firstPrompt;
-      await state.runCommand(session, startCommand, createMessageId(clock.now()));
-      if (firstPrompt.controller.signal.aborted) return;
-      // OpenCode 按原生消息 id 的顺序选取最新提示词，任务消息必须排在开始命令之后。
-      firstPrompt.messageId = createMessageId(clock.now());
-      await state.send(session, text, firstPrompt.messageId);
+      await state.send(session, text, messageId);
     } catch (err) {
       const current = mustFind(session.attemptId);
       if (current.status !== AttemptStatus.Running) return;

@@ -101,6 +101,7 @@ export const TranscriptSystemEvent = {
   /** The model service sent nothing for opencode's chunk timeout and the reply was cut off (D217). */
   ModelStalled: 'model_stalled',
   ResultSubmitted: 'result_submitted',
+  SessionStartCommandFailed: 'session_start_command_failed',
   SessionEndCommandFailed: 'session_end_command_failed',
   /** Waiting for the user: an open blocking question or a permission request (12 §4.2). */
   AwaitingInput: 'awaiting_input',

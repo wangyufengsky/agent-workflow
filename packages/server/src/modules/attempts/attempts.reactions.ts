@@ -209,9 +209,10 @@ export function watchSessions(
     if (session.stall !== null && endsStoppedReply(session.stall, event)) return;
     const attempt = mustFind(session.attemptId);
     const running = attempt.status === AttemptStatus.Running;
-    // Errors after the attempt ended (e.g. the abort we sent after a submit) are not the attempt's.
-    if (running || event.type !== OpencodeEventType.Error) record(attempt, session.view.toEntries(event));
-    if (running) {
+    // 命令请求单独处理失败。开始命令的迟到事件按顺序先于首条任务消息，结束命令发生在提交之后。
+    if (event.type === OpencodeEventType.Error && (!running || session.firstPrompt !== null)) return;
+    record(attempt, session.view.toEntries(event));
+    if (running && session.firstPrompt === null) {
       if (event.type === OpencodeEventType.Retry) waitForModel(session);
       else modelAnswering(session);
     }
@@ -232,7 +233,6 @@ export function watchSessions(
         } else state.releaseSession(session);
         return;
       case OpencodeEventType.Error:
-        if (!running) return;
         move(attempt, AttemptEvent.SessionError, {
           code: ErrorCode.AttemptSessionError,
           message: describeOpencodeError(event.error),
@@ -240,7 +240,7 @@ export function watchSessions(
         });
         return;
       case OpencodeEventType.Stalled: {
-        if (!running || session.stall !== null) return;
+        if (!running || session.firstPrompt !== null || session.stall !== null) return;
         // opencode would send the whole request again and stall the same way: stop it and ask for shorter calls.
         const stopped = state.stopSession(session);
         session.stall = { stopped, idled: false, continued: false };
@@ -281,11 +281,11 @@ export function watchSessions(
   function resume(session: LiveSession): void {
     if (!session.parked || state.waitsForUser(session.attemptId)) return;
     session.parked = false;
-    arm(session, session.timeoutMs);
+    if (session.firstPrompt?.messageId !== null) arm(session, session.timeoutMs);
     deps.slots.changed();
     const attempt = mustFind(session.attemptId);
     state.signal('input_answered', attempt);
     if (session.idle) state.inBackground(attempt.id, () => onIdle(attempt, session));
   }
-  return { timeOut, interruptActive, resume };
+  return { arm, timeOut, interruptActive, resume };
 }

@@ -1,7 +1,20 @@
-import { getNodeOp, getTaskOp, getTaskTimelineOp, listInboxOp, readonlyBashRules } from '@aw/shared';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  AppError,
+  ErrorCode,
+  getAttemptOp,
+  getNodeOp,
+  getTaskOp,
+  getTaskTimelineOp,
+  listInboxOp,
+  readonlyBashRules,
+  ServerEventType,
+  updateSettingsOp,
+} from '@aw/shared';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
+import { createFakeClock } from '../../../test/helpers/clock.ts';
+import { waitForEvent } from '../../../test/helpers/events.ts';
 import { addProject, createTask, finalVerify, planArgs, taskReaches } from '../../../test/helpers/tasks.ts';
 import { runGit } from '../git/index.ts';
 
@@ -26,6 +39,49 @@ describe('只读角色执行的步骤', () => {
     // What these rules allow and ask is covered by opencode.permissions.test.ts.
     expect(session?.permission).toEqual(readonlyBashRules(['mvn -q test']));
   });
+});
+
+it('开始命令等待模型超过 30 秒，耗尽配置时限后开发步骤获得单独的完整时限', async () => {
+  const clock = createFakeClock();
+  const isolated = await createTestApp({ clock });
+  try {
+    await isolated.call(updateSettingsOp, {
+      'ai.sessionStartCommand': '/report start',
+      'attempt.timeoutMinutes': 2,
+      'node.maxAttempts': 1,
+    });
+    const { project } = await addProject(isolated, { checkCommand: null });
+    const commandStarted = Promise.withResolvers<void>();
+    vi.spyOn(isolated.fake, 'runCommand').mockImplementation(({ signal }) => {
+      commandStarted.resolve();
+      return new Promise<void>((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(new AppError(ErrorCode.OpencodeRequestFailed)), { once: true });
+      });
+    });
+    isolated.fake.enqueue(script().hang());
+    const sent = waitForEvent(isolated.app.events, ServerEventType.AttemptTranscript, ({ entries }) =>
+      entries.some((entry) => entry.kind === 'user_message' && entry.data.text.includes('Make a queue probe')),
+    );
+    await createTask(isolated, { projectId: project.id, workflow: 'frontend', requirement: 'Make a queue probe' });
+    await commandStarted.promise;
+    clock.advance(31_000);
+    expect(isolated.fake.prompts).toHaveLength(0);
+
+    clock.advance(89_000);
+    const { attemptId } = await sent;
+    clock.advance(119_000);
+    expect((await isolated.call(getAttemptOp, { id: attemptId })).body.status).toBe('running');
+
+    const failed = waitForEvent(
+      isolated.app.events,
+      ServerEventType.AttemptUpdated,
+      ({ attempt }) => attempt.id === attemptId && attempt.status === 'failed',
+    );
+    clock.advance(1_000);
+    expect((await failed).attempt.error?.code).toBe(ErrorCode.AttemptTimeout);
+  } finally {
+    await isolated.close();
+  }
 });
 
 describe('任务主链路（新功能开发，简单模式）', () => {
