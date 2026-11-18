@@ -21,6 +21,7 @@ import {
   type ListTasksQuery,
   McpToolName,
   type NodeDetailDTO,
+  NodeKind,
   type PlanDTO,
   type PlanGraph,
   type PreviewSessions,
@@ -41,7 +42,7 @@ import { listTaskEvents } from '../timeline/index.ts';
 import { createBrowserCases } from './browser-cases.service.ts';
 import { createTaskActions } from './tasks.actions.ts';
 import { createTaskAgentsMd } from './tasks.agents-md.ts';
-import { createTaskArtifacts } from './tasks.artifacts.ts';
+import { createTaskArtifacts, isArtifactWritingStep } from './tasks.artifacts.ts';
 import { createTaskChanges } from './tasks.changes.ts';
 import { createTaskChecks } from './tasks.checks.ts';
 import { isCodeReviewStep, latestFinishedCodeReview, resolveTaskCodeReview } from './tasks.code-review.ts';
@@ -98,6 +99,14 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   });
 
   const isFrontend = (id: string): boolean => isFrontendWorkflow(workflows.get(state.get(id).workflowId));
+
+  function resultSubmissionFields(workflow: ReturnType<typeof workflows.get>, node: ReturnType<typeof nodes.get>) {
+    return {
+      artifact: isArtifactWorkflow(workflow) && isArtifactWritingStep(node.key),
+      verify: node.kind === NodeKind.Verify,
+      review: isTaskCodeReview(workflow) && isCodeReviewStep(node),
+    };
+  }
 
   function detail(id: string): TaskDetailDTO {
     const task = state.get(id);
@@ -197,6 +206,10 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   }
 
   return {
+    resultSubmissionFields(attempt: AttemptDTO) {
+      if (attempt.taskId === null || attempt.nodeId === null) return { verify: false, review: false, artifact: false };
+      return resultSubmissionFields(workflows.get(state.get(attempt.taskId).workflowId), nodes.get(attempt.nodeId));
+    },
     detail,
     async workbenchDetail(id: string): Promise<TaskDetailDTO> {
       await documents.prepare(id);
@@ -523,7 +536,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       const { code_review, ...result } = input;
       // Older confirmed plans still submit a plain-text summary.
       if (code_review === undefined) return nodes.submitResult(attempt, result, state.runContext(task));
-      if (!isTaskCodeReview(workflow) || !isCodeReviewStep(node))
+      if (!resultSubmissionFields(workflow, node).review)
         throw new AppError(ErrorCode.McpToolNotAllowed, 'Structured findings are for the code review step');
       const report = await resolveTaskCodeReview(deps.projects.getRecord(task.projectId).repoPath, code_review);
       return nodes.submitResult(attempt, { ...result, reviewReport: report }, state.runContext(task));

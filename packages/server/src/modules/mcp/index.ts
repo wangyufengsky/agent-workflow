@@ -1,5 +1,6 @@
 import { type AttemptKind, listMcpToolsOp, MCP_EXEC_PATH, MCP_SERVER_NAME } from '@aw/shared';
 import type { FastifyInstance } from 'fastify';
+import type { EventBus } from '../../core/event-bus.ts';
 import { registerMcpEndpoint } from '../../core/http/mcp-endpoint.ts';
 import type { Logger } from '../../core/logger.ts';
 import { implement } from '../../core/operations/operations.ts';
@@ -28,6 +29,7 @@ import { getTaskDiffTool } from './tools/get-task-diff.tool.ts';
 import { readOfficeFileTool } from './tools/office-file.tool.ts';
 import { delegationTools } from './tools/readonly-delegation.tool.ts';
 import { reportProgressTool } from './tools/report-progress.tool.ts';
+import { createSubmissionGuides } from './tools/submission-guide.tool.ts';
 import { submitAnswerTool } from './tools/submit-answer.tool.ts';
 import { submitBreakdownTool } from './tools/submit-breakdown.tool.ts';
 import { submitCommitMessageTool } from './tools/submit-commit-message.tool.ts';
@@ -43,6 +45,7 @@ import { taskArtifactTools } from './tools/task-artifact.tool.ts';
 export type { McpToolDefinition } from './mcp.registry.ts';
 
 export type McpModuleDeps = {
+  events: EventBus;
   token: string;
   attempts: AttemptsService;
   tasks: TasksService;
@@ -64,6 +67,7 @@ export type McpModuleDeps = {
 };
 
 export function createMcpModule({
+  events,
   token,
   attempts,
   tasks,
@@ -82,8 +86,10 @@ export function createMcpModule({
   filesDirOf,
   log,
 }: McpModuleDeps) {
+  const guides = createSubmissionGuides(tasks, events);
   const tools: McpToolDefinition[] = [
     getTaskContextTool(tasks, debug),
+    guides.tool,
     getNodeOutputTool(tasks),
     getTaskDiffTool(tasks),
     ...delegationTools(tasks),
@@ -109,7 +115,7 @@ export function createMcpModule({
     submitBreakdownTool(initiatives),
     ...browserTools({ browser, attempts, knowledge, filesDirOf, tasks }),
   ];
-  const registry = createToolRegistry(tools, attempts, log, tasks.browserTestSubmit);
+  const registry = createToolRegistry(tools, attempts, log, tasks.browserTestSubmit, guides.rejected);
   return {
     registry,
     operations: [implement(listMcpToolsOp, () => ({ items: registry.info() }))],

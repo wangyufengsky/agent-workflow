@@ -31,6 +31,7 @@ export const SkillName = {
   CodeReview: 'aw-code-review',
   ArtifactRevision: 'aw-artifact-revision',
   TaskDelivery: 'aw-task-delivery',
+  SubmitResult: 'aw-submit-result',
   BackendDevelopment: 'aw-backend-development',
   FrontendDevelopment: 'aw-frontend-development',
 } as const;
@@ -42,7 +43,7 @@ export const SKILL_MAX_BYTES = 8 * 1024;
 /** The description is listed in every session the skill is given to (41 §6.1). */
 export const SKILL_DESCRIPTION_MAX = 400;
 /** Skills one agent may be given (D212). */
-export const AGENT_SKILLS_MAX = 8;
+export const AGENT_SKILLS_MAX = 9;
 export const ASSISTANT_SKILLS_MAX = 10;
 
 /**
@@ -50,12 +51,14 @@ export const ASSISTANT_SKILLS_MAX = 10;
  */
 export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
   [SessionAgent.Planner]: [
+    SkillName.SubmitResult,
     SkillName.DbReadonly,
     SkillName.OfflineNetwork,
     SkillName.PageCheck,
     SkillName.ImageAnalysis,
   ],
   [SessionAgent.Executor]: [
+    SkillName.SubmitResult,
     SkillName.DbReadonly,
     SkillName.OfflineNetwork,
     SkillName.MergeConflicts,
@@ -65,7 +68,13 @@ export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
     SkillName.BackendDevelopment,
     SkillName.FrontendDevelopment,
   ],
-  [SessionAgent.Reviewer]: [SkillName.DbReadonly, SkillName.PageCheck, SkillName.CodeReview, SkillName.ImageAnalysis],
+  [SessionAgent.Reviewer]: [
+    SkillName.SubmitResult,
+    SkillName.DbReadonly,
+    SkillName.PageCheck,
+    SkillName.CodeReview,
+    SkillName.ImageAnalysis,
+  ],
   [SessionAgent.Researcher]: [SkillName.DbReadonly],
   [SessionAgent.SlidesWriter]: [],
   [SessionAgent.CodeReviewer]: [SkillName.CodeReview, SkillName.ImageAnalysis],

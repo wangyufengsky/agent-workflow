@@ -72,9 +72,14 @@ export function createToolRegistry(
   attempts: AttemptLookup,
   log: Logger,
   browserTestSubmit: (attempt: AttemptDTO) => BrowserTestSubmitTool | undefined,
+  rejectionGuide: (
+    attempt: AttemptDTO,
+    name: McpToolName,
+    args: Record<string, unknown>,
+    error: ErrorInfo,
+  ) => { next: string } | undefined,
 ): ToolRegistry {
-  function resolveAttempt(tool: McpToolDefinition, sessionId: unknown): AttemptDTO {
-    const attempt = typeof sessionId === 'string' ? attempts.findLatestBySession(sessionId) : undefined;
+  function resolveAttempt(tool: McpToolDefinition, sessionId: unknown, attempt: AttemptDTO | undefined): AttemptDTO {
     if (attempt === undefined) {
       throw new AppError(ErrorCode.McpAttemptUnresolved, 'No attempt for this session', { sessionId });
     }
@@ -110,10 +115,15 @@ export function createToolRegistry(
     return attempt;
   }
 
-  function errorResult(info: ErrorInfo, hint: string | undefined): CallToolResult {
+  function errorResult(info: ErrorInfo, hint: string | undefined, guide?: unknown): CallToolResult {
     return {
       isError: true,
-      content: [{ type: 'text', text: JSON.stringify({ ...info, ...(hint === undefined ? {} : { hint }) }) }],
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({ ...info, ...(guide ? { guide } : {}), ...(hint === undefined ? {} : { hint }) }),
+        },
+      ],
     };
   }
 
@@ -141,8 +151,9 @@ export function createToolRegistry(
         return errorResult({ code: ErrorCode.NotFound, message: `Unknown tool ${name}` }, undefined);
       }
       const { [MCP_SESSION_ARG]: sessionId, ...rest } = args;
+      const owner = typeof sessionId === 'string' ? attempts.findLatestBySession(sessionId) : undefined;
       try {
-        const attempt = resolveAttempt(tool, sessionId);
+        const attempt = resolveAttempt(tool, sessionId, owner);
         const parsed = tool.input.safeParse(rest);
         if (!parsed.success) {
           throw new AppError(ErrorCode.ValidationFailed, 'Tool arguments are invalid', { issues: parsed.error.issues });
@@ -156,7 +167,13 @@ export function createToolRegistry(
       } catch (err) {
         if (err instanceof AppError) {
           log.info({ tool: name, code: err.code }, 'mcp tool failed');
-          return errorResult(err.toInfo(), tool.hints?.[err.code] ?? COMMON_HINTS[err.code]);
+          const info = err.toInfo();
+          const guide =
+            owner && (owner.status === AttemptStatus.Running || owner.status === AttemptStatus.Starting)
+              ? rejectionGuide(owner, tool.name, rest, info)
+              : undefined;
+          const hint = tool.hints?.[err.code] ?? COMMON_HINTS[err.code];
+          return errorResult(info, guide ? [guide.next, hint].filter(Boolean).join(' ') : hint, guide);
         }
         log.error({ err, tool: name }, 'mcp tool crashed');
         return errorResult({ code: ErrorCode.InternalError, message: 'Internal error' }, undefined);

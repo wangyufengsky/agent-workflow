@@ -53,12 +53,16 @@ describe('核验验收清单步骤（31 §2.2，Q-02）', () => {
     });
     const [filter] = (await t.call(getRequirementsOp, { id: task.id })).body.items;
     if (filter === undefined) throw new Error('missing checklist item');
-    t.fake.enqueue(script().callTool('browser_submit_report', { summary: '筛选正确' }), {
-      title: '· 执行浏览器测试',
-    });
+    t.fake.enqueue(
+      script().callTool('get_submission_guide').callTool('browser_submit_report', { summary: '筛选正确' }),
+      {
+        title: '· 执行浏览器测试',
+      },
+    );
     t.fake.enqueue(
       script()
         .callTool('browser_submit_report', { summary: '尝试提交清单核验' })
+        .callTool('get_submission_guide')
         .callTool('submit_result', {
           summary: '检查通过',
           requirement_results: [{ item_id: filter.id, conclusion: 'pass', note: '正常筛选' }],
@@ -71,9 +75,19 @@ describe('核验验收清单步骤（31 §2.2，Q-02）', () => {
     await t.fake.settled();
 
     expect(t.fake.toolCalls.map(({ isError, name }) => [name, isError])).toEqual([
+      ['get_submission_guide', false],
       ['browser_submit_report', false],
       ['browser_submit_report', true],
+      ['get_submission_guide', false],
       ['submit_result', false],
+    ]);
+    expect(t.fake.toolCalls.filter((c) => c.name === 'get_submission_guide').map((c) => c.result)).toMatchObject([
+      { tool: 'browser_submit_report', required: ['summary'], allowed: ['summary', 'notes'] },
+      {
+        tool: 'submit_result',
+        example: { requirement_results: [{ item_id: filter.id }] },
+        lastRejection: { tool: 'browser_submit_report' },
+      },
     ]);
     expect(t.fake.prompts.map(({ text }) => text)).toEqual([
       expect.stringContaining('agent-workflow_browser_submit_report'),
