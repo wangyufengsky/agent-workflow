@@ -226,6 +226,30 @@
   background: var(--accent-fill);
 }
 
+/* 工作区的文件和活动共用右栏，让代码保留主要宽度。 */
+.taskWorkspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(168px, 18cqi, 212px);
+  align-items: start;
+  gap: var(--s-3);
+}
+
+.taskSidebar {
+  display: grid;
+  min-width: 0;
+  gap: var(--s-2);
+}
+
+.taskSidebar .treeRoot {
+  max-height: min(42vh, 320px);
+}
+
+@container (width >= 640px) {
+  .taskWorkspace[data-activity="true"] {
+    grid-template-columns: minmax(0, 1fr) clamp(220px, 24cqi, 300px);
+  }
+}
+
 /* The large view (D114): the tree and the diff scroll on their own and fill the dialog. */
 .frame[data-fill] {
   height: 100%;
@@ -253,6 +277,18 @@
 
 /* Narrow: the tree above the diff so the code keeps the full width; side by side would leave each side a sliver. */
 @container (width < 640px) {
+  .taskWorkspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .taskSidebar {
+    grid-row: 1;
+  }
+
+  .taskSidebar .treeRoot {
+    max-height: 120px;
+  }
+
   .browser {
     grid-template-columns: minmax(0, 1fr);
     min-height: 0;

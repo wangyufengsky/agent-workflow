@@ -365,15 +365,22 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
     await round(1, '导出', '导出订单');
     await round(2, '导出订单', '下载订单');
     await expect(workbench.getByRole('button', { name: '手机', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await workbench.getByRole('button', { name: '界面修改 2' }).click();
+    await workbench
+      .getByRole('region', { name: '修改记录' })
+      .getByRole('button', { name: '界面修改 2', exact: true })
+      .click();
     await expect(page.getByRole('tab', { name: '过程' })).toBeVisible();
     await expect.poll(nativeText, { timeout: 3_000 }).toBe('下载订单');
     const stepDetails = workbench.getByRole('complementary', { name: '界面修改 2' });
     await expect(stepDetails.getByRole('tab', { name: '过程' })).toBeVisible();
     await expect(workbench.getByLabel('页面路径')).toHaveValue(route);
     await stepDetails.getByRole('button', { name: '关闭', exact: true }).click();
-    await expect(workbench.getByRole('button', { name: '界面修改 2' })).toBeVisible();
+    await expect(
+      workbench.getByRole('region', { name: '修改记录' }).getByRole('button', { name: '界面修改 2', exact: true }),
+    ).toBeVisible();
     await page.getByRole('button', { name: '扩大视图' }).click();
+    await workbench.getByRole('combobox', { name: '活动步骤' }).selectOption({ label: '界面修改 2' });
+    await expect(workbench.getByTestId('conversation-stream')).toHaveAttribute('data-open', 'true');
     await page.screenshot({ path: testInfo.outputPath('frontend-workspace.png'), animations: 'disabled' });
     const bounds = await workbench.getByTestId('preview-area').boundingBox();
     writeFileSync(testInfo.outputPath('frontend-bounds.json'), JSON.stringify(bounds));
@@ -388,10 +395,11 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
     await expect.poll(nativeText).toBeUndefined();
     await page.getByRole('tab', { name: '网页预览' }).click();
     await expect.poll(nativeText).toBe('下载订单');
-    await page.getByRole('button', { name: '还原视图' }).click();
     await expect(await request.patch(`${api}/settings`, { headers, data: { 'ui.theme': 'default' } })).toBeOK();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'default');
     await page.screenshot({ path: testInfo.outputPath('frontend-history-dark.png'), animations: 'disabled' });
+
+    await page.getByRole('button', { name: '还原视图' }).click();
 
     await queue({ title: '前端交付验收' }, [submitResult('构建与页面验收')]);
     await queue({ agent: 'aw-reviewer' }, [passReview]);

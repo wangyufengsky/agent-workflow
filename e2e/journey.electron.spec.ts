@@ -100,6 +100,7 @@ test('J10 打包应用：引导页 → 添加项目 → 修 Bug 到结果卡；�
   const taskId = new URL(page.url()).pathname.split('/').at(-1) ?? '';
 
   // Quit while the first step's session is running, then start again on the same data.
+  await page.getByRole('tab', { name: '流程画布' }).click();
   await expect(page.getByTestId('step-locate')).toContainText('进行中', { timeout: 120_000 });
   await app.close();
   app = await launch();

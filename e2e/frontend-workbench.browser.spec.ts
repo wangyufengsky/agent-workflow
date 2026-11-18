@@ -18,6 +18,7 @@ test('前端开发从开始任务直接进入预览，在同一个任务提交�
     }),
   ).toBeOK();
   await queueTurn(request, project, { title: '开发首版页面' }, [
+    { type: 'think', text: '先检查订单页的入口，再启动预览。' },
     { type: 'edit', file: 'preview.mjs', content: server },
     submitResult('首版就绪'),
   ]);
@@ -67,7 +68,13 @@ test('前端开发从开始任务直接进入预览，在同一个任务提交�
   } finally {
     release.resolve();
   }
-  // The mutation success handler closes notes and opens the task history.
+  // 完成修改后直接显示活动。可从这里回看首版执行记录，完整流程在第二个页签。
+  const activity = workbench.getByRole('region', { name: 'AI 活动' });
+  await expect(activity).toBeVisible();
+  await expect(workbench.getByTestId('progress-canvas')).toHaveCount(0);
+  await activity.getByRole('combobox', { name: '活动步骤' }).selectOption({ label: '开发首版页面' });
+  await expect(activity.getByTestId('stream-thinking')).toContainText('先检查订单页的入口');
+
   await expect(workbench.getByRole('button', { name: '界面修改 1' })).toBeVisible();
   await expect(page.getByText('待查看页面', { exact: true })).toBeVisible();
   await expect(workbench.getByRole('button', { name: '完成并验收' })).toBeEnabled();

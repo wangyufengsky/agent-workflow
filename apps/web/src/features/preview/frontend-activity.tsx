@@ -1,5 +1,6 @@
 import { InboxKind, type TaskDetailDTO } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
@@ -13,27 +14,31 @@ export function FrontendActivity({
   task,
   inMain,
   starting,
+  showInbox = true,
   buildingTitle = C.building,
   buildingHint = C.waitingHint,
 }: {
   task: TaskDetailDTO;
   inMain: boolean;
   starting: boolean;
+  showInbox?: boolean;
   buildingTitle?: string;
   buildingHint?: string;
 }) {
-  const active = task.activeAttempts.reduce<(typeof task.activeAttempts)[number] | undefined>(
-    (latest, attempt) => (latest === undefined || attempt.startedAt >= latest.startedAt ? attempt : latest),
-    undefined,
-  );
-  const lastNode = task.nodes.findLast((node) => node.attemptCount > 0);
-  const node = task.nodes.find((item) => item.id === active?.nodeId) ?? lastNode;
+  const [step, setStep] = useState('');
+  const executed = task.nodes.filter((item) => item.attemptCount > 0);
+  const selected = executed.find((item) => item.id === step);
+  const active = task.activeAttempts.reduce<(typeof task.activeAttempts)[number] | undefined>((latest, attempt) => {
+    if (selected !== undefined && attempt.nodeId !== selected.id) return latest;
+    return latest === undefined || attempt.startedAt >= latest.startedAt ? attempt : latest;
+  }, undefined);
+  const node = selected ?? task.nodes.find((item) => item.id === active?.nodeId) ?? executed.at(-1);
   const history = useQuery({
-    ...nodeQuery(task.id, lastNode?.id ?? ''),
-    enabled: active === undefined && lastNode !== undefined,
+    ...nodeQuery(task.id, node?.id ?? ''),
+    enabled: active === undefined && node !== undefined,
   });
   const attempt = active ?? history.data?.attempts.at(-1);
-  const inbox = task.openInbox.filter((item) => item.kind !== InboxKind.Failure);
+  const inbox = showInbox ? task.openInbox.filter((item) => item.kind !== InboxKind.Failure) : [];
 
   return (
     <div className={styles.activityFlow} data-testid="frontend-activity">
@@ -51,13 +56,29 @@ export function FrontendActivity({
       {inbox.map((item) => (
         <InboxCard key={item.id} item={item} showTask={false} />
       ))}
+      {executed.length > 1 && (
+        <select
+          className="input"
+          aria-label={C.activityStep}
+          value={selected?.id ?? ''}
+          onChange={(e) => setStep(e.currentTarget.value)}
+        >
+          <option value="">{C.followStep}</option>
+          {executed.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.title}
+            </option>
+          ))}
+        </select>
+      )}
       {attempt !== undefined ? (
         <ConversationStream
-          key={attempt.id}
+          key={selected ? `selected:${attempt.id}` : attempt.id}
           attemptId={attempt.id}
           title={node?.title ?? C.activity}
           pro={false}
           size={inMain ? 'card' : 'side'}
+          initiallyExpanded={selected !== undefined}
           showLastActivity
         />
       ) : history.isError ? (
