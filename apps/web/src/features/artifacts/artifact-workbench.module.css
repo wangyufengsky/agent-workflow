@@ -129,3 +129,23 @@
   width: 1%;
   white-space: nowrap;
 }
+
+.revision {
+  display: inline-block;
+  margin-inline-start: var(--s-2);
+  font-size: var(--fs-xs);
+  color: var(--ok);
+}
+.revision[data-kind="modified"] {
+  color: var(--warn);
+}
+.paper :is(h1, h2, h3, h4, h5, h6, p, li, tr):has(> .revision),
+.source li:has(.revision),
+td:has(.revision) {
+  background: var(--ok-fill);
+}
+.paper :is(h1, h2, h3, h4, h5, h6, p, li, tr):has(> .revision[data-kind="modified"]),
+.source li:has(.revision[data-kind="modified"]),
+td:has(.revision[data-kind="modified"]) {
+  background: var(--warn-fill);
+}

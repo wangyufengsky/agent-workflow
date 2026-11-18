@@ -27,6 +27,10 @@ test('前端开发从开始任务直接进入预览，在同一个任务提交�
   ]);
   await startTask(page, project, /^前端开发$/, '在预览中开发订单页');
   const workbench = page.getByTestId('frontend-workbench');
+  await expect(page.getByRole('tab', { name: '网页预览' })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('tab', { name: '流程画布' }).click();
+  await expect(page.getByTestId('progress-canvas')).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  await page.getByRole('tab', { name: '网页预览' }).click();
   await expect(workbench).toBeVisible();
   await expect(page.getByText('待查看页面', { exact: true })).toBeVisible({ timeout: 2 * TASK_RUN_TIMEOUT_MS });
   await expect(workbench.getByRole('button', { name: '完成并验收' })).toBeEnabled();

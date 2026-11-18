@@ -94,6 +94,14 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
     const repoPath = mkdtempSync(join(tmpdir(), 'aw-frontend-e2e-project-'));
     const project = await call(initGitOp, { repoPath });
     expect(project.preview).toBeNull();
+    const convention = '订单支持按状态筛选。';
+    writeFileSync(join(repoPath, 'orders.md'), convention);
+    execFileSync('git', ['add', 'orders.md'], { cwd: repoPath });
+    execFileSync(
+      'git',
+      ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', 'commit', '-qm', 'Project conventions'],
+      { cwd: repoPath },
+    );
     const workflows = (await (await request.get(`${api}/workflows`, { headers })).json()).items;
     const workflow = workflows.find((item: { key: string }) => item.key === FRONTEND_WORKFLOW_KEY);
 
@@ -152,6 +160,7 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
             editPage('导出'),
           ]),
       { type: 'callTool', server: 'exec', name: 'browser_open', args: { url: '/' } },
+      { type: 'tool', tool: 'read', input: { filePath: 'orders.md' }, output: convention },
       permissionStep(continueEditing),
       ...(nativeVue ? [editPage('导出'), permissionStep(finishFirstPage)] : []),
       submitResult('订单页面已可预览'),
@@ -200,6 +209,11 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
     await expect(activity.getByRole('heading', { name: 'AI 活动' })).toBeVisible();
     await expect(activity.getByRole('heading', { name: '正在构建首屏' })).toHaveCount(0);
     await expect(permission(continueEditing)).toBeVisible();
+    await page.getByRole('button', { name: '跟随 AI 阅读' }).click();
+    await expect(page.getByRole('region', { name: '项目文件阅读' })).toContainText(convention);
+    await expect.poll(nativeText).toBeUndefined();
+    await page.getByRole('button', { name: '返回成果' }).click();
+    await expect.poll(nativeText).toBe(nativeVue ? '订单操作准备中' : '导出');
     const previewBounds = await workbench.getByTestId('preview-area').boundingBox();
     const activityBounds = await activity.boundingBox();
     expect(activityBounds?.x).toBeGreaterThan(previewBounds?.x ?? Number.POSITIVE_INFINITY);
@@ -359,6 +373,10 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
     await expect(workbench.getByLabel('页面路径')).toHaveValue(route);
     await stepDetails.getByRole('button', { name: '关闭', exact: true }).click();
     await expect(workbench.getByRole('button', { name: '界面修改 2' })).toBeVisible();
+    await page.getByRole('button', { name: '扩大视图' }).click();
+    await page.screenshot({ path: testInfo.outputPath('frontend-workspace.png'), animations: 'disabled' });
+    const bounds = await workbench.getByTestId('preview-area').boundingBox();
+    writeFileSync(testInfo.outputPath('frontend-bounds.json'), JSON.stringify(bounds));
     const nativeImage = await app.evaluate(async ({ BrowserWindow }) => {
       const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((item) => 'webContents' in item);
       const contents = (view as Electron.WebContentsView | undefined)?.webContents;
@@ -366,6 +384,11 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
       return (await contents.capturePage()).toPNG().toString('base64');
     });
     writeFileSync(testInfo.outputPath('frontend-native-page.png'), Buffer.from(nativeImage, 'base64'));
+    await page.getByRole('tab', { name: '流程画布' }).click();
+    await expect.poll(nativeText).toBeUndefined();
+    await page.getByRole('tab', { name: '网页预览' }).click();
+    await expect.poll(nativeText).toBe('下载订单');
+    await page.getByRole('button', { name: '还原视图' }).click();
     await expect(await request.patch(`${api}/settings`, { headers, data: { 'ui.theme': 'default' } })).toBeOK();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'default');
     await page.screenshot({ path: testInfo.outputPath('frontend-history-dark.png'), animations: 'disabled' });

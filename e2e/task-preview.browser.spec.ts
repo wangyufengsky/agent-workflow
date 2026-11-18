@@ -42,7 +42,7 @@ test('J28 任务页预览：观看 AI 的画面，预览停止与启动失败时
   await queueTurn(request, project, { title: '修复' }, [{ type: 'hang' }]);
 
   await startTask(page, project, /^修 Bug$/, '订单列表空白');
-  await page.getByRole('tab', { name: '预览' }).click();
+  await page.getByRole('button', { name: '打开网页预览' }).click();
   const pane = page.getByTestId('preview-pane');
   // The AI started the preview; the browser build cannot show the live page.
   await expect(pane).toContainText('页面只在桌面版中显示。');
@@ -65,7 +65,7 @@ test('J28 任务页预览：观看 AI 的画面，预览停止与启动失败时
   await expect(pane).toContainText('boom');
   await expect(pane.getByRole('link', { name: '修改预览设置' })).toBeVisible();
 
-  await page.getByRole('tab', { name: '进度' }).click();
+  await page.getByRole('tab', { name: '流程画布' }).click();
   await expect(pane).toBeHidden();
   await expect(page).not.toHaveURL(/view=preview/);
   // The fix step keeps working: it would hold one of the AI slots the specs after this one need.
@@ -118,6 +118,6 @@ test('助手打开任务的预览页签（29 §2.6）', async ({ page, request }
   await panel.getByLabel('发给助手的消息').press('ControlOrMeta+Enter');
   await expect(panel.getByText('已打开预览页签。')).toBeVisible();
   await expect(page).toHaveURL(/view=preview/);
-  await expect(page.getByRole('tab', { name: '预览' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: '网页预览' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('preview-pane')).toBeVisible();
 });

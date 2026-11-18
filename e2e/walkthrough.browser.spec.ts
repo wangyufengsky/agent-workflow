@@ -912,7 +912,12 @@ const SHOTS: Shot[] = [
     },
   },
   { name: 'tasks', mode: UiMode.Simple, url: () => '/tasks', ready: (page) => page.getByRole('table') },
-  { name: 'task-running', mode: UiMode.Simple, url: (s) => `/tasks/${s.running.id}`, ready: testId('progress-canvas') },
+  {
+    name: 'task-running',
+    mode: UiMode.Simple,
+    url: (s) => `/tasks/${s.running.id}`,
+    ready: testId('task-code-changes'),
+  },
   {
     name: 'task-running-drawer',
     mode: UiMode.Simple,
@@ -934,13 +939,13 @@ const SHOTS: Shot[] = [
   {
     name: 'task-question',
     mode: UiMode.Simple,
-    url: (s) => `/tasks/${s.question.id}`,
+    url: (s) => `/tasks/${s.question.id}?view=progress`,
     ready: testId('progress-canvas'),
   },
   {
     name: 'inbox-drawer',
     mode: UiMode.Simple,
-    url: (s) => `/tasks/${s.question.id}`,
+    url: (s) => `/tasks/${s.question.id}?view=progress`,
     ready: testId('progress-canvas'),
     open: async (page) => {
       await page.getByRole('button', { name: /需要你处理（\d+）/ }).click();
@@ -984,7 +989,7 @@ const SHOTS: Shot[] = [
     url: (s) => `/tasks/${s.review.id}?node=${node(s.review, 'fix')}&open=true`,
     ready: testId('result-card'),
     open: async (page) => {
-      await page.getByRole('tab', { name: '改动' }).click();
+      await page.getByRole('tab', { name: '改动', exact: true }).click();
       await expect(page.getByTestId('diff-view')).toBeVisible();
       return page.getByRole('dialog');
     },
@@ -996,7 +1001,7 @@ const SHOTS: Shot[] = [
     url: (s) => `/tasks/${s.review.id}?node=${node(s.review, 'fix')}&open=true`,
     ready: testId('result-card'),
     open: async (page) => {
-      await page.getByRole('tab', { name: '改动' }).click();
+      await page.getByRole('tab', { name: '改动', exact: true }).click();
       await page.getByRole('button', { name: '放大查看' }).click();
       const large = page.getByRole('dialog', { name: '改动 · 修复' });
       await expect(large.getByTestId('diff-view')).toBeVisible();
@@ -1044,7 +1049,7 @@ const SHOTS: Shot[] = [
   {
     name: 'assistant-panel',
     mode: UiMode.Simple,
-    url: (s) => `/tasks/${s.running.id}`,
+    url: (s) => `/tasks/${s.running.id}?view=progress`,
     ready: testId('progress-canvas'),
     open: async (page, s) => {
       const panel = await openAssistant(page, s.assistantConversation);
@@ -1057,7 +1062,7 @@ const SHOTS: Shot[] = [
     // The charts in the panel's narrow column (35 §5.6).
     name: 'assistant-charts',
     mode: UiMode.Simple,
-    url: (s) => `/tasks/${s.running.id}`,
+    url: (s) => `/tasks/${s.running.id}?view=progress`,
     ready: testId('progress-canvas'),
     open: async (page, s) => {
       const panel = await openAssistant(page, s.assistantCharts);
@@ -1075,7 +1080,7 @@ const SHOTS: Shot[] = [
   {
     name: 'assistant-busy',
     mode: UiMode.Simple,
-    url: (s) => `/tasks/${s.running.id}`,
+    url: (s) => `/tasks/${s.running.id}?view=progress`,
     ready: testId('progress-canvas'),
     open: async (page, s) => {
       const panel = await openAssistant(page, s.assistantBusy);
@@ -1275,7 +1280,7 @@ const SHOTS: Shot[] = [
   {
     name: 'pro-task-running',
     mode: UiMode.Pro,
-    url: (s) => `/tasks/${s.running.id}`,
+    url: (s) => `/tasks/${s.running.id}?view=progress`,
     ready: testId('progress-canvas'),
   },
   {

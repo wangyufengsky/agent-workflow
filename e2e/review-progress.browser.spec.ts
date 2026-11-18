@@ -139,6 +139,7 @@ test('J22 任务 AI 评审：当前步骤与简单过程页显示评审会话，
     passReview,
   ]);
   await startTask(page, project, /修 Bug/, '修复并评审边界条件');
+  await page.getByRole('tab', { name: '流程画布' }).click();
   const side = page.getByTestId('current-step');
   await expect(side.getByTestId('conversation-stream')).toContainText('评审修复的边界条件', {
     timeout: TASK_RUN_TIMEOUT_MS,

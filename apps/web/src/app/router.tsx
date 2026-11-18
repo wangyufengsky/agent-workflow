@@ -208,7 +208,7 @@ const taskRoute = createRoute({
     delivery: z.boolean().optional(),
     artifactVersion: z.uuid().optional(),
     // The preview tab (29 §8.1); the progress tab without it.
-    view: z.literal('preview').optional(),
+    view: z.enum(['preview', 'progress', 'result']).optional(),
   }),
   component: TaskPage,
 });

@@ -87,11 +87,22 @@ const cases = [
 }>;
 
 for (const item of cases) {
-  test(`${item.format} 产物可预览、定位标注、比较版本并验收`, async ({ page, request }) => {
+  test(`${item.format} 产物可预览、定位标注、比较版本并验收`, async ({ page, request }, testInfo) => {
     const project = await createProject(request, null);
     // Hold completion after the first file so the test can see the preview while the task is still running.
     await queueTurn(request, project, { title: '生成首版产物' }, [
       { type: 'think', text: '先生成可查看的初稿。' },
+      ...(item.format === 'Word'
+        ? [
+            {
+              type: 'tool' as const,
+              tool: 'read',
+              input: { filePath: project.repoPath + '/package.json' },
+              output: '{"scripts":{"test":"vitest run"}}',
+            },
+            { type: 'permission' as const, permission: 'bash', patterns: ['node verify-source.mjs'] },
+          ]
+        : []),
       item.before,
       { type: 'permission', permission: 'bash', patterns: ['node check-artifact.mjs'] },
       submitResult('首版已就绪'),
@@ -110,6 +121,12 @@ for (const item of cases) {
     await page.getByRole('button', { name: /^开始/ }).click();
     await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/, { timeout: TASK_RUN_TIMEOUT_MS });
     const workbench = page.getByTestId('artifact-workbench');
+    if (item.format === 'Word') {
+      await page.getByRole('button', { name: '跟随 AI 阅读' }).click();
+      await expect(page.getByRole('region', { name: '项目文件阅读' })).toContainText('vitest run');
+      await page.getByRole('button', { name: '返回成果' }).click();
+      await workbench.getByRole('button', { name: '允许一次' }).click();
+    }
     const taskPath = new URL(page.url()).pathname;
     const detail = async () =>
       taskDetailSchema.parse(await (await request.get(`${API_BASE}${taskPath}`, { headers: AUTH })).json());
@@ -141,6 +158,11 @@ for (const item of cases) {
     await releaseRevision.getByRole('button', { name: '允许一次' }).click();
     await expect(workbench.getByText(item.revised, { exact: true })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
     await expect(page.getByText('待查看产物', { exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '文档预览' })).toHaveAttribute('aria-selected', 'true');
+    await expect(workbench.locator('[data-kind="modified"]').first()).toBeVisible();
+    await page.getByRole('button', { name: '扩大视图' }).click();
+    await page.screenshot({ path: testInfo.outputPath('document.png'), animations: 'disabled' });
+    await page.getByRole('button', { name: '还原视图' }).click();
     const reviewed = await detail();
     const artifact = artifactTaskSchema.parse(reviewed.artifact);
     expect(artifact.versions.map(({ number }) => number)).toEqual([1, 2]);

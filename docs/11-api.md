@@ -142,7 +142,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | GET | `/tasks/:id/check-evidence/:evidenceId` | `tasks.checkEvidence`（read）：按结果中该检查的 `evidenceId` 延迟读取当次检查的 `CheckResult`；标识不属于当前任务结果或证据不可用时返回 404 `NOT_FOUND`（UX-03） |
 | POST | `/tasks/:id/delivery-status` | 刷新当前 PR / MR 状态并保存最近成功结果；失败保存错误，保留旧快照。仅查询配置仓库下的已记录 URL。 |
 | GET | `/initiatives/:id/items/:key/merge-readiness` | 对照平台合入提交与需求计划本地基础分支，返回远端、等待本地、证据不足或可确认状态；旧交付缺少 head 时不推测；GitLab 缺合入提交时仅在原交付 head 确实是本地基础分支祖先时确认；不自动确认。用户可在页面重新检查本地分支，Git 错误显示后可重试。 |
-| GET | `/tasks/:id/diff` | `DiffDTO { base, files }`：worktree（含未提交改动）相对任务分支与目标分支的 merge-base（起初即基线提交；解决冲突合入目标分支后为目标分支的提交）的文件列表与增删统计。已交付且 worktree 不再可用时对比该次交付的 `diffBase` 与 `diffHead`；范围或提交不可用时返回 404 `NOT_FOUND`（UX-03） |
+| GET | `/tasks/:id/diff` | `DiffDTO { base, files }`：worktree（含未提交改动）相对任务分支与目标分支的 merge-base（起初即基线提交；解决冲突合入目标分支后为目标分支的提交）的文件列表与增删统计。运行中可返回最近修改的文件名 `latestPath`，用于跟随工作区编辑。已交付且 worktree 不再可用时对比该次交付的 `diffBase` 与 `diffHead`；范围或提交不可用时返回 404 `NOT_FOUND`（UX-03） |
 | GET | `/tasks/:id/diff/file?path=` | 单文件 unified diff `FileDiffDTO`（超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }`） |
 
 ### 5.1 创建
@@ -293,7 +293,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | GET | `/projects/:id/git/commits/:sha?parent` | 提交详情（含提交者、包含它的本地分支）+ 相对第 `parent` 个父提交（默认 1）的文件列表（根提交与空树比较） |
 | GET | `/projects/:id/git/diff?from&to` | 任意两个 ref 的文件列表 `DiffDTO` |
 | GET | `/projects/:id/git/diff/file?from&to&path` | 单文件 unified diff（`FileDiffDTO`，超过 `DIFF_FILE_MAX_BYTES` 只返回大小） |
-| GET | `/projects/:id/git/tree?ref&path` | 目录浏览（目录在前；`path` 为空即仓库根） |
+| GET | `/projects/:id/git/tree?ref&path` | 目录浏览（目录在前；`path` 为空即仓库根）；符号链接条目带 `symlink: true` |
 | GET | `/projects/:id/git/file?ref&path` | 文件内容；二进制返回 `{ binary: true }`，超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }` |
 | POST | `/projects/:id/git/fetch` | `git fetch --all --prune`（仓库锁内） |
 | GET | `/projects/:id/git/changes` | 未提交的改动 `{ staged, unstaged, conflicted }`（`DiffFile[]`，未跟踪文件是 unstaged 中的 added，改名带 `oldPath`；合并冲突没解决完的路径只在 `conflicted` 中） |

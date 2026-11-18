@@ -16,12 +16,14 @@ export function FileDiff({
   path,
   query,
   mode,
+  annotate = false,
   marks,
   focus,
 }: {
   path: string;
   query: FileDiffQuery;
   mode: DiffMode;
+  annotate?: boolean;
   marks?: readonly DiffMark[] | undefined;
   focus?: DiffFocus | undefined;
 }) {
@@ -39,7 +41,7 @@ export function FileDiff({
         onRetry={() => void diff.refetch()}
       />
     );
-  return <DiffView file={diff.data} mode={mode} marks={marks} focus={focus} />;
+  return <DiffView annotate={annotate} file={diff.data} mode={mode} marks={marks} focus={focus} />;
 }
 
 /**
@@ -52,6 +54,7 @@ export function DiffBrowser({
   fileQuery,
   selected: controlled,
   onSelect,
+  annotate = false,
   marks,
   focus,
   fill = false,
@@ -60,6 +63,7 @@ export function DiffBrowser({
   fileQuery: FileDiffQuery;
   selected?: string | undefined;
   onSelect?: ((path: string) => void) | undefined;
+  annotate?: boolean;
   marks?: ((path: string) => readonly DiffMark[]) | undefined;
   focus?: DiffFocus | undefined;
   fill?: boolean;
@@ -92,6 +96,7 @@ export function DiffBrowser({
           ) : (
             <FileDiff
               path={selected}
+              annotate={annotate}
               query={fileQuery}
               mode={mode}
               marks={marks?.(selected)}

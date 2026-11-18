@@ -48,6 +48,7 @@ test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开�
   await expect(page.getByTestId('task-page').getByText('待合并', { exact: true }).first()).toBeVisible();
 
   // Review opens the canvas ahead of the result, including on direct access and reload.
+  await page.getByRole('tab', { name: '流程画布' }).click();
   const fold = page.locator('details').filter({ has: page.getByText('查看步骤', { exact: true }) });
   await expect(fold).toHaveAttribute('open', '');
   expect((await box(fold)).top).toBeLessThan((await box(result)).top);
@@ -86,6 +87,7 @@ test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开�
 
   // The step's summary in the side panel is Markdown, not its source (14 §2.2).
   await page.getByTestId('step-impl').click();
+  await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
   const side = page.getByTestId('task-side');
   await expect(side.getByRole('heading', { name: '实现思路' })).toBeVisible();
   await expect(side.locator('pre code')).toHaveText('export const greet = () => "你好";');
@@ -93,7 +95,7 @@ test('J1 简单模式：选项目 → 新功能流程 → 输入需求 → 开�
 
   // The step's changes open almost full screen; j and ↑ switch files in the list's order (14 §2.3).
   await side.getByRole('button', { name: '查看详情' }).click();
-  await page.getByRole('tab', { name: '改动' }).click();
+  await page.getByRole('tab', { name: '改动', exact: true }).click();
   await page.getByRole('button', { name: '放大查看' }).click();
   const large = page.getByRole('dialog', { name: '改动 · 实现问候函数' });
   const files = large.getByRole('navigation', { name: '改动文件' });
@@ -142,6 +144,7 @@ test('UX-02 长流程在待合并时可查看并交付', async ({ page, request 
   await startTask(page, project, /新功能开发/, '按顺序完成八个开发步骤');
   const result = page.getByTestId('result-card');
   await expect(result).toBeVisible({ timeout: 60_000 });
+  await page.getByRole('tab', { name: '流程画布' }).click();
   const fold = page.locator('details').filter({ has: page.getByText('查看步骤', { exact: true }) });
   for (const mode of ['simple', 'pro'] as const) {
     await patchSettings(request, { 'ui.mode': mode });
@@ -153,6 +156,8 @@ test('UX-02 长流程在待合并时可查看并交付', async ({ page, request 
       await page.reload();
       await expect(fold).toHaveAttribute('open', '');
       await page.getByTestId('progress-canvas').getByTestId('step-step_7').click();
+      await expect(page.getByRole('dialog')).toHaveAccessibleName('开发步骤 8');
+      await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
       await expect(page.getByTestId('task-side')).toContainText('开发步骤 8');
       await page.getByRole('link', { name: '查看验收结果' }).click();
       const merge = result.getByRole('button', { name: '合并到 main' });

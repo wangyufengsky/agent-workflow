@@ -82,6 +82,9 @@ test('将待确认的 AI 计划保存为固定流程', async ({ page, request })
   await expect(result).toContainText('已完成 2 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
   await result.getByRole('button', { name: '合并到 main' }).click();
   await expect(result.getByTestId('delivery-outcome')).toContainText('已合并到 main', { timeout: TASK_RUN_TIMEOUT_MS });
+  await page.getByRole('tab', { name: '流程画布' }).click();
+  await expect(page.getByTestId('step-impl')).toBeVisible();
+  await page.getByRole('tab', { name: '代码改动' }).click();
   await page.getByRole('link', { name: '存为流程模板' }).click();
   await expect(page.getByText(/来源任务.*计划第 2 版/)).toBeVisible();
   await expect(page.getByTestId('step-impl')).toBeVisible();

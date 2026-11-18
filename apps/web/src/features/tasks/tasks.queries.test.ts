@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { queryKeys } from '../../api/query-keys.ts';
 import { updateTask } from './tasks.queries.ts';
 
-const task = (status: 'preparing' | 'running') =>
+const task = (status: 'preparing' | 'running' | 'review') =>
   ({ id: 't1', status, displayGroup: status, workflow: { key: 'bugfix' } }) as unknown as TaskDetailDTO;
 
 describe('task.updated 更新任务详情缓存', () => {
@@ -29,4 +29,21 @@ describe('task.updated 更新任务详情缓存', () => {
     expect(qc.getQueryData<TaskDetailDTO>(queryKeys.task('t1'))?.status).toBe('running');
     unsubscribe();
   });
+});
+
+it('结束运行时刷新差异清单和文件内容，包含最后一次轮询之后的写入', async () => {
+  const qc = new QueryClient();
+  const keys = [queryKeys.taskDiff('t1'), queryKeys.taskDiffFile('t1', 'index.ts')];
+  let version = 1;
+  const observers = keys.map((queryKey) => new QueryObserver(qc, { queryKey, queryFn: async () => version }));
+  const subscriptions = observers.map((observer) => observer.subscribe(() => {}));
+  try {
+    await Promise.all(observers.map((observer) => observer.refetch()));
+    version = 2;
+    await updateTask(qc, task('review') as unknown as TaskSummaryDTO);
+    expect(keys.map((key) => qc.getQueryData(key))).toEqual([2, 2]);
+  } finally {
+    for (const unsubscribe of subscriptions) unsubscribe();
+    qc.clear();
+  }
 });

@@ -1710,3 +1710,12 @@ legend {
 fieldset.field > legend {
   margin-bottom: 8px;
 }
+
+/* 扩大任务工作区时收起导航，保留原生标题栏和助手停靠位。 */
+.app:has([data-result-expanded]) {
+  --nav-w: 0px;
+}
+.app:has([data-result-expanded]) > .nav {
+  visibility: hidden;
+  padding: 0;
+}

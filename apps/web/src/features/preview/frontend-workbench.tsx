@@ -83,6 +83,7 @@ export function FrontendWorkbench({
   task,
   pro,
   hasConfiguredPreview,
+  active,
   progress,
   delivery,
   onOpenNode,
@@ -91,6 +92,7 @@ export function FrontendWorkbench({
   task: TaskDetailDTO;
   pro: boolean;
   hasConfiguredPreview: boolean;
+  active: boolean;
   progress: ReactNode;
   delivery: ReactNode;
   onOpenNode: (id: string) => void;
@@ -123,7 +125,8 @@ export function FrontendWorkbench({
   const live = previewState === PreviewState.Running;
   const failed = previewState === PreviewState.Failed;
   const activityInMain = !live && !failed && !firstResult;
-  const defaultPanel = pickedPanel === undefined ? (activityInMain ? null : 'activity') : pickedPanel;
+  const defaultPanel =
+    pickedPanel === undefined ? (!activityInMain && task.openInbox.length > 0 ? 'activity' : null) : pickedPanel;
   const panel = nodeDetails === undefined ? defaultPanel : 'node';
   const checking =
     working && task.nodes.findLast((node) => node.kind !== NodeKind.Verify)?.key.startsWith(FRONTEND_VERIFY_PREFIX);
@@ -310,7 +313,7 @@ export function FrontendWorkbench({
         {!activityInMain && (
           <div className={styles.preview}>
             {preview.data !== undefined && worktreeReady ? (
-              <MyPreview task={task} preview={preview.data} active pro={pro} />
+              <MyPreview task={task} preview={preview.data} active={active} pro={pro} />
             ) : preview.isError ? (
               <ErrorState error={preview.error} onRetry={() => void preview.refetch()} />
             ) : null}

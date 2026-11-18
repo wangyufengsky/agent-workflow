@@ -313,3 +313,86 @@
 .testPanel[hidden] {
   display: none;
 }
+
+/* 成果与画布共享完整宽度，隐藏的画布仍有尺寸，保留缩放与选中状态。 */
+.resultPage.resultPage {
+  max-width: none;
+  padding: 12px clamp(12px, 1.5vw, 24px) 24px;
+}
+.resultPage > .header {
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.resultTabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.viewArea {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+}
+.viewPanel {
+  padding-top: 8px;
+  animation: revealView 0.16s ease-out;
+}
+.viewPanel[data-state="inactive"] {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+  overflow: hidden;
+  animation: none;
+}
+.testViewing .viewPanel[data-state="active"] {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+@keyframes revealView {
+  from {
+    opacity: 0.4;
+    transform: translateX(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .viewPanel {
+    animation: none;
+  }
+}
+
+.viewBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+.viewBar > :first-child {
+  flex: 1;
+  border: 0;
+}
+.resultPage[data-result-expanded] > header {
+  display: none;
+}
+
+.resultPage[data-result-expanded] {
+  --task-view-height: max(480px, calc(100dvh - 188px));
+}
+
+.readExcerpt {
+  margin: 0;
+  padding: 16px;
+  max-height: var(--task-view-height, 68vh);
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}

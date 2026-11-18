@@ -8,7 +8,7 @@ import {
   textLines,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { type MouseEvent, type ReactNode, useState } from 'react';
+import { type MouseEvent, type ReactNode, useMemo, useState } from 'react';
 import type { Components } from 'react-markdown';
 import { callOperation } from '../../api/client.ts';
 import { Button } from '../../components/button.tsx';
@@ -17,9 +17,27 @@ import { IconButton } from '../../components/icon-button.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { ARTIFACT_COPY } from '../../copy/artifacts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
+import { DIFF_COPY } from '../../copy/diff.ts';
+import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 import { SheetView } from '../attachments/attachment-preview.tsx';
 import styles from './artifact-workbench.module.css';
 
+import { changedLines, type VersionChange } from './version-changes.ts';
+
+const versionQuery = (task: string, version: string | undefined, sheet?: string) => ({
+  queryKey: ['task-artifact-version', task, version, sheet],
+  queryFn: () => callOperation(getTaskArtifactOp, { id: task, versionId: version ?? '', sheet }),
+  enabled: version !== undefined,
+  staleTime: Infinity,
+});
+function ChangeMark({ change }: { change: VersionChange | undefined }) {
+  return change ? (
+    <small className={styles.revision} data-kind={change.kind}>
+      {DIFF_COPY.status[change.kind]}
+      {change.before !== undefined && <span>{R.previous(change.before)}</span>}
+    </small>
+  ) : null;
+}
 export type ArtifactSelection = { anchor: ArtifactAnchor; quote: string };
 type OnPick = (selection: ArtifactSelection) => void;
 
@@ -38,24 +56,40 @@ function blockAnchor(lines: string[], from: number, to: number): ArtifactSelecti
   };
 }
 
-function Content({ source, onPick }: { source: string; onPick?: OnPick | undefined }) {
+function Content({
+  source,
+  changes,
+  onPick,
+}: {
+  changes: Map<number, VersionChange>;
+  source: string;
+  onPick?: OnPick | undefined;
+}) {
   const lines = textLines(source);
   function marker(from: number | undefined, to: number | undefined) {
-    if (onPick === undefined || from === undefined || to === undefined) return null;
+    if (from === undefined || to === undefined) return null;
+    let change: VersionChange | undefined;
+    for (let i = from; i <= to && change === undefined; i++) change = changes.get(i);
+    if (!change && !onPick) return null;
     return (
-      <IconButton
-        icon="edit"
-        label={ARTIFACT_COPY.markLines(from, to)}
-        onClick={() => onPick(blockAnchor(lines, from, to))}
-        className={styles.mark}
-      />
+      <>
+        <ChangeMark change={change} />
+        {onPick && (
+          <IconButton
+            icon="edit"
+            label={ARTIFACT_COPY.markLines(from, to)}
+            onClick={() => onPick(blockAnchor(lines, from, to))}
+            className={styles.mark}
+          />
+        )}
+      </>
     );
   }
   const components: Components = {
     img: ({ alt }) => (alt ? <span>{alt}</span> : null),
     p: ({ children, node }) => (
       <p>
-        {children}
+        <span>{children}</span>
         {marker(node?.position?.start.line, node?.position?.end.line)}
       </p>
     ),
@@ -99,7 +133,15 @@ function Content({ source, onPick }: { source: string; onPick?: OnPick | undefin
 
 const PAGE_LINES = 180;
 
-function Lines({ source, onPick }: { source: string; onPick?: OnPick | undefined }) {
+function Lines({
+  source,
+  changes,
+  onPick,
+}: {
+  changes: Map<number, VersionChange>;
+  source: string;
+  onPick?: OnPick | undefined;
+}) {
   const [start, setStart] = useState(0);
   const [anchor, setAnchor] = useState<number>();
   const lines = textLines(source);
@@ -137,6 +179,7 @@ function Lines({ source, onPick }: { source: string; onPick?: OnPick | undefined
               ) : (
                 <code>{line || '\u00a0'}</code>
               )}
+              <ChangeMark change={changes.get(number)} />
             </li>
           );
         })}
@@ -158,7 +201,18 @@ function Lines({ source, onPick }: { source: string; onPick?: OnPick | undefined
 
 type Cell = { row: number; col: number; value: string };
 
-function Workbook({ data, onPick }: { data: SheetPreviewDTO; onPick?: OnPick | undefined }) {
+const cellMap = (sheet: SheetPreviewDTO | null | undefined) =>
+  new Map(sheet?.rows.flatMap((row) => row.cells.map((c) => [row.r + ':' + c.c, c] as const)));
+
+function Workbook({
+  data,
+  before,
+  onPick,
+}: {
+  before?: SheetPreviewDTO | null | undefined;
+  data: SheetPreviewDTO;
+  onPick?: OnPick | undefined;
+}) {
   const [origin, setOrigin] = useState<Cell>();
   const [selected, setSelected] = useState<{ top: number; bottom: number; left: number; right: number }>();
   function pick(cell: Cell, event: MouseEvent) {
@@ -183,6 +237,8 @@ function Workbook({ data, onPick }: { data: SheetPreviewDTO; onPick?: OnPick | u
       );
     onPick?.({ anchor: { kind: 'cells', sheet: data.name, range }, quote: entries.join('\n').slice(0, 2400) });
   }
+  const oldCells = useMemo(() => cellMap(before), [before]);
+  const newCells = useMemo(() => cellMap(data), [data]);
   function renderCell(row: number, col: number, value: string): ReactNode {
     const cell = `${columnName(col)}${row}`;
     const marked =
@@ -191,6 +247,22 @@ function Workbook({ data, onPick }: { data: SheetPreviewDTO; onPick?: OnPick | u
       row <= selected.bottom &&
       col >= selected.left &&
       col <= selected.right;
+    const key = row + ':' + col;
+    const old = oldCells.get(key),
+      current = newCells.get(key);
+    const change: VersionChange | undefined =
+      before === undefined || (current?.v === old?.v && current?.f === old?.f)
+        ? undefined
+        : old
+          ? { kind: 'modified', before: old.f === undefined ? String(old.v ?? '') : '=' + old.f }
+          : { kind: 'added' };
+    if (!onPick)
+      return (
+        <>
+          <span>{value}</span>
+          <ChangeMark change={change} />
+        </>
+      );
     return (
       <button
         type="button"
@@ -200,29 +272,55 @@ function Workbook({ data, onPick }: { data: SheetPreviewDTO; onPick?: OnPick | u
         onClick={(event) => pick({ row, col, value }, event)}
       >
         {value || '\u00a0'}
+        <ChangeMark change={change} />
       </button>
     );
   }
-  return <SheetView data={data} renderCell={onPick === undefined ? undefined : renderCell} />;
+  return <SheetView data={data} renderCell={onPick === undefined && before === undefined ? undefined : renderCell} />;
 }
 
 export function ArtifactPreview({
   taskId,
   version,
+  previous,
   onPick,
 }: {
   taskId: string;
   version: ArtifactVersion;
+  previous?: ArtifactVersion | undefined;
   onPick?: OnPick | undefined;
 }) {
   const [sheet, setSheet] = useState<string>();
   const [plain, setPlain] = useState(false);
   const view = useQuery({
-    queryKey: ['task-artifact-version', taskId, version.id, sheet],
-    queryFn: () => callOperation(getTaskArtifactOp, { id: taskId, versionId: version.id, sheet }),
-    staleTime: Infinity,
+    ...versionQuery(taskId, version.id, sheet),
     placeholderData: (previous) => previous,
   });
+  const old = useQuery(versionQuery(taskId, previous?.id));
+  const prior = old.data;
+  const current = view.data;
+  const name = current?.format === 'xlsx' ? current.sheet.name : undefined;
+  const needsSheet =
+    prior?.format === 'xlsx' && prior.sheet.name !== name && prior.meta.sheets.some((s) => s.name === name);
+  const otherSheet = useQuery(versionQuery(taskId, needsSheet ? previous?.id : undefined, name));
+  const oldSheet =
+    prior?.format !== 'xlsx'
+      ? undefined
+      : prior.sheet.name === name
+        ? prior.sheet
+        : needsSheet
+          ? otherSheet.data?.format === 'xlsx'
+            ? otherSheet.data.sheet
+            : undefined
+          : null;
+  const changes = useMemo(() => {
+    if (!current || !prior || current.format !== prior.format || current.format === 'xlsx' || prior.format === 'xlsx')
+      return new Map<number, VersionChange>();
+    return changedLines(
+      prior.format === 'docx' ? prior.markdown : prior.text,
+      current.format === 'docx' ? current.markdown : current.text,
+    );
+  }, [current, prior]);
   if (view.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (view.isError) return <ErrorState error={view.error} onRetry={() => void view.refetch()} />;
   const data = view.data;
@@ -243,11 +341,17 @@ export function ArtifactPreview({
             </Button>
           ))}
         </fieldset>
-        <Workbook key={data.sheet.name} data={data.sheet} onPick={view.isPlaceholderData ? undefined : onPick} />
+        <Workbook
+          before={oldSheet}
+          key={data.sheet.name}
+          data={data.sheet}
+          onPick={view.isPlaceholderData ? undefined : onPick}
+        />
       </div>
     );
   }
-  if (data.format === AttachmentFormat.Docx) return <Content source={data.markdown} onPick={onPick} />;
+  if (data.format === AttachmentFormat.Docx)
+    return <Content changes={changes} source={data.markdown} onPick={onPick} />;
   return (
     <div className="col">
       {data.format === 'md' && (
@@ -267,9 +371,9 @@ export function ArtifactPreview({
       )}
       {data.truncated && <p className="hint">{ARTIFACT_COPY.truncated}</p>}
       {data.format === 'txt' || plain ? (
-        <Lines source={data.text} onPick={onPick} />
+        <Lines changes={changes} source={data.text} onPick={onPick} />
       ) : (
-        <Content source={data.text} onPick={onPick} />
+        <Content changes={changes} source={data.text} onPick={onPick} />
       )}
     </div>
   );

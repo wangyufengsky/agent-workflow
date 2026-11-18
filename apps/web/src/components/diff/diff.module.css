@@ -303,3 +303,9 @@
   min-height: 0;
   padding: var(--s-4) var(--s-5) var(--s-5);
 }
+
+.editLabel {
+  margin-inline-start: var(--s-3);
+  color: var(--sub);
+  font-size: var(--fs-xs);
+}
