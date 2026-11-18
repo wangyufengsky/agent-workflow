@@ -4,7 +4,7 @@ import { API_BASE, AUTH } from './env.ts';
 import { createProject, queueTurn, startTask, submitResult, TASK_RUN_TIMEOUT_MS } from './helpers.ts';
 
 const server = `import { createServer } from 'node:http';
-createServer((_request, response) => { response.end('<h1>Orders</h1>'); }).listen(Number(process.env.PORT), '127.0.0.1');
+createServer((_request, response) => { response.setHeader('Content-Type', 'text/html; charset=utf-8'); response.end('<!doctype html><meta name="viewport" content="width=device-width"><h1>Orders</h1>'); }).listen(Number(process.env.PORT), '127.0.0.1');
 `;
 
 test('前端开发从开始任务直接进入预览，在同一个任务提交整页修改意见', async ({ page, request }) => {
@@ -96,4 +96,58 @@ test('前端开发从开始任务直接进入预览，在同一个任务提交�
   const toMerge = await request.get(`${API_BASE}/tasks?displayGroup=review&projectId=${project.id}`, { headers: AUTH });
   await expect(toMerge).toBeOK();
   expect((await toMerge.json()).items).toEqual([]);
+});
+
+test('前端验收跟随首版新增文件和实际手机页面，退出跟随可继续浏览自己的预览', async ({ page, request }, info) => {
+  const project = await createProject(request, null);
+  await expect(
+    await request.patch(`${API_BASE}/projects/${project.id}`, {
+      headers: AUTH,
+      data: {
+        preview: { command: 'node preview.mjs', setupCommand: null, readyPath: '/', pages: ['/'], extraOrigins: [] },
+      },
+    }),
+  ).toBeOK();
+  const file = 'web/src/pages/TransformerArticle.vue';
+  await queueTurn(request, project, { title: '开发首版页面' }, [
+    { type: 'edit', file: 'preview.mjs', content: server },
+    { type: 'edit', file, content: '<template>\nTransformer\n</template>\n' },
+    submitResult('首版就绪'),
+  ]);
+  await queueTurn(request, project, { title: '前端交付验收' }, [
+    { type: 'tool', tool: 'read', input: { filePath: file, offset: 2 }, output: '<content>2: Transformer</content>' },
+    { type: 'permission', permission: 'bash', patterns: ['node check-page.mjs'] },
+    { type: 'callTool', name: 'browser_open', args: { url: '/transformer#why' } },
+    { type: 'callTool', name: 'browser_viewport', args: { preset: 'mobile' } },
+    { type: 'hang' },
+  ]);
+  await startTask(page, project, /^前端开发$/, '核验介绍页');
+  const path = new URL(page.url()).pathname;
+  try {
+    await page.getByRole('button', { name: '完成并验收' }).click();
+    await page.getByRole('button', { name: '跟随 AI 阅读', exact: true }).click();
+    await expect(page.getByRole('region', { name: '项目文件阅读' }).locator('mark')).toHaveText('2: Transformer');
+    const detail = taskDetailSchema.parse(await (await request.get(API_BASE + path, { headers: AUTH })).json());
+    const permission = detail.openInbox.find((i) => i.kind === InboxKind.Permission);
+    if (!permission) throw new Error('Missing verification permission');
+    await expect(
+      await request.post(`${API_BASE}/inbox/${permission.id}/resolve`, {
+        headers: AUTH,
+        data: { response: { decision: PermissionDecision.Once } },
+      }),
+    ).toBeOK();
+    const screen = page.getByRole('region', { name: 'AI 网页画面' });
+    await expect(screen).toContainText('/transformer#why');
+    await expect.poll(() => screen.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(390);
+    await page.screenshot({ path: info.outputPath('verification-mobile.png') });
+    await page.getByRole('tab', { name: '流程画布' }).click();
+    await expect(screen).toBeHidden();
+    await page.getByRole('tab', { name: '网页预览' }).click();
+    await expect(screen).toBeVisible();
+    await page.getByRole('button', { name: '暂停跟随阅读' }).click();
+    await expect(screen).toBeHidden();
+    await expect(page.getByTestId('frontend-workbench').getByText('页面只在桌面版中显示。')).toBeVisible();
+  } finally {
+    await request.post(`${API_BASE}${path}/cancel`, { headers: AUTH, data: {} });
+  }
 });

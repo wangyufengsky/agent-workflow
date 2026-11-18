@@ -179,3 +179,9 @@
     border-inline-start: 0;
   }
 }
+
+.personalPreview:not([hidden]) {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}

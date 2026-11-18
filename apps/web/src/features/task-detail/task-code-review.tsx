@@ -58,7 +58,7 @@ export function TaskCodeReviewWorkbench({
   const acknowledgement = useDeliveryAcknowledgement(task.id);
   const reviewing = task.status === TaskStatus.Review;
   const node = task.nodes.findLast((n) => n.key === TASK_CODE_REVIEW_NODE_KEY || n.kind === NodeKind.Revise);
-  const live = task.activeAttempts.find((a) => a.nodeId === node?.id && a.kind === AttemptKind.Execute);
+  const live = task.activeAttempts.findLast((a) => a.kind === AttemptKind.Execute || a.kind === AttemptKind.Review);
   const history = useQuery({ ...nodeQuery(task.id, node?.id ?? ''), enabled: active && !!node && !live });
   const id = live?.id ?? history.data?.attempts.findLast((a) => a.kind === AttemptKind.Execute)?.id;
   const attempt = useQuery({ ...attemptQuery(id ?? ''), enabled: active && !!id });

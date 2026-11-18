@@ -1,5 +1,6 @@
 export const FRONTEND_COPY = {
   preview: '页面预览',
+  aiScreen: 'AI 网页画面',
   mark: '标注修改',
   activityStep: '活动步骤',
   followStep: '跟随当前步骤',

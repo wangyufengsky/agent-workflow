@@ -401,9 +401,25 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
 
     await page.getByRole('button', { name: '还原视图' }).click();
 
-    await queue({ title: '前端交付验收' }, [submitResult('构建与页面验收')]);
+    const watchPhone = 'node verify-mobile-page.mjs';
+    await queue({ title: '前端交付验收' }, [
+      { type: 'callTool', server: 'exec', name: 'browser_open', args: { url: '/?watch=mobile#orders' } },
+      { type: 'callTool', server: 'exec', name: 'browser_viewport', args: { preset: 'mobile' } },
+      permissionStep(watchPhone),
+      submitResult('构建与页面验收'),
+    ]);
     await queue({ agent: 'aw-reviewer' }, [passReview]);
     await workbench.getByRole('button', { name: '完成并验收' }).click();
+    await page.getByRole('button', { name: '跟随 AI 阅读', exact: true }).click();
+    const aiPage = workbench.getByRole('region', { name: 'AI 网页画面' });
+    await expect(aiPage).toContainText('/?watch=mobile#orders');
+    await expect.poll(() => aiPage.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(390);
+    await expect.poll(nativeText).toBeUndefined();
+    await page.screenshot({ path: testInfo.outputPath('frontend-verifier-mobile.png'), animations: 'disabled' });
+    await page.getByRole('button', { name: '暂停跟随阅读' }).click();
+    await expect.poll(nativeText).toBe('下载订单');
+    await expect(workbench.getByRole('textbox', { name: '页面路径' })).toHaveValue(route);
+    await allow(watchPhone);
     await expect
       .poll(
         async () => {

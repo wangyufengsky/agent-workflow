@@ -1,4 +1,5 @@
 import {
+  type BrowserFrame,
   GitTreeEntryType,
   getTaskDocumentDraftOp,
   isWritingRepositoryDocument,
@@ -15,12 +16,14 @@ import { Button } from '../../components/button.tsx';
 import { revealInPane, sizeReadingPane } from '../../components/reveal-in-pane.ts';
 import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 import { attemptQuery, attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
-import { gitTreeQuery } from '../git/git.queries.ts';
+import { gitCommitBeforeQuery, gitTreeQuery } from '../git/git.queries.ts';
+import { FollowedBrowserFrame } from '../preview/followed-browser-frame.tsx';
+import { framesQuery } from '../preview/preview.queries.ts';
 import { officeRead, projectReadPath, readRequest } from './project-file-read.ts';
 import styles from './task-page.module.css';
 
 type Reading = { path: string; location: string; excerpt: string; line?: number | undefined };
-type Activity = { id: string; time: number; seq: number; reading?: Reading };
+type Activity = { id: string; time: number; seq: number; reading?: Reading; frame?: BrowserFrame };
 function excerpt(tool: string, output: string): string {
   if (tool === officeRead) {
     try {
@@ -53,7 +56,9 @@ function ReadObserver({
   const attempt = useQuery(attemptQuery(id));
   const client = useQueryClient();
   const call = entries.findLast(
-    (e) => e.kind === TranscriptEntryKind.ToolCall && e.data.tool !== MCP_TOOL_PREFIX + McpToolName.ReportProgress,
+    (e) =>
+      e.kind === TranscriptEntryKind.ToolCall &&
+      (e.data.tool !== MCP_TOOL_PREFIX + McpToolName.ReportProgress || typeof e.data.input.proposal === 'string'),
   );
   const data = call?.kind === TranscriptEntryKind.ToolCall ? call.data : undefined;
   const read = useMemo(() => data && readRequest(data.tool, data.input), [data]);
@@ -64,8 +69,17 @@ function ReadObserver({
       read.directory ?? attempt.data?.directory ?? '',
       [task.git.worktreePath, repo].filter((s): s is string => Boolean(s)),
     );
-  const ref = task.git.baseCommit ?? task.git.baseBranch;
   const project = task.project.id;
+  const branch = task.git.branch;
+  const atStart = useQuery({
+    ...gitCommitBeforeQuery(project, branch ?? '', attempt.data?.startedAt ?? 0),
+    enabled: !!path && !!branch && !!attempt.data,
+    staleTime: Infinity,
+  });
+  const ref = atStart.data?.sha ?? task.git.baseCommit ?? task.git.baseBranch;
+  const browsing = data?.tool.startsWith(`${MCP_TOOL_PREFIX}browser_`) === true;
+  const frames = useQuery({ ...framesQuery(id), enabled: browsing });
+  const frame = browsing ? frames.data?.at(-1) : undefined;
   const exists = useQuery({
     queryKey: ['task-read-source', project, ref, path],
     enabled: !!path,
@@ -108,12 +122,13 @@ function ReadObserver({
   const activity = useMemo((): Activity | undefined => {
     if (!call || !data) return undefined;
     const value: Activity = { id, time: call.ts, seq: call.seq };
+    if (frame) value.frame = frame;
     if (path && readable && result?.data.status === 'completed' && result.data.output) {
       const text = excerpt(data.tool, result.data.output);
       if (text && read) value.reading = { path, excerpt: text, location: read.location, line: read.line };
     }
     return value;
-  }, [call, data, readable, id, path, read, result]);
+  }, [call, data, frame, readable, id, path, read, result]);
   useEffect(() => {
     if (activity) report(activity);
   }, [activity, report]);
@@ -158,7 +173,7 @@ export function TaskReadFollow({
   active: boolean;
   following: boolean;
   onFollow: (on: boolean) => void;
-  children: (reading: boolean) => ReactNode;
+  children: (reading: boolean, frame?: BrowserFrame) => ReactNode;
 }) {
   const [held, setHeld] = useState<Reading>();
   const [latest, setLatest] = useState<Record<string, Activity>>({});
@@ -166,8 +181,10 @@ export function TaskReadFollow({
   const live = task.activeAttempts
     .map((a) => latest[a.id])
     .filter((a): a is Activity => a !== undefined)
-    .sort((a, b) => b.time - a.time || b.seq - a.seq)[0]?.reading;
-  const reading = following ? live : held;
+    .sort((a, b) => b.time - a.time || b.seq - a.seq)[0];
+  const reading = following ? live?.reading : held;
+  const frame = following ? live?.frame : undefined;
+  const standaloneFrame = !task.frontend && frame;
   return (
     <>
       {active &&
@@ -210,7 +227,8 @@ export function TaskReadFollow({
           <ReadExcerpt reading={reading} follow={following && active} />
         </section>
       )}
-      <div hidden={!!reading}>{children(!!reading)}</div>
+      {standaloneFrame && <FollowedBrowserFrame frame={standaloneFrame} />}
+      <div hidden={!!reading || !!standaloneFrame}>{children(!!reading || !!standaloneFrame, frame)}</div>
     </>
   );
 }

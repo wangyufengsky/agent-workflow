@@ -1,4 +1,5 @@
 import {
+  type BrowserFrame,
   ChangeRequestReason,
   FRONTEND_ANNOTATION_LIMIT,
   FRONTEND_FEEDBACK_LIMIT,
@@ -29,6 +30,7 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { FRONTEND_COPY as C } from '../../copy/frontend.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { useFinishFrontendTask, useRequestChanges } from '../tasks/tasks.queries.ts';
+import { FollowedBrowserFrame } from './followed-browser-frame.tsx';
 import { FrontendActivity } from './frontend-activity.tsx';
 import styles from './frontend-workbench.module.css';
 import { MyPreview } from './my-preview.tsx';
@@ -83,6 +85,7 @@ export function FrontendWorkbench({
   task,
   pro,
   hasConfiguredPreview,
+  frame,
   active,
   delivery,
   onOpenNode,
@@ -91,6 +94,7 @@ export function FrontendWorkbench({
   task: TaskDetailDTO;
   pro: boolean;
   hasConfiguredPreview: boolean;
+  frame?: BrowserFrame | undefined;
   active: boolean;
   delivery: ReactNode;
   onOpenNode: (id: string) => void;
@@ -122,7 +126,8 @@ export function FrontendWorkbench({
   const autoStart = worktreeReady && (firstResult || (hasConfiguredPreview && working));
   const live = previewState === PreviewState.Running;
   const failed = previewState === PreviewState.Failed;
-  const activityInMain = !live && !failed && !firstResult;
+  const showFrame = frame !== undefined && pickedPanel !== 'notes';
+  const activityInMain = !showFrame && !live && !failed && !firstResult;
   const defaultPanel = pickedPanel === undefined ? (activityInMain ? null : 'activity') : pickedPanel;
   const panel = nodeDetails === undefined ? defaultPanel : 'node';
   const checking =
@@ -239,7 +244,7 @@ export function FrontendWorkbench({
             {status}
           </span>
         </div>
-        {tabId !== undefined && (
+        {!showFrame && tabId !== undefined && (
           <Button variant="ghost" size="sm" icon="sparkle" onClick={() => showAssistant(true)}>
             {C.assistant}
           </Button>
@@ -300,8 +305,11 @@ export function FrontendWorkbench({
       <div className={styles.body}>
         {!activityInMain && (
           <div className={styles.preview}>
+            {showFrame && <FollowedBrowserFrame frame={frame} />}
             {preview.data !== undefined && worktreeReady ? (
-              <MyPreview task={task} preview={preview.data} active={active} pro={pro} />
+              <div hidden={showFrame} className={styles.personalPreview}>
+                <MyPreview task={task} preview={preview.data} active={active && !showFrame} pro={pro} />
+              </div>
             ) : preview.isError ? (
               <ErrorState error={preview.error} onRetry={() => void preview.refetch()} />
             ) : null}
