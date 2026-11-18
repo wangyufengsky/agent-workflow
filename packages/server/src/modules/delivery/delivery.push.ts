@@ -15,13 +15,16 @@ export type OriginBranchInput = { repoPath: string; branch: string; authorizatio
 /** Pushes the task branch to `origin` for a pull request (09 §7), under the repository lock; never forced. */
 export async function pushBranch(
   locks: RepoLocks,
-  input: OriginBranchInput & { targetBranch: string; reviewedDocument?: ArtifactVersion['repository'] },
+  input: OriginBranchInput & {
+    targetBranch: string;
+    reviewedDocuments?: NonNullable<ArtifactVersion['repository']>[] | undefined;
+  },
 ): Promise<{ diffBase: string; diffHead: string }> {
   const ref = `refs/heads/${input.branch}`;
   return locks.run(input.repoPath, async () => {
     const cwd = input.repoPath;
     const diffHead = (await runGit(['rev-parse', '--verify', `${ref}^{commit}`], { cwd })).stdout.trim();
-    if (input.reviewedDocument !== undefined) await assertReviewedDocument(cwd, diffHead, input.reviewedDocument);
+    for (const document of input.reviewedDocuments ?? []) await assertReviewedDocument(cwd, diffHead, document);
     const diffBase = await mergeBase(cwd, `refs/heads/${input.targetBranch}`, diffHead);
     await runGit(['push', '--quiet', 'origin', `${diffHead}:${ref}`], {
       cwd,

@@ -9,11 +9,21 @@ import {
   textLines,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { type MouseEvent, type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  type MouseEvent,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { Components } from 'react-markdown';
 import { callOperation } from '../../api/client.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { ExternalLink } from '../../components/external-link.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { revealInPane, sizeReadingPane } from '../../components/reveal-in-pane.ts';
@@ -24,6 +34,7 @@ import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 import { SheetView } from '../attachments/attachment-preview.tsx';
 import styles from './artifact-workbench.module.css';
 
+import { DocumentNavigation, resolveDocumentLink, revealDocumentHeading } from './document-links.ts';
 import { changedLines, type VersionChange } from './version-changes.ts';
 
 const versionQuery = (task: string, version: string | undefined, sheet?: string) => ({
@@ -59,14 +70,23 @@ function blockAnchor(lines: string[], from: number, to: number): ArtifactSelecti
 }
 
 function Content({
+  path,
   source,
   changes,
   onPick,
 }: {
   changes: Map<number, VersionChange>;
+  path: string;
   source: string;
   onPick?: OnPick | undefined;
 }) {
+  const article = useRef<HTMLElement>(null);
+  const navigation = useContext(DocumentNavigation);
+  const target = navigation?.target;
+  useLayoutEffect(() => {
+    if (target?.path === path && article.current && target.fragment)
+      revealDocumentHeading(article.current, target.fragment);
+  }, [target, path]);
   const lines = textLines(source);
   function marker(from: number | undefined, to: number | undefined) {
     if (from === undefined || to === undefined) return null;
@@ -88,6 +108,23 @@ function Content({
     );
   }
   const components: Components = {
+    a: ({ href, children }) => {
+      if (!href) return <>{children}</>;
+      const link = resolveDocumentLink(href, path, navigation?.paths);
+      if (!link) return <ExternalLink href={href}>{children}</ExternalLink>;
+      return (
+        <a
+          href={href}
+          onClick={(event) => {
+            event.preventDefault();
+            if (link.path !== path) navigation?.open(link.path, link.fragment);
+            else if (article.current) revealDocumentHeading(article.current, link.fragment);
+          }}
+        >
+          {children}
+        </a>
+      );
+    },
     img: ({ alt }) => (alt ? <span>{alt}</span> : null),
     p: ({ children, node }) => (
       <p>
@@ -127,7 +164,7 @@ function Content({
     );
   }
   return (
-    <article className={styles.paper}>
+    <article ref={article} className={styles.paper}>
       <Markdown source={source} components={components} />
     </article>
   );
@@ -305,7 +342,7 @@ export function DocumentDraftPreview({ draft, follow }: { draft: RepositoryDocum
     <section aria-label={ARTIFACT_COPY.workingDraft} className={styles.reader} ref={attach}>
       {draft.truncated && <p className="hint">{ARTIFACT_COPY.truncated}</p>}
       {/\.md$/i.test(draft.path) ? (
-        <Content source={snapshot.text} changes={snapshot.changes} />
+        <Content path={draft.path} source={snapshot.text} changes={snapshot.changes} />
       ) : (
         <Lines
           source={snapshot.text}
@@ -401,7 +438,12 @@ export function ArtifactPreview({
   if (data.format === AttachmentFormat.Docx)
     return (
       <div ref={content}>
-        <Content changes={changes} source={data.markdown} onPick={onPick} />
+        <Content
+          path={version.repository?.path ?? version.name}
+          changes={changes}
+          source={data.markdown}
+          onPick={onPick}
+        />
       </div>
     );
   return (
@@ -430,7 +472,7 @@ export function ArtifactPreview({
           onPick={onPick}
         />
       ) : (
-        <Content changes={changes} source={data.text} onPick={onPick} />
+        <Content path={version.repository?.path ?? version.name} changes={changes} source={data.text} onPick={onPick} />
       )}
     </div>
   );

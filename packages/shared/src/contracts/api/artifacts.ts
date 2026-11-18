@@ -57,10 +57,23 @@ export const artifactVersionSchema = z.object({
   createdAt: z.number(),
   lost: z.array(officeLossSchema),
   repository: z
-    .object({ path: z.string(), commit: z.string(), integratedDeliveryId: z.string().optional() })
+    .object({
+      path: z.string(),
+      commit: z.string(),
+      originalPath: z.string().optional(),
+      integratedDeliveryId: z.string().optional(),
+    })
     .optional(),
 });
 export type ArtifactVersion = z.infer<typeof artifactVersionSchema>;
+
+export function artifactDocumentKey(version: ArtifactVersion) {
+  return version.repository?.originalPath ?? version.repository?.path ?? version.name;
+}
+
+export function latestDocumentVersions(versions: ArtifactVersion[]) {
+  return new Map(versions.map((version) => [artifactDocumentKey(version), version]));
+}
 
 const lines = z
   .object({

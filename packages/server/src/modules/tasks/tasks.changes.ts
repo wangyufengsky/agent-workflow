@@ -18,6 +18,7 @@ import {
   isFrontendWorkflow,
   isRepositoryDocumentWorkflow,
   isTaskCodeReview,
+  latestDocumentVersions,
   NodeKind,
   NodeStatus,
   nodeAcceptanceSchema,
@@ -243,7 +244,9 @@ export function createTaskChanges(
     const workflow = workflows.get(task.workflowId);
     if ((!isArtifactWorkflow(workflow) && !isRepositoryDocumentWorkflow(workflow)) || task.status !== TaskStatus.Review)
       throw new AppError(ErrorCode.StateTransitionInvalid, 'The task is not waiting for artifact feedback');
-    const version = artifacts.visibleVersions(id).at(-1);
+    const version = Array.from(latestDocumentVersions(artifacts.visibleVersions(id)).values()).find(
+      (v) => v.id === versionId,
+    );
     if (version?.id !== versionId)
       throw new AppError(
         ErrorCode.StateTransitionInvalid,

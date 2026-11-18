@@ -200,8 +200,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     if (isFrontend(id) && !frontendVerified(nodes.listByTask(id)))
       throw new AppError(ErrorCode.StateTransitionInvalid, 'Finish frontend verification before delivery');
     const checklist = await requirements.deliveryCheck(id, request.acknowledgedRequirementsRevisionId);
-    const reviewedDocument = await documents.forDelivery(id, request.artifactVersionId);
-    await delivery.deliver(id, request, checklist, reviewedDocument);
+    const reviewedDocuments = await documents.forDelivery(id, request.artifactVersionId);
+    await delivery.deliver(id, request, checklist, reviewedDocuments);
     return detail(id);
   }
 

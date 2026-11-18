@@ -74,7 +74,9 @@ export function tasksOperations(tasks: TasksService) {
     implement(startAgentsMdTaskOp, (input) => tasks.createAgentsMdTask(input)),
     implement(previewConventionEvidenceOp, (input) => tasks.previewConventionEvidence(input)),
     implement(getTaskOp, ({ id }) => tasks.workbenchDetail(id)),
-    implement(getTaskDocumentDraftOp, async ({ id, nodeId }) => ({ draft: await tasks.documentDraft(id, nodeId) })),
+    implement(getTaskDocumentDraftOp, async ({ id, nodeId, path }) => ({
+      draft: await tasks.documentDraft(id, nodeId, path),
+    })),
     implement(getTaskArtifactOp, ({ id, versionId, sheet }) => tasks.artifacts.preview(id, versionId, sheet)),
     implement(reviseTaskArtifactOp, (input) => tasks.reviseArtifact(input)),
     implement(getRequirementsOp, ({ id }) => tasks.requirements(id)),

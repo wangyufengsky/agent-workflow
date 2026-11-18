@@ -201,9 +201,9 @@ type TaskDetailDTO = {
 };
 ```
 
-文档与表格、详细设计、需求拆解的任务详情通过 `artifact` 提供可预览版本及标注历史。仓库文档版本还记录 `repository.path` 和 `repository.commit`。代码审查通过 `codeReview` 提供总结和结构化报告，每条发现带验证后的文件路径与提交；历史文字报告的 `report` 为 null。预览用 `GET /tasks/:id/artifacts/:versionId?sheet=`，原件用同路径的 `/raw`，下轮修改用 `POST /tasks/:id/revise-artifact`（`versionId` 和 `notes`），见 [39 §8.4](39-office-files.md#84-文档与表格任务工作台)。
+文档与表格、详细设计、需求拆解的任务详情通过 `artifact` 提供可预览版本及标注历史。仓库文档版本按文件独立编号，记录 `repository.path` 与 `repository.commit`，重命名时用 `repository.originalPath` 关联历史。标注绑定所选文档的最新版本，交付使用任务整体的最新快照 ID 并核对每份文档。代码审查通过 `codeReview` 提供总结和结构化报告，每条发现带验证后的文件路径与提交；历史文字报告的 `report` 为 null。预览用 `GET /tasks/:id/artifacts/:versionId?sheet=`，原件用同路径的 `/raw`，下轮修改用 `POST /tasks/:id/revise-artifact`（`versionId` 和 `notes`），见 [39 §8.4](39-office-files.md#84-文档与表格任务工作台)。
 
-详细设计和需求拆解的文档预览在编写或修订步骤运行期间读取 `GET /tasks/:id/nodes/:nodeId/document-draft`。返回 `{ draft: null }` 或 `{ draft: { path, text, truncated } }`。草稿来自任务工作区中已写入的 Markdown 或纯文本，正式版本仍由步骤提交产生。
+详细设计和需求拆解的文档预览在编写或修订步骤运行期间读取 `GET /tasks/:id/nodes/:nodeId/document-draft`。返回 `{ draft: null }` 或 `{ draft: { path, text, truncated } }`。可选查询参数 `path` 定位到已改动的指定文件，省略时选最近编辑的文档。草稿来自任务工作区中已写入的 Markdown 或纯文本，正式版本仍由步骤提交产生。
 
 ### 5.3 交付
 

@@ -10,6 +10,7 @@ export function artifactAnchorLabel(anchor: ArtifactAnchor): string {
 }
 
 export const ARTIFACT_COPY = {
+  selectFile: '选择文档',
   workingDraft: '工作区草稿',
   panels: {
     activity: 'AI 活动',

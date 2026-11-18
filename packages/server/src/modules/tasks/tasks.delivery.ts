@@ -101,7 +101,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
     delivery: DeliveryDTO,
     worktree: Worktree,
     repoPath: string,
-    reviewedDocument: ArtifactVersion['repository'],
+    reviewedDocuments: NonNullable<ArtifactVersion['repository']>[] | undefined,
   ): Promise<void> {
     const strategy = delivery.strategy;
     if (!isLocalMerge(strategy)) throw new Error(`Strategy ${strategy} is not a local merge`);
@@ -115,7 +115,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
         strategy,
         message: withRequestedBy(`${task.title} (${task.key})`, await readConfiguredIdentity(repoPath)),
         identity: settings.get('git.commitIdentity'),
-        reviewedDocument,
+        reviewedDocuments,
       });
     } catch (err) {
       recordFailure(task.id, delivery, err);
@@ -149,7 +149,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
     worktree: Worktree,
     hosting: GitHostingProvider & { ref: HostingRef },
     pr: { title: string; body: string },
-    reviewedDocument: ArtifactVersion['repository'],
+    reviewedDocuments: NonNullable<ArtifactVersion['repository']>[] | undefined,
   ): Promise<void> {
     let url: string;
     let diff: { diffBase: string; diffHead: string };
@@ -161,7 +161,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
         targetBranch: delivery.targetBranch,
         authorization: hosting.gitAuthorization(),
         network: await deps.gitNetwork(),
-        reviewedDocument,
+        reviewedDocuments,
       });
       // After a revision from review comments the push updates the pull request already open (21 §5).
       const open = await hosting.findOpenPullRequest(worktree.branch, delivery.targetBranch);
@@ -188,7 +188,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
       taskId: string,
       request: Omit<DeliverRequest, 'id'>,
       requirements: RequirementsDeliverySummary | null,
-      reviewedDocument?: ArtifactVersion['repository'],
+      reviewedDocuments?: NonNullable<ArtifactVersion['repository']>[] | undefined,
     ): Promise<void> {
       const task = get(taskId);
       transition(taskMachine, task.status, TaskEvent.Deliver, TaskStatus.Merging);
@@ -247,10 +247,10 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
         move(task, TaskEvent.Deliver, TaskStatus.Merging);
         return started;
       });
-      if (hosting === undefined) await mergeTask(task, delivery, worktree, repoPath, reviewedDocument);
+      if (hosting === undefined) await mergeTask(task, delivery, worktree, repoPath, reviewedDocuments);
       else {
         const pr = request.pr ?? { title: task.title, body: task.result?.summary ?? '' };
-        await openPullRequest(task, delivery, worktree, hosting, pr, reviewedDocument);
+        await openPullRequest(task, delivery, worktree, hosting, pr, reviewedDocuments);
       }
     },
 

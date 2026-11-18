@@ -1,5 +1,7 @@
 import {
   GitTreeEntryType,
+  getTaskDocumentDraftOp,
+  isWritingRepositoryDocument,
   MCP_TOOL_PREFIX,
   McpToolName,
   type TaskDetailDTO,
@@ -8,6 +10,7 @@ import {
 } from '@aw/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { callOperation } from '../../api/client.ts';
 import { Button } from '../../components/button.tsx';
 import { revealInPane, sizeReadingPane } from '../../components/reveal-in-pane.ts';
 import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
@@ -87,15 +90,30 @@ function ReadObserver({
           e.kind === TranscriptEntryKind.ToolResult && e.data.callId === data.callId,
       )
     : undefined;
+  const writing = task.artifact && task.nodes.find(isWritingRepositoryDocument);
+  const published = !!path && !!task.artifact?.versions.some((v) => v.repository?.path === path);
+  const created = useQuery({
+    queryKey: ['task-read-document', task.id, writing?.id, path, data?.callId],
+    enabled:
+      !!writing &&
+      !!path &&
+      /\.(md|txt)$/i.test(path) &&
+      exists.data === false &&
+      !published &&
+      result?.data.status === 'completed',
+    queryFn: async () =>
+      Boolean((await callOperation(getTaskDocumentDraftOp, { id: task.id, nodeId: writing?.id ?? '', path })).draft),
+  });
+  const readable = exists.data || published || created.data;
   const activity = useMemo((): Activity | undefined => {
     if (!call || !data) return undefined;
     const value: Activity = { id, time: call.ts, seq: call.seq };
-    if (path && exists.data && result?.data.status === 'completed' && result.data.output) {
+    if (path && readable && result?.data.status === 'completed' && result.data.output) {
       const text = excerpt(data.tool, result.data.output);
       if (text && read) value.reading = { path, excerpt: text, location: read.location, line: read.line };
     }
     return value;
-  }, [call, data, exists.data, id, path, read, result]);
+  }, [call, data, readable, id, path, read, result]);
   useEffect(() => {
     if (activity) report(activity);
   }, [activity, report]);

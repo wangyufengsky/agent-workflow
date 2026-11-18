@@ -36,7 +36,7 @@ export type LocalMergeInput = {
   message: string;
   /** Setting `git.commitIdentity` (D227). */
   identity: CommitIdentity | null;
-  reviewedDocument?: ArtifactVersion['repository'];
+  reviewedDocuments?: NonNullable<ArtifactVersion['repository']>[] | undefined;
 };
 
 export type MergeOutcome =
@@ -238,17 +238,21 @@ export function mergeLocally(locks: RepoLocks, input: LocalMergeInput): Promise<
     (holder) => assertTargetClean(holder, input.targetBranch),
     async (dir) => {
       const diffBase = await head(dir);
-      const document = input.reviewedDocument;
-      if (document !== undefined) {
+      const documents = input.reviewedDocuments ?? [];
+      if (documents.length) {
         const branch = `refs/heads/${input.branch}`;
-        await assertReviewedDocument(input.repoPath, branch, document);
         const common = await mergeBase(input.repoPath, diffBase, branch);
-        // Even a clean textual merge would add unreviewed edits from the target. Integrate them on the task first.
-        if (
-          (await fileChangedBetween(input.repoPath, common, diffBase, document.path)) &&
-          (await fileChangedBetween(input.repoPath, document.commit, diffBase, document.path))
-        )
-          return { merged: false, conflictFiles: [document.path] };
+        const conflicts: string[] = [];
+        for (const document of documents) {
+          await assertReviewedDocument(input.repoPath, branch, document);
+          // Even a clean textual merge would add unreviewed edits from the target. Integrate them on the task first.
+          if (
+            (await fileChangedBetween(input.repoPath, common, diffBase, document.path)) &&
+            (await fileChangedBetween(input.repoPath, document.commit, diffBase, document.path))
+          )
+            conflicts.push(document.path);
+        }
+        if (conflicts.length) return { merged: false, conflictFiles: conflicts };
       }
       const outcome = await mergeIn(dir, input);
       return outcome.merged ? { ...outcome, diffBase } : outcome;

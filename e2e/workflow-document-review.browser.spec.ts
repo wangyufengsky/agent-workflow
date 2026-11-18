@@ -114,6 +114,87 @@ test('详细设计首版分段写入时即显示 Markdown 正文，追加可跟�
   }
 });
 
+test('中文目录在当前阅读框内跳到章节，不打开其他窗口', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const path = 'docs/design/guide.md';
+  const source = [
+    '[数据模型与表结构](#5-数据模型与表结构)',
+    ...Array.from({ length: 60 }, (_, i) => `段落 ${i}`),
+    '## 5. 数据模型与表结构',
+  ].join('\n\n');
+  await queueTurn(request, project, { title: '· 梳理现状' }, [submitResult('已梳理')]);
+  await queueTurn(request, project, { title: '· 编写详细设计' }, [
+    { type: 'edit', file: path, content: source },
+    submitResult('已完成'),
+  ]);
+  await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
+  await page.goto(await start(request, project.id, 'detailed_design', '生成有目录的文档'));
+  const viewer = page.getByRole('region', { name: '产物预览 v1' });
+  const link = viewer.getByRole('link', { name: '数据模型与表结构' });
+  await expect(link).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  const url = page.url();
+  await link.click();
+  await expect(viewer.getByRole('heading', { name: '5. 数据模型与表结构' })).toBeInViewport();
+  expect(page.url()).toBe(url);
+  expect(page.context().pages()).toHaveLength(1);
+});
+
+test('两份仓库文档随编辑切换，交付前后均可按路径独立选择', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const a = 'docs/design/guide.md';
+  const b = 'docs/api/guide.md';
+  await queueTurn(request, project, { title: '· 梳理现状' }, [submitResult('已梳理')]);
+  await queueTurn(request, project, { title: '· 编写详细设计' }, [
+    { type: 'edit', file: a, content: '# 系统设计\n\n[接口约定](../api/guide.md#接口约定)' },
+    { type: 'permission', permission: 'bash', patterns: ['node continue.mjs'] },
+    { type: 'edit', file: b, content: '# 接口指南\n\n## 接口约定' },
+    { type: 'permission', permission: 'bash', patterns: ['node finish.mjs'] },
+    { type: 'tool', tool: 'read', input: { filePath: a }, output: '<content>1: # 系统设计</content>' },
+    { type: 'permission', permission: 'bash', patterns: ['node reread.mjs'] },
+    { type: 'tool', tool: 'read', input: { filePath: b, offset: 3 }, output: '<content>3: ## 接口约定</content>' },
+    { type: 'permission', permission: 'bash', patterns: ['node publish.mjs'] },
+    submitResult('已完成两份文档'),
+  ]);
+  await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
+  const path = await start(request, project.id, 'detailed_design', '编写设计和接口指南');
+  await page.goto(path);
+  const workbench = page.getByTestId('artifact-workbench');
+  const draft = workbench.getByRole('region', { name: '工作区草稿' });
+  await expect(draft.getByRole('heading', { name: '系统设计' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  await advanceDocument(request, path);
+  await expect(draft.getByRole('heading', { name: '接口指南' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  await advanceDocument(request, path);
+  await page.getByRole('button', { name: '跟随 AI 阅读' }).click();
+  const reading = page.getByRole('region', { name: '项目文件阅读' });
+  await expect(reading).toContainText(a);
+  await advanceDocument(request, path);
+  await expect(reading).toContainText(b);
+  await expect(reading.locator('mark')).toContainText('3: ## 接口约定');
+  await advanceDocument(request, path);
+  const picker = workbench.getByRole('combobox', { name: '选择文档' });
+  await expect(picker).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  for (const [file, heading] of [
+    [a, '系统设计'],
+    [b, '接口指南'],
+  ] as const) {
+    await picker.selectOption({ label: file });
+    await expect(
+      workbench.getByRole('region', { name: '产物预览 v1' }).getByRole('heading', { name: heading }),
+    ).toBeVisible();
+  }
+  await picker.selectOption({ label: a });
+  await workbench.getByRole('link', { name: '接口约定' }).click();
+  await expect(workbench.getByRole('heading', { name: '接口约定' })).toBeFocused();
+  if (process.env.AW_WALKTHROUGH_DIR !== undefined)
+    await page.screenshot({ animations: 'disabled', path: join(WALKTHROUGH_DIR, 'document-switcher.png') });
+  await workbench.getByRole('button', { name: '验收并交付' }).click();
+  await page.getByRole('dialog', { name: '验收并交付' }).getByRole('button', { name: '合并到 main' }).click();
+  await expect(page.getByTestId('delivery-outcome')).toContainText('已合并到 main');
+  await page.reload();
+  await picker.selectOption({ label: a });
+  await expect(workbench.getByRole('heading', { name: '系统设计' })).toBeVisible();
+});
+
 for (const item of documents) {
   test(`${item.write}在工作台标注、对照并合并仓库文件`, async ({ page, request }) => {
     if (GIT_HEAVY_SPECS_SLOW) test.slow();

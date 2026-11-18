@@ -450,7 +450,7 @@ export const getTaskDocumentDraftOp = defineOperationContract({
   id: 'tasks.getDocumentDraft',
   title: 'op.tasks.getDocumentDraft',
   description: 'Preview the Markdown or text being edited by the current repository document step.',
-  input: byNode,
+  input: byNode.extend({ path: z.string().optional() }),
   output: z.object({ draft: repositoryDocumentDraftSchema.nullable() }),
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/tasks/:id/nodes/:nodeId/document-draft' },

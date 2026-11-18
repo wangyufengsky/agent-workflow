@@ -46,6 +46,63 @@ it('草稿只读取工作区已更改的文本文档，其他步骤和较新的�
   expect(detail.artifact?.versions).toHaveLength(0);
 });
 
+it('对非默认文档的标注只修订该文件，交付时同时核对其他文档', async () => {
+  const a = 'api.md';
+  const b = 'design.md';
+  const { project, repo } = await addProject(t, { files: { [a]: '旧接口', [b]: '旧设计' } });
+  const task = await createTask(t, { projectId: project.id, workflow: 'detailed_design', start: false });
+  const directory = `/${task.key}`;
+  t.fake.enqueue(script().callTool('submit_result', { summary: '已梳理' }), { title: '· 梳理现状', directory });
+  t.fake.enqueue(script().edit(a, '接口一版').edit(b, '设计一版').callTool('submit_result', { summary: '已编写' }), {
+    title: '· 编写详细设计',
+    directory,
+  });
+  const accept = () =>
+    t.fake.enqueue(script().callTool('submit_review', { verdict: 'pass', summary: '通过' }), {
+      agent: 'aw-reviewer',
+      directory,
+    });
+  accept();
+  const ready = taskReaches(t, TaskStatus.Review);
+  await t.call(startTaskOp, { id: task.id });
+  await ready;
+  const versions = async () => (await t.call(getTaskOp, { id: task.id })).body.artifact?.versions ?? [];
+  const initial = await versions();
+  expect(initial.map((v) => [v.name, v.number])).toEqual([
+    [a, 1],
+    [b, 1],
+  ]);
+  const first = initial[0];
+  if (!first) throw new Error('Missing document');
+  t.fake.enqueue(script().edit(a, '接口二版').callTool('submit_result', { summary: '已修改接口' }), {
+    title: '· 产物修改 1',
+    directory,
+  });
+  accept();
+  const revised = taskReaches(t, TaskStatus.Review);
+  const change = await t.call(reviseTaskArtifactOp, {
+    id: task.id,
+    versionId: first.id,
+    notes: [{ anchor: { kind: 'whole' }, quote: '', note: '修订接口' }],
+  });
+  expect(change.status).toBe(200);
+  await revised;
+  const current = await versions();
+  expect(current.map((v) => [v.name, v.number])).toEqual([
+    [a, 1],
+    [b, 1],
+    [a, 2],
+  ]);
+  await writeFile(join(repo.path, b), '目标分支上的设计');
+  await repo.git('commit', '-am', 'change other document');
+  const result = await t.call(deliverTaskOp, {
+    id: task.id,
+    strategy: 'squash',
+    artifactVersionId: current.at(-1)?.id,
+  });
+  expect(result.body.lastDelivery).toMatchObject({ status: 'conflict', conflictFiles: [b] });
+});
+
 it('目标分支更新同一文档后先重新审阅，已合并任务仍可读版本快照', async () => {
   const path = 'orders.md';
   const { project, repo } = await addProject(t, { files: { [path]: '# 订单\n\n权限：旧规则\n\n超时：旧配置\n' } });

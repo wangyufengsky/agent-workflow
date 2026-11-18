@@ -8,12 +8,14 @@ import {
   type ArtifactVersion,
   AttemptKind,
   AttemptStatus,
+  artifactDocumentKey,
   artifactNameSchema,
   DeliveryStatus,
   DiffFileStatus,
   ErrorCode,
   isRepositoryDocumentWorkflow,
   isWritingRepositoryDocument,
+  latestDocumentVersions,
   NodeKind,
   NodeStatus,
   REPOSITORY_DOCUMENT_NODE_KEY,
@@ -61,9 +63,8 @@ export function createTaskDocuments(
   state: TaskState,
   artifacts: ReturnType<typeof createTaskArtifacts>,
 ) {
-  async function captureManualIntegration(taskId: string, repoPath: string) {
+  async function captureManualIntegration(taskId: string, repoPath: string, latest: ArtifactVersion) {
     const task = state.get(taskId);
-    const latest = artifacts.visibleVersions(taskId).at(-1);
     const previous = latest?.repository;
     const delivery = deliveries.latest(taskId);
     const worktree = worktrees.findByTask(taskId);
@@ -94,7 +95,7 @@ export function createTaskDocuments(
       latest.nodeId,
       latest.attemptId,
       {
-        path: previous.path,
+        ...previous,
         commit,
         integratedDeliveryId: delivery.id,
       },
@@ -108,30 +109,44 @@ export function createTaskDocuments(
     node: Node,
     base: string,
     commit: string,
-    primary: string | undefined,
-  ): Promise<string | undefined> {
+    versions: ArtifactVersion[],
+    missingPathsOnly = false,
+  ): Promise<boolean> {
     const attempt = attempts
       .listByNode(node.id)
       .findLast(({ kind, status }) => kind === AttemptKind.Execute && status === AttemptStatus.Succeeded);
-    if (attempt === undefined) return;
-    const paths = (await diffCommits(repoPath, base, commit)).filter(
-      ({ path, oldPath, status, additions }) =>
-        status !== DiffFileStatus.Deleted &&
-        additions !== null &&
-        documentName(path) &&
-        (primary === undefined || primary === path || primary === oldPath),
-    );
-    const declared = new Set(node.result?.changes?.map(({ path }) => path));
-    const named = paths.filter(({ path }) => declared.has(path));
-    const candidate = paths.length === 1 ? paths[0] : named.length === 1 ? named[0] : undefined;
-    if (candidate === undefined) return;
-    const file = await readFile(repoPath, commit, candidate.path);
-    if (!('content' in file)) return;
-    await artifacts.saveRepositoryVersion(taskId, node.id, attempt.id, { path: candidate.path, commit }, file.content);
-    return candidate.path;
+    if (attempt === undefined) return false;
+    const paths = await diffCommits(repoPath, base, commit);
+    for (const file of paths) {
+      if (file.status === DiffFileStatus.Deleted || file.additions === null || !documentName(file.path)) continue;
+      if (
+        versions.some((v) => v.repository?.path === file.path && (missingPathsOnly || v.repository.commit === commit))
+      )
+        continue;
+      const content = await readFile(repoPath, commit, file.path);
+      if (!('content' in content)) continue;
+      const previous = versions.findLast((v) => v.repository?.path === (file.oldPath ?? file.path));
+      const originalPath = previous && artifactDocumentKey(previous);
+      await artifacts.saveRepositoryVersion(
+        taskId,
+        node.id,
+        attempt.id,
+        {
+          path: file.path,
+          commit,
+          ...(originalPath && originalPath !== file.path ? { originalPath } : {}),
+        },
+        content.content,
+      );
+    }
+    return true;
   }
 
-  async function draft(taskId: string, nodeId: string): Promise<RepositoryDocumentDraft | null> {
+  async function draft(
+    taskId: string,
+    nodeId: string,
+    requestedPath?: string,
+  ): Promise<RepositoryDocumentDraft | null> {
     const task = state.get(taskId);
     const worktree = worktrees.findByTask(taskId);
     if (
@@ -148,10 +163,9 @@ export function createTaskDocuments(
       runGit(['ls-files', '--others', '--exclude-standard', '-z', ...patterns], { cwd, verbatim: true }),
     ]);
     const paths = new Set((tracked.stdout + untracked.stdout).split('\0').filter(documentName));
-    const primary = artifacts.visibleVersions(taskId).at(-1)?.repository?.path;
     const candidates: { path: string; stat: Stats }[] = [];
     for (const path of paths) {
-      if (primary && path !== primary) continue;
+      if (requestedPath && path !== requestedPath) continue;
       try {
         const stat = await lstat(join(cwd, path));
         if (stat.isFile()) candidates.push({ path, stat });
@@ -171,14 +185,14 @@ export function createTaskDocuments(
     return null;
   }
 
+  // 旧版每个节点只保存一份文档，首次查看时按提交补齐其余快照。
+  const scanned = new Map<string, string>();
   async function prepare(taskId: string): Promise<void> {
     const task = state.get(taskId);
     if (!isRepositoryDocumentWorkflow(workflows.get(task.workflowId))) return;
     const { repoPath } = projects.getRecord(task.projectId);
     await locks.run(repoPath, async () => {
-      const versions = artifacts.visibleVersions(taskId);
-      const captured = new Set(versions.map(({ nodeId }) => nodeId));
-      let primary = versions.at(-1)?.repository?.path;
+      let versions = artifacts.visibleVersions(taskId);
       const documentNodes = nodes
         .listByTask(taskId)
         .filter(
@@ -186,15 +200,20 @@ export function createTaskDocuments(
             node.status === NodeStatus.Done &&
             (node.key === REPOSITORY_DOCUMENT_NODE_KEY || node.kind === NodeKind.Revise),
         );
+      let missingCommit = false;
       for (const node of documentNodes) {
-        if (captured.has(node.id) || node.commitSha === null) continue;
+        if (node.commitSha === null || scanned.get(node.id) === node.commitSha) continue;
         const commit = node.commitSha;
-        if (!(await commitsExist(repoPath, [commit]))) continue;
+        if (!(await commitsExist(repoPath, [commit]))) {
+          missingCommit = true;
+          continue;
+        }
         const parent = (await runGit(['rev-parse', `${commit}^1`], { cwd: repoPath })).stdout;
-        primary = (await captureDelta(repoPath, taskId, node, parent, commit, primary)) ?? primary;
+        if (await captureDelta(repoPath, taskId, node, parent, commit, versions)) scanned.set(node.id, commit);
+        versions = artifacts.visibleVersions(taskId);
       }
       // A squash or rebase can leave only the recorded delivery range available for an older completed task.
-      if (primary === undefined && task.status === TaskStatus.Completed) {
+      if ((versions.length === 0 || missingCommit) && task.status === TaskStatus.Completed) {
         const delivery = deliveries.latest(taskId);
         const node = documentNodes.at(-1);
         if (
@@ -204,27 +223,30 @@ export function createTaskDocuments(
           delivery.diffHead !== null &&
           (await commitsExist(repoPath, [delivery.diffBase, delivery.diffHead]))
         ) {
-          await captureDelta(repoPath, taskId, node, delivery.diffBase, delivery.diffHead, undefined);
+          await captureDelta(repoPath, taskId, node, delivery.diffBase, delivery.diffHead, versions, true);
         }
       }
-      await captureManualIntegration(taskId, repoPath);
+      if (deliveries.latest(taskId)?.status === DeliveryStatus.Conflict)
+        for (const latest of latestDocumentVersions(versions).values())
+          await captureManualIntegration(taskId, repoPath, latest);
     });
   }
 
-  async function forDelivery(taskId: string, expectedId: string | undefined): Promise<ArtifactVersion['repository']> {
+  async function forDelivery(taskId: string, expectedId: string | undefined) {
     const task = state.get(taskId);
     if (!isRepositoryDocumentWorkflow(workflows.get(task.workflowId)) || task.status !== TaskStatus.Review) return;
     await prepare(taskId);
-    const latest = artifacts.visibleVersions(taskId).at(-1);
+    const versions = artifacts.visibleVersions(taskId);
+    const latest = versions.at(-1);
     if (expectedId !== undefined && expectedId !== latest?.id) {
       throw new AppError(ErrorCode.StateTransitionInvalid, 'The document version changed. Review the latest version.');
     }
-    return latest?.repository;
+    return Array.from(latestDocumentVersions(versions).values()).flatMap((v) => (v.repository ? [v.repository] : []));
   }
 
   async function assertEditableVersion(input: ArtifactRevision) {
-    const document = artifacts.visibleVersions(input.id).at(-1);
-    if (document?.id !== input.versionId || document.repository === undefined) return;
+    const document = artifacts.visibleVersions(input.id).find((v) => v.id === input.versionId);
+    if (document?.repository === undefined) return;
     const worktree = worktrees.findByTask(input.id);
     if (worktree?.status !== WorktreeStatus.Ready) return;
     const { commit, path } = document.repository;

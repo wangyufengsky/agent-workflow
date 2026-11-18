@@ -4,9 +4,11 @@ import {
   ARTIFACT_NOTES_MAX,
   type ArtifactNote,
   type ArtifactVersion,
+  artifactDocumentKey,
   DeliveryStrategy,
   getTaskDocumentDraftOp,
   isWritingRepositoryDocument,
+  latestDocumentVersions,
   type TaskDetailDTO,
   TaskStatus,
   WorkflowDeliverable,
@@ -33,6 +35,7 @@ import { UnmetNotice, useDeliveryAcknowledgement } from '../requirements/unmet-n
 import { useDeliver, useReviseTaskArtifact } from '../tasks/tasks.queries.ts';
 import { ArtifactPreview, type ArtifactSelection, DocumentDraftPreview } from './artifact-preview.tsx';
 import styles from './artifact-workbench.module.css';
+import { DocumentNavigation } from './document-links.ts';
 
 type DraftNote = ArtifactNote & { id: string };
 
@@ -63,28 +66,37 @@ export function ArtifactWorkbench({
   const [chosenPanel, setPanel] = useState<Panel>();
   const repositoryDocument = task.workflow.deliverable === WorkflowDeliverable.CodeChanges;
   const writing = repositoryDocument ? task.nodes.find(isWritingRepositoryDocument) : undefined;
+  const documents = latestDocumentVersions(artifact.versions);
+  const pinned = artifact.versions.find((v) => v.id === selectedVersion);
+  const [target, setTarget] = useState<{ path: string; fragment: string }>();
+  const [draftPin, setDraftPin] = useState<{ nodeId: string; path: string }>();
+  const pinnedDraft = draftPin && draftPin.nodeId === writing?.id ? draftPin.path : undefined;
   const document = useQuery({
-    queryKey: ['task-document-draft', task.id, writing?.id],
+    queryKey: ['task-document-draft', task.id, writing?.id, pinnedDraft],
+    placeholderData: (previous, query) => (query?.queryKey[2] === writing?.id ? previous : undefined),
     enabled: active && writing !== undefined && selectedVersion === undefined,
-    queryFn: () => callOperation(getTaskDocumentDraftOp, { id: task.id, nodeId: writing?.id ?? '' }),
+    queryFn: () => callOperation(getTaskDocumentDraftOp, { id: task.id, nodeId: writing?.id ?? '', path: pinnedDraft }),
     refetchInterval: active && task.status === TaskStatus.Running && writing !== undefined ? 2000 : false,
   });
   const workingDraft = writing && selectedVersion === undefined ? document.data?.draft : undefined;
-  const [followDraft, setFollowDraft] = useState(true);
+  const followDraft = pinnedDraft === undefined;
   const panel =
     chosenPanel === undefined ? (task.openInbox.length > 0 || workingDraft ? 'activity' : null) : chosenPanel;
   const [draft, setDraft] = useState<{ versionId: string; notes: DraftNote[] }>();
   const [selection, setSelection] = useState<ArtifactSelection>();
   const [note, setNote] = useState('');
   const [compare, setCompare] = useState(false);
-  const latest = artifact.versions.at(-1);
+  const newest = artifact.versions.at(-1);
+  const selectedFile = pinned ? artifactDocumentKey(pinned) : newest && artifactDocumentKey(newest);
+  const versions = artifact.versions.filter((v) => artifactDocumentKey(v) === selectedFile);
+  const latest = versions.at(-1);
   const version = workingDraft
     ? undefined
     : selectedVersion === undefined
       ? latest
       : artifact.versions.find(({ id }) => id === selectedVersion);
   const missingVersion = selectedVersion !== undefined && version === undefined;
-  const previous = version === undefined ? undefined : artifact.versions[artifact.versions.indexOf(version) - 1];
+  const previous = version === undefined ? undefined : versions[versions.indexOf(version) - 1];
   const notes = draft !== undefined && draft.versionId === version?.id ? draft.notes : [];
   const review = task.status === TaskStatus.Review;
   const canNote = review && version !== undefined && version.id === latest?.id;
@@ -136,7 +148,8 @@ export function ArtifactWorkbench({
   }
 
   function choose(id: string) {
-    onSelectVersion(id === '' || (!writing && id === latest?.id) ? undefined : id);
+    setTarget(undefined);
+    onSelectVersion(id === '' || (!writing && id === newest?.id) ? undefined : id);
     setSelection(undefined);
     setNote('');
     setCompare(false);
@@ -144,14 +157,37 @@ export function ArtifactWorkbench({
 
   const pendingNotes = notes.length > 0 || note.trim() !== '' || revision.isPending;
   const sidebar = nodeDetails !== undefined || (!building && panel !== null);
-  return (
+  const workbench = (
     <section className={layout.workbench} data-testid="artifact-workbench" aria-label={ARTIFACT_COPY.workbench}>
       <header className={layout.toolbar}>
         <div className={styles.file}>
           <div className={styles.documentTitle}>
-            <strong>{workingDraft ? ARTIFACT_COPY.workingDraft : (version?.name ?? ARTIFACT_COPY.file)}</strong>
+            {documents.size > 1 && (
+              <label className={styles.documentTitle}>
+                <span className="hint">{ARTIFACT_COPY.selectFile}</span>
+                <select
+                  className="input"
+                  aria-label={ARTIFACT_COPY.selectFile}
+                  value={workingDraft ? '' : selectedFile}
+                  onChange={(event) => {
+                    const target = documents.get(event.currentTarget.value);
+                    choose(target?.id ?? '');
+                  }}
+                >
+                  {writing && <option value="">{ARTIFACT_COPY.workingDraft}</option>}
+                  {Array.from(documents, ([key, file]) => (
+                    <option key={key} value={key}>
+                      {file.repository?.path ?? file.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {(workingDraft || documents.size < 2) && (
+              <strong>{workingDraft ? ARTIFACT_COPY.workingDraft : (version?.name ?? ARTIFACT_COPY.file)}</strong>
+            )}
             {workingDraft && <span className="mono hint">{workingDraft.path}</span>}
-            {version?.repository !== undefined && (
+            {documents.size < 2 && version?.repository !== undefined && (
               <span className="mono hint" title={version.repository.commit}>
                 {version.repository.path}
               </span>
@@ -165,7 +201,7 @@ export function ArtifactWorkbench({
               onChange={(event) => choose(event.currentTarget.value)}
             >
               {writing && <option value="">{ARTIFACT_COPY.workingDraft}</option>}
-              {[...artifact.versions].reverse().map((file) => (
+              {[...versions].reverse().map((file) => (
                 <option key={file.id} value={file.id}>
                   v{file.number}
                   {file.id === latest?.id ? ARTIFACT_COPY.latest : ''}
@@ -175,7 +211,14 @@ export function ArtifactWorkbench({
           )}
         </div>
         {workingDraft && (
-          <Button size="sm" variant="ghost" aria-pressed={followDraft} onClick={() => setFollowDraft(!followDraft)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-pressed={followDraft}
+            onClick={() =>
+              setDraftPin(followDraft && writing ? { nodeId: writing.id, path: workingDraft.path } : undefined)
+            }
+          >
             {followDraft ? R.followEdit : R.resumeEdit}
           </Button>
         )}
@@ -233,7 +276,7 @@ export function ArtifactWorkbench({
           </Link>
         )}
         {review && renderDelivery !== undefined && version !== undefined
-          ? renderDelivery(version, !canNote || pendingNotes)
+          ? renderDelivery(newest ?? version, !canNote || pendingNotes)
           : review &&
             renderDelivery === undefined && (
               <Button
@@ -338,13 +381,15 @@ export function ArtifactWorkbench({
                   </Button>
                 )}
                 <ol className={styles.history}>
-                  {[...artifact.versions].reverse().map((file) => (
+                  {[...versions].reverse().map((file) => (
                     <li key={file.id}>
                       <Button size="sm" aria-pressed={file.id === version.id} onClick={() => choose(file.id)}>
                         v{file.number} · {formatDateTime(file.createdAt)}
                       </Button>
                       {artifact.rounds
-                        .filter((round) => round.nodeId === file.nodeId)
+                        .filter(
+                          (round) => round.nodeId === file.nodeId && versions.some((v) => v.id === round.versionId),
+                        )
                         .flatMap(({ notes }) =>
                           notes.map((item) => (
                             <div key={item.id} className={layout.note}>
@@ -437,5 +482,22 @@ export function ArtifactWorkbench({
       </div>
       {(review || task.status === TaskStatus.Completed) && <RequirementsSection task={task} />}
     </section>
+  );
+  return (
+    <DocumentNavigation.Provider
+      value={{
+        paths: new Set(Array.from(documents.values(), (v) => v.repository?.path ?? v.name)),
+        open: (path, fragment) => {
+          const file = Array.from(documents.values()).find((v) => (v.repository?.path ?? v.name) === path);
+          if (file) {
+            choose(file.id);
+            setTarget({ path, fragment });
+          }
+        },
+        target,
+      }}
+    >
+      {workbench}
+    </DocumentNavigation.Provider>
   );
 }
