@@ -4,10 +4,10 @@ import {
   BROWSER_TEST_WORKFLOW_KEY,
   type BrowserTestScope,
   browserTestScopeSchema,
+  canRunInBatchOrSchedule,
   InitiativeTemplateKind,
   type ProjectDTO,
   WorkflowKind,
-  WorkflowPlanning,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
@@ -165,7 +165,7 @@ export function HomeComposer({
     onProjectChange(id);
   };
   const shown = workflows.data?.filter((w) => task.pro || w.kind === WorkflowKind.Builtin);
-  const workflow = shown?.find((w) => w.key === workflowKey);
+  const workflow = workflows.data?.find((w) => w.key === workflowKey);
   const template = templates.data?.find((t) => t.key === templateKey);
   // An initiative is started from a template or by the AI's breakdown.
   const initiativeMode = template !== undefined || breakdown;
@@ -209,7 +209,15 @@ export function HomeComposer({
   const send = () => {
     if (workflow !== undefined) task.start();
     else if (initiativeMode) initiative.start();
-    else if (knowledgeDraft === undefined && !empty && !busy && !ask.isPending && !files.blocked) {
+    else if (
+      workflowKey === undefined &&
+      templateKey === undefined &&
+      knowledgeDraft === undefined &&
+      !empty &&
+      !busy &&
+      !ask.isPending &&
+      !files.blocked
+    ) {
       ask.ask(
         text.trim(),
         conversation,
@@ -515,7 +523,7 @@ export function HomeComposer({
                 </label>
               )}
               {/* Fixed workflows can run on several targets at once (20 §2) and on a schedule (22 §7). */}
-              {!browserTesting && workflow.planning === WorkflowPlanning.Fixed && knowledgeDraft === undefined && (
+              {canRunInBatchOrSchedule(workflow) && knowledgeDraft === undefined && (
                 <>
                   <Link
                     to={ROUTES.batchNew}

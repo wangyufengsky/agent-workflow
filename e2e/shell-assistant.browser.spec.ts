@@ -93,6 +93,20 @@ test('J11 对助手说开始任务 → 确认卡片 → 任务运行', async ({ 
   await expect(panel).toBeVisible();
 });
 
+test('助手只预填需求也进入可提交的任务表单', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  await queueAssistantTurn(request, [
+    appTool('open_form', { form: 'tasks.create', values: { projectId: project.id, requirement: '补上分页入口' } }),
+    { type: 'text', text: '请核对需求。' },
+  ]);
+  await page.goto(`/?projectId=${project.id}`);
+  const input = page.getByRole('textbox', { name: '告诉助手，或开始任务' });
+  await input.fill('准备任务');
+  await input.press('ControlOrMeta+Enter');
+  await expect(page.getByRole('textbox', { name: '需求' })).toHaveValue('补上分页入口');
+  await expect(page.getByRole('button', { name: /^开始 / })).toBeEnabled();
+});
+
 test('助手预填浏览器测试地址和写入范围，由用户确认', async ({ page, request }) => {
   const project = await createProject(request, null);
   const workflows: { items: { id: string; key: string }[] } = await (

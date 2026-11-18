@@ -1,6 +1,6 @@
 import type { InitiativeTemplateDTO, WorkflowSummaryDTO } from '@aw/shared';
 import { useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { ATTACHMENTS_COPY } from '../../copy/attachments.ts';
 import { INITIATIVES_COPY as C } from '../../copy/initiatives.ts';
@@ -48,6 +48,7 @@ export function useStartInitiative({
   const [review, setReview] = useState(false);
   const create = useCreateInitiative();
   const navigate = useNavigate();
+  const submitting = useRef(false);
   const noWorkflow = breakdown && allowedWorkflows?.length === 0;
   const canStart =
     (templateKey !== undefined || breakdown) &&
@@ -65,7 +66,8 @@ export function useStartInitiative({
           ? C.allowedWorkflowsNone
           : undefined;
   const start = () => {
-    if (!canStart) return;
+    if (!canStart || submitting.current) return;
+    submitting.current = true;
     create.mutate(
       {
         projectId,
@@ -77,6 +79,9 @@ export function useStartInitiative({
         ...(attachmentIds.length === 0 ? {} : { attachmentIds: [...attachmentIds] }),
       },
       {
+        onSettled: () => {
+          submitting.current = false;
+        },
         onSuccess: (initiative) => {
           onStarted();
           void navigate({ to: ROUTES.initiative, params: { initiativeId: initiative.id } });

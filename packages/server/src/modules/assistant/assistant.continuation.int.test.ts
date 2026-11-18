@@ -1,4 +1,9 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { setImmediate as nextTurn } from 'node:timers/promises';
 import {
+  ASSISTANT_CONVERSATIONS_DIR,
+  ASSISTANT_DIR,
   ATTACHMENT_NAME_HEADER,
   createAssistantContinuationOp,
   createConversationOp,
@@ -11,6 +16,7 @@ import {
   OPENCODE_ASSISTANT_AGENT,
   ServerEventType,
   sendAssistantMessageOp,
+  TRANSCRIPT_PAGE_SIZE,
 } from '@aw/shared';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
@@ -32,6 +38,32 @@ async function say(id: string, text: string) {
   await t.call(sendAssistantMessageOp, { id, text, context: { page: 'home', params: {} } });
   await idle;
 }
+
+it('续接多页历史时后端仍能处理其他事件，重复请求只生成同一个交接', async () => {
+  const source = (await t.call(createConversationOp, {})).body;
+  const directory = join(t.dataDir, ASSISTANT_DIR, ASSISTANT_CONVERSATIONS_DIR);
+  await mkdir(directory, { recursive: true });
+  const file = join(directory, `${source.id}.jsonl`);
+  const length = TRANSCRIPT_PAGE_SIZE * 3 + 1;
+  const lines = Array.from({ length }, (_, i) =>
+    JSON.stringify({
+      seq: i + 1,
+      ts: 1,
+      kind: 'user_message',
+      data: { text: i === length - 1 ? '最后一条需求' : '历史消息' },
+    }),
+  );
+  await writeFile(file, lines.join('\n') + '\n');
+  const request = { id: source.id, requestId: crypto.randomUUID(), attachmentIds: [] };
+  const turn = nextTurn('event');
+  const child = Promise.resolve(t.app.services.assistant.continueConversation(request));
+  expect(await Promise.race([turn, child.then(() => 'finished')])).toBe('event');
+  const duplicate = await t.app.services.assistant.continueConversation(request);
+  expect(duplicate.id).toBe((await child).id);
+  expect(duplicate.continuation?.cutoffSeq).toBe(length);
+  await say(duplicate.id, '继续');
+  expect(t.fake.prompts.at(-1)?.text).toContain('最后一条需求');
+});
 
 it('续接隔离模型会话、固定历史范围，并在来源删除后保留交接', async () => {
   const { project } = await addProject(t);

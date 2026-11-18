@@ -1,11 +1,10 @@
 import {
   BATCH_TARGET_PLACEHOLDER,
   BATCH_TARGETS_MAX,
-  BROWSER_TEST_WORKFLOW_KEY,
+  canRunInBatchOrSchedule,
   renderBatchRequirement,
   UiMode,
   WorkflowKind,
-  WorkflowPlanning,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, useNavigate } from '@tanstack/react-router';
@@ -15,6 +14,7 @@ import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { BATCH_DEFAULT_TEMPLATE, BATCHES_COPY as C } from '../../copy/batches.ts';
+import { COMMON_COPY } from '../../copy/common.ts';
 import { projectsQuery } from '../projects/projects.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { workflowsQuery } from '../tasks/tasks.queries.ts';
@@ -43,12 +43,7 @@ export function NewBatchPage() {
   const pro = useSettings()['ui.mode'] === UiMode.Pro;
   const projects = useQuery(projectsQuery).data ?? [];
   const workflows = useQuery(workflowsQuery);
-  const fixed = workflows.data?.filter(
-    (w) =>
-      w.key !== BROWSER_TEST_WORKFLOW_KEY &&
-      w.planning === WorkflowPlanning.Fixed &&
-      (pro || w.kind === WorkflowKind.Builtin),
-  );
+  const fixed = workflows.data?.filter((w) => canRunInBatchOrSchedule(w) && (pro || w.kind === WorkflowKind.Builtin));
   const [projectId, setProjectId] = useState(
     projects.some((p) => p.id === search.projectId) ? search.projectId : projects[0]?.id,
   );
@@ -59,7 +54,11 @@ export function NewBatchPage() {
 
   const project = projects.find((p) => p.id === projectId);
   const workflow =
-    fixed?.find((w) => w.id === workflowId) ?? fixed?.find((w) => w.key === search.workflow) ?? fixed?.[0];
+    workflowId === undefined
+      ? search.workflow === undefined
+        ? fixed?.[0]
+        : fixed?.find((w) => w.key === search.workflow)
+      : fixed?.find((w) => w.id === workflowId);
   // The workflow's default template until the user edits it.
   const template =
     edited ?? (workflow === undefined ? '' : (BATCH_DEFAULT_TEMPLATE[workflow.key] ?? BATCH_TARGET_PLACEHOLDER));
@@ -125,6 +124,11 @@ export function NewBatchPage() {
                   setEdited(undefined);
                 }}
               >
+                {workflow === undefined && (
+                  <option value="" disabled>
+                    {COMMON_COPY.chooseWorkflow}
+                  </option>
+                )}
                 {fixed?.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.name}

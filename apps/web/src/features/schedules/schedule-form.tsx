@@ -1,15 +1,9 @@
-import {
-  BROWSER_TEST_WORKFLOW_KEY,
-  type ProjectDTO,
-  type ScheduleDetailDTO,
-  UiMode,
-  WorkflowKind,
-  WorkflowPlanning,
-} from '@aw/shared';
+import { canRunInBatchOrSchedule, type ProjectDTO, type ScheduleDetailDTO, UiMode, WorkflowKind } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { COMMON_COPY } from '../../copy/common.ts';
 import { SCHEDULES_COPY as C, SCHEDULE_DEFAULT_REQUIREMENT } from '../../copy/schedules.ts';
 import { gitBranchesQuery } from '../git/git.queries.ts';
 import { useSettings } from '../settings/settings.queries.ts';
@@ -84,10 +78,7 @@ export function ScheduleForm({
   const pro = useSettings()['ui.mode'] === UiMode.Pro;
   const workflows = useQuery(workflowsQuery);
   const fixed = workflows.data?.filter(
-    (w) =>
-      w.key !== BROWSER_TEST_WORKFLOW_KEY &&
-      w.planning === WorkflowPlanning.Fixed &&
-      (pro || w.kind === WorkflowKind.Builtin || w.key === initial?.workflow.key),
+    (w) => canRunInBatchOrSchedule(w) && (pro || w.kind === WorkflowKind.Builtin || w.key === initial?.workflow.key),
   );
   const [projectId, setProjectId] = useState(
     initial?.project.id ?? (projects.some((p) => p.id === initialProjectId) ? initialProjectId : projects[0]?.id),
@@ -97,7 +88,7 @@ export function ScheduleForm({
   const [draft, setDraft] = useState(initial === undefined ? DEFAULT_FREQUENCY : draftOf(initial.frequency));
   const [baseBranch, setBaseBranch] = useState(initial?.baseBranch ?? null);
 
-  const workflow = fixed?.find((w) => w.key === workflowKey) ?? fixed?.[0];
+  const workflow = workflowKey === undefined ? fixed?.[0] : fixed?.find((w) => w.key === workflowKey);
   // The workflow's default requirement until the user edits it.
   const requirement = edited ?? (workflow === undefined ? '' : (SCHEDULE_DEFAULT_REQUIREMENT[workflow.key] ?? ''));
   const frequency = frequencyOf(draft);
@@ -149,6 +140,11 @@ export function ScheduleForm({
                 if (initial === undefined) setEdited(undefined);
               }}
             >
+              {workflow === undefined && (
+                <option value="" disabled>
+                  {COMMON_COPY.chooseWorkflow}
+                </option>
+              )}
               {fixed?.map((w) => (
                 <option key={w.key} value={w.key}>
                   {w.name}

@@ -25,6 +25,7 @@ export const formatBytes = (bytes: number) =>
 
 export const COMMON_COPY = {
   loading: '正在加载…',
+  chooseWorkflow: '请选择流程',
   retry: '重试',
   loadMore: '加载更多',
   cancel: '取消',
