@@ -6,6 +6,7 @@ import {
   type TaskDetailDTO,
   TaskStatus,
   UiMode,
+  VERSION_REVIEW_WORKFLOW_KEY,
   WorkflowDeliverable,
   WorkflowPlanning,
   WorktreeStatus,
@@ -23,6 +24,7 @@ import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
 import { BROWSER_CASE_COPY } from '../../copy/browser-cases.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
+import { TASK_CODE_REVIEW_COPY } from '../../copy/task-code-review.ts';
 import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 import { BROWSER_TEST_COPY, TASK_COPY as C } from '../../copy/tasks.ts';
 import { ArtifactWorkbench } from '../artifacts/artifact-workbench.tsx';
@@ -50,6 +52,7 @@ import { TaskCodeReviewWorkbench } from './task-code-review.tsx';
 import { TaskHeader } from './task-header.tsx';
 import styles from './task-page.module.css';
 import { TaskPlanEditor } from './task-plan-editor.tsx';
+import { TaskProposal } from './task-proposal.tsx';
 import { TaskReadFollow } from './task-read-follow.tsx';
 import { TaskSide } from './task-side.tsx';
 
@@ -240,6 +243,7 @@ export function TaskPage() {
   const codeReview = task.data.codeReview;
   const reviewOpen =
     codeReview !== undefined && task.data.status !== TaskStatus.Draft && task.data.status !== TaskStatus.PlanReview;
+  const proposal = task.data.proposal;
   const artifactOpen =
     artifact !== undefined && task.data.status !== TaskStatus.Draft && task.data.status !== TaskStatus.PlanReview;
   const nodeDetails =
@@ -277,7 +281,9 @@ export function TaskPage() {
     (status) => status === task.data.status,
   );
   const hasViews =
-    ((!needsPlan && (workbench || artifactOpen || code)) || browserTest || configuredPreview) && !reviewOpen;
+    (!needsPlan && (workbench || artifactOpen || code || reviewOpen || proposal !== undefined)) ||
+    browserTest ||
+    configuredPreview;
   const canvas =
     hasViews &&
     (view === 'progress' ||
@@ -290,13 +296,19 @@ export function TaskPage() {
   if (canvas && visitedCanvas !== taskId) setVisitedCanvas(taskId);
   const siteSelected = view === 'preview' || (canvas && siteTask === taskId);
   const watchingTest = browserTest && !canvas && hasViews;
-  const resultLabel = artifactOpen
-    ? R.document
-    : browserTest
-      ? BROWSER_TEST_COPY.browser
-      : code && !needsPlan
-        ? R.code
-        : PREVIEW_PANE_COPY.tabPreview;
+  const resultLabel = reviewOpen
+    ? task.data.workflow.key === VERSION_REVIEW_WORKFLOW_KEY
+      ? TASK_CODE_REVIEW_COPY.diff
+      : TASK_CODE_REVIEW_COPY.source
+    : proposal
+      ? TASK_CODE_REVIEW_COPY.proposal
+      : artifactOpen
+        ? R.document
+        : browserTest
+          ? BROWSER_TEST_COPY.browser
+          : code && !needsPlan
+            ? R.code
+            : PREVIEW_PANE_COPY.tabPreview;
   const resultPanel = (reading = false) =>
     needsPlan && !hasViews && !workbench && !artifactOpen && !reviewOpen ? (
       <TaskMain task={task.data} selection={selection} pro={pro} />
@@ -325,11 +337,15 @@ export function TaskPage() {
             }
           : {})}
       />
+    ) : proposal && !needsPlan ? (
+      <TaskProposal key={taskId} active={!canvas} task={task.data} text={proposal.text} />
     ) : reviewOpen ? (
       <TaskCodeReviewWorkbench
         key={taskId}
         task={task.data}
         review={codeReview}
+        repo={project.data?.repoPath ?? ''}
+        active={!canvas}
         pro={isPro}
         record={record}
         nodeDetails={canvas ? undefined : nodeDetails}

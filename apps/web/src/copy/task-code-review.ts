@@ -2,6 +2,13 @@ import type { TaskCodeReviewReport } from '@aw/shared';
 import { GIT_COPY } from './git.ts';
 
 export const TASK_CODE_REVIEW_COPY = {
+  source: '审查代码',
+  diff: '版本差异',
+  file: '审查文件',
+  waitRead: '等待读取代码。AI 打开文件后，代码和行号会显示在这里。',
+  outline: '方案目录',
+  proposal: '方案正文',
+  waitProposal: '正在阅读项目。首段方案写好后会显示在这里。',
   title: '代码审查报告',
   findings: '问题清单',
   code: '代码位置',

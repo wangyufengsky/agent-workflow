@@ -14,7 +14,7 @@
 
 .treeRoot {
   overflow: auto;
-  max-height: 70vh;
+  max-height: min(70dvh, var(--reader-available-height, 70dvh));
   padding: var(--s-2);
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
@@ -112,7 +112,10 @@
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: var(--panel);
+}
 
+.scroll,
+.syntax {
   --syntax-foreground: var(--ink-2);
   --syntax-background: transparent;
   --syntax-token-keyword: var(--accent);
@@ -349,4 +352,13 @@
   margin-inline-start: var(--s-3);
   color: var(--sub);
   font-size: var(--fs-xs);
+}
+
+.reviewNote {
+  padding: var(--s-2);
+  color: var(--ink);
+  font-family: var(--font);
+  white-space: normal;
+  background: var(--warn-fill);
+  border-inline-start: 2px solid var(--warn);
 }
