@@ -25,13 +25,13 @@ export function projectReadPath(raw: string, cwd: string, roots: string[]): stri
   return undefined;
 }
 
-type ReadRequest = { path: string; location: string; directory?: string };
+type ReadRequest = { path: string; location: string; line?: number; directory?: string };
 
 export function readRequest(tool: string, input: Record<string, unknown>): ReadRequest | undefined {
   const path = input.filePath ?? input.path;
   if (tool === 'read' && typeof path === 'string') {
     const start = typeof input.offset === 'number' && input.offset > 0 ? input.offset : 1;
-    return { path, location: R.line(start) };
+    return { path, location: R.line(start), line: start };
   }
   if (tool === officeRead && typeof path === 'string') {
     return { path, location: [input.sheet, input.range].filter((v) => typeof v === 'string').join(' · ') };
@@ -50,6 +50,7 @@ export function readRequest(tool: string, input: Record<string, unknown>): ReadR
   return {
     path: literal,
     location: R.line(sed?.[1] ?? 1, sed?.[2]),
+    line: Number(sed?.[1] ?? 1),
     ...(typeof input.workdir === 'string' ? { directory: input.workdir } : {}),
   };
 }

@@ -149,3 +149,11 @@ td:has(.revision) {
 td:has(.revision[data-kind="modified"]) {
   background: var(--warn-fill);
 }
+
+.reader {
+  min-width: 0;
+  max-height: min(65dvh, var(--reader-available-height, 65dvh));
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}

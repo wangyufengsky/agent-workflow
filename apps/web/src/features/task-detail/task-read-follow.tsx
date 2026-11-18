@@ -7,15 +7,16 @@ import {
   TranscriptEntryKind,
 } from '@aw/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/button.tsx';
+import { revealInPane, sizeReadingPane } from '../../components/reveal-in-pane.ts';
 import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 import { attemptQuery, attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
 import { gitTreeQuery } from '../git/git.queries.ts';
 import { officeRead, projectReadPath, readRequest } from './project-file-read.ts';
 import styles from './task-page.module.css';
 
-type Reading = { path: string; location: string; excerpt: string };
+type Reading = { path: string; location: string; excerpt: string; line?: number | undefined };
 type Activity = { id: string; time: number; seq: number; reading?: Reading };
 function excerpt(tool: string, output: string): string {
   if (tool === officeRead) {
@@ -91,7 +92,7 @@ function ReadObserver({
     const value: Activity = { id, time: call.ts, seq: call.seq };
     if (path && exists.data && result?.data.status === 'completed' && result.data.output) {
       const text = excerpt(data.tool, result.data.output);
-      if (text && read) value.reading = { path, excerpt: text, location: read.location };
+      if (text && read) value.reading = { path, excerpt: text, location: read.location, line: read.line };
     }
     return value;
   }, [call, data, exists.data, id, path, read, result]);
@@ -99,6 +100,31 @@ function ReadObserver({
     if (activity) report(activity);
   }, [activity, report]);
   return null;
+}
+
+function ReadExcerpt({ reading, follow }: { reading: Reading; follow: boolean }) {
+  const pane = useRef<HTMLPreElement>(null);
+  const target = useRef<HTMLElement>(null);
+  const attach = useCallback((element: HTMLPreElement | null) => {
+    pane.current = element;
+    return sizeReadingPane(element);
+  }, []);
+  const lines = useMemo(() => reading.excerpt.split('\n'), [reading.excerpt]);
+  const at = Math.max(
+    0,
+    lines.findIndex((line) => Number(/^\s*(\d+):/.exec(line)?.[1]) === reading.line),
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 同一文件的下一次读取也要重新定位。
+  useLayoutEffect(() => {
+    if (follow && pane.current && target.current) revealInPane(pane.current, target.current);
+  }, [reading, follow]);
+  return (
+    <pre ref={attach} className={styles.readExcerpt}>
+      {at > 0 && lines.slice(0, at).join('\n') + '\n'}
+      <mark ref={target}>{lines[at]}</mark>
+      {at + 1 < lines.length && '\n' + lines.slice(at + 1).join('\n')}
+    </pre>
+  );
 }
 
 export function TaskReadFollow({
@@ -163,9 +189,7 @@ export function TaskReadFollow({
             <span className="hint">{reading.location}</span>
             <span className="hint">{following ? R.reading : R.paused}</span>
           </div>
-          <pre key={reading.path + reading.location} className={styles.readExcerpt}>
-            {reading.excerpt}
-          </pre>
+          <ReadExcerpt reading={reading} follow={following && active} />
         </section>
       )}
       <div hidden={!!reading}>{children(!!reading)}</div>

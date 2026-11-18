@@ -8,13 +8,14 @@ import {
   textLines,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { type MouseEvent, type ReactNode, useMemo, useState } from 'react';
+import { type MouseEvent, type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Components } from 'react-markdown';
 import { callOperation } from '../../api/client.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
 import { Markdown } from '../../components/markdown.tsx';
+import { revealInPane } from '../../components/reveal-in-pane.ts';
 import { ARTIFACT_COPY } from '../../copy/artifacts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DIFF_COPY } from '../../copy/diff.ts';
@@ -134,15 +135,21 @@ function Content({
 const PAGE_LINES = 180;
 
 function Lines({
+  focusLine,
   source,
   changes,
   onPick,
 }: {
+  focusLine?: number | undefined;
   changes: Map<number, VersionChange>;
   source: string;
   onPick?: OnPick | undefined;
 }) {
-  const [start, setStart] = useState(0);
+  const targetPage = focusLine === undefined ? undefined : Math.floor((focusLine - 1) / PAGE_LINES) * PAGE_LINES;
+  const [paging, setPaging] = useState({ targetPage, start: targetPage ?? 0 });
+  if (paging.targetPage !== targetPage) setPaging({ targetPage, start: targetPage ?? paging.start });
+  const { start } = paging;
+  const setPage = (start: number) => setPaging({ targetPage, start });
   const [anchor, setAnchor] = useState<number>();
   const lines = textLines(source);
   const last = Math.min(start + PAGE_LINES, lines.length);
@@ -186,11 +193,11 @@ function Lines({
       </ol>
       {lines.length > PAGE_LINES && (
         <div className="row wrap">
-          <Button size="sm" disabled={start === 0} onClick={() => setStart(start - PAGE_LINES)}>
+          <Button size="sm" disabled={start === 0} onClick={() => setPage(start - PAGE_LINES)}>
             {ARTIFACT_COPY.previousPage}
           </Button>
           <span className="hint">{ARTIFACT_COPY.pageLines(start + 1, last, lines.length)}</span>
-          <Button size="sm" disabled={last === lines.length} onClick={() => setStart(start + PAGE_LINES)}>
+          <Button size="sm" disabled={last === lines.length} onClick={() => setPage(start + PAGE_LINES)}>
             {ARTIFACT_COPY.nextPage}
           </Button>
         </div>
@@ -280,11 +287,13 @@ function Workbook({
 }
 
 export function ArtifactPreview({
+  follow = false,
   taskId,
   version,
   previous,
   onPick,
 }: {
+  follow?: boolean;
   taskId: string;
   version: ArtifactVersion;
   previous?: ArtifactVersion | undefined;
@@ -321,12 +330,20 @@ export function ArtifactPreview({
       current.format === 'docx' ? current.markdown : current.text,
     );
   }, [current, prior]);
+  const content = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 异步版本、工作表或显示模式会替换待定位的 DOM。
+  useLayoutEffect(() => {
+    if (!follow || view.isPlaceholderData) return;
+    const target = content.current?.querySelector('[data-kind]');
+    const pane = content.current?.closest('section');
+    if (target && pane) revealInPane(pane, target);
+  }, [follow, changes, oldSheet, plain, current, view.isPlaceholderData]);
   if (view.isPending) return <p className="hint">{COMMON_COPY.loading}</p>;
   if (view.isError) return <ErrorState error={view.error} onRetry={() => void view.refetch()} />;
   const data = view.data;
   if (data.format === AttachmentFormat.Xlsx) {
     return (
-      <div className="col">
+      <div className="col" ref={content}>
         <fieldset className={`row wrap ${styles.sheets}`} aria-label={ARTIFACT_COPY.sheets}>
           {data.meta.sheets.map(({ name, hidden }) => (
             <Button
@@ -351,9 +368,13 @@ export function ArtifactPreview({
     );
   }
   if (data.format === AttachmentFormat.Docx)
-    return <Content changes={changes} source={data.markdown} onPick={onPick} />;
+    return (
+      <div ref={content}>
+        <Content changes={changes} source={data.markdown} onPick={onPick} />
+      </div>
+    );
   return (
-    <div className="col">
+    <div className="col" ref={content}>
       {data.format === 'md' && (
         <div className="row">
           <Button
@@ -371,7 +392,12 @@ export function ArtifactPreview({
       )}
       {data.truncated && <p className="hint">{ARTIFACT_COPY.truncated}</p>}
       {data.format === 'txt' || plain ? (
-        <Lines changes={changes} source={data.text} onPick={onPick} />
+        <Lines
+          focusLine={follow ? changes.keys().next().value : undefined}
+          changes={changes}
+          source={data.text}
+          onPick={onPick}
+        />
       ) : (
         <Content changes={changes} source={data.text} onPick={onPick} />
       )}

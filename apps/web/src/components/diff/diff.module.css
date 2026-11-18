@@ -234,6 +234,11 @@
   gap: var(--s-3);
 }
 
+.taskWorkspace .scroll {
+  max-height: min(70dvh, var(--reader-available-height, 70dvh));
+  overscroll-behavior: contain;
+}
+
 .taskSidebar {
   display: grid;
   min-width: 0;

@@ -17,10 +17,12 @@ import { saveBytes } from '../../app/save-file.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
+import { sizeReadingPane } from '../../components/reveal-in-pane.ts';
 import { ARTIFACT_COPY, artifactAnchorLabel } from '../../copy/artifacts.ts';
 import { ASSISTANT_COPY } from '../../copy/assistant.ts';
 import { formatDateTime } from '../../copy/common.ts';
 import { PPT_COPY } from '../../copy/ppt.ts';
+import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 import { FrontendActivity } from '../preview/frontend-activity.tsx';
 import layout from '../preview/frontend-workbench.module.css';
 import { RequirementsSection } from '../requirements/requirements-section.tsx';
@@ -37,6 +39,7 @@ type NodeDetails = { title: string; content: ReactNode; onClose: () => void };
 export function ArtifactWorkbench({
   task,
   artifact,
+  active,
   selectedVersion,
   onSelectVersion,
   record,
@@ -45,6 +48,7 @@ export function ArtifactWorkbench({
   renderDelivery,
 }: {
   task: TaskDetailDTO;
+  active: boolean;
   artifact: NonNullable<TaskDetailDTO['artifact']>;
   selectedVersion: string | undefined;
   onSelectVersion: (id: string | undefined) => void;
@@ -148,6 +152,16 @@ export function ArtifactWorkbench({
             </select>
           )}
         </div>
+        {version && (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-pressed={selectedVersion === undefined}
+            onClick={() => onSelectVersion(selectedVersion === undefined ? version.id : undefined)}
+          >
+            {selectedVersion === undefined ? R.followEdit : R.resumeEdit}
+          </Button>
+        )}
         {!building && (
           <Button
             size="sm"
@@ -217,17 +231,26 @@ export function ArtifactWorkbench({
           {version !== undefined ? (
             <div className={compare && previous !== undefined ? styles.comparison : 'col'}>
               {compare && previous !== undefined && (
-                <section aria-label={ARTIFACT_COPY.beforeLabel(previous.number)} className="col">
+                <section
+                  aria-label={ARTIFACT_COPY.beforeLabel(previous.number)}
+                  ref={sizeReadingPane}
+                  className={styles.reader}
+                >
                   <h3>{ARTIFACT_COPY.before(previous.number)}</h3>
                   <ArtifactPreview key={previous.id} taskId={task.id} version={previous} />
                 </section>
               )}
-              <section aria-label={ARTIFACT_COPY.previewLabel(version.number)} className="col">
+              <section
+                aria-label={ARTIFACT_COPY.previewLabel(version.number)}
+                ref={sizeReadingPane}
+                className={styles.reader}
+              >
                 {compare && previous !== undefined && <h3>{ARTIFACT_COPY.after(version.number)}</h3>}
                 {version.lost.length > 0 && <p className="hint">{ASSISTANT_COPY.file.lost(version.lost)}</p>}
                 <ArtifactPreview
                   key={version.id}
                   taskId={task.id}
+                  follow={active && selectedVersion === undefined && !compare && panel !== 'notes'}
                   previous={previous}
                   version={version}
                   onPick={canNote && panel === 'notes' && !compare ? pick : undefined}

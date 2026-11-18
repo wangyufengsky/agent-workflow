@@ -305,6 +305,7 @@ export function TaskPage() {
         key={task.data.id}
         task={task.data}
         artifact={artifact}
+        active={!canvas && !reading}
         selectedVersion={artifactVersion}
         onSelectVersion={(id) => void navigate({ search: (prev) => ({ ...prev, artifactVersion: id }), replace: true })}
         nodeDetails={canvas ? undefined : nodeDetails}

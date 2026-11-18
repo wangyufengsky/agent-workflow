@@ -1,3 +1,4 @@
+import { InboxKind, taskDetailSchema } from '@aw/shared';
 import { expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import { createProject, queueTurn, startTask, submitResult, TASK_RUN_TIMEOUT_MS } from './helpers.ts';
@@ -59,8 +60,11 @@ test('选择跟随阅读后看到项目文件的实际摘录，暂停保留位�
     {
       type: 'tool',
       tool: 'read',
-      input: { filePath: 'package.json', offset: 1 },
-      output: '<content>1: {"scripts":{"test":"vitest run"}}</content>',
+      input: { filePath: 'package.json', offset: 201 },
+      output:
+        '<content>201: vitest run\n' +
+        Array.from({ length: 100 }, (_, i) => `${202 + i}: config`).join('\n') +
+        '</content>',
     },
     { type: 'permission', permission: 'bash', patterns: ['node verify-reading.mjs'] },
     { type: 'edit', file: 'probe.js', content: 'export const probe = true;\n' },
@@ -74,17 +78,62 @@ test('选择跟随阅读后看到项目文件的实际摘录，暂停保留位�
     const reading = page.getByRole('region', { name: '项目文件阅读' });
     await expect(reading).toContainText('package.json');
     await expect(reading).toContainText('vitest run');
-    await expect(reading.getByText('第 1 行')).toBeVisible();
+    await expect(reading.getByText('第 201 行')).toBeVisible();
+    await expect(reading.locator('mark')).toContainText('201: vitest run');
     await page.screenshot({ path: info.outputPath('reading.png'), animations: 'disabled' });
     await page.getByRole('button', { name: '暂停跟随阅读' }).click();
+    const scroll = await reading.locator('pre').evaluate((el) => {
+      el.scrollTop = 200;
+      return el.scrollTop;
+    });
+    expect(scroll).toBeGreaterThan(0);
     await page.getByRole('tab', { name: '流程画布' }).click();
     await page.getByRole('button', { name: '允许一次' }).click();
     await page.getByRole('tab', { name: '代码改动' }).click();
     await expect(reading).toContainText('package.json');
+    expect(await reading.locator('pre').evaluate((el) => el.scrollTop)).toBe(scroll);
     await page.getByRole('button', { name: '继续跟随阅读' }).click();
     await expect(reading).toHaveCount(0);
     await expect(page.getByTestId('task-code-changes')).toContainText('probe.js');
   } finally {
     await request.post(`${API_BASE}${taskPath}/cancel`, { headers: AUTH, data: {} });
+  }
+});
+
+test('跟随同一文件深处的修改时只滚动代码框，任务页留在原位', async ({ page, request }, info) => {
+  const project = await createProject(request, null);
+  const lines = Array.from({ length: 140 }, (_, i) => `export const row${i} = ${i};`);
+  const modified = lines.map((line, i) => (i === 139 ? 'export const row139 = 999;' : line));
+  await queueTurn(request, project, { title: '定位根因' }, [submitResult('已定位。')]);
+  await queueTurn(request, project, { title: '修复' }, [
+    { type: 'edit', file: 'long.ts', content: lines.join('\n') },
+    { type: 'permission', permission: 'bash', patterns: ['node verify-long.mjs'] },
+    { type: 'edit', file: 'long.ts', content: modified.join('\n') },
+    { type: 'hang' },
+  ]);
+  await startTask(page, project, /^修 Bug$/, '核对长文件修改');
+  const path = new URL(page.url()).pathname;
+  try {
+    const frame = page.getByTestId('diff-view');
+    const tabs = page.getByRole('tablist', { name: '任务视图' });
+    await expect(frame.locator('[data-focus]')).toContainText('row0', { timeout: TASK_RUN_TIMEOUT_MS });
+    const top = await tabs.evaluate((el) => el.getBoundingClientRect().top);
+    const detail = taskDetailSchema.parse(await (await request.get(API_BASE + path, { headers: AUTH })).json());
+    const item = detail.openInbox.find((i) => i.kind === InboxKind.Permission);
+    if (!item) throw new Error('Missing pending permission');
+    await expect(
+      await request.post(`${API_BASE}/inbox/${item.id}/resolve`, {
+        headers: AUTH,
+        data: { response: { decision: 'once' } },
+      }),
+    ).toBeOK();
+    const focus = frame.locator('[data-focus]');
+    await expect(focus).toContainText('row139 = 999', { timeout: TASK_RUN_TIMEOUT_MS });
+    await expect(focus).toBeInViewport();
+    expect(await frame.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    expect(await tabs.evaluate((el) => el.getBoundingClientRect().top)).toBeCloseTo(top, 0);
+    await page.screenshot({ path: info.outputPath('follow-last-line.png'), animations: 'disabled' });
+  } finally {
+    await request.post(API_BASE + path + '/cancel', { headers: AUTH, data: {} });
   }
 });
