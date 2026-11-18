@@ -28,7 +28,16 @@ test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → �
   ]);
   await queueTurn(request, project, { agent: 'aw-reviewer', title: '修复' }, [passReview]);
   // The verify step gives no AI conclusion here: the AI item stays unverified.
-  await queueTurn(request, project, { title: '核验验收清单' }, [submitResult('核验完成')]);
+  await queueTurn(request, project, { title: '核验验收清单' }, [
+    {
+      type: 'tool',
+      tool: 'read',
+      input: { filePath: 'search.ts' },
+      output: '<content>1: export const search = () => [];</content>',
+    },
+    { type: 'permission', permission: 'bash', patterns: ['node verify-search.mjs'] },
+    submitResult('核验完成'),
+  ]);
 
   await page.goto(`/?projectId=${project.id}`);
   await pickWorkflow(page, /修 Bug/);
@@ -46,6 +55,13 @@ test('验收清单：开始任务时填写 → 核验步骤逐项给结论 → �
   await start.click();
   await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/, { timeout: TASK_RUN_TIMEOUT_MS });
 
+  await page.getByRole('button', { name: '跟随 AI 阅读', exact: true }).click();
+  await expect(page.getByRole('region', { name: '项目文件阅读' }).locator('mark')).toContainText(
+    'export const search',
+    { timeout: TASK_RUN_TIMEOUT_MS },
+  );
+  await page.getByRole('button', { name: '返回成果' }).click();
+  await page.getByRole('button', { name: '允许一次' }).click();
   const checklist = page.getByTestId('requirements');
   await expect(checklist).toContainText('2 项必需：0 项满足，2 项未满足', { timeout: TASK_RUN_TIMEOUT_MS });
   await expect(checklist).toContainText('未通过');

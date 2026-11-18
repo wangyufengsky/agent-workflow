@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { InboxKind, taskDetailSchema } from '@aw/shared';
+import { type CreateTaskRequest, InboxKind, taskDetailSchema } from '@aw/shared';
 import { type APIRequestContext, expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import {
@@ -15,13 +15,19 @@ import {
 } from './helpers.ts';
 import { inspectPage, WALKTHROUGH_DIR } from './walkthrough.ts';
 
-async function start(request: APIRequestContext, projectId: string, workflow: string, requirement: string) {
+async function start(
+  request: APIRequestContext,
+  projectId: string,
+  workflow: string,
+  requirement: string,
+  requirements?: CreateTaskRequest['requirements'],
+) {
   const response = await request.get(`${API_BASE}/workflows`, { headers: AUTH });
   const { items } = await response.json();
   const selected = items.find((item: { key: string }) => item.key === workflow);
   const created = await request.post(`${API_BASE}/tasks`, {
     headers: AUTH,
-    data: { projectId, workflowId: selected.id, requirement, start: true },
+    data: { projectId, workflowId: selected.id, requirement, requirements, start: true },
   });
   await expect(created).toBeOK();
   const task = await created.json();
@@ -376,7 +382,19 @@ test('审查跟随真实行号，点选暂停跟随，画布节点仍打开详�
     { type: 'permission', permission: 'bash', patterns: ['node submit.mjs'] },
     { type: 'callTool', name: 'submit_result', args: { summary: '完成审查。', code_review: report } },
   ]);
-  const path = await start(request, project.id, 'security_review', '核对订单行');
+  await queueTurn(request, project, { title: '核验验收清单' }, [
+    {
+      type: 'tool',
+      tool: 'read',
+      input: { filePath: file, offset: 190, limit: 1 },
+      output: '<content>190: export const order190 = 190;</content>',
+    },
+    { type: 'permission', permission: 'bash', patterns: ['node finish-check.mjs'] },
+    submitResult('核验结束'),
+  ]);
+  const path = await start(request, project.id, 'security_review', '核对订单行', [
+    { title: '核对订单', expected: '审查结果可定位' },
+  ]);
   await page.goto(path);
   const code = page.getByRole('region', { name: '代码位置' });
   await expect(code.locator('[data-focus="true"]')).toContainText('order160', { timeout: TASK_RUN_TIMEOUT_MS });
@@ -392,12 +410,17 @@ test('审查跟随真实行号，点选暂停跟随，画布节点仍打开详�
   await page.keyboard.press('Escape');
   await page.getByRole('tab', { name: '审查代码' }).click();
   await expect(code.locator('[data-focus="true"]')).toBeInViewport();
+  await page.getByRole('button', { name: '继续跟随阅读' }).click();
+  await advanceDocument(request, path);
+  await expect(code.locator('[data-focus="true"]')).toContainText('order190', { timeout: TASK_RUN_TIMEOUT_MS });
   await advanceDocument(request, path);
 });
 test('方案在步骤提交前展示最新草稿，目录能在阅读框中跳转', async ({ page, request }) => {
   const project = await createProject(request, null);
   const intro = '# 订单方案\n\n## 现状\n\n' + Array.from({ length: 40 }, (_, i) => `规则 ${i + 1}。`).join('\n\n');
   await queueTurn(request, project, { title: '· 方案设计' }, [
+    { type: 'tool', tool: 'read', input: { filePath: 'package.json' }, output: '<content>1: 项目配置</content>' },
+    { type: 'permission', permission: 'bash', patterns: ['node start-proposal.mjs'] },
     { type: 'callTool', name: 'report_progress', args: { message: '整理现状', proposal: intro } },
     { type: 'permission', permission: 'bash', patterns: ['node next-section.mjs'] },
     {
@@ -410,6 +433,9 @@ test('方案在步骤提交前展示最新草稿，目录能在阅读框中跳�
   ]);
   const path = await start(request, project.id, 'design_proposal', '提出订单方案');
   await page.goto(path);
+  await page.getByRole('button', { name: '跟随 AI 阅读', exact: true }).click();
+  await expect(page.getByRole('region', { name: '项目文件阅读' })).toContainText('项目配置');
+  await advanceDocument(request, path);
   const paper = page.getByRole('region', { name: '工作区草稿' });
   await expect(paper.getByRole('heading', { name: '现状' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
   await advanceDocument(request, path);

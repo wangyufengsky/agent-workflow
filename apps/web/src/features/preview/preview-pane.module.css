@@ -229,3 +229,12 @@
   font-size: 13px;
   color: var(--sub);
 }
+
+.followedFrame {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--s-2);
+  min-width: 0;
+  max-height: var(--task-view-height, max(480px, calc(100dvh - 245px)));
+}

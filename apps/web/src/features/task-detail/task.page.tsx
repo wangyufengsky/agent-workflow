@@ -1,4 +1,5 @@
 import {
+  type BrowserFrame,
   DeliveryStatus,
   EDITABLE_NODE_STATUSES,
   InboxKind,
@@ -309,7 +310,7 @@ export function TaskPage() {
           : code && !needsPlan
             ? R.code
             : PREVIEW_PANE_COPY.tabPreview;
-  const resultPanel = (reading = false) =>
+  const resultPanel = (reading = false, frame?: BrowserFrame) =>
     needsPlan && !hasViews && !workbench && !artifactOpen && !reviewOpen ? (
       <TaskMain task={task.data} selection={selection} pro={pro} />
     ) : artifactOpen ? (
@@ -356,6 +357,7 @@ export function TaskPage() {
         task={task.data}
         pro={pro}
         active={!canvas && !reading}
+        frame={frame}
         hasConfiguredPreview={project.data?.preview != null}
         onOpenNode={(id) => selection.open(id, NodeTab.Process)}
         nodeDetails={canvas ? undefined : nodeDetails}
@@ -403,11 +405,14 @@ export function TaskPage() {
       <TaskMain task={task.data} selection={selection} pro={pro} />
     );
   const resultView =
-    (code ||
+    (proposal !== undefined ||
+      configuredPreview ||
+      code ||
       workbench ||
       artifactOpen ||
       (needsPlan && task.data.workflow.deliverable === WorkflowDeliverable.CodeChanges)) &&
-    !browserTest ? (
+    !browserTest &&
+    !reviewOpen ? (
       <TaskReadFollow
         key={taskId}
         task={task.data}
