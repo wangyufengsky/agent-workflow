@@ -1,4 +1,5 @@
 import {
+  canRunInBatchOrSchedule,
   DEFINITION_KEY_PATTERN,
   RoleBaseAgent,
   type RoleDTO,
@@ -214,7 +215,7 @@ export function WorkflowsPage() {
               <Button size="sm" icon="copy" onClick={() => setTarget({ mode: 'copy', from: w })}>
                 {C.copy}
               </Button>
-              {w.planning === WorkflowPlanning.Fixed && (
+              {canRunInBatchOrSchedule(w) && (
                 <>
                   <Link to={ROUTES.batchNew} search={{ workflow: w.key }} className="btn ghost sm">
                     {BATCHES_COPY.runAsBatch}

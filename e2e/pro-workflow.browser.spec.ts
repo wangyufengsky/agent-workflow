@@ -17,6 +17,20 @@ import {
 test.beforeEach(({ request }) => patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'pro' }));
 test.afterAll(({ request }) => patchSettings(request, { 'ui.mode': 'simple' }));
 
+test('浏览器测试卡片只提供支持的运行入口', async ({ page, request }) => {
+  await createProject(request, null);
+  await page.goto('/workflows');
+  const card = page.getByRole('article', { name: '浏览器测试' });
+  await expect(card).toBeVisible();
+  await expect(card.getByRole('link', { name: /批量运行|定时运行/ })).toHaveCount(0);
+  for (const path of ['/batches/new', '/schedules/new']) {
+    await page.goto(`${path}?workflow=browser_test`);
+    const picker = page.getByRole('combobox', { name: '流程', exact: true });
+    await expect(picker.getByRole('option', { name: '补单元测试' })).toBeAttached();
+    await expect(picker).toHaveValue('');
+  }
+});
+
 test('J8 专业模式：复制内置流程 → 修改 → 用它跑通一个任务', async ({ page, request }) => {
   const project = await createProject(request, null);
   await queueTurn(request, project, { title: '定位根因' }, [submitResult('找到了根因')]);

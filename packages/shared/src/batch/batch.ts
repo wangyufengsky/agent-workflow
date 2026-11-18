@@ -1,7 +1,13 @@
 import { BATCH_TARGET_PLACEHOLDER } from '../constants/app.ts';
+import { BROWSER_TEST_WORKFLOW_KEY } from '../contracts/api/browser-cases.ts';
 import type { DeliveryDTO } from '../contracts/api/delivery.ts';
 import { DeliveryStatus } from '../enums/git.ts';
 import { TASK_DISPLAY_GROUPS, type TaskDisplayGroup, TaskStatus } from '../enums/task.ts';
+import { WorkflowPlanning } from '../enums/workflow.ts';
+
+/** 浏览器测试有逐次授权的目标，批量和定时入口不能代选。 */
+export const canRunInBatchOrSchedule = (workflow: { key: string; planning: WorkflowPlanning }) =>
+  workflow.planning === WorkflowPlanning.Fixed && workflow.key !== BROWSER_TEST_WORKFLOW_KEY;
 
 /**
  * A task's requirement in a batch: every placeholder of the template replaced by the target (20 §2), literally — a

@@ -143,9 +143,9 @@ export function createGithubProvider(repo: string, token: string, apiUrl: string
       const { data } = await octokit.rest.pulls.create({ owner, repo: name, head, base, title, body }).catch(translate);
       return { url: data.html_url };
     },
-    async findOpenPullRequest(branch) {
+    async findOpenPullRequest(branch, targetBranch) {
       const { data } = await octokit.rest.pulls
-        .list({ owner, repo: name, head: `${owner}:${branch}`, state: 'open' })
+        .list({ owner, repo: name, head: `${owner}:${branch}`, base: targetBranch, state: 'open' })
         .catch(translate);
       const [pull] = data;
       return pull === undefined ? undefined : { number: pull.number, url: pull.html_url };

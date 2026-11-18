@@ -64,10 +64,13 @@ export function createGitlabProvider(repo: string, token: string, host: string):
       const request = await api.MergeRequests.create(repo, head, base, title, { description: body }).catch(translate);
       return { url: request.web_url };
     },
-    async findOpenPullRequest(branch) {
-      const requests = await api.MergeRequests.all({ projectId: repo, sourceBranch: branch, state: 'opened' }).catch(
-        translate,
-      );
+    async findOpenPullRequest(branch, targetBranch) {
+      const requests = await api.MergeRequests.all({
+        projectId: repo,
+        sourceBranch: branch,
+        targetBranch,
+        state: 'opened',
+      }).catch(translate);
       const [request] = requests;
       return request === undefined ? undefined : { number: request.iid, url: request.web_url };
     },

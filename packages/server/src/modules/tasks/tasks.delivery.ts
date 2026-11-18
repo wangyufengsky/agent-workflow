@@ -164,7 +164,7 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
         reviewedDocument,
       });
       // After a revision from review comments the push updates the pull request already open (21 §5).
-      const open = await hosting.findOpenPullRequest(worktree.branch);
+      const open = await hosting.findOpenPullRequest(worktree.branch, delivery.targetBranch);
       ({ url } =
         open ??
         (await hosting.createPullRequest({
@@ -230,6 +230,9 @@ export function createTaskDelivery(deps: TasksServiceDeps, state: TaskState) {
       const worktree = readyWorktree(task);
       const { repoPath } = projects.getRecord(task.projectId);
       const targetBranch = request.targetBranch ?? task.baseBranch;
+      if (targetBranch === worktree.branch) {
+        throw new AppError(ErrorCode.ValidationFailed, 'The delivery target must differ from the task branch');
+      }
       await checkDeliverable({
         repoPath,
         worktreePath: worktree.path,

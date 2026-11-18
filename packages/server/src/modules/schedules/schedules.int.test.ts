@@ -130,6 +130,20 @@ describe('定时任务：到点运行（22 §4）', () => {
     expect((await detail(schedule.id)).nextRunAt).toBe(TWO_AM + 4 * DAY);
   });
 
+  it('同批到期的第二个计划在首个检查期间暂停，保持暂停且没有运行', async () => {
+    await open(TWO_AM - 1000);
+    const { project } = await addProject(t, { checkCommand: null });
+    await createSchedule(project.id);
+    const second = await createSchedule(project.id);
+    queueReview(1);
+    const review = taskReaches(t, 'review');
+    clock.advance(1000);
+    expect((await t.call(pauseScheduleOp, { id: second.id })).status).toBe(200);
+    await t.app.services.schedules.settled();
+    await review;
+    expect(await detail(second.id)).toMatchObject({ status: 'paused', nextRunAt: null, runs: [] });
+  });
+
   it('暂停后到点不运行；恢复后从现在起算下一次', async () => {
     await open();
     const { project } = await addProject(t, { checkCommand: null });

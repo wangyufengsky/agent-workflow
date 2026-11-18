@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { useUiStore } from '../../state/ui.store.ts';
+import { DEFAULT_START_WORKFLOW } from '../home/workflow-icon.ts';
 import { workflowsQuery } from '../tasks/tasks.queries.ts';
 import { useOpenAssistantPage } from './assistant-page.ts';
 import { followAssistant } from './handoff.ts';
@@ -60,7 +61,7 @@ export function useAssistantRequests(): void {
                 search: (s) => ({
                   ...(s.conversation === undefined ? {} : { conversation: s.conversation }),
                   ...(projectId === undefined ? {} : { projectId }),
-                  ...(workflow === undefined ? {} : { workflow }),
+                  workflow: workflow ?? DEFAULT_START_WORKFLOW,
                   ...(requirement === undefined ? {} : { requirement }),
                   ...(prefillScope ? { formSeq: request.seq } : {}),
                 }),

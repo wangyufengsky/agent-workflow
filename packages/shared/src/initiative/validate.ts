@@ -1,4 +1,5 @@
 import { INITIATIVE_TEMPLATE_PLACEHOLDER } from '../constants/app.ts';
+import { BROWSER_TEST_WORKFLOW_KEY } from '../contracts/api/browser-cases.ts';
 import type { InitiativeDraft } from '../contracts/api/initiatives.ts';
 import { WorkflowDeliverable, WorkflowKind } from '../enums/workflow.ts';
 import { type InitiativeProblem, InitiativeProblemCode } from '../errors/initiative-problems.ts';
@@ -10,6 +11,10 @@ import { findCycles } from '../workflow/validate-plan-graph.ts';
  */
 export const isDefaultInitiativeWorkflow = (workflow: { kind: WorkflowKind; deliverable: WorkflowDeliverable }) =>
   workflow.kind === WorkflowKind.Builtin && workflow.deliverable === WorkflowDeliverable.CodeChanges;
+
+/** 浏览器测试需要用户逐次指定范围，不能由工作包自动启动。 */
+export const canRunInInitiative = (workflow: { key: string; kind: WorkflowKind }) =>
+  workflow.kind !== WorkflowKind.System && workflow.key !== BROWSER_TEST_WORKFLOW_KEY;
 
 export type InitiativeDraftRules = {
   /** Whether a workflow key names a workflow a work package may run (not a system one). */

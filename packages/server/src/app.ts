@@ -639,6 +639,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   attempts.service.recover();
   team.service.analyses.recover();
   nodes.service.recover();
+  worktrees.service.recover();
   tasks.service.recover();
   initiatives.service.recover();
 

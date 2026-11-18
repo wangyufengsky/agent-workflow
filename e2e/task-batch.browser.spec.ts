@@ -21,6 +21,63 @@ test.beforeEach(({ request }) =>
   patchSettings(request, { 'ui.theme': 'codex', 'ui.mode': 'simple', 'delivery.defaultStrategy': 'squash' }),
 );
 
+test('首次创建请求未结束时快捷键只启动一个任务', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const received = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  let submitted = 0;
+  await page.route('**/api/v1/tasks', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    submitted++;
+    received.resolve();
+    await release.promise;
+    await route.continue();
+  });
+  await page.goto(`/?projectId=${project.id}&workflow=code_review`);
+  const input = page.getByLabel('需求', { exact: true });
+  await input.fill('检查分页实现');
+  await input.press('ControlOrMeta+Enter');
+  await received.promise;
+  try {
+    await input.press('ControlOrMeta+Enter');
+  } finally {
+    release.resolve();
+  }
+  await expect(page.getByTestId('task-page')).toBeVisible();
+  expect(submitted).toBe(1);
+});
+
+test('批次列表能看到后续页的未结束批次', async ({ page, request }) => {
+  await createProject(request, null);
+  await page.route(
+    (url) => url.pathname.endsWith('/api/v1/batches'),
+    (route) => {
+      const older = new URL(route.request().url()).searchParams.has('cursor');
+      const seq = older ? 1 : 2;
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              id: String(seq),
+              key: `B-${seq}`,
+              title: older ? '仍在执行的旧批次' : '新批次',
+              project: { id: 'p', name: '项目' },
+              workflow: { id: 'w', key: 'unit_tests', name: '测试', deliverable: 'code_changes' },
+              total: 1,
+              counts: [],
+              ended: 0,
+              createdAt: seq,
+            },
+          ],
+          nextCursor: older ? null : '2',
+        },
+      });
+    },
+  );
+  await page.goto('/batches');
+  await expect(page.getByTestId('batch-card').filter({ hasText: '仍在执行的旧批次' })).toBeVisible();
+});
+
 test('J17 主页「补单元测试」的「批量」→ 选 3 个目录 → 三个任务各自跑完 → 合并全部 → 主分支 3 个提交', async ({
   page,
   request,

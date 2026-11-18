@@ -4,9 +4,11 @@ import {
   type DeliverBatchRequest,
   deliverBatchOp,
   getBatchOp,
+  LIST_PAGE_MAX,
   listBatchesOp,
 } from '@aw/shared';
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
+import { allPages } from '../../api/all-pages.ts';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 
@@ -15,7 +17,10 @@ export type BatchFilter = { projectId?: string };
 export const batchesQuery = (filter: BatchFilter = {}) =>
   queryOptions({
     queryKey: queryKeys.batches(filter),
-    queryFn: async () => (await callOperation(listBatchesOp, { ...filter })).items,
+    queryFn: () =>
+      allPages((cursor) =>
+        callOperation(listBatchesOp, { ...filter, limit: LIST_PAGE_MAX, ...(cursor === undefined ? {} : { cursor }) }),
+      ),
   });
 
 export const batchQuery = (id: string) =>

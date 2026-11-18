@@ -1,6 +1,6 @@
 import { type BrowserTestScope, UiMode } from '@aw/shared';
 import { useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
 import { ATTACHMENTS_COPY } from '../../copy/attachments.ts';
 import { REQUIREMENTS_COPY } from '../../copy/requirements.ts';
@@ -43,6 +43,7 @@ export function useStartTask({
   const [options, setOptions] = useState<MoreOptions>(NO_OPTIONS);
   const create = useCreateTask();
   const navigate = useNavigate();
+  const submitting = useRef(false);
   const checklistReady = isComplete(requirements);
   const canStart =
     workflowId !== undefined &&
@@ -65,7 +66,8 @@ export function useStartTask({
             : C.needsWorkflow;
 
   const start = (asDraft = false) => {
-    if (!canStart) return;
+    if (!canStart || submitting.current) return;
+    submitting.current = true;
     const more = pro ? options : NO_OPTIONS;
     const checkpoints = {
       ...(confirmPlan ? { confirm_plan: true } : {}),
@@ -86,6 +88,9 @@ export function useStartTask({
         ...(requirements.length === 0 ? {} : { requirements: toInputs(requirements) }),
       },
       {
+        onSettled: () => {
+          submitting.current = false;
+        },
         onSuccess: (task) => {
           onStarted();
           void navigate({ to: ROUTES.task, params: { taskId: task.id } });

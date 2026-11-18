@@ -17,6 +17,7 @@ import { testCipher } from '../../../test/helpers/cipher.ts';
 import { createTestRepo } from '../../../test/helpers/git.ts';
 import { taskInReview } from '../../../test/helpers/tasks.ts';
 import { runGit } from '../git/index.ts';
+import { createHostingProvider } from './hosting.provider.ts';
 
 const TOKEN = 'ghp_valid';
 let hosting: FakeHosting;
@@ -118,6 +119,29 @@ describe('交付：创建 PR（11 §5.3）', () => {
     ]);
     const remote = await runGit(['rev-parse', `refs/heads/${task.git.branch}`], { cwd: origin });
     expect(remote.stdout).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it.each(['github', 'gitlab'] as const)('%s 只复用指向交付目标的 PR', async (provider) => {
+    const { project } = await projectWithOrigin();
+    const ref = { provider, repo: 'acme/shop', baseUrl: provider === 'gitlab' ? hosting.endpoints.gitlabUrl : null };
+    await t.call(setProjectHostingOp, {
+      id: project.id,
+      provider,
+      repo: ref.repo,
+      token: TOKEN,
+      ...(ref.baseUrl === null ? {} : { baseUrl: ref.baseUrl }),
+    });
+    const task = await taskInReview(t, project.id, { 'fix.txt': 'fixed' });
+    await createHostingProvider(ref, TOKEN, hosting.endpoints).createPullRequest({
+      head: task.git.branch ?? '',
+      base: 'release',
+      title: 'Release',
+      body: '',
+    });
+    const delivered = await t.call(deliverTaskOp, { id: task.id, strategy: 'pull_request' });
+    expect(delivered.body.status).toBe('completed');
+    expect(hosting.pullRequests.map((pr) => pr.base)).toEqual(['release', 'main']);
+    expect(delivered.body.lastDelivery?.prUrl).toMatch(/\/2$/);
   });
 
   it('GitLab 创建 MR，可指定标题与说明；平台报错时交付失败，任务回到待合并', async () => {

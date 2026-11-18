@@ -16,7 +16,7 @@ import {
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
 import type { Logger } from '../../core/logger.ts';
-import { branchExists, type RepoLocks, runGit } from '../git/index.ts';
+import { branchExists, listWorktrees, type RepoLocks, runGit } from '../git/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { createWorktreesRepo, type Worktree } from './worktrees.repo.ts';
 
@@ -73,8 +73,8 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
 
   async function remove(worktree: Worktree, options: { repoPath: string; deleteBranch: boolean }): Promise<void> {
     const removing = move(worktree, WorktreeEvent.Remove);
-    for (const listener of beforeRemove) await listener(removing);
     try {
+      for (const listener of beforeRemove) await listener(removing);
       await locks.run(options.repoPath, async () => {
         const cwd = options.repoPath;
         if (existsSync(removing.path)) await runGit(['worktree', 'remove', '--force', removing.path], { cwd });
@@ -84,13 +84,18 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
         }
       });
     } catch (err) {
-      if (err instanceof AppError) move(removing, WorktreeEvent.RemoveFailed, { error: messageOf(err) });
+      move(removing, WorktreeEvent.RemoveFailed, { error: err instanceof AppError ? messageOf(err) : String(err) });
       throw err;
     }
     move(removing, WorktreeEvent.Removed, { removedAt: clock.now() });
   }
 
   return {
+    recover(): void {
+      for (const worktree of repo.listByStatus(WorktreeStatus.Removing)) {
+        move(worktree, WorktreeEvent.RemoveFailed, { error: 'Worktree removal was interrupted' });
+      }
+    },
     onBeforeRemove(listener: (worktree: Worktree) => Promise<void>): () => void {
       beforeRemove.add(listener);
       return () => beforeRemove.delete(listener);
@@ -163,19 +168,22 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
       });
     },
 
-    /**
-     * Clears a worktree that never became ready (creation failed, or the app stopped while creating) so the task can
-     * prepare again: leftovers are removed and the record deleted, since a task has at most one worktree.
-     */
-    async discard(worktree: Worktree, repoPath: string): Promise<void> {
-      if (worktree.status !== WorktreeStatus.Removed) {
-        const failed =
-          worktree.status === WorktreeStatus.Creating
-            ? move(worktree, WorktreeEvent.CreateFailed, { error: 'interrupted while creating' })
-            : worktree;
-        await remove(failed, { repoPath, deleteBranch: true });
-      }
-      repo.delete(worktree.id);
+    /** 创建失败时记录的只是预定路径和分支。重试保留现场，由 git 自己检查名称占用。 */
+    async recoverPreparation(worktree: Worktree, repoPath: string): Promise<Worktree | undefined> {
+      if (worktree.status === WorktreeStatus.Ready) return worktree;
+      return locks.run(repoPath, async () => {
+        if (worktree.status === WorktreeStatus.Creating) {
+          const registered = (await listWorktrees(repoPath)).find((entry) => entry.path === worktree.path);
+          if (
+            registered?.branch === worktree.branch &&
+            !registered.prunable &&
+            registered.commit === worktree.baseCommit
+          )
+            return move(worktree, WorktreeEvent.Created);
+        }
+        repo.delete(worktree.id);
+        return undefined;
+      });
     },
   };
 }

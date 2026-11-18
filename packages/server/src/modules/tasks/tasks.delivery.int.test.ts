@@ -3,11 +3,13 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
+  AppError,
   deliverTaskOp,
   ErrorCode,
   getTaskOp,
   getTaskTimelineOp,
   listInboxOp,
+  pruneWorktreesOp,
   type TaskDetailDTO,
   TeamPeriod,
   teamSummaryOp,
@@ -58,6 +60,16 @@ describe('交付：本地合并（09 §7）', () => {
     await repo.git('config', 'user.email', '');
     const other = await taskInReview(t, project.id, { 'greet.ts': 'export const greet = () => "hey";\n' });
     expect(await trailers(other.git.branch ?? '')).toBe('agent-workflow|');
+  });
+
+  it('拒绝将任务分支交付到自身，保留分支提交和待合并状态', async () => {
+    const { task, repo } = await inReview();
+    const branch = task.git.branch ?? '';
+    const tip = await repo.git('rev-parse', branch);
+    const response = await t.call(deliverTaskOp, { id: task.id, strategy: 'squash', targetBranch: branch });
+    expect(response.raw.json()).toMatchObject({ error: { code: ErrorCode.ValidationFailed } });
+    expect(await repo.git('rev-parse', branch)).toBe(tip);
+    expect((await t.call(getTaskOp, { id: task.id })).body).toMatchObject({ status: 'review', lastDelivery: null });
   });
 
   it('设置了提交人时任务提交与 squash 提交都用它，团队页仍算发起人经 AI 任务的提交（D227）', async () => {
@@ -189,6 +201,26 @@ describe('交付：本地合并（09 §7）', () => {
       status: 'review',
       lastDelivery: { status: 'failed', error: { code: ErrorCode.GitCommandFailed } },
     });
+  });
+
+  it('清理监听失败和上次退出时正在移除的工作树都能再次清理', async () => {
+    const { repo, project, task } = await inReview();
+    const unsubscribe = t.app.services.worktrees.onBeforeRemove(async () => {
+      throw new AppError(ErrorCode.InternalError, 'Preview failed to stop');
+    });
+    const delivered = await t.call(deliverTaskOp, { id: task.id, strategy: 'squash' });
+    unsubscribe();
+    expect(delivered.body.git.worktreeStatus).toBe('error');
+    await t.close();
+    const db = new DatabaseSync(join(t.dataDir, 'app.db'));
+    db.prepare("UPDATE worktrees SET status = 'removing' WHERE task_id = ?").run(task.id);
+    db.close();
+    t = await createTestApp({ dataDir: t.dataDir });
+    await t.call(pruneWorktreesOp, { id: project.id });
+    expect((await t.call(getTaskOp, { id: task.id })).body.git.worktreeStatus).toBe('removed');
+    expect(await repo.git('branch', '--list', task.git.branch ?? '', '--format=%(refname:short)')).toBe(
+      task.git.branch,
+    );
   });
 
   it('应用在交付中退出：重启后交付记为中断，任务回到待合并', async () => {

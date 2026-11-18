@@ -298,7 +298,7 @@ export function createRepositoryWrites({ projects, tasks, locks, gitNetwork }: R
     ): Promise<{ url: string; existed: boolean }> {
       assertNotTaskOwned(projectId, input.branch);
       const hosting = await projects.hostingOf(projectId);
-      const open = await hosting.findOpenPullRequest(input.branch);
+      const open = await hosting.findOpenPullRequest(input.branch, input.base);
       if (open !== undefined) return { url: open.url, existed: true };
       const { url } = await hosting.createPullRequest({
         head: input.branch,

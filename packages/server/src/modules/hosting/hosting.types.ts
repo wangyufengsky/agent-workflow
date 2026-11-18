@@ -29,7 +29,7 @@ export type GitHostingProvider = {
   /** Opens a pull (merge) request and returns its web address. */
   createPullRequest(input: PullRequestInput): Promise<{ url: string }>;
   /** The open pull request from `branch` of the repository itself, if there is one. */
-  findOpenPullRequest(branch: string): Promise<OpenPullRequest | undefined>;
+  findOpenPullRequest(branch: string, targetBranch: string): Promise<OpenPullRequest | undefined>;
   /** 当前 head 的平台状态。 */
   getPullRequestStatus(number: number): Promise<PullRequestStatus>;
   /** Unresolved review threads and general comments of a pull request (21 §2.2), oldest first. */

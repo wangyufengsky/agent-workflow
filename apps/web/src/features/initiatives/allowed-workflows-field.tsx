@@ -1,4 +1,4 @@
-import { isDefaultInitiativeWorkflow, WorkflowKind, type WorkflowSummaryDTO } from '@aw/shared';
+import { canRunInInitiative, isDefaultInitiativeWorkflow, type WorkflowSummaryDTO } from '@aw/shared';
 import { useState } from 'react';
 import { Icon } from '../../components/icon.tsx';
 import { INITIATIVES_COPY as C } from '../../copy/initiatives.ts';
@@ -22,7 +22,7 @@ export function AllowedWorkflowsField({
   onChange: (keys: string[]) => void;
 }) {
   const [open, setOpen] = useState(value !== undefined);
-  const choosable = workflows.filter((w) => w.kind !== WorkflowKind.System);
+  const choosable = workflows.filter(canRunInInitiative);
   const chosen = value ?? defaultAllowedWorkflows(choosable);
   if (!open) {
     return (

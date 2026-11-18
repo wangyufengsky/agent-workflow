@@ -127,7 +127,7 @@ opencode 检测：设置 `opencode.binaryPath` 非空时只用该路径，否则
 | POST | `/tasks/:id/start` | `draft → preparing` |
 | POST | `/tasks/:id/pause` 🅿 | `running → paused`：不再派发新步骤，进行中的步骤继续 |
 | POST | `/tasks/:id/resume` 🅿 | `paused → running`；未确认的调整草稿被取代 |
-| POST | `/tasks/:id/retry` | `{ feedback? }`：`failed → <failedPhase>`；`feedback`（D118）作为重试的失败步骤下一次尝试的说明（同 `nodes/:nodeId/retry`），其他阶段的失败忽略它；检查命令无法运行而失败的步骤 `recheck`（用已提交的结果重新检查，不重跑 AI，D116），其余失败步骤 `retry` |
+| POST | `/tasks/:id/retry` | `{ feedback? }`：`failed → <failedPhase>`；`feedback`（D118）作为重试的失败步骤下一次尝试的说明（同 `nodes/:nodeId/retry`），其他阶段的失败忽略它；重试准备阶段会保留已有分支和工作区，遇到同名冲突仍返回准备失败；检查命令无法运行而失败的步骤 `recheck`（用已提交的结果重新检查，不重跑 AI，D116），其余失败步骤 `retry` |
 | POST | `/tasks/:id/check-command` | `{ command, updateProject, expectedCommand? }`（D116、UX-01）：提交原检查命令时校验它仍是失败原因；工作区须可用。只限在执行阶段因命令检查失败的任务（`CHECK_COMMAND_UNRUNNABLE`，或 `NODE_ATTEMPTS_EXHAUSTED` 且最近一次已提交的结果未通过命令检查），否则 409 `STATE_TRANSITION_INVALID`；任务未完成的步骤（`pending` / `ready` / `failed`）中与失败命令相同的命令检查换成 `command`，`updateProject` 时同时设为项目的检查命令；然后重试：已提交结果的失败步骤 `recheck`（预算重置），其余 `retry` |
 | POST | `/tasks/:id/skip-check` | （D116）只限因 `CHECK_COMMAND_UNRUNNABLE` 或 `BROWSER_CHECK_UNRUNNABLE` 失败的任务，否则 409 `STATE_TRANSITION_INVALID`；未完成步骤中这条命令检查（或所有页面体检）标 `skipped`，然后重试（失败步骤 `recheck`）；结果卡与 PR 说明写明未验证 |
 | POST | `/tasks/:id/cancel` | `{ keepBranch?: boolean }` |
@@ -205,8 +205,8 @@ type TaskDetailDTO = {
 
 ### 5.3 交付
 
-- `strategy ∈ { squash, merge, rebase }`：本地合并到 `targetBranch`（默认 `baseBranch`），见 09 §7。合并前的检查失败直接返回错误、不改状态：`DELIVERY_TARGET_NOT_FOUND`、`WORKTREE_DIRTY`、`DELIVERY_TARGET_DIRTY`（目标分支检出在有未提交改动的工作区）。成功 → 任务 `completed`。冲突 → 任务回 `review`，`lastDelivery.status = conflict`，`conflictFiles` 列出文件；前端提供「交给 AI 解决」（= `request-changes` with `reason: 'conflict'`）。其他 git 失败 → 任务回 `review`，`lastDelivery.status = failed`，`error` 为原因。以上都返回操作后的 `TaskDetailDTO`。
-- `pull_request`：项目没有可用令牌（自己的或全局的，D155）→ 400 `HOSTING_NOT_CONFIGURED`（不改状态）。在仓库锁内把任务分支推送到 `origin`（HTTPS 远端经环境变量 `http.extraHeader` 带上令牌，不出现在命令参数中；SSH 远端用用户自己的密钥）→ 创建 PR/MR（`targetBranch` 为目标，标题与说明默认为任务标题与结果摘要，可用 `pr` 指定）→ 任务 `completed`，`prUrl` 记录在 delivery；worktree 删除，分支保留。推送或平台失败 → `lastDelivery.status = failed`，任务回 `review`。推送后先按分支查找打开的 PR/MR：已有（按审查意见修改后再次交付）就沿用它、不改标题与说明，`prUrl` 为同一个地址（21 §5）。
+- `strategy ∈ { squash, merge, rebase }`：本地合并到 `targetBranch`（默认 `baseBranch`），见 09 §7。交付目标与任务分支相同时返回 `VALIDATION_FAILED`。合并前的检查失败直接返回错误、不改状态：`DELIVERY_TARGET_NOT_FOUND`、`WORKTREE_DIRTY`、`DELIVERY_TARGET_DIRTY`（目标分支检出在有未提交改动的工作区）。成功 → 任务 `completed`。冲突 → 任务回 `review`，`lastDelivery.status = conflict`，`conflictFiles` 列出文件；前端提供「交给 AI 解决」（= `request-changes` with `reason: 'conflict'`）。其他 git 失败 → 任务回 `review`，`lastDelivery.status = failed`，`error` 为原因。以上都返回操作后的 `TaskDetailDTO`。
+- `pull_request`：项目没有可用令牌（自己的或全局的，D155）→ 400 `HOSTING_NOT_CONFIGURED`（不改状态）。在仓库锁内把任务分支推送到 `origin`（HTTPS 远端经环境变量 `http.extraHeader` 带上令牌，不出现在命令参数中；SSH 远端用用户自己的密钥）→ 创建 PR/MR（`targetBranch` 为目标，标题与说明默认为任务标题与结果摘要，可用 `pr` 指定）→ 任务 `completed`，`prUrl` 记录在 delivery；worktree 删除，分支保留。推送或平台失败 → `lastDelivery.status = failed`，任务回 `review`。推送后先按任务分支和交付目标分支一起查找打开的 PR/MR：已有（按审查意见修改后再次交付）就沿用它、不改标题与说明，`prUrl` 为同一个地址（21 §5）。
 - `report_only`：仅 `deliverable = report` 的任务可用，直接 `completed`。
 - `deliverable = report` 的任务使用其他策略 → 400 `VALIDATION_FAILED`。
 - 仓库文档工作台提交当前 `artifactVersionId`。版本变化时返回 `STATE_TRANSITION_INVALID`；交付在仓库锁内核对任务分支文件。目标分支改过同一文件且内容会变时进入现有冲突处理流程，解决后再查看文档的新版本。
@@ -315,7 +315,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | GET | `/git/reviews/:reviewId` | 一次审查；`GIT_REVIEW_NOT_FOUND` |
 | POST | `/git/reviews/:reviewId/stop` | 停止进行中的审查，write |
 | GET | `/projects/:id/worktrees` | 所有 worktree（含非本应用创建的，标注 `managed`），关联任务、分支、脏状态、相对项目默认分支的 ahead/behind；目录已不存在的标 `prunable` |
-| POST | `/projects/:id/worktrees/prune` | 删除终态任务遗留的 worktree（保留分支）并 `git worktree prune`，返回新的列表 |
+| POST | `/projects/:id/worktrees/prune` | 删除终态任务遗留的 worktree（保留分支）并 `git worktree prune`；上次退出时中断的移除可在重启后重新清理，返回新的列表 |
 
 不存在的 ref 或路径返回 404 `NOT_FOUND`（`details.object`）。
 
@@ -486,7 +486,7 @@ N2a 实现组合模板，N2b 加入 AI 拆解（`templateKey` 省略时）、重
 | 方法 | 路径 | 操作 | 风险 | 说明 |
 | --- | --- | --- | --- | --- |
 | GET | `/initiative-templates` | `initiativeTemplates.list` | read | `{ items: InitiativeTemplateDTO[] }`：内置组合模板按内置顺序，其后是自定义模板（按创建时间） |
-| POST | `/initiative-templates` | `initiativeTemplates.create` | write（专业，仅 UI） | `{ key, name, description, phases, items }` → 201 模板；按 `validateInitiativeDraft(…, { template: true })` 校验（至少一个工作包的需求含 `{{requirement}}`，否则 `INITIATIVE_BREAKDOWN_INVALID` 子码 `TEMPLATE_REQUIREMENT_MISSING`）；key 已被占用 `INITIATIVE_TEMPLATE_ALREADY_EXISTS`。「存为模板」与「复制」都是界面预填后调用它（34 §15.6），没有单独的操作 |
+| POST | `/initiative-templates` | `initiativeTemplates.create` | write（专业，仅 UI） | `{ key, name, description, phases, items }` → 201 模板；按 `validateInitiativeDraft(…, { template: true })` 校验（工作包须使用可独立启动且无需页面测试授权范围的流程，至少一个工作包的需求含 `{{requirement}}`，否则 `INITIATIVE_BREAKDOWN_INVALID` 子码 `TEMPLATE_REQUIREMENT_MISSING`）；key 已被占用 `INITIATIVE_TEMPLATE_ALREADY_EXISTS`。「存为模板」与「复制」都是界面预填后调用它（34 §15.6），没有单独的操作 |
 | PUT | `/initiative-templates/:key` | `initiativeTemplates.update` | write（专业，仅 UI） | 同上，就地修改；内置模板 `INITIATIVE_TEMPLATE_READONLY`；用它开始的需求计划不受影响（快照） |
 | DELETE | `/initiative-templates/:key` | `initiativeTemplates.delete` | critical（专业，仅 UI） | 204；内置模板 `INITIATIVE_TEMPLATE_READONLY`；用它开始的需求计划保留阶段与工作包，页头的来源变为空 |
 | GET | `/initiatives?projectId&limit&cursor` | `initiatives.list` | read | `{ items: InitiativeSummaryDTO[], nextCursor }`，按编号倒序 |

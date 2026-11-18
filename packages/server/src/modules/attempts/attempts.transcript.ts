@@ -1,5 +1,6 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { appendFileSync, createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { createInterface } from 'node:readline';
 import {
   mergePiece,
   TRANSCRIPT_PAGE_SIZE,
@@ -82,6 +83,21 @@ export function createTranscriptStore<S extends { id: string }>({
         merged.push(entry);
       }
       return { entries: merged, lastSeq: page.at(-1)?.seq ?? afterSeq, hasMore, done: isEnded && !hasMore };
+    },
+
+    /** 交接读取开始时固定字节边界；并发追加的消息留给源对话。 */
+    async *snapshot(subject: S): AsyncGenerator<TranscriptEntry> {
+      const file = fileOf(subject);
+      const bytes = statSync(file, { throwIfNoEntry: false })?.size ?? 0;
+      if (bytes === 0) return;
+      const input = createReadStream(file, { start: 0, end: bytes - 1, encoding: 'utf8' });
+      const reader = createInterface({ input, crlfDelay: Infinity });
+      try {
+        for await (const line of reader) yield transcriptEntrySchema.parse(JSON.parse(line));
+      } finally {
+        reader.close();
+        input.destroy();
+      }
     },
 
     /** 升级会话时只回放最近的可见文字，避免把完整历史一次装入模型。 */

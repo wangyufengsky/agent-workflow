@@ -30,6 +30,7 @@ import {
   producedEntity,
   type SendAssistantMessageRequest,
   ServerEventType,
+  type TranscriptEntry,
   TranscriptEntryKind,
   type TranscriptPage,
   TranscriptSystemEvent,
@@ -737,7 +738,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       return publish(id);
     },
 
-    continueConversation({
+    async continueConversation({
       id,
       requestId,
       attachmentIds,
@@ -745,29 +746,51 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       id: string;
       requestId: string;
       attachmentIds: string[];
-    }): AssistantConversationDTO {
-      const existing = repo.findContinuationByRequest(requestId);
-      if (existing !== undefined) {
-        if (existing.sourceConversationId !== id)
-          throw new AppError(ErrorCode.ValidationFailed, 'Request belongs to another source');
-        return toDto(get(existing.conversationId));
-      }
-      const source = get(id);
-      const state = liveOf(id);
-      if (state.busy || state.sending || state.deleting || state.stopping)
-        throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is busy`, { id });
+    }): Promise<AssistantConversationDTO> {
+      const priorRequest = () => {
+        const existing = repo.findContinuationByRequest(requestId);
+        if (existing !== undefined) {
+          if (existing.sourceConversationId !== id)
+            throw new AppError(ErrorCode.ValidationFailed, 'Request belongs to another source');
+          return toDto(get(existing.conversationId));
+        }
+        return undefined;
+      };
+      const existing = priorRequest();
+      if (existing !== undefined) return existing;
+      const availableSource = () => {
+        const source = get(id);
+        const state = liveOf(id);
+        if (state.busy || state.sending || state.deleting || state.stopping)
+          throw new AppError(ErrorCode.AssistantBusy, `Conversation ${id} is busy`, { id });
+        return source;
+      };
+      const source = availableSource();
       const previous = repo.findContinuation(id);
       const own = new Set(attachments.listByOwner({ kind: AttachmentOwnerKind.AssistantMessage, id }).map((a) => a.id));
       if (attachmentIds.some((attachmentId) => !own.has(attachmentId)))
         throw new AppError(ErrorCode.AttachmentNotFound, 'Not attachments of this conversation');
-      const entries: import('@aw/shared').TranscriptEntry[] = [];
+      const entries: TranscriptEntry[] = [];
       let afterSeq = 0;
-      let page: TranscriptPage;
-      do {
-        page = transcripts.read(source, afterSeq, true);
-        entries.push(...page.entries);
-        afterSeq = page.lastSeq;
-      } while (page.hasMore);
+      try {
+        for await (const entry of transcripts.snapshot(source)) {
+          afterSeq = entry.seq;
+          if (
+            entry.kind === TranscriptEntryKind.UserMessage ||
+            entry.kind === TranscriptEntryKind.Text ||
+            entry.kind === TranscriptEntryKind.EntityRef ||
+            entry.kind === TranscriptEntryKind.Error
+          )
+            entries.push(entry);
+        }
+      } catch (err) {
+        // 源对话在文件打开前被删除时，返回对话已删除的领域错误。
+        get(id);
+        throw err;
+      }
+      const concurrent = priorRequest();
+      if (concurrent !== undefined) return concurrent;
+      availableSource();
       const handoff = continuationContext(entries, previous?.handoffText);
       const lastUserIndex = entries.findLastIndex((entry) => entry.kind === TranscriptEntryKind.UserMessage);
       const lastUser = entries[lastUserIndex];

@@ -1,9 +1,9 @@
 import {
+  canRunInInitiative,
   type InitiativeDetailDTO,
   type InitiativeDraft,
   type InitiativeItemDTO,
   InitiativeItemStatus,
-  WorkflowKind,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { type Dispatch, type ReactNode, type SetStateAction, useState } from 'react';
@@ -59,7 +59,7 @@ export function DraftFields({
   /** After 添加工作包: the editor's own buttons. */
   actions: ReactNode;
 }) {
-  const workflows = (useQuery(workflowsQuery).data ?? []).filter((w) => w.kind !== WorkflowKind.System);
+  const workflows = (useQuery(workflowsQuery).data ?? []).filter(canRunInInitiative);
   const setItem = (key: string, change: Partial<DraftItem>) =>
     setDraft((d) => ({ ...d, items: d.items.map((i) => (i.key === key ? { ...i, ...change } : i)) }));
   const setPhase = (index: number, change: Partial<InitiativeDraft['phases'][number]>) =>

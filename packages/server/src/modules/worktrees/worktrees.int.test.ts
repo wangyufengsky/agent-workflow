@@ -92,6 +92,11 @@ describe('worktrees', () => {
         baseBranch: 'main',
       }),
     ).rejects.toMatchObject({ code: ErrorCode.WorktreeCreateFailed });
-    expect(t.app.services.worktrees.findByTask(task.id)).toMatchObject({ status: 'error' });
+    const failed = t.app.services.worktrees.findByTask(task.id);
+    if (failed === undefined) throw new Error('Missing failed worktree');
+    expect(failed.status).toBe('error');
+    const original = await repo.git('rev-parse', failed.branch);
+    await t.app.services.worktrees.recoverPreparation(failed, repo.path);
+    expect(await repo.git('show-ref', '--verify', '--hash', `refs/heads/${failed.branch}`)).toBe(original);
   });
 });

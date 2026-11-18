@@ -183,21 +183,20 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
     let worktree: Worktree;
     try {
       const existing = worktrees.findByTask(taskId);
-      if (existing !== undefined && existing.status !== WorktreeStatus.Ready)
-        await worktrees.discard(existing, project.repoPath);
+      const recovered =
+        existing === undefined ? undefined : await worktrees.recoverPreparation(existing, project.repoPath);
       worktree =
-        existing?.status === WorktreeStatus.Ready
-          ? existing
-          : await worktrees.create({
-              taskId,
-              taskKey: task.key,
-              title: task.title,
-              projectId: project.id,
-              projectSlug: project.slug,
-              repoPath: project.repoPath,
-              baseBranch: task.baseBranch,
-              ...(task.mergeSource === null ? {} : { startPoint: task.mergeSource }),
-            });
+        recovered ??
+        (await worktrees.create({
+          taskId,
+          taskKey: task.key,
+          title: task.title,
+          projectId: project.id,
+          projectSlug: project.slug,
+          repoPath: project.repoPath,
+          baseBranch: task.baseBranch,
+          ...(task.mergeSource === null ? {} : { startPoint: task.mergeSource }),
+        }));
       // A merge task starts at its source with the base branch merged in, conflicts left for its step (27 §3.6). A
       // preparation resumed after a restart may find the merge already under way.
       if (task.mergeSource !== null && !(await hasMergeHead(worktree.path))) {
