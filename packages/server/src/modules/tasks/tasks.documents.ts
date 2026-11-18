@@ -241,7 +241,28 @@ export function createTaskDocuments(
     if (expectedId !== undefined && expectedId !== latest?.id) {
       throw new AppError(ErrorCode.StateTransitionInvalid, 'The document version changed. Review the latest version.');
     }
-    return Array.from(latestDocumentVersions(versions).values()).flatMap((v) => (v.repository ? [v.repository] : []));
+    const documents = Array.from(latestDocumentVersions(versions).values()).flatMap((v) =>
+      v.repository ? [v.repository] : [],
+    );
+    const revision = nodes
+      .listByTask(taskId)
+      .findLast((n) => n.kind === NodeKind.Revise && n.status === NodeStatus.Done && n.commitSha)?.commitSha;
+    if (!revision || !documents.length) return documents;
+    const { repoPath } = projects.getRecord(task.projectId);
+    // A reviewed revision can remove a previously published file. Check its absence at delivery,
+    // retaining the original snapshot for history and detecting any subsequent unreviewed re-add.
+    const { stdout } = await runGit(
+      ['--literal-pathspecs', 'ls-tree', '-z', '--name-only', revision, '--', ...documents.map((doc) => doc.path)],
+      { cwd: repoPath, verbatim: true },
+    );
+    const present = new Set(stdout.split('\0'));
+    return Promise.all(
+      documents.map(async (doc) => {
+        if (present.has(doc.path) || (doc.integratedDeliveryId && !(await isAncestor(repoPath, doc.commit, revision))))
+          return doc;
+        return { ...doc, commit: revision };
+      }),
+    );
   }
 
   async function assertEditableVersion(input: ArtifactRevision) {

@@ -1,4 +1,4 @@
-import { utimes, writeFile } from 'node:fs/promises';
+import { unlink, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   deliverTaskOp,
@@ -46,7 +46,7 @@ it('草稿只读取工作区已更改的文本文档，其他步骤和较新的�
   expect(detail.artifact?.versions).toHaveLength(0);
 });
 
-it('对非默认文档的标注只修订该文件，交付时同时核对其他文档', async () => {
+it.each(['保留', '删除'])('对非默认文档的标注只修订该文件，交付时核对修订中%s的其他文档', async (operation) => {
   const a = 'api.md';
   const b = 'design.md';
   const { project, repo } = await addProject(t, { files: { [a]: '旧接口', [b]: '旧设计' } });
@@ -80,6 +80,11 @@ it('对非默认文档的标注只修订该文件，交付时同时核对其他�
   });
   accept();
   const revised = taskReaches(t, TaskStatus.Review);
+  if (operation === '删除') {
+    const tree = t.app.services.worktrees.findByTask(task.id);
+    if (!tree) throw new Error('Missing worktree');
+    await unlink(join(tree.path, b));
+  }
   const change = await t.call(reviseTaskArtifactOp, {
     id: task.id,
     versionId: first.id,
@@ -93,6 +98,35 @@ it('对非默认文档的标注只修订该文件，交付时同时核对其他�
     [b, 1],
     [a, 2],
   ]);
+  if (operation === '删除') {
+    const tree = t.app.services.worktrees.findByTask(task.id);
+    if (!tree) throw new Error('Missing worktree');
+    await writeFile(join(tree.path, b), '未经核验的恢复');
+    await repo.git('-C', tree.path, 'add', b);
+    await repo.git('-C', tree.path, 'commit', '-m', 'restore after review');
+    const restored = await t.call(deliverTaskOp, {
+      id: task.id,
+      strategy: 'squash',
+      artifactVersionId: current.at(-1)?.id,
+    });
+    expect(restored.body.status).toBe(TaskStatus.Review);
+    expect(await repo.git('show', `main:${b}`)).toBe('旧设计');
+    await repo.git('-C', tree.path, 'rm', b);
+    await repo.git('-C', tree.path, 'commit', '-m', 'return to reviewed deletion');
+    const delivered = await t.call(deliverTaskOp, {
+      id: task.id,
+      strategy: 'squash',
+      artifactVersionId: current.at(-1)?.id,
+    });
+    expect(delivered.body.status).toBe(TaskStatus.Completed);
+    expect(await repo.git('ls-tree', '--name-only', 'main', '--', b)).toBe('');
+    const removed = initial.find((v) => v.name === b);
+    if (!removed) throw new Error('Missing historical version');
+    expect((await t.call(getTaskArtifactOp, { id: task.id, versionId: removed.id })).body).toMatchObject({
+      text: '设计一版',
+    });
+    return;
+  }
   await writeFile(join(repo.path, b), '目标分支上的设计');
   await repo.git('commit', '-am', 'change other document');
   const result = await t.call(deliverTaskOp, {
