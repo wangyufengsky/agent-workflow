@@ -4,18 +4,29 @@ import {
   AttachmentFormat,
   columnName,
   getTaskArtifactOp,
+  type RepositoryDocumentDraft,
   type SheetPreviewDTO,
   textLines,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { type MouseEvent, type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  type MouseEvent,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { Components } from 'react-markdown';
 import { callOperation } from '../../api/client.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { ExternalLink } from '../../components/external-link.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
 import { Markdown } from '../../components/markdown.tsx';
-import { revealInPane } from '../../components/reveal-in-pane.ts';
+import { revealInPane, sizeReadingPane } from '../../components/reveal-in-pane.ts';
 import { ARTIFACT_COPY } from '../../copy/artifacts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DIFF_COPY } from '../../copy/diff.ts';
@@ -23,6 +34,7 @@ import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 import { SheetView } from '../attachments/attachment-preview.tsx';
 import styles from './artifact-workbench.module.css';
 
+import { DocumentNavigation, resolveDocumentLink, revealDocumentHeading } from './document-links.ts';
 import { changedLines, type VersionChange } from './version-changes.ts';
 
 const versionQuery = (task: string, version: string | undefined, sheet?: string) => ({
@@ -58,14 +70,23 @@ function blockAnchor(lines: string[], from: number, to: number): ArtifactSelecti
 }
 
 function Content({
+  path,
   source,
   changes,
   onPick,
 }: {
   changes: Map<number, VersionChange>;
+  path: string;
   source: string;
   onPick?: OnPick | undefined;
 }) {
+  const article = useRef<HTMLElement>(null);
+  const navigation = useContext(DocumentNavigation);
+  const target = navigation?.target;
+  useLayoutEffect(() => {
+    if (target?.path === path && article.current && target.fragment)
+      revealDocumentHeading(article.current, target.fragment);
+  }, [target, path]);
   const lines = textLines(source);
   function marker(from: number | undefined, to: number | undefined) {
     if (from === undefined || to === undefined) return null;
@@ -87,6 +108,23 @@ function Content({
     );
   }
   const components: Components = {
+    a: ({ href, children }) => {
+      if (!href) return <>{children}</>;
+      const link = resolveDocumentLink(href, path, navigation?.paths);
+      if (!link) return <ExternalLink href={href}>{children}</ExternalLink>;
+      return (
+        <a
+          href={href}
+          onClick={(event) => {
+            event.preventDefault();
+            if (link.path !== path) navigation?.open(link.path, link.fragment);
+            else if (article.current) revealDocumentHeading(article.current, link.fragment);
+          }}
+        >
+          {children}
+        </a>
+      );
+    },
     img: ({ alt }) => (alt ? <span>{alt}</span> : null),
     p: ({ children, node }) => (
       <p>
@@ -126,7 +164,7 @@ function Content({
     );
   }
   return (
-    <article className={styles.paper}>
+    <article ref={article} className={styles.paper}>
       <Markdown source={source} components={components} />
     </article>
   );
@@ -286,6 +324,36 @@ function Workbook({
   return <SheetView data={data} renderCell={onPick === undefined && before === undefined ? undefined : renderCell} />;
 }
 
+/** 工作区预览只比较相邻两次实际读到的正文；正式版本仍由节点成功提交后生成。 */
+export function DocumentDraftPreview({ draft, follow }: { draft: RepositoryDocumentDraft; follow: boolean }) {
+  const [snapshot, setSnapshot] = useState(() => ({ text: draft.text, changes: new Map<number, VersionChange>() }));
+  if (snapshot.text !== draft.text) setSnapshot({ text: draft.text, changes: changedLines(snapshot.text, draft.text) });
+  const pane = useRef<HTMLElement>(null);
+  const attach = useCallback((element: HTMLElement | null) => {
+    pane.current = element;
+    return sizeReadingPane(element);
+  }, []);
+  useLayoutEffect(() => {
+    if (!follow || !snapshot.changes.size || !pane.current) return;
+    const mark = pane.current.querySelector('[data-kind]');
+    if (mark) revealInPane(pane.current, mark);
+  }, [follow, snapshot]);
+  return (
+    <section aria-label={ARTIFACT_COPY.workingDraft} className={styles.reader} ref={attach}>
+      {draft.truncated && <p className="hint">{ARTIFACT_COPY.truncated}</p>}
+      {/\.md$/i.test(draft.path) ? (
+        <Content path={draft.path} source={snapshot.text} changes={snapshot.changes} />
+      ) : (
+        <Lines
+          source={snapshot.text}
+          changes={snapshot.changes}
+          focusLine={follow ? snapshot.changes.keys().next().value : undefined}
+        />
+      )}
+    </section>
+  );
+}
+
 export function ArtifactPreview({
   follow = false,
   taskId,
@@ -370,7 +438,12 @@ export function ArtifactPreview({
   if (data.format === AttachmentFormat.Docx)
     return (
       <div ref={content}>
-        <Content changes={changes} source={data.markdown} onPick={onPick} />
+        <Content
+          path={version.repository?.path ?? version.name}
+          changes={changes}
+          source={data.markdown}
+          onPick={onPick}
+        />
       </div>
     );
   return (
@@ -399,7 +472,7 @@ export function ArtifactPreview({
           onPick={onPick}
         />
       ) : (
-        <Content changes={changes} source={data.text} onPick={onPick} />
+        <Content path={version.repository?.path ?? version.name} changes={changes} source={data.text} onPick={onPick} />
       )}
     </div>
   );

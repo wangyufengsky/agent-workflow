@@ -11,7 +11,7 @@ import { type DiffHunk, type DiffLine, parseUnifiedDiff, toSplitRows } from './p
 export type DiffMode = 'unified' | 'split';
 
 /** A line an AI review found something on (27 §4.5): a dot by its number, coloured by severity. */
-export type DiffMark = { line: number; side: 'new' | 'old'; severity: string; title: string };
+export type DiffMark = { line: number; side: 'new' | 'old'; severity: string; title: string; description?: string };
 /** A line to scroll to and highlight. */
 export type DiffFocus = { line: number; side: 'new' | 'old' };
 
@@ -92,7 +92,8 @@ function UnifiedRows({
       )
     : undefined;
   return hunk.lines.map((line) => {
-    const mark = marks.find((m) => atLine(line, m));
+    const matching = marks.filter((m) => atLine(line, m));
+    const mark = matching[0];
     return (
       <tr
         key={`${line.oldNo}-${line.newNo}`}
@@ -108,6 +109,13 @@ function UnifiedRows({
         <td className={styles.sign}>{SIGN[line.kind]}</td>
         <td className={styles.code}>
           <Code line={line} tokens={tokens} />
+          {matching
+            .filter((m) => m.description)
+            .map((m) => (
+              <div key={m.title} className={styles.reviewNote}>
+                <strong>{m.title}</strong>　{m.description}
+              </div>
+            ))}
           {annotate && line.kind !== 'context' && (
             <small className={styles.editLabel}>
               {C.status[line.kind === 'del' ? 'deleted' : replacements?.has(line) ? 'modified' : 'added']}

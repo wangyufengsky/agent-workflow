@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { artifactPreviewSchema, artifactRevisionSchema } from '../contracts/api/artifacts.ts';
+import {
+  artifactPreviewSchema,
+  artifactRevisionSchema,
+  repositoryDocumentDraftSchema,
+} from '../contracts/api/artifacts.ts';
 import { previewSessionsSchema } from '../contracts/api/browser.ts';
 import {
   deliverRequestSchema,
@@ -438,6 +442,18 @@ export const requestChangesOp = defineOperationContract({
   http: { method: 'POST', path: '/tasks/:id/request-changes' },
   // A preview tab is the user's own: the assistant has none to attach. Nor can it attach files yet (30 §2.2).
   assistantOmit: ['page', 'attachmentIds'],
+});
+
+export const getTaskDocumentDraftOp = defineOperationContract({
+  ...common,
+  expose: { palette: false, assistant: false },
+  id: 'tasks.getDocumentDraft',
+  title: 'op.tasks.getDocumentDraft',
+  description: 'Preview the Markdown or text being edited by the current repository document step.',
+  input: byNode.extend({ path: z.string().optional() }),
+  output: z.object({ draft: repositoryDocumentDraftSchema.nullable() }),
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/tasks/:id/nodes/:nodeId/document-draft' },
 });
 
 export const getTaskArtifactOp = defineOperationContract({

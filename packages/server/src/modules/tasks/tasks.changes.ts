@@ -15,9 +15,11 @@ import {
   type FrontendRound,
   InboxKind,
   isArtifactWorkflow,
+  isDesignProposalWorkflow,
   isFrontendWorkflow,
   isRepositoryDocumentWorkflow,
   isTaskCodeReview,
+  latestDocumentVersions,
   NodeKind,
   NodeStatus,
   nodeAcceptanceSchema,
@@ -98,7 +100,8 @@ export function createTaskChanges(
     const confirmed = plans.confirmed(task.id);
     if (confirmed === undefined) throw new Error(`Task ${task.key} has no confirmed plan`);
     const system = SYSTEM_NODES[revision.reason];
-    const revisingReview = isTaskCodeReview(workflows.get(task.workflowId));
+    const workflow = workflows.get(task.workflowId);
+    const revisingReview = isTaskCodeReview(workflow) || isDesignProposalWorkflow(workflow);
     const spec: PlanNodeSpec = {
       key: nextKey(task.id, system.keyPrefix),
       title: system.title,
@@ -243,7 +246,9 @@ export function createTaskChanges(
     const workflow = workflows.get(task.workflowId);
     if ((!isArtifactWorkflow(workflow) && !isRepositoryDocumentWorkflow(workflow)) || task.status !== TaskStatus.Review)
       throw new AppError(ErrorCode.StateTransitionInvalid, 'The task is not waiting for artifact feedback');
-    const version = artifacts.visibleVersions(id).at(-1);
+    const version = Array.from(latestDocumentVersions(artifacts.visibleVersions(id)).values()).find(
+      (v) => v.id === versionId,
+    );
     if (version?.id !== versionId)
       throw new AppError(
         ErrorCode.StateTransitionInvalid,
@@ -481,8 +486,15 @@ export function createTaskChanges(
               : [
                   `先用 agent-workflow_get_node_output 读取 ${previous.key} 的上一份审查报告，再去核对代码。除非用户要求换范围，沿用原来审查的提交与范围。`,
                 ]),
+            '用 read 阅读需要复核的行，确认问题后用 report_progress.code_review 更新当前完整问题清单。',
             '调用 agent-workflow_submit_result 提交修订后的总结和完整 code_review。若没有发现，提交空的 findings。',
             withPage,
+          ].join('\n\n');
+        } else if (isDesignProposalWorkflow(workflow)) {
+          instructions = [
+            withPage,
+            '根据上一版方案和反馈修订。每写好一节，用 agent-workflow_report_progress 的 proposal 同步当前完整正文，最后用 submit_result.summary 提交完整方案。保持只读。',
+            task.result?.summary,
           ].join('\n\n');
         } else {
           instructions = renderTemplate(prompts[PromptName.Revise], {

@@ -279,7 +279,7 @@ type HandoffOutput = {
 输出：`{ accepted: true, next: 'verifying' | 'awaiting_acceptance' | 'done' }`
 错误：`MCP_RESULT_ALREADY_SUBMITTED`、`VALIDATION_FAILED`。
 
-内置「代码审查」步骤可附带 `code_review: { scope, findings }`。`scope` 可以是 `{ kind: 'diff', from, to }` 或 `{ kind: 'files', commit, directory }`，提交均填写完整 Git SHA，整仓审查的目录用空串。发现沿用 Git 工作台的严重程度、分类、路径和行号协议。服务器验证每条发现归属审查范围及指定的文件版本，返回的任务报告含可跳转的位置。按反馈修订时沿用只读评审员，可通过 `get_node_output.reviewReport` 查看上轮报告，再提交完整的新报告。早期确认的流程仍可提交原有文字总结。
+内置代码审查、版本比对审查和安全审查步骤可附带 `code_review: { scope, findings }`。`scope` 可以是 `{ kind: 'diff', from, to }` 或 `{ kind: 'files', commit, directory }`，提交均填写完整 Git SHA，整仓审查的目录用空串。发现沿用 Git 工作台的严重程度、分类、路径和行号协议。服务器验证每条发现归属审查范围及指定的文件版本，返回的任务报告含可跳转的位置。按反馈修订时沿用只读评审员，可通过 `get_node_output.reviewReport` 查看上轮报告，再提交完整的新报告。早期确认的流程仍可提交原有文字总结。
 
 ### 6.6 `submit_review`
 
@@ -321,8 +321,8 @@ type HandoffOutput = {
 
 ### 6.8 `report_progress`
 
-输入：`{ message: string }`（1..`REPORT_PROGRESS_MAX_CHARS`）
-行为：记为当前尝试的 `progress`（只在内存中，尝试结束时清除），推送 `attempt.updated`；节点（或任务规划阶段）的「当前进展」显示其活动尝试的这一行。不写库历史。
+输入：`{ message: string, code_review?: TaskCodeReviewInput, proposal?: string }`（message 为 1..`REPORT_PROGRESS_MAX_CHARS`）
+行为：记为当前尝试的 `progress`（只在内存中，尝试结束时清除），推送 `attempt.updated`；节点（或任务规划阶段）的「当前进展」显示其活动尝试的这一行。简短进展保存在内存。审查步骤可附带截至当前的完整 `code_review`，范围与行号校验同 submit_result。方案设计步骤可附带当前完整 Markdown 正文 `proposal`（上限同 summary）。两种草稿互斥并按尝试保存为 report_draft 事件，供任务页实时预览。
 输出：`{ ok: true }`
 
 ### 6.9 `db_list_connections`

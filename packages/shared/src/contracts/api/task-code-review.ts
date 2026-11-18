@@ -3,9 +3,16 @@ import { WorkflowKind } from '../../enums/workflow.ts';
 import { gitFindingSchema, submitFindingsInputSchema } from './git.ts';
 
 export const CODE_REVIEW_WORKFLOW_KEY = 'code_review';
+export const VERSION_REVIEW_WORKFLOW_KEY = 'version_review';
+export const SECURITY_REVIEW_WORKFLOW_KEY = 'security_review';
+export const DESIGN_PROPOSAL_WORKFLOW_KEY = 'design_proposal';
 export const TASK_CODE_REVIEW_NODE_KEY = 'review';
 export const isTaskCodeReview = (workflow: { key: string; kind: WorkflowKind }): boolean =>
-  workflow.kind === WorkflowKind.Builtin && workflow.key === CODE_REVIEW_WORKFLOW_KEY;
+  workflow.kind === WorkflowKind.Builtin &&
+  [CODE_REVIEW_WORKFLOW_KEY, VERSION_REVIEW_WORKFLOW_KEY, SECURITY_REVIEW_WORKFLOW_KEY].includes(workflow.key);
+
+export const isDesignProposalWorkflow = (workflow: { key: string; kind: WorkflowKind }) =>
+  workflow.kind === WorkflowKind.Builtin && workflow.key === DESIGN_PROPOSAL_WORKFLOW_KEY;
 
 const commitSha = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/);
 

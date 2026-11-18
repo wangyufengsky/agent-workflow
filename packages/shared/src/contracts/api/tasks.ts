@@ -276,7 +276,14 @@ export const taskDetailSchema = taskSummarySchema.extend({
   nodes: z.array(nodeSummarySchema),
   activeAttempts: z.array(attemptSummarySchema),
   artifact: artifactTaskSchema.optional(),
-  codeReview: z.object({ report: taskCodeReviewReportSchema.nullable(), summary: z.string().nullable() }).optional(),
+  proposal: z.object({ text: z.string().nullable() }).optional(),
+  codeReview: z
+    .object({
+      draft: taskCodeReviewReportSchema.optional(),
+      report: taskCodeReviewReportSchema.nullable(),
+      summary: z.string().nullable(),
+    })
+    .optional(),
   frontend: z.object({ verified: z.boolean(), rounds: z.array(frontendRoundSchema) }).optional(),
   openInbox: z.array(inboxItemSchema),
   result: taskResultSchema.nullable(),

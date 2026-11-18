@@ -97,8 +97,8 @@ export function appendTranscript(qc: QueryClient, source: TranscriptSource, entr
 }
 
 /** One stream: the first page as soon as it arrives, the rest read on in the background, live lines after. */
-export function useTranscript(source: TranscriptSource) {
-  const pages = useInfiniteQuery(transcriptQuery(source));
+export function useTranscript(source: TranscriptSource, enabled = true) {
+  const pages = useInfiniteQuery({ ...transcriptQuery(source), enabled });
   const live = useQuery(liveTranscriptQuery(source));
   const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = pages;
   // After a failed page the view offers a retry instead of reading on by itself.

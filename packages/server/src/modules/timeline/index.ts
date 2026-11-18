@@ -22,6 +22,10 @@ export function deliveredRequirements(db: DbExecutor, deliveryByTask: ReadonlyMa
   return createTimelineRepo(db).deliveredRequirements(deliveryByTask);
 }
 
+export function latestTaskPayload(db: DbExecutor, taskId: string, attemptId: string, type: string) {
+  return createTimelineRepo(db).latestPayload(taskId, attemptId, type);
+}
+
 /** Events happen in id order: the newest matching event's id orders it against others (0 when none). */
 export function latestTaskEventId(
   db: DbExecutor,

@@ -1,10 +1,12 @@
-import { writeFile } from 'node:fs/promises';
+import { unlink, utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   deliverTaskOp,
   ErrorCode,
   getTaskArtifactOp,
+  getTaskDocumentDraftOp,
   getTaskOp,
+  NodeStatus,
   reviseTaskArtifactOp,
   startTaskOp,
   TaskStatus,
@@ -12,13 +14,128 @@ import {
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
-import { addProject, createTask, taskReaches } from '../../../test/helpers/tasks.ts';
+import { addProject, createTask, nodeReaches, taskReaches } from '../../../test/helpers/tasks.ts';
 
 let t: TestApp;
 beforeEach(async () => {
   t = await createTestApp();
 });
 afterEach(() => t.close());
+
+it('草稿只读取工作区已更改的文本文档，其他步骤和较新的二进制文件不遮挡正文', async () => {
+  const { project } = await addProject(t, { files: { 'design.md': '# 原始设计' } });
+  const task = await createTask(t, { projectId: project.id, workflow: 'detailed_design', start: false });
+  t.fake.enqueue(script().callTool('submit_result', { summary: '已梳理' }), { title: '· 梳理现状' });
+  t.fake.enqueue(script().hang(), { title: '· 编写详细设计' });
+  const writing = nodeReaches(t, 'write', NodeStatus.Running);
+  await t.call(startTaskOp, { id: task.id });
+  const { node } = await writing;
+  const read = async () => (await t.call(getTaskDocumentDraftOp, { id: task.id, nodeId: node.id })).body.draft;
+  expect(await read()).toBeNull();
+  const tree = t.app.services.worktrees.findByTask(task.id);
+  if (!tree) throw new Error('Missing worktree');
+  const text = '# 原始设计\n\n## 正在补充的段落';
+  await writeFile(join(tree.path, 'design.md'), text);
+  await utimes(join(tree.path, 'design.md'), new Date(0), new Date(0));
+  await writeFile(join(tree.path, 'other.txt'), Buffer.from([0, 1, 2]));
+  expect(await read()).toEqual({ path: 'design.md', text, truncated: false });
+  const detail = (await t.call(getTaskOp, { id: task.id })).body;
+  const survey = detail.nodes.find(({ id }) => id !== node.id);
+  if (!survey) throw new Error('Missing sibling node');
+  expect((await t.call(getTaskDocumentDraftOp, { id: task.id, nodeId: survey.id })).body.draft).toBeNull();
+  expect(detail.artifact?.versions).toHaveLength(0);
+});
+
+it.each(['保留', '删除'])('对非默认文档的标注只修订该文件，交付时核对修订中%s的其他文档', async (operation) => {
+  const a = 'api.md';
+  const b = 'design.md';
+  const { project, repo } = await addProject(t, { files: { [a]: '旧接口', [b]: '旧设计' } });
+  const task = await createTask(t, { projectId: project.id, workflow: 'detailed_design', start: false });
+  const directory = `/${task.key}`;
+  t.fake.enqueue(script().callTool('submit_result', { summary: '已梳理' }), { title: '· 梳理现状', directory });
+  t.fake.enqueue(script().edit(a, '接口一版').edit(b, '设计一版').callTool('submit_result', { summary: '已编写' }), {
+    title: '· 编写详细设计',
+    directory,
+  });
+  const accept = () =>
+    t.fake.enqueue(script().callTool('submit_review', { verdict: 'pass', summary: '通过' }), {
+      agent: 'aw-reviewer',
+      directory,
+    });
+  accept();
+  const ready = taskReaches(t, TaskStatus.Review);
+  await t.call(startTaskOp, { id: task.id });
+  await ready;
+  const versions = async () => (await t.call(getTaskOp, { id: task.id })).body.artifact?.versions ?? [];
+  const initial = await versions();
+  expect(initial.map((v) => [v.name, v.number])).toEqual([
+    [a, 1],
+    [b, 1],
+  ]);
+  const first = initial[0];
+  if (!first) throw new Error('Missing document');
+  t.fake.enqueue(script().edit(a, '接口二版').callTool('submit_result', { summary: '已修改接口' }), {
+    title: '· 产物修改 1',
+    directory,
+  });
+  accept();
+  const revised = taskReaches(t, TaskStatus.Review);
+  if (operation === '删除') {
+    const tree = t.app.services.worktrees.findByTask(task.id);
+    if (!tree) throw new Error('Missing worktree');
+    await unlink(join(tree.path, b));
+  }
+  const change = await t.call(reviseTaskArtifactOp, {
+    id: task.id,
+    versionId: first.id,
+    notes: [{ anchor: { kind: 'whole' }, quote: '', note: '修订接口' }],
+  });
+  expect(change.status).toBe(200);
+  await revised;
+  const current = await versions();
+  expect(current.map((v) => [v.name, v.number])).toEqual([
+    [a, 1],
+    [b, 1],
+    [a, 2],
+  ]);
+  if (operation === '删除') {
+    const tree = t.app.services.worktrees.findByTask(task.id);
+    if (!tree) throw new Error('Missing worktree');
+    await writeFile(join(tree.path, b), '未经核验的恢复');
+    await repo.git('-C', tree.path, 'add', b);
+    await repo.git('-C', tree.path, 'commit', '-m', 'restore after review');
+    const restored = await t.call(deliverTaskOp, {
+      id: task.id,
+      strategy: 'squash',
+      artifactVersionId: current.at(-1)?.id,
+    });
+    expect(restored.body.status).toBe(TaskStatus.Review);
+    expect(await repo.git('show', `main:${b}`)).toBe('旧设计');
+    await repo.git('-C', tree.path, 'rm', b);
+    await repo.git('-C', tree.path, 'commit', '-m', 'return to reviewed deletion');
+    const delivered = await t.call(deliverTaskOp, {
+      id: task.id,
+      strategy: 'squash',
+      artifactVersionId: current.at(-1)?.id,
+    });
+    expect(delivered.body.status).toBe(TaskStatus.Completed);
+    expect(await repo.git('ls-tree', '--name-only', 'main', '--', b)).toBe('');
+    const removed = initial.find((v) => v.name === b);
+    if (!removed) throw new Error('Missing historical version');
+    expect((await t.call(getTaskArtifactOp, { id: task.id, versionId: removed.id })).body).toMatchObject({
+      text: '设计一版',
+    });
+    return;
+  }
+  await writeFile(join(repo.path, b), '目标分支上的设计');
+  await repo.git('commit', '-am', 'change other document');
+  const result = await t.call(deliverTaskOp, {
+    id: task.id,
+    strategy: 'squash',
+    artifactVersionId: current.at(-1)?.id,
+  });
+  expect(result.body.lastDelivery).toMatchObject({ status: 'conflict', conflictFiles: [b] });
+});
 
 it('目标分支更新同一文档后先重新审阅，已合并任务仍可读版本快照', async () => {
   const path = 'orders.md';

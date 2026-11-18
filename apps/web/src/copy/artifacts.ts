@@ -10,6 +10,8 @@ export function artifactAnchorLabel(anchor: ArtifactAnchor): string {
 }
 
 export const ARTIFACT_COPY = {
+  selectFile: '选择文档',
+  workingDraft: '工作区草稿',
   panels: {
     activity: 'AI 活动',
     notes: '标注修改',
@@ -29,6 +31,8 @@ export const ARTIFACT_COPY = {
   previewLabel: (version: number) => `产物预览 v${version}`,
   after: (version: number) => `改后 · v${version}`,
   openLatest: '打开最新版本',
+  awaitingDraft: '等待写入文档',
+  awaitingDraftHint: 'AI 将文档写入工作区后，正文会在这里自动打开。',
   building: '正在生成首版产物',
   buildingHint: '首个文件发布后会自动打开预览。',
   empty: '还没有可查看的文件。',

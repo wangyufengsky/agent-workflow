@@ -94,3 +94,57 @@
 .metadata {
   overflow-wrap: anywhere;
 }
+
+.reader {
+  height: min(var(--reader-available-height, 62dvh), 78dvh);
+  overflow: auto;
+  padding-block: var(--s-3);
+  overscroll-behavior: contain;
+}
+.reader code {
+  white-space: pre;
+  font: inherit;
+}
+.reader .line {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.65;
+}
+.reader .line[data-marked="true"] {
+  background: var(--ok-fill);
+  border-inline-start: 2px solid var(--ok);
+}
+.annotation {
+  margin: var(--s-1) var(--s-2) var(--s-2) 5ch;
+  padding: var(--s-2);
+  background: var(--warn-fill);
+  border-inline-start: 2px solid var(--warn);
+}
+.fileHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  padding-bottom: var(--s-2);
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.metadata select {
+  width: auto;
+  max-width: min(100%, 40ch);
+}
+
+.outline {
+  display: grid;
+  gap: var(--s-1);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line);
+}
+.outline button {
+  text-align: start;
+  color: var(--ink-2);
+  padding: var(--s-1);
+}
+.outline button:hover {
+  background: var(--accent-fill);
+}

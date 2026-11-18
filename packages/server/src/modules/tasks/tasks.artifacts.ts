@@ -9,6 +9,7 @@ import {
   type AttemptDTO,
   AttemptKind,
   AttemptStatus,
+  artifactDocumentKey,
   artifactNameSchema,
   artifactRoundSchema,
   artifactVersionSchema,
@@ -52,6 +53,18 @@ export function createTaskArtifacts(deps: TasksServiceDeps, state: TaskState) {
       (version) =>
         version.repository !== undefined || attempts.get(version.attemptId)?.status === AttemptStatus.Succeeded,
     );
+    if (ready.some((v) => v.repository)) {
+      // 旧任务补齐的早期快照可能最后入库；沿用编写步骤的完成时间排列每份文档的版本。
+      const counts = new Map<string, number>();
+      return ready
+        .sort((a, b) => a.createdAt - b.createdAt)
+        .map((v) => {
+          const key = artifactDocumentKey(v);
+          const number = (counts.get(key) ?? 0) + 1;
+          counts.set(key, number);
+          return { ...v, number };
+        });
+    }
     if (ready.length > 0) return ready;
     return versions.filter((version) => {
       const status = attempts.get(version.attemptId)?.status;
@@ -166,7 +179,9 @@ export function createTaskArtifacts(deps: TasksServiceDeps, state: TaskState) {
       (repository.integratedDeliveryId === undefined ? deps.nodes.get(nodeId).finishedAt : null) ?? deps.clock.now();
     const version: ArtifactVersion = {
       id: randomUUID(),
-      number: (allVersions(taskId).at(-1)?.number ?? 0) + 1,
+      number:
+        (allVersions(taskId).findLast((v) => artifactDocumentKey(v) === (repository.originalPath ?? repository.path))
+          ?.number ?? 0) + 1,
       name: basename(repository.path),
       size: Buffer.byteLength(content),
       nodeId,

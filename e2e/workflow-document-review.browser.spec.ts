@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { InboxKind, taskDetailSchema } from '@aw/shared';
 import { type APIRequestContext, expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import {
@@ -27,6 +28,20 @@ async function start(request: APIRequestContext, projectId: string, workflow: st
   return `/tasks/${task.id}`;
 }
 
+async function advanceDocument(request: APIRequestContext, path: string) {
+  const response = await request.get(API_BASE + path, { headers: AUTH });
+  const permission = taskDetailSchema
+    .parse(await response.json())
+    .openInbox.find((i) => i.kind === InboxKind.Permission);
+  if (!permission) throw new Error('Missing permission');
+  await expect(
+    await request.post(`${API_BASE}/inbox/${permission.id}/resolve`, {
+      headers: AUTH,
+      data: { response: { decision: 'once' } },
+    }),
+  ).toBeOK();
+}
+
 const documents = [
   {
     workflow: 'detailed_design',
@@ -52,6 +67,134 @@ const documents = [
   },
 ] as const;
 
+test('详细设计首版分段写入时即显示 Markdown 正文，追加可跟随，提交后才进入版本历史', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const file = 'docs/design/detailed-design.md';
+  const initial = ['# 接口详细设计', ...Array.from({ length: 55 }, (_, i) => `第 ${i + 1} 个模块说明。`)].join('\n\n');
+  await queueTurn(request, project, { title: '· 梳理现状' }, [submitResult('已梳理')]);
+  await queueTurn(request, project, { title: '· 编写详细设计' }, [
+    { type: 'edit', file, content: initial },
+    { type: 'permission', permission: 'bash', patterns: ['node continue-design.mjs'] },
+    { type: 'edit', file, content: initial + '\n\n## 状态迁移验证\n\n仅允许有效迁移。\n' },
+    { type: 'permission', permission: 'bash', patterns: ['node submit-design.mjs'] },
+    submitResult('文档已完成'),
+  ]);
+  await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
+  const path = await start(request, project.id, 'detailed_design', '分段编写接口详细设计');
+  const detail = async () =>
+    taskDetailSchema.parse(await (await request.get(API_BASE + path, { headers: AUTH })).json());
+  try {
+    await page.goto(path);
+    const draft = page.getByRole('region', { name: '工作区草稿' });
+    await expect(draft.getByRole('heading', { name: '接口详细设计' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+    await expect(page.getByTestId('artifact-workbench')).toContainText(file);
+    expect((await detail()).artifact?.versions).toHaveLength(0);
+    await page.reload();
+    await expect(draft.getByRole('heading', { name: '接口详细设计' })).toBeVisible();
+    await page.getByRole('button', { name: '跟随编辑', exact: true }).click();
+    await advanceDocument(request, path);
+    const appended = draft.getByRole('heading', { name: '状态迁移验证' });
+    await expect(appended).toBeAttached({ timeout: TASK_RUN_TIMEOUT_MS });
+    await expect(appended).not.toBeInViewport();
+    await page.getByRole('button', { name: '继续跟随编辑', exact: true }).click();
+    await expect(draft.getByRole('heading', { name: '状态迁移验证' })).toBeInViewport({ timeout: TASK_RUN_TIMEOUT_MS });
+    expect(await draft.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    if (process.env.AW_WALKTHROUGH_DIR !== undefined)
+      await page.screenshot({ animations: 'disabled', path: join(WALKTHROUGH_DIR, 'document-draft.png') });
+    expect((await detail()).artifact?.versions).toHaveLength(0);
+    await advanceDocument(request, path);
+    await expect(page.getByRole('region', { name: '产物预览 v1' }).getByText('仅允许有效迁移。')).toBeVisible({
+      timeout: TASK_RUN_TIMEOUT_MS,
+    });
+    await expect(draft).toHaveCount(0);
+    expect((await detail()).artifact?.versions).toHaveLength(1);
+  } finally {
+    const task = await detail();
+    if (task.activeAttempts.length) await request.post(API_BASE + path + '/cancel', { headers: AUTH, data: {} });
+  }
+});
+
+test('中文目录在当前阅读框内跳到章节，不打开其他窗口', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const path = 'docs/design/guide.md';
+  const source = [
+    '[数据模型与表结构](#5-数据模型与表结构)',
+    ...Array.from({ length: 60 }, (_, i) => `段落 ${i}`),
+    '## 5. 数据模型与表结构',
+  ].join('\n\n');
+  await queueTurn(request, project, { title: '· 梳理现状' }, [submitResult('已梳理')]);
+  await queueTurn(request, project, { title: '· 编写详细设计' }, [
+    { type: 'edit', file: path, content: source },
+    submitResult('已完成'),
+  ]);
+  await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
+  await page.goto(await start(request, project.id, 'detailed_design', '生成有目录的文档'));
+  const viewer = page.getByRole('region', { name: '产物预览 v1' });
+  const link = viewer.getByRole('link', { name: '数据模型与表结构' });
+  await expect(link).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  const url = page.url();
+  await link.click();
+  await expect(viewer.getByRole('heading', { name: '5. 数据模型与表结构' })).toBeInViewport();
+  expect(page.url()).toBe(url);
+  expect(page.context().pages()).toHaveLength(1);
+});
+
+test('两份仓库文档随编辑切换，交付前后均可按路径独立选择', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const a = 'docs/design/guide.md';
+  const b = 'docs/api/guide.md';
+  await queueTurn(request, project, { title: '· 梳理现状' }, [submitResult('已梳理')]);
+  await queueTurn(request, project, { title: '· 编写详细设计' }, [
+    { type: 'edit', file: a, content: '# 系统设计\n\n[接口约定](../api/guide.md#接口约定)' },
+    { type: 'permission', permission: 'bash', patterns: ['node continue.mjs'] },
+    { type: 'edit', file: b, content: '# 接口指南\n\n## 接口约定' },
+    { type: 'permission', permission: 'bash', patterns: ['node finish.mjs'] },
+    { type: 'tool', tool: 'read', input: { filePath: a }, output: '<content>1: # 系统设计</content>' },
+    { type: 'permission', permission: 'bash', patterns: ['node reread.mjs'] },
+    { type: 'tool', tool: 'read', input: { filePath: b, offset: 3 }, output: '<content>3: ## 接口约定</content>' },
+    { type: 'permission', permission: 'bash', patterns: ['node publish.mjs'] },
+    submitResult('已完成两份文档'),
+  ]);
+  await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
+  const path = await start(request, project.id, 'detailed_design', '编写设计和接口指南');
+  await page.goto(path);
+  const workbench = page.getByTestId('artifact-workbench');
+  const draft = workbench.getByRole('region', { name: '工作区草稿' });
+  await expect(draft.getByRole('heading', { name: '系统设计' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  await advanceDocument(request, path);
+  await expect(draft.getByRole('heading', { name: '接口指南' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  await advanceDocument(request, path);
+  await page.getByRole('button', { name: '跟随 AI 阅读' }).click();
+  const reading = page.getByRole('region', { name: '项目文件阅读' });
+  await expect(reading).toContainText(a);
+  await advanceDocument(request, path);
+  await expect(reading).toContainText(b);
+  await expect(reading.locator('mark')).toContainText('3: ## 接口约定');
+  await advanceDocument(request, path);
+  const picker = workbench.getByRole('combobox', { name: '选择文档' });
+  await expect(picker).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  for (const [file, heading] of [
+    [a, '系统设计'],
+    [b, '接口指南'],
+  ] as const) {
+    await picker.selectOption({ label: file });
+    await expect(
+      workbench.getByRole('region', { name: '产物预览 v1' }).getByRole('heading', { name: heading }),
+    ).toBeVisible();
+  }
+  await picker.selectOption({ label: a });
+  await workbench.getByRole('link', { name: '接口约定' }).click();
+  await expect(workbench.getByRole('heading', { name: '接口约定' })).toBeFocused();
+  if (process.env.AW_WALKTHROUGH_DIR !== undefined)
+    await page.screenshot({ animations: 'disabled', path: join(WALKTHROUGH_DIR, 'document-switcher.png') });
+  await workbench.getByRole('button', { name: '验收并交付' }).click();
+  await page.getByRole('dialog', { name: '验收并交付' }).getByRole('button', { name: '合并到 main' }).click();
+  await expect(page.getByTestId('delivery-outcome')).toContainText('已合并到 main');
+  await page.reload();
+  await picker.selectOption({ label: a });
+  await expect(workbench.getByRole('heading', { name: '系统设计' })).toBeVisible();
+});
+
 for (const item of documents) {
   test(`${item.write}在工作台标注、对照并合并仓库文件`, async ({ page, request }) => {
     if (GIT_HEAVY_SPECS_SLOW) test.slow();
@@ -65,10 +208,12 @@ for (const item of documents) {
     await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
     await queueTurn(request, project, { title: '· 产物修改 1' }, [
       { type: 'edit', file: item.path, content: item.after },
+      { type: 'permission', permission: 'bash', patterns: ['node submit-revision.mjs'] },
       submitResult('已修改文档'),
     ]);
     await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
-    await page.goto(await start(request, project.id, item.workflow, item.write));
+    const path = await start(request, project.id, item.workflow, item.write);
+    await page.goto(path);
     const workbench = page.getByTestId('artifact-workbench');
     await expect(workbench.getByText(item.path, { exact: true })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS * 2 });
     await workbench.getByRole('button', { name: '标注修改' }).click();
@@ -81,7 +226,14 @@ for (const item of documents) {
       await page.screenshot({ animations: 'disabled', path: join(WALKTHROUGH_DIR, `${item.workflow}.png`) });
     await workbench.getByRole('button', { name: '加入本轮' }).click();
     await workbench.getByRole('button', { name: '交给 AI 修改' }).click();
-    await expect(workbench.getByText(item.current, { exact: true })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS * 2 });
+    const draft = workbench.getByRole('region', { name: '工作区草稿' });
+    await expect(draft.getByText(item.current, { exact: true })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS * 2 });
+    const liveTask = taskDetailSchema.parse(await (await request.get(API_BASE + path, { headers: AUTH })).json());
+    expect(liveTask.artifact?.versions).toHaveLength(1);
+    await advanceDocument(request, path);
+    await expect(workbench.getByRole('region', { name: '产物预览 v2' })).toBeVisible({
+      timeout: TASK_RUN_TIMEOUT_MS * 2,
+    });
     await workbench.getByRole('button', { name: '版本记录' }).click();
     await workbench.getByRole('button', { name: '对照上一版' }).click();
     await expect(
@@ -156,7 +308,7 @@ test('代码审查在主区按严重程度筛选，定位到审查时的文件�
   writeFileSync(join(project.repoPath, file), 'export const updateAllowed = false;\n');
   git(project.repoPath, 'commit', '-am', 'change working branch after review');
   await review.getByRole('button', { name: 'access.ts:1' }).click();
-  const code = review.getByRole('complementary', { name: '代码位置' });
+  const code = review.getByRole('region', { name: '代码位置' });
   await expect(code.getByText('export const updateAllowed = true;', { exact: false })).toBeVisible();
   await expect(code.getByRole('link', { name: '在 Git 工作台打开' })).toHaveAttribute('href', new RegExp(commit));
   await expect(review.getByRole('heading', { name: '更新接口未检查权限' })).toBeVisible();
@@ -192,4 +344,112 @@ test('代码审查在主区按严重程度筛选，定位到审查时的文件�
   await review.getByRole('button', { name: '完成审查' }).click();
   await expect(review.getByRole('button', { name: '完成审查' })).toHaveCount(0);
   await expect(review.getByRole('heading', { name: '问题清单' })).toBeVisible();
+});
+
+test('审查跟随真实行号，点选暂停跟随，画布节点仍打开详情', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const file = 'orders.ts';
+  writeFileSync(
+    join(project.repoPath, file),
+    Array.from({ length: 200 }, (_, i) => `export const order${i + 1} = ${i + 1};`).join('\n'),
+  );
+  git(project.repoPath, 'add', file);
+  git(project.repoPath, 'commit', '-m', 'add orders');
+  const commit = git(project.repoPath, 'rev-parse', 'HEAD');
+  const report = {
+    scope: { kind: 'files', commit, directory: '' },
+    findings: [
+      {
+        path: file,
+        line: 170,
+        severity: 'minor',
+        category: 'correctness',
+        title: '核对固定值',
+        description: '第 170 行返回固定订单编号。',
+      },
+    ],
+  };
+  await queueTurn(request, project, { title: '· 安全审查' }, [
+    { type: 'tool', tool: 'read', input: { filePath: file, offset: 160, limit: 8 }, output: '<type>file</type>' },
+    { type: 'permission', permission: 'bash', patterns: ['node read-next.mjs'] },
+    { type: 'callTool', name: 'report_progress', args: { message: '已核对', code_review: report } },
+    { type: 'permission', permission: 'bash', patterns: ['node submit.mjs'] },
+    { type: 'callTool', name: 'submit_result', args: { summary: '完成审查。', code_review: report } },
+  ]);
+  const path = await start(request, project.id, 'security_review', '核对订单行');
+  await page.goto(path);
+  const code = page.getByRole('region', { name: '代码位置' });
+  await expect(code.locator('[data-focus="true"]')).toContainText('order160', { timeout: TASK_RUN_TIMEOUT_MS });
+  await expect(code.locator('[data-focus="true"]')).toBeInViewport();
+  await advanceDocument(request, path);
+  await expect(code.getByText('核对固定值')).toBeVisible();
+  await page.getByRole('button', { name: 'orders.ts:170' }).click();
+  await expect(code.locator('[data-focus="true"]')).toContainText('order170');
+  await expect(page.getByRole('button', { name: '继续跟随阅读' })).toBeVisible();
+  await page.getByRole('tab', { name: '流程画布' }).click();
+  await page.locator('.react-flow__node').filter({ hasText: '安全审查' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByRole('tab', { name: '审查代码' }).click();
+  await expect(code.locator('[data-focus="true"]')).toBeInViewport();
+  await advanceDocument(request, path);
+});
+test('方案在步骤提交前展示最新草稿，目录能在阅读框中跳转', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const intro = '# 订单方案\n\n## 现状\n\n' + Array.from({ length: 40 }, (_, i) => `规则 ${i + 1}。`).join('\n\n');
+  await queueTurn(request, project, { title: '· 方案设计' }, [
+    { type: 'callTool', name: 'report_progress', args: { message: '整理现状', proposal: intro } },
+    { type: 'permission', permission: 'bash', patterns: ['node next-section.mjs'] },
+    {
+      type: 'callTool',
+      name: 'report_progress',
+      args: { message: '提出建议', proposal: intro + '\n\n## 建议\n\n保留订单状态。' },
+    },
+    { type: 'permission', permission: 'bash', patterns: ['node finish.mjs'] },
+    submitResult('# 订单方案\n\n最终建议。'),
+  ]);
+  const path = await start(request, project.id, 'design_proposal', '提出订单方案');
+  await page.goto(path);
+  const paper = page.getByRole('region', { name: '工作区草稿' });
+  await expect(paper.getByRole('heading', { name: '现状' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+  await advanceDocument(request, path);
+  await expect(paper.getByText('保留订单状态。')).toBeInViewport();
+  await page.getByRole('navigation', { name: '方案目录' }).getByRole('button', { name: '现状' }).click();
+  await expect(paper.getByRole('heading', { name: '现状' })).toBeInViewport();
+  await advanceDocument(request, path);
+  await expect(paper.getByText('最终建议。')).toBeVisible();
+});
+
+test('版本比对发现标在旧提交的删除行', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const file = 'pricing.ts';
+  writeFileSync(join(project.repoPath, file), 'export const due = Math.max(0, total);\n');
+  git(project.repoPath, 'add', file);
+  git(project.repoPath, 'commit', '-m', 'cap discount');
+  const from = git(project.repoPath, 'rev-parse', 'HEAD');
+  writeFileSync(join(project.repoPath, file), 'export const due = total;\n');
+  git(project.repoPath, 'commit', '-am', 'simplify discount');
+  const to = git(project.repoPath, 'rev-parse', 'HEAD');
+  const report = {
+    scope: { kind: 'diff', from, to },
+    findings: [
+      {
+        path: file,
+        line: 1,
+        side: 'old',
+        severity: 'major',
+        category: 'correctness',
+        title: '删除了金额下限',
+        description: '优惠额超出总价时仍应归零。',
+      },
+    ],
+  };
+  await queueTurn(request, project, { title: '· 版本比对审查' }, [
+    { type: 'callTool', name: 'submit_result', args: { summary: '发现一处变化。', code_review: report } },
+  ]);
+  await page.goto(await start(request, project.id, 'version_review', '审查金额差异'));
+  const row = page.getByTestId('diff-view').locator('tr[data-kind="del"]');
+  await expect(row).toContainText('删除了金额下限', { timeout: TASK_RUN_TIMEOUT_MS });
+  await expect(row).toContainText('Math.max(0, total)');
+  await expect(page.getByRole('tab', { name: '版本差异' })).toHaveAttribute('aria-selected', 'true');
 });

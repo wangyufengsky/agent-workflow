@@ -15,6 +15,7 @@
 
 .file select {
   width: auto;
+  max-width: 100%;
 }
 
 .stage {
