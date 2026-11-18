@@ -1,7 +1,8 @@
 export const FRONTEND_COPY = {
   preview: '页面预览',
   mark: '标注修改',
-  progress: '任务记录',
+  activityStep: '活动步骤',
+  followStep: '跟随当前步骤',
   finish: '完成并验收',
   verified: '已完成验收',
   waiting: '首屏构建中',

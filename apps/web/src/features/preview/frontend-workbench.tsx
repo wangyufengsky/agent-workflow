@@ -34,7 +34,7 @@ import styles from './frontend-workbench.module.css';
 import { MyPreview } from './my-preview.tsx';
 import { previewQuery, taskFileUrl, useImage, useStartPreview } from './preview.queries.ts';
 
-type Panel = 'activity' | 'notes' | 'progress' | null;
+type Panel = 'activity' | 'notes' | null;
 type Draft = { element: FrontendElement; note: string };
 
 function BeforeImage({ taskId, before }: { taskId: string; before: NonNullable<FrontendRound['before']> }) {
@@ -84,7 +84,6 @@ export function FrontendWorkbench({
   pro,
   hasConfiguredPreview,
   active,
-  progress,
   delivery,
   onOpenNode,
   nodeDetails,
@@ -93,7 +92,6 @@ export function FrontendWorkbench({
   pro: boolean;
   hasConfiguredPreview: boolean;
   active: boolean;
-  progress: ReactNode;
   delivery: ReactNode;
   onOpenNode: (id: string) => void;
   nodeDetails?: { title: string; content: ReactNode; onClose: () => void } | undefined;
@@ -125,8 +123,7 @@ export function FrontendWorkbench({
   const live = previewState === PreviewState.Running;
   const failed = previewState === PreviewState.Failed;
   const activityInMain = !live && !failed && !firstResult;
-  const defaultPanel =
-    pickedPanel === undefined ? (!activityInMain && task.openInbox.length > 0 ? 'activity' : null) : pickedPanel;
+  const defaultPanel = pickedPanel === undefined ? (activityInMain ? null : 'activity') : pickedPanel;
   const panel = nodeDetails === undefined ? defaultPanel : 'node';
   const checking =
     working && task.nodes.findLast((node) => node.kind !== NodeKind.Verify)?.key.startsWith(FRONTEND_VERIFY_PREFIX);
@@ -227,7 +224,7 @@ export function FrontendWorkbench({
         onSuccess: () => {
           setNotes([]);
           setFeedback('');
-          setPanel('progress');
+          setPanel('activity');
         },
       },
     );
@@ -270,15 +267,6 @@ export function FrontendWorkbench({
         >
           {C.mark}
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          icon="list"
-          aria-expanded={panel === 'progress'}
-          onClick={() => toggle('progress')}
-        >
-          {C.progress}
-        </Button>
         {delivery}
         {!verified && (
           <Button
@@ -295,7 +283,7 @@ export function FrontendWorkbench({
                 {
                   onSuccess: () => {
                     nodeDetails?.onClose();
-                    setPanel('progress');
+                    setPanel('activity');
                   },
                 },
               );
@@ -339,6 +327,7 @@ export function FrontendWorkbench({
             </div>
           )}
           <FrontendActivity task={task} inMain={activityInMain} starting={previewState === PreviewState.Starting} />
+          {!activityInMain && panel === 'activity' && <FrontendRoundHistory task={task} onOpen={onOpenNode} />}
           {activityInMain && preview.isError && (
             <ErrorState error={preview.error} onRetry={() => void preview.refetch()} />
           )}
@@ -353,94 +342,85 @@ export function FrontendWorkbench({
             {nodeDetails.content}
           </aside>
         )}
-        {(panel === 'notes' || panel === 'progress') && (
-          <aside className={styles.inspector} aria-label={panel === 'notes' ? C.notes : C.progress}>
-            {panel === 'notes' ? (
+        {panel === 'notes' && (
+          <aside className={styles.inspector} aria-label={C.notes}>
+            <div className={styles.inspectorHead}>
+              <h2>{C.notes}</h2>
+              <IconButton icon="x" label={C.close} onClick={() => toggle('notes')} />
+            </div>
+            {picking ? (
               <>
-                <div className={styles.inspectorHead}>
-                  <h2>{C.notes}</h2>
-                  <IconButton icon="x" label={C.close} onClick={() => toggle('notes')} />
-                </div>
-                {picking ? (
-                  <>
-                    <p className="hint" role="status">
-                      {C.pickHint}
-                    </p>
-                    <Button size="sm" onClick={cancelPick}>
-                      {C.cancelPick}
-                    </Button>
-                  </>
-                ) : (
-                  <Button size="sm" icon="target" disabled={!canPick} onClick={() => void beginPick()}>
-                    {C.pick}
-                  </Button>
-                )}
-                {tabId === undefined && <p className="hint">{C.desktopPick}</p>}
-                {pickError !== null && <ErrorState error={pickError} />}
-                {notes.map(({ element, note }) => {
-                  const label = element.label || C.element(element.tag);
-                  return (
-                    <div className={styles.note} key={element.id}>
-                      <div className={styles.inspectorHead}>
-                        <strong>{label}</strong>
-                        <IconButton
-                          icon="x"
-                          label={C.removeNote(label)}
-                          onClick={() => setNotes((items) => items.filter((item) => item.element.id !== element.id))}
-                        />
-                      </div>
-                      <small>
-                        {element.path} · {element.layout.width}×{element.layout.height}
-                      </small>
-                      <textarea
-                        className="input"
-                        rows={2}
-                        aria-label={C.noteFor(label)}
-                        placeholder={C.noteHint}
-                        value={note}
-                        maxLength={FRONTEND_NOTE_LIMIT}
-                        onChange={(event) => {
-                          const value = event.currentTarget.value;
-                          setNotes((items) =>
-                            items.map((item) => (item.element.id === element.id ? { ...item, note: value } : item)),
-                          );
-                        }}
-                      />
-                    </div>
-                  );
-                })}
-                <textarea
-                  className="input"
-                  rows={3}
-                  aria-label={C.notesHint}
-                  placeholder={C.notesHint}
-                  value={feedback}
-                  maxLength={FRONTEND_FEEDBACK_LIMIT}
-                  onChange={(event) => setFeedback(event.target.value)}
-                />
-                {revision.isError && <ErrorState error={revision.error} />}
-                <Button
-                  variant="primary"
-                  icon="sparkle"
-                  onClick={revise}
-                  pending={revision.isPending}
-                  disabled={
-                    !review ||
-                    !hasDraft ||
-                    picking ||
-                    (tabId === undefined && notes.length > 0) ||
-                    notes.some((item) => item.note.trim() === '')
-                  }
-                >
-                  {C.submit}
+                <p className="hint" role="status">
+                  {C.pickHint}
+                </p>
+                <Button size="sm" onClick={cancelPick}>
+                  {C.cancelPick}
                 </Button>
               </>
             ) : (
-              <>
-                {progress}
-                <FrontendRoundHistory task={task} onOpen={onOpenNode} />
-              </>
+              <Button size="sm" icon="target" disabled={!canPick} onClick={() => void beginPick()}>
+                {C.pick}
+              </Button>
             )}
+            {tabId === undefined && <p className="hint">{C.desktopPick}</p>}
+            {pickError !== null && <ErrorState error={pickError} />}
+            {notes.map(({ element, note }) => {
+              const label = element.label || C.element(element.tag);
+              return (
+                <div className={styles.note} key={element.id}>
+                  <div className={styles.inspectorHead}>
+                    <strong>{label}</strong>
+                    <IconButton
+                      icon="x"
+                      label={C.removeNote(label)}
+                      onClick={() => setNotes((items) => items.filter((item) => item.element.id !== element.id))}
+                    />
+                  </div>
+                  <small>
+                    {element.path} · {element.layout.width}×{element.layout.height}
+                  </small>
+                  <textarea
+                    className="input"
+                    rows={2}
+                    aria-label={C.noteFor(label)}
+                    placeholder={C.noteHint}
+                    value={note}
+                    maxLength={FRONTEND_NOTE_LIMIT}
+                    onChange={(event) => {
+                      const value = event.currentTarget.value;
+                      setNotes((items) =>
+                        items.map((item) => (item.element.id === element.id ? { ...item, note: value } : item)),
+                      );
+                    }}
+                  />
+                </div>
+              );
+            })}
+            <textarea
+              className="input"
+              rows={3}
+              aria-label={C.notesHint}
+              placeholder={C.notesHint}
+              value={feedback}
+              maxLength={FRONTEND_FEEDBACK_LIMIT}
+              onChange={(event) => setFeedback(event.target.value)}
+            />
+            {revision.isError && <ErrorState error={revision.error} />}
+            <Button
+              variant="primary"
+              icon="sparkle"
+              onClick={revise}
+              pending={revision.isPending}
+              disabled={
+                !review ||
+                !hasDraft ||
+                picking ||
+                (tabId === undefined && notes.length > 0) ||
+                notes.some((item) => item.note.trim() === '')
+              }
+            >
+              {C.submit}
+            </Button>
           </aside>
         )}
       </div>

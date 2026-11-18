@@ -2,11 +2,16 @@ import { type TaskDetailDTO, TaskStatus } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Button } from '../../components/button.tsx';
-import { DiffBrowser } from '../../components/diff/diff-browser.tsx';
+import styles from '../../components/diff/diff.module.css';
+import { DiffPane } from '../../components/diff/diff-browser.tsx';
 import type { DiffFocus } from '../../components/diff/diff-view.tsx';
+import { FileTree } from '../../components/diff/file-tree.tsx';
 import { parseUnifiedDiff } from '../../components/diff/parse-diff.ts';
 import { ErrorState } from '../../components/error-state.tsx';
+import { DIFF_COPY } from '../../copy/diff.ts';
+import { FRONTEND_COPY } from '../../copy/frontend.ts';
 import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
+import { FrontendActivity } from '../preview/frontend-activity.tsx';
 import { taskDiffFileQuery, taskDiffQuery } from '../tasks/tasks.queries.ts';
 
 /** 和上一次读取的工作区相比，定位本次新出现的改动；原文件行号用于纯删除。 */
@@ -23,6 +28,7 @@ export function editFocus(before: string, after: string): DiffFocus | undefined 
 
 export function TaskCodeChanges({ task, active }: { task: TaskDetailDTO; active: boolean }) {
   const [pinned, setPinned] = useState<string>();
+  const [activity, setActivity] = useState(false);
   const interval = active && task.status === TaskStatus.Running ? 2500 : false;
   const summary = useQuery({ ...taskDiffQuery(task.id), enabled: active, refetchInterval: interval });
   const files = summary.data?.files;
@@ -56,17 +62,36 @@ export function TaskCodeChanges({ task, active }: { task: TaskDetailDTO; active:
       </div>
       {files === undefined ? (
         <p className="hint">{R.loading}</p>
-      ) : files.length === 0 ? (
-        <p className="hint">{R.empty}</p>
       ) : (
-        <DiffBrowser
-          files={files}
-          fileQuery={fileQuery}
-          selected={selected}
-          onSelect={setPinned}
-          focus={active && pinned === undefined ? last.focus : undefined}
-          annotate
-        />
+        <div className={styles.frame}>
+          <div className={styles.taskWorkspace} data-activity={activity}>
+            {files.length === 0 ? (
+              <p className="hint">{R.empty}</p>
+            ) : (
+              <DiffPane
+                selected={selected}
+                fileQuery={fileQuery}
+                annotate
+                focus={active && pinned === undefined ? last.focus : undefined}
+              />
+            )}
+            <aside className={styles.taskSidebar} aria-label={R.codeSidebar}>
+              <div className="seg">
+                <button type="button" aria-pressed={!activity} onClick={() => setActivity(false)}>
+                  {DIFF_COPY.files}
+                </button>
+                <button type="button" aria-pressed={activity} onClick={() => setActivity(true)}>
+                  {FRONTEND_COPY.activity}
+                </button>
+              </div>
+              {activity ? (
+                <FrontendActivity task={task} inMain={false} starting={false} showInbox={false} />
+              ) : (
+                files.length > 0 && <FileTree files={files} selected={selected} onSelect={setPinned} />
+              )}
+            </aside>
+          </div>
+        </div>
       )}
     </section>
   );

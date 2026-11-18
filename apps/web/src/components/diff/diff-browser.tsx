@@ -71,7 +71,6 @@ export function DiffBrowser({
   const [own, setOwn] = useState<string | undefined>(undefined);
   const picked = controlled ?? own;
   const setPicked = onSelect ?? setOwn;
-  const [mode, setMode] = useState<DiffMode>('unified');
   if (files.length === 0) return <p className="hint">{C.noFiles}</p>;
   // The first file until one is picked; a picked file that left the list falls back the same way.
   const selected = files.some((f) => f.path === picked) ? picked : files[0]?.path;
@@ -79,32 +78,57 @@ export function DiffBrowser({
     <div className={styles.frame} data-fill={fill || undefined}>
       <div className={styles.browser}>
         <FileTree files={files} selected={selected} onSelect={setPicked} />
-        <section className={styles.pane} aria-label={selected}>
-          <div className={styles.toolbar}>
-            <span className="mono grow ellipsis">{selected}</span>
-            {/* biome-ignore lint/a11y/useSemanticElements: a segmented control, not a form fieldset */}
-            <div className={`seg ${styles.modes}`} role="group" aria-label={C.viewMode}>
-              {(['unified', 'split'] as const).map((m) => (
-                <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>
-                  {C[m]}
-                </button>
-              ))}
-            </div>
-          </div>
-          {selected === undefined ? (
-            <p className="hint">{C.pickFile}</p>
-          ) : (
-            <FileDiff
-              path={selected}
-              annotate={annotate}
-              query={fileQuery}
-              mode={mode}
-              marks={marks?.(selected)}
-              focus={selected === controlled ? focus : undefined}
-            />
-          )}
-        </section>
+        <DiffPane
+          selected={selected}
+          fileQuery={fileQuery}
+          annotate={annotate}
+          marks={marks}
+          focus={selected === controlled ? focus : undefined}
+        />
       </div>
     </div>
+  );
+}
+
+export function DiffPane({
+  selected,
+  fileQuery,
+  annotate,
+  marks,
+  focus,
+}: {
+  selected: string | undefined;
+  fileQuery: FileDiffQuery;
+  annotate: boolean;
+  marks?: ((path: string) => readonly DiffMark[]) | undefined;
+  focus?: DiffFocus | undefined;
+}) {
+  const [mode, setMode] = useState<DiffMode>('unified');
+  return (
+    <section className={styles.pane} aria-label={selected}>
+      <div className={styles.toolbar}>
+        <span className="mono grow ellipsis">{selected}</span>
+        {/* biome-ignore lint/a11y/useSemanticElements: a segmented control, not a form fieldset */}
+        <div className={`seg ${styles.modes}`} role="group" aria-label={C.viewMode}>
+          {(['unified', 'split'] as const).map((m) => (
+            <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>
+              {C[m]}
+            </button>
+          ))}
+        </div>
+      </div>
+      {selected === undefined ? (
+        <p className="hint">{C.pickFile}</p>
+      ) : (
+        <FileDiff
+          path={selected}
+          annotate={annotate}
+          query={fileQuery}
+          mode={mode}
+          marks={marks?.(selected)}
+          focus={focus}
+        />
+      )}
+    </section>
   );
 }

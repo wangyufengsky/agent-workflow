@@ -24,6 +24,16 @@ test('修复中的任务展示未提交文件，切到画布可单击查看步�
     await expect(result.locator('[data-focus=true]').first()).toBeVisible();
     await page.getByRole('button', { name: '扩大视图' }).click();
     await expect(page.getByRole('button', { name: '还原视图' })).toBeVisible();
+    const files = result.getByRole('navigation', { name: '改动文件' });
+    const bounds = await files.boundingBox();
+    const codeBounds = await result.getByTestId('diff-view').boundingBox();
+    expect(bounds?.width).toBeLessThanOrEqual(216);
+    expect(bounds?.x).toBeGreaterThan(codeBounds?.x ?? Number.POSITIVE_INFINITY);
+    await result.getByRole('button', { name: 'AI 活动' }).click();
+    await expect(result.getByTestId('conversation-stream')).toContainText('修复');
+    await expect(files).toBeHidden();
+    await result.getByRole('button', { name: '改动文件' }).click();
+    await expect(files).toBeVisible();
     await page.screenshot({ path: info.outputPath('code.png'), animations: 'disabled' });
     await result.getByRole('button', { name: '跟随编辑', exact: true }).click();
     await page.getByRole('button', { name: '允许一次' }).click();
@@ -39,7 +49,7 @@ test('修复中的任务展示未提交文件，切到画布可单击查看步�
     await page.getByRole('tab', { name: '代码改动' }).click();
     await expect(result).toBeVisible();
   } finally {
-    await request.post(API_BASE + taskPath + '/cancel', { headers: AUTH, data: {} });
+    await request.post(`${API_BASE}${taskPath}/cancel`, { headers: AUTH, data: {} });
   }
 });
 

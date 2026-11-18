@@ -37,7 +37,7 @@ import { failedNodeKeyOf } from '../tasks/failure-text.ts';
 import { taskQuery } from '../tasks/tasks.queries.ts';
 import { DeliveryDialogButton } from './delivery-actions.tsx';
 import { FailurePanel } from './failure-panel.tsx';
-import { NodeDetailPane, NodeDrawer, type NodeTab } from './node-drawer.tsx';
+import { NodeDetailPane, NodeDrawer, NodeTab } from './node-drawer.tsx';
 import { PausedBanner } from './paused-banner.tsx';
 import { PlanReview } from './plan-review.tsx';
 import { PlanningProgress } from './planning-progress.tsx';
@@ -134,13 +134,7 @@ function SavePlanTemplate({ task }: { task: TaskDetailDTO }) {
 }
 
 /** The main area follows the task's state (14 §3.3). */
-function TaskMain({
-  task,
-  selection,
-  pro,
-  deliveryInToolbar = false,
-  canvasActive,
-}: MainProps & { deliveryInToolbar?: boolean; canvasActive?: boolean }) {
+function TaskMain({ task, selection, pro, canvasActive }: MainProps & { canvasActive?: boolean }) {
   const active = canvasActive !== false;
   const props = { task, selection, pro };
   switch (task.status) {
@@ -171,7 +165,7 @@ function TaskMain({
           <a href="#task-acceptance-result">{C.viewAcceptanceResult}</a>
           {active && (
             <div id="task-acceptance-result" tabIndex={-1}>
-              <ResultCard task={task} showDelivery={!deliveryInToolbar} />
+              <ResultCard task={task} />
             </div>
           )}
         </div>
@@ -346,19 +340,10 @@ export function TaskPage() {
         pro={pro}
         active={!canvas && !reading}
         hasConfiguredPreview={project.data?.preview != null}
-        onOpenNode={selection.open}
+        onOpenNode={(id) => selection.open(id, NodeTab.Process)}
         nodeDetails={canvas ? undefined : nodeDetails}
         delivery={
           task.data.status === TaskStatus.Review && frontend.verified && <DeliveryDialogButton task={task.data} />
-        }
-        progress={
-          <div className={styles.frontendProgress}>
-            {task.data.status === TaskStatus.Review && !frontend.verified ? (
-              <StepsView task={task.data} selection={selection} pro={pro} />
-            ) : (
-              <TaskMain task={task.data} selection={selection} pro={pro} deliveryInToolbar />
-            )}
-          </div>
         }
       />
     ) : browserTest ? (

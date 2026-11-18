@@ -8,6 +8,7 @@ export const TASK_RESULT_COPY = {
   expand: '扩大视图',
   restore: '还原视图',
   changes: '工作区改动',
+  codeSidebar: '代码任务侧栏',
   followEdit: '跟随编辑',
   resumeEdit: '继续跟随编辑',
   loading: '正在读取工作区…',
