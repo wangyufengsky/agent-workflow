@@ -23,6 +23,7 @@ import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
 import { BROWSER_CASE_COPY } from '../../copy/browser-cases.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
+import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 import { BROWSER_TEST_COPY, TASK_COPY as C } from '../../copy/tasks.ts';
 import { ArtifactWorkbench } from '../artifacts/artifact-workbench.tsx';
 import { TaskBrowserCase } from '../browser-cases/task-browser-case.tsx';
@@ -296,11 +297,11 @@ export function TaskPage() {
   const siteSelected = view === 'preview' || (canvas && siteTask === taskId);
   const watchingTest = browserTest && !canvas && hasViews;
   const resultLabel = artifactOpen
-    ? '文档预览'
+    ? R.document
     : browserTest
       ? BROWSER_TEST_COPY.browser
       : code && !needsPlan
-        ? '代码改动'
+        ? R.code
         : PREVIEW_PANE_COPY.tabPreview;
   const resultPanel = (reading = false) =>
     needsPlan && !hasViews && !workbench && !artifactOpen && !reviewOpen ? (
@@ -379,7 +380,7 @@ export function TaskPage() {
               void navigate({ search: (prev) => ({ ...prev, view: view === 'preview' ? 'result' : 'preview' }) })
             }
           >
-            {view === 'preview' ? '查看代码改动' : '打开网页预览'}
+            {view === 'preview' ? R.viewCode : R.openWeb}
           </button>
         )}
         {configuredPreview && siteSelected ? (
@@ -479,12 +480,12 @@ export function TaskPage() {
           }}
         >
           <div className={styles.viewBar}>
-            <RadixTabs.List className="tabs" aria-label="任务视图">
+            <RadixTabs.List className="tabs" aria-label={R.views}>
               <RadixTabs.Trigger className="tab" value="result">
                 {resultLabel}
               </RadixTabs.Trigger>
               <RadixTabs.Trigger className="tab" value="progress">
-                流程画布
+                {R.canvas}
               </RadixTabs.Trigger>
             </RadixTabs.List>
             <Button
@@ -494,7 +495,7 @@ export function TaskPage() {
               aria-pressed={expanded}
               onClick={() => setExpandedTask(expanded ? undefined : taskId)}
             >
-              {expanded ? '还原视图' : '扩大视图'}
+              {expanded ? R.restore : R.expand}
             </Button>
           </div>
           <div className={styles.viewArea}>

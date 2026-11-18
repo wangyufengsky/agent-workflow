@@ -109,7 +109,7 @@ function UnifiedRows({
           <Code line={line} tokens={tokens} />
           {annotate && line.kind !== 'context' && (
             <small className={styles.editLabel}>
-              {line.kind === 'del' ? '删除' : replacements?.has(line) ? '修改' : '新增'}
+              {C.status[line.kind === 'del' ? 'deleted' : replacements?.has(line) ? 'modified' : 'added']}
             </small>
           )}
         </td>

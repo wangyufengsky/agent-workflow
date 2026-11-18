@@ -159,7 +159,7 @@ for (const item of cases) {
     await expect(workbench.getByText(item.revised, { exact: true })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
     await expect(page.getByText('待查看产物', { exact: true })).toBeVisible();
     await expect(page.getByRole('tab', { name: '文档预览' })).toHaveAttribute('aria-selected', 'true');
-    await expect(workbench.locator('[data-kind="修改"]').first()).toBeVisible();
+    await expect(workbench.locator('[data-kind="modified"]').first()).toBeVisible();
     await page.getByRole('button', { name: '扩大视图' }).click();
     await page.screenshot({ path: testInfo.outputPath('document.png'), animations: 'disabled' });
     await page.getByRole('button', { name: '还原视图' }).click();

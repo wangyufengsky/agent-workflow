@@ -1,7 +1,7 @@
 import { textLines } from '@aw/shared';
 import { diffArrays } from 'diff';
 
-export type VersionChange = { kind: '新增' | '修改'; before?: string };
+export type VersionChange = { kind: 'added' | 'modified'; before?: string };
 /** 以未变的段落为锚点，在相邻的删除和插入块内逐行对照。 */
 export function changedLines(before: string, after: string): Map<number, VersionChange> {
   const changes = new Map<number, VersionChange>();
@@ -14,7 +14,7 @@ export function changedLines(before: string, after: string): Map<number, Version
     if (part.added)
       for (const [offset] of part.value.entries()) {
         const old = previous?.removed ? previous.value[offset] : undefined;
-        changes.set(line + offset, old === undefined ? { kind: '新增' } : { kind: '修改', before: old });
+        changes.set(line + offset, old === undefined ? { kind: 'added' } : { kind: 'modified', before: old });
       }
     line += part.count;
   }

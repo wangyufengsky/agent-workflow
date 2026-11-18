@@ -6,6 +6,7 @@ import { DiffBrowser } from '../../components/diff/diff-browser.tsx';
 import type { DiffFocus } from '../../components/diff/diff-view.tsx';
 import { parseUnifiedDiff } from '../../components/diff/parse-diff.ts';
 import { ErrorState } from '../../components/error-state.tsx';
+import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 import { taskDiffFileQuery, taskDiffQuery } from '../tasks/tasks.queries.ts';
 
 /** 和上一次读取的工作区相比，定位本次新出现的改动；原文件行号用于纯删除。 */
@@ -41,22 +42,22 @@ export function TaskCodeChanges({ task, active }: { task: TaskDetailDTO; active:
     setLast({ path: selected, diff, focus: editFocus(last.path === selected ? last.diff : '', diff) });
   if (summary.isError) return <ErrorState error={summary.error} onRetry={() => void summary.refetch()} />;
   return (
-    <section className="col" aria-label="工作区改动" data-testid="task-code-changes">
+    <section className="col" aria-label={R.changes} data-testid="task-code-changes">
       <div className="row">
-        <strong className="grow">工作区改动</strong>
+        <strong className="grow">{R.changes}</strong>
         <Button
           size="sm"
           aria-pressed={pinned === undefined}
           disabled={!selected}
           onClick={() => setPinned(pinned === undefined ? selected : undefined)}
         >
-          {pinned === undefined ? '跟随编辑' : '继续跟随编辑'}
+          {pinned === undefined ? R.followEdit : R.resumeEdit}
         </Button>
       </div>
       {files === undefined ? (
-        <p className="hint">正在读取工作区…</p>
+        <p className="hint">{R.loading}</p>
       ) : files.length === 0 ? (
-        <p className="hint">当前没有文件改动。</p>
+        <p className="hint">{R.empty}</p>
       ) : (
         <DiffBrowser
           files={files}

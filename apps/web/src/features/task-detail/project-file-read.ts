@@ -1,4 +1,5 @@
 import { MCP_TOOL_PREFIX, McpToolName } from '@aw/shared';
+import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 export const officeRead = MCP_TOOL_PREFIX + McpToolName.ReadOfficeFile;
 
 /** 先按会话目录解析相对路径，再限制到本次任务的项目和工作区。 */
@@ -30,7 +31,7 @@ export function readRequest(tool: string, input: Record<string, unknown>): ReadR
   const path = input.filePath ?? input.path;
   if (tool === 'read' && typeof path === 'string') {
     const start = typeof input.offset === 'number' && input.offset > 0 ? input.offset : 1;
-    return { path, location: `第 ${start} 行` };
+    return { path, location: R.line(start) };
   }
   if (tool === officeRead && typeof path === 'string') {
     return { path, location: [input.sheet, input.range].filter((v) => typeof v === 'string').join(' · ') };
@@ -48,7 +49,7 @@ export function readRequest(tool: string, input: Record<string, unknown>): ReadR
   if (!literal || literal.startsWith('-') || literal.startsWith('~')) return undefined;
   return {
     path: literal,
-    location: sed?.[2] ? `第 ${sed[1]}–${sed[2]} 行` : `第 ${sed?.[1] ?? 1} 行`,
+    location: R.line(sed?.[1] ?? 1, sed?.[2]),
     ...(typeof input.workdir === 'string' ? { directory: input.workdir } : {}),
   };
 }

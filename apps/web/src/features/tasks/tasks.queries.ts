@@ -49,6 +49,7 @@ import {
   startTaskOp,
   type TaskDetailDTO,
   type TaskDisplayGroup,
+  TaskStatus,
   type TaskSummaryDTO,
   taskDiffFileOp,
   taskDiffOp,
@@ -206,7 +207,14 @@ export async function updateTask(qc: QueryClient, summary: TaskSummaryDTO): Prom
   qc.setQueryData<TaskDetailDTO>(detail, (old) =>
     old === undefined ? old : { ...old, ...summary, workflow: old.workflow },
   );
+  const diffKey = queryKeys.taskDiff(summary.id);
+  const refreshDiff = async () => {
+    // 最后一次写入可能发生在两次轮询之间，先取消旧快照，再刷新清单及其下的单文件查询。
+    await qc.cancelQueries({ queryKey: diffKey });
+    await qc.invalidateQueries({ queryKey: diffKey });
+  };
   await Promise.all([
+    summary.status === TaskStatus.Running ? undefined : refreshDiff(),
     qc.invalidateQueries({ queryKey: queryKeys.taskLists }),
     // The detail's plan, nodes, items and result change with its state; refetch it in the background.
     qc.invalidateQueries({ queryKey: detail, exact: true }),

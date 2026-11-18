@@ -9,6 +9,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../../components/button.tsx';
+import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 import { attemptQuery, attemptTranscript, useTranscript } from '../attempts/attempt.queries.ts';
 import { gitTreeQuery } from '../git/git.queries.ts';
 import { officeRead, projectReadPath, readRequest } from './project-file-read.ts';
@@ -139,7 +140,7 @@ export function TaskReadFollow({
               onFollow(!following);
             }}
           >
-            {following ? '暂停跟随阅读' : held ? '继续跟随阅读' : '跟随 AI 阅读'}
+            {following ? R.pauseRead : held ? R.resumeRead : R.followRead}
           </Button>
           {reading && (
             <Button
@@ -150,17 +151,17 @@ export function TaskReadFollow({
                 setHeld(undefined);
               }}
             >
-              返回成果
+              {R.back}
             </Button>
           )}
         </div>
       )}
       {reading && (
-        <section className="col" aria-label="项目文件阅读">
+        <section className="col" aria-label={R.readRegion}>
           <div className="row">
             <strong>{reading.path}</strong>
             <span className="hint">{reading.location}</span>
-            <span className="hint">{following ? 'AI 阅读' : '已暂停'}</span>
+            <span className="hint">{following ? R.reading : R.paused}</span>
           </div>
           <pre key={reading.path + reading.location} className={styles.readExcerpt}>
             {reading.excerpt}

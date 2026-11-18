@@ -17,6 +17,8 @@ import { IconButton } from '../../components/icon-button.tsx';
 import { Markdown } from '../../components/markdown.tsx';
 import { ARTIFACT_COPY } from '../../copy/artifacts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
+import { DIFF_COPY } from '../../copy/diff.ts';
+import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 import { SheetView } from '../attachments/attachment-preview.tsx';
 import styles from './artifact-workbench.module.css';
 
@@ -31,8 +33,8 @@ const versionQuery = (task: string, version: string | undefined, sheet?: string)
 function ChangeMark({ change }: { change: VersionChange | undefined }) {
   return change ? (
     <small className={styles.revision} data-kind={change.kind}>
-      {change.kind}
-      {change.before !== undefined && <span> · 原值 {change.before}</span>}
+      {DIFF_COPY.status[change.kind]}
+      {change.before !== undefined && <span>{R.previous(change.before)}</span>}
     </small>
   ) : null;
 }
@@ -252,8 +254,8 @@ function Workbook({
       before === undefined || (current?.v === old?.v && current?.f === old?.f)
         ? undefined
         : old
-          ? { kind: '修改', before: old.f === undefined ? String(old.v ?? '') : '=' + old.f }
-          : { kind: '新增' };
+          ? { kind: 'modified', before: old.f === undefined ? String(old.v ?? '') : '=' + old.f }
+          : { kind: 'added' };
     if (!onPick)
       return (
         <>
