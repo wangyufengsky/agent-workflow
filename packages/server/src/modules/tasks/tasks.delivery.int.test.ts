@@ -60,6 +60,16 @@ describe('交付：本地合并（09 §7）', () => {
     expect(await trailers(other.git.branch ?? '')).toBe('agent-workflow|');
   });
 
+  it('拒绝将任务分支交付到自身，保留分支提交和待合并状态', async () => {
+    const { task, repo } = await inReview();
+    const branch = task.git.branch ?? '';
+    const tip = await repo.git('rev-parse', branch);
+    const response = await t.call(deliverTaskOp, { id: task.id, strategy: 'squash', targetBranch: branch });
+    expect(response.raw.json()).toMatchObject({ error: { code: ErrorCode.ValidationFailed } });
+    expect(await repo.git('rev-parse', branch)).toBe(tip);
+    expect((await t.call(getTaskOp, { id: task.id })).body).toMatchObject({ status: 'review', lastDelivery: null });
+  });
+
   it('设置了提交人时任务提交与 squash 提交都用它，团队页仍算发起人经 AI 任务的提交（D227）', async () => {
     const { repo, project } = await addProject(t, { files: GREET });
     await repo.git('config', 'user.name', 'Zhang San');

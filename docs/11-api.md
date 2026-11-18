@@ -205,7 +205,7 @@ type TaskDetailDTO = {
 
 ### 5.3 交付
 
-- `strategy ∈ { squash, merge, rebase }`：本地合并到 `targetBranch`（默认 `baseBranch`），见 09 §7。合并前的检查失败直接返回错误、不改状态：`DELIVERY_TARGET_NOT_FOUND`、`WORKTREE_DIRTY`、`DELIVERY_TARGET_DIRTY`（目标分支检出在有未提交改动的工作区）。成功 → 任务 `completed`。冲突 → 任务回 `review`，`lastDelivery.status = conflict`，`conflictFiles` 列出文件；前端提供「交给 AI 解决」（= `request-changes` with `reason: 'conflict'`）。其他 git 失败 → 任务回 `review`，`lastDelivery.status = failed`，`error` 为原因。以上都返回操作后的 `TaskDetailDTO`。
+- `strategy ∈ { squash, merge, rebase }`：本地合并到 `targetBranch`（默认 `baseBranch`），见 09 §7。交付目标与任务分支相同时返回 `VALIDATION_FAILED`。准备失败后重试保留占用名称的已有分支。合并前的检查失败直接返回错误、不改状态：`DELIVERY_TARGET_NOT_FOUND`、`WORKTREE_DIRTY`、`DELIVERY_TARGET_DIRTY`（目标分支检出在有未提交改动的工作区）。成功 → 任务 `completed`。冲突 → 任务回 `review`，`lastDelivery.status = conflict`，`conflictFiles` 列出文件；前端提供「交给 AI 解决」（= `request-changes` with `reason: 'conflict'`）。其他 git 失败 → 任务回 `review`，`lastDelivery.status = failed`，`error` 为原因。以上都返回操作后的 `TaskDetailDTO`。
 - `pull_request`：项目没有可用令牌（自己的或全局的，D155）→ 400 `HOSTING_NOT_CONFIGURED`（不改状态）。在仓库锁内把任务分支推送到 `origin`（HTTPS 远端经环境变量 `http.extraHeader` 带上令牌，不出现在命令参数中；SSH 远端用用户自己的密钥）→ 创建 PR/MR（`targetBranch` 为目标，标题与说明默认为任务标题与结果摘要，可用 `pr` 指定）→ 任务 `completed`，`prUrl` 记录在 delivery；worktree 删除，分支保留。推送或平台失败 → `lastDelivery.status = failed`，任务回 `review`。推送后先按分支查找打开的 PR/MR：已有（按审查意见修改后再次交付）就沿用它、不改标题与说明，`prUrl` 为同一个地址（21 §5）。
 - `report_only`：仅 `deliverable = report` 的任务可用，直接 `completed`。
 - `deliverable = report` 的任务使用其他策略 → 400 `VALIDATION_FAILED`。

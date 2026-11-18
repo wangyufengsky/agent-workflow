@@ -16,7 +16,7 @@ import {
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
 import type { Logger } from '../../core/logger.ts';
-import { branchExists, type RepoLocks, runGit } from '../git/index.ts';
+import { branchExists, listWorktrees, type RepoLocks, runGit } from '../git/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { createWorktreesRepo, type Worktree } from './worktrees.repo.ts';
 
@@ -163,19 +163,22 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
       });
     },
 
-    /**
-     * Clears a worktree that never became ready (creation failed, or the app stopped while creating) so the task can
-     * prepare again: leftovers are removed and the record deleted, since a task has at most one worktree.
-     */
-    async discard(worktree: Worktree, repoPath: string): Promise<void> {
-      if (worktree.status !== WorktreeStatus.Removed) {
-        const failed =
-          worktree.status === WorktreeStatus.Creating
-            ? move(worktree, WorktreeEvent.CreateFailed, { error: 'interrupted while creating' })
-            : worktree;
-        await remove(failed, { repoPath, deleteBranch: true });
-      }
-      repo.delete(worktree.id);
+    /** 创建失败时记录的只是预定路径和分支。重试保留现场，由 git 自己检查名称占用。 */
+    async recoverPreparation(worktree: Worktree, repoPath: string): Promise<Worktree | undefined> {
+      if (worktree.status === WorktreeStatus.Ready) return worktree;
+      return locks.run(repoPath, async () => {
+        if (worktree.status === WorktreeStatus.Creating) {
+          const registered = (await listWorktrees(repoPath)).find((entry) => entry.path === worktree.path);
+          if (
+            registered?.branch === worktree.branch &&
+            !registered.prunable &&
+            registered.commit === worktree.baseCommit
+          )
+            return move(worktree, WorktreeEvent.Created);
+        }
+        repo.delete(worktree.id);
+        return undefined;
+      });
     },
   };
 }
