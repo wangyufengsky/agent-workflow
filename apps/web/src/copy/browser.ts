@@ -81,7 +81,7 @@ export const WEBSITE_PROMPT_COPY = {
 /** The task page's preview tab (29 §8.1–§8.2). */
 export const PREVIEW_PANE_COPY = {
   tabProgress: '进度',
-  tabPreview: '预览',
+  tabPreview: '网页预览',
   session: '查看',
   mine: '我的预览',
   aiSession: (title: string, running: boolean) => `AI：${title}${running ? '（运行中）' : ''}`,

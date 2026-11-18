@@ -1,3 +1,5 @@
+import { lstat } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import {
   AppError,
   DeliveryStatus,
@@ -77,7 +79,25 @@ export function createTaskDiffs(deps: TasksServiceDeps, state: TaskState) {
       if (range !== null) return { base: range.base, files: await diffCommits(range.repo, range.base, range.head) };
       const worktree = readyWorktree(task);
       const base = await taskDiffBase(worktree.path, task.baseBranch);
-      return { base, files: await diffWorktree(worktree.path, base) };
+      const files = await diffWorktree(worktree.path, base);
+      if (task.status !== TaskStatus.Running) return { base, files };
+      let newest = -1;
+      let latestPath: string | undefined;
+      for (const file of files) {
+        // 文件可能在 Git 列出清单之后被移动。删除取父目录的更新时间。
+        const path = join(worktree.path, file.path);
+        const stats = await lstat(file.status === 'deleted' ? dirname(path) : path).catch(
+          (error: NodeJS.ErrnoException) => {
+            if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return undefined;
+            throw error;
+          },
+        );
+        if (stats !== undefined && stats.mtimeMs > newest) {
+          newest = stats.mtimeMs;
+          latestPath = file.path;
+        }
+      }
+      return { base, files, latestPath };
     },
 
     async diffFile(taskId: string, path: string): Promise<FileDiffDTO> {

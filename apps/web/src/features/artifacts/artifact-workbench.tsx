@@ -53,7 +53,8 @@ export function ArtifactWorkbench({
   onOpenNode: (id: string) => void;
   renderDelivery?: (version: ArtifactVersion, disabled: boolean) => ReactNode;
 }) {
-  const [panel, setPanel] = useState<Panel>('activity');
+  const [chosenPanel, setPanel] = useState<Panel>();
+  const panel = chosenPanel === undefined ? (task.openInbox.length > 0 ? 'activity' : null) : chosenPanel;
   const [draft, setDraft] = useState<{ versionId: string; notes: DraftNote[] }>();
   const [selection, setSelection] = useState<ArtifactSelection>();
   const [note, setNote] = useState('');
@@ -227,6 +228,7 @@ export function ArtifactWorkbench({
                 <ArtifactPreview
                   key={version.id}
                   taskId={task.id}
+                  previous={previous}
                   version={version}
                   onPick={canNote && panel === 'notes' && !compare ? pick : undefined}
                 />

@@ -98,9 +98,9 @@ test('J30 任务页预览：真实页面放进窗口，跟随地址栏，统计�
     await expect(pane).toContainText('控制台错误 1 · 失败请求 0');
     await expect(address).toHaveValue('/broken');
 
-    await page.getByRole('tab', { name: '进度' }).click();
+    await page.getByRole('tab', { name: '流程画布' }).click();
     await expect.poll(views).toBe(alone);
-    await page.getByRole('tab', { name: '预览' }).click();
+    await page.getByRole('tab', { name: '网页预览' }).click();
     await expect.poll(views).toBe(alone + 1);
 
     // A reload starts the page over: no cleanup of the page ran, yet the tab closes rather than lingering hidden.

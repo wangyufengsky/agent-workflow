@@ -68,15 +68,18 @@ test('步骤操作冒烟：暂停 → 跳过步骤 → 中止会话 → 继续�
   await queueTurn(request, project, { title: '定位根因' }, [{ type: 'hang' }]);
 
   await startBugfix(page, project, '退款金额算错了', false);
+  await page.getByRole('tab', { name: '流程画布' }).click();
   await expect(page.getByTestId('step-locate')).toContainText('进行中');
   await page.getByRole('button', { name: '暂停' }).click();
   await expect(page.getByTestId('paused-banner')).toBeVisible();
 
   await page.getByTestId('step-fix').click();
+  await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
   await page.getByRole('button', { name: '跳过' }).click();
   await expect(page.getByTestId('step-fix')).toContainText('已跳过');
 
   await page.getByTestId('step-locate').click();
+  await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
   await page.getByRole('button', { name: '中止' }).click();
   await expect(page.getByTestId('step-locate')).toContainText('即将开始');
 

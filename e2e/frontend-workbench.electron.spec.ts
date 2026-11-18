@@ -359,6 +359,10 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
     await expect(workbench.getByLabel('页面路径')).toHaveValue(route);
     await stepDetails.getByRole('button', { name: '关闭', exact: true }).click();
     await expect(workbench.getByRole('button', { name: '界面修改 2' })).toBeVisible();
+    await page.getByRole('button', { name: '扩大视图' }).click();
+    await page.screenshot({ path: testInfo.outputPath('frontend-workspace.png'), animations: 'disabled' });
+    const bounds = await workbench.getByTestId('preview-area').boundingBox();
+    writeFileSync(testInfo.outputPath('frontend-bounds.json'), JSON.stringify(bounds));
     const nativeImage = await app.evaluate(async ({ BrowserWindow }) => {
       const view = BrowserWindow.getAllWindows()[0]?.contentView.children.find((item) => 'webContents' in item);
       const contents = (view as Electron.WebContentsView | undefined)?.webContents;
@@ -366,6 +370,11 @@ test('首版执行中显示 AI 活动并提前打开预览，随后完成两轮�
       return (await contents.capturePage()).toPNG().toString('base64');
     });
     writeFileSync(testInfo.outputPath('frontend-native-page.png'), Buffer.from(nativeImage, 'base64'));
+    await page.getByRole('tab', { name: '流程画布' }).click();
+    await expect.poll(nativeText).toBeUndefined();
+    await page.getByRole('tab', { name: '网页预览' }).click();
+    await expect.poll(nativeText).toBe('下载订单');
+    await page.getByRole('button', { name: '还原视图' }).click();
     await expect(await request.patch(`${api}/settings`, { headers, data: { 'ui.theme': 'default' } })).toBeOK();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'default');
     await page.screenshot({ path: testInfo.outputPath('frontend-history-dark.png'), animations: 'disabled' });

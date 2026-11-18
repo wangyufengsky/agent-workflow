@@ -25,7 +25,7 @@
 .body {
   display: flex;
   gap: var(--s-3);
-  min-height: max(480px, calc(100dvh - 245px));
+  min-height: var(--task-view-height, max(480px, calc(100dvh - 245px)));
 }
 
 .preview {
@@ -103,7 +103,7 @@
   flex-direction: column;
   gap: var(--s-3);
   min-width: 220px;
-  max-height: max(480px, calc(100dvh - 245px));
+  max-height: var(--task-view-height, max(480px, calc(100dvh - 245px)));
   padding-inline-start: var(--s-3);
   overflow: auto;
   border-inline-start: 1px solid var(--line);

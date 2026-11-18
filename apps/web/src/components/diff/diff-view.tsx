@@ -73,14 +73,23 @@ const SIGN = { context: ' ', add: '+', del: '−' } as const;
 function UnifiedRows({
   hunk,
   tokens,
+  annotate,
   marks,
   focus,
 }: {
   hunk: DiffHunk;
   tokens: Tokens | null | undefined;
+  annotate: boolean;
   marks: readonly DiffMark[];
   focus: DiffFocus | undefined;
 }) {
+  const replacements = annotate
+    ? new Set(
+        toSplitRows(hunk.lines)
+          .filter((row) => row.left?.kind === 'del' && row.right?.kind === 'add')
+          .map((row) => row.right),
+      )
+    : undefined;
   return hunk.lines.map((line) => {
     const mark = marks.find((m) => atLine(line, m));
     return (
@@ -98,6 +107,11 @@ function UnifiedRows({
         <td className={styles.sign}>{SIGN[line.kind]}</td>
         <td className={styles.code}>
           <Code line={line} tokens={tokens} />
+          {annotate && line.kind !== 'context' && (
+            <small className={styles.editLabel}>
+              {line.kind === 'del' ? '删除' : replacements?.has(line) ? '修改' : '新增'}
+            </small>
+          )}
         </td>
       </tr>
     );
@@ -123,11 +137,13 @@ function SplitRows({ hunk, tokens }: { hunk: DiffHunk; tokens: Tokens | null | u
 export function DiffView({
   file,
   mode,
+  annotate = false,
   marks = [],
   focus,
 }: {
   file: FileDiffDTO;
   mode: DiffMode;
+  annotate?: boolean;
   marks?: readonly DiffMark[] | undefined;
   focus?: DiffFocus | undefined;
 }) {
@@ -175,7 +191,7 @@ export function DiffView({
                 <td colSpan={4}>{hunk.header}</td>
               </tr>
               {mode === 'unified' ? (
-                <UnifiedRows hunk={hunk} tokens={tokens.data} marks={marks} focus={focus} />
+                <UnifiedRows annotate={annotate} hunk={hunk} tokens={tokens.data} marks={marks} focus={focus} />
               ) : (
                 <SplitRows hunk={hunk} tokens={tokens.data} />
               )}

@@ -119,7 +119,11 @@ export const fileDiffSchema = z.union([
 export type FileDiffDTO = z.infer<typeof fileDiffSchema>;
 
 /** Changed files of a task or node and the commit they are compared with (null: a node that committed nothing). */
-export const diffSchema = z.object({ base: z.string().nullable(), files: z.array(diffFileSchema) });
+export const diffSchema = z.object({
+  base: z.string().nullable(),
+  files: z.array(diffFileSchema),
+  latestPath: z.string().optional(),
+});
 export type DiffDTO = z.infer<typeof diffSchema>;
 
 /** `GET /projects/:id/worktrees`: every worktree of the repository, ours (`managed`) or not. */

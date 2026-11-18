@@ -55,7 +55,7 @@ test('原生测试页签完成登录后继续，结束时清理测试分区的 C
       expect(run.status()).toBe(201);
       const { id } = await run.json();
       await page.goto(`${base}/tasks/${id}`);
-      await page.getByRole('button', { name: '打开测试页签' }).click();
+      await expect(page.getByRole('tab', { name: '测试浏览器' })).toHaveAttribute('aria-selected', 'true');
       await expect(page.getByText('等待登录 · 打开测试页面')).toBeVisible();
       const { browserCaseHandoff } = await (await request.get(`${api}/tasks/${id}`, { headers })).json();
       const partition = `aw-attempt-${String(browserCaseHandoff.tabId).split(':')[0]}`;
@@ -66,7 +66,7 @@ test('原生测试页签完成登录后继续，结束时清理测试分区的 C
       await page.getByRole('button', { name: '接管测试页签' }).click();
       await expect(page.getByTestId('case-handoff-surface')).toBeVisible();
       await expect.poll(count).toBe(1);
-      await page.getByRole('tab', { name: '进度', exact: true }).click();
+      await page.getByRole('tab', { name: '流程画布', exact: true }).click();
       await expect.poll(count).toBe(0);
       await page.getByRole('button', { name: '打开测试页签' }).click();
       await expect(page.getByTestId('case-handoff-surface')).toBeVisible();
@@ -91,7 +91,7 @@ test('原生测试页签完成登录后继续，结束时清理测试分区的 C
       await expect.poll(cookieNames).toContain('caseLogin');
       await page.getByRole('button', { name: '验证完成，继续测试' }).click();
       await expect.poll(count).toBe(0);
-      await page.getByRole('tab', { name: '进度', exact: true }).click();
+      await page.getByRole('tab', { name: '流程画布', exact: true }).click();
       await expect(page.getByTestId('result-card').getByText('步骤 1 · 检查登录结果 · 通过')).toBeVisible();
       await expect.poll(cookieNames).toEqual([]);
     } finally {

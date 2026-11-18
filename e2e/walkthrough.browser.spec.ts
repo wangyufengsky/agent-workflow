@@ -984,7 +984,7 @@ const SHOTS: Shot[] = [
     url: (s) => `/tasks/${s.review.id}?node=${node(s.review, 'fix')}&open=true`,
     ready: testId('result-card'),
     open: async (page) => {
-      await page.getByRole('tab', { name: '改动' }).click();
+      await page.getByRole('tab', { name: '改动', exact: true }).click();
       await expect(page.getByTestId('diff-view')).toBeVisible();
       return page.getByRole('dialog');
     },
@@ -996,7 +996,7 @@ const SHOTS: Shot[] = [
     url: (s) => `/tasks/${s.review.id}?node=${node(s.review, 'fix')}&open=true`,
     ready: testId('result-card'),
     open: async (page) => {
-      await page.getByRole('tab', { name: '改动' }).click();
+      await page.getByRole('tab', { name: '改动', exact: true }).click();
       await page.getByRole('button', { name: '放大查看' }).click();
       const large = page.getByRole('dialog', { name: '改动 · 修复' });
       await expect(large.getByTestId('diff-view')).toBeVisible();

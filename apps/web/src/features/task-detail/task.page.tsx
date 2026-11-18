@@ -1,6 +1,7 @@
 import {
   DeliveryStatus,
   EDITABLE_NODE_STATUSES,
+  InboxKind,
   NodeKind,
   type TaskDetailDTO,
   TaskStatus,
@@ -25,6 +26,7 @@ import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { BROWSER_TEST_COPY, TASK_COPY as C } from '../../copy/tasks.ts';
 import { ArtifactWorkbench } from '../artifacts/artifact-workbench.tsx';
 import { TaskBrowserCase } from '../browser-cases/task-browser-case.tsx';
+import { InboxCard } from '../inbox/inbox-card.tsx';
 import { FrontendRoundHistory, FrontendWorkbench } from '../preview/frontend-workbench.tsx';
 import { BrowserTestPane, PreviewPane } from '../preview/preview-pane.tsx';
 import { projectQuery } from '../projects/projects.queries.ts';
@@ -42,6 +44,7 @@ import { RemoteDeliveryStatus } from './remote-delivery-status.tsx';
 import { DeliveryOutcome, ResultCard } from './result-card.tsx';
 import { ReviewComments } from './review-comments.tsx';
 import { stepsOfNodes } from './steps.ts';
+import { TaskCodeChanges } from './task-code-changes.tsx';
 import { TaskCodeReviewWorkbench } from './task-code-review.tsx';
 import { TaskHeader } from './task-header.tsx';
 import styles from './task-page.module.css';
@@ -56,7 +59,6 @@ const ENDED_TASK: readonly TaskStatus[] = [TaskStatus.Completed, TaskStatus.Canc
 
 type Selection = {
   selected: string | undefined;
-  select: (id: string) => void;
   /** Opens the step's details drawer, on `tab` when given. */
   open: (id: string, tab?: NodeTab) => void;
 };
@@ -71,7 +73,7 @@ function StepsView({ task, selection, pro }: MainProps) {
         label={CANVAS_COPY.progressLabel}
         finished={FINISHED_TASK.includes(task.status)}
         selectedId={selection.selected}
-        onSelect={selection.select}
+        onSelect={selection.open}
         onOpen={selection.open}
       />
       <TaskSide task={task} selectedId={selection.selected} onOpen={selection.open} pro={pro} />
@@ -117,8 +119,26 @@ function StepsMain(props: MainProps) {
   );
 }
 
+function SavePlanTemplate({ task }: { task: TaskDetailDTO }) {
+  return (
+    task.status === TaskStatus.Completed &&
+    task.plan !== null &&
+    task.workflow.planning === WorkflowPlanning.Ai && (
+      <Link className="btn secondary" to={ROUTES.workflowNew} search={{ task: task.id, version: task.plan.version }}>
+        {C.savePlanTemplate}
+      </Link>
+    )
+  );
+}
+
 /** The main area follows the task's state (14 §3.3). */
-function TaskMain({ task, selection, pro, deliveryInToolbar = false }: MainProps & { deliveryInToolbar?: boolean }) {
+function TaskMain({
+  task,
+  selection,
+  pro,
+  deliveryInToolbar = false,
+  active = true,
+}: MainProps & { deliveryInToolbar?: boolean; active?: boolean }) {
   const props = { task, selection, pro };
   switch (task.status) {
     case TaskStatus.Draft:
@@ -146,9 +166,11 @@ function TaskMain({ task, selection, pro, deliveryInToolbar = false }: MainProps
             </details>
           )}
           <a href="#task-acceptance-result">{C.viewAcceptanceResult}</a>
-          <div id="task-acceptance-result" tabIndex={-1}>
-            <ResultCard task={task} showDelivery={!deliveryInToolbar} />
-          </div>
+          {active && (
+            <div id="task-acceptance-result" tabIndex={-1}>
+              <ResultCard task={task} showDelivery={!deliveryInToolbar} />
+            </div>
+          )}
         </div>
       );
     case TaskStatus.Merging:
@@ -156,18 +178,8 @@ function TaskMain({ task, selection, pro, deliveryInToolbar = false }: MainProps
     case TaskStatus.Cancelled:
       return (
         <div className="col">
-          {task.result !== null ? <ResultCard task={task} /> : null}
-          {task.status === TaskStatus.Completed &&
-            task.plan !== null &&
-            task.workflow.planning === WorkflowPlanning.Ai && (
-              <Link
-                className="btn secondary"
-                to={ROUTES.workflowNew}
-                search={{ task: task.id, version: task.plan.version }}
-              >
-                {C.savePlanTemplate}
-              </Link>
-            )}
+          {active && task.result !== null ? <ResultCard task={task} /> : null}
+          {active && <SavePlanTemplate task={task} />}
           {task.nodes.length > 0 && (
             <details className={styles.canvasFold} open={task.result === null}>
               <summary className="hint">{C.canvasToggle}</summary>
@@ -189,6 +201,10 @@ function hasVisibleChecklist(task: TaskDetailDTO): boolean {
 
 export function TaskPage() {
   const { taskId } = route.useParams();
+  const [expandedTask, setExpandedTask] = useState<string>();
+  const expanded = expandedTask === taskId;
+  const [siteTask, setSiteTask] = useState<string>();
+  const [visitedCanvas, setVisitedCanvas] = useState<string>();
   const { node, details, requirement, artifactVersion } = route.useSearch();
   const navigate = route.useNavigate();
   const task = useQuery({
@@ -202,8 +218,16 @@ export function TaskPage() {
   const pro = isPro || details === true;
   const selection: Selection = {
     selected: node,
-    select: (id) => void navigate({ search: (prev) => ({ ...prev, node: id }), replace: true }),
-    open: (id, tab) => void navigate({ search: (prev) => ({ ...prev, node: id, open: true, tab }) }),
+    open: (id, tab) =>
+      void navigate({
+        search: (prev) => ({
+          ...prev,
+          view: prev.view ?? (canvas ? 'progress' : 'result'),
+          node: id,
+          open: true,
+          tab,
+        }),
+      }),
   };
   const { open, tab, view } = route.useSearch();
   const nodeId = open === true ? node : undefined;
@@ -238,16 +262,152 @@ export function TaskPage() {
       )}
     </div>
   );
-  const watchingTest = task.data.browserTest !== undefined && view === 'preview';
+  const browserTest = task.data.browserTest !== undefined;
+  const configuredPreview =
+    project.data?.preview != null &&
+    task.data.git.worktreeStatus === WorktreeStatus.Ready &&
+    !ENDED_TASK.includes(task.data.status);
+  const code =
+    !artifactOpen &&
+    !reviewOpen &&
+    !workbench &&
+    !browserTest &&
+    task.data.workflow.deliverable === WorkflowDeliverable.CodeChanges &&
+    (task.data.git.worktreeStatus === WorktreeStatus.Ready || task.data.status === TaskStatus.Completed);
+  const needsPlan = [TaskStatus.Draft, TaskStatus.Preparing, TaskStatus.Planning, TaskStatus.PlanReview].some(
+    (status) => status === task.data.status,
+  );
+  const hasViews =
+    ((!needsPlan && (workbench || artifactOpen || code)) || browserTest || configuredPreview) && !reviewOpen;
+  const canvas =
+    hasViews &&
+    (view === 'progress' ||
+      (view === undefined &&
+        ((needsPlan && !workbench && !artifactOpen && !browserTest) ||
+          node !== undefined ||
+          requirement !== undefined ||
+          task.data.status === TaskStatus.Failed ||
+          task.data.status === TaskStatus.Paused)));
+  if (canvas && visitedCanvas !== taskId) setVisitedCanvas(taskId);
+  const siteSelected = view === 'preview' || (canvas && siteTask === taskId);
+  const watchingTest = browserTest && !canvas && hasViews;
+  const resultLabel = artifactOpen
+    ? '文档预览'
+    : browserTest
+      ? BROWSER_TEST_COPY.browser
+      : code && !needsPlan
+        ? '代码改动'
+        : PREVIEW_PANE_COPY.tabPreview;
+  const resultPanel =
+    needsPlan && !hasViews && !workbench && !artifactOpen && !reviewOpen ? (
+      <TaskMain task={task.data} selection={selection} pro={pro} />
+    ) : artifactOpen ? (
+      <ArtifactWorkbench
+        key={task.data.id}
+        task={task.data}
+        artifact={artifact}
+        selectedVersion={artifactVersion}
+        onSelectVersion={(id) => void navigate({ search: (prev) => ({ ...prev, artifactVersion: id }), replace: true })}
+        nodeDetails={canvas ? undefined : nodeDetails}
+        onOpenNode={selection.open}
+        record={record}
+        {...(task.data.workflow.deliverable === WorkflowDeliverable.CodeChanges
+          ? {
+              renderDelivery: (version, disabled) => (
+                <DeliveryDialogButton
+                  key={version.id}
+                  task={task.data}
+                  label={ARTIFACT_COPY.deliver}
+                  artifactVersionId={version.id}
+                  disabled={disabled}
+                />
+              ),
+            }
+          : {})}
+      />
+    ) : reviewOpen ? (
+      <TaskCodeReviewWorkbench
+        key={taskId}
+        task={task.data}
+        review={codeReview}
+        pro={isPro}
+        record={record}
+        nodeDetails={canvas ? undefined : nodeDetails}
+      />
+    ) : workbench ? (
+      <FrontendWorkbench
+        key={task.data.id}
+        task={task.data}
+        pro={pro}
+        active={!canvas}
+        hasConfiguredPreview={project.data?.preview != null}
+        onOpenNode={selection.open}
+        nodeDetails={canvas ? undefined : nodeDetails}
+        delivery={
+          task.data.status === TaskStatus.Review && frontend.verified && <DeliveryDialogButton task={task.data} />
+        }
+        progress={
+          <div className={styles.frontendProgress}>
+            {task.data.status === TaskStatus.Review && !frontend.verified ? (
+              <StepsView task={task.data} selection={selection} pro={pro} />
+            ) : (
+              <TaskMain task={task.data} selection={selection} pro={pro} deliveryInToolbar />
+            )}
+          </div>
+        }
+      />
+    ) : browserTest ? (
+      <BrowserTestPane task={task.data} active={!canvas} />
+    ) : code && !needsPlan ? (
+      <>
+        {!canvas &&
+          task.data.openInbox
+            .filter((item) => item.kind !== InboxKind.Failure)
+            .map((item) => <InboxCard key={item.id} item={item} showTask={false} />)}
+        {!canvas && task.data.status === TaskStatus.Failed && (
+          <FailurePanel task={task.data} onOpenStep={selection.open} />
+        )}
+        {configuredPreview && (
+          <button
+            type="button"
+            className="btn sm"
+            onClick={() =>
+              void navigate({ search: (prev) => ({ ...prev, view: view === 'preview' ? 'result' : 'preview' }) })
+            }
+          >
+            {view === 'preview' ? '查看代码改动' : '打开网页预览'}
+          </button>
+        )}
+        {configuredPreview && siteSelected ? (
+          <PreviewPane task={task.data} active={!canvas} pro={pro} />
+        ) : (
+          <TaskCodeChanges key={taskId} task={task.data} active={!canvas} />
+        )}
+        {!canvas && task.data.result !== null && (
+          <>
+            <ResultCard task={task.data} />
+            <SavePlanTemplate task={task.data} />
+          </>
+        )}
+      </>
+    ) : configuredPreview ? (
+      <PreviewPane task={task.data} active={!canvas} pro={pro} />
+    ) : (
+      <TaskMain task={task.data} selection={selection} pro={pro} />
+    );
   return (
-    <div className={`page wide ${watchingTest ? styles.testViewing : ''}`} data-testid="task-page">
+    <div
+      className={`page wide ${hasViews ? styles.resultPage : ''} ${watchingTest ? styles.testViewing : ''}`}
+      data-result-expanded={(hasViews && expanded) || undefined}
+      data-testid="task-page"
+    >
       <TaskHeader
         task={task.data}
         pro={pro}
         details={isPro ? undefined : details === true}
         onDetailsChange={(on) => void navigate({ search: (prev) => ({ ...prev, details: on }), replace: true })}
       />
-      {task.data.browserCaseHandoff !== undefined && view !== 'preview' && (
+      {task.data.browserCaseHandoff !== undefined && !watchingTest && (
         <div className="row">
           <strong>{BROWSER_CASE_COPY.handoff.heading}</strong>
           <Button size="sm" onClick={() => void navigate({ search: (prev) => ({ ...prev, view: 'preview' }) })}>
@@ -255,19 +415,23 @@ export function TaskPage() {
           </Button>
         </div>
       )}
-      {task.data.browserTest !== undefined && !watchingTest && (
+      {task.data.browserTest !== undefined && (
         <div className="col">
           <div className="row">
             <TaskBrowserCase key={task.data.id} task={task.data} />
           </div>
-          <p className="hint">
-            {BROWSER_TEST_COPY.target} · {task.data.browserTest.target}
-          </p>
-          <p className="hint">
-            {BROWSER_TEST_COPY.writes} ·{' '}
-            {task.data.browserTest.writes.map(({ method, path }) => `${method} ${path}`).join('、') ||
-              BROWSER_TEST_COPY.noWrites}
-          </p>
+          {!watchingTest && (
+            <p className="hint">
+              {BROWSER_TEST_COPY.target} · {task.data.browserTest.target}
+            </p>
+          )}
+          {!watchingTest && (
+            <p className="hint">
+              {BROWSER_TEST_COPY.writes} ·{' '}
+              {task.data.browserTest.writes.map(({ method, path }) => `${method} ${path}`).join('、') ||
+                BROWSER_TEST_COPY.noWrites}
+            </p>
+          )}
         </div>
       )}
       {requirement !== undefined && !hasVisibleChecklist(task.data) && <RequirementsSection task={task.data} />}
@@ -275,109 +439,72 @@ export function TaskPage() {
       {repositoryDocument && task.data.status === TaskStatus.Completed && task.data.pullRequest !== null && (
         <RemoteDeliveryStatus task={task.data} />
       )}
-      {artifactOpen ? (
-        <ArtifactWorkbench
-          key={task.data.id}
-          task={task.data}
-          artifact={artifact}
-          selectedVersion={artifactVersion}
-          onSelectVersion={(id) =>
-            void navigate({ search: (prev) => ({ ...prev, artifactVersion: id }), replace: true })
-          }
-          nodeDetails={nodeDetails}
-          onOpenNode={selection.open}
-          record={record}
-          {...(task.data.workflow.deliverable === WorkflowDeliverable.CodeChanges
-            ? {
-                renderDelivery: (version, disabled) => (
-                  <DeliveryDialogButton
-                    key={version.id}
-                    task={task.data}
-                    label={ARTIFACT_COPY.deliver}
-                    artifactVersionId={version.id}
-                    disabled={disabled}
-                  />
-                ),
-              }
-            : {})}
-        />
-      ) : reviewOpen ? (
-        <TaskCodeReviewWorkbench
-          key={taskId}
-          task={task.data}
-          review={codeReview}
-          pro={isPro}
-          record={record}
-          nodeDetails={nodeDetails}
-        />
-      ) : workbench ? (
-        <FrontendWorkbench
-          key={task.data.id}
-          task={task.data}
-          pro={pro}
-          hasConfiguredPreview={project.data?.preview != null}
-          onOpenNode={selection.open}
-          nodeDetails={nodeDetails}
-          delivery={
-            task.data.status === TaskStatus.Review && frontend.verified && <DeliveryDialogButton task={task.data} />
-          }
-          progress={
-            <div className={styles.frontendProgress}>
-              {task.data.status === TaskStatus.Review && !frontend.verified ? (
-                <StepsView task={task.data} selection={selection} pro={pro} />
-              ) : (
-                <TaskMain task={task.data} selection={selection} pro={pro} deliveryInToolbar />
-              )}
-            </div>
-          }
-        />
-      ) : task.data.browserTest !== undefined ||
-        (project.data?.preview != null &&
-          task.data.git.worktreeStatus === WorktreeStatus.Ready &&
-          !ENDED_TASK.includes(task.data.status)) ? (
+      {hasViews ? (
         <RadixTabs.Root
-          className={watchingTest ? styles.testTabs : undefined}
-          value={view ?? 'progress'}
-          onValueChange={(next) =>
+          className={styles.resultTabs}
+          value={canvas ? 'progress' : 'result'}
+          onValueChange={(value) => {
+            if (value === 'progress') setSiteTask(siteSelected ? taskId : undefined);
             void navigate({
-              search: (prev) => ({ ...prev, view: next === 'preview' ? 'preview' : undefined }),
+              search: (prev) => ({
+                ...prev,
+                view: value === 'progress' ? 'progress' : siteTask === taskId ? 'preview' : 'result',
+                open: false,
+              }),
               replace: true,
-            })
-          }
+            });
+          }}
         >
-          <RadixTabs.List className="tabs">
-            <RadixTabs.Trigger value="progress" className="tab">
-              {PREVIEW_PANE_COPY.tabProgress}
-            </RadixTabs.Trigger>
-            <RadixTabs.Trigger value="preview" className="tab">
-              {task.data.browserTest === undefined ? PREVIEW_PANE_COPY.tabPreview : BROWSER_TEST_COPY.browser}
-            </RadixTabs.Trigger>
-          </RadixTabs.List>
-          <RadixTabs.Content value="progress" className="tab-panel">
-            <TaskMain task={task.data} selection={selection} pro={pro} />
-          </RadixTabs.Content>
-          {/* Kept mounted on the progress tab: the user's preview tab stays open, only off the window. */}
-          <RadixTabs.Content
-            value="preview"
-            className={`tab-panel ${watchingTest ? styles.testPanel : ''}`}
-            forceMount
-            hidden={view !== 'preview'}
-          >
-            {task.data.browserTest === undefined ? (
-              <PreviewPane task={task.data} active={view === 'preview'} pro={pro} />
-            ) : (
-              <BrowserTestPane task={task.data} active={view === 'preview'} />
-            )}
-          </RadixTabs.Content>
+          <div className={styles.viewBar}>
+            <RadixTabs.List className="tabs" aria-label="任务视图">
+              <RadixTabs.Trigger className="tab" value="result">
+                {resultLabel}
+              </RadixTabs.Trigger>
+              <RadixTabs.Trigger className="tab" value="progress">
+                流程画布
+              </RadixTabs.Trigger>
+            </RadixTabs.List>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="expand"
+              aria-pressed={expanded}
+              onClick={() => setExpandedTask(expanded ? undefined : taskId)}
+            >
+              {expanded ? '还原视图' : '扩大视图'}
+            </Button>
+          </div>
+          <div className={styles.viewArea}>
+            <RadixTabs.Content
+              value="result"
+              forceMount
+              inert={canvas}
+              aria-hidden={canvas}
+              className={styles.viewPanel}
+            >
+              {resultPanel}
+            </RadixTabs.Content>
+            <RadixTabs.Content
+              value="progress"
+              forceMount
+              inert={!canvas}
+              aria-hidden={!canvas}
+              className={styles.viewPanel}
+            >
+              {(canvas || visitedCanvas === taskId) && (
+                <TaskMain active={canvas} task={task.data} selection={selection} pro={pro} />
+              )}
+            </RadixTabs.Content>
+          </div>
         </RadixTabs.Root>
       ) : (
-        <TaskMain task={task.data} selection={selection} pro={pro} />
+        resultPanel
       )}
       {repositoryDocument && task.data.status === TaskStatus.Completed && task.data.pullRequest !== null && (
         <ReviewComments task={task.data} />
       )}
       {!workbench && frontend !== undefined && <FrontendRoundHistory task={task.data} onOpen={selection.open} />}
-      {!workbench && !artifactOpen && !reviewOpen && (
+      {(canvas || (!workbench && !artifactOpen && !reviewOpen)) && (
         <NodeDrawer taskId={taskId} nodeId={nodeId} tab={tab} pro={pro} onClose={closeNode} />
       )}
     </div>

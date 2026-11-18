@@ -57,7 +57,7 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
     .poll(async () => (await (await request.get(`${api}/tasks/${task.id}`, { headers })).json()).status)
     .toBe('plan_review');
   await page.goto(`${base}/tasks/${task.id}`);
-  await page.getByRole('tab', { name: '预览', exact: true }).click();
+  await page.getByRole('tab', { name: '网页预览', exact: true }).click();
   await page.getByRole('button', { name: '启动预览', exact: true }).click();
   await expect(page.getByTestId('preview-area')).toBeVisible();
   const nativeCount = () =>
@@ -172,7 +172,7 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
       response.url().endsWith(`/assistant/conversations/${id}/preview`) &&
       response.request().postDataJSON()?.preview === null,
   );
-  await page.getByRole('tab', { name: '进度', exact: true }).click();
+  await page.getByRole('tab', { name: '流程画布', exact: true }).click();
   expect((await unbound).status()).toBe(204);
   await expect.poll(nativeCount).toBe(0);
 
@@ -182,7 +182,7 @@ res.end('<title>我的测试预览</title><h1>只有用户预览的内容</h1>')
       response.url().endsWith(`/assistant/conversations/${id}/preview`) &&
       response.request().postDataJSON()?.preview !== null,
   );
-  await page.getByRole('tab', { name: '预览', exact: true }).click();
+  await page.getByRole('tab', { name: '网页预览', exact: true }).click();
   await expect.poll(nativeCount).toBe(1);
   expect((await rebound).status()).toBe(204);
 

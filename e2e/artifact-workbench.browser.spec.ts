@@ -87,7 +87,7 @@ const cases = [
 }>;
 
 for (const item of cases) {
-  test(`${item.format} 产物可预览、定位标注、比较版本并验收`, async ({ page, request }) => {
+  test(`${item.format} 产物可预览、定位标注、比较版本并验收`, async ({ page, request }, testInfo) => {
     const project = await createProject(request, null);
     // Hold completion after the first file so the test can see the preview while the task is still running.
     await queueTurn(request, project, { title: '生成首版产物' }, [
@@ -141,6 +141,11 @@ for (const item of cases) {
     await releaseRevision.getByRole('button', { name: '允许一次' }).click();
     await expect(workbench.getByText(item.revised, { exact: true })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
     await expect(page.getByText('待查看产物', { exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '文档预览' })).toHaveAttribute('aria-selected', 'true');
+    await expect(workbench.locator('[data-kind="修改"]').first()).toBeVisible();
+    await page.getByRole('button', { name: '扩大视图' }).click();
+    await page.screenshot({ path: testInfo.outputPath('document.png'), animations: 'disabled' });
+    await page.getByRole('button', { name: '还原视图' }).click();
     const reviewed = await detail();
     const artifact = artifactTaskSchema.parse(reviewed.artifact);
     expect(artifact.versions.map(({ number }) => number)).toEqual([1, 2]);
