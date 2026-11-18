@@ -248,7 +248,11 @@ export async function createFakeHosting(options: {
       // The open pull requests from a branch: GitHub `head=owner:branch&state=open`, GitLab `source_branch=…`.
       const head =
         provider === 'github' ? url.searchParams.get('head')?.split(':')[1] : url.searchParams.get('source_branch');
-      const open = pullRequests.filter((p) => p.provider === provider && p.repo === repo && p.open && p.head === head);
+      const base = url.searchParams.get(provider === 'github' ? 'base' : 'target_branch');
+      const open = pullRequests.filter(
+        (p) =>
+          p.provider === provider && p.repo === repo && p.open && p.head === head && (base === null || p.base === base),
+      );
       return send(
         res,
         200,

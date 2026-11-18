@@ -3,11 +3,13 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
+  AppError,
   deliverTaskOp,
   ErrorCode,
   getTaskOp,
   getTaskTimelineOp,
   listInboxOp,
+  pruneWorktreesOp,
   type TaskDetailDTO,
   TeamPeriod,
   teamSummaryOp,
@@ -199,6 +201,26 @@ describe('交付：本地合并（09 §7）', () => {
       status: 'review',
       lastDelivery: { status: 'failed', error: { code: ErrorCode.GitCommandFailed } },
     });
+  });
+
+  it('清理监听失败和上次退出时正在移除的工作树都能再次清理', async () => {
+    const { repo, project, task } = await inReview();
+    const unsubscribe = t.app.services.worktrees.onBeforeRemove(async () => {
+      throw new AppError(ErrorCode.InternalError, 'Preview failed to stop');
+    });
+    const delivered = await t.call(deliverTaskOp, { id: task.id, strategy: 'squash' });
+    unsubscribe();
+    expect(delivered.body.git.worktreeStatus).toBe('error');
+    await t.close();
+    const db = new DatabaseSync(join(t.dataDir, 'app.db'));
+    db.prepare("UPDATE worktrees SET status = 'removing' WHERE task_id = ?").run(task.id);
+    db.close();
+    t = await createTestApp({ dataDir: t.dataDir });
+    await t.call(pruneWorktreesOp, { id: project.id });
+    expect((await t.call(getTaskOp, { id: task.id })).body.git.worktreeStatus).toBe('removed');
+    expect(await repo.git('branch', '--list', task.git.branch ?? '', '--format=%(refname:short)')).toBe(
+      task.git.branch,
+    );
   });
 
   it('应用在交付中退出：重启后交付记为中断，任务回到待合并', async () => {

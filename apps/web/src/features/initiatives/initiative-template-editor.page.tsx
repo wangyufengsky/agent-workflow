@@ -1,11 +1,11 @@
 import {
+  canRunInInitiative,
   DEFINITION_KEY_PATTERN,
   INITIATIVE_TEMPLATE_PLACEHOLDER,
   type InitiativeDraft,
   InitiativeTemplateKind,
   type SaveInitiativeTemplateRequest,
   validateInitiativeDraft,
-  WorkflowKind,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
@@ -53,7 +53,7 @@ function TemplateEditor({
   const create = useCreateInitiativeTemplate();
   const update = useUpdateInitiativeTemplate();
   const save = isNew ? create : update;
-  const workflowExists = (key: string) => workflows.some((w) => w.key === key && w.kind !== WorkflowKind.System);
+  const workflowExists = (key: string) => workflows.some((w) => w.key === key && canRunInInitiative(w));
   const problems = [
     ...(DEFINITION_KEY_PATTERN.test(meta.key) ? [] : [C.keyProblem]),
     ...(meta.name.trim() === '' || meta.description.trim() === '' ? [C.nameRequired] : []),

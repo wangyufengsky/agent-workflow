@@ -188,7 +188,7 @@ export function createSchedulesService({
    * the schedule is idle is checked again where the task is created: two starts may both have passed the earlier
    * check while `checkCreate` ran.
    */
-  async function startTask(schedule: Schedule, occasion: RunOccasion): Promise<string> {
+  async function startTask(schedule: Schedule, occasion: RunOccasion, claim?: () => boolean): Promise<void> {
     const workflow = fixedWorkflow(schedule.workflowKey);
     const baseBranch = await tasks.checkCreate({
       projectId: schedule.projectId,
@@ -196,6 +196,7 @@ export function createSchedulesService({
       ...(schedule.baseBranch === null ? {} : { baseBranch: schedule.baseBranch }),
     });
     const taskId = unit.transact(() => {
+      if (claim !== undefined && !claim()) return null;
       assertIdle(schedule.id);
       const id = tasks.insertDraft({
         projectId: schedule.projectId,
@@ -208,9 +209,9 @@ export function createSchedulesService({
       publish(schedule.id);
       return id;
     });
+    if (taskId === null) return;
     log.info({ scheduleId: schedule.id, taskId, trigger: occasion.trigger }, 'scheduled task started');
     tasks.start(taskId);
-    return taskId;
   }
 
   /** A due run that could not start its task pauses the schedule and asks the user to look (22 §5, D91). */
@@ -238,20 +239,37 @@ export function createSchedulesService({
     const { dueAt, missed } = foldDueTimes(schedule.frequency, schedule.nextRunAt, now, timeZone);
     const late = missed > 0 || now - dueAt > SCHEDULE_CATCH_UP_AFTER_MS;
     const occasion = { trigger: late ? ScheduleRunTrigger.CatchUp : ScheduleRunTrigger.OnTime, dueAt, missed };
-    // Moved on first: whatever this run does, the schedule is not due again until its next time.
-    repo.update(schedule.id, { nextRunAt: nextRunAfter(schedule.frequency, now, timeZone), updatedAt: now });
+    // 在记录运行的同一事务内领取到期时刻，保留 Git 检查期间用户的暂停、修改或删除。
+    const claim = () => {
+      const current = repo.find(schedule.id);
+      if (
+        current?.status !== ScheduleStatus.Active ||
+        current.nextRunAt !== schedule.nextRunAt ||
+        current.workflowKey !== schedule.workflowKey ||
+        current.baseBranch !== schedule.baseBranch ||
+        current.requirement !== schedule.requirement
+      )
+        return false;
+      repo.update(current.id, { nextRunAt: nextRunAfter(current.frequency, now, timeZone), updatedAt: now });
+      return true;
+    };
+    if (repo.find(schedule.id)?.status !== ScheduleStatus.Active) return;
     if (activeTask(schedule.id) !== null) {
-      skipRun(schedule, occasion);
+      unit.transact(() => {
+        if (claim()) skipRun(schedule, occasion);
+      });
       return;
     }
     try {
-      await startTask(schedule, occasion);
+      await startTask(schedule, occasion, claim);
     } catch (err) {
       if (!(err instanceof AppError)) throw err;
       // A manual run started meanwhile: like any run that finds a task going, this one is skipped.
-      if (err.code === ErrorCode.ScheduleBusy) skipRun(schedule, occasion);
-      // Otherwise a failed run: the schedule pauses and the user gets an inbox item (22 §5).
-      else failRun(get(schedule.id), occasion, err);
+      unit.transact(() => {
+        if (!claim()) return;
+        if (err.code === ErrorCode.ScheduleBusy) skipRun(schedule, occasion);
+        else failRun(schedule, occasion, err);
+      });
     }
   }
 

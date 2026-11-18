@@ -8,6 +8,7 @@ import {
   AttemptKind,
   attemptMachine,
   type CreateInitiativeRequest,
+  canRunInInitiative,
   createInitiativeRequestSchema,
   type DeliverInitiativePhaseResponse,
   DeliveryStrategy,
@@ -44,7 +45,6 @@ import {
   validateInitiativeDraft,
   WorkflowDeliverable,
   type WorkflowDTO,
-  WorkflowKind,
   type WorkflowSummaryDTO,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
@@ -147,7 +147,10 @@ export function createInitiativesService({
       throw err;
     }
   }
-  const workflowExists = (key: string) => workflowOf(key) !== null;
+  const workflowExists = (key: string) => {
+    const workflow = workflowOf(key);
+    return workflow !== null && canRunInInitiative(workflow);
+  };
 
   /** Every work package with its task, latest delivery and display state (34 §6.1). */
   function views(initiative: Initiative): ItemView[] {
@@ -501,7 +504,7 @@ export function createInitiativesService({
 
   /** The workflows the AI may give work packages: the initiative's, else every listed one (34 §5.1). */
   function allowedWorkflowsOf(initiative: Initiative): WorkflowSummaryDTO[] {
-    const listed = workflows.list().filter((w) => w.kind !== WorkflowKind.System);
+    const listed = workflows.list().filter(canRunInInitiative);
     return initiative.allowedWorkflows === null
       ? listed
       : listed.filter((w) => initiative.allowedWorkflows?.includes(w.key));

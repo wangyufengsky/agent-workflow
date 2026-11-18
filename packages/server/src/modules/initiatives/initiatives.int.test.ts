@@ -94,6 +94,10 @@ describe('组合模板（34 §15）', () => {
       ],
     };
 
+    const browser = { ...template, items: template.items.map((item) => ({ ...item, workflow: 'browser_test' })) };
+    expect((await t.call(createInitiativeTemplateOp, browser)).body).toMatchObject({
+      error: { code: ErrorCode.InitiativeBreakdownInvalid },
+    });
     const missing = { ...template, items: template.items.map((i) => ({ ...i, requirement: '审查' })) };
     expect((await t.call(createInitiativeTemplateOp, missing)).body).toMatchObject({
       error: {

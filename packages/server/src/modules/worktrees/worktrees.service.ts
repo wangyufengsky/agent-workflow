@@ -73,8 +73,8 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
 
   async function remove(worktree: Worktree, options: { repoPath: string; deleteBranch: boolean }): Promise<void> {
     const removing = move(worktree, WorktreeEvent.Remove);
-    for (const listener of beforeRemove) await listener(removing);
     try {
+      for (const listener of beforeRemove) await listener(removing);
       await locks.run(options.repoPath, async () => {
         const cwd = options.repoPath;
         if (existsSync(removing.path)) await runGit(['worktree', 'remove', '--force', removing.path], { cwd });
@@ -84,13 +84,18 @@ export function createWorktreesService({ db, clock, log, locks, settings, dataDi
         }
       });
     } catch (err) {
-      if (err instanceof AppError) move(removing, WorktreeEvent.RemoveFailed, { error: messageOf(err) });
+      move(removing, WorktreeEvent.RemoveFailed, { error: err instanceof AppError ? messageOf(err) : String(err) });
       throw err;
     }
     move(removing, WorktreeEvent.Removed, { removedAt: clock.now() });
   }
 
   return {
+    recover(): void {
+      for (const worktree of repo.listByStatus(WorktreeStatus.Removing)) {
+        move(worktree, WorktreeEvent.RemoveFailed, { error: 'Worktree removal was interrupted' });
+      }
+    },
     onBeforeRemove(listener: (worktree: Worktree) => Promise<void>): () => void {
       beforeRemove.add(listener);
       return () => beforeRemove.delete(listener);

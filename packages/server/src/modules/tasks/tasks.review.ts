@@ -55,21 +55,21 @@ export function createTaskReview(
   async function openPullRequest(
     task: Task,
   ): Promise<{ hosting: GitHostingProvider; open: OpenPullRequest; pushedAt: number }> {
-    const delivered = pullRequestOf(task.id);
-    if (delivered === null || task.branch === null) {
+    const delivered = deliveries.latestPullRequest(task.id);
+    if (delivered?.finishedAt == null || task.branch === null) {
       throw new AppError(ErrorCode.PullRequestNotOpen, 'The task was not delivered as a pull request', {
         taskId: task.id,
       });
     }
     const hosting = await projects.hostingOf(task.projectId);
-    const open = await hosting.findOpenPullRequest(task.branch);
-    if (open === undefined) {
+    const open = await hosting.findOpenPullRequest(task.branch, delivered.targetBranch);
+    if (open === undefined || open.url !== delivered.prUrl) {
       throw new AppError(ErrorCode.PullRequestNotOpen, 'The pull request was merged or closed', {
         taskId: task.id,
         branch: task.branch,
       });
     }
-    return { hosting, open, pushedAt: delivered.pushedAt };
+    return { hosting, open, pushedAt: delivered.finishedAt };
   }
 
   async function readComments(task: Task) {
