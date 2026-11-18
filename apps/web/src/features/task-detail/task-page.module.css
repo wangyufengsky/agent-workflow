@@ -384,3 +384,15 @@
 .resultPage[data-result-expanded] {
   --task-view-height: max(480px, calc(100dvh - 188px));
 }
+
+.readExcerpt {
+  margin: 0;
+  padding: 16px;
+  max-height: var(--task-view-height, 68vh);
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}

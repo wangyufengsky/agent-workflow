@@ -92,6 +92,17 @@ for (const item of cases) {
     // Hold completion after the first file so the test can see the preview while the task is still running.
     await queueTurn(request, project, { title: '生成首版产物' }, [
       { type: 'think', text: '先生成可查看的初稿。' },
+      ...(item.format === 'Word'
+        ? [
+            {
+              type: 'tool' as const,
+              tool: 'read',
+              input: { filePath: project.repoPath + '/package.json' },
+              output: '{"scripts":{"test":"vitest run"}}',
+            },
+            { type: 'permission' as const, permission: 'bash', patterns: ['node verify-source.mjs'] },
+          ]
+        : []),
       item.before,
       { type: 'permission', permission: 'bash', patterns: ['node check-artifact.mjs'] },
       submitResult('首版已就绪'),
@@ -110,6 +121,12 @@ for (const item of cases) {
     await page.getByRole('button', { name: /^开始/ }).click();
     await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/, { timeout: TASK_RUN_TIMEOUT_MS });
     const workbench = page.getByTestId('artifact-workbench');
+    if (item.format === 'Word') {
+      await page.getByRole('button', { name: '跟随 AI 阅读' }).click();
+      await expect(page.getByRole('region', { name: '项目文件阅读' })).toContainText('vitest run');
+      await page.getByRole('button', { name: '返回成果' }).click();
+      await workbench.getByRole('button', { name: '允许一次' }).click();
+    }
     const taskPath = new URL(page.url()).pathname;
     const detail = async () =>
       taskDetailSchema.parse(await (await request.get(`${API_BASE}${taskPath}`, { headers: AUTH })).json());

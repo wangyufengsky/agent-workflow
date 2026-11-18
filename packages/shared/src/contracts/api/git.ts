@@ -98,6 +98,7 @@ export const gitTreeEntrySchema = z.object({
   /** From the repository root. */
   path: z.string(),
   type: z.enum(GitTreeEntryType),
+  symlink: z.literal(true).optional(),
   /** Bytes; null for directories and submodules. */
   size: z.number().nullable(),
 });

@@ -49,6 +49,7 @@ import { TaskCodeReviewWorkbench } from './task-code-review.tsx';
 import { TaskHeader } from './task-header.tsx';
 import styles from './task-page.module.css';
 import { TaskPlanEditor } from './task-plan-editor.tsx';
+import { TaskReadFollow } from './task-read-follow.tsx';
 import { TaskSide } from './task-side.tsx';
 
 const route = getRouteApi(ROUTE_IDS.task);
@@ -137,8 +138,9 @@ function TaskMain({
   selection,
   pro,
   deliveryInToolbar = false,
-  active = true,
-}: MainProps & { deliveryInToolbar?: boolean; active?: boolean }) {
+  canvasActive,
+}: MainProps & { deliveryInToolbar?: boolean; canvasActive?: boolean }) {
+  const active = canvasActive !== false;
   const props = { task, selection, pro };
   switch (task.status) {
     case TaskStatus.Draft:
@@ -178,9 +180,10 @@ function TaskMain({
     case TaskStatus.Cancelled:
       return (
         <div className="col">
+          {canvasActive !== undefined && task.nodes.length > 0 && <StepsView {...props} />}
           {active && task.result !== null ? <ResultCard task={task} /> : null}
           {active && <SavePlanTemplate task={task} />}
-          {task.nodes.length > 0 && (
+          {canvasActive === undefined && task.nodes.length > 0 && (
             <details className={styles.canvasFold} open={task.result === null}>
               <summary className="hint">{C.canvasToggle}</summary>
               <StepsView {...props} />
@@ -203,6 +206,7 @@ export function TaskPage() {
   const { taskId } = route.useParams();
   const [expandedTask, setExpandedTask] = useState<string>();
   const expanded = expandedTask === taskId;
+  const [readFollowTask, setReadFollowTask] = useState<string>();
   const [siteTask, setSiteTask] = useState<string>();
   const [visitedCanvas, setVisitedCanvas] = useState<string>();
   const { node, details, requirement, artifactVersion } = route.useSearch();
@@ -298,7 +302,7 @@ export function TaskPage() {
       : code && !needsPlan
         ? '代码改动'
         : PREVIEW_PANE_COPY.tabPreview;
-  const resultPanel =
+  const resultPanel = (reading = false) =>
     needsPlan && !hasViews && !workbench && !artifactOpen && !reviewOpen ? (
       <TaskMain task={task.data} selection={selection} pro={pro} />
     ) : artifactOpen ? (
@@ -339,7 +343,7 @@ export function TaskPage() {
         key={task.data.id}
         task={task.data}
         pro={pro}
-        active={!canvas}
+        active={!canvas && !reading}
         hasConfiguredPreview={project.data?.preview != null}
         onOpenNode={selection.open}
         nodeDetails={canvas ? undefined : nodeDetails}
@@ -357,7 +361,7 @@ export function TaskPage() {
         }
       />
     ) : browserTest ? (
-      <BrowserTestPane task={task.data} active={!canvas} />
+      <BrowserTestPane task={task.data} active={!canvas && !reading} />
     ) : code && !needsPlan ? (
       <>
         {!canvas &&
@@ -379,9 +383,9 @@ export function TaskPage() {
           </button>
         )}
         {configuredPreview && siteSelected ? (
-          <PreviewPane task={task.data} active={!canvas} pro={pro} />
+          <PreviewPane task={task.data} active={!canvas && !reading} pro={pro} />
         ) : (
-          <TaskCodeChanges key={taskId} task={task.data} active={!canvas} />
+          <TaskCodeChanges key={taskId} task={task.data} active={!canvas && !reading} />
         )}
         {!canvas && task.data.result !== null && (
           <>
@@ -391,9 +395,28 @@ export function TaskPage() {
         )}
       </>
     ) : configuredPreview ? (
-      <PreviewPane task={task.data} active={!canvas} pro={pro} />
+      <PreviewPane task={task.data} active={!canvas && !reading} pro={pro} />
     ) : (
       <TaskMain task={task.data} selection={selection} pro={pro} />
+    );
+  const resultView =
+    (code ||
+      workbench ||
+      artifactOpen ||
+      (needsPlan && task.data.workflow.deliverable === WorkflowDeliverable.CodeChanges)) &&
+    !browserTest ? (
+      <TaskReadFollow
+        key={taskId}
+        task={task.data}
+        repo={project.data?.repoPath ?? ''}
+        active={!canvas}
+        following={readFollowTask === taskId}
+        onFollow={(on) => setReadFollowTask(on ? taskId : undefined)}
+      >
+        {resultPanel}
+      </TaskReadFollow>
+    ) : (
+      resultPanel()
     );
   return (
     <div
@@ -482,7 +505,7 @@ export function TaskPage() {
               aria-hidden={canvas}
               className={styles.viewPanel}
             >
-              {resultPanel}
+              {resultView}
             </RadixTabs.Content>
             <RadixTabs.Content
               value="progress"
@@ -492,13 +515,13 @@ export function TaskPage() {
               className={styles.viewPanel}
             >
               {(canvas || visitedCanvas === taskId) && (
-                <TaskMain active={canvas} task={task.data} selection={selection} pro={pro} />
+                <TaskMain canvasActive={canvas} task={task.data} selection={selection} pro={pro} />
               )}
             </RadixTabs.Content>
           </div>
         </RadixTabs.Root>
       ) : (
-        resultPanel
+        resultView
       )}
       {repositoryDocument && task.data.status === TaskStatus.Completed && task.data.pullRequest !== null && (
         <ReviewComments task={task.data} />

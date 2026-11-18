@@ -11,12 +11,18 @@ export function parseLsTree(output: string, dir: string): GitTreeEntryDTO[] {
     .filter((entry) => entry !== '')
     .map((entry) => {
       const tab = entry.indexOf('\t');
-      const [, type, , size] = entry.slice(0, tab).split(/ +/);
+      const [mode, type, , size] = entry.slice(0, tab).split(/ +/);
       const name = entry.slice(tab + 1);
       if (tab < 0 || type === undefined || size === undefined || !isEntryType(type)) {
         throw new Error(`Unexpected git ls-tree entry ${entry}`);
       }
-      return { name, path: dir === '' ? name : `${dir}/${name}`, type, size: size === '-' ? null : Number(size) };
+      return {
+        ...(mode === '120000' ? { symlink: true as const } : {}),
+        name,
+        path: dir === '' ? name : `${dir}/${name}`,
+        type,
+        size: size === '-' ? null : Number(size),
+      };
     });
   // Directories first, then by name, as file browsers list them.
   return entries.sort(

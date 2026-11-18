@@ -293,7 +293,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | GET | `/projects/:id/git/commits/:sha?parent` | 提交详情（含提交者、包含它的本地分支）+ 相对第 `parent` 个父提交（默认 1）的文件列表（根提交与空树比较） |
 | GET | `/projects/:id/git/diff?from&to` | 任意两个 ref 的文件列表 `DiffDTO` |
 | GET | `/projects/:id/git/diff/file?from&to&path` | 单文件 unified diff（`FileDiffDTO`，超过 `DIFF_FILE_MAX_BYTES` 只返回大小） |
-| GET | `/projects/:id/git/tree?ref&path` | 目录浏览（目录在前；`path` 为空即仓库根） |
+| GET | `/projects/:id/git/tree?ref&path` | 目录浏览（目录在前；`path` 为空即仓库根）；符号链接条目带 `symlink: true` |
 | GET | `/projects/:id/git/file?ref&path` | 文件内容；二进制返回 `{ binary: true }`，超过 `DIFF_FILE_MAX_BYTES` 返回 `{ tooLarge: true, size }` |
 | POST | `/projects/:id/git/fetch` | `git fetch --all --prune`（仓库锁内） |
 | GET | `/projects/:id/git/changes` | 未提交的改动 `{ staged, unstaged, conflicted }`（`DiffFile[]`，未跟踪文件是 unstaged 中的 added，改名带 `oldPath`；合并冲突没解决完的路径只在 `conflicted` 中） |
