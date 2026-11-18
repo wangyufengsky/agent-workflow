@@ -229,5 +229,7 @@ it('T-11 前端修改的首次拒绝列出所有无关字段，读取指引后�
     omit: expect.arrayContaining(['code_review', 'requirement_results']),
   });
   const fixed = (first.body.guide as { example: Record<string, unknown> }).example;
+  const revised = taskReaches(t, 'review');
   expect((await callTool(mcp, 'submit_result', { ...fixed, ...auth })).body).toMatchObject({ accepted: true });
+  await revised;
 });
