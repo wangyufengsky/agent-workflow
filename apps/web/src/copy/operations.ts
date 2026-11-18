@@ -137,6 +137,7 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.nodes.diffFile': '查看步骤的文件改动',
   'op.tasks.deliver': '合并或创建 PR',
   'op.tasks.finishFrontend': '完成前端修改并验收',
+  'op.tasks.getDocumentDraft': '预览工作区文档草稿',
   'op.tasks.getArtifact': '查看任务产物',
   'op.tasks.reviseArtifact': '修改任务产物',
   'op.tasks.requestChanges': '让 AI 再改改',

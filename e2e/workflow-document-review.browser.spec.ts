@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { InboxKind, taskDetailSchema } from '@aw/shared';
 import { type APIRequestContext, expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import {
@@ -27,6 +28,20 @@ async function start(request: APIRequestContext, projectId: string, workflow: st
   return `/tasks/${task.id}`;
 }
 
+async function advanceDocument(request: APIRequestContext, path: string) {
+  const response = await request.get(API_BASE + path, { headers: AUTH });
+  const permission = taskDetailSchema
+    .parse(await response.json())
+    .openInbox.find((i) => i.kind === InboxKind.Permission);
+  if (!permission) throw new Error('Missing permission');
+  await expect(
+    await request.post(`${API_BASE}/inbox/${permission.id}/resolve`, {
+      headers: AUTH,
+      data: { response: { decision: 'once' } },
+    }),
+  ).toBeOK();
+}
+
 const documents = [
   {
     workflow: 'detailed_design',
@@ -52,6 +67,53 @@ const documents = [
   },
 ] as const;
 
+test('详细设计首版分段写入时即显示 Markdown 正文，追加可跟随，提交后才进入版本历史', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const file = 'docs/design/detailed-design.md';
+  const initial = ['# 接口详细设计', ...Array.from({ length: 55 }, (_, i) => `第 ${i + 1} 个模块说明。`)].join('\n\n');
+  await queueTurn(request, project, { title: '· 梳理现状' }, [submitResult('已梳理')]);
+  await queueTurn(request, project, { title: '· 编写详细设计' }, [
+    { type: 'edit', file, content: initial },
+    { type: 'permission', permission: 'bash', patterns: ['node continue-design.mjs'] },
+    { type: 'edit', file, content: initial + '\n\n## 状态迁移验证\n\n仅允许有效迁移。\n' },
+    { type: 'permission', permission: 'bash', patterns: ['node submit-design.mjs'] },
+    submitResult('文档已完成'),
+  ]);
+  await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
+  const path = await start(request, project.id, 'detailed_design', '分段编写接口详细设计');
+  const detail = async () =>
+    taskDetailSchema.parse(await (await request.get(API_BASE + path, { headers: AUTH })).json());
+  try {
+    await page.goto(path);
+    const draft = page.getByRole('region', { name: '工作区草稿' });
+    await expect(draft.getByRole('heading', { name: '接口详细设计' })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+    await expect(page.getByTestId('artifact-workbench')).toContainText(file);
+    expect((await detail()).artifact?.versions).toHaveLength(0);
+    await page.reload();
+    await expect(draft.getByRole('heading', { name: '接口详细设计' })).toBeVisible();
+    await page.getByRole('button', { name: '跟随编辑', exact: true }).click();
+    await advanceDocument(request, path);
+    const appended = draft.getByRole('heading', { name: '状态迁移验证' });
+    await expect(appended).toBeAttached({ timeout: TASK_RUN_TIMEOUT_MS });
+    await expect(appended).not.toBeInViewport();
+    await page.getByRole('button', { name: '继续跟随编辑', exact: true }).click();
+    await expect(draft.getByRole('heading', { name: '状态迁移验证' })).toBeInViewport({ timeout: TASK_RUN_TIMEOUT_MS });
+    expect(await draft.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    if (process.env.AW_WALKTHROUGH_DIR !== undefined)
+      await page.screenshot({ animations: 'disabled', path: join(WALKTHROUGH_DIR, 'document-draft.png') });
+    expect((await detail()).artifact?.versions).toHaveLength(0);
+    await advanceDocument(request, path);
+    await expect(page.getByRole('region', { name: '产物预览 v1' }).getByText('仅允许有效迁移。')).toBeVisible({
+      timeout: TASK_RUN_TIMEOUT_MS,
+    });
+    await expect(draft).toHaveCount(0);
+    expect((await detail()).artifact?.versions).toHaveLength(1);
+  } finally {
+    const task = await detail();
+    if (task.activeAttempts.length) await request.post(API_BASE + path + '/cancel', { headers: AUTH, data: {} });
+  }
+});
+
 for (const item of documents) {
   test(`${item.write}在工作台标注、对照并合并仓库文件`, async ({ page, request }) => {
     if (GIT_HEAVY_SPECS_SLOW) test.slow();
@@ -65,10 +127,12 @@ for (const item of documents) {
     await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
     await queueTurn(request, project, { title: '· 产物修改 1' }, [
       { type: 'edit', file: item.path, content: item.after },
+      { type: 'permission', permission: 'bash', patterns: ['node submit-revision.mjs'] },
       submitResult('已修改文档'),
     ]);
     await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
-    await page.goto(await start(request, project.id, item.workflow, item.write));
+    const path = await start(request, project.id, item.workflow, item.write);
+    await page.goto(path);
     const workbench = page.getByTestId('artifact-workbench');
     await expect(workbench.getByText(item.path, { exact: true })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS * 2 });
     await workbench.getByRole('button', { name: '标注修改' }).click();
@@ -81,7 +145,14 @@ for (const item of documents) {
       await page.screenshot({ animations: 'disabled', path: join(WALKTHROUGH_DIR, `${item.workflow}.png`) });
     await workbench.getByRole('button', { name: '加入本轮' }).click();
     await workbench.getByRole('button', { name: '交给 AI 修改' }).click();
-    await expect(workbench.getByText(item.current, { exact: true })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS * 2 });
+    const draft = workbench.getByRole('region', { name: '工作区草稿' });
+    await expect(draft.getByText(item.current, { exact: true })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS * 2 });
+    const liveTask = taskDetailSchema.parse(await (await request.get(API_BASE + path, { headers: AUTH })).json());
+    expect(liveTask.artifact?.versions).toHaveLength(1);
+    await advanceDocument(request, path);
+    await expect(workbench.getByRole('region', { name: '产物预览 v2' })).toBeVisible({
+      timeout: TASK_RUN_TIMEOUT_MS * 2,
+    });
     await workbench.getByRole('button', { name: '版本记录' }).click();
     await workbench.getByRole('button', { name: '对照上一版' }).click();
     await expect(

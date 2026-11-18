@@ -1,6 +1,9 @@
-import { basename } from 'node:path';
+import type { Stats } from 'node:fs';
+import { lstat, open, realpath } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import {
   AppError,
+  ARTIFACT_PREVIEW_CHARS,
   type ArtifactRevision,
   type ArtifactVersion,
   AttemptKind,
@@ -10,9 +13,11 @@ import {
   DiffFileStatus,
   ErrorCode,
   isRepositoryDocumentWorkflow,
+  isWritingRepositoryDocument,
   NodeKind,
   NodeStatus,
   REPOSITORY_DOCUMENT_NODE_KEY,
+  type RepositoryDocumentDraft,
   TaskStatus,
   WorktreeStatus,
 } from '@aw/shared';
@@ -23,6 +28,32 @@ import type { TaskState, TasksServiceDeps } from './tasks.state.ts';
 
 const documentName = (path: string) =>
   /\.(md|txt)$/i.test(path) && artifactNameSchema.safeParse(basename(path)).success;
+
+function isMissingFile(err: unknown) {
+  return err instanceof Error && 'code' in err && (err.code === 'ENOENT' || err.code === 'ENOTDIR');
+}
+
+async function readDraftFile(cwd: string, path: string, expected: Stats): Promise<RepositoryDocumentDraft | null> {
+  const absolute = join(cwd, path);
+  if ((await realpath(absolute)) !== absolute) return null;
+  const file = await open(absolute, 'r');
+  try {
+    const stat = await file.stat();
+    if (!stat.isFile() || stat.ino !== expected.ino || stat.dev !== expected.dev) return null;
+    const buffer = Buffer.alloc(Math.min(stat.size, ARTIFACT_PREVIEW_CHARS * 4));
+    const { bytesRead } = await file.read(buffer);
+    const bytes = buffer.subarray(0, bytesRead);
+    if (bytes.includes(0)) return null;
+    const text = bytes.toString('utf8');
+    return {
+      path,
+      text: text.slice(0, ARTIFACT_PREVIEW_CHARS),
+      truncated: stat.size > bytesRead || text.length > ARTIFACT_PREVIEW_CHARS,
+    };
+  } finally {
+    await file.close();
+  }
+}
 
 /** A document version is a snapshot of a successful step's Git commit, including for tasks from earlier versions. */
 export function createTaskDocuments(
@@ -100,6 +131,46 @@ export function createTaskDocuments(
     return candidate.path;
   }
 
+  async function draft(taskId: string, nodeId: string): Promise<RepositoryDocumentDraft | null> {
+    const task = state.get(taskId);
+    const worktree = worktrees.findByTask(taskId);
+    if (
+      worktree?.status !== WorktreeStatus.Ready ||
+      !isRepositoryDocumentWorkflow(workflows.get(task.workflowId)) ||
+      !isWritingRepositoryDocument(nodes.detail(taskId, nodeId))
+    )
+      return null;
+
+    const cwd = worktree.path;
+    const patterns = ['--', ':(icase)*.md', ':(icase)*.txt'];
+    const [tracked, untracked] = await Promise.all([
+      runGit(['diff', '--name-only', '-z', '--diff-filter=ACMRT', 'HEAD', ...patterns], { cwd, verbatim: true }),
+      runGit(['ls-files', '--others', '--exclude-standard', '-z', ...patterns], { cwd, verbatim: true }),
+    ]);
+    const paths = new Set((tracked.stdout + untracked.stdout).split('\0').filter(documentName));
+    const primary = artifacts.visibleVersions(taskId).at(-1)?.repository?.path;
+    const candidates: { path: string; stat: Stats }[] = [];
+    for (const path of paths) {
+      if (primary && path !== primary) continue;
+      try {
+        const stat = await lstat(join(cwd, path));
+        if (stat.isFile()) candidates.push({ path, stat });
+      } catch (err) {
+        if (!isMissingFile(err)) throw err;
+      }
+    }
+    candidates.sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs);
+    for (const { path, stat } of candidates) {
+      try {
+        const result = await readDraftFile(cwd, path, stat);
+        if (result) return result;
+      } catch (err) {
+        if (!isMissingFile(err)) throw err;
+      }
+    }
+    return null;
+  }
+
   async function prepare(taskId: string): Promise<void> {
     const task = state.get(taskId);
     if (!isRepositoryDocumentWorkflow(workflows.get(task.workflowId))) return;
@@ -165,5 +236,5 @@ export function createTaskDocuments(
       throw new AppError(ErrorCode.StateTransitionInvalid, 'The worktree document changed since review', { path });
   }
 
-  return { prepare, forDelivery, assertEditableVersion };
+  return { draft, prepare, forDelivery, assertEditableVersion };
 }

@@ -233,6 +233,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
         : undefined;
     },
     artifacts,
+    documentDraft: documents.draft,
     async reviseArtifact(input: ArtifactRevision): Promise<TaskDetailDTO> {
       await documents.prepare(input.id);
       await documents.assertEditableVersion(input);

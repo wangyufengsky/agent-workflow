@@ -1,10 +1,12 @@
-import { writeFile } from 'node:fs/promises';
+import { utimes, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   deliverTaskOp,
   ErrorCode,
   getTaskArtifactOp,
+  getTaskDocumentDraftOp,
   getTaskOp,
+  NodeStatus,
   reviseTaskArtifactOp,
   startTaskOp,
   TaskStatus,
@@ -12,13 +14,37 @@ import {
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
-import { addProject, createTask, taskReaches } from '../../../test/helpers/tasks.ts';
+import { addProject, createTask, nodeReaches, taskReaches } from '../../../test/helpers/tasks.ts';
 
 let t: TestApp;
 beforeEach(async () => {
   t = await createTestApp();
 });
 afterEach(() => t.close());
+
+it('草稿只读取工作区已更改的文本文档，其他步骤和较新的二进制文件不遮挡正文', async () => {
+  const { project } = await addProject(t, { files: { 'design.md': '# 原始设计' } });
+  const task = await createTask(t, { projectId: project.id, workflow: 'detailed_design', start: false });
+  t.fake.enqueue(script().callTool('submit_result', { summary: '已梳理' }), { title: '· 梳理现状' });
+  t.fake.enqueue(script().hang(), { title: '· 编写详细设计' });
+  const writing = nodeReaches(t, 'write', NodeStatus.Running);
+  await t.call(startTaskOp, { id: task.id });
+  const { node } = await writing;
+  const read = async () => (await t.call(getTaskDocumentDraftOp, { id: task.id, nodeId: node.id })).body.draft;
+  expect(await read()).toBeNull();
+  const tree = t.app.services.worktrees.findByTask(task.id);
+  if (!tree) throw new Error('Missing worktree');
+  const text = '# 原始设计\n\n## 正在补充的段落';
+  await writeFile(join(tree.path, 'design.md'), text);
+  await utimes(join(tree.path, 'design.md'), new Date(0), new Date(0));
+  await writeFile(join(tree.path, 'other.txt'), Buffer.from([0, 1, 2]));
+  expect(await read()).toEqual({ path: 'design.md', text, truncated: false });
+  const detail = (await t.call(getTaskOp, { id: task.id })).body;
+  const survey = detail.nodes.find(({ id }) => id !== node.id);
+  if (!survey) throw new Error('Missing sibling node');
+  expect((await t.call(getTaskDocumentDraftOp, { id: task.id, nodeId: survey.id })).body.draft).toBeNull();
+  expect(detail.artifact?.versions).toHaveLength(0);
+});
 
 it('目标分支更新同一文档后先重新审阅，已合并任务仍可读版本快照', async () => {
   const path = 'orders.md';

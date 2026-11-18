@@ -5,13 +5,16 @@ import {
   type ArtifactNote,
   type ArtifactVersion,
   DeliveryStrategy,
+  getTaskDocumentDraftOp,
+  isWritingRepositoryDocument,
   type TaskDetailDTO,
   TaskStatus,
+  WorkflowDeliverable,
 } from '@aw/shared';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
-import { getBlob } from '../../api/client.ts';
+import { callOperation, getBlob } from '../../api/client.ts';
 import { ROUTES } from '../../app/routes.ts';
 import { saveBytes } from '../../app/save-file.ts';
 import { Button } from '../../components/button.tsx';
@@ -28,7 +31,7 @@ import layout from '../preview/frontend-workbench.module.css';
 import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { UnmetNotice, useDeliveryAcknowledgement } from '../requirements/unmet-notice.tsx';
 import { useDeliver, useReviseTaskArtifact } from '../tasks/tasks.queries.ts';
-import { ArtifactPreview, type ArtifactSelection } from './artifact-preview.tsx';
+import { ArtifactPreview, type ArtifactSelection, DocumentDraftPreview } from './artifact-preview.tsx';
 import styles from './artifact-workbench.module.css';
 
 type DraftNote = ArtifactNote & { id: string };
@@ -58,20 +61,37 @@ export function ArtifactWorkbench({
   renderDelivery?: (version: ArtifactVersion, disabled: boolean) => ReactNode;
 }) {
   const [chosenPanel, setPanel] = useState<Panel>();
-  const panel = chosenPanel === undefined ? (task.openInbox.length > 0 ? 'activity' : null) : chosenPanel;
+  const repositoryDocument = task.workflow.deliverable === WorkflowDeliverable.CodeChanges;
+  const writing = repositoryDocument ? task.nodes.find(isWritingRepositoryDocument) : undefined;
+  const document = useQuery({
+    queryKey: ['task-document-draft', task.id, writing?.id],
+    enabled: active && writing !== undefined && selectedVersion === undefined,
+    queryFn: () => callOperation(getTaskDocumentDraftOp, { id: task.id, nodeId: writing?.id ?? '' }),
+    refetchInterval: active && task.status === TaskStatus.Running && writing !== undefined ? 2000 : false,
+  });
+  const workingDraft = writing && selectedVersion === undefined ? document.data?.draft : undefined;
+  const [followDraft, setFollowDraft] = useState(true);
+  const panel =
+    chosenPanel === undefined ? (task.openInbox.length > 0 || workingDraft ? 'activity' : null) : chosenPanel;
   const [draft, setDraft] = useState<{ versionId: string; notes: DraftNote[] }>();
   const [selection, setSelection] = useState<ArtifactSelection>();
   const [note, setNote] = useState('');
   const [compare, setCompare] = useState(false);
   const latest = artifact.versions.at(-1);
-  const version = selectedVersion === undefined ? latest : artifact.versions.find(({ id }) => id === selectedVersion);
+  const version = workingDraft
+    ? undefined
+    : selectedVersion === undefined
+      ? latest
+      : artifact.versions.find(({ id }) => id === selectedVersion);
   const missingVersion = selectedVersion !== undefined && version === undefined;
   const previous = version === undefined ? undefined : artifact.versions[artifact.versions.indexOf(version) - 1];
   const notes = draft !== undefined && draft.versionId === version?.id ? draft.notes : [];
   const review = task.status === TaskStatus.Review;
   const canNote = review && version !== undefined && version.id === latest?.id;
   const building =
-    latest === undefined && [TaskStatus.Preparing, TaskStatus.Running].some((status) => status === task.status);
+    !workingDraft &&
+    latest === undefined &&
+    [TaskStatus.Preparing, TaskStatus.Running].some((status) => status === task.status);
   const revision = useReviseTaskArtifact();
   const delivery = useDeliver();
   const acknowledgement = useDeliveryAcknowledgement(task.id);
@@ -116,7 +136,7 @@ export function ArtifactWorkbench({
   }
 
   function choose(id: string) {
-    onSelectVersion(id === latest?.id ? undefined : id);
+    onSelectVersion(id === '' || (!writing && id === latest?.id) ? undefined : id);
     setSelection(undefined);
     setNote('');
     setCompare(false);
@@ -129,20 +149,22 @@ export function ArtifactWorkbench({
       <header className={layout.toolbar}>
         <div className={styles.file}>
           <div className={styles.documentTitle}>
-            <strong>{version?.name ?? ARTIFACT_COPY.file}</strong>
+            <strong>{workingDraft ? ARTIFACT_COPY.workingDraft : (version?.name ?? ARTIFACT_COPY.file)}</strong>
+            {workingDraft && <span className="mono hint">{workingDraft.path}</span>}
             {version?.repository !== undefined && (
               <span className="mono hint" title={version.repository.commit}>
                 {version.repository.path}
               </span>
             )}
           </div>
-          {version !== undefined && (
+          {(version || (workingDraft && latest)) && (
             <select
               className="input"
               aria-label={ARTIFACT_COPY.version}
-              value={version.id}
+              value={version?.id ?? ''}
               onChange={(event) => choose(event.currentTarget.value)}
             >
+              {writing && <option value="">{ARTIFACT_COPY.workingDraft}</option>}
               {[...artifact.versions].reverse().map((file) => (
                 <option key={file.id} value={file.id}>
                   v{file.number}
@@ -152,6 +174,11 @@ export function ArtifactWorkbench({
             </select>
           )}
         </div>
+        {workingDraft && (
+          <Button size="sm" variant="ghost" aria-pressed={followDraft} onClick={() => setFollowDraft(!followDraft)}>
+            {followDraft ? R.followEdit : R.resumeEdit}
+          </Button>
+        )}
         {version && (
           <Button
             size="sm"
@@ -223,12 +250,15 @@ export function ArtifactWorkbench({
               </Button>
             )}
       </header>
+      {active && writing && selectedVersion === undefined && document.isError && <ErrorState error={document.error} />}
       {save.isError && <ErrorState error={save.error} />}
       {delivery.isError && <ErrorState error={delivery.error} />}
       {review && renderDelivery === undefined && <UnmetNotice acknowledgement={acknowledgement} />}
       <div className={layout.body}>
         <div className={styles.stage}>
-          {version !== undefined ? (
+          {workingDraft ? (
+            <DocumentDraftPreview key={workingDraft.path} draft={workingDraft} follow={active && followDraft} />
+          ) : version !== undefined ? (
             <div className={compare && previous !== undefined ? styles.comparison : 'col'}>
               {compare && previous !== undefined && (
                 <section
@@ -271,8 +301,8 @@ export function ArtifactWorkbench({
               task={task}
               inMain
               starting={false}
-              buildingTitle={ARTIFACT_COPY.building}
-              buildingHint={ARTIFACT_COPY.buildingHint}
+              buildingTitle={repositoryDocument ? ARTIFACT_COPY.awaitingDraft : ARTIFACT_COPY.building}
+              buildingHint={repositoryDocument ? ARTIFACT_COPY.awaitingDraftHint : ARTIFACT_COPY.buildingHint}
             />
           ) : (
             <div className="col">

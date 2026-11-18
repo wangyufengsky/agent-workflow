@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { WorkflowKind } from '../../enums/workflow.ts';
+import { NodeStatus } from '../../enums/task.ts';
+import { NodeKind, WorkflowKind } from '../../enums/workflow.ts';
 import { officeLossSchema } from '../mcp/office-write.ts';
 import { officeFilePreviewSchema } from './attachments.ts';
 
@@ -17,6 +18,21 @@ export const isRepositoryDocumentWorkflow = (workflow: { key: string; kind: Work
   workflow.kind === WorkflowKind.Builtin &&
   (workflow.key === REPOSITORY_DOCUMENT_WORKFLOW.DetailedDesign ||
     workflow.key === REPOSITORY_DOCUMENT_WORKFLOW.Breakdown);
+
+/** 仅文档编写与修订步骤拥有正在编辑的仓库草稿。 */
+export const isWritingRepositoryDocument = (node: { key: string; kind: NodeKind; status: NodeStatus }) =>
+  (node.key === REPOSITORY_DOCUMENT_NODE_KEY || node.kind === NodeKind.Revise) &&
+  (node.status === NodeStatus.Running ||
+    node.status === NodeStatus.WaitingInput ||
+    node.status === NodeStatus.Verifying ||
+    node.status === NodeStatus.AwaitingAcceptance);
+
+export const repositoryDocumentDraftSchema = z.object({
+  path: z.string(),
+  text: z.string(),
+  truncated: z.boolean(),
+});
+export type RepositoryDocumentDraft = z.infer<typeof repositoryDocumentDraftSchema>;
 
 export const ARTIFACT_PREVIEW_CHARS = 200_000;
 export const ARTIFACT_NOTE_LIMIT = 1000;

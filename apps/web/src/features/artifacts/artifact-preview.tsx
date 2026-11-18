@@ -4,18 +4,19 @@ import {
   AttachmentFormat,
   columnName,
   getTaskArtifactOp,
+  type RepositoryDocumentDraft,
   type SheetPreviewDTO,
   textLines,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
-import { type MouseEvent, type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type MouseEvent, type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Components } from 'react-markdown';
 import { callOperation } from '../../api/client.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { IconButton } from '../../components/icon-button.tsx';
 import { Markdown } from '../../components/markdown.tsx';
-import { revealInPane } from '../../components/reveal-in-pane.ts';
+import { revealInPane, sizeReadingPane } from '../../components/reveal-in-pane.ts';
 import { ARTIFACT_COPY } from '../../copy/artifacts.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { DIFF_COPY } from '../../copy/diff.ts';
@@ -284,6 +285,36 @@ function Workbook({
     );
   }
   return <SheetView data={data} renderCell={onPick === undefined && before === undefined ? undefined : renderCell} />;
+}
+
+/** 工作区预览只比较相邻两次实际读到的正文；正式版本仍由节点成功提交后生成。 */
+export function DocumentDraftPreview({ draft, follow }: { draft: RepositoryDocumentDraft; follow: boolean }) {
+  const [snapshot, setSnapshot] = useState(() => ({ text: draft.text, changes: new Map<number, VersionChange>() }));
+  if (snapshot.text !== draft.text) setSnapshot({ text: draft.text, changes: changedLines(snapshot.text, draft.text) });
+  const pane = useRef<HTMLElement>(null);
+  const attach = useCallback((element: HTMLElement | null) => {
+    pane.current = element;
+    return sizeReadingPane(element);
+  }, []);
+  useLayoutEffect(() => {
+    if (!follow || !snapshot.changes.size || !pane.current) return;
+    const mark = pane.current.querySelector('[data-kind]');
+    if (mark) revealInPane(pane.current, mark);
+  }, [follow, snapshot]);
+  return (
+    <section aria-label={ARTIFACT_COPY.workingDraft} className={styles.reader} ref={attach}>
+      {draft.truncated && <p className="hint">{ARTIFACT_COPY.truncated}</p>}
+      {/\.md$/i.test(draft.path) ? (
+        <Content source={snapshot.text} changes={snapshot.changes} />
+      ) : (
+        <Lines
+          source={snapshot.text}
+          changes={snapshot.changes}
+          focusLine={follow ? snapshot.changes.keys().next().value : undefined}
+        />
+      )}
+    </section>
+  );
 }
 
 export function ArtifactPreview({
