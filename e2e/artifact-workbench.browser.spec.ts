@@ -71,8 +71,26 @@ const cases = [
   },
   {
     format: 'TXT',
-    before: textFile('复盘.txt', '核心结论\n新增 100 人。\n统计口径'),
-    after: textFile('复盘.txt', '核心结论\n新增 120 人，主要来自搜索。\n统计口径'),
+    before: textFile(
+      '复盘.txt',
+      [
+        '核心结论',
+        '新增 100 人。',
+        '统计口径',
+        ...Array.from({ length: 217 }, (_, i) => `条目 ${i + 1}`),
+        '新增 90 人。',
+      ].join('\n'),
+    ),
+    after: textFile(
+      '复盘.txt',
+      [
+        '核心结论',
+        '新增 100 人。',
+        '统计口径',
+        ...Array.from({ length: 217 }, (_, i) => `条目 ${i + 1}`),
+        '新增 120 人，主要来自搜索。',
+      ].join('\n'),
+    ),
     original: '新增 100 人。',
     revised: '新增 120 人，主要来自搜索。',
     location: '第 2–3 行',
@@ -122,6 +140,20 @@ for (const item of cases) {
     await expect(page).toHaveURL(/\/tasks\/[0-9a-f-]+/, { timeout: TASK_RUN_TIMEOUT_MS });
     const workbench = page.getByTestId('artifact-workbench');
     if (item.format === 'Word') {
+      const canvasTab = page.getByRole('tab', { name: '流程画布' });
+      const documentTab = page.getByRole('tab', { name: '文档预览' });
+      const firstStep = page.getByTestId('step-write_artifact');
+      await canvasTab.click();
+      await expect(firstStep).toBeVisible();
+      await documentTab.click();
+      await expect(workbench).toBeVisible();
+      await expect(firstStep).toBeHidden();
+      await canvasTab.click();
+      await firstStep.click();
+      await expect(page.getByRole('dialog').getByRole('tab', { name: '过程' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await documentTab.click();
+      await expect(firstStep).toBeHidden();
       await page.getByRole('button', { name: '跟随 AI 阅读' }).click();
       await expect(page.getByRole('region', { name: '项目文件阅读' })).toContainText('vitest run');
       await page.getByRole('button', { name: '返回成果' }).click();
@@ -157,6 +189,11 @@ for (const item of cases) {
     expect(artifactTaskSchema.parse((await detail()).artifact).versions.map(({ number }) => number)).toEqual([1]);
     await releaseRevision.getByRole('button', { name: '允许一次' }).click();
     await expect(workbench.getByText(item.revised, { exact: true })).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+    if (item.format === 'TXT') {
+      const preview = workbench.getByRole('region', { name: '产物预览 v2' });
+      await expect(preview.getByText(item.revised, { exact: true })).toBeInViewport();
+      expect(await preview.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    }
     await expect(page.getByText('待查看产物', { exact: true })).toBeVisible();
     await expect(page.getByRole('tab', { name: '文档预览' })).toHaveAttribute('aria-selected', 'true');
     await expect(workbench.locator('[data-kind="modified"]').first()).toBeVisible();

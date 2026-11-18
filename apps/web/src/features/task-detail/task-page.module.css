@@ -339,11 +339,7 @@
   animation: revealView 0.16s ease-out;
 }
 .viewPanel[data-state="inactive"] {
-  position: absolute;
-  inset: 0;
-  visibility: hidden;
-  pointer-events: none;
-  overflow: hidden;
+  display: none;
   animation: none;
 }
 .testViewing .viewPanel[data-state="active"] {
@@ -388,11 +384,16 @@
 .readExcerpt {
   margin: 0;
   padding: 16px;
-  max-height: var(--task-view-height, 68vh);
+  max-height: min(var(--reader-available-height, 65dvh), 65dvh);
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   background: var(--bg-sunken);
   border: 1px solid var(--line);
   border-radius: 8px;
+  overscroll-behavior: contain;
+}
+.readExcerpt mark {
+  color: inherit;
+  background: var(--accent-fill);
 }

@@ -1,6 +1,7 @@
 import type { DiffFile } from '@aw/shared';
 import { useEffect, useMemo, useRef } from 'react';
 import { DIFF_COPY as C } from '../../copy/diff.ts';
+import { revealInPane } from '../reveal-in-pane.ts';
 import styles from './diff.module.css';
 
 type TreeDir = { name: string; path: string; dirs: TreeDir[]; files: DiffFile[] };
@@ -101,8 +102,8 @@ export function FileTree({
   const nav = useRef<HTMLElement>(null);
   // A file picked by keyboard in the large view may be below the fold of the list.
   useEffect(() => {
-    if (selected !== undefined)
-      nav.current?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' });
+    const file = nav.current?.querySelector('[aria-pressed="true"]');
+    if (selected && nav.current && file) revealInPane(nav.current, file);
   }, [selected]);
   return (
     <nav aria-label={C.files} className={styles.treeRoot} ref={nav}>
