@@ -4,12 +4,15 @@ import {
   ARTIFACT_WORKFLOW_KEY,
   BROWSER_TEST_WORKFLOW_KEY,
   CODE_REVIEW_WORKFLOW_KEY,
+  DESIGN_PROPOSAL_WORKFLOW_KEY,
   FRONTEND_WORKFLOW_KEY,
   PROJECT_CHECK_PLACEHOLDER,
   REPOSITORY_DOCUMENT_NODE_KEY,
   REPOSITORY_DOCUMENT_WORKFLOW,
   RequiredStepPosition,
+  SECURITY_REVIEW_WORKFLOW_KEY,
   TASK_CODE_REVIEW_NODE_KEY,
+  VERSION_REVIEW_WORKFLOW_KEY,
   type WorkflowDefinition,
   WorkflowDeliverable,
   WorkflowPlanning,
@@ -36,10 +39,10 @@ export const BuiltinWorkflowKey = {
   BrowserTest: BROWSER_TEST_WORKFLOW_KEY,
   CodeReview: CODE_REVIEW_WORKFLOW_KEY,
   Refactor: 'refactor',
-  VersionReview: 'version_review',
-  SecurityReview: 'security_review',
+  VersionReview: VERSION_REVIEW_WORKFLOW_KEY,
+  SecurityReview: SECURITY_REVIEW_WORKFLOW_KEY,
   Cleanup: 'cleanup',
-  DesignProposal: 'design_proposal',
+  DesignProposal: DESIGN_PROPOSAL_WORKFLOW_KEY,
   DetailedDesign: REPOSITORY_DOCUMENT_WORKFLOW.DetailedDesign,
   Breakdown: REPOSITORY_DOCUMENT_WORKFLOW.Breakdown,
 } as const;
@@ -61,6 +64,9 @@ const finalVerify = (instructions: string, focus: string) => ({
   acceptance: { checks: [projectCheck, pageCheck, aiReview(focus)], manual: false },
   position: RequiredStepPosition.Last,
 });
+
+const reviewReading =
+  '用 read（filePath、offset、limit）读取正在核对的具体代码段。每确认一处问题，就用 agent-workflow_report_progress 附带 code_review，给出完整 scope 和截至当前的 findings（含具体行号）；任务页会按行展示。最后用 agent-workflow_submit_result 提交完整 code_review 和 summary。';
 
 /** A read-only workflow of one reviewer step whose report is the task's result. */
 const reportOnly = (key: string, title: string, instructions: string) => ({
@@ -249,6 +255,7 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
       TASK_CODE_REVIEW_NODE_KEY,
       '代码审查',
       [
+        reviewReading,
         '按需求描述的范围审查代码。先解析并记录实际读取的完整 Git 提交 SHA，基于这些提交读取文件和差异。',
         '调用 agent-workflow_submit_result，summary 写审查结论，code_review 给出 scope 和 findings。审查分支或提交区间用 diff，填写比较的 from 和 to；目录或全仓库审查用 files，填写 commit 及仓库相对 directory（全仓库传空串）。',
         '每条问题给出严重程度、类别、仓库相对路径、行号或范围、影响及建议。差异中的删除行用 old 侧，其余用 new 侧。只报告能在审查版本中验证的问题；没有发现时提交空数组。',
@@ -291,6 +298,7 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
       'review',
       '版本比对审查',
       [
+        reviewReading,
         '对比任务基础分支的当前版本（HEAD）与需求中指定的起点，只审查这段时间新增与修改的代码。',
         '1. 确定起点：需求写的是日期时，用 `git log --first-parent --before="<日期> 00:00" -1 --format=%H HEAD` 找到那天开始前的最后一个提交；写的是提交、标签或分支时直接用它。',
         '2. 用 `git diff --stat <起点> HEAD` 与 `git diff <起点> HEAD` 阅读改动，用 `git log --first-parent --format="%h %ad %s" --date=short <起点>..HEAD` 了解每次改动的目的（提交数也从这里数），需要时读改动周围的代码。',
@@ -310,6 +318,7 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
       'review',
       '安全审查',
       [
+        reviewReading,
         '按需求描述的范围（没写时为整个仓库）审查安全问题：',
         '- 注入：SQL、命令、路径穿越、模板与 HTML（XSS）；',
         '- 认证与授权：缺少登录校验、越权访问他人数据、会话与令牌处理不当；',
@@ -376,6 +385,7 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
         '2. 两到三个可行方案：每个写明做法、要改的模块、优点、代价与风险、大致工作量（只有一种合理做法时说明原因）；',
         '3. 推荐方案与理由；',
         '4. 按推荐方案实施的步骤，每步写明改什么、怎么验证。',
+        '每写好一节就用 agent-workflow_report_progress 汇报，proposal 传截至当前的 Markdown 正文（含已有章节），供用户边写边看。完成后 submit_result.summary 提交完整正文。',
         '方案要基于代码现状，不编造不存在的模块与接口。这一步不改文件。',
       ].join('\n'),
     ),

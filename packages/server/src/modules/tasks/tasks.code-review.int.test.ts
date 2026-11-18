@@ -108,3 +108,32 @@ it('拒绝越出审查范围的定位，并将删除行固定到当时的旧提�
   expect(requirements.commitSha).toBe(checked.body.commitSha);
   expect(requirements.items[0]?.status).toBe('stale');
 });
+
+it.each(['version_review', 'security_review'])('%s 接受经过 Git 核对的行内发现', async (workflow) => {
+  const path = 'order.ts';
+  const { project, repo } = await addProject(t, { files: { [path]: 'const order = 0;\n' } });
+  const commit = await repo.git('rev-parse', 'HEAD');
+  const scope = { kind: 'files', commit, directory: '' };
+  const finding = {
+    severity: 'minor',
+    category: 'correctness',
+    path,
+    line: 1,
+    title: '订单值固定',
+    description: '订单值写死。',
+  };
+  const report = { scope, findings: [finding] };
+  const task = await createTask(t, { projectId: project.id, workflow, start: false });
+  t.fake.enqueue(
+    script()
+      .callTool('report_progress', { message: '检查订单', code_review: report })
+      .callTool('submit_result', { summary: '检查完成。', code_review: report }),
+  );
+  const ready = taskReaches(t, TaskStatus.Review);
+  await t.call(startTaskOp, { id: task.id });
+  await ready;
+  expect((await t.call(getTaskOp, { id: task.id })).body.codeReview?.report?.findings[0]).toMatchObject({
+    line: 1,
+    location: { path, commit },
+  });
+});

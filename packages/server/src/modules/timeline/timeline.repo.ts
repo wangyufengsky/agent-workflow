@@ -51,6 +51,22 @@ export function createTimelineRepo(db: DbExecutor) {
         .get();
       return row?.id ?? 0;
     },
+    latestPayload(taskId: string, attemptId: string, type: string) {
+      const row = db
+        .select({ payload: taskEventsTable.payload })
+        .from(taskEventsTable)
+        .where(
+          and(
+            eq(taskEventsTable.taskId, taskId),
+            eq(taskEventsTable.entityId, attemptId),
+            eq(taskEventsTable.type, type),
+          ),
+        )
+        .orderBy(desc(taskEventsTable.id))
+        .limit(1)
+        .get();
+      return row?.payload ? payloadSchema.parse(JSON.parse(row.payload)) : undefined;
+    },
     deliveredRequirements(deliveries: ReadonlyMap<string, string>) {
       const rows = db
         .select({ id: taskEventsTable.entityId, payload: taskEventsTable.payload })

@@ -102,7 +102,7 @@ export function createMcpModule({
     submitBrowserReportTool(tasks),
     submitReviewTool(acceptance),
     askUserTool(tasks),
-    reportProgressTool(attempts),
+    reportProgressTool(attempts, tasks),
     dbListConnectionsTool(tasks, knowledge),
     dbDescribeTool(tasks, knowledge),
     dbQueryTool(tasks, knowledge),

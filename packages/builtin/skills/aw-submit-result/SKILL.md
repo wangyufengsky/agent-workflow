@@ -11,7 +11,7 @@ description: Use when a workflow submission is rejected or when choosing how to 
 | --- | --- |
 | 前端修改、开发、文档 | `submit_result({"summary":"已添加今日路线，网页预览显示三个停靠点。"})`。按事实增加 changes；文档步骤先发布产物，再提交，例如 `{"summary":"已更新文档第二段的交付日期，并核对发布版本。"}`。 |
 | 核验验收清单 | `submit_result({"summary":"已核对路线","requirement_results":[{"item_id":"<工具给出的 ID>","conclusion":"pass","note":"页面快照显示三个站点依次排列。"}]})`。只填写 AI 核验项。 |
-| 代码审查任务 | `submit_result({"summary":"已审查 src","code_review":{"scope":{"kind":"files","commit":"<实际审查的完整 SHA>","directory":"src"},"findings":[]}})`。只有实际检查过且无问题时才填空 findings。 |
+| 代码审查、版本比对审查、安全审查 | `submit_result({"summary":"已审查 src","code_review":{"scope":{"kind":"files","commit":"<实际审查的完整 SHA>","directory":"src"},"findings":[]}})`。只有实际检查过且无问题时才填空 findings。 |
 | 浏览器测试报告 | `browser_submit_report({"summary":"登录后进入订单页，实际显示订单列表。","notes":"证据见 f1.jpg"})`，使用本次实际截图文件名。 |
 | 规划 | `submit_plan({"summary":"更新并核对路线","nodes":[{"key":"route","title":"修改路线","role":"<允许的角色>","instructions":"更新路线摘要并检查网页。"}]})`。纳入指引返回的必需节点。 |
 | 验收评审 | `submit_review({"verdict":"pass","summary":"已核对检查结果和验收证据。"})`。未通过时提交 fail 和有依据的问题。 |

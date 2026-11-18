@@ -1,8 +1,9 @@
 import { AttemptKind, McpToolName, reportProgressInputSchema, reportProgressOutputSchema } from '@aw/shared';
 import type { AttemptsService } from '../../attempts/index.ts';
+import type { TasksService } from '../../tasks/index.ts';
 import { defineMcpTool } from '../mcp.registry.ts';
 
-export const reportProgressTool = (attempts: AttemptsService) =>
+export const reportProgressTool = (attempts: AttemptsService, tasks: TasksService) =>
   defineMcpTool({
     name: McpToolName.ReportProgress,
     description: 'Tell the user in one short line what you are doing now.',
@@ -20,7 +21,9 @@ export const reportProgressTool = (attempts: AttemptsService) =>
     ],
     input: reportProgressInputSchema,
     output: reportProgressOutputSchema,
-    handler: ({ message }, { attempt }) => {
+    handler: async ({ message, code_review, proposal }, { attempt }) => {
+      if (code_review !== undefined || proposal !== undefined)
+        await tasks.saveReportDraft(attempt, code_review, proposal);
       attempts.reportProgress(attempt.id, message);
       return { ok: true } as const;
     },

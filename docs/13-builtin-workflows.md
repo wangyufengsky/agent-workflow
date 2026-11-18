@@ -109,6 +109,10 @@ packages/builtin/
 | requiredSteps | `baseline`（position: first）·「建立基线」· tester ·「运行现有测试并记录结果；若重构范围缺少覆盖，先补特征测试」→ `final_verify`（position: last）·「整体验证」· developer · acceptance `[command $PROJECT_CHECK, browser, ai_review(focus: 外部行为是否保持不变)]` |
 | defaultAcceptance | `{ checks: [command $PROJECT_CHECK], manual: false }` |
 
+代码审查、版本比对审查和安全审查的任务页默认在首个标签展示审查文件。成功读取定位到文件和行，点击问题固定到报告记录的提交；版本差异分别使用删除侧与新增侧行号。每次 `report_progress.code_review` 都提交截至当前的完整发现，沿用终稿的 Git 定位校验。
+
+方案设计在 `report_progress.proposal` 分段更新完整 Markdown 正文，终稿由只读步骤的 `submit_result.summary` 提交。这四种任务都可在第二个标签查看流程画布和节点详情。
+
 ### 3.6 `version_review` · 版本比对审查（只读，D126）
 
 | 项 | 值 |

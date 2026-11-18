@@ -23,7 +23,7 @@ export const submitResultTool = (tasks: TasksService, debug: DebugService) =>
       [ErrorCode.RequirementResultsInvalid]:
         'In 核验验收清单, give one conclusion per ai_review item in get_task_context.requirements. Other steps must omit requirement_results.',
       [ErrorCode.McpToolNotAllowed]:
-        'Use the submission tool named in your step instructions. Only the Code Review step can send code_review.',
+        'Use the submission tool named in your step instructions. Only code, version and security review steps can send code_review.',
     },
     handler: async (input, { attempt }) =>
       attempt.taskId === null

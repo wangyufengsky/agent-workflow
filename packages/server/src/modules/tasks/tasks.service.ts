@@ -4,6 +4,7 @@ import {
   AppError,
   type ArtifactRevision,
   type AttemptDTO,
+  AttemptKind,
   BatchDeliveryOutcome,
   BROWSER_TEST_WORKFLOW_KEY,
   type BrowserCase,
@@ -15,6 +16,7 @@ import {
   type ErrorInfo,
   frontendRoundSchema,
   isArtifactWorkflow,
+  isDesignProposalWorkflow,
   isFrontendWorkflow,
   isRepositoryDocumentWorkflow,
   isTaskCodeReview,
@@ -32,13 +34,17 @@ import {
   ServerEventType,
   type StartAgentsMdTaskRequest,
   type SubmitResultInput,
+  TASK_CODE_REVIEW_NODE_KEY,
   TASK_STATUSES,
+  type TaskCodeReviewInput,
   type TaskDetailDTO,
+  TaskEventEntity,
   TaskStatus,
   type TaskSummaryDTO,
+  taskCodeReviewReportSchema,
 } from '@aw/shared';
 import type { EventBus } from '../../core/event-bus.ts';
-import { listTaskEvents } from '../timeline/index.ts';
+import { latestTaskPayload, listTaskEvents, recordTaskEvent } from '../timeline/index.ts';
 import { createBrowserCases } from './browser-cases.service.ts';
 import { createTaskActions } from './tasks.actions.ts';
 import { createTaskAgentsMd } from './tasks.agents-md.ts';
@@ -132,11 +138,36 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     const reviewResult = isTaskCodeReview(workflow)
       ? latestFinishedCodeReview(nodes.listByTask(id))?.result
       : undefined;
+    const proposal = isDesignProposalWorkflow(workflow);
+    const reportNode =
+      proposal || isTaskCodeReview(workflow)
+        ? summaries.findLast(
+            (n) => n.key === (proposal ? 'design' : TASK_CODE_REVIEW_NODE_KEY) || n.kind === NodeKind.Revise,
+          )
+        : undefined;
+    const author =
+      reportNode && !reportNode.resultSummary
+        ? attempts.listByNode(reportNode.id).findLast((a) => a.kind === AttemptKind.Execute)
+        : undefined;
+    const draft = author && latestTaskPayload(db, id, author.id, 'report_draft');
     return {
       ...state.summary(task),
+      ...(proposal
+        ? {
+            proposal: {
+              text: reportNode?.resultSummary ?? (typeof draft?.proposal === 'string' ? draft.proposal : null),
+            },
+          }
+        : {}),
       ...(showArtifact ? { artifact: artifacts.details(id) } : {}),
       ...(isTaskCodeReview(workflow)
-        ? { codeReview: { report: reviewResult?.reviewReport ?? null, summary: reviewResult?.summary ?? null } }
+        ? {
+            codeReview: {
+              ...(draft?.review ? { draft: taskCodeReviewReportSchema.parse(draft.review) } : {}),
+              report: reviewResult?.reviewReport ?? null,
+              summary: reviewResult?.summary ?? null,
+            },
+          }
         : {}),
       requirement: task.requirement,
       ...(task.browserCase === null ? {} : { browserCase: task.browserCase }),
@@ -206,6 +237,32 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   }
 
   return {
+    async saveReportDraft(attempt: AttemptDTO, review: TaskCodeReviewInput | undefined, proposal: string | undefined) {
+      if (attempt.taskId === null || attempt.nodeId === null || attempt.kind !== AttemptKind.Execute)
+        throw new AppError(ErrorCode.McpToolNotAllowed, 'Drafts belong to a report step');
+      const task = state.get(attempt.taskId);
+      const workflow = workflows.get(task.workflowId);
+      const node = nodes.get(attempt.nodeId);
+      let payload: Record<string, unknown>;
+      if (review && proposal === undefined && resultSubmissionFields(workflow, node).review) {
+        payload = { review: await resolveTaskCodeReview(deps.projects.getRecord(task.projectId).repoPath, review) };
+      } else if (
+        proposal &&
+        !review &&
+        isDesignProposalWorkflow(workflow) &&
+        (node.key === 'design' || node.kind === NodeKind.Revise)
+      ) {
+        payload = { proposal };
+      } else throw new AppError(ErrorCode.McpToolNotAllowed, 'This draft does not belong to the current step');
+      recordTaskEvent(db, {
+        taskId: task.id,
+        entity: TaskEventEntity.Attempt,
+        entityId: attempt.id,
+        type: 'report_draft',
+        payload,
+        createdAt: deps.clock.now(),
+      });
+    },
     resultSubmissionFields(attempt: AttemptDTO) {
       if (attempt.taskId === null || attempt.nodeId === null) return { verify: false, review: false, artifact: false };
       return resultSubmissionFields(workflows.get(state.get(attempt.taskId).workflowId), nodes.get(attempt.nodeId));

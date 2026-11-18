@@ -16,7 +16,7 @@ export const submitResultInputSchema = z.object({
   code_review: taskCodeReviewInputSchema
     .optional()
     .describe(
-      'Only for the built-in Code Review task. Give the exact full Git commit IDs you reviewed and structured findings. Use an empty findings array when no issues were found.',
+      'For built-in code, version and security review steps. Give the exact full Git commit IDs you reviewed and structured findings. Use an empty findings array when no issues were found.',
     ),
   handoff: nodeHandoffSchema.optional().describe('Short, evidenced handoff for steps that depend on this result'),
   self_check: z
