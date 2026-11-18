@@ -1,10 +1,20 @@
-import { AttemptKind, ErrorCode, listMcpToolsOp, MCP_SESSION_ARG, McpToolName, RoleBaseAgent } from '@aw/shared';
+import {
+  AttemptKind,
+  ErrorCode,
+  listMcpToolsOp,
+  MCP_SESSION_ARG,
+  McpToolName,
+  RoleBaseAgent,
+  requestChangesOp,
+} from '@aw/shared';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { createTestRepo } from '../../../test/helpers/git.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
+
+import { addProject, createTask, taskReaches } from '../../../test/helpers/tasks.ts';
 
 let t: TestApp;
 let mcp: Client;
@@ -50,6 +60,7 @@ describe('执行 MCP（/mcp/exec）', () => {
     const { tools } = await mcp.listTools();
     expect(tools.map((tool) => tool.name)).toEqual([
       McpToolName.GetTaskContext,
+      McpToolName.GetSubmissionGuide,
       McpToolName.GetNodeOutput,
       McpToolName.GetTaskDiff,
       McpToolName.DelegateReadonly,
@@ -137,6 +148,26 @@ describe('执行 MCP（/mcp/exec）', () => {
     expect(body).toMatchObject({ code: ErrorCode.McpToolNotAllowed });
   });
 
+  it('按会话选择规划和验收的提交契约；修正未通过的评审时保留原判定', async () => {
+    const plan = { [MCP_SESSION_ARG]: await activeSession(AttemptKind.Plan) };
+    const review = { [MCP_SESSION_ARG]: await activeSession(AttemptKind.Review) };
+    expect((await callTool(mcp, 'get_submission_guide', plan)).body).toMatchObject({
+      tool: 'submit_plan',
+      required: ['summary', 'nodes'],
+      example: { nodes: [expect.objectContaining({ key: 'implement' })] },
+    });
+    const refused = await callTool(mcp, 'submit_review', { ...review, verdict: 'fail', summary: '' });
+    expect(refused.body).toMatchObject({
+      code: ErrorCode.ValidationFailed,
+      guide: { example: { verdict: 'fail', issues: [{ severity: 'major' }] } },
+    });
+    expect((await callTool(mcp, 'get_submission_guide', review)).body).toMatchObject({
+      lastRejection: { fields: ['summary'] },
+      example: { verdict: 'fail' },
+    });
+    expect((await callTool(mcp, 'get_submission_guide', plan)).body).not.toHaveProperty('lastRejection');
+  });
+
   it('参数不合法时返回 VALIDATION_FAILED、zod issues 与 hint', async () => {
     const session = await activeSession(AttemptKind.Execute);
     const { isError, body } = await callTool(mcp, McpToolName.SubmitResult, {
@@ -150,4 +181,53 @@ describe('执行 MCP（/mcp/exec）', () => {
       hint: expect.stringContaining('details.issues'),
     });
   });
+});
+
+it('T-11 前端修改的首次拒绝列出所有无关字段，读取指引后仍可正常提交', async () => {
+  const { project } = await addProject(t, { checkCommand: null });
+  t.fake.enqueue(script().edit('index.html', '原页').callTool('submit_result', { summary: '首版完成' }), {
+    title: '开发首版页面',
+  });
+  const review = taskReaches(t, 'review');
+  const task = await createTask(t, { projectId: project.id, workflow: 'frontend' });
+  await review;
+  t.fake.enqueue(script().edit('index.html', '今日路线').hang(), { title: '界面修改 1' });
+  await t.call(requestChangesOp, { id: task.id, reason: 'user', feedback: '加上今日路线' });
+  const session = () => t.fake.sessions.find((s) => s.title.includes('界面修改 1'))?.id;
+  await expect.poll(session).toBeTruthy();
+  const auth = { [MCP_SESSION_ARG]: session() };
+  const bad = {
+    summary: '已添加今日路线',
+    changes: [{ path: 'index.html', description: '显示三个停靠点' }],
+    requirement_results: [],
+    code_review: { scope: { kind: 'diff', from: 'a'.repeat(40), to: 'b'.repeat(40) }, findings: [] },
+  };
+  const first = await callTool(mcp, 'submit_result', { ...bad, ...auth });
+  expect(first.body).toMatchObject({
+    code: ErrorCode.RequirementResultsInvalid,
+    guide: {
+      tool: 'submit_result',
+      remove: expect.arrayContaining(['code_review', 'requirement_results']),
+      example: { summary: bad.summary },
+    },
+  });
+  const second = await callTool(mcp, 'submit_result', {
+    ...bad,
+    handoff: { facts: [], decisions: [], openQuestions: [] },
+    ...auth,
+  });
+  expect(second.body).toMatchObject({
+    code: ErrorCode.ValidationFailed,
+    guide: { remove: expect.arrayContaining(['handoff', 'code_review', 'requirement_results']) },
+  });
+  const guide = await callTool(mcp, 'get_submission_guide', auth);
+  expect(guide.body).toMatchObject({
+    tool: 'submit_result',
+    required: ['summary'],
+    example: { summary: bad.summary },
+    lastRejection: { code: ErrorCode.ValidationFailed, fields: ['handoff'] },
+    omit: expect.arrayContaining(['code_review', 'requirement_results']),
+  });
+  const fixed = (first.body.guide as { example: Record<string, unknown> }).example;
+  expect((await callTool(mcp, 'submit_result', { ...fixed, ...auth })).body).toMatchObject({ accepted: true });
 });

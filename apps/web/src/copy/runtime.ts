@@ -52,6 +52,7 @@ export const TOOLS_COPY = {
   modelDescription: '给模型的说明',
   /** What each tool lets the AI do (12 §6), in the user's words. */
   description: {
+    [McpToolName.GetSubmissionGuide]: '查询当前步骤的提交工具、参数、示例和最近一次拒绝原因。',
     [McpToolName.GetTaskContext]: '读取任务的需求、当前步骤、检查方式、前面步骤的结果，以及用户的回答与反馈。',
     [McpToolName.GetNodeOutput]: '读取本任务中某个已完成步骤的完整产出：摘要、改动文件、注意事项与检查结果。',
     [McpToolName.GetTaskDiff]: '查看任务工作区相对基线的改动：文件列表，或某个文件的 diff。',

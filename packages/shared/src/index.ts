@@ -55,6 +55,7 @@ export * from './contracts/mcp/read-attachment.ts';
 export * from './contracts/mcp/readonly-delegation.ts';
 export * from './contracts/mcp/report-progress.ts';
 export * from './contracts/mcp/sheets.ts';
+export * from './contracts/mcp/submission-guide.ts';
 export * from './contracts/mcp/submit-answer.ts';
 export * from './contracts/mcp/submit-breakdown.ts';
 export * from './contracts/mcp/submit-outline.ts';

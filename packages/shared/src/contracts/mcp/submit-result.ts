@@ -36,6 +36,7 @@ export const submitResultInputSchema = z.object({
       'Only in the step 核验验收清单: your conclusion on each ai_review item of the checklist, with what you based it on',
     ),
 });
+export const submitBrowserReportInputSchema = submitResultInputSchema.pick({ summary: true, notes: true }).strict();
 export type SubmitResultInput = z.infer<typeof submitResultInputSchema>;
 
 export const ResultNext = {

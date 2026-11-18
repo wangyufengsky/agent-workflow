@@ -275,6 +275,7 @@ export function sessionPermissionRules(
     return [
       { permission: '*', action: 'deny', pattern: '*' },
       { permission: 'skill', action: 'allow', pattern: SkillName.ImageAnalysis },
+      { permission: 'skill', action: 'allow', pattern: SkillName.SubmitResult },
       ...[...BROWSER_TEST_TOOLS, browserTestSubmit].map((tool) => ({
         permission: `${MCP_TOOL_PREFIX}${tool}`,
         action: 'allow' as const,

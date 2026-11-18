@@ -537,6 +537,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   const debug = createDebugModule({ attempts: attempts.service, settings: settings.service, prompts });
   const mcp = createMcpModule({
+    events,
     token: mcpToken,
     attempts: attempts.service,
     tasks: tasks.service,

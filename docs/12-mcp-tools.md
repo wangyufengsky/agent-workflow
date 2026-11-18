@@ -165,6 +165,7 @@ MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
 | `delegate_readonly` | execute · review | 把独立的查证问题交给只读会话 |
 | `inspect_delegation` | delegation | 读委派启动时固定的 Git 提交 |
 | `submit_delegation` | delegation | 把只读报告交回父步骤 |
+| `get_submission_guide` | plan / execute / review | 查询当前步骤的提交工具、参数、示例和本次尝试最近一次参数错误 |
 | `submit_plan` | plan | 提交计划 |
 | `submit_result` | execute | 提交节点结果 |
 | `browser_submit_report` | 浏览器测试的 execute | 提交逐项测试结果及证据，参数为 `summary` 和可选的 `notes`。 |
@@ -508,3 +509,18 @@ export const submitPlanTool = defineMcpTool({
 ### 前端开发任务
 
 助手通过 `workflows_list` 选择「前端开发」并调用 `tasks_create`。绑定用户当前预览后的 `browser_read` 另给出页面宽高、滚动宽度和当前文档内最近点选元素。助手可将测量与结构证据写入 `tasks_requestChanges` 的反馈。用户确认后，修改继续在同一任务分支执行。用户表示页面满意时，`tasks_finishFrontend` 发起最终验收，可附当前本地页面路径。改前截图由用户的工作台保留。
+
+
+### 步骤提交被拒后的指引
+
+`agent-workflow_get_submission_guide({})` 使用调用会话定位步骤。返回的 `tool` 是正式提交工具的短名，`required` 和 `allowed` 列出必填及可用字段，`parameters` 给出类型与用途，`omit` 列出本步骤应省略的结果字段。首次查询即可得到 `example`。参数校验拒绝保留原错误码和字段路径，同时返回 `guide.remove` 与可修改的示例。查询时可读取本次尝试最近一次拒绝；尝试结束时清除这条临时记录。模型可以继续修正提交。
+
+| 步骤 | 正式工具 | 参数示例 |
+| --- | --- | --- |
+| 前端修改、普通开发 | `submit_result` | `{"summary":"已显示今日路线，页面快照中三个停靠点顺序正确。"}` |
+| 文档修订 | `submit_result` | 先发布修改后的文档版本，再传 `{"summary":"已修订交付日期，已核对发布版本的第二段。"}` |
+| 清单核验 | `submit_result` | `{"summary":"已核对路线顺序","requirement_results":[{"item_id":"<本步骤返回的 AI 核验项 ID>","conclusion":"pass","note":"页面快照中的站名和顺序与需求一致。"}]}` |
+| 任务代码审查 | `submit_result` | `{"summary":"已检查所选目录","code_review":{"scope":{"kind":"files","commit":"<实际审查的完整提交 SHA>","directory":"src"},"findings":[]}}`。仅在确实未发现问题时用空数组。 |
+| 浏览器报告 | `browser_submit_report` | `{"summary":"打开路线页后显示预期的三个停靠点，检查通过。","notes":"快照显示石桥起点、芦苇栈道、日落码头。"}` |
+| 规划 | `submit_plan` | `{"summary":"修改路线页并验证","nodes":[{"key":"route","title":"修改路线","role":"<允许的角色>","instructions":"更新路线摘要并核对页面快照。"}]}`，同时纳入工具返回的必需节点。 |
+| 验收评审 | `submit_review` | `{"verdict":"fail","summary":"路线仍缺一站","issues":[{"severity":"major","path":"index.html","description":"路线摘要漏掉日落码头。"}]}` |

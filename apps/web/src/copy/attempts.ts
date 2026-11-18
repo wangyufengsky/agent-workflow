@@ -66,6 +66,7 @@ export const DEBUG_COPY = {
 
 /** Our execution MCP tools as the simple process view names them (14 §3.4). */
 const APP_TOOL_LABEL: Record<McpToolName, string> = {
+  [McpToolName.GetSubmissionGuide]: '查询提交指引',
   [McpToolName.GetTaskContext]: '读取任务背景',
   [McpToolName.GetNodeOutput]: '读取前面步骤的产出',
   [McpToolName.GetTaskDiff]: '查看任务的改动',

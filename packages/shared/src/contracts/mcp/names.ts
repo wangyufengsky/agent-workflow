@@ -3,6 +3,7 @@ import { NodeKind } from '../../enums/workflow.ts';
 
 /** Execution MCP tools (12 §6); opencode shows them as `agent-workflow_<name>`. */
 export const McpToolName = {
+  GetSubmissionGuide: 'get_submission_guide',
   GetTaskContext: 'get_task_context',
   GetNodeOutput: 'get_node_output',
   GetTaskDiff: 'get_task_diff',
@@ -53,6 +54,7 @@ export const BROWSER_TEST_TOOLS = Object.values(McpToolName).filter(
   (name) =>
     (name.startsWith('browser_') && name !== McpToolName.BrowserSubmitReport) ||
     name === McpToolName.AnalyzeImage ||
+    name === McpToolName.GetSubmissionGuide ||
     name === McpToolName.GetTaskContext ||
     name === McpToolName.AskUser ||
     name === McpToolName.ReportProgress,

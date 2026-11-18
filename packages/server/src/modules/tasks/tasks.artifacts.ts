@@ -28,6 +28,8 @@ const VERSION_EVENT = 'artifact_version';
 export const ARTIFACT_ROUND_EVENT = 'artifact_round';
 export const ARTIFACT_REVISION_PREFIX = 'artifact_revision_';
 export const ARTIFACT_FIRST_NODE = 'write_artifact';
+export const isArtifactWritingStep = (key: string) =>
+  key === ARTIFACT_FIRST_NODE || key.startsWith(ARTIFACT_REVISION_PREFIX);
 
 /** 产物原件和每版快照放在任务目录，验收清理工作树后仍可查看与下载。 */
 export function createTaskArtifacts(deps: TasksServiceDeps, state: TaskState) {
@@ -144,7 +146,7 @@ export function createTaskArtifacts(deps: TasksServiceDeps, state: TaskState) {
   function assertWriting(taskId: string, attemptId: string, nodeId: string) {
     const attempt = deps.attempts.get(attemptId);
     const key = deps.nodes.get(nodeId).key;
-    if (key !== ARTIFACT_FIRST_NODE && !key.startsWith(ARTIFACT_REVISION_PREFIX))
+    if (!isArtifactWritingStep(key))
       throw new AppError(ErrorCode.McpToolNotAllowed, 'Only artifact creation and revision steps publish versions');
     if (
       state.get(taskId).status !== TaskStatus.Running ||
@@ -216,10 +218,7 @@ export function createTaskArtifacts(deps: TasksServiceDeps, state: TaskState) {
     assertPublished(attempt: AttemptDTO) {
       const { task, nodeId } = permitted(attempt);
       const key = deps.nodes.get(nodeId).key;
-      if (
-        (key === ARTIFACT_FIRST_NODE || key.startsWith(ARTIFACT_REVISION_PREFIX)) &&
-        !allVersions(task.id).some((version) => version.attemptId === attempt.id)
-      )
+      if (isArtifactWritingStep(key) && !allVersions(task.id).some((version) => version.attemptId === attempt.id))
         throw new AppError(
           ErrorCode.ValidationFailed,
           'Publish the file with a task artifact write tool before submitting',

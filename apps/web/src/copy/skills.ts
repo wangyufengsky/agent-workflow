@@ -142,6 +142,11 @@ export const BUILTIN_SKILL_COPY: Readonly<Record<string, { title: string; descri
     description: '按版本和批注定位，修改并复查任务产物。',
     trigger: '按段落、行或单元格批注修订 Word、Excel、Markdown 或 TXT 产物时。',
   },
+  'aw-submit-result': {
+    title: '步骤提交指引',
+    description: '查看本步骤可以提交的参数、示例和上次拒绝的原因。',
+    trigger: '规划、执行或评审提交失败，或需要确认提交方式时。',
+  },
   'aw-task-delivery': {
     title: '任务验收与交付',
     description: '根据任务状态、验收证据和交付记录选择下一步。',

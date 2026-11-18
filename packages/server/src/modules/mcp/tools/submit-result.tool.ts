@@ -1,4 +1,11 @@
-import { AttemptKind, ErrorCode, McpToolName, submitResultInputSchema, submitResultOutputSchema } from '@aw/shared';
+import {
+  AttemptKind,
+  ErrorCode,
+  McpToolName,
+  submitBrowserReportInputSchema,
+  submitResultInputSchema,
+  submitResultOutputSchema,
+} from '@aw/shared';
 import type { DebugService } from '../../debug/index.ts';
 import type { TasksService } from '../../tasks/index.ts';
 import { defineMcpTool } from '../mcp.registry.ts';
@@ -30,7 +37,7 @@ export const submitBrowserReportTool = (tasks: TasksService) =>
     description:
       'Submit your browser test report. Include each test, expected and actual results, pass/fail/blocked, and evidence such as screenshot filenames. A successful submission finishes the step.',
     allowedKinds: [AttemptKind.Execute],
-    input: submitResultInputSchema.pick({ summary: true, notes: true }).strict(),
+    input: submitBrowserReportInputSchema,
     output: submitResultOutputSchema,
     hints: {
       [ErrorCode.ValidationFailed]:

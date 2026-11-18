@@ -53,7 +53,10 @@ it('拒绝越出审查范围的定位，并将删除行固定到当时的旧提�
   await t.call(startTaskOp, { id: task.id });
   await ready;
   expect(t.fake.toolCalls.filter((call) => call.isError).map((call) => call.result)).toMatchObject([
-    { code: ErrorCode.GitReviewFindingsInvalid },
+    {
+      code: ErrorCode.GitReviewFindingsInvalid,
+      guide: { tool: 'submit_result', example: { code_review: { scope: { kind: 'diff', from, to } } } },
+    },
     { code: ErrorCode.GitReviewFindingsInvalid },
   ]);
   expect((await t.call(getTaskOp, { id: task.id })).body.codeReview).toMatchObject({
