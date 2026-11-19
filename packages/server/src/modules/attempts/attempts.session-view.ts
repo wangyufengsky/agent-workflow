@@ -6,6 +6,7 @@ import {
   TranscriptSystemEvent,
 } from '@aw/shared';
 import {
+  CONTEXT_OVERFLOW_ERROR,
   describeOpencodeError,
   OpencodeEventType as E,
   type OpencodeEvent,
@@ -117,7 +118,7 @@ export function createSessionView() {
                   ? {}
                   : {
                       details:
-                        event.error.name === 'ContextOverflowError'
+                        event.error.name === CONTEXT_OVERFLOW_ERROR
                           ? { ...event.error.data, opencodeErrorName: event.error.name }
                           : event.error.data,
                     }),
@@ -125,6 +126,7 @@ export function createSessionView() {
             },
           ];
         case E.StepFinished:
+        case E.Compacted:
         case E.Busy:
         case E.PermissionReplied:
         case E.Idle:

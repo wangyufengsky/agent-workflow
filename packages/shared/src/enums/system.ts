@@ -98,6 +98,8 @@ export const TranscriptSystemEvent = {
   Nudged: 'nudged',
   /** opencode waits before retrying a failed model request; `detail` is its message. */
   Retrying: 'retrying',
+  /** The request overflowed; OpenCode can still compact and continue in this session. */
+  ContextOverflow: 'context_overflow',
   /** The model service sent nothing for opencode's chunk timeout and the reply was cut off (D217). */
   ModelStalled: 'model_stalled',
   ResultSubmitted: 'result_submitted',

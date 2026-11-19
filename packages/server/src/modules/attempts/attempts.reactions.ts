@@ -17,6 +17,7 @@ import type { Clock } from '../../core/clock.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { ModelSlots } from '../model-slots/index.ts';
 import {
+  CONTEXT_OVERFLOW_ERROR,
   describeOpencodeError,
   MESSAGE_ABORTED_ERROR,
   type OpencodeClient,
@@ -198,6 +199,19 @@ export function watchSessions(
     }
   }
 
+  function failSession(
+    attempt: Attempt,
+    session: LiveSession,
+    event: NonNullable<LiveSession['contextOverflow']>,
+  ): void {
+    record(attempt, session.view.toEntries(event));
+    move(attempt, AttemptEvent.SessionError, {
+      code: ErrorCode.AttemptSessionError,
+      message: describeOpencodeError(event.error),
+      ...(event.error === undefined ? {} : { details: { error: event.error } }),
+    });
+  }
+
   function onEvent(event: OpencodeEvent): void {
     if (event.type === OpencodeEventType.RuntimeLost) {
       interruptActive(true);
@@ -210,7 +224,7 @@ export function watchSessions(
     const running = attempt.status === AttemptStatus.Running;
     // 命令请求单独处理失败。开始命令的迟到事件按顺序先于首条任务消息，结束命令发生在提交之后。
     if (event.type === OpencodeEventType.Error && (!running || session.firstPrompt !== null)) return;
-    record(attempt, session.view.toEntries(event));
+    if (event.type !== OpencodeEventType.Error) record(attempt, session.view.toEntries(event));
     if (running && session.firstPrompt === null) {
       if (event.type === OpencodeEventType.Retry) waitForModel(session);
       else modelAnswering(session);
@@ -223,20 +237,29 @@ export function watchSessions(
       case OpencodeEventType.Message:
         if (event.messageId === session.firstPrompt?.messageId) session.firstPrompt = null;
         return;
+      case OpencodeEventType.Compacted:
+        session.contextOverflow = null;
+        return;
       case OpencodeEventType.Idle:
         if (session.finishingCommand) return;
         if (running) {
-          if (session.firstPrompt === null) state.inBackground(attempt.id, () => onIdle(attempt, session));
+          if (session.firstPrompt !== null) return;
+          if (session.contextOverflow !== null) {
+            failSession(attempt, session, session.contextOverflow);
+            state.releaseSession(session);
+          } else state.inBackground(attempt.id, () => onIdle(attempt, session));
         } else if (session.stopAfterSubmit && session.endCommand !== null) {
           finishSubmitted(attempt, session);
         } else state.releaseSession(session);
         return;
       case OpencodeEventType.Error:
-        move(attempt, AttemptEvent.SessionError, {
-          code: ErrorCode.AttemptSessionError,
-          message: describeOpencodeError(event.error),
-          ...(event.error === undefined ? {} : { details: { error: event.error } }),
-        });
+        // OpenCode emits this before trying compaction. Keep the attempt active until recovery or idle.
+        if (event.error?.name === CONTEXT_OVERFLOW_ERROR) {
+          if (session.contextOverflow === null) {
+            record(attempt, [systemEntry(TranscriptSystemEvent.ContextOverflow, describeOpencodeError(event.error))]);
+          }
+          session.contextOverflow = event;
+        } else failSession(attempt, session, event);
         return;
       case OpencodeEventType.Stalled: {
         if (!running || session.firstPrompt !== null || session.stall !== null) return;

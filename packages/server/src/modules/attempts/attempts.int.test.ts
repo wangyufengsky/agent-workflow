@@ -7,6 +7,7 @@ import {
   getAttemptOp,
   ServerEventType,
   startDebugAttemptOp,
+  TranscriptSystemEvent,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -15,6 +16,7 @@ import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
 import { createFakeClock, type FakeClock } from '../../../test/helpers/clock.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { createTestRepo, type TestRepo } from '../../../test/helpers/git.ts';
+import { OpencodeEventType } from '../opencode/index.ts';
 
 let t: TestApp;
 let clock: FakeClock;
@@ -94,6 +96,41 @@ describe('尝试的结束条件（12 §4.2）', () => {
       message: 'APIError: Bad Gateway',
       details: { error: { name: 'APIError', data: { message: 'Bad Gateway' } } },
     });
+  });
+
+  it('上下文超限后等到原会话空闲，压缩未成功则保留原始错误', async () => {
+    const overflow = 'context too long';
+    t.fake.enqueue(script().error('ContextOverflowError', overflow, { idle: false }));
+    const notice = waitForEvent(t.app.events, ServerEventType.AttemptTranscript, (d) =>
+      d.entries.some((e) => e.kind === 'system' && e.data.event === TranscriptSystemEvent.ContextOverflow),
+    );
+    const attempt = await startAttempt();
+    await notice;
+    if (attempt.opencodeSessionId === null) throw new Error('Missing OpenCode session');
+    expect((await t.call(getAttemptOp, { id: attempt.id })).body).toMatchObject({ status: 'running', error: null });
+    expect(t.fake.prompts).toHaveLength(1);
+
+    const failed = reaches('failed');
+    t.fake.replay([{ type: OpencodeEventType.Idle, sessionId: attempt.opencodeSessionId }]);
+    expect((await failed).attempt).toMatchObject({
+      id: attempt.id,
+      nudges: 0,
+      error: { code: ErrorCode.AttemptSessionError, message: `ContextOverflowError: ${overflow}` },
+    });
+    expect(t.fake.prompts).toHaveLength(1);
+  });
+
+  it('压缩成功后空闲且未提交时，在原会话照常提醒提交', async () => {
+    t.fake.enqueue(script().error('ContextOverflowError', 'context too long', { endTurn: false }).compacted());
+    t.fake.enqueue(script().callTool('submit_result', submit));
+    const succeeded = reaches('succeeded');
+    const attempt = await startAttempt();
+    expect((await succeeded).attempt).toMatchObject({ id: attempt.id, nudges: 1, error: null });
+
+    expect(t.fake.prompts.map(({ sessionId }) => sessionId)).toEqual([
+      attempt.opencodeSessionId,
+      attempt.opencodeSessionId,
+    ]);
   });
 
   it('模型服务不可用、opencode 重试期间不计入超时，恢复后照常计时（D163）', async () => {

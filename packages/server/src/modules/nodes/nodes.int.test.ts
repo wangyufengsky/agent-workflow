@@ -69,6 +69,31 @@ describe('节点状态机（09 §3）', () => {
     expect(t.fake.prompts.find((p) => p.text.includes('session error'))?.text).toContain('Your step: 定位根因');
   });
 
+  it('上下文超限后会话自行恢复，原执行提交结果且同一步骤只执行一次', async () => {
+    await t.call(updateSettingsOp, { 'node.maxAttempts': 2 });
+    const { project } = await addProject(t);
+    t.fake.enqueue(
+      script()
+        .error('ContextOverflowError', 'context too long', { endTurn: false })
+        .compacted()
+        .text('Continuing after compaction')
+        .callTool('submit_result', { summary: 'Located after compaction' }),
+      locate,
+    );
+    t.fake.enqueue(submit('Located on retry'), locate);
+    const done = nodeReaches(t, 'locate', 'done');
+    const task = await createTask(t, { projectId: project.id, workflow: 'bugfix' });
+    await done;
+
+    const node = await nodeOf(task.id, 'locate');
+    expect(node).toMatchObject({
+      status: 'done',
+      attemptCount: 1,
+      retryFeedback: null,
+      attempts: [{ seq: 1, status: 'succeeded', error: null }],
+    });
+  });
+
   it('verifying → ready（检查失败，输出作为反馈）→ verifying → done（M3-07）', async () => {
     const { project } = await addProject(t, { checkCommand: 'test -f fix.txt && echo checked' });
     t.fake.enqueue(submit('Located'), locate);
