@@ -23,6 +23,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+      - run: node --test scripts/prepare-release.test.mjs
       - run: pnpm check
       - run: pnpm test
         if: ${{ !cancelled() }}
