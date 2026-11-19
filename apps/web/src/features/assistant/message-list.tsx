@@ -46,10 +46,17 @@ const STAGGER_STEPS = 6;
 
 /** A call that waits for the user shows as its confirmation card, not as a row of its own (15 §4). */
 function waitsForConfirmation(tool: string, result: ToolResult | undefined): boolean {
-  // Only the app's own tools answer with JSON (assistant.tools.ts); other tools may print anything.
   if (!tool.startsWith(MCP_ASSISTANT_TOOL_PREFIX)) return false;
   if (result?.data.status !== 'completed' || result.data.output === undefined) return false;
-  return needsConfirmationOutputSchema.safeParse(JSON.parse(result.data.output)).success;
+  let output: unknown;
+  try {
+    output = JSON.parse(result.data.output);
+  } catch (error) {
+    // opencode 可截断工具输出。此时保留普通操作行，用户仍可查看原文。
+    if (error instanceof SyntaxError) return false;
+    throw error;
+  }
+  return needsConfirmationOutputSchema.safeParse(output).success;
 }
 
 const CHART_TOOLS: ReadonlySet<string> = new Set(
