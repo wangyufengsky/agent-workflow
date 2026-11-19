@@ -79,3 +79,27 @@ test('超限后续接项目对话、选择附件、回看来源并编辑后发�
   await history.getByRole('button', { name: '打开来源对话' }).click();
   await expect(panel.getByTestId('assistant-user-message')).toHaveText('只检查新增字段');
 });
+
+test('应用工具的输出被截断后仍可阅读回复和重新打开对话', async ({ page, request }) => {
+  await patchSettings(request, { 'ui.mode': 'simple' });
+  const project = await createProject(request, null);
+  await queueAssistantTurn(request, [
+    {
+      type: 'tool',
+      tool: 'agent-workflow-app_tasks_list',
+      input: {},
+      output: '{"items":[\n...52805 bytes truncated...',
+    },
+    { type: 'text', text: '已查看任务列表。' },
+  ]);
+  await page.goto(`/?assistantProjectId=${project.id}`);
+  const input = page.getByLabel('告诉助手，或开始任务');
+  await input.fill('查看任务列表');
+  await input.press('ControlOrMeta+Enter');
+  const messages = page.getByTestId('home-messages');
+  await expect(messages).toContainText('已查看任务列表。');
+  await expect(messages.getByTestId('assistant-action')).toBeVisible();
+  await page.reload();
+  await expect(messages).toContainText('已查看任务列表。');
+  await expect(messages.getByTestId('assistant-action')).toBeVisible();
+});
