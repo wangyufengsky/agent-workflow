@@ -24,6 +24,7 @@ extraResources:
 npmRebuild: false
 asar: true
 mac:
+  artifactName: agent-workflow-${version}-${arch}.${ext}
   # Rendered from build/icon.svg (1024 px) and packed with iconutil.
   icon: build/icon.icns
   target:

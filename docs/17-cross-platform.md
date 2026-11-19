@@ -266,7 +266,7 @@ macOS 有三个并行 job，各自保留 30 分钟上限。集成测试维持上
 | 作业 | 步骤 |
 | --- | --- |
 | `verify (macos-latest)` | `pnpm check`、`pnpm test`、`pnpm test:int`（排除数据库集成） |
-| `browser and smoke (macos-latest)` | `pnpm build`、`pnpm e2e --grep-invert @walkthrough`、`pnpm e2e:smoke` |
+| `browser and smoke (macos-latest)` | `pnpm build`、`pnpm e2e --grep-invert @walkthrough`、`pnpm e2e:smoke`、打包并上传 macOS arm64 DMG |
 | `e2e J9 (macos-latest)` | `pnpm build`、`pnpm e2e --grep @walkthrough`，覆盖所有主题 |
 
 **何时运行与当前的验收（D82，用户确认）**：
@@ -279,7 +279,13 @@ macOS 有三个并行 job，各自保留 30 分钟上限。集成测试维持上
 
 **结果与重跑。** job 内后面的步骤在前面失败后照常运行，一轮能看到该 job 的全部问题；任何一步失败，该 job 失败，整个 run 也就失败。只重跑失败部分用 GitHub 自带的「Re-run failed jobs」（或 `gh run rerun <run-id> --failed`），不另做机制。失败时 E2E 的 trace（`retain-on-failure`）连同 `test-results/` 作为 artifact 上传（`e2e-results-*`、`walkthrough-results-*`），后端日志在 CI 中输出到 job 日志。
 
-**打包产物何时产生**：只在手动运行工作流时产生，ubuntu 与 windows 每次运行都打包并上传安装包；macOS 不打包（本机用 `pnpm dist`）。打包与测试同时进行：实测 Windows 的 `package` job（3.2–3.3 分钟）与最长的测试 job（3.0–3.5 分钟）相当，不拖长一轮。
+**打包产物何时产生**：手动运行 CI 时，Linux x64 / arm64、Windows x64 和 macOS arm64 分别上传 `installers-*` 产物。macOS 在 Electron 启动冒烟通过后打包 DMG。PR 工作流继续运行检查和冒烟。
+
+**准备 GitHub 发布草稿**：
+
+1. 给要发布的提交打上并推送 `vX.Y.Z` tag。用这个 tag 运行 `CI`，等该次运行完成并通过，记下运行 ID。
+2. 在默认分支运行 **Prepare release draft**，填 tag 和 CI 运行 ID。测试版勾选 `prerelease`。工作流会核实 tag、安装包版本和 CI 的提交一致。
+3. 在 GitHub Releases 中检查草稿、说明与 6 个安装包，然后手动发布。工作流在 runner 上把下载的安装包原地计算 SHA-256，并把同一份文件直接上传，结束时删除暂存目录。中断后可对同一 CI 运行重跑，已有附件的哈希一致则复用，遇到冲突会报错。
 
 **Playwright 只装 Chromium 的 headless shell**（`--only-shell`，浏览器 E2E 以 headless 运行，原来也只用它），系统依赖只在 Linux 上装（`--with-deps`）：Windows 上的 `--with-deps` 会花约 3.5 分钟启用 Media Foundation 功能，没有 spec 播放媒体（§4.3）。
 
