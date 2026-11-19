@@ -17,6 +17,7 @@ export {
   sessionPermissionRules,
 } from './opencode.config.ts';
 export {
+  CONTEXT_OVERFLOW_ERROR,
   describeOpencodeError,
   MESSAGE_ABORTED_ERROR,
   type OpencodeError,

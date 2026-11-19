@@ -45,10 +45,11 @@ export type FakeStep =
   | { type: 'retry'; messages: string[] }
   /** The model service sends nothing for opencode's chunk timeout: opencode reports the stall and resends (D217). */
   | { type: 'stall' }
+  | { type: 'compacted' }
   /** The tokens (and cost) the turn reports as used when it ends, instead of 100 input, 20 output and no cost. */
   | { type: 'usage'; input: number; output: number; cost: number }
   /** `idle: false`: opencode reports the error without a following idle event. */
-  | { type: 'error'; name: string; message: string; idle: boolean };
+  | { type: 'error'; name: string; message: string; idle: boolean; endTurn?: boolean };
 
 /** Script builder (07 §4): `script().edit('a.ts', '…').callTool('submit_result', {…})`. The turn ends idle. */
 export function script() {
@@ -89,9 +90,10 @@ export function script() {
     retry: (...messages: string[]) => add({ type: 'retry', messages }),
     /** The reply stalls; opencode would resend the request, so the turn waits until the session is aborted. */
     stall: () => add({ type: 'stall' }),
-    /** Fails the turn with a session error. */
-    error: (name: string, message: string, { idle = true }: { idle?: boolean } = {}) =>
-      add({ type: 'error', name, message, idle }),
+    compacted: () => add({ type: 'compacted' }),
+    /** Reports a session error. An overflow can be followed by compaction in the same turn. */
+    error: (name: string, message: string, { idle = true, endTurn = true } = {}) =>
+      add({ type: 'error', name, message, idle, endTurn }),
   };
   return builder;
 }
@@ -317,8 +319,12 @@ export function createFakeOpencode() {
           break;
         case 'error':
           emit({ type: E.Error, sessionId, error: { name: step.name, data: { message: step.message } } });
+          if (step.endTurn === false) break;
           if (step.idle) emit({ type: E.Idle, sessionId });
           return { name: step.name, data: { message: step.message } };
+        case 'compacted':
+          emit({ type: E.Compacted, sessionId });
+          break;
       }
     }
     emit({

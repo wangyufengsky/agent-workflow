@@ -194,6 +194,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       browserWaiting: false,
       // A session re-attached after a restart waits idle for its answer.
       idle: parked,
+      contextOverflow: null,
       pendingAnswers: [],
       stall: null,
       released,

@@ -25,6 +25,7 @@ export const OpencodeEventType = {
   /** opencode sends a model request (again, after a retry wait). */
   Busy: 'busy',
   Idle: 'idle',
+  Compacted: 'compacted',
   Error: 'error',
   PermissionAsked: 'permission_asked',
   PermissionReplied: 'permission_replied',
@@ -60,6 +61,7 @@ const SSE_READ_TIMED_OUT = 'SSE read timed out';
 
 /** The session error opencode reports when a reply still generating is aborted. */
 export const MESSAGE_ABORTED_ERROR = 'MessageAbortedError';
+export const CONTEXT_OVERFLOW_ERROR = 'ContextOverflowError';
 export type OpencodeEvent =
   | {
       type: typeof E.Message;
@@ -102,6 +104,7 @@ export type OpencodeEvent =
   | { type: typeof E.Stalled; sessionId: string }
   | { type: typeof E.Busy; sessionId: string }
   | { type: typeof E.Idle; sessionId: string }
+  | { type: typeof E.Compacted; sessionId: string }
   /** `error` is opencode's error object (`{ name, data }`), absent when opencode gives none. */
   | { type: typeof E.Error; sessionId: string; error: OpencodeError | undefined }
   | {
@@ -180,6 +183,7 @@ const payloadSchema = z.discriminatedUnion('type', [
     }),
   }),
   z.object({ type: z.literal('session.idle'), properties: z.object({ sessionID: z.string() }) }),
+  z.object({ type: z.literal('session.compacted'), properties: z.object({ sessionID: z.string() }) }),
   z.object({
     type: z.literal('session.error'),
     properties: z.object({
@@ -204,6 +208,7 @@ const HANDLED_TYPES: ReadonlySet<string> = new Set([
   'message.part.delta',
   'session.status',
   'session.idle',
+  'session.compacted',
   'session.error',
   'permission.asked',
   'permission.replied',
@@ -278,6 +283,8 @@ export function parseGlobalEvent(raw: unknown): OpencodeEvent | undefined {
     }
     case 'session.idle':
       return { type: E.Idle, sessionId: event.properties.sessionID };
+    case 'session.compacted':
+      return { type: E.Compacted, sessionId: event.properties.sessionID };
     case 'session.error': {
       const { sessionID, error } = event.properties;
       // Errors outside a session (e.g. provider auth at startup) concern no attempt.

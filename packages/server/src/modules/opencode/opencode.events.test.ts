@@ -105,6 +105,15 @@ describe('opencode 全局事件解析', () => {
     expect(failed).toEqual({ type: E.Error, sessionId: 's1', error });
   });
 
+  it('识别 OpenCode 已完成上下文压缩的会话', () => {
+    expect(
+      parseGlobalEvent({
+        directory: '/tmp/aw-repo',
+        payload: { type: 'session.compacted', properties: { sessionID: 's1' } },
+      }),
+    ).toEqual({ type: E.Compacted, sessionId: 's1' });
+  });
+
   it('不消费的事件类型返回 undefined，消费的事件结构不符时报错', () => {
     expect(parseGlobalEvent({ directory: '', payload: { type: 'server.heartbeat', properties: {} } })).toBeUndefined();
     expect(() =>

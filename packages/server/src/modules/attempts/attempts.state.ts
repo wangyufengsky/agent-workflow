@@ -22,7 +22,7 @@ import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { InboxService } from '../inbox/index.ts';
 import type { ModelSlots } from '../model-slots/index.ts';
-import type { ModelRef, OpencodeClient } from '../opencode/index.ts';
+import type { ModelRef, OpencodeClient, OpencodeEvent, OpencodeEventType } from '../opencode/index.ts';
 import { recordTaskEvent } from '../timeline/index.ts';
 import { type Attempt, createAttemptsRepo } from './attempts.repo.ts';
 import type { SessionView } from './attempts.session-view.ts';
@@ -59,6 +59,8 @@ export type LiveSession = {
   browserWaiting: boolean;
   /** The last turn ended and no message was sent since. */
   idle: boolean;
+  /** OpenCode may recover from this error by compacting before the session goes idle. */
+  contextOverflow: Extract<OpencodeEvent, { type: typeof OpencodeEventType.Error }> | null;
   /** Answers to send at the next opportunity (the session was busy, or other questions are still open). */
   pendingAnswers: string[];
   /**
@@ -103,9 +105,9 @@ export function errorOf(err: unknown): ErrorInfo {
   throw err;
 }
 
-export const systemEntry = (event: TranscriptSystemEvent): NewTranscriptEntry => ({
+export const systemEntry = (event: TranscriptSystemEvent, detail?: string): NewTranscriptEntry => ({
   kind: TranscriptEntryKind.System,
-  data: { event },
+  data: { event, ...(detail === undefined ? {} : { detail }) },
 });
 
 /** What the attempt service and its session reactions share: records, live sessions and the transition helper. */
