@@ -1,5 +1,6 @@
 import { createWriteStream } from 'node:fs';
 import { createServer } from 'node:net';
+import { basename } from 'node:path';
 import {
   AppError,
   ErrorCode,
@@ -12,6 +13,7 @@ import {
 import { execa } from 'execa';
 import type { Clock } from '../../core/clock.ts';
 import { host } from '../../core/platform.ts';
+import type { PreviewCommand } from './previews.test-launch.ts';
 
 /** A preview's output: appended to its log file (when it has one) and kept as a tail for the user. */
 export type PreviewLog = {
@@ -63,7 +65,9 @@ export type RunningPreview = {
 
 export type LaunchInput = {
   directory: string;
-  config: ProjectPreview;
+  config: ProjectPreview | { readyPath: string; command: (port: number) => PreviewCommand };
+  onLaunch?: (info: { command: string; readyUrl: string }) => void;
+  onProbe?: (status: number) => void;
   shell: string;
   env: NodeJS.ProcessEnv;
   clock: Clock;
@@ -72,21 +76,35 @@ export type LaunchInput = {
   signal: AbortSignal;
 };
 
-function startFailed(message: string, log: PreviewLog): AppError {
-  return new AppError(ErrorCode.PreviewStartFailed, message, { logTail: log.tail() });
+function startFailed(message: string, log: PreviewLog, readyStatus?: number): AppError {
+  return new AppError(ErrorCode.PreviewStartFailed, message, {
+    logTail: log.tail(),
+    ...(readyStatus === undefined ? {} : { readyStatus }),
+  });
 }
 
 /** Runs a shell command line in the worktree, its output going to the log; null exit code when it was ended. */
-function run(command: string, input: LaunchInput, env: NodeJS.ProcessEnv) {
-  input.log.append(`$ ${command}\n`);
+function show(command: string | PreviewCommand): string {
+  return typeof command === 'string'
+    ? command
+    : [basename(command.executable), ...command.args]
+        .map((value) => (/\s/.test(value) ? JSON.stringify(value) : value))
+        .join(' ');
+}
+
+function run(command: string | PreviewCommand, input: LaunchInput, env: NodeJS.ProcessEnv) {
+  input.log.append(`$ ${show(command)}\n`);
   // Package-manager shell shims can replace a Windows process in the middle of the tree.
   // For simple package commands, use the native launcher. Shell syntax still goes through Git Bash.
-  const direct = host.shellFromGit ? /^(npm|pnpm|yarn|bun)((?: [A-Za-z0-9_.-]+)+)$/.exec(command) : null;
+  const direct =
+    host.shellFromGit && typeof command === 'string'
+      ? /^(npm|pnpm|yarn|bun)((?: [A-Za-z0-9_.-]+)+)$/.exec(command)
+      : null;
   const manager = direct?.[1];
   const args = direct?.[2]?.trim().split(' ') ?? [];
   const executable = manager === undefined ? undefined : host.findExecutable(manager, host.pathDirs(env));
   const options = {
-    cwd: input.directory,
+    cwd: typeof command === 'string' ? input.directory : (command.directory ?? input.directory),
     env,
     extendEnv: false,
     all: true,
@@ -96,13 +114,18 @@ function run(command: string, input: LaunchInput, env: NodeJS.ProcessEnv) {
     killDescendants: true,
   } as const;
   const child =
-    executable === undefined ? execa(command, { ...options, shell: input.shell }) : execa(executable, args, options);
+    typeof command !== 'string'
+      ? execa(command.executable, command.args, options)
+      : executable === undefined
+        ? execa(command, { ...options, shell: input.shell })
+        : execa(executable, args, options);
   child.all.on('data', (chunk: Buffer) => input.log.append(chunk.toString()));
   return child;
 }
 
 /** The setup command (dependency install) a worktree runs before its first start (29 §4.1). */
-export async function setUpPreview(command: string, input: LaunchInput): Promise<void> {
+export async function setUpPreview(command: string | PreviewCommand, input: LaunchInput): Promise<void> {
+  if (input.signal.aborted) throw startFailed('Stopped while preparing', input.log);
   const child = run(command, input, input.env);
   const stop = () => child.kill();
   const cancelTimeout = input.clock.schedule(PREVIEW_SETUP_TIMEOUT_MS, stop);
@@ -114,7 +137,7 @@ export async function setUpPreview(command: string, input: LaunchInput): Promise
 }
 
 /**
- * Starts the dev server on a free port and resolves once its ready path answers with any HTTP response (29 §4.2).
+ * Starts on a free port. Task launchers require a successful HTTP response; configured previews accept any reply (29 §4.2).
  * The path is probed whenever the server writes output and every PREVIEW_PROBE_INTERVAL_MS; the server exiting, or
  * not becoming ready within PREVIEW_START_TIMEOUT_MS (it is ended then), fails with PREVIEW_START_FAILED.
  */
@@ -123,7 +146,16 @@ export async function launchPreview(input: LaunchInput): Promise<RunningPreview>
   if (signal.aborted) throw startFailed('Stopped while starting', log);
 
   const port = await freePort();
-  const child = run(config.command.replaceAll('$PORT', String(port)), input, { ...input.env, PORT: String(port) });
+  if (signal.aborted) throw startFailed('Stopped while starting', log);
+  const command =
+    typeof config.command === 'string' ? config.command.replaceAll('$PORT', String(port)) : config.command(port);
+  const url = `http://127.0.0.1:${port}${config.readyPath}`;
+  input.onLaunch?.({ command: show(command), readyUrl: url });
+  const child = run(command, input, {
+    ...input.env,
+    PORT: String(port),
+    ...(typeof command !== 'string' ? { SERVER_PORT: String(port) } : {}),
+  });
   const exited = child.then(() => undefined);
   const stop = async () => {
     child.kill();
@@ -131,14 +163,28 @@ export async function launchPreview(input: LaunchInput): Promise<RunningPreview>
   };
 
   const { promise: ready, resolve, reject } = Promise.withResolvers<void>();
-  const url = `http://127.0.0.1:${port}${config.readyPath}`;
+  let reason = 'The dev server exited before it was ready';
+  let readyStatus: number | undefined;
   let settled = false;
   let probing = false;
+  const probeController = new AbortController();
   const probe = async () => {
     if (settled || probing) return;
     probing = true;
     try {
-      await fetch(url, { redirect: 'manual' });
+      const response = await fetch(url, { redirect: 'manual', signal: probeController.signal });
+      await response.body?.cancel();
+      if (settled || signal.aborted) return;
+      readyStatus = response.status;
+      input.onProbe?.(readyStatus);
+      if (typeof command !== 'string' && !response.ok) {
+        if (readyStatus >= 500 || readyStatus === 408 || readyStatus === 429) return;
+        reason = `Readiness path returned HTTP ${readyStatus}`;
+        settled = true;
+        child.kill();
+        reject(startFailed(reason, log, readyStatus));
+        return;
+      }
       settled = true;
       resolve();
     } catch {
@@ -154,7 +200,6 @@ export async function launchPreview(input: LaunchInput): Promise<RunningPreview>
   };
   child.all.on('data', () => void probe());
 
-  let reason = 'The dev server exited before it was ready';
   const cancelTimeout = clock.schedule(PREVIEW_START_TIMEOUT_MS, () => {
     reason = `Not ready within ${PREVIEW_START_TIMEOUT_MS} ms`;
     child.kill();
@@ -167,13 +212,17 @@ export async function launchPreview(input: LaunchInput): Promise<RunningPreview>
   void exited.then(() => {
     if (settled) return;
     settled = true;
-    reject(startFailed(reason, log));
+    reject(startFailed(reason, log, readyStatus));
   });
 
   tick();
   try {
     await ready;
+  } catch (error) {
+    await exited;
+    throw error;
   } finally {
+    probeController.abort();
     cancelTick();
     cancelTimeout();
     signal.removeEventListener('abort', abort);

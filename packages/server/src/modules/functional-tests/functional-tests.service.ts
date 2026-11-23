@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import {
   AppError,
   type AttemptDTO,
@@ -7,6 +8,7 @@ import {
   type FunctionalTestCase,
   type FunctionalTestEvent,
   type FunctionalTestExecution,
+  type FunctionalTestLaunch,
   type FunctionalTestPrepare,
   type FunctionalTestProbe,
   type FunctionalTestRead,
@@ -53,10 +55,17 @@ type Deps = {
   filesDirOf: (attempt: AttemptDTO) => string;
 };
 type Phase = (typeof FUNCTIONAL_TEST_NODE)[keyof typeof FUNCTIONAL_TEST_NODE];
+type PreviewLaunchDetails = NonNullable<ReturnType<PreviewsService['launchDetails']>>;
 
 function find<T>(value: T | undefined, message: string): T {
   if (value === undefined) throw new AppError(ErrorCode.NotFound, message);
   return value;
+}
+
+function launchDetail(launch?: FunctionalTestLaunch) {
+  if (launch === undefined) return {};
+  const { directory, source, script, readyPath, profile } = launch;
+  return { launch: { directory, source, script, readyPath, ...(profile === undefined ? {} : { profile }) } };
 }
 
 export function createFunctionalTests({
@@ -75,7 +84,7 @@ export function createFunctionalTests({
   const repo = createFunctionalTestRepo(db, clock, unit);
   const active = new Map<string, { attemptId: string; controller: AbortController; pending: Promise<unknown> }>();
   const ownedPreviews = new Set<string>();
-  const previewLeases = new Set<string>();
+  const previewLeases = new Map<string, PreviewLaunchDetails>();
 
   function context(id: string) {
     const record = task(id);
@@ -108,11 +117,19 @@ export function createFunctionalTests({
     repo.update(taskId, (snapshot) => repo.event(snapshot, event));
   }
 
-  const localReady = (taskId: string) =>
-    previewLeases.has(taskId) && previews.get(taskId).state === PreviewState.Running;
+  const localReady = (taskId: string) => {
+    const lease = previewLeases.get(taskId);
+    return (
+      lease !== undefined &&
+      lease === previews.launchDetails(taskId) &&
+      previews.get(taskId).state === PreviewState.Running
+    );
+  };
   async function release(taskId: string) {
+    const lease = previewLeases.get(taskId);
     if (previewLeases.delete(taskId)) previews.release(taskId);
-    if (ownedPreviews.delete(taskId)) await previews.stop(taskId);
+    if (ownedPreviews.delete(taskId) && (lease === undefined || lease === previews.launchDetails(taskId)))
+      await previews.stop(taskId);
   }
   async function stop(taskId: string) {
     const work = active.get(taskId);
@@ -232,56 +249,81 @@ export function createFunctionalTests({
     return checks;
   }
 
+  /** null means the selected executions used different launchers and need an explicit choice. */
+  function inheritedLaunchFor(taskId: string): FunctionalTestLaunch | null | undefined {
+    const origin = rerunOrigin(taskId);
+    if (origin === undefined || !context(origin.taskId).scope.target.startsWith('/')) return undefined;
+    const source = repo.get(origin.taskId);
+    const selected = new Set(origin.executionIds);
+    const runIds = new Set(source.executions.filter(({ id }) => selected.has(id)).map(({ runId }) => runId));
+    let chosen: FunctionalTestLaunch | undefined;
+    for (const run of source.runs) {
+      const launch = run.environment.launch;
+      if (!runIds.has(run.id) || launch === undefined) continue;
+      if (chosen !== undefined && !isDeepStrictEqual(chosen, launch)) return null;
+      chosen = launch;
+    }
+    return chosen;
+  }
+
   function prepare(
     attempt: AttemptDTO,
-    { checks }: FunctionalTestPrepare,
+    { checks, launch: requestedLaunch }: FunctionalTestPrepare,
     request: AbortSignal | undefined,
   ): Promise<FunctionalTestRun> {
     const { taskId, scope, record } = resolve(attempt, [
       FUNCTIONAL_TEST_NODE.Environment,
       FUNCTIONAL_TEST_NODE.Execute,
     ]);
+    const local = scope.target.startsWith('/');
+    if (!local && requestedLaunch !== undefined)
+      throw new AppError(ErrorCode.ValidationFailed, 'A launch configuration is only allowed for a local test');
     if (checks !== undefined && new Set(checks.map(({ key }) => key)).size !== checks.length)
       throw new AppError(ErrorCode.ValidationFailed, 'Readiness check keys must be unique');
     return perform(taskId, attempt, request, async (signal) => {
       const snapshot = repo.get(taskId);
       const previous = snapshot.runs.at(-1);
+      const hasEvidence = snapshot.executions.length > 0 || snapshot.reports.length > 0;
+      const previousLaunch = previous?.environment.launch;
+      const inheritedLaunch =
+        local && (previousLaunch === undefined || requestedLaunch !== undefined)
+          ? inheritedLaunchFor(taskId)
+          : undefined;
+      const launch = requestedLaunch ?? previousLaunch ?? inheritedLaunch ?? undefined;
       const inherited = inheritedChecksFor(taskId, snapshot);
-      const needsFreshProbes = inherited.some(
-        (check) =>
-          !previous?.environment.checks.some(
-            (observed) =>
-              observed.key === check.key &&
-              observed.path === check.path &&
-              observed.expectedStatus === check.expectedStatus,
-          ),
-      );
-      const definitions = new Map<string, FunctionalTestProbe>(
-        (previous?.environment.checks ?? []).map((check) => [check.key, check]),
-      );
+      const previousChecks = previous?.environment.checks ?? [];
+      const definitions = new Map<string, FunctionalTestProbe>(previousChecks.map((check) => [check.key, check]));
       for (const check of checks ?? []) definitions.set(check.key, check);
       for (const check of inherited) definitions.set(check.key, check);
-      if (
-        previous !== undefined &&
-        !needsFreshProbes &&
-        (!previous.environment.ready || !scope.target.startsWith('/') || localReady(taskId))
-      )
-        return previous;
+      const checksChanged =
+        definitions.size !== previousChecks.length ||
+        previousChecks.some(({ key, path, expectedStatus }) => {
+          const current = definitions.get(key);
+          return current?.path !== path || current?.expectedStatus !== expectedStatus;
+        });
+      const reusable = previous?.environment.ready && !checksChanged && (!local || localReady(taskId));
+      if (reusable && isDeepStrictEqual(previousLaunch, launch)) return previous;
+
       const id = previous?.id ?? randomUUID();
       const baseline = record.git.baseCommit;
-      const local = scope.target.startsWith('/');
+      const launchFields = launchDetail(launch);
+      let effectiveLaunch = launchDetail(previousLaunch);
       const probes: FunctionalTestRun['environment']['checks'] = [];
       let target = scope.target;
       let logTail = '';
       let reason: string | null = null;
       let verified = false;
-      emit(taskId, {
-        runId: id,
-        kind: 'environment',
-        message: local ? '启动项目配置的测试服务' : '连接已授权的测试入口',
-        detail: {},
-      });
+      let startAttempted = false;
+      let launchEvidence: Awaited<ReturnType<PreviewsService['resolveTestLaunch']>> | undefined;
+      let runtimeDetails: PreviewLaunchDetails | undefined;
+      let readyUrl: string | undefined;
+      let readyStatus: number | undefined;
       try {
+        if (launch === undefined && inheritedLaunch === null)
+          throw new AppError(
+            ErrorCode.ValidationFailed,
+            'Selected runs used different launch configurations; choose one for this retest',
+          );
         if (local) {
           const path = find(record.git.worktreePath ?? undefined, 'Test worktree is unavailable');
           const head = (await runGit(['rev-parse', 'HEAD'], { cwd: path })).stdout.trim();
@@ -290,25 +332,85 @@ export function createFunctionalTests({
               ErrorCode.StateTransitionInvalid,
               'The test worktree differs from the selected baseline',
             );
+          if (launch !== undefined) launchEvidence = await previews.resolveTestLaunch(taskId, launch);
+          effectiveLaunch = launchDetail(launchEvidence);
+        }
+        const launchChanged = previous !== undefined && !isDeepStrictEqual(previousLaunch, effectiveLaunch.launch);
+        if (launchChanged && hasEvidence)
+          throw new AppError(
+            ErrorCode.StateTransitionInvalid,
+            'The launch cannot change after test evidence has been recorded',
+          );
+        if (reusable && !launchChanged) return previous;
+        signal.throwIfAborted();
+        const changedInheritedLaunch =
+          inheritedLaunch != null &&
+          requestedLaunch !== undefined &&
+          !isDeepStrictEqual(inheritedLaunch, effectiveLaunch.launch);
+        emit(taskId, {
+          runId: id,
+          kind: 'environment',
+          message: !local
+            ? '连接已授权的测试入口'
+            : launch === undefined
+              ? '启动项目配置的测试服务'
+              : changedInheritedLaunch
+                ? '复测使用修复版本上明确选择的启动配置'
+                : inheritedLaunch != null && previousLaunch === undefined
+                  ? '按来源配置启动并重新核实复测环境'
+                  : '按本任务的启动配置准备测试服务',
+          detail: {
+            ...effectiveLaunch,
+            ...(changedInheritedLaunch
+              ? {
+                  originalLaunch: launchDetail(inheritedLaunch).launch ?? null,
+                  baseline,
+                }
+              : {}),
+          },
+        });
+        if (local) {
+          if (launchChanged && localReady(taskId)) {
+            if (!ownedPreviews.has(taskId) || previews.leaseCount(taskId) > 1)
+              throw new AppError(
+                ErrorCode.StateTransitionInvalid,
+                'The active preview is shared and cannot be replaced',
+              );
+            await release(taskId);
+          }
           signal.throwIfAborted();
           if (previewLeases.has(taskId) && !localReady(taskId)) await release(taskId);
           const state = previews.get(taskId).state;
           if (state !== PreviewState.Running && state !== PreviewState.Starting) ownedPreviews.add(taskId);
-          const preview = await previews.start(taskId, { queue: signal, filterLog: redactText });
+          startAttempted = true;
+          const preview = await previews.start(taskId, {
+            queue: signal,
+            filterLog: redactText,
+            ...(launch === undefined ? {} : { launch }),
+          });
+          runtimeDetails = find(previews.launchDetails(taskId), 'Preview has no launch details');
           signal.throwIfAborted();
           if (!previewLeases.has(taskId)) {
             previews.acquire(taskId);
-            previewLeases.add(taskId);
+            previewLeases.set(taskId, runtimeDetails);
           }
           target = new URL(scope.target, find(preview.url ?? undefined, 'Preview has no URL')).href;
           logTail = redactText(preview.logTail);
           verified = true;
         }
         const url = new URL(target);
-        const probe = await scopedRequest(url, { method: 'GET', signal }, { origin: url.origin, writes: scope.writes });
-        await probe.body?.cancel();
-        if (!probe.ok && probe.status !== 401 && probe.status !== 403)
-          reason = `测试入口就绪检查返回 HTTP ${probe.status}`;
+        // The launcher itself verifies a task-specific readiness endpoint. The business URL can intentionally return 404.
+        if (launch !== undefined) {
+          readyUrl = find(runtimeDetails?.readyUrl, 'Preview has no readiness address');
+          readyStatus = find(runtimeDetails?.readyStatus, 'Preview has no readiness observation');
+        } else {
+          readyUrl = url.href;
+          const probe = await scopedRequest(url, { method: 'GET', signal }, { origin: url.origin, writes: [] });
+          readyStatus = probe.status;
+          await probe.body?.cancel();
+          if (!probe.ok && probe.status !== 401 && probe.status !== 403)
+            reason = `测试环境就绪检查返回 HTTP ${probe.status}`;
+        }
         for (const check of definitions.values()) {
           signal.throwIfAborted();
           let status: number | null = null;
@@ -335,8 +437,28 @@ export function createFunctionalTests({
       } catch (error) {
         if (!(error instanceof AppError || error instanceof TypeError || error instanceof DOMException)) throw error;
         reason = redactText(error.message);
-        if (local) logTail = redactText(previews.get(taskId).logTail);
+        if (local && startAttempted) {
+          const attempted = previews.launchDetails(taskId);
+          if (attempted !== undefined && isDeepStrictEqual(attempted.evidence, launchEvidence)) {
+            runtimeDetails ??= attempted;
+            readyStatus ??= attempted.readyStatus;
+            logTail = redactText(previews.get(taskId).logTail);
+          }
+        }
+        if (local && !startAttempted && (previous?.environment.ready || hasEvidence)) {
+          // A rejected proposal on a prepared run is evidence about that proposal, not the existing service.
+          emit(taskId, {
+            runId: id,
+            kind: 'environment',
+            message: reason,
+            detail: { reason, ...launchFields },
+          });
+          throw error;
+        }
       }
+      const observedUrl = readyUrl ?? runtimeDetails?.readyUrl;
+      // A proposal rejected during validation remains in the activity log, leaving recovery on its last accepted launcher.
+      const persistedLaunch = startAttempted ? effectiveLaunch : launchDetail(previousLaunch);
       const run = {
         id,
         createdAt: previous?.createdAt ?? clock.now(),
@@ -349,6 +471,12 @@ export function createFunctionalTests({
           reason,
           logTail,
           checks: probes,
+          ...persistedLaunch,
+          ...(runtimeDetails === undefined ? {} : { command: redactText(runtimeDetails.command) }),
+          ...(observedUrl === undefined
+            ? {}
+            : { readyUrl: redactText(observedUrl.split(/[?#]/, 1)[0] ?? observedUrl) }),
+          ...(readyStatus === undefined ? {} : { readyStatus }),
         },
       };
       repo.update(taskId, (snapshot) => {
@@ -359,7 +487,7 @@ export function createFunctionalTests({
           runId: id,
           kind: 'environment',
           message: reason ?? '测试环境已就绪',
-          detail: run.environment,
+          detail: { ...run.environment, ...(!startAttempted ? launchFields : {}) },
         });
       });
       if (reason !== null) await release(taskId);
@@ -628,7 +756,7 @@ export function createFunctionalTests({
       }
     },
     async stopAll() {
-      await Promise.allSettled([...new Set([...active.keys(), ...ownedPreviews, ...previewLeases])].map(stop));
+      await Promise.allSettled([...new Set([...active.keys(), ...ownedPreviews, ...previewLeases.keys()])].map(stop));
     },
   };
 }

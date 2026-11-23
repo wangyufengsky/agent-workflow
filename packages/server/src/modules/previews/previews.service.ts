@@ -1,8 +1,10 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import {
   AppError,
   ErrorCode,
+  type FunctionalTestLaunch,
   type Preview,
   PreviewEvent,
   PreviewState,
@@ -22,11 +24,13 @@ import type { SettingsService } from '../settings/index.ts';
 import type { WorktreesService } from '../worktrees/index.ts';
 import {
   createPreviewLog,
+  type LaunchInput,
   launchPreview,
   type PreviewLog,
   type RunningPreview,
   setUpPreview,
 } from './previews.process.ts';
+import { type ResolvedTestLaunch, resolveTestLaunch, type TestLaunchEvidence } from './previews.test-launch.ts';
 
 export type PreviewsServiceDeps = {
   clock: Clock;
@@ -52,7 +56,11 @@ type Entry = {
   leases: number;
   idleSince: number;
   cancelIdle: () => void;
+  evidence: TestLaunchEvidence | undefined;
+  launchDetails: PreviewLaunchDetails | undefined;
 };
+
+type PreviewLaunchDetails = { command: string; readyUrl: string; readyStatus?: number; evidence?: TestLaunchEvidence };
 
 type PreviewLaunch = { directory: string; preview: ProjectPreview };
 
@@ -70,8 +78,8 @@ export function createPreviewsService({
   dataDir,
 }: PreviewsServiceDeps) {
   const entries = new Map<string, Entry>();
-  /** Worktrees whose setup command succeeded since the app started. */
-  const setUp = new Set<string>();
+  /** 成功执行过的安装命令，按工作区及安装目录、命令区分。 */
+  const setUp = new Map<string, Set<string>>();
   /** Tasks whose preview became ready at least once since the app started (29 §7.4). */
   const ran = new Set<string>();
   /** Page checks waiting for room under the limit (29 §4.4); woken when a preview stops or a tab lets go of one. */
@@ -123,9 +131,12 @@ export function createPreviewsService({
    * Under `preview.maxRunning` (29 §4.4): the longest-idle preview without tabs stops to make room. When every one
    * is in use, `queue` waits for room (a page check) until it aborts; otherwise PREVIEW_LIMIT_REACHED.
    */
+  const activeOthers = (taskId: string) =>
+    [...entries.values()].filter((e) => e.taskId !== taskId && ACTIVE.includes(e.state));
+
   async function makeRoom(taskId: string, queue: AbortSignal | undefined): Promise<void> {
     for (;;) {
-      const active = [...entries.values()].filter((e) => e.taskId !== taskId && ACTIVE.includes(e.state));
+      const active = activeOthers(taskId);
       if (active.length < settings.get('preview.maxRunning')) return;
       const idle = active
         .filter((e) => e.state === PreviewState.Running && e.leases === 0)
@@ -148,7 +159,7 @@ export function createPreviewsService({
   async function launch(
     entry: Entry,
     worktreePath: string,
-    { directory, preview: config }: PreviewLaunch,
+    config: PreviewLaunch | ResolvedTestLaunch,
     filterLog?: (text: string) => string,
   ): Promise<Preview> {
     const taskRuns = join(dataDir, 'runs', entry.taskId);
@@ -157,18 +168,32 @@ export function createPreviewsService({
     const previewLog = createPreviewLog(join(taskRuns, 'preview.log'), filterLog);
     entry.log = previewLog;
     try {
-      const input = {
-        directory,
-        config,
+      const explicit = 'evidence' in config;
+      const input: LaunchInput = {
+        directory: config.directory,
+        config: explicit ? { readyPath: config.evidence.readyPath, command: config.command } : config.preview,
         shell: await locateShell(env),
-        env,
+        env: explicit ? config.env : env,
         clock,
         log: previewLog,
+        onLaunch(details) {
+          entry.launchDetails = { ...details, ...(explicit ? { evidence: config.evidence } : {}) };
+        },
+        onProbe(status) {
+          // 保持同一个描述对象，租约使用其身份识别服务是否被替换。
+          if (entry.launchDetails !== undefined) entry.launchDetails.readyStatus = status;
+        },
         signal: entry.abort.signal,
       };
-      if (config.setupCommand !== null && !setUp.has(worktreePath)) {
-        await setUpPreview(config.setupCommand, input);
-        setUp.add(worktreePath);
+      const setup = explicit ? config.setup : (config.preview.setupCommand ?? undefined);
+      const setupKeys = setUp.get(worktreePath) ?? new Set<string>();
+      if (setup !== undefined) {
+        const key = JSON.stringify([config.directory, setup]);
+        if (!setupKeys.has(key)) {
+          await setUpPreview(setup, input);
+          setupKeys.add(key);
+          setUp.set(worktreePath, setupKeys);
+        }
       }
       const running = await launchPreview(input);
       if (entry.state !== PreviewState.Starting) {
@@ -232,16 +257,37 @@ export function createPreviewsService({
     });
   }
 
-  async function configuration(taskId: string): Promise<ProjectPreview> {
+  function readyWorktree(taskId: string) {
     const worktree = worktrees.findByTask(taskId);
     if (worktree?.status !== WorktreeStatus.Ready)
       throw new AppError(ErrorCode.StateTransitionInvalid, 'The task has no worktree to preview', { taskId });
-    return (await resolveConfiguration(taskId, worktree)).preview;
+    return worktree;
+  }
+
+  async function configuration(taskId: string): Promise<ProjectPreview> {
+    return (await resolveConfiguration(taskId, readyWorktree(taskId))).preview;
+  }
+
+  function activePreview(taskId: string, expected?: TestLaunchEvidence): Promise<Preview> | undefined {
+    const entry = entries.get(taskId);
+    if (entry === undefined || (!entry.starting && entry.state !== PreviewState.Running)) return undefined;
+    if (expected !== undefined && !isDeepStrictEqual(expected, entry.evidence))
+      throw new AppError(
+        ErrorCode.StateTransitionInvalid,
+        'A preview is already using a different launch configuration',
+        { taskId },
+      );
+    return entry.starting ?? Promise.resolve(toPreview(taskId, entry));
   }
 
   return {
     configuration,
     isFrontend,
+    async resolveTestLaunch(taskId: string, launch: FunctionalTestLaunch) {
+      return (await resolveTestLaunch(readyWorktree(taskId), launch, env)).evidence;
+    },
+    launchDetails: (taskId: string): PreviewLaunchDetails | undefined => entries.get(taskId)?.launchDetails,
+    leaseCount: (taskId: string): number => entries.get(taskId)?.leases ?? 0,
     projectOf(taskId: string): string {
       const worktree = worktrees.findByTask(taskId);
       if (worktree === undefined || worktree.status !== WorktreeStatus.Ready) {
@@ -264,24 +310,36 @@ export function createPreviewsService({
      */
     async start(
       taskId: string,
-      { queue, filterLog }: { queue?: AbortSignal; filterLog?: (text: string) => string } = {},
+      {
+        queue,
+        filterLog,
+        launch: proposed,
+      }: {
+        queue?: AbortSignal;
+        filterLog?: (text: string) => string;
+        launch?: FunctionalTestLaunch;
+      } = {},
     ): Promise<Preview> {
-      let existing = entries.get(taskId);
-      if (existing?.state === PreviewState.Running) return toPreview(taskId, existing);
-      if (existing?.starting !== null && existing?.starting !== undefined) return existing.starting;
-      const worktree = worktrees.findByTask(taskId);
-      if (worktree?.status !== WorktreeStatus.Ready) {
-        throw new AppError(ErrorCode.StateTransitionInvalid, 'The task has no worktree to preview', {
-          entity: 'preview',
-          taskId,
-        });
+      if (proposed === undefined) {
+        const prior = activePreview(taskId);
+        if (prior !== undefined) return prior;
       }
-      const preview = await resolveConfiguration(taskId, worktree);
-      await makeRoom(taskId, queue);
-      existing = entries.get(taskId);
-      if (existing?.state === PreviewState.Running) return toPreview(taskId, existing);
-      if (existing?.starting !== null && existing?.starting !== undefined) return existing.starting;
-      const entry: Entry = existing ?? {
+      const worktree = readyWorktree(taskId);
+      const preview =
+        proposed === undefined
+          ? await resolveConfiguration(taskId, worktree)
+          : await resolveTestLaunch(worktree, proposed, env);
+      const evidence = 'evidence' in preview ? preview.evidence : undefined;
+      const prior = activePreview(taskId, evidence);
+      if (prior !== undefined) return prior;
+      for (;;) {
+        await makeRoom(taskId, queue);
+        queue?.throwIfAborted();
+        const queued = activePreview(taskId, evidence);
+        if (queued !== undefined) return queued;
+        if (activeOthers(taskId).length < settings.get('preview.maxRunning')) break;
+      }
+      const entry: Entry = entries.get(taskId) ?? {
         taskId,
         state: PreviewState.Stopped,
         log: null,
@@ -291,7 +349,11 @@ export function createPreviewsService({
         leases: 0,
         idleSince: clock.now(),
         cancelIdle: () => {},
+        evidence: undefined,
+        launchDetails: undefined,
       };
+      entry.evidence = evidence;
+      entry.launchDetails = undefined;
       entries.set(taskId, entry);
       move(entry, PreviewEvent.Start);
       entry.abort = new AbortController();

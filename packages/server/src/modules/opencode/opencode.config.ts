@@ -308,7 +308,7 @@ export function sessionPermissionRules(
         action: 'allow' as const,
         pattern: '*',
       })),
-      ...(functionalTestNode === FUNCTIONAL_TEST_NODE.Author
+      ...(functionalTestNode === FUNCTIONAL_TEST_NODE.Author || functionalTestNode === FUNCTIONAL_TEST_NODE.Environment
         ? (['read', 'glob', 'grep'] as const).map((permission) => ({
             permission,
             action: 'allow' as const,

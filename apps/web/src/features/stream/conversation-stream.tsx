@@ -45,7 +45,15 @@ function Prompt({ text }: { text: string }) {
   );
 }
 
-const Item = memo(function Item({ item, pro }: { item: StreamItem; pro: boolean }) {
+const Item = memo(function Item({
+  item,
+  pro,
+  expandActions,
+}: {
+  item: StreamItem;
+  pro: boolean;
+  expandActions: boolean;
+}) {
   switch (item.kind) {
     case 'text':
       return (
@@ -56,9 +64,9 @@ const Item = memo(function Item({ item, pro }: { item: StreamItem; pro: boolean 
     case 'thinking':
       return <ThinkingBlock text={item.text} seconds={item.seconds} writing={item.writing} />;
     case 'action':
-      return <ActionBar item={item} pro={pro} />;
+      return <ActionBar item={item} pro={pro || expandActions} />;
     case 'group':
-      return <ActionGroup actions={item.actions} pro={pro} />;
+      return <ActionGroup actions={item.actions} pro={pro || expandActions} />;
     case 'prompt':
       return <Prompt text={item.text} />;
     case 'wait':
@@ -134,6 +142,7 @@ function Box({
   meta,
   actions,
   pro,
+  expandActions = false,
   size,
   testId,
   foldOnEnd,
@@ -214,7 +223,7 @@ function Box({
             <StreamAttemptContext.Provider value={attempt.id}>
               {items.map((item) => (
                 <div key={item.key} className={styles.item} data-enter={!initial.has(item.key)}>
-                  <Item item={item} pro={pro} />
+                  <Item item={item} pro={pro} expandActions={expandActions} />
                 </div>
               ))}
             </StreamAttemptContext.Provider>
@@ -236,6 +245,7 @@ type StreamProps = {
   /** Buttons beside the header (abort). */
   actions?: ReactNode;
   pro: boolean;
+  expandActions?: boolean;
   size: StreamSize;
   testId?: string;
   /** Folds as soon as the attempt ends, even while watched (the knowledge research card once answered, 18 §2.1). */

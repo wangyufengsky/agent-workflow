@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -24,7 +24,7 @@ import {
   TaskStatus,
 } from '@aw/shared';
 import { expect, it } from 'vitest';
-import { script } from '../../../test/fakes/fake-opencode.ts';
+import { createFakeOpencode, script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
@@ -245,7 +245,14 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
     });
     const environment = next(FUNCTIONAL_TEST_NODE.Environment);
     await must(author, McpToolName.SubmitResult, { summary: '已保存用例' });
+    const refused = await call(environment, McpToolName.TestEnvironmentPrepare, {
+      launch: { directory: '.', source: 'package.json', script: 'dev', readyPath: '/' },
+    });
+    expect(refused.body).toMatchObject({ code: ErrorCode.ValidationFailed });
+    expect((await t.call(functionalTestReadOp, { taskId })).body.runs).toEqual([]);
     const run = await must(environment, McpToolName.TestEnvironmentPrepare, { checks: [probe] });
+    expect(run.environment).toMatchObject({ verified: false, readyStatus: 200 });
+    expect(run.environment).not.toHaveProperty('launch');
     const execute = next(FUNCTIONAL_TEST_NODE.Execute);
     await must(environment, McpToolName.SubmitResult, { summary: '测试环境可达' });
     const params = { runId: run.id, caseId: first.id, version: 1, executionId: 'v1' };
@@ -477,6 +484,246 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
     await testApp?.close();
     app.close();
     outside.close();
+  }
+});
+
+it('本地任务按已提交的脚本启动，用独立就绪地址探测，并在重启后恢复所保存的启动配置', async () => {
+  const fake = createFakeOpencode();
+  let t = await createTestApp({ fake });
+  let mcp = await connectMcp(t.mcpUrl, t.app.mcpToken);
+  try {
+    const server = `import { createServer } from 'node:http';
+createServer((req, res) => {
+  if (req.url === '/ready') res.writeHead(204).end();
+  else if (req.url === '/ready-next') res.end(String(process.pid));
+  else res.writeHead(404).end('订单不存在');
+}).listen(Number(process.env.PORT), '127.0.0.1');`;
+    const { project, repo } = await addProject(t, {
+      files: {
+        'orders/package.json': JSON.stringify({ name: 'orders-fixture', scripts: { dev: 'node server.mjs' } }),
+        'orders/server.mjs': server,
+      },
+    });
+    const created = await t.call(createTaskOp, {
+      projectId: project.id,
+      workflowId: await workflowId(t, FUNCTIONAL_TEST_WORKFLOW_KEY),
+      requirement: '验证不存在的订单返回 404',
+      functionalTest: { target: '/orders', writes: [], caseAttachmentIds: [] },
+      start: false,
+    });
+    expect(created.status).toBe(201);
+    const taskId = created.body.id;
+    const stage = (key: string) =>
+      waitForEvent(
+        t.app.events,
+        ServerEventType.AttemptUpdated,
+        ({ attempt, nodeId, taskId: id }) =>
+          id === taskId &&
+          attempt.status === AttemptStatus.Running &&
+          t.app.services.tasks.detail(taskId).nodes.some((node) => node.id === nodeId && node.key === key),
+      );
+    const call = (attemptId: string, tool: McpToolName, args: Record<string, unknown> = {}) =>
+      callTool(mcp, tool, { ...args, [MCP_SESSION_ARG]: t.app.services.attempts.get(attemptId).opencodeSessionId });
+    const must = async (attemptId: string, tool: McpToolName, input?: Record<string, unknown>) => {
+      const result = await call(attemptId, tool, input);
+      expect(result.isError, JSON.stringify(result.body)).toBe(false);
+      return result.body;
+    };
+    const prepare = async (attemptId: string, input?: Record<string, unknown>) =>
+      functionalTestRunSchema.parse(await must(attemptId, McpToolName.TestEnvironmentPrepare, input));
+
+    fake.enqueue(script().hang());
+    const author = stage(FUNCTIONAL_TEST_NODE.Author);
+    await t.call(startTaskOp, { id: taskId });
+    const authorId = (await author).attempt.id;
+    const testCase = await must(authorId, McpToolName.TestCaseSave, {
+      title: '不存在的订单',
+      requirement: '不存在的订单返回 404',
+      steps: [
+        {
+          kind: 'http',
+          title: '读取订单',
+          method: 'GET',
+          path: '/orders',
+          assertions: [{ field: 'status', equals: 404, basis: '夹具契约' }],
+        },
+      ],
+    });
+    const failedCase = await must(authorId, McpToolName.TestCaseSave, {
+      title: '订单应可读取',
+      requirement: '指定订单返回 200',
+      steps: [
+        {
+          kind: 'http',
+          title: '读取订单',
+          method: 'GET',
+          path: '/orders',
+          assertions: [{ field: 'status', equals: 200, basis: '夹具契约' }],
+        },
+      ],
+    });
+    fake.enqueue(script().hang());
+    const environment = stage(FUNCTIONAL_TEST_NODE.Environment);
+    await must(authorId, McpToolName.SubmitResult, { summary: '已保存用例' });
+    const prepId = (await environment).attempt.id;
+
+    const launch = { directory: 'orders', source: 'orders/package.json', script: 'dev', readyPath: '/ready' };
+    const unsupported = { ...launch, script: 'unknown-script' };
+    const invalidLaunch = await prepare(prepId, { launch: unsupported });
+    expect(invalidLaunch.environment).toMatchObject({
+      ready: false,
+      reason: expect.stringContaining('committed service script'),
+      logTail: '',
+    });
+    expect(invalidLaunch.environment).not.toHaveProperty('launch');
+    expect(invalidLaunch.environment).not.toHaveProperty('command');
+    expect(invalidLaunch.environment).not.toHaveProperty('readyStatus');
+    const invalidProbe = await prepare(prepId, { launch: { ...launch, readyPath: '/not-ready' } });
+    expect(invalidProbe.environment).toMatchObject({
+      ready: false,
+      readyStatus: 404,
+      reason: expect.stringContaining('HTTP 404'),
+      command: expect.stringContaining('run dev'),
+      readyUrl: expect.stringMatching(/\/not-ready$/),
+    });
+    const ready = await prepare(prepId, { launch });
+    expect(ready.id).toBe(invalidProbe.id);
+    expect(ready.id).toBe(invalidLaunch.id);
+    expect(ready.environment).toMatchObject({
+      launch,
+      ready: true,
+      readyStatus: 204,
+      verified: true,
+      reason: null,
+      command: expect.stringContaining('run dev'),
+      readyUrl: expect.stringMatching(/\/ready$/),
+    });
+    expect((await fetch(ready.environment.target)).status).toBe(404);
+    expect(await prepare(prepId, { launch })).toEqual(ready);
+
+    const rejected = await call(prepId, McpToolName.TestEnvironmentPrepare, { launch: unsupported });
+    expect(rejected.body).toMatchObject({ code: ErrorCode.ValidationFailed });
+    const afterRejection = (await t.call(functionalTestReadOp, { taskId })).body;
+    expect(afterRejection.runs).toEqual([ready]);
+    expect(afterRejection.events.at(-1)?.detail).toEqual({
+      launch: unsupported,
+      reason: expect.stringContaining('committed service script'),
+    });
+    expect(await prepare(prepId)).toEqual(ready);
+
+    const changed = { ...launch, readyPath: '/ready-next' };
+    t.app.services.previews.acquire(taskId);
+    try {
+      const blocked = await call(prepId, McpToolName.TestEnvironmentPrepare, { launch: changed });
+      expect(blocked.body).toMatchObject({ code: ErrorCode.StateTransitionInvalid });
+      expect(await prepare(prepId)).toEqual(ready);
+    } finally {
+      t.app.services.previews.release(taskId);
+    }
+    const updated = await prepare(prepId, { launch: changed });
+    expect(updated.environment).toMatchObject({ launch: changed, ready: true, readyStatus: 200 });
+    expect(updated.id).toBe(ready.id);
+    const originalPid = await (await fetch(updated.environment.readyUrl ?? '')).text();
+
+    await mcp.close();
+    const { dataDir } = t;
+    await t.close();
+    fake.enqueue(script().hang());
+    t = await createTestApp({ dataDir, fake });
+    mcp = await connectMcp(t.mcpUrl, t.app.mcpToken);
+    const active = t.app.services.tasks
+      .detail(taskId)
+      .activeAttempts.find(({ status }) => status === AttemptStatus.Running);
+    const recovered = active ?? (await stage(FUNCTIONAL_TEST_NODE.Environment)).attempt;
+    const restored = await prepare(recovered.id);
+    expect(restored.id).toBe(updated.id);
+    expect(restored.environment).toMatchObject({ launch: changed, ready: true, readyStatus: 200 });
+    expect(await (await fetch(restored.environment.readyUrl ?? '')).text()).not.toBe(originalPid);
+    expect((await t.call(functionalTestReadOp, { taskId })).body.runs).toEqual([restored]);
+
+    fake.enqueue(script().hang());
+    const execute = stage(FUNCTIONAL_TEST_NODE.Execute);
+    await must(recovered.id, McpToolName.SubmitResult, { summary: '已恢复测试环境' });
+    const executeId = (await execute).attempt.id;
+    const result = await must(executeId, McpToolName.TestCaseRun, {
+      runId: restored.id,
+      caseId: testCase.id,
+      version: 1,
+      executionId: 'missing-order',
+    });
+    expect(result.status).toBe('passed');
+    const frozen = await call(executeId, McpToolName.TestEnvironmentPrepare, { launch });
+    expect(frozen.body).toMatchObject({ code: ErrorCode.StateTransitionInvalid });
+    const failureId = 'order-defect';
+    const failed = await must(executeId, McpToolName.TestCaseRun, {
+      runId: restored.id,
+      caseId: failedCase.id,
+      version: 1,
+      executionId: failureId,
+    });
+    expect(failed.status).toBe('failed');
+
+    const selection = { taskId, executionIds: [failureId] };
+    fake.enqueue(script().hang(), { title: '定位根因' });
+    const repairReady = waitForEvent(
+      t.app.events,
+      ServerEventType.TaskUpdated,
+      (value) => value.workflow.key === 'bugfix' && value.status === TaskStatus.Running,
+    );
+    const repair = await t.call(functionalTestRepairOp, selection);
+    expect(repair.status).toBe(200);
+    expect((await repairReady).id).toBe(repair.body.taskId);
+    const repairDir = t.app.services.tasks.detail(repair.body.taskId).git.worktreePath;
+    if (repairDir === null) throw new Error('Expected repair worktree');
+    const fixedServer = server.replace(
+      "else res.writeHead(404).end('订单不存在');",
+      "else if (req.url === '/verify-fix') res.writeHead(204).end(); else res.end('已修复');",
+    );
+    await writeFile(join(repairDir, 'orders/server.mjs'), fixedServer);
+    await repo.git('-C', repairDir, 'commit', '-am', '修复读取订单');
+    const fixed = await repo.git('-C', repairDir, 'rev-parse', 'HEAD');
+
+    fake.enqueue(script().hang(), { title: '准备环境' });
+    const rerunStage = waitForEvent(
+      t.app.events,
+      ServerEventType.AttemptUpdated,
+      ({ attempt, taskId: id, nodeId }) =>
+        id !== null &&
+        id !== taskId &&
+        attempt.status === AttemptStatus.Running &&
+        t.app.services.tasks
+          .detail(id)
+          .nodes.some((node) => node.id === nodeId && node.key === FUNCTIONAL_TEST_NODE.Environment),
+    );
+    const rerun = await t.call(functionalTestRerunOp, { ...selection, ref: fixed });
+    expect(rerun.status).toBe(200);
+    const rerunAttempt = await rerunStage;
+    expect(rerunAttempt.taskId).toBe(rerun.body.taskId);
+    const inherited = await prepare(rerunAttempt.attempt.id);
+    expect(inherited.id).not.toBe(restored.id);
+    expect(inherited.environment).toMatchObject({
+      launch: changed,
+      baseline: fixed,
+      ready: true,
+      verified: true,
+      readyStatus: 200,
+    });
+    expect(inherited.environment.readyUrl).not.toBe(restored.environment.readyUrl);
+    expect(await (await fetch(inherited.environment.target)).text()).toBe('已修复');
+
+    const replacement = { ...changed, readyPath: '/verify-fix' };
+    const checked = await prepare(rerunAttempt.attempt.id, { launch: replacement });
+    expect(checked.environment).toMatchObject({ launch: replacement, baseline: fixed, ready: true, readyStatus: 204 });
+    const rerunRead = (await t.call(functionalTestReadOp, { taskId: rerun.body.taskId })).body;
+    expect(rerunRead.events).toContainEqual(
+      expect.objectContaining({
+        kind: 'environment',
+        detail: { launch: replacement, originalLaunch: changed, baseline: fixed },
+      }),
+    );
+  } finally {
+    await mcp.close();
+    await t.close();
   }
 });
 

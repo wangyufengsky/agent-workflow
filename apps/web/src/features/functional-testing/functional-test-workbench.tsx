@@ -22,6 +22,7 @@ import { usePlacedTab } from '../preview/use-placed-tab.ts';
 import { CaseDefinition } from './case-definition.tsx';
 import styles from './functional-test.module.css';
 import { FunctionalTestScopeSummary } from './functional-test-fields.tsx';
+import { TestEnvironment } from './test-environment.tsx';
 import { type EvidenceSelection, revisionsFor, TestExecution } from './test-execution.tsx';
 import { TestReport } from './test-report.tsx';
 
@@ -45,11 +46,19 @@ const phaseIcon: Record<FunctionalTestNode, IconName> = {
 
 const terminalNodes: readonly NodeStatus[] = [NodeStatus.Done, NodeStatus.Skipped, NodeStatus.Cancelled];
 
-function PhaseActivity({ task, nodeId }: { task: TaskDetailDTO; nodeId: string | undefined }) {
+function PhaseActivity({
+  task,
+  nodeId,
+  expandActions = false,
+}: {
+  task: TaskDetailDTO;
+  nodeId: string | undefined;
+  expandActions?: boolean;
+}) {
   if (nodeId === undefined) return null;
   return (
-    <aside className={`${styles.panel} ${styles.phaseActivity}`}>
-      <FrontendActivity task={task} nodeId={nodeId} inMain={false} starting={false} />
+    <aside className={`${styles.panel} ${styles.phaseActivity}`} aria-label={C.actions}>
+      <FrontendActivity task={task} nodeId={nodeId} inMain={false} starting={false} expandActions={expandActions} />
     </aside>
   );
 }
@@ -85,44 +94,46 @@ function AuthorCases({
           </Button>
         )}
       </header>
-      {selected === undefined ? (
-        <p className="hint">{C.noCases}</p>
-      ) : (
-        <div className={styles.author}>
-          <section className={styles.panel} aria-label={C.cases}>
-            <header className={styles.panelHead}>
-              <h2>{C.cases}</h2>
-              <small>{items.length}</small>
-            </header>
-            <fieldset ref={list} className={styles.authorList} aria-label={C.cases}>
-              {items.map((item) => (
-                <button
-                  type="button"
-                  className={styles.caseRow}
-                  key={item.id}
-                  aria-pressed={selected.id === item.id}
-                  onClick={() => setManual(item.id)}
-                >
-                  <span className={styles.caseTitle}>
-                    <span className={`mono ${styles.caseNumber}`}>{item.number}</span>
-                    <strong className="ellipsis">{item.title}</strong>
-                  </span>
-                </button>
-              ))}
-            </fieldset>
-          </section>
-          <div className={styles.panel}>
-            <CaseDefinition
-              key={selected.id}
-              taskId={task.id}
-              item={selected}
-              attachments={task.attachments}
-              revisions={revisionsFor(snapshot.events, selected.id)}
-            />
-          </div>
-          <PhaseActivity task={task} nodeId={nodeId} />
-        </div>
-      )}
+      <div className={styles.author}>
+        {selected === undefined ? (
+          <p className={`hint ${styles.authorEmpty}`}>{C.noCases}</p>
+        ) : (
+          <>
+            <section className={styles.panel} aria-label={C.cases}>
+              <header className={styles.panelHead}>
+                <h2>{C.cases}</h2>
+                <small>{items.length}</small>
+              </header>
+              <fieldset ref={list} className={styles.authorList} aria-label={C.cases}>
+                {items.map((item) => (
+                  <button
+                    type="button"
+                    className={styles.caseRow}
+                    key={item.id}
+                    aria-pressed={selected.id === item.id}
+                    onClick={() => setManual(item.id)}
+                  >
+                    <span className={styles.caseTitle}>
+                      <span className={`mono ${styles.caseNumber}`}>{item.number}</span>
+                      <strong className="ellipsis">{item.title}</strong>
+                    </span>
+                  </button>
+                ))}
+              </fieldset>
+            </section>
+            <div className={styles.panel}>
+              <CaseDefinition
+                key={selected.id}
+                taskId={task.id}
+                item={selected}
+                attachments={task.attachments}
+                revisions={revisionsFor(snapshot.events, selected.id)}
+              />
+            </div>
+          </>
+        )}
+        <PhaseActivity task={task} nodeId={nodeId} expandActions />
+      </div>
     </section>
   );
 }
@@ -265,37 +276,7 @@ export function FunctionalTestWorkbench({
       )}
       {phase === N.Environment && (
         <div className={styles.phaseLayout}>
-          <section className={styles.panel} aria-label={C.prepare}>
-            <header className={styles.panelHead}>
-              <h2>{C.prepare}</h2>
-              {environment !== undefined && (
-                <span className={styles.statusBadge} data-status={environment.ready ? 'passed' : 'blocked'}>
-                  {environment.ready ? C.environmentReady : C.status.blocked}
-                </span>
-              )}
-            </header>
-            <div className={styles.evidenceBody}>
-              {environment === undefined ? (
-                <p className="hint">{C.noEnvironment}</p>
-              ) : (
-                <>
-                  <dl className={styles.environment}>
-                    <dt>{C.environment}</dt>
-                    <dd>
-                      <code>{environment.target}</code>
-                    </dd>
-                    <dt>{C.baseline}</dt>
-                    <dd>
-                      <code>{environment.baseline ?? C.baselineUnverified}</code>
-                      {!environment.verified && environment.baseline !== null ? ` · ${C.baselineUnverified}` : ''}
-                    </dd>
-                  </dl>
-                  {environment.reason !== null && <p className={styles.caution}>{environment.reason}</p>}
-                  {environment.logTail !== '' && <pre className={styles.output}>{environment.logTail}</pre>}
-                </>
-              )}
-            </div>
-          </section>
+          <TestEnvironment environment={environment} />
           <PhaseActivity task={task} nodeId={phaseNodeId} />
         </div>
       )}
