@@ -29,6 +29,7 @@ import { addProject, taskReaches, workflowId } from '../../../test/helpers/tasks
 
 it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据生成报告', async () => {
   const requests: string[] = [];
+  const data = new Set<string>();
   let origin = '';
   let outsideOrigin = '';
   let outsideCalls = 0;
@@ -38,6 +39,25 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
   });
   const app = createServer((request, response) => {
     requests.push(`${request.method} ${request.url}`);
+    if (request.url === '/cleanup-fixture' && request.method === 'POST') {
+      data.add('item-2');
+      response.writeHead(201, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ id: 'item-2' }));
+      return;
+    }
+    if (request.url === '/reset/item-2') {
+      request.socket.destroy();
+      return;
+    }
+    if (request.url === '/cleanup-fixture/item-2' && request.method === 'DELETE') {
+      response.writeHead(data.delete('item-2') ? 204 : 404).end();
+      return;
+    }
+    if (request.url === '/write-redirect') {
+      data.add('item-3');
+      response.writeHead(307, { location: '/write-destination' }).end();
+      return;
+    }
     if (request.url === '/redirect') {
       response.writeHead(302, { location: outsideOrigin });
       response.end();
@@ -66,7 +86,17 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
       projectId: project.id,
       requirement: '检查待办 API',
       workflowId: await workflowId(t, FUNCTIONAL_TEST_WORKFLOW_KEY),
-      functionalTest: { target: origin, writes: [{ method: 'POST', path: '/items' }], caseAttachmentIds: [] },
+      functionalTest: {
+        target: origin,
+        writes: [
+          { method: 'POST', path: '/items' },
+          { method: 'POST', path: '/cleanup-fixture' },
+          { method: 'DELETE', path: '/cleanup-fixture/item-2' },
+          { method: 'POST', path: '/write-redirect' },
+          { method: 'POST', path: '/write-destination' },
+        ],
+        caseAttachmentIds: [],
+      },
       checkpoints: { confirm_plan: false, accept_each_node: false, ask_on_uncertainty: false },
       start: false,
     });
@@ -163,8 +193,52 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
         },
       ],
     });
+    const cleanup = [
+      {
+        kind: 'http',
+        title: '清理本轮数据',
+        method: 'DELETE',
+        path: '/cleanup-fixture/{{0.body.id}}',
+        assertions: [{ field: 'status', equals: 204, basis: '夹具契约' }],
+      },
+    ];
+    const reset = await must(author, McpToolName.TestCaseSave, {
+      ...definition,
+      title: '读取断开时清理已确认创建的数据',
+      steps: [
+        {
+          kind: 'http',
+          title: '创建本轮数据',
+          method: 'POST',
+          path: '/cleanup-fixture',
+          assertions: [{ field: 'status', equals: 201, basis: '夹具契约' }],
+        },
+        {
+          kind: 'http',
+          title: '读取断开的接口',
+          method: 'GET',
+          path: '/reset/{{0.body.id}}',
+          assertions: [{ field: 'status', equals: 200, basis: '夹具契约' }],
+        },
+      ],
+      cleanup,
+    });
+    const redirectedWrite = await must(author, McpToolName.TestCaseSave, {
+      ...definition,
+      title: '写请求收到重定向时暂停',
+      steps: [
+        {
+          kind: 'http',
+          title: '创建后返回重定向',
+          method: 'POST',
+          path: '/write-redirect',
+          assertions: [{ field: 'status', equals: 201, basis: '夹具契约' }],
+        },
+      ],
+      cleanup: [{ ...cleanup[0], path: '/cleanup-fixture/item-2' }],
+    });
     const environment = next(FUNCTIONAL_TEST_NODE.Environment);
-    await must(author, McpToolName.SubmitResult, { summary: '已保存四条用例' });
+    await must(author, McpToolName.SubmitResult, { summary: '已保存用例' });
     const run = await must(environment, McpToolName.TestEnvironmentPrepare);
     const execute = next(FUNCTIONAL_TEST_NODE.Execute);
     await must(environment, McpToolName.SubmitResult, { summary: '测试环境可达' });
@@ -208,17 +282,50 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
       (await must(execute, McpToolName.TestCaseRun, { ...params, caseId: redirected.id, executionId: 'redirect' }))
         .status,
     ).toBe('blocked');
+    const verifyReset = { ...params, caseId: reset.id, executionId: 'reset' };
+    expect((await must(execute, McpToolName.TestCaseRun, verifyReset)).status).toBe('blocked');
+    expect(data.has('item-2')).toBe(false);
+    const write = { ...params, caseId: redirectedWrite.id, executionId: 'redirect-write' };
+    expect((await must(execute, McpToolName.TestCaseRun, write)).status).toBe('blocked');
+    expect((await must(execute, McpToolName.TestCaseRun, write)).id).toBe('redirect-write');
+    expect((await call(execute, McpToolName.TestCaseRun, { ...write, executionId: 'redirect-retry' })).body.code).toBe(
+      ErrorCode.StateTransitionInvalid,
+    );
+    expect(data.has('item-3')).toBe(true);
+    expect(requests.filter((request) => request === 'POST /write-redirect')).toHaveLength(1);
+    expect(requests).not.toContain('POST /write-destination');
+    expect(requests.filter((request) => request === 'DELETE /cleanup-fixture/item-2')).toHaveLength(1);
+    const evidence = (await t.call(functionalTestReadOp, { taskId })).body.events;
+    expect(evidence).toContainEqual(
+      expect.objectContaining({ executionId: 'reset', kind: 'result', step: 1, detail: { status: 'blocked' } }),
+    );
+    expect(evidence).toContainEqual(
+      expect.objectContaining({ executionId: 'reset', kind: 'cleanup', step: 2, detail: { status: 'passed' } }),
+    );
+    expect(evidence).toContainEqual(
+      expect.objectContaining({
+        executionId: 'redirect-write',
+        kind: 'result',
+        detail: { status: 'blocked', unknownWrite: true },
+      }),
+    );
+    expect(evidence).toContainEqual(
+      expect.objectContaining({ executionId: 'redirect-write', kind: 'cleanup', detail: { status: 'not_run' } }),
+    );
     expect(outsideCalls).toBe(0);
     expect(requests).not.toContain('POST /private');
     expect(requests).toContain('GET /items/item-1');
     const report = next(FUNCTIONAL_TEST_NODE.Report);
     await must(execute, McpToolName.SubmitResult, { summary: '执行完成' });
-    const input = { runId: run.id, executionIds: ['v1', 'v2', 'defect', 'scope', 'redirect'] };
+    const input = {
+      runId: run.id,
+      executionIds: ['v1', 'v2', 'defect', 'scope', 'redirect', 'reset', 'redirect-write'],
+    };
     expect((await call(report, McpToolName.TestReportSubmit, { ...input, executionIds: ['v2'] })).body.code).toBe(
       ErrorCode.ValidationFailed,
     );
     const written = await must(report, McpToolName.TestReportSubmit, input);
-    expect(written.counts).toEqual({ passed: 1, failed: 1, blocked: 2, not_run: 0 });
+    expect(written.counts).toEqual({ passed: 1, failed: 1, blocked: 4, not_run: 0 });
     expect(written.markdown).toContain('v1 实测 · 失败');
     expect(written.markdown).toContain('v2 实测 · 通过');
     expect(written.markdown).not.toContain('fixture-secret');

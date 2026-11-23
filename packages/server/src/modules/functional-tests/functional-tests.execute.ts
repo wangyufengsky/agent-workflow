@@ -52,7 +52,10 @@ export async function executeCase({
     });
     emit(step, 'handoff', '已恢复页面操作', { reason });
   });
+  let mayWrite = false;
+  let confirmedWrite = false;
   async function runStep(step: FunctionalTestStep, index: number): Promise<FunctionalTestStatus> {
+    mayWrite = false;
     signal.throwIfAborted();
     mayWrite = step.kind === 'browser' ? writes.length > 0 : !['GET', 'HEAD', 'OPTIONS'].includes(step.method);
     if (step.kind === 'http') {
@@ -64,6 +67,7 @@ export async function executeCase({
           path: redactText(path),
         }),
       );
+      if (mayWrite && result.status >= 200 && result.status < 300) confirmedWrite = true;
       let outcome: FunctionalTestStatus = FunctionalTestStatus.Passed;
       const values = {};
       for (const assertion of step.assertions) {
@@ -92,6 +96,17 @@ export async function executeCase({
     emit(index, 'action', '执行浏览器操作', { title: redactText(step.title), action: redact(step.action) });
     const started = time();
     const result = await website(step, index);
+    if (
+      result.requests.some(
+        ({ method, status, blocked }) =>
+          blocked === null &&
+          status !== null &&
+          status >= 200 &&
+          status < 300 &&
+          !['GET', 'HEAD', 'OPTIONS'].includes(method),
+      )
+    )
+      confirmedWrite = true;
     const blocked = result.requests.some(
       ({ blocked, method }) => blocked !== null && !['GET', 'HEAD', 'OPTIONS'].includes(method),
     );
@@ -117,40 +132,63 @@ export async function executeCase({
     });
     return result.pass ? FunctionalTestStatus.Passed : FunctionalTestStatus.Failed;
   }
-  let outcome: FunctionalTestStatus = FunctionalTestStatus.Passed;
-  let stepIndex: number | null = null;
-  let mayWrite = false;
-  try {
-    for (const [index, step] of definition.steps.entries()) {
-      stepIndex = index;
-      outcome = await runStep(step, index);
-      if (outcome !== FunctionalTestStatus.Passed) break;
-    }
-    for (const [offset, step] of definition.cleanup.entries()) {
-      stepIndex = definition.steps.length + offset;
-      const cleaned = await runStep(step, stepIndex);
-      emit(stepIndex, 'cleanup', '测试数据清理', { status: cleaned });
-      if (outcome === FunctionalTestStatus.Passed && cleaned !== FunctionalTestStatus.Passed)
-        outcome = FunctionalTestStatus.Blocked;
-    }
-  } catch (error) {
+  function recordInterruption(index: number, error: unknown): boolean {
     if (!(error instanceof AppError || error instanceof TypeError || error instanceof DOMException)) throw error;
-    const reason = signal.aborted
-      ? '运行已中断，已发送的写入可能已经提交，需先核实实际状态'
-      : redactText(error.message);
     const unknownWrite =
       mayWrite &&
       (!(error instanceof AppError) ||
         signal.aborted ||
         error.details?.unknownWrite === true ||
         error.code === ErrorCode.BrowserActionFailed);
-    emit(stepIndex, 'result', reason, {
+    const reason = signal.aborted
+      ? unknownWrite
+        ? '运行已中断，需先核实已发送的写入'
+        : '运行已中断'
+      : redactText(error.message);
+    emit(index, 'result', reason, {
       status: FunctionalTestStatus.Blocked,
       ...(unknownWrite ? { unknownWrite: true } : {}),
     });
-    if (definition.cleanup.length > 0)
-      emit(stepIndex, 'cleanup', '运行异常中止，需核实数据状态后清理', { status: FunctionalTestStatus.NotRun });
-    outcome = FunctionalTestStatus.Blocked;
+    return unknownWrite;
+  }
+
+  let outcome: FunctionalTestStatus = FunctionalTestStatus.Passed;
+  try {
+    for (const [index, step] of definition.steps.entries()) {
+      try {
+        outcome = await runStep(step, index);
+      } catch (error) {
+        const unknownWrite = recordInterruption(index, error);
+        outcome = FunctionalTestStatus.Blocked;
+        // 已确认的写入仍可按用例清理。未知写入和取消需要先核实，不再发送请求。
+        if (signal.aborted || unknownWrite || !confirmedWrite) {
+          if (definition.cleanup.length > 0)
+            emit(
+              index,
+              'cleanup',
+              unknownWrite || signal.aborted ? '运行中止，需核实数据状态后清理' : '无已确认的写入，未执行清理',
+              { status: FunctionalTestStatus.NotRun },
+            );
+          return outcome;
+        }
+      }
+      if (outcome !== FunctionalTestStatus.Passed) break;
+    }
+    for (const [offset, step] of definition.cleanup.entries()) {
+      const index = definition.steps.length + offset;
+      let cleaned: FunctionalTestStatus;
+      try {
+        cleaned = await runStep(step, index);
+      } catch (error) {
+        recordInterruption(index, error);
+        emit(index, 'cleanup', '清理中断，保留已执行的步骤', { status: FunctionalTestStatus.Blocked });
+        if (outcome === FunctionalTestStatus.Passed) outcome = FunctionalTestStatus.Blocked;
+        break;
+      }
+      emit(index, 'cleanup', '测试数据清理', { status: cleaned });
+      if (outcome === FunctionalTestStatus.Passed && cleaned !== FunctionalTestStatus.Passed)
+        outcome = FunctionalTestStatus.Blocked;
+    }
   } finally {
     await browser.close(owner.id);
     const output = redactText(logTail());
