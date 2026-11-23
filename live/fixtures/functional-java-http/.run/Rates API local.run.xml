@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Rates API local" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="example.rates.CatalogProbe" />
+    <module name="rates" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/services/rates/example/rates" />
+    <method v="2" />
+  </configuration>
+</component>

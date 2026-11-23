@@ -108,6 +108,7 @@ export const TOOLS_COPY = {
     [McpToolName.TestCaseRun]: '在本轮测试环境执行已保存的指定用例版本，并收集实测证据。',
     [McpToolName.TestCaseRevise]: '记录用例修订的原因、依据与变化，保留原版本及其实测结果。',
     [McpToolName.TestRunRead]: '按运行轮次、用例、步骤或事件序号读取功能测试证据。',
+    [McpToolName.TestIdeConfigurations]: '读取当前项目的 IDEA 运行配置，识别模块、Java 主类与 JDK。',
     [McpToolName.TestEnvironmentPrepare]: '在任务授权范围内启动或连接测试环境并检查就绪状态。',
     [McpToolName.TestReportSubmit]: '用本轮实测记录生成可阅读和导出的功能测试报告。',
     [McpToolName.BrowserScreenshot]: '浏览器：截图并保存给你看；模型支持图片时也能看到截图。',

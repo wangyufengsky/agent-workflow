@@ -539,10 +539,13 @@ export const submitPlanTool = defineMcpTool({
 | 工具 | 使用阶段与参数 |
 | --- | --- |
 | `test_case_save` | 编写、导入。提供用例标题、对应需求、有序的 HTTP 或浏览器步骤、断言依据，以及适用的前置条件、测试数据和清理步骤。导入用例附来源附件和位置。返回稳定编号、用例 ID 和版本。 |
-| `test_environment_prepare` | 准备、恢复执行。连接任务授权的目标，返回运行标识及就绪结果。先用 `test_run_read` 读取已保存用例的 `requires`。本地可传任务级 `launch`，字段为工作区相对目录 `directory`、相对清单路径 `source`、服务脚本或 Spring Boot 目标 `script`、就绪路径 `readyPath` 及可选的 `profile`（test/qa，须与 Node 启动脚本声明一致，或在 Spring 中有相应的配置）。准备节点可只读查阅 README 和项目配置。运行器选择本地端口，完整 URL 仅连接建单时授权的地址。可提供 `checks`，每项包含 `key`、`path`、`expectedStatus`，`key` 须与用例引用一致。复测读取 `inheritedChecks`，执行器沿用原检查定义，在当前环境重新探测。本地复测重新验证原来的启动选择，并在修复工作区分配本轮地址；原入口改变时，准备节点可以明确选择新入口。依赖某项检查的用例以本轮 `environment.checks` 中该键的结果为准。 |
+| `test_ide_configurations` | 仅本地功能测试的准备节点可用。返回任务工作树或已登记项目中 `.run/*.run.xml`、`.idea/runConfigurations/*.xml` 和 `.idea/workspace.xml` 的 Java 运行配置，含主类、模块及可识别的 SDK。自定义环境变量或参数只返回需要核对的类别。 |
+| `test_environment_prepare` | 准备、恢复执行。连接任务授权的目标，返回运行标识及就绪结果。先用 `test_run_read` 读取已保存用例的 `requires`。本地可传任务级 `launch`，字段为工作区相对目录 `directory`、相对清单路径 `source`、服务脚本或 Spring Boot 目标 `script`、就绪路径 `readyPath` 及可选的 `profile`（test/qa，须与 Node 启动脚本声明一致，或在 Spring 中有相应的配置）。普通 Java 服务使用 `script: "java-main"` 并指定 `mainClass`，可指定 `javaVersion`（至少 8）及 Maven 的 `includeProvided`。服务可通过 PORT 或 JVM 系统属性 server.port 读取本轮端口。Gradle 使用模块 main 源集的运行时类路径，Maven 使用模块 classpath。准备节点可查阅 AGENTS.md、模块文档、构建声明、IDEA 启动配置及源码。运行器选择本地端口，完整 URL 仅连接建单时授权的地址。可提供 `checks`，每项包含 `key`、`path`、`expectedStatus`，`key` 须与用例引用一致。复测读取 `inheritedChecks`，执行器沿用原检查定义，在当前环境重新探测。本地复测重新验证原来的启动选择，并在修复工作区分配本轮地址；原入口改变时，准备节点可以明确选择新入口。依赖某项检查的用例以本轮 `environment.checks` 中该键的结果为准。 |
 | `test_case_run` | 执行。参数 `runId`、`caseId`、`version`、`executionId`。同一执行标识读取原结果。在请求路径与 JSON 请求体中可使用 `{{0.body.id}}` 引用同一用例之前的 HTTP 响应字段。 |
 | `test_run_read` | 所有功能测试步骤。可按 `runId`、`caseId`、`step` 或事件游标 `after` 读取已保存记录。复测的 `inheritedChecks` 返回原探测定义，当前轮次的就绪状态见 `environment.checks`。 |
 | `test_case_revise` | 执行。提供原版本、触发执行标识、原因和依据。可传完整新定义，也可指定零起始步骤的字段重命名或成功状态码纠正。可用 `contractPath` 引用已核实的本地基线内 JSON OpenAPI 3 契约。该契约能唯一证明的状态码或请求字段转写纠正可直接创建新版本，其余差异待确认。 |
 | `test_report_submit` | 报告。提供该轮全部已完成执行标识，另可附带逐项缺陷说明和未覆盖范围。证据、结论与计数由后端从已保存记录生成。 |
 
 阶段数据保存后用 `submit_result` 完成当前步骤。阻塞原因和测试失败作为执行结果保留，可随报告交付。
+
+应用助手可调用 `agent-workflow-app_projects_modules` 读取本地 Java 项目的模块及默认配置；`projects_rediscoverModules` 重新扫描。项目试启动、模块检查、停止及保存默认配置分别使用应用操作 `projects_startModuleRun`、`projects_stopModuleRun`、`projects_defaultModuleConfiguration`。创建功能测试时，用 `functionalTest.moduleSelection` 指定目录中的模块和配置。准备阶段可以省略 launch，后端会使用建单时固定的入口。

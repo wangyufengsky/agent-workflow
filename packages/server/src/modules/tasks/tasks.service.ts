@@ -426,9 +426,28 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
 
     async create(input: CreateTaskRequest, onCreated?: (taskId: string) => void): Promise<TaskDetailDTO> {
       const baseBranch = await lifecycle.checkCreate(input);
+      const scope = input.functionalTest;
+      const choice = scope?.moduleSelection;
+      let functionalTest: TaskDetailDTO['functionalTest'] = scope;
+      if (scope && choice) {
+        if (!scope.target.startsWith('/'))
+          throw new AppError(ErrorCode.ValidationFailed, 'Selected modules require a local test target');
+        const { module, config, launch, current } = await deps.selectProjectModule(
+          input.projectId,
+          choice.moduleId,
+          choice.configurationId,
+          choice.fingerprint,
+          baseBranch,
+        );
+        functionalTest = {
+          ...scope,
+          moduleSelection: { moduleId: module.id, configurationId: config.id, fingerprint: config.fingerprint },
+          moduleLaunch: { baseline: current.baseline, moduleName: module.name, configurationName: config.name, launch },
+        };
+      }
       // 助手归属与任务同时提交，启动前已可跟进；登记失败时不留下无归属的任务。
       const id = deps.unit.transact(() => {
-        const created = lifecycle.insertDraft({ ...input, baseBranch });
+        const created = lifecycle.insertDraft({ ...input, ...(functionalTest ? { functionalTest } : {}), baseBranch });
         onCreated?.(created);
         return created;
       });

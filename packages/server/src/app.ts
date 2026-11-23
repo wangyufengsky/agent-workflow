@@ -69,6 +69,7 @@ import {
 } from './modules/opencode/index.ts';
 import { createPlansModule } from './modules/plans/index.ts';
 import { createPreviewsModule, type PreviewsService } from './modules/previews/index.ts';
+import { createProjectModules } from './modules/project-modules/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
 import { projectRuntimeOperations } from './modules/projects/projects.runtime-operations.ts';
 import { createProjectRuntimeService } from './modules/projects/projects.runtime-service.ts';
@@ -376,6 +377,17 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   server.addHook('onReady', () => projectRuntime.recover());
   server.addHook('preClose', () => projectRuntime.stopAll());
+  const projectModules = createProjectModules({
+    db: database.db,
+    projects: projects.service,
+    log,
+    clock,
+    env,
+    locks,
+    dataDir: config.dataDir,
+  });
+  server.addHook('onReady', () => projectModules.recover());
+  server.addHook('preClose', () => projectModules.stopAll());
   const nodes = createNodesModule({
     runBrowserCase: (attempt, test, signal) => {
       const owner = {
@@ -431,6 +443,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   const requirements = createRequirementsModule({ db: database.db, clock });
   const tasks = createTasksModule({
+    selectProjectModule: projectModules.select,
     skills: skills.service,
     office,
     opencode,
@@ -462,6 +475,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     dataDir: config.dataDir,
   });
   const functionalTests = createFunctionalTestsModule({
+    projectDirectory: (id) => projects.service.getRecord(id).repoPath,
     db: database.db,
     rerunOrigin: (taskId) => findTestRerunOrigin(database.db, taskId),
     unit,
@@ -487,7 +501,10 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('preClose', () => testFollowups.close());
   server.addHook('preClose', () => functionalTests.service.stopAll());
   worktrees.service.onBeforeRemove((worktree) => functionalTests.service.stop(worktree.taskId));
-  tasks.service.onProjectDeleted((id) => projectRuntime.abortProject(id));
+  tasks.service.onProjectDeleted((id) => {
+    projectRuntime.abortProject(id);
+    projectModules.abortProject(id);
+  });
   const batches = createBatchesModule({
     db: database.db,
     unit,
@@ -618,6 +635,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...credentials.operations,
     ...storage.operations,
     ...projects.operations,
+    ...projectModules.operations,
     ...projectRuntimeOperations(projectRuntime),
     ...hostingAccounts.operations,
     ...attachments.operations,

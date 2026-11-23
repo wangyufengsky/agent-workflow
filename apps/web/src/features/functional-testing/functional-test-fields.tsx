@@ -120,6 +120,16 @@ export function FunctionalTestFields({
 export function FunctionalTestScopeSummary({ scope }: { scope: FunctionalTestScope }) {
   return (
     <dl className={styles.summary}>
+      {scope.moduleSelection && (
+        <>
+          <dt>{C.selectedModule}</dt>
+          <dd className="mono">
+            {scope.moduleLaunch
+              ? [scope.moduleLaunch.moduleName, scope.moduleLaunch.configurationName].join(' · ')
+              : [scope.moduleSelection.moduleId, scope.moduleSelection.configurationId].filter(Boolean).join(' · ')}
+          </dd>
+        </>
+      )}
       <dt>{B.target}</dt>
       <dd className="mono">{scope.target}</dd>
       <dt>{B.writes}</dt>

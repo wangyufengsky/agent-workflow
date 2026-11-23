@@ -4,12 +4,14 @@ import {
   attachmentIdsSchema,
   browserTestScopeSchema,
   functionalTestScopeSchema,
+  getProjectModulesOp,
   TaskStatus,
   WorktreeStatus,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState } from 'react';
+import { callOperation } from '../../api/client.ts';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
@@ -204,9 +206,9 @@ export function HomePage() {
   const pendingForm = usePendingForm(AssistantForm.StartTask);
   const form = pendingForm?.seq === search.formSeq ? pendingForm?.values : undefined;
   const browserTest = browserTestScopeSchema.optional().parse(form?.browserTest);
-  const functionalTest = functionalTestScopeSchema.optional().parse(form?.functionalTest);
+  const formScope = functionalTestScopeSchema.optional().parse(form?.functionalTest);
   const functionalTestAttachmentIds =
-    functionalTest === undefined ? undefined : attachmentIdsSchema.optional().parse(form?.attachmentIds);
+    formScope === undefined ? undefined : attachmentIdsSchema.optional().parse(form?.attachmentIds);
   const navigate = route.useNavigate();
   const material = useQuery({
     ...attachmentQuery(search.knowledgeMaterial ?? ''),
@@ -220,13 +222,37 @@ export function HomePage() {
         ? search.projectId
         : projects[0]?.id
       : projects.find((project) => project.id === knowledgeOrigin?.projectId)?.id;
+  const selection = search.moduleId
+    ? {
+        moduleId: search.moduleId,
+        configurationId: search.configurationId,
+        fingerprint: search.configurationFingerprint,
+      }
+    : formScope?.moduleSelection;
+  const moduleProject = projects.find((p) => p.id === projectId);
+  const modules = useQuery({
+    queryKey: ['project-modules', projectId, moduleProject?.defaultBranch],
+    enabled: selection !== undefined && moduleProject !== undefined,
+    queryFn: () => callOperation(getProjectModulesOp, { id: projectId ?? '' }),
+  });
+  const selectedModule = modules.data?.modules.find((m) => m.id === selection?.moduleId);
+  const configId = selection?.configurationId ?? (selectedModule && modules.data?.defaults[selectedModule.id]);
+  const configuration = selectedModule?.configurations.find(
+    (c) => c.id === configId && (!selection?.fingerprint || c.fingerprint === selection.fingerprint),
+  );
+  const moduleValid =
+    selection === undefined ||
+    (!!configuration?.launch && !configuration.review.length && (!search.moduleId || projectId === search.projectId));
+  const functionalTest = selection
+    ? { ...(formScope ?? { target: '/', writes: [], caseAttachmentIds: [] }), moduleSelection: selection }
+    : formScope;
   const list = conversations.data ?? [];
   const conversation = list.find((c) => c.id === search.conversation);
 
   const composer = (
     <HomeComposer
       // A new prefill in the address (the assistant's open_form, the report card) starts the input over.
-      key={`${search.conversation}|${search.workflow}|${search.requirement}|${search.formSeq}`}
+      key={`${search.conversation}|${search.workflow}|${search.requirement}|${search.formSeq}|${search.moduleId}|${search.configurationId}|${search.configurationFingerprint}`}
       conversation={conversation}
       projects={projects}
       projectId={projectId ?? ''}
@@ -237,10 +263,27 @@ export function HomePage() {
           replace: true,
         })
       }
-      onProjectChange={(id) => void navigate({ search: (s) => ({ ...s, projectId: id }), replace: true })}
+      onProjectChange={(id) =>
+        void navigate({
+          search: (s) => ({
+            ...s,
+            projectId: id,
+            moduleId: undefined,
+            configurationId: undefined,
+            configurationFingerprint: undefined,
+          }),
+          replace: true,
+        })
+      }
       initialWorkflowKey={search.workflow}
       initialRequirement={search.requirement}
       initialBrowserTest={browserTest}
+      moduleValid={moduleValid}
+      moduleSummary={
+        moduleValid && selectedModule && configuration
+          ? [selectedModule.name, configuration.name, configuration.mainClass].join(' · ')
+          : undefined
+      }
       initialFunctionalTest={functionalTest}
       initialFunctionalTestAttachmentIds={functionalTestAttachmentIds}
       knowledgeDraft={

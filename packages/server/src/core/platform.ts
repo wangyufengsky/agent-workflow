@@ -1,6 +1,7 @@
 import { accessSync, constants, statSync } from 'node:fs';
 import path from 'node:path';
 import { Platform, platformSchema } from '@aw/shared';
+import { execa } from 'execa';
 
 /**
  * Everything that differs between the operating systems the backend runs on (17 §2, D71). Built per platform so
@@ -42,6 +43,18 @@ export function platformRules(os: Platform) {
       const name = (isWindows && Object.keys(env).find((k) => k.toUpperCase() === 'PATH')) || 'PATH';
       const current = envValue(env, 'PATH');
       return { [name]: current === undefined || current === '' ? dir : `${current}${paths.delimiter}${dir}` };
+    },
+    /** Resolve an installed macOS JDK even when its bin directory is not on PATH. */
+    async macRegisteredJavaHome(major: number, env: NodeJS.ProcessEnv): Promise<string | undefined> {
+      const tool = '/usr/libexec/java_home';
+      if (os !== Platform.Darwin || !isExecutableFile(tool)) return undefined;
+      const result = await execa(tool, ['-F', '-v', major === 8 ? '1.8' : String(major)], {
+        env,
+        extendEnv: false,
+        reject: false,
+        timeout: 5000,
+      });
+      return result.exitCode === 0 && path.posix.isAbsolute(result.stdout.trim()) ? result.stdout.trim() : undefined;
     },
     homeDir: (env: NodeJS.ProcessEnv): string | undefined => envValue(env, isWindows ? 'USERPROFILE' : 'HOME'),
     /** A file that can be run (on Windows any existing file: the extension decides, `X_OK` means nothing). */

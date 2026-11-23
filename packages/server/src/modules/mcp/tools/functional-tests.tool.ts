@@ -14,8 +14,10 @@ import {
   functionalTestRunInputSchema,
   functionalTestRunSchema,
   functionalTestSnapshotSchema,
+  ideConfigurationsSchema,
   McpToolName,
 } from '@aw/shared';
+import { z } from 'zod';
 import type { FunctionalTestsService } from '../../functional-tests/index.ts';
 import { defineMcpTool } from '../mcp.registry.ts';
 
@@ -29,8 +31,17 @@ export function functionalTestMcpTools(service: FunctionalTestsService) {
       input: functionalTestCaseSaveSchema,
       output: functionalTestCaseSchema,
       description:
-        'Save one draft case. Provide its title, requirement and ordered HTTP or browser steps with evidence-backed assertions. For imported cases, provide source. Resend the existing ID to complete a draft. Use needsClarification for a missing expectation. Executed versions require test_case_revise.',
+        'Save one draft case. Provide its title, requirement and ordered HTTP or browser steps with evidence-backed assertions. For ordinary service startup omit requires. For an extra case-specific check use only its bare stable key, e.g. requires:["rates_ping"]. Describe the probe path and expected status in preconditions. For imported cases, provide source. Resend the existing ID to complete a draft. Use needsClarification for a missing expectation. Executed versions require test_case_revise.',
       handler: (input, { attempt }) => service.save(attempt, input),
+    }),
+    defineMcpTool({
+      name: McpToolName.TestIdeConfigurations,
+      allowedKinds,
+      input: z.object({}),
+      output: ideConfigurationsSchema,
+      description:
+        'Discover IntelliJ IDEA Application and Spring Boot run configurations for this local test task, including the registered project’s unshared workspace configuration. Returns launch hints and unsupported option categories. Verify the intended main class and test environment in the worktree.',
+      handler: (_, { attempt }) => service.ideConfigurations(attempt),
     }),
     defineMcpTool({
       name: McpToolName.TestEnvironmentPrepare,
@@ -38,7 +49,7 @@ export function functionalTestMcpTools(service: FunctionalTestsService) {
       input: functionalTestPrepareSchema,
       output: functionalTestRunSchema,
       description:
-        'Start the authorized local service or connect to the approved test URL. For local discovery pass launch {directory,source,script,readyPath,profile?}. Paths are worktree-relative; source is the module manifest; script is an existing service script, spring-boot:run, or bootRun. The optional test/qa profile must be backed by the Spring configuration or match the mode/environment in a Node script. The runner allocates PORT. Omit launch to reuse the project setting or recover this run. Never supply launch for an external URL. First read saved requires keys with test_run_read. Supply checks {key,path,expectedStatus} for documented prerequisites under their exact keys. On linked retests inheritedChecks are re-probed automatically and retain their definitions. Read the returned environment.checks to identify case blockers. Service readiness alone does not satisfy a required key.',
+        'Start the authorized local service or connect to the approved test URL. For local discovery pass launch {directory,source,script,readyPath,profile?}. Both paths start at the worktree root: for module/src/Server.java set directory=module/src and source=module/src/Server.java; source is the module manifest or a standalone Java source. Use the existing Node service script, spring-boot:run, bootRun, or java-main. For java-main supply verified mainClass, optional javaVersion and Maven includeProvided; the service must honor PORT or the server.port JVM property. The optional test/qa profile must be backed by the Spring configuration or match the mode/environment in a Node script. The runner allocates PORT. Omit launch to reuse the project setting or recover this run. Never supply launch for an external URL. First read saved requires keys with test_run_read. Supply checks {key,path,expectedStatus} for documented prerequisites under their exact keys. On linked retests inheritedChecks are re-probed automatically and retain their definitions. Read the returned environment.checks to identify case blockers. Service readiness alone does not satisfy a required key.',
       handler: (input, { attempt, signal }) => service.prepare(attempt, input, signal),
     }),
     defineMcpTool({

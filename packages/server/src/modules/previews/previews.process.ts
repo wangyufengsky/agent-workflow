@@ -13,7 +13,7 @@ import {
 import { execa } from 'execa';
 import type { Clock } from '../../core/clock.ts';
 import { host } from '../../core/platform.ts';
-import type { PreviewCommand } from './previews.test-launch.ts';
+import type { PreviewCommand } from './previews.commands.ts';
 
 /** A preview's output: appended to its log file (when it has one) and kept as a tail for the user. */
 export type PreviewLog = {

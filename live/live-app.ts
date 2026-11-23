@@ -32,7 +32,7 @@ export const TASK_TIMEOUT_MS = 25 * 60_000;
 const ENDED: readonly TaskStatus[] = [TaskStatus.Review, TaskStatus.Failed, TaskStatus.Cancelled];
 const IDENTITY = ['-c', 'user.name=aw-live', '-c', 'user.email=aw-live@example.com'];
 
-export type Fixture = 'ts-stats' | 'java-inventory' | 'todo-web' | 'functional-todo';
+export type Fixture = 'ts-stats' | 'java-inventory' | 'todo-web' | 'functional-todo' | 'functional-java-http';
 /** A commit made on top of the fixture, at `date` (ISO 8601), writing `files` (path → content). */
 export type FixtureCommit = { date: string; message: string; files: Record<string, string> };
 /** The fixture's history: its own commit at `initAt`, then `commits` in order. */

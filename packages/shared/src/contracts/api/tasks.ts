@@ -41,6 +41,7 @@ import {
 } from './browser-cases.ts';
 import { deliverySchema, taskPullRequestSchema } from './delivery.ts';
 import { frontendRoundSchema } from './frontend.ts';
+import { functionalTestLaunchSchema } from './functional-testing.ts';
 import { inboxItemSchema } from './inbox.ts';
 import { requirementItemsInputSchema } from './requirements.ts';
 import { skillRefSchema } from './skills.ts';
@@ -57,6 +58,21 @@ export type Checkpoints = z.infer<typeof checkpointsSchema>;
 export const FUNCTIONAL_TEST_WORKFLOW_KEY = 'functional_test';
 export const functionalTestScopeSchema = browserTestScopeSchema.extend({
   caseAttachmentIds: attachmentIdsSchema,
+  moduleSelection: z
+    .object({
+      moduleId: z.string().min(1),
+      configurationId: z.string().min(1).optional(),
+      fingerprint: z.string().min(1).optional(),
+    })
+    .optional(),
+  moduleLaunch: z
+    .object({
+      baseline: z.string(),
+      moduleName: z.string(),
+      configurationName: z.string(),
+      launch: functionalTestLaunchSchema,
+    })
+    .optional(),
   onFailure: z.enum(['repair', 'repair_and_retest']).optional(),
 });
 export type FunctionalTestScope = z.infer<typeof functionalTestScopeSchema>;
@@ -66,7 +82,7 @@ export const createTaskRequestSchema = z.object({
   /** A specific workflow version. */
   workflowId: z.string(),
   browserTest: browserTestScopeSchema.optional(),
-  functionalTest: functionalTestScopeSchema.optional(),
+  functionalTest: functionalTestScopeSchema.omit({ moduleLaunch: true }).optional(),
   requirement: z.string().trim().min(1).max(REQUIREMENT_MAX_CHARS),
   /** Defaults to the requirement's first line. */
   title: z.string().trim().min(1).max(TASK_TITLE_MAX_CHARS).optional(),

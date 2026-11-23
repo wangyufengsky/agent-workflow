@@ -678,10 +678,24 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 
 | 操作 | HTTP | 结果 |
 | --- | --- | --- |
-| `functionalTests.read` | `GET /tasks/:taskId/functional-test` | 用例版本、环境、执行、证据事件及已发布报告。复测快照的可选字段 `inheritedChecks` 保存原用例依赖的检查键、路径和预期状态码；本轮实测结果在 `runs[].environment.checks`。新运行可在 `environment` 返回任务级 `launch`、本次启动的 `command`、就绪探测地址 `readyUrl` 和实测 HTTP 状态 `readyStatus`。可按 `runId`、`caseId`、零起始的 `step` 和事件游标 `after` 筛选。 |
+| `functionalTests.read` | `GET /tasks/:taskId/functional-test` | 用例版本、环境、执行、证据事件及已发布报告。复测快照的可选字段 `inheritedChecks` 保存原用例依赖的检查键、路径和预期状态码；本轮实测结果在 `runs[].environment.checks`。新运行可在 `environment` 返回任务级 `launch`（普通 Java 主类入口保存 `mainClass`、已确认的 JDK 主版本和 provided 依赖选择，供恢复和复测使用）、本次启动的 `command`、就绪探测地址 `readyUrl` 和实测 HTTP 状态 `readyStatus`。可按 `runId`、`caseId`、零起始的 `step` 和事件游标 `after` 筛选。 |
 | `functionalTests.report` | `GET /tasks/:taskId/functional-test/report` | 返回指定 `runId`、`version` 的报告，省略时读取最近发布版本。Markdown 导出使用相同的正文。 |
 | `functionalTests.approveRevision` | `POST /tasks/:taskId/functional-test/revisions/:proposal/approve` | 将指定事件序号中的完整差异提交为新用例版本。若原版本已被替代或该轮报告已发布，拒绝提交。 |
 | `functionalTest.repair` | `POST /tasks/:taskId/functional-test/repair` | 按失败执行 ID 创建或返回关联的修复任务，保留原始证据。 |
 | `functionalTest.rerun` | `POST /tasks/:taskId/functional-test/rerun` | 输入执行 ID 和 Git 引用，在解析出的提交上复测原用例版本，返回关联任务。 |
 
 `functional_test.updated` 在记录提交后推送 `{taskId, after}`。工作台可从最后收到的证据序号增量读取，重连时能取回事件和原始用例版本。浏览器接管复用现有的测试接管操作。
+
+### 项目模块与运行配置
+
+项目详情首次打开时扫描默认分支。Git 提交是源码、模块、构建文件及共享配置的基线，未共享的 IDEA 配置来自登记的本机项目，按基线中的主类核对。重新发现可以读取尚未提交的本机配置。模块无 HTTP 入口时仍可提供构建工具检查。
+
+| 操作 | 接口 | 用途 |
+|---|---|---|
+| `projects.modules` | GET `/projects/:id/modules` | 返回基线、模块、候选启动方式、发现依据、可选检查和近期运行。基线变化后刷新目录。 |
+| `projects.rediscoverModules` | POST `/projects/:id/modules/discover` | 重新读取本地与共享配置。 |
+| `projects.defaultModuleConfiguration` | PUT `/projects/:id/modules/default` | 保存该模块最近成功试启动的配置及指纹。依据变更后需重新验证。 |
+| `projects.startModuleRun` | POST `/projects/:id/modules/run` | 提交默认分支基线与模块 ID，用配置 ID 和指纹试启动，或提交已发现的检查 ID。在隔离工作树内执行。 |
+| `projects.stopModuleRun` | POST `/projects/:id/modules/stop` | 按运行 ID 停止并回收资源。 |
+
+本地功能测试可在 `functionalTest.moduleSelection` 中传入 `moduleId`、`configurationId` 和 `fingerprint`。仅提供模块时复用已保存且仍有效的默认配置。创建任务时由服务端解析并冻结启动配置与 Git 提交，准备阶段从该提交建立工作树并核对入口。记录中的成功就绪状态与当前配置指纹共同决定是否已验证。

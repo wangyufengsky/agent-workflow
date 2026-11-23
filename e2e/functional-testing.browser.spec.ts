@@ -5,6 +5,7 @@ import {
   FUNCTIONAL_TEST_NODE,
   FUNCTIONAL_TEST_WORKFLOW_KEY,
   type FunctionalTestSnapshot,
+  NodeStatus,
   TaskStatus,
   taskDetailSchema,
 } from '@aw/shared';
@@ -107,8 +108,44 @@ for (const fixture of [
       { type: 'hang' },
     ]);
     try {
-      await page.goto(`/tasks/${task.id}`);
-      await expect(await request.post(`${API_BASE}/tasks/${task.id}/start`, { headers: AUTH })).toBeOK();
+      if (!fixture.withFile) await page.goto(`/tasks/${task.id}`);
+      const started = await request.post(`${API_BASE}/tasks/${task.id}/start`, { headers: AUTH });
+      await expect(started).toBeOK();
+      if (fixture.withFile) {
+        // Reproduce the CI trace: the initial task response predates attempt creation and no SSE update wakes the UI.
+        const taskUrl = `${API_BASE}/tasks/${task.id}`;
+        const readTask = async () =>
+          taskDetailSchema.parse(await (await request.get(taskUrl, { headers: AUTH })).json());
+        await expect.poll(async () => (await readTask()).nodes.map(({ key }) => key)).toContain(fixture.node);
+        const snapshot = await readTask();
+        const node = snapshot.nodes.find(({ key }) => key === fixture.node);
+        if (node === undefined) throw new Error('Import node missing from the started task');
+        await page.route('**/api/v1/events?*', (route) => route.abort());
+        await page.route(`**/api/v1/tasks/${task.id}`, (route) =>
+          route.fulfill({
+            json: {
+              ...snapshot,
+              activeAttempts: [],
+              nodes: snapshot.nodes.map((item) =>
+                item.id === node.id ? { ...item, status: NodeStatus.Ready, attemptCount: 0 } : item,
+              ),
+            },
+          }),
+        );
+        // The node's first read can also precede the attempt; the next read goes to the real backend.
+        await page.route(
+          `**/api/v1/tasks/${task.id}/nodes/${node.id}`,
+          async (route) => {
+            const response = await route.fetch();
+            await route.fulfill({
+              response,
+              json: { ...(await response.json()), status: NodeStatus.Ready, attempts: [] },
+            });
+          },
+          { times: 1 },
+        );
+        await page.goto(`/tasks/${task.id}`);
+      }
       const stage = page.getByRole('region', { name: fixture.phase, exact: true });
       await expect(stage.getByText('等待用例保存')).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
       const activity = stage.getByRole('complementary', { name: 'AI 活动' });
@@ -178,6 +215,32 @@ test('准备环境显示实际启动、探测和阻塞原因，并兼容旧运�
         },
       },
       {
+        id: 'run-java',
+        createdAt: now,
+        environment: {
+          id: 'env-java',
+          target: 'http://localhost:49153/orders',
+          baseline: 'cc12345',
+          verified: true,
+          ready: true,
+          reason: null,
+          logTail: '',
+          launch: {
+            directory: 'services/orders',
+            source: 'services/orders/pom.xml',
+            script: 'java-main',
+            mainClass: '订单服务.进程',
+            javaVersion: 8,
+            includeProvided: true,
+            readyPath: '/health',
+          },
+          command: 'java 订单服务.进程',
+          readyUrl: 'http://localhost:49153/health',
+          readyStatus: 200,
+          checks: [],
+        },
+      },
+      {
         id: 'run-1',
         createdAt: now,
         environment: {
@@ -222,6 +285,14 @@ test('准备环境显示实际启动、探测和阻塞原因，并兼容旧运�
   await expect(environment.getByText('/health', { exact: true })).toBeVisible();
   await expect(environment.getByText('Port already in use')).toBeVisible();
   await expect(environment.getByText('HTTP 200', { exact: true })).toHaveCount(0);
+
+  await rounds.selectOption('run-java');
+  await expect(environment.getByText('Java 主类', { exact: true })).toBeVisible();
+  await expect(environment.getByText('订单服务.进程', { exact: true })).toBeVisible();
+  await expect(environment.getByText('Java 8', { exact: true })).toBeVisible();
+  await expect(environment.getByText('运行类路径包含 provided 依赖', { exact: true })).toBeVisible();
+  await expect(environment.getByText('包含', { exact: true })).toBeVisible();
+  await expect(environment.getByText('启动 Profile', { exact: true })).toHaveCount(0);
 
   await rounds.selectOption('run-1');
   await expect(environment.getByText('http://localhost/orders', { exact: true })).toBeVisible();

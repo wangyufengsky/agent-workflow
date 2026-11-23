@@ -337,6 +337,13 @@
       "when": 1795402757922,
       "tag": "0047_functional_test_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1795421287577,
+      "tag": "0048_project_modules",
+      "breakpoints": true
     }
   ]
 }

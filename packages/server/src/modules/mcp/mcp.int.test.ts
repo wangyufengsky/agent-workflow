@@ -80,6 +80,7 @@ describe('执行 MCP（/mcp/exec）', () => {
       McpToolName.SubmitPlan,
       McpToolName.SubmitResult,
       McpToolName.TestCaseSave,
+      McpToolName.TestIdeConfigurations,
       McpToolName.TestEnvironmentPrepare,
       McpToolName.TestCaseRun,
       McpToolName.TestCaseRevise,

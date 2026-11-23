@@ -11,3 +11,8 @@
 ## functional-todo
 
 无默认预览配置的 Node HTTP 测试项目，准备节点按 README 发现 `npm run serve:qa`，服务 在 `PORT` 上监听。夹具的 OpenAPI 契约规定 `POST /api/check` 接受 `done` 字段，用于复测错误转写后的用例。条目 `fixture-1` 的更新接口确认接收，后续读取仍返回未完成，用于检验报告保留产品缺陷。
+
+
+## functional-java-http
+
+无预览设置与第三方依赖的 Java HTTP 夹具。根目录的 `AGENTS.md` 指向 `docs/rates-module.md`，后者记录受测主类、就绪路径及接口契约。`.run/` 保存了服务和离线工具的 IDEA Application 配置。安装 JDK 后可运行 `pnpm test:live live/functional-java-launch.live.test.ts`，由真实模型选择并启动受测服务，再核对实测和报告。

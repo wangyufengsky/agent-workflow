@@ -144,6 +144,17 @@ const CASES: Array<{ name: string; machine: Machine<string, string>; illegal: Ar
     ],
   },
   {
+    name: 'projectModuleRun',
+    machine: MACHINES.projectModuleRun,
+    illegal: [
+      ['starting', 'pass'],
+      ['running', 'ready'],
+      ['ready', 'pass'],
+      ['passed', 'interrupt'],
+      ['stopped', 'ready'],
+    ],
+  },
+  {
     name: 'teamAnalysis',
     machine: MACHINES.teamAnalysis,
     illegal: [

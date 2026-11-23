@@ -75,6 +75,8 @@ export function HomeComposer({
   initialWorkflowKey,
   initialRequirement,
   initialBrowserTest,
+  moduleValid,
+  moduleSummary,
   initialFunctionalTest,
   initialFunctionalTestAttachmentIds,
   knowledgeDraft,
@@ -89,6 +91,8 @@ export function HomeComposer({
   initialWorkflowKey: string | undefined;
   initialRequirement: string | undefined;
   initialBrowserTest: BrowserTestScope | undefined;
+  moduleValid: boolean;
+  moduleSummary: string | undefined;
   initialFunctionalTest: FunctionalTestScope | undefined;
   initialFunctionalTestAttachmentIds: string[] | undefined;
   knowledgeDraft?:
@@ -149,11 +153,21 @@ export function HomeComposer({
   });
   const functionalScope = functionalTestScopeSchema.safeParse({
     target: testTarget.trim(),
+    moduleSelection: initialFunctionalTest?.moduleSelection,
     writes: parseBrowserWriteLines(testWrites),
     caseAttachmentIds,
     onFailure,
   });
-  const functionalApprovalKey = JSON.stringify([projectId, testTarget, testWrites, caseAttachmentIds, onFailure]);
+  const validModuleScope =
+    moduleValid && (!initialFunctionalTest?.moduleSelection || testTarget.trim().startsWith('/'));
+  const functionalApprovalKey = JSON.stringify([
+    projectId,
+    testTarget,
+    testWrites,
+    caseAttachmentIds,
+    onFailure,
+    initialFunctionalTest?.moduleSelection,
+  ]);
   const functionalApproved = approvedFunctionalScope === functionalApprovalKey;
   const task = useStartTask({
     projectId,
@@ -167,10 +181,12 @@ export function HomeComposer({
     requirements: functionalTesting ? [] : checklist,
     browserTest: browserTesting && testApproved && testScope.success ? testScope.data : undefined,
     functionalTest:
-      functionalTesting && functionalApproved && functionalScope.success ? functionalScope.data : undefined,
+      functionalTesting && functionalApproved && validModuleScope && functionalScope.success
+        ? functionalScope.data
+        : undefined,
     browserTestBlocked:
       (browserTesting && (!testApproved || !testScope.success)) ||
-      (functionalTesting && (!functionalApproved || !functionalScope.success)),
+      (functionalTesting && (!functionalApproved || !validModuleScope || !functionalScope.success)),
     onStarted: () => {
       files.clear();
       setChecklist([]);
@@ -449,6 +465,13 @@ export function HomeComposer({
             </label>
           </fieldset>
         )}
+        {functionalTesting && initialFunctionalTest?.moduleSelection && (
+          <p className="hint" role="status">
+            {moduleValid && moduleSummary
+              ? FUNCTIONAL_TEST_COPY.moduleDraft(moduleSummary)
+              : FUNCTIONAL_TEST_COPY.moduleUnavailable}
+          </p>
+        )}
         {functionalTesting && (
           <FunctionalTestFields
             target={testTarget}
@@ -457,7 +480,7 @@ export function HomeComposer({
             caseIds={caseAttachmentIds}
             onFailure={onFailure}
             approved={functionalApproved}
-            valid={functionalScope.success}
+            valid={validModuleScope && functionalScope.success}
             onTargetChange={(value) => {
               setTestTarget(value);
               setApprovedFunctionalScope(undefined);
