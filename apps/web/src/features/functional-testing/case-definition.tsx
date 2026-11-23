@@ -80,14 +80,16 @@ export function CaseDefinition({
   const attachment = attachments.find(({ id }) => id === source?.attachmentId);
   return (
     <article className={styles.definition}>
-      <h3>
-        {item.number} · {item.title}
-      </h3>
-      <p className="hint">
-        {C.version(item.version)}
-        {saved !== undefined && ` · ${C.savedAt(formatDateTime(saved.at))}`}
-        {typeof saved?.detail.author === 'string' && ` · ${C.actor(saved.detail.author)}`}
-      </p>
+      <div className={`mono ${styles.caseNumber}`}>
+        {item.number} / v{item.version}
+      </div>
+      <h3>{item.title}</h3>
+      {saved !== undefined && (
+        <p className="hint">
+          {C.savedAt(formatDateTime(saved.at))}
+          {typeof saved.detail.author === 'string' && ` · ${C.actor(saved.detail.author)}`}
+        </p>
+      )}
       {source !== undefined && (
         <div className="row wrap">
           <span>{[attachment?.name, source.originalId, source.location].filter(Boolean).join(' · ')}</span>

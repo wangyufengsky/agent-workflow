@@ -17,6 +17,7 @@ import {
   type WorkbookSheet,
   type WorkbookValue,
 } from './office.workbook.ts';
+import { compatibleXlsxBytes } from './office.xlsx-package.ts';
 import type { ZipEntry } from './office.zip.ts';
 
 function isoDate(date: Date): string {
@@ -87,10 +88,12 @@ export const workbookParts = (entries: readonly ZipEntry[]) => ({
 export async function readXlsx(
   bytes: Buffer,
   entries: readonly ZipEntry[],
+  unzippedBytes?: number,
 ): Promise<{ text: string; overview: string; workbook: Workbook; meta: XlsxMeta }> {
   const book = new ExcelJS.Workbook();
   // exceljs declares its own Buffer type, which Node's Buffer satisfies at runtime.
-  await book.xlsx.load(bytes as unknown as ExcelJS.Buffer);
+  const compatible = await compatibleXlsxBytes(bytes, entries, unzippedBytes);
+  await book.xlsx.load(compatible as unknown as ExcelJS.Buffer);
   const counted = { cells: 0, formulas: 0 };
   const workbook: Workbook = { sheets: book.worksheets.map((sheet) => readSheet(sheet, counted)) };
   const meta: XlsxMeta = {

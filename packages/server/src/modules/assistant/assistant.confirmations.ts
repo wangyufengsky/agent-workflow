@@ -8,6 +8,7 @@ import {
   AssistantConfirmationStatus,
   assistantConfirmationMachine,
   assistantToolName,
+  createTaskOp,
   ErrorCode,
   OperationRisk,
   ServerEventType,
@@ -139,7 +140,13 @@ export function createConfirmations(deps: ConfirmationsDeps) {
           renderTemplate(prompts[PromptName.AssistantConfirmed], {
             tool: assistantToolName(c.operationId),
             confirmationId: id,
-            result: JSON.stringify(result, null, 2),
+            result: JSON.stringify(
+              !result.ok && c.operationId === createTaskOp.id && c.input.functionalTest !== undefined
+                ? { ...result, retryInput: c.input }
+                : result,
+              null,
+              2,
+            ),
           }),
         );
       });

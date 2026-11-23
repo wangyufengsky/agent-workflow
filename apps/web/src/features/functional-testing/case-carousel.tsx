@@ -1,4 +1,4 @@
-import type { FunctionalTestCase, FunctionalTestExecution } from '@aw/shared';
+import { type FunctionalTestCase, type FunctionalTestExecution, FunctionalTestStatus } from '@aw/shared';
 import { useEffect, useRef } from 'react';
 import { FUNCTIONAL_TEST_COPY as C } from '../../copy/functional-testing.ts';
 import styles from './functional-test.module.css';
@@ -7,12 +7,14 @@ export function CaseCarousel({
   cases,
   executions,
   selected,
+  live,
   onSelect,
   onInteract,
 }: {
   cases: FunctionalTestCase[];
   executions: readonly FunctionalTestExecution[];
   selected: string | undefined;
+  live: boolean;
   onSelect: (id: string) => void;
   onInteract: () => void;
 }) {
@@ -40,7 +42,7 @@ export function CaseCarousel({
       (row) => row instanceof HTMLElement && row.offsetTop + row.offsetHeight >= center,
     );
     const item = cases[index];
-    if (item !== undefined) {
+    if (item !== undefined && item.id !== selected) {
       pickedByScroll.current = item.id;
       onSelect(item.id);
     }
@@ -50,6 +52,7 @@ export function CaseCarousel({
     <fieldset
       ref={list}
       className={styles.carousel}
+      data-scrollable={live || cases.length > 5 || undefined}
       aria-label={C.cases}
       onWheel={() => {
         scrolling.current = true;
@@ -60,14 +63,23 @@ export function CaseCarousel({
       }}
       onScroll={(event) => selectCenter(event.currentTarget)}
       onKeyDown={(event) => {
-        const offset = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
-        if (offset === 0) return;
-        event.preventDefault();
         const index = cases.findIndex((item) => item.id === selected);
-        const next = cases[index + offset];
+        const target =
+          event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? cases.length - 1
+              : event.key === 'ArrowUp'
+                ? index - 1
+                : event.key === 'ArrowDown'
+                  ? index + 1
+                  : undefined;
+        if (target === undefined) return;
+        event.preventDefault();
+        const next = cases[target];
         if (next !== undefined) {
           onSelect(next.id);
-          const button = list.current?.children[index + offset];
+          const button = list.current?.children[target];
           if (button instanceof HTMLButtonElement) button.focus({ preventScroll: true });
         } else {
           onInteract();
@@ -83,13 +95,23 @@ export function CaseCarousel({
             ref={selected === item.id ? selectedRow : undefined}
             className={styles.caseRow}
             aria-pressed={selected === item.id}
+            tabIndex={selected === item.id ? 0 : -1}
             onClick={() => onSelect(item.id)}
           >
-            <span className="mono">{item.number}</span>
-            <strong className="ellipsis">{item.title}</strong>
-            <span data-status={execution?.status}>
-              {execution === undefined ? C.pending : C.status[execution.status]}
+            <span className={styles.caseState} data-status={execution?.status}>
+              <span aria-hidden="true">
+                {execution?.status === FunctionalTestStatus.Passed
+                  ? '✓'
+                  : execution?.status === FunctionalTestStatus.Failed
+                    ? '×'
+                    : '·'}
+              </span>
             </span>
+            <span className={styles.caseTitle}>
+              <span className={`mono ${styles.caseNumber}`}>{item.number}</span>
+              <strong className="ellipsis">{item.title}</strong>
+            </span>
+            <span className={styles.sr}>{execution === undefined ? C.pending : C.status[execution.status]}</span>
           </button>
         );
       })}

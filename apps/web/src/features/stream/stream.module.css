@@ -107,6 +107,43 @@
 [aria-expanded="true"] > .chevron {
   transform: rotate(90deg);
 }
+
+/* 窄侧栏保留展开按钮和完整详情；摘要换行，长节点名称收进省略号。 */
+@container activity-flow (max-width: 420px) {
+  .head {
+    gap: var(--s-1);
+    padding-right: var(--s-1);
+  }
+  .toggle {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0 var(--s-2);
+    padding: var(--s-2);
+  }
+  .state {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .title,
+  .now,
+  .meta {
+    grid-column: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .now,
+  .meta {
+    font-size: var(--fs-xs);
+  }
+  .meta:empty {
+    display: none;
+  }
+  .toggle > .chevron {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
 .body {
   position: relative;
   display: flex;

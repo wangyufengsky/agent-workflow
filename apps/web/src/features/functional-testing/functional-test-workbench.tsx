@@ -8,11 +8,12 @@ import {
   TaskStatus,
 } from '@aw/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { callOperation } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import type { IconName } from '../../components/icon.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { FUNCTIONAL_TEST_COPY as C } from '../../copy/functional-testing.ts';
 import { BrowserCaseHandoffPane } from '../browser-cases/browser-case-handoff.tsx';
@@ -34,23 +35,49 @@ const phaseLabel: Record<FunctionalTestNode, string> = {
   [N.Report]: C.report,
 };
 
+const phaseIcon: Record<FunctionalTestNode, IconName> = {
+  [N.Author]: 'edit',
+  [N.Import]: 'file',
+  [N.Environment]: 'server',
+  [N.Execute]: 'play',
+  [N.Report]: 'file',
+};
+
 const terminalNodes: readonly NodeStatus[] = [NodeStatus.Done, NodeStatus.Skipped, NodeStatus.Cancelled];
+
+function PhaseActivity({ task, nodeId }: { task: TaskDetailDTO; nodeId: string | undefined }) {
+  if (nodeId === undefined) return null;
+  return (
+    <aside className={`${styles.panel} ${styles.phaseActivity}`}>
+      <FrontendActivity task={task} nodeId={nodeId} inMain={false} starting={false} />
+    </aside>
+  );
+}
 
 function AuthorCases({
   task,
   snapshot,
   importing,
+  nodeId,
 }: {
   task: TaskDetailDTO;
   snapshot: FunctionalTestSnapshot;
   importing: boolean;
+  nodeId: string | undefined;
 }) {
   const [manual, setManual] = useState<string>();
   const items = [...new Map(snapshot.cases.map((item) => [item.id, item])).values()];
   const selected = items.find(({ id }) => id === manual) ?? items.at(-1);
+  const list = useRef<HTMLFieldSetElement>(null);
+  const selectedId = selected?.id;
+  useEffect(() => {
+    if (manual === undefined && selectedId !== undefined && list.current !== null) {
+      list.current.scrollTop = list.current.scrollHeight;
+    }
+  }, [manual, selectedId]);
   return (
-    <section className={`col ${styles.panel}`} aria-label={importing ? C.import : C.author}>
-      <header className="row wrap">
+    <section className={styles.stage} aria-label={importing ? C.import : C.author}>
+      <header className={styles.stageHeader}>
         <h2 className="grow">{importing ? C.import : C.author}</h2>
         {manual !== undefined && (
           <Button size="sm" onClick={() => setManual(undefined)}>
@@ -62,27 +89,38 @@ function AuthorCases({
         <p className="hint">{C.noCases}</p>
       ) : (
         <div className={styles.author}>
-          <fieldset className="col" aria-label={C.cases}>
-            {items.map((item) => (
-              <button
-                type="button"
-                className={styles.caseRow}
-                key={item.id}
-                aria-pressed={selected.id === item.id}
-                onClick={() => setManual(item.id)}
-              >
-                <span className="mono">{item.number}</span>
-                <strong className="ellipsis">{item.title}</strong>
-              </button>
-            ))}
-          </fieldset>
-          <CaseDefinition
-            key={selected.id}
-            taskId={task.id}
-            item={selected}
-            attachments={task.attachments}
-            revisions={revisionsFor(snapshot.events, selected.id)}
-          />
+          <section className={styles.panel} aria-label={C.cases}>
+            <header className={styles.panelHead}>
+              <h2>{C.cases}</h2>
+              <small>{items.length}</small>
+            </header>
+            <fieldset ref={list} className={styles.authorList} aria-label={C.cases}>
+              {items.map((item) => (
+                <button
+                  type="button"
+                  className={styles.caseRow}
+                  key={item.id}
+                  aria-pressed={selected.id === item.id}
+                  onClick={() => setManual(item.id)}
+                >
+                  <span className={styles.caseTitle}>
+                    <span className={`mono ${styles.caseNumber}`}>{item.number}</span>
+                    <strong className="ellipsis">{item.title}</strong>
+                  </span>
+                </button>
+              ))}
+            </fieldset>
+          </section>
+          <div className={styles.panel}>
+            <CaseDefinition
+              key={selected.id}
+              taskId={task.id}
+              item={selected}
+              attachments={task.attachments}
+              revisions={revisionsFor(snapshot.events, selected.id)}
+            />
+          </div>
+          <PhaseActivity task={task} nodeId={nodeId} />
         </div>
       )}
     </section>
@@ -159,14 +197,19 @@ export function FunctionalTestWorkbench({
   return (
     <div className={styles.workbench}>
       {query.isRefetchError && <ErrorState error={query.error} onRetry={() => void query.refetch()} />}
-      <div className="row wrap">
-        <nav className={`grow ${styles.phaseBar}`} aria-label={C.phases}>
+      <div className={styles.toolbar}>
+        <nav className={styles.phaseBar} aria-label={C.phases}>
           {phases.map((item) => (
             <Button
               key={item}
               size="sm"
-              variant={phase === item ? 'primary' : 'ghost'}
+              variant="ghost"
+              icon={phaseIcon[item]}
+              aria-current={automatic === item ? 'step' : undefined}
               aria-pressed={phase === item}
+              data-progress={
+                phases.indexOf(item) < phases.indexOf(automatic) ? 'done' : automatic === item ? 'current' : 'pending'
+              }
               onClick={() => selectPhase(item)}
             >
               {phaseLabel[item]}
@@ -196,8 +239,10 @@ export function FunctionalTestWorkbench({
           </select>
         )}
       </div>
-      <details className={styles.panel}>
-        <summary>{C.scope}</summary>
+      <details className={styles.scope}>
+        <summary>
+          {C.scope} <code className={styles.target}>{scope.target}</code>
+        </summary>
         <FunctionalTestScopeSummary scope={scope} />
         {scope.caseAttachmentIds.length > 0 && (
           <p>
@@ -210,36 +255,49 @@ export function FunctionalTestWorkbench({
         )}
       </details>
       {handoff !== undefined && (
-        <section className={`col ${styles.panel}`}>
+        <section className={`col ${styles.panel} ${styles.phaseActivity}`}>
           <BrowserCaseHandoffPane taskId={task.id} handoff={handoff} />
           {window.aw !== undefined && <div ref={handoffArea} className={styles.handoffSurface} />}
         </section>
       )}
       {(phase === N.Author || phase === N.Import) && (
-        <AuthorCases task={task} snapshot={snapshot} importing={phase === N.Import} />
+        <AuthorCases task={task} snapshot={snapshot} importing={phase === N.Import} nodeId={phaseNodeId} />
       )}
       {phase === N.Environment && (
-        <section className={`col ${styles.panel}`} aria-label={C.prepare}>
-          <h2>{C.prepare}</h2>
-          {environment === undefined ? (
-            <p className="hint">{C.noEnvironment}</p>
-          ) : (
-            <>
-              <p>
-                {C.environment} · {environment.target}
-              </p>
-              <p>
-                {C.baseline} · {environment.baseline ?? C.baselineUnverified}
-                {!environment.verified && environment.baseline !== null ? ` · ${C.baselineUnverified}` : ''}
-              </p>
-              {environment.reason !== null && <p>{environment.reason}</p>}
-              {environment.logTail !== '' && <pre>{environment.logTail}</pre>}
-            </>
-          )}
-          {phaseNodeId !== undefined && (
-            <FrontendActivity task={task} nodeId={phaseNodeId} inMain={false} starting={false} />
-          )}
-        </section>
+        <div className={styles.phaseLayout}>
+          <section className={styles.panel} aria-label={C.prepare}>
+            <header className={styles.panelHead}>
+              <h2>{C.prepare}</h2>
+              {environment !== undefined && (
+                <span className={styles.statusBadge} data-status={environment.ready ? 'passed' : 'blocked'}>
+                  {environment.ready ? C.environmentReady : C.status.blocked}
+                </span>
+              )}
+            </header>
+            <div className={styles.evidenceBody}>
+              {environment === undefined ? (
+                <p className="hint">{C.noEnvironment}</p>
+              ) : (
+                <>
+                  <dl className={styles.environment}>
+                    <dt>{C.environment}</dt>
+                    <dd>
+                      <code>{environment.target}</code>
+                    </dd>
+                    <dt>{C.baseline}</dt>
+                    <dd>
+                      <code>{environment.baseline ?? C.baselineUnverified}</code>
+                      {!environment.verified && environment.baseline !== null ? ` · ${C.baselineUnverified}` : ''}
+                    </dd>
+                  </dl>
+                  {environment.reason !== null && <p className={styles.caution}>{environment.reason}</p>}
+                  {environment.logTail !== '' && <pre className={styles.output}>{environment.logTail}</pre>}
+                </>
+              )}
+            </div>
+          </section>
+          <PhaseActivity task={task} nodeId={phaseNodeId} />
+        </div>
       )}
       {phase === N.Execute && (
         <TestExecution
@@ -257,23 +315,20 @@ export function FunctionalTestWorkbench({
           live={active && running && run?.id === snapshot.runs.at(-1)?.id}
         />
       )}
-      {phase === N.Report &&
-        phaseNodeId !== undefined &&
-        running &&
-        snapshot.reports.every(({ runId }) => runId !== run?.id) && (
-          <FrontendActivity task={task} nodeId={phaseNodeId} inMain={false} starting={false} />
-        )}
       {phase === N.Report && (
-        <TestReport
-          key={run?.id}
-          task={task}
-          reports={snapshot.reports.filter(({ runId }) => runId === run?.id)}
-          onEvidence={(caseId, executionId) => {
-            setEvidence({ caseId, executionId });
-            setExecutionView((epoch) => epoch + 1);
-            setPickedPhase(N.Execute);
-          }}
-        />
+        <div className={styles.phaseLayout}>
+          <TestReport
+            key={run?.id}
+            task={task}
+            reports={snapshot.reports.filter(({ runId }) => runId === run?.id)}
+            onEvidence={(caseId, executionId) => {
+              setEvidence({ caseId, executionId });
+              setExecutionView((epoch) => epoch + 1);
+              setPickedPhase(N.Execute);
+            }}
+          />
+          <PhaseActivity task={task} nodeId={phaseNodeId} />
+        </div>
       )}
     </div>
   );

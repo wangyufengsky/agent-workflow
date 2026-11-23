@@ -1,0 +1,128 @@
+.scope {
+  display: grid;
+  gap: var(--s-4);
+  min-inline-size: 0;
+  margin: var(--s-2) 0 0;
+  padding: var(--s-3) 0 0;
+  border: 0;
+  border-block-start: 1px solid var(--line);
+}
+
+.scope > legend,
+.caseFiles > legend {
+  padding: 0 var(--s-2) 0 0;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.scopeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24ch), 1fr));
+  gap: var(--s-3) var(--s-4);
+}
+
+.field,
+.caseFiles {
+  display: grid;
+  align-content: start;
+  gap: var(--s-2);
+  min-inline-size: 0;
+}
+
+.fieldTitle,
+.caseFiles > legend {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.writes {
+  block-size: auto;
+  min-block-size: var(--s-12);
+  padding-block: var(--s-2);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.caseFiles {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.caseFiles p {
+  margin: 0;
+}
+
+.fileList {
+  display: grid;
+  gap: var(--s-1);
+}
+
+.caseChoice,
+.approval {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.caseChoice {
+  align-items: center;
+  min-block-size: var(--s-8);
+  border: 1px solid var(--line);
+  transition:
+    background-color var(--t-fast),
+    border-color var(--t-fast);
+}
+
+.caseChoice:hover,
+.caseChoice:focus-within {
+  border-color: var(--line-3);
+  background: var(--fill-2);
+}
+
+.caseChoice:has(:checked) {
+  border-color: var(--focus-line);
+  background: var(--fill-3);
+}
+
+.approval {
+  border: 1px solid var(--line-2);
+  background: var(--fill-2);
+  line-height: 1.5;
+}
+
+.approval input {
+  margin-block-start: var(--s-1);
+}
+
+.approval:has(:checked) {
+  border-color: var(--focus-line);
+}
+
+.approval:has(:disabled) {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: minmax(0, 7em) minmax(0, 1fr);
+  gap: var(--s-2) var(--s-3);
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+.summary dt {
+  color: var(--muted);
+}
+
+.summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

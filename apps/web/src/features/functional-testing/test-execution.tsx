@@ -5,12 +5,11 @@ import {
   type TaskDetailDTO,
 } from '@aw/shared';
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '../../components/button.tsx';
 import { FUNCTIONAL_TEST_COPY as C } from '../../copy/functional-testing.ts';
 import { CaseCarousel } from './case-carousel.tsx';
 import { CaseDefinition } from './case-definition.tsx';
 import styles from './functional-test.module.css';
-import { TestEvents } from './test-events.tsx';
+import { SelectedCaseActivity, TestAssertions, TestRequests, TestTerminal } from './test-events.tsx';
 import { TestFollowUp } from './test-follow-up.tsx';
 
 const FOLLOW_AFTER_MS = 5000;
@@ -50,8 +49,7 @@ export function TestExecution({
     snapshot.cases.findLast((entry) => entry.id === selected && entry.version === execution?.version) ??
     items.find(({ id }) => id === selected);
   const events = snapshot.events.filter((event) => execution !== undefined && event.executionId === execution.id);
-  const actions = events.filter(({ kind }) => kind === 'action' || kind === 'cleanup' || kind === 'handoff');
-  const evidence = events.filter(({ kind }) => kind !== 'action');
+  const activity = events.filter(({ kind }) => kind !== 'assertion' && kind !== 'environment');
 
   useEffect(() => {
     if (!live || manual === undefined) return;
@@ -94,7 +92,7 @@ export function TestExecution({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: 只监听子控件的交互，用于延长回看。
     <div
-      className={styles.workbench}
+      className={styles.executionLayout}
       onWheel={stayHere}
       onKeyDown={stayHere}
       onPointerDown={() => {
@@ -111,84 +109,110 @@ export function TestExecution({
       }}
       onToggle={stayHere}
     >
-      <section className={`col ${styles.panel}`} aria-label={C.execute}>
-        <header className="row wrap">
-          <h2 className="grow">{C.execute}</h2>
-          {live && currentCase !== undefined && <span role="status">{C.runningCase(currentCase.number)}</span>}
+      <section className={styles.panel} aria-label={C.execute}>
+        <header className={styles.panelHead}>
+          <h2>{C.cases}</h2>
+          <small>{items.length}</small>
+        </header>
+        {items.length === 0 ? (
+          <p className={`hint ${styles.empty}`}>{C.noCases}</p>
+        ) : (
+          <CaseCarousel
+            cases={items}
+            executions={executions}
+            selected={selected}
+            live={live}
+            onInteract={stayHere}
+            onSelect={(caseId) => {
+              setManual((previous) => (previous?.caseId === caseId ? previous : { caseId }));
+              setLastInteraction(Date.now());
+              onReviewChange(true);
+            }}
+          />
+        )}
+        <footer className={styles.panelFoot}>
+          {live && currentCase !== undefined ? (
+            <span className={styles.running} role="status">
+              {C.runningCase(currentCase.number)}
+            </span>
+          ) : (
+            <span>{C.caseCount(items.length)}</span>
+          )}
           {live && manual !== undefined && (
-            <Button
-              size="sm"
+            <button
+              className={styles.textButton}
+              type="button"
               onClick={() => {
                 setManual(undefined);
                 onReviewChange(false);
               }}
             >
               {C.followLive}
-            </Button>
+            </button>
           )}
-        </header>
-        <CaseCarousel
-          cases={items}
-          executions={executions}
-          selected={selected}
-          onInteract={stayHere}
-          onSelect={(caseId) => {
-            setManual((previous) => (previous?.caseId === caseId ? previous : { caseId }));
-            setLastInteraction(Date.now());
-            onReviewChange(true);
-          }}
-        />
+        </footer>
       </section>
-      {item === undefined ? (
-        <p className="hint">{C.noCases}</p>
-      ) : (
+      {item !== undefined && (
         <>
-          <div className="row wrap">
-            <strong className="grow">
-              {item.number} · {item.title} · {C.version(item.version)}
-            </strong>
-            {outcomes.length > 1 && (
-              <select
-                className="input"
-                aria-label={C.execution}
-                value={execution?.id}
-                onChange={(event) => {
-                  setManual({ caseId: item.id, executionId: event.target.value });
-                  setLastInteraction(Date.now());
-                  onReviewChange(true);
-                }}
-              >
-                {outcomes.map((outcome, index) => (
-                  <option key={outcome.id} value={outcome.id}>
-                    {C.executionLabel(index + 1, outcome.version, C.status[outcome.status])}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          <div className={styles.columns}>
-            <TestEvents label={C.actions} events={actions} allEvents={events} follow={live && manual === undefined} />
-            <TestEvents
-              label={C.console}
-              events={evidence}
-              allEvents={events}
-              consoleView
+          <article className={styles.panel}>
+            <div className={styles.evidenceBody}>
+              <div className={`mono ${styles.caseNumber}`}>
+                {item.number} / v{item.version}
+              </div>
+              <header className={styles.evidenceHeader}>
+                <h3>{item.title}</h3>
+                <span className={styles.statusBadge} data-status={execution?.status}>
+                  {execution === undefined ? C.pending : C.status[execution.status]}
+                </span>
+              </header>
+              <p className="hint">{item.requirement}</p>
+              {outcomes.length > 1 && (
+                <select
+                  className="input"
+                  aria-label={C.execution}
+                  value={execution?.id}
+                  onChange={(event) => {
+                    setManual({ caseId: item.id, executionId: event.target.value });
+                    setLastInteraction(Date.now());
+                    onReviewChange(true);
+                  }}
+                >
+                  {outcomes.map((outcome, index) => (
+                    <option key={outcome.id} value={outcome.id}>
+                      {C.executionLabel(index + 1, outcome.version, C.status[outcome.status])}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <TestRequests events={events} allEvents={events} />
+              <TestAssertions events={events} />
+            </div>
+            <TestTerminal
+              events={events}
+              caseLabel={`${item.number} · v${item.version}`}
               follow={live && manual === undefined}
             />
-          </div>
-          {execution?.status === FunctionalTestStatus.Failed && (
-            <TestFollowUp key={execution.id} task={task} executionIds={[execution.id]} />
-          )}
-          {execution === undefined && <p className="hint">{C.pending}</p>}
-          <details className={styles.panel}>
-            <summary>{C.steps}</summary>
-            <CaseDefinition
-              taskId={task.id}
-              item={item}
-              attachments={task.attachments}
-              revisions={revisionsFor(snapshot.events, item.id)}
-            />
-          </details>
+            <details className={styles.inspector}>
+              <summary>{C.steps}</summary>
+              <CaseDefinition
+                taskId={task.id}
+                item={item}
+                attachments={task.attachments}
+                revisions={revisionsFor(snapshot.events, item.id)}
+              />
+            </details>
+            {execution?.status === FunctionalTestStatus.Failed && (
+              <div className={styles.evidenceFoot}>
+                <TestFollowUp key={execution.id} task={task} executionIds={[execution.id]} />
+              </div>
+            )}
+          </article>
+          <SelectedCaseActivity
+            key={execution?.id ?? item.id}
+            caseNumber={item.number}
+            events={activity}
+            allEvents={events}
+          />
         </>
       )}
     </div>

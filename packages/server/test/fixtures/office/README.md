@@ -9,6 +9,7 @@
 | `report.doc` | 同一份 HTML，用 LibreOffice 存为 Word 97 |
 | `report.encrypted.docx` | `report.libreoffice.docx` 用 `msoffcrypto-tool -e -p secret` 加上打开密码（与 Office 一样的 OLE 包装） |
 | `sales.libreoffice.xlsx` | exceljs 写出「明细」（日期、数量、单价、公式金额，第 4 行隐藏）、「汇总」（A1:B1 合并，SUMIF 与 SUM 公式，含竖线的富文本）、隐藏的工作表「隐藏」，再用 LibreOffice 另存为 xlsx（公式带上缓存结果） |
+| `cases.artifact-tool.xlsx` | artifact-tool 直接导出的「运费用例」，含五条案例。保留原始的 SpreadsheetML 前缀标签、绝对 OPC 关系和字符串单元格 |
 | `sales.xls` | 同上，用 LibreOffice 存为 Excel 97 |
 
 Microsoft Word 与 WPS 保存的样本待补：脚本驱动 Word 另存失败，WPS 只能手动操作。

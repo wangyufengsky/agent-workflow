@@ -76,21 +76,25 @@ export function readZipEntry(bytes: Buffer, entry: ZipEntry, maxBytes: number): 
   }
 }
 
+export function assertUnzippedSize(size: number, limit: number): void {
+  if (size > limit) {
+    throw new AppError(ErrorCode.AttachmentTooLarge, 'Unzipped size limit exceeded', {
+      reason: AttachmentLimit.Unzipped,
+      limit,
+    });
+  }
+}
+
 /**
  * Inflates every entry, counting the bytes it really produces and keeping none of them, and stops once they pass
  * `limit` (39 §5.1). The central directory's sizes are the file's own claim and a zip bomb lies about them, so the
  * parsers only get a file that is known to unzip within the limit.
  */
-export async function assertUnzipsWithin(bytes: Buffer, entries: readonly ZipEntry[], limit: number): Promise<void> {
+export async function assertUnzipsWithin(bytes: Buffer, entries: readonly ZipEntry[], limit: number): Promise<number> {
   let total = 0;
   const count = (size: number) => {
     total += size;
-    if (total > limit) {
-      throw new AppError(ErrorCode.AttachmentTooLarge, 'Unzipped size limit exceeded', {
-        reason: AttachmentLimit.Unzipped,
-        limit,
-      });
-    }
+    assertUnzippedSize(total, limit);
   };
   for (const entry of entries) {
     const data = packedData(bytes, entry);
@@ -108,4 +112,5 @@ export async function assertUnzipsWithin(bytes: Buffer, entries: readonly ZipEnt
       throw corrupt(`Cannot inflate ${entry.name}: ${String(err)}`);
     }
   }
+  return total;
 }

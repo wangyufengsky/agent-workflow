@@ -92,6 +92,41 @@ describe('在 worker 线程里读出文字', () => {
     expect(workbook.sheets[1]?.rows.find((row) => row.r === 6)?.cells[1]).toEqual({ c: 2, v: 2791.5, f: 'SUM(B3:B5)' });
   });
 
+  it('直接读取 artifact-tool 原件的工作表与全部五条运费案例', async () => {
+    const bytes = await readFile(fixture('cases.artifact-tool.xlsx'));
+    const { meta, dir } = await parse(bytes);
+    expect(meta).toMatchObject({ sheets: [{ name: '运费用例', range: 'A1:E6', rows: 6, columns: 5 }] });
+    const workbook: Workbook = JSON.parse(await readFile(join(dir, WORKBOOK_FILE), 'utf8'));
+    expect(workbook.sheets[0]?.rows.map(({ cells }) => cells.map(({ v }) => v))).toEqual([
+      ['编号', '案例名称', '操作', '预期结果', '需求依据'],
+      ['QA-01', '轻件首重', 'GET /quote/light', 'HTTP 200，fee 为 6', '首重 1 公斤 6 元'],
+      ['QA-02', '两公斤续重', 'GET /quote/double', 'HTTP 200，fee 为 8', '第二公斤加 2 元'],
+      ['QA-03', '三公斤续重', 'GET /quote/triple', 'HTTP 200，fee 为 10', '第三公斤再加 2 元'],
+      ['QA-04', '免邮会员', 'GET /quote/member', 'HTTP 200，fee 为 0', '会员免邮'],
+      ['QA-05', '未知档位', 'GET /quote/missing', 'HTTP 404，error 为 unknown', '未知档位返回 404'],
+    ]);
+    expect(await readFile(join(dir, 'original'))).toEqual(bytes);
+  });
+
+  it('带前缀的工作簿部件损坏时仍拒绝解析', async () => {
+    const broken = makeZip([
+      {
+        name: '[Content_Types].xml',
+        content:
+          '<Types><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/></Types>',
+      },
+      {
+        name: 'xl/workbook.xml',
+        content:
+          '<x:workbook xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><x:sheets></x:workbook>',
+      },
+    ]);
+    expect(await errorOf(() => parse(broken))).toEqual({
+      code: ErrorCode.AttachmentParseFailed,
+      details: { reason: AttachmentParseFailure.Corrupt },
+    });
+  });
+
   it('实际解压后超过上限的被拒，即使中央目录把大小写小了', async () => {
     const bomb = makeZip([
       { name: '[Content_Types].xml', content: WORD_TYPES },
