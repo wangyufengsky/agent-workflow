@@ -61,6 +61,11 @@ it('matches a local IDEA JUnit config to a new working-tree test and does not ru
   });
   if (outcome.kind !== 'checked') throw new Error('Expected a real check result');
   expect(outcome.output).toContain('dirty fixture');
+  for (const uncovered of ['api/src/test/java/example/OldTest.java', 'worker/job.py', 'cmd/app.go']) {
+    expect.soft(await runIdeaAcceptance({ ...input, env, changedPaths: [changed, uncovered] })).toMatchObject({
+      kind: 'fallback',
+    });
+  }
   expect(await runIdeaAcceptance({ ...input, env, changedPaths: [changed, 'web/src/app.ts'] })).toMatchObject({
     kind: 'fallback',
   });
@@ -70,6 +75,18 @@ it('matches a local IDEA JUnit config to a new working-tree test and does not ru
   expect(await runIdeaAcceptance({ ...input, env: { PATH: '' }, changedPaths: [changed] })).toMatchObject({
     kind: 'fallback',
   });
+  const suite = `<configuration name="API suite" type="MavenRunConfiguration">
+    <MavenSettings><option name="myRunnerParameters"><MavenRunnerParameters>
+      <option name="myWorkingDirPath" value="$PROJECT_DIR$/api"/>
+      <option name="myGoals"><list><option value="test"/></list></option>
+    </MavenRunnerParameters></option></MavenSettings></configuration>`;
+  await writeFile(
+    join(input.repo.path, '.idea/workspace.xml'),
+    `<project><component name="RunManager">${junit('New test')}${suite}</component></project>`,
+  );
+  expect(
+    await runIdeaAcceptance({ ...input, env, changedPaths: [changed, 'api/src/test/java/example/OldTest.java'] }),
+  ).toMatchObject({ kind: 'checked', configurations: ['API suite'], output: expect.stringContaining('["test"]') });
   await writeFile(join(input.repo.path, '.idea/workspace.xml'), '<project><broken');
   expect(await runIdeaAcceptance({ ...input, env, changedPaths: [changed] })).toMatchObject({ kind: 'fallback' });
 

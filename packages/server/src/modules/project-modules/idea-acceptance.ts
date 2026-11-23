@@ -39,10 +39,9 @@ type Candidate =
 
 const fallback = (reason: string): IdeaAcceptanceResult => ({ kind: 'fallback', reason });
 const javaChange =
-  /(?:\.java$|(?:^|\/)src\/(?:main|test)\/(?:java|resources)\/|(?:^|\/)(?:pom\.xml|build\.gradle(?:\.kts)?|settings\.gradle(?:\.kts)?|gradle\.properties)$)/;
-
-const nodeChange =
-  /(?:\.(?:[cm]?[jt]s|[jt]sx|vue|svelte)$|(?:^|\/)(?:package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?)$)/;
+  /(?:\.java$|(?:^|\/)src\/(?:main|test)\/resources\/.*\.(?:properties|xml|ya?ml|json)$|(?:^|\/)(?:pom\.xml|build\.gradle(?:\.kts)?|settings\.gradle(?:\.kts)?|gradle\.properties)$)/;
+// 只有文档和 IDE 元数据能随 Java 改动一起略过。未知源码、脚本和构建配置交给项目检查。
+const ancillaryChange = /(?:\.(?:md|rst|adoc)$|(?:^|\/)(?:\.idea|\.run)\/.*\.xml$)/i;
 
 function externalFailure(error: unknown): boolean {
   return (
@@ -83,15 +82,21 @@ function candidates(catalog: Awaited<ReturnType<typeof discoverTaskModules>>, ch
       )
     )
       return [];
-    const exact = available.filter(
-      ({ testClass }) =>
-        testClass !== undefined &&
-        paths.includes(posix.join(module.directory, 'src/test/java', `${testClass.replaceAll('.', '/')}.java`)),
+    const testRoot = `${posix.join(module.directory, 'src/test/java')}/`;
+    const changedClasses = new Set(
+      paths
+        .filter((path) => path.startsWith(testRoot) && path.endsWith('.java'))
+        .map((path) => path.slice(testRoot.length, -'.java'.length).replaceAll('/', '.')),
     );
+    const exact = available.filter(({ testClass }) => testClass !== undefined && changedClasses.has(testClass));
     const suites = available.filter(({ testClass }) => testClass === undefined);
-    const choices = exact.length > 0 ? exact : suites.length > 0 ? suites : available;
-    const identities = new Set(choices.map(({ testClass }) => testClass));
-    if (choices.length > 1 && (exact.length === 0 || choices.length !== identities.size)) return [];
+    let choices = suites.length > 0 ? suites : available;
+    if (changedClasses.size > 0) {
+      const covered = new Set(exact.map(({ testClass }) => testClass));
+      choices = covered.size === changedClasses.size ? exact : suites;
+      if (choices.length === 0) return [];
+    }
+    if (choices.length > 1 && (choices !== exact || choices.length !== changedClasses.size)) return [];
     if (choices.length === 0) break;
     matches.push({ module, checks: choices });
   }
@@ -149,8 +154,8 @@ function candidates(catalog: Awaited<ReturnType<typeof discoverTaskModules>>, ch
 export async function runIdeaAcceptance(input: Input): Promise<IdeaAcceptanceResult> {
   const { signal, clock, worktreePath, repoPath } = input;
   if (signal.aborted) return { kind: 'interrupted' };
-  if (input.changedPaths.some((path) => nodeChange.test(path)))
-    return fallback('本次改动包含 JavaScript、TypeScript 或 Node 项目配置，改用原验收命令。');
+  if (input.changedPaths.some((path) => !javaChange.test(path) && !ancillaryChange.test(path)))
+    return fallback('本次改动包含 IDEA Java 配置无法验证的文件，改用项目检查命令。');
   const changed = input.changedPaths.filter((path) => javaChange.test(path));
   if (changed.length === 0) return fallback('本次改动未涉及可匹配的 Java 模块。');
   let catalog: Awaited<ReturnType<typeof discoverTaskModules>>;
