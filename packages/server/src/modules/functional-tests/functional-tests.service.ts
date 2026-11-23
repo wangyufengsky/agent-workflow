@@ -37,12 +37,14 @@ import { runGit } from '../git/index.ts';
 import type { PreviewsService } from '../previews/index.ts';
 import { executeCase } from './functional-tests.execute.ts';
 import { redactText, scopedRequest } from './functional-tests.http.ts';
+import { readIdeaConfigurations } from './functional-tests.idea.ts';
 import { createFunctionalTestRepo } from './functional-tests.repo.ts';
 import { latestCases, makeReport } from './functional-tests.reports.ts';
 import { functionalTestRevisions } from './functional-tests.revisions.ts';
 
 type Deps = {
   db: Db;
+  projectDirectory: (projectId: string) => string;
   rerunOrigin: (taskId: string) => { taskId: string; executionIds: string[] } | undefined;
   unit: UnitOfWork;
   clock: Clock;
@@ -64,12 +66,24 @@ function find<T>(value: T | undefined, message: string): T {
 
 function launchDetail(launch?: FunctionalTestLaunch) {
   if (launch === undefined) return {};
-  const { directory, source, script, readyPath, profile } = launch;
-  return { launch: { directory, source, script, readyPath, ...(profile === undefined ? {} : { profile }) } };
+  const { directory, source, script, readyPath, profile, mainClass, javaVersion, includeProvided } = launch;
+  return {
+    launch: {
+      directory,
+      source,
+      script,
+      readyPath,
+      ...(profile === undefined ? {} : { profile }),
+      ...(mainClass === undefined ? {} : { mainClass }),
+      ...(javaVersion === undefined ? {} : { javaVersion }),
+      ...(includeProvided === undefined ? {} : { includeProvided }),
+    },
+  };
 }
 
 export function createFunctionalTests({
   db,
+  projectDirectory,
   rerunOrigin,
   unit,
   clock,
@@ -621,6 +635,14 @@ export function createFunctionalTests({
   const revisions = functionalTestRevisions({ repo, resolve, context });
   return {
     phase,
+    async ideConfigurations(attempt: AttemptDTO) {
+      const { record, scope } = resolve(attempt, [FUNCTIONAL_TEST_NODE.Environment]);
+      if (!scope.target.startsWith('/')) throw new AppError(ErrorCode.McpToolNotAllowed, 'Local test target required');
+      return readIdeaConfigurations(
+        find(record.git.worktreePath ?? undefined, 'Test worktree is unavailable'),
+        projectDirectory(record.project.id),
+      );
+    },
     taskContext(attempt: AttemptDTO) {
       const current = phase(attempt);
       if (attempt.taskId === null || current === undefined || !isFunctionalTestNode(current)) return undefined;

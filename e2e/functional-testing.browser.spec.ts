@@ -178,6 +178,32 @@ test('准备环境显示实际启动、探测和阻塞原因，并兼容旧运�
         },
       },
       {
+        id: 'run-java',
+        createdAt: now,
+        environment: {
+          id: 'env-java',
+          target: 'http://localhost:49153/orders',
+          baseline: 'cc12345',
+          verified: true,
+          ready: true,
+          reason: null,
+          logTail: '',
+          launch: {
+            directory: 'services/orders',
+            source: 'services/orders/pom.xml',
+            script: 'java-main',
+            mainClass: '订单服务.进程',
+            javaVersion: 8,
+            includeProvided: true,
+            readyPath: '/health',
+          },
+          command: 'java 订单服务.进程',
+          readyUrl: 'http://localhost:49153/health',
+          readyStatus: 200,
+          checks: [],
+        },
+      },
+      {
         id: 'run-1',
         createdAt: now,
         environment: {
@@ -222,6 +248,14 @@ test('准备环境显示实际启动、探测和阻塞原因，并兼容旧运�
   await expect(environment.getByText('/health', { exact: true })).toBeVisible();
   await expect(environment.getByText('Port already in use')).toBeVisible();
   await expect(environment.getByText('HTTP 200', { exact: true })).toHaveCount(0);
+
+  await rounds.selectOption('run-java');
+  await expect(environment.getByText('Java 主类', { exact: true })).toBeVisible();
+  await expect(environment.getByText('订单服务.进程', { exact: true })).toBeVisible();
+  await expect(environment.getByText('Java 8', { exact: true })).toBeVisible();
+  await expect(environment.getByText('运行类路径包含 provided 依赖', { exact: true })).toBeVisible();
+  await expect(environment.getByText('包含', { exact: true })).toBeVisible();
+  await expect(environment.getByText('启动 Profile', { exact: true })).toHaveCount(0);
 
   await rounds.selectOption('run-1');
   await expect(environment.getByText('http://localhost/orders', { exact: true })).toBeVisible();

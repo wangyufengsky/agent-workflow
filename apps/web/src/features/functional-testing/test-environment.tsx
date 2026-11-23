@@ -74,6 +74,28 @@ export function TestEnvironment({ environment }: { environment: Environment | un
                   <dd>
                     <code>{launch.script}</code>
                   </dd>
+                  {launch.mainClass !== undefined && (
+                    <>
+                      <dt>{C.launchMainClass}</dt>
+                      <dd>
+                        <code>{launch.mainClass}</code>
+                      </dd>
+                    </>
+                  )}
+                  {launch.javaVersion !== undefined && (
+                    <>
+                      <dt>{C.launchJavaVersion}</dt>
+                      <dd>
+                        <code>Java {launch.javaVersion}</code>
+                      </dd>
+                    </>
+                  )}
+                  {launch.includeProvided !== undefined && (
+                    <>
+                      <dt>{C.launchProvided}</dt>
+                      <dd>{launch.includeProvided ? C.launchIncludesProvided : C.launchExcludesProvided}</dd>
+                    </>
+                  )}
                   <dt>{C.launchDirectory}</dt>
                   <dd>
                     <code>{launch.directory}</code>

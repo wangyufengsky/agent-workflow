@@ -1,4 +1,4 @@
-import { realpath, symlink, writeFile } from 'node:fs/promises';
+import { chmod, readFile, realpath, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   ErrorCode,
@@ -44,11 +44,26 @@ createServer((req, res) => {
 let t: TestApp;
 afterEach(async () => t.close());
 
-async function testWorktree(files: Record<string, string> = {}) {
+async function testWorktree(files: Record<string, string> = {}, wrapper?: { name: string; executable: string }) {
   t = await createTestApp();
-  const { project } = await addProject(t, {
-    files: { 'api/package.json': manifest, 'api/server.mjs': server, ...files },
+  const wrapperFile =
+    wrapper === undefined
+      ? {}
+      : {
+          [wrapper.name]: `#!/bin/sh
+test "${'$'}{PWD##*/}" = api || exit 8
+printf "%s" "$PWD" > .test-wrapper-directory
+exec "${wrapper.executable}" "$@"
+`,
+        };
+  const { project, repo } = await addProject(t, {
+    files: { 'api/package.json': manifest, 'api/server.mjs': server, ...files, ...wrapperFile },
   });
+  if (wrapper !== undefined) {
+    await chmod(join(repo.path, wrapper.name), 0o755);
+    await repo.git('add', '--chmod=+x', '--', wrapper.name);
+    await repo.git('commit', '-m', 'Make root wrapper executable');
+  }
   const ready = taskReaches(t, 'plan_review');
   const task = await createTask(t, { projectId: project.id, workflow: 'bugfix', checkpoints: { confirm_plan: true } });
   await ready;
@@ -200,3 +215,131 @@ createServer((_, res) => res.end(value)).listen(Number(process.env.PORT), proces
   const preview = await t.app.services.previews.start(task.id, { launch });
   expect(await (await fetch(`${preview.url}/health`)).text()).toBe('installed from the service directory');
 });
+
+it.skipIf(!process.env.JAVA8_HOME && !process.env.AW_TEST_REGISTERED_JDK8)(
+  'uses Java 8 and adds only the requested Maven provided dependencies',
+  async () => {
+    const { task, worktree } = await testWorktree(
+      {
+        'api/pom.xml': `<project xmlns="http://maven.apache.org/POM/4.0.0">
+      <modelVersion>4.0.0</modelVersion><groupId>example</groupId><artifactId>qa</artifactId><version>1</version>
+      <properties><maven.compiler.source>8</maven.compiler.source><maven.compiler.target>8</maven.compiler.target></properties>
+      <dependencies>
+        <dependency><groupId>org.apache.commons</groupId><artifactId>commons-lang3</artifactId><version>3.14.0</version><scope>provided</scope></dependency>
+        <dependency><groupId>commons-io</groupId><artifactId>commons-io</artifactId><version>2.15.1</version><scope>runtime</scope></dependency>
+        <dependency><groupId>junit</groupId><artifactId>junit</artifactId><version>4.13.2</version><scope>test</scope></dependency>
+      </dependencies>
+    </project>`,
+        'api/src/main/java/example/Probe.java': `package example;
+      import com.sun.net.httpserver.HttpServer;
+      import java.net.InetSocketAddress;
+      import java.nio.charset.StandardCharsets;
+      class Probe {
+        public static void main(String[] args) throws Exception {
+          String details = System.getProperty("java.specification.version") + "," +
+            present("org.apache.commons.lang3.StringUtils") + "," +
+            present("org.apache.commons.io.IOUtils") + "," +
+            present("org.junit.Test");
+          String serverPort = System.getProperty("server.port");
+          if (!serverPort.equals(System.getenv("PORT")) || !serverPort.equals(System.getenv("SERVER_PORT"))) {
+            throw new IllegalStateException("the JVM property and environment disagree");
+          }
+          HttpServer server = HttpServer.create(new InetSocketAddress(System.getProperty("server.address"), Integer.parseInt(serverPort)), 0);
+          server.createContext("/health", exchange -> {
+            byte[] bytes = details.getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, bytes.length);
+            exchange.getResponseBody().write(bytes);
+            exchange.close();
+          });
+          server.start();
+        }
+        private static boolean present(String name) {
+          try { Class.forName(name); return true; }
+          catch (ClassNotFoundException missing) { return false; }
+        }
+      }`,
+      },
+      process.env.AW_TEST_MAVEN_ROOT_WRAPPER === undefined
+        ? undefined
+        : {
+            name: 'mvnw',
+            executable: process.env.AW_TEST_MAVEN_ROOT_WRAPPER,
+          },
+    );
+    const previews = t.app.services.previews;
+    const proposal: FunctionalTestLaunch = {
+      directory: 'api',
+      source: 'api/pom.xml',
+      script: 'java-main',
+      mainClass: 'example.Probe',
+      javaVersion: 8,
+      readyPath: '/health',
+    };
+    for (const includeProvided of [false, true]) {
+      await previews.start(task.id, { launch: { ...proposal, includeProvided } });
+      if (process.env.AW_TEST_MAVEN_ROOT_WRAPPER !== undefined)
+        expect(await readFile(join(worktree.path, 'api', '.test-wrapper-directory'), 'utf8')).toBe(
+          join(worktree.path, 'api'),
+        );
+      const details = previews.launchDetails(task.id);
+      if (details === undefined) throw new Error('Expected Java launcher evidence');
+      expect(details.evidence).toMatchObject({ javaVersion: 8, includeProvided });
+      expect(await (await fetch(details.readyUrl)).text()).toBe(`1.8,${includeProvided},true,false`);
+      await previews.stop(task.id);
+    }
+  },
+  120_000,
+);
+
+it.skipIf(!process.env.AW_TEST_GRADLE)(
+  'launches the selected Gradle class even when the run task overrides its main class',
+  async () => {
+    const { task, worktree } = await testWorktree(
+      {
+        'settings.gradle': "rootProject.name = 'preview'; include 'api'",
+        'api/build.gradle': `plugins { id 'application' }
+      application { mainClass = 'example.Probe' }
+      tasks.named('run') { mainClass = 'example.Other' }`,
+        'api/src/main/java/example/Other.java': `package example;
+      public class Other { public static void main(String[] args) { throw new AssertionError("Wrong main class"); } }`,
+        'api/src/main/java/example/Probe.java': `package example;
+      import com.sun.net.httpserver.HttpServer;
+      import java.net.InetSocketAddress;
+      class Probe {
+        public static void main(String[] args) throws Exception {
+          HttpServer server = HttpServer.create(new InetSocketAddress(System.getProperty("server.address"), Integer.parseInt(System.getProperty("server.port"))), 0);
+          server.createContext("/health", exchange -> { exchange.sendResponseHeaders(204, -1); exchange.close(); });
+          server.start();
+        }
+      }`,
+      },
+      process.env.AW_TEST_GRADLE_ROOT_WRAPPER === undefined
+        ? undefined
+        : {
+            name: 'gradlew',
+            executable: process.env.AW_TEST_GRADLE_ROOT_WRAPPER,
+          },
+    );
+    const previews = t.app.services.previews;
+    await previews.start(task.id, {
+      launch: {
+        directory: 'api',
+        source: 'api/build.gradle',
+        script: 'java-main',
+        javaVersion: 21,
+        mainClass: 'example.Probe',
+        readyPath: '/health',
+      },
+    });
+    if (process.env.AW_TEST_GRADLE_ROOT_WRAPPER !== undefined)
+      expect(await readFile(join(worktree.path, 'api', '.test-wrapper-directory'), 'utf8')).toBe(
+        join(worktree.path, 'api'),
+      );
+    const details = previews.launchDetails(task.id);
+    if (details === undefined) throw new Error('Expected Gradle launcher evidence');
+    expect(details.evidence).toMatchObject({ manager: 'gradle', javaVersion: 21 });
+    expect(details.command).toContain('example.Probe');
+    expect((await fetch(details.readyUrl)).status).toBe(204);
+  },
+  120_000,
+);

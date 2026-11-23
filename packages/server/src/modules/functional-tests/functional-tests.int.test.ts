@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -130,6 +130,7 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
     const author = next(FUNCTIONAL_TEST_NODE.Author);
     await t.call(startTaskOp, { id: taskId });
     expect((await call(author, McpToolName.TestEnvironmentPrepare)).body.code).toBe(ErrorCode.McpToolNotAllowed);
+    expect((await call(author, McpToolName.TestIdeConfigurations)).body.code).toBe(ErrorCode.McpToolNotAllowed);
     const definition = {
       title: '创建并读取待办',
       requirement: '保存后可用新 ID 读取',
@@ -245,6 +246,7 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
     });
     const environment = next(FUNCTIONAL_TEST_NODE.Environment);
     await must(author, McpToolName.SubmitResult, { summary: '已保存用例' });
+    expect((await call(environment, McpToolName.TestIdeConfigurations)).body.code).toBe(ErrorCode.McpToolNotAllowed);
     const refused = await call(environment, McpToolName.TestEnvironmentPrepare, {
       launch: { directory: '.', source: 'package.json', script: 'dev', readyPath: '/' },
     });
@@ -566,6 +568,15 @@ createServer((req, res) => {
     const environment = stage(FUNCTIONAL_TEST_NODE.Environment);
     await must(authorId, McpToolName.SubmitResult, { summary: '已保存用例' });
     const prepId = (await environment).attempt.id;
+    await mkdir(join(repo.path, '.idea'), { recursive: true });
+    await writeFile(
+      join(repo.path, '.idea/workspace.xml'),
+      '<project><component name="RunManager"><configuration type="Application" name="Local only"><option name="MAIN_CLASS_NAME" value="example.LocalService"/></configuration></component></project>',
+    );
+    const discovered = await must(prepId, McpToolName.TestIdeConfigurations);
+    expect(discovered.configurations).toEqual([
+      expect.objectContaining({ mainClass: 'example.LocalService', location: 'project' }),
+    ]);
 
     const launch = { directory: 'orders', source: 'orders/package.json', script: 'dev', readyPath: '/ready' };
     const unsupported = { ...launch, script: 'unknown-script' };

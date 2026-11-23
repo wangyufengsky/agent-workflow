@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FUNCTIONAL_TEST_JAVA_MAIN_SCRIPT } from '../../constants/functional-testing.ts';
 import { browserCaseActionSchema, browserCaseAssertionSchema } from './browser-cases.ts';
 
 const id = z.string().min(1).max(160);
@@ -73,16 +74,59 @@ const repoPath = z
       value.split('/').every((part) => part && part !== '.' && part !== '..' && part.toLowerCase() !== '.git'),
     'Expected a path relative to the worktree',
   );
-export const functionalTestLaunchSchema = z.strictObject({
-  directory: z.union([z.literal('.'), repoPath]),
-  source: repoPath,
-  script: z
-    .string()
-    .max(128)
-    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_.:-]*$/),
-  profile: z.enum(['test', 'qa']).optional(),
-  readyPath: probeSchema.shape.path,
-});
+const javaIdentifier = /^[\p{L}\p{Nl}\p{Sc}\p{Pc}][\p{L}\p{Nl}\p{Sc}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*$/u;
+const javaReserved = new Set(
+  (
+    'abstract assert boolean break byte case catch char class const continue default do double else enum extends final ' +
+    'finally float for goto if implements import instanceof int interface long native new package private protected ' +
+    'public return short static strictfp super switch synchronized this throw throws transient try void volatile while ' +
+    'true false null'
+  ).split(' '),
+);
+export const functionalTestMainClassSchema = z
+  .string()
+  .min(1)
+  .max(512)
+  .refine(
+    (value) => value.split('.').every((part) => javaIdentifier.test(part) && !javaReserved.has(part)),
+    'Expected a Java class name, optionally qualified by its package',
+  );
+
+export const functionalTestLaunchSchema = z
+  .strictObject({
+    directory: z.union([z.literal('.'), repoPath]),
+    source: repoPath,
+    script: z
+      .string()
+      .max(128)
+      .regex(/^[a-zA-Z0-9][a-zA-Z0-9_.:-]*$/),
+    profile: z.enum(['test', 'qa']).optional(),
+    readyPath: probeSchema.shape.path,
+    mainClass: functionalTestMainClassSchema.optional(),
+    javaVersion: z.number().int().min(8).optional(),
+    includeProvided: z.boolean().optional(),
+  })
+  .superRefine((launch, ctx) => {
+    const javaMain =
+      launch.script === FUNCTIONAL_TEST_JAVA_MAIN_SCRIPT && launch.source.split('/').at(-1) !== 'package.json';
+    if (javaMain !== (launch.mainClass !== undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['mainClass'],
+        message: javaMain ? 'Select the mainClass for java-main' : 'mainClass is only accepted for java-main',
+      });
+    }
+    if (!javaMain) {
+      for (const field of ['javaVersion', 'includeProvided'] as const) {
+        if (launch[field] !== undefined) {
+          ctx.addIssue({ code: 'custom', path: [field], message: `${field} is only accepted for java-main` });
+        }
+      }
+    }
+    if (javaMain && launch.profile !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['profile'], message: 'java-main does not accept a Spring profile' });
+    }
+  });
 export type FunctionalTestLaunch = z.infer<typeof functionalTestLaunchSchema>;
 export const functionalTestPrepareSchema = z.object({
   checks: z.array(probeSchema).max(10).optional(),

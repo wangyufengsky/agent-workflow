@@ -150,7 +150,7 @@ export function createSubmissionGuides(
         'Persist each case with test_case_save, then submit a summary. For imports give every source, case count and unresolved region in your summary.';
     if (phase === FUNCTIONAL_TEST_NODE.Environment)
       instructions =
-        'Read saved case requires keys and inheritedChecks with test_run_read. For a local target without suitable startup settings, inspect the README and committed manifests, then pass the documented task-scoped launch to test_environment_prepare. Use the exact keys for documented prerequisites. Inherited definitions are rechecked on retest. Submit the resulting run ID and readiness summary from the current environment.checks. Report missing or failed prerequisites as blockers for dependent cases.';
+        'Read saved case requires keys and inheritedChecks with test_run_read. For a local target without suitable startup settings, inspect project and module instructions including AGENTS.md/agents.md, linked runbooks, build configuration and source; for Java/IDEA call test_ide_configurations and verify the service main class, then pass the documented task-scoped launch to test_environment_prepare. Use the exact keys for documented prerequisites. Inherited definitions are rechecked on retest. Submit the resulting run ID and readiness summary from the current environment.checks. Report missing or failed prerequisites as blockers for dependent cases.';
     if (phase === FUNCTIONAL_TEST_NODE.Execute)
       instructions =
         'Read saved case versions and the run with test_run_read. Record each executable case with test_case_run. Refer to saved evidence in your summary.';

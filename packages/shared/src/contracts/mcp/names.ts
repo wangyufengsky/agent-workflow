@@ -52,6 +52,7 @@ export const McpToolName = {
   TestCaseRun: 'test_case_run',
   TestCaseRevise: 'test_case_revise',
   TestRunRead: 'test_run_read',
+  TestIdeConfigurations: 'test_ide_configurations',
   TestEnvironmentPrepare: 'test_environment_prepare',
   TestReportSubmit: 'test_report_submit',
 } as const;

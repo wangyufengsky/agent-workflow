@@ -462,6 +462,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     dataDir: config.dataDir,
   });
   const functionalTests = createFunctionalTestsModule({
+    projectDirectory: (id) => projects.service.getRecord(id).repoPath,
     db: database.db,
     rerunOrigin: (taskId) => findTestRerunOrigin(database.db, taskId),
     unit,

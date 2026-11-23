@@ -10,3 +10,5 @@ export type FunctionalTestNode = (typeof FUNCTIONAL_TEST_NODE)[keyof typeof FUNC
 export function isFunctionalTestNode(key: string): key is FunctionalTestNode {
   return Object.values(FUNCTIONAL_TEST_NODE).some((node) => node === key);
 }
+
+export const FUNCTIONAL_TEST_JAVA_MAIN_SCRIPT = 'java-main';

@@ -1,11 +1,18 @@
 import { lstat, readFile, realpath } from 'node:fs/promises';
 import { dirname, join, posix } from 'node:path';
-import { AppError, ErrorCode, type FunctionalTestLaunch, Platform } from '@aw/shared';
+import { AppError, ErrorCode, FUNCTIONAL_TEST_JAVA_MAIN_SCRIPT, type FunctionalTestLaunch } from '@aw/shared';
 import { SaxesParser } from 'saxes';
 import { z } from 'zod';
-import { host } from '../../core/platform.ts';
 import { runGit } from '../git/index.ts';
 import type { Worktree } from '../worktrees/index.ts';
+import {
+  type CommittedSource,
+  findManager,
+  javaBuildExecutable,
+  type PreparePreviewCommand,
+  type PreviewCommand,
+} from './previews.commands.ts';
+import { javaCommands } from './previews.java-launch.ts';
 import { verifySpringProfile } from './previews.spring-profile.ts';
 
 const LOOPBACK = '127.0.0.1';
@@ -16,14 +23,14 @@ const VITE_MODE = /^vite(?: dev| serve)?(?: --mode (test|qa))?$/;
 const SERVER_ENTRY = /^(?:node(?: --watch)?|tsx)\s+(?:"([^"]+)"|'([^']+)'|([^\s]+))$/;
 const FRAMEWORK_SERVICE =
   /^(?:vite(?: dev| serve)?|next dev|astro dev|nuxt dev|react-scripts start|nest start(?: --watch)?)$/;
-type Manager = 'npm' | 'pnpm' | 'yarn' | 'bun' | 'maven' | 'gradle';
+type Manager = 'npm' | 'pnpm' | 'yarn' | 'bun' | 'maven' | 'gradle' | 'java';
 export type TestLaunchEvidence = FunctionalTestLaunch & { manager: Manager; baseline: string };
-export type PreviewCommand = { executable: string; args: string[]; directory?: string };
 export type ResolvedTestLaunch = {
   directory: string;
   evidence: TestLaunchEvidence;
   command: (port: number) => PreviewCommand;
   setup?: PreviewCommand;
+  prepare?: PreparePreviewCommand;
   env: NodeJS.ProcessEnv;
 };
 
@@ -92,15 +99,6 @@ function committedSources(root: string, baseline: string) {
     return { absolute, size: file.size };
   };
 }
-type CommittedSource = ReturnType<typeof committedSources>;
-
-function findManager(manager: string, env: NodeJS.ProcessEnv): string {
-  const executable = host.findExecutable(manager, host.pathDirs(env));
-  if (executable === undefined)
-    throw new AppError(ErrorCode.PreviewStartFailed, 'The project launcher is not installed', { manager });
-  return executable;
-}
-
 async function nodeCommands(
   launch: FunctionalTestLaunch,
   manifest: string,
@@ -274,12 +272,7 @@ async function springCommands(
   if (!maven && !gradle)
     throw invalid('Choose a Spring Boot goal declared by a supported Maven or Gradle build file', launch.source);
   await verifySpringProfile(launch, committed, env);
-  const windows = host.os === Platform.Win32;
-  const wrapper = maven ? (windows ? 'mvnw.cmd' : 'mvnw') : windows ? 'gradlew.bat' : 'gradlew';
-  const localWrapper = await committed(posix.join(launch.directory, wrapper), false);
-  const executable = localWrapper?.absolute ?? findManager(maven ? 'mvn' : 'gradle', env);
-  if (localWrapper !== undefined && !host.isExecutableFile(executable))
-    throw new AppError(ErrorCode.PreviewStartFailed, 'The committed launcher wrapper is not executable', { wrapper });
+  const executable = await javaBuildExecutable(maven ? 'maven' : 'gradle', launch.directory, committed, env);
   return {
     manager: maven ? ('maven' as const) : ('gradle' as const),
     command: (port: number) => {
@@ -298,7 +291,9 @@ async function springCommands(
 export async function resolveTestLaunch(worktree: Worktree, proposal: FunctionalTestLaunch, env: NodeJS.ProcessEnv) {
   const directory = relativePath(proposal.directory, true);
   const source = relativePath(proposal.source, false);
-  if (posix.dirname(source) !== directory || !/^\/(?!\/)[^\\\s?#]*$/.test(proposal.readyPath))
+  if (posix.dirname(source) !== directory)
+    throw invalid('Both source and directory are worktree-relative; directory must equal the parent of source', source);
+  if (!/^\/(?!\/)[^\\\s?#]*$/.test(proposal.readyPath))
     throw invalid('Choose a configuration file in the launch directory and a local readiness path', source);
   const root = await realpath(worktree.path);
   const { stdout: head } = await runGit(['rev-parse', 'HEAD'], { cwd: root });
@@ -315,20 +310,23 @@ export async function resolveTestLaunch(worktree: Worktree, proposal: Functional
   const commands =
     posix.basename(source) === 'package.json'
       ? await nodeCommands(launch, manifest, root, committed, env)
-      : await springCommands(launch, manifest, committed, env);
+      : launch.script === FUNCTIONAL_TEST_JAVA_MAIN_SCRIPT
+        ? await javaCommands(launch, manifest, file.absolute, committed, env)
+        : await springCommands(launch, manifest, committed, env);
   const profile = 'profile' in commands ? commands.profile : launch.profile;
   const evidence: TestLaunchEvidence = {
     ...launch,
     baseline,
     manager: commands.manager,
     ...(profile === undefined ? {} : { profile }),
+    ...('javaVersion' in commands && commands.javaVersion !== undefined ? { javaVersion: commands.javaVersion } : {}),
   };
   const resolved: ResolvedTestLaunch = {
     ...commands,
     directory: dirname(file.absolute),
     evidence,
     env: {
-      ...env,
+      ...('javaEnv' in commands ? commands.javaEnv : env),
       CI: 'true',
       HOST: LOOPBACK,
       HOSTNAME: LOOPBACK,

@@ -195,6 +195,7 @@ export function createPreviewsService({
           setUp.set(worktreePath, setupKeys);
         }
       }
+      if (explicit && config.prepare !== undefined) await config.prepare((command) => setUpPreview(command, input));
       const running = await launchPreview(input);
       if (entry.state !== PreviewState.Starting) {
         // Stopped the moment it became ready: the stop could not end a process it did not have yet.

@@ -52,6 +52,7 @@ export * from './contracts/mcp/functional-test-tools.ts';
 export * from './contracts/mcp/get-node-output.ts';
 export * from './contracts/mcp/get-task-context.ts';
 export * from './contracts/mcp/get-task-diff.ts';
+export * from './contracts/mcp/ide-configurations.ts';
 export * from './contracts/mcp/names.ts';
 export * from './contracts/mcp/office-write.ts';
 export * from './contracts/mcp/process-document.ts';
