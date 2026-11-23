@@ -527,10 +527,11 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     },
     onProjectDeleted: actions.onProjectDeleted,
     /** Creating several tasks in one transaction (batches, 20 §2): check once, insert drafts, start after commit. */
-    async checkCreate(input: Parameters<typeof lifecycle.checkCreate>[0]) {
+    checkCreate: lifecycle.checkCreate,
+    /** 新建任务确认时校验当前项目目录，关联复测则使用先前核准的计划。 */
+    async checkCreateRequest(input: Parameters<typeof lifecycle.checkCreate>[0]) {
       const branch = await lifecycle.checkCreate(input);
       await resolveFunctionalTestScope(input, branch);
-      return branch;
     },
     browserTest: (id: string) => state.get(id).browserTest,
     browserTestSubmit: (attempt: AttemptDTO) => {

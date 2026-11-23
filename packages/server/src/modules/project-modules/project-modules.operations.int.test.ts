@@ -690,6 +690,9 @@ it.skipIf(!(await usableJava()))(
       await writeFile(join(dir, 'rates/Rates.java'), backend.replace(':12}', ':23}'));
       await repo.git('-C', dir, 'commit', '-am', 'Fix the service rate');
       const ref = await repo.git('-C', dir, 'rev-parse', 'HEAD');
+      await repo.git('merge', '--ff-only', ref);
+      const refreshed = (await t.call(getProjectModulesOp, { id: project.id })).body;
+      expect(refreshed.compounds?.find(({ id }) => id === stack.id)?.fingerprint).not.toBe(stack.fingerprint);
       const repeated = stage(FUNCTIONAL_TEST_NODE.Environment, '准备环境');
       const followup = await t.call(functionalTestRerunOp, { ...executions, ref });
       expect(followup.status).toBe(200);

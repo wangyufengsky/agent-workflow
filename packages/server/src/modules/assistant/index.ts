@@ -201,7 +201,7 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
                         ],
                       });
                     }
-                    await deps.tasks.checkCreate(request);
+                    await deps.tasks.checkCreateRequest(request);
                   }
                 },
               ] as const,

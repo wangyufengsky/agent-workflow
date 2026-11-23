@@ -464,7 +464,39 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
       serviceLog: 'Billing returned fee 9',
     },
   });
-  snapshot.nextAfter = 5;
+  snapshot.events.push(
+    {
+      seq: 6,
+      runId: 'run-1',
+      caseId: 'case-2',
+      executionId: 'exec-2',
+      step: 1,
+      at: now,
+      kind: 'assertion',
+      message: 'HTTP 断言',
+      detail: {
+        field: 'status',
+        expected: 404,
+        actual: 404,
+        passed: true,
+        serviceId: 'gateway',
+        serviceName: 'Gateway',
+        moduleId: 'gateway-module',
+      },
+    },
+    {
+      seq: 7,
+      runId: 'run-1',
+      caseId: 'case-2',
+      executionId: 'exec-2',
+      step: 1,
+      at: now,
+      kind: 'result',
+      message: '收到 HTTP 响应',
+      detail: { status: 404, elapsedMs: 10, serviceId: 'gateway', serviceName: 'Gateway', moduleId: 'gateway-module' },
+    },
+  );
+  snapshot.nextAfter = 7;
   const refreshed = page.waitForResponse((response) => new URL(response.url()).pathname === snapshotPath);
   await page.clock.runFor(1000);
   await refreshed;
@@ -514,10 +546,11 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
   await page.getByRole('button', { name: '测试报告', exact: true }).click();
   const report = page.getByRole('region', { name: '测试报告' });
   await expect(report.getByRole('heading', { name: '订单报告' })).toBeVisible();
-  await expect(report.getByText('关联服务 · Billing')).toBeVisible();
+  await expect(report.getByText('关联服务 · Billing', { exact: true })).toBeVisible();
   await report.getByRole('button', { name: '查看实测证据' }).click();
   const serviceEvidence = page.getByRole('region', { name: '关联服务' });
   await expect(serviceEvidence.getByText('billing-module')).toBeVisible();
+  await expect(serviceEvidence.getByText('gateway-module')).toHaveCount(0);
   await serviceEvidence.getByText('失败时的服务日志').click();
   await expect(serviceEvidence.getByText('Billing returned fee 9')).toBeVisible();
   await page.getByRole('button', { name: '测试报告', exact: true }).click();

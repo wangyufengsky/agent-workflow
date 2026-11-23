@@ -1,4 +1,4 @@
-import type { FunctionalTestEvent } from '@aw/shared';
+import { type FunctionalTestEvent, FunctionalTestStatus } from '@aw/shared';
 import { FUNCTIONAL_TEST_COPY as C } from '../../copy/functional-testing.ts';
 import styles from './functional-test.module.css';
 
@@ -7,10 +7,11 @@ export function failureServices(events: readonly FunctionalTestEvent[]) {
   for (const event of events) {
     const { serviceId, serviceName, moduleId, serviceLog } = event.detail;
     if (typeof serviceId !== 'string') continue;
+    const { passed, status } = event.detail;
     const failed =
-      event.detail.passed === false ||
-      (typeof event.detail.status === 'number' && event.detail.status >= 400) ||
-      typeof serviceLog === 'string';
+      (event.kind === 'assertion' && (passed === false || passed === null)) ||
+      ((event.kind === 'result' || event.kind === 'cleanup') &&
+        (status === FunctionalTestStatus.Failed || status === FunctionalTestStatus.Blocked));
     if (!failed) continue;
     const before = byService.get(serviceId);
     byService.set(serviceId, {
