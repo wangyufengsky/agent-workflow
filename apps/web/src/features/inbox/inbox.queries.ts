@@ -47,7 +47,10 @@ export const inboxCountQuery = queryOptions({
 /** SSE `inbox.updated`: the badge count comes with the event; lists refetch. */
 export async function updateInbox(qc: QueryClient, blockingCount: number): Promise<void> {
   qc.setQueryData(queryKeys.inboxCount, blockingCount);
-  await qc.invalidateQueries({ queryKey: [...queryKeys.inbox, 'list'] });
+  const queryKey = [...queryKeys.inbox, 'list'];
+  // 首次读取尚无缓存数据时，失效操作会复用在途请求。先取消旧快照，才能读取事件之后的列表。
+  await qc.cancelQueries({ queryKey, predicate: (query) => query.state.data === undefined });
+  await qc.invalidateQueries({ queryKey });
 }
 
 /** Resolving or dismissing changes the item, its task and possibly its node; their SSE events refresh the rest. */
