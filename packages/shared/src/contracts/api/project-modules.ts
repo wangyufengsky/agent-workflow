@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ProjectModuleRunStatus } from '../../fsm/project-module-run.machine.ts';
 import { functionalTestLaunchSchema } from './functional-testing.ts';
 
 export const projectModuleConfigurationSchema = z.object({
@@ -15,6 +16,8 @@ export const projectModuleConfigurationSchema = z.object({
   fingerprint: z.string(),
 });
 export type ProjectModuleConfiguration = z.infer<typeof projectModuleConfigurationSchema>;
+export const PROJECT_MODULE_CHECK_LIMIT = 64;
+
 export const projectModuleCheckSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -44,7 +47,7 @@ export const projectModuleRunSchema = z.object({
   baseline: z.string(),
   kind: z.enum(['launch', 'checks']),
   checkIds: z.array(z.string()),
-  status: z.enum(['starting', 'ready', 'running', 'passed', 'failed', 'stopped', 'interrupted']),
+  status: z.enum(ProjectModuleRunStatus),
   startedAt: z.number(),
   finishedAt: z.number().nullable(),
   log: z.string(),

@@ -6,6 +6,7 @@ import { inboxMachine } from './inbox.machine.ts';
 import { nodeMachine } from './node.machine.ts';
 import { planMachine } from './plan.machine.ts';
 import { previewMachine } from './preview.machine.ts';
+import { projectModuleRunMachine } from './project-module-run.machine.ts';
 import { runtimeMachine } from './runtime.machine.ts';
 import { scheduleMachine } from './schedule.machine.ts';
 import { taskMachine } from './task.machine.ts';
@@ -22,6 +23,7 @@ export * from './mermaid.ts';
 export * from './node.machine.ts';
 export * from './plan.machine.ts';
 export * from './preview.machine.ts';
+export * from './project-module-run.machine.ts';
 export * from './runtime.machine.ts';
 export * from './schedule.machine.ts';
 export * from './task.machine.ts';
@@ -42,5 +44,6 @@ export const MACHINES = {
   assistantTurn: assistantTurnMachine,
   schedule: scheduleMachine,
   preview: previewMachine,
+  projectModuleRun: projectModuleRunMachine,
   teamAnalysis: teamAnalysisMachine,
 } as const;

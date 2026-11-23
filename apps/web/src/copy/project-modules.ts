@@ -35,6 +35,7 @@ export const PROJECT_MODULES_COPY = {
   viewChecks: '查看模块检查',
   executeChecks: '运行所选检查',
   noChecks: '此模块暂无可运行的检查。',
+  checkLimit: (count: number) => `最多同时选择 ${count} 项检查。`,
   projectChecks: '项目级检查仍可用于整体验收。',
   dependentModules: '建议追加验证的模块',
   dependentModulesHint: '以下模块在构建配置中声明了对此模块的直接依赖。',

@@ -4,14 +4,19 @@ import {
   defaultProjectModuleOp,
   ErrorCode,
   getProjectModulesOp,
+  isTerminalState,
   type ProjectModuleRun,
+  ProjectModuleRunEvent,
   type ProjectModules,
+  projectModuleRunInitialStatus,
+  projectModuleRunMachine,
   projectModuleRunSchema,
   projectModulesSchema,
   projectModuleVerified,
   rediscoverProjectModulesOp,
   startProjectModuleRunOp,
   stopProjectModuleRunOp,
+  transition,
 } from '@aw/shared';
 import { desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -32,7 +37,11 @@ export function createProjectModules({ db, projects, ...deps }: Deps) {
   const readRun = (result: string) => projectModuleRunSchema.parse(JSON.parse(result));
   const runtime = createModuleRuntime({
     ...deps,
-    onUpdate(run) {
+    onUpdate(run, event) {
+      const stored = db.select().from(moduleRunsTable).where(eq(moduleRunsTable.id, run.id)).get();
+      if (stored === undefined) return;
+      const previous = readRun(stored.result);
+      transition(projectModuleRunMachine, previous.status, event, run.status);
       db.update(moduleRunsTable)
         .set({ result: JSON.stringify(run) })
         .where(eq(moduleRunsTable.id, run.id))
@@ -117,6 +126,7 @@ export function createProjectModules({ db, projects, ...deps }: Deps) {
     )
       throw invalid('Review the selected module configuration or checks');
     if (runtime.get(id)) throw new AppError(ErrorCode.StateTransitionInvalid, 'Another module run is active');
+    const kind = checkIds ? 'checks' : 'launch';
     const run: ProjectModuleRun = {
       id: randomUUID(),
       projectId: id,
@@ -124,11 +134,11 @@ export function createProjectModules({ db, projects, ...deps }: Deps) {
       baseline,
       configurationId: config?.id ?? null,
       fingerprint: config?.fingerprint ?? baseline,
-      kind: checkIds ? 'checks' : 'launch',
+      kind,
       checkIds: checkIds ?? [],
       startedAt: deps.clock.now(),
       finishedAt: null,
-      status: checkIds ? 'running' : 'starting',
+      status: projectModuleRunInitialStatus[kind],
       readyUrl: null,
       readyStatus: null,
       log: '',
@@ -164,9 +174,15 @@ export function createProjectModules({ db, projects, ...deps }: Deps) {
         .where(sql`json_extract(${moduleRunsTable.result}, '$.finishedAt') IS NULL`)
         .all()) {
         const run = readRun(item.result);
-        if (run.finishedAt === null)
+        if (!isTerminalState(projectModuleRunMachine, run.status))
           db.update(moduleRunsTable)
-            .set({ result: JSON.stringify({ ...run, status: 'interrupted', finishedAt: deps.clock.now() }) })
+            .set({
+              result: JSON.stringify({
+                ...run,
+                status: transition(projectModuleRunMachine, run.status, ProjectModuleRunEvent.Interrupt),
+                finishedAt: deps.clock.now(),
+              }),
+            })
             .where(eq(moduleRunsTable.id, item.id))
             .run();
       }

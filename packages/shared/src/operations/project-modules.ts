@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { projectModuleRunSchema, projectModulesSchema } from '../contracts/api/project-modules.ts';
+import {
+  PROJECT_MODULE_CHECK_LIMIT,
+  projectModuleRunSchema,
+  projectModulesSchema,
+} from '../contracts/api/project-modules.ts';
 import { InputRef } from '../enums/entity.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
@@ -54,7 +58,7 @@ export const startProjectModuleRunOp = defineOperationContract({
     moduleId: id,
     configurationId: id.optional(),
     fingerprint: id.optional(),
-    checkIds: z.array(id).min(1).max(64).optional(),
+    checkIds: z.array(id).min(1).max(PROJECT_MODULE_CHECK_LIMIT).optional(),
     baseline: id,
   }),
   output: projectModuleRunSchema,

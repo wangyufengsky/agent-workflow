@@ -2,10 +2,15 @@ import { join } from 'node:path';
 import {
   AppError,
   ErrorCode,
+  isTerminalState,
   type ProjectJavaModule,
   type ProjectModuleCheck,
   type ProjectModuleConfiguration,
   type ProjectModuleRun,
+  ProjectModuleRunEvent,
+  projectModuleRunInitialStatus,
+  projectModuleRunMachine,
+  transition,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Logger } from '../../core/logger.ts';
@@ -44,7 +49,7 @@ type RuntimeDeps = {
   locks: RepoLocks;
   dataDir: string;
   log: Logger;
-  onUpdate(run: ProjectModuleRun): void;
+  onUpdate(run: ProjectModuleRun, event: ProjectModuleRunEvent): void;
 };
 
 export function createModuleRuntime({ clock, env, locks, dataDir, log, onUpdate }: RuntimeDeps) {
@@ -53,22 +58,27 @@ export function createModuleRuntime({ clock, env, locks, dataDir, log, onUpdate 
   const active = new Map<string, Trial>();
   let closing = false;
   const snapshot = (trial: Trial): ProjectModuleRun => ({ ...trial.run, log: trial.output.tail() });
-  const publish = (trial: Trial) => {
+  function move(trial: Trial, event: ProjectModuleRunEvent) {
+    trial.run.status = transition(projectModuleRunMachine, trial.run.status, event);
+    if (isTerminalState(projectModuleRunMachine, trial.run.status)) {
+      trial.run.finishedAt = clock.now();
+      trial.output.flush();
+    }
     try {
-      onUpdate(snapshot(trial));
+      onUpdate(snapshot(trial), event);
     } catch (error) {
       log.error({ err: error, runId: trial.run.id }, 'module trial update failed');
     }
-  };
+  }
 
   async function execute(trial: Trial, input: StartTrial) {
     const signal = trial.abort.signal;
     const cancelTimeout = clock.schedule(TRIAL_TIMEOUT_MS, () => {
       trial.output.append('Module trial reached its time limit.\n');
-      trial.abort.abort('interrupted');
+      trial.abort.abort(ProjectModuleRunEvent.Interrupt);
     });
     let worktree: Awaited<ReturnType<typeof createRuntimeWorktree>> | undefined;
-    let status: ProjectModuleRun['status'] = 'failed';
+    let outcome: ProjectModuleRunEvent = ProjectModuleRunEvent.Fail;
     try {
       signal.throwIfAborted();
       worktree = await createRuntimeWorktree(root, input.repoPath, trial.run.baseline, locks);
@@ -87,7 +97,7 @@ export function createModuleRuntime({ clock, env, locks, dataDir, log, onUpdate 
             env: { ...childEnv, CI: 'true' },
           });
         }
-        status = 'passed';
+        outcome = ProjectModuleRunEvent.Pass;
       } else {
         const proposal = input.configuration?.launch;
         if (proposal == null)
@@ -114,10 +124,7 @@ export function createModuleRuntime({ clock, env, locks, dataDir, log, onUpdate 
         const abort = () => void preview.stop();
         signal.addEventListener('abort', abort, { once: true });
         if (signal.aborted) abort();
-        else {
-          trial.run.status = 'ready';
-          publish(trial);
-        }
+        else move(trial, ProjectModuleRunEvent.Ready);
         try {
           await preview.exited;
           if (!signal.aborted) throw new Error('The module process exited');
@@ -132,15 +139,14 @@ export function createModuleRuntime({ clock, env, locks, dataDir, log, onUpdate 
       try {
         await worktree?.remove();
       } catch (error) {
-        status = 'failed';
+        outcome = ProjectModuleRunEvent.Fail;
         trial.output.append('The detached module checkout could not be removed.\n');
         log.warn({ err: error, runId: trial.run.id }, 'module trial checkout removal failed');
       }
-      if (signal.aborted) status = signal.reason === 'stopped' ? 'stopped' : 'interrupted';
-      trial.run.status = status;
-      trial.run.finishedAt = clock.now();
-      trial.output.flush();
-      publish(trial);
+      if (signal.aborted)
+        outcome =
+          signal.reason === ProjectModuleRunEvent.Stop ? ProjectModuleRunEvent.Stop : ProjectModuleRunEvent.Interrupt;
+      move(trial, outcome);
       trial.output.close();
       active.delete(trial.run.projectId);
     }
@@ -150,6 +156,8 @@ export function createModuleRuntime({ clock, env, locks, dataDir, log, onUpdate 
     recover: () => recoverRuntimeWorktrees(root, locks, log),
     start(input: StartTrial): void {
       const { run, checks } = input;
+      if (run.status !== projectModuleRunInitialStatus[run.kind] || run.finishedAt !== null)
+        throw new AppError(ErrorCode.StateTransitionInvalid, 'A module run must begin in its initial state');
       if (closing || active.has(run.projectId))
         throw new AppError(
           ErrorCode.StateTransitionInvalid,
@@ -176,16 +184,16 @@ export function createModuleRuntime({ clock, env, locks, dataDir, log, onUpdate 
     async stop(projectId: string, runId: string): Promise<void> {
       const trial = active.get(projectId);
       if (trial?.run.id !== runId) return;
-      trial.abort.abort('stopped');
+      trial.abort.abort(ProjectModuleRunEvent.Stop);
       await trial.done;
     },
     abortProject(projectId: string): void {
-      active.get(projectId)?.abort.abort('interrupted');
+      active.get(projectId)?.abort.abort(ProjectModuleRunEvent.Interrupt);
     },
     async stopAll(): Promise<void> {
       closing = true;
       const trials = [...active.values()];
-      for (const trial of trials) trial.abort.abort('interrupted');
+      for (const trial of trials) trial.abort.abort(ProjectModuleRunEvent.Interrupt);
       await Promise.all(trials.map((trial) => trial.done));
     },
   };

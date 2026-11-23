@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import {
   AttemptStatus,
   createTaskOp,
@@ -12,6 +13,7 @@ import {
   getTaskOp,
   MCP_SESSION_ARG,
   McpToolName,
+  type ProjectModuleRun,
   rediscoverProjectModulesOp,
   ServerEventType,
   startProjectModuleRunOp,
@@ -25,6 +27,7 @@ import { createTestApp } from '../../../test/helpers/app.ts';
 import { waitForEvent } from '../../../test/helpers/events.ts';
 import { callTool, connectMcp } from '../../../test/helpers/mcp.ts';
 import { addProject, workflowId } from '../../../test/helpers/tasks.ts';
+import { DATABASE_FILE } from '../../core/db/database.ts';
 import { host } from '../../core/platform.ts';
 
 const JAVA = `import com.sun.net.httpserver.HttpServer;
@@ -235,3 +238,60 @@ it.skipIf(!(await usableJava()))(
   },
   45_000,
 );
+
+it('interrupts only in-flight records when the server recovers and keeps terminal history on stop', async () => {
+  const first = await createTestApp();
+  const { project, repo } = await addProject(first);
+  const baseline = await repo.git('rev-parse', 'HEAD');
+  await first.close();
+
+  const statuses = ['starting', 'ready', 'running', 'passed', 'failed', 'stopped', 'interrupted'] as const;
+  const database = new DatabaseSync(join(first.dataDir, DATABASE_FILE));
+  try {
+    const insert = database.prepare(
+      'INSERT INTO project_module_runs (id, project_id, started_at, result) VALUES (?, ?, ?, ?)',
+    );
+    for (const status of statuses) {
+      const run: ProjectModuleRun = {
+        id: status,
+        projectId: project.id,
+        moduleId: 'module',
+        configurationId: null,
+        fingerprint: baseline,
+        baseline,
+        kind: status === 'running' || status === 'passed' ? 'checks' : 'launch',
+        checkIds: [],
+        status,
+        startedAt: 1,
+        finishedAt: ['passed', 'failed', 'stopped'].includes(status) ? 2 : null,
+        log: `recorded ${status}`,
+        readyUrl: null,
+        readyStatus: null,
+      };
+      insert.run(run.id, run.projectId, run.startedAt, JSON.stringify(run));
+    }
+  } finally {
+    database.close();
+  }
+
+  const restarted = await createTestApp({ dataDir: first.dataDir });
+  try {
+    const { body } = await restarted.call(getProjectModulesOp, { id: project.id });
+    const runs = new Map(body.runs.map((run) => [run.id, run]));
+    for (const id of ['starting', 'ready', 'running']) {
+      expect(runs.get(id)).toMatchObject({ status: 'interrupted', log: `recorded ${id}` });
+      expect(runs.get(id)?.finishedAt).toBeGreaterThan(2);
+    }
+    for (const id of ['passed', 'failed', 'stopped', 'interrupted']) {
+      const stop = await restarted.call(stopProjectModuleRunOp, { id: project.id, runId: id });
+      expect(stop.status).toBe(200);
+      expect(stop.body).toMatchObject({
+        status: id,
+        finishedAt: id === 'interrupted' ? null : 2,
+        log: `recorded ${id}`,
+      });
+    }
+  } finally {
+    await restarted.close();
+  }
+});

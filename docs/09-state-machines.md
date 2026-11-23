@@ -443,3 +443,30 @@ stateDiagram-v2
 - `submit`：`submit_member_analysis` 校验通过，报告随之写入。
 - `fail`：会话结束却没有提交（出错、超时、运行时消失）；应用重启时，排队与运行中的分析一律 `fail`（`TEAM_ANALYSIS_INTERRUPTED`），可「重新生成」。
 - `cancel`：排队中直接取消；运行中先记为取消，再中止会话，会话结束不再改变它。
+
+## 16. 项目模块运行
+
+启动试运行以 `starting` 创建，收到成功的就绪探测才进入 `ready`。检查以 `running` 创建，所有选定检查成功才进入 `passed`。进程或准备出错进入 `failed`，用户停止进入 `stopped`，超时、项目移除、后端关闭或重启恢复进入 `interrupted`。进入终态后保留运行记录，再运行会创建新记录。
+
+<!-- fsm:projectModuleRun 由 pnpm gen:fsm-docs 生成，勿手改 -->
+```mermaid
+stateDiagram-v2
+  [*] --> starting
+  [*] --> running
+  starting --> ready: ready
+  starting --> failed: fail
+  starting --> stopped: stop
+  starting --> interrupted: interrupt
+  ready --> failed: fail
+  ready --> stopped: stop
+  ready --> interrupted: interrupt
+  running --> passed: pass
+  running --> failed: fail
+  running --> stopped: stop
+  running --> interrupted: interrupt
+  passed --> [*]
+  failed --> [*]
+  stopped --> [*]
+  interrupted --> [*]
+```
+<!-- /fsm:projectModuleRun -->

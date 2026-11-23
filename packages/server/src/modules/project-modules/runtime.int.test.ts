@@ -220,3 +220,17 @@ it('automatically interrupts a running check and releases its detached worktree'
     await runtime.stopAll();
   }
 });
+
+it('rejects a run supplied in an invalid initial or terminal state without creating a checkout', async () => {
+  const repo = await createTestRepo();
+  const baseline = await repo.git('rev-parse', 'HEAD');
+  const { runtime, run } = await fixture(baseline);
+  for (const status of ['running', 'ready', 'stopped'] as const) {
+    expect(() =>
+      runtime.start({ repoPath: repo.path, run: { ...run, status }, module, configuration, checks: [] }),
+    ).toThrow(expect.objectContaining({ code: ErrorCode.StateTransitionInvalid }));
+  }
+  expect(runtime.get(run.projectId)).toBeUndefined();
+  expect(await listWorktrees(repo.path)).toHaveLength(1);
+  await runtime.stopAll();
+});

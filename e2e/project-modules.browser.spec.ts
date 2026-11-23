@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { PROJECT_MODULE_CHECK_LIMIT } from '@aw/shared';
 import { type APIRequestContext, expect, test } from '@playwright/test';
 import { API_BASE, AUTH } from './env.ts';
 import { createProject, git, patchSettings, TASK_RUN_TIMEOUT_MS } from './helpers.ts';
@@ -37,7 +38,7 @@ const config = (name: string, javaVersion?: number) =>
     }
   </configuration>`;
 
-async function moduleFixture(request: APIRequestContext, javaVersion?: number) {
+async function moduleFixture(request: APIRequestContext, javaVersion?: number, ledgerClasses = 1) {
   const project = await createProject(request, null);
   const files: Record<string, string> = {
     'quote-service/demo/QuoteService.java': service,
@@ -54,6 +55,10 @@ async function moduleFixture(request: APIRequestContext, javaVersion?: number) {
       'package demo; import org.junit.jupiter.api.Test; class LedgerTest { @Test void sums() {} }',
     '.run/Team.run.xml': `<component name="ProjectRunConfigurationManager">${config('团队共享配置', javaVersion)}</component>`,
   };
+  for (let i = 1; i < ledgerClasses; i += 1) {
+    files[`ledger/src/test/java/demo/Ledger${i}Test.java`] =
+      `package demo; import org.junit.jupiter.api.Test; class Ledger${i}Test { @Test void sums() {} }`;
+  }
   for (const [name, body] of Object.entries(files)) {
     const destination = join(project.repoPath, name);
     await mkdir(dirname(destination), { recursive: true });
@@ -77,7 +82,7 @@ async function moduleFixture(request: APIRequestContext, javaVersion?: number) {
 }
 
 test('项目模块支持搜索、切换启动配置和选择模块检查', async ({ page, request }) => {
-  const { project } = await moduleFixture(request);
+  const { project } = await moduleFixture(request, undefined, PROJECT_MODULE_CHECK_LIMIT);
   await page.goto(`/projects/${project.id}`);
   const panel = page.getByRole('region', { name: '模块与运行配置' });
   const list = panel.getByRole('complementary', { name: '项目模块' });
@@ -110,10 +115,21 @@ test('项目模块支持搜索、切换启动配置和选择模块检查', async
   const checks = panel.getByRole('tabpanel', { name: /模块检查/ });
   const run = panel.getByRole('button', { name: '运行所选检查' });
   await expect(run).toBeEnabled();
-  for (const choice of await checks.getByRole('checkbox').all()) await choice.uncheck();
-  await expect(run).toBeDisabled();
-  await checks.getByRole('checkbox', { name: /LedgerTest/ }).check();
+  const suite = checks.getByRole('checkbox', { name: /All tests/ });
+  const individual = checks.getByRole('checkbox', { name: /LedgerTest/ });
+  const selected = checks.getByRole('checkbox', { checked: true });
+  await expect(checks.getByRole('checkbox')).toHaveCount(PROJECT_MODULE_CHECK_LIMIT + 1);
+  await expect(selected).toHaveCount(1);
+  await expect(suite).toBeChecked();
+  await individual.check();
+  await expect(suite).not.toBeChecked();
+  await expect(selected).toHaveCount(1);
   await expect(run).toBeEnabled();
+  await suite.check();
+  await expect(individual).not.toBeChecked();
+  await expect(selected).toHaveCount(1);
+  await suite.uncheck();
+  await expect(run).toBeDisabled();
   await expect(panel.getByRole('link', { name: '发起功能测试' })).toHaveCount(0);
   const dependents = checks.getByRole('region', { name: '建议追加验证的模块' });
   await dependents.getByRole('button', { name: '查看 billing 的模块检查' }).click();

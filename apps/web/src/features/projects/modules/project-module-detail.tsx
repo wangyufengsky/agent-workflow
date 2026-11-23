@@ -1,6 +1,8 @@
 import {
   FUNCTIONAL_TEST_WORKFLOW_KEY,
+  PROJECT_MODULE_CHECK_LIMIT,
   type ProjectJavaModule,
+  type ProjectModuleCheck,
   type ProjectModuleConfiguration,
   type ProjectModules,
   projectModuleVerified,
@@ -40,6 +42,8 @@ export function moduleState(
 export const preferredConfiguration = (snapshot: ProjectModules, module: ProjectJavaModule) =>
   module.configurations.find(({ id }) => id === snapshot.defaults[module.id]) ?? module.configurations[0];
 
+const isSuiteCheck = ({ kind }: ProjectModuleCheck) => kind === 'maven-test' || kind === 'gradle-test';
+
 export function ProjectModuleDetail({
   snapshot,
   module,
@@ -58,7 +62,7 @@ export function ProjectModuleDetail({
   onChooseDependent(id: string): void;
 }) {
   const [tab, setTab] = useState<Tab>(openChecks ? 'checks' : 'configuration');
-  const [selectedChecks, setSelectedChecks] = useState<Record<string, boolean>>({});
+  const [selectedChecks, setSelectedChecks] = useState<string[]>();
   const configuration =
     module.configurations.find(({ id }) => id === selectedConfig) ?? preferredConfiguration(snapshot, module);
   const isDefault = configuration !== undefined && snapshot.defaults[module.id] === configuration.id;
@@ -82,7 +86,21 @@ export function ProjectModuleDetail({
   const { start, stop, setDefault, rediscover } = operations;
   const busy = start.isPending || stop.isPending || setDefault.isPending || rediscover.isPending;
   const dependents = snapshot.modules.filter(({ id }) => module.dependentModules?.includes(id));
-  const checked = module.checks.filter(({ id }) => selectedChecks[id] ?? true).map(({ id }) => id);
+  const suite = module.checks.find(isSuiteCheck);
+  const checked = module.checks
+    .filter(({ id }) => selectedChecks?.includes(id) ?? id === suite?.id)
+    .map(({ id }) => id);
+
+  function toggleCheck(check: ProjectModuleCheck, on: boolean) {
+    if (!on) setSelectedChecks(checked.filter((id) => id !== check.id));
+    else if (isSuiteCheck(check)) setSelectedChecks([check.id]);
+    else {
+      const individual = checked.filter((id) => id !== suite?.id);
+      if (individual.length < PROJECT_MODULE_CHECK_LIMIT) setSelectedChecks([...individual, check.id]);
+    }
+  }
+
+  const atCheckLimit = checked.length >= PROJECT_MODULE_CHECK_LIMIT;
   const canSetDefault = canLaunch && configuration !== undefined && current === 'verified' && !isDefault;
 
   function trial() {
@@ -149,11 +167,9 @@ export function ProjectModuleDetail({
                     <label className={styles.check}>
                       <input
                         type="checkbox"
-                        checked={selectedChecks[check.id] ?? true}
-                        onChange={(event) => {
-                          const on = event.target.checked;
-                          setSelectedChecks((previous) => ({ ...previous, [check.id]: on }));
-                        }}
+                        checked={checked.includes(check.id)}
+                        disabled={atCheckLimit && !isSuiteCheck(check) && !checked.includes(check.id)}
+                        onChange={(event) => toggleCheck(check, event.currentTarget.checked)}
                       />
                       <span>
                         {check.name}
@@ -187,6 +203,7 @@ export function ProjectModuleDetail({
               </div>
             </section>
           )}
+          {atCheckLimit && <p className="hint">{C.checkLimit(PROJECT_MODULE_CHECK_LIMIT)}</p>}
           <p className="hint">{C.projectChecks}</p>
         </Tabs.Content>
         <Tabs.Content className={styles.content} value="records">
