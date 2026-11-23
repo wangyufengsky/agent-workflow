@@ -12,7 +12,7 @@ import {
   TASK_TITLE_MAX_CHARS,
   TaskStatus,
 } from '@aw/shared';
-import { eq, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, or } from 'drizzle-orm';
 import type { Db } from '../../core/db/database.ts';
 import type { UnitOfWork } from '../../core/db/unit-of-work.ts';
 import type { EventBus } from '../../core/event-bus.ts';
@@ -52,7 +52,7 @@ export function createTestFollowups({ db, unit, tasks, workflows, projects, test
     const commit =
       ref === undefined
         ? baseline
-        : (await runGit(['rev-parse', '--verify', '--end-of-options', ref + '^{commit}'], { cwd: repoPath })).stdout;
+        : (await runGit(['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`], { cwd: repoPath })).stdout;
     const requestKey = createHash('sha256')
       .update(JSON.stringify([source.id, kind, executions, commit]))
       .digest('hex');
@@ -76,21 +76,21 @@ export function createTestFollowups({ db, unit, tasks, workflows, projects, test
       cases.set(test.id, test);
       const defect = entry.events.filter((e) => e.kind === 'assertion' || e.kind === 'result').slice(-5);
       return [
-        test.number + ' v' + test.version + ' ' + test.title,
-        '目标：' + test.requirement,
-        '步骤：' + test.steps.map((s) => s.title).join(' → '),
+        `${test.number} v${test.version} ${test.title}`,
+        `目标：${test.requirement}`,
+        `步骤：${test.steps.map((s) => s.title).join(' → ')}`,
         '实测证据：' +
           JSON.stringify(defect.map((e) => ({ seq: e.seq, message: e.message, detail: e.detail }))).slice(0, 2200),
-        '来源执行：' + entry.execution.id + '，运行：' + entry.run.id,
+        `来源执行：${entry.execution.id}，运行：${entry.run.id}`,
       ].join('\n');
     });
     const input = {
       projectId: source.project.id,
       workflowId: workflow.id,
       baseBranch: source.git.baseBranch,
-      title: ((kind === 'repair' ? '修复' : '复测') + ' · ' + source.title).slice(0, TASK_TITLE_MAX_CHARS),
+      title: `${kind === 'repair' ? '修复' : '复测'} · ${source.title}`.slice(0, TASK_TITLE_MAX_CHARS),
       requirement: [
-        '来源任务 ' + source.key + '，测试目标 ' + scope.target + '。被测工作区基线 ' + baseline + '。',
+        `来源任务 ${source.key}，测试目标 ${scope.target}。被测工作区基线 ${baseline}。`,
         kind === 'repair' ? '复现并修复以下缺陷，按原用例验证修复。' : '按附带的原始用例版本重新执行。',
         ...notes,
       ]
@@ -123,10 +123,9 @@ export function createTestFollowups({ db, unit, tasks, workflows, projects, test
         fixed.lastDelivery?.commitSha ??
         (fixed.git.branch
           ? (
-              await runGit(
-                ['rev-parse', '--verify', '--end-of-options', 'refs/heads/' + fixed.git.branch + '^{commit}'],
-                { cwd: projects.getRecord(fixed.project.id).repoPath },
-              )
+              await runGit(['rev-parse', '--verify', '--end-of-options', `refs/heads/${fixed.git.branch}^{commit}`], {
+                cwd: projects.getRecord(fixed.project.id).repoPath,
+              })
             ).stdout
           : null);
       if (commit && commit !== parent.git.baseCommit) await create(parent.id, repair.executions, commit);
@@ -156,19 +155,23 @@ export function createTestFollowups({ db, unit, tasks, workflows, projects, test
   });
   return {
     recover() {
-      const sources = db
-        .select({ id: tasksTable.id })
+      const rows = db
+        .select({ id: tasksTable.id, status: tasksTable.status })
         .from(tasksTable)
-        .where(isNotNull(tasksTable.functionalTest))
+        .leftJoin(testFollowupsTable, eq(testFollowupsTable.taskId, tasksTable.id))
+        .where(
+          or(
+            and(
+              inArray(tasksTable.status, [...ready]),
+              or(isNotNull(tasksTable.functionalTest), eq(testFollowupsTable.kind, 'repair')),
+            ),
+            and(eq(tasksTable.status, TaskStatus.Draft), isNotNull(testFollowupsTable.taskId)),
+          ),
+        )
         .all();
-      const linked = db
-        .select({ id: testFollowupsTable.taskId })
-        .from(testFollowupsTable)
-        .where(eq(testFollowupsTable.kind, 'repair'))
-        .all();
-      for (const { id } of [...sources, ...linked]) {
-        const row = db.select({ status: tasksTable.status }).from(tasksTable).where(eq(tasksTable.id, id)).get();
-        if (row && ready.some((s) => s === row.status)) enqueue(id);
+      for (const { id, status } of rows) {
+        if (status === TaskStatus.Draft) tasks.start(id);
+        else enqueue(id);
       }
     },
     async close() {

@@ -105,6 +105,8 @@ export function createFunctionalTests({
     repo.update(taskId, (snapshot) => repo.event(snapshot, event));
   }
 
+  const localReady = (taskId: string) =>
+    previewLeases.has(taskId) && previews.get(taskId).state === PreviewState.Running;
   async function release(taskId: string) {
     if (previewLeases.delete(taskId)) previews.release(taskId);
     if (ownedPreviews.delete(taskId)) await previews.stop(taskId);
@@ -162,7 +164,10 @@ export function createFunctionalTests({
           : source === undefined
             ? undefined
             : latest.find(
-                (item) => item.source?.attachmentId === source.attachmentId && item.source.location === source.location,
+                (item) =>
+                  item.source?.attachmentId === source.attachmentId &&
+                  item.source.location === source.location &&
+                  item.source.originalId === source.originalId,
               );
       if (previous !== undefined && snapshot.executions.some(({ caseId }) => caseId === previous.id))
         throw new AppError(
@@ -197,11 +202,13 @@ export function createFunctionalTests({
       FUNCTIONAL_TEST_NODE.Environment,
       FUNCTIONAL_TEST_NODE.Execute,
     ]);
+    if (checks !== undefined && new Set(checks.map(({ key }) => key)).size !== checks.length)
+      throw new AppError(ErrorCode.ValidationFailed, 'Readiness check keys must be unique');
     return perform(taskId, attempt, request, async (signal) => {
       const previous = repo.get(taskId).runs.at(-1);
       if (
         previous !== undefined &&
-        (!previous.environment.ready || !scope.target.startsWith('/') || previewLeases.has(taskId))
+        (!previous.environment.ready || !scope.target.startsWith('/') || localReady(taskId))
       )
         return previous;
       const id = previous?.id ?? randomUUID();
@@ -228,6 +235,7 @@ export function createFunctionalTests({
               'The test worktree differs from the selected baseline',
             );
           signal.throwIfAborted();
+          if (previewLeases.has(taskId) && !localReady(taskId)) await release(taskId);
           const state = previews.get(taskId).state;
           if (state !== PreviewState.Running && state !== PreviewState.Starting) ownedPreviews.add(taskId);
           const preview = await previews.start(taskId, { queue: signal, filterLog: redactText });
@@ -365,7 +373,7 @@ export function createFunctionalTests({
           run.environment.reason ??
           (missingCondition === undefined ? null : `未核实的用例依赖条件：${missingCondition}`);
         if (issue !== null) note(null, 'result', redactText(issue), { status });
-        else if (scope.target.startsWith('/') && !previewLeases.has(taskId))
+        else if (scope.target.startsWith('/') && !localReady(taskId))
           note(null, 'result', '本地服务已停止，请先恢复环境', { status });
         else {
           const target = scope.target.startsWith('/')
@@ -430,13 +438,15 @@ export function createFunctionalTests({
     taskContext(attempt: AttemptDTO) {
       const current = phase(attempt);
       if (attempt.taskId === null || current === undefined || !isFunctionalTestNode(current)) return undefined;
+      const { scope } = context(attempt.taskId);
       const snapshot = repo.get(attempt.taskId);
       const run = snapshot.runs.at(-1);
       return {
         phase: current,
         tools: functionalTestTools(current),
         runId: run?.id ?? null,
-        environmentReady: run?.environment.ready ?? false,
+        environmentReady:
+          run?.environment.ready === true && (!scope.target.startsWith('/') || localReady(attempt.taskId)),
         pendingCaseIds: latestCases(snapshot)
           .filter(
             (test) =>

@@ -126,11 +126,16 @@ export function FunctionalTestWorkbench({
     enabled: active,
     refetchInterval: active && running ? POLL_INTERVAL_MS : false,
   });
-  usePlacedTab(active && query.isSuccess ? (handoff?.tabId ?? null) : null, handoffArea);
+  usePlacedTab(active && query.data !== undefined ? (handoff?.tabId ?? null) : null, handoffArea);
   const scope = task.functionalTest;
   if (scope === undefined) return null;
-  if (query.isError) return <ErrorState error={query.error} onRetry={() => void query.refetch()} />;
-  if (query.data === undefined) return <p className="hint">{COMMON_COPY.loading}</p>;
+  if (query.data === undefined) {
+    return query.isError ? (
+      <ErrorState error={query.error} onRetry={() => void query.refetch()} />
+    ) : (
+      <p className="hint">{COMMON_COPY.loading}</p>
+    );
+  }
   const snapshot = query.data;
   const source = scope.caseAttachmentIds.length === 0 ? N.Author : N.Import;
   const phases = [source, N.Environment, N.Execute, N.Report];
@@ -153,6 +158,7 @@ export function FunctionalTestWorkbench({
   };
   return (
     <div className={styles.workbench}>
+      {query.isRefetchError && <ErrorState error={query.error} onRetry={() => void query.refetch()} />}
       <div className="row wrap">
         <nav className={`grow ${styles.phaseBar}`} aria-label={C.phases}>
           {phases.map((item) => (

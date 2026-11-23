@@ -83,7 +83,7 @@ export function TestReport({
 }) {
   const [version, setVersion] = useState<number>();
   const finish = useDeliver();
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>();
   const report = reports.find((item) => item.version === version) ?? reports.at(-1);
   const exportFile = useMutation({
     mutationFn: (item: FunctionalTestReport) =>
@@ -92,8 +92,10 @@ export function TestReport({
   if (report === undefined) return <p className="hint">{C.noReport}</p>;
   const origin = task.testLinks?.find(({ taskId, kind }) => taskId === task.id && kind === 'rerun');
   const failed = report.items.filter((item) => item.status === FunctionalTestStatus.Failed);
+  const firstFailure = failed.length === 1 ? failed[0]?.executionId : undefined;
+  const checkedIds = selected ?? (firstFailure == null ? [] : [firstFailure]);
   const selectedFailures = failed.flatMap(({ executionId }) =>
-    executionId !== null && selected.includes(executionId) ? [executionId] : [],
+    executionId !== null && checkedIds.includes(executionId) ? [executionId] : [],
   );
   return (
     <section className={`col ${styles.panel}`} aria-label={C.report}>
@@ -106,7 +108,7 @@ export function TestReport({
             value={report.version}
             onChange={(event) => {
               setVersion(Number(event.target.value));
-              setSelected([]);
+              setSelected(undefined);
             }}
           >
             {reports.map((item) => (
@@ -136,11 +138,11 @@ export function TestReport({
                     <label>
                       <input
                         type="checkbox"
-                        checked={selected.includes(executionId)}
+                        checked={checkedIds.includes(executionId)}
                         onChange={(event) => {
                           const checked = event.target.checked;
-                          setSelected((ids) =>
-                            checked ? [...ids, executionId] : ids.filter((id) => id !== executionId),
+                          setSelected(
+                            checked ? [...checkedIds, executionId] : checkedIds.filter((id) => id !== executionId),
                           );
                         }}
                       />

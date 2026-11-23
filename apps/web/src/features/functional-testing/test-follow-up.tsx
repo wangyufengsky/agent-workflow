@@ -1,5 +1,5 @@
 import { functionalTestRepairOp, functionalTestRerunOp, type TaskDetailDTO } from '@aw/shared';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { callOperation } from '../../api/client.ts';
@@ -8,6 +8,7 @@ import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { FUNCTIONAL_TEST_COPY as C } from '../../copy/functional-testing.ts';
+import { TaskBadge } from '../tasks/task-badge.tsx';
 import { taskQuery } from '../tasks/tasks.queries.ts';
 
 export function FunctionalTestSourceLinks({ task }: { task: TaskDetailDTO }) {
@@ -19,10 +20,21 @@ export function FunctionalTestSourceLinks({ task }: { task: TaskDetailDTO }) {
         className="btn sm"
         to={ROUTES.task}
         params={{ taskId: link.sourceId }}
+        search={{ view: 'result', testExecution: link.executionIds[0] }}
       >
         {C.sourceTask}
       </Link>
     ));
+}
+
+function LinkedTestTask({ id, label }: { id: string; label: string }) {
+  const task = useQuery(taskQuery(id));
+  return (
+    <Link className="btn sm" to={ROUTES.task} params={{ taskId: id }}>
+      {label}
+      {task.data !== undefined && <TaskBadge group={task.data.displayGroup} />}
+    </Link>
+  );
 }
 
 export function TestFollowUp({ task, executionIds }: { task: TaskDetailDTO; executionIds: string[] }) {
@@ -64,9 +76,7 @@ export function TestFollowUp({ task, executionIds }: { task: TaskDetailDTO; exec
           </Button>
         )}
         {repairs.map((link) => (
-          <Link key={link.taskId} className="btn sm" to={ROUTES.task} params={{ taskId: link.taskId }}>
-            {C.openRepair}
-          </Link>
+          <LinkedTestTask key={link.taskId} id={link.taskId} label={C.openRepair} />
         ))}
         {repairs.length > 0 && (
           <Button size="sm" onClick={() => setOpen(true)}>
@@ -74,9 +84,7 @@ export function TestFollowUp({ task, executionIds }: { task: TaskDetailDTO; exec
           </Button>
         )}
         {reruns.map((link) => (
-          <Link key={link.taskId} className="btn sm" to={ROUTES.task} params={{ taskId: link.taskId }}>
-            {C.openRerun}
-          </Link>
+          <LinkedTestTask key={link.taskId} id={link.taskId} label={C.openRerun} />
         ))}
       </div>
       {repair.isError && <ErrorState error={repair.error} />}

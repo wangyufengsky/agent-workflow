@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { FUNCTIONAL_TEST_WORKFLOW_KEY, type FunctionalTestSnapshot, TaskStatus, taskDetailSchema } from '@aw/shared';
 import { expect } from '@playwright/test';
 import { test } from './assistant-fixtures.ts';
@@ -197,6 +198,31 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
   await expect(second).toHaveAttribute('aria-pressed', 'true');
   await expect(actions).toContainText('GET /orders/second · 201 · 72 毫秒');
   await expect(terminal).toContainText('迟到的第二个响应');
+
+  const body = '## 订单报告\n\nFT-02：响应不符合用例预期。';
+  snapshot.reports.push({
+    runId: 'run-1',
+    version: 1,
+    markdown: body,
+    createdAt: now,
+    counts: { passed: 0, failed: 1, blocked: 0, not_run: 2 },
+    items: [
+      { caseId: 'case-2', number: 'FT-02', title: '用例 2', version: 1, status: 'failed', executionId: 'exec-2' },
+    ],
+  });
+  const published = page.waitForResponse((response) => new URL(response.url()).pathname === snapshotPath);
+  await page.clock.runFor(1000);
+  await published;
+  await page.getByRole('button', { name: '测试报告', exact: true }).click();
+  const report = page.getByRole('region', { name: '测试报告' });
+  await expect(report.getByRole('heading', { name: '订单报告' })).toBeVisible();
+  await expect(report.getByRole('button', { name: '建立修复任务' })).toBeEnabled();
+  const downloading = page.waitForEvent('download');
+  await report.getByRole('button', { name: '导出 Markdown' }).click();
+  const download = await downloading;
+  expect(await readFile(await download.path(), 'utf8')).toBe(body);
+  await report.getByRole('button', { name: '查看实测证据' }).click();
+  await expect(terminal).toContainText('迟到的第二个响应');
 });
 
 test('助手确认卡展示测试地址、写入范围与失败后续操作', async ({ page, request }) => {
@@ -228,6 +254,7 @@ test('助手确认卡展示测试地址、写入范围与失败后续操作', as
   await input.press('ControlOrMeta+Enter');
   const card = page.getByTestId('confirmation-card');
   await expect(card.getByText('功能测试范围')).toBeVisible();
+  await expect(card.getByRole('button', { name: /总是允许/ })).toHaveCount(0);
   await expect(card.getByText('/orders', { exact: true })).toBeVisible();
   await expect(card.getByText('POST /api/orders', { exact: true })).toBeVisible();
   await expect(card.getByText('创建并运行修复任务，有可测试的修复提交后复测', { exact: true })).toBeVisible();

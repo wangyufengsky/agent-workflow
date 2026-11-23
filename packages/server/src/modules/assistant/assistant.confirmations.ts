@@ -20,6 +20,7 @@ import type { EventBus } from '../../core/event-bus.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { OperationImpl } from '../../core/operations/operations.ts';
 import type { SettingsService } from '../settings/index.ts';
+import { assistantOperationRisk } from './assistant.operation-risk.ts';
 import { type Confirmation, createAssistantRepo } from './assistant.repo.ts';
 import type { AssistantService } from './assistant.service.ts';
 import type { TaskRelay } from './assistant.tasks.ts';
@@ -71,7 +72,7 @@ export function createConfirmations(deps: ConfirmationsDeps) {
 
   function toDto(c: Confirmation): AssistantConfirmationDTO {
     const { contract } = implOf(c.operationId);
-    return { ...c, title: contract.title, risk: contract.risk };
+    return { ...c, title: contract.title, risk: assistantOperationRisk(contract, c.input) };
   }
 
   function get(id: string): Confirmation {
@@ -119,7 +120,7 @@ export function createConfirmations(deps: ConfirmationsDeps) {
     async confirm(id: string, alwaysAllow: boolean): Promise<AssistantConfirmationDTO> {
       const c = get(id);
       const impl = implOf(c.operationId);
-      if (alwaysAllow && impl.contract.risk !== OperationRisk.Write) {
+      if (alwaysAllow && assistantOperationRisk(impl.contract, c.input) !== OperationRisk.Write) {
         throw new AppError(ErrorCode.ValidationFailed, `${c.operationId} cannot be always allowed`, {
           issues: [{ path: ['alwaysAllow'], message: `only write operations can be always allowed` }],
         });

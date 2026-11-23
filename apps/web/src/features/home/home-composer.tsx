@@ -205,6 +205,7 @@ export function HomeComposer({
   const changeProject = (id: string) => {
     task.setOptions({ ...task.options, baseBranch: null });
     setTestApproved(false);
+    setApprovedFunctionalScope(undefined);
     onProjectChange(id);
   };
   const shown = workflows.data?.filter((w) => task.pro || w.kind === WorkflowKind.Builtin);
@@ -508,7 +509,10 @@ export function HomeComposer({
             id={moreId}
             project={project}
             value={task.options}
-            onChange={task.setOptions}
+            onChange={(options) => {
+              if (options.baseBranch !== task.options.baseBranch) setApprovedFunctionalScope(undefined);
+              task.setOptions(options);
+            }}
             confirmPlan={task.confirmPlan}
             onConfirmPlanChange={task.setConfirmPlan}
           />

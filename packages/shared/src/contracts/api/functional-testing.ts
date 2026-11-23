@@ -139,7 +139,22 @@ export const functionalTestReadSchema = z.object({
 export type FunctionalTestRead = z.infer<typeof functionalTestReadSchema>;
 export const functionalTestRunInputSchema = z.object({ runId: id, caseId: id, version, executionId: id });
 export const functionalTestReviseSchema = functionalTestRunInputSchema.omit({ runId: true }).extend({
-  definition: caseDefinition,
+  definition: caseDefinition.optional(),
+  change: z
+    .discriminatedUnion('kind', [
+      z.object({
+        kind: z.literal('rename_request_field'),
+        step: z.number().int().nonnegative(),
+        from: z.string().regex(/^[\w-]+$/),
+        to: z.string().regex(/^[\w-]+$/),
+      }),
+      z.object({
+        kind: z.literal('correct_success_status'),
+        step: z.number().int().nonnegative(),
+        expected: z.number().int().min(200).max(299),
+      }),
+    ])
+    .optional(),
   reason: note,
   basis: note,
   contractPath: z.string().max(500).optional(),
@@ -148,6 +163,7 @@ export const functionalTestRevisionResultSchema = z.object({
   case: functionalTestCaseSchema,
   pending: z.boolean(),
   proposal: z.number().int().positive().optional(),
+  reason: z.string().optional(),
 });
 export const functionalTestReportSubmitSchema = z.object({
   runId: id,

@@ -56,7 +56,7 @@ export function functionalTestMcpTools(service: FunctionalTestsService) {
       input: functionalTestReviseSchema,
       output: functionalTestRevisionResultSchema,
       description:
-        'Propose a new full case definition without altering old evidence. Supply caseId, version, triggering executionId, reason and independent basis. Set contractPath for a committed JSON OpenAPI 3 contract when it directly proves the correction. Pending proposals need user approval. Read the returned version before retesting.',
+        'Propose a case correction without altering old evidence. Supply caseId, version, triggering executionId, reason and independent basis. For HTTP corrections use change { kind: rename_request_field, step, from, to } or { kind: correct_success_status, step, expected }; step is zero-based. Otherwise supply the exact saved definition minus id/version/number with only the intended edits. Set contractPath for the committed JSON OpenAPI 3 contract that proves the correction. A pending result leaves the current version unchanged until user approval.',
       handler: (input, { attempt }) => service.revise(attempt, input),
     }),
     defineMcpTool({

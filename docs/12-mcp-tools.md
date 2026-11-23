@@ -542,7 +542,7 @@ export const submitPlanTool = defineMcpTool({
 | `test_environment_prepare` | 准备、恢复执行。连接任务授权的目标，返回运行标识及就绪结果。可提供 `checks`，每项包含 `key`、`path`、`expectedStatus`，用例以 `requires` 引用对应依赖。 |
 | `test_case_run` | 执行。参数 `runId`、`caseId`、`version`、`executionId`。同一执行标识读取原结果。在请求路径与 JSON 请求体中可使用 `{{0.body.id}}` 引用同一用例之前的 HTTP 响应字段。 |
 | `test_run_read` | 所有功能测试步骤。可按 `runId`、`caseId`、`step` 或事件游标 `after` 读取已保存记录。 |
-| `test_case_revise` | 执行。提供原版本、触发执行标识、完整新定义、原因和依据。可用 `contractPath` 引用已核实的本地基线内 JSON OpenAPI 3 契约。该契约能唯一证明的状态码或请求字段转写纠正可直接创建新版本，其余差异待确认。 |
+| `test_case_revise` | 执行。提供原版本、触发执行标识、原因和依据。可传完整新定义，也可指定零起始步骤的字段重命名或成功状态码纠正。可用 `contractPath` 引用已核实的本地基线内 JSON OpenAPI 3 契约。该契约能唯一证明的状态码或请求字段转写纠正可直接创建新版本，其余差异待确认。 |
 | `test_report_submit` | 报告。提供该轮全部已完成执行标识，另可附带逐项缺陷说明和未覆盖范围。证据、结论与计数由后端从已保存记录生成。 |
 
 阶段数据保存后用 `submit_result` 完成当前步骤。阻塞原因和测试失败作为执行结果保留，可随报告交付。

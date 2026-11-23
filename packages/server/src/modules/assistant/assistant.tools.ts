@@ -3,6 +3,7 @@ import {
   type AssistantConfirmationDTO,
   assistantInputSchema,
   assistantToolName,
+  createTaskOp,
   ErrorCode,
   type ErrorInfo,
   isAssistantCallable,
@@ -18,6 +19,7 @@ import type { McpTools } from '../../core/http/mcp-endpoint.ts';
 import type { Logger } from '../../core/logger.ts';
 import type { OperationImpl } from '../../core/operations/operations.ts';
 import type { SettingsService } from '../settings/index.ts';
+import { assistantOperationRisk } from './assistant.operation-risk.ts';
 import type { Conversation } from './assistant.repo.ts';
 import type { TaskRelay } from './assistant.tasks.ts';
 
@@ -86,15 +88,20 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
       const { contract } = impl;
       return {
         name: assistantToolName(contract.id),
-        description: `${contract.description}.${RISK_NOTE[contract.risk]}`,
+        description:
+          `${contract.description}.${RISK_NOTE[assistantOperationRisk(contract, {})]}` +
+          (contract.id === createTaskOp.id
+            ? ' When functionalTest is given, the precise test scope requires confirmation each time.'
+            : ''),
         input: assistantInputSchema(contract),
         mode: contract.mode,
         async handler(given, { conversation }) {
           const input = deps.completions.get(contract.id)?.(given) ?? given;
           await deps.prechecks.get(contract.id)?.(conversation.id, input);
+          const risk = assistantOperationRisk(contract, input);
           const allowed =
-            contract.risk === OperationRisk.Read ||
-            (contract.risk === OperationRisk.Write && deps.settings.get('assistant.alwaysAllow').includes(contract.id));
+            risk === OperationRisk.Read ||
+            (risk === OperationRisk.Write && deps.settings.get('assistant.alwaysAllow').includes(contract.id));
           if (allowed) {
             // A failing operation answers with its error code, like any tool (12 §5).
             const output = await deps.run(conversation.id, impl, input);

@@ -82,7 +82,7 @@ it(
       const task = await live.runTask(
         FUNCTIONAL_TEST_WORKFLOW_KEY,
         'functional-todo',
-        '验证待办模块的完成字段及完成状态持久化。cases.md 是用户提供的原用例。先保留两条用例的原步骤和预期，执行后根据已确认且适用于此版本的 openapi.json 与其文字说明 contract.md 判断问题归属。修订时传入 contractPath 为 openapi.json，仅替换实测证实为转写错误的请求步骤 body 内对应字段。保留定义中其他所有字段的原值，包括标题、数据说明、步骤标题、断言和依据。对转写错误按契约修订并复测，对产品缺陷保留原实测，最后出报告。',
+        '验证待办模块的完成字段及完成状态持久化。cases.md 是用户提供的原用例。先保留两条用例的原步骤和预期，执行后根据已确认且适用于此版本的 openapi.json 与其文字说明 contract.md 判断问题归属。修订时用 test_case_revise 的 change 参数指明字段更正和 contractPath: openapi.json，保留定义中的其他原始信息。对转写错误按契约修订并复测，对产品缺陷保留原实测，最后出报告。',
         {
           attachmentIds: [cases, contract],
           functionalTest: {

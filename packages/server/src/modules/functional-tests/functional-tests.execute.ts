@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import {
   AppError,
+  ErrorCode,
   type FunctionalTestCase,
   type FunctionalTestEvent,
   FunctionalTestStatus,
@@ -8,7 +9,7 @@ import {
 } from '@aw/shared';
 import type { BrowserOwner, BrowserService } from '../browser/index.ts';
 import { createFunctionalBrowser } from './functional-tests.browser.ts';
-import { createHttpRunner, fieldValue, redact, redactText } from './functional-tests.http.ts';
+import { createHttpRunner, fieldValue, redact, redactField, redactText } from './functional-tests.http.ts';
 
 type Emit = (
   step: number | null,
@@ -75,10 +76,10 @@ export async function executeCase({
               ? FunctionalTestStatus.Passed
               : FunctionalTestStatus.Failed;
         if (checked === FunctionalTestStatus.Failed || outcome === FunctionalTestStatus.Passed) outcome = checked;
-        const safe = redact({ [assertion.field]: observed ?? null });
+        const safe = redactField(assertion.field, observed ?? null);
         emit(index, 'assertion', 'HTTP 断言', {
           field: assertion.field,
-          expected: redact({ [assertion.field]: assertion.equals }),
+          expected: redactField(assertion.field, assertion.equals),
           actual: safe,
           passed,
           basis: redactText(assertion.basis),
@@ -91,16 +92,22 @@ export async function executeCase({
     emit(index, 'action', '执行浏览器操作', { title: redactText(step.title), action: redact(step.action) });
     const started = time();
     const result = await website(step, index);
+    const blocked = result.requests.some(
+      ({ blocked, method }) => blocked !== null && !['GET', 'HEAD', 'OPTIONS'].includes(method),
+    );
     emit(index, 'result', '浏览器实测结果', {
-      status: result.pass ? FunctionalTestStatus.Passed : FunctionalTestStatus.Failed,
+      status: blocked
+        ? FunctionalTestStatus.Blocked
+        : result.pass
+          ? FunctionalTestStatus.Passed
+          : FunctionalTestStatus.Failed,
       elapsedMs: time() - started,
       requests: result.requests,
       logs: result.logs,
       screenshot: result.screenshot,
       attemptId: owner.id,
     });
-    if (result.requests.some(({ blocked, method }) => blocked !== null && !['GET', 'HEAD', 'OPTIONS'].includes(method)))
-      return FunctionalTestStatus.Blocked;
+    if (blocked) return FunctionalTestStatus.Blocked;
     emit(index, 'assertion', '页面断言', {
       field: step.expect.kind,
       expected: redact(step.expect),
@@ -131,10 +138,18 @@ export async function executeCase({
     const reason = signal.aborted
       ? '运行已中断，已发送的写入可能已经提交，需先核实实际状态'
       : redactText(error.message);
+    const unknownWrite =
+      mayWrite &&
+      (!(error instanceof AppError) ||
+        signal.aborted ||
+        error.details?.unknownWrite === true ||
+        error.code === ErrorCode.BrowserActionFailed);
     emit(stepIndex, 'result', reason, {
       status: FunctionalTestStatus.Blocked,
-      ...(mayWrite && (!(error instanceof AppError) || signal.aborted) ? { unknownWrite: true } : {}),
+      ...(unknownWrite ? { unknownWrite: true } : {}),
     });
+    if (definition.cleanup.length > 0)
+      emit(stepIndex, 'cleanup', '运行异常中止，需核实数据状态后清理', { status: FunctionalTestStatus.NotRun });
     outcome = FunctionalTestStatus.Blocked;
   } finally {
     await browser.close(owner.id);

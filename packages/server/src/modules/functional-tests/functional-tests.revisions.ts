@@ -20,13 +20,62 @@ import { latestCases } from './functional-tests.reports.ts';
 
 type Context = { record: TaskDetailDTO; scope: FunctionalTestScope };
 type Input = z.output<typeof functionalTestReviseSchema>;
+type Definition = Omit<FunctionalTestCase, 'id' | 'number' | 'version'>;
+
+function definitionOf(input: Input, before: FunctionalTestCase): Definition {
+  if (input.definition !== undefined && input.change === undefined) return input.definition;
+  const change = input.change;
+  if (change === undefined || input.definition !== undefined)
+    throw new AppError(ErrorCode.ValidationFailed, 'Supply exactly one of definition or change');
+  const { id, number, version, ...old } = before;
+  const step = old.steps[change.step];
+  if (step?.kind !== 'http')
+    throw new AppError(ErrorCode.ValidationFailed, 'Select an HTTP step in the saved definition');
+  let updated = step;
+  if (change.kind === 'rename_request_field') {
+    const body = step.body;
+    if (
+      body === undefined ||
+      body === null ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      !Object.hasOwn(body, change.from) ||
+      Object.hasOwn(body, change.to)
+    )
+      throw new AppError(
+        ErrorCode.ValidationFailed,
+        'The original field must exist and the replacement must be unused',
+      );
+    updated = {
+      ...step,
+      body: Object.fromEntries(
+        Object.entries(body).map(([key, value]) => [key === change.from ? change.to : key, value]),
+      ),
+    };
+  } else {
+    const status = step.assertions.filter(({ field }) => field === 'status');
+    if (status.length !== 1)
+      throw new AppError(ErrorCode.ValidationFailed, 'The selected step must have exactly one status assertion');
+    updated = {
+      ...step,
+      assertions: step.assertions.map((assertion) =>
+        assertion.field === 'status' ? { ...assertion, equals: change.expected } : assertion,
+      ),
+    };
+  }
+  return { ...old, steps: old.steps.map((item, index) => (index === change.step ? updated : item)) };
+}
 
 const contractPath = /^(?!\/|.*(?:^|\/)\.\.(?:\/|$))[\w./-]+\.json$/;
 const contractSchema = z.object({ openapi: z.string().startsWith('3.'), paths: z.record(z.string(), z.json()) });
 
 /** 只有被测提交上的合同能自动纠正唯一的成功状态码或明确的请求字段。 */
-async function contractProves(input: Input, before: FunctionalTestCase, record: TaskDetailDTO): Promise<boolean> {
-  const path = input.contractPath;
+async function contractProves(
+  path: string | undefined,
+  next: Definition,
+  before: FunctionalTestCase,
+  record: TaskDetailDTO,
+): Promise<boolean> {
   if (
     path === undefined ||
     !contractPath.test(path) ||
@@ -54,7 +103,6 @@ async function contractProves(input: Input, before: FunctionalTestCase, record: 
   const contract = contractSchema.safeParse(parsed);
   if (!contract.success) return false;
   const { id, number, version, ...old } = before;
-  const next = input.definition;
   if (!isDeepStrictEqual({ ...next, steps: [] }, { ...old, steps: [] }) || next.steps.length !== old.steps.length)
     return false;
   let changes = 0;
@@ -90,7 +138,8 @@ async function contractProves(input: Input, before: FunctionalTestCase, record: 
         typeof previous.equals !== 'number' ||
         previous.equals < 200 ||
         previous.equals >= 300 ||
-        String(assertion.equals) !== success[0]
+        assertion.equals !== Number(success[0]) ||
+        !isDeepStrictEqual(assertion, { ...previous, equals: assertion.equals })
       )
         return false;
       changes++;
@@ -162,7 +211,7 @@ export function functionalTestRevisions({
   return {
     async revise(attempt: AttemptDTO, input: Input) {
       const { taskId, record } = resolve(attempt, [FUNCTIONAL_TEST_NODE.Execute]);
-      const { caseId, version, executionId, definition } = input;
+      const { caseId, version, executionId } = input;
       const snapshot = repo.get(taskId);
       const before = latest(snapshot, caseId, version);
       const execution = snapshot.executions.find(({ id }) => id === executionId);
@@ -172,6 +221,9 @@ export function functionalTestRevisions({
         execution.status === FunctionalTestStatus.Running
       )
         throw new AppError(ErrorCode.ValidationFailed, 'The triggering execution does not belong to this case version');
+      const definition = definitionOf(input, before);
+      if (definition.steps.length === 0 && definition.needsClarification === undefined)
+        throw new AppError(ErrorCode.ValidationFailed, 'Supply executable steps or mark the missing expectation');
       if (!isDeepStrictEqual(before.source, definition.source))
         throw new AppError(ErrorCode.ValidationFailed, 'Keep the original case source reference');
       const candidate = { ...definition, id: caseId, version: version + 1, number: before.number };
@@ -179,7 +231,7 @@ export function functionalTestRevisions({
       const verified =
         environment?.verified === true &&
         environment.baseline === record.git.baseCommit &&
-        (await contractProves(input, before, record));
+        (await contractProves(input.contractPath, definition, before, record));
       return repo.update(taskId, (current) => {
         latest(current, caseId, version);
         const detail = {
@@ -219,7 +271,13 @@ export function functionalTestRevisions({
         return {
           case: verified ? candidate : before,
           pending: !verified,
-          ...(verified ? {} : { proposal: current.nextAfter }),
+          ...(verified
+            ? {}
+            : {
+                proposal: current.nextAfter,
+                reason:
+                  'The supplied correction is not uniquely proven by the contract at the verified baseline. The current version is unchanged until the user approves this proposal.',
+              }),
         };
       });
     },

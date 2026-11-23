@@ -33,7 +33,18 @@ it('在本地工作区测试页面点击和刷新，证据落盘后取消并回�
   const host = createChromiumHost();
   const t = await createTestApp({ browserHost: host });
   try {
-    const { project } = await addProject(t, { files: { 'server.mjs': server } });
+    const contract = JSON.stringify({
+      openapi: '3.1.0',
+      paths: {
+        '/done': {
+          post: {
+            responses: { 200: { description: 'Done' } },
+            requestBody: { content: { 'application/json': { schema: { properties: { done: {}, note: {} } } } } },
+          },
+        },
+      },
+    });
+    const { project } = await addProject(t, { files: { 'server.mjs': server, 'openapi.json': contract } });
     await t.call(updateProjectOp, {
       id: project.id,
       preview: {
@@ -115,6 +126,23 @@ it('在本地工作区测试页面点击和刷新，证据落盘后取消并回�
         ],
       }),
     );
+    const statusCase = tests.save(
+      authored,
+      functionalTestCaseSaveSchema.parse({
+        title: '提交成功的状态码',
+        requirement: '服务确认完成操作',
+        steps: [
+          {
+            kind: 'http',
+            title: '完成',
+            method: 'POST',
+            path: '/done',
+            body: { state: true, note: { source: 'original' } },
+            assertions: [{ field: 'status', equals: 201, basis: '已确认的 OpenAPI 契约' }],
+          },
+        ],
+      }),
+    );
     const prep = next(FUNCTIONAL_TEST_NODE.Environment);
     await tasks.submitResult(authored, { summary: '已保存案例' });
     const preparing = attempts.get((await prep).attempt.id);
@@ -136,6 +164,45 @@ it('在本地工作区测试页面点击和刷新，证据落盘后取消并回�
       expect.arrayContaining([expect.objectContaining({ method: 'POST', status: 200 })]),
     );
     expect(events.find(({ kind, step }) => kind === 'assertion' && step === 2)?.detail).toMatchObject({ passed: true });
+    const trial = { ...test, caseId: statusCase.id, executionId: 'status-v1' };
+    expect((await tests.execute(runner, trial)).status).toBe('failed');
+    const statusStep = statusCase.steps[0];
+    if (statusStep?.kind !== 'http') throw new Error('Expected the HTTP status step');
+    const proposal = {
+      caseId: trial.caseId,
+      version: 1,
+      executionId: trial.executionId,
+      contractPath: 'openapi.json',
+      reason: '纠正契约转写',
+      basis: 'openapi.json /done POST',
+    };
+    const { id, version, number, ...saved } = statusCase;
+    for (const step of [
+      { ...statusStep, assertions: [{ field: 'status', equals: 200, basis: '同时替换依据' }] },
+      { ...statusStep, assertions: [{ field: 'status', equals: '200', basis: '已确认的 OpenAPI 契约' }] },
+      { ...statusStep, body: { done: true, note: { source: 'changed' } } },
+      { ...statusStep, body: { done: false, note: { source: 'original' } } },
+    ]) {
+      const result = await tests.revise(runner, { ...proposal, definition: { ...saved, steps: [step] } });
+      expect(result).toMatchObject({ case: statusCase, pending: true });
+    }
+    const revision = await tests.revise(runner, {
+      caseId: trial.caseId,
+      version: 1,
+      executionId: trial.executionId,
+      change: { kind: 'correct_success_status', step: 0, expected: 200 },
+      contractPath: 'openapi.json',
+      reason: '纠正状态码转写',
+      basis: 'openapi.json /done POST responses',
+    });
+    expect(revision).toMatchObject({ case: { version: 2 }, pending: false });
+    expect((await tests.execute(runner, { ...trial, version: 2, executionId: 'status-v2' })).status).toBe('passed');
+    expect(tests.getCaseExecution(taskId, 'status-v1').events).toContainEqual(
+      expect.objectContaining({
+        kind: 'assertion',
+        detail: expect.objectContaining({ expected: 201, actual: 200, passed: false }),
+      }),
+    );
     const started = waitForEvent(
       t.app.events,
       ServerEventType.FunctionalTestUpdated,

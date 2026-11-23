@@ -25,6 +25,9 @@ export function redact(value: Json): Json {
     );
   return value;
 }
+export function redactField(field: string, value: Json): Json {
+  return SECRET.test(field) ? '[redacted]' : redact(value);
+}
 export function redactText(text: string): string {
   return String(redact(text));
 }
@@ -120,6 +123,7 @@ export async function scopedRequest(url: URL, init: RequestInit & { method: stri
       throw new AppError(
         ErrorCode.StateTransitionInvalid,
         'A redirect followed this request; verify its result before retrying',
+        { unknownWrite: true },
       );
     url = new URL(to, url);
   }

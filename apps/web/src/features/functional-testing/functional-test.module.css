@@ -78,8 +78,7 @@
   outline-offset: -3px;
 }
 
-.caseRow [data-status="failed"],
-.failed {
+.caseRow [data-status="failed"] {
   color: var(--danger);
 }
 
