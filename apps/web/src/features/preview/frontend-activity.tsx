@@ -1,4 +1,4 @@
-import { InboxKind, type TaskDetailDTO, UiMode } from '@aw/shared';
+import { InboxKind, NodeStatus, type TaskDetailDTO, UiMode } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
@@ -46,11 +46,19 @@ export function FrontendActivity({
   }, undefined);
   const node =
     selected ??
-    task.nodes.find((item) => item.id === active?.nodeId) ??
+    task.nodes.find((item) => item.id === (nodeId ?? active?.nodeId)) ??
     (nodeId === undefined ? executed.at(-1) : undefined);
   const history = useQuery({
     ...nodeQuery(task.id, node?.id ?? ''),
     enabled: active === undefined && node !== undefined,
+    // An explicit phase can be shown before the task snapshot includes its first attempt.
+    refetchInterval: (query) =>
+      nodeId !== undefined &&
+      active === undefined &&
+      query.state.data?.attempts.length === 0 &&
+      (query.state.data.status === NodeStatus.Ready || query.state.data.status === NodeStatus.Running)
+        ? 1000
+        : false,
   });
   const attempt = active ?? history.data?.attempts.at(-1);
   const inbox = showInbox ? task.openInbox.filter((item) => item.kind !== InboxKind.Failure) : [];
