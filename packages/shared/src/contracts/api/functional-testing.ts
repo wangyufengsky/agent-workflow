@@ -62,7 +62,32 @@ const probeSchema = z.object({
   expectedStatus: z.number().int().min(100).max(599),
 });
 export type FunctionalTestProbe = z.infer<typeof probeSchema>;
-export const functionalTestPrepareSchema = z.object({ checks: z.array(probeSchema).max(10).optional() });
+const repoPath = z
+  .string()
+  .trim()
+  .min(1)
+  .max(512)
+  .refine(
+    (value) =>
+      !/[\p{Cc}:\\]/u.test(value) &&
+      value.split('/').every((part) => part && part !== '.' && part !== '..' && part.toLowerCase() !== '.git'),
+    'Expected a path relative to the worktree',
+  );
+export const functionalTestLaunchSchema = z.strictObject({
+  directory: z.union([z.literal('.'), repoPath]),
+  source: repoPath,
+  script: z
+    .string()
+    .max(128)
+    .regex(/^[a-zA-Z0-9][a-zA-Z0-9_.:-]*$/),
+  profile: z.enum(['test', 'qa']).optional(),
+  readyPath: probeSchema.shape.path,
+});
+export type FunctionalTestLaunch = z.infer<typeof functionalTestLaunchSchema>;
+export const functionalTestPrepareSchema = z.object({
+  checks: z.array(probeSchema).max(10).optional(),
+  launch: functionalTestLaunchSchema.optional(),
+});
 export type FunctionalTestPrepare = z.output<typeof functionalTestPrepareSchema>;
 
 export const functionalTestEnvironmentSchema = z.object({
@@ -73,6 +98,10 @@ export const functionalTestEnvironmentSchema = z.object({
   ready: z.boolean(),
   reason: z.string().nullable(),
   logTail: z.string(),
+  launch: functionalTestLaunchSchema.optional(),
+  command: z.string().optional(),
+  readyUrl: z.string().optional(),
+  readyStatus: z.number().int().min(100).max(599).optional(),
   checks: z
     .array(
       probeSchema.extend({ status: z.number().int().nullable(), ready: z.boolean(), reason: z.string().nullable() }),

@@ -131,6 +131,7 @@ describe('opencode 配置生成', () => {
   it('按功能测试阶段授权 Skill 和专用工具，拒绝原生写入、命令与直接浏览器操作', () => {
     for (const [node, tool] of [
       [FUNCTIONAL_TEST_NODE.Import, McpToolName.TestCaseSave],
+      [FUNCTIONAL_TEST_NODE.Environment, McpToolName.TestEnvironmentPrepare],
       [FUNCTIONAL_TEST_NODE.Execute, McpToolName.TestCaseRun],
       [FUNCTIONAL_TEST_NODE.Report, McpToolName.TestReportSubmit],
     ] as const) {
@@ -141,6 +142,9 @@ describe('opencode 配置生成', () => {
       );
       const allowed = rules.filter(({ action }) => action === 'allow').map(({ permission }) => permission);
       expect(allowed).toContain(`${MCP_TOOL_PREFIX}${tool}`);
+      for (const reader of ['read', 'glob', 'grep']) {
+        expect(allowed.includes(reader)).toBe(node === FUNCTIONAL_TEST_NODE.Environment);
+      }
       expect(allowed).not.toContain('bash');
       expect(allowed).not.toContain('edit');
       expect(allowed).not.toContain(`${MCP_TOOL_PREFIX}${McpToolName.BrowserOpen}`);

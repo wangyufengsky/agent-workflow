@@ -38,7 +38,7 @@ export function functionalTestMcpTools(service: FunctionalTestsService) {
       input: functionalTestPrepareSchema,
       output: functionalTestRunSchema,
       description:
-        'Start the authorized local service or connect to the approved test URL. First read saved requires keys with test_run_read. Supply checks {key,path,expectedStatus} for documented prerequisites under their exact keys. On linked retests inheritedChecks are re-probed automatically and retain their definitions. Read the returned environment.checks to identify case blockers. Service readiness alone does not satisfy a required key.',
+        'Start the authorized local service or connect to the approved test URL. For local discovery pass launch {directory,source,script,readyPath,profile?}. Paths are worktree-relative; source is the module manifest; script is an existing service script, spring-boot:run, or bootRun. The optional test/qa profile must be backed by the Spring configuration or match the mode/environment in a Node script. The runner allocates PORT. Omit launch to reuse the project setting or recover this run. Never supply launch for an external URL. First read saved requires keys with test_run_read. Supply checks {key,path,expectedStatus} for documented prerequisites under their exact keys. On linked retests inheritedChecks are re-probed automatically and retain their definitions. Read the returned environment.checks to identify case blockers. Service readiness alone does not satisfy a required key.',
       handler: (input, { attempt, signal }) => service.prepare(attempt, input, signal),
     }),
     defineMcpTool({

@@ -10,6 +10,11 @@ async function readBody(req) {
 
 createServer(async (req, res) => {
   res.setHeader('content-type', 'application/json');
+  if (req.url === '/healthz') {
+    res.statusCode = process.env.NODE_ENV === 'qa' ? 200 : 503;
+    res.end(JSON.stringify({ profile: process.env.NODE_ENV }));
+    return;
+  }
   if (req.method === 'POST' && req.url === '/api/check') {
     const body = await readBody(req);
     const accepted = body.done === true;

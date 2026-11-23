@@ -20,6 +20,7 @@ export function FrontendActivity({
   inMain,
   starting,
   showInbox = true,
+  expandActions = false,
   nodeId,
   buildingTitle = C.building,
   buildingHint = C.waitingHint,
@@ -28,6 +29,7 @@ export function FrontendActivity({
   inMain: boolean;
   starting: boolean;
   showInbox?: boolean;
+  expandActions?: boolean;
   nodeId?: string;
   buildingTitle?: string;
   buildingHint?: string;
@@ -90,6 +92,7 @@ export function FrontendActivity({
           attemptId={attempt.id}
           title={attempt.nodeId === null ? C.activity : node?.title}
           pro={pro}
+          expandActions={expandActions}
           actions={
             attempt.nodeId === null ? (
               <button type="button" className={styles.activityDetails} onClick={() => setDetailAttempt(attempt.id)}>

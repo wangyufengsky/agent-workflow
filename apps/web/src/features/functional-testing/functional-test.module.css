@@ -168,6 +168,10 @@
   max-height: 27rem;
 }
 
+.authorEmpty {
+  grid-column: span 2;
+}
+
 .carousel {
   --case-height: 3.75rem;
   position: relative;
@@ -575,6 +579,10 @@
   .author,
   .phaseLayout {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .authorEmpty {
+    grid-column: 1;
   }
 
   .carousel,

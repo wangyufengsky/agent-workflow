@@ -1,9 +1,17 @@
 import { readFile } from 'node:fs/promises';
-import { FUNCTIONAL_TEST_WORKFLOW_KEY, type FunctionalTestSnapshot, TaskStatus, taskDetailSchema } from '@aw/shared';
-import { expect } from '@playwright/test';
+import {
+  ATTACHMENT_NAME_HEADER,
+  attachmentSchema,
+  FUNCTIONAL_TEST_NODE,
+  FUNCTIONAL_TEST_WORKFLOW_KEY,
+  type FunctionalTestSnapshot,
+  TaskStatus,
+  taskDetailSchema,
+} from '@aw/shared';
+import { type APIRequestContext, expect } from '@playwright/test';
 import { test } from './assistant-fixtures.ts';
 import { API_BASE, AUTH } from './env.ts';
-import { appTool, createProject, queueAssistantTurn } from './helpers.ts';
+import { appTool, createProject, queueAssistantTurn, queueTurn, TASK_RUN_TIMEOUT_MS } from './helpers.ts';
 
 test('发起功能测试时选择已上传的用例附件并确认范围', async ({ page, request }) => {
   const project = await createProject(request, null);
@@ -52,8 +60,12 @@ test('发起功能测试时选择已上传的用例附件并确认范围', async
   await expect(page.getByRole('button', { name: '解析上传用例', exact: true })).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('回看用例时行为与终端同步，迟到响应仍归属原用例，空闲后恢复跟随', async ({ page, request }) => {
-  const project = await createProject(request, null);
+async function createFunctionalTestDraft(
+  request: APIRequestContext,
+  projectId?: string,
+  caseAttachmentIds: string[] = [],
+) {
+  const id = projectId ?? (await createProject(request, null)).id;
   const workflowsResponse = await request.get(`${API_BASE}/workflows`, { headers: AUTH });
   await expect(workflowsResponse).toBeOK();
   const workflows: { items: { id: string; key: string }[] } = await workflowsResponse.json();
@@ -62,15 +74,163 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
   const created = await request.post(`${API_BASE}/tasks`, {
     headers: AUTH,
     data: {
-      projectId: project.id,
+      projectId: id,
       workflowId: workflow.id,
       requirement: '验证订单接口',
-      functionalTest: { target: '/orders', writes: [], caseAttachmentIds: [] },
+      functionalTest: { target: '/orders', writes: [], caseAttachmentIds },
+      attachmentIds: caseAttachmentIds,
       start: false,
     },
   });
   await expect(created).toBeOK();
-  const task = taskDetailSchema.parse(await created.json());
+  return taskDetailSchema.parse(await created.json());
+}
+
+for (const fixture of [
+  { phase: '编写用例', node: FUNCTIONAL_TEST_NODE.Author, source: '编写案例', withFile: false },
+  { phase: '解析上传用例', node: FUNCTIONAL_TEST_NODE.Import, source: '解析上传案例', withFile: true },
+]) {
+  test(`${fixture.phase}在首条用例保存前显示可展开的实际 AI 步骤`, async ({ page, request }) => {
+    const project = await createProject(request, null);
+    const attachmentIds: string[] = [];
+    if (fixture.withFile) {
+      const attachment = await request.post(`${API_BASE}/attachments`, {
+        headers: { ...AUTH, 'Content-Type': 'application/octet-stream', [ATTACHMENT_NAME_HEADER]: 'orders.md' },
+        data: Buffer.from('# ORD-01\nGET /orders 应返回 200'),
+      });
+      await expect(attachment).toBeOK();
+      attachmentIds.push(attachmentSchema.parse(await attachment.json()).id);
+    }
+    const task = await createFunctionalTestDraft(request, project.id, attachmentIds);
+    await queueTurn(request, project, { title: fixture.source, taskKey: task.key }, [
+      { type: 'callTool', name: 'get_task_context', args: {} },
+      { type: 'hang' },
+    ]);
+    try {
+      await page.goto(`/tasks/${task.id}`);
+      await expect(await request.post(`${API_BASE}/tasks/${task.id}/start`, { headers: AUTH })).toBeOK();
+      const stage = page.getByRole('region', { name: fixture.phase, exact: true });
+      await expect(stage.getByText('等待用例保存')).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+      const activity = stage.getByRole('complementary', { name: 'AI 活动' });
+      const step = activity.getByTestId('stream-action').filter({ hasText: '读取任务背景' });
+      const expand = step.getByRole('button');
+      await expect(expand).toBeVisible({ timeout: TASK_RUN_TIMEOUT_MS });
+      await expand.click();
+      await expect(expand).toHaveAttribute('aria-expanded', 'true');
+      await expect(step.getByText(new RegExp(`"phase"\\s*:\\s*"${fixture.node}"`))).toBeVisible();
+      await expect(activity.getByRole('link', { name: '完整详情' })).toBeVisible();
+    } finally {
+      await request.post(`${API_BASE}/tasks/${task.id}/cancel`, { headers: AUTH, data: {} });
+    }
+  });
+}
+
+test('准备环境显示实际启动、探测和阻塞原因，并兼容旧运行记录', async ({ page, request }) => {
+  const task = await createFunctionalTestDraft(request);
+  const now = Date.now();
+  const snapshot: FunctionalTestSnapshot = {
+    cases: [],
+    runs: [
+      {
+        id: 'run-ready',
+        createdAt: now - 2,
+        environment: {
+          id: 'env-ready',
+          target: 'http://localhost:49152/orders',
+          baseline: 'aa12345',
+          verified: true,
+          ready: true,
+          reason: null,
+          logTail: 'Started OrderServer',
+          launch: {
+            directory: 'services/orders',
+            source: 'README.md 的 QA 启动说明',
+            script: 'bootRun',
+            profile: 'qa',
+            readyPath: '/health',
+          },
+          command: './gradlew bootRun --args=--spring.profiles.active=qa',
+          readyUrl: 'http://localhost:49152/health',
+          readyStatus: 200,
+          checks: [{ key: 'orders', path: '/orders', expectedStatus: 200, status: 200, ready: true, reason: null }],
+        },
+      },
+      {
+        id: 'run-blocked',
+        createdAt: now - 1,
+        environment: {
+          id: 'env-blocked',
+          target: '/orders',
+          baseline: 'bb12345',
+          verified: false,
+          ready: false,
+          reason: '进程启动失败',
+          logTail: 'Port already in use',
+          launch: {
+            directory: 'services/orders',
+            source: 'README.md 的 QA 启动说明',
+            script: 'bootRun',
+            profile: 'qa',
+            readyPath: '/health',
+          },
+          command: './gradlew bootRun --args=--spring.profiles.active=qa',
+          checks: [],
+        },
+      },
+      {
+        id: 'run-1',
+        createdAt: now,
+        environment: {
+          id: 'env-1',
+          target: 'http://localhost/orders',
+          baseline: null,
+          verified: false,
+          ready: true,
+          reason: null,
+          logTail: '',
+          checks: [],
+        },
+      },
+    ],
+    executions: [],
+    events: [],
+    reports: [],
+    nextAfter: 0,
+  };
+  await page.route(
+    (url) => url.pathname === `/api/v1/tasks/${task.id}/functional-test`,
+    (route) => route.fulfill({ json: snapshot }),
+  );
+  await page.goto(`/tasks/${task.id}`);
+  await page.getByRole('button', { name: '准备环境', exact: true }).click();
+  const environment = page.getByRole('region', { name: '准备环境', exact: true });
+  const rounds = page.getByRole('combobox', { name: '测试轮次' });
+  await rounds.selectOption('run-ready');
+  await expect(environment.getByText('就绪', { exact: true })).toBeVisible();
+  await expect(environment.getByText('README.md 的 QA 启动说明')).toBeVisible();
+  await expect(environment.getByText('bootRun', { exact: true })).toBeVisible();
+  await expect(environment.getByText('services/orders', { exact: true })).toBeVisible();
+  await expect(environment.getByText('qa', { exact: true })).toBeVisible();
+  await expect(environment.getByText('./gradlew bootRun --args=--spring.profiles.active=qa')).toBeVisible();
+  await expect(environment.getByText('http://localhost:49152/health', { exact: true })).toBeVisible();
+  await expect(environment.getByText('HTTP 200', { exact: true })).toBeVisible();
+  await expect(environment.getByRole('row', { name: /orders/ }).getByRole('cell')).toHaveText(['200', '200']);
+
+  await rounds.selectOption('run-blocked');
+  await expect(environment.getByText('阻塞', { exact: true })).toBeVisible();
+  await expect(environment.getByText('进程启动失败')).toBeVisible();
+  await expect(environment.getByText('/health', { exact: true })).toBeVisible();
+  await expect(environment.getByText('Port already in use')).toBeVisible();
+  await expect(environment.getByText('HTTP 200', { exact: true })).toHaveCount(0);
+
+  await rounds.selectOption('run-1');
+  await expect(environment.getByText('http://localhost/orders', { exact: true })).toBeVisible();
+  await expect(environment.getByText('AI 启动依据', { exact: true })).toHaveCount(0);
+  await expect(environment.getByText('实际启动命令', { exact: true })).toHaveCount(0);
+});
+
+test('回看用例时行为与终端同步，迟到响应仍归属原用例，空闲后恢复跟随', async ({ page, request }) => {
+  const task = await createFunctionalTestDraft(request);
   const now = Date.now();
   const snapshot: FunctionalTestSnapshot = {
     cases: [1, 2, 3].map((number) => ({
@@ -96,6 +256,7 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
           ready: true,
           reason: null,
           logTail: '',
+          checks: [],
         },
       },
     ],

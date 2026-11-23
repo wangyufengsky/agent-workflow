@@ -10,4 +10,4 @@
 
 ## functional-todo
 
-无依赖的 Node HTTP 测试项目，`npm run dev` 在 `PORT` 上监听。夹具的 OpenAPI 契约规定 `POST /api/check` 接受 `done` 字段，用于复测错误转写后的用例。条目 `fixture-1` 的更新接口确认接收，后续读取仍返回未完成，用于检验报告保留产品缺陷。
+无默认预览配置的 Node HTTP 测试项目，准备节点按 README 发现 `npm run serve:qa`，服务 在 `PORT` 上监听。夹具的 OpenAPI 契约规定 `POST /api/check` 接受 `done` 字段，用于复测错误转写后的用例。条目 `fixture-1` 的更新接口确认接收，后续读取仍返回未完成，用于检验报告保留产品缺陷。

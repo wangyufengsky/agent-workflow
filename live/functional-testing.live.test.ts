@@ -113,6 +113,11 @@ it(
       );
 
       const { body: snapshot } = await live.t.call(functionalTestReadOp, { taskId: task.id });
+      expect(snapshot.runs.at(-1)?.environment).toMatchObject({
+        ready: true,
+        readyStatus: 200,
+        launch: { directory: '.', source: 'package.json', script: 'serve:qa', profile: 'qa', readyPath: '/healthz' },
+      });
       const field = snapshot.cases.find((item) => item.source?.originalId === 'FT-FIELD');
       const state = snapshot.cases.find((item) => item.source?.originalId === 'FT-STATE');
       expect(field).toMatchObject({ source: { attachmentId: cases } });
