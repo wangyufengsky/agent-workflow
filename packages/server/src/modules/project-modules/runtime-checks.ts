@@ -6,13 +6,14 @@ import {
   type ProjectJavaModule,
   type ProjectModuleCheck,
 } from '@aw/shared';
-import { committedSources, javaBuildExecutable, type PreviewCommand } from '../previews/index.ts';
+import { committedSources, javaBuildExecutable, type PreviewCommand, worktreeSources } from '../previews/index.ts';
 
 export async function runtimeCheckCommands(
   worktree: { path: string; baseCommit: string },
   module: Pick<ProjectJavaModule, 'build' | 'directory'>,
   checks: readonly ProjectModuleCheck[],
   env: NodeJS.ProcessEnv,
+  allowWorkingTreeChanges = false,
 ): Promise<PreviewCommand[]> {
   const { directory, build } = module;
   const invalid = () =>
@@ -25,11 +26,12 @@ export async function runtimeCheckCommands(
   )
     throw invalid();
   const committed = committedSources(worktree.path, worktree.baseCommit);
+  const files = allowWorkingTreeChanges ? worktreeSources(worktree.path) : committed;
   const manifest =
     build === 'maven'
-      ? await committed(posix.join(directory, 'pom.xml'), true)
-      : ((await committed(posix.join(directory, 'build.gradle'), false)) ??
-        (await committed(posix.join(directory, 'build.gradle.kts'), true)));
+      ? await files(posix.join(directory, 'pom.xml'), true)
+      : ((await files(posix.join(directory, 'build.gradle'), false)) ??
+        (await files(posix.join(directory, 'build.gradle.kts'), true)));
   if (manifest === undefined) throw invalid();
   const executable = await javaBuildExecutable(build, directory, committed, env);
   const commands: PreviewCommand[] = [];
@@ -45,7 +47,7 @@ export async function runtimeCheckCommands(
       throw invalid();
     if (selected !== undefined) {
       const testSource = posix.join(directory, 'src/test/java', `${selected.replaceAll('.', '/')}.java`);
-      await committed(testSource, true);
+      await files(testSource, true);
     }
     const args =
       build === 'maven'

@@ -1,11 +1,12 @@
 import { COMPANION_PATH, taskDisplayGroupSchema } from '@aw/shared';
 import type { QueryClient } from '@tanstack/react-query';
-import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect } from '@tanstack/react-router';
+import { createRootRouteWithContext, createRoute, createRouter, Link, Outlet, redirect } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { z } from 'zod';
 import { useServerEvents } from '../api/server-events.ts';
 import { ErrorState } from '../components/error-state.tsx';
 import { ToastHost } from '../components/toast.tsx';
+import { COMMON_COPY } from '../copy/common.ts';
 import { MemoryPage } from '../features/assistant/memory-page.tsx';
 import { BatchPage } from '../features/batches/batch.page.tsx';
 import { BatchesPage } from '../features/batches/batches.page.tsx';
@@ -91,6 +92,9 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
   errorComponent: ({ error, reset }) => (
     <div className="page narrow">
       <ErrorState error={error} onRetry={reset} />
+      <Link className="btn" to={ROUTES.home} search={{}}>
+        {COMMON_COPY.returnHome}
+      </Link>
     </div>
   ),
 });

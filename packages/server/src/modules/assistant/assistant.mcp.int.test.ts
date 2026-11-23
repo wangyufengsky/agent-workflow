@@ -234,6 +234,35 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toHaveLength(1);
   });
 
+  it('项目验收方式和检查命令沿用项目更新确认并保留其他设置', async () => {
+    const { project } = await addProject(t);
+    const configure = { id: project.id, acceptanceMode: 'command', checkCommand: 'pnpm test --run' };
+    const proposed = await call('projects_update', configure);
+    expect(proposed.body).toMatchObject({ status: 'needs_confirmation', confirmation_id: expect.any(String) });
+    const [card] = (await t.call(listConfirmationsOp, { id: conversationId })).body.items;
+    expect(card).toMatchObject({ operationId: 'projects.update', risk: 'write', input: configure });
+    expect((await t.call(getProjectOp, { id: project.id })).body).toMatchObject({
+      acceptanceMode: 'auto',
+      checkCommand: project.checkCommand,
+    });
+    const confirmed = await decide(String(proposed.body.confirmation_id), 'confirm');
+    expect(confirmed.body).toMatchObject({
+      result: {
+        ok: true,
+        output: { acceptanceMode: 'command', checkCommand: configure.checkCommand, name: project.name },
+      },
+    });
+    const changeMode = await call('projects_update', { id: project.id, acceptanceMode: 'auto' });
+    expect(changeMode.body).toMatchObject({ status: 'needs_confirmation' });
+    const switched = await decide(String(changeMode.body.confirmation_id), 'confirm');
+    expect(switched.body).toMatchObject({
+      result: {
+        ok: true,
+        output: { acceptanceMode: 'auto', checkCommand: configure.checkCommand, name: project.name },
+      },
+    });
+  });
+
   it('已有任务全局放行时，功能测试仍需逐次确认授权范围', async () => {
     const { project } = await addProject(t);
     await t.call(updateSettingsOp, { 'assistant.alwaysAllow': [createTaskOp.id] });

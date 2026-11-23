@@ -143,3 +143,75 @@ test('修改失败检查命令时显示失败步骤与原条件', async ({ page,
   await expect(dialog.getByLabel('检查命令', { exact: true })).toHaveValue('aw-command-does-not-exist');
   await expect(dialog.getByLabel('同时设为项目的检查命令')).not.toBeChecked();
 });
+
+test('验收结果区分 IDEA 检查、回退命令和缺少可执行检查', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  const workflows = await (await request.get(`${API_BASE}/workflows`, { headers: AUTH })).json();
+  const workflow = workflows.items.find(({ key }: { key: string }) => key === 'bugfix');
+  const created = await request.post(`${API_BASE}/tasks`, {
+    headers: AUTH,
+    data: { projectId: project.id, workflowId: workflow.id, requirement: '核对自动验收证据', start: false },
+  });
+  await expect(created).toBeOK();
+  const draft = await created.json();
+  const check = {
+    kind: 'command',
+    nodeKey: 'fix',
+    nodeTitle: '修复',
+    passed: true,
+    skipped: false,
+    command: 'node ./fallback.mjs',
+  };
+  await page.route(`**/api/v1/tasks/${draft.id}`, (route) =>
+    route.fulfill({
+      json: {
+        ...draft,
+        status: 'review',
+        displayGroup: 'review',
+        result: {
+          summary: '自动验收完成',
+          filesChanged: 0,
+          insertions: 0,
+          deletions: 0,
+          files: [],
+          checks: [
+            {
+              ...check,
+              autoSelection: {
+                source: 'idea',
+                reason: '当前变更匹配订单模块',
+                configurations: ['OrdersUnitTest'],
+              },
+            },
+            {
+              ...check,
+              command: 'node ./selected-fallback.mjs',
+              autoSelection: { source: 'fallback', reason: '没有匹配的 IDEA 测试配置', configurations: [] },
+            },
+            {
+              ...check,
+              command: '$PROJECT_CHECK',
+              passed: false,
+              skipped: true,
+              autoSelection: { source: 'fallback', reason: '没有匹配项，也未设置回退命令', configurations: [] },
+            },
+            { ...check, command: 'node ./user-skipped.mjs', passed: false, skipped: true },
+          ],
+          nodeSummaries: [],
+          assumptions: [],
+        },
+      },
+    }),
+  );
+  await page.goto(`/tasks/${draft.id}?view=result`);
+  const result = page.getByTestId('result-card');
+  await expect(result.getByText('OrdersUnitTest', { exact: true })).toBeVisible();
+  await expect(result.getByText('当前变更匹配订单模块', { exact: true })).toBeVisible();
+  await expect(result.getByText('node ./selected-fallback.mjs', { exact: true })).toBeVisible();
+  await expect(result.getByText('没有匹配的 IDEA 测试配置', { exact: true })).toBeVisible();
+  await expect(result.getByText('没有匹配项，也未设置回退命令', { exact: true })).toBeVisible();
+  await expect(result).toContainText('1 项自动验收未找到可运行的检查');
+  await expect(result).not.toContainText('node ./fallback.mjs');
+  await expect(result).not.toContainText('$PROJECT_CHECK');
+  await expect(result).toContainText('有 1 项检查没有运行：node ./user-skipped.mjs（已跳过）');
+});

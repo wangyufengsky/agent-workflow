@@ -258,3 +258,5 @@ export function createProjectModules({ db, projects, ...deps }: Deps) {
     ],
   };
 }
+
+export { runIdeaAcceptance } from './idea-acceptance.ts';

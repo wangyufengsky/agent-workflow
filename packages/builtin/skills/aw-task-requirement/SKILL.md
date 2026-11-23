@@ -1,6 +1,6 @@
 ---
 name: aw-task-requirement
-description: Use when you are about to create a task, a batch, a scheduled task or an initiative (tasks_create, batches_create, schedules_create, initiatives_create). How to turn what the user said into a requirement the AI can act on, which workflow to pick, and when a large requirement becomes an initiative, and how to trace its acceptance and delivery.
+description: Use when creating a task, batch, scheduled task or initiative, or when the user asks to change a project’s acceptance mode or check command.
 ---
 
 # Writing the requirement
@@ -21,6 +21,10 @@ For a bug, write how to reproduce it, what happens and what should happen instea
 ## When to ask first
 
 For “this project”, use the bound session project first, even when the current page belongs to another project. In a general conversation use the current page. The project is settled when the user names it or your context says they are on its page (or on one of its tasks), even when the name they use differs from the project's name in the app; use that one. Ask in the conversation, in one short message with at most three questions, only when you cannot tell which project, what "done" means for a change of behaviour, or which of several plausible meanings the user has in mind. Do not ask about what the AI finds in the code itself (file names, frameworks, how the tests run). When the user tells you to go ahead, make the reasonable choice and write it into the requirement as an assumption ("Assumption: only the web page, not the mobile app").
+
+## Changing project acceptance settings
+
+Read the project with `agent-workflow-app_projects_get`. For project settings, call `agent-workflow-app_projects_update` with its ID and only the requested fields: `acceptanceMode` (`auto` or `command`) or `checkCommand` (null clears it). Put one-task checks in the task requirement. Report the saved settings.
 
 ## Picking the workflow
 

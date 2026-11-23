@@ -51,6 +51,7 @@
 | slug | TEXT UNIQUE | worktree 目录名 |
 | repo_path | TEXT UNIQUE | 仓库根目录绝对路径 |
 | default_branch | TEXT | 添加时读取，可改 |
+| acceptance_mode | TEXT NOT NULL DEFAULT `auto` | `auto` 自动验收，`command` 使用配置的检查命令。迁移保留已有命令。 |
 | check_command | TEXT NULL | 项目检查命令，验收中的 `$PROJECT_CHECK`（见 13 §1） |
 | preview | TEXT(JSON) NULL | 页面预览设置 `ProjectPreview`（29 §4.1，迁移 `0016_project_preview`）：读出时按 `projectPreviewSchema` 解析；null 为没有预览。预览本身只在内存里，不建表 |
 | hosting_provider | TEXT NULL | `HostingProvider` |
@@ -253,7 +254,7 @@ type Acceptance = {
 | role_id | TEXT → roles | |
 | instructions | TEXT | |
 | depends_on | TEXT(JSON) | node key 列表 |
-| acceptance | TEXT(JSON) | 解析后的 `Acceptance`（`NodeAcceptance`）：计划确认时冻结（13 §1；页面体检冻结 `pages` 与 `viewports`，项目没有预览时移除，29 §7.1）；用户可在任务失败后改写其中的命令检查，或给无法运行的命令检查、页面体检标 `skipped: true`（D116） |
+| acceptance | TEXT(JSON) | 解析后的 `Acceptance`（`NodeAcceptance`），命令检查可含 `autoProject: true`，此时 `command` 保存冻结的备用命令，无备用时为 `$PROJECT_CHECK`。计划确认时冻结（13 §1；页面体检冻结 `pages` 与 `viewports`，项目没有预览时移除，29 §7.1）；用户可在任务失败后改写其中的命令检查，或给无法运行的命令检查、页面体检标 `skipped: true`（D116） |
 | kind | TEXT | `normal` / `revise` |
 | status | TEXT | `NodeStatus` |
 | attempt_count | INTEGER | 消耗的预算 |
@@ -263,6 +264,8 @@ type Acceptance = {
 | commit_sha | TEXT NULL | |
 | position | INTEGER | 画布与列表排序 |
 | created_at / updated_at / started_at / finished_at | INTEGER | |
+
+自动验收的命令结果可含 `autoSelection { source, configurations, reason }`，来源为 `idea` 或 `fallback`。未匹配到配置且备用命令为空时记录 `skipped: true`，结果卡会标明没有可运行的检查。旧记录继续按原格式读取。
 
 索引：`(task_id, status)`。
 

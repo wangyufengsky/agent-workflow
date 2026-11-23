@@ -41,6 +41,7 @@ export const nodeAcceptanceSchema = z.object({
       z.object({
         kind: z.literal(AcceptanceCheckKind.Command),
         command: z.string().min(1),
+        autoProject: z.literal(true).optional(),
         skipped: z.literal(true).optional(),
         requirementItemId,
       }),

@@ -9,8 +9,9 @@ import {
   TranscriptEntryKind,
   UiMode,
 } from '@aw/shared';
-import { useQuery } from '@tanstack/react-query';
-import { memo, type ReactNode, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { CatchBoundary, type ErrorComponentProps } from '@tanstack/react-router';
+import { memo, type ReactNode, useCallback, useMemo, useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
@@ -214,6 +215,24 @@ function Body({ entry, ctx, fresh }: { entry: TranscriptEntry; ctx: Rendered; fr
   }
 }
 
+/** 单条历史记录可能来自旧版。重试只重读记录和确认卡片，不重新执行工具。 */
+function useHistoryError(conversationId: string, message: string) {
+  const client = useQueryClient();
+  return useCallback(
+    ({ error, reset }: ErrorComponentProps) => {
+      const retry = async () => {
+        await Promise.all([
+          client.invalidateQueries({ queryKey: conversationTranscript(conversationId).key, exact: true }),
+          client.invalidateQueries({ queryKey: confirmationsQuery(conversationId).queryKey, exact: true }),
+        ]);
+        reset();
+      };
+      return <ErrorState error={error} message={message} onRetry={() => void retry()} />;
+    },
+    [client, conversationId, message],
+  );
+}
+
 const Message = memo(function Message({
   entry,
   ctx,
@@ -252,6 +271,7 @@ function Stream({
   conversation: AssistantConversationDTO;
   entries: readonly TranscriptEntry[];
 }) {
+  const messageError = useHistoryError(conversation.id, C.messageUnavailable);
   const confirmations = useQuery(confirmationsQuery(conversation.id)).data;
   const pro = useSettings()['ui.mode'] === UiMode.Pro;
   const onContinue = useContinueConversation()?.start ?? null;
@@ -300,13 +320,14 @@ function Stream({
     <>
       <div className={styles.feed} ref={stick.ref} onScroll={stick.onScroll}>
         {entries.map((entry, i) => (
-          <Message
-            key={keyOf(entry)}
-            entry={entry}
-            ctx={ctx}
-            step={i < opened ? Math.max(0, STAGGER_STEPS - (opened - i)) : 0}
-            fresh={i >= opened}
-          />
+          <CatchBoundary key={keyOf(entry)} getResetKey={() => conversation.id} errorComponent={messageError}>
+            <Message
+              entry={entry}
+              ctx={ctx}
+              step={i < opened ? Math.max(0, STAGGER_STEPS - (opened - i)) : 0}
+              fresh={i >= opened}
+            />
+          </CatchBoundary>
         ))}
         {thinking && <Thinking queuePosition={conversation.queuePosition} />}
       </div>
@@ -316,7 +337,7 @@ function Stream({
 }
 
 /** The conversation's message stream (15 §6), kept scrolled to the newest message. */
-export function MessageList({ conversation }: { conversation: AssistantConversationDTO }) {
+function ConversationHistory({ conversation }: { conversation: AssistantConversationDTO }) {
   const { pages, entries } = useTranscript(conversationTranscript(conversation.id));
   if (pages.data === undefined)
     return (
@@ -333,5 +354,14 @@ export function MessageList({ conversation }: { conversation: AssistantConversat
       <ContinuationSource conversation={conversation} />
       <Stream conversation={conversation} entries={entries} />
     </>
+  );
+}
+
+export function MessageList({ conversation }: { conversation: AssistantConversationDTO }) {
+  const historyError = useHistoryError(conversation.id, C.historyUnavailable);
+  return (
+    <CatchBoundary getResetKey={() => conversation.id} errorComponent={historyError}>
+      <ConversationHistory conversation={conversation} />
+    </CatchBoundary>
   );
 }

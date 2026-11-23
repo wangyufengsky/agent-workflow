@@ -24,6 +24,8 @@ import { DIFF_COPY } from '../../copy/diff.ts';
 import { NODE_COPY as C, TASK_COPY } from '../../copy/tasks.ts';
 import { PageCheckResultView } from '../preview/page-check-result.tsx';
 import { ConversationStream } from '../stream/conversation-stream.tsx';
+import { AutoAcceptanceEvidence, autoAcceptanceLabel } from '../tasks/auto-acceptance-evidence.tsx';
+import { noAutomaticCheck } from '../tasks/skipped-checks.ts';
 import { NodeBadge } from '../tasks/task-badge.tsx';
 import { nodeDiffFileQuery, nodeDiffQuery, nodeQuery } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
@@ -36,6 +38,7 @@ export type NodeTab = (typeof NodeTab)[keyof typeof NodeTab];
  * A check's outcome; a command or page check may also have been skipped, or not run in the app's environment (D116).
  */
 function checkBadge(check: CheckResult): { tone: StatusTone; label: string } {
+  if (noAutomaticCheck(check)) return { tone: 'warn', label: TASK_COPY.autoNoCheck };
   if (check.kind !== AcceptanceCheckKind.AiReview && check.skipped) return { tone: 'warn', label: C.checkSkipped };
   if (check.kind !== AcceptanceCheckKind.AiReview && check.unrunnable !== null)
     return { tone: 'danger', label: C.checkUnrunnable };
@@ -57,7 +60,7 @@ function checkKey(check: CheckResult): string {
 export function Check({ taskId, check }: { taskId: string; check: CheckResult }) {
   const label =
     check.kind === AcceptanceCheckKind.Command
-      ? C.commandCheck(check.command)
+      ? (autoAcceptanceLabel(check) ?? C.commandCheck(check.command))
       : check.kind === AcceptanceCheckKind.Browser
         ? C.pageCheck
         : C.reviewCheck;
@@ -66,7 +69,7 @@ export function Check({ taskId, check }: { taskId: string; check: CheckResult })
     <details>
       <summary className="row">
         <StatusBadge tone={badge.tone} label={badge.label} />
-        <span className="mono ellipsis">{label}</span>
+        {!noAutomaticCheck(check) && <span className="mono ellipsis">{label}</span>}
         {check.kind === AcceptanceCheckKind.Command && check.timedOut && <span className="hint">{C.timedOut}</span>}
         {check.kind === AcceptanceCheckKind.Command && check.unrunnable !== null && (
           <span className="hint">{C.unrunnableHint(check.unrunnable.program, check.unrunnable.reason)}</span>
@@ -77,7 +80,14 @@ export function Check({ taskId, check }: { taskId: string; check: CheckResult })
       ) : check.kind === AcceptanceCheckKind.Browser ? (
         <PageCheckResultView taskId={taskId} check={check} />
       ) : (
-        <pre className={styles.output}>{check.output}</pre>
+        <>
+          <AutoAcceptanceEvidence check={check} />
+          {check.output !== '' ? (
+            <pre className={styles.output}>{check.output}</pre>
+          ) : (
+            <p className="hint">{check.skipped ? C.skippedCommandOutput : C.emptyCommandOutput}</p>
+          )}
+        </>
       )}
     </details>
   );

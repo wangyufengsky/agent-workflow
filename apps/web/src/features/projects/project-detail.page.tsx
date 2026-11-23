@@ -33,6 +33,7 @@ const route = getRouteApi(ROUTE_IDS.project);
 function ProjectForm({ project }: { project: ProjectDetailDTO }) {
   const [name, setName] = useState(project.name);
   const [defaultBranch, setDefaultBranch] = useState(project.defaultBranch);
+  const [acceptanceMode, setAcceptanceMode] = useState(project.acceptanceMode);
   const [checkCommand, setCheckCommand] = useState(project.checkCommand ?? '');
   const update = useUpdateProject(project.id);
 
@@ -45,11 +46,13 @@ function ProjectForm({ project }: { project: ProjectDetailDTO }) {
     );
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const command = checkCommand.trim();
+    const command = checkCommand.trim() || null;
+    // 只保存用户编辑的字段，避免把助手刚调整的其他设置改回旧值。
     void save({
-      name: name.trim(),
-      defaultBranch: defaultBranch.trim(),
-      checkCommand: command === '' ? null : command,
+      ...(name.trim() !== project.name ? { name: name.trim() } : {}),
+      ...(defaultBranch.trim() !== project.defaultBranch ? { defaultBranch: defaultBranch.trim() } : {}),
+      ...(acceptanceMode !== project.acceptanceMode ? { acceptanceMode } : {}),
+      ...(command !== project.checkCommand ? { checkCommand: command } : {}),
     });
   };
   // Tasks start from the default branch, which is origin's when there is one: not where the user works (D216).
@@ -88,6 +91,24 @@ function ProjectForm({ project }: { project: ProjectDetailDTO }) {
         )}
       </div>
       <div className="field">
+        <label className="label" htmlFor="project-acceptance-mode">
+          {C.acceptanceMode}
+        </label>
+        <select
+          id="project-acceptance-mode"
+          className="input"
+          value={acceptanceMode}
+          aria-describedby="project-acceptance-hint"
+          onChange={(event) => setAcceptanceMode(event.target.value === 'command' ? 'command' : 'auto')}
+        >
+          <option value="auto">{C.acceptanceModes.auto}</option>
+          <option value="command">{C.acceptanceModes.command}</option>
+        </select>
+        <p id="project-acceptance-hint" className="hint">
+          {C.acceptanceModeHint}
+        </p>
+      </div>
+      <div className="field">
         <label className="label" htmlFor="project-check">
           {C.checkCommand}
         </label>
@@ -95,9 +116,12 @@ function ProjectForm({ project }: { project: ProjectDetailDTO }) {
           id="project-check"
           className="input mono"
           value={checkCommand}
+          aria-describedby="project-check-hint"
           onChange={(e) => setCheckCommand(e.target.value)}
         />
-        <p className="hint">{C.checkCommandHint}</p>
+        <p id="project-check-hint" className="hint">
+          {acceptanceMode === 'auto' ? C.fallbackCommandHint : C.checkCommandHint}
+        </p>
       </div>
       {update.isError && <ErrorState error={update.error} />}
       <div className="divider" />

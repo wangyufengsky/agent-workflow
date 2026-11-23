@@ -11,12 +11,17 @@ export const hostingRefSchema = z.object({
 });
 export type HostingRef = z.infer<typeof hostingRefSchema>;
 
+export const PROJECT_DEFAULT_ACCEPTANCE_MODE = 'auto';
+export const projectAcceptanceModeSchema = z.enum(['auto', 'command']);
+export type ProjectAcceptanceMode = z.infer<typeof projectAcceptanceModeSchema>;
+
 export const projectSchema = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
   repoPath: z.string(),
   defaultBranch: z.string(),
+  acceptanceMode: projectAcceptanceModeSchema.default(PROJECT_DEFAULT_ACCEPTANCE_MODE),
   /** `$PROJECT_CHECK` in acceptance checks (13 §1); null when the project has none. */
   checkCommand: z.string().nullable(),
   /** Bound remote (M4-05); only whether a token is stored is exposed. */
@@ -72,6 +77,7 @@ export const updateProjectRequestSchema = z.object({
   id: z.string(),
   name: z.string().trim().min(1).optional(),
   defaultBranch: z.string().min(1).optional(),
+  acceptanceMode: projectAcceptanceModeSchema.optional(),
   checkCommand: z.string().trim().min(1).nullable().optional(),
   preview: projectPreviewSchema.nullable().optional(),
 });

@@ -4,6 +4,8 @@
 
 助手独立提供 `browser_readUrl`（明确地址、强制只读、文字与日志；整体读取最长 30 秒，超时为 `BROWSER_READ_FAILED`）、无参 `browser_read`（界面明确关联的用户预览）与 `previews_get/start/stop`（写操作仍须确认），不开放本页执行 MCP 的点击、输入和截图工具；契约见 [11 §13f](11-api.md#13f-页面预览v1329-4) 与 [29 §9](29-browser.md#9-应用助手)。用户页签的创建、导航、视口与绑定操作不对助手暴露，模型不能提供 tabId 来选择页面。
 
+应用助手可通过 `projects_update` 修改项目的 `acceptanceMode` 或 `checkCommand`。沿用项目更新的写操作确认规则。出现确认卡时会展示本次改动，省略的设置保留当前值。
+
 ## 1. 职责边界
 
 - **opencode 原生工具**（read / edit / write / bash / grep / glob …）负责读写代码、跑命令。会话 `directory` = 任务 worktree。

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Markdown } from '../../components/markdown.tsx';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { lastFailure, outputTail } from '../task-detail/last-failure.ts';
+import { autoAcceptanceLabel } from './auto-acceptance-evidence.tsx';
 import { failedNodeKeyOf, failureText } from './failure-text.ts';
 import { nodeQuery, taskQuery } from './tasks.queries.ts';
 
@@ -32,7 +33,9 @@ function LatestOutcome({ taskId, nodeId }: { taskId: string; nodeId: string }) {
     const output = outputTail(check.output, 2).tail.slice(-300);
     return (
       <p>
-        <Markdown inline source={C.lastCommand(check.command, check.exitCode, check.timedOut)} />
+        {autoAcceptanceLabel(check) ?? (
+          <Markdown inline source={C.lastCommand(check.command, check.exitCode, check.timedOut)} />
+        )}
         {output !== '' && <span className="mono"> {output}</span>}
       </p>
     );

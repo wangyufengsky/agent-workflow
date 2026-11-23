@@ -74,6 +74,7 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
           nodeId: node.id,
           commitSha: node.commitSha,
           evidence: c,
+          ...(c.kind === AcceptanceCheckKind.Command && c.autoSelection ? { autoSelection: c.autoSelection } : {}),
           evidenceId: randomUUID(),
           kind: c.kind,
           passed: c.passed,
@@ -121,6 +122,7 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
       if (failed === undefined) throw new Error(`Task ${task.key} has no failed node`);
       const step = { nodeKey: failed.key, nodeTitle: failed.title };
       const unrunnable = nodes.unrunnableCheck(failed);
+      const failedCommand = nodes.failedCommand(failed);
       fail(
         task,
         TaskFailedPhase.Running,
@@ -131,7 +133,7 @@ export function createTaskResults(deps: TasksServiceDeps, state: TaskState) {
               details: {
                 ...step,
                 feedback: failed.retryFeedback,
-                command: nodes.failedCommand(failed)?.command ?? null,
+                command: failedCommand?.autoSelection?.source === 'idea' ? null : (failedCommand?.command ?? null),
               },
             }
           : unrunnable.kind === AcceptanceCheckKind.Command

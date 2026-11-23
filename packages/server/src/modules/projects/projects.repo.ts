@@ -4,9 +4,14 @@ import type { DbExecutor } from '../../core/db/database.ts';
 import { projectBashRulesTable, projectsTable } from './projects.table.ts';
 
 type ProjectRow = typeof projectsTable.$inferSelect;
-export type NewProject = Omit<ProjectRow, 'hostingProvider' | 'hostingBaseUrl' | 'hostingRepo' | 'hostingCredentialId'>;
+export type NewProject = Omit<
+  ProjectRow,
+  'hostingProvider' | 'hostingBaseUrl' | 'hostingRepo' | 'hostingCredentialId' | 'acceptanceMode'
+>;
 /** Undefined fields are left unchanged. */
-export type ProjectChanges = { [K in 'name' | 'defaultBranch' | 'checkCommand']?: ProjectRow[K] | undefined } & {
+export type ProjectChanges = {
+  [K in 'name' | 'defaultBranch' | 'acceptanceMode' | 'checkCommand']?: ProjectRow[K] | undefined;
+} & {
   preview?: ProjectPreview | null | undefined;
   updatedAt: number;
 };
@@ -30,6 +35,7 @@ function toProject(row: ProjectRow): ProjectDTO {
     slug: row.slug,
     repoPath: row.repoPath,
     defaultBranch: row.defaultBranch,
+    acceptanceMode: row.acceptanceMode,
     checkCommand: row.checkCommand,
     preview: previewOf(row.preview),
     hosting:

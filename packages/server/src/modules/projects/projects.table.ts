@@ -1,4 +1,4 @@
-import type { HostingProvider } from '@aw/shared';
+import { type HostingProvider, PROJECT_DEFAULT_ACCEPTANCE_MODE, type ProjectAcceptanceMode } from '@aw/shared';
 import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { credentialsTable } from '../credentials/index.ts';
 
@@ -10,6 +10,10 @@ export const projectsTable = sqliteTable('projects', {
   /** Repository root, symlinks resolved. */
   repoPath: text('repo_path').notNull().unique(),
   defaultBranch: text('default_branch').notNull(),
+  acceptanceMode: text('acceptance_mode')
+    .$type<ProjectAcceptanceMode>()
+    .notNull()
+    .default(PROJECT_DEFAULT_ACCEPTANCE_MODE),
   checkCommand: text('check_command'),
   /** `ProjectPreview` as JSON (29 §4.1); null when the project has no preview. */
   preview: text('preview'),

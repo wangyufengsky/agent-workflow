@@ -95,7 +95,8 @@ export const updateProjectOp = defineOperationContract({
   id: 'projects.update',
   refs: { id: InputRef.Project },
   title: 'op.projects.update',
-  description: 'Rename a project or change its default branch or check command',
+  description:
+    'Update project settings. For acceptance, set acceptanceMode to auto or command and set checkCommand only when the user requests changing it. Omitted fields are preserved.',
   input: updateProjectRequestSchema,
   output: projectDetailSchema,
   risk: OperationRisk.Write,

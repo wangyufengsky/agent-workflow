@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Prompts } from '@aw/builtin';
 import {
   AppError,
@@ -208,6 +210,19 @@ export function createTaskState(deps: TasksServiceDeps) {
     return section === '' ? task.requirement : `${task.requirement}\n\n${section}`;
   }
 
+  function acceptanceProject(task: Task) {
+    const project = projects.getRecord(task.projectId);
+    const worktree = worktrees.findByTask(task.id);
+    const roots = worktree ? [worktree.path, project.repoPath] : [project.repoPath];
+    return {
+      checkCommand: project.checkCommand,
+      previewPages: project.preview?.pages ?? null,
+      useIdea:
+        project.acceptanceMode === 'auto' &&
+        roots.some((root) => existsSync(join(root, '.idea')) || existsSync(join(root, '.run'))),
+    };
+  }
+
   function runContext(task: Task): NodeRunContext {
     const worktree = worktrees.findByTask(task.id);
     if (worktree?.status !== WorktreeStatus.Ready) {
@@ -227,6 +242,7 @@ export function createTaskState(deps: TasksServiceDeps) {
       requirement: promptRequirement(task),
       directory: worktree.path,
       repoPath: project.repoPath,
+      baseCommit: worktree.baseCommit,
       checkCommand: project.checkCommand,
       askOnUncertainty: task.checkpoints.ask_on_uncertainty,
     };
@@ -244,6 +260,7 @@ export function createTaskState(deps: TasksServiceDeps) {
     attachmentsOf,
     promptRequirement,
     runContext,
+    acceptanceProject,
     verify: createVerifySteps(deps),
   };
 }

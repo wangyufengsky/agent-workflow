@@ -11,26 +11,21 @@ import {
   NodeStatus,
   PAGE_CHECK_VIEWPORTS,
   PROJECT_CHECK_PLACEHOLDER,
-  type ProjectDTO,
 } from '@aw/shared';
 
-/** What a project lends a node's acceptance: its check command, and its preview's key pages (null: no preview). */
-export type AcceptanceProject = { checkCommand: string | null; previewPages: readonly string[] | null };
+export type AcceptanceProject = {
+  checkCommand: string | null;
+  previewPages: readonly string[] | null;
+  useIdea?: boolean;
+};
 
-export const acceptanceProject = (project: ProjectDTO): AcceptanceProject => ({
-  checkCommand: project.checkCommand,
-  previewPages: project.preview?.pages ?? null,
-});
-
-/**
- * The acceptance a node runs with (13 §1): `$PROJECT_CHECK` becomes the project's check command, or the check is
- * dropped when the project has none; a page check freezes its pages (the project's key pages unless it names its
- * own) and viewports, or is dropped when the project has no preview (29 §7.1); the task's `accept_each_node`
- * checkpoint adds manual acceptance (09 §3).
- */
+/** 仅完整的项目检查占位符参与自动选择；带参数或管道的自定义命令仍按原样展开。 */
 function resolveCheck(check: Acceptance['checks'][number], project: AcceptanceProject): NodeAcceptance['checks'] {
   switch (check.kind) {
     case AcceptanceCheckKind.Command:
+      if (project.useIdea && check.command === PROJECT_CHECK_PLACEHOLDER) {
+        return [{ ...check, command: project.checkCommand ?? PROJECT_CHECK_PLACEHOLDER, autoProject: true }];
+      }
       if (!check.command.includes(PROJECT_CHECK_PLACEHOLDER)) return [check];
       if (project.checkCommand === null) return [];
       return [{ ...check, command: check.command.replaceAll(PROJECT_CHECK_PLACEHOLDER, project.checkCommand) }];
@@ -94,6 +89,9 @@ export function feedbackFromChecks(results: readonly CheckResult[]): string {
   const failed = results.filter((r) => !r.passed);
   const parts = failed.map((r) => {
     if (r.kind === AcceptanceCheckKind.Command) {
+      if (r.autoSelection?.source === 'idea') {
+        return `The IDEA check (${r.autoSelection.configurations.join(', ')}) failed:\n${r.output.slice(-FEEDBACK_OUTPUT_CHARS)}`;
+      }
       const how = r.timedOut ? 'timed out' : `exited with code ${r.exitCode}`;
       return `The check \`${r.command}\` ${how}. The end of its output:\n\n\`\`\`\n${r.output.slice(-FEEDBACK_OUTPUT_CHARS)}\n\`\`\``;
     }

@@ -28,7 +28,7 @@ import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
 import { projectQuery } from '../projects/projects.queries.ts';
 import { UnmetNotice, useDeliveryAcknowledgement } from '../requirements/unmet-notice.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
-import { skippedChecks } from '../tasks/skipped-checks.ts';
+import { noAutomaticCheck, skippedChecks } from '../tasks/skipped-checks.ts';
 import { useCancelTask, useDeliver, useRequestChanges } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
 
@@ -104,7 +104,14 @@ function PullRequestForm({
   const [body, setBody] = useState(() => {
     if (task.result === null) return '';
     const skipped = skippedChecks(task.result);
-    return skipped.length === 0 ? task.result.summary : `${task.result.summary}\n\n${TASK_COPY.prUnverified(skipped)}`;
+    const unavailable = task.result.checks.filter(noAutomaticCheck).length;
+    return [
+      task.result.summary,
+      skipped.length === 0 ? undefined : TASK_COPY.prUnverified(skipped),
+      unavailable === 0 ? undefined : TASK_COPY.autoNoChecks(unavailable),
+    ]
+      .filter(Boolean)
+      .join('\n\n');
   });
   return (
     <div className="col">

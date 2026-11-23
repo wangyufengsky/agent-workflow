@@ -43,6 +43,7 @@ describe('添加项目', () => {
       slug: 'order-service',
       repoPath: repo.path,
       defaultBranch: 'main',
+      acceptanceMode: 'auto',
       checkCommand: 'pnpm test',
       hosting: null,
       inferredHosting: { provider: 'github', baseUrl: null, repo: 'acme/order-service' },
@@ -113,6 +114,27 @@ describe('添加项目', () => {
 });
 
 describe('修改与删除项目', () => {
+  it('验收方式和检查命令可独立修改，其他项目设置保留', async () => {
+    const repo = await nodeRepo();
+    const { body: project } = await t.call(createProjectOp, { repoPath: repo.path });
+    const command = await t.call(updateProjectOp, { id: project.id, acceptanceMode: 'command' });
+    expect(command.status).toBe(200);
+    expect(command.body).toMatchObject({
+      acceptanceMode: 'command',
+      checkCommand: project.checkCommand,
+      name: project.name,
+      defaultBranch: project.defaultBranch,
+      preview: project.preview,
+    });
+    const edited = await t.call(updateProjectOp, { id: project.id, checkCommand: 'pnpm test --run' });
+    expect(edited.body).toMatchObject({ acceptanceMode: 'command', checkCommand: 'pnpm test --run' });
+    await t.call(updateProjectOp, { id: project.id, acceptanceMode: 'auto' });
+    expect((await t.call(getProjectOp, { id: project.id })).body).toMatchObject({
+      acceptanceMode: 'auto',
+      checkCommand: 'pnpm test --run',
+    });
+  });
+
   it('修改名称、默认分支与检查命令（可清空）', async () => {
     const repo = await nodeRepo();
     await repo.git('branch', 'develop');
