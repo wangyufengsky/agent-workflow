@@ -547,3 +547,5 @@ export const submitPlanTool = defineMcpTool({
 | `test_report_submit` | 报告。提供该轮全部已完成执行标识，另可附带逐项缺陷说明和未覆盖范围。证据、结论与计数由后端从已保存记录生成。 |
 
 阶段数据保存后用 `submit_result` 完成当前步骤。阻塞原因和测试失败作为执行结果保留，可随报告交付。
+
+应用助手可调用 `agent-workflow-app_projects_modules` 读取本地 Java 项目的模块及默认配置；`projects_rediscoverModules` 重新扫描。项目试启动、模块检查、停止及保存默认配置分别使用应用操作 `projects_startModuleRun`、`projects_stopModuleRun`、`projects_defaultModuleConfiguration`。创建功能测试时，用 `functionalTest.moduleSelection` 指定目录中的模块和配置。准备阶段可以省略 launch，后端会使用建单时固定的入口。

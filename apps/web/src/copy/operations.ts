@@ -26,6 +26,11 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.projects.previewGitInit': '查看初始化 Git 将纳入的文件',
   'op.projects.initGit': '初始化 Git 并添加项目',
   'op.projects.get': '查看项目',
+  'op.projects.modules': '查看项目模块',
+  'op.projects.rediscoverModules': '重新发现项目模块',
+  'op.projects.defaultModuleConfiguration': '保存模块默认配置',
+  'op.projects.startModuleRun': '试启动或运行模块检查',
+  'op.projects.stopModuleRun': '停止模块运行',
   'op.projects.runtimeCheck': '查看项目运行检查',
   'op.projects.startRuntimeCheck': '运行项目环境检查',
   'op.projects.stopRuntimeCheck': '停止项目环境检查',
@@ -287,6 +292,12 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
  * their label from what they name (`INPUT_REF_LABEL`). A unit test keeps every field of a confirmed operation covered.
  */
 export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
+  moduleId: '模块',
+  configurationId: '启动配置',
+  fingerprint: '配置指纹',
+  checkIds: '选中的模块检查',
+  baseline: '基线提交',
+  runId: '运行记录',
   requestId: '操作编号',
   page: '当前页面',
   browserTest: '浏览器测试授权',

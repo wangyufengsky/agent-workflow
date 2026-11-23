@@ -11,6 +11,7 @@ import {
   javaBuildExecutable,
   type PreparePreviewCommand,
   type PreviewCommand,
+  projectLaunchEnvironment,
 } from './previews.commands.ts';
 import { javaCommands } from './previews.java-launch.ts';
 import { verifySpringProfile } from './previews.spring-profile.ts';
@@ -77,7 +78,7 @@ async function fileMetadata(path: string) {
   }
 }
 
-function committedSources(root: string, baseline: string) {
+export function committedSources(root: string, baseline: string) {
   return async (relative: string, required: boolean) => {
     let absolute = root;
     for (const component of relative.split('/')) {
@@ -288,7 +289,12 @@ async function springCommands(
   };
 }
 
-export async function resolveTestLaunch(worktree: Worktree, proposal: FunctionalTestLaunch, env: NodeJS.ProcessEnv) {
+export async function resolveTestLaunch(
+  worktree: Pick<Worktree, 'path' | 'baseCommit'>,
+  proposal: FunctionalTestLaunch,
+  inheritedEnv: NodeJS.ProcessEnv,
+) {
+  const env = projectLaunchEnvironment(inheritedEnv);
   const directory = relativePath(proposal.directory, true);
   const source = relativePath(proposal.source, false);
   if (posix.dirname(source) !== directory)

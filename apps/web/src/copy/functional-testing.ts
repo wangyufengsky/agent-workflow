@@ -1,4 +1,7 @@
 export const FUNCTIONAL_TEST_COPY = {
+  selectedModule: '模块启动配置',
+  moduleDraft: (summary: string) => `已选本地模块：${summary}`,
+  moduleUnavailable: '正在核对所选配置。若配置已变更，请返回项目重新选择。',
   workbench: '测试现场',
   scope: '功能测试范围',
   onFailure: '发现功能失败时',

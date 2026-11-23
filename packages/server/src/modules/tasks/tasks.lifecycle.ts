@@ -221,6 +221,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
           repoPath: project.repoPath,
           baseBranch: task.baseBranch,
           ...(task.mergeSource === null ? {} : { startPoint: task.mergeSource }),
+          ...(task.functionalTest?.moduleLaunch ? { startPoint: task.functionalTest.moduleLaunch.baseline } : {}),
           ...(task.testStartCommit === null ? {} : { startPoint: task.testStartCommit }),
         }));
       // A merge task starts at its source with the base branch merged in, conflicts left for its step (27 §3.6). A

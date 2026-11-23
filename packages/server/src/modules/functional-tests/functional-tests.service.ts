@@ -303,7 +303,15 @@ export function createFunctionalTests({
         local && (previousLaunch === undefined || requestedLaunch !== undefined)
           ? inheritedLaunchFor(taskId)
           : undefined;
-      const launch = requestedLaunch ?? previousLaunch ?? inheritedLaunch ?? undefined;
+      const pinned = scope.moduleLaunch?.launch;
+      if (
+        pinned &&
+        requestedLaunch &&
+        !isDeepStrictEqual(requestedLaunch, pinned) &&
+        !isDeepStrictEqual(requestedLaunch, previousLaunch)
+      )
+        throw new AppError(ErrorCode.ValidationFailed, 'Use the module launch configuration selected for this task');
+      const launch = requestedLaunch ?? previousLaunch ?? inheritedLaunch ?? pinned;
       const inherited = inheritedChecksFor(taskId, snapshot);
       const previousChecks = previous?.environment.checks ?? [];
       const definitions = new Map<string, FunctionalTestProbe>(previousChecks.map((check) => [check.key, check]));

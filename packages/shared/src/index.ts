@@ -26,6 +26,7 @@ export * from './contracts/api/initiatives.ts';
 export * from './contracts/api/insights.ts';
 export * from './contracts/api/knowledge.ts';
 export * from './contracts/api/previews.ts';
+export * from './contracts/api/project-modules.ts';
 export * from './contracts/api/projects.ts';
 export * from './contracts/api/requirements.ts';
 export * from './contracts/api/schedules.ts';

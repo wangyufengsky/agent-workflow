@@ -1,3 +1,5 @@
+import { posix } from 'node:path';
+
 const IDENTIFIER = '[\\p{L}\\p{Nl}\\p{Sc}\\p{Pc}][\\p{L}\\p{Nl}\\p{Sc}\\p{Pc}\\p{Mn}\\p{Mc}\\p{Nd}]*';
 const TOKEN =
   /\/\/[^\n\r]*|\/\*[\s\S]*?\*\/|"""(?:\\[\s\S]|(?!""")[\s\S])*"""|'''[\s\S]*?'''|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|[\p{L}\p{Nl}\p{Sc}\p{Pc}][\p{L}\p{Nl}\p{Sc}\p{Pc}\p{Mn}\p{Mc}\p{Nd}]*|\.\.\.|[^\s]/gu;
@@ -62,4 +64,13 @@ export function hasJavaMain(source: string, mainClass: string, sourceMode: boole
     index = end;
   }
   return false;
+}
+
+/** JDK 22 introduced resolving source dependencies relative to a package-aligned directory. */
+export function matchesJavaPackagePath(source: string, mainClass: string, javaVersion: number): boolean {
+  const packageEnd = mainClass.lastIndexOf('.');
+  if (javaVersion < 22 || packageEnd < 0) return true;
+  const packageDirectory = mainClass.slice(0, packageEnd).replaceAll('.', '/');
+  const folder = posix.dirname(source);
+  return folder === packageDirectory || folder.endsWith(`/${packageDirectory}`);
 }

@@ -51,6 +51,7 @@ import { createTasksRepo, type Task, type TaskChanges } from './tasks.repo.ts';
 import { createVerifySteps } from './tasks.verify.ts';
 
 export type TasksServiceDeps = {
+  selectProjectModule: ReturnType<typeof import('../project-modules/index.ts').createProjectModules>['select'];
   /** The app's CA and proxy for pushing task branches (D175). */
   gitNetwork: () => Promise<GitNetwork>;
   db: Db;

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { hasJavaMain } from './previews.java-source.ts';
+import { hasJavaMain, matchesJavaPackagePath } from './previews.java-source.ts';
 
 it.each([
   ['class Probe { public static void main(String[] args) {} }', 'Probe', true],
@@ -26,4 +26,13 @@ it.each([
   ['package example; class Probe { public static void main(String[] args) {} }', 'Probe', false],
 ])('rejects a mismatched Java entry in %s', (source, main, direct) => {
   expect(hasJavaMain(source, main, direct)).toBe(false);
+});
+
+it('requires standalone package directories only on JDK 22 and newer', () => {
+  expect(matchesJavaPackagePath('tools/Probe.java', 'demo.api.Probe', 21)).toBe(true);
+  expect(matchesJavaPackagePath('tools/Probe.java', 'demo.api.Probe', 22)).toBe(false);
+  expect(matchesJavaPackagePath('tools/mydemo/api/Probe.java', 'demo.api.Probe', 22)).toBe(false);
+  expect(matchesJavaPackagePath('tools/demo/api/Probe.java', 'demo.api.Probe', 26)).toBe(true);
+  expect(matchesJavaPackagePath('demo/api/Other.java', 'demo.api.Probe', 26)).toBe(true);
+  expect(matchesJavaPackagePath('Probe.java', 'Probe', 26)).toBe(true);
 });

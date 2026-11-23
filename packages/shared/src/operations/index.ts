@@ -309,6 +309,16 @@ export * from './initiatives.ts';
 export * from './insights.ts';
 export * from './knowledge.ts';
 export * from './previews.ts';
+
+import {
+  defaultProjectModuleOp,
+  getProjectModulesOp,
+  rediscoverProjectModulesOp,
+  startProjectModuleRunOp,
+  stopProjectModuleRunOp,
+} from './project-modules.ts';
+
+export * from './project-modules.ts';
 export * from './projects.ts';
 export * from './requirements.ts';
 export * from './schedules.ts';
@@ -356,6 +366,11 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   getStorageOp,
   cleanStorageOp,
   listMcpToolsOp,
+  getProjectModulesOp,
+  rediscoverProjectModulesOp,
+  defaultProjectModuleOp,
+  startProjectModuleRunOp,
+  stopProjectModuleRunOp,
   listProjectsOp,
   createProjectOp,
   previewGitInitOp,

@@ -52,7 +52,15 @@ const caseDefinition = z.object({
   source: z.object({ attachmentId: id, originalId: id.optional(), location: note }).optional(),
   needsClarification: note.optional(),
 });
-export const functionalTestCaseSaveSchema = caseDefinition.extend({ id: id.optional() });
+export const functionalTestCaseSaveSchema = caseDefinition.extend({
+  id: id.optional(),
+  requires: z
+    .array(
+      id.regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/, 'Use a check key such as rates_ping, without prose, URL or HTTP status'),
+    )
+    .max(10)
+    .default([]),
+});
 export const functionalTestCaseSchema = caseDefinition.extend({ id, number: id, version });
 export type FunctionalTestCase = z.infer<typeof functionalTestCaseSchema>;
 export type FunctionalTestStep = FunctionalTestCase['steps'][number];

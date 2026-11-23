@@ -2,6 +2,9 @@ import { functionalTestApproveRevisionOp, functionalTestReadOp, functionalTestRe
 import { implement } from '../../core/operations/operations.ts';
 import { createFunctionalTests } from './functional-tests.service.ts';
 
+export { ideaConfigurationReader, readIdeaConfigurations } from './functional-tests.idea.ts';
+export { parseIdeaConfigurations, projectPath, visitIdeaXml } from './functional-tests.idea-xml.ts';
+
 export type FunctionalTestsService = ReturnType<typeof createFunctionalTests>;
 
 export function createFunctionalTestsModule(deps: Parameters<typeof createFunctionalTests>[0]) {

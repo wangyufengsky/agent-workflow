@@ -10,7 +10,7 @@ import {
   type PreparePreviewCommand,
   type PreviewCommand,
 } from './previews.commands.ts';
-import { hasJavaMain } from './previews.java-source.ts';
+import { hasJavaMain, matchesJavaPackagePath } from './previews.java-source.ts';
 
 const MAX_SOURCE = 1024 * 1024;
 const BUILD_CLASSPATH = 'org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath';
@@ -232,6 +232,12 @@ export async function javaCommands(
   if (direct) {
     if (jdk.major < 11)
       throw invalid('Standalone Java source-file launch requires JDK 11 or newer', { javaVersion: jdk.major });
+    if (!matchesJavaPackagePath(source, mainClass, jdk.major))
+      throw invalid('Standalone Java source must be in a directory matching its package on JDK 22 or newer', {
+        source,
+        mainClass,
+        javaVersion: jdk.major,
+      });
     return {
       ...runtime,
       manager: 'java',

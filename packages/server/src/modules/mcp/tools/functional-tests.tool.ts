@@ -31,7 +31,7 @@ export function functionalTestMcpTools(service: FunctionalTestsService) {
       input: functionalTestCaseSaveSchema,
       output: functionalTestCaseSchema,
       description:
-        'Save one draft case. Provide its title, requirement and ordered HTTP or browser steps with evidence-backed assertions. For imported cases, provide source. Resend the existing ID to complete a draft. Use needsClarification for a missing expectation. Executed versions require test_case_revise.',
+        'Save one draft case. Provide its title, requirement and ordered HTTP or browser steps with evidence-backed assertions. For ordinary service startup omit requires. For an extra case-specific check use only its bare stable key, e.g. requires:["rates_ping"]. Describe the probe path and expected status in preconditions. For imported cases, provide source. Resend the existing ID to complete a draft. Use needsClarification for a missing expectation. Executed versions require test_case_revise.',
       handler: (input, { attempt }) => service.save(attempt, input),
     }),
     defineMcpTool({

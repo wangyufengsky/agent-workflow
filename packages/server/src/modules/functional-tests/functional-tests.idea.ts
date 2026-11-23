@@ -11,7 +11,7 @@ function missing(error: unknown) {
   return error instanceof Error && 'code' in error && (error.code === 'ENOENT' || error.code === 'ENOTDIR');
 }
 
-function reader(root: string, location: IdeConfiguration['location'], warnings: Set<string>) {
+export function ideaConfigurationReader(root: string, location: IdeConfiguration['location'], warnings: Set<string>) {
   let remaining = XML_BYTES * 3;
   async function checked(path: string) {
     const absolute = join(root, path);
@@ -64,7 +64,7 @@ function reader(root: string, location: IdeConfiguration['location'], warnings: 
   return { xml, configs, location };
 }
 
-async function sdkSettings(files: ReturnType<typeof reader>) {
+async function sdkSettings(files: ReturnType<typeof ideaConfigurationReader>) {
   let project: string | undefined;
   const modules = new Map<string, string>();
   const paths = new Set<string>();
@@ -98,8 +98,8 @@ export async function readIdeaConfigurations(worktreeRoot: string, projectRoot: 
   const seen = new Set<string>();
   const local = await realpath(projectRoot);
   const tree = await realpath(worktreeRoot);
-  const project = reader(local, 'project', warnings);
-  const worktree = reader(tree, 'worktree', warnings);
+  const project = ideaConfigurationReader(local, 'project', warnings);
+  const worktree = ideaConfigurationReader(tree, 'worktree', warnings);
   const localSdk = await sdkSettings(project);
   const treeSdk = tree === local ? localSdk : await sdkSettings(worktree);
   for (const files of tree === local ? [worktree] : [worktree, project]) {

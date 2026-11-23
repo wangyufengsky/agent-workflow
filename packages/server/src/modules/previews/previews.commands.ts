@@ -9,6 +9,11 @@ export type CommittedSource = (
 ) => Promise<{ absolute: string; size: number } | undefined>;
 export type PreparePreviewCommand = (run: (command: PreviewCommand) => Promise<void>) => Promise<void>;
 
+/** App authentication credentials must never be passed to a project-controlled process. */
+export function projectLaunchEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !/^AW_(?:API|MCP|ASSISTANT_MCP)_TOKEN$/i.test(key)));
+}
+
 export function findManager(manager: string, env: NodeJS.ProcessEnv): string {
   const executable = host.findExecutable(manager, host.pathDirs(env));
   if (executable === undefined)

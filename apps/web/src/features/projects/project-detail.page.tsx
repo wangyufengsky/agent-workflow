@@ -20,6 +20,7 @@ import { DEFAULT_START_WORKFLOW } from '../home/workflow-icon.ts';
 import { useSettings } from '../settings/settings.queries.ts';
 import { ProjectSkillBindings } from '../skills/project-skill-bindings.tsx';
 import { HostingPanel } from './hosting-form.tsx';
+import { ProjectModulesPanel } from './modules/project-modules.tsx';
 import { ProjectAgentsMd } from './project-agents-md.tsx';
 import { ProjectAllowedBash } from './project-allowed-bash.tsx';
 import { ProjectPreviewForm } from './project-preview.tsx';
@@ -125,7 +126,7 @@ export function ProjectDetailPage() {
   }
   const p = project.data;
   return (
-    <div className="page narrow">
+    <div className="page">
       <div className="crumbs">
         <Link to={ROUTES.projects}>{C.back}</Link>
         <span className="sep">/</span>
@@ -145,6 +146,9 @@ export function ProjectDetailPage() {
           </Link>
         </div>
       </div>
+      <section className="section">
+        <ProjectModulesPanel key={p.id} projectId={p.id} branch={p.defaultBranch} />
+      </section>
       <section className="section">
         <ProjectRecentTasks projectId={p.id} />
       </section>

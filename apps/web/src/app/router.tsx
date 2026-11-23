@@ -174,6 +174,9 @@ const homeRoute = createRoute({
   validateSearch: z.object({
     conversation: z.string().optional(),
     assistantProjectId: z.string().optional(),
+    moduleId: z.string().optional(),
+    configurationId: z.string().optional(),
+    configurationFingerprint: z.string().optional(),
     projectId: z.string().optional(),
     workflow: z.string().optional(),
     requirement: z.string().optional(),
