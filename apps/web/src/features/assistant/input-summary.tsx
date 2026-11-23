@@ -31,18 +31,14 @@ type Input = Record<string, unknown>;
 /** A ref field holds one id, or several (a project's database connections). */
 const idsSchema = z.union([z.string().transform((id) => [id]), z.array(z.string())]);
 
-function fieldLabel(field: string): string {
-  const label = INPUT_FIELD_LABEL[field];
-  // Confirmed operations' fields are all labelled (copy/operations.test.ts); a gap is a copy defect.
-  if (label === undefined) throw new Error(`No label for input field ${field}`);
-  return label;
-}
-
 /** A scalar in words; objects (a plan, a workflow definition) stay JSON. */
 function valueText(field: string, value: unknown): string | undefined {
   if (typeof value === 'boolean') return value ? CONFIRMATION_COPY.yes : CONFIRMATION_COPY.no;
   if (typeof value === 'number') return String(value);
-  if (typeof value === 'string') return INPUT_VALUE_LABEL[field]?.[value] ?? value;
+  if (typeof value === 'string') {
+    const labels = Object.hasOwn(INPUT_VALUE_LABEL, field) ? INPUT_VALUE_LABEL[field] : undefined;
+    return labels && Object.hasOwn(labels, value) ? labels[value] : value;
+  }
   // A schedule's frequency in words (22 §2); the model's input is checked like any boundary.
   const frequency = field === 'frequency' ? scheduleFrequencySchema.safeParse(value) : undefined;
   return frequency?.success === true ? frequencyText(frequency.data) : undefined;
@@ -172,13 +168,18 @@ function AttachmentRef({ ids }: { ids: string[] }) {
 }
 
 function RefValue({ kind, value, input }: { kind: InputRef; value: unknown; input: Input }) {
-  const ids = idsSchema.parse(value);
+  const ids = idsSchema.safeParse(value).data;
+  if (ids === undefined || ids.length === 0) return <pre className={styles.json}>{JSON.stringify(value, null, 2)}</pre>;
   const [first = ''] = ids;
   switch (kind) {
     case InputRef.Task:
       return <TaskRef id={first} />;
     case InputRef.Node:
-      return <NodeRef taskId={z.string().parse(input.id)} id={first} />;
+      return typeof input.id === 'string' ? (
+        <NodeRef taskId={input.id} id={first} />
+      ) : (
+        <span className="mono">{first}</span>
+      );
     case InputRef.Project:
       return <ProjectRef id={first} />;
     case InputRef.KnowledgeConversation:
@@ -216,8 +217,9 @@ export function InputSummary({ operation, input }: { operation: OperationContrac
   return (
     <dl className={styles.params} aria-label={CONFIRMATION_COPY.input}>
       {fields.map(([field, value]) => {
-        if (field === 'functionalTest') {
-          const scope = functionalTestScopeSchema.parse(value);
+        // 历史记录也包含模型提交后校验失败的原始参数。
+        const scope = field === 'functionalTest' ? functionalTestScopeSchema.safeParse(value).data : undefined;
+        if (scope !== undefined) {
           return (
             <div key={field} className={styles.param}>
               <dt>{FUNCTIONAL_TEST_COPY.scope}</dt>
@@ -233,11 +235,17 @@ export function InputSummary({ operation, input }: { operation: OperationContrac
             </div>
           );
         }
-        const ref = operation.refs?.[field];
+        const ref = operation.refs && Object.hasOwn(operation.refs, field) ? operation.refs[field] : undefined;
         const text = ref === undefined ? valueText(field, value) : undefined;
         return (
           <div key={field} className={styles.param}>
-            <dt>{ref === undefined ? fieldLabel(field) : INPUT_REF_LABEL[ref]}</dt>
+            <dt>
+              {ref !== undefined
+                ? INPUT_REF_LABEL[ref]
+                : Object.hasOwn(INPUT_FIELD_LABEL, field)
+                  ? INPUT_FIELD_LABEL[field]
+                  : field}
+            </dt>
             <dd>
               {ref !== undefined ? (
                 <RefValue kind={ref} value={value} input={input} />
