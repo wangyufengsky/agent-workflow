@@ -47,8 +47,8 @@ async function officeBytes(file: string) {
     throw new AppError(ErrorCode.ValidationFailed, message, { issues: [{ path: ['path'], message }] });
   }
   const entries = zipEntries(bytes);
-  await assertUnzipsWithin(bytes, entries, OFFICE_UNZIPPED_BYTES_MAX);
-  return { bytes, format, entries };
+  const unzippedBytes = await assertUnzipsWithin(bytes, entries, OFFICE_UNZIPPED_BYTES_MAX);
+  return { bytes, format, entries, unzippedBytes };
 }
 
 /**
@@ -56,21 +56,21 @@ async function officeBytes(file: string) {
  * Excel file gives its sheet `sheet`, or the first.
  */
 export async function previewOffice(file: string, sheet: string | undefined): Promise<OfficeFilePreviewDTO> {
-  const { bytes, format, entries } = await officeBytes(file);
+  const { bytes, format, entries, unzippedBytes } = await officeBytes(file);
   if (format === AttachmentFormat.Docx) {
     const { text, meta } = await translated(format, () => readDocx(bytes));
     return { format, meta, markdown: text };
   }
-  const { workbook, meta } = await translated(format, () => readXlsx(bytes, entries));
+  const { workbook, meta } = await translated(format, () => readXlsx(bytes, entries, unzippedBytes));
   const name = sheet ?? workbook.sheets[0]?.name ?? '';
   return { format, meta, sheet: sheetPreview(workbook, name, OFFICE_PREVIEW_ROWS) };
 }
 
 /** 读取正文或各工作表的完整文字，限制返回主线程的长度。 */
 export async function officeFileText(file: string, limit: number) {
-  const { bytes, format, entries } = await officeBytes(file);
+  const { bytes, format, entries, unzippedBytes } = await officeBytes(file);
   const { text } = await translated<{ text: string }>(format, () =>
-    format === AttachmentFormat.Docx ? readDocx(bytes) : readXlsx(bytes, entries),
+    format === AttachmentFormat.Docx ? readDocx(bytes) : readXlsx(bytes, entries, unzippedBytes),
   );
   return { text: text.slice(0, limit), chars: text.length };
 }
@@ -83,7 +83,7 @@ export async function readOfficeFile(
   file: string,
   { path, sheet, range, cursor }: ReadOfficeFileInput,
 ): Promise<ReadOfficeFileOutput> {
-  const { bytes, format, entries } = await officeBytes(file);
+  const { bytes, format, entries, unzippedBytes } = await officeBytes(file);
   if (format === AttachmentFormat.Docx) {
     const { text } = await translated(format, () => readDocx(bytes));
     const end = cursor + ATTACHMENT_READ_MAX_CHARS;
@@ -97,7 +97,7 @@ export async function readOfficeFile(
       next_range: null,
     };
   }
-  const { workbook, overview } = await translated(format, () => readXlsx(bytes, entries));
+  const { workbook, overview } = await translated(format, () => readXlsx(bytes, entries, unzippedBytes));
   if (sheet === undefined) {
     // Cut at a line: the sheets' rows are read with `sheet`.
     const text =
@@ -114,13 +114,13 @@ export async function readOfficeFile(
 export async function parseOffice(format: OfficeFormat, source: string, outDir: string): Promise<OfficeMeta> {
   const bytes = await readFile(source);
   const entries = zipEntries(bytes);
-  await assertUnzipsWithin(bytes, entries, OFFICE_UNZIPPED_BYTES_MAX);
+  const unzippedBytes = await assertUnzipsWithin(bytes, entries, OFFICE_UNZIPPED_BYTES_MAX);
   if (format === AttachmentFormat.Docx) {
     const { text, meta } = await translated(format, () => readDocx(bytes));
     await writeFile(join(outDir, OFFICE_TEXT_FILE), text);
     return meta;
   }
-  const { text, overview, workbook, meta } = await translated(format, () => readXlsx(bytes, entries));
+  const { text, overview, workbook, meta } = await translated(format, () => readXlsx(bytes, entries, unzippedBytes));
   await writeFile(join(outDir, OFFICE_TEXT_FILE), text);
   await writeFile(join(outDir, WORKBOOK_FILE), JSON.stringify(workbook));
   await writeFile(join(outDir, OVERVIEW_FILE), overview);

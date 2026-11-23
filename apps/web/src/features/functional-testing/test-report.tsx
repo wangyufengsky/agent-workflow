@@ -19,7 +19,7 @@ import { DELIVERY_COPY } from '../../copy/delivery.ts';
 import { FUNCTIONAL_TEST_COPY as C } from '../../copy/functional-testing.ts';
 import { useDeliver } from '../tasks/tasks.queries.ts';
 import styles from './functional-test.module.css';
-import { TestFollowUp } from './test-follow-up.tsx';
+import { TestFollowUp, TestFollowUpCheckbox } from './test-follow-up.tsx';
 
 function RunComparison({
   report,
@@ -98,7 +98,7 @@ export function TestReport({
     executionId !== null && checkedIds.includes(executionId) ? [executionId] : [],
   );
   return (
-    <section className={`col ${styles.panel}`} aria-label={C.report}>
+    <section className={`${styles.panel} ${styles.reportPaper}`} aria-label={C.report}>
       <header className="row wrap">
         <h2 className="grow">{C.report}</h2>
         {reports.length > 1 && (
@@ -135,19 +135,15 @@ export function TestReport({
               executionId !== null && (
                 <li key={executionId} className="row wrap">
                   {status === FunctionalTestStatus.Failed && (
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={checkedIds.includes(executionId)}
-                        onChange={(event) => {
-                          const checked = event.target.checked;
-                          setSelected(
-                            checked ? [...checkedIds, executionId] : checkedIds.filter((id) => id !== executionId),
-                          );
-                        }}
-                      />
-                      {C.includeRepair(number)}
-                    </label>
+                    <TestFollowUpCheckbox
+                      label={C.includeRepair(number)}
+                      checked={checkedIds.includes(executionId)}
+                      onChange={(checked) =>
+                        setSelected(
+                          checked ? [...checkedIds, executionId] : checkedIds.filter((id) => id !== executionId),
+                        )
+                      }
+                    />
                   )}
                   <span>
                     {number} · {title} · {C.version(version)} · {C.status[status]}

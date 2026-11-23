@@ -7,9 +7,28 @@ import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { Icon } from '../../components/icon.tsx';
 import { FUNCTIONAL_TEST_COPY as C } from '../../copy/functional-testing.ts';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import { taskQuery } from '../tasks/tasks.queries.ts';
+import styles from './test-follow-up.module.css';
+
+export function TestFollowUpCheckbox({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange(checked: boolean): void;
+}) {
+  return (
+    <label className={styles.choice}>
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <span>{label}</span>
+    </label>
+  );
+}
 
 export function FunctionalTestSourceLinks({ task }: { task: TaskDetailDTO }) {
   return task.testLinks
@@ -17,11 +36,12 @@ export function FunctionalTestSourceLinks({ task }: { task: TaskDetailDTO }) {
     .map((link) => (
       <Link
         key={`${link.kind}:${link.sourceId}`}
-        className="btn sm"
+        className={`btn sm secondary ${styles.link}`}
         to={ROUTES.task}
         params={{ taskId: link.sourceId }}
         search={{ view: 'result', testExecution: link.executionIds[0] }}
       >
+        <Icon name="chevLeft" size="sm" />
         {C.sourceTask}
       </Link>
     ));
@@ -30,7 +50,8 @@ export function FunctionalTestSourceLinks({ task }: { task: TaskDetailDTO }) {
 function LinkedTestTask({ id, label }: { id: string; label: string }) {
   const task = useQuery(taskQuery(id));
   return (
-    <Link className="btn sm" to={ROUTES.task} params={{ taskId: id }}>
+    <Link className={`btn sm secondary ${styles.link}`} to={ROUTES.task} params={{ taskId: id }}>
+      <Icon name="external" size="sm" />
       {label}
       {task.data !== undefined && <TaskBadge group={task.data.displayGroup} />}
     </Link>
@@ -63,11 +84,13 @@ export function TestFollowUp({ task, executionIds }: { task: TaskDetailDTO; exec
   const repairs = linked.filter(({ kind }) => kind === 'repair');
   const reruns = linked.filter(({ kind }) => kind === 'rerun');
   return (
-    <div className="col">
-      <div className="row wrap">
+    <div className={styles.followUp}>
+      <div className={styles.actions}>
         {repairs.length === 0 && (
           <Button
             size="sm"
+            icon="tool"
+            variant="primary"
             disabled={executionIds.length === 0}
             pending={repair.isPending}
             onClick={() => repair.mutate()}
@@ -79,7 +102,7 @@ export function TestFollowUp({ task, executionIds }: { task: TaskDetailDTO; exec
           <LinkedTestTask key={link.taskId} id={link.taskId} label={C.openRepair} />
         ))}
         {repairs.length > 0 && (
-          <Button size="sm" onClick={() => setOpen(true)}>
+          <Button size="sm" icon="refresh" onClick={() => setOpen(true)}>
             {C.rerun}
           </Button>
         )}
@@ -95,6 +118,7 @@ export function TestFollowUp({ task, executionIds }: { task: TaskDetailDTO; exec
         footer={
           <Button
             variant="primary"
+            icon="play"
             disabled={ref.trim() === ''}
             pending={rerun.isPending}
             onClick={() => rerun.mutate()}
@@ -103,7 +127,7 @@ export function TestFollowUp({ task, executionIds }: { task: TaskDetailDTO; exec
           </Button>
         }
       >
-        <label className="col">
+        <label className={styles.refField}>
           {C.rerunRef}
           <input className="input mono" value={ref} onChange={(event) => setRef(event.target.value)} />
         </label>

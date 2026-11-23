@@ -149,8 +149,9 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
     reports: [],
     nextAfter: 3,
   };
+  const testLinks: NonNullable<typeof task.testLinks> = [];
   await page.route(`**/api/v1/tasks/${task.id}`, (route) =>
-    route.fulfill({ json: { ...task, status: TaskStatus.Running } }),
+    route.fulfill({ json: { ...task, status: TaskStatus.Running, testLinks } }),
   );
   const snapshotPath = `/api/v1/tasks/${task.id}/functional-test`;
   await page.route(
@@ -163,7 +164,7 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
   await page.clock.install();
   await page.goto(`/tasks/${task.id}`);
   await page.getByRole('button', { name: '执行测试', exact: true }).click();
-  const actions = page.getByRole('region', { name: 'AI 测试行为' });
+  const actions = page.getByRole('complementary', { name: 'AI 活动' });
   const terminal = page.getByRole('region', { name: '结果终端' });
   const cases = page.getByRole('group', { name: '测试用例' });
   const second = cases.getByRole('button', { name: /FT-02/ });
@@ -188,7 +189,18 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
     message: '迟到的第二个响应',
     detail: { status: 201, elapsedMs: 72 },
   });
-  snapshot.nextAfter = 4;
+  snapshot.events.push({
+    seq: 5,
+    runId: 'run-1',
+    caseId: 'case-2',
+    executionId: 'exec-2',
+    step: 0,
+    at: now,
+    kind: 'assertion',
+    message: 'HTTP 断言',
+    detail: { field: 'body.fee', expected: 10, actual: 9, passed: false },
+  });
+  snapshot.nextAfter = 5;
   const refreshed = page.waitForResponse((response) => new URL(response.url()).pathname === snapshotPath);
   await page.clock.runFor(1000);
   await refreshed;
@@ -198,6 +210,24 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
   await expect(second).toHaveAttribute('aria-pressed', 'true');
   await expect(actions).toContainText('GET /orders/second · 201 · 72 毫秒');
   await expect(terminal).toContainText('迟到的第二个响应');
+
+  const assertion = page.getByRole('table').getByRole('row', { name: /body.fee/ });
+  await expect(assertion.getByRole('cell')).toHaveText(['10', '9']);
+  await expect(terminal).toContainText('FAIL · body.fee · 预期 10，实际 9');
+  await actions.getByText('GET /orders/second · 201 · 72 毫秒', { exact: true }).click();
+  const responseAction = actions.getByRole('group').filter({ hasText: 'GET /orders/second · 201 · 72 毫秒' });
+  await expect(responseAction.getByText(/"status": 201/)).toBeVisible();
+  await actions.getByRole('button', { name: '完整详情' }).click();
+  const detail = page.getByRole('dialog', { name: 'AI 活动 · FT-02' });
+  await expect(detail.getByText(/"status": 201/).first()).toBeVisible();
+  await detail.getByRole('button', { name: '关闭' }).click();
+  await expect(detail).toBeHidden();
+  await second.focus();
+  await page.keyboard.press('Home');
+  await expect(first).toBeFocused();
+  await expect(first).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '回到实时' }).click();
+  await expect(second).toHaveAttribute('aria-pressed', 'true');
 
   const body = '## 订单报告\n\nFT-02：响应不符合用例预期。';
   snapshot.reports.push({
@@ -216,7 +246,34 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
   await page.getByRole('button', { name: '测试报告', exact: true }).click();
   const report = page.getByRole('region', { name: '测试报告' });
   await expect(report.getByRole('heading', { name: '订单报告' })).toBeVisible();
-  await expect(report.getByRole('button', { name: '建立修复任务' })).toBeEnabled();
+  const failure = report.getByRole('checkbox', { name: '将 FT-02 纳入修复' });
+  const repair = report.getByRole('button', { name: '建立修复任务' });
+  await expect(failure).toBeChecked();
+  await failure.uncheck();
+  await expect(repair).toBeDisabled();
+  await failure.focus();
+  await failure.press('Space');
+  await expect(repair).toBeEnabled();
+  await page.route(`**${snapshotPath}/repair`, (route) => {
+    expect(route.request().postDataJSON()).toMatchObject({ executionIds: ['exec-2'] });
+    testLinks.push({ sourceId: task.id, taskId: 'repair-task', kind: 'repair', executionIds: ['exec-2'] });
+    return route.fulfill({ json: { taskId: 'repair-task' } });
+  });
+  await repair.click();
+  await expect(report.getByRole('link', { name: '打开关联修复任务' })).toBeVisible();
+  await report.getByRole('button', { name: '用修复版本复测' }).click();
+  const rerunDialog = page.getByRole('dialog', { name: '用修复版本复测' });
+  const rerun = rerunDialog.getByRole('button', { name: '开始复测' });
+  await expect(rerun).toBeDisabled();
+  await rerunDialog.getByRole('textbox', { name: '修复提交或分支' }).fill('fix/orders');
+  await page.route(`**${snapshotPath}/rerun`, (route) => {
+    expect(route.request().postDataJSON()).toMatchObject({ executionIds: ['exec-2'], ref: 'fix/orders' });
+    testLinks.push({ sourceId: task.id, taskId: 'rerun-task', kind: 'rerun', executionIds: ['exec-2'] });
+    return route.fulfill({ json: { taskId: 'rerun-task' } });
+  });
+  await rerun.click();
+  await expect(rerunDialog).not.toBeVisible();
+  await expect(report.getByRole('link', { name: '打开复测任务' })).toBeVisible();
   const downloading = page.waitForEvent('download');
   await report.getByRole('button', { name: '导出 Markdown' }).click();
   const download = await downloading;

@@ -59,6 +59,20 @@ const RETRY_TARGET = {
   [TaskFailedPhase.Merging]: TaskStatus.Review,
 } as const satisfies Record<TaskFailedPhase, TaskStatus>;
 
+function assertTestTarget(input: Pick<CreateTaskRequest, 'browserTest' | 'functionalTest'>): void {
+  const target = input.browserTest?.target ?? input.functionalTest?.target;
+  if (target !== undefined && !target.startsWith('/') && !URL.canParse(target)) {
+    throw new AppError(ErrorCode.ValidationFailed, 'Invalid test target', {
+      issues: [
+        {
+          path: [input.functionalTest === undefined ? 'browserTest' : 'functionalTest', 'target'],
+          message: 'Use a valid HTTP(S) address or project preview path',
+        },
+      ],
+    });
+  }
+}
+
 /**
  * The task lifecycle (09 §2): create → prepare the worktree → plan (AI or template) → run nodes → review; plus
  * cancelling and retrying. Node dispatch and the derived task events belong to the scheduler.
@@ -267,7 +281,10 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
     prepare,
 
     /** What creating a task needs (11 §5.1): its project, workflow and base branch exist; resolves the branch. */
-    async checkCreate(input: Pick<CreateTaskRequest, 'projectId' | 'workflowId' | 'baseBranch'>): Promise<string> {
+    async checkCreate(
+      input: Pick<CreateTaskRequest, 'projectId' | 'workflowId' | 'baseBranch' | 'browserTest' | 'functionalTest'>,
+    ): Promise<string> {
+      assertTestTarget(input);
       const project = projects.getRecord(input.projectId);
       // System workflows are started by the app only (27 §3.6).
       if (workflows.get(input.workflowId).kind === WorkflowKind.System) {
@@ -308,10 +325,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       if (input.functionalTest?.caseAttachmentIds.some((id) => !input.attachmentIds?.includes(id))) {
         throw new AppError(ErrorCode.ValidationFailed, 'Case files must be attached to this task');
       }
-      const target = input.browserTest?.target ?? input.functionalTest?.target;
-      if (target !== undefined && !target.startsWith('/') && !URL.canParse(target)) {
-        throw new AppError(ErrorCode.ValidationFailed, 'Invalid browser test target');
-      }
+      assertTestTarget(input);
       // Request > workflow definition > setting (11 §5.1); fixed for the task's lifetime.
       const checkpoints = {
         confirm_plan: input.checkpoints?.confirm_plan ?? workflow.definition.checkpoints.confirm_plan,

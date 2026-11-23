@@ -1,6 +1,9 @@
 import { type AttachmentDTO, AttachmentFormat, type FunctionalTestScope } from '@aw/shared';
+import { useId } from 'react';
+import { Icon } from '../../components/icon.tsx';
 import { FUNCTIONAL_TEST_COPY as C } from '../../copy/functional-testing.ts';
 import { BROWSER_TEST_COPY as B } from '../../copy/tasks.ts';
+import styles from './functional-test-fields.module.css';
 
 export const canImportCaseAttachment = ({ format }: AttachmentDTO) =>
   format === AttachmentFormat.Text || format === AttachmentFormat.Docx || format === AttachmentFormat.Xlsx;
@@ -32,46 +35,61 @@ export function FunctionalTestFields({
   onFailureChange(value: FunctionalTestScope['onFailure']): void;
   onApprovalChange(value: boolean): void;
 }) {
+  const targetHintId = useId();
+  const writesHintId = useId();
   return (
-    <fieldset className="col">
+    <fieldset className={styles.scope}>
       <legend>{C.scope}</legend>
-      <label className="col">
-        {B.target}
-        <input
-          className="input"
-          value={target}
-          placeholder={C.targetPlaceholder}
-          onChange={(event) => onTargetChange(event.target.value)}
-        />
-        <span className="hint">{C.targetHint}</span>
-      </label>
-      <label className="col">
-        {B.writes}
-        <textarea
-          className="input mono"
-          rows={2}
-          value={writes}
-          placeholder={B.writesPlaceholder}
-          onChange={(event) => onWritesChange(event.target.value)}
-        />
-        <span className="hint">{B.writesHint}</span>
-      </label>
-      <fieldset className="col">
+      <div className={styles.scopeGrid}>
+        <label className={styles.field}>
+          <span className={styles.fieldTitle}>{B.target}</span>
+          <input
+            className="input mono"
+            aria-describedby={targetHintId}
+            value={target}
+            placeholder={C.targetPlaceholder}
+            onChange={(event) => onTargetChange(event.target.value)}
+          />
+          <span className="hint" id={targetHintId}>
+            {C.targetHint}
+          </span>
+        </label>
+        <label className={styles.field}>
+          <span className={styles.fieldTitle}>{B.writes}</span>
+          <textarea
+            className={`input mono ${styles.writes}`}
+            aria-describedby={writesHintId}
+            rows={2}
+            value={writes}
+            placeholder={B.writesPlaceholder}
+            onChange={(event) => onWritesChange(event.target.value)}
+          />
+          <span className="hint" id={writesHintId}>
+            {B.writesHint}
+          </span>
+        </label>
+      </div>
+      <fieldset className={styles.caseFiles}>
         <legend>{C.caseInputs}</legend>
-        <span className="hint">{C.caseInputHint}</span>
-        {attachments.map((attachment) => (
-          <label key={attachment.id}>
-            <input
-              type="checkbox"
-              checked={caseIds.includes(attachment.id)}
-              onChange={(event) => onCaseChange(attachment.id, event.target.checked)}
-            />
-            {attachment.name}
-          </label>
-        ))}
+        <p className="hint">{C.caseInputHint}</p>
+        {attachments.length > 0 && (
+          <div className={styles.fileList}>
+            {attachments.map((attachment) => (
+              <label className={styles.caseChoice} key={attachment.id}>
+                <input
+                  type="checkbox"
+                  checked={caseIds.includes(attachment.id)}
+                  onChange={(event) => onCaseChange(attachment.id, event.target.checked)}
+                />
+                <Icon name={attachment.format === AttachmentFormat.Xlsx ? 'table' : 'file'} size="sm" />
+                <span>{attachment.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
       </fieldset>
-      <label className="col">
-        {C.onFailure}
+      <label className={styles.field}>
+        <span className={styles.fieldTitle}>{C.onFailure}</span>
         <select
           className="input"
           value={onFailure ?? ''}
@@ -85,14 +103,15 @@ export function FunctionalTestFields({
           <option value="repair_and_retest">{C.autoRetest}</option>
         </select>
       </label>
-      <label>
+      <label className={styles.approval}>
         <input
           type="checkbox"
           checked={approved}
           disabled={!valid}
           onChange={(event) => onApprovalChange(event.target.checked)}
         />
-        {onFailure === undefined ? B.approved : C.approveWithFollowUp}
+        <Icon name="shield" size="sm" />
+        <span>{onFailure === undefined ? B.approved : C.approveWithFollowUp}</span>
       </label>
     </fieldset>
   );
@@ -100,7 +119,7 @@ export function FunctionalTestFields({
 
 export function FunctionalTestScopeSummary({ scope }: { scope: FunctionalTestScope }) {
   return (
-    <dl className="col">
+    <dl className={styles.summary}>
       <dt>{B.target}</dt>
       <dd className="mono">{scope.target}</dd>
       <dt>{B.writes}</dt>

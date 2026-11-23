@@ -5,11 +5,11 @@ description: Use when writing or importing functional test cases, preparing thei
 
 # Functional testing
 
-Start with `agent-workflow_get_task_context` for the current phase, module, sources and verified scope. Read `agent-workflow_get_submission_guide` for this phase's contract. Use the structured tools below with the `agent-workflow_` prefix. Submit each completed phase with `submit_result`.
+Read `get_task_context` for the phase and scope, then `get_submission_guide` for the phase contract. Prefix these tools with `agent-workflow_`. End each phase with `submit_result`.
 
 ## Author
 
-Tie each case to a user requirement or applicable contract. Give it a title, requirement reference, preconditions, test data and ordered steps. Cover the requested main path, relevant error paths, boundaries and persistent state changes. Explain the evidence for each assertion in its basis. If the current implementation is your only source, mark the behavior as inferred rather than confirmed acceptance. Save each case as soon as it is usable with `test_case_save`. Preserve a missing business rule as a clarification, and continue with independent cases.
+Tie each case to a user requirement or applicable contract. Give it a title, requirement reference, preconditions, test data and ordered steps. Cover the requested main path, relevant error paths, boundaries and persistent state changes. Explain the evidence for each assertion in its basis. If the current implementation is your only source, mark the behavior as inferred rather than confirmed acceptance. Save each case as soon as it is usable with `test_case_save`. Use `requires` only for actual case-specific readiness checks. Give each condition a stable key and document its probe path and expected HTTP status for the environment phase. Preserve a missing business rule as a clarification, and continue with independent cases.
 
 ## Import
 
@@ -24,11 +24,13 @@ Save cases with `test_case_save`, setting `source.attachmentId`, `source.locatio
 
 ## Prepare
 
-Use `test_environment_prepare` to start the configured service or connect to the approved target. Record actual readiness, tested version and any version uncertainty. Inspect the prerequisites for each case. Missing accounts, data, dependencies or unavailable services block the affected cases. Keep unrelated cases available. Keep diagnostics bounded and never copy credentials into cases or reports.
+1. Call `test_run_read`. Inspect the selected saved case versions and their `requires` keys. Match each key to the documented GET probe path and expected HTTP status, using the case handoff or the inherited definitions. A successful service-start probe does not establish a case-specific prerequisite.
+2. Call `test_environment_prepare` to start the configured service or connect to the approved target. On a first run, pass `checks: [{key, path, expectedStatus}]` for documented prerequisites, using each case's exact `requires` key. On a linked retest, `test_run_read` exposes the inherited definitions as `inheritedChecks`. The runner reapplies them automatically on the new target. Supply only needed additional checks, leaving inherited keys, paths and expected statuses intact. For example, a case requiring `GET` still requires `GET` even if the service root also has a `preview-root` check.
+3. Read the returned `environment.checks` for the current run. Use its recorded result for each required key. The previous run's success is evidence for that run only. If a key is missing or fails on this version, report the specific blocker with `submit_result` and continue with cases that have their own prerequisites satisfied. Exclude credentials from evidence and reports.
 
 ## Execute and recover
 
-Use `test_run_read` before your first call and when a session resumes. If the app restarted and the managed test service stopped, call `test_environment_prepare` to recover the same run before continuing. Check saved results before attempting any write again. For each confirmed case, call `test_case_run` with the run ID, case ID, saved version and a unique execution ID for that intended execution. Reuse that execution ID only when retrieving the same attempt. Give an intentional rerun a new ID. After a write with unknown outcome, read state and persisted evidence to determine whether it took effect before deciding to rerun. Stop that case as blocked if the outcome cannot be determined. Continue independent cases.
+Use `test_run_read` before your first call and when a session resumes. If the app restarted and the managed test service stopped, call `test_environment_prepare` to recover the same run before continuing. Reuse the existing prerequisite definitions and read their freshly observed readiness. Check saved results before attempting any write again. For each confirmed case, call `test_case_run` with the run ID, case ID, saved version and a unique execution ID for that intended execution. Reuse that execution ID only when retrieving the same attempt. Give an intentional rerun a new ID. After a write with unknown outcome, read state and persisted evidence to determine whether it took effect before deciding to rerun. Stop that case as blocked if the outcome cannot be determined. Continue independent cases.
 
 - HTTP steps name the approved method and path, structured JSON body where needed, and observable assertions. Compare the specified status or response fields and verify state by reading it again where appropriate. Expected error responses can pass. For writes use isolated test data and authorized cleanup steps.
 - Browser steps use structured actions and visible assertions. Include a reload or query if persistence matters. When interactive authentication is required, direct the user to the test page and wait for takeover.

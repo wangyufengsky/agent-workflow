@@ -187,6 +187,9 @@ importers:
       gaussdb-node:
         specifier: 0.2.2
         version: 0.2.2
+      jszip:
+        specifier: 3.10.2
+        version: 3.10.2
       mammoth:
         specifier: 1.13.0
         version: 1.13.0
@@ -202,6 +205,9 @@ importers:
       pino:
         specifier: 10.4.0
         version: 10.4.0
+      saxes:
+        specifier: 5.0.1
+        version: 5.0.1
       tedious:
         specifier: 20.3.8
         version: 20.3.8

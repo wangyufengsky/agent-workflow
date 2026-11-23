@@ -92,17 +92,19 @@ export function FrontendActivity({
           pro={pro}
           actions={
             attempt.nodeId === null ? (
-              <button type="button" className="btn secondary sm" onClick={() => setDetailAttempt(attempt.id)}>
+              <button type="button" className={styles.activityDetails} onClick={() => setDetailAttempt(attempt.id)}>
                 {TASK_COPY.viewNodePage}
+                <Icon name="expand" size="sm" />
               </button>
             ) : (
               <Link
                 to={ROUTES.node}
                 params={{ taskId: task.id, nodeId: attempt.nodeId }}
                 search={{ attempt: attempt.id }}
-                className="btn secondary sm"
+                className={styles.activityDetails}
               >
                 {TASK_COPY.viewNodePage}
+                <Icon name="external" size="sm" />
               </Link>
             )
           }

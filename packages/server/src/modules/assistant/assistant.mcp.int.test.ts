@@ -239,8 +239,14 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     await t.call(updateSettingsOp, { 'assistant.alwaysAllow': [createTaskOp.id] });
     const base = {
       projectId: project.id,
-      workflowId: await workflowId(t, FUNCTIONAL_TEST_WORKFLOW_KEY),
       requirement: '验证订单保存',
+      requirements: [
+        {
+          title: '保存后可重读',
+          expected: '订单状态显示为已保存',
+          verification: { kind: 'command', command: 'node verify.js' },
+        },
+      ],
       start: false,
     };
     const functionalTest = {
@@ -249,17 +255,71 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
       caseAttachmentIds: [],
       onFailure: 'repair_and_retest',
     };
+    const tool = (await mcp.listTools()).tools.find(({ name }) => name === 'tasks_create');
+    expect(tool?.inputSchema.required).not.toContain('workflowId');
+    expect(tool?.description).toContain('Omit workflowId');
     const { body } = await call('tasks_create', { ...base, functionalTest });
     expect(body).toMatchObject({ status: 'needs_confirmation' });
     expect(await entityRefs()).toEqual([]);
     const id = String(body.confirmation_id);
     expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toMatchObject([
-      { id, risk: OperationRisk.Critical, input: { functionalTest } },
+      {
+        id,
+        risk: OperationRisk.Critical,
+        input: {
+          workflowId: await workflowId(t, FUNCTIONAL_TEST_WORKFLOW_KEY),
+          requirement: '验证订单保存\n\n功能验收条件\n- 保存后可重读（必验）：订单状态显示为已保存',
+          functionalTest,
+        },
+      },
     ]);
     expect((await t.call(confirmAssistantCallOp, { id, alwaysAllow: true })).status).toBe(400);
-    expect((await decide(id, 'confirm')).body.result).toMatchObject({ ok: true, output: { functionalTest } });
+    expect((await decide(id, 'confirm')).body.result).toMatchObject({
+      ok: true,
+      output: { functionalTest, requirement: expect.stringContaining('订单状态显示为已保存') },
+    });
+    expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toHaveLength(1);
     const changed = await call('tasks_create', { ...base, functionalTest: { ...functionalTest, target: '/returns' } });
     expect(changed.body).toMatchObject({ status: 'needs_confirmation' });
+  });
+
+  it('功能测试确认前拒绝无效范围，确认后基线变化时回传该次参数', async () => {
+    const { project, repo } = await addProject(t);
+    const input = {
+      projectId: project.id,
+      baseBranch: 'test-baseline',
+      requirement: '验证订单保存',
+      functionalTest: { target: '/orders', writes: [], caseAttachmentIds: [] },
+      start: false,
+    };
+    const invalid = await call('tasks_create', {
+      ...input,
+      functionalTest: { ...input.functionalTest, caseAttachmentIds: ['missing-attachment'] },
+    });
+    expect(invalid.body).toMatchObject({ code: ErrorCode.ValidationFailed });
+    expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toEqual([]);
+
+    const malformedTarget = await call('tasks_create', {
+      ...input,
+      functionalTest: { ...input.functionalTest, target: 'http://[' },
+    });
+    expect(malformedTarget.body).toMatchObject({
+      code: ErrorCode.ValidationFailed,
+      details: { issues: [{ path: ['functionalTest', 'target'] }] },
+    });
+    expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toEqual([]);
+
+    await runGit(['branch', 'test-baseline'], { cwd: repo.path });
+    const pending = await call('tasks_create', input);
+    expect(pending.body).toMatchObject({ status: 'needs_confirmation' });
+    await runGit(['branch', '-D', 'test-baseline'], { cwd: repo.path });
+    const result = await decide(String(pending.body.confirmation_id), 'confirm');
+    expect(result.body.result).toMatchObject({ ok: false, error: { code: ErrorCode.GitBaseBranchNotFound } });
+    expect(t.fake.prompts.at(-1)?.text).toContain('"retryInput"');
+    expect(t.fake.prompts.at(-1)?.text).toContain('"baseBranch": "test-baseline"');
+    expect(t.fake.prompts.at(-1)?.text).toContain('"target": "/orders"');
+    const corrected = await call('tasks_create', { ...input, baseBranch: 'main' });
+    expect(corrected.body).toMatchObject({ status: 'needs_confirmation' });
   });
 
   it('确认后执行「开始任务」：消息流出现指向该任务的 entity_ref（D66）', async () => {

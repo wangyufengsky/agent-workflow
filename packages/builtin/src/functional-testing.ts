@@ -33,7 +33,7 @@ export function createFunctionalTestTemplate(importCases: boolean): NonNullable<
         '准备环境',
         BuiltinRoleKey.Tester,
         [first.key],
-        'Call test_environment_prepare to start or connect to the authorized environment. Record the observed readiness and source of the tested version. Report missing prerequisites with submit_result so independent cases or the blocked report can proceed.',
+        'Use test_run_read first to inspect each saved case’s requires keys and any inheritedChecks. Call test_environment_prepare on the authorized environment using the exact prerequisite keys. A linked retest reapplies its inherited probe definitions and records new observations. Compare environment.checks with the required keys, then submit the tested version, run ID and actual readiness. Report missing or failed prerequisites and continue with independent cases.',
       ),
       stage(
         FUNCTIONAL_TEST_NODE.Execute,

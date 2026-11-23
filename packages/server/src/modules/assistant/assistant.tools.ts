@@ -21,6 +21,7 @@ import type { OperationImpl } from '../../core/operations/operations.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { assistantOperationRisk } from './assistant.operation-risk.ts';
 import type { Conversation } from './assistant.repo.ts';
+import { assistantTaskInputSchema } from './assistant.task-input.ts';
 import type { TaskRelay } from './assistant.tasks.ts';
 
 export type AssistantToolContext = { conversation: Conversation; signal?: AbortSignal | undefined };
@@ -91,9 +92,9 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
         description:
           `${contract.description}.${RISK_NOTE[assistantOperationRisk(contract, {})]}` +
           (contract.id === createTaskOp.id
-            ? ' When functionalTest is given, the precise test scope requires confirmation each time.'
+            ? ' To test a module, pass functionalTest with target, writes and caseAttachmentIds. Omit workflowId to select the built-in functional test directly. Put expected behavior in requirement. Each test scope requires confirmation.'
             : ''),
-        input: assistantInputSchema(contract),
+        input: contract.id === createTaskOp.id ? assistantTaskInputSchema : assistantInputSchema(contract),
         mode: contract.mode,
         async handler(given, { conversation }) {
           const input = deps.completions.get(contract.id)?.(given) ?? given;

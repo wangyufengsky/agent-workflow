@@ -38,7 +38,7 @@ export function functionalTestMcpTools(service: FunctionalTestsService) {
       input: functionalTestPrepareSchema,
       output: functionalTestRunSchema,
       description:
-        'Start the task project’s approved local service or connect to its approved test URL. Optionally supply checks {key,path,expectedStatus}; cases with matching requires keys depend on their result. Returns a run ID and readiness evidence. Record a failed probe as an environment blocker and continue to the report.',
+        'Start the authorized local service or connect to the approved test URL. First read saved requires keys with test_run_read. Supply checks {key,path,expectedStatus} for documented prerequisites under their exact keys. On linked retests inheritedChecks are re-probed automatically and retain their definitions. Read the returned environment.checks to identify case blockers. Service readiness alone does not satisfy a required key.',
       handler: (input, { attempt, signal }) => service.prepare(attempt, input, signal),
     }),
     defineMcpTool({
@@ -65,7 +65,7 @@ export function functionalTestMcpTools(service: FunctionalTestsService) {
       input: functionalTestReadSchema,
       output: functionalTestSnapshotSchema,
       description:
-        'Read the task’s persisted case versions, environments, executions, evidence and reports. Filter by runId, caseId, step or event sequence after to inspect exact evidence. Use before resuming an interrupted write.',
+        'Read saved case versions, prerequisite keys, environments, executions, evidence and reports. On linked retests, inheritedChecks contains original probe definitions without their old verdicts. Filter by runId, caseId, step or event sequence after to inspect exact evidence. Use before environment preparation or when resuming an interrupted write.',
       handler: (input, { attempt }) => {
         if (attempt.taskId === null) throw new AppError(ErrorCode.McpToolNotAllowed);
         return service.read(attempt.taskId, input);

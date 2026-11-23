@@ -1,0 +1,51 @@
+.followUp {
+  display: grid;
+  gap: var(--s-2);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.link {
+  max-inline-size: 100%;
+}
+
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-block-size: var(--s-8);
+  padding-inline: var(--s-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  color: var(--sub);
+  cursor: pointer;
+  transition:
+    background-color var(--t-fast),
+    border-color var(--t-fast),
+    color var(--t-fast);
+}
+
+.choice:hover,
+.choice:focus-within {
+  border-color: var(--line-3);
+  background: var(--fill-2);
+  color: var(--ink);
+}
+
+.choice:has(:checked) {
+  border-color: var(--focus-line);
+  background: var(--fill-3);
+  color: var(--ink);
+}
+
+.refField {
+  display: grid;
+  gap: var(--s-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}

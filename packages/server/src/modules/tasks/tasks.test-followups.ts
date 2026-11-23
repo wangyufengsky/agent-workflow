@@ -35,6 +35,15 @@ type Dependencies = {
   projects: ProjectsService;
   tests: FunctionalTestsService;
 };
+export function findTestRerunOrigin(db: Db, taskId: string) {
+  const row = db
+    .select()
+    .from(testFollowupsTable)
+    .where(and(eq(testFollowupsTable.taskId, taskId), eq(testFollowupsTable.kind, 'rerun')))
+    .get();
+  return row === undefined ? undefined : { taskId: row.sourceId, executionIds: row.executions };
+}
+
 export function createTestFollowups({ db, unit, tasks, workflows, projects, tests, events, log }: Dependencies) {
   async function create(taskId: string, ids: string[], ref?: string) {
     const source = tasks.detail(taskId);
@@ -106,8 +115,9 @@ export function createTestFollowups({ db, unit, tasks, workflows, projects, test
       const duplicate = prior();
       if (duplicate) return duplicate;
       const id = tasks.insertDraft({ ...input, baseBranch, testStartCommit: commit });
-      if (kind === 'rerun') tests.importCases(id, [...cases.values()]);
+      if (kind === 'rerun') tests.importCases(id, [...cases.values()], tests.readinessChecksFor(taskId, executions));
       db.insert(testFollowupsTable).values({ taskId: id, sourceId: taskId, kind, executions, requestKey }).run();
+      tasks.publishUpdate(taskId);
       unit.afterCommit(() => tasks.start(id));
       return { taskId: id };
     });

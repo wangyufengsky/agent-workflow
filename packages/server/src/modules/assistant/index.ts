@@ -12,6 +12,7 @@ import {
   createProjectOp,
   createScheduleOp,
   createTaskOp,
+  createTaskRequestSchema,
   ErrorCode,
   functionalTestApproveRevisionOp,
   functionalTestReadOp,
@@ -55,6 +56,7 @@ import { assistantOperations, confirmedBrowserOperation } from './assistant.oper
 import { registerAssistantRoutes } from './assistant.routes.ts';
 import { type AssistantServiceDeps, createAssistantService } from './assistant.service.ts';
 import { createAssistantSnapshots } from './assistant.snapshots.ts';
+import { completeAssistantTaskInput } from './assistant.task-input.ts';
 import { createTaskRelay } from './assistant.tasks.ts';
 import { createAssistantToolRegistry, NEEDS_CONFIRMATION_INSTRUCTION, operationTools } from './assistant.tools.ts';
 import { createWhisperService } from './assistant.whisper.ts';
@@ -125,15 +127,28 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
         requestConfirmation: confirmations.request,
         recordProduced: conversations.recordProduced,
         deferred: new Map(KNOWLEDGE_QUESTION_OPS.map((id) => [id, relay.researching])),
-        completions: new Map(
-          [createTaskOp.id, createBatchOp.id, createInitiativeOp.id].map((id) => [
-            id,
-            (input: Record<string, unknown>) =>
-              input.baseBranch === undefined
-                ? { ...input, baseBranch: deps.projects.getRecord(z.string().parse(input.projectId)).defaultBranch }
-                : input,
-          ]),
-        ),
+        completions: new Map([
+          [
+            createTaskOp.id,
+            (given: Record<string, unknown>) => {
+              const input = completeAssistantTaskInput(given, deps.workflows);
+              return {
+                ...input,
+                baseBranch: input.baseBranch ?? deps.projects.getRecord(input.projectId).defaultBranch,
+              };
+            },
+          ],
+          ...[createBatchOp.id, createInitiativeOp.id].map(
+            (id) =>
+              [
+                id,
+                (input: Record<string, unknown>) =>
+                  input.baseBranch === undefined
+                    ? { ...input, baseBranch: deps.projects.getRecord(z.string().parse(input.projectId)).defaultBranch }
+                    : input,
+              ] as const,
+          ),
+        ]),
         prechecks: new Map([
           ...[
             functionalTestRepairOp,
@@ -156,7 +171,7 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
             (id) =>
               [
                 id,
-                (conversationId: string, input: Record<string, unknown>) => {
+                async (conversationId: string, input: Record<string, unknown>) => {
                   const { projectId } = conversations.get(conversationId);
                   if (projectId !== null && projectId !== input.projectId)
                     throw new AppError(ErrorCode.ValidationFailed, 'Start a conversation for the target project', {
@@ -174,6 +189,20 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
                       conversationId,
                       attachmentIdsSchema.optional().parse(input.attachmentIds) ?? [],
                     );
+                  if (id === createTaskOp.id && input.functionalTest !== undefined) {
+                    const request = createTaskRequestSchema.parse(input);
+                    if (request.functionalTest?.caseAttachmentIds.some((id) => !request.attachmentIds?.includes(id))) {
+                      throw new AppError(ErrorCode.ValidationFailed, 'Case files must be attached to this task', {
+                        issues: [
+                          {
+                            path: ['functionalTest', 'caseAttachmentIds'],
+                            message: 'Every case file must also be in attachmentIds',
+                          },
+                        ],
+                      });
+                    }
+                    await deps.tasks.checkCreate(request);
+                  }
                 },
               ] as const,
           ),

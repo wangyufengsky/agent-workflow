@@ -64,10 +64,28 @@
 }
 
 .activityFlow {
+  container: activity-flow / inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
   min-width: 0;
+}
+
+.activityDetails {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: var(--s-1);
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+
+.activityDetails:hover {
+  background: var(--accent-fill);
 }
 
 .buildHeader {

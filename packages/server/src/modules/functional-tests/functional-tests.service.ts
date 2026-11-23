@@ -8,6 +8,7 @@ import {
   type FunctionalTestEvent,
   type FunctionalTestExecution,
   type FunctionalTestPrepare,
+  type FunctionalTestProbe,
   type FunctionalTestRead,
   type FunctionalTestRun,
   type FunctionalTestSnapshot,
@@ -40,6 +41,7 @@ import { functionalTestRevisions } from './functional-tests.revisions.ts';
 
 type Deps = {
   db: Db;
+  rerunOrigin: (taskId: string) => { taskId: string; executionIds: string[] } | undefined;
   unit: UnitOfWork;
   clock: Clock;
   events: EventBus;
@@ -59,6 +61,7 @@ function find<T>(value: T | undefined, message: string): T {
 
 export function createFunctionalTests({
   db,
+  rerunOrigin,
   unit,
   clock,
   events,
@@ -193,6 +196,42 @@ export function createFunctionalTests({
     });
   }
 
+  function readinessChecksFor(taskId: string, executionIds: string[]): FunctionalTestProbe[] {
+    const snapshot = repo.get(taskId);
+    const selected = new Map<string, FunctionalTestProbe>();
+    for (const id of executionIds) {
+      const execution = find(
+        snapshot.executions.find((item) => item.id === id),
+        'Functional test execution not found',
+      );
+      const test = caseOf(snapshot, execution.caseId, execution.version);
+      for (const { key, path, expectedStatus } of runOf(snapshot, execution.runId).environment.checks) {
+        if (!test.requires.includes(key)) continue;
+        const first = selected.get(key);
+        if (first !== undefined && (first.path !== path || first.expectedStatus !== expectedStatus))
+          throw new AppError(
+            ErrorCode.ValidationFailed,
+            'Selected cases have conflicting readiness check definitions',
+            { key },
+          );
+        selected.set(key, { key, path, expectedStatus });
+      }
+    }
+    return [...selected.values()];
+  }
+
+  function inheritedChecksFor(taskId: string, snapshot: FunctionalTestSnapshot): FunctionalTestProbe[] {
+    if (snapshot.inheritedChecks !== undefined) return snapshot.inheritedChecks;
+    if (snapshot.executions.length > 0 || snapshot.reports.length > 0) return [];
+    const source = rerunOrigin(taskId);
+    if (source === undefined) return [];
+    const checks = readinessChecksFor(source.taskId, source.executionIds);
+    repo.update(taskId, (current) => {
+      current.inheritedChecks = checks;
+    });
+    return checks;
+  }
+
   function prepare(
     attempt: AttemptDTO,
     { checks }: FunctionalTestPrepare,
@@ -205,9 +244,26 @@ export function createFunctionalTests({
     if (checks !== undefined && new Set(checks.map(({ key }) => key)).size !== checks.length)
       throw new AppError(ErrorCode.ValidationFailed, 'Readiness check keys must be unique');
     return perform(taskId, attempt, request, async (signal) => {
-      const previous = repo.get(taskId).runs.at(-1);
+      const snapshot = repo.get(taskId);
+      const previous = snapshot.runs.at(-1);
+      const inherited = inheritedChecksFor(taskId, snapshot);
+      const needsFreshProbes = inherited.some(
+        (check) =>
+          !previous?.environment.checks.some(
+            (observed) =>
+              observed.key === check.key &&
+              observed.path === check.path &&
+              observed.expectedStatus === check.expectedStatus,
+          ),
+      );
+      const definitions = new Map<string, FunctionalTestProbe>(
+        (previous?.environment.checks ?? []).map((check) => [check.key, check]),
+      );
+      for (const check of checks ?? []) definitions.set(check.key, check);
+      for (const check of inherited) definitions.set(check.key, check);
       if (
         previous !== undefined &&
+        !needsFreshProbes &&
         (!previous.environment.ready || !scope.target.startsWith('/') || localReady(taskId))
       )
         return previous;
@@ -240,8 +296,10 @@ export function createFunctionalTests({
           if (state !== PreviewState.Running && state !== PreviewState.Starting) ownedPreviews.add(taskId);
           const preview = await previews.start(taskId, { queue: signal, filterLog: redactText });
           signal.throwIfAborted();
-          previews.acquire(taskId);
-          previewLeases.add(taskId);
+          if (!previewLeases.has(taskId)) {
+            previews.acquire(taskId);
+            previewLeases.add(taskId);
+          }
           target = new URL(scope.target, find(preview.url ?? undefined, 'Preview has no URL')).href;
           logTail = redactText(preview.logTail);
           verified = true;
@@ -251,7 +309,7 @@ export function createFunctionalTests({
         await probe.body?.cancel();
         if (!probe.ok && probe.status !== 401 && probe.status !== 403)
           reason = `测试入口就绪检查返回 HTTP ${probe.status}`;
-        for (const check of checks ?? previous?.environment.checks ?? []) {
+        for (const check of definitions.values()) {
           signal.throwIfAborted();
           let status: number | null = null;
           let problem: string | null = null;
@@ -469,12 +527,14 @@ export function createFunctionalTests({
     stop,
     ...revisions,
     latestCases: (taskId: string) => latestCases(read(taskId)),
-    importCases(taskId: string, cases: FunctionalTestCase[]) {
+    readinessChecksFor,
+    importCases(taskId: string, cases: FunctionalTestCase[], inheritedChecks: FunctionalTestProbe[]) {
       context(taskId);
       repo.update(taskId, (snapshot) => {
         if (snapshot.cases.length > 0)
           throw new AppError(ErrorCode.StateTransitionInvalid, 'This task already has test cases');
         snapshot.cases.push(...cases);
+        snapshot.inheritedChecks = inheritedChecks;
         for (const test of cases)
           repo.event(snapshot, {
             caseId: test.id,

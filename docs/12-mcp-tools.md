@@ -539,9 +539,9 @@ export const submitPlanTool = defineMcpTool({
 | 工具 | 使用阶段与参数 |
 | --- | --- |
 | `test_case_save` | 编写、导入。提供用例标题、对应需求、有序的 HTTP 或浏览器步骤、断言依据，以及适用的前置条件、测试数据和清理步骤。导入用例附来源附件和位置。返回稳定编号、用例 ID 和版本。 |
-| `test_environment_prepare` | 准备、恢复执行。连接任务授权的目标，返回运行标识及就绪结果。可提供 `checks`，每项包含 `key`、`path`、`expectedStatus`，用例以 `requires` 引用对应依赖。 |
+| `test_environment_prepare` | 准备、恢复执行。连接任务授权的目标，返回运行标识及就绪结果。先用 `test_run_read` 读取已保存用例的 `requires`。可提供 `checks`，每项包含 `key`、`path`、`expectedStatus`，`key` 须与用例引用一致。复测读取 `inheritedChecks`，执行器沿用原检查定义，在当前环境重新探测。依赖某项检查的用例以本轮 `environment.checks` 中该键的结果为准。 |
 | `test_case_run` | 执行。参数 `runId`、`caseId`、`version`、`executionId`。同一执行标识读取原结果。在请求路径与 JSON 请求体中可使用 `{{0.body.id}}` 引用同一用例之前的 HTTP 响应字段。 |
-| `test_run_read` | 所有功能测试步骤。可按 `runId`、`caseId`、`step` 或事件游标 `after` 读取已保存记录。 |
+| `test_run_read` | 所有功能测试步骤。可按 `runId`、`caseId`、`step` 或事件游标 `after` 读取已保存记录。复测的 `inheritedChecks` 返回原探测定义，当前轮次的就绪状态见 `environment.checks`。 |
 | `test_case_revise` | 执行。提供原版本、触发执行标识、原因和依据。可传完整新定义，也可指定零起始步骤的字段重命名或成功状态码纠正。可用 `contractPath` 引用已核实的本地基线内 JSON OpenAPI 3 契约。该契约能唯一证明的状态码或请求字段转写纠正可直接创建新版本，其余差异待确认。 |
 | `test_report_submit` | 报告。提供该轮全部已完成执行标识，另可附带逐项缺陷说明和未覆盖范围。证据、结论与计数由后端从已保存记录生成。 |
 
