@@ -18,3 +18,4 @@ export function createBrowserModule(deps: BrowserServiceDeps) {
 }
 
 export { runBrowserCase } from './browser.case.ts';
+export { browserTestRequests } from './browser.test-evidence.ts';

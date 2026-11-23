@@ -6,6 +6,7 @@ import {
   AttemptKind,
   ErrorCode,
   type ErrorInfo,
+  FUNCTIONAL_TEST_NODE,
   MCP_TOOL_PREFIX,
   McpToolName,
   RequirementVerification,
@@ -59,7 +60,11 @@ const correctable: readonly ErrorCode[] = [
   ErrorCode.GitReviewFindingsInvalid,
 ];
 
-export function createSubmissionGuides(tasks: TasksService, events: EventBus) {
+export function createSubmissionGuides(
+  tasks: TasksService,
+  events: EventBus,
+  functionalPhase: (attempt: AttemptDTO) => string | undefined,
+) {
   const last = new Map<
     string,
     { rejection: SubmissionRejection; summary?: string; failingReview: boolean; scope?: TaskCodeReviewInput['scope'] }
@@ -139,6 +144,19 @@ export function createSubmissionGuides(tasks: TasksService, events: EventBus) {
     const example: Record<string, unknown> = { summary: exampleSummary };
     let instructions =
       'Start with summary. Add valid changes, self_check or evidenced handoff when useful. Delete omitted keys entirely, including empty arrays and objects.';
+    const phase = functionalPhase(attempt);
+    if (phase === FUNCTIONAL_TEST_NODE.Author || phase === FUNCTIONAL_TEST_NODE.Import)
+      instructions =
+        'Persist each case with test_case_save, then submit a summary. For imports give every source, case count and unresolved region in your summary.';
+    if (phase === FUNCTIONAL_TEST_NODE.Environment)
+      instructions =
+        'Call test_environment_prepare, then submit the resulting run ID and readiness summary. A readiness blocker is a valid result.';
+    if (phase === FUNCTIONAL_TEST_NODE.Execute)
+      instructions =
+        'Read saved case versions and the run with test_run_read. Record each executable case with test_case_run. Refer to saved evidence in your summary.';
+    if (phase === FUNCTIONAL_TEST_NODE.Report)
+      instructions =
+        'First publish the evidence-based report with test_report_submit { runId, executionIds, findings?, uncovered? }, then submit the published report version.';
     if (fields.artifact)
       instructions += ' Publish the finished document with the artifact tool before submitting the result.';
     if (report)

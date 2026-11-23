@@ -1,4 +1,4 @@
-import { SessionAgent } from '@aw/shared';
+import { FUNCTIONAL_TEST_WORKFLOW_KEY, SessionAgent } from '@aw/shared';
 
 /**
  * Skills in `packages/builtin/skills/<name>/SKILL.md` (41), by name. opencode reads them from the directory the
@@ -30,6 +30,7 @@ export const SkillName = {
   /** Evidence and findings for task reviews and Git workbench code reviews (41 §13). */
   CodeReview: 'aw-code-review',
   ArtifactRevision: 'aw-artifact-revision',
+  FunctionalTesting: 'aw-functional-testing',
   TaskDelivery: 'aw-task-delivery',
   SubmitResult: 'aw-submit-result',
   BackendDevelopment: 'aw-backend-development',
@@ -80,6 +81,16 @@ export const AGENT_SKILLS: Record<SessionAgent, SkillName[]> = {
   [SessionAgent.CodeReviewer]: [SkillName.CodeReview, SkillName.ImageAnalysis],
   [SessionAgent.Delegate]: [],
 };
+/** 工作流专属会话用这份列表替代执行者的默认分配。 */
+export const WORKFLOW_SKILLS: Record<typeof FUNCTIONAL_TEST_WORKFLOW_KEY, SkillName[]> = {
+  [FUNCTIONAL_TEST_WORKFLOW_KEY]: [
+    SkillName.FunctionalTesting,
+    SkillName.SubmitResult,
+    SkillName.PageCheck,
+    SkillName.ImageAnalysis,
+  ],
+};
+
 export const ASSISTANT_SKILLS: SkillName[] = [
   SkillName.TaskRequirement,
   SkillName.TaskDiagnosis,

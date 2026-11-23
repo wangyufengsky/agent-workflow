@@ -87,6 +87,7 @@ export const assistantPageRefSchema = z
         taskId: z.string().min(1).optional(),
         nodeId: z.string().min(1).optional(),
         artifactVersionId: z.uuid().optional(),
+        testExecutionId: z.string().min(1).max(160).optional(),
         projectId: z.string().min(1).optional(),
         workflowKey: z.string().min(1).optional(),
         knowledgeConversationId: z.string().min(1).optional(),

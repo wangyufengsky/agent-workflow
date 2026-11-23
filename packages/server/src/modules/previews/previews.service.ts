@@ -149,11 +149,12 @@ export function createPreviewsService({
     entry: Entry,
     worktreePath: string,
     { directory, preview: config }: PreviewLaunch,
+    filterLog?: (text: string) => string,
   ): Promise<Preview> {
     const taskRuns = join(dataDir, 'runs', entry.taskId);
     mkdirSync(taskRuns, { recursive: true });
     entry.log?.close();
-    const previewLog = createPreviewLog(join(taskRuns, 'preview.log'));
+    const previewLog = createPreviewLog(join(taskRuns, 'preview.log'), filterLog);
     entry.log = previewLog;
     try {
       const input = {
@@ -261,7 +262,10 @@ export function createPreviewsService({
      * Starts the task's preview, or joins a start in progress; resolves once it is running (29 §4.2). `queue`: wait
      * for room under the limit instead of failing (a page check, 29 §4.4).
      */
-    async start(taskId: string, { queue }: { queue?: AbortSignal } = {}): Promise<Preview> {
+    async start(
+      taskId: string,
+      { queue, filterLog }: { queue?: AbortSignal; filterLog?: (text: string) => string } = {},
+    ): Promise<Preview> {
       let existing = entries.get(taskId);
       if (existing?.state === PreviewState.Running) return toPreview(taskId, existing);
       if (existing?.starting !== null && existing?.starting !== undefined) return existing.starting;
@@ -291,7 +295,7 @@ export function createPreviewsService({
       entries.set(taskId, entry);
       move(entry, PreviewEvent.Start);
       entry.abort = new AbortController();
-      const starting = launch(entry, worktree.path, preview);
+      const starting = launch(entry, worktree.path, preview, filterLog);
       entry.starting = starting;
       try {
         return await starting;
@@ -301,6 +305,14 @@ export function createPreviewsService({
     },
 
     stop,
+
+    /** 仅返回检查点以来本次预览写出的日志尾部。 */
+    logSince(taskId: string): () => string {
+      const log = entries.get(taskId)?.log;
+      if (log === undefined || log === null) return () => '';
+      const start = log.position();
+      return () => log.since(start);
+    },
 
     /** A browser tab starts using the preview: it no longer stops for idleness (29 §4.2). */
     acquire(taskId: string): void {

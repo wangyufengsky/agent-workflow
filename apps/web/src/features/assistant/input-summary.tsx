@@ -1,13 +1,22 @@
-import { InboxStatus, InputRef, MCP_SESSION_ARG, type OperationContract, scheduleFrequencySchema } from '@aw/shared';
+import {
+  functionalTestScopeSchema,
+  InboxStatus,
+  InputRef,
+  MCP_SESSION_ARG,
+  type OperationContract,
+  scheduleFrequencySchema,
+} from '@aw/shared';
 import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 import { z } from 'zod';
 import { CONFIRMATION_COPY, INPUT_REF_LABEL } from '../../copy/assistant.ts';
+import { FUNCTIONAL_TEST_COPY } from '../../copy/functional-testing.ts';
 import { INPUT_FIELD_LABEL, INPUT_VALUE_LABEL } from '../../copy/operations.ts';
 import { frequencyText } from '../../copy/schedules.ts';
 import { INBOX_COPY } from '../../copy/tasks.ts';
 import { attachmentQuery } from '../attachments/attachments.api.ts';
 import { batchQuery } from '../batches/batches.queries.ts';
 import { dbConnectionsQuery } from '../databases/databases.queries.ts';
+import { FunctionalTestScopeSummary } from '../functional-testing/functional-test-fields.tsx';
 import { inboxQuery } from '../inbox/inbox.queries.ts';
 import { initiativeQuery } from '../initiatives/initiatives.queries.ts';
 import { knowledgeConversationQuery } from '../knowledge/knowledge.queries.ts';
@@ -207,6 +216,23 @@ export function InputSummary({ operation, input }: { operation: OperationContrac
   return (
     <dl className={styles.params} aria-label={CONFIRMATION_COPY.input}>
       {fields.map(([field, value]) => {
+        if (field === 'functionalTest') {
+          const scope = functionalTestScopeSchema.parse(value);
+          return (
+            <div key={field} className={styles.param}>
+              <dt>{FUNCTIONAL_TEST_COPY.scope}</dt>
+              <dd>
+                <FunctionalTestScopeSummary scope={scope} />
+                {scope.caseAttachmentIds.length > 0 && (
+                  <div className="row wrap">
+                    <span>{FUNCTIONAL_TEST_COPY.caseInputs}</span>
+                    <AttachmentRef ids={scope.caseAttachmentIds} />
+                  </div>
+                )}
+              </dd>
+            </div>
+          );
+        }
         const ref = operation.refs?.[field];
         const text = ref === undefined ? valueText(field, value) : undefined;
         return (

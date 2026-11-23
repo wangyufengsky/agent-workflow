@@ -207,6 +207,7 @@ const taskRoute = createRoute({
     requirementRevision: z.uuid().optional(),
     delivery: z.boolean().optional(),
     artifactVersion: z.uuid().optional(),
+    testExecution: z.string().max(160).optional(),
     // The preview tab (29 §8.1); the progress tab without it.
     view: z.enum(['preview', 'progress', 'result']).optional(),
   }),

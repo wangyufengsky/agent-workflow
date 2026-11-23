@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { AGENT_SKILLS, ASSISTANT_SKILLS, builtinSkillHeader, SKILL_FILE, SkillName } from '@aw/builtin';
+import {
+  AGENT_SKILLS,
+  ASSISTANT_SKILLS,
+  builtinSkillHeader,
+  SKILL_FILE,
+  SkillName,
+  WORKFLOW_SKILLS,
+} from '@aw/builtin';
 import { type BuiltinSkillDTO, SessionAgent } from '@aw/shared';
 
 export function readBuiltinSkills(dir: string): BuiltinSkillDTO[] {
@@ -16,6 +23,9 @@ export function readBuiltinSkills(dir: string): BuiltinSkillDTO[] {
       source,
       description: header.description,
       assistantEnabled: ASSISTANT_SKILLS.includes(name),
+      workflows: Object.entries(WORKFLOW_SKILLS)
+        .filter(([, skills]) => skills.some((skill) => skill === name))
+        .map(([key]) => key),
       agents: agents.filter((agent) => AGENT_SKILLS[agent].includes(name)),
     };
   });

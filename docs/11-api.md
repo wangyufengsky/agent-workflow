@@ -673,3 +673,15 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 | `skills.setProjectBinding` | PUT `/projects/:projectId/skill-bindings/:workflowKey` | 用有序 `{skillIds}` 替换绑定，传空数组解除 |
 
 助手发送消息可传允许选用的 `skillIds`。任务详情的可选 `skills` 返回创建时绑定的 Skill 名称、版本和角色范围。助手的任务页面上下文可携带 `params.artifactVersionId`，仅在该版本属于当前任务时描述它。
+
+## 功能测试运行与报告
+
+| 操作 | HTTP | 结果 |
+| --- | --- | --- |
+| `functionalTests.read` | `GET /tasks/:taskId/functional-test` | 用例版本、环境、执行、证据事件及已发布报告。可按 `runId`、`caseId`、零起始的 `step` 和事件游标 `after` 筛选。 |
+| `functionalTests.report` | `GET /tasks/:taskId/functional-test/report` | 返回指定 `runId`、`version` 的报告，省略时读取最近发布版本。Markdown 导出使用相同的正文。 |
+| `functionalTests.approveRevision` | `POST /tasks/:taskId/functional-test/revisions/:proposal/approve` | 将指定事件序号中的完整差异提交为新用例版本。若原版本已被替代或该轮报告已发布，拒绝提交。 |
+| `functionalTest.repair` | `POST /tasks/:taskId/functional-test/repair` | 按失败执行 ID 创建或返回关联的修复任务，保留原始证据。 |
+| `functionalTest.rerun` | `POST /tasks/:taskId/functional-test/rerun` | 输入执行 ID 和 Git 引用，在解析出的提交上复测原用例版本，返回关联任务。 |
+
+`functional_test.updated` 在记录提交后推送 `{taskId, after}`。工作台可从最后收到的证据序号增量读取，重连时能取回事件和原始用例版本。浏览器接管复用现有的测试接管操作。

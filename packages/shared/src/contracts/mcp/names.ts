@@ -12,6 +12,7 @@ export const McpToolName = {
   SubmitDelegation: 'submit_delegation',
   ReadAttachment: 'read_attachment',
   AnalyzeImage: 'analyze_image',
+  ProcessDocument: 'process_document',
   ReadSheet: 'read_sheet',
   QuerySheet: 'query_sheet',
   ReadOfficeFile: 'read_office_file',
@@ -47,6 +48,12 @@ export const McpToolName = {
   BrowserViewport: 'browser_viewport',
   BrowserScreenshot: 'browser_screenshot',
   BrowserSubmitReport: 'browser_submit_report',
+  TestCaseSave: 'test_case_save',
+  TestCaseRun: 'test_case_run',
+  TestCaseRevise: 'test_case_revise',
+  TestRunRead: 'test_run_read',
+  TestEnvironmentPrepare: 'test_environment_prepare',
+  TestReportSubmit: 'test_report_submit',
 } as const;
 export type McpToolName = (typeof McpToolName)[keyof typeof McpToolName];
 

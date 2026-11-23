@@ -14,17 +14,28 @@ import type { Clock } from '../../core/clock.ts';
 import { host } from '../../core/platform.ts';
 
 /** A preview's output: appended to its log file (when it has one) and kept as a tail for the user. */
-export type PreviewLog = { append(text: string): void; tail(): string; close(): void };
+export type PreviewLog = {
+  append(text: string): void;
+  tail(): string;
+  position(): number;
+  since(position: number): string;
+  close(): void;
+};
 
-export function createPreviewLog(file: string | null): PreviewLog {
+export function createPreviewLog(file: string | null, filter?: (text: string) => string): PreviewLog {
   let tail = '';
+  let position = 0;
   const stream = file === null ? null : createWriteStream(file, { flags: 'a' });
   return {
     append(text) {
-      tail = (tail + text).slice(-PREVIEW_LOG_TAIL_CHARS);
-      stream?.write(text);
+      const output = filter === undefined ? text : filter(text);
+      position += output.length;
+      tail = (tail + output).slice(-PREVIEW_LOG_TAIL_CHARS);
+      stream?.write(output);
     },
     tail: () => tail,
+    position: () => position,
+    since: (start) => tail.slice(Math.max(0, tail.length + start - position)),
     close: () => stream?.end(),
   };
 }

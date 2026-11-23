@@ -525,3 +525,24 @@ export const submitPlanTool = defineMcpTool({
 | 浏览器报告 | `browser_submit_report` | `{"summary":"打开路线页后显示预期的三个停靠点，检查通过。","notes":"快照显示石桥起点、芦苇栈道、日落码头。"}` |
 | 规划 | `submit_plan` | `{"summary":"修改路线页并验证","nodes":[{"key":"route","title":"修改路线","role":"<允许的角色>","instructions":"更新路线摘要并核对页面快照。"}]}`，同时纳入工具返回的必需节点。 |
 | 验收评审 | `submit_review` | `{"verdict":"fail","summary":"路线仍缺一站","issues":[{"severity":"major","path":"index.html","description":"路线摘要漏掉日落码头。"}]}` |
+
+## 功能测试与文档处理（v1.6）
+
+功能测试节点按阶段加载 `aw-functional-testing`。编写和导入期间逐条调用 `test_case_save`，随后用 `test_environment_prepare` 建立环境。执行端用 `test_case_run` 运行特定用例版本，以 `test_run_read` 查看实测，`test_case_revise` 保留修订及其依据。报告节点以 `test_report_submit` 发布按执行证据计算的报告，再完成节点提交。用例和日志按任务隔离。
+
+助手与任务会话还可通过 `process_document` 委派给文档处理员。输入指令与可选原文，可以传入摘录、当前任务或对话拥有的附件页、Excel 工作表与范围。返回文档正文和下一页位置。生成或修改后的内容可用发起方已有的文档工具发布新版本。图像处理员通过现有的 `analyze_image` 接受识图委派，可在角色库选用。
+
+## 功能测试
+
+功能测试的执行工具仅供相应功能测试步骤调用。会话确定任务、节点及授权写入范围。打开和恢复时用 `get_task_context` 读取节点、运行标识、待执行用例及允许的工具，再用 `get_submission_guide` 读取该阶段的提交约定。
+
+| 工具 | 使用阶段与参数 |
+| --- | --- |
+| `test_case_save` | 编写、导入。提供用例标题、对应需求、有序的 HTTP 或浏览器步骤、断言依据，以及适用的前置条件、测试数据和清理步骤。导入用例附来源附件和位置。返回稳定编号、用例 ID 和版本。 |
+| `test_environment_prepare` | 准备、恢复执行。连接任务授权的目标，返回运行标识及就绪结果。可提供 `checks`，每项包含 `key`、`path`、`expectedStatus`，用例以 `requires` 引用对应依赖。 |
+| `test_case_run` | 执行。参数 `runId`、`caseId`、`version`、`executionId`。同一执行标识读取原结果。在请求路径与 JSON 请求体中可使用 `{{0.body.id}}` 引用同一用例之前的 HTTP 响应字段。 |
+| `test_run_read` | 所有功能测试步骤。可按 `runId`、`caseId`、`step` 或事件游标 `after` 读取已保存记录。 |
+| `test_case_revise` | 执行。提供原版本、触发执行标识、原因和依据。可传完整新定义，也可指定零起始步骤的字段重命名或成功状态码纠正。可用 `contractPath` 引用已核实的本地基线内 JSON OpenAPI 3 契约。该契约能唯一证明的状态码或请求字段转写纠正可直接创建新版本，其余差异待确认。 |
+| `test_report_submit` | 报告。提供该轮全部已完成执行标识，另可附带逐项缺陷说明和未覆盖范围。证据、结论与计数由后端从已保存记录生成。 |
+
+阶段数据保存后用 `submit_result` 完成当前步骤。阻塞原因和测试失败作为执行结果保留，可随报告交付。

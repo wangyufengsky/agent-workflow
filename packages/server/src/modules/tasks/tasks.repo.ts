@@ -7,6 +7,7 @@ import {
   ErrorCode,
   type ErrorInfo,
   errorInfoSchema,
+  functionalTestScopeSchema,
   type SkillSnapshot,
   skillSnapshotsSchema,
   type TaskResultDTO,
@@ -72,7 +73,8 @@ export type NewTask = Pick<
   | 'mergeSource'
   | 'createdAt'
   | 'updatedAt'
-> & { checkpoints: Checkpoints; skills: SkillSnapshot[] };
+> &
+  Partial<Pick<TaskRow, 'functionalTest' | 'testStartCommit'>> & { checkpoints: Checkpoints; skills: SkillSnapshot[] };
 
 // JSON columns: parsed at the boundary (06 §9).
 function toTask(row: { tasks: TaskRow; projectName: string; workflowKey: string; workflowName: string }): Task {
@@ -80,6 +82,7 @@ function toTask(row: { tasks: TaskRow; projectName: string; workflowKey: string;
   return {
     ...t,
     ...names,
+    functionalTest: t.functionalTest === null ? null : functionalTestScopeSchema.parse(t.functionalTest),
     browserCase: t.browserCase === null ? null : browserCaseSchema.parse(t.browserCase),
     failure: t.failure === null ? null : errorInfoSchema.parse(JSON.parse(t.failure)),
     checkpoints: checkpointsSchema.parse(JSON.parse(t.checkpoints)),

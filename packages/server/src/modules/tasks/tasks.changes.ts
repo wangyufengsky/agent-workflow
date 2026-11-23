@@ -91,12 +91,18 @@ export function createTaskChanges(
    * One more step after all current ones, in a new plan version confirmed at once (13 §4); the task goes back to
    * `running` with `event`. Only the new node is materialized.
    */
+  function assertGenericChangesAllowed(task: Task): void {
+    if (task.functionalTest !== null)
+      throw new AppError(ErrorCode.StateTransitionInvalid, 'Use functional test case revision, repair or rerun');
+  }
+
   function appendRevision(
     task: Task,
     revision: { reason: ChangeRequestReason; instructions: string; feedback: string | null },
     event: typeof TaskEvent.ChangesRequested | typeof TaskEvent.ReviewFeedback,
     attachmentIds: readonly string[] = [],
   ): void {
+    assertGenericChangesAllowed(task);
     const confirmed = plans.confirmed(task.id);
     if (confirmed === undefined) throw new Error(`Task ${task.key} has no confirmed plan`);
     const system = SYSTEM_NODES[revision.reason];
@@ -260,7 +266,7 @@ export function createTaskChanges(
     const step: PlanNodeSpec = {
       key,
       title: `产物修改 ${key.slice(ARTIFACT_REVISION_PREFIX.length)}`,
-      roleKey: SYSTEM_NODES[ChangeRequestReason.User].roleKey,
+      roleKey: BuiltinRoleKey.DocumentProcessor,
       instructions: [
         ...(version.repository === undefined
           ? [
@@ -356,6 +362,11 @@ export function createTaskChanges(
       items?: readonly RequirementItemInput[],
     ): Promise<void> {
       const initial = get(taskId);
+      if (initial.functionalTest !== null)
+        throw new AppError(
+          ErrorCode.RequirementsNotEditable,
+          'Use functional case results to verify functional acceptance',
+        );
       const ctx = state.runContext(initial);
       await locks.run(ctx.repoPath, async () => {
         // Refuse a missing or unusable worktree before changing either the checklist or the plan.
@@ -453,6 +464,7 @@ export function createTaskChanges(
       page?: RequestChangesRequest['page'],
     ): Promise<void> {
       const task = get(taskId);
+      assertGenericChangesAllowed(task);
       transition(taskMachine, task.status, TaskEvent.ChangesRequested);
       let instructions: string;
       if (reason === ChangeRequestReason.User) {

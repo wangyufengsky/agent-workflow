@@ -237,14 +237,17 @@ export function Changes({ node }: { node: NodeDetailDTO }) {
 }
 
 /** 最近一轮执行与随后的 AI 评审共用会话流，评审中也能看到实际进展。 */
-export function Process({ node }: { node: NodeDetailDTO }) {
-  const attempt = latestExecute(node);
+export function Process({ node, attemptId }: { node: NodeDetailDTO; attemptId?: string | undefined }) {
+  const attempt = node.attempts.find((a) => a.id === attemptId) ?? latestExecute(node);
   if (attempt === undefined) return <p className="hint">{C.noAttempt}</p>;
-  const attempts = node.attempts
-    .slice(node.attempts.indexOf(attempt))
-    .filter(
-      (a) => a.kind === AttemptKind.Execute || a.kind === AttemptKind.Review || a.kind === AttemptKind.Delegation,
-    );
+  const attempts =
+    attempt.id === attemptId
+      ? [attempt]
+      : node.attempts
+          .slice(node.attempts.indexOf(attempt))
+          .filter(
+            (a) => a.kind === AttemptKind.Execute || a.kind === AttemptKind.Review || a.kind === AttemptKind.Delegation,
+          );
   return (
     <div className="col">
       {attempts.map((a) => (
@@ -277,7 +280,15 @@ export const firstTab = (node: NodeDetailDTO): NodeTab =>
     : NodeTab.Output;
 
 /** The three tabs of a step in the simple view (14 §3.4), opening on `tab` when one is asked for. */
-export function NodeTabs({ node, tab }: { node: NodeDetailDTO; tab?: NodeTab | undefined }) {
+export function NodeTabs({
+  node,
+  tab,
+  attemptId,
+}: {
+  node: NodeDetailDTO;
+  tab?: NodeTab | undefined;
+  attemptId?: string | undefined;
+}) {
   return (
     <Tabs
       key={`${node.id}-${tab}`}
@@ -285,7 +296,7 @@ export function NodeTabs({ node, tab }: { node: NodeDetailDTO; tab?: NodeTab | u
       items={[
         { value: NodeTab.Output, label: C.output, content: <Output node={node} /> },
         { value: NodeTab.Changes, label: C.changes, content: <Changes node={node} /> },
-        { value: NodeTab.Process, label: C.process, content: <Process node={node} /> },
+        { value: NodeTab.Process, label: C.process, content: <Process node={node} attemptId={attemptId} /> },
       ]}
     />
   );

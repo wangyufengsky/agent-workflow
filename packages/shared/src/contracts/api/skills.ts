@@ -50,6 +50,7 @@ export const builtinSkillSchema = z.object({
   source: z.string(),
   assistantEnabled: z.boolean(),
   agents: z.array(z.enum(SessionAgent)),
+  workflows: z.array(z.string()).optional(),
 });
 export type BuiltinSkillDTO = z.infer<typeof builtinSkillSchema>;
 

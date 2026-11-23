@@ -5,6 +5,8 @@ import { attemptKindSchema, nodeStatusSchema } from '../../enums/task.ts';
 import { workflowDeliverableSchema } from '../../enums/workflow.ts';
 import { nodeAcceptanceSchema, planNodeSpecSchema } from '../../workflow/plan-graph.ts';
 import { browserTestScopeSchema } from '../api/browser-cases.ts';
+import { functionalTestScopeSchema } from '../api/tasks.ts';
+import { McpToolName } from './names.ts';
 import { nodeHandoffOutputSchema } from './node-handoff.ts';
 
 export const getTaskContextInputSchema = z.object({});
@@ -16,9 +18,20 @@ export const getTaskContextOutputSchema = z.object({
     title: z.string(),
     requirement: z.string(),
     browserTest: browserTestScopeSchema.optional(),
+    functionalTest: functionalTestScopeSchema.optional(),
     workflow: z.string(),
     deliverable: workflowDeliverableSchema,
   }),
+  functionalTest: z
+    .object({
+      phase: z.string(),
+      tools: z.array(z.enum(McpToolName)),
+      runId: z.string().nullable(),
+      environmentReady: z.boolean(),
+      pendingCaseIds: z.array(z.string()),
+      lastEvent: z.number().int().nonnegative(),
+    })
+    .optional(),
   project: z.object({
     name: z.string(),
     defaultBranch: z.string(),

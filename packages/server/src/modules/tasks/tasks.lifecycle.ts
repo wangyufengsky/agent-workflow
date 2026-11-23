@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { PromptName, renderTemplate } from '@aw/builtin';
+import { createFunctionalTestTemplate, PromptName, renderTemplate } from '@aw/builtin';
 import {
   ACTIVE_ATTEMPT_STATUSES,
   AppError,
@@ -14,6 +14,7 @@ import {
   ErrorCode,
   type ErrorInfo,
   FailureAction,
+  FUNCTIONAL_TEST_WORKFLOW_KEY,
   InboxKind,
   InboxStatus,
   isFrontendWorkflow,
@@ -142,7 +143,17 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       move(task, TaskEvent.WorkspaceReady, TaskStatus.Planning, git);
       return;
     }
-    const { template } = workflow.definition;
+    let template =
+      task.functionalTest === null
+        ? workflow.definition.template
+        : createFunctionalTestTemplate(task.functionalTest.caseAttachmentIds.length > 0);
+    if (template && task.functionalTest && task.testStartCommit) {
+      // 复测在建任务的事务内已经绑定所选用例及版本，从环境准备开始。
+      const [initial, ...remaining] = template.nodes;
+      template = {
+        nodes: remaining.map((node) => ({ ...node, dependsOn: node.dependsOn.filter((key) => key !== initial?.key) })),
+      };
+    }
     if (template === undefined) {
       throw new AppError(ErrorCode.WorkflowDefinitionInvalid, `Fixed workflow ${workflow.key} has no template`, {
         problems: [
@@ -196,6 +207,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
           repoPath: project.repoPath,
           baseBranch: task.baseBranch,
           ...(task.mergeSource === null ? {} : { startPoint: task.mergeSource }),
+          ...(task.testStartCommit === null ? {} : { startPoint: task.testStartCommit }),
         }));
       // A merge task starts at its source with the base branch merged in, conflicts left for its step (27 §3.6). A
       // preparation resumed after a restart may find the merge already under way.
@@ -275,6 +287,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       input: Omit<CreateTaskRequest, 'start'> & {
         baseBranch: string;
         browserCase?: BrowserCase;
+        testStartCommit?: string;
         mergeSource?: string;
         initialRequirementIds?: boolean;
       },
@@ -283,7 +296,19 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
       if ((workflow.key === BROWSER_TEST_WORKFLOW_KEY) !== (input.browserTest !== undefined)) {
         throw new AppError(ErrorCode.ValidationFailed, 'The browser test needs an explicit target and write scope');
       }
-      const target = input.browserTest?.target;
+      if ((workflow.key === FUNCTIONAL_TEST_WORKFLOW_KEY) !== (input.functionalTest !== undefined)) {
+        throw new AppError(ErrorCode.ValidationFailed, 'The functional test needs a target and a write scope');
+      }
+      if (input.functionalTest !== undefined && (input.requirements?.length ?? 0) > 0) {
+        throw new AppError(
+          ErrorCode.ValidationFailed,
+          'Put functional acceptance criteria in the test requirement or case source',
+        );
+      }
+      if (input.functionalTest?.caseAttachmentIds.some((id) => !input.attachmentIds?.includes(id))) {
+        throw new AppError(ErrorCode.ValidationFailed, 'Case files must be attached to this task');
+      }
+      const target = input.browserTest?.target ?? input.functionalTest?.target;
       if (target !== undefined && !target.startsWith('/') && !URL.canParse(target)) {
         throw new AppError(ErrorCode.ValidationFailed, 'Invalid browser test target');
       }
@@ -304,6 +329,8 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
             title: input.title ?? firstLine(input.requirement).slice(0, TASK_TITLE_MAX_CHARS),
             requirement: input.requirement,
             browserTest: input.browserTest ?? null,
+            functionalTest: input.functionalTest ?? null,
+            testStartCommit: input.testStartCommit ?? null,
             browserCase: input.browserCase ?? null,
             skills: deps.skills.forWorkflow(input.projectId, workflow.key),
             status: TaskStatus.Draft,
@@ -444,6 +471,9 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
      */
     saveDraft(taskId: string, baseVersion: number, graph: PlanGraph): PlanDTO {
       const task = get(taskId);
+      if (task.functionalTest !== null) {
+        throw new AppError(ErrorCode.NodeNotEditable, 'The functional testing plan has fixed test phases');
+      }
       if (task.status !== TaskStatus.PlanReview && task.status !== TaskStatus.Paused) {
         throw new AppError(ErrorCode.StateTransitionInvalid, `The plan of task ${task.key} cannot be edited now`, {
           entity: 'task',

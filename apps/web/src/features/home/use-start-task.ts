@@ -1,4 +1,4 @@
-import { type BrowserTestScope, UiMode } from '@aw/shared';
+import { type BrowserTestScope, type FunctionalTestScope, UiMode } from '@aw/shared';
 import { useNavigate } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
@@ -23,6 +23,7 @@ export function useStartTask({
   requirements,
   browserTest,
   browserTestBlocked,
+  functionalTest,
   onStarted,
 }: {
   projectId: string;
@@ -36,6 +37,7 @@ export function useStartTask({
   requirements: readonly DraftRequirement[];
   browserTest: BrowserTestScope | undefined;
   browserTestBlocked: boolean;
+  functionalTest: FunctionalTestScope | undefined;
   onStarted: () => void;
 }) {
   const pro = useSettings()['ui.mode'] === UiMode.Pro;
@@ -80,6 +82,7 @@ export function useStartTask({
         workflowId,
         requirement: requirement.trim(),
         ...(browserTest === undefined ? {} : { browserTest }),
+        ...(functionalTest === undefined ? {} : { functionalTest }),
         ...(Object.keys(checkpoints).length === 0 ? {} : { checkpoints }),
         ...(more.title.trim() === '' ? {} : { title: more.title.trim() }),
         ...(more.baseBranch === null ? {} : { baseBranch: more.baseBranch }),

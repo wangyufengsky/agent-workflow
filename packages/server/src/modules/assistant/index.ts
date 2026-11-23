@@ -13,6 +13,11 @@ import {
   createScheduleOp,
   createTaskOp,
   ErrorCode,
+  functionalTestApproveRevisionOp,
+  functionalTestReadOp,
+  functionalTestRepairOp,
+  functionalTestReportReadOp,
+  functionalTestRerunOp,
   type GetAppStatusOutput,
   initGitOp,
   MCP_ASSISTANT_PATH,
@@ -26,6 +31,7 @@ import type { OperationImpl } from '../../core/operations/operations.ts';
 import type { BatchesService } from '../batches/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DecksService } from '../decks/index.ts';
+import type { DocumentProcessor } from '../document-processor/index.ts';
 import type { GitReviewsService } from '../git-reviews/index.ts';
 import type { ImageAnalysis } from '../image-analysis/index.ts';
 import type { InitiativesService } from '../initiatives/index.ts';
@@ -71,6 +77,7 @@ export type AssistantModuleDeps = Omit<AssistantServiceDeps, 'context' | 'memory
   team: TeamService;
   browser: BrowserService;
   imageAnalysis: ImageAnalysis;
+  documentProcessor: DocumentProcessor;
   /** Word and Excel files: writing them, and the previews of the files cards (39 §7.2, §8.2). */
   office: Office;
   /** Every other operation of the app; the assistant's tools are generated from them (15 §3). */
@@ -128,6 +135,23 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
           ]),
         ),
         prechecks: new Map([
+          ...[
+            functionalTestRepairOp,
+            functionalTestRerunOp,
+            functionalTestReadOp,
+            functionalTestReportReadOp,
+            functionalTestApproveRevisionOp,
+          ].map(
+            (op) =>
+              [
+                op.id,
+                (conversationId: string, input: Record<string, unknown>) => {
+                  const projectId = conversations.get(conversationId).projectId;
+                  if (projectId !== null && deps.tasks.detail(z.string().parse(input.taskId)).project.id !== projectId)
+                    throw new AppError(ErrorCode.ValidationFailed, 'Start a conversation for the target project');
+                },
+              ] as const,
+          ),
           ...projectStarts.map(
             (id) =>
               [

@@ -1,6 +1,7 @@
 import { mkdtemp, open, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { BuiltinRoleKey } from '@aw/builtin';
 import {
   type AnalyzeImageOutput,
   AppError,
@@ -14,17 +15,20 @@ import {
 import type { Clock } from '../../core/clock.ts';
 import type { ModelSlots } from '../model-slots/index.ts';
 import { type OpencodeClient, parseModelRef } from '../opencode/index.ts';
+import type { RolesService } from '../roles/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 
 type ImageSource = { path: string; mime: string; reference: AnalyzeImageOutput['source'] };
 
 export function createImageAnalysis({
   clock,
+  roles,
   settings,
   slots,
   opencode,
 }: {
   clock: Clock;
+  roles: RolesService;
   settings: SettingsService;
   slots: ModelSlots;
   opencode: OpencodeClient;
@@ -37,7 +41,7 @@ export function createImageAnalysis({
     question: string,
     requestSignal?: AbortSignal,
   ): Promise<AnalyzeImageOutput> {
-    const configured = settings.get('ai.imageModel');
+    const configured = roles.getByKey(BuiltinRoleKey.ImageProcessor).model ?? settings.get('ai.imageModel');
     if (configured === null) {
       throw new AppError(ErrorCode.ImageAnalysisUnavailable, 'Set the image reader model in Settings first');
     }

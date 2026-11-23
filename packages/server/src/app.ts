@@ -45,6 +45,8 @@ import { createDatabasesModule, DB_DRIVERS } from './modules/databases/index.ts'
 import { createDebugModule } from './modules/debug/index.ts';
 import { createDecksModule, type DecksService } from './modules/decks/index.ts';
 import { createDeliveryModule } from './modules/delivery/index.ts';
+import { createDocumentProcessor } from './modules/document-processor/index.ts';
+import { createFunctionalTestsModule, type FunctionalTestsService } from './modules/functional-tests/index.ts';
 import { createRepoLocks, locateOpencodeShell } from './modules/git/index.ts';
 import { createGitReviewsModule } from './modules/git-reviews/index.ts';
 import { createHostingModule, type HostingEndpoints, PUBLIC_HOSTING } from './modules/hosting/index.ts';
@@ -79,7 +81,7 @@ import { createSettingsModule } from './modules/settings/index.ts';
 import { createSkillsModule } from './modules/skills/index.ts';
 import { createStorageModule } from './modules/storage/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
-import { createTasksModule, readTaskSkills, type TasksService } from './modules/tasks/index.ts';
+import { createTasksModule, createTestFollowups, readTaskSkills, type TasksService } from './modules/tasks/index.ts';
 import { createTeamModule } from './modules/team/index.ts';
 import { createWorkflowsModule, type WorkflowsService } from './modules/workflows/index.ts';
 import { createWorktreesModule, type WorktreesService } from './modules/worktrees/index.ts';
@@ -118,6 +120,7 @@ export type App = {
     roles: RolesService;
     workflows: WorkflowsService;
     tasks: TasksService;
+    functionalTests: FunctionalTestsService;
     nodes: NodesService;
     inbox: InboxService;
     worktrees: WorktreesService;
@@ -261,7 +264,13 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   const inbox = createInboxModule({ db: database.db, unit, clock, log });
   const modelSlots = createModelSlotsModule({ settings: settings.service, events, log });
-  const imageAnalysis = createImageAnalysis({ clock, settings: settings.service, slots: modelSlots.service, opencode });
+  const imageAnalysis = createImageAnalysis({
+    roles: roles.service,
+    clock,
+    settings: settings.service,
+    slots: modelSlots.service,
+    opencode,
+  });
   server.addHook('preClose', async () => modelSlots.service.dispose());
   const attempts = createAttemptsModule({
     taskSkills: (id) => readTaskSkills(database.db, id),
@@ -312,6 +321,13 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('preClose', async () => {
     attachments.service.stopCleanup();
     await attachments.service.settled();
+  });
+  const documentProcessor = createDocumentProcessor({
+    attachments: attachments.service,
+    roles: roles.service,
+    slots: modelSlots.service,
+    settings: settings.service,
+    opencode,
   });
   // Dev servers end with the backend: nothing else stops them once it is gone.
   server.addHook('preClose', () => previews.service.stopAll());
@@ -439,6 +455,31 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     locks,
     dataDir: config.dataDir,
   });
+  const functionalTests = createFunctionalTestsModule({
+    db: database.db,
+    unit,
+    clock,
+    events,
+    task: tasks.service.detail,
+    attempts: attempts.service,
+    browser: browser.service,
+    previews: previews.service,
+    filesDirOf: attempts.filesDirOf,
+    log,
+  });
+  const testFollowups = createTestFollowups({
+    db: database.db,
+    unit,
+    tasks: tasks.service,
+    projects: projects.service,
+    workflows: workflows.service,
+    tests: functionalTests.service,
+    events,
+    log,
+  });
+  server.addHook('preClose', () => testFollowups.close());
+  server.addHook('preClose', () => functionalTests.service.stopAll());
+  worktrees.service.onBeforeRemove((worktree) => functionalTests.service.stop(worktree.taskId));
   tasks.service.onProjectDeleted((id) => projectRuntime.abortProject(id));
   const batches = createBatchesModule({
     db: database.db,
@@ -539,6 +580,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const mcp = createMcpModule({
     events,
     token: mcpToken,
+    functionalTests: functionalTests.service,
     attempts: attempts.service,
     tasks: tasks.service,
     acceptance: acceptance.service,
@@ -554,6 +596,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     browser: browser.service,
     filesDirOf: attempts.filesDirOf,
     imageAnalysis,
+    documentProcessor,
     log,
   });
   mcp.register(server);
@@ -578,6 +621,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     ...workflows.operations,
     ...skills.operations,
     ...tasks.operations,
+    ...functionalTests.operations,
+    ...testFollowups.operations,
     ...batches.operations,
     ...initiatives.operations,
     ...schedules.operations,
@@ -622,6 +667,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     dataDir: config.dataDir,
     timeZone,
     imageAnalysis,
+    documentProcessor,
     token: assistantMcpToken,
     operations,
     appStatus: async () => ({
@@ -637,6 +683,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
 
   // Recovery from the previous run (03 §2.1): attempts first (their nodes and tasks react to the interruption), then
   // what is left of nodes and tasks. Scheduling starts once the API listens (start()).
+  functionalTests.service.recover();
+  testFollowups.recover();
   attempts.service.recover();
   team.service.analyses.recover();
   nodes.service.recover();
@@ -658,6 +706,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       roles: roles.service,
       workflows: workflows.service,
       tasks: tasks.service,
+      functionalTests: functionalTests.service,
       nodes: nodes.service,
       inbox: inbox.service,
       worktrees: worktrees.service,

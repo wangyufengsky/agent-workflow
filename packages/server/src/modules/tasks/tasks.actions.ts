@@ -85,7 +85,11 @@ export function createTaskActions(deps: TasksServiceDeps, state: TaskState, life
           await attempts.deliverAnswer(
             attemptId,
             renderTemplate(prompts[PromptName.StartAnswer], { question: item.payload.question, answer }),
-            { agent: role.baseAgent, system: role.prompt },
+            {
+              agent: role.baseAgent,
+              system: role.prompt,
+              functionalTest: state.get(taskOf(item)).functionalTest !== null,
+            },
           );
           break;
         }

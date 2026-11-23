@@ -96,6 +96,15 @@ test('前端开发从开始任务直接进入预览，在同一个任务提交�
   const toMerge = await request.get(`${API_BASE}/tasks?displayGroup=review&projectId=${project.id}`, { headers: AUTH });
   await expect(toMerge).toBeOK();
   expect((await toMerge.json()).items).toEqual([]);
+  const original = task.nodes.find((node) => node.title === '开发首版页面');
+  if (!original) throw new Error('Missing first implementation step');
+  const toggle = activity.getByRole('button', { name: /开发首版页面/ });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await activity.getByRole('link', { name: '完整详情' }).click();
+  await expect(page).toHaveURL(new RegExp(`/nodes/${original.id}\\?attempt=`));
+  await expect(page.getByRole('tab', { name: '过程' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('stream-thinking')).toContainText('先检查订单页的入口');
 });
 
 test('前端验收跟随首版新增文件和实际手机页面，退出跟随可继续浏览自己的预览', async ({ page, request }, info) => {

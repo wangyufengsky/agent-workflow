@@ -7,7 +7,9 @@ import {
   type BrowserTestSubmitTool,
   ErrorCode,
   type ErrorInfo,
+  functionalTestTools,
   isAttemptSubmitTool,
+  isFunctionalTestNode,
   MCP_SESSION_ARG,
   type McpToolInfo,
   McpToolName,
@@ -78,6 +80,7 @@ export function createToolRegistry(
     args: Record<string, unknown>,
     error: ErrorInfo,
   ) => { next: string } | undefined,
+  functionalPhase: (attempt: AttemptDTO) => string | undefined,
 ): ToolRegistry {
   function resolveAttempt(tool: McpToolDefinition, sessionId: unknown, attempt: AttemptDTO | undefined): AttemptDTO {
     if (attempt === undefined) {
@@ -92,6 +95,13 @@ export function createToolRegistry(
       throw new AppError(ErrorCode.McpAttemptUnresolved, `Attempt ${attempt.id} is ${attempt.status}`, {
         attemptId: attempt.id,
       });
+    }
+    const phase = functionalPhase(attempt);
+    if (phase !== undefined && isFunctionalTestNode(phase) && !functionalTestTools(phase).includes(tool.name)) {
+      throw new AppError(ErrorCode.McpToolNotAllowed, 'This functional test step can only use its declared tools');
+    }
+    if (tool.name.startsWith('test_') && (phase === undefined || !isFunctionalTestNode(phase))) {
+      throw new AppError(ErrorCode.McpToolNotAllowed, 'Only functional test steps can use this tool');
     }
     const testSubmit = browserTestSubmit(attempt);
     if (tool.name === McpToolName.BrowserSubmitReport && testSubmit !== tool.name) {

@@ -139,7 +139,13 @@ describe('我的 Skill', () => {
     const response = await app.call(getSkillCatalogOp, {});
     expect(response.status).toBe(200);
     const { builtin, scopes } = response.body;
-    expect(builtin).toHaveLength(18);
+    expect(builtin).toHaveLength(19);
+    expect(builtin.find(({ name }) => name === 'aw-functional-testing')).toMatchObject({
+      source: expect.stringContaining('test_case_revise'),
+      assistantEnabled: false,
+      agents: [],
+      workflows: ['functional_test'],
+    });
     expect(builtin.find(({ name }) => name === 'aw-submit-result')).toMatchObject({
       source: expect.stringContaining('agent-workflow_get_submission_guide'),
       assistantEnabled: false,

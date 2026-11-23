@@ -57,7 +57,8 @@ Agent Workflow 把「让 AI 写代码」变成一条看得见、停得住、由�
 
 | 功能 | 说明 |
 | --- | --- |
-| **11 个内置流程** | 新功能开发、修 Bug、补单元测试、代码审查、重构、版本比对审查、安全审查、清理告警、方案设计、详细设计、需求拆解。审查类与设计类流程只读，不改代码。 |
+| **内置流程** | 新功能开发、修 Bug、补单元测试、代码审查、重构、版本比对审查、安全审查、清理告警、方案设计、详细设计、需求拆解、功能测试。审查类与设计类流程只读，不改代码。 |
+| **功能测试** | 针对选定模块编写用例，或导入 Markdown、TXT、Word（.docx）、Excel（.xlsx）用例文件。实时查看每个用例的请求、输出、修订记录与报告，并从失败结果创建修复和复测任务。 |
 | **进度画布** | 任务页以画布展示 AI 规划出的步骤，节点依次亮起；右侧实时显示当前步骤的执行过程、AI 的思考与汇报。 |
 | **自动检查** | 每一步完成后自动验收：运行项目的检查命令（测试、lint 等）、AI 评审，前端项目还可以做页面体检。 |
 | **需求验收清单** | 可以给任务写几条验收要求，最后由只读的核验步骤逐项给出结论；结果卡逐项显示，交付前提醒未满足的项。 |
@@ -99,7 +100,7 @@ PPT、质量与用量、团队在专业模式的侧栏里；简单模式下从�
 | --- | --- |
 | **计划编辑** | 运行前在画布上增删步骤、改依赖、改角色与指令、改验收方式；执行中暂停 → 调整未执行的步骤 → 继续；单步重跑、跳过、人工验收。 |
 | **流程编排器** | 自定义流程：固定步骤，或 AI 规划 + 约束（规划指引、必经步骤）；可以把别的固定流程的步骤插进来。 |
-| **角色** | 4 个内置角色（规划师、开发工程师、测试工程师、评审员），可复制后自定义提示词与模型。 |
+| **角色** | 规划师、开发工程师、测试工程师、评审员、文档处理员和图像处理员。助手与流程角色可委托文档处理员读取、起草或修订文字，也可调用图像处理员分析图片。 |
 | **Git 工作台** | 在主工作区里暂存、提交、推送、拉取，建 / 切 / 删分支，查看提交与 diff、浏览文件、worktree 总览，合并（冲突可交给 AI），以及 AI 只读审查改动。 |
 | **数据库** | 连接 MySQL、PostgreSQL、openGauss / GaussDB、SQL Server、GoldenDB，浏览表结构；关联到项目后，AI 可以只读查询。 |
 | **系统** | 运行环境（opencode 状态、日志、重启）、MCP 工具清单、存储空间统计与清理旧日志。 |
@@ -233,16 +234,16 @@ Linux 上用 `Ctrl` 代替 `⌘`。
 
 ## 安装
 
-在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。**v1.5.6** 的安装包如下。
+在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。**v1.6.0** 的安装包如下。
 
 | 平台 | 文件 |
 | --- | --- |
-| macOS（Apple 芯片） | `agent-workflow-1.5.6-arm64.dmg` |
-| Linux x64（Ubuntu / Debian） | `agent-workflow_1.5.6_amd64.deb` |
-| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.5.6_arm64.deb` |
-| Linux x64（其他发行版） | `agent-workflow-1.5.6-x86_64.AppImage` |
-| Linux arm64（其他发行版） | `agent-workflow-1.5.6-arm64.AppImage` |
-| Windows 10 / 11 x64 | `agent-workflow-1.5.6-setup-x64.exe` |
+| macOS（Apple 芯片） | `agent-workflow-1.6.0-arm64.dmg` |
+| Linux x64（Ubuntu / Debian） | `agent-workflow_1.6.0_amd64.deb` |
+| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.6.0_arm64.deb` |
+| Linux x64（其他发行版） | `agent-workflow-1.6.0-x86_64.AppImage` |
+| Linux arm64（其他发行版） | `agent-workflow-1.6.0-arm64.AppImage` |
+| Windows 10 / 11 x64 | `agent-workflow-1.6.0-setup-x64.exe` |
 
 可以用同一页的 `SHA256SUMS.txt` 校验下载的文件：
 
@@ -289,7 +290,7 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 **deb（推荐 Ubuntu / Debian）**：
 
 ```bash
-sudo apt install ./agent-workflow_1.5.6_amd64.deb
+sudo apt install ./agent-workflow_1.6.0_amd64.deb
 ```
 
 arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `/usr/bin/agent-workflow` 指向它，菜单项在 `/usr/share/applications/agent-workflow.desktop`），用户数据在 `~/.config/Agent Workflow/`。之后在应用菜单中打开，或运行 `agent-workflow`；第一次启动时应用会在桌面放一个快捷方式（只放一次，删掉后不再出现）。卸载：`sudo apt remove agent-workflow`。
@@ -297,8 +298,8 @@ arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `
 **AppImage（其他发行版）**：
 
 ```bash
-chmod +x agent-workflow-1.5.6-x86_64.AppImage
-./agent-workflow-1.5.6-x86_64.AppImage
+chmod +x agent-workflow-1.6.0-x86_64.AppImage
+./agent-workflow-1.6.0-x86_64.AppImage
 ```
 
 - AppImage 不安装，放在哪里就从哪里运行（建议先移到固定位置，如 `~/Applications/`）；第一次启动时在桌面放一个指向它当前位置的快捷方式，之后移动文件需要删掉快捷方式重新放。

@@ -48,6 +48,8 @@ packages/builtin/
 | `planner` | 规划师 | planner | 先读代码再规划；节点粒度为「一个人一次能完成并验证的改动」；写清每个节点的输入、产出、验收；不确定处按 askOnUncertainty 规则处理 |
 | `developer` | 开发工程师 | executor | 遵循仓库现有风格；最小必要改动；**不写兜底和过度防御代码，缺陷找根因**；改完自己跑相关测试；不做 Git 提交 |
 | `tester` | 测试工程师 | executor | 测试验证行为而非实现细节；不写冗余测试；不为通过测试而修改被测代码的行为（发现缺陷写进 notes） |
+| `document_processor` | 文档处理员 | executor | 读取文档与表格、保留来源和歧义、发布并核对文档版本。功能测试中负责导入案例及发布报告 |
+| `image_processor` | 图像处理员 | executor | 识别图像和截图的文字与布局，引用原图或区域，标记无法确定的细节 |
 | `reviewer` | 评审员 | reviewer | 对照需求与本节点指令评审；只报真实问题并给出位置；区分 blocker / major / minor；不提风格偏好类意见 |
 
 ## 3. 内置流程
@@ -73,6 +75,19 @@ packages/builtin/
 | template | `locate`「定位根因」developer：复现问题，写一个能稳定复现的失败测试，在 notes 中写明根因与证据；不修复 → `fix`「修复」developer：修复根因（不是掩盖症状），让复现测试通过，不破坏其他测试 |
 | acceptance | `locate`：无检查；`fix`：`[command $PROJECT_CHECK, browser, ai_review(focus: 是否修复根因而非绕过症状，是否引入兜底逻辑)]` |
 | checkpoints | 全部 `false` |
+
+### `functional_test` · 功能测试
+
+固定的报告流程，以模块、测试目标和写入范围开始。未指定案例附件时由测试工程师编写案例。选定 Markdown、TXT、Word 或 Excel 案例附件时，由文档处理员解析并保留原编号、位置与待澄清项。流程按以下顺序执行。计划可查看和确认，阶段顺序与权限由工作流固定。验收写入案例或测试需求，通过本流程的用例修订、关联修复与复测处理反馈。
+
+| 步骤 | 角色 | 交付 |
+| --- | --- | --- |
+| `test_case_author` 或 `test_case_import` | 测试工程师或文档处理员 | 保存内部用例、预期依据及原文出处 |
+| `test_environment` | 测试工程师 | 准备测试目标并记录可用条件 |
+| `test_execute` | 测试工程师 | 执行已保存的用例并记录实测、断言与修订 |
+| `test_report` | 文档处理员 | 按执行记录发布可追溯的报告 |
+
+文档与表格任务的首版和标注修改也可使用文档处理员，按原有产物版本流程交付。既有任务继续使用其已确认的流程计划。
 
 ### `browser_test` · 浏览器测试
 

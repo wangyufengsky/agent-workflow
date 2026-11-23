@@ -37,13 +37,14 @@ The app and its task data run locally. **Local-first does not mean offline infer
 
 | Area | Capabilities |
 | --- | --- |
-| Coding workflows | 11 built-in workflows: features, bug fixes, unit tests, code review, refactoring, version comparison review, security review, warning cleanup, solution design, detailed design, and requirements breakdown. Review and design workflows are read-only. |
+| Coding workflows | Built-in workflows include features, bug fixes, unit tests, code review, refactoring, version comparison review, security review, warning cleanup, solution design, detailed design, requirements breakdown, and functional testing. Review and design workflows are read-only. |
+| Functional testing | Generate cases for a module or import Markdown, text, Word (.docx), and Excel (.xlsx) cases. Follow requests and evidence per case, inspect revisions, and create linked fixes and reruns from the report. |
 | Verification | Project checks such as tests and lint, AI review, acceptance checklists, and optional browser-based page checks. Inspect the results before merging. |
 | Parallel work | Independent tasks, batch runs, scheduled workflows, and larger initiatives split into stages and work packages. Scheduled execution still leaves merging to you. |
 | Delivery | File diffs, local merge strategies, GitHub PRs / GitLab MRs, and a feedback loop for selected review comments. |
 | Browser preview | Start a preview in a task's worktree; inspect the same page the AI uses, with desktop, tablet, and phone sizes. |
 | Project knowledge | Read-only questions about code, documents, and linked databases, with citations. Web search is separately controlled and off by default. |
-| Assistant and documents | Use the in-app assistant, work with Word / Excel files, and create presentations for PowerPoint or PDF export. |
+| Assistant and documents | Use the in-app assistant, delegate text or image analysis to specialist agents, work with Word / Excel files, and create presentations for PowerPoint or PDF export. |
 | Professional mode | Custom workflows and roles, plan editing, a Git workbench, read-only database access for AI, and usage / quality views. |
 
 See the [Chinese user guide](README.md#使用指南) and [design documentation](docs/README.md) for the full feature set and operating details.

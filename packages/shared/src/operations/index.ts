@@ -92,6 +92,11 @@ import {
 } from './decks.ts';
 import type { OperationContract } from './define.ts';
 import {
+  functionalTestApproveRevisionOp,
+  functionalTestReadOp,
+  functionalTestReportReadOp,
+} from './functional-testing.ts';
+import {
   gitBranchesOp,
   gitChangeFileOp,
   gitChangesOp,
@@ -268,6 +273,7 @@ import {
   updateTeamIdentityOp,
   updateTeamSettingsOp,
 } from './team.ts';
+import { functionalTestRepairOp, functionalTestRerunOp } from './test-followups.ts';
 import {
   createRoleOp,
   createWorkflowOp,
@@ -294,6 +300,7 @@ export * from './databases.ts';
 export * from './debug.ts';
 export * from './decks.ts';
 export * from './define.ts';
+export * from './functional-testing.ts';
 export * from './git.ts';
 export * from './git-reviews.ts';
 export * from './hosting.ts';
@@ -313,6 +320,11 @@ export * from './workflows.ts';
 
 /** Every operation contract; the server mounts exactly these and the copy table covers all their titles. */
 export const OPERATION_CONTRACTS: readonly OperationContract[] = [
+  functionalTestApproveRevisionOp,
+  functionalTestReadOp,
+  functionalTestReportReadOp,
+  functionalTestRepairOp,
+  functionalTestRerunOp,
   listBrowserCasesOp,
   createBrowserCaseOp,
   updateBrowserCaseOp,

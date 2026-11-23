@@ -1,5 +1,5 @@
 import type { BuiltinSkillDTO, RoleDTO, UserSkillDTO, UserSkillScope } from '@aw/shared';
-import { SessionAgent } from '@aw/shared';
+import { FUNCTIONAL_TEST_WORKFLOW_KEY, SessionAgent } from '@aw/shared';
 import { BUILTIN_SKILL_COPY, SKILLS_COPY as C } from '../../copy/skills.ts';
 
 export const SkillAudience = {
@@ -24,8 +24,15 @@ export type CatalogEntry = Entry &
 
 const assistant: Audience = { id: SkillAudience.Assistant, name: C.assistant };
 const researcher: Audience = { id: SkillAudience.Researcher, name: C.researcher };
+const functionalTest: Audience = { id: FUNCTIONAL_TEST_WORKFLOW_KEY, name: C.functionalTest };
 const gitReviewer: Audience = { id: SkillAudience.GitReviewer, name: C.gitReviewer };
-export const audienceOptions = (roles: RoleDTO[]): Audience[] => [assistant, ...roles, researcher, gitReviewer];
+export const audienceOptions = (roles: RoleDTO[]): Audience[] => [
+  assistant,
+  ...roles,
+  researcher,
+  gitReviewer,
+  functionalTest,
+];
 
 export function catalogEntries(
   userSkills: UserSkillDTO[],
@@ -63,6 +70,7 @@ export function catalogEntries(
         audiences: [
           ...(skill.assistantEnabled ? [assistant] : []),
           ...roles.filter((role) => skill.agents.includes(role.baseAgent)),
+          ...(skill.workflows?.includes(functionalTest.id) ? [functionalTest] : []),
           ...(skill.agents.includes(SessionAgent.Researcher) ? [researcher] : []),
           ...(skill.agents.includes(SessionAgent.CodeReviewer) ? [gitReviewer] : []),
         ],

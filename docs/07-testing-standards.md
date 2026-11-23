@@ -142,6 +142,8 @@ E2E 使用页面上的可访问名称与 `data-testid`（仅在无合适可访�
 - 团队 `live/team.live.test.ts`（T-04、T-06）：`ts-stats` 上一位成员的两个提交，真实模型生成成员分析，断言分析完成、报告引用的都是这位成员的提交并通过校验；助手在团队页被问「近 30 天谁提交最多？谁表现最好？」，断言调用了 `team_summary`、回复含成员名，回复写到 `live/reports/team-assistant-<时间>.json` 供人看是否打分排名；再让助手分析一位成员、确认卡片后真实模型分析，结束后断言助手转述了报告并附成员页链接（`team-assistant-analysis-<时间>.json`）。
 - 应用助手 `live/assistant.live.test.ts`（A-09）：让助手查明天的日期并列出项目，断言调用了 `get_current_time` 与 `projects_list`、回复含明天的日期与项目名，报告写到 `live/reports/assistant-<时间>.json`。
 - 助手画图 `live/assistant-charts.live.test.ts`（V-06，35 §10）：三位成员（3 / 2 / 1 个提交）的仓库，让助手统计最近 30 天每个成员的提交数并画柱状图，断言调用了 `team_summary` 与 `show_chart`、柱状图里各成员的数值与提交历史一致；再让它把内置「修 Bug」流程画成流程图，断言调用了 `show_flowchart` 且至少 3 个节点、2 条连线。报告写到 `live/reports/assistant-charts-<时间>.json`。
+- 功能测试 `live/functional-testing.live.test.ts`：导入原用例，用已提交的 OpenAPI 契约纠正转写字段后复测，保留另一个真实失败，核对 Skill、各阶段工具、报告计数和版本。
+- 文档处理 `live/document-processing.live.test.ts`：应用助手和任务评审员分别委派对原附件的条款提取，两端都检查工具回执和结果中的随机条款编号。
 - 识图（U-04，`live/image-analysis.live.test.ts`）：把随机错误码写进 Chromium 生成的 PNG，用纯文本模型提问，断言通过图像处理员返回同一错误码。默认使用 `opencode-go/glm-5.3` 发起，由 `opencode-go/deepseek-v4.1-flash` 读图；可用 `AW_LIVE_TEXT_MODEL`、`AW_LIVE_IMAGE_MODEL` 指定其他模型。
 - 不作为通过/失败的硬门槛（模型有随机性），但内置提示词改动的 PR 必须附 live 报告对比。
 

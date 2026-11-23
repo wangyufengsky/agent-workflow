@@ -14,6 +14,7 @@ import {
   createProjectOp,
   createTaskOp,
   ErrorCode,
+  FUNCTIONAL_TEST_WORKFLOW_KEY,
   generateDeckOp,
   getProjectOp,
   getRequirementsOp,
@@ -21,6 +22,7 @@ import {
   listConfirmationsOp,
   MCP_SESSION_ARG,
   OPENCODE_ASSISTANT_AGENT,
+  OperationRisk,
   RoleBaseAgent,
   ServerEventType,
   SlideLayout,
@@ -230,6 +232,34 @@ describe('助手 MCP（/mcp/assistant，A-04）', () => {
     const second = await call('projects_update', { id: project.id, name: 'B' });
     expect(second.body).toMatchObject({ name: 'B' });
     expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toHaveLength(1);
+  });
+
+  it('已有任务全局放行时，功能测试仍需逐次确认授权范围', async () => {
+    const { project } = await addProject(t);
+    await t.call(updateSettingsOp, { 'assistant.alwaysAllow': [createTaskOp.id] });
+    const base = {
+      projectId: project.id,
+      workflowId: await workflowId(t, FUNCTIONAL_TEST_WORKFLOW_KEY),
+      requirement: '验证订单保存',
+      start: false,
+    };
+    const functionalTest = {
+      target: '/orders',
+      writes: [{ method: 'POST', path: '/api/orders' }],
+      caseAttachmentIds: [],
+      onFailure: 'repair_and_retest',
+    };
+    const { body } = await call('tasks_create', { ...base, functionalTest });
+    expect(body).toMatchObject({ status: 'needs_confirmation' });
+    expect(await entityRefs()).toEqual([]);
+    const id = String(body.confirmation_id);
+    expect((await t.call(listConfirmationsOp, { id: conversationId })).body.items).toMatchObject([
+      { id, risk: OperationRisk.Critical, input: { functionalTest } },
+    ]);
+    expect((await t.call(confirmAssistantCallOp, { id, alwaysAllow: true })).status).toBe(400);
+    expect((await decide(id, 'confirm')).body.result).toMatchObject({ ok: true, output: { functionalTest } });
+    const changed = await call('tasks_create', { ...base, functionalTest: { ...functionalTest, target: '/returns' } });
+    expect(changed.body).toMatchObject({ status: 'needs_confirmation' });
   });
 
   it('确认后执行「开始任务」：消息流出现指向该任务的 entity_ref（D66）', async () => {

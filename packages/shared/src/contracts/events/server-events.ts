@@ -74,6 +74,10 @@ export const serverEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal(ServerEventType.PreviewUpdated), data: previewSchema }),
   z.object({ type: z.literal(ServerEventType.BrowserFrame), data: browserFrameSchema }),
   z.object({
+    type: z.literal(ServerEventType.FunctionalTestUpdated),
+    data: z.object({ taskId: z.string(), after: z.number().int().nonnegative() }),
+  }),
+  z.object({
     type: z.literal(ServerEventType.BrowserTestUpdated),
     data: z.object({ taskId: z.string(), attemptId: z.string() }),
   }),
