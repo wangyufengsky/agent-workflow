@@ -11,7 +11,7 @@ import type { TasksServiceDeps } from './tasks.state.ts';
 export { readTaskSkills, type Task } from './tasks.repo.ts';
 export type { TasksService } from './tasks.service.ts';
 export { tasksTable } from './tasks.table.ts';
-export { createTestFollowups } from './tasks.test-followups.ts';
+export { createTestFollowups, findTestRerunOrigin } from './tasks.test-followups.ts';
 
 export function createTasksModule(deps: TasksServiceDeps & { events: EventBus }) {
   const service = createTasksService(deps);

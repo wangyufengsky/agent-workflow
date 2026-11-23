@@ -61,6 +61,7 @@ const probeSchema = z.object({
   path: path.refine((value) => !value.includes('?')),
   expectedStatus: z.number().int().min(100).max(599),
 });
+export type FunctionalTestProbe = z.infer<typeof probeSchema>;
 export const functionalTestPrepareSchema = z.object({ checks: z.array(probeSchema).max(10).optional() });
 export type FunctionalTestPrepare = z.output<typeof functionalTestPrepareSchema>;
 
@@ -123,6 +124,7 @@ export const functionalTestReportSchema = z.object({
 export type FunctionalTestReport = z.infer<typeof functionalTestReportSchema>;
 export const functionalTestSnapshotSchema = z.object({
   cases: z.array(functionalTestCaseSchema),
+  inheritedChecks: z.array(probeSchema).optional(),
   runs: z.array(functionalTestRunSchema),
   executions: z.array(functionalTestExecutionSchema),
   events: z.array(functionalTestEventSchema),

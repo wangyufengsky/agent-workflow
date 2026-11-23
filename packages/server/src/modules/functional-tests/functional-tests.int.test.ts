@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import {
   ATTACHMENT_NAME_HEADER,
   AttemptStatus,
@@ -13,6 +15,7 @@ import {
   functionalTestRepairOp,
   functionalTestReportReadOp,
   functionalTestRerunOp,
+  functionalTestRunSchema,
   getTaskOp,
   MCP_SESSION_ARG,
   McpToolName,
@@ -154,8 +157,10 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
       ],
     };
     const first = await must(author, McpToolName.TestCaseSave, definition);
+    const probe = { key: 'GET', path: '/health', expectedStatus: 200 };
     const failedCase = await must(author, McpToolName.TestCaseSave, {
       ...definition,
+      requires: [probe.key],
       title: '正常接口缺陷',
       steps: [
         {
@@ -239,7 +244,7 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
     });
     const environment = next(FUNCTIONAL_TEST_NODE.Environment);
     await must(author, McpToolName.SubmitResult, { summary: '已保存用例' });
-    const run = await must(environment, McpToolName.TestEnvironmentPrepare);
+    const run = await must(environment, McpToolName.TestEnvironmentPrepare, { checks: [probe] });
     const execute = next(FUNCTIONAL_TEST_NODE.Execute);
     await must(environment, McpToolName.SubmitResult, { summary: '测试环境可达' });
     const params = { runId: run.id, caseId: first.id, version: 1, executionId: 'v1' };
@@ -358,6 +363,17 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
         event.workflow.key === FUNCTIONAL_TEST_WORKFLOW_KEY &&
         event.status === TaskStatus.Running,
     );
+    const rerunStage = waitForEvent(
+      t.app.events,
+      ServerEventType.AttemptUpdated,
+      ({ attempt, taskId: candidate, nodeId }) =>
+        candidate !== null &&
+        candidate !== taskId &&
+        attempt.status === AttemptStatus.Running &&
+        t.app.services.tasks
+          .detail(candidate)
+          .nodes.some((node) => node.id === nodeId && node.key === FUNCTIONAL_TEST_NODE.Environment),
+    );
     const rerun = await t.call(functionalTestRerunOp, { ...selection, ref: commit });
     expect(rerun.status).toBe(200);
     await rerunReady;
@@ -377,6 +393,65 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
       kind: 'rerun',
       executionIds: ['defect'],
     });
+    const persistedRerun = (await t.call(functionalTestReadOp, { taskId: followup.id })).body;
+    expect(persistedRerun.inheritedChecks).toEqual([probe]);
+    expect(persistedRerun.runs).toEqual([]);
+    // 上一版本已准备环境的复测任务没有继承定义，且模型另命名了探测条件。
+    const { inheritedChecks, ...legacySnapshot } = persistedRerun;
+    const originalRun = functionalTestRunSchema.parse(run);
+    const legacyRun = {
+      ...originalRun,
+      id: 'legacy-run',
+      environment: {
+        ...originalRun.environment,
+        id: 'legacy-run',
+        checks: [{ key: 'preview-root', path: '/', expectedStatus: 200, ready: true, reason: null, status: 200 }],
+      },
+    };
+    const db = new DatabaseSync(join(t.dataDir, 'app.db'));
+    try {
+      db.prepare('UPDATE functional_tests SET snapshot = ? WHERE task_id = ?').run(
+        JSON.stringify({ ...legacySnapshot, runs: [legacyRun] }),
+        followup.id,
+      );
+    } finally {
+      db.close();
+    }
+    expect(requests.filter((request) => request === 'GET /health')).toHaveLength(1);
+    const newRun = await must(rerunStage, McpToolName.TestEnvironmentPrepare, {
+      checks: [
+        { key: 'preview-root', path: '/', expectedStatus: 200 },
+        { ...probe, path: '/different-path' },
+      ],
+    });
+    expect(newRun.id).toBe('legacy-run');
+    expect(newRun.environment).toMatchObject({
+      checks: expect.arrayContaining([{ ...probe, status: 200, ready: true, reason: null }]),
+    });
+    expect(requests.filter((request) => request === 'GET /health')).toHaveLength(2);
+    expect(requests).not.toContain('GET /different-path');
+    t.fake.enqueue(script().hang());
+    const rerunExecution = waitForEvent(
+      t.app.events,
+      ServerEventType.AttemptUpdated,
+      ({ attempt, taskId, nodeId }) =>
+        taskId === followup.id &&
+        attempt.status === AttemptStatus.Running &&
+        t.app.services.tasks
+          .detail(taskId)
+          .nodes.some((node) => node.id === nodeId && node.key === FUNCTIONAL_TEST_NODE.Execute),
+    );
+    await must(rerunStage, McpToolName.SubmitResult, { summary: '已重新核实环境' });
+    expect(
+      (
+        await must(rerunExecution, McpToolName.TestCaseRun, {
+          runId: newRun.id,
+          caseId: failedCase.id,
+          version: 1,
+          executionId: 'rerun-defect',
+        })
+      ).status,
+    ).toBe('failed');
     expect((await fetch(origin)).status).toBe(200);
   } finally {
     await client?.close();

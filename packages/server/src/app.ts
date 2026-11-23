@@ -81,7 +81,13 @@ import { createSettingsModule } from './modules/settings/index.ts';
 import { createSkillsModule } from './modules/skills/index.ts';
 import { createStorageModule } from './modules/storage/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
-import { createTasksModule, createTestFollowups, readTaskSkills, type TasksService } from './modules/tasks/index.ts';
+import {
+  createTasksModule,
+  createTestFollowups,
+  findTestRerunOrigin,
+  readTaskSkills,
+  type TasksService,
+} from './modules/tasks/index.ts';
 import { createTeamModule } from './modules/team/index.ts';
 import { createWorkflowsModule, type WorkflowsService } from './modules/workflows/index.ts';
 import { createWorktreesModule, type WorktreesService } from './modules/worktrees/index.ts';
@@ -457,6 +463,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   const functionalTests = createFunctionalTestsModule({
     db: database.db,
+    rerunOrigin: (taskId) => findTestRerunOrigin(database.db, taskId),
     unit,
     clock,
     events,

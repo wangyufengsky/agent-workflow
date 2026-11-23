@@ -83,7 +83,7 @@ packages/builtin/
 | 步骤 | 角色 | 交付 |
 | --- | --- | --- |
 | `test_case_author` 或 `test_case_import` | 测试工程师或文档处理员 | 保存内部用例、预期依据及原文出处 |
-| `test_environment` | 测试工程师 | 准备测试目标并记录可用条件 |
+| `test_environment` | 测试工程师 | 准备测试目标并记录可用条件。复测沿用所选用例的依赖键和原探测定义，在修复版本上重新核实 |
 | `test_execute` | 测试工程师 | 执行已保存的用例并记录实测、断言与修订 |
 | `test_report` | 文档处理员 | 按执行记录发布可追溯的报告 |
 
