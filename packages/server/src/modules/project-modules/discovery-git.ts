@@ -1,4 +1,9 @@
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { AppError, ErrorCode } from '@aw/shared';
 import { runGit } from '../git/index.ts';
+import { worktreeSources } from '../previews/index.ts';
 
 export type BaselineFile = { path: string; oid: string; bytes: number };
 const MAX_TEXT_BYTES = 512 * 1024;
@@ -50,6 +55,75 @@ export async function baselineTree(repoPath: string, branch: string) {
       .split('\0')
       .filter(Boolean)
       .map((entry) => entry.slice(baseline.length + 1));
+  }
+  return { baseline, files, text, javaCandidates };
+}
+
+/** 验收发生在节点提交前，跟踪文件和未忽略的新文件均来自任务工作区。 */
+export async function taskTree(repoPath: string): Promise<Awaited<ReturnType<typeof baselineTree>>> {
+  const { stdout: baseline } = await runGit(['rev-parse', 'HEAD'], { cwd: repoPath });
+  const { stdout } = await runGit(['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
+    cwd: repoPath,
+    verbatim: true,
+  });
+  const files = new Map<string, BaselineFile>();
+  const texts = new Map<string, Promise<string | undefined>>();
+  const readSource = worktreeSources(repoPath);
+  // 大仓库只检查发现器可能读取的证据，避免遍历生成物和无关资产。
+  const paths = [
+    ...new Set(
+      stdout
+        .split('\0')
+        .filter((path) =>
+          /(?:\.java|\.xml|\.iml|\.gradle(?:\.kts)?|\.md|\.properties|\.ya?ml|compound-services\.json)$/i.test(path),
+        ),
+    ),
+  ];
+  for (let offset = 0; offset < paths.length; offset += 64) {
+    await Promise.all(
+      paths.slice(offset, offset + 64).map(async (path) => {
+        try {
+          const file = await readSource(path, false);
+          if (file !== undefined) files.set(path, { path, bytes: file.size, oid: path });
+        } catch (error) {
+          if (!(error instanceof AppError) || error.code !== ErrorCode.ValidationFailed) throw error;
+          // 配置和启动证据不能通过符号链接读取。
+        }
+      }),
+    );
+  }
+  function text(path: string): Promise<string | undefined> {
+    const file = files.get(path);
+    if (file === undefined || file.bytes > MAX_TEXT_BYTES) return Promise.resolve(undefined);
+    let pending = texts.get(path);
+    if (!pending) {
+      pending = readFile(join(repoPath, path), 'utf8').then((content) => {
+        if (content.includes('\0')) return undefined;
+        file.oid = createHash('sha256').update(content).digest('hex');
+        return content;
+      });
+      texts.set(path, pending);
+    }
+    return pending;
+  }
+  async function javaCandidates() {
+    const { stdout } = await runGit(
+      [
+        'grep',
+        '--untracked',
+        '--exclude-standard',
+        '--name-only',
+        '-z',
+        '-I',
+        '-E',
+        '-e',
+        '(^|[^[:alnum:]_$])main([^[:alnum:]_$]|$)|org\\.junit|junit\\.framework',
+        '--',
+        '*.java',
+      ],
+      { cwd: repoPath, okExitCodes: [0, 1], verbatim: true },
+    );
+    return stdout.split('\0').filter((path) => files.has(path));
   }
   return { baseline, files, text, javaCandidates };
 }

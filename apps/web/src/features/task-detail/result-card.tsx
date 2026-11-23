@@ -32,7 +32,8 @@ import { attemptFileUrl, previewSessionsQuery, useImage } from '../preview/previ
 import { ResultPages } from '../preview/result-pages.tsx';
 import { RequirementsSection } from '../requirements/requirements-section.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
-import { skippedChecks } from '../tasks/skipped-checks.ts';
+import { AutoAcceptanceEvidence } from '../tasks/auto-acceptance-evidence.tsx';
+import { noAutomaticCheck, skippedChecks } from '../tasks/skipped-checks.ts';
 import { taskDiffFileQuery, taskDiffQuery } from '../tasks/tasks.queries.ts';
 import { DeliveryActions } from './delivery-actions.tsx';
 import { Check } from './node-drawer.tsx';
@@ -125,7 +126,15 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
   const failedChecks = result.checks.filter((c) => !c.passed && !c.skipped).length;
   const skipped = skippedChecks(result);
   // One skipped check per step that had the command; the commands are listed once each.
-  const skippedCount = result.checks.filter((c) => c.skipped).length;
+  const skippedCount = result.checks.filter((c) => c.skipped && !noAutomaticCheck(c)).length;
+  const unavailableCount = result.checks.filter(noAutomaticCheck).length;
+  const evidenceChecks = result.checks.filter(
+    (check) =>
+      !check.passed ||
+      check.skipped ||
+      check.kind === AcceptanceCheckKind.Browser ||
+      (check.kind === AcceptanceCheckKind.Command && check.autoSelection !== undefined),
+  );
   const checks =
     result.checks.length === 0
       ? C.noChecks
@@ -133,7 +142,9 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
         ? C.checksFailed(failedChecks)
         : skippedCount > 0
           ? C.checksSkipped(skippedCount, skipped)
-          : C.checksPassed;
+          : unavailableCount > 0
+            ? C.autoNoChecks(unavailableCount)
+            : C.checksPassed;
   const delivered = task.status === TaskStatus.Completed && task.lastDelivery?.status === DeliveryStatus.Succeeded;
   // Delivered changes use their recorded commit range after the worktree is removed.
   const browsable = task.git.worktreeStatus === WorktreeStatus.Ready || (delivered && !report);
@@ -152,6 +163,9 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
                   result.deletions,
                 )}{' '}
                 · <Markdown inline source={checks} />
+                {unavailableCount > 0 &&
+                  (failedChecks > 0 || skippedCount > 0) &&
+                  ` · ${C.autoNoChecks(unavailableCount)}`}
               </>
             ) : (
               <>
@@ -188,26 +202,23 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
         ) : (
           task.browserTest !== undefined && <BrowserTestEvidence taskId={task.id} />
         )}
-        {result.checks.some(
-          (check) => !check.passed || check.skipped || check.kind === AcceptanceCheckKind.Browser,
-        ) && (
+        {evidenceChecks.length > 0 && (
           <section className={styles.block}>
             <h3 className="sec-t">{C.checkEvidenceHeading}</h3>
-            {result.checks
-              .filter((check) => !check.passed || check.skipped || check.kind === AcceptanceCheckKind.Browser)
-              .map((check, index) => (
-                <div key={check.evidenceId ?? `${check.nodeKey}-${index}`} data-testid="check-evidence-row">
-                  <p>
-                    {check.nodeTitle}
-                    {check.commitSha ? C.checkEvidenceCommit(check.commitSha) : ''}
-                  </p>
-                  {check.evidenceId === undefined ? (
-                    <p className="hint">{C.checkEvidenceOld}</p>
-                  ) : (
-                    <Evidence taskId={task.id} evidenceId={check.evidenceId} />
-                  )}
-                </div>
-              ))}
+            {evidenceChecks.map((check, index) => (
+              <div key={check.evidenceId ?? `${check.nodeKey}-${index}`} data-testid="check-evidence-row">
+                <p>
+                  {check.nodeTitle}
+                  {check.commitSha ? C.checkEvidenceCommit(check.commitSha) : ''}
+                </p>
+                {check.kind === AcceptanceCheckKind.Command && <AutoAcceptanceEvidence check={check} />}
+                {check.evidenceId === undefined ? (
+                  !noAutomaticCheck(check) && <p className="hint">{C.checkEvidenceOld}</p>
+                ) : (
+                  <Evidence taskId={task.id} evidenceId={check.evidenceId} />
+                )}
+              </div>
+            ))}
           </section>
         )}
         <ResultPages task={task} />

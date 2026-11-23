@@ -37,7 +37,6 @@ import {
 } from '@aw/shared';
 import { backendCommitter, gitFailure, type RepoLocks, runGit, unmergedFiles } from '../git/index.ts';
 import type { Node } from '../nodes/index.ts';
-import { acceptanceProject } from '../nodes/index.ts';
 import { frontendCheckCommands } from '../projects/index.ts';
 import { recordTaskEvent } from '../timeline/index.ts';
 import { ARTIFACT_REVISION_PREFIX, ARTIFACT_ROUND_EVENT, type createTaskArtifacts } from './tasks.artifacts.ts';
@@ -73,7 +72,7 @@ export function createTaskChanges(
   currentDelivery: (taskId: string) => DeliveryDTO | null,
   retryVerification: (taskId: string) => void,
 ) {
-  const { unit, prompts, projects, workflows, plans, nodes, inbox, locks, browser } = deps;
+  const { unit, prompts, workflows, plans, nodes, inbox, locks, browser } = deps;
   const { get, move } = state;
 
   /** Merges the target into the task worktree for a conflict step (13 §4); returns the conflicted files. */
@@ -139,7 +138,7 @@ export function createTaskChanges(
     added: readonly PlanNodeSpec[],
     feedback: string | null,
     event: typeof TaskEvent.ChangesRequested | typeof TaskEvent.ReviewFeedback,
-    project = acceptanceProject(projects.getRecord(task.projectId)),
+    project = state.acceptanceProject(task),
   ): Node[] {
     const confirmed = plans.confirmed(task.id);
     if (confirmed === undefined) throw new Error(`Task ${task.key} has no confirmed plan`);
@@ -323,7 +322,7 @@ export function createTaskChanges(
       const plan = plans.confirmed(taskId);
       if (plan === undefined) throw new Error(`Task ${task.key} has no confirmed plan`);
       const pages = [...new Set([...(path === undefined ? [] : [path]), ...preview.pages])].slice(0, PREVIEW_PAGES_MAX);
-      const project = acceptanceProject(projects.getRecord(task.projectId));
+      const project = state.acceptanceProject(task);
       if (project.checkCommand !== null) commands.push(project.checkCommand);
       const final: PlanNodeSpec = {
         key: nextKey(taskId, FRONTEND_VERIFY_PREFIX),

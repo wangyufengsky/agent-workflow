@@ -11,6 +11,7 @@ import { COMMON_COPY } from '../../copy/common.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { PageCheckResultView } from '../preview/page-check-result.tsx';
 import { RequirementsSection } from '../requirements/requirements-section.tsx';
+import { AutoAcceptanceEvidence } from '../tasks/auto-acceptance-evidence.tsx';
 import { CheckFailureActions } from '../tasks/check-failure-actions.tsx';
 import { checkUnrunnable, failedNodeKeyOf, failureText, pageUnrunnableDetails } from '../tasks/failure-text.ts';
 import { nodeQuery, useRetryTask } from '../tasks/tasks.queries.ts';
@@ -109,7 +110,11 @@ function LastFailureView({ taskId, last }: { taskId: string; last: LastFailure }
       const { tail, cut } = outputTail(check.output, OUTPUT_TAIL_LINES);
       return (
         <div className="col" data-testid="last-failure">
-          <Markdown inline source={C.lastCommand(check.command, check.exitCode, check.timedOut)} />
+          {check.autoSelection === undefined ? (
+            <Markdown inline source={C.lastCommand(check.command, check.exitCode, check.timedOut)} />
+          ) : (
+            <AutoAcceptanceEvidence check={check} />
+          )}
           <pre className={styles.output}>{full ? check.output : tail}</pre>
           {cut && (
             <span>

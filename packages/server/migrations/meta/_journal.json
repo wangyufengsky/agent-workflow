@@ -344,6 +344,13 @@
       "when": 1795421287577,
       "tag": "0048_project_modules",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1795434896224,
+      "tag": "0049_project_acceptance_mode",
+      "breakpoints": true
     }
   ]
 }

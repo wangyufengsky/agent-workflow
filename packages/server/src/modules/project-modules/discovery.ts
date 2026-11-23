@@ -12,7 +12,7 @@ import {
 import { hasJavaMain } from '../previews/index.ts';
 import { type BuildHints, gradleHints, gradleSettings, mavenHints } from './discovery-build.ts';
 import { compoundManifest, discoverCompounds, readCompoundMetadata } from './discovery-compound.ts';
-import { baselineTree } from './discovery-git.ts';
+import { baselineTree, taskTree } from './discovery-git.ts';
 import { discoverIdeaConfigurations, type IdeaTest } from './discovery-idea.ts';
 
 const JAVA_LIMIT = 384;
@@ -394,8 +394,15 @@ function moduleConfigurations(
 }
 
 export async function discoverProjectModules(repoPath: string, branch: string) {
+  return discoverFromTree(repoPath, await baselineTree(repoPath, branch));
+}
+
+export async function discoverTaskModules(worktreePath: string, repoPath: string) {
+  return discoverFromTree(repoPath, await taskTree(worktreePath));
+}
+
+async function discoverFromTree(repoPath: string, tree: Awaited<ReturnType<typeof baselineTree>>) {
   const warnings: string[] = [];
-  const tree = await baselineTree(repoPath, branch);
   const [modules, idea] = await Promise.all([
     discoverBuilds(tree, warnings),
     discoverIdeaConfigurations(repoPath, tree, warnings),

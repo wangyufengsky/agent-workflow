@@ -108,11 +108,7 @@ export function createNodesService(deps: NodesServiceDeps) {
       roleId: roles.getByKey(spec.roleKey).id,
       instructions: spec.instructions,
       dependsOn: spec.dependsOn,
-      acceptance: resolveAcceptance(
-        spec.acceptance ?? input.defaultAcceptance,
-        { checkCommand: input.checkCommand, previewPages: input.previewPages },
-        input.acceptEachNode,
-      ),
+      acceptance: resolveAcceptance(spec.acceptance ?? input.defaultAcceptance, input, input.acceptEachNode),
       kind: spec.kind ?? NodeKind.Normal,
       position,
     };

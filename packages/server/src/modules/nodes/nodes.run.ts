@@ -20,6 +20,7 @@ import {
   NodeStatus,
   nodeMachine,
   type PageCheckUnrunnable,
+  PROJECT_CHECK_PLACEHOLDER,
   type ResultNext,
   transition,
   withRequestedBy,
@@ -27,6 +28,7 @@ import {
 import type { CommandCheckResult } from '../acceptance/index.ts';
 import type { Attempt } from '../attempts/index.ts';
 import { backendCommitter, hasMergeHead, readConfiguredIdentity, runGit } from '../git/index.ts';
+import { runAutomaticCheck } from './nodes.project-check.ts';
 import type { createNodesRepo, Node, NodeChanges } from './nodes.repo.ts';
 import { feedbackFromAttempt, feedbackFromChecks, feedbackFromRejection, nextAfterFailure } from './nodes.rules.ts';
 import type { NodeRunContext, NodesServiceDeps } from './nodes.types.ts';
@@ -136,11 +138,15 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
       );
       for (const check of checks) {
         if (check.kind === AcceptanceCheckKind.Command) {
-          results.push(
-            check.skipped === true
-              ? skippedResult(check.command)
-              : await acceptance.runCommand(ctx.directory, check.command, controller.signal),
-          );
+          if (check.skipped === true) {
+            results.push(skippedResult(check.command));
+          } else if (check.autoProject) {
+            const result = await runAutomaticCheck(deps, ctx, check.command, controller.signal);
+            if (result === null) return;
+            results.push(result);
+          } else {
+            results.push(await acceptance.runCommand(ctx.directory, check.command, controller.signal));
+          }
         } else if (check.kind === AcceptanceCheckKind.Browser) {
           results.push(
             check.skipped === true
@@ -172,7 +178,9 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
               directory: ctx.directory,
               checkCommands: [
                 ...(ctx.checkCommand === null ? [] : [ctx.checkCommand]),
-                ...node.acceptance.checks.flatMap((c) => (c.kind === AcceptanceCheckKind.Command ? [c.command] : [])),
+                ...node.acceptance.checks.flatMap((c) =>
+                  c.kind === AcceptanceCheckKind.Command && c.command !== PROJECT_CHECK_PLACEHOLDER ? [c.command] : [],
+                ),
               ],
             },
             controller.signal,

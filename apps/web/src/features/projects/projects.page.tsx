@@ -57,7 +57,14 @@ export function ProjectsPage() {
             </span>
             <PathText path={p.repoPath} className="hint" />
             <span className="hint">
-              {C.checkCommand}：<span className="mono">{p.checkCommand ?? C.noCheckCommand}</span>
+              {C.acceptanceSummary(C.acceptanceModes[p.acceptanceMode])}
+              {p.checkCommand !== null && (
+                <>
+                  {' '}
+                  · {p.acceptanceMode === 'auto' ? C.fallbackCommand : C.checkCommand}{' '}
+                  <span className="mono">{p.checkCommand}</span>
+                </>
+              )}
             </span>
           </Link>
         ))}

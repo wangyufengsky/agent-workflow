@@ -69,7 +69,7 @@ import {
 } from './modules/opencode/index.ts';
 import { createPlansModule } from './modules/plans/index.ts';
 import { createPreviewsModule, type PreviewsService } from './modules/previews/index.ts';
-import { createProjectModules } from './modules/project-modules/index.ts';
+import { createProjectModules, runIdeaAcceptance } from './modules/project-modules/index.ts';
 import { createProjectsModule } from './modules/projects/index.ts';
 import { projectRuntimeOperations } from './modules/projects/projects.runtime-operations.ts';
 import { createProjectRuntimeService } from './modules/projects/projects.runtime-service.ts';
@@ -389,6 +389,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('onReady', () => projectModules.recover());
   server.addHook('preClose', () => projectModules.stopAll());
   const nodes = createNodesModule({
+    runIdeaCheck: (ctx, changedPaths, signal) =>
+      runIdeaAcceptance({ worktreePath: ctx.directory, repoPath: ctx.repoPath, changedPaths, clock, env, signal }),
     runBrowserCase: (attempt, test, signal) => {
       const owner = {
         id: attempt.id,

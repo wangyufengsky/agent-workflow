@@ -218,6 +218,10 @@ export const TASK_COPY = {
   skipCheckConfirm: '跳过并继续',
   checkSkipped: '已跳过这项检查',
   // 结果卡
+  autoIdeaCheck: '自动验收 · IDEA 检查',
+  autoFallbackCheck: '自动验收 · 回退命令',
+  autoNoCheck: '未找到可运行的自动验收检查',
+  autoNoChecks: (count: number) => `${count} 项自动验收未找到可运行的检查`,
   checkEvidenceHeading: '检查与证据',
   checkEvidenceOld: '旧结果未保存此检查的证据，请查看步骤或重新核验。',
   checkEvidenceView: '查看证据',

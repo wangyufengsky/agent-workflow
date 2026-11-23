@@ -43,8 +43,15 @@ export const PROJECTS_COPY = {
   otherBranchCheckedOut: (current: string, base: string) =>
     `仓库现在检出的是 ${current}，新任务却从 ${base} 开始。平时在 ${current} 上开发的话，改用它。`,
   switchToBranch: (branch: string) => `改用 ${branch}`,
+  acceptanceMode: '任务验收方式',
+  acceptanceModes: { auto: '自动验收', command: '使用检查命令' },
+  acceptanceModeHint: '自动验收会根据任务改动选择适用的检查。未能确定检查时，可使用下方配置的回退命令。',
   checkCommand: '检查命令',
-  checkCommandHint: '每个步骤完成后自动运行的检查，例如 pnpm test；留空表示不运行。',
+  fallbackCommand: '回退命令',
+  checkCommandHint: '命令用于任务验收，例如 pnpm test。留空时没有可执行的检查命令。',
+  fallbackCommandHint: '可选，例如 pnpm test。自动验收未能确定适用检查时使用。',
+  acceptanceSummary: (mode: string) => `任务验收 · ${mode}`,
+
   noCheckCommand: '未设置',
   name: '名称',
   path: '路径',
@@ -105,7 +112,7 @@ export const AGENTS_MD_COPY = {
 
 export const PROJECT_RUNTIME_COPY = {
   title: '检查运行环境',
-  description: '在临时独立工作区运行所选命令；安装命令也会执行。',
+  description: '在临时独立工作区直接运行所选命令。勾选预览时也会执行安装命令。任务的自动验收在执行任务时进行。',
   branch: '目标分支',
   command: '检查命令',
   preview: '预览安装与启动命令',

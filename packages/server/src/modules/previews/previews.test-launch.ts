@@ -79,7 +79,7 @@ async function fileMetadata(path: string) {
   }
 }
 
-export function committedSources(root: string, baseline: string) {
+export function worktreeSources(root: string) {
   return async (relative: string, required: boolean) => {
     let absolute = root;
     for (const component of relative.split('/')) {
@@ -93,14 +93,23 @@ export function committedSources(root: string, baseline: string) {
     }
     const file = await lstat(absolute);
     if (!file.isFile()) throw invalid('Test launch source must be a regular file', relative);
+    return { absolute, size: file.size };
+  };
+}
+export function committedSources(root: string, baseline: string) {
+  const current = worktreeSources(root);
+  return async (relative: string, required: boolean) => {
+    const file = await current(relative, required);
+    if (file === undefined) return undefined;
     const pathspec = `:(literal)${relative}`;
     const { stdout } = await runGit(['ls-tree', baseline, '--', pathspec], { cwd: root });
     if (!/^100(?:644|755) blob /.test(stdout)) throw invalid('Test launch source must be a committed file', relative);
     const difference = await runGit(['diff', '--quiet', baseline, '--', pathspec], { cwd: root, okExitCodes: [0, 1] });
     if (difference.exitCode !== 0) throw invalid('Test launch source differs from the selected baseline', relative);
-    return { absolute, size: file.size };
+    return file;
   };
 }
+
 async function nodeCommands(
   launch: FunctionalTestLaunch,
   manifest: string,
@@ -264,6 +273,7 @@ async function springCommands(
   manifest: string,
   committed: CommittedSource,
   env: NodeJS.ProcessEnv,
+  wrapperSources: CommittedSource = committed,
 ) {
   const source = posix.basename(launch.source);
   const maven = source === 'pom.xml' && launch.script === 'spring-boot:run' && mavenUsesSpringBoot(manifest);
@@ -274,7 +284,7 @@ async function springCommands(
   if (!maven && !gradle)
     throw invalid('Choose a Spring Boot goal declared by a supported Maven or Gradle build file', launch.source);
   await verifySpringProfile(launch, committed, env);
-  const executable = await javaBuildExecutable(maven ? 'maven' : 'gradle', launch.directory, committed, env);
+  const executable = await javaBuildExecutable(maven ? 'maven' : 'gradle', launch.directory, wrapperSources, env);
   return {
     manager: maven ? ('maven' as const) : ('gradle' as const),
     command: (port: number) => {
@@ -294,6 +304,7 @@ export async function resolveTestLaunch(
   worktree: Pick<Worktree, 'path' | 'baseCommit'>,
   proposal: FunctionalTestLaunch,
   inheritedEnv: NodeJS.ProcessEnv,
+  options: { allowWorkingTreeChanges?: boolean } = {},
 ) {
   const env = projectLaunchEnvironment(inheritedEnv);
   const directory = relativePath(proposal.directory, true);
@@ -306,10 +317,13 @@ export async function resolveTestLaunch(
   const { stdout: head } = await runGit(['rev-parse', 'HEAD'], { cwd: root });
   const baseline = worktree.baseCommit;
   if (head !== baseline) throw invalid('The test worktree differs from the selected baseline');
-  const dirty = await runGit(['diff', '--quiet', baseline, '--'], { cwd: root, okExitCodes: [0, 1] });
-  if (dirty.exitCode !== 0) throw invalid('The test worktree has changes to files in the selected baseline');
   const committed = committedSources(root, baseline);
-  const file = await committed(source, true);
+  if (!options.allowWorkingTreeChanges) {
+    const dirty = await runGit(['diff', '--quiet', baseline, '--'], { cwd: root, okExitCodes: [0, 1] });
+    if (dirty.exitCode !== 0) throw invalid('The test worktree has changes to files in the selected baseline');
+  }
+  const files = options.allowWorkingTreeChanges ? worktreeSources(root) : committed;
+  const file = await files(source, true);
   if (file === undefined || file.size > MANIFEST_MAX_BYTES)
     throw invalid('The test launch source is too large', source);
   const manifest = await readFile(file.absolute, 'utf8');
@@ -318,8 +332,8 @@ export async function resolveTestLaunch(
     posix.basename(source) === 'package.json'
       ? await nodeCommands(launch, manifest, root, committed, env)
       : launch.script === FUNCTIONAL_TEST_JAVA_MAIN_SCRIPT
-        ? await javaCommands(launch, manifest, file.absolute, committed, env)
-        : await springCommands(launch, manifest, committed, env);
+        ? await javaCommands(launch, manifest, file.absolute, files, env, committed)
+        : await springCommands(launch, manifest, files, env, committed);
   const profile = 'profile' in commands ? commands.profile : launch.profile;
   const evidence: TestLaunchEvidence = {
     ...launch,

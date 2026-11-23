@@ -1,0 +1,1 @@
+ALTER TABLE `projects` ADD `acceptance_mode` text DEFAULT 'auto' NOT NULL;

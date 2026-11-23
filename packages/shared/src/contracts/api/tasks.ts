@@ -123,11 +123,18 @@ export const nodeResultSchema = submitResultInputSchema.extend({
 });
 export type NodeResult = z.infer<typeof nodeResultSchema>;
 
+const autoSelectionSchema = z.object({
+  source: z.enum(['idea', 'fallback']),
+  reason: z.string(),
+  configurations: z.array(z.string()),
+});
+
 /** One acceptance check of a node's latest verification (10 §nodes `check_results`). */
 export const checkResultSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal(AcceptanceCheckKind.Command),
     command: z.string(),
+    autoSelection: autoSelectionSchema.optional(),
     passed: z.boolean(),
     /** Combined stdout and stderr, cut to its last ACCEPTANCE_OUTPUT_MAX_CHARS characters. */
     output: z.string(),
@@ -247,6 +254,7 @@ export const taskResultSchema = z.object({
       /** Snapshot of the check at the time this result was computed; absent in older results. */
       evidence: checkResultSchema.optional(),
       evidenceId: z.string().optional(),
+      autoSelection: autoSelectionSchema.optional(),
       nodeId: z.string().optional(),
       commitSha: z.string().nullable().optional(),
       kind: acceptanceCheckKindSchema,

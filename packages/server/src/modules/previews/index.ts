@@ -7,7 +7,7 @@ export { createPreviewLog, type LaunchInput, launchPreview, setUpPreview } from 
 export { createProjectLog } from './previews.project-log.ts';
 export type { PreviewsService } from './previews.service.ts';
 export { startServiceGroup } from './previews.service-group.ts';
-export { committedSources, resolveTestLaunch } from './previews.test-launch.ts';
+export { committedSources, resolveTestLaunch, worktreeSources } from './previews.test-launch.ts';
 
 export function createPreviewsModule(deps: PreviewsServiceDeps) {
   const service = createPreviewsService(deps);

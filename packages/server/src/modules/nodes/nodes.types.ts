@@ -23,6 +23,11 @@ export type NodesServiceDeps = {
   settings: SettingsService;
   prompts: Prompts;
   locks: RepoLocks;
+  runIdeaCheck: (
+    ctx: NodeRunContext,
+    changedPaths: string[],
+    signal: AbortSignal,
+  ) => ReturnType<typeof import('../project-modules/index.ts').runIdeaAcceptance>;
   runBrowserCase: (attempt: AttemptDTO, test: BrowserCase, signal: AbortSignal) => Promise<BrowserCaseReport>;
   isBrowserTestTask?: (taskId: string) => boolean;
 };
@@ -41,6 +46,7 @@ export type NodeRunContext = {
   directory: string;
   /** The project repository, whose lock guards ref changes (D37). */
   repoPath: string;
+  baseCommit: string;
   /** The project check command, which a reviewer may run without asking (12 §2). */
   checkCommand: string | null;
   askOnUncertainty: boolean;
@@ -50,6 +56,7 @@ export type MaterializeInput = {
   taskId: string;
   planId: string;
   graph: PlanGraph;
+  useIdea?: boolean;
   checkCommand: string | null;
   /** The project's preview key pages; null when it has no preview (page checks are dropped then, 29 §7.1). */
   previewPages: readonly string[] | null;

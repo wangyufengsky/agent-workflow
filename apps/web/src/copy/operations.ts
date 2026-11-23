@@ -338,6 +338,7 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   repoPath: '仓库目录',
   name: '名称',
   defaultBranch: '默认分支',
+  acceptanceMode: '任务验收方式',
   checkCommand: '检查命令',
   preview: '页面预览设置',
   command: '新的检查命令',

@@ -26,6 +26,7 @@ type StartServiceGroup = {
   env: NodeJS.ProcessEnv;
   clock: Clock;
   signal: AbortSignal;
+  allowWorkingTreeChanges?: boolean;
   update?(services: FunctionalTestServiceRuntime[]): void;
 };
 
@@ -199,7 +200,12 @@ export async function startServiceGroup(input: StartServiceGroup) {
     const configs = await Promise.allSettled(
       items.map(async ({ service }) => {
         try {
-          return [service.id, await resolveTestLaunch(worktree, service.launch, groupEnv)] as const;
+          return [
+            service.id,
+            await resolveTestLaunch(worktree, service.launch, groupEnv, {
+              allowWorkingTreeChanges: input.allowWorkingTreeChanges ?? false,
+            }),
+          ] as const;
         } catch (error) {
           failed(service.id, error);
           throw error;

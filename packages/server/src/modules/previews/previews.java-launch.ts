@@ -202,6 +202,7 @@ export async function javaCommands(
   sourcePath: string,
   committed: CommittedSource,
   env: NodeJS.ProcessEnv,
+  wrapperSources: CommittedSource = committed,
 ): Promise<JavaCommands> {
   const { source, directory, mainClass, javaVersion, includeProvided } = launch;
   if (
@@ -245,10 +246,10 @@ export async function javaCommands(
     };
   }
   if (gradle) {
-    const executable = await javaBuildExecutable('gradle', directory, committed, jdk.env);
+    const executable = await javaBuildExecutable('gradle', directory, wrapperSources, jdk.env);
     return { ...runtime, manager: 'gradle', ...gradleCommands(executable, jdk.java, mainClass) };
   }
-  const executable = await javaBuildExecutable('maven', directory, committed, jdk.env);
+  const executable = await javaBuildExecutable('maven', directory, wrapperSources, jdk.env);
   return {
     ...runtime,
     manager: 'maven',

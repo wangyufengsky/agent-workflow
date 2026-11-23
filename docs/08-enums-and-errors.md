@@ -43,6 +43,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `PlanStatus` | `draft` · `confirmed` · `superseded` |
 | `PlanSource` | `ai` · `template` · `user` |
 | `CheckpointKey` | `confirm_plan`（运行前确认计划）· `accept_each_node`（每个节点人工验收）· `ask_on_uncertainty`（不确定时停下来问） |
+| `ProjectAcceptanceMode` | `auto`（默认，按任务改动读取适用的 IDEA 配置，无法使用时回退到项目检查命令）· `command`（按项目检查命令验收） |
 | `AcceptanceCheckKind` | `command`（在 worktree 运行命令，退出码 0 为通过）· `browser`（页面体检：任务预览的关键页面按事实判定，不用模型，v1.3，29 §7）· `ai_review`（评审角色会话）；一个步骤的检查按 `CHECK_KIND_ORDER` 依次运行 |
 | `CheckUnrunnableReason` | `not_found`（退出码 127，shell 找不到检查命令点名的程序）· `not_executable`（126，程序没有执行权限）：检查命令在应用环境里无法运行（D116，09 §3） |
 | `TaskEventEntity` | `task` · `node` · `attempt` · `plan` · `delivery`（`task_events.entity`） |
