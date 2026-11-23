@@ -5,6 +5,7 @@ import {
   attemptMachine,
   createProjectOp,
   createTaskOp,
+  type FunctionalTestScope,
   getAttemptOp,
   getRuntimeOp,
   getTaskOp,
@@ -31,11 +32,19 @@ export const TASK_TIMEOUT_MS = 25 * 60_000;
 const ENDED: readonly TaskStatus[] = [TaskStatus.Review, TaskStatus.Failed, TaskStatus.Cancelled];
 const IDENTITY = ['-c', 'user.name=aw-live', '-c', 'user.email=aw-live@example.com'];
 
-export type Fixture = 'ts-stats' | 'java-inventory' | 'todo-web';
+export type Fixture = 'ts-stats' | 'java-inventory' | 'todo-web' | 'functional-todo';
 /** A commit made on top of the fixture, at `date` (ISO 8601), writing `files` (path → content). */
 export type FixtureCommit = { date: string; message: string; files: Record<string, string> };
 /** The fixture's history: its own commit at `initAt`, then `commits` in order. */
 export type FixtureHistory = { initAt: string; commits: FixtureCommit[] };
+
+type LiveTaskOptions = {
+  confirmPlan?: boolean;
+  requirements?: RequirementItemInput[];
+  history?: FixtureHistory;
+  attachmentIds?: string[];
+  functionalTest?: FunctionalTestScope;
+};
 
 type Report = {
   workflow: string;
@@ -62,7 +71,7 @@ export type LiveApp = {
     fixture: Fixture,
     requirement: string,
     /** `requirements`: the task's acceptance checklist (31); `history`: commits with dates (version review). */
-    options?: { confirmPlan?: boolean; requirements?: RequirementItemInput[]; history?: FixtureHistory },
+    options?: LiveTaskOptions,
   ): Promise<TaskDetailDTO>;
   /** A fresh repository of the fixture, added as a project; returns the project id. */
   addProject(fixture: Fixture, history?: FixtureHistory): Promise<string>;
@@ -152,6 +161,8 @@ export async function startLiveApp(name: string, options: { browserHost?: Browse
         requirement,
         checkpoints: { confirm_plan: confirmPlan },
         ...(options.requirements === undefined ? {} : { requirements: options.requirements }),
+        ...(options.attachmentIds === undefined ? {} : { attachmentIds: options.attachmentIds }),
+        ...(options.functionalTest === undefined ? {} : { functionalTest: options.functionalTest }),
       });
       taskId = created.id;
       workflowOfTask.set(taskId, `${workflowKey} · ${fixture}`);
@@ -175,7 +186,11 @@ export async function startLiveApp(name: string, options: { browserHost?: Browse
       unsubscribe();
       const { body: task } = await t.call(getTaskOp, { id: taskId });
       const attemptIds = [
-        ...new Set((await readdir(join(t.dataDir, 'runs', taskId))).map((f) => f.replace('.jsonl', ''))),
+        ...new Set(
+          (await readdir(join(t.dataDir, 'runs', taskId)))
+            .filter((f) => f.endsWith('.jsonl'))
+            .map((f) => f.slice(0, -6)),
+        ),
       ];
       const attempts = await Promise.all(attemptIds.map(async (id) => (await t.call(getAttemptOp, { id })).body));
       reports.push({

@@ -1,0 +1,42 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "待办接口契约",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/check": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "done": { "type": "boolean" }
+                },
+                "required": ["done"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "响应 accepted 为 true" },
+          "400": { "description": "完成字段缺失，响应 accepted 为 false" }
+        }
+      }
+    },
+    "/api/todos/fixture-1": {
+      "patch": {
+        "responses": {
+          "200": { "description": "接受完成状态更新" }
+        }
+      },
+      "get": {
+        "responses": {
+          "200": { "description": "响应 done 为当前保存的完成状态，成功更新后为 true" }
+        }
+      }
+    }
+  }
+}

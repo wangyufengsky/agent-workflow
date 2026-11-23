@@ -693,3 +693,7 @@ class AppError extends Error {
 | REQUIREMENTS_NOT_EDITABLE（Q-01 已实现） | 409 | 任务状态不允许编辑清单（只有 `draft`、`plan_review`、`review` 可以），或不在 `review` 时请求重新核验／人工结论 |
 | REQUIREMENT_RESULTS_INVALID（Q-02 已实现） | —（只经执行 MCP 返回） | 非核验节点提交 `requirement_results`，或项不属于当前版本、不是 AI 核验项、重复 |
 | REQUIREMENTS_UNACKNOWLEDGED（Q-03 已实现） | 409 | 交付时有未满足的必需项，而没有带 `acknowledgedRequirementsRevisionId` 或它不是当前清单版本；`details.items` 列出这些项 |；`details.revisionId` 为当前版本。判断「未满足」的 `isUnmet`（failed / unverified / stale）在 shared，前后端共用
+
+## 功能测试结果
+
+功能测试执行使用 `FunctionalTestStatus`。执行期间为 `running`，完成后由证据推导 `passed`、`failed` 或 `blocked`。尚未执行的用例在报告中标作 `not_run`。功能测试不改变任务状态机。

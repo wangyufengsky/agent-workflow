@@ -1,0 +1,7 @@
+{
+  "name": "functional-todo-fixture",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs"
+  }
+}

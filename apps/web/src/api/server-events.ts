@@ -123,6 +123,8 @@ async function applyEvent(qc: QueryClient, event: ServerEvent): Promise<void> {
       return;
     case ServerEventType.BrowserFrame:
       return appendFrame(qc, event.data);
+    case ServerEventType.FunctionalTestUpdated:
+      return qc.invalidateQueries({ queryKey: queryKeys.functionalTest(event.data.taskId) });
     case ServerEventType.BrowserTestUpdated:
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.previewSessions(event.data.taskId) }),

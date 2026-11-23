@@ -103,6 +103,13 @@ export const TOOLS_COPY = {
     [McpToolName.BrowserLogs]: '浏览器：查看控制台错误、未捕获的异常与失败的请求。',
     [McpToolName.BrowserViewport]: '浏览器：切换桌面、平板或手机尺寸。',
     [McpToolName.AnalyzeImage]: '请图像处理员读取当前任务的图片资料或浏览器截图。',
+    [McpToolName.ProcessDocument]: '请文档处理员读取所选文件并返回分析，或生成文档版本。',
+    [McpToolName.TestCaseSave]: '逐条保存功能测试用例。导入案例时保留原编号和来源位置。',
+    [McpToolName.TestCaseRun]: '在本轮测试环境执行已保存的指定用例版本，并收集实测证据。',
+    [McpToolName.TestCaseRevise]: '记录用例修订的原因、依据与变化，保留原版本及其实测结果。',
+    [McpToolName.TestRunRead]: '按运行轮次、用例、步骤或事件序号读取功能测试证据。',
+    [McpToolName.TestEnvironmentPrepare]: '在任务授权范围内启动或连接测试环境并检查就绪状态。',
+    [McpToolName.TestReportSubmit]: '用本轮实测记录生成可阅读和导出的功能测试报告。',
     [McpToolName.BrowserScreenshot]: '浏览器：截图并保存给你看；模型支持图片时也能看到截图。',
   } satisfies Record<McpToolName, string>,
 } as const;

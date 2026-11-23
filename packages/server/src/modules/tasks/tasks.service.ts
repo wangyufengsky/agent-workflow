@@ -43,6 +43,7 @@ import {
   type TaskSummaryDTO,
   taskCodeReviewReportSchema,
 } from '@aw/shared';
+import { eq, or } from 'drizzle-orm';
 import type { EventBus } from '../../core/event-bus.ts';
 import { latestTaskPayload, listTaskEvents, recordTaskEvent } from '../timeline/index.ts';
 import { createBrowserCases } from './browser-cases.service.ts';
@@ -65,6 +66,7 @@ import { createTaskRequirements } from './tasks.requirements.ts';
 import { createTaskResults } from './tasks.result.ts';
 import { createTaskReview } from './tasks.review.ts';
 import { createTaskState, type TasksServiceDeps } from './tasks.state.ts';
+import { testFollowupsTable } from './tasks.table.ts';
 
 /** Tasks (09 §2): lifecycle, the context their attempts read, decisions on their items, and their views. */
 export function createTasksService(deps: TasksServiceDeps & { events: EventBus }) {
@@ -150,8 +152,19 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
         ? attempts.listByNode(reportNode.id).findLast((a) => a.kind === AttemptKind.Execute)
         : undefined;
     const draft = author && latestTaskPayload(db, id, author.id, 'report_draft');
+    const links = db
+      .select({
+        sourceId: testFollowupsTable.sourceId,
+        taskId: testFollowupsTable.taskId,
+        kind: testFollowupsTable.kind,
+        executionIds: testFollowupsTable.executions,
+      })
+      .from(testFollowupsTable)
+      .where(or(eq(testFollowupsTable.sourceId, id), eq(testFollowupsTable.taskId, id)))
+      .all();
     return {
       ...state.summary(task),
+      ...(links.length ? { testLinks: links } : {}),
       ...(proposal
         ? {
             proposal: {
@@ -173,6 +186,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       ...(task.browserCase === null ? {} : { browserCase: task.browserCase }),
       ...(browserCaseHandoff === undefined ? {} : { browserCaseHandoff }),
       ...(task.browserTest === null ? {} : { browserTest: task.browserTest }),
+      ...(task.functionalTest === null ? {} : { functionalTest: task.functionalTest }),
       ...(skills.length === 0 ? {} : { skills: skills.map(({ id, name, version }) => ({ id, name, version })) }),
       failedPhase: task.failedPhase,
       failure: task.failure,
@@ -572,6 +586,8 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     },
     skipNode(taskId: string, nodeId: string): NodeDetailDTO {
       nodes.detail(taskId, nodeId);
+      if (state.get(taskId).functionalTest !== null)
+        throw new AppError(ErrorCode.NodeNotEditable, 'Functional testing stages must finish in order');
       nodes.skip(nodeId);
       return nodes.detail(taskId, nodeId);
     },

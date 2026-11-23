@@ -242,12 +242,21 @@ export function createBrowserService({
   function sessionOf(owner: BrowserOwner): Session {
     const existing = sessions.get(owner.id);
     if (existing !== undefined) return existing;
+    const dir = ownerDir(owner);
+    const shots = existsSync(dir)
+      ? Math.max(
+          0,
+          ...readdirSync(dir)
+            .filter((file) => /^\d+\.jpg$/.test(file))
+            .map((file) => Number.parseInt(file, 10)),
+        )
+      : 0;
     const session: Session = {
       owner,
       tabs: {},
       opening: {},
       current: null,
-      shots: 0,
+      shots,
       frames: 0,
       testActions: 0,
       acceptedChallenge: null,

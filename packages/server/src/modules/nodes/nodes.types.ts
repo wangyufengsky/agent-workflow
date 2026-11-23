@@ -34,6 +34,7 @@ export type NodeRunContext = {
   taskKey: string;
   taskTitle: string;
   browserTest?: boolean;
+  functionalTest?: boolean;
   browserCase?: BrowserCase;
   requirement: string;
   /** The task worktree. */

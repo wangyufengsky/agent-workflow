@@ -1,6 +1,7 @@
 import { UiMode } from '@aw/shared';
 import { COMPANION_COPY } from './companion.ts';
 import { DELIVERY_COPY } from './delivery.ts';
+import { FUNCTIONAL_TEST_COPY } from './functional-testing.ts';
 import { PPT_COPY } from './ppt.ts';
 import { AGENTS_MD_COPY } from './projects.ts';
 import { SETTINGS_COPY } from './settings.ts';
@@ -34,6 +35,11 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
   'op.projects.startAgentsMdTask': '让 AI 整理项目的 AGENTS.md',
   'op.previews.get': '查看页面预览',
   'op.browser.readUrl': '读取网页文字',
+  'op.functionalTests.read': '查看功能测试实况',
+  'op.functionalTests.approveRevision': FUNCTIONAL_TEST_COPY.approveRevision,
+  'op.functionalTests.report': '读取功能测试报告',
+  'op.functionalTest.repair': FUNCTIONAL_TEST_COPY.repair,
+  'op.functionalTest.rerun': FUNCTIONAL_TEST_COPY.rerun,
   'op.browserCases.list': '列出浏览器测试用例',
   'op.browserCases.create': '保存浏览器测试用例',
   'op.browserCases.update': '编辑浏览器测试用例',
@@ -284,6 +290,9 @@ export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   requestId: '操作编号',
   page: '当前页面',
   browserTest: '浏览器测试授权',
+  functionalTest: FUNCTIONAL_TEST_COPY.scope,
+  executionIds: FUNCTIONAL_TEST_COPY.execution,
+  proposal: FUNCTIONAL_TEST_COPY.revision,
   fields: '表单字段',
   write: '允许发送的请求',
   path: '页面路径',

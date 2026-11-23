@@ -1,7 +1,9 @@
 import {
   type AssistantConversationDTO,
   AssistantForm,
+  attachmentIdsSchema,
   browserTestScopeSchema,
+  functionalTestScopeSchema,
   TaskStatus,
   WorktreeStatus,
 } from '@aw/shared';
@@ -200,10 +202,11 @@ export function HomePage() {
   const conversations = useQuery(conversationsQuery);
   const search = route.useSearch();
   const pendingForm = usePendingForm(AssistantForm.StartTask);
-  const browserTest =
-    pendingForm !== undefined && pendingForm.seq === search.formSeq
-      ? browserTestScopeSchema.parse(pendingForm.values.browserTest)
-      : undefined;
+  const form = pendingForm?.seq === search.formSeq ? pendingForm?.values : undefined;
+  const browserTest = browserTestScopeSchema.optional().parse(form?.browserTest);
+  const functionalTest = functionalTestScopeSchema.optional().parse(form?.functionalTest);
+  const functionalTestAttachmentIds =
+    functionalTest === undefined ? undefined : attachmentIdsSchema.optional().parse(form?.attachmentIds);
   const navigate = route.useNavigate();
   const material = useQuery({
     ...attachmentQuery(search.knowledgeMaterial ?? ''),
@@ -238,6 +241,8 @@ export function HomePage() {
       initialWorkflowKey={search.workflow}
       initialRequirement={search.requirement}
       initialBrowserTest={browserTest}
+      initialFunctionalTest={functionalTest}
+      initialFunctionalTestAttachmentIds={functionalTestAttachmentIds}
       knowledgeDraft={
         search.knowledgeMaterial === undefined
           ? undefined

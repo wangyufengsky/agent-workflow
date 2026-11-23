@@ -1,6 +1,15 @@
 import { pathToFileURL } from 'node:url';
 import { AGENT_SKILLS_MAX, ASSISTANT_SKILLS_MAX, PromptName, SkillName } from '@aw/builtin';
-import { BashPolicy, OPENCODE_ASSISTANT_AGENT, RoleBaseAgent, readonlyBashRules, SessionAgent } from '@aw/shared';
+import {
+  BashPolicy,
+  FUNCTIONAL_TEST_NODE,
+  MCP_TOOL_PREFIX,
+  McpToolName,
+  OPENCODE_ASSISTANT_AGENT,
+  RoleBaseAgent,
+  readonlyBashRules,
+  SessionAgent,
+} from '@aw/shared';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
@@ -57,11 +66,11 @@ describe('opencode 配置生成', () => {
   it('注入应用自带的 skill 目录；各 agent 只放行分配给它的 skill，拒绝全部的规则在最前（D207、D212）', () => {
     const { skills, agent } = config(undefined);
     expect(skills).toEqual({ paths: [SKILLS_DIR] });
-    // The companion has no skill rule: it denies every tool already.
+    // Tool-free companion and delegated processing agents deny every tool already.
     const rules = Object.entries(agentSkillRules.parse(agent)).flatMap(([name, a]) =>
       a.permission.skill === undefined ? [] : [[name, a.permission.skill] as const],
     );
-    expect(rules).toHaveLength(Object.values(SessionAgent).length + 1);
+    expect(rules).toHaveLength(Object.values(SessionAgent).length + 2);
     for (const [name, rule] of rules) {
       if (rule === 'deny') continue;
       const [first, ...allowed] = Object.entries(rule);
@@ -117,6 +126,29 @@ describe('opencode 配置生成', () => {
       { permission: 'webfetch', pattern: '*', action: 'allow' },
       { permission: 'websearch', pattern: '*', action: 'allow' },
     ]);
+  });
+
+  it('按功能测试阶段授权 Skill 和专用工具，拒绝原生写入、命令与直接浏览器操作', () => {
+    for (const [node, tool] of [
+      [FUNCTIONAL_TEST_NODE.Import, McpToolName.TestCaseSave],
+      [FUNCTIONAL_TEST_NODE.Execute, McpToolName.TestCaseRun],
+      [FUNCTIONAL_TEST_NODE.Report, McpToolName.TestReportSubmit],
+    ] as const) {
+      const rules = sessionPermissionRules(SessionAgent.Executor, BashPolicy.Auto, { functionalTestNode: node });
+      expect(rules[0]).toEqual({ permission: '*', action: 'deny', pattern: '*' });
+      expect(rules.filter(({ permission }) => permission === 'skill').map(({ pattern }) => pattern)).toContain(
+        SkillName.FunctionalTesting,
+      );
+      const allowed = rules.filter(({ action }) => action === 'allow').map(({ permission }) => permission);
+      expect(allowed).toContain(`${MCP_TOOL_PREFIX}${tool}`);
+      expect(allowed).not.toContain('bash');
+      expect(allowed).not.toContain('edit');
+      expect(allowed).not.toContain(`${MCP_TOOL_PREFIX}${McpToolName.BrowserOpen}`);
+      expect(allowed).not.toContain(`${MCP_TOOL_PREFIX}${McpToolName.WriteTaskDocx}`);
+      if (node !== FUNCTIONAL_TEST_NODE.Execute) {
+        expect(allowed).not.toContain(`${MCP_TOOL_PREFIX}${McpToolName.TestCaseRun}`);
+      }
+    }
   });
 
   it('离线环境下打开网络检索只放行 webfetch（读内网网页），不放行 websearch（D168）', () => {

@@ -5,11 +5,14 @@ import {
   type BrowserTestScope,
   browserTestScopeSchema,
   canRunInBatchOrSchedule,
+  FUNCTIONAL_TEST_WORKFLOW_KEY,
+  type FunctionalTestScope,
+  functionalTestScopeSchema,
   InitiativeTemplateKind,
   type ProjectDTO,
   WorkflowKind,
 } from '@aw/shared';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { MOD_KEY } from '../../app/platform.ts';
@@ -21,6 +24,7 @@ import { ASSISTANT_COPY } from '../../copy/assistant.ts';
 import { ATTACHMENTS_COPY } from '../../copy/attachments.ts';
 import { BATCHES_COPY } from '../../copy/batches.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
+import { FUNCTIONAL_TEST_COPY } from '../../copy/functional-testing.ts';
 import { HOME_COPY as C } from '../../copy/home.ts';
 import { INITIATIVES_COPY } from '../../copy/initiatives.ts';
 import { KNOWLEDGE_COPY } from '../../copy/knowledge.ts';
@@ -34,9 +38,11 @@ import { ConversationProjectSelect } from '../assistant/conversation-project-sel
 import { UsageButton } from '../assistant/usage-line.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
 import { AttachmentList, dropFilesInto, pasteFilesInto, useAttachmentPickers } from '../attachments/attachment-bar.tsx';
+import { attachmentQuery } from '../attachments/attachments.api.ts';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
 import { useAttachmentDraft } from '../attachments/use-attachment-draft.ts';
 import { browserWriteLines, parseBrowserWriteLines } from '../browser-cases/browser-case-scope.tsx';
+import { canImportCaseAttachment, FunctionalTestFields } from '../functional-testing/functional-test-fields.tsx';
 import { AllowedWorkflowsField } from '../initiatives/allowed-workflows-field.tsx';
 import { initiativeTemplatesQuery } from '../initiatives/initiatives.queries.ts';
 import { templateChain, useStartInitiative } from '../initiatives/use-start-initiative.ts';
@@ -69,6 +75,8 @@ export function HomeComposer({
   initialWorkflowKey,
   initialRequirement,
   initialBrowserTest,
+  initialFunctionalTest,
+  initialFunctionalTestAttachmentIds,
   knowledgeDraft,
   docked,
 }: {
@@ -81,6 +89,8 @@ export function HomeComposer({
   initialWorkflowKey: string | undefined;
   initialRequirement: string | undefined;
   initialBrowserTest: BrowserTestScope | undefined;
+  initialFunctionalTest: FunctionalTestScope | undefined;
+  initialFunctionalTestAttachmentIds: string[] | undefined;
   knowledgeDraft?:
     | { attachment: AttachmentDTO | undefined; loading: boolean; error: unknown; retry(): void; dismiss(): void }
     | undefined;
@@ -104,7 +114,12 @@ export function HomeComposer({
   const input = useRef<HTMLTextAreaElement>(null);
   const focusSeq = useUiStore((s) => s.homeInputFocus);
   const material = knowledgeDraft?.attachment;
-  const files = useAttachmentDraft(knowledgeDraft === undefined ? 0 : 1);
+  const [prefillIds, setPrefillIds] = useState(() => [
+    ...new Set([...(initialFunctionalTestAttachmentIds ?? []), ...(initialFunctionalTest?.caseAttachmentIds ?? [])]),
+  ]);
+  const prefill = useQueries({ queries: prefillIds.map(attachmentQuery) });
+  const prefillAttachments = prefill.flatMap(({ data }) => (data === undefined ? [] : [data]));
+  const files = useAttachmentDraft(prefillIds.length + (knowledgeDraft === undefined ? 0 : 1));
   const context = useContextAttachments(files);
   const [flowsOpen, setFlowsOpen] = useState(false);
   const flowsId = useId();
@@ -113,27 +128,55 @@ export function HomeComposer({
   const [moreOpen, setMoreOpen] = useState(false);
   const moreId = useId();
   const browserTesting = workflowKey === BROWSER_TEST_WORKFLOW_KEY;
-  const [testTarget, setTestTarget] = useState(initialBrowserTest?.target ?? '');
-  const [testWrites, setTestWrites] = useState(
-    initialBrowserTest === undefined ? '' : browserWriteLines(initialBrowserTest),
-  );
+  const functionalTesting = workflowKey === FUNCTIONAL_TEST_WORKFLOW_KEY;
+  const [selectedCaseIds, setSelectedCaseIds] = useState(initialFunctionalTest?.caseAttachmentIds ?? []);
+  const [onFailure, setOnFailure] = useState(initialFunctionalTest?.onFailure);
+  const caseAttachments = [
+    ...prefillAttachments.filter(canImportCaseAttachment),
+    ...files.items.flatMap((item) =>
+      item.state === 'ready' && canImportCaseAttachment(item.attachment) ? [item.attachment] : [],
+    ),
+  ];
+  const caseAttachmentIds = caseAttachments.filter(({ id }) => selectedCaseIds.includes(id)).map(({ id }) => id);
+  const [approvedFunctionalScope, setApprovedFunctionalScope] = useState<string>();
+  const initialScope = initialFunctionalTest ?? initialBrowserTest;
+  const [testTarget, setTestTarget] = useState(initialScope?.target ?? '');
+  const [testWrites, setTestWrites] = useState(initialScope === undefined ? '' : browserWriteLines(initialScope));
   const [testApproved, setTestApproved] = useState(false);
   const testScope = browserTestScopeSchema.safeParse({
     target: testTarget,
     writes: parseBrowserWriteLines(testWrites),
   });
+  const functionalScope = functionalTestScopeSchema.safeParse({
+    target: testTarget.trim(),
+    writes: parseBrowserWriteLines(testWrites),
+    caseAttachmentIds,
+    onFailure,
+  });
+  const functionalApprovalKey = JSON.stringify([projectId, testTarget, testWrites, caseAttachmentIds, onFailure]);
+  const functionalApproved = approvedFunctionalScope === functionalApprovalKey;
   const task = useStartTask({
     projectId,
     workflowId: workflows.data?.find((w) => w.key === workflowKey)?.id,
     requirement: text,
-    attachmentIds: material === undefined ? files.ids : [material.id, ...files.ids],
-    attachmentsBlocked: files.blocked || (knowledgeDraft !== undefined && material === undefined),
-    requirements: checklist,
+    attachmentIds: [...new Set([...(material === undefined ? [] : [material.id]), ...prefillIds, ...files.ids])],
+    attachmentsBlocked:
+      files.blocked ||
+      prefillAttachments.length !== prefillIds.length ||
+      (knowledgeDraft !== undefined && material === undefined),
+    requirements: functionalTesting ? [] : checklist,
     browserTest: browserTesting && testApproved && testScope.success ? testScope.data : undefined,
-    browserTestBlocked: browserTesting && (!testApproved || !testScope.success),
+    functionalTest:
+      functionalTesting && functionalApproved && functionalScope.success ? functionalScope.data : undefined,
+    browserTestBlocked:
+      (browserTesting && (!testApproved || !testScope.success)) ||
+      (functionalTesting && (!functionalApproved || !functionalScope.success)),
     onStarted: () => {
       files.clear();
       setChecklist([]);
+      setSelectedCaseIds([]);
+      setPrefillIds([]);
+      setApprovedFunctionalScope(undefined);
       setTestApproved(false);
     },
   });
@@ -344,6 +387,27 @@ export function HomeComposer({
           </div>
         )}
         <AttachmentList draft={files} />
+        {prefillIds.length > 0 && (
+          <div className="col">
+            <SentAttachments attachments={prefillAttachments} />
+            {prefill.map((attachment, index) => {
+              const id = prefillIds[index];
+              return id === undefined ? null : (
+                <div key={id} className="row wrap">
+                  {attachment.isPending && <span className="hint">{COMMON_COPY.loading}</span>}
+                  {attachment.isError && <ErrorState error={attachment.error} />}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setPrefillIds((items) => items.filter((item) => item !== id))}
+                  >
+                    {FUNCTIONAL_TEST_COPY.removeAttachment(attachment.data?.name ?? id)}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {browserTesting && (
           <fieldset className="col">
             <legend>{workflow?.name}</legend>
@@ -384,9 +448,37 @@ export function HomeComposer({
             </label>
           </fieldset>
         )}
+        {functionalTesting && (
+          <FunctionalTestFields
+            target={testTarget}
+            writes={testWrites}
+            attachments={caseAttachments}
+            caseIds={caseAttachmentIds}
+            onFailure={onFailure}
+            approved={functionalApproved}
+            valid={functionalScope.success}
+            onTargetChange={(value) => {
+              setTestTarget(value);
+              setApprovedFunctionalScope(undefined);
+            }}
+            onWritesChange={(value) => {
+              setTestWrites(value);
+              setApprovedFunctionalScope(undefined);
+            }}
+            onCaseChange={(id, checked) => {
+              setSelectedCaseIds((ids) => (checked ? [...ids, id] : ids.filter((item) => item !== id)));
+              setApprovedFunctionalScope(undefined);
+            }}
+            onFailureChange={(value) => {
+              setOnFailure(value);
+              setApprovedFunctionalScope(undefined);
+            }}
+            onApprovalChange={(value) => setApprovedFunctionalScope(value ? functionalApprovalKey : undefined)}
+          />
+        )}
         {workflow !== undefined && (
           <div className={styles.taskTools}>
-            <ChecklistField drafts={checklist} onChange={setChecklist} />
+            {!functionalTesting && <ChecklistField drafts={checklist} onChange={setChecklist} />}
             {task.pro && project !== undefined && (
               <button
                 type="button"
@@ -439,6 +531,7 @@ export function HomeComposer({
             onPick={(key) => {
               setWorkflowKey(key);
               setTestApproved(false);
+              setApprovedFunctionalScope(undefined);
               setTemplateKey(undefined);
               setBreakdown(false);
               setFlowsOpen(false);

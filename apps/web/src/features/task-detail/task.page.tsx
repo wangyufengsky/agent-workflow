@@ -24,12 +24,15 @@ import { ARTIFACT_COPY } from '../../copy/artifacts.ts';
 import { PREVIEW_PANE_COPY } from '../../copy/browser.ts';
 import { BROWSER_CASE_COPY } from '../../copy/browser-cases.ts';
 import { COMMON_COPY } from '../../copy/common.ts';
+import { FUNCTIONAL_TEST_COPY } from '../../copy/functional-testing.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { TASK_CODE_REVIEW_COPY } from '../../copy/task-code-review.ts';
 import { TASK_RESULT_COPY as R } from '../../copy/task-results.ts';
 import { BROWSER_TEST_COPY, TASK_COPY as C } from '../../copy/tasks.ts';
 import { ArtifactWorkbench } from '../artifacts/artifact-workbench.tsx';
 import { TaskBrowserCase } from '../browser-cases/task-browser-case.tsx';
+import { FunctionalTestWorkbench } from '../functional-testing/functional-test-workbench.tsx';
+import { FunctionalTestSourceLinks } from '../functional-testing/test-follow-up.tsx';
 import { InboxCard } from '../inbox/inbox-card.tsx';
 import { FrontendRoundHistory, FrontendWorkbench } from '../preview/frontend-workbench.tsx';
 import { BrowserTestPane, PreviewPane } from '../preview/preview-pane.tsx';
@@ -97,7 +100,7 @@ function StepsMain(props: MainProps) {
   const [adjusting, setAdjusting] = useState(false);
   const paused = task.status === TaskStatus.Paused;
   const failed = task.status === TaskStatus.Failed;
-  if (paused && adjusting && task.plan !== null) {
+  if (paused && adjusting && task.plan !== null && task.functionalTest === undefined) {
     const base = task.draftPlan ?? task.plan;
     const lock = {
       base: task.plan.graph,
@@ -208,7 +211,7 @@ export function TaskPage() {
   const [readFollowTask, setReadFollowTask] = useState<string>();
   const [siteTask, setSiteTask] = useState<string>();
   const [visitedCanvas, setVisitedCanvas] = useState<string>();
-  const { node, details, requirement, artifactVersion } = route.useSearch();
+  const { node, details, requirement, artifactVersion, testExecution } = route.useSearch();
   const navigate = route.useNavigate();
   const task = useQuery({
     ...taskQuery(taskId),
@@ -267,6 +270,7 @@ export function TaskPage() {
     </div>
   );
   const browserTest = task.data.browserTest !== undefined;
+  const functionalTest = task.data.functionalTest !== undefined;
   const configuredPreview =
     project.data?.preview != null &&
     task.data.git.worktreeStatus === WorktreeStatus.Ready &&
@@ -276,6 +280,7 @@ export function TaskPage() {
     !reviewOpen &&
     !workbench &&
     !browserTest &&
+    !functionalTest &&
     task.data.workflow.deliverable === WorkflowDeliverable.CodeChanges &&
     (task.data.git.worktreeStatus === WorktreeStatus.Ready || task.data.status === TaskStatus.Completed);
   const needsPlan = [TaskStatus.Draft, TaskStatus.Preparing, TaskStatus.Planning, TaskStatus.PlanReview].some(
@@ -284,12 +289,13 @@ export function TaskPage() {
   const hasViews =
     (!needsPlan && (workbench || artifactOpen || code || reviewOpen || proposal !== undefined)) ||
     browserTest ||
+    functionalTest ||
     configuredPreview;
   const canvas =
     hasViews &&
     (view === 'progress' ||
       (view === undefined &&
-        ((needsPlan && !workbench && !artifactOpen && !browserTest) ||
+        ((needsPlan && !workbench && !artifactOpen && !browserTest && !functionalTest) ||
           node !== undefined ||
           requirement !== undefined ||
           task.data.status === TaskStatus.Failed ||
@@ -297,21 +303,30 @@ export function TaskPage() {
   if (canvas && visitedCanvas !== taskId) setVisitedCanvas(taskId);
   const siteSelected = view === 'preview' || (canvas && siteTask === taskId);
   const watchingTest = browserTest && !canvas && hasViews;
-  const resultLabel = reviewOpen
-    ? task.data.workflow.key === VERSION_REVIEW_WORKFLOW_KEY
-      ? TASK_CODE_REVIEW_COPY.diff
-      : TASK_CODE_REVIEW_COPY.source
-    : proposal
-      ? TASK_CODE_REVIEW_COPY.proposal
-      : artifactOpen
-        ? R.document
-        : browserTest
-          ? BROWSER_TEST_COPY.browser
-          : code && !needsPlan
-            ? R.code
-            : PREVIEW_PANE_COPY.tabPreview;
+  const resultLabel = functionalTest
+    ? FUNCTIONAL_TEST_COPY.workbench
+    : reviewOpen
+      ? task.data.workflow.key === VERSION_REVIEW_WORKFLOW_KEY
+        ? TASK_CODE_REVIEW_COPY.diff
+        : TASK_CODE_REVIEW_COPY.source
+      : proposal
+        ? TASK_CODE_REVIEW_COPY.proposal
+        : artifactOpen
+          ? R.document
+          : browserTest
+            ? BROWSER_TEST_COPY.browser
+            : code && !needsPlan
+              ? R.code
+              : PREVIEW_PANE_COPY.tabPreview;
   const resultPanel = (reading = false, frame?: BrowserFrame) =>
-    needsPlan && !hasViews && !workbench && !artifactOpen && !reviewOpen ? (
+    functionalTest ? (
+      <FunctionalTestWorkbench
+        key={`${taskId}:${testExecution ?? ''}`}
+        task={task.data}
+        active={!canvas && !reading}
+        linkedExecutionId={testExecution}
+      />
+    ) : needsPlan && !hasViews && !workbench && !artifactOpen && !reviewOpen ? (
       <TaskMain task={task.data} selection={selection} pro={pro} />
     ) : artifactOpen ? (
       <ArtifactWorkbench
@@ -412,6 +427,7 @@ export function TaskPage() {
       artifactOpen ||
       (needsPlan && task.data.workflow.deliverable === WorkflowDeliverable.CodeChanges)) &&
     !browserTest &&
+    !functionalTest &&
     !reviewOpen ? (
       <TaskReadFollow
         key={taskId}
@@ -438,7 +454,8 @@ export function TaskPage() {
         details={isPro ? undefined : details === true}
         onDetailsChange={(on) => void navigate({ search: (prev) => ({ ...prev, details: on }), replace: true })}
       />
-      {task.data.browserCaseHandoff !== undefined && !watchingTest && (
+      <FunctionalTestSourceLinks task={task.data} />
+      {task.data.browserCaseHandoff !== undefined && !functionalTest && !watchingTest && (
         <div className="row">
           <strong>{BROWSER_CASE_COPY.handoff.heading}</strong>
           <Button size="sm" onClick={() => void navigate({ search: (prev) => ({ ...prev, view: 'preview' }) })}>
@@ -465,7 +482,9 @@ export function TaskPage() {
           )}
         </div>
       )}
-      {requirement !== undefined && !hasVisibleChecklist(task.data) && <RequirementsSection task={task.data} />}
+      {!functionalTest && requirement !== undefined && !hasVisibleChecklist(task.data) && (
+        <RequirementsSection task={task.data} />
+      )}
       {repositoryDocument && <DeliveryOutcome task={task.data} />}
       {repositoryDocument && task.data.status === TaskStatus.Completed && task.data.pullRequest !== null && (
         <RemoteDeliveryStatus task={task.data} />

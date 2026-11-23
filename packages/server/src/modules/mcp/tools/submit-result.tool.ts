@@ -1,4 +1,5 @@
 import {
+  type AttemptDTO,
   AttemptKind,
   ErrorCode,
   McpToolName,
@@ -10,7 +11,11 @@ import type { DebugService } from '../../debug/index.ts';
 import type { TasksService } from '../../tasks/index.ts';
 import { defineMcpTool } from '../mcp.registry.ts';
 
-export const submitResultTool = (tasks: TasksService, debug: DebugService) =>
+export const submitResultTool = (
+  tasks: TasksService,
+  debug: DebugService,
+  assertFunctionalSubmission: (attempt: AttemptDTO) => void,
+) =>
   defineMcpTool({
     name: McpToolName.SubmitResult,
     description:
@@ -25,10 +30,11 @@ export const submitResultTool = (tasks: TasksService, debug: DebugService) =>
       [ErrorCode.McpToolNotAllowed]:
         'Use the submission tool named in your step instructions. Only code, version and security review steps can send code_review.',
     },
-    handler: async (input, { attempt }) =>
-      attempt.taskId === null
-        ? debug.submitResult(attempt, input)
-        : { accepted: true as const, next: await tasks.submitResult(attempt, input) },
+    handler: async (input, { attempt }) => {
+      if (attempt.taskId === null) return debug.submitResult(attempt, input);
+      assertFunctionalSubmission(attempt);
+      return { accepted: true as const, next: await tasks.submitResult(attempt, input) };
+    },
   });
 
 export const submitBrowserReportTool = (tasks: TasksService) =>

@@ -37,7 +37,8 @@ The app and its task data run locally. **Local-first does not mean offline infer
 
 | Area | Capabilities |
 | --- | --- |
-| Coding workflows | 11 built-in workflows: features, bug fixes, unit tests, code review, refactoring, version comparison review, security review, warning cleanup, solution design, detailed design, and requirements breakdown. Review and design workflows are read-only. |
+| Coding workflows | Built-in workflows include features, bug fixes, unit tests, code review, refactoring, version comparison review, security review, warning cleanup, solution design, detailed design, requirements breakdown, and functional testing. Review and design workflows are read-only. |
+| Functional testing | Generate cases for a module or import Markdown, text, Word, and Excel cases. Follow requests and evidence per case, inspect revisions, and create linked fixes and reruns from the report. |
 | Verification | Project checks such as tests and lint, AI review, acceptance checklists, and optional browser-based page checks. Inspect the results before merging. |
 | Parallel work | Independent tasks, batch runs, scheduled workflows, and larger initiatives split into stages and work packages. Scheduled execution still leaves merging to you. |
 | Delivery | File diffs, local merge strategies, GitHub PRs / GitLab MRs, and a feedback loop for selected review comments. |

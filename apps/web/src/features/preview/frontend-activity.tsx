@@ -1,11 +1,16 @@
-import { InboxKind, type TaskDetailDTO } from '@aw/shared';
+import { InboxKind, type TaskDetailDTO, UiMode } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
+import { ROUTES } from '../../app/routes.ts';
+import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { FRONTEND_COPY as C } from '../../copy/frontend.ts';
+import { TASK_COPY } from '../../copy/tasks.ts';
 import { InboxCard } from '../inbox/inbox-card.tsx';
+import { useSettings } from '../settings/settings.queries.ts';
 import { ConversationStream } from '../stream/conversation-stream.tsx';
 import { nodeQuery } from '../tasks/tasks.queries.ts';
 import styles from './frontend-workbench.module.css';
@@ -15,6 +20,7 @@ export function FrontendActivity({
   inMain,
   starting,
   showInbox = true,
+  nodeId,
   buildingTitle = C.building,
   buildingHint = C.waitingHint,
 }: {
@@ -22,17 +28,24 @@ export function FrontendActivity({
   inMain: boolean;
   starting: boolean;
   showInbox?: boolean;
+  nodeId?: string;
   buildingTitle?: string;
   buildingHint?: string;
 }) {
   const [step, setStep] = useState('');
+  const [detailAttempt, setDetailAttempt] = useState<string>();
+  const pro = useSettings()['ui.mode'] === UiMode.Pro;
   const executed = task.nodes.filter((item) => item.attemptCount > 0);
-  const selected = executed.find((item) => item.id === step);
+  const selected = executed.find((item) => item.id === (nodeId ?? step));
   const active = task.activeAttempts.reduce<(typeof task.activeAttempts)[number] | undefined>((latest, attempt) => {
-    if (selected !== undefined && attempt.nodeId !== selected.id) return latest;
+    const target = nodeId ?? selected?.id;
+    if (target !== undefined && attempt.nodeId !== target) return latest;
     return latest === undefined || attempt.startedAt >= latest.startedAt ? attempt : latest;
   }, undefined);
-  const node = selected ?? task.nodes.find((item) => item.id === active?.nodeId) ?? executed.at(-1);
+  const node =
+    selected ??
+    task.nodes.find((item) => item.id === active?.nodeId) ??
+    (nodeId === undefined ? executed.at(-1) : undefined);
   const history = useQuery({
     ...nodeQuery(task.id, node?.id ?? ''),
     enabled: active === undefined && node !== undefined,
@@ -56,7 +69,7 @@ export function FrontendActivity({
       {inbox.map((item) => (
         <InboxCard key={item.id} item={item} showTask={false} />
       ))}
-      {executed.length > 1 && (
+      {nodeId === undefined && executed.length > 1 && (
         <select
           className="input"
           aria-label={C.activityStep}
@@ -75,8 +88,24 @@ export function FrontendActivity({
         <ConversationStream
           key={selected ? `selected:${attempt.id}` : attempt.id}
           attemptId={attempt.id}
-          title={node?.title ?? C.activity}
-          pro={false}
+          title={attempt.nodeId === null ? C.activity : node?.title}
+          pro={pro}
+          actions={
+            attempt.nodeId === null ? (
+              <button type="button" className="btn secondary sm" onClick={() => setDetailAttempt(attempt.id)}>
+                {TASK_COPY.viewNodePage}
+              </button>
+            ) : (
+              <Link
+                to={ROUTES.node}
+                params={{ taskId: task.id, nodeId: attempt.nodeId }}
+                search={{ attempt: attempt.id }}
+                className="btn secondary sm"
+              >
+                {TASK_COPY.viewNodePage}
+              </Link>
+            )
+          }
           size={inMain ? 'card' : 'side'}
           initiallyExpanded={selected !== undefined}
           showLastActivity
@@ -86,6 +115,11 @@ export function FrontendActivity({
       ) : (
         <p className="hint">{history.fetchStatus === 'fetching' ? COMMON_COPY.loading : C.noActivity}</p>
       )}
+      <Dialog open={detailAttempt !== undefined} onOpenChange={() => setDetailAttempt(undefined)} title={C.activity}>
+        {detailAttempt !== undefined && (
+          <ConversationStream attemptId={detailAttempt} title={C.activity} pro={pro} size="page" initiallyExpanded />
+        )}
+      </Dialog>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import {
   AppError,
   ErrorCode,
   type ExternalMcpStatus,
+  OPENCODE_DOCUMENT_AGENT,
   OPENCODE_IMAGE_AGENT,
   type PermissionDecision,
   type PermissionRule,
@@ -88,6 +89,7 @@ export type OpencodeClient = {
   runCommand(input: SessionRequest & Pick<PromptInput, 'agent' | 'model' | 'text' | 'messageId'>): Promise<void>;
   /** 助手按请求关联完成；接受与结束分开，消息不必等模型整轮结束才清空草稿。 */
   promptAssistant(input: PromptInput & { messageId: string }): AssistantPrompt;
+  promptDocument(input: SessionRequest & Pick<PromptInput, 'system' | 'model' | 'text'>): Promise<string>;
   promptImage(input: ImagePromptInput): Promise<string>;
   abort(input: SessionRequest): Promise<void>;
   /** Already missing sessions count as deleted, so interrupted cleanup can be retried. */
@@ -290,6 +292,27 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
           return data[sessionId]?.type === 'busy' || data[sessionId]?.type === 'retry';
         },
       };
+    },
+    async promptDocument({ sessionId, directory, model, system, text, signal }) {
+      const { data } = await request('session.prompt', () =>
+        runtime.sdk().session.prompt(
+          {
+            sessionID: sessionId,
+            directory,
+            agent: OPENCODE_DOCUMENT_AGENT,
+            ...(system === undefined ? {} : { system }),
+            ...(model === undefined ? {} : { model: { providerID: model.providerId, modelID: model.modelId } }),
+            parts: [{ type: 'text', text }],
+          },
+          requestOptions(signal),
+        ),
+      );
+      if ('error' in data.info && data.info.error !== undefined)
+        throw new AppError(ErrorCode.OpencodeRequestFailed, 'The document model returned an error');
+      return data.parts
+        .flatMap((p) => (p.type === 'text' ? [p.text] : []))
+        .join('\n')
+        .trim();
     },
     async promptImage({ sessionId, directory, model, question, image, signal }) {
       const { data } = await request('session.prompt', () =>

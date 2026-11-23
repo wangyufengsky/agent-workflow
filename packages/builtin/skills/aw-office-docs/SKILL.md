@@ -37,3 +37,5 @@ To change an attached workbook, `agent-workflow-app_edit_xlsx` applies operation
 ## What a changed file lost
 
 `edit_xlsx` and `revise_docx` return `lost`: what the new file does not carry over (charts, pictures, pivot tables, headers and footers, comments; formulas whose references no longer match after rows or columns moved). When `lost` is not empty, tell the user in one sentence what is missing and that the original is unchanged. When keeping those parts matters to them, suggest they make the change in Word or Excel themselves.
+
+For focused extraction, structured summaries or verification of an attachment, use `agent-workflow-app_process_document` with the exact attachment and the user's question. Use its source references for quotes and ranges. To publish or revise a version in a document task, use that task's artifact tools.

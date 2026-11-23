@@ -65,6 +65,8 @@ export const OPENCODE_AGENT_NAME = {
 } as const satisfies Record<SessionAgent, string>;
 /** The app assistant's agent (15 §2); not a role base agent. */
 export const OPENCODE_ASSISTANT_AGENT = 'aw-assistant';
+export const OPENCODE_FUNCTIONAL_TEST_AGENT = 'aw-functional-tester';
+export const OPENCODE_DOCUMENT_AGENT = 'aw-document-processor';
 export const OPENCODE_IMAGE_AGENT = 'aw-image-reader';
 export const OPENCODE_COMPANION_AGENT = 'aw-companion';
 export const COMPANION_WHISPER_TIMEOUT_MS = 60_000;

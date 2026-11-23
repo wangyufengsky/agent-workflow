@@ -110,6 +110,13 @@ const APP_TOOL_LABEL: Record<McpToolName, string> = {
   [McpToolName.BrowserLogs]: '查看控制台',
   [McpToolName.BrowserViewport]: '切换尺寸',
   [McpToolName.AnalyzeImage]: '图像处理员',
+  [McpToolName.ProcessDocument]: '文档处理员',
+  [McpToolName.TestCaseSave]: '保存功能测试用例',
+  [McpToolName.TestCaseRun]: '执行功能测试用例',
+  [McpToolName.TestCaseRevise]: '修订功能测试用例',
+  [McpToolName.TestRunRead]: '读取功能测试实况',
+  [McpToolName.TestEnvironmentPrepare]: '准备功能测试环境',
+  [McpToolName.TestReportSubmit]: '发布功能测试报告',
   [McpToolName.BrowserScreenshot]: '截图',
 };
 

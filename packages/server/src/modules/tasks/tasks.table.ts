@@ -1,4 +1,4 @@
-import type { BrowserCase, BrowserTestScope, TaskFailedPhase, TaskStatus } from '@aw/shared';
+import type { BrowserCase, BrowserTestScope, FunctionalTestScope, TaskFailedPhase, TaskStatus } from '@aw/shared';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { projectsTable } from '../projects/projects.table.ts';
 import { workflowsTable } from '../workflows/workflows.table.ts';
@@ -22,6 +22,9 @@ export const tasksTable = sqliteTable(
     title: text('title').notNull(),
     requirement: text('requirement').notNull(),
     browserTest: text('browser_test', { mode: 'json' }).$type<BrowserTestScope>(),
+    functionalTest: text('functional_test', { mode: 'json' }).$type<FunctionalTestScope>(),
+    /** Follow-up tasks start at the exact revision selected from the functional test report. */
+    testStartCommit: text('test_start_commit'),
     browserCase: text('browser_case', { mode: 'json' }).$type<BrowserCase>(),
     /** 创建任务时固定的用户 Skill（JSON）。 */
     skills: text('skills').notNull().default('[]'),
@@ -58,4 +61,17 @@ export const tasksTable = sqliteTable(
 export const appCountersTable = sqliteTable('app_counters', {
   name: text('name').primaryKey(),
   value: integer('value').notNull(),
+});
+
+/** Durable relation between a test and one repair or rerun, including its source evidence. */
+export const testFollowupsTable = sqliteTable('test_followups', {
+  taskId: text('task_id')
+    .primaryKey()
+    .references(() => tasksTable.id, { onDelete: 'cascade' }),
+  sourceId: text('source_id')
+    .notNull()
+    .references(() => tasksTable.id, { onDelete: 'cascade' }),
+  kind: text('kind').$type<'repair' | 'rerun'>().notNull(),
+  executions: text('executions', { mode: 'json' }).$type<string[]>().notNull(),
+  requestKey: text('request_key').notNull().unique(),
 });

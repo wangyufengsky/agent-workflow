@@ -49,7 +49,8 @@ export function PlanReview({ task, pro }: { task: TaskDetailDTO; pro: boolean })
   const [editing, setEditing] = useState(false);
   const { plan } = task;
   if (plan === null) return null;
-  if (editing) return <TaskPlanEditor task={task} base={plan} onDone={() => setEditing(false)} />;
+  if (editing && task.functionalTest === undefined)
+    return <TaskPlanEditor task={task} base={plan} onDone={() => setEditing(false)} />;
   const sendFeedback = (e: FormEvent) => {
     e.preventDefault();
     replan.mutate({ id: task.id, feedback: feedback.trim() }, { onSuccess: () => setFeedback('') });
@@ -92,7 +93,7 @@ export function PlanReview({ task, pro }: { task: TaskDetailDTO; pro: boolean })
                 {C.savePlanTemplate}
               </Link>
             )}
-            {pro && (
+            {pro && task.functionalTest === undefined && (
               <Button icon="edit" onClick={() => setEditing(true)}>
                 {C.editPlan}
               </Button>

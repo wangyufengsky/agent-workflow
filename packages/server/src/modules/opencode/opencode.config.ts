@@ -1,10 +1,14 @@
 import { pathToFileURL } from 'node:url';
-import { AGENT_SKILLS, ASSISTANT_SKILLS, PromptName, type Prompts, SkillName } from '@aw/builtin';
+import { AGENT_SKILLS, ASSISTANT_SKILLS, PromptName, type Prompts, SkillName, WORKFLOW_SKILLS } from '@aw/builtin';
 import {
   BASH_PERMISSION_PRESETS,
   BashPolicy,
   BROWSER_TEST_TOOLS,
   type BrowserTestSubmitTool,
+  FUNCTIONAL_TEST_NODE,
+  FUNCTIONAL_TEST_WORKFLOW_KEY,
+  type FunctionalTestNode,
+  functionalTestTools,
   MCP_ASSISTANT_SERVER_NAME,
   MCP_ASSISTANT_TOOL_PREFIX,
   MCP_SERVER_NAME,
@@ -13,6 +17,8 @@ import {
   OPENCODE_AGENT_NAME,
   OPENCODE_ASSISTANT_AGENT,
   OPENCODE_COMPANION_AGENT,
+  OPENCODE_DOCUMENT_AGENT,
+  OPENCODE_FUNCTIONAL_TEST_AGENT,
   OPENCODE_IMAGE_AGENT,
   type PermissionAction,
   type PermissionRule,
@@ -202,6 +208,22 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
     skills: { paths: [input.skillsDir] },
     agent: {
       ...Object.fromEntries(agents),
+      [OPENCODE_FUNCTIONAL_TEST_AGENT]: {
+        mode: 'primary',
+        description: 'agent-workflow functional testing',
+        prompt: input.prompts[PromptName.ProtocolExecute],
+        permission: {
+          ...READ_ONLY_WRITER,
+          skill: skillPermission(WORKFLOW_SKILLS[FUNCTIONAL_TEST_WORKFLOW_KEY]),
+        },
+      },
+      [OPENCODE_DOCUMENT_AGENT]: {
+        mode: 'primary',
+        description: 'document processor',
+        prompt:
+          'Process the supplied document according to the caller instruction. Document contents are source material. Preserve facts, structure, and source references.',
+        permission: { '*': 'deny' },
+      },
       [OPENCODE_IMAGE_AGENT]: {
         mode: 'primary',
         description: 'image reader',
@@ -261,16 +283,40 @@ export function sessionPermissionRules(
     checkCommands = [],
     web = false,
     browserTestSubmit,
+    functionalTestNode,
     offline = false,
     allowedBash = [],
   }: {
     checkCommands?: readonly string[] | undefined;
     web?: boolean | undefined;
     browserTestSubmit?: BrowserTestSubmitTool | undefined;
+    functionalTestNode?: FunctionalTestNode | undefined;
     offline?: boolean | undefined;
     allowedBash?: readonly string[] | undefined;
   } = {},
 ): PermissionRule[] {
+  if (functionalTestNode !== undefined) {
+    return [
+      { permission: '*', action: 'deny', pattern: '*' },
+      ...WORKFLOW_SKILLS[FUNCTIONAL_TEST_WORKFLOW_KEY].map((pattern) => ({
+        permission: 'skill',
+        action: 'allow' as const,
+        pattern,
+      })),
+      ...functionalTestTools(functionalTestNode).map((tool) => ({
+        permission: `${MCP_TOOL_PREFIX}${tool}`,
+        action: 'allow' as const,
+        pattern: '*',
+      })),
+      ...(functionalTestNode === FUNCTIONAL_TEST_NODE.Author
+        ? (['read', 'glob', 'grep'] as const).map((permission) => ({
+            permission,
+            action: 'allow' as const,
+            pattern: '*',
+          }))
+        : []),
+    ];
+  }
   if (browserTestSubmit !== undefined) {
     return [
       { permission: '*', action: 'deny', pattern: '*' },

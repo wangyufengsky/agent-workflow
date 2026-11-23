@@ -330,6 +330,13 @@
       "when": 1794894841180,
       "tag": "0046_assistant_browser_activity",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1795402757922,
+      "tag": "0047_functional_test_scope",
+      "breakpoints": true
     }
   ]
 }

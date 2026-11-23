@@ -22,7 +22,7 @@ export function PausedBanner({ task, pro, onAdjust }: { task: TaskDetailDTO; pro
         )}
         {confirm.isError && <ErrorState error={confirm.error} />}
       </div>
-      {pro && (
+      {pro && task.functionalTest === undefined && (
         <div className="actions">
           {draft !== null && (
             <Button

@@ -11,6 +11,7 @@ import {
   type CheckUnrunnableReason,
   ErrorCode,
   InboxKind,
+  isFunctionalTestNode,
   MCP_TOOL_PREFIX,
   McpToolName,
   NodeEvent,
@@ -390,6 +391,7 @@ export function createNodeRunner(deps: NodesServiceDeps, { repo, get, move }: No
         system: role.prompt,
         prompt,
         ...(ctx.browserTest === true ? { browserTestSubmit: submitTool } : {}),
+        ...(ctx.functionalTest === true && isFunctionalTestNode(node.key) ? { functionalTestNode: node.key } : {}),
         // A step of a read-only role (the code review's reviewer) may run the project check like a review (D51).
         checkCommands: ctx.checkCommand === null ? [] : [ctx.checkCommand],
       });

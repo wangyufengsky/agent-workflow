@@ -32,7 +32,7 @@ test('简单模式：侧栏 7 项、顶栏没有主题切换；「直接开始�
   const more = page.getByRole('list', { name: '更多流程' });
   await expect(more).toBeHidden();
   await panel.getByRole('button', { name: /^更多流程/ }).click();
-  await expect(more.getByRole('button')).toHaveCount(8);
+  await expect(more.getByRole('button', { name: '功能测试', exact: true })).toBeVisible();
   await expect(more.getByRole('button', { name: /浏览器测试/ })).toBeVisible();
   await more.getByRole('button', { name: /浏览器测试/ }).click();
   const submitBrowserTest = page.getByRole('main').getByRole('button', { name: /^开始(?:\s|$)/ });

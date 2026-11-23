@@ -6,6 +6,7 @@ import {
   CODE_REVIEW_WORKFLOW_KEY,
   DESIGN_PROPOSAL_WORKFLOW_KEY,
   FRONTEND_WORKFLOW_KEY,
+  FUNCTIONAL_TEST_WORKFLOW_KEY,
   PROJECT_CHECK_PLACEHOLDER,
   REPOSITORY_DOCUMENT_NODE_KEY,
   REPOSITORY_DOCUMENT_WORKFLOW,
@@ -17,6 +18,7 @@ import {
   WorkflowDeliverable,
   WorkflowPlanning,
 } from '@aw/shared';
+import { createFunctionalTestTemplate } from './functional-testing.ts';
 import { BuiltinRoleKey } from './roles.ts';
 import { SkillName } from './skills.ts';
 
@@ -37,6 +39,7 @@ export const BuiltinWorkflowKey = {
   Bugfix: 'bugfix',
   UnitTests: 'unit_tests',
   BrowserTest: BROWSER_TEST_WORKFLOW_KEY,
+  FunctionalTest: FUNCTIONAL_TEST_WORKFLOW_KEY,
   CodeReview: CODE_REVIEW_WORKFLOW_KEY,
   Refactor: 'refactor',
   VersionReview: VERSION_REVIEW_WORKFLOW_KEY,
@@ -86,14 +89,15 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
     planning: WorkflowPlanning.Fixed,
     deliverable: WorkflowDeliverable.Report,
     definition: {
-      allowedRoles: [BuiltinRoleKey.Developer],
+      allowedRoles: [BuiltinRoleKey.DocumentProcessor],
       template: {
         nodes: [
           {
             key: 'write_artifact',
             title: '生成首版产物',
-            roleKey: BuiltinRoleKey.Developer,
+            roleKey: BuiltinRoleKey.DocumentProcessor,
             instructions: [
+              `先读取任务上下文，用 skill 工具加载 ${SkillName.ArtifactRevision} 以了解产物版本流程。`,
               '根据需求与资料生成一份主要产物。按用户指定格式交付；未指定时，表格用 Excel，正文用 Word。',
               '直接使用 agent-workflow_write_task_docx、agent-workflow_write_task_xlsx 或 agent-workflow_write_task_text 发布首个可审阅版本。文本工具接受 .md 或 .txt。',
               '用 agent-workflow_read_task_artifact 确认正文、数据及格式符合要求。发布后用 submit_result 总结产物和剩余问题。等待用户在同一任务提出标注。项目工作区仅作资料来源。',
@@ -189,6 +193,19 @@ export const BUILTIN_WORKFLOWS: readonly BuiltinWorkflow[] = [
       },
       checkpoints: noCheckpoints,
       defaultAcceptance: checked,
+    },
+  },
+  {
+    key: BuiltinWorkflowKey.FunctionalTest,
+    name: '功能测试',
+    description: '按模块编写或导入用例，执行接口和页面测试并交付证据报告',
+    planning: WorkflowPlanning.Fixed,
+    deliverable: WorkflowDeliverable.Report,
+    definition: {
+      allowedRoles: [BuiltinRoleKey.Tester, BuiltinRoleKey.DocumentProcessor],
+      template: createFunctionalTestTemplate(false),
+      checkpoints: noCheckpoints,
+      defaultAcceptance: unchecked,
     },
   },
   {

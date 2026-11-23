@@ -14,9 +14,11 @@ import {
   BASH_PERMISSION,
   type BrowserTestSubmitTool,
   ErrorCode,
+  type FunctionalTestNode,
   isTerminalState,
   type McpToolName,
   OPENCODE_AGENT_NAME,
+  OPENCODE_FUNCTIONAL_TEST_AGENT,
   PermissionDecision,
   type PermissionPayload,
   RoleBaseAgent,
@@ -81,11 +83,16 @@ export type StartAttemptInput = {
   /** The researcher may use the web (18 §5.1). */
   web?: boolean;
   browserTestSubmit?: BrowserTestSubmitTool;
+  functionalTestNode?: FunctionalTestNode;
   delegation?: { parentAttemptId: string; commit: string };
 };
 
 /** What re-attaching to a persisted session needs after a restart: the session state lived in memory. */
-export type ResumeInput = { agent: SessionAgent; system: string | undefined };
+export type ResumeInput = {
+  agent: SessionAgent;
+  system: string | undefined;
+  functionalTest?: boolean;
+};
 
 type ContinueInput = { id?: string; prompt: string; model?: string | null; kind?: AttemptKind } & ResumeInput;
 
@@ -265,7 +272,8 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
   /** Creates the session of a started (or just granted) attempt and sends the first message. */
   async function launch(id: string, input: StartAttemptInput): Promise<AttemptDTO> {
     record(mustFind(id), [systemEntry(TranscriptSystemEvent.AttemptStarted)]);
-    const agent = OPENCODE_AGENT_NAME[input.agent];
+    const agent =
+      input.functionalTestNode === undefined ? OPENCODE_AGENT_NAME[input.agent] : OPENCODE_FUNCTIONAL_TEST_AGENT;
     let sessionId: string;
     try {
       sessionId = await opencode.createSession({
@@ -276,6 +284,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
           checkCommands: input.checkCommands,
           web: input.web,
           browserTestSubmit: input.browserTestSubmit,
+          functionalTestNode: input.functionalTestNode,
           offline: settings.get('network.offline'),
           allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
         }),
@@ -591,7 +600,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
             taskId: attempt.taskId,
             sessionId: attempt.opencodeSessionId,
             directory: attempt.directory,
-            agent: OPENCODE_AGENT_NAME[resume.agent],
+            agent: resume.functionalTest ? OPENCODE_FUNCTIONAL_TEST_AGENT : OPENCODE_AGENT_NAME[resume.agent],
             model: attempt.model === null ? undefined : parseModelRef(attempt.model),
             system: resume.system,
           },

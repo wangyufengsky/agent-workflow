@@ -16,6 +16,7 @@ export const SKILLS_COPY = {
   scope: '使用范围',
   assistant: '应用助手',
   researcher: '知识问答研究员',
+  functionalTest: '功能测试流程',
   gitReviewer: 'Git 工作台代码审查',
   assistantOn: '在对话中手动选用，仅用于当次消息。',
   assistantOff: '未在助手中启用。',
@@ -77,6 +78,11 @@ export const SKILLS_COPY = {
 } as const;
 
 export const BUILTIN_SKILL_COPY: Readonly<Record<string, { title: string; description: string; trigger: string }>> = {
+  'aw-functional-testing': {
+    title: '功能测试',
+    description: '编写或导入用例，准备环境，执行测试并根据记录提交报告。',
+    trigger: '功能测试任务进入用例、环境、执行或报告阶段时。',
+  },
   'aw-task-requirement': {
     title: '任务需求整理',
     description: '明确范围、验收标准并选择流程。',

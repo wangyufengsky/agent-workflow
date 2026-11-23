@@ -1,4 +1,5 @@
 export { loadBuiltinRoles, loadBuiltinWorkflows, type RoleSeed, type WorkflowSeed } from './builtins.ts';
+export { createFunctionalTestTemplate } from './functional-testing.ts';
 export {
   BUILTIN_INITIATIVE_TEMPLATES,
   type BuiltinInitiativeTemplate,
@@ -24,6 +25,7 @@ export {
   SKILL_FILE,
   SKILL_MAX_BYTES,
   SkillName,
+  WORKFLOW_SKILLS,
 } from './skills.ts';
 export { SYSTEM_NODES, type SystemNode, VERIFY_NODE } from './system-nodes.ts';
 export {

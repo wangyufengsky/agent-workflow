@@ -238,6 +238,30 @@ describe('助手消息的附件（30 §5）', () => {
     return res;
   }
 
+  it('助手委派文档处理员修订已绑定的原文，保留附件并隔离其他对话', async () => {
+    const attachment = await uploaded('验收：刷新后保持已完成', 'cases.md');
+    const mine = (await t.call(createConversationOp, {})).body;
+    const other = (await t.call(createConversationOp, {})).body;
+    const api = vi.spyOn(t.fake, 'promptDocument').mockResolvedValue('刷新后，原事项仍应显示已完成。');
+    const input = { instruction: '把验收写成一句话', source: { attachment_id: attachment.id } };
+    const delegate = () =>
+      t.fake.enqueue(script().callAppTool('process_document', input), { agent: OPENCODE_ASSISTANT_AGENT });
+    delegate();
+    await say(mine.id, '修订这条用例', [attachment.id]);
+    expect(toolResult('process_document')).toMatchObject({
+      isError: false,
+      result: { text: '刷新后，原事项仍应显示已完成。', next_cursor: null },
+    });
+    expect(api.mock.calls[0]?.[0].text).toContain('验收：刷新后保持已完成');
+    delegate();
+    await say(other.id, '处理上一个对话的附件');
+    expect(toolResult('process_document', 1)).toMatchObject({
+      isError: true,
+      result: { code: ErrorCode.AttachmentNotFound },
+    });
+    expect(api).toHaveBeenCalledTimes(1);
+  });
+
   it('助手从当前对话委派 PNG 给单独配置的模型，其他对话不能读图', async () => {
     const model = { providerId: 'local', modelId: 'vision' };
     t.fake.models.push({ ...model, name: 'Vision', contextLimit: null, supportsImage: true });

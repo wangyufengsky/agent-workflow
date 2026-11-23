@@ -54,11 +54,19 @@ export const checkpointsSchema = z.object({
 });
 export type Checkpoints = z.infer<typeof checkpointsSchema>;
 
+export const FUNCTIONAL_TEST_WORKFLOW_KEY = 'functional_test';
+export const functionalTestScopeSchema = browserTestScopeSchema.extend({
+  caseAttachmentIds: attachmentIdsSchema,
+  onFailure: z.enum(['repair', 'repair_and_retest']).optional(),
+});
+export type FunctionalTestScope = z.infer<typeof functionalTestScopeSchema>;
+
 export const createTaskRequestSchema = z.object({
   projectId: z.string(),
   /** A specific workflow version. */
   workflowId: z.string(),
   browserTest: browserTestScopeSchema.optional(),
+  functionalTest: functionalTestScopeSchema.optional(),
   requirement: z.string().trim().min(1).max(REQUIREMENT_MAX_CHARS),
   /** Defaults to the requirement's first line. */
   title: z.string().trim().min(1).max(TASK_TITLE_MAX_CHARS).optional(),
@@ -245,10 +253,18 @@ export const taskSummarySchema = z.object({
 export type TaskSummaryDTO = z.infer<typeof taskSummarySchema>;
 
 /** `TaskDetailDTO` (11 §5.2). */
+export const testLinkSchema = z.object({
+  sourceId: z.string(),
+  taskId: z.string(),
+  kind: z.enum(['repair', 'rerun']),
+  executionIds: z.array(z.string()),
+});
 export const taskDetailSchema = taskSummarySchema.extend({
+  testLinks: z.array(testLinkSchema).optional(),
   browserCase: browserCaseSchema.optional(),
   browserCaseHandoff: browserCaseHandoffSchema.optional(),
   browserTest: browserTestScopeSchema.optional(),
+  functionalTest: functionalTestScopeSchema.optional(),
   skills: z.array(skillRefSchema).optional(),
   requirement: z.string(),
   failedPhase: taskFailedPhaseSchema.nullable(),

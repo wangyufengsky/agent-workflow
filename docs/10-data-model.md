@@ -860,3 +860,16 @@ items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`ex
 - `user_skills` 按 UUID 保存 `name`（唯一）、`description`、`source`（完整 SKILL.md）与 `version`（从 1 开始，内容有变化时递增）与 `assistant_enabled`（允许助手手动选用，默认开启）。
 - `project_skill_bindings` 主键为 `(project_id, workflow_key, skill_id)`，按 `position` 保存选用顺序。`role_ids` 保存精确角色 ID 的 JSON 数组，null 适用于该流程全部角色。迁移 0042 为旧选用和绑定保留原范围。外键随项目或 Skill 删除级联清理。流程下线或角色删除时，同一事务清理所涉及的绑定。若最后一个显式绑定角色被删除，则解除该条绑定。
 - 助手 JSONL 的 `user_message` 可选 `skills` 字段保存当轮选用的 `id`、`name`、`version`。
+
+## 功能测试记录（v1.6）
+
+迁移 0047 为任务保存测试目标、允许的写路径、用例附件及复测选定的提交。每个功能测试任务的用例版本、实际执行、带递增序号的事件及版本化报告存入 `functional_tests`。`test_followups` 按来源与目标任务关联修复、复测及执行编号，重复提交同一请求返回已有任务。旧任务的功能测试配置为空。
+
+### functional_tests · 功能测试记录
+
+| 列 | 类型 | 说明 |
+| --- | --- | --- |
+| task_id | TEXT PK、FK → tasks.id | 删除任务时级联删除 |
+| snapshot | TEXT(JSON) | 用例编号和版本、环境、执行、递增序号的脱敏事件以及 Markdown 报告版本。一次写入和相应序号同事务提交，随任务删除。 |
+
+同一任务内的执行标识唯一。原始用例版本、对应执行和报告保存至任务删除。复制复测用例和新任务的关联记录共用同一事务。应用启动时将未完成执行归为阻塞并记录需要核实的写入。

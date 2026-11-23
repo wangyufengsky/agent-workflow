@@ -3,13 +3,16 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SkillName } from '@aw/builtin';
+import { SkillName, WORKFLOW_SKILLS } from '@aw/builtin';
 import {
   BashPolicy,
+  FUNCTIONAL_TEST_NODE,
+  FUNCTIONAL_TEST_WORKFLOW_KEY,
   MCP_TOOL_PREFIX,
   McpToolName,
   OPENCODE_AGENT_NAME,
   OPENCODE_ASSISTANT_AGENT,
+  OPENCODE_FUNCTIONAL_TEST_AGENT,
   SessionAgent,
 } from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -24,9 +27,6 @@ import { AGENT_SKILLS, ASSISTANT_SKILLS, assistantPermissionRules, sessionPermis
  */
 const PROVIDER = 'aw-scripted';
 const MODEL = 'scripted';
-/** Skills planted in the repository and opencode's own: no aw session may see them (D207). */
-const FOREIGN = ['repo-agents', 'repo-claude', 'customize-opencode'];
-
 type ModelRequest = { tools?: Array<{ function: { name: string } }> };
 
 async function bodyOf(req: IncomingMessage): Promise<ModelRequest & { stream?: boolean }> {
@@ -37,10 +37,10 @@ async function bodyOf(req: IncomingMessage): Promise<ModelRequest & { stream?: b
 
 /** Records every request; `next` resolves with the next one that offers tools (an agent's turn, not a title). */
 function scriptedModel() {
-  const waiting: Array<(request: { body: ModelRequest; raw: string }) => void> = [];
+  const waiting: Array<(request: ModelRequest) => void> = [];
   const server: Server = createServer((req, res) => {
     void bodyOf(req).then((body) => {
-      if (body.tools !== undefined && body.tools.length > 0) waiting.shift()?.({ body, raw: JSON.stringify(body) });
+      if (body.tools !== undefined && body.tools.length > 0) waiting.shift()?.(body);
       const base = { id: 'chatcmpl-scripted', created: 0, model: MODEL };
       const usage = { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 };
       if (body.stream !== true) {
@@ -65,7 +65,7 @@ function scriptedModel() {
   });
   return {
     server,
-    next: () => new Promise<{ body: ModelRequest; raw: string }>((resolve) => waiting.push(resolve)),
+    next: () => new Promise<ModelRequest>((resolve) => waiting.push(resolve)),
   };
 }
 
@@ -131,6 +131,14 @@ async function turnOf(
   return request;
 }
 
+function offeredSkills(body: ModelRequest): string[] {
+  // OpenCode advertises Skill availability in a separate section of its system message.
+  const list = /<available_skills>(.*?)<\/available_skills>/.exec(JSON.stringify(body))?.[1];
+  return list === undefined
+    ? []
+    : [...list.matchAll(/<name>([^<]+)<\/name>/g)].flatMap((match) => (match[1] === undefined ? [] : [match[1]]));
+}
+
 describe('@opencode 内置 skill（41）', () => {
   it('opencode 找到应用自带的 skill，不扫描仓库里 .agents 与 .claude 下的 skill（D206、D207）', async () => {
     const { data } = await t.app.services.runtime.sdk().app.skills({ directory: repo.path }, { throwOnError: true });
@@ -151,9 +159,9 @@ describe('@opencode 内置 skill（41）', () => {
     ];
     // One after another: a request is attributed to the only agent whose turn is running.
     for (const { agent, skills, permission } of agents) {
-      const { body, raw } = await turnOf(agent, permission);
+      const body = await turnOf(agent, permission);
       const tools = (body.tools ?? []).map((tool) => tool.function.name);
-      const seen = [...Object.values(SkillName), ...FOREIGN].filter((name) => raw.includes(name));
+      const seen = offeredSkills(body);
       expect({ agent, skillTool: tools.includes('skill'), seen: seen.toSorted() }).toEqual({
         agent,
         skillTool: skills.length > 0,
@@ -161,8 +169,23 @@ describe('@opencode 内置 skill（41）', () => {
       });
     }
   });
+  it('功能测试导入会话只看到专用 Skill，不能通过命令、文件或浏览器操作测试目标', async () => {
+    const body = await turnOf(
+      OPENCODE_FUNCTIONAL_TEST_AGENT,
+      sessionPermissionRules(SessionAgent.Executor, BashPolicy.Auto, {
+        functionalTestNode: FUNCTIONAL_TEST_NODE.Import,
+      }),
+    );
+    const tools = (body.tools ?? []).map((tool) => tool.function.name);
+    const seen = offeredSkills(body);
+    expect(seen.toSorted()).toEqual([...WORKFLOW_SKILLS[FUNCTIONAL_TEST_WORKFLOW_KEY]].toSorted());
+    expect(tools).toEqual(expect.arrayContaining(['skill', `${MCP_TOOL_PREFIX}${McpToolName.ReadAttachment}`]));
+    for (const tool of ['bash', 'edit', 'read', `${MCP_TOOL_PREFIX}${McpToolName.BrowserOpen}`]) {
+      expect(tools).not.toContain(tool);
+    }
+  });
   it('浏览器测试会话可以读取识图 Skill 并调用识图工具', async () => {
-    const { body } = await turnOf(
+    const body = await turnOf(
       OPENCODE_AGENT_NAME[SessionAgent.Executor],
       sessionPermissionRules(SessionAgent.Executor, BashPolicy.Auto, {
         browserTestSubmit: McpToolName.BrowserSubmitReport,

@@ -1,4 +1,4 @@
-import { AssistantForm, AssistantPage, BROWSER_TEST_WORKFLOW_KEY } from '@aw/shared';
+import { AssistantForm, AssistantPage, BROWSER_TEST_WORKFLOW_KEY, FUNCTIONAL_TEST_WORKFLOW_KEY } from '@aw/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
@@ -53,7 +53,9 @@ export function useAssistantRequests(): void {
               const workflow = workflows.find((w) => w.id === values.workflowId)?.key;
               const projectId = text(values.projectId);
               const requirement = text(values.requirement);
-              const prefillScope = workflow === BROWSER_TEST_WORKFLOW_KEY && values.browserTest !== undefined;
+              const prefillScope =
+                (workflow === BROWSER_TEST_WORKFLOW_KEY && values.browserTest !== undefined) ||
+                (workflow === FUNCTIONAL_TEST_WORKFLOW_KEY && values.functionalTest !== undefined);
               if (prefillScope) setPendingForm({ seq: request.seq, form, values });
               // Home puts its input in「开始任务」mode with the prefill (D111), under the conversation if one is shown.
               await navigate({

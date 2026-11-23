@@ -13,7 +13,7 @@ import { AttemptView } from '../attempts/attempt-view.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { ClampedText } from '../stream/clamped-text.tsx';
 import { hasNodeActions, NodeActions } from '../task-detail/node-actions.tsx';
-import { Changes, NodeTabs, Output } from '../task-detail/node-drawer.tsx';
+import { Changes, NodeTab, NodeTabs, Output } from '../task-detail/node-drawer.tsx';
 import { NodeBadge } from '../tasks/task-badge.tsx';
 import { nodeQuery, taskQuery } from '../tasks/tasks.queries.ts';
 import styles from './node-page.module.css';
@@ -85,7 +85,7 @@ export function NodePage() {
     return (
       <div className="page" data-testid="node-page">
         {header}
-        <NodeTabs node={n} />
+        <NodeTabs node={n} tab={attemptId === undefined ? undefined : NodeTab.Process} attemptId={attemptId} />
       </div>
     );
 

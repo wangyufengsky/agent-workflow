@@ -1,24 +1,37 @@
 import {
   acceptNodeOp,
   confirmPlanOp,
+  createTaskOp,
   ErrorCode,
+  FUNCTIONAL_TEST_NODE,
+  FUNCTIONAL_TEST_WORKFLOW_KEY,
   getNodeOp,
   getTaskOp,
   listPlansOp,
   type PlanGraph,
   pauseTaskOp,
+  replanOp,
+  requestChangesOp,
   resolveInboxOp,
   resumeTaskOp,
   retryTaskOp,
   saveDraftPlanOp,
   skipNodeOp,
   type TaskDetailDTO,
+  TaskStatus,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { script } from '../../../test/fakes/fake-opencode.ts';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
-import { addProject, createTask, inboxOpens, nodeReaches, taskReaches } from '../../../test/helpers/tasks.ts';
+import {
+  addProject,
+  createTask,
+  inboxOpens,
+  nodeReaches,
+  taskReaches,
+  workflowId,
+} from '../../../test/helpers/tasks.ts';
 
 let t: TestApp;
 beforeEach(async () => {
@@ -41,6 +54,43 @@ const nodeByKey = (task: TaskDetailDTO, key: string) => {
   if (node === undefined) throw new Error(`No node ${key}`);
   return node;
 };
+
+it('功能测试保留计划确认，拒绝替换阶段或走通用改代码入口', async () => {
+  const { project } = await addProject(t);
+  const request = {
+    projectId: project.id,
+    workflowId: await workflowId(t, FUNCTIONAL_TEST_WORKFLOW_KEY),
+    requirement: '检查项目首页',
+    checkpoints: { confirm_plan: true },
+    functionalTest: { target: '/', writes: [], caseAttachmentIds: [] },
+  };
+  const invalid = await t.call(createTaskOp, {
+    ...request,
+    requirements: [{ title: '命令检查', expected: '退出码为 0', verification: { kind: 'command', command: 'true' } }],
+  });
+  expect(invalid.body).toMatchObject({ error: { code: ErrorCode.ValidationFailed } });
+  const waiting = taskReaches(t, TaskStatus.PlanReview);
+  const { body: created } = await t.call(createTaskOp, request);
+  await waiting;
+  const { body: task } = await t.call(getTaskOp, { id: created.id });
+  const replaced = edited(task, (graph) => {
+    const first = graph.nodes[0];
+    if (first !== undefined) first.roleKey = 'developer';
+  });
+  expect((await t.call(saveDraftPlanOp, { id: task.id, baseVersion: 1, graph: replaced })).body).toMatchObject({
+    error: { code: ErrorCode.NodeNotEditable },
+  });
+  expect((await t.call(replanOp, { id: task.id, feedback: '增加命令检查' })).body).toMatchObject({
+    error: { code: ErrorCode.ValidationFailed },
+  });
+  expect((await t.call(requestChangesOp, { id: task.id, reason: 'user', feedback: '改动代码' })).body).toMatchObject({
+    error: { code: ErrorCode.StateTransitionInvalid, message: 'Use functional test case revision, repair or rerun' },
+  });
+  t.fake.enqueue(script().hang());
+  expect((await t.call(confirmPlanOp, { id: task.id, version: 1 })).body).toMatchObject({
+    nodes: expect.arrayContaining([expect.objectContaining({ key: FUNCTIONAL_TEST_NODE.Author, roleKey: 'tester' })]),
+  });
+});
 
 describe('暂停调整（M5-02）', () => {
   it('暂停后只能改未开始的步骤：改已开始的步骤 409；确认新版本后重新物化，继续后按新计划执行', async () => {

@@ -215,7 +215,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
         {task.status === TaskStatus.Completed && task.lastDelivery?.strategy === DeliveryStrategy.PullRequest && (
           <RemoteDeliveryStatus task={task} />
         )}
-        <RequirementsSection task={task} />
+        {task.functionalTest === undefined && <RequirementsSection task={task} />}
         {result.assumptions.length > 0 && (
           <section className={styles.block}>
             <h3 className="sec-t">{C.assumptions}</h3>
@@ -260,7 +260,7 @@ export function ResultCard({ task }: { task: TaskDetailDTO }) {
           </section>
         )}
         {task.status === TaskStatus.Completed && task.pullRequest !== null && <ReviewComments task={task} />}
-        {task.status === TaskStatus.Review && <DeliveryActions task={task} />}
+        {task.functionalTest === undefined && task.status === TaskStatus.Review && <DeliveryActions task={task} />}
       </div>
       {browsable && (
         <DiffDialog

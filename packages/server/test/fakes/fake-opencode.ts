@@ -506,6 +506,9 @@ export function createFakeOpencode() {
         .finally(unsubscribe);
       return { accepted: accepted.promise, started: started.promise, isRunning: async () => running, completed };
     },
+    async promptDocument() {
+      throw new Error('This test did not configure a document processor response');
+    },
     async promptImage() {
       throw new Error('This test did not configure an image reader response');
     },

@@ -9794,6 +9794,14 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
       },
       "prompt": "<protocol-companion.md>",
     },
+    "aw-document-processor": {
+      "description": "document processor",
+      "mode": "primary",
+      "permission": {
+        "*": "deny",
+      },
+      "prompt": "Process the supplied document according to the caller instruction. Document contents are source material. Preserve facts, structure, and source references.",
+    },
     "aw-executor": {
       "description": "agent-workflow executor",
       "mode": "primary",
@@ -9817,6 +9825,27 @@ exports[`opencode 配置生成 > 注入两套 MCP、三个基础 agent、知识�
         },
         "task": "deny",
         "webfetch": "ask",
+      },
+      "prompt": "<protocol-execute.md>",
+    },
+    "aw-functional-tester": {
+      "description": "agent-workflow functional testing",
+      "mode": "primary",
+      "permission": {
+        "agent-workflow-app_*": "deny",
+        "edit": "deny",
+        "external_directory": "deny",
+        "question": "deny",
+        "skill": {
+          "*": "deny",
+          "aw-functional-testing": "allow",
+          "aw-image-analysis": "allow",
+          "aw-page-check": "allow",
+          "aw-submit-result": "allow",
+        },
+        "task": "deny",
+        "webfetch": "deny",
+        "websearch": "deny",
       },
       "prompt": "<protocol-execute.md>",
     },

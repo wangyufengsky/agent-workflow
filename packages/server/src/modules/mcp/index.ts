@@ -10,6 +10,8 @@ import type { AttemptsService } from '../attempts/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DebugService } from '../debug/index.ts';
 import type { DecksService } from '../decks/index.ts';
+import type { DocumentProcessor } from '../document-processor/index.ts';
+import type { FunctionalTestsService } from '../functional-tests/index.ts';
 import type { CommitDrafts, GitReviewsService } from '../git-reviews/index.ts';
 import type { ImageAnalysis } from '../image-analysis/index.ts';
 import type { InitiativesService } from '../initiatives/index.ts';
@@ -23,10 +25,12 @@ import { askUserTool } from './tools/ask-user.tool.ts';
 import { attachmentTools } from './tools/attachment.tool.ts';
 import { browserTools } from './tools/browser.tool.ts';
 import { dbDescribeTool, dbListConnectionsTool, dbQueryTool } from './tools/db-tools.tool.ts';
+import { functionalTestMcpTools } from './tools/functional-tests.tool.ts';
 import { getNodeOutputTool } from './tools/get-node-output.tool.ts';
 import { getTaskContextTool } from './tools/get-task-context.tool.ts';
 import { getTaskDiffTool } from './tools/get-task-diff.tool.ts';
 import { readOfficeFileTool } from './tools/office-file.tool.ts';
+import { processDocumentTool } from './tools/process-document.tool.ts';
 import { delegationTools } from './tools/readonly-delegation.tool.ts';
 import { reportProgressTool } from './tools/report-progress.tool.ts';
 import { createSubmissionGuides } from './tools/submission-guide.tool.ts';
@@ -49,6 +53,7 @@ export type McpModuleDeps = {
   token: string;
   attempts: AttemptsService;
   tasks: TasksService;
+  functionalTests: FunctionalTestsService;
   acceptance: AcceptanceService;
   debug: DebugService;
   knowledge: KnowledgeService;
@@ -59,6 +64,7 @@ export type McpModuleDeps = {
   initiatives: InitiativesService;
   attachments: AttachmentsService;
   imageAnalysis: ImageAnalysis;
+  documentProcessor: DocumentProcessor;
   office: Office;
   browser: BrowserService;
   /** Where an attempt's transcript and files live (29 §5.7). */
@@ -71,6 +77,7 @@ export function createMcpModule({
   token,
   attempts,
   tasks,
+  functionalTests,
   acceptance,
   debug,
   knowledge,
@@ -81,24 +88,27 @@ export function createMcpModule({
   initiatives,
   attachments,
   imageAnalysis,
+  documentProcessor,
   office,
   browser,
   filesDirOf,
   log,
 }: McpModuleDeps) {
-  const guides = createSubmissionGuides(tasks, events);
+  const guides = createSubmissionGuides(tasks, events, functionalTests.phase);
   const tools: McpToolDefinition[] = [
-    getTaskContextTool(tasks, debug),
+    getTaskContextTool(tasks, debug, functionalTests),
     guides.tool,
     getNodeOutputTool(tasks),
     getTaskDiffTool(tasks),
     ...delegationTools(tasks),
     ...attachmentTools(tasks, initiatives, attachments),
+    processDocumentTool(documentProcessor, tasks, initiatives),
     imageAnalysisTool({ imageAnalysis, attachments, attempts, browser, tasks, initiatives }),
     readOfficeFileTool(office),
     ...taskArtifactTools(tasks, office, attachments),
     submitPlanTool(tasks),
-    submitResultTool(tasks, debug),
+    submitResultTool(tasks, debug, functionalTests.assertSubmission),
+    ...functionalTestMcpTools(functionalTests),
     submitBrowserReportTool(tasks),
     submitReviewTool(acceptance),
     askUserTool(tasks),
@@ -115,7 +125,14 @@ export function createMcpModule({
     submitBreakdownTool(initiatives),
     ...browserTools({ browser, attempts, knowledge, filesDirOf, tasks }),
   ];
-  const registry = createToolRegistry(tools, attempts, log, tasks.browserTestSubmit, guides.rejected);
+  const registry = createToolRegistry(
+    tools,
+    attempts,
+    log,
+    tasks.browserTestSubmit,
+    guides.rejected,
+    functionalTests.phase,
+  );
   return {
     registry,
     operations: [implement(listMcpToolsOp, () => ({ items: registry.info() }))],

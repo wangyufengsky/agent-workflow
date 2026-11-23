@@ -21,6 +21,8 @@ import {
   listFilesInputSchema,
   openFormInputSchema,
   openPageInputSchema,
+  processDocumentDescription,
+  processDocumentInputSchema,
   querySheetInputSchema,
   readAttachmentInputSchema,
   readBrowserInputSchema,
@@ -37,6 +39,7 @@ import type { EventBus } from '../../core/event-bus.ts';
 import type { AttachmentsService } from '../attachments/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import type { DecksService } from '../decks/index.ts';
+import type { DocumentProcessor } from '../document-processor/index.ts';
 import type { ImageAnalysis } from '../image-analysis/index.ts';
 import { localTime } from './assistant.context.ts';
 import type { AssistantService } from './assistant.service.ts';
@@ -50,6 +53,7 @@ export type HelperToolDeps = {
   appStatus(): Promise<GetAppStatusOutput>;
   attachments: AttachmentsService;
   imageAnalysis: ImageAnalysis;
+  documentProcessor: DocumentProcessor;
   browser: BrowserService;
   decks: DecksService;
 };
@@ -97,6 +101,19 @@ export function helperTools(deps: HelperToolDeps): AssistantTool[] {
       input: getAppStatusInputSchema,
       mode: UiMode.Simple,
       handler: () => deps.appStatus(),
+    },
+    {
+      name: AssistantToolName.ProcessDocument,
+      description: processDocumentDescription,
+      input: processDocumentInputSchema,
+      mode: UiMode.Simple,
+      handler(input, { conversation, signal }) {
+        return deps.documentProcessor.process(
+          processDocumentInputSchema.parse(input),
+          (id) => assertOwn(conversation.id, id),
+          signal,
+        );
+      },
     },
     {
       name: AssistantToolName.AnalyzeImage,
