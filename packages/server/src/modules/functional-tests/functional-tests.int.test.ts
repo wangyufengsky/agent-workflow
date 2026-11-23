@@ -1,6 +1,9 @@
+import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import {
+  ATTACHMENT_NAME_HEADER,
   AttemptStatus,
+  attachmentSchema,
   createTaskOp,
   ErrorCode,
   FUNCTIONAL_TEST_NODE,
@@ -273,5 +276,137 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
     await testApp?.close();
     app.close();
     outside.close();
+  }
+});
+
+it('解析节点读取 Markdown、TXT、Word 表格和 Excel 多工作表，并保存原编号与出处', async () => {
+  const t = await createTestApp();
+  const mcp = await connectMcp(t.mcpUrl, t.app.mcpToken);
+  try {
+    const fixture = (name: string) => readFile(new URL(`../../../test/fixtures/office/${name}`, import.meta.url));
+    const { project } = await addProject(t);
+    const files = [
+      { name: '订单用例.md', format: 'text', bytes: Buffer.from('# ORD-01\nGET /orders 应返回 200\n') },
+      { name: '订单用例.txt', format: 'text', bytes: Buffer.from('ORD-01\nGET /orders 应返回 200\n') },
+      { name: '订单用例.docx', format: 'docx', bytes: await fixture('report.libreoffice.docx') },
+      { name: '订单用例.xlsx', format: 'xlsx', bytes: await fixture('sales.libreoffice.xlsx') },
+    ];
+    const attachments = await Promise.all(
+      files.map(async ({ name, format, bytes }) => {
+        const response = await t.request({
+          method: 'POST',
+          url: '/attachments',
+          headers: { 'content-type': 'application/octet-stream', [ATTACHMENT_NAME_HEADER]: encodeURIComponent(name) },
+          payload: bytes,
+        });
+        expect(response.statusCode).toBe(201);
+        const attachment = attachmentSchema.parse(response.json());
+        expect(attachment).toMatchObject({ name, format });
+        return attachment;
+      }),
+    );
+    const [md, txt, docx, xlsx] = attachments;
+    if (!md || !txt || !docx || !xlsx) throw new Error('Missing case attachments');
+    const attachmentIds = attachments.map(({ id }) => id);
+    const creation = await t.call(createTaskOp, {
+      projectId: project.id,
+      requirement: '从选定的四份材料导入案例',
+      workflowId: await workflowId(t, FUNCTIONAL_TEST_WORKFLOW_KEY),
+      attachmentIds,
+      functionalTest: { target: 'http://127.0.0.1:8080/orders', writes: [], caseAttachmentIds: attachmentIds },
+      start: false,
+    });
+    expect(creation.status).toBe(201);
+    const { id } = creation.body;
+    t.fake.enqueue(script().hang());
+    const started = waitForEvent(
+      t.app.events,
+      ServerEventType.AttemptUpdated,
+      ({ attempt, nodeId, taskId }) =>
+        taskId === id &&
+        attempt.status === AttemptStatus.Running &&
+        t.app.services.tasks
+          .detail(id)
+          .nodes.some((node) => node.id === nodeId && node.key === FUNCTIONAL_TEST_NODE.Import),
+    );
+    await t.call(startTaskOp, { id });
+    const { attempt } = await started;
+    const session = t.app.services.attempts.get(attempt.id).opencodeSessionId;
+    const must = async (name: McpToolName, input: Record<string, unknown> = {}) => {
+      const { isError, body } = await callTool(mcp, name, { ...input, [MCP_SESSION_ARG]: session });
+      expect(isError, JSON.stringify(body)).toBe(false);
+      return body;
+    };
+    expect((await t.call(getTaskOp, { id })).body.nodes.map(({ key }) => key)).toEqual([
+      FUNCTIONAL_TEST_NODE.Import,
+      FUNCTIONAL_TEST_NODE.Environment,
+      FUNCTIONAL_TEST_NODE.Execute,
+      FUNCTIONAL_TEST_NODE.Report,
+    ]);
+    const context = await must(McpToolName.GetTaskContext);
+    expect(context).toMatchObject({
+      task: { functionalTest: { caseAttachmentIds: attachmentIds } },
+      functionalTest: { phase: FUNCTIONAL_TEST_NODE.Import },
+    });
+
+    for (const file of [md, txt, docx]) {
+      const result = await must(McpToolName.ReadAttachment, { attachment_id: file.id });
+      expect(result.attachment_id).toBe(file.id);
+      expect(result.text).toContain(file.id === docx.id ? '| order_id | string | 订单号 |' : 'GET /orders 应返回 200');
+    }
+    const summary = await must(McpToolName.ReadSheet, { attachment_id: xlsx.id, sheet: '汇总', range: 'A3:B4' });
+    expect(summary).toMatchObject({
+      range: 'A3:B4',
+      rows: [
+        { row: 3, values: ['华东', 1384] },
+        { row: 4, values: ['华北', 707.5] },
+      ],
+    });
+    const details = await must(McpToolName.ReadSheet, { attachment_id: xlsx.id, sheet: '明细', range: 'A1:B2' });
+    expect(details).toMatchObject({ range: 'A1:B2', rows: [{ row: 1 }, { row: 2 }] });
+
+    // 脚本替代模型映射，实际文件解析和用例保存均走应用工具。
+    const sources = [
+      { attachmentId: md.id, originalId: 'ORD-01', location: '标题 ORD-01，第 1–2 行' },
+      { attachmentId: txt.id, originalId: 'ORD-01', location: '第 1–2 行' },
+      { attachmentId: docx.id, originalId: 'order_id', location: '字段表，order_id 行' },
+      { attachmentId: xlsx.id, originalId: '华东', location: '汇总!A3:B4' },
+      { attachmentId: xlsx.id, originalId: '明细-2', location: '明细!A1:B2' },
+    ];
+    for (const [index, source] of sources.entries()) {
+      const definition =
+        index < 2
+          ? {
+              steps: [
+                {
+                  kind: 'http',
+                  title: '读取订单',
+                  method: 'GET',
+                  path: '/orders',
+                  assertions: [{ field: 'status', equals: 200, basis: source.location }],
+                },
+              ],
+            }
+          : { steps: [], needsClarification: '原文件没有接口预期' };
+      await must(McpToolName.TestCaseSave, {
+        title: '导入订单案例',
+        requirement: '保留来源中的业务规则',
+        source,
+        ...definition,
+      });
+    }
+    const snapshot = (await t.call(functionalTestReadOp, { taskId: id })).body;
+    expect(snapshot.cases.map(({ source }) => source)).toEqual(sources);
+    expect(new Set(snapshot.cases.map(({ id: caseId }) => caseId)).size).toBe(sources.length);
+    expect(snapshot.cases.map(({ needsClarification }) => needsClarification !== undefined)).toEqual([
+      false,
+      false,
+      true,
+      true,
+      true,
+    ]);
+  } finally {
+    await mcp.close();
+    await t.close();
   }
 });
