@@ -2,6 +2,7 @@ import type { ProjectModuleRun } from '@aw/shared';
 import { formatDateTime } from '../../../copy/common.ts';
 import { PROJECT_MODULES_COPY as C } from '../../../copy/project-modules.ts';
 import styles from './project-modules.module.css';
+import { ServiceRuntimeEvidence } from './service-runtime-evidence.tsx';
 
 type State = ProjectModuleRun['status'] | 'discovered' | 'verified' | 'stale' | 'pending' | 'no_entry';
 
@@ -53,7 +54,11 @@ export function ModuleRecords({ runs }: { runs: readonly ProjectModuleRun[] }) {
               <div className="col">
                 {readinessLine(run) !== undefined && <p>{readinessLine(run)}</p>}
                 {run.readyUrl !== null && <code>{run.readyUrl}</code>}
-                <pre className={`mono ${styles.log}`}>{run.log || C.noLogs}</pre>
+                {run.services?.length ? (
+                  <ServiceRuntimeEvidence services={run.services} initialServiceId={run.targetServiceId} />
+                ) : (
+                  <pre className={`mono ${styles.log}`}>{run.log || C.noLogs}</pre>
+                )}
               </div>
             </details>
           </li>

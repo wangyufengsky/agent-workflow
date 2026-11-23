@@ -444,6 +444,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const requirements = createRequirementsModule({ db: database.db, clock });
   const tasks = createTasksModule({
     selectProjectModule: projectModules.select,
+    selectProjectCompound: projectModules.selectCompound,
     skills: skills.service,
     office,
     opencode,
@@ -475,6 +476,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     dataDir: config.dataDir,
   });
   const functionalTests = createFunctionalTestsModule({
+    env,
     projectDirectory: (id) => projects.service.getRecord(id).repoPath,
     db: database.db,
     rerunOrigin: (taskId) => findTestRerunOrigin(database.db, taskId),

@@ -13,6 +13,7 @@ import {
   type FunctionalTestProbe,
   type FunctionalTestRead,
   type FunctionalTestRun,
+  type FunctionalTestServiceRuntime,
   type FunctionalTestSnapshot,
   FunctionalTestStatus,
   type functionalTestCaseSaveSchema,
@@ -34,7 +35,7 @@ import type { Logger } from '../../core/logger.ts';
 import type { AttemptsService } from '../attempts/index.ts';
 import type { BrowserService } from '../browser/index.ts';
 import { runGit } from '../git/index.ts';
-import type { PreviewsService } from '../previews/index.ts';
+import { type PreviewsService, startServiceGroup } from '../previews/index.ts';
 import { executeCase } from './functional-tests.execute.ts';
 import { redactText, scopedRequest } from './functional-tests.http.ts';
 import { readIdeaConfigurations } from './functional-tests.idea.ts';
@@ -44,6 +45,7 @@ import { functionalTestRevisions } from './functional-tests.revisions.ts';
 
 type Deps = {
   db: Db;
+  env: NodeJS.ProcessEnv;
   projectDirectory: (projectId: string) => string;
   rerunOrigin: (taskId: string) => { taskId: string; executionIds: string[] } | undefined;
   unit: UnitOfWork;
@@ -83,6 +85,7 @@ function launchDetail(launch?: FunctionalTestLaunch) {
 
 export function createFunctionalTests({
   db,
+  env,
   projectDirectory,
   rerunOrigin,
   unit,
@@ -99,6 +102,8 @@ export function createFunctionalTests({
   const active = new Map<string, { attemptId: string; controller: AbortController; pending: Promise<unknown> }>();
   const ownedPreviews = new Set<string>();
   const previewLeases = new Map<string, PreviewLaunchDetails>();
+  const serviceGroups = new Map<string, Awaited<ReturnType<typeof startServiceGroup>>>();
+  const compoundServices = (taskId: string) => serviceGroups.get(taskId)?.snapshot() ?? [];
 
   function context(id: string) {
     const record = task(id);
@@ -132,6 +137,8 @@ export function createFunctionalTests({
   }
 
   const localReady = (taskId: string) => {
+    const group = serviceGroups.get(taskId);
+    if (group !== undefined) return !group.signal.aborted;
     const lease = previewLeases.get(taskId);
     return (
       lease !== undefined &&
@@ -140,6 +147,17 @@ export function createFunctionalTests({
     );
   };
   async function release(taskId: string) {
+    const group = serviceGroups.get(taskId);
+    serviceGroups.delete(taskId);
+    if (group !== undefined) {
+      await group.stop();
+      const last = repo.get(taskId).runs.at(-1);
+      if (last?.environment.targetServiceId === group.targetServiceId)
+        repo.update(taskId, (snapshot) => {
+          const run = snapshot.runs.find(({ id }) => id === last.id);
+          if (run !== undefined) run.environment.services = group.snapshot();
+        });
+    }
     const lease = previewLeases.get(taskId);
     if (previewLeases.delete(taskId)) previews.release(taskId);
     if (ownedPreviews.delete(taskId) && (lease === undefined || lease === previews.launchDetails(taskId)))
@@ -160,7 +178,7 @@ export function createFunctionalTests({
     if (event.type !== ServerEventType.TaskUpdated) return;
     const { id, status } = event.data;
     if (status !== TaskStatus.Cancelled && status !== TaskStatus.Failed) return;
-    if (active.has(id) || previewLeases.has(id) || ownedPreviews.has(id))
+    if (active.has(id) || previewLeases.has(id) || ownedPreviews.has(id) || serviceGroups.has(id))
       void stop(id).catch((err: unknown) => log.error({ err, taskId: id }, 'functional test cleanup failed'));
   });
 
@@ -186,6 +204,13 @@ export function createFunctionalTests({
       throw new AppError(ErrorCode.ValidationFailed, 'Choose a user-selected case attachment for this source');
     if (input.steps.length === 0 && input.needsClarification === undefined)
       throw new AppError(ErrorCode.ValidationFailed, 'Supply an executable step or explain the missing expectation');
+    const members = scope.compoundLaunch?.plan.services ?? [];
+    for (const step of [...input.steps, ...input.cleanup]) {
+      if (step.kind === 'http' && step.serviceId !== undefined && !members.some(({ id }) => id === step.serviceId))
+        throw new AppError(ErrorCode.ValidationFailed, 'Choose an HTTP serviceId from the pinned compound plan', {
+          serviceId: step.serviceId,
+        });
+    }
     return repo.update(taskId, (snapshot) => {
       const latest = latestCases(snapshot);
       const source = input.source;
@@ -236,16 +261,19 @@ export function createFunctionalTests({
         'Functional test execution not found',
       );
       const test = caseOf(snapshot, execution.caseId, execution.version);
-      for (const { key, path, expectedStatus } of runOf(snapshot, execution.runId).environment.checks) {
+      for (const { key, path, expectedStatus, serviceId } of runOf(snapshot, execution.runId).environment.checks) {
         if (!test.requires.includes(key)) continue;
         const first = selected.get(key);
-        if (first !== undefined && (first.path !== path || first.expectedStatus !== expectedStatus))
+        if (
+          first !== undefined &&
+          (first.path !== path || first.expectedStatus !== expectedStatus || first.serviceId !== serviceId)
+        )
           throw new AppError(
             ErrorCode.ValidationFailed,
             'Selected cases have conflicting readiness check definitions',
             { key },
           );
-        selected.set(key, { key, path, expectedStatus });
+        selected.set(key, { key, path, expectedStatus, ...(serviceId ? { serviceId } : {}) });
       }
     }
     return [...selected.values()];
@@ -303,7 +331,15 @@ export function createFunctionalTests({
         local && (previousLaunch === undefined || requestedLaunch !== undefined)
           ? inheritedLaunchFor(taskId)
           : undefined;
+      const compound = scope.compoundLaunch?.plan;
+      if (compound !== undefined && !local)
+        throw new AppError(ErrorCode.ValidationFailed, 'A service group can be prepared only for a local test target');
       const pinned = scope.moduleLaunch?.launch;
+      if (compound && requestedLaunch !== undefined)
+        throw new AppError(
+          ErrorCode.ValidationFailed,
+          'This task has a fixed service group; omit the single-service launch',
+        );
       if (
         pinned &&
         requestedLaunch &&
@@ -311,17 +347,27 @@ export function createFunctionalTests({
         !isDeepStrictEqual(requestedLaunch, previousLaunch)
       )
         throw new AppError(ErrorCode.ValidationFailed, 'Use the module launch configuration selected for this task');
-      const launch = requestedLaunch ?? previousLaunch ?? inheritedLaunch ?? pinned;
+      const launch = compound ? undefined : (requestedLaunch ?? previousLaunch ?? inheritedLaunch ?? pinned);
       const inherited = inheritedChecksFor(taskId, snapshot);
       const previousChecks = previous?.environment.checks ?? [];
       const definitions = new Map<string, FunctionalTestProbe>(previousChecks.map((check) => [check.key, check]));
       for (const check of checks ?? []) definitions.set(check.key, check);
       for (const check of inherited) definitions.set(check.key, check);
+      const serviceIds = new Set(compound?.services.map(({ id }) => id));
+      for (const { serviceId } of [...(checks ?? []), ...definitions.values()]) {
+        if (serviceId !== undefined && !serviceIds.has(serviceId))
+          throw new AppError(
+            ErrorCode.ValidationFailed,
+            'A service readiness check must name a member of this task service group',
+          );
+      }
       const checksChanged =
         definitions.size !== previousChecks.length ||
-        previousChecks.some(({ key, path, expectedStatus }) => {
+        previousChecks.some(({ key, path, expectedStatus, serviceId }) => {
           const current = definitions.get(key);
-          return current?.path !== path || current?.expectedStatus !== expectedStatus;
+          return (
+            current?.path !== path || current?.expectedStatus !== expectedStatus || current?.serviceId !== serviceId
+          );
         });
       const reusable = previous?.environment.ready && !checksChanged && (!local || localReady(taskId));
       if (reusable && isDeepStrictEqual(previousLaunch, launch)) return previous;
@@ -340,8 +386,9 @@ export function createFunctionalTests({
       let runtimeDetails: PreviewLaunchDetails | undefined;
       let readyUrl: string | undefined;
       let readyStatus: number | undefined;
+      let services: FunctionalTestServiceRuntime[] | undefined;
       try {
-        if (launch === undefined && inheritedLaunch === null)
+        if (compound === undefined && launch === undefined && inheritedLaunch === null)
           throw new AppError(
             ErrorCode.ValidationFailed,
             'Selected runs used different launch configurations; choose one for this retest',
@@ -374,13 +421,15 @@ export function createFunctionalTests({
           kind: 'environment',
           message: !local
             ? '连接已授权的测试入口'
-            : launch === undefined
-              ? '启动项目配置的测试服务'
-              : changedInheritedLaunch
-                ? '复测使用修复版本上明确选择的启动配置'
-                : inheritedLaunch != null && previousLaunch === undefined
-                  ? '按来源配置启动并重新核实复测环境'
-                  : '按本任务的启动配置准备测试服务',
+            : compound
+              ? '按本任务配置启动服务组'
+              : launch === undefined
+                ? '启动项目配置的测试服务'
+                : changedInheritedLaunch
+                  ? '复测使用修复版本上明确选择的启动配置'
+                  : inheritedLaunch != null && previousLaunch === undefined
+                    ? '按来源配置启动并重新核实复测环境'
+                    : '按本任务的启动配置准备测试服务',
           detail: {
             ...effectiveLaunch,
             ...(changedInheritedLaunch
@@ -391,7 +440,51 @@ export function createFunctionalTests({
               : {}),
           },
         });
-        if (local) {
+        if (local && compound !== undefined) {
+          const worktree = {
+            path: find(record.git.worktreePath ?? undefined, 'Test worktree is unavailable'),
+            baseCommit: find(baseline ?? undefined, 'Test baseline is unavailable'),
+          };
+          let group = serviceGroups.get(taskId);
+          startAttempted = true;
+          if (group === undefined || group.signal.aborted) {
+            await release(taskId);
+            const lifetime = new AbortController();
+            const abort = () => lifetime.abort();
+            signal.addEventListener('abort', abort, { once: true });
+            try {
+              signal.throwIfAborted();
+              group = await startServiceGroup({
+                worktree,
+                plan: compound,
+                env,
+                clock,
+                signal: lifetime.signal,
+                update(observations) {
+                  services = observations;
+                },
+              });
+              serviceGroups.set(taskId, group);
+              void group.exited.catch((err: unknown) =>
+                log.error({ err, taskId }, 'functional service group cleanup failed'),
+              );
+            } finally {
+              signal.removeEventListener('abort', abort);
+            }
+          }
+          signal.throwIfAborted();
+          group.signal.throwIfAborted();
+          services = group.snapshot();
+          const primary = find(
+            services.find(({ id }) => id === compound.targetServiceId),
+            'Service group target is missing',
+          );
+          target = new URL(scope.target, group.target).href;
+          logTail = primary.logTail;
+          readyUrl = find(primary.readyUrl ?? undefined, 'Service group has no readiness address');
+          readyStatus = find(primary.readyStatus ?? undefined, 'Service group has no readiness observation');
+          verified = true;
+        } else if (local) {
           if (launchChanged && localReady(taskId)) {
             if (!ownedPreviews.has(taskId) || previews.leaseCount(taskId) > 1)
               throw new AppError(
@@ -422,10 +515,10 @@ export function createFunctionalTests({
         }
         const url = new URL(target);
         // The launcher itself verifies a task-specific readiness endpoint. The business URL can intentionally return 404.
-        if (launch !== undefined) {
+        if (compound === undefined && launch !== undefined) {
           readyUrl = find(runtimeDetails?.readyUrl, 'Preview has no readiness address');
           readyStatus = find(runtimeDetails?.readyStatus, 'Preview has no readiness observation');
-        } else {
+        } else if (compound === undefined) {
           readyUrl = url.href;
           const probe = await scopedRequest(url, { method: 'GET', signal }, { origin: url.origin, writes: [] });
           readyStatus = probe.status;
@@ -437,13 +530,16 @@ export function createFunctionalTests({
           signal.throwIfAborted();
           let status: number | null = null;
           let problem: string | null = null;
-          const address = new URL(check.path, url.origin);
           try {
-            const response = await scopedRequest(
-              address,
-              { method: 'GET', signal },
-              { origin: url.origin, writes: [] },
-            );
+            const origin =
+              check.serviceId === undefined
+                ? url.origin
+                : find(
+                    services?.find(({ id }) => id === check.serviceId)?.target ?? undefined,
+                    'Readiness check names an unavailable service',
+                  );
+            const address = new URL(check.path, origin);
+            const response = await scopedRequest(address, { method: 'GET', signal }, { origin, writes: [] });
             status = response.status;
             await response.body?.cancel();
             if (status !== check.expectedStatus) problem = `HTTP ${status}，预期 ${check.expectedStatus}`;
@@ -452,14 +548,22 @@ export function createFunctionalTests({
               throw error;
             problem = redactText(error.message);
           }
-          const result = { ...check, path: address.pathname, status, ready: problem === null, reason: problem };
+          const { serviceId: checkedService, ...definition } = check;
+          const result = {
+            ...definition,
+            ...(checkedService === undefined ? {} : { serviceId: checkedService }),
+            status,
+            ready: problem === null,
+            reason: problem,
+          };
           probes.push(result);
           emit(taskId, { runId: id, kind: 'environment', message: `环境条件：${check.key}`, detail: result });
         }
+        if (compound !== undefined) serviceGroups.get(taskId)?.signal.throwIfAborted();
       } catch (error) {
         if (!(error instanceof AppError || error instanceof TypeError || error instanceof DOMException)) throw error;
         reason = redactText(error.message);
-        if (local && startAttempted) {
+        if (local && startAttempted && compound === undefined) {
           const attempted = previews.launchDetails(taskId);
           if (attempted !== undefined && isDeepStrictEqual(attempted.evidence, launchEvidence)) {
             runtimeDetails ??= attempted;
@@ -493,7 +597,9 @@ export function createFunctionalTests({
           reason,
           logTail,
           checks: probes,
+          ...(compound === undefined ? {} : { targetServiceId: compound.targetServiceId, services: services ?? [] }),
           ...persistedLaunch,
+          ...(runtimeDetails?.diagnostics === undefined ? {} : { diagnostics: runtimeDetails.diagnostics }),
           ...(runtimeDetails === undefined ? {} : { command: redactText(runtimeDetails.command) }),
           ...(observedUrl === undefined
             ? {}
@@ -505,11 +611,28 @@ export function createFunctionalTests({
         const index = snapshot.runs.findIndex((item) => item.id === run.id);
         if (index === -1) snapshot.runs.push(run);
         else snapshot.runs[index] = run;
+        const { services, checks, diagnostics: _diagnostics, ...environment } = run.environment;
         repo.event(snapshot, {
           runId: id,
           kind: 'environment',
           message: reason ?? '测试环境已就绪',
-          detail: { ...run.environment, ...(!startAttempted ? launchFields : {}) },
+          detail: {
+            ...environment,
+            checks: checks.map(({ serviceId, ...check }) => ({ ...check, serviceId: serviceId ?? null })),
+            ...(services === undefined
+              ? {}
+              : {
+                  services: services.map((service) => ({
+                    id: service.id,
+                    name: service.name ?? service.id,
+                    moduleId: service.moduleId ?? null,
+                    target: service.target,
+                    readyUrl: service.readyUrl,
+                    readyStatus: service.readyStatus,
+                  })),
+                }),
+            ...(!startAttempted ? launchFields : {}),
+          },
         });
       });
       if (reason !== null) await release(taskId);
@@ -585,7 +708,13 @@ export function createFunctionalTests({
           note(null, 'result', '本地服务已停止，请先恢复环境', { status });
         else {
           const target = scope.target.startsWith('/')
-            ? new URL(scope.target, find(previews.get(taskId).url ?? undefined, 'Local test service stopped')).href
+            ? new URL(
+                scope.target,
+                find(
+                  serviceGroups.get(taskId)?.target ?? previews.get(taskId).url ?? undefined,
+                  'Local test service stopped',
+                ),
+              ).href
             : scope.target;
           status = await executeCase({
             definition,
@@ -603,7 +732,18 @@ export function createFunctionalTests({
               browserTest: { target, writes: scope.writes },
               savedCase: true,
             },
-            logTail: scope.target.startsWith('/') ? previews.logSince(taskId) : () => '',
+            logTail:
+              run.environment.targetServiceId !== undefined
+                ? () => compoundServices(taskId).find(({ id }) => id === run.environment.targetServiceId)?.logTail ?? ''
+                : scope.target.startsWith('/')
+                  ? previews.logSince(taskId)
+                  : () => '',
+            ...(run.environment.targetServiceId === undefined
+              ? {}
+              : {
+                  services: () => compoundServices(taskId),
+                  targetServiceId: run.environment.targetServiceId,
+                }),
             waitForUser: (wait) => attempts.waitForBrowserInput(attempt.id, wait),
           });
         }
@@ -626,6 +766,10 @@ export function createFunctionalTests({
     context(taskId);
     const snapshot = repo.get(taskId);
     const { runId, caseId, step, after = 0 } = input;
+    const group = serviceGroups.get(taskId);
+    const latest = snapshot.runs.at(-1);
+    if (group !== undefined && latest?.environment.targetServiceId === group.targetServiceId)
+      latest.environment.services = group.snapshot();
     const matches = (item: { runId: string | null; caseId: string | null }) =>
       (runId === undefined || item.runId === runId) && (caseId === undefined || item.caseId === caseId);
     return {
@@ -786,7 +930,9 @@ export function createFunctionalTests({
       }
     },
     async stopAll() {
-      await Promise.allSettled([...new Set([...active.keys(), ...ownedPreviews, ...previewLeases.keys()])].map(stop));
+      await Promise.allSettled(
+        [...new Set([...active.keys(), ...ownedPreviews, ...previewLeases.keys(), ...serviceGroups.keys()])].map(stop),
+      );
     },
   };
 }

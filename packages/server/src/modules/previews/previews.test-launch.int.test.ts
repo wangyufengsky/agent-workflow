@@ -284,6 +284,15 @@ it.skipIf(!process.env.JAVA8_HOME && !process.env.AW_TEST_REGISTERED_JDK8)(
       const details = previews.launchDetails(task.id);
       if (details === undefined) throw new Error('Expected Java launcher evidence');
       expect(details.evidence).toMatchObject({ javaVersion: 8, includeProvided });
+      expect(details.diagnostics).toMatchObject({
+        javaVersion: 8,
+        workingDirectory: 'api',
+        includeProvided,
+        classpathEntries: includeProvided ? 3 : 2,
+        beforeRun: ['maven_compile'],
+        managedVmOptions: ['server.port', 'server.address'],
+        requested: { javaVersion: 8, workingDirectory: 'api', includeProvided },
+      });
       expect(await (await fetch(details.readyUrl)).text()).toBe(`1.8,${includeProvided},true,false`);
       await previews.stop(task.id);
     }
@@ -338,6 +347,13 @@ it.skipIf(!process.env.AW_TEST_GRADLE)(
     const details = previews.launchDetails(task.id);
     if (details === undefined) throw new Error('Expected Gradle launcher evidence');
     expect(details.evidence).toMatchObject({ manager: 'gradle', javaVersion: 21 });
+    expect(details.diagnostics).toMatchObject({
+      javaVersion: 21,
+      workingDirectory: 'api',
+      classpathEntries: expect.any(Number),
+      beforeRun: ['gradle_classes'],
+      requested: { javaVersion: 21, workingDirectory: 'api' },
+    });
     expect(details.command).toContain('example.Probe');
     expect((await fetch(details.readyUrl)).status).toBe(204);
   },

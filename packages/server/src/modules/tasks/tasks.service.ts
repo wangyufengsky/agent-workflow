@@ -250,6 +250,65 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     return detail(id);
   }
 
+  async function resolveFunctionalTestScope(
+    input: Pick<CreateTaskRequest, 'projectId' | 'functionalTest'>,
+    baseBranch: string,
+  ): Promise<TaskDetailDTO['functionalTest']> {
+    const scope = input.functionalTest;
+    const choice = scope?.moduleSelection;
+    const compoundChoice = scope?.compoundSelection;
+    if (choice && compoundChoice)
+      throw new AppError(ErrorCode.ValidationFailed, 'Choose either a module or a Compound configuration');
+    let functionalTest: TaskDetailDTO['functionalTest'] = scope;
+    if (scope && choice) {
+      if (!scope.target.startsWith('/'))
+        throw new AppError(ErrorCode.ValidationFailed, 'Selected modules require a local test target');
+      const { module, config, launch, current } = await deps.selectProjectModule(
+        input.projectId,
+        choice.moduleId,
+        choice.configurationId,
+        choice.fingerprint,
+        baseBranch,
+      );
+      functionalTest = {
+        ...scope,
+        moduleSelection: { moduleId: module.id, configurationId: config.id, fingerprint: config.fingerprint },
+        moduleLaunch: { baseline: current.baseline, moduleName: module.name, configurationName: config.name, launch },
+      };
+    }
+    if (scope && compoundChoice) {
+      if (!scope.target.startsWith('/'))
+        throw new AppError(ErrorCode.ValidationFailed, 'Selected Compound configurations require a local test target');
+      const { compound, current, plan } = await deps.selectProjectCompound(
+        input.projectId,
+        compoundChoice.compoundId,
+        compoundChoice.fingerprint,
+        compoundChoice.targetServiceId,
+        baseBranch,
+      );
+      functionalTest = {
+        ...scope,
+        compoundSelection: {
+          compoundId: compound.id,
+          fingerprint: compound.fingerprint,
+          targetServiceId: plan.targetServiceId,
+        },
+        compoundLaunch: { baseline: current.baseline, compoundName: compound.name, plan },
+      };
+    }
+    const members = functionalTest?.compoundLaunch?.plan.services ?? [];
+    if (
+      functionalTest?.writes.some(
+        (rule) => rule.serviceId !== undefined && !members.some((member) => member.id === rule.serviceId),
+      )
+    )
+      throw new AppError(
+        ErrorCode.ValidationFailed,
+        'Specify an authorized compound member for each service-scoped write',
+      );
+    return functionalTest;
+  }
+
   return {
     async saveReportDraft(attempt: AttemptDTO, review: TaskCodeReviewInput | undefined, proposal: string | undefined) {
       if (attempt.taskId === null || attempt.nodeId === null || attempt.kind !== AttemptKind.Execute)
@@ -426,25 +485,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
 
     async create(input: CreateTaskRequest, onCreated?: (taskId: string) => void): Promise<TaskDetailDTO> {
       const baseBranch = await lifecycle.checkCreate(input);
-      const scope = input.functionalTest;
-      const choice = scope?.moduleSelection;
-      let functionalTest: TaskDetailDTO['functionalTest'] = scope;
-      if (scope && choice) {
-        if (!scope.target.startsWith('/'))
-          throw new AppError(ErrorCode.ValidationFailed, 'Selected modules require a local test target');
-        const { module, config, launch, current } = await deps.selectProjectModule(
-          input.projectId,
-          choice.moduleId,
-          choice.configurationId,
-          choice.fingerprint,
-          baseBranch,
-        );
-        functionalTest = {
-          ...scope,
-          moduleSelection: { moduleId: module.id, configurationId: config.id, fingerprint: config.fingerprint },
-          moduleLaunch: { baseline: current.baseline, moduleName: module.name, configurationName: config.name, launch },
-        };
-      }
+      const functionalTest = await resolveFunctionalTestScope(input, baseBranch);
       // 助手归属与任务同时提交，启动前已可跟进；登记失败时不留下无归属的任务。
       const id = deps.unit.transact(() => {
         const created = lifecycle.insertDraft({ ...input, ...(functionalTest ? { functionalTest } : {}), baseBranch });
@@ -486,7 +527,11 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
     },
     onProjectDeleted: actions.onProjectDeleted,
     /** Creating several tasks in one transaction (batches, 20 §2): check once, insert drafts, start after commit. */
-    checkCreate: lifecycle.checkCreate,
+    async checkCreate(input: Parameters<typeof lifecycle.checkCreate>[0]) {
+      const branch = await lifecycle.checkCreate(input);
+      await resolveFunctionalTestScope(input, branch);
+      return branch;
+    },
     browserTest: (id: string) => state.get(id).browserTest,
     browserTestSubmit: (attempt: AttemptDTO) => {
       if (attempt.taskId === null || state.get(attempt.taskId).browserTest === null) return undefined;

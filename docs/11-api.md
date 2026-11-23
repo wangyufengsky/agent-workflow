@@ -692,10 +692,34 @@ type PdfExport = { ok: true; path: string | null } | { ok: false; error: ErrorIn
 
 | 操作 | 接口 | 用途 |
 |---|---|---|
-| `projects.modules` | GET `/projects/:id/modules` | 返回基线、模块、候选启动方式、发现依据、可选检查和近期运行。基线变化后刷新目录。 |
+| `projects.modules` | GET `/projects/:id/modules` | 返回基线、模块、候选启动方式、发现依据、可选检查、IDEA Compound 组合和近期运行。基线变化后刷新目录。 |
 | `projects.rediscoverModules` | POST `/projects/:id/modules/discover` | 重新读取本地与共享配置。 |
 | `projects.defaultModuleConfiguration` | PUT `/projects/:id/modules/default` | 保存该模块最近成功试启动的配置及指纹。依据变更后需重新验证。 |
-| `projects.startModuleRun` | POST `/projects/:id/modules/run` | 提交默认分支基线与模块 ID，用配置 ID 和指纹试启动，或提交已发现的检查 ID。在隔离工作树内执行。 |
+| `projects.startModuleRun` | POST `/projects/:id/modules/run` | 在隔离工作树内运行。提交默认分支基线与模块 ID，再用配置 ID 和指纹试启动或提交已发现的检查 ID。试启动组合时提交 `compoundId`、`fingerprint` 和可选的 `targetServiceId`。 |
 | `projects.stopModuleRun` | POST `/projects/:id/modules/stop` | 按运行 ID 停止并回收资源。 |
 
 本地功能测试可在 `functionalTest.moduleSelection` 中传入 `moduleId`、`configurationId` 和 `fingerprint`。仅提供模块时复用已保存且仍有效的默认配置。创建任务时由服务端解析并冻结启动配置与 Git 提交，准备阶段从该提交建立工作树并核对入口。记录中的成功就绪状态与当前配置指纹共同决定是否已验证。
+
+本地功能测试也可通过 `functionalTest.compoundSelection` 选择组合，使用相同的 `compoundId`、`fingerprint` 和可选的 `targetServiceId`。服务器将选择、基线和服务计划一起冻结。组合目录记录 IDEA 声明顺序、成员来源以及无法解析或不支持的成员。组合成功解析后，每个服务分配独立本机端口。HTTP 默认目的地取组合显式声明的目标，或声明顺序中的第一个服务。用户可以选择其他成员作为 HTTP 目标。
+
+IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与运行时 URL 时，可在默认分支提交 `.aw/compound-services.json`，以 IDEA 中显示的组合名和成员名引用相应配置：
+
+```json
+{
+  "compounds": [
+    {
+      "name": "仓储联调",
+      "target": "仓储 API",
+      "services": [
+        {
+          "name": "仓储 API",
+          "dependsOn": ["库存服务"],
+          "inject": { "INVENTORY_URL": "库存服务" }
+        }
+      ]
+    }
+  ]
+}
+```
+
+没有声明依赖的成员独立启动。在上例中，库存服务通过就绪探测后，运行器将其本机 URL 注入仓储 API 的 `INVENTORY_URL`。可注入的环境变量名以 `_URL`、`_URI` 或 `_ORIGIN` 结尾，来源须是该服务声明的依赖。如果成员的 IDEA 配置声明了环境变量，映射必须覆盖同一组键，运行器仅使用新分配的本机 URL。发现到循环依赖、未识别成员或无效声明时，目录中的 `review` 解释原因。

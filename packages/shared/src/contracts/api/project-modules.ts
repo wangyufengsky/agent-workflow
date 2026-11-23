@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { ProjectModuleRunStatus } from '../../fsm/project-module-run.machine.ts';
-import { functionalTestLaunchSchema } from './functional-testing.ts';
+import {
+  functionalTestLaunchSchema,
+  functionalTestServicePlanSchema,
+  functionalTestServiceRuntimeSchema,
+} from './functional-testing.ts';
 
 export const projectModuleConfigurationSchema = z.object({
   id: z.string(),
@@ -38,6 +42,33 @@ export const projectJavaModuleSchema = z.object({
   dependentModules: z.array(z.string()).optional(),
 });
 export type ProjectJavaModule = z.infer<typeof projectJavaModuleSchema>;
+export const projectModuleCompoundSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  source: z.string(),
+  scope: z.enum(['project', 'local']),
+  fingerprint: z.string(),
+  metadataSource: z.string().optional(),
+  members: z.array(
+    z.object({
+      name: z.string(),
+      type: z.string(),
+      moduleId: z.string().optional(),
+      configurationId: z.string().optional(),
+      source: z.string().optional(),
+      scope: z.enum(['project', 'local']).optional(),
+      status: z.enum(['resolved', 'missing', 'ambiguous', 'unsupported']),
+    }),
+  ),
+  review: z.array(z.string()),
+  plan: functionalTestServicePlanSchema.nullable(),
+});
+export type ProjectModuleCompound = z.infer<typeof projectModuleCompoundSchema>;
+export const projectModuleCompoundSelectionSchema = z.object({
+  compoundId: z.string().min(1),
+  fingerprint: z.string().min(1),
+  targetServiceId: z.string().min(1).optional(),
+});
 export const projectModuleRunSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -53,6 +84,9 @@ export const projectModuleRunSchema = z.object({
   log: z.string(),
   readyUrl: z.string().nullable(),
   readyStatus: z.number().int().nullable(),
+  compoundId: z.string().optional(),
+  targetServiceId: z.string().optional(),
+  services: z.array(functionalTestServiceRuntimeSchema).optional(),
 });
 export type ProjectModuleRun = z.infer<typeof projectModuleRunSchema>;
 export const projectModulesSchema = z.object({
@@ -61,6 +95,7 @@ export const projectModulesSchema = z.object({
   baseline: z.string(),
   scannedAt: z.number(),
   modules: z.array(projectJavaModuleSchema),
+  compounds: z.array(projectModuleCompoundSchema).optional(),
   warnings: z.array(z.string()),
   defaults: z.record(z.string(), z.string()),
   runs: z.array(projectModuleRunSchema),

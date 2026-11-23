@@ -58,6 +58,7 @@ Agent Workflow 把「让 AI 写代码」变成一条看得见、停得住、由�
 | 功能 | 说明 |
 | --- | --- |
 | **内置流程** | 新功能开发、修 Bug、补单元测试、代码审查、重构、版本比对审查、安全审查、清理告警、方案设计、详细设计、需求拆解、功能测试。审查类与设计类流程只读，不改代码。 |
+| **Java 项目与 IDEA** | 在项目详情查看本机和共享启动配置、服务与可运行检查，试启动并查看诊断。可选 IDEA Compound 联调多个服务，按声明注入本机地址，将选定组合交给助手测试。 |
 | **功能测试** | 针对选定模块编写用例，或导入 Markdown、TXT、Word（.docx）、Excel（.xlsx）用例文件。实时查看每个用例的请求、输出、修订记录与报告，并从失败结果创建修复和复测任务。 |
 | **进度画布** | 任务页以画布展示 AI 规划出的步骤，节点依次亮起；右侧实时显示当前步骤的执行过程、AI 的思考与汇报。 |
 | **自动检查** | 每一步完成后自动验收：运行项目的检查命令（测试、lint 等）、AI 评审，前端项目还可以做页面体检。 |
@@ -234,16 +235,16 @@ Linux 上用 `Ctrl` 代替 `⌘`。
 
 ## 安装
 
-在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。**v1.6.1** 的安装包如下。
+在 [Releases](https://github.com/wangyufengsky/agent-workflow/releases/latest) 下载对应平台的安装包。**v1.6.2** 的安装包如下。
 
 | 平台 | 文件 |
 | --- | --- |
-| macOS（Apple 芯片） | `agent-workflow-1.6.1-arm64.dmg` |
-| Linux x64（Ubuntu / Debian） | `agent-workflow_1.6.1_amd64.deb` |
-| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.6.1_arm64.deb` |
-| Linux x64（其他发行版） | `agent-workflow-1.6.1-x86_64.AppImage` |
-| Linux arm64（其他发行版） | `agent-workflow-1.6.1-arm64.AppImage` |
-| Windows 10 / 11 x64 | `agent-workflow-1.6.1-setup-x64.exe` |
+| macOS（Apple 芯片） | `agent-workflow-1.6.2-arm64.dmg` |
+| Linux x64（Ubuntu / Debian） | `agent-workflow_1.6.2_amd64.deb` |
+| Linux arm64（Ubuntu / Debian） | `agent-workflow_1.6.2_arm64.deb` |
+| Linux x64（其他发行版） | `agent-workflow-1.6.2-x86_64.AppImage` |
+| Linux arm64（其他发行版） | `agent-workflow-1.6.2-arm64.AppImage` |
+| Windows 10 / 11 x64 | `agent-workflow-1.6.2-setup-x64.exe` |
 
 可以用同一页的 `SHA256SUMS.txt` 校验下载的文件：
 
@@ -290,7 +291,7 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 **deb（推荐 Ubuntu / Debian）**：
 
 ```bash
-sudo apt install ./agent-workflow_1.6.1_amd64.deb
+sudo apt install ./agent-workflow_1.6.2_amd64.deb
 ```
 
 arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `/usr/bin/agent-workflow` 指向它，菜单项在 `/usr/share/applications/agent-workflow.desktop`），用户数据在 `~/.config/Agent Workflow/`。之后在应用菜单中打开，或运行 `agent-workflow`；第一次启动时应用会在桌面放一个快捷方式（只放一次，删掉后不再出现）。卸载：`sudo apt remove agent-workflow`。
@@ -298,8 +299,8 @@ arm64 机器换成 `_arm64.deb`。应用装在 `/opt/Agent Workflow/`（命令 `
 **AppImage（其他发行版）**：
 
 ```bash
-chmod +x agent-workflow-1.6.1-x86_64.AppImage
-./agent-workflow-1.6.1-x86_64.AppImage
+chmod +x agent-workflow-1.6.2-x86_64.AppImage
+./agent-workflow-1.6.2-x86_64.AppImage
 ```
 
 - AppImage 不安装，放在哪里就从哪里运行（建议先移到固定位置，如 `~/Applications/`）；第一次启动时在桌面放一个指向它当前位置的快捷方式，之后移动文件需要删掉快捷方式重新放。

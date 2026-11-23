@@ -5,6 +5,7 @@ import {
   ErrorCode,
   getProjectModulesOp,
   isTerminalState,
+  type ProjectModuleCompound,
   type ProjectModuleRun,
   ProjectModuleRunEvent,
   type ProjectModules,
@@ -59,7 +60,7 @@ export function createProjectModules({ db, projects, ...deps }: Deps) {
           ['rev-parse', '--verify', '--end-of-options', `refs/heads/${branch}^{commit}`],
           { cwd: repoPath },
         );
-        if (cached.branch === branch && cached.baseline === stdout) return cached;
+        if (cached.branch === branch && cached.baseline === stdout && cached.compounds !== undefined) return cached;
       }
       const found = await discoverProjectModules(repoPath, branch);
       const current = { projectId: id, branch, scannedAt: deps.clock.now(), ...found };
@@ -111,18 +112,57 @@ export function createProjectModules({ db, projects, ...deps }: Deps) {
       throw invalid('Select a current runnable module configuration');
     return { module, config, current, launch: config.launch };
   }
+  function resolveCompound(
+    current: z.infer<typeof catalogSchema>,
+    compoundId: string,
+    fingerprint: string | undefined,
+    targetServiceId?: string,
+  ) {
+    const compound = current.compounds?.find((item) => item.id === compoundId);
+    if (!compound?.plan || compound.review.length !== 0 || compound.fingerprint !== fingerprint)
+      throw invalid('Select a current runnable Compound configuration');
+    const plan: NonNullable<ProjectModuleCompound['plan']> = {
+      ...compound.plan,
+      targetServiceId: targetServiceId ?? compound.plan.targetServiceId,
+    };
+    if (!plan.services.some((service) => service.id === plan.targetServiceId))
+      throw invalid('Select a service in the Compound configuration as the HTTP target');
+    return { compound, plan };
+  }
+  async function selectCompound(
+    id: string,
+    compoundId: string,
+    fingerprint: string,
+    targetServiceId: string | undefined,
+    branch: string,
+  ) {
+    const current = await catalog(id, true);
+    if (current.branch !== branch) throw invalid('Compound selection belongs to the project default branch');
+    return { current, ...resolveCompound(current, compoundId, fingerprint, targetServiceId) };
+  }
   async function start(input: z.infer<typeof startProjectModuleRunOp.input>) {
-    const { id, moduleId, baseline, configurationId, checkIds, fingerprint } = input;
+    const { id, baseline, configurationId, checkIds, fingerprint, compoundId, targetServiceId } = input;
+    const moduleId = input.moduleId ?? compoundId;
+    if (
+      !moduleId ||
+      (compoundId !== undefined &&
+        (input.moduleId !== undefined || configurationId !== undefined || checkIds !== undefined)) ||
+      (compoundId === undefined && targetServiceId !== undefined)
+    )
+      throw invalid('Choose either a module configuration, checks, or a Compound configuration');
     const current = await catalog(id, true);
     const module = current.modules.find((m) => m.id === moduleId);
-    if (!module || current.baseline !== baseline)
+    if ((!module && compoundId === undefined) || current.baseline !== baseline)
       throw invalid('Project baseline or module changed; refresh module discovery');
-    const config = module.configurations.find((c) => c.id === configurationId);
-    const checks = module.checks.filter((c) => checkIds?.includes(c.id));
+    const config = module?.configurations.find((c) => c.id === configurationId);
+    const checks = module?.checks.filter((c) => checkIds?.includes(c.id)) ?? [];
+    const compound =
+      compoundId === undefined ? undefined : resolveCompound(current, compoundId, fingerprint, targetServiceId);
     if (
-      checkIds
+      compound === undefined &&
+      (checkIds
         ? checks.length !== checkIds.length || configurationId !== undefined || fingerprint !== undefined
-        : !config?.launch || config.review.length || config.fingerprint !== fingerprint
+        : !config?.launch || config.review.length || config.fingerprint !== fingerprint)
     )
       throw invalid('Review the selected module configuration or checks');
     if (runtime.get(id)) throw new AppError(ErrorCode.StateTransitionInvalid, 'Another module run is active');
@@ -133,7 +173,8 @@ export function createProjectModules({ db, projects, ...deps }: Deps) {
       moduleId,
       baseline,
       configurationId: config?.id ?? null,
-      fingerprint: config?.fingerprint ?? baseline,
+      fingerprint: compound?.compound.fingerprint ?? config?.fingerprint ?? baseline,
+      ...(compound === undefined ? {} : { compoundId, targetServiceId: compound.plan.targetServiceId }),
       kind,
       checkIds: checkIds ?? [],
       startedAt: deps.clock.now(),
@@ -154,18 +195,15 @@ export function createProjectModules({ db, projects, ...deps }: Deps) {
         AND json_extract(result, '$.kind') = ${run.kind}
         AND id != ${run.id} ORDER BY started_at DESC, rowid DESC LIMIT -1 OFFSET 7
       )`);
-      runtime.start({
-        repoPath: projects.getRecord(id).repoPath,
-        run,
-        module,
-        checks,
-        ...(config ? { configuration: config } : {}),
-      });
+      const repoPath = projects.getRecord(id).repoPath;
+      if (compound) runtime.start({ repoPath, run, compoundPlan: compound.plan });
+      else if (module) runtime.start({ repoPath, run, module, checks, ...(config ? { configuration: config } : {}) });
     });
     return run;
   }
   return {
     select,
+    selectCompound,
     recover: async () => {
       await runtime.recover();
       for (const item of db

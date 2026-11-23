@@ -83,13 +83,31 @@ export function createTestFollowups({ db, unit, tasks, workflows, projects, test
       if (previous && previous.version !== test.version)
         throw new AppError(ErrorCode.ValidationFailed, 'Select one revision per case');
       cases.set(test.id, test);
-      const defect = entry.events.filter((e) => e.kind === 'assertion' || e.kind === 'result').slice(-5);
+      const failed = entry.events.filter(
+        (e) => e.detail.passed === false || e.detail.status === FunctionalTestStatus.Failed,
+      );
+      const defect = failed.length
+        ? failed
+        : entry.events.filter((e) => e.kind === 'assertion' || e.kind === 'result').slice(-5);
+      const steps = new Set(defect.map((e) => e.step));
+      const requests = entry.events.filter((e) => e.kind === 'action' && steps.has(e.step));
+      const serviceEvidence = defect
+        .filter((e) => typeof e.detail.serviceId === 'string')
+        .map(({ seq, detail }) => {
+          const log = typeof detail.serviceLog === 'string' ? detail.serviceLog.slice(-600) : '';
+          return `服务 ${detail.serviceName ?? detail.serviceId}（${detail.moduleId ?? detail.serviceId}）· 证据 #${seq}
+${log}`;
+        });
       return [
         `${test.number} v${test.version} ${test.title}`,
         `目标：${test.requirement}`,
         `步骤：${test.steps.map((s) => s.title).join(' → ')}`,
+        ...requests.map((e) => `请求 #${e.seq} ${e.detail.method ?? ''} ${e.detail.path ?? e.detail.title ?? ''}`),
+        ...serviceEvidence,
         '实测证据：' +
-          JSON.stringify(defect.map((e) => ({ seq: e.seq, message: e.message, detail: e.detail }))).slice(0, 2200),
+          JSON.stringify(
+            defect.map((e) => ({ seq: e.seq, message: e.message, detail: { ...e.detail, serviceLog: undefined } })),
+          ).slice(0, 2200),
         `来源执行：${entry.execution.id}，运行：${entry.run.id}`,
       ].join('\n');
     });
@@ -107,7 +125,19 @@ export function createTestFollowups({ db, unit, tasks, workflows, projects, test
         .slice(0, REQUIREMENT_MAX_CHARS),
       attachmentIds: source.attachments.map((a) => a.id),
       ...(kind === 'rerun'
-        ? { functionalTest: { target: scope.target, writes: scope.writes, caseAttachmentIds: scope.caseAttachmentIds } }
+        ? {
+            functionalTest: {
+              target: scope.target,
+              writes: scope.writes,
+              caseAttachmentIds: scope.caseAttachmentIds,
+              ...(scope.compoundLaunch
+                ? {
+                    compoundSelection: scope.compoundSelection,
+                    compoundLaunch: { ...scope.compoundLaunch, baseline: commit },
+                  }
+                : {}),
+            },
+          }
         : {}),
     };
     const baseBranch = await tasks.checkCreate(input);

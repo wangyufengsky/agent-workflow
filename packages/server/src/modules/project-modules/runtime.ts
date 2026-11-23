@@ -2,7 +2,10 @@ import { join } from 'node:path';
 import {
   AppError,
   ErrorCode,
+  type FunctionalTestServicePlan,
+  type FunctionalTestServiceRuntime,
   isTerminalState,
+  PREVIEW_LOG_TAIL_CHARS,
   type ProjectJavaModule,
   type ProjectModuleCheck,
   type ProjectModuleConfiguration,
@@ -15,15 +18,8 @@ import {
 import type { Clock } from '../../core/clock.ts';
 import type { Logger } from '../../core/logger.ts';
 import { locateShell, type RepoLocks } from '../git/index.ts';
-import {
-  type LaunchInput,
-  launchPreview,
-  projectLaunchEnvironment,
-  resolveTestLaunch,
-  setUpPreview,
-} from '../previews/index.ts';
+import { createProjectLog, projectLaunchEnvironment, setUpPreview, startServiceGroup } from '../previews/index.ts';
 import { runtimeCheckCommands } from './runtime-checks.ts';
-import { createRuntimeLog } from './runtime-log.ts';
 import { createRuntimeWorktree, recoverRuntimeWorktrees } from './runtime-worktree.ts';
 
 const TRIAL_TIMEOUT_MS = 10 * 60_000;
@@ -31,16 +27,17 @@ const TRIAL_TIMEOUT_MS = 10 * 60_000;
 type StartTrial = {
   repoPath: string;
   run: ProjectModuleRun;
-  module: ProjectJavaModule;
-  configuration?: ProjectModuleConfiguration;
-  checks: ProjectModuleCheck[];
-};
+} & (
+  | { module: ProjectJavaModule; configuration?: ProjectModuleConfiguration; checks: ProjectModuleCheck[] }
+  | { compoundPlan: FunctionalTestServicePlan }
+);
 
 type Trial = {
   run: ProjectModuleRun;
-  output: ReturnType<typeof createRuntimeLog>;
+  output: ReturnType<typeof createProjectLog>;
   abort: AbortController;
   done: Promise<void>;
+  readServices?: () => FunctionalTestServiceRuntime[];
 };
 
 type RuntimeDeps = {
@@ -57,7 +54,15 @@ export function createModuleRuntime({ clock, env, locks, dataDir, log, onUpdate 
   const childEnv = projectLaunchEnvironment(env);
   const active = new Map<string, Trial>();
   let closing = false;
-  const snapshot = (trial: Trial): ProjectModuleRun => ({ ...trial.run, log: trial.output.tail() });
+  const snapshot = (trial: Trial): ProjectModuleRun => {
+    const services = trial.readServices?.() ?? trial.run.services;
+    const targetLog = services?.find(({ id }) => id === trial.run.targetServiceId)?.logTail;
+    return {
+      ...trial.run,
+      ...(services === undefined ? {} : { services }),
+      log: `${targetLog ?? ''}${trial.output.tail()}`.slice(-PREVIEW_LOG_TAIL_CHARS),
+    };
+  };
   function move(trial: Trial, event: ProjectModuleRunEvent) {
     trial.run.status = transition(projectModuleRunMachine, trial.run.status, event);
     if (isTerminalState(projectModuleRunMachine, trial.run.status)) {
@@ -83,8 +88,8 @@ export function createModuleRuntime({ clock, env, locks, dataDir, log, onUpdate 
       signal.throwIfAborted();
       worktree = await createRuntimeWorktree(root, input.repoPath, trial.run.baseline, locks);
       signal.throwIfAborted();
-      const shell = await locateShell(childEnv);
-      if (trial.run.kind === 'checks') {
+      if ('checks' in input && trial.run.kind === 'checks') {
+        const shell = await locateShell(childEnv);
         const commands = await runtimeCheckCommands(worktree, input.module, input.checks, childEnv);
         for (const command of commands) {
           await setUpPreview(command, {
@@ -99,37 +104,48 @@ export function createModuleRuntime({ clock, env, locks, dataDir, log, onUpdate 
         }
         outcome = ProjectModuleRunEvent.Pass;
       } else {
-        const proposal = input.configuration?.launch;
-        if (proposal == null)
-          throw new AppError(ErrorCode.ValidationFailed, 'The module configuration has no supported launch');
-        const resolved = await resolveTestLaunch(worktree, proposal, childEnv);
-        const launch: LaunchInput = {
-          config: { readyPath: resolved.evidence.readyPath, command: resolved.command },
-          directory: resolved.directory,
-          env: resolved.env,
-          shell,
-          log: trial.output,
-          signal,
+        let plan: FunctionalTestServicePlan;
+        if ('compoundPlan' in input) {
+          plan = input.compoundPlan;
+        } else {
+          const proposal = input.configuration?.launch;
+          if (proposal == null)
+            throw new AppError(ErrorCode.ValidationFailed, 'The module configuration has no supported launch');
+          plan = {
+            services: [
+              {
+                id: input.module.id,
+                moduleId: input.module.id,
+                name: input.module.name,
+                launch: proposal,
+                dependsOn: [],
+                inject: [],
+              },
+            ],
+            targetServiceId: input.module.id,
+          };
+        }
+        const group = await startServiceGroup({
+          worktree,
+          plan,
+          env: childEnv,
           clock,
-          onLaunch: ({ readyUrl }) => {
-            trial.run.readyUrl = readyUrl;
+          signal,
+          update(services) {
+            trial.run.services = services;
+            trial.run.targetServiceId = plan.targetServiceId;
+            const target = services.find(({ id }) => id === plan.targetServiceId);
+            trial.run.readyUrl = target?.readyUrl ?? null;
+            trial.run.readyStatus = target?.readyStatus ?? null;
           },
-          onProbe: (status) => {
-            trial.run.readyStatus = status;
-          },
-        };
-        if (resolved.setup !== undefined) await setUpPreview(resolved.setup, launch);
-        if (resolved.prepare !== undefined) await resolved.prepare((command) => setUpPreview(command, launch));
-        const preview = await launchPreview(launch);
-        const abort = () => void preview.stop();
-        signal.addEventListener('abort', abort, { once: true });
-        if (signal.aborted) abort();
-        else move(trial, ProjectModuleRunEvent.Ready);
+        });
+        trial.readServices = group.snapshot;
         try {
-          await preview.exited;
-          if (!signal.aborted) throw new Error('The module process exited');
+          if (!group.signal.aborted) move(trial, ProjectModuleRunEvent.Ready);
+          await group.exited;
+          if (!signal.aborted) throw group.failure() ?? new Error('The module service group exited');
         } finally {
-          signal.removeEventListener('abort', abort);
+          await group.stop();
         }
       }
     } catch (error) {
@@ -155,7 +171,7 @@ export function createModuleRuntime({ clock, env, locks, dataDir, log, onUpdate 
   return {
     recover: () => recoverRuntimeWorktrees(root, locks, log),
     start(input: StartTrial): void {
-      const { run, checks } = input;
+      const { run } = input;
       if (run.status !== projectModuleRunInitialStatus[run.kind] || run.finishedAt !== null)
         throw new AppError(ErrorCode.StateTransitionInvalid, 'A module run must begin in its initial state');
       if (closing || active.has(run.projectId))
@@ -164,14 +180,16 @@ export function createModuleRuntime({ clock, env, locks, dataDir, log, onUpdate 
           'A module trial is already running or the service is closing',
         );
       if (
-        (run.kind === 'launch' && input.configuration?.launch == null) ||
-        (run.kind === 'checks' && checks.length === 0)
+        'compoundPlan' in input
+          ? run.kind !== 'launch'
+          : (run.kind === 'launch' && input.configuration?.launch == null) ||
+            (run.kind === 'checks' && input.checks.length === 0)
       )
         throw new AppError(ErrorCode.ValidationFailed, 'Choose a runnable module configuration or discovered checks');
       const trial: Trial = {
         run: { ...run },
         abort: new AbortController(),
-        output: createRuntimeLog(env),
+        output: createProjectLog(env),
         done: Promise.resolve(),
       };
       active.set(run.projectId, trial);

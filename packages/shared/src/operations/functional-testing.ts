@@ -23,7 +23,8 @@ export const functionalTestReadOp = defineOperationContract({
   ...common,
   id: 'functionalTests.read',
   title: 'op.functionalTests.read',
-  description: 'Read function test case versions, environments, executions and evidence for a task',
+  description:
+    'Read functional test case versions, per-service environment diagnostics, executions and step evidence including the failing member and masked logs',
   input: functionalTestReadSchema.extend({ taskId }),
   output: functionalTestSnapshotSchema,
   http: { method: 'GET', path: '/tasks/:taskId/functional-test' },

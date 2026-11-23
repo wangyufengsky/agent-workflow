@@ -549,3 +549,7 @@ export const submitPlanTool = defineMcpTool({
 阶段数据保存后用 `submit_result` 完成当前步骤。阻塞原因和测试失败作为执行结果保留，可随报告交付。
 
 应用助手可调用 `agent-workflow-app_projects_modules` 读取本地 Java 项目的模块及默认配置；`projects_rediscoverModules` 重新扫描。项目试启动、模块检查、停止及保存默认配置分别使用应用操作 `projects_startModuleRun`、`projects_stopModuleRun`、`projects_defaultModuleConfiguration`。创建功能测试时，用 `functionalTest.moduleSelection` 指定目录中的模块和配置。准备阶段可以省略 launch，后端会使用建单时固定的入口。
+
+IDEA 联调组可由应用助手通过 `projects_modules` 读取，`tasks_create` 传入 `functionalTest.compoundSelection {compoundId,fingerprint,targetServiceId?}`。准备节点从任务上下文读取服务 ID，并以 `test_environment_prepare` 启动固定计划。HTTP 用例步骤、清理和就绪探测均可指定 `serviceId`。写入规则默认仅授权主入口，其他成员需按其 ID 单独授权。浏览器使用主入口。
+
+`test_run_read` 返回各成员观察值和失败步骤的服务、模块及脱敏日志。项目试启动与测试环境有各自的进程生命周期。`functionalTest_repair` 依据选定失败执行生成带证据的修复任务，`functionalTest_rerun` 在给定修复提交上重启同一组合并重复运行原版本的用例。

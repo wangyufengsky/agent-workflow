@@ -120,6 +120,24 @@ async function contractProves(
       !isDeepStrictEqual({ ...step, body: undefined, assertions: [] }, { ...original, body: undefined, assertions: [] })
     )
       return false;
+    const plan = record.functionalTest?.compoundLaunch?.plan;
+    if (plan) {
+      const member = plan.services.find((service) => service.id === (step.serviceId ?? plan.targetServiceId));
+      const directory = member?.launch.directory;
+      // 多个服务可以有同名路由，自动修订仅接受能归属到当前服务的合同。
+      if (
+        !directory ||
+        directory === '.' ||
+        !path.startsWith(`${directory}/`) ||
+        plan.services.some(
+          (other) =>
+            other.id !== member?.id &&
+            other.launch.directory.length >= directory.length &&
+            path.startsWith(`${other.launch.directory}/`),
+        )
+      )
+        return false;
+    }
     const operation = fieldValue(contract.data.paths[step.path], step.method.toLowerCase());
     if (operation === undefined) return false;
     if (step.assertions.length !== original.assertions.length) return false;

@@ -92,7 +92,7 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
         description:
           `${contract.description}.${RISK_NOTE[assistantOperationRisk(contract, {})]}` +
           (contract.id === createTaskOp.id
-            ? ' To test a module, pass functionalTest with target, writes and caseAttachmentIds. Omit workflowId to select the built-in functional test directly. Put expected behavior in requirement. Each test scope requires confirmation.'
+            ? ' For a named Java module or IDEA compound read projects_modules and pass functionalTest with moduleSelection or compoundSelection, target, writes and caseAttachmentIds. For a compound copy the catalog compoundId (its id), fingerprint and targetServiceId; scope non-primary writes to their serviceId. Omit workflowId to select the built-in functional test directly. Put expected behavior in requirement. Each test scope requires confirmation.'
             : ''),
         input: contract.id === createTaskOp.id ? assistantTaskInputSchema : assistantInputSchema(contract),
         mode: contract.mode,

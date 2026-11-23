@@ -9,6 +9,7 @@ import {
   visitIdeaXml,
 } from '../functional-tests/index.ts';
 import { runGit } from '../git/index.ts';
+import { parseCompoundConfigurations } from './discovery-compound.ts';
 import type { baselineTree } from './discovery-git.ts';
 
 type Tree = Awaited<ReturnType<typeof baselineTree>>;
@@ -56,9 +57,17 @@ export async function discoverIdeaConfigurations(repo: string, tree: Tree, warni
   if (sharedPaths.length > IDEA_LIMIT) warnings.push('Baseline IDEA configuration file limit reached');
   const configurations: IdeConfiguration[] = [];
   const tests: IdeaTest[] = [];
+  const compounds: ReturnType<typeof parseCompoundConfigurations>['compounds'] = [];
+  const declarations: ReturnType<typeof parseCompoundConfigurations>['declarations'] = [];
+  function appendCompounds(xml: string, path: string, scope: 'local' | 'project') {
+    const found = parseCompoundConfigurations(xml, path, scope);
+    compounds.push(...found.compounds);
+    declarations.push(...found.declarations);
+  }
   for (const path of sharedPaths.slice(0, IDEA_LIMIT)) {
     await inspect(path, (xml) => {
       tests.push(...parseTestConfigurations(xml, path, 'project'));
+      appendCompounds(xml, path, 'project');
     });
     await inspect(path, (xml) =>
       configurations.push(...parseIdeaConfigurations(xml, path, 'worktree', projectSdk, moduleSdks)),
@@ -85,11 +94,14 @@ export async function discoverIdeaConfigurations(repo: string, tree: Tree, warni
   ];
   for (const path of localPaths) {
     if (isLocal(path)) {
-      await reader.xml(path, (xml) => tests.push(...parseTestConfigurations(xml, path, 'local')));
+      await reader.xml(path, (xml) => {
+        tests.push(...parseTestConfigurations(xml, path, 'local'));
+        appendCompounds(xml, path, 'local');
+      });
     }
   }
   warnings.push(...localWarnings);
-  return { configurations, tests };
+  return { configurations, tests, compounds, declarations };
 }
 
 export type IdeaTest = {

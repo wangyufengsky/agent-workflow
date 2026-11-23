@@ -1,5 +1,6 @@
 import type { FunctionalTestRun } from '@aw/shared';
 import { FUNCTIONAL_TEST_COPY as C } from '../../copy/functional-testing.ts';
+import { LaunchDiagnostics, ServiceRuntimeEvidence } from '../projects/modules/service-runtime-evidence.tsx';
 import styles from './functional-test.module.css';
 
 type Environment = FunctionalTestRun['environment'];
@@ -145,8 +146,13 @@ export function TestEnvironment({ environment }: { environment: Environment | un
               )}
             </dl>
             {environment.reason !== null && <p className={styles.caution}>{environment.reason}</p>}
+            {environment.diagnostics !== undefined && <LaunchDiagnostics diagnostics={environment.diagnostics} />}
             {environment.checks.length > 0 && <EnvironmentChecks checks={environment.checks} />}
-            {environment.logTail !== '' && <pre className={styles.output}>{environment.logTail}</pre>}
+            {environment.services?.length ? (
+              <ServiceRuntimeEvidence services={environment.services} initialServiceId={environment.targetServiceId} />
+            ) : (
+              environment.logTail !== '' && <pre className={styles.output}>{environment.logTail}</pre>
+            )}
           </>
         )}
       </div>

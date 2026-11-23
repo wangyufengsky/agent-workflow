@@ -301,6 +301,7 @@ export function FunctionalTestWorkbench({
           <TestReport
             key={run?.id}
             task={task}
+            events={snapshot.events}
             reports={snapshot.reports.filter(({ runId }) => runId === run?.id)}
             onEvidence={(caseId, executionId) => {
               setEvidence({ caseId, executionId });

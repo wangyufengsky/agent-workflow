@@ -400,3 +400,41 @@
     transition: none;
   }
 }
+
+.serviceRuntime {
+  display: grid;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.serviceFacts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--s-2) var(--s-4);
+  margin-block: 0;
+}
+
+.serviceFacts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.compoundMember {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding-block: var(--s-2);
+  overflow-wrap: anywhere;
+}
+
+.injections {
+  display: block;
+}
+
+.diagnosticsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--s-4);
+  padding-block: var(--s-3);
+  border-block: 1px solid var(--line);
+}

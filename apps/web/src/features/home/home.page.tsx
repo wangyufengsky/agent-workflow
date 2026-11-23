@@ -4,14 +4,12 @@ import {
   attachmentIdsSchema,
   browserTestScopeSchema,
   functionalTestScopeSchema,
-  getProjectModulesOp,
   TaskStatus,
   WorktreeStatus,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useId, useRef, useState } from 'react';
-import { callOperation } from '../../api/client.ts';
 import { ROUTE_IDS, ROUTES } from '../../app/routes.ts';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
@@ -218,41 +216,42 @@ export function HomePage() {
   const knowledgeOrigin = origin != null && 'kind' in origin ? origin : undefined;
   const projectId =
     search.knowledgeMaterial === undefined
-      ? projects.some((p) => p.id === search.projectId)
+      ? search.moduleId !== undefined ||
+        search.compoundId !== undefined ||
+        projects.some((p) => p.id === search.projectId)
         ? search.projectId
         : projects[0]?.id
       : projects.find((project) => project.id === knowledgeOrigin?.projectId)?.id;
-  const selection = search.moduleId
-    ? {
-        moduleId: search.moduleId,
-        configurationId: search.configurationId,
-        fingerprint: search.configurationFingerprint,
-      }
-    : formScope?.moduleSelection;
-  const moduleProject = projects.find((p) => p.id === projectId);
-  const modules = useQuery({
-    queryKey: ['project-modules', projectId, moduleProject?.defaultBranch],
-    enabled: selection !== undefined && moduleProject !== undefined,
-    queryFn: () => callOperation(getProjectModulesOp, { id: projectId ?? '' }),
-  });
-  const selectedModule = modules.data?.modules.find((m) => m.id === selection?.moduleId);
-  const configId = selection?.configurationId ?? (selectedModule && modules.data?.defaults[selectedModule.id]);
-  const configuration = selectedModule?.configurations.find(
-    (c) => c.id === configId && (!selection?.fingerprint || c.fingerprint === selection.fingerprint),
-  );
-  const moduleValid =
-    selection === undefined ||
-    (!!configuration?.launch && !configuration.review.length && (!search.moduleId || projectId === search.projectId));
-  const functionalTest = selection
-    ? { ...(formScope ?? { target: '/', writes: [], caseAttachmentIds: [] }), moduleSelection: selection }
-    : formScope;
+  const defaultScope = { target: '/', writes: [], caseAttachmentIds: [] };
+  const functionalTest =
+    search.compoundId !== undefined
+      ? {
+          ...(formScope ?? defaultScope),
+          compoundSelection: {
+            compoundId: search.compoundId,
+            fingerprint: search.compoundFingerprint ?? '',
+            targetServiceId: search.targetServiceId,
+          },
+          moduleSelection: undefined,
+        }
+      : search.moduleId
+        ? {
+            ...(formScope ?? defaultScope),
+            moduleSelection: {
+              moduleId: search.moduleId,
+              configurationId: search.configurationId,
+              fingerprint: search.configurationFingerprint,
+            },
+            compoundSelection: undefined,
+          }
+        : formScope;
   const list = conversations.data ?? [];
   const conversation = list.find((c) => c.id === search.conversation);
 
   const composer = (
     <HomeComposer
       // A new prefill in the address (the assistant's open_form, the report card) starts the input over.
-      key={`${search.conversation}|${search.workflow}|${search.requirement}|${search.formSeq}|${search.moduleId}|${search.configurationId}|${search.configurationFingerprint}`}
+      key={`${search.conversation}|${search.workflow}|${search.requirement}|${search.formSeq}|${search.moduleId}|${search.configurationId}|${search.configurationFingerprint}|${search.compoundId}|${search.compoundFingerprint}|${search.targetServiceId}`}
       conversation={conversation}
       projects={projects}
       projectId={projectId ?? ''}
@@ -271,6 +270,9 @@ export function HomePage() {
             moduleId: undefined,
             configurationId: undefined,
             configurationFingerprint: undefined,
+            compoundId: undefined,
+            compoundFingerprint: undefined,
+            targetServiceId: undefined,
           }),
           replace: true,
         })
@@ -278,12 +280,6 @@ export function HomePage() {
       initialWorkflowKey={search.workflow}
       initialRequirement={search.requirement}
       initialBrowserTest={browserTest}
-      moduleValid={moduleValid}
-      moduleSummary={
-        moduleValid && selectedModule && configuration
-          ? [selectedModule.name, configuration.name, configuration.mainClass].join(' · ')
-          : undefined
-      }
       initialFunctionalTest={functionalTest}
       initialFunctionalTestAttachmentIds={functionalTestAttachmentIds}
       knowledgeDraft={
