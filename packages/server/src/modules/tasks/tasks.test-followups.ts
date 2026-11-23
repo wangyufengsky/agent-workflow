@@ -117,6 +117,7 @@ export function createTestFollowups({ db, unit, tasks, workflows, projects, test
       const id = tasks.insertDraft({ ...input, baseBranch, testStartCommit: commit });
       if (kind === 'rerun') tests.importCases(id, [...cases.values()], tests.readinessChecksFor(taskId, executions));
       db.insert(testFollowupsTable).values({ taskId: id, sourceId: taskId, kind, executions, requestKey }).run();
+      tasks.publishUpdate(taskId);
       unit.afterCommit(() => tasks.start(id));
       return { taskId: id };
     });

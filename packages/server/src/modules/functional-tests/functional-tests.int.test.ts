@@ -99,6 +99,7 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
           { method: 'POST', path: '/write-destination' },
         ],
         caseAttachmentIds: [],
+        onFailure: 'repair',
       },
       checkpoints: { confirm_plan: false, accept_each_node: false, ask_on_uncertainty: false },
       start: false,
@@ -337,12 +338,28 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
     const published = await t.call(functionalTestReportReadOp, { taskId });
     expect(published.body.markdown).toBe(written.markdown);
     const review = taskReaches(t, TaskStatus.Review);
+    const linkedTaskUpdate = (kind: 'repair' | 'rerun') =>
+      waitForEvent(
+        t.app.events,
+        ServerEventType.TaskUpdated,
+        (event) =>
+          event.id === taskId &&
+          t.app.services.tasks
+            .detail(taskId)
+            .testLinks?.some((link) => link.sourceId === taskId && link.kind === kind) === true,
+      );
+    const repairLinked = linkedTaskUpdate('repair');
+    t.fake.enqueue(script().hang());
     await must(report, McpToolName.SubmitResult, { summary: '已生成报告' });
     await review;
+    await repairLinked;
     const selection = { taskId, executionIds: ['defect'] };
-    t.fake.enqueue(script().hang());
+    const automaticRepair = (await t.call(getTaskOp, { id: taskId })).body.testLinks?.find(
+      ({ kind }) => kind === 'repair',
+    );
     const repair = await t.call(functionalTestRepairOp, selection);
     expect(repair.status).toBe(200);
+    expect(repair.body.taskId).toBe(automaticRepair?.taskId);
     expect((await t.call(functionalTestRepairOp, selection)).body).toEqual(repair.body);
     const original = (await t.call(getTaskOp, { id: taskId })).body;
     expect(original.testLinks).toContainEqual({
@@ -374,8 +391,10 @@ it('在授权的 HTTP 范围内执行，保留断言与修订，按本轮证据�
           .detail(candidate)
           .nodes.some((node) => node.id === nodeId && node.key === FUNCTIONAL_TEST_NODE.Environment),
     );
+    const rerunLinked = linkedTaskUpdate('rerun');
     const rerun = await t.call(functionalTestRerunOp, { ...selection, ref: commit });
     expect(rerun.status).toBe(200);
+    await rerunLinked;
     await rerunReady;
     const followup = (await t.call(getTaskOp, { id: rerun.body.taskId })).body;
     expect(followup.git.baseCommit).toBe(commit);

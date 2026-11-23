@@ -474,6 +474,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       return attempt.nodeId === null ? McpToolName.SubmitResult : browserTestSubmitTool(nodes.get(attempt.nodeId).kind);
     },
     insertDraft: lifecycle.insertDraft,
+    publishUpdate: state.publish,
     start(id: string): TaskDetailDTO {
       lifecycle.start(id);
       return detail(id);
