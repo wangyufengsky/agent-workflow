@@ -272,6 +272,8 @@ export const NODE_COPY = {
   checks: '检查',
   checkPassed: '通过',
   checkFailed: '未通过',
+  skippedCommandOutput: '已跳过本次检查，没有命令输出。',
+  emptyCommandOutput: '命令没有输出。',
   checkSkipped: '已跳过',
   checking: '正在检查这一次的结果……',
   checkUnrunnable: '无法运行',

@@ -82,7 +82,11 @@ export function Check({ taskId, check }: { taskId: string; check: CheckResult })
       ) : (
         <>
           <AutoAcceptanceEvidence check={check} />
-          {check.output !== '' && <pre className={styles.output}>{check.output}</pre>}
+          {check.output !== '' ? (
+            <pre className={styles.output}>{check.output}</pre>
+          ) : (
+            <p className="hint">{check.skipped ? C.skippedCommandOutput : C.emptyCommandOutput}</p>
+          )}
         </>
       )}
     </details>

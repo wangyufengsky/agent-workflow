@@ -1,6 +1,7 @@
 import { MCP_ASSISTANT_TOOL_PREFIX } from '@aw/shared';
 import { expect } from '@playwright/test';
 import { test } from './assistant-fixtures.ts';
+import { API_BASE, AUTH } from './env.ts';
 import { appTool, createProject, queueAssistantTurn } from './helpers.ts';
 
 test('助手历史里的异常工具参数仍可查看，打开会话后可直接切换和新建对话', async ({ page, request }) => {
@@ -59,13 +60,13 @@ test('一张历史确认卡片报错，可切换会话并在原处重试', async
   const affected = new URL(page.url()).searchParams.get('conversation');
   const confirmations = `**/assistant/conversations/${affected}/confirmations`;
   // 旧版本留下的卡片仍符合 API 契约，但当前版本无法渲染其操作。
-  await page.route(confirmations, async (route) => {
-    const response = await route.fetch();
-    const { items } = await response.json();
-    await route.fulfill({
-      json: { items: items.map((item: object) => ({ ...item, operationId: 'removed.operation' })) },
-    });
+  const response = await request.get(`${API_BASE}/assistant/conversations/${affected}/confirmations`, {
+    headers: AUTH,
   });
+  expect(response.ok()).toBe(true);
+  const { items } = await response.json();
+  const legacy = items.map((item: object) => ({ ...item, operationId: 'removed.operation' }));
+  await page.route(confirmations, (route) => route.fulfill({ json: { items: legacy } }));
   await page.reload();
   await expect(stream.getByRole('alert')).toContainText('这条消息暂时无法显示');
   await expect(stream).toContainText('请核对这个修改。');

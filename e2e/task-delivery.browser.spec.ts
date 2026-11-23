@@ -114,7 +114,7 @@ test('无法运行的命令跳过后，从结果卡读取当次检查证据', as
   await retry.click();
   await evidence.getByText('aw-command-that-does-not-exist').click();
   await expect(evidence).toContainText('已跳过');
-  await expect(evidence.locator('pre')).toBeVisible();
+  await expect(evidence.getByText('已跳过本次检查，没有命令输出。')).toBeVisible();
 });
 
 test('J6 两个任务改同一文件 → 第二个合并冲突 → 交给 AI 解决 → 合并成功', async ({ page, request }) => {
