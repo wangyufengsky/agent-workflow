@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FUNCTIONAL_TEST_COPY as C } from '../../copy/functional-testing.ts';
 import { CaseCarousel } from './case-carousel.tsx';
 import { CaseDefinition } from './case-definition.tsx';
+import { FailureServiceEvidence } from './failure-services.tsx';
 import styles from './functional-test.module.css';
 import { SelectedCaseActivity, TestAssertions, TestRequests, TestTerminal } from './test-events.tsx';
 import { TestFollowUp } from './test-follow-up.tsx';
@@ -203,6 +204,7 @@ export function TestExecution({
             </details>
             {execution?.status === FunctionalTestStatus.Failed && (
               <div className={styles.evidenceFoot}>
+                <FailureServiceEvidence events={events} />
                 <TestFollowUp key={execution.id} task={task} executionIds={[execution.id]} />
               </div>
             )}

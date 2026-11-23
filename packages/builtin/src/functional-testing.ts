@@ -23,7 +23,7 @@ export function createFunctionalTestTemplate(importCases: boolean): NonNullable<
         '编写案例',
         BuiltinRoleKey.Tester,
         [],
-        'Design independent cases covering the requested behavior. Cite the requirement or contract for every assertion. Use test_case_save as each case is written, then use submit_result to hand over the planned coverage and remaining questions.',
+        'Design independent cases covering the requested behavior. Cite the requirement or contract for every assertion. For compound HTTP cases select the saved service ID per step. Use test_case_save as each case is written, then use submit_result to hand over the planned coverage and remaining questions.',
       );
   return {
     nodes: [
@@ -33,7 +33,7 @@ export function createFunctionalTestTemplate(importCases: boolean): NonNullable<
         '准备环境',
         BuiltinRoleKey.Tester,
         [first.key],
-        'Use test_run_read first to inspect each saved case’s requires keys and any inheritedChecks. For a task with functionalTest.moduleLaunch use test_environment_prepare without launch to start the pinned module. Otherwise use the configured local service or the approved complete URL. If no local startup is configured, or this task explicitly selects a different module/test profile, read AGENTS.md/agents.md and referenced module docs, manifests and source; for Java or IDEA use test_ide_configurations and verify the service main and runtime requirements in the worktree and pass an evidence-backed launch to test_environment_prepare. Follow the Prepare instructions in the skill. Use the exact prerequisite keys. A linked retest reapplies its inherited probe definitions and records new observations. Compare environment.checks with the required keys, then submit the tested version, run ID and actual readiness. Report missing or failed prerequisites and continue with independent cases.',
+        'Use test_run_read first to inspect each saved case’s requires keys and any inheritedChecks. For a task with functionalTest.moduleLaunch or compoundLaunch use test_environment_prepare without launch to start the pinned module or all members of the pinned compound. Inspect each service’s readiness and diagnostics. Otherwise use the configured local service or the approved complete URL. If no local startup is configured, or this task explicitly selects a different module/test profile, read AGENTS.md/agents.md and referenced module docs, manifests and source; for Java or IDEA use test_ide_configurations and verify the service main and runtime requirements in the worktree and pass an evidence-backed launch to test_environment_prepare. Follow the Prepare instructions in the skill. Use the exact prerequisite keys. A linked retest reapplies its inherited probe definitions and records new observations. Compare environment.checks with the required keys, then submit the tested version, run ID and actual readiness. Report missing or failed prerequisites and continue with independent cases.',
       ),
       stage(
         FUNCTIONAL_TEST_NODE.Execute,
@@ -47,7 +47,7 @@ export function createFunctionalTestTemplate(importCases: boolean): NonNullable<
         '测试报告',
         BuiltinRoleKey.DocumentProcessor,
         [FUNCTIONAL_TEST_NODE.Execute],
-        'Read the execution records with test_run_read. Submit the run and execution references, defect observations and coverage gaps with test_report_submit. Use the generated report result for submit_result. The saved execution records determine counts and verdicts.',
+        'Read the execution records with test_run_read. Submit the run and execution references, the failed request and service/module evidence, defect observations and coverage gaps with test_report_submit. Use the generated report result for submit_result. The saved execution records determine counts and verdicts.',
       ),
     ],
   };

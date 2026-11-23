@@ -68,6 +68,7 @@ export type LaunchInput = {
   config: ProjectPreview | { readyPath: string; command: (port: number) => PreviewCommand };
   onLaunch?: (info: { command: string; readyUrl: string }) => void;
   onProbe?: (status: number) => void;
+  reservedPorts?: Set<number>;
   shell: string;
   env: NodeJS.ProcessEnv;
   clock: Clock;
@@ -145,12 +146,15 @@ export async function launchPreview(input: LaunchInput): Promise<RunningPreview>
   const { config, clock, log, signal } = input;
   if (signal.aborted) throw startFailed('Stopped while starting', log);
 
-  const port = await freePort();
+  let port = await freePort();
+  while (input.reservedPorts?.has(port)) port = await freePort();
+  input.reservedPorts?.add(port);
   if (signal.aborted) throw startFailed('Stopped while starting', log);
   const command =
     typeof config.command === 'string' ? config.command.replaceAll('$PORT', String(port)) : config.command(port);
   const url = `http://127.0.0.1:${port}${config.readyPath}`;
   input.onLaunch?.({ command: show(command), readyUrl: url });
+  if (signal.aborted) throw startFailed('Stopped while starting', log);
   const child = run(command, input, {
     ...input.env,
     PORT: String(port),

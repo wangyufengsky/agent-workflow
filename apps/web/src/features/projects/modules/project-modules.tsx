@@ -6,6 +6,7 @@ import { Icon, type IconName } from '../../../components/icon.tsx';
 import { COMMON_COPY, formatDateTime } from '../../../copy/common.ts';
 import { PROJECT_MODULES_COPY as C } from '../../../copy/project-modules.ts';
 import { stateTone } from './module-records.tsx';
+import { ProjectCompoundDetail } from './project-compound-detail.tsx';
 import { moduleState, ProjectModuleDetail, preferredConfiguration } from './project-module-detail.tsx';
 import styles from './project-modules.module.css';
 import { useProjectModules } from './project-modules.queries.ts';
@@ -22,14 +23,21 @@ export function ProjectModulesPanel({ projectId, branch }: { projectId: string; 
   const { query, rediscover, start, stop, setDefault } = operations;
   const [filter, setFilter] = useState('');
   const [selected, setSelected] = useState<string>();
+  const [selectedCompound, setSelectedCompound] = useState<string>();
   const [checksModule, setChecksModule] = useState<string>();
   const [chosenConfigs, setChosenConfigs] = useState<Record<string, string>>({});
   const snapshot = query.data;
   const modules = snapshot?.modules ?? [];
+  const compounds = snapshot?.compounds ?? [];
   const term = filter.trim().toLocaleLowerCase();
   const shown = modules.filter((module) =>
     [module.name, module.directory, C.kind[module.kind]].some((value) => value.toLocaleLowerCase().includes(term)),
   );
+  const shownCompounds = compounds.filter(({ name, source }) =>
+    [name, source, C.compound].some((value) => value.toLocaleLowerCase().includes(term)),
+  );
+  const compound =
+    shownCompounds.find(({ id }) => id === selectedCompound) ?? (shown.length === 0 ? shownCompounds[0] : undefined);
   const module = shown.find(({ id }) => id === selected) ?? shown[0];
   const serviceCount = modules.filter(({ kind }) => kind === 'service').length;
   const busy = start.isPending || stop.isPending || setDefault.isPending;
@@ -63,7 +71,7 @@ export function ProjectModulesPanel({ projectId, branch }: { projectId: string; 
       )}
       {snapshot !== undefined && (
         <>
-          {modules.length === 0 ? (
+          {modules.length === 0 && compounds.length === 0 ? (
             <p className={styles.empty}>{C.noModules}</p>
           ) : (
             <div className={styles.layout}>
@@ -88,9 +96,10 @@ export function ProjectModulesPanel({ projectId, branch }: { projectId: string; 
                         type="button"
                         className={styles.module}
                         key={item.id}
-                        aria-pressed={item.id === module?.id}
+                        aria-pressed={compound === undefined && item.id === module?.id}
                         onClick={() => {
                           setSelected(item.id);
+                          setSelectedCompound(undefined);
                           setChecksModule(undefined);
                         }}
                       >
@@ -111,9 +120,33 @@ export function ProjectModulesPanel({ projectId, branch }: { projectId: string; 
                       </button>
                     );
                   })}
+                  {shownCompounds.map((item) => (
+                    <button
+                      type="button"
+                      className={styles.module}
+                      key={item.id}
+                      aria-pressed={compound?.id === item.id}
+                      onClick={() => setSelectedCompound(item.id)}
+                    >
+                      <span className={styles.moduleIcon}>
+                        <Icon name="layers" size="sm" />
+                      </span>
+                      <span className={styles.moduleText}>
+                        <strong className="mono ellipsis">{item.name}</strong>
+                        <small>{C.compound}</small>
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </aside>
-              {module === undefined ? (
+              {compound !== undefined ? (
+                <ProjectCompoundDetail
+                  key={compound.id}
+                  compound={compound}
+                  snapshot={snapshot}
+                  operations={operations}
+                />
+              ) : module === undefined ? (
                 <p className={styles.empty}>{C.noSearch}</p>
               ) : (
                 <ProjectModuleDetail

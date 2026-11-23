@@ -5,6 +5,7 @@ import {
   AppError,
   ErrorCode,
   type FunctionalTestLaunch,
+  type FunctionalTestLaunchDiagnostics,
   type Preview,
   PreviewEvent,
   PreviewState,
@@ -22,6 +23,7 @@ import { locateShell } from '../git/index.ts';
 import { inferTaskFrontendPreview, type ProjectsService } from '../projects/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import type { WorktreesService } from '../worktrees/index.ts';
+import { launchDiagnostics } from './previews.launch-diagnostics.ts';
 import {
   createPreviewLog,
   type LaunchInput,
@@ -60,7 +62,13 @@ type Entry = {
   launchDetails: PreviewLaunchDetails | undefined;
 };
 
-type PreviewLaunchDetails = { command: string; readyUrl: string; readyStatus?: number; evidence?: TestLaunchEvidence };
+type PreviewLaunchDetails = {
+  command: string;
+  readyUrl: string;
+  readyStatus?: number;
+  evidence?: TestLaunchEvidence;
+  diagnostics?: FunctionalTestLaunchDiagnostics;
+};
 
 type PreviewLaunch = { directory: string; preview: ProjectPreview };
 
@@ -169,15 +177,30 @@ export function createPreviewsService({
     entry.log = previewLog;
     try {
       const explicit = 'evidence' in config;
+      const beforeRun: string[] = [];
+      let diagnostics: FunctionalTestLaunchDiagnostics | undefined;
       const input: LaunchInput = {
         directory: config.directory,
-        config: explicit ? { readyPath: config.evidence.readyPath, command: config.command } : config.preview,
+        config: explicit
+          ? {
+              readyPath: config.evidence.readyPath,
+              command(port) {
+                const command = config.command(port);
+                diagnostics = launchDiagnostics(config, config.proposal, command.args, { beforeRun });
+                return command;
+              },
+            }
+          : config.preview,
         shell: await locateShell(env),
         env: explicit ? config.env : env,
         clock,
         log: previewLog,
         onLaunch(details) {
-          entry.launchDetails = { ...details, ...(explicit ? { evidence: config.evidence } : {}) };
+          entry.launchDetails = {
+            ...details,
+            ...(explicit ? { evidence: config.evidence } : {}),
+            ...(diagnostics === undefined ? {} : { diagnostics }),
+          };
         },
         onProbe(status) {
           // 保持同一个描述对象，租约使用其身份识别服务是否被替换。
@@ -190,12 +213,16 @@ export function createPreviewsService({
       if (setup !== undefined) {
         const key = JSON.stringify([config.directory, setup]);
         if (!setupKeys.has(key)) {
+          beforeRun.push('install_dependencies');
           await setUpPreview(setup, input);
           setupKeys.add(key);
           setUp.set(worktreePath, setupKeys);
-        }
+        } else beforeRun.push('reuse_installed_dependencies');
       }
-      if (explicit && config.prepare !== undefined) await config.prepare((command) => setUpPreview(command, input));
+      if (explicit && config.prepare !== undefined) {
+        beforeRun.push(config.evidence.manager === 'gradle' ? 'gradle_classes' : 'maven_compile');
+        await config.prepare((command) => setUpPreview(command, input));
+      }
       const running = await launchPreview(input);
       if (entry.state !== PreviewState.Starting) {
         // Stopped the moment it became ready: the stop could not end a process it did not have yet.

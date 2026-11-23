@@ -22,7 +22,7 @@ export const getProjectModulesOp = defineOperationContract({
   id: 'projects.modules',
   title: 'op.projects.modules',
   description:
-    'Read Java modules, service and test configurations, source evidence, module defaults and recent runs for the project default branch',
+    'Discover Java modules and IDEA Compound service groups, member IDs, supported launch plans, source evidence, module defaults, recent runs and per-service diagnostics for the project default branch',
   input: project,
   output: projectModulesSchema,
   risk: OperationRisk.Read,
@@ -53,9 +53,11 @@ export const startProjectModuleRunOp = defineOperationContract({
   id: 'projects.startModuleRun',
   title: 'op.projects.startModuleRun',
   description:
-    'Start a module trial using its configuration ID and fingerprint, or run the selected check IDs from the project catalog in an isolated worktree',
+    'Start a compound trial with compoundId, fingerprint, baseline and optional targetServiceId, start one module configuration, or run selected module checks in an isolated worktree',
   input: project.extend({
-    moduleId: id,
+    moduleId: id.optional(),
+    compoundId: id.optional(),
+    targetServiceId: id.optional(),
     configurationId: id.optional(),
     fingerprint: id.optional(),
     checkIds: z.array(id).min(1).max(PROJECT_MODULE_CHECK_LIMIT).optional(),

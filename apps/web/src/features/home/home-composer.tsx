@@ -52,6 +52,7 @@ import { ChecklistField } from '../requirements/checklist-field.tsx';
 import { AssistantSkillPicker } from '../skills/assistant-skill-picker.tsx';
 import { WorkflowSkillSummary } from '../skills/workflow-skill-summary.tsx';
 import { workflowsQuery } from '../tasks/tasks.queries.ts';
+import { FunctionalTestSource, useFunctionalTestSource } from './functional-test-source.tsx';
 import styles from './home.module.css';
 import { MoreOptionsFields } from './more-options.tsx';
 import { useStartTask } from './use-start-task.ts';
@@ -75,8 +76,6 @@ export function HomeComposer({
   initialWorkflowKey,
   initialRequirement,
   initialBrowserTest,
-  moduleValid,
-  moduleSummary,
   initialFunctionalTest,
   initialFunctionalTestAttachmentIds,
   knowledgeDraft,
@@ -91,8 +90,6 @@ export function HomeComposer({
   initialWorkflowKey: string | undefined;
   initialRequirement: string | undefined;
   initialBrowserTest: BrowserTestScope | undefined;
-  moduleValid: boolean;
-  moduleSummary: string | undefined;
   initialFunctionalTest: FunctionalTestScope | undefined;
   initialFunctionalTestAttachmentIds: string[] | undefined;
   knowledgeDraft?:
@@ -133,6 +130,15 @@ export function HomeComposer({
   const moreId = useId();
   const browserTesting = workflowKey === BROWSER_TEST_WORKFLOW_KEY;
   const functionalTesting = workflowKey === FUNCTIONAL_TEST_WORKFLOW_KEY;
+  const project = projects.find((p) => p.id === projectId);
+  const functionalSource = useFunctionalTestSource({
+    project,
+    prefill: {
+      moduleSelection: initialFunctionalTest?.moduleSelection,
+      compoundSelection: initialFunctionalTest?.compoundSelection,
+    },
+    enabled: functionalTesting,
+  });
   const [selectedCaseIds, setSelectedCaseIds] = useState(initialFunctionalTest?.caseAttachmentIds ?? []);
   const [onFailure, setOnFailure] = useState(initialFunctionalTest?.onFailure);
   const caseAttachments = [
@@ -145,7 +151,27 @@ export function HomeComposer({
   const [approvedFunctionalScope, setApprovedFunctionalScope] = useState<string>();
   const initialScope = initialFunctionalTest ?? initialBrowserTest;
   const [testTarget, setTestTarget] = useState(initialScope?.target ?? '');
-  const [testWrites, setTestWrites] = useState(initialScope === undefined ? '' : browserWriteLines(initialScope));
+  const initialWrites = initialFunctionalTest?.writes ?? [];
+  const [testWrites, setTestWrites] = useState(
+    initialFunctionalTest === undefined
+      ? initialBrowserTest === undefined
+        ? ''
+        : browserWriteLines(initialBrowserTest)
+      : browserWriteLines({
+          ...initialFunctionalTest,
+          writes: initialWrites.filter(({ serviceId }) => serviceId === undefined),
+        }),
+  );
+  const [serviceWrites, setServiceWrites] = useState<Record<string, string>>(() => {
+    const text: Record<string, string> = {};
+    for (const { serviceId, method, path } of initialWrites) {
+      if (serviceId !== undefined) text[serviceId] = [text[serviceId], `${method} ${path}`].filter(Boolean).join('\n');
+    }
+    return text;
+  });
+  const scopedWrites = Object.entries(serviceWrites).flatMap(([serviceId, lines]) =>
+    parseBrowserWriteLines(lines).map((rule) => ({ ...rule, serviceId })),
+  );
   const [testApproved, setTestApproved] = useState(false);
   const testScope = browserTestScopeSchema.safeParse({
     target: testTarget,
@@ -153,20 +179,25 @@ export function HomeComposer({
   });
   const functionalScope = functionalTestScopeSchema.safeParse({
     target: testTarget.trim(),
-    moduleSelection: initialFunctionalTest?.moduleSelection,
-    writes: parseBrowserWriteLines(testWrites),
+    ...functionalSource.selection,
+    writes: [...parseBrowserWriteLines(testWrites), ...scopedWrites],
     caseAttachmentIds,
     onFailure,
   });
   const validModuleScope =
-    moduleValid && (!initialFunctionalTest?.moduleSelection || testTarget.trim().startsWith('/'));
+    functionalSource.valid &&
+    (!functionalSource.bound || testTarget.trim().startsWith('/')) &&
+    scopedWrites.every(({ serviceId }) => functionalSource.services.some(({ id }) => id === serviceId));
   const functionalApprovalKey = JSON.stringify([
     projectId,
     testTarget,
     testWrites,
     caseAttachmentIds,
     onFailure,
-    initialFunctionalTest?.moduleSelection,
+    functionalSource.selection,
+    functionalSource.target?.id,
+    functionalSource.config?.fingerprint,
+    scopedWrites,
   ]);
   const functionalApproved = approvedFunctionalScope === functionalApprovalKey;
   const task = useStartTask({
@@ -207,7 +238,6 @@ export function HomeComposer({
     attachmentsBlocked: files.blocked,
     onStarted: () => files.clear(),
   });
-  const project = projects.find((p) => p.id === projectId);
   const selectedAssistantId = conversation === undefined ? assistantProjectId : conversation.projectId;
   const attachmentProject =
     workflowKey !== undefined || templateKey !== undefined || breakdown
@@ -222,6 +252,8 @@ export function HomeComposer({
     task.setOptions({ ...task.options, baseBranch: null });
     setTestApproved(false);
     setApprovedFunctionalScope(undefined);
+    functionalSource.reset();
+    setServiceWrites({});
     onProjectChange(id);
   };
   const shown = workflows.data?.filter((w) => task.pro || w.kind === WorkflowKind.Builtin);
@@ -465,17 +497,30 @@ export function HomeComposer({
             </label>
           </fieldset>
         )}
-        {functionalTesting && initialFunctionalTest?.moduleSelection && (
-          <p className="hint" role="status">
-            {moduleValid && moduleSummary
-              ? FUNCTIONAL_TEST_COPY.moduleDraft(moduleSummary)
-              : FUNCTIONAL_TEST_COPY.moduleUnavailable}
-          </p>
+        {functionalTesting && (
+          <FunctionalTestSource
+            source={{
+              ...functionalSource,
+              chooseTarget: (id) => {
+                functionalSource.chooseTarget(id);
+                setApprovedFunctionalScope(undefined);
+              },
+              choose: (key) => {
+                functionalSource.choose(key);
+                setServiceWrites({});
+                setApprovedFunctionalScope(undefined);
+                if (key !== '' && testTarget.trim() === '') setTestTarget('/');
+              },
+            }}
+          />
         )}
         {functionalTesting && (
           <FunctionalTestFields
             target={testTarget}
             writes={testWrites}
+            services={functionalSource.services}
+            serviceWrites={serviceWrites}
+            onServiceWritesChange={(id, value) => setServiceWrites((before) => ({ ...before, [id]: value }))}
             attachments={caseAttachments}
             caseIds={caseAttachmentIds}
             onFailure={onFailure}

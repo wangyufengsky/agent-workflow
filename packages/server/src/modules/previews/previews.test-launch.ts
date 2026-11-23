@@ -29,6 +29,7 @@ export type TestLaunchEvidence = FunctionalTestLaunch & { manager: Manager; base
 export type ResolvedTestLaunch = {
   directory: string;
   evidence: TestLaunchEvidence;
+  proposal: FunctionalTestLaunch;
   command: (port: number) => PreviewCommand;
   setup?: PreviewCommand;
   prepare?: PreparePreviewCommand;
@@ -331,6 +332,7 @@ export async function resolveTestLaunch(
     ...commands,
     directory: dirname(file.absolute),
     evidence,
+    proposal,
     env: {
       ...('javaEnv' in commands ? commands.javaEnv : env),
       CI: 'true',

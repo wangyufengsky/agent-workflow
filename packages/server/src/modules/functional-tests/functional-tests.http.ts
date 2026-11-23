@@ -130,14 +130,15 @@ export async function scopedRequest(url: URL, init: RequestInit & { method: stri
   throw new AppError(ErrorCode.ValidationFailed, 'Too many redirects in the test target');
 }
 
-export function createHttpRunner(origin: string, scope: NonNullable<WriteScope>, signal: AbortSignal) {
+export function createHttpRunner(signal: AbortSignal) {
   const responses = new Map<number, Result>();
   return async (
     step: Extract<FunctionalTestStep, { kind: 'http' }>,
     index: number,
+    scope: NonNullable<WriteScope>,
     onRequest: (path: string) => void,
   ) => {
-    const url = new URL(interpolate(step.path, responses, encodeURIComponent), origin);
+    const url = new URL(interpolate(step.path, responses, encodeURIComponent), scope.origin);
     onRequest(url.pathname);
     const body = step.body === undefined ? undefined : bodyOf(step.body, responses);
     const response = await scopedRequest(

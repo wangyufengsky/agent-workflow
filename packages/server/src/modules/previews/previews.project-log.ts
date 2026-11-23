@@ -1,10 +1,10 @@
 import { stripVTControlCharacters } from 'node:util';
-import { createPreviewLog } from '../previews/index.ts';
+import { createPreviewLog } from './previews.process.ts';
 
 const MAX_LINE = 16_384;
 const SECRET_KEY = /password|passwd|secret|cookie|authorization|api.?key|access.?key|private.?key|credential|token/i;
 
-export function createRuntimeLog(env: NodeJS.ProcessEnv) {
+export function createProjectLog(env: NodeJS.ProcessEnv) {
   const values = [
     ...new Set(
       Object.entries(env)

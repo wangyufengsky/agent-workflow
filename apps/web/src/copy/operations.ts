@@ -294,6 +294,8 @@ export const OPERATION_TITLE: Readonly<Record<string, string>> = {
 export const INPUT_FIELD_LABEL: Readonly<Record<string, string>> = {
   moduleId: '模块',
   configurationId: '启动配置',
+  compoundId: '组合配置',
+  targetServiceId: '默认请求服务',
   fingerprint: '配置指纹',
   checkIds: '选中的模块检查',
   baseline: '基线提交',

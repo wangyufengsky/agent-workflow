@@ -11,8 +11,11 @@ const path = z
 const version = z.number().int().positive();
 const at = z.number().int().nonnegative();
 
+export const functionalTestServiceIdSchema = z.string().min(1).max(2048);
+
 const httpStep = z.object({
   kind: z.literal('http'),
+  serviceId: functionalTestServiceIdSchema.optional(),
   title: note,
   method: z.enum(['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']),
   path,
@@ -66,6 +69,7 @@ export type FunctionalTestCase = z.infer<typeof functionalTestCaseSchema>;
 export type FunctionalTestStep = FunctionalTestCase['steps'][number];
 
 const probeSchema = z.object({
+  serviceId: functionalTestServiceIdSchema.optional(),
   key: id,
   path: path.refine((value) => !value.includes('?')),
   expectedStatus: z.number().int().min(100).max(599),
@@ -136,6 +140,61 @@ export const functionalTestLaunchSchema = z
     }
   });
 export type FunctionalTestLaunch = z.infer<typeof functionalTestLaunchSchema>;
+
+export const functionalTestServiceInjectionEnvironmentSchema = z
+  .string()
+  .regex(/^[A-Z][A-Z0-9_]*(?:_URL|_URI|_ORIGIN)$/);
+
+export const functionalTestServicePlanSchema = z.object({
+  services: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().optional(),
+        moduleId: z.string().optional(),
+        launch: functionalTestLaunchSchema,
+        dependsOn: z.array(z.string().min(1)),
+        inject: z.array(
+          z.object({ env: functionalTestServiceInjectionEnvironmentSchema, serviceId: z.string().min(1) }),
+        ),
+      }),
+    )
+    .min(1)
+    .max(16),
+  targetServiceId: z.string().min(1),
+});
+export type FunctionalTestServicePlan = z.infer<typeof functionalTestServicePlanSchema>;
+
+export const functionalTestLaunchDiagnosticsSchema = z.object({
+  workingDirectory: z.string(),
+  manager: z.string(),
+  javaVersion: z.number().int().optional(),
+  classpathEntries: z.number().int().optional(),
+  includeProvided: z.boolean().optional(),
+  managedVmOptions: z.array(z.string()),
+  beforeRun: z.array(z.string()),
+  injectedEnvironment: z.array(z.string()),
+  requested: z
+    .object({
+      workingDirectory: z.string(),
+      javaVersion: z.number().int().optional(),
+      includeProvided: z.boolean().optional(),
+    })
+    .optional(),
+});
+export type FunctionalTestLaunchDiagnostics = z.infer<typeof functionalTestLaunchDiagnosticsSchema>;
+
+export const functionalTestServiceRuntimeSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  moduleId: z.string().optional(),
+  target: z.string().nullable(),
+  logTail: z.string(),
+  readyUrl: z.string().nullable(),
+  readyStatus: z.number().int().nullable(),
+  diagnostics: functionalTestLaunchDiagnosticsSchema.optional(),
+});
+export type FunctionalTestServiceRuntime = z.infer<typeof functionalTestServiceRuntimeSchema>;
 export const functionalTestPrepareSchema = z.object({
   checks: z.array(probeSchema).max(10).optional(),
   launch: functionalTestLaunchSchema.optional(),
@@ -143,6 +202,9 @@ export const functionalTestPrepareSchema = z.object({
 export type FunctionalTestPrepare = z.output<typeof functionalTestPrepareSchema>;
 
 export const functionalTestEnvironmentSchema = z.object({
+  diagnostics: functionalTestLaunchDiagnosticsSchema.optional(),
+  services: z.array(functionalTestServiceRuntimeSchema).optional(),
+  targetServiceId: z.string().optional(),
   id,
   target: z.string(),
   baseline: z.string().nullable(),

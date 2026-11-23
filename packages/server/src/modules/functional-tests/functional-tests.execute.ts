@@ -4,6 +4,8 @@ import {
   ErrorCode,
   type FunctionalTestCase,
   type FunctionalTestEvent,
+  type FunctionalTestScope,
+  type FunctionalTestServiceRuntime,
   FunctionalTestStatus,
   type FunctionalTestStep,
 } from '@aw/shared';
@@ -22,7 +24,9 @@ type Options = {
   browser: BrowserService;
   owner: BrowserOwner;
   target: string;
-  writes: Parameters<typeof createHttpRunner>[1]['writes'];
+  writes: FunctionalTestScope['writes'];
+  services?: () => FunctionalTestServiceRuntime[];
+  targetServiceId?: string | undefined;
   signal: AbortSignal;
   emit: Emit;
   time: () => number;
@@ -37,30 +41,66 @@ export async function executeCase({
   target,
   writes,
   signal,
-  emit,
+  emit: publish,
+  services,
+  targetServiceId,
   time,
   logTail,
   waitForUser,
 }: Options) {
   const origin = new URL(target).origin;
-  const http = createHttpRunner(origin, { origin, writes }, signal);
-  const website = createFunctionalBrowser(browser, owner, signal, async (step, reason, wait) => {
-    await waitForUser(() => {
-      const pending = wait();
-      emit(step, 'handoff', '浏览器需要人工接管', { reason });
-      return pending;
+  const http = createHttpRunner(signal);
+  const defaultWrites = writes.filter((rule) => (rule.serviceId ?? targetServiceId) === targetServiceId);
+  const emit: Emit = (index, kind, message, detail) => {
+    const step =
+      index === null ? undefined : (definition.steps[index] ?? definition.cleanup[index - definition.steps.length]);
+    const serviceId = (step?.kind === 'http' ? step.serviceId : undefined) ?? targetServiceId;
+    if (step === undefined || serviceId === undefined) return publish(index, kind, message, detail);
+    const service = services?.().find((entry) => entry.id === serviceId);
+    const failed =
+      detail.passed === false ||
+      detail.passed === null ||
+      detail.status === FunctionalTestStatus.Blocked ||
+      detail.status === FunctionalTestStatus.Failed;
+    publish(index, kind, message, {
+      ...detail,
+      serviceId,
+      ...(service?.name ? { serviceName: redactText(service.name) } : {}),
+      ...(service?.moduleId ? { moduleId: service.moduleId } : {}),
+      ...(failed && service?.logTail ? { serviceLog: redactText(service.logTail.slice(-2400)) } : {}),
     });
-    emit(step, 'handoff', '已恢复页面操作', { reason });
-  });
+  };
+  const website = createFunctionalBrowser(
+    browser,
+    { ...owner, browserTest: { target, writes: defaultWrites } },
+    signal,
+    async (step, reason, wait) => {
+      await waitForUser(() => {
+        const pending = wait();
+        emit(step, 'handoff', '浏览器需要人工接管', { reason });
+        return pending;
+      });
+      emit(step, 'handoff', '已恢复页面操作', { reason });
+    },
+  );
   let mayWrite = false;
   let confirmedWrite = false;
   async function runStep(step: FunctionalTestStep, index: number): Promise<FunctionalTestStatus> {
     mayWrite = false;
     signal.throwIfAborted();
-    mayWrite = step.kind === 'browser' ? writes.length > 0 : !['GET', 'HEAD', 'OPTIONS'].includes(step.method);
+    mayWrite = step.kind === 'browser' && defaultWrites.length > 0;
     if (step.kind === 'http') {
       const started = time();
-      const result = await http(step, index, (path) =>
+      const serviceId = step.serviceId ?? targetServiceId;
+      const member = serviceId ? services?.().find((service) => service.id === serviceId) : undefined;
+      if (serviceId && !member?.target)
+        throw new AppError(ErrorCode.ValidationFailed, 'The requested service is unavailable in this test environment');
+      const scope = {
+        origin: member?.target ? new URL(member.target).origin : origin,
+        writes: writes.filter((rule) => (rule.serviceId ?? targetServiceId) === serviceId),
+      };
+      mayWrite = !['GET', 'HEAD', 'OPTIONS'].includes(step.method);
+      const result = await http(step, index, scope, (path) =>
         emit(index, 'action', '等待 HTTP 响应', {
           title: redactText(step.title),
           method: step.method,

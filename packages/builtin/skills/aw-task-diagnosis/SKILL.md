@@ -15,6 +15,10 @@ Find the actual cause before you suggest anything, and quote the line that shows
 4. `agent-workflow-app_nodes_get` for the step that failed or is running: its instructions, the submitted result, each check's result (the check command's exit code and output, the page check's failures, the AI review's issues) and the attempts with their errors.
 5. Only when the trouble is outside the task's own work (attempts end with an error of the AI session instead of a failed check, or a running task has not moved for a long time): `agent-workflow-app_system_environment`, and in pro mode `agent-workflow-app_system_runtime` and `agent-workflow-app_system_runtimeLogs` (the last lines of the opencode log).
 
+For a Java module or IDEA compound, read `agent-workflow-app_projects_modules` for the project and `agent-workflow-app_functionalTests_read` for the task run if present. Compare the intended configuration and source against the observed working directory, Java version, classpath and module evidence, managed VM options and before-run steps. Distinguish unsupported options, missing evidence and actual port/readiness failures. Quote the member and masked evidence.
+
+For a requested trial, call `agent-workflow-app_projects_startModuleRun` with the current baseline and either module/configuration IDs and fingerprint, or compound ID and fingerprint. For a module check pass its checkIds instead. Inspect the returned run by ID in the catalog and stop that trial using `agent-workflow-app_projects_stopModuleRun`. Save a verified single-module default via `agent-workflow-app_projects_defaultModuleConfiguration` only when requested. Rediscover after configuration changes.
+
 ## Causes and next steps
 
 Name one cause. If two fit, say which the evidence supports better.

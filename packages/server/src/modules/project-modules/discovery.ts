@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
 import {
+  type FunctionalTestLaunch,
   functionalTestLaunchSchema,
   functionalTestMainClassSchema,
   type IdeConfiguration,
@@ -10,6 +11,7 @@ import {
 } from '@aw/shared';
 import { hasJavaMain } from '../previews/index.ts';
 import { type BuildHints, gradleHints, gradleSettings, mavenHints } from './discovery-build.ts';
+import { compoundManifest, discoverCompounds, readCompoundMetadata } from './discovery-compound.ts';
 import { baselineTree } from './discovery-git.ts';
 import { discoverIdeaConfigurations, type IdeaTest } from './discovery-idea.ts';
 
@@ -336,6 +338,7 @@ function moduleConfigurations(
   module: Module,
   configs: IdeConfiguration[],
   docs: Awaited<ReturnType<typeof moduleDocs>>,
+  compoundCandidates: Map<string, FunctionalTestLaunch>,
 ): ProjectModuleConfiguration[] {
   const configurations: ProjectModuleConfiguration[] = [];
   for (const main of module.mains) {
@@ -361,6 +364,10 @@ function moduleConfigurations(
         ...(entry?.includeProvided === undefined ? {} : { includeProvided: entry.includeProvided }),
       });
       if (!launch.success) review.push('unsupported preview configuration');
+      const candidate =
+        (main.service || module.hints.spring || docs.documentedServices.has(main.name)) && launch.success
+          ? launch.data
+          : null;
       const configuration = {
         id,
         name: entry?.name ?? main.name,
@@ -371,14 +378,11 @@ function moduleConfigurations(
         ...(entry?.javaVersion === undefined ? {} : { javaVersion: entry.javaVersion }),
         ...(entry?.includeProvided === undefined ? {} : { includeProvided: entry.includeProvided }),
         review: [...new Set(review)],
-        launch:
-          review.length === 0 &&
-          (main.service || module.hints.spring || docs.documentedServices.has(main.name)) &&
-          launch.success
-            ? launch.data
-            : null,
+        launch: review.length === 0 ? candidate : null,
       } satisfies Omit<ProjectModuleConfiguration, 'fingerprint'>;
       if (configurations.some((existing) => existing.id === id)) continue;
+      if (candidate && entry && review.every((item) => item === 'environment variables or files'))
+        compoundCandidates.set(id, candidate);
       const evidence = [module.source, main.path, source, ...module.memberships, ...docs.documents];
       configurations.push({
         ...configuration,
@@ -424,6 +428,7 @@ export async function discoverProjectModules(repoPath: string, branch: string) {
     testsByModule.set(module, [...(testsByModule.get(module) ?? []), test]);
   }
   const result: ProjectJavaModule[] = [];
+  const compoundCandidates = new Map<string, FunctionalTestLaunch>();
   for (const module of modules.sort((a, b) => a.id.localeCompare(b.id))) {
     const docs = await moduleDocs(tree, module);
     result.push({
@@ -435,7 +440,7 @@ export async function discoverProjectModules(repoPath: string, branch: string) {
       directory: module.directory,
       build: module.build,
       kind: moduleKind(module, docs.documentedServices),
-      configurations: moduleConfigurations(tree, module, byModule.get(module) ?? [], docs),
+      configurations: moduleConfigurations(tree, module, byModule.get(module) ?? [], docs, compoundCandidates),
       checks: moduleChecks(module, testsByModule.get(module) ?? []),
       ...(module.dependentModules.size === 0 ? {} : { dependentModules: [...module.dependentModules].sort() }),
       evidence: [
@@ -450,5 +455,7 @@ export async function discoverProjectModules(repoPath: string, branch: string) {
       ],
     });
   }
-  return { baseline: tree.baseline, modules: result, warnings: [...new Set(warnings)].sort() };
+  const metadata = readCompoundMetadata(await tree.text(compoundManifest), tree.files.has(compoundManifest), warnings);
+  const compounds = discoverCompounds(idea.compounds, idea.declarations, result, metadata, compoundCandidates);
+  return { baseline: tree.baseline, modules: result, compounds, warnings: [...new Set(warnings)].sort() };
 }

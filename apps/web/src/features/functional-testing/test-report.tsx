@@ -1,5 +1,6 @@
 import {
   DeliveryStrategy,
+  type FunctionalTestEvent,
   type FunctionalTestReport,
   FunctionalTestStatus,
   functionalTestReadOp,
@@ -18,6 +19,7 @@ import { Markdown } from '../../components/markdown.tsx';
 import { DELIVERY_COPY } from '../../copy/delivery.ts';
 import { FUNCTIONAL_TEST_COPY as C } from '../../copy/functional-testing.ts';
 import { useDeliver } from '../tasks/tasks.queries.ts';
+import { failureServices } from './failure-services.tsx';
 import styles from './functional-test.module.css';
 import { TestFollowUp, TestFollowUpCheckbox } from './test-follow-up.tsx';
 
@@ -75,10 +77,12 @@ function RunComparison({
 export function TestReport({
   task,
   reports,
+  events,
   onEvidence,
 }: {
   task: TaskDetailDTO;
   reports: readonly FunctionalTestReport[];
+  events: readonly FunctionalTestEvent[];
   onEvidence: (caseId: string, executionId: string) => void;
 }) {
   const [version, setVersion] = useState<number>();
@@ -92,6 +96,18 @@ export function TestReport({
   if (report === undefined) return <p className="hint">{C.noReport}</p>;
   const origin = task.testLinks?.find(({ taskId, kind }) => taskId === task.id && kind === 'rerun');
   const failed = report.items.filter((item) => item.status === FunctionalTestStatus.Failed);
+  const failures = new Map(
+    failed.map(({ executionId }) => [
+      executionId,
+      [
+        ...failureServices(
+          events.filter((event) => event.runId === report.runId && event.executionId === executionId),
+        ).values(),
+      ]
+        .map(({ service }) => service)
+        .join('、'),
+    ]),
+  );
   const firstFailure = failed.length === 1 ? failed[0]?.executionId : undefined;
   const checkedIds = selected ?? (firstFailure == null ? [] : [firstFailure]);
   const selectedFailures = failed.flatMap(({ executionId }) =>
@@ -148,6 +164,11 @@ export function TestReport({
                   <span>
                     {number} · {title} · {C.version(version)} · {C.status[status]}
                   </span>
+                  {failures.get(executionId) && (
+                    <small>
+                      {C.failureService} · {failures.get(executionId)}
+                    </small>
+                  )}
                   <Button size="sm" onClick={() => onEvidence(caseId, executionId)}>
                     {C.evidence}
                   </Button>

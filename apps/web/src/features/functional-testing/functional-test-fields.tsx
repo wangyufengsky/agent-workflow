@@ -1,7 +1,13 @@
-import { type AttachmentDTO, AttachmentFormat, type FunctionalTestScope } from '@aw/shared';
+import {
+  type AttachmentDTO,
+  AttachmentFormat,
+  type FunctionalTestScope,
+  type FunctionalTestServicePlan,
+} from '@aw/shared';
 import { useId } from 'react';
 import { Icon } from '../../components/icon.tsx';
 import { FUNCTIONAL_TEST_COPY as C } from '../../copy/functional-testing.ts';
+import { PROJECT_MODULES_COPY as M } from '../../copy/project-modules.ts';
 import { BROWSER_TEST_COPY as B } from '../../copy/tasks.ts';
 import styles from './functional-test-fields.module.css';
 
@@ -11,6 +17,9 @@ export const canImportCaseAttachment = ({ format }: AttachmentDTO) =>
 export function FunctionalTestFields({
   target,
   writes,
+  services,
+  serviceWrites,
+  onServiceWritesChange,
   attachments,
   caseIds,
   onFailure,
@@ -24,6 +33,9 @@ export function FunctionalTestFields({
 }: {
   target: string;
   writes: string;
+  services: FunctionalTestServicePlan['services'];
+  serviceWrites: Record<string, string>;
+  onServiceWritesChange(id: string, value: string): void;
   attachments: readonly AttachmentDTO[];
   caseIds: readonly string[];
   onFailure: FunctionalTestScope['onFailure'];
@@ -35,6 +47,14 @@ export function FunctionalTestFields({
   onFailureChange(value: FunctionalTestScope['onFailure']): void;
   onApprovalChange(value: boolean): void;
 }) {
+  const consent =
+    services.length > 0
+      ? onFailure === undefined
+        ? C.approveCompound
+        : C.approveCompoundFollowUp
+      : onFailure === undefined
+        ? B.approved
+        : C.approveWithFollowUp;
   const targetHintId = useId();
   const writesHintId = useId();
   return (
@@ -65,10 +85,30 @@ export function FunctionalTestFields({
             onChange={(event) => onWritesChange(event.target.value)}
           />
           <span className="hint" id={writesHintId}>
-            {B.writesHint}
+            {services.length > 0 ? C.primaryServiceWritesHint : B.writesHint}
           </span>
         </label>
       </div>
+      {services.length > 0 && (
+        <details className={styles.caseFiles} open={Object.values(serviceWrites).some(Boolean) || undefined}>
+          <summary>{C.serviceWrites}</summary>
+          <p className="hint">{C.serviceWritesHint}</p>
+          <div className={styles.scopeGrid}>
+            {services.map(({ id, name, moduleId }) => (
+              <label className={styles.field} key={id}>
+                <span className={styles.fieldTitle}>{name ?? moduleId ?? id}</span>
+                <textarea
+                  className={`input mono ${styles.writes}`}
+                  rows={2}
+                  value={serviceWrites[id] ?? ''}
+                  placeholder={B.writesPlaceholder}
+                  onChange={(event) => onServiceWritesChange(id, event.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+        </details>
+      )}
       <fieldset className={styles.caseFiles}>
         <legend>{C.caseInputs}</legend>
         <p className="hint">{C.caseInputHint}</p>
@@ -111,13 +151,18 @@ export function FunctionalTestFields({
           onChange={(event) => onApprovalChange(event.target.checked)}
         />
         <Icon name="shield" size="sm" />
-        <span>{onFailure === undefined ? B.approved : C.approveWithFollowUp}</span>
+        <span>{consent}</span>
       </label>
     </fieldset>
   );
 }
 
 export function FunctionalTestScopeSummary({ scope }: { scope: FunctionalTestScope }) {
+  const plan = scope.compoundLaunch?.plan;
+  const target = scope.compoundSelection?.targetServiceId ?? plan?.targetServiceId;
+  const serviceLabel = (id: string) => plan?.services.find((service) => service.id === id)?.name ?? id;
+  const defaultWriteTarget =
+    target !== undefined ? serviceLabel(target) : scope.compoundSelection ? C.defaultTargetService : undefined;
   return (
     <dl className={styles.summary}>
       {scope.moduleSelection && (
@@ -130,10 +175,29 @@ export function FunctionalTestScopeSummary({ scope }: { scope: FunctionalTestSco
           </dd>
         </>
       )}
+      {scope.compoundSelection && (
+        <>
+          <dt>{C.selectedCompound}</dt>
+          <dd className="mono">{scope.compoundLaunch?.compoundName ?? scope.compoundSelection.compoundId}</dd>
+        </>
+      )}
+      {target !== undefined && (
+        <>
+          <dt>{M.targetService}</dt>
+          <dd className="mono">{serviceLabel(target)}</dd>
+        </>
+      )}
       <dt>{B.target}</dt>
       <dd className="mono">{scope.target}</dd>
       <dt>{B.writes}</dt>
-      <dd className="mono">{scope.writes.map(({ method, path }) => `${method} ${path}`).join('、') || B.noWrites}</dd>
+      <dd className="mono">
+        {scope.writes
+          .map(({ method, path, serviceId }) => {
+            const label = serviceId === undefined ? defaultWriteTarget : serviceLabel(serviceId);
+            return label === undefined ? `${method} ${path}` : `${label} · ${method} ${path}`;
+          })
+          .join('、') || B.noWrites}
+      </dd>
       <dt>{C.onFailure}</dt>
       <dd>
         {scope.onFailure === 'repair'

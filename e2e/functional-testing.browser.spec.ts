@@ -234,6 +234,17 @@ test('准备环境显示实际启动、探测和阻塞原因，并兼容旧运�
             includeProvided: true,
             readyPath: '/health',
           },
+          diagnostics: {
+            requested: { workingDirectory: 'services/orders', javaVersion: 8, includeProvided: true },
+            workingDirectory: 'services/orders/runtime',
+            manager: 'maven',
+            javaVersion: 17,
+            classpathEntries: 12,
+            includeProvided: false,
+            managedVmOptions: ['server.port', 'server.address'],
+            beforeRun: ['maven_compile'],
+            injectedEnvironment: [],
+          },
           command: 'java 订单服务.进程',
           readyUrl: 'http://localhost:49153/health',
           readyStatus: 200,
@@ -289,14 +300,26 @@ test('准备环境显示实际启动、探测和阻塞原因，并兼容旧运�
   await rounds.selectOption('run-java');
   await expect(environment.getByText('Java 主类', { exact: true })).toBeVisible();
   await expect(environment.getByText('订单服务.进程', { exact: true })).toBeVisible();
-  await expect(environment.getByText('Java 8', { exact: true })).toBeVisible();
-  await expect(environment.getByText('运行类路径包含 provided 依赖', { exact: true })).toBeVisible();
+  const requested = environment.getByRole('region', { name: '声明的启动配置' });
+  const resolved = environment.getByRole('region', { name: '启动器记录' });
+  await expect(requested.getByText('Java 8', { exact: true })).toBeVisible();
+  await expect(requested.getByText('services/orders', { exact: true })).toBeVisible();
+  await expect(requested.getByText('包含 provided 依赖', { exact: true })).toBeVisible();
+  await expect(resolved.getByText('Java 17', { exact: true })).toBeVisible();
+  await expect(resolved.getByText('services/orders/runtime', { exact: true })).toBeVisible();
+  await expect(resolved.getByText('运行时依赖', { exact: true })).toBeVisible();
+  await expect(resolved.getByText('12', { exact: true })).toBeVisible();
+  await expect(resolved.getByText('server.port', { exact: true })).toBeVisible();
+  await expect(resolved.getByText('Maven compile', { exact: true })).toBeVisible();
+  await expect(resolved.getByText('未记录', { exact: true })).toBeVisible();
+  await expect(environment.getByText('配置是否包含 provided 依赖', { exact: true })).toBeVisible();
   await expect(environment.getByText('包含', { exact: true })).toBeVisible();
   await expect(environment.getByText('启动 Profile', { exact: true })).toHaveCount(0);
 
   await rounds.selectOption('run-1');
   await expect(environment.getByText('http://localhost/orders', { exact: true })).toBeVisible();
   await expect(environment.getByText('AI 启动依据', { exact: true })).toHaveCount(0);
+  await expect(environment.getByRole('region', { name: '启动器记录' })).toHaveCount(0);
   await expect(environment.getByText('实际启动命令', { exact: true })).toHaveCount(0);
 });
 
@@ -430,9 +453,50 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
     at: now,
     kind: 'assertion',
     message: 'HTTP 断言',
-    detail: { field: 'body.fee', expected: 10, actual: 9, passed: false },
+    detail: {
+      field: 'body.fee',
+      expected: 10,
+      actual: 9,
+      passed: false,
+      serviceId: 'billing',
+      serviceName: 'Billing',
+      moduleId: 'billing-module',
+      serviceLog: 'Billing returned fee 9',
+    },
   });
-  snapshot.nextAfter = 5;
+  snapshot.events.push(
+    {
+      seq: 6,
+      runId: 'run-1',
+      caseId: 'case-2',
+      executionId: 'exec-2',
+      step: 1,
+      at: now,
+      kind: 'assertion',
+      message: 'HTTP 断言',
+      detail: {
+        field: 'status',
+        expected: 404,
+        actual: 404,
+        passed: true,
+        serviceId: 'gateway',
+        serviceName: 'Gateway',
+        moduleId: 'gateway-module',
+      },
+    },
+    {
+      seq: 7,
+      runId: 'run-1',
+      caseId: 'case-2',
+      executionId: 'exec-2',
+      step: 1,
+      at: now,
+      kind: 'result',
+      message: '收到 HTTP 响应',
+      detail: { status: 404, elapsedMs: 10, serviceId: 'gateway', serviceName: 'Gateway', moduleId: 'gateway-module' },
+    },
+  );
+  snapshot.nextAfter = 7;
   const refreshed = page.waitForResponse((response) => new URL(response.url()).pathname === snapshotPath);
   await page.clock.runFor(1000);
   await refreshed;
@@ -461,6 +525,10 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
   await page.getByRole('button', { name: '回到实时' }).click();
   await expect(second).toHaveAttribute('aria-pressed', 'true');
 
+  const secondExecution = snapshot.executions.find(({ id }) => id === 'exec-2');
+  if (secondExecution === undefined) throw new Error('Second execution missing');
+  secondExecution.status = 'failed';
+  secondExecution.finishedAt = now;
   const body = '## 订单报告\n\nFT-02：响应不符合用例预期。';
   snapshot.reports.push({
     runId: 'run-1',
@@ -478,6 +546,14 @@ test('回看用例时行为与终端同步，迟到响应仍归属原用例，�
   await page.getByRole('button', { name: '测试报告', exact: true }).click();
   const report = page.getByRole('region', { name: '测试报告' });
   await expect(report.getByRole('heading', { name: '订单报告' })).toBeVisible();
+  await expect(report.getByText('关联服务 · Billing', { exact: true })).toBeVisible();
+  await report.getByRole('button', { name: '查看实测证据' }).click();
+  const serviceEvidence = page.getByRole('region', { name: '关联服务' });
+  await expect(serviceEvidence.getByText('billing-module')).toBeVisible();
+  await expect(serviceEvidence.getByText('gateway-module')).toHaveCount(0);
+  await serviceEvidence.getByText('失败时的服务日志').click();
+  await expect(serviceEvidence.getByText('Billing returned fee 9')).toBeVisible();
+  await page.getByRole('button', { name: '测试报告', exact: true }).click();
   const failure = report.getByRole('checkbox', { name: '将 FT-02 纳入修复' });
   const repair = report.getByRole('button', { name: '建立修复任务' });
   await expect(failure).toBeChecked();
