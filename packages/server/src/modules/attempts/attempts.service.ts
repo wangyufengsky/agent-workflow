@@ -17,6 +17,7 @@ import {
   type FunctionalTestNode,
   isTerminalState,
   type McpToolName,
+  type ModelEffort,
   OPENCODE_AGENT_NAME,
   OPENCODE_FUNCTIONAL_TEST_AGENT,
   PermissionDecision,
@@ -59,6 +60,7 @@ const SESSION_COMMAND_CLEANUP_TIMEOUT_MS = 5_000;
 import { grantKey, type PermissionReviewer, scopedRules, type TaskPermissionPolicy } from '../permissions/index.ts';
 export type AttemptsServiceDeps = AttemptStateDeps & {
   permissionReviewer: PermissionReviewer;
+  effortsForRole(id: string | null): ModelEffort[];
   taskPolicy(id: string): TaskPermissionPolicy;
   taskSkills(taskId: string): SkillSnapshot[];
   settings: SettingsService;
@@ -197,6 +199,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
             .filter(({ roleIds }) => roleIds == null || (attempt.roleId !== null && roleIds.includes(attempt.roleId)));
     const tracked: LiveSession = {
       ...session,
+      efforts: attempt.efforts ?? [],
       system: skills.length === 0 ? session.system : withUserSkills(session.system ?? '', skills),
       view: createSessionView(),
       timeoutMs,
@@ -432,6 +435,9 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         seq: repo.nextSeq(input),
         status: queued ? AttemptStatus.Queued : AttemptStatus.Starting,
         model: input.model,
+        efforts: input.delegation
+          ? mustFind(input.delegation.parentAttemptId).efforts
+          : deps.effortsForRole(input.roleId),
         directory: input.directory,
         opencodeSessionId: null,
         nudges: 0,
@@ -480,6 +486,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       seq: repo.nextSeq({ ...previous, kind }),
       status: queued ? AttemptStatus.Queued : AttemptStatus.Starting,
       model,
+      efforts: deps.effortsForRole(previous.roleId),
       directory: previous.directory,
       opencodeSessionId: previous.opencodeSessionId,
       permissionBaseline: previous.permissionBaseline,

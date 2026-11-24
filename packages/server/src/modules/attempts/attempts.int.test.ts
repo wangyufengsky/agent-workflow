@@ -1,13 +1,16 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
+  AttemptKind,
   type AttemptStatus,
   abortAttemptOp,
   ErrorCode,
   getAttemptOp,
+  RoleBaseAgent,
   ServerEventType,
   startDebugAttemptOp,
   TranscriptSystemEvent,
+  updateRoleOp,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -41,6 +44,31 @@ async function startAttempt() {
 const submit = { summary: 'Added hello.txt', changes: [{ path: 'hello.txt', description: 'greeting' }] };
 
 describe('尝试的结束条件（12 §4.2）', () => {
+  it('执行角色的模型、独立强度和跟随全局分别进入任务请求', async () => {
+    const model = 'opencode/fake-model';
+    const global = { model, variant: 'deep' };
+    await t.call(updateSettingsOp, { 'ai.defaultModel': model, 'ai.defaultEffort': global });
+    const role = t.app.services.roles.getByKey('developer');
+    for (const choice of [null, { model, variant: 'low' }, { model, variant: null }]) {
+      await t.call(updateRoleOp, { id: role.id, effort: choice });
+      t.fake.enqueue(script().stall());
+      const started = await t.app.services.attempts.start({
+        kind: AttemptKind.Execute,
+        taskId: null,
+        nodeId: null,
+        projectId: null,
+        roleId: role.id,
+        agent: RoleBaseAgent.Executor,
+        directory: repo.path,
+        title: 'Effort probe',
+        model,
+        prompt: 'Check effort.',
+      });
+      expect(t.fake.prompts.at(-1)?.efforts?.find((e) => e.model === model)).toEqual(choice ?? global);
+      await t.app.services.attempts.abort(started.id);
+    }
+  });
+
   it('提交结果后成功，并中止会话后续的生成', async () => {
     t.fake.enqueue(script().edit('hello.txt', 'hi\n').callTool('submit_result', submit).text('Done.'));
     const succeeded = reaches('succeeded');

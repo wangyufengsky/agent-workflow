@@ -5,6 +5,7 @@ import {
   COMPANION_WHISPER_MAX_CHARS,
   COMPANION_WHISPER_TIMEOUT_MS,
   ErrorCode,
+  modelEfforts,
   OPENCODE_COMPANION_AGENT,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
@@ -87,6 +88,7 @@ export function createWhisperService(deps: {
                   sessionId,
                   directory,
                   agent: OPENCODE_COMPANION_AGENT,
+                  efforts: modelEfforts(settings.getAll()),
                   ...(model === null ? {} : { model: parseModelRef(model) }),
                   text: '请随口说一句日常碎碎念。',
                   system: `Current local time: ${new Date(clock.now()).toISOString()}.`,

@@ -7,6 +7,7 @@ import {
   ErrorCode,
   IMAGE_ANALYSIS_MAX_CHARS,
   IMAGE_ANALYSIS_TIMEOUT_MS,
+  modelEfforts,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import { type OpencodeClient, parseModelRef, type SessionDispatcher, SessionPurpose } from '../opencode/index.ts';
@@ -34,7 +35,8 @@ export function createImageAnalysis({
     requestSignal?: AbortSignal,
     delegatedFrom?: AbortSignal,
   ): Promise<AnalyzeImageOutput> {
-    const configured = roles.getByKey(BuiltinRoleKey.ImageProcessor).model ?? settings.get('ai.defaultModel');
+    const role = roles.getByKey(BuiltinRoleKey.ImageProcessor);
+    const configured = role.model ?? settings.get('ai.defaultModel');
 
     const deadline = new AbortController();
     const cancelTimeout = clock.schedule(IMAGE_ANALYSIS_TIMEOUT_MS, () => deadline.abort());
@@ -52,6 +54,7 @@ export function createImageAnalysis({
             ...session,
             model,
             question,
+            efforts: modelEfforts(settings.getAll(), role),
             image: { mime: source.mime, data },
           }),
         async (signal) => {

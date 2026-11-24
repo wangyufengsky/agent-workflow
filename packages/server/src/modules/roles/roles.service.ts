@@ -4,6 +4,7 @@ import {
   AppError,
   type CreateRoleRequest,
   ErrorCode,
+  type ModelEffort,
   type RoleDTO,
   RoleKind,
   type UpdateRoleRequest,
@@ -13,9 +14,16 @@ import type { Db } from '../../core/db/database.ts';
 import type { Logger } from '../../core/logger.ts';
 import { createRolesRepo } from './roles.repo.ts';
 
-export type RolesServiceDeps = { supportsImage(model: string): Promise<boolean>; db: Db; clock: Clock; log: Logger };
+export type RolesServiceDeps = {
+  defaultModel(): string | null;
+  validateEffort(effort: ModelEffort, selectedModel: () => string | null): Promise<void>;
+  supportsImage(model: string): Promise<boolean>;
+  db: Db;
+  clock: Clock;
+  log: Logger;
+};
 
-export function createRolesService({ db, clock, log, supportsImage }: RolesServiceDeps) {
+export function createRolesService({ db, clock, log, supportsImage, validateEffort, defaultModel }: RolesServiceDeps) {
   const repo = createRolesRepo(db);
 
   function get(id: string): RoleDTO {
@@ -54,6 +62,7 @@ export function createRolesService({ db, clock, log, supportsImage }: RolesServi
               key: seed.key,
               kind: RoleKind.Builtin,
               model: null,
+              effort: null,
               ...content,
               createdAt: now,
               updatedAt: now,
@@ -73,10 +82,7 @@ export function createRolesService({ db, clock, log, supportsImage }: RolesServi
     },
 
     /** A new custom role, or a copy of a role (built-in ones included) under a new key. */
-    create({ key, name, copyFrom, ...fields }: CreateRoleRequest): RoleDTO {
-      if (repo.findByKey(key) !== undefined) {
-        throw new AppError(ErrorCode.RoleAlreadyExists, `Role ${key} already exists`, { key });
-      }
+    async create({ key, name, copyFrom, ...fields }: CreateRoleRequest): Promise<RoleDTO> {
       const source = copyFrom === undefined ? undefined : get(copyFrom);
       const baseAgent = fields.baseAgent ?? source?.baseAgent;
       const prompt = fields.prompt ?? source?.prompt;
@@ -84,6 +90,10 @@ export function createRolesService({ db, clock, log, supportsImage }: RolesServi
       if (baseAgent === undefined || prompt === undefined) {
         throw new Error('A new role without copyFrom passed validation incomplete');
       }
+      const model = fields.model === undefined ? (source?.model ?? null) : fields.model;
+      const effort = fields.effort === undefined ? (model === source?.model ? source.effort : null) : fields.effort;
+      if (effort) await validateEffort(effort, () => model ?? defaultModel());
+      if (repo.findByKey(key)) throw new AppError(ErrorCode.RoleAlreadyExists, 'Role already exists', { key });
       const now = clock.now();
       const id = randomUUID();
       repo.insert({
@@ -94,7 +104,8 @@ export function createRolesService({ db, clock, log, supportsImage }: RolesServi
         baseAgent,
         description: fields.description ?? source?.description ?? '',
         prompt,
-        model: fields.model === undefined ? (source?.model ?? null) : fields.model,
+        model,
+        effort,
         createdAt: now,
         updatedAt: now,
       });
@@ -128,10 +139,17 @@ export function createRolesService({ db, clock, log, supportsImage }: RolesServi
       }
       if (
         role.kind === RoleKind.Builtin &&
-        (changes.model === undefined || Object.keys(changes).some((key) => key !== 'model'))
+        (Object.keys(changes).length === 0 || Object.keys(changes).some((key) => key !== 'model' && key !== 'effort'))
       ) {
         throw new AppError(ErrorCode.RoleReadonly, 'Built-in roles are read-only; copy the role to change it', { id });
       }
+      if (changes.effort)
+        await validateEffort(
+          changes.effort,
+          () => (changes.model === undefined ? get(id).model : changes.model) ?? defaultModel(),
+        );
+      if (changes.model !== undefined && changes.model !== role.model && changes.effort === undefined)
+        changes.effort = null;
       repo.update(id, { ...changes, updatedAt: clock.now() });
       return get(id);
     },

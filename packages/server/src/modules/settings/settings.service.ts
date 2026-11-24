@@ -1,4 +1,5 @@
 import {
+  type ModelEffort,
   SETTING_DEFAULTS,
   SETTING_KEYS,
   ServerEventType,
@@ -17,6 +18,7 @@ export type SettingsServiceDeps = {
   events: EventBus;
   clock: Clock;
   /** Checks only the backend can make (a certificate parses, D164); throws VALIDATION_FAILED before anything is saved. */
+  validateEffort: (effort: ModelEffort, selectedModel: () => string | null) => Promise<void>;
   validate: (patch: SettingsPatch) => void;
 };
 
@@ -35,6 +37,12 @@ export function createSettingsService({ db, events, clock, validate }: SettingsS
     },
     update(patch: SettingsPatch): Settings {
       validate(patch);
+      if (
+        patch['ai.defaultModel'] !== undefined &&
+        patch['ai.defaultModel'] !== getAll()['ai.defaultModel'] &&
+        patch['ai.defaultEffort'] === undefined
+      )
+        patch = { ...patch, 'ai.defaultEffort': null };
       const keys = SETTING_KEYS.filter((key) => patch[key] !== undefined);
       const now = clock.now();
       db.transaction((tx) => {

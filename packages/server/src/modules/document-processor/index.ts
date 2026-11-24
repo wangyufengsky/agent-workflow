@@ -1,5 +1,5 @@
 import { BuiltinRoleKey } from '@aw/builtin';
-import { AppError, ErrorCode, type ProcessDocumentInput } from '@aw/shared';
+import { AppError, ErrorCode, modelEfforts, type ProcessDocumentInput } from '@aw/shared';
 import type { AttachmentsService } from '../attachments/index.ts';
 import { type OpencodeClient, parseModelRef, type SessionDispatcher, SessionPurpose } from '../opencode/index.ts';
 import type { RolesService } from '../roles/index.ts';
@@ -53,6 +53,7 @@ export function createDocumentProcessor({ attachments, roles, sessions, settings
       async (session) => {
         const text = await opencode.promptDocument({
           ...session,
+          efforts: modelEfforts(settings.getAll(), role),
           system: role.prompt,
           ...(model === null ? {} : { model: parseModelRef(model) }),
           text: JSON.stringify({ instruction: input.instruction, document: content }),

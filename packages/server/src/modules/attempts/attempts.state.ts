@@ -10,6 +10,7 @@ import {
   InboxKind,
   isTerminalState,
   type McpToolName,
+  type ModelEffort,
   ServerEventType,
   TaskEventEntity,
   TranscriptEntryKind,
@@ -41,6 +42,7 @@ export type LiveSession = {
   directory: string;
   agent: string;
   model: ModelRef | undefined;
+  efforts: ModelEffort[];
   system: string | undefined;
   view: SessionView;
   timeoutMs: number;
@@ -132,6 +134,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
 
   function toSummary({
     permissionBaseline: _baseline,
+    efforts: _efforts,
     directory: _d,
     opencodeSessionId: _s,
     tokensInput: _i,
@@ -215,7 +218,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
     waitsForAnswer,
     toSummary,
     toDto: (attempt: Attempt): AttemptDTO => {
-      const { roleId: _roleId, permissionBaseline: _baseline, ...rest } = attempt;
+      const { roleId: _roleId, permissionBaseline: _baseline, efforts: _efforts, ...rest } = attempt;
       return { ...rest, progress: progress.get(attempt.id) ?? null, queuePosition: slots.position(attempt.id) };
     },
     onSignal(listener: (signal: AttemptSignal) => void): void {
@@ -289,6 +292,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
         sessionId: session.sessionId,
         directory: session.directory,
         agent: session.agent,
+        efforts: session.efforts,
         ...(session.model === undefined ? {} : { model: session.model }),
         ...(session.system === undefined ? {} : { system: session.system }),
         text,
@@ -308,6 +312,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
           sessionId: session.sessionId,
           directory: session.directory,
           agent: session.agent,
+          efforts: session.efforts,
           ...(session.model === undefined ? {} : { model: session.model }),
           text,
           ...(messageId === undefined ? {} : { messageId }),

@@ -4,6 +4,7 @@ import {
   APPROVER_ROLE_KEY,
   AppError,
   ErrorCode,
+  modelEfforts,
   OPENCODE_APPROVER_AGENT,
   type PermissionAction,
   PermissionDecision,
@@ -175,6 +176,7 @@ export function createPermissionReviewer(deps: {
         (session) =>
           deps.opencode.promptDocument({
             ...session,
+            efforts: modelEfforts(deps.settings.getAll(), role),
             agent: OPENCODE_APPROVER_AGENT,
             system: role.prompt,
             text,

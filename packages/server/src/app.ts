@@ -14,6 +14,8 @@ import {
   isTerminalState,
   MCP_ASSISTANT_PATH,
   MCP_EXEC_PATH,
+  type ModelEffort,
+  modelEfforts,
   RuntimeStatus,
   ServerEventType,
   TASK_STATUSES,
@@ -195,7 +197,13 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   registerErrorHandling(server, { serveSpa: config.webDir !== undefined });
   registerSseHub(server, events);
 
-  const settings = createSettingsModule({ db: database.db, events, clock, validate: validateNetworkSettings });
+  const settings = createSettingsModule({
+    db: database.db,
+    events,
+    clock,
+    validate: validateNetworkSettings,
+    validateEffort,
+  });
   const credentials = createCredentialsModule({ db: database.db, clock, cipher: deps.cipher ?? unavailableCipher });
   const startupEnvironment = createStartupEnvironmentModule({ db: database.db, credentials: credentials.service });
   const env = scopedStartupEnvironment(deps.env ?? process.env);
@@ -270,6 +278,14 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     logDir: join(config.dataDir, 'logs'),
   });
   const opencode = deps.opencode ?? createRuntimeClient(runtime, log);
+  async function validateEffort(effort: ModelEffort, selectedModel: () => string | null) {
+    const { available, defaultModel } = await opencode.listModels();
+    const selected = selectedModel() ?? defaultModel;
+    const model = available.find((m) => m.providerId + '/' + m.modelId === selected);
+    if (selected !== effort.model || !model || (effort.variant !== null && !model.variants?.includes(effort.variant))) {
+      throw new AppError(ErrorCode.ValidationFailed, 'The selected model does not offer this variant');
+    }
+  }
   // Before the API and database close: opencode's last requests and events still reach a working backend.
   server.addHook('preClose', async () => {
     // 临时碎碎念会话须在运行时关闭前取消并删除。
@@ -324,6 +340,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     db: database.db,
     clock,
     log,
+    validateEffort,
+    defaultModel: () => settings.service.get('ai.defaultModel'),
     supportsImage: async (model) =>
       (await opencode.listModels()).available.some((m) => m.supportsImage && model === m.providerId + '/' + m.modelId),
   });
@@ -348,8 +366,13 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     databases: databases.service,
     sessions,
     opencode,
-    model: () =>
-      roles.service.getByKey(BuiltinRoleKey.DatabaseAnalyst).model ?? settings.service.get('ai.defaultModel'),
+    model: () => {
+      const role = roles.service.getByKey(BuiltinRoleKey.DatabaseAnalyst);
+      return {
+        model: role.model ?? settings.service.get('ai.defaultModel'),
+        efforts: modelEfforts(settings.service.getAll(), role),
+      };
+    },
     dataDir: config.dataDir,
     log,
   });
@@ -387,6 +410,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   server.addHook('preClose', async () => modelSlots.service.dispose());
   const attempts = createAttemptsModule({
     permissionReviewer,
+    effortsForRole: (id) => modelEfforts(settings.service.getAll(), id ? roles.service.get(id) : undefined),
     taskPolicy: (id) => readTaskPermissionPolicy(database.db, id),
     sessions,
     taskSkills: (id) => readTaskSkills(database.db, id),

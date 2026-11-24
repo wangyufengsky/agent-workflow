@@ -1,4 +1,4 @@
-import type { RoleBaseAgent, RoleKind } from '@aw/shared';
+import type { ModelEffort, RoleBaseAgent, RoleKind } from '@aw/shared';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const rolesTable = sqliteTable('roles', {
@@ -12,6 +12,7 @@ export const rolesTable = sqliteTable('roles', {
   prompt: text('prompt').notNull(),
   /** `provider/model`. */
   model: text('model'),
+  effort: text('effort', { mode: 'json' }).$type<ModelEffort>(),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

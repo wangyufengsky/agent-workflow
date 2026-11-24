@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { modelEffortSchema } from '../../constants/settings.ts';
 import {
   roleBaseAgentSchema,
   roleKindSchema,
@@ -37,6 +38,7 @@ export const roleSchema = z.object({
   prompt: z.string(),
   /** `provider/model`; null falls back to the `ai.defaultModel` setting, then opencode's default. */
   model: z.string().nullable(),
+  effort: modelEffortSchema.nullable(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
@@ -48,6 +50,7 @@ export const updateRoleRequestSchema = z.object({
   description: z.string().optional(),
   prompt: z.string().min(1).optional(),
   model: z.string().min(1).nullable().optional(),
+  effort: modelEffortSchema.nullable().optional(),
 });
 export type UpdateRoleRequest = z.infer<typeof updateRoleRequestSchema>;
 
@@ -61,6 +64,7 @@ export const createRoleRequestSchema = z
     baseAgent: roleBaseAgentSchema.optional(),
     prompt: z.string().min(1).optional(),
     model: z.string().min(1).nullable().optional(),
+    effort: modelEffortSchema.nullable().optional(),
   })
   .superRefine(requireNewOrCopy(['baseAgent', 'prompt']));
 export type CreateRoleRequest = z.infer<typeof createRoleRequestSchema>;

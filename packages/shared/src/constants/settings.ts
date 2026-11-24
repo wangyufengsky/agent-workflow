@@ -45,6 +45,20 @@ const sessionCommandSchema = z
   .regex(/^\/[^\s]+(?:[ \t]+[^\r\n]*)?$/)
   .nullable();
 
+/** 档位绑定到声明它的模型。variant 为空时显式使用模型默认。 */
+export const modelEffortSchema = z.object({ model: z.string().min(1), variant: z.string().min(1).nullable() });
+export type ModelEffort = z.infer<typeof modelEffortSchema>;
+
+/** 只对当前实际模型匹配档位。角色可单独覆盖；固定模型的角色只使用自己的档位。 */
+export function modelEfforts(
+  settings: Settings,
+  role?: { model: string | null; effort: ModelEffort | null },
+): ModelEffort[] {
+  return [role?.effort, role?.model ? null : settings['ai.defaultEffort']].filter(
+    (value): value is ModelEffort => value != null,
+  );
+}
+
 /** User settings (08 §4.3): key → value schema. Unknown keys are rejected. */
 export const settingsSchema = z.strictObject({
   'ui.mode': uiModeSchema,
@@ -54,6 +68,7 @@ export const settingsSchema = z.strictObject({
   'ai.askOnUncertainty': z.boolean(),
   /** `provider/model`; null uses opencode's default model. */
   'ai.defaultModel': z.string().min(1).nullable(),
+  'ai.defaultEffort': modelEffortSchema.nullable(),
   'ai.bashPolicy': bashPolicySchema,
   'ai.sessionStartCommand': sessionCommandSchema,
   'ai.sessionEndCommand': sessionCommandSchema,
@@ -112,6 +127,7 @@ export const SETTING_DEFAULTS: Settings = {
   'ui.introAnimation': true,
   'ai.askOnUncertainty': false,
   'ai.defaultModel': null,
+  'ai.defaultEffort': null,
   'ai.bashPolicy': BashPolicy.Auto,
   'ai.sessionStartCommand': null,
   'ai.sessionEndCommand': null,
@@ -151,6 +167,7 @@ export const SETTING_MODE: Record<SettingKey, UiMode> = {
   'ui.introAnimation': UiMode.Simple,
   'ai.askOnUncertainty': UiMode.Simple,
   'ai.defaultModel': UiMode.Pro,
+  'ai.defaultEffort': UiMode.Pro,
   'ai.bashPolicy': UiMode.Pro,
   'ai.sessionStartCommand': UiMode.Pro,
   'ai.sessionEndCommand': UiMode.Pro,

@@ -40,6 +40,8 @@ import { OpencodeEventType, ToolCallStatus } from './opencode.events.ts';
 const PROVIDER = 'aw-scripted';
 const PROJECT_PROVIDER = 'aw-project-scripted';
 const MODEL = 'scripted';
+const EFFORT_PROBE = 'VERIFY_MODEL_EFFORT';
+const sentEfforts: Array<string | undefined> = [];
 const RUN = 'RUN: ';
 const PROJECT_PATTERNS = ['./scripts/check.sh -q *'];
 const PROBE_PARENT = 'VERIFY_MANAGED_DELEGATION';
@@ -76,6 +78,7 @@ function textOf(message: ChatMessage): string {
 }
 
 async function bodyOf(req: IncomingMessage): Promise<{
+  reasoning_effort?: string;
   messages: ChatMessage[];
   stream?: boolean;
   tools?: Array<{ function: { name: string } }>;
@@ -98,9 +101,10 @@ function scriptedModel(): Server {
       void recordCommand(req).then(() => res.end());
       return;
     }
-    void bodyOf(req).then(({ messages, stream, tools }) => {
+    void bodyOf(req).then(({ messages, stream, tools, reasoning_effort }) => {
       const last = messages.at(-1);
       const prompt = last?.role === 'user' ? textOf(last) : '';
+      if (prompt.startsWith(EFFORT_PROBE)) sentEfforts.push(reasoning_effort);
       const command = prompt.includes(RUN) ? prompt.slice(prompt.indexOf(RUN) + RUN.length).trim() : undefined;
       const hasProbe = (marker: string) => messages.some((m) => m.role === 'user' && textOf(m).includes(marker));
       const names = (tools ?? []).map((tool) => tool.function.name);
@@ -177,7 +181,7 @@ function providerFor(model: Server) {
     npm: '@ai-sdk/openai-compatible',
     name: 'Scripted',
     options: { baseURL: `http://127.0.0.1:${(model.address() as AddressInfo).port}/v1`, apiKey: 'unused' },
-    models: { [MODEL]: { name: 'Scripted', tool_call: true } },
+    models: { [MODEL]: { name: 'Scripted', tool_call: true, variants: { deep: { reasoningEffort: 'high' } } } },
   };
 }
 
@@ -242,6 +246,25 @@ async function decide(command: string): Promise<PermissionAction> {
     await reply;
   }
 }
+
+it('自定义档位进入真实模型请求，下一轮模型默认及无效档位均省略强度', async () => {
+  const oc = t.app.services.opencode;
+  const directory = repo.path;
+  const agent = OPENCODE_AGENT_NAME[RoleBaseAgent.Reviewer];
+  const sessionId = await oc.createSession({ directory, agent, permission: [], title: 'Variant probe' });
+  const model = { providerId: PROVIDER, modelId: MODEL };
+  for (const variant of ['deep', null, 'missing']) {
+    await oc.promptDocument({
+      directory,
+      sessionId,
+      agent,
+      model,
+      efforts: [{ model: PROVIDER + '/' + MODEL, variant }],
+      text: EFFORT_PROBE + String(variant),
+    });
+  }
+  expect(sentEfforts).toEqual(['high', undefined, undefined]);
+});
 
 describe('@opencode 只读会话的 bash 规则与项目中总是允许的模式', () => {
   it('并行 find 请求：总是允许后两条都收到答复事件，再答复已完成请求返回失效错误', async () => {

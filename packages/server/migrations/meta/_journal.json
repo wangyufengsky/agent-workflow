@@ -379,6 +379,13 @@
       "when": 1795492407163,
       "tag": "0053_scoped_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1795520184918,
+      "tag": "0054_model_effort",
+      "breakpoints": true
     }
   ]
 }

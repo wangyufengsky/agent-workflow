@@ -151,7 +151,13 @@ export function createFakeOpencode() {
   const permissionReplies: Array<{ permissionId: string; reply: PermissionDecision }> = [];
   const aborts: string[] = [];
   const models: OpencodeModel[] = [
-    { providerId: 'opencode', modelId: 'fake-model', name: 'Fake Model', contextLimit: 128_000 },
+    {
+      providerId: 'opencode',
+      modelId: 'fake-model',
+      name: 'Fake Model',
+      contextLimit: 128_000,
+      variants: ['low', 'deep'],
+    },
     {
       providerId: 'opencode',
       modelId: 'fake-model-2',

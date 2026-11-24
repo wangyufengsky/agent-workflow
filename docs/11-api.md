@@ -747,3 +747,7 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 ## 审批与角色模型
 
 创建对话和任务可带 `permissionMode`。通过 `PATCH /assistant/conversations/:id/permission-mode` 或 `PATCH /tasks/:id/permission-mode` 提交 `{"permissionMode":"assisted"}`。两个端点都返回更新后的对象。角色更新支持为内置角色单独提交 `model`，传 `null` 恢复跟随默认模型。图像处理员的显式模型须在运行时目录中声明支持图片输入。
+
+### 模型思考强度
+
+环境模型列表的 variants 是 OpenCode 提供的可选档位 ID 数组。角色创建、更新、读取携带 effort；设置使用 ai.defaultEffort。两者都将选择绑定到完整模型 ID。固定角色模型默认使用模型自身设置，跟随全局模型的角色可以继承、单独覆盖或显式采用模型默认。

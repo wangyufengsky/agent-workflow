@@ -8,6 +8,7 @@ import {
   databaseInvestigationSchema,
   ErrorCode,
   type InvestigateDatabaseInput,
+  type ModelEffort,
   OPENCODE_DATABASE_INVESTIGATOR_AGENT,
 } from '@aw/shared';
 import { and, desc, eq, sql } from 'drizzle-orm';
@@ -122,7 +123,7 @@ export function createDatabaseInvestigations({
   >;
   sessions: SessionDispatcher;
   opencode: Pick<OpencodeClient, 'promptDocument' | 'isConnected'>;
-  model(): string | null;
+  model(): { model: string | null; efforts: ModelEffort[] };
   dataDir: string;
   log: Logger;
 }) {
@@ -264,7 +265,7 @@ export function createDatabaseInvestigations({
           ...(parentSignal === undefined ? {} : { parentSignal }),
         },
         async ({ sessionId, directory, signal: sessionSignal }) => {
-          const selected = model();
+          const { model: selected, efforts } = model();
           let prompt = JSON.stringify({
             dialect: connection.type,
             question: input.question,
@@ -282,6 +283,7 @@ export function createDatabaseInvestigations({
               system: SYSTEM,
               text: prompt,
               signal: sessionSignal,
+              efforts,
               ...(selected === null ? {} : { model: parseModelRef(selected) }),
             });
             sessionSignal.throwIfAborted();

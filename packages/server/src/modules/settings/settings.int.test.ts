@@ -38,6 +38,17 @@ describe('设置 API', () => {
     expect(res.body['ai.defaultModel']).toBeNull();
   });
 
+  it('强度只接受所选模型实际声明的档位，切换默认模型会清除旧档位', async () => {
+    const model = 'opencode/fake-model';
+    const effort = { model, variant: 'deep' };
+    await t.call(updateSettingsOp, { 'ai.defaultModel': model, 'ai.defaultEffort': effort });
+    expect((await t.call(getSettingsOp, {})).body['ai.defaultEffort']).toEqual(effort);
+    expect((await t.call(updateSettingsOp, { 'ai.defaultEffort': { model, variant: 'high' } })).status).toBe(400);
+    expect(
+      (await t.call(updateSettingsOp, { 'ai.defaultModel': 'opencode/fake-model-2' })).body['ai.defaultEffort'],
+    ).toBeNull();
+  });
+
   it('未知设置键返回 400 VALIDATION_FAILED', async () => {
     const res = await t.request({ method: 'PATCH', url: '/settings', payload: { 'ui.colour': 'red' } });
     expect(res.statusCode).toBe(400);

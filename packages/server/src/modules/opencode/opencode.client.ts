@@ -5,6 +5,7 @@ import {
   AppError,
   ErrorCode,
   type ExternalMcpStatus,
+  type ModelEffort,
   OPENCODE_APPROVER_AGENT,
   OPENCODE_DATABASE_INVESTIGATOR_AGENT,
   OPENCODE_DOCUMENT_AGENT,
@@ -51,6 +52,7 @@ export type ModelRef = { providerId: string; modelId: string };
 type SessionRequest = { sessionId: string; directory: string; signal?: AbortSignal };
 
 type ImagePromptInput = {
+  efforts?: readonly ModelEffort[];
   sessionId: string;
   directory: string;
   model: ModelRef;
@@ -66,6 +68,7 @@ export type CreateSessionInput = {
   signal?: AbortSignal;
 };
 export type PromptInput = {
+  efforts?: readonly ModelEffort[];
   sessionId: string;
   directory: string;
   agent: string;
@@ -90,11 +93,13 @@ export type OpencodeClient = {
   setPermissions(input: SessionRequest & { permission: PermissionRule[] }): Promise<void>;
   /** Sends a message and returns at once (`prompt_async`); progress arrives as events. */
   prompt(input: PromptInput): Promise<void>;
-  runCommand(input: SessionRequest & Pick<PromptInput, 'agent' | 'model' | 'text' | 'messageId'>): Promise<void>;
+  runCommand(
+    input: SessionRequest & Pick<PromptInput, 'agent' | 'model' | 'text' | 'messageId' | 'efforts'>,
+  ): Promise<void>;
   /** 助手按请求关联完成；接受与结束分开，消息不必等模型整轮结束才清空草稿。 */
   promptAssistant(input: PromptInput & { messageId: string }): AssistantPrompt;
   promptDocument(
-    input: SessionRequest & Pick<PromptInput, 'system' | 'model' | 'text'> & { agent?: string },
+    input: SessionRequest & Pick<PromptInput, 'system' | 'model' | 'text' | 'efforts'> & { agent?: string },
   ): Promise<string>;
   promptImage(input: ImagePromptInput): Promise<string>;
   abort(input: SessionRequest): Promise<void>;
@@ -131,6 +136,7 @@ export type OpencodeModel = {
   name: string;
   contextLimit: number | null;
   supportsImage?: boolean;
+  variants?: string[];
 };
 
 /** `provider/model` → parts; the model id itself may contain `/`. */
@@ -194,6 +200,45 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
     }
   }
 
+  async function listModels(directory?: string, signal?: AbortSignal) {
+    const sdk = runtime.sdk();
+    const at = directory === undefined ? {} : { directory };
+    const options = requestOptions(signal);
+    const [{ data: providers }, { data: config }] = await Promise.all([
+      request('config.providers', () => sdk.config.providers(at, options)),
+      request('config.get', () => sdk.config.get(at, options)),
+    ]);
+    const available = providers.providers.flatMap((p) =>
+      Object.values(p.models).map((m) => ({
+        providerId: p.id,
+        modelId: m.id,
+        name: m.name,
+        contextLimit: m.limit.context > 0 ? m.limit.context : null,
+        supportsImage: m.capabilities.input.image,
+        variants: Object.keys(m.variants ?? {}),
+      })),
+    );
+    return config.model === undefined ? { available } : { available, defaultModel: config.model };
+  }
+
+  /** 目录可以覆盖全局模型配置；只向当前模型发送仍在其目录中声明的档位。 */
+  async function selection(
+    directory: string,
+    model: ModelRef | undefined,
+    efforts: readonly ModelEffort[] = [],
+    signal?: AbortSignal,
+  ): Promise<{ model?: { providerID: string; modelID: string }; variant?: string }> {
+    const base = model ? { model: { providerID: model.providerId, modelID: model.modelId } } : {};
+    const explicit = model && model.providerId + '/' + model.modelId;
+    if (!efforts.length || (explicit && !efforts.find((e) => e.model === explicit)?.variant)) return base;
+    const catalog = await listModels(directory, signal);
+    const key = explicit ?? catalog.defaultModel;
+    const variant = efforts.find((e) => e.model === key)?.variant;
+    const entry = catalog.available.find((m) => m.providerId + '/' + m.modelId === key);
+    if (!entry || !variant || !entry.variants.includes(variant)) return base;
+    return { model: { providerID: entry.providerId, modelID: entry.modelId }, variant };
+  }
+
   return {
     isConnected: runtime.isReady,
     shutdown: runtime.shutdown,
@@ -222,14 +267,14 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         runtime.sdk().session.update({ sessionID: sessionId, directory, permission }, requestOptions(signal)),
       );
     },
-    async prompt({ sessionId, directory, agent, model, system, text, messageId }) {
-      await request('session.promptAsync', () =>
+    async prompt({ sessionId, directory, agent, model, efforts, system, text, messageId }) {
+      await request('session.promptAsync', async () =>
         runtime.sdk().session.promptAsync(
           {
             sessionID: sessionId,
             directory,
             agent,
-            ...(model === undefined ? {} : { model: { providerID: model.providerId, modelID: model.modelId } }),
+            ...(await selection(directory, model, efforts)),
             ...(system === undefined ? {} : { system }),
             parts: [{ type: 'text', text }],
             ...(messageId === undefined ? {} : { messageID: messageId }),
@@ -238,7 +283,8 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         ),
       );
     },
-    async runCommand({ sessionId, directory, agent, model, text, messageId, signal }) {
+    async runCommand({ sessionId, directory, agent, model, efforts, text, messageId, signal }) {
+      const selected = await selection(directory, model, efforts, signal);
       const separator = text.search(/\s/);
       const { data } = await request('session.command', () =>
         runtime.sdk().session.command(
@@ -246,7 +292,8 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
             sessionID: sessionId,
             directory,
             agent,
-            ...(model === undefined ? {} : { model: `${model.providerId}/${model.modelId}` }),
+            ...(selected.model ? { model: selected.model.providerID + '/' + selected.model.modelID } : {}),
+            ...(selected.variant ? { variant: selected.variant } : {}),
             command: text.slice(1, separator === -1 ? undefined : separator),
             ...(messageId === undefined ? {} : { messageID: messageId }),
             arguments: separator === -1 ? '' : text.slice(separator).trimStart(),
@@ -261,7 +308,7 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         });
       }
     },
-    promptAssistant({ sessionId, directory, agent, model, system, text, messageId }) {
+    promptAssistant({ sessionId, directory, agent, model, efforts, system, text, messageId }) {
       const accepted = Promise.withResolvers<void>();
       const started = Promise.withResolvers<void>();
       let running = false;
@@ -280,14 +327,14 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         }
       };
       listeners.add(observe);
-      const completed = request('session.prompt', () =>
+      const completed = request('session.prompt', async () =>
         runtime.sdk().session.prompt(
           {
             sessionID: sessionId,
             messageID: messageId,
             directory,
             agent,
-            ...(model === undefined ? {} : { model: { providerID: model.providerId, modelID: model.modelId } }),
+            ...(await selection(directory, model, efforts, abort.signal)),
             ...(system === undefined ? {} : { system }),
             parts: [{ type: 'text', text }],
           },
@@ -317,15 +364,24 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         },
       };
     },
-    async promptDocument({ sessionId, directory, model, system, text, signal, agent = OPENCODE_DOCUMENT_AGENT }) {
-      const { data } = await request('session.prompt', () =>
+    async promptDocument({
+      sessionId,
+      directory,
+      model,
+      efforts,
+      system,
+      text,
+      signal,
+      agent = OPENCODE_DOCUMENT_AGENT,
+    }) {
+      const { data } = await request('session.prompt', async () =>
         runtime.sdk().session.prompt(
           {
             sessionID: sessionId,
             directory,
             agent,
             ...(system === undefined ? {} : { system }),
-            ...(model === undefined ? {} : { model: { providerID: model.providerId, modelID: model.modelId } }),
+            ...(await selection(directory, model, efforts, signal)),
             parts: [{ type: 'text', text }],
           },
           requestOptions(signal),
@@ -343,14 +399,14 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         .join('\n')
         .trim();
     },
-    async promptImage({ sessionId, directory, model, question, image, signal }) {
-      const { data } = await request('session.prompt', () =>
+    async promptImage({ sessionId, directory, model, efforts, question, image, signal }) {
+      const { data } = await request('session.prompt', async () =>
         runtime.sdk().session.prompt(
           {
             sessionID: sessionId,
             directory,
             agent: OPENCODE_IMAGE_AGENT,
-            model: { providerID: model.providerId, modelID: model.modelId },
+            ...(await selection(directory, model, efforts, signal)),
             parts: [
               { type: 'text', text: question },
               { type: 'file', mime: image.mime, url: `data:${image.mime};base64,${image.data.toString('base64')}` },
@@ -398,25 +454,7 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         }
       });
     },
-    async listModels(directory, signal) {
-      const sdk = runtime.sdk();
-      const at = directory === undefined ? {} : { directory };
-      const options = requestOptions(signal);
-      const [{ data: providers }, { data: config }] = await Promise.all([
-        request('config.providers', () => sdk.config.providers(at, options)),
-        request('config.get', () => sdk.config.get(at, options)),
-      ]);
-      const available = providers.providers.flatMap((p) =>
-        Object.values(p.models).map((m) => ({
-          providerId: p.id,
-          modelId: m.id,
-          name: m.name,
-          contextLimit: m.limit.context > 0 ? m.limit.context : null,
-          supportsImage: m.capabilities.input.image,
-        })),
-      );
-      return config.model === undefined ? { available } : { available, defaultModel: config.model };
-    },
+    listModels,
     async prepareDelegationModel({ sourceDirectory, sourceSessionId, targetDirectory, model }) {
       const sdk = runtime.sdk();
       const { data: source } = await request('config.get', () => sdk.config.get({ directory: sourceDirectory }, THROW));
