@@ -53,6 +53,38 @@ function result(tool: string, current: DatabaseInvestigation): TranscriptEntry {
   };
 }
 
+const lookupError = 'DB_CONNECTION_NOT_FOUND · This investigation requires the same linked database';
+const legacyReceipt = 'Legacy investigation receipt';
+
+function otherReceipts(tool: string, ts: number): TranscriptEntry[] {
+  return [
+    {
+      kind: TranscriptEntryKind.ToolCall,
+      seq: 4,
+      ts,
+      data: { callId: 'db-error', tool, input: { connection: '未绑定库', question } },
+    },
+    {
+      kind: TranscriptEntryKind.ToolResult,
+      seq: 5,
+      ts,
+      data: { callId: 'db-error', tool, status: 'error', error: lookupError },
+    },
+    {
+      kind: TranscriptEntryKind.ToolCall,
+      seq: 6,
+      ts,
+      data: { callId: 'db-legacy', tool, input: { connection: '旧运行库', question } },
+    },
+    {
+      kind: TranscriptEntryKind.ToolResult,
+      seq: 7,
+      ts,
+      data: { callId: 'db-legacy', tool, status: 'completed', output: legacyReceipt },
+    },
+  ];
+}
+
 const evidence: DatabaseInvestigation['evidence'][number] = {
   id: 'query-1',
   kind: 'query',
@@ -101,10 +133,10 @@ test('助手活动显示本轮调查进度，完成后打开历史查询证据',
     await page.route(`**/assistant/conversations/${id}/transcript?*`, (route) =>
       route.fulfill({
         json: {
-          entries: [message, call(tool, ts), ...(completed ? [result(tool, current)] : [])],
+          entries: [message, call(tool, ts), ...(completed ? [result(tool, current), ...otherReceipts(tool, ts)] : [])],
           hasMore: false,
           done: false,
-          lastSeq: completed ? 3 : 2,
+          lastSeq: completed ? 7 : 2,
         },
       }),
     );
@@ -121,7 +153,8 @@ test('助手活动显示本轮调查进度，完成后打开历史查询证据',
       route.fulfill({ json: { items: [previous, current, ...(ambiguous ? [concurrent] : [])] } }),
     );
     await page.goto(`/?conversation=${id}`);
-    const activity = page.getByTestId('assistant-action').filter({ hasText: '调查数据库' });
+    const assistantAction = page.getByTestId('assistant-action').filter({ hasText: '调查数据库' });
+    const activity = assistantAction.filter({ hasText: connection });
     await activity.locator('summary').click();
     await expect(activity.getByText(current.investigationId, { exact: true })).toBeVisible();
     await expect(activity.getByText(previous.investigationId, { exact: true })).toHaveCount(0);
@@ -140,6 +173,10 @@ test('助手活动显示本轮调查进度，完成后打开历史查询证据',
     await expectEvidence(page, current.investigationId);
     await expect(activity.getByText(current.answer, { exact: true })).toBeVisible();
     await expect(activity.getByText(current.limitations[0] ?? '')).toBeVisible();
+    await assistantAction.filter({ hasText: '未绑定库' }).locator('summary').click();
+    await expect(assistantAction.filter({ hasText: '未绑定库' }).getByText(lookupError)).toBeVisible();
+    await assistantAction.filter({ hasText: '旧运行库' }).locator('summary').click();
+    await expect(assistantAction.filter({ hasText: '旧运行库' }).getByText(legacyReceipt)).toBeVisible();
   } finally {
     await request.post(`${API_BASE}/assistant/conversations/${id}/abort`, { headers: AUTH, data: {} });
     await request.delete(`${API_BASE}/assistant/conversations/${id}`, { headers: AUTH });
@@ -174,15 +211,22 @@ test('节点调查只显示本尝试的证据', async ({ page, request }) => {
     };
     const tool = `${MCP_TOOL_PREFIX}${McpToolName.InvestigateDatabase}`;
     await page.route(`**/attempts/${attempt.id}/transcript?*`, (route) =>
-      route.fulfill({ json: { entries: [call(tool, ts)], hasMore: false, done: false, lastSeq: 2 } }),
+      route.fulfill({
+        json: { entries: [call(tool, ts), ...otherReceipts(tool, ts)], hasMore: false, done: false, lastSeq: 7 },
+      }),
     );
     await page.route(`**/database-investigations/task/${task.id}`, (route) =>
       route.fulfill({ json: { items: [otherAttempt, current] } }),
     );
     await page.goto(`/tasks/${task.id}/nodes/${attempt.nodeId}?attempt=${attempt.id}`);
-    await page.getByTestId('stream-action').filter({ hasText: '调查数据库' }).getByRole('button').click();
+    const nodeAction = page.getByTestId('stream-action').filter({ hasText: '调查数据库' });
+    await nodeAction.filter({ hasText: connection }).getByRole('button').click();
     await expectEvidence(page, current.investigationId);
     await expect(page.getByText(otherAttempt.answer)).toHaveCount(0);
+    await nodeAction.filter({ hasText: '未绑定库' }).getByRole('button').click();
+    await expect(nodeAction.filter({ hasText: '未绑定库' }).getByText(lookupError)).toBeVisible();
+    await nodeAction.filter({ hasText: '旧运行库' }).getByRole('button').click();
+    await expect(nodeAction.filter({ hasText: '旧运行库' }).getByText(legacyReceipt)).toBeVisible();
   } finally {
     await request.post(`${API_BASE}/tasks/${task.id}/cancel`, { headers: AUTH, data: {} });
   }

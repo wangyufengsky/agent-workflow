@@ -47,7 +47,7 @@ it('persists evidence and reuses the same restricted native session after restar
     '{"action":"query","sql":"DELETE FROM rates"}',
     '{"action":"query","sql":"SELECT COUNT(*) AS total FROM rates"}',
     '{"action":"finish","answer":"There are 2 rates."}',
-    '{"action":"query","sql":"SELECT MIN(amount) AS minimum FROM rates"}',
+    JSON.stringify({ action: 'query', sql: "SELECT MIN(amount) AS minimum, printf('%0401d', 0) AS detail FROM rates" }),
     '{"action":"finish","answer":"The minimum is 23."}',
     '{"action":"query","sql":"SELECT MAX(amount) AS maximum FROM rates"}',
     '{"action":"finish","answer":"The maximum is 42."}',
@@ -160,6 +160,16 @@ it('persists evidence and reuses the same restricted native session after restar
       status: 'completed',
       answer: 'The minimum is 23.',
     });
+    const sampled = second.evidence.at(-1);
+    expect(sampled).toMatchObject({ kind: 'query', rowCount: 1, truncated: true });
+    expect(messages.map(({ text }) => text)).toContain(
+      JSON.stringify({
+        evidenceId: sampled?.id,
+        columns: ['minimum', 'detail'],
+        rows: [[23, '0'.repeat(400)]],
+        truncated: true,
+      }),
+    );
     expect(third).toMatchObject({
       investigationId: first.investigationId,
       status: 'completed',
@@ -175,7 +185,7 @@ it('persists evidence and reuses the same restricted native session after restar
     expect(new Set(messages.map(({ sessionId, directory }) => [sessionId, directory].join('/'))).size).toBe(1);
     expect(statements).toEqual([
       'SELECT COUNT(*) AS total FROM rates',
-      'SELECT MIN(amount) AS minimum FROM rates',
+      "SELECT MIN(amount) AS minimum, printf('%0401d', 0) AS detail FROM rates",
       'SELECT MAX(amount) AS maximum FROM rates',
     ]);
 

@@ -81,6 +81,7 @@ export function ToolRow({
             startedAt={call.ts}
             active={state === 'running'}
             output={result?.data.status === 'completed' ? result.data.output : undefined}
+            error={result?.data.status === 'error' ? result.data.error : undefined}
           />
         )}
         {pro && !investigates && (

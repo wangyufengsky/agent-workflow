@@ -89,6 +89,7 @@ export function ActionBar({ item, pro }: { item: StreamAction; pro: boolean }) {
               startedAt={item.startedAt}
               active={item.state === 'running'}
               output={item.state === 'ok' ? item.output : undefined}
+              error={item.state === 'failed' ? item.output : undefined}
             />
           )}
           {pro && !investigates && (

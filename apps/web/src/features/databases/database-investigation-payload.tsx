@@ -2,6 +2,7 @@ import { investigateDatabaseInputSchema, listDatabaseInvestigationsOp } from '@a
 import { useQuery } from '@tanstack/react-query';
 import { callOperation } from '../../api/client.ts';
 import { DATABASE_INVESTIGATION_COPY as C } from '../../copy/databases.ts';
+import styles from './database-investigation-evidence.module.css';
 import { DatabaseInvestigationEvidence, readDatabaseInvestigation } from './database-investigation-evidence.tsx';
 
 type Owner = { kind: 'assistant'; id: string } | { kind: 'task'; id: string; attemptId: string };
@@ -41,18 +42,19 @@ export function DatabaseInvestigationPayload({
   startedAt,
   active,
   output,
+  error,
 }: {
   owner: Owner | undefined;
   input: Record<string, unknown>;
   startedAt: number;
   active: boolean;
   output: string | undefined;
+  error: string | undefined;
 }) {
   const live = useDatabaseInvestigation(owner, input, startedAt, active);
   const investigation = readDatabaseInvestigation(output) ?? live;
-  return investigation === undefined ? (
-    <p className="hint">{active ? C.status.running : C.unavailable}</p>
-  ) : (
-    <DatabaseInvestigationEvidence investigation={investigation} />
-  );
+  if (investigation !== undefined) return <DatabaseInvestigationEvidence investigation={investigation} />;
+  const receipt = error || output;
+  if (receipt) return <pre className={styles.sql}>{receipt}</pre>;
+  return <p className="hint">{active ? C.status.running : C.unavailable}</p>;
 }

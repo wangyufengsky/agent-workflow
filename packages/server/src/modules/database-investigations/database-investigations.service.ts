@@ -68,23 +68,31 @@ function parseAction(text: string) {
   }
 }
 
-function safeSample(value: unknown): unknown {
-  if (value === null || typeof value === 'number' || typeof value === 'boolean') return value;
-  if (typeof value === 'string') return value.slice(0, 400);
-  if (typeof value === 'bigint') return value.toString();
-  return '[non-scalar value]';
+const MAX_SAMPLE_COLUMNS = 32;
+const MAX_CELL_CHARS = 400;
+
+function safeSample(value: unknown) {
+  if (value === null || typeof value === 'boolean') return { value, truncated: false };
+  if (typeof value === 'number') return { value, truncated: !Number.isFinite(value) };
+  if (typeof value === 'string')
+    return { value: value.slice(0, MAX_CELL_CHARS), truncated: value.length > MAX_CELL_CHARS };
+  if (typeof value === 'bigint') return { value: value.toString(), truncated: false };
+  return { value: '[non-scalar value]', truncated: true };
 }
 
 function sampleRows(rows: unknown[][]) {
   const sample: unknown[][] = [];
   let length = 0;
+  let truncated = rows.length > MAX_ROWS;
   for (const row of rows.slice(0, MAX_ROWS)) {
-    const cells = row.slice(0, 32).map(safeSample);
-    length += JSON.stringify(cells).length;
-    if (length > MAX_SAMPLE_CHARS) break;
-    sample.push(cells);
+    const cells = row.slice(0, MAX_SAMPLE_COLUMNS).map(safeSample);
+    truncated ||= row.length > MAX_SAMPLE_COLUMNS || cells.some((cell) => cell.truncated);
+    const values = cells.map(({ value }) => value);
+    length += JSON.stringify(values).length;
+    if (length > MAX_SAMPLE_CHARS) return { rows: sample, truncated: true };
+    sample.push(values);
   }
-  return sample;
+  return { rows: sample, truncated };
 }
 
 function cancellable<T>(pending: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -331,20 +339,21 @@ export function createDatabaseInvestigations({
                   databases.queryByLink(projectId, connection.id, choice.sql, choice.limit ?? MAX_ROWS),
                   sessionSignal,
                 );
-                const rows = sampleRows(query.rows);
+                const sample = sampleRows(query.rows);
+                const truncated = query.truncated || query.columns.length > MAX_SAMPLE_COLUMNS || sample.truncated;
                 const evidenceId = record({
                   kind: 'query',
                   sql: choice.sql,
                   durationMs: Math.max(0, query.elapsedMs),
                   rowCount: query.rows.length,
-                  truncated: query.truncated,
+                  truncated,
                   summary: `${query.rows.length} returned rows, ${query.columns.length} columns`,
                 });
                 prompt = JSON.stringify({
                   evidenceId,
-                  columns: query.columns.slice(0, 32),
-                  rows,
-                  truncated: query.truncated || query.columns.length > 32 || rows.length < query.rows.length,
+                  columns: query.columns.slice(0, MAX_SAMPLE_COLUMNS),
+                  rows: sample.rows,
+                  truncated,
                 });
               }
             } catch (error) {
