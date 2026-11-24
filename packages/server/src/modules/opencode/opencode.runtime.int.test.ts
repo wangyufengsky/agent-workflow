@@ -10,6 +10,7 @@ import {
   recheckEnvironmentOp,
   restartRuntimeOp,
   ServerEventType,
+  setOpencodeHeadersOp,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -72,6 +73,27 @@ describe('opencode 运行时', () => {
 
     expect(await launchCount()).toBe(2);
     expect((await t.call(getRuntimeOp, {})).body).toMatchObject({ status: 'crashed', version: OPENCODE_VERSION });
+  });
+
+  it('请求头密钥锁定时保留配置，解锁后自动重新启动 OpenCode', async () => {
+    const password = 'header-test-password';
+    await t.app.services.credentials.setupMasterPassword(password);
+    const item = { name: 'X-Gateway-Key', secret: true, value: 'fixture-gateway-secret' } as const;
+    expect((await t.call(setOpencodeHeadersOp, { items: [item] })).status).toBe(200);
+    const dataDir = t.dataDir;
+    await t.close();
+    bin = await mkdtemp(join(tmpdir(), 'aw-reopened-bin-'));
+    await crashingOpencode();
+    t = await createTestApp({ dataDir, env: await isolatedEnv(bin, bin, { git: true }), realOpencode: true });
+    await t.app.start(t.port);
+    expect((await t.call(getRuntimeOp, {})).body.status).toBe(RuntimeStatus.Crashed);
+    await expect(readFile(launches)).rejects.toMatchObject({ code: 'ENOENT' });
+    const settled = waitForEvent(t.app.events, ServerEventType.RuntimeUpdated, nthCrash(2));
+    await t.app.services.credentials.unlock(password);
+    await settled;
+    const envs = await launchEnvs();
+    expect(envs).toHaveLength(2);
+    expect(JSON.stringify(envs)).not.toContain(item.value);
   });
 
   it('手动重启重新允许一次自动重启', async () => {

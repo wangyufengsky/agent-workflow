@@ -47,6 +47,7 @@ export const CredentialKind = {
   GitToken: 'git_token',
   DbPassword: 'db_password',
   StartupEnvironment: 'startup_environment',
+  OpencodeHeader: 'opencode_header',
 } as const;
 export type CredentialKind = (typeof CredentialKind)[keyof typeof CredentialKind];
 export const credentialKindSchema = z.enum(CredentialKind);

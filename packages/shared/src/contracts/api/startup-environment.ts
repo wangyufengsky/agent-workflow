@@ -48,32 +48,55 @@ const name = z
   .refine((value) => !reserved.has(value.toUpperCase()), 'This name is managed by the application');
 const value = z.string().refine((value) => !value.includes('\0'), 'Environment values cannot contain NUL');
 
-export const startupEnvironmentInputSchema = z
-  .object({
-    expectedRevision: z
-      .string()
-      .regex(/^[a-f0-9]{64}$/)
-      .optional(),
-    items: z.array(
-      z.discriminatedUnion('secret', [
-        z.object({ name, secret: z.literal(true), value: value.optional() }),
-        z.object({ name, secret: z.literal(false), value }),
-      ]),
-    ),
-  })
-  .superRefine(({ items }, ctx) => {
-    const keys = new Set<string>();
-    for (const [index, item] of items.entries()) {
-      const key = item.name.toUpperCase();
-      if (keys.has(key))
-        ctx.addIssue({
-          code: 'custom',
-          path: ['items', index, 'name'],
-          message: 'Duplicate environment variable name',
-        });
-      keys.add(key);
-    }
-  });
+function inputSchema(name: z.ZodString, value: z.ZodString) {
+  return z
+    .object({
+      expectedRevision: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/)
+        .optional(),
+      items: z.array(
+        z.discriminatedUnion('secret', [
+          z.object({ name, secret: z.literal(true), value: value.optional() }),
+          z.object({ name, secret: z.literal(false), value }),
+        ]),
+      ),
+    })
+    .superRefine(({ items }, ctx) => {
+      const keys = new Set<string>();
+      for (const [index, item] of items.entries()) {
+        const key = item.name.toUpperCase();
+        if (keys.has(key))
+          ctx.addIssue({
+            code: 'custom',
+            path: ['items', index, 'name'],
+            message: 'Duplicate name',
+          });
+        keys.add(key);
+      }
+    });
+}
+
+export const startupEnvironmentInputSchema = inputSchema(name, value);
+const transportHeaders = new Set([
+  'host',
+  'content-length',
+  'transfer-encoding',
+  'connection',
+  'keep-alive',
+  'upgrade',
+  'trailer',
+  'te',
+  'proxy-authorization',
+  'proxy-connection',
+  'content-encoding',
+]);
+const headerName = z
+  .string()
+  .regex(/^[!#$%&'*+.^_`|~0-9a-zA-Z-]+$/)
+  .refine((key) => !transportHeaders.has(key.toLowerCase()));
+const headerValue = z.string().regex(/^[\t\x20-\x7e]*$/);
+export const opencodeHeadersInputSchema = inputSchema(headerName, headerValue);
 export type StartupEnvironmentInput = z.infer<typeof startupEnvironmentInputSchema>;
 
 export const startupEnvironmentSchema = z.object({

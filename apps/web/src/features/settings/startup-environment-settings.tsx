@@ -1,4 +1,12 @@
-import { ErrorCode, getStartupEnvironmentOp, setStartupEnvironmentOp, startupEnvironmentInputSchema } from '@aw/shared';
+import {
+  ErrorCode,
+  getOpencodeHeadersOp,
+  getStartupEnvironmentOp,
+  opencodeHeadersInputSchema,
+  setOpencodeHeadersOp,
+  setStartupEnvironmentOp,
+  startupEnvironmentInputSchema,
+} from '@aw/shared';
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import type { z } from 'zod';
@@ -6,7 +14,7 @@ import { ApiError, callOperation } from '../../api/client.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
-import { STARTUP_ENVIRONMENT_COPY as C } from '../../copy/settings.ts';
+import { OPENCODE_HEADERS_COPY, STARTUP_ENVIRONMENT_COPY } from '../../copy/settings.ts';
 import styles from './startup-environment.module.css';
 
 type Snapshot = z.output<typeof getStartupEnvironmentOp.output>;
@@ -14,10 +22,24 @@ type Item = Snapshot['items'][number];
 type Row = { id: string; name: string; secret: boolean; value: string | undefined };
 type Draft = { base: Snapshot; rows: Row[] };
 
-const startupEnvironmentQuery = queryOptions({
-  queryKey: ['settings', 'startup-environment'],
-  queryFn: () => callOperation(getStartupEnvironmentOp, {}),
-});
+const environmentEditor = {
+  copy: STARTUP_ENVIRONMENT_COPY,
+  query: queryOptions({
+    queryKey: ['settings', 'startup-environment'],
+    queryFn: () => callOperation(getStartupEnvironmentOp, {}),
+  }),
+  schema: startupEnvironmentInputSchema,
+  save: (input: z.output<typeof startupEnvironmentInputSchema>) => callOperation(setStartupEnvironmentOp, input),
+};
+const headerEditor = {
+  copy: OPENCODE_HEADERS_COPY,
+  query: queryOptions({
+    queryKey: ['settings', 'opencode-headers'],
+    queryFn: () => callOperation(getOpencodeHeadersOp, {}),
+  }),
+  schema: opencodeHeadersInputSchema,
+  save: (input: z.output<typeof opencodeHeadersInputSchema>) => callOperation(setOpencodeHeadersOp, input),
+};
 
 const visibleValue = (item: Item) => (item.secret ? undefined : item.value);
 
@@ -35,30 +57,30 @@ function canKeep(row: Row, saved: readonly Item[]): boolean {
   );
 }
 
-export function StartupEnvironmentSettings() {
+function KeyValueSettings({ editor }: { editor: typeof headerEditor | typeof environmentEditor }) {
+  const C = editor.copy;
   const client = useQueryClient();
-  const query = useQuery(startupEnvironmentQuery);
+  const query = useQuery(editor.query);
   const [draft, setDraft] = useState<Draft>();
   const [saved, setSaved] = useState(false);
   const nextId = useRef(0);
   const snapshot = query.data;
   const rows = draft?.rows ?? (snapshot === undefined ? [] : rowsFrom(snapshot));
   const base = draft?.base ?? snapshot;
-  const parsed = startupEnvironmentInputSchema.safeParse({
+  const parsed = editor.schema.safeParse({
     expectedRevision: draft?.base.revision,
     items: rows.map(({ name, secret, value }) => ({ name, secret, ...(value === undefined ? {} : { value }) })),
   });
   const missingValue = rows.some((row) => row.value === undefined && !canKeep(row, base?.items ?? []));
   const save = useMutation({
     gcTime: 0,
-    mutationFn: (input: z.output<typeof startupEnvironmentInputSchema>) =>
-      callOperation(setStartupEnvironmentOp, input),
+    mutationFn: editor.save,
     onError: async (error) => {
       if (isRevisionConflict(error)) await query.refetch();
     },
     onSuccess: async (result) => {
-      await client.cancelQueries({ queryKey: startupEnvironmentQuery.queryKey, exact: true });
-      client.setQueryData(startupEnvironmentQuery.queryKey, result);
+      await client.cancelQueries({ queryKey: editor.query.queryKey, exact: true });
+      client.setQueryData(editor.query.queryKey, result);
       setDraft(undefined);
       setSaved(true);
       save.reset();
@@ -218,5 +240,14 @@ export function StartupEnvironmentSettings() {
         </form>
       )}
     </section>
+  );
+}
+
+export function StartupEnvironmentSettings() {
+  return (
+    <div className="col">
+      <KeyValueSettings editor={environmentEditor} />
+      <KeyValueSettings editor={headerEditor} />
+    </div>
   );
 }

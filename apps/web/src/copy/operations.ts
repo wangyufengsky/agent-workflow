@@ -9,6 +9,8 @@ import { THEME_LABEL } from './themes.ts';
 
 /** Operation titles by the contract's `title` key (shared/operations); a unit test keeps it complete. */
 export const OPERATION_TITLE: Readonly<Record<string, string>> = {
+  'op.settings.getOpencodeHeaders': '读取模型请求头',
+  'op.settings.setOpencodeHeaders': '保存模型请求头',
   'op.settings.getStartupEnvironment': '读取启动环境变量',
   'op.settings.setStartupEnvironment': '保存启动环境变量',
   'op.settings.get': '查看设置',

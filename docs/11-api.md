@@ -739,3 +739,7 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 | `PUT /settings/startup-environment` | 保存整份列表。设置页提交 `expectedRevision`，版本已变化时返回冲突并保留草稿。以同名密钥且省略 `value` 表示保留原密钥。传空字符串表示显式设置为空，传空列表清除配置。 |
 
 这两个操作供专业模式设置页使用。启动配置和密钥值独立于通用设置及助手工具。
+
+## OpenCode 模型请求头
+
+专业设置通过 `GET /settings/opencode-headers` 读取、`PUT /settings/opencode-headers` 替换列表，沿用上节的密钥省略和版本冲突约定。头名按 HTTP token 校验且大小写不敏感，值接受可打印 ASCII 字符和制表符，拒绝换行。Host、Content-Length 等传输控制字段由客户端管理。此配置在 OpenCode 下次启动时生效，作用于所有所选模型供应商。

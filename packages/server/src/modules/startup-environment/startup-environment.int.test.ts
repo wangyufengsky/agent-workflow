@@ -2,7 +2,9 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
   ErrorCode,
+  getOpencodeHeadersOp,
   getStartupEnvironmentOp,
+  setOpencodeHeadersOp,
   setStartupEnvironmentOp,
   setupMasterPasswordOp,
   unlockCredentialsOp,
@@ -276,3 +278,26 @@ it.each(['reset', 'rotate'] as const)(
     }
   },
 );
+
+it('header settings reject invalid transport fields without replacing saved headers or environment variables', async () => {
+  const app = await createTestApp();
+  try {
+    const item = { name: 'CLIENT', value: 'model', secret: false } as const;
+    await app.call(setStartupEnvironmentOp, { items: [{ ...item, value: 'project' }] });
+    const saved = await app.call(setOpencodeHeadersOp, { items: [item] });
+    expect(saved.status).toBe(200);
+    for (const patch of [
+      { value: 'one\r\nX-Other: two' },
+      { name: 'Content-Length' },
+      { name: 'Bad Name' },
+      { name: 'client' },
+    ]) {
+      const result = await app.call(setOpencodeHeadersOp, { items: [item, { ...item, name: 'X-Value', ...patch }] });
+      expect(result.body).toMatchObject({ error: { code: ErrorCode.ValidationFailed } });
+    }
+    expect((await app.call(getOpencodeHeadersOp, {})).body).toEqual(saved.body);
+    expect(await app.app.services.startupEnvironment.resolve()).toMatchObject({ env: { CLIENT: 'project' } });
+  } finally {
+    await app.close();
+  }
+});

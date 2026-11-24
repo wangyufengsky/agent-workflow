@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { MCP_ASSISTANT_TOOL_PREFIX } from '@aw/shared';
 import { expect } from '@playwright/test';
 import { test } from './assistant-fixtures.ts';
@@ -124,12 +125,18 @@ test('长对话直接打开最新回复，补读历史和收到新消息都保�
   const stream = page.getByTestId('home-messages');
   await expect(stream.getByText('已回答第 18 题。', { exact: true })).toBeInViewport();
   await expect(stream.getByText('最初的问题', { exact: true })).toHaveCount(0);
+  const previews = process.env.AW_ASSISTANT_HISTORY_SCREENSHOTS;
+  if (previews) await page.screenshot({ path: join(previews, 'assistant-latest.png'), animations: 'disabled' });
   const older = stream.getByRole('button', { name: '加载更早的消息' });
   await older.scrollIntoViewIfNeeded();
   const anchor = stream.getByTestId('assistant-user-message').first();
   const original = stream.getByText(await anchor.innerText(), { exact: true });
   const top = () => original.evaluate((element) => element.getBoundingClientRect().top);
   const before = await top();
+  if (previews) {
+    await expect(stream.getByRole('button', { name: /回到最新/ })).toBeVisible();
+    await page.screenshot({ path: join(previews, 'assistant-history.png'), animations: 'disabled' });
+  }
   await older.click();
   await expect(stream.getByText('第 10 题', { exact: true })).toBeAttached();
   await expect.poll(async () => Math.abs((await top()) - before)).toBeLessThan(2);

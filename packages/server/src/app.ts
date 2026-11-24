@@ -2,7 +2,9 @@ import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { BUILTIN_INITIATIVE_TEMPLATES, loadBuiltinRoles, loadBuiltinWorkflows, loadPrompts } from '@aw/builtin';
 import {
+  AppError,
   DB_QUERY_TIMEOUT_MS,
+  ErrorCode,
   isTerminalState,
   MCP_ASSISTANT_PATH,
   MCP_EXEC_PATH,
@@ -215,6 +217,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const mcpToken = randomBytes(32).toString('hex');
   const assistantMcpToken = randomBytes(32).toString('hex');
   let apiPort: number | undefined;
+  let waitingForHeaderUnlock = false;
   const runtime = createOpencodeRuntime({
     env,
     binaryPath: () => settings.service.get('opencode.binaryPath'),
@@ -223,7 +226,17 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       const api = `http://127.0.0.1:${apiPort}`;
       const shell = await locateOpencodeShell(env);
       const offline = settings.service.get('network.offline');
+      let headers: Record<string, string>;
+      try {
+        headers = await startupEnvironment.headers.values();
+        waitingForHeaderUnlock = false;
+      } catch (error) {
+        waitingForHeaderUnlock = error instanceof AppError && error.code === ErrorCode.CredentialLocked;
+        throw error;
+      }
+      const hasHeaders = Object.keys(headers).length > 0;
       const launchEnv = opencodeLaunchEnv({
+        readHeaderInput: hasHeaders,
         mcpUrl: `${api}${MCP_EXEC_PATH}`,
         mcpToken,
         assistantMcpUrl: `${api}${MCP_ASSISTANT_PATH}`,
@@ -236,7 +249,11 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
       });
       // opencode's grep, glob and skill tools run rg, downloading it when missing: not on intranet machines (D213).
       const ripgrep = config.ripgrepDir === undefined ? {} : host.pathAppending(env, config.ripgrepDir);
-      return { env: { ...launchEnv, ...ripgrep }, offline };
+      return {
+        env: { ...launchEnv, ...ripgrep },
+        offline,
+        ...(hasHeaders ? { headerInput: JSON.stringify(headers) } : {}),
+      };
     },
     networkEnv: network.opencodeEnv,
     log,
@@ -258,6 +275,9 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   const startHostedRuntime = async () => {
     if (hosting) await runtime.startIfDown();
   };
+  credentials.service.onUnlock(async () => {
+    if (waitingForHeaderUnlock) await startHostedRuntime();
+  });
   const databases = createDatabasesModule({
     db: database.db,
     clock,

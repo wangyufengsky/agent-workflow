@@ -96,6 +96,8 @@
 
   离线环境下尝试不带费用（`AttemptDTO.cost` 为 `null`，D181），助手的 `attempts.get` 工具输出只有 tokens。opencode 在配置目录后台安装 `@opencode-ai/plugin` 没有开关可关，应用暂不处理，前提是内网机器上已装好（D182，实测见 §8.2）。
 
+托管 OpenCode 启动时由标准输入接收本次自定义模型请求头。bridge 在 `chat.headers` 钩子合并头字段，大小写不同的同名字段按显式配置覆盖。应用的 MCP、界面 API 和项目命令使用各自原有的传输配置。
+
 ## 3. 调用归属（哪个尝试在调用工具）
 
 MCP 连接在 opencode 内是全局的，请求头无法区分会话，因此：
