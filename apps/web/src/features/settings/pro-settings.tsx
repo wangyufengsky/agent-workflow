@@ -15,6 +15,7 @@ import { SETTINGS_COPY as C } from '../../copy/settings.ts';
 import { environmentQuery } from '../onboarding/environment.queries.ts';
 import { usableModels } from '../onboarding/usable-models.ts';
 import { rolesQuery } from '../tasks/tasks.queries.ts';
+import styles from './pro-settings.module.css';
 import { NumberSetting, Segmented, TextSetting } from './setting-inputs.tsx';
 import { StartupEnvironmentSettings } from './startup-environment-settings.tsx';
 
@@ -83,166 +84,180 @@ export function ProSettings({ settings, set }: { settings: Settings; set: (patch
   const model = settings['ai.defaultModel'];
   return (
     <Panel title={C.pro}>
-      <ModelFields>
+      <section className={styles.group}>
+        <h3>{C.modelGroup}</h3>
+        <ModelFields>
+          <div className="field">
+            <label className="label" htmlFor="setting-model">
+              {C.defaultModel}
+            </label>
+            <select
+              id="setting-model"
+              className="select"
+              value={model ?? ''}
+              onChange={(e) => set({ 'ai.defaultModel': e.target.value === '' ? null : e.target.value })}
+            >
+              <option value="">{C.opencodeDefault}</option>
+              {model !== null && !ids.includes(model) && <option value={model}>{model}</option>}
+              {models.map((m) => (
+                <option key={`${m.providerId}/${m.modelId}`} value={`${m.providerId}/${m.modelId}`}>
+                  {m.name}（{m.providerId}/{m.modelId}）
+                </option>
+              ))}
+            </select>
+            <p className="hint">{C.defaultModelHint}</p>
+          </div>
+          <ModelEffortField
+            model={models.find(
+              (m) => m.providerId + '/' + m.modelId === (model ?? environment.data?.models.defaultModel),
+            )}
+            value={settings['ai.defaultEffort']}
+            onChange={(effort) => set({ 'ai.defaultEffort': effort })}
+          />
+        </ModelFields>
+        {roles.data && (
+          <details className={styles.usage}>
+            <summary>{C.roleModels}</summary>
+            <dl>
+              {roles.data.map((role) => {
+                const key = role.model ?? model ?? environment.data?.models.defaultModel;
+                const selected = models.find((m) => m.providerId + '/' + m.modelId === key);
+                const variant = modelEfforts(settings, role).find((e) => e.model === key)?.variant;
+                return (
+                  <div key={role.id}>
+                    <dt>{role.name}</dt>
+                    <dd className="hint">
+                      {selected?.name ?? key ?? C.opencodeDefault} ·{' '}
+                      {variant && selected?.variants.includes(variant) ? effortLabel(variant) : C.effortDefault}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </details>
+        )}
+      </section>
+      <section className={styles.group}>
+        <h3>{C.executionGroup}</h3>
         <div className="field">
-          <label className="label" htmlFor="setting-model">
-            {C.defaultModel}
-          </label>
-          <select
-            id="setting-model"
-            className="select"
-            value={model ?? ''}
-            onChange={(e) => set({ 'ai.defaultModel': e.target.value === '' ? null : e.target.value })}
-          >
-            <option value="">{C.opencodeDefault}</option>
-            {model !== null && !ids.includes(model) && <option value={model}>{model}</option>}
-            {models.map((m) => (
-              <option key={`${m.providerId}/${m.modelId}`} value={`${m.providerId}/${m.modelId}`}>
-                {m.name}（{m.providerId}/{m.modelId}）
-              </option>
-            ))}
-          </select>
-          <p className="hint">{C.defaultModelHint}</p>
+          <span className="label">{C.bashPolicy}</span>
+          <Segmented
+            label={C.bashPolicy}
+            value={settings['ai.bashPolicy']}
+            options={[
+              { value: BashPolicy.Auto, label: C.bashAuto },
+              { value: BashPolicy.Ask, label: C.bashAsk },
+            ]}
+            onChange={(v) => set({ 'ai.bashPolicy': v })}
+          />
         </div>
-        <ModelEffortField
-          model={models.find(
-            (m) => m.providerId + '/' + m.modelId === (model ?? environment.data?.models.defaultModel),
-          )}
-          value={settings['ai.defaultEffort']}
-          onChange={(effort) => set({ 'ai.defaultEffort': effort })}
+        <div className={styles.numbers}>
+          <div className="field">
+            <label className="label" htmlFor="setting-nodes-per-task">
+              {C.nodesPerTask}
+            </label>
+            <NumberSetting
+              key={settings['scheduler.maxConcurrentNodesPerTask']}
+              id="setting-nodes-per-task"
+              value={settings['scheduler.maxConcurrentNodesPerTask']}
+              onCommit={(n) => set({ 'scheduler.maxConcurrentNodesPerTask': n })}
+            />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="setting-max-attempts">
+              {C.maxAttempts}
+            </label>
+            <NumberSetting
+              key={settings['node.maxAttempts']}
+              id="setting-max-attempts"
+              value={settings['node.maxAttempts']}
+              onCommit={(n) => set({ 'node.maxAttempts': n })}
+            />
+          </div>
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="setting-timeout">
+            {C.timeoutMinutes}
+          </label>
+          <NumberSetting
+            key={settings['attempt.timeoutMinutes']}
+            id="setting-timeout"
+            value={settings['attempt.timeoutMinutes']}
+            onCommit={(n) => set({ 'attempt.timeoutMinutes': n })}
+          />
+          <p className="hint">{C.timeoutHint}</p>
+        </div>
+      </section>
+      <section className={styles.group}>
+        <h3>{C.deliveryGroup}</h3>
+        <div className="field">
+          <label className="label" htmlFor="setting-commit-draft-timeout">
+            {C.commitDraftTimeout}
+          </label>
+          <NumberSetting
+            key={settings['git.commitDraftTimeoutSeconds']}
+            id="setting-commit-draft-timeout"
+            value={settings['git.commitDraftTimeoutSeconds']}
+            onCommit={(n) => set({ 'git.commitDraftTimeoutSeconds': n })}
+          />
+          <p className="hint">{C.commitDraftTimeoutHint}</p>
+        </div>
+        <CommitIdentitySetting
+          key={JSON.stringify(settings['git.commitIdentity'])}
+          value={settings['git.commitIdentity']}
+          onCommit={(v) => set({ 'git.commitIdentity': v })}
         />
-      </ModelFields>
-      {roles.data && (
-        <details>
-          <summary>{C.roleModels}</summary>
-          <dl>
-            {roles.data.map((role) => {
-              const key = role.model ?? model ?? environment.data?.models.defaultModel;
-              const selected = models.find((m) => m.providerId + '/' + m.modelId === key);
-              const variant = modelEfforts(settings, role).find((e) => e.model === key)?.variant;
-              return (
-                <div key={role.id} className="row">
-                  <dt>{role.name}</dt>
-                  <dd className="hint">
-                    {selected?.name ?? key ?? C.opencodeDefault} ·{' '}
-                    {variant && selected?.variants.includes(variant) ? effortLabel(variant) : C.effortDefault}
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
-        </details>
-      )}
-      <div className="field">
-        <span className="label">{C.bashPolicy}</span>
-        <Segmented
-          label={C.bashPolicy}
-          value={settings['ai.bashPolicy']}
-          options={[
-            { value: BashPolicy.Auto, label: C.bashAuto },
-            { value: BashPolicy.Ask, label: C.bashAsk },
-          ]}
-          onChange={(v) => set({ 'ai.bashPolicy': v })}
-        />
-      </div>
-      <div className="field">
-        <label className="label" htmlFor="setting-nodes-per-task">
-          {C.nodesPerTask}
-        </label>
-        <NumberSetting
-          key={settings['scheduler.maxConcurrentNodesPerTask']}
-          id="setting-nodes-per-task"
-          value={settings['scheduler.maxConcurrentNodesPerTask']}
-          onCommit={(n) => set({ 'scheduler.maxConcurrentNodesPerTask': n })}
-        />
-      </div>
-      <div className="field">
-        <label className="label" htmlFor="setting-max-attempts">
-          {C.maxAttempts}
-        </label>
-        <NumberSetting
-          key={settings['node.maxAttempts']}
-          id="setting-max-attempts"
-          value={settings['node.maxAttempts']}
-          onCommit={(n) => set({ 'node.maxAttempts': n })}
-        />
-      </div>
-      <div className="field">
-        <label className="label" htmlFor="setting-timeout">
-          {C.timeoutMinutes}
-        </label>
-        <NumberSetting
-          key={settings['attempt.timeoutMinutes']}
-          id="setting-timeout"
-          value={settings['attempt.timeoutMinutes']}
-          onCommit={(n) => set({ 'attempt.timeoutMinutes': n })}
-        />
-        <p className="hint">{C.timeoutHint}</p>
-      </div>
-      <div className="field">
-        <label className="label" htmlFor="setting-commit-draft-timeout">
-          {C.commitDraftTimeout}
-        </label>
-        <NumberSetting
-          key={settings['git.commitDraftTimeoutSeconds']}
-          id="setting-commit-draft-timeout"
-          value={settings['git.commitDraftTimeoutSeconds']}
-          onCommit={(n) => set({ 'git.commitDraftTimeoutSeconds': n })}
-        />
-        <p className="hint">{C.commitDraftTimeoutHint}</p>
-      </div>
-      <CommitIdentitySetting
-        key={JSON.stringify(settings['git.commitIdentity'])}
-        value={settings['git.commitIdentity']}
-        onCommit={(v) => set({ 'git.commitIdentity': v })}
-      />
-      <div className="field">
-        <span className="label">{C.defaultStrategy}</span>
-        <Segmented
-          label={C.defaultStrategy}
-          value={settings['delivery.defaultStrategy']}
-          options={LOCAL_MERGE_STRATEGIES.map((s) => ({ value: s, label: DELIVERY_COPY.strategies[s] }))}
-          onChange={(v) => set({ 'delivery.defaultStrategy': v })}
-        />
-      </div>
-      <div className="field row">
-        <span className="label grow" id="setting-delete-branch">
-          {C.deleteBranch}
-        </span>
-        <button
-          type="button"
-          role="switch"
-          className="switch"
-          aria-checked={settings['delivery.deleteBranchAfterMerge']}
-          aria-labelledby="setting-delete-branch"
-          onClick={() => set({ 'delivery.deleteBranchAfterMerge': !settings['delivery.deleteBranchAfterMerge'] })}
-        />
-      </div>
-      <div className="field">
-        <label className="label" htmlFor="setting-worktree-root">
-          {C.worktreeRoot}
-        </label>
-        <TextSetting
-          key={settings['worktree.rootDir'] ?? ''}
-          id="setting-worktree-root"
-          value={settings['worktree.rootDir']}
-          onCommit={(v) => set({ 'worktree.rootDir': v })}
-        />
-        <p className="hint">{C.worktreeRootHint}</p>
-      </div>
-      <div className="field">
-        <label className="label" htmlFor="setting-binary">
-          {C.binaryPath}
-        </label>
-        <TextSetting
-          key={settings['opencode.binaryPath'] ?? ''}
-          id="setting-binary"
-          value={settings['opencode.binaryPath']}
-          onCommit={(v) => set({ 'opencode.binaryPath': v })}
-        />
-        <p className="hint">{C.binaryPathHint}</p>
-      </div>
-      <StartupEnvironmentSettings />
+        <div className="field">
+          <span className="label">{C.defaultStrategy}</span>
+          <Segmented
+            label={C.defaultStrategy}
+            value={settings['delivery.defaultStrategy']}
+            options={LOCAL_MERGE_STRATEGIES.map((s) => ({ value: s, label: DELIVERY_COPY.strategies[s] }))}
+            onChange={(v) => set({ 'delivery.defaultStrategy': v })}
+          />
+        </div>
+        <div className="field row">
+          <span className="label grow" id="setting-delete-branch">
+            {C.deleteBranch}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            className="switch"
+            aria-checked={settings['delivery.deleteBranchAfterMerge']}
+            aria-labelledby="setting-delete-branch"
+            onClick={() => set({ 'delivery.deleteBranchAfterMerge': !settings['delivery.deleteBranchAfterMerge'] })}
+          />
+        </div>
+      </section>
+      <section className={styles.group}>
+        <h3>{C.environmentGroup}</h3>
+        <div className="field">
+          <label className="label" htmlFor="setting-worktree-root">
+            {C.worktreeRoot}
+          </label>
+          <TextSetting
+            key={settings['worktree.rootDir'] ?? ''}
+            id="setting-worktree-root"
+            value={settings['worktree.rootDir']}
+            onCommit={(v) => set({ 'worktree.rootDir': v })}
+          />
+          <p className="hint">{C.worktreeRootHint}</p>
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="setting-binary">
+            {C.binaryPath}
+          </label>
+          <TextSetting
+            key={settings['opencode.binaryPath'] ?? ''}
+            id="setting-binary"
+            value={settings['opencode.binaryPath']}
+            onCommit={(v) => set({ 'opencode.binaryPath': v })}
+          />
+          <p className="hint">{C.binaryPathHint}</p>
+        </div>
+        <StartupEnvironmentSettings />
+      </section>
     </Panel>
   );
 }

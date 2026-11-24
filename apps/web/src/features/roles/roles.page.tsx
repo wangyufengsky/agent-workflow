@@ -129,7 +129,7 @@ function RoleDialog({ editing, onClose }: { editing: Editing; onClose: () => voi
   const title = editing.mode === 'edit' ? editing.role.name : editing.mode === 'copy' ? C.copy : C.create;
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()} title={title}>
-      <form className="col" onSubmit={submit}>
+      <form className={styles.form} onSubmit={submit}>
         {editing.mode !== 'edit' && (
           <div className="field">
             <label className="label" htmlFor="role-key">
@@ -267,12 +267,13 @@ export function RolesPage() {
       {active && (
         <div className={styles.layout}>
           <nav className={styles.list} aria-label={C.title}>
-            {[RoleKind.Builtin, RoleKind.Custom].map((kind) => (
-              <section key={kind}>
-                <h2 className="hint">{kind === RoleKind.Builtin ? C.readonly : C.custom}</h2>
-                {roles.data
-                  ?.filter((r) => r.kind === kind)
-                  .map((r) => (
+            {[RoleKind.Builtin, RoleKind.Custom].map((kind) => {
+              const group = roles.data?.filter((r) => r.kind === kind);
+              if (!group?.length) return null;
+              return (
+                <section key={kind}>
+                  <h2 className="hint">{kind === RoleKind.Builtin ? C.readonly : C.custom}</h2>
+                  {group.map((r) => (
                     <button
                       type="button"
                       className={styles.role}
@@ -286,28 +287,33 @@ export function RolesPage() {
                       {r.name}
                     </button>
                   ))}
-              </section>
-            ))}
+                </section>
+              );
+            })}
           </nav>
-          <article className="card pad col" aria-label={active.name}>
-            <span className="hint">{active.kind === RoleKind.Builtin ? C.locked : C.custom}</span>
-            <h2>{active.name}</h2>
-            <p>{active.description}</p>
-            <ModelSelect
-              value={active.model}
-              effort={active.effort}
-              onEffort={(effort) => update.mutate({ id: active.id, effort })}
-              image={active.key === IMAGE_PROCESSOR_ROLE_KEY}
-              disabled={update.isPending}
-              onChange={(model) => update.mutate({ id: active.id, model })}
-            />
-            {active.model === null && (
-              <Link className="hint" to={ROUTES.settings} hash="setting-model">
-                {C.globalSettings}
-              </Link>
-            )}
-            {update.isError && <ErrorState error={update.error} />}
-            <details open={active.key === APPROVER_ROLE_KEY} key={active.id}>
+          <article className={`card ${styles.detail}`} aria-label={active.name}>
+            <header className={styles.identity}>
+              <span className="hint">{active.kind === RoleKind.Builtin ? C.locked : C.custom}</span>
+              <h2>{active.name}</h2>
+              <p>{active.description}</p>
+            </header>
+            <div className={styles.configuration}>
+              <ModelSelect
+                value={active.model}
+                effort={active.effort}
+                onEffort={(effort) => update.mutate({ id: active.id, effort })}
+                image={active.key === IMAGE_PROCESSOR_ROLE_KEY}
+                disabled={update.isPending}
+                onChange={(model) => update.mutate({ id: active.id, model })}
+              />
+              {active.model === null && (
+                <Link className="hint" to={ROUTES.settings} hash="setting-model">
+                  {C.globalSettings}
+                </Link>
+              )}
+              {update.isError && <ErrorState error={update.error} />}
+            </div>
+            <details className={styles.disclosure} open={active.key === APPROVER_ROLE_KEY} key={active.id}>
               <summary>{active.key === APPROVER_ROLE_KEY ? C.approvalRules : C.prompt}</summary>
               {active.key === APPROVER_ROLE_KEY ? (
                 <dl>
@@ -322,7 +328,7 @@ export function RolesPage() {
                 <p className={styles.prompt}>{active.prompt}</p>
               )}
             </details>
-            <div className="row">
+            <footer className={styles.actions}>
               {active.kind === RoleKind.Custom && (
                 <Button size="sm" icon="edit" onClick={() => setEditing({ mode: 'edit', role: active })}>
                   {C.edit}
@@ -336,7 +342,7 @@ export function RolesPage() {
                   {C.delete}
                 </Button>
               )}
-            </div>
+            </footer>
           </article>
         </div>
       )}

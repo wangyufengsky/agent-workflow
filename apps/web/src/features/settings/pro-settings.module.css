@@ -1,0 +1,56 @@
+.group {
+  display: grid;
+  gap: 22px;
+  padding: 4px 0;
+  min-width: 0;
+}
+.group + .group {
+  margin-top: 26px;
+  border-top: 1px solid var(--line);
+  padding-top: 26px;
+}
+.group h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.group > :global(.field) + :global(.field),
+.numbers > :global(.field) + :global(.field) {
+  margin-top: 0;
+}
+.group :global(.seg) {
+  align-self: flex-start;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 20px 24px;
+}
+.usage {
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.usage summary {
+  padding: 12px 0;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+.usage dl {
+  margin: 0;
+  padding-bottom: 8px;
+}
+.usage dl > div {
+  display: grid;
+  grid-template-columns: minmax(6em, 1fr) minmax(0, 3fr);
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+  align-items: baseline;
+  overflow-wrap: anywhere;
+}
+.usage dd {
+  margin: 0;
+}
