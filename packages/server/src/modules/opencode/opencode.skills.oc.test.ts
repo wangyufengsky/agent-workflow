@@ -8,15 +8,19 @@ import {
   BashPolicy,
   FUNCTIONAL_TEST_NODE,
   FUNCTIONAL_TEST_WORKFLOW_KEY,
+  getOpencodeHeadersOp,
   MCP_TOOL_PREFIX,
   McpToolName,
   OPENCODE_AGENT_NAME,
   OPENCODE_ASSISTANT_AGENT,
   OPENCODE_FUNCTIONAL_TEST_AGENT,
+  restartRuntimeOp,
   SessionAgent,
+  setOpencodeHeadersOp,
 } from '@aw/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, type TestApp } from '../../../test/helpers/app.ts';
+import { testCipher } from '../../../test/helpers/cipher.ts';
 import { createTestRepo, type TestRepo } from '../../../test/helpers/git.ts';
 import { AGENT_SKILLS, ASSISTANT_SKILLS, assistantPermissionRules, sessionPermissionRules } from './opencode.config.ts';
 
@@ -27,7 +31,7 @@ import { AGENT_SKILLS, ASSISTANT_SKILLS, assistantPermissionRules, sessionPermis
  */
 const PROVIDER = 'aw-scripted';
 const MODEL = 'scripted';
-type ModelRequest = { tools?: Array<{ function: { name: string } }> };
+type ModelRequest = { requestHeaders?: IncomingMessage['headers']; tools?: Array<{ function: { name: string } }> };
 
 async function bodyOf(req: IncomingMessage): Promise<ModelRequest & { stream?: boolean }> {
   const chunks: Buffer[] = [];
@@ -40,7 +44,8 @@ function scriptedModel() {
   const waiting: Array<(request: ModelRequest) => void> = [];
   const server: Server = createServer((req, res) => {
     void bodyOf(req).then((body) => {
-      if (body.tools !== undefined && body.tools.length > 0) waiting.shift()?.(body);
+      if (body.tools !== undefined && body.tools.length > 0)
+        waiting.shift()?.({ ...body, requestHeaders: req.headers });
       const base = { id: 'chatcmpl-scripted', created: 0, model: MODEL };
       const usage = { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 };
       if (body.stream !== true) {
@@ -94,7 +99,11 @@ beforeAll(async () => {
       },
     }),
   );
-  t = await createTestApp({ realOpencode: true, env: { ...process.env, OPENCODE_CONFIG: configFile } });
+  t = await createTestApp({
+    realOpencode: true,
+    cipher: testCipher,
+    env: { ...process.env, OPENCODE_CONFIG: configFile },
+  });
   await t.app.start(t.port);
   repo = await createTestRepo({
     files: {
@@ -112,10 +121,11 @@ afterAll(async () => {
 async function turnOf(
   agent: string,
   permission: Parameters<TestApp['app']['services']['opencode']['createSession']>[0]['permission'],
+  directory = repo.path,
 ) {
   const opencode = t.app.services.opencode;
   const sessionId = await opencode.createSession({
-    directory: repo.path,
+    directory,
     title: `skills · ${agent}`,
     agent,
     permission,
@@ -123,7 +133,7 @@ async function turnOf(
   const request = model.next();
   await opencode.prompt({
     sessionId,
-    directory: repo.path,
+    directory,
     agent,
     model: { providerId: PROVIDER, modelId: MODEL },
     text: 'hello',
@@ -195,4 +205,40 @@ describe('@opencode 内置 skill（41）', () => {
       expect.arrayContaining(['skill', `${MCP_TOOL_PREFIX}${McpToolName.AnalyzeImage}`]),
     );
   });
+});
+
+it('真实 OpenCode 向模型发送多个自定义请求头，重启后移除已删除的头', async () => {
+  const items = [
+    { name: 'X-Workflow-Client', secret: false, value: 'agent-workflow' },
+    { name: 'X-Workflow-Key', secret: true, value: 'fixture-header-secret' },
+    { name: 'Authorization', secret: true, value: 'Bearer fixture-override' },
+  ];
+  expect((await t.call(setOpencodeHeadersOp, { items })).status).toBe(200);
+  expect((await t.call(getOpencodeHeadersOp, {})).body.items).toEqual([
+    items[0],
+    { name: 'X-Workflow-Key', secret: true },
+    { name: 'Authorization', secret: true },
+  ]);
+  expect((await t.call(restartRuntimeOp, {})).body.status).toBe('ready');
+  const send = () => turnOf(OPENCODE_ASSISTANT_AGENT, assistantPermissionRules());
+  const first = await send();
+  expect(first.requestHeaders).toMatchObject({
+    'x-workflow-client': 'agent-workflow',
+    'x-workflow-key': 'fixture-header-secret',
+    authorization: 'Bearer fixture-override',
+  });
+  expect(JSON.stringify(await t.app.services.runtime.sdk().config.get()).includes('fixture-header-secret')).toBe(false);
+  const other = await createTestRepo();
+  const worker = await turnOf(
+    OPENCODE_AGENT_NAME[SessionAgent.Executor],
+    sessionPermissionRules(SessionAgent.Executor, BashPolicy.Auto),
+    other.path,
+  );
+  expect(worker.requestHeaders?.['x-workflow-key']).toBe('fixture-header-secret');
+  await t.call(setOpencodeHeadersOp, { items: [] });
+  expect((await t.call(restartRuntimeOp, {})).body.status).toBe('ready');
+  const after = await send();
+  expect(after.requestHeaders).not.toHaveProperty('x-workflow-key');
+  expect(after.requestHeaders).not.toHaveProperty('x-workflow-client');
+  expect(after.requestHeaders?.authorization).toBe('Bearer unused');
 });

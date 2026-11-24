@@ -49,6 +49,7 @@ test('专业设置管理普通与密钥启动变量，并提示完整重启', as
       ]),
     );
     await page.reload();
+    await settings.getByRole('button', { name: '启动环境变量', exact: true }).click();
     await expect(settings.getByLabel('变量值', { exact: true }).last()).toHaveValue('');
     await expect(settings.getByPlaceholder('已保存的密钥不会显示')).toBeVisible();
     await expect(settings).not.toContainText('synthetic-token');
@@ -100,6 +101,89 @@ test('专业设置管理普通与密钥启动变量，并提示完整重启', as
     await expect.poll(read).toEqual([]);
   } finally {
     await store([]);
+    await patchSettings(request, { 'ui.mode': 'simple', 'ui.theme': 'codex' });
+  }
+});
+
+test('专业设置独立保存多个模型请求头，重开后可以编辑、保留密钥和删除', async ({ page, request }) => {
+  const screenshots = process.env.AW_STARTUP_ENVIRONMENT_SCREENSHOTS;
+  await page.setViewportSize({ width: 1440, height: 1050 });
+  const headersUrl = `${API_BASE}/settings/opencode-headers`;
+  const envUrl = `${API_BASE}/settings/startup-environment`;
+  const set = (url: string, items: object[]) => request.put(url, { headers: AUTH, data: { items } });
+  await createProject(request, null);
+  await patchSettings(request, { 'ui.mode': 'pro', 'ui.theme': 'codex' });
+  await expect(await set(envUrl, [{ name: 'JAVA_HOME', secret: false, value: '/opt/jdk-17' }])).toBeOK();
+  await expect(await set(headersUrl, [])).toBeOK();
+  try {
+    await page.goto('/settings');
+    const headers = page.getByRole('region', { name: 'OpenCode 模型请求头' });
+    const env = page.getByRole('region', { name: '启动环境变量', exact: true });
+    const toggleEnv = env.getByRole('button', { name: '启动环境变量', exact: true });
+    const toggleHeaders = headers.getByRole('button', { name: 'OpenCode 模型请求头', exact: true });
+    await expect(toggleEnv).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggleHeaders).toHaveAttribute('aria-expanded', 'false');
+    if (screenshots)
+      await headers
+        .locator('..')
+        .screenshot({ path: join(screenshots, 'startup-sections-collapsed.png'), animations: 'disabled' });
+    const add = headers.getByRole('button', { name: '添加请求头' });
+    const save = headers.getByRole('button', { name: '保存请求头' });
+    await add.click();
+    const first = headers.getByRole('group', { name: '请求头 1', exact: true });
+    const second = headers.getByRole('group', { name: '请求头 2', exact: true });
+    await first.getByLabel('请求头名称').fill('X-Client-Name');
+    await first.getByLabel('请求头值').fill('agent-workflow');
+    await toggleHeaders.click();
+    await expect(first).toBeHidden();
+    await toggleEnv.click();
+    await expect(env.getByLabel('变量值')).toHaveValue('/opt/jdk-17');
+    await toggleHeaders.press('Enter');
+    await expect(first.getByLabel('请求头值')).toHaveValue('agent-workflow');
+    await expect(toggleEnv).toHaveAttribute('aria-expanded', 'true');
+    await add.click();
+    await second.getByLabel('请求头名称').fill('x-client-name');
+    await expect(save).toBeDisabled();
+    await second.getByLabel('请求头名称').fill('X-Gateway-Key');
+    await second.getByLabel('作为密钥保存').check();
+    await second.getByLabel('请求头值').fill('demo-local-only');
+    await save.click();
+    await expect(headers.getByRole('status')).toContainText('下次启动 OpenCode 时生效');
+    await page.reload();
+    await toggleHeaders.click();
+    await expect(first.getByLabel('请求头值')).toHaveValue('agent-workflow');
+    await expect(second.getByLabel('请求头值')).toHaveValue('');
+    await expect(second.getByPlaceholder('已保存的密钥不会显示')).toBeVisible();
+    if (screenshots)
+      await headers
+        .locator('..')
+        .screenshot({ path: join(screenshots, 'startup-only-headers-open.png'), animations: 'disabled' });
+    await toggleEnv.click();
+    await expect(env.getByLabel('变量值')).toHaveValue('/opt/jdk-17');
+    if (screenshots !== undefined) {
+      for (const theme of ['codex', 'default'] as const) {
+        await patchSettings(request, { 'ui.theme': theme });
+        await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+        await headers
+          .locator('..')
+          .screenshot({ path: join(screenshots, `startup-and-headers-${theme}.png`), animations: 'disabled' });
+      }
+    }
+    await first.getByLabel('请求头值').fill('workflow-desktop');
+    await save.click();
+    await expect(headers.getByRole('status')).toContainText('已保存');
+    const get = async () => (await (await request.get(headersUrl, { headers: AUTH })).json()).items;
+    expect(await get()).toEqual([
+      { name: 'X-Client-Name', secret: false, value: 'workflow-desktop' },
+      { name: 'X-Gateway-Key', secret: true },
+    ]);
+    await headers.getByRole('button', { name: '移除请求头 2' }).click();
+    await save.click();
+    await expect.poll(get).toHaveLength(1);
+    await expect(env.getByLabel('变量值')).toHaveValue('/opt/jdk-17');
+  } finally {
+    await set(headersUrl, []);
+    await set(envUrl, []);
     await patchSettings(request, { 'ui.mode': 'simple', 'ui.theme': 'codex' });
   }
 });

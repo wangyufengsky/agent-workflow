@@ -11,7 +11,7 @@ import {
 } from '@aw/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CatchBoundary, type ErrorComponentProps } from '@tanstack/react-router';
-import { memo, type ReactNode, useCallback, useMemo, useState } from 'react';
+import { memo, type ReactNode, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
 import { Icon } from '../../components/icon.tsx';
@@ -21,7 +21,6 @@ import { ATTEMPT_COPY, STREAM_COPY, TRANSCRIPT_SYSTEM_LABEL } from '../../copy/a
 import { COMMON_COPY } from '../../copy/common.ts';
 import { ERROR_COPY } from '../../copy/errors.ts';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
-import { useTranscript } from '../attempts/attempt.queries.ts';
 import { Character } from '../companion/character.tsx';
 import { useSettings } from '../settings/settings.queries.ts';
 import { UsedSkills } from '../skills/used-skills.tsx';
@@ -30,7 +29,12 @@ import { thinkingSeconds } from '../stream/stream-items.ts';
 import { ThinkingBlock } from '../stream/thinking-block.tsx';
 import { useStickToBottom } from '../stream/use-stick-to-bottom.ts';
 import styles from './assistant.module.css';
-import { confirmationsQuery, conversationTranscript, useReplyAssistantPermission } from './assistant.queries.ts';
+import {
+  confirmationsQuery,
+  conversationTranscript,
+  useAssistantHistory,
+  useReplyAssistantPermission,
+} from './assistant.queries.ts';
 import { AssistantWelcome } from './assistant-welcome.tsx';
 import cards from './cards.module.css';
 import { ChartCard } from './chart-card.tsx';
@@ -41,9 +45,6 @@ import { EntityCard } from './entity-card.tsx';
 import { FileCard } from './file-card.tsx';
 import { ReplyMarkdown } from './reply-markdown.tsx';
 import { type ToolResult, ToolRow } from './tool-row.tsx';
-
-/** The newest messages of a conversation as it opens fade in one after another (`data-step` delays, assistant.module.css). */
-const STAGGER_STEPS = 6;
 
 /** A call that waits for the user shows as its confirmation card, not as a row of its own (15 §4). */
 function waitsForConfirmation(tool: string, result: ToolResult | undefined): boolean {
@@ -236,19 +237,17 @@ function useHistoryError(conversationId: string, message: string) {
 const Message = memo(function Message({
   entry,
   ctx,
-  step,
   fresh,
 }: {
   entry: TranscriptEntry;
   ctx: Rendered;
-  step: number;
   /** Arrived after the conversation opened: a chart grows in (35 §5.4). */
   fresh: boolean;
 }) {
   const body = Body({ entry, ctx, fresh });
   if (body === null) return null;
   return (
-    <div className={styles.message} data-kind={entry.kind} data-step={step}>
+    <div className={styles.message} data-kind={entry.kind} data-fresh={fresh || undefined}>
       {body}
     </div>
   );
@@ -267,16 +266,17 @@ function Thinking({ queuePosition }: { queuePosition: number | null }) {
 function Stream({
   conversation,
   entries,
+  pages,
 }: {
   conversation: AssistantConversationDTO;
   entries: readonly TranscriptEntry[];
+  pages: ReturnType<typeof useAssistantHistory>['pages'];
 }) {
   const messageError = useHistoryError(conversation.id, C.messageUnavailable);
   const confirmations = useQuery(confirmationsQuery(conversation.id)).data;
   const pro = useSettings()['ui.mode'] === UiMode.Pro;
   const onContinue = useContinueConversation()?.start ?? null;
-  // What was there when the conversation opened is staggered; what arrives later fades in at once.
-  const [opened] = useState(entries.length);
+  const [openedThrough] = useState(() => Math.max(pages.data?.pages[0]?.lastSeq ?? 0, entries.at(-1)?.seq ?? 0));
   const last = entries.at(-1);
   const results = useMemo(
     () =>
@@ -305,10 +305,27 @@ function Stream({
   const thinking = conversation.busy && writingKey === undefined && !runningCall;
   const lastLength = last !== undefined && 'partId' in last ? last.data.text.length : 0;
   // Follows the newest message until the user scrolls up (25 §4.1).
+  const liveCount = entries.filter((entry) => entry.seq > openedThrough).length;
   const stick = useStickToBottom(
-    `${entries.length}:${lastLength}:${conversation.busy}:${confirmations?.length ?? 0}`,
-    entries.length,
+    `${last?.seq}:${lastLength}:${conversation.busy}:${confirmations?.length ?? 0}`,
+    liveCount,
   );
+  const anchor = useRef<{ element: HTMLElement; top: number } | null>(null);
+  const oldest = pages.data?.pages.at(-1);
+  const loadOlder = () => {
+    const element = stick.ref.current?.querySelector<HTMLElement>('[data-kind]');
+    if (element) anchor.current = { element, top: element.offsetTop };
+    void pages.fetchNextPage();
+  };
+  // 使用同一条消息的位置差，等待请求时用户的滚动和底部新来的回复都不会计入补偿。
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 只在旧页插入后恢复锚点。
+  useLayoutEffect(() => {
+    const previous = anchor.current;
+    if (previous && stick.ref.current && previous.element.isConnected) {
+      stick.ref.current.scrollTop += previous.element.offsetTop - previous.top;
+      anchor.current = null;
+    }
+  }, [oldest?.before, stick.ref]);
 
   if (entries.length === 0 && !conversation.busy)
     return (
@@ -319,14 +336,15 @@ function Stream({
   return (
     <>
       <div className={styles.feed} ref={stick.ref} onScroll={stick.onScroll}>
-        {entries.map((entry, i) => (
+        {pages.hasNextPage && (
+          <Button size="sm" variant="ghost" pending={pages.isFetchingNextPage} onClick={loadOlder}>
+            {C.earlierMessages}
+          </Button>
+        )}
+        {pages.isFetchNextPageError && <ErrorState error={pages.error} onRetry={loadOlder} />}
+        {entries.map((entry) => (
           <CatchBoundary key={keyOf(entry)} getResetKey={() => conversation.id} errorComponent={messageError}>
-            <Message
-              entry={entry}
-              ctx={ctx}
-              step={i < opened ? Math.max(0, STAGGER_STEPS - (opened - i)) : 0}
-              fresh={i >= opened}
-            />
+            <Message entry={entry} ctx={ctx} fresh={entry.seq > openedThrough} />
           </CatchBoundary>
         ))}
         {thinking && <Thinking queuePosition={conversation.queuePosition} />}
@@ -338,7 +356,7 @@ function Stream({
 
 /** The conversation's message stream (15 §6), kept scrolled to the newest message. */
 function ConversationHistory({ conversation }: { conversation: AssistantConversationDTO }) {
-  const { pages, entries } = useTranscript(conversationTranscript(conversation.id));
+  const { pages, entries } = useAssistantHistory(conversation.id);
   if (pages.data === undefined)
     return (
       <div className={styles.feed}>
@@ -352,7 +370,7 @@ function ConversationHistory({ conversation }: { conversation: AssistantConversa
   return (
     <>
       <ContinuationSource conversation={conversation} />
-      <Stream conversation={conversation} entries={entries} />
+      <Stream conversation={conversation} entries={entries} pages={pages} />
     </>
   );
 }

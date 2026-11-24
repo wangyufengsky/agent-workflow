@@ -36,6 +36,7 @@ export type OpencodeConfigInput = {
   assistantMcpUrl: string;
   assistantMcpToken: string;
   pluginFile: string;
+  readHeaderInput?: boolean;
   /** The app's own skills (41, D206). */
   skillsDir: string;
   prompts: Prompts;
@@ -218,7 +219,11 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
       [MCP_SERVER_NAME]: remote(input.mcpUrl, input.mcpToken),
       [MCP_ASSISTANT_SERVER_NAME]: remote(input.assistantMcpUrl, input.assistantMcpToken),
     },
-    plugin: [pathToFileURL(input.pluginFile).href],
+    plugin: [
+      input.readHeaderInput
+        ? [pathToFileURL(input.pluginFile).href, { readHeaderInput: true }]
+        : pathToFileURL(input.pluginFile).href,
+    ],
     skills: { paths: [input.skillsDir] },
     agent: {
       ...Object.fromEntries(agents),

@@ -208,7 +208,12 @@ import {
   setSkillScopeOp,
   updateSkillOp,
 } from './skills.ts';
-import { getStartupEnvironmentOp, setStartupEnvironmentOp } from './startup-environment.ts';
+import {
+  getOpencodeHeadersOp,
+  getStartupEnvironmentOp,
+  setOpencodeHeadersOp,
+  setStartupEnvironmentOp,
+} from './startup-environment.ts';
 import {
   cleanStorageOp,
   getEnvironmentOp,
@@ -355,6 +360,8 @@ export const OPERATION_CONTRACTS: readonly OperationContract[] = [
   updateSkillOp,
   getSettingsOp,
   updateSettingsOp,
+  getOpencodeHeadersOp,
+  setOpencodeHeadersOp,
   getStartupEnvironmentOp,
   setStartupEnvironmentOp,
   getHealthOp,

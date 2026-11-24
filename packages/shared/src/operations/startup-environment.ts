@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { startupEnvironmentInputSchema, startupEnvironmentSchema } from '../contracts/api/startup-environment.ts';
+import {
+  opencodeHeadersInputSchema,
+  startupEnvironmentInputSchema,
+  startupEnvironmentSchema,
+} from '../contracts/api/startup-environment.ts';
 import { OperationRisk } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
@@ -30,4 +34,24 @@ export const setStartupEnvironmentOp = defineOperationContract({
   credentialFields: ['items'],
   risk: OperationRisk.Write,
   http: { method: 'PUT', path: '/settings/startup-environment' },
+});
+
+export const getOpencodeHeadersOp = defineOperationContract({
+  ...common,
+  id: 'settings.getOpencodeHeaders',
+  title: 'op.settings.getOpencodeHeaders',
+  description: 'Read the configured model request headers without revealing secret values',
+  input: z.object({}),
+  risk: OperationRisk.Read,
+  http: { method: 'GET', path: '/settings/opencode-headers' },
+});
+export const setOpencodeHeadersOp = defineOperationContract({
+  ...common,
+  id: 'settings.setOpencodeHeaders',
+  title: 'op.settings.setOpencodeHeaders',
+  description: 'Replace the custom headers for model requests made by OpenCode',
+  input: opencodeHeadersInputSchema,
+  credentialFields: ['items'],
+  risk: OperationRisk.Write,
+  http: { method: 'PUT', path: '/settings/opencode-headers' },
 });

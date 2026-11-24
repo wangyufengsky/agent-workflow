@@ -10,7 +10,12 @@ import { createTranscriptStore } from './attempts.transcript.ts';
 export type { Attempt } from './attempts.repo.ts';
 export { createSessionView, type SessionView } from './attempts.session-view.ts';
 export { attemptsTable } from './attempts.table.ts';
-export { createTranscriptStore, type NewTranscriptEntry, type TranscriptStore } from './attempts.transcript.ts';
+export {
+  createTranscriptStore,
+  mergeTranscriptParts,
+  type NewTranscriptEntry,
+  type TranscriptStore,
+} from './attempts.transcript.ts';
 
 const DEBUG_RUN_DIR = 'debug';
 const KNOWLEDGE_RUN_DIR = 'knowledge';

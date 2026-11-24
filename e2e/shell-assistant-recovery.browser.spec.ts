@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { MCP_ASSISTANT_TOOL_PREFIX } from '@aw/shared';
 import { expect } from '@playwright/test';
 import { test } from './assistant-fixtures.ts';
@@ -94,4 +95,63 @@ test('打开会话时整页加载失败，恢复后可直接返回主页', async
   await expect(page.getByRole('textbox', { name: '告诉助手，或开始任务' })).toBeVisible();
   await expect(page.getByRole('link', { name: '设置', exact: true })).toBeVisible();
   expect(await page.evaluate(() => performance.timeOrigin)).toBe(documentStart);
+});
+
+test('长对话直接打开最新回复，补读历史和收到新消息都保留阅读位置', async ({ page, request }) => {
+  const project = await createProject(request, null);
+  await queueAssistantTurn(request, [{ type: 'text', text: '最初的回复' }]);
+  await page.goto(`/?projectId=${project.id}`);
+  const input = page.getByRole('textbox', { name: '告诉助手，或开始任务' });
+  await input.fill('最初的问题');
+  await input.press('ControlOrMeta+Enter');
+  await expect(page.getByText('最初的回复', { exact: true })).toBeVisible();
+  const history = page.url();
+  const id = new URL(history).searchParams.get('conversation');
+  const url = `${API_BASE}/assistant/conversations/${id}`;
+  await page.goto('/settings');
+  const send = async (n: number) => {
+    await queueAssistantTurn(request, [{ type: 'text', text: `已回答第 ${n} 题。` }]);
+    await expect(
+      await request.post(`${url}/messages`, {
+        headers: AUTH,
+        data: { text: `第 ${n} 题`, context: { page: 'home', params: {} } },
+      }),
+    ).toBeOK();
+    await expect.poll(async () => (await (await request.get(url, { headers: AUTH })).json()).busy).toBe(false);
+  };
+  for (let n = 1; n <= 18; n++) await send(n);
+
+  await page.goto(history);
+  const stream = page.getByTestId('home-messages');
+  await expect(stream.getByText('已回答第 18 题。', { exact: true })).toBeInViewport();
+  await expect(stream.getByText('最初的问题', { exact: true })).toHaveCount(0);
+  const previews = process.env.AW_ASSISTANT_HISTORY_SCREENSHOTS;
+  if (previews) await page.screenshot({ path: join(previews, 'assistant-latest.png'), animations: 'disabled' });
+  const older = stream.getByRole('button', { name: '加载更早的消息' });
+  await older.scrollIntoViewIfNeeded();
+  const anchor = stream.getByTestId('assistant-user-message').first();
+  const original = stream.getByText(await anchor.innerText(), { exact: true });
+  const top = () => original.evaluate((element) => element.getBoundingClientRect().top);
+  const before = await top();
+  if (previews) {
+    await expect(stream.getByRole('button', { name: /回到最新/ })).toBeVisible();
+    await page.screenshot({ path: join(previews, 'assistant-history.png'), animations: 'disabled' });
+  }
+  await older.click();
+  await expect(stream.getByText('第 10 题', { exact: true })).toBeAttached();
+  await expect.poll(async () => Math.abs((await top()) - before)).toBeLessThan(2);
+  await send(19);
+  await expect(stream.getByText('已回答第 19 题。', { exact: true })).toBeAttached();
+  await expect.poll(async () => Math.abs((await top()) - before)).toBeLessThan(2);
+  await older.click();
+  await expect(stream.getByText('最初的问题', { exact: true })).toBeAttached();
+  await expect(older).toHaveCount(0);
+  await stream.getByRole('button', { name: /回到最新/ }).click();
+  await expect(stream.getByText('已回答第 19 题。', { exact: true })).toBeInViewport();
+
+  await page.getByRole('link', { name: '设置', exact: true }).click();
+  await page.keyboard.press('ControlOrMeta+j');
+  const panel = page.getByRole('complementary', { name: '应用助手' });
+  await expect(panel.getByText('已回答第 19 题。', { exact: true })).toBeInViewport();
+  await expect(panel.getByTestId('assistant-messages').getByText('最初的问题', { exact: true })).toHaveCount(0);
 });

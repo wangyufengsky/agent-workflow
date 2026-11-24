@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { AppError, CredentialKind, ErrorCode, type StartupEnvironment, type StartupEnvironmentInput } from '@aw/shared';
 import { asc } from 'drizzle-orm';
 import type { Db, DbExecutor } from '../../core/db/database.ts';
-import { startupEnvironmentTable as table } from './startup-environment.table.ts';
+import { opencodeHeadersTable, startupEnvironmentTable } from './startup-environment.table.ts';
 
 type Secret = { name: string; credentialId: string };
 type Resolved = { env: Record<string, string>; deferred: string[] };
@@ -13,7 +13,13 @@ type StartupCredentialAccess = {
   remove(id: string, executor?: DbExecutor): void;
 };
 
-export function createStartupEnvironmentService({ db, credentials }: { db: Db; credentials: StartupCredentialAccess }) {
+export function createStartupEnvironmentService(
+  { db, credentials }: { db: Db; credentials: StartupCredentialAccess },
+  kind:
+    | typeof CredentialKind.StartupEnvironment
+    | typeof CredentialKind.OpencodeHeader = CredentialKind.StartupEnvironment,
+) {
+  const table = kind === CredentialKind.OpencodeHeader ? opencodeHeadersTable : startupEnvironmentTable;
   const read = (executor: DbExecutor = db) => executor.select().from(table).orderBy(asc(table.position)).all();
   const revision = (rows: ReturnType<typeof read>) => createHash('sha256').update(JSON.stringify(rows)).digest('hex');
   const get = (): StartupEnvironment => {
@@ -25,7 +31,7 @@ export function createStartupEnvironmentService({ db, credentials }: { db: Db; c
   };
   function assertRevision(rows: ReturnType<typeof read>, expected: string | undefined) {
     if (expected !== undefined && expected !== revision(rows))
-      throw new AppError(ErrorCode.StateTransitionInvalid, 'Startup environment changed since it was loaded');
+      throw new AppError(ErrorCode.StateTransitionInvalid, 'Startup settings changed since they were loaded');
   }
   let writes = Promise.resolve();
   async function replace({ items, expectedRevision }: StartupEnvironmentInput) {
@@ -48,7 +54,7 @@ export function createStartupEnvironmentService({ db, credentials }: { db: Db; c
           credentialId = previousByKey.get(key)?.credentialId ?? null;
         } else {
           try {
-            const prepared = await credentials.prepare(CredentialKind.StartupEnvironment, item.value);
+            const prepared = await credentials.prepare(kind, item.value);
             stores.push(prepared);
             credentialId = prepared.id;
           } catch (error) {
@@ -56,7 +62,7 @@ export function createStartupEnvironmentService({ db, credentials }: { db: Db; c
               error instanceof AppError && error.code === ErrorCode.CredentialLocked
                 ? ErrorCode.CredentialLocked
                 : ErrorCode.CredentialUnavailable;
-            throw new AppError(code, 'The startup environment secret could not be encrypted');
+            throw new AppError(code, 'The configured secret could not be encrypted');
           }
         }
       }
@@ -115,7 +121,15 @@ export function createStartupEnvironmentService({ db, credentials }: { db: Db; c
     };
   }
 
-  return { get, set, resolve };
+  async function values(): Promise<Record<string, string>> {
+    const entries: [string, string][] = [];
+    for (const row of read()) {
+      if (row.value !== null) entries.push([row.name, row.value]);
+      else if (row.credentialId !== null) entries.push([row.name, await credentials.reveal(row.credentialId)]);
+    }
+    return Object.fromEntries(entries);
+  }
+  return { get, set, resolve, values };
 }
 
 export type StartupEnvironmentService = ReturnType<typeof createStartupEnvironmentService>;

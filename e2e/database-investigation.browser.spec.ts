@@ -130,12 +130,11 @@ test('助手活动显示本轮调查进度，完成后打开历史查询证据',
       data: { text: question },
     };
     let completed = false;
-    await page.route(`**/assistant/conversations/${id}/transcript?*`, (route) =>
+    await page.route(`**/assistant/conversations/${id}/history`, (route) =>
       route.fulfill({
         json: {
           entries: [message, call(tool, ts), ...(completed ? [result(tool, current), ...otherReceipts(tool, ts)] : [])],
-          hasMore: false,
-          done: false,
+          before: null,
           lastSeq: completed ? 7 : 2,
         },
       }),

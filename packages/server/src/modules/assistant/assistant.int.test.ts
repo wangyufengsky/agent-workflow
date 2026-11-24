@@ -269,3 +269,38 @@ describe('助手对话（A-02、A-03）', () => {
     expect(existsSync(join(t.dataDir, 'assistant', 'conversations', `${c.id}.jsonl`))).toBe(false);
   });
 });
+
+it('从文件末尾读取完整轮次，追加新回复不改变旧页游标', async () => {
+  const { id } = await newConversation();
+  const url = `/assistant/conversations/${id}/history`;
+  const first = await t.request({ url });
+  expect(first.statusCode).toBe(200);
+  expect(first.json()).toMatchObject({ entries: [], lastSeq: 0, before: null });
+  await say(id, '建立记录');
+  const file = join(t.dataDir, 'assistant', 'conversations', `${id}.jsonl`);
+  const entries = Array.from({ length: 40 }, (_, i) => [
+    { kind: 'user_message', seq: 3 * i + 1, ts: 0, data: { text: `问题${i}` } },
+    { kind: 'text', seq: 3 * i + 2, ts: 0, partId: `p${i}`, data: { text: '答'.repeat(30000), offset: 0 } },
+    { kind: 'text', seq: 3 * i + 3, ts: 0, partId: `p${i}`, data: { text: '完', offset: 30000 } },
+  ]).flat();
+  writeFileSync(file, `${entries.map((e) => JSON.stringify(e)).join('\n')}\n`);
+  const read = async (before?: number) => {
+    const res = await t.request({ url: before === undefined ? url : `${url}?before=${before}` });
+    expect(res.statusCode).toBe(200);
+    return res.json<{ entries: TranscriptPage['entries']; lastSeq: number; before: number | null }>();
+  };
+  let page = await read();
+  expect(page.lastSeq).toBe(120);
+  expect(page.before).not.toBeNull();
+  expect(page.entries.at(-1)?.data).toMatchObject({ text: `${'答'.repeat(30000)}完` });
+  const ids = page.entries.map((entry) => entry.seq);
+  writeFileSync(file, `${JSON.stringify({ kind: 'user_message', seq: 121, ts: 1, data: { text: '新消息' } })}\n`, {
+    flag: 'a',
+  });
+  while (page.before !== null) {
+    page = await read(page.before);
+    ids.unshift(...page.entries.map((entry) => entry.seq));
+  }
+  expect(ids).toEqual(entries.filter((entry) => entry.seq % 3 !== 2).map((entry) => entry.seq));
+  expect((await read()).lastSeq).toBe(121);
+});

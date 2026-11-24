@@ -406,6 +406,7 @@ type AttemptDTO = AttemptSummaryDTO & {
 | GET | `/assistant/conversations/:id/browser-control?tabId=` | `assistant.getBrowserControl`，返回当前操作方 `mode`（`off`、`assistant`、`manual`）及本地对话记录 `activity` |
 | PUT | `/assistant/conversations/:id/browser-control/handoff` | `assistant.handoffBrowser`，`{ tabId, manual }`，204。接管暂停助手读页和操作并使旧确认失效，交回恢复当前授权 |
 | POST | `/assistant/conversations/:id/permissions/:permissionId` | `{ reply: PermissionDecision }`：回复助手会话的权限请求（bash / webfetch 询问），不存在 404 `NOT_FOUND` |
+| GET | `/assistant/conversations/:id/history?before=` | 助手界面首次从末尾取最近 8 轮，每页按时间升序返回完整轮次。响应含 `entries`、供实时事件去重的 `lastSeq`、取更早一页的游标 `before`（到头为 null）。追加记录后旧游标仍然有效。 |
 | GET | `/assistant/conversations/:id/transcript?afterSeq=` | 消息流分页（非清单路由，格式同 `/attempts/:id/transcript`；`done` 恒为 false：对话不会结束） |
 | GET | `/assistant/external-mcp` | `assistant.externalMcp`（read，仅界面）：`{ items: Array<{ name, status: ExternalMcpStatus, error: string \| null }> }`：opencode `mcp.status`（助手目录）报告的 MCP 服务器，去掉应用自己的 `agent-workflow` 与 `agent-workflow-app`，按名称排序；opencode 没就绪 503 `OPENCODE_NOT_READY`（28 §4） |
 | GET | `/assistant/conversations/:id/files` | `{ items: Array<{ path, absolutePath, size, modifiedAt }> }`：`files/<id>/` 下助手写的文件 |
@@ -738,3 +739,7 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 | `PUT /settings/startup-environment` | 保存整份列表。设置页提交 `expectedRevision`，版本已变化时返回冲突并保留草稿。以同名密钥且省略 `value` 表示保留原密钥。传空字符串表示显式设置为空，传空列表清除配置。 |
 
 这两个操作供专业模式设置页使用。启动配置和密钥值独立于通用设置及助手工具。
+
+## OpenCode 模型请求头
+
+专业设置通过 `GET /settings/opencode-headers` 读取、`PUT /settings/opencode-headers` 替换列表，沿用上节的密钥省略和版本冲突约定。头名按 HTTP token 校验且大小写不敏感，值接受可打印 ASCII 字符和制表符，拒绝换行。Host、Content-Length 等传输控制字段由客户端管理。此配置在 OpenCode 下次启动时生效，作用于所有所选模型供应商。

@@ -32,7 +32,7 @@ export type OpencodeRuntimeDeps = {
    * `offline` (D168). Built per launch because the configuration holds the MCP endpoint and follows the settings.
    * Rejects when opencode cannot be hosted safely here (no Git Bash on Windows, D72).
    */
-  launchEnv: () => Promise<{ env: Record<string, string>; offline: boolean }>;
+  launchEnv: () => Promise<{ env: Record<string, string>; offline: boolean; headerInput?: string }>;
   /** Certificate and proxy variables for the next launch (D164, D165), on top of `env`. */
   networkEnv: () => Promise<NodeJS.ProcessEnv>;
   log: Logger;
@@ -43,11 +43,11 @@ export type OpencodeRuntimeDeps = {
 
 const SERVE_ARGS = ['serve', '--hostname', '127.0.0.1', '--port', '0', '--print-logs', '--log-level', 'WARN'];
 
-function spawnServe(path: string, env: NodeJS.ProcessEnv) {
+function spawnServe(path: string, env: NodeJS.ProcessEnv, headerInput?: string) {
   return execa(path, SERVE_ARGS, {
     env,
     extendEnv: false,
-    stdin: 'ignore',
+    ...(headerInput === undefined ? { stdin: 'ignore' as const } : { input: headerInput }),
     buffer: false,
     reject: false,
     // Stopping ends its bash commands and language servers too: on Windows they would outlive it, holding worktree
@@ -119,8 +119,9 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
     path: string,
     launchEnv: Record<string, string>,
     networkEnv: NodeJS.ProcessEnv,
+    headerInput?: string,
   ): { launched: Process; address: Promise<string> } {
-    const child = spawnServe(path, { ...deps.env, ...networkEnv, ...launchEnv });
+    const child = spawnServe(path, { ...deps.env, ...networkEnv, ...launchEnv }, headerInput);
     const logFile = openLog();
     const launched: Process = {
       child,
@@ -198,7 +199,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       await stopProcess();
     }
     setState({ status: RuntimeStatus.Starting, path, version });
-    let launchEnv: { env: Record<string, string>; offline: boolean };
+    let launchEnv: Awaited<ReturnType<OpencodeRuntimeDeps['launchEnv']>>;
     let networkEnv: NodeJS.ProcessEnv;
     try {
       launchEnv = await deps.launchEnv();
@@ -211,7 +212,7 @@ export function createOpencodeRuntime(deps: OpencodeRuntimeDeps) {
       setState({ status: RuntimeStatus.Crashed, path, version });
       return snapshot();
     }
-    const { launched, address } = launch(path, launchEnv.env, networkEnv);
+    const { launched, address } = launch(path, launchEnv.env, networkEnv, launchEnv.headerInput);
     proc = launched;
     void launched.exited.then((exit) => onExit(launched, exit));
     try {

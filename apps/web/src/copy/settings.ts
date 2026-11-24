@@ -122,3 +122,21 @@ export const STARTUP_ENVIRONMENT_COPY = {
   save: '保存环境变量',
   saved: '已保存。下次完全退出并重新打开应用时生效。',
 } as const;
+
+export const OPENCODE_HEADERS_COPY = {
+  ...STARTUP_ENVIRONMENT_COPY,
+  title: 'OpenCode 模型请求头',
+  description: '重启 OpenCode 后，助手和工作流向模型发消息时都会携带这些请求头。切换模型供应商后同样生效。',
+  empty: '尚未添加请求头。',
+  add: '添加请求头',
+  name: '请求头名称',
+  value: '请求头值',
+  row: (index: number) => `请求头 ${index}`,
+  removeRow: (index: number) => `移除请求头 ${index}`,
+  enterNewValue: '请为改名或取消加密的请求头输入新值。',
+  invalid: '请输入有效的 HTTP 请求头名称。名称不区分大小写，不能重复，也不能使用 Host、Content-Length 等传输控制字段。',
+  invalidValue: '请求头值仅支持可打印的 ASCII 字符和制表符。',
+  stale: '请求头已被修改，请加载最新设置后继续编辑。',
+  save: '保存请求头',
+  saved: '已保存。下次启动 OpenCode 时生效。',
+} as const;
