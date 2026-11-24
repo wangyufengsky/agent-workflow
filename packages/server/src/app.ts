@@ -278,11 +278,16 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     logDir: join(config.dataDir, 'logs'),
   });
   const opencode = deps.opencode ?? createRuntimeClient(runtime, log);
-  async function validateEffort(effort: ModelEffort, selectedModel: () => string | null) {
+  async function supportsEffort(effort: ModelEffort, selectedModel: () => string | null) {
     const { available, defaultModel } = await opencode.listModels();
     const selected = selectedModel() ?? defaultModel;
     const model = available.find((m) => m.providerId + '/' + m.modelId === selected);
-    if (selected !== effort.model || !model || (effort.variant !== null && !model.variants?.includes(effort.variant))) {
+    return (
+      selected === effort.model && !!model && (effort.variant === null || !!model.variants?.includes(effort.variant))
+    );
+  }
+  async function validateEffort(effort: ModelEffort, selectedModel: () => string | null) {
+    if (!(await supportsEffort(effort, selectedModel))) {
       throw new AppError(ErrorCode.ValidationFailed, 'The selected model does not offer this variant');
     }
   }
@@ -341,6 +346,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     clock,
     log,
     validateEffort,
+    supportsEffort,
     defaultModel: () => settings.service.get('ai.defaultModel'),
     supportsImage: async (model) =>
       (await opencode.listModels()).available.some((m) => m.supportsImage && model === m.providerId + '/' + m.modelId),

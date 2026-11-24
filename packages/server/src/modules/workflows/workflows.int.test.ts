@@ -248,6 +248,19 @@ describe('自定义角色（M5-06）', () => {
     expect((await t.call(updateRoleOp, { id: copy.body.id, model: 'opencode/fake-model-2' })).body.effort).toBeNull();
     expect((await t.call(listRolesOp, {})).body.items.find((r) => r.id === id)?.effort).toEqual(effort);
   });
+  it('切换全局模型后，复制跟随全局模型的角色时只保留有效强度', async () => {
+    const id = await roleId('developer');
+    const effort = { model: 'opencode/fake-model', variant: 'deep' };
+    await t.call(updateSettingsOp, { 'ai.defaultModel': effort.model });
+    expect((await t.call(updateRoleOp, { id, effort })).status).toBe(200);
+    await t.call(updateSettingsOp, { 'ai.defaultModel': 'opencode/fake-model-2' });
+    const copy = { key: 'follow_copy', copyFrom: id, name: '副本' };
+    expect((await t.call(createRoleOp, { ...copy, effort })).status).toBe(400);
+    const created = await t.call(createRoleOp, copy);
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ model: null, effort: null });
+  });
+
   it('复制内置角色后可修改提示词与模型；键重复时 ROLE_ALREADY_EXISTS', async () => {
     const created = await t.call(createRoleOp, {
       copyFrom: await roleId('developer'),

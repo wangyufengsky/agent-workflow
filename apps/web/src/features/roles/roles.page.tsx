@@ -119,7 +119,7 @@ function RoleDialog({ editing, onClose }: { editing: Editing; onClose: () => voi
       description,
       prompt,
       model,
-      ...(editing.mode === 'edit' && source?.model === model && source?.effort === effort ? {} : { effort }),
+      ...(source?.model === model && source.effort === effort ? {} : { effort }),
     };
     if (editing.mode === 'edit') update.mutate({ id: editing.role.id, ...fields }, { onSuccess: done(C.saved) });
     else if (editing.mode === 'copy') {

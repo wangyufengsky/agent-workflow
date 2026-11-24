@@ -17,13 +17,22 @@ import { createRolesRepo } from './roles.repo.ts';
 export type RolesServiceDeps = {
   defaultModel(): string | null;
   validateEffort(effort: ModelEffort, selectedModel: () => string | null): Promise<void>;
+  supportsEffort(effort: ModelEffort, selectedModel: () => string | null): Promise<boolean>;
   supportsImage(model: string): Promise<boolean>;
   db: Db;
   clock: Clock;
   log: Logger;
 };
 
-export function createRolesService({ db, clock, log, supportsImage, validateEffort, defaultModel }: RolesServiceDeps) {
+export function createRolesService({
+  db,
+  clock,
+  log,
+  supportsImage,
+  validateEffort,
+  supportsEffort,
+  defaultModel,
+}: RolesServiceDeps) {
   const repo = createRolesRepo(db);
 
   function get(id: string): RoleDTO {
@@ -91,8 +100,12 @@ export function createRolesService({ db, clock, log, supportsImage, validateEffo
         throw new Error('A new role without copyFrom passed validation incomplete');
       }
       const model = fields.model === undefined ? (source?.model ?? null) : fields.model;
-      const effort = fields.effort === undefined ? (model === source?.model ? source.effort : null) : fields.effort;
-      if (effort) await validateEffort(effort, () => model ?? defaultModel());
+      const selectedModel = () => model ?? defaultModel();
+      let effort = fields.effort ?? null;
+      if (effort) await validateEffort(effort, selectedModel);
+      else if (fields.effort === undefined && source?.effort && model === source.model) {
+        if (await supportsEffort(source.effort, selectedModel)) effort = source.effort;
+      }
       if (repo.findByKey(key)) throw new AppError(ErrorCode.RoleAlreadyExists, 'Role already exists', { key });
       const now = clock.now();
       const id = randomUUID();
