@@ -61,13 +61,21 @@ export function createSystemService({
       Promise.all(projects.list().map(async (p) => ({ projectId: p.id, ...(await opencode.listModels(p.repoPath)) }))),
     ]);
     const models = new Map<string, ModelInfo>(
-      global.available.map((m) => [modelKey(m), { ...m, supportsImage: m.supportsImage ?? false, projectIds: [] }]),
+      global.available.map((m) => [
+        modelKey(m),
+        { ...m, variants: m.variants ?? [], supportsImage: m.supportsImage ?? false, projectIds: [] },
+      ]),
     );
     for (const { projectId, available } of ofProjects) {
       for (const m of available) {
         const known = models.get(modelKey(m));
         if (known === undefined)
-          models.set(modelKey(m), { ...m, supportsImage: m.supportsImage ?? false, projectIds: [projectId] });
+          models.set(modelKey(m), {
+            ...m,
+            variants: m.variants ?? [],
+            supportsImage: m.supportsImage ?? false,
+            projectIds: [projectId],
+          });
         else if (known.projectIds.length > 0) known.projectIds.push(projectId);
       }
     }

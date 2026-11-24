@@ -3,15 +3,18 @@ import {
   type CommitIdentity,
   commitIdentitySchema,
   LOCAL_MERGE_STRATEGIES,
+  modelEfforts,
   type Settings,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
 import { type KeyboardEvent, useState } from 'react';
+import { effortLabel, ModelEffortField, ModelFields } from '../../components/model-effort-field.tsx';
 import { Panel } from '../../components/panel.tsx';
 import { DELIVERY_COPY } from '../../copy/delivery.ts';
 import { SETTINGS_COPY as C } from '../../copy/settings.ts';
 import { environmentQuery } from '../onboarding/environment.queries.ts';
 import { usableModels } from '../onboarding/usable-models.ts';
+import { rolesQuery } from '../tasks/tasks.queries.ts';
 import { NumberSetting, Segmented, TextSetting } from './setting-inputs.tsx';
 import { StartupEnvironmentSettings } from './startup-environment-settings.tsx';
 
@@ -73,31 +76,63 @@ function CommitIdentitySetting({
 /** Pro-mode settings (08 §4.3 `SETTING_MODE` = pro, M5-08). Inputs are keyed by the saved value to reset with it. */
 export function ProSettings({ settings, set }: { settings: Settings; set: (patch: Partial<Settings>) => void }) {
   // The default model applies to every project: only the global configuration's (D162).
-  const models = usableModels(useQuery(environmentQuery).data?.models.available ?? [], null);
+  const roles = useQuery(rolesQuery);
+  const environment = useQuery(environmentQuery);
+  const models = usableModels(environment.data?.models.available ?? [], null);
   const ids = models.map((m) => `${m.providerId}/${m.modelId}`);
   const model = settings['ai.defaultModel'];
   return (
     <Panel title={C.pro}>
-      <div className="field">
-        <label className="label" htmlFor="setting-model">
-          {C.defaultModel}
-        </label>
-        <select
-          id="setting-model"
-          className="select"
-          value={model ?? ''}
-          onChange={(e) => set({ 'ai.defaultModel': e.target.value === '' ? null : e.target.value })}
-        >
-          <option value="">{C.opencodeDefault}</option>
-          {model !== null && !ids.includes(model) && <option value={model}>{model}</option>}
-          {models.map((m) => (
-            <option key={`${m.providerId}/${m.modelId}`} value={`${m.providerId}/${m.modelId}`}>
-              {m.name}（{m.providerId}/{m.modelId}）
-            </option>
-          ))}
-        </select>
-        <p className="hint">{C.defaultModelHint}</p>
-      </div>
+      <ModelFields>
+        <div className="field">
+          <label className="label" htmlFor="setting-model">
+            {C.defaultModel}
+          </label>
+          <select
+            id="setting-model"
+            className="select"
+            value={model ?? ''}
+            onChange={(e) => set({ 'ai.defaultModel': e.target.value === '' ? null : e.target.value })}
+          >
+            <option value="">{C.opencodeDefault}</option>
+            {model !== null && !ids.includes(model) && <option value={model}>{model}</option>}
+            {models.map((m) => (
+              <option key={`${m.providerId}/${m.modelId}`} value={`${m.providerId}/${m.modelId}`}>
+                {m.name}（{m.providerId}/{m.modelId}）
+              </option>
+            ))}
+          </select>
+          <p className="hint">{C.defaultModelHint}</p>
+        </div>
+        <ModelEffortField
+          model={models.find(
+            (m) => m.providerId + '/' + m.modelId === (model ?? environment.data?.models.defaultModel),
+          )}
+          value={settings['ai.defaultEffort']}
+          onChange={(effort) => set({ 'ai.defaultEffort': effort })}
+        />
+      </ModelFields>
+      {roles.data && (
+        <details>
+          <summary>{C.roleModels}</summary>
+          <dl>
+            {roles.data.map((role) => {
+              const key = role.model ?? model ?? environment.data?.models.defaultModel;
+              const selected = models.find((m) => m.providerId + '/' + m.modelId === key);
+              const variant = modelEfforts(settings, role).find((e) => e.model === key)?.variant;
+              return (
+                <div key={role.id} className="row">
+                  <dt>{role.name}</dt>
+                  <dd className="hint">
+                    {selected?.name ?? key ?? C.opencodeDefault} ·{' '}
+                    {variant && selected?.variants.includes(variant) ? effortLabel(variant) : C.effortDefault}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+        </details>
+      )}
       <div className="field">
         <span className="label">{C.bashPolicy}</span>
         <Segmented

@@ -8,6 +8,7 @@ const model = (modelId: string, projectIds: string[]): ModelInfo => ({
   name: modelId,
   contextLimit: null,
   supportsImage: false,
+  variants: [],
   projectIds,
 });
 const global = model('global', []);

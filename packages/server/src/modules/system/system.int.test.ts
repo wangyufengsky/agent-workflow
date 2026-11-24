@@ -97,6 +97,7 @@ describe('可用的模型（D162）', () => {
         name: 'Qwen Coder',
         contextLimit: null,
         supportsImage: false,
+        variants: [],
         projectIds: [project.id],
       },
     ]);
@@ -115,7 +116,9 @@ describe('可用的模型（D162）', () => {
     t.fake.models.splice(0, Infinity, global);
     const { project } = await addProject(t);
     t.fake.projectModels.set(project.repoPath, [global]);
-    expect((await t.call(getEnvironmentOp, {})).body.models.available).toEqual([{ ...global, projectIds: [] }]);
+    expect((await t.call(getEnvironmentOp, {})).body.models.available).toEqual([
+      { ...global, variants: [], projectIds: [] },
+    ]);
   });
 });
 

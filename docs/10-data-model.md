@@ -898,3 +898,7 @@ items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`ex
 ## 对话和任务的审批配置
 
 迁移 0053 为 `assistant_conversations` 和 `tasks` 增加 `permission_mode`，默认 `ask`。每个对象独立保存选择。普通执行尝试的 `attempts.permission_baseline` 保存创建时的规则，同一原生会话继续执行时沿用。既有 `ai.imageModel` 迁入图像处理员的空模型字段，已有角色选择优先。
+
+### 模型思考强度
+
+迁移 0054 为 roles 增加可空 JSON 列 effort。null 表示按角色的模型选择使用默认策略；对象保存 {model, variant}，其中 variant 为 null 时显式采用模型默认。已有角色无需重新配置。 同一迁移在 attempts.model_efforts 保存本次运行的模型档位选择；排队、恢复和同一尝试后续消息沿用快照。旧尝试使用模型默认。

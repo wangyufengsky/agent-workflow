@@ -1,4 +1,12 @@
-import { AppError, AttemptKind, type AttemptStatus, ErrorCode, type ErrorInfo, errorInfoSchema } from '@aw/shared';
+import {
+  AppError,
+  AttemptKind,
+  type AttemptStatus,
+  ErrorCode,
+  type ErrorInfo,
+  errorInfoSchema,
+  modelEffortSchema,
+} from '@aw/shared';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { DbExecutor } from '../../core/db/database.ts';
 import { attemptsTable } from './attempts.table.ts';
@@ -10,13 +18,19 @@ export type Attempt = Omit<AttemptRow, 'error'> & { error: ErrorInfo | null };
 
 export type NewAttempt = Omit<
   AttemptRow,
-  'error' | 'tokensInput' | 'tokensOutput' | 'cost' | 'endedAt' | 'permissionBaseline'
+  'error' | 'tokensInput' | 'tokensOutput' | 'cost' | 'endedAt' | 'permissionBaseline' | 'efforts'
 > &
-  Partial<Pick<AttemptRow, 'permissionBaseline'>>;
+  Partial<Pick<AttemptRow, 'permissionBaseline' | 'efforts'>>;
 
-function toAttempt({ error, ...row }: AttemptRow): Attempt {
+const effortSnapshotSchema = modelEffortSchema.array().nullable();
+
+function toAttempt({ error, efforts, ...row }: AttemptRow): Attempt {
   // JSON column: parsed at the boundary (06 §9).
-  return { ...row, error: error === null ? null : errorInfoSchema.parse(JSON.parse(error)) };
+  return {
+    ...row,
+    efforts: effortSnapshotSchema.parse(efforts),
+    error: error === null ? null : errorInfoSchema.parse(JSON.parse(error)),
+  };
 }
 
 export function createAttemptsRepo(db: DbExecutor) {

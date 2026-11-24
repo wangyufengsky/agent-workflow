@@ -1,4 +1,4 @@
-import type { AttemptKind, AttemptStatus, PermissionRule } from '@aw/shared';
+import type { AttemptKind, AttemptStatus, ModelEffort, PermissionRule } from '@aw/shared';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { nodesTable } from '../nodes/nodes.table.ts';
 import { projectsTable } from '../projects/projects.table.ts';
@@ -20,6 +20,7 @@ export const attemptsTable = sqliteTable(
     status: text('status').$type<AttemptStatus>().notNull(),
     roleId: text('role_id').references(() => rolesTable.id),
     model: text('model'),
+    efforts: text('model_efforts', { mode: 'json' }).$type<ModelEffort[]>(),
     /** Working directory of the session (the task worktree). */
     directory: text('directory').notNull(),
     /** Not unique: a re-planning attempt continues the previous planning session (12 §4.3). */

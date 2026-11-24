@@ -699,3 +699,7 @@ class AppError extends Error {
 功能测试执行使用 `FunctionalTestStatus`。执行期间为 `running`，完成后由证据推导 `passed`、`failed` 或 `blocked`。尚未执行的用例在报告中标作 `not_run`。功能测试不改变任务状态机。
 
 权限模式 `PermissionMode` 包括 `ask`（始终询问，默认）、`assisted`（帮我批准）和 `full`（完全访问）。
+
+### 模型思考强度
+
+专业设置 `ai.defaultEffort` 默认为 null，使用模型默认。显式选择保存声明该档位的 `provider/model` 和 OpenCode 的原始 `variant` 字符串。切换默认模型时同步清空旧选择；不属于当前模型的档位在写入前返回 VALIDATION_FAILED。

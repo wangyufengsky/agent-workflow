@@ -10,6 +10,7 @@ import {
   listWorkflowsOp,
   listWorkflowVersionsOp,
   updateRoleOp,
+  updateSettingsOp,
   updateWorkflowOp,
   validateWorkflowOp,
   type WorkflowDTO,
@@ -235,6 +236,31 @@ describe('自定义流程（M5-05）', () => {
 });
 
 describe('自定义角色（M5-06）', () => {
+  it('内置和复制的角色可独立选档，拒绝其他模型的档位', async () => {
+    const model = 'opencode/fake-model',
+      effort = { model, variant: 'deep' };
+    await t.call(updateSettingsOp, { 'ai.defaultModel': model });
+    const id = await roleId('aw-approver');
+    expect((await t.call(updateRoleOp, { id, effort })).body).toMatchObject({ model: null, effort });
+    const copy = await t.call(createRoleOp, { key: 'custom_review', copyFrom: id, name: '独立评审' });
+    expect(copy.body.effort).toEqual(effort);
+    expect((await t.call(updateRoleOp, { id: copy.body.id, model: 'opencode/fake-model-2', effort })).status).toBe(400);
+    expect((await t.call(updateRoleOp, { id: copy.body.id, model: 'opencode/fake-model-2' })).body.effort).toBeNull();
+    expect((await t.call(listRolesOp, {})).body.items.find((r) => r.id === id)?.effort).toEqual(effort);
+  });
+  it('切换全局模型后，复制跟随全局模型的角色时只保留有效强度', async () => {
+    const id = await roleId('developer');
+    const effort = { model: 'opencode/fake-model', variant: 'deep' };
+    await t.call(updateSettingsOp, { 'ai.defaultModel': effort.model });
+    expect((await t.call(updateRoleOp, { id, effort })).status).toBe(200);
+    await t.call(updateSettingsOp, { 'ai.defaultModel': 'opencode/fake-model-2' });
+    const copy = { key: 'follow_copy', copyFrom: id, name: '副本' };
+    expect((await t.call(createRoleOp, { ...copy, effort })).status).toBe(400);
+    const created = await t.call(createRoleOp, copy);
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ model: null, effort: null });
+  });
+
   it('复制内置角色后可修改提示词与模型；键重复时 ROLE_ALREADY_EXISTS', async () => {
     const created = await t.call(createRoleOp, {
       copyFrom: await roleId('developer'),

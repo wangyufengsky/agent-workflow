@@ -2,16 +2,20 @@ import {
   APPROVER_ROLE_KEY,
   DEFINITION_KEY_PATTERN,
   IMAGE_PROCESSOR_ROLE_KEY,
+  type ModelEffort,
   RoleBaseAgent,
   type RoleDTO,
   RoleKind,
   roleBaseAgentSchema,
 } from '@aw/shared';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { type FormEvent, useId, useState } from 'react';
+import { ROUTES } from '../../app/routes.ts';
 import { Button } from '../../components/button.tsx';
 import { Dialog } from '../../components/dialog.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { ModelEffortField, ModelFields } from '../../components/model-effort-field.tsx';
 import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { ROLES_COPY as C } from '../../copy/roles.ts';
@@ -28,9 +32,13 @@ type Editing = { mode: 'create' } | { mode: 'copy'; from: RoleDTO } | { mode: 'e
 function ModelSelect({
   value,
   onChange,
+  effort,
+  onEffort,
   image = false,
   disabled = false,
 }: {
+  effort: ModelEffort | null;
+  onEffort: (v: ModelEffort | null) => void;
   image?: boolean;
   disabled?: boolean;
   value: string | null;
@@ -45,35 +53,44 @@ function ModelSelect({
   const inherited = settings['ai.defaultModel'] ?? environment.data?.models.defaultModel;
   const incompatible = image && !!environment.data && !ids.includes(inherited ?? '');
   return (
-    <div className="field">
-      <label className="label" htmlFor={modelId}>
-        {C.model}
-      </label>
-      <select
+    <ModelFields>
+      <div className="field">
+        <label className="label" htmlFor={modelId}>
+          {C.model}
+        </label>
+        <select
+          disabled={disabled}
+          id={modelId}
+          className="select"
+          value={value ?? ''}
+          onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
+        >
+          <option value="" disabled={incompatible}>
+            {C.defaultModel}
+            {inherited ? ' · ' + inherited : ''}
+          </option>
+          {value !== null && !ids.includes(value) && (
+            <option disabled value={value}>
+              {value}
+            </option>
+          )}
+          {models.map((m) => (
+            <option key={`${m.providerId}/${m.modelId}`} value={`${m.providerId}/${m.modelId}`}>
+              {m.name}（{m.providerId}/{m.modelId}）
+            </option>
+          ))}
+        </select>
+        {incompatible && value === null && <span className="hint">{C.visionRequired}</span>}
+        {environment.data !== undefined && models.length === 0 && <span className="hint">{C.modelsUnavailable}</span>}
+      </div>
+      <ModelEffortField
+        model={models.find((m) => m.providerId + '/' + m.modelId === (value ?? inherited))}
+        value={effort}
+        {...(value === null ? { inherited: settings['ai.defaultEffort'] } : {})}
         disabled={disabled}
-        id={modelId}
-        className="select"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
-      >
-        <option value="" disabled={incompatible}>
-          {C.defaultModel}
-          {inherited ? ' · ' + inherited : ''}
-        </option>
-        {value !== null && !ids.includes(value) && (
-          <option disabled value={value}>
-            {value}
-          </option>
-        )}
-        {models.map((m) => (
-          <option key={`${m.providerId}/${m.modelId}`} value={`${m.providerId}/${m.modelId}`}>
-            {m.name}（{m.providerId}/{m.modelId}）
-          </option>
-        ))}
-      </select>
-      {incompatible && value === null && <span className="hint">{C.visionRequired}</span>}
-      {environment.data !== undefined && models.length === 0 && <span className="hint">{C.modelsUnavailable}</span>}
-    </div>
+        onChange={onEffort}
+      />
+    </ModelFields>
   );
 }
 
@@ -85,6 +102,7 @@ function RoleDialog({ editing, onClose }: { editing: Editing; onClose: () => voi
   const [baseAgent, setBaseAgent] = useState<RoleBaseAgent>(source?.baseAgent ?? RoleBaseAgent.Executor);
   const [prompt, setPrompt] = useState(source?.prompt ?? '');
   const [model, setModel] = useState<string | null>(source?.model ?? null);
+  const [effort, setEffort] = useState(source?.effort ?? null);
   const create = useCreateRole();
   const update = useUpdateRole();
   const mutation = editing.mode === 'edit' ? update : create;
@@ -96,7 +114,13 @@ function RoleDialog({ editing, onClose }: { editing: Editing; onClose: () => voi
   };
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const fields = { name: name.trim(), description, prompt, model };
+    const fields = {
+      name: name.trim(),
+      description,
+      prompt,
+      model,
+      ...(source?.model === model && source.effort === effort ? {} : { effort }),
+    };
     if (editing.mode === 'edit') update.mutate({ id: editing.role.id, ...fields }, { onSuccess: done(C.saved) });
     else if (editing.mode === 'copy') {
       create.mutate({ key, copyFrom: editing.from.id, ...fields }, { onSuccess: done(C.created) });
@@ -169,7 +193,15 @@ function RoleDialog({ editing, onClose }: { editing: Editing; onClose: () => voi
           />
           <span className="hint">{C.promptHint}</span>
         </div>
-        <ModelSelect value={model} onChange={setModel} />
+        <ModelSelect
+          value={model}
+          effort={effort}
+          onEffort={setEffort}
+          onChange={(v) => {
+            setModel(v);
+            setEffort(null);
+          }}
+        />
         {mutation.isError && <ErrorState error={mutation.error} />}
         <div className="row">
           <Button type="submit" variant="primary" pending={mutation.isPending} disabled={!valid}>
@@ -263,10 +295,17 @@ export function RolesPage() {
             <p>{active.description}</p>
             <ModelSelect
               value={active.model}
+              effort={active.effort}
+              onEffort={(effort) => update.mutate({ id: active.id, effort })}
               image={active.key === IMAGE_PROCESSOR_ROLE_KEY}
               disabled={update.isPending}
               onChange={(model) => update.mutate({ id: active.id, model })}
             />
+            {active.model === null && (
+              <Link className="hint" to={ROUTES.settings} hash="setting-model">
+                {C.globalSettings}
+              </Link>
+            )}
             {update.isError && <ErrorState error={update.error} />}
             <details open={active.key === APPROVER_ROLE_KEY} key={active.id}>
               <summary>{active.key === APPROVER_ROLE_KEY ? C.approvalRules : C.prompt}</summary>
