@@ -550,9 +550,10 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     const controller = new AbortController();
     deciding.set(event.permissionId, controller);
     const signal = AbortSignal.any([controller.signal, turn.delegation.signal]);
-    function ask(reason?: string) {
+    function ask(reason?: string, bashGrant: AssistantPermissionRequestDTO['bashGrant'] = null) {
       state.permissions.set(event.permissionId, {
         permissionId: event.permissionId,
+        ...(event.permission === 'bash' ? { bashGrant } : {}),
         permission: event.permission,
         patterns: event.patterns,
         ...(reason ? { reason } : {}),
@@ -560,23 +561,23 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       publish(c.id);
     }
     const run = async () => {
-      const result =
-        c.permissionMode === PermissionMode.Ask && state.grants.has(grantKey(event))
-          ? { reply: PermissionDecision.Once, reason: undefined }
-          : await deps.permissionReviewer.native({
-              event,
-              call:
-                c.permissionMode === PermissionMode.Assisted
-                  ? await state.view.permissionCall(event.callId, clock, signal)
-                  : undefined,
-              directory: filesDir(c.id),
-              intent: turn.intent,
-              mode: c.permissionMode,
-              mutable: true,
-              parentSignal: turn.delegation.signal,
-              baselineRules: assistantPermissionRules(),
-              signal,
-            });
+      const result = await deps.permissionReviewer.native({
+        owner: { conversationId: c.id },
+        sessionAllowed: state.grants.has(grantKey(event)),
+        event,
+        call:
+          c.permissionMode === PermissionMode.Assisted ||
+          (event.permission === 'bash' && c.permissionMode === PermissionMode.Ask)
+            ? await state.view.permissionCall(event.callId, clock, signal)
+            : undefined,
+        directory: filesDir(c.id),
+        intent: turn.intent,
+        mode: c.permissionMode,
+        mutable: true,
+        parentSignal: turn.delegation.signal,
+        baselineRules: assistantPermissionRules(),
+        signal,
+      });
       if (signal.aborted || state.turn !== turn) return;
       if (result.reason)
         record(c, [
@@ -593,7 +594,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           },
         ]);
       if (!result.reply || get(c.id).permissionMode !== c.permissionMode) {
-        ask(result.reason);
+        ask(result.reason, result.bashGrant);
         return;
       }
       await opencode.replyPermission({
@@ -1200,7 +1201,10 @@ export function createAssistantService(deps: AssistantServiceDeps) {
           directory: filesDir(id),
           reply: reply === PermissionDecision.Always ? PermissionDecision.Once : reply,
         });
-        if (reply === PermissionDecision.Always) state.grants.add(grantKey(pending));
+        if (reply === PermissionDecision.Always) {
+          if (pending.bashGrant) deps.permissionReviewer.remember('conversationId', id, pending.bashGrant);
+          else if (pending.permission !== 'bash') state.grants.add(grantKey(pending));
+        }
       } catch (error) {
         if (error instanceof AppError && error.code === ErrorCode.PermissionRequestExpired)
           completePermission(id, permissionId);

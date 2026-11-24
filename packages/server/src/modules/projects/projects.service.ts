@@ -25,6 +25,7 @@ import {
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
 import type { Db } from '../../core/db/database.ts';
+import { bashGrants } from '../bash-grants/index.ts';
 import type { CredentialsService } from '../credentials/index.ts';
 import type { DatabasesService } from '../databases/index.ts';
 import {
@@ -219,6 +220,7 @@ export function createProjectsService({
       effectiveHosting: effective === undefined ? null : { ...effective.ref, source: effective.source },
       dbConnectionIds: databases.linkedIds(project.id),
       allowedBash: repo.allowedBash(project.id),
+      exactBash: bashGrants(db).forProject(project.id),
       currentBranch: currentBranch ?? null,
     };
   }
@@ -353,7 +355,8 @@ export function createProjectsService({
     /** Later sessions ask again; the sessions already running keep their rules (D35). */
     removeAllowedBash(id: string, pattern: string): Promise<ProjectDetailDTO> {
       const project = require(id);
-      repo.removeAllowedBash(id, pattern);
+      if (pattern.startsWith('exact:')) bashGrants(db).revokeProject(id, pattern.slice(6));
+      else repo.removeAllowedBash(id, pattern);
       return detail(project);
     },
 

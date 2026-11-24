@@ -57,3 +57,36 @@ test('全局与角色按模型目录选档，继承、独立覆盖及模型默�
     });
   }
 });
+
+test('专业设置和角色详情的模型与强度宽屏对齐，窄窗口分行', async ({ page, request }, testInfo) => {
+  await createProject(request, null);
+  const settings = await (await request.get(API_BASE + '/settings', { headers: AUTH })).json();
+  try {
+    await patchSettings(request, { 'ui.mode': 'pro', 'ui.theme': 'default', 'ai.defaultModel': 'opencode/fake-model' });
+    for (const [path, label] of [
+      ['/settings', '默认模型'],
+      ['/roles', '模型'],
+    ] as const) {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto(path);
+      const model = page.getByRole('combobox', { name: label, exact: true });
+      const effort = page.getByRole('combobox', { name: '思考强度', exact: true });
+      await expect(effort).toBeEnabled();
+      if (path === '/settings') {
+        await page.getByRole('region', { name: '专业设置', exact: true }).evaluate((el) => el.scrollIntoView());
+      }
+      const top = (field: typeof model) => field.evaluate((el) => el.getBoundingClientRect().top);
+      expect(Math.abs((await top(model)) - (await top(effort)))).toBeLessThan(1);
+      await page.screenshot({ path: testInfo.outputPath(path.slice(1) + '.png'), animations: 'disabled' });
+      await page.setViewportSize({ width: 640, height: 800 });
+      await expect.poll(async () => (await top(effort)) - (await top(model))).toBeGreaterThan(40);
+    }
+  } finally {
+    await patchSettings(request, {
+      'ui.mode': settings['ui.mode'],
+      'ui.theme': settings['ui.theme'],
+      'ai.defaultModel': settings['ai.defaultModel'],
+      'ai.defaultEffort': settings['ai.defaultEffort'],
+    });
+  }
+});

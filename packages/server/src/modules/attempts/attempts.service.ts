@@ -223,6 +223,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       permissionStop: new AbortController(),
       deciding: new Map(),
       seenPermissions: new Set(),
+      replyingPermissions: new Map(),
       grants: new Set(),
       delegation: new AbortController(),
     };
@@ -709,13 +710,28 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       reactions.resume(session);
     },
 
-    /**
-     * The user's decision on a permission request goes back to opencode, and the turn continues (D34). opencode keeps
-     * 「总是允许」for the session only; a bash one is remembered for the project's later sessions too (D101).
-     */
-    async replyPermission(attemptId: string, payload: PermissionPayload, reply: PermissionDecision): Promise<void> {
-      const scoped = mustFind(attemptId).permissionBaseline !== null;
+    /** 明确选择范围后由应用记住任务命令，OpenCode 仅获得本次许可。 */
+    async replyPermission(
+      attemptId: string,
+      payload: PermissionPayload,
+      reply: PermissionDecision,
+      scope?: 'task' | 'project',
+    ): Promise<void> {
+      const attempt = mustFind(attemptId);
+      const scoped = attempt.permissionBaseline !== null || payload.bashGrant !== undefined;
+      if (
+        scope &&
+        (reply !== PermissionDecision.Always ||
+          !payload.bashGrant ||
+          !attempt.taskId ||
+          (scope === 'project' && !attempt.projectId))
+      ) {
+        throw new AppError(ErrorCode.ValidationFailed, 'Unavailable permission scope');
+      }
       const session = state.sessionOf(attemptId);
+      if (session?.replyingPermissions.has(payload.opencodePermissionId))
+        throw new AppError(ErrorCode.InboxItemClosed, 'Permission reply in progress');
+      session?.replyingPermissions.set(payload.opencodePermissionId, undefined);
       try {
         await opencode.replyPermission({
           permissionId: payload.opencodePermissionId,
@@ -723,17 +739,31 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
           reply: scoped && reply === PermissionDecision.Always ? PermissionDecision.Once : reply,
         });
       } catch (error) {
-        if (error instanceof AppError && error.code === ErrorCode.PermissionRequestExpired) {
-          state.inbox.completePermission(attemptId, payload.opencodePermissionId, undefined);
-          const session = state.sessionOf(attemptId);
-          if (session !== undefined) reactions.resume(session);
+        // 如果 SSE 已收到原生结果，但 HTTP 回复丢失，按实际结果收卡；只在 HTTP 成功后记住授权。
+        const received = session?.replyingPermissions.get(payload.opencodePermissionId);
+        if (received || (error instanceof AppError && error.code === ErrorCode.PermissionRequestExpired)) {
+          state.inbox.completePermission(attemptId, payload.opencodePermissionId, received);
+          if (session) reactions.resume(session);
         }
         throw error;
+      } finally {
+        session?.replyingPermissions.delete(payload.opencodePermissionId);
       }
-      if (scoped && reply === PermissionDecision.Always) session?.grants.add(grantKey(payload));
-      state.inbox.completePermission(attemptId, payload.opencodePermissionId, reply);
-      const { projectId } = mustFind(attemptId);
-      if (reply === PermissionDecision.Always && payload.permission === BASH_PERMISSION && projectId !== null) {
+      if (scoped && reply === PermissionDecision.Always) {
+        if (payload.bashGrant && attempt.taskId) {
+          if (scope === 'project' && attempt.projectId)
+            deps.permissionReviewer.remember('projectId', attempt.projectId, payload.bashGrant);
+          else deps.permissionReviewer.remember('taskId', attempt.taskId, payload.bashGrant);
+        } else if (payload.permission !== BASH_PERMISSION) session?.grants.add(grantKey(payload));
+      }
+      state.inbox.completePermission(attemptId, payload.opencodePermissionId, reply, scope);
+      const { projectId } = attempt;
+      if (
+        !scoped &&
+        reply === PermissionDecision.Always &&
+        payload.permission === BASH_PERMISSION &&
+        projectId !== null
+      ) {
         projects.rememberBash(projectId, payload.patterns);
       }
     },

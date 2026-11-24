@@ -399,6 +399,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
 
   const permissionReviewer = createPermissionReviewer({
+    db: database.db,
     sessions,
     settings: settings.service,
     roles: roles.service,

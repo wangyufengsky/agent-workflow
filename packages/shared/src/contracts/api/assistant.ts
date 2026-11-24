@@ -13,6 +13,7 @@ import { operationRiskSchema, permissionModeSchema } from '../../enums/system.ts
 import { errorInfoSchema } from '../../errors/codes.ts';
 import { attachmentIdsSchema } from './attachments.ts';
 import { transcriptEntrySchema } from './attempts.ts';
+import { bashGrantSchema } from './inbox.ts';
 import { assistantSkillIdsSchema } from './skills.ts';
 
 /** A permission request of the assistant's session, answered in the panel (15 §6). Kept in memory, like opencode's. */
@@ -21,6 +22,7 @@ export const assistantPermissionRequestSchema = z.object({
   permission: z.string(),
   patterns: z.array(z.string()),
   reason: z.string().optional(),
+  bashGrant: bashGrantSchema.nullable().optional(),
 });
 export type AssistantPermissionRequestDTO = z.infer<typeof assistantPermissionRequestSchema>;
 

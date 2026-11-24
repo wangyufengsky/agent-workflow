@@ -18,6 +18,14 @@ export const questionAnswerSchema = z.object({ answer: z.string().trim().min(1) 
 export const questionAssumedSchema = z.object({ assumed: z.literal(true), value: z.string() });
 export const questionResponseSchema = z.union([questionAnswerSchema, questionAssumedSchema]);
 
+export const bashGrantSchema = z.object({
+  command: z.string(),
+  directory: z.string(),
+  relativeDirectory: z.string(),
+  fingerprint: z.string(),
+});
+export type BashGrant = z.infer<typeof bashGrantSchema>;
+
 export const permissionPayloadSchema = z.object({
   opencodePermissionId: z.string(),
   sessionId: z.string(),
@@ -25,12 +33,17 @@ export const permissionPayloadSchema = z.object({
   directory: z.string(),
   /** opencode permission type, e.g. `bash`, `webfetch`. */
   permission: z.string(),
-  /** The sub-commands asked about; on「总是允许」bash ones are remembered for the project too (D101). */
+  /** OpenCode 报告的子命令，精确授权另外核对完整的工具参数。 */
   patterns: z.array(z.string()),
   reason: z.string().optional(),
+  bashGrant: bashGrantSchema.nullable().optional(),
+  projectGrantAvailable: z.boolean().optional(),
 });
 export type PermissionPayload = z.infer<typeof permissionPayloadSchema>;
-export const permissionResponseSchema = z.object({ decision: permissionDecisionSchema });
+export const permissionResponseSchema = z.object({
+  decision: permissionDecisionSchema,
+  scope: z.enum(['task', 'project']).optional(),
+});
 
 export const acceptancePayloadSchema = z.object({});
 export const acceptanceResponseSchema = z.object({

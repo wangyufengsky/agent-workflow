@@ -1,14 +1,21 @@
 .fields {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: var(--s-3, 12px);
-  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: 24px;
+  row-gap: 18px;
 }
-.fields > * {
+.fields > :global(.field) {
+  flex: 1 1 10rem;
   min-width: 0;
 }
-@media (max-width: 700px) {
-  .fields {
-    grid-template-columns: minmax(0, 1fr);
-  }
+.fields > :global(.field):first-child {
+  flex: 2 1 17rem;
+}
+.fields > :global(.field) + :global(.field) {
+  margin-top: 0;
+}
+.fields select {
+  width: 100%;
+  text-overflow: ellipsis;
 }

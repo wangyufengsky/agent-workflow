@@ -292,7 +292,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `BASH_PERMISSION_PRESETS` | `auto` / `ask` 两套规则 | 执行者的会话级 bash 规则（12 §2） |
 | `readonlyBashRules(checkCommands, allowedBash)` | 函数 | 规划与评审会话的会话级 bash 规则，`ask` 策略即不带检查命令的这一套；`allowedBash` 为项目中总是允许的模式（12 §2，D64、D100、D101） |
 | `BASH_PERMISSION` | `bash` | opencode 中 shell 命令的权限类型 |
-| `projectBashPatterns(commands)` | 函数 | bash 请求的「总是允许」中记到项目的模式：每条子命令的程序与开头的选项（到第一个不以 `-` 开头的参数为止）加 ` *`，去重；Git 与前置变量赋值的不记（D101） |
+| `projectBashPatterns(commands)` | 函数 | 旧式权限请求中记到项目的模式：每条子命令的程序与开头的选项（到第一个不以 `-` 开头的参数为止）加 ` *`，去重；Git 与前置变量赋值的不记（D101） |
 | `VIEWPORT_SIZES` | 桌面 1280×800、平板 768×1024、手机 390×844（后两者为移动设备） | 视口预设的 CSS 像素，一律经设备指标设置，DPR 为 1（29 §5.2） |
 | `PAGE_CHECK_VIEWPORTS` | `desktop`、`mobile` | 页面体检没写视口时用的视口（29 §7.1） |
 | `CHECK_KIND_ORDER` | `command` → `browser` → `ai_review` | 一个步骤的检查按这个顺序运行（29 §7.2） |
@@ -698,7 +698,7 @@ class AppError extends Error {
 
 功能测试执行使用 `FunctionalTestStatus`。执行期间为 `running`，完成后由证据推导 `passed`、`failed` 或 `blocked`。尚未执行的用例在报告中标作 `not_run`。功能测试不改变任务状态机。
 
-权限模式 `PermissionMode` 包括 `ask`（始终询问，默认）、`assisted`（帮我批准）和 `full`（完全访问）。
+权限模式 `PermissionMode` 包括 `ask`（始终询问，默认）、`assisted`（帮我批准）和 `full`（完全访问）。在 ask 和 assisted 下，已明确记住的 Bash 调用可在授权范围内复用；工作目录、完整命令、脚本入口或参数变化时重新判定。审批员只能批准本次。
 
 ### 模型思考强度
 

@@ -11,6 +11,7 @@ import {
   isTerminalState,
   type McpToolName,
   type ModelEffort,
+  type PermissionDecision,
   ServerEventType,
   TaskEventEntity,
   TranscriptEntryKind,
@@ -34,6 +35,7 @@ export type LiveSession = {
   permissionStop: AbortController;
   deciding: Map<string, AbortController>;
   seenPermissions: Set<string>;
+  replyingPermissions: Map<string, PermissionDecision | undefined>;
   grants: Set<string>;
   attemptId: string;
   delegation: AbortController;

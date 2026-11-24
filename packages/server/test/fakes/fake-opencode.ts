@@ -39,7 +39,7 @@ export type FakeStep =
   /** A native tool call that only reads (`read`, `grep`, a bash command …): reported, nothing happens. */
   | { type: 'tool'; tool: string; input: Record<string, unknown>; output: string }
   | { type: 'callTool'; server: FakeMcpServer; name: string; args: Record<string, unknown> }
-  | { type: 'permission'; permission: string; patterns: string[] }
+  | { type: 'permission'; permission: string; patterns: string[]; input?: Record<string, unknown> | undefined }
   | { type: 'hang' }
   /** The model service fails: opencode reports a retry per message, then waits until `recoverModel()`. */
   | { type: 'retry'; messages: string[] }
@@ -78,7 +78,8 @@ export function script() {
     ask: (args: { question: string; blocking: boolean; options?: string[]; default_assumption?: string }) =>
       add({ type: 'callTool', server: 'exec', name: 'ask_user', args }),
     /** Asks for a permission and waits until the backend replies. */
-    requestPermission: (permission: string, patterns: string[]) => add({ type: 'permission', permission, patterns }),
+    requestPermission: (permission: string, patterns: string[], input?: Record<string, unknown>) =>
+      add({ type: 'permission', permission, patterns, ...(input ? { input } : {}) }),
     /** The tokens the turn reports when it ends (quality and usage, 19), and its cost in dollars. */
     usage: (input: number, output: number, cost = 0) => add({ type: 'usage', input, output, cost }),
     /** Keeps working (never idle) until the session is aborted. */
@@ -288,17 +289,30 @@ export function createFakeOpencode() {
           const replied = new Promise<PermissionDecision>((resolve) =>
             pendingPermissions.set(permissionId, { sessionId, resolve }),
           );
-          const { permission, patterns } = step;
+          const { permission, patterns, input } = step;
+          if (input)
+            emit({ type: E.Tool, ...ids, callId: partId, tool: permission, input, status: ToolCallStatus.Running });
           emit({
             type: E.PermissionAsked,
             sessionId,
             directory: session.directory,
             permissionId,
+            ...(input ? { callId: partId } : {}),
             messageId,
             permission,
             patterns,
           });
           await replied;
+          if (input)
+            emit({
+              type: E.Tool,
+              ...ids,
+              callId: partId,
+              tool: permission,
+              input,
+              status: ToolCallStatus.Completed,
+              output: '',
+            });
           break;
         }
         case 'usage':

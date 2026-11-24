@@ -209,37 +209,48 @@ test('J3 权限请求 → 允许一次 → 继续；总是允许 → 记到项�
   page,
   request,
 }) => {
-  const project = await createProject(request, null);
-  await queueTurn(request, project, { title: '定位根因' }, [
-    { type: 'permission', permission: 'bash', patterns: ['rm -rf dist'] },
-    submitResult('清理后复现了问题'),
-  ]);
-  await queueTurn(request, project, { title: '修复' }, [
-    { type: 'permission', permission: 'bash', patterns: ['./scripts/build.sh --clean'] },
-    submitResult('已修复'),
-  ]);
-  await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
+  await patchSettings(request, { 'ai.bashPolicy': 'ask' });
+  try {
+    const project = await createProject(request, null);
+    await queueTurn(request, project, { title: '定位根因' }, [
+      { type: 'permission', permission: 'bash', patterns: ['rm -rf dist'] },
+      submitResult('清理后复现了问题'),
+    ]);
+    await queueTurn(request, project, { title: '修复' }, [
+      { type: 'edit', file: 'build.sh', content: 'echo test' },
+      {
+        type: 'permission',
+        permission: 'bash',
+        patterns: ['./build.sh --clean'],
+        input: { command: './build.sh --clean' },
+      },
+      submitResult('已修复'),
+    ]);
+    await queueTurn(request, project, { agent: 'aw-reviewer' }, [passReview]);
 
-  await startTask(page, project, /修 Bug/, '构建产物残留导致测试失败');
-  const permission = page.getByTestId('inbox-permission');
-  // The reminder bubble goes away with the request it is about, wherever that was answered (32 §3.5).
-  const reminder = page.getByRole('region', { name: '有件事需要你处理' });
-  await expect(permission).toContainText('rm -rf dist');
-  await expect(reminder).toBeVisible();
-  await permission.getByRole('button', { name: '允许一次' }).click();
-  await expect(permission).toContainText('./scripts/build.sh --clean');
-  await expect(permission).toContainText('「总是允许」会为本项目记住 ./scripts/build.sh --clean *');
-  await expect(reminder.getByRole('button', { name: '知道了', exact: true })).toBeVisible();
-  await permission.getByRole('button', { name: '总是允许' }).click();
-  await expect(reminder).toHaveCount(0);
-  await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
+    await startTask(page, project, /修 Bug/, '构建产物残留导致测试失败');
+    const permission = page.getByTestId('inbox-permission');
+    // The reminder bubble goes away with the request it is about, wherever that was answered (32 §3.5).
+    const reminder = page.getByRole('region', { name: '有件事需要你处理' });
+    await expect(permission).toContainText('rm -rf dist');
+    await expect(reminder).toBeVisible();
+    await permission.getByRole('button', { name: '允许一次' }).click();
+    await expect(permission).toContainText('./build.sh --clean');
+    await expect(permission.getByRole('button', { name: '本任务内允许' })).toBeVisible();
+    await expect(reminder.getByRole('button', { name: '知道了', exact: true })).toBeVisible();
+    await permission.getByRole('button', { name: '此项目始终允许' }).click();
+    await expect(reminder).toHaveCount(0);
+    await expect(page.getByTestId('result-card')).toContainText('已完成 2 个步骤', { timeout: TASK_RUN_TIMEOUT_MS });
 
-  await patchSettings(request, { 'ui.mode': 'pro' });
-  await page.goto(`/projects/${project.id}`);
-  const allowed = page.getByRole('list', { name: '总是允许的命令' });
-  await expect(allowed).toContainText('./scripts/build.sh --clean *');
-  await allowed.getByRole('button', { name: '撤销' }).click();
-  await expect(page.getByText('还没有总是允许的命令。')).toBeVisible();
+    await patchSettings(request, { 'ui.mode': 'pro' });
+    await page.goto(`/projects/${project.id}`);
+    const allowed = page.getByRole('list', { name: '总是允许的命令' });
+    await expect(allowed).toContainText('./build.sh --clean');
+    await allowed.getByRole('button', { name: '撤销' }).click();
+    await expect(page.getByText('还没有总是允许的命令。')).toBeVisible();
+  } finally {
+    await patchSettings(request, { 'ai.bashPolicy': 'auto' });
+  }
 });
 
 test('J4 检查失败 → 自动重试成功；另一步骤预算耗尽 → 任务失败 → 用户重试 → 完成', async ({ page, request }) => {
