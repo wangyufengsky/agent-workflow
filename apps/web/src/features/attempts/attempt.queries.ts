@@ -51,7 +51,7 @@ const transcriptQuery = (source: TranscriptSource) =>
  * the pages: a page read just before a line was appended misses it, and the line's event may arrive before that page
  * does. Pages and live lines together hold every line exactly once or twice, never zero times.
  */
-const liveTranscriptQuery = (source: TranscriptSource) =>
+export const liveTranscriptQuery = (source: TranscriptSource) =>
   queryOptions<TranscriptEntry[]>({ queryKey: source.liveKey, queryFn: skipToken });
 
 /**
@@ -60,7 +60,7 @@ const liveTranscriptQuery = (source: TranscriptSource) =>
  * its lines merge into its text as they come (D104), whichever source brought them.
  */
 export function transcriptEntries(
-  pages: readonly TranscriptPage[],
+  pages: readonly Pick<TranscriptPage, 'entries' | 'lastSeq'>[],
   live: readonly TranscriptEntry[],
 ): TranscriptEntry[] {
   const entries: TranscriptEntry[] = [];

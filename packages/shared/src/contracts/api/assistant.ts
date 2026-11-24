@@ -12,6 +12,7 @@ import { permissionDecisionSchema } from '../../enums/inbox.ts';
 import { operationRiskSchema } from '../../enums/system.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
 import { attachmentIdsSchema } from './attachments.ts';
+import { transcriptEntrySchema } from './attempts.ts';
 import { skillIdsSchema } from './skills.ts';
 
 /** A permission request of the assistant's session, answered in the panel (15 §6). Kept in memory, like opencode's. */
@@ -198,3 +199,11 @@ export const assistantFileSchema = z.object({
   modifiedAt: z.number(),
 });
 export type AssistantFileDTO = z.infer<typeof assistantFileSchema>;
+
+export const assistantHistoryQuerySchema = z.object({ before: z.coerce.number().int().positive().optional() });
+export const assistantHistoryPageSchema = z.object({
+  entries: z.array(transcriptEntrySchema),
+  lastSeq: z.number().int().nonnegative(),
+  before: z.number().int().positive().nullable(),
+});
+export type AssistantHistoryPage = z.infer<typeof assistantHistoryPageSchema>;

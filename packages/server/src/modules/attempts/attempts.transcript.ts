@@ -67,22 +67,12 @@ export function createTranscriptStore<S extends { id: string }>({
         .slice(afterSeq, afterSeq + TRANSCRIPT_PAGE_SIZE)
         .map((line) => transcriptEntrySchema.parse(JSON.parse(line)));
       const hasMore = all.length > afterSeq + page.length;
-      const merged: TranscriptEntry[] = [];
-      const indexOfPart = new Map<string, number>();
-      for (const entry of page) {
-        const partId = 'partId' in entry ? entry.partId : undefined;
-        const at = partId === undefined ? undefined : indexOfPart.get(partId);
-        if (at !== undefined) {
-          const before = merged[at];
-          // Only text and reasoning lines have a partId.
-          if (before !== undefined && 'partId' in before && 'partId' in entry)
-            merged[at] = { ...entry, data: mergePiece(before.data, entry.data) };
-          continue;
-        }
-        if (partId !== undefined) indexOfPart.set(partId, merged.length);
-        merged.push(entry);
-      }
-      return { entries: merged, lastSeq: page.at(-1)?.seq ?? afterSeq, hasMore, done: isEnded && !hasMore };
+      return {
+        entries: mergeTranscriptParts(page),
+        lastSeq: page.at(-1)?.seq ?? afterSeq,
+        hasMore,
+        done: isEnded && !hasMore,
+      };
     },
 
     /** 交接读取开始时固定字节边界；并发追加的消息留给源对话。 */
@@ -120,3 +110,22 @@ export function createTranscriptStore<S extends { id: string }>({
   };
 }
 export type TranscriptStore<S extends { id: string }> = ReturnType<typeof createTranscriptStore<S>>;
+
+export function mergeTranscriptParts(page: TranscriptEntry[]): TranscriptEntry[] {
+  const merged: TranscriptEntry[] = [];
+  const indexOfPart = new Map<string, number>();
+  for (const entry of page) {
+    const partId = 'partId' in entry ? entry.partId : undefined;
+    const at = partId === undefined ? undefined : indexOfPart.get(partId);
+    if (at !== undefined) {
+      const before = merged[at];
+      // Only text and reasoning lines have a partId.
+      if (before !== undefined && 'partId' in before && 'partId' in entry)
+        merged[at] = { ...entry, data: mergePiece(before.data, entry.data) };
+      continue;
+    }
+    if (partId !== undefined) indexOfPart.set(partId, merged.length);
+    merged.push(entry);
+  }
+  return merged;
+}

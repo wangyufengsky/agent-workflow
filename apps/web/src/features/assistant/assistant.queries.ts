@@ -3,6 +3,7 @@ import {
   type AssistantConfirmationDTO,
   type AssistantConversationDTO,
   abortAssistantOp,
+  assistantHistoryPageSchema,
   bindAssistantPreviewOp,
   cancelAssistantCallOp,
   confirmAssistantCallOp,
@@ -20,11 +21,19 @@ import {
   type SendAssistantMessageRequest,
   sendAssistantMessageOp,
 } from '@aw/shared';
-import { type QueryClient, queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiError, apiToken, callOperation } from '../../api/client.ts';
+import {
+  type QueryClient,
+  queryOptions,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { ApiError, apiToken, callOperation, getJson } from '../../api/client.ts';
 import { queryKeys } from '../../api/query-keys.ts';
 import { useUiStore } from '../../state/ui.store.ts';
-import type { TranscriptSource } from '../attempts/attempt.queries.ts';
+import { liveTranscriptQuery, type TranscriptSource, transcriptEntries } from '../attempts/attempt.queries.ts';
 
 /** 与界面绑定更新串行：首次消息一定在它的当前预览关联写入后发送。 */
 export const PREVIEW_BINDING_SCOPE = { id: 'assistant-preview-binding' };
@@ -71,8 +80,27 @@ export async function fetchAssistantFile(id: string, path: string): Promise<Uint
 export const conversationTranscript = (id: string): TranscriptSource => ({
   key: queryKeys.assistantTranscript(id),
   liveKey: queryKeys.assistantTranscriptLive(id),
-  url: `${API_PREFIX}/assistant/conversations/${encodeURIComponent(id)}/transcript`,
+  url: `${API_PREFIX}/assistant/conversations/${encodeURIComponent(id)}/history`,
 });
+
+/** 历史向前翻页，实时消息仍按 seq 接在文件快照之后。关闭聊天时释放已展开的旧页。 */
+export function useAssistantHistory(id: string) {
+  const source = conversationTranscript(id);
+  const pages = useInfiniteQuery({
+    queryKey: source.key,
+    gcTime: 0,
+    initialPageParam: null as number | null,
+    queryFn: ({ pageParam }) =>
+      getJson(pageParam === null ? source.url : `${source.url}?before=${pageParam}`, assistantHistoryPageSchema),
+    getNextPageParam: (oldest) => oldest.before,
+  });
+  const live = useQuery(liveTranscriptQuery(source));
+  const entries = useMemo(
+    () => (pages.data === undefined ? [] : transcriptEntries([...pages.data.pages].reverse(), live.data ?? [])),
+    [pages.data, live.data],
+  );
+  return { pages, entries };
+}
 
 /**
  * SSE and mutations: a conversation's new state replaces it in the list, newest first. As with confirmations, a read

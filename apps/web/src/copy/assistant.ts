@@ -35,6 +35,7 @@ const LOST: Record<OfficeLoss, (count: number) => string> = {
 export const ASSISTANT_COPY = {
   panel: '应用助手',
   messageUnavailable: '这条消息暂时无法显示。',
+  earlierMessages: '加载更早的消息',
   historyUnavailable: '暂时无法显示这段对话的历史消息。',
   open: `打开助手（${MOD_KEY}J）`,
   shortcut: `${MOD_KEY}J`,

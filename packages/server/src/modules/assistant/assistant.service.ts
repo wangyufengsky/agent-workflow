@@ -70,6 +70,7 @@ import type { AssistantMemory } from './assistant.memory.ts';
 import { recoveryContext } from './assistant.recovery-context.ts';
 import { type Conversation, createAssistantRepo } from './assistant.repo.ts';
 import { createAssistantUsage } from './assistant.usage.ts';
+import { readAssistantHistory } from './assistant-history.ts';
 
 export type AssistantServiceDeps = {
   skills: SkillsService;
@@ -158,8 +159,9 @@ export function createAssistantService(deps: AssistantServiceDeps) {
   slots.addCounter(usage.usingModel);
   /** opencode session id → conversation id, for the sessions this run has used. */
   const sessions = new Map<string, string>();
+  const transcriptFile = (c: { id: string }) => join(directory, ASSISTANT_CONVERSATIONS_DIR, `${c.id}.jsonl`);
   const transcripts = createTranscriptStore<{ id: string }>({
-    fileOf: (c) => join(directory, ASSISTANT_CONVERSATIONS_DIR, `${c.id}.jsonl`),
+    fileOf: transcriptFile,
     onAppend: (c, entries) =>
       events.publish({ type: ServerEventType.AssistantTranscript, data: { conversationId: c.id, entries } }),
     clock,
@@ -1074,6 +1076,10 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       }
       completePermission(id, permissionId);
       return toDto(get(id));
+    },
+
+    history(id: string, before?: number) {
+      return readAssistantHistory(transcriptFile(get(id)), before);
     },
 
     transcript(id: string, afterSeq: number): TranscriptPage {

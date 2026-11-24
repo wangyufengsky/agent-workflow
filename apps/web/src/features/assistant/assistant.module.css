@@ -187,6 +187,7 @@
 }
 /* The scrolling message stream inside; 「回到最新」floats over its bottom (25 §4.1). */
 .feed {
+  overflow-anchor: none;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -199,22 +200,10 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.message[data-fresh] {
   animation: message-in 0.42s var(--ease) both;
-}
-.message[data-step="1"] {
-  animation-delay: 50ms;
-}
-.message[data-step="2"] {
-  animation-delay: 100ms;
-}
-.message[data-step="3"] {
-  animation-delay: 150ms;
-}
-.message[data-step="4"] {
-  animation-delay: 200ms;
-}
-.message[data-step="5"] {
-  animation-delay: 250ms;
 }
 @keyframes message-in {
   from {
@@ -540,7 +529,7 @@
     animation: fade-out 0.14s linear both;
   }
   .panel[data-busy]::before,
-  .message,
+  .message[data-fresh],
   .streaming > * > :last-child::after {
     animation: none;
   }
