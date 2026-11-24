@@ -23,3 +23,22 @@
 .note {
   grid-column: 1 / -1;
 }
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: var(--s-1) 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.content:not([hidden]) {
+  display: grid;
+  gap: var(--s-3);
+}

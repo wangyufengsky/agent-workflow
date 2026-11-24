@@ -8,11 +8,12 @@ import {
   startupEnvironmentInputSchema,
 } from '@aw/shared';
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import type { z } from 'zod';
 import { ApiError, callOperation } from '../../api/client.ts';
 import { Button } from '../../components/button.tsx';
 import { ErrorState } from '../../components/error-state.tsx';
+import { Icon } from '../../components/icon.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { OPENCODE_HEADERS_COPY, STARTUP_ENVIRONMENT_COPY } from '../../copy/settings.ts';
 import styles from './startup-environment.module.css';
@@ -59,6 +60,8 @@ function canKeep(row: Row, saved: readonly Item[]): boolean {
 
 function KeyValueSettings({ editor }: { editor: typeof headerEditor | typeof environmentEditor }) {
   const C = editor.copy;
+  const contentId = useId();
+  const [expanded, setExpanded] = useState(false);
   const client = useQueryClient();
   const query = useQuery(editor.query);
   const [draft, setDraft] = useState<Draft>();
@@ -117,12 +120,24 @@ function KeyValueSettings({ editor }: { editor: typeof headerEditor | typeof env
   return (
     <section className={styles.section} aria-label={C.title}>
       <div className="row wrap">
-        <h3 className="section-title grow">{C.title}</h3>
+        <h3 className="section-title grow">
+          <button
+            type="button"
+            className={styles.toggle}
+            aria-expanded={expanded}
+            aria-controls={contentId}
+            onClick={() => setExpanded((open) => !open)}
+          >
+            <Icon name={expanded ? 'chevDown' : 'chevRight'} size="sm" />
+            {C.title}
+          </button>
+        </h3>
         <Button
           size="sm"
           icon="plus"
           disabled={snapshot === undefined || save.isPending || stale}
           onClick={() => {
+            setExpanded(true);
             const id = `new:${nextId.current++}`;
             edit((before) => [...before, { id, name: '', secret: false, value: '' }]);
           }}
@@ -130,115 +145,117 @@ function KeyValueSettings({ editor }: { editor: typeof headerEditor | typeof env
           {C.add}
         </Button>
       </div>
-      <p className="hint">{C.description}</p>
-      {query.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
-      {query.isError && <ErrorState error={query.error} onRetry={() => void query.refetch()} />}
-      {snapshot !== undefined && (
-        <form
-          className="col"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (parsed.success && !missingValue && !stale && draft !== undefined && !save.isPending)
-              save.mutate(parsed.data);
-          }}
-        >
-          {rows.length === 0 && <p className="hint">{C.empty}</p>}
-          {rows.map((row, index) => {
-            const issues = parsed.error?.issues.filter(({ path }) => path[0] === 'items' && path[1] === index) ?? [];
-            const invalidName = issues.some(({ path }) => path[2] === 'name');
-            const invalidValue = issues.some(({ path }) => path[2] === 'value');
-            const retained = row.value === undefined && canKeep(row, base?.items ?? []);
-            return (
-              <fieldset key={row.id} className={styles.row} disabled={save.isPending || stale}>
-                <legend>{C.row(index + 1)}</legend>
-                <label className="col">
-                  <span className="label">{C.name}</span>
-                  <input
-                    className="input mono"
-                    value={row.name}
-                    autoComplete="off"
-                    spellCheck={false}
-                    aria-invalid={invalidName || undefined}
-                    onChange={(event) => update(row.id, { name: event.currentTarget.value })}
-                  />
-                </label>
-                <label className="col">
-                  <span className="label">{C.value}</span>
-                  <input
-                    className="input mono"
-                    type={row.secret ? 'password' : 'text'}
-                    autoComplete="off"
-                    spellCheck={false}
-                    value={row.value ?? ''}
-                    placeholder={retained ? C.secretSaved : undefined}
-                    aria-invalid={invalidValue || (row.value === undefined && !retained) || undefined}
-                    onChange={(event) => update(row.id, { value: event.currentTarget.value })}
-                  />
-                </label>
-                <div className="row wrap">
-                  <label className="row">
+      <div id={contentId} className={styles.content} hidden={!expanded}>
+        <p className="hint">{C.description}</p>
+        {query.isPending && <p className="hint">{COMMON_COPY.loading}</p>}
+        {query.isError && <ErrorState error={query.error} onRetry={() => void query.refetch()} />}
+        {snapshot !== undefined && (
+          <form
+            className="col"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (parsed.success && !missingValue && !stale && draft !== undefined && !save.isPending)
+                save.mutate(parsed.data);
+            }}
+          >
+            {rows.length === 0 && <p className="hint">{C.empty}</p>}
+            {rows.map((row, index) => {
+              const issues = parsed.error?.issues.filter(({ path }) => path[0] === 'items' && path[1] === index) ?? [];
+              const invalidName = issues.some(({ path }) => path[2] === 'name');
+              const invalidValue = issues.some(({ path }) => path[2] === 'value');
+              const retained = row.value === undefined && canKeep(row, base?.items ?? []);
+              return (
+                <fieldset key={row.id} className={styles.row} disabled={save.isPending || stale}>
+                  <legend>{C.row(index + 1)}</legend>
+                  <label className="col">
+                    <span className="label">{C.name}</span>
                     <input
-                      type="checkbox"
-                      checked={row.secret}
-                      onChange={(event) => update(row.id, { secret: event.currentTarget.checked })}
+                      className="input mono"
+                      value={row.name}
+                      autoComplete="off"
+                      spellCheck={false}
+                      aria-invalid={invalidName || undefined}
+                      onChange={(event) => update(row.id, { name: event.currentTarget.value })}
                     />
-                    {C.secret}
                   </label>
-                  <Button
-                    size="sm"
-                    icon="trash"
-                    aria-label={C.removeRow(index + 1)}
-                    onClick={() => edit((before) => before.filter(({ id }) => id !== row.id))}
-                  >
-                    {C.remove}
-                  </Button>
-                </div>
-                {retained && (
-                  <div className={styles.note}>
-                    <Button size="sm" variant="ghost" onClick={() => update(row.id, { value: '' })}>
-                      {C.replaceSecret}
+                  <label className="col">
+                    <span className="label">{C.value}</span>
+                    <input
+                      className="input mono"
+                      type={row.secret ? 'password' : 'text'}
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={row.value ?? ''}
+                      placeholder={retained ? C.secretSaved : undefined}
+                      aria-invalid={invalidValue || (row.value === undefined && !retained) || undefined}
+                      onChange={(event) => update(row.id, { value: event.currentTarget.value })}
+                    />
+                  </label>
+                  <div className="row wrap">
+                    <label className="row">
+                      <input
+                        type="checkbox"
+                        checked={row.secret}
+                        onChange={(event) => update(row.id, { secret: event.currentTarget.checked })}
+                      />
+                      {C.secret}
+                    </label>
+                    <Button
+                      size="sm"
+                      icon="trash"
+                      aria-label={C.removeRow(index + 1)}
+                      onClick={() => edit((before) => before.filter(({ id }) => id !== row.id))}
+                    >
+                      {C.remove}
                     </Button>
                   </div>
-                )}
-                {row.value === undefined && !retained && (
-                  <div className={styles.note}>
-                    <p className="error-text">{C.enterNewValue}</p>
-                    <Button size="sm" variant="ghost" onClick={() => update(row.id, { value: '' })}>
-                      {C.useEmptyValue}
-                    </Button>
-                  </div>
-                )}
-              </fieldset>
-            );
-          })}
-          {parsed.error?.issues.some(({ path }) => path[2] === 'name') && <p className="error-text">{C.invalid}</p>}
-          {parsed.error?.issues.some(({ path }) => path[2] === 'value') && (
-            <p className="error-text">{C.invalidValue}</p>
-          )}
-          {save.isError && !isRevisionConflict(save.error) && <ErrorState error={save.error} />}
-          {stale && <p role="status">{C.stale}</p>}
-          <div className="row wrap">
-            <Button
-              type="submit"
-              variant="primary"
-              pending={save.isPending}
-              disabled={draft === undefined || !parsed.success || missingValue || stale}
-            >
-              {C.save}
-            </Button>
-            {draft !== undefined && (
-              <Button disabled={save.isPending || (stale && query.isFetching)} onClick={() => void discardDraft()}>
-                {stale ? C.useLatest : COMMON_COPY.cancel}
+                  {retained && (
+                    <div className={styles.note}>
+                      <Button size="sm" variant="ghost" onClick={() => update(row.id, { value: '' })}>
+                        {C.replaceSecret}
+                      </Button>
+                    </div>
+                  )}
+                  {row.value === undefined && !retained && (
+                    <div className={styles.note}>
+                      <p className="error-text">{C.enterNewValue}</p>
+                      <Button size="sm" variant="ghost" onClick={() => update(row.id, { value: '' })}>
+                        {C.useEmptyValue}
+                      </Button>
+                    </div>
+                  )}
+                </fieldset>
+              );
+            })}
+            {parsed.error?.issues.some(({ path }) => path[2] === 'name') && <p className="error-text">{C.invalid}</p>}
+            {parsed.error?.issues.some(({ path }) => path[2] === 'value') && (
+              <p className="error-text">{C.invalidValue}</p>
+            )}
+            {save.isError && !isRevisionConflict(save.error) && <ErrorState error={save.error} />}
+            {stale && <p role="status">{C.stale}</p>}
+            <div className="row wrap">
+              <Button
+                type="submit"
+                variant="primary"
+                pending={save.isPending}
+                disabled={draft === undefined || !parsed.success || missingValue || stale}
+              >
+                {C.save}
               </Button>
-            )}
-            {saved && (
-              <span className="hint" role="status">
-                {C.saved}
-              </span>
-            )}
-          </div>
-        </form>
-      )}
+              {draft !== undefined && (
+                <Button disabled={save.isPending || (stale && query.isFetching)} onClick={() => void discardDraft()}>
+                  {stale ? C.useLatest : COMMON_COPY.cancel}
+                </Button>
+              )}
+              {saved && (
+                <span className="hint" role="status">
+                  {C.saved}
+                </span>
+              )}
+            </div>
+          </form>
+        )}
+      </div>
     </section>
   );
 }

@@ -49,6 +49,7 @@ test('专业设置管理普通与密钥启动变量，并提示完整重启', as
       ]),
     );
     await page.reload();
+    await settings.getByRole('button', { name: '启动环境变量', exact: true }).click();
     await expect(settings.getByLabel('变量值', { exact: true }).last()).toHaveValue('');
     await expect(settings.getByPlaceholder('已保存的密钥不会显示')).toBeVisible();
     await expect(settings).not.toContainText('synthetic-token');
@@ -117,6 +118,15 @@ test('专业设置独立保存多个模型请求头，重开后可以编辑、�
   try {
     await page.goto('/settings');
     const headers = page.getByRole('region', { name: 'OpenCode 模型请求头' });
+    const env = page.getByRole('region', { name: '启动环境变量', exact: true });
+    const toggleEnv = env.getByRole('button', { name: '启动环境变量', exact: true });
+    const toggleHeaders = headers.getByRole('button', { name: 'OpenCode 模型请求头', exact: true });
+    await expect(toggleEnv).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggleHeaders).toHaveAttribute('aria-expanded', 'false');
+    if (screenshots)
+      await headers
+        .locator('..')
+        .screenshot({ path: join(screenshots, 'startup-sections-collapsed.png'), animations: 'disabled' });
     const add = headers.getByRole('button', { name: '添加请求头' });
     const save = headers.getByRole('button', { name: '保存请求头' });
     await add.click();
@@ -124,6 +134,13 @@ test('专业设置独立保存多个模型请求头，重开后可以编辑、�
     const second = headers.getByRole('group', { name: '请求头 2', exact: true });
     await first.getByLabel('请求头名称').fill('X-Client-Name');
     await first.getByLabel('请求头值').fill('agent-workflow');
+    await toggleHeaders.click();
+    await expect(first).toBeHidden();
+    await toggleEnv.click();
+    await expect(env.getByLabel('变量值')).toHaveValue('/opt/jdk-17');
+    await toggleHeaders.press('Enter');
+    await expect(first.getByLabel('请求头值')).toHaveValue('agent-workflow');
+    await expect(toggleEnv).toHaveAttribute('aria-expanded', 'true');
     await add.click();
     await second.getByLabel('请求头名称').fill('x-client-name');
     await expect(save).toBeDisabled();
@@ -133,10 +150,15 @@ test('专业设置独立保存多个模型请求头，重开后可以编辑、�
     await save.click();
     await expect(headers.getByRole('status')).toContainText('下次启动 OpenCode 时生效');
     await page.reload();
+    await toggleHeaders.click();
     await expect(first.getByLabel('请求头值')).toHaveValue('agent-workflow');
     await expect(second.getByLabel('请求头值')).toHaveValue('');
     await expect(second.getByPlaceholder('已保存的密钥不会显示')).toBeVisible();
-    const env = page.getByRole('region', { name: '启动环境变量', exact: true });
+    if (screenshots)
+      await headers
+        .locator('..')
+        .screenshot({ path: join(screenshots, 'startup-only-headers-open.png'), animations: 'disabled' });
+    await toggleEnv.click();
     await expect(env.getByLabel('变量值')).toHaveValue('/opt/jdk-17');
     if (screenshots !== undefined) {
       for (const theme of ['codex', 'default'] as const) {
