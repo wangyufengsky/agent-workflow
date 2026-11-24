@@ -13,6 +13,7 @@ import { SETTINGS_COPY as C } from '../../copy/settings.ts';
 import { environmentQuery } from '../onboarding/environment.queries.ts';
 import { usableModels } from '../onboarding/usable-models.ts';
 import { NumberSetting, Segmented, TextSetting } from './setting-inputs.tsx';
+import { StartupEnvironmentSettings } from './startup-environment-settings.tsx';
 
 /**
  * Name and email of task commits (D227), saved when focus leaves both inputs or on Enter: both filled in, or both empty
@@ -230,6 +231,7 @@ export function ProSettings({ settings, set }: { settings: Settings; set: (patch
         />
         <p className="hint">{C.binaryPathHint}</p>
       </div>
+      <StartupEnvironmentSettings />
     </Panel>
   );
 }

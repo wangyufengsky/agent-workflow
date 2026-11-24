@@ -99,3 +99,26 @@ export const SETTINGS_COPY = {
   binaryPath: 'opencode 可执行文件',
   binaryPathHint: '留空则从 PATH 与主目录下的 .opencode/bin 查找；修改后到运行环境页重新检测。',
 } as const;
+
+export const STARTUP_ENVIRONMENT_COPY = {
+  title: '启动环境变量',
+  description: '保存后，下次完全退出并重新打开应用时生效，供应用后台和启动的子进程使用。',
+  empty: '尚未添加启动环境变量。',
+  add: '添加变量',
+  name: '变量名',
+  value: '变量值',
+  secret: '作为密钥保存',
+  secretSaved: '已保存的密钥不会显示',
+  replaceSecret: '更改密钥值',
+  enterNewValue: '请为改名或取消加密的变量输入新值。',
+  useEmptyValue: '使用空值',
+  row: (index: number) => `变量 ${index}`,
+  removeRow: (index: number) => `移除变量 ${index}`,
+  remove: '移除',
+  invalid: '请核对变量名。只可使用英文字母、数字和下划线，不能以数字开头。名称不能重复或使用应用保留的名称。',
+  invalidValue: '请核对变量值，不能包含空字符。',
+  stale: '启动环境变量已被修改。请先加载最新设置，再继续编辑。',
+  useLatest: '加载最新设置',
+  save: '保存环境变量',
+  saved: '已保存。下次完全退出并重新打开应用时生效。',
+} as const;

@@ -1,4 +1,5 @@
-import { type CredentialPortResponse, credentialPortRequestSchema } from '@aw/shared';
+import type { CredentialCipher } from '@aw/server/startup-environment';
+import { AppError, type CredentialPortResponse, credentialPortRequestSchema, ErrorCode } from '@aw/shared';
 import { safeStorage, type UtilityProcess } from 'electron';
 
 /**
@@ -16,34 +17,57 @@ function unavailableReason(): string | undefined {
     : undefined;
 }
 
+function requireSafeStorage(): void {
+  const reason = unavailableReason();
+  if (reason !== undefined) throw new AppError(ErrorCode.CredentialUnavailable, reason);
+}
+
+/** The same OS key store serves read-only pre-fork resolution and the backend's credential IPC. */
+export const desktopCredentialCipher: CredentialCipher = {
+  isAvailable: async () => unavailableReason() === undefined,
+  async encrypt(value) {
+    requireSafeStorage();
+    try {
+      return safeStorage.encryptString(value);
+    } catch {
+      throw new AppError(ErrorCode.CredentialUnavailable, 'safeStorage could not encrypt the credential');
+    }
+  },
+  async decrypt(value) {
+    requireSafeStorage();
+    try {
+      return safeStorage.decryptString(Buffer.from(value));
+    } catch {
+      throw new AppError(ErrorCode.CredentialUnavailable, 'safeStorage could not decrypt the credential');
+    }
+  },
+};
+
 /** Answers the backend's credential requests with safeStorage (the backend never sees the OS keychain). */
 export function serveCredentialRequests(child: UtilityProcess): void {
-  child.on('message', (message: unknown) => {
+  child.on('message', async (message: unknown) => {
     const parsed = credentialPortRequestSchema.safeParse(message);
     if (!parsed.success) return;
     const { id, op, data } = parsed.data;
     let response: CredentialPortResponse;
-    const reason = unavailableReason();
-    if (reason !== undefined) {
-      response = { type: 'credential.response', id, ok: false, error: reason };
-    } else {
-      try {
-        const result =
-          op === 'status'
-            ? ''
-            : op === 'encrypt'
-              ? safeStorage.encryptString(data).toString('base64')
-              : safeStorage.decryptString(Buffer.from(data, 'base64'));
-        response = { type: 'credential.response', id, ok: true, data: result };
-      } catch (err) {
-        // Translate: the backend maps this to CREDENTIAL_UNAVAILABLE.
-        response = {
-          type: 'credential.response',
-          id,
-          ok: false,
-          error: err instanceof Error ? err.message : String(err),
-        };
+    try {
+      let result: string;
+      if (op === 'status') {
+        requireSafeStorage();
+        result = '';
+      } else if (op === 'encrypt') {
+        result = Buffer.from(await desktopCredentialCipher.encrypt(data)).toString('base64');
+      } else {
+        result = await desktopCredentialCipher.decrypt(Buffer.from(data, 'base64'));
       }
+      response = { type: 'credential.response', id, ok: true, data: result };
+    } catch (error) {
+      response = {
+        type: 'credential.response',
+        id,
+        ok: false,
+        error: error instanceof AppError ? error.message : 'The OS credential request failed',
+      };
     }
     child.postMessage(response);
   });

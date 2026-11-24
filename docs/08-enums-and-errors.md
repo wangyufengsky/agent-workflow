@@ -115,7 +115,7 @@ export const taskStatusSchema = z.enum(TASK_STATUSES);
 | `Platform` | `darwin` · `win32` · `linux`（运行应用的操作系统，17 §1） |
 | `DbType` | `mysql` · `postgresql` · `opengauss`（openGauss / GaussDB）· `sqlserver` · `goldendb`（MySQL 协议）（v1.2，24 §1） |
 | `DbTlsMode` | `off`（不加密）· `verify`（加密并校验证书链与主机名，信任列表同 D164）· `no_verify`（加密但不校验证书）（D166，24 §2） |
-| `CredentialKind` | `git_token` · `db_password` |
+| `CredentialKind` | `git_token` · `db_password` · `startup_environment` |
 | `CredentialSeal` | `system` · `master_password` · `discarded` | 凭据由什么加密（D167）：系统密钥服务、主密码；`discarded` 为主密码重置后已清除、需要重新填写 |
 | `MasterPasswordState` | `none` · `locked` · `unlocked` | 主密码（D167）：没设置、设置了但本次启动还没输入、已解锁 |
 | `TranscriptEntryKind` | `user_message` · `text` · `reasoning` · `tool_call` · `tool_result` · `file_edit` · `permission` · `system` · `error` · `confirmation` · `attachment` · `entity_ref` · `chart`（后四种仅助手对话，10 §3；`chart` 见 35 §4） |

@@ -1,4 +1,12 @@
-export { backendCommitter, commitsExist, type GitOptions, type GitResult, gitFailure, runGit } from './git.cli.ts';
+export {
+  backendCommitter,
+  commitsExist,
+  type GitOptions,
+  type GitResult,
+  gitFailure,
+  installGitProcessEnvironment,
+  runGit,
+} from './git.cli.ts';
 export {
   diffChangeFile,
   diffCommits,

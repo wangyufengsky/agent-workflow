@@ -1,8 +1,10 @@
 import { backendShutdownMessageSchema, MCP_ASSISTANT_PATH, MCP_EXEC_PATH } from '@aw/shared';
 import { buildApp } from './app.ts';
 import { loadConfig } from './core/config.ts';
+import { applyStartupEnvironment, controlProcessOverlay } from './core/startup-environment.ts';
 import { type BrowserHost, createPortBrowserHost, parentPortBrowserTransport } from './modules/browser/index.ts';
 import { type CredentialCipher, createPortCipher, parentPortTransport } from './modules/credentials/index.ts';
+import { installGitProcessEnvironment } from './modules/git/index.ts';
 
 async function selectCipher(): Promise<CredentialCipher | undefined> {
   // Inside Electron utilityProcess: main encrypts with safeStorage.
@@ -61,6 +63,10 @@ const browserHost = await selectBrowserHost();
 const fake = await selectFakeOpencode();
 const fakeHosting = await selectFakeHosting();
 const app = await buildApp(config, {
+  onStartupEnvironment(overlay, deferred, runtimeEnv) {
+    installGitProcessEnvironment(runtimeEnv);
+    applyStartupEnvironment(process.env, controlProcessOverlay(overlay), deferred);
+  },
   ...(cipher === undefined ? {} : { cipher }),
   ...(browserHost === undefined ? {} : { browserHost }),
   ...(fake === undefined ? {} : { opencode: fake.fake }),

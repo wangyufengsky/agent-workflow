@@ -2,15 +2,28 @@ import { copyFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, write
 import { createConnection, createServer, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { _electron as electron, expect, test } from '@playwright/test';
+import {
+  createProjectOp,
+  getProjectRuntimeCheckOp,
+  type OperationContract,
+  setStartupEnvironmentOp,
+  startProjectRuntimeCheckOp,
+  toOperationRequest,
+  updateProjectOp,
+  updateSettingsOp,
+} from '@aw/shared';
+import { type ElectronApplication, _electron as electron, expect, test } from '@playwright/test';
+import type { z } from 'zod';
+import { createRepo, git } from './helpers.ts';
 
 // Electron smoke for CI on every platform (17 §4.1): the built app starts its backend, shows onboarding with the
 // checks answered, and quits cleanly (main waits for the backend to stop opencode and exit). No opencode or model
 // is needed; the full journey with them is J10. The window comes first with the opening animation, which a click
 // skips (28 §5, D113).
-async function launch(userDataDir: string) {
+async function launch(userDataDir: string, env?: NodeJS.ProcessEnv) {
   const executablePath = process.env.AW_E2E_EXECUTABLE_PATH;
   return await electron.launch({
+    ...(env === undefined ? {} : { env }),
     ...(executablePath === undefined ? {} : { executablePath }),
     args: [...(executablePath === undefined ? ['apps/desktop'] : []), `--user-data-dir=${userDataDir}`],
   });
@@ -115,5 +128,91 @@ test('退出时释放应用预连接，后端与桌面进程都能正常结束',
     for (const socket of sockets) socket.destroy();
     await new Promise<void>((resolve) => proxy.close(() => resolve()));
     await (closing ?? app.close());
+  }
+});
+
+test('启动环境变量在重启后传入项目命令，删除后恢复继承值', async ({ request }) => {
+  test.setTimeout(120_000);
+  const userDataDir = mkdtempSync(join(tmpdir(), 'aw-e2e-startup-env-'));
+  const repoPath = createRepo();
+  const literal = '开发 then $HOME = 42';
+  writeFileSync(
+    join(repoPath, 'verify.cjs'),
+    [
+      'const first = process.env.WORKFLOW_TEST_REGION;',
+      'const second = process.env.WORKFLOW_TEST_EMPTY;',
+      `if (first === ${JSON.stringify(literal)} && second === "") console.log("configured");`,
+      'else if (first === "from-parent" && second === undefined) console.log("inherited");',
+      'else process.exitCode = 1;',
+    ].join('\n'),
+  );
+  git(repoPath, 'add', 'verify.cjs');
+  git(repoPath, 'commit', '-qm', 'Add environment check');
+  const inherited: NodeJS.ProcessEnv = { ...process.env, WORKFLOW_TEST_REGION: 'from-parent' };
+  delete inherited.WORKFLOW_TEST_EMPTY;
+  const launchApp = () => launch(userDataDir, inherited);
+
+  async function rendererApi(app: ElectronApplication) {
+    const page = await app.firstWindow();
+    await page.mouse.click(10, 10);
+    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 60_000 });
+    const base = new URL(page.url()).origin;
+    const token = await page.evaluate(() => window.aw?.apiToken);
+    return async <I extends z.ZodObject, O extends z.ZodType>(
+      op: OperationContract<I, O>,
+      input: z.input<I>,
+    ): Promise<z.output<O>> => {
+      const { method, url, body } = toOperationRequest(op, input);
+      const res = await request.fetch(base + url, {
+        method,
+        headers: { Authorization: `Bearer ${token}` },
+        data: body,
+      });
+      expect(res.ok(), `${method} ${url} returned ${res.status()}`).toBe(true);
+      return op.output.parse(await res.json());
+    };
+  }
+  let app = await launchApp();
+  try {
+    let call = await rendererApi(app);
+    await call(updateSettingsOp, { 'ui.mode': 'pro' });
+    const project = await call(createProjectOp, { repoPath });
+    const saved = await call(updateProjectOp, { id: project.id, checkCommand: 'node verify.cjs' });
+    async function check(expected: string) {
+      await call(startProjectRuntimeCheckOp, {
+        id: project.id,
+        branch: 'main',
+        configVersion: saved.updatedAt,
+        runCommand: true,
+        runPreview: false,
+      });
+      await expect
+        .poll(
+          async () => {
+            const result = await call(getProjectRuntimeCheckOp, { id: project.id });
+            return result?.status === 'completed' ? result.command : null;
+          },
+          { timeout: 30_000 },
+        )
+        .toMatchObject({ status: 'passed', output: expect.stringContaining(expected) });
+    }
+    await call(setStartupEnvironmentOp, {
+      items: [
+        { name: 'WORKFLOW_TEST_REGION', value: literal, secret: false },
+        { name: 'WORKFLOW_TEST_EMPTY', value: '', secret: false },
+      ],
+    });
+    await check('inherited');
+    await app.close();
+    app = await launchApp();
+    call = await rendererApi(app);
+    await check('configured');
+    await call(setStartupEnvironmentOp, { items: [] });
+    await app.close();
+    app = await launchApp();
+    call = await rendererApi(app);
+    await check('inherited');
+  } finally {
+    await app.close();
   }
 });

@@ -48,6 +48,7 @@ async function wrap(password: string, dataKey: Buffer) {
  */
 export function createMasterPassword({ db, clock }: { db: Db; clock: Clock }) {
   let dataKey: Buffer | undefined;
+  let generation = 0;
   // Setup, unlock, change and reset run one at a time: each awaits scrypt, and a reset landing in that gap would have
   // the key it discarded put back when the derivation finishes.
   let queue: Promise<unknown> = Promise.resolve();
@@ -80,6 +81,7 @@ export function createMasterPassword({ db, clock }: { db: Db; clock: Clock }) {
   }
 
   return {
+    generation: () => generation,
     state(): MasterPasswordState {
       if (dataKey !== undefined) return MasterPasswordState.Unlocked;
       return row() === undefined ? MasterPasswordState.None : MasterPasswordState.Locked;
@@ -116,6 +118,7 @@ export function createMasterPassword({ db, clock }: { db: Db; clock: Clock }) {
           tx.delete(credentialVaultTable).where(eq(credentialVaultTable.id, VAULT_ID)).run();
         });
         dataKey = undefined;
+        generation++;
       }),
     encrypt: (plaintext: string): Buffer => seal(unlockedKey(), Buffer.from(plaintext, 'utf8')),
     decrypt(ciphertext: Buffer): string {

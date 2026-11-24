@@ -33,3 +33,11 @@ export function openDatabase(file: string, migrationsDir: string): Database {
   });
   return { db, close: () => raw.close() };
 }
+
+/** The desktop shell reads the existing startup snapshot before forking Node. It never creates or migrates it. */
+export function openReadOnlyDatabase(file: string): Database {
+  const raw = new DatabaseSync(file, { readOnly: true });
+  raw.exec('PRAGMA busy_timeout = 5000;');
+  const { db } = createDrizzle(raw);
+  return { db, close: () => raw.close() };
+}

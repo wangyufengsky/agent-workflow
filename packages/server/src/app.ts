@@ -25,6 +25,7 @@ import { createLogger, type Logger } from './core/logger.ts';
 import { mountOperations, type OperationImpl } from './core/operations/operations.ts';
 import { host } from './core/platform.ts';
 import { registerSseHub } from './core/sse/sse-hub.ts';
+import { applyStartupEnvironment, scopedStartupEnvironment } from './core/startup-environment.ts';
 import { createAcceptanceModule } from './modules/acceptance/index.ts';
 import { type AssistantService, createAssistantModule, createBrowserActivity } from './modules/assistant/index.ts';
 import { type AttachmentsService, createAttachmentsModule } from './modules/attachments/index.ts';
@@ -84,6 +85,7 @@ import { createScheduler } from './modules/scheduler/index.ts';
 import { createSchedulesModule, type SchedulesService } from './modules/schedules/index.ts';
 import { createSettingsModule } from './modules/settings/index.ts';
 import { createSkillsModule } from './modules/skills/index.ts';
+import { createStartupEnvironmentModule, type StartupEnvironmentService } from './modules/startup-environment/index.ts';
 import { createStorageModule } from './modules/storage/index.ts';
 import { createSystemModule } from './modules/system/index.ts';
 import {
@@ -106,6 +108,12 @@ export type AppDeps = {
   cipher?: CredentialCipher;
   /** Environment used to locate git and opencode (PATH, HOME). */
   env?: NodeJS.ProcessEnv;
+  /** Normal backend entry point updates its own environment for tools which inherit it by default. */
+  onStartupEnvironment?: (
+    overlay: Readonly<Record<string, string>>,
+    deferred: readonly string[],
+    runtimeEnv: NodeJS.ProcessEnv,
+  ) => void;
   /** Replaces the hosted opencode (FakeOpencode in tests and browser E2E); the runtime is then never started. */
   opencode?: OpencodeClient;
   /** GitHub / GitLab API addresses (FakeHosting in tests); the public platforms by default. */
@@ -125,6 +133,7 @@ export type App = {
   log: Logger;
   services: {
     credentials: CredentialsService;
+    startupEnvironment: StartupEnvironmentService;
     databaseInvestigations: DatabaseInvestigations;
     runtime: OpencodeRuntime;
     opencode: OpencodeClient;
@@ -178,7 +187,27 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
 
   const settings = createSettingsModule({ db: database.db, events, clock, validate: validateNetworkSettings });
   const credentials = createCredentialsModule({ db: database.db, clock, cipher: deps.cipher ?? unavailableCipher });
-  const env = deps.env ?? process.env;
+  const startupEnvironment = createStartupEnvironmentModule({ db: database.db, credentials: credentials.service });
+  const env = scopedStartupEnvironment(deps.env ?? process.env);
+  const installOverlay = ({ env: overlay, deferred }: { env: Record<string, string>; deferred: string[] }) => {
+    applyStartupEnvironment(env, overlay, deferred);
+    deps.onStartupEnvironment?.(overlay, deferred, env);
+  };
+  const startup = await startupEnvironment.service.resolve();
+  installOverlay(startup);
+  if (startup.deferred.length > 0) {
+    log.info({ count: startup.deferred.length }, 'startup credentials were deferred until unlock');
+    credentials.service.onUnlock(async () => {
+      try {
+        const restored = await startup.retryDeferred();
+        installOverlay(restored);
+        if (Object.keys(restored.env).some((key) => /^(?:HTTPS?|ALL|NO)_PROXY$/i.test(key)))
+          network.refreshProxyEnvironment();
+      } catch {
+        log.warn('deferred startup credentials could not be resolved after unlock');
+      }
+    });
+  }
   const network = await createNetworkModule({ settings: settings.service, events, env, dataDir: config.dataDir, log });
   server.addHook('onClose', async () => network.close());
   const prompts = loadPrompts(config.promptsDir);
@@ -675,6 +704,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   attachments.registerRoutes(server);
   const operations: OperationImpl[] = [
     ...settings.operations,
+    ...startupEnvironment.operations,
     ...system.operations,
     ...modelSlots.operations,
     ...credentials.operations,
@@ -771,6 +801,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     log,
     services: {
       credentials: credentials.service,
+      startupEnvironment: startupEnvironment.service,
       databaseInvestigations,
       runtime,
       opencode,
