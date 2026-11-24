@@ -26,7 +26,8 @@ import {
   type OfficeLossItem,
   OPENCODE_ASSISTANT_AGENT,
   type OperationContract,
-  type PermissionDecision,
+  PermissionDecision,
+  PermissionMode,
   producedEntity,
   type SendAssistantMessageRequest,
   ServerEventType,
@@ -61,6 +62,7 @@ import {
   SessionPurpose,
   ToolCallStatus,
 } from '../opencode/index.ts';
+import { grantKey, type PermissionReviewer, scopedRules } from '../permissions/index.ts';
 import type { SettingsService } from '../settings/index.ts';
 import { type SkillsService, withUserSkills } from '../skills/index.ts';
 import { type ContextRenderer, localTime } from './assistant.context.ts';
@@ -71,8 +73,8 @@ import { recoveryContext } from './assistant.recovery-context.ts';
 import { type Conversation, createAssistantRepo } from './assistant.repo.ts';
 import { createAssistantUsage } from './assistant.usage.ts';
 import { readAssistantHistory } from './assistant-history.ts';
-
 export type AssistantServiceDeps = {
+  permissionReviewer: PermissionReviewer;
   skills: SkillsService;
   db: Db;
   unit: UnitOfWork;
@@ -96,6 +98,7 @@ export type AssistantServiceDeps = {
 type TurnOutcome = { error: OpencodeError | undefined } | { requestError: unknown };
 type Turn = {
   delegation: AbortController;
+  intent: string;
   source: 'user' | 'app';
   confirmedStop: typeof AssistantTurnEvent.Abort | typeof AssistantTurnEvent.Timeout | null;
   abortPending: Promise<void> | null;
@@ -121,6 +124,8 @@ type Live = {
   turn: Turn | null;
   view: SessionView;
   permissions: Map<string, AssistantPermissionRequestDTO>;
+  deciding: Map<string, AbortController>;
+  grants: Set<string>;
   /** Files already shown as attachments. */
   attached: Set<string>;
   /** Where the user was at their last message; told to the model with messages the app sends. */
@@ -187,6 +192,8 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         turn: null,
         view: createSessionView(),
         permissions: new Map(),
+        deciding: new Map(),
+        grants: new Set(),
         attached: new Set(),
         page: undefined,
       };
@@ -230,6 +237,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       id: c.id,
       title: c.title,
       projectId: c.projectId,
+      permissionMode: c.permissionMode,
       busy: state.busy || state.sending || state.deleting || state.stopping,
       queuePosition: slots.position(c.id),
       pendingPermissions: [...state.permissions.values()],
@@ -279,6 +287,12 @@ export function createAssistantService(deps: AssistantServiceDeps) {
       repo.updateConversation(c.id, { retiredSessionId: null });
     }
     const previousSessionId = current.opencodeSessionId;
+    if (previousSessionId !== null && !sessions.has(previousSessionId))
+      await opencode.setPermissions({
+        sessionId: previousSessionId,
+        directory: filesDir(c.id),
+        permission: scopedRules(assistantPermissionRules()),
+      });
     if (previousSessionId === null) mkdirSync(filesDir(c.id), { recursive: true });
     const binding = dispatch.bind({
       purpose: SessionPurpose.Assistant,
@@ -288,7 +302,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         directory: filesDir(c.id),
         title: `Assistant · ${c.title}`,
         agent: OPENCODE_ASSISTANT_AGENT,
-        permission: assistantPermissionRules(),
+        permission: scopedRules(assistantPermissionRules()),
       },
     });
     const sessionId = typeof binding === 'string' ? binding : await binding;
@@ -344,6 +358,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     const messageId = createMessageId(clock.now());
     const started = usage.start(c.id, source, messageId);
     const turn: Turn = {
+      intent: '',
       source,
       delegation: new AbortController(),
       confirmedStop: null,
@@ -518,10 +533,89 @@ export function createAssistantService(deps: AssistantServiceDeps) {
   function completePermission(id: string, permissionId: string): void {
     const state = liveOf(id);
     if (!state.permissions.delete(permissionId)) return;
-    if (state.permissions.size === 0) usage.resume(id);
+    if (state.permissions.size === 0 && state.deciding.size === 0) usage.resume(id);
     publish(id);
   }
 
+  function permissionRequest(
+    c: Conversation,
+    state: Live,
+    turn: Turn,
+    event: Extract<OpencodeEvent, { type: typeof OpencodeEventType.PermissionAsked }>,
+  ) {
+    const deciding = state.deciding;
+    if (deciding.has(event.permissionId) || state.permissions.has(event.permissionId)) return;
+    const controller = new AbortController();
+    deciding.set(event.permissionId, controller);
+    const signal = AbortSignal.any([controller.signal, turn.delegation.signal]);
+    function ask(reason?: string) {
+      state.permissions.set(event.permissionId, {
+        permissionId: event.permissionId,
+        permission: event.permission,
+        patterns: event.patterns,
+        ...(reason ? { reason } : {}),
+      });
+      publish(c.id);
+    }
+    const run = async () => {
+      const result =
+        c.permissionMode === PermissionMode.Ask && state.grants.has(grantKey(event))
+          ? { reply: PermissionDecision.Once, reason: undefined }
+          : await deps.permissionReviewer.native({
+              event,
+              call:
+                c.permissionMode === PermissionMode.Assisted
+                  ? await state.view.permissionCall(event.callId, clock, signal)
+                  : undefined,
+              directory: filesDir(c.id),
+              intent: turn.intent,
+              mode: c.permissionMode,
+              mutable: true,
+              parentSignal: turn.delegation.signal,
+              baselineRules: assistantPermissionRules(),
+              signal,
+            });
+      if (signal.aborted || state.turn !== turn) return;
+      if (result.reason)
+        record(c, [
+          {
+            kind: TranscriptEntryKind.System,
+            data: {
+              event: TranscriptSystemEvent.PermissionReview,
+              detail: [
+                event.permission,
+                result.reply && get(c.id).permissionMode === c.permissionMode ? '批准本次' : '询问你',
+                result.reason,
+              ].join(' · '),
+            },
+          },
+        ]);
+      if (!result.reply || get(c.id).permissionMode !== c.permissionMode) {
+        ask(result.reason);
+        return;
+      }
+      await opencode.replyPermission({
+        permissionId: event.permissionId,
+        directory: filesDir(c.id),
+        reply: result.reply,
+      });
+    };
+    void run()
+      .catch((err: unknown) => {
+        if (
+          signal.aborted ||
+          state.turn !== turn ||
+          (err instanceof AppError && err.code === ErrorCode.PermissionRequestExpired)
+        )
+          return;
+        log.warn({ err, conversationId: c.id }, 'permission reply failed');
+        ask();
+      })
+      .finally(() => {
+        if (deciding.get(event.permissionId) === controller) deciding.delete(event.permissionId);
+        if (state.turn === turn && !state.permissions.size && !deciding.size) usage.resume(c.id);
+      });
+  }
   function onEvent(event: OpencodeEvent): void {
     if (event.type === OpencodeEventType.RuntimeLost) {
       onRuntimeLost();
@@ -551,14 +645,10 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         if (state.turn === null || (event.messageId !== undefined && !usage.ownsActiveMessage(id, event.messageId)))
           return;
         usage.pause(id);
-        state.permissions.set(event.permissionId, {
-          permissionId: event.permissionId,
-          permission: event.permission,
-          patterns: event.patterns,
-        });
-        publish(id);
+        permissionRequest(c, state, state.turn, event);
         return;
       case OpencodeEventType.PermissionReplied:
+        state.deciding.get(event.permissionId)?.abort();
         completePermission(id, event.permissionId);
         return;
       default:
@@ -709,6 +799,29 @@ export function createAssistantService(deps: AssistantServiceDeps) {
   }
 
   return {
+    async approveWrite(id: string, operationId: string, input: Record<string, unknown>) {
+      const c = get(id);
+      if (c.permissionMode === PermissionMode.Full) return true;
+      if (c.permissionMode === PermissionMode.Ask) return settings.get('assistant.alwaysAllow').includes(operationId);
+      const state = liveOf(id),
+        turn = state.turn;
+      if (c.permissionMode !== PermissionMode.Assisted || !turn?.intent) return false;
+      // 只允许创建可撤销的本地草稿进入自动审查。发布、删除、设置和未知写操作继续出确认卡。
+      if (operationId !== 'tasks.create' || input.start !== false || input.projectId !== c.projectId) return false;
+      const result = await deps.permissionReviewer.review(turn.intent, { operationId, input }, turn.delegation.signal);
+      if (state.turn !== turn || turn.delegation.signal.aborted || get(id).permissionMode !== PermissionMode.Assisted)
+        return false;
+      record(c, [
+        {
+          kind: TranscriptEntryKind.System,
+          data: {
+            event: TranscriptSystemEvent.PermissionReview,
+            detail: [operationId, result.decision === 'once' ? '批准本次' : '询问你', result.reason].join(' · '),
+          },
+        },
+      ]);
+      return result.decision === 'once';
+    },
     delegationSignal(id: string, sessionId: string): AbortSignal | undefined {
       const state = live.get(id);
       const signal = state?.turn?.delegation.signal;
@@ -744,13 +857,23 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     findBySession: (sessionId: string): Conversation | undefined => repo.findBySession(sessionId),
     filesDir,
 
-    create(title: string | undefined, projectId?: string | null): AssistantConversationDTO {
+    setPermissionMode(id: string, permissionMode: PermissionMode) {
+      get(id);
+      repo.updateConversation(id, { permissionMode, updatedAt: clock.now() });
+      return publish(id);
+    },
+    create(
+      title: string | undefined,
+      projectId?: string | null,
+      permissionMode: PermissionMode = PermissionMode.Ask,
+    ): AssistantConversationDTO {
       if (projectId != null) deps.projects.getRecord(projectId);
       const now = clock.now();
       const id = randomUUID();
       repo.insertConversation({
         id,
         title: title ?? '',
+        permissionMode,
         projectId: projectId ?? null,
         opencodeSessionId: null,
         isolated: true,
@@ -932,7 +1055,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
         state.deleting = false;
         if (live.has(id)) {
           if (turn?.outcome !== null && turn?.outcome !== undefined) completeTurn(c, turn, turn.outcome);
-          if (state.busy && state.permissions.size === 0) usage.resume(id);
+          if (state.busy && state.permissions.size === 0 && state.deciding.size === 0) usage.resume(id);
           publish(id);
         }
       }
@@ -988,6 +1111,7 @@ export function createAssistantService(deps: AssistantServiceDeps) {
               ErrorCode.AssistantBusy,
               'Assistant stopped before the message was sent; your draft is retained',
             );
+          turn.intent = text;
           const sent = show();
           state.page = page;
           const queued = repo.pendingMessages(id);
@@ -1064,11 +1188,17 @@ export function createAssistantService(deps: AssistantServiceDeps) {
     ): Promise<AssistantConversationDTO> {
       get(id);
       const state = liveOf(id);
-      if (!state.permissions.has(permissionId)) {
+      const pending = state.permissions.get(permissionId);
+      if (!pending) {
         throw new AppError(ErrorCode.NotFound, `No open permission request ${permissionId}`, { permissionId });
       }
       try {
-        await opencode.replyPermission({ permissionId, directory: filesDir(id), reply });
+        await opencode.replyPermission({
+          permissionId,
+          directory: filesDir(id),
+          reply: reply === PermissionDecision.Always ? PermissionDecision.Once : reply,
+        });
+        if (reply === PermissionDecision.Always) state.grants.add(grantKey(pending));
       } catch (error) {
         if (error instanceof AppError && error.code === ErrorCode.PermissionRequestExpired)
           completePermission(id, permissionId);

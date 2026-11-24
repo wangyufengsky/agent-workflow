@@ -2,3 +2,44 @@
   font-size: 12.5px;
   color: var(--sub);
 }
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(155px, 0.7fr) minmax(0, 2fr);
+  gap: var(--s-4, 16px);
+  align-items: start;
+}
+.list {
+  display: grid;
+  gap: 16px;
+}
+.list section {
+  display: grid;
+  gap: 3px;
+}
+.role {
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  border: 0;
+  cursor: pointer;
+}
+.role[aria-pressed="true"] {
+  background: var(--accent-fill);
+}
+.prompt {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 620px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .list section {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+}

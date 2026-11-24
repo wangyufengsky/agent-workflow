@@ -112,6 +112,7 @@ export type OpencodeEvent =
       sessionId: string;
       directory: string;
       permissionId: string;
+      callId?: string;
       messageId?: string;
       permission: string;
       patterns: string[];
@@ -198,7 +199,7 @@ const payloadSchema = z.discriminatedUnion('type', [
       sessionID: z.string(),
       permission: z.string(),
       patterns: z.array(z.string()),
-      tool: z.object({ messageID: z.string() }).optional(),
+      tool: z.object({ messageID: z.string(), callID: z.string().optional() }).optional(),
     }),
   }),
 ]);
@@ -300,6 +301,7 @@ export function parseGlobalEvent(raw: unknown): OpencodeEvent | undefined {
         directory,
         permissionId: p.id,
         ...(p.tool === undefined ? {} : { messageId: p.tool.messageID }),
+        ...(p.tool?.callID === undefined ? {} : { callId: p.tool.callID }),
         permission: p.permission,
         patterns: p.patterns,
       };

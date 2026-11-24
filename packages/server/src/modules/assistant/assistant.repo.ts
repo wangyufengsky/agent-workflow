@@ -92,7 +92,7 @@ export function createAssistantRepo(db: DbExecutor) {
     acknowledgeMessages(ids: number[]): void {
       db.delete(outbox).where(inArray(outbox.id, ids)).run();
     },
-    insertConversation(row: Conversation): void {
+    insertConversation(row: typeof assistantConversationsTable.$inferInsert): void {
       db.insert(conversations).values(row).run();
     },
     findConversation(id: string): Conversation | undefined {

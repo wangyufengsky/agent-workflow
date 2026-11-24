@@ -16,6 +16,7 @@ import { type MoreOptions, NO_OPTIONS } from './more-options.tsx';
  */
 export function useStartTask({
   projectId,
+  permissionMode,
   workflowId,
   requirement,
   attachmentIds,
@@ -27,6 +28,7 @@ export function useStartTask({
   onStarted,
 }: {
   projectId: string;
+  permissionMode: import('@aw/shared').PermissionMode;
   workflowId: string | undefined;
   requirement: string;
   /** Files attached to the requirement (30 §2); none are still uploading or failed. */
@@ -79,6 +81,7 @@ export function useStartTask({
     create.mutate(
       {
         projectId,
+        permissionMode,
         workflowId,
         requirement: requirement.trim(),
         ...(browserTest === undefined ? {} : { browserTest }),

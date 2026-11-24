@@ -3,8 +3,11 @@ import { SKILL_SELECTION_MAX, USER_SKILL_MAX_CHARS } from '../../constants/limit
 import { SessionAgent } from '../../enums/workflow.ts';
 import { DEFINITION_KEY_PATTERN } from './workflows.ts';
 
+export const builtinSkillId = (name: string) => 'builtin:' + name;
+const assistantSkillId = z.union([z.uuid(), z.string().regex(/^builtin:aw-[a-z0-9-]+$/)]);
+export const assistantSkillIdsSchema = z.array(assistantSkillId).max(SKILL_SELECTION_MAX);
 export const skillRefSchema = z.object({
-  id: z.uuid(),
+  id: assistantSkillId,
   name: z.string(),
   version: z.number().int().positive(),
 });

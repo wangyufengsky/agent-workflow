@@ -4,10 +4,12 @@ import {
   attachmentSchema,
   createConversationOp,
   getRuntimeOp,
+  IMAGE_PROCESSOR_ROLE_KEY,
   MCP_ASSISTANT_TOOL_PREFIX,
   ServerEventType,
   sendAssistantMessageOp,
   type TranscriptPage,
+  updateRoleOp,
   updateSettingsOp,
 } from '@aw/shared';
 import { chromium } from '@playwright/test';
@@ -42,7 +44,11 @@ it(
       const model = (name: string) => available.find((m) => `${m.providerId}/${m.modelId}` === name);
       expect(model(TEXT_MODEL), TEXT_MODEL).toMatchObject({ supportsImage: false });
       expect(model(VISION_MODEL), VISION_MODEL).toMatchObject({ supportsImage: true });
-      await t.call(updateSettingsOp, { 'ai.defaultModel': TEXT_MODEL, 'ai.imageModel': VISION_MODEL });
+      await t.call(updateRoleOp, {
+        id: t.app.services.roles.getByKey(IMAGE_PROCESSOR_ROLE_KEY).id,
+        model: VISION_MODEL,
+      });
+      await t.call(updateSettingsOp, { 'ai.defaultModel': TEXT_MODEL });
       const uploaded = await t.request({
         method: 'POST',
         url: '/attachments',

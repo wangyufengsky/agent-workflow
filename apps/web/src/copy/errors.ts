@@ -50,7 +50,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.WorkflowDefinitionInvalid]: '流程定义有问题，按编辑器右侧列出的问题修改后再保存。',
   [ErrorCode.WorkflowAlreadyExists]: '这个流程标识已经被使用，换一个再试。',
   [ErrorCode.RoleNotFound]: '这个角色不存在。',
-  [ErrorCode.RoleReadonly]: '内置角色不能修改，可以复制后再改。',
+  [ErrorCode.RoleReadonly]: '内置角色仅支持更换模型。要调整职责或提示词，可以复制为自定义角色。',
   [ErrorCode.RoleInUse]: '这个角色正被流程使用，或已在任务中用过，不能删除。',
   [ErrorCode.RoleAlreadyExists]: '这个角色标识已经被使用，换一个再试。',
   [ErrorCode.TaskNotFound]: '这个任务不存在或已被删除。',
@@ -129,7 +129,7 @@ export const ERROR_COPY: Record<ErrorCode, string> = {
   [ErrorCode.AttachmentNotFound]: '这份资料不存在或已失效，请重新添加。',
   [ErrorCode.AttachmentInvalidType]:
     '这个操作无法读取所选附件的格式。支持上传文本、PNG、JPEG、Word（.docx）和 Excel（.xlsx）。',
-  [ErrorCode.ImageAnalysisUnavailable]: '图像处理员不可用，请在专业设置中选择支持图片输入的模型。',
+  [ErrorCode.ImageAnalysisUnavailable]: '图像处理员不可用，请在角色页为图像处理员选择支持图片输入的模型。',
   [ErrorCode.ImageAnalysisFailed]: '图像处理员未能读图。可以查看原图，或稍后再试。',
   [ErrorCode.AttachmentTooLarge]:
     '资料太大或太多了：每次最多 10 个；文本和图片不超过 5 MB，Word / Excel 不超过 20 MB。',

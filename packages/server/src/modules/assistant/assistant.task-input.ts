@@ -2,7 +2,10 @@ import { AppError, createTaskRequestSchema, ErrorCode, FUNCTIONAL_TEST_WORKFLOW_
 import { parseInput } from '../../core/http/errors.ts';
 import type { WorkflowsService } from '../workflows/index.ts';
 
-export const assistantTaskInputSchema = createTaskRequestSchema.partial({ workflowId: true }).strict();
+export const assistantTaskInputSchema = createTaskRequestSchema
+  .omit({ permissionMode: true })
+  .partial({ workflowId: true })
+  .strict();
 
 export function completeAssistantTaskInput(given: Record<string, unknown>, workflows: WorkflowsService) {
   const { functionalTest, workflowId, requirements, ...rest } = parseInput(assistantTaskInputSchema, given);

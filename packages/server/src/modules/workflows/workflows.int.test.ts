@@ -28,7 +28,7 @@ afterEach(() => t.close());
 const promptsDir = loadConfig({ AW_API_TOKEN: 'x'.repeat(32), AW_DATA_DIR: '/tmp' }).promptsDir;
 
 describe('内置流程与角色', () => {
-  it('首次启动写入 7 个角色与 15 个流程，按内置顺序列出', async () => {
+  it('首次启动写入 8 个角色与 15 个流程，按内置顺序列出', async () => {
     const roles = (await t.call(listRolesOp, {})).body.items;
     expect(roles.map((r) => [r.key, r.kind, r.baseAgent])).toEqual([
       ['planner', 'builtin', 'planner'],
@@ -38,6 +38,7 @@ describe('内置流程与角色', () => {
       ['image_processor', 'builtin', 'executor'],
       ['database_analyst', 'builtin', 'database_analyst'],
       ['reviewer', 'builtin', 'reviewer'],
+      ['aw-approver', 'builtin', 'reviewer'],
     ]);
     const workflows = (await t.call(listWorkflowsOp, {})).body.items;
     expect(workflows.map((w) => [w.key, w.version, w.planning, w.deliverable])).toEqual([

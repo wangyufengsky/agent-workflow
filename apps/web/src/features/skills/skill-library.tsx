@@ -10,7 +10,7 @@ import { Icon } from '../../components/icon.tsx';
 import { SKILLS_COPY as C } from '../../copy/skills.ts';
 import { clearPendingForm, usePendingForm } from '../../state/ui.store.ts';
 import { projectsQuery } from '../projects/projects.queries.ts';
-import { rolesQuery, workflowsQuery } from '../tasks/tasks.queries.ts';
+import { workflowRolesQuery, workflowsQuery } from '../tasks/tasks.queries.ts';
 import { audienceOptions, catalogEntries, matchesAudience, SkillAudience } from './skill-catalog.ts';
 import { type SkillDraft, SkillEditor, skillTemplate } from './skill-editor.tsx';
 import { SkillInspector } from './skill-inspector.tsx';
@@ -27,7 +27,7 @@ export function SkillLibraryPage() {
   const catalog = useQuery(skillCatalogQuery);
   const projects = useQuery(projectsQuery);
   const workflows = useQuery(workflowsQuery);
-  const roles = useQuery(rolesQuery);
+  const roles = useQuery(workflowRolesQuery);
   const pending = usePendingForm(AssistantForm.CreateSkill);
   const [draft, setDraft] = useState<SkillDraft>();
   const [scopeId, setScopeId] = useState<string>();

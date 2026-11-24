@@ -14,6 +14,7 @@ import {
   PermissionDecision,
   ServerEventType,
   sendAssistantMessageOp,
+  setConversationPermissionModeOp,
   type TranscriptPage,
   updateSettingsOp,
 } from '@aw/shared';
@@ -27,6 +28,7 @@ import { assistantPermissionRules } from '../opencode/index.ts';
 const MODEL = 'aw-assistant-scripted/model';
 const TOOL_PREFIX = 'TOOL_INPUT: ';
 const advertisedTools = new Set<string>();
+const reviewerTools: string[][] = [];
 const rejectedPermissions: string[] = [];
 const continuationRequests: Array<z.infer<typeof requestSchema>['messages']> = [];
 const CONTINUATION_TEST = 'VERIFY_CONTINUATION_HANDOFF';
@@ -65,13 +67,21 @@ function scriptedModel(): Server {
         res.flushHeaders();
         return;
       }
+      const review = last?.role === 'user' && text.startsWith('{"userRequest":');
+      if (review) reviewerTools.push(tools.map((tool) => tool.function.name));
       const instruction =
-        last?.role === 'user' && text.includes(TOOL_PREFIX)
+        !review && last?.role === 'user' && text.includes(TOOL_PREFIX)
           ? callSchema.parse(JSON.parse(text.slice(text.lastIndexOf(TOOL_PREFIX) + TOOL_PREFIX.length)))
           : undefined;
       const delta =
         instruction === undefined
-          ? { role: 'assistant', content: 'done' }
+          ? {
+              role: 'assistant',
+              content:
+                review && !text.includes('MALFORMED_REVIEW')
+                  ? JSON.stringify({ decision: 'once', reason: '用户要求查看工作目录。' })
+                  : 'done',
+            }
           : {
               role: 'assistant',
               tool_calls: [
@@ -150,6 +160,13 @@ it('@opencode 续接在新模型会话发送绑定项目和旧决定，下一轮
 });
 
 async function say(id: string, instruction: z.infer<typeof callSchema>) {
+  const previous = t.app.services.assistant.get(id).usage.latest?.id;
+  const completion = waitForEvent(
+    t.app.events,
+    ServerEventType.AssistantTranscript,
+    (e) => e.conversationId === id && e.entries.some((entry) => entry.kind === 'tool_result'),
+    60_000,
+  );
   const seen = new Set<string>();
   const replies: Promise<unknown>[] = [];
   const unsubscribe = t.app.events.subscribe((event) => {
@@ -161,14 +178,19 @@ async function say(id: string, instruction: z.infer<typeof callSchema>) {
       replies.push(t.app.services.assistant.replyPermission(id, permission.permissionId, PermissionDecision.Reject));
     }
   });
-  const idle = waitForEvent(t.app.events, ServerEventType.AssistantUpdated, (c) => c.id === id && !c.busy, 60_000);
+  const idle = waitForEvent(
+    t.app.events,
+    ServerEventType.AssistantUpdated,
+    (c) => c.id === id && !c.busy && !!c.usage.latest && c.usage.latest.id !== previous,
+    60_000,
+  );
   const response = await t.call(sendAssistantMessageOp, {
     id,
     text: `${TOOL_PREFIX}${JSON.stringify(instruction)}`,
     context: { page: 'home', params: {} },
   });
-  expect(response.status).toBe(200);
-  await idle;
+  expect(response.status, JSON.stringify(response.body)).toBe(200);
+  await Promise.all([idle, completion]);
   unsubscribe();
   await Promise.all(replies);
   const result = await t.request({ method: 'GET', url: `/assistant/conversations/${id}/transcript` });
@@ -327,4 +349,25 @@ it('@opencode 助手可加载重验、需求追溯和项目约定技能', async 
   const requirement = await say(conversation.id, { name: 'skill', arguments: { name: 'aw-task-requirement' } });
   expect(requirement).toMatchObject({ data: { status: 'completed' } });
   expect(JSON.stringify(requirement?.data)).toContain('Older plans may have only a package-level link');
+});
+
+it('@opencode 同一对话从帮我批准切到完全访问再切回始终询问，每次执行使用当前权限', async () => {
+  const { body: c } = await t.call(createConversationOp, { permissionMode: 'assisted' });
+  const cards = rejectedPermissions.length;
+  const op = { name: 'bash' as const, arguments: { command: 'pwd', description: '查看工作目录' } };
+  const before = reviewerTools.length;
+  expect(await say(c.id, op)).toMatchObject({ data: { status: 'completed' } });
+  expect(reviewerTools.slice(before)).toEqual([[]]);
+  expect(rejectedPermissions).toHaveLength(cards);
+  await t.call(setConversationPermissionModeOp, { id: c.id, permissionMode: 'full' });
+  expect(
+    await say(c.id, { name: 'bash', arguments: { command: 'echo scoped-full', description: '输出验证标记' } }),
+  ).toMatchObject({ data: { output: expect.stringContaining('scoped-full') } });
+  await t.call(setConversationPermissionModeOp, { id: c.id, permissionMode: 'ask' });
+  expect(await say(c.id, op)).toMatchObject({ data: { status: 'error' } });
+  expect(rejectedPermissions.slice(cards)).toContain('bash');
+  await t.call(setConversationPermissionModeOp, { id: c.id, permissionMode: 'assisted' });
+  const fallback = await say(c.id, { name: 'bash', arguments: { command: 'pwd', description: 'MALFORMED_REVIEW' } });
+  expect(fallback).toMatchObject({ data: { status: 'error' } });
+  expect(rejectedPermissions.slice(cards)).toEqual(['bash', 'bash']);
 });

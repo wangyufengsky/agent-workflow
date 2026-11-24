@@ -11,7 +11,7 @@ import { toast } from '../../components/toast.tsx';
 import { COMMON_COPY } from '../../copy/common.ts';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
-import { rolesQuery, useSaveDraftPlan, workflowQuery } from '../tasks/tasks.queries.ts';
+import { useSaveDraftPlan, workflowQuery, workflowRolesQuery } from '../tasks/tasks.queries.ts';
 
 type Props = {
   task: TaskDetailDTO;
@@ -25,7 +25,7 @@ type Props = {
 
 /** Editing a task's plan (M5-01 / M5-02): the plan editor with the workflow's rules, saved as a new draft version. */
 export function TaskPlanEditor({ task, base, lock, statuses, onDone }: Props) {
-  const roles = useQuery(rolesQuery);
+  const roles = useQuery(workflowRolesQuery);
   const workflow = useQuery(workflowQuery(task.workflow.id));
   const save = useSaveDraftPlan();
   const history = useHistory(base.graph);

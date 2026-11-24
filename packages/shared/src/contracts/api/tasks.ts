@@ -12,6 +12,7 @@ import {
   viewportPresetSchema,
 } from '../../enums/browser.ts';
 import { worktreeStatusSchema } from '../../enums/git.ts';
+import { permissionModeSchema } from '../../enums/system.ts';
 import {
   AcceptanceCheckKind,
   acceptanceCheckKindSchema,
@@ -94,6 +95,7 @@ export const functionalTestScopeSchema = browserTestScopeSchema.extend({
 export type FunctionalTestScope = z.infer<typeof functionalTestScopeSchema>;
 
 export const createTaskRequestSchema = z.object({
+  permissionMode: permissionModeSchema.optional(),
   projectId: z.string(),
   /** A specific workflow version. */
   workflowId: z.string(),
@@ -300,6 +302,7 @@ export const testLinkSchema = z.object({
   executionIds: z.array(z.string()),
 });
 export const taskDetailSchema = taskSummarySchema.extend({
+  permissionMode: permissionModeSchema.optional(),
   testLinks: z.array(testLinkSchema).optional(),
   browserCase: browserCaseSchema.optional(),
   browserCaseHandoff: browserCaseHandoffSchema.optional(),

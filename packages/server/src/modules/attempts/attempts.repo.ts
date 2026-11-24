@@ -8,7 +8,11 @@ type AttemptRow = typeof attemptsTable.$inferSelect;
 /** An attempt as stored; the service adds in-memory state (progress) for DTOs. */
 export type Attempt = Omit<AttemptRow, 'error'> & { error: ErrorInfo | null };
 
-export type NewAttempt = Omit<AttemptRow, 'error' | 'tokensInput' | 'tokensOutput' | 'cost' | 'endedAt'>;
+export type NewAttempt = Omit<
+  AttemptRow,
+  'error' | 'tokensInput' | 'tokensOutput' | 'cost' | 'endedAt' | 'permissionBaseline'
+> &
+  Partial<Pick<AttemptRow, 'permissionBaseline'>>;
 
 function toAttempt({ error, ...row }: AttemptRow): Attempt {
   // JSON column: parsed at the boundary (06 §9).
@@ -123,8 +127,8 @@ export function createAttemptsRepo(db: DbExecutor) {
     deleteMany(ids: readonly string[]): void {
       db.delete(attemptsTable).where(inArray(attemptsTable.id, ids)).run();
     },
-    setSession(id: string, sessionId: string): void {
-      db.update(attemptsTable).set({ opencodeSessionId: sessionId }).where(byId(id)).run();
+    setSession(id: string, sessionId: string, permissionBaseline: AttemptRow['permissionBaseline'] = null): void {
+      db.update(attemptsTable).set({ opencodeSessionId: sessionId, permissionBaseline }).where(byId(id)).run();
     },
     incrementNudges(id: string): void {
       db.update(attemptsTable)

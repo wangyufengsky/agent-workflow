@@ -3,8 +3,8 @@ export const HOME_COPY = {
   /** The wordmark of the home hero and the opening animation (28 §5): `lead` then the emphasised `emphasis`. */
   mark: { lead: 'Everything is a', emphasis: 'Workflow.' },
   tagline: '万事皆流程，执行由你掌控。',
-  placeholder: '今天想让 AI 做什么？',
-  conversationPlaceholder: '接着说，或选一个流程直接开始任务…',
+  placeholder: '今天想让 AI 做什么？输入 / 选择 Skill…',
+  conversationPlaceholder: '接着说，或输入 / 选择 Skill…',
   inputLabel: '告诉助手，或开始任务',
   startTask: (workflow: string) => `开始任务 · ${workflow}`,
   askInstead: '改为问助手',

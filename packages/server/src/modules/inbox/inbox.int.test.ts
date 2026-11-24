@@ -156,7 +156,7 @@ describe('权限的「总是允许」记到项目（D101）', () => {
     const fixing = nodeReaches(t, 'fix', 'running');
     await t.call(resolveInboxOp, { id: asked.id, response: { decision: 'always' } });
     await fixing;
-    expect(t.fake.permissionReplies).toEqual([{ permissionId: asked.payload.opencodePermissionId, reply: 'always' }]);
+    expect(t.fake.permissionReplies).toEqual([{ permissionId: asked.payload.opencodePermissionId, reply: 'once' }]);
     expect((await t.call(getProjectOp, { id: project.id })).body.allowedBash).toEqual(['./scripts/mvn.sh -q *']);
     const fix = t.fake.sessions.find((s) => s.title.includes('· 修复'));
     expect(fix?.permission).toContainEqual({ permission: 'bash', pattern: './scripts/mvn.sh -q *', action: 'allow' });

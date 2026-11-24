@@ -346,6 +346,7 @@ export function createTaskLifecycle(deps: TasksServiceDeps, state: TaskState) {
             id,
             projectId: input.projectId,
             workflowId: workflow.id,
+            ...(input.permissionMode === undefined ? {} : { permissionMode: input.permissionMode }),
             title: input.title ?? firstLine(input.requirement).slice(0, TASK_TITLE_MAX_CHARS),
             requirement: input.requirement,
             browserTest: input.browserTest ?? null,

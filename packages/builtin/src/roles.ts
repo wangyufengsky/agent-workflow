@@ -1,4 +1,4 @@
-import { RoleBaseAgent } from '@aw/shared';
+import { APPROVER_ROLE_KEY, IMAGE_PROCESSOR_ROLE_KEY, RoleBaseAgent } from '@aw/shared';
 
 /** Built-in role (13 §2); its prompt is `prompts/roles/<key>.md`. */
 export type BuiltinRole = { key: string; name: string; baseAgent: RoleBaseAgent; description: string };
@@ -9,7 +9,8 @@ export const BuiltinRoleKey = {
   Tester: 'tester',
   Reviewer: 'reviewer',
   DocumentProcessor: 'document_processor',
-  ImageProcessor: 'image_processor',
+  ImageProcessor: IMAGE_PROCESSOR_ROLE_KEY,
+  Approver: APPROVER_ROLE_KEY,
   DatabaseAnalyst: 'database_analyst',
 } as const;
 export type BuiltinRoleKey = (typeof BuiltinRoleKey)[keyof typeof BuiltinRoleKey];
@@ -56,5 +57,11 @@ export const BUILTIN_ROLES: readonly BuiltinRole[] = [
     name: '评审员',
     baseAgent: RoleBaseAgent.Reviewer,
     description: '对照需求与步骤指令评审改动，只报真实问题并给出位置与严重程度',
+  },
+  {
+    key: BuiltinRoleKey.Approver,
+    name: '审批员',
+    description: '核对当前请求、用户授权和操作的实际影响。只返回本次审批结论。',
+    baseAgent: RoleBaseAgent.Reviewer,
   },
 ];

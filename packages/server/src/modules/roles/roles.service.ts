@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { RoleSeed } from '@aw/builtin';
+import { BuiltinRoleKey, type RoleSeed } from '@aw/builtin';
 import {
   AppError,
   type CreateRoleRequest,
@@ -13,9 +13,9 @@ import type { Db } from '../../core/db/database.ts';
 import type { Logger } from '../../core/logger.ts';
 import { createRolesRepo } from './roles.repo.ts';
 
-export type RolesServiceDeps = { db: Db; clock: Clock; log: Logger };
+export type RolesServiceDeps = { supportsImage(model: string): Promise<boolean>; db: Db; clock: Clock; log: Logger };
 
-export function createRolesService({ db, clock, log }: RolesServiceDeps) {
+export function createRolesService({ db, clock, log, supportsImage }: RolesServiceDeps) {
   const repo = createRolesRepo(db);
 
   function get(id: string): RoleDTO {
@@ -117,9 +117,19 @@ export function createRolesService({ db, clock, log }: RolesServiceDeps) {
       log.info({ role: role.key }, 'role deleted');
     },
 
-    update({ id, ...changes }: UpdateRoleRequest): RoleDTO {
+    async update({ id, ...changes }: UpdateRoleRequest): Promise<RoleDTO> {
       const role = get(id);
-      if (role.kind === RoleKind.Builtin) {
+      if (
+        role.key === BuiltinRoleKey.ImageProcessor &&
+        changes.model != null &&
+        !(await supportsImage(changes.model))
+      ) {
+        throw new AppError(ErrorCode.ImageAnalysisUnavailable, 'This model lacks image input');
+      }
+      if (
+        role.kind === RoleKind.Builtin &&
+        (changes.model === undefined || Object.keys(changes).some((key) => key !== 'model'))
+      ) {
         throw new AppError(ErrorCode.RoleReadonly, 'Built-in roles are read-only; copy the role to change it', { id });
       }
       repo.update(id, { ...changes, updatedAt: clock.now() });

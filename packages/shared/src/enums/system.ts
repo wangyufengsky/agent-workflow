@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+export const PermissionMode = { Ask: 'ask', Assisted: 'assisted', Full: 'full' } as const;
+export type PermissionMode = (typeof PermissionMode)[keyof typeof PermissionMode];
+export const permissionModeSchema = z.enum(PermissionMode);
+
 export const RuntimeStatus = {
   NotInstalled: 'not_installed',
   VersionMismatch: 'version_mismatch',
@@ -95,6 +99,7 @@ export const transcriptEntryKindSchema = z.enum(TranscriptEntryKind);
 
 /** What a `system` transcript entry records; the renderer words it (web/src/copy). */
 export const TranscriptSystemEvent = {
+  PermissionReview: 'permission_review',
   AttemptStarted: 'attempt_started',
   /** Idle without a result: the nudge prompt was sent (12 §4.2). */
   Nudged: 'nudged',

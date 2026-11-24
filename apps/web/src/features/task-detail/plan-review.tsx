@@ -11,7 +11,7 @@ import { Panel } from '../../components/panel.tsx';
 import { toast } from '../../components/toast.tsx';
 import { CANVAS_COPY } from '../../copy/plan-editor.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
-import { rolesQuery, useConfirmPlan, useReplan } from '../tasks/tasks.queries.ts';
+import { useConfirmPlan, useReplan, workflowRolesQuery } from '../tasks/tasks.queries.ts';
 import { stepsOfPlan } from './steps.ts';
 import styles from './task-page.module.css';
 import { TaskPlanEditor } from './task-plan-editor.tsx';
@@ -42,7 +42,7 @@ function PlanSteps({ graph, roles }: { graph: PlanGraph; roles: readonly RoleDTO
  * view can edit the plan first (M5-01), which saves a new draft version.
  */
 export function PlanReview({ task, pro }: { task: TaskDetailDTO; pro: boolean }) {
-  const roles = useQuery(rolesQuery);
+  const roles = useQuery(workflowRolesQuery);
   const confirm = useConfirmPlan();
   const replan = useReplan();
   const [feedback, setFeedback] = useState('');

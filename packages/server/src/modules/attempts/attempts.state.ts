@@ -30,6 +30,10 @@ import type { NewTranscriptEntry, TranscriptStore } from './attempts.transcript.
 
 /** In-memory state of a session we created, kept until it goes quiet so trailing events still reach the transcript. */
 export type LiveSession = {
+  permissionStop: AbortController;
+  deciding: Map<string, AbortController>;
+  seenPermissions: Set<string>;
+  grants: Set<string>;
   attemptId: string;
   delegation: AbortController;
   taskId: string | null;
@@ -127,6 +131,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
   }
 
   function toSummary({
+    permissionBaseline: _baseline,
     directory: _d,
     opencodeSessionId: _s,
     tokensInput: _i,
@@ -170,6 +175,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
         signal('end_command_finished', mustFind(session.attemptId));
       }
     }
+    session.permissionStop.abort();
     session.firstPrompt?.controller.abort();
     session.delegation.abort();
     session.release();
@@ -178,6 +184,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
   /** An open blocking question or a pending permission request of the attempt: the session waits for the user. */
   function waitsForUser(attemptId: string): boolean {
     return (
+      !!sessionOf(attemptId)?.deciding.size ||
       sessionOf(attemptId)?.browserWaiting === true ||
       inbox
         .listOpen({ attemptId })
@@ -208,7 +215,7 @@ export function createAttemptState({ db, unit, clock, log, opencode, inbox, tran
     waitsForAnswer,
     toSummary,
     toDto: (attempt: Attempt): AttemptDTO => {
-      const { roleId: _roleId, ...rest } = attempt;
+      const { roleId: _roleId, permissionBaseline: _baseline, ...rest } = attempt;
       return { ...rest, progress: progress.get(attempt.id) ?? null, queuePosition: slots.position(attempt.id) };
     },
     onSignal(listener: (signal: AttemptSignal) => void): void {

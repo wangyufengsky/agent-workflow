@@ -43,11 +43,11 @@ import {
 import { stepsOfPlan } from '../task-detail/steps.ts';
 import {
   planVersionQuery,
-  rolesQuery,
   taskQuery,
   useCreateWorkflow,
   useUpdateWorkflow,
   workflowQuery,
+  workflowRolesQuery,
   workflowsQuery,
   workflowVersionsQuery,
 } from '../tasks/tasks.queries.ts';
@@ -467,7 +467,7 @@ export function WorkflowEditorPage() {
   const list = useQuery(workflowsQuery);
   const summary = list.data?.find((w) => w.key === key);
   const workflow = useQuery({ ...workflowQuery(summary?.id ?? ''), enabled: summary !== undefined });
-  const roles = useQuery(rolesQuery);
+  const roles = useQuery(workflowRolesQuery);
   const error = list.error ?? workflow.error ?? roles.error;
   return (
     <div className="page wide">
@@ -489,7 +489,7 @@ export function NewWorkflowFromPlanPage() {
   const { task: taskId, version } = getRouteApi(ROUTE_IDS.workflowNew).useSearch();
   const task = useQuery(taskQuery(taskId));
   const plan = useQuery(planVersionQuery(taskId, version));
-  const roles = useQuery(rolesQuery);
+  const roles = useQuery(workflowRolesQuery);
   const original = useQuery({ ...workflowQuery(task.data?.workflow.id ?? ''), enabled: task.data !== undefined });
   const error = task.error ?? plan.error ?? roles.error ?? original.error;
   if (error !== null) return <ErrorState error={error} />;

@@ -29,7 +29,7 @@ import {
   WORKFLOW_PLANNING_LABEL,
 } from '../../copy/workflows.ts';
 import { workflowIcon } from '../home/workflow-icon.ts';
-import { rolesQuery, useCreateWorkflow, useDeleteWorkflow, workflowsQuery } from '../tasks/tasks.queries.ts';
+import { useCreateWorkflow, useDeleteWorkflow, workflowRolesQuery, workflowsQuery } from '../tasks/tasks.queries.ts';
 
 /**
  * A blank definition of each planning kind (13 §5), from the roles that exist: executors do the steps, the first
@@ -55,7 +55,7 @@ type Target = { mode: 'create' } | { mode: 'copy'; from: WorkflowSummaryDTO };
 /** New workflow or copy: a key and name, then the editor (13 §5). */
 function NewWorkflowDialog({ target, onClose }: { target: Target; onClose: () => void }) {
   const create = useCreateWorkflow();
-  const roles = useQuery(rolesQuery);
+  const roles = useQuery(workflowRolesQuery);
   const navigate = useNavigate();
   const [key, setKey] = useState(target.mode === 'copy' ? `${target.from.key}_copy` : '');
   const [name, setName] = useState(target.mode === 'copy' ? C.copyName(target.from.name) : '');

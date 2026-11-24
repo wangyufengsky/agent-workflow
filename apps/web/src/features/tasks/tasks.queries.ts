@@ -1,4 +1,5 @@
 import {
+  APPROVER_ROLE_KEY,
   type ArtifactRevision,
   acceptNodeOp,
   archiveFinishedTasksOp,
@@ -33,6 +34,7 @@ import {
   pauseTaskOp,
   type RequestChangesRequest,
   type ReviseFromReviewRequest,
+  type RoleDTO,
   refreshDeliveryStatusOp,
   rejectNodeOp,
   replanOp,
@@ -44,6 +46,7 @@ import {
   reviseFromReviewOp,
   reviseTaskArtifactOp,
   saveDraftPlanOp,
+  setTaskPermissionModeOp,
   skipCheckOp,
   skipNodeOp,
   startTaskOp,
@@ -137,6 +140,11 @@ export const rolesQuery = queryOptions({
   queryKey: queryKeys.roles,
   queryFn: async () => (await callOperation(listRolesOp, {})).items,
 });
+
+export const workflowRolesQuery = {
+  ...rolesQuery,
+  select: (roles: RoleDTO[]) => roles.filter((r) => r.key !== APPROVER_ROLE_KEY),
+};
 
 export type TaskFilter = { projectId?: string; displayGroup?: TaskDisplayGroup; archived?: boolean; limit?: number };
 
@@ -249,6 +257,10 @@ function useTaskMutation<I>(run: (input: I) => Promise<TaskDetailDTO>) {
   });
 }
 
+export const useTaskPermission = () =>
+  useTaskMutation((input: { id: string; permissionMode: import('@aw/shared').PermissionMode }) =>
+    callOperation(setTaskPermissionModeOp, input),
+  );
 export const useCreateTask = () => useTaskMutation((input: CreateTaskRequest) => callOperation(createTaskOp, input));
 export const useCancelTask = () => useTaskMutation((id: string) => callOperation(cancelTaskOp, { id }));
 export const useArchiveTask = () => useTaskMutation((id: string) => callOperation(archiveTaskOp, { id }));

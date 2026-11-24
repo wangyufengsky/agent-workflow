@@ -1,6 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { BUILTIN_INITIATIVE_TEMPLATES, loadBuiltinRoles, loadBuiltinWorkflows, loadPrompts } from '@aw/builtin';
+import {
+  BUILTIN_INITIATIVE_TEMPLATES,
+  BuiltinRoleKey,
+  loadBuiltinRoles,
+  loadBuiltinWorkflows,
+  loadPrompts,
+} from '@aw/builtin';
 import {
   AppError,
   DB_QUERY_TIMEOUT_MS,
@@ -74,6 +80,7 @@ import {
   type OpencodeRuntime,
   opencodeLaunchEnv,
 } from './modules/opencode/index.ts';
+import { createPermissionReviewer } from './modules/permissions/index.ts';
 import { createPlansModule } from './modules/plans/index.ts';
 import { createPreviewsModule, type PreviewsService } from './modules/previews/index.ts';
 import { createProjectModules, runIdeaAcceptance } from './modules/project-modules/index.ts';
@@ -94,6 +101,7 @@ import {
   createTasksModule,
   createTestFollowups,
   findTestRerunOrigin,
+  readTaskPermissionPolicy,
   readTaskSkills,
   type TasksService,
 } from './modules/tasks/index.ts';
@@ -312,7 +320,13 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     startRuntime: startHostedRuntime,
   });
   // Built-in roles and workflows of this app version are written on every start (13).
-  const roles = createRolesModule({ db: database.db, clock, log });
+  const roles = createRolesModule({
+    db: database.db,
+    clock,
+    log,
+    supportsImage: async (model) =>
+      (await opencode.listModels()).available.some((m) => m.supportsImage && model === m.providerId + '/' + m.modelId),
+  });
   roles.service.syncBuiltin(loadBuiltinRoles(config.promptsDir));
   const workflows = createWorkflowsModule({ db: database.db, unit, clock, log, roles: roles.service });
   workflows.service.syncBuiltin(loadBuiltinWorkflows(config.promptsDir));
@@ -334,7 +348,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     databases: databases.service,
     sessions,
     opencode,
-    model: () => settings.service.get('ai.defaultModel'),
+    model: () =>
+      roles.service.getByKey(BuiltinRoleKey.DatabaseAnalyst).model ?? settings.service.get('ai.defaultModel'),
     dataDir: config.dataDir,
     log,
   });
@@ -354,6 +369,14 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
     await databaseInvestigations.dispose();
   });
 
+  const permissionReviewer = createPermissionReviewer({
+    sessions,
+    settings: settings.service,
+    roles: roles.service,
+    clock,
+    log,
+    opencode,
+  });
   const imageAnalysis = createImageAnalysis({
     roles: roles.service,
     clock,
@@ -363,6 +386,8 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   });
   server.addHook('preClose', async () => modelSlots.service.dispose());
   const attempts = createAttemptsModule({
+    permissionReviewer,
+    taskPolicy: (id) => readTaskPermissionPolicy(database.db, id),
     sessions,
     taskSkills: (id) => readTaskSkills(database.db, id),
     db: database.db,
@@ -761,6 +786,7 @@ export async function buildApp(config: AppConfig, deps: AppDeps = {}): Promise<A
   ];
   const activeTaskStatuses = TASK_STATUSES.filter((s) => !isTerminalState(taskMachine, s));
   const assistant = createAssistantModule({
+    permissionReviewer,
     databaseInvestigations,
     sessions,
     skills: skills.service,

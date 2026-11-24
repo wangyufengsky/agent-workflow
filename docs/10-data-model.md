@@ -894,3 +894,7 @@ items 每项：`id`（后端分配，同一项跨版本保留）、`title`、`ex
 `startup_environment` 保存变量名、用于去重的规范化名称及显示顺序。普通值保存在本行，密钥值保存为指向 `credentials` 的外键。替换配置时同步更新凭据引用，删除行时清除其专用凭据。
 
 `opencode_headers` 按相同规则单独保存模型请求头，名称大小写不敏感，加密值引用 `opencode_header` 凭据。环境变量和请求头分别保存，允许两者同名。
+
+## 对话和任务的审批配置
+
+迁移 0053 为 `assistant_conversations` 和 `tasks` 增加 `permission_mode`，默认 `ask`。每个对象独立保存选择。普通执行尝试的 `attempts.permission_baseline` 保存创建时的规则，同一原生会话继续执行时沿用。既有 `ai.imageModel` 迁入图像处理员的空模型字段，已有角色选择优先。

@@ -21,7 +21,9 @@ import { usePendingForm, useUiStore } from '../../state/ui.store.ts';
 import { conversationsQuery } from '../assistant/assistant.queries.ts';
 import { ConversationContinuation } from '../assistant/conversation-continuation.tsx';
 import { ConversationMenu, titleOf } from '../assistant/conversation-menu.tsx';
+import { ConversationProjectSelect } from '../assistant/conversation-project-select.tsx';
 import { MessageList } from '../assistant/message-list.tsx';
+import { UsageButton } from '../assistant/usage-line.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
 import { attachmentQuery } from '../attachments/attachments.api.ts';
 import { Character } from '../companion/character.tsx';
@@ -152,7 +154,20 @@ function HomeConversation({
         <div className={styles.conversationMain}>
           <header className={styles.conversationHead}>
             <Character mood={conversation.busy ? 'thinking' : undefined} />
-            <ConversationMenu conversations={conversations} active={conversation} onSelect={select} />
+            <div>
+              <ConversationMenu conversations={conversations} active={conversation} onSelect={select} />
+              <ConversationProjectSelect
+                value={conversation.projectId}
+                projects={projects ?? []}
+                onChange={(id) =>
+                  void navigate({
+                    to: ROUTES.home,
+                    search: (s) => ({ ...s, conversation: undefined, assistantProjectId: id ?? undefined }),
+                    replace: true,
+                  })
+                }
+              />
+            </div>
             <span className="grow" />
             {desktop && previewTasks.length > 0 && (
               <select
@@ -178,6 +193,7 @@ function HomeConversation({
           </header>
           <div className={styles.stream} data-testid="home-messages">
             <MessageList key={conversation.id} conversation={conversation} />
+            <UsageButton usage={conversation.usage} />
           </div>
           {composer}
         </div>

@@ -11,6 +11,8 @@ import {
   InboxKind,
   MCP_TOOL_PREFIX,
   McpToolName,
+  PermissionDecision,
+  PermissionMode,
   TranscriptSystemEvent,
 } from '@aw/shared';
 import type { Clock } from '../../core/clock.ts';
@@ -25,6 +27,7 @@ import {
   OpencodeEventType,
   ToolCallStatus,
 } from '../opencode/index.ts';
+import { grantKey, type PermissionReviewer, type TaskPermissionPolicy } from '../permissions/index.ts';
 import type { Attempt } from './attempts.repo.ts';
 import { type AttemptState, errorOf, type LiveSession, systemEntry } from './attempts.state.ts';
 
@@ -42,7 +45,15 @@ type PermissionEvent = Extract<OpencodeEvent, { type: typeof OpencodeEventType.P
  */
 export function watchSessions(
   state: AttemptState,
-  deps: { opencode: OpencodeClient; prompts: Prompts; clock: Clock; slots: Pick<ModelSlots, 'changed'>; log: Logger },
+  deps: {
+    taskPolicy(id: string): TaskPermissionPolicy;
+    permissionReviewer: PermissionReviewer;
+    opencode: OpencodeClient;
+    prompts: Prompts;
+    clock: Clock;
+    slots: Pick<ModelSlots, 'changed'>;
+    log: Logger;
+  },
   isLocal: (id: string) => boolean,
 ) {
   const { repo, live, mustFind, move, record } = state;
@@ -137,7 +148,77 @@ export function watchSessions(
   }
 
   /** A permission request waits in「需要你处理」until the user decides (03 §2.5). */
-  function onPermission(attempt: Attempt, event: PermissionEvent): void {
+
+  function routePermission(attempt: Attempt, session: LiveSession, event: PermissionEvent) {
+    if (session.seenPermissions.has(event.permissionId)) return;
+    session.seenPermissions.add(event.permissionId);
+    if (attempt.taskId === null) {
+      onPermission(attempt, event);
+      return;
+    }
+    const taskId = attempt.taskId,
+      policy = deps.taskPolicy(taskId);
+    if (policy.mode === PermissionMode.Ask && attempt.permissionBaseline === null) {
+      onPermission(attempt, event);
+      return;
+    }
+    const outstanding = session.deciding;
+    const ticket = new AbortController();
+    outstanding.set(event.permissionId, ticket);
+    const signal = AbortSignal.any([ticket.signal, session.permissionStop.signal]);
+    const decide = async () => {
+      const result =
+        policy.mode === PermissionMode.Ask && session.grants.has(grantKey(event))
+          ? { reply: PermissionDecision.Once, reason: undefined }
+          : await deps.permissionReviewer.native({
+              event,
+              call:
+                policy.mode === PermissionMode.Assisted
+                  ? await session.view.permissionCall(event.callId, deps.clock, signal)
+                  : undefined,
+              directory: session.directory,
+              intent: policy.intent,
+              checkCommand: policy.checkCommand,
+              mode: policy.mode,
+              mutable: attempt.permissionBaseline !== null,
+              parentSignal: session.permissionStop.signal,
+              baselineRules: attempt.permissionBaseline ?? [],
+              signal,
+            });
+      if (signal.aborted) return;
+      if (result.reason)
+        record(attempt, [
+          systemEntry(
+            TranscriptSystemEvent.PermissionReview,
+            [
+              event.permission,
+              result.reply && deps.taskPolicy(taskId).mode === policy.mode ? '批准本次' : '询问你',
+              result.reason,
+            ].join(' · '),
+          ),
+        ]);
+      if (result.reply === undefined || deps.taskPolicy(taskId).mode !== policy.mode) {
+        onPermission(attempt, event, result.reason);
+        return;
+      }
+      await deps.opencode.replyPermission({
+        permissionId: event.permissionId,
+        directory: event.directory,
+        reply: result.reply,
+      });
+    };
+    void decide()
+      .catch((err: unknown) => {
+        if (signal.aborted || (err instanceof AppError && err.code === ErrorCode.PermissionRequestExpired)) return;
+        deps.log.warn({ err, attemptId: attempt.id }, 'permission response failed');
+        onPermission(attempt, event);
+      })
+      .finally(() => {
+        if (outstanding.get(event.permissionId) === ticket) outstanding.delete(event.permissionId);
+        if (!session.permissionStop.signal.aborted) resume(session);
+      });
+  }
+  function onPermission(attempt: Attempt, event: PermissionEvent, reason?: string): void {
     state.inbox.create({
       kind: InboxKind.Permission,
       taskId: attempt.taskId,
@@ -150,6 +231,7 @@ export function watchSessions(
         directory: event.directory,
         permission: event.permission,
         patterns: event.patterns,
+        ...(reason ? { reason } : {}),
       },
     });
   }
@@ -273,10 +355,12 @@ export function watchSessions(
         onToolEvent(attempt, session, event);
         return;
       case OpencodeEventType.PermissionAsked:
-        if (running || session.finishingCommand) onPermission(attempt, event);
+        if (running || session.finishingCommand) routePermission(attempt, session, event);
         if (running) state.park(session, attempt);
         return;
       case OpencodeEventType.PermissionReplied:
+        session.deciding.get(event.permissionId)?.abort();
+        session.deciding.delete(event.permissionId);
         state.inbox.completePermission(attempt.id, event.permissionId, event.reply);
         if (running) resume(session);
         return;

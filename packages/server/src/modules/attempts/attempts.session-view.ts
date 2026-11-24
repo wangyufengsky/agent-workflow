@@ -5,6 +5,7 @@ import {
   TranscriptEntryKind,
   TranscriptSystemEvent,
 } from '@aw/shared';
+import type { Clock } from '../../core/clock.ts';
 import {
   CONTEXT_OVERFLOW_ERROR,
   describeOpencodeError,
@@ -31,6 +32,8 @@ type TextPart = {
 export function createSessionView() {
   const roles = new Map<string, 'user' | 'assistant'>();
   const parts = new Map<string, TextPart>();
+  const activeCalls = new Map<string, Extract<OpencodeEvent, { type: typeof E.Tool }>>();
+  const callEvents = new EventTarget();
   const calledTools = new Set<string>();
   /** The reason of the retry in progress; cleared by anything the session does other than sending the request. */
   let retrying: string | undefined;
@@ -42,6 +45,24 @@ export function createSessionView() {
   };
 
   return {
+    async permissionCall(id: string | undefined, clock: Clock, signal: AbortSignal) {
+      if (!id || signal.aborted) return;
+      const existing = activeCalls.get(id);
+      if (existing) return existing;
+      // 原生权限事件可能早于同一调用的 running 事件。只接收已关联的调用。
+      await new Promise<void>((resolve) => {
+        const finish = () => {
+          cancel();
+          signal.removeEventListener('abort', finish);
+          callEvents.removeEventListener(id, finish);
+          resolve();
+        };
+        const cancel = clock.schedule(1000, finish);
+        signal.addEventListener('abort', finish, { once: true });
+        callEvents.addEventListener(id, finish, { once: true });
+      });
+      return activeCalls.get(id);
+    },
     toEntries(event: OpencodeEvent): NewTranscriptEntry[] {
       if (event.type !== E.Retry && event.type !== E.Busy) retrying = undefined;
       switch (event.type) {
@@ -67,6 +88,10 @@ export function createSessionView() {
         }
         case E.Tool: {
           const { callId, tool } = event;
+          if (event.status === ToolCallStatus.Running) {
+            activeCalls.set(callId, event);
+            callEvents.dispatchEvent(new Event(callId));
+          } else if (event.status !== ToolCallStatus.Pending) activeCalls.delete(callId);
           if (event.status === ToolCallStatus.Pending) return [];
           if (event.status === ToolCallStatus.Running) {
             if (calledTools.has(callId)) return [];

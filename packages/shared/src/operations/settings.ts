@@ -35,6 +35,7 @@ export const updateSettingsOp = defineOperationContract({
     'assistant.alwaysAllow',
     'opencode.binaryPath',
     'ai.bashPolicy',
+    'ai.defaultModel',
     'ai.sessionStartCommand',
     'ai.sessionEndCommand',
     'worktree.rootDir',

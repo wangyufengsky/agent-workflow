@@ -87,6 +87,7 @@ function PermissionCard({ item, resolve, pending }: CardProps<typeof InboxKind.P
       <span className="sub">
         {C.wantsTo}（{item.payload.permission}）
       </span>
+      {item.payload.reason && <p>{item.payload.reason}</p>}
       <code className={styles.command}>{item.payload.patterns.join('\n')}</code>
       <div className={styles.actions}>
         <Button

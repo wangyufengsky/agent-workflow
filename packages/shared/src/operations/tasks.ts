@@ -26,7 +26,7 @@ import {
   taskSummarySchema,
 } from '../contracts/api/tasks.ts';
 import { EntityKind, InputRef } from '../enums/entity.ts';
-import { OperationRisk } from '../enums/system.ts';
+import { OperationRisk, permissionModeSchema } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
 
@@ -46,9 +46,22 @@ export const listTasksOp = defineOperationContract({
   http: { method: 'GET', path: '/tasks' },
 });
 
+export const setTaskPermissionModeOp = defineOperationContract({
+  ...common,
+  id: 'tasks.setPermissionMode',
+  title: 'op.tasks.setPermissionMode',
+  description: 'Set the approval policy for this task',
+  input: z.object({ id: z.string(), permissionMode: permissionModeSchema }),
+  output: taskDetailSchema,
+  http: { method: 'PATCH', path: '/tasks/:id/permission-mode' },
+  risk: OperationRisk.Critical,
+  expose: { palette: false, assistant: false },
+});
+
 export const createTaskOp = defineOperationContract({
   ...common,
   id: 'tasks.create',
+  assistantOmit: ['permissionMode'],
   refs: { projectId: InputRef.Project, workflowId: InputRef.Workflow, attachmentIds: InputRef.Attachment },
   title: 'op.tasks.create',
   description: 'Create a development task in a project with a workflow and start it (unless start is false)',
