@@ -2,6 +2,17 @@ import { AppError, type CommitIdentity, ErrorCode, GIT_COMMIT_IDENTITY } from '@
 import { execa } from 'execa';
 import { host } from '../../core/platform.ts';
 
+let processEnvironment: NodeJS.ProcessEnv | undefined;
+
+/** Installed by the real backend entry point; embedding the app never changes this default. */
+export function installGitProcessEnvironment(env: NodeJS.ProcessEnv): void {
+  processEnvironment = env;
+}
+
+export function gitProcessEnvironment(): NodeJS.ProcessEnv {
+  return processEnvironment ?? process.env;
+}
+
 export type GitOptions = {
   cwd: string;
   /** Exit codes that are answers rather than failures (e.g. 1 from `symbolic-ref --quiet`). Default [0]. */
@@ -22,7 +33,7 @@ export type GitResult = { stdout: string; stderr: string; exitCode: number };
  * missing binary → GIT_NOT_INSTALLED, unexpected exit → GIT_COMMAND_FAILED with args, exit code and stderr.
  */
 export async function runGit(args: readonly string[], options: GitOptions): Promise<GitResult> {
-  const env = options.env ?? process.env;
+  const env = options.env ?? gitProcessEnvironment();
   // Located here rather than by spawning: on Windows execa runs an unresolvable command through cmd.exe, which
   // exits 1 instead of reporting ENOENT.
   const git = host.findExecutable('git', host.pathDirs(env));

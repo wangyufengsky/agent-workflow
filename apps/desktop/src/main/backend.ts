@@ -1,9 +1,10 @@
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
+import { desktopBackendEnvironment } from '@aw/server/startup-environment';
 import { type BackendShutdownMessage, devPorts, platformSchema } from '@aw/shared';
 import { app, utilityProcess } from 'electron';
 import { type BrowserTabs, type BrowserTabsDeps, serveBrowserRequests } from './browser.ts';
-import { serveCredentialRequests } from './credentials.ts';
+import { desktopCredentialCipher, serveCredentialRequests } from './credentials.ts';
 import { withLoginShellEnv } from './shell-path.ts';
 
 /** `stop` asks the backend to shut down (it stops opencode first) and resolves once it has exited. */
@@ -20,14 +21,20 @@ export async function startBackend(
   browser: Omit<BrowserTabsDeps, 'emit'>,
 ): Promise<Backend> {
   // `shell` is null only on Windows, which has no login shell to ask.
-  const env = await withLoginShellEnv(platformSchema.parse(process.platform), process.env, userInfo().shell ?? '');
+  const dataDir = app.getPath('userData');
+  const inherited = await withLoginShellEnv(
+    platformSchema.parse(process.platform),
+    process.env,
+    userInfo().shell ?? '',
+  );
+  const env = await desktopBackendEnvironment(dataDir, inherited, desktopCredentialCipher);
   const child = utilityProcess.fork(join(import.meta.dirname, 'server.js'), [], {
     serviceName: 'agent-workflow-backend',
     stdio: 'inherit',
     env: {
       ...env,
       AW_API_TOKEN: apiToken,
-      AW_DATA_DIR: app.getPath('userData'),
+      AW_DATA_DIR: dataDir,
       AW_PORT: String(isDev ? devPorts(process.env).api : 0),
       AW_APP_VERSION: app.getVersion(),
       AW_MIGRATIONS_DIR: app.isPackaged

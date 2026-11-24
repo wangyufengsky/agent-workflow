@@ -10,7 +10,7 @@ import {
 } from '@aw/shared';
 import { eq } from 'drizzle-orm';
 import type { Clock } from '../../core/clock.ts';
-import type { Db } from '../../core/db/database.ts';
+import type { Db, DbExecutor } from '../../core/db/database.ts';
 import type { CredentialCipher } from './cipher.ts';
 import { credentialsTable } from './credentials.table.ts';
 import { createMasterPassword } from './master-password.ts';
@@ -20,13 +20,18 @@ export type CredentialsServiceDeps = { db: Db; clock: Clock; cipher: CredentialC
 /** The only reader and writer of secrets (06 §11); other modules keep just the credential id. */
 export function createCredentialsService({ db, clock, cipher }: CredentialsServiceDeps) {
   const masterPassword = createMasterPassword({ db, clock });
+  const unlockListeners = new Set<() => Promise<void>>();
 
   /** The OS key store when it works, else the master password (D167). */
-  async function seal(secret: string): Promise<{ seal: CredentialSeal; ciphertext: Buffer }> {
+  async function seal(secret: string): Promise<{ seal: CredentialSeal; ciphertext: Buffer; generation?: number }> {
     if (await cipher.isAvailable()) {
       return { seal: CredentialSeal.System, ciphertext: Buffer.from(await cipher.encrypt(secret)) };
     }
-    return { seal: CredentialSeal.MasterPassword, ciphertext: masterPassword.encrypt(secret) };
+    return {
+      seal: CredentialSeal.MasterPassword,
+      ciphertext: masterPassword.encrypt(secret),
+      generation: masterPassword.generation(),
+    };
   }
 
   async function status(): Promise<CredentialStatusDTO> {
@@ -35,20 +40,38 @@ export function createCredentialsService({ db, clock, cipher }: CredentialsServi
     return { available: system || state === MasterPasswordState.Unlocked, system, masterPassword: state };
   }
 
+  function assertSealCurrent(generation: number | undefined) {
+    if (generation !== undefined && generation !== masterPassword.generation())
+      throw new AppError(
+        ErrorCode.CredentialUnavailable,
+        'The credential vault was reset before encryption could be committed',
+      );
+  }
+
+  async function prepare(kind: CredentialKind, secret: string) {
+    const { generation, ...sealed } = await seal(secret);
+    const record = { id: randomUUID(), kind, ...sealed, createdAt: clock.now() };
+    return {
+      id: record.id,
+      save(executor: DbExecutor) {
+        assertSealCurrent(generation);
+        executor.insert(credentialsTable).values(record).run();
+      },
+    };
+  }
+
   return {
+    /** Encrypt outside a synchronous transaction, then store with the record that owns the secret. */
+    prepare,
     async create(kind: CredentialKind, secret: string): Promise<string> {
-      const id = randomUUID();
-      db.insert(credentialsTable)
-        .values({ id, kind, ...(await seal(secret)), createdAt: clock.now() })
-        .run();
-      return id;
+      const prepared = await prepare(kind, secret);
+      prepared.save(db);
+      return prepared.id;
     },
     async replace(id: string, secret: string): Promise<void> {
-      const { changes } = db
-        .update(credentialsTable)
-        .set(await seal(secret))
-        .where(eq(credentialsTable.id, id))
-        .run();
+      const { generation, ...sealed } = await seal(secret);
+      assertSealCurrent(generation);
+      const { changes } = db.update(credentialsTable).set(sealed).where(eq(credentialsTable.id, id)).run();
       if (changes === 0) throw new AppError(ErrorCode.NotFound, `Credential ${id} not found`);
     },
     /** Decrypts for immediate use; never return the result through an API or MCP response. */
@@ -67,15 +90,19 @@ export function createCredentialsService({ db, clock, cipher }: CredentialsServi
       }
     },
     status,
-    remove(id: string): void {
-      db.delete(credentialsTable).where(eq(credentialsTable.id, id)).run();
+    remove(id: string, executor: DbExecutor = db): void {
+      executor.delete(credentialsTable).where(eq(credentialsTable.id, id)).run();
     },
     async setupMasterPassword(password: string): Promise<CredentialStatusDTO> {
       await masterPassword.setup(password);
       return status();
     },
+    onUnlock(listener: () => Promise<void>): void {
+      unlockListeners.add(listener);
+    },
     async unlock(password: string): Promise<CredentialStatusDTO> {
       await masterPassword.unlock(password);
+      for (const listener of unlockListeners) await listener();
       return status();
     },
     async changeMasterPassword(currentPassword: string, newPassword: string): Promise<CredentialStatusDTO> {

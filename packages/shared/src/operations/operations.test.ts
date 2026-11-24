@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OperationRisk } from '../enums/system.ts';
-import { OPERATION_CONTRACTS } from './index.ts';
+import { OPERATION_CONTRACTS, setStartupEnvironmentOp } from './index.ts';
 
 /** Input field names that carry a secret (D28): they must never reach the assistant's tool schema. */
 const SECRET_FIELD = /password|token|secret|credential/i;
@@ -11,7 +11,7 @@ describe('操作清单的标注（M5-10）', () => {
     const secrets = OPERATION_CONTRACTS.map((op) => [
       op.id,
       Object.keys(op.input.shape)
-        .filter((field) => SECRET_FIELD.test(field))
+        .filter((field) => SECRET_FIELD.test(field) || (op.id === setStartupEnvironmentOp.id && field === 'items'))
         .sort(),
     ]);
     expect(declared).toEqual(secrets);

@@ -729,3 +729,12 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 ## 数据库调查活动
 
 `GET /database-investigations/:kind/:id` 读取任务（`task`）或助手会话（`assistant`）的调查活动。服务端从所属对象取项目。返回的 `items` 包含问题、状态、已取得的证据、回答及历轮结果，按最近更新时间降序排列。助手调查详情在专业模式下展示。
+
+## 启动环境变量
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| `GET /settings/startup-environment` | 返回有序的 `items` 和版本标识 `revision`。普通变量带名称和值，密钥只返回名称和 `secret: true`。 |
+| `PUT /settings/startup-environment` | 保存整份列表。设置页提交 `expectedRevision`，版本已变化时返回冲突并保留草稿。以同名密钥且省略 `value` 表示保留原密钥。传空字符串表示显式设置为空，传空列表清除配置。 |
+
+这两个操作供专业模式设置页使用。启动配置和密钥值独立于通用设置及助手工具。

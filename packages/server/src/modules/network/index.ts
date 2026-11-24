@@ -81,6 +81,7 @@ export async function createNetworkModule({ settings, events, env, dataDir, log 
   });
 
   return {
+    refreshProxyEnvironment: applyProxy,
     /**
      * Variables for the next opencode launch: bun reads the system store with `NODE_USE_SYSTEM_CA`, the setting's
      * certificates from the file `NODE_EXTRA_CA_CERTS` names, and the forwarding proxy while a proxy is in effect

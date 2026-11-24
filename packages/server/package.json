@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./startup-environment": "./src/startup-environment.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",

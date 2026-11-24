@@ -1,5 +1,5 @@
 import { AppError, ErrorCode } from '@aw/shared';
-import { runGit } from './git.cli.ts';
+import { gitProcessEnvironment, runGit } from './git.cli.ts';
 
 /**
  * What reaching remotes over HTTPS takes besides the user's own git configuration (D175): `-c` settings, passed in the
@@ -19,7 +19,7 @@ export function originEnv(network: GitNetwork, authorization?: string): NodeJS.P
     ...(authorization === undefined ? [] : [['http.extraHeader', `Authorization: ${authorization}`] as const]),
   ];
   return {
-    ...process.env,
+    ...gitProcessEnvironment(),
     ...network.env,
     ...(config.length === 0 ? {} : { GIT_CONFIG_PARAMETERS: configParameters(config) }),
     GIT_TERMINAL_PROMPT: '0',
