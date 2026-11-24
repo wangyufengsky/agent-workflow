@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { WorkflowSeed } from '@aw/builtin';
 import {
+  APPROVER_ROLE_KEY,
   AppError,
   type CreateWorkflowRequest,
   ErrorCode,
@@ -61,7 +62,10 @@ export function createWorkflowsService({ db, unit, clock, log, roles }: Workflow
   }
 
   const validate = (shape: WorkflowShape): ValidateWorkflowResponse => ({
-    problems: validateWorkflowDefinition(shape, roles.list()),
+    problems: validateWorkflowDefinition(
+      shape,
+      roles.list().filter((r) => r.key !== APPROVER_ROLE_KEY),
+    ),
   });
 
   function assertValid(shape: WorkflowShape): void {

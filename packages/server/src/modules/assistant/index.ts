@@ -130,7 +130,7 @@ export function createAssistantModule(deps: AssistantModuleDeps) {
   const registry = createAssistantToolRegistry(
     [
       ...operationTools(deps.operations, {
-        settings: deps.settings,
+        approveWrite: conversations.approveWrite,
         run,
         requestConfirmation: confirmations.request,
         recordProduced: conversations.recordProduced,

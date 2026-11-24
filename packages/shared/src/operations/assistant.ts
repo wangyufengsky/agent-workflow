@@ -18,7 +18,7 @@ import {
   assistantBrowserControlSchema,
   assistantBrowserResultSchema,
 } from '../contracts/api/browser.ts';
-import { OperationRisk } from '../enums/system.ts';
+import { OperationRisk, permissionModeSchema } from '../enums/system.ts';
 import { UiMode } from '../enums/ui.ts';
 import { defineOperationContract } from './define.ts';
 
@@ -46,6 +46,18 @@ export const listConversationsOp = defineOperationContract({
   output: z.object({ items: z.array(assistantConversationSchema) }),
   risk: OperationRisk.Read,
   http: { method: 'GET', path: '/assistant/conversations' },
+});
+
+export const setConversationPermissionModeOp = defineOperationContract({
+  ...common,
+  id: 'assistant.setPermissionMode',
+  title: 'op.assistant.setPermissionMode',
+  description: 'Set the approval policy for this conversation',
+  input: z.object({ id: z.string(), permissionMode: permissionModeSchema }),
+  output: assistantConversationSchema,
+  http: { method: 'PATCH', path: '/assistant/conversations/:id/permission-mode' },
+  risk: OperationRisk.Critical,
+  expose: { palette: false, assistant: false },
 });
 
 export const createConversationOp = defineOperationContract({

@@ -5,6 +5,7 @@ import {
   AppError,
   ErrorCode,
   IMAGE_ANALYSIS_CLEANUP_TIMEOUT_MS,
+  OPENCODE_APPROVER_AGENT,
   OPENCODE_ASSISTANT_AGENT,
   OPENCODE_COMPANION_AGENT,
   OPENCODE_DATABASE_INVESTIGATOR_AGENT,
@@ -24,6 +25,7 @@ export const SessionPurpose = {
   Initiative: 'initiative',
   PlanningRevision: 'planning-revision',
   Assistant: 'assistant',
+  Approval: 'approval',
   Document: 'document',
   Image: 'image',
   Companion: 'companion',
@@ -37,6 +39,12 @@ const dispatchPolicies = {
   [SessionPurpose.Initiative]: { lifetime: 'attempt', slot: 'owner', reuse: 'when_available' },
   [SessionPurpose.PlanningRevision]: { lifetime: 'attempt', slot: 'owner', reuse: 'required' },
   [SessionPurpose.Assistant]: { lifetime: 'object', slot: 'owner', agent: OPENCODE_ASSISTANT_AGENT },
+  [SessionPurpose.Approval]: {
+    lifetime: 'call',
+    slot: 'borrowOrExclusive',
+    agent: OPENCODE_APPROVER_AGENT,
+    prefix: 'aw-approval-',
+  },
   [SessionPurpose.Document]: {
     lifetime: 'call',
     slot: 'borrowOrExclusive',
@@ -77,7 +85,7 @@ type Slot = { kind: 'exclusive' } | { kind: 'optional' } | { kind: 'delegated'; 
 type DispatchPolicy = { slot: Slot; signal?: AbortSignal };
 type Session = { sessionId: string; directory: string; signal: AbortSignal };
 type Call = { title: string; signal?: AbortSignal; parentSignal?: AbortSignal } & (
-  | { purpose: typeof SessionPurpose.Document | typeof SessionPurpose.Image }
+  | { purpose: typeof SessionPurpose.Approval | typeof SessionPurpose.Document | typeof SessionPurpose.Image }
   | { purpose: typeof SessionPurpose.Companion; directory: string }
 );
 

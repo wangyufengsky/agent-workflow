@@ -44,12 +44,12 @@ export const NEEDS_CONFIRMATION_INSTRUCTION =
 
 const RISK_NOTE: Record<OperationRisk, string> = {
   [OperationRisk.Read]: '',
-  [OperationRisk.Write]: " Changes the app: needs the user's confirmation unless they always allow it.",
+  [OperationRisk.Write]: " Changes the app under the conversation's approval mode.",
   [OperationRisk.Critical]: " Cannot be undone easily: needs the user's confirmation every time.",
 };
 
 export type OperationToolDeps = {
-  settings: SettingsService;
+  approveWrite(id: string, operationId: string, input: Record<string, unknown>): Promise<boolean>;
   run: TaskRelay['run'];
   /** Records the object an operation produced in the conversation (D66). */
   recordProduced(conversationId: string, contract: OperationContract, output: unknown): void;
@@ -102,7 +102,7 @@ export function operationTools(impls: readonly OperationImpl[], deps: OperationT
           const risk = assistantOperationRisk(contract, input);
           const allowed =
             risk === OperationRisk.Read ||
-            (risk === OperationRisk.Write && deps.settings.get('assistant.alwaysAllow').includes(contract.id));
+            (risk === OperationRisk.Write && (await deps.approveWrite(conversation.id, contract.id, input)));
           if (allowed) {
             // A failing operation answers with its error code, like any tool (12 §5).
             const output = await deps.run(conversation.id, impl, input);

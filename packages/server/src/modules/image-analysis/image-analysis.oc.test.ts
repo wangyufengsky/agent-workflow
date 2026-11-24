@@ -5,9 +5,11 @@ import { join } from 'node:path';
 import {
   ATTACHMENT_NAME_HEADER,
   createConversationOp,
+  IMAGE_PROCESSOR_ROLE_KEY,
   ServerEventType,
   sendAssistantMessageOp,
   type TranscriptPage,
+  updateRoleOp,
   updateSettingsOp,
 } from '@aw/shared';
 import { expect, it } from 'vitest';
@@ -123,10 +125,10 @@ it('@opencode 纯文本助手加载识图 Skill，经 MCP 发送原图给视觉�
     );
     t = await createTestApp({ realOpencode: true, env: { ...process.env, OPENCODE_CONFIG: config } });
     await t.app.start(t.port);
+    await t.call(updateRoleOp, { id: t.app.services.roles.getByKey(IMAGE_PROCESSOR_ROLE_KEY).id, model: VISION_MODEL });
     expect(
       (
         await t.call(updateSettingsOp, {
-          'ai.imageModel': VISION_MODEL,
           'ai.defaultModel': TEXT_MODEL,
           'scheduler.maxConcurrentAttempts': 1,
         })

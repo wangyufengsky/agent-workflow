@@ -76,8 +76,6 @@ export function ProSettings({ settings, set }: { settings: Settings; set: (patch
   const models = usableModels(useQuery(environmentQuery).data?.models.available ?? [], null);
   const ids = models.map((m) => `${m.providerId}/${m.modelId}`);
   const model = settings['ai.defaultModel'];
-  const imageModel = settings['ai.imageModel'];
-  const imageModels = models.filter((item) => item.supportsImage);
   return (
     <Panel title={C.pro}>
       <div className="field">
@@ -99,28 +97,6 @@ export function ProSettings({ settings, set }: { settings: Settings; set: (patch
           ))}
         </select>
         <p className="hint">{C.defaultModelHint}</p>
-      </div>
-      <div className="field">
-        <label className="label" htmlFor="setting-image-model">
-          {C.imageModel}
-        </label>
-        <select
-          id="setting-image-model"
-          className="select"
-          value={imageModel ?? ''}
-          onChange={(e) => set({ 'ai.imageModel': e.target.value === '' ? null : e.target.value })}
-        >
-          <option value="">{C.imageModelDisabled}</option>
-          {imageModel !== null && !imageModels.some((item) => `${item.providerId}/${item.modelId}` === imageModel) && (
-            <option value={imageModel}>{imageModel}</option>
-          )}
-          {imageModels.map((item) => (
-            <option key={`${item.providerId}/${item.modelId}`} value={`${item.providerId}/${item.modelId}`}>
-              {item.name}（{item.providerId}/{item.modelId}）
-            </option>
-          ))}
-        </select>
-        <p className="hint">{C.imageModelHint}</p>
       </div>
       <div className="field">
         <span className="label">{C.bashPolicy}</span>

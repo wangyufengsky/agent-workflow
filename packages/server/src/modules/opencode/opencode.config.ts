@@ -16,6 +16,7 @@ import {
   MCP_TOOL_PREFIX,
   McpToolName,
   OPENCODE_AGENT_NAME,
+  OPENCODE_APPROVER_AGENT,
   OPENCODE_ASSISTANT_AGENT,
   OPENCODE_COMPANION_AGENT,
   OPENCODE_DATABASE_INVESTIGATOR_AGENT,
@@ -242,6 +243,7 @@ export function buildOpencodeConfig(input: OpencodeConfigInput) {
         prompt: input.prompts[PromptName.ProtocolDatabaseInvestigator],
         permission: { '*': 'deny' },
       },
+      [OPENCODE_APPROVER_AGENT]: { mode: 'primary', description: 'Permission reviewer', permission: { '*': 'deny' } },
       [OPENCODE_DOCUMENT_AGENT]: {
         mode: 'primary',
         description: 'document processor',

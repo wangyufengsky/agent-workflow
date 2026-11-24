@@ -27,6 +27,7 @@ export const permissionPayloadSchema = z.object({
   permission: z.string(),
   /** The sub-commands asked about; on「总是允许」bash ones are remembered for the project too (D101). */
   patterns: z.array(z.string()),
+  reason: z.string().optional(),
 });
 export type PermissionPayload = z.infer<typeof permissionPayloadSchema>;
 export const permissionResponseSchema = z.object({ decision: permissionDecisionSchema });

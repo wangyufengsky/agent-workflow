@@ -9,6 +9,7 @@ import {
   type FunctionalTestScope,
   functionalTestScopeSchema,
   InitiativeTemplateKind,
+  PermissionMode,
   type ProjectDTO,
   WorkflowKind,
 } from '@aw/shared';
@@ -32,10 +33,9 @@ import { SCHEDULES_COPY } from '../../copy/schedules.ts';
 import { BROWSER_TEST_COPY, HOME_TASK_COPY } from '../../copy/tasks.ts';
 import { useUiStore } from '../../state/ui.store.ts';
 import { AddMenu, type AddMenuItem } from '../assistant/add-menu.tsx';
-import { useAbortAssistant } from '../assistant/assistant.queries.ts';
+import { useAbortAssistant, useSetConversationPermission } from '../assistant/assistant.queries.ts';
 import { useContextAttachments } from '../assistant/context-attachments.tsx';
 import { ConversationProjectSelect } from '../assistant/conversation-project-select.tsx';
-import { UsageButton } from '../assistant/usage-line.tsx';
 import { useAsk } from '../assistant/use-ask.ts';
 import { AttachmentList, dropFilesInto, pasteFilesInto, useAttachmentPickers } from '../attachments/attachment-bar.tsx';
 import { attachmentQuery } from '../attachments/attachments.api.ts';
@@ -46,10 +46,11 @@ import { canImportCaseAttachment, FunctionalTestFields } from '../functional-tes
 import { AllowedWorkflowsField } from '../initiatives/allowed-workflows-field.tsx';
 import { initiativeTemplatesQuery } from '../initiatives/initiatives.queries.ts';
 import { templateChain, useStartInitiative } from '../initiatives/use-start-initiative.ts';
+import { PermissionPicker } from '../permissions/permission-picker.tsx';
 import { ProjectPicker } from '../projects/project-picker.tsx';
 import type { DraftRequirement } from '../requirements/checklist-editor.tsx';
 import { ChecklistField } from '../requirements/checklist-field.tsx';
-import { AssistantSkillPicker } from '../skills/assistant-skill-picker.tsx';
+import { useSlashSkills } from '../skills/assistant-skill-picker.tsx';
 import { WorkflowSkillSummary } from '../skills/workflow-skill-summary.tsx';
 import { workflowsQuery } from '../tasks/tasks.queries.ts';
 import { FunctionalTestSource, useFunctionalTestSource } from './functional-test-source.tsx';
@@ -110,6 +111,9 @@ export function HomeComposer({
   const [breakdown, setBreakdown] = useState(false);
   const [allowedWorkflows, setAllowedWorkflows] = useState<string[] | undefined>(undefined);
   const ask = useAsk();
+  const [draftMode, setDraftMode] = useState<PermissionMode>(PermissionMode.Ask);
+  const changeMode = useSetConversationPermission();
+  const chatMode = conversation?.permissionMode ?? draftMode;
   const [skillIds, setSkillIds] = useState<string[]>([]);
   const abort = useAbortAssistant();
   const input = useRef<HTMLTextAreaElement>(null);
@@ -200,7 +204,9 @@ export function HomeComposer({
     scopedWrites,
   ]);
   const functionalApproved = approvedFunctionalScope === functionalApprovalKey;
+  const [taskMode, setTaskMode] = useState<PermissionMode>(PermissionMode.Ask);
   const task = useStartTask({
+    permissionMode: taskMode,
     projectId,
     workflowId: workflows.data?.find((w) => w.key === workflowKey)?.id,
     requirement: text,
@@ -321,6 +327,7 @@ export function HomeComposer({
         files.ids,
         assistantProjectId,
         skillIds,
+        chatMode,
       );
     }
   };
@@ -328,7 +335,9 @@ export function HomeComposer({
     e.preventDefault();
     send();
   };
-  const onKeyDown = (e: KeyboardEvent) => {
+  const slash = useSlashSkills(input, text, setText, skillIds, setSkillIds, mode === undefined);
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (slash.keyDown(e)) return;
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       send();
@@ -398,8 +407,10 @@ export function HomeComposer({
             )}
           </div>
         )}
-        {!docked && conversationProject}
+        {mode === undefined && !docked && conversationProject}
+        {slash.panel}
         <textarea
+          {...slash.props}
           ref={input}
           className={styles.input}
           rows={docked ? 1 : 3}
@@ -412,7 +423,10 @@ export function HomeComposer({
                 : C.placeholder
           }
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            slash.sync(e.currentTarget);
+          }}
           onKeyDown={onKeyDown}
           onPaste={pasteFilesInto(files)}
         />
@@ -628,8 +642,20 @@ export function HomeComposer({
         )}
         <div className={styles.boxFoot}>
           <AddMenu items={addItems} onOpen={context.capture} />
-          {docked && conversationProject && <div className={styles.dockedProject}>{conversationProject}</div>}
-          {mode === undefined && <AssistantSkillPicker selected={skillIds} onChange={setSkillIds} />}
+
+          {!initiativeMode && (
+            <PermissionPicker
+              task={mode !== undefined}
+              value={mode === undefined ? chatMode : taskMode}
+              disabled={changeMode.isPending}
+              onChange={(permissionMode) => {
+                if (mode !== undefined) setTaskMode(permissionMode);
+                else if (conversation) changeMode.mutate({ id: conversation.id, permissionMode });
+                else setDraftMode(permissionMode);
+              }}
+            />
+          )}
+          {changeMode.isError && <ErrorState error={changeMode.error} />}
           {initiativeMode ? (
             <>
               <label className="check">
@@ -673,7 +699,6 @@ export function HomeComposer({
                 </span>
               </button>
               <span className="grow" />
-              {conversation !== undefined && <UsageButton usage={conversation.usage} />}
             </>
           ) : (
             <>
@@ -772,12 +797,11 @@ export function HomeComposer({
             </button>
           ) : (
             <>
-              <span className="kbd">{ASSISTANT_COPY.sendHint}</span>
               <button
                 type="submit"
                 className={styles.send}
                 aria-label={C.send}
-                title={C.send}
+                title={ASSISTANT_COPY.sendHint}
                 disabled={empty || ask.isPending || files.blocked || knowledgeDraft !== undefined}
               >
                 {ask.isPending ? <span className="spin" aria-hidden="true" /> : <Icon name="arrowUp" size="sm" />}

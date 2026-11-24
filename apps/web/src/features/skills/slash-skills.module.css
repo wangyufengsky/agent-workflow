@@ -1,0 +1,49 @@
+.anchor {
+  position: relative;
+}
+.menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--raised);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+  border-radius: 10px;
+  padding: 6px;
+  max-height: min(45vh, 320px);
+  overflow: auto;
+}
+.heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.menu button {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  width: 100%;
+  padding: 7px 9px;
+  text-align: left;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.menu button[aria-selected="true"] {
+  background: var(--fill-2);
+}
+.menu button strong {
+  flex-shrink: 0;
+}
+.menu button span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.menu p {
+  padding: 6px 8px;
+}

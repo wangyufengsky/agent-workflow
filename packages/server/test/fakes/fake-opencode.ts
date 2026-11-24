@@ -445,6 +445,12 @@ export function createFakeOpencode() {
       mcpClients.clear();
     },
     isConnected: () => connected,
+    async sessionRules({ sessionId }) {
+      return sessionOf(sessionId).permission ?? [];
+    },
+    async setPermissions({ sessionId, permission }) {
+      sessionOf(sessionId).permission = permission;
+    },
     async createSession(input) {
       if (holding) await new Promise<void>((resolve) => heldSessions.add(resolve));
       if (!connected) throw new Error('FakeOpencode is not connected');

@@ -7,6 +7,7 @@ import {
   createTaskOp,
   ErrorCode,
   getKnowledgeOp,
+  IMAGE_PROCESSOR_ROLE_KEY,
   knowledgeCitationOp,
   listBrowserFramesOp,
   listMcpToolsOp,
@@ -14,6 +15,7 @@ import {
   McpToolName,
   RoleBaseAgent,
   ServerEventType,
+  updateRoleOp,
   updateSettingsOp,
 } from '@aw/shared';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -130,7 +132,10 @@ describe('浏览器工具', () => {
     expect(saved.body).toMatchObject({ file: '1.jpg' });
     const model = { providerId: 'local', modelId: 'vision' };
     t.fake.models.push({ ...model, name: 'Vision', contextLimit: null, supportsImage: true });
-    await t.call(updateSettingsOp, { 'ai.imageModel': 'local/vision' });
+    await t.call(updateRoleOp, {
+      id: t.app.services.roles.getByKey(IMAGE_PROCESSOR_ROLE_KEY).id,
+      model: 'local/vision',
+    });
     const readImage = vi.spyOn(t.fake, 'promptImage').mockResolvedValue('保存按钮在左侧');
     const question = '保存按钮在哪里？';
     expect(

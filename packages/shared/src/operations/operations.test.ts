@@ -28,6 +28,8 @@ describe('操作清单的标注（M5-10）', () => {
         'assistant.actBrowser',
         'assistant.confirm',
         'assistant.delete',
+        'assistant.setPermissionMode',
+        'tasks.setPermissionMode',
         'assistant.replyPermission',
         'batches.deliver',
         'credentials.resetMasterPassword',

@@ -67,6 +67,9 @@ export const OPENCODE_AGENT_NAME = {
 /** The app assistant's agent (15 §2); not a role base agent. */
 export const OPENCODE_ASSISTANT_AGENT = 'aw-assistant';
 export const OPENCODE_FUNCTIONAL_TEST_AGENT = 'aw-functional-tester';
+export const APPROVER_ROLE_KEY = 'aw-approver';
+export const IMAGE_PROCESSOR_ROLE_KEY = 'image_processor';
+export const OPENCODE_APPROVER_AGENT = 'aw-approver';
 export const OPENCODE_DOCUMENT_AGENT = 'aw-document-processor';
 export const OPENCODE_DATABASE_INVESTIGATOR_AGENT = 'aw-database-investigator';
 export const OPENCODE_IMAGE_AGENT = 'aw-image-reader';

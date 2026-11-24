@@ -80,7 +80,7 @@ function PermissionCard({
   text: string;
 }) {
   const reply = useReplyAssistantPermission();
-  const open = conversation.pendingPermissions.some((p) => p.permissionId === permissionId);
+  const open = conversation.pendingPermissions.find((p) => p.permissionId === permissionId);
   if (!open) return <p className={styles.system}>{text}</p>;
   const answer = (decision: PermissionDecision) => reply.mutate({ id: conversation.id, permissionId, reply: decision });
   return (
@@ -93,6 +93,7 @@ function PermissionCard({
           <span className={cards.cardTitle}>{C.permissionTitle}</span>
         </span>
       </header>
+      {open.reason && <p>{open.reason}</p>}
       <pre className={cards.json}>{text}</pre>
       <div className={cards.actions}>
         <Button size="sm" variant="primary" disabled={reply.isPending} onClick={() => answer(PermissionDecision.Once)}>

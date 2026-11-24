@@ -9924,6 +9924,13 @@ exports[`opencode 配置生成 > ai.bashPolicy = auto 时各 agent 的会话 bas
 exports[`opencode 配置生成 > 注入两套 MCP、基础与临时 agent 与 bridge 插件 1`] = `
 {
   "agent": {
+    "aw-approver": {
+      "description": "Permission reviewer",
+      "mode": "primary",
+      "permission": {
+        "*": "deny",
+      },
+    },
     "aw-assistant": {
       "description": "agent-workflow assistant",
       "mode": "primary",

@@ -157,6 +157,7 @@ export const deleteRoleOp = defineOperationContract({
 
 export const updateRoleOp = defineOperationContract({
   id: 'roles.update',
+  assistantOmit: ['model'],
   refs: { id: InputRef.Role },
   title: 'op.roles.update',
   description: "Change a custom role's name, prompt or model; built-in roles are read-only",

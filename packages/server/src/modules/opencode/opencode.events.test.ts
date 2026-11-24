@@ -52,6 +52,7 @@ describe('opencode 全局事件解析', () => {
       sessionId: 'ses_eac74a387ffeMgXo9hDGXzyQPQ',
       directory: '/tmp/aw-repo',
       permissionId: 'per_1538b763f00126bX5oaRtvGt4W',
+      callId: 'call-68dfc13f-ea64-49f3-a807-8a90e44a691e',
       messageId: 'msg_1538b72b8001PShaIBPviQmH3V',
       permission: 'bash',
       patterns: ['ls'],

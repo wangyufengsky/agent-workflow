@@ -1,4 +1,4 @@
-import type { AssistantConversationDTO } from '@aw/shared';
+import { type AssistantConversationDTO, PermissionMode } from '@aw/shared';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { useRef } from 'react';
 import { ROUTES } from '../../app/routes.ts';
@@ -62,13 +62,14 @@ export function useAsk() {
     attachmentIds: readonly string[] = [],
     projectId: string | null = null,
     skillIds: readonly string[] = [],
+    permissionMode: PermissionMode = PermissionMode.Ask,
   ) => {
     if (conversation !== undefined) sendTo(conversation, text, attachmentIds, skillIds, onSent);
-    else if (draftTarget.current?.projectId === projectId)
+    else if (draftTarget.current?.projectId === projectId && draftTarget.current?.permissionMode === permissionMode)
       sendTo(draftTarget.current, text, attachmentIds, skillIds, onSent);
     else
       create.mutate(
-        { projectId },
+        { projectId, permissionMode },
         {
           onSuccess: (c) => {
             draftTarget.current = c;

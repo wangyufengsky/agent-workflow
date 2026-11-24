@@ -52,7 +52,14 @@ export type Task = Omit<TaskRow, 'failure' | 'checkpoints' | 'result'> & {
 export type TaskChanges = Partial<
   Pick<
     TaskRow,
-    'failedPhase' | 'baseCommit' | 'branch' | 'currentPlanId' | 'startedAt' | 'finishedAt' | 'archivedAt'
+    | 'permissionMode'
+    | 'failedPhase'
+    | 'baseCommit'
+    | 'branch'
+    | 'currentPlanId'
+    | 'startedAt'
+    | 'finishedAt'
+    | 'archivedAt'
   > & {
     failure: ErrorInfo | null;
     result: TaskResultDTO;
@@ -74,7 +81,10 @@ export type NewTask = Pick<
   | 'createdAt'
   | 'updatedAt'
 > &
-  Partial<Pick<TaskRow, 'functionalTest' | 'testStartCommit'>> & { checkpoints: Checkpoints; skills: SkillSnapshot[] };
+  Partial<Pick<TaskRow, 'permissionMode' | 'functionalTest' | 'testStartCommit'>> & {
+    checkpoints: Checkpoints;
+    skills: SkillSnapshot[];
+  };
 
 // JSON columns: parsed at the boundary (06 §9).
 function toTask(row: { tasks: TaskRow; projectName: string; workflowKey: string; workflowName: string }): Task {
@@ -114,6 +124,20 @@ export function readTaskSkills(db: DbExecutor, id: string): SkillSnapshot[] {
   return skillSnapshotsSchema.parse(JSON.parse(row.skills));
 }
 
+export function readTaskPermissionPolicy(db: DbExecutor, id: string) {
+  const task = db
+    .select({
+      mode: tasksTable.permissionMode,
+      intent: tasksTable.requirement,
+      checkCommand: projectsTable.checkCommand,
+    })
+    .from(tasksTable)
+    .leftJoin(projectsTable, eq(projectsTable.id, tasksTable.projectId))
+    .where(eq(tasksTable.id, id))
+    .get();
+  if (!task) throw new AppError(ErrorCode.TaskNotFound, 'Task does not exist', { id });
+  return task;
+}
 export function createTasksRepo(db: DbExecutor) {
   const t = tasksTable;
   const select = (where: SQL | undefined) =>

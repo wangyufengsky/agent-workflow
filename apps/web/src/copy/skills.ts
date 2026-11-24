@@ -1,5 +1,9 @@
 export const SKILLS_COPY = {
   title: '我的 Skill',
+  slashKeys: '↑ ↓ 选择 · ↵ 加入',
+  limit: (n: number) => '每条消息最多选 ' + n + ' 个 Skill',
+  loading: '正在读取 Skill…',
+  remove: (name: string) => '移除 ' + name,
   subtitle: '查看内置和自定义 Skill，以及每条 Skill 的使用范围。',
   all: '全部',
   mine: '自定义',

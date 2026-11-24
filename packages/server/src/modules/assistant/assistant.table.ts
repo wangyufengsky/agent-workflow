@@ -1,4 +1,5 @@
 import type { AssistantConfirmationStatus, AssistantTurnEvent, AssistantTurnStatus } from '@aw/shared';
+import { PermissionMode } from '@aw/shared';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { initiativesTable } from '../initiatives/initiatives.table.ts';
 import { projectsTable } from '../projects/projects.table.ts';
@@ -10,6 +11,7 @@ export const assistantConversationsTable = sqliteTable(
   'assistant_conversations',
   {
     id: text('id').primaryKey(),
+    permissionMode: text('permission_mode').$type<PermissionMode>().notNull().default(PermissionMode.Ask),
     title: text('title').notNull(),
     /** Kept even if the project is deleted, so it cannot become a general chat silently. */
     projectId: text('project_id'),

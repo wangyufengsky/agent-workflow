@@ -100,7 +100,11 @@ describe('助手对话（A-02、A-03）', () => {
       expect.objectContaining({
         directory: join(realpathSync(t.dataDir), 'assistant', 'files', c.id),
         agent: OPENCODE_ASSISTANT_AGENT,
-        permission: [{ permission: 'bash', pattern: '*', action: 'ask' }],
+        permission: ['bash', 'external_directory', 'webfetch', 'edit'].map((permission) => ({
+          permission,
+          pattern: '*',
+          action: 'ask',
+        })),
       }),
     ]);
     const [sent] = t.fake.prompts;

@@ -22,6 +22,7 @@ import {
   previewAssistantFileOp,
   replyAssistantPermissionOp,
   sendAssistantMessageOp,
+  setConversationPermissionModeOp,
   snapshotAssistantContextOp,
   stopWhisperOp,
   whisperOp,
@@ -51,7 +52,12 @@ export function assistantOperations(
     implement(whisperOp, () => whisper.generate()),
     implement(stopWhisperOp, () => whisper.stop()),
     implement(listConversationsOp, () => ({ items: conversations.list() })),
-    implement(createConversationOp, ({ title, projectId }) => conversations.create(title, projectId)),
+    implement(setConversationPermissionModeOp, ({ id, permissionMode }) =>
+      conversations.setPermissionMode(id, permissionMode),
+    ),
+    implement(createConversationOp, ({ title, projectId, permissionMode }) =>
+      conversations.create(title, projectId, permissionMode),
+    ),
     implement(createAssistantContinuationOp, (input) => conversations.continueConversation(input)),
     implement(getAssistantContinuationHistoryOp, ({ id, afterSeq }) => conversations.continuationHistory(id, afterSeq)),
     implement(listAssistantAttachmentsOp, ({ id }) => ({ items: conversations.listAttachments(id) })),

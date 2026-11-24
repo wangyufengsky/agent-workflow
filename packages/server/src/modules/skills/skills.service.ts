@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import {
+  APPROVER_ROLE_KEY,
   AppError,
+  builtinSkillId,
   ErrorCode,
   type ProjectSkillBinding,
   SKILL_SELECTION_MAX,
@@ -70,7 +72,12 @@ export function createSkillsService(deps: {
 
   function validateScopes(scopes: SkillBindingScope[]) {
     const workflowKeys = new Set(workflows.list().map(({ key }) => key));
-    const roleIds = new Set(roles.list().map(({ id }) => id));
+    const roleIds = new Set(
+      roles
+        .list()
+        .filter((r) => r.key !== APPROVER_ROLE_KEY)
+        .map(({ id }) => id),
+    );
     const projectIds = new Set(projects.list().map(({ id }) => id));
     const seen = new Set<string>();
     for (const scope of scopes) {
@@ -178,7 +185,16 @@ export function createSkillsService(deps: {
         return { projectId, workflowKey, skillIds: ids };
       }),
     selected: (ids: string[]) =>
-      selected(ids).map((skill) => {
+      [...new Set(ids)].map((id) => {
+        if (id.startsWith('builtin:')) {
+          builtin ??= readBuiltinSkills(skillsDir);
+          const definition = builtin.find((s) => builtinSkillId(s.name) === id);
+          if (!definition) throw notFound(id);
+          if (!definition.assistantEnabled)
+            throw new AppError(ErrorCode.SkillAssistantDisabled, 'Skill is disabled for the assistant', { id });
+          return snapshotSkill({ ...definition, id, version: 1 });
+        }
+        const skill = get(id);
         if (!skill.assistantEnabled) {
           throw new AppError(ErrorCode.SkillAssistantDisabled, 'Skill is disabled for the assistant', { id: skill.id });
         }

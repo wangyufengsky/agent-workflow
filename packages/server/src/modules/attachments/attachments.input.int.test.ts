@@ -13,6 +13,7 @@ import {
   getModelSlotsOp,
   IMAGE_ANALYSIS_CLEANUP_TIMEOUT_MS,
   IMAGE_ANALYSIS_TIMEOUT_MS,
+  IMAGE_PROCESSOR_ROLE_KEY,
   listTasksOp,
   OPENCODE_ASSISTANT_AGENT,
   OPENCODE_IMAGE_AGENT,
@@ -21,6 +22,7 @@ import {
   sendAssistantMessageOp,
   startTaskOp,
   type TranscriptPage,
+  updateRoleOp,
   updateSettingsOp,
 } from '@aw/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -287,7 +289,14 @@ describe('助手消息的附件（30 §5）', () => {
       result: { code: ErrorCode.ImageAnalysisUnavailable },
     });
 
-    expect((await t.call(updateSettingsOp, { 'ai.imageModel': 'local/vision' })).status).toBe(200);
+    expect(
+      (
+        await t.call(updateRoleOp, {
+          id: t.app.services.roles.getByKey(IMAGE_PROCESSOR_ROLE_KEY).id,
+          model: 'local/vision',
+        })
+      ).status,
+    ).toBe(200);
     delegate();
     await say(other.id, '请读图');
     expect(toolResult('analyze_image', 1)).toMatchObject({
@@ -325,7 +334,11 @@ describe('助手消息的附件（30 §5）', () => {
       contextLimit: null,
       supportsImage: true,
     });
-    await t.call(updateSettingsOp, { 'ai.imageModel': 'local/vision', 'scheduler.maxConcurrentAttempts': 1 });
+    await t.call(updateRoleOp, {
+      id: t.app.services.roles.getByKey(IMAGE_PROCESSOR_ROLE_KEY).id,
+      model: 'local/vision',
+    });
+    await t.call(updateSettingsOp, { 'scheduler.maxConcurrentAttempts': 1 });
     const image = await uploaded(Buffer.from(WHITE_PNG_BASE64, 'base64'), 'screen.png');
     const { body: conversation } = await t.call(createConversationOp, {});
     const started = Promise.withResolvers<string>();

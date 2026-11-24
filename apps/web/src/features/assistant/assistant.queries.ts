@@ -20,6 +20,7 @@ import {
   replyAssistantPermissionOp,
   type SendAssistantMessageRequest,
   sendAssistantMessageOp,
+  setConversationPermissionModeOp,
 } from '@aw/shared';
 import {
   type QueryClient,
@@ -136,11 +137,22 @@ export async function updateConfirmation(qc: QueryClient, confirmation: Assistan
     await qc.invalidateQueries({ queryKey: queryKeys.assistantMemories });
 }
 
+export function useSetConversationPermission() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; permissionMode: import('@aw/shared').PermissionMode }) =>
+      callOperation(setConversationPermissionModeOp, input),
+    onSuccess: (c) => updateConversation(client, c),
+  });
+}
 export function useCreateConversation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { title?: string; projectId?: string | null } | undefined) =>
-      callOperation(createConversationOp, input ?? {}),
+    mutationFn: (
+      input:
+        | { title?: string; projectId?: string | null; permissionMode?: import('@aw/shared').PermissionMode }
+        | undefined,
+    ) => callOperation(createConversationOp, input ?? {}),
     onSuccess: (c) => updateConversation(queryClient, c),
   });
 }

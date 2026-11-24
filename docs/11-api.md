@@ -743,3 +743,7 @@ IDEA Compound 的成员列表声明有哪些服务。需要指定服务依赖与
 ## OpenCode 模型请求头
 
 专业设置通过 `GET /settings/opencode-headers` 读取、`PUT /settings/opencode-headers` 替换列表，沿用上节的密钥省略和版本冲突约定。头名按 HTTP token 校验且大小写不敏感，值接受可打印 ASCII 字符和制表符，拒绝换行。Host、Content-Length 等传输控制字段由客户端管理。此配置在 OpenCode 下次启动时生效，作用于所有所选模型供应商。
+
+## 审批与角色模型
+
+创建对话和任务可带 `permissionMode`。通过 `PATCH /assistant/conversations/:id/permission-mode` 或 `PATCH /tasks/:id/permission-mode` 提交 `{"permissionMode":"assisted"}`。两个端点都返回更新后的对象。角色更新支持为内置角色单独提交 `model`，传 `null` 恢复跟随默认模型。图像处理员的显式模型须在运行时目录中声明支持图片输入。

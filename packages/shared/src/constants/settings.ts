@@ -54,7 +54,6 @@ export const settingsSchema = z.strictObject({
   'ai.askOnUncertainty': z.boolean(),
   /** `provider/model`; null uses opencode's default model. */
   'ai.defaultModel': z.string().min(1).nullable(),
-  'ai.imageModel': z.string().min(1).nullable(),
   'ai.bashPolicy': bashPolicySchema,
   'ai.sessionStartCommand': sessionCommandSchema,
   'ai.sessionEndCommand': sessionCommandSchema,
@@ -113,7 +112,6 @@ export const SETTING_DEFAULTS: Settings = {
   'ui.introAnimation': true,
   'ai.askOnUncertainty': false,
   'ai.defaultModel': null,
-  'ai.imageModel': null,
   'ai.bashPolicy': BashPolicy.Auto,
   'ai.sessionStartCommand': null,
   'ai.sessionEndCommand': null,
@@ -153,7 +151,6 @@ export const SETTING_MODE: Record<SettingKey, UiMode> = {
   'ui.introAnimation': UiMode.Simple,
   'ai.askOnUncertainty': UiMode.Simple,
   'ai.defaultModel': UiMode.Pro,
-  'ai.imageModel': UiMode.Pro,
   'ai.bashPolicy': UiMode.Pro,
   'ai.sessionStartCommand': UiMode.Pro,
   'ai.sessionEndCommand': UiMode.Pro,

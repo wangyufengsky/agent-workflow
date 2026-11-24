@@ -20,10 +20,12 @@ import {
   isFrontendWorkflow,
   isRepositoryDocumentWorkflow,
   isTaskCodeReview,
+  isTerminalState,
   type ListTasksQuery,
   McpToolName,
   type NodeDetailDTO,
   NodeKind,
+  type PermissionMode,
   type PlanDTO,
   type PlanGraph,
   type PreviewSessions,
@@ -42,6 +44,7 @@ import {
   TaskStatus,
   type TaskSummaryDTO,
   taskCodeReviewReportSchema,
+  taskMachine,
 } from '@aw/shared';
 import { eq, or } from 'drizzle-orm';
 import type { EventBus } from '../../core/event-bus.ts';
@@ -164,6 +167,7 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
       .all();
     return {
       ...state.summary(task),
+      permissionMode: task.permissionMode,
       ...(links.length ? { testLinks: links } : {}),
       ...(proposal
         ? {
@@ -310,6 +314,13 @@ export function createTasksService(deps: TasksServiceDeps & { events: EventBus }
   }
 
   return {
+    setPermissionMode(id: string, permissionMode: PermissionMode) {
+      if (isTerminalState(taskMachine, state.get(id).status))
+        throw new AppError(ErrorCode.StateTransitionInvalid, 'This task has already ended');
+      state.repo.update(id, { permissionMode, updatedAt: deps.clock.now() });
+      state.publish(id);
+      return detail(id);
+    },
     async saveReportDraft(attempt: AttemptDTO, review: TaskCodeReviewInput | undefined, proposal: string | undefined) {
       if (attempt.taskId === null || attempt.nodeId === null || attempt.kind !== AttemptKind.Execute)
         throw new AppError(ErrorCode.McpToolNotAllowed, 'Drafts belong to a report step');

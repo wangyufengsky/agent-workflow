@@ -1,4 +1,5 @@
 import type { BrowserCase, BrowserTestScope, FunctionalTestScope, TaskFailedPhase, TaskStatus } from '@aw/shared';
+import { PermissionMode } from '@aw/shared';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { projectsTable } from '../projects/projects.table.ts';
 import { workflowsTable } from '../workflows/workflows.table.ts';
@@ -8,6 +9,7 @@ export const tasksTable = sqliteTable(
   'tasks',
   {
     id: text('id').primaryKey(),
+    permissionMode: text('permission_mode').$type<PermissionMode>().notNull().default(PermissionMode.Ask),
     seq: integer('seq').notNull().unique(),
     /** `T-<seq>` */
     key: text('key').notNull().unique(),

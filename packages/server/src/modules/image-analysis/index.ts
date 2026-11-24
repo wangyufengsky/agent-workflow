@@ -34,23 +34,20 @@ export function createImageAnalysis({
     requestSignal?: AbortSignal,
     delegatedFrom?: AbortSignal,
   ): Promise<AnalyzeImageOutput> {
-    const configured = roles.getByKey(BuiltinRoleKey.ImageProcessor).model ?? settings.get('ai.imageModel');
-    if (configured === null) {
-      throw new AppError(ErrorCode.ImageAnalysisUnavailable, 'Set the image reader model in Settings first');
-    }
-    const model = parseModelRef(configured);
+    const configured = roles.getByKey(BuiltinRoleKey.ImageProcessor).model ?? settings.get('ai.defaultModel');
+
     const deadline = new AbortController();
     const cancelTimeout = clock.schedule(IMAGE_ANALYSIS_TIMEOUT_MS, () => deadline.abort());
     const signal = requestSignal === undefined ? deadline.signal : AbortSignal.any([deadline.signal, requestSignal]);
     try {
-      const analysis = await sessions.callPrepared<string, Buffer>(
+      const analysis = await sessions.callPrepared<string, { data: Buffer; model: ReturnType<typeof parseModelRef> }>(
         {
           purpose: SessionPurpose.Image,
           title: 'Image analysis',
           ...(delegatedFrom === undefined ? {} : { parentSignal: delegatedFrom }),
           signal,
         },
-        (session, data) =>
+        (session, { data, model }) =>
           opencode.promptImage({
             ...session,
             model,
@@ -58,7 +55,10 @@ export function createImageAnalysis({
             image: { mime: source.mime, data },
           }),
         async (signal) => {
-          const { available } = await opencode.listModels(undefined, signal);
+          const { available, defaultModel } = await opencode.listModels(undefined, signal);
+          const ref = configured ?? defaultModel;
+          if (!ref) throw new AppError(ErrorCode.ImageAnalysisUnavailable, 'Choose a role model with image input');
+          const model = parseModelRef(ref);
           if (
             !available.some(
               (item) =>
@@ -83,7 +83,7 @@ export function createImageAnalysis({
           } finally {
             await file.close();
           }
-          return data;
+          return { data, model };
         },
       );
       signal.throwIfAborted();

@@ -56,7 +56,10 @@ import {
 
 const SESSION_COMMAND_CLEANUP_TIMEOUT_MS = 5_000;
 
+import { grantKey, type PermissionReviewer, scopedRules, type TaskPermissionPolicy } from '../permissions/index.ts';
 export type AttemptsServiceDeps = AttemptStateDeps & {
+  permissionReviewer: PermissionReviewer;
+  taskPolicy(id: string): TaskPermissionPolicy;
   taskSkills(taskId: string): SkillSnapshot[];
   settings: SettingsService;
   prompts: Prompts;
@@ -214,6 +217,10 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       stall: null,
       released,
       release,
+      permissionStop: new AbortController(),
+      deciding: new Map(),
+      seenPermissions: new Set(),
+      grants: new Set(),
       delegation: new AbortController(),
     };
     state.live.set(session.sessionId, tracked);
@@ -283,6 +290,19 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     record(mustFind(id), [systemEntry(TranscriptSystemEvent.AttemptStarted)]);
     const agent =
       input.functionalTestNode === undefined ? OPENCODE_AGENT_NAME[input.agent] : OPENCODE_FUNCTIONAL_TEST_AGENT;
+    const mutable =
+      input.taskId !== null &&
+      input.agent === RoleBaseAgent.Executor &&
+      input.functionalTestNode === undefined &&
+      input.browserTestSubmit === undefined;
+    const baseRules = sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
+      checkCommands: input.checkCommands,
+      web: input.web,
+      browserTestSubmit: input.browserTestSubmit,
+      functionalTestNode: input.functionalTestNode,
+      offline: settings.get('network.offline'),
+      allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
+    });
     let sessionId: string;
     try {
       sessionId = await sessions.bind({
@@ -292,14 +312,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
           directory: input.directory,
           title: input.title,
           agent,
-          permission: sessionPermissionRules(input.agent, settings.get('ai.bashPolicy'), {
-            checkCommands: input.checkCommands,
-            web: input.web,
-            browserTestSubmit: input.browserTestSubmit,
-            functionalTestNode: input.functionalTestNode,
-            offline: settings.get('network.offline'),
-            allowedBash: input.projectId === null ? [] : projects.allowedBash(input.projectId),
-          }),
+          permission: mutable ? scopedRules(baseRules) : baseRules,
         },
       });
     } catch (err) {
@@ -309,7 +322,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       if (current.status !== AttemptStatus.Starting) return toDto(current);
       return toDto(move(current, AttemptEvent.StartFailed, errorOf(err)));
     }
-    repo.setSession(id, sessionId);
+    repo.setSession(id, sessionId, mutable ? baseRules : null);
     const attempt = mustFind(id);
     // The runtime may have gone away (or the task been cancelled) while the session was being created.
     if (attempt.status !== AttemptStatus.Starting) return toDto(attempt);
@@ -335,6 +348,28 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     return toDto(mustFind(id));
   }
 
+  /** 升级前已停在提问处的执行会话保留创建时的命令规则；专用测试会话的原生工具限制继续生效。 */
+  async function restorePermissionRules(attempt: Attempt, resume: ResumeInput) {
+    if (
+      attempt.permissionBaseline !== null ||
+      !attempt.taskId ||
+      !attempt.opencodeSessionId ||
+      resume.agent !== RoleBaseAgent.Executor ||
+      resume.functionalTest
+    )
+      return;
+    const request = { sessionId: attempt.opencodeSessionId, directory: attempt.directory };
+    const rules = await opencode.sessionRules(request);
+    if (!rules.length || !rules.every((r) => r.permission === 'bash')) return;
+    repo.setSession(attempt.id, request.sessionId, rules);
+    try {
+      await opencode.setPermissions({ ...request, permission: scopedRules(rules) });
+    } catch (error) {
+      repo.setSession(attempt.id, request.sessionId, null);
+      throw error;
+    }
+  }
+
   /** Follows the earlier attempt's session again for a started (or just granted) attempt and sends the next message. */
   async function relaunch(
     id: string,
@@ -357,6 +392,8 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     const attempt = mustFind(id);
     // Cancelled while waiting.
     if (attempt.status !== AttemptStatus.Starting) return toDto(attempt);
+    await restorePermissionRules(attempt, input);
+    if (mustFind(id).status !== AttemptStatus.Starting) return toDto(mustFind(id));
     const session = track(
       attempt,
       {
@@ -445,6 +482,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
       model,
       directory: previous.directory,
       opencodeSessionId: previous.opencodeSessionId,
+      permissionBaseline: previous.permissionBaseline,
       nudges: 0,
       startedAt: clock.now(),
     });
@@ -642,6 +680,8 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
     async deliverAnswer(attemptId: string, text: string, resume: ResumeInput): Promise<void> {
       const attempt = mustFind(attemptId);
       if (attempt.status !== AttemptStatus.Running || attempt.opencodeSessionId === null) return;
+      if (!state.sessionOf(attemptId)) await restorePermissionRules(attempt, resume);
+      if (mustFind(attemptId).status !== AttemptStatus.Running) return;
       const session =
         state.sessionOf(attemptId) ??
         track(
@@ -667,11 +707,13 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
      * 「总是允许」for the session only; a bash one is remembered for the project's later sessions too (D101).
      */
     async replyPermission(attemptId: string, payload: PermissionPayload, reply: PermissionDecision): Promise<void> {
+      const scoped = mustFind(attemptId).permissionBaseline !== null;
+      const session = state.sessionOf(attemptId);
       try {
         await opencode.replyPermission({
           permissionId: payload.opencodePermissionId,
           directory: payload.directory,
-          reply,
+          reply: scoped && reply === PermissionDecision.Always ? PermissionDecision.Once : reply,
         });
       } catch (error) {
         if (error instanceof AppError && error.code === ErrorCode.PermissionRequestExpired) {
@@ -681,6 +723,7 @@ export function createAttemptsService(deps: AttemptsServiceDeps) {
         }
         throw error;
       }
+      if (scoped && reply === PermissionDecision.Always) session?.grants.add(grantKey(payload));
       state.inbox.completePermission(attemptId, payload.opencodePermissionId, reply);
       const { projectId } = mustFind(attemptId);
       if (reply === PermissionDecision.Always && payload.permission === BASH_PERMISSION && projectId !== null) {

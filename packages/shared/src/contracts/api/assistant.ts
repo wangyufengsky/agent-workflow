@@ -9,17 +9,18 @@ import {
   externalMcpStatusSchema,
 } from '../../enums/assistant.ts';
 import { permissionDecisionSchema } from '../../enums/inbox.ts';
-import { operationRiskSchema } from '../../enums/system.ts';
+import { operationRiskSchema, permissionModeSchema } from '../../enums/system.ts';
 import { errorInfoSchema } from '../../errors/codes.ts';
 import { attachmentIdsSchema } from './attachments.ts';
 import { transcriptEntrySchema } from './attempts.ts';
-import { skillIdsSchema } from './skills.ts';
+import { assistantSkillIdsSchema } from './skills.ts';
 
 /** A permission request of the assistant's session, answered in the panel (15 §6). Kept in memory, like opencode's. */
 export const assistantPermissionRequestSchema = z.object({
   permissionId: z.string(),
   permission: z.string(),
   patterns: z.array(z.string()),
+  reason: z.string().optional(),
 });
 export type AssistantPermissionRequestDTO = z.infer<typeof assistantPermissionRequestSchema>;
 
@@ -51,6 +52,7 @@ export type AssistantUsageDTO = z.infer<typeof assistantUsageSchema>;
 
 /** `AssistantConversationDTO` (11 §13): `busy` while the assistant works on a turn. */
 export const assistantConversationSchema = z.object({
+  permissionMode: permissionModeSchema.optional(),
   id: z.string(),
   title: z.string(),
   projectId: z.string().nullable(),
@@ -131,12 +133,13 @@ export const snapshotAssistantContextRequestSchema = z.strictObject({ source: as
 export type SnapshotAssistantContextRequest = z.infer<typeof snapshotAssistantContextRequestSchema>;
 
 export const createConversationRequestSchema = z.object({
+  permissionMode: permissionModeSchema.optional(),
   title: z.string().trim().min(1).optional(),
   projectId: z.string().min(1).nullable().optional(),
 });
 
 export const sendAssistantMessageRequestSchema = z.object({
-  skillIds: skillIdsSchema.optional(),
+  skillIds: assistantSkillIdsSchema.optional(),
   id: z.string(),
   text: z.string().trim().min(1).max(ASSISTANT_MESSAGE_MAX_CHARS),
   context: assistantPageRefSchema,

@@ -1,4 +1,12 @@
-import { AttachmentSource, isTerminalState, NodeStatus, type TaskDetailDTO, TaskStatus, taskMachine } from '@aw/shared';
+import {
+  AttachmentSource,
+  isTerminalState,
+  NodeStatus,
+  PermissionMode,
+  type TaskDetailDTO,
+  TaskStatus,
+  taskMachine,
+} from '@aw/shared';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ROUTES } from '../../app/routes.ts';
@@ -16,6 +24,7 @@ import { TASK_CODE_REVIEW_COPY } from '../../copy/task-code-review.ts';
 import { TASK_COPY as C } from '../../copy/tasks.ts';
 import { useAsk } from '../assistant/use-ask.ts';
 import { SentAttachments } from '../attachments/sent-attachments.tsx';
+import { PermissionPicker } from '../permissions/permission-picker.tsx';
 import { UsedSkills } from '../skills/used-skills.tsx';
 import { TaskBadge } from '../tasks/task-badge.tsx';
 import {
@@ -25,6 +34,7 @@ import {
   usePauseTask,
   useResumeTask,
   useStartTask,
+  useTaskPermission,
   useUnarchiveTask,
 } from '../tasks/tasks.queries.ts';
 import styles from './task-page.module.css';
@@ -59,6 +69,7 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
   const pause = usePauseTask();
   const resume = useResumeTask();
   const start = useStartTask();
+  const permission = useTaskPermission();
   const doing = task.progress ?? task.currentStep;
   const reviewLabel =
     task.codeReview !== undefined
@@ -78,6 +89,13 @@ export function TaskHeader({ task, pro, details, onDetailsChange }: Props) {
           archived={task.archivedAt !== null}
           label={task.status === TaskStatus.Review ? reviewLabel : undefined}
         />
+        <PermissionPicker
+          task
+          disabled={finished || permission.isPending}
+          value={task.permissionMode ?? PermissionMode.Ask}
+          onChange={(permissionMode) => permission.mutate({ id: task.id, permissionMode })}
+        />
+        {permission.isError && <ErrorState error={permission.error} />}
         {details !== undefined && (
           <Button variant="ghost" size="sm" icon="layers" onClick={() => onDetailsChange(!details)}>
             {details ? C.hideDetails : C.showDetails}

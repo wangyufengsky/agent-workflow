@@ -81,15 +81,18 @@ test('新建和导入 Skill，绑定到流程，在助手里选用并保存提�
 
   await queueAssistantTurn(request, [{ type: 'text', text: '已按约定整理。' }]);
   await page.goto('/');
-  await page.getByRole('button', { name: '选择 Skill' }).click();
-  await expect(editor.getByRole('checkbox', { name: /weekly-report-e2e/ })).toHaveCount(0);
-  await editor.getByRole('checkbox', { name: /sheet-review-e2e/ }).check();
-  await editor.getByRole('button', { name: '完成' }).click();
   const input = page.getByLabel('告诉助手，或开始任务');
-  await input.fill('整理这次表格检查的复盘');
+  await input.fill('/');
+  await expect(page.getByRole('option', { name: /weekly-report-e2e/ })).toHaveCount(0);
+  await page.getByRole('option', { name: /sheet-review-e2e/ }).click();
+  await input.fill('整理这次表格检查的复盘 /aw-office-docs');
+  await expect(page.getByRole('option', { name: /Word 与 Excel/ })).toBeVisible();
+  await input.press('Enter');
+  await expect(input).toHaveValue('整理这次表格检查的复盘 ');
   await input.press('ControlOrMeta+Enter');
   const messages = page.getByTestId('home-messages');
   await expect(messages).toContainText('sheet-review-e2e · v1');
+  await expect(messages).toContainText('aw-office-docs · v1');
   await expect(messages).toContainText('已按约定整理。');
 
   await queueAssistantTurn(request, [

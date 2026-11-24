@@ -1,4 +1,4 @@
-import type { AttemptKind, AttemptStatus } from '@aw/shared';
+import type { AttemptKind, AttemptStatus, PermissionRule } from '@aw/shared';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { nodesTable } from '../nodes/nodes.table.ts';
 import { projectsTable } from '../projects/projects.table.ts';
@@ -24,6 +24,7 @@ export const attemptsTable = sqliteTable(
     directory: text('directory').notNull(),
     /** Not unique: a re-planning attempt continues the previous planning session (12 §4.3). */
     opencodeSessionId: text('opencode_session_id'),
+    permissionBaseline: text('permission_baseline', { mode: 'json' }).$type<PermissionRule[]>(),
     nudges: integer('nudges').notNull(),
     /** JSON `ErrorInfo`. */
     error: text('error'),

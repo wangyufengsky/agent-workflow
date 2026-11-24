@@ -5,6 +5,7 @@ import {
   AppError,
   ErrorCode,
   type ExternalMcpStatus,
+  OPENCODE_APPROVER_AGENT,
   OPENCODE_DATABASE_INVESTIGATOR_AGENT,
   OPENCODE_DOCUMENT_AGENT,
   OPENCODE_IMAGE_AGENT,
@@ -85,6 +86,8 @@ export type OpencodeClient = {
   isConnected(): boolean;
   /** Returns the new session id. */
   createSession(input: CreateSessionInput): Promise<string>;
+  sessionRules(input: SessionRequest): Promise<PermissionRule[]>;
+  setPermissions(input: SessionRequest & { permission: PermissionRule[] }): Promise<void>;
   /** Sends a message and returns at once (`prompt_async`); progress arrives as events. */
   prompt(input: PromptInput): Promise<void>;
   runCommand(input: SessionRequest & Pick<PromptInput, 'agent' | 'model' | 'text' | 'messageId'>): Promise<void>;
@@ -195,7 +198,11 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
     isConnected: runtime.isReady,
     shutdown: runtime.shutdown,
     async createSession({ directory, title, agent, permission, signal }) {
-      if (agent === OPENCODE_IMAGE_AGENT || agent === OPENCODE_DATABASE_INVESTIGATOR_AGENT) {
+      if (
+        agent === OPENCODE_APPROVER_AGENT ||
+        agent === OPENCODE_IMAGE_AGENT ||
+        agent === OPENCODE_DATABASE_INVESTIGATOR_AGENT
+      ) {
         // 独立会话绑定原图，覆盖用户全局配置中的自动分享。
         await writeFile(join(directory, 'opencode.json'), JSON.stringify({ share: 'disabled', autoshare: false }));
       }
@@ -203,6 +210,17 @@ export function createRuntimeClient(runtime: OpencodeRuntime, log: Logger): Open
         runtime.sdk().session.create({ directory, title, agent, permission }, requestOptions(signal)),
       );
       return data.id;
+    },
+    async sessionRules({ sessionId, directory, signal }) {
+      const { data } = await request('session.get', () =>
+        runtime.sdk().session.get({ sessionID: sessionId, directory }, requestOptions(signal)),
+      );
+      return data.permission ?? [];
+    },
+    async setPermissions({ sessionId, directory, permission, signal }) {
+      await request('session.update', () =>
+        runtime.sdk().session.update({ sessionID: sessionId, directory, permission }, requestOptions(signal)),
+      );
     },
     async prompt({ sessionId, directory, agent, model, system, text, messageId }) {
       await request('session.promptAsync', () =>

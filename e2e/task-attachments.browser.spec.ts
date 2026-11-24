@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { WHITE_PNG_BASE64 } from '../packages/server/test/fixtures/white-png.ts';
+import { AUTH } from './env.ts';
 import {
   addFromMenu,
   appTool,
@@ -101,27 +102,26 @@ test('问助手时附上文件：消息下面显示附件，可以打开', async
   await expect(page.getByRole('dialog', { name: 'spec.md' })).toContainText('导出按钮放在右上角');
 });
 
-test('专业设置仅列出支持图片输入的模型，选择后重新打开仍然生效', async ({ page, request }, testInfo) => {
-  await patchSettings(request, { 'ui.mode': 'pro', 'ai.imageModel': null });
+test('图像处理员仅列出支持图片输入的模型，刷新后保留选择', async ({ page, request }) => {
+  await patchSettings(request, { 'ui.mode': 'pro' });
+  await page.goto('/roles');
+  const image = page.getByRole('button', { name: '图像处理员', exact: true });
+  await image.click();
+  const model = page.getByRole('combobox', { name: '模型', exact: true });
+  await expect(model.locator('option')).toHaveText([/默认模型/, 'Fake Model 2（opencode/fake-model-2）']);
+  const original = await model.inputValue();
+  const save = (value: string) =>
+    Promise.all([
+      page.waitForResponse((r) => r.request().method() === 'PUT' && r.url().includes('/roles/')),
+      model.selectOption(value, { force: true }),
+    ]);
+  const [saved] = await save('opencode/fake-model-2');
   try {
-    await page.goto('/settings');
-    const model = page.getByRole('combobox', { name: '图像处理员模型' });
-    await expect(model.locator('option')).toHaveText(['未启用', 'Fake Model 2（opencode/fake-model-2）']);
-    const saved = page.waitForResponse((res) => res.request().method() === 'PATCH' && res.url().endsWith('/settings'));
-    await model.selectOption('opencode/fake-model-2');
-    expect((await saved).status()).toBe(200);
-    for (const [theme, state] of [
-      ['codex', 'light'],
-      ['default', 'dark'],
-    ] as const) {
-      await patchSettings(request, { 'ui.theme': theme });
-      await page.reload();
-      await expect(model).toHaveValue('opencode/fake-model-2');
-      await model.scrollIntoViewIfNeeded();
-      await page.screenshot({ path: testInfo.outputPath(`image-reader-settings-${state}.png`) });
-    }
+    await page.reload();
+    await image.click();
+    await expect(model).toHaveValue('opencode/fake-model-2');
   } finally {
-    await patchSettings(request, { 'ai.imageModel': null });
+    expect((await request.put(saved.url(), { headers: AUTH, data: { model: original || null } })).ok()).toBe(true);
   }
 });
 
